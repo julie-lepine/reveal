@@ -21,6 +21,7 @@ import { requireLobbyPlay } from "../core/gameGuard.js";
 import { navigate } from "../core/router.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
 import { bindNav } from "../screens/nav.js";
+import { onTimerSecond, primeTimerSound } from "../core/timerSound.js";
 
 export function mountGuessLie(app) {
   if (!requireLobbyPlay()) return null;
@@ -95,8 +96,10 @@ export function mountGuessLie(app) {
     const round = currentRound();
     const isSubject = round.player === localName;
     clearTimer();
+    primeTimerSound();
     intervalId = setInterval(() => {
       timer -= 1;
+      onTimerSecond({ remaining: timer, urgentAt: 5 });
       const el = app.querySelector("#timer-el");
       if (el) {
         el.textContent = String(timer);

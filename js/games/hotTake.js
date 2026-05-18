@@ -22,6 +22,7 @@ import { requireLobbyPlay } from "../core/gameGuard.js";
 import { navigate } from "../core/router.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
 import { bindNav } from "../screens/nav.js";
+import { onTimerSecond, primeTimerSound } from "../core/timerSound.js";
 
 export function mountHotTake(app) {
   if (!requireLobbyPlay()) return null;
@@ -285,9 +286,11 @@ export function mountHotTake(app) {
 
   function startVoteTimer() {
     clearTimer();
+    primeTimerSound();
     intervalId = setInterval(() => {
       if (paused) return;
       timer -= 1;
+      onTimerSecond({ remaining: timer, urgentAt: 3 });
       const timerEl = app.querySelector("#timer-el");
       const progressEl = app.querySelector("#progress-el");
       if (timerEl) timerEl.textContent = String(timer);
@@ -313,10 +316,12 @@ export function mountHotTake(app) {
 
   function startIntermission() {
     clearTimer();
+    primeTimerSound();
     intermissionTimer = HOT_TAKE_INTERMISSION_SEC;
     updateIntermissionUi();
     intervalId = setInterval(() => {
       intermissionTimer -= 1;
+      onTimerSecond({ remaining: intermissionTimer, urgentAt: 3 });
       if (intermissionTimer <= 0) {
         clearTimer();
         startNextTakeVote();

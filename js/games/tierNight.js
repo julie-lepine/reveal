@@ -7,6 +7,7 @@ import { requireLobbyPlay } from "../core/gameGuard.js";
 import { navigate } from "../core/router.js";
 import { escapeHtml, pageShell, tierLogoHtml, bindTierLogos } from "../core/ui.js";
 import { bindNav } from "../screens/nav.js";
+import { onTimerSecond, primeTimerSound } from "../core/timerSound.js";
 
 export function mountTierNight(app) {
   if (!requireLobbyPlay()) return null;
@@ -192,8 +193,10 @@ export function mountTierNight(app) {
 
   function startTimer() {
     clearTimer();
+    primeTimerSound();
     intervalId = setInterval(() => {
       timerSec -= 1;
+      onTimerSecond({ remaining: timerSec, urgentAt: 20 });
       if (timerSec <= 0) {
         finishGame();
         return;

@@ -10,6 +10,7 @@ import { setLobbyWaiting } from "../core/lobby.js";
 import { navigate } from "../core/router.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
 import { bindNav } from "./nav.js";
+import { onTimerSecond, primeTimerSound } from "../core/timerSound.js";
 
 const DISCUSS_SEC = 25;
 
@@ -151,8 +152,10 @@ export function mountTierNightEnd(app) {
 
   function startDiscussTimer() {
     clearTimer();
+    primeTimerSound();
     intervalId = setInterval(() => {
       discussTimer -= 1;
+      onTimerSecond({ remaining: discussTimer, urgentAt: 5 });
       if (discussTimer <= 0) {
         clearTimer();
         phase = "controversial";
