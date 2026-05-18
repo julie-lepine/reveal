@@ -1,7 +1,7 @@
 import { GAMES } from "../../data/games.js";
 import { getEveningRecap } from "../core/eveningRecap.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
-import { escapeHtml, pageShell } from "../core/ui.js";
+import { escapeHtml, pageShell, gameTileLogoHtml, bindGameTileLogos } from "../core/ui.js";
 import { bindNav } from "./nav.js";
 
 function eveningRecapHtml(recap) {
@@ -73,15 +73,19 @@ export function mountGameSelect(app) {
             return `
               <div class="game-tile game-tile--disabled ${g.cssClass}">
                 <span class="game-tile__emoji">${g.emoji}</span>
-                <span class="game-tile__title">${escapeHtml(g.title)}</span>
-                <span class="badge badge--soon">Soon</span>
+                <div class="game-tile__meta">
+                  <span class="game-tile__title">${escapeHtml(g.title)}</span>
+                  <span class="badge badge--soon">Soon</span>
+                </div>
               </div>`;
           }
           return `
             <button type="button" class="game-tile ${g.cssClass}" data-nav="${g.id}">
-              <span class="game-tile__emoji">${g.emoji}</span>
-              <span class="game-tile__title">${escapeHtml(g.title)}</span>
-              <span class="game-tile__desc">${escapeHtml(g.desc)}</span>
+              ${g.logo ? gameTileLogoHtml(g) : `<span class="game-tile__emoji">${g.emoji}</span>`}
+              <div class="game-tile__text">
+                <span class="game-tile__title">${escapeHtml(g.title)}</span>
+                <span class="game-tile__desc">${escapeHtml(g.desc)}</span>
+              </div>
             </button>`;
         }).join("")}
       </div>
@@ -89,5 +93,6 @@ export function mountGameSelect(app) {
   });
 
   bindNav(app);
+  bindGameTileLogos(app);
   return null;
 }

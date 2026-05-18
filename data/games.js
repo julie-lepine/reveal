@@ -6,6 +6,8 @@ export const GAMES = [
     desc: "Opinions impopulaires — vote BASED ou CRIMINEL",
     emoji: "🔥",
     cssClass: "hot",
+    logo: "js/games/hottake.png",
+    borderGradient: "linear-gradient(145deg, #FF6B6B 0%, #FF3CAC 48%, #2B2D66 100%)",
     enabled: true,
   },
   {
@@ -14,6 +16,8 @@ export const GAMES = [
     desc: "2 vérités, 1 mensonge",
     emoji: "🕵️",
     cssClass: "guess",
+    logo: "js/games/guesslie.png",
+    borderGradient: "linear-gradient(200deg, #4ADE80 0%, #22D3EE 42%, #2B2D66 100%)",
     enabled: true,
   },
   {
@@ -22,6 +26,8 @@ export const GAMES = [
     desc: "Choisis une tier list, puis classe en S / A / B / C / D",
     emoji: "🏆",
     cssClass: "tier",
+    logo: "js/games/tiernight.png",
+    borderGradient: "linear-gradient(320deg, #FBBF24 0%, #F97316 38%, #2B2D66 100%)",
     enabled: true,
   },
   {

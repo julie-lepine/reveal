@@ -54,6 +54,40 @@ export function tierLogoHtml(list, className = "tier-list-logo") {
     <span class="tier-list-logo--emoji" hidden>${emoji}</span>`;
 }
 
+export function gameTileLogoHtml(game) {
+  const logo = game.logo ? escapeHtml(game.logo) : "";
+  const gradient = game.borderGradient
+    ? escapeHtml(game.borderGradient)
+    : "linear-gradient(135deg, #FF6B6B 0%, #2B2D66 100%)";
+  const emoji = game.emoji || "🎮";
+  const mod = game.cssClass ? ` game-tile__logo-wrap--${escapeHtml(game.cssClass)}` : "";
+  return `
+    <span class="game-tile__logo-wrap${mod}" style="--logo-border:${gradient}">
+      <span class="game-tile__logo-inner">
+        <img src="${logo}" alt="" class="game-tile__logo" data-game-logo width="108" height="108" />
+        <span class="game-tile__emoji game-tile__emoji--fallback" hidden>${emoji}</span>
+      </span>
+    </span>`;
+}
+
+/** Affiche l’emoji si le logo jeu ne charge pas */
+export function bindGameTileLogos(root) {
+  root.querySelectorAll("[data-game-logo]").forEach((img) => {
+    const wrap = img.closest(".game-tile__logo-wrap");
+    const fb = wrap?.querySelector(".game-tile__emoji--fallback");
+    const showEmoji = () => {
+      img.style.display = "none";
+      if (fb) fb.hidden = false;
+    };
+    if (!img.getAttribute("src")) {
+      showEmoji();
+      return;
+    }
+    img.addEventListener("error", showEmoji);
+    if (img.complete && !img.naturalWidth) showEmoji();
+  });
+}
+
 /** Affiche l’emoji si l’image logo est absente ou en erreur */
 export function bindTierLogos(root) {
   root.querySelectorAll("[data-tier-img]").forEach((img) => {
