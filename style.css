@@ -1419,6 +1419,154 @@ button.game-card{
   text-decoration:underline;
 }
 
+.auth-welcome__actions{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:10px;
+  margin-top:4px;
+}
+
+.page-title{
+  font-size:26px;
+  font-weight:800;
+  margin:0 0 18px;
+  letter-spacing:-.02em;
+}
+
+.settings-section{
+  margin-bottom:14px;
+}
+
+.settings-section__title{
+  margin:0 0 6px;
+  font-size:16px;
+  font-weight:700;
+}
+
+.settings-section__hint{
+  margin:0 0 14px;
+}
+
+.settings-social-hint{
+  margin:0 0 20px;
+  text-align:center;
+}
+
+.settings-ok{
+  margin:0 0 10px;
+  font-size:13px;
+  color:#6EE7B7;
+}
+
+.btn--compact{
+  width:auto;
+  margin:12px 0 0;
+  padding:10px 18px;
+  font-size:14px;
+}
+
+.settings-toggle{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  margin-bottom:4px;
+  cursor:pointer;
+}
+
+.settings-toggle__label{
+  font-size:15px;
+  font-weight:600;
+}
+
+.settings-toggle__input{
+  position:absolute;
+  opacity:0;
+  width:0;
+  height:0;
+  pointer-events:none;
+}
+
+.settings-toggle__track{
+  position:relative;
+  flex-shrink:0;
+  width:48px;
+  height:28px;
+  border-radius:999px;
+  background:rgba(255,255,255,.15);
+  transition:background .2s;
+}
+
+.settings-toggle__track::after{
+  content:"";
+  position:absolute;
+  top:3px;
+  left:3px;
+  width:22px;
+  height:22px;
+  border-radius:50%;
+  background:#fff;
+  transition:transform .2s;
+}
+
+.settings-toggle__input:checked + .settings-toggle__track{
+  background:linear-gradient(135deg,#8B5CF6,#6366F1);
+}
+
+.settings-toggle__input:checked + .settings-toggle__track::after{
+  transform:translateX(20px);
+}
+
+.emoji-picker-preview{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  margin-bottom:14px;
+}
+
+.emoji-picker-preview__avatar{
+  width:52px;
+  height:52px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  border-radius:16px;
+  font-size:28px;
+  background:rgba(96,165,250,.25);
+  border:1px solid rgba(96,165,250,.35);
+}
+
+.emoji-picker{
+  display:grid;
+  grid-template-columns:repeat(8, 1fr);
+  gap:8px;
+  margin-bottom:14px;
+}
+
+.emoji-picker__btn{
+  aspect-ratio:1;
+  min-height:40px;
+  padding:0;
+  border-radius:12px;
+  border:1px solid rgba(255,255,255,.1);
+  background:rgba(255,255,255,.05);
+  font-size:22px;
+  line-height:1;
+  cursor:pointer;
+  transition:background .15s, border-color .15s, transform .1s;
+  -webkit-tap-highlight-color:transparent;
+}
+
+.emoji-picker__btn--active{
+  background:rgba(139,92,246,.28);
+  border-color:rgba(167,139,250,.5);
+}
+
+.emoji-picker__btn:active{
+  transform:scale(.92);
+}
+
 .social-row{
   display:flex;
   justify-content:center;
@@ -1934,14 +2082,14 @@ button.game-card{
   line-height:1.1;
 }
 
-/* Bouton central REVEAL — taille naturelle, comme les autres icônes */
+/* Bouton central REVEAL — centré verticalement dans la barre */
 .bottom-nav__item--logo{
-  min-height:52px;
-  padding:4px 6px 2px;
-}
-
-.bottom-nav__item--logo .bottom-nav__label{
-  margin-top:2px;
+  align-self:center;
+  justify-content:center;
+  min-height:0;
+  height:auto;
+  padding:4px 6px;
+  gap:0;
 }
 
 .bottom-nav__logo-wrap{

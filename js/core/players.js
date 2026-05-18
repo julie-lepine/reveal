@@ -1,6 +1,6 @@
 import { PLAYERS } from "../../data/players.js";
 import { getLobbyParticipants, hasActiveLobby } from "./lobby.js";
-import { getLocalDisplayName, getState, ensurePlayerScore } from "./state.js";
+import { getLocalDisplayName, getLocalEmoji, getState, ensurePlayerScore } from "./state.js";
 
 /** Joueurs actifs : lobby si présent, sinon NPC + local */
 export function getActivePlayers() {
@@ -17,7 +17,7 @@ export function getActivePlayers() {
   const localName = getLocalDisplayName();
   return [
     ...PLAYERS.map((p) => ({ ...p, isLocal: false, isHost: false })),
-    { name: localName, color: "#60A5FA", emoji: "👤", isLocal: true, isHost: true },
+    { name: localName, color: "#60A5FA", emoji: getLocalEmoji(), isLocal: true, isHost: true },
   ];
 }
 
@@ -33,7 +33,7 @@ export function getLocalPlayer() {
   return getActivePlayers().find((p) => p.isLocal) || {
     name: getLocalDisplayName(),
     color: "#60A5FA",
-    emoji: "👤",
+    emoji: getLocalEmoji(),
     isLocal: true,
   };
 }

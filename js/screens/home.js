@@ -15,7 +15,7 @@ import {
   joinLobbyAsGuest,
   hasActiveLobby,
   getLobby,
-  goToLobby,
+  goToGameSelect,
 } from "../core/lobby.js";
 import { getGlobalStats } from "../core/state.js";
 import { navigate } from "../core/router.js";
@@ -45,13 +45,19 @@ export function mountHome(app) {
             ? `
           <div class="auth-welcome card">
             <p class="auth-welcome__hi">Salut, <strong>${escapeHtml(user.name)}</strong> 👋</p>
-            <button type="button" class="btn-link" id="btn-logout">Se déconnecter</button>
+            <div class="auth-welcome__actions">
+              <button type="button" class="btn btn-secondary btn--compact" data-nav="settings">Paramètres</button>
+              <button type="button" class="btn-link" id="btn-logout">Se déconnecter</button>
+            </div>
           </div>`
             : guest
               ? `
           <div class="auth-welcome card auth-welcome--guest">
             <p class="auth-welcome__hi">Invité : <strong>${escapeHtml(user.name)}</strong> 🎭</p>
-            <button type="button" class="btn-link" id="btn-logout">Quitter la session</button>
+            <div class="auth-welcome__actions">
+              <button type="button" class="btn btn-secondary btn--compact" data-nav="settings">Paramètres</button>
+              <button type="button" class="btn-link" id="btn-logout">Quitter la session</button>
+            </div>
           </div>`
               : `
           <div class="auth-tabs">
@@ -103,7 +109,7 @@ export function mountHome(app) {
           ${
             hasActiveLobby()
               ? `<button type="button" class="btn btn-primary btn--lobby-return" id="btn-return-lobby">
-            Revenir au lobby <span class="muted">(${escapeHtml(getLobby().code)})</span>
+            Retour aux jeux <span class="muted">(${escapeHtml(getLobby().code)})</span>
           </button>`
               : ""
           }
@@ -189,7 +195,7 @@ export function mountHome(app) {
     });
 
     app.querySelector("#btn-return-lobby")?.addEventListener("click", () => {
-      goToLobby();
+      goToGameSelect();
     });
 
     app.querySelector("#btn-create-lobby")?.addEventListener("click", () => {

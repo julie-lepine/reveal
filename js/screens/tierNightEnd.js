@@ -2,7 +2,6 @@ import { TIER_LEVELS, TIER_COLORS } from "../../data/tierTopics.js";
 import {
   getTierNightRecaps,
   getTierNightSession,
-  getTierConsensus,
 } from "../core/tierNightSession.js";
 import { exportTierBoardPng, downloadDataUrl } from "../core/tierExport.js";
 import { getLocalDisplayName, setLastGame } from "../core/state.js";
@@ -10,27 +9,14 @@ import { setLobbyWaiting } from "../core/lobby.js";
 import { navigate } from "../core/router.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
 import { bindNav } from "./nav.js";
-import { onTimerSecond, primeTimerSound } from "../core/timerSound.js";
-
-const DISCUSS_SEC = 25;
 
 export function mountTierNightEnd(app) {
   let phase = "recap";
-  let discussTimer = DISCUSS_SEC;
-  let intervalId = null;
   const session = getTierNightSession();
   const recaps = getTierNightRecaps();
-  const consensus = getTierConsensus();
   const localName = getLocalDisplayName();
   const localRecap = recaps.find((r) => r.player === localName);
   const controversial = session.controversialItem;
-
-  function clearTimer() {
-    if (intervalId) {
-      clearInterval(intervalId);
-      intervalId = null;
-    }
-  }
 
   function render() {
     let content = "";
@@ -62,27 +48,7 @@ export function mountTierNightEnd(app) {
             )
             .join("")}
         </div>
-        <button type="button" class="btn btn-primary" id="btn-discuss">Phase discussion →</button>`;
-    }
-
-    if (phase === "discuss") {
-      content = `
-        <p class="label-upper label-upper--gold">💬 Discussion</p>
-        <h2 class="screen-title">Débattez vos choix</h2>
-        <p class="hint">Timer ${discussTimer}s — comparez avec le consensus (simulé).</p>
-        ${
-          consensus
-            ? `<div class="card">
-            <p class="card-heading">Consensus du lobby</p>
-            ${TIER_LEVELS.map((tier) => {
-              const items = consensus[tier] || [];
-              if (!items.length) return "";
-              return `<p><span style="color:${TIER_COLORS[tier]}">${tier}</span> : ${items.map(escapeHtml).join(", ")}</p>`;
-            }).join("")}
-          </div>`
-            : ""
-        }
-        <button type="button" class="btn btn-primary" id="btn-vote-contro">Controverse →</button>`;
+        <button type="button" class="btn btn-primary" id="btn-contro">Controverse →</button>`;
     }
 
     if (phase === "controversial") {
@@ -113,21 +79,12 @@ export function mountTierNightEnd(app) {
 
     bindNav(app);
 
-    app.querySelector("#btn-discuss")?.addEventListener("click", () => {
-      phase = "discuss";
-      discussTimer = DISCUSS_SEC;
-      render();
-      startDiscussTimer();
-    });
-
-    app.querySelector("#btn-vote-contro")?.addEventListener("click", () => {
-      clearTimer();
+    app.querySelector("#btn-contro")?.addEventListener("click", () => {
       phase = "controversial";
       render();
     });
 
     app.querySelector("#btn-export-phase")?.addEventListener("click", () => {
-      clearTimer();
       phase = "export";
       render();
     });
@@ -150,27 +107,9 @@ export function mountTierNightEnd(app) {
     });
   }
 
-  function startDiscussTimer() {
-    clearTimer();
-    primeTimerSound();
-    intervalId = setInterval(() => {
-      discussTimer -= 1;
-      onTimerSecond({ remaining: discussTimer, urgentAt: 5 });
-      if (discussTimer <= 0) {
-        clearTimer();
-        phase = "controversial";
-        render();
-        return;
-      }
-      const hint = app.querySelector(".hint");
-      if (hint) hint.textContent = `Timer ${discussTimer}s — comparez avec le consensus (simulé).`;
-    }, 1000);
-  }
-
   render();
 
   return () => {
-    clearTimer();
     setLobbyWaiting();
   };
 }

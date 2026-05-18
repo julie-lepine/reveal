@@ -13,6 +13,7 @@ import { mountTierNightSelect } from "./screens/tierNightSelect.js";
 import { mountTierNightCreate } from "./screens/tierNightCreate.js";
 import { mountTierNightEnd } from "./screens/tierNightEnd.js";
 import { mountHotTakePrep } from "./screens/hotTakePrep.js";
+import { mountSettings } from "./screens/settings.js";
 import { mountHotTake } from "./games/hotTake.js";
 import { mountGuessLie } from "./games/guessLie.js";
 import { mountTierNight } from "./games/tierNight.js";
@@ -34,6 +35,7 @@ if (joinCode) {
 initRouter(app);
 
 registerScreen("home", mountHome);
+registerScreen("settings", mountSettings);
 registerScreen("lobby", mountLobby);
 registerScreen("game-select", mountGameSelect);
 registerScreen("results", mountResults);

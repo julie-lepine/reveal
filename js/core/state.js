@@ -1,4 +1,5 @@
 import { scheduleSave } from "./persist.js";
+import { DEFAULT_PROFILE_EMOJI } from "../../data/profileEmojis.js";
 
 const STORAGE_KEY = "reveal-app-state";
 
@@ -16,9 +17,12 @@ const defaultGlobalStats = () => ({
   playersJoined: 0,
 });
 
+const GUEST_FALLBACK_EMOJIS = ["🎭", "🎪", "🎲", "🃏", "🎯", "🌟", "🎈", "🎊"];
+
 const defaultUser = () => ({
   email: null,
   name: null,
+  emoji: null,
   loggedIn: false,
   isGuest: false,
   provider: null,
@@ -41,7 +45,12 @@ export const defaultPlayerStats = () => ({
   tierNightsPlayed: 0,
 });
 
+const defaultSettings = () => ({
+  timerMuted: false,
+});
+
 const defaultState = () => ({
+  settings: defaultSettings(),
   scores: {},
   playerStats: {},
   stats: {
@@ -99,6 +108,7 @@ function loadState() {
       tierNightGame: { ...defaultState().tierNightGame, ...parsed.tierNightGame },
       openLobbies: parsed.openLobbies || {},
       lastGame: parsed.lastGame || null,
+      settings: { ...defaultSettings(), ...parsed.settings },
     };
     if (!merged.guessLie.sessionId) {
       merged.guessLie.sessionId = merged.lobbyCode;
@@ -130,6 +140,7 @@ export function saveStatePatch(patch) {
   if (patch.user) state.user = { ...state.user, ...patch.user };
   if (patch.globalStats) state.globalStats = { ...state.globalStats, ...patch.globalStats };
   if (patch.playerStats) state.playerStats = { ...state.playerStats, ...patch.playerStats };
+  if (patch.settings) state.settings = { ...state.settings, ...patch.settings };
   save();
 }
 
@@ -142,6 +153,106 @@ export const LOCAL_PLAYER = "Toi";
 export function getLocalDisplayName() {
   const name = state.user?.name?.trim();
   return name || LOCAL_PLAYER;
+}
+
+function guestEmojiFromName(name) {
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = (h + name.charCodeAt(i)) % GUEST_FALLBACK_EMOJIS.length;
+  return GUEST_FALLBACK_EMOJIS[h];
+}
+
+export function getLocalEmoji() {
+  const custom = state.user?.emoji?.trim();
+  if (custom) return [...custom][0] || custom;
+  if (state.user?.isGuest) return guestEmojiFromName(getLocalDisplayName());
+  return DEFAULT_PROFILE_EMOJI;
+}
+
+export function setLocalEmoji(emoji) {
+  const graphemes = [...emoji.trim()];
+  if (!graphemes.length) {
+    return { ok: false, error: "Choisis un emoji." };
+  }
+  const chosen = graphemes.slice(0, 2).join("");
+
+  state.user = { ...state.user, emoji: chosen };
+
+  if (state.lobby?.participants?.length) {
+    state.lobby = {
+      ...state.lobby,
+      participants: state.lobby.participants.map((p) =>
+        p.isLocal ? { ...p, emoji: chosen } : p
+      ),
+    };
+  }
+
+  save();
+  return { ok: true, emoji: chosen };
+}
+
+function mergeKeyedRecord(record, oldKey, newKey) {
+  if (!record || oldKey === newKey || record[oldKey] === undefined) return record;
+  const next = { ...record };
+  if (next[newKey] !== undefined) {
+    if (typeof next[newKey] === "object" && next[newKey] !== null && typeof next[oldKey] === "object") {
+      next[newKey] = { ...next[oldKey], ...next[newKey] };
+    }
+  } else {
+    next[newKey] = next[oldKey];
+  }
+  delete next[oldKey];
+  return next;
+}
+
+/** Renomme le joueur local (scores, lobby, sessions). */
+export function renameLocalPlayer(newName) {
+  const trimmed = newName.trim().slice(0, 24);
+  if (trimmed.length < 2) {
+    return { ok: false, error: "Le pseudo doit faire au moins 2 caractères." };
+  }
+
+  const oldName = getLocalDisplayName();
+  if (oldName === trimmed) return { ok: true, name: trimmed };
+
+  state.scores = mergeKeyedRecord(state.scores, oldName, trimmed);
+  state.playerStats = mergeKeyedRecord(state.playerStats, oldName, trimmed);
+
+  if (state.guessLie?.submissions) {
+    state.guessLie.submissions = mergeKeyedRecord(state.guessLie.submissions, oldName, trimmed);
+  }
+
+  const ht = state.hotTakeGame;
+  if (ht) {
+    if (ht.ready) ht.ready = mergeKeyedRecord(ht.ready, oldName, trimmed);
+    if (ht.pausedBy === oldName) ht.pausedBy = trimmed;
+    if (Array.isArray(ht.customTakes)) {
+      ht.customTakes = ht.customTakes.map((t) =>
+        t?.author === oldName ? { ...t, author: trimmed } : t
+      );
+    }
+  }
+
+  if (Array.isArray(state.tierNightGame?.recaps)) {
+    state.tierNightGame.recaps = state.tierNightGame.recaps.map((r) =>
+      r?.player === oldName ? { ...r, player: trimmed } : r
+    );
+  }
+
+  if (state.lobby?.participants?.length) {
+    state.lobby = {
+      ...state.lobby,
+      participants: state.lobby.participants.map((p) =>
+        p.isLocal ? { ...p, name: trimmed, emoji: p.isHost ? p.emoji : p.emoji } : p
+      ),
+    };
+  }
+
+  if (state.user) {
+    state.user = { ...state.user, name: trimmed };
+  }
+
+  save();
+  return { ok: true, name: trimmed };
 }
 
 export function ensurePlayerScore(playerName) {

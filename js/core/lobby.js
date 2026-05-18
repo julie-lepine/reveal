@@ -1,24 +1,23 @@
 import { PLAYERS } from "../../data/players.js";
-import { getState, saveStatePatch, newLobby as genLobbyCode, getLocalDisplayName, ensurePlayerScore } from "./state.js";
+import {
+  getState,
+  saveStatePatch,
+  newLobby as genLobbyCode,
+  getLocalDisplayName,
+  getLocalEmoji,
+  ensurePlayerScore,
+} from "./state.js";
 import { loginAsGuest } from "./auth.js";
 import { syncAllPlayerScores } from "./players.js";
 import { navigate } from "./router.js";
 
 const MAX_PLAYERS = 10;
 
-const GUEST_EMOJIS = ["🎭", "🎪", "🎲", "🃏", "🎯", "🌟", "🎈", "🎊"];
-
-function pickGuestEmoji(name) {
-  let h = 0;
-  for (let i = 0; i < name.length; i++) h = (h + name.charCodeAt(i)) % GUEST_EMOJIS.length;
-  return GUEST_EMOJIS[h];
-}
-
 function localParticipant(ready = false, { asHost = false } = {}) {
   const name = getLocalDisplayName();
   return {
     name,
-    emoji: asHost ? "⭐" : pickGuestEmoji(name),
+    emoji: getLocalEmoji(),
     color: asHost ? "#A78BFA" : "#60A5FA",
     ready,
     isHost: asHost,
@@ -97,6 +96,17 @@ export function goToLobby() {
   }
   saveStatePatch({ inLobby: true });
   navigate("lobby", { navStack: ["home", "lobby"] });
+}
+
+/** Accueil (partie en cours) → choix des jeux */
+export function goToGameSelect() {
+  if (!hasActiveLobby()) {
+    navigate("home", { reset: true });
+    return;
+  }
+  saveStatePatch({ inLobby: true });
+  setLobbyWaiting();
+  navigate("game-select", { navStack: ["home", "lobby", "game-select"] });
 }
 
 export function getLobbyParticipants() {

@@ -73,7 +73,7 @@ function syncActiveTab(screenId) {
 }
 
 /** Masqué sur accueil + lobby d’attente ; visible à partir du menu jeux */
-const SCREENS_WITHOUT_NAV = new Set(["home", "lobby"]);
+const SCREENS_WITHOUT_NAV = new Set(["home", "lobby", "settings"]);
 
 function updateNavVisibility(screenId) {
   const nav = document.getElementById("bottom-nav");

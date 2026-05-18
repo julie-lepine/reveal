@@ -1,5 +1,7 @@
 /** Tick chronomètre pour les décomptes (Web Audio, sans fichier). */
 
+import { isTimerMuted } from "./settings.js";
+
 let ctx = null;
 let primeListenerAdded = false;
 
@@ -48,7 +50,8 @@ function beep({ freq = 800, duration = 0.04, volume = 0.1, type = "square" } = {
 }
 
 /** Un tick par seconde ; `remaining` = secondes restantes après décrément. */
-export function onTimerSecond({ remaining, urgentAt = 5 } = {}) {
+export function onTimerSecond({ remaining, urgentAt = 5, force = false } = {}) {
+  if (!force && isTimerMuted()) return;
   ensurePrimeOnInteraction();
   primeTimerSound();
 
