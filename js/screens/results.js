@@ -2,6 +2,7 @@ import { getEveningRecap } from "../core/eveningRecap.js";
 import { getLastGame } from "../core/state.js";
 import { getLobbyStatus, getLobbyGameId } from "../core/lobby.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
+import { navigate } from "../core/router.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
 import { bindNav } from "./nav.js";
 
@@ -58,6 +59,12 @@ export function mountResults(app) {
     `,
   });
 
-  bindNav(app);
+  bindNav(app, {
+    leaderboard: () => {
+      navigate("leaderboard", {
+        navStack: ["home", "lobby", "game-select", "results", "leaderboard"],
+      });
+    },
+  });
   return null;
 }

@@ -6,6 +6,13 @@ import {
 import { exportTierBoardPng, downloadDataUrl } from "../core/tierExport.js";
 import { getLocalDisplayName, setLastGame } from "../core/state.js";
 import { setLobbyWaiting } from "../core/lobby.js";
+import {
+  completeGameSession,
+  isGameSyncActive,
+  isLobbyHost,
+  onGameSessionChange,
+  suppressSessionRoute,
+} from "../core/gameSync.js";
 import { navigate } from "../core/router.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
 import { bindNav } from "./nav.js";
@@ -17,6 +24,34 @@ export function mountTierNightEnd(app) {
   const localName = getLocalDisplayName();
   const localRecap = recaps.find((r) => r.player === localName);
   const controversial = session.controversialItem;
+
+  async function goToResults() {
+    setLastGame({
+      gameId: "tiernight",
+      title: "Tier Night",
+      summary: `« ${session.listName || "Tier list"} » · +${session.localConsensusPoints || 0} pts consensus`,
+    });
+
+    const resultsNav = { navStack: ["home", "lobby", "game-select", "results"] };
+
+    if (isGameSyncActive()) {
+      if (isLobbyHost()) {
+        try {
+          await completeGameSession({ gameId: "tiernight", screen: "results", state: {} });
+        } catch (e) {
+          console.warn("REVEAL completeGameSession:", e);
+          navigate("results", resultsNav);
+        }
+      } else {
+        suppressSessionRoute(120000);
+        navigate("results", resultsNav);
+      }
+      return;
+    }
+
+    await setLobbyWaiting();
+    navigate("results", resultsNav);
+  }
 
   function render() {
     let content = "";
@@ -77,7 +112,7 @@ export function mountTierNightEnd(app) {
       content,
     });
 
-    bindNav(app);
+    bindNav(app, { results: goToResults });
 
     app.querySelector("#btn-contro")?.addEventListener("click", () => {
       phase = "controversial";
@@ -98,18 +133,18 @@ export function mountTierNightEnd(app) {
       if (url) downloadDataUrl(url, `tier-${Date.now()}.png`);
     });
 
-    app.querySelector('[data-nav="results"]')?.addEventListener("click", () => {
-      setLastGame({
-        gameId: "tiernight",
-        title: "Tier Night",
-        summary: `« ${session.listName || "Tier list"} » · +${session.localConsensusPoints || 0} pts consensus`,
-      });
-    });
   }
+
+  const unsubSession = onGameSessionChange((row) => {
+    if (row?.screen === "results") {
+      navigate("results", { navStack: ["home", "lobby", "game-select", "results"] });
+    }
+  });
 
   render();
 
   return () => {
+    unsubSession();
     setLobbyWaiting();
   };
 }

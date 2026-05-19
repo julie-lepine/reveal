@@ -1,9 +1,10 @@
 import {
   allLobbySubmitted,
-  getGuessLieEntryScreen,
   hasLocalSubmission,
 } from "../core/guessLieSession.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
+import { isGameSyncActive, isLobbyHost } from "../core/gameSync.js";
+import { markGuessLieLobbyComplete } from "../core/state.js";
 import { navigate } from "../core/router.js";
 import { pageShell } from "../core/ui.js";
 import { bindNav } from "./nav.js";
@@ -61,8 +62,12 @@ export function mountGuessLieMenu(app) {
 
   bindNav(app);
 
-  app.querySelector("#btn-play")?.addEventListener("click", () => {
-    navigate(getGuessLieEntryScreen());
+  app.querySelector("#btn-play")?.addEventListener("click", async () => {
+    if (isGameSyncActive()) {
+      if (isLobbyHost()) await markGuessLieLobbyComplete();
+      return;
+    }
+    navigate("guesslie", { reset: true });
   });
 
   return null;

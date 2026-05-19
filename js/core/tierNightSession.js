@@ -71,6 +71,34 @@ export function findMostControversialItem(recaps, items) {
   return { item: best, spread: bestSpread };
 }
 
+export function buildRecapsFromPlacements(topicId, listName, items, placementsByName) {
+  const recaps = getActivePlayers().map((p) => ({
+    player: p.name,
+    emoji: p.emoji,
+    color: p.color,
+    placed: placementsByName[p.name] || {},
+  }));
+
+  const consensus = computeConsensusPlaced(recaps, items);
+  const controversial = findMostControversialItem(recaps, items);
+  const localName = getLocalDisplayName();
+  const localPlaced = placementsByName[localName] || {};
+  const pts = scoreConsensusProximity(localPlaced, consensus);
+  addScore(localName, pts);
+  bumpPlayerStat(localName, "tierConsensusPoints", pts);
+  bumpPlayerStat(localName, "tierNightsPlayed", 1);
+
+  saveTierNightRecaps(recaps, {
+    topicId,
+    listName,
+    consensus,
+    controversialItem: controversial.item,
+    controversialSpread: controversial.spread,
+    localConsensusPoints: pts,
+  });
+  return recaps;
+}
+
 export function buildRecapsWithSimulation(topicId, listName, items, localPlaced) {
   const recaps = [
     {

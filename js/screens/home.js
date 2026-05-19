@@ -9,6 +9,7 @@ import {
   getUser,
   logout,
 } from "../core/auth.js";
+import { isSupabaseConfigured } from "../core/supabaseClient.js";
 import {
   createLobby,
   joinLobby,
@@ -20,7 +21,8 @@ import {
 import { getGlobalStats } from "../core/state.js";
 import { navigate } from "../core/router.js";
 import { escapeHtml, logoHtml, pageShell } from "../core/ui.js";
-import { bindNav } from "./nav.js";
+import { bindNav, goToEveningSettings } from "./nav.js";
+import { showAppAlert } from "../core/dialog.js";
 
 export function mountHome(app) {
   const pendingJoin = sessionStorage.getItem("reveal-pending-join");
@@ -86,7 +88,7 @@ export function mountHome(app) {
               <button type="button" class="btn btn-primary btn--spaced" id="btn-signup">Créer mon compte</button>
             </div>
             <div id="auth-panel-guest" class="${authTab === "guest" ? "" : "hidden"}">
-              <p class="hint auth-form__guest-intro">Rejoins une partie avec un code — pas besoin de compte. Les invités ne peuvent pas créer de lobby.</p>
+              <p class="hint auth-form__guest-intro">Rejoins avec un code, un lien d'invitation ou en scannant le QR de l'hôte. Pas de compte requis — les invités ne peuvent pas créer de lobby.</p>
               <label class="field-label" for="guest-name">Ton pseudo</label>
               <input type="text" class="field-input" id="guest-name" placeholder="Ex : Alex" maxlength="24" />
               <label class="field-label" for="guest-code">Code d'invitation</label>
@@ -99,10 +101,10 @@ export function mountHome(app) {
           ${authTab !== "guest" ? `
           <p class="auth-divider"><span>ou continuer avec</span></p>
           <div class="social-row">
-            <button type="button" class="social-btn" data-social="google" title="Google">G</button>
-            <button type="button" class="social-btn" data-social="apple" title="Apple"></button>
-            <button type="button" class="social-btn" data-social="discord" title="Discord">D</button>
-          </div>` : ""}`
+            <button type="button" class="social-btn social-btn--facebook" data-social="facebook" title="Facebook">f</button>
+            <button type="button" class="social-btn social-btn--instagram" data-social="instagram" title="Instagram">📷</button>
+          </div>
+          ${!isSupabaseConfigured() ? '<p class="hint auth-social-hint">Mode démo locale — configure Supabase pour la connexion réelle.</p>' : '<p class="hint auth-social-hint">Instagram passe par Meta (même compte que Facebook).</p>'}` : ""}`
         }
 
         <div class="lobby-actions">
@@ -144,7 +146,9 @@ export function mountHome(app) {
   }
 
   function bindEvents() {
-    bindNav(app);
+    bindNav(app, {
+      settings: () => goToEveningSettings(),
+    });
 
     app.querySelectorAll("[data-tab]").forEach((btn) => {
       btn.addEventListener("click", () => {
@@ -153,44 +157,65 @@ export function mountHome(app) {
       });
     });
 
-    app.querySelector("#btn-login")?.addEventListener("click", () => {
+    app.querySelector("#btn-login")?.addEventListener("click", async () => {
       const err = app.querySelector("#login-error");
-      const res = loginWithEmail(
+      const btn = app.querySelector("#btn-login");
+      btn.disabled = true;
+      const res = await loginWithEmail(
         app.querySelector("#login-email").value,
         app.querySelector("#login-password").value
       );
+      btn.disabled = false;
       if (!res.ok) {
         err.textContent = res.error;
         err.classList.remove("hidden");
         return;
       }
+      err.classList.add("hidden");
       render();
     });
 
-    app.querySelector("#btn-signup")?.addEventListener("click", () => {
+    app.querySelector("#btn-signup")?.addEventListener("click", async () => {
       const err = app.querySelector("#signup-error");
-      const res = signupWithEmail(
+      const btn = app.querySelector("#btn-signup");
+      btn.disabled = true;
+      const res = await signupWithEmail(
         app.querySelector("#signup-email").value,
         app.querySelector("#signup-password").value,
         app.querySelector("#signup-name").value
       );
+      btn.disabled = false;
       if (!res.ok) {
         err.textContent = res.error;
         err.classList.remove("hidden");
         return;
       }
+      err.classList.add("hidden");
       render();
     });
 
     app.querySelectorAll("[data-social]").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        loginWithSocial(btn.getAttribute("data-social"));
+      btn.addEventListener("click", async () => {
+        const err = app.querySelector("#login-error") || app.querySelector("#signup-error");
+        btn.disabled = true;
+        const res = await loginWithSocial(btn.getAttribute("data-social"));
+        btn.disabled = false;
+        if (!res.ok) {
+          if (err) {
+            err.textContent = res.error;
+            err.classList.remove("hidden");
+          } else {
+            await showAppAlert(res.error, { title: "Connexion", icon: "⚠️" });
+          }
+          return;
+        }
+        if (res.redirecting) return;
         render();
       });
     });
 
-    app.querySelector("#btn-logout")?.addEventListener("click", () => {
-      logout();
+    app.querySelector("#btn-logout")?.addEventListener("click", async () => {
+      await logout();
       render();
     });
 
@@ -198,33 +223,51 @@ export function mountHome(app) {
       goToGameSelect();
     });
 
-    app.querySelector("#btn-create-lobby")?.addEventListener("click", () => {
+    app.querySelector("#btn-create-lobby")?.addEventListener("click", async () => {
       if (!canCreateLobby()) return;
-      createLobby();
-      navigate("lobby");
+      const btn = app.querySelector("#btn-create-lobby");
+      btn.disabled = true;
+      try {
+        await createLobby();
+        navigate("lobby");
+      } catch (e) {
+        await showAppAlert(e.message || "Impossible de créer le lobby.", {
+          title: "Erreur",
+          icon: "⚠️",
+        });
+      } finally {
+        btn.disabled = false;
+      }
     });
 
-    app.querySelector("#btn-join-lobby")?.addEventListener("click", () => {
+    app.querySelector("#btn-join-lobby")?.addEventListener("click", async () => {
       if (!isLoggedIn()) return;
-      const res = joinLobby(app.querySelector("#join-code").value);
+      const btn = app.querySelector("#btn-join-lobby");
+      btn.disabled = true;
+      const res = await joinLobby(app.querySelector("#join-code").value);
+      btn.disabled = false;
       if (!res.ok) {
-        alert(res.error);
+        await showAppAlert(res.error, { title: "Rejoindre le lobby", icon: "⚠️" });
         return;
       }
       navigate("lobby");
     });
 
-    app.querySelector("#btn-guest-join")?.addEventListener("click", () => {
+    app.querySelector("#btn-guest-join")?.addEventListener("click", async () => {
       const err = app.querySelector("#guest-error");
-      const res = joinLobbyAsGuest(
+      const btn = app.querySelector("#btn-guest-join");
+      btn.disabled = true;
+      const res = await joinLobbyAsGuest(
         app.querySelector("#guest-code").value,
         app.querySelector("#guest-name").value
       );
+      btn.disabled = false;
       if (!res.ok) {
         err.textContent = res.error;
         err.classList.remove("hidden");
         return;
       }
+      err.classList.add("hidden");
       navigate("lobby");
     });
   }

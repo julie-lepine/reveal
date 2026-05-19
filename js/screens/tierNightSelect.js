@@ -1,8 +1,10 @@
 import { getAllTierLists } from "../core/tierLists.js";
 import { setTierNightTopicId } from "../core/state.js";
 import { navigate } from "../core/router.js";
+import { isGameSyncActive, isLobbyHost, syncTierNightSession } from "../core/gameSync.js";
 import { escapeHtml, pageShell, tierLogoHtml, bindTierLogos } from "../core/ui.js";
 import { bindNav } from "./nav.js";
+import { showAppAlert } from "../core/dialog.js";
 
 export function mountTierNightSelect(app) {
   const lists = getAllTierLists();
@@ -46,9 +48,21 @@ export function mountTierNightSelect(app) {
   bindTierLogos(app);
 
   app.querySelectorAll(".tier-list-card").forEach((card) => {
-    card.addEventListener("click", () => {
-      setTierNightTopicId(card.getAttribute("data-tier-id"));
-      navigate("tiernight");
+    card.addEventListener("click", async () => {
+      const id = card.getAttribute("data-tier-id");
+      if (isGameSyncActive()) {
+        if (!isLobbyHost()) {
+          await showAppAlert("Seul l'hôte choisit la tier list pour le lobby.", {
+            title: "Action réservée",
+            icon: "👑",
+          });
+          return;
+        }
+        await syncTierNightSession({ topicId: id, screen: "tiernight" });
+      } else {
+        setTierNightTopicId(id);
+        navigate("tiernight");
+      }
     });
   });
 

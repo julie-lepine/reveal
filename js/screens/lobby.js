@@ -12,11 +12,20 @@ import {
   createLobby,
   hasActiveLobby,
   resetAllParticipantsReady,
+  goToGameSelect,
+  allLobbyMembersReady,
+  getNotReadyParticipants,
+  getLobbyNudge,
+  sendLobbyNudgeToNotReady,
 } from "../core/lobby.js";
 import { canCreateLobby } from "../core/auth.js";
+import { isSupabaseConfigured } from "../core/supabaseClient.js";
+import { isGameSyncActive, isLobbyHost, startGameSession, startMultiplayerSync } from "../core/gameSync.js";
+import { triggerLobbyNudge } from "../core/nudge.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
 import { bindNav } from "./nav.js";
+import { showAppAlert } from "../core/dialog.js";
 
 function participantsHtml(participants) {
   return participants
@@ -33,17 +42,35 @@ function participantsHtml(participants) {
     .join("");
 }
 
+const LABEL_WAITING_READY = "En attente de validation du « Prêt »";
+const LABEL_WAITING_HOST_START = "L'hôte va lancer la soirée…";
+
+function lobbyFooterHint(ready, total) {
+  if (total > 0 && ready === total) return "Tout le monde est prêt !";
+  return LABEL_WAITING_READY;
+}
+
+function guestStartLabel(allReady) {
+  return allReady ? LABEL_WAITING_HOST_START : LABEL_WAITING_READY;
+}
+
+function hostStartLabel(allReady) {
+  return allReady ? "Commencer la soirée" : LABEL_WAITING_READY;
+}
+
 export function mountLobby(app) {
   if (!requireLobbyPlay()) return null;
 
   let cleanupSim = null;
   let mounted = false;
+  let lastNudgeSeen = 0;
+  let wizzCooldownUntil = 0;
 
-  function ensureLobby() {
+  async function ensureLobby() {
     const lobby = getLobby();
     if (lobby?.code && lobby.participants?.length) return;
     if (hasActiveLobby()) return;
-    if (canCreateLobby()) createLobby();
+    if (canCreateLobby()) await createLobby();
   }
 
   function renderMessages() {
@@ -93,6 +120,45 @@ export function mountLobby(app) {
     box.scrollTop = box.scrollHeight;
   }
 
+  function checkIncomingNudge() {
+    const { at, forUserId } = getLobbyNudge();
+    if (!at || at <= lastNudgeSeen) return;
+
+    const local = getLobbyParticipants().find((p) => p.isLocal);
+    if (!local || local.ready) return;
+    if (forUserId && forUserId !== local.userId) return;
+
+    lastNudgeSeen = at;
+    triggerLobbyNudge();
+  }
+
+  function updateHostControls() {
+    const allReady = allLobbyMembersReady();
+    const notReadyGuests = getNotReadyParticipants().filter((p) => !p.isHost);
+    const wizzOnCooldown = Date.now() < wizzCooldownUntil;
+
+    const startBtn = app.querySelector("#btn-start");
+    if (startBtn) {
+      startBtn.disabled = !allReady;
+      startBtn.classList.toggle("btn-start--waiting", !allReady);
+      startBtn.title = allReady
+        ? "Lancer la soirée"
+        : "Tous les joueurs doivent être prêts";
+    }
+
+    const wizzBtn = app.querySelector("#btn-wizz");
+    if (wizzBtn) {
+      const canWizz = isSupabaseConfigured() && notReadyGuests.length > 0 && !wizzOnCooldown;
+      wizzBtn.disabled = !canWizz;
+      const names = notReadyGuests.map((p) => p.name).join(", ");
+      wizzBtn.title = canWizz
+        ? `Réveiller : ${names}`
+        : wizzOnCooldown
+          ? "Patiente quelques secondes…"
+          : "Personne à réveiller";
+    }
+  }
+
   function refreshParticipants() {
     const participants = getLobbyParticipants();
     const { ready, total } = getReadyCount();
@@ -106,9 +172,7 @@ export function mountLobby(app) {
 
     const footer = app.querySelector(".lobby-footer");
     if (footer) {
-      footer.textContent = `${ready} / ${total} prêts · ${
-        ready === total && total > 0 ? "Tout le monde est prêt !" : "En attente des joueurs"
-      }`;
+      footer.textContent = `${ready} / ${total} prêts · ${lobbyFooterHint(ready, total)}`;
     }
 
     const readyBtn = app.querySelector("#btn-ready");
@@ -118,6 +182,14 @@ export function mountLobby(app) {
         <span class="btn-ready__icon">${local?.ready ? "✅" : "⬜"}</span>
         ${local?.ready ? "Prêt !" : "Je suis prêt !"}`;
     }
+
+    updateHostControls();
+    checkIncomingNudge();
+  }
+
+  function onLobbyUpdate() {
+    refreshParticipants();
+    refreshChat();
   }
 
   function bindEvents(lobby) {
@@ -139,15 +211,50 @@ export function mountLobby(app) {
       }
     });
 
-    app.querySelector("#btn-ready")?.addEventListener("click", () => {
-      toggleLocalReady();
+    app.querySelector("#copy-link")?.addEventListener("click", async () => {
+      const btn = app.querySelector("#copy-link");
+      try {
+        await navigator.clipboard.writeText(getLobbyJoinUrl(lobby.code));
+        if (btn) btn.textContent = "Lien copié ✓";
+      } catch {
+        if (btn) btn.textContent = "Erreur";
+      }
+    });
+
+    app.querySelector("#btn-ready")?.addEventListener("click", async () => {
+      await toggleLocalReady();
       refreshParticipants();
     });
 
-    const sendChat = () => {
+    app.querySelector("#btn-start")?.addEventListener("click", async () => {
+      if (!allLobbyMembersReady()) {
+        await showAppAlert("Tous les joueurs doivent être prêts avant de commencer la soirée.", {
+          title: "Pas encore prêt",
+          icon: "⏳",
+        });
+        return;
+      }
+      if (isGameSyncActive() && isLobbyHost()) {
+        await startGameSession("menu", "game-select", {});
+      } else {
+        goToGameSelect();
+      }
+    });
+
+    app.querySelector("#btn-wizz")?.addEventListener("click", async () => {
+      const res = await sendLobbyNudgeToNotReady();
+      if (!res.ok) {
+        await showAppAlert(res.error, { title: "Wizz", icon: "📳" });
+        return;
+      }
+      wizzCooldownUntil = Date.now() + 5000;
+      updateHostControls();
+    });
+
+    const sendChat = async () => {
       const input = app.querySelector("#chat-input");
       if (!input?.value.trim()) return;
-      addLobbyMessage(input.value);
+      await addLobbyMessage(input.value);
       input.value = "";
       refreshChat();
       input.focus();
@@ -162,12 +269,17 @@ export function mountLobby(app) {
   function renderFull() {
     const chatState = mounted ? captureChatState() : null;
 
-    ensureLobby();
     const lobby = getLobby();
     const participants = getLobbyParticipants();
     const { ready, total } = getReadyCount();
     const local = participants.find((p) => p.isLocal);
     const isHost = local?.isHost;
+    const allReady = allLobbyMembersReady();
+    const notReadyGuests = getNotReadyParticipants().filter((p) => !p.isHost);
+    const joinUrl = getLobbyJoinUrl(lobby.code);
+    const online = isSupabaseConfigured();
+
+    lastNudgeSeen = getLobbyNudge().at || 0;
 
     app.innerHTML = pageShell({
       backTarget: "home",
@@ -183,10 +295,14 @@ export function mountLobby(app) {
           <div class="invite-card__row">
             <span class="invite-code">${escapeHtml(lobby.code)}</span>
             <button type="button" class="btn-icon" id="copy-code" aria-label="Copier le code">⧉</button>
-          </div>>
-          <img class="lobby-qr" id="lobby-qr" width="140" height="140" alt="QR code" />
-          <p class="hint"><a href="${escapeHtml(getLobbyJoinUrl(lobby.code))}" class="lobby-deep-link">Lien d'invitation</a> (démo locale)</p>
-        </div>>
+          </div>
+          <img class="lobby-qr" id="lobby-qr" width="140" height="140" alt="QR code d'invitation" />
+          <p class="hint">
+            <a href="${escapeHtml(joinUrl)}" class="lobby-deep-link">Lien d'invitation</a>
+            · <button type="button" class="btn-link" id="copy-link">Copier le lien</button>
+          </p>
+          <p class="hint">${online ? "Partage le QR ou le lien — les invités rejoignent sans compte." : "Démo locale : ouvre le lien sur le même appareil ou un autre onglet."}</p>
+        </div>
 
         <div class="chat-panel">
           <div class="chat-messages" id="chat-messages">${renderMessages()}</div>
@@ -203,16 +319,33 @@ export function mountLobby(app) {
 
         ${
           isHost
-            ? `<button type="button" class="btn btn-start" id="btn-start" data-nav="game-select">
-            <span class="btn-start__icon">▶</span>
-            Commencer la soirée
+            ? `
+        <div class="lobby-host-actions">
+          ${
+            online && notReadyGuests.length
+              ? `<button type="button" class="btn btn-wizz" id="btn-wizz" title="Réveiller les joueurs pas prêts">
+            📳 Wizz ! <span class="btn-wizz__count">${notReadyGuests.length} pas prêt</span>
           </button>`
+              : ""
+          }
+          <button type="button" class="btn btn-start ${allReady ? "" : "btn-start--waiting"}" id="btn-start" ${
+            allReady ? "" : "disabled"
+          }>
+            <span class="btn-start__icon">▶</span>
+            ${hostStartLabel(allReady)}
+          </button>
+          ${
+            !allReady
+              ? `<p class="hint lobby-host-hint">Chaque joueur doit appuyer sur « Je suis prêt ! » avant le lancement.</p>`
+              : ""
+          }
+        </div>`
             : `<button type="button" class="btn btn-start btn-start--waiting" disabled>
-            En attente de l'hôte…
+            ${guestStartLabel(allReady)}
           </button>`
         }
 
-        <p class="lobby-footer">${ready} / ${total} prêts · ${ready === total && total > 0 ? "Tout le monde est prêt !" : "En attente des joueurs"}</p>
+        <p class="lobby-footer">${ready} / ${total} prêts · ${lobbyFooterHint(ready, total)}</p>
       `,
     });
 
@@ -222,10 +355,13 @@ export function mountLobby(app) {
     mounted = true;
   }
 
-  ensureLobby();
-  resetAllParticipantsReady();
-  renderFull();
-  cleanupSim = simulateLobbyJoins(refreshParticipants);
+  (async () => {
+    await ensureLobby();
+    await resetAllParticipantsReady();
+    renderFull();
+    if (isGameSyncActive()) startMultiplayerSync();
+    cleanupSim = simulateLobbyJoins(onLobbyUpdate);
+  })();
 
   return () => {
     if (cleanupSim) cleanupSim();

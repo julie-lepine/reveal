@@ -1,7 +1,9 @@
 import {
   addCustomTake,
   allHotTakeReady,
+  countOtherPlayersCustomTakes,
   getHotTakeSession,
+  getMyCustomTakes,
   getHotTakePrepSummary,
   getModerationNotice,
   isLocalHotTakeHost,
@@ -17,24 +19,222 @@ import {
   HOT_TAKE_CATALOG_ID,
 } from "../core/hotTakeSession.js";
 import { getLobbyParticipants } from "../core/lobby.js";
+import { onLobbyBundleUpdated } from "../core/supabaseLobby.js";
 import { getLocalDisplayName } from "../core/state.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
+import { isGameSyncActive, isLobbyHost, onGameSessionChange } from "../core/gameSync.js";
 import { navigate } from "../core/router.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
 import { bindNav } from "./nav.js";
-
-function formatTake(t) {
-  if (typeof t === "string") return { text: t, author: null };
-  return t;
-}
 
 export function mountHotTakePrep(app) {
   if (!requireLobbyPlay()) return null;
 
   let cleanupSim = null;
+  let mounted = false;
   const moderationNotice = getModerationNotice();
 
-  function render() {
+  function captureDraft() {
+    const input = app.querySelector("#new-take");
+    return {
+      value: input?.value ?? "",
+      focused: document.activeElement === input,
+      selStart: input?.selectionStart ?? 0,
+      selEnd: input?.selectionEnd ?? 0,
+    };
+  }
+
+  function restoreDraft(state) {
+    const input = app.querySelector("#new-take");
+    if (!input || !state) return;
+    input.value = state.value;
+    if (state.focused) {
+      input.focus();
+      try {
+        input.setSelectionRange(state.selStart, state.selEnd);
+      } catch {
+        /* ignore */
+      }
+    }
+  }
+
+  function customTakesListHtml() {
+    const myTakes = getMyCustomTakes();
+    if (!myTakes.length) return "";
+    return `<ul class="take-list">${myTakes
+      .map((t) => `<li>${escapeHtml(t.text)}</li>`)
+      .join("")}</ul>`;
+  }
+
+  function othersTakesHintHtml() {
+    const n = countOtherPlayersCustomTakes();
+    if (!n) return "";
+    return `<p class="hint" id="hot-take-others-hint">${n} hot take${n > 1 ? "s" : ""} d'autres joueurs — révélée${n > 1 ? "s" : ""} en manche.</p>`;
+  }
+
+  function renderCustomTakesList() {
+    const card = app.querySelector("#new-take")?.closest(".card");
+    if (!card) return;
+
+    let list = card.querySelector(".take-list");
+    const listHtml = customTakesListHtml();
+    if (!listHtml) list?.remove();
+    else if (list) list.outerHTML = listHtml;
+    else {
+      const anchor = card.querySelector("#take-error") || card.querySelector(".moderation-notice");
+      anchor?.insertAdjacentHTML("afterend", listHtml);
+    }
+
+    let hint = card.querySelector("#hot-take-others-hint");
+    const hintHtml = othersTakesHintHtml();
+    if (!hintHtml) hint?.remove();
+    else if (hint) hint.outerHTML = hintHtml;
+    else card.insertAdjacentHTML("beforeend", hintHtml);
+  }
+
+  function refreshReadySection() {
+    const session = getHotTakeSession();
+    const members = getLobbyParticipants();
+    const allReady = allHotTakeReady();
+    const localReady = session.ready[getLocalDisplayName()];
+    const prep = getHotTakePrepSummary();
+
+    const playersCard = app.querySelector("#hot-take-players");
+    if (playersCard) {
+      playersCard.innerHTML = `
+        <p class="card-heading">Joueurs prêts</p>
+        ${members
+          .map(
+            (m) => `
+          <div class="lobby-player ${session.ready[m.name] ? "lobby-player--ready" : ""}">
+            <span class="lobby-player__status">${session.ready[m.name] ? "✓" : "…"}</span>
+            <span class="lobby-player__name">${escapeHtml(m.name)}</span>
+          </div>`
+          )
+          .join("")}`;
+    }
+
+    const readyBtn = app.querySelector("#btn-ready");
+    if (readyBtn) {
+      readyBtn.classList.toggle("btn-ready--active", Boolean(localReady));
+      readyBtn.textContent = localReady ? "Prêt ✓" : "Je suis prêt !";
+    }
+
+    const startSlot = app.querySelector("#hot-take-start-slot");
+    if (startSlot) {
+      if (allReady && prep.effective > 0 && isLobbyHost()) {
+        startSlot.innerHTML = `<button type="button" class="btn btn-primary btn--spaced" id="btn-start-game">Lancer Hot Take →</button>`;
+        startSlot.querySelector("#btn-start-game")?.addEventListener("click", onStartGame);
+      } else {
+        startSlot.innerHTML = `<button type="button" class="btn btn-secondary btn--spaced" disabled>${
+          prep.effective === 0 ? "Aucune take disponible" : "En attente des joueurs…"
+        }</button>`;
+      }
+    }
+
+    if (document.activeElement?.id !== "new-take") {
+      renderCustomTakesList();
+    }
+  }
+
+  function refreshThemeAndRounds() {
+    const session = getHotTakeSession();
+    const themeId = session.selectedThemeId || HOT_TAKE_CATALOG_ID;
+    const roundCount = session.roundCount ?? 5;
+    const isHost = isLocalHotTakeHost();
+    const prep = getHotTakePrepSummary();
+
+    app.querySelectorAll("[data-theme]").forEach((btn) => {
+      const id = btn.getAttribute("data-theme");
+      btn.classList.toggle("theme-chip--active", themeId === id);
+      btn.disabled = !isHost;
+    });
+
+    const poolSize = prep.poolSize;
+    app.querySelectorAll("[data-round]").forEach((btn) => {
+      const value = Number(btn.getAttribute("data-round"));
+      const disabled =
+        value === HOT_TAKE_ROUND_ALL ? poolSize === 0 : poolSize < value;
+      btn.classList.toggle("theme-chip--active", roundCount === value);
+      btn.disabled = disabled || !isHost;
+    });
+
+    const dur = app.querySelector("#hot-take-duration");
+    if (dur) {
+      dur.innerHTML = `
+        <strong>${prep.effective}</strong> hot take${prep.effective > 1 ? "s" : ""}
+        · ${escapeHtml(prep.durationLabel)}
+        <span class="muted"> (estimation)</span>`;
+    }
+  }
+
+  function refreshFromSync() {
+    const draft = captureDraft();
+    refreshThemeAndRounds();
+    refreshReadySection();
+    restoreDraft(draft);
+  }
+
+  async function onStartGame() {
+    if (!isLobbyHost()) return;
+    await markHotTakeLobbyStarted();
+    if (!isGameSyncActive()) navigate("hottake");
+  }
+
+  function bindEvents() {
+    bindNav(app);
+
+    app.querySelectorAll("[data-round]").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        if (!isLocalHotTakeHost() || btn.disabled) return;
+        const draft = captureDraft();
+        await setHotTakeRoundCount(Number(btn.getAttribute("data-round")));
+        render(draft);
+      });
+    });
+
+    app.querySelectorAll("[data-theme]").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        if (!isLocalHotTakeHost()) return;
+        const draft = captureDraft();
+        await setHotTakeTheme(btn.getAttribute("data-theme"));
+        render(draft);
+      });
+    });
+
+    app.querySelector("#add-take")?.addEventListener("click", async () => {
+      const err = app.querySelector("#take-error");
+      const res = await addCustomTake(app.querySelector("#new-take").value);
+      if (!res.ok) {
+        err.textContent = res.error;
+        err.classList.remove("hidden");
+        return;
+      }
+      err.classList.add("hidden");
+      render(captureDraft());
+      const input = app.querySelector("#new-take");
+      if (input) input.value = "";
+    });
+
+    app.querySelector("#btn-ready")?.addEventListener("click", async () => {
+      await toggleLocalHotTakeReady();
+      if (!isGameSyncActive()) {
+        const session = getHotTakeSession();
+        const wasReady = Boolean(session.ready[getLocalDisplayName()]);
+        if (!wasReady) {
+          if (cleanupSim) cleanupSim();
+          cleanupSim = simulateHotTakeReady(refreshReadySection);
+        }
+      }
+      refreshReadySection();
+    });
+
+    app.querySelector("#btn-start-game")?.addEventListener("click", onStartGame);
+  }
+
+  function render(preserveDraft = null) {
+    const draft = preserveDraft ?? (mounted ? captureDraft() : null);
+
     const session = getHotTakeSession();
     const members = getLobbyParticipants();
     const allReady = allHotTakeReady();
@@ -118,19 +318,11 @@ export function mountHotTakePrep(app) {
           </div>
           <p class="moderation-notice">${escapeHtml(moderationNotice)}</p>
           <p class="auth-error hidden" id="take-error"></p>
-          ${
-            session.customTakes?.length
-              ? `<ul class="take-list">${session.customTakes
-                  .map((t) => {
-                    const x = formatTake(t);
-                    return `<li><strong>${escapeHtml(x.author || "Toi")}</strong> : ${escapeHtml(x.text)}</li>`;
-                  })
-                  .join("")}</ul>`
-              : ""
-          }
+          ${customTakesListHtml()}
+          ${othersTakesHintHtml()}
         </div>
 
-        <div class="card">
+        <div class="card" id="hot-take-players">
           <p class="card-heading">Joueurs prêts</p>
           ${members
             .map(
@@ -147,6 +339,7 @@ export function mountHotTakePrep(app) {
           ${localReady ? "Prêt ✓" : "Je suis prêt !"}
         </button>
 
+        <div id="hot-take-start-slot">
         ${
           allReady && prep.effective > 0
             ? `<button type="button" class="btn btn-primary btn--spaced" id="btn-start-game">Lancer Hot Take →</button>`
@@ -154,61 +347,30 @@ export function mountHotTakePrep(app) {
                 prep.effective === 0 ? "Aucune take disponible" : "En attente des joueurs…"
               }</button>`
         }
+        </div>
       `,
     });
 
-    bindNav(app);
-
-    app.querySelectorAll("[data-round]").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        if (!isHost || btn.disabled) return;
-        setHotTakeRoundCount(Number(btn.getAttribute("data-round")));
-        render();
-      });
-    });
-
-    app.querySelectorAll("[data-theme]").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        if (!isHost) return;
-        setHotTakeTheme(btn.getAttribute("data-theme"));
-        render();
-      });
-    });
-
-    app.querySelector("#add-take")?.addEventListener("click", () => {
-      const err = app.querySelector("#take-error");
-      const res = addCustomTake(app.querySelector("#new-take").value);
-      if (!res.ok) {
-        err.textContent = res.error;
-        err.classList.remove("hidden");
-        return;
-      }
-      err.classList.add("hidden");
-      app.querySelector("#new-take").value = "";
-      render();
-    });
-
-    app.querySelector("#btn-ready")?.addEventListener("click", () => {
-      const name = getLocalDisplayName();
-      const wasReady = Boolean(session.ready[name]);
-      toggleLocalHotTakeReady();
-      if (!wasReady) {
-        if (cleanupSim) cleanupSim();
-        cleanupSim = simulateHotTakeReady(render);
-      }
-      render();
-    });
-
-    app.querySelector("#btn-start-game")?.addEventListener("click", () => {
-      markHotTakeLobbyStarted();
-      navigate("hottake");
-    });
+    bindEvents();
+    restoreDraft(draft);
+    mounted = true;
   }
 
   resetHotTakeReady();
   render();
 
+  const unsub = onGameSessionChange(() => {
+    refreshFromSync();
+  });
+
+  const unsubLobby = onLobbyBundleUpdated(() => {
+    if (!mounted) return;
+    render(captureDraft());
+  });
+
   return () => {
     if (cleanupSim) cleanupSim();
+    unsub();
+    unsubLobby();
   };
 }

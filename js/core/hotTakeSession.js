@@ -14,6 +14,14 @@ import {
 import { getActivePlayerNames, getActivePlayers } from "./players.js";
 import { getLobbyParticipants } from "./lobby.js";
 import { getLocalDisplayName, getState, saveStatePatch } from "./state.js";
+import {
+  isGameSyncActive,
+  isLobbyHost,
+  syncHotTakeSession,
+  pushGameSession,
+  allMembersReady,
+  hotTakeToRemote,
+} from "./gameSync.js";
 
 function defaultSession() {
   return {
@@ -24,6 +32,12 @@ function defaultSession() {
     selectedThemeId: HOT_TAKE_CATALOG_ID,
     roundCount: 5,
     deck: null,
+    takeIdx: 0,
+    phase: null,
+    votes: {},
+    voteEndsAt: null,
+    intermissionEndsAt: null,
+    takeScored: false,
   };
 }
 
@@ -71,11 +85,9 @@ function normalizeTake(entry) {
   return entry;
 }
 
-export function setHotTakeTheme(themeId) {
+export async function setHotTakeTheme(themeId) {
   const session = getHotTakeSession();
-  saveStatePatch({
-    hotTakeGame: { ...session, selectedThemeId: themeId, deck: null },
-  });
+  await syncHotTakeSession({ ...session, selectedThemeId: themeId, deck: null });
 }
 
 export function isLocalHotTakeHost() {
@@ -96,11 +108,9 @@ export function getHotTakeRoundCount() {
   return session.roundCount ?? 5;
 }
 
-export function setHotTakeRoundCount(count) {
+export async function setHotTakeRoundCount(count) {
   const session = getHotTakeSession();
-  saveStatePatch({
-    hotTakeGame: { ...session, roundCount: count, deck: null },
-  });
+  await syncHotTakeSession({ ...session, roundCount: count, deck: null });
 }
 
 export function getHotTakePrepSummary() {
@@ -141,7 +151,8 @@ export function buildHotTakeDeck() {
     fullDeck.length
   );
   const deck = shuffleArray(fullDeck).slice(0, effective);
-  saveStatePatch({ hotTakeGame: { ...session, deck } });
+  const next = { ...session, deck };
+  saveStatePatch({ hotTakeGame: next });
   return deck;
 }
 
@@ -151,7 +162,23 @@ export function getAllTakesForGame() {
   return buildHotTakeDeck();
 }
 
-export function addCustomTake(text) {
+/** Takes ajoutées par le joueur local (seules visibles en préparation). */
+export function getMyCustomTakes() {
+  const me = getLocalDisplayName();
+  return (getHotTakeSession().customTakes || [])
+    .map(normalizeTake)
+    .filter((t) => (t.author || me) === me);
+}
+
+/** Nombre de takes custom des autres (texte masqué jusqu’à la manche). */
+export function countOtherPlayersCustomTakes() {
+  const me = getLocalDisplayName();
+  return (getHotTakeSession().customTakes || [])
+    .map(normalizeTake)
+    .filter((t) => t.author && t.author !== me).length;
+}
+
+export async function addCustomTake(text) {
   const trimmed = text.trim();
   if (!trimmed) return { ok: false, error: "Texte vide." };
 
@@ -160,40 +187,40 @@ export function addCustomTake(text) {
 
   const session = getHotTakeSession();
   const entry = { text: trimmed, author: getLocalDisplayName() };
-  saveStatePatch({
-    hotTakeGame: {
-      ...session,
-      customTakes: [...(session.customTakes || []), entry],
-      deck: null,
-    },
+  await syncHotTakeSession({
+    ...session,
+    customTakes: [...(session.customTakes || []), entry],
+    deck: null,
   });
   return { ok: true };
 }
 
-export function setHotTakeReady(playerName, ready) {
+export async function setHotTakeReady(playerName, ready) {
   const session = getHotTakeSession();
-  saveStatePatch({
-    hotTakeGame: {
-      ...session,
-      ready: { ...session.ready, [playerName]: ready },
-    },
+  await syncHotTakeSession({
+    ...session,
+    ready: { ...session.ready, [playerName]: ready },
   });
 }
 
-export function toggleLocalHotTakeReady() {
+export async function toggleLocalHotTakeReady() {
   const name = getLocalDisplayName();
   const session = getHotTakeSession();
-  setHotTakeReady(name, !session.ready[name]);
+  await setHotTakeReady(name, !session.ready[name]);
 }
 
 export function allHotTakeReady() {
   const session = getHotTakeSession();
+  if (isGameSyncActive()) {
+    const remote = hotTakeToRemote(session);
+    return allMembersReady(remote.ready || {});
+  }
   return getActivePlayerNames().every((n) => session.ready[n]);
 }
 
-export function resetHotTakeReady() {
+export async function resetHotTakeReady() {
   const session = getHotTakeSession();
-  saveStatePatch({ hotTakeGame: { ...session, ready: {} } });
+  await syncHotTakeSession({ ...session, ready: {} });
 }
 
 export function simulateHotTakeReady(onUpdate) {
@@ -212,24 +239,61 @@ export function simulateHotTakeReady(onUpdate) {
   return () => clearInterval(id);
 }
 
-export function markHotTakeLobbyStarted() {
+export async function markHotTakeLobbyStarted() {
   buildHotTakeDeck();
   const session = getHotTakeSession();
-  saveStatePatch({ hotTakeGame: { ...session, lobbyStarted: true } });
+  const next = {
+    ...getHotTakeSession(),
+    lobbyStarted: true,
+    takeIdx: 0,
+    phase: "question",
+    votes: {},
+    voteEndsAt: null,
+    intermissionEndsAt: null,
+  };
+  saveStatePatch({ hotTakeGame: next });
+  if (isGameSyncActive() && isLobbyHost()) {
+    await pushGameSession({
+      screen: "hottake",
+      gameId: "hottake",
+      state: { hotTake: hotTakeToRemote(next) },
+    });
+  }
 }
 
-export function setHotTakePausedBy(name) {
+export async function setHotTakePausedBy(name) {
   const session = getHotTakeSession();
-  saveStatePatch({ hotTakeGame: { ...session, pausedBy: name } });
+  await syncHotTakeSession({ ...session, pausedBy: name });
 }
 
-export function clearHotTakePause() {
+export async function clearHotTakePause() {
   const session = getHotTakeSession();
-  saveStatePatch({ hotTakeGame: { ...session, pausedBy: null } });
+  await syncHotTakeSession({ ...session, pausedBy: null });
 }
 
-export function resetHotTakeSession() {
-  saveStatePatch({ hotTakeGame: defaultSession() });
+export async function resetHotTakeSession() {
+  await syncHotTakeSession(defaultSession());
+}
+
+export async function commitHotTakePlay(patch) {
+  const session = { ...getHotTakeSession(), ...patch };
+  await syncHotTakeSession(session);
+  return session;
+}
+
+export function getHotTakeVotesForUi() {
+  return getHotTakeSession().votes || {};
+}
+
+export function countHotTakeVotes() {
+  return Object.keys(getHotTakeVotesForUi()).length;
+}
+
+export function allHotTakeVotesIn() {
+  const session = getHotTakeSession();
+  if (!isGameSyncActive()) return false;
+  const remote = hotTakeToRemote(session);
+  return Object.keys(remote.votes || {}).length >= getActivePlayerNames().length;
 }
 
 export function getHotTakeEntryScreen() {

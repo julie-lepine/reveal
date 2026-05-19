@@ -8,6 +8,10 @@ const emptyGuessLie = () => ({
   submissions: {},
   lobbyComplete: false,
   currentRound: 0,
+  roundIdx: 0,
+  phase: null,
+  votes: {},
+  roundScored: false,
 });
 
 const defaultGlobalStats = () => ({
@@ -29,6 +33,7 @@ const defaultUser = () => ({
 });
 
 const defaultLobby = () => ({
+  id: null,
   code: null,
   participants: [],
   messages: [],
@@ -50,6 +55,7 @@ const defaultSettings = () => ({
 });
 
 const defaultState = () => ({
+  supabaseUserId: null,
   settings: defaultSettings(),
   scores: {},
   playerStats: {},
@@ -76,6 +82,12 @@ const defaultState = () => ({
     selectedThemeId: "catalog",
     roundCount: 5,
     deck: null,
+    takeIdx: 0,
+    phase: null,
+    votes: {},
+    voteEndsAt: null,
+    intermissionEndsAt: null,
+    takeScored: false,
   },
   tierNightGame: { recaps: [], topicId: null, listName: "", controversialItem: null },
   openLobbies: {},
@@ -351,7 +363,7 @@ function syncGuessLieSession() {
   }
 }
 
-export function setLocalGuessLieSubmission(statements, lieIndex) {
+export async function setLocalGuessLieSubmission(statements, lieIndex) {
   syncGuessLieSession();
   const name = getLocalDisplayName();
   ensurePlayerScore(name);
@@ -360,6 +372,8 @@ export function setLocalGuessLieSubmission(statements, lieIndex) {
     lie: lieIndex,
   };
   save();
+  const { isGameSyncActive, syncGuessLieSession: pushGl } = await import("./gameSync.js");
+  if (isGameSyncActive()) await pushGl(state.guessLie);
 }
 
 export function setGuessLieSubmission(playerName, payload) {
@@ -369,10 +383,22 @@ export function setGuessLieSubmission(playerName, payload) {
   save();
 }
 
-export function markGuessLieLobbyComplete() {
+export async function markGuessLieLobbyComplete() {
   syncGuessLieSession();
   state.guessLie.lobbyComplete = true;
+  state.guessLie.roundIdx = 0;
+  state.guessLie.phase = "voting";
+  state.guessLie.votes = {};
+  state.guessLie.roundScored = false;
   save();
+  const { isGameSyncActive, pushGameSession, guessLieToRemote } = await import("./gameSync.js");
+  if (isGameSyncActive()) {
+    await pushGameSession({
+      screen: "guesslie",
+      gameId: "guesslie",
+      state: { guessLie: guessLieToRemote(state.guessLie) },
+    });
+  }
 }
 
 export function resetGuessLieSession() {

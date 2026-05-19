@@ -19,9 +19,9 @@ export function backButton(label = "Retour", target = "back") {
   return `<button type="button" class="back" data-nav="${escapeHtml(target)}" aria-label="${escapeHtml(label)}">‹</button>`;
 }
 
-export function pageShell({ back = true, backTarget = "back", content, orb = true }) {
+export function pageShell({ back = true, backTarget = "back", content, orb = true, scroll = false }) {
   return `
-    <${EL} class="page">
+    <${EL} class="page${scroll ? " page--scroll" : ""}">
       ${orb ? orbsHtml() : ""}
       ${back ? backButton("Retour", backTarget) : ""}
       <${EL} class="container">${content}</${EL}>

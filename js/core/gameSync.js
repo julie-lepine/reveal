@@ -1,0 +1,728 @@
+import { isSupabaseConfigured } from "./supabaseClient.js";
+import { getSupabaseUserId } from "./supabaseAuth.js";
+import { getState, saveStatePatch, recordTierNightPlayed } from "./state.js";
+import { navigate, getCurrentScreen } from "./router.js";
+import { getLobbyParticipants } from "./lobby.js";
+import { buildRecapsFromPlacements, getTierNightSession } from "./tierNightSession.js";
+import {
+  fetchGameSessionByLobby,
+  upsertGameSession,
+  updateGameSession,
+  deleteGameSession,
+} from "./supabaseGame.js";
+
+let cachedRow = null;
+let lastSessionSig = "";
+const listeners = new Set();
+let routing = false;
+let pollTimer = null;
+/** Évite de forcer l’écran de prep quand l’invité revient au menu manuellement. */
+let suppressSessionRouteUntil = 0;
+/** Écran de session ignoré pendant la suppression (retour invité au menu jeux). */
+let suppressSessionScreen = null;
+
+const MENU_SCREENS = new Set(["home", "lobby", "game-select", "settings"]);
+export const POST_GAME_SCREENS = new Set(["results", "leaderboard"]);
+
+function sessionSignature(row) {
+  if (!row) return "";
+  return `${row.screen}|${JSON.stringify(row.state || {})}`;
+}
+
+export function isGameSyncActive() {
+  return isSupabaseConfigured() && Boolean(getState().lobby?.id);
+}
+
+export function isLobbyHost() {
+  const local = getState().lobby?.participants?.find((p) => p.isLocal);
+  return Boolean(local?.isHost);
+}
+
+/** Écrans de préparation (jeu choisi mais pas encore lancé). */
+const GAME_SETUP_SCREENS = new Set([
+  "hottake-prep",
+  "guesslie-menu",
+  "guesslie-setup",
+  "guesslie-wait",
+  "tiernight-select",
+  "tiernight-create",
+]);
+
+/** Guess The Lie : préparation par joueur — la session reste sur guesslie-menu. */
+const GUESS_LIE_PREP_SCREENS = new Set(["guesslie-menu", "guesslie-setup", "guesslie-wait"]);
+
+/** Tier Night : création locale possible depuis tiernight-select. */
+const TIER_NIGHT_PREP_SCREENS = new Set(["tiernight-select", "tiernight-create"]);
+
+function isCompatibleSessionScreen(sessionScreen, localScreen) {
+  if (sessionScreen === localScreen) return true;
+  if (sessionScreen === "guesslie-menu" && GUESS_LIE_PREP_SCREENS.has(localScreen)) return true;
+  if (sessionScreen === "tiernight-select" && TIER_NIGHT_PREP_SCREENS.has(localScreen)) return true;
+  /** Résultats ↔ classement : navigation locale sans forcer le retour via la session. */
+  if (
+    (sessionScreen === "results" && localScreen === "leaderboard") ||
+    (sessionScreen === "leaderboard" && localScreen === "results")
+  ) {
+    return true;
+  }
+  /** Consulter le classement depuis le menu jeux / lobby sans être renvoyé. */
+  if (
+    localScreen === "leaderboard" &&
+    (sessionScreen === "game-select" || sessionScreen === "lobby")
+  ) {
+    return true;
+  }
+  /** Retour lobby depuis le menu jeux (session encore sur game-select). */
+  if (sessionScreen === "game-select" && localScreen === "lobby") {
+    return true;
+  }
+  /** Accueil / paramètres pendant une soirée active (sans quitter le lobby). */
+  if (getState().inLobby && getState().lobby?.id) {
+    if (localScreen === "settings" || localScreen === "home") {
+      return true;
+    }
+  }
+  return false;
+}
+
+export function isOnGameSetupScreen(screen = getCurrentScreen()) {
+  return GAME_SETUP_SCREENS.has(screen);
+}
+
+export function getCachedGameSession() {
+  return cachedRow;
+}
+
+export function onGameSessionChange(fn) {
+  listeners.add(fn);
+  return () => listeners.delete(fn);
+}
+
+function notify(row) {
+  listeners.forEach((fn) => {
+    try {
+      fn(row);
+    } catch (e) {
+      console.warn("gameSync listener:", e);
+    }
+  });
+}
+
+export function userIdForName(name) {
+  const p = getState().lobby?.participants?.find((x) => x.name === name);
+  return p?.userId || null;
+}
+
+export function nameForUserId(uid) {
+  const p = getState().lobby?.participants?.find((x) => x.userId === uid);
+  return p?.name || null;
+}
+
+function mapReadyByName(readyByUid = {}) {
+  const out = {};
+  Object.entries(readyByUid).forEach(([uid, val]) => {
+    const name = nameForUserId(uid) || uid;
+    out[name] = Boolean(val);
+  });
+  return out;
+}
+
+function mapReadyByUid(readyByName = {}) {
+  const out = {};
+  Object.entries(readyByName).forEach(([name, val]) => {
+    const uid = userIdForName(name) || name;
+    out[uid] = Boolean(val);
+  });
+  return out;
+}
+
+function mapVotesByName(votesByUid = {}) {
+  const out = {};
+  Object.entries(votesByUid).forEach(([uid, val]) => {
+    const name = nameForUserId(uid) || uid;
+    if (val != null) out[name] = val;
+  });
+  return out;
+}
+
+function mapVotesByUid(votesByName = {}) {
+  const out = {};
+  Object.entries(votesByName).forEach(([name, val]) => {
+    const uid = userIdForName(name) || name;
+    if (val != null) out[uid] = val;
+  });
+  return out;
+}
+
+function mapSubmissionsByName(subsByUid = {}) {
+  const out = {};
+  Object.entries(subsByUid).forEach(([uid, val]) => {
+    const name = nameForUserId(uid) || uid;
+    if (val) out[name] = val;
+  });
+  return out;
+}
+
+function mapSubmissionsByUid(subsByName = {}) {
+  const out = {};
+  Object.entries(subsByName).forEach(([name, val]) => {
+    const uid = userIdForName(name) || name;
+    if (val) out[uid] = val;
+  });
+  return out;
+}
+
+function mapPlacementsByName(placementsByUid = {}) {
+  const out = {};
+  Object.entries(placementsByUid).forEach(([uid, val]) => {
+    const name = nameForUserId(uid) || uid;
+    if (val) out[name] = val;
+  });
+  return out;
+}
+
+function mapPlacementsByUid(placementsByName = {}) {
+  const out = {};
+  Object.entries(placementsByName).forEach(([name, val]) => {
+    const uid = userIdForName(name) || name;
+    if (val) out[uid] = val;
+  });
+  return out;
+}
+
+export function hotTakeToRemote(session) {
+  return {
+    customTakes: session.customTakes || [],
+    ready: mapReadyByUid(session.ready || {}),
+    lobbyStarted: Boolean(session.lobbyStarted),
+    pausedBy: session.pausedBy ? userIdForName(session.pausedBy) || session.pausedBy : null,
+    selectedThemeId: session.selectedThemeId || "catalog",
+    roundCount: session.roundCount ?? 5,
+    deck: session.deck || null,
+    takeIdx: session.takeIdx ?? 0,
+    phase: session.phase || null,
+    votes: mapVotesByUid(session.votes || {}),
+    voteEndsAt: session.voteEndsAt || null,
+    intermissionEndsAt: session.intermissionEndsAt || null,
+    takeScored: Boolean(session.takeScored),
+  };
+}
+
+export function hotTakeFromRemote(remote) {
+  if (!remote) return null;
+  return {
+    customTakes: remote.customTakes || [],
+    ready: mapReadyByName(remote.ready || {}),
+    lobbyStarted: Boolean(remote.lobbyStarted),
+    pausedBy: remote.pausedBy ? nameForUserId(remote.pausedBy) || remote.pausedBy : null,
+    selectedThemeId: remote.selectedThemeId || "catalog",
+    roundCount: remote.roundCount ?? 5,
+    deck: remote.deck || null,
+    takeIdx: remote.takeIdx ?? 0,
+    phase: remote.phase || null,
+    votes: mapVotesByName(remote.votes || {}),
+    voteEndsAt: remote.voteEndsAt || null,
+    intermissionEndsAt: remote.intermissionEndsAt || null,
+    takeScored: Boolean(remote.takeScored),
+  };
+}
+
+export function guessLieToRemote(gl) {
+  return {
+    sessionId: gl.sessionId,
+    submissions: mapSubmissionsByUid(gl.submissions || {}),
+    lobbyComplete: Boolean(gl.lobbyComplete),
+    roundIdx: gl.roundIdx ?? 0,
+    phase: gl.phase || null,
+    votes: mapVotesByUid(gl.votes || {}),
+    roundScored: Boolean(gl.roundScored),
+  };
+}
+
+export function guessLieFromRemote(remote) {
+  if (!remote) return null;
+  return {
+    sessionId: remote.sessionId,
+    submissions: mapSubmissionsByName(remote.submissions || {}),
+    lobbyComplete: Boolean(remote.lobbyComplete),
+    currentRound: remote.roundIdx ?? 0,
+    roundIdx: remote.roundIdx ?? 0,
+    phase: remote.phase || null,
+    votes: mapVotesByName(remote.votes || {}),
+    roundScored: Boolean(remote.roundScored),
+  };
+}
+
+export function tierNightToRemote({ topicId, game, placements, finished }) {
+  return {
+    topicId: topicId || null,
+    game: game || null,
+    placements: mapPlacementsByUid(placements || {}),
+    finished: finished || {},
+  };
+}
+
+export function tierNightFromRemote(remote) {
+  if (!remote) return null;
+  return remote;
+}
+
+export function scoresToRemote(scoresByName = {}) {
+  const out = {};
+  Object.entries(scoresByName).forEach(([name, val]) => {
+    const uid = userIdForName(name) || name;
+    if (typeof val === "number" && Number.isFinite(val)) out[uid] = val;
+  });
+  return out;
+}
+
+function scoresFromRemote(remote = {}) {
+  const out = {};
+  Object.entries(remote).forEach(([uid, val]) => {
+    const name = nameForUserId(uid) || uid;
+    if (typeof val === "number" && Number.isFinite(val)) out[name] = val;
+  });
+  return out;
+}
+
+export function applyRemoteLobbyScores(remote) {
+  if (!remote || typeof remote !== "object") return;
+  const byName = scoresFromRemote(remote);
+  if (!Object.keys(byName).length) return;
+
+  const merged = { ...getState().scores };
+  Object.entries(byName).forEach(([name, pts]) => {
+    merged[name] = pts;
+  });
+  saveStatePatch({ scores: merged });
+}
+
+/** Hôte : pousse le cumul des scores vers game_sessions.state.scores */
+export async function syncLobbyScores() {
+  if (!isGameSyncActive() || !isLobbyHost()) return;
+  await patchGameState({ scores: scoresToRemote(getState().scores) });
+}
+
+export function applyRemoteSession(row) {
+  const prevScreen = cachedRow?.screen ?? null;
+  const sig = sessionSignature(row);
+  const sigUnchanged = sig === lastSessionSig;
+  if (!sigUnchanged) lastSessionSig = sig;
+
+  cachedRow = row;
+  if (!row?.state) {
+    notify(row);
+    if (!row && isGameSyncActive() && (isOnGameSetupScreen() || isOnPostGameScreen())) {
+      routeToSessionScreen("game-select", { force: true });
+    }
+    return;
+  }
+
+  const patch = {};
+  const st = row.state;
+
+  if (st.hotTake) {
+    patch.hotTakeGame = hotTakeFromRemote(st.hotTake);
+  }
+  if (st.guessLie) {
+    const gl = guessLieFromRemote(st.guessLie);
+    patch.guessLie = gl;
+  }
+  if (st.tierNight) {
+    const tn = tierNightFromRemote(st.tierNight);
+    if (tn.topicId != null) patch.tierNightTopicId = tn.topicId;
+    if (tn.game) patch.tierNightGame = tn.game;
+  }
+
+  if (Object.keys(patch).length) saveStatePatch(patch);
+
+  if (st.scores) applyRemoteLobbyScores(st.scores);
+
+  notify(row);
+
+  if (row?.screen && (!sigUnchanged || getCurrentScreen() !== row.screen)) {
+    handleSessionRoute(row, { fromScreen: prevScreen });
+  }
+}
+
+export async function refreshGameSession() {
+  const lobbyId = getState().lobby?.id;
+  if (!lobbyId) return null;
+  const row = await fetchGameSessionByLobby(lobbyId);
+  if (row) applyRemoteSession(row);
+  else {
+    cachedRow = null;
+    notify(null);
+  }
+  return row;
+}
+
+function navStackFor(screen) {
+  const base = ["home", "lobby", "game-select"];
+  const gameScreens = new Set([
+    "hottake-prep",
+    "hottake",
+    "guesslie-menu",
+    "guesslie-setup",
+    "guesslie-wait",
+    "guesslie",
+    "tiernight-select",
+    "tiernight-create",
+    "tiernight",
+    "tiernight-end",
+    "results",
+  ]);
+  if (gameScreens.has(screen)) return [...base, screen];
+  return [...base, screen];
+}
+
+export function routeToSessionScreen(screen, { force = false } = {}) {
+  if (!screen || routing) return;
+  const current = getCurrentScreen();
+  if (!force && current === screen) return;
+
+  routing = true;
+  try {
+    if (screen === "game-select") {
+      navigate("game-select", { navStack: navStackFor("game-select") });
+    } else if (screen === "lobby") {
+      navigate("lobby", { navStack: ["home", "lobby"] });
+    } else if (screen === "results") {
+      navigate("results", { navStack: navStackFor("results") });
+    } else {
+      navigate(screen, { navStack: navStackFor(screen) });
+    }
+  } finally {
+    routing = false;
+  }
+}
+
+export function suppressSessionRoute(ms = 45000, screen = getCachedGameSession()?.screen ?? null) {
+  suppressSessionRouteUntil = Date.now() + ms;
+  suppressSessionScreen = screen;
+}
+
+function clearSessionRouteSuppress() {
+  suppressSessionRouteUntil = 0;
+  suppressSessionScreen = null;
+}
+
+function isActiveGameSessionScreen(screen) {
+  if (!screen || MENU_SCREENS.has(screen)) return false;
+  if (POST_GAME_SCREENS.has(screen)) return false;
+  return true;
+}
+
+export function handleSessionRoute(row, { fromScreen = null } = {}) {
+  if (!row?.screen) return;
+  const current = getCurrentScreen();
+  if (row.screen === current) return;
+  if (isCompatibleSessionScreen(row.screen, current)) return;
+
+  const hostLaunchedFromMenu =
+    fromScreen === "game-select" && row.screen !== "game-select";
+
+  const sessionAdvanced =
+    suppressSessionScreen != null && row.screen !== suppressSessionScreen;
+
+  const catchUpFromMenu =
+    current === "game-select" &&
+    isActiveGameSessionScreen(row.screen) &&
+    row.screen !== suppressSessionScreen;
+
+  if (Date.now() < suppressSessionRouteUntil) {
+    if (hostLaunchedFromMenu || sessionAdvanced || catchUpFromMenu) {
+      clearSessionRouteSuppress();
+    } else {
+      return;
+    }
+  }
+
+  routeToSessionScreen(row.screen, { force: true });
+}
+
+/** Polling de secours si Realtime ne pousse pas l’événement (fréquent en local). */
+async function syncTick() {
+  if (!isGameSyncActive() || !getState().inLobby) {
+    stopMultiplayerSync();
+    return;
+  }
+  try {
+    const row = await refreshGameSession();
+    if (row) handleSessionRoute(row);
+  } catch (e) {
+    console.warn("REVEAL sync:", e.message || e);
+  }
+}
+
+export function startMultiplayerSync() {
+  if (!isGameSyncActive()) return;
+  stopMultiplayerSync();
+  syncTick();
+  pollTimer = setInterval(syncTick, 1500);
+}
+
+export function stopMultiplayerSync() {
+  if (pollTimer) {
+    clearInterval(pollTimer);
+    pollTimer = null;
+  }
+}
+
+export async function startGameSession(gameId, screen, state) {
+  if (!isGameSyncActive()) return null;
+  const lobbyId = getState().lobby.id;
+  const hostId = getSupabaseUserId();
+  if (!hostId) throw new Error("Session requise.");
+
+  const { setLobbyPlaying } = await import("./lobby.js");
+  await setLobbyPlaying(gameId);
+  const row = await upsertGameSession({
+    lobbyId,
+    gameId,
+    screen,
+    hostId,
+    state: {
+      scores: scoresToRemote(getState().scores),
+      ...(state || {}),
+    },
+  });
+  applyRemoteSession(row);
+  routeToSessionScreen(screen, { force: true });
+  return row;
+}
+
+export async function pushGameSession({ screen, gameId, state }) {
+  if (!isGameSyncActive()) return null;
+  const lobbyId = getState().lobby.id;
+  const current = cachedRow?.state || {};
+  const nextState = state ? { ...current, ...state } : current;
+  const patch = { state: nextState };
+  if (screen) patch.screen = screen;
+  if (gameId) patch.game_id = gameId;
+
+  const row = await updateGameSession(lobbyId, patch);
+  applyRemoteSession(row);
+  if (screen) handleSessionRoute(row);
+  return row;
+}
+
+export async function patchGameState(stateMerge, { screen, gameId } = {}) {
+  if (!isGameSyncActive()) return null;
+  const lobbyId = getState().lobby.id;
+  const current = cachedRow?.state || {};
+  const nextState = { ...current, ...stateMerge };
+  const patch = { state: nextState };
+  if (screen) patch.screen = screen;
+  if (gameId) patch.game_id = gameId;
+
+  const row = await updateGameSession(lobbyId, patch);
+  applyRemoteSession(row);
+  if (screen) handleSessionRoute(row);
+  return row;
+}
+
+export async function endGameSession() {
+  if (!isGameSyncActive()) return;
+  const lobbyId = getState().lobby.id;
+  await deleteGameSession(lobbyId);
+  cachedRow = null;
+  lastSessionSig = "";
+  const { setLobbyWaiting } = await import("./lobby.js");
+  await setLobbyWaiting();
+  notify(null);
+}
+
+/** Fin de partie : écran résultats pour tout le lobby (upsert, pas delete+update). */
+export async function completeGameSession({ gameId = "menu", screen = "results", state = {} } = {}) {
+  if (!isGameSyncActive()) return null;
+  const lobbyId = getState().lobby.id;
+  const hostId = getSupabaseUserId();
+  if (!hostId) return null;
+
+  const { setLobbyWaiting } = await import("./lobby.js");
+  await setLobbyWaiting();
+
+  const row = await upsertGameSession({
+    lobbyId,
+    gameId,
+    screen,
+    hostId,
+    state: {
+      scores: scoresToRemote(getState().scores),
+      ...(state || {}),
+    },
+  });
+  applyRemoteSession(row);
+  routeToSessionScreen(screen, { force: true });
+  return row;
+}
+
+function resetLocalGamePrepState() {
+  const code = getState().lobbyCode;
+  saveStatePatch({
+    hotTakeGame: {
+      customTakes: [],
+      ready: {},
+      lobbyStarted: false,
+      pausedBy: null,
+      selectedThemeId: "catalog",
+      roundCount: 5,
+      deck: null,
+      takeIdx: 0,
+      phase: null,
+      votes: {},
+      voteEndsAt: null,
+      intermissionEndsAt: null,
+      takeScored: false,
+    },
+    guessLie: {
+      sessionId: code,
+      submissions: {},
+      lobbyComplete: false,
+      roundIdx: 0,
+      phase: null,
+      votes: {},
+      roundScored: false,
+    },
+    tierNightTopicId: null,
+    tierNightGame: null,
+  });
+}
+
+export function isOnPostGameScreen(screen = getCurrentScreen()) {
+  return POST_GAME_SCREENS.has(screen);
+}
+
+/** Retour au menu jeux (hôte : ferme la session ; invité : navigation locale). */
+export async function returnToGameSelect() {
+  if (!isGameSyncActive()) return false;
+
+  if (isLobbyHost()) {
+    await endGameSession();
+    resetLocalGamePrepState();
+    routeToSessionScreen("game-select", { force: true });
+    return true;
+  }
+
+  suppressSessionRoute();
+  navigate("game-select", { navStack: ["home", "lobby", "game-select"] });
+  return true;
+}
+
+/** Quitter la préparation d’un jeu (retour au menu jeux) — multijoueur. */
+export async function leaveGameSetup() {
+  if (!isGameSyncActive() || !isLobbyHost()) return false;
+  return returnToGameSelect();
+}
+
+export async function syncHotTakeSession(extra = {}) {
+  const session = { ...getState().hotTakeGame, ...extra };
+  saveStatePatch({ hotTakeGame: session });
+  if (!isGameSyncActive()) return session;
+  await patchGameState({ hotTake: hotTakeToRemote(session) });
+  return session;
+}
+
+export async function syncGuessLieSession(extra = {}) {
+  const gl = { ...getState().guessLie, ...extra };
+  saveStatePatch({ guessLie: gl });
+  if (!isGameSyncActive()) return gl;
+  await patchGameState({ guessLie: guessLieToRemote(gl) });
+  return gl;
+}
+
+export async function commitGuessLiePlay(patch, { screen } = {}) {
+  const gl = await syncGuessLieSession(patch);
+  if (screen && isGameSyncActive()) {
+    await pushGameSession({ screen, gameId: "guesslie", state: { guessLie: guessLieToRemote(gl) } });
+  }
+  return gl;
+}
+
+export async function syncTierNightSession(payload) {
+  if (payload.topicId != null) saveStatePatch({ tierNightTopicId: payload.topicId });
+  if (payload.game) saveStatePatch({ tierNightGame: payload.game });
+  if (!isGameSyncActive()) return;
+  const cached = getTierNightRemote() || {};
+  const remote = tierNightToRemote({
+    topicId: payload.topicId ?? getState().tierNightTopicId,
+    game: payload.game ?? getState().tierNightGame,
+    placements: payload.placements ?? cached.placements,
+    finished: payload.finished ?? cached.finished,
+  });
+  await patchGameState({ tierNight: remote }, { screen: payload.screen, gameId: "tiernight" });
+}
+
+export function getActiveMemberUserIds() {
+  return (getState().lobby?.participants || [])
+    .map((p) => p.userId)
+    .filter(Boolean);
+}
+
+export function allMembersReady(readyMapByUid) {
+  const ids = getActiveMemberUserIds();
+  if (!ids.length) return false;
+  return ids.every((id) => readyMapByUid[id]);
+}
+
+export function getTierNightRemote() {
+  return getCachedGameSession()?.state?.tierNight || null;
+}
+
+export function getTierNightLobbyProgress() {
+  const finished = getTierNightRemote()?.finished || {};
+  return getLobbyParticipants().map((p) => ({
+    name: p.name,
+    emoji: p.emoji,
+    color: p.color,
+    userId: p.userId,
+    done: Boolean(p.userId && finished[p.userId]),
+  }));
+}
+
+export function allTierNightMembersFinished(finishedMap) {
+  const ids = getActiveMemberUserIds();
+  if (!ids.length) return false;
+  const map = finishedMap ?? getTierNightRemote()?.finished ?? {};
+  return ids.every((id) => map[id]);
+}
+
+export function ensureTierNightRecapsFromRemote(list) {
+  const session = getTierNightSession();
+  if (session.topicId === list.id && (session.recaps?.length || 0) > 0) return;
+
+  const tn = getTierNightRemote();
+  if (!tn) return;
+
+  const placements = tn.placements || {};
+  const byName = {};
+  getLobbyParticipants().forEach((p) => {
+    if (p.userId && placements[p.userId]) byName[p.name] = placements[p.userId];
+  });
+
+  buildRecapsFromPlacements(list.id, list.name, list.items, byName);
+  recordTierNightPlayed();
+}
+
+/** Hôte uniquement : passe à l’écran résultats quand tout le lobby a terminé. */
+export async function advanceTierNightToResultsWhenReady(list) {
+  if (!isGameSyncActive() || !isLobbyHost()) return false;
+  if (!allTierNightMembersFinished()) return false;
+
+  ensureTierNightRecapsFromRemote(list);
+  await pushGameSession({ screen: "tiernight-end", gameId: "tiernight", state: {} });
+  navigate("tiernight-end");
+  return true;
+}
+
+export function allMembersVoted(votesByUid, options = {}) {
+  const { excludeUserId = null } = options;
+  const ids = getActiveMemberUserIds().filter((id) => id !== excludeUserId);
+  if (!ids.length) return false;
+  return ids.every((id) => votesByUid[id] != null && votesByUid[id] !== "");
+}
+
+export function initGameSyncFromLobby(row) {
+  if (row) applyRemoteSession(row);
+}

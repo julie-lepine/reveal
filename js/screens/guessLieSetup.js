@@ -91,10 +91,10 @@ export function mountGuessLieSetup(app) {
 
   inputs.forEach((el) => el?.addEventListener("input", validate));
 
-  goBtn.addEventListener("click", () => {
+  goBtn.addEventListener("click", async () => {
     const statements = inputs.map((el) => el.value.trim());
     if (statements.some((s) => !s) || lieIndex === null) return;
-    setLocalGuessLieSubmission(statements, lieIndex);
+    await setLocalGuessLieSubmission(statements, lieIndex);
     navigate("guesslie-wait", { reset: true });
   });
 

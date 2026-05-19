@@ -1,4 +1,15 @@
 import { getState, saveStatePatch, renameLocalPlayer, setLocalEmoji } from "./state.js";
+import { isSupabaseConfigured } from "./supabaseClient.js";
+import {
+  signUpWithEmail as sbSignUp,
+  signInWithEmail as sbSignIn,
+  signInAsGuest as sbGuest,
+  signInWithOAuth as sbOAuth,
+  signOutSupabase,
+  updatePassword,
+} from "./supabaseAuth.js";
+import { upsertProfile } from "./supabaseProfile.js";
+import { getSupabaseUserId } from "./supabaseAuth.js";
 import {
   registerEmailAccount,
   verifyEmailAccount,
@@ -6,6 +17,8 @@ import {
   updateEmailAccountName,
   changeEmailAccountPassword,
 } from "./authCredentials.js";
+import { unsubscribeLobbyRealtime, updateLobbyMemberProfileSupabase } from "./supabaseLobby.js";
+import { stopMultiplayerSync } from "./gameSync.js";
 
 export function isLoggedIn() {
   const user = getState().user;
@@ -18,10 +31,12 @@ export function isGuest() {
 
 export function isEmailAccount() {
   const user = getState().user;
+  if (isSupabaseConfigured()) {
+    return Boolean(user?.loggedIn && !user?.isGuest && user?.provider === "email");
+  }
   return Boolean(user?.loggedIn && !user?.isGuest && user?.provider === "email");
 }
 
-/** Compte ou invité avec pseudo */
 export function canPlay() {
   const user = getState().user;
   return Boolean(user?.loggedIn || user?.isGuest);
@@ -35,7 +50,11 @@ export function getUser() {
   return getState().user;
 }
 
-export function loginWithEmail(email, password) {
+export async function loginWithEmail(email, password) {
+  if (isSupabaseConfigured()) {
+    return sbSignIn(email, password);
+  }
+
   const trimmed = email.trim().toLowerCase();
   if (!trimmed || !password) return { ok: false, error: "Email et mot de passe requis." };
 
@@ -61,7 +80,11 @@ export function loginWithEmail(email, password) {
   return { ok: true };
 }
 
-export function signupWithEmail(email, password, name) {
+export async function signupWithEmail(email, password, name) {
+  if (isSupabaseConfigured()) {
+    return sbSignUp(email, password, name);
+  }
+
   const trimmed = email.trim().toLowerCase();
   const displayName = (name || trimmed.split("@")[0]).trim().slice(0, 24);
   if (!trimmed || !password || password.length < 4) {
@@ -70,7 +93,6 @@ export function signupWithEmail(email, password, name) {
   if (displayName.length < 2) {
     return { ok: false, error: "Choisis un pseudo (2 caractères min.)." };
   }
-
   if (hasEmailAccount(trimmed)) {
     return { ok: false, error: "Un compte existe déjà pour cet email. Connecte-toi." };
   }
@@ -88,8 +110,19 @@ export function signupWithEmail(email, password, name) {
   return { ok: true };
 }
 
-export function loginWithSocial(provider) {
-  const names = { google: "Joueur Google", apple: "Joueur Apple", discord: "Joueur Discord" };
+/** Facebook OAuth (Meta). Instagram utilise le même fournisseur Meta. */
+export async function loginWithSocial(provider) {
+  if (isSupabaseConfigured()) {
+    if (provider === "instagram") {
+      return sbOAuth("facebook");
+    }
+    if (provider === "facebook") {
+      return sbOAuth("facebook");
+    }
+    return { ok: false, error: "Connexion sociale non disponible." };
+  }
+
+  const names = { facebook: "Joueur Facebook", instagram: "Joueur Instagram" };
   saveStatePatch({
     user: {
       email: `${provider}@reveal.app`,
@@ -102,8 +135,11 @@ export function loginWithSocial(provider) {
   return { ok: true };
 }
 
-/** Invité : pseudo uniquement, pas de compte */
-export function loginAsGuest(displayName) {
+export async function loginAsGuest(displayName) {
+  if (isSupabaseConfigured()) {
+    return sbGuest(displayName);
+  }
+
   const name = displayName.trim().slice(0, 24);
   if (name.length < 2) {
     return { ok: false, error: "Choisis un pseudo (2 caractères min.)." };
@@ -120,9 +156,24 @@ export function loginAsGuest(displayName) {
   return { ok: true };
 }
 
-export function updateProfileName(name) {
+export async function updateProfileName(name) {
   const res = renameLocalPlayer(name);
   if (!res.ok) return res;
+
+  if (isSupabaseConfigured()) {
+    const userId = getSupabaseUserId();
+    if (userId) {
+      try {
+        await upsertProfile({ userId, displayName: res.name, emoji: getState().user?.emoji });
+        if (getState().lobby?.id) {
+          await updateLobbyMemberProfileSupabase({ displayName: res.name });
+        }
+      } catch (e) {
+        return { ok: false, error: e.message || "Erreur profil." };
+      }
+    }
+    return res;
+  }
 
   const user = getState().user;
   if (user?.provider === "email" && user.email) {
@@ -131,21 +182,58 @@ export function updateProfileName(name) {
   return res;
 }
 
-export function updateProfileEmoji(emoji) {
-  return setLocalEmoji(emoji);
+export async function updateProfileEmoji(emoji) {
+  const res = setLocalEmoji(emoji);
+  if (!res.ok) return res;
+
+  if (isSupabaseConfigured()) {
+    const userId = getSupabaseUserId();
+    if (userId) {
+      try {
+        await upsertProfile({
+          userId,
+          displayName: getState().user?.name || "Joueur",
+          emoji: res.emoji,
+        });
+        if (getState().lobby?.id) {
+          await updateLobbyMemberProfileSupabase({ emoji: res.emoji });
+        }
+      } catch (e) {
+        return { ok: false, error: e.message || "Erreur profil." };
+      }
+    }
+  }
+  return res;
 }
 
-export function changeEmailPassword(currentPassword, newPassword) {
+export async function changeEmailPassword(_currentPassword, newPassword) {
   const user = getState().user;
   if (!isEmailAccount() || !user.email) {
     return { ok: false, error: "Réservé aux comptes connectés par email." };
   }
-  return changeEmailAccountPassword(user.email, currentPassword, newPassword);
+
+  if (isSupabaseConfigured()) {
+    if (!newPassword || newPassword.length < 4) {
+      return { ok: false, error: "Le nouveau mot de passe doit faire au moins 4 caractères." };
+    }
+    return updatePassword(newPassword);
+  }
+
+  return changeEmailAccountPassword(user.email, _currentPassword, newPassword);
 }
 
-export function logout() {
+export async function logout() {
+  if (isSupabaseConfigured()) {
+    stopMultiplayerSync();
+    unsubscribeLobbyRealtime();
+    await signOutSupabase();
+    saveStatePatch({ inLobby: false, lobby: null, lobbyCode: null });
+    return;
+  }
   saveStatePatch({
     user: { email: null, name: null, loggedIn: false, isGuest: false, provider: null },
     inLobby: false,
+    lobby: null,
+    lobbyCode: null,
   });
 }

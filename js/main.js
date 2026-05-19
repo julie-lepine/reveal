@@ -1,6 +1,7 @@
 import { initRouter, registerScreen, navigate, resetNav } from "./core/router.js";
 import { initBottomNav } from "./core/bottomNav.js";
 import { parseJoinCodeFromHash } from "./core/lobby.js";
+import { initSupabaseAuth } from "./core/supabaseAuth.js";
 import { mountHome } from "./screens/home.js";
 import { mountLobby } from "./screens/lobby.js";
 import { mountGameSelect } from "./screens/gameSelect.js";
@@ -53,5 +54,10 @@ registerScreen("tiernight", mountTierNight);
 
 initBottomNav();
 
-resetNav();
-navigate("home", { reset: true });
+async function boot() {
+  await initSupabaseAuth();
+  resetNav();
+  navigate("home", { reset: true });
+}
+
+boot();

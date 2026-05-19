@@ -10,6 +10,18 @@ import {
 import { loginAsGuest } from "./auth.js";
 import { syncAllPlayerScores } from "./players.js";
 import { navigate } from "./router.js";
+import { isSupabaseConfigured } from "./supabaseClient.js";
+import {
+  createLobbySupabase,
+  joinLobbySupabase,
+  refreshLobbyFromSupabase,
+  setLocalReadySupabase,
+  setLobbyStatusSupabase,
+  addLobbyMessageSupabase,
+  subscribeLobbyRealtime,
+  unsubscribeLobbyRealtime,
+  sendLobbyNudgeSupabase,
+} from "./supabaseLobby.js";
 
 const MAX_PLAYERS = 10;
 
@@ -58,13 +70,21 @@ export function getLobbyGameId() {
   return getLobby()?.gameId || null;
 }
 
-export function setLobbyPlaying(gameId) {
+export async function setLobbyPlaying(gameId) {
+  if (isSupabaseConfigured() && getLobby()?.id) {
+    await setLobbyStatusSupabase("playing", gameId);
+    return;
+  }
   const lobby = { ...getLobby(), status: "playing", gameId };
   saveStatePatch({ lobby });
   if (lobby.code) publishOpenLobby(lobby.code, lobby);
 }
 
-export function setLobbyWaiting() {
+export async function setLobbyWaiting() {
+  if (isSupabaseConfigured() && getLobby()?.id) {
+    await setLobbyStatusSupabase("waiting", null);
+    return;
+  }
   const lobby = { ...getLobby(), status: "waiting", gameId: null };
   const participants = (lobby.participants || []).map((p) => ({ ...p, ready: false }));
   const next = { ...lobby, participants };
@@ -72,10 +92,15 @@ export function setLobbyWaiting() {
   if (next.code) publishOpenLobby(next.code, next);
 }
 
-/** Tous les joueurs repassent en non-prêt */
-export function resetAllParticipantsReady() {
+export async function resetAllParticipantsReady() {
   const lobby = getLobby();
   if (!lobby?.participants?.length) return;
+
+  if (isSupabaseConfigured() && lobby.id) {
+    await setLocalReadySupabase(false);
+    return;
+  }
+
   const participants = lobby.participants.map((p) => ({ ...p, ready: false }));
   const next = { ...lobby, participants };
   saveStatePatch({ lobby: next });
@@ -87,7 +112,6 @@ export function hasActiveLobby() {
   return Boolean(getState().inLobby && lobby?.code && lobby.participants?.length);
 }
 
-/** Accueil → salon d’attente (pas la liste des jeux) */
 export function goToLobby() {
   const lobby = getLobby();
   if (!lobby?.code || !lobby.participants?.length) {
@@ -98,7 +122,6 @@ export function goToLobby() {
   navigate("lobby", { navStack: ["home", "lobby"] });
 }
 
-/** Accueil (partie en cours) → choix des jeux */
 export function goToGameSelect() {
   if (!hasActiveLobby()) {
     navigate("home", { reset: true });
@@ -127,7 +150,13 @@ export function parseJoinCodeFromHash() {
   return m ? decodeURIComponent(m[1]) : null;
 }
 
-export function createLobby() {
+export async function createLobby() {
+  if (isSupabaseConfigured()) {
+    const res = await createLobbySupabase();
+    if (!res.ok) throw new Error(res.error);
+    return res.code;
+  }
+
   const code = genLobbyCode();
   const participants = [localParticipant(false, { asHost: true })];
   ensurePlayerScore(getLocalDisplayName());
@@ -143,7 +172,11 @@ export function createLobby() {
   return code;
 }
 
-export function joinLobby(code) {
+export async function joinLobby(code) {
+  if (isSupabaseConfigured()) {
+    return joinLobbySupabase(code);
+  }
+
   const trimmed = code.trim().toUpperCase().replace(/\s/g, "");
   if (trimmed.length < 4) return { ok: false, error: "Code invalide." };
 
@@ -187,13 +220,17 @@ export function joinLobby(code) {
   return { ok: true, code: trimmed };
 }
 
-export function joinLobbyAsGuest(code, guestName) {
-  const auth = loginAsGuest(guestName);
+export async function joinLobbyAsGuest(code, guestName) {
+  const auth = await loginAsGuest(guestName);
   if (!auth.ok) return auth;
   return joinLobby(code);
 }
 
-export function setLocalReady(ready) {
+export async function setLocalReady(ready) {
+  if (isSupabaseConfigured() && getLobby()?.id) {
+    await setLocalReadySupabase(ready);
+    return;
+  }
   const participants = getLobbyParticipants().map((p) =>
     p.isLocal ? { ...p, ready } : p
   );
@@ -202,9 +239,9 @@ export function setLocalReady(ready) {
   if (lobby.code) publishOpenLobby(lobby.code, lobby);
 }
 
-export function toggleLocalReady() {
+export async function toggleLocalReady() {
   const local = getLobbyParticipants().find((p) => p.isLocal);
-  setLocalReady(!local?.ready);
+  await setLocalReady(!local?.ready);
 }
 
 export function getReadyCount() {
@@ -215,7 +252,39 @@ export function getReadyCount() {
   };
 }
 
+export function allLobbyMembersReady() {
+  const { ready, total } = getReadyCount();
+  return total > 0 && ready === total;
+}
+
+export function getNotReadyParticipants() {
+  return getLobbyParticipants().filter((p) => !p.ready);
+}
+
+export function getLobbyNudge() {
+  const lobby = getLobby();
+  return {
+    at: lobby?.nudgeAt || 0,
+    forUserId: lobby?.nudgeForUserId || null,
+  };
+}
+
+export async function sendLobbyNudgeToNotReady() {
+  if (!isSupabaseConfigured()) {
+    return { ok: false, error: "Wizz disponible avec le lobby en ligne (Supabase)." };
+  }
+  const notReady = getNotReadyParticipants().filter((p) => !p.isHost);
+  if (!notReady.length) {
+    return { ok: false, error: "Tout le monde est déjà prêt." };
+  }
+  return sendLobbyNudgeSupabase(null);
+}
+
 export function simulateLobbyJoins(onUpdate) {
+  if (isSupabaseConfigured()) {
+    return subscribeLobbyRealtime(onUpdate);
+  }
+
   const pool = PLAYERS.filter(
     (p) => !getLobbyParticipants().some((x) => x.name === p.name)
   );
@@ -247,7 +316,11 @@ export function getLobbyMessages() {
   return getLobby().messages || [];
 }
 
-export function addLobbyMessage(text) {
+export async function addLobbyMessage(text) {
+  if (isSupabaseConfigured() && getLobby()?.id) {
+    await addLobbyMessageSupabase(text);
+    return;
+  }
   const trimmed = text.trim();
   if (!trimmed) return;
   const messages = [
@@ -265,4 +338,4 @@ function incrementGlobalStat(key) {
   saveStatePatch({ globalStats: gs });
 }
 
-export { MAX_PLAYERS };
+export { MAX_PLAYERS, unsubscribeLobbyRealtime };

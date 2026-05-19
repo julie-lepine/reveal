@@ -4,7 +4,6 @@ import {
   HOT_TAKE_TIMER_SEC,
 } from "../../data/hotTakes.js";
 
-/** Pause entre deux hot takes — source unique pour le jeu */
 const HOT_TAKE_INTERMISSION_SEC = 5;
 import {
   getAllTakesForGame,
@@ -14,8 +13,11 @@ import {
   clearHotTakePause,
   simulateLobbyVotes,
   getMajorityOption,
+  commitHotTakePlay,
+  allHotTakeVotesIn,
 } from "../core/hotTakeSession.js";
 import { awardHotTakeVotes } from "../core/scoring.js";
+import { gameCumulativeScoresHtml } from "../core/gameScores.js";
 import { getLocalDisplayName, recordHotTakePlayed, setLastGame } from "../core/state.js";
 import { setLobbyPlaying, setLobbyWaiting } from "../core/lobby.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
@@ -23,6 +25,13 @@ import { navigate } from "../core/router.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
 import { bindNav } from "../screens/nav.js";
 import { onTimerSecond, primeTimerSound } from "../core/timerSound.js";
+import {
+  isGameSyncActive,
+  isLobbyHost,
+  onGameSessionChange,
+  completeGameSession,
+  syncLobbyScores,
+} from "../core/gameSync.js";
 
 export function mountHotTake(app) {
   if (!requireLobbyPlay()) return null;
@@ -52,6 +61,7 @@ export function mountHotTake(app) {
   let intervalId = null;
   let paused = false;
   const localName = getLocalDisplayName();
+  const mp = isGameSyncActive();
 
   function clearTimer() {
     if (intervalId) {
@@ -60,10 +70,42 @@ export function mountHotTake(app) {
     }
   }
 
+  function secondsUntil(iso) {
+    if (!iso) return null;
+    return Math.max(0, Math.ceil((new Date(iso).getTime() - Date.now()) / 1000));
+  }
+
+  function syncFromSession() {
+    const s = getHotTakeSession();
+    if (s.takeIdx != null) takeIdx = s.takeIdx;
+    if (s.phase) phase = s.phase;
+    votes = { ...(s.votes || {}) };
+    myVote = votes[localName] ?? null;
+    paused = Boolean(s.pausedBy);
+    takeScored = Boolean(s.takeScored);
+    if (phase === "voting" && s.voteEndsAt) {
+      timer = secondsUntil(s.voteEndsAt) ?? timer;
+    }
+    if (phase === "intermission" && s.intermissionEndsAt) {
+      intermissionTimer = secondsUntil(s.intermissionEndsAt) ?? intermissionTimer;
+    }
+    if (phase === "reveal" && takeScored && !lastAward) {
+      lastAward = getMajorityOption(votes, HOT_TAKE_OPTIONS);
+    }
+  }
+
   function takeLabel(take) {
-    const text = typeof take === "string" ? take : take.text;
-    const author = typeof take === "object" && take.author ? take.author : null;
-    return { text, author };
+    if (typeof take === "string") return { text: take, author: null, themeId: null };
+    return {
+      text: take.text,
+      author: take.author || null,
+      themeId: take.themeId || null,
+    };
+  }
+
+  function takeAuthorLine(take) {
+    if (take.themeId !== "custom" || !take.author) return "";
+    return `<p class="hot-take-author">Hot take de ${escapeHtml(take.author)}</p>`;
   }
 
   function voteCounts() {
@@ -108,30 +150,98 @@ export function mountHotTake(app) {
     if (hint) hint.textContent = `Lancement du vote dans ${intermissionTimer} s…`;
   }
 
-  function startNextTakeVote() {
-    phase = "voting";
-    timer = HOT_TAKE_TIMER_SEC;
-    myVote = null;
-    votes = {};
-    paused = false;
-    clearHotTakePause();
-    render();
-    startVoteTimer();
+  async function goToReveal() {
+    if (!takeScored) {
+      lastAward = awardHotTakeVotes(votes, HOT_TAKE_OPTIONS);
+      takeScored = true;
+      if (mp && isLobbyHost()) await syncLobbyScores();
+    }
+    if (mp) {
+      await commitHotTakePlay({
+        phase: "reveal",
+        takeScored: true,
+        votes,
+        voteEndsAt: null,
+      });
+    } else {
+      phase = "reveal";
+      render();
+    }
+  }
+
+  async function startVotePhase() {
+    if (mp && !isLobbyHost()) return;
+    const endsAt = new Date(Date.now() + HOT_TAKE_TIMER_SEC * 1000).toISOString();
+    if (mp) {
+      await commitHotTakePlay({
+        phase: "voting",
+        votes: {},
+        takeScored: false,
+        voteEndsAt: endsAt,
+        intermissionEndsAt: null,
+        pausedBy: null,
+      });
+    } else {
+      phase = "voting";
+      timer = HOT_TAKE_TIMER_SEC;
+      myVote = null;
+      votes = {};
+      paused = false;
+      clearHotTakePause();
+      render();
+      startVoteTimer();
+    }
+  }
+
+  async function startNextTakeVote() {
+    if (mp && !isLobbyHost()) return;
+    if (mp) {
+      await commitHotTakePlay({
+        phase: "voting",
+        takeIdx,
+        votes: {},
+        takeScored: false,
+        voteEndsAt: new Date(Date.now() + HOT_TAKE_TIMER_SEC * 1000).toISOString(),
+        intermissionEndsAt: null,
+        pausedBy: null,
+      });
+    } else {
+      phase = "voting";
+      timer = HOT_TAKE_TIMER_SEC;
+      myVote = null;
+      votes = {};
+      paused = false;
+      clearHotTakePause();
+      render();
+      startVoteTimer();
+    }
   }
 
   function render() {
+    syncFromSession();
     const take = takeLabel(TAKES[takeIdx]);
     const total = TAKES.length;
     const counts = voteCounts();
     const totalVotes = Object.values(counts).reduce((a, b) => a + b, 0);
     const { majority } = getMajorityOption(votes, HOT_TAKE_OPTIONS);
+    const host = !mp || isLobbyHost();
+    const voteHint = mp
+      ? myVote
+        ? allHotTakeVotesIn()
+          ? "Tout le monde a voté !"
+          : "En attente des autres joueurs…"
+        : "Choisis ton camp !"
+      : myVote
+        ? "Les autres votent en même temps (NPC)."
+        : "Choisis ton camp !";
 
     let phaseHtml = "";
 
     if (phase === "question") {
-      phaseHtml = `
-        <p class="hint">Vote simultané du lobby — lance le chrono quand tout le monde est prêt.</p>
-        <button type="button" class="btn btn-primary" id="start-vote">Lancer le vote →</button>`;
+      phaseHtml = host
+        ? `<p class="hint">Vote simultané — lance le chrono quand tout le monde est prêt.</p>
+        <button type="button" class="btn btn-primary" id="start-vote">Lancer le vote →</button>`
+        : `<p class="hint">En attente que l'hôte lance le vote…</p>`;
     }
 
     if (phase === "voting") {
@@ -151,17 +261,18 @@ export function mountHotTake(app) {
             </button>`
           ).join("")}
         </div>
-        <button type="button" class="btn btn-secondary btn--spaced" id="btn-pause">${paused ? "Reprendre" : "Pause"}</button>
-        <p class="hint">${myVote ? "Les autres votent en même temps (NPC)." : "Choisis ton camp !"}</p>`;
+        ${host ? `<button type="button" class="btn btn-secondary btn--spaced" id="btn-pause">${paused ? "Reprendre" : "Pause"}</button>` : ""}
+        <p class="hint">${voteHint}</p>`;
     }
 
     if (phase === "reveal") {
       const awardHtml = lastAward
-        ? `<p class="hint">Majorité : <strong style="color:${HOT_TAKE_OPTION_COLORS[lastAward.majority]}">${lastAward.majority}</strong> — camp majoritaire +${12} pts, dissent +${18} pts</p>`
+        ? `<p class="hint">Majorité : <strong style="color:${HOT_TAKE_OPTION_COLORS[lastAward.majority]}">${lastAward.majority}</strong> — camp majoritaire +12 pts, dissent +18 pts</p>`
         : "";
       phaseHtml = `
         <h3 class="section-title">Résultats du vote</h3>
         ${awardHtml}
+        ${gameCumulativeScoresHtml({ gameLabel: "Hot Take", title: "Cumul des scores" })}
         ${HOT_TAKE_OPTIONS.map((opt) => {
           const n = counts[opt] || 0;
           const pct = totalVotes ? Math.round((n / totalVotes) * 100) : 0;
@@ -187,9 +298,13 @@ export function mountHotTake(app) {
             )
             .join("")}
         </div>
-        <button type="button" class="btn btn-primary btn--spaced" id="next-take">
+        ${
+          host
+            ? `<button type="button" class="btn btn-primary btn--spaced" id="next-take">
           ${takeIdx < total - 1 ? "Prochain Hot Take →" : "Voir les résultats →"}
-        </button>`;
+        </button>`
+            : `<p class="hint">En attente de l'hôte pour la suite…</p>`
+        }`;
     }
 
     if (phase === "intermission") {
@@ -211,7 +326,7 @@ export function mountHotTake(app) {
             ? `<p class="intermission-label">Pause avant la suite…</p>`
             : `<div class="card card--hot">
           <p class="label-upper label-upper--hot">🔥 Hot Take #${takeIdx + 1}</p>
-          ${take.author ? `<p class="hot-take-author">Par ${escapeHtml(take.author)}</p>` : ""}
+          ${takeAuthorLine(take)}
           <p class="hot-take-text">"${escapeHtml(take.text)}"</p>
         </div>`
         }
@@ -221,64 +336,97 @@ export function mountHotTake(app) {
 
     bindNav(app);
 
-    app.querySelector("#start-vote")?.addEventListener("click", () => {
-      phase = "voting";
-      timer = HOT_TAKE_TIMER_SEC;
-      myVote = null;
-      votes = {};
-      paused = false;
-      clearHotTakePause();
-      render();
-      startVoteTimer();
-    });
+    app.querySelector("#start-vote")?.addEventListener("click", () => startVotePhase());
 
     app.querySelectorAll("[data-vote]").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        if (paused) return;
-        myVote = btn.getAttribute("data-vote");
-        votes = simulateLobbyVotes(myVote, HOT_TAKE_OPTIONS);
+      btn.addEventListener("click", async () => {
+        if (paused || myVote) return;
+        const choice = btn.getAttribute("data-vote");
+        myVote = choice;
+        votes = { ...votes, [localName]: choice };
+        if (mp) {
+          await commitHotTakePlay({ votes });
+          if (allHotTakeVotesIn() && isLobbyHost()) await goToReveal();
+        } else {
+          votes = simulateLobbyVotes(choice, HOT_TAKE_OPTIONS);
+          render();
+          if (!intervalId) startVoteTimer();
+        }
         render();
-        if (!intervalId) startVoteTimer();
       });
     });
 
-    app.querySelector("#btn-pause")?.addEventListener("click", () => {
+    app.querySelector("#btn-pause")?.addEventListener("click", async () => {
       if (!paused) {
         paused = true;
         clearTimer();
-        setHotTakePausedBy(localName);
+        await setHotTakePausedBy(localName);
       } else {
         paused = false;
-        clearHotTakePause();
+        await clearHotTakePause();
         if (phase === "voting") startVoteTimer();
       }
       render();
     });
 
-    app.querySelector("#next-take")?.addEventListener("click", () => {
+    app.querySelector("#next-take")?.addEventListener("click", async () => {
       if (!takeScored) {
         lastAward = awardHotTakeVotes(votes, HOT_TAKE_OPTIONS);
         takeScored = true;
+        if (mp && isLobbyHost()) await syncLobbyScores();
       }
 
       if (takeIdx < total - 1) {
-        takeIdx += 1;
-        phase = "intermission";
-        intermissionTimer = HOT_TAKE_INTERMISSION_SEC;
-        myVote = null;
-        votes = {};
-        lastAward = null;
-        takeScored = false;
-        render();
-        startIntermission();
+        const nextIdx = takeIdx + 1;
+        if (mp) {
+          const intermissionEndsAt = new Date(
+            Date.now() + HOT_TAKE_INTERMISSION_SEC * 1000
+          ).toISOString();
+          await commitHotTakePlay({
+            takeIdx: nextIdx,
+            phase: "intermission",
+            votes: {},
+            takeScored: false,
+            voteEndsAt: null,
+            intermissionEndsAt,
+          });
+          takeIdx = nextIdx;
+          phase = "intermission";
+          intermissionTimer = HOT_TAKE_INTERMISSION_SEC;
+          myVote = null;
+          votes = {};
+          lastAward = null;
+          takeScored = false;
+          render();
+          if (isLobbyHost()) startIntermission();
+        } else {
+          takeIdx = nextIdx;
+          phase = "intermission";
+          intermissionTimer = HOT_TAKE_INTERMISSION_SEC;
+          myVote = null;
+          votes = {};
+          lastAward = null;
+          takeScored = false;
+          render();
+          startIntermission();
+        }
       } else {
         recordHotTakePlayed();
         setLastGame({
           gameId: "hottake",
           title: "Hot Take",
-          summary: `${total} prises · dernière majorité : ${lastAward.majority}`,
+          summary: `${total} prises · dernière majorité : ${lastAward?.majority || "—"}`,
         });
-        setLobbyWaiting();
+        if (mp) {
+          try {
+            await completeGameSession({ gameId: "hottake", screen: "results", state: {} });
+          } catch (e) {
+            console.warn("REVEAL completeGameSession:", e);
+            navigate("results", { navStack: ["home", "lobby", "game-select", "results"] });
+          }
+        } else {
+          setLobbyWaiting();
+        }
         navigate("results");
       }
     });
@@ -286,10 +434,16 @@ export function mountHotTake(app) {
 
   function startVoteTimer() {
     clearTimer();
+    if (mp && !getHotTakeSession().voteEndsAt) return;
     primeTimerSound();
-    intervalId = setInterval(() => {
+
+    const tick = async () => {
       if (paused) return;
-      timer -= 1;
+      if (mp) {
+        timer = secondsUntil(getHotTakeSession().voteEndsAt) ?? 0;
+      } else {
+        timer -= 1;
+      }
       onTimerSecond({ remaining: timer, urgentAt: 3 });
       const timerEl = app.querySelector("#timer-el");
       const progressEl = app.querySelector("#progress-el");
@@ -299,41 +453,74 @@ export function mountHotTake(app) {
       }
       if (timer <= 0) {
         clearTimer();
-        if (!myVote) {
-          myVote = HOT_TAKE_OPTIONS[0];
-          votes = simulateLobbyVotes(myVote, HOT_TAKE_OPTIONS);
+        if (!mp) {
+          if (!myVote) {
+            myVote = HOT_TAKE_OPTIONS[0];
+            votes = simulateLobbyVotes(myVote, HOT_TAKE_OPTIONS);
+          }
+          phase = "reveal";
+          if (!takeScored) {
+            lastAward = awardHotTakeVotes(votes, HOT_TAKE_OPTIONS);
+            takeScored = true;
+          }
+          clearHotTakePause();
+          render();
+        } else if (isLobbyHost()) {
+          if (!myVote) {
+            myVote = HOT_TAKE_OPTIONS[0];
+            votes = { ...votes, [localName]: myVote };
+          }
+          await goToReveal();
         }
-        phase = "reveal";
-        if (!takeScored) {
-          lastAward = awardHotTakeVotes(votes, HOT_TAKE_OPTIONS);
-          takeScored = true;
-        }
-        clearHotTakePause();
-        render();
       }
-    }, 1000);
+    };
+
+    tick();
+    intervalId = setInterval(tick, 1000);
   }
 
   function startIntermission() {
     clearTimer();
+    if (mp && !getHotTakeSession().intermissionEndsAt) return;
     primeTimerSound();
-    intermissionTimer = HOT_TAKE_INTERMISSION_SEC;
-    updateIntermissionUi();
-    intervalId = setInterval(() => {
-      intermissionTimer -= 1;
+
+    const tick = async () => {
+      if (mp) {
+        intermissionTimer = secondsUntil(getHotTakeSession().intermissionEndsAt) ?? 0;
+      } else {
+        intermissionTimer -= 1;
+      }
       onTimerSecond({ remaining: intermissionTimer, urgentAt: 3 });
+      updateIntermissionUi();
       if (intermissionTimer <= 0) {
         clearTimer();
-        startNextTakeVote();
-        return;
+        if (!mp || isLobbyHost()) await startNextTakeVote();
       }
-      updateIntermissionUi();
-    }, 1000);
+    };
+
+    tick();
+    intervalId = setInterval(tick, 1000);
   }
 
+  const unsubGame = onGameSessionChange(() => {
+    const prevPhase = phase;
+    syncFromSession();
+    render();
+    if (phase === "voting" && prevPhase !== "voting") startVoteTimer();
+    if (phase === "intermission" && prevPhase !== "intermission") startIntermission();
+    if (phase === "reveal" && takeScored && !lastAward) {
+      lastAward = getMajorityOption(votes, HOT_TAKE_OPTIONS);
+    }
+  });
+
+  syncFromSession();
   render();
+  if (phase === "voting") startVoteTimer();
+  if (phase === "intermission") startIntermission();
+
   return () => {
     clearTimer();
-    setLobbyWaiting();
+    unsubGame();
+    if (!mp) setLobbyWaiting();
   };
 }

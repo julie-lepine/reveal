@@ -1,7 +1,6 @@
-import { getLocalDisplayName, markGuessLieLobbyComplete, setGuessLieSubmission } from "../core/state.js";
+import { getLocalDisplayName, markGuessLieLobbyComplete } from "../core/state.js";
 import {
   allLobbySubmitted,
-  fallbackForPlayer,
   getGuessLieSession,
   getLobbyMemberNames,
 } from "../core/guessLieSession.js";
@@ -9,17 +8,18 @@ import { requireLobbyPlay } from "../core/gameGuard.js";
 import { navigate } from "../core/router.js";
 import { escapeHtml, logoHtml, pageShell } from "../core/ui.js";
 import { bindNav } from "./nav.js";
+import { isGameSyncActive, isLobbyHost, onGameSessionChange } from "../core/gameSync.js";
 
 export function mountGuessLieLobbyWait(app) {
   if (!requireLobbyPlay()) return null;
 
-  let intervalId = null;
-  let simIdx = 0;
   const localName = getLocalDisplayName();
+  const mp = isGameSyncActive();
 
   function render() {
     const session = getGuessLieSession();
     const members = getLobbyMemberNames();
+    const allReady = allLobbySubmitted();
 
     app.innerHTML = pageShell({
       back: false,
@@ -41,19 +41,21 @@ export function mountGuessLieLobbyWait(app) {
             <div class="lobby-player ${ready ? "lobby-player--ready" : ""}">
               <span class="lobby-player__status">${ready ? "✓" : "…"}</span>
               <span class="lobby-player__name">${escapeHtml(name)}${name === localName ? " (vous)" : ""}</span>
-            </div>>`;
+            </div>`;
             })
             .join("")}
-        </div>>
+        </div>
 
         <p class="hint" id="wait-hint">
-          ${allLobbySubmitted() ? "Tout le monde est prêt !" : "Les autres joueurs préparent leurs affirmations…"}
+          ${allReady ? "Tout le monde est prêt !" : "Les autres joueurs préparent leurs affirmations…"}
         </p>
 
         ${
-          allLobbySubmitted()
+          allReady && isLobbyHost()
             ? `<button type="button" class="btn btn-primary btn--spaced" id="btn-start">Lancer la partie →</button>`
-            : `<button type="button" class="btn btn-secondary btn--spaced" disabled>En attente…</button>`
+            : allReady
+              ? `<button type="button" class="btn btn-secondary btn--spaced" disabled>En attente de l'hôte…</button>`
+              : `<button type="button" class="btn btn-secondary btn--spaced" disabled>En attente…</button>`
         }
         <button type="button" class="btn btn-secondary btn--spaced" data-nav="game-select">Retour</button>
       `,
@@ -61,34 +63,16 @@ export function mountGuessLieLobbyWait(app) {
 
     bindNav(app);
 
-    app.querySelector("#btn-start")?.addEventListener("click", () => {
-      markGuessLieLobbyComplete();
-      navigate("guesslie", { reset: true });
+    app.querySelector("#btn-start")?.addEventListener("click", async () => {
+      await markGuessLieLobbyComplete();
+      if (!mp) navigate("guesslie", { reset: true });
     });
   }
 
-  function simulateNextNpc() {
-    const queue = getLobbyMemberNames().filter((n) => n !== localName);
-    if (simIdx >= queue.length) {
-      render();
-      return;
-    }
-    const name = queue[simIdx];
-    simIdx += 1;
-    const session = getGuessLieSession();
-    if (!session.submissions[name]) {
-      setGuessLieSubmission(name, fallbackForPlayer(name));
-    }
-    render();
-    if (simIdx < queue.length) {
-      intervalId = setTimeout(simulateNextNpc, 800 + Math.random() * 600);
-    }
-  }
-
   render();
-  intervalId = setTimeout(simulateNextNpc, 400);
+  const unsub = onGameSessionChange(() => render());
 
   return () => {
-    if (intervalId) clearTimeout(intervalId);
+    unsub();
   };
 }

@@ -8,7 +8,18 @@ import {
   getGuessLieEntryScreen,
   getGuessLieRounds,
   simulateRoundVotes,
+  getGuessLieSession,
 } from "../core/guessLieSession.js";
+import {
+  isGameSyncActive,
+  isLobbyHost,
+  onGameSessionChange,
+  commitGuessLiePlay,
+  getActiveMemberUserIds,
+  nameForUserId,
+  completeGameSession,
+  syncLobbyScores,
+} from "../core/gameSync.js";
 import {
   getLocalDisplayName,
   addScore,
@@ -16,6 +27,7 @@ import {
   recordLieGuess,
   setLastGame,
 } from "../core/state.js";
+import { gameCumulativeScoresHtml } from "../core/gameScores.js";
 import { setLobbyPlaying, setLobbyWaiting } from "../core/lobby.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
 import { navigate } from "../core/router.js";
@@ -40,6 +52,8 @@ export function mountGuessLie(app) {
 
   setLobbyPlaying("guesslie");
 
+  const mp = isGameSyncActive();
+
   let roundIdx = 0;
   let phase = "voting";
   let selected = null;
@@ -57,17 +71,41 @@ export function mountGuessLie(app) {
   }
 
   function currentRound() {
-    return rounds[roundIdx];
+    return rounds[roundIdx] ?? rounds[0];
+  }
+
+  function ensureRevealDisplay() {
+    if (phase !== "reveal") return;
+    if (!roundScored && !mp) {
+      applyRoundScore(computeReveal());
+    } else if (!revealResult) {
+      setRevealDisplay(computeReveal());
+    }
+  }
+
+  function syncFromGl() {
+    const gl = getGuessLieSession();
+    if (gl.roundIdx != null) roundIdx = gl.roundIdx;
+    if (gl.phase) phase = gl.phase;
+    if (gl.votes && gl.votes[localName] != null) selected = gl.votes[localName];
+    roundScored = Boolean(gl.roundScored);
   }
 
   function computeReveal() {
     const round = currentRound();
-    const all = { ...simulateRoundVotes(round, round.player) };
+    const gl = getGuessLieSession();
+    const all = mp
+      ? { ...(gl.votes || {}) }
+      : { ...simulateRoundVotes(round, round.player) };
     if (selected !== null && localName !== round.player) all[localName] = selected;
     const voters = Object.keys(all).filter((n) => n !== round.player);
     const correct = voters.filter((n) => all[n] === round.lie);
     const ratio = voters.length ? correct.length / voters.length : 0;
     return { all, correct, ratio, round, liarBonus: ratio < GUESS_LIE_LIAR_BONUS_THRESHOLD };
+  }
+
+  function setRevealDisplay(result) {
+    revealResult = { ...result, all: result.all };
   }
 
   function applyRoundScore(result) {
@@ -89,7 +127,8 @@ export function mountGuessLie(app) {
       bumpPlayerStat(round.player, "liesFooled", 1);
     }
 
-    revealResult = { ...result, all: result.all };
+    setRevealDisplay(result);
+    if (mp && isLobbyHost()) void syncLobbyScores();
   }
 
   function startVotingTimer() {
@@ -111,6 +150,7 @@ export function mountGuessLie(app) {
       }
       if (timer <= 0) {
         clearTimer();
+        if (mp) return;
         if (!isSubject && selected === null) selected = 0;
         phase = "reveal";
         render();
@@ -128,30 +168,67 @@ export function mountGuessLie(app) {
     startVotingTimer();
   }
 
-  function nextRound() {
+  async function nextRound() {
+    if (mp && !isLobbyHost()) return;
+
     if (roundIdx >= rounds.length - 1) {
       setLastGame({
         gameId: "guesslie",
         title: "Guess The Lie",
         summary: `${rounds.length} manches jouées`,
       });
-      setLobbyWaiting();
-      navigate("results");
+      if (mp) {
+        try {
+          await completeGameSession({ gameId: "guesslie", screen: "results", state: {} });
+        } catch (e) {
+          console.warn("REVEAL completeGameSession:", e);
+          navigate("results", { navStack: ["home", "lobby", "game-select", "results"] });
+        }
+      } else {
+        setLobbyWaiting();
+        navigate("results");
+      }
       return;
     }
-    roundIdx += 1;
-    beginRound();
+    const next = roundIdx + 1;
+    if (mp) {
+      roundIdx = next;
+      phase = "voting";
+      selected = null;
+      roundScored = false;
+      revealResult = null;
+      timer = GUESS_LIE_VOTE_TIMER_SEC;
+      await commitGuessLiePlay(
+        { roundIdx: next, phase: "voting", votes: {}, roundScored: false },
+        { screen: "guesslie" }
+      );
+      clearTimer();
+      render();
+      startVotingTimer();
+    } else {
+      roundIdx = next;
+      beginRound();
+    }
   }
 
   function render() {
+    syncFromGl();
+    ensureRevealDisplay();
+
     const round = currentRound();
     const total = rounds.length;
-    const isSubject = round.player === localName;
-
-    if (phase === "reveal" && !roundScored) {
-      applyRoundScore(computeReveal());
+    if (!round) {
+      app.innerHTML = pageShell({
+        backTarget: "back",
+        content: `
+          <p class="label-upper label-upper--green">🕵️ Guess The Lie</p>
+          <p class="hint">Chargement de la manche…</p>`,
+      });
+      bindNav(app);
+      return;
     }
 
+    const isSubject = round.player === localName;
     let body = "";
 
     if (phase === "voting") {
@@ -224,7 +301,7 @@ export function mountGuessLie(app) {
               if (i === round.lie) cls += " statement--lie";
               return `
             <div class="${cls}">
-              <span class="statement__letter">${i === round.lie ? "✗" : String.fromCharCode(65 + i)}</span>
+              <span class="statement__letter">${i === round.lie ? "✓" : String.fromCharCode(65 + i)}</span>
               <span>${escapeHtml(text)}</span>
             </div>`;
             })
@@ -234,6 +311,7 @@ export function mountGuessLie(app) {
           <p class="feedback-title">Mensonge : lettre ${String.fromCharCode(65 + round.lie)}</p>
           <p class="feedback-sub">${correct.length} détective(s) sur ${Object.keys(all).length}${liarBonus ? ` · ${escapeHtml(round.player)} +${GUESS_LIE_LIAR_POINTS} pts` : ""}</p>
         </div>
+        ${gameCumulativeScoresHtml({ gameLabel: "Guess The Lie", title: "Cumul des scores" })}
         <div class="card card--votes">
           ${Object.entries(all)
             .map(
@@ -245,9 +323,13 @@ export function mountGuessLie(app) {
             )
             .join("")}
         </div>
-        <button type="button" class="btn btn-primary btn--spaced" id="next-round">
+        ${
+          !mp || isLobbyHost()
+            ? `<button type="button" class="btn btn-primary btn--spaced" id="next-round">
           ${roundIdx >= total - 1 ? "Voir les résultats →" : "Manche suivante →"}
-        </button>`;
+        </button>`
+            : `<p class="hint">En attente de l'hôte pour la suite…</p>`
+        }`;
     }
 
     app.innerHTML = pageShell({
@@ -268,20 +350,57 @@ export function mountGuessLie(app) {
       });
     });
 
-    app.querySelector("#confirm")?.addEventListener("click", () => {
+    app.querySelector("#confirm")?.addEventListener("click", async () => {
       if (selected === null) return;
       clearTimer();
-      phase = "reveal";
+      if (mp) {
+        const votes = { ...(getGuessLieSession().votes || {}), [localName]: selected };
+        await commitGuessLiePlay({ votes, phase: "reveal" });
+        const round = currentRound();
+        const detectives = getActiveMemberUserIds()
+          .map((uid) => nameForUserId(uid))
+          .filter((n) => n && n !== round.player);
+        const allVoted = detectives.every((n) => votes[n] != null);
+        if (allVoted && isLobbyHost()) {
+          applyRoundScore(computeReveal());
+          await commitGuessLiePlay({ roundScored: true });
+        }
+      } else {
+        phase = "reveal";
+      }
       render();
     });
 
     app.querySelector("#next-round")?.addEventListener("click", nextRound);
   }
 
-  beginRound();
+  function onSyncUpdate() {
+    const prevIdx = roundIdx;
+    const prevPhase = phase;
+    syncFromGl();
+    const advanced =
+      mp && (roundIdx !== prevIdx || (phase === "voting" && prevPhase === "reveal"));
+    if (advanced) {
+      revealResult = null;
+      selected = phase === "voting" ? null : selected;
+      timer = GUESS_LIE_VOTE_TIMER_SEC;
+      clearTimer();
+    }
+    render();
+    if (phase === "voting" && (advanced || !intervalId)) startVotingTimer();
+  }
+
+  const unsub = onGameSessionChange(onSyncUpdate);
+
+  if (mp) {
+    onSyncUpdate();
+  } else {
+    beginRound();
+  }
 
   return () => {
     clearTimer();
-    setLobbyWaiting();
+    unsub();
+    if (!mp) setLobbyWaiting();
   };
 }

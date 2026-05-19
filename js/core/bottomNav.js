@@ -1,6 +1,8 @@
 import { APP_LOGO } from "../../data/branding.js";
 import { hasActiveLobby, goToLobby } from "./lobby.js";
 import { navigate, onScreenChange, getCurrentScreen } from "./router.js";
+import { getCachedGameSession, handleSessionRoute } from "./gameSync.js";
+import { goToEveningHome } from "../screens/nav.js";
 
 const TAB_HOME = "home";
 const TAB_GAMES = "games";
@@ -25,15 +27,24 @@ const SCREEN_TO_TAB = {
   "tiernight-create": TAB_GAMES,
   tiernight: TAB_GAMES,
   "tiernight-end": TAB_RESULTS,
+  settings: TAB_HOME,
 };
 
 function goHome() {
-  navigate("home", { reset: true });
+  goToEveningHome();
 }
 
 function goGames() {
-  if (hasActiveLobby()) navigate("game-select");
-  else navigate("home", { reset: true });
+  if (!hasActiveLobby()) {
+    navigate("home", { reset: true });
+    return;
+  }
+  const row = getCachedGameSession();
+  if (row?.screen && row.screen !== "game-select" && row.screen !== getCurrentScreen()) {
+    handleSessionRoute(row);
+    return;
+  }
+  navigate("game-select");
 }
 
 function goLogo() {
@@ -72,8 +83,8 @@ function syncActiveTab(screenId) {
   else setActiveTab(null);
 }
 
-/** Masqué sur accueil + lobby d’attente ; visible à partir du menu jeux */
-const SCREENS_WITHOUT_NAV = new Set(["home", "lobby", "settings"]);
+/** Masqué uniquement sur le lobby d’attente (avant « Commencer »). */
+const SCREENS_WITHOUT_NAV = new Set(["lobby"]);
 
 function updateNavVisibility(screenId) {
   const nav = document.getElementById("bottom-nav");
