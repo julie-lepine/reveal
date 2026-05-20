@@ -70,11 +70,88 @@ function eveningRecapHtml(recap) {
 export function mountGameSelect(app) {
   if (!requireLobbyPlay()) return null;
 
-  const recap = getEveningRecap();
+  let unsubSession = () => {};
+  let guestRoutePoll = null;
 
-  app.innerHTML = pageShell({
-    backTarget: "lobby",
-    content: `
+  function bindGameSelectEvents() {
+    const mpHandlers = {};
+    if (isGameSyncActive()) {
+      mpHandlers["hottake-prep"] = async () => {
+        if (!isLobbyHost()) {
+          await showAppAlert("Seul l'hôte peut lancer un jeu.", {
+            title: "Action réservée",
+            icon: "👑",
+          });
+          return;
+        }
+        const ht = {
+          customTakes: [],
+          ready: {},
+          lobbyStarted: false,
+          pausedBy: null,
+          selectedThemeId: "catalog",
+          roundCount: 5,
+          deck: null,
+          takeIdx: 0,
+          phase: null,
+          votes: {},
+          voteEndsAt: null,
+          intermissionEndsAt: null,
+          takeScored: false,
+        };
+        await startGameSession("hottake", "hottake-prep", { hotTake: hotTakeToRemote(ht) });
+      };
+      mpHandlers.guesslie = async () => {
+        if (!isLobbyHost()) {
+          await showAppAlert("Seul l'hôte peut lancer un jeu.", {
+            title: "Action réservée",
+            icon: "👑",
+          });
+          return;
+        }
+        const gl = {
+          sessionId: getState().lobbyCode,
+          submissions: {},
+          lobbyComplete: false,
+          roundIdx: 0,
+          phase: null,
+          votes: {},
+          roundScored: false,
+        };
+        await startGameSession("guesslie", "guesslie-menu", { guessLie: guessLieToRemote(gl) });
+      };
+      mpHandlers["tiernight-select"] = async () => {
+        if (!isLobbyHost()) {
+          await showAppAlert("Seul l'hôte peut lancer un jeu.", {
+            title: "Action réservée",
+            icon: "👑",
+          });
+          return;
+        }
+        await startGameSession("tiernight", "tiernight-select", {
+          tierNight: { topicId: null, game: null, placements: {}, finished: {} },
+        });
+      };
+    }
+
+    bindNav(app, {
+      ...mpHandlers,
+      settings: () => goToEveningSettings(),
+      leaderboard: () => {
+        navigate("leaderboard", {
+          navStack: ["home", "lobby", "game-select", "leaderboard"],
+        });
+      },
+    });
+    bindGameTileLogos(app);
+  }
+
+  function render() {
+    const recap = getEveningRecap();
+
+    app.innerHTML = pageShell({
+      backTarget: "lobby",
+      content: `
       <p class="label-upper label-upper--gold">🎮 La soirée</p>
       <h2 class="screen-title">Choisir un jeu</h2>
       <p class="game-intro">Sélectionne une activité pour le lobby.</p>
@@ -105,88 +182,24 @@ export function mountGameSelect(app) {
         }).join("")}
       </div>
     `,
-  });
+    });
 
-  const mpHandlers = {};
-  if (isGameSyncActive()) {
-    mpHandlers["hottake-prep"] = async () => {
-      if (!isLobbyHost()) {
-        await showAppAlert("Seul l'hôte peut lancer un jeu.", {
-          title: "Action réservée",
-          icon: "👑",
-        });
-        return;
-      }
-      const ht = {
-        customTakes: [],
-        ready: {},
-        lobbyStarted: false,
-        pausedBy: null,
-        selectedThemeId: "catalog",
-        roundCount: 5,
-        deck: null,
-        takeIdx: 0,
-        phase: null,
-        votes: {},
-        voteEndsAt: null,
-        intermissionEndsAt: null,
-        takeScored: false,
-      };
-      await startGameSession("hottake", "hottake-prep", { hotTake: hotTakeToRemote(ht) });
-    };
-    mpHandlers.guesslie = async () => {
-      if (!isLobbyHost()) {
-        await showAppAlert("Seul l'hôte peut lancer un jeu.", {
-          title: "Action réservée",
-          icon: "👑",
-        });
-        return;
-      }
-      const gl = {
-        sessionId: getState().lobbyCode,
-        submissions: {},
-        lobbyComplete: false,
-        roundIdx: 0,
-        phase: null,
-        votes: {},
-        roundScored: false,
-      };
-      await startGameSession("guesslie", "guesslie-menu", { guessLie: guessLieToRemote(gl) });
-    };
-    mpHandlers["tiernight-select"] = async () => {
-      if (!isLobbyHost()) {
-        await showAppAlert("Seul l'hôte peut lancer un jeu.", {
-          title: "Action réservée",
-          icon: "👑",
-        });
-        return;
-      }
-      await startGameSession("tiernight", "tiernight-select", {
-        tierNight: { topicId: null, game: null, placements: {}, finished: {} },
-      });
-    };
+    bindGameSelectEvents();
   }
 
-  bindNav(app, {
-    ...mpHandlers,
-    settings: () => goToEveningSettings(),
-    leaderboard: () => {
-      navigate("leaderboard", {
-        navStack: ["home", "lobby", "game-select", "leaderboard"],
-      });
-    },
-  });
-  bindGameTileLogos(app);
+  render();
 
-  let unsubSession = () => {};
-  let guestRoutePoll = null;
   if (isGameSyncActive()) {
     void (async () => {
       const row = (await refreshGameSession()) || getCachedGameSession();
-      if (row) handleSessionRoute(row);
+      if (row) {
+        handleSessionRoute(row);
+        render();
+      }
     })();
 
     unsubSession = onGameSessionChange((row) => {
+      if (getCurrentScreen() === "game-select") render();
       if (row) handleSessionRoute(row);
     });
 

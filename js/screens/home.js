@@ -19,17 +19,45 @@ import {
   goToGameSelect,
 } from "../core/lobby.js";
 import { getGlobalStats } from "../core/state.js";
+import { getEveningRecap } from "../core/eveningRecap.js";
+import { isGameSyncActive, onGameSessionChange, refreshGameSession } from "../core/gameSync.js";
 import { navigate } from "../core/router.js";
 import { escapeHtml, logoHtml, pageShell } from "../core/ui.js";
 import { bindNav, goToEveningSettings } from "./nav.js";
 import { showAppAlert } from "../core/dialog.js";
+
+function homeStatsHtml() {
+  if (hasActiveLobby()) {
+    const recap = getEveningRecap();
+    const liesDisplay =
+      recap.liesTotal > 0 ? `${recap.liesFound}/${recap.liesTotal}` : String(recap.liesFound);
+
+    return `
+        <p class="label-upper label-upper--muted">Stats de la soirée</p>
+        <div class="stats stats--global">
+          <div class="stat"><div>👥</div><div class="stat-number">${recap.participantCount}</div><div class="stat-label">Joueurs</div></div>
+          <div class="stat"><div>🔥</div><div class="stat-number">${recap.hotTakes}</div><div class="stat-label">Hot takes</div></div>
+          <div class="stat"><div>🕵️</div><div class="stat-number">${liesDisplay}</div><div class="stat-label">Mensonges trouvés</div></div>
+          <div class="stat"><div>🏆</div><div class="stat-number">${recap.tierNights}</div><div class="stat-label">Tier lists</div></div>
+        </div>`;
+  }
+
+  const global = getGlobalStats();
+  return `
+        <p class="label-upper label-upper--muted">Tes stats (tous les lobbys)</p>
+        <div class="stats stats--global">
+          <div class="stat"><div>🎉</div><div class="stat-number">${global.lobbiesCreated || 0}</div><div class="stat-label">Lobbys créés</div></div>
+          <div class="stat"><div>🔥</div><div class="stat-number">${global.hotTakesPlayed || 0}</div><div class="stat-label">Hot takes</div></div>
+          <div class="stat"><div>🕵️</div><div class="stat-number">${global.liesFound || 0}</div><div class="stat-label">Mensonges trouvés</div></div>
+          <div class="stat"><div>👥</div><div class="stat-number">${global.playersJoined || 0}</div><div class="stat-label">Parties rejointes</div></div>
+        </div>`;
+}
 
 export function mountHome(app) {
   const pendingJoin = sessionStorage.getItem("reveal-pending-join");
   let authTab = pendingJoin ? "guest" : "login";
 
   function render() {
-    const global = getGlobalStats();
     const user = getUser();
     const loggedIn = isLoggedIn();
     const guest = isGuest();
@@ -132,13 +160,7 @@ export function mountHome(app) {
           ${!loggedIn && !guest ? '<p class="hint">Seuls les comptes connectés peuvent créer un lobby.</p>' : ""}
         </div>
 
-        <p class="label-upper label-upper--muted">Stats globales (tous les lobbys)</p>
-        <div class="stats stats--global">
-          <div class="stat"><div>🎉</div><div class="stat-number">${global.lobbiesCreated || 0}</div><div class="stat-label">Lobbys créés</div></div>
-          <div class="stat"><div>🔥</div><div class="stat-number">${global.hotTakesPlayed || 0}</div><div class="stat-label">Hot takes</div></div>
-          <div class="stat"><div>🕵️</div><div class="stat-number">${global.liesFound || 0}</div><div class="stat-label">Mensonges trouvés</div></div>
-          <div class="stat"><div>👥</div><div class="stat-number">${global.playersJoined || 0}</div><div class="stat-label">Joueurs accueillis</div></div>
-        </div>
+        ${homeStatsHtml()}
       `,
     });
 
@@ -274,12 +296,20 @@ export function mountHome(app) {
 
   render();
 
+  let unsubSession = () => {};
+  if (isGameSyncActive() && hasActiveLobby()) {
+    void refreshGameSession().then(() => render());
+    unsubSession = onGameSessionChange(() => render());
+  }
+
   if (pendingJoin) {
     const codeEl = app.querySelector("#guest-code");
     if (codeEl) codeEl.value = pendingJoin;
     sessionStorage.removeItem("reveal-pending-join");
   }
 
-  return null;
+  return () => {
+    unsubSession();
+  };
 }
 

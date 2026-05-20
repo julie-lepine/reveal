@@ -42,20 +42,30 @@ function participantsHtml(participants) {
     .join("");
 }
 
-const LABEL_WAITING_READY = "En attente de validation du « Prêt »";
+const LABEL_BE_READY = 'Soyez « prêt »';
+const LABEL_WAITING_LAUNCH = "En attente de lancement de la partie";
+const LABEL_WAITING_ALL_READY = "En attente que tous soient prêts";
 const LABEL_WAITING_HOST_START = "L'hôte va lancer la soirée…";
 
 function lobbyFooterHint(ready, total) {
   if (total > 0 && ready === total) return "Tout le monde est prêt !";
-  return LABEL_WAITING_READY;
+  return "En attente de validation du « Prêt »";
 }
 
-function guestStartLabel(allReady) {
-  return allReady ? LABEL_WAITING_HOST_START : LABEL_WAITING_READY;
+function hostStartLabel(allReady, localReady) {
+  if (allReady) return "Commencer la soirée";
+  if (!localReady) return LABEL_BE_READY;
+  return LABEL_WAITING_ALL_READY;
 }
 
-function hostStartLabel(allReady) {
-  return allReady ? "Commencer la soirée" : LABEL_WAITING_READY;
+function guestStartLabel(allReady, localReady) {
+  if (allReady) return LABEL_WAITING_HOST_START;
+  if (!localReady) return LABEL_BE_READY;
+  return LABEL_WAITING_LAUNCH;
+}
+
+function getLobbyStartLabel({ isHost, allReady, localReady }) {
+  return isHost ? hostStartLabel(allReady, localReady) : guestStartLabel(allReady, localReady);
 }
 
 export function mountLobby(app) {
@@ -132,19 +142,43 @@ export function mountLobby(app) {
     triggerLobbyNudge();
   }
 
-  function updateHostControls() {
+  function updateStartButton() {
+    const participants = getLobbyParticipants();
+    const local = participants.find((p) => p.isLocal);
+    const isHost = Boolean(local?.isHost);
+    const localReady = Boolean(local?.ready);
     const allReady = allLobbyMembersReady();
-    const notReadyGuests = getNotReadyParticipants().filter((p) => !p.isHost);
-    const wizzOnCooldown = Date.now() < wizzCooldownUntil;
+    const label = getLobbyStartLabel({ isHost, allReady, localReady });
 
     const startBtn = app.querySelector("#btn-start");
-    if (startBtn) {
+    if (!startBtn) return;
+
+    if (isHost) {
       startBtn.disabled = !allReady;
       startBtn.classList.toggle("btn-start--waiting", !allReady);
       startBtn.title = allReady
         ? "Lancer la soirée"
-        : "Tous les joueurs doivent être prêts";
+        : localReady
+          ? "Tous les joueurs doivent être prêts"
+          : 'Appuie sur « Je suis prêt ! »';
+    } else {
+      startBtn.disabled = true;
+      startBtn.classList.add("btn-start--waiting");
+      startBtn.title = allReady
+        ? "L'hôte va lancer la soirée"
+        : localReady
+          ? "Patiente pendant que les autres se préparent"
+          : 'Appuie sur « Je suis prêt ! »';
     }
+
+    startBtn.innerHTML = `<span class="btn-start__icon">▶</span>${label}`;
+  }
+
+  function updateHostControls() {
+    const notReadyGuests = getNotReadyParticipants().filter((p) => !p.isHost);
+    const wizzOnCooldown = Date.now() < wizzCooldownUntil;
+
+    updateStartButton();
 
     const wizzBtn = app.querySelector("#btn-wizz");
     if (wizzBtn) {
@@ -332,7 +366,7 @@ export function mountLobby(app) {
             allReady ? "" : "disabled"
           }>
             <span class="btn-start__icon">▶</span>
-            ${hostStartLabel(allReady)}
+            ${hostStartLabel(allReady, local?.ready)}
           </button>
           ${
             !allReady
@@ -340,8 +374,9 @@ export function mountLobby(app) {
               : ""
           }
         </div>`
-            : `<button type="button" class="btn btn-start btn-start--waiting" disabled>
-            ${guestStartLabel(allReady)}
+            : `<button type="button" class="btn btn-start btn-start--waiting" id="btn-start" disabled>
+            <span class="btn-start__icon">▶</span>
+            ${guestStartLabel(allReady, local?.ready)}
           </button>`
         }
 

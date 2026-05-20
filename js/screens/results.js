@@ -5,37 +5,44 @@ import { requireLobbyPlay } from "../core/gameGuard.js";
 import { navigate } from "../core/router.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
 import { bindNav } from "./nav.js";
+import {
+  isGameSyncActive,
+  onGameSessionChange,
+  refreshGameSession,
+} from "../core/gameSync.js";
+import { refreshLobbyFromSupabase, onLobbyBundleUpdated } from "../core/supabaseLobby.js";
 
 export function mountResults(app) {
   if (!requireLobbyPlay()) return null;
 
-  const recap = getEveningRecap();
-  const last = getLastGame();
-  const status = getLobbyStatus();
-  const gameId = getLobbyGameId();
+  function render() {
+    const recap = getEveningRecap();
+    const last = getLastGame();
+    const status = getLobbyStatus();
+    const gameId = getLobbyGameId();
 
-  const lastBlock = last
-    ? `
+    const lastBlock = last
+      ? `
     <div class="card card--highlight">
       <p class="card-heading">Dernière partie</p>
       <p class="evening-recap__title">${escapeHtml(last.title || last.gameId)}</p>
       <p class="hint">${escapeHtml(last.summary || "")}</p>
     </div>`
-    : `<p class="hint">Aucune partie récente.</p>`;
+      : `<p class="hint">Aucune partie récente.</p>`;
 
-  const chips = [
-    recap.hotTakes > 0 ? `<span class="evening-recap__chip">🔥 ${recap.hotTakes}</span>` : "",
-    recap.liesTotal > 0
-      ? `<span class="evening-recap__chip">🕵️ ${recap.liesFound}/${recap.liesTotal}</span>`
-      : "",
-    recap.tierNights > 0 ? `<span class="evening-recap__chip">🏆 ${recap.tierNights}</span>` : "",
-  ]
-    .filter(Boolean)
-    .join("");
+    const chips = [
+      recap.hotTakes > 0 ? `<span class="evening-recap__chip">🔥 ${recap.hotTakes}</span>` : "",
+      recap.liesTotal > 0
+        ? `<span class="evening-recap__chip">🕵️ ${recap.liesFound}/${recap.liesTotal}</span>`
+        : "",
+      recap.tierNights > 0 ? `<span class="evening-recap__chip">🏆 ${recap.tierNights}</span>` : "",
+    ]
+      .filter(Boolean)
+      .join("");
 
-  app.innerHTML = pageShell({
-    backTarget: "game-select",
-    content: `
+    app.innerHTML = pageShell({
+      backTarget: "game-select",
+      content: `
       <p class="label-upper label-upper--gold">📊 Résultats</p>
       <h2 class="screen-title">Récap de la soirée</h2>
       <p class="hint lobby-status-hint">Lobby : ${status === "playing" ? `en jeu (${gameId || "—"})` : "en attente"}</p>
@@ -57,14 +64,33 @@ export function mountResults(app) {
         <button type="button" class="btn btn-secondary" data-nav="leaderboard">Classement</button>
       </div>
     `,
-  });
+    });
 
-  bindNav(app, {
-    leaderboard: () => {
-      navigate("leaderboard", {
-        navStack: ["home", "lobby", "game-select", "results", "leaderboard"],
-      });
-    },
-  });
-  return null;
+    bindNav(app, {
+      leaderboard: () => {
+        navigate("leaderboard", {
+          navStack: ["home", "lobby", "game-select", "results", "leaderboard"],
+        });
+      },
+    });
+  }
+
+  render();
+
+  let unsubSession = () => {};
+  let unsubLobby = () => {};
+  if (isGameSyncActive()) {
+    void (async () => {
+      await refreshLobbyFromSupabase();
+      await refreshGameSession();
+      render();
+    })();
+    unsubSession = onGameSessionChange(() => render());
+    unsubLobby = onLobbyBundleUpdated(() => render());
+  }
+
+  return () => {
+    unsubSession();
+    unsubLobby();
+  };
 }

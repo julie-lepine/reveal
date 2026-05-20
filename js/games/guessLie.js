@@ -22,6 +22,8 @@ import {
 } from "../core/gameSync.js";
 import {
   getLocalDisplayName,
+  getState,
+  saveStatePatch,
   addScore,
   bumpPlayerStat,
   recordLieGuess,
@@ -34,6 +36,11 @@ import { navigate } from "../core/router.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
 import { bindNav } from "../screens/nav.js";
 import { onTimerSecond, primeTimerSound } from "../core/timerSound.js";
+
+function revealFeedbackTitle({ isSubject, myCorrect, liarBonus }) {
+  if (isSubject) return liarBonus ? "Mensonge non trouvé 🥳" : "Mensonge trouvé 😭";
+  return myCorrect ? "Mensonge trouvé 🥳" : "Mensonge non trouvé 😭";
+}
 
 export function mountGuessLie(app) {
   if (!requireLobbyPlay()) return null;
@@ -118,7 +125,22 @@ export function mountGuessLie(app) {
       bumpPlayerStat(name, "liesDetected", 1);
     });
 
-    if (localName !== round.player) {
+    if (mp && isLobbyHost()) {
+      const stats = getState().stats;
+      const globalStats = getState().globalStats;
+      const lieFound = correct.length > 0;
+      saveStatePatch({
+        stats: {
+          ...stats,
+          liesTotal: (stats.liesTotal || 0) + 1,
+          liesFound: (stats.liesFound || 0) + (lieFound ? 1 : 0),
+        },
+        globalStats: {
+          ...globalStats,
+          liesFound: (globalStats.liesFound || 0) + (lieFound ? 1 : 0),
+        },
+      });
+    } else if (localName !== round.player) {
       recordLieGuess(correct.includes(localName));
     }
 
@@ -308,7 +330,7 @@ export function mountGuessLie(app) {
             .join("")}
         </div>
         <div class="card card--feedback ${myCorrect && localName !== round.player ? "card--ok" : localName === round.player ? "card--ok" : "card--fail"}">
-          <p class="feedback-title">Mensonge : lettre ${String.fromCharCode(65 + round.lie)}</p>
+          <p class="feedback-title">${revealFeedbackTitle({ isSubject: localName === round.player, myCorrect, liarBonus })}</p>
           <p class="feedback-sub">${correct.length} détective(s) sur ${Object.keys(all).length}${liarBonus ? ` · ${escapeHtml(round.player)} +${GUESS_LIE_LIAR_POINTS} pts` : ""}</p>
         </div>
         ${gameCumulativeScoresHtml({ gameLabel: "Guess The Lie", title: "Cumul des scores" })}

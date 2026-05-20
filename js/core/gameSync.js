@@ -297,10 +297,45 @@ export function applyRemoteLobbyScores(remote) {
   saveStatePatch({ scores: merged });
 }
 
-/** Hôte : pousse le cumul des scores vers game_sessions.state.scores */
+function eveningStateToRemote() {
+  const { stats, lastGame, tierNightGame } = getState();
+  return {
+    scores: scoresToRemote(getState().scores),
+    stats: {
+      hotTakesPlayed: stats.hotTakesPlayed || 0,
+      liesFound: stats.liesFound || 0,
+      liesTotal: stats.liesTotal || 0,
+      tierNightsPlayed: stats.tierNightsPlayed || 0,
+    },
+    lastGame: lastGame ? { ...lastGame } : null,
+    lastTierName: tierNightGame?.listName || null,
+  };
+}
+
+export function applyRemoteEveningState(st) {
+  if (!st || typeof st !== "object") return;
+  const patch = {};
+
+  if (st.stats && typeof st.stats === "object") {
+    patch.stats = { ...getState().stats, ...st.stats };
+  }
+  if (st.lastGame !== undefined) {
+    patch.lastGame = st.lastGame;
+  }
+  if (st.lastTierName && getState().tierNightGame) {
+    patch.tierNightGame = { ...getState().tierNightGame, listName: st.lastTierName };
+  } else if (st.lastTierName) {
+    patch.tierNightGame = { listName: st.lastTierName };
+  }
+
+  if (Object.keys(patch).length) saveStatePatch(patch);
+  if (st.scores) applyRemoteLobbyScores(st.scores);
+}
+
+/** Hôte : pousse scores + stats de soirée vers game_sessions.state */
 export async function syncLobbyScores() {
   if (!isGameSyncActive() || !isLobbyHost()) return;
-  await patchGameState({ scores: scoresToRemote(getState().scores) });
+  await patchGameState(eveningStateToRemote());
 }
 
 export function applyRemoteSession(row) {
@@ -336,7 +371,7 @@ export function applyRemoteSession(row) {
 
   if (Object.keys(patch).length) saveStatePatch(patch);
 
-  if (st.scores) applyRemoteLobbyScores(st.scores);
+  applyRemoteEveningState(st);
 
   notify(row);
 
@@ -483,7 +518,7 @@ export async function startGameSession(gameId, screen, state) {
     screen,
     hostId,
     state: {
-      scores: scoresToRemote(getState().scores),
+      ...eveningStateToRemote(),
       ...(state || {}),
     },
   });
@@ -549,7 +584,7 @@ export async function completeGameSession({ gameId = "menu", screen = "results",
     screen,
     hostId,
     state: {
-      scores: scoresToRemote(getState().scores),
+      ...eveningStateToRemote(),
       ...(state || {}),
     },
   });
