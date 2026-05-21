@@ -56,7 +56,7 @@ export function mountFilRougeMission(app) {
             ? `<p class="card card--ok">Mission reçue ✓ — accessible depuis le menu jeux.</p>`
             : `<button type="button" class="btn btn-primary btn--spaced" id="fil-rouge-ack">Mission reçue</button>`
         }
-        <button type="button" class="btn btn-secondary" data-nav="game-select">Retour aux jeux</button>
+        <button type="button" class="btn btn-accent" data-nav="game-select">Retour aux jeux</button>
       `,
     });
 

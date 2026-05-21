@@ -172,6 +172,10 @@ create policy "lobbies_select_member" on public.lobbies for select using (
   public.is_lobby_member(id)
 );
 
+drop policy if exists "lobbies_delete_host" on public.lobbies;
+create policy "lobbies_delete_host" on public.lobbies
+  for delete using (auth.uid() = host_id);
+
 drop policy if exists "members_select_same_lobby" on public.lobby_members;
 create policy "members_select_same_lobby" on public.lobby_members for select using (
   public.is_lobby_member(lobby_id)

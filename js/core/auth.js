@@ -17,7 +17,10 @@ import {
   updateEmailAccountName,
   changeEmailAccountPassword,
 } from "./authCredentials.js";
-import { unsubscribeLobbyRealtime, updateLobbyMemberProfileSupabase } from "./supabaseLobby.js";
+import {
+  stopLobbyPresenceSync,
+  updateLobbyMemberProfileSupabase,
+} from "./supabaseLobby.js";
 import { stopMultiplayerSync } from "./gameSync.js";
 
 export function isLoggedIn() {
@@ -229,7 +232,7 @@ export async function logout() {
       await leaveLobby({ navigateAway: false });
     } else {
       stopMultiplayerSync();
-      unsubscribeLobbyRealtime();
+      stopLobbyPresenceSync();
     }
     await signOutSupabase();
     saveStatePatch({ inLobby: false, lobby: null, lobbyCode: null });

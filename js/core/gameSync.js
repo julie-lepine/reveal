@@ -936,6 +936,12 @@ export async function refreshGameSession() {
   else {
     cachedRow = null;
     notify(null);
+    try {
+      const { refreshLobbyFromSupabase } = await import("./supabaseLobby.js");
+      await refreshLobbyFromSupabase();
+    } catch {
+      /* lobby fermé → handleLobbyDissolvedForGuest */
+    }
   }
   return row;
 }
@@ -1092,6 +1098,14 @@ async function syncTick() {
     return;
   }
   try {
+    const { refreshLobbyFromSupabase } = await import("./supabaseLobby.js");
+    await refreshLobbyFromSupabase();
+  } catch (e) {
+    const gone =
+      e?.code === "PGRST116" || String(e?.message || "").includes("0 rows");
+    if (!gone) console.warn("REVEAL sync lobby:", e.message || e);
+  }
+  try {
     const row = await refreshGameSession();
     if (!row) return;
     if (await routeToActiveGameIfNeeded(row)) return;
@@ -1105,6 +1119,7 @@ async function syncTick() {
 export function startMultiplayerSync() {
   if (!isGameSyncActive()) return;
   stopMultiplayerSync();
+  import("./supabaseLobby.js").then((m) => m.startLobbyPresenceSync());
   syncTick();
   pollTimer = setInterval(syncTick, 1500);
 }

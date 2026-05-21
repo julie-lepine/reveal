@@ -47,7 +47,7 @@ export function mountGuessLieSetup(app) {
         GO — envoyer au lobby
       </button>
 
-      <button type="button" class="btn btn-secondary btn--spaced" data-nav="game-select">
+      <button type="button" class="btn btn-accent btn--spaced" data-nav="game-select">
         Retour aux jeux
       </button>
     `,

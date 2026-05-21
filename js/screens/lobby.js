@@ -238,12 +238,6 @@ export function mountLobby(app) {
   function bindEvents(lobby) {
     bindNav(app);
 
-    const qr = app.querySelector("#lobby-qr");
-    if (qr && lobby.code) {
-      const url = encodeURIComponent(getLobbyJoinUrl(lobby.code));
-      qr.src = `https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=${url}`;
-    }
-
     app.querySelector("#copy-code")?.addEventListener("click", async () => {
       const btn = app.querySelector("#copy-code");
       try {
@@ -339,12 +333,11 @@ export function mountLobby(app) {
             <span class="invite-code">${escapeHtml(lobby.code)}</span>
             <button type="button" class="btn-icon" id="copy-code" aria-label="Copier le code">⧉</button>
           </div>
-          <img class="lobby-qr" id="lobby-qr" width="140" height="140" alt="QR code d'invitation" />
           <p class="hint">
             <a href="${escapeHtml(joinUrl)}" class="lobby-deep-link">Lien d'invitation</a>
             · <button type="button" class="btn-link" id="copy-link">Copier le lien</button>
           </p>
-          <p class="hint">${online ? "Partage le QR ou le lien — les invités rejoignent sans compte." : "Démo locale : ouvre le lien sur le même appareil ou un autre onglet."}</p>
+          <p class="hint">${online ? "Partage le code ou le lien — les invités rejoignent sans compte." : "Démo locale : ouvre le lien sur le même appareil ou un autre onglet."}</p>
         </div>
 
         <div class="chat-panel">

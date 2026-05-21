@@ -15,7 +15,17 @@ const HOST_COLOR = "#A78BFA";
 const GUEST_COLOR = "#60A5FA";
 
 let realtimeChannel = null;
+let lobbyPresencePollTimer = null;
+let presenceLobbyId = null;
 const lobbyBundleListeners = new Set();
+
+function isLobbyGoneError(e) {
+  return (
+    e?.code === "PGRST116" ||
+    String(e?.message || "").includes("0 rows") ||
+    String(e?.details || "").includes("0 rows")
+  );
+}
 
 export function onLobbyBundleUpdated(fn) {
   lobbyBundleListeners.add(fn);
@@ -110,8 +120,39 @@ function applyLobbyToState(bundle) {
     },
   });
   bundle.participants.forEach((p) => ensurePlayerScore(p.name));
+  startLobbyPresenceSync();
   startMultiplayerSync();
   notifyLobbyBundleUpdated();
+}
+
+/** Realtime + polling tant que le joueur est dans un lobby (tous les écrans). */
+export function startLobbyPresenceSync() {
+  if (!isSupabaseConfigured() || !getState().inLobby || !getState().lobby?.id) return;
+
+  const lobbyId = getState().lobby.id;
+  if (presenceLobbyId === lobbyId && realtimeChannel) return;
+
+  stopLobbyPresenceSync();
+  presenceLobbyId = lobbyId;
+
+  subscribeLobbyRealtime(() => notifyLobbyBundleUpdated());
+
+  lobbyPresencePollTimer = setInterval(() => {
+    refreshLobbyFromSupabase().catch((e) => {
+      if (!isLobbyGoneError(e)) {
+        console.warn("REVEAL lobby presence poll:", e.message || e);
+      }
+    });
+  }, 2500);
+}
+
+export function stopLobbyPresenceSync() {
+  presenceLobbyId = null;
+  if (lobbyPresencePollTimer) {
+    clearInterval(lobbyPresencePollTimer);
+    lobbyPresencePollTimer = null;
+  }
+  unsubscribeLobbyRealtime();
 }
 
 async function generateUniqueCode() {
@@ -241,9 +282,51 @@ export async function joinLobbySupabase(codeInput) {
 export async function refreshLobbyFromSupabase() {
   const lobbyId = getState().lobby?.id;
   if (!lobbyId) return false;
-  const bundle = await fetchLobbyBundle(lobbyId);
-  applyLobbyToState(bundle);
-  return true;
+  try {
+    const bundle = await fetchLobbyBundle(lobbyId);
+    applyLobbyToState(bundle);
+    return true;
+  } catch (e) {
+    if (isLobbyGoneError(e)) {
+      const { handleLobbyDissolvedForGuest } = await import("./lobby.js");
+      await handleLobbyDissolvedForGuest();
+      return false;
+    }
+    throw e;
+  }
+}
+
+/** Hôte : supprime le lobby (membres et messages en cascade). */
+export async function closeLobbySupabase() {
+  const lobbyId = getState().lobby?.id;
+  const userId = getSupabaseUserId();
+  const hostId = getState().lobby?.hostId;
+  const isHostMember = getState().lobby?.participants?.some((p) => p.isLocal && p.isHost);
+  const isHost =
+    Boolean(userId && hostId && userId === hostId) ||
+    (isHostMember && !hostId);
+
+  if (!lobbyId || !isHost) {
+    return { ok: false, error: "Seul l'hôte peut fermer le lobby." };
+  }
+
+  try {
+    const { deleteGameSession } = await import("./supabaseGame.js");
+    await deleteGameSession(lobbyId);
+  } catch (e) {
+    console.warn("REVEAL delete game session on close lobby:", e.message || e);
+  }
+
+  const { data, error } = await supabase.from("lobbies").delete().eq("id", lobbyId).select("id");
+  if (error) return { ok: false, error: error.message };
+  if (!data?.length) {
+    return {
+      ok: false,
+      error:
+        "Le lobby n'a pas pu être supprimé (droits ou session). Reconnecte-toi avec le compte qui a créé la partie.",
+    };
+  }
+  return { ok: true };
 }
 
 /** Quitte le lobby côté serveur (retire le membre local). */
@@ -384,11 +467,26 @@ export function subscribeLobbyRealtime(onUpdate) {
     )
     .on(
       "postgres_changes",
+      { event: "DELETE", schema: "public", table: "lobbies", filter: `id=eq.${lobbyId}` },
+      async () => {
+        const { handleLobbyDissolvedForGuest } = await import("./lobby.js");
+        await handleLobbyDissolvedForGuest();
+        onUpdate?.();
+      }
+    )
+    .on(
+      "postgres_changes",
       { event: "*", schema: "public", table: "game_sessions", filter: `lobby_id=eq.${lobbyId}` },
       async (payload) => {
         if (payload.eventType === "DELETE") {
           applyRemoteSession(null);
-          onUpdate?.();
+          refreshLobbyFromSupabase()
+            .catch((e) => {
+              if (!isLobbyGoneError(e)) {
+                console.warn("REVEAL lobby after game_sessions delete:", e.message || e);
+              }
+            })
+            .finally(() => onUpdate?.());
           return;
         }
         try {

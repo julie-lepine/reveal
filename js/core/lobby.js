@@ -17,14 +17,19 @@ import {
   createLobbySupabase,
   joinLobbySupabase,
   leaveLobbySupabase,
+  closeLobbySupabase,
   refreshLobbyFromSupabase,
   setLocalReadySupabase,
   setLobbyStatusSupabase,
   addLobbyMessageSupabase,
   subscribeLobbyRealtime,
   unsubscribeLobbyRealtime,
+  startLobbyPresenceSync,
+  stopLobbyPresenceSync,
+  onLobbyBundleUpdated,
   sendLobbyNudgeSupabase,
 } from "./supabaseLobby.js";
+import { showAppAlert, showAppConfirm } from "./dialog.js";
 import {
   stopMultiplayerSync,
   endGameSession,
@@ -40,6 +45,64 @@ import {
 } from "./gameSync.js";
 
 const MAX_PLAYERS = 10;
+
+let lobbyDissolveHandling = false;
+
+function isLocalLobbyHost() {
+  const uid = getSupabaseUserId();
+  const hostId = getLobby()?.hostId;
+  if (uid && hostId) return uid === hostId;
+  return getLobbyParticipants().some((p) => p.isLocal && p.isHost);
+}
+
+async function signOutAnonGuestIfNeeded(wasGuest) {
+  let shouldSignOut = wasGuest;
+  if (!shouldSignOut && isSupabaseConfigured()) {
+    const { data: authData } = await supabase.auth.getUser();
+    shouldSignOut = Boolean(authData?.user?.is_anonymous);
+  }
+  if (shouldSignOut) {
+    try {
+      await signOutSupabase();
+    } catch (e) {
+      console.warn("REVEAL signOut guest on leave:", e.message || e);
+    }
+  }
+}
+
+function clearLocalOpenLobbySlot(code) {
+  if (!code) return;
+  const open = { ...(getState().openLobbies || {}) };
+  const published = open[code];
+  if (!published) return;
+  const localName = getLocalDisplayName();
+  open[code] = {
+    ...published,
+    participants: (published.participants || []).filter((p) => p.name !== localName),
+    updatedAt: Date.now(),
+  };
+  saveStatePatch({ openLobbies: open });
+}
+
+function applyLeaveLobbyLocal({ wasGuest, navigateAway }) {
+  const patch = { inLobby: false, lobby: null, lobbyCode: null };
+  if (wasGuest) {
+    patch.user = {
+      email: null,
+      name: null,
+      loggedIn: false,
+      isGuest: false,
+      provider: null,
+    };
+    sessionStorage.setItem("reveal-auth-tab", "guest");
+  }
+  resetEveningState();
+  clearCachedGameSession();
+  saveStatePatch(patch);
+  if (navigateAway) {
+    navigate("home", { reset: true });
+  }
+}
 
 function localParticipant(ready = false, { asHost = false } = {}) {
   const name = getLocalDisplayName();
@@ -191,7 +254,7 @@ export async function reconcileLobbyMembership() {
 /** Réinitialisation complète (session + stockage local) — déblocage accueil invité. */
 export async function resetAppToCleanHome() {
   stopMultiplayerSync();
-  unsubscribeLobbyRealtime();
+  stopLobbyPresenceSync();
   try {
     await signOutSupabase();
   } catch (e) {
@@ -252,6 +315,10 @@ export async function resumeEveningSession({ force = false } = {}) {
 
   if (force) clearSessionRouteSuppress();
   saveStatePatch({ inLobby: true });
+
+  if (isSupabaseConfigured()) {
+    startLobbyPresenceSync();
+  }
 
   if (isGameSyncActive()) {
     try {
@@ -408,76 +475,97 @@ async function clearGuestSessionAfterFailedJoin() {
   sessionStorage.setItem("reveal-auth-tab", "guest");
 }
 
+/** Invité : l'hôte a fermé le lobby (realtime ou refresh). */
+export async function handleLobbyDissolvedForGuest() {
+  if (lobbyDissolveHandling) return;
+  if (!getState().inLobby) return;
+  if (isLocalLobbyHost()) return;
+
+  lobbyDissolveHandling = true;
+  stopMultiplayerSync();
+  stopLobbyPresenceSync();
+
+  const wasGuest = isGuest();
+  await signOutAnonGuestIfNeeded(wasGuest);
+  applyLeaveLobbyLocal({ wasGuest, navigateAway: false });
+
+  await showAppAlert("L'hôte a quitté le lobby.", { title: "Lobby fermé", icon: "👋" });
+
+  lobbyDissolveHandling = false;
+  navigate("home", { reset: true });
+}
+
+/** Hôte : supprime le lobby pour tout le monde. */
+export async function dissolveLobbyAsHost({ navigateAway = true } = {}) {
+  stopMultiplayerSync();
+  stopLobbyPresenceSync();
+
+  const lobby = getLobby();
+  const code = lobby?.code;
+  const wasGuest = isGuest();
+
+  if (isSupabaseConfigured() && lobby?.id) {
+    const res = await closeLobbySupabase();
+    if (!res.ok) {
+      return { ok: false, error: res.error };
+    }
+    await signOutAnonGuestIfNeeded(wasGuest);
+  } else if (code) {
+    clearLocalOpenLobbySlot(code);
+  }
+
+  applyLeaveLobbyLocal({ wasGuest, navigateAway });
+  return { ok: true };
+}
+
+/** Confirmation si hôte, sinon simple sortie du lobby. */
+export async function confirmAndLeaveLobby({ navigateAway = true } = {}) {
+  if (!hasActiveLobby()) return { ok: true };
+
+  if (isSupabaseConfigured() && isLocalLobbyHost()) {
+    const ok = await showAppConfirm(
+      "Le lobby sera fermé pour tous les joueurs. Continuer ?",
+      {
+        title: "Quitter le lobby",
+        confirmLabel: "Fermer le lobby",
+        cancelLabel: "Annuler",
+        icon: "🚪",
+      }
+    );
+    if (!ok) return { ok: false, cancelled: true };
+    return dissolveLobbyAsHost({ navigateAway });
+  }
+
+  return leaveLobby({ navigateAway });
+}
+
 /**
  * Quitte le lobby sans supprimer le compte connecté.
  * Invité : retour à l’accueil (onglet Invité) pour rejoindre une autre partie.
  */
 export async function leaveLobby({ navigateAway = true } = {}) {
+  if (isSupabaseConfigured() && getLobby()?.id && isLocalLobbyHost()) {
+    return confirmAndLeaveLobby({ navigateAway });
+  }
+
   stopMultiplayerSync();
-  unsubscribeLobbyRealtime();
+  stopLobbyPresenceSync();
 
   const lobby = getLobby();
   const code = lobby?.code;
   const wasGuest = isGuest();
-  const isHost = getLobbyParticipants().some((p) => p.isLocal && p.isHost);
 
   if (isSupabaseConfigured() && lobby?.id) {
-    if (isHost) {
-      try {
-        await endGameSession();
-      } catch (e) {
-        console.warn("REVEAL endGameSession on leave:", e.message || e);
-      }
-    }
     const res = await leaveLobbySupabase();
     if (!res.ok) {
       console.warn("REVEAL leaveLobbySupabase:", res.error);
     }
-    let shouldSignOut = wasGuest;
-    if (!shouldSignOut) {
-      const { data: authData } = await supabase.auth.getUser();
-      shouldSignOut = Boolean(authData?.user?.is_anonymous);
-    }
-    if (shouldSignOut) {
-      try {
-        await signOutSupabase();
-      } catch (e) {
-        console.warn("REVEAL signOut guest on leave:", e.message || e);
-      }
-    }
+    await signOutAnonGuestIfNeeded(wasGuest);
   } else if (code) {
-    const open = { ...(getState().openLobbies || {}) };
-    const published = open[code];
-    if (published) {
-      const localName = getLocalDisplayName();
-      open[code] = {
-        ...published,
-        participants: (published.participants || []).filter((p) => p.name !== localName),
-        updatedAt: Date.now(),
-      };
-      saveStatePatch({ openLobbies: open });
-    }
+    clearLocalOpenLobbySlot(code);
   }
 
-  const patch = { inLobby: false, lobby: null, lobbyCode: null };
-
-  if (wasGuest) {
-    patch.user = {
-      email: null,
-      name: null,
-      loggedIn: false,
-      isGuest: false,
-      provider: null,
-    };
-    sessionStorage.setItem("reveal-auth-tab", "guest");
-  }
-
-  resetEveningState();
-  clearCachedGameSession();
-  saveStatePatch(patch);
-  if (navigateAway) {
-    navigate("home", { reset: true });
-  }
+  applyLeaveLobbyLocal({ wasGuest, navigateAway });
   return { ok: true };
 }
 
@@ -537,7 +625,10 @@ export async function sendLobbyNudgeToNotReady() {
 
 export function simulateLobbyJoins(onUpdate) {
   if (isSupabaseConfigured()) {
-    return subscribeLobbyRealtime(onUpdate);
+    startLobbyPresenceSync();
+    if (!onUpdate) return () => {};
+    const unsub = onLobbyBundleUpdated(onUpdate);
+    return () => unsub();
   }
 
   const pool = PLAYERS.filter(

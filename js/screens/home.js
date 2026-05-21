@@ -17,7 +17,7 @@ import {
   hasActiveLobby,
   getLobby,
   returnToEveningGames,
-  leaveLobby,
+  confirmAndLeaveLobby,
   reconcileLobbyMembership,
   resetAppToCleanHome,
 } from "../core/lobby.js";
@@ -265,7 +265,7 @@ export function mountHome(app) {
         <div class="lobby-actions">
           ${
             hasActiveLobby()
-              ? `<button type="button" class="btn btn-primary btn--lobby-return" id="btn-return-lobby">
+              ? `<button type="button" class="btn btn-accent btn--lobby-return" id="btn-return-lobby">
             Retour aux jeux <span class="muted">(${escapeHtml(getLobby().code)})</span>
           </button>
           <button type="button" class="btn btn-secondary btn--leave-lobby" id="btn-leave-lobby">Quitter le lobby</button>`
@@ -386,8 +386,9 @@ export function mountHome(app) {
     if (e.target.closest("#btn-leave-lobby")) {
       const btn = e.target.closest("#btn-leave-lobby");
       btn.disabled = true;
-      const res = await leaveLobby();
+      const res = await confirmAndLeaveLobby();
       btn.disabled = false;
+      if (res.cancelled) return;
       if (!res.ok) {
         await showAppAlert(res.error || "Impossible de quitter le lobby.", {
           title: "Quitter le lobby",

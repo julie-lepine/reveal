@@ -1,7 +1,12 @@
-import { GAMES } from "../../data/games.js";
+import { GAMES_COMING_SOON, GAMES_AVAILABLE } from "../../data/games.js";
 import { getEveningRecap } from "../core/eveningRecap.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
-import { escapeHtml, pageShell, gameTileLogoHtml, bindGameTileLogos } from "../core/ui.js";
+import {
+  escapeHtml,
+  pageShell,
+  gameTileVisualHtml,
+  bindGameTileLogos,
+} from "../core/ui.js";
 import { handleNavTarget, goToEveningSettings } from "./nav.js";
 import {
   isGameSyncActive,
@@ -13,6 +18,9 @@ import {
   routeToActiveGameIfNeeded,
 } from "../core/gameSync.js";
 import { navigate, getCurrentScreen } from "../core/router.js";
+import { isSupabaseConfigured } from "../core/supabaseClient.js";
+import { startLobbyPresenceSync } from "../core/supabaseLobby.js";
+import { hasActiveLobby } from "../core/lobby.js";
 import { getLastGame, getState } from "../core/state.js";
 import { getFilRougeSession } from "../core/filRougeSession.js";
 import {
@@ -23,7 +31,7 @@ import {
   launchGuessLieMenu,
   launchTierNightSelect,
   eveningRecapRestartButtonHtml,
-  bindRestartGameButtons,
+  restartGame,
 } from "../core/restartGame.js";
 import { filRougeGameSelectSectionHtml, bindFilRougeBox } from "../core/filRougeUi.js";
 
@@ -104,6 +112,41 @@ function buildGameSelectHandlers() {
       });
     },
   };
+}
+
+function gameTileMarkup(g) {
+  const visual = gameTileVisualHtml(g);
+  const badge = escapeHtml(g.badgeLabel || "Bientôt");
+
+  if (!g.enabled) {
+    return `
+      <div class="game-tile game-tile--disabled ${escapeHtml(g.cssClass)}" aria-disabled="true">
+        ${visual}
+        <div class="game-tile__text">
+          <span class="game-tile__title">${escapeHtml(g.title)}</span>
+          <span class="game-tile__desc">${escapeHtml(g.desc)}</span>
+          <span class="badge badge--soon">${badge}</span>
+        </div>
+      </div>`;
+  }
+
+  return `
+    <button type="button" class="game-tile ${escapeHtml(g.cssClass)}" data-nav="${escapeHtml(g.id)}">
+      ${visual}
+      <div class="game-tile__text">
+        <span class="game-tile__title">${escapeHtml(g.title)}</span>
+        <span class="game-tile__desc">${escapeHtml(g.desc)}</span>
+      </div>
+    </button>`;
+}
+
+function gameGridSection(label, games) {
+  if (!games.length) return "";
+  return `
+    <p class="game-grid__label">${escapeHtml(label)}</p>
+    <div class="game-grid">
+      ${games.map((g) => gameTileMarkup(g)).join("")}
+    </div>`;
 }
 
 function gameSelectRenderSnapshot() {
@@ -201,28 +244,8 @@ export function mountGameSelect(app) {
       ${eveningRecapHtml(recap)}
       ${filSection}
 
-      <div class="game-grid">
-        ${GAMES.map((g) => {
-          if (!g.enabled) {
-            return `
-              <div class="game-tile game-tile--disabled ${g.cssClass}">
-                <span class="game-tile__emoji">${g.emoji}</span>
-                <div class="game-tile__meta">
-                  <span class="game-tile__title">${escapeHtml(g.title)}</span>
-                  <span class="badge badge--soon">Soon</span>
-                </div>
-              </div>`;
-          }
-          return `
-            <button type="button" class="game-tile ${g.cssClass}" data-nav="${g.id}">
-              ${g.logo ? gameTileLogoHtml(g) : `<span class="game-tile__emoji">${g.emoji}</span>`}
-              <div class="game-tile__text">
-                <span class="game-tile__title">${escapeHtml(g.title)}</span>
-                <span class="game-tile__desc">${escapeHtml(g.desc)}</span>
-              </div>
-            </button>`;
-        }).join("")}
-      </div>
+      ${gameGridSection("🎮 Jeux disponibles", GAMES_AVAILABLE)}
+      ${gameGridSection("🎵 Bientôt", GAMES_COMING_SOON)}
     `,
     });
 
@@ -231,6 +254,10 @@ export function mountGameSelect(app) {
   }
 
   scheduleRender(true);
+
+  if (isSupabaseConfigured() && hasActiveLobby()) {
+    startLobbyPresenceSync();
+  }
 
   if (isGameSyncActive()) {
     void (async () => {

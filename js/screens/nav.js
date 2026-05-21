@@ -1,5 +1,10 @@
 import { navigate, goBack, getCurrentScreen } from "../core/router.js";
-import { goToLobby, hasActiveLobby, leaveLobby, returnToEveningGames } from "../core/lobby.js";
+import {
+  goToLobby,
+  hasActiveLobby,
+  confirmAndLeaveLobby,
+  returnToEveningGames,
+} from "../core/lobby.js";
 import { canPlay } from "../core/auth.js";
 import {
   isGameSyncActive,
@@ -47,7 +52,8 @@ export function returnFromEveningProfile() {
 
 async function handleBackNavigation() {
   if (getCurrentScreen() === "lobby") {
-    await leaveLobby();
+    const res = await confirmAndLeaveLobby();
+    if (res.cancelled) return;
     return;
   }
   if (getCurrentScreen() === "game-select") {
@@ -78,7 +84,8 @@ export async function handleNavTarget(target, handlers) {
   }
   if (target === "home") {
     if (hasActiveLobby() && getCurrentScreen() === "lobby") {
-      await leaveLobby();
+      const res = await confirmAndLeaveLobby();
+      if (res.cancelled) return;
       return;
     }
     if (hasActiveLobby()) {

@@ -1,5 +1,27 @@
-/** Catalogue des jeux affichés dans le menu */
+/** Catalogue des jeux affichés dans le menu (inactifs en tête, puis actifs). */
 export const GAMES = [
+  {
+    id: "blindtest-prep",
+    title: "Blind Test",
+    desc: "Extraits musicaux — devine titre ou artiste le plus vite",
+    emoji: "🎧",
+    cssClass: "blindtest",
+    borderGradient:
+      "linear-gradient(145deg, #6366F1 0%, #818CF8 48%, #2B2D66 100%)",
+    enabled: false,
+    badgeLabel: "Bientôt",
+  },
+  {
+    id: "playlistguess-prep",
+    title: "De qui la playlist ?",
+    desc: "Une chanson s’affiche — à qui appartient cette playlist ?",
+    emoji: "🎶",
+    cssClass: "playlist",
+    borderGradient:
+      "linear-gradient(200deg, #A78BFA 0%, #6366F1 48%, #2B2D66 100%)",
+    enabled: false,
+    badgeLabel: "Bientôt",
+  },
   {
     id: "hottake-prep",
     title: "HotTake",
@@ -7,7 +29,8 @@ export const GAMES = [
     emoji: "🔥",
     cssClass: "hot",
     logo: "js/games/hottake.png",
-    borderGradient: "linear-gradient(145deg, #FF6B6B 0%, #FF3CAC 48%, #2B2D66 100%)",
+    borderGradient:
+      "linear-gradient(145deg, #FF6B6B 0%, #FF3CAC 48%, #2B2D66 100%)",
     enabled: true,
   },
   {
@@ -17,7 +40,8 @@ export const GAMES = [
     emoji: "🕵️",
     cssClass: "guess",
     logo: "js/games/guesslie.png",
-    borderGradient: "linear-gradient(200deg, #FF6B6B 0%, #FF3CAC 48%, #2B2D66 100%)",
+    borderGradient:
+      "linear-gradient(200deg, #FF6B6B 0%, #FF3CAC 48%, #2B2D66 100%)",
     enabled: true,
   },
   {
@@ -27,7 +51,8 @@ export const GAMES = [
     emoji: "⚡",
     cssClass: "speed",
     logo: "js/games/speedvote.png",
-    borderGradient: "linear-gradient(145deg, #FBBF24 0%, #FF3CAC 48%, #2B2D66 100%)",
+    borderGradient:
+      "linear-gradient(145deg, #FBBF24 0%, #FF3CAC 48%, #2B2D66 100%)",
     enabled: true,
   },
   {
@@ -37,7 +62,8 @@ export const GAMES = [
     emoji: "⚖️",
     cssClass: "dilemma",
     logo: "js/games/dilemma.png",
-    borderGradient: "linear-gradient(145deg, #60A5FA 0%, #FF3CAC 48%, #2B2D66 100%)",
+    borderGradient:
+      "linear-gradient(145deg, #60A5FA 0%, #FF3CAC 48%, #2B2D66 100%)",
     enabled: true,
   },
   {
@@ -47,7 +73,8 @@ export const GAMES = [
     emoji: "📏",
     cssClass: "truth",
     logo: "js/games/truthmeter.png",
-    borderGradient: "linear-gradient(145deg, #34D399 0%, #60A5FA 48%, #2B2D66 100%)",
+    borderGradient:
+      "linear-gradient(145deg, #34D399 0%, #60A5FA 48%, #2B2D66 100%)",
     enabled: true,
   },
   {
@@ -57,15 +84,11 @@ export const GAMES = [
     emoji: "🏆",
     cssClass: "tier",
     logo: "js/games/tiernight.png",
-    borderGradient: "linear-gradient(320deg, #FF6B6B 0%, #FF3CAC 48%, #2B2D66 100%)",
+    borderGradient:
+      "linear-gradient(320deg, #FF6B6B 0%, #FF3CAC 48%, #2B2D66 100%)",
     enabled: true,
   },
-  {
-    id: "songrank",
-    title: "SongRank",
-    desc: "Bientôt disponible",
-    emoji: "🎵",
-    cssClass: "song",
-    enabled: false,
-  },
 ];
+
+export const GAMES_COMING_SOON = GAMES.filter((g) => !g.enabled);
+export const GAMES_AVAILABLE = GAMES.filter((g) => g.enabled);

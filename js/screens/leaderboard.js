@@ -53,7 +53,7 @@ export function mountLeaderboard(app) {
       </div>
 
       <div class="btn-row">
-        <button type="button" class="btn btn-secondary" data-nav="results">Résultats</button>
+        <button type="button" class="btn btn-accent" data-nav="results">Résultats</button>
         <button type="button" class="btn btn-primary" data-nav="game-select">Autre jeu</button>
       </div>
     `,
