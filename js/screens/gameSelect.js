@@ -2,7 +2,7 @@ import { GAMES } from "../../data/games.js";
 import { getEveningRecap } from "../core/eveningRecap.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
 import { escapeHtml, pageShell, gameTileLogoHtml, bindGameTileLogos } from "../core/ui.js";
-import { bindNav, goToEveningSettings } from "./nav.js";
+import { handleNavTarget, goToEveningSettings } from "./nav.js";
 import {
   isGameSyncActive,
   isLobbyHost,
@@ -13,7 +13,8 @@ import {
   routeToActiveGameIfNeeded,
 } from "../core/gameSync.js";
 import { navigate, getCurrentScreen } from "../core/router.js";
-import { getLastGame } from "../core/state.js";
+import { getLastGame, getState } from "../core/state.js";
+import { getFilRougeSession } from "../core/filRougeSession.js";
 import {
   launchSpeedVotePrep,
   launchTruthMeterPrep,
@@ -24,6 +25,7 @@ import {
   eveningRecapRestartButtonHtml,
   bindRestartGameButtons,
 } from "../core/restartGame.js";
+import { filRougeGameSelectSectionHtml, bindFilRougeBox } from "../core/filRougeUi.js";
 
 function eveningRecapHtml(recap) {
   if (!recap.hasActivity) {
@@ -87,44 +89,109 @@ function eveningRecapHtml(recap) {
     </div>`;
 }
 
+function buildGameSelectHandlers() {
+  return {
+    "speedvote-prep": launchSpeedVotePrep,
+    "truthmeter-prep": launchTruthMeterPrep,
+    "dilemma-prep": launchDilemmaPrep,
+    "hottake-prep": launchHotTakePrep,
+    guesslie: launchGuessLieMenu,
+    "tiernight-select": launchTierNightSelect,
+    settings: () => goToEveningSettings(),
+    leaderboard: () => {
+      navigate("leaderboard", {
+        navStack: ["home", "lobby", "game-select", "leaderboard"],
+      });
+    },
+  };
+}
+
+function gameSelectRenderSnapshot() {
+  const recap = getEveningRecap();
+  const fr = getFilRougeSession();
+  const participants = getState().lobby?.participants || [];
+  return JSON.stringify({
+    n: participants.length,
+    recap: recap.hasActivity,
+    ht: recap.hotTakes,
+    sv: recap.speedVotes,
+    tm: recap.truthMeters,
+    dl: recap.dilemmas,
+    frStatus: fr.status,
+    frVal: fr.validations,
+    frModal: fr.resultsModalOpen,
+    lastGame: getLastGame()?.gameId ?? null,
+  });
+}
+
 export function mountGameSelect(app) {
   if (!requireLobbyPlay()) return null;
 
   let unsubSession = () => {};
   let guestRoutePoll = null;
+  let renderTimer = null;
+  let renderInFlight = false;
+  let lastSnapshot = "";
+  const navHandlers = buildGameSelectHandlers();
 
-  function bindGameSelectEvents() {
-    const mpHandlers = {};
-    if (isGameSyncActive()) {
-      mpHandlers["speedvote-prep"] = launchSpeedVotePrep;
-      mpHandlers["truthmeter-prep"] = launchTruthMeterPrep;
-      mpHandlers["dilemma-prep"] = launchDilemmaPrep;
-      mpHandlers["hottake-prep"] = launchHotTakePrep;
-      mpHandlers.guesslie = launchGuessLieMenu;
-      mpHandlers["tiernight-select"] = launchTierNightSelect;
+  function onGameSelectClick(e) {
+    if (getCurrentScreen() !== "game-select") return;
+
+    const restartEl = e.target.closest("[data-restart-game]");
+    if (restartEl) {
+      void restartGame(restartEl.getAttribute("data-restart-game"));
+      return;
     }
 
-    bindNav(app, {
-      ...mpHandlers,
-      "speedvote-prep": launchSpeedVotePrep,
-      "truthmeter-prep": launchTruthMeterPrep,
-      "dilemma-prep": launchDilemmaPrep,
-      settings: () => goToEveningSettings(),
-      leaderboard: () => {
-        navigate("leaderboard", {
-          navStack: ["home", "lobby", "game-select", "leaderboard"],
-        });
-      },
-    });
-    bindGameTileLogos(app);
-    bindRestartGameButtons(app);
+    const navEl = e.target.closest("[data-nav]");
+    if (navEl) {
+      void handleNavTarget(navEl.getAttribute("data-nav"), navHandlers);
+    }
   }
 
-  function render() {
+  app.addEventListener("click", onGameSelectClick);
+
+  function bindGameSelectEvents() {
+    bindGameTileLogos(app);
+    bindFilRougeBox(app);
+  }
+
+  function scheduleRender(force = false) {
+    if (renderTimer) clearTimeout(renderTimer);
+    const delay = force ? 0 : 300;
+    renderTimer = setTimeout(() => {
+      renderTimer = null;
+      void renderIfNeeded(force);
+    }, delay);
+  }
+
+  async function renderIfNeeded(force = false) {
+    const snap = gameSelectRenderSnapshot();
+    if (!force && snap === lastSnapshot) return;
+    if (renderInFlight) {
+      scheduleRender(false);
+      return;
+    }
+    renderInFlight = true;
+    try {
+      await render();
+      lastSnapshot = snap;
+    } finally {
+      renderInFlight = false;
+    }
+  }
+
+  async function render() {
     const recap = getEveningRecap();
+    let filSection = "";
+    try {
+      filSection = await filRougeGameSelectSectionHtml();
+    } catch (err) {
+      console.error("[game-select] fil rouge section", err);
+    }
 
     app.innerHTML = pageShell({
-      backTarget: "lobby",
+      backTarget: "home",
       content: `
       <p class="label-upper label-upper--gold">🎮 La soirée</p>
       <h2 class="screen-title">Choisir un jeu</h2>
@@ -132,6 +199,7 @@ export function mountGameSelect(app) {
       <button type="button" class="btn-link game-select-profile" data-nav="settings">Profil & paramètres</button>
 
       ${eveningRecapHtml(recap)}
+      ${filSection}
 
       <div class="game-grid">
         ${GAMES.map((g) => {
@@ -159,20 +227,21 @@ export function mountGameSelect(app) {
     });
 
     bindGameSelectEvents();
+    bindFilRougeBox(app);
   }
 
-  render();
+  scheduleRender(true);
 
   if (isGameSyncActive()) {
     void (async () => {
       if (await routeToActiveGameIfNeeded()) return;
       const row = (await refreshGameSession()) || getCachedGameSession();
       if (row) handleSessionRoute(row);
-      render();
+      scheduleRender(true);
     })();
 
     unsubSession = onGameSessionChange(async (row) => {
-      if (getCurrentScreen() === "game-select") render();
+      if (getCurrentScreen() === "game-select") scheduleRender(false);
       if (row && (await routeToActiveGameIfNeeded())) return;
       if (row) handleSessionRoute(row);
     });
@@ -188,7 +257,9 @@ export function mountGameSelect(app) {
   }
 
   return () => {
+    app.removeEventListener("click", onGameSelectClick);
     unsubSession();
     if (guestRoutePoll) clearInterval(guestRoutePoll);
+    if (renderTimer) clearTimeout(renderTimer);
   };
 }

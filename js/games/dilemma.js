@@ -25,6 +25,7 @@ import { navigate } from "../core/router.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
 import { bindNav } from "../screens/nav.js";
 import { exitGameToLobbyButtonHtml, bindExitGameToLobby } from "../core/exitGame.js";
+import { isEveningGameplayPaused } from "../core/filRougeSession.js";
 import { onTimerSecond, primeTimerSound } from "../core/timerSound.js";
 import {
   isGameSyncActive,
@@ -212,7 +213,7 @@ export function mountDilemma(app) {
     if (mp && !getDilemmaSession().voteEndsAt) return;
     primeTimerSound();
     intervalId = setInterval(async () => {
-      if (paused) return;
+      if (paused || isEveningGameplayPaused()) return;
       const s = getDilemmaSession();
       if (phase !== "voting") {
         clearTimer();
@@ -383,7 +384,7 @@ export function mountDilemma(app) {
   }
 
   function canChangeVote() {
-    return phase === "voting" && timer > 0 && !paused;
+    return phase === "voting" && timer > 0 && !paused && !isEveningGameplayPaused();
   }
 
   function render() {

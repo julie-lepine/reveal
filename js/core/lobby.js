@@ -6,11 +6,13 @@ import {
   getLocalDisplayName,
   getLocalEmoji,
   ensurePlayerScore,
+  resetEveningState,
 } from "./state.js";
-import { loginAsGuest } from "./auth.js";
+import { loginAsGuest, isGuest } from "./auth.js";
+import { signOutSupabase, getSupabaseUserId } from "./supabaseAuth.js";
 import { syncAllPlayerScores } from "./players.js";
 import { navigate } from "./router.js";
-import { isSupabaseConfigured } from "./supabaseClient.js";
+import { isSupabaseConfigured, supabase } from "./supabaseClient.js";
 import {
   createLobbySupabase,
   joinLobbySupabase,
@@ -23,8 +25,6 @@ import {
   unsubscribeLobbyRealtime,
   sendLobbyNudgeSupabase,
 } from "./supabaseLobby.js";
-import { isGuest } from "./auth.js";
-import { resetEveningState } from "./state.js";
 import {
   stopMultiplayerSync,
   endGameSession,
@@ -35,6 +35,7 @@ import {
   isGameSyncActive,
   suppressSessionRoute,
   clearSessionRouteSuppress,
+  isSessionRouteSuppressed,
   getCachedGameSession,
 } from "./gameSync.js";
 
@@ -124,7 +125,88 @@ export async function resetAllParticipantsReady() {
 
 export function hasActiveLobby() {
   const lobby = getLobby();
-  return Boolean(getState().inLobby && lobby?.code && lobby.participants?.length);
+  if (!getState().inLobby || !lobby?.code || !lobby.participants?.length) {
+    return false;
+  }
+  if (isSupabaseConfigured()) {
+    const uid = getSupabaseUserId();
+    if (uid && !lobby.participants.some((p) => p.userId === uid || p.isLocal)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+/** Nettoie un lobby fantôme en local (sans quitter Supabase côté serveur). */
+export function forceClearClientLobbyState() {
+  stopMultiplayerSync();
+  clearCachedGameSession();
+  saveStatePatch({ inLobby: false, lobby: null, lobbyCode: null });
+}
+
+/**
+ * Vérifie que le joueur local est encore membre du lobby (après F5 / nouvelle session anon).
+ * @returns {{ cleared: boolean }}
+ */
+export async function reconcileLobbyMembership() {
+  if (!getState().inLobby) return { cleared: false };
+
+  if (!isSupabaseConfigured()) {
+    const lobby = getLobby();
+    if (!lobby?.code || !lobby.participants?.length) {
+      forceClearClientLobbyState();
+      return { cleared: true };
+    }
+    return { cleared: false };
+  }
+
+  const lobbyId = getLobby()?.id;
+  const uid = getSupabaseUserId();
+
+  if (!lobbyId) {
+    if (!uid) forceClearClientLobbyState();
+    return { cleared: !uid };
+  }
+
+  if (!uid) {
+    forceClearClientLobbyState();
+    return { cleared: true };
+  }
+
+  try {
+    await refreshLobbyFromSupabase();
+    const participants = getLobbyParticipants();
+    if (!participants.length || !participants.some((p) => p.userId === uid)) {
+      forceClearClientLobbyState();
+      return { cleared: true };
+    }
+    return { cleared: false };
+  } catch (e) {
+    console.warn("REVEAL reconcile lobby:", e.message || e);
+    forceClearClientLobbyState();
+    return { cleared: true };
+  }
+}
+
+/** Réinitialisation complète (session + stockage local) — déblocage accueil invité. */
+export async function resetAppToCleanHome() {
+  stopMultiplayerSync();
+  unsubscribeLobbyRealtime();
+  try {
+    await signOutSupabase();
+  } catch (e) {
+    console.warn("REVEAL reset signOut:", e.message || e);
+  }
+  try {
+    localStorage.removeItem("reveal-app-state");
+    localStorage.removeItem("reveal-auth-credentials");
+    localStorage.removeItem("reveal-fil-rouge-private");
+  } catch {
+    /* ignore */
+  }
+  sessionStorage.removeItem("reveal-pending-join");
+  sessionStorage.setItem("reveal-auth-tab", "guest");
+  window.location.reload();
 }
 
 export function goToLobby() {
@@ -145,7 +227,6 @@ export async function returnToEveningGames() {
   }
 
   saveStatePatch({ inLobby: true });
-  suppressSessionRoute(120000, getCachedGameSession()?.screen ?? null);
 
   if (isGameSyncActive()) {
     startMultiplayerSync();
@@ -161,11 +242,15 @@ export async function goToGameSelect() {
   await returnToEveningGames();
 }
 
-/** Après F5 ou reconnexion : resynchronise et rejoint la partie en cours si besoin. */
-export async function resumeEveningSession() {
+/**
+ * Après F5 ou reconnexion : resynchronise et rejoint la partie en cours si besoin.
+ * @param {{ force?: boolean }} [options] — force=true au boot ; false si l’utilisateur est allé à l’accueil volontairement.
+ */
+export async function resumeEveningSession({ force = false } = {}) {
   if (!hasActiveLobby()) return false;
+  if (!force && isSessionRouteSuppressed()) return false;
 
-  clearSessionRouteSuppress();
+  if (force) clearSessionRouteSuppress();
   saveStatePatch({ inLobby: true });
 
   if (isGameSyncActive()) {
@@ -275,22 +360,65 @@ export async function joinLobby(code) {
   return { ok: true, code: trimmed };
 }
 
+function normalizeLobbyCode(code) {
+  return String(code || "")
+    .trim()
+    .toUpperCase()
+    .replace(/\s/g, "");
+}
+
 export async function joinLobbyAsGuest(code, guestName) {
   const auth = await loginAsGuest(guestName);
   if (!auth.ok) return auth;
-  return joinLobby(code);
+
+  const nextCode = normalizeLobbyCode(code);
+  const currentCode = normalizeLobbyCode(getLobby()?.code);
+  if (hasActiveLobby() && currentCode && nextCode && currentCode !== nextCode) {
+    await leaveLobby({ navigateAway: false });
+  }
+
+  const res = await joinLobby(code);
+  if (!res.ok) {
+    await clearGuestSessionAfterFailedJoin();
+  }
+  return res;
+}
+
+/** Évite de rester « invité » sans lobby si le code est invalide ou le join échoue. */
+async function clearGuestSessionAfterFailedJoin() {
+  if (isSupabaseConfigured()) {
+    try {
+      await signOutSupabase();
+    } catch (e) {
+      console.warn("REVEAL guest rollback:", e.message || e);
+    }
+  }
+  saveStatePatch({
+    user: {
+      email: null,
+      name: null,
+      loggedIn: false,
+      isGuest: false,
+      provider: null,
+    },
+    inLobby: false,
+    lobby: null,
+    lobbyCode: null,
+  });
+  sessionStorage.setItem("reveal-auth-tab", "guest");
 }
 
 /**
  * Quitte le lobby sans supprimer le compte connecté.
  * Invité : retour à l’accueil (onglet Invité) pour rejoindre une autre partie.
  */
-export async function leaveLobby() {
+export async function leaveLobby({ navigateAway = true } = {}) {
   stopMultiplayerSync();
   unsubscribeLobbyRealtime();
 
   const lobby = getLobby();
   const code = lobby?.code;
+  const wasGuest = isGuest();
   const isHost = getLobbyParticipants().some((p) => p.isLocal && p.isHost);
 
   if (isSupabaseConfigured() && lobby?.id) {
@@ -302,7 +430,21 @@ export async function leaveLobby() {
       }
     }
     const res = await leaveLobbySupabase();
-    if (!res.ok) return res;
+    if (!res.ok) {
+      console.warn("REVEAL leaveLobbySupabase:", res.error);
+    }
+    let shouldSignOut = wasGuest;
+    if (!shouldSignOut) {
+      const { data: authData } = await supabase.auth.getUser();
+      shouldSignOut = Boolean(authData?.user?.is_anonymous);
+    }
+    if (shouldSignOut) {
+      try {
+        await signOutSupabase();
+      } catch (e) {
+        console.warn("REVEAL signOut guest on leave:", e.message || e);
+      }
+    }
   } else if (code) {
     const open = { ...(getState().openLobbies || {}) };
     const published = open[code];
@@ -319,7 +461,7 @@ export async function leaveLobby() {
 
   const patch = { inLobby: false, lobby: null, lobbyCode: null };
 
-  if (isGuest()) {
+  if (wasGuest) {
     patch.user = {
       email: null,
       name: null,
@@ -333,7 +475,9 @@ export async function leaveLobby() {
   resetEveningState();
   clearCachedGameSession();
   saveStatePatch(patch);
-  navigate("home", { reset: true });
+  if (navigateAway) {
+    navigate("home", { reset: true });
+  }
   return { ok: true };
 }
 

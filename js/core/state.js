@@ -50,6 +50,7 @@ export const defaultPlayerStats = () => ({
   tierNightsPlayed: 0,
   truthMeterBluffWins: 0,
   truthMeterMindReaderWins: 0,
+  filRougeMissionsValidated: 0,
 });
 
 const defaultSettings = () => ({
@@ -137,6 +138,16 @@ const defaultState = () => ({
     blindMode: false,
     pausedBy: null,
   },
+  filRougeGame: {
+    status: "idle",
+    submissions: {},
+    missionAcks: {},
+    validations: {},
+    resultsModalOpen: false,
+    resultsSnapshot: null,
+    closedAt: null,
+    closedByUid: null,
+  },
   tierNightGame: { recaps: [], topicId: null, listName: "", controversialItem: null },
   openLobbies: {},
 });
@@ -168,6 +179,7 @@ function loadState() {
       speedVoteGame: { ...defaultState().speedVoteGame, ...parsed.speedVoteGame },
       truthMeterGame: { ...defaultState().truthMeterGame, ...parsed.truthMeterGame },
       dilemmaGame: { ...defaultState().dilemmaGame, ...parsed.dilemmaGame },
+      filRougeGame: { ...defaultState().filRougeGame, ...parsed.filRougeGame },
       tierNightGame: { ...defaultState().tierNightGame, ...parsed.tierNightGame },
       openLobbies: parsed.openLobbies || {},
       lastGame: parsed.lastGame || null,
@@ -385,6 +397,7 @@ export function resetEveningState() {
     speedVoteGame: { ...base.speedVoteGame },
     truthMeterGame: { ...base.truthMeterGame },
     dilemmaGame: { ...base.dilemmaGame },
+    filRougeGame: { ...base.filRougeGame },
     guessLie: { ...emptyGuessLie(), sessionId: getState().lobbyCode || null },
     tierNightTopicId: null,
     tierNightGame: { ...base.tierNightGame },

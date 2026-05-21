@@ -1,5 +1,5 @@
 import { navigate, goBack, getCurrentScreen } from "../core/router.js";
-import { goToLobby, hasActiveLobby, returnToEveningGames } from "../core/lobby.js";
+import { goToLobby, hasActiveLobby, leaveLobby, returnToEveningGames } from "../core/lobby.js";
 import { canPlay } from "../core/auth.js";
 import {
   isGameSyncActive,
@@ -19,7 +19,7 @@ export function goToEveningHome() {
     return;
   }
   suppressSessionRoute(120000, getCachedGameSession()?.screen ?? null);
-  navigate("home");
+  navigate("home", { reset: true });
 }
 
 /** Paramètres sans quitter le lobby. */
@@ -46,6 +46,14 @@ export function returnFromEveningProfile() {
 }
 
 async function handleBackNavigation() {
+  if (getCurrentScreen() === "lobby") {
+    await leaveLobby();
+    return;
+  }
+  if (getCurrentScreen() === "game-select") {
+    goToEveningHome();
+    return;
+  }
   if (isGameSyncActive() && isOnGameSetupScreen(getCurrentScreen())) {
     if (isLobbyHost()) {
       const left = await leaveGameSetup();
@@ -59,7 +67,7 @@ async function handleBackNavigation() {
   goBack();
 }
 
-async function handleNavTarget(target, handlers) {
+export async function handleNavTarget(target, handlers) {
   if (target === "back") {
     await handleBackNavigation();
     return;
@@ -69,6 +77,14 @@ async function handleNavTarget(target, handlers) {
     return;
   }
   if (target === "home") {
+    if (hasActiveLobby() && getCurrentScreen() === "lobby") {
+      await leaveLobby();
+      return;
+    }
+    if (hasActiveLobby()) {
+      goToEveningHome();
+      return;
+    }
     navigate("home", { reset: true });
     return;
   }

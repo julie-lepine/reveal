@@ -224,8 +224,13 @@ export async function changeEmailPassword(_currentPassword, newPassword) {
 
 export async function logout() {
   if (isSupabaseConfigured()) {
-    stopMultiplayerSync();
-    unsubscribeLobbyRealtime();
+    const { hasActiveLobby, leaveLobby } = await import("./lobby.js");
+    if (hasActiveLobby()) {
+      await leaveLobby({ navigateAway: false });
+    } else {
+      stopMultiplayerSync();
+      unsubscribeLobbyRealtime();
+    }
     await signOutSupabase();
     saveStatePatch({ inLobby: false, lobby: null, lobbyCode: null });
     return;

@@ -1,6 +1,11 @@
 import { initRouter, registerScreen, navigate, resetNav } from "./core/router.js";
 import { initBottomNav } from "./core/bottomNav.js";
-import { parseJoinCodeFromHash, hasActiveLobby, resumeEveningSession } from "./core/lobby.js";
+import {
+  parseJoinCodeFromHash,
+  hasActiveLobby,
+  resumeEveningSession,
+  reconcileLobbyMembership,
+} from "./core/lobby.js";
 import { initSupabaseAuth } from "./core/supabaseAuth.js";
 import { mountHome } from "./screens/home.js";
 import { mountLobby } from "./screens/lobby.js";
@@ -24,6 +29,9 @@ import { mountTruthMeter } from "./games/truthMeter.js";
 import { mountDilemma } from "./games/dilemma.js";
 import { mountGuessLie } from "./games/guessLie.js";
 import { mountTierNight } from "./games/tierNight.js";
+import { mountFilRougeSetup } from "./screens/filRougeSetup.js";
+import { mountFilRougeMission } from "./screens/filRougeMission.js";
+import { initFilRougeResultsListener } from "./core/filRougeResultsModal.js";
 
 const app = document.getElementById("app");
 
@@ -63,16 +71,27 @@ registerScreen("dilemma-prep", mountDilemmaPrep);
 registerScreen("dilemma", mountDilemma);
 registerScreen("guesslie", mountGuessLie);
 registerScreen("tiernight", mountTierNight);
+registerScreen("filrouge-setup", mountFilRougeSetup);
+registerScreen("filrouge-mission", mountFilRougeMission);
 
 initBottomNav();
+initFilRougeResultsListener();
 
 async function boot() {
   await initSupabaseAuth();
+  await reconcileLobbyMembership();
   resetNav();
   navigate("home", { reset: true });
   if (hasActiveLobby()) {
-    void resumeEveningSession();
+    void resumeEveningSession({ force: true });
   }
 }
 
-boot();
+boot().catch((e) => {
+  console.error("REVEAL boot:", e);
+  app.innerHTML = `<div class="card" style="margin:1.5rem;padding:1.25rem">
+    <p><strong>Erreur au démarrage</strong></p>
+    <p class="hint">${e?.message || e}</p>
+    <button type="button" class="btn btn-primary btn--spaced" onclick="location.reload()">Recharger</button>
+  </div>`;
+});

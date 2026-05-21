@@ -26,7 +26,9 @@ import {
   startGameSession,
   startMultiplayerSync,
   routeToActiveGameIfNeeded,
+  onGameSessionChange,
 } from "../core/gameSync.js";
+import { navigate, getCurrentScreen } from "../core/router.js";
 import { triggerLobbyNudge } from "../core/nudge.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
@@ -78,6 +80,7 @@ export function mountLobby(app) {
   if (!requireLobbyPlay()) return null;
 
   let cleanupSim = null;
+  let unsubSession = () => {};
   let mounted = false;
   let lastNudgeSeen = 0;
   let wizzCooldownUntil = 0;
@@ -403,11 +406,19 @@ export function mountLobby(app) {
     if (isGameSyncActive()) {
       startMultiplayerSync();
       void routeToActiveGameIfNeeded();
+      unsubSession = onGameSessionChange(async (row) => {
+        if (!row) return;
+        if (await routeToActiveGameIfNeeded(row)) return;
+        if (row.screen !== "game-select") return;
+        if (getCurrentScreen() !== "lobby") return;
+        navigate("game-select", { navStack: ["home", "lobby", "game-select"] });
+      });
     }
     cleanupSim = simulateLobbyJoins(onLobbyUpdate);
   })();
 
   return () => {
+    unsubSession();
     if (cleanupSim) cleanupSim();
   };
 }

@@ -21,6 +21,7 @@ import { navigate } from "../core/router.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
 import { bindNav } from "../screens/nav.js";
 import { exitGameToLobbyButtonHtml, bindExitGameToLobby } from "../core/exitGame.js";
+import { isEveningGameplayPaused } from "../core/filRougeSession.js";
 import { onTimerSecond, primeTimerSound } from "../core/timerSound.js";
 import {
   isGameSyncActive,
@@ -74,12 +75,16 @@ export function mountSpeedVote(app) {
 
   function syncFromSession() {
     const s = getSpeedVoteSession();
+    const prevRound = roundIdx;
     if (s.roundIdx != null) roundIdx = s.roundIdx;
     if (s.phase) phase = s.phase;
     if (s.currentQuestion) currentQuestion = s.currentQuestion;
     if (s.modifier) modifier = s.modifier;
     votes = { ...(s.votes || {}) };
     myVote = votes[localName] ?? null;
+    if (roundIdx !== prevRound || phase !== "reveal") {
+      lastAward = null;
+    }
     takeScored = Boolean(s.roundScored);
     if (phase === "voting" && s.voteEndsAt) {
       timer = secondsUntil(s.voteEndsAt) ?? timer;
@@ -134,6 +139,7 @@ export function mountSpeedVote(app) {
     clearTimer();
     primeTimerSound();
     intervalId = setInterval(async () => {
+      if (isEveningGameplayPaused()) return;
       const s = getSpeedVoteSession();
       if (phase !== "voting") {
         clearTimer();
@@ -202,8 +208,9 @@ export function mountSpeedVote(app) {
     );
     const host = !mp || isLobbyHost();
 
-    const awardHtml = lastAward?.winners?.length
-      ? `<p class="hint">👑 ${lastAward.winners.map((n) => escapeHtml(n)).join(", ")} — <strong>+${lastAward.pointsAwarded} pts</strong>${mod.multiplier > 1 ? " (×2)" : ""}</p>`
+    const points = SPEED_VOTE_POINTS_WINNER * mod.multiplier;
+    const awardHtml = leaders.length
+      ? `<p class="hint">👑 ${leaders.map((n) => escapeHtml(n)).join(", ")} — <strong>+${points} pts</strong>${mod.multiplier > 1 ? " (×2)" : ""}</p>`
       : `<p class="hint">Aucun vote enregistré pour cette manche.</p>`;
 
     const bars = names.length
@@ -311,7 +318,7 @@ export function mountSpeedVote(app) {
 
     app.querySelectorAll("[data-vote-player]").forEach((btn) => {
       btn.addEventListener("click", async () => {
-        if (phase !== "voting" || myVote) return;
+        if (phase !== "voting" || myVote || isEveningGameplayPaused()) return;
         const target = btn.getAttribute("data-vote-player");
         myVote = target;
         votes = { ...votes, [localName]: target };
@@ -391,7 +398,6 @@ export function mountSpeedVote(app) {
     }
     if (phase === "reveal") {
       clearTimer();
-      if (!lastAward) lastAward = previewRoundAward();
     }
     render();
   });

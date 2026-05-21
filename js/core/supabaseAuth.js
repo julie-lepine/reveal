@@ -118,16 +118,54 @@ function guestAuthErrorMessage(error) {
 }
 
 export async function signInAsGuest(displayName) {
-  const { data, error } = await supabase.auth.signInAnonymously();
-  if (error) return { ok: false, error: guestAuthErrorMessage(error) };
-  if (!data.user) return { ok: false, error: "Connexion invité impossible." };
+  const trimmed = String(displayName || "")
+    .trim()
+    .slice(0, 24);
+  if (trimmed.length < 2) {
+    return { ok: false, error: "Choisis un pseudo (2 caractères min.)." };
+  }
+
+  const { data: existing } = await supabase.auth.getSession();
+  let session = existing?.session ?? null;
+  let user = session?.user ?? null;
+
+  if (user && !user.is_anonymous) {
+    return {
+      ok: false,
+      error: "Tu es connecté avec un compte. Déconnecte-toi pour rejoindre en invité.",
+    };
+  }
+
+  if (!user) {
+    const { data, error } = await supabase.auth.signInAnonymously();
+    if (error) return { ok: false, error: guestAuthErrorMessage(error) };
+    user = data.user;
+    session = data.session;
+    if (session) await syncSessionToState(session);
+  } else if (session) {
+    await syncSessionToState(session);
+  }
+
+  if (!user) return { ok: false, error: "Connexion invité impossible." };
 
   await upsertProfile({
-    userId: data.user.id,
-    displayName,
+    userId: user.id,
+    displayName: trimmed,
     emoji: "🎭",
   });
-  if (data.session) await syncSessionToState(data.session);
+
+  saveStatePatch({
+    supabaseUserId: user.id,
+    user: {
+      email: null,
+      name: trimmed,
+      emoji: "🎭",
+      loggedIn: false,
+      isGuest: true,
+      provider: "guest",
+    },
+  });
+
   return { ok: true };
 }
 

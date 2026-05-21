@@ -36,7 +36,7 @@ export async function updateGameSession(lobbyId, patch) {
     .update(patch)
     .eq("lobby_id", lobbyId)
     .select("id, lobby_id, game_id, screen, host_id, state, updated_at")
-    .single();
+    .maybeSingle();
   if (error) throw error;
   return data;
 }

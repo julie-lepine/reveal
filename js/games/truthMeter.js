@@ -32,6 +32,7 @@ import { navigate } from "../core/router.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
 import { bindNav } from "../screens/nav.js";
 import { exitGameToLobbyButtonHtml, bindExitGameToLobby } from "../core/exitGame.js";
+import { isEveningGameplayPaused } from "../core/filRougeSession.js";
 import { onTimerSecond, primeTimerSound } from "../core/timerSound.js";
 import {
   isGameSyncActive,
@@ -748,6 +749,7 @@ export function mountTruthMeter(app) {
     primeTimerSound();
 
     const tick = async () => {
+      if (isEveningGameplayPaused()) return;
       if (mp) {
         timer = secondsUntil(getTruthMeterSession().voteEndsAt) ?? 0;
       } else {

@@ -9,8 +9,9 @@
    - `lobby_members`
    - `lobby_messages`
    - `game_sessions`
-4. Exécute aussi **`supabase/game-sessions.sql`** (multijoueur des jeux)
+4. Exécute aussi **`supabase/game-sessions.sql`** (multijoueur des jeux). Si les invités ne peuvent pas synchroniser Fil Rouge / mini-jeux (erreur `PGRST116` ou `406` sur `PATCH game_sessions`), réexécute au minimum la politique `game_sessions_update` (section `with check`) de ce fichier.
 5. Exécute **`supabase/lobby-nudge.sql`** (wizz hôte → joueurs pas prêts : colonnes `nudge_at`, `nudge_for` sur `lobbies`)
+6. Exécute **`supabase/fil-rouge-private.sql`** (Fil Rouge — missions privées par joueur)
 
 ## 2. Clés API
 

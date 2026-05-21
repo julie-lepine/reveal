@@ -17,8 +17,9 @@ import {
   hasActiveLobby,
   getLobby,
   returnToEveningGames,
-  resumeEveningSession,
   leaveLobby,
+  reconcileLobbyMembership,
+  resetAppToCleanHome,
 } from "../core/lobby.js";
 import { getGlobalStats } from "../core/state.js";
 import { getEveningRecap } from "../core/eveningRecap.js";
@@ -26,11 +27,29 @@ import {
   isGameSyncActive,
   onGameSessionChange,
   routeToActiveGameIfNeeded,
+  isSessionRouteSuppressed,
 } from "../core/gameSync.js";
-import { navigate } from "../core/router.js";
+import { navigate, getCurrentScreen } from "../core/router.js";
 import { escapeHtml, logoHtml, pageShell } from "../core/ui.js";
-import { bindNav, goToEveningSettings } from "./nav.js";
-import { showAppAlert } from "../core/dialog.js";
+import { handleNavTarget, goToEveningSettings } from "./nav.js";
+import { showAppAlert, showAppConfirm } from "../core/dialog.js";
+
+function guestJoinPanelHtml({ leaveHint = false } = {}) {
+  return `
+    <div class="card auth-form auth-form--guest auth-form--guest-rejoin">
+      ${
+        leaveHint
+          ? `<p class="hint auth-form__guest-intro auth-form__guest-intro--warn">Tu es encore lié à un lobby (${escapeHtml(getLobby()?.code || "?")}). Utilise « Quitter le lobby » ou rejoins avec le code ci-dessous.</p>`
+          : `<p class="hint auth-form__guest-intro">Entre le code de la partie et ton pseudo pour rejoindre le lobby.</p>`
+      }
+      <label class="field-label" for="guest-rejoin-name">Ton pseudo</label>
+      <input type="text" class="field-input" id="guest-rejoin-name" placeholder="Ex : Alex" maxlength="24" value="${escapeHtml(getUser()?.name || "")}" />
+      <label class="field-label" for="guest-rejoin-code">Code d'invitation</label>
+      <input type="text" class="field-input" id="guest-rejoin-code" placeholder="6 caractères" maxlength="8" autocapitalize="characters" />
+      <p class="auth-error hidden" id="guest-rejoin-error"></p>
+      <button type="button" class="btn btn-primary btn--spaced" id="btn-guest-rejoin">Rejoindre la partie →</button>
+    </div>`;
+}
 
 function homeStatsHtml() {
   if (hasActiveLobby()) {
@@ -62,13 +81,109 @@ function homeStatsHtml() {
         </div>`;
 }
 
+function homeRenderSnapshot(authTab) {
+  const user = getUser();
+  return JSON.stringify({
+    tab: authTab,
+    loggedIn: isLoggedIn(),
+    guest: isGuest(),
+    name: user?.name,
+    inLobby: hasActiveLobby(),
+    lobbyCode: getLobby()?.code,
+    recap: hasActiveLobby() ? getEveningRecap().participantCount : 0,
+  });
+}
+
+/** Retire une modale bloquante restée dans le DOM. */
+function clearStuckDialogs() {
+  document.querySelectorAll(".app-dialog").forEach((el) => el.remove());
+}
+
 export function mountHome(app) {
   const pendingJoin = sessionStorage.getItem("reveal-pending-join");
   const tabAfterLeave = sessionStorage.getItem("reveal-auth-tab");
   let authTab = tabAfterLeave || (pendingJoin ? "guest" : "login");
   if (tabAfterLeave) sessionStorage.removeItem("reveal-auth-tab");
 
-  function render() {
+  let unsubSession = () => {};
+  let renderTimer = null;
+  let renderInFlight = false;
+  let lastSnapshot = "";
+
+  const navHandlers = {
+    settings: () => goToEveningSettings(),
+  };
+
+  function readGuestJoinFields() {
+    const nameEl =
+      app.querySelector("#guest-rejoin-name") || app.querySelector("#guest-name");
+    const codeEl =
+      app.querySelector("#guest-rejoin-code") || app.querySelector("#guest-code");
+    const errEl =
+      app.querySelector("#guest-rejoin-error") || app.querySelector("#guest-error");
+    return { nameEl, codeEl, errEl };
+  }
+
+  function preserveInputDrafts() {
+    const drafts = {};
+    app.querySelectorAll("input.field-input, input.join-input").forEach((el) => {
+      if (el.id) drafts[el.id] = el.value;
+    });
+    const focusedId = document.activeElement?.id;
+    return { drafts, focusedId };
+  }
+
+  function restoreInputDrafts({ drafts, focusedId }) {
+    Object.entries(drafts).forEach(([id, value]) => {
+      const el = app.querySelector(`[id="${id}"]`);
+      if (el && value != null) el.value = value;
+    });
+    if (focusedId) {
+      const el = app.querySelector(`[id="${focusedId}"]`);
+      if (el) {
+        el.focus();
+        const len = el.value.length;
+        if (el.setSelectionRange) el.setSelectionRange(len, len);
+      }
+    }
+  }
+
+  function scheduleRender(force = false) {
+    if (renderTimer) clearTimeout(renderTimer);
+    renderTimer = setTimeout(() => {
+      renderTimer = null;
+      void renderIfNeeded(force);
+    }, force ? 0 : 300);
+  }
+
+  async function renderIfNeeded(force = false) {
+    const snap = homeRenderSnapshot(authTab);
+    const { drafts, focusedId } = preserveInputDrafts();
+    const typing = focusedId && drafts[focusedId] !== undefined;
+
+    if (!force && typing) return;
+    if (!force && snap === lastSnapshot) return;
+
+    if (renderInFlight) {
+      scheduleRender(false);
+      return;
+    }
+
+    renderInFlight = true;
+    try {
+      paint();
+      lastSnapshot = snap;
+      restoreInputDrafts({ drafts, focusedId });
+      if (pendingJoin && !sessionStorage.getItem("reveal-pending-join")) {
+        const { codeEl } = readGuestJoinFields();
+        if (codeEl) codeEl.value = pendingJoin;
+      }
+    } finally {
+      renderInFlight = false;
+    }
+  }
+
+  function paint() {
     const user = getUser();
     const loggedIn = isLoggedIn();
     const guest = isGuest();
@@ -99,7 +214,8 @@ export function mountHome(app) {
               <button type="button" class="btn btn-secondary btn--compact" data-nav="settings">Paramètres</button>
               <button type="button" class="btn-link" id="btn-logout">Quitter la session</button>
             </div>
-          </div>`
+          </div>
+          ${guestJoinPanelHtml({ leaveHint: hasActiveLobby() })}`
               : `
           <div class="auth-tabs">
             <button type="button" class="auth-tab ${authTab === "login" ? "auth-tab--active" : ""}" data-tab="login">Connexion</button>
@@ -173,31 +289,57 @@ export function mountHome(app) {
         </div>
 
         ${homeStatsHtml()}
+
+        <p class="home-reset-wrap">
+          <button type="button" class="btn-link home-reset-link" id="btn-reset-app">Problème d'affichage ? Réinitialiser l'app</button>
+        </p>
       `,
     });
-
-    bindEvents();
   }
 
-  function bindEvents() {
-    bindNav(app, {
-      settings: () => goToEveningSettings(),
-    });
+  async function onHomeClick(e) {
+    if (getCurrentScreen() !== "home") return;
 
-    app.querySelectorAll("[data-tab]").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        authTab = btn.getAttribute("data-tab");
-        render();
-      });
-    });
+    const navEl = e.target.closest("[data-nav]");
+    if (navEl) {
+      void handleNavTarget(navEl.getAttribute("data-nav"), navHandlers);
+      return;
+    }
 
-    app.querySelector("#btn-login")?.addEventListener("click", async () => {
+    const tabBtn = e.target.closest("[data-tab]");
+    if (tabBtn) {
+      authTab = tabBtn.getAttribute("data-tab");
+      scheduleRender(true);
+      return;
+    }
+
+    const socialBtn = e.target.closest("[data-social]");
+    if (socialBtn) {
+      const err = app.querySelector("#login-error") || app.querySelector("#signup-error");
+      socialBtn.disabled = true;
+      const res = await loginWithSocial(socialBtn.getAttribute("data-social"));
+      socialBtn.disabled = false;
+      if (!res.ok) {
+        if (err) {
+          err.textContent = res.error;
+          err.classList.remove("hidden");
+        } else {
+          await showAppAlert(res.error, { title: "Connexion", icon: "⚠️" });
+        }
+        return;
+      }
+      if (res.redirecting) return;
+      scheduleRender(true);
+      return;
+    }
+
+    if (e.target.closest("#btn-login")) {
       const err = app.querySelector("#login-error");
-      const btn = app.querySelector("#btn-login");
+      const btn = e.target.closest("#btn-login");
       btn.disabled = true;
       const res = await loginWithEmail(
-        app.querySelector("#login-email").value,
-        app.querySelector("#login-password").value
+        app.querySelector("#login-email")?.value,
+        app.querySelector("#login-password")?.value
       );
       btn.disabled = false;
       if (!res.ok) {
@@ -205,18 +347,19 @@ export function mountHome(app) {
         err.classList.remove("hidden");
         return;
       }
-      err.classList.add("hidden");
-      render();
-    });
+      err?.classList.add("hidden");
+      scheduleRender(true);
+      return;
+    }
 
-    app.querySelector("#btn-signup")?.addEventListener("click", async () => {
+    if (e.target.closest("#btn-signup")) {
       const err = app.querySelector("#signup-error");
-      const btn = app.querySelector("#btn-signup");
+      const btn = e.target.closest("#btn-signup");
       btn.disabled = true;
       const res = await signupWithEmail(
-        app.querySelector("#signup-email").value,
-        app.querySelector("#signup-password").value,
-        app.querySelector("#signup-name").value
+        app.querySelector("#signup-email")?.value,
+        app.querySelector("#signup-password")?.value,
+        app.querySelector("#signup-name")?.value
       );
       btn.disabled = false;
       if (!res.ok) {
@@ -224,41 +367,24 @@ export function mountHome(app) {
         err.classList.remove("hidden");
         return;
       }
-      err.classList.add("hidden");
-      render();
-    });
+      err?.classList.add("hidden");
+      scheduleRender(true);
+      return;
+    }
 
-    app.querySelectorAll("[data-social]").forEach((btn) => {
-      btn.addEventListener("click", async () => {
-        const err = app.querySelector("#login-error") || app.querySelector("#signup-error");
-        btn.disabled = true;
-        const res = await loginWithSocial(btn.getAttribute("data-social"));
-        btn.disabled = false;
-        if (!res.ok) {
-          if (err) {
-            err.textContent = res.error;
-            err.classList.remove("hidden");
-          } else {
-            await showAppAlert(res.error, { title: "Connexion", icon: "⚠️" });
-          }
-          return;
-        }
-        if (res.redirecting) return;
-        render();
-      });
-    });
-
-    app.querySelector("#btn-logout")?.addEventListener("click", async () => {
+    if (e.target.closest("#btn-logout")) {
       await logout();
-      render();
-    });
+      scheduleRender(true);
+      return;
+    }
 
-    app.querySelector("#btn-return-lobby")?.addEventListener("click", () => {
+    if (e.target.closest("#btn-return-lobby")) {
       void returnToEveningGames();
-    });
+      return;
+    }
 
-    app.querySelector("#btn-leave-lobby")?.addEventListener("click", async () => {
-      const btn = app.querySelector("#btn-leave-lobby");
+    if (e.target.closest("#btn-leave-lobby")) {
+      const btn = e.target.closest("#btn-leave-lobby");
       btn.disabled = true;
       const res = await leaveLobby();
       btn.disabled = false;
@@ -267,81 +393,111 @@ export function mountHome(app) {
           title: "Quitter le lobby",
           icon: "⚠️",
         });
+        return;
       }
-    });
+      scheduleRender(true);
+      return;
+    }
 
-    app.querySelector("#btn-create-lobby")?.addEventListener("click", async () => {
+    if (e.target.closest("#btn-create-lobby")) {
       if (!canCreateLobby()) return;
-      const btn = app.querySelector("#btn-create-lobby");
+      const btn = e.target.closest("#btn-create-lobby");
       btn.disabled = true;
       try {
         await createLobby();
         navigate("lobby");
-      } catch (e) {
-        await showAppAlert(e.message || "Impossible de créer le lobby.", {
+      } catch (err) {
+        await showAppAlert(err.message || "Impossible de créer le lobby.", {
           title: "Erreur",
           icon: "⚠️",
         });
       } finally {
         btn.disabled = false;
       }
-    });
+      return;
+    }
 
-    app.querySelector("#btn-join-lobby")?.addEventListener("click", async () => {
+    if (e.target.closest("#btn-join-lobby")) {
       if (!isLoggedIn()) return;
-      const btn = app.querySelector("#btn-join-lobby");
+      const btn = e.target.closest("#btn-join-lobby");
       btn.disabled = true;
-      const res = await joinLobby(app.querySelector("#join-code").value);
+      const res = await joinLobby(app.querySelector("#join-code")?.value);
       btn.disabled = false;
       if (!res.ok) {
         await showAppAlert(res.error, { title: "Rejoindre le lobby", icon: "⚠️" });
         return;
       }
       navigate("lobby");
-    });
+      return;
+    }
 
-    app.querySelector("#btn-guest-join")?.addEventListener("click", async () => {
-      const err = app.querySelector("#guest-error");
-      const btn = app.querySelector("#btn-guest-join");
+    if (e.target.closest("#btn-guest-join") || e.target.closest("#btn-guest-rejoin")) {
+      const { nameEl, codeEl, errEl } = readGuestJoinFields();
+      const btn = e.target.closest("#btn-guest-join, #btn-guest-rejoin");
       btn.disabled = true;
-      const res = await joinLobbyAsGuest(
-        app.querySelector("#guest-code").value,
-        app.querySelector("#guest-name").value
-      );
+      errEl?.classList.add("hidden");
+      const res = await joinLobbyAsGuest(codeEl?.value, nameEl?.value);
       btn.disabled = false;
       if (!res.ok) {
-        err.textContent = res.error;
-        err.classList.remove("hidden");
+        if (errEl) {
+          errEl.textContent = res.error;
+          errEl.classList.remove("hidden");
+        } else {
+          await showAppAlert(res.error, { title: "Rejoindre", icon: "⚠️" });
+        }
+        scheduleRender(true);
         return;
       }
-      err.classList.add("hidden");
       navigate("lobby");
-    });
+      return;
+    }
+
+    if (e.target.closest("#btn-reset-app")) {
+      const ok = await showAppConfirm(
+        "Ta session et les données locales seront effacées. Tu pourras rejoindre une partie à nouveau.",
+        {
+          title: "Réinitialiser REVEAL",
+          confirmLabel: "Réinitialiser",
+          cancelLabel: "Annuler",
+          icon: "🔄",
+        }
+      );
+      if (!ok) return;
+      await resetAppToCleanHome();
+    }
   }
 
-  render();
+  clearStuckDialogs();
+  app.addEventListener("click", onHomeClick);
 
-  let unsubSession = () => {};
+  scheduleRender(true);
+
+  void (async () => {
+    const { cleared } = await reconcileLobbyMembership();
+    if (cleared) scheduleRender(true);
+  })();
+
   if (isGameSyncActive() && hasActiveLobby()) {
-    void (async () => {
-      if (await resumeEveningSession()) return;
-      render();
-    })();
     unsubSession = onGameSessionChange(async () => {
       if (getCurrentScreen() !== "home") return;
-      if (await routeToActiveGameIfNeeded()) return;
-      render();
+      if (!isSessionRouteSuppressed()) {
+        if (await routeToActiveGameIfNeeded()) return;
+      }
+      scheduleRender(false);
     });
   }
 
   if (pendingJoin) {
-    const codeEl = app.querySelector("#guest-code");
-    if (codeEl) codeEl.value = pendingJoin;
     sessionStorage.removeItem("reveal-pending-join");
+    requestAnimationFrame(() => {
+      const { codeEl } = readGuestJoinFields();
+      if (codeEl) codeEl.value = pendingJoin;
+    });
   }
 
   return () => {
+    app.removeEventListener("click", onHomeClick);
     unsubSession();
+    if (renderTimer) clearTimeout(renderTimer);
   };
 }
-

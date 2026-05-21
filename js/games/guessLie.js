@@ -36,6 +36,7 @@ import { navigate } from "../core/router.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
 import { bindNav } from "../screens/nav.js";
 import { exitGameToLobbyButtonHtml, bindExitGameToLobby } from "../core/exitGame.js";
+import { isEveningGameplayPaused } from "../core/filRougeSession.js";
 import { onTimerSecond, primeTimerSound } from "../core/timerSound.js";
 
 function revealFeedbackTitle({ isSubject, myCorrect, liarBonus }) {
@@ -160,6 +161,7 @@ export function mountGuessLie(app) {
     clearTimer();
     primeTimerSound();
     intervalId = setInterval(() => {
+      if (isEveningGameplayPaused()) return;
       timer -= 1;
       onTimerSecond({ remaining: timer, urgentAt: 5 });
       const el = app.querySelector("#timer-el");
@@ -370,6 +372,7 @@ export function mountGuessLie(app) {
 
     app.querySelectorAll("[data-pick]").forEach((btn) => {
       btn.addEventListener("click", () => {
+        if (isEveningGameplayPaused()) return;
         selected = Number(btn.getAttribute("data-pick"));
         render();
       });

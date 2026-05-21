@@ -5,6 +5,7 @@ import {
 import { filterVoterVotes, computeRoundMetrics } from "./truthMeterSession.js";
 import { SPEED_VOTE_POINTS_WINNER } from "../../data/speedVote.js";
 import { DILEMMA_POINTS_MAJORITY_WIN } from "../../data/dilemma.js";
+import { FIL_ROUGE_POINTS_MISSION } from "../../data/filRouge.js";
 import { countDilemmaResults } from "./dilemmaSession.js";
 import {
   TRUTH_METER_BLUFF_GAP,
@@ -19,9 +20,19 @@ import { addScore, bumpPlayerStat } from "./state.js";
 import { getMajorityOption } from "./hotTakeSession.js";
 
 export function awardHotTakeVotes(votes, options) {
-  const { majority } = getMajorityOption(votes, options);
-  const summary = { majority, dissenters: [], majorityWinners: [] };
+  const { majority, tied, counts } = getMajorityOption(votes, options);
+  const summary = {
+    majority,
+    tied: Boolean(tied),
+    counts,
+    dissenters: [],
+    majorityWinners: [],
+    pointsAwarded: false,
+  };
 
+  if (!majority || tied) return summary;
+
+  summary.pointsAwarded = true;
   Object.entries(votes).forEach(([name, choice]) => {
     if (choice === majority) {
       addScore(name, HOT_TAKE_POINTS_MAJORITY);
@@ -138,4 +149,10 @@ export function awardDilemmaRound(votes) {
   });
 
   return summary;
+}
+
+export function awardFilRougeMission(agentName) {
+  addScore(agentName, FIL_ROUGE_POINTS_MISSION);
+  bumpPlayerStat(agentName, "filRougeMissionsValidated", 1);
+  return { points: FIL_ROUGE_POINTS_MISSION };
 }

@@ -31,7 +31,9 @@ for insert with check (
 
 drop policy if exists "game_sessions_update" on public.game_sessions;
 create policy "game_sessions_update" on public.game_sessions
-for update using (public.is_lobby_member(lobby_id));
+for update
+using (public.is_lobby_member(lobby_id))
+with check (public.is_lobby_member(lobby_id));
 
 drop policy if exists "game_sessions_delete" on public.game_sessions;
 create policy "game_sessions_delete" on public.game_sessions

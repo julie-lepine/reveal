@@ -5,6 +5,7 @@ import {
   HOT_TAKE_FORBIDDEN_WORDS,
   HOT_TAKE_MODERATION_NOTICE,
   HOT_TAKE_ROUND_PRESETS,
+  HOT_TAKE_TIMER_SEC,
   getThemeBankTexts,
 } from "../../data/hotTakes.js";
 import {
@@ -37,6 +38,7 @@ function defaultSession() {
     phase: null,
     votes: {},
     voteEndsAt: null,
+    voteTimerRemaining: null,
     intermissionEndsAt: null,
     takeScored: false,
   };
@@ -262,14 +264,46 @@ export async function markHotTakeLobbyStarted() {
   }
 }
 
-export async function setHotTakePausedBy(name) {
+export async function pauseHotTakeVote(pausedByName, remainingSec) {
   const session = getHotTakeSession();
-  await syncHotTakeSession({ ...session, pausedBy: name });
+  const rem = Math.max(0, Math.ceil(Number(remainingSec) || 0));
+  await syncHotTakeSession({
+    ...session,
+    pausedBy: pausedByName,
+    voteTimerRemaining: rem,
+    voteEndsAt: null,
+  });
 }
 
-export async function clearHotTakePause() {
+export async function resumeHotTakeVote() {
   const session = getHotTakeSession();
-  await syncHotTakeSession({ ...session, pausedBy: null });
+  const rem = session.voteTimerRemaining ?? HOT_TAKE_TIMER_SEC;
+  await syncHotTakeSession({
+    ...session,
+    pausedBy: null,
+    voteTimerRemaining: null,
+    voteEndsAt: new Date(Date.now() + rem * 1000).toISOString(),
+  });
+}
+
+/** @deprecated Utiliser pauseHotTakeVote */
+export async function setHotTakePausedBy(name) {
+  const s = getHotTakeSession();
+  let rem = HOT_TAKE_TIMER_SEC;
+  if (s.voteEndsAt) {
+    rem = Math.max(
+      0,
+      Math.ceil((new Date(s.voteEndsAt).getTime() - Date.now()) / 1000)
+    );
+  } else if (s.voteTimerRemaining != null) {
+    rem = s.voteTimerRemaining;
+  }
+  return pauseHotTakeVote(name, rem);
+}
+
+/** @deprecated Utiliser resumeHotTakeVote */
+export async function clearHotTakePause() {
+  return resumeHotTakeVote();
 }
 
 export async function resetHotTakeSession() {
@@ -291,10 +325,9 @@ export function countHotTakeVotes() {
 }
 
 export function allHotTakeVotesIn() {
-  const session = getHotTakeSession();
-  if (!isGameSyncActive()) return false;
-  const remote = hotTakeToRemote(session);
-  return Object.keys(remote.votes || {}).length >= getActivePlayerNames().length;
+  const votes = getHotTakeSession().votes || {};
+  const names = getActivePlayerNames();
+  return names.length > 0 && names.every((name) => votes[name] != null && votes[name] !== "");
 }
 
 export function getHotTakeEntryScreen() {
@@ -323,15 +356,18 @@ export function getMajorityOption(votes, options) {
     acc[opt] = Object.values(votes).filter((v) => v === opt).length;
     return acc;
   }, {});
-  let best = options[0];
-  let max = -1;
+  let max = 0;
   options.forEach((opt) => {
-    if (counts[opt] > max) {
-      max = counts[opt];
-      best = opt;
-    }
+    if (counts[opt] > max) max = counts[opt];
   });
-  return { majority: best, counts };
+  if (max === 0) {
+    return { majority: null, tied: false, counts, maxVotes: 0 };
+  }
+  const leaders = options.filter((opt) => counts[opt] === max);
+  if (leaders.length !== 1) {
+    return { majority: null, tied: true, counts, maxVotes: max };
+  }
+  return { majority: leaders[0], tied: false, counts, maxVotes: max };
 }
 
 export {

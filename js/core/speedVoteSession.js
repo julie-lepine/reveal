@@ -220,10 +220,9 @@ export async function commitSpeedVotePlay(patch) {
 }
 
 export function allSpeedVoteVotesIn() {
-  const session = getSpeedVoteSession();
-  if (!isGameSyncActive()) return false;
-  const remote = speedVoteToRemote(session);
-  return Object.keys(remote.votes || {}).length >= getActivePlayerNames().length;
+  const votes = getSpeedVoteSession().votes || {};
+  const names = getActivePlayerNames();
+  return names.length > 0 && names.every((name) => votes[name] != null && votes[name] !== "");
 }
 
 export function getSpeedVoteEntryScreen() {
