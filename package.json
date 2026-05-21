@@ -2,6 +2,9 @@
   "name": "reveal-party-games",
   "private": true,
   "type": "module",
+  "scripts": {
+    "test": "node --test tests/sessionMerge.test.js"
+  },
   "dependencies": {
     "@supabase/supabase-js": "^2.49.1"
   }

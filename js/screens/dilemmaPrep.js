@@ -28,8 +28,17 @@ import {
   onGameSessionChange,
   refreshGameSession,
 } from "../core/gameSync.js";
-import { navigate, getCurrentScreen } from "../core/router.js";
+import { navigate } from "../core/router.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
+import {
+  bindPrepRemoveDelegation,
+  customEntryListHtml,
+  patchDynamicListInCard,
+  playersReadySectionHtml,
+  prepStartSlotHtml,
+  updatePlayersReadyCard,
+  updateReadyButton,
+} from "../core/prepScreen.js";
 import { bindNav } from "./nav.js";
 
 export function mountDilemmaPrep(app) {
@@ -60,19 +69,16 @@ export function mountDilemmaPrep(app) {
   }
 
   function customDilemmasListHtml() {
-    const mine = getMyCustomDilemmas();
-    if (!mine.length) return "";
-    return `<ul class="take-list dilemma-custom-list">${mine
-      .map(
-        (d) =>
-          `<li class="dilemma-custom-list__item">
-            <span class="dilemma-custom-list__a">${escapeHtml(d.optionA)}</span>
-            <span class="dilemma-custom-list__vs">VS</span>
-            <span class="dilemma-custom-list__b">${escapeHtml(d.optionB)}</span>
-            <button type="button" class="btn-link dilemma-custom-list__remove" data-remove-dilemma="${escapeHtml(d.id)}" aria-label="Supprimer ce dilemme">Supprimer</button>
-          </li>`
-      )
-      .join("")}</ul>`;
+    return customEntryListHtml(getMyCustomDilemmas(), {
+      listClass: "take-list dilemma-custom-list",
+      itemClass: "dilemma-custom-list__item",
+      removeClass: "dilemma-custom-list__remove",
+      removeAttr: "data-remove-dilemma",
+      renderItem: (d) =>
+        `<span class="dilemma-custom-list__a">${escapeHtml(d.optionA)}</span>
+         <span class="dilemma-custom-list__vs">VS</span>
+         <span class="dilemma-custom-list__b">${escapeHtml(d.optionB)}</span>`,
+    });
   }
 
   function othersDilemmasHintHtml() {
@@ -82,23 +88,13 @@ export function mountDilemmaPrep(app) {
   }
 
   function renderCustomDilemmasList() {
-    const card = app.querySelector("#dilemma-option-a")?.closest(".card");
-    if (!card) return;
-
-    let list = card.querySelector(".dilemma-custom-list");
-    const listHtml = customDilemmasListHtml();
-    if (!listHtml) list?.remove();
-    else if (list) list.outerHTML = listHtml;
-    else {
-      const anchor = card.querySelector("#dilemma-error") || card.querySelector(".moderation-notice");
-      anchor?.insertAdjacentHTML("afterend", listHtml);
-    }
-
-    let hint = card.querySelector("#dilemma-others-hint");
-    const hintHtml = othersDilemmasHintHtml();
-    if (!hintHtml) hint?.remove();
-    else if (hint) hint.outerHTML = hintHtml;
-    else card.insertAdjacentHTML("beforeend", hintHtml);
+    patchDynamicListInCard(app.querySelector("#dilemma-option-a")?.closest(".card"), {
+      listSelector: ".dilemma-custom-list",
+      listHtml: customDilemmasListHtml(),
+      hintSelector: "#dilemma-others-hint",
+      hintHtml: othersDilemmasHintHtml(),
+      insertAfterSelectors: ["#dilemma-error", ".moderation-notice"],
+    });
   }
 
   function localReadyState() {
@@ -107,16 +103,13 @@ export function mountDilemmaPrep(app) {
   }
 
   function dilemmaStartSlotHtml(allReady, prep) {
-    if (prep.effective === 0) {
-      return `<button type="button" class="btn btn-secondary btn--spaced" disabled>Aucun dilemme disponible</button>`;
-    }
-    if (allReady && isLobbyHost()) {
-      return `<button type="button" class="btn btn-primary btn--spaced" id="btn-start-game">Lancer Dilemma →</button>`;
-    }
-    if (allReady) {
-      return `<button type="button" class="btn btn-secondary btn--spaced" disabled>En attente de l'hôte…</button>`;
-    }
-    return `<button type="button" class="btn btn-secondary btn--spaced" disabled>En attente des joueurs…</button>`;
+    return prepStartSlotHtml({
+      poolEmpty: prep.effective === 0,
+      poolEmptyLabel: "Aucun dilemme disponible",
+      allReady,
+      isHost: isLobbyHost(),
+      launchLabel: "Lancer Dilemma →",
+    });
   }
 
   function refreshReadySection() {
@@ -126,26 +119,8 @@ export function mountDilemmaPrep(app) {
     const localReady = localReadyState();
     const prep = getDilemmaPrepSummary();
 
-    const playersCard = app.querySelector("#dilemma-players");
-    if (playersCard) {
-      playersCard.innerHTML = `
-        <p class="card-heading">Joueurs prêts</p>
-        ${members
-          .map(
-            (m) => `
-          <div class="lobby-player ${session.ready[m.name] ? "lobby-player--ready" : ""}">
-            <span class="lobby-player__status">${session.ready[m.name] ? "✓" : "…"}</span>
-            <span class="lobby-player__name">${escapeHtml(m.name)}</span>
-          </div>`
-          )
-          .join("")}`;
-    }
-
-    const readyBtn = app.querySelector("#btn-ready");
-    if (readyBtn) {
-      readyBtn.classList.toggle("btn-ready--active", Boolean(localReady));
-      readyBtn.textContent = localReady ? "Prêt ✓" : "Je suis prêt !";
-    }
+    updatePlayersReadyCard(app.querySelector("#dilemma-players"), members, session.ready);
+    updateReadyButton(app.querySelector("#btn-ready"), localReady);
 
     const startSlot = app.querySelector("#dilemma-start-slot");
     if (startSlot) {
@@ -348,18 +323,7 @@ export function mountDilemmaPrep(app) {
           ${othersDilemmasHintHtml()}
         </div>
 
-        <div class="card" id="dilemma-players">
-          <p class="card-heading">Joueurs prêts</p>
-          ${members
-            .map(
-              (m) => `
-            <div class="lobby-player ${session.ready[m.name] ? "lobby-player--ready" : ""}">
-              <span class="lobby-player__status">${session.ready[m.name] ? "✓" : "…"}</span>
-              <span class="lobby-player__name">${escapeHtml(m.name)}</span>
-            </div>`
-            )
-            .join("")}
-        </div>
+        <div class="card" id="dilemma-players">${playersReadySectionHtml(members, session.ready)}</div>
 
         <button type="button" class="btn btn-ready ${localReady ? "btn-ready--active" : ""}" id="btn-ready">
           ${localReady ? "Prêt ✓" : "Je suis prêt !"}
@@ -376,20 +340,14 @@ export function mountDilemmaPrep(app) {
     mounted = true;
   }
 
-  async function onDilemmaPrepClick(e) {
-    if (getCurrentScreen() !== "dilemma-prep") return;
-
-    const removeBtn = e.target.closest("[data-remove-dilemma]");
-    if (removeBtn) {
-      e.preventDefault();
-      const id = removeBtn.getAttribute("data-remove-dilemma");
-      if (!id) return;
+  const unbindRemove = bindPrepRemoveDelegation(app, {
+    screenId: "dilemma-prep",
+    attr: "data-remove-dilemma",
+    onRemove: async (id) => {
       await removeCustomDilemma(id);
       refreshFromSync();
-    }
-  }
-
-  app.addEventListener("click", onDilemmaPrepClick);
+    },
+  });
 
   render();
 
@@ -407,7 +365,7 @@ export function mountDilemmaPrep(app) {
   });
 
   return () => {
-    app.removeEventListener("click", onDilemmaPrepClick);
+    unbindRemove();
     if (cleanupSim) cleanupSim();
     unsub();
     unsubLobby();

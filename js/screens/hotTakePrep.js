@@ -1,5 +1,6 @@
 import {
   addCustomTake,
+  removeCustomTake,
   allHotTakeReady,
   countOtherPlayersCustomTakes,
   getHotTakeSession,
@@ -25,6 +26,15 @@ import { requireLobbyPlay } from "../core/gameGuard.js";
 import { isGameSyncActive, isLobbyHost, onGameSessionChange } from "../core/gameSync.js";
 import { navigate } from "../core/router.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
+import {
+  bindPrepRemoveDelegation,
+  customEntryListHtml,
+  patchDynamicListInCard,
+  playersReadySectionHtml,
+  prepStartSlotHtml,
+  updatePlayersReadyCard,
+  updateReadyButton,
+} from "../core/prepScreen.js";
 import { bindNav } from "./nav.js";
 
 export function mountHotTakePrep(app) {
@@ -62,11 +72,11 @@ export function mountHotTakePrep(app) {
   }
 
   function customTakesListHtml() {
-    const myTakes = getMyCustomTakes();
-    if (!myTakes.length) return "";
-    return `<ul class="take-list">${myTakes
-      .map((t) => `<li>${escapeHtml(t.text)}</li>`)
-      .join("")}</ul>`;
+    return customEntryListHtml(getMyCustomTakes(), {
+      listClass: "take-list",
+      removeAttr: "data-remove-take",
+      renderItem: (t) => `<span class="take-list__text">${escapeHtml(t.text)}</span>`,
+    });
   }
 
   function othersTakesHintHtml() {
@@ -77,22 +87,13 @@ export function mountHotTakePrep(app) {
 
   function renderCustomTakesList() {
     const card = app.querySelector("#new-take")?.closest(".card");
-    if (!card) return;
-
-    let list = card.querySelector(".take-list");
-    const listHtml = customTakesListHtml();
-    if (!listHtml) list?.remove();
-    else if (list) list.outerHTML = listHtml;
-    else {
-      const anchor = card.querySelector("#take-error") || card.querySelector(".moderation-notice");
-      anchor?.insertAdjacentHTML("afterend", listHtml);
-    }
-
-    let hint = card.querySelector("#hot-take-others-hint");
-    const hintHtml = othersTakesHintHtml();
-    if (!hintHtml) hint?.remove();
-    else if (hint) hint.outerHTML = hintHtml;
-    else card.insertAdjacentHTML("beforeend", hintHtml);
+    patchDynamicListInCard(card, {
+      listSelector: ".take-list",
+      listHtml: customTakesListHtml(),
+      hintSelector: "#hot-take-others-hint",
+      hintHtml: othersTakesHintHtml(),
+      insertAfterSelectors: ["#take-error", ".moderation-notice"],
+    });
   }
 
   function localReadyState() {
@@ -101,16 +102,13 @@ export function mountHotTakePrep(app) {
   }
 
   function hotTakeStartSlotHtml(allReady, prep) {
-    if (prep.effective === 0) {
-      return `<button type="button" class="btn btn-secondary btn--spaced" disabled>Aucune take disponible</button>`;
-    }
-    if (allReady && isLobbyHost()) {
-      return `<button type="button" class="btn btn-primary btn--spaced" id="btn-start-game">Lancer Hot Take →</button>`;
-    }
-    if (allReady) {
-      return `<button type="button" class="btn btn-secondary btn--spaced" disabled>En attente de l'hôte…</button>`;
-    }
-    return `<button type="button" class="btn btn-secondary btn--spaced" disabled>En attente des joueurs…</button>`;
+    return prepStartSlotHtml({
+      poolEmpty: prep.effective === 0,
+      poolEmptyLabel: "Aucune take disponible",
+      allReady,
+      isHost: isLobbyHost(),
+      launchLabel: "Lancer Hot Take →",
+    });
   }
 
   function refreshReadySection() {
@@ -120,26 +118,8 @@ export function mountHotTakePrep(app) {
     const localReady = localReadyState();
     const prep = getHotTakePrepSummary();
 
-    const playersCard = app.querySelector("#hot-take-players");
-    if (playersCard) {
-      playersCard.innerHTML = `
-        <p class="card-heading">Joueurs prêts</p>
-        ${members
-          .map(
-            (m) => `
-          <div class="lobby-player ${session.ready[m.name] ? "lobby-player--ready" : ""}">
-            <span class="lobby-player__status">${session.ready[m.name] ? "✓" : "…"}</span>
-            <span class="lobby-player__name">${escapeHtml(m.name)}</span>
-          </div>`
-          )
-          .join("")}`;
-    }
-
-    const readyBtn = app.querySelector("#btn-ready");
-    if (readyBtn) {
-      readyBtn.classList.toggle("btn-ready--active", Boolean(localReady));
-      readyBtn.textContent = localReady ? "Prêt ✓" : "Je suis prêt !";
-    }
+    updatePlayersReadyCard(app.querySelector("#hot-take-players"), members, session.ready);
+    updateReadyButton(app.querySelector("#btn-ready"), localReady);
 
     const startSlot = app.querySelector("#hot-take-start-slot");
     if (startSlot) {
@@ -344,18 +324,7 @@ export function mountHotTakePrep(app) {
           ${othersTakesHintHtml()}
         </div>
 
-        <div class="card" id="hot-take-players">
-          <p class="card-heading">Joueurs prêts</p>
-          ${members
-            .map(
-              (m) => `
-            <div class="lobby-player ${session.ready[m.name] ? "lobby-player--ready" : ""}">
-              <span class="lobby-player__status">${session.ready[m.name] ? "✓" : "…"}</span>
-              <span class="lobby-player__name">${escapeHtml(m.name)}</span>
-            </div>`
-            )
-            .join("")}
-        </div>
+        <div class="card" id="hot-take-players">${playersReadySectionHtml(members, session.ready)}</div>
 
         <button type="button" class="btn btn-ready ${localReady ? "btn-ready--active" : ""}" id="btn-ready">
           ${localReady ? "Prêt ✓" : "Je suis prêt !"}
@@ -370,6 +339,15 @@ export function mountHotTakePrep(app) {
     mounted = true;
   }
 
+  const unbindRemove = bindPrepRemoveDelegation(app, {
+    screenId: "hottake-prep",
+    attr: "data-remove-take",
+    onRemove: async (id) => {
+      await removeCustomTake(id);
+      refreshFromSync();
+    },
+  });
+
   render();
 
   const unsub = onGameSessionChange(() => {
@@ -378,10 +356,11 @@ export function mountHotTakePrep(app) {
 
   const unsubLobby = onLobbyBundleUpdated(() => {
     if (!mounted) return;
-    render(captureDraft());
+    refreshFromSync();
   });
 
   return () => {
+    unbindRemove();
     if (cleanupSim) cleanupSim();
     unsub();
     unsubLobby();

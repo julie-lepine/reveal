@@ -9,38 +9,14 @@ import {
 } from "./state.js";
 import { navigate, getCurrentScreen } from "./router.js";
 import { getLobbyParticipants } from "./lobby.js";
-import { getActivePlayers, getActivePlayerNames } from "./players.js";
-
-function normalizeDilemmaEntry(entry) {
-  if (!entry || typeof entry !== "object") return null;
-  const optionA = String(entry.optionA || "").trim();
-  const optionB = String(entry.optionB || "").trim();
-  if (!optionA || !optionB) return null;
-  return {
-    id: entry.id || `custom-${optionA}-${optionB}`,
-    optionA,
-    optionB,
-    author: entry.author || null,
-    tier: entry.tier || "custom",
-  };
-}
-
-/** Fusion customs : liste locale = source de vérité pour le joueur local ; remote = autres auteurs uniquement. */
-function mergeDilemmaCustomDilemmas(localList = [], remoteList = []) {
-  const me = getLocalDisplayName();
-  const byId = new Map();
-  for (const raw of remoteList) {
-    const d = normalizeDilemmaEntry(raw);
-    if (!d) continue;
-    const author = d.author;
-    if (author && author !== me) byId.set(d.id, d);
-  }
-  for (const raw of localList) {
-    const d = normalizeDilemmaEntry(raw);
-    if (d) byId.set(d.id, d);
-  }
-  return [...byId.values()];
-}
+import { getActivePlayerNames, getActivePlayers } from "./players.js";
+import {
+  mergeReadyMapsLocal,
+  mergeDilemmaCustomDilemmas,
+  mergeHotTakeCustomTakes,
+  mergeDilemmaPatchState,
+  mergeHotTakePatchState,
+} from "./sessionMerge.js";
 import { buildRecapsFromPlacements, getTierNightSession } from "./tierNightSession.js";
 import {
   fetchGameSessionByLobby,
@@ -55,6 +31,12 @@ const listeners = new Set();
 let routing = false;
 let pollTimer = null;
 let syncTickInFlight = false;
+let pollIntervalMs = 4000;
+let pollUnchangedStreak = 0;
+let lastGameSessionRealtimeAt = 0;
+const POLL_MS_MIN = 3000;
+const POLL_MS_MAX = 12000;
+const POLL_MS_DEFAULT = 4000;
 /** Évite de forcer l’écran de prep quand l’invité revient au menu manuellement. */
 let suppressSessionRouteUntil = 0;
 /** Écran de session ignoré pendant la suppression (retour invité au menu jeux). */
@@ -321,19 +303,11 @@ function mergeRemoteReadyUid(cur, inc) {
   return { ...(cur?.ready || {}), ...(inc?.ready || {}) };
 }
 
-/** En préparation : fusionne les « prêt » de tous les joueurs (noms locaux). */
-function mergeReadyMapsLocal(localReady = {}, remoteReady = {}) {
-  const merged = { ...remoteReady };
-  getActivePlayerNames().forEach((name) => {
-    if (localReady[name] || remoteReady[name]) merged[name] = true;
-  });
-  return merged;
-}
-
 /** Fusion locale à l’application d’une session distante. */
 function mergeHotTakeGameLocal(local, remote) {
   if (!remote) return local;
   if (!local) return remote;
+  const me = getLocalDisplayName();
   const remoteVotes = remote.votes || {};
   const localVotes = local.votes || {};
   let votes = remoteVotes;
@@ -349,9 +323,14 @@ function mergeHotTakeGameLocal(local, remote) {
   }
   const ready =
     !remote.lobbyStarted && !local.lobbyStarted
-      ? mergeReadyMapsLocal(local.ready || {}, remote.ready || {})
+      ? mergeReadyMapsLocal(local.ready || {}, remote.ready || {}, getActivePlayerNames())
       : remote.ready || {};
-  return { ...local, ...remote, votes, ready };
+  const customTakes = mergeHotTakeCustomTakes(
+    local.customTakes || [],
+    remote.customTakes || [],
+    me
+  );
+  return { ...local, ...remote, votes, ready, customTakes };
 }
 
 function isNewSpeedVoteVoteRound(cur, inc) {
@@ -394,7 +373,7 @@ function mergeSpeedVoteGameLocal(local, remote) {
   }
   const ready =
     !remote.lobbyStarted && !local.lobbyStarted
-      ? mergeReadyMapsLocal(local.ready || {}, remote.ready || {})
+      ? mergeReadyMapsLocal(local.ready || {}, remote.ready || {}, getActivePlayerNames())
       : remote.ready || {};
   return { ...local, ...remote, votes, ready };
 }
@@ -425,10 +404,16 @@ function mergeRemoteDilemmaVotes(cur, inc) {
 function mergeDilemmaGameLocal(local, remote) {
   if (!remote) return local;
   if (!local) return remote;
-  const ready = mergeReadyMapsLocal(local.ready || {}, remote.ready || {});
+  const me = getLocalDisplayName();
+  const ready = mergeReadyMapsLocal(
+    local.ready || {},
+    remote.ready || {},
+    getActivePlayerNames()
+  );
   const customDilemmas = mergeDilemmaCustomDilemmas(
     local.customDilemmas || [],
-    remote.customDilemmas || []
+    remote.customDilemmas || [],
+    me
   );
   const remoteVotes = remote.votes || {};
   const localVotes = local.votes || {};
@@ -490,7 +475,7 @@ function mergeTruthMeterGameLocal(local, remote) {
   }
   const ready =
     !remote.lobbyStarted && !local.lobbyStarted
-      ? mergeReadyMapsLocal(local.ready || {}, remote.ready || {})
+      ? mergeReadyMapsLocal(local.ready || {}, remote.ready || {}, getActivePlayerNames())
       : remote.ready || {};
   return { ...local, ...remote, votes, ready };
 }
@@ -1146,6 +1131,33 @@ export function handleSessionRoute(row, { fromScreen = null } = {}) {
 }
 
 /** Polling de secours si Realtime ne pousse pas l’événement (fréquent en local). */
+export function pulseGameSessionRealtime() {
+  lastGameSessionRealtimeAt = Date.now();
+  pollIntervalMs = POLL_MS_MIN;
+  pollUnchangedStreak = 0;
+}
+
+function scheduleSyncPoll() {
+  if (pollTimer) clearInterval(pollTimer);
+  pollTimer = setInterval(syncTick, pollIntervalMs);
+}
+
+function adjustPollBackoff(sigChanged) {
+  if (sigChanged) {
+    pollUnchangedStreak = 0;
+    pollIntervalMs = POLL_MS_DEFAULT;
+    return;
+  }
+  pollUnchangedStreak += 1;
+  const recentRealtime = Date.now() - lastGameSessionRealtimeAt < 8000;
+  if (recentRealtime && pollUnchangedStreak >= 2) {
+    pollIntervalMs = Math.min(POLL_MS_MAX, pollIntervalMs + 1500);
+  } else if (!recentRealtime && pollUnchangedStreak >= 1) {
+    pollIntervalMs = Math.min(POLL_MS_MAX, Math.round(pollIntervalMs * 1.25));
+  }
+  pollIntervalMs = Math.max(POLL_MS_MIN, pollIntervalMs);
+}
+
 async function syncTick() {
   if (!isGameSyncActive() || !getState().inLobby) {
     stopMultiplayerSync();
@@ -1153,9 +1165,12 @@ async function syncTick() {
   }
   if (syncTickInFlight) return;
   syncTickInFlight = true;
+  const prevSig = lastSessionSig;
   try {
     const row = await refreshGameSession();
     if (!row) return;
+    adjustPollBackoff(sessionSignature(row) !== prevSig);
+    scheduleSyncPoll();
     if (await routeToActiveGameIfNeeded(row)) return;
     const local = getCurrentScreen();
     if (local !== row?.screen) handleSessionRoute(row);
@@ -1169,9 +1184,12 @@ async function syncTick() {
 export function startMultiplayerSync() {
   if (!isGameSyncActive()) return;
   stopMultiplayerSync();
+  pollIntervalMs = POLL_MS_DEFAULT;
+  pollUnchangedStreak = 0;
+  lastGameSessionRealtimeAt = Date.now();
   import("./supabaseLobby.js").then((m) => m.startLobbyPresenceSync());
   syncTick();
-  pollTimer = setInterval(syncTick, 1500);
+  scheduleSyncPoll();
 }
 
 export function stopMultiplayerSync() {
@@ -1179,6 +1197,8 @@ export function stopMultiplayerSync() {
     clearInterval(pollTimer);
     pollTimer = null;
   }
+  pollIntervalMs = POLL_MS_DEFAULT;
+  pollUnchangedStreak = 0;
 }
 
 export async function startGameSession(gameId, screen, state) {
@@ -1252,13 +1272,12 @@ export async function patchGameState(stateMerge, { screen, gameId } = {}) {
   if (stateMerge.hotTake) {
     const curHt = current.hotTake;
     const incHt = stateMerge.hotTake;
+    const me = getLocalDisplayName();
     nextState.hotTake = curHt
-      ? {
-          ...curHt,
-          ...incHt,
-          ready: mergeRemoteReadyUid(curHt, incHt),
-          votes: mergeRemoteHotTakeVotesUid(curHt, incHt),
-        }
+      ? mergeHotTakePatchState(curHt, incHt, me, {
+          mergeReadyUid: mergeRemoteReadyUid,
+          mergeVotes: mergeRemoteHotTakeVotesUid,
+        })
       : incHt;
   }
   if (stateMerge.speedVote) {
@@ -1291,17 +1310,12 @@ export async function patchGameState(stateMerge, { screen, gameId } = {}) {
   if (stateMerge.dilemma) {
     const curDm = current.dilemma;
     const incDm = stateMerge.dilemma;
+    const me = getLocalDisplayName();
     nextState.dilemma = curDm
-      ? {
-          ...curDm,
-          ...incDm,
-          ready: mergeRemoteReadyUid(curDm, incDm),
-          votes: mergeRemoteDilemmaVotes(curDm, incDm),
-          customDilemmas: mergeDilemmaCustomDilemmas(
-            incDm.customDilemmas || [],
-            curDm.customDilemmas || []
-          ),
-        }
+      ? mergeDilemmaPatchState(curDm, incDm, me, {
+          mergeReadyUid: mergeRemoteReadyUid,
+          mergeVotes: mergeRemoteDilemmaVotes,
+        })
       : incDm;
   }
   if (stateMerge.tierNight) {

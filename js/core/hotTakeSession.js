@@ -24,6 +24,7 @@ import {
   allMembersReady,
   hotTakeToRemote,
 } from "./gameSync.js";
+import { mergeHotTakeCustomTakes } from "./sessionMerge.js";
 
 function defaultSession() {
   return {
@@ -84,8 +85,20 @@ export function checkHotTakeModeration(text) {
 }
 
 function normalizeTake(entry) {
-  if (typeof entry === "string") return { text: entry, author: null, themeId: null };
-  return entry;
+  if (typeof entry === "string") {
+    const text = entry.trim();
+    if (!text) return null;
+    return { id: `legacy-${text.slice(0, 24)}`, text, author: null, themeId: null };
+  }
+  if (!entry || typeof entry !== "object") return null;
+  const text = String(entry.text || "").trim();
+  if (!text) return null;
+  return {
+    id: entry.id || `custom-${text.slice(0, 24)}-${entry.author || "anon"}`,
+    text,
+    author: entry.author || null,
+    themeId: entry.themeId || null,
+  };
 }
 
 export async function setHotTakeTheme(themeId) {
@@ -189,12 +202,32 @@ export async function addCustomTake(text) {
   if (mod.blocked) return { ok: false, error: mod.message };
 
   const session = getHotTakeSession();
-  const entry = { text: trimmed, author: getLocalDisplayName() };
+  const entry = {
+    id: `custom-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    text: trimmed,
+    author: getLocalDisplayName(),
+  };
+  const merged = mergeHotTakeCustomTakes(
+    [...(session.customTakes || []), entry],
+    [],
+    getLocalDisplayName()
+  );
   await syncHotTakeSession({
     ...session,
-    customTakes: [...(session.customTakes || []), entry],
+    customTakes: merged,
     deck: null,
   });
+  return { ok: true };
+}
+
+export async function removeCustomTake(takeId) {
+  const me = getLocalDisplayName();
+  const session = getHotTakeSession();
+  const next = (session.customTakes || [])
+    .map(normalizeTake)
+    .filter(Boolean)
+    .filter((t) => !(t.id === takeId && (t.author || me) === me));
+  await syncHotTakeSession({ ...session, customTakes: next, deck: null });
   return { ok: true };
 }
 

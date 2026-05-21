@@ -492,6 +492,8 @@ export function subscribeLobbyRealtime(onUpdate) {
           return;
         }
         try {
+          const { pulseGameSessionRealtime } = await import("./gameSync.js");
+          pulseGameSessionRealtime();
           await refreshGameSession();
           const row = getCachedGameSession();
           if (row) handleSessionRoute(row);

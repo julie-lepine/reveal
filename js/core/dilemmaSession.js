@@ -21,6 +21,7 @@ import {
   dilemmaToRemote,
 } from "./gameSync.js";
 import { checkHotTakeModeration, getModerationNotice } from "./hotTakeSession.js";
+import { mergeDilemmaCustomDilemmas, mergeAuthorOwnedCustomList, normalizeDilemmaEntry } from "./sessionMerge.js";
 
 function defaultSession() {
   return {
@@ -149,14 +150,12 @@ export function countOtherPlayersCustomDilemmas() {
     .filter((d) => d.author && d.author !== me).length;
 }
 
-/** Fusionne les listes custom (par id) — évite doublons et écrasements multijoueur. */
+/** Fusionne les listes custom (par id) — usage local uniquement. */
 export function mergeCustomDilemmasLists(localList = [], remoteList = []) {
-  const byId = new Map();
-  [...localList, ...remoteList].forEach((raw) => {
-    const d = normalizeCustomDilemma(raw);
-    if (d) byId.set(d.id, d);
+  return mergeAuthorOwnedCustomList(localList, remoteList, {
+    normalize: normalizeDilemmaEntry,
+    localAuthor: getLocalDisplayName(),
   });
-  return [...byId.values()];
 }
 
 export async function addCustomDilemma(optionA, optionB) {
@@ -177,7 +176,11 @@ export async function addCustomDilemma(optionA, optionB) {
     author: getLocalDisplayName(),
     tier: "custom",
   };
-  const merged = mergeCustomDilemmasLists(session.customDilemmas, [entry]);
+  const merged = mergeDilemmaCustomDilemmas(
+    [...(session.customDilemmas || []), entry],
+    [],
+    getLocalDisplayName()
+  );
   await syncDilemmaSession({
     ...session,
     customDilemmas: merged,
