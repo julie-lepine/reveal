@@ -1,7 +1,6 @@
 import { APP_LOGO } from "../../data/branding.js";
-import { hasActiveLobby, goToLobby } from "./lobby.js";
+import { hasActiveLobby, goToLobby, returnToEveningGames } from "./lobby.js";
 import { navigate, onScreenChange, getCurrentScreen } from "./router.js";
-import { getCachedGameSession, handleSessionRoute } from "./gameSync.js";
 import { goToEveningHome } from "../screens/nav.js";
 
 const TAB_HOME = "home";
@@ -21,6 +20,8 @@ const SCREEN_TO_TAB = {
   hottake: TAB_GAMES,
   "speedvote-prep": TAB_GAMES,
   speedvote: TAB_GAMES,
+  "truthmeter-prep": TAB_GAMES,
+  truthmeter: TAB_GAMES,
   guesslie: TAB_GAMES,
   "guesslie-menu": TAB_GAMES,
   "guesslie-setup": TAB_GAMES,
@@ -36,17 +37,8 @@ function goHome() {
   goToEveningHome();
 }
 
-function goGames() {
-  if (!hasActiveLobby()) {
-    navigate("home", { reset: true });
-    return;
-  }
-  const row = getCachedGameSession();
-  if (row?.screen && row.screen !== "game-select" && row.screen !== getCurrentScreen()) {
-    handleSessionRoute(row);
-    return;
-  }
-  navigate("game-select");
+async function goGames() {
+  await returnToEveningGames();
 }
 
 function goLogo() {

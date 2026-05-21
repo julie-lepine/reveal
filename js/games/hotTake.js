@@ -18,6 +18,7 @@ import {
 } from "../core/hotTakeSession.js";
 import { awardHotTakeVotes } from "../core/scoring.js";
 import { gameCumulativeScoresHtml } from "../core/gameScores.js";
+import { getActivePlayers } from "../core/players.js";
 import { getLocalDisplayName, recordHotTakePlayed, setLastGame } from "../core/state.js";
 import { setLobbyPlaying, setLobbyWaiting } from "../core/lobby.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
@@ -62,6 +63,9 @@ export function mountHotTake(app) {
   let paused = false;
   /** Vote en cours d’envoi — évite que la synchro efface l’UI avant la réponse serveur. */
   let voteCommitInFlight = null;
+  /** Verrou local : plus de changement de vote avant la fin du timer. */
+  let voteLockedThisRound = false;
+  let lockedVoteChoice = null;
   const localName = getLocalDisplayName();
   const mp = isGameSyncActive();
 
@@ -103,10 +107,30 @@ export function mountHotTake(app) {
     if (s.takeIdx != null) takeIdx = s.takeIdx;
     if (s.phase) phase = s.phase;
     votes = { ...(s.votes || {}) };
-    myVote = votes[localName] ?? null;
-    if (voteCommitInFlight && phase === "voting" && myVote == null) {
-      myVote = voteCommitInFlight;
-      votes = { ...votes, [localName]: voteCommitInFlight };
+
+    if (phase !== "voting") {
+      voteLockedThisRound = false;
+      lockedVoteChoice = null;
+      myVote = null;
+    } else {
+      const remoteVote = votes[localName];
+      if (remoteVote != null) {
+        voteLockedThisRound = true;
+        lockedVoteChoice = remoteVote;
+        myVote = remoteVote;
+      } else if (voteCommitInFlight != null) {
+        voteLockedThisRound = true;
+        lockedVoteChoice = voteCommitInFlight;
+        myVote = voteCommitInFlight;
+        votes = { ...votes, [localName]: voteCommitInFlight };
+      } else if (voteLockedThisRound && lockedVoteChoice != null) {
+        myVote = lockedVoteChoice;
+        votes = { ...votes, [localName]: lockedVoteChoice };
+      } else {
+        voteLockedThisRound = false;
+        lockedVoteChoice = null;
+        myVote = null;
+      }
     }
     paused = Boolean(s.pausedBy);
     takeScored = Boolean(s.takeScored);
@@ -135,11 +159,35 @@ export function mountHotTake(app) {
     return `<p class="hot-take-author">Hot take de ${escapeHtml(take.author)}</p>`;
   }
 
-  function voteCounts() {
+  function voteCounts(votesMap = votes) {
     return HOT_TAKE_OPTIONS.reduce((acc, opt) => {
-      acc[opt] = Object.values(votes).filter((v) => v === opt).length;
+      acc[opt] = Object.values(votesMap).filter((v) => v === opt).length;
       return acc;
     }, {});
+  }
+
+  function hotTakePlayerVotesHtml(votesMap) {
+    const players = getActivePlayers();
+    if (!players.length) return "";
+
+    const rows = players
+      .map((p) => {
+        const choice = votesMap[p.name];
+        const voteHtml = choice
+          ? `<span class="hot-take-vote-pill" style="color:${HOT_TAKE_OPTION_COLORS[choice]}">${escapeHtml(choice)}</span>`
+          : `<span class="muted">Pas voté</span>`;
+        return `
+          <div class="player-row player-row--compact">
+            <div class="avatar avatar--sm" style="background:${p.color}">${p.emoji}</div>
+            <span class="player-name">${escapeHtml(p.name)}</span>
+            ${voteHtml}
+          </div>`;
+      })
+      .join("");
+
+    return `
+      <h3 class="section-title section-title--sm">Votes des joueurs</h3>
+      <div class="card card--votes">${rows}</div>`;
   }
 
   function pauseBanner() {
@@ -214,6 +262,8 @@ export function mountHotTake(app) {
       timer = HOT_TAKE_TIMER_SEC;
       myVote = null;
       votes = {};
+      voteLockedThisRound = false;
+      lockedVoteChoice = null;
       paused = false;
       clearHotTakePause();
       render();
@@ -238,6 +288,8 @@ export function mountHotTake(app) {
       timer = HOT_TAKE_TIMER_SEC;
       myVote = null;
       votes = {};
+      voteLockedThisRound = false;
+      lockedVoteChoice = null;
       paused = false;
       clearHotTakePause();
       render();
@@ -273,6 +325,7 @@ export function mountHotTake(app) {
     }
 
     if (phase === "voting") {
+      const voteLocked = voteLockedThisRound;
       phaseHtml = `
         ${pauseBanner()}
         <p class="label-upper label-upper--muted">Vote simultané</p>
@@ -280,11 +333,12 @@ export function mountHotTake(app) {
         <div class="progress progress--timer">
           <div class="progress-fill" id="progress-el" style="width:${(timer / HOT_TAKE_TIMER_SEC) * 100}%"></div>
         </div>
-        <div class="vote-buttons">
+        <div class="vote-buttons ${voteLocked ? "vote-buttons--locked" : ""}">
           ${HOT_TAKE_OPTIONS.map(
             (opt) => `
             <button type="button" class="vote-btn ${myVote === opt ? "vote-btn--active" : ""}"
-              data-vote="${opt}" style="--vote-color:${HOT_TAKE_OPTION_COLORS[opt]}">
+              data-vote="${opt}" style="--vote-color:${HOT_TAKE_OPTION_COLORS[opt]}"
+              ${voteLocked ? "disabled" : ""}>
               ${opt}${myVote === opt ? " ✓" : ""}
             </button>`
           ).join("")}
@@ -294,38 +348,32 @@ export function mountHotTake(app) {
     }
 
     if (phase === "reveal") {
+      const revealVotes = votesForAward();
+      const revealCounts = voteCounts(revealVotes);
+      const revealTotal = Object.values(revealCounts).reduce((a, b) => a + b, 0);
+      const { majority: revealMajority } = getMajorityOption(revealVotes, HOT_TAKE_OPTIONS);
       const awardHtml = lastAward
         ? `<p class="hint">Majorité : <strong style="color:${HOT_TAKE_OPTION_COLORS[lastAward.majority]}">${lastAward.majority}</strong> — camp majoritaire +12 pts, dissent +18 pts</p>`
         : "";
       phaseHtml = `
         <h3 class="section-title">Résultats du vote</h3>
         ${awardHtml}
-        ${gameCumulativeScoresHtml({ gameLabel: "Hot Take", title: "Cumul des scores" })}
         ${HOT_TAKE_OPTIONS.map((opt) => {
-          const n = counts[opt] || 0;
-          const pct = totalVotes ? Math.round((n / totalVotes) * 100) : 0;
+          const n = revealCounts[opt] || 0;
+          const pct = revealTotal ? Math.round((n / revealTotal) * 100) : 0;
           return `
             <div class="result-row">
               <div class="result-row__head">
-                <span style="color:${HOT_TAKE_OPTION_COLORS[opt]}">${opt}${opt === majority ? " 👑" : ""}</span>
-                <span class="muted">${n} votes · ${pct}%</span>
+                <span style="color:${HOT_TAKE_OPTION_COLORS[opt]}">${opt}${opt === revealMajority ? " 👑" : ""}</span>
+                <span class="muted">${n} vote${n > 1 ? "s" : ""} · ${pct}%</span>
               </div>
               <div class="progress">
                 <div class="progress-fill" style="width:${pct}%;background:${HOT_TAKE_OPTION_COLORS[opt]}"></div>
               </div>
             </div>`;
         }).join("")}
-        <div class="card card--votes">
-          ${Object.entries(votes)
-            .map(
-              ([name, v]) => `
-            <div class="player-row player-row--compact">
-              <span class="player-name">${escapeHtml(name)}</span>
-              <span style="color:${HOT_TAKE_OPTION_COLORS[v]};font-weight:800">${v}</span>
-            </div>`
-            )
-            .join("")}
-        </div>
+        ${hotTakePlayerVotesHtml(revealVotes)}
+        ${gameCumulativeScoresHtml({ gameLabel: "Hot Take", title: "Cumul des scores" })}
         ${
           host
             ? `<button type="button" class="btn btn-primary btn--spaced" id="next-take">
@@ -368,8 +416,10 @@ export function mountHotTake(app) {
 
     app.querySelectorAll("[data-vote]").forEach((btn) => {
       btn.addEventListener("click", async () => {
-        if (paused || myVote) return;
+        if (paused || voteLockedThisRound) return;
         const choice = btn.getAttribute("data-vote");
+        voteLockedThisRound = true;
+        lockedVoteChoice = choice;
         myVote = choice;
         votes = { ...votes, [localName]: choice };
         if (mp) {

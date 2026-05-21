@@ -16,6 +16,10 @@ import {
 import { navigate } from "../core/router.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
 import { bindNav } from "./nav.js";
+import {
+  eveningRecapRestartButtonHtml,
+  bindRestartGameButtons,
+} from "../core/restartGame.js";
 
 export function mountTierNightEnd(app) {
   let phase = "recap";
@@ -83,6 +87,7 @@ export function mountTierNightEnd(app) {
             )
             .join("")}
         </div>
+        ${eveningRecapRestartButtonHtml({ gameId: "tiernight", title: "TierNight" })}
         <button type="button" class="btn btn-primary" id="btn-contro">Controverse →</button>`;
     }
 
@@ -95,6 +100,7 @@ export function mountTierNightEnd(app) {
         <div class="card card--controversial">
           <p class="controversial-item">${escapeHtml(item)}</p>
         </div>
+        ${eveningRecapRestartButtonHtml({ gameId: "tiernight", title: "TierNight" })}
         <button type="button" class="btn btn-primary btn--spaced" id="btn-export-phase">Continuer</button>`;
     }
 
@@ -104,6 +110,7 @@ export function mountTierNightEnd(app) {
         <h2 class="screen-title">Ton board</h2>
         <p class="game-intro">Télécharge ton classement en PNG.</p>
         <button type="button" class="btn btn-primary" id="btn-download">Télécharger le board</button>
+        ${eveningRecapRestartButtonHtml({ gameId: "tiernight", title: "TierNight" })}
         <button type="button" class="btn btn-secondary btn--spaced" data-nav="results">Voir les résultats →</button>`;
     }
 
@@ -113,6 +120,7 @@ export function mountTierNightEnd(app) {
     });
 
     bindNav(app, { results: goToResults });
+    bindRestartGameButtons(app);
 
     app.querySelector("#btn-contro")?.addEventListener("click", () => {
       phase = "controversial";

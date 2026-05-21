@@ -1,6 +1,6 @@
 import { initRouter, registerScreen, navigate, resetNav } from "./core/router.js";
 import { initBottomNav } from "./core/bottomNav.js";
-import { parseJoinCodeFromHash } from "./core/lobby.js";
+import { parseJoinCodeFromHash, hasActiveLobby, resumeEveningSession } from "./core/lobby.js";
 import { initSupabaseAuth } from "./core/supabaseAuth.js";
 import { mountHome } from "./screens/home.js";
 import { mountLobby } from "./screens/lobby.js";
@@ -15,9 +15,11 @@ import { mountTierNightCreate } from "./screens/tierNightCreate.js";
 import { mountTierNightEnd } from "./screens/tierNightEnd.js";
 import { mountHotTakePrep } from "./screens/hotTakePrep.js";
 import { mountSpeedVotePrep } from "./screens/speedVotePrep.js";
+import { mountTruthMeterPrep } from "./screens/truthMeterPrep.js";
 import { mountSettings } from "./screens/settings.js";
 import { mountHotTake } from "./games/hotTake.js";
 import { mountSpeedVote } from "./games/speedVote.js";
+import { mountTruthMeter } from "./games/truthMeter.js";
 import { mountGuessLie } from "./games/guessLie.js";
 import { mountTierNight } from "./games/tierNight.js";
 
@@ -53,6 +55,8 @@ registerScreen("hottake-prep", mountHotTakePrep);
 registerScreen("hottake", mountHotTake);
 registerScreen("speedvote-prep", mountSpeedVotePrep);
 registerScreen("speedvote", mountSpeedVote);
+registerScreen("truthmeter-prep", mountTruthMeterPrep);
+registerScreen("truthmeter", mountTruthMeter);
 registerScreen("guesslie", mountGuessLie);
 registerScreen("tiernight", mountTierNight);
 
@@ -62,6 +66,9 @@ async function boot() {
   await initSupabaseAuth();
   resetNav();
   navigate("home", { reset: true });
+  if (hasActiveLobby()) {
+    void resumeEveningSession();
+  }
 }
 
 boot();

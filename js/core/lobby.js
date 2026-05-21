@@ -25,7 +25,16 @@ import {
 } from "./supabaseLobby.js";
 import { isGuest } from "./auth.js";
 import { resetEveningState } from "./state.js";
-import { stopMultiplayerSync, endGameSession, clearCachedGameSession } from "./gameSync.js";
+import {
+  stopMultiplayerSync,
+  endGameSession,
+  clearCachedGameSession,
+  routeToActiveGameIfNeeded,
+  refreshGameSession,
+  clearSessionRouteSuppress,
+  startMultiplayerSync,
+  isGameSyncActive,
+} from "./gameSync.js";
 
 const MAX_PLAYERS = 10;
 
@@ -126,14 +135,51 @@ export function goToLobby() {
   navigate("lobby", { navStack: ["home", "lobby"] });
 }
 
-export function goToGameSelect() {
+/** Accueil / paramètres → menu jeux, ou reprise d’une partie encore en cours. */
+export async function returnToEveningGames() {
   if (!hasActiveLobby()) {
     navigate("home", { reset: true });
     return;
   }
+
+  clearSessionRouteSuppress();
   saveStatePatch({ inLobby: true });
-  setLobbyWaiting();
+
+  if (isGameSyncActive()) {
+    startMultiplayerSync();
+    const row = await refreshGameSession();
+    if (await routeToActiveGameIfNeeded(row)) return;
+  } else {
+    setLobbyWaiting();
+  }
+
   navigate("game-select", { navStack: ["home", "lobby", "game-select"] });
+}
+
+export async function goToGameSelect() {
+  await returnToEveningGames();
+}
+
+/** Après F5 ou reconnexion : resynchronise et rejoint la partie en cours si besoin. */
+export async function resumeEveningSession() {
+  if (!hasActiveLobby()) return false;
+
+  clearSessionRouteSuppress();
+  saveStatePatch({ inLobby: true });
+
+  if (isGameSyncActive()) {
+    try {
+      await refreshLobbyFromSupabase();
+    } catch (e) {
+      console.warn("REVEAL resume lobby:", e);
+    }
+    startMultiplayerSync();
+    const row = await refreshGameSession();
+    if (await routeToActiveGameIfNeeded(row)) return true;
+    return false;
+  }
+
+  return false;
 }
 
 export function getLobbyParticipants() {

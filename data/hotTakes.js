@@ -1,6 +1,9 @@
 /** Id du thème qui fusionne toutes les banques (sauf lui-même) */
 export const HOT_TAKE_CATALOG_ID = "catalog";
 
+/** Mix : tirage aléatoire parmi les banques des autres thèmes (pas de liste locale). */
+export const HOT_TAKE_MIX_ID = "mix";
+
 /** Opinions par thème — utilisées en banque Hot Take */
 export const HOT_TAKE_THEMES = [
   {
@@ -12,6 +15,14 @@ export const HOT_TAKE_THEMES = [
     id: "food",
     label: "🍕 Food",
     takes: [
+      "Les chips dans un sandwich, c’est du génie.",
+      "Commander une salade au resto pour piquer les frites des autres, c’est stratégique.",
+      "Les goûters de 16h méritent plus de respect.",
+      "Les gens qui aiment les raisins secs dans les cookies ne sont pas dignes de confiance.",
+      "Le pain un peu brûlé a meilleur goût.",
+      "Les frites sans sauce, c’est triste.",
+      "Les pâtes au beurre peuvent sauver une journée.",
+      "Le café sans sucre c'est pas du vrai café.",
       "Les céréales dans l'eau c'est meilleur.",
       "L'ananas sur la pizza, c'est objectivement bon.",
       "La mayonnaise est meilleure que le ketchup.",
@@ -20,9 +31,24 @@ export const HOT_TAKE_THEMES = [
     ],
   },
   {
+    id: "habits",
+    label: "🧠 Habitudes étranges",
+    takes: [
+      "Les chats savent exactement quand déranger.",
+      "Les gens qui mâchent fort devraient être mutés.",
+      "Les gens qui courent après le bus développent un lien personnel avec le chauffeur.",
+      "Ouvrir le frigo sans raison précise est une activité à part entière.",
+      "Les gens qui courent pour le plaisir me font peur.",
+      "Refaire son lit est une perte de temps.",
+      "Les gens qui aiment l’été n’ont jamais pris les transports en commun sous canicule.",
+      "Les crocs sont moches… mais confortables donc validées.",
+    ],
+  },
+  {
     id: "culture",
     label: "🎬 Culture",
     takes: [
+      "Les films d’horreur sont surtout des séances de cardio.",
       "Le cinéma c'est surfait, Netflix c'est mieux.",
       "Les films en noir et blanc sont ennuyeux.",
       "Les gens qui regardent les sous-titres sont plus intelligents.",
@@ -33,21 +59,30 @@ export const HOT_TAKE_THEMES = [
     id: "life",
     label: "☕ Vie quotidienne",
     takes: [
+      "Les gens qui mettent des réveils sans se lever sont des artistes du chaos.",
+      "Les gens qui mettent leur réveil avec une musique douce aiment souffrir lentement.",
       "Dormir avec des chaussettes c'est correct.",
-      "Le café sans sucre c'est pas du vrai café.",
       "Les réveils à 6h rendent plus productif.",
+      "Les discussions après 23h deviennent automatiquement philosophiques.",
+      "Les stories “happy birthdayyy” sont une obligation sociale étrange.",
+      "Les “mdrrr” sans rire derrière devraient être taxés",
+      "Dire “je suis à 5 minutes” en étant encore chez soi est une tradition.",
+      "Les “on doit parler” enlèvent 5 ans d’espérance de vie.",
+      "Les “tu fais la gueule ?” donnent instantanément envie de faire la gueule.",
+      "Les vocaux de 7 minutes devraient être illégaux.",
+      "Les gens qui répondent “ok” sont inquiétants.",
       "Le mode silencieux devrait être obligatoire en public.",
+      "Les couvertures lourdes donnent un faux sentiment de sécurité mais ça fonctionne.",
+      "Regarder la pluie par la fenêtre, c’est une activité.",
+      "Le lundi ne devrait pas exister.",
+      "Arriver 30 minutes en avance à l’aéroport, c’est vivre dangereusement.",
+      "Les gens qui aiment l’été n’ont jamais pris les transports en commun sous canicule.",
     ],
   },
   {
-    id: "mix",
+    id: HOT_TAKE_MIX_ID,
     label: "🎲 Mix",
-    takes: [
-      "Les céréales dans l'eau c'est meilleur.",
-      "L'ananas sur la pizza, c'est objectivement bon.",
-      "Le cinéma c'est surfait, Netflix c'est mieux.",
-      "Dormir avec des chaussettes c'est correct.",
-    ],
+    takes: [],
   },
 ];
 
@@ -55,12 +90,14 @@ function normalizeTakeKey(text) {
   return String(text).trim().toLowerCase();
 }
 
-/** Toutes les takes de tous les thèmes (hors catalogue), sans doublon — mis à jour si tu ajoutes un thème dans HOT_TAKE_THEMES */
+const AGGREGATE_THEME_IDS = new Set([HOT_TAKE_CATALOG_ID, HOT_TAKE_MIX_ID]);
+
+/** Toutes les takes des thèmes « banque » (hors catalogue / mix), sans doublon. */
 export function getCatalogTakes(themes = HOT_TAKE_THEMES) {
   const seen = new Set();
   const out = [];
   for (const theme of themes) {
-    if (theme.id === HOT_TAKE_CATALOG_ID) continue;
+    if (AGGREGATE_THEME_IDS.has(theme.id)) continue;
     for (const text of theme.takes || []) {
       const key = normalizeTakeKey(text);
       if (seen.has(key)) continue;
@@ -71,11 +108,12 @@ export function getCatalogTakes(themes = HOT_TAKE_THEMES) {
   return out;
 }
 
-/** Banque d’un thème (catalogue = fusion automatique) */
+/** Banque d’un thème (catalogue / mix = fusion des autres thèmes ; le deck est mélangé à la volée). */
 export function getThemeBankTexts(themeId, themes = HOT_TAKE_THEMES) {
-  if (themeId === HOT_TAKE_CATALOG_ID) return getCatalogTakes(themes);
-  const theme =
-    themes.find((t) => t.id === themeId) || themes.find((t) => t.id === "mix");
+  if (themeId === HOT_TAKE_CATALOG_ID || themeId === HOT_TAKE_MIX_ID) {
+    return getCatalogTakes(themes);
+  }
+  const theme = themes.find((t) => t.id === themeId);
   return [...(theme?.takes || [])];
 }
 
@@ -118,5 +156,5 @@ export const HOT_TAKE_FORBIDDEN_WORDS = [
 export const HOT_TAKE_MODERATION_NOTICE =
   "Les insultes et termes racistes, homophobes, transphobes ou haineux sont interdits. Si ta hot take en contient, elle sera refusée.";
 
-/** @deprecated — utiliser HOT_TAKE_THEMES */
-export const HOT_TAKES = HOT_TAKE_THEMES.find((t) => t.id === "mix")?.takes || [];
+/** @deprecated — utiliser getThemeBankTexts */
+export const HOT_TAKES = getCatalogTakes();

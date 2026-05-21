@@ -16,6 +16,7 @@ import {
   HOT_TAKE_ROUND_PRESETS,
   HOT_TAKE_ROUND_ALL,
   HOT_TAKE_CATALOG_ID,
+  HOT_TAKE_MIX_ID,
 } from "../core/hotTakeSession.js";
 import { getLobbyParticipants } from "../core/lobby.js";
 import { onLobbyBundleUpdated } from "../core/supabaseLobby.js";
@@ -185,7 +186,9 @@ export function mountHotTakePrep(app) {
   async function onStartGame() {
     if (!isLobbyHost()) return;
     await markHotTakeLobbyStarted();
-    if (!isGameSyncActive()) navigate("hottake");
+    navigate("hottake", {
+      navStack: ["home", "lobby", "game-select", "hottake-prep", "hottake"],
+    });
   }
 
   function bindEvents() {
@@ -289,7 +292,9 @@ export function mountHotTakePrep(app) {
             prep.poolSize > 0
               ? themeId === HOT_TAKE_CATALOG_ID
                 ? `<p class="hint">${prep.poolSize} take(s) dans le deck — tous les thèmes fusionnés (sans doublons).</p>`
-                : `<p class="hint">${prep.poolSize} take(s) dans ce thème (+ customs si ajoutées).</p>`
+                : themeId === HOT_TAKE_MIX_ID
+                  ? `<p class="hint">${prep.poolSize} take(s) tirées au hasard parmi tous les thèmes (+ customs).</p>`
+                  : `<p class="hint">${prep.poolSize} take(s) dans ce thème (+ customs si ajoutées).</p>`
               : `<p class="hint">Ajoute un thème dans hotTakes.js pour commencer.</p>`
           }
         </div>

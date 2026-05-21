@@ -1,5 +1,5 @@
 import { navigate, goBack, getCurrentScreen } from "../core/router.js";
-import { goToLobby, hasActiveLobby, goToGameSelect } from "../core/lobby.js";
+import { goToLobby, hasActiveLobby, returnToEveningGames } from "../core/lobby.js";
 import { canPlay } from "../core/auth.js";
 import {
   isGameSyncActive,
@@ -10,7 +10,6 @@ import {
   returnToGameSelect,
   suppressSessionRoute,
   getCachedGameSession,
-  routeToSessionScreen,
 } from "../core/gameSync.js";
 
 /** Accueil sans quitter le lobby (soirée en cours). */
@@ -35,20 +34,13 @@ export function goToEveningSettings() {
   navigate("settings");
 }
 
-/** Retour au jeu après profil / paramètres. */
+/** Retour au menu jeux (ou partie en cours) après profil / paramètres. */
 export function returnFromEveningProfile() {
   if (!hasActiveLobby()) {
     goBack();
     return;
   }
-  const row = getCachedGameSession();
-  const target =
-    row?.screen && row.screen !== "home" && row.screen !== "settings"
-      ? row.screen
-      : "game-select";
-
-  suppressSessionRoute(120000, "settings");
-  routeToSessionScreen(target, { force: true });
+  void returnToEveningGames();
 }
 
 async function handleBackNavigation() {

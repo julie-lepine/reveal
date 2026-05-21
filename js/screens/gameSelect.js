@@ -6,48 +6,23 @@ import { bindNav, goToEveningSettings } from "./nav.js";
 import {
   isGameSyncActive,
   isLobbyHost,
-  startGameSession,
-  hotTakeToRemote,
-  speedVoteToRemote,
-  guessLieToRemote,
   onGameSessionChange,
   handleSessionRoute,
   refreshGameSession,
   getCachedGameSession,
+  routeToActiveGameIfNeeded,
 } from "../core/gameSync.js";
 import { navigate, getCurrentScreen } from "../core/router.js";
-import { getState, saveStatePatch } from "../core/state.js";
-import { defaultSpeedVotePrepSession } from "../core/speedVoteSession.js";
-import { showAppAlert } from "../core/dialog.js";
-
-async function launchSpeedVotePrep() {
-  const sv = defaultSpeedVotePrepSession();
-  saveStatePatch({ speedVoteGame: sv });
-
-  if (isGameSyncActive()) {
-    if (!isLobbyHost()) {
-      await showAppAlert("Seul l'hôte peut lancer un jeu.", {
-        title: "Action réservée",
-        icon: "👑",
-      });
-      return;
-    }
-    try {
-      await startGameSession("speedvote", "speedvote-prep", {
-        speedVote: speedVoteToRemote(sv),
-      });
-    } catch (e) {
-      console.warn("REVEAL launch SpeedVote:", e);
-      await showAppAlert(e.message || "Impossible de lancer SpeedVote.", {
-        title: "SpeedVote",
-        icon: "⚠️",
-      });
-    }
-    return;
-  }
-
-  navigate("speedvote-prep");
-}
+import { getLastGame } from "../core/state.js";
+import {
+  launchSpeedVotePrep,
+  launchTruthMeterPrep,
+  launchHotTakePrep,
+  launchGuessLieMenu,
+  launchTierNightSelect,
+  eveningRecapRestartButtonHtml,
+  bindRestartGameButtons,
+} from "../core/restartGame.js";
 
 function eveningRecapHtml(recap) {
   if (!recap.hasActivity) {
@@ -65,6 +40,12 @@ function eveningRecapHtml(recap) {
       : "",
     recap.liesTotal > 0
       ? `<span class="evening-recap__chip">🕵️ ${recap.liesFound}/${recap.liesTotal} mensonges · ${recap.lieRate}</span>`
+      : "",
+    recap.speedVotes > 0
+      ? `<span class="evening-recap__chip">⚡ ${recap.speedVotes} SpeedVote${recap.speedVotes > 1 ? "s" : ""}</span>`
+      : "",
+    recap.truthMeters > 0
+      ? `<span class="evening-recap__chip">📏 ${recap.truthMeters} TruthMeter${recap.truthMeters > 1 ? "s" : ""}</span>`
       : "",
     recap.tierNights > 0
       ? `<span class="evening-recap__chip">🏆 ${recap.tierNights} tier list${recap.tierNights > 1 ? "s" : ""}</span>`
@@ -88,12 +69,16 @@ function eveningRecapHtml(recap) {
     ? `<button type="button" class="evening-recap__link" data-nav="leaderboard">Voir le classement →</button>`
     : "";
 
+  const last = getLastGame();
+  const restartBtn = eveningRecapRestartButtonHtml(last);
+
   return `
     <div class="evening-recap card">
       <p class="evening-recap__title">📋 Récap de la soirée</p>
       <div class="evening-recap__chips">${chips}</div>
       ${leader}
       ${lastTier}
+      ${restartBtn}
       ${moreLink}
     </div>`;
 }
@@ -108,67 +93,16 @@ export function mountGameSelect(app) {
     const mpHandlers = {};
     if (isGameSyncActive()) {
       mpHandlers["speedvote-prep"] = launchSpeedVotePrep;
-      mpHandlers["hottake-prep"] = async () => {
-        if (!isLobbyHost()) {
-          await showAppAlert("Seul l'hôte peut lancer un jeu.", {
-            title: "Action réservée",
-            icon: "👑",
-          });
-          return;
-        }
-        const ht = {
-          customTakes: [],
-          ready: {},
-          lobbyStarted: false,
-          pausedBy: null,
-          selectedThemeId: "catalog",
-          roundCount: 5,
-          deck: null,
-          takeIdx: 0,
-          phase: null,
-          votes: {},
-          voteEndsAt: null,
-          intermissionEndsAt: null,
-          takeScored: false,
-        };
-        await startGameSession("hottake", "hottake-prep", { hotTake: hotTakeToRemote(ht) });
-      };
-      mpHandlers.guesslie = async () => {
-        if (!isLobbyHost()) {
-          await showAppAlert("Seul l'hôte peut lancer un jeu.", {
-            title: "Action réservée",
-            icon: "👑",
-          });
-          return;
-        }
-        const gl = {
-          sessionId: getState().lobbyCode,
-          submissions: {},
-          lobbyComplete: false,
-          roundIdx: 0,
-          phase: null,
-          votes: {},
-          roundScored: false,
-        };
-        await startGameSession("guesslie", "guesslie-menu", { guessLie: guessLieToRemote(gl) });
-      };
-      mpHandlers["tiernight-select"] = async () => {
-        if (!isLobbyHost()) {
-          await showAppAlert("Seul l'hôte peut lancer un jeu.", {
-            title: "Action réservée",
-            icon: "👑",
-          });
-          return;
-        }
-        await startGameSession("tiernight", "tiernight-select", {
-          tierNight: { topicId: null, game: null, placements: {}, finished: {} },
-        });
-      };
+      mpHandlers["truthmeter-prep"] = launchTruthMeterPrep;
+      mpHandlers["hottake-prep"] = launchHotTakePrep;
+      mpHandlers.guesslie = launchGuessLieMenu;
+      mpHandlers["tiernight-select"] = launchTierNightSelect;
     }
 
     bindNav(app, {
       ...mpHandlers,
       "speedvote-prep": launchSpeedVotePrep,
+      "truthmeter-prep": launchTruthMeterPrep,
       settings: () => goToEveningSettings(),
       leaderboard: () => {
         navigate("leaderboard", {
@@ -177,6 +111,7 @@ export function mountGameSelect(app) {
       },
     });
     bindGameTileLogos(app);
+    bindRestartGameButtons(app);
   }
 
   function render() {
@@ -224,20 +159,21 @@ export function mountGameSelect(app) {
 
   if (isGameSyncActive()) {
     void (async () => {
+      if (await routeToActiveGameIfNeeded()) return;
       const row = (await refreshGameSession()) || getCachedGameSession();
-      if (row) {
-        handleSessionRoute(row);
-        render();
-      }
+      if (row) handleSessionRoute(row);
+      render();
     })();
 
-    unsubSession = onGameSessionChange((row) => {
+    unsubSession = onGameSessionChange(async (row) => {
       if (getCurrentScreen() === "game-select") render();
+      if (row && (await routeToActiveGameIfNeeded())) return;
       if (row) handleSessionRoute(row);
     });
 
     if (!isLobbyHost()) {
       guestRoutePoll = setInterval(async () => {
+        if (await routeToActiveGameIfNeeded()) return;
         if (getCurrentScreen() !== "game-select") return;
         const row = (await refreshGameSession()) || getCachedGameSession();
         if (row) handleSessionRoute(row);

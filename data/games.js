@@ -31,6 +31,16 @@ export const GAMES = [
     enabled: true,
   },
   {
+    id: "truthmeter-prep",
+    title: "TruthMeter",
+    desc: "Affirmation + curseur Fake → Vrai — le groupe tranche",
+    emoji: "📏",
+    cssClass: "truth",
+    logo: "js/games/truthmeter.png",
+    borderGradient: "linear-gradient(145deg, #34D399 0%, #60A5FA 48%, #2B2D66 100%)",
+    enabled: true,
+  },
+  {
     id: "tiernight-select",
     title: "TierNight",
     desc: "Choisis une tier list, puis classe en S / A / B / C / D",

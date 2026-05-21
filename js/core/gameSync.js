@@ -48,6 +48,7 @@ export function isLobbyHost() {
 const GAME_SETUP_SCREENS = new Set([
   "hottake-prep",
   "speedvote-prep",
+  "truthmeter-prep",
   "guesslie-menu",
   "guesslie-setup",
   "guesslie-wait",
@@ -83,9 +84,10 @@ function isCompatibleSessionScreen(sessionScreen, localScreen) {
   if (sessionScreen === "game-select" && localScreen === "lobby") {
     return true;
   }
-  /** Accueil / paramètres pendant une soirée active (sans quitter le lobby). */
+  /** Accueil / paramètres : libre si pas de partie en cours ; sinon rattrapage vers le jeu. */
   if (getState().inLobby && getState().lobby?.id) {
     if (localScreen === "settings" || localScreen === "home") {
+      if (isActiveGameSessionScreen(sessionScreen)) return false;
       return true;
     }
   }
@@ -249,8 +251,14 @@ function mergeRemoteHotTakeVotesUid(cur, inc) {
   const curVotes = cur?.votes || {};
   const incVotes = inc?.votes || {};
   if (isNewHotTakeVoteRound(cur, inc)) return incVotes;
-  if (inc?.phase !== "voting" || cur?.phase !== "voting") return incVotes;
-  return { ...curVotes, ...incVotes };
+  if (
+    (inc?.phase === "voting" && cur?.phase === "voting") ||
+    inc?.phase === "reveal" ||
+    cur?.phase === "reveal"
+  ) {
+    return { ...curVotes, ...incVotes };
+  }
+  return incVotes;
 }
 
 /** Fusion des « prêt » uid (écriture patch). */
@@ -280,6 +288,8 @@ function mergeHotTakeGameLocal(local, remote) {
     const name = getLocalDisplayName();
     const lv = localVotes[name];
     if (lv != null && votes[name] == null) votes[name] = lv;
+  } else if (remote.phase === "reveal" || local.phase === "reveal") {
+    votes = { ...remoteVotes, ...localVotes };
   }
   const ready =
     !remote.lobbyStarted && !local.lobbyStarted
@@ -296,6 +306,93 @@ function mergeSpeedVoteGameLocal(local, remote) {
       ? mergeReadyMapsLocal(local.ready || {}, remote.ready || {})
       : remote.ready || {};
   return { ...local, ...remote, ready };
+}
+
+function isNewTruthMeterVoteRound(cur, inc) {
+  return (
+    inc?.phase === "voting" &&
+    inc?.voteEndsAt &&
+    inc.voteEndsAt !== cur?.voteEndsAt &&
+    Object.keys(inc.votes || {}).length === 0
+  );
+}
+
+function mergeRemoteTruthMeterVotesUid(cur, inc) {
+  const curVotes = cur?.votes || {};
+  const incVotes = inc?.votes || {};
+  if (isNewTruthMeterVoteRound(cur, inc)) return incVotes;
+  if (
+    (inc?.phase === "voting" && cur?.phase === "voting") ||
+    inc?.phase === "reveal" ||
+    inc?.phase === "reveal-pending" ||
+    cur?.phase === "reveal" ||
+    cur?.phase === "reveal-pending"
+  ) {
+    return { ...curVotes, ...incVotes };
+  }
+  return incVotes;
+}
+
+function mergeTruthMeterGameLocal(local, remote) {
+  if (!remote) return local;
+  if (!local) return remote;
+  const remoteVotes = remote.votes || {};
+  const localVotes = local.votes || {};
+  let votes = remoteVotes;
+  if (isNewTruthMeterVoteRound(local, remote)) {
+    votes = remoteVotes;
+  } else if (remote.phase === "voting") {
+    votes = { ...remoteVotes };
+    const name = getLocalDisplayName();
+    const lv = localVotes[name];
+    if (lv != null && votes[name] == null) votes[name] = lv;
+  } else if (remote.phase === "reveal" || remote.phase === "reveal-pending") {
+    votes = { ...remoteVotes };
+  } else if (local.phase === "reveal" || local.phase === "reveal-pending") {
+    votes = { ...localVotes, ...remoteVotes };
+  }
+  const ready =
+    !remote.lobbyStarted && !local.lobbyStarted
+      ? mergeReadyMapsLocal(local.ready || {}, remote.ready || {})
+      : remote.ready || {};
+  return { ...local, ...remote, votes, ready };
+}
+
+export function truthMeterToRemote(session) {
+  return {
+    ready: mapReadyByUid(session.ready || {}),
+    lobbyStarted: Boolean(session.lobbyStarted),
+    authorOrder: session.authorOrder || [],
+    roundIdx: session.roundIdx ?? 0,
+    phase: session.phase || null,
+    affirmation: session.affirmation || null,
+    authorEstimate:
+      session.authorEstimate != null && Number.isFinite(session.authorEstimate)
+        ? session.authorEstimate
+        : null,
+    votes: mapVotesByUid(session.votes || {}),
+    voteEndsAt: session.voteEndsAt || null,
+    roundScored: Boolean(session.roundScored),
+  };
+}
+
+export function truthMeterFromRemote(remote) {
+  if (!remote) return null;
+  return {
+    ready: mapReadyByName(remote.ready || {}),
+    lobbyStarted: Boolean(remote.lobbyStarted),
+    authorOrder: remote.authorOrder || [],
+    roundIdx: remote.roundIdx ?? 0,
+    phase: remote.phase || null,
+    affirmation: remote.affirmation || null,
+    authorEstimate:
+      remote.authorEstimate != null && Number.isFinite(remote.authorEstimate)
+        ? remote.authorEstimate
+        : null,
+    votes: mapVotesByName(remote.votes || {}),
+    voteEndsAt: remote.voteEndsAt || null,
+    roundScored: Boolean(remote.roundScored),
+  };
 }
 
 export function speedVoteToRemote(session) {
@@ -407,6 +504,9 @@ export function applyRemoteLobbyScores(remote) {
   if (!Object.keys(byName).length) return;
 
   const merged = { ...getState().scores };
+  getLobbyParticipants().forEach((p) => {
+    if (byName[p.name] != null) merged[p.name] = byName[p.name];
+  });
   Object.entries(byName).forEach(([name, pts]) => {
     merged[name] = pts;
   });
@@ -419,6 +519,8 @@ function eveningStateToRemote() {
     scores: scoresToRemote(getState().scores),
     stats: {
       hotTakesPlayed: stats.hotTakesPlayed || 0,
+      speedVotesPlayed: stats.speedVotesPlayed || 0,
+      truthMetersPlayed: stats.truthMetersPlayed || 0,
       liesFound: stats.liesFound || 0,
       liesTotal: stats.liesTotal || 0,
       tierNightsPlayed: stats.tierNightsPlayed || 0,
@@ -482,6 +584,11 @@ export function applyRemoteSession(row) {
     const local = getState().speedVoteGame;
     patch.speedVoteGame = local ? mergeSpeedVoteGameLocal(local, remote) : remote;
   }
+  if (st.truthMeter) {
+    const remote = truthMeterFromRemote(st.truthMeter);
+    const local = getState().truthMeterGame;
+    patch.truthMeterGame = local ? mergeTruthMeterGameLocal(local, remote) : remote;
+  }
   if (st.guessLie) {
     const gl = guessLieFromRemote(st.guessLie);
     patch.guessLie = gl;
@@ -498,7 +605,15 @@ export function applyRemoteSession(row) {
 
   notify(row);
 
-  if (row?.screen && (!sigUnchanged || getCurrentScreen() !== row.screen)) {
+  const effective = getEffectiveSessionScreen(row);
+  if (
+    effective &&
+    isActiveGameSessionScreen(effective) &&
+    getCurrentScreen() !== effective
+  ) {
+    clearSessionRouteSuppress();
+    handleSessionRoute(row, { fromScreen: prevScreen });
+  } else if (effective && (!sigUnchanged || getCurrentScreen() !== effective)) {
     handleSessionRoute(row, { fromScreen: prevScreen });
   }
 }
@@ -522,6 +637,8 @@ function navStackFor(screen) {
     "hottake",
     "speedvote-prep",
     "speedvote",
+    "truthmeter-prep",
+    "truthmeter",
     "guesslie-menu",
     "guesslie-setup",
     "guesslie-wait",
@@ -562,33 +679,63 @@ export function suppressSessionRoute(ms = 45000, screen = getCachedGameSession()
   suppressSessionScreen = screen;
 }
 
-function clearSessionRouteSuppress() {
+export function clearSessionRouteSuppress() {
   suppressSessionRouteUntil = 0;
   suppressSessionScreen = null;
 }
 
-function isActiveGameSessionScreen(screen) {
+export function isActiveGameSessionScreen(screen) {
   if (!screen || MENU_SCREENS.has(screen)) return false;
   if (POST_GAME_SCREENS.has(screen)) return false;
   return true;
 }
 
+/** Écran réel de la partie (row.screen ou état jeu si le champ screen n’a pas été mis à jour). */
+export function getEffectiveSessionScreen(row) {
+  if (!row) return null;
+  const declared = row.screen || null;
+  if (declared && (MENU_SCREENS.has(declared) || POST_GAME_SCREENS.has(declared))) {
+    return declared;
+  }
+  const st = row.state || {};
+  if (st.truthMeter?.lobbyStarted) return "truthmeter";
+  if (st.hotTake?.lobbyStarted) return "hottake";
+  if (st.speedVote?.lobbyStarted) return "speedvote";
+  const glPhase = st.guessLie?.phase;
+  if (glPhase && glPhase !== "idle" && glPhase !== "lobby") return "guesslie";
+  if (st.tierNight?.game && !st.tierNight?.finished) return "tiernight";
+  return declared;
+}
+
+/** Renvoie l’invité (ou l’hôte) vers la partie en cours si une session active existe. */
+export async function routeToActiveGameIfNeeded(cachedRowOnly = null) {
+  if (!isGameSyncActive()) return false;
+  const row =
+    cachedRowOnly || (await refreshGameSession()) || getCachedGameSession();
+  const screen = getEffectiveSessionScreen(row);
+  if (!screen || !isActiveGameSessionScreen(screen)) return false;
+  if (getCurrentScreen() === screen) return true;
+  clearSessionRouteSuppress();
+  routeToSessionScreen(screen, { force: true });
+  return true;
+}
+
 export function handleSessionRoute(row, { fromScreen = null } = {}) {
-  if (!row?.screen) return;
+  const screen = getEffectiveSessionScreen(row);
+  if (!screen) return;
   const current = getCurrentScreen();
-  if (row.screen === current) return;
-  if (isCompatibleSessionScreen(row.screen, current)) return;
+  if (screen === current) return;
+  if (isCompatibleSessionScreen(screen, current)) return;
 
   const hostLaunchedFromMenu =
-    fromScreen === "game-select" && row.screen !== "game-select";
+    fromScreen === "game-select" && screen !== "game-select";
 
   const sessionAdvanced =
-    suppressSessionScreen != null && row.screen !== suppressSessionScreen;
+    suppressSessionScreen != null && screen !== suppressSessionScreen;
 
   const catchUpFromMenu =
-    current === "game-select" &&
-    isActiveGameSessionScreen(row.screen) &&
-    row.screen !== suppressSessionScreen;
+    (current === "game-select" || MENU_SCREENS.has(current)) &&
+    isActiveGameSessionScreen(screen);
 
   if (Date.now() < suppressSessionRouteUntil) {
     if (hostLaunchedFromMenu || sessionAdvanced || catchUpFromMenu) {
@@ -598,7 +745,7 @@ export function handleSessionRoute(row, { fromScreen = null } = {}) {
     }
   }
 
-  routeToSessionScreen(row.screen, { force: true });
+  routeToSessionScreen(screen, { force: true });
 }
 
 /** Polling de secours si Realtime ne pousse pas l’événement (fréquent en local). */
@@ -609,7 +756,10 @@ async function syncTick() {
   }
   try {
     const row = await refreshGameSession();
-    if (row) handleSessionRoute(row);
+    if (!row) return;
+    if (await routeToActiveGameIfNeeded(row)) return;
+    const local = getCurrentScreen();
+    if (local !== row?.screen) handleSessionRoute(row);
   } catch (e) {
     console.warn("REVEAL sync:", e.message || e);
   }
@@ -671,7 +821,7 @@ export async function patchGameState(stateMerge, { screen, gameId } = {}) {
   if (!isGameSyncActive()) return null;
   const lobbyId = getState().lobby.id;
   const current = cachedRow?.state || {};
-  const nextState = { ...current, ...stateMerge };
+  let nextState = { ...current, ...stateMerge };
   if (stateMerge.hotTake) {
     const curHt = current.hotTake;
     const incHt = stateMerge.hotTake;
@@ -691,6 +841,22 @@ export async function patchGameState(stateMerge, { screen, gameId } = {}) {
       ? { ...curSv, ...incSv, ready: mergeRemoteReadyUid(curSv, incSv) }
       : incSv;
   }
+  if (stateMerge.truthMeter) {
+    const curTm = current.truthMeter;
+    const incTm = stateMerge.truthMeter;
+    nextState.truthMeter = curTm
+      ? {
+          ...curTm,
+          ...incTm,
+          ready: mergeRemoteReadyUid(curTm, incTm),
+          votes: mergeRemoteTruthMeterVotesUid(curTm, incTm),
+        }
+      : incTm;
+  }
+  if (isLobbyHost()) {
+    nextState = { ...nextState, ...eveningStateToRemote() };
+  }
+
   const patch = { state: nextState };
   if (screen) patch.screen = screen;
   if (gameId) patch.game_id = gameId;
@@ -787,6 +953,14 @@ export async function syncSpeedVoteSession(extra = {}) {
   saveStatePatch({ speedVoteGame: session });
   if (!isGameSyncActive()) return session;
   await patchGameState({ speedVote: speedVoteToRemote(session) });
+  return session;
+}
+
+export async function syncTruthMeterSession(extra = {}) {
+  const session = { ...getState().truthMeterGame, ...extra };
+  saveStatePatch({ truthMeterGame: session });
+  if (!isGameSyncActive()) return session;
+  await patchGameState({ truthMeter: truthMeterToRemote(session) });
   return session;
 }
 

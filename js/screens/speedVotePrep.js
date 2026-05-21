@@ -114,7 +114,9 @@ export function mountSpeedVotePrep(app) {
   async function onStartGame() {
     if (!isLobbyHost()) return;
     await markSpeedVoteLobbyStarted();
-    if (!isGameSyncActive()) navigate("speedvote");
+    navigate("speedvote", {
+      navStack: ["home", "lobby", "game-select", "speedvote-prep", "speedvote"],
+    });
   }
 
   function bindEvents() {

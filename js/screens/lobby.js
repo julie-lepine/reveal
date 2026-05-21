@@ -20,7 +20,13 @@ import {
 } from "../core/lobby.js";
 import { canCreateLobby } from "../core/auth.js";
 import { isSupabaseConfigured } from "../core/supabaseClient.js";
-import { isGameSyncActive, isLobbyHost, startGameSession, startMultiplayerSync } from "../core/gameSync.js";
+import {
+  isGameSyncActive,
+  isLobbyHost,
+  startGameSession,
+  startMultiplayerSync,
+  routeToActiveGameIfNeeded,
+} from "../core/gameSync.js";
 import { triggerLobbyNudge } from "../core/nudge.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
@@ -394,7 +400,10 @@ export function mountLobby(app) {
     await ensureLobby();
     await resetAllParticipantsReady();
     renderFull();
-    if (isGameSyncActive()) startMultiplayerSync();
+    if (isGameSyncActive()) {
+      startMultiplayerSync();
+      void routeToActiveGameIfNeeded();
+    }
     cleanupSim = simulateLobbyJoins(onLobbyUpdate);
   })();
 

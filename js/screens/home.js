@@ -16,12 +16,17 @@ import {
   joinLobbyAsGuest,
   hasActiveLobby,
   getLobby,
-  goToGameSelect,
+  returnToEveningGames,
+  resumeEveningSession,
   leaveLobby,
 } from "../core/lobby.js";
 import { getGlobalStats } from "../core/state.js";
 import { getEveningRecap } from "../core/eveningRecap.js";
-import { isGameSyncActive, onGameSessionChange, refreshGameSession } from "../core/gameSync.js";
+import {
+  isGameSyncActive,
+  onGameSessionChange,
+  routeToActiveGameIfNeeded,
+} from "../core/gameSync.js";
 import { navigate } from "../core/router.js";
 import { escapeHtml, logoHtml, pageShell } from "../core/ui.js";
 import { bindNav, goToEveningSettings } from "./nav.js";
@@ -38,6 +43,8 @@ function homeStatsHtml() {
         <div class="stats stats--global">
           <div class="stat"><div>👥</div><div class="stat-number">${recap.participantCount}</div><div class="stat-label">Joueurs</div></div>
           <div class="stat"><div>🔥</div><div class="stat-number">${recap.hotTakes}</div><div class="stat-label">Hot takes</div></div>
+          <div class="stat"><div>⚡</div><div class="stat-number">${recap.speedVotes}</div><div class="stat-label">SpeedVotes</div></div>
+          <div class="stat"><div>📏</div><div class="stat-number">${recap.truthMeters}</div><div class="stat-label">TruthMeter</div></div>
           <div class="stat"><div>🕵️</div><div class="stat-number">${liesDisplay}</div><div class="stat-label">Mensonges trouvés</div></div>
           <div class="stat"><div>🏆</div><div class="stat-number">${recap.tierNights}</div><div class="stat-label">Tier lists</div></div>
         </div>`;
@@ -246,7 +253,7 @@ export function mountHome(app) {
     });
 
     app.querySelector("#btn-return-lobby")?.addEventListener("click", () => {
-      goToGameSelect();
+      void returnToEveningGames();
     });
 
     app.querySelector("#btn-leave-lobby")?.addEventListener("click", async () => {
@@ -315,8 +322,14 @@ export function mountHome(app) {
 
   let unsubSession = () => {};
   if (isGameSyncActive() && hasActiveLobby()) {
-    void refreshGameSession().then(() => render());
-    unsubSession = onGameSessionChange(() => render());
+    void (async () => {
+      if (await resumeEveningSession()) return;
+      render();
+    })();
+    unsubSession = onGameSessionChange(async () => {
+      if (await routeToActiveGameIfNeeded()) return;
+      render();
+    });
   }
 
   if (pendingJoin) {

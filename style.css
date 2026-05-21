@@ -691,12 +691,31 @@ button.game-card{
   color:var(--vote-color,#fff)!important;
 }
 
-.vote-btn:disabled{ cursor:default; }
+.vote-btn:disabled{
+  cursor:not-allowed;
+  opacity:.55;
+}
+
+.vote-buttons--locked .vote-btn--active{
+  opacity:1;
+}
 
 .section-title{
   font-size:18px;
   font-weight:800;
   margin:0 0 16px;
+}
+
+.section-title--sm{
+  font-size:15px;
+  margin:20px 0 10px;
+}
+
+.hot-take-vote-pill{
+  font-weight:800;
+  font-size:14px;
+  text-transform:uppercase;
+  letter-spacing:.02em;
 }
 
 .result-row{ margin-bottom:14px; }
@@ -756,9 +775,17 @@ button.game-card{
 }
 
 .player-row--compact{
+  display:flex;
+  align-items:center;
+  gap:10px;
   margin-bottom:0;
   padding:10px 0;
   border-bottom:1px solid rgba(255,255,255,.06);
+}
+
+.player-row--compact .player-name{
+  flex:1;
+  min-width:0;
 }
 
 .player-row--compact:last-child{ border-bottom:none; }
@@ -2200,6 +2227,11 @@ body.wizz-shake #app{
   margin:0 0 8px;
 }
 
+.evening-recap__restart{
+  width:100%;
+  margin:10px 0 4px;
+}
+
 .evening-recap__link{
   display:block;
   width:100%;
@@ -2253,6 +2285,7 @@ body.wizz-shake #app{
 .game-grid .game-tile.hot,
 .game-grid .game-tile.guess,
 .game-grid .game-tile.speed,
+.game-grid .game-tile.truth,
 .game-grid .game-tile.tier,
 .game-grid .game-tile.song{
   background:transparent;
@@ -2320,6 +2353,10 @@ body.wizz-shake #app{
 
 .game-tile__logo-wrap--speed{
   --logo-border:linear-gradient(145deg, #FBBF24 0%, #FF3CAC 48%, #2B2D66 100%);
+}
+
+.game-tile__logo-wrap--truth{
+  --logo-border:linear-gradient(145deg, #34D399 0%, #60A5FA 48%, #2B2D66 100%);
 }
 
 .game-tile__logo{
@@ -2939,4 +2976,275 @@ body{
   flex:1 1 120px;
   max-width:none;
   margin:0;
+}
+
+/* ─── TruthMeter ─── */
+.truth-meter__affirmation-card{
+  text-align:center;
+  margin-bottom:16px;
+}
+
+.truth-meter__slider-wrap{
+  margin:20px 0;
+  text-align:center;
+  touch-action:none;
+  user-select:none;
+  -webkit-user-select:none;
+}
+
+.truth-meter__question{
+  font-size:14px;
+  font-weight:600;
+  color:rgba(255,255,255,.75);
+  margin:0 0 12px;
+}
+
+.truth-meter__pct{
+  font-size:42px;
+  font-weight:900;
+  line-height:1;
+  margin:0 0 4px;
+  color:#fff;
+}
+
+.truth-meter__pct--lg{
+  font-size:52px;
+}
+
+.truth-meter__label{
+  font-size:16px;
+  font-weight:800;
+  text-transform:uppercase;
+  letter-spacing:.06em;
+  color:#34D399;
+  margin:0 0 16px;
+}
+
+.truth-meter__range-labels{
+  display:flex;
+  justify-content:space-between;
+  font-size:12px;
+  font-weight:700;
+  text-transform:uppercase;
+  letter-spacing:.08em;
+  color:rgba(255,255,255,.45);
+  margin:0 0 8px;
+  padding:0 4px;
+}
+
+.truth-meter__range{
+  -webkit-appearance:none;
+  appearance:none;
+  width:100%;
+  height:36px;
+  margin:0;
+  padding:0;
+  background:transparent;
+  cursor:pointer;
+  touch-action:none;
+}
+
+.truth-meter__range:disabled{
+  opacity:.45;
+  cursor:not-allowed;
+}
+
+.truth-meter__range::-webkit-slider-runnable-track{
+  height:10px;
+  border-radius:999px;
+  background:rgba(255,255,255,.14);
+  border:1px solid rgba(255,255,255,.2);
+}
+
+.truth-meter__range::-webkit-slider-thumb{
+  -webkit-appearance:none;
+  appearance:none;
+  width:28px;
+  height:28px;
+  margin-top:-10px;
+  border-radius:50%;
+  background:#34D399;
+  border:3px solid #fff;
+  box-shadow:0 2px 10px rgba(0,0,0,.35);
+  cursor:grab;
+}
+
+.truth-meter__range:active::-webkit-slider-thumb{
+  cursor:grabbing;
+  transform:scale(1.06);
+}
+
+.truth-meter__range::-moz-range-track{
+  height:10px;
+  border-radius:999px;
+  background:rgba(255,255,255,.14);
+  border:1px solid rgba(255,255,255,.2);
+}
+
+.truth-meter__range::-moz-range-thumb{
+  width:28px;
+  height:28px;
+  border-radius:50%;
+  background:#34D399;
+  border:3px solid #fff;
+  box-shadow:0 2px 10px rgba(0,0,0,.35);
+  cursor:grab;
+}
+
+.truth-meter__range:focus{
+  outline:none;
+}
+
+.truth-meter__range:focus-visible::-webkit-slider-thumb{
+  box-shadow:0 0 0 3px rgba(52,211,153,.45),0 2px 10px rgba(0,0,0,.35);
+}
+
+.truth-meter__hint{
+  margin-top:12px;
+}
+
+.truth-meter__waiting{
+  text-align:center;
+  padding:24px 0;
+}
+
+.truth-meter__suspense{
+  text-align:center;
+  padding:40px 16px;
+}
+
+.truth-meter__suspense-title{
+  font-size:20px;
+  font-weight:800;
+  margin:0 0 20px;
+}
+
+.truth-meter__suspense-pulse{
+  width:64px;
+  height:64px;
+  margin:0 auto;
+  border-radius:50%;
+  background:linear-gradient(135deg,#34D399,#60A5FA);
+  animation:truth-meter-pulse 1s ease-in-out infinite;
+}
+
+@keyframes truth-meter-pulse{
+  0%,100%{ transform:scale(.9); opacity:.7; }
+  50%{ transform:scale(1.08); opacity:1; }
+}
+
+.truth-meter__gauge{
+  padding:20px 16px 24px;
+  margin-bottom:16px;
+}
+
+.truth-meter__gauge-title{
+  font-size:12px;
+  text-transform:uppercase;
+  letter-spacing:.1em;
+  color:rgba(255,255,255,.45);
+  margin:0 0 8px;
+  text-align:center;
+}
+
+.truth-meter__gauge-track{
+  position:relative;
+  height:14px;
+  border-radius:999px;
+  background:rgba(255,255,255,.1);
+  margin:16px 0 8px;
+  overflow:visible;
+}
+
+.truth-meter__gauge-fill{
+  height:100%;
+  border-radius:999px;
+  background:linear-gradient(90deg,#EF4444 0%,#FBBF24 50%,#34D399 100%);
+  transition:none;
+}
+
+.truth-meter__gauge-pin{
+  position:absolute;
+  top:50%;
+  width:18px;
+  height:18px;
+  margin:-9px 0 0 -9px;
+  border-radius:50%;
+  background:#fff;
+  border:3px solid #A78BFA;
+  box-shadow:0 0 12px rgba(167,139,250,.8);
+  z-index:2;
+  transition:opacity .35s ease;
+}
+
+.truth-meter__spread{
+  position:relative;
+  margin:16px 0;
+  padding-top:8px;
+}
+
+.truth-meter__spread-avg{
+  position:absolute;
+  top:0;
+  width:3px;
+  height:100%;
+  margin-left:-1px;
+  background:rgba(251,191,36,.9);
+  border-radius:2px;
+  z-index:1;
+  pointer-events:none;
+}
+
+.truth-meter__spread-row{
+  display:grid;
+  grid-template-columns:minmax(72px,1fr) 1fr 40px;
+  align-items:center;
+  gap:10px;
+  margin-bottom:10px;
+}
+
+.truth-meter__spread-row--author{
+  margin-top:14px;
+  padding-top:12px;
+  border-top:1px dashed rgba(255,255,255,.12);
+}
+
+.truth-meter__spread-name{
+  font-size:13px;
+  font-weight:600;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+
+.truth-meter__spread-track{
+  position:relative;
+  height:8px;
+  border-radius:999px;
+  background:rgba(255,255,255,.08);
+}
+
+.truth-meter__spread-dot{
+  position:absolute;
+  top:50%;
+  width:12px;
+  height:12px;
+  margin:-6px 0 0 -6px;
+  border-radius:50%;
+  border:2px solid rgba(0,0,0,.35);
+}
+
+.truth-meter__spread-dot--author{
+  background:#fff;
+  border-color:#A78BFA;
+  width:14px;
+  height:14px;
+  margin:-7px 0 0 -7px;
+}
+
+.truth-meter__spread-val{
+  font-size:12px;
+  font-weight:700;
+  text-align:right;
+  color:rgba(255,255,255,.55);
 }

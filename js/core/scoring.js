@@ -2,7 +2,17 @@ import {
   HOT_TAKE_POINTS_MAJORITY,
   HOT_TAKE_POINTS_DISSENT,
 } from "../../data/hotTakes.js";
+import { filterVoterVotes, computeRoundMetrics } from "./truthMeterSession.js";
 import { SPEED_VOTE_POINTS_WINNER } from "../../data/speedVote.js";
+import {
+  TRUTH_METER_BLUFF_GAP,
+  TRUTH_METER_POINTS_BLUFF,
+  TRUTH_METER_POINTS_CONSENSUS,
+  TRUTH_METER_CONSENSUS_GAP,
+  TRUTH_METER_POINTS_MIND_READER,
+  TRUTH_METER_POINTS_CLOSE,
+  TRUTH_METER_CLOSE_DISTANCE,
+} from "../../data/truthMeter.js";
 import { addScore, bumpPlayerStat } from "./state.js";
 import { getMajorityOption } from "./hotTakeSession.js";
 
@@ -46,4 +56,55 @@ export function awardSpeedVoteRound(votes, { basePoints = SPEED_VOTE_POINTS_WINN
   winners.forEach((name) => addScore(name, pointsAwarded));
 
   return { counts, winners, maxVotes: max, pointsAwarded };
+}
+
+/** TruthMeter : bonus auteur si grand écart (bluff), « le plus proche » = plus proche de la moyenne groupe. */
+export function awardTruthMeterRound(votes, author, authorEstimate) {
+  const voterVotes = filterVoterVotes(votes, author);
+  const { groupAvg, gap, variance } = computeRoundMetrics(
+    voterVotes,
+    authorEstimate,
+    author
+  );
+  const summary = {
+    groupAvg,
+    gap,
+    authorEstimate,
+    variance,
+    bluffWin: false,
+    consensus: false,
+    mindReader: null,
+    closeVoters: [],
+  };
+
+  if (gap >= TRUTH_METER_BLUFF_GAP) {
+    addScore(author, TRUTH_METER_POINTS_BLUFF);
+    bumpPlayerStat(author, "truthMeterBluffWins", 1);
+    summary.bluffWin = true;
+  } else if (gap <= TRUTH_METER_CONSENSUS_GAP) {
+    addScore(author, TRUTH_METER_POINTS_CONSENSUS);
+    summary.consensus = true;
+  }
+
+  let closest = null;
+  let bestDist = Infinity;
+  Object.entries(voterVotes).forEach(([name, v]) => {
+    const d = Math.abs(v - groupAvg);
+    if (d <= TRUTH_METER_CLOSE_DISTANCE) {
+      addScore(name, TRUTH_METER_POINTS_CLOSE);
+      summary.closeVoters.push(name);
+    }
+    if (d < bestDist) {
+      bestDist = d;
+      closest = name;
+    }
+  });
+
+  if (closest) {
+    addScore(closest, TRUTH_METER_POINTS_MIND_READER);
+    bumpPlayerStat(closest, "truthMeterMindReaderWins", 1);
+    summary.mindReader = closest;
+  }
+
+  return summary;
 }

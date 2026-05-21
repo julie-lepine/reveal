@@ -48,6 +48,8 @@ export const defaultPlayerStats = () => ({
   liesFooled: 0,
   tierConsensusPoints: 0,
   tierNightsPlayed: 0,
+  truthMeterBluffWins: 0,
+  truthMeterMindReaderWins: 0,
 });
 
 const defaultSettings = () => ({
@@ -61,6 +63,8 @@ const defaultState = () => ({
   playerStats: {},
   stats: {
     hotTakesPlayed: 0,
+    speedVotesPlayed: 0,
+    truthMetersPlayed: 0,
     liesFound: 0,
     liesTotal: 0,
     tierNightsPlayed: 0,
@@ -103,6 +107,18 @@ const defaultState = () => ({
     modifier: "normal",
     currentQuestion: null,
   },
+  truthMeterGame: {
+    ready: {},
+    lobbyStarted: false,
+    authorOrder: [],
+    roundIdx: 0,
+    phase: null,
+    affirmation: null,
+    authorEstimate: null,
+    votes: {},
+    voteEndsAt: null,
+    roundScored: false,
+  },
   tierNightGame: { recaps: [], topicId: null, listName: "", controversialItem: null },
   openLobbies: {},
 });
@@ -132,6 +148,7 @@ function loadState() {
       inLobby: parsed.inLobby || false,
       hotTakeGame: { ...defaultState().hotTakeGame, ...parsed.hotTakeGame },
       speedVoteGame: { ...defaultState().speedVoteGame, ...parsed.speedVoteGame },
+      truthMeterGame: { ...defaultState().truthMeterGame, ...parsed.truthMeterGame },
       tierNightGame: { ...defaultState().tierNightGame, ...parsed.tierNightGame },
       openLobbies: parsed.openLobbies || {},
       lastGame: parsed.lastGame || null,
@@ -321,6 +338,7 @@ export function defaultEveningStats() {
     liesTotal: 0,
     tierNightsPlayed: 0,
     speedVotesPlayed: 0,
+    truthMetersPlayed: 0,
   };
 }
 
@@ -333,6 +351,7 @@ export function resetEveningState() {
     lastGame: null,
     hotTakeGame: { ...base.hotTakeGame },
     speedVoteGame: { ...base.speedVoteGame },
+    truthMeterGame: { ...base.truthMeterGame },
     guessLie: { ...emptyGuessLie(), sessionId: getState().lobbyCode || null },
     tierNightTopicId: null,
     tierNightGame: { ...base.tierNightGame },
@@ -366,6 +385,11 @@ export function recordHotTakePlayed() {
 
 export function recordSpeedVotePlayed() {
   state.stats.speedVotesPlayed = (state.stats.speedVotesPlayed || 0) + 1;
+  save();
+}
+
+export function recordTruthMeterPlayed() {
+  state.stats.truthMetersPlayed = (state.stats.truthMetersPlayed || 0) + 1;
   save();
 }
 

@@ -6,6 +6,10 @@ import { navigate } from "../core/router.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
 import { bindNav } from "./nav.js";
 import {
+  eveningRecapRestartButtonHtml,
+  bindRestartGameButtons,
+} from "../core/restartGame.js";
+import {
   isGameSyncActive,
   onGameSessionChange,
   refreshGameSession,
@@ -27,6 +31,7 @@ export function mountResults(app) {
       <p class="card-heading">Dernière partie</p>
       <p class="evening-recap__title">${escapeHtml(last.title || last.gameId)}</p>
       <p class="hint">${escapeHtml(last.summary || "")}</p>
+      ${eveningRecapRestartButtonHtml(last)}
     </div>`
       : `<p class="hint">Aucune partie récente.</p>`;
 
@@ -35,6 +40,8 @@ export function mountResults(app) {
       recap.liesTotal > 0
         ? `<span class="evening-recap__chip">🕵️ ${recap.liesFound}/${recap.liesTotal}</span>`
         : "",
+      recap.speedVotes > 0 ? `<span class="evening-recap__chip">⚡ ${recap.speedVotes}</span>` : "",
+      recap.truthMeters > 0 ? `<span class="evening-recap__chip">📏 ${recap.truthMeters}</span>` : "",
       recap.tierNights > 0 ? `<span class="evening-recap__chip">🏆 ${recap.tierNights}</span>` : "",
     ]
       .filter(Boolean)
@@ -73,6 +80,7 @@ export function mountResults(app) {
         });
       },
     });
+    bindRestartGameButtons(app);
   }
 
   render();
