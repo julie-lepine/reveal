@@ -5,7 +5,7 @@ import {
   getState,
   saveStatePatch,
   recordTierNightPlayed,
-  resetEveningState,
+  resetGameSessionsOnly,
 } from "./state.js";
 import { navigate, getCurrentScreen } from "./router.js";
 import { getLobbyParticipants } from "./lobby.js";
@@ -388,20 +388,6 @@ function mergeRemoteDilemmaVotes(cur, inc) {
   return incVotes;
 }
 
-function mergeRemoteDilemmaReactions(cur, inc) {
-  const curReactions = cur?.reactions || {};
-  const incReactions = inc?.reactions || {};
-  if (isNewDilemmaVoteRound(cur, inc)) return incReactions;
-  if (
-    (inc?.phase === "voting" && cur?.phase === "voting") ||
-    inc?.phase === "reveal" ||
-    cur?.phase === "reveal"
-  ) {
-    return { ...curReactions, ...incReactions };
-  }
-  return incReactions;
-}
-
 function mergeDilemmaGameLocal(local, remote) {
   if (!remote) return local;
   if (!local) return remote;
@@ -409,9 +395,19 @@ function mergeDilemmaGameLocal(local, remote) {
     !remote.lobbyStarted && !local.lobbyStarted
       ? mergeReadyMapsLocal(local.ready || {}, remote.ready || {})
       : remote.ready || {};
-  const votes = mergeRemoteDilemmaVotes(local, remote);
-  const reactions = mergeRemoteDilemmaReactions(local, remote);
-  return { ...local, ...remote, ready, votes, reactions };
+  const remoteVotes = remote.votes || {};
+  const localVotes = local.votes || {};
+  let votes = remoteVotes;
+  if (isNewDilemmaVoteRound(local, remote)) {
+    votes = remoteVotes;
+  } else if (remote.phase === "voting") {
+    votes = { ...remoteVotes };
+    const name = getLocalDisplayName();
+    if (localVotes[name] != null) votes[name] = localVotes[name];
+  } else if (remote.phase === "reveal" || local.phase === "reveal") {
+    votes = { ...remoteVotes, ...localVotes };
+  }
+  return { ...local, ...remote, ready, votes };
 }
 
 function isNewTruthMeterVoteRound(cur, inc) {
@@ -785,6 +781,14 @@ export function applyRemoteEveningState(st) {
 export async function syncLobbyScores() {
   if (!isGameSyncActive() || !isLobbyHost()) return;
   await patchGameState(eveningStateToRemote());
+}
+
+/** Recharge le classement depuis la session multijoueur (résultats / leaderboard). */
+export async function refreshEveningScoresFromSession() {
+  if (!isGameSyncActive()) return null;
+  const row = await refreshGameSession();
+  if (row?.state?.scores) applyRemoteLobbyScores(row.state.scores);
+  return row;
 }
 
 export function applyRemoteSession(row) {
@@ -1170,6 +1174,18 @@ export async function patchGameState(stateMerge, { screen, gameId } = {}) {
   if (stateMerge.filRouge) {
     nextState.filRouge = mergeFilRougeRemote(current.filRouge, stateMerge.filRouge);
   }
+  if (stateMerge.dilemma) {
+    const curDm = current.dilemma;
+    const incDm = stateMerge.dilemma;
+    nextState.dilemma = curDm
+      ? {
+          ...curDm,
+          ...incDm,
+          ready: mergeRemoteReadyUid(curDm, incDm),
+          votes: mergeRemoteDilemmaVotesUid(curDm, incDm),
+        }
+      : incDm;
+  }
   if (isLobbyHost()) {
     nextState = { ...nextState, ...eveningStateToRemote() };
   }
@@ -1227,7 +1243,7 @@ export async function completeGameSession({ gameId = "menu", screen = "results",
 }
 
 function resetLocalGamePrepState() {
-  resetEveningState();
+  resetGameSessionsOnly();
 }
 
 /** Vide le cache session multijoueur (après quit lobby). */

@@ -37,7 +37,7 @@ export const SPEED_VOTE_THEMES = [
     questions: [
       "Qui survivrait le moins longtemps en apocalypse zombie ?",
       "Dans un apocalypse zombie, qui serait le premier dévoré ?",
-      "Dans un apocalypse zombie, qui trouverait la nourriture en premier ?",
+      "Dans un apocalypse zombie, qui trouverait de la nourriture en premier ?",
       "Qui paniquerait le plus vite en se retrouvant devant un zombie ?",
       "Dans un apocalypse zombie, qui deviendrait chef du groupe par accident ?",
     ],

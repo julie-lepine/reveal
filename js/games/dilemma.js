@@ -1,6 +1,5 @@
 import {
   DILEMMA_VOTE_TIMER_SEC,
-  DILEMMA_REACTIONS,
   DILEMMA_POINTS_MAJORITY_WIN,
 } from "../../data/dilemma.js";
 import {
@@ -59,7 +58,7 @@ export function mountDilemma(app) {
   let timer = DILEMMA_VOTE_TIMER_SEC;
   let myVote = null;
   let votes = {};
-  let reactions = {};
+  let voteCommitInFlight = null;
   let lastAward = null;
   let roundScored = false;
   let currentDilemma = ROUNDS[0];
@@ -89,8 +88,12 @@ export function mountDilemma(app) {
     if (s.phase) phase = s.phase;
     if (s.currentDilemma) currentDilemma = s.currentDilemma;
     votes = { ...(s.votes || {}) };
-    reactions = { ...(s.reactions || {}) };
-    myVote = votes[localName] ?? null;
+    if (voteCommitInFlight != null) {
+      myVote = voteCommitInFlight;
+      votes = { ...votes, [localName]: voteCommitInFlight };
+    } else {
+      myVote = votes[localName] ?? null;
+    }
     roundScored = Boolean(s.roundScored);
     if (phase === "voting" && s.voteEndsAt) {
       timer = secondsUntil(s.voteEndsAt) ?? timer;
@@ -155,12 +158,10 @@ export function mountDilemma(app) {
         phase: "reveal",
         roundScored: true,
         votes,
-        reactions: {},
         voteEndsAt: null,
       });
     } else {
       phase = "reveal";
-      reactions = {};
       render();
       animateRevealBars(pctA, pctB);
     }
@@ -180,7 +181,6 @@ export function mountDilemma(app) {
         timer = DILEMMA_VOTE_TIMER_SEC;
         myVote = null;
         votes = {};
-        reactions = {};
         lastAward = null;
         roundScored = false;
         render();
@@ -277,21 +277,6 @@ export function mountDilemma(app) {
       </div>`;
   }
 
-  function reactionsHtml() {
-    const mine = reactions[localName];
-    return `
-      <p class="label-upper label-upper--muted">Réactions emoji</p>
-      <div class="dilemma__reactions">
-        ${DILEMMA_REACTIONS.map(
-          (r) => `
-          <button type="button" class="dilemma__reaction ${mine === r.id ? "dilemma__reaction--active" : ""}"
-            data-reaction="${r.id}" aria-label="${escapeHtml(r.label)}">
-            <span class="dilemma__reaction-emoji" aria-hidden="true">${r.emoji}</span>
-          </button>`
-        ).join("")}
-      </div>`;
-  }
-
   function revealHtml() {
     const totalRounds = ROUNDS.length;
     const host = !mp || isLobbyHost();
@@ -379,8 +364,7 @@ export function mountDilemma(app) {
       </div>
       ${voteTapHtml()}
       ${host ? `<button type="button" class="btn btn-secondary btn--spaced" id="btn-pause">${paused ? "Reprendre" : "Pause"}</button>` : ""}
-      <p class="hint">${voteHint}${myVote ? " · Tu peux changer ton vote avant la fin du chrono." : ""}</p>
-      ${reactionsHtml()}`;
+      <p class="hint">${voteHint}${canChangeVote() ? " · Tu peux changer ton vote avant la fin du chrono." : ""}</p>`;
   }
 
   function canChangeVote() {
@@ -417,11 +401,18 @@ export function mountDilemma(app) {
       btn.addEventListener("click", async () => {
         if (!canChangeVote()) return;
         const choice = btn.getAttribute("data-vote");
+        if (choice === myVote && votes[localName] === choice) return;
         myVote = choice;
         votes = { ...votes, [localName]: choice };
         if (mp) {
-          await commitDilemmaPlay({ votes });
-          if (allDilemmaVotesIn() && isLobbyHost()) await goToReveal();
+          voteCommitInFlight = choice;
+          render();
+          try {
+            await commitDilemmaPlay({ votes: { ...votes } });
+          } finally {
+            voteCommitInFlight = null;
+            syncFromSession();
+          }
         } else {
           if (!intervalId) startVoteTimer();
         }
@@ -440,19 +431,6 @@ export function mountDilemma(app) {
         if (phase === "voting") startVoteTimer();
       }
       render();
-    });
-
-    app.querySelectorAll("[data-reaction]").forEach((btn) => {
-      btn.addEventListener("click", async () => {
-        if (!canChangeVote()) return;
-        const id = btn.getAttribute("data-reaction");
-        const nextReactions = { ...reactions };
-        if (nextReactions[localName] === id) delete nextReactions[localName];
-        else nextReactions[localName] = id;
-        reactions = nextReactions;
-        if (mp) await commitDilemmaPlay({ reactions });
-        render();
-      });
     });
 
     app.querySelector("#next-round")?.addEventListener("click", () => {

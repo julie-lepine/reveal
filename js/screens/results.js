@@ -12,7 +12,7 @@ import {
 import {
   isGameSyncActive,
   onGameSessionChange,
-  refreshGameSession,
+  refreshEveningScoresFromSession,
 } from "../core/gameSync.js";
 import { refreshLobbyFromSupabase, onLobbyBundleUpdated } from "../core/supabaseLobby.js";
 
@@ -90,7 +90,7 @@ export function mountResults(app) {
   if (isGameSyncActive()) {
     void (async () => {
       await refreshLobbyFromSupabase();
-      await refreshGameSession();
+      await refreshEveningScoresFromSession();
       render();
     })();
     unsubSession = onGameSessionChange(() => render());

@@ -389,10 +389,14 @@ export function defaultEveningStats() {
 /** Scores + stats de soirée + état des jeux — nouvelle partie / lobby. */
 export function resetEveningState() {
   resetScores();
+  resetGameSessionsOnly();
+  saveStatePatch({ stats: defaultEveningStats() });
+}
+
+/** Remet à zéro les sessions de jeu sans effacer le classement de la soirée. */
+export function resetGameSessionsOnly() {
   const base = defaultState();
   saveStatePatch({
-    stats: defaultEveningStats(),
-    lastGame: null,
     hotTakeGame: { ...base.hotTakeGame },
     speedVoteGame: { ...base.speedVoteGame },
     truthMeterGame: { ...base.truthMeterGame },

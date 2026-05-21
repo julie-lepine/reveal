@@ -3,13 +3,15 @@ import { getPlayerBadges } from "../core/badges.js";
 import { navigate } from "../core/router.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
 import { bindNav } from "./nav.js";
+import { isGameSyncActive, refreshEveningScoresFromSession } from "../core/gameSync.js";
 
 export function mountLeaderboard(app) {
-  const { scores } = getState();
-  const sorted = getPlayerBadges();
-  const podium = [sorted[1], sorted[0], sorted[2]].filter(Boolean);
+  function renderBoard() {
+    const { scores } = getState();
+    const sorted = getPlayerBadges();
+    const podium = [sorted[1], sorted[0], sorted[2]].filter(Boolean);
 
-  app.innerHTML = pageShell({
+    app.innerHTML = pageShell({
     content: `
       <p class="label-upper label-upper--gold">Fin de manche</p>
       <div class="logo logo--sm"><h1>CLASSEMENT</h1></div>
@@ -55,14 +57,22 @@ export function mountLeaderboard(app) {
         <button type="button" class="btn btn-primary" data-nav="game-select">Autre jeu</button>
       </div>
     `,
-  });
+    });
 
-  bindNav(app, {
-    results: () => {
-      navigate("results", {
-        navStack: ["home", "lobby", "game-select", "results"],
-      });
-    },
-  });
+    bindNav(app, {
+      results: () => {
+        navigate("results", {
+          navStack: ["home", "lobby", "game-select", "results"],
+        });
+      },
+    });
+  }
+
+  renderBoard();
+
+  if (isGameSyncActive()) {
+    void refreshEveningScoresFromSession().then(() => renderBoard());
+  }
+
   return null;
 }
