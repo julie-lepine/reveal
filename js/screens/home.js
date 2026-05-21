@@ -4,7 +4,7 @@ import {
   canPlay,
   canCreateLobby,
   loginWithEmail,
-  loginWithSocial,
+  // loginWithSocial, /* réactiver avec connexion Facebook / Instagram */
   signupWithEmail,
   getUser,
   logout,
@@ -172,6 +172,11 @@ export function mountHome(app) {
     }
   }
 
+  /* Connexion Facebook / Instagram (home.js paint) — réactiver plus tard :
+   *  HTML : auth-divider « ou continuer avec », social-row data-social facebook|instagram, hint Meta.
+   *  JS : import loginWithSocial + handler data-social dans onHomeClick.
+   */
+
   function paint() {
     const user = getUser();
     const loggedIn = isLoggedIn();
@@ -241,14 +246,7 @@ export function mountHome(app) {
               <button type="button" class="btn btn-primary btn--spaced" id="btn-guest-join">Rejoindre la partie →</button>
             </div>
           </div>
-
-          ${authTab !== "guest" ? `
-          <p class="auth-divider"><span>ou continuer avec</span></p>
-          <div class="social-row">
-            <button type="button" class="social-btn social-btn--facebook" data-social="facebook" title="Facebook">f</button>
-            <button type="button" class="social-btn social-btn--instagram" data-social="instagram" title="Instagram">📷</button>
-          </div>
-          ${!isSupabaseConfigured() ? '<p class="hint auth-social-hint">Mode démo locale — configure Supabase pour la connexion réelle.</p>' : '<p class="hint auth-social-hint">Instagram passe par Meta (même compte que Facebook).</p>'}` : ""}`
+          `
         }
 
         <div class="lobby-actions">
@@ -302,6 +300,7 @@ export function mountHome(app) {
       return;
     }
 
+    /* Connexion sociale — réactiver avec le bloc HTML ci-dessus.
     const socialBtn = e.target.closest("[data-social]");
     if (socialBtn) {
       const err = app.querySelector("#login-error") || app.querySelector("#signup-error");
@@ -321,6 +320,7 @@ export function mountHome(app) {
       scheduleRender(true);
       return;
     }
+    */
 
     if (e.target.closest("#btn-login")) {
       const err = app.querySelector("#login-error");
