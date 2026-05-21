@@ -16,7 +16,7 @@ import {
   commitHotTakePlay,
   allHotTakeVotesIn,
 } from "../core/hotTakeSession.js";
-import { awardHotTakeVotes } from "../core/scoring.js";
+import { awardHotTakeVotes, EVENING_POINTS } from "../core/scoring.js";
 import { gameCumulativeScoresHtml } from "../core/gameScores.js";
 import { getActivePlayers } from "../core/players.js";
 import { getLocalDisplayName, recordHotTakePlayed, setLastGame } from "../core/state.js";
@@ -212,7 +212,7 @@ export function mountHotTake(app) {
       return `<p class="hint">Égalité — <strong>aucun point</strong> (pas de majorité ni de dissent).</p>`;
     }
     const ptsLine = pointsAwarded
-      ? " — camp majoritaire +12 pts, dissent +18 pts"
+      ? ` — majorité +${EVENING_POINTS.WIN} pts, dissent +${EVENING_POINTS.BONUS} pts`
       : "";
     return `<p class="hint">Majorité : <strong style="color:${HOT_TAKE_OPTION_COLORS[voteResult.majority]}">${voteResult.majority}</strong>${ptsLine}</p>`;
   }

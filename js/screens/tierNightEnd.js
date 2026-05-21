@@ -38,7 +38,6 @@ export function mountTierNightEnd(app) {
   let recaps = getTierNightRecaps();
   const localName = getLocalDisplayName();
   let localRecap = recaps.find((r) => r.player === localName);
-  const controversial = session.controversialItem;
   let bootstrapping = false;
 
   function reloadSession() {
@@ -145,20 +144,7 @@ export function mountTierNightEnd(app) {
             : `<p class="hint">Chargement des classements…</p>`}
         </div>
         ${eveningRecapRestartButtonHtml({ gameId: "tiernight", title: "TierNight" })}
-        <button type="button" class="btn btn-primary" id="btn-contro">Controverse →</button>`;
-    }
-
-    if (phase === "controversial") {
-      const item = controversial || "—";
-      content = `
-        <p class="label-upper label-upper--gold">🌶️ Controverse</p>
-        <h2 class="screen-title">Le plus clivant</h2>
-        <p class="game-intro">Celui dont les classements divergent le plus dans le lobby.</p>
-        <div class="card card--controversial">
-          <p class="controversial-item">${escapeHtml(item)}</p>
-        </div>
-        ${eveningRecapRestartButtonHtml({ gameId: "tiernight", title: "TierNight" })}
-        <button type="button" class="btn btn-primary btn--spaced" id="btn-export-phase">Continuer</button>`;
+        <button type="button" class="btn btn-primary" id="btn-export-phase">Continuer →</button>`;
     }
 
     if (phase === "export") {
@@ -178,11 +164,6 @@ export function mountTierNightEnd(app) {
 
     bindNav(app, { results: goToResults });
     bindRestartGameButtons(app);
-
-    app.querySelector("#btn-contro")?.addEventListener("click", () => {
-      phase = "controversial";
-      render();
-    });
 
     app.querySelector("#btn-export-phase")?.addEventListener("click", () => {
       phase = "export";

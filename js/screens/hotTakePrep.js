@@ -100,6 +100,19 @@ export function mountHotTakePrep(app) {
     return Boolean(getHotTakeSession().ready[localName]);
   }
 
+  function hotTakeStartSlotHtml(allReady, prep) {
+    if (prep.effective === 0) {
+      return `<button type="button" class="btn btn-secondary btn--spaced" disabled>Aucune take disponible</button>`;
+    }
+    if (allReady && isLobbyHost()) {
+      return `<button type="button" class="btn btn-primary btn--spaced" id="btn-start-game">Lancer Hot Take →</button>`;
+    }
+    if (allReady) {
+      return `<button type="button" class="btn btn-secondary btn--spaced" disabled>En attente de l'hôte…</button>`;
+    }
+    return `<button type="button" class="btn btn-secondary btn--spaced" disabled>En attente des joueurs…</button>`;
+  }
+
   function refreshReadySection() {
     const session = getHotTakeSession();
     const members = getLobbyParticipants();
@@ -130,14 +143,8 @@ export function mountHotTakePrep(app) {
 
     const startSlot = app.querySelector("#hot-take-start-slot");
     if (startSlot) {
-      if (allReady && prep.effective > 0 && isLobbyHost()) {
-        startSlot.innerHTML = `<button type="button" class="btn btn-primary btn--spaced" id="btn-start-game">Lancer Hot Take →</button>`;
-        startSlot.querySelector("#btn-start-game")?.addEventListener("click", onStartGame);
-      } else {
-        startSlot.innerHTML = `<button type="button" class="btn btn-secondary btn--spaced" disabled>${
-          prep.effective === 0 ? "Aucune take disponible" : "En attente des joueurs…"
-        }</button>`;
-      }
+      startSlot.innerHTML = hotTakeStartSlotHtml(allReady, prep);
+      startSlot.querySelector("#btn-start-game")?.addEventListener("click", onStartGame);
     }
 
     if (document.activeElement?.id !== "new-take") {
@@ -291,7 +298,7 @@ export function mountHotTakePrep(app) {
           ${
             prep.poolSize > 0
               ? themeId === HOT_TAKE_CATALOG_ID
-                ? `<p class="hint">${prep.poolSize} take(s) dans le deck — tous les thèmes fusionnés (sans doublons).</p>`
+                ? `<p class="hint">${prep.poolSize} take(s) dans le deck — tous les thèmes fusionnés.</p>`
                 : themeId === HOT_TAKE_MIX_ID
                   ? `<p class="hint">${prep.poolSize} take(s) tirées au hasard parmi tous les thèmes (+ customs).</p>`
                   : `<p class="hint">${prep.poolSize} take(s) dans ce thème (+ customs si ajoutées).</p>`
@@ -354,15 +361,7 @@ export function mountHotTakePrep(app) {
           ${localReady ? "Prêt ✓" : "Je suis prêt !"}
         </button>
 
-        <div id="hot-take-start-slot">
-        ${
-          allReady && prep.effective > 0
-            ? `<button type="button" class="btn btn-primary btn--spaced" id="btn-start-game">Lancer Hot Take →</button>`
-            : `<button type="button" class="btn btn-secondary btn--spaced" disabled>${
-                prep.effective === 0 ? "Aucune take disponible" : "En attente des joueurs…"
-              }</button>`
-        }
-        </div>
+        <div id="hot-take-start-slot">${hotTakeStartSlotHtml(allReady, prep)}</div>
       `,
     });
 

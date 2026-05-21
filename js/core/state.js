@@ -61,6 +61,7 @@ const defaultState = () => ({
   supabaseUserId: null,
   settings: defaultSettings(),
   scores: {},
+  filRougeScores: {},
   playerStats: {},
   stats: {
     hotTakesPlayed: 0,
@@ -167,6 +168,7 @@ function loadState() {
       ...base,
       ...parsed,
       scores: { ...base.scores, ...parsed.scores },
+      filRougeScores: { ...base.filRougeScores, ...parsed.filRougeScores },
       playerStats: { ...base.playerStats, ...parsed.playerStats },
       stats: { ...base.stats, ...parsed.stats },
       guessLie: { ...emptyGuessLie(), ...parsed.guessLie },
@@ -214,6 +216,9 @@ export function saveStatePatch(patch) {
   if (patch.lobby) state.lobby = { ...state.lobby, ...patch.lobby };
   if (patch.user) state.user = { ...state.user, ...patch.user };
   if (patch.globalStats) state.globalStats = { ...state.globalStats, ...patch.globalStats };
+  if (patch.filRougeScores) {
+    state.filRougeScores = { ...state.filRougeScores, ...patch.filRougeScores };
+  }
   if (patch.playerStats) state.playerStats = { ...state.playerStats, ...patch.playerStats };
   if (patch.settings) state.settings = { ...state.settings, ...patch.settings };
   save();
@@ -290,6 +295,7 @@ export function renameLocalPlayer(newName) {
   if (oldName === trimmed) return { ok: true, name: trimmed };
 
   state.scores = mergeKeyedRecord(state.scores, oldName, trimmed);
+  state.filRougeScores = mergeKeyedRecord(state.filRougeScores, oldName, trimmed);
   state.playerStats = mergeKeyedRecord(state.playerStats, oldName, trimmed);
 
   if (state.guessLie?.submissions) {
@@ -349,6 +355,10 @@ export function ensurePlayerScore(playerName) {
     state.scores[playerName] = 0;
     save();
   }
+  if (state.filRougeScores[playerName] === undefined) {
+    state.filRougeScores[playerName] = 0;
+    save();
+  }
   if (!state.playerStats[playerName]) {
     state.playerStats[playerName] = defaultPlayerStats();
     save();
@@ -367,8 +377,13 @@ export function bumpPlayerStat(playerName, key, amount = 1) {
 }
 
 export function resetScores() {
-  Object.keys(state.scores).forEach((name) => {
+  const names = new Set([
+    ...Object.keys(state.scores),
+    ...Object.keys(state.filRougeScores),
+  ]);
+  names.forEach((name) => {
     state.scores[name] = 0;
+    state.filRougeScores[name] = 0;
     state.playerStats[name] = defaultPlayerStats();
   });
   save();
@@ -412,6 +427,16 @@ export function addScore(playerName, points) {
   ensurePlayerScore(playerName);
   state.scores[playerName] += points;
   save();
+}
+
+export function addFilRougeScore(playerName, points) {
+  ensurePlayerScore(playerName);
+  state.filRougeScores[playerName] = (state.filRougeScores[playerName] || 0) + points;
+  save();
+}
+
+export function getFilRougeScores() {
+  return state.filRougeScores || {};
 }
 
 export function addLocalScore(points) {

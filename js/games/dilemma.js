@@ -255,7 +255,7 @@ export function mountDilemma(app) {
       <div class="dilemma__card card">
         <p class="dilemma__label">OPTION A</p>
         <p class="dilemma__option dilemma__option--a">${a}</p>
-        <img src="${DILEMMA_VS_SRC}" class="dilemma__vs" width="15" height="15" alt="" />
+        <img src="${DILEMMA_VS_SRC}" class="dilemma__vs" width="45" height="45" alt="" />
         <p class="dilemma__label">OPTION B</p>
         <p class="dilemma__option dilemma__option--b">${b}</p>
       </div>`;

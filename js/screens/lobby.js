@@ -264,6 +264,7 @@ export function mountLobby(app) {
     });
 
     app.querySelector("#btn-start")?.addEventListener("click", async () => {
+      const startBtn = app.querySelector("#btn-start");
       if (!allLobbyMembersReady()) {
         await showAppAlert("Tous les joueurs doivent être prêts avant de commencer la soirée.", {
           title: "Pas encore prêt",
@@ -271,10 +272,20 @@ export function mountLobby(app) {
         });
         return;
       }
-      if (isGameSyncActive() && isLobbyHost()) {
-        await startGameSession("menu", "game-select", {});
-      } else {
-        goToGameSelect();
+      if (startBtn?.disabled) return;
+      if (startBtn) startBtn.disabled = true;
+      try {
+        if (isGameSyncActive() && isLobbyHost()) {
+          await startGameSession("menu", "game-select", {});
+        } else {
+          await goToGameSelect();
+        }
+      } catch (err) {
+        await showAppAlert(err.message || "Impossible de lancer la soirée.", {
+          title: "Erreur",
+          icon: "⚠️",
+        });
+        updateHostControls();
       }
     });
 

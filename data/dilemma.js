@@ -1,3 +1,5 @@
+import { EVENING_POINTS } from "./eveningScoring.js";
+
 /** Id du deck qui fusionne toutes les banques */
 export const DILEMMA_CATALOG_ID = "catalog";
 
@@ -5,7 +7,7 @@ export const DILEMMA_VOTE_TIMER_SEC = 10;
 export const DILEMMA_REVEAL_HOLD_SEC = 3;
 export const DILEMMA_SPLIT_THRESHOLD = 8;
 /** Points si le joueur a voté avec la majorité (victoire de manche). */
-export const DILEMMA_POINTS_MAJORITY_WIN = 20;
+export const DILEMMA_POINTS_MAJORITY_WIN = EVENING_POINTS.WIN;
 export const DILEMMA_ROUND_PRESETS = [5, 8, 12];
 export const DILEMMA_ROUND_ALL = -1;
 

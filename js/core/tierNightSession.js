@@ -1,4 +1,5 @@
 import { TIER_LEVELS } from "../../data/tierTopics.js";
+import { tierNightPointsForRankDiff } from "../../data/eveningScoring.js";
 import { getActivePlayers } from "./players.js";
 import {
   getLocalDisplayName,
@@ -65,7 +66,7 @@ export function scoreConsensusProximity(localPlaced, consensus) {
     const localTier = tierOfItem(localPlaced, item);
     const consTier = tierOfItem(consensus, item);
     const diff = Math.abs(rankValue(localTier) - rankValue(consTier));
-    total += Math.max(0, 15 - diff * 5);
+    total += tierNightPointsForRankDiff(diff);
   });
   return Math.round(total / items.length);
 }

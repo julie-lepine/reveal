@@ -68,7 +68,7 @@ export function mountResults(app) {
 
       <div class="btn-row">
         <button type="button" class="btn btn-primary" data-nav="game-select">Autre jeu</button>
-        <button type="button" class="btn btn-secondary" data-nav="leaderboard">Classement</button>
+        <button type="button" class="btn btn-accent" data-nav="leaderboard">Classement</button>
       </div>
     `,
     });

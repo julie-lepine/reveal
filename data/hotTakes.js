@@ -1,3 +1,5 @@
+import { EVENING_POINTS } from "./eveningScoring.js";
+
 /** Id du thème qui fusionne toutes les banques (sauf lui-même) */
 export const HOT_TAKE_CATALOG_ID = "catalog";
 
@@ -132,8 +134,10 @@ export const HOT_TAKE_ROUND_PRESETS = [3, 5, 8];
 /** @deprecated — défini dans js/games/hotTake.js */
 export const HOT_TAKE_INTERMISSION_SEC = 5;
 
-export const HOT_TAKE_POINTS_MAJORITY = 12;
-export const HOT_TAKE_POINTS_DISSENT = 18;
+/** @deprecated — utiliser EVENING_POINTS depuis data/eveningScoring.js */
+export const HOT_TAKE_POINTS_MAJORITY = EVENING_POINTS.WIN;
+/** @deprecated */
+export const HOT_TAKE_POINTS_DISSENT = EVENING_POINTS.BONUS;
 
 export const HOT_TAKE_FORBIDDEN_WORDS = [
   "nègre",

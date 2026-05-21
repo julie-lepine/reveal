@@ -171,7 +171,6 @@ export function mountGameSelect(app) {
   if (!requireLobbyPlay()) return null;
 
   let unsubSession = () => {};
-  let guestRoutePoll = null;
   let renderTimer = null;
   let renderInFlight = false;
   let lastSnapshot = "";
@@ -269,24 +268,14 @@ export function mountGameSelect(app) {
 
     unsubSession = onGameSessionChange(async (row) => {
       if (getCurrentScreen() === "game-select") scheduleRender(false);
-      if (row && (await routeToActiveGameIfNeeded())) return;
+      if (row && (await routeToActiveGameIfNeeded(row))) return;
       if (row) handleSessionRoute(row);
     });
-
-    if (!isLobbyHost()) {
-      guestRoutePoll = setInterval(async () => {
-        if (await routeToActiveGameIfNeeded()) return;
-        if (getCurrentScreen() !== "game-select") return;
-        const row = (await refreshGameSession()) || getCachedGameSession();
-        if (row) handleSessionRoute(row);
-      }, 1000);
-    }
   }
 
   return () => {
     app.removeEventListener("click", onGameSelectClick);
     unsubSession();
-    if (guestRoutePoll) clearInterval(guestRoutePoll);
     if (renderTimer) clearTimeout(renderTimer);
   };
 }

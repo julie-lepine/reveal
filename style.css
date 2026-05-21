@@ -3425,8 +3425,8 @@ body{
 .dilemma__vs{
   display:block;
   margin:8px auto 12px;
-  width:15px;
-  height:15px;
+  width:45px;
+  height:45px;
   object-fit:contain;
 }
 
@@ -3569,13 +3569,27 @@ body{
   gap:8px;
 }
 
-.dilemma-custom-list li{
+.dilemma-custom-list li,
+.dilemma-custom-list__item{
   font-size:13px;
   line-height:1.4;
   padding:10px 12px;
   border-radius:12px;
   background:rgba(255,255,255,.05);
   border:1px solid rgba(255,255,255,.08);
+}
+
+.dilemma-custom-list__item{
+  display:flex;
+  flex-wrap:wrap;
+  align-items:center;
+  gap:6px 10px;
+}
+
+.dilemma-custom-list__remove{
+  margin-left:auto;
+  font-size:12px;
+  color:rgba(255,255,255,.55);
 }
 
 .dilemma-custom-list__a{ color:#93C5FD; font-weight:700; }

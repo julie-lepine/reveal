@@ -1,3 +1,5 @@
+import { EVENING_POINTS } from "./eveningScoring.js";
+
 /**
  * Fallback NPC — affirmations par joueur
  */
@@ -40,8 +42,8 @@ export const GUESS_LIE_ROUNDS = [
   },
 ];
 
-export const GUESS_LIE_DETECTIVE_POINTS = 20;
-export const GUESS_LIE_LIAR_POINTS = 25;
+export const GUESS_LIE_DETECTIVE_POINTS = EVENING_POINTS.WIN;
+export const GUESS_LIE_LIAR_POINTS = EVENING_POINTS.BONUS;
 export const GUESS_LIE_VOTE_TIMER_SEC = 30;
 /** Moins de ce ratio de détectives → bonus menteur */
 export const GUESS_LIE_LIAR_BONUS_THRESHOLD = 0.5;

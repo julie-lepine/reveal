@@ -2,7 +2,6 @@ import {
   GUESS_LIE_DETECTIVE_POINTS,
   GUESS_LIE_LIAR_POINTS,
   GUESS_LIE_VOTE_TIMER_SEC,
-  GUESS_LIE_LIAR_BONUS_THRESHOLD,
 } from "../../data/guessLies.js";
 import {
   getGuessLieEntryScreen,
@@ -24,11 +23,10 @@ import {
   getLocalDisplayName,
   getState,
   saveStatePatch,
-  addScore,
-  bumpPlayerStat,
   recordLieGuess,
   setLastGame,
 } from "../core/state.js";
+import { awardGuessLieRound, guessLieLiarWins } from "../core/scoring.js";
 import { gameCumulativeScoresHtml } from "../core/gameScores.js";
 import { setLobbyPlaying, setLobbyWaiting } from "../core/lobby.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
@@ -85,10 +83,11 @@ export function mountGuessLie(app) {
 
   function ensureRevealDisplay() {
     if (phase !== "reveal") return;
-    if (!roundScored && !mp) {
-      applyRoundScore(computeReveal());
+    const result = computeReveal();
+    if (!roundScored && (!mp || isLobbyHost())) {
+      applyRoundScore(result);
     } else if (!revealResult) {
-      setRevealDisplay(computeReveal());
+      setRevealDisplay(result);
     }
   }
 
@@ -110,7 +109,8 @@ export function mountGuessLie(app) {
     const voters = Object.keys(all).filter((n) => n !== round.player);
     const correct = voters.filter((n) => all[n] === round.lie);
     const ratio = voters.length ? correct.length / voters.length : 0;
-    return { all, correct, ratio, round, liarBonus: ratio < GUESS_LIE_LIAR_BONUS_THRESHOLD };
+    const liarBonus = guessLieLiarWins(correct.length, voters.length);
+    return { all, correct, ratio, round, liarBonus };
   }
 
   function setRevealDisplay(result) {
@@ -122,9 +122,10 @@ export function mountGuessLie(app) {
     roundScored = true;
     const { correct, round, liarBonus } = result;
 
-    correct.forEach((name) => {
-      addScore(name, GUESS_LIE_DETECTIVE_POINTS);
-      bumpPlayerStat(name, "liesDetected", 1);
+    awardGuessLieRound({
+      correct,
+      liarName: round.player,
+      liarBonus,
     });
 
     if (mp && isLobbyHost()) {
@@ -144,11 +145,6 @@ export function mountGuessLie(app) {
       });
     } else if (localName !== round.player) {
       recordLieGuess(correct.includes(localName));
-    }
-
-    if (liarBonus) {
-      addScore(round.player, GUESS_LIE_LIAR_POINTS);
-      bumpPlayerStat(round.player, "liesFooled", 1);
     }
 
     setRevealDisplay(result);

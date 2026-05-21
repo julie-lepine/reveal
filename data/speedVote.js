@@ -1,8 +1,11 @@
+import { EVENING_POINTS } from "./eveningScoring.js";
+
 /** Id du thème qui fusionne toutes les banques */
 export const SPEED_VOTE_CATALOG_ID = "catalog";
 
 export const SPEED_VOTE_TIMER_SEC = 7;
-export const SPEED_VOTE_POINTS_WINNER = 10;
+
+export const SPEED_VOTE_POINTS_WINNER = EVENING_POINTS.WIN;
 export const SPEED_VOTE_ROUND_PRESETS = [3, 5, 8];
 export const SPEED_VOTE_ROUND_ALL = -1;
 

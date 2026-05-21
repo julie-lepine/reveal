@@ -1,5 +1,6 @@
 import {
   addCustomDilemma,
+  removeCustomDilemma,
   allDilemmaReady,
   countOtherPlayersCustomDilemmas,
   getDilemmaPrepSummary,
@@ -21,8 +22,13 @@ import { getLobbyParticipants } from "../core/lobby.js";
 import { onLobbyBundleUpdated } from "../core/supabaseLobby.js";
 import { getLocalDisplayName } from "../core/state.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
-import { isGameSyncActive, isLobbyHost, onGameSessionChange } from "../core/gameSync.js";
-import { navigate } from "../core/router.js";
+import {
+  isGameSyncActive,
+  isLobbyHost,
+  onGameSessionChange,
+  refreshGameSession,
+} from "../core/gameSync.js";
+import { navigate, getCurrentScreen } from "../core/router.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
 import { bindNav } from "./nav.js";
 
@@ -59,7 +65,12 @@ export function mountDilemmaPrep(app) {
     return `<ul class="take-list dilemma-custom-list">${mine
       .map(
         (d) =>
-          `<li><span class="dilemma-custom-list__a">${escapeHtml(d.optionA)}</span> <span class="dilemma-custom-list__vs">VS</span> <span class="dilemma-custom-list__b">${escapeHtml(d.optionB)}</span></li>`
+          `<li class="dilemma-custom-list__item">
+            <span class="dilemma-custom-list__a">${escapeHtml(d.optionA)}</span>
+            <span class="dilemma-custom-list__vs">VS</span>
+            <span class="dilemma-custom-list__b">${escapeHtml(d.optionB)}</span>
+            <button type="button" class="btn-link dilemma-custom-list__remove" data-remove-dilemma="${escapeHtml(d.id)}" aria-label="Supprimer ce dilemme">Supprimer</button>
+          </li>`
       )
       .join("")}</ul>`;
   }
@@ -95,6 +106,19 @@ export function mountDilemmaPrep(app) {
     return Boolean(getDilemmaSession().ready[localName]);
   }
 
+  function dilemmaStartSlotHtml(allReady, prep) {
+    if (prep.effective === 0) {
+      return `<button type="button" class="btn btn-secondary btn--spaced" disabled>Aucun dilemme disponible</button>`;
+    }
+    if (allReady && isLobbyHost()) {
+      return `<button type="button" class="btn btn-primary btn--spaced" id="btn-start-game">Lancer Dilemma →</button>`;
+    }
+    if (allReady) {
+      return `<button type="button" class="btn btn-secondary btn--spaced" disabled>En attente de l'hôte…</button>`;
+    }
+    return `<button type="button" class="btn btn-secondary btn--spaced" disabled>En attente des joueurs…</button>`;
+  }
+
   function refreshReadySection() {
     const session = getDilemmaSession();
     const members = getLobbyParticipants();
@@ -125,14 +149,8 @@ export function mountDilemmaPrep(app) {
 
     const startSlot = app.querySelector("#dilemma-start-slot");
     if (startSlot) {
-      if (allReady && prep.effective > 0 && isLocalDilemmaHost()) {
-        startSlot.innerHTML = `<button type="button" class="btn btn-primary btn--spaced" id="btn-start-game">Lancer Dilemma →</button>`;
-        startSlot.querySelector("#btn-start-game")?.addEventListener("click", onStartGame);
-      } else {
-        startSlot.innerHTML = `<button type="button" class="btn btn-secondary btn--spaced" disabled>${
-          prep.effective === 0 ? "Aucun dilemme disponible" : "En attente des joueurs…"
-        }</button>`;
-      }
+      startSlot.innerHTML = dilemmaStartSlotHtml(allReady, prep);
+      startSlot.querySelector("#btn-start-game")?.addEventListener("click", onStartGame);
     }
   }
 
@@ -347,15 +365,7 @@ export function mountDilemmaPrep(app) {
           ${localReady ? "Prêt ✓" : "Je suis prêt !"}
         </button>
 
-        <div id="dilemma-start-slot">
-        ${
-          allReady && prep.effective > 0
-            ? `<button type="button" class="btn btn-primary btn--spaced" id="btn-start-game">Lancer Dilemma →</button>`
-            : `<button type="button" class="btn btn-secondary btn--spaced" disabled>${
-                prep.effective === 0 ? "Aucun dilemme disponible" : "En attente des joueurs…"
-              }</button>`
-        }
-        </div>
+        <div id="dilemma-start-slot">${dilemmaStartSlotHtml(allReady, prep)}</div>
       `,
     });
 
@@ -366,7 +376,26 @@ export function mountDilemmaPrep(app) {
     mounted = true;
   }
 
+  async function onDilemmaPrepClick(e) {
+    if (getCurrentScreen() !== "dilemma-prep") return;
+
+    const removeBtn = e.target.closest("[data-remove-dilemma]");
+    if (removeBtn) {
+      e.preventDefault();
+      const id = removeBtn.getAttribute("data-remove-dilemma");
+      if (!id) return;
+      await removeCustomDilemma(id);
+      refreshFromSync();
+    }
+  }
+
+  app.addEventListener("click", onDilemmaPrepClick);
+
   render();
+
+  if (isGameSyncActive()) {
+    void refreshGameSession().then(() => refreshFromSync());
+  }
 
   const unsub = onGameSessionChange(() => {
     refreshFromSync();
@@ -374,10 +403,11 @@ export function mountDilemmaPrep(app) {
 
   const unsubLobby = onLobbyBundleUpdated(() => {
     if (!mounted) return;
-    render(captureDraft());
+    refreshFromSync();
   });
 
   return () => {
+    app.removeEventListener("click", onDilemmaPrepClick);
     if (cleanupSim) cleanupSim();
     unsub();
     unsubLobby();

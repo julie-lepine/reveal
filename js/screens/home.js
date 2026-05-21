@@ -21,7 +21,6 @@ import {
   reconcileLobbyMembership,
   resetAppToCleanHome,
 } from "../core/lobby.js";
-import { getGlobalStats } from "../core/state.js";
 import { getEveningRecap } from "../core/eveningRecap.js";
 import {
   isGameSyncActive,
@@ -52,12 +51,13 @@ function guestJoinPanelHtml({ leaveHint = false } = {}) {
 }
 
 function homeStatsHtml() {
-  if (hasActiveLobby()) {
-    const recap = getEveningRecap();
-    const liesDisplay =
-      recap.liesTotal > 0 ? `${recap.liesFound}/${recap.liesTotal}` : String(recap.liesFound);
+  if (!hasActiveLobby()) return "";
 
-    return `
+  const recap = getEveningRecap();
+  const liesDisplay =
+    recap.liesTotal > 0 ? `${recap.liesFound}/${recap.liesTotal}` : String(recap.liesFound);
+
+  return `
         <p class="label-upper label-upper--muted">Stats de la soirée</p>
         <div class="stats stats--global">
           <div class="stat stat--banner"><div>👥</div><div class="stat-number">${recap.participantCount}</div><div class="stat-label">Joueurs</div></div>
@@ -67,17 +67,6 @@ function homeStatsHtml() {
           <div class="stat"><div>⚖️</div><div class="stat-number">${recap.dilemmas}</div><div class="stat-label">Dilemma</div></div>
           <div class="stat"><div>🕵️</div><div class="stat-number">${liesDisplay}</div><div class="stat-label">Mensonges trouvés</div></div>
           <div class="stat"><div>🏆</div><div class="stat-number">${recap.tierNights}</div><div class="stat-label">Tier lists</div></div>
-        </div>`;
-  }
-
-  const global = getGlobalStats();
-  return `
-        <p class="label-upper label-upper--muted">Tes stats (tous les lobbys)</p>
-        <div class="stats stats--global">
-          <div class="stat"><div>🎉</div><div class="stat-number">${global.lobbiesCreated || 0}</div><div class="stat-label">Lobbys créés</div></div>
-          <div class="stat"><div>🔥</div><div class="stat-number">${global.hotTakesPlayed || 0}</div><div class="stat-label">Hot takes</div></div>
-          <div class="stat"><div>🕵️</div><div class="stat-number">${global.liesFound || 0}</div><div class="stat-label">Mensonges trouvés</div></div>
-          <div class="stat"><div>👥</div><div class="stat-number">${global.playersJoined || 0}</div><div class="stat-label">Parties rejointes</div></div>
         </div>`;
 }
 

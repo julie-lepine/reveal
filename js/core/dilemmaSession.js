@@ -64,7 +64,7 @@ export function isLocalDilemmaHost() {
   return local?.isHost !== false;
 }
 
-function normalizeCustomDilemma(entry) {
+export function normalizeCustomDilemma(entry) {
   if (!entry || typeof entry !== "object") return null;
   const optionA = String(entry.optionA || "").trim();
   const optionB = String(entry.optionB || "").trim();
@@ -149,6 +149,16 @@ export function countOtherPlayersCustomDilemmas() {
     .filter((d) => d.author && d.author !== me).length;
 }
 
+/** Fusionne les listes custom (par id) — évite doublons et écrasements multijoueur. */
+export function mergeCustomDilemmasLists(localList = [], remoteList = []) {
+  const byId = new Map();
+  [...localList, ...remoteList].forEach((raw) => {
+    const d = normalizeCustomDilemma(raw);
+    if (d) byId.set(d.id, d);
+  });
+  return [...byId.values()];
+}
+
 export async function addCustomDilemma(optionA, optionB) {
   const a = String(optionA || "").trim();
   const b = String(optionB || "").trim();
@@ -167,11 +177,23 @@ export async function addCustomDilemma(optionA, optionB) {
     author: getLocalDisplayName(),
     tier: "custom",
   };
+  const merged = mergeCustomDilemmasLists(session.customDilemmas, [entry]);
   await syncDilemmaSession({
     ...session,
-    customDilemmas: [...(session.customDilemmas || []), entry],
+    customDilemmas: merged,
     deck: null,
   });
+  return { ok: true };
+}
+
+export async function removeCustomDilemma(dilemmaId) {
+  const me = getLocalDisplayName();
+  const session = getDilemmaSession();
+  const next = (session.customDilemmas || [])
+    .map(normalizeCustomDilemma)
+    .filter(Boolean)
+    .filter((d) => !(d.id === dilemmaId && (d.author || me) === me));
+  await syncDilemmaSession({ ...session, customDilemmas: next, deck: null });
   return { ok: true };
 }
 

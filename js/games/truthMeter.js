@@ -6,7 +6,6 @@ import {
   TRUTH_METER_INTERMISSION_SEC,
   TRUTH_METER_BLUFF_GAP,
   TRUTH_METER_CONSENSUS_GAP,
-  TRUTH_METER_POINTS_BLUFF,
   TRUTH_METER_EXAMPLES,
 } from "../../data/truthMeter.js";
 import {
@@ -22,7 +21,7 @@ import {
   computeRoundMetrics,
   filterVoterVotes,
 } from "../core/truthMeterSession.js";
-import { awardTruthMeterRound } from "../core/scoring.js";
+import { awardTruthMeterRound, EVENING_POINTS } from "../core/scoring.js";
 import { gameCumulativeScoresHtml, refreshGameScoresBox } from "../core/gameScores.js";
 import { getActivePlayers } from "../core/players.js";
 import { getLocalDisplayName, recordTruthMeterPlayed, setLastGame } from "../core/state.js";
@@ -448,15 +447,18 @@ export function mountTruthMeter(app) {
     if (phase === "reveal" && affirmation) {
       const authorName = affirmation.author;
       const votesToShow = votesForAward();
-      const metrics = buildRevealMetrics(votesToShow, authorName);
+      const metrics = {
+        ...buildRevealMetrics(votesToShow, authorName),
+        ...(lastAward || {}),
+      };
       const verdictPct = metrics.groupAvg;
       const awardLine = metrics.bluffWin
-        ? `<p class="hint">🎭 Bluff réussi ! Écart <strong>${metrics.gap}</strong> — <strong>${escapeHtml(affirmation.author)}</strong> +${TRUTH_METER_POINTS_BLUFF} pts</p>`
+        ? `<p class="hint">🎭 Bluff réussi ! Écart <strong>${metrics.gap}</strong> — <strong>${escapeHtml(affirmation.author)}</strong> +${EVENING_POINTS.BONUS} pts</p>`
         : metrics.consensus
-          ? `<p class="hint">🤝 Consensus — tout le monde aligné (écart ${metrics.gap}).</p>`
+          ? `<p class="hint">🤝 Consensus — <strong>${escapeHtml(affirmation.author)}</strong> +${EVENING_POINTS.WIN} pts (écart ${metrics.gap}).</p>`
           : `<p class="hint">Écart auteur/groupe : <strong>${metrics.gap}</strong> pts</p>`;
       const mindLine = metrics.mindReader
-        ? `<p class="hint">🧠 Le plus proche : <strong>${escapeHtml(metrics.mindReader)}</strong></p>`
+        ? `<p class="hint">🧠 Le plus proche : <strong>${escapeHtml(metrics.mindReader)}</strong> +${metrics.voterPoints || EVENING_POINTS.WIN} pts</p>`
         : "";
 
       phaseHtml = `

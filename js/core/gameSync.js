@@ -9,7 +9,38 @@ import {
 } from "./state.js";
 import { navigate, getCurrentScreen } from "./router.js";
 import { getLobbyParticipants } from "./lobby.js";
-import { getActivePlayers } from "./players.js";
+import { getActivePlayers, getActivePlayerNames } from "./players.js";
+
+function normalizeDilemmaEntry(entry) {
+  if (!entry || typeof entry !== "object") return null;
+  const optionA = String(entry.optionA || "").trim();
+  const optionB = String(entry.optionB || "").trim();
+  if (!optionA || !optionB) return null;
+  return {
+    id: entry.id || `custom-${optionA}-${optionB}`,
+    optionA,
+    optionB,
+    author: entry.author || null,
+    tier: entry.tier || "custom",
+  };
+}
+
+/** Fusion customs : liste locale = source de vérité pour le joueur local ; remote = autres auteurs uniquement. */
+function mergeDilemmaCustomDilemmas(localList = [], remoteList = []) {
+  const me = getLocalDisplayName();
+  const byId = new Map();
+  for (const raw of remoteList) {
+    const d = normalizeDilemmaEntry(raw);
+    if (!d) continue;
+    const author = d.author;
+    if (author && author !== me) byId.set(d.id, d);
+  }
+  for (const raw of localList) {
+    const d = normalizeDilemmaEntry(raw);
+    if (d) byId.set(d.id, d);
+  }
+  return [...byId.values()];
+}
 import { buildRecapsFromPlacements, getTierNightSession } from "./tierNightSession.js";
 import {
   fetchGameSessionByLobby,
@@ -23,6 +54,7 @@ let lastSessionSig = "";
 const listeners = new Set();
 let routing = false;
 let pollTimer = null;
+let syncTickInFlight = false;
 /** Évite de forcer l’écran de prep quand l’invité revient au menu manuellement. */
 let suppressSessionRouteUntil = 0;
 /** Écran de session ignoré pendant la suppression (retour invité au menu jeux). */
@@ -289,11 +321,12 @@ function mergeRemoteReadyUid(cur, inc) {
   return { ...(cur?.ready || {}), ...(inc?.ready || {}) };
 }
 
-/** En préparation : conserve le « prêt » local si pas encore sur le serveur. */
+/** En préparation : fusionne les « prêt » de tous les joueurs (noms locaux). */
 function mergeReadyMapsLocal(localReady = {}, remoteReady = {}) {
   const merged = { ...remoteReady };
-  const name = getLocalDisplayName();
-  if (localReady[name] && !merged[name]) merged[name] = true;
+  getActivePlayerNames().forEach((name) => {
+    if (localReady[name] || remoteReady[name]) merged[name] = true;
+  });
   return merged;
 }
 
@@ -392,10 +425,11 @@ function mergeRemoteDilemmaVotes(cur, inc) {
 function mergeDilemmaGameLocal(local, remote) {
   if (!remote) return local;
   if (!local) return remote;
-  const ready =
-    !remote.lobbyStarted && !local.lobbyStarted
-      ? mergeReadyMapsLocal(local.ready || {}, remote.ready || {})
-      : remote.ready || {};
+  const ready = mergeReadyMapsLocal(local.ready || {}, remote.ready || {});
+  const customDilemmas = mergeDilemmaCustomDilemmas(
+    local.customDilemmas || [],
+    remote.customDilemmas || []
+  );
   const remoteVotes = remote.votes || {};
   const localVotes = local.votes || {};
   let votes = remoteVotes;
@@ -408,7 +442,7 @@ function mergeDilemmaGameLocal(local, remote) {
   } else if (remote.phase === "reveal" || local.phase === "reveal") {
     votes = { ...remoteVotes, ...localVotes };
   }
-  return { ...local, ...remote, ready, votes };
+  return { ...local, ...remote, ready, votes, customDilemmas };
 }
 
 function isNewTruthMeterVoteRound(cur, inc) {
@@ -776,10 +810,26 @@ export function applyRemoteLobbyScores(remote) {
   saveStatePatch({ scores: merged });
 }
 
+function applyRemoteFilRougeScores(remote) {
+  if (!remote || typeof remote !== "object") return;
+  const byName = scoresFromRemote(remote);
+  if (!Object.keys(byName).length) return;
+
+  const merged = { ...getState().filRougeScores };
+  getLobbyParticipants().forEach((p) => {
+    if (byName[p.name] != null) merged[p.name] = byName[p.name];
+  });
+  Object.entries(byName).forEach(([name, pts]) => {
+    merged[name] = pts;
+  });
+  saveStatePatch({ filRougeScores: merged });
+}
+
 function eveningStateToRemote() {
   const { stats, lastGame, tierNightGame } = getState();
   return {
     scores: scoresToRemote(getState().scores),
+    filRougeScores: scoresToRemote(getState().filRougeScores || {}),
     stats: {
       hotTakesPlayed: stats.hotTakesPlayed || 0,
       speedVotesPlayed: stats.speedVotesPlayed || 0,
@@ -812,6 +862,7 @@ export function applyRemoteEveningState(st) {
 
   if (Object.keys(patch).length) saveStatePatch(patch);
   if (st.scores) applyRemoteLobbyScores(st.scores);
+  if (st.filRougeScores) applyRemoteFilRougeScores(st.filRougeScores);
 }
 
 /** Hôte : pousse scores + stats de soirée vers game_sessions.state */
@@ -835,8 +886,9 @@ export function applyRemoteSession(row) {
   if (!sigUnchanged) lastSessionSig = sig;
 
   cachedRow = row;
+
   if (!row?.state) {
-    notify(row);
+    if (!sigUnchanged) notify(row);
     if (!row && isGameSyncActive()) {
       const current = getCurrentScreen();
       if (isActiveGameSessionScreen(current) || isOnGameSetupScreen(current)) {
@@ -902,6 +954,8 @@ export function applyRemoteSession(row) {
   if (Object.keys(patch).length) saveStatePatch(patch);
 
   applyRemoteEveningState(st);
+
+  if (sigUnchanged) return;
 
   notify(row);
 
@@ -1097,14 +1151,8 @@ async function syncTick() {
     stopMultiplayerSync();
     return;
   }
-  try {
-    const { refreshLobbyFromSupabase } = await import("./supabaseLobby.js");
-    await refreshLobbyFromSupabase();
-  } catch (e) {
-    const gone =
-      e?.code === "PGRST116" || String(e?.message || "").includes("0 rows");
-    if (!gone) console.warn("REVEAL sync lobby:", e.message || e);
-  }
+  if (syncTickInFlight) return;
+  syncTickInFlight = true;
   try {
     const row = await refreshGameSession();
     if (!row) return;
@@ -1113,6 +1161,8 @@ async function syncTick() {
     if (local !== row?.screen) handleSessionRoute(row);
   } catch (e) {
     console.warn("REVEAL sync:", e.message || e);
+  } finally {
+    syncTickInFlight = false;
   }
 }
 
@@ -1246,7 +1296,11 @@ export async function patchGameState(stateMerge, { screen, gameId } = {}) {
           ...curDm,
           ...incDm,
           ready: mergeRemoteReadyUid(curDm, incDm),
-          votes: mergeRemoteDilemmaVotesUid(curDm, incDm),
+          votes: mergeRemoteDilemmaVotes(curDm, incDm),
+          customDilemmas: mergeDilemmaCustomDilemmas(
+            incDm.customDilemmas || [],
+            curDm.customDilemmas || []
+          ),
         }
       : incDm;
   }

@@ -5,7 +5,6 @@ import { getLocalDisplayName, getLocalEmoji } from "./state.js";
 import {
   applyRemoteSession,
   handleSessionRoute,
-  startMultiplayerSync,
   refreshGameSession,
   getCachedGameSession,
 } from "./gameSync.js";
@@ -121,7 +120,6 @@ function applyLobbyToState(bundle) {
   });
   bundle.participants.forEach((p) => ensurePlayerScore(p.name));
   startLobbyPresenceSync();
-  startMultiplayerSync();
   notifyLobbyBundleUpdated();
 }
 
@@ -200,6 +198,8 @@ export async function createLobbySupabase() {
 
   const bundle = await fetchLobbyBundle(lobby.id);
   applyLobbyToState(bundle);
+  const { startMultiplayerSync } = await import("./gameSync.js");
+  startMultiplayerSync();
   try {
     const gameRow = await fetchGameSessionByLobby(lobby.id);
     if (gameRow) applyRemoteSession(gameRow);
@@ -267,6 +267,8 @@ export async function joinLobbySupabase(codeInput) {
 
   const bundle = await fetchLobbyBundle(lobbyRow.id);
   applyLobbyToState(bundle);
+  const { startMultiplayerSync } = await import("./gameSync.js");
+  startMultiplayerSync();
   try {
     const gameRow = await fetchGameSessionByLobby(lobbyRow.id);
     if (gameRow) {

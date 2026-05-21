@@ -1,6 +1,9 @@
 /** Fil Rouge — Mot Interdit (couche persistante de soirée) */
 
-export const FIL_ROUGE_POINTS_MISSION = 50;
+import { FIL_ROUGE_POINTS } from "./eveningScoring.js";
+
+
+export const FIL_ROUGE_POINTS_MISSION = FIL_ROUGE_POINTS.MISSION;
 export const FIL_ROUGE_MIN_WORD_LENGTH = 3;
 export const FIL_ROUGE_MIN_PLAYERS = 3;
 
