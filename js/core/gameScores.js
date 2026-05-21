@@ -17,6 +17,31 @@ function gameScoresBoxRowsHtml(players, scores) {
     .join("");
 }
 
+/** Points consensus de la manche Tier Night (tous les joueurs). */
+export function tierNightRoundScoresHtml(recaps, { title = "Points de la manche" } = {}) {
+  if (!recaps?.length) return "";
+  const sorted = [...recaps].sort((a, b) => (b.consensusPoints ?? 0) - (a.consensusPoints ?? 0));
+  const rows = sorted
+    .map((r, i) => {
+      const pts = r.consensusPoints ?? 0;
+      return `
+        <div class="game-scores-box__row">
+          <span class="game-scores-box__rank">${i + 1}</span>
+          <div class="avatar avatar--sm" style="background:${r.color}">${r.emoji}</div>
+          <span class="player-name game-scores-box__name">${escapeHtml(r.player)}</span>
+          <span class="player-score ${i === 0 ? "player-score--gold" : ""}">+${pts}</span>
+        </div>`;
+    })
+    .join("");
+
+  return `
+    <div class="card game-scores-box game-scores-box--round" data-scores="round">
+      <p class="card-heading game-scores-box__title">${escapeHtml(title)}</p>
+      <p class="game-scores-box__game">Proximité au consensus du groupe</p>
+      ${rows}
+    </div>`;
+}
+
 /** Boîte de cumul des scores (soirée) affichée en fin de manche. */
 export function gameCumulativeScoresHtml({ gameLabel = null, title = "Cumul des scores" } = {}) {
   const { scores } = getState();
@@ -24,7 +49,7 @@ export function gameCumulativeScoresHtml({ gameLabel = null, title = "Cumul des 
   if (!players.length) return "";
 
   return `
-    <div class="card game-scores-box">
+    <div class="card game-scores-box" data-scores="evening">
       <p class="card-heading game-scores-box__title">${escapeHtml(title)}</p>
       ${gameLabel ? `<p class="game-scores-box__game">${escapeHtml(gameLabel)}</p>` : ""}
       ${gameScoresBoxRowsHtml(players, scores)}
@@ -38,7 +63,7 @@ export function refreshGameScoresBox(app, { gameLabel = null, title = "Cumul des
   const players = getSortedActivePlayers();
   if (!players.length) return;
 
-  const box = app.querySelector(".game-scores-box");
+  const box = app.querySelector('[data-scores="evening"]');
   if (!box) return;
 
   const titleEl = box.querySelector(".game-scores-box__title");

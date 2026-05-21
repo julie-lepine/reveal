@@ -1,6 +1,12 @@
 import { TIER_LEVELS } from "../../data/tierTopics.js";
 import { getActivePlayers } from "./players.js";
-import { getLocalDisplayName, addScore, bumpPlayerStat, saveStatePatch, getState } from "./state.js";
+import {
+  getLocalDisplayName,
+  addScore,
+  bumpPlayerStat,
+  saveStatePatch,
+  getState,
+} from "./state.js";
 
 const TIER_RANK = { S: 0, A: 1, B: 2, C: 3, D: 4 };
 
@@ -24,6 +30,14 @@ function tierOfItem(placed, item) {
 
 function rankValue(tier) {
   return TIER_RANK[tier] ?? 4;
+}
+
+function isMultiplayerLobby() {
+  return Boolean(getState().lobby?.id);
+}
+
+function isLocalLobbyHost() {
+  return Boolean(getState().lobby?.participants?.find((p) => p.isLocal)?.isHost);
 }
 
 /** Consensus = tier médian des joueurs pour chaque item */
@@ -71,6 +85,41 @@ export function findMostControversialItem(recaps, items) {
   return { item: best, spread: bestSpread };
 }
 
+function attachConsensusPoints(recaps, consensus) {
+  recaps.forEach((r) => {
+    r.consensusPoints = scoreConsensusProximity(r.placed, consensus);
+  });
+  return recaps;
+}
+
+/** Ajoute les points de manche au cumul soirée (une seule fois par partie). */
+function applyTierNightRoundScores(recaps) {
+  const session = getTierNightSession();
+  if (session.scoresApplied) return false;
+
+  const mp = isMultiplayerLobby();
+  const toScore = mp ? recaps : recaps.filter((r) => r.player === getLocalDisplayName());
+
+  toScore.forEach((r) => {
+    const pts = r.consensusPoints ?? 0;
+    addScore(r.player, pts);
+    bumpPlayerStat(r.player, "tierConsensusPoints", pts);
+    bumpPlayerStat(r.player, "tierNightsPlayed", 1);
+  });
+
+  saveTierNightRecaps(recaps, { scoresApplied: true });
+  return true;
+}
+
+function finalizeTierNightRecapSave(recaps, meta) {
+  const localName = getLocalDisplayName();
+  const localPts = recaps.find((r) => r.player === localName)?.consensusPoints ?? 0;
+  saveTierNightRecaps(recaps, {
+    ...meta,
+    localConsensusPoints: localPts,
+  });
+}
+
 export function buildRecapsFromPlacements(topicId, listName, items, placementsByName) {
   const recaps = getActivePlayers().map((p) => ({
     player: p.name,
@@ -81,21 +130,21 @@ export function buildRecapsFromPlacements(topicId, listName, items, placementsBy
 
   const consensus = computeConsensusPlaced(recaps, items);
   const controversial = findMostControversialItem(recaps, items);
-  const localName = getLocalDisplayName();
-  const localPlaced = placementsByName[localName] || {};
-  const pts = scoreConsensusProximity(localPlaced, consensus);
-  addScore(localName, pts);
-  bumpPlayerStat(localName, "tierConsensusPoints", pts);
-  bumpPlayerStat(localName, "tierNightsPlayed", 1);
+  attachConsensusPoints(recaps, consensus);
 
-  saveTierNightRecaps(recaps, {
+  finalizeTierNightRecapSave(recaps, {
     topicId,
     listName,
     consensus,
     controversialItem: controversial.item,
     controversialSpread: controversial.spread,
-    localConsensusPoints: pts,
   });
+
+  const mp = isMultiplayerLobby();
+  if (!mp || isLocalLobbyHost()) {
+    applyTierNightRoundScores(recaps);
+  }
+
   return recaps;
 }
 
@@ -132,20 +181,17 @@ export function buildRecapsWithSimulation(topicId, listName, items, localPlaced)
 
   const consensus = computeConsensusPlaced(recaps, items);
   const controversial = findMostControversialItem(recaps, items);
-  const localName = getLocalDisplayName();
-  const pts = scoreConsensusProximity(localPlaced, consensus);
-  addScore(localName, pts);
-  bumpPlayerStat(localName, "tierConsensusPoints", pts);
-  bumpPlayerStat(localName, "tierNightsPlayed", 1);
+  attachConsensusPoints(recaps, consensus);
 
-  saveTierNightRecaps(recaps, {
+  finalizeTierNightRecapSave(recaps, {
     topicId,
     listName,
     consensus,
     controversialItem: controversial.item,
     controversialSpread: controversial.spread,
-    localConsensusPoints: pts,
   });
+
+  applyTierNightRoundScores(recaps);
   return recaps;
 }
 
@@ -155,4 +201,11 @@ export function getTierNightRecaps() {
 
 export function getTierConsensus() {
   return getTierNightSession().consensus;
+}
+
+/** Points de la manche Tier Night, triés (pour l’écran récap). */
+export function getTierNightRoundPointsSorted() {
+  return [...getTierNightRecaps()].sort(
+    (a, b) => (b.consensusPoints ?? 0) - (a.consensusPoints ?? 0)
+  );
 }

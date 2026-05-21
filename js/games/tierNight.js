@@ -11,6 +11,7 @@ import {
   advanceTierNightToResultsWhenReady,
   ensureTierNightRecapsFromRemote,
   getTierNightLobbyProgress,
+  refreshGameSession,
 } from "../core/gameSync.js";
 import { getSupabaseUserId } from "../core/supabaseAuth.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
@@ -273,7 +274,8 @@ export function mountTierNight(app) {
   const unsub = onGameSessionChange(async () => {
     const row = getCachedGameSession();
     if (row?.screen === "tiernight-end") {
-      ensureTierNightRecapsFromRemote(list);
+      await refreshGameSession();
+      await ensureTierNightRecapsFromRemote(list);
       navigate("tiernight-end");
       return;
     }

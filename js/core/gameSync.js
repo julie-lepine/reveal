@@ -9,6 +9,7 @@ import {
 } from "./state.js";
 import { navigate, getCurrentScreen } from "./router.js";
 import { getLobbyParticipants } from "./lobby.js";
+import { getActivePlayers } from "./players.js";
 import { buildRecapsFromPlacements, getTierNightSession } from "./tierNightSession.js";
 import {
   fetchGameSessionByLobby,
@@ -706,6 +707,42 @@ export function tierNightFromRemote(remote) {
   return remote;
 }
 
+/** Récap Tier Night partagé (hôte → invités via game_sessions.state.tierNight.recap). */
+export function tierNightRecapToRemote(session) {
+  if (!session?.recaps?.length) return null;
+  return {
+    topicId: session.topicId ?? null,
+    listName: session.listName ?? "",
+    recaps: session.recaps.map((r) => ({
+      player: r.player,
+      emoji: r.emoji,
+      color: r.color,
+      placed: r.placed || {},
+      consensusPoints: r.consensusPoints ?? 0,
+    })),
+    consensus: session.consensus || null,
+    controversialItem: session.controversialItem ?? null,
+    controversialSpread: session.controversialSpread ?? 0,
+    scoresApplied: Boolean(session.scoresApplied),
+  };
+}
+
+export function applyTierNightRecapFromRemote(recap) {
+  if (!recap?.recaps?.length) return false;
+  const localName = getLocalDisplayName();
+  const localPts =
+    recap.recaps.find((r) => r.player === localName)?.consensusPoints ?? 0;
+  saveStatePatch({
+    tierNightGame: {
+      ...getTierNightSession(),
+      ...recap,
+      localConsensusPoints: localPts,
+      recapSynced: true,
+    },
+  });
+  return true;
+}
+
 export function scoresToRemote(scoresByName = {}) {
   const out = {};
   Object.entries(scoresByName).forEach(([name, val]) => {
@@ -842,7 +879,19 @@ export function applyRemoteSession(row) {
   if (st.tierNight) {
     const tn = tierNightFromRemote(st.tierNight);
     if (tn.topicId != null) patch.tierNightTopicId = tn.topicId;
-    if (tn.game) patch.tierNightGame = tn.game;
+    if (tn.recap?.recaps?.length) {
+      const localName = getLocalDisplayName();
+      const localPts =
+        tn.recap.recaps.find((r) => r.player === localName)?.consensusPoints ?? 0;
+      patch.tierNightGame = {
+        ...getState().tierNightGame,
+        ...tn.recap,
+        localConsensusPoints: localPts,
+        recapSynced: true,
+      };
+    } else if (tn.game) {
+      patch.tierNightGame = { ...getState().tierNightGame, ...tn.game };
+    }
   }
   if (st.filRouge) {
     const remote = filRougeFromRemote(st.filRouge);
@@ -1186,6 +1235,9 @@ export async function patchGameState(stateMerge, { screen, gameId } = {}) {
         }
       : incDm;
   }
+  if (stateMerge.tierNight) {
+    nextState.tierNight = { ...(current.tierNight || {}), ...stateMerge.tierNight };
+  }
   if (isLobbyHost()) {
     nextState = { ...nextState, ...eveningStateToRemote() };
   }
@@ -1385,12 +1437,34 @@ export function allTierNightMembersFinished(finishedMap) {
   return ids.every((id) => map[id]);
 }
 
-export function ensureTierNightRecapsFromRemote(list) {
-  const session = getTierNightSession();
-  if (session.topicId === list.id && (session.recaps?.length || 0) > 0) return;
+function tierNightLocalRecapsComplete(session, list) {
+  if (session.recapSynced) return true;
+  if (session.topicId !== list.id) return false;
+  const recaps = session.recaps || [];
+  if (!recaps.length) return false;
+  if (recaps[0]?.consensusPoints == null) return false;
+  const expected = getActivePlayers().length;
+  if (expected > 0 && recaps.length < expected) return false;
+  return recaps.some((r) => Object.values(r.placed || {}).flat().length > 0);
+}
+
+export async function ensureTierNightRecapsFromRemote(list) {
+  if (isGameSyncActive()) {
+    await refreshGameSession();
+  }
 
   const tn = getTierNightRemote();
   if (!tn) return;
+
+  if (tn.recap?.recaps?.length) {
+    applyTierNightRecapFromRemote(tn.recap);
+    return;
+  }
+
+  const session = getTierNightSession();
+  if (tierNightLocalRecapsComplete(session, list)) {
+    return;
+  }
 
   const placements = tn.placements || {};
   const byName = {};
@@ -1398,8 +1472,19 @@ export function ensureTierNightRecapsFromRemote(list) {
     if (p.userId && placements[p.userId]) byName[p.name] = placements[p.userId];
   });
 
-  buildRecapsFromPlacements(list.id, list.name, list.items, byName);
-  recordTierNightPlayed();
+  const built = buildRecapsFromPlacements(list.id, list.name, list.items, byName);
+  if (built.some((r) => Object.values(r.placed || {}).flat().length > 0)) {
+    recordTierNightPlayed();
+  }
+}
+
+/** Hôte : publie le récap Tier Night pour les invités. */
+export async function pushTierNightRecapToSession() {
+  if (!isGameSyncActive() || !isLobbyHost()) return;
+  const recap = tierNightRecapToRemote(getTierNightSession());
+  if (!recap) return;
+  const tn = getTierNightRemote() || {};
+  await patchGameState({ tierNight: { ...tn, recap } });
 }
 
 /** Hôte uniquement : passe à l’écran résultats quand tout le lobby a terminé. */
@@ -1407,8 +1492,15 @@ export async function advanceTierNightToResultsWhenReady(list) {
   if (!isGameSyncActive() || !isLobbyHost()) return false;
   if (!allTierNightMembersFinished()) return false;
 
-  ensureTierNightRecapsFromRemote(list);
-  await pushGameSession({ screen: "tiernight-end", gameId: "tiernight", state: {} });
+  await ensureTierNightRecapsFromRemote(list);
+  await pushTierNightRecapToSession();
+  await syncLobbyScores();
+  const tnRemote = getTierNightRemote() || {};
+  await pushGameSession({
+    screen: "tiernight-end",
+    gameId: "tiernight",
+    state: { tierNight: tnRemote },
+  });
   navigate("tiernight-end");
   return true;
 }

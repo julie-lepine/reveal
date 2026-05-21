@@ -49,6 +49,7 @@ async function selectTierList(id) {
       });
       return;
     }
+    setTierNightTopicId(id);
     await syncTierNightSession({ topicId: id, screen: "tiernight" });
   } else {
     setTierNightTopicId(id);

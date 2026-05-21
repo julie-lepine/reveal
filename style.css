@@ -1438,8 +1438,20 @@ button.game-card{
 }
 
 .recap-card__name{
+  flex:1;
   font-weight:800;
   font-size:16px;
+}
+
+.recap-card__pts{
+  font-weight:800;
+  font-size:14px;
+  color:#4ADE80;
+  white-space:nowrap;
+}
+
+.game-scores-box--round{
+  margin-bottom:16px;
 }
 
 .recap-tier{
@@ -2268,7 +2280,7 @@ body.wizz-shake #app{
 
 .evening-recap__restart{
   width:100%;
-  margin:10px 0 4px;
+  margin:10px 0 24px;
 }
 
 .evening-recap__link{

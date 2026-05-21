@@ -534,6 +534,7 @@ export function resetGuessLieSession() {
 
 export function setTierNightTopicId(id) {
   state.tierNightTopicId = id;
+  state.tierNightGame = { ...defaultState().tierNightGame };
   save();
 }
 
