@@ -4,6 +4,8 @@ import {
 } from "../../data/hotTakes.js";
 import { filterVoterVotes, computeRoundMetrics } from "./truthMeterSession.js";
 import { SPEED_VOTE_POINTS_WINNER } from "../../data/speedVote.js";
+import { DILEMMA_POINTS_MAJORITY_WIN } from "../../data/dilemma.js";
+import { countDilemmaResults } from "./dilemmaSession.js";
 import {
   TRUTH_METER_BLUFF_GAP,
   TRUTH_METER_POINTS_BLUFF,
@@ -105,6 +107,35 @@ export function awardTruthMeterRound(votes, author, authorEstimate) {
     bumpPlayerStat(closest, "truthMeterMindReaderWins", 1);
     summary.mindReader = closest;
   }
+
+  return summary;
+}
+
+/** Dilemma : +20 pts si vote aligné avec la majorité (victoire). */
+export function awardDilemmaRound(votes) {
+  const { majority, divided, pctA, pctB } = countDilemmaResults(votes);
+  const summary = {
+    majority,
+    divided,
+    pctA,
+    pctB,
+    majorityWinners: [],
+    pointsAwarded: DILEMMA_POINTS_MAJORITY_WIN,
+  };
+
+  if (!majority) return summary;
+
+  Object.entries(votes).forEach(([name, choice]) => {
+    if (choice !== "A" && choice !== "B") return;
+    if (choice === majority) {
+      addScore(name, DILEMMA_POINTS_MAJORITY_WIN);
+      bumpPlayerStat(name, "dilemmaMajorityPicks", 1);
+      summary.majorityWinners.push(name);
+    } else {
+      bumpPlayerStat(name, "dilemmaMinorityPicks", 1);
+    }
+    if (divided) bumpPlayerStat(name, "dilemmaChaosRounds", 1);
+  });
 
   return summary;
 }

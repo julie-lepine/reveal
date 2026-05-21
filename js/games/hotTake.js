@@ -25,6 +25,7 @@ import { requireLobbyPlay } from "../core/gameGuard.js";
 import { navigate } from "../core/router.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
 import { bindNav } from "../screens/nav.js";
+import { exitGameToLobbyButtonHtml, bindExitGameToLobby } from "../core/exitGame.js";
 import { onTimerSecond, primeTimerSound } from "../core/timerSound.js";
 import {
   isGameSyncActive,
@@ -380,11 +381,12 @@ export function mountHotTake(app) {
           ${takeIdx < total - 1 ? "Prochain Hot Take →" : "Voir les résultats →"}
         </button>`
             : `<p class="hint">En attente de l'hôte pour la suite…</p>`
-        }`;
+        }
+        ${exitGameToLobbyButtonHtml()}`;
     }
 
     if (phase === "intermission") {
-      phaseHtml = intermissionRing(intermissionTimer);
+      phaseHtml = `${intermissionRing(intermissionTimer)}${exitGameToLobbyButtonHtml()}`;
     }
 
     app.innerHTML = pageShell({
@@ -411,6 +413,7 @@ export function mountHotTake(app) {
     });
 
     bindNav(app);
+    bindExitGameToLobby(app);
 
     app.querySelector("#start-vote")?.addEventListener("click", () => startVotePhase());
 

@@ -31,9 +31,11 @@ import {
   clearCachedGameSession,
   routeToActiveGameIfNeeded,
   refreshGameSession,
-  clearSessionRouteSuppress,
   startMultiplayerSync,
   isGameSyncActive,
+  suppressSessionRoute,
+  clearSessionRouteSuppress,
+  getCachedGameSession,
 } from "./gameSync.js";
 
 const MAX_PLAYERS = 10;
@@ -135,20 +137,19 @@ export function goToLobby() {
   navigate("lobby", { navStack: ["home", "lobby"] });
 }
 
-/** Accueil / paramètres → menu jeux, ou reprise d’une partie encore en cours. */
+/** Accueil / paramètres → menu jeux (ne force pas la reprise d’une partie en cours). */
 export async function returnToEveningGames() {
   if (!hasActiveLobby()) {
     navigate("home", { reset: true });
     return;
   }
 
-  clearSessionRouteSuppress();
   saveStatePatch({ inLobby: true });
+  suppressSessionRoute(120000, getCachedGameSession()?.screen ?? null);
 
   if (isGameSyncActive()) {
     startMultiplayerSync();
-    const row = await refreshGameSession();
-    if (await routeToActiveGameIfNeeded(row)) return;
+    await refreshGameSession();
   } else {
     setLobbyWaiting();
   }

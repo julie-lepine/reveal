@@ -7,11 +7,13 @@ import {
   hotTakeToRemote,
   speedVoteToRemote,
   truthMeterToRemote,
+  dilemmaToRemote,
   guessLieToRemote,
 } from "./gameSync.js";
 import { navigate } from "./router.js";
 import { defaultSpeedVotePrepSession } from "./speedVoteSession.js";
 import { defaultTruthMeterPrepSession } from "./truthMeterSession.js";
+import { defaultDilemmaPrepSession } from "./dilemmaSession.js";
 import { showAppAlert } from "./dialog.js";
 import { escapeHtml } from "./ui.js";
 
@@ -19,6 +21,7 @@ const GAME_ID_TO_TILE = {
   hottake: "hottake-prep",
   speedvote: "speedvote-prep",
   truthmeter: "truthmeter-prep",
+  dilemma: "dilemma-prep",
   guesslie: "guesslie",
   tiernight: "tiernight-select",
 };
@@ -60,6 +63,29 @@ export async function launchSpeedVotePrep() {
   }
 
   navigate("speedvote-prep");
+}
+
+export async function launchDilemmaPrep() {
+  const dm = defaultDilemmaPrepSession();
+  saveStatePatch({ dilemmaGame: dm });
+
+  if (isGameSyncActive()) {
+    if (!(await requireHostToLaunch())) return;
+    try {
+      await startGameSession("dilemma", "dilemma-prep", {
+        dilemma: dilemmaToRemote(dm),
+      });
+    } catch (e) {
+      console.warn("REVEAL launch Dilemma:", e);
+      await showAppAlert(e.message || "Impossible de lancer Dilemma.", {
+        title: "Dilemma",
+        icon: "⚠️",
+      });
+    }
+    return;
+  }
+
+  navigate("dilemma-prep");
 }
 
 export async function launchTruthMeterPrep() {
@@ -173,6 +199,7 @@ const RESTART_HANDLERS = {
   hottake: launchHotTakePrep,
   speedvote: launchSpeedVotePrep,
   truthmeter: launchTruthMeterPrep,
+  dilemma: launchDilemmaPrep,
   guesslie: launchGuessLieMenu,
   tiernight: launchTierNightSelect,
 };

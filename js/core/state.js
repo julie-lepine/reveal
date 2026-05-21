@@ -65,6 +65,7 @@ const defaultState = () => ({
     hotTakesPlayed: 0,
     speedVotesPlayed: 0,
     truthMetersPlayed: 0,
+    dilemmasPlayed: 0,
     liesFound: 0,
     liesTotal: 0,
     tierNightsPlayed: 0,
@@ -119,6 +120,23 @@ const defaultState = () => ({
     voteEndsAt: null,
     roundScored: false,
   },
+  dilemmaGame: {
+    ready: {},
+    lobbyStarted: false,
+    customDilemmas: [],
+    selectedDeckId: "catalog",
+    roundCount: 8,
+    deck: null,
+    roundIdx: 0,
+    phase: null,
+    currentDilemma: null,
+    votes: {},
+    reactions: {},
+    voteEndsAt: null,
+    roundScored: false,
+    blindMode: false,
+    pausedBy: null,
+  },
   tierNightGame: { recaps: [], topicId: null, listName: "", controversialItem: null },
   openLobbies: {},
 });
@@ -149,6 +167,7 @@ function loadState() {
       hotTakeGame: { ...defaultState().hotTakeGame, ...parsed.hotTakeGame },
       speedVoteGame: { ...defaultState().speedVoteGame, ...parsed.speedVoteGame },
       truthMeterGame: { ...defaultState().truthMeterGame, ...parsed.truthMeterGame },
+      dilemmaGame: { ...defaultState().dilemmaGame, ...parsed.dilemmaGame },
       tierNightGame: { ...defaultState().tierNightGame, ...parsed.tierNightGame },
       openLobbies: parsed.openLobbies || {},
       lastGame: parsed.lastGame || null,
@@ -277,6 +296,18 @@ export function renameLocalPlayer(newName) {
     }
   }
 
+  const dm = state.dilemmaGame;
+  if (dm) {
+    if (dm.ready) dm.ready = mergeKeyedRecord(dm.ready, oldName, trimmed);
+    if (dm.votes) dm.votes = mergeKeyedRecord(dm.votes, oldName, trimmed);
+    if (dm.pausedBy === oldName) dm.pausedBy = trimmed;
+    if (Array.isArray(dm.customDilemmas)) {
+      dm.customDilemmas = dm.customDilemmas.map((d) =>
+        d?.author === oldName ? { ...d, author: trimmed } : d
+      );
+    }
+  }
+
   if (Array.isArray(state.tierNightGame?.recaps)) {
     state.tierNightGame.recaps = state.tierNightGame.recaps.map((r) =>
       r?.player === oldName ? { ...r, player: trimmed } : r
@@ -339,6 +370,7 @@ export function defaultEveningStats() {
     tierNightsPlayed: 0,
     speedVotesPlayed: 0,
     truthMetersPlayed: 0,
+    dilemmasPlayed: 0,
   };
 }
 
@@ -352,6 +384,7 @@ export function resetEveningState() {
     hotTakeGame: { ...base.hotTakeGame },
     speedVoteGame: { ...base.speedVoteGame },
     truthMeterGame: { ...base.truthMeterGame },
+    dilemmaGame: { ...base.dilemmaGame },
     guessLie: { ...emptyGuessLie(), sessionId: getState().lobbyCode || null },
     tierNightTopicId: null,
     tierNightGame: { ...base.tierNightGame },
@@ -390,6 +423,11 @@ export function recordSpeedVotePlayed() {
 
 export function recordTruthMeterPlayed() {
   state.stats.truthMetersPlayed = (state.stats.truthMetersPlayed || 0) + 1;
+  save();
+}
+
+export function recordDilemmaPlayed() {
+  state.stats.dilemmasPlayed = (state.stats.dilemmasPlayed || 0) + 1;
   save();
 }
 

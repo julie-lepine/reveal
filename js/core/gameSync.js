@@ -49,6 +49,7 @@ const GAME_SETUP_SCREENS = new Set([
   "hottake-prep",
   "speedvote-prep",
   "truthmeter-prep",
+  "dilemma-prep",
   "guesslie-menu",
   "guesslie-setup",
   "guesslie-wait",
@@ -308,6 +309,55 @@ function mergeSpeedVoteGameLocal(local, remote) {
   return { ...local, ...remote, ready };
 }
 
+function isNewDilemmaVoteRound(cur, inc) {
+  return (
+    inc?.phase === "voting" &&
+    inc?.voteEndsAt &&
+    inc.voteEndsAt !== cur?.voteEndsAt &&
+    Object.keys(inc.votes || {}).length === 0
+  );
+}
+
+function mergeRemoteDilemmaVotes(cur, inc) {
+  const curVotes = cur?.votes || {};
+  const incVotes = inc?.votes || {};
+  if (isNewDilemmaVoteRound(cur, inc)) return incVotes;
+  if (
+    (inc?.phase === "voting" && cur?.phase === "voting") ||
+    inc?.phase === "reveal" ||
+    cur?.phase === "reveal"
+  ) {
+    return { ...curVotes, ...incVotes };
+  }
+  return incVotes;
+}
+
+function mergeRemoteDilemmaReactions(cur, inc) {
+  const curReactions = cur?.reactions || {};
+  const incReactions = inc?.reactions || {};
+  if (isNewDilemmaVoteRound(cur, inc)) return incReactions;
+  if (
+    (inc?.phase === "voting" && cur?.phase === "voting") ||
+    inc?.phase === "reveal" ||
+    cur?.phase === "reveal"
+  ) {
+    return { ...curReactions, ...incReactions };
+  }
+  return incReactions;
+}
+
+function mergeDilemmaGameLocal(local, remote) {
+  if (!remote) return local;
+  if (!local) return remote;
+  const ready =
+    !remote.lobbyStarted && !local.lobbyStarted
+      ? mergeReadyMapsLocal(local.ready || {}, remote.ready || {})
+      : remote.ready || {};
+  const votes = mergeRemoteDilemmaVotes(local, remote);
+  const reactions = mergeRemoteDilemmaReactions(local, remote);
+  return { ...local, ...remote, ready, votes, reactions };
+}
+
 function isNewTruthMeterVoteRound(cur, inc) {
   return (
     inc?.phase === "voting" &&
@@ -416,6 +466,65 @@ export function speedVoteToRemote(session) {
   };
 }
 
+export function dilemmaToRemote(session) {
+  const remoteVotes = {};
+  Object.entries(session.votes || {}).forEach(([voter, choice]) => {
+    remoteVotes[userIdForName(voter) || voter] = choice;
+  });
+  const remoteReactions = {};
+  Object.entries(session.reactions || {}).forEach(([voter, reaction]) => {
+    remoteReactions[userIdForName(voter) || voter] = reaction;
+  });
+  return {
+    customDilemmas: session.customDilemmas || [],
+    ready: mapReadyByUid(session.ready || {}),
+    lobbyStarted: Boolean(session.lobbyStarted),
+    selectedDeckId: session.selectedDeckId || "catalog",
+    roundCount: session.roundCount ?? 8,
+    deck: session.deck || null,
+    roundIdx: session.roundIdx ?? 0,
+    phase: session.phase || null,
+    currentDilemma: session.currentDilemma || null,
+    votes: remoteVotes,
+    reactions: remoteReactions,
+    voteEndsAt: session.voteEndsAt || null,
+    roundScored: Boolean(session.roundScored),
+    blindMode: Boolean(session.blindMode),
+    pausedBy: session.pausedBy ? userIdForName(session.pausedBy) || session.pausedBy : null,
+  };
+}
+
+export function dilemmaFromRemote(remote) {
+  if (!remote) return null;
+  const votes = {};
+  Object.entries(remote.votes || {}).forEach(([voterUid, choice]) => {
+    const voter = nameForUserId(voterUid) || voterUid;
+    votes[voter] = choice;
+  });
+  const reactions = {};
+  Object.entries(remote.reactions || {}).forEach(([voterUid, reaction]) => {
+    const voter = nameForUserId(voterUid) || voterUid;
+    reactions[voter] = reaction;
+  });
+  return {
+    customDilemmas: remote.customDilemmas || [],
+    ready: mapReadyByName(remote.ready || {}),
+    lobbyStarted: Boolean(remote.lobbyStarted),
+    selectedDeckId: remote.selectedDeckId || "catalog",
+    roundCount: remote.roundCount ?? 8,
+    deck: remote.deck || null,
+    roundIdx: remote.roundIdx ?? 0,
+    phase: remote.phase || null,
+    currentDilemma: remote.currentDilemma || null,
+    votes,
+    reactions,
+    voteEndsAt: remote.voteEndsAt || null,
+    roundScored: Boolean(remote.roundScored),
+    blindMode: Boolean(remote.blindMode),
+    pausedBy: remote.pausedBy ? nameForUserId(remote.pausedBy) || remote.pausedBy : null,
+  };
+}
+
 export function speedVoteFromRemote(remote) {
   if (!remote) return null;
   const votes = {};
@@ -521,6 +630,7 @@ function eveningStateToRemote() {
       hotTakesPlayed: stats.hotTakesPlayed || 0,
       speedVotesPlayed: stats.speedVotesPlayed || 0,
       truthMetersPlayed: stats.truthMetersPlayed || 0,
+      dilemmasPlayed: stats.dilemmasPlayed || 0,
       liesFound: stats.liesFound || 0,
       liesTotal: stats.liesTotal || 0,
       tierNightsPlayed: stats.tierNightsPlayed || 0,
@@ -565,8 +675,14 @@ export function applyRemoteSession(row) {
   cachedRow = row;
   if (!row?.state) {
     notify(row);
-    if (!row && isGameSyncActive() && (isOnGameSetupScreen() || isOnPostGameScreen())) {
-      routeToSessionScreen("game-select", { force: true });
+    if (!row && isGameSyncActive()) {
+      const current = getCurrentScreen();
+      if (isActiveGameSessionScreen(current) || isOnGameSetupScreen(current)) {
+        suppressSessionRoute(120000);
+        void import("./lobby.js").then(({ goToLobby }) => goToLobby());
+      } else if (isOnPostGameScreen(current)) {
+        routeToSessionScreen("game-select", { force: true });
+      }
     }
     return;
   }
@@ -589,6 +705,11 @@ export function applyRemoteSession(row) {
     const local = getState().truthMeterGame;
     patch.truthMeterGame = local ? mergeTruthMeterGameLocal(local, remote) : remote;
   }
+  if (st.dilemma) {
+    const remote = dilemmaFromRemote(st.dilemma);
+    const local = getState().dilemmaGame;
+    patch.dilemmaGame = local ? mergeDilemmaGameLocal(local, remote) : remote;
+  }
   if (st.guessLie) {
     const gl = guessLieFromRemote(st.guessLie);
     patch.guessLie = gl;
@@ -606,14 +727,20 @@ export function applyRemoteSession(row) {
   notify(row);
 
   const effective = getEffectiveSessionScreen(row);
+  const routingSuppressed = Date.now() < suppressSessionRouteUntil;
   if (
     effective &&
     isActiveGameSessionScreen(effective) &&
-    getCurrentScreen() !== effective
+    getCurrentScreen() !== effective &&
+    !routingSuppressed
   ) {
     clearSessionRouteSuppress();
     handleSessionRoute(row, { fromScreen: prevScreen });
   } else if (effective && (!sigUnchanged || getCurrentScreen() !== effective)) {
+    const cur = getCurrentScreen();
+    if (routingSuppressed && (cur === "home" || cur === "settings")) {
+      return;
+    }
     handleSessionRoute(row, { fromScreen: prevScreen });
   }
 }
@@ -701,6 +828,7 @@ export function getEffectiveSessionScreen(row) {
   if (st.truthMeter?.lobbyStarted) return "truthmeter";
   if (st.hotTake?.lobbyStarted) return "hottake";
   if (st.speedVote?.lobbyStarted) return "speedvote";
+  if (st.dilemma?.lobbyStarted) return "dilemma";
   const glPhase = st.guessLie?.phase;
   if (glPhase && glPhase !== "idle" && glPhase !== "lobby") return "guesslie";
   if (st.tierNight?.game && !st.tierNight?.finished) return "tiernight";
@@ -710,12 +838,12 @@ export function getEffectiveSessionScreen(row) {
 /** Renvoie l’invité (ou l’hôte) vers la partie en cours si une session active existe. */
 export async function routeToActiveGameIfNeeded(cachedRowOnly = null) {
   if (!isGameSyncActive()) return false;
+  if (Date.now() < suppressSessionRouteUntil) return false;
   const row =
     cachedRowOnly || (await refreshGameSession()) || getCachedGameSession();
   const screen = getEffectiveSessionScreen(row);
   if (!screen || !isActiveGameSessionScreen(screen)) return false;
   if (getCurrentScreen() === screen) return true;
-  clearSessionRouteSuppress();
   routeToSessionScreen(screen, { force: true });
   return true;
 }
@@ -738,7 +866,11 @@ export function handleSessionRoute(row, { fromScreen = null } = {}) {
     isActiveGameSessionScreen(screen);
 
   if (Date.now() < suppressSessionRouteUntil) {
-    if (hostLaunchedFromMenu || sessionAdvanced || catchUpFromMenu) {
+    /** Accueil / paramètres : l’utilisateur est resté volontairement (profil, menu). */
+    if (current === "home" || current === "settings") {
+      return;
+    }
+    if (hostLaunchedFromMenu || sessionAdvanced) {
       clearSessionRouteSuppress();
     } else {
       return;
@@ -961,6 +1093,14 @@ export async function syncTruthMeterSession(extra = {}) {
   saveStatePatch({ truthMeterGame: session });
   if (!isGameSyncActive()) return session;
   await patchGameState({ truthMeter: truthMeterToRemote(session) });
+  return session;
+}
+
+export async function syncDilemmaSession(extra = {}) {
+  const session = { ...getState().dilemmaGame, ...extra };
+  saveStatePatch({ dilemmaGame: session });
+  if (!isGameSyncActive()) return session;
+  await patchGameState({ dilemma: dilemmaToRemote(session) });
   return session;
 }
 

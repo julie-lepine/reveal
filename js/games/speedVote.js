@@ -20,6 +20,7 @@ import { requireLobbyPlay } from "../core/gameGuard.js";
 import { navigate } from "../core/router.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
 import { bindNav } from "../screens/nav.js";
+import { exitGameToLobbyButtonHtml, bindExitGameToLobby } from "../core/exitGame.js";
 import { onTimerSecond, primeTimerSound } from "../core/timerSound.js";
 import {
   isGameSyncActive,
@@ -249,7 +250,8 @@ export function mountSpeedVote(app) {
           ${roundIdx < QUESTIONS.length - 1 ? "Prochaine question →" : "Voir les résultats →"}
         </button>`
           : `<p class="hint">En attente de l'hôte pour la suite…</p>`
-      }`;
+      }
+      ${exitGameToLobbyButtonHtml()}`;
   }
 
   function render() {
@@ -305,6 +307,7 @@ export function mountSpeedVote(app) {
     });
 
     bindNav(app);
+    bindExitGameToLobby(app);
 
     app.querySelectorAll("[data-vote-player]").forEach((btn) => {
       btn.addEventListener("click", async () => {

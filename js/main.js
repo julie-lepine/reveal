@@ -16,10 +16,12 @@ import { mountTierNightEnd } from "./screens/tierNightEnd.js";
 import { mountHotTakePrep } from "./screens/hotTakePrep.js";
 import { mountSpeedVotePrep } from "./screens/speedVotePrep.js";
 import { mountTruthMeterPrep } from "./screens/truthMeterPrep.js";
+import { mountDilemmaPrep } from "./screens/dilemmaPrep.js";
 import { mountSettings } from "./screens/settings.js";
 import { mountHotTake } from "./games/hotTake.js";
 import { mountSpeedVote } from "./games/speedVote.js";
 import { mountTruthMeter } from "./games/truthMeter.js";
+import { mountDilemma } from "./games/dilemma.js";
 import { mountGuessLie } from "./games/guessLie.js";
 import { mountTierNight } from "./games/tierNight.js";
 
@@ -57,6 +59,8 @@ registerScreen("speedvote-prep", mountSpeedVotePrep);
 registerScreen("speedvote", mountSpeedVote);
 registerScreen("truthmeter-prep", mountTruthMeterPrep);
 registerScreen("truthmeter", mountTruthMeter);
+registerScreen("dilemma-prep", mountDilemmaPrep);
+registerScreen("dilemma", mountDilemma);
 registerScreen("guesslie", mountGuessLie);
 registerScreen("tiernight", mountTierNight);
 

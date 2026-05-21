@@ -30,6 +30,8 @@ export function goToEveningSettings() {
   }
   if (hasActiveLobby()) {
     suppressSessionRoute(120000, getCachedGameSession()?.screen ?? null);
+    navigate("settings", { navStack: ["home", "settings"] });
+    return;
   }
   navigate("settings");
 }

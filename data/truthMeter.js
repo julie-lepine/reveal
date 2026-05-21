@@ -1,6 +1,6 @@
 /** TruthMeter — constantes */
 
-export const TRUTH_METER_VOTE_TIMER_SEC = 12;
+export const TRUTH_METER_VOTE_TIMER_SEC = 10;
 export const TRUTH_METER_DISPLAY_SEC = 2;
 export const TRUTH_METER_REVEAL_PENDING_MS = 800;
 export const TRUTH_METER_REVEAL_HOLD_SEC = 5;

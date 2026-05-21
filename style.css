@@ -1685,6 +1685,13 @@ button.game-card{
   text-decoration:underline;
 }
 
+.game-exit-lobby{
+  display:block;
+  width:100%;
+  text-align:center;
+  margin-top:4px;
+}
+
 .auth-welcome__actions{
   display:flex;
   flex-direction:column;
@@ -1894,6 +1901,33 @@ button.game-card{
 
 .stats--global{
   grid-template-columns:1fr 1fr;
+}
+
+.stats--global .stat--banner{
+  grid-column:1 / -1;
+  display:flex;
+  align-items:center;
+  gap:14px;
+  padding:16px 20px;
+}
+
+.stats--global .stat--banner > div:first-child{
+  font-size:28px;
+  line-height:1;
+  flex-shrink:0;
+}
+
+.stats--global .stat--banner .stat-number{
+  margin-top:0;
+  font-size:clamp(32px,9vw,40px);
+}
+
+.stats--global .stat--banner .stat-label{
+  margin-top:0;
+  margin-left:auto;
+  font-size:13px;
+  font-weight:600;
+  color:rgba(255,255,255,.5);
 }
 
 .label-upper--muted{
@@ -2285,6 +2319,7 @@ body.wizz-shake #app{
 .game-grid .game-tile.hot,
 .game-grid .game-tile.guess,
 .game-grid .game-tile.speed,
+.game-grid .game-tile.dilemma,
 .game-grid .game-tile.truth,
 .game-grid .game-tile.tier,
 .game-grid .game-tile.song{
@@ -2357,6 +2392,10 @@ body.wizz-shake #app{
 
 .game-tile__logo-wrap--truth{
   --logo-border:linear-gradient(145deg, #34D399 0%, #60A5FA 48%, #2B2D66 100%);
+}
+
+.game-tile__logo-wrap--dilemma{
+  --logo-border:linear-gradient(145deg, #60A5FA 0%, #FF3CAC 48%, #2B2D66 100%);
 }
 
 .game-tile__logo{
@@ -3247,4 +3286,199 @@ body{
   font-weight:700;
   text-align:right;
   color:rgba(255,255,255,.55);
+}
+
+/* —— Dilemma —— */
+.timer--dilemma{
+  color:#FF3CAC;
+  text-shadow:0 0 24px rgba(255,60,172,.4);
+}
+
+.dilemma__card{
+  text-align:center;
+  padding:20px 16px;
+  margin-bottom:16px;
+}
+
+.dilemma__label{
+  font-size:11px;
+  font-weight:800;
+  letter-spacing:.12em;
+  color:rgba(255,255,255,.45);
+  margin:0 0 6px;
+}
+
+.dilemma__option{
+  font-size:clamp(18px,5vw,22px);
+  font-weight:900;
+  line-height:1.25;
+  margin:0 0 12px;
+}
+
+.dilemma__option--a{ color:#60A5FA; }
+.dilemma__option--b{ color:#FF6B6B; }
+
+.dilemma__vs{
+  display:block;
+  margin:8px auto 12px;
+  width:15px;
+  height:15px;
+  object-fit:contain;
+}
+
+.dilemma__taps{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+  margin:12px 0;
+}
+
+.dilemma__tap{
+  min-height:72px;
+  border-radius:16px;
+  border:2px solid rgba(255,255,255,.14);
+  background:rgba(255,255,255,.06);
+  color:#fff;
+  font-weight:800;
+  font-size:14px;
+  cursor:pointer;
+  position:relative;
+  transition:transform .1s,border-color .15s,background .15s;
+}
+
+.dilemma__tap:active:not(:disabled){ transform:scale(.97); }
+
+.dilemma__tap--a.dilemma__tap--picked{
+  border-color:#60A5FA;
+  background:rgba(96,165,250,.18);
+  box-shadow:0 0 20px rgba(96,165,250,.25);
+}
+
+.dilemma__tap--b.dilemma__tap--picked{
+  border-color:#FF6B6B;
+  background:rgba(255,107,107,.18);
+  box-shadow:0 0 20px rgba(255,107,107,.25);
+}
+
+.dilemma__tap:disabled{ opacity:.85; cursor:default; }
+
+.dilemma__tap-check{
+  position:absolute;
+  top:8px;
+  right:10px;
+  font-size:18px;
+}
+
+.dilemma__reactions{
+  display:flex;
+  flex-wrap:wrap;
+  gap:10px;
+  justify-content:center;
+  margin:16px 0 8px;
+}
+
+.dilemma__reaction{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  width:56px;
+  height:56px;
+  padding:0;
+  border-radius:16px;
+  border:2px solid rgba(255,255,255,.14);
+  background:rgba(255,255,255,.05);
+  color:#fff;
+  cursor:pointer;
+  transition:border-color .15s,background .15s,transform .1s;
+}
+
+.dilemma__reaction:active{
+  transform:scale(.96);
+}
+
+.dilemma__reaction--active{
+  border-color:#FF3CAC;
+  background:rgba(255,60,172,.18);
+  box-shadow:0 0 16px rgba(255,60,172,.25);
+}
+
+.dilemma__reaction-emoji{
+  font-size:28px;
+  line-height:1;
+}
+
+.dilemma__result-row{
+  margin-bottom:14px;
+  padding:10px 12px;
+  border-radius:12px;
+  background:rgba(255,255,255,.04);
+}
+
+.dilemma__result-row--winner{
+  border:1px solid rgba(255,60,172,.45);
+  background:rgba(255,60,172,.08);
+}
+
+.dilemma__result-head{
+  display:flex;
+  justify-content:space-between;
+  font-weight:800;
+  margin-bottom:8px;
+}
+
+.dilemma__pct{ font-size:18px; color:#FF3CAC; }
+
+.dilemma__bar-a{ background:linear-gradient(90deg,#60A5FA,#3B82F6); }
+.dilemma__bar-b{ background:linear-gradient(90deg,#FF6B6B,#FF3CAC); }
+
+.dilemma__divided{
+  text-align:center;
+  font-weight:900;
+  font-size:14px;
+  color:#FBBF24;
+  margin:0 0 12px;
+  animation:dilemma-pulse 1s ease infinite;
+}
+
+@keyframes dilemma-pulse{
+  0%,100%{ opacity:1; }
+  50%{ opacity:.65; }
+}
+
+.dilemma__choice-tag{
+  font-weight:900;
+  font-size:12px;
+  padding:2px 8px;
+  border-radius:8px;
+}
+
+.dilemma__choice-tag--A{ background:rgba(96,165,250,.25); color:#93C5FD; }
+.dilemma__choice-tag--B{ background:rgba(255,107,107,.25); color:#FCA5A5; }
+
+.take-list,
+.dilemma-custom-list{
+  list-style:none;
+  margin:12px 0 0;
+  padding:0;
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+}
+
+.dilemma-custom-list li{
+  font-size:13px;
+  line-height:1.4;
+  padding:10px 12px;
+  border-radius:12px;
+  background:rgba(255,255,255,.05);
+  border:1px solid rgba(255,255,255,.08);
+}
+
+.dilemma-custom-list__a{ color:#93C5FD; font-weight:700; }
+.dilemma-custom-list__b{ color:#FCA5A5; font-weight:700; }
+.dilemma-custom-list__vs{
+  font-size:10px;
+  font-weight:900;
+  color:rgba(255,60,172,.85);
+  margin:0 4px;
 }

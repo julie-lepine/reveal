@@ -31,6 +31,16 @@ export const GAMES = [
     enabled: true,
   },
   {
+    id: "dilemma-prep",
+    title: "Dilemma",
+    desc: "Dilemme A vs B — vote, réactions emoji en 10 s",
+    emoji: "⚖️",
+    cssClass: "dilemma",
+    logo: "js/games/dilemma.png",
+    borderGradient: "linear-gradient(145deg, #60A5FA 0%, #FF3CAC 48%, #2B2D66 100%)",
+    enabled: true,
+  },
+  {
     id: "truthmeter-prep",
     title: "TruthMeter",
     desc: "Affirmation + curseur Fake → Vrai — le groupe tranche",

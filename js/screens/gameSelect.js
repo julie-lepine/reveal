@@ -17,6 +17,7 @@ import { getLastGame } from "../core/state.js";
 import {
   launchSpeedVotePrep,
   launchTruthMeterPrep,
+  launchDilemmaPrep,
   launchHotTakePrep,
   launchGuessLieMenu,
   launchTierNightSelect,
@@ -46,6 +47,9 @@ function eveningRecapHtml(recap) {
       : "",
     recap.truthMeters > 0
       ? `<span class="evening-recap__chip">📏 ${recap.truthMeters} TruthMeter${recap.truthMeters > 1 ? "s" : ""}</span>`
+      : "",
+    recap.dilemmas > 0
+      ? `<span class="evening-recap__chip">⚖️ ${recap.dilemmas} Dilemma${recap.dilemmas > 1 ? "s" : ""}</span>`
       : "",
     recap.tierNights > 0
       ? `<span class="evening-recap__chip">🏆 ${recap.tierNights} tier list${recap.tierNights > 1 ? "s" : ""}</span>`
@@ -94,6 +98,7 @@ export function mountGameSelect(app) {
     if (isGameSyncActive()) {
       mpHandlers["speedvote-prep"] = launchSpeedVotePrep;
       mpHandlers["truthmeter-prep"] = launchTruthMeterPrep;
+      mpHandlers["dilemma-prep"] = launchDilemmaPrep;
       mpHandlers["hottake-prep"] = launchHotTakePrep;
       mpHandlers.guesslie = launchGuessLieMenu;
       mpHandlers["tiernight-select"] = launchTierNightSelect;
@@ -103,6 +108,7 @@ export function mountGameSelect(app) {
       ...mpHandlers,
       "speedvote-prep": launchSpeedVotePrep,
       "truthmeter-prep": launchTruthMeterPrep,
+      "dilemma-prep": launchDilemmaPrep,
       settings: () => goToEveningSettings(),
       leaderboard: () => {
         navigate("leaderboard", {

@@ -41,10 +41,11 @@ function homeStatsHtml() {
     return `
         <p class="label-upper label-upper--muted">Stats de la soirée</p>
         <div class="stats stats--global">
-          <div class="stat"><div>👥</div><div class="stat-number">${recap.participantCount}</div><div class="stat-label">Joueurs</div></div>
+          <div class="stat stat--banner"><div>👥</div><div class="stat-number">${recap.participantCount}</div><div class="stat-label">Joueurs</div></div>
           <div class="stat"><div>🔥</div><div class="stat-number">${recap.hotTakes}</div><div class="stat-label">Hot takes</div></div>
           <div class="stat"><div>⚡</div><div class="stat-number">${recap.speedVotes}</div><div class="stat-label">SpeedVotes</div></div>
           <div class="stat"><div>📏</div><div class="stat-number">${recap.truthMeters}</div><div class="stat-label">TruthMeter</div></div>
+          <div class="stat"><div>⚖️</div><div class="stat-number">${recap.dilemmas}</div><div class="stat-label">Dilemma</div></div>
           <div class="stat"><div>🕵️</div><div class="stat-number">${liesDisplay}</div><div class="stat-label">Mensonges trouvés</div></div>
           <div class="stat"><div>🏆</div><div class="stat-number">${recap.tierNights}</div><div class="stat-label">Tier lists</div></div>
         </div>`;
@@ -327,6 +328,7 @@ export function mountHome(app) {
       render();
     })();
     unsubSession = onGameSessionChange(async () => {
+      if (getCurrentScreen() !== "home") return;
       if (await routeToActiveGameIfNeeded()) return;
       render();
     });
