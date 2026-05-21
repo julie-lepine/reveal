@@ -8,9 +8,8 @@ import {
   getModerationNotice,
   isLocalHotTakeHost,
   markHotTakeLobbyStarted,
-  resetHotTakeReady,
+  setHotTakeReady,
   simulateHotTakeReady,
-  toggleLocalHotTakeReady,
   setHotTakeTheme,
   setHotTakeRoundCount,
   HOT_TAKE_THEMES,
@@ -32,6 +31,9 @@ export function mountHotTakePrep(app) {
 
   let cleanupSim = null;
   let mounted = false;
+  /** Prêt en cours d’envoi — évite que la synchro efface l’UI. */
+  let readyCommitInFlight = null;
+  const localName = getLocalDisplayName();
   const moderationNotice = getModerationNotice();
 
   function captureDraft() {
@@ -92,11 +94,16 @@ export function mountHotTakePrep(app) {
     else card.insertAdjacentHTML("beforeend", hintHtml);
   }
 
+  function localReadyState() {
+    if (readyCommitInFlight !== null) return readyCommitInFlight;
+    return Boolean(getHotTakeSession().ready[localName]);
+  }
+
   function refreshReadySection() {
     const session = getHotTakeSession();
     const members = getLobbyParticipants();
     const allReady = allHotTakeReady();
-    const localReady = session.ready[getLocalDisplayName()];
+    const localReady = localReadyState();
     const prep = getHotTakePrepSummary();
 
     const playersCard = app.querySelector("#hot-take-players");
@@ -217,16 +224,19 @@ export function mountHotTakePrep(app) {
     });
 
     app.querySelector("#btn-ready")?.addEventListener("click", async () => {
-      await toggleLocalHotTakeReady();
-      if (!isGameSyncActive()) {
-        const session = getHotTakeSession();
-        const wasReady = Boolean(session.ready[getLocalDisplayName()]);
-        if (!wasReady) {
+      const nextReady = !localReadyState();
+      readyCommitInFlight = nextReady;
+      refreshReadySection();
+      try {
+        await setHotTakeReady(localName, nextReady);
+        if (!isGameSyncActive() && nextReady) {
           if (cleanupSim) cleanupSim();
           cleanupSim = simulateHotTakeReady(refreshReadySection);
         }
+      } finally {
+        readyCommitInFlight = null;
+        refreshReadySection();
       }
-      refreshReadySection();
     });
 
     app.querySelector("#btn-start-game")?.addEventListener("click", onStartGame);
@@ -238,7 +248,7 @@ export function mountHotTakePrep(app) {
     const session = getHotTakeSession();
     const members = getLobbyParticipants();
     const allReady = allHotTakeReady();
-    const localReady = session.ready[getLocalDisplayName()];
+    const localReady = localReadyState();
     const themeId = session.selectedThemeId || HOT_TAKE_CATALOG_ID;
     const roundCount = session.roundCount ?? 5;
     const isHost = isLocalHotTakeHost();
@@ -356,7 +366,6 @@ export function mountHotTakePrep(app) {
     mounted = true;
   }
 
-  resetHotTakeReady();
   render();
 
   const unsub = onGameSessionChange(() => {

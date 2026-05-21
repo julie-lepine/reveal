@@ -8,8 +8,6 @@ import {
 } from "../core/auth.js";
 import { getLocalDisplayName, getLocalEmoji } from "../core/state.js";
 import { PROFILE_EMOJI_CHOICES } from "../../data/profileEmojis.js";
-import { isTimerMuted, setTimerMuted } from "../core/settings.js";
-import { onTimerSecond, primeTimerSound } from "../core/timerSound.js";
 import { hasActiveLobby, getLobby } from "../core/lobby.js";
 import { navigate } from "../core/router.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
@@ -27,7 +25,6 @@ export function mountSettings(app) {
   let selectedEmoji = getLocalEmoji();
 
   function render() {
-    const muted = isTimerMuted();
     selectedEmoji = getLocalEmoji();
     const inLobby = hasActiveLobby();
     const lobbyCode = inLobby ? getLobby()?.code : "";
@@ -44,25 +41,12 @@ export function mountSettings(app) {
         <div class="card card--highlight settings-lobby-banner">
           <p class="hint settings-lobby-banner__text">
             Soirée en cours — lobby <strong>${escapeHtml(lobbyCode || "")}</strong>.
-            Tu restes connecté : pseudo, emoji et sons s’appliquent pour tout le monde.
+            Tu restes connecté : pseudo et emoji s’appliquent pour tout le monde.
           </p>
           <button type="button" class="btn btn-primary btn--spaced" data-nav="evening-return">Retour aux jeux</button>
         </div>`
             : ""
         }
-
-        <div class="card settings-section">
-          <h2 class="settings-section__title">Son des timers</h2>
-          <p class="hint settings-section__hint">Tick chrono pendant les votes et décomptes.</p>
-          <label class="settings-toggle">
-            <span class="settings-toggle__label">Sons du chrono</span>
-            <input type="checkbox" class="settings-toggle__input" id="toggle-timer-sound" ${muted ? "" : "checked"} />
-            <span class="settings-toggle__track" aria-hidden="true"></span>
-          </label>
-          <button type="button" class="btn btn-secondary btn--compact" id="btn-test-sound" ${muted ? "disabled" : ""}>
-            Tester le son
-          </button>
-        </div>
 
         <div class="card settings-section">
           <h2 class="settings-section__title">Emoji</h2>
@@ -120,20 +104,6 @@ export function mountSettings(app) {
   }
 
   function bindEvents() {
-    const toggle = app.querySelector("#toggle-timer-sound");
-    const testBtn = app.querySelector("#btn-test-sound");
-
-    toggle?.addEventListener("change", () => {
-      const on = toggle.checked;
-      setTimerMuted(!on);
-      if (testBtn) testBtn.disabled = !on;
-    });
-
-    testBtn?.addEventListener("click", () => {
-      primeTimerSound();
-      onTimerSecond({ remaining: 3, urgentAt: 5, force: true });
-    });
-
     app.querySelectorAll(".emoji-picker__btn").forEach((btn) => {
       btn.addEventListener("click", async () => {
         const emoji = btn.getAttribute("data-emoji");

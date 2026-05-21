@@ -21,6 +21,16 @@ export const GAMES = [
     enabled: true,
   },
   {
+    id: "speedvote-prep",
+    title: "SpeedVote",
+    desc: "Vote éclair — chaos instantané en 7 secondes",
+    emoji: "⚡",
+    cssClass: "speed",
+    logo: "js/games/speedvote.png",
+    borderGradient: "linear-gradient(145deg, #FBBF24 0%, #FF3CAC 48%, #2B2D66 100%)",
+    enabled: true,
+  },
+  {
     id: "tiernight-select",
     title: "TierNight",
     desc: "Choisis une tier list, puis classe en S / A / B / C / D",

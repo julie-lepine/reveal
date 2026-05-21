@@ -60,6 +60,8 @@ export function mountHotTake(app) {
   let takeScored = false;
   let intervalId = null;
   let paused = false;
+  /** Vote en cours d’envoi — évite que la synchro efface l’UI avant la réponse serveur. */
+  let voteCommitInFlight = null;
   const localName = getLocalDisplayName();
   const mp = isGameSyncActive();
 
@@ -75,12 +77,37 @@ export function mountHotTake(app) {
     return Math.max(0, Math.ceil((new Date(iso).getTime() - Date.now()) / 1000));
   }
 
+  /** Votes complets pour le scoring (session sync), pas le snapshot local du clic. */
+  function votesForAward() {
+    const fromSession = { ...(getHotTakeSession().votes || {}) };
+    if (voteCommitInFlight != null && fromSession[localName] == null) {
+      fromSession[localName] = voteCommitInFlight;
+    }
+    if (!mp && Object.keys(fromSession).length === 0 && Object.keys(votes).length > 0) {
+      return { ...votes };
+    }
+    votes = fromSession;
+    return fromSession;
+  }
+
+  function alreadyScoredThisTake() {
+    return takeScored || Boolean(getHotTakeSession().takeScored);
+  }
+
+  function canAwardThisTake() {
+    return !alreadyScoredThisTake() && (!mp || isLobbyHost());
+  }
+
   function syncFromSession() {
     const s = getHotTakeSession();
     if (s.takeIdx != null) takeIdx = s.takeIdx;
     if (s.phase) phase = s.phase;
     votes = { ...(s.votes || {}) };
     myVote = votes[localName] ?? null;
+    if (voteCommitInFlight && phase === "voting" && myVote == null) {
+      myVote = voteCommitInFlight;
+      votes = { ...votes, [localName]: voteCommitInFlight };
+    }
     paused = Boolean(s.pausedBy);
     takeScored = Boolean(s.takeScored);
     if (phase === "voting" && s.voteEndsAt) {
@@ -151,16 +178,17 @@ export function mountHotTake(app) {
   }
 
   async function goToReveal() {
-    if (!takeScored) {
-      lastAward = awardHotTakeVotes(votes, HOT_TAKE_OPTIONS);
+    const votesToScore = votesForAward();
+    if (canAwardThisTake()) {
+      lastAward = awardHotTakeVotes(votesToScore, HOT_TAKE_OPTIONS);
       takeScored = true;
-      if (mp && isLobbyHost()) await syncLobbyScores();
+      if (mp) await syncLobbyScores();
     }
     if (mp) {
       await commitHotTakePlay({
         phase: "reveal",
         takeScored: true,
-        votes,
+        votes: votesToScore,
         voteEndsAt: null,
       });
     } else {
@@ -345,8 +373,14 @@ export function mountHotTake(app) {
         myVote = choice;
         votes = { ...votes, [localName]: choice };
         if (mp) {
-          await commitHotTakePlay({ votes });
-          if (allHotTakeVotesIn() && isLobbyHost()) await goToReveal();
+          voteCommitInFlight = choice;
+          render();
+          try {
+            await commitHotTakePlay({ votes });
+            if (allHotTakeVotesIn() && isLobbyHost()) await goToReveal();
+          } finally {
+            voteCommitInFlight = null;
+          }
         } else {
           votes = simulateLobbyVotes(choice, HOT_TAKE_OPTIONS);
           render();
@@ -370,10 +404,11 @@ export function mountHotTake(app) {
     });
 
     app.querySelector("#next-take")?.addEventListener("click", async () => {
-      if (!takeScored) {
-        lastAward = awardHotTakeVotes(votes, HOT_TAKE_OPTIONS);
+      if (canAwardThisTake()) {
+        const votesToScore = votesForAward();
+        lastAward = awardHotTakeVotes(votesToScore, HOT_TAKE_OPTIONS);
         takeScored = true;
-        if (mp && isLobbyHost()) await syncLobbyScores();
+        if (mp) await syncLobbyScores();
       }
 
       if (takeIdx < total - 1) {
@@ -459,8 +494,9 @@ export function mountHotTake(app) {
             votes = simulateLobbyVotes(myVote, HOT_TAKE_OPTIONS);
           }
           phase = "reveal";
-          if (!takeScored) {
-            lastAward = awardHotTakeVotes(votes, HOT_TAKE_OPTIONS);
+          if (canAwardThisTake()) {
+            const votesToScore = votesForAward();
+            lastAward = awardHotTakeVotes(votesToScore, HOT_TAKE_OPTIONS);
             takeScored = true;
           }
           clearHotTakePause();
@@ -469,6 +505,7 @@ export function mountHotTake(app) {
           if (!myVote) {
             myVote = HOT_TAKE_OPTIONS[0];
             votes = { ...votes, [localName]: myVote };
+            if (mp) await commitHotTakePlay({ votes });
           }
           await goToReveal();
         }

@@ -8,6 +8,7 @@ import {
   isLobbyHost,
   startGameSession,
   hotTakeToRemote,
+  speedVoteToRemote,
   guessLieToRemote,
   onGameSessionChange,
   handleSessionRoute,
@@ -15,8 +16,38 @@ import {
   getCachedGameSession,
 } from "../core/gameSync.js";
 import { navigate, getCurrentScreen } from "../core/router.js";
-import { getState } from "../core/state.js";
+import { getState, saveStatePatch } from "../core/state.js";
+import { defaultSpeedVotePrepSession } from "../core/speedVoteSession.js";
 import { showAppAlert } from "../core/dialog.js";
+
+async function launchSpeedVotePrep() {
+  const sv = defaultSpeedVotePrepSession();
+  saveStatePatch({ speedVoteGame: sv });
+
+  if (isGameSyncActive()) {
+    if (!isLobbyHost()) {
+      await showAppAlert("Seul l'hôte peut lancer un jeu.", {
+        title: "Action réservée",
+        icon: "👑",
+      });
+      return;
+    }
+    try {
+      await startGameSession("speedvote", "speedvote-prep", {
+        speedVote: speedVoteToRemote(sv),
+      });
+    } catch (e) {
+      console.warn("REVEAL launch SpeedVote:", e);
+      await showAppAlert(e.message || "Impossible de lancer SpeedVote.", {
+        title: "SpeedVote",
+        icon: "⚠️",
+      });
+    }
+    return;
+  }
+
+  navigate("speedvote-prep");
+}
 
 function eveningRecapHtml(recap) {
   if (!recap.hasActivity) {
@@ -76,6 +107,7 @@ export function mountGameSelect(app) {
   function bindGameSelectEvents() {
     const mpHandlers = {};
     if (isGameSyncActive()) {
+      mpHandlers["speedvote-prep"] = launchSpeedVotePrep;
       mpHandlers["hottake-prep"] = async () => {
         if (!isLobbyHost()) {
           await showAppAlert("Seul l'hôte peut lancer un jeu.", {
@@ -136,6 +168,7 @@ export function mountGameSelect(app) {
 
     bindNav(app, {
       ...mpHandlers,
+      "speedvote-prep": launchSpeedVotePrep,
       settings: () => goToEveningSettings(),
       leaderboard: () => {
         navigate("leaderboard", {

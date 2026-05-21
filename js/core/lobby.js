@@ -14,6 +14,7 @@ import { isSupabaseConfigured } from "./supabaseClient.js";
 import {
   createLobbySupabase,
   joinLobbySupabase,
+  leaveLobbySupabase,
   refreshLobbyFromSupabase,
   setLocalReadySupabase,
   setLobbyStatusSupabase,
@@ -22,6 +23,9 @@ import {
   unsubscribeLobbyRealtime,
   sendLobbyNudgeSupabase,
 } from "./supabaseLobby.js";
+import { isGuest } from "./auth.js";
+import { resetEveningState } from "./state.js";
+import { stopMultiplayerSync, endGameSession, clearCachedGameSession } from "./gameSync.js";
 
 const MAX_PLAYERS = 10;
 
@@ -151,6 +155,8 @@ export function parseJoinCodeFromHash() {
 }
 
 export async function createLobby() {
+  resetEveningState();
+
   if (isSupabaseConfigured()) {
     const res = await createLobbySupabase();
     if (!res.ok) throw new Error(res.error);
@@ -173,6 +179,8 @@ export async function createLobby() {
 }
 
 export async function joinLobby(code) {
+  resetEveningState();
+
   if (isSupabaseConfigured()) {
     return joinLobbySupabase(code);
   }
@@ -224,6 +232,62 @@ export async function joinLobbyAsGuest(code, guestName) {
   const auth = await loginAsGuest(guestName);
   if (!auth.ok) return auth;
   return joinLobby(code);
+}
+
+/**
+ * Quitte le lobby sans supprimer le compte connecté.
+ * Invité : retour à l’accueil (onglet Invité) pour rejoindre une autre partie.
+ */
+export async function leaveLobby() {
+  stopMultiplayerSync();
+  unsubscribeLobbyRealtime();
+
+  const lobby = getLobby();
+  const code = lobby?.code;
+  const isHost = getLobbyParticipants().some((p) => p.isLocal && p.isHost);
+
+  if (isSupabaseConfigured() && lobby?.id) {
+    if (isHost) {
+      try {
+        await endGameSession();
+      } catch (e) {
+        console.warn("REVEAL endGameSession on leave:", e.message || e);
+      }
+    }
+    const res = await leaveLobbySupabase();
+    if (!res.ok) return res;
+  } else if (code) {
+    const open = { ...(getState().openLobbies || {}) };
+    const published = open[code];
+    if (published) {
+      const localName = getLocalDisplayName();
+      open[code] = {
+        ...published,
+        participants: (published.participants || []).filter((p) => p.name !== localName),
+        updatedAt: Date.now(),
+      };
+      saveStatePatch({ openLobbies: open });
+    }
+  }
+
+  const patch = { inLobby: false, lobby: null, lobbyCode: null };
+
+  if (isGuest()) {
+    patch.user = {
+      email: null,
+      name: null,
+      loggedIn: false,
+      isGuest: false,
+      provider: null,
+    };
+    sessionStorage.setItem("reveal-auth-tab", "guest");
+  }
+
+  resetEveningState();
+  clearCachedGameSession();
+  saveStatePatch(patch);
+  navigate("home", { reset: true });
+  return { ok: true };
 }
 
 export async function setLocalReady(ready) {

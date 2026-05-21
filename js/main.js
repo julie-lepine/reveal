@@ -14,8 +14,10 @@ import { mountTierNightSelect } from "./screens/tierNightSelect.js";
 import { mountTierNightCreate } from "./screens/tierNightCreate.js";
 import { mountTierNightEnd } from "./screens/tierNightEnd.js";
 import { mountHotTakePrep } from "./screens/hotTakePrep.js";
+import { mountSpeedVotePrep } from "./screens/speedVotePrep.js";
 import { mountSettings } from "./screens/settings.js";
 import { mountHotTake } from "./games/hotTake.js";
+import { mountSpeedVote } from "./games/speedVote.js";
 import { mountGuessLie } from "./games/guessLie.js";
 import { mountTierNight } from "./games/tierNight.js";
 
@@ -49,6 +51,8 @@ registerScreen("tiernight-create", mountTierNightCreate);
 registerScreen("tiernight-end", mountTierNightEnd);
 registerScreen("hottake-prep", mountHotTakePrep);
 registerScreen("hottake", mountHotTake);
+registerScreen("speedvote-prep", mountSpeedVotePrep);
+registerScreen("speedvote", mountSpeedVote);
 registerScreen("guesslie", mountGuessLie);
 registerScreen("tiernight", mountTierNight);
 

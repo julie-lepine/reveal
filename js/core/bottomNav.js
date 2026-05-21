@@ -19,6 +19,8 @@ const SCREEN_TO_TAB = {
   results: TAB_RESULTS,
   "hottake-prep": TAB_GAMES,
   hottake: TAB_GAMES,
+  "speedvote-prep": TAB_GAMES,
+  speedvote: TAB_GAMES,
   guesslie: TAB_GAMES,
   "guesslie-menu": TAB_GAMES,
   "guesslie-setup": TAB_GAMES,

@@ -1,6 +1,12 @@
 import { isSupabaseConfigured } from "./supabaseClient.js";
 import { getSupabaseUserId } from "./supabaseAuth.js";
-import { getState, saveStatePatch, recordTierNightPlayed } from "./state.js";
+import {
+  getLocalDisplayName,
+  getState,
+  saveStatePatch,
+  recordTierNightPlayed,
+  resetEveningState,
+} from "./state.js";
 import { navigate, getCurrentScreen } from "./router.js";
 import { getLobbyParticipants } from "./lobby.js";
 import { buildRecapsFromPlacements, getTierNightSession } from "./tierNightSession.js";
@@ -41,6 +47,7 @@ export function isLobbyHost() {
 /** Écrans de préparation (jeu choisi mais pas encore lancé). */
 const GAME_SETUP_SCREENS = new Set([
   "hottake-prep",
+  "speedvote-prep",
   "guesslie-menu",
   "guesslie-setup",
   "guesslie-wait",
@@ -227,6 +234,115 @@ export function hotTakeFromRemote(remote) {
   };
 }
 
+/** Nouvelle manche de vote (chrono relancé, votes vidés côté hôte). */
+function isNewHotTakeVoteRound(cur, inc) {
+  return (
+    inc?.phase === "voting" &&
+    inc?.voteEndsAt &&
+    inc.voteEndsAt !== cur?.voteEndsAt &&
+    Object.keys(inc.votes || {}).length === 0
+  );
+}
+
+/** Fusion des votes uid (écriture patch) — évite d’écraser les votes des autres joueurs. */
+function mergeRemoteHotTakeVotesUid(cur, inc) {
+  const curVotes = cur?.votes || {};
+  const incVotes = inc?.votes || {};
+  if (isNewHotTakeVoteRound(cur, inc)) return incVotes;
+  if (inc?.phase !== "voting" || cur?.phase !== "voting") return incVotes;
+  return { ...curVotes, ...incVotes };
+}
+
+/** Fusion des « prêt » uid (écriture patch). */
+function mergeRemoteReadyUid(cur, inc) {
+  return { ...(cur?.ready || {}), ...(inc?.ready || {}) };
+}
+
+/** En préparation : conserve le « prêt » local si pas encore sur le serveur. */
+function mergeReadyMapsLocal(localReady = {}, remoteReady = {}) {
+  const merged = { ...remoteReady };
+  const name = getLocalDisplayName();
+  if (localReady[name] && !merged[name]) merged[name] = true;
+  return merged;
+}
+
+/** Fusion locale à l’application d’une session distante. */
+function mergeHotTakeGameLocal(local, remote) {
+  if (!remote) return local;
+  if (!local) return remote;
+  const remoteVotes = remote.votes || {};
+  const localVotes = local.votes || {};
+  let votes = remoteVotes;
+  if (isNewHotTakeVoteRound(local, remote)) {
+    votes = remoteVotes;
+  } else if (remote.phase === "voting") {
+    votes = { ...remoteVotes };
+    const name = getLocalDisplayName();
+    const lv = localVotes[name];
+    if (lv != null && votes[name] == null) votes[name] = lv;
+  }
+  const ready =
+    !remote.lobbyStarted && !local.lobbyStarted
+      ? mergeReadyMapsLocal(local.ready || {}, remote.ready || {})
+      : remote.ready || {};
+  return { ...local, ...remote, votes, ready };
+}
+
+function mergeSpeedVoteGameLocal(local, remote) {
+  if (!remote) return local;
+  if (!local) return remote;
+  const ready =
+    !remote.lobbyStarted && !local.lobbyStarted
+      ? mergeReadyMapsLocal(local.ready || {}, remote.ready || {})
+      : remote.ready || {};
+  return { ...local, ...remote, ready };
+}
+
+export function speedVoteToRemote(session) {
+  const remoteVotes = {};
+  Object.entries(session.votes || {}).forEach(([voter, target]) => {
+    remoteVotes[userIdForName(voter) || voter] = userIdForName(target) || target;
+  });
+  return {
+    ready: mapReadyByUid(session.ready || {}),
+    lobbyStarted: Boolean(session.lobbyStarted),
+    selectedThemeId: session.selectedThemeId || "catalog",
+    roundCount: session.roundCount ?? 5,
+    deck: session.deck || null,
+    roundIdx: session.roundIdx ?? 0,
+    phase: session.phase || null,
+    currentQuestion: session.currentQuestion || null,
+    votes: remoteVotes,
+    voteEndsAt: session.voteEndsAt || null,
+    roundScored: Boolean(session.roundScored),
+    modifier: session.modifier || "normal",
+  };
+}
+
+export function speedVoteFromRemote(remote) {
+  if (!remote) return null;
+  const votes = {};
+  Object.entries(remote.votes || {}).forEach(([voterUid, targetUid]) => {
+    const voter = nameForUserId(voterUid) || voterUid;
+    const target = nameForUserId(targetUid) || targetUid;
+    votes[voter] = target;
+  });
+  return {
+    ready: mapReadyByName(remote.ready || {}),
+    lobbyStarted: Boolean(remote.lobbyStarted),
+    selectedThemeId: remote.selectedThemeId || "catalog",
+    roundCount: remote.roundCount ?? 5,
+    deck: remote.deck || null,
+    roundIdx: remote.roundIdx ?? 0,
+    phase: remote.phase || null,
+    currentQuestion: remote.currentQuestion || null,
+    votes,
+    voteEndsAt: remote.voteEndsAt || null,
+    roundScored: Boolean(remote.roundScored),
+    modifier: remote.modifier || "normal",
+  };
+}
+
 export function guessLieToRemote(gl) {
   return {
     sessionId: gl.sessionId,
@@ -357,7 +473,14 @@ export function applyRemoteSession(row) {
   const st = row.state;
 
   if (st.hotTake) {
-    patch.hotTakeGame = hotTakeFromRemote(st.hotTake);
+    const remote = hotTakeFromRemote(st.hotTake);
+    const local = getState().hotTakeGame;
+    patch.hotTakeGame = local ? mergeHotTakeGameLocal(local, remote) : remote;
+  }
+  if (st.speedVote) {
+    const remote = speedVoteFromRemote(st.speedVote);
+    const local = getState().speedVoteGame;
+    patch.speedVoteGame = local ? mergeSpeedVoteGameLocal(local, remote) : remote;
   }
   if (st.guessLie) {
     const gl = guessLieFromRemote(st.guessLie);
@@ -397,6 +520,8 @@ function navStackFor(screen) {
   const gameScreens = new Set([
     "hottake-prep",
     "hottake",
+    "speedvote-prep",
+    "speedvote",
     "guesslie-menu",
     "guesslie-setup",
     "guesslie-wait",
@@ -547,6 +672,25 @@ export async function patchGameState(stateMerge, { screen, gameId } = {}) {
   const lobbyId = getState().lobby.id;
   const current = cachedRow?.state || {};
   const nextState = { ...current, ...stateMerge };
+  if (stateMerge.hotTake) {
+    const curHt = current.hotTake;
+    const incHt = stateMerge.hotTake;
+    nextState.hotTake = curHt
+      ? {
+          ...curHt,
+          ...incHt,
+          ready: mergeRemoteReadyUid(curHt, incHt),
+          votes: mergeRemoteHotTakeVotesUid(curHt, incHt),
+        }
+      : incHt;
+  }
+  if (stateMerge.speedVote) {
+    const curSv = current.speedVote;
+    const incSv = stateMerge.speedVote;
+    nextState.speedVote = curSv
+      ? { ...curSv, ...incSv, ready: mergeRemoteReadyUid(curSv, incSv) }
+      : incSv;
+  }
   const patch = { state: nextState };
   if (screen) patch.screen = screen;
   if (gameId) patch.game_id = gameId;
@@ -594,35 +738,14 @@ export async function completeGameSession({ gameId = "menu", screen = "results",
 }
 
 function resetLocalGamePrepState() {
-  const code = getState().lobbyCode;
-  saveStatePatch({
-    hotTakeGame: {
-      customTakes: [],
-      ready: {},
-      lobbyStarted: false,
-      pausedBy: null,
-      selectedThemeId: "catalog",
-      roundCount: 5,
-      deck: null,
-      takeIdx: 0,
-      phase: null,
-      votes: {},
-      voteEndsAt: null,
-      intermissionEndsAt: null,
-      takeScored: false,
-    },
-    guessLie: {
-      sessionId: code,
-      submissions: {},
-      lobbyComplete: false,
-      roundIdx: 0,
-      phase: null,
-      votes: {},
-      roundScored: false,
-    },
-    tierNightTopicId: null,
-    tierNightGame: null,
-  });
+  resetEveningState();
+}
+
+/** Vide le cache session multijoueur (après quit lobby). */
+export function clearCachedGameSession() {
+  cachedRow = null;
+  lastSessionSig = "";
+  notify(null);
 }
 
 export function isOnPostGameScreen(screen = getCurrentScreen()) {
@@ -656,6 +779,14 @@ export async function syncHotTakeSession(extra = {}) {
   saveStatePatch({ hotTakeGame: session });
   if (!isGameSyncActive()) return session;
   await patchGameState({ hotTake: hotTakeToRemote(session) });
+  return session;
+}
+
+export async function syncSpeedVoteSession(extra = {}) {
+  const session = { ...getState().speedVoteGame, ...extra };
+  saveStatePatch({ speedVoteGame: session });
+  if (!isGameSyncActive()) return session;
+  await patchGameState({ speedVote: speedVoteToRemote(session) });
   return session;
 }
 

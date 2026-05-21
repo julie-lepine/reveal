@@ -89,6 +89,20 @@ const defaultState = () => ({
     intermissionEndsAt: null,
     takeScored: false,
   },
+  speedVoteGame: {
+    ready: {},
+    lobbyStarted: false,
+    selectedThemeId: "catalog",
+    roundCount: 5,
+    deck: null,
+    roundIdx: 0,
+    phase: null,
+    votes: {},
+    voteEndsAt: null,
+    roundScored: false,
+    modifier: "normal",
+    currentQuestion: null,
+  },
   tierNightGame: { recaps: [], topicId: null, listName: "", controversialItem: null },
   openLobbies: {},
 });
@@ -117,6 +131,7 @@ function loadState() {
       lobby: { ...defaultLobby(), ...parsed.lobby },
       inLobby: parsed.inLobby || false,
       hotTakeGame: { ...defaultState().hotTakeGame, ...parsed.hotTakeGame },
+      speedVoteGame: { ...defaultState().speedVoteGame, ...parsed.speedVoteGame },
       tierNightGame: { ...defaultState().tierNightGame, ...parsed.tierNightGame },
       openLobbies: parsed.openLobbies || {},
       lastGame: parsed.lastGame || null,
@@ -236,6 +251,7 @@ export function renameLocalPlayer(newName) {
   const ht = state.hotTakeGame;
   if (ht) {
     if (ht.ready) ht.ready = mergeKeyedRecord(ht.ready, oldName, trimmed);
+    if (ht.votes) ht.votes = mergeKeyedRecord(ht.votes, oldName, trimmed);
     if (ht.pausedBy === oldName) ht.pausedBy = trimmed;
     if (Array.isArray(ht.customTakes)) {
       ht.customTakes = ht.customTakes.map((t) =>
@@ -298,6 +314,31 @@ export function resetScores() {
   save();
 }
 
+export function defaultEveningStats() {
+  return {
+    hotTakesPlayed: 0,
+    liesFound: 0,
+    liesTotal: 0,
+    tierNightsPlayed: 0,
+    speedVotesPlayed: 0,
+  };
+}
+
+/** Scores + stats de soirée + état des jeux — nouvelle partie / lobby. */
+export function resetEveningState() {
+  resetScores();
+  const base = defaultState();
+  saveStatePatch({
+    stats: defaultEveningStats(),
+    lastGame: null,
+    hotTakeGame: { ...base.hotTakeGame },
+    speedVoteGame: { ...base.speedVoteGame },
+    guessLie: { ...emptyGuessLie(), sessionId: getState().lobbyCode || null },
+    tierNightTopicId: null,
+    tierNightGame: { ...base.tierNightGame },
+  });
+}
+
 export function addScore(playerName, points) {
   ensurePlayerScore(playerName);
   state.scores[playerName] += points;
@@ -320,6 +361,11 @@ export function getLastGame() {
 export function recordHotTakePlayed() {
   state.stats.hotTakesPlayed += 1;
   state.globalStats.hotTakesPlayed = (state.globalStats.hotTakesPlayed || 0) + 1;
+  save();
+}
+
+export function recordSpeedVotePlayed() {
+  state.stats.speedVotesPlayed = (state.stats.speedVotesPlayed || 0) + 1;
   save();
 }
 
@@ -430,4 +476,16 @@ export function addCustomTierList({ name, items, emoji = "✨" }) {
   state.tierNightTopicId = id;
   save();
   return id;
+}
+
+export function deleteCustomTierList(id) {
+  const lists = state.customTierLists || [];
+  const next = lists.filter((t) => t.id !== id);
+  if (next.length === lists.length) return false;
+  state.customTierLists = next;
+  if (state.tierNightTopicId === id) {
+    state.tierNightTopicId = null;
+  }
+  save();
+  return true;
 }

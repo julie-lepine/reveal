@@ -246,6 +246,22 @@ export async function refreshLobbyFromSupabase() {
   return true;
 }
 
+/** Quitte le lobby côté serveur (retire le membre local). */
+export async function leaveLobbySupabase() {
+  const lobbyId = getState().lobby?.id;
+  const userId = getSupabaseUserId();
+  if (!lobbyId || !userId) return { ok: true };
+
+  const { error } = await supabase
+    .from("lobby_members")
+    .delete()
+    .eq("lobby_id", lobbyId)
+    .eq("user_id", userId);
+
+  if (error) return { ok: false, error: error.message };
+  return { ok: true };
+}
+
 export async function setLocalReadySupabase(ready) {
   const lobbyId = getState().lobby?.id;
   const userId = getSupabaseUserId();

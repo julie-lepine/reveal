@@ -553,6 +553,93 @@ button.game-card{
   margin-bottom:20px;
 }
 
+.card--speed{
+  background:linear-gradient(135deg,rgba(251,191,36,.2),rgba(245,158,11,.1));
+  border-color:rgba(251,191,36,.35);
+  margin-bottom:20px;
+}
+
+.timer--speed{
+  color:#FBBF24;
+  text-shadow:0 0 24px rgba(251,191,36,.45);
+}
+
+.speedvote-modifier{
+  text-align:center;
+  font-weight:800;
+  font-size:13px;
+  margin:0 0 12px;
+  padding:8px 12px;
+  border-radius:12px;
+  background:rgba(255,255,255,.06);
+}
+
+.speedvote-modifier--double{
+  color:#FDE68A;
+  border:1px solid rgba(251,191,36,.35);
+}
+
+.speedvote-modifier--hidden{
+  color:#C4B5FD;
+  border:1px solid rgba(167,139,250,.35);
+}
+
+.speedvote-vote-grid{
+  display:grid;
+  grid-template-columns:repeat(2,1fr);
+  gap:10px;
+  margin:16px 0;
+}
+
+.speedvote-vote-btn{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:8px;
+  padding:14px 10px;
+  border-radius:16px;
+  border:2px solid rgba(255,255,255,.12);
+  background:rgba(255,255,255,.05);
+  color:#fff;
+  cursor:pointer;
+  position:relative;
+  min-height:88px;
+  transition:border-color .15s,transform .1s;
+}
+
+.speedvote-vote-btn:active{
+  transform:scale(.97);
+}
+
+.speedvote-vote-btn--active{
+  border-color:var(--vote-color,#FBBF24);
+  box-shadow:0 0 0 1px var(--vote-color,#FBBF24),0 8px 24px rgba(0,0,0,.25);
+}
+
+.speedvote-vote-btn__avatar{
+  width:44px;
+  height:44px;
+  border-radius:50%;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:22px;
+}
+
+.speedvote-vote-btn__name{
+  font-weight:700;
+  font-size:13px;
+  text-align:center;
+  line-height:1.2;
+}
+
+.speedvote-vote-btn__check{
+  position:absolute;
+  top:8px;
+  right:10px;
+  font-size:14px;
+}
+
 .moderation-notice{
   margin:10px 0 0;
   font-size:12px;
@@ -576,6 +663,11 @@ button.game-card{
 }
 
 .btn--lobby-return{
+  margin-bottom:12px;
+}
+
+.btn--leave-lobby{
+  width:100%;
   margin-bottom:12px;
 }
 
@@ -997,7 +1089,53 @@ button.game-card{
 }
 
 .tier-list-card--custom{
+  position:relative;
   border-style:dashed;
+  cursor:default;
+}
+
+.tier-list-card__delete{
+  position:absolute;
+  top:8px;
+  right:8px;
+  z-index:2;
+  width:28px;
+  height:28px;
+  padding:0;
+  border:none;
+  border-radius:50%;
+  background:rgba(0,0,0,.45);
+  color:rgba(255,255,255,.85);
+  font-size:18px;
+  line-height:1;
+  cursor:pointer;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  transition:background .15s,color .15s,transform .15s;
+}
+
+.tier-list-card__delete:hover,
+.tier-list-card__delete:focus-visible{
+  background:rgba(239,68,68,.75);
+  color:#fff;
+  transform:scale(1.05);
+}
+
+.tier-list-card__body{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:10px;
+  width:100%;
+  cursor:pointer;
+  outline:none;
+}
+
+.tier-list-card__body:focus-visible{
+  outline:2px solid rgba(251,191,36,.5);
+  outline-offset:4px;
+  border-radius:12px;
 }
 
 .btn:disabled{
@@ -2114,6 +2252,7 @@ body.wizz-shake #app{
 
 .game-grid .game-tile.hot,
 .game-grid .game-tile.guess,
+.game-grid .game-tile.speed,
 .game-grid .game-tile.tier,
 .game-grid .game-tile.song{
   background:transparent;
@@ -2177,6 +2316,10 @@ body.wizz-shake #app{
 
 .game-tile__logo-wrap--tier{
   --logo-border:linear-gradient(320deg, #FBBF24 0%, #F97316 38%, #2B2D66 100%);
+}
+
+.game-tile__logo-wrap--speed{
+  --logo-border:linear-gradient(145deg, #FBBF24 0%, #FF3CAC 48%, #2B2D66 100%);
 }
 
 .game-tile__logo{
@@ -2783,4 +2926,17 @@ body{
 .app-dialog__btn{
   max-width:200px;
   margin:0 auto;
+}
+
+.app-dialog__actions{
+  display:flex;
+  flex-wrap:wrap;
+  gap:10px;
+  justify-content:center;
+}
+
+.app-dialog__actions .app-dialog__btn{
+  flex:1 1 120px;
+  max-width:none;
+  margin:0;
 }

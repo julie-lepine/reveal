@@ -17,6 +17,7 @@ import {
   hasActiveLobby,
   getLobby,
   goToGameSelect,
+  leaveLobby,
 } from "../core/lobby.js";
 import { getGlobalStats } from "../core/state.js";
 import { getEveningRecap } from "../core/eveningRecap.js";
@@ -55,7 +56,9 @@ function homeStatsHtml() {
 
 export function mountHome(app) {
   const pendingJoin = sessionStorage.getItem("reveal-pending-join");
-  let authTab = pendingJoin ? "guest" : "login";
+  const tabAfterLeave = sessionStorage.getItem("reveal-auth-tab");
+  let authTab = tabAfterLeave || (pendingJoin ? "guest" : "login");
+  if (tabAfterLeave) sessionStorage.removeItem("reveal-auth-tab");
 
   function render() {
     const user = getUser();
@@ -140,7 +143,8 @@ export function mountHome(app) {
             hasActiveLobby()
               ? `<button type="button" class="btn btn-primary btn--lobby-return" id="btn-return-lobby">
             Retour aux jeux <span class="muted">(${escapeHtml(getLobby().code)})</span>
-          </button>`
+          </button>
+          <button type="button" class="btn btn-secondary btn--leave-lobby" id="btn-leave-lobby">Quitter le lobby</button>`
               : ""
           }
           ${
@@ -243,6 +247,19 @@ export function mountHome(app) {
 
     app.querySelector("#btn-return-lobby")?.addEventListener("click", () => {
       goToGameSelect();
+    });
+
+    app.querySelector("#btn-leave-lobby")?.addEventListener("click", async () => {
+      const btn = app.querySelector("#btn-leave-lobby");
+      btn.disabled = true;
+      const res = await leaveLobby();
+      btn.disabled = false;
+      if (!res.ok) {
+        await showAppAlert(res.error || "Impossible de quitter le lobby.", {
+          title: "Quitter le lobby",
+          icon: "⚠️",
+        });
+      }
     });
 
     app.querySelector("#btn-create-lobby")?.addEventListener("click", async () => {
