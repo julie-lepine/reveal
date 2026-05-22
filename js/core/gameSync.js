@@ -679,16 +679,37 @@ export function filRougeFromRemote(remote) {
   };
 }
 
+const FIL_ROUGE_STATUS_RANK = { idle: 0, setup: 1, active: 2, completed: 3 };
+
+function filRougeStatusRank(status) {
+  return FIL_ROUGE_STATUS_RANK[status] ?? 0;
+}
+
+function pickFilRougeStatusFields(cur, inc) {
+  const curRank = filRougeStatusRank(cur?.status);
+  const incRank = filRougeStatusRank(inc?.status);
+  const preferInc = incRank >= curRank;
+  const src = preferInc ? inc : cur;
+  return {
+    status: src?.status || cur?.status || inc?.status || "idle",
+    resultsModalOpen: Boolean(src?.resultsModalOpen),
+    resultsSnapshot: src?.resultsSnapshot ?? cur?.resultsSnapshot ?? inc?.resultsSnapshot ?? null,
+    closedAt: src?.closedAt ?? cur?.closedAt ?? inc?.closedAt ?? null,
+    closedByUid: src?.closedByUid ?? cur?.closedByUid ?? inc?.closedByUid ?? null,
+  };
+}
+
 function mergeFilRougeRemote(cur, inc) {
   if (!inc) return cur;
   if (!cur) return inc;
+  const statusFields = pickFilRougeStatusFields(cur, inc);
   return {
     ...cur,
     ...inc,
+    ...statusFields,
     submissions: { ...(cur.submissions || {}), ...(inc.submissions || {}) },
     missionAcks: { ...(cur.missionAcks || {}), ...(inc.missionAcks || {}) },
     validations: { ...(cur.validations || {}), ...(inc.validations || {}) },
-    resultsSnapshot: inc.resultsSnapshot ?? cur.resultsSnapshot,
   };
 }
 
@@ -1496,12 +1517,19 @@ export async function syncDilemmaSession(extra = {}) {
 
 export async function syncFilRougeSession(extra = {}) {
   const session = { ...getState().filRougeGame, ...extra };
+  saveStatePatch({ filRougeGame: session });
   if (!isGameSyncActive()) {
-    saveStatePatch({ filRougeGame: session });
     return session;
   }
   await patchGameState({ filRouge: filRougeToRemote(session) });
   return getState().filRougeGame || session;
+}
+
+/** Recharge l'état Fil Rouge depuis la session multijoueur (hôte + invités). */
+export async function refreshFilRougeFromSession() {
+  if (!isGameSyncActive()) return getState().filRougeGame;
+  const row = await refreshGameSession();
+  return getState().filRougeGame;
 }
 
 export async function syncGuessLieSession(extra = {}) {

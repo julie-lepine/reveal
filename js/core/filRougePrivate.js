@@ -148,9 +148,10 @@ export async function hostDistributeFilRougeMissions(assignments) {
   }
 }
 
-export function clearFilRougePrivateForLobby(lobbyId) {
+export async function clearFilRougePrivateForLobby(lobbyId) {
   if (!lobbyId) return;
   localStorage.removeItem(`${LOCAL_KEY}:${lobbyId}`);
   if (!isSupabaseConfigured()) return;
-  void supabase.from("fil_rouge_private").delete().eq("lobby_id", lobbyId);
+  const { error } = await supabase.from("fil_rouge_private").delete().eq("lobby_id", lobbyId);
+  if (error) throw error;
 }

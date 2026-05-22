@@ -12,6 +12,7 @@ import {
   hostApproveFilRougeMission,
   hostRejectFilRougeMission,
   hostCloseFilRougeGame,
+  hostRestartFilRougeGame,
   requestFilRougeValidation,
 } from "./filRougeSession.js";
 import { isLobbyHost, nameForUserId } from "./gameSync.js";
@@ -160,9 +161,16 @@ export async function filRougeBoxHtml() {
       : "";
 
   const hostClose =
-    host && (status === FIL_ROUGE_STATUS.ACTIVE || status === FIL_ROUGE_STATUS.COMPLETED)
+    host && status === FIL_ROUGE_STATUS.ACTIVE
       ? `<button type="button" class="btn btn-secondary btn--spaced" id="fil-rouge-close">Clôturer le jeu</button>`
       : "";
+
+  const hostRestart =
+    host && status === FIL_ROUGE_STATUS.COMPLETED
+      ? `<button type="button" class="btn btn-primary btn--spaced" id="fil-rouge-restart">Relancer une partie</button>`
+      : status === FIL_ROUGE_STATUS.COMPLETED
+        ? `<p class="hint fil-rouge-box__restart-wait">En attente de l'hôte pour relancer une partie…</p>`
+        : "";
 
   const ctaLabel =
     status === FIL_ROUGE_STATUS.ACTIVE ? "Voir ma mission" : "Ajouter mon mot";
@@ -209,6 +217,7 @@ export async function filRougeBoxHtml() {
       ${personalCard}
       ${hostPending}
       ${hostClose}
+      ${hostRestart}
       ${
         status === FIL_ROUGE_STATUS.COMPLETED
           ? `<button type="button" class="btn-link" id="fil-rouge-view-results">Voir les résultats</button>`
@@ -304,6 +313,24 @@ export function bindFilRougeBox(root) {
     );
     if (!ok) return;
     await hostCloseFilRougeGame();
+    notifyFilRougeChange();
+  });
+
+  root.querySelector("#fil-rouge-restart")?.addEventListener("click", async () => {
+    const ok = await showAppConfirm(
+      "Lancer une nouvelle partie Mot Interdit ? Les mots et missions seront réinitialisés pour tout le monde.",
+      { title: "Relancer une partie", confirmLabel: "Relancer", cancelLabel: "Annuler", icon: "🤫" }
+    );
+    if (!ok) return;
+    const res = await hostRestartFilRougeGame();
+    if (!res.ok) {
+      await showAppAlert(res.error, { title: "Mot Interdit", icon: "⚠️" });
+      return;
+    }
+    notifyFilRougeChange();
+    import("../core/router.js").then(({ navigate }) => {
+      navigate("filrouge-setup", { navStack: ["home", "lobby", "game-select", "filrouge-setup"] });
+    });
   });
 
   root.querySelector("#fil-rouge-view-results")?.addEventListener("click", () => {

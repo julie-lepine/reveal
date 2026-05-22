@@ -14,6 +14,7 @@ import {
   onGameSessionChange,
   handleSessionRoute,
   refreshGameSession,
+  refreshFilRougeFromSession,
   getCachedGameSession,
   routeToActiveGameIfNeeded,
 } from "../core/gameSync.js";
@@ -266,13 +267,17 @@ export function mountGameSelect(app) {
   if (isGameSyncActive()) {
     void (async () => {
       if (await routeToActiveGameIfNeeded()) return;
-      const row = (await refreshGameSession()) || getCachedGameSession();
+      await refreshFilRougeFromSession();
+      const row = getCachedGameSession() || (await refreshGameSession());
       if (row) handleSessionRoute(row);
       scheduleRender(true);
     })();
 
     unsubSession = onGameSessionChange(async (row) => {
-      if (getCurrentScreen() === "game-select") scheduleRender(false);
+      if (getCurrentScreen() === "game-select") {
+        await refreshFilRougeFromSession();
+        scheduleRender(true);
+      }
       if (row && (await routeToActiveGameIfNeeded(row))) return;
       if (row) handleSessionRoute(row);
     });

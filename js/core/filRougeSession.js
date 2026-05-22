@@ -21,6 +21,7 @@ import {
   fetchMyFilRougePrivate,
   hostDistributeFilRougeMissions,
   upsertMyFilRougeSetupWord,
+  clearFilRougePrivateForLobby,
 } from "./filRougePrivate.js";
 import { getSupabaseUserId } from "./supabaseAuth.js";
 
@@ -398,6 +399,32 @@ export async function hostResumeAfterFilRougeResults() {
     ...getFilRougeSession(),
     resultsModalOpen: false,
   });
+  return { ok: true };
+}
+
+/** Hôte : nouvelle partie après clôture (mots + missions réinitialisés). */
+export async function hostRestartFilRougeGame() {
+  if (!isLobbyHost()) return { ok: false, error: "Réservé à l'hôte." };
+  const lobbyId = getState().lobby?.id;
+  await clearFilRougePrivateForLobby(lobbyId);
+
+  const uids = participantUids();
+  const validations = {};
+  uids.forEach((uid) => {
+    validations[uid] = { status: FIL_ROUGE_VALIDATION.IN_PROGRESS };
+  });
+
+  await syncFilRougeSession({
+    status: FIL_ROUGE_STATUS.SETUP,
+    submissions: {},
+    missionAcks: {},
+    validations,
+    resultsModalOpen: false,
+    resultsSnapshot: null,
+    closedAt: null,
+    closedByUid: null,
+  });
+
   return { ok: true };
 }
 

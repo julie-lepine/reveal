@@ -3917,6 +3917,11 @@ body{
   min-height:auto;
 }
 
+.fil-rouge-box__restart-wait{
+  margin:12px 0 4px;
+  text-align:center;
+}
+
 .fil-rouge-setup__req{
   display:flex;
   align-items:flex-start;
