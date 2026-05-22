@@ -647,14 +647,9 @@ export function filRougeToRemote(session) {
   Object.entries(session.submissions || {}).forEach(([k, v]) => {
     submissions[userIdForName(k) || k] = v;
   });
-  const missionAcks = {};
-  Object.entries(session.missionAcks || {}).forEach(([k, v]) => {
-    missionAcks[userIdForName(k) || k] = v;
-  });
   return {
     status: session.status || "idle",
     submissions,
-    missionAcks,
     validations: mapFilRougeValidationsToUid(session.validations || {}),
     resultsModalOpen: Boolean(session.resultsModalOpen),
     resultsSnapshot: session.resultsSnapshot || null,
@@ -670,7 +665,6 @@ export function filRougeFromRemote(remote) {
   return {
     status: remote.status || "idle",
     submissions: { ...(remote.submissions || {}) },
-    missionAcks: { ...(remote.missionAcks || {}) },
     validations: { ...(remote.validations || {}) },
     resultsModalOpen: Boolean(remote.resultsModalOpen),
     resultsSnapshot: remote.resultsSnapshot || null,
@@ -685,7 +679,27 @@ function filRougeStatusRank(status) {
   return FIL_ROUGE_STATUS_RANK[status] ?? 0;
 }
 
+/** Relance ou reset : setup sans soumissions ni résultats → prioritaire sur « completed ». */
+function isFilRougeRoundReset(inc) {
+  return (
+    inc?.status === "setup" &&
+    inc?.submissions !== undefined &&
+    Object.keys(inc.submissions || {}).length === 0 &&
+    !inc?.resultsModalOpen &&
+    !inc?.resultsSnapshot
+  );
+}
+
 function pickFilRougeStatusFields(cur, inc) {
+  if (isFilRougeRoundReset(inc)) {
+    return {
+      status: "setup",
+      resultsModalOpen: false,
+      resultsSnapshot: null,
+      closedAt: null,
+      closedByUid: null,
+    };
+  }
   const curRank = filRougeStatusRank(cur?.status);
   const incRank = filRougeStatusRank(inc?.status);
   const preferInc = incRank >= curRank;
@@ -699,18 +713,32 @@ function pickFilRougeStatusFields(cur, inc) {
   };
 }
 
+function mergeFilRougeSubmissions(cur, inc) {
+  if (!inc || inc.submissions === undefined) return { ...(cur?.submissions || {}) };
+  const incSubs = inc.submissions || {};
+  if (Object.keys(incSubs).length === 0) return {};
+  return { ...(cur?.submissions || {}), ...incSubs };
+}
+
 function mergeFilRougeRemote(cur, inc) {
   if (!inc) return cur;
   if (!cur) return inc;
+  const reset = isFilRougeRoundReset(inc);
   const statusFields = pickFilRougeStatusFields(cur, inc);
-  return {
+  const merged = {
     ...cur,
     ...inc,
     ...statusFields,
-    submissions: { ...(cur.submissions || {}), ...(inc.submissions || {}) },
-    missionAcks: { ...(cur.missionAcks || {}), ...(inc.missionAcks || {}) },
-    validations: { ...(cur.validations || {}), ...(inc.validations || {}) },
+    submissions: mergeFilRougeSubmissions(cur, inc),
+    validations: reset
+      ? { ...(inc.validations || {}) }
+      : { ...(cur.validations || {}), ...(inc.validations || {}) },
   };
+  merged.missionAcks = reset ? {} : { ...(cur.missionAcks || {}) };
+  if (merged.status === "setup" && cur.status !== "setup") {
+    merged.missionAcks = {};
+  }
+  return merged;
 }
 
 function mergeFilRougeLocal(local, remote) {

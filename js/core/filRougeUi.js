@@ -81,7 +81,6 @@ function personalCardHtml(mission, myStatus) {
         <p class="label-upper label-upper--muted">Ta mission</p>
         ${missionLines}
         <p class="fil-rouge-box__status-msg fil-rouge-box__status-msg--ok">Mission validée par l'hôte · +${FIL_ROUGE_POINTS_MISSION} pts ✓</p>
-        <button type="button" class="btn-link" data-fil-rouge-mission>Voir ma mission</button>
       </div>`;
   }
 
@@ -91,7 +90,6 @@ function personalCardHtml(mission, myStatus) {
         <p class="label-upper label-upper--muted">Ta mission</p>
         ${missionLines}
         <p class="fil-rouge-box__status-msg fil-rouge-box__status-msg--pending">En attente de validation par l'hôte ⏳</p>
-        <button type="button" class="btn-link" data-fil-rouge-mission>Voir ma mission</button>
       </div>`;
   }
 
@@ -106,7 +104,6 @@ function personalCardHtml(mission, myStatus) {
         <button type="button" class="btn btn-primary btn--spaced" id="fil-rouge-validate" disabled>
           J'ai validé ma mission
         </button>
-        <button type="button" class="btn-link" data-fil-rouge-mission>Voir ma mission</button>
       </div>`;
 }
 
@@ -178,7 +175,7 @@ export async function filRougeBoxHtml() {
   const setupCta =
     status === FIL_ROUGE_STATUS.COMPLETED
       ? ""
-      : `<button type="button" class="btn btn-primary fil-rouge-box__cta" data-fil-rouge-tile>${escapeHtml(ctaLabel)}</button>`;
+      : `<button type="button" class="btn ${status === FIL_ROUGE_STATUS.ACTIVE ? "btn-secondary" : "btn-primary"} fil-rouge-box__cta" data-fil-rouge-tile>${escapeHtml(ctaLabel)}</button>`;
 
   return `
     <div class="fil-rouge-box card" id="fil-rouge-box">
@@ -284,12 +281,6 @@ export function bindFilRougeBox(root) {
     });
   }
 
-  root.querySelector("[data-fil-rouge-mission]")?.addEventListener("click", () => {
-    import("../core/router.js").then(({ navigate }) => {
-      navigate("filrouge-mission", { navStack: ["home", "lobby", "game-select", "filrouge-mission"] });
-    });
-  });
-
   root.querySelectorAll("[data-fr-approve]").forEach((btn) => {
     btn.addEventListener("click", async () => {
       const pUid = btn.getAttribute("data-fr-approve");
@@ -327,10 +318,8 @@ export function bindFilRougeBox(root) {
       await showAppAlert(res.error, { title: "Mot Interdit", icon: "⚠️" });
       return;
     }
-    notifyFilRougeChange();
-    import("../core/router.js").then(({ navigate }) => {
-      navigate("filrouge-setup", { navStack: ["home", "lobby", "game-select", "filrouge-setup"] });
-    });
+    const { navigate } = await import("../core/router.js");
+    navigate("filrouge-setup", { navStack: ["home", "lobby", "game-select", "filrouge-setup"] });
   });
 
   root.querySelector("#fil-rouge-view-results")?.addEventListener("click", () => {

@@ -39,6 +39,10 @@ export function mountFilRougeMission(app) {
 
     const uid = getSupabaseUserId() || userIdForName(getLocalDisplayName());
     const acked = session.missionAcks?.[uid];
+    if (acked) {
+      navigate("game-select", { navStack: ["home", "lobby", "game-select"] });
+      return;
+    }
 
     app.innerHTML = pageShell({
       backTarget: "game-select",
@@ -51,11 +55,7 @@ export function mountFilRougeMission(app) {
           <p class="fil-rouge-mission__target">${escapeHtml(mission.targetName)}</p>
         </div>
         <p class="hint fil-rouge-mission__secret">Ne révèle ton mot à personne.</p>
-        ${
-          acked
-            ? `<p class="card card--ok">Mission reçue ✓ — accessible depuis le menu jeux.</p>`
-            : `<button type="button" class="btn btn-primary btn--spaced" id="fil-rouge-ack">Mission reçue</button>`
-        }
+        <button type="button" class="btn btn-primary btn--spaced" id="fil-rouge-ack">Mission reçue</button>
         <button type="button" class="btn btn-accent" data-nav="game-select">Retour aux jeux</button>
       `,
     });
@@ -65,9 +65,9 @@ export function mountFilRougeMission(app) {
     app.querySelector("#fil-rouge-ack")?.addEventListener("click", async () => {
       if (uid) {
         await ackMyFilRougeMission();
-        await setFilRougeMissionAck(uid);
+        setFilRougeMissionAck(uid);
       }
-      render();
+      navigate("game-select", { navStack: ["home", "lobby", "game-select"] });
     });
   }
 

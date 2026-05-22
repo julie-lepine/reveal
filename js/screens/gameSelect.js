@@ -276,7 +276,7 @@ export function mountGameSelect(app) {
     unsubSession = onGameSessionChange(async (row) => {
       if (getCurrentScreen() === "game-select") {
         await refreshFilRougeFromSession();
-        scheduleRender(true);
+        scheduleRender(false);
       }
       if (row && (await routeToActiveGameIfNeeded(row))) return;
       if (row) handleSessionRoute(row);

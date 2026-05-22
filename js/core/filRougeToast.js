@@ -1,16 +1,14 @@
 import { FIL_ROUGE_POINTS_MISSION, FIL_ROUGE_TILE, FIL_ROUGE_VALIDATION } from "../../data/filRouge.js";
 import { getFilRougeSession } from "./filRougeSession.js";
-import { onGameSessionChange } from "./gameSync.js";
+import { onGameSessionChange, userIdForName } from "./gameSync.js";
 import { getSupabaseUserId } from "./supabaseAuth.js";
-import { userIdForName } from "./gameSync.js";
 import { getLocalDisplayName } from "./state.js";
 import { escapeHtml } from "./ui.js";
 
 const TOAST_ID = "fil-rouge-validated-toast";
-const AUTO_DISMISS_MS = 7000;
 
 let lastLocalValidationStatus = null;
-let dismissTimer = null;
+let dismissedByUser = false;
 
 function localValidationUid() {
   return getSupabaseUserId() || userIdForName(getLocalDisplayName());
@@ -22,16 +20,15 @@ function localValidationStatus() {
   return getFilRougeSession().validations?.[uid]?.status ?? null;
 }
 
-function hideToast() {
-  if (dismissTimer) {
-    clearTimeout(dismissTimer);
-    dismissTimer = null;
-  }
+function hideToast({ dismissed = false } = {}) {
+  if (dismissed) dismissedByUser = true;
   document.getElementById(TOAST_ID)?.remove();
 }
 
 export function showFilRougeValidatedToast() {
-  hideToast();
+  if (dismissedByUser) return;
+  if (document.getElementById(TOAST_ID)) return;
+
   const root = document.createElement("div");
   root.id = TOAST_ID;
   root.className = "fil-rouge-toast";
@@ -50,22 +47,44 @@ export function showFilRougeValidatedToast() {
   document.body.prepend(root);
   requestAnimationFrame(() => root.classList.add("fil-rouge-toast--in"));
 
-  root.querySelector(".fil-rouge-toast__close")?.addEventListener("click", hideToast);
-  dismissTimer = setTimeout(hideToast, AUTO_DISMISS_MS);
+  root.querySelector(".fil-rouge-toast__close")?.addEventListener("click", () => {
+    hideToast({ dismissed: true });
+  });
+}
+
+function ensureValidationToastVisible() {
+  const status = localValidationStatus();
+  if (status !== FIL_ROUGE_VALIDATION.VALIDATED) {
+    hideToast();
+    return;
+  }
+  if (!dismissedByUser) showFilRougeValidatedToast();
 }
 
 function onSessionValidationChange() {
   const status = localValidationStatus();
-  if (
-    lastLocalValidationStatus === FIL_ROUGE_VALIDATION.PENDING &&
-    status === FIL_ROUGE_VALIDATION.VALIDATED
-  ) {
-    showFilRougeValidatedToast();
-  }
+  const prev = lastLocalValidationStatus;
   lastLocalValidationStatus = status;
+
+  if (status === FIL_ROUGE_VALIDATION.PENDING) {
+    dismissedByUser = false;
+  }
+
+  if (status !== FIL_ROUGE_VALIDATION.VALIDATED) {
+    hideToast();
+    return;
+  }
+
+  if (prev === FIL_ROUGE_VALIDATION.PENDING || !document.getElementById(TOAST_ID)) {
+    showFilRougeValidatedToast();
+  } else {
+    ensureValidationToastVisible();
+  }
 }
 
 export function initFilRougeValidationListener() {
   lastLocalValidationStatus = localValidationStatus();
+  dismissedByUser = false;
   onGameSessionChange(onSessionValidationChange);
+  ensureValidationToastVisible();
 }

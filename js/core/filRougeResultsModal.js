@@ -2,6 +2,7 @@ import { escapeHtml } from "./ui.js";
 import { isLobbyHost } from "./gameSync.js";
 import { hostResumeAfterFilRougeResults } from "./filRougeSession.js";
 import { FIL_ROUGE_POINTS_MISSION } from "../../data/filRouge.js";
+import { getCurrentScreen } from "./router.js";
 
 let openModal = null;
 let lastOpenToken = "";
@@ -94,6 +95,7 @@ export function showFilRougeResultsModal(snapshot, { readOnly = false } = {}) {
           ? `<button type="button" class="btn btn-primary btn--spaced" id="fil-rouge-resume">Reprendre la soirée</button>`
           : `<p class="hint fil-rouge-modal__wait">En attente de l'hôte pour reprendre…</p>`
       }
+      <button type="button" class="btn btn-secondary btn--spaced" id="fil-rouge-modal-close">Fermer</button>
     </div>
   `;
 
@@ -103,6 +105,12 @@ export function showFilRougeResultsModal(snapshot, { readOnly = false } = {}) {
 
   root.querySelector("#fil-rouge-resume")?.addEventListener("click", async () => {
     await hostResumeAfterFilRougeResults();
+  });
+  root.querySelector("#fil-rouge-modal-close")?.addEventListener("click", () => {
+    closeFilRougeResultsModal();
+  });
+  root.querySelector(".fil-rouge-modal__backdrop")?.addEventListener("click", () => {
+    closeFilRougeResultsModal();
   });
 }
 
@@ -118,11 +126,16 @@ export function initFilRougeResultsListener() {
     onGameSessionChange(() => {
       import("./filRougeSession.js").then(({ getFilRougeSession }) => {
         const fr = getFilRougeSession();
-        if (fr.resultsModalOpen && fr.resultsSnapshot) {
-          showFilRougeResultsModal(fr.resultsSnapshot);
-        } else {
+        if (!fr.resultsModalOpen || !fr.resultsSnapshot) {
           closeFilRougeResultsModal();
+          return;
         }
+        /** Sur « Choisir un jeu », la box Fil Rouge suffit — pas de overlay bloquant. */
+        if (getCurrentScreen() === "game-select") {
+          closeFilRougeResultsModal();
+          return;
+        }
+        showFilRougeResultsModal(fr.resultsSnapshot);
       });
     });
   });

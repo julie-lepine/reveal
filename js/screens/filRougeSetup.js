@@ -1,6 +1,7 @@
 import {
   FIL_ROUGE_MIN_WORD_LENGTH,
   FIL_ROUGE_MIN_PLAYERS,
+  FIL_ROUGE_STATUS,
   FIL_ROUGE_TILE,
 } from "../../data/filRouge.js";
 import {
@@ -41,6 +42,10 @@ export function mountFilRougeSetup(app) {
 
   async function ensureSetup() {
     const s = getFilRougeSession();
+    if (s.status === FIL_ROUGE_STATUS.COMPLETED) {
+      navigate("game-select", { navStack: ["home", "lobby", "game-select"] });
+      return;
+    }
     if (s.status === "idle") await startFilRougeSetup();
   }
 

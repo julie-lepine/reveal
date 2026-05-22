@@ -376,14 +376,30 @@ export function buildFilRougeResultsSnapshot() {
   };
 }
 
+async function clearFilRougeWordsForNewRound() {
+  const lobbyId = getState().lobby?.id;
+  await clearFilRougePrivateForLobby(lobbyId);
+  const session = getFilRougeSession();
+  saveStatePatch({
+    filRougeGame: {
+      ...session,
+      submissions: {},
+      missionAcks: {},
+    },
+  });
+}
+
 export async function hostCloseFilRougeGame() {
   if (!isLobbyHost()) return { ok: false, error: "Réservé à l'hôte." };
   const snapshot = buildFilRougeResultsSnapshot();
   const uid = getSupabaseUserId();
 
+  await clearFilRougeWordsForNewRound();
+
   await syncFilRougeSession({
     ...getFilRougeSession(),
     status: FIL_ROUGE_STATUS.COMPLETED,
+    submissions: {},
     resultsModalOpen: true,
     resultsSnapshot: snapshot,
     closedAt: snapshot.closedAt,
@@ -405,8 +421,6 @@ export async function hostResumeAfterFilRougeResults() {
 /** Hôte : nouvelle partie après clôture (mots + missions réinitialisés). */
 export async function hostRestartFilRougeGame() {
   if (!isLobbyHost()) return { ok: false, error: "Réservé à l'hôte." };
-  const lobbyId = getState().lobby?.id;
-  await clearFilRougePrivateForLobby(lobbyId);
 
   const uids = participantUids();
   const validations = {};
@@ -414,10 +428,25 @@ export async function hostRestartFilRougeGame() {
     validations[uid] = { status: FIL_ROUGE_VALIDATION.IN_PROGRESS };
   });
 
+  await clearFilRougeWordsForNewRound();
+
+  saveStatePatch({
+    filRougeGame: {
+      ...getFilRougeSession(),
+      status: FIL_ROUGE_STATUS.SETUP,
+      submissions: {},
+      missionAcks: {},
+      validations,
+      resultsModalOpen: false,
+      resultsSnapshot: null,
+      closedAt: null,
+      closedByUid: null,
+    },
+  });
+
   await syncFilRougeSession({
     status: FIL_ROUGE_STATUS.SETUP,
     submissions: {},
-    missionAcks: {},
     validations,
     resultsModalOpen: false,
     resultsSnapshot: null,
@@ -428,10 +457,11 @@ export async function hostRestartFilRougeGame() {
   return { ok: true };
 }
 
-export async function setFilRougeMissionAck(uid) {
+/** Accusé « mission reçue » — local uniquement (ne pas impacter l'écran des autres joueurs). */
+export function setFilRougeMissionAck(uid) {
   const session = getFilRougeSession();
   const missionAcks = { ...(session.missionAcks || {}), [uid]: true };
-  await syncFilRougeSession({ ...session, missionAcks });
+  saveStatePatch({ filRougeGame: { ...session, missionAcks } });
 }
 
 export function resetFilRougeSessionLocal() {
