@@ -2,6 +2,7 @@ import {
   FIL_ROUGE_TILE,
   FIL_ROUGE_VALIDATION,
   FIL_ROUGE_STATUS,
+  FIL_ROUGE_POINTS_MISSION,
 } from "../../data/filRouge.js";
 import { escapeHtml } from "./ui.js";
 import {
@@ -17,8 +18,23 @@ import { isLobbyHost, nameForUserId } from "./gameSync.js";
 import { getLobbyParticipants } from "./lobby.js";
 import { getSupabaseUserId } from "./supabaseAuth.js";
 import { userIdForName } from "./gameSync.js";
+import { getLocalDisplayName } from "./state.js";
 import { showAppConfirm, showAppAlert } from "./dialog.js";
 import { showFilRougeResultsModal } from "./filRougeResultsModal.js";
+
+let filRougeRefreshCallback = null;
+
+export function registerFilRougeRefresh(fn) {
+  filRougeRefreshCallback = fn;
+}
+
+function notifyFilRougeChange() {
+  void filRougeRefreshCallback?.();
+}
+
+function localUid() {
+  return getSupabaseUserId() || userIdForName(getLocalDisplayName());
+}
 
 /** Bandeau pleine largeur (état idle) — au-dessus de la grille de jeux. */
 export function filRougeBannerHtml() {
@@ -53,6 +69,46 @@ function playerStatusLine(p, validations) {
   return `<span class="fil-rouge-box__player">${escapeHtml(p.name)} …</span>`;
 }
 
+function personalCardHtml(mission, myStatus) {
+  const missionLines = `
+        <p class="fil-rouge-box__mission-line">Faire dire : <strong>« ${escapeHtml(mission.word)} »</strong></p>
+        <p class="fil-rouge-box__mission-line">à <strong>${escapeHtml(mission.targetName)}</strong></p>`;
+
+  if (myStatus === FIL_ROUGE_VALIDATION.VALIDATED) {
+    return `
+      <div class="fil-rouge-box__personal card fil-rouge-box__personal--validated">
+        <p class="label-upper label-upper--muted">Ta mission</p>
+        ${missionLines}
+        <p class="fil-rouge-box__status-msg fil-rouge-box__status-msg--ok">Mission validée par l'hôte · +${FIL_ROUGE_POINTS_MISSION} pts ✓</p>
+        <button type="button" class="btn-link" data-fil-rouge-mission>Voir ma mission</button>
+      </div>`;
+  }
+
+  if (myStatus === FIL_ROUGE_VALIDATION.PENDING) {
+    return `
+      <div class="fil-rouge-box__personal card fil-rouge-box__personal--pending">
+        <p class="label-upper label-upper--muted">Ta mission</p>
+        ${missionLines}
+        <p class="fil-rouge-box__status-msg fil-rouge-box__status-msg--pending">En attente de validation par l'hôte ⏳</p>
+        <button type="button" class="btn-link" data-fil-rouge-mission>Voir ma mission</button>
+      </div>`;
+  }
+
+  return `
+      <div class="fil-rouge-box__personal card">
+        <p class="label-upper label-upper--muted">Ta mission</p>
+        ${missionLines}
+        <label class="fil-rouge-box__check">
+          <input type="checkbox" id="fil-rouge-word-spoken" />
+          Le mot a été prononcé
+        </label>
+        <button type="button" class="btn btn-primary btn--spaced" id="fil-rouge-validate" disabled>
+          J'ai validé ma mission
+        </button>
+        <button type="button" class="btn-link" data-fil-rouge-mission>Voir ma mission</button>
+      </div>`;
+}
+
 export async function filRougeBoxHtml() {
   const session = getFilRougeSession();
   const status = session.status;
@@ -63,40 +119,27 @@ export async function filRougeBoxHtml() {
   const validations = session.validations || {};
   const host = isLobbyHost();
   const label = getFilRougeStatusLabel(status);
+  const uid = localUid();
+  const myStatus = uid ? validations[uid]?.status : null;
 
   const validated = participants.filter((p) => {
-    const uid = p.userId || userIdForName(p.name);
-    return validations[uid]?.status === FIL_ROUGE_VALIDATION.VALIDATED;
+    const pUid = p.userId || userIdForName(p.name);
+    return validations[pUid]?.status === FIL_ROUGE_VALIDATION.VALIDATED;
   });
   const inProgress = participants.filter((p) => {
-    const uid = p.userId || userIdForName(p.name);
-    const st = validations[uid]?.status;
+    const pUid = p.userId || userIdForName(p.name);
+    const st = validations[pUid]?.status;
     return st !== FIL_ROUGE_VALIDATION.VALIDATED && st !== FIL_ROUGE_VALIDATION.PENDING;
   });
   const pending = participants.filter((p) => {
-    const uid = p.userId || userIdForName(p.name);
-    return validations[uid]?.status === FIL_ROUGE_VALIDATION.PENDING;
+    const pUid = p.userId || userIdForName(p.name);
+    return validations[pUid]?.status === FIL_ROUGE_VALIDATION.PENDING;
   });
 
   const mission = status === FIL_ROUGE_STATUS.ACTIVE ? await getLocalFilRougeMission() : null;
 
   const personalCard =
-    mission && status === FIL_ROUGE_STATUS.ACTIVE
-      ? `
-      <div class="fil-rouge-box__personal card">
-        <p class="label-upper label-upper--muted">Ta mission</p>
-        <p class="fil-rouge-box__mission-line">Faire dire : <strong>« ${escapeHtml(mission.word)} »</strong></p>
-        <p class="fil-rouge-box__mission-line">à <strong>${escapeHtml(mission.targetName)}</strong></p>
-        <label class="fil-rouge-box__check">
-          <input type="checkbox" id="fil-rouge-word-spoken" />
-          Le mot a été prononcé
-        </label>
-        <button type="button" class="btn btn-primary btn--spaced" id="fil-rouge-validate" disabled>
-          J'ai validé ma mission
-        </button>
-        <button type="button" class="btn-link" data-fil-rouge-mission>Voir ma mission</button>
-      </div>`
-      : "";
+    mission && status === FIL_ROUGE_STATUS.ACTIVE ? personalCardHtml(mission, myStatus) : "";
 
   const hostPending =
     host && pending.length
@@ -104,12 +147,12 @@ export async function filRougeBoxHtml() {
         <p class="label-upper label-upper--hot">Validations en attente</p>
         ${pending
           .map((p) => {
-            const uid = p.userId || userIdForName(p.name);
+            const pUid = p.userId || userIdForName(p.name);
             return `
             <div class="fil-rouge-box__pending-row">
               <span>${escapeHtml(p.name)}</span>
-              <button type="button" class="btn btn-primary fil-rouge-box__btn-mini" data-fr-approve="${escapeHtml(uid)}">Valider +50</button>
-              <button type="button" class="btn btn-secondary fil-rouge-box__btn-mini" data-fr-reject="${escapeHtml(uid)}">Rejeter</button>
+              <button type="button" class="btn btn-primary fil-rouge-box__btn-mini" data-fr-approve="${escapeHtml(pUid)}">Valider +${FIL_ROUGE_POINTS_MISSION}</button>
+              <button type="button" class="btn btn-secondary fil-rouge-box__btn-mini" data-fr-reject="${escapeHtml(pUid)}">Rejeter</button>
             </div>`;
           })
           .join("")}
@@ -143,11 +186,17 @@ export async function filRougeBoxHtml() {
         </div>
       </header>
       ${setupCta}
-      <div class="fil-rouge-box__cols">
+      <div class="fil-rouge-box__cols fil-rouge-box__cols--triple">
         <div>
           <p class="fil-rouge-box__section-label">Missions validées</p>
           <div class="fil-rouge-box__players">
             ${validated.map((p) => playerStatusLine(p, validations)).join("") || '<span class="muted">—</span>'}
+          </div>
+        </div>
+        <div>
+          <p class="fil-rouge-box__section-label">En attente hôte</p>
+          <div class="fil-rouge-box__players">
+            ${pending.map((p) => playerStatusLine(p, validations)).join("") || '<span class="muted">—</span>'}
           </div>
         </div>
         <div>
@@ -220,7 +269,9 @@ export function bindFilRougeBox(root) {
       const res = await requestFilRougeValidation();
       if (!res.ok) {
         await showAppAlert(res.error, { title: "Mission", icon: "⚠️" });
+        return;
       }
+      notifyFilRougeChange();
     });
   }
 
@@ -232,15 +283,17 @@ export function bindFilRougeBox(root) {
 
   root.querySelectorAll("[data-fr-approve]").forEach((btn) => {
     btn.addEventListener("click", async () => {
-      const uid = btn.getAttribute("data-fr-approve");
-      await hostApproveFilRougeMission(uid);
+      const pUid = btn.getAttribute("data-fr-approve");
+      await hostApproveFilRougeMission(pUid);
+      notifyFilRougeChange();
     });
   });
 
   root.querySelectorAll("[data-fr-reject]").forEach((btn) => {
     btn.addEventListener("click", async () => {
-      const uid = btn.getAttribute("data-fr-reject");
-      await hostRejectFilRougeMission(uid);
+      const pUid = btn.getAttribute("data-fr-reject");
+      await hostRejectFilRougeMission(pUid);
+      notifyFilRougeChange();
     });
   });
 

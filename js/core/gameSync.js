@@ -401,6 +401,42 @@ function mergeRemoteDilemmaVotes(cur, inc) {
   return incVotes;
 }
 
+function isNewGuessLieVoteRound(cur, inc) {
+  return inc?.roundIdx != null && inc.roundIdx !== cur?.roundIdx;
+}
+
+function mergeRemoteGuessLieVotes(cur, inc) {
+  const curVotes = cur?.votes || {};
+  const incVotes = inc?.votes || {};
+  if (isNewGuessLieVoteRound(cur, inc)) return incVotes;
+  if (
+    (inc?.phase === "voting" && cur?.phase === "voting") ||
+    inc?.phase === "reveal" ||
+    cur?.phase === "reveal"
+  ) {
+    return { ...curVotes, ...incVotes };
+  }
+  return incVotes;
+}
+
+function mergeGuessLieGameLocal(local, remote) {
+  if (!remote) return local;
+  if (!local) return remote;
+  const remoteVotes = remote.votes || {};
+  const localVotes = local.votes || {};
+  let votes = remoteVotes;
+  if (isNewGuessLieVoteRound(local, remote)) {
+    votes = remoteVotes;
+  } else if (remote.phase === "voting") {
+    votes = { ...remoteVotes };
+    const name = getLocalDisplayName();
+    if (localVotes[name] != null) votes[name] = localVotes[name];
+  } else if (remote.phase === "reveal" || local.phase === "reveal") {
+    votes = { ...remoteVotes, ...localVotes };
+  }
+  return { ...local, ...remote, votes };
+}
+
 function mergeDilemmaGameLocal(local, remote) {
   if (!remote) return local;
   if (!local) return remote;
@@ -910,8 +946,9 @@ export function applyRemoteSession(row) {
     patch.dilemmaGame = local ? mergeDilemmaGameLocal(local, remote) : remote;
   }
   if (st.guessLie) {
-    const gl = guessLieFromRemote(st.guessLie);
-    patch.guessLie = gl;
+    const remote = guessLieFromRemote(st.guessLie);
+    const local = getState().guessLie;
+    patch.guessLie = local ? mergeGuessLieGameLocal(local, remote) : remote;
   }
   if (st.tierNight) {
     const tn = tierNightFromRemote(st.tierNight);
@@ -1320,6 +1357,17 @@ export async function patchGameState(stateMerge, { screen, gameId } = {}) {
   }
   if (stateMerge.tierNight) {
     nextState.tierNight = { ...(current.tierNight || {}), ...stateMerge.tierNight };
+  }
+  if (stateMerge.guessLie) {
+    const curGl = current.guessLie;
+    const incGl = stateMerge.guessLie;
+    nextState.guessLie = curGl
+      ? {
+          ...curGl,
+          ...incGl,
+          votes: mergeRemoteGuessLieVotes(curGl, incGl),
+        }
+      : incGl;
   }
   if (isLobbyHost()) {
     nextState = { ...nextState, ...eveningStateToRemote() };

@@ -3326,21 +3326,7 @@ body{
 }
 
 .truth-meter__spread{
-  position:relative;
   margin:16px 0;
-  padding-top:8px;
-}
-
-.truth-meter__spread-avg{
-  position:absolute;
-  top:0;
-  width:3px;
-  height:100%;
-  margin-left:-1px;
-  background:rgba(251,191,36,.9);
-  border-radius:2px;
-  z-index:1;
-  pointer-events:none;
 }
 
 .truth-meter__spread-row{
@@ -3780,6 +3766,16 @@ body{
   margin-bottom:12px;
 }
 
+.fil-rouge-box__cols--triple{
+  grid-template-columns:repeat(3, minmax(0, 1fr));
+}
+
+@media (max-width:380px){
+  .fil-rouge-box__cols--triple{
+    grid-template-columns:1fr;
+  }
+}
+
 .fil-rouge-box__section-label{
   font-size:11px;
   font-weight:800;
@@ -3801,6 +3797,96 @@ body{
 .fil-rouge-box__personal{
   margin-top:12px;
   padding:14px;
+}
+
+.fil-rouge-box__personal--pending{
+  border-color:rgba(251,191,36,.35);
+  background:rgba(251,191,36,.08);
+}
+
+.fil-rouge-box__personal--validated{
+  border-color:rgba(110,231,183,.35);
+  background:rgba(110,231,183,.08);
+}
+
+.fil-rouge-box__status-msg{
+  margin:12px 0 8px;
+  font-size:14px;
+  font-weight:700;
+  line-height:1.4;
+}
+
+.fil-rouge-box__status-msg--pending{
+  color:#FCD34D;
+}
+
+.fil-rouge-box__status-msg--ok{
+  color:#6EE7B7;
+}
+
+.fil-rouge-toast{
+  position:fixed;
+  top:calc(8px + env(safe-area-inset-top, 0px));
+  left:max(12px, env(safe-area-inset-left, 0px));
+  right:max(12px, env(safe-area-inset-right, 0px));
+  z-index:1300;
+  pointer-events:none;
+  opacity:0;
+  transform:translateY(-12px);
+  transition:opacity .3s ease, transform .3s ease;
+}
+
+.fil-rouge-toast--in{
+  opacity:1;
+  transform:translateY(0);
+}
+
+.fil-rouge-toast__inner{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  padding:12px 14px;
+  border-radius:14px;
+  border:1px solid rgba(110,231,183,.45);
+  background:linear-gradient(135deg, rgba(16,24,40,.96), rgba(88,28,135,.92));
+  box-shadow:0 8px 32px rgba(0,0,0,.45);
+  pointer-events:auto;
+}
+
+.fil-rouge-toast__emoji{
+  font-size:24px;
+  flex-shrink:0;
+}
+
+.fil-rouge-toast__text{
+  flex:1;
+  min-width:0;
+}
+
+.fil-rouge-toast__title{
+  margin:0;
+  font-size:14px;
+  font-weight:800;
+  color:#6EE7B7;
+}
+
+.fil-rouge-toast__sub{
+  margin:2px 0 0;
+  font-size:12px;
+  color:rgba(255,255,255,.65);
+}
+
+.fil-rouge-toast__close{
+  flex-shrink:0;
+  width:32px;
+  height:32px;
+  border:none;
+  border-radius:8px;
+  background:rgba(255,255,255,.1);
+  color:rgba(255,255,255,.8);
+  font-size:20px;
+  line-height:1;
+  cursor:pointer;
 }
 
 .fil-rouge-box__mission-line{
@@ -3975,6 +4061,15 @@ body{
 .fil-rouge-mission__secret{
   text-align:center;
   margin-top:12px;
+}
+
+#fil-rouge-ack{
+  margin-bottom:20px;
+}
+
+#fil-rouge-ack + .btn-accent,
+.fil-rouge-mission__secret + .card--ok + .btn-accent{
+  margin-bottom:20px;
 }
 
 .fil-rouge-modal{

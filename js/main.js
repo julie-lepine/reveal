@@ -32,6 +32,7 @@ import { mountTierNight } from "./games/tierNight.js";
 import { mountFilRougeSetup } from "./screens/filRougeSetup.js";
 import { mountFilRougeMission } from "./screens/filRougeMission.js";
 import { initFilRougeResultsListener } from "./core/filRougeResultsModal.js";
+import { initFilRougeValidationListener } from "./core/filRougeToast.js";
 
 const app = document.getElementById("app");
 
@@ -76,6 +77,7 @@ registerScreen("filrouge-mission", mountFilRougeMission);
 
 initBottomNav();
 initFilRougeResultsListener();
+initFilRougeValidationListener();
 
 async function boot() {
   await initSupabaseAuth();

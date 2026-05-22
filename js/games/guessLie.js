@@ -68,6 +68,7 @@ export function mountGuessLie(app) {
   let roundScored = false;
   let revealResult = null;
   let intervalId = null;
+  let revealAdvancing = false;
   const localName = getLocalDisplayName();
 
   function clearTimer() {
@@ -79,6 +80,34 @@ export function mountGuessLie(app) {
 
   function currentRound() {
     return rounds[roundIdx] ?? rounds[0];
+  }
+
+  function detectiveNamesForRound(round) {
+    return getActiveMemberUserIds()
+      .map((uid) => nameForUserId(uid))
+      .filter((n) => n && n !== round.player);
+  }
+
+  function allDetectivesVoted(votes, round) {
+    const detectives = detectiveNamesForRound(round);
+    return detectives.length > 0 && detectives.every((n) => votes[n] != null);
+  }
+
+  async function tryAdvanceToReveal() {
+    if (!mp || phase !== "voting" || revealAdvancing) return;
+    const gl = getGuessLieSession();
+    const votes = gl.votes || {};
+    const round = currentRound();
+    if (!allDetectivesVoted(votes, round) || !isLobbyHost()) return;
+    if (gl.roundScored || roundScored) return;
+    revealAdvancing = true;
+    try {
+      await commitGuessLiePlay({ phase: "reveal" });
+      applyRoundScore(computeReveal());
+      await commitGuessLiePlay({ roundScored: true });
+    } finally {
+      revealAdvancing = false;
+    }
   }
 
   function ensureRevealDisplay() {
@@ -286,7 +315,26 @@ export function mountGuessLie(app) {
             <div class="liar-stage__scan"></div>
           </div>`;
       } else {
-        body = `
+        const alreadyVoted = mp && (getGuessLieSession().votes || {})[localName] != null;
+        if (alreadyVoted) {
+          body = `
+          ${statementsBlock}
+          <div class="statements statements--readonly">
+            ${round.statements
+              .map((text, i) => {
+                const cls =
+                  selected === i ? "statement statement--readonly statement--picked" : "statement statement--readonly";
+                return `
+              <div class="${cls}">
+                <span class="statement__letter">${String.fromCharCode(65 + i)}</span>
+                <span>${escapeHtml(text)}</span>
+              </div>`;
+              })
+              .join("")}
+          </div>
+          <p class="hint">Vote enregistré — en attente des autres détectives…</p>`;
+        } else {
+          body = `
           ${statementsBlock}
           <div class="timer" id="timer-el">${timer}</div>
           <div class="progress progress--timer">
@@ -305,6 +353,7 @@ export function mountGuessLie(app) {
               .join("")}
           </div>
           <button type="button" class="btn btn-primary" id="confirm" ${selected === null ? "disabled" : ""}>Valider mon vote</button>`;
+        }
       }
     }
 
@@ -379,16 +428,8 @@ export function mountGuessLie(app) {
       clearTimer();
       if (mp) {
         const votes = { ...(getGuessLieSession().votes || {}), [localName]: selected };
-        await commitGuessLiePlay({ votes, phase: "reveal" });
-        const round = currentRound();
-        const detectives = getActiveMemberUserIds()
-          .map((uid) => nameForUserId(uid))
-          .filter((n) => n && n !== round.player);
-        const allVoted = detectives.every((n) => votes[n] != null);
-        if (allVoted && isLobbyHost()) {
-          applyRoundScore(computeReveal());
-          await commitGuessLiePlay({ roundScored: true });
-        }
+        await commitGuessLiePlay({ votes });
+        await tryAdvanceToReveal();
       } else {
         phase = "reveal";
       }
@@ -410,6 +451,7 @@ export function mountGuessLie(app) {
       timer = GUESS_LIE_VOTE_TIMER_SEC;
       clearTimer();
     }
+    void tryAdvanceToReveal();
     render();
     if (phase === "voting" && (advanced || !intervalId)) startVotingTimer();
   }

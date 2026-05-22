@@ -33,7 +33,11 @@ import {
   eveningRecapRestartButtonHtml,
   restartGame,
 } from "../core/restartGame.js";
-import { filRougeGameSelectSectionHtml, bindFilRougeBox } from "../core/filRougeUi.js";
+import {
+  filRougeGameSelectSectionHtml,
+  bindFilRougeBox,
+  registerFilRougeRefresh,
+} from "../core/filRougeUi.js";
 
 function eveningRecapHtml(recap) {
   if (!recap.hasActivity) {
@@ -252,6 +256,7 @@ export function mountGameSelect(app) {
     bindFilRougeBox(app);
   }
 
+  registerFilRougeRefresh(() => scheduleRender(true));
   scheduleRender(true);
 
   if (isSupabaseConfigured() && hasActiveLobby()) {
@@ -274,6 +279,7 @@ export function mountGameSelect(app) {
   }
 
   return () => {
+    registerFilRougeRefresh(null);
     app.removeEventListener("click", onGameSelectClick);
     unsubSession();
     if (renderTimer) clearTimeout(renderTimer);

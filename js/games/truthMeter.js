@@ -215,7 +215,7 @@ export function mountTruthMeter(app) {
     return { color: p?.color || "#A78BFA", emoji: p?.emoji || "🎭" };
   }
 
-  function spreadHtml(votesMap, groupAvg, showAuthor) {
+  function spreadHtml(votesMap, showAuthor) {
     const author = affirmation?.author;
     const rows = Object.entries(votesMap)
       .filter(([name]) => name !== author)
@@ -246,7 +246,6 @@ export function mountTruthMeter(app) {
 
     return `
       <div class="truth-meter__spread">
-        <div class="truth-meter__spread-avg" style="left:${groupAvg}%"></div>
         ${rows}
         ${authorRow}
       </div>`;
@@ -483,7 +482,7 @@ export function mountTruthMeter(app) {
           ${awardLine}
           ${mindLine}
         </div>
-        ${spreadHtml(votesToShow, metrics.groupAvg, authorRevealed)}
+        ${spreadHtml(votesToShow, authorRevealed)}
         ${gameCumulativeScoresHtml({ gameLabel: "TruthMeter", title: "Cumul des scores" })}
         ${
           host
