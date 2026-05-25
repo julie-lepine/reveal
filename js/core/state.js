@@ -68,6 +68,7 @@ const defaultState = () => ({
     speedVotesPlayed: 0,
     truthMetersPlayed: 0,
     dilemmasPlayed: 0,
+    triviaGamesPlayed: 0,
     liesFound: 0,
     liesTotal: 0,
     tierNightsPlayed: 0,
@@ -139,6 +140,24 @@ const defaultState = () => ({
     blindMode: false,
     pausedBy: null,
   },
+  triviaGame: {
+    ready: {},
+    lobbyStarted: false,
+    selectedThemeId: "random",
+    questionCount: 5,
+    questionTimeSec: 15,
+    deck: null,
+    questionIdx: 0,
+    phase: null,
+    currentQuestion: null,
+    answers: {},
+    questionEndsAt: null,
+    questionScored: false,
+    matchScores: {},
+    lastRound: null,
+    podiumApplied: false,
+    results: null,
+  },
   filRougeGame: {
     status: "idle",
     submissions: {},
@@ -181,6 +200,7 @@ function loadState() {
       speedVoteGame: { ...defaultState().speedVoteGame, ...parsed.speedVoteGame },
       truthMeterGame: { ...defaultState().truthMeterGame, ...parsed.truthMeterGame },
       dilemmaGame: { ...defaultState().dilemmaGame, ...parsed.dilemmaGame },
+      triviaGame: { ...defaultState().triviaGame, ...parsed.triviaGame },
       filRougeGame: { ...defaultState().filRougeGame, ...parsed.filRougeGame },
       tierNightGame: { ...defaultState().tierNightGame, ...parsed.tierNightGame },
       openLobbies: parsed.openLobbies || {},
@@ -398,6 +418,7 @@ export function defaultEveningStats() {
     speedVotesPlayed: 0,
     truthMetersPlayed: 0,
     dilemmasPlayed: 0,
+    triviaGamesPlayed: 0,
   };
 }
 
@@ -416,6 +437,7 @@ export function resetGameSessionsOnly() {
     speedVoteGame: { ...base.speedVoteGame },
     truthMeterGame: { ...base.truthMeterGame },
     dilemmaGame: { ...base.dilemmaGame },
+    triviaGame: { ...base.triviaGame },
     filRougeGame: { ...base.filRougeGame },
     guessLie: { ...emptyGuessLie(), sessionId: getState().lobbyCode || null },
     tierNightTopicId: null,
@@ -470,6 +492,11 @@ export function recordTruthMeterPlayed() {
 
 export function recordDilemmaPlayed() {
   state.stats.dilemmasPlayed = (state.stats.dilemmasPlayed || 0) + 1;
+  save();
+}
+
+export function recordTriviaPlayed() {
+  state.stats.triviaGamesPlayed = (state.stats.triviaGamesPlayed || 0) + 1;
   save();
 }
 

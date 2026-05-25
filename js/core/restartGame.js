@@ -6,12 +6,14 @@ import {
   startGameSession,
   hotTakeToRemote,
   speedVoteToRemote,
+  triviaToRemote,
   truthMeterToRemote,
   dilemmaToRemote,
   guessLieToRemote,
 } from "./gameSync.js";
 import { navigate } from "./router.js";
 import { defaultSpeedVotePrepSession } from "./speedVoteSession.js";
+import { defaultTriviaPrepSession } from "./triviaSession.js";
 import { defaultTruthMeterPrepSession } from "./truthMeterSession.js";
 import { defaultDilemmaPrepSession } from "./dilemmaSession.js";
 import { showAppAlert } from "./dialog.js";
@@ -20,6 +22,7 @@ import { escapeHtml } from "./ui.js";
 const GAME_ID_TO_TILE = {
   hottake: "hottake-prep",
   speedvote: "speedvote-prep",
+  trivia: "trivia-prep",
   truthmeter: "truthmeter-prep",
   dilemma: "dilemma-prep",
   guesslie: "guesslie",
@@ -86,6 +89,29 @@ export async function launchDilemmaPrep() {
   }
 
   navigate("dilemma-prep");
+}
+
+export async function launchTriviaPrep() {
+  const trivia = defaultTriviaPrepSession();
+  saveStatePatch({ triviaGame: trivia });
+
+  if (isGameSyncActive()) {
+    if (!(await requireHostToLaunch())) return;
+    try {
+      await startGameSession("trivia", "trivia-prep", {
+        trivia: triviaToRemote(trivia),
+      });
+    } catch (e) {
+      console.warn("REVEAL launch Trivia:", e);
+      await showAppAlert(e.message || "Impossible de lancer Trivia.", {
+        title: "Trivia",
+        icon: "⚠️",
+      });
+    }
+    return;
+  }
+
+  navigate("trivia-prep");
 }
 
 export async function launchTruthMeterPrep() {
@@ -198,6 +224,7 @@ export async function launchTierNightSelect() {
 const RESTART_HANDLERS = {
   hottake: launchHotTakePrep,
   speedvote: launchSpeedVotePrep,
+  trivia: launchTriviaPrep,
   truthmeter: launchTruthMeterPrep,
   dilemma: launchDilemmaPrep,
   guesslie: launchGuessLieMenu,

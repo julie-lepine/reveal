@@ -26,6 +26,7 @@ import { getLastGame, getState } from "../core/state.js";
 import { getFilRougeSession } from "../core/filRougeSession.js";
 import {
   launchSpeedVotePrep,
+  launchTriviaPrep,
   launchTruthMeterPrep,
   launchDilemmaPrep,
   launchHotTakePrep,
@@ -59,6 +60,9 @@ function eveningRecapHtml(recap) {
       : "",
     recap.speedVotes > 0
       ? `<span class="evening-recap__chip">⚡ ${recap.speedVotes} SpeedVote${recap.speedVotes > 1 ? "s" : ""}</span>`
+      : "",
+    recap.triviaGames > 0
+      ? `<span class="evening-recap__chip">🧠 ${recap.triviaGames} Trivia${recap.triviaGames > 1 ? "s" : ""}</span>`
       : "",
     recap.truthMeters > 0
       ? `<span class="evening-recap__chip">📏 ${recap.truthMeters} TruthMeter${recap.truthMeters > 1 ? "s" : ""}</span>`
@@ -105,6 +109,7 @@ function eveningRecapHtml(recap) {
 function buildGameSelectHandlers() {
   return {
     "speedvote-prep": launchSpeedVotePrep,
+    "trivia-prep": launchTriviaPrep,
     "truthmeter-prep": launchTruthMeterPrep,
     "dilemma-prep": launchDilemmaPrep,
     "hottake-prep": launchHotTakePrep,
@@ -163,6 +168,7 @@ function gameSelectRenderSnapshot() {
     recap: recap.hasActivity,
     ht: recap.hotTakes,
     sv: recap.speedVotes,
+    tq: recap.triviaGames,
     tm: recap.truthMeters,
     dl: recap.dilemmas,
     frStatus: fr.status,

@@ -70,6 +70,7 @@ export function isLobbyHost() {
 const GAME_SETUP_SCREENS = new Set([
   "hottake-prep",
   "speedvote-prep",
+  "trivia-prep",
   "truthmeter-prep",
   "dilemma-prep",
   "guesslie-menu",
@@ -192,6 +193,34 @@ function mapVotesByUid(votesByName = {}) {
   Object.entries(votesByName).forEach(([name, val]) => {
     const uid = userIdForName(name) || name;
     if (val != null) out[uid] = val;
+  });
+  return out;
+}
+
+function mapTriviaAnswersByName(answersByUid = {}) {
+  const out = {};
+  Object.entries(answersByUid).forEach(([uid, val]) => {
+    const name = nameForUserId(uid) || uid;
+    if (val && Number.isInteger(val.answerIndex)) {
+      out[name] = {
+        answerIndex: val.answerIndex,
+        answeredAt: val.answeredAt || null,
+      };
+    }
+  });
+  return out;
+}
+
+function mapTriviaAnswersByUid(answersByName = {}) {
+  const out = {};
+  Object.entries(answersByName).forEach(([name, val]) => {
+    const uid = userIdForName(name) || name;
+    if (val && Number.isInteger(val.answerIndex)) {
+      out[uid] = {
+        answerIndex: val.answerIndex,
+        answeredAt: val.answeredAt || null,
+      };
+    }
   });
   return out;
 }
@@ -378,6 +407,70 @@ function mergeSpeedVoteGameLocal(local, remote) {
   return { ...local, ...remote, votes, ready };
 }
 
+function isNewTriviaQuestionRound(cur, inc) {
+  return (
+    inc?.phase === "question" &&
+    inc?.questionEndsAt &&
+    inc.questionEndsAt !== cur?.questionEndsAt &&
+    Object.keys(inc.answers || {}).length === 0
+  );
+}
+
+function mergeRemoteTriviaAnswersUid(cur, inc) {
+  const curAnswers = cur?.answers || {};
+  const incAnswers = inc?.answers || {};
+  if (isNewTriviaQuestionRound(cur, inc)) return incAnswers;
+  if (
+    (inc?.phase === "question" && cur?.phase === "question") ||
+    inc?.phase === "reveal" ||
+    cur?.phase === "reveal" ||
+    inc?.phase === "final" ||
+    cur?.phase === "final"
+  ) {
+    return { ...curAnswers, ...incAnswers };
+  }
+  return incAnswers;
+}
+
+function pickLatestTriviaAnswer(localAnswer, remoteAnswer) {
+  if (!localAnswer) return remoteAnswer || null;
+  if (!remoteAnswer) return localAnswer;
+  return (remoteAnswer.answeredAt || 0) >= (localAnswer.answeredAt || 0)
+    ? remoteAnswer
+    : localAnswer;
+}
+
+function mergeTriviaGameLocal(local, remote) {
+  if (!remote) return local;
+  if (!local) return remote;
+  const remoteAnswers = remote.answers || {};
+  const localAnswers = local.answers || {};
+  let answers = remoteAnswers;
+  if (isNewTriviaQuestionRound(local, remote)) {
+    answers = remoteAnswers;
+  } else if (
+    remote.phase === "question" ||
+    remote.phase === "reveal" ||
+    remote.phase === "final"
+  ) {
+    answers = { ...remoteAnswers };
+    const me = getLocalDisplayName();
+    const mergedLocal = pickLatestTriviaAnswer(localAnswers[me], remoteAnswers[me]);
+    if (mergedLocal) answers[me] = mergedLocal;
+  }
+  const ready =
+    !remote.lobbyStarted && !local.lobbyStarted
+      ? mergeReadyMapsLocal(local.ready || {}, remote.ready || {}, getActivePlayerNames())
+      : remote.ready || {};
+  return {
+    ...local,
+    ...remote,
+    ready,
+    answers,
+    matchScores: { ...(remote.matchScores || {}) },
+  };
+}
+
 function isNewDilemmaVoteRound(cur, inc) {
   return (
     inc?.phase === "voting" &&
@@ -550,6 +643,71 @@ export function truthMeterFromRemote(remote) {
     votes: mapVotesByName(remote.votes || {}),
     voteEndsAt: remote.voteEndsAt || null,
     roundScored: Boolean(remote.roundScored),
+  };
+}
+
+export function triviaToRemote(session) {
+  return {
+    ready: mapReadyByUid(session.ready || {}),
+    lobbyStarted: Boolean(session.lobbyStarted),
+    selectedThemeId: session.selectedThemeId || "random",
+    questionCount: session.questionCount ?? 5,
+    questionTimeSec: session.questionTimeSec ?? 15,
+    deck: session.deck || null,
+    questionIdx: session.questionIdx ?? 0,
+    phase: session.phase || null,
+    currentQuestion: session.currentQuestion || null,
+    answers: mapTriviaAnswersByUid(session.answers || {}),
+    questionEndsAt: session.questionEndsAt || null,
+    questionScored: Boolean(session.questionScored),
+    matchScores: scoresToRemote(session.matchScores || {}),
+    lastRound: session.lastRound
+      ? {
+          ...session.lastRound,
+          correctPlayers: (session.lastRound.correctPlayers || []).map(
+            (name) => userIdForName(name) || name
+          ),
+          fastestPlayer: session.lastRound.fastestPlayer
+            ? userIdForName(session.lastRound.fastestPlayer) || session.lastRound.fastestPlayer
+            : null,
+          deltas: scoresToRemote(session.lastRound.deltas || {}),
+        }
+      : null,
+    podiumApplied: Boolean(session.podiumApplied),
+    results: session.results || null,
+  };
+}
+
+export function triviaFromRemote(remote) {
+  if (!remote) return null;
+  return {
+    ready: mapReadyByName(remote.ready || {}),
+    lobbyStarted: Boolean(remote.lobbyStarted),
+    selectedThemeId: remote.selectedThemeId || "random",
+    questionCount: remote.questionCount ?? 5,
+    questionTimeSec: remote.questionTimeSec ?? 15,
+    deck: remote.deck || null,
+    questionIdx: remote.questionIdx ?? 0,
+    phase: remote.phase || null,
+    currentQuestion: remote.currentQuestion || null,
+    answers: mapTriviaAnswersByName(remote.answers || {}),
+    questionEndsAt: remote.questionEndsAt || null,
+    questionScored: Boolean(remote.questionScored),
+    matchScores: scoresFromRemote(remote.matchScores || {}),
+    lastRound: remote.lastRound
+      ? {
+          ...remote.lastRound,
+          correctPlayers: (remote.lastRound.correctPlayers || []).map(
+            (uid) => nameForUserId(uid) || uid
+          ),
+          fastestPlayer: remote.lastRound.fastestPlayer
+            ? nameForUserId(remote.lastRound.fastestPlayer) || remote.lastRound.fastestPlayer
+            : null,
+          deltas: scoresFromRemote(remote.lastRound.deltas || {}),
+        }
+      : null,
+    podiumApplied: Boolean(remote.podiumApplied),
+    results: remote.results || null,
   };
 }
 
@@ -903,6 +1061,7 @@ function eveningStateToRemote() {
     stats: {
       hotTakesPlayed: stats.hotTakesPlayed || 0,
       speedVotesPlayed: stats.speedVotesPlayed || 0,
+      triviaGamesPlayed: stats.triviaGamesPlayed || 0,
       truthMetersPlayed: stats.truthMetersPlayed || 0,
       dilemmasPlayed: stats.dilemmasPlayed || 0,
       liesFound: stats.liesFound || 0,
@@ -983,6 +1142,11 @@ export function applyRemoteSession(row) {
     const remote = speedVoteFromRemote(st.speedVote);
     const local = getState().speedVoteGame;
     patch.speedVoteGame = local ? mergeSpeedVoteGameLocal(local, remote) : remote;
+  }
+  if (st.trivia) {
+    const remote = triviaFromRemote(st.trivia);
+    const local = getState().triviaGame;
+    patch.triviaGame = local ? mergeTriviaGameLocal(local, remote) : remote;
   }
   if (st.truthMeter) {
     const remote = truthMeterFromRemote(st.truthMeter);
@@ -1078,6 +1242,8 @@ function navStackFor(screen) {
     "hottake",
     "speedvote-prep",
     "speedvote",
+    "trivia-prep",
+    "trivia",
     "truthmeter-prep",
     "truthmeter",
     "guesslie-menu",
@@ -1149,6 +1315,10 @@ export function getEffectiveSessionScreen(row) {
   if (st.speedVote) {
     if (st.speedVote.lobbyStarted) return "speedvote";
     if (gid === "speedvote" || declared === "speedvote-prep") return "speedvote-prep";
+  }
+  if (st.trivia) {
+    if (st.trivia.lobbyStarted) return "trivia";
+    if (gid === "trivia" || declared === "trivia-prep") return "trivia-prep";
   }
   if (st.truthMeter) {
     if (st.truthMeter.lobbyStarted) return "truthmeter";
@@ -1378,6 +1548,19 @@ export async function patchGameState(stateMerge, { screen, gameId } = {}) {
         }
       : incSv;
   }
+  if (stateMerge.trivia) {
+    const curTrivia = current.trivia;
+    const incTrivia = stateMerge.trivia;
+    nextState.trivia = curTrivia
+      ? {
+          ...curTrivia,
+          ...incTrivia,
+          ready: mergeRemoteReadyUid(curTrivia, incTrivia),
+          answers: mergeRemoteTriviaAnswersUid(curTrivia, incTrivia),
+          matchScores: { ...(curTrivia.matchScores || {}), ...(incTrivia.matchScores || {}) },
+        }
+      : incTrivia;
+  }
   if (stateMerge.truthMeter) {
     const curTm = current.truthMeter;
     const incTm = stateMerge.truthMeter;
@@ -1524,6 +1707,14 @@ export async function syncSpeedVoteSession(extra = {}) {
   saveStatePatch({ speedVoteGame: session });
   if (!isGameSyncActive()) return session;
   await patchGameState({ speedVote: speedVoteToRemote(session) });
+  return session;
+}
+
+export async function syncTriviaSession(extra = {}) {
+  const session = { ...getState().triviaGame, ...extra };
+  saveStatePatch({ triviaGame: session });
+  if (!isGameSyncActive()) return session;
+  await patchGameState({ trivia: triviaToRemote(session) });
   return session;
 }
 

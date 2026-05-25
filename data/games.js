@@ -23,6 +23,16 @@ export const GAMES = [
     badgeLabel: "Bientôt",
   },
   {
+    id: "trivia-prep",
+    title: "Trivia Quiz",
+    desc: "Testez votre culture generale",
+    emoji: "🧠",
+    cssClass: "trivia",
+    borderGradient:
+      "linear-gradient(145deg, #A78BFA 0%, #22D3EE 44%, #2B2D66 100%)",
+    enabled: true,
+  },
+  {
     id: "hottake-prep",
     title: "HotTake",
     desc: "Opinions impopulaires — vote BASED ou CRIMINEL",

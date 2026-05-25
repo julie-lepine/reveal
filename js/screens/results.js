@@ -41,6 +41,7 @@ export function mountResults(app) {
         ? `<span class="evening-recap__chip">🕵️ ${recap.liesFound}/${recap.liesTotal}</span>`
         : "",
       recap.speedVotes > 0 ? `<span class="evening-recap__chip">⚡ ${recap.speedVotes}</span>` : "",
+      recap.triviaGames > 0 ? `<span class="evening-recap__chip">🧠 ${recap.triviaGames}</span>` : "",
       recap.truthMeters > 0 ? `<span class="evening-recap__chip">📏 ${recap.truthMeters}</span>` : "",
       recap.tierNights > 0 ? `<span class="evening-recap__chip">🏆 ${recap.tierNights}</span>` : "",
     ]

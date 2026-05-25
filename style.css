@@ -2409,6 +2409,7 @@ body.wizz-shake #app{
 .game-grid .game-tile.hot,
 .game-grid .game-tile.guess,
 .game-grid .game-tile.speed,
+.game-grid .game-tile.trivia,
 .game-grid .game-tile.dilemma,
 .game-grid .game-tile.truth,
 .game-grid .game-tile.tier,
@@ -2490,6 +2491,10 @@ body.wizz-shake #app{
 
 .game-tile__logo-wrap--speed{
   --logo-border:linear-gradient(145deg, #FBBF24 0%, #FF3CAC 48%, #2B2D66 100%);
+}
+
+.game-tile__logo-wrap--trivia{
+  --logo-border:linear-gradient(145deg, #A78BFA 0%, #22D3EE 44%, #2B2D66 100%);
 }
 
 .game-tile__logo-wrap--truth{
@@ -4174,4 +4179,184 @@ body{
 .fil-rouge-modal__wait{
   text-align:center;
   margin:8px 0 0;
+}
+
+/* —— Trivia —— */
+.trivia-question-card{
+  margin-bottom:14px;
+}
+
+.trivia-question-card__theme{
+  margin:0 0 10px;
+  font-size:12px;
+  font-weight:800;
+  color:#A78BFA;
+  text-transform:uppercase;
+  letter-spacing:.08em;
+}
+
+.trivia-question-card__wait{
+  margin:14px 0 0;
+  text-align:center;
+}
+
+.trivia-answer-grid{
+  display:grid;
+  grid-template-columns:1fr;
+  gap:12px;
+  margin-bottom:16px;
+}
+
+.trivia-answer-btn{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  width:100%;
+  padding:16px 14px;
+  border-radius:18px;
+  border:1px solid rgba(255,255,255,.08);
+  background:rgba(255,255,255,.05);
+  color:#fff;
+  text-align:left;
+  transition:transform .14s ease, border-color .18s ease, background .18s ease, box-shadow .18s ease;
+}
+
+.trivia-answer-btn:active{
+  transform:scale(.98);
+}
+
+.trivia-answer-btn--active{
+  border-color:rgba(167,139,250,.72);
+  background:rgba(167,139,250,.18);
+  box-shadow:0 10px 28px rgba(167,139,250,.18);
+}
+
+.trivia-answer-btn__letter{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  width:34px;
+  height:34px;
+  flex-shrink:0;
+  border-radius:999px;
+  background:rgba(34,211,238,.18);
+  color:#67E8F9;
+  font-weight:900;
+}
+
+.trivia-answer-btn__text{
+  flex:1;
+  min-width:0;
+  font-size:15px;
+  line-height:1.35;
+  font-weight:700;
+}
+
+.trivia-answer-btn__check{
+  color:#4ADE80;
+  font-size:18px;
+  font-weight:900;
+}
+
+.trivia-timer-wrap{
+  margin-bottom:12px;
+}
+
+.trivia-reveal-card{
+  margin-bottom:16px;
+}
+
+.trivia-reveal-card__answer{
+  margin:8px 0 12px;
+  font-size:24px;
+  line-height:1.25;
+  font-weight:900;
+  color:#67E8F9;
+}
+
+.trivia-delta-list{
+  display:grid;
+  gap:8px;
+  margin-top:14px;
+}
+
+.trivia-delta-list__row{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  padding:10px 12px;
+  border-radius:12px;
+  background:rgba(255,255,255,.04);
+}
+
+.trivia-scoreboard{
+  margin-top:12px;
+}
+
+.trivia-scoreboard__row--bump{
+  animation:trivia-score-bump .35s ease;
+}
+
+.trivia-scoreboard__delta{
+  margin-right:10px;
+  font-size:12px;
+  font-weight:900;
+  color:#4ADE80;
+}
+
+.trivia-results__podium{
+  display:grid;
+  gap:10px;
+  margin-top:14px;
+}
+
+.trivia-results__row{
+  display:grid;
+  grid-template-columns:auto auto 1fr auto;
+  gap:10px;
+  align-items:center;
+  padding:12px 14px;
+  border-radius:16px;
+  background:rgba(255,255,255,.05);
+}
+
+.trivia-results__row--winner{
+  border:1px solid rgba(251,191,36,.35);
+  background:linear-gradient(135deg, rgba(251,191,36,.12), rgba(167,139,250,.12));
+}
+
+.trivia-results__medal{
+  font-size:20px;
+  line-height:1;
+}
+
+.trivia-results__name{
+  min-width:0;
+}
+
+.trivia-results__score,
+.trivia-results__bonus{
+  font-size:12px;
+  font-weight:800;
+  color:rgba(255,255,255,.78);
+}
+
+.trivia-results__bonus{
+  grid-column:4;
+}
+
+.trivia-results__actions{
+  margin-top:18px;
+}
+
+@keyframes trivia-score-bump{
+  0%{ transform:translateY(0); }
+  50%{ transform:translateY(-4px); }
+  100%{ transform:translateY(0); }
+}
+
+@media (min-width:640px){
+  .trivia-answer-grid{
+    grid-template-columns:1fr 1fr;
+  }
 }

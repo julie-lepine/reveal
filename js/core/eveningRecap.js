@@ -13,6 +13,7 @@ export function getEveningRecap() {
 
   const hotTakes = stats.hotTakesPlayed || 0;
   const speedVotes = stats.speedVotesPlayed || 0;
+  const triviaGames = stats.triviaGamesPlayed || 0;
   const truthMeters = stats.truthMetersPlayed || 0;
   const dilemmas = stats.dilemmasPlayed || 0;
   const liesTotal = stats.liesTotal || 0;
@@ -23,6 +24,7 @@ export function getEveningRecap() {
   const hasActivity =
     hotTakes > 0 ||
     speedVotes > 0 ||
+    triviaGames > 0 ||
     truthMeters > 0 ||
     dilemmas > 0 ||
     liesTotal > 0 ||
@@ -33,6 +35,7 @@ export function getEveningRecap() {
     participantCount: participants.length,
     hotTakes,
     speedVotes,
+    triviaGames,
     truthMeters,
     dilemmas,
     liesFound,
