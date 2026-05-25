@@ -22,6 +22,8 @@ const SCREEN_TO_TAB = {
   speedvote: TAB_GAMES,
   "truthmeter-prep": TAB_GAMES,
   truthmeter: TAB_GAMES,
+  "consensus-prep": TAB_GAMES,
+  consensus: TAB_GAMES,
   "dilemma-prep": TAB_GAMES,
   dilemma: TAB_GAMES,
   guesslie: TAB_GAMES,

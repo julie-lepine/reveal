@@ -1,0 +1,131 @@
+import { useConsensusGame } from "../core/useConsensusGame.js";
+import { getLobbyParticipants } from "../core/lobby.js";
+import { getLocalDisplayName } from "../core/state.js";
+import { showAppAlert } from "../core/dialog.js";
+import { requireLobbyPlay } from "../core/gameGuard.js";
+import { isGameSyncActive, isLobbyHost, onGameSessionChange } from "../core/gameSync.js";
+import { navigate } from "../core/router.js";
+import { pageShell } from "../core/ui.js";
+import { bindNav } from "./nav.js";
+import { renderConsensusSetup } from "../consensus/ConsensusSetup.js";
+
+export function mountConsensusSetup(app) {
+  if (!requireLobbyPlay()) return null;
+
+  const consensus = useConsensusGame();
+  if (consensus.getEntryScreen() !== "consensus-prep") {
+    navigate(consensus.getEntryScreen());
+    return null;
+  }
+
+  let cleanupSim = null;
+  let readyCommitInFlight = null;
+  const localName = getLocalDisplayName();
+
+  function localReadyState() {
+    if (readyCommitInFlight !== null) return readyCommitInFlight;
+    return Boolean(consensus.getSession().ready?.[localName]);
+  }
+
+  async function onStartGame() {
+    if (!isLobbyHost()) return;
+    const validation = consensus.validateLaunchConfig();
+    if (!validation.ok) {
+      await showAppAlert(
+        `Il manque ${validation.missing} question(s) pour lancer ${validation.requested} manche(s).`,
+        {
+          title: "Banque insuffisante",
+          icon: "🤝",
+        }
+      );
+      return;
+    }
+    const result = await consensus.startLobbyGame();
+    if (!result.ok) return;
+    navigate("consensus", {
+      navStack: ["home", "lobby", "game-select", "consensus-prep", "consensus"],
+    });
+  }
+
+  function bindEvents() {
+    bindNav(app);
+
+    app.querySelectorAll("[data-consensus-mode]").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        if (!consensus.isHost()) return;
+        await consensus.setMode(btn.getAttribute("data-consensus-mode"));
+        render();
+      });
+    });
+
+    app.querySelectorAll("[data-consensus-count]").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        if (!consensus.isHost()) return;
+        await consensus.setQuestionCount(Number(btn.getAttribute("data-consensus-count")));
+        render();
+      });
+    });
+
+    app.querySelector("#btn-consensus-ready")?.addEventListener("click", async () => {
+      const nextReady = !localReadyState();
+      readyCommitInFlight = nextReady;
+      render();
+      try {
+        await consensus.setReady(localName, nextReady);
+        if (!isGameSyncActive() && nextReady) {
+          if (cleanupSim) cleanupSim();
+          cleanupSim = consensus.simulateReady(() => render());
+        }
+      } finally {
+        readyCommitInFlight = null;
+        render();
+      }
+    });
+
+    app.querySelector("#btn-consensus-start")?.addEventListener("click", () => {
+      void onStartGame();
+    });
+  }
+
+  function render() {
+    const session = consensus.getSession();
+    const prep = consensus.getPrepSummary();
+    const members = getLobbyParticipants();
+
+    app.innerHTML = pageShell({
+      backTarget: "back",
+      content: renderConsensusSetup({
+        modeId: session.selectedModeId,
+        modes: consensus.getModes(),
+        questionCount: session.questionCount,
+        countPresets: consensus.getQuestionCountPresets(),
+        isHost: consensus.isHost(),
+        prep,
+        members,
+        readyMap: session.ready || {},
+        localReady: localReadyState(),
+        allReady: consensus.allReady(),
+      }),
+    });
+
+    bindEvents();
+  }
+
+  render();
+
+  const unsub = onGameSessionChange(() => {
+    const entry = consensus.getEntryScreen();
+    if (entry !== "consensus-prep") {
+      navigate(entry, {
+        navStack: ["home", "lobby", "game-select", "consensus-prep", entry],
+      });
+      return;
+    }
+    render();
+  });
+
+  return () => {
+    if (cleanupSim) cleanupSim();
+    unsub();
+  };
+}

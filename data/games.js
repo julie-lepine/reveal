@@ -89,6 +89,17 @@ export const GAMES = [
     enabled: true,
   },
   {
+    id: "consensus-prep",
+    title: "Consensus",
+    desc: "Curseur 0 → 100 — pense comme le groupe, pas comme toi",
+    emoji: "🤝",
+    cssClass: "consensus",
+    logo: "js/games/consensus.png",
+    borderGradient:
+      "linear-gradient(145deg, #22D3EE 0%, #A78BFA 48%, #2B2D66 100%)",
+    enabled: true,
+  },
+  {
     id: "tiernight-select",
     title: "TierNight",
     desc: "Choisis une tier list, puis classe en S / A / B / C / D",

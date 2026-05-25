@@ -28,6 +28,7 @@ import {
   launchSpeedVotePrep,
   launchTriviaPrep,
   launchTruthMeterPrep,
+  launchConsensusPrep,
   launchDilemmaPrep,
   launchHotTakePrep,
   launchGuessLieMenu,
@@ -66,6 +67,9 @@ function eveningRecapHtml(recap) {
       : "",
     recap.truthMeters > 0
       ? `<span class="evening-recap__chip">📏 ${recap.truthMeters} TruthMeter${recap.truthMeters > 1 ? "s" : ""}</span>`
+      : "",
+    recap.consensusGames > 0
+      ? `<span class="evening-recap__chip">🤝 ${recap.consensusGames} Consensus${recap.consensusGames > 1 ? "s" : ""}</span>`
       : "",
     recap.dilemmas > 0
       ? `<span class="evening-recap__chip">⚖️ ${recap.dilemmas} Dilemma${recap.dilemmas > 1 ? "s" : ""}</span>`
@@ -111,6 +115,7 @@ function buildGameSelectHandlers() {
     "speedvote-prep": launchSpeedVotePrep,
     "trivia-prep": launchTriviaPrep,
     "truthmeter-prep": launchTruthMeterPrep,
+    "consensus-prep": launchConsensusPrep,
     "dilemma-prep": launchDilemmaPrep,
     "hottake-prep": launchHotTakePrep,
     guesslie: launchGuessLieMenu,
@@ -170,6 +175,7 @@ function gameSelectRenderSnapshot() {
     sv: recap.speedVotes,
     tq: recap.triviaGames,
     tm: recap.truthMeters,
+    cs: recap.consensusGames,
     dl: recap.dilemmas,
     frStatus: fr.status,
     frVal: fr.validations,

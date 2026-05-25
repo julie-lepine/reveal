@@ -67,6 +67,7 @@ const defaultState = () => ({
     hotTakesPlayed: 0,
     speedVotesPlayed: 0,
     truthMetersPlayed: 0,
+    consensusGamesPlayed: 0,
     dilemmasPlayed: 0,
     triviaGamesPlayed: 0,
     liesFound: 0,
@@ -122,6 +123,23 @@ const defaultState = () => ({
     votes: {},
     voteEndsAt: null,
     roundScored: false,
+  },
+  consensusGame: {
+    ready: {},
+    lobbyStarted: false,
+    selectedModeId: "standard",
+    questionCount: 5,
+    questionTimeSec: 15,
+    deck: null,
+    questionIdx: 0,
+    phase: null,
+    currentQuestion: null,
+    answers: {},
+    questionEndsAt: null,
+    roundScored: false,
+    matchScores: {},
+    lastRound: null,
+    podiumApplied: false,
   },
   dilemmaGame: {
     ready: {},
@@ -199,6 +217,7 @@ function loadState() {
       hotTakeGame: { ...defaultState().hotTakeGame, ...parsed.hotTakeGame },
       speedVoteGame: { ...defaultState().speedVoteGame, ...parsed.speedVoteGame },
       truthMeterGame: { ...defaultState().truthMeterGame, ...parsed.truthMeterGame },
+      consensusGame: { ...defaultState().consensusGame, ...parsed.consensusGame },
       dilemmaGame: { ...defaultState().dilemmaGame, ...parsed.dilemmaGame },
       triviaGame: { ...defaultState().triviaGame, ...parsed.triviaGame },
       filRougeGame: { ...defaultState().filRougeGame, ...parsed.filRougeGame },
@@ -346,6 +365,18 @@ export function renameLocalPlayer(newName) {
     }
   }
 
+  const consensus = state.consensusGame;
+  if (consensus) {
+    if (consensus.ready) consensus.ready = mergeKeyedRecord(consensus.ready, oldName, trimmed);
+    if (consensus.answers) consensus.answers = mergeKeyedRecord(consensus.answers, oldName, trimmed);
+    if (consensus.matchScores) {
+      consensus.matchScores = mergeKeyedRecord(consensus.matchScores, oldName, trimmed);
+    }
+    if (consensus.lastRound?.deltas) {
+      consensus.lastRound.deltas = mergeKeyedRecord(consensus.lastRound.deltas, oldName, trimmed);
+    }
+  }
+
   if (Array.isArray(state.tierNightGame?.recaps)) {
     state.tierNightGame.recaps = state.tierNightGame.recaps.map((r) =>
       r?.player === oldName ? { ...r, player: trimmed } : r
@@ -417,6 +448,7 @@ export function defaultEveningStats() {
     tierNightsPlayed: 0,
     speedVotesPlayed: 0,
     truthMetersPlayed: 0,
+    consensusGamesPlayed: 0,
     dilemmasPlayed: 0,
     triviaGamesPlayed: 0,
   };
@@ -436,6 +468,7 @@ export function resetGameSessionsOnly() {
     hotTakeGame: { ...base.hotTakeGame },
     speedVoteGame: { ...base.speedVoteGame },
     truthMeterGame: { ...base.truthMeterGame },
+    consensusGame: { ...base.consensusGame },
     dilemmaGame: { ...base.dilemmaGame },
     triviaGame: { ...base.triviaGame },
     filRougeGame: { ...base.filRougeGame },
@@ -487,6 +520,11 @@ export function recordSpeedVotePlayed() {
 
 export function recordTruthMeterPlayed() {
   state.stats.truthMetersPlayed = (state.stats.truthMetersPlayed || 0) + 1;
+  save();
+}
+
+export function recordConsensusPlayed() {
+  state.stats.consensusGamesPlayed = (state.stats.consensusGamesPlayed || 0) + 1;
   save();
 }
 

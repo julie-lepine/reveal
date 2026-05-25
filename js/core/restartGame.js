@@ -8,6 +8,7 @@ import {
   speedVoteToRemote,
   triviaToRemote,
   truthMeterToRemote,
+  consensusToRemote,
   dilemmaToRemote,
   guessLieToRemote,
 } from "./gameSync.js";
@@ -15,6 +16,7 @@ import { navigate } from "./router.js";
 import { defaultSpeedVotePrepSession } from "./speedVoteSession.js";
 import { defaultTriviaPrepSession } from "./triviaSession.js";
 import { defaultTruthMeterPrepSession } from "./truthMeterSession.js";
+import { defaultConsensusPrepSession } from "./consensusSession.js";
 import { defaultDilemmaPrepSession } from "./dilemmaSession.js";
 import { showAppAlert } from "./dialog.js";
 import { escapeHtml } from "./ui.js";
@@ -24,6 +26,7 @@ const GAME_ID_TO_TILE = {
   speedvote: "speedvote-prep",
   trivia: "trivia-prep",
   truthmeter: "truthmeter-prep",
+  consensus: "consensus-prep",
   dilemma: "dilemma-prep",
   guesslie: "guesslie",
   tiernight: "tiernight-select",
@@ -137,6 +140,29 @@ export async function launchTruthMeterPrep() {
   navigate("truthmeter-prep");
 }
 
+export async function launchConsensusPrep() {
+  const consensus = defaultConsensusPrepSession();
+  saveStatePatch({ consensusGame: consensus });
+
+  if (isGameSyncActive()) {
+    if (!(await requireHostToLaunch())) return;
+    try {
+      await startGameSession("consensus", "consensus-prep", {
+        consensus: consensusToRemote(consensus),
+      });
+    } catch (e) {
+      console.warn("REVEAL launch Consensus:", e);
+      await showAppAlert(e.message || "Impossible de lancer Consensus.", {
+        title: "Consensus",
+        icon: "⚠️",
+      });
+    }
+    return;
+  }
+
+  navigate("consensus-prep");
+}
+
 export async function launchHotTakePrep() {
   const ht = {
     customTakes: [],
@@ -226,6 +252,7 @@ const RESTART_HANDLERS = {
   speedvote: launchSpeedVotePrep,
   trivia: launchTriviaPrep,
   truthmeter: launchTruthMeterPrep,
+  consensus: launchConsensusPrep,
   dilemma: launchDilemmaPrep,
   guesslie: launchGuessLieMenu,
   tiernight: launchTierNightSelect,

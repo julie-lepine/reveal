@@ -51,23 +51,29 @@ function guestJoinPanelHtml({ leaveHint = false } = {}) {
 }
 
 function homeStatsHtml() {
-  if (!hasActiveLobby()) return "";
-
-  const recap = getEveningRecap();
-  const liesDisplay =
-    recap.liesTotal > 0 ? `${recap.liesFound}/${recap.liesTotal}` : String(recap.liesFound);
-
-  return `
-        <p class="label-upper label-upper--muted">Stats de la soirée</p>
-        <div class="stats stats--global">
-          <div class="stat stat--banner"><div>👥</div><div class="stat-number">${recap.participantCount}</div><div class="stat-label">Joueurs</div></div>
-          <div class="stat"><div>🔥</div><div class="stat-number">${recap.hotTakes}</div><div class="stat-label">Hot takes</div></div>
-          <div class="stat"><div>⚡</div><div class="stat-number">${recap.speedVotes}</div><div class="stat-label">SpeedVotes</div></div>
-          <div class="stat"><div>📏</div><div class="stat-number">${recap.truthMeters}</div><div class="stat-label">TruthMeter</div></div>
-          <div class="stat"><div>⚖️</div><div class="stat-number">${recap.dilemmas}</div><div class="stat-label">Dilemma</div></div>
-          <div class="stat"><div>🕵️</div><div class="stat-number">${liesDisplay}</div><div class="stat-label">Mensonges trouvés</div></div>
-          <div class="stat"><div>🏆</div><div class="stat-number">${recap.tierNights}</div><div class="stat-label">Tier lists</div></div>
-        </div>`;
+  /*
+   * Stats de la soirée dans le lobby masquées temporairement.
+   * On garde le code ci-dessous commenté pour pouvoir le réutiliser plus tard.
+   *
+   * if (!hasActiveLobby()) return "";
+   *
+   * const recap = getEveningRecap();
+   * const liesDisplay =
+   *   recap.liesTotal > 0 ? `${recap.liesFound}/${recap.liesTotal}` : String(recap.liesFound);
+   *
+   * return `
+   *       <p class="label-upper label-upper--muted">Stats de la soirée</p>
+   *       <div class="stats stats--global">
+   *         <div class="stat stat--banner"><div>👥</div><div class="stat-number">${recap.participantCount}</div><div class="stat-label">Joueurs</div></div>
+   *         <div class="stat"><div>🔥</div><div class="stat-number">${recap.hotTakes}</div><div class="stat-label">Hot takes</div></div>
+   *         <div class="stat"><div>⚡</div><div class="stat-number">${recap.speedVotes}</div><div class="stat-label">SpeedVotes</div></div>
+   *         <div class="stat"><div>📏</div><div class="stat-number">${recap.truthMeters}</div><div class="stat-label">TruthMeter</div></div>
+   *         <div class="stat"><div>⚖️</div><div class="stat-number">${recap.dilemmas}</div><div class="stat-label">Dilemma</div></div>
+   *         <div class="stat"><div>🕵️</div><div class="stat-number">${liesDisplay}</div><div class="stat-label">Mensonges trouvés</div></div>
+   *         <div class="stat"><div>🏆</div><div class="stat-number">${recap.tierNights}</div><div class="stat-label">Tier lists</div></div>
+   *       </div>`;
+   */
+  return "";
 }
 
 function homeRenderSnapshot(authTab) {

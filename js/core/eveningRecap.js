@@ -15,6 +15,7 @@ export function getEveningRecap() {
   const speedVotes = stats.speedVotesPlayed || 0;
   const triviaGames = stats.triviaGamesPlayed || 0;
   const truthMeters = stats.truthMetersPlayed || 0;
+  const consensusGames = stats.consensusGamesPlayed || 0;
   const dilemmas = stats.dilemmasPlayed || 0;
   const liesTotal = stats.liesTotal || 0;
   const liesFound = stats.liesFound || 0;
@@ -26,6 +27,7 @@ export function getEveningRecap() {
     speedVotes > 0 ||
     triviaGames > 0 ||
     truthMeters > 0 ||
+    consensusGames > 0 ||
     dilemmas > 0 ||
     liesTotal > 0 ||
     tierNights > 0 ||
@@ -37,6 +39,7 @@ export function getEveningRecap() {
     speedVotes,
     triviaGames,
     truthMeters,
+    consensusGames,
     dilemmas,
     liesFound,
     liesTotal,

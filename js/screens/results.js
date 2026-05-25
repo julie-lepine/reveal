@@ -43,6 +43,7 @@ export function mountResults(app) {
       recap.speedVotes > 0 ? `<span class="evening-recap__chip">⚡ ${recap.speedVotes}</span>` : "",
       recap.triviaGames > 0 ? `<span class="evening-recap__chip">🧠 ${recap.triviaGames}</span>` : "",
       recap.truthMeters > 0 ? `<span class="evening-recap__chip">📏 ${recap.truthMeters}</span>` : "",
+      recap.consensusGames > 0 ? `<span class="evening-recap__chip">🤝 ${recap.consensusGames}</span>` : "",
       recap.tierNights > 0 ? `<span class="evening-recap__chip">🏆 ${recap.tierNights}</span>` : "",
     ]
       .filter(Boolean)

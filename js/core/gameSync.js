@@ -72,6 +72,7 @@ const GAME_SETUP_SCREENS = new Set([
   "speedvote-prep",
   "trivia-prep",
   "truthmeter-prep",
+  "consensus-prep",
   "dilemma-prep",
   "guesslie-menu",
   "guesslie-setup",
@@ -219,6 +220,36 @@ function mapTriviaAnswersByUid(answersByName = {}) {
       out[uid] = {
         answerIndex: val.answerIndex,
         answeredAt: val.answeredAt || null,
+      };
+    }
+  });
+  return out;
+}
+
+function mapConsensusAnswersByName(answersByUid = {}) {
+  const out = {};
+  Object.entries(answersByUid).forEach(([uid, val]) => {
+    const name = nameForUserId(uid) || uid;
+    if (val && Number.isFinite(val.value)) {
+      out[name] = {
+        value: val.value,
+        timestamp: val.timestamp || 0,
+        submittedAt: val.submittedAt || null,
+      };
+    }
+  });
+  return out;
+}
+
+function mapConsensusAnswersByUid(answersByName = {}) {
+  const out = {};
+  Object.entries(answersByName).forEach(([name, val]) => {
+    const uid = userIdForName(name) || name;
+    if (val && Number.isFinite(val.value)) {
+      out[uid] = {
+        value: val.value,
+        timestamp: val.timestamp || 0,
+        submittedAt: val.submittedAt || null,
       };
     }
   });
@@ -471,6 +502,67 @@ function mergeTriviaGameLocal(local, remote) {
   };
 }
 
+function isNewConsensusQuestionRound(cur, inc) {
+  return (
+    inc?.phase === "question" &&
+    inc?.questionEndsAt &&
+    inc.questionEndsAt !== cur?.questionEndsAt &&
+    Object.keys(inc.answers || {}).length === 0
+  );
+}
+
+function pickLatestConsensusAnswer(localAnswer, remoteAnswer) {
+  if (!localAnswer) return remoteAnswer || null;
+  if (!remoteAnswer) return localAnswer;
+  return (remoteAnswer.timestamp || 0) >= (localAnswer.timestamp || 0)
+    ? remoteAnswer
+    : localAnswer;
+}
+
+function mergeRemoteConsensusAnswersUid(cur, inc) {
+  const curAnswers = cur?.answers || {};
+  const incAnswers = inc?.answers || {};
+  if (isNewConsensusQuestionRound(cur, inc)) return incAnswers;
+  const merged = { ...curAnswers };
+  Object.entries(incAnswers).forEach(([uid, incoming]) => {
+    const current = merged[uid];
+    merged[uid] = pickLatestConsensusAnswer(current, incoming);
+  });
+  return merged;
+}
+
+function mergeConsensusGameLocal(local, remote) {
+  if (!remote) return local;
+  if (!local) return remote;
+  const remoteAnswers = remote.answers || {};
+  const localAnswers = local.answers || {};
+  let answers = remoteAnswers;
+  if (isNewConsensusQuestionRound(local, remote)) {
+    answers = remoteAnswers;
+  } else if (
+    remote.phase === "question" ||
+    remote.phase === "reveal-pending" ||
+    remote.phase === "reveal" ||
+    remote.phase === "final"
+  ) {
+    answers = { ...remoteAnswers };
+    const me = getLocalDisplayName();
+    const mergedLocal = pickLatestConsensusAnswer(localAnswers[me], remoteAnswers[me]);
+    if (mergedLocal) answers[me] = mergedLocal;
+  }
+  const ready =
+    !remote.lobbyStarted && !local.lobbyStarted
+      ? mergeReadyMapsLocal(local.ready || {}, remote.ready || {}, getActivePlayerNames())
+      : remote.ready || {};
+  return {
+    ...local,
+    ...remote,
+    ready,
+    answers,
+    matchScores: { ...(remote.matchScores || {}) },
+  };
+}
+
 function isNewDilemmaVoteRound(cur, inc) {
   return (
     inc?.phase === "voting" &&
@@ -643,6 +735,81 @@ export function truthMeterFromRemote(remote) {
     votes: mapVotesByName(remote.votes || {}),
     voteEndsAt: remote.voteEndsAt || null,
     roundScored: Boolean(remote.roundScored),
+  };
+}
+
+export function consensusToRemote(session) {
+  return {
+    ready: mapReadyByUid(session.ready || {}),
+    lobbyStarted: Boolean(session.lobbyStarted),
+    selectedModeId: session.selectedModeId || "standard",
+    questionCount: session.questionCount ?? 5,
+    questionTimeSec: session.questionTimeSec ?? 15,
+    deck: session.deck || null,
+    questionIdx: session.questionIdx ?? 0,
+    phase: session.phase || null,
+    currentQuestion: session.currentQuestion || null,
+    answers: mapConsensusAnswersByUid(session.answers || {}),
+    questionEndsAt: session.questionEndsAt || null,
+    roundScored: Boolean(session.roundScored),
+    matchScores: scoresToRemote(session.matchScores || {}),
+    lastRound: session.lastRound
+      ? {
+          ...session.lastRound,
+          deltas: scoresToRemote(session.lastRound.deltas || {}),
+          precisionPlayers: (session.lastRound.precisionPlayers || []).map(
+            (name) => userIdForName(name) || name
+          ),
+          closestPlayers: (session.lastRound.closestPlayers || []).map(
+            (name) => userIdForName(name) || name
+          ),
+          intuitionPlayers: (session.lastRound.intuitionPlayers || []).map(
+            (name) => userIdForName(name) || name
+          ),
+          consensusPlayers: (session.lastRound.consensusPlayers || []).map(
+            (name) => userIdForName(name) || name
+          ),
+        }
+      : null,
+    podiumApplied: Boolean(session.podiumApplied),
+  };
+}
+
+export function consensusFromRemote(remote) {
+  if (!remote) return null;
+  return {
+    ready: mapReadyByName(remote.ready || {}),
+    lobbyStarted: Boolean(remote.lobbyStarted),
+    selectedModeId: remote.selectedModeId || "standard",
+    questionCount: remote.questionCount ?? 5,
+    questionTimeSec: remote.questionTimeSec ?? 15,
+    deck: remote.deck || null,
+    questionIdx: remote.questionIdx ?? 0,
+    phase: remote.phase || null,
+    currentQuestion: remote.currentQuestion || null,
+    answers: mapConsensusAnswersByName(remote.answers || {}),
+    questionEndsAt: remote.questionEndsAt || null,
+    roundScored: Boolean(remote.roundScored),
+    matchScores: scoresFromRemote(remote.matchScores || {}),
+    lastRound: remote.lastRound
+      ? {
+          ...remote.lastRound,
+          deltas: scoresFromRemote(remote.lastRound.deltas || {}),
+          precisionPlayers: (remote.lastRound.precisionPlayers || []).map(
+            (uid) => nameForUserId(uid) || uid
+          ),
+          closestPlayers: (remote.lastRound.closestPlayers || []).map(
+            (uid) => nameForUserId(uid) || uid
+          ),
+          intuitionPlayers: (remote.lastRound.intuitionPlayers || []).map(
+            (uid) => nameForUserId(uid) || uid
+          ),
+          consensusPlayers: (remote.lastRound.consensusPlayers || []).map(
+            (uid) => nameForUserId(uid) || uid
+          ),
+        }
+      : null,
+    podiumApplied: Boolean(remote.podiumApplied),
   };
 }
 
@@ -1063,6 +1230,7 @@ function eveningStateToRemote() {
       speedVotesPlayed: stats.speedVotesPlayed || 0,
       triviaGamesPlayed: stats.triviaGamesPlayed || 0,
       truthMetersPlayed: stats.truthMetersPlayed || 0,
+      consensusGamesPlayed: stats.consensusGamesPlayed || 0,
       dilemmasPlayed: stats.dilemmasPlayed || 0,
       liesFound: stats.liesFound || 0,
       liesTotal: stats.liesTotal || 0,
@@ -1152,6 +1320,11 @@ export function applyRemoteSession(row) {
     const remote = truthMeterFromRemote(st.truthMeter);
     const local = getState().truthMeterGame;
     patch.truthMeterGame = local ? mergeTruthMeterGameLocal(local, remote) : remote;
+  }
+  if (st.consensus) {
+    const remote = consensusFromRemote(st.consensus);
+    const local = getState().consensusGame;
+    patch.consensusGame = local ? mergeConsensusGameLocal(local, remote) : remote;
   }
   if (st.dilemma) {
     const remote = dilemmaFromRemote(st.dilemma);
@@ -1246,6 +1419,8 @@ function navStackFor(screen) {
     "trivia",
     "truthmeter-prep",
     "truthmeter",
+    "consensus-prep",
+    "consensus",
     "guesslie-menu",
     "guesslie-setup",
     "guesslie-wait",
@@ -1323,6 +1498,10 @@ export function getEffectiveSessionScreen(row) {
   if (st.truthMeter) {
     if (st.truthMeter.lobbyStarted) return "truthmeter";
     if (gid === "truthmeter" || declared === "truthmeter-prep") return "truthmeter-prep";
+  }
+  if (st.consensus) {
+    if (st.consensus.lobbyStarted) return "consensus";
+    if (gid === "consensus" || declared === "consensus-prep") return "consensus-prep";
   }
   if (st.dilemma) {
     if (st.dilemma.lobbyStarted) return "dilemma";
@@ -1573,6 +1752,22 @@ export async function patchGameState(stateMerge, { screen, gameId } = {}) {
         }
       : incTm;
   }
+  if (stateMerge.consensus) {
+    const curConsensus = current.consensus;
+    const incConsensus = stateMerge.consensus;
+    nextState.consensus = curConsensus
+      ? {
+          ...curConsensus,
+          ...incConsensus,
+          ready: mergeRemoteReadyUid(curConsensus, incConsensus),
+          answers: mergeRemoteConsensusAnswersUid(curConsensus, incConsensus),
+          matchScores: {
+            ...(curConsensus.matchScores || {}),
+            ...(incConsensus.matchScores || {}),
+          },
+        }
+      : incConsensus;
+  }
   if (stateMerge.filRouge) {
     nextState.filRouge = mergeFilRougeRemote(current.filRouge, stateMerge.filRouge);
   }
@@ -1723,6 +1918,14 @@ export async function syncTruthMeterSession(extra = {}) {
   saveStatePatch({ truthMeterGame: session });
   if (!isGameSyncActive()) return session;
   await patchGameState({ truthMeter: truthMeterToRemote(session) });
+  return session;
+}
+
+export async function syncConsensusSession(extra = {}) {
+  const session = { ...getState().consensusGame, ...extra };
+  saveStatePatch({ consensusGame: session });
+  if (!isGameSyncActive()) return session;
+  await patchGameState({ consensus: consensusToRemote(session) });
   return session;
 }
 
