@@ -28,6 +28,7 @@ export const GAMES = [
     desc: "Testez votre culture generale",
     emoji: "🧠",
     cssClass: "trivia",
+    logo: "js/games/trivia.png",
     borderGradient:
       "linear-gradient(145deg, #A78BFA 0%, #22D3EE 44%, #2B2D66 100%)",
     enabled: true,

@@ -53,6 +53,7 @@ export function mountTrivia(app) {
   let intervalId = null;
   let npcTimers = [];
   let npcRoundKey = "";
+  let revealInFlight = false;
 
   const localName = getLocalDisplayName();
   const mp = isGameSyncActive();
@@ -89,7 +90,7 @@ export function mountTrivia(app) {
     if (phase !== "question") return "";
     if (myAnswerIndex() != null) {
       return trivia.allAnswersIn()
-        ? "Tout le monde a repondu. Le chrono continue jusqu'a la fin."
+        ? "Tout le monde a repondu. Revelation en cours…"
         : "En attente des autres joueurs… tu peux encore changer ta reponse.";
     }
     return "Choisis une reponse. Tu peux la modifier jusqu'a la fin du chrono.";
@@ -137,6 +138,10 @@ export function mountTrivia(app) {
             },
           };
           await trivia.commitPlay({ ...live, answers: nextAnswers });
+          if (trivia.allAnswersIn()) {
+            await goToReveal();
+            return;
+          }
           render();
         }, delayMs);
         npcTimers.push(timeoutId);
@@ -144,14 +149,22 @@ export function mountTrivia(app) {
   }
 
   async function goToReveal() {
-    const session = trivia.scoreRound(trivia.getSession());
+    if (revealInFlight) return;
+    const live = trivia.getSession();
+    if (live.phase !== "question") return;
+    revealInFlight = true;
+    const session = trivia.scoreRound(live);
     clearNpcTimers();
     clearTimer();
-    await trivia.commitPlay({
-      ...session,
-      phase: "reveal",
-      questionEndsAt: null,
-    });
+    try {
+      await trivia.commitPlay({
+        ...session,
+        phase: "reveal",
+        questionEndsAt: null,
+      });
+    } finally {
+      revealInFlight = false;
+    }
   }
 
   async function startVoteTimer() {
@@ -396,6 +409,10 @@ export function mountTrivia(app) {
         btn.addEventListener("click", async () => {
           if (trivia.getSession().phase !== "question" || isEveningGameplayPaused()) return;
           await trivia.commitAnswer(Number(btn.getAttribute("data-trivia-answer")));
+          if (trivia.allAnswersIn() && (!mp || isLobbyHost())) {
+            await goToReveal();
+            return;
+          }
           render();
         });
       });
@@ -447,6 +464,10 @@ export function mountTrivia(app) {
   const unsub = onGameSessionChange(() => {
     const prevPhase = phase;
     syncFromSession();
+    if (phase === "question" && isLobbyHost() && trivia.allAnswersIn()) {
+      void goToReveal();
+      return;
+    }
     if (phase === "question" && prevPhase !== "question") {
       clearTimer();
       timer = secondsUntil(trivia.getSession().questionEndsAt) ?? TRIVIA_TIMER_SEC;

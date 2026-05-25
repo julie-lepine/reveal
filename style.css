@@ -4310,7 +4310,12 @@ body{
   margin-top:14px;
 }
 
+.trivia-results__summary{
+  margin:8px 0 0;
+}
+
 .trivia-results__row{
+  position:relative;
   display:grid;
   grid-template-columns:auto auto 1fr auto;
   gap:10px;
@@ -4318,6 +4323,7 @@ body{
   padding:12px 14px;
   border-radius:16px;
   background:rgba(255,255,255,.05);
+  overflow:hidden;
 }
 
 .trivia-results__row--winner{
@@ -4325,20 +4331,82 @@ body{
   background:linear-gradient(135deg, rgba(251,191,36,.12), rgba(167,139,250,.12));
 }
 
+.trivia-results__row--champion{
+  box-shadow:0 12px 36px rgba(251,191,36,.18);
+}
+
 .trivia-results__medal{
+  position:relative;
+  z-index:1;
   font-size:20px;
   line-height:1;
 }
 
 .trivia-results__name{
+  position:relative;
+  z-index:1;
   min-width:0;
 }
 
 .trivia-results__score,
 .trivia-results__bonus{
+  position:relative;
+  z-index:1;
   font-size:12px;
   font-weight:800;
   color:rgba(255,255,255,.78);
+}
+
+.trivia-results__confetti{
+  position:absolute;
+  inset:0;
+  pointer-events:none;
+  opacity:.9;
+}
+
+.trivia-results__confetti span{
+  position:absolute;
+  top:-10px;
+  width:8px;
+  height:14px;
+  border-radius:999px;
+  animation:trivia-confetti-fall 2.4s ease-in infinite;
+}
+
+.trivia-results__confetti span:nth-child(1){
+  left:8%;
+  background:#FBBF24;
+  animation-delay:0s;
+}
+
+.trivia-results__confetti span:nth-child(2){
+  left:24%;
+  background:#22D3EE;
+  animation-delay:.25s;
+}
+
+.trivia-results__confetti span:nth-child(3){
+  left:41%;
+  background:#A78BFA;
+  animation-delay:.5s;
+}
+
+.trivia-results__confetti span:nth-child(4){
+  left:58%;
+  background:#FB7185;
+  animation-delay:.15s;
+}
+
+.trivia-results__confetti span:nth-child(5){
+  left:74%;
+  background:#4ADE80;
+  animation-delay:.4s;
+}
+
+.trivia-results__confetti span:nth-child(6){
+  left:90%;
+  background:#F59E0B;
+  animation-delay:.65s;
 }
 
 .trivia-results__bonus{
@@ -4353,6 +4421,12 @@ body{
   0%{ transform:translateY(0); }
   50%{ transform:translateY(-4px); }
   100%{ transform:translateY(0); }
+}
+
+@keyframes trivia-confetti-fall{
+  0%{ transform:translateY(-18px) rotate(0deg); opacity:0; }
+  12%{ opacity:1; }
+  100%{ transform:translateY(88px) rotate(240deg); opacity:0; }
 }
 
 @media (min-width:640px){
