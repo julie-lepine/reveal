@@ -317,8 +317,10 @@ export function allPlaylistGuessVotesIn() {
   const round = getCurrentPlaylistGuessRound();
   if (!round) return false;
   const votes = session.votes || {};
-  const voters = getActivePlayerNames().filter((n) => n !== round.ownerName);
-  return voters.length > 0 && voters.every((n) => votes[n] != null && votes[n] !== "");
+  const voterNames = lobbyPlayersWithIds()
+    .map((p) => p.name)
+    .filter((n) => n !== round.ownerName);
+  return voterNames.length > 0 && voterNames.every((n) => votes[n] != null && votes[n] !== "");
 }
 
 export function simulatePlaylistGuessVotes(round, localPick) {
@@ -326,7 +328,9 @@ export function simulatePlaylistGuessVotes(round, localPick) {
   const local = getLocalDisplayName();
   const choices = round.choices.map((c) => c.playerId);
 
-  getActivePlayerNames().forEach((name) => {
+  lobbyPlayersWithIds()
+    .map((p) => p.name)
+    .forEach((name) => {
     if (name === round.ownerName) return;
     if (name === local) {
       if (localPick) votes[name] = localPick;
