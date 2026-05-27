@@ -86,17 +86,28 @@ export function mountPlaylistGuess(app) {
   }
 
   function syncFromSession() {
+    const prevIdx = roundIdx;
+    const prevPhase = phase;
     const s = getPlaylistGuessSession();
-    const prevRound = roundIdx;
     if (s.roundIdx != null) roundIdx = s.roundIdx;
     if (s.phase) phase = s.phase;
     const votesByUid = { ...(s.votes || {}) };
-    selected = votesByUid[localUid] ?? null;
+    const serverPick = votesByUid[localUid];
+    /**
+     * Important: ne pas écraser la sélection locale tant que le vote n'est pas
+     * confirmé dans la session (sinon "cliquer un nom" ne fait rien).
+     */
+    if (serverPick != null) {
+      selected = serverPick;
+    } else if (phase === "voting" && (roundIdx !== prevIdx || prevPhase !== "voting")) {
+      // Nouvelle manche / retour en voting → reset du draft local
+      selected = null;
+    }
     roundScored = Boolean(s.roundScored);
     if (phase === "voting" && s.voteEndsAt) {
       timer = secondsUntil(s.voteEndsAt) ?? timer;
     }
-    if (roundIdx !== prevRound || phase !== "reveal") {
+    if (roundIdx !== prevIdx || phase !== "reveal") {
       revealSummary = null;
     }
   }
