@@ -1160,10 +1160,8 @@ function mergePlaylistGuessGameLocal(local, remote) {
 }
 
 export function playlistGuessToRemote(session) {
-  const remoteVotes = {};
-  Object.entries(session.votes || {}).forEach(([voter, pickId]) => {
-    remoteVotes[userIdForName(voter) || voter] = pickId;
-  });
+  // Votes keyed by voter uid (durable, avoids name collisions)
+  const remoteVotes = { ...(session.votes || {}) };
   return {
     // Ready is keyed by userId already (durable, avoids name collisions)
     ready: session.ready || {},
@@ -1183,11 +1181,8 @@ export function playlistGuessToRemote(session) {
 
 export function playlistGuessFromRemote(remote) {
   if (!remote) return null;
-  const votes = {};
-  Object.entries(remote.votes || {}).forEach(([voterUid, pickId]) => {
-    const voter = nameForUserId(voterUid) || voterUid;
-    votes[voter] = pickId;
-  });
+  // Votes remain keyed by voter uid
+  const votes = { ...(remote.votes || {}) };
   return {
     // Ready map remains keyed by userId (no lossy name mapping)
     ready: { ...(remote.ready || {}) },

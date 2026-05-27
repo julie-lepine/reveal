@@ -8,7 +8,7 @@ export function revealOwnerCardHtml({
   ownerStealth,
   myCorrect,
   isOwner,
-  votesByName,
+  votesByUid,
   nameForPlayerId,
 }) {
   const ownerLabel = round.ownerName;
@@ -28,13 +28,14 @@ export function revealOwnerCardHtml({
       ? `+${PLAYLIST_GUESS_POINTS.CORRECT_GUESS} pts`
       : `${correctVoters.length} bonne(s) réponse(s) sur cette manche`;
 
-  const voteRows = Object.entries(votesByName)
-    .map(([voter, pickId]) => {
+  const voteRows = Object.entries(votesByUid || {})
+    .map(([voterUid, pickId]) => {
+      const voterName = nameForPlayerId(voterUid) || voterUid;
       const pickName = nameForPlayerId(pickId) || pickId;
-      const ok = pickId === round.ownerPlayerId || pickName === round.ownerName;
+      const ok = pickId === round.ownerPlayerId;
       return `
         <div class="player-row player-row--compact">
-          <span>${escapeHtml(voter)}</span>
+          <span>${escapeHtml(voterName)}</span>
           <span>${escapeHtml(pickName)}${ok ? " ✓" : ""}</span>
         </div>`;
     })

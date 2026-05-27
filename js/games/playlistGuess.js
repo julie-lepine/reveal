@@ -90,8 +90,8 @@ export function mountPlaylistGuess(app) {
     const prevRound = roundIdx;
     if (s.roundIdx != null) roundIdx = s.roundIdx;
     if (s.phase) phase = s.phase;
-    const votes = { ...(s.votes || {}) };
-    selected = votes[localName] ?? null;
+    const votesByUid = { ...(s.votes || {}) };
+    selected = votesByUid[localUid] ?? null;
     roundScored = Boolean(s.roundScored);
     if (phase === "voting" && s.voteEndsAt) {
       timer = secondsUntil(s.voteEndsAt) ?? timer;
@@ -105,12 +105,10 @@ export function mountPlaylistGuess(app) {
     const round = currentRound();
     const s = getPlaylistGuessSession();
     const all = mp ? { ...(s.votes || {}) } : { ...simulatePlaylistGuessVotes(round, selected) };
-    if (selected != null && !isOwner(round)) all[localName] = selected;
+    if (selected != null && !isOwner(round)) all[localUid] = selected;
 
-    const voters = Object.keys(all).filter((n) => n !== round.ownerName);
-    const correct = voters.filter(
-      (n) => all[n] === round.ownerPlayerId || all[n] === round.ownerName
-    );
+    const voters = Object.keys(all).filter((uid) => uid !== round.ownerPlayerId);
+    const correct = voters.filter((uid) => all[uid] === round.ownerPlayerId);
     const allCorrect = voters.length > 0 && correct.length === voters.length;
     const ownerStealth = !allCorrect;
 
@@ -123,15 +121,16 @@ export function mountPlaylistGuess(app) {
     const { correct, ownerStealth, round } = result;
     revealSummary = {
       ...awardPlaylistGuessRound({
-        votes: result.all,
+        votesByUid: result.all,
         ownerName: round.ownerName,
         ownerPlayerId: round.ownerPlayerId,
+        resolveName: nameForPlayerId,
       }),
       round,
       ownerStealth,
-      myCorrect: correct.includes(localName),
+      myCorrect: correct.includes(localUid),
       isOwner: isOwner(round),
-      votesByName: result.all,
+      votesByUid: result.all,
     };
     if (mp && isLobbyHost()) void syncLobbyScores();
   }
@@ -286,7 +285,7 @@ export function mountPlaylistGuess(app) {
       if (owner) {
         body = ownerWaitingStageHtml(round, timer);
       } else {
-        const alreadyVoted = mp && (getPlaylistGuessSession().votes || {})[localName] != null;
+        const alreadyVoted = mp && (getPlaylistGuessSession().votes || {})[localUid] != null;
         if (alreadyVoted) {
           body = `
             ${songGuessCardHtml(round, { selectedPlayerId: selected, readonly: true })}
@@ -344,7 +343,7 @@ export function mountPlaylistGuess(app) {
       if (selected === null) return;
       clearTimer();
       if (mp) {
-        const votes = { ...(getPlaylistGuessSession().votes || {}), [localName]: selected };
+        const votes = { ...(getPlaylistGuessSession().votes || {}), [localUid]: selected };
         await commitPlaylistGuessPlay({ votes });
         await tryAdvanceToReveal();
       } else {

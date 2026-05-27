@@ -155,21 +155,20 @@ export function awardDilemmaRound(votes) {
 }
 
 /** VibeCheck — devine le propriétaire du like Spotify */
-export function awardPlaylistGuessRound({ votes, ownerName, ownerPlayerId }) {
-  const voters = Object.entries(votes).filter(([voter]) => voter !== ownerName);
-  const correct = voters.filter(
-    ([, pick]) => pick === ownerPlayerId || pick === ownerName
-  );
+export function awardPlaylistGuessRound({ votesByUid, ownerName, ownerPlayerId, resolveName }) {
+  const nameFor = (uid) => (resolveName ? resolveName(uid) : uid);
+  const voters = Object.entries(votesByUid || {}).filter(([voterUid]) => voterUid !== ownerPlayerId);
+  const correct = voters.filter(([, pick]) => pick === ownerPlayerId);
   const allCorrect = voters.length > 0 && correct.length === voters.length;
   const ownerStealth = !allCorrect;
 
-  correct.forEach(([name]) => addScore(name, PLAYLIST_GUESS_POINTS.CORRECT_GUESS));
+  correct.forEach(([uid]) => addScore(nameFor(uid), PLAYLIST_GUESS_POINTS.CORRECT_GUESS));
   if (ownerStealth && ownerName) {
     addScore(ownerName, PLAYLIST_GUESS_POINTS.OWNER_STEALTH);
   }
 
   return {
-    correctVoters: correct.map(([n]) => n),
+    correctVoters: correct.map(([uid]) => nameFor(uid)),
     allCorrect,
     ownerStealth,
     ownerPoints: ownerStealth ? PLAYLIST_GUESS_POINTS.OWNER_STEALTH : 0,

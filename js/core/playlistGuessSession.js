@@ -316,30 +316,33 @@ export function allPlaylistGuessVotesIn() {
   const session = getPlaylistGuessSession();
   const round = getCurrentPlaylistGuessRound();
   if (!round) return false;
-  const votes = session.votes || {};
-  const voterNames = lobbyPlayersWithIds()
-    .map((p) => p.name)
-    .filter((n) => n !== round.ownerName);
-  return voterNames.length > 0 && voterNames.every((n) => votes[n] != null && votes[n] !== "");
+  const votesByUid = session.votes || {};
+  const voterUids = lobbyPlayersWithIds()
+    .map((p) => p.userId)
+    .filter((uid) => uid !== round.ownerPlayerId);
+  return (
+    voterUids.length > 0 &&
+    voterUids.every((uid) => votesByUid[uid] != null && votesByUid[uid] !== "")
+  );
 }
 
 export function simulatePlaylistGuessVotes(round, localPick) {
   const votes = {};
   const local = getLocalDisplayName();
+  const localUid = getLocalParticipantId();
   const choices = round.choices.map((c) => c.playerId);
 
   lobbyPlayersWithIds()
-    .map((p) => p.name)
-    .forEach((name) => {
-    if (name === round.ownerName) return;
-    if (name === local) {
-      if (localPick) votes[name] = localPick;
+    .forEach((p) => {
+    if (p.userId === round.ownerPlayerId) return;
+    if (p.userId === localUid) {
+      if (localPick) votes[p.userId] = localPick;
       return;
     }
     const pick = choices[Math.floor(Math.random() * choices.length)];
-    votes[name] = pick;
+    votes[p.userId] = pick;
   });
-  if (localPick && local !== round.ownerName) votes[local] = localPick;
+  if (localPick && localUid !== round.ownerPlayerId) votes[localUid] = localPick;
   return votes;
 }
 
