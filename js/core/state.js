@@ -66,6 +66,7 @@ const defaultState = () => ({
   stats: {
     hotTakesPlayed: 0,
     speedVotesPlayed: 0,
+    playlistGuessesPlayed: 0,
     truthMetersPlayed: 0,
     consensusGamesPlayed: 0,
     dilemmasPlayed: 0,
@@ -111,6 +112,21 @@ const defaultState = () => ({
     roundScored: false,
     modifier: "normal",
     currentQuestion: null,
+  },
+  playlistGuessGame: {
+    ready: {},
+    spotifyByUid: {},
+    librariesByUid: {},
+    lobbyStarted: false,
+    roundCount: 5,
+    deck: null,
+    roundIdx: 0,
+    phase: null,
+    votes: {},
+    voteEndsAt: null,
+    roundScored: false,
+    usedTrackIds: [],
+    connectError: null,
   },
   truthMeterGame: {
     ready: {},
@@ -216,6 +232,7 @@ function loadState() {
       inLobby: parsed.inLobby || false,
       hotTakeGame: { ...defaultState().hotTakeGame, ...parsed.hotTakeGame },
       speedVoteGame: { ...defaultState().speedVoteGame, ...parsed.speedVoteGame },
+      playlistGuessGame: { ...defaultState().playlistGuessGame, ...parsed.playlistGuessGame },
       truthMeterGame: { ...defaultState().truthMeterGame, ...parsed.truthMeterGame },
       consensusGame: { ...defaultState().consensusGame, ...parsed.consensusGame },
       dilemmaGame: { ...defaultState().dilemmaGame, ...parsed.dilemmaGame },
@@ -447,6 +464,7 @@ export function defaultEveningStats() {
     liesTotal: 0,
     tierNightsPlayed: 0,
     speedVotesPlayed: 0,
+    playlistGuessesPlayed: 0,
     truthMetersPlayed: 0,
     consensusGamesPlayed: 0,
     dilemmasPlayed: 0,
@@ -467,6 +485,7 @@ export function resetGameSessionsOnly() {
   saveStatePatch({
     hotTakeGame: { ...base.hotTakeGame },
     speedVoteGame: { ...base.speedVoteGame },
+    playlistGuessGame: { ...base.playlistGuessGame },
     truthMeterGame: { ...base.truthMeterGame },
     consensusGame: { ...base.consensusGame },
     dilemmaGame: { ...base.dilemmaGame },
@@ -515,6 +534,11 @@ export function recordHotTakePlayed() {
 
 export function recordSpeedVotePlayed() {
   state.stats.speedVotesPlayed = (state.stats.speedVotesPlayed || 0) + 1;
+  save();
+}
+
+export function recordPlaylistGuessPlayed() {
+  state.stats.playlistGuessesPlayed = (state.stats.playlistGuessesPlayed || 0) + 1;
   save();
 }
 

@@ -26,6 +26,7 @@ import { getLastGame, getState } from "../core/state.js";
 import { getFilRougeSession } from "../core/filRougeSession.js";
 import {
   launchSpeedVotePrep,
+  launchPlaylistGuessPrep,
   launchTriviaPrep,
   launchTruthMeterPrep,
   launchConsensusPrep,
@@ -61,6 +62,9 @@ function eveningRecapHtml(recap) {
       : "",
     recap.speedVotes > 0
       ? `<span class="evening-recap__chip">⚡ ${recap.speedVotes} SpeedVote${recap.speedVotes > 1 ? "s" : ""}</span>`
+      : "",
+    recap.playlistGuesses > 0
+      ? `<span class="evening-recap__chip">🎶 ${recap.playlistGuesses} playlist${recap.playlistGuesses > 1 ? "s" : ""}</span>`
       : "",
     recap.triviaGames > 0
       ? `<span class="evening-recap__chip">🧠 ${recap.triviaGames} Trivia${recap.triviaGames > 1 ? "s" : ""}</span>`
@@ -113,6 +117,7 @@ function eveningRecapHtml(recap) {
 function buildGameSelectHandlers() {
   return {
     "speedvote-prep": launchSpeedVotePrep,
+    "playlistguess-prep": launchPlaylistGuessPrep,
     "trivia-prep": launchTriviaPrep,
     "truthmeter-prep": launchTruthMeterPrep,
     "consensus-prep": launchConsensusPrep,

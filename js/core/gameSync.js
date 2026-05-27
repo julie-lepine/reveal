@@ -74,6 +74,7 @@ const GAME_SETUP_SCREENS = new Set([
   "truthmeter-prep",
   "consensus-prep",
   "dilemma-prep",
+  "playlistguess-prep",
   "guesslie-menu",
   "guesslie-setup",
   "guesslie-wait",
@@ -1096,6 +1097,112 @@ export function speedVoteFromRemote(remote) {
   };
 }
 
+function isNewPlaylistGuessVoteRound(cur, inc) {
+  return (
+    inc?.phase === "voting" &&
+    inc?.voteEndsAt &&
+    inc.voteEndsAt !== cur?.voteEndsAt &&
+    Object.keys(inc.votes || {}).length === 0
+  );
+}
+
+function mergeRemotePlaylistGuessVotesUid(cur, inc) {
+  const curVotes = cur?.votes || {};
+  const incVotes = inc?.votes || {};
+  if (isNewPlaylistGuessVoteRound(cur, inc)) return incVotes;
+  if (
+    (inc?.phase === "voting" && cur?.phase === "voting") ||
+    inc?.phase === "reveal" ||
+    cur?.phase === "reveal"
+  ) {
+    return { ...curVotes, ...incVotes };
+  }
+  return incVotes;
+}
+
+function mergePlaylistGuessLibrariesUid(cur, inc) {
+  if (!inc?.librariesByUid) return cur?.librariesByUid || {};
+  return { ...(cur?.librariesByUid || {}), ...inc.librariesByUid };
+}
+
+function mergePlaylistGuessSpotifyMetaUid(cur, inc) {
+  if (!inc?.spotifyByUid) return cur?.spotifyByUid || {};
+  return { ...(cur?.spotifyByUid || {}), ...inc.spotifyByUid };
+}
+
+function mergePlaylistGuessGameLocal(local, remote) {
+  if (!remote) return local;
+  if (!local) return remote;
+  const remoteVotes = remote.votes || {};
+  const localVotes = local.votes || {};
+  let votes = remoteVotes;
+  if (isNewPlaylistGuessVoteRound(local, remote)) {
+    votes = remoteVotes;
+  } else if (remote.phase === "voting") {
+    votes = { ...remoteVotes };
+    const name = getLocalDisplayName();
+    if (localVotes[name] != null) votes[name] = localVotes[name];
+  } else if (remote.phase === "reveal" || local.phase === "reveal") {
+    votes = { ...remoteVotes, ...localVotes };
+  }
+  const ready =
+    !remote.lobbyStarted && !local.lobbyStarted
+      ? mergeReadyMapsLocal(local.ready || {}, remote.ready || {}, getActivePlayerNames())
+      : remote.ready || {};
+  return {
+    ...local,
+    ...remote,
+    votes,
+    ready,
+    librariesByUid: mergePlaylistGuessLibrariesUid(local, remote),
+    spotifyByUid: mergePlaylistGuessSpotifyMetaUid(local, remote),
+  };
+}
+
+export function playlistGuessToRemote(session) {
+  const remoteVotes = {};
+  Object.entries(session.votes || {}).forEach(([voter, pickId]) => {
+    remoteVotes[userIdForName(voter) || voter] = pickId;
+  });
+  return {
+    ready: mapReadyByUid(session.ready || {}),
+    spotifyByUid: session.spotifyByUid || {},
+    librariesByUid: session.librariesByUid || {},
+    lobbyStarted: Boolean(session.lobbyStarted),
+    roundCount: session.roundCount ?? 5,
+    deck: session.deck || null,
+    roundIdx: session.roundIdx ?? 0,
+    phase: session.phase || null,
+    votes: remoteVotes,
+    voteEndsAt: session.voteEndsAt || null,
+    roundScored: Boolean(session.roundScored),
+    usedTrackIds: session.usedTrackIds || [],
+  };
+}
+
+export function playlistGuessFromRemote(remote) {
+  if (!remote) return null;
+  const votes = {};
+  Object.entries(remote.votes || {}).forEach(([voterUid, pickId]) => {
+    const voter = nameForUserId(voterUid) || voterUid;
+    votes[voter] = pickId;
+  });
+  return {
+    ready: mapReadyByName(remote.ready || {}),
+    spotifyByUid: remote.spotifyByUid || {},
+    librariesByUid: remote.librariesByUid || {},
+    lobbyStarted: Boolean(remote.lobbyStarted),
+    roundCount: remote.roundCount ?? 5,
+    deck: remote.deck || null,
+    roundIdx: remote.roundIdx ?? 0,
+    phase: remote.phase || null,
+    votes,
+    voteEndsAt: remote.voteEndsAt || null,
+    roundScored: Boolean(remote.roundScored),
+    usedTrackIds: remote.usedTrackIds || [],
+  };
+}
+
 export function guessLieToRemote(gl) {
   return {
     sessionId: gl.sessionId,
@@ -1336,6 +1443,11 @@ export function applyRemoteSession(row) {
     const local = getState().guessLie;
     patch.guessLie = local ? mergeGuessLieGameLocal(local, remote) : remote;
   }
+  if (st.playlistGuess) {
+    const remote = playlistGuessFromRemote(st.playlistGuess);
+    const local = getState().playlistGuessGame;
+    patch.playlistGuessGame = local ? mergePlaylistGuessGameLocal(local, remote) : remote;
+  }
   if (st.tierNight) {
     const tn = tierNightFromRemote(st.tierNight);
     if (tn.topicId != null) patch.tierNightTopicId = tn.topicId;
@@ -1415,6 +1527,8 @@ function navStackFor(screen) {
     "hottake",
     "speedvote-prep",
     "speedvote",
+    "playlistguess-prep",
+    "playlistguess",
     "trivia-prep",
     "trivia",
     "truthmeter-prep",
@@ -1506,6 +1620,10 @@ export function getEffectiveSessionScreen(row) {
   if (st.dilemma) {
     if (st.dilemma.lobbyStarted) return "dilemma";
     if (gid === "dilemma" || declared === "dilemma-prep") return "dilemma-prep";
+  }
+  if (st.playlistGuess) {
+    if (st.playlistGuess.lobbyStarted) return "playlistguess";
+    if (gid === "playlistguess" || declared === "playlistguess-prep") return "playlistguess-prep";
   }
 
   if (declared && (MENU_SCREENS.has(declared) || POST_GAME_SCREENS.has(declared))) {
@@ -1796,6 +1914,20 @@ export async function patchGameState(stateMerge, { screen, gameId } = {}) {
         }
       : incGl;
   }
+  if (stateMerge.playlistGuess) {
+    const curPg = current.playlistGuess;
+    const incPg = stateMerge.playlistGuess;
+    nextState.playlistGuess = curPg
+      ? {
+          ...curPg,
+          ...incPg,
+          ready: mergeRemoteReadyUid(curPg, incPg),
+          votes: mergeRemotePlaylistGuessVotesUid(curPg, incPg),
+          librariesByUid: mergePlaylistGuessLibrariesUid(curPg, incPg),
+          spotifyByUid: mergePlaylistGuessSpotifyMetaUid(curPg, incPg),
+        }
+      : incPg;
+  }
   if (isLobbyHost()) {
     nextState = { ...nextState, ...eveningStateToRemote() };
   }
@@ -1902,6 +2034,14 @@ export async function syncSpeedVoteSession(extra = {}) {
   saveStatePatch({ speedVoteGame: session });
   if (!isGameSyncActive()) return session;
   await patchGameState({ speedVote: speedVoteToRemote(session) });
+  return session;
+}
+
+export async function syncPlaylistGuessSession(extra = {}) {
+  const session = { ...getState().playlistGuessGame, ...extra };
+  saveStatePatch({ playlistGuessGame: session });
+  if (!isGameSyncActive()) return session;
+  await patchGameState({ playlistGuess: playlistGuessToRemote(session) });
   return session;
 }
 

@@ -1,4 +1,5 @@
 import { EVENING_POINTS, FIL_ROUGE_POINTS, tierNightPointsForRankDiff } from "../../data/eveningScoring.js";
+import { PLAYLIST_GUESS_POINTS } from "../../data/playlistGuess.js";
 import { filterVoterVotes, computeRoundMetrics } from "./truthMeterSession.js";
 import { countDilemmaResults } from "./dilemmaSession.js";
 import {
@@ -151,6 +152,29 @@ export function awardDilemmaRound(votes) {
   });
 
   return summary;
+}
+
+/** De qui la playlist ? — devine le propriétaire du like Spotify */
+export function awardPlaylistGuessRound({ votes, ownerName, ownerPlayerId }) {
+  const voters = Object.entries(votes).filter(([voter]) => voter !== ownerName);
+  const correct = voters.filter(
+    ([, pick]) => pick === ownerPlayerId || pick === ownerName
+  );
+  const allCorrect = voters.length > 0 && correct.length === voters.length;
+  const ownerStealth = !allCorrect;
+
+  correct.forEach(([name]) => addScore(name, PLAYLIST_GUESS_POINTS.CORRECT_GUESS));
+  if (ownerStealth && ownerName) {
+    addScore(ownerName, PLAYLIST_GUESS_POINTS.OWNER_STEALTH);
+  }
+
+  return {
+    correctVoters: correct.map(([n]) => n),
+    allCorrect,
+    ownerStealth,
+    ownerPoints: ownerStealth ? PLAYLIST_GUESS_POINTS.OWNER_STEALTH : 0,
+    guessPoints: PLAYLIST_GUESS_POINTS.CORRECT_GUESS,
+  };
 }
 
 export function awardGuessLieRound({ correct, liarName, liarBonus }) {

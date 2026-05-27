@@ -7,6 +7,7 @@ import {
   reconcileLobbyMembership,
 } from "./core/lobby.js";
 import { initSupabaseAuth } from "./core/supabaseAuth.js";
+import { initSpotifyAuth } from "./core/spotifyAuth.js";
 import { mountHome } from "./screens/home.js";
 import { mountLobby } from "./screens/lobby.js";
 import { mountGameSelect } from "./screens/gameSelect.js";
@@ -20,6 +21,7 @@ import { mountTierNightCreate } from "./screens/tierNightCreate.js";
 import { mountTierNightEnd } from "./screens/tierNightEnd.js";
 import { mountHotTakePrep } from "./screens/hotTakePrep.js";
 import { mountSpeedVotePrep } from "./screens/speedVotePrep.js";
+import { mountPlaylistGuessPrep } from "./screens/playlistGuessPrep.js";
 import { mountTruthMeterPrep } from "./screens/truthMeterPrep.js";
 import { mountDilemmaPrep } from "./screens/dilemmaPrep.js";
 import { mountTriviaSetup } from "./screens/triviaSetup.js";
@@ -27,6 +29,7 @@ import { mountConsensusSetup } from "./screens/consensusSetup.js";
 import { mountSettings } from "./screens/settings.js";
 import { mountHotTake } from "./games/hotTake.js";
 import { mountSpeedVote } from "./games/speedVote.js";
+import { mountPlaylistGuess } from "./games/playlistGuess.js";
 import { mountTruthMeter } from "./games/truthMeter.js";
 import { mountDilemma } from "./games/dilemma.js";
 import { mountTrivia } from "./games/trivia.js";
@@ -70,6 +73,8 @@ registerScreen("hottake-prep", mountHotTakePrep);
 registerScreen("hottake", mountHotTake);
 registerScreen("speedvote-prep", mountSpeedVotePrep);
 registerScreen("speedvote", mountSpeedVote);
+registerScreen("playlistguess-prep", mountPlaylistGuessPrep);
+registerScreen("playlistguess", mountPlaylistGuess);
 registerScreen("truthmeter-prep", mountTruthMeterPrep);
 registerScreen("truthmeter", mountTruthMeter);
 registerScreen("dilemma-prep", mountDilemmaPrep);
@@ -89,9 +94,24 @@ initFilRougeValidationListener();
 
 async function boot() {
   await initSupabaseAuth();
+  const spotifyAuth = await initSpotifyAuth();
   await reconcileLobbyMembership();
   resetNav();
   navigate("home", { reset: true });
+  if (spotifyAuth?.connected) {
+    try {
+      const returnScreen = sessionStorage.getItem("reveal-spotify-return");
+      sessionStorage.removeItem("reveal-spotify-return");
+      if (returnScreen === "playlistguess-prep" && hasActiveLobby()) {
+        const { navigate: nav } = await import("./core/router.js");
+        nav("playlistguess-prep", {
+          navStack: ["home", "lobby", "game-select", "playlistguess-prep"],
+        });
+      }
+    } catch {
+      /* ignore */
+    }
+  }
   if (hasActiveLobby()) {
     void resumeEveningSession({ force: true });
   }

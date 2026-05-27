@@ -11,9 +11,11 @@ import {
   consensusToRemote,
   dilemmaToRemote,
   guessLieToRemote,
+  playlistGuessToRemote,
 } from "./gameSync.js";
 import { navigate } from "./router.js";
 import { defaultSpeedVotePrepSession } from "./speedVoteSession.js";
+import { defaultPlaylistGuessPrepSession } from "./playlistGuessSession.js";
 import { defaultTriviaPrepSession } from "./triviaSession.js";
 import { defaultTruthMeterPrepSession } from "./truthMeterSession.js";
 import { defaultConsensusPrepSession } from "./consensusSession.js";
@@ -29,6 +31,7 @@ const GAME_ID_TO_TILE = {
   consensus: "consensus-prep",
   dilemma: "dilemma-prep",
   guesslie: "guesslie",
+  playlistguess: "playlistguess-prep",
   tiernight: "tiernight-select",
 };
 
@@ -69,6 +72,29 @@ export async function launchSpeedVotePrep() {
   }
 
   navigate("speedvote-prep");
+}
+
+export async function launchPlaylistGuessPrep() {
+  const pg = defaultPlaylistGuessPrepSession();
+  saveStatePatch({ playlistGuessGame: pg });
+
+  if (isGameSyncActive()) {
+    if (!(await requireHostToLaunch())) return;
+    try {
+      await startGameSession("playlistguess", "playlistguess-prep", {
+        playlistGuess: playlistGuessToRemote(pg),
+      });
+    } catch (e) {
+      console.warn("REVEAL launch Playlist Guess:", e);
+      await showAppAlert(e.message || "Impossible de lancer le jeu.", {
+        title: "De qui la playlist ?",
+        icon: "⚠️",
+      });
+    }
+    return;
+  }
+
+  navigate("playlistguess-prep");
 }
 
 export async function launchDilemmaPrep() {
@@ -255,6 +281,7 @@ const RESTART_HANDLERS = {
   consensus: launchConsensusPrep,
   dilemma: launchDilemmaPrep,
   guesslie: launchGuessLieMenu,
+  playlistguess: launchPlaylistGuessPrep,
   tiernight: launchTierNightSelect,
 };
 

@@ -3,7 +3,7 @@ export const GAMES = [
   {
     id: "blindtest-prep",
     title: "Blind Test",
-    desc: "Extraits musicaux — devine titre ou artiste le plus vite",
+    desc: "Extraits musicaux - devine titre ou artiste le plus vite",
     emoji: "🎧",
     cssClass: "blindtest",
     borderGradient:
@@ -14,29 +14,29 @@ export const GAMES = [
   {
     id: "playlistguess-prep",
     title: "De qui la playlist ?",
-    desc: "Une chanson s’affiche — à qui appartient cette playlist ?",
+    desc: "Une chanson de vos likes Spotify — devine qui l’a aimée",
     emoji: "🎶",
     cssClass: "playlist",
+    logo: "js/games/vibecheck.png",
     borderGradient:
       "linear-gradient(200deg, #A78BFA 0%, #6366F1 48%, #2B2D66 100%)",
-    enabled: false,
-    badgeLabel: "Bientôt",
+    enabled: true,
   },
   {
-    id: "trivia-prep",
-    title: "Trivia Quiz",
-    desc: "Testez votre culture generale",
-    emoji: "🧠",
-    cssClass: "trivia",
-    logo: "js/games/trivia.png",
+    id: "consensus-prep",
+    title: "Consensus",
+    desc: "Curseur 0 → 100 - pense comme le groupe, pas comme toi",
+    emoji: "🤝",
+    cssClass: "consensus",
+    logo: "js/games/consensus.png",
     borderGradient:
-      "linear-gradient(145deg, #A78BFA 0%, #22D3EE 44%, #2B2D66 100%)",
+      "linear-gradient(145deg, #22D3EE 0%, #A78BFA 48%, #2B2D66 100%)",
     enabled: true,
   },
   {
     id: "hottake-prep",
     title: "HotTake",
-    desc: "Opinions impopulaires — vote BASED ou CRIMINEL",
+    desc: "Opinions impopulaires",
     emoji: "🔥",
     cssClass: "hot",
     logo: "js/games/hottake.png",
@@ -58,7 +58,7 @@ export const GAMES = [
   {
     id: "speedvote-prep",
     title: "SpeedVote",
-    desc: "Vote éclair — chaos instantané en 7 secondes",
+    desc: "Vote éclair - chaos instantané en 7 secondes",
     emoji: "⚡",
     cssClass: "speed",
     logo: "js/games/speedvote.png",
@@ -69,7 +69,7 @@ export const GAMES = [
   {
     id: "dilemma-prep",
     title: "Dilemma",
-    desc: "Dilemme A vs B — vote, réactions emoji en 10 s",
+    desc: "Dilemme A vs B - Choisis ton camp, défends-le… vote",
     emoji: "⚖️",
     cssClass: "dilemma",
     logo: "js/games/dilemma.png",
@@ -80,23 +80,12 @@ export const GAMES = [
   {
     id: "truthmeter-prep",
     title: "TruthMeter",
-    desc: "Affirmation + curseur Fake → Vrai — le groupe tranche",
+    desc: "Affirmation + curseur Fake → Vrai - le groupe tranche",
     emoji: "📏",
     cssClass: "truth",
     logo: "js/games/truthmeter.png",
     borderGradient:
       "linear-gradient(145deg, #34D399 0%, #60A5FA 48%, #2B2D66 100%)",
-    enabled: true,
-  },
-  {
-    id: "consensus-prep",
-    title: "Consensus",
-    desc: "Curseur 0 → 100 — pense comme le groupe, pas comme toi",
-    emoji: "🤝",
-    cssClass: "consensus",
-    logo: "js/games/consensus.png",
-    borderGradient:
-      "linear-gradient(145deg, #22D3EE 0%, #A78BFA 48%, #2B2D66 100%)",
     enabled: true,
   },
   {
@@ -108,6 +97,17 @@ export const GAMES = [
     logo: "js/games/tiernight.png",
     borderGradient:
       "linear-gradient(320deg, #FF6B6B 0%, #FF3CAC 48%, #2B2D66 100%)",
+    enabled: true,
+  },
+  {
+    id: "trivia-prep",
+    title: "Trivia Quiz",
+    desc: "Testez votre culture generale",
+    emoji: "🧠",
+    cssClass: "trivia",
+    logo: "js/games/trivia.png",
+    borderGradient:
+      "linear-gradient(145deg, #A78BFA 0%, #22D3EE 44%, #2B2D66 100%)",
     enabled: true,
   },
 ];
