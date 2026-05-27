@@ -2,9 +2,30 @@ import { supabase, isSupabaseConfigured } from "./supabaseClient.js";
 import { getState, saveStatePatch } from "./state.js";
 import { fetchProfile, upsertProfile } from "./supabaseProfile.js";
 
+const PASSWORD_RECOVERY_KEY = "reveal-pending-password-reset";
+
 function redirectUrl() {
   const base = window.location.origin + window.location.pathname;
   return base.replace(/\/$/, "") || base;
+}
+
+export function isPasswordRecoveryPending() {
+  return sessionStorage.getItem(PASSWORD_RECOVERY_KEY) === "1";
+}
+
+export function setPasswordRecoveryPending() {
+  sessionStorage.setItem(PASSWORD_RECOVERY_KEY, "1");
+}
+
+export function clearPasswordRecoveryPending() {
+  sessionStorage.removeItem(PASSWORD_RECOVERY_KEY);
+}
+
+function isRecoveryAuthParams(hashParams, searchParams) {
+  return (
+    hashParams.get("type") === "recovery" ||
+    searchParams.get("type") === "recovery"
+  );
 }
 
 function providerFromUser(user) {
@@ -56,8 +77,12 @@ export async function syncSessionToState(session) {
 export async function initSupabaseAuth() {
   if (!isSupabaseConfigured()) return;
 
-  const params = new URLSearchParams(window.location.search);
+  const searchParams = new URLSearchParams(window.location.search);
   const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+
+  if (isRecoveryAuthParams(hashParams, searchParams)) {
+    setPasswordRecoveryPending();
+  }
 
   if (hashParams.get("access_token") || hashParams.get("error_description")) {
     const { data, error } = await supabase.auth.getSession();
@@ -69,8 +94,11 @@ export async function initSupabaseAuth() {
   const { data } = await supabase.auth.getSession();
   if (data.session) await syncSessionToState(data.session);
 
-  supabase.auth.onAuthStateChange((_event, session) => {
+  supabase.auth.onAuthStateChange((event, session) => {
     syncSessionToState(session);
+    if (event === "PASSWORD_RECOVERY") {
+      setPasswordRecoveryPending();
+    }
   });
 }
 
@@ -96,7 +124,7 @@ export async function signUpWithEmail(email, password, displayName) {
     });
   }
   if (data.session) await syncSessionToState(data.session);
-  return { ok: true };
+  return { ok: true, needsEmailConfirmation: !data.session };
 }
 
 export async function signInWithEmail(email, password) {
@@ -185,6 +213,16 @@ export async function signOutSupabase() {
   if (!isSupabaseConfigured()) return;
   await supabase.auth.signOut();
   await syncSessionToState(null);
+}
+
+export async function sendPasswordResetEmail(email) {
+  const trimmed = String(email || "").trim().toLowerCase();
+  if (!trimmed) return { ok: false, error: "Email requis." };
+  const { error } = await supabase.auth.resetPasswordForEmail(trimmed, {
+    redirectTo: redirectUrl(),
+  });
+  if (error) return { ok: false, error: error.message };
+  return { ok: true };
 }
 
 export async function updatePassword(newPassword) {

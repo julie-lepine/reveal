@@ -6,6 +6,7 @@ import {
   signInAsGuest as sbGuest,
   signInWithOAuth as sbOAuth,
   signOutSupabase,
+  sendPasswordResetEmail as sbSendPasswordResetEmail,
   updatePassword,
 } from "./supabaseAuth.js";
 import { upsertProfile } from "./supabaseProfile.js";
@@ -111,6 +112,17 @@ export async function signupWithEmail(email, password, name) {
     },
   });
   return { ok: true };
+}
+
+export async function requestPasswordReset(email) {
+  if (isSupabaseConfigured()) {
+    return sbSendPasswordResetEmail(email);
+  }
+  return {
+    ok: false,
+    error:
+      "Réinitialisation par email indisponible en mode démo local. Connecte-toi puis change ton mot de passe dans Paramètres, ou réinitialise l’app.",
+  };
 }
 
 /** Facebook OAuth (Meta). Instagram utilise le même fournisseur Meta. */

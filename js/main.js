@@ -6,7 +6,8 @@ import {
   resumeEveningSession,
   reconcileLobbyMembership,
 } from "./core/lobby.js";
-import { initSupabaseAuth } from "./core/supabaseAuth.js";
+import { initSupabaseAuth, isPasswordRecoveryPending } from "./core/supabaseAuth.js";
+import { mountResetPassword } from "./screens/resetPassword.js";
 import { initSpotifyAuth } from "./core/spotifyAuth.js";
 import { mountHome } from "./screens/home.js";
 import { mountLobby } from "./screens/lobby.js";
@@ -58,6 +59,7 @@ if (joinCode) {
 initRouter(app);
 
 registerScreen("home", mountHome);
+registerScreen("reset-password", mountResetPassword);
 registerScreen("settings", mountSettings);
 registerScreen("lobby", mountLobby);
 registerScreen("game-select", mountGameSelect);
@@ -97,7 +99,11 @@ async function boot() {
   const spotifyAuth = await initSpotifyAuth();
   await reconcileLobbyMembership();
   resetNav();
-  navigate("home", { reset: true });
+  if (isPasswordRecoveryPending()) {
+    navigate("reset-password", { reset: true });
+  } else {
+    navigate("home", { reset: true });
+  }
   if (spotifyAuth?.connected) {
     try {
       const returnScreen = sessionStorage.getItem("reveal-spotify-return");

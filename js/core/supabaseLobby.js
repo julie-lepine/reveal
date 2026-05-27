@@ -26,6 +26,41 @@ function isLobbyGoneError(e) {
   );
 }
 
+const DISPLAY_NAME_TAKEN_MSG =
+  "Ce pseudo est déjà pris dans ce lobby, choisis-en un autre.";
+
+export function isDuplicateLobbyDisplayNameError(error) {
+  const code = error?.code || "";
+  const msg = String(error?.message || error || "").toLowerCase();
+  return (
+    code === "23505" ||
+    msg.includes("duplicate key") ||
+    msg.includes("unique constraint") ||
+    msg.includes("lobby_members_unique_name")
+  );
+}
+
+/** Vérifie si un pseudo est déjà utilisé dans le lobby (casse ignorée). */
+export async function isLobbyDisplayNameTaken(lobbyId, displayName, excludeUserId = null) {
+  const trimmed = String(displayName || "").trim();
+  if (!lobbyId || trimmed.length < 2) return false;
+
+  let query = supabase
+    .from("lobby_members")
+    .select("user_id")
+    .eq("lobby_id", lobbyId)
+    .ilike("display_name", trimmed)
+    .limit(1);
+
+  if (excludeUserId) {
+    query = query.neq("user_id", excludeUserId);
+  }
+
+  const { data, error } = await query;
+  if (error) throw error;
+  return (data?.length ?? 0) > 0;
+}
+
 export function onLobbyBundleUpdated(fn) {
   lobbyBundleListeners.add(fn);
   return () => lobbyBundleListeners.delete(fn);
@@ -248,17 +283,39 @@ export async function joinLobbySupabase(codeInput) {
       return { ok: false, error: "Le lobby est complet (10 joueurs max)." };
     }
 
+    const displayName = getLocalDisplayName();
+    try {
+      if (await isLobbyDisplayNameTaken(lobbyRow.id, displayName)) {
+        return {
+          ok: false,
+          code: "display_name_taken",
+          error: DISPLAY_NAME_TAKEN_MSG,
+        };
+      }
+    } catch (e) {
+      return { ok: false, error: e.message || "Impossible de vérifier le pseudo." };
+    }
+
     const { error: joinErr } = await supabase.from("lobby_members").insert({
       lobby_id: lobbyRow.id,
       user_id: userId,
-      display_name: getLocalDisplayName(),
+      display_name: displayName,
       emoji: getLocalEmoji(),
       color: GUEST_COLOR,
       is_host: false,
       ready: false,
     });
 
-    if (joinErr) return { ok: false, error: joinErr.message };
+    if (joinErr) {
+      if (isDuplicateLobbyDisplayNameError(joinErr)) {
+        return {
+          ok: false,
+          code: "display_name_taken",
+          error: DISPLAY_NAME_TAKEN_MSG,
+        };
+      }
+      return { ok: false, error: joinErr.message };
+    }
 
     const gs = { ...getState().globalStats };
     gs.playersJoined = (gs.playersJoined || 0) + 1;
@@ -390,7 +447,14 @@ export async function updateLobbyMemberProfileSupabase({ displayName, emoji } = 
   if (!lobbyId || !userId) return;
 
   const patch = {};
-  if (displayName != null) patch.display_name = String(displayName).trim().slice(0, 24);
+  if (displayName != null) {
+    const trimmed = String(displayName).trim().slice(0, 24);
+    if (trimmed.length >= 2) {
+      const taken = await isLobbyDisplayNameTaken(lobbyId, trimmed, userId);
+      if (taken) throw new Error(DISPLAY_NAME_TAKEN_MSG);
+      patch.display_name = trimmed;
+    }
+  }
   if (emoji != null) patch.emoji = emoji;
 
   if (!Object.keys(patch).length) return;
@@ -401,7 +465,12 @@ export async function updateLobbyMemberProfileSupabase({ displayName, emoji } = 
     .eq("lobby_id", lobbyId)
     .eq("user_id", userId);
 
-  if (error) throw error;
+  if (error) {
+    if (isDuplicateLobbyDisplayNameError(error)) {
+      throw new Error(DISPLAY_NAME_TAKEN_MSG);
+    }
+    throw error;
+  }
   await refreshLobbyFromSupabase();
 }
 

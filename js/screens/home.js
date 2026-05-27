@@ -6,6 +6,7 @@ import {
   loginWithEmail,
   // loginWithSocial, /* réactiver avec connexion Facebook / Instagram */
   signupWithEmail,
+  requestPasswordReset,
   getUser,
   logout,
 } from "../core/auth.js";
@@ -31,7 +32,34 @@ import {
 import { navigate, getCurrentScreen } from "../core/router.js";
 import { escapeHtml, logoHtml, pageShell } from "../core/ui.js";
 import { handleNavTarget, goToEveningSettings } from "./nav.js";
-import { showAppAlert, showAppConfirm } from "../core/dialog.js";
+import { showAppAlert, showAppConfirm, showAppEmailPrompt } from "../core/dialog.js";
+
+async function runPasswordResetEmailFlow(defaultEmail = "", { title, message, icon } = {}) {
+  const prompt = await showAppEmailPrompt(
+    message ||
+      "Entre ton email pour recevoir un lien de réinitialisation de mot de passe.",
+    {
+      title: title || "Mot de passe oublié",
+      defaultValue: defaultEmail,
+      icon: icon || "🔐",
+      confirmLabel: "Valider",
+      cancelLabel: "Annuler",
+    }
+  );
+  if (!prompt.ok) return { ok: false, cancelled: true };
+
+  const res = await requestPasswordReset(prompt.value);
+  if (!res.ok) {
+    await showAppAlert(res.error, { title: "Réinitialisation", icon: "⚠️" });
+    return { ok: false, cancelled: false, error: res.error };
+  }
+
+  await showAppAlert("C’est envoyé. Vérifie tes emails (pense aux spams).", {
+    title: "Email envoyé",
+    icon: "📧",
+  });
+  return { ok: true, cancelled: false };
+}
 
 function guestJoinPanelHtml({ leaveHint = false } = {}) {
   return `
@@ -228,9 +256,13 @@ export function mountHome(app) {
               <label class="field-label" for="login-email">Email</label>
               <input type="email" class="field-input" id="login-email" placeholder="toi@email.com" />
               <label class="field-label" for="login-password">Mot de passe</label>
-              <input type="password" class="field-input" id="login-password" placeholder="••••••••" />
+              <div class="password-field">
+                <input type="password" class="field-input password-field__input" id="login-password" placeholder="••••••••" />
+                <button type="button" class="password-field__toggle" data-toggle-password="login-password" aria-label="Afficher le mot de passe" aria-pressed="false">👁️</button>
+              </div>
               <p class="auth-error hidden" id="login-error"></p>
               <button type="button" class="btn btn-primary btn--spaced" id="btn-login">Se connecter</button>
+              <button type="button" class="btn-link auth-forgot" id="btn-forgot-password">Mot de passe oublié ?</button>
             </div>
             <div id="auth-panel-signup" class="${authTab === "signup" ? "" : "hidden"}">
               <label class="field-label" for="signup-name">Pseudo</label>
@@ -238,7 +270,10 @@ export function mountHome(app) {
               <label class="field-label" for="signup-email">Email</label>
               <input type="email" class="field-input" id="signup-email" placeholder="toi@email.com" />
               <label class="field-label" for="signup-password">Mot de passe</label>
-              <input type="password" class="field-input" id="signup-password" placeholder="4 caractères min." />
+              <div class="password-field">
+                <input type="password" class="field-input password-field__input" id="signup-password" placeholder="4 caractères min." />
+                <button type="button" class="password-field__toggle" data-toggle-password="signup-password" aria-label="Afficher le mot de passe" aria-pressed="false">👁️</button>
+              </div>
               <p class="auth-error hidden" id="signup-error"></p>
               <button type="button" class="btn btn-primary btn--spaced" id="btn-signup">Créer mon compte</button>
             </div>
@@ -347,6 +382,12 @@ export function mountHome(app) {
       return;
     }
 
+    if (e.target.closest("#btn-forgot-password")) {
+      app.querySelector("#login-error")?.classList.add("hidden");
+      await runPasswordResetEmailFlow(app.querySelector("#login-email")?.value || "");
+      return;
+    }
+
     if (e.target.closest("#btn-signup")) {
       const err = app.querySelector("#signup-error");
       const btn = e.target.closest("#btn-signup");
@@ -358,12 +399,45 @@ export function mountHome(app) {
       );
       btn.disabled = false;
       if (!res.ok) {
+        const msg = String(res.error || "");
+        if (/already.*registered|already registered|user.*exists|email.*already|déjà.*utilisé|existe déjà/i.test(msg)) {
+          err?.classList.add("hidden");
+          await runPasswordResetEmailFlow(app.querySelector("#signup-email")?.value || "", {
+            title: "Email déjà utilisé",
+            message:
+              "Cet email est déjà enregistré. Entre-le pour recevoir un lien de réinitialisation de mot de passe.",
+            icon: "🔐",
+          });
+          return;
+        }
+
         err.textContent = res.error;
         err.classList.remove("hidden");
         return;
       }
       err?.classList.add("hidden");
+      if (res.needsEmailConfirmation) {
+        await showAppAlert(
+          "On t'a envoyé un lien de confirmation. Vérifie ta boîte mail (pense aux spams), puis reviens te connecter avec ton email et ton mot de passe.",
+          { title: "Vérifie tes emails", icon: "📧" }
+        );
+      }
       scheduleRender(true);
+      return;
+    }
+
+    const toggleBtn = e.target.closest("[data-toggle-password]");
+    if (toggleBtn) {
+      const inputId = toggleBtn.getAttribute("data-toggle-password");
+      const input = inputId ? app.querySelector(`#${CSS.escape(inputId)}`) : null;
+      if (input) {
+        const next = input.type === "password" ? "text" : "password";
+        input.type = next;
+        const shown = next === "text";
+        toggleBtn.setAttribute("aria-pressed", shown ? "true" : "false");
+        toggleBtn.setAttribute("aria-label", shown ? "Masquer le mot de passe" : "Afficher le mot de passe");
+        toggleBtn.textContent = shown ? "🙈" : "👁️";
+      }
       return;
     }
 

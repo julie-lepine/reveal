@@ -111,3 +111,108 @@ export function showAppConfirm(
     root.querySelector("[data-dialog-cancel]")?.focus();
   });
 }
+
+/**
+ * Saisie d’email dans une modale (ex. mot de passe oublié).
+ * @returns {Promise<{ ok: true, value: string } | { ok: false }>}
+ */
+export function showAppEmailPrompt(
+  message,
+  {
+    title = "Email",
+    defaultValue = "",
+    placeholder = "toi@email.com",
+    confirmLabel = "Valider",
+    cancelLabel = "Annuler",
+    icon = "📧",
+  } = {}
+) {
+  return new Promise((resolve) => {
+    if (openDialog) {
+      removeDialog(openDialog, () => {});
+      openDialog = null;
+    }
+
+    const root = document.createElement("div");
+    root.className = "app-dialog";
+    root.setAttribute("role", "dialog");
+    root.setAttribute("aria-modal", "true");
+    root.setAttribute("aria-labelledby", "app-dialog-title");
+
+    const close = (result) => removeDialog(root, () => resolve(result));
+
+    root.innerHTML = `
+      <div class="app-dialog__backdrop" data-dialog-dismiss aria-hidden="true"></div>
+      <div class="app-dialog__panel">
+        <div class="app-dialog__glow" aria-hidden="true"></div>
+        <p class="app-dialog__icon" aria-hidden="true">${icon}</p>
+        <p class="app-dialog__title" id="app-dialog-title">${escapeHtml(title)}</p>
+        <p class="app-dialog__message">${escapeHtml(message)}</p>
+        <label class="sr-only" for="app-dialog-email">Email</label>
+        <input
+          type="email"
+          class="field-input app-dialog__input"
+          id="app-dialog-email"
+          placeholder="${escapeHtml(placeholder)}"
+          autocomplete="email"
+          inputmode="email"
+        />
+        <p class="app-dialog__field-error hidden" id="app-dialog-email-error" role="alert"></p>
+        <div class="app-dialog__actions">
+          <button type="button" class="btn btn-secondary app-dialog__btn" data-dialog-cancel>${escapeHtml(cancelLabel)}</button>
+          <button type="button" class="btn btn-primary app-dialog__btn" data-dialog-ok>${escapeHtml(confirmLabel)}</button>
+        </div>
+      </div>
+    `;
+
+    const input = root.querySelector("#app-dialog-email");
+    const fieldErr = root.querySelector("#app-dialog-email-error");
+    if (input) input.value = String(defaultValue || "").trim();
+
+    const showFieldError = (text) => {
+      if (!fieldErr) return;
+      if (text) {
+        fieldErr.textContent = text;
+        fieldErr.classList.remove("hidden");
+      } else {
+        fieldErr.textContent = "";
+        fieldErr.classList.add("hidden");
+      }
+    };
+
+    const submit = () => {
+      const value = String(input?.value || "").trim();
+      if (!value) {
+        showFieldError("Entre ton email.");
+        input?.focus();
+        return;
+      }
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
+        showFieldError("Email invalide.");
+        input?.focus();
+        return;
+      }
+      close({ ok: true, value });
+    };
+
+    root.querySelector("[data-dialog-ok]")?.addEventListener("click", submit);
+    root.querySelector("[data-dialog-cancel]")?.addEventListener("click", () => close({ ok: false }));
+    root.querySelector("[data-dialog-dismiss]")?.addEventListener("click", () => close({ ok: false }));
+    input?.addEventListener("input", () => showFieldError(""));
+    input?.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        submit();
+      }
+    });
+    root.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") close({ ok: false });
+    });
+
+    document.body.appendChild(root);
+    openDialog = root;
+    requestAnimationFrame(() => root.classList.add("app-dialog--in"));
+    input?.focus();
+    if (input?.value) input.select();
+  });
+}

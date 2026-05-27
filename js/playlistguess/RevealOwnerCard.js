@@ -17,7 +17,7 @@ export function revealOwnerCardHtml({
       ? "Like discret 🥳"
       : "Tout le monde t'a trouvé 😭"
     : myCorrect
-      ? "Bonne vibe 🥳"
+      ? "Bien joué ! 🥳"
       : "Raté cette fois 😅";
 
   const feedbackSub = isOwner
