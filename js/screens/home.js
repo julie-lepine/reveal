@@ -33,8 +33,42 @@ import { navigate, getCurrentScreen } from "../core/router.js";
 import { escapeHtml, logoHtml, pageShell } from "../core/ui.js";
 import { handleNavTarget, goToEveningSettings } from "./nav.js";
 import { showAppAlert, showAppConfirm, showAppEmailPrompt } from "../core/dialog.js";
+import {
+  getPasswordResetCooldownRemainingMs,
+  passwordResetCooldownMessage,
+} from "../core/passwordResetCooldown.js";
+
+function syncForgotPasswordButton(root) {
+  const btn = root.querySelector("#btn-forgot-password");
+  if (!btn) return;
+  const rem = getPasswordResetCooldownRemainingMs();
+  if (rem > 0) {
+    const sec = Math.ceil(rem / 1000);
+    btn.disabled = true;
+    btn.setAttribute("aria-disabled", "true");
+    btn.textContent =
+      sec >= 120
+        ? `Réessaie dans ${Math.ceil(sec / 60)} min`
+        : `Réessaie dans ${sec} s`;
+    btn.classList.add("auth-forgot--cooldown");
+    return;
+  }
+  btn.disabled = false;
+  btn.removeAttribute("aria-disabled");
+  btn.textContent = "Mot de passe oublié ?";
+  btn.classList.remove("auth-forgot--cooldown");
+}
 
 async function runPasswordResetEmailFlow(defaultEmail = "", { title, message, icon } = {}) {
+  const cooldownRem = getPasswordResetCooldownRemainingMs();
+  if (cooldownRem > 0) {
+    await showAppAlert(passwordResetCooldownMessage(cooldownRem), {
+      title: "Réinitialisation",
+      icon: "⏳",
+    });
+    return { ok: false, cancelled: false, cooldown: true };
+  }
+
   const prompt = await showAppEmailPrompt(
     message ||
       "Entre ton email pour recevoir un lien de réinitialisation de mot de passe.",
@@ -50,15 +84,24 @@ async function runPasswordResetEmailFlow(defaultEmail = "", { title, message, ic
 
   const res = await requestPasswordReset(prompt.value);
   if (!res.ok) {
-    await showAppAlert(res.error, { title: "Réinitialisation", icon: "⚠️" });
-    return { ok: false, cancelled: false, error: res.error };
+    await showAppAlert(res.error, {
+      title: "Réinitialisation",
+      icon: res.rateLimited ? "⏳" : "⚠️",
+    });
+    return {
+      ok: false,
+      cancelled: false,
+      error: res.error,
+      cooldown: Boolean(res.cooldown || res.rateLimited),
+      rateLimited: Boolean(res.rateLimited),
+    };
   }
 
   await showAppAlert("C’est envoyé. Vérifie tes emails (pense aux spams).", {
     title: "Email envoyé",
     icon: "📧",
   });
-  return { ok: true, cancelled: false };
+  return { ok: true, cancelled: false, cooldownStarted: true };
 }
 
 function guestJoinPanelHtml({ leaveHint = false } = {}) {
@@ -132,6 +175,19 @@ export function mountHome(app) {
   let renderTimer = null;
   let renderInFlight = false;
   let lastSnapshot = "";
+  let forgotCooldownTimer = null;
+
+  function startForgotCooldownTicker() {
+    if (forgotCooldownTimer) return;
+    forgotCooldownTimer = setInterval(() => {
+      if (getCurrentScreen() !== "home") return;
+      syncForgotPasswordButton(app);
+      if (getPasswordResetCooldownRemainingMs() <= 0) {
+        clearInterval(forgotCooldownTimer);
+        forgotCooldownTimer = null;
+      }
+    }, 1000);
+  }
 
   const navHandlers = {
     settings: () => goToEveningSettings(),
@@ -201,6 +257,8 @@ export function mountHome(app) {
         const { codeEl } = readGuestJoinFields();
         if (codeEl) codeEl.value = pendingJoin;
       }
+      syncForgotPasswordButton(app);
+      if (getPasswordResetCooldownRemainingMs() > 0) startForgotCooldownTicker();
     } finally {
       renderInFlight = false;
     }
@@ -383,8 +441,14 @@ export function mountHome(app) {
     }
 
     if (e.target.closest("#btn-forgot-password")) {
+      const btn = e.target.closest("#btn-forgot-password");
+      if (btn.disabled) return;
       app.querySelector("#login-error")?.classList.add("hidden");
-      await runPasswordResetEmailFlow(app.querySelector("#login-email")?.value || "");
+      const res = await runPasswordResetEmailFlow(app.querySelector("#login-email")?.value || "");
+      if (res?.cooldownStarted || res?.cooldown || getPasswordResetCooldownRemainingMs() > 0) {
+        syncForgotPasswordButton(app);
+        startForgotCooldownTicker();
+      }
       return;
     }
 
@@ -402,12 +466,19 @@ export function mountHome(app) {
         const msg = String(res.error || "");
         if (/already.*registered|already registered|user.*exists|email.*already|déjà.*utilisé|existe déjà/i.test(msg)) {
           err?.classList.add("hidden");
-          await runPasswordResetEmailFlow(app.querySelector("#signup-email")?.value || "", {
-            title: "Email déjà utilisé",
-            message:
-              "Cet email est déjà enregistré. Entre-le pour recevoir un lien de réinitialisation de mot de passe.",
-            icon: "🔐",
-          });
+          const resetRes = await runPasswordResetEmailFlow(
+            app.querySelector("#signup-email")?.value || "",
+            {
+              title: "Email déjà utilisé",
+              message:
+                "Cet email est déjà enregistré. Entre-le pour recevoir un lien de réinitialisation de mot de passe.",
+              icon: "🔐",
+            }
+          );
+          if (resetRes?.cooldownStarted || resetRes?.cooldown || getPasswordResetCooldownRemainingMs() > 0) {
+            syncForgotPasswordButton(app);
+            startForgotCooldownTicker();
+          }
           return;
         }
 
@@ -569,5 +640,6 @@ export function mountHome(app) {
     app.removeEventListener("click", onHomeClick);
     unsubSession();
     if (renderTimer) clearTimeout(renderTimer);
+    if (forgotCooldownTimer) clearInterval(forgotCooldownTimer);
   };
 }

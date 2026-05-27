@@ -1,6 +1,13 @@
 import { supabase, isSupabaseConfigured } from "./supabaseClient.js";
 import { getState, saveStatePatch } from "./state.js";
 import { fetchProfile, upsertProfile } from "./supabaseProfile.js";
+import { formatAuthErrorMessage, isAuthRateLimitError } from "./authErrors.js";
+import {
+  getPasswordResetCooldownRemainingMs,
+  markPasswordResetSent,
+  markPasswordResetRateLimited,
+  passwordResetCooldownMessage,
+} from "./passwordResetCooldown.js";
 
 const PASSWORD_RECOVERY_KEY = "reveal-pending-password-reset";
 
@@ -218,10 +225,31 @@ export async function signOutSupabase() {
 export async function sendPasswordResetEmail(email) {
   const trimmed = String(email || "").trim().toLowerCase();
   if (!trimmed) return { ok: false, error: "Email requis." };
+
+  const remaining = getPasswordResetCooldownRemainingMs();
+  if (remaining > 0) {
+    return {
+      ok: false,
+      error: passwordResetCooldownMessage(remaining),
+      cooldown: true,
+    };
+  }
+
   const { error } = await supabase.auth.resetPasswordForEmail(trimmed, {
     redirectTo: redirectUrl(),
   });
-  if (error) return { ok: false, error: error.message };
+  if (error) {
+    if (isAuthRateLimitError(error.message)) {
+      markPasswordResetRateLimited();
+    }
+    return {
+      ok: false,
+      error: formatAuthErrorMessage(error.message),
+      rateLimited: isAuthRateLimitError(error.message),
+    };
+  }
+
+  markPasswordResetSent();
   return { ok: true };
 }
 
