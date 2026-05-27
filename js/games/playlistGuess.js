@@ -219,7 +219,7 @@ export function mountPlaylistGuess(app) {
       recordPlaylistGuessPlayed();
       setLastGame({
         gameId: "playlistguess",
-        title: "De qui la playlist ?",
+        title: "VibeCheck",
         summary: `${deck.length} manches jouées`,
       });
       if (mp) {
@@ -309,7 +309,7 @@ export function mountPlaylistGuess(app) {
           ...revealSummary,
           nameForPlayerId,
         })}
-        ${gameCumulativeScoresHtml({ gameLabel: "De qui la playlist ?", title: "Cumul des scores" })}
+        ${gameCumulativeScoresHtml({ gameLabel: "VibeCheck", title: "Cumul des scores" })}
         ${
           !mp || isLobbyHost()
             ? `<button type="button" class="btn btn-primary btn--spaced" id="next-round">
@@ -323,8 +323,8 @@ export function mountPlaylistGuess(app) {
     app.innerHTML = pageShell({
       backTarget: "back",
       content: `
-        <p class="label-upper label-upper--purple">🎶 Manche ${roundIdx + 1}/${total}</p>
-        <div class="logo logo--sm"><h1>DE QUI LA PLAYLIST ?</h1></div>
+        <p class="label-upper label-upper--purple">🎵 Manche ${roundIdx + 1}/${total}</p>
+        <div class="logo logo--sm"><h1>VIBECHECK</h1></div>
         ${body}
       `,
     });

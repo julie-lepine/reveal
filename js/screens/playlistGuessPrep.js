@@ -36,7 +36,7 @@ export function mountPlaylistGuessPrep(app) {
 
   function localReadyState() {
     if (readyCommitInFlight !== null) return readyCommitInFlight;
-    return Boolean(getPlaylistGuessSession().ready[localName]);
+    return Boolean(getPlaylistGuessSession().ready[localUid]);
   }
 
   function memberSpotifyLine(m) {
@@ -68,8 +68,8 @@ export function mountPlaylistGuessPrep(app) {
           .map((m) => {
             const uid = m.userId || m.name;
             return `
-          <div class="lobby-player ${session.ready[m.name] ? "lobby-player--ready" : ""}">
-            <span class="lobby-player__status">${session.ready[m.name] ? "✓" : "…"}</span>
+          <div class="lobby-player ${session.ready[uid] ? "lobby-player--ready" : ""}">
+            <span class="lobby-player__status">${session.ready[uid] ? "✓" : "…"}</span>
             <span class="lobby-player__name">${escapeHtml(m.name)}</span>
             ${memberSpotifyLine({ ...m, userId: uid })}
           </div>`;
@@ -183,7 +183,7 @@ export function mountPlaylistGuessPrep(app) {
     } catch (e) {
       const { showAppAlert } = await import("../core/dialog.js");
       await showAppAlert(spotifyErrorLabel(e.message) || e.message || "Impossible de lancer.", {
-        title: "De qui la playlist ?",
+        title: "VibeCheck",
         icon: "⚠️",
       });
     }
@@ -218,7 +218,7 @@ export function mountPlaylistGuessPrep(app) {
     app.innerHTML = pageShell({
       backTarget: "back",
       content: `
-        <p class="label-upper label-upper--purple">🎶 De qui la playlist ?</p>
+        <p class="label-upper label-upper--purple">🎵 VibeCheck</p>
         <h2 class="screen-title">Préparation</h2>
         <p class="game-intro">Une chanson tirée des likes Spotify du groupe — devine qui l'a aimée.</p>
 

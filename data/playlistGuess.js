@@ -1,4 +1,4 @@
-/** De qui la playlist ? — likes Spotify, devine le propriétaire */
+/** VibeCheck — likes Spotify, devine le propriétaire */
 
 export const PLAYLIST_GUESS_TIMER_SEC = 30;
 

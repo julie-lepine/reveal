@@ -5,7 +5,6 @@ import {
   PLAYLIST_GUESS_ROUND_PRESETS,
 } from "../../data/playlistGuess.js";
 import { getLobbyParticipants } from "./lobby.js";
-import { getActivePlayerNames } from "./players.js";
 import { getLocalDisplayName, getState, saveStatePatch } from "./state.js";
 import { getSupabaseUserId } from "./supabaseAuth.js";
 import { isSpotifyConnected } from "./spotifyAuth.js";
@@ -23,6 +22,7 @@ import {
 
 function defaultSession() {
   return {
+    /** Ready map keyed by playerId (userId) to avoid name collisions. */
     ready: {},
     spotifyByUid: {},
     librariesByUid: {},
@@ -54,6 +54,10 @@ export function lobbyPlayersWithIds() {
     emoji: p.emoji,
     isLocal: Boolean(p.isLocal),
   }));
+}
+
+function activePlayerIds() {
+  return lobbyPlayersWithIds().map((p) => p.userId);
 }
 
 export function getPlaylistGuessSession() {
@@ -156,7 +160,7 @@ export async function disconnectLocalSpotify() {
     ...session,
     librariesByUid: libraries,
     spotifyByUid: spotify,
-    ready: { ...session.ready, [getLocalDisplayName()]: false },
+    ready: { ...session.ready, [uid]: false },
   });
 }
 
@@ -171,21 +175,21 @@ export async function setPlaylistGuessRoundCount(count) {
   await syncPlaylistGuessSession({ ...session, roundCount: count, deck: null });
 }
 
-export async function setPlaylistGuessReady(playerName, ready) {
+export async function setPlaylistGuessReady(playerId, ready) {
   const session = getPlaylistGuessSession();
   await syncPlaylistGuessSession({
     ...session,
-    ready: { ...session.ready, [playerName]: ready },
+    ready: { ...session.ready, [playerId]: ready },
   });
 }
 
 export async function toggleLocalPlaylistGuessReady() {
-  const name = getLocalDisplayName();
+  const id = getLocalParticipantId();
   const session = getPlaylistGuessSession();
-  if (!session.ready[name] && !isLocalSpotifyReady()) {
+  if (!session.ready[id] && !isLocalSpotifyReady()) {
     return { ok: false, error: "SPOTIFY_REQUIRED" };
   }
-  await setPlaylistGuessReady(name, !session.ready[name]);
+  await setPlaylistGuessReady(id, !session.ready[id]);
   return { ok: true };
 }
 
@@ -195,7 +199,8 @@ export function allPlaylistGuessReady() {
     const remote = playlistGuessToRemote(session);
     return allMembersReady(remote.ready || {});
   }
-  return getActivePlayerNames().every((n) => session.ready[n]);
+  const ids = activePlayerIds();
+  return ids.length > 0 && ids.every((id) => session.ready[id]);
 }
 
 function votingPayloadForRound(roundIdx, deck) {

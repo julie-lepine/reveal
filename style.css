@@ -2926,7 +2926,7 @@ body.wizz-shake #app{
   50%{ transform:scale(1.06); }
 }
 
-/* ─── De qui la playlist ? / VibeCheck ─── */
+/* ─── VibeCheck ─── */
 .label-upper--purple{
   color:rgba(167,139,250,.9);
 }

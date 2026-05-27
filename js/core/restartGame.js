@@ -87,7 +87,7 @@ export async function launchPlaylistGuessPrep() {
     } catch (e) {
       console.warn("REVEAL launch Playlist Guess:", e);
       await showAppAlert(e.message || "Impossible de lancer le jeu.", {
-        title: "De qui la playlist ?",
+        title: "VibeCheck",
         icon: "⚠️",
       });
     }

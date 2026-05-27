@@ -1165,7 +1165,8 @@ export function playlistGuessToRemote(session) {
     remoteVotes[userIdForName(voter) || voter] = pickId;
   });
   return {
-    ready: mapReadyByUid(session.ready || {}),
+    // Ready is keyed by userId already (durable, avoids name collisions)
+    ready: session.ready || {},
     spotifyByUid: session.spotifyByUid || {},
     librariesByUid: session.librariesByUid || {},
     lobbyStarted: Boolean(session.lobbyStarted),
@@ -1188,7 +1189,8 @@ export function playlistGuessFromRemote(remote) {
     votes[voter] = pickId;
   });
   return {
-    ready: mapReadyByName(remote.ready || {}),
+    // Ready map remains keyed by userId (no lossy name mapping)
+    ready: { ...(remote.ready || {}) },
     spotifyByUid: remote.spotifyByUid || {},
     librariesByUid: remote.librariesByUid || {},
     lobbyStarted: Boolean(remote.lobbyStarted),

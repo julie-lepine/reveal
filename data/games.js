@@ -13,9 +13,9 @@ export const GAMES = [
   },
   {
     id: "playlistguess-prep",
-    title: "De qui la playlist ?",
+    title: "VibeCheck",
     desc: "Une chanson de vos likes Spotify — devine qui l’a aimée",
-    emoji: "🎶",
+    emoji: "🎵",
     cssClass: "playlist",
     logo: "js/games/vibecheck.png",
     borderGradient:
