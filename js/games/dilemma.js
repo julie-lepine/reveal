@@ -23,7 +23,7 @@ import { requireLobbyPlay } from "../core/gameGuard.js";
 import { navigate } from "../core/router.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
 import { bindNav } from "../screens/nav.js";
-import { exitGameToLobbyButtonHtml, bindExitGameToLobby } from "../core/exitGame.js";
+import { gameExitBarHtml, bindExitGame } from "../core/exitGame.js";
 import { isEveningGameplayPaused } from "../core/filRougeSession.js";
 import { onTimerSecond, primeTimerSound } from "../core/timerSound.js";
 import {
@@ -339,8 +339,7 @@ export function mountDilemma(app) {
           ${roundIdx < totalRounds - 1 ? "Manche suivante →" : "Voir les résultats →"}
         </button>`
           : `<p class="hint">En attente de l'hôte pour la suite…</p>`
-      }
-      ${exitGameToLobbyButtonHtml()}`;
+      }`;
   }
 
   function votingPhaseHtml() {
@@ -391,11 +390,12 @@ export function mountDilemma(app) {
         <div class="logo logo--sm"><h1>DILEMMA</h1></div>
         ${dilemmaCardHtml()}
         ${phaseHtml}
+        ${gameExitBarHtml()}
       `,
     });
 
     bindNav(app);
-    bindExitGameToLobby(app);
+    bindExitGame(app);
 
     app.querySelectorAll("[data-vote]").forEach((btn) => {
       btn.addEventListener("click", async () => {

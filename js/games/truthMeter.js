@@ -30,7 +30,7 @@ import { requireLobbyPlay } from "../core/gameGuard.js";
 import { navigate } from "../core/router.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
 import { bindNav } from "../screens/nav.js";
-import { exitGameToLobbyButtonHtml, bindExitGameToLobby } from "../core/exitGame.js";
+import { gameExitBarHtml, bindExitGame } from "../core/exitGame.js";
 import { isEveningGameplayPaused } from "../core/filRougeSession.js";
 import { onTimerSecond, primeTimerSound } from "../core/timerSound.js";
 import {
@@ -490,8 +490,7 @@ export function mountTruthMeter(app) {
           ${roundIdx < total - 1 ? "Joueur suivant →" : "Voir les résultats →"}
         </button>`
             : `<p class="hint">En attente de l'hôte…</p>`
-        }
-        ${exitGameToLobbyButtonHtml()}`;
+        }`;
     }
 
     app.innerHTML = pageShell({
@@ -506,11 +505,12 @@ export function mountTruthMeter(app) {
         <div class="logo logo--sm"><h1>TRUTHMETER</h1></div>
         ${author ? `<p class="hint">Auteur : <strong>${escapeHtml(author)}</strong></p>` : ""}
         ${phaseHtml}
+        ${gameExitBarHtml()}
       `,
     });
 
     bindNav(app);
-    bindExitGameToLobby(app);
+    bindExitGame(app);
 
     if (phase === "writing" && isAuthor) {
       const textEl = app.querySelector("#affirmation-text");

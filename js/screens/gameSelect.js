@@ -1,4 +1,4 @@
-import { GAMES_COMING_SOON, GAMES_AVAILABLE } from "../../data/games.js";
+import { GAMES_AVAILABLE } from "../../data/games.js";
 import { getEveningRecap } from "../core/eveningRecap.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
 import {
@@ -266,7 +266,6 @@ export function mountGameSelect(app) {
       ${filSection}
 
       ${gameGridSection("🎮 Jeux disponibles", GAMES_AVAILABLE)}
-      ${gameGridSection("🎵 Bientôt", GAMES_COMING_SOON)}
     `,
     });
 

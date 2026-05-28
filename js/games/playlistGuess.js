@@ -19,7 +19,7 @@ import { requireLobbyPlay } from "../core/gameGuard.js";
 import { navigate } from "../core/router.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
 import { bindNav } from "../screens/nav.js";
-import { exitGameToLobbyButtonHtml, bindExitGameToLobby } from "../core/exitGame.js";
+import { gameExitBarHtml, bindExitGame } from "../core/exitGame.js";
 import { isEveningGameplayPaused } from "../core/filRougeSession.js";
 import { onTimerSecond, primeTimerSound } from "../core/timerSound.js";
 import {
@@ -326,8 +326,7 @@ export function mountPlaylistGuess(app) {
           ${roundIdx >= total - 1 ? "Voir les résultats →" : "Manche suivante →"}
         </button>`
             : `<p class="hint">En attente de l'hôte pour la suite…</p>`
-        }
-        ${exitGameToLobbyButtonHtml()}`;
+        }`;
     }
 
     app.innerHTML = pageShell({
@@ -336,11 +335,12 @@ export function mountPlaylistGuess(app) {
         <p class="label-upper label-upper--purple">🎵 Manche ${roundIdx + 1}/${total}</p>
         <div class="logo logo--sm"><h1>VIBECHECK</h1></div>
         ${body}
+        ${gameExitBarHtml()}
       `,
     });
 
     bindNav(app);
-    bindExitGameToLobby(app);
+    bindExitGame(app);
 
     app.querySelectorAll("[data-vote-id]").forEach((btn) => {
       btn.addEventListener("click", () => {

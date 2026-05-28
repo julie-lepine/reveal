@@ -1,49 +1,54 @@
 import { showAppConfirm } from "./dialog.js";
 import { escapeHtml } from "./ui.js";
-import {
-  isGameSyncActive,
-  isLobbyHost,
-  endGameSession,
-  suppressSessionRoute,
-} from "./gameSync.js";
-import { resetEveningState } from "./state.js";
-import { goToLobby } from "./lobby.js";
+import { isGameSyncActive, isLobbyHost, returnToGameSelect } from "./gameSync.js";
+import { resetGameSessionsOnly } from "./state.js";
+import { goToGameSelect, setLobbyWaiting } from "./lobby.js";
 
-export const EXIT_GAME_LOBBY_LABEL = "Sortir du jeu - retour au lobby";
+export const EXIT_GAME_LABEL = "Arrêter la partie - menu des jeux";
 
-export function exitGameToLobbyButtonHtml() {
-  return `<button type="button" class="btn-link game-exit-lobby btn--spaced" data-exit-game-lobby>${escapeHtml(EXIT_GAME_LOBBY_LABEL)}</button>`;
+export function gameExitBarHtml() {
+  return `<div class="game-exit-bar">
+    <button type="button" class="btn btn-secondary btn--compact game-exit-bar__btn" data-exit-game>${escapeHtml(EXIT_GAME_LABEL)}</button>
+  </div>`;
 }
 
-/** Quitte la partie en cours et renvoie au lobby (hôte : termine la session pour tous). */
-export async function exitGameToLobby() {
+/** @deprecated Utiliser gameExitBarHtml */
+export const exitGameToLobbyButtonHtml = gameExitBarHtml;
+
+/** Quitte la partie en cours → menu des jeux (hôte : termine la session pour tous). */
+export async function exitGameToGameSelect() {
   const host = isGameSyncActive() && isLobbyHost();
   const ok = await showAppConfirm(
     host
-      ? "Terminer la partie pour tout le monde et retourner au lobby ?"
-      : "Quitter la partie en cours et retourner au lobby ? Les autres joueurs peuvent continuer sans toi.",
+      ? "Arrêter la partie pour tout le monde et revenir au menu des jeux ?"
+      : "Quitter cette partie et revenir au menu des jeux ?",
     {
-      title: "Sortir du jeu",
-      confirmLabel: "Retour au lobby",
-      icon: "🚪",
+      title: "Arrêter la partie",
+      confirmLabel: "Menu des jeux",
+      icon: "🛑",
     }
   );
   if (!ok) return false;
 
   if (isGameSyncActive()) {
-    if (host) {
-      await endGameSession();
-      resetEveningState();
-    } else {
-      suppressSessionRoute(120000);
-    }
+    await returnToGameSelect();
+    return true;
   }
-  goToLobby();
+
+  resetGameSessionsOnly();
+  await setLobbyWaiting();
+  await goToGameSelect();
   return true;
 }
 
-export function bindExitGameToLobby(root) {
-  root.querySelector("[data-exit-game-lobby]")?.addEventListener("click", () => {
-    void exitGameToLobby();
+/** @deprecated Utiliser exitGameToGameSelect */
+export const exitGameToLobby = exitGameToGameSelect;
+
+export function bindExitGame(root) {
+  root.querySelector("[data-exit-game]")?.addEventListener("click", () => {
+    void exitGameToGameSelect();
   });
 }
+
+/** @deprecated Utiliser bindExitGame */
+export const bindExitGameToLobby = bindExitGame;

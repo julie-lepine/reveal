@@ -1814,6 +1814,18 @@ button.game-card{
   text-decoration:underline;
 }
 
+.game-exit-bar{
+  margin-top:20px;
+  padding-top:16px;
+  border-top:1px solid rgba(255,255,255,.08);
+  display:flex;
+  justify-content:center;
+}
+
+.game-exit-bar__btn{
+  max-width:100%;
+}
+
 .game-exit-lobby{
   display:block;
   width:100%;

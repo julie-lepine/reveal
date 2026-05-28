@@ -17,6 +17,7 @@ import { getSupabaseUserId } from "../core/supabaseAuth.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
 import { navigate } from "../core/router.js";
 import { escapeHtml, pageShell, tierLogoHtml, bindTierLogos } from "../core/ui.js";
+import { gameExitBarHtml, bindExitGame } from "../core/exitGame.js";
 import { bindNav } from "../screens/nav.js";
 import { onTimerSecond, primeTimerSound } from "../core/timerSound.js";
 import { isEveningGameplayPaused } from "../core/filRougeSession.js";
@@ -205,11 +206,13 @@ export function mountTierNight(app) {
           <button type="button" class="btn btn-secondary btn--spaced" id="btn-finish-early">Terminer maintenant</button>`
               : `<p class="hint tier-done-hint">Tous les items sont classés.</p>`
         }
+        ${gameExitBarHtml()}
       `,
     });
 
     bindTierLogos(app);
     bindNav(app);
+    bindExitGame(app);
     if (!finished) bindGameEvents(remaining);
     else if (remaining.length > 0) {
       requestAnimationFrame(() => {

@@ -1,16 +1,5 @@
-/** Catalogue des jeux affichés dans le menu (inactifs en tête, puis actifs). */
+/** Catalogue des jeux affichés dans le menu. `enabled: false` → section « Bientôt » (gameSelect). */
 export const GAMES = [
-  {
-    id: "blindtest-prep",
-    title: "Blind Test",
-    desc: "Extraits musicaux - devine titre ou artiste le plus vite",
-    emoji: "🎧",
-    cssClass: "blindtest",
-    borderGradient:
-      "linear-gradient(145deg, #6366F1 0%, #818CF8 48%, #2B2D66 100%)",
-    enabled: false,
-    badgeLabel: "Bientôt",
-  },
   {
     id: "playlistguess-prep",
     title: "VibeCheck",
