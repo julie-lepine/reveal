@@ -40,7 +40,7 @@ export function mountSettings(app) {
             ? `
         <div class="card card--highlight settings-lobby-banner">
           <p class="hint settings-lobby-banner__text">
-            Soirée en cours — lobby <strong>${escapeHtml(lobbyCode || "")}</strong>.
+            Soirée en cours - lobby <strong>${escapeHtml(lobbyCode || "")}</strong>.
             Tu restes connecté : pseudo et emoji s’appliquent pour tout le monde.
           </p>
           <button type="button" class="btn btn-accent btn--spaced" data-nav="evening-return">Retour aux jeux</button>
@@ -91,7 +91,7 @@ export function mountSettings(app) {
           <button type="button" class="btn btn-primary btn--spaced" id="btn-save-password">Changer le mot de passe</button>
         </div>`
             : user.loggedIn
-              ? `<p class="hint settings-social-hint">Compte ${escapeHtml(user.provider || "social")} — le mot de passe se gère chez le fournisseur.</p>`
+              ? `<p class="hint settings-social-hint">Compte ${escapeHtml(user.provider || "social")} - le mot de passe se gère chez le fournisseur.</p>`
               : ""
         }
       `,

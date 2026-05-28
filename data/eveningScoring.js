@@ -7,7 +7,7 @@ export const EVENING_POINTS = {
   BONUS: 15,
 };
 
-/** Points Fil Rouge — hors `state.scores` */
+/** Points Fil Rouge - hors `state.scores` */
 export const FIL_ROUGE_POINTS = {
   MISSION: 50,
 };

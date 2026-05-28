@@ -55,12 +55,18 @@ export function getUser() {
 }
 
 export async function loginWithEmail(email, password) {
+  if (!email?.trim()) {
+    return { ok: false, error: "Indique ton email pour te connecter." };
+  }
+  if (!password) {
+    return { ok: false, error: "Indique ton mot de passe." };
+  }
+
   if (isSupabaseConfigured()) {
     return sbSignIn(email, password);
   }
 
   const trimmed = email.trim().toLowerCase();
-  if (!trimmed || !password) return { ok: false, error: "Email et mot de passe requis." };
 
   let check = verifyEmailAccount(trimmed, password);
   if (!check.ok && !hasEmailAccount(trimmed)) {

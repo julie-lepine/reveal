@@ -115,7 +115,7 @@ export function mountTierNightEnd(app) {
       content = `
         <p class="label-upper label-upper--gold">🏆 Tier Night</p>
         <h2 class="screen-title">Récap des classements</h2>
-        <p class="game-intro">« ${escapeHtml(session.listName || "Tier list")} » — +${session.localConsensusPoints ?? 0} pts consensus pour toi cette manche.</p>
+        <p class="game-intro">« ${escapeHtml(session.listName || "Tier list")} » - +${session.localConsensusPoints ?? 0} pts consensus pour toi cette manche.</p>
         ${tierNightRoundScoresHtml(roundSorted)}
         ${gameCumulativeScoresHtml({ gameLabel: "Tier Night", title: "Cumul de la soirée" })}
         <div class="recap-list">

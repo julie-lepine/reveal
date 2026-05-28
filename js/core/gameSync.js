@@ -82,7 +82,7 @@ const GAME_SETUP_SCREENS = new Set([
   "tiernight-create",
 ]);
 
-/** Guess The Lie : préparation par joueur — la session reste sur guesslie-menu. */
+/** Guess The Lie : préparation par joueur - la session reste sur guesslie-menu. */
 const GUESS_LIE_PREP_SCREENS = new Set(["guesslie-menu", "guesslie-setup", "guesslie-wait"]);
 
 /** Tier Night : création locale possible depuis tiernight-select. */
@@ -344,7 +344,7 @@ function isNewHotTakeVoteRound(cur, inc) {
   );
 }
 
-/** Fusion des votes uid (écriture patch) — évite d’écraser les votes des autres joueurs. */
+/** Fusion des votes uid (écriture patch) - évite d’écraser les votes des autres joueurs. */
 function mergeRemoteHotTakeVotesUid(cur, inc) {
   const curVotes = cur?.votes || {};
   const incVotes = inc?.votes || {};
@@ -2012,7 +2012,7 @@ export async function returnToGameSelect() {
   return true;
 }
 
-/** Quitter la préparation d’un jeu (retour au menu jeux) — multijoueur. */
+/** Quitter la préparation d’un jeu (retour au menu jeux) - multijoueur. */
 export async function leaveGameSetup() {
   if (!isGameSyncActive() || !isLobbyHost()) return false;
   return returnToGameSelect();

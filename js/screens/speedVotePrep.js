@@ -183,7 +183,7 @@ export function mountSpeedVotePrep(app) {
       content: `
         <p class="label-upper label-upper--gold">⚡ SpeedVote</p>
         <h2 class="screen-title">Préparation</h2>
-        <p class="game-intro">Vote éclair sur les joueurs du lobby — 7 secondes par manche.</p>
+        <p class="game-intro">Vote éclair sur les joueurs du lobby - 7 secondes par manche.</p>
 
         <div class="card">
           <p class="card-heading">Thème des questions</p>
@@ -199,7 +199,7 @@ export function mountSpeedVotePrep(app) {
           ${
             prep.poolSize > 0
               ? themeId === SPEED_VOTE_CATALOG_ID
-                ? `<p class="hint">${prep.poolSize} question(s) — tous les thèmes fusionnés.</p>`
+                ? `<p class="hint">${prep.poolSize} question(s) - tous les thèmes fusionnés.</p>`
                 : `<p class="hint">${prep.poolSize} question(s) dans ce thème.</p>`
               : `<p class="hint">Ajoute des questions dans data/speedVote.js.</p>`
           }

@@ -104,7 +104,7 @@ export function mountDilemma(app) {
   function pauseBanner() {
     const who = getDilemmaSession().pausedBy;
     if (!who) return "";
-    return `<p class="pause-banner">⏸ Pause — ${escapeHtml(who)} a mis la partie en pause</p>`;
+    return `<p class="pause-banner">⏸ Pause - ${escapeHtml(who)} a mis la partie en pause</p>`;
   }
 
   function playerMeta(name) {
@@ -249,8 +249,8 @@ export function mountDilemma(app) {
   }
 
   function dilemmaCardHtml() {
-    const a = escapeHtml(currentDilemma?.optionA || "—");
-    const b = escapeHtml(currentDilemma?.optionB || "—");
+    const a = escapeHtml(currentDilemma?.optionA || "-");
+    const b = escapeHtml(currentDilemma?.optionB || "-");
     return `
       <div class="dilemma__card card">
         <p class="dilemma__label">OPTION A</p>
@@ -287,7 +287,7 @@ export function mountDilemma(app) {
     const widthB = revealAnimDone ? pctB : revealPctB;
 
     const awardLine = lastAward?.majorityWinners?.length
-      ? `<p class="hint">🏆 Victoire (majorité) — <strong>+${DILEMMA_POINTS_MAJORITY_WIN} pts</strong> : ${lastAward.majorityWinners.map((n) => escapeHtml(n)).join(", ")}</p>`
+      ? `<p class="hint">🏆 Victoire (majorité) - <strong>+${DILEMMA_POINTS_MAJORITY_WIN} pts</strong> : ${lastAward.majorityWinners.map((n) => escapeHtml(n)).join(", ")}</p>`
       : "";
 
     const dividedBanner = divided

@@ -375,7 +375,7 @@ export function mountTruthMeter(app) {
     if (phase === "writing") {
       if (isAuthor) {
         phaseHtml = `
-          <p class="hint">Tu es l'auteur — écris une affirmation personnelle et place sa vérité.</p>
+          <p class="hint">Tu es l'auteur - écris une affirmation personnelle et place sa vérité.</p>
           <div class="card card--hot">
             <label class="field-label" for="affirmation-text">Ton affirmation</label>
             <textarea class="field-textarea" id="affirmation-text" rows="4" maxlength="200" autocomplete="off"
@@ -400,7 +400,7 @@ export function mountTruthMeter(app) {
         <div class="card card--hot truth-meter__affirmation-card">
           <p class="label-upper label-upper--hot">Affirmation</p>
           <p class="hot-take-text">"${escapeHtml(affirmation.text)}"</p>
-          <p class="hint">— ${escapeHtml(affirmation.author)}</p>
+          <p class="hint">- ${escapeHtml(affirmation.author)}</p>
         </div>
         <p class="hint">${host ? "Le vote commence dans un instant…" : "Le vote va commencer…"}</p>`;
     }
@@ -417,7 +417,7 @@ export function mountTruthMeter(app) {
         phaseHtml = `
           <div class="card card--hot truth-meter__affirmation-card">
             <p class="hot-take-text">"${escapeHtml(affirmation.text)}"</p>
-            <p class="hint">— ${escapeHtml(affirmation.author)}</p>
+            <p class="hint">- ${escapeHtml(affirmation.author)}</p>
           </div>
           <p class="timer" id="timer-el">${timer}</p>
           <div class="progress progress--timer">
@@ -428,7 +428,7 @@ export function mountTruthMeter(app) {
             value: myVote ?? 50,
             disabled: voteLocked,
             question: "À quel point tu crois cette affirmation ?",
-            hint: voteLocked ? "Vote enregistré — en attente des autres…" : "0 = Fake · 100 = Vrai",
+            hint: voteLocked ? "Vote enregistré - en attente des autres…" : "0 = Fake · 100 = Vrai",
           })}
           <button type="button" class="btn btn-primary btn--spaced" id="btn-confirm-vote"
             ${voteLocked ? "disabled" : ""}>Valider mon vote</button>`;
@@ -452,9 +452,9 @@ export function mountTruthMeter(app) {
       };
       const verdictPct = metrics.groupAvg;
       const awardLine = metrics.bluffWin
-        ? `<p class="hint">🎭 Bluff réussi ! Écart <strong>${metrics.gap}</strong> — <strong>${escapeHtml(affirmation.author)}</strong> +${EVENING_POINTS.BONUS} pts</p>`
+        ? `<p class="hint">🎭 Bluff réussi ! Écart <strong>${metrics.gap}</strong> - <strong>${escapeHtml(affirmation.author)}</strong> +${EVENING_POINTS.BONUS} pts</p>`
         : metrics.consensus
-          ? `<p class="hint">🤝 Consensus — <strong>${escapeHtml(affirmation.author)}</strong> +${EVENING_POINTS.WIN} pts (écart ${metrics.gap}).</p>`
+          ? `<p class="hint">🤝 Consensus - <strong>${escapeHtml(affirmation.author)}</strong> +${EVENING_POINTS.WIN} pts (écart ${metrics.gap}).</p>`
           : `<p class="hint">Écart auteur/groupe : <strong>${metrics.gap}</strong> pts</p>`;
       const mindLine = metrics.mindReader
         ? `<p class="hint">🧠 Le plus proche : <strong>${escapeHtml(metrics.mindReader)}</strong> +${metrics.voterPoints || EVENING_POINTS.WIN} pts</p>`
@@ -723,7 +723,7 @@ export function mountTruthMeter(app) {
         setLastGame({
           gameId: "truthmeter",
           title: "TruthMeter",
-          summary: `${total} manches · dernier verdict ${lastAward?.groupAvg ?? "—"}%`,
+          summary: `${total} manches · dernier verdict ${lastAward?.groupAvg ?? "-"}%`,
         });
         if (mp) {
           try {

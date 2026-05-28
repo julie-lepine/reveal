@@ -210,7 +210,7 @@ export function mountSpeedVote(app) {
 
     const points = SPEED_VOTE_POINTS_WINNER * mod.multiplier;
     const awardHtml = leaders.length
-      ? `<p class="hint">👑 ${leaders.map((n) => escapeHtml(n)).join(", ")} — <strong>+${points} pts</strong>${mod.multiplier > 1 ? " (×2)" : ""}</p>`
+      ? `<p class="hint">👑 ${leaders.map((n) => escapeHtml(n)).join(", ")} - <strong>+${points} pts</strong>${mod.multiplier > 1 ? " (×2)" : ""}</p>`
       : `<p class="hint">Aucun vote enregistré pour cette manche.</p>`;
 
     const bars = names.length
@@ -360,7 +360,7 @@ export function mountSpeedVote(app) {
         }
       } else {
         recordSpeedVotePlayed();
-        const winners = lastAward?.winners?.join(", ") || "—";
+        const winners = lastAward?.winners?.join(", ") || "-";
         setLastGame({
           gameId: "speedvote",
           title: "SpeedVote",

@@ -44,7 +44,7 @@ export function mountGuessLieSetup(app) {
       <p class="hint" id="setup-hint">Remplis les 3 champs et sélectionne le mensonge.</p>
 
       <button type="button" class="btn btn-primary btn--spaced" id="btn-go" disabled>
-        GO — envoyer au lobby
+        GO - envoyer au lobby
       </button>
 
       <button type="button" class="btn btn-accent btn--spaced" data-nav="game-select">
@@ -77,7 +77,7 @@ export function mountGuessLieSetup(app) {
     } else if (lieIndex === null) {
       hint.textContent = "Indique laquelle est le mensonge (A, B ou C).";
     } else {
-      hint.textContent = "Tout est prêt — envoie au lobby !";
+      hint.textContent = "Tout est prêt - envoie au lobby !";
     }
   }
 

@@ -1,4 +1,4 @@
-/** Fil Rouge — Mot Interdit (couche persistante de soirée) */
+/** Fil Rouge - Mot Interdit (couche persistante de soirée) */
 
 import { FIL_ROUGE_POINTS } from "./eveningScoring.js";
 

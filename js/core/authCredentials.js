@@ -1,4 +1,4 @@
-/** Comptes email simulés (localStorage) — démo sans backend. */
+/** Comptes email simulés (localStorage) - démo sans backend. */
 
 const STORAGE_KEY = "reveal-auth-credentials";
 

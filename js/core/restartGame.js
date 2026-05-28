@@ -15,7 +15,9 @@ import {
 } from "./gameSync.js";
 import { navigate } from "./router.js";
 import { defaultSpeedVotePrepSession } from "./speedVoteSession.js";
+import { PLAYLIST_GUESS_MIN_PLAYERS } from "../../data/playlistGuess.js";
 import { defaultPlaylistGuessPrepSession } from "./playlistGuessSession.js";
+import { getLobbyParticipants } from "./lobby.js";
 import { defaultTriviaPrepSession } from "./triviaSession.js";
 import { defaultTruthMeterPrepSession } from "./truthMeterSession.js";
 import { defaultConsensusPrepSession } from "./consensusSession.js";
@@ -75,6 +77,15 @@ export async function launchSpeedVotePrep() {
 }
 
 export async function launchPlaylistGuessPrep() {
+  const playerCount = getLobbyParticipants().length;
+  if (playerCount < PLAYLIST_GUESS_MIN_PLAYERS) {
+    await showAppAlert(
+      `VibeCheck nécessite au moins ${PLAYLIST_GUESS_MIN_PLAYERS} joueurs dans le lobby (${playerCount} pour l'instant).`,
+      { title: "3 joueurs minimum", icon: "👥" }
+    );
+    return;
+  }
+
   const pg = defaultPlaylistGuessPrepSession();
   saveStatePatch({ playlistGuessGame: pg });
 

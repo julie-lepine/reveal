@@ -19,7 +19,7 @@ export function hotTakeTimerSeconds(roundCount) {
 export function estimateHotTakeDuration(roundCount) {
   const n = Math.max(0, roundCount);
   if (n === 0) {
-    return { minSec: 0, maxSec: 0, label: "—" };
+    return { minSec: 0, maxSec: 0, label: "-" };
   }
   const timers = hotTakeTimerSeconds(n);
   const minSec = timers + FIRST_LAUNCH_SEC + (n - 1) * REVEAL_MIN_SEC;
@@ -35,7 +35,7 @@ export function formatDurationRange(minSec, maxSec) {
   const minMin = Math.max(1, Math.round(minSec / 60));
   const maxMin = Math.max(minMin, Math.round(maxSec / 60));
   if (minMin === maxMin) return `~${minMin} min`;
-  return `~${minMin}–${maxMin} min`;
+  return `~${minMin}-${maxMin} min`;
 }
 
 export function resolveEffectiveRoundCount(requested, poolSize) {

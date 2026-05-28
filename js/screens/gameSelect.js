@@ -88,7 +88,7 @@ function eveningRecapHtml(recap) {
   const leader = recap.top[0]
     ? `<div class="evening-recap__leader">
         <span class="evening-recap__leader-avatar" style="background:${recap.top[0].color}">${recap.top[0].emoji}</span>
-        <span>En tête : <strong>${escapeHtml(recap.top[0].name)}</strong> — ${recap.top[0].score} pts</span>
+        <span>En tête : <strong>${escapeHtml(recap.top[0].name)}</strong> - ${recap.top[0].score} pts</span>
       </div>`
     : "";
 

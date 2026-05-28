@@ -15,7 +15,7 @@ export const SPEED_VOTE_MODIFIERS = {
   hidden: { id: "hidden", label: "Votes cachés", emoji: "🙈", multiplier: 1 },
 };
 
-/** Questions par thème — vote = choisir un joueur du lobby */
+/** Questions par thème - vote = choisir un joueur du lobby */
 export const SPEED_VOTE_THEMES = [
   {
     id: SPEED_VOTE_CATALOG_ID,

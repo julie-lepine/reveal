@@ -119,10 +119,9 @@ export async function signUpWithEmail(email, password, displayName) {
     password,
     options: {
       data: { display_name: displayName.trim().slice(0, 24) },
-      emailRedirectTo: redirectUrl(),
     },
   });
-  if (error) return { ok: false, error: error.message };
+  if (error) return { ok: false, error: formatAuthErrorMessage(error.message) };
   if (data.user) {
     await upsertProfile({
       userId: data.user.id,
@@ -131,7 +130,7 @@ export async function signUpWithEmail(email, password, displayName) {
     });
   }
   if (data.session) await syncSessionToState(data.session);
-  return { ok: true, needsEmailConfirmation: !data.session };
+  return { ok: true, loggedIn: Boolean(data.session) };
 }
 
 export async function signInWithEmail(email, password) {
@@ -139,7 +138,7 @@ export async function signInWithEmail(email, password) {
     email: email.trim().toLowerCase(),
     password,
   });
-  if (error) return { ok: false, error: error.message };
+  if (error) return { ok: false, error: formatAuthErrorMessage(error.message) };
   if (data.session) await syncSessionToState(data.session);
   return { ok: true };
 }
@@ -204,7 +203,7 @@ export async function signInAsGuest(displayName) {
   return { ok: true };
 }
 
-/** Facebook (Meta) — aussi utilisé pour « Instagram » (OAuth Meta). */
+/** Facebook (Meta) - aussi utilisé pour « Instagram » (OAuth Meta). */
 export async function signInWithOAuth(provider) {
   const { error } = await supabase.auth.signInWithOAuth({
     provider,

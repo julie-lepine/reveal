@@ -1,7 +1,7 @@
 import { EVENING_POINTS } from "./eveningScoring.js";
 
 /**
- * Fallback NPC — affirmations par joueur
+ * Fallback NPC - affirmations par joueur
  */
 export const GUESS_LIE_ROUNDS = [
   {

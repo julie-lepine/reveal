@@ -204,7 +204,7 @@ export function mountTrivia(app) {
   function revealBlock() {
     const correctLabel = currentQuestion
       ? `${String.fromCharCode(65 + currentQuestion.correct)}. ${currentQuestion.answers[currentQuestion.correct]}`
-      : "—";
+      : "-";
     const deltas = lastRound?.deltas || {};
     const deltaRows = Object.entries(deltas).sort(([, a], [, b]) => b - a);
 
@@ -305,7 +305,7 @@ export function mountTrivia(app) {
       setLastGame({
         gameId: "trivia",
         title: "Trivia Quiz",
-        summary: `${standings.length} joueur(s) · gagnant : ${standings[0]?.name || "—"}`,
+        summary: `${standings.length} joueur(s) · gagnant : ${standings[0]?.name || "-"}`,
       });
     }
 

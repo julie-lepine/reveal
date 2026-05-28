@@ -33,7 +33,7 @@ export function exportTierBoardPng({ listName, placed }) {
     const items = (placed[tier] || []).join(" · ");
     ctx.fillStyle = "rgba(255,255,255,.9)";
     ctx.font = "14px Inter, sans-serif";
-    const text = items || "—";
+    const text = items || "-";
     ctx.fillText(text.length > 70 ? `${text.slice(0, 67)}…` : text, labelW + 20, y + rowH / 2 + 6);
   });
 

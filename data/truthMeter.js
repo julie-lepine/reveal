@@ -1,4 +1,4 @@
-/** TruthMeter — constantes */
+/** TruthMeter - constantes */
 
 import { EVENING_POINTS } from "./eveningScoring.js";
 
@@ -10,7 +10,7 @@ export const TRUTH_METER_INTERMISSION_SEC = 3;
 
 export const TRUTH_METER_BLUFF_GAP = 40;
 export const TRUTH_METER_CONSENSUS_GAP = 12;
-/** @deprecated — barème unifié : EVENING_POINTS */
+/** @deprecated - barème unifié : EVENING_POINTS */
 export const TRUTH_METER_POINTS_BLUFF = EVENING_POINTS.BONUS;
 export const TRUTH_METER_POINTS_CONSENSUS = EVENING_POINTS.WIN;
 export const TRUTH_METER_POINTS_MIND_READER = EVENING_POINTS.BONUS;

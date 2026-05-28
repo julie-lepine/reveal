@@ -3,10 +3,11 @@ import { escapeHtml } from "../core/ui.js";
 const ERROR_LABELS = {
   SPOTIFY_DISCONNECTED: "Spotify non connecté.",
   NO_LIKED_SONGS: "Aucun titre dans tes likes Spotify.",
-  SPOTIFY_TOKEN_EXPIRED: "Session Spotify expirée — reconnecte-toi.",
+  SPOTIFY_TOKEN_EXPIRED: "Session Spotify expirée - reconnecte-toi.",
   SPOTIFY_API_FAILURE: "Impossible de joindre Spotify. Réessaie.",
   SPOTIFY_NOT_CONFIGURED: "Spotify n'est pas configuré sur cette build.",
   SPOTIFY_TOKEN_EXCHANGE_FAILED: "Échec de la connexion Spotify.",
+  NOT_ENOUGH_PLAYERS: "Il faut au moins 3 joueurs dans le lobby pour lancer VibeCheck.",
 };
 
 export function spotifyErrorLabel(code) {
@@ -29,7 +30,7 @@ export function spotifyConnectCardHtml({
     : "";
 
   const devNote = devMode
-    ? `<p class="hint muted">Mode démo local — titres fictifs sans Spotify.</p>`
+    ? `<p class="hint muted">Mode démo local - titres fictifs sans Spotify.</p>`
     : "";
 
   return `

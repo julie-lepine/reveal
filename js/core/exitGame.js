@@ -9,7 +9,7 @@ import {
 import { resetEveningState } from "./state.js";
 import { goToLobby } from "./lobby.js";
 
-export const EXIT_GAME_LOBBY_LABEL = "Sortir du jeu — retour au lobby";
+export const EXIT_GAME_LOBBY_LABEL = "Sortir du jeu - retour au lobby";
 
 export function exitGameToLobbyButtonHtml() {
   return `<button type="button" class="btn-link game-exit-lobby btn--spaced" data-exit-game-lobby>${escapeHtml(EXIT_GAME_LOBBY_LABEL)}</button>`;

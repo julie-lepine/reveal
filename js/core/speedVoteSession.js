@@ -129,7 +129,7 @@ export function getVoteTargets() {
 }
 
 function votingPayloadForRound(roundIdx, deck) {
-  const question = deck[roundIdx] || "—";
+  const question = deck[roundIdx] || "-";
   const endsAt = new Date(Date.now() + SPEED_VOTE_TIMER_SEC * 1000).toISOString();
   return {
     roundIdx,

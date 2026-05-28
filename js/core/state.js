@@ -472,7 +472,7 @@ export function defaultEveningStats() {
   };
 }
 
-/** Scores + stats de soirée + état des jeux — nouvelle partie / lobby. */
+/** Scores + stats de soirée + état des jeux - nouvelle partie / lobby. */
 export function resetEveningState() {
   resetScores();
   resetGameSessionsOnly();
@@ -578,7 +578,7 @@ export function recordLieGuess(correct) {
 
 export function getLieSuccessRate() {
   const { liesFound, liesTotal } = state.stats;
-  if (liesTotal === 0) return "—";
+  if (liesTotal === 0) return "-";
   return `${Math.round((liesFound / liesTotal) * 100)}%`;
 }
 

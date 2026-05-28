@@ -264,7 +264,7 @@ export function mountHome(app) {
     }
   }
 
-  /* Connexion Facebook / Instagram (home.js paint) — réactiver plus tard :
+  /* Connexion Facebook / Instagram (home.js paint) - réactiver plus tard :
    *  HTML : auth-divider « ou continuer avec », social-row data-social facebook|instagram, hint Meta.
    *  JS : import loginWithSocial + handler data-social dans onHomeClick.
    */
@@ -336,7 +336,7 @@ export function mountHome(app) {
               <button type="button" class="btn btn-primary btn--spaced" id="btn-signup">Créer mon compte</button>
             </div>
             <div id="auth-panel-guest" class="${authTab === "guest" ? "" : "hidden"}">
-              <p class="hint auth-form__guest-intro">Rejoins avec un code, un lien d'invitation ou en scannant le QR de l'hôte. Pas de compte requis — les invités ne peuvent pas créer de lobby.</p>
+              <p class="hint auth-form__guest-intro">Rejoins avec un code, un lien d'invitation ou en scannant le QR de l'hôte. Pas de compte requis - les invités ne peuvent pas créer de lobby.</p>
               <label class="field-label" for="guest-name">Ton pseudo</label>
               <input type="text" class="field-input" id="guest-name" placeholder="Ex : Alex" maxlength="24" />
               <label class="field-label" for="guest-code">Code d'invitation</label>
@@ -399,7 +399,7 @@ export function mountHome(app) {
       return;
     }
 
-    /* Connexion sociale — réactiver avec le bloc HTML ci-dessus.
+    /* Connexion sociale - réactiver avec le bloc HTML ci-dessus.
     const socialBtn = e.target.closest("[data-social]");
     if (socialBtn) {
       const err = app.querySelector("#login-error") || app.querySelector("#signup-error");
@@ -487,10 +487,15 @@ export function mountHome(app) {
         return;
       }
       err?.classList.add("hidden");
-      if (res.needsEmailConfirmation) {
+      if (res.loggedIn) {
+        await showAppAlert("Compte créé, bienvenue ! Tu peux créer ou rejoindre un lobby.", {
+          title: "Bienvenue",
+          icon: "🎉",
+        });
+      } else {
         await showAppAlert(
-          "On t'a envoyé un lien de confirmation. Vérifie ta boîte mail (pense aux spams), puis reviens te connecter avec ton email et ton mot de passe.",
-          { title: "Vérifie tes emails", icon: "📧" }
+          "Compte créé. Connecte-toi avec ton email et ton mot de passe.",
+          { title: "Compte créé", icon: "✅" }
         );
       }
       scheduleRender(true);

@@ -96,7 +96,7 @@ export function customEntryListHtml(items, { listClass, itemClass, removeClass, 
 }
 
 /**
- * Délégation clic sur #app pour [data-remove-*] — survit aux outerHTML des listes.
+ * Délégation clic sur #app pour [data-remove-*] - survit aux outerHTML des listes.
  */
 export function bindPrepRemoveDelegation(app, { screenId, attr, onRemove }) {
   async function onClick(e) {

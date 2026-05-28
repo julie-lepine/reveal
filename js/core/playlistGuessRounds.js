@@ -9,7 +9,7 @@ export function shuffleArray(arr) {
 
 /**
  * @param {Array<{ userId: string, name: string }>} players
- * @param {Array} pool — pistes avec ownerUserId
+ * @param {Array} pool - pistes avec ownerUserId
  * @param {string[]} usedTrackIds
  */
 export function generateWhoLikesRound(players, pool, usedTrackIds = []) {

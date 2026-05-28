@@ -251,7 +251,7 @@ export async function reconcileLobbyMembership() {
   }
 }
 
-/** Réinitialisation complète (session + stockage local) — déblocage accueil invité. */
+/** Réinitialisation complète (session + stockage local) - déblocage accueil invité. */
 export async function resetAppToCleanHome() {
   stopMultiplayerSync();
   stopLobbyPresenceSync();
@@ -307,7 +307,7 @@ export async function goToGameSelect() {
 
 /**
  * Après F5 ou reconnexion : resynchronise et rejoint la partie en cours si besoin.
- * @param {{ force?: boolean }} [options] — force=true au boot ; false si l’utilisateur est allé à l’accueil volontairement.
+ * @param {{ force?: boolean }} [options] - force=true au boot ; false si l’utilisateur est allé à l’accueil volontairement.
  */
 export async function resumeEveningSession({ force = false } = {}) {
   if (!hasActiveLobby()) return false;

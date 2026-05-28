@@ -71,7 +71,7 @@ export function getVoterNames() {
   return getActivePlayerNames().filter((n) => n !== author);
 }
 
-/** Votes des juges uniquement — l'auteur ne participe pas au verdict du groupe. */
+/** Votes des juges uniquement - l'auteur ne participe pas au verdict du groupe. */
 export function filterVoterVotes(votes = {}, author = getCurrentAuthor()) {
   const out = {};
   Object.entries(votes || {}).forEach(([name, v]) => {

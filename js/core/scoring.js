@@ -154,7 +154,7 @@ export function awardDilemmaRound(votes) {
   return summary;
 }
 
-/** VibeCheck — devine le propriétaire du like Spotify */
+/** VibeCheck - devine le propriétaire du like Spotify */
 export function awardPlaylistGuessRound({ votesByUid, ownerName, ownerPlayerId, resolveName }) {
   const nameFor = (uid) => (resolveName ? resolveName(uid) : uid);
   const voters = Object.entries(votesByUid || {}).filter(([voterUid]) => voterUid !== ownerPlayerId);

@@ -113,8 +113,8 @@ export function mountFilRougeSetup(app) {
           <p class="fil-rouge-setup__req-detail">
             ${
               minPlayersMet
-                ? `${playerCount} joueurs dans le lobby — c'est bon.`
-                : `<strong>${playerCount} / ${FIL_ROUGE_MIN_PLAYERS}</strong> joueurs dans le lobby — invite au moins <strong>${FIL_ROUGE_MIN_PLAYERS - playerCount}</strong> personne${FIL_ROUGE_MIN_PLAYERS - playerCount > 1 ? "s" : ""} de plus.`
+                ? `${playerCount} joueurs dans le lobby - c'est bon.`
+                : `<strong>${playerCount} / ${FIL_ROUGE_MIN_PLAYERS}</strong> joueurs dans le lobby - invite au moins <strong>${FIL_ROUGE_MIN_PLAYERS - playerCount}</strong> personne${FIL_ROUGE_MIN_PLAYERS - playerCount > 1 ? "s" : ""} de plus.`
             }
           </p>
         </div>

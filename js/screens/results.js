@@ -54,7 +54,7 @@ export function mountResults(app) {
       content: `
       <p class="label-upper label-upper--gold">📊 Résultats</p>
       <h2 class="screen-title">Récap de la soirée</h2>
-      <p class="hint lobby-status-hint">Lobby : ${status === "playing" ? `en jeu (${gameId || "—"})` : "en attente"}</p>
+      <p class="hint lobby-status-hint">Lobby : ${status === "playing" ? `en jeu (${gameId || "-"})` : "en attente"}</p>
 
       ${lastBlock}
 
@@ -63,7 +63,7 @@ export function mountResults(app) {
         <div class="evening-recap__chips">${chips || '<span class="hint">Lance un jeu !</span>'}</div>
         ${
           recap.top[0]
-            ? `<p class="evening-recap__meta">En tête : <strong>${escapeHtml(recap.top[0].name)}</strong> — ${recap.top[0].score} pts</p>`
+            ? `<p class="evening-recap__meta">En tête : <strong>${escapeHtml(recap.top[0].name)}</strong> - ${recap.top[0].score} pts</p>`
             : ""
         }
       </div>

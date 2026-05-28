@@ -150,7 +150,7 @@ export function countOtherPlayersCustomDilemmas() {
     .filter((d) => d.author && d.author !== me).length;
 }
 
-/** Fusionne les listes custom (par id) — usage local uniquement. */
+/** Fusionne les listes custom (par id) - usage local uniquement. */
 export function mergeCustomDilemmasLists(localList = [], remoteList = []) {
   return mergeAuthorOwnedCustomList(localList, remoteList, {
     normalize: normalizeDilemmaEntry,
@@ -207,7 +207,7 @@ export function getDilemmaRounds() {
 }
 
 function votingPayloadForRound(roundIdx, deck) {
-  const dilemma = deck[roundIdx] || { optionA: "—", optionB: "—" };
+  const dilemma = deck[roundIdx] || { optionA: "-", optionB: "-" };
   const endsAt = new Date(Date.now() + DILEMMA_VOTE_TIMER_SEC * 1000).toISOString();
   return {
     roundIdx,

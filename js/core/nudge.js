@@ -32,7 +32,7 @@ function buzz({ freq, duration, volume, delay = 0, type = "square" }) {
   }
 }
 
-/** Son type MSN « wizz » — plusieurs buzz courts. */
+/** Son type MSN « wizz » - plusieurs buzz courts. */
 export function playLobbyNudge() {
   if (isTimerMuted()) return;
   const ac = getAudioContext();

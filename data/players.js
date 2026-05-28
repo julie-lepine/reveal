@@ -1,4 +1,4 @@
-/** Joueurs par défaut — modifiez cette liste pour votre groupe */
+/** Joueurs par défaut - modifiez cette liste pour votre groupe */
 export const PLAYERS = [
   { name: "Lucas", color: "#FF6B6B", emoji: "🦊" },
   { name: "Emma", color: "#A78BFA", emoji: "🦋" },

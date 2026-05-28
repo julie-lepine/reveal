@@ -14,7 +14,7 @@ export const GAMES = [
   {
     id: "playlistguess-prep",
     title: "VibeCheck",
-    desc: "Une chanson de vos likes Spotify — devine qui l’a aimée",
+    desc: "3 joueurs min. - une chanson de vos likes Spotify, devine qui l’a aimée",
     emoji: "🎵",
     cssClass: "playlist",
     logo: "js/games/vibecheck.png",

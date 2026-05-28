@@ -350,7 +350,7 @@ export function buildFilRougeResultsSnapshot() {
     .sort((a, b) => a.sec - b.sec)[0];
 
   const { playerStats } = getState();
-  let bestManipulator = "—";
+  let bestManipulator = "-";
   let bestScore = -1;
   validated.forEach((p) => {
     const n = playerStats[p.name]?.filRougeMissionsValidated || 0;
@@ -366,9 +366,9 @@ export function buildFilRougeResultsSnapshot() {
     inProgress,
     pending,
     analytics: {
-      bestManipulator: bestManipulator || "—",
+      bestManipulator: bestManipulator || "-",
       fastestValidationSec: fastest?.sec != null ? Math.round(fastest.sec) : null,
-      fastestPlayer: fastest?.name || "—",
+      fastestPlayer: fastest?.name || "-",
       totalValidated: validated.length,
       totalPlayers: participants.length,
     },
@@ -457,7 +457,7 @@ export async function hostRestartFilRougeGame() {
   return { ok: true };
 }
 
-/** Accusé « mission reçue » — local uniquement (ne pas impacter l'écran des autres joueurs). */
+/** Accusé « mission reçue » - local uniquement (ne pas impacter l'écran des autres joueurs). */
 export function setFilRougeMissionAck(uid) {
   const session = getFilRougeSession();
   const missionAcks = { ...(session.missionAcks || {}), [uid]: true };

@@ -49,8 +49,8 @@ export function mountTierNightCreate(app) {
     const ok = name.length >= 2 && items.length >= 4;
     createBtn.disabled = !ok;
     if (!name) hint.textContent = "Donne un nom à ta tier list.";
-    else if (items.length < 4) hint.textContent = `${items.length}/4 items — ajoute-en encore.`;
-    else hint.textContent = `${items.length} items — prêt à créer !`;
+    else if (items.length < 4) hint.textContent = `${items.length}/4 items - ajoute-en encore.`;
+    else hint.textContent = `${items.length} items - prêt à créer !`;
   }
 
   [nameEl, emojiEl, itemsEl].forEach((el) => el?.addEventListener("input", validate));

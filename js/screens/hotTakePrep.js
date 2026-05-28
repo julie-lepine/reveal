@@ -42,7 +42,7 @@ export function mountHotTakePrep(app) {
 
   let cleanupSim = null;
   let mounted = false;
-  /** Prêt en cours d’envoi — évite que la synchro efface l’UI. */
+  /** Prêt en cours d’envoi - évite que la synchro efface l’UI. */
   let readyCommitInFlight = null;
   const localName = getLocalDisplayName();
   const moderationNotice = getModerationNotice();
@@ -82,7 +82,7 @@ export function mountHotTakePrep(app) {
   function othersTakesHintHtml() {
     const n = countOtherPlayersCustomTakes();
     if (!n) return "";
-    return `<p class="hint" id="hot-take-others-hint">${n} hot take${n > 1 ? "s" : ""} d'autres joueurs — révélée${n > 1 ? "s" : ""} en manche.</p>`;
+    return `<p class="hint" id="hot-take-others-hint">${n} hot take${n > 1 ? "s" : ""} d'autres joueurs - révélée${n > 1 ? "s" : ""} en manche.</p>`;
   }
 
   function renderCustomTakesList() {
@@ -278,7 +278,7 @@ export function mountHotTakePrep(app) {
           ${
             prep.poolSize > 0
               ? themeId === HOT_TAKE_CATALOG_ID
-                ? `<p class="hint">${prep.poolSize} take(s) dans le deck — tous les thèmes fusionnés.</p>`
+                ? `<p class="hint">${prep.poolSize} take(s) dans le deck - tous les thèmes fusionnés.</p>`
                 : themeId === HOT_TAKE_MIX_ID
                   ? `<p class="hint">${prep.poolSize} take(s) tirées au hasard parmi tous les thèmes (+ customs).</p>`
                   : `<p class="hint">${prep.poolSize} take(s) dans ce thème (+ customs si ajoutées).</p>`
@@ -306,7 +306,7 @@ export function mountHotTakePrep(app) {
           </p>
           ${
             prep.capped
-              ? `<p class="hint">Seulement ${prep.poolSize} take(s) dans le deck — toutes seront jouées.</p>`
+              ? `<p class="hint">Seulement ${prep.poolSize} take(s) dans le deck - toutes seront jouées.</p>`
               : ""
           }
           ${!isHost ? `<p class="hint">Seul l'hôte peut modifier le nombre de manches.</p>` : ""}

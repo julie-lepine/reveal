@@ -1,4 +1,5 @@
 import {
+  PLAYLIST_GUESS_MIN_PLAYERS,
   PLAYLIST_GUESS_ROUND_PRESETS,
   PLAYLIST_GUESS_ROUND_DEFAULT,
   allPlaylistGuessReady,
@@ -84,23 +85,46 @@ export function mountPlaylistGuessPrep(app) {
       readyBtn.disabled = !isLocalSpotifyReady() && !canUseDevTrackFallback();
     }
 
+    const minCard = app.querySelector("#pg-min-players");
+    if (minCard) {
+      const playerCount = members.length;
+      const minPlayersMet = playerCount >= PLAYLIST_GUESS_MIN_PLAYERS;
+      minCard.innerHTML = `
+        <div class="fil-rouge-setup__req ${minPlayersMet ? "fil-rouge-setup__req--ok" : "fil-rouge-setup__req--warn"}" role="status">
+          <span class="fil-rouge-setup__req-icon" aria-hidden="true">👥</span>
+          <div class="fil-rouge-setup__req-body">
+            <p class="fil-rouge-setup__req-title">Minimum ${PLAYLIST_GUESS_MIN_PLAYERS} joueurs</p>
+            <p class="fil-rouge-setup__req-detail">
+              ${
+                minPlayersMet
+                  ? `${playerCount} joueurs dans le lobby - c'est bon.`
+                  : `<strong>${playerCount} / ${PLAYLIST_GUESS_MIN_PLAYERS}</strong> joueurs - invite encore <strong>${PLAYLIST_GUESS_MIN_PLAYERS - playerCount}</strong> personne${PLAYLIST_GUESS_MIN_PLAYERS - playerCount > 1 ? "s" : ""}.`
+              }
+            </p>
+          </div>
+        </div>`;
+    }
+
     const startSlot = app.querySelector("#pg-start-slot");
     if (startSlot) {
+      const minPlayersMet = prep.minPlayersMet;
       let poolLabel = "En attente des joueurs…";
-      if (!prep.validation.ok) {
+      if (!minPlayersMet) {
+        poolLabel = `Il faut au moins ${PLAYLIST_GUESS_MIN_PLAYERS} joueurs`;
+      } else if (!prep.validation.ok) {
         if (prep.validation.error === "DUPLICATE_POOL_ONLY") {
           poolLabel = "Pas assez de titres uniques";
         } else if (prep.validation.error === "INSUFFICIENT_POOL") {
           poolLabel = "Pool insuffisant pour les manches";
         }
       } else if (prep.poolSize === 0) {
-        poolLabel = "Aucun titre — connecte Spotify";
+        poolLabel = "Aucun titre - connecte Spotify";
       }
 
       startSlot.innerHTML = prepStartSlotHtml({
-        poolEmpty: prep.poolSize === 0 || !prep.validation.ok,
+        poolEmpty: !minPlayersMet || prep.poolSize === 0 || !prep.validation.ok,
         poolEmptyLabel: poolLabel,
-        allReady,
+        allReady: allReady && minPlayersMet,
         isHost: isHost && isLobbyHost(),
         launchLabel: "Lancer la partie →",
       });
@@ -175,6 +199,14 @@ export function mountPlaylistGuessPrep(app) {
 
   async function onStartGame() {
     if (!isLobbyHost()) return;
+    if (getLobbyParticipants().length < PLAYLIST_GUESS_MIN_PLAYERS) {
+      const { showAppAlert } = await import("../core/dialog.js");
+      await showAppAlert(
+        `VibeCheck se joue à au moins ${PLAYLIST_GUESS_MIN_PLAYERS} : chaque manche, une chanson appartient à quelqu'un du groupe.`,
+        { title: "3 joueurs minimum", icon: "👥" }
+      );
+      return;
+    }
     try {
       await markPlaylistGuessLobbyStarted();
       navigate("playlistguess", {
@@ -220,7 +252,9 @@ export function mountPlaylistGuessPrep(app) {
       content: `
         <p class="label-upper label-upper--purple">🎵 VibeCheck</p>
         <h2 class="screen-title">Préparation</h2>
-        <p class="game-intro">Une chanson tirée des likes Spotify du groupe — devine qui l'a aimée.</p>
+        <p class="game-intro">Une chanson tirée des likes Spotify du groupe - devine qui l'a aimée. <span class="muted">3 joueurs minimum.</span></p>
+
+        <div id="pg-min-players"></div>
 
         <div id="pg-spotify-slot"></div>
 

@@ -22,8 +22,8 @@ export function revealOwnerCardHtml({
 
   const feedbackSub = isOwner
     ? ownerStealth
-      ? `+${PLAYLIST_GUESS_POINTS.OWNER_STEALTH} pts — pas tout le monde t'a identifié`
-      : "0 pt — tout le monde a deviné"
+      ? `+${PLAYLIST_GUESS_POINTS.OWNER_STEALTH} pts - pas tout le monde t'a identifié`
+      : "0 pt - tout le monde a deviné"
     : myCorrect
       ? `+${PLAYLIST_GUESS_POINTS.CORRECT_GUESS} pts`
       : `${correctVoters.length} bonne(s) réponse(s) sur cette manche`;

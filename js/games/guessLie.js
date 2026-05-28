@@ -284,7 +284,7 @@ export function mountGuessLie(app) {
     if (phase === "voting") {
       const statementsBlock = `
         <p class="game-intro">Manche de <strong>${escapeHtml(round.player)}</strong></p>
-        <p class="hint">${isSubject ? "🎭 Tu es le menteur — les détectives ont 30 s." : "Quelle affirmation est le mensonge ?"}</p>`;
+        <p class="hint">${isSubject ? "🎭 Tu es le menteur - les détectives ont 30 s." : "Quelle affirmation est le mensonge ?"}</p>`;
 
       if (isSubject) {
         const lieLetter = String.fromCharCode(65 + round.lie);
@@ -332,7 +332,7 @@ export function mountGuessLie(app) {
               })
               .join("")}
           </div>
-          <p class="hint">Vote enregistré — en attente des autres détectives…</p>`;
+          <p class="hint">Vote enregistré - en attente des autres détectives…</p>`;
         } else {
           body = `
           ${statementsBlock}

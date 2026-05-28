@@ -1,5 +1,5 @@
 /**
- * Fusions d'état multijoueur (prêt, customs par auteur) — testables sans Supabase.
+ * Fusions d'état multijoueur (prêt, customs par auteur) - testables sans Supabase.
  */
 
 export function normalizeDilemmaEntry(entry) {

@@ -115,7 +115,7 @@ export function initBottomNav() {
       <span class="bottom-nav__icon-wrap"><span class="bottom-nav__icon" aria-hidden="true">🎮</span></span>
       <span class="bottom-nav__label">Jeux</span>
     </button>
-    <button type="button" class="bottom-nav__item bottom-nav__item--logo" data-tab="${TAB_LOGO}" data-tab-nav="${TAB_LOGO}" aria-label="REVEAL — Lobby">
+    <button type="button" class="bottom-nav__item bottom-nav__item--logo" data-tab="${TAB_LOGO}" data-tab-nav="${TAB_LOGO}" aria-label="REVEAL - Lobby">
       <span class="bottom-nav__logo-wrap">
         <img src="${APP_LOGO}" alt="REVEAL" class="bottom-nav__logo" />
       </span>

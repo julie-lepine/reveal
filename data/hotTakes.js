@@ -6,7 +6,7 @@ export const HOT_TAKE_CATALOG_ID = "catalog";
 /** Mix : tirage aléatoire parmi les banques des autres thèmes (pas de liste locale). */
 export const HOT_TAKE_MIX_ID = "mix";
 
-/** Opinions par thème — utilisées en banque Hot Take */
+/** Opinions par thème - utilisées en banque Hot Take */
 export const HOT_TAKE_THEMES = [
   {
     id: HOT_TAKE_CATALOG_ID,
@@ -129,12 +129,12 @@ export const HOT_TAKE_OPTION_COLORS = {
 
 export const HOT_TAKE_TIMER_SEC = 7;
 
-/** Nombre de manches proposées en préparation (—1 = tout le deck) */
+/** Nombre de manches proposées en préparation (-1 = tout le deck) */
 export const HOT_TAKE_ROUND_PRESETS = [3, 5, 8];
-/** @deprecated — défini dans js/games/hotTake.js */
+/** @deprecated - défini dans js/games/hotTake.js */
 export const HOT_TAKE_INTERMISSION_SEC = 5;
 
-/** @deprecated — utiliser EVENING_POINTS depuis data/eveningScoring.js */
+/** @deprecated - utiliser EVENING_POINTS depuis data/eveningScoring.js */
 export const HOT_TAKE_POINTS_MAJORITY = EVENING_POINTS.WIN;
 /** @deprecated */
 export const HOT_TAKE_POINTS_DISSENT = EVENING_POINTS.BONUS;
@@ -160,5 +160,5 @@ export const HOT_TAKE_FORBIDDEN_WORDS = [
 export const HOT_TAKE_MODERATION_NOTICE =
   "Les insultes et termes racistes, homophobes, transphobes ou haineux sont interdits. Si ta hot take en contient, elle sera refusée.";
 
-/** @deprecated — utiliser getThemeBankTexts */
+/** @deprecated - utiliser getThemeBankTexts */
 export const HOT_TAKES = getCatalogTakes();

@@ -1,5 +1,6 @@
 import {
   PLAYLIST_GUESS_DEV_FALLBACK,
+  PLAYLIST_GUESS_MIN_PLAYERS,
   PLAYLIST_GUESS_ROUND_DEFAULT,
   PLAYLIST_GUESS_TIMER_SEC,
   PLAYLIST_GUESS_ROUND_PRESETS,
@@ -103,6 +104,8 @@ export function getPlaylistGuessPrepSummary() {
     effective: validation.ok ? roundCount : Math.min(roundCount, pool.length),
     connectedCount,
     playerCount: players.length,
+    minPlayersMet: players.length >= PLAYLIST_GUESS_MIN_PLAYERS,
+    minPlayers: PLAYLIST_GUESS_MIN_PLAYERS,
     validation,
     durationLabel: `~${Math.ceil((roundCount * PLAYLIST_GUESS_TIMER_SEC) / 60)} min`,
   };
@@ -250,6 +253,9 @@ export async function markPlaylistGuessLobbyStarted() {
     await ensureDevLibrariesForSolo();
   }
   const players = lobbyPlayersWithIds();
+  if (players.length < PLAYLIST_GUESS_MIN_PLAYERS) {
+    throw new Error("NOT_ENOUGH_PLAYERS");
+  }
   const session = getPlaylistGuessSession();
   const pool = mergeSongsPool(session.librariesByUid);
   const roundCount = session.roundCount ?? PLAYLIST_GUESS_ROUND_DEFAULT;

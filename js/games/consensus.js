@@ -464,7 +464,7 @@ export function mountConsensus(app) {
       setLastGame({
         gameId: "consensus",
         title: "Consensus",
-        summary: `${standings.length} joueur(s) · gagnant : ${standings[0]?.name || "—"}`,
+        summary: `${standings.length} joueur(s) · gagnant : ${standings[0]?.name || "-"}`,
       });
     }
 

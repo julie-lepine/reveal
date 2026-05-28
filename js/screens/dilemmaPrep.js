@@ -84,7 +84,7 @@ export function mountDilemmaPrep(app) {
   function othersDilemmasHintHtml() {
     const n = countOtherPlayersCustomDilemmas();
     if (!n) return "";
-    return `<p class="hint" id="dilemma-others-hint">${n} dilemme${n > 1 ? "s" : ""} d'autres joueurs — révélé${n > 1 ? "s" : ""} en manche.</p>`;
+    return `<p class="hint" id="dilemma-others-hint">${n} dilemme${n > 1 ? "s" : ""} d'autres joueurs - révélé${n > 1 ? "s" : ""} en manche.</p>`;
   }
 
   function renderCustomDilemmasList() {
@@ -270,7 +270,7 @@ export function mountDilemmaPrep(app) {
       content: `
         <p class="label-upper label-upper--gold">⚖️ Dilemma</p>
         <h2 class="screen-title">Préparation</h2>
-        <p class="game-intro">Choix impossible A vs B — vote, réactions emoji et reveal en 10 secondes. Ajoute tes dilemmes si tu veux.</p>
+        <p class="game-intro">Choix impossible A vs B - vote, réactions emoji et reveal en 10 secondes. Ajoute tes dilemmes si tu veux.</p>
 
         <div class="card">
           <p class="card-heading">Deck de dilemmes</p>
@@ -302,7 +302,7 @@ export function mountDilemmaPrep(app) {
           <p class="hot-take-duration" id="dilemma-duration" aria-live="polite"></p>
           ${
             prep.capped
-              ? `<p class="hint">Seulement ${prep.poolSize} dilemme(s) — toutes les manches seront jouées.</p>`
+              ? `<p class="hint">Seulement ${prep.poolSize} dilemme(s) - toutes les manches seront jouées.</p>`
               : ""
           }
           ${!isHost ? `<p class="hint">Seul l'hôte peut modifier les réglages.</p>` : ""}

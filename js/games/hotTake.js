@@ -63,7 +63,7 @@ export function mountHotTake(app) {
   let takeScored = false;
   let intervalId = null;
   let paused = false;
-  /** Vote en cours d’envoi — évite que la synchro efface l’UI avant la réponse serveur. */
+  /** Vote en cours d’envoi - évite que la synchro efface l’UI avant la réponse serveur. */
   let voteCommitInFlight = null;
   /** Chrono figé en pause (mode local sans sync). */
   let localPausedRemaining = null;
@@ -182,7 +182,7 @@ export function mountHotTake(app) {
   function pauseBanner() {
     const who = getHotTakeSession().pausedBy;
     if (!who) return "";
-    return `<p class="pause-banner">⏸ Pause — ${escapeHtml(who)} a mis la partie en pause</p>`;
+    return `<p class="pause-banner">⏸ Pause - ${escapeHtml(who)} a mis la partie en pause</p>`;
   }
 
   function votingSecondsLeft(session = getHotTakeSession()) {
@@ -209,10 +209,10 @@ export function mountHotTake(app) {
   function hotTakeAwardSummaryHtml(voteResult, { pointsAwarded = false } = {}) {
     if (!voteResult) return "";
     if (voteResult.tied || !voteResult.majority) {
-      return `<p class="hint">Égalité — <strong>aucun point</strong> (pas de majorité ni de dissent).</p>`;
+      return `<p class="hint">Égalité - <strong>aucun point</strong> (pas de majorité ni de dissent).</p>`;
     }
     const ptsLine = pointsAwarded
-      ? ` — majorité +${EVENING_POINTS.WIN} pts, dissent +${EVENING_POINTS.BONUS} pts`
+      ? ` - majorité +${EVENING_POINTS.WIN} pts, dissent +${EVENING_POINTS.BONUS} pts`
       : "";
     return `<p class="hint">Majorité : <strong style="color:${HOT_TAKE_OPTION_COLORS[voteResult.majority]}">${voteResult.majority}</strong>${ptsLine}</p>`;
   }
@@ -343,7 +343,7 @@ export function mountHotTake(app) {
 
     if (phase === "question") {
       phaseHtml = host
-        ? `<p class="hint">Vote simultané — lance le chrono quand tout le monde est prêt.</p>
+        ? `<p class="hint">Vote simultané - lance le chrono quand tout le monde est prêt.</p>
         <button type="button" class="btn btn-primary" id="start-vote">Lancer le vote →</button>`
         : `<p class="hint">En attente que l'hôte lance le vote…</p>`;
     }
@@ -540,7 +540,7 @@ export function mountHotTake(app) {
         setLastGame({
           gameId: "hottake",
           title: "Hot Take",
-          summary: `${total} prises · dernière majorité : ${lastAward?.majority || "—"}`,
+          summary: `${total} prises · dernière majorité : ${lastAward?.majority || "-"}`,
         });
         if (mp) {
           try {

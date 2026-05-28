@@ -37,7 +37,7 @@ function localUid() {
   return getSupabaseUserId() || userIdForName(getLocalDisplayName());
 }
 
-/** Bandeau pleine largeur (état idle) — au-dessus de la grille de jeux. */
+/** Bandeau pleine largeur (état idle) - au-dessus de la grille de jeux. */
 export function filRougeBannerHtml() {
   const session = getFilRougeSession();
   const status = session.status || FIL_ROUGE_STATUS.IDLE;
@@ -195,19 +195,19 @@ export async function filRougeBoxHtml() {
         <div>
           <p class="fil-rouge-box__section-label">Missions validées</p>
           <div class="fil-rouge-box__players">
-            ${validated.map((p) => playerStatusLine(p, validations)).join("") || '<span class="muted">—</span>'}
+            ${validated.map((p) => playerStatusLine(p, validations)).join("") || '<span class="muted">-</span>'}
           </div>
         </div>
         <div>
           <p class="fil-rouge-box__section-label">En attente hôte</p>
           <div class="fil-rouge-box__players">
-            ${pending.map((p) => playerStatusLine(p, validations)).join("") || '<span class="muted">—</span>'}
+            ${pending.map((p) => playerStatusLine(p, validations)).join("") || '<span class="muted">-</span>'}
           </div>
         </div>
         <div>
           <p class="fil-rouge-box__section-label">Missions en cours</p>
           <div class="fil-rouge-box__players">
-            ${inProgress.map((p) => playerStatusLine(p, validations)).join("") || '<span class="muted">—</span>'}
+            ${inProgress.map((p) => playerStatusLine(p, validations)).join("") || '<span class="muted">-</span>'}
           </div>
         </div>
       </div>
@@ -223,7 +223,7 @@ export async function filRougeBoxHtml() {
     </div>`;
 }
 
-/** Bandeau (idle) ou box (setup/active/completed) — une seule zone au-dessus des jeux. */
+/** Bandeau (idle) ou box (setup/active/completed) - une seule zone au-dessus des jeux. */
 export async function filRougeGameSelectSectionHtml() {
   const banner = filRougeBannerHtml();
   if (banner) return banner;

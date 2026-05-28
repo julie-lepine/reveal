@@ -72,10 +72,10 @@ export function renderConsensusResults({
     : "Aucun";
   const closestLabel = (lastRound.closestPlayers || []).length
     ? lastRound.closestPlayers.map((name) => escapeHtml(name)).join(", ")
-    : "—";
+    : "-";
   const precisionLabel = (lastRound.precisionPlayers || []).length
     ? lastRound.precisionPlayers.map((name) => escapeHtml(name)).join(", ")
-    : "—";
+    : "-";
   const heroLabel = lastRound.anchorLabel || "Point d'équilibre du groupe";
   const heroValue = formatScore(lastRound.anchor || lastRound.mean);
   const showMeanPill = (lastRound.anchorLabel || "").toLowerCase() !== "moyenne";

@@ -1,5 +1,5 @@
 /**
- * Tier lists — ajoutez vos logos dans assets/tiers/
+ * Tier lists - ajoutez vos logos dans assets/tiers/
  */
 export const TIER_LISTS = [
   {

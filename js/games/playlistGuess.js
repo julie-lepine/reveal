@@ -300,7 +300,7 @@ export function mountPlaylistGuess(app) {
         if (alreadyVoted) {
           body = `
             ${songGuessCardHtml(round, { selectedPlayerId: selected, readonly: true })}
-            <p class="hint">Vote enregistré — en attente des autres…</p>`;
+            <p class="hint">Vote enregistré - en attente des autres…</p>`;
         } else {
           body = `
             <div class="timer" id="timer-el">${timer}</div>

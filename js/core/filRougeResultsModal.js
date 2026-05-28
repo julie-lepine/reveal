@@ -57,11 +57,11 @@ function resultsBodyHtml(snapshot) {
         : ""
     }
     <div class="fil-rouge-modal__analytics card">
-      <p><strong>Meilleur manipulateur :</strong> ${escapeHtml(a.bestManipulator || "—")}</p>
+      <p><strong>Meilleur manipulateur :</strong> ${escapeHtml(a.bestManipulator || "-")}</p>
       <p><strong>Validation la plus rapide :</strong> ${
         a.fastestValidationSec != null
-          ? `${escapeHtml(a.fastestPlayer || "—")} (${a.fastestValidationSec}s)`
-          : "—"
+          ? `${escapeHtml(a.fastestPlayer || "-")} (${a.fastestValidationSec}s)`
+          : "-"
       }</p>
       <p class="muted">${a.totalValidated || 0} / ${a.totalPlayers || 0} missions validées · +${FIL_ROUGE_POINTS_MISSION} pts chacune</p>
     </div>`;
@@ -88,7 +88,7 @@ export function showFilRougeResultsModal(snapshot, { readOnly = false } = {}) {
     <div class="fil-rouge-modal__backdrop" aria-hidden="true"></div>
     <div class="fil-rouge-modal__panel app-dialog__panel--fil-rouge">
       <p class="fil-rouge-modal__icon" aria-hidden="true">🤫</p>
-      <h2 class="fil-rouge-modal__title">Fil Rouge — Mot Interdit</h2>
+      <h2 class="fil-rouge-modal__title">Fil Rouge - Mot Interdit</h2>
       <div class="fil-rouge-modal__scroll">${resultsBodyHtml(snapshot)}</div>
       ${
         host
@@ -130,7 +130,7 @@ export function initFilRougeResultsListener() {
           closeFilRougeResultsModal();
           return;
         }
-        /** Sur « Choisir un jeu », la box Fil Rouge suffit — pas de overlay bloquant. */
+        /** Sur « Choisir un jeu », la box Fil Rouge suffit - pas de overlay bloquant. */
         if (getCurrentScreen() === "game-select") {
           closeFilRougeResultsModal();
           return;

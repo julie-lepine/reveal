@@ -82,7 +82,7 @@ async function exchangeCodeForToken(code, verifier) {
 }
 
 /**
- * Rafraîchissement du token — placeholder prêt pour Edge Function.
+ * Rafraîchissement du token - placeholder prêt pour Edge Function.
  * En client public Spotify, refresh via client_id uniquement.
  */
 export async function refreshSpotifyAccessToken() {

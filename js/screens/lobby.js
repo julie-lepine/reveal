@@ -348,7 +348,7 @@ export function mountLobby(app) {
             <a href="${escapeHtml(joinUrl)}" class="lobby-deep-link">Lien d'invitation</a>
             · <button type="button" class="btn-link" id="copy-link">Copier le lien</button>
           </p>
-          <p class="hint">${online ? "Partage le code ou le lien — les invités rejoignent sans compte." : "Démo locale : ouvre le lien sur le même appareil ou un autre onglet."}</p>
+          <p class="hint">${online ? "Partage le code ou le lien - les invités rejoignent sans compte." : "Démo locale : ouvre le lien sur le même appareil ou un autre onglet."}</p>
         </div>
 
         <div class="chat-panel">

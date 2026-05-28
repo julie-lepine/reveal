@@ -13,7 +13,7 @@ export function speedVoteTimerSeconds(roundCount) {
 export function estimateSpeedVoteDuration(roundCount) {
   const n = Math.max(0, roundCount);
   if (n === 0) {
-    return { minSec: 0, maxSec: 0, label: "—" };
+    return { minSec: 0, maxSec: 0, label: "-" };
   }
   const timers = speedVoteTimerSeconds(n);
   const minSec = timers + n * RESULTS_PAUSE_SEC;
@@ -29,7 +29,7 @@ export function formatDurationRange(minSec, maxSec) {
   const minMin = Math.max(1, Math.round(minSec / 60));
   const maxMin = Math.max(minMin, Math.round(maxSec / 60));
   if (minMin === maxMin) return `~${minMin} min`;
-  return `~${minMin}–${maxMin} min`;
+  return `~${minMin}-${maxMin} min`;
 }
 
 export function resolveEffectiveRoundCount(requested, poolSize) {
