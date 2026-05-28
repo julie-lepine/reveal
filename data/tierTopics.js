@@ -3,9 +3,24 @@
  */
 export const TIER_LISTS = [
   {
+    id: "life",
+    name: "Situations de vie",
+    emoji: "💥",
+    items: [
+      "Se faire ghost",
+      "Se tromper de message",
+      "Arriver en retard important",
+      "Se faire griller en train de mentir",
+      "Oublier un anniversaire",
+      "Rater un examen",
+      "Se faire refuser un date",
+      "Se ridiculiser devant un crush",
+      "Envoyer un message au mauvais groupe",
+    ],
+  },
+  {
     id: "marvel",
     name: "Films Marvel",
-    logo: "assets/tiers/marvel.png",
     emoji: "🦸",
     items: [
       "Iron Man",
@@ -19,7 +34,6 @@ export const TIER_LISTS = [
   {
     id: "fastfood",
     name: "Fast Food",
-    logo: "assets/tiers/fastfood.png",
     emoji: "🍔",
     items: [
       "McDonald's",
@@ -31,23 +45,8 @@ export const TIER_LISTS = [
     ],
   },
   {
-    id: "apps",
-    name: "Applications",
-    logo: "assets/tiers/apps.png",
-    emoji: "📱",
-    items: [
-      "Instagram",
-      "TikTok",
-      "Snapchat",
-      "Twitter",
-      "BeReal",
-      "YouTube",
-    ],
-  },
-  {
     id: "series",
     name: "Séries TV",
-    logo: "assets/tiers/series.png",
     emoji: "📺",
     items: [
       "Breaking Bad",
@@ -58,6 +57,102 @@ export const TIER_LISTS = [
       "Friends",
     ],
   },
+  {
+    id: "animation",
+    name: "Dessins animés",
+    emoji: "🎬",
+    items: [
+      "Shrek",
+      "Toy Story",
+      "Les Indestructibles",
+      "Kung Fu Panda",
+      "L'Âge de Glace",
+      "Ratatouille",
+      "Madagascar",
+      "Cars",
+      "Monstres & Cie",
+    ],
+  },
+  {
+    id: "games",
+    name: "Jeux vidéo",
+    emoji: "🎮",
+    items: [
+      "Minecraft",
+      "Fortnite",
+      "GTA V",
+      "Call of Duty",
+      "League of Legends",
+      "FIFA",
+      "Among Us",
+      "The Witcher 3",
+      "Zelda Breath of the Wild",
+    ],
+  },
+  {
+    id: "music",
+    name: "Artistes",
+    emoji: "🎵",
+    items: [
+      "Drake",
+      "Taylor Swift",
+      "The Weeknd",
+      "Beyoncé",
+      "Kanye West",
+      "Billie Eilish",
+      "Travis Scott",
+      "Ariana Grande",
+      "Eminem",
+    ],
+  },
+  {
+    id: "movies",
+    name: "Films cultes",
+    emoji: "🍿",
+    items: [
+      "Inception",
+      "Titanic",
+      "Interstellar",
+      "Matrix",
+      "Le Parrain",
+      "Fight Club",
+      "Harry Potter",
+      "Gladiator",
+      "Forrest Gump",
+    ],
+  },
+  {
+    id: "apps_hot",
+    name: "Apps du quotidien",
+    emoji: "📲",
+    items: [
+      "TikTok",
+      "Instagram",
+      "Snapchat",
+      "Twitter / X",
+      "BeReal",
+      "YouTube",
+      "Discord",
+      "Spotify",
+      "WhatsApp",
+    ],
+  },
+  {
+    id: "food",
+    name: "Nourriture",
+    emoji: "🍕",
+    items: [
+      "Pizza",
+      "Sushi",
+      "Burger",
+      "Tacos",
+      "Kebab",
+      "Pâtes",
+      "Raclette",
+      "Sushi burger (controversé)",
+      "Frites",
+    ],
+  }
 ];
 
 export const TIER_LEVELS = ["S", "A", "B", "C", "D"];
