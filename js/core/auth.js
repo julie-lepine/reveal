@@ -54,7 +54,7 @@ export function getUser() {
   return getState().user;
 }
 
-export async function loginWithEmail(email, password) {
+export async function loginWithEmail(email, password, captchaToken = null) {
   if (!email?.trim()) {
     return { ok: false, error: "Indique ton email pour te connecter." };
   }
@@ -63,7 +63,13 @@ export async function loginWithEmail(email, password) {
   }
 
   if (isSupabaseConfigured()) {
-    return sbSignIn(email, password);
+    if (!captchaToken) {
+      const { isTurnstileRequired } = await import("./turnstile.js");
+      if (isTurnstileRequired()) {
+        return { ok: false, error: "Valide la vérification anti-robot.", captcha: true };
+      }
+    }
+    return sbSignIn(email, password, captchaToken);
   }
 
   const trimmed = email.trim().toLowerCase();
@@ -90,9 +96,15 @@ export async function loginWithEmail(email, password) {
   return { ok: true };
 }
 
-export async function signupWithEmail(email, password, name) {
+export async function signupWithEmail(email, password, name, captchaToken = null) {
   if (isSupabaseConfigured()) {
-    return sbSignUp(email, password, name);
+    if (!captchaToken) {
+      const { isTurnstileRequired } = await import("./turnstile.js");
+      if (isTurnstileRequired()) {
+        return { ok: false, error: "Valide la vérification anti-robot.", captcha: true };
+      }
+    }
+    return sbSignUp(email, password, name, captchaToken);
   }
 
   const trimmed = email.trim().toLowerCase();
@@ -120,9 +132,15 @@ export async function signupWithEmail(email, password, name) {
   return { ok: true };
 }
 
-export async function requestPasswordReset(email) {
+export async function requestPasswordReset(email, captchaToken = null) {
   if (isSupabaseConfigured()) {
-    return sbSendPasswordResetEmail(email);
+    if (!captchaToken) {
+      const { isTurnstileRequired } = await import("./turnstile.js");
+      if (isTurnstileRequired()) {
+        return { ok: false, error: "Valide la vérification anti-robot.", captcha: true };
+      }
+    }
+    return sbSendPasswordResetEmail(email, captchaToken);
   }
   return {
     ok: false,

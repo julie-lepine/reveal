@@ -37,6 +37,15 @@ import {
   getPasswordResetCooldownRemainingMs,
   passwordResetCooldownMessage,
 } from "../core/passwordResetCooldown.js";
+import {
+  isTurnstileRequired,
+  mountTurnstile,
+  removeTurnstile,
+  removeAllTurnstile,
+  getTurnstileToken,
+  isTurnstileSolved,
+  resetTurnstile,
+} from "../core/turnstile.js";
 
 function syncForgotPasswordButton(root) {
   const btn = root.querySelector("#btn-forgot-password");
@@ -82,7 +91,7 @@ async function runPasswordResetEmailFlow(defaultEmail = "", { title, message, ic
   );
   if (!prompt.ok) return { ok: false, cancelled: true };
 
-  const res = await requestPasswordReset(prompt.value);
+  const res = await requestPasswordReset(prompt.value, prompt.captchaToken ?? null);
   if (!res.ok) {
     await showAppAlert(res.error, {
       title: "Réinitialisation",
@@ -94,6 +103,7 @@ async function runPasswordResetEmailFlow(defaultEmail = "", { title, message, ic
       error: res.error,
       cooldown: Boolean(res.cooldown || res.rateLimited),
       rateLimited: Boolean(res.rateLimited),
+      captcha: Boolean(res.captcha),
     };
   }
 
@@ -259,8 +269,53 @@ export function mountHome(app) {
       }
       syncForgotPasswordButton(app);
       if (getPasswordResetCooldownRemainingMs() > 0) startForgotCooldownTicker();
+      await setupAuthTurnstile();
     } finally {
       renderInFlight = false;
+    }
+  }
+
+  async function setupAuthTurnstile() {
+    removeTurnstile("login");
+    removeTurnstile("signup");
+
+    if (isLoggedIn() || isGuest()) return;
+
+    if (authTab === "login") {
+      const container = app.querySelector("#login-turnstile");
+      const btn = app.querySelector("#btn-login");
+      const mountRes = await mountTurnstile("login", container, {
+        onChange: (solved) => {
+          if (btn) btn.disabled = !solved;
+        },
+      });
+      if (!mountRes.ok) {
+        const err = app.querySelector("#login-error");
+        if (err) {
+          err.textContent = mountRes.error;
+          err.classList.remove("hidden");
+        }
+        if (btn) btn.disabled = true;
+      }
+      return;
+    }
+
+    if (authTab === "signup") {
+      const container = app.querySelector("#signup-turnstile");
+      const btn = app.querySelector("#btn-signup");
+      const mountRes = await mountTurnstile("signup", container, {
+        onChange: (solved) => {
+          if (btn) btn.disabled = !solved;
+        },
+      });
+      if (!mountRes.ok) {
+        const err = app.querySelector("#signup-error");
+        if (err) {
+          err.textContent = mountRes.error;
+          err.classList.remove("hidden");
+        }
+        if (btn) btn.disabled = true;
+      }
     }
   }
 
@@ -318,8 +373,9 @@ export function mountHome(app) {
                 <input type="password" class="field-input password-field__input" id="login-password" placeholder="••••••••" />
                 <button type="button" class="password-field__toggle" data-toggle-password="login-password" aria-label="Afficher le mot de passe" aria-pressed="false">👁️</button>
               </div>
+              <div id="login-turnstile" class="auth-turnstile-wrap"></div>
               <p class="auth-error hidden" id="login-error"></p>
-              <button type="button" class="btn btn-primary btn--spaced" id="btn-login">Se connecter</button>
+              <button type="button" class="btn btn-primary btn--spaced" id="btn-login"${isTurnstileRequired() ? " disabled" : ""}>Se connecter</button>
               <button type="button" class="btn-link auth-forgot" id="btn-forgot-password">Mot de passe oublié ?</button>
             </div>
             <div id="auth-panel-signup" class="${authTab === "signup" ? "" : "hidden"}">
@@ -332,8 +388,9 @@ export function mountHome(app) {
                 <input type="password" class="field-input password-field__input" id="signup-password" placeholder="4 caractères min." />
                 <button type="button" class="password-field__toggle" data-toggle-password="signup-password" aria-label="Afficher le mot de passe" aria-pressed="false">👁️</button>
               </div>
+              <div id="signup-turnstile" class="auth-turnstile-wrap"></div>
               <p class="auth-error hidden" id="signup-error"></p>
-              <button type="button" class="btn btn-primary btn--spaced" id="btn-signup">Créer mon compte</button>
+              <button type="button" class="btn btn-primary btn--spaced" id="btn-signup"${isTurnstileRequired() ? " disabled" : ""}>Créer mon compte</button>
             </div>
             <div id="auth-panel-guest" class="${authTab === "guest" ? "" : "hidden"}">
               <p class="hint auth-form__guest-intro">Rejoins avec un code, un lien d'invitation ou en scannant le QR de l'hôte. Pas de compte requis - les invités ne peuvent pas créer de lobby.</p>
@@ -424,13 +481,26 @@ export function mountHome(app) {
     if (e.target.closest("#btn-login")) {
       const err = app.querySelector("#login-error");
       const btn = e.target.closest("#btn-login");
+      if (!isTurnstileSolved("login")) {
+        if (err) {
+          err.textContent = "Valide la vérification anti-robot.";
+          err.classList.remove("hidden");
+        }
+        return;
+      }
       btn.disabled = true;
       const res = await loginWithEmail(
         app.querySelector("#login-email")?.value,
-        app.querySelector("#login-password")?.value
+        app.querySelector("#login-password")?.value,
+        getTurnstileToken("login")
       );
-      btn.disabled = false;
+      if (isTurnstileRequired()) {
+        btn.disabled = !isTurnstileSolved("login");
+      } else {
+        btn.disabled = false;
+      }
       if (!res.ok) {
+        if (res.captcha) resetTurnstile("login");
         err.textContent = res.error;
         err.classList.remove("hidden");
         return;
@@ -455,14 +525,27 @@ export function mountHome(app) {
     if (e.target.closest("#btn-signup")) {
       const err = app.querySelector("#signup-error");
       const btn = e.target.closest("#btn-signup");
+      if (!isTurnstileSolved("signup")) {
+        if (err) {
+          err.textContent = "Valide la vérification anti-robot.";
+          err.classList.remove("hidden");
+        }
+        return;
+      }
       btn.disabled = true;
       const res = await signupWithEmail(
         app.querySelector("#signup-email")?.value,
         app.querySelector("#signup-password")?.value,
-        app.querySelector("#signup-name")?.value
+        app.querySelector("#signup-name")?.value,
+        getTurnstileToken("signup")
       );
-      btn.disabled = false;
+      if (isTurnstileRequired()) {
+        btn.disabled = !isTurnstileSolved("signup");
+      } else {
+        btn.disabled = false;
+      }
       if (!res.ok) {
+        if (res.captcha) resetTurnstile("signup");
         const msg = String(res.error || "");
         if (/already.*registered|already registered|user.*exists|email.*already|déjà.*utilisé|existe déjà/i.test(msg)) {
           err?.classList.add("hidden");
@@ -646,5 +729,6 @@ export function mountHome(app) {
     unsubSession();
     if (renderTimer) clearTimeout(renderTimer);
     if (forgotCooldownTimer) clearInterval(forgotCooldownTimer);
+    removeAllTurnstile();
   };
 }

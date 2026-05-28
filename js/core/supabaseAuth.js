@@ -1,7 +1,7 @@
 import { supabase, isSupabaseConfigured } from "./supabaseClient.js";
 import { getState, saveStatePatch } from "./state.js";
 import { fetchProfile, upsertProfile } from "./supabaseProfile.js";
-import { formatAuthErrorMessage, isAuthRateLimitError } from "./authErrors.js";
+import { formatAuthErrorMessage, isAuthRateLimitError, isAuthCaptchaError } from "./authErrors.js";
 import {
   getPasswordResetCooldownRemainingMs,
   markPasswordResetSent,
@@ -113,15 +113,21 @@ export function getSupabaseUserId() {
   return getState().supabaseUserId || null;
 }
 
-export async function signUpWithEmail(email, password, displayName) {
+export async function signUpWithEmail(email, password, displayName, captchaToken = null) {
+  const options = {
+    data: { display_name: displayName.trim().slice(0, 24) },
+  };
+  if (captchaToken) options.captchaToken = captchaToken;
+
   const { data, error } = await supabase.auth.signUp({
     email: email.trim().toLowerCase(),
     password,
-    options: {
-      data: { display_name: displayName.trim().slice(0, 24) },
-    },
+    options,
   });
-  if (error) return { ok: false, error: formatAuthErrorMessage(error.message) };
+  if (error) {
+    const msg = formatAuthErrorMessage(error.message);
+    return { ok: false, error: msg, captcha: isAuthCaptchaError(error.message) };
+  }
   if (data.user) {
     await upsertProfile({
       userId: data.user.id,
@@ -133,12 +139,19 @@ export async function signUpWithEmail(email, password, displayName) {
   return { ok: true, loggedIn: Boolean(data.session) };
 }
 
-export async function signInWithEmail(email, password) {
+export async function signInWithEmail(email, password, captchaToken = null) {
+  const options = {};
+  if (captchaToken) options.captchaToken = captchaToken;
+
   const { data, error } = await supabase.auth.signInWithPassword({
     email: email.trim().toLowerCase(),
     password,
+    options,
   });
-  if (error) return { ok: false, error: formatAuthErrorMessage(error.message) };
+  if (error) {
+    const msg = formatAuthErrorMessage(error.message);
+    return { ok: false, error: msg, captcha: isAuthCaptchaError(error.message) };
+  }
   if (data.session) await syncSessionToState(data.session);
   return { ok: true };
 }
@@ -221,7 +234,7 @@ export async function signOutSupabase() {
   await syncSessionToState(null);
 }
 
-export async function sendPasswordResetEmail(email) {
+export async function sendPasswordResetEmail(email, captchaToken = null) {
   const trimmed = String(email || "").trim().toLowerCase();
   if (!trimmed) return { ok: false, error: "Email requis." };
 
@@ -234,9 +247,10 @@ export async function sendPasswordResetEmail(email) {
     };
   }
 
-  const { error } = await supabase.auth.resetPasswordForEmail(trimmed, {
-    redirectTo: redirectUrl(),
-  });
+  const resetOptions = { redirectTo: redirectUrl() };
+  if (captchaToken) resetOptions.captchaToken = captchaToken;
+
+  const { error } = await supabase.auth.resetPasswordForEmail(trimmed, resetOptions);
   if (error) {
     if (isAuthRateLimitError(error.message)) {
       markPasswordResetRateLimited();
@@ -245,6 +259,7 @@ export async function sendPasswordResetEmail(email) {
       ok: false,
       error: formatAuthErrorMessage(error.message),
       rateLimited: isAuthRateLimitError(error.message),
+      captcha: isAuthCaptchaError(error.message),
     };
   }
 

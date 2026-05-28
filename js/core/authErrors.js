@@ -20,8 +20,18 @@ export function formatAuthErrorMessage(message) {
   if (/password.*at least|weak password/i.test(m)) {
     return "Le mot de passe est trop faible (4 caractères minimum).";
   }
+  if (/missing email or phone/i.test(m)) {
+    return "Indique ton email pour te connecter.";
+  }
+  if (/captcha|turnstile|challenge.*failed|verification.*failed|no captcha_token/i.test(m)) {
+    return "Vérifie la case anti-robot et réessaie.";
+  }
 
   return raw;
+}
+
+export function isAuthCaptchaError(message) {
+  return /captcha|turnstile|challenge|verification/i.test(String(message || "").toLowerCase());
 }
 
 export function isAuthRateLimitError(message) {

@@ -1,4 +1,11 @@
 import { escapeHtml } from "./ui.js";
+import {
+  isTurnstileRequired,
+  mountTurnstile,
+  removeTurnstile,
+  isTurnstileSolved,
+  getTurnstileToken,
+} from "./turnstile.js";
 
 let openDialog = null;
 
@@ -139,7 +146,14 @@ export function showAppEmailPrompt(
     root.setAttribute("aria-modal", "true");
     root.setAttribute("aria-labelledby", "app-dialog-title");
 
-    const close = (result) => removeDialog(root, () => resolve(result));
+    const close = (result) => {
+      removeTurnstile("reset");
+      removeDialog(root, () => resolve(result));
+    };
+
+    const turnstileBlock = isTurnstileRequired()
+      ? `<div id="app-dialog-turnstile" class="auth-turnstile-wrap auth-turnstile-wrap--dialog"></div>`
+      : "";
 
     root.innerHTML = `
       <div class="app-dialog__backdrop" data-dialog-dismiss aria-hidden="true"></div>
@@ -158,15 +172,17 @@ export function showAppEmailPrompt(
           inputmode="email"
         />
         <p class="app-dialog__field-error hidden" id="app-dialog-email-error" role="alert"></p>
+        ${turnstileBlock}
         <div class="app-dialog__actions">
           <button type="button" class="btn btn-secondary app-dialog__btn" data-dialog-cancel>${escapeHtml(cancelLabel)}</button>
-          <button type="button" class="btn btn-primary app-dialog__btn" data-dialog-ok>${escapeHtml(confirmLabel)}</button>
+          <button type="button" class="btn btn-primary app-dialog__btn" data-dialog-ok${isTurnstileRequired() ? " disabled" : ""}>${escapeHtml(confirmLabel)}</button>
         </div>
       </div>
     `;
 
     const input = root.querySelector("#app-dialog-email");
     const fieldErr = root.querySelector("#app-dialog-email-error");
+    const okBtn = root.querySelector("[data-dialog-ok]");
     if (input) input.value = String(defaultValue || "").trim();
 
     const showFieldError = (text) => {
@@ -180,6 +196,14 @@ export function showAppEmailPrompt(
       }
     };
 
+    if (isTurnstileRequired()) {
+      void mountTurnstile("reset", root.querySelector("#app-dialog-turnstile"), {
+        onChange: (solved) => {
+          if (okBtn) okBtn.disabled = !solved;
+        },
+      });
+    }
+
     const submit = () => {
       const value = String(input?.value || "").trim();
       if (!value) {
@@ -192,7 +216,12 @@ export function showAppEmailPrompt(
         input?.focus();
         return;
       }
-      close({ ok: true, value });
+      if (isTurnstileRequired() && !isTurnstileSolved("reset")) {
+        showFieldError("Valide la vérification anti-robot.");
+        return;
+      }
+      const captchaToken = getTurnstileToken("reset");
+      close({ ok: true, value, captchaToken });
     };
 
     root.querySelector("[data-dialog-ok]")?.addEventListener("click", submit);

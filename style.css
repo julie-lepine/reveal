@@ -1761,6 +1761,17 @@ button.game-card{
   padding:0 12px;
 }
 
+.auth-turnstile-wrap{
+  display:flex;
+  justify-content:center;
+  margin:14px 0 4px;
+  min-height:65px;
+}
+
+.auth-turnstile-wrap--dialog{
+  margin:12px 0 8px;
+}
+
 .auth-error{
   color:#F87171;
   font-size:13px;
