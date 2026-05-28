@@ -1,4 +1,4 @@
-import { PLAYERS } from "../../data/players.js";
+import { DEMO_NPC_PLAYERS } from "./demoPlayers.js";
 import {
   getState,
   saveStatePatch,
@@ -631,7 +631,7 @@ export function simulateLobbyJoins(onUpdate) {
     return () => unsub();
   }
 
-  const pool = PLAYERS.filter(
+  const pool = DEMO_NPC_PLAYERS.filter(
     (p) => !getLobbyParticipants().some((x) => x.name === p.name)
   );
   let i = 0;

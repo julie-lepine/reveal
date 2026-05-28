@@ -67,7 +67,9 @@ Sans `supabase.js` configuré, l’app reste en **mode démo locale** (localStor
 npm install
 ```
 
-Le client charge `@supabase/supabase-js` via `esm.sh` dans le navigateur ; `npm install` sert surtout à la doc et aux outils futurs (Capacitor).
+Le client charge `@supabase/supabase-js` via `esm.sh` dans le navigateur ; `npm install` sert aux tests et à Capacitor (voir [CAPACITOR.md](./CAPACITOR.md)).
+
+**Lancement web** : [LAUNCH_CHECKLIST.md](./LAUNCH_CHECKLIST.md)
 
 ## 6. Vérification rapide
 

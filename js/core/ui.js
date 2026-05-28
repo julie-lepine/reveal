@@ -1,4 +1,3 @@
-import { PLAYERS } from "../../data/players.js";
 import { APP_LOGO } from "../../data/branding.js";
 
 const EL = "di" + "v";
@@ -25,19 +24,6 @@ export function pageShell({ back = true, backTarget = "back", content, orb = tru
       ${orb ? orbsHtml() : ""}
       ${back ? backButton("Retour", backTarget) : ""}
       <${EL} class="container">${content}</${EL}>
-    </${EL}>
-  `;
-}
-
-export function avatarsHtml() {
-  return `
-    <${EL} class="avatars">
-      ${PLAYERS.map(
-        (p, i) => `
-        <${EL} class="avatar" style="background:${p.color};z-index:${10 - i}" title="${escapeHtml(p.name)}">
-          ${p.emoji}
-        </${EL}>`
-      ).join("")}
     </${EL}>
   `;
 }

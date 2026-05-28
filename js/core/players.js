@@ -1,4 +1,4 @@
-import { PLAYERS } from "../../data/players.js";
+import { DEMO_NPC_PLAYERS } from "./demoPlayers.js";
 import { getLobbyParticipants, hasActiveLobby } from "./lobby.js";
 import { getLocalDisplayName, getLocalEmoji, getState, ensurePlayerScore } from "./state.js";
 
@@ -16,7 +16,7 @@ export function getActivePlayers() {
   }
   const localName = getLocalDisplayName();
   return [
-    ...PLAYERS.map((p) => ({ ...p, isLocal: false, isHost: false })),
+    ...DEMO_NPC_PLAYERS.map((p) => ({ ...p, isLocal: false, isHost: false })),
     { name: localName, color: "#60A5FA", emoji: getLocalEmoji(), isLocal: true, isHost: true },
   ];
 }

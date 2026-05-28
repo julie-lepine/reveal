@@ -91,7 +91,7 @@ export const GAMES = [
   {
     id: "trivia-prep",
     title: "Trivia Quiz",
-    desc: "Testez votre culture generale",
+    desc: "Testez votre culture générale",
     emoji: "🧠",
     cssClass: "trivia",
     logo: "js/games/trivia.png",
