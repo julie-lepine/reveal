@@ -69,7 +69,7 @@ export const GAMES = [
   {
     id: "truthmeter-prep",
     title: "TruthMeter",
-    desc: "Affirmation + curseur Fake → Vrai - le groupe tranche",
+    desc: "Affirmation + curseur Faux → Vrai - le groupe tranche",
     emoji: "📏",
     cssClass: "truth",
     logo: "js/games/truthmeter.png",

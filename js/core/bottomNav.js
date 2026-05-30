@@ -1,5 +1,5 @@
 import { APP_LOGO } from "../../data/branding.js";
-import { hasActiveLobby, goToLobby, returnToEveningGames } from "./lobby.js";
+import { hasActiveLobby, returnToEveningGames } from "./lobby.js";
 import { navigate, onScreenChange, getCurrentScreen } from "./router.js";
 import { goToEveningHome } from "../screens/nav.js";
 import { suppressRoutingForScoreView } from "./gameSync.js";
@@ -46,11 +46,6 @@ async function goGames() {
   await returnToEveningGames();
 }
 
-function goLogo() {
-  if (hasActiveLobby()) goToLobby();
-  else navigate("home", { reset: true });
-}
-
 function goResults() {
   if (hasActiveLobby()) {
     suppressRoutingForScoreView();
@@ -68,7 +63,6 @@ function goFinal() {
 const TAB_ACTIONS = {
   [TAB_HOME]: goHome,
   [TAB_GAMES]: goGames,
-  [TAB_LOGO]: goLogo,
   [TAB_RESULTS]: goResults,
   [TAB_FINAL]: goFinal,
 };
@@ -121,7 +115,7 @@ export function initBottomNav() {
       <span class="bottom-nav__icon-wrap"><span class="bottom-nav__icon" aria-hidden="true">🎮</span></span>
       <span class="bottom-nav__label">Jeux</span>
     </button>
-    <div class="bottom-nav__item bottom-nav__item--logo" data-tab="${TAB_LOGO}" data-tab-nav="${TAB_LOGO}" aria-label="REVEAL - Lobby">
+    <div class="bottom-nav__item bottom-nav__item--logo" data-tab="${TAB_LOGO}" aria-hidden="true">
       <span class="bottom-nav__logo-wrap">
         <img src="${APP_LOGO}" alt="REVEAL" class="bottom-nav__logo" />
       </span>

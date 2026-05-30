@@ -249,6 +249,8 @@ export function mountHotTake(app) {
       : myVote
         ? "Les autres votent en même temps (NPC)."
         : "Choisis ton camp !";
+    const voteOptionsHint =
+      "Valide = d'accord · Acceptable = bof · Criminel = pas d'accord";
     const voteHintExtra =
       phase === "voting" && canChangeVote()
         ? " · Tu peux changer ton vote tant que le vote est ouvert."
@@ -279,6 +281,7 @@ export function mountHotTake(app) {
             </button>`
           ).join("")}
         </div>
+        <p class="hint">${voteOptionsHint}</p>
         <p class="hint">${voteHint}${voteHintExtra}</p>
         ${
           host

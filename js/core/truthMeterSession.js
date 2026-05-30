@@ -53,7 +53,7 @@ export function isLocalTruthMeterHost() {
 
 export function truthLabel(pct) {
   const n = Math.max(0, Math.min(100, Math.round(Number(pct) || 0)));
-  if (n <= 15) return "Fake";
+  if (n <= 15) return "Faux";
   if (n <= 40) return "Très douteux";
   if (n <= 55) return "Possible";
   if (n <= 80) return "Probable";

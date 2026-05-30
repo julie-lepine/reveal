@@ -135,12 +135,12 @@ export function mountTruthMeterPrep(app) {
           <h2 class="screen-title">Préparation</h2>
           ${rulesButtonHtml("truthmeter")}
         </div>
-        <p class="game-intro">Chacun écrit une affirmation, les autres jugent avec un curseur Fake → Vrai.</p>
+        <p class="game-intro">Chacun écrit une affirmation, les autres jugent avec un curseur Faux → Vrai.</p>
 
         <div class="card">
           <p class="card-heading">Déroulé</p>
-          <p class="hint"><strong>${roundCount}</strong> manche${roundCount > 1 ? "s" : ""} - un auteur par joueur.</p>
-          <p class="hint">0 = Fake · 100 = Vrai · Gros écart auteur/groupe = bonus bluff.</p>
+          <p class="hint"><strong>${roundCount}</strong> manche${roundCount > 1 ? "s" : ""} - un auteur.</p>
+          <p class="hint">0 = Faux · 100 = Vrai · Gros écart auteur/groupe = bonus bluff.</p>
         </div>
 
         <div class="card" id="truth-meter-players">

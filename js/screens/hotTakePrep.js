@@ -266,7 +266,7 @@ export function mountHotTakePrep(app) {
           <h2 class="screen-title">Préparation</h2>
           ${rulesButtonHtml("hottake")}
         </div>
-        <p class="game-intro">Choisis d'abord un thème, puis le nombre de manches. Ajoute tes prises si tu veux.</p>
+        <p class="game-intro">L'admin choisit d'abord un thème, puis le nombre de manches. Ajoute tes takes si tu veux.</p>
 
         <div class="card">
           <p class="card-heading">Banque par thème</p>

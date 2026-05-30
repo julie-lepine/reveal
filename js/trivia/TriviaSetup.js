@@ -19,7 +19,7 @@ export function renderTriviaSetup({
       <h2 class="screen-title">Configuration</h2>
       ${rulesButtonHtml("trivia")}
     </div>
-    <p class="game-intro">Repondez juste, mais surtout vite : une bonne reponse vaut +10 pts, le plus rapide a repondre juste prend +10 pts bonus. La manche se cloture des que tout le monde a repondu.</p>
+    <p class="game-intro">Répondez juste, mais surtout vite : une bonne réponse vaut +10 pts, le plus rapide a répondre juste prend +10 pts bonus. La manche se cloture des que tout le monde a répondu.</p>
 
     <div class="card">
       <p class="card-heading">Theme</p>

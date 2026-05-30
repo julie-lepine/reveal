@@ -274,7 +274,7 @@ export function mountDilemmaPrep(app) {
           <h2 class="screen-title">Préparation</h2>
           ${rulesButtonHtml("dilemma")}
         </div>
-        <p class="game-intro">Choix impossible A vs B - vote et réactions emoji, reveal dès que tout le monde a choisi. Ajoute tes dilemmes si tu veux.</p>
+        <p class="game-intro">Choix impossible A vs B, reveal dès que tout le monde a choisi. Ajoute tes dilemmes si tu veux.</p>
 
         <div class="card">
           <p class="card-heading">Deck de dilemmes</p>

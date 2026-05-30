@@ -55,7 +55,7 @@ function sliderBlockHtml({
       <p class="truth-meter__pct" id="${id}-pct">${v}%</p>
       <p class="truth-meter__label" id="${id}-label">${truthLabel(v)}</p>
       <div class="truth-meter__range-labels">
-        <span>Fake</span>
+        <span>Faux</span>
         <span>Vrai</span>
       </div>
       <input type="range" class="truth-meter__range" id="${id}" min="0" max="100" step="1" value="${v}"
@@ -393,7 +393,7 @@ export function mountTruthMeter(app) {
             id: "author-slider",
             value: draftEstimate,
             question: "Pour toi, cette affirmation est…",
-            hint: "0 = Fake · 100 = Vrai (honnête)",
+            hint: "0 = Faux · 100 = Vrai (honnête)",
           })}
           <button type="button" class="btn btn-primary btn--spaced" id="btn-submit-affirmation">Envoyer →</button>`;
       } else {
@@ -431,7 +431,7 @@ export function mountTruthMeter(app) {
             value: myVote ?? 50,
             disabled: voteLocked,
             question: "À quel point tu crois cette affirmation ?",
-            hint: voteLocked ? "Vote enregistré - en attente des autres…" : "0 = Fake · 100 = Vrai",
+            hint: voteLocked ? "Vote enregistré - en attente des autres…" : "0 = Faux · 100 = Vrai",
           })}
           <button type="button" class="btn btn-primary btn--spaced" id="btn-confirm-vote"
             ${voteLocked ? "disabled" : ""}>Valider mon vote</button>`;
@@ -487,7 +487,7 @@ export function mountTruthMeter(app) {
               title="Position auteur"></span>
           </div>
           <div class="truth-meter__range-labels">
-            <span>Fake</span>
+            <span>Faux</span>
             <span>Vrai</span>
           </div>
           ${awardLine}

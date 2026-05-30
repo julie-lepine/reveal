@@ -119,10 +119,10 @@ export function getThemeBankTexts(themeId, themes = HOT_TAKE_THEMES) {
   return [...(theme?.takes || [])];
 }
 
-export const HOT_TAKE_OPTIONS = ["BASED", "ACCEPTABLE", "CRIMINEL"];
+export const HOT_TAKE_OPTIONS = ["VALIDE", "ACCEPTABLE", "CRIMINEL"];
 
 export const HOT_TAKE_OPTION_COLORS = {
-  BASED: "#4ADE80",
+  VALIDE: "#4ADE80",
   ACCEPTABLE: "#FBBF24",
   CRIMINEL: "#F87171",
 };

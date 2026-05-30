@@ -187,7 +187,7 @@ export function mountSpeedVotePrep(app) {
           <h2 class="screen-title">Préparation</h2>
           ${rulesButtonHtml("speedvote")}
         </div>
-        <p class="game-intro">Vote éclair sur les joueurs du lobby. La manche se clôture dès que tout le monde a voté.</p>
+        <p class="game-intro">Vote éclair sur les joueurs de la soirée. La manche se clôture dès que tout le monde a voté.</p>
 
         <div class="card">
           <p class="card-heading">Thème des questions</p>

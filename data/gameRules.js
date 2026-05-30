@@ -1,6 +1,5 @@
 // Fiches de règles affichées dans la modale « Règles » (écrans de paramétrage + cartes).
 // Contenu volontairement court et concret. Les points correspondent au barème réel des jeux.
-// À peaufiner librement : ton, exemples, formulations.
 
 export const GAME_RULES = {
   playlistguess: {
@@ -41,10 +40,10 @@ export const GAME_RULES = {
   hottake: {
     title: "HotTake",
     emoji: "🔥",
-    but: "Une opinion clivante : suis la majorité, ou assume d'être le rebelle.",
+    but: "Une opinion clivante : vote Valide, Acceptable ou Criminel — suis la majorité ou assume d'être le rebelle.",
     etapes: [
       "Une affirmation s'affiche (ex. « Le sucré-salé, c'est non »).",
-      "Chacun vote D'accord / Pas d'accord.",
+      "Chacun vote : Valide (d'accord), Acceptable (bof), ou Criminel (non).",
       "On révèle la répartition des votes.",
     ],
     points: [
@@ -53,7 +52,7 @@ export const GAME_RULES = {
       "En cas d'égalité parfaite : personne ne marque.",
     ],
     exemple:
-      "5 votent « D'accord », 1 « Pas d'accord ». Les 5 gagnent +10, et le rebelle solo gagne +15.",
+      "5 votent « Valide », 1 « Criminel ». Les 5 gagnent +10, et le rebelle solo gagne +15.",
   },
 
   guesslie: {
@@ -110,10 +109,10 @@ export const GAME_RULES = {
   truthmeter: {
     title: "TruthMeter",
     emoji: "📏",
-    but: "Une affirmation chiffrée et un curseur Fake → Vrai : le groupe estime, l'auteur bluffe ou non.",
+    but: "Une affirmation chiffrée et un curseur Faux → Vrai : le groupe estime, l'auteur bluffe ou non.",
     etapes: [
       "Un joueur fait une affirmation et garde son estimation secrète.",
-      "Le groupe place le curseur entre Fake et Vrai.",
+      "Le groupe place le curseur entre Faux et Vrai.",
       "On compare l'estimation de l'auteur, la moyenne du groupe et la vérité.",
     ],
     points: [
