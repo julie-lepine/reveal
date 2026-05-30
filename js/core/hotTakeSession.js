@@ -161,12 +161,16 @@ export function buildHotTakeDeck() {
     themeId: "custom",
   }));
 
-  const fullDeck = [...bank, ...customs];
+  const totalAvailable = bank.length + customs.length;
   const effective = resolveEffectiveRoundCount(
     session.roundCount ?? 5,
-    fullDeck.length
+    totalAvailable
   );
-  const deck = shuffleArray(fullDeck).slice(0, effective);
+  // Les takes des joueurs sont garanties (dans la limite des manches), le reste vient de la banque.
+  const customsKept = shuffleArray(customs).slice(0, effective);
+  const remaining = Math.max(0, effective - customsKept.length);
+  const bankKept = shuffleArray(bank).slice(0, remaining);
+  const deck = shuffleArray([...customsKept, ...bankKept]);
   const next = { ...session, deck };
   saveStatePatch({ hotTakeGame: next });
   return deck;

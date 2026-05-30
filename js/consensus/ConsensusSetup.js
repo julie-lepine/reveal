@@ -1,4 +1,5 @@
 import { escapeHtml } from "../core/ui.js";
+import { rulesButtonHtml } from "../core/gameRulesUi.js";
 
 export function renderConsensusSetup({
   questionCount,
@@ -12,7 +13,10 @@ export function renderConsensusSetup({
 } = {}) {
   return `
     <p class="label-upper label-upper--gold">🤝 Consensus</p>
-    <h2 class="screen-title">Configuration</h2>
+    <div class="screen-title-row">
+      <h2 class="screen-title">Configuration</h2>
+      ${rulesButtonHtml("consensus")}
+    </div>
     <p class="game-intro">Tout le monde répond avec un slider de 0 à 100. Le but n'est pas d'avoir raison, mais de ressentir où le groupe va se placer.</p>
 
     <!-- Bloc Mode masqué temporairement. On garde la logique derrière pour le réactiver plus tard. -->

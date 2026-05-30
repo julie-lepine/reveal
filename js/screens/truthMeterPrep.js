@@ -10,6 +10,7 @@ import { getActivePlayerNames } from "../core/players.js";
 import { getLobbyParticipants } from "../core/lobby.js";
 import { getLocalDisplayName } from "../core/state.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
+import { rulesButtonHtml } from "../core/gameRulesUi.js";
 import { isGameSyncActive, isLobbyHost, onGameSessionChange } from "../core/gameSync.js";
 import { navigate } from "../core/router.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
@@ -130,7 +131,10 @@ export function mountTruthMeterPrep(app) {
       backTarget: "back",
       content: `
         <p class="label-upper label-upper--gold">📏 TruthMeter</p>
-        <h2 class="screen-title">Préparation</h2>
+        <div class="screen-title-row">
+          <h2 class="screen-title">Préparation</h2>
+          ${rulesButtonHtml("truthmeter")}
+        </div>
         <p class="game-intro">Chacun écrit une affirmation, les autres jugent avec un curseur Fake → Vrai.</p>
 
         <div class="card">

@@ -22,6 +22,7 @@ import { getLobbyParticipants } from "../core/lobby.js";
 import { onLobbyBundleUpdated } from "../core/supabaseLobby.js";
 import { getLocalDisplayName } from "../core/state.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
+import { rulesButtonHtml } from "../core/gameRulesUi.js";
 import {
   isGameSyncActive,
   isLobbyHost,
@@ -269,8 +270,11 @@ export function mountDilemmaPrep(app) {
       backTarget: "back",
       content: `
         <p class="label-upper label-upper--gold">⚖️ Dilemma</p>
-        <h2 class="screen-title">Préparation</h2>
-        <p class="game-intro">Choix impossible A vs B - vote, réactions emoji et reveal en 10 secondes. Ajoute tes dilemmes si tu veux.</p>
+        <div class="screen-title-row">
+          <h2 class="screen-title">Préparation</h2>
+          ${rulesButtonHtml("dilemma")}
+        </div>
+        <p class="game-intro">Choix impossible A vs B - vote et réactions emoji, reveal dès que tout le monde a choisi. Ajoute tes dilemmes si tu veux.</p>
 
         <div class="card">
           <p class="card-heading">Deck de dilemmes</p>

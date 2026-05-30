@@ -1,4 +1,5 @@
 import { escapeHtml } from "../core/ui.js";
+import { rulesButtonHtml } from "../core/gameRulesUi.js";
 
 export function renderTriviaSetup({
   themeId,
@@ -14,8 +15,11 @@ export function renderTriviaSetup({
 } = {}) {
   return `
     <p class="label-upper label-upper--gold">🧠 Trivia Quiz</p>
-    <h2 class="screen-title">Configuration</h2>
-    <p class="game-intro">Repondez juste, mais surtout vite : une bonne reponse vaut +10 pts, le plus rapide prend +10 pts bonus, et le chrono s'arrete des que tout le monde a repondu.</p>
+    <div class="screen-title-row">
+      <h2 class="screen-title">Configuration</h2>
+      ${rulesButtonHtml("trivia")}
+    </div>
+    <p class="game-intro">Repondez juste, mais surtout vite : une bonne reponse vaut +10 pts, le plus rapide a repondre juste prend +10 pts bonus. La manche se cloture des que tout le monde a repondu.</p>
 
     <div class="card">
       <p class="card-heading">Theme</p>

@@ -98,24 +98,45 @@ function bindSlider(app, id, { onInput, disabled } = {}) {
     wrap.addEventListener("pointerdown", (e) => {
       if (input.disabled) return;
       if (e.target.closest("button")) return;
-      e.preventDefault();
-      input.setPointerCapture?.(e.pointerId);
-      setFromClientX(e.clientX);
+      // On ne capture pas tout de suite : on attend de savoir si le geste est
+      // horizontal (réglage du slider) ou vertical (scroll de la page).
+      const startX = e.clientX;
+      const startY = e.clientY;
+      const DRAG_THRESHOLD = 6;
+      let mode = "pending";
+
+      function cleanup() {
+        document.removeEventListener("pointermove", onMove);
+        document.removeEventListener("pointerup", onUp);
+        document.removeEventListener("pointercancel", onCancel);
+      }
 
       const onMove = (ev) => {
+        const dx = ev.clientX - startX;
+        const dy = ev.clientY - startY;
+        if (mode === "pending") {
+          if (Math.abs(dx) < DRAG_THRESHOLD && Math.abs(dy) < DRAG_THRESHOLD) return;
+          if (Math.abs(dy) > Math.abs(dx)) {
+            mode = "scroll";
+            cleanup();
+            return;
+          }
+          mode = "drag";
+          input.setPointerCapture?.(ev.pointerId);
+        }
         if (ev.cancelable) ev.preventDefault();
         setFromClientX(ev.clientX);
       };
       const onUp = (ev) => {
-        input.releasePointerCapture?.(ev.pointerId);
-        document.removeEventListener("pointermove", onMove);
-        document.removeEventListener("pointerup", onUp);
-        document.removeEventListener("pointercancel", onUp);
+        if (mode === "drag") input.releasePointerCapture?.(ev.pointerId);
+        else if (mode === "pending") setFromClientX(ev.clientX);
+        cleanup();
       };
+      const onCancel = () => cleanup();
 
       document.addEventListener("pointermove", onMove, { passive: false });
       document.addEventListener("pointerup", onUp);
-      document.addEventListener("pointercancel", onUp);
+      document.addEventListener("pointercancel", onCancel);
     });
   }
 

@@ -1342,6 +1342,16 @@ button.game-card{
   color:rgba(255,255,255,.3);
 }
 
+select.field-input{
+  cursor:pointer;
+}
+
+/* Options rendues par l'OS : forcer un contraste lisible. */
+select.field-input option{
+  color:#111;
+  background:#fff;
+}
+
 .lie-pick-row{
   display:flex;
   gap:12px;
@@ -3344,6 +3354,145 @@ body{
   text-align:left;
 }
 
+/* ─── Modale Règles (contenu riche) ─── */
+.app-dialog__panel--rich{
+  max-width:420px;
+  text-align:left;
+}
+
+.app-dialog__panel--rich .app-dialog__icon,
+.app-dialog__panel--rich .app-dialog__title{
+  text-align:center;
+}
+
+.app-dialog__panel--rich .app-dialog__title{
+  color:#fff;
+  font-size:15px;
+  letter-spacing:.02em;
+  text-transform:none;
+}
+
+.app-dialog__rich{
+  max-height:min(56vh, 460px);
+  overflow-y:auto;
+  margin:4px 0 20px;
+  padding-right:6px;
+  -webkit-overflow-scrolling:touch;
+}
+
+.rules-modal__but{
+  margin:0 0 16px;
+  font-size:15px;
+  font-weight:600;
+  line-height:1.5;
+  color:rgba(255,255,255,.92);
+}
+
+.rules-modal__section{
+  margin:16px 0 6px;
+  font-size:11px;
+  font-weight:800;
+  letter-spacing:.12em;
+  text-transform:uppercase;
+  color:#FF6B6B;
+}
+
+.rules-modal__list{
+  margin:0;
+  padding-left:20px;
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+}
+
+.rules-modal__list li{
+  font-size:14px;
+  line-height:1.45;
+  color:rgba(255,255,255,.85);
+}
+
+.rules-modal__example{
+  margin:0;
+  padding:12px 14px;
+  border-radius:14px;
+  background:rgba(255,255,255,.06);
+  border:1px solid rgba(255,255,255,.1);
+  font-size:14px;
+  line-height:1.5;
+  font-style:italic;
+  color:rgba(255,255,255,.82);
+}
+
+/* ─── Bouton Règles (en-tête des écrans de paramétrage) ─── */
+.screen-title-row{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+}
+
+.rules-btn{
+  flex-shrink:0;
+  display:inline-flex;
+  align-items:center;
+  gap:5px;
+  padding:6px 12px;
+  border-radius:999px;
+  border:1px solid rgba(255,255,255,.18);
+  background:rgba(255,255,255,.07);
+  color:rgba(255,255,255,.9);
+  font-size:12px;
+  font-weight:700;
+  cursor:pointer;
+  transition:background .15s ease, transform .15s ease;
+}
+
+.rules-btn:active{ transform:scale(.95); }
+
+@media (hover:hover){
+  .rules-btn:hover{ background:rgba(255,255,255,.14); }
+}
+
+.rules-btn__icon{ font-size:14px; line-height:1; }
+
+/* ─── Icône Règles sur les cartes de jeu ─── */
+.game-tile-cell{
+  position:relative;
+  display:flex;
+}
+
+.game-tile-cell .game-tile{
+  width:100%;
+}
+
+.rules-icon-btn{
+  position:absolute;
+  top:8px;
+  right:8px;
+  z-index:2;
+  width:24px;
+  height:24px;
+  border-radius:50%;
+  border:none;
+  background:rgba(5,6,15,.5);
+  color:#fff;
+  font-size:13px;
+  font-weight:800;
+  line-height:1;
+  cursor:pointer;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  backdrop-filter:blur(4px);
+  -webkit-backdrop-filter:blur(4px);
+}
+
+.rules-icon-btn:active{ transform:scale(.9); }
+
+@media (hover:hover){
+  .rules-icon-btn:hover{ background:rgba(5,6,15,.75); }
+}
+
 .sr-only{
   position:absolute;
   width:1px;
@@ -3365,7 +3514,8 @@ body{
 .truth-meter__slider-wrap{
   margin:20px 0;
   text-align:center;
-  touch-action:none;
+  /* pan-y : on laisse le scroll vertical de la page, le réglage horizontal est géré en JS. */
+  touch-action:pan-y;
   user-select:none;
   -webkit-user-select:none;
 }
@@ -3419,7 +3569,7 @@ body{
   padding:0;
   background:transparent;
   cursor:pointer;
-  touch-action:none;
+  touch-action:pan-y;
 }
 
 .truth-meter__range:disabled{

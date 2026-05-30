@@ -16,6 +16,7 @@ import {
 import { getLobbyParticipants } from "../core/lobby.js";
 import { getLocalDisplayName } from "../core/state.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
+import { rulesButtonHtml } from "../core/gameRulesUi.js";
 import { isGameSyncActive, isLobbyHost, onGameSessionChange } from "../core/gameSync.js";
 import { navigate } from "../core/router.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
@@ -182,8 +183,11 @@ export function mountSpeedVotePrep(app) {
       backTarget: "back",
       content: `
         <p class="label-upper label-upper--gold">⚡ SpeedVote</p>
-        <h2 class="screen-title">Préparation</h2>
-        <p class="game-intro">Vote éclair sur les joueurs du lobby - 7 secondes par manche.</p>
+        <div class="screen-title-row">
+          <h2 class="screen-title">Préparation</h2>
+          ${rulesButtonHtml("speedvote")}
+        </div>
+        <p class="game-intro">Vote éclair sur les joueurs du lobby. La manche se clôture dès que tout le monde a voté.</p>
 
         <div class="card">
           <p class="card-heading">Thème des questions</p>

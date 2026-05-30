@@ -1,6 +1,7 @@
 import { setLocalGuessLieSubmission } from "../core/state.js";
 import { navigate } from "../core/router.js";
 import { logoHtml, pageShell } from "../core/ui.js";
+import { rulesButtonHtml } from "../core/gameRulesUi.js";
 import { bindNav } from "./nav.js";
 
 export function mountGuessLieSetup(app) {
@@ -13,7 +14,10 @@ export function mountGuessLieSetup(app) {
         ${logoHtml({ className: "app-logo app-logo--sm" })}
       </div>
       <p class="label-upper label-upper--green">🕵️ Guess The Lie</p>
-      <h2 class="screen-title">Prépare tes 3 affirmations</h2>
+      <div class="screen-title-row">
+        <h2 class="screen-title">Prépare tes 3 affirmations</h2>
+        ${rulesButtonHtml("guesslie")}
+      </div>
       <p class="game-intro">
         Écris <strong>2 vérités</strong> et <strong>1 mensonge</strong> sur toi, puis choisis la lettre du mensonge.
       </p>

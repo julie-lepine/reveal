@@ -1,8 +1,8 @@
 import {
-  FIL_ROUGE_MIN_WORD_LENGTH,
   FIL_ROUGE_MIN_PLAYERS,
   FIL_ROUGE_STATUS,
   FIL_ROUGE_TILE,
+  getFilRougeWordChoices,
 } from "../../data/filRouge.js";
 import {
   getFilRougeSession,
@@ -162,10 +162,13 @@ export function mountFilRougeSetup(app) {
             ? myWord
             : `
         <div class="card fil-rouge-setup__form">
-          <label class="field-label" for="fil-rouge-word">Ton mot interdit</label>
-          <input type="text" class="field-input" id="fil-rouge-word" maxlength="40"
-            placeholder="Minimum ${FIL_ROUGE_MIN_WORD_LENGTH} lettres" autocomplete="off"
-            autocapitalize="off" spellcheck="false" inputmode="text" />
+          <label class="field-label" for="fil-rouge-word">Choisis ton mot interdit</label>
+          <select class="field-input" id="fil-rouge-word">
+            <option value="" disabled selected>Choisis un mot…</option>
+            ${getFilRougeWordChoices(localUid)
+              .map((w) => `<option value="${escapeHtml(w)}">${escapeHtml(w)}</option>`)
+              .join("")}
+          </select>
           <button type="button" class="btn btn-primary btn--spaced" id="fil-rouge-submit">Enregistrer mon mot</button>
         </div>`
         }
@@ -188,13 +191,22 @@ export function mountFilRougeSetup(app) {
       wordInput.value = preservedDraft;
       if (refocusInput) {
         wordInput.focus();
-        const len = wordInput.value.length;
-        wordInput.setSelectionRange(len, len);
+        if (typeof wordInput.setSelectionRange === "function") {
+          const len = wordInput.value.length;
+          wordInput.setSelectionRange(len, len);
+        }
       }
     }
 
     app.querySelector("#fil-rouge-submit")?.addEventListener("click", async () => {
       const word = app.querySelector("#fil-rouge-word")?.value || "";
+      if (!word) {
+        await showAppAlert("Choisis un mot dans la liste.", {
+          title: "Mot interdit",
+          icon: "⚠️",
+        });
+        return;
+      }
       try {
         const res = await submitFilRougeWord(word);
         if (!res.ok) {

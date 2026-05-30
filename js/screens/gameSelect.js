@@ -1,4 +1,6 @@
 import { GAMES_AVAILABLE } from "../../data/games.js";
+import { RULES_KEY_BY_NAV } from "../../data/gameRules.js";
+import { rulesIconButtonHtml } from "../core/gameRulesUi.js";
 import { getEveningRecap } from "../core/eveningRecap.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
 import {
@@ -150,14 +152,18 @@ function gameTileMarkup(g) {
       </div>`;
   }
 
+  const rulesKey = RULES_KEY_BY_NAV[g.id];
   return `
-    <button type="button" class="game-tile ${escapeHtml(g.cssClass)}" data-nav="${escapeHtml(g.id)}">
-      ${visual}
-      <div class="game-tile__text">
-        <span class="game-tile__title">${escapeHtml(g.title)}</span>
-        <span class="game-tile__desc">${escapeHtml(g.desc)}</span>
-      </div>
-    </button>`;
+    <div class="game-tile-cell">
+      <button type="button" class="game-tile ${escapeHtml(g.cssClass)}" data-nav="${escapeHtml(g.id)}">
+        ${visual}
+        <div class="game-tile__text">
+          <span class="game-tile__title">${escapeHtml(g.title)}</span>
+          <span class="game-tile__desc">${escapeHtml(g.desc)}</span>
+        </div>
+      </button>
+      ${rulesKey ? rulesIconButtonHtml(rulesKey) : ""}
+    </div>`;
 }
 
 function gameGridSection(label, games) {

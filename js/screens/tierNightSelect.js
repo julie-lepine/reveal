@@ -3,6 +3,7 @@ import { setTierNightTopicId } from "../core/state.js";
 import { navigate } from "../core/router.js";
 import { isGameSyncActive, isLobbyHost, syncTierNightSession } from "../core/gameSync.js";
 import { escapeHtml, pageShell, tierLogoHtml, bindTierLogos } from "../core/ui.js";
+import { rulesButtonHtml } from "../core/gameRulesUi.js";
 import { bindNav } from "./nav.js";
 import { showAppAlert, showAppConfirm } from "../core/dialog.js";
 
@@ -103,7 +104,10 @@ export function mountTierNightSelect(app) {
     backTarget: "back",
     content: `
       <p class="label-upper label-upper--gold">🏆 Tier Night</p>
-      <h2 class="screen-title">Choisis une tier list</h2>
+      <div class="screen-title-row">
+        <h2 class="screen-title">Choisis une tier list</h2>
+        ${rulesButtonHtml("tiernight")}
+      </div>
       <p class="game-intro">Sélectionne un thème ou crée le tien.</p>
 
       <button type="button" class="card card--clickable card--highlight card--create-tier" data-nav="tiernight-create">

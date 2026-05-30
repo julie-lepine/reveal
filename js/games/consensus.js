@@ -81,24 +81,45 @@ function bindConsensusSlider(app, { onInput } = {}) {
     wrap.dataset.dragBound = "1";
     wrap.addEventListener("pointerdown", (event) => {
       if (event.target.closest("button")) return;
-      event.preventDefault();
-      input.setPointerCapture?.(event.pointerId);
-      setFromClientX(event.clientX);
+      // On ne capture pas tout de suite : on attend de savoir si le geste est
+      // horizontal (réglage du slider) ou vertical (scroll de la page).
+      const startX = event.clientX;
+      const startY = event.clientY;
+      const DRAG_THRESHOLD = 6;
+      let mode = "pending";
+
+      function cleanup() {
+        document.removeEventListener("pointermove", onMove);
+        document.removeEventListener("pointerup", onUp);
+        document.removeEventListener("pointercancel", onCancel);
+      }
 
       const onMove = (moveEvent) => {
+        const dx = moveEvent.clientX - startX;
+        const dy = moveEvent.clientY - startY;
+        if (mode === "pending") {
+          if (Math.abs(dx) < DRAG_THRESHOLD && Math.abs(dy) < DRAG_THRESHOLD) return;
+          if (Math.abs(dy) > Math.abs(dx)) {
+            mode = "scroll";
+            cleanup();
+            return;
+          }
+          mode = "drag";
+          input.setPointerCapture?.(moveEvent.pointerId);
+        }
         if (moveEvent.cancelable) moveEvent.preventDefault();
         setFromClientX(moveEvent.clientX);
       };
       const onUp = (upEvent) => {
-        input.releasePointerCapture?.(upEvent.pointerId);
-        document.removeEventListener("pointermove", onMove);
-        document.removeEventListener("pointerup", onUp);
-        document.removeEventListener("pointercancel", onUp);
+        if (mode === "drag") input.releasePointerCapture?.(upEvent.pointerId);
+        else if (mode === "pending") setFromClientX(upEvent.clientX);
+        cleanup();
       };
+      const onCancel = () => cleanup();
 
       document.addEventListener("pointermove", onMove, { passive: false });
       document.addEventListener("pointerup", onUp);
-      document.addEventListener("pointercancel", onUp);
+      document.addEventListener("pointercancel", onCancel);
     });
   }
 

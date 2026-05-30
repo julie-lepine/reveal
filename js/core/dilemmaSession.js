@@ -124,9 +124,13 @@ export function buildDilemmaDeck() {
   const customs = (session.customDilemmas || [])
     .map(normalizeCustomDilemma)
     .filter(Boolean);
-  const fullDeck = [...bank, ...customs];
-  const effective = resolveEffectiveRoundCount(session.roundCount ?? 8, fullDeck.length);
-  const deck = shuffleArray(fullDeck).slice(0, effective);
+  const totalAvailable = bank.length + customs.length;
+  const effective = resolveEffectiveRoundCount(session.roundCount ?? 8, totalAvailable);
+  // Les dilemmes des joueurs sont garantis (dans la limite des manches), le reste vient de la banque.
+  const customsKept = shuffleArray(customs).slice(0, effective);
+  const remaining = Math.max(0, effective - customsKept.length);
+  const bankKept = shuffleArray(bank).slice(0, remaining);
+  const deck = shuffleArray([...customsKept, ...bankKept]);
   const next = { ...session, deck };
   saveStatePatch({ dilemmaGame: next });
   return deck;

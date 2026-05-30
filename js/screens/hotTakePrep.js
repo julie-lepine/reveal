@@ -23,6 +23,7 @@ import { getLobbyParticipants } from "../core/lobby.js";
 import { onLobbyBundleUpdated } from "../core/supabaseLobby.js";
 import { getLocalDisplayName } from "../core/state.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
+import { rulesButtonHtml } from "../core/gameRulesUi.js";
 import { isGameSyncActive, isLobbyHost, onGameSessionChange } from "../core/gameSync.js";
 import { navigate } from "../core/router.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
@@ -261,7 +262,10 @@ export function mountHotTakePrep(app) {
       backTarget: "back",
       content: `
         <p class="label-upper label-upper--hot">🔥 Hot Take</p>
-        <h2 class="screen-title">Préparation</h2>
+        <div class="screen-title-row">
+          <h2 class="screen-title">Préparation</h2>
+          ${rulesButtonHtml("hottake")}
+        </div>
         <p class="game-intro">Choisis d'abord un thème, puis le nombre de manches. Ajoute tes prises si tu veux.</p>
 
         <div class="card">

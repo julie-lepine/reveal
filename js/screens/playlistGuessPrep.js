@@ -15,6 +15,7 @@ import {
 } from "../core/playlistGuessSession.js";
 import { getLobbyParticipants } from "../core/lobby.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
+import { rulesButtonHtml } from "../core/gameRulesUi.js";
 import { isGameSyncActive, isLobbyHost, onGameSessionChange } from "../core/gameSync.js";
 import { navigate } from "../core/router.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
@@ -161,7 +162,10 @@ export function mountPlaylistGuessPrep(app) {
       backTarget: "back",
       content: `
         <p class="label-upper label-upper--purple">🎵 VibeCheck</p>
-        <h2 class="screen-title">Préparation</h2>
+        <div class="screen-title-row">
+          <h2 class="screen-title">Préparation</h2>
+          ${rulesButtonHtml("playlistguess")}
+        </div>
         <p class="game-intro">Une chanson tirée au sort - votez à qui elle correspond le mieux. Le plus voté marque, la majorité aussi. <span class="muted">${PLAYLIST_GUESS_MIN_PLAYERS} joueurs minimum.</span></p>
 
         <div id="pg-min-players"></div>

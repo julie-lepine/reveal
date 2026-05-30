@@ -66,6 +66,50 @@ export function showAppAlert(message, { title = "REVEAL", confirmLabel = "OK", i
 }
 
 /**
+ * Pop-up avec contenu HTML mis en forme (de confiance, non échappé).
+ * Utilisée pour les fiches de règles. Panneau scrollable.
+ * @returns {Promise<void>}
+ */
+export function showAppRichDialog({ title = "REVEAL", icon = "✨", bodyHtml = "", confirmLabel = "Compris !" } = {}) {
+  return new Promise((resolve) => {
+    if (openDialog) {
+      removeDialog(openDialog, () => {});
+      openDialog = null;
+    }
+
+    const root = document.createElement("div");
+    root.className = "app-dialog";
+    root.setAttribute("role", "dialog");
+    root.setAttribute("aria-modal", "true");
+    root.setAttribute("aria-labelledby", "app-dialog-title");
+
+    const close = () => removeDialog(root, resolve);
+
+    root.innerHTML = `
+      <div class="app-dialog__backdrop" data-dialog-dismiss aria-hidden="true"></div>
+      <div class="app-dialog__panel app-dialog__panel--rich">
+        <div class="app-dialog__glow" aria-hidden="true"></div>
+        <p class="app-dialog__icon" aria-hidden="true">${icon}</p>
+        <p class="app-dialog__title" id="app-dialog-title">${escapeHtml(title)}</p>
+        <div class="app-dialog__rich">${bodyHtml}</div>
+        <button type="button" class="btn btn-primary app-dialog__btn" data-dialog-ok>${escapeHtml(confirmLabel)}</button>
+      </div>
+    `;
+
+    root.querySelector("[data-dialog-ok]")?.addEventListener("click", close);
+    root.querySelector("[data-dialog-dismiss]")?.addEventListener("click", close);
+    root.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") close();
+    });
+
+    document.body.appendChild(root);
+    openDialog = root;
+    requestAnimationFrame(() => root.classList.add("app-dialog--in"));
+    root.querySelector("[data-dialog-ok]")?.focus();
+  });
+}
+
+/**
  * Confirmation (ex. suppression). Retourne true si confirmé.
  * @returns {Promise<boolean>}
  */
