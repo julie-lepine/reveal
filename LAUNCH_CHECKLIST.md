@@ -90,12 +90,16 @@ Réplication activée sur : `lobbies`, `lobby_members`, `lobby_messages`, `game_
 
 ---
 
-## 6. Pas bloquant pour la v1 web
+## 6. App native (stores)
 
-- Refactor architecture (métier / DOM)
-- Verrouillage viewport 100vh sur tous les jeux
-- Connexion Facebook / Instagram
-- **App native Capacitor** → voir [CAPACITOR.md](./CAPACITOR.md) (phase 2)
+Checklist complète : **[STORE_CHECKLIST.md](./STORE_CHECKLIST.md)**
+
+- Capacitor + AdMob + deep links + privacy : **code prêt**
+- Reste : test device, assets store, build signé, soumission Play / App Store
+
+---
+
+## 7. Pas bloquant pour la v1 web
 
 ---
 

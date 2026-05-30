@@ -3,9 +3,19 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --test tests/sessionMerge.test.js tests/deckCodec.test.js"
+    "test": "node --test tests/sessionMerge.test.js tests/deckCodec.test.js",
+    "cap:sync-web": "node scripts/syncCapWeb.mjs",
+    "cap:sync": "npm run cap:sync-web && npx cap sync && node scripts/patchNative.mjs",
+    "cap:open:android": "npx cap open android",
+    "cap:open:ios": "npx cap open ios"
   },
   "dependencies": {
+    "@capacitor-community/admob": "^8.0.0",
+    "@capacitor/android": "^8.3.4",
+    "@capacitor/app": "^8.1.0",
+    "@capacitor/cli": "^8.3.4",
+    "@capacitor/core": "^8.3.4",
+    "@capacitor/ios": "^8.3.4",
     "@supabase/supabase-js": "^2.49.1"
   }
 }

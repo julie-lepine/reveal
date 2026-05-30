@@ -94,6 +94,12 @@ export function mountSettings(app) {
               ? `<p class="hint settings-social-hint">Compte ${escapeHtml(user.provider || "social")} - le mot de passe se gère chez le fournisseur.</p>`
               : ""
         }
+
+        <div class="card settings-section">
+          <h2 class="settings-section__title">Légal</h2>
+          <p class="hint settings-section__hint">Politique de confidentialité (RGPD, AdMob, Supabase).</p>
+          <button type="button" class="btn btn-secondary btn--spaced" data-nav="privacy">Politique de confidentialité</button>
+        </div>
       `,
     });
 

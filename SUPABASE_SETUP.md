@@ -46,6 +46,7 @@ Dans **Authentication → URL Configuration**, ajoute :
 - `http://localhost:5500` (ou ton serveur local)
 - `https://ton-domaine.com`
 - Même URL + chemin exact que `index.html` (ex. `http://127.0.0.1:5500/index.html`)
+- **App native (Capacitor)** : `com.reveal.partygames://auth/callback`
 
 Dans l’app Meta (Facebook Login), ajoute les mêmes URLs dans **Valid OAuth Redirect URIs** (format Supabase : `https://TON_PROJECT.supabase.co/auth/v1/callback`).
 

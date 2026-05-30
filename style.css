@@ -62,9 +62,34 @@ body.has-bottom-nav .page{
   padding-bottom:calc(88px + env(safe-area-inset-bottom, 0px));
 }
 
-button{
-  font-family:'Inter',sans-serif;
-  touch-action:manipulation;
+body.has-top-ad .page{
+  padding-top:calc(var(--page-pad) + var(--ad-banner-height, 50px) + env(safe-area-inset-top, 0px));
+}
+
+body.has-top-ad.has-bottom-nav .page{
+  padding-top:calc(var(--page-pad) + var(--ad-banner-height, 50px) + env(safe-area-inset-top, 0px));
+}
+
+.privacy-section__title{
+  font-size:1rem;
+  font-weight:700;
+  margin:0 0 .35rem;
+}
+
+.privacy-section__body{
+  margin:0 0 1rem;
+  color:var(--color-muted, #94a3b8);
+  font-size:.92rem;
+  line-height:1.55;
+}
+
+.privacy-section:last-child .privacy-section__body{
+  margin-bottom:0;
+}
+
+.privacy-external a{
+  color:var(--color-accent, #a78bfa);
+  word-break:break-all;
 }
 
 .page{

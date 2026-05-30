@@ -8,12 +8,42 @@ import {
   markPasswordResetRateLimited,
   passwordResetCooldownMessage,
 } from "./passwordResetCooldown.js";
+import { isNativeApp } from "./platform.js";
+import { NATIVE_AUTH_REDIRECT } from "../../data/appConfig.js";
 
 const PASSWORD_RECOVERY_KEY = "reveal-pending-password-reset";
 
-function redirectUrl() {
+export function getAuthRedirectUrl() {
+  if (isNativeApp()) return NATIVE_AUTH_REDIRECT;
   const base = window.location.origin + window.location.pathname;
   return base.replace(/\/$/, "") || base;
+}
+
+export function parseAuthParamsFromUrl(rawUrl) {
+  const url = String(rawUrl || "");
+  const hashIdx = url.indexOf("#");
+  const qIdx = url.indexOf("?");
+
+  let hash = hashIdx >= 0 ? url.slice(hashIdx + 1) : "";
+  let search = "";
+  if (qIdx >= 0) {
+    const end = hashIdx >= 0 ? hashIdx : url.length;
+    search = url.slice(qIdx + 1, end);
+  }
+
+  return {
+    hashParams: new URLSearchParams(hash),
+    searchParams: new URLSearchParams(search),
+    hash,
+    search,
+  };
+}
+
+function isRecoveryAuthParams(hashParams, searchParams) {
+  return (
+    hashParams.get("type") === "recovery" ||
+    searchParams.get("type") === "recovery"
+  );
 }
 
 export function isPasswordRecoveryPending() {
@@ -26,13 +56,6 @@ export function setPasswordRecoveryPending() {
 
 export function clearPasswordRecoveryPending() {
   sessionStorage.removeItem(PASSWORD_RECOVERY_KEY);
-}
-
-function isRecoveryAuthParams(hashParams, searchParams) {
-  return (
-    hashParams.get("type") === "recovery" ||
-    searchParams.get("type") === "recovery"
-  );
 }
 
 function providerFromUser(user) {
@@ -81,22 +104,56 @@ export async function syncSessionToState(session) {
   });
 }
 
-export async function initSupabaseAuth() {
-  if (!isSupabaseConfigured()) return;
+/** Traite un retour auth (navigateur ou deep link `com.reveal.partygames://…`). */
+export async function handleAuthRedirectUrl(rawUrl) {
+  if (!isSupabaseConfigured() || !rawUrl) {
+    return { handled: false, recovery: false };
+  }
 
-  const searchParams = new URLSearchParams(window.location.search);
-  const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+  const { hashParams, searchParams, hash, search } = parseAuthParamsFromUrl(rawUrl);
+  const hasHashAuth =
+    hashParams.get("access_token") ||
+    hashParams.get("error_description") ||
+    hashParams.get("error");
+  const authCode = searchParams.get("code");
+
+  if (!hasHashAuth && !authCode) {
+    return { handled: false, recovery: false };
+  }
 
   if (isRecoveryAuthParams(hashParams, searchParams)) {
     setPasswordRecoveryPending();
   }
 
-  if (hashParams.get("access_token") || hashParams.get("error_description")) {
+  if (authCode) {
+    const { data, error } = await supabase.auth.exchangeCodeForSession(authCode);
+    if (error) console.warn("Supabase auth code:", error.message);
+    if (data.session) await syncSessionToState(data.session);
+  } else if (hasHashAuth) {
+    const next =
+      window.location.pathname +
+      (search ? `?${search}` : "") +
+      (hash ? `#${hash}` : "");
+    window.history.replaceState(null, "", next);
     const { data, error } = await supabase.auth.getSession();
     if (error) console.warn("Supabase auth redirect:", error.message);
     if (data.session) await syncSessionToState(data.session);
     window.history.replaceState(null, "", window.location.pathname + window.location.search);
   }
+
+  return {
+    handled: true,
+    recovery: isPasswordRecoveryPending(),
+  };
+}
+
+export async function initSupabaseAuth() {
+  if (!isSupabaseConfigured()) return;
+
+  const windowUrl =
+    window.location.href ||
+    `${window.location.origin}${window.location.pathname}${window.location.search}${window.location.hash}`;
+  await handleAuthRedirectUrl(windowUrl);
 
   const { data } = await supabase.auth.getSession();
   if (data.session) await syncSessionToState(data.session);
@@ -221,7 +278,7 @@ export async function signInWithOAuth(provider) {
   const { error } = await supabase.auth.signInWithOAuth({
     provider,
     options: {
-      redirectTo: redirectUrl(),
+      redirectTo: getAuthRedirectUrl(),
     },
   });
   if (error) return { ok: false, error: error.message };
@@ -247,7 +304,7 @@ export async function sendPasswordResetEmail(email, captchaToken = null) {
     };
   }
 
-  const resetOptions = { redirectTo: redirectUrl() };
+  const resetOptions = { redirectTo: getAuthRedirectUrl() };
   if (captchaToken) resetOptions.captchaToken = captchaToken;
 
   const { error } = await supabase.auth.resetPasswordForEmail(trimmed, resetOptions);

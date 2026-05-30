@@ -1,5 +1,7 @@
 import { initRouter, registerScreen, navigate, resetNav } from "./core/router.js";
 import { initBottomNav } from "./core/bottomNav.js";
+import { initAds } from "./core/ads.js";
+import { initDeepLinks } from "./core/deepLinks.js";
 import {
   parseJoinCodeFromHash,
   hasActiveLobby,
@@ -27,6 +29,7 @@ import { mountDilemmaPrep } from "./screens/dilemmaPrep.js";
 import { mountTriviaSetup } from "./screens/triviaSetup.js";
 import { mountConsensusSetup } from "./screens/consensusSetup.js";
 import { mountSettings } from "./screens/settings.js";
+import { mountPrivacy } from "./screens/privacy.js";
 import { mountHotTake } from "./games/hotTake.js";
 import { mountSpeedVote } from "./games/speedVote.js";
 import { mountPlaylistGuess } from "./games/playlistGuess.js";
@@ -60,6 +63,7 @@ initRouter(app);
 registerScreen("home", mountHome);
 registerScreen("reset-password", mountResetPassword);
 registerScreen("settings", mountSettings);
+registerScreen("privacy", mountPrivacy);
 registerScreen("lobby", mountLobby);
 registerScreen("game-select", mountGameSelect);
 registerScreen("results", mountResults);
@@ -90,10 +94,12 @@ registerScreen("filrouge-setup", mountFilRougeSetup);
 registerScreen("filrouge-mission", mountFilRougeMission);
 
 initBottomNav();
+initAds();
 initFilRougeResultsListener();
 initFilRougeValidationListener();
 
 async function boot() {
+  await initDeepLinks();
   await initSupabaseAuth();
   await reconcileLobbyMembership();
   resetNav();
