@@ -38,7 +38,19 @@ Réf. [SUPABASE_SETUP.md](./SUPABASE_SETUP.md)
   - `com.reveal.partygames://**` (wildcard si proposé)
   - Garder l’URL web GitHub Pages si tu maintiens la version web
 - [x] Anonymous + Email activés
-- [ ] Realtime + SQL à jour
+- [x] Realtime + SQL à jour
+
+---
+
+## C bis. Emails Resend + OVH (manuel)
+
+Guide pas à pas : **[RESEND_SETUP.md](./RESEND_SETUP.md)**
+
+- [ ] Domaine ajouté dans **Resend**
+- [ ] **En cours** : enregistrements DNS (TXT / DKIM…) dans **OVH → Zone DNS** — Resend vérifie la propagation
+- [ ] Statut domaine **Verified** dans Resend
+- [ ] Clé API Resend → **Supabase → SMTP Settings** (`smtp.resend.com`, sender `noreply@…`)
+- [ ] 🧪 Test **mot de passe oublié** (web + app native deep link)
 
 ---
 
@@ -58,7 +70,7 @@ npm run cap:open:android   # ou cap:open:ios sur Mac
 
 - [ ] 🧪 Lancer sur **1 Android** + **1 iPhone**
 - [ ] 🧪 Auth email + invité + lobby multijoueur
-- [ ] 🧪 Reset mot de passe → retour dans l’app via deep link
+- [ ] 🧪 Reset mot de passe → mail Resend reçu → retour dans l’app via deep link
 - [ ] 🧪 Bannière AdMob visible (menu) / masquée (manche)
 - [ ] 🧪 Formulaire consentement pub (UE)
 - [ ] 🧪 Soirée pilote complète en APK/IPA debug
@@ -128,6 +140,7 @@ npm run cap:open:android   # ou cap:open:ios sur Mac
 | [data/appConfig.js](./data/appConfig.js) | Bundle ID, deep link, URL privacy |
 | [data/privacyPolicy.js](./data/privacyPolicy.js) | Texte RGPD in-app |
 | [privacy.html](./privacy.html) | Page publique pour les stores |
+| [RESEND_SETUP.md](./RESEND_SETUP.md) | DNS OVH + SMTP Supabase |
 | [ADMOB.md](./ADMOB.md) | Doc technique AdMob |
 | [CAPACITOR.md](./CAPACITOR.md) | Vue d’ensemble Capacitor |
 

@@ -78,3 +78,15 @@ Le client charge `@supabase/supabase-js` via `esm.sh` dans le navigateur ; `npm 
 2. Inscription email → créer un lobby → code + QR visibles.
 3. Autre navigateur / navigation privée → onglet Invité → code ou lien → participants en temps réel.
 4. Facebook : redirection Meta puis retour sur l’app avec session active.
+
+## 7. Emails (Resend + OVH)
+
+Les mails d’auth (reset mot de passe, etc.) passent par **Resend** en SMTP custom Supabase.
+
+→ Guide complet : **[RESEND_SETUP.md](./RESEND_SETUP.md)**
+
+Résumé :
+
+1. Domaine vérifié dans Resend (DNS OVH : TXT, DKIM…)
+2. Supabase → **Authentication → SMTP Settings** → `smtp.resend.com`
+3. Tester « Mot de passe oublié » depuis l’app

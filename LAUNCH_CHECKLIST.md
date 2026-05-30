@@ -55,10 +55,17 @@ Référence détaillée : [SUPABASE_SETUP.md](./SUPABASE_SETUP.md)
 
 Réplication activée sur : `lobbies`, `lobby_members`, `lobby_messages`, `game_sessions` (+ `fil_rouge_private` si Fil Rouge privé)
 
-### Emails
+### Emails (Resend + OVH)
 
+Guide détaillé : **[RESEND_SETUP.md](./RESEND_SETUP.md)**
+
+- [ ] Compte **Resend** créé, domaine ajouté
+- [ ] Enregistrements DNS (**TXT / DKIM / SPF**) ajoutés dans **OVH → Zone DNS**
+- [ ] Domaine **Verified** dans Resend (fin de « Checking DNS »)
+- [ ] Clé API Resend (`re_…`) créée
+- [ ] **Supabase → Authentication → SMTP Settings** : custom SMTP `smtp.resend.com` + sender `@ton-domaine`
 - [ ] Template reset MDP (optionnel) : `supabase/email-reset-password.html`
-- [ ] Quotas email OK ou SMTP (Resend) si beaucoup d’inscriptions / resets
+- [ ] Test : **Mot de passe oublié** depuis l’app → mail reçu + lien OK
 
 ---
 
@@ -113,6 +120,8 @@ Checklist complète : **[STORE_CHECKLIST.md](./STORE_CHECKLIST.md)**
 | Invité impossible | Anonymous sign-ins dans Supabase |
 | Sync multijoueur cassée | Realtime + `game-sessions.sql` + politiques RLS |
 | VibeCheck bloqué | 3 joueurs min ; jaquettes via `node scripts/fetchVibeCheckCovers.mjs` |
+| Pas de mail reset MDP | [RESEND_SETUP.md](./RESEND_SETUP.md) — DNS OVH + SMTP Supabase |
+| Mail reset en spam | DKIM vérifié dans Resend ; sender = domaine vérifié |
 
 ---
 
