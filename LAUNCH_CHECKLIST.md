@@ -20,7 +20,6 @@ Fichiers de config à ne pas oublier en prod (déjà dans le repo si tu as commi
 |---------|------|
 | `js/config/supabase.js` | URL + clé anon |
 | `js/config/turnstile.js` | Site Key Cloudflare |
-| `js/config/spotify.js` | VibeCheck (optionnel) |
 
 ---
 
@@ -72,15 +71,7 @@ Réplication activée sur : `lobbies`, `lobby_members`, `lobby_messages`, `game_
 
 ---
 
-## 4. Spotify — VibeCheck (optionnel)
-
-- [ ] App Spotify Developer : mode **Development** + amis dans **Users and Access**
-- [ ] Redirect URI : `https://julie-lepine.github.io/reveal/`
-- [ ] Test avec **≥ 3 joueurs** connectés Spotify
-
----
-
-## 5. Test soirée pilote (~30 min, 3–4 personnes)
+## 4. Test soirée pilote (~30 min, 3–4 personnes)
 
 - [ ] Hôte : compte email → créer lobby → code / QR
 - [ ] Invité : onglet **Invité** + code (ou 2e navigateur / téléphone)
@@ -91,7 +82,7 @@ Réplication activée sur : `lobbies`, `lobby_members`, `lobby_messages`, `game_
 
 ---
 
-## 6. Contenu & jeux
+## 5. Contenu & jeux
 
 - [ ] Questions à jour dans `data/*.js` (commit + push faits)
 - [ ] Blind Test retiré du menu si tu ne le veux pas (`data/games.js`)
@@ -99,7 +90,7 @@ Réplication activée sur : `lobbies`, `lobby_members`, `lobby_messages`, `game_
 
 ---
 
-## 7. Pas bloquant pour la v1 web
+## 6. Pas bloquant pour la v1 web
 
 - Refactor architecture (métier / DOM)
 - Verrouillage viewport 100vh sur tous les jeux
@@ -117,8 +108,8 @@ Réplication activée sur : `lobbies`, `lobby_members`, `lobby_messages`, `game_
 | Turnstile 600010 | Hostname Cloudflare, bloqueur, ou widget dans onglet caché |
 | Invité impossible | Anonymous sign-ins dans Supabase |
 | Sync multijoueur cassée | Realtime + `game-sessions.sql` + politiques RLS |
-| VibeCheck bloqué | Spotify Development + 3 joueurs min |
+| VibeCheck bloqué | 3 joueurs min ; jaquettes via `node scripts/fetchVibeCheckCovers.mjs` |
 
 ---
 
-**Quand tout est coché en sections 1–5** : tu peux lancer REVEAL en web pour une vraie soirée.
+**Quand tout est coché en sections 1–4** : tu peux lancer REVEAL en web pour une vraie soirée.

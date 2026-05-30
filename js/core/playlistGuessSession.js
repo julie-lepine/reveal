@@ -1,16 +1,13 @@
 import {
-  PLAYLIST_GUESS_DEV_FALLBACK,
   PLAYLIST_GUESS_MIN_PLAYERS,
   PLAYLIST_GUESS_ROUND_DEFAULT,
   PLAYLIST_GUESS_TIMER_SEC,
   PLAYLIST_GUESS_ROUND_PRESETS,
+  PLAYLIST_GUESS_SONGS,
 } from "../../data/playlistGuess.js";
 import { getLobbyParticipants } from "./lobby.js";
 import { getLocalDisplayName, getState, saveStatePatch } from "./state.js";
 import { getSupabaseUserId } from "./supabaseAuth.js";
-import { isSpotifyConnected } from "./spotifyAuth.js";
-import { loadLocalSpotifyLibrary } from "./spotifyLibrary.js";
-import { mergeSongsPool, validateMergedPool } from "./playlistGuessPool.js";
 import { buildPlaylistGuessDeck } from "./playlistGuessRounds.js";
 import {
   isGameSyncActive,
@@ -25,8 +22,6 @@ function defaultSession() {
   return {
     /** Ready map keyed by playerId (userId) to avoid name collisions. */
     ready: {},
-    spotifyByUid: {},
-    librariesByUid: {},
     lobbyStarted: false,
     roundCount: PLAYLIST_GUESS_ROUND_DEFAULT,
     deck: null,
@@ -35,8 +30,6 @@ function defaultSession() {
     votes: {},
     voteEndsAt: null,
     roundScored: false,
-    usedTrackIds: [],
-    connectError: null,
   };
 }
 
@@ -74,103 +67,26 @@ export function isLocalPlaylistGuessHost() {
   return local?.isHost !== false;
 }
 
-export function canUseDevTrackFallback() {
-  return !isGameSyncActive() && !isSpotifyConnected();
-}
-
-export async function buildDevLibraryForLocal() {
-  const id = getLocalParticipantId();
-  const tracks = PLAYLIST_GUESS_DEV_FALLBACK.map((t, i) => ({
-    ...t,
-    spotifyId: `${t.spotifyId}-${id}-${i}`,
-  }));
-  return tracks;
+/** Tous les joueurs du lobby sont des cibles de vote (auto-vote autorisé). */
+export function getVoteTargets() {
+  return lobbyPlayersWithIds();
 }
 
 export function getPlaylistGuessPrepSummary() {
-  const session = getPlaylistGuessSession();
   const players = lobbyPlayersWithIds();
-  const pool = mergeSongsPool(session.librariesByUid);
+  const session = getPlaylistGuessSession();
   const roundCount = session.roundCount ?? PLAYLIST_GUESS_ROUND_DEFAULT;
-  const validation = validateMergedPool(pool, players.length, roundCount);
-  const connectedCount = players.filter((p) => {
-    const meta = session.spotifyByUid?.[p.userId];
-    return meta?.connected && (session.librariesByUid?.[p.userId]?.length || 0) > 0;
-  }).length;
-
+  const poolSize = PLAYLIST_GUESS_SONGS.length;
+  const effective = Math.min(roundCount, poolSize);
   return {
-    poolSize: pool.length,
+    poolSize,
     roundCount,
-    effective: validation.ok ? roundCount : Math.min(roundCount, pool.length),
-    connectedCount,
+    effective,
     playerCount: players.length,
     minPlayersMet: players.length >= PLAYLIST_GUESS_MIN_PLAYERS,
     minPlayers: PLAYLIST_GUESS_MIN_PLAYERS,
-    validation,
-    durationLabel: `~${Math.ceil((roundCount * PLAYLIST_GUESS_TIMER_SEC) / 60)} min`,
+    durationLabel: `~${Math.ceil((effective * PLAYLIST_GUESS_TIMER_SEC) / 60)} min`,
   };
-}
-
-export async function connectAndSyncSpotifyLibrary() {
-  const uid = getLocalParticipantId();
-  let tracks;
-  let errorCode = null;
-
-  try {
-    if (canUseDevTrackFallback()) {
-      tracks = await buildDevLibraryForLocal();
-    } else {
-      tracks = await loadLocalSpotifyLibrary();
-    }
-  } catch (e) {
-    errorCode = e.message || "SPOTIFY_API_FAILURE";
-    const session = getPlaylistGuessSession();
-    await syncPlaylistGuessSession({
-      ...session,
-      spotifyByUid: {
-        ...(session.spotifyByUid || {}),
-        [uid]: { connected: false, trackCount: 0, errorCode },
-      },
-      connectError: errorCode,
-    });
-    throw e;
-  }
-
-  const session = getPlaylistGuessSession();
-  const next = {
-    ...session,
-    librariesByUid: { ...(session.librariesByUid || {}), [uid]: tracks },
-    spotifyByUid: {
-      ...(session.spotifyByUid || {}),
-      [uid]: { connected: true, trackCount: tracks.length, errorCode: null },
-    },
-    connectError: null,
-  };
-  await syncPlaylistGuessSession(next);
-  return tracks;
-}
-
-export async function disconnectLocalSpotify() {
-  const { clearSpotifyToken } = await import("./spotifyAuth.js");
-  clearSpotifyToken();
-  const uid = getLocalParticipantId();
-  const session = getPlaylistGuessSession();
-  const libraries = { ...(session.librariesByUid || {}) };
-  const spotify = { ...(session.spotifyByUid || {}) };
-  delete libraries[uid];
-  delete spotify[uid];
-  await syncPlaylistGuessSession({
-    ...session,
-    librariesByUid: libraries,
-    spotifyByUid: spotify,
-    ready: { ...session.ready, [uid]: false },
-  });
-}
-
-export function isLocalSpotifyReady() {
-  const uid = getLocalParticipantId();
-  const session = getPlaylistGuessSession();
-  return (session.librariesByUid?.[uid]?.length || 0) > 0;
 }
 
 export async function setPlaylistGuessRoundCount(count) {
@@ -189,9 +105,6 @@ export async function setPlaylistGuessReady(playerId, ready) {
 export async function toggleLocalPlaylistGuessReady() {
   const id = getLocalParticipantId();
   const session = getPlaylistGuessSession();
-  if (!session.ready[id] && !isLocalSpotifyReady()) {
-    return { ok: false, error: "SPOTIFY_REQUIRED" };
-  }
   await setPlaylistGuessReady(id, !session.ready[id]);
   return { ok: true };
 }
@@ -206,7 +119,24 @@ export function allPlaylistGuessReady() {
   return ids.length > 0 && ids.every((id) => session.ready[id]);
 }
 
-function votingPayloadForRound(roundIdx, deck) {
+export function simulatePlaylistGuessReady(onUpdate) {
+  const local = getLocalParticipantId();
+  const pool = lobbyPlayersWithIds().filter((p) => p.userId !== local);
+  let i = 0;
+  const id = setInterval(() => {
+    if (i >= pool.length) {
+      clearInterval(id);
+      onUpdate?.();
+      return;
+    }
+    setPlaylistGuessReady(pool[i].userId, true);
+    i += 1;
+    onUpdate?.();
+  }, 500);
+  return () => clearInterval(id);
+}
+
+function votingPayloadForRound(roundIdx) {
   const endsAt = new Date(Date.now() + PLAYLIST_GUESS_TIMER_SEC * 1000).toISOString();
   return {
     roundIdx,
@@ -217,62 +147,21 @@ function votingPayloadForRound(roundIdx, deck) {
   };
 }
 
-/** Mode solo sans Spotify : bibliothèques fictives pour chaque joueur actif. */
-export async function ensureDevLibrariesForSolo() {
-  if (!canUseDevTrackFallback()) return;
-  const session = getPlaylistGuessSession();
-  const libraries = { ...(session.librariesByUid || {}) };
-  const spotify = { ...(session.spotifyByUid || {}) };
-  let changed = false;
-
-  for (const p of lobbyPlayersWithIds()) {
-    if ((libraries[p.userId]?.length || 0) > 0) continue;
-    libraries[p.userId] = PLAYLIST_GUESS_DEV_FALLBACK.map((t, i) => ({
-      ...t,
-      spotifyId: `${t.spotifyId}-${p.userId}-${i}`,
-    }));
-    spotify[p.userId] = {
-      connected: true,
-      trackCount: libraries[p.userId].length,
-      errorCode: null,
-    };
-    changed = true;
-  }
-
-  if (changed) {
-    await syncPlaylistGuessSession({
-      ...session,
-      librariesByUid: libraries,
-      spotifyByUid: spotify,
-    });
-  }
-}
-
 export async function markPlaylistGuessLobbyStarted() {
-  if (canUseDevTrackFallback()) {
-    await ensureDevLibrariesForSolo();
-  }
   const players = lobbyPlayersWithIds();
   if (players.length < PLAYLIST_GUESS_MIN_PLAYERS) {
     throw new Error("NOT_ENOUGH_PLAYERS");
   }
   const session = getPlaylistGuessSession();
-  const pool = mergeSongsPool(session.librariesByUid);
   const roundCount = session.roundCount ?? PLAYLIST_GUESS_ROUND_DEFAULT;
-  const validation = validateMergedPool(pool, players.length, roundCount);
-  if (!validation.ok) {
-    throw new Error(validation.error);
-  }
-
-  const { deck, usedTrackIds } = buildPlaylistGuessDeck(players, pool, roundCount);
+  const { deck } = buildPlaylistGuessDeck(PLAYLIST_GUESS_SONGS, roundCount);
   if (!deck.length) throw new Error("INSUFFICIENT_POOL");
 
   const next = {
     ...session,
     lobbyStarted: true,
     deck,
-    usedTrackIds,
-    ...votingPayloadForRound(0, deck),
+    ...votingPayloadForRound(0),
   };
   saveStatePatch({ playlistGuessGame: next });
 
@@ -303,10 +192,9 @@ export function getPlaylistGuessEntryScreen() {
 }
 
 export async function startPlaylistGuessRound(roundIdx) {
-  const deck = getPlaylistGuessDeck();
   const next = {
     ...getPlaylistGuessSession(),
-    ...votingPayloadForRound(roundIdx, deck),
+    ...votingPayloadForRound(roundIdx),
   };
   await syncPlaylistGuessSession(next);
   return next;
@@ -318,37 +206,31 @@ export async function commitPlaylistGuessPlay(patch) {
   return session;
 }
 
+/** Tous les joueurs du lobby ont voté (auto-vote autorisé, personne n'est exclu). */
 export function allPlaylistGuessVotesIn() {
   const session = getPlaylistGuessSession();
-  const round = getCurrentPlaylistGuessRound();
-  if (!round) return false;
   const votesByUid = session.votes || {};
-  const voterUids = lobbyPlayersWithIds()
-    .map((p) => p.userId)
-    .filter((uid) => uid !== round.ownerPlayerId);
+  const voterUids = lobbyPlayersWithIds().map((p) => p.userId);
   return (
     voterUids.length > 0 &&
     voterUids.every((uid) => votesByUid[uid] != null && votesByUid[uid] !== "")
   );
 }
 
-export function simulatePlaylistGuessVotes(round, localPick) {
+export function simulatePlaylistGuessVotes(_round, localPick) {
   const votes = {};
-  const local = getLocalDisplayName();
   const localUid = getLocalParticipantId();
-  const choices = round.choices.map((c) => c.playerId);
+  const targets = lobbyPlayersWithIds().map((p) => p.userId);
 
-  lobbyPlayersWithIds()
-    .forEach((p) => {
-    if (p.userId === round.ownerPlayerId) return;
+  lobbyPlayersWithIds().forEach((p) => {
     if (p.userId === localUid) {
       if (localPick) votes[p.userId] = localPick;
       return;
     }
-    const pick = choices[Math.floor(Math.random() * choices.length)];
+    const pick = targets[Math.floor(Math.random() * targets.length)];
     votes[p.userId] = pick;
   });
-  if (localPick && localUid !== round.ownerPlayerId) votes[localUid] = localPick;
+  if (localPick) votes[localUid] = localPick;
   return votes;
 }
 

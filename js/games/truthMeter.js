@@ -32,7 +32,6 @@ import { escapeHtml, pageShell } from "../core/ui.js";
 import { bindNav } from "../screens/nav.js";
 import { gameExitBarHtml, bindExitGame } from "../core/exitGame.js";
 import { isEveningGameplayPaused } from "../core/filRougeSession.js";
-import { onTimerSecond, primeTimerSound } from "../core/timerSound.js";
 import {
   isGameSyncActive,
   isLobbyHost,
@@ -136,7 +135,6 @@ export function mountTruthMeter(app) {
 
   let phase = "writing";
   let roundIdx = 0;
-  let timer = TRUTH_METER_VOTE_TIMER_SEC;
   let affirmation = null;
   let authorEstimate = null;
   let votes = {};
@@ -145,7 +143,6 @@ export function mountTruthMeter(app) {
   let draftText = "";
   let lastAward = null;
   let roundScored = false;
-  let intervalId = null;
   let revealAnimId = null;
   let authorRevealed = false;
   let voteCommitInFlight = null;
@@ -157,23 +154,11 @@ export function mountTruthMeter(app) {
 
   const totalRounds = () => getTruthMeterSession().authorOrder?.length || getActivePlayers().length;
 
-  function clearTimer() {
-    if (intervalId) {
-      clearInterval(intervalId);
-      intervalId = null;
-    }
-  }
-
   function cancelRevealAnim() {
     if (revealAnimId) {
       cancelAnimationFrame(revealAnimId);
       revealAnimId = null;
     }
-  }
-
-  function secondsUntil(iso) {
-    if (!iso) return null;
-    return Math.max(0, Math.ceil((new Date(iso).getTime() - Date.now()) / 1000));
   }
 
   function syncFromSession() {
@@ -189,9 +174,6 @@ export function mountTruthMeter(app) {
       votes = { ...votes, [localName]: voteCommitInFlight };
     }
     roundScored = Boolean(s.roundScored);
-    if (phase === "voting" && s.voteEndsAt) {
-      timer = secondsUntil(s.voteEndsAt) ?? timer;
-    }
   }
 
   function votesForAward() {
@@ -343,12 +325,16 @@ export function mountTruthMeter(app) {
       });
     } else {
       phase = "voting";
-      timer = TRUTH_METER_VOTE_TIMER_SEC;
       myVote = null;
       votes = {};
       render();
-      startVoteTimer();
     }
+  }
+
+  /** Filet de sécurité hôte : clôt la manche même si un votant est absent. */
+  async function forceReveal() {
+    if (mp && !isLobbyHost()) return;
+    await goToRevealPending();
   }
 
   async function startDisplayPhase() {
@@ -419,10 +405,6 @@ export function mountTruthMeter(app) {
             <p class="hot-take-text">"${escapeHtml(affirmation.text)}"</p>
             <p class="hint">- ${escapeHtml(affirmation.author)}</p>
           </div>
-          <p class="timer" id="timer-el">${timer}</p>
-          <div class="progress progress--timer">
-            <div class="progress-fill" id="progress-el" style="width:${(timer / TRUTH_METER_VOTE_TIMER_SEC) * 100}%"></div>
-          </div>
           ${sliderBlockHtml({
             id: "vote-slider",
             value: myVote ?? 50,
@@ -432,6 +414,14 @@ export function mountTruthMeter(app) {
           })}
           <button type="button" class="btn btn-primary btn--spaced" id="btn-confirm-vote"
             ${voteLocked ? "disabled" : ""}>Valider mon vote</button>`;
+      }
+      if (host) {
+        const votedCount = Object.keys(votesForAward()).length;
+        const totalVoters = getVoterNames().length;
+        phaseHtml += `
+          <button type="button" class="btn btn-secondary btn--spaced" id="truth-force">
+            Révéler maintenant (${votedCount}/${totalVoters})
+          </button>`;
       }
     }
 
@@ -584,13 +574,17 @@ export function mountTruthMeter(app) {
         } else {
           votes = simulateTruthMeterVotes(choice);
           render();
-          if (!intervalId) startVoteTimer();
           if (allTruthMeterVotesIn()) {
-            clearTimer();
             goToRevealPending();
           }
         }
         render();
+      });
+    }
+
+    if (phase === "voting") {
+      app.querySelector("#truth-force")?.addEventListener("click", () => {
+        void forceReveal();
       });
     }
 
@@ -744,56 +738,17 @@ export function mountTruthMeter(app) {
     }
   }
 
-  function startVoteTimer() {
-    clearTimer();
-    if (mp && !getTruthMeterSession().voteEndsAt) return;
-    primeTimerSound();
-
-    const tick = async () => {
-      if (isEveningGameplayPaused()) return;
-      if (mp) {
-        timer = secondsUntil(getTruthMeterSession().voteEndsAt) ?? 0;
-      } else {
-        timer -= 1;
-      }
-      onTimerSecond({ remaining: timer, urgentAt: 3 });
-      const timerEl = app.querySelector("#timer-el");
-      const progressEl = app.querySelector("#progress-el");
-      if (timerEl) timerEl.textContent = String(timer);
-      if (progressEl) {
-        progressEl.style.width = `${(timer / TRUTH_METER_VOTE_TIMER_SEC) * 100}%`;
-      }
-      if (timer <= 0) {
-        clearTimer();
-        if (!mp || isLobbyHost()) {
-          if (mp && isLobbyHost()) {
-            await refreshGameSession();
-            syncFromSession();
-          }
-          const authorNow = getCurrentAuthor();
-          if (localName !== authorNow && myVote == null && phase === "voting") {
-            captureVoteDraftFromDom();
-            const choice = getPendingVoteValue();
-            myVote = choice;
-            votes = { ...votes, [localName]: choice };
-            if (mp) await commitTruthMeterPlay({ votes: { ...getTruthMeterSession().votes, [localName]: choice } });
-            else votes = simulateTruthMeterVotes(choice);
-          }
-          await goToRevealPending();
-        }
-      }
-    };
-
-    tick();
-    intervalId = setInterval(tick, 1000);
-  }
-
   const unsubGame = onGameSessionChange(() => {
     const prevPhase = phase;
     const prevRound = roundIdx;
     captureAuthorDraftFromDom();
     captureVoteDraftFromDom();
     syncFromSession();
+
+    if (phase === "voting" && isLobbyHost() && allTruthMeterVotesIn()) {
+      void goToRevealPending();
+      return;
+    }
 
     if (shouldSkipFullRender(prevPhase, prevRound)) {
       if (phase === "reveal" || phase === "voting") {
@@ -806,7 +761,6 @@ export function mountTruthMeter(app) {
     if (phase === "display" && prevPhase !== "display" && (!mp || isLobbyHost())) {
       scheduleDisplayToVote();
     }
-    if (phase === "voting" && prevPhase !== "voting") startVoteTimer();
     if (phase === "reveal-pending" && prevPhase !== "reveal-pending" && isLobbyHost()) {
       setTimeout(() => goToReveal(), TRUTH_METER_REVEAL_PENDING_MS);
     }
@@ -826,14 +780,12 @@ export function mountTruthMeter(app) {
 
   syncFromSession();
   render();
-  if (phase === "voting") startVoteTimer();
   if (phase === "display" && (!mp || isLobbyHost())) {
     scheduleDisplayToVote();
   }
 
   return () => {
     app.removeEventListener("click", onAppClick);
-    clearTimer();
     if (displayTimeoutId) clearTimeout(displayTimeoutId);
     if (revealPendingTimeoutId) clearTimeout(revealPendingTimeoutId);
     cancelRevealAnim();

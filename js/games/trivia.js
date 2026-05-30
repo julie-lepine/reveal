@@ -1,4 +1,4 @@
-import { getTriviaThemeLabel, TRIVIA_TIMER_SEC } from "../../data/trivia.js";
+import { getTriviaThemeLabel } from "../../data/trivia.js";
 import { useTriviaGame } from "../core/useTriviaGame.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
 import { getActivePlayers } from "../core/players.js";
@@ -10,7 +10,6 @@ import { escapeHtml, pageShell } from "../core/ui.js";
 import { bindNav } from "../screens/nav.js";
 import { gameExitBarHtml, bindExitGame } from "../core/exitGame.js";
 import { isEveningGameplayPaused } from "../core/filRougeSession.js";
-import { onTimerSecond, primeTimerSound } from "../core/timerSound.js";
 import {
   completeGameSession,
   isGameSyncActive,
@@ -23,12 +22,6 @@ import {
 import { renderTriviaQuestion } from "../trivia/TriviaQuestion.js";
 import { renderTriviaResults } from "../trivia/TriviaResults.js";
 import { renderTriviaScoreboard } from "../trivia/TriviaScoreboard.js";
-import { renderTriviaTimer } from "../trivia/TriviaTimer.js";
-
-function secondsUntil(iso) {
-  if (!iso) return null;
-  return Math.max(0, Math.ceil((new Date(iso).getTime() - Date.now()) / 1000));
-}
 
 export function mountTrivia(app) {
   if (!requireLobbyPlay()) return null;
@@ -50,21 +43,12 @@ export function mountTrivia(app) {
   let answers = {};
   let matchScores = {};
   let lastRound = null;
-  let timer = TRIVIA_TIMER_SEC;
-  let intervalId = null;
   let npcTimers = [];
   let npcRoundKey = "";
   let revealInFlight = false;
 
   const localName = getLocalDisplayName();
   const mp = isGameSyncActive();
-
-  function clearTimer() {
-    if (intervalId) {
-      clearInterval(intervalId);
-      intervalId = null;
-    }
-  }
 
   function clearNpcTimers() {
     npcTimers.forEach((timerId) => clearTimeout(timerId));
@@ -80,7 +64,6 @@ export function mountTrivia(app) {
     answers = { ...(session.answers || {}) };
     matchScores = { ...(session.matchScores || {}) };
     lastRound = session.lastRound || null;
-    timer = secondsUntil(session.questionEndsAt) ?? timer;
   }
 
   function myAnswerIndex() {
@@ -94,7 +77,7 @@ export function mountTrivia(app) {
         ? "Tout le monde a repondu. Revelation en cours…"
         : "En attente des autres joueurs… tu peux encore changer ta reponse.";
     }
-    return "Choisis une reponse. Tu peux la modifier jusqu'a la fin du chrono.";
+    return "Choisis ta reponse. Tu peux la modifier tant que tout le monde n'a pas repondu.";
   }
 
   function pickNpcAnswerIndex(question) {
@@ -156,7 +139,6 @@ export function mountTrivia(app) {
     revealInFlight = true;
     const session = trivia.scoreRound(live);
     clearNpcTimers();
-    clearTimer();
     try {
       await trivia.commitPlay({
         ...session,
@@ -168,38 +150,11 @@ export function mountTrivia(app) {
     }
   }
 
-  async function startVoteTimer() {
-    clearTimer();
-    primeTimerSound();
-    intervalId = setInterval(async () => {
-      if (isEveningGameplayPaused()) return;
-      const live = trivia.getSession();
-      if (live.phase !== "question") {
-        clearTimer();
-        return;
-      }
-      timer = secondsUntil(live.questionEndsAt) ?? 0;
-      onTimerSecond({ remaining: timer, urgentAt: 3 });
-
-      const timerEl = app.querySelector("#trivia-timer-el");
-      if (timerEl) {
-        timerEl.textContent = String(timer);
-        timerEl.classList.toggle("timer--urgent", timer <= 3);
-      }
-      const progressEl = app.querySelector("#trivia-progress-el");
-      if (progressEl) {
-        progressEl.style.width = `${(timer / TRIVIA_TIMER_SEC) * 100}%`;
-      }
-
-      if (timer > 0) return;
-      clearTimer();
-      if (!mp) {
-        await fillMissingLocalAnswers();
-        await goToReveal();
-      } else if (isLobbyHost()) {
-        await goToReveal();
-      }
-    }, 1000);
+  /** Filet de sécurité hôte : clôt la manche même si un joueur (AFK/déconnecté) n'a pas répondu. */
+  async function forceReveal() {
+    if (mp && !isLobbyHost()) return;
+    if (!mp) await fillMissingLocalAnswers();
+    await goToReveal();
   }
 
   function revealBlock() {
@@ -319,7 +274,6 @@ export function mountTrivia(app) {
     };
 
     clearNpcTimers();
-    clearTimer();
 
     if (mp && isLobbyHost()) {
       await completeGameSession({
@@ -346,8 +300,11 @@ export function mountTrivia(app) {
 
     let phaseHtml = "";
     if (phase === "question") {
+      const answeredCount = Object.values(answers).filter(
+        (a) => a && Number.isInteger(a.answerIndex)
+      ).length;
+      const totalPlayers = getActivePlayers().length;
       phaseHtml = `
-        ${renderTriviaTimer({ timer, total: TRIVIA_TIMER_SEC })}
         ${renderTriviaQuestion({
           question: {
             ...currentQuestion,
@@ -361,7 +318,14 @@ export function mountTrivia(app) {
         ${renderTriviaScoreboard({
           standings,
           title: scoreTitle,
-        })}`;
+        })}
+        ${
+          !mp || isLobbyHost()
+            ? `<button type="button" class="btn btn-secondary btn--spaced" id="btn-trivia-force">
+                Révéler maintenant (${answeredCount}/${totalPlayers})
+              </button>`
+            : ""
+        }`;
     } else if (phase === "reveal") {
       phaseHtml = `
         ${revealBlock()}
@@ -419,6 +383,9 @@ export function mountTrivia(app) {
           render();
         });
       });
+      app.querySelector("#btn-trivia-force")?.addEventListener("click", () => {
+        void forceReveal();
+      });
     }
 
     app.querySelector("#btn-trivia-next")?.addEventListener("click", async () => {
@@ -455,25 +422,16 @@ export function mountTrivia(app) {
       if (!mp && roundKey !== npcRoundKey) {
         scheduleLocalNpcAnswers();
       }
-      if (!intervalId && timer > 0) {
-        void startVoteTimer();
-      }
     } else {
       clearNpcTimers();
-      clearTimer();
     }
   }
 
   const unsub = onGameSessionChange(() => {
-    const prevPhase = phase;
     syncFromSession();
     if (phase === "question" && isLobbyHost() && trivia.allAnswersIn()) {
       void goToReveal();
       return;
-    }
-    if (phase === "question" && prevPhase !== "question") {
-      clearTimer();
-      timer = secondsUntil(trivia.getSession().questionEndsAt) ?? TRIVIA_TIMER_SEC;
     }
     render();
   });
@@ -482,7 +440,6 @@ export function mountTrivia(app) {
 
   return () => {
     clearNpcTimers();
-    clearTimer();
     unsub();
   };
 }

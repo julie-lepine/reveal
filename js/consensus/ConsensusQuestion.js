@@ -5,8 +5,6 @@ export function renderConsensusQuestion({
   questionIdx = 0,
   totalQuestions = 0,
   value = 50,
-  timer = 15,
-  totalTime = 15,
   answerState = "draft",
   waitingMessage = "",
 } = {}) {
@@ -32,11 +30,6 @@ export function renderConsensusQuestion({
           : ""
       }
       <p class="hot-take-text">${escapeHtml(question.question)}</p>
-    </div>
-
-    <p class="timer consensus-timer" id="consensus-timer-el">${timer}</p>
-    <div class="progress progress--timer">
-      <div class="progress-fill" id="consensus-progress-el" style="width:${(timer / totalTime) * 100}%"></div>
     </div>
 
     <div class="truth-meter__slider-wrap consensus-slider">

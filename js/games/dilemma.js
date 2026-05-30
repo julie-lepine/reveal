@@ -1,7 +1,4 @@
-import {
-  DILEMMA_VOTE_TIMER_SEC,
-  DILEMMA_POINTS_MAJORITY_WIN,
-} from "../../data/dilemma.js";
+import { DILEMMA_POINTS_MAJORITY_WIN } from "../../data/dilemma.js";
 import {
   getDilemmaEntryScreen,
   getDilemmaSession,
@@ -11,8 +8,6 @@ import {
   simulateDilemmaLobbyVotes,
   countDilemmaResults,
   startDilemmaRound,
-  setDilemmaPausedBy,
-  clearDilemmaPause,
 } from "../core/dilemmaSession.js";
 import { awardDilemmaRound } from "../core/scoring.js";
 import { gameCumulativeScoresHtml } from "../core/gameScores.js";
@@ -25,7 +20,6 @@ import { escapeHtml, pageShell } from "../core/ui.js";
 import { bindNav } from "../screens/nav.js";
 import { gameExitBarHtml, bindExitGame } from "../core/exitGame.js";
 import { isEveningGameplayPaused } from "../core/filRougeSession.js";
-import { onTimerSecond, primeTimerSound } from "../core/timerSound.js";
 import {
   isGameSyncActive,
   isLobbyHost,
@@ -55,32 +49,17 @@ export function mountDilemma(app) {
 
   let roundIdx = 0;
   let phase = "voting";
-  let timer = DILEMMA_VOTE_TIMER_SEC;
   let myVote = null;
   let votes = {};
   let voteCommitInFlight = null;
   let lastAward = null;
   let roundScored = false;
   let currentDilemma = ROUNDS[0];
-  let intervalId = null;
   let revealPctA = 0;
   let revealPctB = 0;
   let revealAnimDone = false;
-  let paused = false;
   const localName = getLocalDisplayName();
   const mp = isGameSyncActive();
-
-  function clearTimer() {
-    if (intervalId) {
-      clearInterval(intervalId);
-      intervalId = null;
-    }
-  }
-
-  function secondsUntil(iso) {
-    if (!iso) return null;
-    return Math.max(0, Math.ceil((new Date(iso).getTime() - Date.now()) / 1000));
-  }
 
   function syncFromSession() {
     const s = getDilemmaSession();
@@ -95,16 +74,6 @@ export function mountDilemma(app) {
       myVote = votes[localName] ?? null;
     }
     roundScored = Boolean(s.roundScored);
-    if (phase === "voting" && s.voteEndsAt) {
-      timer = secondsUntil(s.voteEndsAt) ?? timer;
-    }
-    paused = Boolean(s.pausedBy);
-  }
-
-  function pauseBanner() {
-    const who = getDilemmaSession().pausedBy;
-    if (!who) return "";
-    return `<p class="pause-banner">⏸ Pause - ${escapeHtml(who)} a mis la partie en pause</p>`;
   }
 
   function playerMeta(name) {
@@ -167,6 +136,12 @@ export function mountDilemma(app) {
     }
   }
 
+  /** Filet de sécurité hôte : clôt la manche même si un joueur n'a pas voté. */
+  async function forceReveal() {
+    if (mp && !isLobbyHost()) return;
+    await goToReveal();
+  }
+
   async function advanceRound() {
     if (mp && !isLobbyHost()) return;
     const total = ROUNDS.length;
@@ -178,13 +153,11 @@ export function mountDilemma(app) {
         roundIdx = nextIdx;
         currentDilemma = ROUNDS[roundIdx];
         phase = "voting";
-        timer = DILEMMA_VOTE_TIMER_SEC;
         myVote = null;
         votes = {};
         lastAward = null;
         roundScored = false;
         render();
-        startVoteTimer();
       }
     } else {
       recordDilemmaPlayed();
@@ -206,46 +179,6 @@ export function mountDilemma(app) {
         navigate("results", { navStack: ["home", "lobby", "game-select", "results"] });
       }
     }
-  }
-
-  function startVoteTimer() {
-    clearTimer();
-    if (mp && !getDilemmaSession().voteEndsAt) return;
-    primeTimerSound();
-    intervalId = setInterval(async () => {
-      if (paused || isEveningGameplayPaused()) return;
-      const s = getDilemmaSession();
-      if (phase !== "voting") {
-        clearTimer();
-        return;
-      }
-      if (mp && s.voteEndsAt) {
-        timer = secondsUntil(s.voteEndsAt) ?? 0;
-      } else {
-        timer -= 1;
-      }
-      onTimerSecond({ remaining: timer, urgentAt: 3 });
-      const progress = app.querySelector("#progress-el");
-      const timerEl = app.querySelector("#timer-el");
-      if (progress) {
-        progress.style.width = `${(timer / DILEMMA_VOTE_TIMER_SEC) * 100}%`;
-      }
-      if (timerEl) timerEl.textContent = String(timer);
-
-      if (timer <= 0) {
-        clearTimer();
-        if (!mp) {
-          if (!myVote) {
-            const pick = Math.random() < 0.5 ? "A" : "B";
-            myVote = pick;
-            votes = simulateDilemmaLobbyVotes(pick);
-          } else if (!allDilemmaVotesIn()) {
-            votes = simulateDilemmaLobbyVotes(myVote);
-          }
-        }
-        if (!mp || isLobbyHost()) await goToReveal();
-      }
-    }, 1000);
   }
 
   function dilemmaCardHtml() {
@@ -354,20 +287,23 @@ export function mountDilemma(app) {
         ? "Les autres votent…"
         : "Choisis ton camp !";
 
+    const votedCount = Object.keys(votes).length;
+    const totalPlayers = getLobbyParticipants().length;
     return `
-      ${pauseBanner()}
-      <p class="label-upper label-upper--muted">Vote en ${DILEMMA_VOTE_TIMER_SEC}s</p>
-      <div class="timer timer--dilemma" id="timer-el">${timer}</div>
-      <div class="progress progress--timer">
-        <div class="progress-fill" id="progress-el" style="width:${(timer / DILEMMA_VOTE_TIMER_SEC) * 100}%"></div>
-      </div>
+      <p class="label-upper label-upper--muted">Vote simultané</p>
       ${voteTapHtml()}
-      ${host ? `<button type="button" class="btn btn-secondary btn--spaced" id="btn-pause">${paused ? "Reprendre" : "Pause"}</button>` : ""}
-      <p class="hint">${voteHint}${canChangeVote() ? " · Tu peux changer ton vote avant la fin du chrono." : ""}</p>`;
+      <p class="hint">${voteHint}${canChangeVote() ? " · Tu peux changer ton vote tant que le vote est ouvert." : ""}</p>
+      ${
+        host
+          ? `<button type="button" class="btn btn-secondary btn--spaced" id="dilemma-force">
+              Révéler maintenant (${votedCount}/${totalPlayers})
+            </button>`
+          : ""
+      }`;
   }
 
   function canChangeVote() {
-    return phase === "voting" && timer > 0 && !paused && !isEveningGameplayPaused();
+    return phase === "voting" && !isEveningGameplayPaused();
   }
 
   function render() {
@@ -413,31 +349,26 @@ export function mountDilemma(app) {
             voteCommitInFlight = null;
             syncFromSession();
           }
+          if (allDilemmaVotesIn() && isLobbyHost()) {
+            await goToReveal();
+            return;
+          }
         } else {
-          if (!intervalId) startVoteTimer();
+          votes = simulateDilemmaLobbyVotes(choice);
+          await goToReveal();
+          return;
         }
         render();
       });
     });
 
-    app.querySelector("#btn-pause")?.addEventListener("click", async () => {
-      if (!paused) {
-        paused = true;
-        clearTimer();
-        await setDilemmaPausedBy(localName);
-      } else {
-        paused = false;
-        await clearDilemmaPause();
-        if (phase === "voting") startVoteTimer();
-      }
-      render();
+    app.querySelector("#dilemma-force")?.addEventListener("click", () => {
+      void forceReveal();
     });
 
     app.querySelector("#next-round")?.addEventListener("click", () => {
       void advanceRound();
     });
-
-    if (phase === "voting" && !intervalId && timer > 0 && !paused) startVoteTimer();
 
     if (phase === "reveal" && !revealAnimDone && revealPctA === 0 && revealPctB === 0) {
       const { pctA, pctB } = countDilemmaResults(votes);
@@ -449,14 +380,14 @@ export function mountDilemma(app) {
     const prevPhase = phase;
     syncFromSession();
     if (!currentDilemma && ROUNDS[roundIdx]) currentDilemma = ROUNDS[roundIdx];
+    if (phase === "voting" && isLobbyHost() && allDilemmaVotesIn()) {
+      void goToReveal();
+      return;
+    }
     if (phase === "voting" && prevPhase !== "voting") {
-      clearTimer();
       revealAnimDone = false;
-      timer = secondsUntil(getDilemmaSession().voteEndsAt) ?? DILEMMA_VOTE_TIMER_SEC;
-      if (!paused) startVoteTimer();
     }
     if (phase === "reveal" && prevPhase !== "reveal") {
-      clearTimer();
       revealAnimDone = false;
       revealPctA = 0;
       revealPctB = 0;
@@ -471,7 +402,6 @@ export function mountDilemma(app) {
   render();
 
   return () => {
-    clearTimer();
     unsub();
   };
 }

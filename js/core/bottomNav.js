@@ -2,6 +2,7 @@ import { APP_LOGO } from "../../data/branding.js";
 import { hasActiveLobby, goToLobby, returnToEveningGames } from "./lobby.js";
 import { navigate, onScreenChange, getCurrentScreen } from "./router.js";
 import { goToEveningHome } from "../screens/nav.js";
+import { suppressRoutingForScoreView } from "./gameSync.js";
 
 const TAB_HOME = "home";
 const TAB_GAMES = "games";
@@ -51,11 +52,16 @@ function goLogo() {
 }
 
 function goResults() {
-  if (hasActiveLobby()) navigate("results");
-  else navigate("home", { reset: true });
+  if (hasActiveLobby()) {
+    suppressRoutingForScoreView();
+    navigate("results");
+  } else {
+    navigate("home", { reset: true });
+  }
 }
 
 function goFinal() {
+  if (hasActiveLobby()) suppressRoutingForScoreView();
   navigate("leaderboard");
 }
 

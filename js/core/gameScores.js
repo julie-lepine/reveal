@@ -42,6 +42,72 @@ export function tierNightRoundScoresHtml(recaps, { title = "Points de la manche"
     </div>`;
 }
 
+const GAME_LABELS = {
+  playlistguess: { title: "VibeCheck", emoji: "🎵", statKey: "playlistGuessesPlayed" },
+  consensus: { title: "Consensus", emoji: "🤝", statKey: "consensusGamesPlayed" },
+  hottake: { title: "HotTake", emoji: "🔥", statKey: "hotTakesPlayed" },
+  guesslie: { title: "Guess The Lie", emoji: "🕵️", statKey: null },
+  speedvote: { title: "SpeedVote", emoji: "⚡", statKey: "speedVotesPlayed" },
+  dilemma: { title: "Dilemma", emoji: "⚖️", statKey: "dilemmasPlayed" },
+  truthmeter: { title: "TruthMeter", emoji: "📏", statKey: "truthMetersPlayed" },
+  tiernight: { title: "TierNight", emoji: "🏆", statKey: "tierNightsPlayed" },
+  trivia: { title: "Trivia Quiz", emoji: "🧠", statKey: "triviaGamesPlayed" },
+};
+
+function gameLeaderboardRowsHtml(players, scoreMap) {
+  const sorted = [...players].sort(
+    (a, b) => (scoreMap[b.name] || 0) - (scoreMap[a.name] || 0)
+  );
+  return sorted
+    .map((p, i) => {
+      const pts = scoreMap[p.name] || 0;
+      const gold = i === 0 && pts > 0 ? "player-score--gold" : "";
+      return `
+        <div class="game-scores-box__row">
+          <span class="game-scores-box__rank">${i + 1}</span>
+          <div class="avatar avatar--sm" style="background:${p.color}">${p.emoji}</div>
+          <span class="player-name game-scores-box__name">${escapeHtml(p.name)}</span>
+          <span class="player-score ${gold}">${pts}</span>
+        </div>`;
+    })
+    .join("");
+}
+
+function gameLeaderboardCardHtml(titleHtml, players, scoreMap) {
+  return `
+    <div class="card game-scores-box">
+      <p class="card-heading game-scores-box__title">${titleHtml}</p>
+      ${gameLeaderboardRowsHtml(players, scoreMap)}
+    </div>`;
+}
+
+/** Classement de chaque jeu joué dans la soirée (+ bloc Fil Rouge). */
+export function eveningGameLeaderboardsHtml() {
+  const { gameScores = {}, gameScoreOrder = [], stats = {}, filRougeScores = {} } = getState();
+  const players = getSortedActivePlayers();
+  if (!players.length) return "";
+
+  const blocks = [];
+  gameScoreOrder.forEach((gid) => {
+    const meta = GAME_LABELS[gid];
+    if (!meta) return;
+    const count = meta.statKey ? stats[meta.statKey] || 0 : 0;
+    const countLabel = count > 1 ? ` · ${count} parties` : "";
+    const titleHtml = `${meta.emoji} ${escapeHtml(meta.title)}${countLabel}`;
+    blocks.push(gameLeaderboardCardHtml(titleHtml, players, gameScores[gid] || {}));
+  });
+
+  const hasFilRouge = Object.values(filRougeScores).some((v) => Number(v) !== 0);
+  if (hasFilRouge) {
+    blocks.push(gameLeaderboardCardHtml("🧵 Fil Rouge", players, filRougeScores));
+  }
+
+  if (!blocks.length) return "";
+  return `
+    <p class="card-heading game-leaderboards__heading">Classement par jeu</p>
+    ${blocks.join("")}`;
+}
+
 /** Boîte de cumul des scores (soirée) affichée en fin de manche. */
 export function gameCumulativeScoresHtml({ gameLabel = null, title = "Cumul des scores" } = {}) {
   const { scores } = getState();

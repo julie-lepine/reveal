@@ -7,6 +7,7 @@ import {
   getLocalEmoji,
   ensurePlayerScore,
   resetEveningState,
+  setActiveScoringGame,
 } from "./state.js";
 import { loginAsGuest, isGuest } from "./auth.js";
 import { signOutSupabase, getSupabaseUserId } from "./supabaseAuth.js";
@@ -42,6 +43,8 @@ import {
   clearSessionRouteSuppress,
   isSessionRouteSuppressed,
   getCachedGameSession,
+  getFilRougeResumeScreen,
+  routeToSessionScreen,
 } from "./gameSync.js";
 
 const MAX_PLAYERS = 10;
@@ -150,6 +153,7 @@ export function getLobbyGameId() {
 }
 
 export async function setLobbyPlaying(gameId) {
+  setActiveScoringGame(gameId);
   if (isSupabaseConfigured() && getLobby()?.id) {
     await setLobbyStatusSupabase("playing", gameId);
     return;
@@ -329,6 +333,12 @@ export async function resumeEveningSession({ force = false } = {}) {
     startMultiplayerSync();
     const row = await refreshGameSession();
     if (await routeToActiveGameIfNeeded(row)) return true;
+    /** Aucune partie « classique » en cours : restaurer le Fil Rouge (config / mission non vue). */
+    const frScreen = getFilRougeResumeScreen();
+    if (frScreen) {
+      routeToSessionScreen(frScreen, { force: true });
+      return true;
+    }
     return false;
   }
 

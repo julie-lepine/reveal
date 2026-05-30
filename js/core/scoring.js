@@ -154,25 +154,45 @@ export function awardDilemmaRound(votes) {
   return summary;
 }
 
-/** VibeCheck - devine le propriétaire du like Spotify */
-export function awardPlaylistGuessRound({ votesByUid, ownerName, ownerPlayerId, resolveName }) {
+/**
+ * VibeCheck - les joueurs votent à qui la chanson correspond le mieux.
+ * Le(s) plus voté(s) gagnent MOST_VOTED. Tout joueur ayant voté pour un
+ * plus-voté (majorité) gagne MAJORITY. Les deux peuvent se cumuler.
+ */
+export function awardPlaylistGuessRound({ votesByUid, resolveName }) {
   const nameFor = (uid) => (resolveName ? resolveName(uid) : uid);
-  const voters = Object.entries(votesByUid || {}).filter(([voterUid]) => voterUid !== ownerPlayerId);
-  const correct = voters.filter(([, pick]) => pick === ownerPlayerId);
-  const allCorrect = voters.length > 0 && correct.length === voters.length;
-  const ownerStealth = !allCorrect;
+  const entries = Object.entries(votesByUid || {}).filter(([, pick]) => pick != null && pick !== "");
 
-  correct.forEach(([uid]) => addScore(nameFor(uid), PLAYLIST_GUESS_POINTS.CORRECT_GUESS));
-  if (ownerStealth && ownerName) {
-    addScore(ownerName, PLAYLIST_GUESS_POINTS.OWNER_STEALTH);
-  }
+  const counts = {};
+  entries.forEach(([, pick]) => {
+    counts[pick] = (counts[pick] || 0) + 1;
+  });
+
+  let maxVotes = 0;
+  Object.values(counts).forEach((n) => {
+    if (n > maxVotes) maxVotes = n;
+  });
+  const leaders = Object.entries(counts)
+    .filter(([, n]) => n === maxVotes && maxVotes > 0)
+    .map(([uid]) => uid);
+  const leaderSet = new Set(leaders);
+
+  leaders.forEach((uid) => addScore(nameFor(uid), PLAYLIST_GUESS_POINTS.MOST_VOTED));
+
+  const majorityVoterUids = entries
+    .filter(([, pick]) => leaderSet.has(pick))
+    .map(([voterUid]) => voterUid);
+  majorityVoterUids.forEach((uid) => addScore(nameFor(uid), PLAYLIST_GUESS_POINTS.MAJORITY));
 
   return {
-    correctVoters: correct.map(([uid]) => nameFor(uid)),
-    allCorrect,
-    ownerStealth,
-    ownerPoints: ownerStealth ? PLAYLIST_GUESS_POINTS.OWNER_STEALTH : 0,
-    guessPoints: PLAYLIST_GUESS_POINTS.CORRECT_GUESS,
+    counts,
+    leaders,
+    maxVotes,
+    totalVotes: entries.length,
+    winnerNames: leaders.map((uid) => nameFor(uid)),
+    majorityVoterUids,
+    mostVotedPoints: PLAYLIST_GUESS_POINTS.MOST_VOTED,
+    majorityPoints: PLAYLIST_GUESS_POINTS.MAJORITY,
   };
 }
 

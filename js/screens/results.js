@@ -9,10 +9,12 @@ import {
   eveningRecapRestartButtonHtml,
   bindRestartGameButtons,
 } from "../core/restartGame.js";
+import { eveningGameLeaderboardsHtml } from "../core/gameScores.js";
 import {
   isGameSyncActive,
   onGameSessionChange,
   refreshEveningScoresFromSession,
+  suppressRoutingForScoreView,
 } from "../core/gameSync.js";
 import { refreshLobbyFromSupabase, onLobbyBundleUpdated } from "../core/supabaseLobby.js";
 
@@ -68,6 +70,8 @@ export function mountResults(app) {
         }
       </div>
 
+      ${eveningGameLeaderboardsHtml()}
+
       <div class="btn-row">
         <button type="button" class="btn btn-primary" data-nav="game-select">Autre jeu</button>
         <button type="button" class="btn btn-accent" data-nav="leaderboard">Classement</button>
@@ -77,6 +81,7 @@ export function mountResults(app) {
 
     bindNav(app, {
       leaderboard: () => {
+        suppressRoutingForScoreView();
         navigate("leaderboard", {
           navStack: ["home", "lobby", "game-select", "results", "leaderboard"],
         });

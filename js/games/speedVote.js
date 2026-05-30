@@ -1,4 +1,4 @@
-import { SPEED_VOTE_TIMER_SEC, SPEED_VOTE_POINTS_WINNER } from "../../data/speedVote.js";
+import { SPEED_VOTE_POINTS_WINNER } from "../../data/speedVote.js";
 import {
   getSpeedVoteEntryScreen,
   getSpeedVoteSession,
@@ -22,7 +22,6 @@ import { escapeHtml, pageShell } from "../core/ui.js";
 import { bindNav } from "../screens/nav.js";
 import { gameExitBarHtml, bindExitGame } from "../core/exitGame.js";
 import { isEveningGameplayPaused } from "../core/filRougeSession.js";
-import { onTimerSecond, primeTimerSound } from "../core/timerSound.js";
 import {
   isGameSyncActive,
   isLobbyHost,
@@ -50,28 +49,14 @@ export function mountSpeedVote(app) {
 
   let roundIdx = 0;
   let phase = "voting";
-  let timer = SPEED_VOTE_TIMER_SEC;
   let myVote = null;
   let votes = {};
   let lastAward = null;
   let takeScored = false;
-  let intervalId = null;
   let currentQuestion = QUESTIONS[0];
   let modifier = "normal";
   const localName = getLocalDisplayName();
   const mp = isGameSyncActive();
-
-  function clearTimer() {
-    if (intervalId) {
-      clearInterval(intervalId);
-      intervalId = null;
-    }
-  }
-
-  function secondsUntil(iso) {
-    if (!iso) return null;
-    return Math.max(0, Math.ceil((new Date(iso).getTime() - Date.now()) / 1000));
-  }
 
   function syncFromSession() {
     const s = getSpeedVoteSession();
@@ -86,9 +71,6 @@ export function mountSpeedVote(app) {
       lastAward = null;
     }
     takeScored = Boolean(s.roundScored);
-    if (phase === "voting" && s.voteEndsAt) {
-      timer = secondsUntil(s.voteEndsAt) ?? timer;
-    }
   }
 
   function playerMeta(name) {
@@ -135,46 +117,10 @@ export function mountSpeedVote(app) {
     }
   }
 
-  function startVoteTimer() {
-    clearTimer();
-    primeTimerSound();
-    intervalId = setInterval(async () => {
-      if (isEveningGameplayPaused()) return;
-      const s = getSpeedVoteSession();
-      if (phase !== "voting") {
-        clearTimer();
-        return;
-      }
-      if (mp && s.voteEndsAt) {
-        timer = secondsUntil(s.voteEndsAt) ?? 0;
-      } else {
-        timer -= 1;
-      }
-      onTimerSecond({ remaining: timer, urgentAt: 3 });
-      const progress = app.querySelector("#progress-el");
-      const timerEl = app.querySelector("#timer-el");
-      if (progress) {
-        progress.style.width = `${(timer / SPEED_VOTE_TIMER_SEC) * 100}%`;
-      }
-      if (timerEl) timerEl.textContent = String(timer);
-
-      if (timer <= 0) {
-        clearTimer();
-        if (!mp) {
-          if (!myVote) {
-            const targets = getVoteTargets();
-            if (targets.length) {
-              const pick = targets[Math.floor(Math.random() * targets.length)].name;
-              myVote = pick;
-              votes = simulateSpeedVoteLobbyVotes(pick);
-            }
-          } else if (Object.keys(votes).length < getLobbyParticipants().length) {
-            votes = simulateSpeedVoteLobbyVotes(myVote);
-          }
-        }
-        if (!mp || isLobbyHost()) await goToReveal();
-      }
-    }, 1000);
+  /** Filet de sécurité hôte : clôt la manche même si un joueur n'a pas voté. */
+  async function forceReveal() {
+    if (mp && !isLobbyHost()) return;
+    await goToReveal();
   }
 
   function voteButtonsHtml() {
@@ -279,15 +225,20 @@ export function mountSpeedVote(app) {
     let phaseHtml = "";
 
     if (phase === "voting") {
+      const votedCount = Object.keys(votes).length;
+      const totalPlayers = getVoteTargets().length;
       phaseHtml = `
         ${modifierBadgeHtml()}
-        <p class="label-upper label-upper--muted">Vote en ${SPEED_VOTE_TIMER_SEC}s</p>
-        <div class="timer timer--speed" id="timer-el">${timer}</div>
-        <div class="progress progress--timer">
-          <div class="progress-fill" id="progress-el" style="width:${(timer / SPEED_VOTE_TIMER_SEC) * 100}%"></div>
-        </div>
+        <p class="label-upper label-upper--muted">Vote simultané</p>
         ${voteButtonsHtml()}
-        <p class="hint">${voteHint}</p>`;
+        <p class="hint">${voteHint}</p>
+        ${
+          host
+            ? `<button type="button" class="btn btn-secondary btn--spaced" id="speedvote-force">
+                Révéler maintenant (${votedCount}/${totalPlayers})
+              </button>`
+            : ""
+        }`;
     }
 
     if (phase === "reveal") {
@@ -325,12 +276,16 @@ export function mountSpeedVote(app) {
         if (mp) {
           await commitSpeedVotePlay({ votes });
           if (allSpeedVoteVotesIn() && isLobbyHost()) await goToReveal();
-        } else {
           render();
-          if (!intervalId) startVoteTimer();
+        } else {
+          votes = simulateSpeedVoteLobbyVotes(target);
+          await goToReveal();
         }
-        render();
       });
+    });
+
+    app.querySelector("#speedvote-force")?.addEventListener("click", () => {
+      void forceReveal();
     });
 
     app.querySelector("#next-round")?.addEventListener("click", async () => {
@@ -349,14 +304,12 @@ export function mountSpeedVote(app) {
           roundIdx = nextIdx;
           currentQuestion = QUESTIONS[roundIdx];
           phase = "voting";
-          timer = SPEED_VOTE_TIMER_SEC;
           myVote = null;
           votes = {};
           lastAward = null;
           takeScored = false;
           modifier = Math.random() < 0.18 ? "double" : Math.random() < 0.32 ? "hidden" : "normal";
           render();
-          startVoteTimer();
         }
       } else {
         recordSpeedVotePlayed();
@@ -380,24 +333,16 @@ export function mountSpeedVote(app) {
       }
     });
 
-    if (phase === "voting" && !intervalId && timer > 0) {
-      startVoteTimer();
-    }
   }
 
   const unsub = onGameSessionChange(() => {
-    const prevPhase = phase;
     syncFromSession();
     if (!currentQuestion && QUESTIONS[roundIdx]) {
       currentQuestion = QUESTIONS[roundIdx];
     }
-    if (phase === "voting" && prevPhase !== "voting") {
-      clearTimer();
-      timer = secondsUntil(getSpeedVoteSession().voteEndsAt) ?? SPEED_VOTE_TIMER_SEC;
-      startVoteTimer();
-    }
-    if (phase === "reveal") {
-      clearTimer();
+    if (phase === "voting" && isLobbyHost() && allSpeedVoteVotesIn()) {
+      void goToReveal();
+      return;
     }
     render();
   });
@@ -405,7 +350,6 @@ export function mountSpeedVote(app) {
   render();
 
   return () => {
-    clearTimer();
     unsub();
   };
 }

@@ -9,19 +9,18 @@ import {
   startPlaylistGuessRound,
   nameForPlayerId,
   getLocalParticipantId,
-  PLAYLIST_GUESS_TIMER_SEC,
+  lobbyPlayersWithIds,
 } from "../core/playlistGuessSession.js";
 import { awardPlaylistGuessRound } from "../core/scoring.js";
 import { gameCumulativeScoresHtml } from "../core/gameScores.js";
-import { getLocalDisplayName, setLastGame, recordPlaylistGuessPlayed } from "../core/state.js";
+import { setLastGame, recordPlaylistGuessPlayed } from "../core/state.js";
 import { setLobbyPlaying, setLobbyWaiting } from "../core/lobby.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
 import { navigate } from "../core/router.js";
-import { escapeHtml, pageShell } from "../core/ui.js";
+import { pageShell } from "../core/ui.js";
 import { bindNav } from "../screens/nav.js";
 import { gameExitBarHtml, bindExitGame } from "../core/exitGame.js";
 import { isEveningGameplayPaused } from "../core/filRougeSession.js";
-import { onTimerSecond, primeTimerSound } from "../core/timerSound.js";
 import {
   isGameSyncActive,
   isLobbyHost,
@@ -29,11 +28,24 @@ import {
   completeGameSession,
   syncLobbyScores,
 } from "../core/gameSync.js";
-import {
-  songGuessCardHtml,
-  ownerWaitingStageHtml,
-} from "../playlistguess/SongGuessCard.js";
-import { revealOwnerCardHtml } from "../playlistguess/RevealOwnerCard.js";
+import { songGuessCardHtml } from "../playlistguess/SongGuessCard.js";
+import { revealResultCardHtml } from "../playlistguess/RevealOwnerCard.js";
+
+function countResults(votesByUid) {
+  const counts = {};
+  Object.values(votesByUid || {}).forEach((pick) => {
+    if (pick == null || pick === "") return;
+    counts[pick] = (counts[pick] || 0) + 1;
+  });
+  let maxVotes = 0;
+  Object.values(counts).forEach((n) => {
+    if (n > maxVotes) maxVotes = n;
+  });
+  const leaders = Object.entries(counts)
+    .filter(([, n]) => n === maxVotes && maxVotes > 0)
+    .map(([uid]) => uid);
+  return { counts, leaders, maxVotes };
+}
 
 export function mountPlaylistGuess(app) {
   if (!requireLobbyPlay()) return null;
@@ -53,36 +65,17 @@ export function mountPlaylistGuess(app) {
   setLobbyPlaying("playlistguess");
 
   const mp = isGameSyncActive();
-  const localName = getLocalDisplayName();
   const localUid = getLocalParticipantId();
 
   let roundIdx = 0;
   let phase = "voting";
   let selected = null;
-  let timer = PLAYLIST_GUESS_TIMER_SEC;
   let roundScored = false;
   let revealSummary = null;
-  let intervalId = null;
   let revealAdvancing = false;
-
-  function clearTimer() {
-    if (intervalId) {
-      clearInterval(intervalId);
-      intervalId = null;
-    }
-  }
 
   function currentRound() {
     return getCurrentPlaylistGuessRound() || deck[roundIdx];
-  }
-
-  function isOwner(round) {
-    return round.ownerPlayerId === localUid || round.ownerName === localName;
-  }
-
-  function secondsUntil(iso) {
-    if (!iso) return null;
-    return Math.max(0, Math.ceil((new Date(iso).getTime() - Date.now()) / 1000));
   }
 
   function syncFromSession() {
@@ -93,69 +86,58 @@ export function mountPlaylistGuess(app) {
     if (s.phase) phase = s.phase;
     const votesByUid = { ...(s.votes || {}) };
     const serverPick = votesByUid[localUid];
-    /**
-     * Important: ne pas écraser la sélection locale tant que le vote n'est pas
-     * confirmé dans la session (sinon "cliquer un nom" ne fait rien).
-     */
     if (serverPick != null) {
       selected = serverPick;
     } else if (phase === "voting" && (roundIdx !== prevIdx || prevPhase !== "voting")) {
-      // Nouvelle manche / retour en voting → reset du draft local
       selected = null;
     }
     roundScored = Boolean(s.roundScored);
-    if (phase === "voting" && s.voteEndsAt) {
-      timer = secondsUntil(s.voteEndsAt) ?? timer;
-    }
     if (roundIdx !== prevIdx || phase !== "reveal") {
       revealSummary = null;
     }
   }
 
-  function computeReveal() {
+  function gatherVotes() {
     const round = currentRound();
     const s = getPlaylistGuessSession();
     const all = mp ? { ...(s.votes || {}) } : { ...simulatePlaylistGuessVotes(round, selected) };
-    if (selected != null && !isOwner(round)) all[localUid] = selected;
-
-    const voters = Object.keys(all).filter((uid) => uid !== round.ownerPlayerId);
-    const correct = voters.filter((uid) => all[uid] === round.ownerPlayerId);
-    const allCorrect = voters.length > 0 && correct.length === voters.length;
-    const ownerStealth = !allCorrect;
-
-    return { all, correct, allCorrect, ownerStealth, round };
+    if (selected != null) all[localUid] = selected;
+    return all;
   }
 
-  function applyRoundScore(result) {
+  function buildSummary(votesByUid, scored) {
+    const round = currentRound();
+    const players = lobbyPlayersWithIds();
+    const result = scored
+      ? awardPlaylistGuessRound({ votesByUid, resolveName: nameForPlayerId })
+      : countResults(votesByUid);
+    return {
+      song: round.song || round.track || {},
+      players,
+      counts: result.counts,
+      leaders: result.leaders,
+      votesByUid,
+      localUid,
+      nameForPlayerId,
+    };
+  }
+
+  function applyRoundScore() {
     if (roundScored) return;
     roundScored = true;
-    const { correct, ownerStealth, round } = result;
-    revealSummary = {
-      ...awardPlaylistGuessRound({
-        votesByUid: result.all,
-        ownerName: round.ownerName,
-        ownerPlayerId: round.ownerPlayerId,
-        resolveName: nameForPlayerId,
-      }),
-      round,
-      ownerStealth,
-      myCorrect: correct.includes(localUid),
-      isOwner: isOwner(round),
-      votesByUid: result.all,
-    };
+    revealSummary = buildSummary(gatherVotes(), true);
     if (mp && isLobbyHost()) void syncLobbyScores();
   }
 
   async function tryAdvanceToReveal() {
     if (!mp || phase !== "voting" || revealAdvancing) return;
-    const s = getPlaylistGuessSession();
-    const round = currentRound();
     if (!allPlaylistGuessVotesIn() || !isLobbyHost()) return;
+    const s = getPlaylistGuessSession();
     if (s.roundScored || roundScored) return;
     revealAdvancing = true;
     try {
       await commitPlaylistGuessPlay({ phase: "reveal", voteEndsAt: null });
-      applyRoundScore(computeReveal());
+      applyRoundScore();
       await commitPlaylistGuessPlay({ roundScored: true });
     } finally {
       revealAdvancing = false;
@@ -164,62 +146,30 @@ export function mountPlaylistGuess(app) {
 
   function ensureRevealDisplay() {
     if (phase !== "reveal") return;
-    const result = computeReveal();
     if (!roundScored && (!mp || isLobbyHost())) {
-      applyRoundScore(result);
+      applyRoundScore();
     } else if (!revealSummary) {
-      const { correct, allCorrect, ownerStealth, round, all } = result;
-      revealSummary = {
-        round,
-        ownerStealth,
-        myCorrect: correct.includes(localName),
-        isOwner: isOwner(round),
-        votesByName: all,
-        correctVoters: correct,
-        allCorrect,
-      };
+      revealSummary = buildSummary(gatherVotes(), false);
     }
   }
 
-  function startVotingTimer() {
-    clearTimer();
-    primeTimerSound();
-    intervalId = setInterval(async () => {
-      if (isEveningGameplayPaused()) return;
-      const s = getPlaylistGuessSession();
-      if (phase !== "voting") {
-        clearTimer();
-        return;
+  /** Filet de sécurité hôte : clôt la manche même si un joueur n'a pas voté. */
+  async function forceReveal() {
+    if (mp && !isLobbyHost()) return;
+    if (mp) {
+      if (revealAdvancing || phase !== "voting") return;
+      revealAdvancing = true;
+      try {
+        await commitPlaylistGuessPlay({ phase: "reveal", voteEndsAt: null });
+        applyRoundScore();
+        await commitPlaylistGuessPlay({ roundScored: true });
+      } finally {
+        revealAdvancing = false;
       }
-      if (mp && s.voteEndsAt) {
-        timer = secondsUntil(s.voteEndsAt) ?? 0;
-      } else {
-        timer -= 1;
-      }
-      onTimerSecond({ remaining: timer, urgentAt: 5 });
-      const el = app.querySelector("#timer-el");
-      if (el) {
-        el.textContent = String(timer);
-        if (timer <= 5) el.classList.add("timer--urgent");
-      }
-      const progressEl = app.querySelector("#progress-el");
-      if (progressEl) {
-        progressEl.style.width = `${(timer / PLAYLIST_GUESS_TIMER_SEC) * 100}%`;
-      }
-      if (timer <= 0) {
-        clearTimer();
-        if (!mp) {
-          const round = currentRound();
-          if (!isOwner(round) && selected === null && round.choices?.length) {
-            selected = round.choices[Math.floor(Math.random() * round.choices.length)].playerId;
-          }
-          phase = "reveal";
-          render();
-        } else if (isLobbyHost()) {
-          await tryAdvanceToReveal();
-        }
-      }
-    }, 1000);
+    } else {
+      phase = "reveal";
+      render();
+    }
   }
 
   async function nextRound() {
@@ -253,25 +203,13 @@ export function mountPlaylistGuess(app) {
     const next = roundIdx + 1;
     if (mp) {
       await startPlaylistGuessRound(next);
-      roundIdx = next;
-      phase = "voting";
-      selected = null;
-      roundScored = false;
-      revealSummary = null;
-      timer = PLAYLIST_GUESS_TIMER_SEC;
-      clearTimer();
-      render();
-      startVotingTimer();
-    } else {
-      roundIdx = next;
-      phase = "voting";
-      selected = null;
-      roundScored = false;
-      revealSummary = null;
-      timer = PLAYLIST_GUESS_TIMER_SEC;
-      render();
-      startVotingTimer();
     }
+    roundIdx = next;
+    phase = "voting";
+    selected = null;
+    roundScored = false;
+    revealSummary = null;
+    render();
   }
 
   function render() {
@@ -289,36 +227,32 @@ export function mountPlaylistGuess(app) {
       return;
     }
 
-    const owner = isOwner(round);
+    const players = lobbyPlayersWithIds();
     let body = "";
 
     if (phase === "voting") {
-      if (owner) {
-        body = ownerWaitingStageHtml(round, timer);
+      const alreadyVoted = mp && (getPlaylistGuessSession().votes || {})[localUid] != null;
+      if (alreadyVoted) {
+        body = `
+          ${songGuessCardHtml(round, { players, selectedPlayerId: selected, readonly: true })}
+          <p class="hint">Vote enregistré - en attente des autres…</p>`;
       } else {
-        const alreadyVoted = mp && (getPlaylistGuessSession().votes || {})[localUid] != null;
-        if (alreadyVoted) {
-          body = `
-            ${songGuessCardHtml(round, { selectedPlayerId: selected, readonly: true })}
-            <p class="hint">Vote enregistré - en attente des autres…</p>`;
-        } else {
-          body = `
-            <div class="timer" id="timer-el">${timer}</div>
-            <div class="progress progress--timer">
-              <div class="progress-fill" id="progress-el" style="width:${(timer / PLAYLIST_GUESS_TIMER_SEC) * 100}%"></div>
-            </div>
-            ${songGuessCardHtml(round, { selectedPlayerId: selected })}
-            <button type="button" class="btn btn-primary" id="confirm" ${selected === null ? "disabled" : ""}>Valider mon vote</button>`;
-        }
+        body = `
+          ${songGuessCardHtml(round, { players, selectedPlayerId: selected })}
+          <button type="button" class="btn btn-primary" id="confirm" ${selected === null ? "disabled" : ""}>Valider mon vote</button>`;
+      }
+      if (!mp || isLobbyHost()) {
+        const votedCount = Object.keys(getPlaylistGuessSession().votes || {}).length;
+        body += `
+          <button type="button" class="btn btn-secondary btn--spaced" id="playlist-force">
+            Révéler maintenant (${votedCount} vote${votedCount > 1 ? "s" : ""})
+          </button>`;
       }
     }
 
     if (phase === "reveal" && revealSummary) {
       body = `
-        ${revealOwnerCardHtml({
-          ...revealSummary,
-          nameForPlayerId,
-        })}
+        ${revealResultCardHtml(revealSummary)}
         ${gameCumulativeScoresHtml({ gameLabel: "VibeCheck", title: "Cumul des scores" })}
         ${
           !mp || isLobbyHost()
@@ -352,7 +286,6 @@ export function mountPlaylistGuess(app) {
 
     app.querySelector("#confirm")?.addEventListener("click", async () => {
       if (selected === null) return;
-      clearTimer();
       if (mp) {
         const votes = { ...(getPlaylistGuessSession().votes || {}), [localUid]: selected };
         await commitPlaylistGuessPlay({ votes });
@@ -362,6 +295,8 @@ export function mountPlaylistGuess(app) {
       }
       render();
     });
+
+    app.querySelector("#playlist-force")?.addEventListener("click", () => void forceReveal());
 
     app.querySelector("#next-round")?.addEventListener("click", () => void nextRound());
   }
@@ -375,12 +310,9 @@ export function mountPlaylistGuess(app) {
     if (advanced) {
       revealSummary = null;
       selected = phase === "voting" ? null : selected;
-      timer = PLAYLIST_GUESS_TIMER_SEC;
-      clearTimer();
     }
     void tryAdvanceToReveal();
     render();
-    if (phase === "voting" && (advanced || !intervalId)) startVotingTimer();
   }
 
   const unsub = onGameSessionChange(onSyncUpdate);
@@ -389,11 +321,9 @@ export function mountPlaylistGuess(app) {
     onSyncUpdate();
   } else {
     render();
-    startVotingTimer();
   }
 
   return () => {
-    clearTimer();
     unsub();
     if (!mp) setLobbyWaiting();
   };

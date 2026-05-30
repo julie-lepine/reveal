@@ -62,6 +62,10 @@ const defaultState = () => ({
   settings: defaultSettings(),
   scores: {},
   filRougeScores: {},
+  /** Points par jeu : { [gameId]: { [playerName]: points } } (agrégé sur la soirée). */
+  gameScores: {},
+  /** Ordre de passage des jeux pour l'affichage des classements. */
+  gameScoreOrder: [],
   playerStats: {},
   stats: {
     hotTakesPlayed: 0,
@@ -115,8 +119,6 @@ const defaultState = () => ({
   },
   playlistGuessGame: {
     ready: {},
-    spotifyByUid: {},
-    librariesByUid: {},
     lobbyStarted: false,
     roundCount: 5,
     deck: null,
@@ -125,8 +127,6 @@ const defaultState = () => ({
     votes: {},
     voteEndsAt: null,
     roundScored: false,
-    usedTrackIds: [],
-    connectError: null,
   },
   truthMeterGame: {
     ready: {},
@@ -222,6 +222,8 @@ function loadState() {
       ...parsed,
       scores: { ...base.scores, ...parsed.scores },
       filRougeScores: { ...base.filRougeScores, ...parsed.filRougeScores },
+      gameScores: { ...base.gameScores, ...parsed.gameScores },
+      gameScoreOrder: Array.isArray(parsed.gameScoreOrder) ? parsed.gameScoreOrder : [],
       playerStats: { ...base.playerStats, ...parsed.playerStats },
       stats: { ...base.stats, ...parsed.stats },
       guessLie: { ...emptyGuessLie(), ...parsed.guessLie },
@@ -275,6 +277,7 @@ export function saveStatePatch(patch) {
   if (patch.filRougeScores) {
     state.filRougeScores = { ...state.filRougeScores, ...patch.filRougeScores };
   }
+  if (patch.gameScores) state.gameScores = { ...state.gameScores, ...patch.gameScores };
   if (patch.playerStats) state.playerStats = { ...state.playerStats, ...patch.playerStats };
   if (patch.settings) state.settings = { ...state.settings, ...patch.settings };
   save();
@@ -454,6 +457,8 @@ export function resetScores() {
     state.filRougeScores[name] = 0;
     state.playerStats[name] = defaultPlayerStats();
   });
+  state.gameScores = {};
+  state.gameScoreOrder = [];
   save();
 }
 
@@ -497,9 +502,29 @@ export function resetGameSessionsOnly() {
   });
 }
 
+let activeScoringGameId = null;
+
+/** Définit le jeu auquel les points ajoutés via addScore() sont attribués. */
+export function setActiveScoringGame(gameId) {
+  activeScoringGameId = gameId || null;
+}
+
+function creditGameScore(playerName, points) {
+  const gid = activeScoringGameId;
+  if (!gid) return;
+  if (!state.gameScores[gid]) {
+    state.gameScores[gid] = {};
+    if (!state.gameScoreOrder.includes(gid)) {
+      state.gameScoreOrder = [...state.gameScoreOrder, gid];
+    }
+  }
+  state.gameScores[gid][playerName] = (state.gameScores[gid][playerName] || 0) + points;
+}
+
 export function addScore(playerName, points) {
   ensurePlayerScore(playerName);
   state.scores[playerName] += points;
+  creditGameScore(playerName, points);
   save();
 }
 

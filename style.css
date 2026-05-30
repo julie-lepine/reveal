@@ -523,7 +523,14 @@ button{
 
 .player-row:last-child{ margin-bottom:0; }
 
-.player-name{ font-weight:600; }
+.player-name{
+  font-weight:600;
+  display:block;
+  min-width:0;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
 
 .badge{
   margin-left:auto;
@@ -1106,6 +1113,7 @@ button.game-card{
 
 .player-row__info{
   flex:1;
+  min-width:0;
   display:flex;
   flex-direction:column;
 }
@@ -1118,9 +1126,12 @@ button.game-card{
 .player-score{
   font-size:22px;
   font-weight:900;
+  flex-shrink:0;
 }
 
 .player-score--gold{ color:#FBBF24; }
+
+.game-leaderboards__heading{ margin-top:18px; }
 
 .btn-row{
   display:grid;
@@ -3046,8 +3057,67 @@ body.wizz-shake #app{
   margin:12px 0 20px;
 }
 
-.vibecheck-connect-card .btn-primary{
-  background:linear-gradient(135deg,#1DB954,#6366F1);
+.vibecheck-vote__emoji{
+  margin-right:8px;
+}
+
+.vibecheck-song-card--mini{
+  padding:14px;
+}
+
+.vibecheck-album--mini{
+  width:120px;
+  max-width:120px;
+  margin:0 auto 10px;
+  font-size:36px;
+}
+
+.vibecheck-results{
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+}
+
+.vibecheck-result-row__head{
+  display:flex;
+  justify-content:space-between;
+  align-items:baseline;
+  margin-bottom:6px;
+  gap:10px;
+}
+
+.vibecheck-result-row__name{
+  font-weight:700;
+}
+
+.vibecheck-result-row__votes{
+  font-size:13px;
+  color:rgba(255,255,255,.6);
+  white-space:nowrap;
+}
+
+.vibecheck-result-row--winner .vibecheck-result-row__votes{
+  color:#C4B5FD;
+  font-weight:700;
+}
+
+.vibecheck-result-bar{
+  height:10px;
+  border-radius:999px;
+  background:rgba(255,255,255,.08);
+  overflow:hidden;
+}
+
+.vibecheck-result-bar span{
+  display:block;
+  height:100%;
+  border-radius:999px;
+  background:linear-gradient(90deg,#6366F1,#A78BFA);
+  transition:width .4s ease;
+}
+
+.vibecheck-result-row--winner .vibecheck-result-bar span{
+  background:linear-gradient(90deg,#A78BFA,#F0ABFC);
 }
 
 /* ─── Mobile only (fin) ─── */

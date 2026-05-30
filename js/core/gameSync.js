@@ -37,6 +37,8 @@ let lastGameSessionRealtimeAt = 0;
 const POLL_MS_MIN = 3000;
 const POLL_MS_MAX = 12000;
 const POLL_MS_DEFAULT = 4000;
+/** En partie active on garde un polling serré (le Realtime peut être étranglé sur certains appareils). */
+const POLL_MS_ACTIVE = 2000;
 /** Évite de forcer l’écran de prep quand l’invité revient au menu manuellement. */
 let suppressSessionRouteUntil = 0;
 /** Écran de session ignoré pendant la suppression (retour invité au menu jeux). */
@@ -1120,16 +1122,6 @@ function mergeRemotePlaylistGuessVotesUid(cur, inc) {
   return incVotes;
 }
 
-function mergePlaylistGuessLibrariesUid(cur, inc) {
-  if (!inc?.librariesByUid) return cur?.librariesByUid || {};
-  return { ...(cur?.librariesByUid || {}), ...inc.librariesByUid };
-}
-
-function mergePlaylistGuessSpotifyMetaUid(cur, inc) {
-  if (!inc?.spotifyByUid) return cur?.spotifyByUid || {};
-  return { ...(cur?.spotifyByUid || {}), ...inc.spotifyByUid };
-}
-
 function mergePlaylistGuessGameLocal(local, remote) {
   if (!remote) return local;
   if (!local) return remote;
@@ -1140,8 +1132,10 @@ function mergePlaylistGuessGameLocal(local, remote) {
     votes = remoteVotes;
   } else if (remote.phase === "voting") {
     votes = { ...remoteVotes };
-    const name = getLocalDisplayName();
-    if (localVotes[name] != null) votes[name] = localVotes[name];
+    const localUid = getSupabaseUserId() || getLocalDisplayName();
+    if (localVotes[localUid] != null && votes[localUid] == null) {
+      votes[localUid] = localVotes[localUid];
+    }
   } else if (remote.phase === "reveal" || local.phase === "reveal") {
     votes = { ...remoteVotes, ...localVotes };
   }
@@ -1154,8 +1148,6 @@ function mergePlaylistGuessGameLocal(local, remote) {
     ...remote,
     votes,
     ready,
-    librariesByUid: mergePlaylistGuessLibrariesUid(local, remote),
-    spotifyByUid: mergePlaylistGuessSpotifyMetaUid(local, remote),
   };
 }
 
@@ -1165,8 +1157,6 @@ export function playlistGuessToRemote(session) {
   return {
     // Ready is keyed by userId already (durable, avoids name collisions)
     ready: session.ready || {},
-    spotifyByUid: session.spotifyByUid || {},
-    librariesByUid: session.librariesByUid || {},
     lobbyStarted: Boolean(session.lobbyStarted),
     roundCount: session.roundCount ?? 5,
     deck: session.deck || null,
@@ -1175,7 +1165,6 @@ export function playlistGuessToRemote(session) {
     votes: remoteVotes,
     voteEndsAt: session.voteEndsAt || null,
     roundScored: Boolean(session.roundScored),
-    usedTrackIds: session.usedTrackIds || [],
   };
 }
 
@@ -1186,8 +1175,6 @@ export function playlistGuessFromRemote(remote) {
   return {
     // Ready map remains keyed by userId (no lossy name mapping)
     ready: { ...(remote.ready || {}) },
-    spotifyByUid: remote.spotifyByUid || {},
-    librariesByUid: remote.librariesByUid || {},
     lobbyStarted: Boolean(remote.lobbyStarted),
     roundCount: remote.roundCount ?? 5,
     deck: remote.deck || null,
@@ -1196,7 +1183,6 @@ export function playlistGuessFromRemote(remote) {
     votes,
     voteEndsAt: remote.voteEndsAt || null,
     roundScored: Boolean(remote.roundScored),
-    usedTrackIds: remote.usedTrackIds || [],
   };
 }
 
@@ -1294,6 +1280,30 @@ function scoresFromRemote(remote = {}) {
   return out;
 }
 
+function gameScoresToRemote(byGame = {}) {
+  const out = {};
+  Object.entries(byGame).forEach(([gid, scoresByName]) => {
+    out[gid] = scoresToRemote(scoresByName || {});
+  });
+  return out;
+}
+
+function gameScoresFromRemote(remote = {}) {
+  const out = {};
+  Object.entries(remote).forEach(([gid, scoresByUid]) => {
+    out[gid] = scoresFromRemote(scoresByUid || {});
+  });
+  return out;
+}
+
+function applyRemoteGameScores(remote, order) {
+  if (!remote || typeof remote !== "object") return;
+  const byGame = gameScoresFromRemote(remote);
+  const patch = { gameScores: byGame };
+  if (Array.isArray(order) && order.length) patch.gameScoreOrder = order;
+  saveStatePatch(patch);
+}
+
 export function applyRemoteLobbyScores(remote) {
   if (!remote || typeof remote !== "object") return;
   const byName = scoresFromRemote(remote);
@@ -1329,9 +1339,12 @@ function eveningStateToRemote() {
   return {
     scores: scoresToRemote(getState().scores),
     filRougeScores: scoresToRemote(getState().filRougeScores || {}),
+    gameScores: gameScoresToRemote(getState().gameScores || {}),
+    gameScoreOrder: [...(getState().gameScoreOrder || [])],
     stats: {
       hotTakesPlayed: stats.hotTakesPlayed || 0,
       speedVotesPlayed: stats.speedVotesPlayed || 0,
+      playlistGuessesPlayed: stats.playlistGuessesPlayed || 0,
       triviaGamesPlayed: stats.triviaGamesPlayed || 0,
       truthMetersPlayed: stats.truthMetersPlayed || 0,
       consensusGamesPlayed: stats.consensusGamesPlayed || 0,
@@ -1364,6 +1377,7 @@ export function applyRemoteEveningState(st) {
   if (Object.keys(patch).length) saveStatePatch(patch);
   if (st.scores) applyRemoteLobbyScores(st.scores);
   if (st.filRougeScores) applyRemoteFilRougeScores(st.filRougeScores);
+  if (st.gameScores) applyRemoteGameScores(st.gameScores, st.gameScoreOrder);
 }
 
 /** Hôte : pousse scores + stats de soirée vers game_sessions.state */
@@ -1581,6 +1595,19 @@ export function isSessionRouteSuppressed() {
   return Date.now() < suppressSessionRouteUntil;
 }
 
+/**
+ * Consulter le classement / les résultats pendant une partie en cours.
+ * On suspend le routage auto vers le jeu courant (sinon le prochain tick de polling
+ * renverrait l'utilisateur dans la partie au bout de quelques secondes), tout en
+ * gardant la bascule automatique si l'hôte lance/avance vers un AUTRE écran.
+ */
+export function suppressRoutingForScoreView(ms = 15 * 60 * 1000) {
+  const active = getEffectiveSessionScreen(getCachedGameSession());
+  if (active && isActiveGameSessionScreen(active)) {
+    suppressSessionRoute(ms, active);
+  }
+}
+
 export function isActiveGameSessionScreen(screen) {
   if (!screen || MENU_SCREENS.has(screen)) return false;
   if (POST_GAME_SCREENS.has(screen)) return false;
@@ -1632,6 +1659,25 @@ export function getEffectiveSessionScreen(row) {
   if (gid === "guesslie" || declared === "guesslie-menu") return "guesslie-menu";
   if (st.tierNight?.game && !st.tierNight?.finished) return "tiernight";
   return declared;
+}
+
+/**
+ * Écran Fil Rouge à restaurer au redémarrage de l'app, le cas échéant.
+ * Le Fil Rouge est un jeu « de fond » : il ne doit pas être traité comme un écran de
+ * partie actif dans le routage continu (sinon il volerait la vedette aux autres jeux),
+ * mais à la reprise on ramène le joueur sur la config ou sa mission secrète non vue.
+ * Renvoie null si rien à restaurer (mission déjà prise en compte, jeu terminé, etc.).
+ */
+export function getFilRougeResumeScreen() {
+  const fr = getCachedGameSession()?.state?.filRouge;
+  if (!fr) return null;
+  if (fr.status === "setup") return "filrouge-setup";
+  if (fr.status === "active") {
+    const uid = getSupabaseUserId();
+    const acked = uid ? getState().filRougeGame?.missionAcks?.[uid] : true;
+    if (uid && !acked) return "filrouge-mission";
+  }
+  return null;
 }
 
 /** Renvoie l’invité (ou l’hôte) vers la partie en cours si une session active existe. */
@@ -1693,6 +1739,17 @@ function scheduleSyncPoll() {
 }
 
 function adjustPollBackoff(sigChanged) {
+  /**
+   * Pendant une partie active : polling rapide et constant. Si le websocket Realtime
+   * d'un joueur est étranglé (arrière-plan mobile, économiseur de batterie, réseau
+   * restrictif), il ne reçoit plus les events ; ralentir le polling le ferait voir les
+   * questions « bien plus tard ». On reste donc serré tant qu'on est en jeu.
+   */
+  if (isActiveGameSessionScreen(getCurrentScreen())) {
+    pollUnchangedStreak = sigChanged ? 0 : pollUnchangedStreak + 1;
+    pollIntervalMs = POLL_MS_ACTIVE;
+    return;
+  }
   if (sigChanged) {
     pollUnchangedStreak = 0;
     pollIntervalMs = POLL_MS_DEFAULT;
@@ -1920,8 +1977,6 @@ export async function patchGameState(stateMerge, { screen, gameId } = {}) {
           ...incPg,
           ready: mergeRemoteReadyUid(curPg, incPg),
           votes: mergeRemotePlaylistGuessVotesUid(curPg, incPg),
-          librariesByUid: mergePlaylistGuessLibrariesUid(curPg, incPg),
-          spotifyByUid: mergePlaylistGuessSpotifyMetaUid(curPg, incPg),
         }
       : incPg;
   }

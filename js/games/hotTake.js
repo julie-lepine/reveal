@@ -4,13 +4,10 @@ import {
   HOT_TAKE_TIMER_SEC,
 } from "../../data/hotTakes.js";
 
-const HOT_TAKE_INTERMISSION_SEC = 5;
 import {
   getAllTakesForGame,
   getHotTakeEntryScreen,
   getHotTakeSession,
-  pauseHotTakeVote,
-  resumeHotTakeVote,
   simulateLobbyVotes,
   getMajorityOption,
   commitHotTakePlay,
@@ -27,7 +24,6 @@ import { escapeHtml, pageShell } from "../core/ui.js";
 import { bindNav } from "../screens/nav.js";
 import { gameExitBarHtml, bindExitGame } from "../core/exitGame.js";
 import { isEveningGameplayPaused } from "../core/filRougeSession.js";
-import { onTimerSecond, primeTimerSound } from "../core/timerSound.js";
 import {
   isGameSyncActive,
   isLobbyHost,
@@ -55,33 +51,14 @@ export function mountHotTake(app) {
 
   let takeIdx = 0;
   let phase = "question";
-  let timer = HOT_TAKE_TIMER_SEC;
-  let intermissionTimer = HOT_TAKE_INTERMISSION_SEC;
   let myVote = null;
   let votes = {};
   let lastAward = null;
   let takeScored = false;
-  let intervalId = null;
-  let paused = false;
   /** Vote en cours d’envoi - évite que la synchro efface l’UI avant la réponse serveur. */
   let voteCommitInFlight = null;
-  /** Chrono figé en pause (mode local sans sync). */
-  let localPausedRemaining = null;
-  let prevPaused = false;
   const localName = getLocalDisplayName();
   const mp = isGameSyncActive();
-
-  function clearTimer() {
-    if (intervalId) {
-      clearInterval(intervalId);
-      intervalId = null;
-    }
-  }
-
-  function secondsUntil(iso) {
-    if (!iso) return null;
-    return Math.max(0, Math.ceil((new Date(iso).getTime() - Date.now()) / 1000));
-  }
 
   /** Votes complets pour le scoring (session sync), pas le snapshot local du clic. */
   function votesForAward() {
@@ -112,7 +89,6 @@ export function mountHotTake(app) {
 
     if (phase !== "voting") {
       myVote = null;
-      localPausedRemaining = null;
     } else {
       if (voteCommitInFlight != null) {
         myVote = voteCommitInFlight;
@@ -121,14 +97,7 @@ export function mountHotTake(app) {
         myVote = votes[localName] ?? null;
       }
     }
-    paused = Boolean(s.pausedBy);
     takeScored = Boolean(s.takeScored);
-    if (phase === "voting") {
-      timer = votingSecondsLeft(s);
-    }
-    if (phase === "intermission" && s.intermissionEndsAt) {
-      intermissionTimer = secondsUntil(s.intermissionEndsAt) ?? intermissionTimer;
-    }
     if (phase === "voting" && !takeScored) {
       lastAward = null;
     }
@@ -179,31 +148,8 @@ export function mountHotTake(app) {
       <div class="card card--votes">${rows}</div>`;
   }
 
-  function pauseBanner() {
-    const who = getHotTakeSession().pausedBy;
-    if (!who) return "";
-    return `<p class="pause-banner">⏸ Pause - ${escapeHtml(who)} a mis la partie en pause</p>`;
-  }
-
-  function votingSecondsLeft(session = getHotTakeSession()) {
-    if (phase !== "voting") return 0;
-    if (session.pausedBy && session.voteTimerRemaining != null) {
-      return session.voteTimerRemaining;
-    }
-    if (session.voteEndsAt) {
-      return secondsUntil(session.voteEndsAt) ?? 0;
-    }
-    if (!mp && localPausedRemaining != null) return localPausedRemaining;
-    return timer;
-  }
-
   function canChangeVote() {
-    return (
-      phase === "voting" &&
-      !paused &&
-      !isEveningGameplayPaused() &&
-      votingSecondsLeft() > 0
-    );
+    return phase === "voting" && !isEveningGameplayPaused();
   }
 
   function hotTakeAwardSummaryHtml(voteResult, { pointsAwarded = false } = {}) {
@@ -215,35 +161,6 @@ export function mountHotTake(app) {
       ? ` - majorité +${EVENING_POINTS.WIN} pts, dissent +${EVENING_POINTS.BONUS} pts`
       : "";
     return `<p class="hint">Majorité : <strong style="color:${HOT_TAKE_OPTION_COLORS[voteResult.majority]}">${voteResult.majority}</strong>${ptsLine}</p>`;
-  }
-
-  function intermissionRing(sec) {
-    const pct = sec / HOT_TAKE_INTERMISSION_SEC;
-    const r = 40;
-    const c = 2 * Math.PI * r;
-    return `
-      <div class="intermission-wrap intermission-wrap--hot">
-        <svg class="intermission-ring" width="100" height="100" viewBox="0 0 100 100" aria-hidden="true">
-          <circle cx="50" cy="50" r="${r}" fill="none" stroke="rgba(255,255,255,.1)" stroke-width="6"/>
-          <circle class="intermission-arc" cx="50" cy="50" r="${r}" fill="none" stroke="#FF6B6B" stroke-width="6" stroke-linecap="round"
-            stroke-dasharray="${c}" stroke-dashoffset="${c * (1 - pct)}" transform="rotate(-90 50 50)"/>
-          <text class="intermission-sec" x="50" y="56" text-anchor="middle" fill="#fff" font-size="26" font-weight="800">${sec}</text>
-        </svg>
-        <p class="intermission-wrap__title">Prochaine manche</p>
-        <p class="hint" id="intermission-hint">Lancement du vote dans ${sec} s…</p>
-      </div>`;
-  }
-
-  function updateIntermissionUi() {
-    const pct = intermissionTimer / HOT_TAKE_INTERMISSION_SEC;
-    const r = 40;
-    const c = 2 * Math.PI * r;
-    const ring = app.querySelector(".intermission-sec");
-    const arc = app.querySelector(".intermission-arc");
-    const hint = app.querySelector("#intermission-hint");
-    if (ring) ring.textContent = String(intermissionTimer);
-    if (arc) arc.setAttribute("stroke-dashoffset", String(c * (1 - pct)));
-    if (hint) hint.textContent = `Lancement du vote dans ${intermissionTimer} s…`;
   }
 
   async function goToReveal() {
@@ -275,19 +192,14 @@ export function mountHotTake(app) {
         votes: {},
         takeScored: false,
         voteEndsAt: endsAt,
-        voteTimerRemaining: null,
         intermissionEndsAt: null,
         pausedBy: null,
       });
     } else {
       phase = "voting";
-      timer = HOT_TAKE_TIMER_SEC;
       myVote = null;
       votes = {};
-      localPausedRemaining = null;
-      paused = false;
       render();
-      startVoteTimer();
     }
   }
 
@@ -300,20 +212,25 @@ export function mountHotTake(app) {
         votes: {},
         takeScored: false,
         voteEndsAt: new Date(Date.now() + HOT_TAKE_TIMER_SEC * 1000).toISOString(),
-        voteTimerRemaining: null,
         intermissionEndsAt: null,
         pausedBy: null,
       });
     } else {
       phase = "voting";
-      timer = HOT_TAKE_TIMER_SEC;
       myVote = null;
       votes = {};
-      localPausedRemaining = null;
-      paused = false;
       render();
-      startVoteTimer();
     }
+  }
+
+  /** Filet de sécurité hôte : clôt le vote même si un joueur n'a pas voté. */
+  async function forceReveal() {
+    if (mp && !isLobbyHost()) return;
+    if (!mp && !myVote) {
+      myVote = HOT_TAKE_OPTIONS[0];
+      votes = simulateLobbyVotes(myVote, HOT_TAKE_OPTIONS);
+    }
+    await goToReveal();
   }
 
   function render() {
@@ -334,30 +251,25 @@ export function mountHotTake(app) {
         : "Choisis ton camp !";
     const voteHintExtra =
       phase === "voting" && canChangeVote()
-        ? " · Tu peux changer ton vote avant la fin du chrono."
-        : paused
-          ? " · Vote en pause."
-          : "";
+        ? " · Tu peux changer ton vote tant que le vote est ouvert."
+        : "";
 
     let phaseHtml = "";
 
     if (phase === "question") {
       phaseHtml = host
-        ? `<p class="hint">Vote simultané - lance le chrono quand tout le monde est prêt.</p>
+        ? `<p class="hint">Vote simultané - lance le vote quand tout le monde est prêt.</p>
         <button type="button" class="btn btn-primary" id="start-vote">Lancer le vote →</button>`
         : `<p class="hint">En attente que l'hôte lance le vote…</p>`;
     }
 
     if (phase === "voting") {
       const canVote = canChangeVote();
+      const votedCount = Object.keys(votes).length;
+      const totalPlayers = getActivePlayers().length;
       phaseHtml = `
-        ${pauseBanner()}
         <p class="label-upper label-upper--muted">Vote simultané</p>
-        <div class="timer ${paused ? "timer--paused" : ""}" id="timer-el">${timer}</div>
-        <div class="progress progress--timer">
-          <div class="progress-fill" id="progress-el" style="width:${(timer / HOT_TAKE_TIMER_SEC) * 100}%"></div>
-        </div>
-        <div class="vote-buttons ${paused ? "vote-buttons--locked" : ""}">
+        <div class="vote-buttons">
           ${HOT_TAKE_OPTIONS.map(
             (opt) => `
             <button type="button" class="vote-btn ${myVote === opt ? "vote-btn--active" : ""}"
@@ -367,8 +279,14 @@ export function mountHotTake(app) {
             </button>`
           ).join("")}
         </div>
-        ${host ? `<button type="button" class="btn btn-secondary btn--spaced" id="btn-pause">${paused ? "Reprendre" : "Pause"}</button>` : ""}
-        <p class="hint">${voteHint}${voteHintExtra}</p>`;
+        <p class="hint">${voteHint}${voteHintExtra}</p>
+        ${
+          host
+            ? `<button type="button" class="btn btn-secondary btn--spaced" id="hottake-force">
+                Révéler maintenant (${votedCount}/${totalPlayers})
+              </button>`
+            : ""
+        }`;
     }
 
     if (phase === "reveal") {
@@ -408,10 +326,6 @@ export function mountHotTake(app) {
         }`;
     }
 
-    if (phase === "intermission") {
-      phaseHtml = `${intermissionRing(intermissionTimer)}`;
-    }
-
     app.innerHTML = pageShell({
       backTarget: "back",
       content: `
@@ -422,15 +336,11 @@ export function mountHotTake(app) {
           <span class="muted">${takeIdx + 1}/${total}</span>
         </div>
         <div class="logo logo--sm"><h1>HOT TAKE</h1></div>
-        ${
-          phase === "intermission"
-            ? `<p class="intermission-label">Pause avant la suite…</p>`
-            : `<div class="card card--hot">
+        <div class="card card--hot">
           <p class="label-upper label-upper--hot">🔥 Hot Take #${takeIdx + 1}</p>
           ${takeAuthorLine(take)}
           <p class="hot-take-text">"${escapeHtml(take.text)}"</p>
-        </div>`
-        }
+        </div>
         ${phaseHtml}
         ${gameExitBarHtml()}
       `,
@@ -457,40 +367,22 @@ export function mountHotTake(app) {
             voteCommitInFlight = null;
             syncFromSession();
           }
+          if (allHotTakeVotesIn() && isLobbyHost()) {
+            await goToReveal();
+            return;
+          }
         } else {
           votes = simulateLobbyVotes(choice, HOT_TAKE_OPTIONS);
           render();
-          if (!intervalId) startVoteTimer();
+          await goToReveal();
+          return;
         }
         render();
       });
     });
 
-    app.querySelector("#btn-pause")?.addEventListener("click", async () => {
-      if (!paused) {
-        const remaining = mp
-          ? (secondsUntil(getHotTakeSession().voteEndsAt) ?? timer)
-          : timer;
-        clearTimer();
-        if (mp) {
-          await pauseHotTakeVote(localName, remaining);
-        } else {
-          paused = true;
-          localPausedRemaining = remaining;
-        }
-      } else {
-        if (mp) {
-          await resumeHotTakeVote();
-        } else {
-          paused = false;
-          if (localPausedRemaining != null) {
-            timer = localPausedRemaining;
-          }
-          localPausedRemaining = null;
-          if (phase === "voting") startVoteTimer();
-        }
-      }
-      render();
+    app.querySelector("#hottake-force")?.addEventListener("click", () => {
+      void forceReveal();
     });
 
     app.querySelector("#next-take")?.addEventListener("click", async () => {
@@ -503,38 +395,13 @@ export function mountHotTake(app) {
 
       if (takeIdx < total - 1) {
         const nextIdx = takeIdx + 1;
-        if (mp) {
-          const intermissionEndsAt = new Date(
-            Date.now() + HOT_TAKE_INTERMISSION_SEC * 1000
-          ).toISOString();
-          await commitHotTakePlay({
-            takeIdx: nextIdx,
-            phase: "intermission",
-            votes: {},
-            takeScored: false,
-            voteEndsAt: null,
-            intermissionEndsAt,
-          });
-          takeIdx = nextIdx;
-          phase = "intermission";
-          intermissionTimer = HOT_TAKE_INTERMISSION_SEC;
-          myVote = null;
-          votes = {};
-          lastAward = null;
-          takeScored = false;
-          render();
-          if (isLobbyHost()) startIntermission();
-        } else {
-          takeIdx = nextIdx;
-          phase = "intermission";
-          intermissionTimer = HOT_TAKE_INTERMISSION_SEC;
-          myVote = null;
-          votes = {};
-          lastAward = null;
-          takeScored = false;
-          render();
-          startIntermission();
-        }
+        takeIdx = nextIdx;
+        myVote = null;
+        votes = {};
+        lastAward = null;
+        takeScored = false;
+        await startNextTakeVote();
+        render();
       } else {
         recordHotTakePlayed();
         setLastGame({
@@ -557,116 +424,19 @@ export function mountHotTake(app) {
     });
   }
 
-  function startVoteTimer() {
-    clearTimer();
-    if (phase !== "voting") return;
-    const s = getHotTakeSession();
-    if (mp && !s.voteEndsAt && !(s.pausedBy && s.voteTimerRemaining != null)) return;
-    primeTimerSound();
-
-    const tick = async () => {
-      syncFromSession();
-      if (isEveningGameplayPaused()) return;
-      if (paused) {
-        const timerEl = app.querySelector("#timer-el");
-        const progressEl = app.querySelector("#progress-el");
-        if (timerEl) timerEl.textContent = String(timer);
-        if (progressEl) {
-          progressEl.style.width = `${(timer / HOT_TAKE_TIMER_SEC) * 100}%`;
-        }
-        return;
-      }
-      if (mp) {
-        timer = votingSecondsLeft();
-      } else {
-        timer -= 1;
-      }
-      onTimerSecond({ remaining: timer, urgentAt: 3 });
-      const timerEl = app.querySelector("#timer-el");
-      const progressEl = app.querySelector("#progress-el");
-      if (timerEl) timerEl.textContent = String(timer);
-      if (progressEl) {
-        progressEl.style.width = `${(timer / HOT_TAKE_TIMER_SEC) * 100}%`;
-      }
-      if (timer <= 0) {
-        clearTimer();
-        if (!mp) {
-          if (!myVote) {
-            myVote = HOT_TAKE_OPTIONS[0];
-            votes = simulateLobbyVotes(myVote, HOT_TAKE_OPTIONS);
-          }
-          phase = "reveal";
-          if (canAwardThisTake()) {
-            const votesToScore = votesForAward();
-            lastAward = awardHotTakeVotes(votesToScore, HOT_TAKE_OPTIONS);
-            takeScored = true;
-          }
-          paused = false;
-          localPausedRemaining = null;
-          render();
-        } else if (isLobbyHost()) {
-          if (!myVote) {
-            myVote = HOT_TAKE_OPTIONS[0];
-            votes = { ...votes, [localName]: myVote };
-            if (mp) await commitHotTakePlay({ votes });
-          }
-          await goToReveal();
-        }
-      }
-    };
-
-    tick();
-    intervalId = setInterval(tick, 1000);
-  }
-
-  function startIntermission() {
-    clearTimer();
-    if (mp && !getHotTakeSession().intermissionEndsAt) return;
-    primeTimerSound();
-
-    const tick = async () => {
-      if (mp) {
-        intermissionTimer = secondsUntil(getHotTakeSession().intermissionEndsAt) ?? 0;
-      } else {
-        intermissionTimer -= 1;
-      }
-      onTimerSecond({ remaining: intermissionTimer, urgentAt: 3 });
-      updateIntermissionUi();
-      if (intermissionTimer <= 0) {
-        clearTimer();
-        if (!mp || isLobbyHost()) await startNextTakeVote();
-      }
-    };
-
-    tick();
-    intervalId = setInterval(tick, 1000);
-  }
-
   const unsubGame = onGameSessionChange(() => {
-    const prevPhase = phase;
-    const wasPaused = prevPaused;
     syncFromSession();
-    prevPaused = paused;
+    if (phase === "voting" && isLobbyHost() && allHotTakeVotesIn()) {
+      void goToReveal();
+      return;
+    }
     render();
-    if (phase === "reveal" && prevPhase === "voting") {
-      clearTimer();
-    }
-    if (paused && !wasPaused) {
-      clearTimer();
-    } else if (!paused && wasPaused && phase === "voting") {
-      startVoteTimer();
-    }
-    if (phase === "voting" && prevPhase !== "voting") startVoteTimer();
-    if (phase === "intermission" && prevPhase !== "intermission") startIntermission();
   });
 
   syncFromSession();
   render();
-  if (phase === "voting") startVoteTimer();
-  if (phase === "intermission") startIntermission();
 
   return () => {
-    clearTimer();
     unsubGame();
     if (!mp) setLobbyWaiting();
   };

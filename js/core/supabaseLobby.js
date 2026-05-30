@@ -7,7 +7,9 @@ import {
   handleSessionRoute,
   refreshGameSession,
   getCachedGameSession,
+  isActiveGameSessionScreen,
 } from "./gameSync.js";
+import { getCurrentScreen } from "./router.js";
 import { fetchGameSessionByLobby } from "./supabaseGame.js";
 
 const HOST_COLOR = "#A78BFA";
@@ -16,7 +18,23 @@ const GUEST_COLOR = "#60A5FA";
 let realtimeChannel = null;
 let lobbyPresencePollTimer = null;
 let presenceLobbyId = null;
+let lastLobbyBundleSig = "";
 const lobbyBundleListeners = new Set();
+
+/** Signature du lobby : ne notifier (donc re-render) que si quelque chose a réellement changé. */
+function lobbyBundleSignature(bundle) {
+  return JSON.stringify({
+    s: bundle.status,
+    g: bundle.gameId,
+    n: bundle.nudgeAt,
+    nf: bundle.nudgeForUserId,
+    p: (bundle.participants || []).map(
+      (x) => `${x.userId}:${x.name}:${x.emoji}:${x.ready ? 1 : 0}:${x.isHost ? 1 : 0}`
+    ),
+    m: (bundle.messages || []).length,
+    lm: bundle.messages?.[bundle.messages.length - 1]?.at || 0,
+  });
+}
 
 function isLobbyGoneError(e) {
   return (
@@ -155,7 +173,11 @@ function applyLobbyToState(bundle) {
   });
   bundle.participants.forEach((p) => ensurePlayerScore(p.name));
   startLobbyPresenceSync();
-  notifyLobbyBundleUpdated();
+  const sig = lobbyBundleSignature(bundle);
+  if (sig !== lastLobbyBundleSig) {
+    lastLobbyBundleSig = sig;
+    notifyLobbyBundleUpdated();
+  }
 }
 
 /** Realtime + polling tant que le joueur est dans un lobby (tous les écrans). */
@@ -170,19 +192,36 @@ export function startLobbyPresenceSync() {
 
   subscribeLobbyRealtime(() => notifyLobbyBundleUpdated());
 
-  lobbyPresencePollTimer = setInterval(() => {
-    refreshLobbyFromSupabase().catch((e) => {
+  scheduleLobbyPresencePoll();
+}
+
+/**
+ * Poll de présence auto-planifié. En partie active, on l'espace (le fetch ramène
+ * lobby + membres + 100 messages : inutile de marteler ça pendant un jeu, ça
+ * contribue aux lags côté hôte). Hors jeu (lobby/menu) on reste réactif.
+ */
+function scheduleLobbyPresencePoll() {
+  if (lobbyPresencePollTimer) clearTimeout(lobbyPresencePollTimer);
+  const inGame = isActiveGameSessionScreen(getCurrentScreen());
+  const delay = inGame ? 7000 : 2500;
+  lobbyPresencePollTimer = setTimeout(async () => {
+    lobbyPresencePollTimer = null;
+    try {
+      await refreshLobbyFromSupabase();
+    } catch (e) {
       if (!isLobbyGoneError(e)) {
         console.warn("REVEAL lobby presence poll:", e.message || e);
       }
-    });
-  }, 2500);
+    }
+    if (presenceLobbyId) scheduleLobbyPresencePoll();
+  }, delay);
 }
 
 export function stopLobbyPresenceSync() {
   presenceLobbyId = null;
+  lastLobbyBundleSig = "";
   if (lobbyPresencePollTimer) {
-    clearInterval(lobbyPresencePollTimer);
+    clearTimeout(lobbyPresencePollTimer);
     lobbyPresencePollTimer = null;
   }
   unsubscribeLobbyRealtime();
@@ -563,7 +602,16 @@ export function subscribeLobbyRealtime(onUpdate) {
         try {
           const { pulseGameSessionRealtime } = await import("./gameSync.js");
           pulseGameSessionRealtime();
-          await refreshGameSession();
+          /**
+           * Le payload Realtime contient déjà la ligne complète (state inclus) :
+           * on l'applique directement au lieu de refaire un aller-retour DB. Ça
+           * réduit la latence et évite que 6 clients refetchent en même temps.
+           */
+          if (payload.new && payload.new.state !== undefined) {
+            applyRemoteSession(payload.new);
+          } else {
+            await refreshGameSession();
+          }
           const row = getCachedGameSession();
           if (row) handleSessionRoute(row);
         } catch (e) {

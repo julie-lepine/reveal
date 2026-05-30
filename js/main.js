@@ -8,7 +8,6 @@ import {
 } from "./core/lobby.js";
 import { initSupabaseAuth, isPasswordRecoveryPending } from "./core/supabaseAuth.js";
 import { mountResetPassword } from "./screens/resetPassword.js";
-import { initSpotifyAuth } from "./core/spotifyAuth.js";
 import { mountHome } from "./screens/home.js";
 import { mountLobby } from "./screens/lobby.js";
 import { mountGameSelect } from "./screens/gameSelect.js";
@@ -96,27 +95,12 @@ initFilRougeValidationListener();
 
 async function boot() {
   await initSupabaseAuth();
-  const spotifyAuth = await initSpotifyAuth();
   await reconcileLobbyMembership();
   resetNav();
   if (isPasswordRecoveryPending()) {
     navigate("reset-password", { reset: true });
   } else {
     navigate("home", { reset: true });
-  }
-  if (spotifyAuth?.connected) {
-    try {
-      const returnScreen = sessionStorage.getItem("reveal-spotify-return");
-      sessionStorage.removeItem("reveal-spotify-return");
-      if (returnScreen === "playlistguess-prep" && hasActiveLobby()) {
-        const { navigate: nav } = await import("./core/router.js");
-        nav("playlistguess-prep", {
-          navStack: ["home", "lobby", "game-select", "playlistguess-prep"],
-        });
-      }
-    } catch {
-      /* ignore */
-    }
   }
   if (hasActiveLobby()) {
     void resumeEveningSession({ force: true });

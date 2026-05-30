@@ -16,7 +16,7 @@ Ce qui demande du travail **avant** une app store ou un APK :
 
 ## Prérequis métier
 
-1. **Web validé** — checklist [LAUNCH_CHECKLIST.md](./LAUNCH_CHECKLIST.md) sections 1–5 OK en prod
+1. **Web validé** — checklist [LAUNCH_CHECKLIST.md](./LAUNCH_CHECKLIST.md) sections 1–4 OK en prod
 2. Compte **Apple Developer** (iOS) et/ou **Google Play Console** (Android) si publication store
 3. Mac avec **Xcode** pour builds iOS (ou CI cloud)
 
@@ -51,22 +51,17 @@ Dans **Authentication → URL Configuration**, ajouter les redirect de l’app n
 
 Sans ça : connexion / reset mot de passe / OAuth ne reviennent pas dans l’app.
 
-### 4. Spotify (VibeCheck)
-
-- Ajouter dans Spotify Developer Dashboard une redirect URI pour l’app (scheme custom ou URL Capacitor).
-- Adapter `SPOTIFY_REDIRECT_URI` dans `js/config/spotify.js` selon plateforme (web vs native).
-
-### 5. Turnstile
+### 4. Turnstile
 
 Fonctionne en général dans une **WebView**, mais à tester sur vrai iPhone/Android (parfois restrictions réseau / IT policy).
 
-### 6. Réseau & stores
+### 5. Réseau & stores
 
-- L’app a besoin d’**Internet** (Supabase, Cloudflare, Spotify, polices Google).
+- L’app a besoin d’**Internet** (Supabase, Cloudflare, polices Google).
 - **Politique de confidentialité** + fiche store si publication Play / App Store.
 - Icônes splash (`resources/`) — non générées aujourd’hui.
 
-### 7. Dépendances npm
+### 6. Dépendances npm
 
 Aujourd’hui `package.json` ne contient que `@supabase/supabase-js` pour les tests. Capacitor ajoutera des paquets et des scripts du type :
 
@@ -87,7 +82,7 @@ Option future : bundler les modules au lieu de `esm.sh` pour offline partiel et 
 | 1 | Lancer en **web** avec amis ([LAUNCH_CHECKLIST.md](./LAUNCH_CHECKLIST.md)) |
 | 2 | Corriger bugs remontés en soirée réelle |
 | 3 | Init Capacitor + test **debug** sur 1 téléphone |
-| 4 | Auth redirect + Spotify native |
+| 4 | Auth redirect (deep links) |
 | 5 | Icônes, splash, privacy policy |
 | 6 | TestFlight / APK interne puis store (optionnel) |
 

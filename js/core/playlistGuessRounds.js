@@ -8,43 +8,21 @@ export function shuffleArray(arr) {
 }
 
 /**
- * @param {Array<{ userId: string, name: string }>} players
- * @param {Array} pool - pistes avec ownerUserId
- * @param {string[]} usedTrackIds
+ * Construit le deck VibeCheck : `roundCount` chansons tirées au hasard du pool.
+ * Chaque manche = une chanson ; les joueurs votent à qui elle correspond le mieux.
+ * @param {Array<{ id: string, title: string, artist: string, albumImage: string|null }>} pool
+ * @param {number} roundCount
  */
-export function generateWhoLikesRound(players, pool, usedTrackIds = []) {
-  const eligible = pool.filter((s) => !usedTrackIds.includes(s.spotifyId));
-  if (!eligible.length) return null;
-
-  const trackEntry = eligible[Math.floor(Math.random() * eligible.length)];
-  const owner = players.find((p) => p.userId === trackEntry.ownerUserId);
-  if (!owner) return null;
-
-  const choices = shuffleArray(
-    players.map((p) => ({ playerId: p.userId, label: p.name }))
-  );
-
-  return {
-    track: {
-      spotifyId: trackEntry.spotifyId,
-      title: trackEntry.title,
-      artist: trackEntry.artist,
-      albumImage: trackEntry.albumImage,
-    },
-    ownerPlayerId: owner.userId,
-    ownerName: owner.name,
-    choices,
-  };
-}
-
-export function buildPlaylistGuessDeck(players, pool, roundCount) {
-  const deck = [];
-  const used = [];
-  for (let i = 0; i < roundCount; i++) {
-    const round = generateWhoLikesRound(players, pool, used);
-    if (!round) break;
-    used.push(round.track.spotifyId);
-    deck.push(round);
-  }
-  return { deck, usedTrackIds: used };
+export function buildPlaylistGuessDeck(pool, roundCount) {
+  const deck = shuffleArray(pool)
+    .slice(0, roundCount)
+    .map((song) => ({
+      song: {
+        id: song.id,
+        title: song.title,
+        artist: song.artist,
+        albumImage: song.albumImage || null,
+      },
+    }));
+  return { deck };
 }
