@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --test tests/sessionMerge.test.js"
+    "test": "node --test tests/sessionMerge.test.js tests/deckCodec.test.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.49.1"
