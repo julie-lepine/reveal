@@ -20,6 +20,7 @@ import {
 import { buildRecapsFromPlacements, getTierNightSession } from "./tierNightSession.js";
 import {
   fetchGameSessionByLobby,
+  fetchGameSessionMeta,
   upsertGameSession,
   updateGameSession,
   deleteGameSession,
@@ -27,6 +28,8 @@ import {
 
 let cachedRow = null;
 let lastSessionSig = "";
+/** Dernier updated_at connu de game_sessions : pour le polling conditionnel. */
+let lastSessionUpdatedAt = "";
 const listeners = new Set();
 let routing = false;
 let pollTimer = null;
@@ -1400,6 +1403,8 @@ export function applyRemoteSession(row) {
   const sigUnchanged = sig === lastSessionSig;
   if (!sigUnchanged) lastSessionSig = sig;
 
+  if (row?.updated_at) lastSessionUpdatedAt = row.updated_at;
+
   cachedRow = row;
 
   if (!row?.state) {
@@ -1774,6 +1779,28 @@ async function syncTick() {
   syncTickInFlight = true;
   const prevSig = lastSessionSig;
   try {
+    const lobbyId = getState().lobby?.id;
+    // Polling conditionnel : on récupère d'abord une méta légère (sans `state`),
+    // et on ne télécharge le blob complet que si `updated_at` a changé.
+    let meta = null;
+    try {
+      meta = await fetchGameSessionMeta(lobbyId);
+    } catch {
+      meta = null;
+    }
+
+    if (meta && meta.updated_at && meta.updated_at === lastSessionUpdatedAt) {
+      adjustPollBackoff(false);
+      scheduleSyncPoll();
+      const cached = getCachedGameSession();
+      if (cached) {
+        if (await routeToActiveGameIfNeeded(cached)) return;
+        const local = getCurrentScreen();
+        if (local !== cached.screen) handleSessionRoute(cached);
+      }
+      return;
+    }
+
     const row = await refreshGameSession();
     if (!row) return;
     adjustPollBackoff(sessionSignature(row) !== prevSig);
@@ -1793,6 +1820,7 @@ export function startMultiplayerSync() {
   stopMultiplayerSync();
   pollIntervalMs = POLL_MS_DEFAULT;
   pollUnchangedStreak = 0;
+  lastSessionUpdatedAt = "";
   lastGameSessionRealtimeAt = Date.now();
   import("./supabaseLobby.js").then((m) => m.startLobbyPresenceSync());
   syncTick();
@@ -1840,7 +1868,11 @@ export async function pushGameSession({ screen, gameId, state }) {
   if (screen) patch.screen = screen;
   if (gameId) patch.game_id = gameId;
 
-  const row = await updateGameSession(lobbyId, patch);
+  let row = await updateGameSession(lobbyId, patch);
+  // L'update ne renvoie plus `state` : on le rattache localement (on vient de l'écrire).
+  if (row) row = { ...row, state: nextState };
+  else row = await fetchGameSessionByLobby(lobbyId);
+  if (!row) return null;
   applyRemoteSession(row);
   if (screen) handleSessionRoute(row);
   return row;
@@ -1989,7 +2021,10 @@ export async function patchGameState(stateMerge, { screen, gameId } = {}) {
   if (gameId) patch.game_id = gameId;
 
   let row = await updateGameSession(lobbyId, patch);
-  if (!row) {
+  // L'update ne renvoie plus `state` : on le rattache localement (on vient de l'écrire).
+  if (row) {
+    row = { ...row, state: nextState };
+  } else {
     row = await fetchGameSessionByLobby(lobbyId);
   }
   if (!row) {
@@ -2006,6 +2041,7 @@ export async function endGameSession() {
   await deleteGameSession(lobbyId);
   cachedRow = null;
   lastSessionSig = "";
+  lastSessionUpdatedAt = "";
   const { setLobbyWaiting } = await import("./lobby.js");
   await setLobbyWaiting();
   notify(null);
@@ -2044,6 +2080,7 @@ function resetLocalGamePrepState() {
 export function clearCachedGameSession() {
   cachedRow = null;
   lastSessionSig = "";
+  lastSessionUpdatedAt = "";
   notify(null);
 }
 

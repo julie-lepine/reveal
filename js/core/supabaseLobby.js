@@ -110,31 +110,46 @@ function mapMember(row, currentUserId) {
   };
 }
 
-async function fetchLobbyBundle(lobbyId) {
+/**
+ * Bundle lobby. Par défaut on NE rapatrie PAS les 100 messages (gros poste d'egress) :
+ * ils ne changent qu'à l'envoi d'un message, géré séparément (Realtime + envoi).
+ * On ne les charge que quand `withMessages` est explicitement demandé.
+ */
+async function fetchLobbyBundle(lobbyId, { withMessages = false } = {}) {
   const userId = getSupabaseUserId();
-  const [{ data: lobby, error: lErr }, { data: members, error: mErr }, { data: messages, error: msgErr }] =
-    await Promise.all([
-      supabase
-        .from("lobbies")
-        .select("id, code, status, game_id, host_id, nudge_at, nudge_for")
-        .eq("id", lobbyId)
-        .single(),
-      supabase.from("lobby_members").select("*").eq("lobby_id", lobbyId).order("joined_at"),
+  const queries = [
+    supabase
+      .from("lobbies")
+      .select("id, code, status, game_id, host_id, nudge_at, nudge_for")
+      .eq("id", lobbyId)
+      .single(),
+    supabase
+      .from("lobby_members")
+      .select("user_id, display_name, emoji, color, ready, is_host, joined_at")
+      .eq("lobby_id", lobbyId)
+      .order("joined_at"),
+  ];
+  if (withMessages) {
+    queries.push(
       supabase
         .from("lobby_messages")
         .select("display_name, body, created_at, user_id")
         .eq("lobby_id", lobbyId)
         .order("created_at", { ascending: true })
-        .limit(100),
-    ]);
+        .limit(100)
+    );
+  }
+
+  const [{ data: lobby, error: lErr }, { data: members, error: mErr }, msgRes] =
+    await Promise.all(queries);
 
   if (lErr) throw lErr;
   if (mErr) throw mErr;
-  if (msgErr) throw msgErr;
+  if (msgRes?.error) throw msgRes.error;
 
   const participants = (members || []).map((m) => mapMember(m, userId));
 
-  return {
+  const bundle = {
     id: lobby.id,
     code: lobby.code,
     status: lobby.status || "waiting",
@@ -143,21 +158,30 @@ async function fetchLobbyBundle(lobbyId) {
     nudgeAt: lobby.nudge_at ? new Date(lobby.nudge_at).getTime() : 0,
     nudgeForUserId: lobby.nudge_for || null,
     participants,
-    messages: (messages || []).map((m) => ({
+  };
+
+  if (withMessages) {
+    bundle.messages = (msgRes?.data || []).map((m) => ({
       from: m.display_name,
       text: m.body,
       at: new Date(m.created_at).getTime(),
-    })),
-  };
+    }));
+  }
+
+  return bundle;
 }
 
 function applyLobbyToState(bundle) {
+  // Si le bundle n'a pas chargé les messages, on conserve ceux déjà en mémoire.
+  const messages =
+    bundle.messages !== undefined ? bundle.messages : getState().lobby?.messages || [];
+
   saveStatePatch({
     lobby: {
       id: bundle.id,
       code: bundle.code,
       participants: bundle.participants,
-      messages: bundle.messages,
+      messages,
       status: bundle.status,
       gameId: bundle.gameId,
       hostId: bundle.hostId,
@@ -173,7 +197,7 @@ function applyLobbyToState(bundle) {
   });
   bundle.participants.forEach((p) => ensurePlayerScore(p.name));
   startLobbyPresenceSync();
-  const sig = lobbyBundleSignature(bundle);
+  const sig = lobbyBundleSignature({ ...bundle, messages });
   if (sig !== lastLobbyBundleSig) {
     lastLobbyBundleSig = sig;
     notifyLobbyBundleUpdated();
@@ -202,8 +226,10 @@ export function startLobbyPresenceSync() {
  */
 function scheduleLobbyPresencePoll() {
   if (lobbyPresencePollTimer) clearTimeout(lobbyPresencePollTimer);
+  // Le Realtime gère les changements en direct ; ce poll n'est qu'un filet de
+  // sécurité (et il ne rapatrie ni les messages ni le `state` du jeu).
   const inGame = isActiveGameSessionScreen(getCurrentScreen());
-  const delay = inGame ? 7000 : 2500;
+  const delay = inGame ? 20000 : 12000;
   lobbyPresencePollTimer = setTimeout(async () => {
     lobbyPresencePollTimer = null;
     try {
@@ -270,7 +296,7 @@ export async function createLobbySupabase() {
 
   if (memberErr) return { ok: false, error: memberErr.message };
 
-  const bundle = await fetchLobbyBundle(lobby.id);
+  const bundle = await fetchLobbyBundle(lobby.id, { withMessages: true });
   applyLobbyToState(bundle);
   const { startMultiplayerSync } = await import("./gameSync.js");
   startMultiplayerSync();
@@ -361,7 +387,7 @@ export async function joinLobbySupabase(codeInput) {
     saveStatePatch({ globalStats: gs });
   }
 
-  const bundle = await fetchLobbyBundle(lobbyRow.id);
+  const bundle = await fetchLobbyBundle(lobbyRow.id, { withMessages: true });
   applyLobbyToState(bundle);
   const { startMultiplayerSync } = await import("./gameSync.js");
   startMultiplayerSync();
@@ -377,11 +403,11 @@ export async function joinLobbySupabase(codeInput) {
   return { ok: true, code: bundle.code };
 }
 
-export async function refreshLobbyFromSupabase() {
+export async function refreshLobbyFromSupabase({ withMessages = false } = {}) {
   const lobbyId = getState().lobby?.id;
   if (!lobbyId) return false;
   try {
-    const bundle = await fetchLobbyBundle(lobbyId);
+    const bundle = await fetchLobbyBundle(lobbyId, { withMessages });
     applyLobbyToState(bundle);
     return true;
   } catch (e) {
@@ -541,7 +567,7 @@ export async function addLobbyMessageSupabase(text) {
   });
 
   if (error) throw error;
-  await refreshLobbyFromSupabase();
+  await refreshLobbyFromSupabase({ withMessages: true });
 }
 
 export function subscribeLobbyRealtime(onUpdate) {
@@ -565,7 +591,7 @@ export function subscribeLobbyRealtime(onUpdate) {
       "postgres_changes",
       { event: "*", schema: "public", table: "lobby_messages", filter: `lobby_id=eq.${lobbyId}` },
       () => {
-        refreshLobbyFromSupabase().then(() => onUpdate?.());
+        refreshLobbyFromSupabase({ withMessages: true }).then(() => onUpdate?.());
       }
     )
     .on(

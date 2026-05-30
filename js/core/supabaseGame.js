@@ -11,6 +11,21 @@ export async function fetchGameSessionByLobby(lobbyId) {
   return data;
 }
 
+/**
+ * Méta légère (sans le blob `state`) : sert au polling conditionnel.
+ * On ne télécharge le `state` complet que si `updated_at` a bougé.
+ */
+export async function fetchGameSessionMeta(lobbyId) {
+  if (!isSupabaseConfigured() || !lobbyId) return null;
+  const { data, error } = await supabase
+    .from("game_sessions")
+    .select("id, screen, game_id, updated_at")
+    .eq("lobby_id", lobbyId)
+    .maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
 export async function upsertGameSession({ lobbyId, gameId, screen, hostId, state }) {
   const { data, error } = await supabase
     .from("game_sessions")
@@ -31,11 +46,13 @@ export async function upsertGameSession({ lobbyId, gameId, screen, hostId, state
 }
 
 export async function updateGameSession(lobbyId, patch) {
+  // On ne re-télécharge PAS `state` ici : l'appelant connaît déjà l'état qu'il
+  // vient d'écrire, et le Realtime diffuse la ligne complète aux autres clients.
   const { data, error } = await supabase
     .from("game_sessions")
     .update(patch)
     .eq("lobby_id", lobbyId)
-    .select("id, lobby_id, game_id, screen, host_id, state, updated_at")
+    .select("id, lobby_id, game_id, screen, host_id, updated_at")
     .maybeSingle();
   if (error) throw error;
   return data;
