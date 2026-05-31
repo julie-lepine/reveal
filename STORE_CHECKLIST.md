@@ -46,7 +46,7 @@ Réf. [SUPABASE_SETUP.md](./SUPABASE_SETUP.md)
 
 Guide pas à pas : **[RESEND_SETUP.md](./RESEND_SETUP.md)**
 
-- [ ] Domaine ajouté dans **Resend**
+- [x] Domaine ajouté dans **Resend**
 - [ ] **En cours** : enregistrements DNS (TXT / DKIM…) dans **OVH → Zone DNS** — Resend vérifie la propagation
 - [ ] Statut domaine **Verified** dans Resend
 - [ ] Clé API Resend → **Supabase → SMTP Settings** (`smtp.resend.com`, sender `noreply@…`)
@@ -108,7 +108,7 @@ npm run cap:open:android   # ou cap:open:ios sur Mac
 - [ ] Compléter **App Privacy** (Apple) : email, identifiants, pub AdMob, Supabase
 - [ ] Questionnaire **classification contenu** (Google)
 - [ ] Déclarer la **publicité** dans les deux consoles
-- [ ] Email de contact éditeur (fiche store + RGPD dans `data/privacyPolicy.js`)
+- [ ] Email de contact éditeur (fiche store + RGPD dans `data/legalContent.js`)
 
 ---
 
@@ -138,7 +138,7 @@ npm run cap:open:android   # ou cap:open:ios sur Mac
 |---------|------|
 | [data/admobConfig.js](./data/admobConfig.js) | IDs pub + mode test/prod |
 | [data/appConfig.js](./data/appConfig.js) | Bundle ID, deep link, URL privacy |
-| [data/privacyPolicy.js](./data/privacyPolicy.js) | Texte RGPD in-app |
+| [data/legalContent.js](./data/legalContent.js) | Texte RGPD in-app |
 | [privacy.html](./privacy.html) | Page publique pour les stores |
 | [RESEND_SETUP.md](./RESEND_SETUP.md) | DNS OVH + SMTP Supabase |
 | [ADMOB.md](./ADMOB.md) | Doc technique AdMob |

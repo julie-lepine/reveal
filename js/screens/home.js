@@ -126,6 +126,7 @@ function guestJoinPanelHtml({ leaveHint = false } = {}) {
       <input type="text" class="field-input" id="guest-rejoin-name" placeholder="Ex : Alex" maxlength="24" value="${escapeHtml(getUser()?.name || "")}" />
       <label class="field-label" for="guest-rejoin-code">Code d'invitation</label>
       <input type="text" class="field-input" id="guest-rejoin-code" placeholder="6 caractères" maxlength="8" autocapitalize="characters" />
+      <div id="guest-rejoin-turnstile" class="auth-turnstile-wrap"></div>
       <p class="auth-error hidden" id="guest-rejoin-error"></p>
       <button type="button" class="btn btn-primary btn--spaced" id="btn-guest-rejoin">Rejoindre la partie →</button>
     </div>`;
@@ -278,8 +279,14 @@ export function mountHome(app) {
   async function setupAuthTurnstile() {
     removeTurnstile("login");
     removeTurnstile("signup");
+    removeTurnstile("guest");
 
-    if (isLoggedIn() || isGuest()) return;
+    if (isLoggedIn()) return;
+
+    if (isGuest()) {
+      await setupGuestRejoinTurnstile();
+      return;
+    }
 
     if (authTab === "login") {
       const container = app.querySelector("#login-turnstile");
@@ -316,6 +323,45 @@ export function mountHome(app) {
         }
         if (btn) btn.disabled = true;
       }
+      return;
+    }
+
+    if (authTab === "guest") {
+      const container = app.querySelector("#guest-turnstile");
+      const btn = app.querySelector("#btn-guest-join");
+      const mountRes = await mountTurnstile("guest", container, {
+        onChange: (solved) => {
+          if (btn) btn.disabled = !solved;
+        },
+      });
+      if (!mountRes.ok) {
+        const err = app.querySelector("#guest-error");
+        if (err) {
+          err.textContent = mountRes.error;
+          err.classList.remove("hidden");
+        }
+        if (btn) btn.disabled = true;
+      }
+    }
+  }
+
+  async function setupGuestRejoinTurnstile({ requireSolved = false } = {}) {
+    if (!isGuest() || !isTurnstileRequired()) return;
+
+    const container = app.querySelector("#guest-rejoin-turnstile");
+    const btn = app.querySelector("#btn-guest-rejoin");
+    const mountRes = await mountTurnstile("guest", container, {
+      onChange: (solved) => {
+        if (btn && requireSolved) btn.disabled = !solved;
+      },
+    });
+    if (!mountRes.ok) {
+      const err = app.querySelector("#guest-rejoin-error");
+      if (err) {
+        err.textContent = mountRes.error;
+        err.classList.remove("hidden");
+      }
+      if (btn && requireSolved) btn.disabled = true;
     }
   }
 
@@ -398,6 +444,7 @@ export function mountHome(app) {
               <input type="text" class="field-input" id="guest-name" placeholder="Ex : Alex" maxlength="24" />
               <label class="field-label" for="guest-code">Code d'invitation</label>
               <input type="text" class="field-input" id="guest-code" placeholder="6 caractères" maxlength="8" autocapitalize="characters" />
+              <div id="guest-turnstile" class="auth-turnstile-wrap"></div>
               <p class="auth-error hidden" id="guest-error"></p>
               <button type="button" class="btn btn-primary btn--spaced" id="btn-guest-join">Rejoindre la partie →</button>
             </div>
@@ -663,11 +710,31 @@ export function mountHome(app) {
     if (e.target.closest("#btn-guest-join") || e.target.closest("#btn-guest-rejoin")) {
       const { nameEl, codeEl, errEl } = readGuestJoinFields();
       const btn = e.target.closest("#btn-guest-join, #btn-guest-rejoin");
+
+      if (!isGuest() && isTurnstileRequired() && !isTurnstileSolved("guest")) {
+        if (errEl) {
+          errEl.textContent = "Valide la vérification anti-robot.";
+          errEl.classList.remove("hidden");
+        }
+        return;
+      }
+
       btn.disabled = true;
       errEl?.classList.add("hidden");
-      const res = await joinLobbyAsGuest(codeEl?.value, nameEl?.value);
-      btn.disabled = false;
+
+      const captchaToken =
+        isTurnstileRequired() && isTurnstileSolved("guest") ? getTurnstileToken("guest") : null;
+      const res = await joinLobbyAsGuest(codeEl?.value, nameEl?.value, captchaToken);
+      btn.disabled = isTurnstileRequired() && !isGuest() ? !isTurnstileSolved("guest") : false;
+
       if (!res.ok) {
+        if (res.captcha && isGuest()) {
+          await setupGuestRejoinTurnstile({ requireSolved: true });
+          if (btn) btn.disabled = true;
+        } else if (res.captcha) {
+          resetTurnstile("guest");
+          if (btn) btn.disabled = true;
+        }
         if (errEl) {
           errEl.textContent = res.error;
           errEl.classList.remove("hidden");

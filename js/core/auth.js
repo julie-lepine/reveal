@@ -174,9 +174,9 @@ export async function loginWithSocial(provider) {
   return { ok: true };
 }
 
-export async function loginAsGuest(displayName) {
+export async function loginAsGuest(displayName, captchaToken = null) {
   if (isSupabaseConfigured()) {
-    return sbGuest(displayName);
+    return sbGuest(displayName, captchaToken);
   }
 
   const name = displayName.trim().slice(0, 24);

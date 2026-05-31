@@ -58,6 +58,34 @@ export function clearPasswordRecoveryPending() {
   sessionStorage.removeItem(PASSWORD_RECOVERY_KEY);
 }
 
+function isStaleRefreshTokenError(message) {
+  return /refresh token|invalid.*token|session.*not found|jwt expired/i.test(
+    String(message || "").toLowerCase()
+  );
+}
+
+/** Efface une session locale invalide (refresh token révoqué ou absent). */
+export async function clearStaleSupabaseSession(error) {
+  if (!supabase || !error) return;
+  if (!isStaleRefreshTokenError(error.message || error)) return;
+  try {
+    await supabase.auth.signOut({ scope: "local" });
+  } catch (e) {
+    console.warn("Supabase clear stale session:", e?.message || e);
+  }
+}
+
+async function recoverAuthSession() {
+  if (!supabase) return null;
+  const { data, error } = await supabase.auth.getSession();
+  if (error) {
+    console.warn("Supabase session:", error.message);
+    await clearStaleSupabaseSession(error);
+    return null;
+  }
+  return data.session ?? null;
+}
+
 function providerFromUser(user) {
   if (user.app_metadata?.provider === "anonymous") return "guest";
   const p = user.app_metadata?.provider || "email";
@@ -155,8 +183,8 @@ export async function initSupabaseAuth() {
     `${window.location.origin}${window.location.pathname}${window.location.search}${window.location.hash}`;
   await handleAuthRedirectUrl(windowUrl);
 
-  const { data } = await supabase.auth.getSession();
-  if (data.session) await syncSessionToState(data.session);
+  const session = await recoverAuthSession();
+  if (session) await syncSessionToState(session);
 
   supabase.auth.onAuthStateChange((event, session) => {
     syncSessionToState(session);
@@ -218,10 +246,10 @@ function guestAuthErrorMessage(error) {
   if (/anonymous sign-ins are disabled/i.test(msg)) {
     return "Connexion invité désactivée côté Supabase. Dashboard → Authentication → Providers → Anonymous → activer.";
   }
-  return msg || "Connexion invité impossible.";
+  return formatAuthErrorMessage(msg) || "Connexion invité impossible.";
 }
 
-export async function signInAsGuest(displayName) {
+export async function signInAsGuest(displayName, captchaToken = null) {
   const trimmed = String(displayName || "")
     .trim()
     .slice(0, 24);
@@ -229,8 +257,7 @@ export async function signInAsGuest(displayName) {
     return { ok: false, error: "Choisis un pseudo (2 caractères min.)." };
   }
 
-  const { data: existing } = await supabase.auth.getSession();
-  let session = existing?.session ?? null;
+  let session = await recoverAuthSession();
   let user = session?.user ?? null;
 
   if (user && !user.is_anonymous) {
@@ -241,8 +268,26 @@ export async function signInAsGuest(displayName) {
   }
 
   if (!user) {
-    const { data, error } = await supabase.auth.signInAnonymously();
-    if (error) return { ok: false, error: guestAuthErrorMessage(error) };
+    const { isTurnstileRequired } = await import("./turnstile.js");
+    if (isTurnstileRequired() && !captchaToken) {
+      return {
+        ok: false,
+        error: "Valide la vérification anti-robot.",
+        captcha: true,
+      };
+    }
+
+    const options = {};
+    if (captchaToken) options.captchaToken = captchaToken;
+
+    const { data, error } = await supabase.auth.signInAnonymously({ options });
+    if (error) {
+      return {
+        ok: false,
+        error: guestAuthErrorMessage(error),
+        captcha: isAuthCaptchaError(error.message),
+      };
+    }
     user = data.user;
     session = data.session;
     if (session) await syncSessionToState(session);

@@ -3,15 +3,16 @@ import { isSupabaseConfigured } from "./supabaseClient.js";
 
 const SCRIPT_SRC = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
 
-/** @typedef {"login" | "signup" | "reset"} TurnstileSlot */
+/** @typedef {"login" | "signup" | "reset" | "guest"} TurnstileSlot */
 
-const SLOTS = /** @type {TurnstileSlot[]} */ (["login", "signup", "reset"]);
+const SLOTS = /** @type {TurnstileSlot[]} */ (["login", "signup", "reset", "guest"]);
 
 /** @type {Record<TurnstileSlot, { widgetId: string | null, solved: boolean, onChange: ((solved: boolean) => void) | null }>} */
 const slotState = {
   login: { widgetId: null, solved: false, onChange: null },
   signup: { widgetId: null, solved: false, onChange: null },
   reset: { widgetId: null, solved: false, onChange: null },
+  guest: { widgetId: null, solved: false, onChange: null },
 };
 
 let loadPromise = null;

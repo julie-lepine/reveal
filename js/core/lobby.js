@@ -444,8 +444,8 @@ function normalizeLobbyCode(code) {
     .replace(/\s/g, "");
 }
 
-export async function joinLobbyAsGuest(code, guestName) {
-  const auth = await loginAsGuest(guestName);
+export async function joinLobbyAsGuest(code, guestName, captchaToken = null) {
+  const auth = await loginAsGuest(guestName, captchaToken);
   if (!auth.ok) return auth;
 
   const nextCode = normalizeLobbyCode(code);

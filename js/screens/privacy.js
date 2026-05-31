@@ -1,4 +1,4 @@
-import { PRIVACY_POLICY } from "../../data/privacyPolicy.js";
+import { PRIVACY_POLICY } from "../../data/legalContent.js";
 import { PRIVACY_POLICY_PUBLIC_URL } from "../../data/appConfig.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
 import { bindNav } from "./nav.js";
