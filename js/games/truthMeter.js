@@ -38,7 +38,6 @@ import {
   onGameSessionChange,
   completeGameSession,
   syncLobbyScores,
-  refreshGameSession,
 } from "../core/gameSync.js";
 
 function sliderBlockHtml({
@@ -64,7 +63,12 @@ function sliderBlockHtml({
     </div>`;
 }
 
-function bindSlider(app, id, { onInput, disabled } = {}) {
+function blurAffirmationInput(container) {
+  const textEl = container?.querySelector("#affirmation-text");
+  if (textEl && document.activeElement === textEl) textEl.blur();
+}
+
+function bindSlider(app, id, { onInput, disabled, onInteract } = {}) {
   const input = app.querySelector(`#${id}`);
   const wrap = input?.closest(".truth-meter__slider-wrap");
   if (!input || !wrap || disabled) return;
@@ -91,6 +95,7 @@ function bindSlider(app, id, { onInput, disabled } = {}) {
     input.dataset.bound = "1";
     input.addEventListener("input", update);
     input.addEventListener("change", update);
+    input.addEventListener("focus", () => blurAffirmationInput(app));
   }
 
   if (wrap.dataset.dragBound !== "1") {
@@ -98,6 +103,8 @@ function bindSlider(app, id, { onInput, disabled } = {}) {
     wrap.addEventListener("pointerdown", (e) => {
       if (input.disabled) return;
       if (e.target.closest("button")) return;
+      blurAffirmationInput(app);
+      onInteract?.();
       // On ne capture pas tout de suite : on attend de savoir si le geste est
       // horizontal (réglage du slider) ou vertical (scroll de la page).
       const startX = e.clientX;
@@ -170,6 +177,9 @@ export function mountTruthMeter(app) {
   let displayTimeoutId = null;
   let revealPendingTimeoutId = null;
   let nextRoundInFlight = false;
+  let revealInFlight = false;
+  let authorFocusRound = -1;
+  let suppressAuthorAutoFocus = false;
   const localName = getLocalDisplayName();
   const mp = isGameSyncActive();
 
@@ -209,8 +219,17 @@ export function mountTruthMeter(app) {
     return filterVoterVotes(fromSession, author);
   }
 
-  function canAwardThisRound() {
-    return !roundScored && (!mp || isLobbyHost());
+  function alreadyScoredThisRound() {
+    return roundScored || Boolean(getTruthMeterSession().roundScored);
+  }
+
+  function scheduleRevealFromPending() {
+    if (revealPendingTimeoutId || revealInFlight || phase !== "reveal-pending") return;
+    if (mp && !isLobbyHost()) return;
+    revealPendingTimeoutId = setTimeout(() => {
+      revealPendingTimeoutId = null;
+      void transitionToReveal();
+    }, TRUTH_METER_REVEAL_PENDING_MS);
   }
 
   function playerMeta(name) {
@@ -293,45 +312,60 @@ export function mountTruthMeter(app) {
     } else {
       phase = "reveal-pending";
       render();
-      setTimeout(() => goToReveal(), TRUTH_METER_REVEAL_PENDING_MS);
+      scheduleRevealFromPending();
     }
   }
 
-  async function goToReveal() {
-    if (mp) {
-      await refreshGameSession();
-      syncFromSession();
+  async function transitionToReveal() {
+    if (alreadyScoredThisRound()) {
+      if (!mp && phase !== "reveal") {
+        phase = "reveal";
+        render();
+      }
+      return;
     }
-    const author = affirmation?.author;
-    const votesToScore = votesForAward();
-    const est = authorEstimate;
+    if (mp && !isLobbyHost()) return;
+    if (revealInFlight) return;
 
-    if (canAwardThisRound() && author) {
-      lastAward = awardTruthMeterRound(votesToScore, author, est);
+    revealInFlight = true;
+    try {
+      const author = affirmation?.author;
+      const votesToScore = votesForAward();
+      const est = authorEstimate;
+
       roundScored = true;
-      if (mp) await syncLobbyScores();
-    } else if (!lastAward && author) {
-      lastAward = {
-        ...computeRoundMetrics(votesToScore, est),
-        bluffWin: false,
-        consensus: false,
-        mindReader: null,
-      };
-    }
-
-    if (mp) {
       await commitTruthMeterPlay({
         phase: "reveal",
         roundScored: true,
         votes: votesToScore,
         voteEndsAt: null,
       });
-    } else {
-      phase = "reveal";
-      render();
-      const avg = lastAward?.groupAvg ?? computeRoundMetrics(votesToScore, est).groupAvg;
-      animateRevealGauge(avg);
+
+      if (author && (!mp || isLobbyHost())) {
+        lastAward = awardTruthMeterRound(votesToScore, author, est);
+        if (mp) await syncLobbyScores();
+      } else if (!lastAward && author) {
+        lastAward = {
+          ...computeRoundMetrics(votesToScore, est),
+          bluffWin: false,
+          consensus: false,
+          mindReader: null,
+        };
+      }
+
+      if (!mp) {
+        phase = "reveal";
+        render();
+        const avg = lastAward?.groupAvg ?? computeRoundMetrics(votesToScore, est).groupAvg;
+        animateRevealGauge(avg);
+      }
+    } finally {
+      revealInFlight = false;
     }
+  }
+
+  async function goToReveal() {
+    await transitionToReveal();
   }
 
   async function startVotingPhase() {
@@ -533,11 +567,24 @@ export function mountTruthMeter(app) {
           });
         }
         textEl.value = draftText;
-        textEl.focus();
+        if (authorFocusRound !== roundIdx && !suppressAuthorAutoFocus) {
+          authorFocusRound = roundIdx;
+          requestAnimationFrame(() => {
+            if (suppressAuthorAutoFocus || phase !== "writing" || getCurrentAuthor() !== localName) {
+              return;
+            }
+            if (document.activeElement?.closest(".truth-meter__slider-wrap")) return;
+            textEl.focus({ preventScroll: true });
+          });
+        }
       }
       bindSlider(app, "author-slider", {
         onInput: (v) => {
+          suppressAuthorAutoFocus = true;
           draftEstimate = v;
+        },
+        onInteract: () => {
+          suppressAuthorAutoFocus = true;
         },
       });
       app.querySelector("#btn-submit-affirmation")?.addEventListener("click", async () => {
@@ -617,11 +664,8 @@ export function mountTruthMeter(app) {
       }
     }
 
-    if (phase === "reveal-pending" && host && mp && !revealPendingTimeoutId) {
-      revealPendingTimeoutId = setTimeout(() => {
-        revealPendingTimeoutId = null;
-        goToReveal();
-      }, TRUTH_METER_REVEAL_PENDING_MS);
+    if (phase === "reveal-pending" && host && mp) {
+      scheduleRevealFromPending();
     }
   }
 
@@ -693,22 +737,13 @@ export function mountTruthMeter(app) {
     if (btn) btn.disabled = true;
 
     try {
-      if (canAwardThisRound()) {
-        const votesToScore = votesForAward();
-        lastAward = awardTruthMeterRound(
-          votesToScore,
-          affirmation?.author,
-          authorEstimate
-        );
-        roundScored = true;
-        if (mp) await syncLobbyScores();
-      }
-
       const total = totalRounds();
       if (roundIdx < total - 1) {
         const nextIdx = roundIdx + 1;
         draftText = "";
         draftEstimate = 50;
+        suppressAuthorAutoFocus = false;
+        authorFocusRound = -1;
         myVote = null;
         votes = {};
         lastAward = null;
@@ -783,7 +818,7 @@ export function mountTruthMeter(app) {
       scheduleDisplayToVote();
     }
     if (phase === "reveal-pending" && prevPhase !== "reveal-pending" && isLobbyHost()) {
-      setTimeout(() => goToReveal(), TRUTH_METER_REVEAL_PENDING_MS);
+      scheduleRevealFromPending();
     }
     if (phase === "reveal" && prevPhase !== "reveal") {
       const authorName = affirmation?.author;

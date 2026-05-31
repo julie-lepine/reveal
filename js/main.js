@@ -105,11 +105,11 @@ async function boot() {
   resetNav();
   if (isPasswordRecoveryPending()) {
     navigate("reset-password", { reset: true });
+  } else if (hasActiveLobby()) {
+    const resumed = await resumeEveningSession({ force: true });
+    if (!resumed) navigate("home", { reset: true });
   } else {
     navigate("home", { reset: true });
-  }
-  if (hasActiveLobby()) {
-    void resumeEveningSession({ force: true });
   }
 }
 

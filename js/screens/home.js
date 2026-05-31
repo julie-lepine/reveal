@@ -17,6 +17,7 @@ import {
   joinLobbyAsGuest,
   hasActiveLobby,
   getLobby,
+  isLobbyEveningStarted,
   returnToEveningGames,
   confirmAndLeaveLobby,
   reconcileLobbyMembership,
@@ -456,7 +457,7 @@ export function mountHome(app) {
           ${
             hasActiveLobby()
               ? `<button type="button" class="btn btn-accent btn--lobby-return" id="btn-return-lobby">
-            Retour aux jeux <span class="muted">(${escapeHtml(getLobby().code)})</span>
+            ${isLobbyEveningStarted() ? "Retour aux jeux" : "Retour au lobby"} <span class="muted">(${escapeHtml(getLobby().code)})</span>
           </button>
           <button type="button" class="btn btn-secondary btn--leave-lobby" id="btn-leave-lobby">Quitter le lobby</button>`
               : ""

@@ -429,10 +429,33 @@ export function mountConsensus(app) {
 
   async function finishConsensusGame() {
     const live = consensus.getSession();
+    if (live.podiumApplied) {
+      if (mp && isLobbyHost()) {
+        await completeGameSession({
+          gameId: "consensus",
+          screen: "consensus",
+          state: { consensus: consensusToRemote(live) },
+        });
+      }
+      return;
+    }
+
     let standings = consensus.getPodiumAwards(consensus.buildStandings(live.matchScores || {}));
 
-    if (!live.podiumApplied && (!mp || isLobbyHost())) {
-      standings = consensus.applyLobbyPodium(live);
+    if (!mp || isLobbyHost()) {
+      const claimed = {
+        ...live,
+        phase: "final",
+        questionEndsAt: null,
+        podiumApplied: true,
+      };
+      if (mp) {
+        await consensus.commitPlay(claimed);
+      } else {
+        saveStatePatch({ consensusGame: claimed });
+      }
+
+      standings = consensus.applyLobbyPodium(consensus.getSession());
       recordConsensusPlayed();
       setLastGame({
         gameId: "consensus",
@@ -442,7 +465,7 @@ export function mountConsensus(app) {
     }
 
     const finalSession = {
-      ...live,
+      ...consensus.getSession(),
       phase: "final",
       questionEndsAt: null,
       podiumApplied: true,

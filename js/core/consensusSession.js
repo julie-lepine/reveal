@@ -350,6 +350,9 @@ function getExtremesReference(values, target) {
 }
 
 export function scoreConsensusRound(session = getConsensusSession()) {
+  if (session.roundScored) {
+    return session;
+  }
   const currentScores = createConsensusScores(session.matchScores || {});
   const entries = Object.entries(session.answers || {})
     .filter(([, answer]) => Number.isFinite(answer?.value))

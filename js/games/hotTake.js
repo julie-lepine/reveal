@@ -55,6 +55,8 @@ export function mountHotTake(app) {
   let votes = {};
   let lastAward = null;
   let takeScored = false;
+  /** Évite deux révélations / double scoring concurrentes. */
+  let revealInFlight = false;
   /** Vote en cours d’envoi - évite que la synchro efface l’UI avant la réponse serveur. */
   let voteCommitInFlight = null;
   const localName = getLocalDisplayName();
@@ -155,31 +157,65 @@ export function mountHotTake(app) {
   function hotTakeAwardSummaryHtml(voteResult, { pointsAwarded = false } = {}) {
     if (!voteResult) return "";
     if (voteResult.tied || !voteResult.majority) {
-      return `<p class="hint">Égalité - <strong>aucun point</strong> (pas de majorité ni de dissent).</p>`;
+      return `<p class="hint">Égalité - <strong>aucun point</strong> (pas de majorité ni de minorité).</p>`;
     }
     const ptsLine = pointsAwarded
-      ? ` - majorité +${EVENING_POINTS.WIN} pts, dissent +${EVENING_POINTS.BONUS} pts`
+      ? ` - majorité +${EVENING_POINTS.WIN} pts, minorité +${EVENING_POINTS.BONUS} pts`
       : "";
     return `<p class="hint">Majorité : <strong style="color:${HOT_TAKE_OPTION_COLORS[voteResult.majority]}">${voteResult.majority}</strong>${ptsLine}</p>`;
   }
 
   async function goToReveal() {
+    if (revealInFlight) return;
     const votesToScore = votesForAward();
-    if (canAwardThisTake()) {
-      lastAward = awardHotTakeVotes(votesToScore, HOT_TAKE_OPTIONS);
-      takeScored = true;
-      if (mp) await syncLobbyScores();
+
+    if (alreadyScoredThisTake()) {
+      if (phase !== "reveal") {
+        phase = "reveal";
+        if (!mp) {
+          await commitHotTakePlay({
+            phase: "reveal",
+            takeScored: true,
+            votes: votesToScore,
+            voteEndsAt: null,
+          });
+        }
+        render();
+      }
+      return;
     }
-    if (mp) {
+
+    if (!canAwardThisTake()) {
+      if (mp) {
+        await commitHotTakePlay({
+          phase: "reveal",
+          votes: votesToScore,
+          voteEndsAt: null,
+        });
+      } else {
+        phase = "reveal";
+        render();
+      }
+      return;
+    }
+
+    revealInFlight = true;
+    try {
+      takeScored = true;
       await commitHotTakePlay({
         phase: "reveal",
         takeScored: true,
         votes: votesToScore,
         voteEndsAt: null,
       });
-    } else {
-      phase = "reveal";
-      render();
+      lastAward = awardHotTakeVotes(votesToScore, HOT_TAKE_OPTIONS);
+      if (mp) await syncLobbyScores();
+      if (!mp) {
+        phase = "reveal";
+        render();
+      }
+    } finally {
+      revealInFlight = false;
     }
   }
 
@@ -389,13 +425,6 @@ export function mountHotTake(app) {
     });
 
     app.querySelector("#next-take")?.addEventListener("click", async () => {
-      if (canAwardThisTake()) {
-        const votesToScore = votesForAward();
-        lastAward = awardHotTakeVotes(votesToScore, HOT_TAKE_OPTIONS);
-        takeScored = true;
-        if (mp) await syncLobbyScores();
-      }
-
       if (takeIdx < total - 1) {
         const nextIdx = takeIdx + 1;
         takeIdx = nextIdx;

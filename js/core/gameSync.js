@@ -6,9 +6,10 @@ import {
   saveStatePatch,
   recordTierNightPlayed,
   resetGameSessionsOnly,
+  defaultEveningStats,
 } from "./state.js";
 import { navigate, getCurrentScreen } from "./router.js";
-import { getLobbyParticipants } from "./lobby.js";
+import { getLobbyParticipants, getLobbyStatus } from "./lobby.js";
 import { getActivePlayerNames, getActivePlayers } from "./players.js";
 import {
   mergeReadyMapsLocal,
@@ -44,6 +45,26 @@ const listeners = new Set();
 let routing = false;
 let pollTimer = null;
 let syncTickInFlight = false;
+
+function mergeTruthy(localVal, remoteVal) {
+  return Boolean(localVal) || Boolean(remoteVal);
+}
+
+function mergeEveningStats(localStats = {}, remoteStats = {}) {
+  const merged = { ...localStats };
+  for (const key of Object.keys(defaultEveningStats())) {
+    const localVal = Number(localStats[key]) || 0;
+    const remoteVal = remoteStats[key];
+    if (remoteVal != null) {
+      merged[key] = Math.max(localVal, Number(remoteVal) || 0);
+    }
+  }
+  return merged;
+}
+
+function mergeMaxIndex(localIdx, remoteIdx) {
+  return Math.max(localIdx ?? -1, remoteIdx ?? -1);
+}
 let pollIntervalMs = 4000;
 let pollUnchangedStreak = 0;
 let lastGameSessionRealtimeAt = 0;
@@ -406,7 +427,14 @@ function mergeHotTakeGameLocal(local, remote) {
     remote.customTakes || [],
     me
   );
-  return { ...local, ...remote, votes, ready, customTakes };
+  return {
+    ...local,
+    ...remote,
+    votes,
+    ready,
+    customTakes,
+    takeScored: mergeTruthy(local.takeScored, remote.takeScored),
+  };
 }
 
 function isNewSpeedVoteVoteRound(cur, inc) {
@@ -451,7 +479,13 @@ function mergeSpeedVoteGameLocal(local, remote) {
     !remote.lobbyStarted && !local.lobbyStarted
       ? mergeReadyMapsLocal(local.ready || {}, remote.ready || {}, getActivePlayerNames())
       : remote.ready || {};
-  return { ...local, ...remote, votes, ready };
+  return {
+    ...local,
+    ...remote,
+    votes,
+    ready,
+    roundScored: mergeTruthy(local.roundScored, remote.roundScored),
+  };
 }
 
 function isNewTriviaQuestionRound(cur, inc) {
@@ -515,6 +549,8 @@ function mergeTriviaGameLocal(local, remote) {
     ready,
     answers,
     matchScores: { ...(remote.matchScores || {}) },
+    questionScored: mergeTruthy(local.questionScored, remote.questionScored),
+    podiumApplied: mergeTruthy(local.podiumApplied, remote.podiumApplied),
   };
 }
 
@@ -576,6 +612,8 @@ function mergeConsensusGameLocal(local, remote) {
     ready,
     answers,
     matchScores: { ...(remote.matchScores || {}) },
+    roundScored: mergeTruthy(local.roundScored, remote.roundScored),
+    podiumApplied: mergeTruthy(local.podiumApplied, remote.podiumApplied),
   };
 }
 
@@ -635,7 +673,13 @@ function mergeGuessLieGameLocal(local, remote) {
   } else if (remote.phase === "reveal" || local.phase === "reveal") {
     votes = { ...remoteVotes, ...localVotes };
   }
-  return { ...local, ...remote, votes };
+  return {
+    ...local,
+    ...remote,
+    votes,
+    roundScored: mergeTruthy(local.roundScored, remote.roundScored),
+    statsRecordedRoundIdx: mergeMaxIndex(local.statsRecordedRoundIdx, remote.statsRecordedRoundIdx),
+  };
 }
 
 function mergeDilemmaGameLocal(local, remote) {
@@ -664,7 +708,14 @@ function mergeDilemmaGameLocal(local, remote) {
   } else if (remote.phase === "reveal" || local.phase === "reveal") {
     votes = { ...remoteVotes, ...localVotes };
   }
-  return { ...local, ...remote, ready, votes, customDilemmas };
+  return {
+    ...local,
+    ...remote,
+    ready,
+    votes,
+    customDilemmas,
+    roundScored: mergeTruthy(local.roundScored, remote.roundScored),
+  };
 }
 
 function isNewTruthMeterVoteRound(cur, inc) {
@@ -714,7 +765,13 @@ function mergeTruthMeterGameLocal(local, remote) {
     !remote.lobbyStarted && !local.lobbyStarted
       ? mergeReadyMapsLocal(local.ready || {}, remote.ready || {}, getActivePlayerNames())
       : remote.ready || {};
-  return { ...local, ...remote, votes, ready };
+  return {
+    ...local,
+    ...remote,
+    votes,
+    ready,
+    roundScored: mergeTruthy(local.roundScored, remote.roundScored),
+  };
 }
 
 export function truthMeterToRemote(session) {
@@ -1161,6 +1218,7 @@ function mergePlaylistGuessGameLocal(local, remote) {
     ...remote,
     votes,
     ready,
+    roundScored: mergeTruthy(local.roundScored, remote.roundScored),
   };
 }
 
@@ -1208,6 +1266,7 @@ export function guessLieToRemote(gl) {
     phase: gl.phase || null,
     votes: mapVotesByUid(gl.votes || {}),
     roundScored: Boolean(gl.roundScored),
+    statsRecordedRoundIdx: gl.statsRecordedRoundIdx ?? -1,
   };
 }
 
@@ -1222,6 +1281,7 @@ export function guessLieFromRemote(remote) {
     phase: remote.phase || null,
     votes: mapVotesByName(remote.votes || {}),
     roundScored: Boolean(remote.roundScored),
+    statsRecordedRoundIdx: remote.statsRecordedRoundIdx ?? -1,
   };
 }
 
@@ -1312,7 +1372,16 @@ function gameScoresFromRemote(remote = {}) {
 function applyRemoteGameScores(remote, order) {
   if (!remote || typeof remote !== "object") return;
   const byGame = gameScoresFromRemote(remote);
-  const patch = { gameScores: byGame };
+  const current = getState().gameScores || {};
+  const merged = { ...current };
+  Object.entries(byGame).forEach(([gid, scoresByName]) => {
+    const prev = { ...(merged[gid] || {}) };
+    Object.entries(scoresByName).forEach(([name, pts]) => {
+      prev[name] = Math.max(prev[name] || 0, pts);
+    });
+    merged[gid] = prev;
+  });
+  const patch = { gameScores: merged };
   if (Array.isArray(order) && order.length) patch.gameScoreOrder = order;
   saveStatePatch(patch);
 }
@@ -1324,10 +1393,12 @@ export function applyRemoteLobbyScores(remote) {
 
   const merged = { ...getState().scores };
   getLobbyParticipants().forEach((p) => {
-    if (byName[p.name] != null) merged[p.name] = byName[p.name];
+    if (byName[p.name] != null) {
+      merged[p.name] = Math.max(merged[p.name] || 0, byName[p.name]);
+    }
   });
   Object.entries(byName).forEach(([name, pts]) => {
-    merged[name] = pts;
+    merged[name] = Math.max(merged[name] || 0, pts);
   });
   saveStatePatch({ scores: merged });
 }
@@ -1376,7 +1447,7 @@ export function applyRemoteEveningState(st) {
   const patch = {};
 
   if (st.stats && typeof st.stats === "object") {
-    patch.stats = { ...getState().stats, ...st.stats };
+    patch.stats = mergeEveningStats(getState().stats, st.stats);
   }
   if (st.lastGame !== undefined) {
     patch.lastGame = st.lastGame;
@@ -1716,6 +1787,7 @@ export async function routeToActiveGameIfNeeded(cachedRowOnly = null) {
 export function handleSessionRoute(row, { fromScreen = null } = {}) {
   const screen = getEffectiveSessionScreen(row);
   if (!screen) return;
+  if (screen === "game-select" && getLobbyStatus() !== "playing") return;
   const current = getCurrentScreen();
   if (screen === current) return;
   if (isCompatibleSessionScreen(screen, current)) return;
@@ -1790,6 +1862,12 @@ async function syncTick() {
   const prevSig = lastSessionSig;
   try {
     const lobbyId = getState().lobby?.id;
+    // Pas de session tant que la soirée n'est pas lancée — évite le polling inutile.
+    if (!getCachedGameSession() && getLobbyStatus() === "waiting") {
+      adjustPollBackoff(false);
+      scheduleSyncPoll();
+      return;
+    }
     // Polling conditionnel : on récupère d'abord une méta légère (sans `state`),
     // et on ne télécharge le blob complet que si `updated_at` a changé.
     let meta = null;
@@ -1928,6 +2006,9 @@ export async function patchGameState(stateMerge, { screen, gameId } = {}) {
           mergeVotes: mergeRemoteHotTakeVotesUid,
         })
       : incHt;
+    if (curHt && incHt && nextState.hotTake) {
+      nextState.hotTake.takeScored = mergeTruthy(curHt.takeScored, incHt.takeScored);
+    }
   }
   if (stateMerge.speedVote) {
     const curSv = current.speedVote;
@@ -1938,6 +2019,7 @@ export async function patchGameState(stateMerge, { screen, gameId } = {}) {
           ...incSv,
           ready: mergeRemoteReadyUid(curSv, incSv),
           votes: mergeRemoteSpeedVoteVotesUid(curSv, incSv),
+          roundScored: mergeTruthy(curSv.roundScored, incSv.roundScored),
         }
       : incSv;
   }
@@ -1951,6 +2033,8 @@ export async function patchGameState(stateMerge, { screen, gameId } = {}) {
           ready: mergeRemoteReadyUid(curTrivia, incTrivia),
           answers: mergeRemoteTriviaAnswersUid(curTrivia, incTrivia),
           matchScores: { ...(curTrivia.matchScores || {}), ...(incTrivia.matchScores || {}) },
+          questionScored: mergeTruthy(curTrivia.questionScored, incTrivia.questionScored),
+          podiumApplied: mergeTruthy(curTrivia.podiumApplied, incTrivia.podiumApplied),
         }
       : incTrivia;
   }
@@ -1963,6 +2047,7 @@ export async function patchGameState(stateMerge, { screen, gameId } = {}) {
           ...incTm,
           ready: mergeRemoteReadyUid(curTm, incTm),
           votes: mergeRemoteTruthMeterVotesUid(curTm, incTm),
+          roundScored: mergeTruthy(curTm.roundScored, incTm.roundScored),
         }
       : incTm;
   }
@@ -1979,6 +2064,8 @@ export async function patchGameState(stateMerge, { screen, gameId } = {}) {
             ...(curConsensus.matchScores || {}),
             ...(incConsensus.matchScores || {}),
           },
+          roundScored: mergeTruthy(curConsensus.roundScored, incConsensus.roundScored),
+          podiumApplied: mergeTruthy(curConsensus.podiumApplied, incConsensus.podiumApplied),
         }
       : incConsensus;
   }
@@ -1995,6 +2082,9 @@ export async function patchGameState(stateMerge, { screen, gameId } = {}) {
           mergeVotes: mergeRemoteDilemmaVotes,
         })
       : incDm;
+    if (curDm && incDm && nextState.dilemma) {
+      nextState.dilemma.roundScored = mergeTruthy(curDm.roundScored, incDm.roundScored);
+    }
   }
   if (stateMerge.tierNight) {
     nextState.tierNight = { ...(current.tierNight || {}), ...stateMerge.tierNight };
@@ -2007,6 +2097,11 @@ export async function patchGameState(stateMerge, { screen, gameId } = {}) {
           ...curGl,
           ...incGl,
           votes: mergeRemoteGuessLieVotes(curGl, incGl),
+          roundScored: mergeTruthy(curGl.roundScored, incGl.roundScored),
+          statsRecordedRoundIdx: mergeMaxIndex(
+            curGl.statsRecordedRoundIdx,
+            incGl.statsRecordedRoundIdx
+          ),
         }
       : incGl;
   }
@@ -2019,6 +2114,7 @@ export async function patchGameState(stateMerge, { screen, gameId } = {}) {
           ...incPg,
           ready: mergeRemoteReadyUid(curPg, incPg),
           votes: mergeRemotePlaylistGuessVotesUid(curPg, incPg),
+          roundScored: mergeTruthy(curPg.roundScored, incPg.roundScored),
         }
       : incPg;
   }

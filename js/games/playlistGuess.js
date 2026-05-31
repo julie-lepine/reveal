@@ -122,23 +122,31 @@ export function mountPlaylistGuess(app) {
     };
   }
 
-  function applyRoundScore() {
-    if (roundScored) return;
+  async function transitionToReveal() {
+    if (roundScored || getPlaylistGuessSession().roundScored) {
+      if (!revealSummary) revealSummary = buildSummary(gatherVotes(), false);
+      return;
+    }
+    if (mp && !isLobbyHost()) return;
+
     roundScored = true;
+    await commitPlaylistGuessPlay({
+      phase: "reveal",
+      voteEndsAt: null,
+      roundScored: true,
+    });
     revealSummary = buildSummary(gatherVotes(), true);
-    if (mp && isLobbyHost()) void syncLobbyScores();
+    if (mp && isLobbyHost()) await syncLobbyScores();
   }
 
   async function tryAdvanceToReveal() {
     if (!mp || phase !== "voting" || revealAdvancing) return;
     if (!allPlaylistGuessVotesIn() || !isLobbyHost()) return;
-    const s = getPlaylistGuessSession();
-    if (s.roundScored || roundScored) return;
+    if (getPlaylistGuessSession().roundScored || roundScored) return;
     revealAdvancing = true;
     try {
-      await commitPlaylistGuessPlay({ phase: "reveal", voteEndsAt: null });
-      applyRoundScore();
-      await commitPlaylistGuessPlay({ roundScored: true });
+      await transitionToReveal();
+      render();
     } finally {
       revealAdvancing = false;
     }
@@ -146,9 +154,7 @@ export function mountPlaylistGuess(app) {
 
   function ensureRevealDisplay() {
     if (phase !== "reveal") return;
-    if (!roundScored && (!mp || isLobbyHost())) {
-      applyRoundScore();
-    } else if (!revealSummary) {
+    if (!revealSummary) {
       revealSummary = buildSummary(gatherVotes(), false);
     }
   }
@@ -156,18 +162,19 @@ export function mountPlaylistGuess(app) {
   /** Filet de sécurité hôte : clôt la manche même si un joueur n'a pas voté. */
   async function forceReveal() {
     if (mp && !isLobbyHost()) return;
+    if (getPlaylistGuessSession().roundScored || roundScored) return;
     if (mp) {
       if (revealAdvancing || phase !== "voting") return;
       revealAdvancing = true;
       try {
-        await commitPlaylistGuessPlay({ phase: "reveal", voteEndsAt: null });
-        applyRoundScore();
-        await commitPlaylistGuessPlay({ roundScored: true });
+        await transitionToReveal();
+        render();
       } finally {
         revealAdvancing = false;
       }
     } else {
       phase = "reveal";
+      await transitionToReveal();
       render();
     }
   }
@@ -292,8 +299,9 @@ export function mountPlaylistGuess(app) {
         await tryAdvanceToReveal();
       } else {
         phase = "reveal";
+        await transitionToReveal();
+        render();
       }
-      render();
     });
 
     app.querySelector("#playlist-force")?.addEventListener("click", () => void forceReveal());

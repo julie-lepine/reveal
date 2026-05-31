@@ -148,6 +148,10 @@ export function getLobbyStatus() {
   return getLobby()?.status || "waiting";
 }
 
+export function isLobbyEveningStarted() {
+  return getLobbyStatus() === "playing";
+}
+
 export function getLobbyGameId() {
   return getLobby()?.gameId || null;
 }
@@ -293,20 +297,52 @@ export async function returnToEveningGames() {
     return;
   }
 
-  saveStatePatch({ inLobby: true });
-
-  if (isGameSyncActive()) {
-    startMultiplayerSync();
-    await refreshGameSession();
-  } else {
-    setLobbyWaiting();
-  }
-
-  navigate("game-select", { navStack: ["home", "lobby", "game-select"] });
+  clearSessionRouteSuppress();
+  await routeToEveningHub();
 }
 
 export async function goToGameSelect() {
   await returnToEveningGames();
+}
+
+export async function routeToEveningHub() {
+  if (!hasActiveLobby()) return false;
+
+  saveStatePatch({ inLobby: true });
+
+  if (isSupabaseConfigured()) {
+    startLobbyPresenceSync();
+    try {
+      await refreshLobbyFromSupabase();
+    } catch (e) {
+      console.warn("REVEAL evening hub:", e);
+    }
+  }
+
+  if (isGameSyncActive()) {
+    startMultiplayerSync();
+    const row = await refreshGameSession();
+    if (await routeToActiveGameIfNeeded(row)) return true;
+    const frScreen = getFilRougeResumeScreen();
+    if (frScreen) {
+      routeToSessionScreen(frScreen, { force: true });
+      return true;
+    }
+    if (!isLobbyEveningStarted()) {
+      goToLobby();
+      return true;
+    }
+    navigate("game-select", { navStack: ["home", "lobby", "game-select"] });
+    return true;
+  }
+
+  if (!isLobbyEveningStarted()) {
+    goToLobby();
+    return true;
+  }
+
+  navigate("game-select", { navStack: ["home", "lobby", "game-select"] });
+  return true;
 }
 
 /**
@@ -318,31 +354,7 @@ export async function resumeEveningSession({ force = false } = {}) {
   if (!force && isSessionRouteSuppressed()) return false;
 
   if (force) clearSessionRouteSuppress();
-  saveStatePatch({ inLobby: true });
-
-  if (isSupabaseConfigured()) {
-    startLobbyPresenceSync();
-  }
-
-  if (isGameSyncActive()) {
-    try {
-      await refreshLobbyFromSupabase();
-    } catch (e) {
-      console.warn("REVEAL resume lobby:", e);
-    }
-    startMultiplayerSync();
-    const row = await refreshGameSession();
-    if (await routeToActiveGameIfNeeded(row)) return true;
-    /** Aucune partie « classique » en cours : restaurer le Fil Rouge (config / mission non vue). */
-    const frScreen = getFilRougeResumeScreen();
-    if (frScreen) {
-      routeToSessionScreen(frScreen, { force: true });
-      return true;
-    }
-    return false;
-  }
-
-  return false;
+  return routeToEveningHub();
 }
 
 export function getLobbyParticipants() {

@@ -253,10 +253,33 @@ export function mountTrivia(app) {
 
   async function finishTriviaGame() {
     const live = trivia.getSession();
+    if (live.podiumApplied) {
+      if (mp && isLobbyHost()) {
+        await completeGameSession({
+          gameId: "trivia",
+          screen: "trivia",
+          state: { trivia: triviaToRemote(live) },
+        });
+      }
+      return;
+    }
+
     let standings = trivia.getPodiumAwards(trivia.buildStandings(live.matchScores || {}));
 
-    if (!live.podiumApplied && (!mp || isLobbyHost())) {
-      standings = trivia.applyLobbyPodium(live);
+    if (!mp || isLobbyHost()) {
+      const claimed = {
+        ...live,
+        phase: "final",
+        questionEndsAt: null,
+        podiumApplied: true,
+      };
+      if (mp) {
+        await trivia.commitPlay(claimed);
+      } else {
+        saveStatePatch({ triviaGame: claimed });
+      }
+
+      standings = trivia.applyLobbyPodium(trivia.getSession());
       recordTriviaPlayed();
       setLastGame({
         gameId: "trivia",
@@ -266,7 +289,7 @@ export function mountTrivia(app) {
     }
 
     const finalSession = {
-      ...live,
+      ...trivia.getSession(),
       phase: "final",
       questionEndsAt: null,
       podiumApplied: true,

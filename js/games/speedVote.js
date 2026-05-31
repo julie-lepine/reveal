@@ -53,10 +53,15 @@ export function mountSpeedVote(app) {
   let votes = {};
   let lastAward = null;
   let takeScored = false;
+  let revealInFlight = false;
   let currentQuestion = QUESTIONS[0];
   let modifier = "normal";
   const localName = getLocalDisplayName();
   const mp = isGameSyncActive();
+
+  function alreadyScoredThisRound() {
+    return takeScored || Boolean(getSpeedVoteSession().roundScored);
+  }
 
   function syncFromSession() {
     const s = getSpeedVoteSession();
@@ -93,8 +98,21 @@ export function mountSpeedVote(app) {
     };
   }
 
-  async function goToReveal() {
-    if (!takeScored) {
+  async function transitionToReveal() {
+    if (alreadyScoredThisRound()) return;
+    if (mp && !isLobbyHost()) return;
+    if (revealInFlight) return;
+
+    revealInFlight = true;
+    try {
+      takeScored = true;
+      await commitSpeedVotePlay({
+        phase: "reveal",
+        roundScored: true,
+        votes,
+        voteEndsAt: null,
+      });
+
       if (!mp || isLobbyHost()) {
         const mod = getSpeedVoteModifier({ modifier });
         lastAward = awardSpeedVoteRound(votes, { multiplier: mod.multiplier });
@@ -102,19 +120,18 @@ export function mountSpeedVote(app) {
       } else {
         lastAward = previewRoundAward();
       }
-      takeScored = true;
+
+      if (!mp) {
+        phase = "reveal";
+        render();
+      }
+    } finally {
+      revealInFlight = false;
     }
-    if (mp) {
-      await commitSpeedVotePlay({
-        phase: "reveal",
-        roundScored: true,
-        votes,
-        voteEndsAt: null,
-      });
-    } else {
-      phase = "reveal";
-      render();
-    }
+  }
+
+  async function goToReveal() {
+    await transitionToReveal();
   }
 
   /** Filet de sécurité hôte : clôt la manche même si un joueur n'a pas voté. */
@@ -289,13 +306,6 @@ export function mountSpeedVote(app) {
     });
 
     app.querySelector("#next-round")?.addEventListener("click", async () => {
-      if (!takeScored) {
-        const m = getSpeedVoteModifier({ modifier });
-        lastAward = awardSpeedVoteRound(votes, { multiplier: m.multiplier });
-        takeScored = true;
-        if (mp && isLobbyHost()) await syncLobbyScores();
-      }
-
       if (roundIdx < total - 1) {
         const nextIdx = roundIdx + 1;
         if (mp && isLobbyHost()) {

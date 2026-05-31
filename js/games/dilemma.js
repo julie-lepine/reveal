@@ -54,6 +54,7 @@ export function mountDilemma(app) {
   let voteCommitInFlight = null;
   let lastAward = null;
   let roundScored = false;
+  let revealInFlight = false;
   let currentDilemma = ROUNDS[0];
   let revealPctA = 0;
   let revealPctB = 0;
@@ -109,31 +110,37 @@ export function mountDilemma(app) {
     requestAnimationFrame(frame);
   }
 
-  async function goToReveal() {
-    if (!roundScored) {
-      if (!mp || isLobbyHost()) {
-        lastAward = awardDilemmaRound(votes);
-        if (mp) await syncLobbyScores();
-      } else {
-        lastAward = { ...countDilemmaResults(votes), majorityWinners: [] };
-      }
+  async function transitionToReveal() {
+    if (roundScored || getDilemmaSession().roundScored) return;
+    if (mp && !isLobbyHost()) return;
+    if (revealInFlight) return;
+
+    revealInFlight = true;
+    try {
       roundScored = true;
-    }
-    const { pctA, pctB } = countDilemmaResults(votes);
-    revealPctA = 0;
-    revealPctB = 0;
-    if (mp) {
       await commitDilemmaPlay({
         phase: "reveal",
         roundScored: true,
         votes,
         voteEndsAt: null,
       });
-    } else {
-      phase = "reveal";
-      render();
-      animateRevealBars(pctA, pctB);
+
+      lastAward = awardDilemmaRound(votes);
+      if (mp) await syncLobbyScores();
+
+      if (!mp) {
+        phase = "reveal";
+        const { pctA, pctB } = countDilemmaResults(votes);
+        render();
+        animateRevealBars(pctA, pctB);
+      }
+    } finally {
+      revealInFlight = false;
     }
+  }
+
+  async function goToReveal() {
+    await transitionToReveal();
   }
 
   /** Filet de sécurité hôte : clôt la manche même si un joueur n'a pas voté. */
@@ -219,8 +226,16 @@ export function mountDilemma(app) {
     const widthA = revealAnimDone ? pctA : revealPctA;
     const widthB = revealAnimDone ? pctB : revealPctB;
 
-    const awardLine = lastAward?.majorityWinners?.length
-      ? `<p class="hint">🏆 Victoire (majorité) - <strong>+${DILEMMA_POINTS_MAJORITY_WIN} pts</strong> : ${lastAward.majorityWinners.map((n) => escapeHtml(n)).join(", ")}</p>`
+    const awardWinners =
+      lastAward?.majorityWinners?.length > 0
+        ? lastAward.majorityWinners
+        : majority
+          ? Object.entries(votes)
+              .filter(([, choice]) => choice === majority)
+              .map(([name]) => name)
+          : [];
+    const awardLine = awardWinners.length
+      ? `<p class="hint">🏆 Victoire (majorité) - <strong>+${DILEMMA_POINTS_MAJORITY_WIN} pts</strong> : ${awardWinners.map((n) => escapeHtml(n)).join(", ")}</p>`
       : "";
 
     const dividedBanner = divided

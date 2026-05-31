@@ -12,6 +12,7 @@ const emptyGuessLie = () => ({
   phase: null,
   votes: {},
   roundScored: false,
+  statsRecordedRoundIdx: -1,
 });
 
 const defaultGlobalStats = () => ({
@@ -85,6 +86,8 @@ const defaultState = () => ({
   inLobby: false,
   lobbyCode: generateLobbyCode(),
   lastGame: null,
+  /** Jeux déjà comptés dans stats.eveningGamesRecorded (évite double record*Played). */
+  eveningGamesRecorded: {},
   guessLie: emptyGuessLie(),
   tierNightTopicId: null,
   customTierLists: [],
@@ -481,7 +484,7 @@ export function defaultEveningStats() {
 export function resetEveningState() {
   resetScores();
   resetGameSessionsOnly();
-  saveStatePatch({ stats: defaultEveningStats() });
+  saveStatePatch({ stats: defaultEveningStats(), eveningGamesRecorded: {} });
 }
 
 /** Remet à zéro les sessions de jeu sans effacer le classement de la soirée. */
@@ -551,51 +554,80 @@ export function getLastGame() {
   return state.lastGame;
 }
 
-export function recordHotTakePlayed() {
-  state.stats.hotTakesPlayed += 1;
-  state.globalStats.hotTakesPlayed = (state.globalStats.hotTakesPlayed || 0) + 1;
+/** Incrémente les stats de fin de partie une seule fois par gameId et par soirée. */
+export function recordEveningGameOnce(gameId, apply) {
+  if (!gameId || typeof apply !== "function") return false;
+  if (!state.eveningGamesRecorded) state.eveningGamesRecorded = {};
+  if (state.eveningGamesRecorded[gameId]) return false;
+  state.eveningGamesRecorded[gameId] = true;
+  apply();
   save();
+  return true;
+}
+
+export function recordHotTakePlayed() {
+  recordEveningGameOnce("hottake", () => {
+    state.stats.hotTakesPlayed += 1;
+    state.globalStats.hotTakesPlayed = (state.globalStats.hotTakesPlayed || 0) + 1;
+  });
 }
 
 export function recordSpeedVotePlayed() {
-  state.stats.speedVotesPlayed = (state.stats.speedVotesPlayed || 0) + 1;
-  save();
+  recordEveningGameOnce("speedvote", () => {
+    state.stats.speedVotesPlayed = (state.stats.speedVotesPlayed || 0) + 1;
+  });
 }
 
 export function recordPlaylistGuessPlayed() {
-  state.stats.playlistGuessesPlayed = (state.stats.playlistGuessesPlayed || 0) + 1;
-  save();
+  recordEveningGameOnce("playlistguess", () => {
+    state.stats.playlistGuessesPlayed = (state.stats.playlistGuessesPlayed || 0) + 1;
+  });
 }
 
 export function recordTruthMeterPlayed() {
-  state.stats.truthMetersPlayed = (state.stats.truthMetersPlayed || 0) + 1;
-  save();
+  recordEveningGameOnce("truthmeter", () => {
+    state.stats.truthMetersPlayed = (state.stats.truthMetersPlayed || 0) + 1;
+  });
 }
 
 export function recordConsensusPlayed() {
-  state.stats.consensusGamesPlayed = (state.stats.consensusGamesPlayed || 0) + 1;
-  save();
+  recordEveningGameOnce("consensus", () => {
+    state.stats.consensusGamesPlayed = (state.stats.consensusGamesPlayed || 0) + 1;
+  });
 }
 
 export function recordDilemmaPlayed() {
-  state.stats.dilemmasPlayed = (state.stats.dilemmasPlayed || 0) + 1;
-  save();
+  recordEveningGameOnce("dilemma", () => {
+    state.stats.dilemmasPlayed = (state.stats.dilemmasPlayed || 0) + 1;
+  });
 }
 
 export function recordTriviaPlayed() {
-  state.stats.triviaGamesPlayed = (state.stats.triviaGamesPlayed || 0) + 1;
-  save();
+  recordEveningGameOnce("trivia", () => {
+    state.stats.triviaGamesPlayed = (state.stats.triviaGamesPlayed || 0) + 1;
+  });
 }
 
 export function recordTierNightPlayed() {
-  state.stats.tierNightsPlayed = (state.stats.tierNightsPlayed || 0) + 1;
-  save();
+  recordEveningGameOnce("tiernight", () => {
+    state.stats.tierNightsPlayed = (state.stats.tierNightsPlayed || 0) + 1;
+  });
 }
 
 export function recordLieGuess(correct) {
   state.stats.liesTotal += 1;
   if (correct) {
     state.stats.liesFound += 1;
+    state.globalStats.liesFound = (state.globalStats.liesFound || 0) + 1;
+  }
+  save();
+}
+
+/** Guess The Lie : une manche = un mensonge ; +1 trouvé si au moins un détective a raison. */
+export function recordGuessLieRoundStats(lieDetected) {
+  state.stats.liesTotal = (state.stats.liesTotal || 0) + 1;
+  if (lieDetected) {
+    state.stats.liesFound = (state.stats.liesFound || 0) + 1;
     state.globalStats.liesFound = (state.globalStats.liesFound || 0) + 1;
   }
   save();

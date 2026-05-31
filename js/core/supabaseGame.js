@@ -6,9 +6,9 @@ export async function fetchGameSessionByLobby(lobbyId) {
     .from("game_sessions")
     .select("id, lobby_id, game_id, screen, host_id, state, updated_at")
     .eq("lobby_id", lobbyId)
-    .maybeSingle();
+    .limit(1);
   if (error) throw error;
-  return data;
+  return data?.[0] ?? null;
 }
 
 /**
@@ -21,9 +21,9 @@ export async function fetchGameSessionMeta(lobbyId) {
     .from("game_sessions")
     .select("id, screen, game_id, updated_at")
     .eq("lobby_id", lobbyId)
-    .maybeSingle();
+    .limit(1);
   if (error) throw error;
-  return data;
+  return data?.[0] ?? null;
 }
 
 export async function upsertGameSession({ lobbyId, gameId, screen, hostId, state }) {
@@ -53,9 +53,9 @@ export async function updateGameSession(lobbyId, patch) {
     .update(patch)
     .eq("lobby_id", lobbyId)
     .select("id, lobby_id, game_id, screen, host_id, updated_at")
-    .maybeSingle();
+    .limit(1);
   if (error) throw error;
-  return data;
+  return data?.[0] ?? null;
 }
 
 export async function deleteGameSession(lobbyId) {

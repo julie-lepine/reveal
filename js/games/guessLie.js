@@ -18,13 +18,7 @@ import {
   completeGameSession,
   syncLobbyScores,
 } from "../core/gameSync.js";
-import {
-  getLocalDisplayName,
-  getState,
-  saveStatePatch,
-  recordLieGuess,
-  setLastGame,
-} from "../core/state.js";
+import { getLocalDisplayName, recordGuessLieRoundStats, setLastGame } from "../core/state.js";
 import { awardGuessLieRound, guessLieLiarWins } from "../core/scoring.js";
 import { gameCumulativeScoresHtml } from "../core/gameScores.js";
 import { setLobbyPlaying, setLobbyWaiting } from "../core/lobby.js";
@@ -82,6 +76,40 @@ export function mountGuessLie(app) {
     return detectives.length > 0 && detectives.every((n) => votes[n] != null);
   }
 
+  async function transitionToReveal() {
+    const gl = getGuessLieSession();
+    if (roundScored || gl.roundScored) {
+      if (!revealResult) setRevealDisplay(computeReveal());
+      return;
+    }
+    if (mp && !isLobbyHost()) return;
+
+    const result = computeReveal();
+    const { correct, round, liarBonus } = result;
+    const lieDetected = correct.length > 0;
+    const recordStats = gl.statsRecordedRoundIdx !== roundIdx;
+
+    roundScored = true;
+    await commitGuessLiePlay({
+      phase: "reveal",
+      roundScored: true,
+      ...(recordStats ? { statsRecordedRoundIdx: roundIdx } : {}),
+    });
+
+    awardGuessLieRound({
+      correct,
+      liarName: round.player,
+      liarBonus,
+    });
+
+    if (recordStats && (!mp || isLobbyHost())) {
+      recordGuessLieRoundStats(lieDetected);
+    }
+
+    setRevealDisplay(result);
+    if (mp && isLobbyHost()) await syncLobbyScores();
+  }
+
   async function tryAdvanceToReveal() {
     if (!mp || phase !== "voting" || revealAdvancing) return;
     const gl = getGuessLieSession();
@@ -91,9 +119,8 @@ export function mountGuessLie(app) {
     if (gl.roundScored || roundScored) return;
     revealAdvancing = true;
     try {
-      await commitGuessLiePlay({ phase: "reveal" });
-      applyRoundScore(computeReveal());
-      await commitGuessLiePlay({ roundScored: true });
+      await transitionToReveal();
+      render();
     } finally {
       revealAdvancing = false;
     }
@@ -101,12 +128,7 @@ export function mountGuessLie(app) {
 
   function ensureRevealDisplay() {
     if (phase !== "reveal") return;
-    const result = computeReveal();
-    if (!roundScored && (!mp || isLobbyHost())) {
-      applyRoundScore(result);
-    } else if (!revealResult) {
-      setRevealDisplay(result);
-    }
+    if (!revealResult) setRevealDisplay(computeReveal());
   }
 
   function syncFromGl() {
@@ -135,55 +157,22 @@ export function mountGuessLie(app) {
     revealResult = { ...result, all: result.all };
   }
 
-  function applyRoundScore(result) {
-    if (roundScored) return;
-    roundScored = true;
-    const { correct, round, liarBonus } = result;
-
-    awardGuessLieRound({
-      correct,
-      liarName: round.player,
-      liarBonus,
-    });
-
-    if (mp && isLobbyHost()) {
-      const stats = getState().stats;
-      const globalStats = getState().globalStats;
-      const lieFound = correct.length > 0;
-      saveStatePatch({
-        stats: {
-          ...stats,
-          liesTotal: (stats.liesTotal || 0) + 1,
-          liesFound: (stats.liesFound || 0) + (lieFound ? 1 : 0),
-        },
-        globalStats: {
-          ...globalStats,
-          liesFound: (globalStats.liesFound || 0) + (lieFound ? 1 : 0),
-        },
-      });
-    } else if (localName !== round.player) {
-      recordLieGuess(correct.includes(localName));
-    }
-
-    setRevealDisplay(result);
-    if (mp && isLobbyHost()) void syncLobbyScores();
-  }
-
   /** Filet de sécurité hôte : clôt la manche même si un détective n'a pas voté. */
   async function forceReveal() {
     if (mp && !isLobbyHost()) return;
+    if (getGuessLieSession().roundScored || roundScored) return;
     if (mp) {
       if (revealAdvancing || phase !== "voting") return;
       revealAdvancing = true;
       try {
-        await commitGuessLiePlay({ phase: "reveal" });
-        applyRoundScore(computeReveal());
-        await commitGuessLiePlay({ roundScored: true });
+        await transitionToReveal();
+        render();
       } finally {
         revealAdvancing = false;
       }
     } else {
       phase = "reveal";
+      await transitionToReveal();
       render();
     }
   }
@@ -408,8 +397,9 @@ export function mountGuessLie(app) {
         await tryAdvanceToReveal();
       } else {
         phase = "reveal";
+        await transitionToReveal();
+        render();
       }
-      render();
     });
 
     app.querySelector("#guesslie-force")?.addEventListener("click", () => void forceReveal());

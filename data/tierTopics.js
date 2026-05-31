@@ -19,19 +19,6 @@ export const TIER_LISTS = [
     ],
   },
   {
-    id: "marvel",
-    name: "Films Marvel",
-    emoji: "🦸",
-    items: [
-      "Iron Man",
-      "Avengers",
-      "Thor",
-      "Black Panther",
-      "Doctor Strange",
-      "Guardians of the Galaxy",
-    ],
-  },
-  {
     id: "fastfood",
     name: "Fast Food",
     emoji: "🍔",
@@ -42,19 +29,6 @@ export const TIER_LISTS = [
       "Subway",
       "Domino's",
       "Five Guys",
-    ],
-  },
-  {
-    id: "series",
-    name: "Séries TV",
-    emoji: "📺",
-    items: [
-      "Breaking Bad",
-      "Stranger Things",
-      "The Office",
-      "Game of Thrones",
-      "Squid Game",
-      "Friends",
     ],
   },
   {

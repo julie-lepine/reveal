@@ -414,6 +414,7 @@ export function mountLobby(app) {
         if (!row) return;
         if (await routeToActiveGameIfNeeded(row)) return;
         if (row.screen !== "game-select") return;
+        if (getLobbyStatus() !== "playing") return;
         if (getCurrentScreen() !== "lobby") return;
         navigate("game-select", { navStack: ["home", "lobby", "game-select"] });
       });

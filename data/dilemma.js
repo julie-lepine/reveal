@@ -39,7 +39,7 @@ export const DILEMMA_DECKS = [
       },
       {
         id: "money-time",
-        optionA: "100 € par jour",
+        optionA: "20 € par jour",
         optionB: "1 million dans 30 ans",
       },
       {
@@ -55,7 +55,7 @@ export const DILEMMA_DECKS = [
       {
         id: "always-late",
         optionA: "Toujours 20 min en retard",
-        optionB: "Toujours 2 h en avance",
+        optionB: "Toujours 1 h en avance",
       },
       {
         id: "read-mind",
@@ -94,8 +94,8 @@ export const DILEMMA_DECKS = [
       },
       {
         id: "late-early",
-        optionA: "Être toujours 10 minutes en retard",
-        optionB: "Être toujours 1 h trop en avance",
+        optionA: "Être toujours 1 h en retard",
+        optionB: "Être toujours 1 h en avance",
       },
       {
         id: "hot-cold-room",
@@ -139,7 +139,7 @@ export const DILEMMA_DECKS = [
       {
         id: "wet-socks",
         optionA: "Chaussettes mouillées à vie",
-        optionB: "Cheveux collés à la gel permanente",
+        optionB: "Cheveux collés à vie",
         tier: "impossible",
       },
       {
@@ -156,8 +156,8 @@ export const DILEMMA_DECKS = [
       },
       {
         id: "npc-life",
-        optionA: "Vivre en PNJ de Sims sans contrôle",
-        optionB: "Vivre en commentateur YouTube de ta vie",
+        optionA: "Vivre dans les Sims sans contrôle",
+        optionB: "Vivre dans Minecraft sans contrôle",
         tier: "impossible",
       },
       {
