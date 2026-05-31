@@ -27,7 +27,6 @@ import {
   isLobbyHost,
   onGameSessionChange,
   completeGameSession,
-  syncLobbyScores,
 } from "../core/gameSync.js";
 
 export function mountSpeedVote(app) {
@@ -106,20 +105,21 @@ export function mountSpeedVote(app) {
     revealInFlight = true;
     try {
       takeScored = true;
-      await commitSpeedVotePlay({
-        phase: "reveal",
-        roundScored: true,
-        votes,
-        voteEndsAt: null,
-      });
-
       if (!mp || isLobbyHost()) {
         const mod = getSpeedVoteModifier({ modifier });
         lastAward = awardSpeedVoteRound(votes, { multiplier: mod.multiplier });
-        if (mp) await syncLobbyScores();
       } else {
         lastAward = previewRoundAward();
       }
+      await commitSpeedVotePlay(
+        {
+          phase: "reveal",
+          roundScored: true,
+          votes,
+          voteEndsAt: null,
+        },
+        { withEveningScores: mp && isLobbyHost() }
+      );
 
       if (!mp) {
         phase = "reveal";

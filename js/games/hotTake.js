@@ -29,7 +29,6 @@ import {
   isLobbyHost,
   onGameSessionChange,
   completeGameSession,
-  syncLobbyScores,
 } from "../core/gameSync.js";
 
 export function mountHotTake(app) {
@@ -202,14 +201,16 @@ export function mountHotTake(app) {
     revealInFlight = true;
     try {
       takeScored = true;
-      await commitHotTakePlay({
-        phase: "reveal",
-        takeScored: true,
-        votes: votesToScore,
-        voteEndsAt: null,
-      });
       lastAward = awardHotTakeVotes(votesToScore, HOT_TAKE_OPTIONS);
-      if (mp) await syncLobbyScores();
+      await commitHotTakePlay(
+        {
+          phase: "reveal",
+          takeScored: true,
+          votes: votesToScore,
+          voteEndsAt: null,
+        },
+        { withEveningScores: mp && isLobbyHost() }
+      );
       if (!mp) {
         phase = "reveal";
         render();

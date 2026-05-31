@@ -68,11 +68,16 @@ function mergeMaxIndex(localIdx, remoteIdx) {
 let pollIntervalMs = 4000;
 let pollUnchangedStreak = 0;
 let lastGameSessionRealtimeAt = 0;
+let syncVisibilityInit = false;
+let syncPausedByHidden = false;
 const POLL_MS_MIN = 3000;
 const POLL_MS_MAX = 12000;
 const POLL_MS_DEFAULT = 4000;
-/** En partie active on garde un polling serré (le Realtime peut être étranglé sur certains appareils). */
+/** Secours si Realtime silencieux en partie active. */
 const POLL_MS_ACTIVE = 2000;
+/** Realtime récent : on espace le polling (egress) sans sacrifier la réactivité perçue. */
+const POLL_MS_ACTIVE_RELAXED = 4000;
+const REALTIME_RECENT_MS = 10000;
 /** Évite de forcer l’écran de prep quand l’invité revient au menu manuellement. */
 let suppressSessionRouteUntil = 0;
 /** Écran de session ignoré pendant la suppression (retour invité au menu jeux). */
@@ -1816,8 +1821,80 @@ export function handleSessionRoute(row, { fromScreen = null } = {}) {
 /** Polling de secours si Realtime ne pousse pas l’événement (fréquent en local). */
 export function pulseGameSessionRealtime() {
   lastGameSessionRealtimeAt = Date.now();
-  pollIntervalMs = POLL_MS_MIN;
   pollUnchangedStreak = 0;
+  if (isActiveGameSessionScreen(getCurrentScreen())) {
+    pollIntervalMs = POLL_MS_ACTIVE_RELAXED;
+  } else {
+    pollIntervalMs = POLL_MS_MIN;
+  }
+}
+
+/** Pause le polling quand l’onglet est en arrière-plan (egress + batterie). */
+export function initMultiplayerSyncVisibility() {
+  if (syncVisibilityInit || typeof document === "undefined") return;
+  syncVisibilityInit = true;
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) {
+      syncPausedByHidden = true;
+      if (pollTimer) {
+        clearInterval(pollTimer);
+        pollTimer = null;
+      }
+      return;
+    }
+    syncPausedByHidden = false;
+    if (isGameSyncActive() && getState().inLobby) {
+      scheduleSyncPoll();
+      void syncTick();
+      import("./supabaseLobby.js").then((m) => {
+        m.refreshLobbyFromSupabase?.().catch(() => {});
+      });
+    }
+  });
+}
+
+function isRecentGameSessionRealtime() {
+  return Date.now() - lastGameSessionRealtimeAt < REALTIME_RECENT_MS;
+}
+
+const EVENING_STATE_KEYS = new Set([
+  "scores",
+  "filRougeScores",
+  "gameScores",
+  "gameScoreOrder",
+  "stats",
+  "lastGame",
+  "lastTierName",
+]);
+
+function isEveningScoresOnlyMerge(stateMerge) {
+  if (!stateMerge || typeof stateMerge !== "object") return false;
+  const keys = Object.keys(stateMerge);
+  if (!keys.length) return false;
+  return keys.every((k) => EVENING_STATE_KEYS.has(k));
+}
+
+/**
+ * Évite un fetch complet du blob `state` avant merge :
+ * - hôte + patch scores seulement : cache local,
+ * - hôte + patch de manche : fetch complet (filet si Realtime manqué),
+ * - invité : méta légère si `updated_at` inchangé, sinon fetch complet.
+ */
+async function loadSessionRowForPatch(lobbyId, { scoresOnly = false } = {}) {
+  const cached =
+    cachedRow?.state && cachedRow.lobby_id === lobbyId ? cachedRow : null;
+  if (cached && isLobbyHost() && scoresOnly) return cached;
+  if (cached && !isLobbyHost()) {
+    try {
+      const meta = await fetchGameSessionMeta(lobbyId);
+      if (meta?.updated_at && meta.updated_at === lastSessionUpdatedAt) {
+        return cached;
+      }
+    } catch {
+      /* fetch complet ci-dessous */
+    }
+  }
+  return fetchGameSessionByLobby(lobbyId);
 }
 
 function scheduleSyncPoll() {
@@ -1827,14 +1904,13 @@ function scheduleSyncPoll() {
 
 function adjustPollBackoff(sigChanged) {
   /**
-   * Pendant une partie active : polling rapide et constant. Si le websocket Realtime
-   * d'un joueur est étranglé (arrière-plan mobile, économiseur de batterie, réseau
-   * restrictif), il ne reçoit plus les events ; ralentir le polling le ferait voir les
-   * questions « bien plus tard ». On reste donc serré tant qu'on est en jeu.
+   * En partie active : 4 s si Realtime vient de pousser, 2 s sinon (filet de secours).
+   * Si le websocket est étranglé (mobile arrière-plan, réseau restrictif), on retombe
+   * sur le polling serré dès que Realtime se tait.
    */
   if (isActiveGameSessionScreen(getCurrentScreen())) {
     pollUnchangedStreak = sigChanged ? 0 : pollUnchangedStreak + 1;
-    pollIntervalMs = POLL_MS_ACTIVE;
+    pollIntervalMs = isRecentGameSessionRealtime() ? POLL_MS_ACTIVE_RELAXED : POLL_MS_ACTIVE;
     return;
   }
   if (sigChanged) {
@@ -1843,7 +1919,7 @@ function adjustPollBackoff(sigChanged) {
     return;
   }
   pollUnchangedStreak += 1;
-  const recentRealtime = Date.now() - lastGameSessionRealtimeAt < 8000;
+  const recentRealtime = isRecentGameSessionRealtime();
   if (recentRealtime && pollUnchangedStreak >= 2) {
     pollIntervalMs = Math.min(POLL_MS_MAX, pollIntervalMs + 1500);
   } else if (!recentRealtime && pollUnchangedStreak >= 1) {
@@ -1857,6 +1933,7 @@ async function syncTick() {
     stopMultiplayerSync();
     return;
   }
+  if (syncPausedByHidden) return;
   if (syncTickInFlight) return;
   syncTickInFlight = true;
   const prevSig = lastSessionSig;
@@ -1905,14 +1982,17 @@ async function syncTick() {
 
 export function startMultiplayerSync() {
   if (!isGameSyncActive()) return;
+  initMultiplayerSyncVisibility();
   stopMultiplayerSync();
   pollIntervalMs = POLL_MS_DEFAULT;
   pollUnchangedStreak = 0;
   lastSessionUpdatedAt = "";
   lastGameSessionRealtimeAt = Date.now();
   import("./supabaseLobby.js").then((m) => m.startLobbyPresenceSync());
-  syncTick();
-  scheduleSyncPoll();
+  if (!syncPausedByHidden) {
+    syncTick();
+    scheduleSyncPoll();
+  }
 }
 
 export function stopMultiplayerSync() {
@@ -1966,10 +2046,18 @@ export async function pushGameSession({ screen, gameId, state }) {
   return row;
 }
 
-export async function patchGameState(stateMerge, { screen, gameId } = {}) {
+export async function patchGameState(
+  stateMerge,
+  { screen, gameId, withEveningScores = false } = {}
+) {
   if (!isGameSyncActive()) return null;
   const lobbyId = getState().lobby.id;
-  let freshRow = await fetchGameSessionByLobby(lobbyId);
+  let mergePayload = stateMerge;
+  if (withEveningScores && isLobbyHost()) {
+    mergePayload = { ...stateMerge, ...eveningStateToRemote() };
+  }
+  const scoresOnly = isEveningScoresOnlyMerge(mergePayload);
+  let freshRow = await loadSessionRowForPatch(lobbyId, { scoresOnly });
 
   if (!freshRow) {
     const hostId = getSupabaseUserId();
@@ -1995,10 +2083,10 @@ export async function patchGameState(stateMerge, { screen, gameId } = {}) {
   }
 
   const current = freshRow?.state || cachedRow?.state || {};
-  let nextState = { ...current, ...stateMerge };
-  if (stateMerge.hotTake) {
+  let nextState = { ...current, ...mergePayload };
+  if (mergePayload.hotTake) {
     const curHt = current.hotTake;
-    const incHt = stateMerge.hotTake;
+    const incHt = mergePayload.hotTake;
     const me = getLocalDisplayName();
     nextState.hotTake = curHt
       ? mergeHotTakePatchState(curHt, incHt, me, {
@@ -2010,9 +2098,9 @@ export async function patchGameState(stateMerge, { screen, gameId } = {}) {
       nextState.hotTake.takeScored = mergeTruthy(curHt.takeScored, incHt.takeScored);
     }
   }
-  if (stateMerge.speedVote) {
+  if (mergePayload.speedVote) {
     const curSv = current.speedVote;
-    const incSv = stateMerge.speedVote;
+    const incSv = mergePayload.speedVote;
     nextState.speedVote = curSv
       ? {
           ...curSv,
@@ -2023,9 +2111,9 @@ export async function patchGameState(stateMerge, { screen, gameId } = {}) {
         }
       : incSv;
   }
-  if (stateMerge.trivia) {
+  if (mergePayload.trivia) {
     const curTrivia = current.trivia;
-    const incTrivia = stateMerge.trivia;
+    const incTrivia = mergePayload.trivia;
     nextState.trivia = curTrivia
       ? {
           ...curTrivia,
@@ -2038,9 +2126,9 @@ export async function patchGameState(stateMerge, { screen, gameId } = {}) {
         }
       : incTrivia;
   }
-  if (stateMerge.truthMeter) {
+  if (mergePayload.truthMeter) {
     const curTm = current.truthMeter;
-    const incTm = stateMerge.truthMeter;
+    const incTm = mergePayload.truthMeter;
     nextState.truthMeter = curTm
       ? {
           ...curTm,
@@ -2051,9 +2139,9 @@ export async function patchGameState(stateMerge, { screen, gameId } = {}) {
         }
       : incTm;
   }
-  if (stateMerge.consensus) {
+  if (mergePayload.consensus) {
     const curConsensus = current.consensus;
-    const incConsensus = stateMerge.consensus;
+    const incConsensus = mergePayload.consensus;
     nextState.consensus = curConsensus
       ? {
           ...curConsensus,
@@ -2069,12 +2157,12 @@ export async function patchGameState(stateMerge, { screen, gameId } = {}) {
         }
       : incConsensus;
   }
-  if (stateMerge.filRouge) {
-    nextState.filRouge = mergeFilRougeRemote(current.filRouge, stateMerge.filRouge);
+  if (mergePayload.filRouge) {
+    nextState.filRouge = mergeFilRougeRemote(current.filRouge, mergePayload.filRouge);
   }
-  if (stateMerge.dilemma) {
+  if (mergePayload.dilemma) {
     const curDm = current.dilemma;
-    const incDm = stateMerge.dilemma;
+    const incDm = mergePayload.dilemma;
     const me = getLocalDisplayName();
     nextState.dilemma = curDm
       ? mergeDilemmaPatchState(curDm, incDm, me, {
@@ -2086,12 +2174,12 @@ export async function patchGameState(stateMerge, { screen, gameId } = {}) {
       nextState.dilemma.roundScored = mergeTruthy(curDm.roundScored, incDm.roundScored);
     }
   }
-  if (stateMerge.tierNight) {
-    nextState.tierNight = { ...(current.tierNight || {}), ...stateMerge.tierNight };
+  if (mergePayload.tierNight) {
+    nextState.tierNight = { ...(current.tierNight || {}), ...mergePayload.tierNight };
   }
-  if (stateMerge.guessLie) {
+  if (mergePayload.guessLie) {
     const curGl = current.guessLie;
-    const incGl = stateMerge.guessLie;
+    const incGl = mergePayload.guessLie;
     nextState.guessLie = curGl
       ? {
           ...curGl,
@@ -2105,9 +2193,9 @@ export async function patchGameState(stateMerge, { screen, gameId } = {}) {
         }
       : incGl;
   }
-  if (stateMerge.playlistGuess) {
+  if (mergePayload.playlistGuess) {
     const curPg = current.playlistGuess;
-    const incPg = stateMerge.playlistGuess;
+    const incPg = mergePayload.playlistGuess;
     nextState.playlistGuess = curPg
       ? {
           ...curPg,
@@ -2117,9 +2205,6 @@ export async function patchGameState(stateMerge, { screen, gameId } = {}) {
           roundScored: mergeTruthy(curPg.roundScored, incPg.roundScored),
         }
       : incPg;
-  }
-  if (isLobbyHost()) {
-    nextState = { ...nextState, ...eveningStateToRemote() };
   }
 
   const patch = { state: nextState };
@@ -2216,69 +2301,69 @@ export async function leaveGameSetup() {
   return returnToGameSelect();
 }
 
-export async function syncHotTakeSession(extra = {}) {
+export async function syncHotTakeSession(extra = {}, patchOpts = {}) {
   const session = { ...getState().hotTakeGame, ...extra };
   saveStatePatch({ hotTakeGame: session });
   if (!isGameSyncActive()) return session;
-  await patchGameState({ hotTake: hotTakeToRemote(session) });
+  await patchGameState({ hotTake: hotTakeToRemote(session) }, patchOpts);
   return session;
 }
 
-export async function syncSpeedVoteSession(extra = {}) {
+export async function syncSpeedVoteSession(extra = {}, patchOpts = {}) {
   const session = { ...getState().speedVoteGame, ...extra };
   saveStatePatch({ speedVoteGame: session });
   if (!isGameSyncActive()) return session;
-  await patchGameState({ speedVote: speedVoteToRemote(session) });
+  await patchGameState({ speedVote: speedVoteToRemote(session) }, patchOpts);
   return session;
 }
 
-export async function syncPlaylistGuessSession(extra = {}) {
+export async function syncPlaylistGuessSession(extra = {}, patchOpts = {}) {
   const session = { ...getState().playlistGuessGame, ...extra };
   saveStatePatch({ playlistGuessGame: session });
   if (!isGameSyncActive()) return session;
-  await patchGameState({ playlistGuess: playlistGuessToRemote(session) });
+  await patchGameState({ playlistGuess: playlistGuessToRemote(session) }, patchOpts);
   return session;
 }
 
-export async function syncTriviaSession(extra = {}) {
+export async function syncTriviaSession(extra = {}, patchOpts = {}) {
   const session = { ...getState().triviaGame, ...extra };
   saveStatePatch({ triviaGame: session });
   if (!isGameSyncActive()) return session;
-  await patchGameState({ trivia: triviaToRemote(session) });
+  await patchGameState({ trivia: triviaToRemote(session) }, patchOpts);
   return session;
 }
 
-export async function syncTruthMeterSession(extra = {}) {
+export async function syncTruthMeterSession(extra = {}, patchOpts = {}) {
   const session = { ...getState().truthMeterGame, ...extra };
   saveStatePatch({ truthMeterGame: session });
   if (!isGameSyncActive()) return session;
-  await patchGameState({ truthMeter: truthMeterToRemote(session) });
+  await patchGameState({ truthMeter: truthMeterToRemote(session) }, patchOpts);
   return session;
 }
 
-export async function syncConsensusSession(extra = {}) {
+export async function syncConsensusSession(extra = {}, patchOpts = {}) {
   const session = { ...getState().consensusGame, ...extra };
   saveStatePatch({ consensusGame: session });
   if (!isGameSyncActive()) return session;
-  await patchGameState({ consensus: consensusToRemote(session) });
+  await patchGameState({ consensus: consensusToRemote(session) }, patchOpts);
   return session;
 }
 
-export async function syncDilemmaSession(extra = {}) {
+export async function syncDilemmaSession(extra = {}, patchOpts = {}) {
   const session = { ...getState().dilemmaGame, ...extra };
   saveStatePatch({ dilemmaGame: session });
   if (!isGameSyncActive()) return session;
-  await patchGameState({ dilemma: dilemmaToRemote(session) });
+  await patchGameState({ dilemma: dilemmaToRemote(session) }, patchOpts);
   return session;
 }
 
-export async function syncFilRougeSession(extra = {}) {
+export async function syncFilRougeSession(extra = {}, patchOpts = {}) {
   const session = { ...getState().filRougeGame, ...extra };
   saveStatePatch({ filRougeGame: session });
   if (!isGameSyncActive()) {
     return session;
   }
-  await patchGameState({ filRouge: filRougeToRemote(session) });
+  await patchGameState({ filRouge: filRougeToRemote(session) }, patchOpts);
   return getState().filRougeGame || session;
 }
 
@@ -2289,16 +2374,16 @@ export async function refreshFilRougeFromSession() {
   return getState().filRougeGame;
 }
 
-export async function syncGuessLieSession(extra = {}) {
+export async function syncGuessLieSession(extra = {}, patchOpts = {}) {
   const gl = { ...getState().guessLie, ...extra };
   saveStatePatch({ guessLie: gl });
   if (!isGameSyncActive()) return gl;
-  await patchGameState({ guessLie: guessLieToRemote(gl) });
+  await patchGameState({ guessLie: guessLieToRemote(gl) }, patchOpts);
   return gl;
 }
 
-export async function commitGuessLiePlay(patch, { screen } = {}) {
-  const gl = await syncGuessLieSession(patch);
+export async function commitGuessLiePlay(patch, { screen, withEveningScores = false } = {}) {
+  const gl = await syncGuessLieSession(patch, { withEveningScores });
   if (screen && isGameSyncActive()) {
     await pushGameSession({ screen, gameId: "guesslie", state: { guessLie: guessLieToRemote(gl) } });
   }
@@ -2403,20 +2488,18 @@ export async function pushTierNightRecapToSession() {
   await patchGameState({ tierNight: { ...tn, recap } });
 }
 
-/** Hôte uniquement : passe à l’écran résultats quand tout le lobby a terminé. */
+/** Hôte : fin Tier Night — récap + scores + écran en un seul write. */
 export async function advanceTierNightToResultsWhenReady(list) {
   if (!isGameSyncActive() || !isLobbyHost()) return false;
   if (!allTierNightMembersFinished()) return false;
 
   await ensureTierNightRecapsFromRemote(list);
-  await pushTierNightRecapToSession();
-  await syncLobbyScores();
+  const recap = tierNightRecapToRemote(getTierNightSession());
   const tnRemote = getTierNightRemote() || {};
-  await pushGameSession({
-    screen: "tiernight-end",
-    gameId: "tiernight",
-    state: { tierNight: tnRemote },
-  });
+  await patchGameState(
+    { tierNight: { ...tnRemote, ...(recap ? { recap } : {}) } },
+    { screen: "tiernight-end", gameId: "tiernight", withEveningScores: true }
+  );
   navigate("tiernight-end");
   return true;
 }

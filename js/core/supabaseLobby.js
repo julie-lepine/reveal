@@ -232,6 +232,10 @@ function scheduleLobbyPresencePoll() {
   const delay = inGame ? 20000 : 12000;
   lobbyPresencePollTimer = setTimeout(async () => {
     lobbyPresencePollTimer = null;
+    if (typeof document !== "undefined" && document.hidden) {
+      if (presenceLobbyId) scheduleLobbyPresencePoll();
+      return;
+    }
     try {
       await refreshLobbyFromSupabase();
     } catch (e) {

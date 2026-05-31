@@ -182,9 +182,9 @@ export async function markTruthMeterLobbyStarted() {
   }
 }
 
-export async function commitTruthMeterPlay(patch) {
+export async function commitTruthMeterPlay(patch, patchOpts = {}) {
   const session = { ...getTruthMeterSession(), ...patch };
-  await syncTruthMeterSession(session);
+  await syncTruthMeterSession(session, patchOpts);
   return session;
 }
 

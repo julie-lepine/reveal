@@ -25,7 +25,6 @@ import {
   isLobbyHost,
   onGameSessionChange,
   completeGameSession,
-  syncLobbyScores,
 } from "../core/gameSync.js";
 
 const DILEMMA_VS_SRC = "js/games/dilemma-vs.svg";
@@ -118,15 +117,16 @@ export function mountDilemma(app) {
     revealInFlight = true;
     try {
       roundScored = true;
-      await commitDilemmaPlay({
-        phase: "reveal",
-        roundScored: true,
-        votes,
-        voteEndsAt: null,
-      });
-
       lastAward = awardDilemmaRound(votes);
-      if (mp) await syncLobbyScores();
+      await commitDilemmaPlay(
+        {
+          phase: "reveal",
+          roundScored: true,
+          votes,
+          voteEndsAt: null,
+        },
+        { withEveningScores: mp && isLobbyHost() }
+      );
 
       if (!mp) {
         phase = "reveal";

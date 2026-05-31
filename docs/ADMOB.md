@@ -10,7 +10,7 @@ La bannière s’affiche en **haut** sur les écrans de navigation (menu, prep, 
 
 ## Configuration AdMob
 
-Fichier central : [`data/admobConfig.js`](./data/admobConfig.js)
+Fichier central : [`data/admobConfig.js`](../data/admobConfig.js)
 
 | Clé | Usage |
 |-----|--------|

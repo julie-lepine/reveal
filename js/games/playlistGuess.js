@@ -26,7 +26,6 @@ import {
   isLobbyHost,
   onGameSessionChange,
   completeGameSession,
-  syncLobbyScores,
 } from "../core/gameSync.js";
 import { songGuessCardHtml } from "../playlistguess/SongGuessCard.js";
 import { revealResultCardHtml } from "../playlistguess/RevealOwnerCard.js";
@@ -130,13 +129,15 @@ export function mountPlaylistGuess(app) {
     if (mp && !isLobbyHost()) return;
 
     roundScored = true;
-    await commitPlaylistGuessPlay({
-      phase: "reveal",
-      voteEndsAt: null,
-      roundScored: true,
-    });
     revealSummary = buildSummary(gatherVotes(), true);
-    if (mp && isLobbyHost()) await syncLobbyScores();
+    await commitPlaylistGuessPlay(
+      {
+        phase: "reveal",
+        voteEndsAt: null,
+        roundScored: true,
+      },
+      { withEveningScores: mp && isLobbyHost() }
+    );
   }
 
   async function tryAdvanceToReveal() {

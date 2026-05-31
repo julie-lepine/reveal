@@ -4,6 +4,10 @@
   "type": "module",
   "scripts": {
     "test": "node --test tests/sessionMerge.test.js tests/deckCodec.test.js",
+    "assets:prepare": "powershell -ExecutionPolicy Bypass -File scripts/prepareStoreAssets.ps1",
+    "assets:native": "npx @capacitor/assets generate",
+    "assets:sync": "npm run assets:native && npm run cap:sync",
+    "assets:all": "npm run assets:prepare && npm run assets:native && npm run cap:sync",
     "cap:sync-web": "node scripts/syncCapWeb.mjs",
     "cap:sync": "npm run cap:sync-web && npx cap sync && node scripts/patchNative.mjs",
     "cap:open:android": "npx cap open android",
@@ -17,5 +21,8 @@
     "@capacitor/core": "^8.3.4",
     "@capacitor/ios": "^8.3.4",
     "@supabase/supabase-js": "^2.49.1"
+  },
+  "devDependencies": {
+    "@capacitor/assets": "^3.0.5"
   }
 }

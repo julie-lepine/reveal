@@ -213,9 +213,9 @@ export function simulateSpeedVoteReady(onUpdate) {
   return () => clearInterval(id);
 }
 
-export async function commitSpeedVotePlay(patch) {
+export async function commitSpeedVotePlay(patch, patchOpts = {}) {
   const session = { ...getSpeedVoteSession(), ...patch };
-  await syncSpeedVoteSession(session);
+  await syncSpeedVoteSession(session, patchOpts);
   return session;
 }
 

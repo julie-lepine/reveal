@@ -12,7 +12,8 @@ Capacitor est **initialisé**. Checklist complète store : **[STORE_CHECKLIST.md
 | AdMob bannière + consentement UMP | ✅ |
 | Deep links auth Supabase | ✅ |
 | Politique de confidentialité | ✅ (`privacy.html` + écran in-app) |
-| Icônes / splash store | ☐ |
+| Sources icône / splash (`resources/`) | ✅ custom (icon, splash 2732², portrait iOS/Android) |
+| Icônes / splash injectés dans `android/` / `ios/` | ☐ `npm run assets:sync` (Node ≥ 22) |
 | Test sur device réel | ☐ |
 | Build release signé | ☐ |
 
@@ -30,9 +31,17 @@ npm run cap:open:ios       # Mac + Xcode uniquement
 
 `cap:sync` copie les assets vers `www/`, synchronise les projets natifs, et applique `scripts/patchNative.mjs` (AdMob, deep links, ATT iOS).
 
----
+## Assets natifs (icône / splash)
 
-## Identifiants app
+Sources dans [`resources/`](../resources/README.md) — **ne pas** lancer `assets:prepare` si tes PNG custom sont déjà en place.
+
+```bash
+npm run assets:sync    # @capacitor/assets + cap:sync
+```
+
+Prérequis : **Node.js ≥ 22**.
+
+---
 
 - **Bundle ID** : `com.reveal.partygames`
 - **Deep link auth** : `com.reveal.partygames://auth/callback`

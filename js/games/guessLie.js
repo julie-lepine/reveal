@@ -16,7 +16,6 @@ import {
   getActiveMemberUserIds,
   nameForUserId,
   completeGameSession,
-  syncLobbyScores,
 } from "../core/gameSync.js";
 import { getLocalDisplayName, recordGuessLieRoundStats, setLastGame } from "../core/state.js";
 import { awardGuessLieRound, guessLieLiarWins } from "../core/scoring.js";
@@ -90,11 +89,6 @@ export function mountGuessLie(app) {
     const recordStats = gl.statsRecordedRoundIdx !== roundIdx;
 
     roundScored = true;
-    await commitGuessLiePlay({
-      phase: "reveal",
-      roundScored: true,
-      ...(recordStats ? { statsRecordedRoundIdx: roundIdx } : {}),
-    });
 
     awardGuessLieRound({
       correct,
@@ -106,8 +100,16 @@ export function mountGuessLie(app) {
       recordGuessLieRoundStats(lieDetected);
     }
 
+    await commitGuessLiePlay(
+      {
+        phase: "reveal",
+        roundScored: true,
+        ...(recordStats ? { statsRecordedRoundIdx: roundIdx } : {}),
+      },
+      { withEveningScores: mp && isLobbyHost() }
+    );
+
     setRevealDisplay(result);
-    if (mp && isLobbyHost()) await syncLobbyScores();
   }
 
   async function tryAdvanceToReveal() {

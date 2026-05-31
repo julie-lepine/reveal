@@ -297,11 +297,7 @@ export async function hostApproveFilRougeMission(agentUid) {
     },
   };
 
-  await syncFilRougeSession({ ...session, validations });
-  if (isGameSyncActive()) {
-    const { syncLobbyScores } = await import("./gameSync.js");
-    await syncLobbyScores();
-  }
+  await syncFilRougeSession({ ...session, validations }, { withEveningScores: true });
 
   return { ok: true };
 }

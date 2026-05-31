@@ -43,6 +43,7 @@ import { mountFilRougeSetup } from "./screens/filRougeSetup.js";
 import { mountFilRougeMission } from "./screens/filRougeMission.js";
 import { initFilRougeResultsListener } from "./core/filRougeResultsModal.js";
 import { initFilRougeValidationListener } from "./core/filRougeToast.js";
+import { initMultiplayerSyncVisibility } from "./core/gameSync.js";
 
 const app = document.getElementById("app");
 
@@ -95,6 +96,7 @@ registerScreen("filrouge-mission", mountFilRougeMission);
 
 initBottomNav();
 initAds();
+initMultiplayerSyncVisibility();
 initFilRougeResultsListener();
 initFilRougeValidationListener();
 

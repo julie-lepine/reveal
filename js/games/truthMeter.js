@@ -37,7 +37,6 @@ import {
   isLobbyHost,
   onGameSessionChange,
   completeGameSession,
-  syncLobbyScores,
 } from "../core/gameSync.js";
 
 function sliderBlockHtml({
@@ -334,16 +333,8 @@ export function mountTruthMeter(app) {
       const est = authorEstimate;
 
       roundScored = true;
-      await commitTruthMeterPlay({
-        phase: "reveal",
-        roundScored: true,
-        votes: votesToScore,
-        voteEndsAt: null,
-      });
-
       if (author && (!mp || isLobbyHost())) {
         lastAward = awardTruthMeterRound(votesToScore, author, est);
-        if (mp) await syncLobbyScores();
       } else if (!lastAward && author) {
         lastAward = {
           ...computeRoundMetrics(votesToScore, est),
@@ -352,6 +343,15 @@ export function mountTruthMeter(app) {
           mindReader: null,
         };
       }
+      await commitTruthMeterPlay(
+        {
+          phase: "reveal",
+          roundScored: true,
+          votes: votesToScore,
+          voteEndsAt: null,
+        },
+        { withEveningScores: mp && isLobbyHost() && Boolean(author) }
+      );
 
       if (!mp) {
         phase = "reveal";

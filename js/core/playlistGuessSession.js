@@ -200,9 +200,9 @@ export async function startPlaylistGuessRound(roundIdx) {
   return next;
 }
 
-export async function commitPlaylistGuessPlay(patch) {
+export async function commitPlaylistGuessPlay(patch, patchOpts = {}) {
   const session = { ...getPlaylistGuessSession(), ...patch };
-  await syncPlaylistGuessSession(session);
+  await syncPlaylistGuessSession(session, patchOpts);
   return session;
 }
 

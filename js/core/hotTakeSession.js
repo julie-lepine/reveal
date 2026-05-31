@@ -347,9 +347,9 @@ export async function resetHotTakeSession() {
   await syncHotTakeSession(defaultSession());
 }
 
-export async function commitHotTakePlay(patch) {
+export async function commitHotTakePlay(patch, patchOpts = {}) {
   const session = { ...getHotTakeSession(), ...patch };
-  await syncHotTakeSession(session);
+  await syncHotTakeSession(session, patchOpts);
   return session;
 }
 

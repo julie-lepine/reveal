@@ -17,6 +17,8 @@ Légende : ✅ fait dans le repo · ☐ à faire manuellement · 🧪 à tester 
 - [x] Patch natif auto : AdMob App ID, deep link, ATT iOS (`scripts/patchNative.mjs`)
 - [x] Politique de confidentialité : écran in-app + `privacy.html` (URL store)
 - [x] IDs AdMob configurés (`data/admobConfig.js`)
+- [x] Sources icône / splash : `resources/` (icon 1024², splash 2732², exports portrait iOS/Android) — voir [resources/README.md](../resources/README.md)
+- [x] Scripts assets : `assets:prepare` (secours), `assets:native`, `assets:sync`, `assets:all` (`package.json`)
 
 ---
 
@@ -63,8 +65,11 @@ Guide pas à pas : **[RESEND_SETUP.md](./RESEND_SETUP.md)**
 
 ## E. Build & test device (manuel)
 
+**Prérequis : Node.js ≥ 22** (`node -v`) — Capacitor 8 refuse Node 20.
+
 ```bash
-npm run cap:sync
+npm run assets:sync      # icône/splash → android/ios + sync web (si assets prêts)
+# ou npm run cap:sync    # sync web seulement
 npm run cap:open:android   # ou cap:open:ios sur Mac
 ```
 
@@ -91,14 +96,37 @@ npm run cap:open:android   # ou cap:open:ios sur Mac
 
 ## G. Assets store (manuel)
 
-- [ ] Icône app 1024×1024 (iOS) + adaptive icon (Android)
-  - Option : placer `resources/icon.png` + `resources/splash.png`, puis `@capacitor/assets generate`
-- [ ] Splash screen
-- [ ] Captures d’écran (menu, lobby, 1–2 jeux) — tailles requises par chaque store
+### In-app (Capacitor) — sources dans le repo
+
+- [x] **Icône** : `resources/icon.png` (1024×1024)
+- [x] **Splash Capacitor** : `resources/splash.png` (2732×2732) — lu par `@capacitor/assets`
+- [x] **Splashes portrait** (logo + tagline, archivage / référence) :
+  - `resources/splash_android_1080x1920.png`
+  - `resources/splash_ios_828x1792.png`
+  - `resources/splash_ios_1125x2436.png`
+  - `resources/splash_ios_1242x2688.png`
+  - Doc : [resources/README.md](../resources/README.md)
+- [ ] **Natif** : injecter dans `android/` + `ios/` :
+  ```bash
+  npm run assets:sync
+  ```
+  (équivalent : `npm run assets:native` puis `npm run cap:sync`)
+  ===> cap:sync OK, assets:native en attente
+  ===> OK vérif sur Android Studio et lancer l’app sur un téléphone.
+  - ⚠️ **Node ≥ 22** obligatoire pour `cap sync`
+  - ⚠️ `@capacitor/assets` peut échouer sur Windows (TLS / `sharp`) — autre réseau ou Mac
+  - ⚠️ **Ne pas** lancer `npm run assets:prepare` : écrase icon/splash sans tagline
+- [ ] 🧪 Vérifier icône + splash sur device après sync
+
+### Fiche store (upload consoles — pas d’hébergement web)
+
+- [ ] Captures d’écran (menu, lobby, 1–2 jeux) — archivage optionnel : `store-assets/`
 - [ ] Textes fiche store (titre, description, mots-clés, catégorie)
-- [ ] **URL politique de confidentialité** :
+- [ ] **URL politique de confidentialité** (seule URL image/texte obligatoire côté web) :
   `https://julie-lepine.github.io/reveal/privacy.html`
   (déployer `privacy.html` avec le prochain push web)
+
+> **Rappel** : icône et splash **ne sont pas hébergés** sur GitHub Pages — ils sont embarqués dans l’APK/IPA (ou upload PNG 1024 direct sur App Store Connect).
 
 ---
 
@@ -136,14 +164,16 @@ npm run cap:open:android   # ou cap:open:ios sur Mac
 
 | Fichier | Rôle |
 |---------|------|
-| [data/admobConfig.js](./data/admobConfig.js) | IDs pub + mode test/prod |
-| [data/appConfig.js](./data/appConfig.js) | Bundle ID, deep link, URL privacy |
-| [data/legalContent.js](./data/legalContent.js) | Texte RGPD in-app |
-| [privacy.html](./privacy.html) | Page publique pour les stores |
+| [data/admobConfig.js](../data/admobConfig.js) | IDs pub + mode test/prod |
+| [data/appConfig.js](../data/appConfig.js) | Bundle ID, deep link, URL privacy |
+| [data/legalContent.js](../data/legalContent.js) | Texte RGPD in-app |
+| [privacy.html](../privacy.html) | Page publique pour les stores |
 | [RESEND_SETUP.md](./RESEND_SETUP.md) | DNS OVH + SMTP Supabase |
 | [ADMOB.md](./ADMOB.md) | Doc technique AdMob |
 | [CAPACITOR.md](./CAPACITOR.md) | Vue d’ensemble Capacitor |
+| [resources/README.md](../resources/README.md) | Icône / splash Capacitor |
+| [store-assets/README.md](../store-assets/README.md) | Archivage captures store (optionnel) |
 
 ---
 
-**Prochaine action recommandée** : section **E** — `npm run cap:sync` puis test sur un vrai téléphone Android.
+**Prochaine action recommandée** : installer **Node 22 LTS**, puis section **G** — `npm run assets:sync` et test device (section **E**).

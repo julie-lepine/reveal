@@ -296,9 +296,9 @@ export function simulateDilemmaReady(onUpdate) {
   return () => clearInterval(id);
 }
 
-export async function commitDilemmaPlay(patch) {
+export async function commitDilemmaPlay(patch, patchOpts = {}) {
   const session = { ...getDilemmaSession(), ...patch };
-  await syncDilemmaSession(session);
+  await syncDilemmaSession(session, patchOpts);
   return session;
 }
 

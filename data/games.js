@@ -6,7 +6,7 @@ export const GAMES = [
     desc: "3 joueurs min. - une chanson, votez à qui elle correspond le mieux",
     emoji: "🎵",
     cssClass: "playlist",
-    logo: "js/games/vibecheck.png",
+    logo: "assets/games/vibecheck.png",
     borderGradient:
       "linear-gradient(200deg, #A78BFA 0%, #6366F1 48%, #2B2D66 100%)",
     enabled: true,
@@ -17,7 +17,7 @@ export const GAMES = [
     desc: "Curseur 0 → 100 - pense comme le groupe, pas comme toi",
     emoji: "🤝",
     cssClass: "consensus",
-    logo: "js/games/consensus.png",
+    logo: "assets/games/consensus.png",
     borderGradient:
       "linear-gradient(145deg, #22D3EE 0%, #A78BFA 48%, #2B2D66 100%)",
     enabled: true,
@@ -28,7 +28,7 @@ export const GAMES = [
     desc: "Opinions impopulaires",
     emoji: "🔥",
     cssClass: "hot",
-    logo: "js/games/hottake.png",
+    logo: "assets/games/hottake.png",
     borderGradient:
       "linear-gradient(145deg, #FF6B6B 0%, #FF3CAC 48%, #2B2D66 100%)",
     enabled: true,
@@ -39,7 +39,7 @@ export const GAMES = [
     desc: "2 vérités, 1 mensonge",
     emoji: "🕵️",
     cssClass: "guess",
-    logo: "js/games/guesslie.png",
+    logo: "assets/games/guesslie.png",
     borderGradient:
       "linear-gradient(200deg, #FF6B6B 0%, #FF3CAC 48%, #2B2D66 100%)",
     enabled: true,
@@ -50,7 +50,7 @@ export const GAMES = [
     desc: "Vote éclair - chaos instantané en 7 secondes",
     emoji: "⚡",
     cssClass: "speed",
-    logo: "js/games/speedvote.png",
+    logo: "assets/games/speedvote.png",
     borderGradient:
       "linear-gradient(145deg, #FBBF24 0%, #FF3CAC 48%, #2B2D66 100%)",
     enabled: true,
@@ -61,7 +61,7 @@ export const GAMES = [
     desc: "Dilemme A vs B - Choisis ton camp, défends-le… vote",
     emoji: "⚖️",
     cssClass: "dilemma",
-    logo: "js/games/dilemma.png",
+    logo: "assets/games/dilemma.png",
     borderGradient:
       "linear-gradient(145deg, #60A5FA 0%, #FF3CAC 48%, #2B2D66 100%)",
     enabled: true,
@@ -72,7 +72,7 @@ export const GAMES = [
     desc: "Affirmation + curseur Faux → Vrai - le groupe tranche",
     emoji: "📏",
     cssClass: "truth",
-    logo: "js/games/truthmeter.png",
+    logo: "assets/games/truthmeter.png",
     borderGradient:
       "linear-gradient(145deg, #34D399 0%, #60A5FA 48%, #2B2D66 100%)",
     enabled: true,
@@ -83,7 +83,7 @@ export const GAMES = [
     desc: "Choisis une tier list, puis classe en S / A / B / C / D",
     emoji: "🏆",
     cssClass: "tier",
-    logo: "js/games/tiernight.png",
+    logo: "assets/games/tiernight.png",
     borderGradient:
       "linear-gradient(320deg, #FF6B6B 0%, #FF3CAC 48%, #2B2D66 100%)",
     enabled: true,
@@ -94,7 +94,7 @@ export const GAMES = [
     desc: "Testez votre culture générale",
     emoji: "🧠",
     cssClass: "trivia",
-    logo: "js/games/trivia.png",
+    logo: "assets/games/trivia.png",
     borderGradient:
       "linear-gradient(145deg, #A78BFA 0%, #22D3EE 44%, #2B2D66 100%)",
     enabled: true,
