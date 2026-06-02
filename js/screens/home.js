@@ -30,7 +30,7 @@ import {
   routeToActiveGameIfNeeded,
   isSessionRouteSuppressed,
 } from "../core/gameSync.js";
-import { navigate, getCurrentScreen } from "../core/router.js";
+import { navigate, getCurrentScreen, getScreenParams } from "../core/router.js";
 import { escapeHtml, logoHtml, pageShell } from "../core/ui.js";
 import { handleNavTarget, goToEveningSettings } from "./nav.js";
 import { showAppAlert, showAppConfirm, showAppEmailPrompt } from "../core/dialog.js";
@@ -180,7 +180,13 @@ function clearStuckDialogs() {
 export function mountHome(app) {
   const pendingJoin = sessionStorage.getItem("reveal-pending-join");
   const tabAfterLeave = sessionStorage.getItem("reveal-auth-tab");
-  let authTab = tabAfterLeave || (pendingJoin ? "guest" : "login");
+  const routeAuthTab = getScreenParams()?.authTab;
+  let authTab =
+    tabAfterLeave ||
+    (routeAuthTab === "login" || routeAuthTab === "signup" || routeAuthTab === "guest"
+      ? routeAuthTab
+      : null) ||
+    (pendingJoin ? "guest" : "login");
   if (tabAfterLeave) sessionStorage.removeItem("reveal-auth-tab");
 
   let unsubSession = () => {};

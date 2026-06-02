@@ -1756,6 +1756,61 @@ select.field-input option{
   font-size:13px;
 }
 
+.welcome{
+  display:flex;
+  flex-direction:column;
+  min-height:min(72vh,640px);
+  padding-bottom:24px;
+}
+
+.welcome__hero{
+  margin-top:8px;
+  margin-bottom:20px;
+}
+
+.welcome__features{
+  list-style:none;
+  margin:0 0 28px;
+  padding:0;
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+}
+
+.welcome__feature{
+  display:flex;
+  align-items:flex-start;
+  gap:12px;
+  padding:14px 16px;
+  border-radius:16px;
+  border:1px solid rgba(255,255,255,.08);
+  background:rgba(255,255,255,.04);
+}
+
+.welcome__feature-icon{
+  font-size:22px;
+  line-height:1.2;
+  flex-shrink:0;
+}
+
+.welcome__feature-text{
+  font-size:15px;
+  line-height:1.45;
+  color:rgba(255,255,255,.82);
+}
+
+.welcome__actions{
+  margin-top:auto;
+  padding-top:8px;
+}
+
+.welcome__privacy{
+  display:block;
+  width:100%;
+  text-align:center;
+  margin-top:12px;
+}
+
 .auth-tabs{
   display:flex;
   gap:8px;

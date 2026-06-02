@@ -189,6 +189,7 @@ export function mountConsensus(app) {
   let npcRoundKey = "";
   let revealInFlight = false;
   let revealPendingTimeoutId = null;
+  let questionDeadlineTimerId = null;
   let roundKey = "";
   let draftValue = 50;
 
@@ -206,6 +207,42 @@ export function mountConsensus(app) {
       clearTimeout(revealPendingTimeoutId);
       revealPendingTimeoutId = null;
     }
+  }
+
+  function clearQuestionDeadline() {
+    if (questionDeadlineTimerId) {
+      clearTimeout(questionDeadlineTimerId);
+      questionDeadlineTimerId = null;
+    }
+  }
+
+  /** Solo / démo : révélation directe (comme Trivia). MP : suspense court puis score. */
+  async function beginReveal() {
+    if (!mp) {
+      clearRevealPending();
+      await goToReveal();
+      return;
+    }
+    await goToRevealPending();
+  }
+
+  function scheduleQuestionDeadline() {
+    clearQuestionDeadline();
+    if (phase !== "question") return;
+    if (mp && !isLobbyHost()) return;
+    const endsAt = consensus.getSession().questionEndsAt;
+    if (!endsAt) return;
+    const delayMs = new Date(endsAt).getTime() - Date.now();
+    if (delayMs <= 0) {
+      void forceReveal();
+      return;
+    }
+    questionDeadlineTimerId = setTimeout(() => {
+      questionDeadlineTimerId = null;
+      if (consensus.getSession().phase === "question") {
+        void forceReveal();
+      }
+    }, delayMs + 80);
   }
 
   function captureDraftFromDom() {
@@ -292,7 +329,7 @@ export function mountConsensus(app) {
         const timeoutId = setTimeout(async () => {
           const live = consensus.getSession();
           if (live.phase !== "question") return;
-          if (Number.isFinite((live.answers || {})[player.name]?.value)) return;
+          if ((live.answers || {})[player.name]?.submittedAt) return;
           const nextAnswers = {
             ...(live.answers || {}),
             [player.name]: {
@@ -306,7 +343,7 @@ export function mountConsensus(app) {
             answers: nextAnswers,
           });
           if (consensus.allAnswersIn()) {
-            await goToRevealPending();
+            await beginReveal();
           } else {
             render();
           }
@@ -316,24 +353,21 @@ export function mountConsensus(app) {
   }
 
   async function goToRevealPending() {
-    if (revealInFlight) return;
-    clearRevealPending();
-    if (mp) {
-      await consensus.commitPlay({
-        phase: "reveal-pending",
-        questionEndsAt: null,
-      });
-    } else {
-      await consensus.commitPlay({
-        phase: "reveal-pending",
-        questionEndsAt: null,
-      });
+    if (revealInFlight) {
       render();
-      revealPendingTimeoutId = setTimeout(() => {
-        revealPendingTimeoutId = null;
-        void goToReveal();
-      }, CONSENSUS_REVEAL_PENDING_MS);
+      return;
     }
+    clearRevealPending();
+    clearQuestionDeadline();
+    await consensus.commitPlay({
+      phase: "reveal-pending",
+      questionEndsAt: null,
+    });
+    render();
+    revealPendingTimeoutId = setTimeout(() => {
+      revealPendingTimeoutId = null;
+      void goToReveal();
+    }, CONSENSUS_REVEAL_PENDING_MS);
   }
 
   /** Filet de sécurité hôte : clôt la manche même si un joueur n'a pas validé sa réponse. */
@@ -344,7 +378,7 @@ export function mountConsensus(app) {
     } else {
       await commitLocalDraft({ submitted: true });
     }
-    await goToRevealPending();
+    await beginReveal();
   }
 
   async function goToReveal() {
@@ -353,6 +387,8 @@ export function mountConsensus(app) {
     if (live.phase !== "question" && live.phase !== "reveal-pending") return;
     revealInFlight = true;
     clearNpcTimers();
+    clearQuestionDeadline();
+    clearRevealPending();
     try {
       if (mp) {
         await refreshGameSession();
@@ -363,9 +399,9 @@ export function mountConsensus(app) {
         phase: "reveal",
         questionEndsAt: null,
       });
-      if (!mp) render();
     } finally {
       revealInFlight = false;
+      render();
     }
   }
 
@@ -473,6 +509,7 @@ export function mountConsensus(app) {
 
     clearNpcTimers();
     clearRevealPending();
+    clearQuestionDeadline();
 
     if (mp && isLobbyHost()) {
       await completeGameSession({
@@ -593,7 +630,7 @@ export function mountConsensus(app) {
       app.querySelector("#btn-consensus-submit")?.addEventListener("click", async () => {
         await commitLocalDraft({ submitted: true });
         if (consensus.allAnswersIn() && (!mp || isLobbyHost())) {
-          await goToRevealPending();
+          await beginReveal();
         } else {
           render();
         }
@@ -606,7 +643,7 @@ export function mountConsensus(app) {
     app.querySelector("#btn-consensus-next")?.addEventListener("click", async () => {
       if (questionIdx < totalQuestions - 1) {
         await consensus.startQuestion(questionIdx + 1);
-        if (!mp) render();
+        render();
         return;
       }
       await finishConsensusGame();
@@ -638,21 +675,19 @@ export function mountConsensus(app) {
       if (!mp && nextRoundKey !== npcRoundKey) {
         scheduleLocalNpcAnswers();
       }
+      scheduleQuestionDeadline();
     } else {
       clearNpcTimers();
+      clearQuestionDeadline();
     }
   }
 
   const unsub = onGameSessionChange(() => {
     const prevPhase = phase;
-    const prevRoundKey = roundKey;
     captureDraftFromDom();
     syncFromSession();
     if (phase === "question" && isLobbyHost() && consensus.allAnswersIn()) {
-      void goToRevealPending();
-      return;
-    }
-    if (phase === "question" && prevPhase === "question" && prevRoundKey === roundKey) {
+      void beginReveal();
       return;
     }
     if (phase === "reveal-pending" && prevPhase !== "reveal-pending" && isLobbyHost()) {
@@ -670,6 +705,7 @@ export function mountConsensus(app) {
   return () => {
     clearNpcTimers();
     clearRevealPending();
+    clearQuestionDeadline();
     unsub();
   };
 }

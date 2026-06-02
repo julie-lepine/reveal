@@ -9,7 +9,9 @@ import {
   reconcileLobbyMembership,
 } from "./core/lobby.js";
 import { initSupabaseAuth, isPasswordRecoveryPending } from "./core/supabaseAuth.js";
+import { shouldShowWelcome } from "./core/welcomeGate.js";
 import { mountResetPassword } from "./screens/resetPassword.js";
+import { mountWelcome } from "./screens/welcome.js";
 import { mountHome } from "./screens/home.js";
 import { mountLobby } from "./screens/lobby.js";
 import { mountGameSelect } from "./screens/gameSelect.js";
@@ -61,6 +63,7 @@ if (joinCode) {
 
 initRouter(app);
 
+registerScreen("welcome", mountWelcome);
 registerScreen("home", mountHome);
 registerScreen("reset-password", mountResetPassword);
 registerScreen("settings", mountSettings);
@@ -110,6 +113,8 @@ async function boot() {
   } else if (hasActiveLobby()) {
     const resumed = await resumeEveningSession({ force: true });
     if (!resumed) navigate("home", { reset: true });
+  } else if (shouldShowWelcome()) {
+    navigate("welcome", { reset: true });
   } else {
     navigate("home", { reset: true });
   }

@@ -8,6 +8,7 @@ Légende : ✅ fait dans le repo · ☐ à faire manuellement · 🧪 à tester 
 
 ## A. Déjà fait dans le code
 
+- [x] Écran d’intro **welcome** (avant connexion) → bouton vers `home` (`js/screens/welcome.js`)
 - [x] Capacitor initialisé (`capacitor.config.ts`, scripts `cap:sync`)
 - [x] Plateformes `android/` et `ios/` générées
 - [x] AdMob : bannière haut, masquée en gameplay (`js/core/ads.js`)
@@ -48,18 +49,20 @@ Réf. [SUPABASE_SETUP.md](./SUPABASE_SETUP.md)
 
 Guide pas à pas : **[RESEND_SETUP.md](./RESEND_SETUP.md)**
 
-- [x] Domaine ajouté dans **Resend**
-- [ ] **En cours** : enregistrements DNS (TXT / DKIM…) dans **OVH → Zone DNS** — Resend vérifie la propagation
-- [ ] Statut domaine **Verified** dans Resend
-- [ ] Clé API Resend → **Supabase → SMTP Settings** (`smtp.resend.com`, sender `noreply@…`)
-- [ ] 🧪 Test **mot de passe oublié** (web + app native deep link)
+- [x] Domaine ajouté dans **Resend** (`revealthepartygame.fr`)
+- [x] Enregistrements DNS dans **OVH → Zone DNS** (TXT / DKIM / SPF + MX `send` — MX ajouté via édition avancée de la zone)
+- [x] Statut domaine **Verified** dans Resend
+- [x] Clé API Resend → **Supabase → Authentication → Emails** → Custom SMTP (`smtp.resend.com`, user `resend`, sender `noreply@…` sur domaine vérifié — pas de boîte mail OVH requise)
+- [x] 🧪 Envoi email OK (reset mot de passe via Resend)
+
+> **Note (02 juin 2026)** : le SMTP se configure dans **Authentication → Emails**, pas dans Project Settings (menu parfois bloquer si quota org dépassé).
 
 ---
 
 ## D. Cloudflare Turnstile (native — manuel)
 
-- [x] Widget Turnstile : ajouter hostnames **`localhost`** et **`127.0.0.1`** (WebView Capacitor Android/iOS)
-- [ ] 🧪 Tester connexion / inscription / reset MDP sur **vrai téléphone** (pas seulement émulateur)
+- [x] Widget Turnstile : hostnames **`localhost`**, **`127.0.0.1`**, **`julie-lepine.github.io`**
+- [x] 🧪 Captcha OK sur **Samsung Z Flip** (app native) — login, inscription, invité (après mise à jour hostnames Cloudflare)
 
 ---
 
@@ -73,9 +76,10 @@ npm run assets:sync      # icône/splash → android/ios + sync web (si assets p
 npm run cap:open:android   # ou cap:open:ios sur Mac
 ```
 
-- [ ] 🧪 Lancer sur **1 Android** + **1 iPhone**
-- [ ] 🧪 Auth email + invité + lobby multijoueur
-- [ ] 🧪 Reset mot de passe → mail Resend reçu → retour dans l’app via deep link
+- [x] 🧪 **Android** : Samsung Z Flip via **Android Studio** (projet `android/`, config `app`, débogage USB)
+- [ ] 🧪 **iPhone** (Mac + Xcode)
+- [ ] 🧪 Auth email + invité + **lobby multijoueur** (2e client web ou 2e téléphone)
+- [ ] 🧪 Reset mot de passe → **deep link** natif → écran nouveau MDP dans l’app (mail Resend OK ✅)
 - [ ] 🧪 Bannière AdMob visible (menu) / masquée (manche)
 - [ ] 🧪 Formulaire consentement pub (UE)
 - [ ] 🧪 Soirée pilote complète en APK/IPA debug
@@ -111,12 +115,12 @@ npm run cap:open:android   # ou cap:open:ios sur Mac
   npm run assets:sync
   ```
   (équivalent : `npm run assets:native` puis `npm run cap:sync`)
-  ===> cap:sync OK, assets:native en attente
-  ===> OK vérif sur Android Studio et lancer l’app sur un téléphone.
+  - [x] `cap:sync` + run Android Studio → app lancée sur téléphone (02 juin 2026)
+  - [ ] `assets:native` si besoin de régénérer icône/splash dans `android/` / `ios/`
   - ⚠️ **Node ≥ 22** obligatoire pour `cap sync`
   - ⚠️ `@capacitor/assets` peut échouer sur Windows (TLS / `sharp`) — autre réseau ou Mac
   - ⚠️ **Ne pas** lancer `npm run assets:prepare` : écrase icon/splash sans tagline
-- [ ] 🧪 Vérifier icône + splash sur device après sync
+- [ ] 🧪 Vérifier icône + splash sur device après `assets:sync` complet
 
 ### Fiche store (upload consoles — pas d’hébergement web)
 
@@ -130,9 +134,39 @@ npm run cap:open:android   # ou cap:open:ios sur Mac
 
 ---
 
+## G bis. Site légal `revealthepartygame.fr` (repo séparé + OVH)
+
+Repo **hors** de ce dossier Party Games (pages statiques créées de ton côté). Guide détaillé OVH (équivalent Hostinger / FTP) : **[LEGAL_SITE_OVH.md](./LEGAL_SITE_OVH.md)**.
+
+### Contenu du site (repo légal)
+
+- [x] Repo Git du site légal créé
+- [ ] Compléter les placeholders dans **mentions légales** (éditeur, adresse, SIRET, hébergeur, email)
+- [ ] **Liens pour télécharger l’app** sur le site légal :
+  - [ ] `index.html` : pilule(s) ou bouton **Google Play** + **App Store** (URLs réelles une fois les apps publiées ; sinon libellé « Bientôt disponible »)
+  - [ ] `mentions-legales.html` : courte section « Téléchargement » avec les mêmes liens
+  - [ ] Garder le lien **Jouer en ligne** → `https://julie-lepine.github.io/reveal/`
+- [ ] Vérifier que `privacy.html` est aligné avec `data/legalContent.js` (ce repo)
+
+### Publication OVH (manuel — pas Hostinger)
+
+- [ ] Avoir un **Hébergement Web OVH** associé au domaine (le nom de domaine seul ne suffit pas pour « coller » des fichiers)
+- [ ] **Multisite** : attacher `revealthepartygame.fr` (+ `www`) au dossier `www` de l’hébergement
+- [ ] **Zone DNS** : retirer le parking « Site en construction » ; **ne pas toucher** `send.*` (Resend)
+- [ ] Upload FTP / **Explorer FTP** (OVH) : `index.html`, `privacy.html`, `mentions-legales.html`, `legal.css`, `reveal.png` → racine du site
+- [ ] Activer **SSL** (Let’s Encrypt) sur le domaine
+- [ ] 🧪 Tester : `/`, `/privacy.html`, `/mentions-legales.html` en HTTPS
+- [ ] Mettre à jour `data/appConfig.js` → `PRIVACY_POLICY_PUBLIC_URL` =  
+  `https://www.revealthepartygame.fr/privacy.html` (adapter si tu n’utilises pas `www`)
+- [ ] Fiches store : utiliser cette URL (remplacer GitHub Pages ci-dessous)
+
+> **Alternative sans FTP OVH** : déployer le repo légal via **Cloudflare Pages** + CNAME `www` dans OVH — voir [LEGAL_SITE_OVH.md](./LEGAL_SITE_OVH.md).
+
+---
+
 ## H. Conformité & questionnaires store
 
-- [ ] Politique de confidentialité en ligne (URL ci-dessus)
+- [ ] Politique de confidentialité en ligne (URL domaine après G bis, ou provisoirement GitHub Pages ci-dessus)
 - [ ] Compléter **App Privacy** (Apple) : email, identifiants, pub AdMob, Supabase
 - [ ] Questionnaire **classification contenu** (Google)
 - [ ] Déclarer la **publicité** dans les deux consoles
@@ -167,7 +201,8 @@ npm run cap:open:android   # ou cap:open:ios sur Mac
 | [data/admobConfig.js](../data/admobConfig.js) | IDs pub + mode test/prod |
 | [data/appConfig.js](../data/appConfig.js) | Bundle ID, deep link, URL privacy |
 | [data/legalContent.js](../data/legalContent.js) | Texte RGPD in-app |
-| [privacy.html](../privacy.html) | Page publique pour les stores |
+| [privacy.html](../privacy.html) | Ancienne page publique (GitHub Pages) ; URL store → domaine après G bis |
+| [LEGAL_SITE_OVH.md](./LEGAL_SITE_OVH.md) | Déployer le repo légal sur OVH (FTP / SSL / DNS) |
 | [RESEND_SETUP.md](./RESEND_SETUP.md) | DNS OVH + SMTP Supabase |
 | [ADMOB.md](./ADMOB.md) | Doc technique AdMob |
 | [CAPACITOR.md](./CAPACITOR.md) | Vue d’ensemble Capacitor |
@@ -176,4 +211,4 @@ npm run cap:open:android   # ou cap:open:ios sur Mac
 
 ---
 
-**Prochaine action recommandée** : installer **Node 22 LTS**, puis section **G** — `npm run assets:sync` et test device (section **E**).
+**Prochaine action recommandée** (après 02 juin 2026) : section **E** — lobby multijoueur (2e client), deep link reset MDP dans l’app, AdMob + consentement ; puis **B** (inscription stores au dernier moment) et **G** (`assets:sync` + captures fiche store).

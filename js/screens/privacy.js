@@ -1,5 +1,6 @@
 import { PRIVACY_POLICY } from "../../data/legalContent.js";
 import { PRIVACY_POLICY_PUBLIC_URL } from "../../data/appConfig.js";
+import { getScreenParams } from "../core/router.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
 import { bindNav } from "./nav.js";
 
@@ -16,8 +17,9 @@ function privacyBodyHtml() {
 }
 
 export function mountPrivacy(app) {
+  const backTarget = getScreenParams()?.backTarget === "welcome" ? "back" : "settings";
   app.innerHTML = pageShell({
-    backTarget: "settings",
+    backTarget,
     scroll: true,
     content: `
       <p class="label-upper label-upper--muted">Légal</p>

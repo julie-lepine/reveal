@@ -13,6 +13,7 @@ import { loginAsGuest, isGuest } from "./auth.js";
 import { signOutSupabase, getSupabaseUserId } from "./supabaseAuth.js";
 import { syncAllPlayerScores } from "./players.js";
 import { navigate } from "./router.js";
+import { resetWelcomeSeen } from "./welcomeGate.js";
 import { isSupabaseConfigured, supabase } from "./supabaseClient.js";
 import {
   createLobbySupabase,
@@ -268,6 +269,7 @@ export async function resetAppToCleanHome() {
   } catch (e) {
     console.warn("REVEAL reset signOut:", e.message || e);
   }
+  resetWelcomeSeen();
   try {
     localStorage.removeItem("reveal-app-state");
     localStorage.removeItem("reveal-auth-credentials");
