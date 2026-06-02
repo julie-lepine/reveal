@@ -7,10 +7,14 @@ export function renderTriviaQuestion({
   selectedAnswer = null,
   locked = false,
   waitingMessage = "",
+  revealed = false,
+  correctIndex = null,
 } = {}) {
   if (!question) {
     return `<p class="hint">Aucune question disponible.</p>`;
   }
+
+  const showResults = revealed && Number.isInteger(correctIndex);
 
   return `
     <div class="card card--speed trivia-question-card">
@@ -21,20 +25,33 @@ export function renderTriviaQuestion({
     <div class="trivia-answer-grid">
       ${(question.answers || [])
         .map((answer, idx) => {
-          const active = selectedAnswer === idx;
+          const isSelected = selectedAnswer === idx;
+          const isCorrect = showResults && idx === correctIndex;
+          const isWrongPick = showResults && isSelected && idx !== correctIndex;
+          const active = !showResults && isSelected;
+          let stateClass = "";
+          if (isCorrect) stateClass = "trivia-answer-btn--correct";
+          else if (isWrongPick) stateClass = "trivia-answer-btn--wrong";
+          else if (active) stateClass = "trivia-answer-btn--active";
+
+          let suffix = "";
+          if (isCorrect) suffix = '<span class="trivia-answer-btn__mark trivia-answer-btn__mark--ok">✓</span>';
+          else if (isWrongPick) suffix = '<span class="trivia-answer-btn__mark trivia-answer-btn__mark--ko">✗</span>';
+          else if (active) suffix = '<span class="trivia-answer-btn__check">✓</span>';
+
           return `
             <button
               type="button"
-              class="trivia-answer-btn ${active ? "trivia-answer-btn--active" : ""}"
+              class="trivia-answer-btn ${stateClass}"
               data-trivia-answer="${idx}"
-              ${locked ? "disabled" : ""}
+              ${locked || showResults ? "disabled" : ""}
             >
               <span class="trivia-answer-btn__letter">${String.fromCharCode(65 + idx)}</span>
               <span class="trivia-answer-btn__text">${escapeHtml(answer)}</span>
-              ${active ? '<span class="trivia-answer-btn__check">✓</span>' : ""}
+              ${suffix}
             </button>`;
         })
         .join("")}
     </div>
-    <p class="hint trivia-question-card__wait">${escapeHtml(waitingMessage)}</p>`;
+    ${waitingMessage ? `<p class="hint trivia-question-card__wait">${escapeHtml(waitingMessage)}</p>` : ""}`;
 }

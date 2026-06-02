@@ -13,7 +13,7 @@ Capacitor est **initialisé**. Checklist complète store : **[STORE_CHECKLIST.md
 | Deep links auth Supabase | ✅ |
 | Politique de confidentialité | ✅ (`privacy.html` + écran in-app) |
 | Sources icône / splash (`resources/`) | ✅ custom (icon, splash 2732², portrait iOS/Android) |
-| Icônes / splash injectés dans `android/` / `ios/` | ☐ `npm run assets:sync` (Node ≥ 22) |
+| Icônes / splash injectés dans `android/` / `ios/` | ✅ `npm run assets:native` puis rebuild Android Studio |
 | Test sur device réel | ☐ |
 | Build release signé | ☐ |
 
@@ -40,6 +40,18 @@ npm run assets:sync    # @capacitor/assets + cap:sync
 ```
 
 Prérequis : **Node.js ≥ 22**.
+
+### Splash invisible ou logo Capacitor bleu
+
+1. **Régénérer les PNG natifs** (obligatoire après changement de `resources/splash.png`) :
+   ```bash
+   npm run assets:native
+   ```
+2. **Rebuild** dans Android Studio : *Build → Clean Project*, puis *Run* (ou désinstaller l’app sur le téléphone puis réinstaller).
+3. **Tester depuis l’icône** sur l’écran d’accueil du téléphone, pas seulement le bouton ▶ d’Android Studio : sur certaines versions Android 12, le splash système ne s’affiche pas au lancement depuis l’IDE (comportement Google, corrigé sur Android 13+).
+4. Le splash **carré** (`resources/splash.png`) est propagé en portrait ; la **tagline** des maquettes `splash_android_1080x1920.png` n’est pas injectée automatiquement — pour l’avoir partout, refaire un `splash.png` 2732² avec tagline puis relancer `assets:native`.
+
+Plugin `@capacitor/splash-screen` : durée ~2 s au lancement (`capacitor.config.ts`).
 
 ---
 

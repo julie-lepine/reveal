@@ -8,28 +8,14 @@ import {
   ADMOB_DEFAULT_BANNER_HEIGHT,
 } from "../../data/admobConfig.js";
 
-/** Manches actives : pas de pub (UX + clics accidentels). */
-const GAMEPLAY_SCREENS = new Set([
-  "hottake",
-  "speedvote",
-  "playlistguess",
-  "truthmeter",
-  "dilemma",
-  "trivia",
-  "consensus",
-  "guesslie",
-  "tiernight",
-  "filrouge-mission",
-]);
-
 let initialized = false;
 let bannerVisible = false;
 let initPromise = null;
 let admobModule = null;
 
+/** Pub visible sur tous les écrans sauf reset MDP (layout via body.has-top-ad). */
 function shouldShowAdForScreen(screenId) {
-  if (!screenId || screenId === "reset-password") return false;
-  return !GAMEPLAY_SCREENS.has(screenId);
+  return Boolean(screenId && screenId !== "reset-password");
 }
 
 function setTopAdLayout(active, heightPx = ADMOB_DEFAULT_BANNER_HEIGHT) {
@@ -87,7 +73,7 @@ async function ensureAdMobReady() {
       await ensureConsent(AdMob, AdmobConsentStatus);
 
       AdMob.addListener(BannerAdPluginEvents.SizeChanged, (size) => {
-        if (bannerVisible && size?.height) {
+        if (bannerVisible && size?.height && shouldShowAdForScreen(getCurrentScreen())) {
           setTopAdLayout(true, size.height);
         }
       });
@@ -111,11 +97,14 @@ async function ensureAdMobReady() {
 
 async function showTopBanner() {
   if (!isNativeApp()) return;
+  if (!shouldShowAdForScreen(getCurrentScreen())) return;
+
   const adId = bannerAdId();
   if (!adId) return;
 
   const ready = await ensureAdMobReady();
   if (!ready) return;
+  if (!shouldShowAdForScreen(getCurrentScreen())) return;
 
   const mod = await loadAdMobModule();
   if (!mod) return;
@@ -124,6 +113,12 @@ async function showTopBanner() {
   try {
     if (bannerVisible) {
       await AdMob.resumeBanner();
+      if (!shouldShowAdForScreen(getCurrentScreen())) {
+        await AdMob.hideBanner();
+        bannerVisible = false;
+        setTopAdLayout(false);
+        return;
+      }
       setTopAdLayout(true);
       return;
     }
@@ -135,6 +130,14 @@ async function showTopBanner() {
       margin: 0,
       isTesting: ADMOB_USE_TEST_ADS,
     });
+
+    if (!shouldShowAdForScreen(getCurrentScreen())) {
+      await AdMob.hideBanner();
+      bannerVisible = false;
+      setTopAdLayout(false);
+      return;
+    }
+
     bannerVisible = true;
     setTopAdLayout(true);
   } catch (err) {
@@ -145,23 +148,24 @@ async function showTopBanner() {
 }
 
 async function hideTopBanner() {
-  if (!isNativeApp() || !initialized) {
-    setTopAdLayout(false);
-    return;
-  }
+  setTopAdLayout(false);
+  if (!isNativeApp()) return;
 
   try {
     const mod = await loadAdMobModule();
-    if (!mod) return;
-    const { AdMob } = mod;
-    if (bannerVisible) {
-      await AdMob.hideBanner();
-      bannerVisible = false;
+    if (mod) {
+      const { AdMob } = mod;
+      await ensureAdMobReady();
+      try {
+        await AdMob.hideBanner();
+      } catch (err) {
+        console.warn("AdMob hideBanner:", err);
+      }
     }
   } catch (err) {
-    console.warn("AdMob hideBanner:", err);
+    console.warn("AdMob hide:", err);
   } finally {
-    setTopAdLayout(false);
+    bannerVisible = false;
   }
 }
 

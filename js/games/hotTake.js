@@ -75,6 +75,7 @@ export function mountHotTake(app) {
   }
 
   function alreadyScoredThisTake() {
+    if (phase !== "reveal") return false;
     return takeScored || Boolean(getHotTakeSession().takeScored);
   }
 
@@ -242,22 +243,17 @@ export function mountHotTake(app) {
 
   async function startNextTakeVote() {
     if (mp && !isLobbyHost()) return;
-    if (mp) {
-      await commitHotTakePlay({
-        phase: "voting",
-        takeIdx,
-        votes: {},
-        takeScored: false,
-        voteEndsAt: new Date(Date.now() + HOT_TAKE_TIMER_SEC * 1000).toISOString(),
-        intermissionEndsAt: null,
-        pausedBy: null,
-      });
-    } else {
-      phase = "voting";
-      myVote = null;
-      votes = {};
-      render();
-    }
+    await commitHotTakePlay({
+      phase: "voting",
+      takeIdx,
+      votes: {},
+      takeScored: false,
+      voteEndsAt: new Date(Date.now() + HOT_TAKE_TIMER_SEC * 1000).toISOString(),
+      intermissionEndsAt: null,
+      pausedBy: null,
+    });
+    syncFromSession();
+    render();
   }
 
   /** Filet de sécurité hôte : clôt le vote même si un joueur n'a pas voté. */

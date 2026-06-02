@@ -70,6 +70,10 @@ body.has-top-ad.has-bottom-nav .page{
   padding-top:calc(var(--page-pad) + var(--ad-banner-height, 50px) + env(safe-area-inset-top, 0px));
 }
 
+body.has-top-ad .back{
+  top:calc(12px + var(--ad-banner-height, 50px) + env(safe-area-inset-top, 0px));
+}
+
 .privacy-section__title{
   font-size:1rem;
   font-weight:700;
@@ -1039,6 +1043,22 @@ button.game-card{
   font-weight:600;
   cursor:grab;
   user-select:none;
+  touch-action:none;
+}
+
+.unplaced-chip--dragging{
+  opacity:.85;
+  transform:scale(1.04);
+  border-color:rgba(167,139,250,.55);
+  box-shadow:0 4px 16px rgba(0,0,0,.35);
+  pointer-events:none;
+}
+
+.tier-row--drop-target .tier-items{
+  outline:2px dashed rgba(167,139,250,.65);
+  outline-offset:2px;
+  border-radius:8px;
+  min-height:36px;
 }
 
 .quick-place{
@@ -4678,6 +4698,75 @@ body{
 
 .trivia-answer-btn:active{
   transform:scale(.98);
+}
+
+.trivia-answer-btn--correct{
+  border-color:rgba(74,222,128,.75);
+  background:rgba(74,222,128,.14);
+  box-shadow:0 0 0 1px rgba(74,222,128,.25);
+}
+
+.trivia-answer-btn--wrong{
+  border-color:rgba(248,113,113,.75);
+  background:rgba(248,113,113,.12);
+  box-shadow:0 0 0 1px rgba(248,113,113,.22);
+}
+
+.trivia-answer-btn__mark{
+  margin-left:auto;
+  font-weight:800;
+  font-size:18px;
+  line-height:1;
+}
+
+.trivia-answer-btn__mark--ok{
+  color:#4ADE80;
+}
+
+.trivia-answer-btn__mark--ko{
+  color:#F87171;
+}
+
+.trivia-your-result{
+  margin-bottom:14px;
+  padding:14px 16px;
+  border-radius:16px;
+  border:1px solid rgba(255,255,255,.1);
+}
+
+.trivia-your-result--ok{
+  background:rgba(74,222,128,.1);
+  border-color:rgba(74,222,128,.35);
+}
+
+.trivia-your-result--ko{
+  background:rgba(248,113,113,.08);
+  border-color:rgba(248,113,113,.3);
+}
+
+.trivia-your-result__title{
+  margin:0 0 6px;
+  font-weight:800;
+  font-size:1.05rem;
+}
+
+.trivia-your-result--ok .trivia-your-result__title{
+  color:#4ADE80;
+}
+
+.trivia-your-result--ko .trivia-your-result__title{
+  color:#F87171;
+}
+
+.trivia-your-result__points{
+  margin:8px 0 0;
+  font-weight:700;
+  color:#4ADE80;
+}
+
+.trivia-your-result__points--none{
+  color:rgba(255,255,255,.55);
+  font-weight:600;
 }
 
 .trivia-answer-btn--active{

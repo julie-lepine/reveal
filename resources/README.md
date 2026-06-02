@@ -46,9 +46,11 @@ Les fichiers `splash_android_*` et `splash_ios_*` **ne sont pas injectés seuls*
 ### 1. Injecter dans les projets natifs
 
 ```bash
-npm run assets:native    # npx @capacitor/assets generate
+npm run assets:native    # generate depuis resources/ (pas assets/games/)
 npm run cap:sync
 ```
+
+`assets:native` utilise `--assetPath resources` : le dossier `assets/` du repo contient les icônes de jeux, pas le splash store.
 
 Ou :
 

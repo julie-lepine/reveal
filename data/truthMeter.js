@@ -2,6 +2,9 @@
 
 import { EVENING_POINTS } from "./eveningScoring.js";
 
+/** Auteur + au moins 1 votant. */
+export const TRUTH_METER_MIN_PLAYERS = 2;
+
 export const TRUTH_METER_VOTE_TIMER_SEC = 10;
 export const TRUTH_METER_DISPLAY_SEC = 2;
 export const TRUTH_METER_REVEAL_PENDING_MS = 800;

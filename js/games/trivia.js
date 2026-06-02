@@ -6,7 +6,7 @@ import { goToGameSelect, setLobbyPlaying, setLobbyWaiting } from "../core/lobby.
 import { getLocalDisplayName, recordTriviaPlayed, saveStatePatch, setLastGame } from "../core/state.js";
 import { showAppAlert } from "../core/dialog.js";
 import { navigate } from "../core/router.js";
-import { escapeHtml, pageShell } from "../core/ui.js";
+import { escapeHtml, pageShell, resetPageScroll } from "../core/ui.js";
 import { bindNav } from "../screens/nav.js";
 import { gameExitBarHtml, bindExitGame } from "../core/exitGame.js";
 import { isEveningGameplayPaused } from "../core/filRougeSession.js";
@@ -74,10 +74,10 @@ export function mountTrivia(app) {
     if (phase !== "question") return "";
     if (myAnswerIndex() != null) {
       return trivia.allAnswersIn()
-        ? "Tout le monde a repondu. Revelation en cours…"
-        : "En attente des autres joueurs… tu peux encore changer ta reponse.";
+        ? "Tout le monde a répondu. Révélation en cours…"
+        : "En attente des autres joueurs… tu peux encore changer ta réponse.";
     }
-    return "Choisis ta reponse. Tu peux la modifier tant que tout le monde n'a pas repondu.";
+    return "Choisis ta réponse. Tu peux la modifier tant que tout le monde n'a pas répondu.";
   }
 
   function pickNpcAnswerIndex(question) {
@@ -157,6 +157,39 @@ export function mountTrivia(app) {
     await goToReveal();
   }
 
+  function localRevealFeedbackHtml() {
+    const mine = myAnswerIndex();
+    const correctIdx = lastRound?.correctIndex ?? currentQuestion?.correct;
+    if (mine == null || !Number.isInteger(correctIdx)) {
+      return `<p class="hint">Tu n'as pas répondu à cette question.</p>`;
+    }
+
+    const isCorrect = mine === correctIdx;
+    const myLabel = currentQuestion?.answers?.[mine] || "-";
+    const delta = lastRound?.deltas?.[localName] || 0;
+    const isFastest = lastRound?.fastestPlayer === localName;
+
+    let pointsLine = "";
+    if (isCorrect && delta > 0) {
+      pointsLine = isFastest
+        ? `<p class="trivia-your-result__points">+${delta} pts <span class="muted">(bonne réponse + bonus vitesse)</span></p>`
+        : `<p class="trivia-your-result__points">+${delta} pts</p>`;
+    } else if (!isCorrect) {
+      pointsLine = `<p class="trivia-your-result__points trivia-your-result__points--none">Aucun point cette manche</p>`;
+    }
+
+    return `
+      <div class="trivia-your-result ${isCorrect ? "trivia-your-result--ok" : "trivia-your-result--ko"}">
+        <p class="trivia-your-result__title">${isCorrect ? "Bonne réponse !" : "Mauvaise réponse"}</p>
+        ${
+          isCorrect
+            ? `<p class="hint">Tu as trouvé : <strong>${escapeHtml(myLabel)}</strong></p>`
+            : `<p class="hint">Tu as choisi <strong>${escapeHtml(myLabel)}</strong></p>`
+        }
+        ${pointsLine}
+      </div>`;
+  }
+
   function revealBlock() {
     const correctLabel = currentQuestion
       ? `${String.fromCharCode(65 + currentQuestion.correct)}. ${currentQuestion.answers[currentQuestion.correct]}`
@@ -165,14 +198,15 @@ export function mountTrivia(app) {
     const deltaRows = Object.entries(deltas).sort(([, a], [, b]) => b - a);
 
     return `
+      ${localRevealFeedbackHtml()}
       <div class="card trivia-reveal-card">
-        <p class="card-heading">Bonne reponse</p>
+        <p class="card-heading">Bonne réponse</p>
         <p class="trivia-reveal-card__answer">${escapeHtml(correctLabel)}</p>
         <p class="hint">
           ${
             lastRound?.fastestPlayer
-              ? `Bonus vitesse : ${escapeHtml(lastRound.fastestPlayer)} +10`
-              : "Personne n'a trouve la bonne reponse a temps."
+              ? `Bonus vitesse : ${escapeHtml(lastRound.fastestPlayer)}`
+              : "Personne n'a trouvé la bonne réponse à temps."
           }
         </p>
         ${
@@ -188,7 +222,7 @@ export function mountTrivia(app) {
                 )
                 .join("")}
             </div>`
-            : '<p class="hint">Aucun point distribue sur cette question.</p>'
+            : '<p class="hint">Aucun point distribué sur cette question.</p>'
         }
       </div>`;
   }
@@ -350,7 +384,19 @@ export function mountTrivia(app) {
             : ""
         }`;
     } else if (phase === "reveal") {
+      const correctIdx = lastRound?.correctIndex ?? currentQuestion?.correct;
       phaseHtml = `
+        ${renderTriviaQuestion({
+          question: {
+            ...currentQuestion,
+            themeLabel: getTriviaThemeLabel(currentQuestion?.theme),
+          },
+          questionIdx,
+          totalQuestions,
+          selectedAnswer: myAnswerIndex(),
+          revealed: true,
+          correctIndex: correctIdx,
+        })}
         ${revealBlock()}
         ${renderTriviaScoreboard({
           standings,
@@ -373,6 +419,7 @@ export function mountTrivia(app) {
 
     app.innerHTML = pageShell({
       backTarget: "back",
+      scroll: true,
       content: `
         <div class="game-header">
           <div class="dots">
@@ -393,6 +440,7 @@ export function mountTrivia(app) {
 
     bindNav(app);
     bindExitGame(app);
+    resetPageScroll(app);
 
     if (phase === "question") {
       app.querySelectorAll("[data-trivia-answer]").forEach((btn) => {

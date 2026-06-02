@@ -109,8 +109,14 @@ export function mountDilemma(app) {
     requestAnimationFrame(frame);
   }
 
+  function alreadyScoredThisRound() {
+    if (phase !== "reveal") return false;
+    return roundScored || Boolean(getDilemmaSession().roundScored);
+  }
+
   async function transitionToReveal() {
-    if (roundScored || getDilemmaSession().roundScored) return;
+    if (phase !== "voting") return;
+    if (alreadyScoredThisRound()) return;
     if (mp && !isLobbyHost()) return;
     if (revealInFlight) return;
 
@@ -154,18 +160,13 @@ export function mountDilemma(app) {
     const total = ROUNDS.length;
     if (roundIdx < total - 1) {
       const nextIdx = roundIdx + 1;
-      if (mp && isLobbyHost()) {
-        await startDilemmaRound(nextIdx);
-      } else {
-        roundIdx = nextIdx;
-        currentDilemma = ROUNDS[roundIdx];
-        phase = "voting";
-        myVote = null;
-        votes = {};
-        lastAward = null;
-        roundScored = false;
-        render();
-      }
+      await startDilemmaRound(nextIdx);
+      syncFromSession();
+      revealAnimDone = false;
+      revealPctA = 0;
+      revealPctB = 0;
+      lastAward = null;
+      render();
     } else {
       recordDilemmaPlayed();
       const { majority, pctA } = countDilemmaResults(votes);

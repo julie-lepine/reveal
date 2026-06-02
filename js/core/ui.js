@@ -28,6 +28,20 @@ export function pageShell({ back = true, backTarget = "back", content, orb = tru
   `;
 }
 
+/** Remet la vue en haut après navigation ou nouvelle manche (WebView mobile). */
+export function resetPageScroll(root = document.getElementById("app")) {
+  if (!root) return;
+  root.scrollTop = 0;
+  if (typeof window !== "undefined") {
+    window.scrollTo(0, 0);
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+  }
+  root.querySelectorAll(".page").forEach((page) => {
+    page.scrollTop = 0;
+  });
+}
+
 export function logoHtml({ className = "app-logo", alt = "REVEAL" } = {}) {
   return `<img src="${APP_LOGO}" alt="${escapeHtml(alt)}" class="${className}" />`;
 }

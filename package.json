@@ -5,7 +5,7 @@
   "scripts": {
     "test": "node --test tests/sessionMerge.test.js tests/deckCodec.test.js",
     "assets:prepare": "powershell -ExecutionPolicy Bypass -File scripts/prepareStoreAssets.ps1",
-    "assets:native": "npx @capacitor/assets generate",
+    "assets:native": "npx @capacitor/assets generate --assetPath resources",
     "assets:sync": "npm run assets:native && npm run cap:sync",
     "assets:all": "npm run assets:prepare && npm run assets:native && npm run cap:sync",
     "cap:sync-web": "node scripts/syncCapWeb.mjs",
@@ -20,6 +20,7 @@
     "@capacitor/cli": "^8.3.4",
     "@capacitor/core": "^8.3.4",
     "@capacitor/ios": "^8.3.4",
+    "@capacitor/splash-screen": "^8.0.1",
     "@supabase/supabase-js": "^2.49.1"
   },
   "devDependencies": {

@@ -297,7 +297,7 @@ export function allTriviaAnswersIn() {
 }
 
 export function scoreTriviaRound(session = getTriviaSession()) {
-  if (session.questionScored) {
+  if (session.questionScored && session.lastRound) {
     return session;
   }
   const question = session.currentQuestion;

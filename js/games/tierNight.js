@@ -16,7 +16,7 @@ import {
 import { getSupabaseUserId } from "../core/supabaseAuth.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
 import { navigate } from "../core/router.js";
-import { escapeHtml, pageShell, tierLogoHtml, bindTierLogos } from "../core/ui.js";
+import { escapeHtml, pageShell, tierLogoHtml, bindTierLogos, resetPageScroll } from "../core/ui.js";
 import { gameExitBarHtml, bindExitGame } from "../core/exitGame.js";
 import { bindNav } from "../screens/nav.js";
 
@@ -176,12 +176,19 @@ export function mountTierNight(app) {
     bindTierLogos(app);
     bindNav(app);
     bindExitGame(app);
+    resetPageScroll(app);
     if (!finished) bindGameEvents(remaining);
-    else if (remaining.length > 0) {
-      requestAnimationFrame(() => {
-        app.querySelector(".quick-place")?.scrollIntoView({ behavior: "smooth", block: "end" });
-      });
-    }
+  }
+
+  function clearTierDropHighlight() {
+    app.querySelectorAll(".tier-row--drop-target").forEach((row) => {
+      row.classList.remove("tier-row--drop-target");
+    });
+  }
+
+  function tierRowAtPoint(clientX, clientY) {
+    const el = document.elementFromPoint(clientX, clientY);
+    return el?.closest?.(".tier-row") || null;
   }
 
   function bindGameEvents(remaining) {
@@ -189,6 +196,35 @@ export function mountTierNight(app) {
       chip.addEventListener("dragstart", () => {
         dragItem = chip.getAttribute("data-item");
       });
+
+      chip.addEventListener("pointerdown", (e) => {
+        if (e.button !== 0 || finished) return;
+        dragItem = chip.getAttribute("data-item");
+        chip.classList.add("unplaced-chip--dragging");
+        chip.setPointerCapture(e.pointerId);
+        e.preventDefault();
+      });
+
+      chip.addEventListener("pointermove", (e) => {
+        if (!dragItem || !chip.classList.contains("unplaced-chip--dragging")) return;
+        if (e.cancelable) e.preventDefault();
+        clearTierDropHighlight();
+        const row = tierRowAtPoint(e.clientX, e.clientY);
+        row?.classList.add("tier-row--drop-target");
+      });
+
+      const endPointerDrag = (e) => {
+        if (!chip.classList.contains("unplaced-chip--dragging")) return;
+        chip.classList.remove("unplaced-chip--dragging");
+        chip.releasePointerCapture?.(e.pointerId);
+        const row = tierRowAtPoint(e.clientX, e.clientY);
+        if (dragItem && row) placeItem(dragItem, row.getAttribute("data-tier"));
+        dragItem = null;
+        clearTierDropHighlight();
+      };
+
+      chip.addEventListener("pointerup", endPointerDrag);
+      chip.addEventListener("pointercancel", endPointerDrag);
     });
 
     app.querySelectorAll(".tier-row").forEach((row) => {
@@ -196,6 +232,7 @@ export function mountTierNight(app) {
       row.addEventListener("drop", () => {
         if (dragItem) placeItem(dragItem, row.getAttribute("data-tier"));
         dragItem = null;
+        clearTierDropHighlight();
       });
     });
 

@@ -1,3 +1,5 @@
+import { resetPageScroll } from "./ui.js";
+
 let appEl = null;
 let currentCleanup = null;
 const navStack = ["home"];
@@ -54,6 +56,7 @@ export function navigate(screenId, { reset = false, params = null, navStack: for
 
   currentCleanup = screens[screenId](appEl) || null;
   notifyScreenChange(screenId);
+  requestAnimationFrame(() => resetPageScroll(appEl));
 }
 
 export function goBack(fallback = "home") {
@@ -72,11 +75,13 @@ export function goBack(fallback = "home") {
     navStack.push(fallback);
     currentCleanup = screens[fallback](appEl) || null;
     notifyScreenChange(fallback);
+    requestAnimationFrame(() => resetPageScroll(appEl));
     return;
   }
 
   currentCleanup = screens[screenId](appEl) || null;
   notifyScreenChange(screenId);
+  requestAnimationFrame(() => resetPageScroll(appEl));
 }
 
 export function resetNav() {

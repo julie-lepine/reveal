@@ -15,6 +15,7 @@ import { isGameSyncActive, isLobbyHost, onGameSessionChange } from "../core/game
 import { navigate } from "../core/router.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
 import { bindNav } from "./nav.js";
+import { TRUTH_METER_MIN_PLAYERS } from "../../data/truthMeter.js";
 import { showAppAlert } from "../core/dialog.js";
 
 const TRUTH_METER_NAV = ["home", "lobby", "game-select", "truthmeter-prep", "truthmeter"];
@@ -61,12 +62,14 @@ export function mountTruthMeterPrep(app) {
 
     const startSlot = app.querySelector("#truth-meter-start-slot");
     if (startSlot) {
-      if (allReady && roundCount >= 2 && isLocalTruthMeterHost()) {
+      if (allReady && roundCount >= TRUTH_METER_MIN_PLAYERS && isLocalTruthMeterHost()) {
         startSlot.innerHTML = `<button type="button" class="btn btn-primary btn--spaced" id="btn-start-game">Lancer TruthMeter →</button>`;
         startSlot.querySelector("#btn-start-game")?.addEventListener("click", onStartGame);
       } else {
         startSlot.innerHTML = `<button type="button" class="btn btn-secondary btn--spaced" disabled>${
-          roundCount < 2 ? "Il faut au moins 2 joueurs" : "En attente des joueurs…"
+          roundCount < TRUTH_METER_MIN_PLAYERS
+            ? `Il faut au moins ${TRUTH_METER_MIN_PLAYERS} joueurs`
+            : "En attente des joueurs…"
         }</button>`;
       }
     }
@@ -162,11 +165,11 @@ export function mountTruthMeterPrep(app) {
 
         <div id="truth-meter-start-slot">
         ${
-          allReady && roundCount >= 2 && isLocalTruthMeterHost()
+          allReady && roundCount >= TRUTH_METER_MIN_PLAYERS && isLocalTruthMeterHost()
             ? `<button type="button" class="btn btn-primary btn--spaced" id="btn-start-game">Lancer TruthMeter →</button>`
             : `<button type="button" class="btn btn-secondary btn--spaced" disabled>${
-                roundCount < 2
-                  ? "Il faut au moins 2 joueurs"
+                roundCount < TRUTH_METER_MIN_PLAYERS
+                  ? `Il faut au moins ${TRUTH_METER_MIN_PLAYERS} joueurs`
                   : !isLocalTruthMeterHost()
                     ? "En attente de l'hôte…"
                     : "En attente des joueurs…"

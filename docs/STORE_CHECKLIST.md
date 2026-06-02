@@ -127,7 +127,7 @@ npm run cap:open:android   # ou cap:open:ios sur Mac
 - [ ] Captures d’écran (menu, lobby, 1–2 jeux) — archivage optionnel : `store-assets/`
 - [ ] Textes fiche store (titre, description, mots-clés, catégorie)
 - [ ] **URL politique de confidentialité** (seule URL image/texte obligatoire côté web) :
-  `https://julie-lepine.github.io/reveal/privacy.html`
+  `https://revealthepartygame.fr/`
   (déployer `privacy.html` avec le prochain push web)
 
 > **Rappel** : icône et splash **ne sont pas hébergés** sur GitHub Pages — ils sont embarqués dans l’APK/IPA (ou upload PNG 1024 direct sur App Store Connect).

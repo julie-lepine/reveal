@@ -59,6 +59,7 @@ export function mountSpeedVote(app) {
   const mp = isGameSyncActive();
 
   function alreadyScoredThisRound() {
+    if (phase !== "reveal") return false;
     return takeScored || Boolean(getSpeedVoteSession().roundScored);
   }
 
@@ -311,16 +312,10 @@ export function mountSpeedVote(app) {
         if (mp && isLobbyHost()) {
           await startSpeedVoteRound(nextIdx);
         } else {
-          roundIdx = nextIdx;
-          currentQuestion = QUESTIONS[roundIdx];
-          phase = "voting";
-          myVote = null;
-          votes = {};
-          lastAward = null;
-          takeScored = false;
-          modifier = Math.random() < 0.18 ? "double" : Math.random() < 0.32 ? "hidden" : "normal";
-          render();
+          await startSpeedVoteRound(nextIdx);
+          syncFromSession();
         }
+        render();
       } else {
         recordSpeedVotePlayed();
         const winners = lastAward?.winners?.join(", ") || "-";

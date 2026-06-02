@@ -19,6 +19,7 @@ import { PLAYLIST_GUESS_MIN_PLAYERS } from "../../data/playlistGuess.js";
 import { defaultPlaylistGuessPrepSession } from "./playlistGuessSession.js";
 import { getLobbyParticipants } from "./lobby.js";
 import { defaultTriviaPrepSession } from "./triviaSession.js";
+import { TRUTH_METER_MIN_PLAYERS } from "../../data/truthMeter.js";
 import { defaultTruthMeterPrepSession } from "./truthMeterSession.js";
 import { defaultConsensusPrepSession } from "./consensusSession.js";
 import { defaultDilemmaPrepSession } from "./dilemmaSession.js";
@@ -155,6 +156,15 @@ export async function launchTriviaPrep() {
 }
 
 export async function launchTruthMeterPrep() {
+  const playerCount = getLobbyParticipants().length;
+  if (playerCount < TRUTH_METER_MIN_PLAYERS) {
+    await showAppAlert(
+      `TruthMeter nécessite au moins ${TRUTH_METER_MIN_PLAYERS} joueurs dans le lobby (${playerCount} pour l'instant).`,
+      { title: "2 joueurs minimum", icon: "👥" }
+    );
+    return;
+  }
+
   const tm = defaultTruthMeterPrepSession();
   saveStatePatch({ truthMeterGame: tm });
 

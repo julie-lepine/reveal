@@ -350,7 +350,7 @@ function getExtremesReference(values, target) {
 }
 
 export function scoreConsensusRound(session = getConsensusSession()) {
-  if (session.roundScored) {
+  if (session.roundScored && session.lastRound) {
     return session;
   }
   const currentScores = createConsensusScores(session.matchScores || {});
