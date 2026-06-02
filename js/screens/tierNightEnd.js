@@ -117,7 +117,7 @@ export function mountTierNightEnd(app) {
         <h2 class="screen-title">Récap des classements</h2>
         <p class="game-intro">« ${escapeHtml(session.listName || "Tier list")} » - +${session.localConsensusPoints ?? 0} pts consensus pour toi cette manche.</p>
         ${tierNightRoundScoresHtml(roundSorted)}
-        ${gameCumulativeScoresHtml({ gameLabel: "Tier Night", title: "Cumul de la soirée" })}
+        ${gameCumulativeScoresHtml({ gameId: "tiernight", gameLabel: "Tier Night", title: "Cumul des scores" })}
         <div class="recap-list">
           ${recaps.length
             ? recaps
@@ -180,7 +180,11 @@ export function mountTierNightEnd(app) {
     });
 
     if (phase === "recap" && isGameSyncActive()) {
-      refreshGameScoresBox(app, { gameLabel: "Tier Night", title: "Cumul de la soirée" });
+      refreshGameScoresBox(app, {
+        gameId: "tiernight",
+        gameLabel: "Tier Night",
+        title: "Cumul des scores",
+      });
     }
   }
 

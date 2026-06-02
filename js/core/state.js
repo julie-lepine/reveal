@@ -65,6 +65,9 @@ const defaultState = () => ({
   filRougeScores: {},
   /** Points par jeu : { [gameId]: { [playerName]: points } } (agrégé sur la soirée). */
   gameScores: {},
+  /** Snapshot gameScores au démarrage de la partie en cours (affichage in-game). */
+  gameScoreSessionBaseline: {},
+  gameScoreSessionGameId: null,
   /** Ordre de passage des jeux pour l'affichage des classements. */
   gameScoreOrder: [],
   playerStats: {},
@@ -226,6 +229,11 @@ function loadState() {
       scores: { ...base.scores, ...parsed.scores },
       filRougeScores: { ...base.filRougeScores, ...parsed.filRougeScores },
       gameScores: { ...base.gameScores, ...parsed.gameScores },
+      gameScoreSessionBaseline: {
+        ...base.gameScoreSessionBaseline,
+        ...parsed.gameScoreSessionBaseline,
+      },
+      gameScoreSessionGameId: parsed.gameScoreSessionGameId ?? null,
       gameScoreOrder: Array.isArray(parsed.gameScoreOrder) ? parsed.gameScoreOrder : [],
       playerStats: { ...base.playerStats, ...parsed.playerStats },
       stats: { ...base.stats, ...parsed.stats },
@@ -462,6 +470,8 @@ export function resetScores() {
   });
   state.gameScores = {};
   state.gameScoreOrder = [];
+  state.gameScoreSessionBaseline = {};
+  state.gameScoreSessionGameId = null;
   save();
 }
 
@@ -507,9 +517,41 @@ export function resetGameSessionsOnly() {
 
 let activeScoringGameId = null;
 
+/** Jeu actif pour le scoring (partie en cours). */
+export function getActiveScoringGame() {
+  return activeScoringGameId || state.gameScoreSessionGameId || null;
+}
+
 /** Définit le jeu auquel les points ajoutés via addScore() sont attribués. */
 export function setActiveScoringGame(gameId) {
   activeScoringGameId = gameId || null;
+}
+
+/** Marque le début d'une partie : affichage in-game = points depuis ce snapshot. */
+export function beginGameScoreSession(gameId) {
+  if (!gameId) return;
+  activeScoringGameId = gameId;
+  state.gameScoreSessionGameId = gameId;
+  state.gameScoreSessionBaseline = { ...(state.gameScores[gameId] || {}) };
+  save();
+}
+
+/** Scores de la partie en cours (pas le cumul soirée). */
+export function getCurrentSessionScoreMap(gameId = getActiveScoringGame()) {
+  if (!gameId) return {};
+  const total = state.gameScores[gameId] || {};
+  const useBaseline = gameId === state.gameScoreSessionGameId;
+  const base = useBaseline ? state.gameScoreSessionBaseline || {} : {};
+  const names = new Set([
+    ...Object.keys(total),
+    ...Object.keys(base),
+    ...Object.keys(state.scores),
+  ]);
+  const out = {};
+  names.forEach((name) => {
+    out[name] = (total[name] || 0) - (base[name] || 0);
+  });
+  return out;
 }
 
 function creditGameScore(playerName, points) {

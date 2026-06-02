@@ -11,12 +11,12 @@ Légende : ✅ fait dans le repo · ☐ à faire manuellement · 🧪 à tester 
 - [x] Écran d’intro **welcome** (avant connexion) → bouton vers `home` (`js/screens/welcome.js`)
 - [x] Capacitor initialisé (`capacitor.config.ts`, scripts `cap:sync`)
 - [x] Plateformes `android/` et `ios/` générées
-- [x] AdMob : bannière haut, masquée en gameplay (`js/core/ads.js`)
+- [x] AdMob : bannière haut, masquée sur `welcome`, `home`, `reset-password` ; visible lobby → jeux (`js/core/ads.js`, `body.has-top-ad`)
 - [x] Consentement pub UMP (RGPD) au démarrage AdMob
 - [x] Deep links auth : `com.reveal.partygames://auth/callback` (`js/core/deepLinks.js`)
 - [x] Redirect Supabase natif (`getAuthRedirectUrl()` dans `supabaseAuth.js`)
 - [x] Patch natif auto : AdMob App ID, deep link, ATT iOS (`scripts/patchNative.mjs`)
-- [x] Politique de confidentialité : écran in-app + `privacy.html` (URL store)
+- [x] Politique de confidentialité : écran in-app + `privacy.html` — URL store `https://revealthepartygame.fr/privacy.html` (`data/appConfig.js`)
 - [x] IDs AdMob configurés (`data/admobConfig.js`)
 - [x] Sources icône / splash : `resources/` (icon 1024², splash 2732², exports portrait iOS/Android) — voir [resources/README.md](../resources/README.md)
 - [x] Scripts assets : `assets:prepare` (secours), `assets:native`, `assets:sync`, `assets:all` (`package.json`)
@@ -80,7 +80,7 @@ npm run cap:open:android   # ou cap:open:ios sur Mac
 - [ ] 🧪 **iPhone** (Mac + Xcode)
 - [ ] 🧪 Auth email + invité + **lobby multijoueur** (2e client web ou 2e téléphone)
 - [ ] 🧪 Reset mot de passe → **deep link** natif → écran nouveau MDP dans l’app (mail Resend OK ✅)
-- [ ] 🧪 Bannière AdMob visible (menu) / masquée (manche)
+- [ ] 🧪 Bannière AdMob absente sur accueil/connexion ; visible à partir du lobby
 - [ ] 🧪 Formulaire consentement pub (UE)
 - [ ] 🧪 Soirée pilote complète en APK/IPA debug
 
@@ -116,7 +116,7 @@ npm run cap:open:android   # ou cap:open:ios sur Mac
   ```
   (équivalent : `npm run assets:native` puis `npm run cap:sync`)
   - [x] `cap:sync` + run Android Studio → app lancée sur téléphone (02 juin 2026)
-  - [ ] `assets:native` si besoin de régénérer icône/splash dans `android/` / `ios/`
+  - [x] `assets:native` régénéré (splash plein écran Android 12+, `logoSplashScale 0.62`) — 🧪 revérifier sur device après reinstall
   - ⚠️ **Node ≥ 22** obligatoire pour `cap sync`
   - ⚠️ `@capacitor/assets` peut échouer sur Windows (TLS / `sharp`) — autre réseau ou Mac
   - ⚠️ **Ne pas** lancer `npm run assets:prepare` : écrase icon/splash sans tagline
@@ -125,10 +125,11 @@ npm run cap:open:android   # ou cap:open:ios sur Mac
 ### Fiche store (upload consoles — pas d’hébergement web)
 
 - [ ] Captures d’écran (menu, lobby, 1–2 jeux) — archivage optionnel : `store-assets/`
-- [ ] Textes fiche store (titre, description, mots-clés, catégorie)
-- [ ] **URL politique de confidentialité** (seule URL image/texte obligatoire côté web) :
-  `https://revealthepartygame.fr/`
-  (déployer `privacy.html` avec le prochain push web)
+- [x] Textes fiche store (titre, description, mots-clés, catégorie)
+- [x] **URL politique de confidentialité** (app + fiches store) :  
+  `https://revealthepartygame.fr/privacy.html`  
+  → définie dans `data/appConfig.js` (`PRIVACY_POLICY_PUBLIC_URL`) ; même URL à coller dans Play Console et App Store Connect
+- [x] 🧪 URL privacy répond en HTTPS (`https://revealthepartygame.fr/privacy.html`, juin 2026)
 
 > **Rappel** : icône et splash **ne sont pas hébergés** sur GitHub Pages — ils sont embarqués dans l’APK/IPA (ou upload PNG 1024 direct sur App Store Connect).
 
@@ -141,24 +142,24 @@ Repo **hors** de ce dossier Party Games (pages statiques créées de ton côté)
 ### Contenu du site (repo légal)
 
 - [x] Repo Git du site légal créé
-- [ ] Compléter les placeholders dans **mentions légales** (éditeur, adresse, SIRET, hébergeur, email)
+- [x] Compléter les placeholders dans **mentions légales** (éditeur, adresse, SIRET, hébergeur, email)
 - [ ] **Liens pour télécharger l’app** sur le site légal :
   - [ ] `index.html` : pilule(s) ou bouton **Google Play** + **App Store** (URLs réelles une fois les apps publiées ; sinon libellé « Bientôt disponible »)
   - [ ] `mentions-legales.html` : courte section « Téléchargement » avec les mêmes liens
-  - [ ] Garder le lien **Jouer en ligne** → `https://julie-lepine.github.io/reveal/`
-- [ ] Vérifier que `privacy.html` est aligné avec `data/legalContent.js` (ce repo)
+  - [x] Lien **Jouer en ligne** → `https://julie-lepine.github.io/reveal/` (présent sur le site)
+- [x] Vérifier que `privacy.html` est aligné avec `data/legalContent.js` (ce repo)
 
 ### Publication OVH (manuel — pas Hostinger)
 
-- [ ] Avoir un **Hébergement Web OVH** associé au domaine (le nom de domaine seul ne suffit pas pour « coller » des fichiers)
-- [ ] **Multisite** : attacher `revealthepartygame.fr` (+ `www`) au dossier `www` de l’hébergement
-- [ ] **Zone DNS** : retirer le parking « Site en construction » ; **ne pas toucher** `send.*` (Resend)
-- [ ] Upload FTP / **Explorer FTP** (OVH) : `index.html`, `privacy.html`, `mentions-legales.html`, `legal.css`, `reveal.png` → racine du site
-- [ ] Activer **SSL** (Let’s Encrypt) sur le domaine
-- [ ] 🧪 Tester : `/`, `/privacy.html`, `/mentions-legales.html` en HTTPS
-- [ ] Mettre à jour `data/appConfig.js` → `PRIVACY_POLICY_PUBLIC_URL` =  
-  `https://www.revealthepartygame.fr/privacy.html` (adapter si tu n’utilises pas `www`)
-- [ ] Fiches store : utiliser cette URL (remplacer GitHub Pages ci-dessous)
+- [x] **Hébergement Web OVH** associé au domaine
+- [x] **Multisite** : `revealthepartygame.fr` (+ `www`) → dossier `www`
+- [x] **Zone DNS** : parking retiré ; `send.*` (Resend) intact
+- [x] Fichiers en ligne : `index.html`, `privacy.html`, `mentions-legales.html`, `legal.css`, `reveal.png`
+- [x] **SSL** (Let’s Encrypt) actif
+- [x] 🧪 HTTPS OK : [accueil](https://revealthepartygame.fr/), [privacy](https://revealthepartygame.fr/privacy.html), [mentions](https://revealthepartygame.fr/mentions-legales.html) (juin 2026)
+- [x] `data/appConfig.js` → `PRIVACY_POLICY_PUBLIC_URL` =  
+  `https://revealthepartygame.fr/privacy.html`
+- [ ] Fiches store : coller la même URL privacy dans Play Console + App Store Connect (au moment de la soumission)
 
 > **Alternative sans FTP OVH** : déployer le repo légal via **Cloudflare Pages** + CNAME `www` dans OVH — voir [LEGAL_SITE_OVH.md](./LEGAL_SITE_OVH.md).
 
@@ -166,7 +167,7 @@ Repo **hors** de ce dossier Party Games (pages statiques créées de ton côté)
 
 ## H. Conformité & questionnaires store
 
-- [ ] Politique de confidentialité en ligne (URL domaine après G bis, ou provisoirement GitHub Pages ci-dessus)
+- [x] Politique de confidentialité **accessible en ligne** — [revealthepartygame.fr/privacy.html](https://revealthepartygame.fr/privacy.html) ; URL dans l’app ✅
 - [ ] Compléter **App Privacy** (Apple) : email, identifiants, pub AdMob, Supabase
 - [ ] Questionnaire **classification contenu** (Google)
 - [ ] Déclarer la **publicité** dans les deux consoles
@@ -201,7 +202,7 @@ Repo **hors** de ce dossier Party Games (pages statiques créées de ton côté)
 | [data/admobConfig.js](../data/admobConfig.js) | IDs pub + mode test/prod |
 | [data/appConfig.js](../data/appConfig.js) | Bundle ID, deep link, URL privacy |
 | [data/legalContent.js](../data/legalContent.js) | Texte RGPD in-app |
-| [privacy.html](../privacy.html) | Ancienne page publique (GitHub Pages) ; URL store → domaine après G bis |
+| [privacy.html](../privacy.html) | Copie locale / GitHub Pages (legacy) ; **URL store** → domaine OVH via `appConfig.js` |
 | [LEGAL_SITE_OVH.md](./LEGAL_SITE_OVH.md) | Déployer le repo légal sur OVH (FTP / SSL / DNS) |
 | [RESEND_SETUP.md](./RESEND_SETUP.md) | DNS OVH + SMTP Supabase |
 | [ADMOB.md](./ADMOB.md) | Doc technique AdMob |
@@ -211,4 +212,4 @@ Repo **hors** de ce dossier Party Games (pages statiques créées de ton côté)
 
 ---
 
-**Prochaine action recommandée** (après 02 juin 2026) : section **E** — lobby multijoueur (2e client), deep link reset MDP dans l’app, AdMob + consentement ; puis **B** (inscription stores au dernier moment) et **G** (`assets:sync` + captures fiche store).
+**Prochaine action recommandée** : section **E** (tests device restants : deep link reset MDP, AdMob, soirée pilote) ; **G** (captures store) ; **B** (comptes Play / Apple) ; liens Play/App Store sur le site légal après publication.

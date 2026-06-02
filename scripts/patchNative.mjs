@@ -10,6 +10,69 @@ const ANDROID_APP_ID = "ca-app-pub-6332424645114129~4800114696";
 const IOS_APP_ID = "ca-app-pub-6332424645114129~1825936767";
 const URL_SCHEME = "com.reveal.partygames";
 
+const SPLASH_SCREEN_XML = `<?xml version="1.0" encoding="utf-8"?>
+<!-- Fond plein écran (portrait : drawable-port-*/splash.png) -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android" android:opacity="opaque">
+    <item android:drawable="@color/splash_background" />
+    <item>
+        <bitmap
+            android:gravity="fill"
+            android:src="@drawable/splash" />
+    </item>
+</layer-list>
+`;
+
+const ANDROID_LAUNCH_STYLES = `    <!-- Plein écran : évite l'icône minuscule Android 12 (Theme.SplashScreen + animatedIcon). -->
+    <style name="AppTheme.NoActionBarLaunch" parent="AppTheme.NoActionBar">
+        <item name="android:background">@drawable/splash_screen</item>
+        <item name="android:windowFullscreen">true</item>
+        <item name="android:windowDrawsSystemBarBackgrounds">true</item>
+        <item name="android:statusBarColor">@color/splash_background</item>
+        <item name="android:navigationBarColor">@color/splash_background</item>
+    </style>
+`;
+
+function patchAndroidSplash() {
+  const resDir = path.join(root, "android", "app", "src", "main", "res");
+  const splashScreenPath = path.join(resDir, "drawable", "splash_screen.xml");
+  const stylesPath = path.join(resDir, "values", "styles.xml");
+  const colorsPath = path.join(resDir, "values", "colors.xml");
+
+  if (!fs.existsSync(splashScreenPath)) {
+    fs.mkdirSync(path.dirname(splashScreenPath), { recursive: true });
+    fs.writeFileSync(splashScreenPath, SPLASH_SCREEN_XML);
+    console.log("Android: splash_screen.xml créé");
+  }
+
+  if (fs.existsSync(stylesPath)) {
+    let styles = fs.readFileSync(stylesPath, "utf8");
+    if (styles.includes("Theme.SplashScreen") || styles.includes("windowSplashScreenAnimatedIcon")) {
+      styles = styles.replace(
+        /<!-- Android 12\+[\s\S]*?<\/style>\s*\n\s*<\/resources>/,
+        `${ANDROID_LAUNCH_STYLES}\n</resources>`
+      );
+      if (styles.includes("Theme.SplashScreen")) {
+        styles = styles.replace(
+          /<style name="AppTheme\.NoActionBarLaunch" parent="Theme\.SplashScreen">[\s\S]*?<\/style>/,
+          ANDROID_LAUNCH_STYLES.trim()
+        );
+      }
+      fs.writeFileSync(stylesPath, styles);
+      console.log("Android: thème splash plein écran appliqué");
+    }
+  }
+
+  if (fs.existsSync(colorsPath) && !fs.readFileSync(colorsPath, "utf8").includes("splash_background")) {
+    let colors = fs.readFileSync(colorsPath, "utf8");
+    colors = colors.replace(
+      "</resources>",
+      `    <color name="splash_background">#0A0F1C</color>\n</resources>`
+    );
+    fs.writeFileSync(colorsPath, colors);
+    console.log("Android: splash_background ajouté");
+  }
+}
+
 function patchAndroid() {
   const manifestPath = path.join(root, "android", "app", "src", "main", "AndroidManifest.xml");
   const stringsPath = path.join(root, "android", "app", "src", "main", "res", "values", "strings.xml");
@@ -56,6 +119,8 @@ function patchAndroid() {
       console.log("Android: admob_app_id ajouté dans strings.xml");
     }
   }
+
+  patchAndroidSplash();
 }
 
 function plistInsertAfterDict(plist, insert) {

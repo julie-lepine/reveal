@@ -1,5 +1,5 @@
 import { getSortedActivePlayers } from "./players.js";
-import { getState } from "./state.js";
+import { getCurrentSessionScoreMap, getState } from "./state.js";
 import { escapeHtml } from "./ui.js";
 
 function gameScoresBoxRowsHtml(players, scores) {
@@ -108,14 +108,18 @@ export function eveningGameLeaderboardsHtml() {
     ${blocks.join("")}`;
 }
 
-/** Boîte de cumul des scores (soirée) affichée en fin de manche. */
-export function gameCumulativeScoresHtml({ gameLabel = null, title = "Cumul des scores" } = {}) {
-  const { scores } = getState();
+/** Boîte de cumul des scores de la partie en cours (pas la soirée). */
+export function gameCumulativeScoresHtml({
+  gameId = null,
+  gameLabel = null,
+  title = "Cumul des scores",
+} = {}) {
+  const scores = getCurrentSessionScoreMap(gameId);
   const players = getSortedActivePlayers();
   if (!players.length) return "";
 
   return `
-    <div class="card game-scores-box" data-scores="evening">
+    <div class="card game-scores-box" data-scores="session">
       <p class="card-heading game-scores-box__title">${escapeHtml(title)}</p>
       ${gameLabel ? `<p class="game-scores-box__game">${escapeHtml(gameLabel)}</p>` : ""}
       ${gameScoresBoxRowsHtml(players, scores)}
@@ -123,13 +127,17 @@ export function gameCumulativeScoresHtml({ gameLabel = null, title = "Cumul des 
 }
 
 /** Met à jour le cumul des scores sans re-render tout l’écran (sync multijoueur). */
-export function refreshGameScoresBox(app, { gameLabel = null, title = "Cumul des scores" } = {}) {
+export function refreshGameScoresBox(app, {
+  gameId = null,
+  gameLabel = null,
+  title = "Cumul des scores",
+} = {}) {
   if (!app) return;
-  const { scores } = getState();
+  const scores = getCurrentSessionScoreMap(gameId);
   const players = getSortedActivePlayers();
   if (!players.length) return;
 
-  const box = app.querySelector('[data-scores="evening"]');
+  const box = app.querySelector('[data-scores="session"]');
   if (!box) return;
 
   const titleEl = box.querySelector(".game-scores-box__title");

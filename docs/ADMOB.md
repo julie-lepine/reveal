@@ -4,7 +4,7 @@
 
 Capacitor est **initialisé** avec les plateformes `android/` et `ios/`, le plugin `@capacitor-community/admob`, et la logique JS dans `js/core/ads.js`.
 
-La bannière s’affiche en **haut** sur les écrans de navigation (menu, prep, résultats…) et se **masque pendant les manches** (gameplay actif).
+La bannière s’affiche en **haut** à partir du **lobby** (prep, jeux, résultats…). Elle est **masquée** sur l’intro (`welcome`), la page connexion / accueil (`home`) et le reset mot de passe.
 
 ---
 

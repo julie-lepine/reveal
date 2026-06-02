@@ -7,7 +7,7 @@ import {
   getLocalEmoji,
   ensurePlayerScore,
   resetEveningState,
-  setActiveScoringGame,
+  beginGameScoreSession,
 } from "./state.js";
 import { loginAsGuest, isGuest } from "./auth.js";
 import { signOutSupabase, getSupabaseUserId } from "./supabaseAuth.js";
@@ -158,7 +158,7 @@ export function getLobbyGameId() {
 }
 
 export async function setLobbyPlaying(gameId) {
-  setActiveScoringGame(gameId);
+  beginGameScoreSession(gameId);
   if (isSupabaseConfigured() && getLobby()?.id) {
     await setLobbyStatusSupabase("playing", gameId);
     return;

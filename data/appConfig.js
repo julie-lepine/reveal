@@ -12,4 +12,4 @@ export const NATIVE_AUTH_REDIRECT = `${APP_URL_SCHEME}://auth/callback`;
  * Déployer privacy.html sur GitHub Pages ou ton domaine.
  */
 export const PRIVACY_POLICY_PUBLIC_URL =
-  "https://julie-lepine.github.io/reveal/privacy.html";
+  "https://revealthepartygame.fr/privacy.html";

@@ -51,6 +51,16 @@ Prérequis : **Node.js ≥ 22**.
 3. **Tester depuis l’icône** sur l’écran d’accueil du téléphone, pas seulement le bouton ▶ d’Android Studio : sur certaines versions Android 12, le splash système ne s’affiche pas au lancement depuis l’IDE (comportement Google, corrigé sur Android 13+).
 4. Le splash **carré** (`resources/splash.png`) est propagé en portrait ; la **tagline** des maquettes `splash_android_1080x1920.png` n’est pas injectée automatiquement — pour l’avoir partout, refaire un `splash.png` 2732² avec tagline puis relancer `assets:native`.
 
+### Logo splash trop petit (Android 12+)
+
+Android 12 affichait l’image comme **icône centrée** (`Theme.SplashScreen` + `windowSplashScreenAnimatedIcon`). Corrigé par :
+
+- `android/.../drawable/splash_screen.xml` — image **plein écran** (`gravity="fill"`)
+- `AppTheme.NoActionBarLaunch` → fond `@drawable/splash_screen` (plus `Theme.SplashScreen`)
+- `npm run assets:native` avec `--logoSplashScale 0.62` et fond `#0A0F1C`
+
+Si le logo reste petit dans **resources/splash.png** lui-même, agrandir le logo dans le PNG source ou utiliser `splash_android_1080x1920.png` comme base.
+
 Plugin `@capacitor/splash-screen` : durée ~2 s au lancement (`capacitor.config.ts`).
 
 ---

@@ -1487,12 +1487,15 @@ function applyRemoteFilRougeScores(remote) {
 }
 
 function eveningStateToRemote() {
-  const { stats, lastGame, tierNightGame } = getState();
+  const { stats, lastGame, tierNightGame, gameScoreSessionBaseline, gameScoreSessionGameId } =
+    getState();
   return {
     scores: scoresToRemote(getState().scores),
     filRougeScores: scoresToRemote(getState().filRougeScores || {}),
     gameScores: gameScoresToRemote(getState().gameScores || {}),
     gameScoreOrder: [...(getState().gameScoreOrder || [])],
+    gameScoreSessionBaseline: scoresToRemote(gameScoreSessionBaseline || {}),
+    gameScoreSessionGameId: gameScoreSessionGameId || null,
     stats: {
       hotTakesPlayed: stats.hotTakesPlayed || 0,
       speedVotesPlayed: stats.speedVotesPlayed || 0,
@@ -1530,6 +1533,22 @@ export function applyRemoteEveningState(st) {
   if (st.scores) applyRemoteLobbyScores(st.scores);
   if (st.filRougeScores) applyRemoteFilRougeScores(st.filRougeScores);
   if (st.gameScores) applyRemoteGameScores(st.gameScores, st.gameScoreOrder);
+  if (st.gameScoreSessionGameId !== undefined || st.gameScoreSessionBaseline) {
+    const baselinePatch = {};
+    if (st.gameScoreSessionGameId !== undefined) {
+      baselinePatch.gameScoreSessionGameId = st.gameScoreSessionGameId;
+    }
+    if (st.gameScoreSessionBaseline) {
+      const byName = scoresFromRemote(st.gameScoreSessionBaseline);
+      const merged = { ...getState().gameScoreSessionBaseline };
+      getLobbyParticipants().forEach((p) => {
+        if (byName[p.name] != null) merged[p.name] = byName[p.name];
+      });
+      Object.assign(merged, byName);
+      baselinePatch.gameScoreSessionBaseline = merged;
+    }
+    if (Object.keys(baselinePatch).length) saveStatePatch(baselinePatch);
+  }
 }
 
 /** Hôte : pousse scores + stats de soirée vers game_sessions.state */
@@ -1925,6 +1944,8 @@ const EVENING_STATE_KEYS = new Set([
   "filRougeScores",
   "gameScores",
   "gameScoreOrder",
+  "gameScoreSessionBaseline",
+  "gameScoreSessionGameId",
   "stats",
   "lastGame",
   "lastTierName",

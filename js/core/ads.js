@@ -13,9 +13,11 @@ let bannerVisible = false;
 let initPromise = null;
 let admobModule = null;
 
-/** Pub visible sur tous les écrans sauf reset MDP (layout via body.has-top-ad). */
+/** Écrans sans bannière (accueil, connexion, reset MDP). Layout via body.has-top-ad ailleurs. */
+const NO_AD_SCREENS = new Set(["welcome", "home", "reset-password"]);
+
 function shouldShowAdForScreen(screenId) {
-  return Boolean(screenId && screenId !== "reset-password");
+  return Boolean(screenId && !NO_AD_SCREENS.has(screenId));
 }
 
 function setTopAdLayout(active, heightPx = ADMOB_DEFAULT_BANNER_HEIGHT) {
