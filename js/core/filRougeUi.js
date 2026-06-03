@@ -1,4 +1,6 @@
+/** MOT INTERDIT (Fil Rouge) — UI conservée ; active si FIL_ROUGE_ENABLED dans data/filRouge.js */
 import {
+  FIL_ROUGE_ENABLED,
   FIL_ROUGE_TILE,
   FIL_ROUGE_VALIDATION,
   FIL_ROUGE_STATUS,
@@ -26,6 +28,7 @@ import { showFilRougeResultsModal } from "./filRougeResultsModal.js";
 let filRougeRefreshCallback = null;
 
 export function registerFilRougeRefresh(fn) {
+  if (!FIL_ROUGE_ENABLED) return;
   filRougeRefreshCallback = fn;
 }
 
@@ -39,6 +42,7 @@ function localUid() {
 
 /** Bandeau pleine largeur (état idle) - au-dessus de la grille de jeux. */
 export function filRougeBannerHtml() {
+  if (!FIL_ROUGE_ENABLED) return "";
   const session = getFilRougeSession();
   const status = session.status || FIL_ROUGE_STATUS.IDLE;
   if (status !== FIL_ROUGE_STATUS.IDLE) return "";
@@ -108,6 +112,7 @@ function personalCardHtml(mission, myStatus) {
 }
 
 export async function filRougeBoxHtml() {
+  if (!FIL_ROUGE_ENABLED) return "";
   const session = getFilRougeSession();
   const status = session.status;
 
@@ -225,12 +230,14 @@ export async function filRougeBoxHtml() {
 
 /** Bandeau (idle) ou box (setup/active/completed) - une seule zone au-dessus des jeux. */
 export async function filRougeGameSelectSectionHtml() {
+  if (!FIL_ROUGE_ENABLED) return "";
   const banner = filRougeBannerHtml();
   if (banner) return banner;
   return filRougeBoxHtml();
 }
 
 export function bindFilRougeTile(root, { onNavigate } = {}) {
+  if (!FIL_ROUGE_ENABLED) return;
   const go = (el) => {
     if (!el) return;
     el.addEventListener("click", () => {
@@ -252,6 +259,7 @@ export function bindFilRougeTile(root, { onNavigate } = {}) {
 }
 
 export function bindFilRougeBox(root) {
+  if (!FIL_ROUGE_ENABLED) return;
   bindFilRougeTile(root, {
     onNavigate: (screen) => {
       import("../core/router.js").then(({ navigate }) => {

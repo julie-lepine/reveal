@@ -4273,7 +4273,7 @@ body{
   margin:0 4px;
 }
 
-/* Fil Rouge — Mot Interdit */
+/* === MOT INTERDIT (Fil Rouge) — styles conservés, jeu désactivé (data/filRouge.js) === */
 .fil-rouge-banner{
   display:flex;
   align-items:center;

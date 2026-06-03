@@ -59,7 +59,7 @@ npm run cap:open:ios
 
 | Affichée | Masquée |
 |----------|---------|
-| home, game-select, lobby, prep, résultats, classement | hottake, speedvote, playlistguess, truthmeter, dilemma, trivia, consensus, guesslie, tiernight, fil rouge mission |
+| home, game-select, lobby, prep, résultats, classement | hottake, speedvote, playlistguess, truthmeter, dilemma, trivia, consensus, guesslie, tiernight *(fil rouge mission : désactivé)* |
 
 Logique : `js/core/ads.js` → `GAMEPLAY_SCREENS`.
 

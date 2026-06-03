@@ -23,6 +23,7 @@ import {
   updateLobbyMemberProfileSupabase,
 } from "./supabaseLobby.js";
 import { stopMultiplayerSync } from "./gameSync.js";
+import { isPasswordRecoveryPending } from "./supabaseAuth.js";
 
 export function isLoggedIn() {
   const user = getState().user;
@@ -247,7 +248,8 @@ export async function updateProfileEmoji(emoji) {
 
 export async function changeEmailPassword(_currentPassword, newPassword) {
   const user = getState().user;
-  if (!isEmailAccount() || !user.email) {
+  const recoveryFlow = isPasswordRecoveryPending();
+  if (!recoveryFlow && (!isEmailAccount() || !user.email)) {
     return { ok: false, error: "Réservé aux comptes connectés par email." };
   }
 

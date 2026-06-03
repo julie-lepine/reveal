@@ -26,6 +26,7 @@ import { navigate } from "../core/router.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
 import { bindNav } from "../screens/nav.js";
 import { gameExitBarHtml, bindExitGame } from "../core/exitGame.js";
+// FIL_ROUGE (Mot interdit) — pause soirée ; isEveningGameplayPaused() = false si désactivé
 import { isEveningGameplayPaused } from "../core/filRougeSession.js";
 
 function revealFeedbackTitle({ isSubject, myCorrect, liarBonus }) {

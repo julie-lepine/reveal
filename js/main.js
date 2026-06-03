@@ -41,10 +41,11 @@ import { mountTrivia } from "./games/trivia.js";
 import { mountConsensus } from "./games/consensus.js";
 import { mountGuessLie } from "./games/guessLie.js";
 import { mountTierNight } from "./games/tierNight.js";
-import { mountFilRougeSetup } from "./screens/filRougeSetup.js";
-import { mountFilRougeMission } from "./screens/filRougeMission.js";
-import { initFilRougeResultsListener } from "./core/filRougeResultsModal.js";
-import { initFilRougeValidationListener } from "./core/filRougeToast.js";
+// FIL_ROUGE (Mot interdit) — désactivé, voir data/filRouge.js
+// import { mountFilRougeSetup } from "./screens/filRougeSetup.js";
+// import { mountFilRougeMission } from "./screens/filRougeMission.js";
+// import { initFilRougeResultsListener } from "./core/filRougeResultsModal.js";
+// import { initFilRougeValidationListener } from "./core/filRougeToast.js";
 import { initMultiplayerSyncVisibility } from "./core/gameSync.js";
 
 const app = document.getElementById("app");
@@ -94,14 +95,14 @@ registerScreen("consensus-prep", mountConsensusSetup);
 registerScreen("consensus", mountConsensus);
 registerScreen("guesslie", mountGuessLie);
 registerScreen("tiernight", mountTierNight);
-registerScreen("filrouge-setup", mountFilRougeSetup);
-registerScreen("filrouge-mission", mountFilRougeMission);
+// registerScreen("filrouge-setup", mountFilRougeSetup);
+// registerScreen("filrouge-mission", mountFilRougeMission);
 
 initBottomNav();
 initAds();
 initMultiplayerSyncVisibility();
-initFilRougeResultsListener();
-initFilRougeValidationListener();
+// initFilRougeResultsListener();
+// initFilRougeValidationListener();
 
 async function boot() {
   await initDeepLinks();

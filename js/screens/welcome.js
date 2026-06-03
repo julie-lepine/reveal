@@ -79,10 +79,8 @@ export function mountWelcome(app) {
 
   app.querySelector("#btn-welcome-auth")?.addEventListener("click", () => {
     markWelcomeSeen();
-    navigate("home", {
-      navStack: ["welcome", "home"],
-      params: { authTab: "login" },
-    });
+    // Pile sans « welcome » : Retour depuis paramètres ne doit pas réafficher l’intro.
+    navigate("home", { reset: true, params: { authTab: "login" } });
   });
 
   app.querySelector("#btn-welcome-privacy")?.addEventListener("click", () => {

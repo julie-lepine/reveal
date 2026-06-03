@@ -36,6 +36,8 @@ import {
   dehydratePlaylistGuessDeck,
   rehydratePlaylistGuessDeck,
 } from "./deckCodec.js";
+import { scalePollIntervalMs } from "../config/syncConfig.js";
+import { FIL_ROUGE_ENABLED } from "../../data/filRouge.js";
 
 let cachedRow = null;
 let lastSessionSig = "";
@@ -155,11 +157,21 @@ export function isCompatibleSessionScreen(sessionScreen, localScreen) {
   ) {
     return true;
   }
-  if (
-    sessionScreen === "game-select" &&
-    (localScreen === "filrouge-setup" || localScreen === "filrouge-mission")
-  ) {
-    return true;
+  // FIL_ROUGE (Mot interdit) — écrans désactivés
+  // if (
+  //   sessionScreen === "game-select" &&
+  //   (localScreen === "filrouge-setup" || localScreen === "filrouge-mission")
+  // ) {
+  //   return true;
+  // }
+  /**
+   * Hub soirée (screen DB = game-select) + Fil Rouge ou mini-jeu en parallèle :
+   * ne pas renvoyer vers le menu quand l'utilisateur est déjà en prep ou en partie.
+   */
+  if (sessionScreen === "game-select") {
+    if (isOnGameSetupScreen(localScreen) || isActiveGameSessionScreen(localScreen)) {
+      return true;
+    }
   }
   /** Accueil / paramètres : libre si pas de partie en cours ; sinon rattrapage vers le jeu. */
   if (getState().inLobby && getState().lobby?.id) {
@@ -1489,9 +1501,8 @@ function applyRemoteFilRougeScores(remote) {
 function eveningStateToRemote() {
   const { stats, lastGame, tierNightGame, gameScoreSessionBaseline, gameScoreSessionGameId } =
     getState();
-  return {
+  const remote = {
     scores: scoresToRemote(getState().scores),
-    filRougeScores: scoresToRemote(getState().filRougeScores || {}),
     gameScores: gameScoresToRemote(getState().gameScores || {}),
     gameScoreOrder: [...(getState().gameScoreOrder || [])],
     gameScoreSessionBaseline: scoresToRemote(gameScoreSessionBaseline || {}),
@@ -1511,6 +1522,10 @@ function eveningStateToRemote() {
     lastGame: lastGame ? { ...lastGame } : null,
     lastTierName: tierNightGame?.listName || null,
   };
+  if (FIL_ROUGE_ENABLED) {
+    remote.filRougeScores = scoresToRemote(getState().filRougeScores || {});
+  }
+  return remote;
 }
 
 export function applyRemoteEveningState(st) {
@@ -1531,7 +1546,7 @@ export function applyRemoteEveningState(st) {
 
   if (Object.keys(patch).length) saveStatePatch(patch);
   if (st.scores) applyRemoteLobbyScores(st.scores);
-  if (st.filRougeScores) applyRemoteFilRougeScores(st.filRougeScores);
+  if (FIL_ROUGE_ENABLED && st.filRougeScores) applyRemoteFilRougeScores(st.filRougeScores);
   if (st.gameScores) applyRemoteGameScores(st.gameScores, st.gameScoreOrder);
   if (st.gameScoreSessionGameId !== undefined || st.gameScoreSessionBaseline) {
     const baselinePatch = {};
@@ -1649,7 +1664,7 @@ export function applyRemoteSession(row) {
       patch.tierNightGame = { ...getState().tierNightGame, ...tn.game };
     }
   }
-  if (st.filRouge) {
+  if (FIL_ROUGE_ENABLED && st.filRouge) {
     const remote = filRougeFromRemote(st.filRouge);
     const local = getState().filRougeGame;
     patch.filRougeGame = local ? mergeFilRougeLocal(local, remote) : remote;
@@ -1842,6 +1857,7 @@ export function getEffectiveSessionScreen(row) {
  * Renvoie null si rien à restaurer (mission déjà prise en compte, jeu terminé, etc.).
  */
 export function getFilRougeResumeScreen() {
+  if (!FIL_ROUGE_ENABLED) return null;
   const fr = getCachedGameSession()?.state?.filRouge;
   if (!fr) return null;
   if (fr.status === "setup") return "filrouge-setup";
@@ -1905,9 +1921,9 @@ export function pulseGameSessionRealtime() {
   lastGameSessionRealtimeAt = Date.now();
   pollUnchangedStreak = 0;
   if (isActiveGameSessionScreen(getCurrentScreen())) {
-    pollIntervalMs = POLL_MS_ACTIVE_RELAXED;
+    pollIntervalMs = scalePollIntervalMs(POLL_MS_ACTIVE_RELAXED);
   } else {
-    pollIntervalMs = POLL_MS_MIN;
+    pollIntervalMs = scalePollIntervalMs(POLL_MS_MIN);
   }
 }
 
@@ -1960,15 +1976,15 @@ function isEveningScoresOnlyMerge(stateMerge) {
 
 /**
  * Évite un fetch complet du blob `state` avant merge :
- * - hôte + patch scores seulement : cache local,
- * - hôte + patch de manche : fetch complet (filet si Realtime manqué),
- * - invité : méta légère si `updated_at` inchangé, sinon fetch complet.
+ * - patch scores seulement (hôte) : cache local,
+ * - hôte ou invité avec cache : méta légère ; fetch complet seulement si `updated_at` a bougé
+ *   (ex. vote invité) — sinon on retéléchargeait le blob à chaque action hôte (egress).
  */
 async function loadSessionRowForPatch(lobbyId, { scoresOnly = false } = {}) {
   const cached =
     cachedRow?.state && cachedRow.lobby_id === lobbyId ? cachedRow : null;
   if (cached && isLobbyHost() && scoresOnly) return cached;
-  if (cached && !isLobbyHost()) {
+  if (cached) {
     try {
       const meta = await fetchGameSessionMeta(lobbyId);
       if (meta?.updated_at && meta.updated_at === lastSessionUpdatedAt) {
@@ -1994,22 +2010,30 @@ function adjustPollBackoff(sigChanged) {
    */
   if (isActiveGameSessionScreen(getCurrentScreen())) {
     pollUnchangedStreak = sigChanged ? 0 : pollUnchangedStreak + 1;
-    pollIntervalMs = isRecentGameSessionRealtime() ? POLL_MS_ACTIVE_RELAXED : POLL_MS_ACTIVE;
+    pollIntervalMs = scalePollIntervalMs(
+      isRecentGameSessionRealtime() ? POLL_MS_ACTIVE_RELAXED : POLL_MS_ACTIVE
+    );
     return;
   }
   if (sigChanged) {
     pollUnchangedStreak = 0;
-    pollIntervalMs = POLL_MS_DEFAULT;
+    pollIntervalMs = scalePollIntervalMs(POLL_MS_DEFAULT);
     return;
   }
   pollUnchangedStreak += 1;
   const recentRealtime = isRecentGameSessionRealtime();
   if (recentRealtime && pollUnchangedStreak >= 2) {
-    pollIntervalMs = Math.min(POLL_MS_MAX, pollIntervalMs + 1500);
+    pollIntervalMs = Math.min(
+      scalePollIntervalMs(POLL_MS_MAX),
+      pollIntervalMs + scalePollIntervalMs(1500)
+    );
   } else if (!recentRealtime && pollUnchangedStreak >= 1) {
-    pollIntervalMs = Math.min(POLL_MS_MAX, Math.round(pollIntervalMs * 1.25));
+    pollIntervalMs = Math.min(
+      scalePollIntervalMs(POLL_MS_MAX),
+      Math.round(pollIntervalMs * 1.25)
+    );
   }
-  pollIntervalMs = Math.max(POLL_MS_MIN, pollIntervalMs);
+  pollIntervalMs = Math.max(scalePollIntervalMs(POLL_MS_MIN), pollIntervalMs);
 }
 
 async function syncTick() {
@@ -2068,7 +2092,7 @@ export function startMultiplayerSync() {
   if (!isGameSyncActive()) return;
   initMultiplayerSyncVisibility();
   stopMultiplayerSync();
-  pollIntervalMs = POLL_MS_DEFAULT;
+  pollIntervalMs = scalePollIntervalMs(POLL_MS_DEFAULT);
   pollUnchangedStreak = 0;
   lastSessionUpdatedAt = "";
   lastGameSessionRealtimeAt = Date.now();
@@ -2084,7 +2108,7 @@ export function stopMultiplayerSync() {
     clearInterval(pollTimer);
     pollTimer = null;
   }
-  pollIntervalMs = POLL_MS_DEFAULT;
+  pollIntervalMs = scalePollIntervalMs(POLL_MS_DEFAULT);
   pollUnchangedStreak = 0;
 }
 
@@ -2096,6 +2120,17 @@ export async function startGameSession(gameId, screen, state) {
 
   const { setLobbyPlaying } = await import("./lobby.js");
   await setLobbyPlaying(gameId);
+  const priorState = cachedRow?.state || {};
+  const filRougePreserve = FIL_ROUGE_ENABLED
+    ? (() => {
+        const localFr = getState().filRougeGame;
+        return priorState.filRouge != null
+          ? { filRouge: priorState.filRouge }
+          : localFr?.status && localFr.status !== "idle" && localFr.status !== "completed"
+            ? { filRouge: filRougeToRemote(localFr) }
+            : {};
+      })()
+    : {};
   const row = await upsertGameSession({
     lobbyId,
     gameId,
@@ -2103,6 +2138,7 @@ export async function startGameSession(gameId, screen, state) {
     hostId,
     state: {
       ...eveningStateToRemote(),
+      ...filRougePreserve,
       ...(state || {}),
     },
   });
@@ -2255,7 +2291,7 @@ export async function patchGameState(
         }
       : incConsensus;
   }
-  if (mergePayload.filRouge) {
+  if (FIL_ROUGE_ENABLED && mergePayload.filRouge) {
     nextState.filRouge = mergeFilRougeRemote(current.filRouge, mergePayload.filRouge);
   }
   if (mergePayload.dilemma) {
@@ -2459,6 +2495,7 @@ export async function syncDilemmaSession(extra = {}, patchOpts = {}) {
 }
 
 export async function syncFilRougeSession(extra = {}, patchOpts = {}) {
+  if (!FIL_ROUGE_ENABLED) return getState().filRougeGame || null;
   const session = { ...getState().filRougeGame, ...extra };
   saveStatePatch({ filRougeGame: session });
   if (!isGameSyncActive()) {
@@ -2470,6 +2507,7 @@ export async function syncFilRougeSession(extra = {}, patchOpts = {}) {
 
 /** Recharge l'état Fil Rouge depuis la session multijoueur (hôte + invités). */
 export async function refreshFilRougeFromSession() {
+  if (!FIL_ROUGE_ENABLED) return null;
   if (!isGameSyncActive()) return getState().filRougeGame;
   const row = await refreshGameSession();
   return getState().filRougeGame;

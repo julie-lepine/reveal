@@ -1,4 +1,5 @@
-import { FIL_ROUGE_TILE } from "../../data/filRouge.js";
+/** MOT INTERDIT (Fil Rouge) — écran mission conservé ; voir data/filRouge.js */
+import { FIL_ROUGE_ENABLED, FIL_ROUGE_TILE } from "../../data/filRouge.js";
 import {
   getLocalFilRougeMission,
   setFilRougeMissionAck,
@@ -14,6 +15,7 @@ import { userIdForName } from "../core/gameSync.js";
 import { getLocalDisplayName } from "../core/state.js";
 
 export function mountFilRougeMission(app) {
+  if (!FIL_ROUGE_ENABLED) return () => {};
   if (!requireLobbyPlay()) return null;
 
   async function render() {

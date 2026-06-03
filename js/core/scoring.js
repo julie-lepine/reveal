@@ -217,8 +217,10 @@ export function guessLieLiarWins(correctCount, voterCount) {
   return correctCount * 2 < voterCount;
 }
 
+/** MOT INTERDIT (Fil Rouge) — désactivé, voir data/filRouge.js */
 export function awardFilRougeMission(agentName) {
-  addFilRougeScore(agentName, FIL_ROUGE_POINTS.MISSION);
-  bumpPlayerStat(agentName, "filRougeMissionsValidated", 1);
-  return { points: FIL_ROUGE_POINTS.MISSION };
+  // addFilRougeScore(agentName, FIL_ROUGE_POINTS.MISSION);
+  // bumpPlayerStat(agentName, "filRougeMissionsValidated", 1);
+  void agentName;
+  return { points: 0 };
 }

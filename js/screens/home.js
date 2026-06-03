@@ -446,7 +446,7 @@ export function mountHome(app) {
               <button type="button" class="btn btn-primary btn--spaced" id="btn-signup"${isTurnstileRequired() ? " disabled" : ""}>Créer mon compte</button>
             </div>
             <div id="auth-panel-guest" class="${authTab === "guest" ? "" : "hidden"}">
-              <p class="hint auth-form__guest-intro">Rejoins avec un code, un lien d'invitation ou en scannant le QR de l'hôte. Pas de compte requis - les invités ne peuvent pas créer de lobby.</p>
+              <p class="hint auth-form__guest-intro">Rejoins avec un code ou un lien d'invitation de l'hôte. Pas de compte requis — les invités ne peuvent pas créer de lobby.</p>
               <label class="field-label" for="guest-name">Ton pseudo</label>
               <input type="text" class="field-input" id="guest-name" placeholder="Ex : Alex" maxlength="24" />
               <label class="field-label" for="guest-code">Code d'invitation</label>

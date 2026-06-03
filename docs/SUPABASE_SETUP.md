@@ -9,9 +9,9 @@
    - `lobby_members`
    - `lobby_messages`
    - `game_sessions`
-4. Exécute aussi **`supabase/game-sessions.sql`** (multijoueur des jeux). Si les invités ne peuvent pas synchroniser Fil Rouge / mini-jeux (erreur `PGRST116` ou `406` sur `PATCH game_sessions`), réexécute au minimum la politique `game_sessions_update` (section `with check`) de ce fichier.
+4. Exécute aussi **`supabase/game-sessions.sql`** (multijoueur des jeux). Si les invités ne peuvent pas synchroniser les mini-jeux (erreur `PGRST116` ou `406` sur `PATCH game_sessions`), réexécute au minimum la politique `game_sessions_update` (section `with check`) de ce fichier.
 5. Exécute **`supabase/lobby-nudge.sql`** (wizz hôte → joueurs pas prêts : colonnes `nudge_at`, `nudge_for` sur `lobbies`)
-6. Exécute **`supabase/fil-rouge-private.sql`** (Fil Rouge — missions privées par joueur)
+6. ~~Exécute **`supabase/fil-rouge-private.sql`**~~ *(Mot interdit / Fil Rouge abandonné — optionnel, voir `data/filRouge.js` `FIL_ROUGE_ENABLED`)*
 
 ## 2. Clés API
 
@@ -54,11 +54,11 @@ Dans l’app Meta (Facebook Login), ajoute les mêmes URLs dans **Valid OAuth Re
 
 | Profil | Créer lobby | Rejoindre |
 |--------|-------------|-----------|
-| Email / Facebook | Oui | Code, lien `#join=CODE`, QR |
-| Invité anonyme | Non | Code, lien, QR (pseudo requis) |
+| Email / Facebook | Oui | Code ou lien `#join=CODE` |
+| Invité anonyme | Non | Code ou lien d’invitation (pseudo requis) |
 
 - **Lien d’invitation** : `https://ton-site/#join=ABC123` (hash lu au chargement → onglet Invité prérempli).
-- **QR** : encode le même lien ; scan → rejoindre en invité.
+- **Lobby hôte** : code affiché + bouton « Copier le lien » (pas de scan QR dans l’app).
 
 Sans `supabase.js` configuré, l’app reste en **mode démo locale** (localStorage + simulation de joueurs).
 
@@ -75,7 +75,7 @@ Le client charge `@supabase/supabase-js` via `esm.sh` dans le navigateur ; `npm 
 ## 6. Vérification rapide
 
 1. Lance l’app (Live Server ou `npx serve .`).
-2. Inscription email → créer un lobby → code + QR visibles.
+2. Inscription email → créer un lobby → code + lien d’invitation visibles.
 3. Autre navigateur / navigation privée → onglet Invité → code ou lien → participants en temps réel.
 4. Facebook : redirection Meta puis retour sur l’app avec session active.
 
@@ -90,3 +90,7 @@ Résumé :
 1. Domaine vérifié dans Resend (DNS OVH : TXT, DKIM…)
 2. Supabase → **Authentication → SMTP Settings** → `smtp.resend.com`
 3. Tester « Mot de passe oublié » depuis l’app
+
+## 7. Egress (quota « sortant »)
+
+Si le dashboard affiche **Egress > 100 %** avec une petite base : c’est surtout les **lectures répétées** de `game_sessions.state`, pas Realtime. Voir **[SUPABASE_EGRESS.md](./SUPABASE_EGRESS.md)** (réglages app, SQL de nettoyage, bonnes pratiques dev).

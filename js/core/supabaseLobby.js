@@ -11,6 +11,7 @@ import {
 } from "./gameSync.js";
 import { getCurrentScreen } from "./router.js";
 import { fetchGameSessionByLobby } from "./supabaseGame.js";
+import { scalePollIntervalMs } from "../config/syncConfig.js";
 
 const HOST_COLOR = "#A78BFA";
 const GUEST_COLOR = "#60A5FA";
@@ -229,7 +230,7 @@ function scheduleLobbyPresencePoll() {
   // Le Realtime gère les changements en direct ; ce poll n'est qu'un filet de
   // sécurité (et il ne rapatrie ni les messages ni le `state` du jeu).
   const inGame = isActiveGameSessionScreen(getCurrentScreen());
-  const delay = inGame ? 20000 : 12000;
+  const delay = scalePollIntervalMs(inGame ? 20000 : 12000);
   lobbyPresencePollTimer = setTimeout(async () => {
     lobbyPresencePollTimer = null;
     if (typeof document !== "undefined" && document.hidden) {
@@ -331,7 +332,8 @@ export async function joinLobbySupabase(codeInput) {
   if (!lobbyRow) {
     return {
       ok: false,
-      error: "Code introuvable. Demande le code à l'hôte ou scanne le QR.",
+      error:
+        "Code introuvable. Vérifie le code auprès de l'hôte ou ouvre le lien d'invitation qu'il t'a envoyé.",
     };
   }
 

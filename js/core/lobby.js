@@ -44,7 +44,7 @@ import {
   clearSessionRouteSuppress,
   isSessionRouteSuppressed,
   getCachedGameSession,
-  getFilRougeResumeScreen,
+  // getFilRougeResumeScreen,
   routeToSessionScreen,
 } from "./gameSync.js";
 
@@ -273,7 +273,7 @@ export async function resetAppToCleanHome() {
   try {
     localStorage.removeItem("reveal-app-state");
     localStorage.removeItem("reveal-auth-credentials");
-    localStorage.removeItem("reveal-fil-rouge-private");
+    // localStorage.removeItem("reveal-fil-rouge-private");
   } catch {
     /* ignore */
   }
@@ -325,11 +325,12 @@ export async function routeToEveningHub() {
     startMultiplayerSync();
     const row = await refreshGameSession();
     if (await routeToActiveGameIfNeeded(row)) return true;
-    const frScreen = getFilRougeResumeScreen();
-    if (frScreen) {
-      routeToSessionScreen(frScreen, { force: true });
-      return true;
-    }
+    // FIL_ROUGE (Mot interdit) — reprise setup/mission désactivée
+    // const frScreen = getFilRougeResumeScreen();
+    // if (frScreen) {
+    //   routeToSessionScreen(frScreen, { force: true });
+    //   return true;
+    // }
     if (!isLobbyEveningStarted()) {
       goToLobby();
       return true;
@@ -415,7 +416,8 @@ export async function joinLobby(code) {
   if (!published) {
     return {
       ok: false,
-      error: "Code introuvable. Demande le code à l'hôte ou vérifie qu'il n'y a pas de faute.",
+      error:
+        "Code introuvable. Vérifie le code auprès de l'hôte ou ouvre le lien d'invitation qu'il t'a envoyé.",
     };
   }
 

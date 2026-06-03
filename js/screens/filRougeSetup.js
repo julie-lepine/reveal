@@ -1,4 +1,6 @@
+/** MOT INTERDIT (Fil Rouge) — écran setup conservé ; voir data/filRouge.js */
 import {
+  FIL_ROUGE_ENABLED,
   FIL_ROUGE_MIN_PLAYERS,
   FIL_ROUGE_STATUS,
   FIL_ROUGE_TILE,
@@ -33,6 +35,7 @@ function setupSnapshot(session, localUid) {
 }
 
 export function mountFilRougeSetup(app) {
+  if (!FIL_ROUGE_ENABLED) return () => {};
   if (!requireLobbyPlay()) return null;
 
   let unsub = () => {};

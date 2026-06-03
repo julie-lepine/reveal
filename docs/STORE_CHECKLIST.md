@@ -77,7 +77,7 @@ npm run cap:open:android   # ou cap:open:ios sur Mac
 ```
 
 - [x] 🧪 **Android** : Samsung Z Flip via **Android Studio** (projet `android/`, config `app`, débogage USB)
-- [ ] 🧪 **iPhone** (Mac + Xcode)
+- [ ] 🧪 **iPhone** (Mac + Xcode) — checklist détaillée : **[IPHONE_TEST_CHECKLIST.md](./IPHONE_TEST_CHECKLIST.md)**
 - [ ] 🧪 Auth email + invité + **lobby multijoueur** (2e client web ou 2e téléphone)
 - [ ] 🧪 Reset mot de passe → **deep link** natif → écran nouveau MDP dans l’app (mail Resend OK ✅)
 - [ ] 🧪 Bannière AdMob absente sur accueil/connexion ; visible à partir du lobby
@@ -212,4 +212,4 @@ Repo **hors** de ce dossier Party Games (pages statiques créées de ton côté)
 
 ---
 
-**Prochaine action recommandée** : section **E** (tests device restants : deep link reset MDP, AdMob, soirée pilote) ; **G** (captures store) ; **B** (comptes Play / Apple) ; liens Play/App Store sur le site légal après publication.
+**Prochaine action recommandée** : **[IPHONE_TEST_CHECKLIST.md](./IPHONE_TEST_CHECKLIST.md)** (jour Mac) ; section **E** (deep link, AdMob, soirée pilote) ; **G** (captures store) ; **B** (comptes Play / Apple).

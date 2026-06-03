@@ -1,7 +1,8 @@
 import { escapeHtml } from "./ui.js";
 import { isLobbyHost } from "./gameSync.js";
+/** MOT INTERDIT (Fil Rouge) — modal résultats ; voir data/filRouge.js */
 import { hostResumeAfterFilRougeResults } from "./filRougeSession.js";
-import { FIL_ROUGE_POINTS_MISSION } from "../../data/filRouge.js";
+import { FIL_ROUGE_ENABLED, FIL_ROUGE_POINTS_MISSION } from "../../data/filRouge.js";
 import { getCurrentScreen } from "./router.js";
 
 let openModal = null;
@@ -68,6 +69,7 @@ function resultsBodyHtml(snapshot) {
 }
 
 export function showFilRougeResultsModal(snapshot, { readOnly = false } = {}) {
+  if (!FIL_ROUGE_ENABLED) return;
   const token = JSON.stringify(snapshot?.closedAt || snapshot);
   if (openModal && lastOpenToken === token) return;
 
@@ -122,6 +124,7 @@ export function closeFilRougeResultsModal() {
 }
 
 export function initFilRougeResultsListener() {
+  if (!FIL_ROUGE_ENABLED) return;
   import("./gameSync.js").then(({ onGameSessionChange }) => {
     onGameSessionChange(() => {
       import("./filRougeSession.js").then(({ getFilRougeSession }) => {

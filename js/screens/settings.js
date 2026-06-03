@@ -31,6 +31,7 @@ export function mountSettings(app) {
 
     app.innerHTML = pageShell({
       back: !inLobby,
+      backTarget: inLobby ? "back" : "home",
       content: `
         <p class="label-upper">Paramètres</p>
         <h1 class="page-title">Ton profil</h1>

@@ -1,4 +1,5 @@
--- REVEAL — Fil Rouge (missions privées par joueur)
+-- REVEAL — Fil Rouge / Mot interdit (missions privées par joueur)
+-- JEU ABANDONNÉ dans l'app (FIL_ROUGE_ENABLED = false) — conserver ce script pour réactivation future.
 -- Run after schema.sql + game-sessions.sql
 
 create or replace function public.is_lobby_host(p_lobby_id uuid)

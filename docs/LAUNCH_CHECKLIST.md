@@ -46,14 +46,14 @@ Référence détaillée : [SUPABASE_SETUP.md](./SUPABASE_SETUP.md)
 
 - [ ] `supabase/schema.sql` exécuté
 - [ ] `supabase/game-sessions.sql`
-- [ ] `supabase/fil-rouge-private.sql`
+- [ ] ~~`supabase/fil-rouge-private.sql`~~ *(Mot interdit désactivé — uniquement si réactivation)*
 - [ ] `supabase/lobby-nudge.sql`
 - [ ] `supabase/lobby-members-unique-name.sql` (pseudo unique par lobby)
 - [ ] Correctifs RLS si besoin : `fix-rls-recursion.sql`, `fix-lobbies-insert.sql`, `lobby-host-close.sql`
 
 ### Realtime
 
-Réplication activée sur : `lobbies`, `lobby_members`, `lobby_messages`, `game_sessions` (+ `fil_rouge_private` si Fil Rouge privé)
+Réplication activée sur : `lobbies`, `lobby_members`, `lobby_messages`, `game_sessions` *(+ `fil_rouge_private` si Mot interdit réactivé)*
 
 ### Emails (Resend + OVH)
 
@@ -80,12 +80,12 @@ Guide détaillé : **[RESEND_SETUP.md](./RESEND_SETUP.md)**
 
 ## 4. Test soirée pilote (~30 min, 3–4 personnes)
 
-- [ ] Hôte : compte email → créer lobby → code / QR
+- [ ] Hôte : compte email → créer lobby → code / lien d’invitation
 - [ ] Invité : onglet **Invité** + code (ou 2e navigateur / téléphone)
 - [ ] Lancer **SpeedVote** ou **Consensus** (court)
 - [ ] **Arrêter la partie** → retour menu jeux → autre jeu
 - [ ] **Quitter le lobby** / réinitialiser l’app si besoin
-- [ ] Optionnel : Fil Rouge + TierNight
+- [ ] Optionnel : TierNight *(Mot interdit / Fil Rouge : désactivé)*
 
 ---
 

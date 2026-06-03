@@ -14,7 +14,7 @@ Capacitor est **initialisé**. Checklist complète store : **[STORE_CHECKLIST.md
 | Politique de confidentialité | ✅ (`privacy.html` + écran in-app) |
 | Sources icône / splash (`resources/`) | ✅ custom (icon, splash 2732², portrait iOS/Android) |
 | Icônes / splash injectés dans `android/` / `ios/` | ✅ `npm run assets:native` puis rebuild Android Studio |
-| Test sur device réel | ☐ |
+| Test sur device réel | Android ✅ · iPhone → [IPHONE_TEST_CHECKLIST.md](./IPHONE_TEST_CHECKLIST.md) |
 | Build release signé | ☐ |
 
 ---

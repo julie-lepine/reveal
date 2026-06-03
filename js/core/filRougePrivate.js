@@ -1,3 +1,5 @@
+/** MOT INTERDIT (Fil Rouge) — missions privées Supabase ; voir data/filRouge.js */
+import { FIL_ROUGE_ENABLED } from "../../data/filRouge.js";
 import { supabase, isSupabaseConfigured } from "./supabaseClient.js";
 import { getSupabaseUserId } from "./supabaseAuth.js";
 import { getState } from "./state.js";
@@ -22,6 +24,7 @@ function writeLocalBundle(lobbyId, bundle) {
 }
 
 export async function fetchMyFilRougePrivate() {
+  if (!FIL_ROUGE_ENABLED) return null;
   const lobbyId = getState().lobby?.id;
   const uid = getSupabaseUserId();
   if (!lobbyId || !uid) return null;
@@ -49,6 +52,7 @@ export async function fetchMyFilRougePrivate() {
 
 /** Hôte : toutes les lignes du lobby (distribution). */
 export async function fetchAllFilRougePrivateForLobby() {
+  if (!FIL_ROUGE_ENABLED) return [];
   const lobbyId = getState().lobby?.id;
   if (!lobbyId) return [];
 
@@ -68,6 +72,7 @@ export async function fetchAllFilRougePrivateForLobby() {
 }
 
 export async function upsertMyFilRougeSetupWord(setupWord) {
+  if (!FIL_ROUGE_ENABLED) return null;
   const lobbyId = getState().lobby?.id;
   const uid = getSupabaseUserId();
   if (!lobbyId || !uid) return null;
@@ -92,6 +97,7 @@ export async function upsertMyFilRougeSetupWord(setupWord) {
 }
 
 export async function ackMyFilRougeMission() {
+  if (!FIL_ROUGE_ENABLED) return;
   const lobbyId = getState().lobby?.id;
   const uid = getSupabaseUserId();
   if (!lobbyId || !uid) return;
@@ -117,6 +123,7 @@ export async function ackMyFilRougeMission() {
 
 /** Hôte : écrit les missions sur chaque ligne. */
 export async function hostDistributeFilRougeMissions(assignments) {
+  if (!FIL_ROUGE_ENABLED) return;
   const lobbyId = getState().lobby?.id;
   if (!lobbyId) return;
 
@@ -149,6 +156,7 @@ export async function hostDistributeFilRougeMissions(assignments) {
 }
 
 export async function clearFilRougePrivateForLobby(lobbyId) {
+  if (!FIL_ROUGE_ENABLED) return;
   if (!lobbyId) return;
   localStorage.removeItem(`${LOCAL_KEY}:${lobbyId}`);
   if (!isSupabaseConfigured()) return;

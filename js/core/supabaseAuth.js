@@ -139,13 +139,15 @@ export async function handleAuthRedirectUrl(rawUrl) {
   }
 
   const { hashParams, searchParams, hash, search } = parseAuthParamsFromUrl(rawUrl);
+  const authCode = searchParams.get("code");
+  const tokenHash = searchParams.get("token_hash") || hashParams.get("token_hash");
+  const authType = searchParams.get("type") || hashParams.get("type");
   const hasHashAuth =
     hashParams.get("access_token") ||
     hashParams.get("error_description") ||
     hashParams.get("error");
-  const authCode = searchParams.get("code");
 
-  if (!hasHashAuth && !authCode) {
+  if (!hasHashAuth && !authCode && !tokenHash) {
     return { handled: false, recovery: false };
   }
 
@@ -156,23 +158,65 @@ export async function handleAuthRedirectUrl(rawUrl) {
   if (authCode) {
     const { data, error } = await supabase.auth.exchangeCodeForSession(authCode);
     if (error) console.warn("Supabase auth code:", error.message);
-    if (data.session) await syncSessionToState(data.session);
+    if (data?.session) {
+      await syncSessionToState(data.session);
+      if (authType === "recovery") setPasswordRecoveryPending();
+    }
+  } else if (tokenHash && authType) {
+    const { data, error } = await supabase.auth.verifyOtp({
+      token_hash: tokenHash,
+      type: authType,
+    });
+    if (error) console.warn("Supabase verifyOtp:", error.message);
+    if (data?.session) {
+      await syncSessionToState(data.session);
+      if (authType === "recovery") setPasswordRecoveryPending();
+    }
   } else if (hasHashAuth) {
-    const next =
-      window.location.pathname +
-      (search ? `?${search}` : "") +
-      (hash ? `#${hash}` : "");
-    window.history.replaceState(null, "", next);
-    const { data, error } = await supabase.auth.getSession();
-    if (error) console.warn("Supabase auth redirect:", error.message);
-    if (data.session) await syncSessionToState(data.session);
-    window.history.replaceState(null, "", window.location.pathname + window.location.search);
+    const access_token = hashParams.get("access_token");
+    const refresh_token = hashParams.get("refresh_token");
+    if (access_token && refresh_token) {
+      // App native : les tokens sont dans le deep link, pas dans window.location.
+      const { data, error } = await supabase.auth.setSession({
+        access_token,
+        refresh_token,
+      });
+      if (error) console.warn("Supabase setSession:", error.message);
+      if (data?.session) await syncSessionToState(data.session);
+    } else if (!isNativeApp()) {
+      const next =
+        window.location.pathname +
+        (search ? `?${search}` : "") +
+        (hash ? `#${hash}` : "");
+      window.history.replaceState(null, "", next);
+      const { data, error } = await supabase.auth.getSession();
+      if (error) console.warn("Supabase auth redirect:", error.message);
+      if (data?.session) await syncSessionToState(data.session);
+      window.history.replaceState(null, "", window.location.pathname + window.location.search);
+    }
   }
 
   return {
     handled: true,
     recovery: isPasswordRecoveryPending(),
   };
+}
+
+/** Réessaie de traiter l’URL de lancement (deep link) si la session recovery n’est pas encore là. */
+export async function reprocessAuthLaunchUrl() {
+  if (!isSupabaseConfigured() || !isNativeApp()) return false;
+  try {
+    const { loadCapacitorApp } = await import("./capacitorImports.js");
+    const mod = await loadCapacitorApp();
+    const launch = await mod?.App?.getLaunchUrl?.();
+    if (!launch?.url) return false;
+    await handleAuthRedirectUrl(launch.url);
+    const { data } = await supabase.auth.getSession();
+    return Boolean(data?.session?.user && !data.session.user.is_anonymous);
+  } catch (e) {
+    console.warn("REVEAL reprocessAuthLaunchUrl:", e?.message || e);
+    return false;
+  }
 }
 
 export async function initSupabaseAuth() {

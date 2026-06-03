@@ -38,7 +38,7 @@ export function goToEveningSettings() {
     navigate("settings", { navStack: ["home", "settings"] });
     return;
   }
-  navigate("settings");
+  navigate("settings", { navStack: ["home", "settings"] });
 }
 
 /** Retour au menu jeux (ou partie en cours) après profil / paramètres. */
@@ -51,6 +51,10 @@ export function returnFromEveningProfile() {
 }
 
 async function handleBackNavigation() {
+  if (getCurrentScreen() === "settings" && !hasActiveLobby()) {
+    navigate("home", { reset: true });
+    return;
+  }
   if (getCurrentScreen() === "lobby") {
     const res = await confirmAndLeaveLobby();
     if (res.cancelled) return;
@@ -111,7 +115,7 @@ export async function handleNavTarget(target, handlers) {
   }
   if (target === "settings") {
     if (hasActiveLobby()) goToEveningSettings();
-    else navigate("settings");
+    else navigate("settings", { navStack: ["home", "settings"] });
     return;
   }
   navigate(target);

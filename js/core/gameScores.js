@@ -97,10 +97,12 @@ export function eveningGameLeaderboardsHtml() {
     blocks.push(gameLeaderboardCardHtml(titleHtml, players, gameScores[gid] || {}));
   });
 
-  const hasFilRouge = Object.values(filRougeScores).some((v) => Number(v) !== 0);
-  if (hasFilRouge) {
-    blocks.push(gameLeaderboardCardHtml("🧵 Fil Rouge", players, filRougeScores));
-  }
+  // FIL_ROUGE (Mot interdit) — bloc classement désactivé
+  // const hasFilRouge = Object.values(filRougeScores).some((v) => Number(v) !== 0);
+  // if (hasFilRouge) {
+  //   blocks.push(gameLeaderboardCardHtml("🧵 Fil Rouge", players, filRougeScores));
+  // }
+  void filRougeScores;
 
   if (!blocks.length) return "";
   return `

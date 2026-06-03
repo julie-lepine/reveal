@@ -16,7 +16,7 @@ import {
   onGameSessionChange,
   handleSessionRoute,
   refreshGameSession,
-  refreshFilRougeFromSession,
+  // refreshFilRougeFromSession,
   getCachedGameSession,
   routeToActiveGameIfNeeded,
 } from "../core/gameSync.js";
@@ -25,7 +25,7 @@ import { isSupabaseConfigured } from "../core/supabaseClient.js";
 import { startLobbyPresenceSync } from "../core/supabaseLobby.js";
 import { hasActiveLobby } from "../core/lobby.js";
 import { getLastGame, getState } from "../core/state.js";
-import { getFilRougeSession } from "../core/filRougeSession.js";
+// import { getFilRougeSession } from "../core/filRougeSession.js";
 import {
   launchSpeedVotePrep,
   launchPlaylistGuessPrep,
@@ -39,11 +39,12 @@ import {
   eveningRecapRestartButtonHtml,
   restartGame,
 } from "../core/restartGame.js";
-import {
-  filRougeGameSelectSectionHtml,
-  bindFilRougeBox,
-  registerFilRougeRefresh,
-} from "../core/filRougeUi.js";
+// FIL_ROUGE (Mot interdit) — désactivé
+// import {
+//   filRougeGameSelectSectionHtml,
+//   bindFilRougeBox,
+//   registerFilRougeRefresh,
+// } from "../core/filRougeUi.js";
 
 function eveningRecapHtml(recap) {
   if (!recap.hasActivity) {
@@ -177,7 +178,6 @@ function gameGridSection(label, games) {
 
 function gameSelectRenderSnapshot() {
   const recap = getEveningRecap();
-  const fr = getFilRougeSession();
   const participants = getState().lobby?.participants || [];
   return JSON.stringify({
     n: participants.length,
@@ -188,9 +188,6 @@ function gameSelectRenderSnapshot() {
     tm: recap.truthMeters,
     cs: recap.consensusGames,
     dl: recap.dilemmas,
-    frStatus: fr.status,
-    frVal: fr.validations,
-    frModal: fr.resultsModalOpen,
     lastGame: getLastGame()?.gameId ?? null,
   });
 }
@@ -223,7 +220,7 @@ export function mountGameSelect(app) {
 
   function bindGameSelectEvents() {
     bindGameTileLogos(app);
-    bindFilRougeBox(app);
+    // bindFilRougeBox(app);
   }
 
   function scheduleRender(force = false) {
@@ -253,13 +250,6 @@ export function mountGameSelect(app) {
 
   async function render() {
     const recap = getEveningRecap();
-    let filSection = "";
-    try {
-      filSection = await filRougeGameSelectSectionHtml();
-    } catch (err) {
-      console.error("[game-select] fil rouge section", err);
-    }
-
     app.innerHTML = pageShell({
       backTarget: "home",
       content: `
@@ -269,17 +259,15 @@ export function mountGameSelect(app) {
       <button type="button" class="btn-link game-select-profile" data-nav="settings">Profil & paramètres</button>
 
       ${eveningRecapHtml(recap)}
-      ${filSection}
 
       ${gameGridSection("🎮 Jeux disponibles", GAMES_AVAILABLE)}
     `,
     });
 
     bindGameSelectEvents();
-    bindFilRougeBox(app);
   }
 
-  registerFilRougeRefresh(() => scheduleRender(true));
+  // registerFilRougeRefresh(() => scheduleRender(true));
   scheduleRender(true);
 
   if (isSupabaseConfigured() && hasActiveLobby()) {
@@ -289,24 +277,19 @@ export function mountGameSelect(app) {
   if (isGameSyncActive()) {
     void (async () => {
       if (await routeToActiveGameIfNeeded()) return;
-      await refreshFilRougeFromSession();
-      const row = getCachedGameSession() || (await refreshGameSession());
+      const row = getCachedGameSession() ?? (await refreshGameSession());
       if (row) handleSessionRoute(row);
       scheduleRender(true);
     })();
 
     unsubSession = onGameSessionChange(async (row) => {
-      if (getCurrentScreen() === "game-select") {
-        await refreshFilRougeFromSession();
-        scheduleRender(false);
-      }
       if (row && (await routeToActiveGameIfNeeded(row))) return;
       if (row) handleSessionRoute(row);
     });
   }
 
   return () => {
-    registerFilRougeRefresh(null);
+    // registerFilRougeRefresh(null);
     app.removeEventListener("click", onGameSelectClick);
     unsubSession();
     if (renderTimer) clearTimeout(renderTimer);

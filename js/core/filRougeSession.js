@@ -1,10 +1,14 @@
+/** MOT INTERDIT (Fil Rouge) — module conservé ; actif si FIL_ROUGE_ENABLED dans data/filRouge.js */
 import {
+  FIL_ROUGE_ENABLED,
   FIL_ROUGE_MIN_WORD_LENGTH,
   FIL_ROUGE_MIN_PLAYERS,
   FIL_ROUGE_POINTS_MISSION,
   FIL_ROUGE_STATUS,
   FIL_ROUGE_VALIDATION,
 } from "../../data/filRouge.js";
+
+const FIL_ROUGE_DISABLED_MSG = "Mot Interdit n'est pas disponible pour le moment.";
 import { checkHotTakeModeration } from "./hotTakeSession.js";
 import { getLobbyParticipants } from "./lobby.js";
 import { getLocalDisplayName, getState, saveStatePatch } from "./state.js";
@@ -43,6 +47,7 @@ export function getFilRougeSession() {
 }
 
 export function isEveningGameplayPaused() {
+  if (!FIL_ROUGE_ENABLED) return false;
   return Boolean(getFilRougeSession().resultsModalOpen);
 }
 
@@ -77,6 +82,7 @@ export function getFilRougeStatusLabel(status = getFilRougeSession().status) {
 }
 
 export async function startFilRougeSetup() {
+  if (!FIL_ROUGE_ENABLED) return defaultSession();
   const next = {
     ...defaultSession(),
     status: FIL_ROUGE_STATUS.SETUP,
@@ -95,6 +101,7 @@ export function allFilRougeWordsSubmitted() {
 }
 
 export async function submitFilRougeWord(word) {
+  if (!FIL_ROUGE_ENABLED) return { ok: false, error: FIL_ROUGE_DISABLED_MSG };
   const trimmed = String(word || "").trim();
   if (trimmed.length < FIL_ROUGE_MIN_WORD_LENGTH) {
     return { ok: false, error: `Minimum ${FIL_ROUGE_MIN_WORD_LENGTH} lettres.` };
@@ -209,6 +216,7 @@ function buildMissionAssignments(rows, uids) {
 }
 
 export async function launchFilRougeMissions() {
+  if (!FIL_ROUGE_ENABLED) return { ok: false, error: FIL_ROUGE_DISABLED_MSG };
   if (!isLobbyHost()) return { ok: false, error: "Réservé à l'hôte." };
   if (participantUids().length < FIL_ROUGE_MIN_PLAYERS) {
     return {
@@ -244,6 +252,7 @@ export async function launchFilRougeMissions() {
 }
 
 export async function getLocalFilRougeMission() {
+  if (!FIL_ROUGE_ENABLED) return null;
   const row = await fetchMyFilRougePrivate();
   if (!row?.mission_word || !row?.mission_target_uid) return null;
   const target = participantByUid(row.mission_target_uid);
@@ -255,6 +264,7 @@ export async function getLocalFilRougeMission() {
 }
 
 export async function requestFilRougeValidation() {
+  if (!FIL_ROUGE_ENABLED) return { ok: false, error: FIL_ROUGE_DISABLED_MSG };
   const uid = getSupabaseUserId() || userIdForName(getLocalDisplayName());
   const session = getFilRougeSession();
   const cur = session.validations?.[uid];
@@ -278,6 +288,7 @@ export async function requestFilRougeValidation() {
 }
 
 export async function hostApproveFilRougeMission(agentUid) {
+  if (!FIL_ROUGE_ENABLED) return { ok: false, error: FIL_ROUGE_DISABLED_MSG };
   if (!isLobbyHost()) return { ok: false, error: "Réservé à l'hôte." };
   const session = getFilRougeSession();
   const cur = session.validations?.[agentUid];
@@ -303,6 +314,7 @@ export async function hostApproveFilRougeMission(agentUid) {
 }
 
 export async function hostRejectFilRougeMission(agentUid) {
+  if (!FIL_ROUGE_ENABLED) return { ok: false, error: FIL_ROUGE_DISABLED_MSG };
   if (!isLobbyHost()) return { ok: false, error: "Réservé à l'hôte." };
   const session = getFilRougeSession();
   const validations = {
@@ -386,6 +398,7 @@ async function clearFilRougeWordsForNewRound() {
 }
 
 export async function hostCloseFilRougeGame() {
+  if (!FIL_ROUGE_ENABLED) return { ok: false, error: FIL_ROUGE_DISABLED_MSG };
   if (!isLobbyHost()) return { ok: false, error: "Réservé à l'hôte." };
   const snapshot = buildFilRougeResultsSnapshot();
   const uid = getSupabaseUserId();
@@ -406,6 +419,7 @@ export async function hostCloseFilRougeGame() {
 }
 
 export async function hostResumeAfterFilRougeResults() {
+  if (!FIL_ROUGE_ENABLED) return { ok: false, error: FIL_ROUGE_DISABLED_MSG };
   if (!isLobbyHost()) return { ok: false, error: "Réservé à l'hôte." };
   await syncFilRougeSession({
     ...getFilRougeSession(),
@@ -416,6 +430,7 @@ export async function hostResumeAfterFilRougeResults() {
 
 /** Hôte : nouvelle partie après clôture (mots + missions réinitialisés). */
 export async function hostRestartFilRougeGame() {
+  if (!FIL_ROUGE_ENABLED) return { ok: false, error: FIL_ROUGE_DISABLED_MSG };
   if (!isLobbyHost()) return { ok: false, error: "Réservé à l'hôte." };
 
   const uids = participantUids();
@@ -455,11 +470,13 @@ export async function hostRestartFilRougeGame() {
 
 /** Accusé « mission reçue » - local uniquement (ne pas impacter l'écran des autres joueurs). */
 export function setFilRougeMissionAck(uid) {
+  if (!FIL_ROUGE_ENABLED) return;
   const session = getFilRougeSession();
   const missionAcks = { ...(session.missionAcks || {}), [uid]: true };
   saveStatePatch({ filRougeGame: { ...session, missionAcks } });
 }
 
 export function resetFilRougeSessionLocal() {
+  if (!FIL_ROUGE_ENABLED) return;
   saveStatePatch({ filRougeGame: defaultSession() });
 }

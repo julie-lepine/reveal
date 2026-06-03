@@ -4,6 +4,7 @@ import { supabase } from "../core/supabaseClient.js";
 import {
   clearPasswordRecoveryPending,
   isPasswordRecoveryPending,
+  reprocessAuthLaunchUrl,
 } from "../core/supabaseAuth.js";
 import { navigate } from "../core/router.js";
 import { pageShell } from "../core/ui.js";
@@ -121,6 +122,15 @@ export function mountResetPassword(app) {
     });
   }
 
+  async function ensureRecoverySession() {
+    if (await checkSession()) return true;
+    if (!isPasswordRecoveryPending()) return false;
+    await reprocessAuthLaunchUrl();
+    if (await checkSession()) return true;
+    await new Promise((r) => setTimeout(r, 350));
+    return checkSession();
+  }
+
   void (async () => {
     if (!isPasswordRecoveryPending()) {
       const ok = await checkSession();
@@ -128,9 +138,11 @@ export function mountResetPassword(app) {
         navigate("home", { reset: true });
         return;
       }
+      render(false);
+      return;
     }
 
-    const ok = await checkSession();
+    const ok = await ensureRecoverySession();
     if (!ok) {
       clearPasswordRecoveryPending();
       render(true);

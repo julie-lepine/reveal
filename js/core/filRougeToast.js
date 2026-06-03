@@ -1,4 +1,10 @@
-import { FIL_ROUGE_POINTS_MISSION, FIL_ROUGE_TILE, FIL_ROUGE_VALIDATION } from "../../data/filRouge.js";
+/** MOT INTERDIT (Fil Rouge) — toast validation ; voir data/filRouge.js */
+import {
+  FIL_ROUGE_ENABLED,
+  FIL_ROUGE_POINTS_MISSION,
+  FIL_ROUGE_TILE,
+  FIL_ROUGE_VALIDATION,
+} from "../../data/filRouge.js";
 import { getFilRougeSession } from "./filRougeSession.js";
 import { onGameSessionChange, userIdForName } from "./gameSync.js";
 import { getSupabaseUserId } from "./supabaseAuth.js";
@@ -109,6 +115,7 @@ function onSessionValidationChange() {
 }
 
 export function initFilRougeValidationListener() {
+  if (!FIL_ROUGE_ENABLED) return;
   lastLocalValidationStatus = localValidationStatus();
   onGameSessionChange(onSessionValidationChange);
   ensureValidationToastVisible();
