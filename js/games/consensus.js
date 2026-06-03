@@ -195,6 +195,8 @@ export function mountConsensus(app) {
   let draftValue = 50;
   let renderTimer = null;
   let lastQuestionRenderKey = "";
+  let lastRenderedPhase = "";
+  let lastRenderedQuestionIdx = -1;
 
   const localName = getLocalDisplayName();
   const mp = isGameSyncActive();
@@ -271,6 +273,22 @@ export function mountConsensus(app) {
     }
   }
 
+  function shouldScrollToTop() {
+    return (
+      phase !== lastRenderedPhase ||
+      (phase === "question" && questionIdx !== lastRenderedQuestionIdx)
+    );
+  }
+
+  function scrollPageToTop() {
+    const scrollEl = app.querySelector(".page--scroll");
+    if (scrollEl) scrollEl.scrollTop = 0;
+    if (typeof window !== "undefined") {
+      window.scrollTo(0, 0);
+      app.scrollTop = 0;
+    }
+  }
+
   function questionRenderKey(session) {
     const answeredCount = getActivePlayers().filter(
       (p) => session.answers?.[p.name]?.submittedAt
@@ -305,12 +323,16 @@ export function mountConsensus(app) {
     }
   }
 
-  function scheduleRender({ force = false } = {}) {
+  function scheduleRender({ force = false, scrollTop = false } = {}) {
     if (renderTimer) {
       clearTimeout(renderTimer);
       renderTimer = null;
     }
     if (force) {
+      if (scrollTop) {
+        lastRenderedPhase = "";
+        lastRenderedQuestionIdx = -1;
+      }
       render();
       return;
     }
@@ -601,7 +623,8 @@ export function mountConsensus(app) {
     }
 
     const scrollEl = app.querySelector(".page--scroll");
-    const scrollTop = scrollEl?.scrollTop ?? 0;
+    const scrollToTop = shouldScrollToTop();
+    const scrollTop = scrollToTop ? 0 : scrollEl?.scrollTop ?? 0;
 
     let phaseHtml = "";
     if (phase === "question") {
@@ -693,6 +716,11 @@ export function mountConsensus(app) {
 
     const newScrollEl = app.querySelector(".page--scroll");
     if (newScrollEl) newScrollEl.scrollTop = scrollTop;
+    if (scrollToTop) {
+      requestAnimationFrame(() => scrollPageToTop());
+    }
+    lastRenderedPhase = phase;
+    lastRenderedQuestionIdx = questionIdx;
 
     if (phase === "question") {
       bindConsensusSlider(app, {
@@ -761,7 +789,6 @@ export function mountConsensus(app) {
     syncFromSession();
     if (phase === "question" && isLobbyHost() && consensus.allAnswersIn()) {
       void beginReveal();
-      return;
     }
     if (phase === "reveal-pending" && prevPhase !== "reveal-pending" && isLobbyHost()) {
       clearRevealPending();
@@ -771,7 +798,12 @@ export function mountConsensus(app) {
       }, CONSENSUS_REVEAL_PENDING_MS);
     }
     const phaseChanged = prevPhase !== phase;
-    scheduleRender({ force: phaseChanged || phase !== "question" });
+    const questionChanged =
+      phase === "question" && questionIdx !== lastRenderedQuestionIdx;
+    scheduleRender({
+      force: phaseChanged || phase !== "question",
+      scrollTop: phaseChanged || questionChanged,
+    });
   });
 
   render();

@@ -12,6 +12,8 @@ let initialized = false;
 let bannerVisible = false;
 let initPromise = null;
 let admobModule = null;
+let lastSyncedAdScreen = null;
+let adSyncChain = Promise.resolve();
 
 /** Écrans sans bannière (accueil, connexion, reset MDP). Layout via body.has-top-ad ailleurs. */
 const NO_AD_SCREENS = new Set(["welcome", "home", "reset-password"]);
@@ -97,9 +99,23 @@ async function ensureAdMobReady() {
   return initPromise;
 }
 
+async function removeBannerIfPresent(AdMob) {
+  try {
+    if (typeof AdMob.removeBanner === "function") {
+      await AdMob.removeBanner();
+    } else {
+      await AdMob.hideBanner();
+    }
+  } catch {
+    /* pas de bannière active */
+  }
+  bannerVisible = false;
+}
+
 async function showTopBanner() {
   if (!isNativeApp()) return;
-  if (!shouldShowAdForScreen(getCurrentScreen())) return;
+  const screenId = getCurrentScreen();
+  if (!shouldShowAdForScreen(screenId)) return;
 
   const adId = bannerAdId();
   if (!adId) return;
@@ -112,17 +128,22 @@ async function showTopBanner() {
   if (!mod) return;
   const { AdMob, BannerAdSize, BannerAdPosition } = mod;
 
+  const cameFromNoAd =
+    lastSyncedAdScreen != null && !shouldShowAdForScreen(lastSyncedAdScreen);
+
   try {
-    if (bannerVisible) {
+    if (bannerVisible && !cameFromNoAd) {
       await AdMob.resumeBanner();
       if (!shouldShowAdForScreen(getCurrentScreen())) {
-        await AdMob.hideBanner();
-        bannerVisible = false;
-        setTopAdLayout(false);
+        await hideTopBanner();
         return;
       }
       setTopAdLayout(true);
       return;
+    }
+
+    if (bannerVisible || cameFromNoAd) {
+      await removeBannerIfPresent(AdMob);
     }
 
     await AdMob.showBanner({
@@ -134,9 +155,7 @@ async function showTopBanner() {
     });
 
     if (!shouldShowAdForScreen(getCurrentScreen())) {
-      await AdMob.hideBanner();
-      bannerVisible = false;
-      setTopAdLayout(false);
+      await hideTopBanner();
       return;
     }
 
@@ -151,18 +170,17 @@ async function showTopBanner() {
 
 async function hideTopBanner() {
   setTopAdLayout(false);
-  if (!isNativeApp()) return;
+  if (!isNativeApp()) {
+    bannerVisible = false;
+    return;
+  }
 
   try {
     const mod = await loadAdMobModule();
     if (mod) {
       const { AdMob } = mod;
       await ensureAdMobReady();
-      try {
-        await AdMob.hideBanner();
-      } catch (err) {
-        console.warn("AdMob hideBanner:", err);
-      }
+      await removeBannerIfPresent(AdMob);
     }
   } catch (err) {
     console.warn("AdMob hide:", err);
@@ -173,6 +191,7 @@ async function hideTopBanner() {
 
 async function syncAdForScreen(screenId) {
   if (!isNativeApp()) return;
+  lastSyncedAdScreen = screenId;
   if (shouldShowAdForScreen(screenId)) {
     await showTopBanner();
   } else {
@@ -180,12 +199,18 @@ async function syncAdForScreen(screenId) {
   }
 }
 
+function enqueueAdSync(screenId) {
+  adSyncChain = adSyncChain
+    .then(() => syncAdForScreen(screenId))
+    .catch((err) => console.warn("AdMob sync:", err));
+}
+
 export function initAds() {
   if (!isNativeApp()) return;
 
   onScreenChange((screenId) => {
-    void syncAdForScreen(screenId);
+    enqueueAdSync(screenId);
   });
 
-  void syncAdForScreen(getCurrentScreen());
+  enqueueAdSync(getCurrentScreen());
 }

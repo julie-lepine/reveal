@@ -208,23 +208,36 @@ export async function startPlaylistGuessRound(roundIdx) {
 }
 
 export async function commitPlaylistGuessPlay(patch, patchOpts = {}) {
-  const session = { ...getPlaylistGuessSession(), ...patch };
-  await syncPlaylistGuessSession(session, patchOpts);
-  return session;
+  const base = getPlaylistGuessSession();
+  const next = { ...base, ...patch };
+  if (next.phase === "voting" && patch.votes === undefined) {
+    next.votes = getEffectivePlaylistGuessVotes(base);
+  }
+  await syncPlaylistGuessSession(next, patchOpts);
+  return next;
+}
+
+/** Votes de la manche en cours (uid normalisé, sans reliquats nom/ancienne manche). */
+export function getEffectivePlaylistGuessVotes(session = getPlaylistGuessSession()) {
+  if (session.phase !== "voting") return { ...(session.votes || {}) };
+  const raw = session.votes || {};
+  const out = {};
+  lobbyPlayersWithIds().forEach((p) => {
+    const pick = raw[p.userId] ?? raw[p.name];
+    if (pick != null && pick !== "") out[p.userId] = pick;
+  });
+  return out;
 }
 
 /** Tous les joueurs du lobby ont voté (auto-vote autorisé, personne n'est exclu). */
-export function allPlaylistGuessVotesIn() {
-  const session = getPlaylistGuessSession();
-  const votesByUid = session.votes || {};
+export function allPlaylistGuessVotesIn(session = getPlaylistGuessSession()) {
+  if (session.phase !== "voting" || session.roundScored) return false;
+  const votesByUid = getEffectivePlaylistGuessVotes(session);
   const players = lobbyPlayersWithIds();
   if (!players.length) return false;
   return players.every((p) => {
-    const id = p.userId;
-    const pick = votesByUid[id];
-    if (pick != null && pick !== "") return true;
-    const byName = votesByUid[p.name];
-    return byName != null && byName !== "";
+    const pick = votesByUid[p.userId];
+    return pick != null && pick !== "";
   });
 }
 

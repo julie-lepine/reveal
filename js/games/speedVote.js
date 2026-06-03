@@ -12,9 +12,10 @@ import {
   startSpeedVoteRound,
 } from "../core/speedVoteSession.js";
 import { awardSpeedVoteRound } from "../core/scoring.js";
-import { gameCumulativeScoresHtml } from "../core/gameScores.js";
+import { gameCumulativeScoresHtml, refreshGameScoresBox } from "../core/gameScores.js";
 import { getLocalDisplayName, recordSpeedVotePlayed, setLastGame } from "../core/state.js";
 import { getLobbyParticipants } from "../core/lobby.js";
+import { getActivePlayers } from "../core/players.js";
 import { setLobbyPlaying, setLobbyWaiting } from "../core/lobby.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
 import { navigate } from "../core/router.js";
@@ -341,13 +342,36 @@ export function mountSpeedVote(app) {
 
   }
 
+  function shouldSkipFullRender(prevPhase, prevRound) {
+    if (phase !== prevPhase || roundIdx !== prevRound) return false;
+    return phase === "voting" || phase === "reveal";
+  }
+
+  function patchVotingChrome() {
+    const votedCount = Object.keys(votes).length;
+    const totalPlayers = getActivePlayers().length;
+    const forceBtn = app.querySelector("#speedvote-force");
+    if (forceBtn) {
+      forceBtn.textContent = `Révéler maintenant (${votedCount}/${totalPlayers})`;
+    }
+  }
+
   const unsub = onGameSessionChange(() => {
+    const prevPhase = phase;
+    const prevRound = roundIdx;
     syncFromSession();
     if (!currentQuestion && QUESTIONS[roundIdx]) {
       currentQuestion = QUESTIONS[roundIdx];
     }
     if (phase === "voting" && isLobbyHost() && allSpeedVoteVotesIn()) {
       void goToReveal();
+      return;
+    }
+    if (shouldSkipFullRender(prevPhase, prevRound)) {
+      if (phase === "voting") patchVotingChrome();
+      if (phase === "reveal") {
+        refreshGameScoresBox(app, { gameLabel: "SpeedVote", title: "Cumul des scores" });
+      }
       return;
     }
     render();

@@ -5,6 +5,7 @@ import {
   getCurrentPlaylistGuessRound,
   commitPlaylistGuessPlay,
   allPlaylistGuessVotesIn,
+  getEffectivePlaylistGuessVotes,
   simulatePlaylistGuessVotes,
   startPlaylistGuessRound,
   nameForPlayerId,
@@ -13,7 +14,11 @@ import {
 } from "../core/playlistGuessSession.js";
 import { awardPlaylistGuessRound } from "../core/scoring.js";
 import { gameCumulativeScoresHtml, refreshGameScoresBox } from "../core/gameScores.js";
-import { setLastGame, recordPlaylistGuessPlayed } from "../core/state.js";
+import {
+  setLastGame,
+  recordPlaylistGuessPlayed,
+  setActiveScoringGame,
+} from "../core/state.js";
 import { setLobbyPlaying, setLobbyWaiting } from "../core/lobby.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
 import { navigate } from "../core/router.js";
@@ -73,6 +78,7 @@ export function mountPlaylistGuess(app) {
   let roundScored = false;
   let revealSummary = null;
   let revealAdvancing = false;
+  let lastScoredRoundIdx = -1;
 
   function currentRound() {
     return getCurrentPlaylistGuessRound() || deck[roundIdx];
@@ -84,16 +90,20 @@ export function mountPlaylistGuess(app) {
     const s = getPlaylistGuessSession();
     if (s.roundIdx != null) roundIdx = s.roundIdx;
     if (s.phase) phase = s.phase;
-    const votesByUid = { ...(s.votes || {}) };
+    const votesByUid = getEffectivePlaylistGuessVotes(s);
     const serverPick = votesByUid[localUid];
-    if (serverPick != null) {
+    if (roundIdx !== prevIdx || (phase === "voting" && prevPhase === "reveal")) {
+      selected = serverPick != null ? serverPick : null;
+      lastScoredRoundIdx = -1;
+    } else if (serverPick != null) {
       selected = serverPick;
-    } else if (phase === "voting" && (roundIdx !== prevIdx || prevPhase !== "voting")) {
+    } else if (phase === "voting" && prevPhase !== "voting") {
       selected = null;
     }
-    if (s.phase === "voting" && (roundIdx !== prevIdx || prevPhase === "reveal")) {
-      roundScored = Boolean(s.roundScored);
-      if (roundScored) roundScored = false;
+    if (s.phase === "voting") {
+      roundScored = Boolean(s.roundScored) && Object.keys(s.votes || {}).length > 0
+        ? Boolean(s.roundScored)
+        : false;
     } else {
       roundScored = Boolean(s.roundScored);
     }
@@ -105,17 +115,17 @@ export function mountPlaylistGuess(app) {
   function gatherVotes() {
     const round = currentRound();
     const s = getPlaylistGuessSession();
-    const all = mp ? { ...(s.votes || {}) } : { ...simulatePlaylistGuessVotes(round, selected) };
+    const all = mp
+      ? { ...getEffectivePlaylistGuessVotes(s) }
+      : { ...simulatePlaylistGuessVotes(round, selected) };
     if (selected != null) all[localUid] = selected;
     return all;
   }
 
-  function buildSummary(votesByUid, scored) {
+  function buildSummary(votesByUid) {
     const round = currentRound();
     const players = lobbyPlayersWithIds();
-    const result = scored
-      ? awardPlaylistGuessRound({ votesByUid, resolveName: nameForPlayerId })
-      : countResults(votesByUid);
+    const result = countResults(votesByUid);
     return {
       song: round.song || round.track || {},
       players,
@@ -131,14 +141,22 @@ export function mountPlaylistGuess(app) {
     const live = getPlaylistGuessSession();
     if (phase === "reveal" || live.phase === "reveal") {
       if (!revealSummary) {
-        revealSummary = buildSummary(gatherVotes(), Boolean(live.roundScored));
+        revealSummary = buildSummary(gatherVotes());
       }
       return;
     }
     if (mp && !isLobbyHost()) return;
 
+    setActiveScoringGame("playlistguess");
     roundScored = true;
-    revealSummary = buildSummary(gatherVotes(), true);
+    if (lastScoredRoundIdx !== roundIdx) {
+      awardPlaylistGuessRound({
+        votesByUid: gatherVotes(),
+        resolveName: nameForPlayerId,
+      });
+      lastScoredRoundIdx = roundIdx;
+    }
+    revealSummary = buildSummary(gatherVotes());
     await commitPlaylistGuessPlay(
       {
         phase: "reveal",
@@ -152,8 +170,9 @@ export function mountPlaylistGuess(app) {
 
   async function tryAdvanceToReveal() {
     if (!mp || phase !== "voting" || revealAdvancing) return;
-    if (!allPlaylistGuessVotesIn() || !isLobbyHost()) return;
-    if (getPlaylistGuessSession().phase === "reveal") return;
+    const live = getPlaylistGuessSession();
+    if (!allPlaylistGuessVotesIn(live) || !isLobbyHost()) return;
+    if (live.phase === "reveal" || live.roundScored) return;
     revealAdvancing = true;
     try {
       await transitionToReveal();
@@ -166,7 +185,7 @@ export function mountPlaylistGuess(app) {
   function ensureRevealDisplay() {
     if (phase !== "reveal") return;
     if (!revealSummary) {
-      revealSummary = buildSummary(gatherVotes(), false);
+      revealSummary = buildSummary(gatherVotes());
     }
   }
 
@@ -249,7 +268,8 @@ export function mountPlaylistGuess(app) {
     let body = "";
 
     if (phase === "voting") {
-      const alreadyVoted = mp && (getPlaylistGuessSession().votes || {})[localUid] != null;
+      const votesNow = getEffectivePlaylistGuessVotes(getPlaylistGuessSession());
+      const alreadyVoted = mp && votesNow[localUid] != null;
       if (alreadyVoted) {
         body = `
           ${songGuessCardHtml(round, { players, selectedPlayerId: selected, readonly: true })}
@@ -260,13 +280,13 @@ export function mountPlaylistGuess(app) {
           <button type="button" class="btn btn-primary" id="confirm" ${selected === null ? "disabled" : ""}>Valider mon vote</button>`;
       }
       if (!mp || isLobbyHost()) {
-        const votedCount = Object.keys(getPlaylistGuessSession().votes || {}).length;
+        const votedCount = Object.keys(votesNow).length;
         body += `
           <button type="button" class="btn btn-secondary btn--spaced" id="playlist-force">
             Révéler maintenant (${votedCount} vote${votedCount > 1 ? "s" : ""})
           </button>`;
       }
-      if (mp && roundIdx > 0) {
+      if (mp) {
         body += gameCumulativeScoresHtml({
           gameId: "playlistguess",
           gameLabel: "VibeCheck",
@@ -278,7 +298,11 @@ export function mountPlaylistGuess(app) {
     if (phase === "reveal" && revealSummary) {
       body = `
         ${revealResultCardHtml(revealSummary)}
-        ${gameCumulativeScoresHtml({ gameLabel: "VibeCheck", title: "Cumul des scores" })}
+        ${gameCumulativeScoresHtml({
+          gameId: "playlistguess",
+          gameLabel: "VibeCheck",
+          title: "Cumul des scores",
+        })}
         ${
           !mp || isLobbyHost()
             ? `<button type="button" class="btn btn-primary btn--spaced" id="next-round">
@@ -312,7 +336,7 @@ export function mountPlaylistGuess(app) {
     app.querySelector("#confirm")?.addEventListener("click", async () => {
       if (selected === null) return;
       if (mp) {
-        const votes = { ...(getPlaylistGuessSession().votes || {}), [localUid]: selected };
+        const votes = { ...getEffectivePlaylistGuessVotes(), [localUid]: selected };
         await commitPlaylistGuessPlay({ votes });
         await tryAdvanceToReveal();
       } else {
@@ -337,21 +361,27 @@ export function mountPlaylistGuess(app) {
       revealSummary = null;
       selected = phase === "voting" ? null : selected;
       render();
-      void tryAdvanceToReveal();
       return;
     }
+    if (phase === "reveal" && !revealSummary) {
+      ensureRevealDisplay();
+    }
     void tryAdvanceToReveal();
-    const scoresEl = app.querySelector('[data-scores="session"]');
-    if (scoresEl && (phase === "reveal" || phase === "voting")) {
-      refreshGameScoresBox(app, { gameId: "playlistguess", gameLabel: "VibeCheck" });
-      if (phase === "voting" && roundIdx === prevIdx) {
-        const votedCount = Object.keys(getPlaylistGuessSession().votes || {}).length;
+    if (phase === "reveal" || phase === "voting") {
+      refreshGameScoresBox(app, {
+        gameId: "playlistguess",
+        gameLabel: "VibeCheck",
+        title: "Cumul des scores",
+      });
+      if (phase === "voting" && roundIdx === prevIdx && prevPhase === phase) {
+        const votesNow = getEffectivePlaylistGuessVotes();
         const forceBtn = app.querySelector("#playlist-force");
         if (forceBtn) {
+          const votedCount = Object.keys(votesNow).length;
           forceBtn.textContent = `Révéler maintenant (${votedCount} vote${votedCount > 1 ? "s" : ""})`;
         }
-        const alreadyVoted = (getPlaylistGuessSession().votes || {})[localUid] != null;
-        if (alreadyVoted || revealSummary) return;
+        const alreadyVoted = votesNow[localUid] != null;
+        if (alreadyVoted) return;
       }
       if (phase === "reveal" && revealSummary) return;
     }
@@ -359,6 +389,8 @@ export function mountPlaylistGuess(app) {
   }
 
   const unsub = onGameSessionChange(onSyncUpdate);
+
+  setActiveScoringGame("playlistguess");
 
   if (mp) {
     onSyncUpdate();

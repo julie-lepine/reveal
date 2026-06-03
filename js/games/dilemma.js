@@ -13,6 +13,7 @@ import { awardDilemmaRound } from "../core/scoring.js";
 import { gameCumulativeScoresHtml } from "../core/gameScores.js";
 import { getLocalDisplayName, recordDilemmaPlayed, setLastGame } from "../core/state.js";
 import { getLobbyParticipants } from "../core/lobby.js";
+import { getActivePlayers } from "../core/players.js";
 import { setLobbyPlaying, setLobbyWaiting } from "../core/lobby.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
 import { navigate } from "../core/router.js";
@@ -393,8 +394,23 @@ export function mountDilemma(app) {
     }
   }
 
+  function shouldSkipFullRender(prevPhase, prevRound) {
+    if (phase !== prevPhase || roundIdx !== prevRound) return false;
+    return phase === "voting";
+  }
+
+  function patchVotingChrome() {
+    const votedCount = Object.keys(votes).length;
+    const totalPlayers = getActivePlayers().length;
+    const forceBtn = app.querySelector("#dilemma-force");
+    if (forceBtn) {
+      forceBtn.textContent = `Révéler maintenant (${votedCount}/${totalPlayers})`;
+    }
+  }
+
   const unsub = onGameSessionChange(() => {
     const prevPhase = phase;
+    const prevRound = roundIdx;
     syncFromSession();
     if (!currentDilemma && ROUNDS[roundIdx]) currentDilemma = ROUNDS[roundIdx];
     if (phase === "voting" && isLobbyHost() && allDilemmaVotesIn()) {
@@ -412,6 +428,11 @@ export function mountDilemma(app) {
       render();
       const { pctA, pctB } = countDilemmaResults(votes);
       animateRevealBars(pctA, pctB);
+      return;
+    }
+    if (shouldSkipFullRender(prevPhase, prevRound)) {
+      patchVotingChrome();
+      return;
     }
     render();
   });

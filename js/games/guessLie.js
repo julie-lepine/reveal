@@ -410,6 +410,19 @@ export function mountGuessLie(app) {
     app.querySelector("#next-round")?.addEventListener("click", nextRound);
   }
 
+  function shouldSkipFullRender(prevIdx, prevPhase) {
+    if (roundIdx !== prevIdx || phase !== prevPhase) return false;
+    return phase === "voting" || phase === "reveal";
+  }
+
+  function patchVotingChrome() {
+    const votedCount = Object.keys(getGuessLieSession().votes || {}).length;
+    const forceBtn = app.querySelector("#guesslie-force");
+    if (forceBtn) {
+      forceBtn.textContent = `Révéler maintenant (${votedCount} vote${votedCount > 1 ? "s" : ""})`;
+    }
+  }
+
   function onSyncUpdate() {
     const prevIdx = roundIdx;
     const prevPhase = phase;
@@ -419,8 +432,15 @@ export function mountGuessLie(app) {
     if (advanced) {
       revealResult = null;
       selected = phase === "voting" ? null : selected;
+      render();
+      void tryAdvanceToReveal();
+      return;
     }
     void tryAdvanceToReveal();
+    if (shouldSkipFullRender(prevIdx, prevPhase)) {
+      if (phase === "voting") patchVotingChrome();
+      return;
+    }
     render();
   }
 

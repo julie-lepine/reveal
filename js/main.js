@@ -1,6 +1,7 @@
 import { initRouter, registerScreen, navigate, resetNav } from "./core/router.js";
 import { initBottomNav } from "./core/bottomNav.js";
 import { initAds } from "./core/ads.js";
+import { initExitGameDelegation } from "./core/exitGame.js";
 import { initDeepLinks } from "./core/deepLinks.js";
 import {
   parseJoinCodeFromHash,
@@ -99,6 +100,7 @@ registerScreen("tiernight", mountTierNight);
 // registerScreen("filrouge-mission", mountFilRougeMission);
 
 initBottomNav();
+initExitGameDelegation(app);
 initAds();
 initMultiplayerSyncVisibility();
 // initFilRougeResultsListener();

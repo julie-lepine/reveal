@@ -373,10 +373,12 @@ export function mountTrivia(app) {
           selectedAnswer: myAnswerIndex(),
           waitingMessage: waitingMessage(),
         })}
-        ${renderTriviaScoreboard({
-          standings,
-          title: scoreTitle,
-        })}
+        <div data-trivia-live-board>
+          ${renderTriviaScoreboard({
+            standings,
+            title: scoreTitle,
+          })}
+        </div>
         ${
           !mp || isLobbyHost()
             ? `<button type="button" class="btn btn-secondary btn--spaced" id="btn-trivia-force">
@@ -499,10 +501,42 @@ export function mountTrivia(app) {
     }
   }
 
+  function shouldSkipFullRender(prevPhase, prevQuestion) {
+    if (phase !== prevPhase || questionIdx !== prevQuestion) return false;
+    return phase === "question" || phase === "reveal";
+  }
+
+  function patchQuestionChrome() {
+    const session = trivia.getSession();
+    const standings = trivia.getPodiumAwards(
+      trivia.buildStandings(matchScores || session.matchScores || {})
+    );
+    const board = app.querySelector("[data-trivia-live-board]");
+    if (board) {
+      board.innerHTML = renderTriviaScoreboard({
+        standings,
+        title: phase === "reveal" ? "Classement en direct" : "Classement temps reel",
+        deltaMap: phase === "reveal" ? lastRound?.deltas || {} : {},
+      });
+    }
+    const answeredCount = Object.values(answers).filter(
+      (a) => a && Number.isInteger(a.answerIndex)
+    ).length;
+    const forceBtn = app.querySelector("#btn-trivia-force");
+    if (forceBtn) {
+      forceBtn.textContent = `Révéler maintenant (${answeredCount}/${getActivePlayers().length})`;
+    }
+  }
+
   const unsub = onGameSessionChange(() => {
+    const prevPhase = phase;
+    const prevQuestion = questionIdx;
     syncFromSession();
     if (phase === "question" && isLobbyHost() && trivia.allAnswersIn()) {
       void goToReveal();
+    }
+    if (shouldSkipFullRender(prevPhase, prevQuestion)) {
+      patchQuestionChrome();
       return;
     }
     render();

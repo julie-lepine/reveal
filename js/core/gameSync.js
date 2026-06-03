@@ -97,11 +97,53 @@ let suppressSessionScreen = null;
 const MENU_SCREENS = new Set(["home", "lobby", "game-select", "settings"]);
 export const POST_GAME_SCREENS = new Set(["results", "leaderboard"]);
 
-/** L'invité sur le menu jeux / lobby doit suivre l'hôte qui lance une partie (malgré suppress). */
+/** Retour forcé vers le jeu qu'un invité a volontairement quitté (suppress actif). */
+function isSuppressedGameReturn(targetScreen) {
+  if (Date.now() >= suppressSessionRouteUntil || !suppressSessionScreen || !targetScreen) {
+    return false;
+  }
+  if (targetScreen === suppressSessionScreen) return true;
+  return isCompatibleSessionScreen(suppressSessionScreen, targetScreen);
+}
+
+/** L'hôte a lancé un autre jeu / écran : l'invité doit suivre malgré suppress. */
+function isSessionAdvancedFromSuppress(targetScreen) {
+  if (!suppressSessionScreen || !targetScreen) return false;
+  if (targetScreen === suppressSessionScreen) return false;
+  if (isCompatibleSessionScreen(suppressSessionScreen, targetScreen)) return false;
+  return true;
+}
+
+/** L'invité sur le menu jeux / lobby doit suivre l'hôte qui lance une partie. */
 function shouldFollowHostGameLaunch(current, targetScreen) {
   if (!targetScreen || !isActiveGameSessionScreen(targetScreen)) return false;
   if (current === "home" || current === "settings") return false;
+  if (isSuppressedGameReturn(targetScreen)) return false;
   return current === "game-select" || current === "lobby";
+}
+
+function shouldApplySessionRoute(row, { fromScreen = null } = {}) {
+  const screen = getEffectiveSessionScreen(row);
+  if (!screen) return false;
+  if (screen === "game-select" && getLobbyStatus() !== "playing") return false;
+  const current = getCurrentScreen();
+  if (screen === current) return false;
+  if (isCompatibleSessionScreen(screen, current)) return false;
+
+  const routingSuppressed = Date.now() < suppressSessionRouteUntil;
+  if (routingSuppressed && isSuppressedGameReturn(screen)) return false;
+
+  const hostLaunchedFromMenu = fromScreen === "game-select" && screen !== "game-select";
+  const sessionAdvanced = isSessionAdvancedFromSuppress(screen);
+
+  if (routingSuppressed) {
+    if (current === "home" || current === "settings") return false;
+    if (sessionAdvanced || hostLaunchedFromMenu || shouldFollowHostGameLaunch(current, screen)) {
+      return true;
+    }
+    return false;
+  }
+  return true;
 }
 
 function sessionSignature(row) {
@@ -1388,8 +1430,10 @@ function mergePlaylistGuessGameLocal(local, remote) {
       ? mergeReadyMapsLocal(local.ready || {}, remote.ready || {}, getActivePlayerNames())
       : remote.ready || {};
   let roundScored = mergeRoundFlag(local.roundScored, remote.roundScored, newVoteRound);
-  if (remote.phase === "voting" && roundScored && newVoteRound) {
+  if (remote.phase === "voting" && newVoteRound) {
     roundScored = Boolean(remote.roundScored);
+  } else if (remote.phase === "voting" && Object.keys(remoteVotes).length === 0) {
+    roundScored = false;
   }
   return {
     ...local,
@@ -1705,7 +1749,10 @@ export function applyRemoteSession(row) {
   }
 
   const patch = {};
-  const st = row.state;
+  const st = { ...(row.state || {}) };
+  if (!FIL_ROUGE_ENABLED) {
+    delete st.filRouge;
+  }
 
   if (st.hotTake) {
     const remote = hotTakeFromRemote(st.hotTake);
@@ -1778,24 +1825,14 @@ export function applyRemoteSession(row) {
 
   notify(row);
 
-  const effective = getEffectiveSessionScreen(row);
-  const routingSuppressed = Date.now() < suppressSessionRouteUntil;
-  const cur = getCurrentScreen();
-  const followHost = shouldFollowHostGameLaunch(cur, effective);
-  if (
-    effective &&
-    isActiveGameSessionScreen(effective) &&
-    cur !== effective &&
-    (!routingSuppressed || followHost)
-  ) {
-    if (followHost) clearSessionRouteSuppress();
-    handleSessionRoute(row, { fromScreen: prevScreen });
-  } else if (effective && (!sigUnchanged || cur !== effective)) {
-    if (routingSuppressed && (cur === "home" || cur === "settings")) {
-      return;
-    }
-    if (routingSuppressed && !shouldFollowHostGameLaunch(cur, effective)) {
-      return;
+  if (shouldApplySessionRoute(row, { fromScreen: prevScreen })) {
+    const screen = getEffectiveSessionScreen(row);
+    const cur = getCurrentScreen();
+    if (
+      isSessionAdvancedFromSuppress(screen) ||
+      shouldFollowHostGameLaunch(cur, screen)
+    ) {
+      clearSessionRouteSuppress();
     }
     handleSessionRoute(row, { fromScreen: prevScreen });
   }
@@ -1979,8 +2016,13 @@ export async function routeToActiveGameIfNeeded(cachedRowOnly = null) {
   const current = getCurrentScreen();
   if (current === screen) return true;
   if (isCompatibleSessionScreen(screen, current)) return true;
-  if (Date.now() < suppressSessionRouteUntil) {
-    if (!shouldFollowHostGameLaunch(current, screen)) return false;
+  if (!shouldApplySessionRoute(row)) return false;
+  const screen = getEffectiveSessionScreen(row);
+  const current = getCurrentScreen();
+  if (
+    isSessionAdvancedFromSuppress(screen) ||
+    shouldFollowHostGameLaunch(current, screen)
+  ) {
     clearSessionRouteSuppress();
   }
   routeToSessionScreen(screen, { force: true });
@@ -1988,31 +2030,15 @@ export async function routeToActiveGameIfNeeded(cachedRowOnly = null) {
 }
 
 export function handleSessionRoute(row, { fromScreen = null } = {}) {
+  if (!shouldApplySessionRoute(row, { fromScreen })) return;
   const screen = getEffectiveSessionScreen(row);
-  if (!screen) return;
-  if (screen === "game-select" && getLobbyStatus() !== "playing") return;
   const current = getCurrentScreen();
-  if (screen === current) return;
-  if (isCompatibleSessionScreen(screen, current)) return;
-
-  const hostLaunchedFromMenu =
-    fromScreen === "game-select" && screen !== "game-select";
-
-  const sessionAdvanced =
-    suppressSessionScreen != null && screen !== suppressSessionScreen;
-
-  if (Date.now() < suppressSessionRouteUntil) {
-    /** Accueil / paramètres : l’utilisateur est resté volontairement (profil, menu). */
-    if (current === "home" || current === "settings") {
-      return;
-    }
-    if (shouldFollowHostGameLaunch(current, screen) || hostLaunchedFromMenu || sessionAdvanced) {
-      clearSessionRouteSuppress();
-    } else {
-      return;
-    }
+  if (
+    isSessionAdvancedFromSuppress(screen) ||
+    shouldFollowHostGameLaunch(current, screen)
+  ) {
+    clearSessionRouteSuppress();
   }
-
   routeToSessionScreen(screen, { force: true });
 }
 
@@ -2455,6 +2481,8 @@ export async function patchGameState(
     let pgRoundScored = mergeRoundFlag(curPg.roundScored, incPg.roundScored, newPgRound);
     if (incPg.phase === "voting" && newPgRound) {
       pgRoundScored = Boolean(incPg.roundScored);
+    } else if (incPg.phase === "voting" && Object.keys(incPg.votes || {}).length === 0) {
+      pgRoundScored = false;
     }
     nextState.playlistGuess = curPg
       ? {
@@ -2550,7 +2578,7 @@ export async function returnToGameSelect() {
     return true;
   }
 
-  suppressSessionRoute();
+  suppressSessionRoute(120000, getCurrentScreen());
   navigate("game-select", { navStack: ["home", "lobby", "game-select"] });
   return true;
 }

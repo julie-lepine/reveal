@@ -6,7 +6,7 @@ import {
   returnToGameSelect,
   suppressSessionRoute,
 } from "./gameSync.js";
-import { navigate } from "./router.js";
+import { navigate, getCurrentScreen } from "./router.js";
 import { resetGameSessionsOnly } from "./state.js";
 import { goToGameSelect, setLobbyWaiting } from "./lobby.js";
 
@@ -45,7 +45,7 @@ export async function exitGameToGameSelect() {
     if (host) {
       await returnToGameSelect();
     } else {
-      suppressSessionRoute(120000);
+      suppressSessionRoute(120000, getCurrentScreen());
       navigate("game-select", { navStack: ["home", "lobby", "game-select"] });
     }
     return true;
@@ -60,10 +60,22 @@ export async function exitGameToGameSelect() {
 /** @deprecated Utiliser exitGameToGameSelect */
 export const exitGameToLobby = exitGameToGameSelect;
 
-export function bindExitGame(root) {
-  root.querySelector("[data-exit-game]")?.addEventListener("click", () => {
+let exitGameDelegationRoot = null;
+
+/** Un seul listener sur #app : survit aux re-renders multijoueur. */
+export function initExitGameDelegation(appRoot) {
+  if (!appRoot || exitGameDelegationRoot === appRoot) return;
+  exitGameDelegationRoot = appRoot;
+  appRoot.addEventListener("click", (event) => {
+    const btn = event.target.closest?.("[data-exit-game]");
+    if (!btn || !appRoot.contains(btn)) return;
+    event.preventDefault();
     void exitGameToGameSelect();
   });
+}
+
+export function bindExitGame(_root) {
+  /* Délégation via initExitGameDelegation (#app). */
 }
 
 /** @deprecated Utiliser bindExitGame */

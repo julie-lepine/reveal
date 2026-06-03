@@ -14,7 +14,7 @@ import {
   allHotTakeVotesIn,
 } from "../core/hotTakeSession.js";
 import { awardHotTakeVotes, EVENING_POINTS } from "../core/scoring.js";
-import { gameCumulativeScoresHtml } from "../core/gameScores.js";
+import { gameCumulativeScoresHtml, refreshGameScoresBox } from "../core/gameScores.js";
 import { getActivePlayers } from "../core/players.js";
 import { getLocalDisplayName, recordHotTakePlayed, setLastGame } from "../core/state.js";
 import { setLobbyPlaying, setLobbyWaiting } from "../core/lobby.js";
@@ -454,10 +454,33 @@ export function mountHotTake(app) {
     });
   }
 
+  function shouldSkipFullRender(prevPhase, prevTake) {
+    if (phase !== prevPhase || takeIdx !== prevTake) return false;
+    return phase === "voting" || phase === "reveal";
+  }
+
+  function patchVotingChrome() {
+    const votedCount = Object.keys(votes).length;
+    const totalPlayers = getActivePlayers().length;
+    const forceBtn = app.querySelector("#hottake-force");
+    if (forceBtn) {
+      forceBtn.textContent = `Révéler maintenant (${votedCount}/${totalPlayers})`;
+    }
+  }
+
   const unsubGame = onGameSessionChange(() => {
+    const prevPhase = phase;
+    const prevTake = takeIdx;
     syncFromSession();
     if (phase === "voting" && isLobbyHost() && allHotTakeVotesIn()) {
       void goToReveal();
+      return;
+    }
+    if (shouldSkipFullRender(prevPhase, prevTake)) {
+      if (phase === "voting") patchVotingChrome();
+      if (phase === "reveal") {
+        refreshGameScoresBox(app, { gameLabel: "Hot Take", title: "Cumul des scores" });
+      }
       return;
     }
     render();
