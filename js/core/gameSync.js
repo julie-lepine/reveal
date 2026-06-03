@@ -221,8 +221,20 @@ export function userIdForName(name) {
 }
 
 export function nameForUserId(uid) {
-  const p = getState().lobby?.participants?.find((x) => x.userId === uid);
-  return p?.name || null;
+  if (uid == null || uid === "") return null;
+  const key = String(uid);
+  const p = getState().lobby?.participants?.find((x) => x.userId === key);
+  if (p?.name) return p.name;
+  const localUid = getSupabaseUserId();
+  if (localUid && localUid === key) return getLocalDisplayName();
+  const byName = getState().lobby?.participants?.find((x) => x.name === key);
+  if (byName) return key;
+  return null;
+}
+
+/** Clé answer/vote/score (uid ou pseudo) → pseudo affiché. */
+export function playerKeyToDisplayName(key) {
+  return nameForUserId(key) || null;
 }
 
 function mapReadyByName(readyByUid = {}) {
@@ -292,14 +304,20 @@ function mapTriviaAnswersByUid(answersByName = {}) {
 function mapConsensusAnswersByName(answersByUid = {}) {
   const out = {};
   Object.entries(answersByUid).forEach(([uid, val]) => {
-    const name = nameForUserId(uid) || uid;
-    if (val && Number.isFinite(val.value)) {
-      out[name] = {
-        value: val.value,
-        timestamp: val.timestamp || 0,
-        submittedAt: val.submittedAt || null,
-      };
+    const name = playerKeyToDisplayName(uid);
+    if (!name || !val || !Number.isFinite(val.value)) return;
+    const prev = out[name];
+    const next = {
+      value: val.value,
+      timestamp: val.timestamp || 0,
+      submittedAt: val.submittedAt || null,
+    };
+    if (!prev) {
+      out[name] = next;
+      return;
     }
+    out[name] =
+      (next.timestamp || 0) >= (prev.timestamp || 0) ? next : prev;
   });
   return out;
 }
@@ -686,15 +704,49 @@ function mergeConsensusGameLocal(local, remote) {
     !remote.lobbyStarted && !local.lobbyStarted
       ? mergeReadyMapsLocal(local.ready || {}, remote.ready || {}, getActivePlayerNames())
       : remote.ready || {};
+  const mergedAnswers = mapConsensusAnswersByName(
+    Object.fromEntries(
+      Object.entries({ ...remoteAnswers, ...localAnswers }).map(([key, val]) => [
+        userIdForName(key) || key,
+        val,
+      ])
+    )
+  );
   return {
     ...local,
     ...remote,
     ready,
-    answers,
-    matchScores: { ...(remote.matchScores || {}) },
+    answers: mergedAnswers,
+    matchScores: scoresFromRemote({
+      ...scoresToRemote(local.matchScores || {}),
+      ...scoresToRemote(remote.matchScores || {}),
+    }),
     roundScored: mergeRoundFlag(local.roundScored, remote.roundScored, newQuestionRound),
-    lastRound: newQuestionRound ? remote.lastRound ?? null : remote.lastRound ?? local.lastRound,
+    lastRound: newQuestionRound
+      ? remote.lastRound ?? null
+      : normalizeConsensusLastRoundRemote(remote.lastRound ?? local.lastRound),
     podiumApplied: mergeRoundFlag(local.podiumApplied, remote.podiumApplied, newQuestionRound),
+  };
+}
+
+function normalizeConsensusPlayerList(list = []) {
+  const names = new Set();
+  list.forEach((id) => {
+    const name = playerKeyToDisplayName(id);
+    if (name && getActivePlayerNames().includes(name)) names.add(name);
+  });
+  return [...names];
+}
+
+function normalizeConsensusLastRoundRemote(lastRound) {
+  if (!lastRound) return null;
+  return {
+    ...lastRound,
+    deltas: scoresFromRemote(lastRound.deltas || {}),
+    precisionPlayers: normalizeConsensusPlayerList(lastRound.precisionPlayers),
+    closestPlayers: normalizeConsensusPlayerList(lastRound.closestPlayers),
+    intuitionPlayers: normalizeConsensusPlayerList(lastRound.intuitionPlayers),
+    consensusPlayers: normalizeConsensusPlayerList(lastRound.consensusPlayers),
   };
 }
 
@@ -1323,7 +1375,8 @@ function mergePlaylistGuessGameLocal(local, remote) {
     votes = remoteVotes;
   } else if (remote.phase === "voting") {
     votes = { ...remoteVotes };
-    const localUid = getSupabaseUserId() || getLocalDisplayName();
+    const localUid =
+      getSupabaseUserId() || userIdForName(getLocalDisplayName()) || getLocalDisplayName();
     if (localVotes[localUid] != null && votes[localUid] == null) {
       votes[localUid] = localVotes[localUid];
     }
@@ -1334,12 +1387,16 @@ function mergePlaylistGuessGameLocal(local, remote) {
     !remote.lobbyStarted && !local.lobbyStarted
       ? mergeReadyMapsLocal(local.ready || {}, remote.ready || {}, getActivePlayerNames())
       : remote.ready || {};
+  let roundScored = mergeRoundFlag(local.roundScored, remote.roundScored, newVoteRound);
+  if (remote.phase === "voting" && roundScored && newVoteRound) {
+    roundScored = Boolean(remote.roundScored);
+  }
   return {
     ...local,
     ...remote,
     votes,
     ready,
-    roundScored: mergeRoundFlag(local.roundScored, remote.roundScored, newVoteRound),
+    roundScored,
   };
 }
 
@@ -1468,8 +1525,10 @@ export function scoresToRemote(scoresByName = {}) {
 function scoresFromRemote(remote = {}) {
   const out = {};
   Object.entries(remote).forEach(([uid, val]) => {
-    const name = nameForUserId(uid) || uid;
-    if (typeof val === "number" && Number.isFinite(val)) out[name] = val;
+    const name = playerKeyToDisplayName(uid);
+    if (!name || typeof val !== "number" || !Number.isFinite(val)) return;
+    const prev = out[name];
+    out[name] = prev == null ? val : Math.max(prev, val);
   });
   return out;
 }
@@ -2325,10 +2384,10 @@ export async function patchGameState(
           ...incConsensus,
           ready: mergeRemoteReadyUid(curConsensus, incConsensus),
           answers: mergeRemoteConsensusAnswersUid(curConsensus, incConsensus),
-          matchScores: {
+          matchScores: scoresFromRemote({
             ...(curConsensus.matchScores || {}),
             ...(incConsensus.matchScores || {}),
-          },
+          }),
           roundScored: mergeRoundFlag(
             curConsensus.roundScored,
             incConsensus.roundScored,
@@ -2336,7 +2395,9 @@ export async function patchGameState(
           ),
           lastRound: isNewConsensusQuestionRoundUid(curConsensus, incConsensus)
             ? incConsensus.lastRound ?? null
-            : incConsensus.lastRound ?? curConsensus.lastRound,
+            : normalizeConsensusLastRoundRemote(
+                incConsensus.lastRound ?? curConsensus.lastRound
+              ),
           podiumApplied: mergeRoundFlag(
             curConsensus.podiumApplied,
             incConsensus.podiumApplied,
@@ -2391,13 +2452,17 @@ export async function patchGameState(
     const curPg = current.playlistGuess;
     const incPg = mergePayload.playlistGuess;
     const newPgRound = curPg && incPg ? isNewPlaylistGuessVoteRound(curPg, incPg) : false;
+    let pgRoundScored = mergeRoundFlag(curPg.roundScored, incPg.roundScored, newPgRound);
+    if (incPg.phase === "voting" && newPgRound) {
+      pgRoundScored = Boolean(incPg.roundScored);
+    }
     nextState.playlistGuess = curPg
       ? {
           ...curPg,
           ...incPg,
           ready: mergeRemoteReadyUid(curPg, incPg),
           votes: mergeRemotePlaylistGuessVotesUid(curPg, incPg),
-          roundScored: mergeRoundFlag(curPg.roundScored, incPg.roundScored, newPgRound),
+          roundScored: pgRoundScored,
         }
       : incPg;
   }

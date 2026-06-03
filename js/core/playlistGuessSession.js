@@ -16,7 +16,14 @@ import {
   pushGameSession,
   playlistGuessToRemote,
   allMembersReady,
+  userIdForName,
 } from "./gameSync.js";
+
+/** Identifiant stable pour les votes (aligné lobby Supabase + invités). */
+export function participantVoteId(participant) {
+  if (!participant) return "";
+  return participant.userId || userIdForName(participant.name) || participant.name;
+}
 
 function defaultSession() {
   return {
@@ -37,12 +44,12 @@ export function getLocalParticipantId() {
   const uid = getSupabaseUserId();
   if (uid) return uid;
   const local = getLobbyParticipants().find((p) => p.isLocal);
-  return local?.userId || getLocalDisplayName();
+  return participantVoteId(local) || userIdForName(getLocalDisplayName()) || getLocalDisplayName();
 }
 
 export function lobbyPlayersWithIds() {
   return getLobbyParticipants().map((p) => ({
-    userId: p.userId || p.name,
+    userId: participantVoteId(p),
     name: p.name,
     color: p.color,
     emoji: p.emoji,
@@ -210,11 +217,15 @@ export async function commitPlaylistGuessPlay(patch, patchOpts = {}) {
 export function allPlaylistGuessVotesIn() {
   const session = getPlaylistGuessSession();
   const votesByUid = session.votes || {};
-  const voterUids = lobbyPlayersWithIds().map((p) => p.userId);
-  return (
-    voterUids.length > 0 &&
-    voterUids.every((uid) => votesByUid[uid] != null && votesByUid[uid] !== "")
-  );
+  const players = lobbyPlayersWithIds();
+  if (!players.length) return false;
+  return players.every((p) => {
+    const id = p.userId;
+    const pick = votesByUid[id];
+    if (pick != null && pick !== "") return true;
+    const byName = votesByUid[p.name];
+    return byName != null && byName !== "";
+  });
 }
 
 export function simulatePlaylistGuessVotes(_round, localPick) {

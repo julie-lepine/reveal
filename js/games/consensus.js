@@ -193,6 +193,8 @@ export function mountConsensus(app) {
   let questionDeadlineTimerId = null;
   let roundKey = "";
   let draftValue = 50;
+  let renderTimer = null;
+  let lastQuestionRenderKey = "";
 
   const localName = getLocalDisplayName();
   const mp = isGameSyncActive();
@@ -265,7 +267,57 @@ export function mountConsensus(app) {
     if (nextRoundKey !== roundKey) {
       draftValue = session.answers?.[localName]?.value ?? 50;
       roundKey = nextRoundKey;
+      lastQuestionRenderKey = "";
     }
+  }
+
+  function questionRenderKey(session) {
+    const answeredCount = getActivePlayers().filter(
+      (p) => session.answers?.[p.name]?.submittedAt
+    ).length;
+    return [
+      phase,
+      questionIdx,
+      session.currentQuestion?.id || "",
+      answerState(),
+      answeredCount,
+    ].join("|");
+  }
+
+  function patchQuestionPhaseChrome(session) {
+    const answeredCount = getActivePlayers().filter(
+      (p) => session.answers?.[p.name]?.submittedAt
+    ).length;
+    const totalPlayers = getActivePlayers().length;
+    const forceBtn = app.querySelector("#btn-consensus-force");
+    if (forceBtn) {
+      forceBtn.textContent = `Révéler maintenant (${answeredCount}/${totalPlayers})`;
+    }
+    const boardHost = app.querySelector("[data-consensus-live-board]");
+    if (boardHost) {
+      const standings = consensus.getPodiumAwards(
+        consensus.buildStandings(matchScores || session.matchScores || {})
+      );
+      boardHost.innerHTML = renderConsensusScoreboard({
+        standings,
+        title: "Classement de la partie",
+      });
+    }
+  }
+
+  function scheduleRender({ force = false } = {}) {
+    if (renderTimer) {
+      clearTimeout(renderTimer);
+      renderTimer = null;
+    }
+    if (force) {
+      render();
+      return;
+    }
+    renderTimer = setTimeout(() => {
+      renderTimer = null;
+      render();
+    }, 100);
   }
 
   function myAnswer() {
@@ -529,12 +581,27 @@ export function mountConsensus(app) {
   }
 
   function render() {
+    captureDraftFromDom();
     syncFromSession();
     const session = consensus.getSession();
     const totalQuestions = session.deck?.length || 0;
     const standings = consensus.getPodiumAwards(
       consensus.buildStandings(matchScores || session.matchScores || {})
     );
+
+    if (phase === "question") {
+      const qKey = questionRenderKey(session);
+      if (qKey === lastQuestionRenderKey && app.querySelector("#consensus-slider")) {
+        patchQuestionPhaseChrome(session);
+        return;
+      }
+      lastQuestionRenderKey = qKey;
+    } else {
+      lastQuestionRenderKey = "";
+    }
+
+    const scrollEl = app.querySelector(".page--scroll");
+    const scrollTop = scrollEl?.scrollTop ?? 0;
 
     let phaseHtml = "";
     if (phase === "question") {
@@ -551,10 +618,12 @@ export function mountConsensus(app) {
           answerState: answerState(),
           waitingMessage: waitingMessage(),
         })}
-        ${renderConsensusScoreboard({
-          standings,
-          title: "Classement de la partie",
-        })}
+        <div data-consensus-live-board>
+          ${renderConsensusScoreboard({
+            standings,
+            title: "Classement de la partie",
+          })}
+        </div>
         ${
           !mp || isLobbyHost()
             ? `<button type="button" class="btn btn-secondary btn--spaced" id="btn-consensus-force">
@@ -621,6 +690,9 @@ export function mountConsensus(app) {
 
     bindNav(app);
     bindExitGame(app);
+
+    const newScrollEl = app.querySelector(".page--scroll");
+    if (newScrollEl) newScrollEl.scrollTop = scrollTop;
 
     if (phase === "question") {
       bindConsensusSlider(app, {
@@ -698,7 +770,8 @@ export function mountConsensus(app) {
         void goToReveal();
       }, CONSENSUS_REVEAL_PENDING_MS);
     }
-    render();
+    const phaseChanged = prevPhase !== phase;
+    scheduleRender({ force: phaseChanged || phase !== "question" });
   });
 
   render();
@@ -707,6 +780,7 @@ export function mountConsensus(app) {
     clearNpcTimers();
     clearRevealPending();
     clearQuestionDeadline();
+    if (renderTimer) clearTimeout(renderTimer);
     unsub();
   };
 }

@@ -15,6 +15,7 @@ import {
   allMembersReady,
   isGameSyncActive,
   isLobbyHost,
+  playerKeyToDisplayName,
   pushGameSession,
   syncConsensusSession,
   consensusToRemote,
@@ -112,8 +113,73 @@ export function defaultConsensusPrepSession() {
   return defaultSession();
 }
 
+function pickLatestConsensusAnswer(localAnswer, remoteAnswer) {
+  if (!localAnswer) return remoteAnswer || null;
+  if (!remoteAnswer) return localAnswer;
+  return (remoteAnswer.timestamp || 0) >= (localAnswer.timestamp || 0)
+    ? remoteAnswer
+    : localAnswer;
+}
+
+function resolveConsensusPlayerName(key) {
+  return playerKeyToDisplayName(key) || (getActivePlayerNames().includes(key) ? key : null);
+}
+
+function normalizeConsensusAnswers(answers = {}) {
+  const out = {};
+  Object.entries(answers).forEach(([key, answer]) => {
+    const name = resolveConsensusPlayerName(key);
+    if (!name || !answer) return;
+    out[name] = pickLatestConsensusAnswer(out[name], answer) || answer;
+  });
+  return out;
+}
+
+function normalizeConsensusScores(scores = {}) {
+  const out = createConsensusScores();
+  Object.entries(scores).forEach(([key, val]) => {
+    const name = resolveConsensusPlayerName(key);
+    if (!name || typeof val !== "number" || !Number.isFinite(val)) return;
+    out[name] = round1(Math.max(out[name] || 0, val));
+  });
+  return out;
+}
+
+function normalizeConsensusLastRound(lastRound) {
+  if (!lastRound) return null;
+  const mapNames = (list = []) =>
+    list
+      .map((id) => resolveConsensusPlayerName(id))
+      .filter(Boolean);
+  const deltas = {};
+  Object.entries(lastRound.deltas || {}).forEach(([key, val]) => {
+    const name = resolveConsensusPlayerName(key);
+    if (!name || typeof val !== "number" || !Number.isFinite(val)) return;
+    deltas[name] = round1(Math.max(deltas[name] || 0, val));
+  });
+  return {
+    ...lastRound,
+    deltas,
+    precisionPlayers: mapNames(lastRound.precisionPlayers),
+    closestPlayers: mapNames(lastRound.closestPlayers),
+    intuitionPlayers: mapNames(lastRound.intuitionPlayers),
+    consensusPlayers: mapNames(lastRound.consensusPlayers),
+  };
+}
+
+export function normalizeConsensusSession(session) {
+  if (!session) return defaultSession();
+  return {
+    ...session,
+    answers: normalizeConsensusAnswers(session.answers || {}),
+    matchScores: normalizeConsensusScores(session.matchScores || {}),
+    lastRound: normalizeConsensusLastRound(session.lastRound),
+  };
+}
+
 export function getConsensusSession() {
-  return getState().consensusGame || defaultSession();
+  const raw = getState().consensusGame || defaultSession();
+  return normalizeConsensusSession(raw);
 }
 
 export function getConsensusModes() {
@@ -350,6 +416,7 @@ function getExtremesReference(values, target) {
 }
 
 export function scoreConsensusRound(session = getConsensusSession()) {
+  session = normalizeConsensusSession(session);
   if (session.roundScored && session.lastRound) {
     return session;
   }

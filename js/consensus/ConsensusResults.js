@@ -1,4 +1,9 @@
 import { escapeHtml } from "../core/ui.js";
+import { playerKeyToDisplayName } from "../core/gameSync.js";
+
+function displayPlayerName(key) {
+  return playerKeyToDisplayName(key) || key;
+}
 
 function formatScore(value) {
   const rounded = Math.round((Number(value) || 0) * 10) / 10;
@@ -46,8 +51,9 @@ export function renderConsensusResults({
 
   const rows = Object.entries(answers)
     .filter(([, answer]) => Number.isFinite(answer?.value))
-    .map(([name, answer]) => {
-      const delta = lastRound.deltas?.[name] || 0;
+    .map(([key, answer]) => {
+      const name = displayPlayerName(key);
+      const delta = lastRound.deltas?.[name] ?? lastRound.deltas?.[key] ?? 0;
       const distance = Math.abs((answer.value || 0) - (lastRound.anchor || lastRound.mean || 0));
       const tags = bonusTags(name, lastRound, answer.value);
       return {
@@ -71,10 +77,10 @@ export function renderConsensusResults({
     ? lastRound.modes.map((value) => formatScore(value)).join(" · ")
     : "Aucun";
   const closestLabel = (lastRound.closestPlayers || []).length
-    ? lastRound.closestPlayers.map((name) => escapeHtml(name)).join(", ")
+    ? lastRound.closestPlayers.map((id) => escapeHtml(displayPlayerName(id))).join(", ")
     : "-";
   const precisionLabel = (lastRound.precisionPlayers || []).length
-    ? lastRound.precisionPlayers.map((name) => escapeHtml(name)).join(", ")
+    ? lastRound.precisionPlayers.map((id) => escapeHtml(displayPlayerName(id))).join(", ")
     : "-";
   const heroLabel = lastRound.anchorLabel || "Point d'équilibre du groupe";
   const heroValue = formatScore(lastRound.anchor || lastRound.mean);

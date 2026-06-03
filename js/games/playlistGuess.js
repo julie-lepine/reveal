@@ -12,7 +12,7 @@ import {
   lobbyPlayersWithIds,
 } from "../core/playlistGuessSession.js";
 import { awardPlaylistGuessRound } from "../core/scoring.js";
-import { gameCumulativeScoresHtml } from "../core/gameScores.js";
+import { gameCumulativeScoresHtml, refreshGameScoresBox } from "../core/gameScores.js";
 import { setLastGame, recordPlaylistGuessPlayed } from "../core/state.js";
 import { setLobbyPlaying, setLobbyWaiting } from "../core/lobby.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
@@ -91,7 +91,12 @@ export function mountPlaylistGuess(app) {
     } else if (phase === "voting" && (roundIdx !== prevIdx || prevPhase !== "voting")) {
       selected = null;
     }
-    roundScored = Boolean(s.roundScored);
+    if (s.phase === "voting" && (roundIdx !== prevIdx || prevPhase === "reveal")) {
+      roundScored = Boolean(s.roundScored);
+      if (roundScored) roundScored = false;
+    } else {
+      roundScored = Boolean(s.roundScored);
+    }
     if (roundIdx !== prevIdx || phase !== "reveal") {
       revealSummary = null;
     }
@@ -123,8 +128,11 @@ export function mountPlaylistGuess(app) {
   }
 
   async function transitionToReveal() {
-    if (roundScored || getPlaylistGuessSession().roundScored) {
-      if (!revealSummary) revealSummary = buildSummary(gatherVotes(), false);
+    const live = getPlaylistGuessSession();
+    if (phase === "reveal" || live.phase === "reveal") {
+      if (!revealSummary) {
+        revealSummary = buildSummary(gatherVotes(), Boolean(live.roundScored));
+      }
       return;
     }
     if (mp && !isLobbyHost()) return;
@@ -139,12 +147,13 @@ export function mountPlaylistGuess(app) {
       },
       { withEveningScores: mp && isLobbyHost() }
     );
+    phase = "reveal";
   }
 
   async function tryAdvanceToReveal() {
     if (!mp || phase !== "voting" || revealAdvancing) return;
     if (!allPlaylistGuessVotesIn() || !isLobbyHost()) return;
-    if (getPlaylistGuessSession().roundScored || roundScored) return;
+    if (getPlaylistGuessSession().phase === "reveal") return;
     revealAdvancing = true;
     try {
       await transitionToReveal();
@@ -164,7 +173,7 @@ export function mountPlaylistGuess(app) {
   /** Filet de sécurité hôte : clôt la manche même si un joueur n'a pas voté. */
   async function forceReveal() {
     if (mp && !isLobbyHost()) return;
-    if (getPlaylistGuessSession().roundScored || roundScored) return;
+    if (getPlaylistGuessSession().phase === "reveal" || phase === "reveal") return;
     if (mp) {
       if (revealAdvancing || phase !== "voting") return;
       revealAdvancing = true;
@@ -257,6 +266,13 @@ export function mountPlaylistGuess(app) {
             Révéler maintenant (${votedCount} vote${votedCount > 1 ? "s" : ""})
           </button>`;
       }
+      if (mp && roundIdx > 0) {
+        body += gameCumulativeScoresHtml({
+          gameId: "playlistguess",
+          gameLabel: "VibeCheck",
+          title: "Cumul des scores",
+        });
+      }
     }
 
     if (phase === "reveal" && revealSummary) {
@@ -320,8 +336,25 @@ export function mountPlaylistGuess(app) {
     if (advanced) {
       revealSummary = null;
       selected = phase === "voting" ? null : selected;
+      render();
+      void tryAdvanceToReveal();
+      return;
     }
     void tryAdvanceToReveal();
+    const scoresEl = app.querySelector('[data-scores="session"]');
+    if (scoresEl && (phase === "reveal" || phase === "voting")) {
+      refreshGameScoresBox(app, { gameId: "playlistguess", gameLabel: "VibeCheck" });
+      if (phase === "voting" && roundIdx === prevIdx) {
+        const votedCount = Object.keys(getPlaylistGuessSession().votes || {}).length;
+        const forceBtn = app.querySelector("#playlist-force");
+        if (forceBtn) {
+          forceBtn.textContent = `Révéler maintenant (${votedCount} vote${votedCount > 1 ? "s" : ""})`;
+        }
+        const alreadyVoted = (getPlaylistGuessSession().votes || {})[localUid] != null;
+        if (alreadyVoted || revealSummary) return;
+      }
+      if (phase === "reveal" && revealSummary) return;
+    }
     render();
   }
 
