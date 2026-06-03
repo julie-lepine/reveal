@@ -2017,8 +2017,6 @@ export async function routeToActiveGameIfNeeded(cachedRowOnly = null) {
   if (current === screen) return true;
   if (isCompatibleSessionScreen(screen, current)) return true;
   if (!shouldApplySessionRoute(row)) return false;
-  const screen = getEffectiveSessionScreen(row);
-  const current = getCurrentScreen();
   if (
     isSessionAdvancedFromSuppress(screen) ||
     shouldFollowHostGameLaunch(current, screen)
