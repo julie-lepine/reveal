@@ -221,14 +221,24 @@ export function mountConsensus(app) {
     }
   }
 
-  /** Solo / démo : révélation directe (comme Trivia). MP : suspense court puis score. */
   async function beginReveal() {
+    const livePhase = consensus.getSession().phase;
+    if (livePhase !== "question") return;
     if (!mp) {
       clearRevealPending();
       await goToReveal();
       return;
     }
     await goToRevealPending();
+  }
+
+  function scheduleRevealFromPending() {
+    if (revealPendingTimeoutId || revealInFlight || phase !== "reveal-pending") return;
+    if (mp && !isLobbyHost()) return;
+    revealPendingTimeoutId = setTimeout(() => {
+      revealPendingTimeoutId = null;
+      void goToReveal();
+    }, CONSENSUS_REVEAL_PENDING_MS);
   }
 
   function scheduleQuestionDeadline() {
@@ -428,21 +438,20 @@ export function mountConsensus(app) {
   }
 
   async function goToRevealPending() {
-    if (revealInFlight) {
-      render();
+    const live = consensus.getSession();
+    if (live.phase === "reveal" || live.phase === "final") return;
+    if (live.phase === "reveal-pending") {
+      scheduleRevealFromPending();
       return;
     }
-    clearRevealPending();
+    if (revealInFlight) return;
     clearQuestionDeadline();
     await consensus.commitPlay({
       phase: "reveal-pending",
       questionEndsAt: null,
     });
     render();
-    revealPendingTimeoutId = setTimeout(() => {
-      revealPendingTimeoutId = null;
-      void goToReveal();
-    }, CONSENSUS_REVEAL_PENDING_MS);
+    scheduleRevealFromPending();
   }
 
   /** Filet de sécurité hôte : clôt la manche même si un joueur n'a pas validé sa réponse. */
@@ -783,19 +792,36 @@ export function mountConsensus(app) {
     }
   }
 
+  function shouldSkipFullRender(prevPhase, prevQuestion) {
+    if (phase !== prevPhase || questionIdx !== prevQuestion) return false;
+    if (phase === "reveal-pending") return true;
+    if (phase === "question") {
+      const session = consensus.getSession();
+      return questionRenderKey(session) === lastQuestionRenderKey;
+    }
+    return false;
+  }
+
   const unsub = onGameSessionChange(() => {
     const prevPhase = phase;
+    const prevQuestion = questionIdx;
     captureDraftFromDom();
     syncFromSession();
-    if (phase === "question" && isLobbyHost() && consensus.allAnswersIn()) {
+    if (
+      phase === "question" &&
+      isLobbyHost() &&
+      consensus.allAnswersIn() &&
+      !revealInFlight &&
+      !revealPendingTimeoutId
+    ) {
       void beginReveal();
     }
-    if (phase === "reveal-pending" && prevPhase !== "reveal-pending" && isLobbyHost()) {
-      clearRevealPending();
-      revealPendingTimeoutId = setTimeout(() => {
-        revealPendingTimeoutId = null;
-        void goToReveal();
-      }, CONSENSUS_REVEAL_PENDING_MS);
+    if (phase === "reveal-pending") {
+      scheduleRevealFromPending();
+    }
+    if (shouldSkipFullRender(prevPhase, prevQuestion)) {
+      if (phase === "question") patchQuestionPhaseChrome(consensus.getSession());
+      return;
     }
     const phaseChanged = prevPhase !== phase;
     const questionChanged =

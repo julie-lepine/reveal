@@ -12,7 +12,7 @@ Légende : ✅ fait dans le repo · ☐ à faire manuellement · 🧪 à tester 
 - [x] Capacitor initialisé (`capacitor.config.ts`, scripts `cap:sync`)
 - [x] Plateformes `android/` et `ios/` générées
 - [x] AdMob : bannière haut, masquée sur `welcome`, `home`, `reset-password` ; visible lobby → jeux (`js/core/ads.js`, `body.has-top-ad`)
-- [x] Consentement pub UMP (RGPD) au démarrage AdMob
+- [x] Consentement pub UMP (RGPD) au démarrage AdMob — code `js/core/ads.js` ; message console **publié** → section **B bis**
 - [x] Deep links auth : `com.reveal.partygames://auth/callback` (`js/core/deepLinks.js`)
 - [x] Redirect Supabase natif (`getAuthRedirectUrl()` dans `supabaseAuth.js`)
 - [x] Patch natif auto : AdMob App ID, deep link, ATT iOS (`scripts/patchNative.mjs`)
@@ -27,8 +27,40 @@ Légende : ✅ fait dans le repo · ☐ à faire manuellement · 🧪 à tester 
 
 - [ ] Compte **Google Play Console** (inscription ~25 €)
 - [ ] Compte **Apple Developer Program** (~99 €/an)
-- [ ] App créée dans **AdMob** (Android + iOS) — IDs déjà renseignés
-- [ ] Lier **Play Console ↔ AdMob** (Android, recommandé)
+- [x] Apps **AdMob** (Android + iOS) — IDs dans `data/admobConfig.js`
+- [ ] Lier **Play Console ↔ AdMob** (Android, recommandé — après publication sur le store)
+
+---
+
+## B bis. AdMob — message RGPD / UMP (manuel)
+
+Console : **Confidentialité et messages** → [Règlementations européennes](https://admob.google.com/v2/privacymessaging/gdpr)  
+(L’UI peut rester blanche en navigation normale → **fenêtre privée** ou désactiver le bloqueur de pub sur `admob.google.com`.)
+
+### Config message (juin 2026)
+
+- [x] Message **Règlementations européennes** créé, stylé (DA REVEAL, contraste **5:1** TCF) et **publié**
+- [x] Apps Android + iOS associées au message
+- [x] URL politique de confidentialité dans le message : `https://revealthepartygame.fr/privacy.html`
+- [x] Textes boutons conformes TCF (ex. « J’accepte », « Refuser », « Gérer les options » — pas « Continuer »)
+- [ ] **En-tête → Logo** : vérifier après **liaison au store** (icône tirée du listing Play / App Store, pas de `resources/icon.png` direct)
+- [ ] Après publication store : **Applications** → passer **Non publiée** → **Publiée** et lier chaque app à sa fiche store ([doc AdMob](https://support.google.com/admob/answer/9989980?hl=fr))
+- [ ] Si test avec ciblage **Partout** : repasser **Pays soumis au RGPD** avant prod store
+
+### Styles appliqués (éditeur AdMob — rappel)
+
+| Section | Réglage | Valeur |
+|---------|---------|--------|
+| **Général** | Principale | `#4f46e5` |
+| | Arrière-plan | `#0d0f1e` |
+| | Titres et boutons / Corps | Inter (ou Open Sans) |
+| | Angles | Circulaires |
+| **Titre** | Couleur / Taille | `#FFFFFF` / `1.25em` |
+| **Corps** | Couleur / Taille | `#CBD5E1` / `1em` |
+| **Boutons** | Texte principal | `#FFFFFF` |
+| | Secondaire | Rempli — fond `#252840`, texte `#FFFFFF` |
+
+> Logo et **nom affiché** (texte par défaut non modifié) se mettent à jour **sans nouvelle version app** une fois l’app liée au store ; le texte édité à la main dans le message doit être mis à jour dans AdMob. Voir [ADMOB.md](./ADMOB.md).
 
 ---
 
@@ -79,9 +111,9 @@ npm run cap:open:android   # ou cap:open:ios sur Mac
 - [x] 🧪 **Android** : Samsung Z Flip via **Android Studio** (projet `android/`, config `app`, débogage USB)
 - [ ] 🧪 **iPhone** (Mac + Xcode) — checklist détaillée : **[IPHONE_TEST_CHECKLIST.md](./IPHONE_TEST_CHECKLIST.md)**
 - [ ] 🧪 Auth email + invité + **lobby multijoueur** (2e client web ou 2e téléphone)
-- [ ] 🧪 Reset mot de passe → **deep link** natif → écran nouveau MDP dans l’app (mail Resend OK ✅)
-- [ ] 🧪 Bannière AdMob absente sur accueil/connexion ; visible à partir du lobby
-- [ ] 🧪 Formulaire consentement pub (UE)
+- [x] 🧪 Reset mot de passe → **deep link** natif → écran nouveau MDP dans l’app (mail Resend OK ✅)
+- [x] 🧪 Bannière AdMob absente sur accueil/connexion ; visible à partir du lobby
+- [x] 🧪 Formulaire consentement pub (UE) — popup au lobby OK (juin 2026)
 - [ ] 🧪 Soirée pilote complète en APK/IPA debug
 
 ---
@@ -102,7 +134,7 @@ npm run cap:open:android   # ou cap:open:ios sur Mac
 
 ### In-app (Capacitor) — sources dans le repo
 
-- [x] **Icône** : `resources/icon.png` (1024×1024)
+- [x] **Icône store + in-app** : `resources/icon.png` (**1024×1024**, version validée juin 2026)
 - [x] **Splash Capacitor** : `resources/splash.png` (2732×2732) — lu par `@capacitor/assets`
 - [x] **Splashes portrait** (logo + tagline, archivage / référence) :
   - `resources/splash_android_1080x1920.png`
@@ -110,21 +142,27 @@ npm run cap:open:android   # ou cap:open:ios sur Mac
   - `resources/splash_ios_1125x2436.png`
   - `resources/splash_ios_1242x2688.png`
   - Doc : [resources/README.md](../resources/README.md)
-- [ ] **Natif** : injecter dans `android/` + `ios/` :
+- [ ] **Natif** : injecter icône + splash dans `android/` + `ios/` :
   ```bash
   npm run assets:sync
   ```
   (équivalent : `npm run assets:native` puis `npm run cap:sync`)
   - [x] `cap:sync` + run Android Studio → app lancée sur téléphone (02 juin 2026)
-  - [x] `assets:native` régénéré (splash plein écran Android 12+, `logoSplashScale 0.62`) — 🧪 revérifier sur device après reinstall
+  - [x] `assets:native` régénéré (splash plein écran Android 12+, `logoSplashScale 0.62`) — 🧪 logo au démarrage OK sur device (juin 2026)
+  - [x] Icône **1024×1024** validée dans `resources/icon.png` — relancer `assets:sync` si tu changes le PNG
   - ⚠️ **Node ≥ 22** obligatoire pour `cap sync`
   - ⚠️ `@capacitor/assets` peut échouer sur Windows (TLS / `sharp`) — autre réseau ou Mac
   - ⚠️ **Ne pas** lancer `npm run assets:prepare` : écrase icon/splash sans tagline
-- [ ] 🧪 Vérifier icône + splash sur device après `assets:sync` complet
+- [x] 🧪 Icône + splash sur device OK (Samsung Z Flip, juin 2026)
 
 ### Fiche store (upload consoles — pas d’hébergement web)
 
-- [ ] Captures d’écran (menu, lobby, 1–2 jeux) — archivage optionnel : `store-assets/`
+- [x] Captures d’écran archivées dans `store-assets/` (5 écrans × 2 OS) :
+  - **Android** (`store-assets/android/`) — **1080×~1920** (9:16) : `welcome`, `lobby_setup`, `dilemma`, `consensus`, `classement`
+  - **iOS** (`store-assets/ios/`) — **1290×2796** (6,7") : mêmes 5 écrans
+  - Doc : [store-assets/README.md](../store-assets/README.md)
+- [x] **Feature graphic** Android (1024×500) — `store-assets/android/feature-graphic.png` (fond sombre, logo `resources/icon-white.png`)
+- [ ] Upload **icône 1024** + captures dans **Play Console** + **App Store Connect** (au moment de la soumission) — source icône : `resources/icon.png` ✅
 - [x] Textes fiche store (titre, description, mots-clés, catégorie)
 - [x] **URL politique de confidentialité** (app + fiches store) :  
   `https://revealthepartygame.fr/privacy.html`  
@@ -168,6 +206,7 @@ Repo **hors** de ce dossier Party Games (pages statiques créées de ton côté)
 ## H. Conformité & questionnaires store
 
 - [x] Politique de confidentialité **accessible en ligne** — [revealthepartygame.fr/privacy.html](https://revealthepartygame.fr/privacy.html) ; URL dans l’app ✅
+- [x] CMP **Google UMP** (message Règlementations européennes publié dans AdMob — section **B bis**)
 - [ ] Compléter **App Privacy** (Apple) : email, identifiants, pub AdMob, Supabase
 - [ ] Questionnaire **classification contenu** (Google)
 - [ ] Déclarer la **publicité** dans les deux consoles
@@ -208,8 +247,8 @@ Repo **hors** de ce dossier Party Games (pages statiques créées de ton côté)
 | [ADMOB.md](./ADMOB.md) | Doc technique AdMob |
 | [CAPACITOR.md](./CAPACITOR.md) | Vue d’ensemble Capacitor |
 | [resources/README.md](../resources/README.md) | Icône / splash Capacitor |
-| [store-assets/README.md](../store-assets/README.md) | Archivage captures store (optionnel) |
+| [store-assets/README.md](../store-assets/README.md) | Captures store Android 1080×1920 + iOS 1290×2796 |
 
 ---
 
-**Prochaine action recommandée** : **[IPHONE_TEST_CHECKLIST.md](./IPHONE_TEST_CHECKLIST.md)** (jour Mac) ; section **E** (deep link, AdMob, soirée pilote) ; **G** (captures store) ; **B** (comptes Play / Apple).
+**Prochaine action recommandée** : section **E** 🧪 — lobby multijoueur + soirée pilote ; puis **B** (comptes Play / Apple) ; **[IPHONE_TEST_CHECKLIST.md](./IPHONE_TEST_CHECKLIST.md)** (jour Mac).

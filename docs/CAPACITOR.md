@@ -29,7 +29,7 @@ npm run cap:open:android   # Windows / Mac
 npm run cap:open:ios       # Mac + Xcode uniquement
 ```
 
-`cap:sync` copie les assets vers `www/`, synchronise les projets natifs, et applique `scripts/patchNative.mjs` (AdMob, deep links, ATT iOS).
+`cap:sync` copie les assets vers `www/`, synchronise les projets natifs, et applique `scripts/patchNative.mjs` (AdMob, deep links, ATT iOS, ProGuard `proguard-android-optimize.txt` pour AGP 9+).
 
 ## Assets natifs (icône / splash)
 

@@ -702,6 +702,23 @@ function isNewConsensusQuestionRound(cur, inc) {
   );
 }
 
+/** Évite qu'un patch « question » tardif écrase reveal-pending / reveal (sync multijoueur). */
+const CONSENSUS_PHASE_RANK = {
+  question: 0,
+  "reveal-pending": 1,
+  reveal: 2,
+  final: 3,
+};
+
+function mergeConsensusPhase(curPhase, incPhase, { newQuestionRound = false } = {}) {
+  if (newQuestionRound) return incPhase ?? curPhase ?? null;
+  const curRank = CONSENSUS_PHASE_RANK[curPhase] ?? -1;
+  const incRank = CONSENSUS_PHASE_RANK[incPhase] ?? -1;
+  if (curRank < 0) return incPhase ?? curPhase ?? null;
+  if (incRank < 0) return curPhase ?? null;
+  return incRank >= curRank ? incPhase : curPhase;
+}
+
 function pickLatestConsensusAnswer(localAnswer, remoteAnswer) {
   if (!localAnswer) return remoteAnswer || null;
   if (!remoteAnswer) return localAnswer;
@@ -758,6 +775,7 @@ function mergeConsensusGameLocal(local, remote) {
     ...local,
     ...remote,
     ready,
+    phase: mergeConsensusPhase(local.phase, remote.phase, { newQuestionRound }),
     answers: mergedAnswers,
     matchScores: scoresFromRemote({
       ...scoresToRemote(local.matchScores || {}),
@@ -2402,11 +2420,18 @@ export async function patchGameState(
   if (mergePayload.consensus) {
     const curConsensus = current.consensus;
     const incConsensus = mergePayload.consensus;
+    const newConsensusQ =
+      curConsensus && incConsensus
+        ? isNewConsensusQuestionRoundUid(curConsensus, incConsensus)
+        : false;
     nextState.consensus = curConsensus
       ? {
           ...curConsensus,
           ...incConsensus,
           ready: mergeRemoteReadyUid(curConsensus, incConsensus),
+          phase: mergeConsensusPhase(curConsensus.phase, incConsensus.phase, {
+            newQuestionRound: newConsensusQ,
+          }),
           answers: mergeRemoteConsensusAnswersUid(curConsensus, incConsensus),
           matchScores: scoresFromRemote({
             ...(curConsensus.matchScores || {}),
@@ -2415,9 +2440,9 @@ export async function patchGameState(
           roundScored: mergeRoundFlag(
             curConsensus.roundScored,
             incConsensus.roundScored,
-            isNewConsensusQuestionRoundUid(curConsensus, incConsensus)
+            newConsensusQ
           ),
-          lastRound: isNewConsensusQuestionRoundUid(curConsensus, incConsensus)
+          lastRound: newConsensusQ
             ? incConsensus.lastRound ?? null
             : normalizeConsensusLastRoundRemote(
                 incConsensus.lastRound ?? curConsensus.lastRound
@@ -2425,7 +2450,7 @@ export async function patchGameState(
           podiumApplied: mergeRoundFlag(
             curConsensus.podiumApplied,
             incConsensus.podiumApplied,
-            isNewConsensusQuestionRoundUid(curConsensus, incConsensus)
+            newConsensusQ
           ),
         }
       : incConsensus;

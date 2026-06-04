@@ -1,5 +1,5 @@
 /**
- * Patch projets natifs Android / iOS : AdMob, deep links auth, ATT iOS.
+ * Patch projets natifs Android / iOS : AdMob, deep links auth, ATT iOS, ProGuard AGP 9+.
  * À lancer après `npx cap add android|ios` ou `npx cap sync`.
  */
 import fs from "node:fs";
@@ -31,6 +31,26 @@ const ANDROID_LAUNCH_STYLES = `    <!-- Plein écran : évite l'icône minuscule
         <item name="android:navigationBarColor">@color/splash_background</item>
     </style>
 `;
+
+const PROGUARD_LEGACY = "getDefaultProguardFile('proguard-android.txt')";
+const PROGUARD_OPTIMIZE = "getDefaultProguardFile('proguard-android-optimize.txt')";
+
+/** AGP 9+ : proguard-android.txt n'est plus accepté (plugins Capacitor pas encore tous à jour). */
+function patchAndroidProguardGradle() {
+  const candidates = [
+    path.join(root, "android", "app", "build.gradle"),
+    path.join(root, "node_modules", "@capacitor-community", "admob", "android", "build.gradle"),
+  ];
+
+  for (const filePath of candidates) {
+    if (!fs.existsSync(filePath)) continue;
+    let gradle = fs.readFileSync(filePath, "utf8");
+    if (!gradle.includes(PROGUARD_LEGACY)) continue;
+    gradle = gradle.replaceAll(PROGUARD_LEGACY, PROGUARD_OPTIMIZE);
+    fs.writeFileSync(filePath, gradle);
+    console.log(`Android: ProGuard AGP9 → ${path.relative(root, filePath)}`);
+  }
+}
 
 function patchAndroidSplash() {
   const resDir = path.join(root, "android", "app", "src", "main", "res");
@@ -120,6 +140,7 @@ function patchAndroid() {
     }
   }
 
+  patchAndroidProguardGradle();
   patchAndroidSplash();
 }
 
