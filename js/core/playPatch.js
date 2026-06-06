@@ -13,6 +13,10 @@ export const PLAY_PATCH_EXCLUDE = new Set([
   "lobbyStarted",
   "lobbyComplete",
   "sessionId",
+  "impostorName",
+  "impostorUid",
+  "rolesByUid",
+  "isLocalImpostor",
 ]);
 
 /**

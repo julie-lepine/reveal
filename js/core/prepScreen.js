@@ -2,23 +2,23 @@ import { escapeHtml } from "./ui.js";
 import { getCurrentScreen } from "./router.js";
 
 /** Carte « Joueurs prêts » (HTML initial). */
-export function playersReadySectionHtml(members, readyMap) {
+export function playersReadySectionHtml(members, readyMap, { readyKey = (m) => m.name } = {}) {
   return `
     <p class="card-heading">Joueurs prêts</p>
     ${members
       .map(
         (m) => `
-      <div class="lobby-player ${readyMap[m.name] ? "lobby-player--ready" : ""}">
-        <span class="lobby-player__status">${readyMap[m.name] ? "✓" : "…"}</span>
+      <div class="lobby-player ${readyMap[readyKey(m)] ? "lobby-player--ready" : ""}">
+        <span class="lobby-player__status">${readyMap[readyKey(m)] ? "✓" : "…"}</span>
         <span class="lobby-player__name">${escapeHtml(m.name)}</span>
       </div>`
       )
       .join("")}`;
 }
 
-export function updatePlayersReadyCard(cardEl, members, readyMap) {
+export function updatePlayersReadyCard(cardEl, members, readyMap, options) {
   if (!cardEl) return;
-  cardEl.innerHTML = playersReadySectionHtml(members, readyMap);
+  cardEl.innerHTML = playersReadySectionHtml(members, readyMap, options);
 }
 
 export function updateReadyButton(btn, localReady) {
@@ -49,6 +49,31 @@ export function prepStartSlotHtml({
     return `<button type="button" class="btn btn-secondary btn--spaced" disabled>${escapeHtml(waitingHostLabel)}</button>`;
   }
   return `<button type="button" class="btn btn-secondary btn--spaced" disabled>${escapeHtml(waitingPlayersLabel)}</button>`;
+}
+
+/** Met à jour le slot lancement et re-bind le bouton hôte. */
+export function updatePrepStartSlot(slotEl, html, onStartGame) {
+  if (!slotEl) return;
+  slotEl.innerHTML = html;
+  slotEl.querySelector("#btn-start-game")?.addEventListener("click", () => {
+    void onStartGame();
+  });
+}
+
+/** Rafraîchit carte joueurs + bouton prêt (sans re-render complet). */
+export function refreshPrepReadyUi(
+  root,
+  {
+    playersSelector,
+    readyBtnSelector,
+    members,
+    readyMap,
+    readyKey,
+    localReady,
+  }
+) {
+  updatePlayersReadyCard(root.querySelector(playersSelector), members, readyMap, { readyKey });
+  updateReadyButton(root.querySelector(readyBtnSelector), localReady);
 }
 
 /**

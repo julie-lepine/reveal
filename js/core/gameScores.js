@@ -65,6 +65,7 @@ export function tierNightRoundScoresHtml(recaps, { title = "Points de la manche"
 }
 
 const GAME_LABELS = {
+  traitre: { title: "Le Traître", emoji: "🎭", statKey: "traitreGamesPlayed" },
   playlistguess: { title: "VibeCheck", emoji: "🎵", statKey: "playlistGuessesPlayed" },
   consensus: { title: "Consensus", emoji: "🤝", statKey: "consensusGamesPlayed" },
   hottake: { title: "HotTake", emoji: "🔥", statKey: "hotTakesPlayed" },

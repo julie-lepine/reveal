@@ -25,7 +25,7 @@ import {
   patchGameState,
   userIdForName,
 } from "./gameSync.js";
-import { launchGameWithSync, commitHostGamePlay } from "./mpLaunch.js";
+import { launchGameWithSync, commitHostGamePlay, commitPrepReadyToggle } from "./mpLaunch.js";
 import { mergeHotTakeCustomTakes } from "./sessionMerge.js";
 
 function defaultSession() {
@@ -111,8 +111,7 @@ export async function setHotTakeTheme(themeId) {
 }
 
 export function isLocalHotTakeHost() {
-  const local = getLobbyParticipants().find((p) => p.isLocal);
-  return local?.isHost !== false;
+  return isLobbyHost();
 }
 
 export function getHotTakePoolSize() {
@@ -240,10 +239,14 @@ export async function removeCustomTake(takeId) {
 }
 
 export async function setHotTakeReady(playerName, ready) {
-  const session = getHotTakeSession();
-  await syncHotTakeSession({
-    ...session,
-    ready: { ...session.ready, [playerName]: ready },
+  await commitPrepReadyToggle({
+    readyKey: playerName,
+    ready,
+    getSession: getHotTakeSession,
+    saveLocal: (session) => saveStatePatch({ hotTakeGame: session }),
+    stateKey: "hotTake",
+    gameId: "hottake",
+    screen: "hottake-prep",
   });
 }
 

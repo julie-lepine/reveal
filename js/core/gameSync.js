@@ -23,10 +23,13 @@ import {
   mergeTraitrePatchState,
   mergeSpeedVotePatchState,
   mergeTruthMeterPatchState,
+  mergeForwardGamePhase,
+  mergeTraitrePhase,
+  isNewTraitreVoteRound,
+  isSubmissionsOnlyGamePatch,
   mergeConsensusPhase,
   pickLatestTriviaAnswer,
   mergeTriviaAnswersUid,
-  isNewTraitreVoteRound,
   isNewConsensusQuestionRound,
   mergeCustomGameDeck,
 } from "./sessionMerge.js";
@@ -690,6 +693,9 @@ function mergeTraitreGameLocal(local, remote) {
   return {
     ...local,
     ...remote,
+    phase: mergeTraitrePhase(local.phase, remote.phase, { newVoteRound }),
+    impostorName: isLobbyHost() && local.impostorName ? local.impostorName : remote.impostorName,
+    isLocalImpostor: remote.isLocalImpostor ?? local.isLocalImpostor ?? false,
     votes,
     dealAcks,
     ready,
@@ -925,6 +931,9 @@ function mergeGuessLieGameLocal(local, remote) {
   return {
     ...local,
     ...remote,
+    phase: newVoteRound
+      ? (remote.phase ?? local.phase)
+      : mergeForwardGamePhase(local.phase, remote.phase),
     votes,
     roundScored: mergeRoundFlag(local.roundScored, remote.roundScored, newVoteRound),
     statsRecordedRoundIdx: mergeMaxIndex(local.statsRecordedRoundIdx, remote.statsRecordedRoundIdx),
@@ -969,6 +978,11 @@ function mergeDilemmaGameLocal(local, remote) {
     matchScores: mergeMatchScoresLocal(local.matchScores || {}, remote.matchScores || {}),
     lastRound: remote.lastRound ?? local.lastRound ?? null,
   };
+}
+
+function isNewTruthMeterRound(cur, inc) {
+  if (!inc || inc.roundIdx == null || cur?.roundIdx == null) return false;
+  return inc.roundIdx > cur.roundIdx;
 }
 
 function isNewTruthMeterVoteRound(cur, inc) {
@@ -1478,6 +1492,17 @@ export function speedVoteFromRemote(remote) {
   };
 }
 
+function buildTraitreRolesByUid(session) {
+  const impostor = session.impostorName;
+  const names = session.alive?.length ? session.alive : getActivePlayerNames();
+  const out = {};
+  names.forEach((name) => {
+    const uid = userIdForName(name) || name;
+    out[uid] = name === impostor ? "b" : "a";
+  });
+  return out;
+}
+
 export function traitreToRemote(session) {
   const remoteVotes = {};
   Object.entries(session.votes || {}).forEach(([voter, target]) => {
@@ -1492,6 +1517,7 @@ export function traitreToRemote(session) {
     lobbyStarted: Boolean(session.lobbyStarted),
     phase: session.phase || null,
     pairId: session.pairId || null,
+    rolesByUid: session.impostorName ? buildTraitreRolesByUid(session) : {},
     impostorName: session.impostorName || null,
     impostorUid: session.impostorName
       ? userIdForName(session.impostorName) || session.impostorName
@@ -1534,8 +1560,24 @@ export function traitreFromRemote(remote) {
     const name = nameForUserId(uid) || uid;
     if (val) dealAcks[name] = true;
   });
+  const localUid = userIdForName(getLocalDisplayName());
+  const rolesByUid = remote.rolesByUid || {};
+  let isLocalImpostor = false;
+  if (localUid && rolesByUid[localUid]) {
+    isLocalImpostor = rolesByUid[localUid] === "b";
+  } else {
+    const impostorUid = remote.impostorUid || null;
+    isLocalImpostor = Boolean(localUid && impostorUid && localUid === impostorUid);
+  }
+  const revealed = Boolean(remote.impostorRevealed);
+  const host = isLobbyHost();
+  const impostorUid = remote.impostorUid || null;
   const impostorName =
-    nameForUserId(remote.impostorUid) || remote.impostorName || null;
+    revealed || host
+      ? nameForUserId(impostorUid) || remote.impostorName || null
+      : isLocalImpostor
+        ? getLocalDisplayName()
+        : null;
   let lastVoteSnapshot = null;
   if (remote.lastVoteSnapshot) {
     lastVoteSnapshot = {};
@@ -1550,6 +1592,7 @@ export function traitreFromRemote(remote) {
     lobbyStarted: Boolean(remote.lobbyStarted),
     phase: remote.phase || null,
     pairId: remote.pairId || null,
+    isLocalImpostor,
     impostorName,
     speakRound: remote.speakRound ?? 1,
     speakerIndex: remote.speakerIndex ?? 0,
@@ -2695,11 +2738,13 @@ async function patchGameStateInner(
     const curTm = current.truthMeter;
     const incTm = mergePayload.truthMeter;
     const newTmVote = curTm && incTm ? isNewTruthMeterVoteRound(curTm, incTm) : false;
+    const newTmRound = curTm && incTm ? isNewTruthMeterRound(curTm, incTm) : false;
     nextState.truthMeter = curTm
       ? {
           ...mergeTruthMeterPatchState(curTm, incTm, {
             mergeReadyUid: mergeRemoteReadyUid,
             mergeVotes: mergeRemoteTruthMeterVotesUid,
+            newRound: newTmVote || newTmRound,
           }),
           roundScored: mergeRoundFlag(curTm.roundScored, incTm.roundScored, newTmVote),
           matchScores: mergeRemoteMatchScoresUid(curTm.matchScores || {}, incTm.matchScores || {}),
@@ -2778,11 +2823,20 @@ async function patchGameStateInner(
   if (mergePayload.guessLie) {
     const curGl = current.guessLie;
     const incGl = mergePayload.guessLie;
+    if (curGl && incGl && isSubmissionsOnlyGamePatch(incGl)) {
+      nextState.guessLie = {
+        ...curGl,
+        submissions: { ...(curGl.submissions || {}), ...(incGl.submissions || {}) },
+      };
+    } else {
     const newGlRound = curGl && incGl ? isNewGuessLieVoteRound(curGl, incGl) : false;
     nextState.guessLie = curGl
       ? {
           ...curGl,
           ...incGl,
+          phase: newGlRound
+            ? (incGl.phase ?? curGl.phase)
+            : mergeForwardGamePhase(curGl.phase, incGl.phase),
           votes: mergeRemoteGuessLieVotes(curGl, incGl),
           roundScored: mergeRoundFlag(curGl.roundScored, incGl.roundScored, newGlRound),
           statsRecordedRoundIdx: mergeMaxIndex(
@@ -2791,6 +2845,7 @@ async function patchGameStateInner(
           ),
         }
       : incGl;
+    }
   }
   if (mergePayload.playlistGuess) {
     const curPg = current.playlistGuess;
@@ -2806,6 +2861,9 @@ async function patchGameStateInner(
       ? {
           ...curPg,
           ...incPg,
+          phase: newPgRound
+            ? (incPg.phase ?? curPg.phase)
+            : mergeForwardGamePhase(curPg.phase, incPg.phase),
           ready: mergeRemoteReadyUid(curPg, incPg),
           votes: mergeRemotePlaylistGuessVotesUid(curPg, incPg),
           roundScored: pgRoundScored,
@@ -2988,6 +3046,19 @@ export async function refreshFilRougeFromSession() {
   if (!isGameSyncActive()) return getState().filRougeGame;
   const row = await refreshGameSession();
   return getState().filRougeGame;
+}
+
+export async function commitGuessLieSubmission(playerName, payload) {
+  const gl = { ...getState().guessLie };
+  gl.submissions = { ...(gl.submissions || {}), [playerName]: payload };
+  saveStatePatch({ guessLie: gl });
+  if (!isGameSyncActive()) return gl;
+  const uid = userIdForName(playerName) || playerName;
+  await patchGameState(
+    { guessLie: { submissions: { [uid]: payload } } },
+    { gameId: "guesslie", screen: "guesslie-setup" }
+  );
+  return gl;
 }
 
 export async function syncGuessLieSession(extra = {}, patchOpts = {}) {

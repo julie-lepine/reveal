@@ -2,7 +2,6 @@ import {
   allTruthMeterReady,
   getTruthMeterEntryScreen,
   getTruthMeterSession,
-  isLocalTruthMeterHost,
   markTruthMeterLobbyStarted,
   setTruthMeterReady,
   simulateTruthMeterReady,
@@ -12,10 +11,17 @@ import { getLobbyParticipants } from "../core/lobby.js";
 import { getLocalDisplayName } from "../core/state.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
 import { rulesButtonHtml } from "../core/gameRulesUi.js";
-import { isGameSyncActive, isLobbyHost, onGameSessionChange } from "../core/gameSync.js";
+import { isLobbyHost, onGameSessionChange } from "../core/gameSync.js";
 import { prepGuestFollowOnSession, runPrepGameLaunch } from "../core/mpLaunch.js";
+import { createPrepLobbyController } from "../core/usePrepLobby.js";
+import {
+  playersReadySectionHtml,
+  prepStartSlotHtml,
+  refreshPrepReadyUi,
+  updatePrepStartSlot,
+} from "../core/prepScreen.js";
 import { navigate } from "../core/router.js";
-import { escapeHtml, pageShell } from "../core/ui.js";
+import { pageShell } from "../core/ui.js";
 import { bindNav } from "./nav.js";
 import { TRUTH_METER_MIN_PLAYERS } from "../../data/truthMeter.js";
 import { showAppAlert } from "../core/dialog.js";
@@ -25,56 +31,41 @@ const TRUTH_METER_NAV = ["home", "lobby", "game-select", "truthmeter-prep", "tru
 export function mountTruthMeterPrep(app) {
   if (!requireLobbyPlay()) return null;
 
-  let cleanupSim = null;
-  let readyCommitInFlight = null;
   const localName = getLocalDisplayName();
+  const prepLobby = createPrepLobbyController({
+    localKey: localName,
+    getReadyMap: () => getTruthMeterSession().ready || {},
+  });
 
-  function localReadyState() {
-    if (readyCommitInFlight !== null) return readyCommitInFlight;
-    return Boolean(getTruthMeterSession().ready[localName]);
+  function minPlayersOk() {
+    return getActivePlayerNames().length >= TRUTH_METER_MIN_PLAYERS;
   }
 
   function refreshReadySection() {
     const session = getTruthMeterSession();
     const members = getLobbyParticipants();
     const allReady = allTruthMeterReady();
-    const localReady = localReadyState();
-    const roundCount = getActivePlayerNames().length;
+    const ok = minPlayersOk();
 
-    const playersCard = app.querySelector("#truth-meter-players");
-    if (playersCard) {
-      playersCard.innerHTML = `
-        <p class="card-heading">Joueurs prêts</p>
-        ${members
-          .map(
-            (m) => `
-          <div class="lobby-player ${session.ready[m.name] ? "lobby-player--ready" : ""}">
-            <span class="lobby-player__status">${session.ready[m.name] ? "✓" : "…"}</span>
-            <span class="lobby-player__name">${escapeHtml(m.name)}</span>
-          </div>`
-          )
-          .join("")}`;
-    }
+    refreshPrepReadyUi(app, {
+      playersSelector: "#truth-meter-players",
+      readyBtnSelector: "#btn-ready",
+      members,
+      readyMap: session.ready || {},
+      localReady: prepLobby.localReadyState(),
+    });
 
-    const readyBtn = app.querySelector("#btn-ready");
-    if (readyBtn) {
-      readyBtn.classList.toggle("btn-ready--active", Boolean(localReady));
-      readyBtn.textContent = localReady ? "Prêt ✓" : "Je suis prêt !";
-    }
-
-    const startSlot = app.querySelector("#truth-meter-start-slot");
-    if (startSlot) {
-      if (allReady && roundCount >= TRUTH_METER_MIN_PLAYERS && isLocalTruthMeterHost()) {
-        startSlot.innerHTML = `<button type="button" class="btn btn-primary btn--spaced" id="btn-start-game">Lancer TruthMeter →</button>`;
-        startSlot.querySelector("#btn-start-game")?.addEventListener("click", onStartGame);
-      } else {
-        startSlot.innerHTML = `<button type="button" class="btn btn-secondary btn--spaced" disabled>${
-          roundCount < TRUTH_METER_MIN_PLAYERS
-            ? `Il faut au moins ${TRUTH_METER_MIN_PLAYERS} joueurs`
-            : "En attente des joueurs…"
-        }</button>`;
-      }
-    }
+    updatePrepStartSlot(
+      app.querySelector("#truth-meter-start-slot"),
+      prepStartSlotHtml({
+        poolEmpty: !ok,
+        poolEmptyLabel: `Il faut au moins ${TRUTH_METER_MIN_PLAYERS} joueurs`,
+        allReady,
+        isHost: isLobbyHost(),
+        launchLabel: "Lancer TruthMeter →",
+      }),
+      onStartGame
+    );
   }
 
   async function onStartGame() {
@@ -101,36 +92,13 @@ export function mountTruthMeterPrep(app) {
     }
   }
 
-  function bindEvents() {
-    bindNav(app);
-
-    app.querySelector("#btn-ready")?.addEventListener("click", async () => {
-      const nextReady = !localReadyState();
-      readyCommitInFlight = nextReady;
-      refreshReadySection();
-      try {
-        await setTruthMeterReady(localName, nextReady);
-        if (!isGameSyncActive() && nextReady) {
-          if (cleanupSim) cleanupSim();
-          cleanupSim = simulateTruthMeterReady(refreshReadySection);
-        }
-        if (!isGameSyncActive() && !nextReady && cleanupSim) {
-          cleanupSim();
-          cleanupSim = null;
-        }
-      } finally {
-        readyCommitInFlight = null;
-        refreshReadySection();
-      }
-    });
-  }
-
   function render() {
     const session = getTruthMeterSession();
     const members = getLobbyParticipants();
     const allReady = allTruthMeterReady();
-    const localReady = localReadyState();
+    const localReady = prepLobby.localReadyState();
     const roundCount = getActivePlayerNames().length;
+    const ok = minPlayersOk();
 
     app.innerHTML = pageShell({
       backTarget: "back",
@@ -149,16 +117,7 @@ export function mountTruthMeterPrep(app) {
         </div>
 
         <div class="card" id="truth-meter-players">
-          <p class="card-heading">Joueurs prêts</p>
-          ${members
-            .map(
-              (m) => `
-            <div class="lobby-player ${session.ready[m.name] ? "lobby-player--ready" : ""}">
-              <span class="lobby-player__status">${session.ready[m.name] ? "✓" : "…"}</span>
-              <span class="lobby-player__name">${escapeHtml(m.name)}</span>
-            </div>`
-            )
-            .join("")}
+          ${playersReadySectionHtml(members, session.ready || {})}
         </div>
 
         <button type="button" class="btn btn-ready ${localReady ? "btn-ready--active" : ""}" id="btn-ready">
@@ -166,23 +125,28 @@ export function mountTruthMeterPrep(app) {
         </button>
 
         <div id="truth-meter-start-slot">
-        ${
-          allReady && roundCount >= TRUTH_METER_MIN_PLAYERS && isLocalTruthMeterHost()
-            ? `<button type="button" class="btn btn-primary btn--spaced" id="btn-start-game">Lancer TruthMeter →</button>`
-            : `<button type="button" class="btn btn-secondary btn--spaced" disabled>${
-                roundCount < TRUTH_METER_MIN_PLAYERS
-                  ? `Il faut au moins ${TRUTH_METER_MIN_PLAYERS} joueurs`
-                  : !isLocalTruthMeterHost()
-                    ? "En attente de l'hôte…"
-                    : "En attente des joueurs…"
-              }</button>`
-        }
+          ${prepStartSlotHtml({
+            poolEmpty: !ok,
+            poolEmptyLabel: `Il faut au moins ${TRUTH_METER_MIN_PLAYERS} joueurs`,
+            allReady,
+            isHost: isLobbyHost(),
+            launchLabel: "Lancer TruthMeter →",
+          })}
         </div>
       `,
     });
 
-    bindEvents();
-    app.querySelector("#btn-start-game")?.addEventListener("click", onStartGame);
+    bindNav(app);
+    app.querySelector("#btn-ready")?.addEventListener("click", () => {
+      void prepLobby.toggleReady({
+        setReady: setTruthMeterReady,
+        simulateReady: simulateTruthMeterReady,
+        render: refreshReadySection,
+      });
+    });
+    app.querySelector("#btn-start-game")?.addEventListener("click", () => {
+      void onStartGame();
+    });
   }
 
   render();
@@ -199,7 +163,7 @@ export function mountTruthMeterPrep(app) {
   });
 
   return () => {
-    if (cleanupSim) cleanupSim();
+    prepLobby.dispose();
     unsub();
   };
 }

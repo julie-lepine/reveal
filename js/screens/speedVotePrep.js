@@ -2,7 +2,6 @@ import {
   allSpeedVoteReady,
   getSpeedVotePrepSummary,
   getSpeedVoteSession,
-  isLocalSpeedVoteHost,
   markSpeedVoteLobbyStarted,
   getSpeedVoteEntryScreen,
   setSpeedVoteReady,
@@ -18,8 +17,15 @@ import { getLobbyParticipants } from "../core/lobby.js";
 import { getLocalDisplayName } from "../core/state.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
 import { rulesButtonHtml } from "../core/gameRulesUi.js";
-import { isGameSyncActive, isLobbyHost, onGameSessionChange } from "../core/gameSync.js";
+import { isLobbyHost, onGameSessionChange } from "../core/gameSync.js";
 import { prepGuestFollowOnSession, runPrepGameLaunch } from "../core/mpLaunch.js";
+import { createPrepLobbyController } from "../core/usePrepLobby.js";
+import {
+  playersReadySectionHtml,
+  prepStartSlotHtml,
+  refreshPrepReadyUi,
+  updatePrepStartSlot,
+} from "../core/prepScreen.js";
 import { navigate } from "../core/router.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
 import { bindNav } from "./nav.js";
@@ -27,55 +33,38 @@ import { bindNav } from "./nav.js";
 export function mountSpeedVotePrep(app) {
   if (!requireLobbyPlay()) return null;
 
-  let cleanupSim = null;
   let mounted = false;
-  let readyCommitInFlight = null;
   const localName = getLocalDisplayName();
-
-  function localReadyState() {
-    if (readyCommitInFlight !== null) return readyCommitInFlight;
-    return Boolean(getSpeedVoteSession().ready[localName]);
-  }
+  const prepLobby = createPrepLobbyController({
+    localKey: localName,
+    getReadyMap: () => getSpeedVoteSession().ready || {},
+  });
 
   function refreshReadySection() {
     const session = getSpeedVoteSession();
     const members = getLobbyParticipants();
     const allReady = allSpeedVoteReady();
-    const localReady = localReadyState();
     const prep = getSpeedVotePrepSummary();
 
-    const playersCard = app.querySelector("#speed-vote-players");
-    if (playersCard) {
-      playersCard.innerHTML = `
-        <p class="card-heading">Joueurs prêts</p>
-        ${members
-          .map(
-            (m) => `
-          <div class="lobby-player ${session.ready[m.name] ? "lobby-player--ready" : ""}">
-            <span class="lobby-player__status">${session.ready[m.name] ? "✓" : "…"}</span>
-            <span class="lobby-player__name">${escapeHtml(m.name)}</span>
-          </div>`
-          )
-          .join("")}`;
-    }
+    refreshPrepReadyUi(app, {
+      playersSelector: "#speed-vote-players",
+      readyBtnSelector: "#btn-ready",
+      members,
+      readyMap: session.ready || {},
+      localReady: prepLobby.localReadyState(),
+    });
 
-    const readyBtn = app.querySelector("#btn-ready");
-    if (readyBtn) {
-      readyBtn.classList.toggle("btn-ready--active", Boolean(localReady));
-      readyBtn.textContent = localReady ? "Prêt ✓" : "Je suis prêt !";
-    }
-
-    const startSlot = app.querySelector("#speed-vote-start-slot");
-    if (startSlot) {
-      if (allReady && prep.effective > 0 && isLocalSpeedVoteHost()) {
-        startSlot.innerHTML = `<button type="button" class="btn btn-primary btn--spaced" id="btn-start-game">Lancer SpeedVote →</button>`;
-        startSlot.querySelector("#btn-start-game")?.addEventListener("click", onStartGame);
-      } else {
-        startSlot.innerHTML = `<button type="button" class="btn btn-secondary btn--spaced" disabled>${
-          prep.effective === 0 ? "Aucune question disponible" : "En attente des joueurs…"
-        }</button>`;
-      }
-    }
+    updatePrepStartSlot(
+      app.querySelector("#speed-vote-start-slot"),
+      prepStartSlotHtml({
+        poolEmpty: prep.effective === 0,
+        poolEmptyLabel: "Aucune question disponible",
+        allReady,
+        isHost: isLobbyHost(),
+        launchLabel: "Lancer SpeedVote →",
+      }),
+      onStartGame
+    );
   }
 
   function refreshThemeAndRounds() {
@@ -128,7 +117,7 @@ export function mountSpeedVotePrep(app) {
 
     app.querySelectorAll("[data-round]").forEach((btn) => {
       btn.addEventListener("click", async () => {
-        if (!isLocalSpeedVoteHost() || btn.disabled) return;
+        if (!isLobbyHost() || btn.disabled) return;
         await setSpeedVoteRoundCount(Number(btn.getAttribute("data-round")));
         render();
       });
@@ -136,26 +125,18 @@ export function mountSpeedVotePrep(app) {
 
     app.querySelectorAll("[data-theme]").forEach((btn) => {
       btn.addEventListener("click", async () => {
-        if (!isLocalSpeedVoteHost()) return;
+        if (!isLobbyHost()) return;
         await setSpeedVoteTheme(btn.getAttribute("data-theme"));
         render();
       });
     });
 
-    app.querySelector("#btn-ready")?.addEventListener("click", async () => {
-      const nextReady = !localReadyState();
-      readyCommitInFlight = nextReady;
-      refreshReadySection();
-      try {
-        await setSpeedVoteReady(localName, nextReady);
-        if (!isGameSyncActive() && nextReady) {
-          if (cleanupSim) cleanupSim();
-          cleanupSim = simulateSpeedVoteReady(refreshReadySection);
-        }
-      } finally {
-        readyCommitInFlight = null;
-        refreshReadySection();
-      }
+    app.querySelector("#btn-ready")?.addEventListener("click", () => {
+      void prepLobby.toggleReady({
+        setReady: setSpeedVoteReady,
+        simulateReady: simulateSpeedVoteReady,
+        render: refreshReadySection,
+      });
     });
   }
 
@@ -163,10 +144,10 @@ export function mountSpeedVotePrep(app) {
     const session = getSpeedVoteSession();
     const members = getLobbyParticipants();
     const allReady = allSpeedVoteReady();
-    const localReady = localReadyState();
+    const localReady = prepLobby.localReadyState();
     const themeId = session.selectedThemeId || SPEED_VOTE_CATALOG_ID;
     const roundCount = session.roundCount ?? 5;
-    const isHost = isLocalSpeedVoteHost();
+    const isHost = isLobbyHost();
     const prep = getSpeedVotePrepSummary();
 
     const roundChips = [
@@ -234,16 +215,7 @@ export function mountSpeedVotePrep(app) {
         </div>
 
         <div class="card" id="speed-vote-players">
-          <p class="card-heading">Joueurs prêts</p>
-          ${members
-            .map(
-              (m) => `
-            <div class="lobby-player ${session.ready[m.name] ? "lobby-player--ready" : ""}">
-              <span class="lobby-player__status">${session.ready[m.name] ? "✓" : "…"}</span>
-              <span class="lobby-player__name">${escapeHtml(m.name)}</span>
-            </div>`
-            )
-            .join("")}
+          ${playersReadySectionHtml(members, session.ready || {})}
         </div>
 
         <button type="button" class="btn btn-ready ${localReady ? "btn-ready--active" : ""}" id="btn-ready">
@@ -251,13 +223,13 @@ export function mountSpeedVotePrep(app) {
         </button>
 
         <div id="speed-vote-start-slot">
-        ${
-          allReady && prep.effective > 0
-            ? `<button type="button" class="btn btn-primary btn--spaced" id="btn-start-game">Lancer SpeedVote →</button>`
-            : `<button type="button" class="btn btn-secondary btn--spaced" disabled>${
-                prep.effective === 0 ? "Aucune question disponible" : "En attente des joueurs…"
-              }</button>`
-        }
+          ${prepStartSlotHtml({
+            poolEmpty: prep.effective === 0,
+            poolEmptyLabel: "Aucune question disponible",
+            allReady,
+            isHost,
+            launchLabel: "Lancer SpeedVote →",
+          })}
         </div>
       `,
     });
@@ -280,7 +252,7 @@ export function mountSpeedVotePrep(app) {
   });
 
   return () => {
-    if (cleanupSim) cleanupSim();
+    prepLobby.dispose();
     unsub();
   };
 }

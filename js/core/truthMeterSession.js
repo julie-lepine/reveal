@@ -14,7 +14,7 @@ import {
   patchGameState,
   userIdForName,
 } from "./gameSync.js";
-import { launchGameWithSync, commitHostGamePlay } from "./mpLaunch.js";
+import { launchGameWithSync, commitHostGamePlay, commitPrepReadyToggle } from "./mpLaunch.js";
 
 function defaultSession() {
   return {
@@ -51,8 +51,7 @@ export function getTruthMeterSession() {
 }
 
 export function isLocalTruthMeterHost() {
-  const local = getState().lobby?.participants?.find((p) => p.isLocal);
-  return local?.isHost !== false;
+  return isLobbyHost();
 }
 
 export function truthLabel(pct) {
@@ -122,10 +121,14 @@ export function validateAffirmation(text) {
 }
 
 export async function setTruthMeterReady(playerName, ready) {
-  const session = getTruthMeterSession();
-  await syncTruthMeterSession({
-    ...session,
-    ready: { ...session.ready, [playerName]: ready },
+  await commitPrepReadyToggle({
+    readyKey: playerName,
+    ready,
+    getSession: getTruthMeterSession,
+    saveLocal: (session) => saveStatePatch({ truthMeterGame: session }),
+    stateKey: "truthMeter",
+    gameId: "truthmeter",
+    screen: "truthmeter-prep",
   });
 }
 

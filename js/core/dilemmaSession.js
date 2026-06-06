@@ -21,7 +21,7 @@ import {
   patchGameState,
   userIdForName,
 } from "./gameSync.js";
-import { launchGameWithSync, commitHostGamePlay } from "./mpLaunch.js";
+import { launchGameWithSync, commitHostGamePlay, commitPrepReadyToggle } from "./mpLaunch.js";
 import { checkHotTakeModeration, getModerationNotice } from "./hotTakeSession.js";
 import { mergeDilemmaCustomDilemmas, mergeAuthorOwnedCustomList, normalizeDilemmaEntry } from "./sessionMerge.js";
 
@@ -65,8 +65,7 @@ export function defaultDilemmaPrepSession() {
 }
 
 export function isLocalDilemmaHost() {
-  const local = getLobbyParticipants().find((p) => p.isLocal);
-  return local?.isHost !== false;
+  return isLobbyHost();
 }
 
 export function normalizeCustomDilemma(entry) {
@@ -288,10 +287,14 @@ export async function resetDilemmaAfterGame() {
 }
 
 export async function setDilemmaReady(playerName, ready) {
-  const session = getDilemmaSession();
-  await syncDilemmaSession({
-    ...session,
-    ready: { ...session.ready, [playerName]: ready },
+  await commitPrepReadyToggle({
+    readyKey: playerName,
+    ready,
+    getSession: getDilemmaSession,
+    saveLocal: (session) => saveStatePatch({ dilemmaGame: session }),
+    stateKey: "dilemma",
+    gameId: "dilemma",
+    screen: "dilemma-prep",
   });
 }
 

@@ -733,13 +733,17 @@ export async function setLocalGuessLieSubmission(statements, lieIndex) {
   syncGuessLieSession();
   const name = getLocalDisplayName();
   ensurePlayerScore(name);
-  state.guessLie.submissions[name] = {
+  const payload = {
     statements: statements.map((s) => s.trim()),
     lie: lieIndex,
   };
-  save();
-  const { isGameSyncActive, syncGuessLieSession: pushGl } = await import("./gameSync.js");
-  if (isGameSyncActive()) await pushGl(state.guessLie);
+  const { isGameSyncActive, commitGuessLieSubmission } = await import("./gameSync.js");
+  if (isGameSyncActive()) {
+    await commitGuessLieSubmission(name, payload);
+  } else {
+    state.guessLie.submissions[name] = payload;
+    save();
+  }
 }
 
 export function setGuessLieSubmission(playerName, payload) {

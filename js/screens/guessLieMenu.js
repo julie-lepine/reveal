@@ -5,7 +5,6 @@ import {
 import { requireLobbyPlay } from "../core/gameGuard.js";
 import { isGameSyncActive, isLobbyHost } from "../core/gameSync.js";
 import { handleGuessLieLaunch } from "../core/guessLieSession.js";
-import { isLobbyHost } from "../core/gameSync.js";
 import { pageShell } from "../core/ui.js";
 import { bindNav } from "./nav.js";
 

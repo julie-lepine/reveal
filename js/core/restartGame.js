@@ -16,6 +16,8 @@ import {
 } from "./gameSync.js";
 import { navigate } from "./router.js";
 import { defaultTraitrePrepSession } from "./traitreSession.js";
+import { TRAITRE_MIN_PLAYERS } from "../../data/traitre.js";
+import { requireMinLobbyPlayers } from "./gameLaunchGuard.js";
 import { defaultSpeedVotePrepSession } from "./speedVoteSession.js";
 import { PLAYLIST_GUESS_MIN_PLAYERS } from "../../data/playlistGuess.js";
 import { defaultPlaylistGuessPrepSession } from "./playlistGuessSession.js";
@@ -58,6 +60,12 @@ async function requireHostToLaunch() {
 }
 
 export async function launchTraitrePrep() {
+  const check = await requireMinLobbyPlayers(TRAITRE_MIN_PLAYERS, {
+    gameTitle: "Le Traître",
+    icon: "🎭",
+  });
+  if (!check.ok) return;
+
   const tr = defaultTraitrePrepSession();
   saveStatePatch({ traitreGame: tr });
 
@@ -104,14 +112,11 @@ export async function launchSpeedVotePrep() {
 }
 
 export async function launchPlaylistGuessPrep() {
-  const playerCount = getLobbyParticipants().length;
-  if (playerCount < PLAYLIST_GUESS_MIN_PLAYERS) {
-    await showAppAlert(
-      `VibeCheck nécessite au moins ${PLAYLIST_GUESS_MIN_PLAYERS} joueurs dans le lobby (${playerCount} pour l'instant).`,
-      { title: "3 joueurs minimum", icon: "👥" }
-    );
-    return;
-  }
+  const check = await requireMinLobbyPlayers(PLAYLIST_GUESS_MIN_PLAYERS, {
+    gameTitle: "VibeCheck",
+    icon: "🎵",
+  });
+  if (!check.ok) return;
 
   const pg = defaultPlaylistGuessPrepSession();
   saveStatePatch({ playlistGuessGame: pg });
@@ -182,14 +187,11 @@ export async function launchTriviaPrep() {
 }
 
 export async function launchTruthMeterPrep() {
-  const playerCount = getLobbyParticipants().length;
-  if (playerCount < TRUTH_METER_MIN_PLAYERS) {
-    await showAppAlert(
-      `TruthMeter nécessite au moins ${TRUTH_METER_MIN_PLAYERS} joueurs dans le lobby (${playerCount} pour l'instant).`,
-      { title: "2 joueurs minimum", icon: "👥" }
-    );
-    return;
-  }
+  const check = await requireMinLobbyPlayers(TRUTH_METER_MIN_PLAYERS, {
+    gameTitle: "TruthMeter",
+    icon: "📊",
+  });
+  if (!check.ok) return;
 
   const tm = defaultTruthMeterPrepSession();
   saveStatePatch({ truthMeterGame: tm });

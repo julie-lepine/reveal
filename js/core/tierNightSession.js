@@ -8,6 +8,7 @@ import {
   saveStatePatch,
   getState,
 } from "./state.js";
+import { isLobbyHost } from "./gameSync.js";
 
 const TIER_RANK = { S: 0, A: 1, B: 2, C: 3, D: 4 };
 
@@ -38,7 +39,7 @@ function isMultiplayerLobby() {
 }
 
 function isLocalLobbyHost() {
-  return Boolean(getState().lobby?.participants?.find((p) => p.isLocal)?.isHost);
+  return isLobbyHost();
 }
 
 /** Consensus = tier médian des joueurs pour chaque item */

@@ -7,7 +7,6 @@ import {
   getMyCustomTakes,
   getHotTakePrepSummary,
   getModerationNotice,
-  isLocalHotTakeHost,
   markHotTakeLobbyStarted,
   getHotTakeEntryScreen,
   setHotTakeReady,
@@ -25,8 +24,9 @@ import { onLobbyBundleUpdated } from "../core/supabaseLobby.js";
 import { getLocalDisplayName } from "../core/state.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
 import { rulesButtonHtml } from "../core/gameRulesUi.js";
-import { isGameSyncActive, isLobbyHost, onGameSessionChange } from "../core/gameSync.js";
+import { isLobbyHost, onGameSessionChange } from "../core/gameSync.js";
 import { prepGuestFollowOnSession, runPrepGameLaunch } from "../core/mpLaunch.js";
+import { createPrepLobbyController } from "../core/usePrepLobby.js";
 import { navigate } from "../core/router.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
 import {
@@ -37,17 +37,19 @@ import {
   prepStartSlotHtml,
   updatePlayersReadyCard,
   updateReadyButton,
+  updatePrepStartSlot,
 } from "../core/prepScreen.js";
 import { bindNav } from "./nav.js";
 
 export function mountHotTakePrep(app) {
   if (!requireLobbyPlay()) return null;
 
-  let cleanupSim = null;
   let mounted = false;
-  /** Prêt en cours d’envoi - évite que la synchro efface l’UI. */
-  let readyCommitInFlight = null;
   const localName = getLocalDisplayName();
+  const prepLobby = createPrepLobbyController({
+    localKey: localName,
+    getReadyMap: () => getHotTakeSession().ready || {},
+  });
   const moderationNotice = getModerationNotice();
 
   function captureDraft() {
@@ -99,11 +101,6 @@ export function mountHotTakePrep(app) {
     });
   }
 
-  function localReadyState() {
-    if (readyCommitInFlight !== null) return readyCommitInFlight;
-    return Boolean(getHotTakeSession().ready[localName]);
-  }
-
   function hotTakeStartSlotHtml(allReady, prep) {
     return prepStartSlotHtml({
       poolEmpty: prep.effective === 0,
@@ -118,17 +115,16 @@ export function mountHotTakePrep(app) {
     const session = getHotTakeSession();
     const members = getLobbyParticipants();
     const allReady = allHotTakeReady();
-    const localReady = localReadyState();
     const prep = getHotTakePrepSummary();
 
     updatePlayersReadyCard(app.querySelector("#hot-take-players"), members, session.ready);
-    updateReadyButton(app.querySelector("#btn-ready"), localReady);
+    updateReadyButton(app.querySelector("#btn-ready"), prepLobby.localReadyState());
 
-    const startSlot = app.querySelector("#hot-take-start-slot");
-    if (startSlot) {
-      startSlot.innerHTML = hotTakeStartSlotHtml(allReady, prep);
-      startSlot.querySelector("#btn-start-game")?.addEventListener("click", onStartGame);
-    }
+    updatePrepStartSlot(
+      app.querySelector("#hot-take-start-slot"),
+      hotTakeStartSlotHtml(allReady, prep),
+      onStartGame
+    );
 
     if (document.activeElement?.id !== "new-take") {
       renderCustomTakesList();
@@ -139,7 +135,7 @@ export function mountHotTakePrep(app) {
     const session = getHotTakeSession();
     const themeId = session.selectedThemeId || HOT_TAKE_CATALOG_ID;
     const roundCount = session.roundCount ?? 5;
-    const isHost = isLocalHotTakeHost();
+    const isHost = isLobbyHost();
     const prep = getHotTakePrepSummary();
 
     app.querySelectorAll("[data-theme]").forEach((btn) => {
@@ -187,7 +183,7 @@ export function mountHotTakePrep(app) {
 
     app.querySelectorAll("[data-round]").forEach((btn) => {
       btn.addEventListener("click", async () => {
-        if (!isLocalHotTakeHost() || btn.disabled) return;
+        if (!isLobbyHost() || btn.disabled) return;
         const draft = captureDraft();
         await setHotTakeRoundCount(Number(btn.getAttribute("data-round")));
         render(draft);
@@ -196,7 +192,7 @@ export function mountHotTakePrep(app) {
 
     app.querySelectorAll("[data-theme]").forEach((btn) => {
       btn.addEventListener("click", async () => {
-        if (!isLocalHotTakeHost()) return;
+        if (!isLobbyHost()) return;
         const draft = captureDraft();
         await setHotTakeTheme(btn.getAttribute("data-theme"));
         render(draft);
@@ -217,20 +213,12 @@ export function mountHotTakePrep(app) {
       if (input) input.value = "";
     });
 
-    app.querySelector("#btn-ready")?.addEventListener("click", async () => {
-      const nextReady = !localReadyState();
-      readyCommitInFlight = nextReady;
-      refreshReadySection();
-      try {
-        await setHotTakeReady(localName, nextReady);
-        if (!isGameSyncActive() && nextReady) {
-          if (cleanupSim) cleanupSim();
-          cleanupSim = simulateHotTakeReady(refreshReadySection);
-        }
-      } finally {
-        readyCommitInFlight = null;
-        refreshReadySection();
-      }
+    app.querySelector("#btn-ready")?.addEventListener("click", () => {
+      void prepLobby.toggleReady({
+        setReady: setHotTakeReady,
+        simulateReady: simulateHotTakeReady,
+        render: refreshReadySection,
+      });
     });
 
     app.querySelector("#btn-start-game")?.addEventListener("click", onStartGame);
@@ -242,10 +230,10 @@ export function mountHotTakePrep(app) {
     const session = getHotTakeSession();
     const members = getLobbyParticipants();
     const allReady = allHotTakeReady();
-    const localReady = localReadyState();
+    const localReady = prepLobby.localReadyState();
     const themeId = session.selectedThemeId || HOT_TAKE_CATALOG_ID;
     const roundCount = session.roundCount ?? 5;
-    const isHost = isLocalHotTakeHost();
+    const isHost = isLobbyHost();
     const prep = getHotTakePrepSummary();
 
     const roundChips = [
@@ -375,7 +363,7 @@ export function mountHotTakePrep(app) {
 
   return () => {
     unbindRemove();
-    if (cleanupSim) cleanupSim();
+    prepLobby.dispose();
     unsub();
     unsubLobby();
   };

@@ -14,6 +14,7 @@ export function getEveningRecap() {
   const hotTakes = stats.hotTakesPlayed || 0;
   const speedVotes = stats.speedVotesPlayed || 0;
   const playlistGuesses = stats.playlistGuessesPlayed || 0;
+  const traitreGames = stats.traitreGamesPlayed || 0;
   const triviaGames = stats.triviaGamesPlayed || 0;
   const truthMeters = stats.truthMetersPlayed || 0;
   const consensusGames = stats.consensusGamesPlayed || 0;
@@ -26,6 +27,8 @@ export function getEveningRecap() {
   const hasActivity =
     hotTakes > 0 ||
     speedVotes > 0 ||
+    playlistGuesses > 0 ||
+    traitreGames > 0 ||
     triviaGames > 0 ||
     truthMeters > 0 ||
     consensusGames > 0 ||
@@ -39,6 +42,7 @@ export function getEveningRecap() {
     hotTakes,
     speedVotes,
     playlistGuesses,
+    traitreGames,
     triviaGames,
     truthMeters,
     consensusGames,

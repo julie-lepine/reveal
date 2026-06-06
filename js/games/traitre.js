@@ -23,7 +23,7 @@ import { getLocalDisplayName, recordTraitrePlayed, setLastGame } from "../core/s
 import { setLobbyPlaying, setLobbyWaiting } from "../core/lobby.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
 import { rulesButtonHtml } from "../core/gameRulesUi.js";
-import { navigate } from "../core/router.js";
+import { navigate, getCurrentScreen } from "../core/router.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
 import { bindNav } from "../screens/nav.js";
 import { gameExitBarHtml, bindExitGame } from "../core/exitGame.js";
@@ -32,6 +32,7 @@ import {
   isGameSyncActive,
   isLobbyHost,
   onGameSessionChange,
+  suppressSessionRoute,
   traitreToRemote,
 } from "../core/gameSync.js";
 
@@ -200,8 +201,10 @@ export function mountTraitre(app) {
       });
     } else if (!mp) {
       await setLobbyWaiting();
+    } else {
+      suppressSessionRoute(120000, getCurrentScreen());
     }
-    navigate("game-select");
+    navigate("game-select", { navStack: ["home", "lobby", "game-select"] });
   }
 
   function speakOrderHtml(session) {

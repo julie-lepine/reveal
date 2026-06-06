@@ -113,6 +113,54 @@ export function isAnswersOnlyGamePatch(inc = {}) {
   return keys.length === 1 && keys[0] === "answers";
 }
 
+/** Patch invité : uniquement le statut prêt (prep). */
+export function isReadyOnlyGamePatch(inc = {}) {
+  const keys = Object.keys(inc);
+  return keys.length === 1 && keys[0] === "ready";
+}
+
+/** Patch Guess The Lie : une soumission locale uniquement. */
+export function isSubmissionsOnlyGamePatch(inc = {}) {
+  const keys = Object.keys(inc);
+  return keys.length === 1 && keys[0] === "submissions";
+}
+
+/** Fusion de phase par rang (avance uniquement, sauf allowReset). */
+export function mergeRankedPhase(curPhase, incPhase, rankMap, { allowReset = false } = {}) {
+  if (allowReset) return incPhase ?? curPhase ?? null;
+  const curRank = rankMap[curPhase] ?? -1;
+  const incRank = rankMap[incPhase] ?? -1;
+  if (curRank < 0) return incPhase ?? curPhase ?? null;
+  if (incRank < 0) return curPhase ?? null;
+  return incRank >= curRank ? incPhase : curPhase;
+}
+
+const TRAITRE_PHASE_RANK = {
+  deal: 0,
+  speak: 1,
+  decision: 2,
+  vote: 3,
+  final: 4,
+};
+
+export function mergeTraitrePhase(curPhase, incPhase, { newVoteRound = false } = {}) {
+  if (newVoteRound) return incPhase ?? curPhase ?? null;
+  return mergeRankedPhase(curPhase, incPhase, TRAITRE_PHASE_RANK);
+}
+
+const TRUTH_METER_PHASE_RANK = {
+  writing: 0,
+  display: 1,
+  voting: 2,
+  "reveal-pending": 3,
+  reveal: 4,
+};
+
+export function mergeTruthMeterPhase(curPhase, incPhase, { newRound = false } = {}) {
+  if (newRound) return incPhase ?? curPhase ?? null;
+  return mergeRankedPhase(curPhase, incPhase, TRUTH_METER_PHASE_RANK);
+}
+
 /** Nouvelle manche Consensus : index avancé ou réponses distantes vidées après une manche précédente. */
 export function isNewConsensusQuestionRound(cur, inc) {
   if (!inc) return false;
@@ -194,6 +242,9 @@ export function mergeForwardGamePhase(curPhase, incPhase) {
 export function mergeDilemmaPatchState(curDm, incDm, localAuthor, { mergeReadyUid, mergeVotes }) {
   if (!curDm) return incDm;
   if (!incDm) return curDm;
+  if (isReadyOnlyGamePatch(incDm)) {
+    return { ...curDm, ready: mergeReadyUid(curDm, incDm) };
+  }
   if (isVotesOnlyGamePatch(incDm)) {
     return {
       ...curDm,
@@ -219,6 +270,9 @@ export function mergeDilemmaPatchState(curDm, incDm, localAuthor, { mergeReadyUi
 export function mergeHotTakePatchState(curHt, incHt, localAuthor, { mergeReadyUid, mergeVotes }) {
   if (!curHt) return incHt;
   if (!incHt) return curHt;
+  if (isReadyOnlyGamePatch(incHt)) {
+    return { ...curHt, ready: mergeReadyUid(curHt, incHt) };
+  }
   if (isVotesOnlyGamePatch(incHt)) {
     return {
       ...curHt,
@@ -248,6 +302,9 @@ export function mergeConsensusPatchState(
 ) {
   if (!cur) return inc;
   if (!inc) return cur;
+  if (isReadyOnlyGamePatch(inc)) {
+    return { ...cur, ready: mergeReadyUid(cur, inc) };
+  }
   if (isAnswersOnlyGamePatch(inc)) {
     return { ...cur, answers: mergeAnswers(cur, inc) };
   }
@@ -268,6 +325,9 @@ export function mergeTriviaPatchState(
 ) {
   if (!cur) return inc;
   if (!inc) return cur;
+  if (isReadyOnlyGamePatch(inc)) {
+    return { ...cur, ready: mergeReadyUid(cur, inc) };
+  }
   if (isAnswersOnlyGamePatch(inc)) {
     return { ...cur, answers: mergeAnswers(cur, inc) };
   }
@@ -284,6 +344,9 @@ export function mergeTriviaPatchState(
 export function mergeSpeedVotePatchState(cur, inc, { mergeReadyUid, mergeVotes }) {
   if (!cur) return inc;
   if (!inc) return cur;
+  if (isReadyOnlyGamePatch(inc)) {
+    return { ...cur, ready: mergeReadyUid(cur, inc) };
+  }
   if (isVotesOnlyGamePatch(inc)) {
     return { ...cur, votes: mergeVotes(cur, inc) };
   }
@@ -297,15 +360,19 @@ export function mergeSpeedVotePatchState(cur, inc, { mergeReadyUid, mergeVotes }
 }
 
 /** État truth meter pour patchGameState. */
-export function mergeTruthMeterPatchState(cur, inc, { mergeReadyUid, mergeVotes }) {
+export function mergeTruthMeterPatchState(cur, inc, { mergeReadyUid, mergeVotes, newRound = false } = {}) {
   if (!cur) return inc;
   if (!inc) return cur;
+  if (isReadyOnlyGamePatch(inc)) {
+    return { ...cur, ready: mergeReadyUid(cur, inc) };
+  }
   if (isVotesOnlyGamePatch(inc)) {
     return { ...cur, votes: mergeVotes(cur, inc) };
   }
   return {
     ...cur,
     ...inc,
+    phase: mergeTruthMeterPhase(cur.phase, inc.phase, { newRound }),
     ready: mergeReadyUid(cur, inc),
     votes: mergeVotes(cur, inc),
   };
@@ -329,6 +396,9 @@ export function isNewTraitreVoteRound(cur, inc) {
 export function mergeTraitrePatchState(cur, inc, { mergeReadyUid, mergeVotes, newVoteRound = false }) {
   if (!cur) return inc;
   if (!inc) return cur;
+  if (isReadyOnlyGamePatch(inc)) {
+    return { ...cur, ready: mergeReadyUid(cur, inc) };
+  }
   if (isVotesOnlyGamePatch(inc)) {
     return { ...cur, votes: mergeVotes(cur, inc) };
   }
@@ -342,9 +412,9 @@ export function mergeTraitrePatchState(cur, inc, { mergeReadyUid, mergeVotes, ne
   return {
     ...cur,
     ...inc,
-    phase: inc.phase ?? cur.phase,
+    phase: mergeTraitrePhase(cur.phase, inc.phase, { newVoteRound }),
     ready: mergeReadyUid(cur, inc),
-    votes: mergeVotes(cur, inc),
+    votes: newVoteRound ? { ...(inc.votes || {}) } : mergeVotes(cur, inc),
     dealAcks: inc.dealAcks ? { ...(cur.dealAcks || {}), ...inc.dealAcks } : cur.dealAcks,
   };
 }

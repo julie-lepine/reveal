@@ -3,8 +3,9 @@ import { getLobbyParticipants } from "../core/lobby.js";
 import { getLocalDisplayName } from "../core/state.js";
 import { showAppAlert } from "../core/dialog.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
-import { isGameSyncActive, isLobbyHost, onGameSessionChange } from "../core/gameSync.js";
+import { isLobbyHost, onGameSessionChange } from "../core/gameSync.js";
 import { prepGuestFollowOnSession, runPrepGameLaunch } from "../core/mpLaunch.js";
+import { createPrepLobbyController } from "../core/usePrepLobby.js";
 import { navigate } from "../core/router.js";
 import { pageShell } from "../core/ui.js";
 import { bindNav } from "./nav.js";
@@ -19,14 +20,11 @@ export function mountConsensusSetup(app) {
     return null;
   }
 
-  let cleanupSim = null;
-  let readyCommitInFlight = null;
   const localName = getLocalDisplayName();
-
-  function localReadyState() {
-    if (readyCommitInFlight !== null) return readyCommitInFlight;
-    return Boolean(consensus.getSession().ready?.[localName]);
-  }
+  const prepLobby = createPrepLobbyController({
+    localKey: localName,
+    getReadyMap: () => consensus.getSession().ready || {},
+  });
 
   async function onStartGame() {
     if (!isLobbyHost()) return;
@@ -68,20 +66,12 @@ export function mountConsensusSetup(app) {
       });
     });
 
-    app.querySelector("#btn-consensus-ready")?.addEventListener("click", async () => {
-      const nextReady = !localReadyState();
-      readyCommitInFlight = nextReady;
-      render();
-      try {
-        await consensus.setReady(localName, nextReady);
-        if (!isGameSyncActive() && nextReady) {
-          if (cleanupSim) cleanupSim();
-          cleanupSim = consensus.simulateReady(() => render());
-        }
-      } finally {
-        readyCommitInFlight = null;
-        render();
-      }
+    app.querySelector("#btn-consensus-ready")?.addEventListener("click", () => {
+      void prepLobby.toggleReady({
+        setReady: (name, ready) => consensus.setReady(name, ready),
+        simulateReady: (cb) => consensus.simulateReady(cb),
+        render,
+      });
     });
 
     app.querySelector("#btn-consensus-start")?.addEventListener("click", () => {
@@ -105,7 +95,7 @@ export function mountConsensusSetup(app) {
         prep,
         members,
         readyMap: session.ready || {},
-        localReady: localReadyState(),
+        localReady: prepLobby.localReadyState(),
         allReady: consensus.allReady(),
       }),
     });
@@ -127,7 +117,7 @@ export function mountConsensusSetup(app) {
   });
 
   return () => {
-    if (cleanupSim) cleanupSim();
+    prepLobby.dispose();
     unsub();
   };
 }

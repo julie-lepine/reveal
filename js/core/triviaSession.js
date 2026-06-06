@@ -21,7 +21,7 @@ import {
   patchGameState,
   userIdForName,
 } from "./gameSync.js";
-import { launchGameWithSync, commitHostGamePlay } from "./mpLaunch.js";
+import { launchGameWithSync, commitHostGamePlay, commitPrepReadyToggle } from "./mpLaunch.js";
 
 const TRIVIA_ESTIMATE_SEC_PER_QUESTION = 40;
 
@@ -131,8 +131,7 @@ export function validateTriviaLaunchConfig(session = getTriviaSession()) {
 }
 
 export function isLocalTriviaHost() {
-  const local = getLobbyParticipants().find((player) => player.isLocal);
-  return local?.isHost !== false;
+  return isLobbyHost();
 }
 
 export async function setTriviaTheme(themeId) {
@@ -154,10 +153,14 @@ export async function setTriviaQuestionCount(questionCount) {
 }
 
 export async function setTriviaReady(playerName, ready) {
-  const session = getTriviaSession();
-  await syncTriviaSession({
-    ...session,
-    ready: { ...(session.ready || {}), [playerName]: ready },
+  await commitPrepReadyToggle({
+    readyKey: playerName,
+    ready,
+    getSession: getTriviaSession,
+    saveLocal: (session) => saveStatePatch({ triviaGame: session }),
+    stateKey: "trivia",
+    gameId: "trivia",
+    screen: "trivia-prep",
   });
 }
 

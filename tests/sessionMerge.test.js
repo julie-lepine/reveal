@@ -18,6 +18,10 @@ import {
   mergeTriviaPatchState,
   mergeTruthMeterPatchState,
   mergeSpeedVotePatchState,
+  mergeTraitrePatchState,
+  mergeTraitrePhase,
+  mergeTruthMeterPhase,
+  isNewTraitreVoteRound,
   pickLatestTriviaAnswer,
   mergeTriviaAnswersUid,
   normalizeDilemmaEntry,
@@ -338,5 +342,62 @@ describe("normalize entries", () => {
   it("normalizeHotTakeEntry accepte string legacy", () => {
     const t = normalizeHotTakeEntry("  hello  ");
     assert.equal(t.text, "hello");
+  });
+});
+
+describe("mergeTraitrePhase", () => {
+  it("bloque vote → speak", () => {
+    assert.equal(mergeTraitrePhase("vote", "speak"), "vote");
+  });
+
+  it("accepte speak → vote", () => {
+    assert.equal(mergeTraitrePhase("speak", "vote"), "vote");
+  });
+
+  it("autorise reset de vote sur revote", () => {
+    assert.equal(mergeTraitrePhase("vote", "vote", { newVoteRound: true }), "vote");
+  });
+});
+
+describe("mergeTraitrePatchState", () => {
+  const mergeReadyUid = (cur, inc) => ({ ...(cur?.ready || {}), ...(inc?.ready || {}) });
+  const mergeVotes = (cur, inc) => ({ ...(cur?.votes || {}), ...(inc?.votes || {}) });
+
+  it("patch ready-only ne régresse pas la phase", () => {
+    const cur = { phase: "vote", ready: { a: true }, votes: { x: "y" } };
+    const inc = { ready: { b: true } };
+    const out = mergeTraitrePatchState(cur, inc, { mergeReadyUid, mergeVotes });
+    assert.equal(out.phase, "vote");
+    assert.equal(out.ready.b, true);
+  });
+
+  it("patch votes-only conserve la phase reveal", () => {
+    const cur = { phase: "vote", votes: {} };
+    const inc = { votes: { a: "b" } };
+    const out = mergeTraitrePatchState(cur, inc, { mergeReadyUid, mergeVotes });
+    assert.equal(out.phase, "vote");
+    assert.equal(out.votes.a, "b");
+  });
+
+  it("nouvelle manche de vote efface les votes distants", () => {
+    const cur = { phase: "vote", votes: { a: "b", c: "d" } };
+    const inc = { phase: "vote", votes: {} };
+    const out = mergeTraitrePatchState(cur, inc, {
+      mergeReadyUid,
+      mergeVotes,
+      newVoteRound: isNewTraitreVoteRound(cur, inc),
+    });
+    assert.deepEqual(out.votes, {});
+    assert.equal(out.phase, "vote");
+  });
+});
+
+describe("mergeTruthMeterPhase", () => {
+  it("bloque reveal → voting", () => {
+    assert.equal(mergeTruthMeterPhase("reveal", "voting"), "reveal");
+  });
+
+  it("accepte voting → reveal-pending", () => {
+    assert.equal(mergeTruthMeterPhase("voting", "reveal-pending"), "reveal-pending");
   });
 });

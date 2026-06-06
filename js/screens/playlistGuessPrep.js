@@ -6,7 +6,6 @@ import {
   getLocalParticipantId,
   getPlaylistGuessPrepSummary,
   getPlaylistGuessSession,
-  isLocalPlaylistGuessHost,
   lobbyPlayersWithIds,
   markPlaylistGuessLobbyStarted,
   getPlaylistGuessEntryScreen,
@@ -17,8 +16,15 @@ import {
 import { getLobbyParticipants } from "../core/lobby.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
 import { rulesButtonHtml } from "../core/gameRulesUi.js";
-import { isGameSyncActive, isLobbyHost, onGameSessionChange } from "../core/gameSync.js";
+import { isLobbyHost, onGameSessionChange } from "../core/gameSync.js";
 import { prepGuestFollowOnSession, runPrepGameLaunch } from "../core/mpLaunch.js";
+import { createPrepLobbyController } from "../core/usePrepLobby.js";
+import {
+  playersReadySectionHtml,
+  prepStartSlotHtml,
+  refreshPrepReadyUi,
+  updatePrepStartSlot,
+} from "../core/prepScreen.js";
 import { navigate } from "../core/router.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
 import { bindNav } from "./nav.js";
@@ -26,43 +32,26 @@ import { bindNav } from "./nav.js";
 export function mountPlaylistGuessPrep(app) {
   if (!requireLobbyPlay()) return null;
 
-  let cleanupSim = null;
-  let readyCommitInFlight = null;
   const localUid = getLocalParticipantId();
-
-  function localReadyState() {
-    if (readyCommitInFlight !== null) return readyCommitInFlight;
-    return Boolean(getPlaylistGuessSession().ready[localUid]);
-  }
+  const prepLobby = createPrepLobbyController({
+    localKey: localUid,
+    getReadyMap: () => getPlaylistGuessSession().ready || {},
+  });
 
   function refreshReadySection() {
     const session = getPlaylistGuessSession();
     const members = lobbyPlayersWithIds();
     const allReady = allPlaylistGuessReady();
-    const localReady = localReadyState();
     const prep = getPlaylistGuessPrepSummary();
-    const isHost = isLocalPlaylistGuessHost();
 
-    const playersCard = app.querySelector("#pg-players");
-    if (playersCard) {
-      playersCard.innerHTML = `
-        <p class="card-heading">Joueurs prêts</p>
-        ${members
-          .map(
-            (m) => `
-          <div class="lobby-player ${session.ready[m.userId] ? "lobby-player--ready" : ""}">
-            <span class="lobby-player__status">${session.ready[m.userId] ? "✓" : "…"}</span>
-            <span class="lobby-player__name">${escapeHtml(m.name)}</span>
-          </div>`
-          )
-          .join("")}`;
-    }
-
-    const readyBtn = app.querySelector("#btn-ready");
-    if (readyBtn) {
-      readyBtn.classList.toggle("btn-ready--active", Boolean(localReady));
-      readyBtn.textContent = localReady ? "Prêt ✓" : "Je suis prêt !";
-    }
+    refreshPrepReadyUi(app, {
+      playersSelector: "#pg-players",
+      readyBtnSelector: "#btn-ready",
+      members,
+      readyMap: session.ready || {},
+      readyKey: (m) => m.userId,
+      localReady: prepLobby.localReadyState(),
+    });
 
     const minCard = app.querySelector("#pg-min-players");
     if (minCard) {
@@ -87,14 +76,17 @@ export function mountPlaylistGuessPrep(app) {
     const startSlot = app.querySelector("#pg-start-slot");
     if (startSlot) {
       const canStart = allReady && prep.minPlayersMet && prep.effective > 0;
-      if (canStart && isHost && isLobbyHost()) {
-        startSlot.innerHTML = `<button type="button" class="btn btn-primary btn--spaced" id="btn-start-game">Lancer la partie →</button>`;
-        startSlot.querySelector("#btn-start-game")?.addEventListener("click", onStartGame);
-      } else {
-        startSlot.innerHTML = `<button type="button" class="btn btn-secondary btn--spaced" disabled>${
-          !prep.minPlayersMet ? `Il faut au moins ${PLAYLIST_GUESS_MIN_PLAYERS} joueurs` : "En attente des joueurs…"
-        }</button>`;
-      }
+      updatePrepStartSlot(
+        startSlot,
+        prepStartSlotHtml({
+          poolEmpty: !prep.minPlayersMet,
+          poolEmptyLabel: `Il faut au moins ${PLAYLIST_GUESS_MIN_PLAYERS} joueurs`,
+          allReady: canStart,
+          isHost: isLobbyHost(),
+          launchLabel: "Lancer la partie →",
+        }),
+        onStartGame
+      );
     }
   }
 
@@ -141,26 +133,18 @@ export function mountPlaylistGuessPrep(app) {
   }
 
   async function onReadyClick() {
-    const nextReady = !localReadyState();
-    readyCommitInFlight = nextReady;
-    refreshReadySection();
-    try {
-      await setPlaylistGuessReady(localUid, nextReady);
-      if (!isGameSyncActive() && nextReady) {
-        if (cleanupSim) cleanupSim();
-        cleanupSim = simulatePlaylistGuessReady(refreshReadySection);
-      }
-    } finally {
-      readyCommitInFlight = null;
-      refreshReadySection();
-    }
+    await prepLobby.toggleReady({
+      setReady: setPlaylistGuessReady,
+      simulateReady: simulatePlaylistGuessReady,
+      render: refreshReadySection,
+    });
   }
 
   function render() {
     const session = getPlaylistGuessSession();
     const roundCount = session.roundCount ?? PLAYLIST_GUESS_ROUND_DEFAULT;
-    const isHost = isLocalPlaylistGuessHost();
-    const localReady = localReadyState();
+    const isHost = isLobbyHost();
+    const localReady = prepLobby.localReadyState();
 
     app.innerHTML = pageShell({
       backTarget: "back",
@@ -203,7 +187,7 @@ export function mountPlaylistGuessPrep(app) {
 
     app.querySelectorAll("[data-pg-round]").forEach((btn) => {
       btn.addEventListener("click", async () => {
-        if (!isLocalPlaylistGuessHost()) return;
+        if (!isLobbyHost()) return;
         await setPlaylistGuessRoundCount(Number(btn.getAttribute("data-pg-round")));
         render();
       });
@@ -227,7 +211,7 @@ export function mountPlaylistGuessPrep(app) {
   });
 
   return () => {
-    if (cleanupSim) cleanupSim();
+    prepLobby.dispose();
     unsub();
   };
 }

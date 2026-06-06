@@ -22,7 +22,7 @@ import {
   userIdForName,
   consensusRevealToRemote,
 } from "./gameSync.js";
-import { launchGameWithSync, commitHostGamePlay } from "./mpLaunch.js";
+import { launchGameWithSync, commitHostGamePlay, commitPrepReadyToggle } from "./mpLaunch.js";
 import {
   applyConsensusDefaultAnswers as applyConsensusDefaultAnswersCore,
   clampConsensusValue,
@@ -277,10 +277,14 @@ export async function setConsensusQuestionCount(questionCount) {
 }
 
 export async function setConsensusReady(playerName, ready) {
-  const session = getConsensusSession();
-  await syncConsensusSession({
-    ...session,
-    ready: { ...(session.ready || {}), [playerName]: ready },
+  await commitPrepReadyToggle({
+    readyKey: playerName,
+    ready,
+    getSession: getConsensusSession,
+    saveLocal: (session) => saveStatePatch({ consensusGame: session }),
+    stateKey: "consensus",
+    gameId: "consensus",
+    screen: "consensus-prep",
   });
 }
 

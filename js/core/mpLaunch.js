@@ -19,6 +19,7 @@ import {
   isLobbyHost,
   patchGameState,
   pushGameSession,
+  userIdForName,
 } from "./gameSync.js";
 import { pickRemotePlayFields } from "./playPatch.js";
 import { showAppAlert } from "./dialog.js";
@@ -212,4 +213,26 @@ export async function commitHostGamePlay({
     { gameId, screen: screen || gameId, ...patchOpts }
   );
   return session;
+}
+
+/**
+ * Toggle prêt en prep : patch local + patch remote narrow (ready uniquement).
+ */
+export async function commitPrepReadyToggle({
+  readyKey,
+  ready,
+  getSession,
+  saveLocal,
+  stateKey,
+  gameId,
+  screen,
+  readyField = "ready",
+}) {
+  const session = getSession();
+  const nextReady = { ...(session[readyField] || {}), [readyKey]: ready };
+  saveLocal({ ...session, [readyField]: nextReady });
+  if (!isGameSyncActive()) return nextReady;
+  const uid = userIdForName(readyKey) || readyKey;
+  await patchGameState({ [stateKey]: { ready: { [uid]: ready } } }, { gameId, screen });
+  return nextReady;
 }

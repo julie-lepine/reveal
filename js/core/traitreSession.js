@@ -5,7 +5,6 @@ import {
   getTraitrePairById,
 } from "../../data/traitre.js";
 import { getActivePlayerNames, getActivePlayers } from "./players.js";
-import { getLobbyParticipants } from "./lobby.js";
 import {
   addScore,
   bumpPlayerStat,
@@ -22,7 +21,7 @@ import {
   patchGameState,
   userIdForName,
 } from "./gameSync.js";
-import { launchGameWithSync, commitHostGamePlay } from "./mpLaunch.js";
+import { launchGameWithSync, commitHostGamePlay, commitPrepReadyToggle } from "./mpLaunch.js";
 
 function defaultSession() {
   return {
@@ -31,6 +30,7 @@ function defaultSession() {
     phase: null,
     pairId: null,
     impostorName: null,
+    isLocalImpostor: false,
     speakRound: 1,
     speakerIndex: 0,
     alive: [],
@@ -58,8 +58,7 @@ export function getTraitreSession() {
 }
 
 export function isLocalTraitreHost() {
-  const local = getLobbyParticipants().find((p) => p.isLocal);
-  return local?.isHost !== false;
+  return isLobbyHost();
 }
 
 export function getTraitrePair(session = getTraitreSession()) {
@@ -70,7 +69,9 @@ export function getMyTraitreWord(session = getTraitreSession()) {
   const pair = getTraitrePair(session);
   if (!pair) return null;
   const me = getLocalDisplayName();
-  return session.impostorName === me ? pair.b : pair.a;
+  const amImpostor =
+    session.isLocalImpostor === true || (session.impostorName && session.impostorName === me);
+  return amImpostor ? pair.b : pair.a;
 }
 
 export function getTraitreSpeakOrder(session = getTraitreSession()) {
@@ -95,10 +96,14 @@ export function allTraitreReady() {
 }
 
 export async function setTraitreReady(playerName, ready) {
-  const session = getTraitreSession();
-  await syncTraitreSession({
-    ...session,
-    ready: { ...(session.ready || {}), [playerName]: ready },
+  await commitPrepReadyToggle({
+    readyKey: playerName,
+    ready,
+    getSession: getTraitreSession,
+    saveLocal: (session) => saveStatePatch({ traitreGame: session }),
+    stateKey: "traitre",
+    gameId: "traitre",
+    screen: "traitre-prep",
   });
 }
 
@@ -133,6 +138,7 @@ export function createStartedTraitreSession() {
   if (!check.ok) return { ok: false, ...check };
   const pair = pickRandomTraitrePair();
   const impostorName = names[Math.floor(Math.random() * names.length)];
+  const localName = getLocalDisplayName();
   return {
     ok: true,
     session: {
@@ -141,6 +147,7 @@ export function createStartedTraitreSession() {
       phase: "deal",
       pairId: pair.id,
       impostorName,
+      isLocalImpostor: impostorName === localName,
       alive: [...names],
       eliminated: [],
       speakRound: 1,

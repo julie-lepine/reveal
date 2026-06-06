@@ -7,7 +7,6 @@ import {
   getDilemmaSession,
   getMyCustomDilemmas,
   getModerationNotice,
-  isLocalDilemmaHost,
   markDilemmaLobbyStarted,
   getDilemmaEntryScreen,
   setDilemmaReady,
@@ -31,6 +30,7 @@ import {
   refreshGameSession,
 } from "../core/gameSync.js";
 import { prepGuestFollowOnSession, runPrepGameLaunch } from "../core/mpLaunch.js";
+import { createPrepLobbyController } from "../core/usePrepLobby.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
 import {
   bindPrepRemoveDelegation,
@@ -40,16 +40,19 @@ import {
   prepStartSlotHtml,
   updatePlayersReadyCard,
   updateReadyButton,
+  updatePrepStartSlot,
 } from "../core/prepScreen.js";
 import { bindNav } from "./nav.js";
 
 export function mountDilemmaPrep(app) {
   if (!requireLobbyPlay()) return null;
 
-  let cleanupSim = null;
-  let readyCommitInFlight = null;
   let mounted = false;
   const localName = getLocalDisplayName();
+  const prepLobby = createPrepLobbyController({
+    localKey: localName,
+    getReadyMap: () => getDilemmaSession().ready || {},
+  });
   const moderationNotice = getModerationNotice();
 
   function captureDraft() {
@@ -100,8 +103,7 @@ export function mountDilemmaPrep(app) {
   }
 
   function localReadyState() {
-    if (readyCommitInFlight !== null) return readyCommitInFlight;
-    return Boolean(getDilemmaSession().ready[localName]);
+    return prepLobby.localReadyState();
   }
 
   function dilemmaStartSlotHtml(allReady, prep) {
@@ -124,18 +126,18 @@ export function mountDilemmaPrep(app) {
     updatePlayersReadyCard(app.querySelector("#dilemma-players"), members, session.ready);
     updateReadyButton(app.querySelector("#btn-ready"), localReady);
 
-    const startSlot = app.querySelector("#dilemma-start-slot");
-    if (startSlot) {
-      startSlot.innerHTML = dilemmaStartSlotHtml(allReady, prep);
-      startSlot.querySelector("#btn-start-game")?.addEventListener("click", onStartGame);
-    }
+    updatePrepStartSlot(
+      app.querySelector("#dilemma-start-slot"),
+      dilemmaStartSlotHtml(allReady, prep),
+      onStartGame
+    );
   }
 
   function refreshDeckAndRounds() {
     const session = getDilemmaSession();
     const deckId = session.selectedDeckId || DILEMMA_CATALOG_ID;
     const roundCount = session.roundCount ?? 8;
-    const isHost = isLocalDilemmaHost();
+    const isHost = isLobbyHost();
     const prep = getDilemmaPrepSummary();
     app.querySelectorAll("[data-deck]").forEach((btn) => {
       const id = btn.getAttribute("data-deck");
@@ -189,7 +191,7 @@ export function mountDilemmaPrep(app) {
 
     app.querySelectorAll("[data-round]").forEach((btn) => {
       btn.addEventListener("click", async () => {
-        if (!isLocalDilemmaHost() || btn.disabled) return;
+        if (!isLobbyHost() || btn.disabled) return;
         const draft = captureDraft();
         await setDilemmaRoundCount(Number(btn.getAttribute("data-round")));
         render(draft);
@@ -198,7 +200,7 @@ export function mountDilemmaPrep(app) {
 
     app.querySelectorAll("[data-deck]").forEach((btn) => {
       btn.addEventListener("click", async () => {
-        if (!isLocalDilemmaHost()) return;
+        if (!isLobbyHost()) return;
         const draft = captureDraft();
         await setDilemmaDeck(btn.getAttribute("data-deck"));
         render(draft);
@@ -224,20 +226,12 @@ export function mountDilemmaPrep(app) {
       if (inputB) inputB.value = "";
     });
 
-    app.querySelector("#btn-ready")?.addEventListener("click", async () => {
-      const nextReady = !localReadyState();
-      readyCommitInFlight = nextReady;
-      refreshReadySection();
-      try {
-        await setDilemmaReady(localName, nextReady);
-        if (!isGameSyncActive() && nextReady) {
-          if (cleanupSim) cleanupSim();
-          cleanupSim = simulateDilemmaReady(refreshReadySection);
-        }
-      } finally {
-        readyCommitInFlight = null;
-        refreshReadySection();
-      }
+    app.querySelector("#btn-ready")?.addEventListener("click", () => {
+      void prepLobby.toggleReady({
+        setReady: setDilemmaReady,
+        simulateReady: simulateDilemmaReady,
+        render: refreshReadySection,
+      });
     });
 
     app.querySelector("#btn-start-game")?.addEventListener("click", onStartGame);
@@ -250,7 +244,7 @@ export function mountDilemmaPrep(app) {
     const localReady = localReadyState();
     const deckId = session.selectedDeckId || DILEMMA_CATALOG_ID;
     const roundCount = session.roundCount ?? 8;
-    const isHost = isLocalDilemmaHost();
+    const isHost = isLobbyHost();
     const prep = getDilemmaPrepSummary();
     const members = getLobbyParticipants();
     const allReady = allDilemmaReady();
@@ -379,7 +373,7 @@ export function mountDilemmaPrep(app) {
 
   return () => {
     unbindRemove();
-    if (cleanupSim) cleanupSim();
+    prepLobby.dispose();
     unsub();
     unsubLobby();
   };

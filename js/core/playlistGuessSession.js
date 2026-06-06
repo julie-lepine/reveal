@@ -17,7 +17,7 @@ import {
   allMembersReady,
   userIdForName,
 } from "./gameSync.js";
-import { launchGameWithSync, commitHostGamePlay } from "./mpLaunch.js";
+import { launchGameWithSync, commitHostGamePlay, commitPrepReadyToggle } from "./mpLaunch.js";
 
 /** Identifiant stable pour les votes (aligné lobby Supabase + invités). */
 export function participantVoteId(participant) {
@@ -70,8 +70,7 @@ export function defaultPlaylistGuessPrepSession() {
 }
 
 export function isLocalPlaylistGuessHost() {
-  const local = getLobbyParticipants().find((p) => p.isLocal);
-  return local?.isHost !== false;
+  return isLobbyHost();
 }
 
 /** Tous les joueurs du lobby sont des cibles de vote (auto-vote autorisé). */
@@ -102,10 +101,14 @@ export async function setPlaylistGuessRoundCount(count) {
 }
 
 export async function setPlaylistGuessReady(playerId, ready) {
-  const session = getPlaylistGuessSession();
-  await syncPlaylistGuessSession({
-    ...session,
-    ready: { ...session.ready, [playerId]: ready },
+  await commitPrepReadyToggle({
+    readyKey: playerId,
+    ready,
+    getSession: getPlaylistGuessSession,
+    saveLocal: (session) => saveStatePatch({ playlistGuessGame: session }),
+    stateKey: "playlistGuess",
+    gameId: "playlistguess",
+    screen: "playlistguess-prep",
   });
 }
 

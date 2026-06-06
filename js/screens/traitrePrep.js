@@ -3,7 +3,6 @@ import {
   allTraitreReady,
   getTraitreEntryScreen,
   getTraitreSession,
-  isLocalTraitreHost,
   markTraitreLobbyStarted,
   setTraitreReady,
   simulateTraitreReady,
@@ -13,23 +12,28 @@ import { getLobbyParticipants } from "../core/lobby.js";
 import { getLocalDisplayName } from "../core/state.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
 import { rulesButtonHtml } from "../core/gameRulesUi.js";
-import { isGameSyncActive, onGameSessionChange } from "../core/gameSync.js";
+import { isLobbyHost, onGameSessionChange } from "../core/gameSync.js";
 import { prepGuestFollowOnSession, runPrepGameLaunch } from "../core/mpLaunch.js";
+import { createPrepLobbyController } from "../core/usePrepLobby.js";
+import {
+  playersReadySectionHtml,
+  prepStartSlotHtml,
+  updatePlayersReadyCard,
+  updateReadyButton,
+  updatePrepStartSlot,
+} from "../core/prepScreen.js";
 import { navigate } from "../core/router.js";
-import { escapeHtml, pageShell } from "../core/ui.js";
+import { pageShell } from "../core/ui.js";
 import { bindNav } from "./nav.js";
 
 export function mountTraitrePrep(app) {
   if (!requireLobbyPlay()) return null;
 
-  let cleanupSim = null;
-  let readyCommitInFlight = null;
   const localName = getLocalDisplayName();
-
-  function localReadyState() {
-    if (readyCommitInFlight !== null) return readyCommitInFlight;
-    return Boolean(getTraitreSession().ready?.[localName]);
-  }
+  const prepLobby = createPrepLobbyController({
+    localKey: localName,
+    getReadyMap: () => getTraitreSession().ready || {},
+  });
 
   async function onStartGame() {
     const check = validateTraitreLaunch();
@@ -53,8 +57,8 @@ export function mountTraitrePrep(app) {
     const session = getTraitreSession();
     const members = getLobbyParticipants();
     const allReady = allTraitreReady();
-    const localReady = localReadyState();
-    const isHost = isLocalTraitreHost();
+    const localReady = prepLobby.localReadyState();
+    const isHost = isLobbyHost();
     const check = validateTraitreLaunch();
 
     app.innerHTML = pageShell({
@@ -71,16 +75,7 @@ export function mountTraitrePrep(app) {
         <p class="hint">${check.ok ? `${check.count} joueur(s) prêts à jouer.` : `Minimum ${TRAITRE_MIN_PLAYERS} joueurs requis (${check.count} présents).`}</p>
 
         <div class="card" id="traitre-players">
-          <p class="card-heading">Joueurs prêts</p>
-          ${members
-            .map(
-              (m) => `
-            <div class="lobby-player ${session.ready?.[m.name] ? "lobby-player--ready" : ""}">
-              <span class="lobby-player__status">${session.ready?.[m.name] ? "✓" : "…"}</span>
-              <span class="lobby-player__name">${escapeHtml(m.name)}</span>
-            </div>`
-            )
-            .join("")}
+          ${playersReadySectionHtml(members, session.ready || {})}
         </div>
 
         <button type="button" class="btn btn-secondary btn--spaced btn-ready ${localReady ? "btn-ready--active" : ""}" id="btn-ready">
@@ -88,38 +83,48 @@ export function mountTraitrePrep(app) {
         </button>
 
         <div id="traitre-start-slot">
-          ${
-            allReady && check.ok && isHost
-              ? `<button type="button" class="btn btn-primary btn--spaced" id="btn-start-game">Lancer Le Traître →</button>`
-              : `<button type="button" class="btn btn-secondary btn--spaced" disabled>${
-                  !check.ok
-                    ? `Minimum ${TRAITRE_MIN_PLAYERS} joueurs`
-                    : "En attente des joueurs…"
-                }</button>`
-          }
+          ${prepStartSlotHtml({
+            poolEmpty: !check.ok,
+            poolEmptyLabel: `Minimum ${TRAITRE_MIN_PLAYERS} joueurs`,
+            allReady,
+            isHost,
+            launchLabel: "Lancer Le Traître →",
+          })}
         </div>
       `,
     });
 
     bindNav(app);
-    app.querySelector("#btn-ready")?.addEventListener("click", async () => {
-      const nextReady = !localReadyState();
-      readyCommitInFlight = nextReady;
-      render();
-      try {
-        await setTraitreReady(localName, nextReady);
-        if (!isGameSyncActive() && nextReady) {
-          if (cleanupSim) cleanupSim();
-          cleanupSim = simulateTraitreReady(render);
-        }
-      } finally {
-        readyCommitInFlight = null;
-        render();
-      }
+    app.querySelector("#btn-ready")?.addEventListener("click", () => {
+      void prepLobby.toggleReady({
+        setReady: setTraitreReady,
+        simulateReady: simulateTraitreReady,
+        render,
+      });
     });
     app.querySelector("#btn-start-game")?.addEventListener("click", () => {
       void onStartGame();
     });
+  }
+
+  function refreshReadySection() {
+    const session = getTraitreSession();
+    const members = getLobbyParticipants();
+    updatePlayersReadyCard(app.querySelector("#traitre-players"), members, session.ready || {});
+    updateReadyButton(app.querySelector("#btn-ready"), prepLobby.localReadyState());
+    const allReady = allTraitreReady();
+    const check = validateTraitreLaunch();
+    updatePrepStartSlot(
+      app.querySelector("#traitre-start-slot"),
+      prepStartSlotHtml({
+        poolEmpty: !check.ok,
+        poolEmptyLabel: `Minimum ${TRAITRE_MIN_PLAYERS} joueurs`,
+        allReady,
+        isHost: isLobbyHost(),
+        launchLabel: "Lancer Le Traître →",
+      }),
+      onStartGame
+    );
   }
 
   const entry = getTraitreEntryScreen();
@@ -134,13 +139,15 @@ export function mountTraitrePrep(app) {
       getEntryScreen: getTraitreEntryScreen,
       buildNavStack: (screen) => ["home", "lobby", "game-select", "traitre-prep", screen],
     });
-    render();
+    if (getTraitreEntryScreen() === "traitre-prep") {
+      refreshReadySection();
+    }
   });
 
   render();
 
   return () => {
-    if (cleanupSim) cleanupSim();
+    prepLobby.dispose();
     unsub();
   };
 }

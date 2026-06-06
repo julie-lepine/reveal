@@ -23,7 +23,7 @@ import {
   patchGameState,
   userIdForName,
 } from "./gameSync.js";
-import { launchGameWithSync, commitHostGamePlay } from "./mpLaunch.js";
+import { launchGameWithSync, commitHostGamePlay, commitPrepReadyToggle } from "./mpLaunch.js";
 
 function defaultSession() {
   return {
@@ -70,8 +70,7 @@ export function getSpeedVoteModifier(session = getSpeedVoteSession()) {
 }
 
 export function isLocalSpeedVoteHost() {
-  const local = getLobbyParticipants().find((p) => p.isLocal);
-  return local?.isHost !== false;
+  return isLobbyHost();
 }
 
 export function getSpeedVotePoolSize() {
@@ -176,10 +175,14 @@ export async function resetSpeedVoteReady() {
 }
 
 export async function setSpeedVoteReady(playerName, ready) {
-  const session = getSpeedVoteSession();
-  await syncSpeedVoteSession({
-    ...session,
-    ready: { ...session.ready, [playerName]: ready },
+  await commitPrepReadyToggle({
+    readyKey: playerName,
+    ready,
+    getSession: getSpeedVoteSession,
+    saveLocal: (session) => saveStatePatch({ speedVoteGame: session }),
+    stateKey: "speedVote",
+    gameId: "speedvote",
+    screen: "speedvote-prep",
   });
 }
 
