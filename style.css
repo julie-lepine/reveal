@@ -2796,6 +2796,7 @@ body.wizz-shake #app{
 }
 
 .game-grid .game-tile.hot,
+.game-grid .game-tile.traitre,
 .game-grid .game-tile.guess,
 .game-grid .game-tile.speed,
 .game-grid .game-tile.trivia,
@@ -5584,4 +5585,68 @@ body{
   .consensus-highlights__grid{
     grid-template-columns:1fr;
   }
+}
+
+/* Le Traître */
+.traitre-word {
+  font-size: 1.35rem;
+  font-weight: 700;
+  text-align: center;
+  margin: 0.75rem 0;
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius-md, 12px);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.traitre-order {
+  list-style: none;
+  padding: 0;
+  margin: 0.75rem 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.traitre-order li {
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--radius-sm, 8px);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.traitre-order li.is-current {
+  background: rgba(255, 200, 80, 0.15);
+  border: 1px solid rgba(255, 200, 80, 0.35);
+  font-weight: 600;
+}
+
+.traitre-order li.is-eliminated {
+  opacity: 0.45;
+  text-decoration: line-through;
+}
+
+.traitre-vote {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin: 0.75rem 0;
+}
+
+.traitre-vote .btn {
+  width: 100%;
+  text-align: left;
+}
+
+.traitre-vote .btn.is-selected {
+  outline: 2px solid var(--accent, #ffc850);
+}
+
+.traitre-decision {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.game-tile.traitre {
+  --tile-accent: #9b59b6;
 }

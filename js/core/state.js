@@ -79,6 +79,7 @@ const defaultState = () => ({
     consensusGamesPlayed: 0,
     dilemmasPlayed: 0,
     triviaGamesPlayed: 0,
+    traitreGamesPlayed: 0,
     liesFound: 0,
     liesTotal: 0,
     tierNightsPlayed: 0,
@@ -122,6 +123,28 @@ const defaultState = () => ({
     roundScored: false,
     modifier: "normal",
     currentQuestion: null,
+  },
+  traitreGame: {
+    ready: {},
+    lobbyStarted: false,
+    phase: null,
+    pairId: null,
+    impostorName: null,
+    speakRound: 1,
+    speakerIndex: 0,
+    alive: [],
+    eliminated: [],
+    votes: {},
+    revotePending: false,
+    revoteCount: 0,
+    voteSurvivals: 0,
+    dealAcks: {},
+    lastVoteSnapshot: null,
+    lastEliminated: null,
+    impostorRevealed: false,
+    winner: null,
+    scoresApplied: false,
+    lastRound: null,
   },
   playlistGuessGame: {
     ready: {},
@@ -241,6 +264,7 @@ function loadState() {
       inLobby: parsed.inLobby || false,
       hotTakeGame: { ...defaultState().hotTakeGame, ...parsed.hotTakeGame },
       speedVoteGame: { ...defaultState().speedVoteGame, ...parsed.speedVoteGame },
+      traitreGame: { ...defaultState().traitreGame, ...parsed.traitreGame },
       playlistGuessGame: { ...defaultState().playlistGuessGame, ...parsed.playlistGuessGame },
       truthMeterGame: { ...defaultState().truthMeterGame, ...parsed.truthMeterGame },
       consensusGame: { ...defaultState().consensusGame, ...parsed.consensusGame },
@@ -483,6 +507,7 @@ export function defaultEveningStats() {
     consensusGamesPlayed: 0,
     dilemmasPlayed: 0,
     triviaGamesPlayed: 0,
+    traitreGamesPlayed: 0,
   };
 }
 
@@ -499,6 +524,7 @@ export function resetGameSessionsOnly() {
   saveStatePatch({
     hotTakeGame: { ...base.hotTakeGame },
     speedVoteGame: { ...base.speedVoteGame },
+    traitreGame: { ...base.traitreGame },
     playlistGuessGame: { ...base.playlistGuessGame },
     truthMeterGame: { ...base.truthMeterGame },
     consensusGame: { ...base.consensusGame },
@@ -643,6 +669,12 @@ export function recordDilemmaPlayed() {
 export function recordTriviaPlayed() {
   recordEveningGameOnce("trivia", () => {
     state.stats.triviaGamesPlayed = (state.stats.triviaGamesPlayed || 0) + 1;
+  });
+}
+
+export function recordTraitrePlayed() {
+  recordEveningGameOnce("traitre", () => {
+    state.stats.traitreGamesPlayed = (state.stats.traitreGamesPlayed || 0) + 1;
   });
 }
 

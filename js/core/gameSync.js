@@ -20,11 +20,13 @@ import {
   mergeHotTakePatchState,
   mergeConsensusPatchState,
   mergeTriviaPatchState,
-  mergeTruthMeterPatchState,
+  mergeTraitrePatchState,
   mergeSpeedVotePatchState,
+  mergeTruthMeterPatchState,
   mergeConsensusPhase,
   pickLatestTriviaAnswer,
   mergeTriviaAnswersUid,
+  isNewTraitreVoteRound,
   isNewConsensusQuestionRound,
   mergeCustomGameDeck,
 } from "./sessionMerge.js";
@@ -190,6 +192,7 @@ export function isLobbyHost() {
 
 /** Écrans de préparation (jeu choisi mais pas encore lancé). */
 const GAME_SETUP_SCREENS = new Set([
+  "traitre-prep",
   "hottake-prep",
   "speedvote-prep",
   "trivia-prep",
@@ -644,6 +647,52 @@ function mergeSpeedVoteGameLocal(local, remote) {
     votes,
     ready,
     roundScored: mergeRoundFlag(local.roundScored, remote.roundScored, newVoteRound),
+  };
+}
+
+function isNewTraitreVoteRoundUid(cur, inc) {
+  return isNewTraitreVoteRound(cur, inc);
+}
+
+function mergeRemoteTraitreVotesUid(cur, inc) {
+  const curVotes = cur?.votes || {};
+  const incVotes = inc?.votes || {};
+  if (isNewTraitreVoteRound(cur, inc)) return incVotes;
+  if (inc?.phase === "vote" || cur?.phase === "vote") {
+    return { ...curVotes, ...incVotes };
+  }
+  return incVotes;
+}
+
+function mergeTraitreGameLocal(local, remote) {
+  if (!remote) return local;
+  if (!local) return remote;
+  const newVoteRound = isNewTraitreVoteRound(local, remote);
+  const remoteVotes = remote.votes || {};
+  const localVotes = local.votes || {};
+  let votes = remoteVotes;
+  if (newVoteRound) {
+    votes = remoteVotes;
+  } else if (remote.phase === "vote" || local.phase === "vote") {
+    votes = { ...remoteVotes };
+    const name = getLocalDisplayName();
+    if (localVotes[name] != null) votes[name] = localVotes[name];
+  } else if (remote.phase === "final" || local.phase === "final") {
+    votes = { ...remoteVotes, ...localVotes };
+  }
+  const remoteAcks = remote.dealAcks || {};
+  const localAcks = local.dealAcks || {};
+  const dealAcks = { ...remoteAcks, ...localAcks };
+  const ready =
+    !remote.lobbyStarted && !local.lobbyStarted
+      ? mergeReadyMapsLocal(local.ready || {}, remote.ready || {}, getActivePlayerNames())
+      : remote.ready || {};
+  return {
+    ...local,
+    ...remote,
+    votes,
+    dealAcks,
+    ready,
   };
 }
 
@@ -1429,6 +1478,97 @@ export function speedVoteFromRemote(remote) {
   };
 }
 
+export function traitreToRemote(session) {
+  const remoteVotes = {};
+  Object.entries(session.votes || {}).forEach(([voter, target]) => {
+    remoteVotes[userIdForName(voter) || voter] = userIdForName(target) || target;
+  });
+  const dealAcks = {};
+  Object.entries(session.dealAcks || {}).forEach(([name, val]) => {
+    if (val) dealAcks[userIdForName(name) || name] = true;
+  });
+  return {
+    ready: mapReadyByUid(session.ready || {}),
+    lobbyStarted: Boolean(session.lobbyStarted),
+    phase: session.phase || null,
+    pairId: session.pairId || null,
+    impostorName: session.impostorName || null,
+    impostorUid: session.impostorName
+      ? userIdForName(session.impostorName) || session.impostorName
+      : null,
+    speakRound: session.speakRound ?? 1,
+    speakerIndex: session.speakerIndex ?? 0,
+    alive: [...(session.alive || [])],
+    eliminated: [...(session.eliminated || [])],
+    votes: remoteVotes,
+    revotePending: Boolean(session.revotePending),
+    revoteCount: session.revoteCount ?? 0,
+    voteSurvivals: session.voteSurvivals ?? 0,
+    dealAcks,
+    lastVoteSnapshot: session.lastVoteSnapshot
+      ? Object.fromEntries(
+          Object.entries(session.lastVoteSnapshot).map(([voter, target]) => [
+            userIdForName(voter) || voter,
+            userIdForName(target) || target,
+          ])
+        )
+      : null,
+    lastEliminated: session.lastEliminated || null,
+    impostorRevealed: Boolean(session.impostorRevealed),
+    winner: session.winner || null,
+    scoresApplied: Boolean(session.scoresApplied),
+    lastRound: session.lastRound || null,
+  };
+}
+
+export function traitreFromRemote(remote) {
+  if (!remote) return null;
+  const votes = {};
+  Object.entries(remote.votes || {}).forEach(([voterUid, targetUid]) => {
+    const voter = nameForUserId(voterUid) || voterUid;
+    const target = nameForUserId(targetUid) || targetUid;
+    votes[voter] = target;
+  });
+  const dealAcks = {};
+  Object.entries(remote.dealAcks || {}).forEach(([uid, val]) => {
+    const name = nameForUserId(uid) || uid;
+    if (val) dealAcks[name] = true;
+  });
+  const impostorName =
+    nameForUserId(remote.impostorUid) || remote.impostorName || null;
+  let lastVoteSnapshot = null;
+  if (remote.lastVoteSnapshot) {
+    lastVoteSnapshot = {};
+    Object.entries(remote.lastVoteSnapshot).forEach(([voterUid, targetUid]) => {
+      const voter = nameForUserId(voterUid) || voterUid;
+      const target = nameForUserId(targetUid) || targetUid;
+      lastVoteSnapshot[voter] = target;
+    });
+  }
+  return {
+    ready: mapReadyByName(remote.ready || {}),
+    lobbyStarted: Boolean(remote.lobbyStarted),
+    phase: remote.phase || null,
+    pairId: remote.pairId || null,
+    impostorName,
+    speakRound: remote.speakRound ?? 1,
+    speakerIndex: remote.speakerIndex ?? 0,
+    alive: [...(remote.alive || [])],
+    eliminated: [...(remote.eliminated || [])],
+    votes,
+    revotePending: Boolean(remote.revotePending),
+    revoteCount: remote.revoteCount ?? 0,
+    voteSurvivals: remote.voteSurvivals ?? 0,
+    dealAcks,
+    lastVoteSnapshot,
+    lastEliminated: remote.lastEliminated || null,
+    impostorRevealed: Boolean(remote.impostorRevealed),
+    winner: remote.winner || null,
+    scoresApplied: Boolean(remote.scoresApplied),
+    lastRound: remote.lastRound || null,
+  };
+}
+
 function isNewPlaylistGuessVoteRound(cur, inc) {
   if (!inc) return false;
   if (
@@ -1829,6 +1969,11 @@ export function applyRemoteSession(row) {
     const local = getState().speedVoteGame;
     patch.speedVoteGame = local ? mergeSpeedVoteGameLocal(local, remote) : remote;
   }
+  if (st.traitre) {
+    const remote = traitreFromRemote(st.traitre);
+    const local = getState().traitreGame;
+    patch.traitreGame = local ? mergeTraitreGameLocal(local, remote) : remote;
+  }
   if (st.trivia) {
     const remote = triviaFromRemote(st.trivia);
     const local = getState().triviaGame;
@@ -1924,6 +2069,8 @@ export async function refreshGameSession() {
 function navStackFor(screen) {
   const base = ["home", "lobby", "game-select"];
   const gameScreens = new Set([
+    "traitre-prep",
+    "traitre",
     "hottake-prep",
     "hottake",
     "speedvote-prep",
@@ -2018,6 +2165,10 @@ export function getEffectiveSessionScreen(row) {
   if (st.speedVote) {
     if (st.speedVote.lobbyStarted) return "speedvote";
     if (gid === "speedvote" || declared === "speedvote-prep") return "speedvote-prep";
+  }
+  if (st.traitre) {
+    if (st.traitre.lobbyStarted) return "traitre";
+    if (gid === "traitre" || declared === "traitre-prep") return "traitre-prep";
   }
   if (st.trivia) {
     if (st.trivia.lobbyStarted) return "trivia";
@@ -2503,6 +2654,18 @@ async function patchGameStateInner(
         }
       : incSv;
   }
+  if (mergePayload.traitre) {
+    const curTr = current.traitre;
+    const incTr = mergePayload.traitre;
+    const newTrVote = curTr && incTr ? isNewTraitreVoteRoundUid(curTr, incTr) : false;
+    nextState.traitre = curTr
+      ? mergeTraitrePatchState(curTr, incTr, {
+          mergeReadyUid: mergeRemoteReadyUid,
+          mergeVotes: mergeRemoteTraitreVotesUid,
+          newVoteRound: newTrVote,
+        })
+      : incTr;
+  }
   if (mergePayload.trivia) {
     const curTrivia = current.trivia;
     const incTrivia = mergePayload.trivia;
@@ -2757,6 +2920,14 @@ export async function syncSpeedVoteSession(extra = {}, patchOpts = {}) {
   saveStatePatch({ speedVoteGame: session });
   if (!isGameSyncActive()) return session;
   await patchGameState({ speedVote: speedVoteToRemote(session) }, patchOpts);
+  return session;
+}
+
+export async function syncTraitreSession(extra = {}, patchOpts = {}) {
+  const session = { ...getState().traitreGame, ...extra };
+  saveStatePatch({ traitreGame: session });
+  if (!isGameSyncActive()) return session;
+  await patchGameState({ traitre: traitreToRemote(session) }, patchOpts);
   return session;
 }
 

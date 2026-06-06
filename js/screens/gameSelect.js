@@ -27,6 +27,7 @@ import { hasActiveLobby } from "../core/lobby.js";
 import { getLastGame, getState } from "../core/state.js";
 // import { getFilRougeSession } from "../core/filRougeSession.js";
 import {
+  launchTraitrePrep,
   launchSpeedVotePrep,
   launchPlaylistGuessPrep,
   launchTriviaPrep,
@@ -119,6 +120,7 @@ function eveningRecapHtml(recap) {
 
 function buildGameSelectHandlers() {
   return {
+    "traitre-prep": launchTraitrePrep,
     "speedvote-prep": launchSpeedVotePrep,
     "playlistguess-prep": launchPlaylistGuessPrep,
     "trivia-prep": launchTriviaPrep,

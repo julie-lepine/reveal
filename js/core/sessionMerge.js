@@ -310,3 +310,41 @@ export function mergeTruthMeterPatchState(cur, inc, { mergeReadyUid, mergeVotes 
     votes: mergeVotes(cur, inc),
   };
 }
+
+export function isNewTraitreVoteRound(cur, inc) {
+  if (!inc) return false;
+  if (inc.phase === "vote" && cur?.phase !== "vote") return true;
+  if (
+    inc.phase === "vote" &&
+    cur?.phase === "vote" &&
+    Object.keys(inc.votes || {}).length === 0 &&
+    Object.keys(cur?.votes || {}).length > 0
+  ) {
+    return true;
+  }
+  return false;
+}
+
+/** État Le Traître pour patchGameState. */
+export function mergeTraitrePatchState(cur, inc, { mergeReadyUid, mergeVotes, newVoteRound = false }) {
+  if (!cur) return inc;
+  if (!inc) return cur;
+  if (isVotesOnlyGamePatch(inc)) {
+    return { ...cur, votes: mergeVotes(cur, inc) };
+  }
+  const incKeys = Object.keys(inc);
+  if (incKeys.length === 1 && inc.dealAcks) {
+    return {
+      ...cur,
+      dealAcks: { ...(cur.dealAcks || {}), ...inc.dealAcks },
+    };
+  }
+  return {
+    ...cur,
+    ...inc,
+    phase: inc.phase ?? cur.phase,
+    ready: mergeReadyUid(cur, inc),
+    votes: mergeVotes(cur, inc),
+    dealAcks: inc.dealAcks ? { ...(cur.dealAcks || {}), ...inc.dealAcks } : cur.dealAcks,
+  };
+}

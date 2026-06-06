@@ -5,6 +5,7 @@ import {
   isLobbyHost,
   startGameSession,
   hotTakeToRemote,
+  traitreToRemote,
   speedVoteToRemote,
   triviaToRemote,
   truthMeterToRemote,
@@ -14,6 +15,7 @@ import {
   playlistGuessToRemote,
 } from "./gameSync.js";
 import { navigate } from "./router.js";
+import { defaultTraitrePrepSession } from "./traitreSession.js";
 import { defaultSpeedVotePrepSession } from "./speedVoteSession.js";
 import { PLAYLIST_GUESS_MIN_PLAYERS } from "../../data/playlistGuess.js";
 import { defaultPlaylistGuessPrepSession } from "./playlistGuessSession.js";
@@ -27,6 +29,7 @@ import { showAppAlert } from "./dialog.js";
 import { escapeHtml } from "./ui.js";
 
 const GAME_ID_TO_TILE = {
+  traitre: "traitre-prep",
   hottake: "hottake-prep",
   speedvote: "speedvote-prep",
   trivia: "trivia-prep",
@@ -52,6 +55,29 @@ async function requireHostToLaunch() {
     icon: "👑",
   });
   return false;
+}
+
+export async function launchTraitrePrep() {
+  const tr = defaultTraitrePrepSession();
+  saveStatePatch({ traitreGame: tr });
+
+  if (isGameSyncActive()) {
+    if (!(await requireHostToLaunch())) return;
+    try {
+      await startGameSession("traitre", "traitre-prep", {
+        traitre: traitreToRemote(tr),
+      });
+    } catch (e) {
+      console.warn("REVEAL launch Traitre:", e);
+      await showAppAlert(e.message || "Impossible de lancer Le Traître.", {
+        title: "Le Traître",
+        icon: "⚠️",
+      });
+    }
+    return;
+  }
+
+  navigate("traitre-prep");
 }
 
 export async function launchSpeedVotePrep() {
@@ -295,6 +321,7 @@ export async function launchTierNightSelect() {
 }
 
 const RESTART_HANDLERS = {
+  traitre: launchTraitrePrep,
   hottake: launchHotTakePrep,
   speedvote: launchSpeedVotePrep,
   trivia: launchTriviaPrep,

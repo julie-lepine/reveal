@@ -156,10 +156,34 @@ export const GAME_RULES = {
     exemple:
       "« Capitale de l'Australie ? » Tu réponds Canberra en premier et juste → +10 (bonne) +10 (rapide).",
   },
+
+  traitre: {
+    title: "Le Traître",
+    emoji: "🎭",
+    but: "Tous reçoivent un mot secret — sauf un, qui a un mot proche. À l'oral, donnez des indices sans prononcer votre mot. Trouvez le traître avant qu'il ne finisse dans le duo final.",
+    etapes: [
+      "4 joueurs minimum. L'app distribue un mot secret à chacun (le traître a un mot voisin, ex. Android / iOS).",
+      "Manche 1 : chaque joueur dit un indice à voix haute, dans l'ordre affiché sur l'app.",
+      "Fin de manche 1 : l'hôte choisit « Continuer » (nouvelle manche d'indices) ou « Voter ».",
+      "À partir de la manche 2, un vote d'élimination est obligatoire après les indices.",
+      "Les indices d'une nouvelle manche doivent être différents des précédents.",
+      "Égalité au vote : revote obligatoire jusqu'à départager.",
+      "La partie continue jusqu'à l'élimination du traître ou s'il reste dans les 2 derniers survivants.",
+    ],
+    points: [
+      "Traître encore présent dans les 2 derniers : +50 pts (+10 pts par vote survécu, cumulés).",
+      "Traître éliminé : 0 pt pour lui.",
+      "Civil qui a voté pour le traître au vote de son élimination : +20 pts.",
+      "Les autres civils (mauvais vote ou pas le bon au bon moment) : 0 pt, même si le groupe gagne.",
+    ],
+    exemple:
+      "Mot majorité « Android », traître « iOS ». M1 : indices oraux. M2 : vote — le traître survit (+10). M3 : vote — Léa et Tom votent le traître, il est éliminé : Léa et Tom +20 chacun, les autres 0.",
+  },
 };
 
 /** Correspondance entre l'id de navigation (cartes / écrans) et la clé de règles. */
 export const RULES_KEY_BY_NAV = {
+  "traitre-prep": "traitre",
   "playlistguess-prep": "playlistguess",
   "consensus-prep": "consensus",
   "hottake-prep": "hottake",

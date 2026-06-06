@@ -1,6 +1,16 @@
 /** Catalogue des jeux affichés dans le menu. `enabled: false` → section « Bientôt » (gameSelect). */
 export const GAMES = [
   {
+    id: "traitre-prep",
+    title: "Le Traître",
+    desc: "4 joueurs min. — mot secret, indices oraux, démasque l'intrus",
+    emoji: "🎭",
+    cssClass: "traitre",
+    borderGradient:
+      "linear-gradient(145deg, #F97316 0%, #EF4444 48%, #2B2D66 100%)",
+    enabled: true,
+  },
+  {
     id: "playlistguess-prep",
     title: "VibeCheck",
     desc: "3 joueurs min. - une chanson, votez à qui elle correspond le mieux",
