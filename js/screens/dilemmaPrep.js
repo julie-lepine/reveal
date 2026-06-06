@@ -9,6 +9,7 @@ import {
   getModerationNotice,
   isLocalDilemmaHost,
   markDilemmaLobbyStarted,
+  getDilemmaEntryScreen,
   setDilemmaReady,
   setDilemmaRoundCount,
   setDilemmaDeck,
@@ -29,7 +30,7 @@ import {
   onGameSessionChange,
   refreshGameSession,
 } from "../core/gameSync.js";
-import { navigate } from "../core/router.js";
+import { prepGuestFollowOnSession, runPrepGameLaunch } from "../core/mpLaunch.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
 import {
   bindPrepRemoveDelegation,
@@ -175,9 +176,10 @@ export function mountDilemmaPrep(app) {
   }
 
   async function onStartGame() {
-    if (!isLobbyHost()) return;
-    await markDilemmaLobbyStarted();
-    navigate("dilemma", {
+    await runPrepGameLaunch({
+      btn: app.querySelector("#btn-start-game"),
+      launch: markDilemmaLobbyStarted,
+      gameScreen: "dilemma",
       navStack: ["home", "lobby", "game-select", "dilemma-prep", "dilemma"],
     });
   }
@@ -359,7 +361,14 @@ export function mountDilemmaPrep(app) {
     void refreshGameSession().then(() => refreshFromSync());
   }
 
+  const guestFollow = prepGuestFollowOnSession({
+    prepScreen: "dilemma-prep",
+    getEntryScreen: getDilemmaEntryScreen,
+    buildNavStack: (entry) => ["home", "lobby", "game-select", "dilemma-prep", entry],
+  });
+
   const unsub = onGameSessionChange(() => {
+    if (guestFollow()) return;
     refreshFromSync();
   });
 

@@ -16,10 +16,12 @@ import {
   isGameSyncActive,
   isLobbyHost,
   syncDilemmaSession,
-  pushGameSession,
   allMembersReady,
   dilemmaToRemote,
+  patchGameState,
+  userIdForName,
 } from "./gameSync.js";
+import { launchGameWithSync, commitHostGamePlay } from "./mpLaunch.js";
 import { checkHotTakeModeration, getModerationNotice } from "./hotTakeSession.js";
 import { mergeDilemmaCustomDilemmas, mergeAuthorOwnedCustomList, normalizeDilemmaEntry } from "./sessionMerge.js";
 
@@ -40,6 +42,8 @@ function defaultSession() {
     roundScored: false,
     blindMode: false,
     pausedBy: null,
+    matchScores: {},
+    lastRound: null,
   };
 }
 
@@ -232,14 +236,19 @@ export async function markDilemmaLobbyStarted() {
     lobbyStarted: true,
     ...votingPayloadForRound(0, deck),
   };
-  saveStatePatch({ dilemmaGame: next });
-  if (isGameSyncActive() && isLobbyHost()) {
-    await pushGameSession({
-      screen: "dilemma",
-      gameId: "dilemma",
-      state: { dilemma: dilemmaToRemote(next) },
-    });
-  }
+  return launchGameWithSync({
+    screen: "dilemma",
+    gameId: "dilemma",
+    mode: "push",
+    beforeCommit: async () => {
+      if (isGameSyncActive() && isLobbyHost()) {
+        const { setLobbyPlaying } = await import("./lobby.js");
+        await setLobbyPlaying("dilemma");
+      }
+    },
+    applyLocal: () => saveStatePatch({ dilemmaGame: next }),
+    getRemoteState: () => ({ dilemma: dilemmaToRemote(next) }),
+  });
 }
 
 export async function startDilemmaRound(roundIdx) {
@@ -255,6 +264,27 @@ export async function startDilemmaRound(roundIdx) {
 export async function resetDilemmaReady() {
   const session = getDilemmaSession();
   await syncDilemmaSession({ ...session, ready: {} });
+}
+
+/** Prep propre après une partie : garde deck / manches, efface customs. */
+export function dilemmaPrepAfterGameReset() {
+  const session = getDilemmaSession();
+  return {
+    ...defaultSession(),
+    selectedDeckId: session.selectedDeckId || DILEMMA_CATALOG_ID,
+    roundCount: session.roundCount ?? 8,
+  };
+}
+
+/** Fin de partie : purge les dilemmes custom pour tout le lobby (hôte sync). */
+export async function resetDilemmaAfterGame() {
+  const next = dilemmaPrepAfterGameReset();
+  if (isGameSyncActive() && isLobbyHost()) {
+    await syncDilemmaSession(next);
+  } else {
+    saveStatePatch({ dilemmaGame: next });
+  }
+  return next;
 }
 
 export async function setDilemmaReady(playerName, ready) {
@@ -297,9 +327,27 @@ export function simulateDilemmaReady(onUpdate) {
 }
 
 export async function commitDilemmaPlay(patch, patchOpts = {}) {
-  const session = { ...getDilemmaSession(), ...patch };
-  await syncDilemmaSession(session, patchOpts);
-  return session;
+  return commitHostGamePlay({
+    patch,
+    gameId: "dilemma",
+    stateKey: "dilemma",
+    getSession: getDilemmaSession,
+    saveLocal: (session) => saveStatePatch({ dilemmaGame: session }),
+    toRemote: dilemmaToRemote,
+    patchOpts,
+  });
+}
+
+/** Invité MP : envoie uniquement son vote (évite d'écraser phase reveal de l'hôte). */
+export async function commitDilemmaVote(choice) {
+  const localName = getLocalDisplayName();
+  const session = getDilemmaSession();
+  const votes = { ...(session.votes || {}), [localName]: choice };
+  saveStatePatch({ dilemmaGame: { ...session, votes } });
+  if (!isGameSyncActive()) return { ...session, votes };
+  const uid = userIdForName(localName) || localName;
+  await patchGameState({ dilemma: { votes: { [uid]: choice } } });
+  return { ...session, votes };
 }
 
 export async function setDilemmaPausedBy(name) {

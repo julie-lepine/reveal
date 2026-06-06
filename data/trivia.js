@@ -1,7 +1,6 @@
 import { EVENING_POINTS } from "./eveningScoring.js";
 
 export const TRIVIA_RANDOM_THEME_ID = "random";
-export const TRIVIA_TIMER_SEC = 15;
 export const TRIVIA_QUESTION_COUNT_PRESETS = [5, 10, 15, 20];
 export const TRIVIA_POINTS_CORRECT = EVENING_POINTS.WIN;
 export const TRIVIA_POINTS_FASTEST = EVENING_POINTS.WIN;
@@ -82,7 +81,7 @@ export const TRIVIA_QUESTIONS = [
   {
     id: "cinema-008",
     theme: "cinema",
-    question: "QDans Harry Potter, comment s'appelle le meilleur ami d'Harry ?",
+    question: "Dans Harry Potter, comment s'appelle le meilleur ami d'Harry ?",
     answers: ["Neville","Drago","Ron","Cedric"],
     correct: 2,
     difficulty: "easy",
@@ -1258,7 +1257,7 @@ export const TRIVIA_QUESTIONS = [
   {
     id: "series-011",
     theme: "series",
-    question: "Quelle série se déroule principalement dans un bureau de papier ?",
+    question: "Quelle série se déroule principalement dans une entreprise de papier ?",
     answers: ["Brooklyn Nine-Nine","The Office","How I Met Your Mother","Friends"],
     correct: 1,
     difficulty: "medium",

@@ -6,6 +6,7 @@ import {
   getSpeedVoteModifier,
   getVoteTargets,
   commitSpeedVotePlay,
+  commitSpeedVoteVote,
   allSpeedVoteVotesIn,
   simulateSpeedVoteLobbyVotes,
   countSpeedVoteResults,
@@ -294,7 +295,7 @@ export function mountSpeedVote(app) {
         myVote = target;
         votes = { ...votes, [localName]: target };
         if (mp) {
-          await commitSpeedVotePlay({ votes });
+          await commitSpeedVoteVote(target);
           if (allSpeedVoteVotesIn() && isLobbyHost()) await goToReveal();
           render();
         } else {

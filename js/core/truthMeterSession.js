@@ -9,10 +9,12 @@ import {
   isGameSyncActive,
   isLobbyHost,
   syncTruthMeterSession,
-  pushGameSession,
   allMembersReady,
   truthMeterToRemote,
+  patchGameState,
+  userIdForName,
 } from "./gameSync.js";
+import { launchGameWithSync, commitHostGamePlay } from "./mpLaunch.js";
 
 function defaultSession() {
   return {
@@ -26,6 +28,8 @@ function defaultSession() {
     votes: {},
     voteEndsAt: null,
     roundScored: false,
+    matchScores: {},
+    lastRound: null,
   };
 }
 
@@ -169,23 +173,49 @@ export async function markTruthMeterLobbyStarted() {
     votes: {},
     voteEndsAt: null,
     roundScored: false,
+    matchScores: {},
+    lastRound: null,
   };
-  saveStatePatch({ truthMeterGame: next });
-  if (isGameSyncActive() && isLobbyHost()) {
-    const { setLobbyPlaying } = await import("./lobby.js");
-    await setLobbyPlaying("truthmeter");
-    await pushGameSession({
-      screen: "truthmeter",
-      gameId: "truthmeter",
-      state: { truthMeter: truthMeterToRemote(next) },
-    });
-  }
+  return launchGameWithSync({
+    screen: "truthmeter",
+    gameId: "truthmeter",
+    mode: "push",
+    beforeCommit: async () => {
+      if (isGameSyncActive() && isLobbyHost()) {
+        const { setLobbyPlaying } = await import("./lobby.js");
+        await setLobbyPlaying("truthmeter");
+      }
+    },
+    applyLocal: () => saveStatePatch({ truthMeterGame: next }),
+    getRemoteState: () => ({ truthMeter: truthMeterToRemote(next) }),
+  });
 }
 
 export async function commitTruthMeterPlay(patch, patchOpts = {}) {
-  const session = { ...getTruthMeterSession(), ...patch };
-  await syncTruthMeterSession(session, patchOpts);
-  return session;
+  return commitHostGamePlay({
+    patch,
+    gameId: "truthmeter",
+    stateKey: "truthMeter",
+    getSession: getTruthMeterSession,
+    saveLocal: (session) => saveStatePatch({ truthMeterGame: session }),
+    toRemote: truthMeterToRemote,
+    patchOpts,
+  });
+}
+
+/** MP : envoie uniquement le vote local (évite d'écraser phase reveal de l'hôte). */
+export async function commitTruthMeterVote(choice) {
+  const localName = getLocalDisplayName();
+  const session = getTruthMeterSession();
+  if (session.votes?.[localName] != null && Number.isFinite(session.votes[localName])) {
+    return session.votes[localName];
+  }
+  const votes = { ...(session.votes || {}), [localName]: choice };
+  saveStatePatch({ truthMeterGame: { ...session, votes } });
+  if (!isGameSyncActive()) return choice;
+  const uid = userIdForName(localName) || localName;
+  await patchGameState({ truthMeter: { votes: { [uid]: choice } } });
+  return choice;
 }
 
 export function allTruthMeterVotesIn() {

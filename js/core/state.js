@@ -151,13 +151,11 @@ const defaultState = () => ({
     lobbyStarted: false,
     selectedModeId: "standard",
     questionCount: 5,
-    questionTimeSec: 15,
     deck: null,
     questionIdx: 0,
     phase: null,
     currentQuestion: null,
     answers: {},
-    questionEndsAt: null,
     roundScored: false,
     matchScores: {},
     lastRound: null,
@@ -185,13 +183,11 @@ const defaultState = () => ({
     lobbyStarted: false,
     selectedThemeId: "random",
     questionCount: 5,
-    questionTimeSec: 15,
     deck: null,
     questionIdx: 0,
     phase: null,
     currentQuestion: null,
     answers: {},
-    questionEndsAt: null,
     questionScored: false,
     matchScores: {},
     lastRound: null,
@@ -555,7 +551,7 @@ export function getCurrentSessionScoreMap(gameId = getActiveScoringGame()) {
 }
 
 function creditGameScore(playerName, points) {
-  const gid = activeScoringGameId;
+  const gid = getActiveScoringGame();
   if (!gid) return;
   if (!state.gameScores[gid]) {
     state.gameScores[gid] = {};
@@ -721,7 +717,7 @@ export function setGuessLieSubmission(playerName, payload) {
   save();
 }
 
-export async function markGuessLieLobbyComplete() {
+function applyGuessLieLobbyCompleteLocal() {
   syncGuessLieSession();
   state.guessLie.lobbyComplete = true;
   state.guessLie.roundIdx = 0;
@@ -729,14 +725,19 @@ export async function markGuessLieLobbyComplete() {
   state.guessLie.votes = {};
   state.guessLie.roundScored = false;
   save();
-  const { isGameSyncActive, pushGameSession, guessLieToRemote } = await import("./gameSync.js");
-  if (isGameSyncActive()) {
-    await pushGameSession({
-      screen: "guesslie",
-      gameId: "guesslie",
-      state: { guessLie: guessLieToRemote(state.guessLie) },
-    });
-  }
+}
+
+export async function markGuessLieLobbyComplete() {
+  syncGuessLieSession();
+  const { launchGameWithSync } = await import("./mpLaunch.js");
+  const { guessLieLobbyStartToRemote } = await import("./gameSync.js");
+  return launchGameWithSync({
+    screen: "guesslie",
+    gameId: "guesslie",
+    mode: "patch",
+    applyLocal: applyGuessLieLobbyCompleteLocal,
+    getRemoteState: () => ({ guessLie: guessLieLobbyStartToRemote() }),
+  });
 }
 
 export function resetGuessLieSession() {

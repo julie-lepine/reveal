@@ -4,6 +4,7 @@ import { getLocalDisplayName } from "../core/state.js";
 import { showAppAlert } from "../core/dialog.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
 import { isGameSyncActive, isLobbyHost, onGameSessionChange } from "../core/gameSync.js";
+import { prepGuestFollowOnSession, runPrepGameLaunch } from "../core/mpLaunch.js";
 import { navigate } from "../core/router.js";
 import { pageShell } from "../core/ui.js";
 import { bindNav } from "./nav.js";
@@ -40,9 +41,10 @@ export function mountTriviaSetup(app) {
       );
       return;
     }
-    const result = await trivia.startLobbyGame();
-    if (!result.ok) return;
-    navigate("trivia", {
+    await runPrepGameLaunch({
+      btn: app.querySelector("#btn-trivia-start"),
+      launch: () => trivia.startLobbyGame(),
+      gameScreen: "trivia",
       navStack: ["home", "lobby", "game-select", "trivia-prep", "trivia"],
     });
   }
@@ -113,14 +115,14 @@ export function mountTriviaSetup(app) {
 
   render();
 
+  const guestFollow = prepGuestFollowOnSession({
+    prepScreen: "trivia-prep",
+    getEntryScreen: () => trivia.getEntryScreen(),
+    buildNavStack: (entry) => ["home", "lobby", "game-select", "trivia-prep", entry],
+  });
+
   const unsub = onGameSessionChange(() => {
-    const entry = trivia.getEntryScreen();
-    if (entry !== "trivia-prep") {
-      navigate(entry, {
-        navStack: ["home", "lobby", "game-select", "trivia-prep", entry],
-      });
-      return;
-    }
+    if (guestFollow()) return;
     render();
   });
 

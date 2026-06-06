@@ -73,7 +73,7 @@ Puis ▶ Run dans Xcode (ou *Product → Clean Build Folder* si comportement biz
 - [ ] 🧪 **Invité** + pseudo + code lobby (Turnstile sur le flux invité si affiché)
 - [ ] 🧪 **Mot de passe oublié** : saisie email → mail reçu (Resend)
 
-Réf. Turnstile hostnames : `localhost`, `127.0.0.1`, `julie-lepine.github.io` — pas besoin d’ajouter un hostname « iPhone » ; c’est la WebView de l’app.
+Réf. Turnstile : `capacitor.config.ts` → `iosScheme: 'https'` (sinon `capacitor://localhost` et captcha bloqué). Hostnames Cloudflare : `localhost`, `127.0.0.1`, `julie-lepine.github.io`. Après modif : `npm run cap:sync` + rebuild Xcode.
 
 ---
 

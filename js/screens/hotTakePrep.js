@@ -9,6 +9,7 @@ import {
   getModerationNotice,
   isLocalHotTakeHost,
   markHotTakeLobbyStarted,
+  getHotTakeEntryScreen,
   setHotTakeReady,
   simulateHotTakeReady,
   setHotTakeTheme,
@@ -25,6 +26,7 @@ import { getLocalDisplayName } from "../core/state.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
 import { rulesButtonHtml } from "../core/gameRulesUi.js";
 import { isGameSyncActive, isLobbyHost, onGameSessionChange } from "../core/gameSync.js";
+import { prepGuestFollowOnSession, runPrepGameLaunch } from "../core/mpLaunch.js";
 import { navigate } from "../core/router.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
 import {
@@ -172,9 +174,10 @@ export function mountHotTakePrep(app) {
   }
 
   async function onStartGame() {
-    if (!isLobbyHost()) return;
-    await markHotTakeLobbyStarted();
-    navigate("hottake", {
+    await runPrepGameLaunch({
+      btn: app.querySelector("#btn-start-game"),
+      launch: markHotTakeLobbyStarted,
+      gameScreen: "hottake",
       navStack: ["home", "lobby", "game-select", "hottake-prep", "hottake"],
     });
   }
@@ -354,7 +357,14 @@ export function mountHotTakePrep(app) {
 
   render();
 
+  const guestFollow = prepGuestFollowOnSession({
+    prepScreen: "hottake-prep",
+    getEntryScreen: getHotTakeEntryScreen,
+    buildNavStack: (entry) => ["home", "lobby", "game-select", "hottake-prep", entry],
+  });
+
   const unsub = onGameSessionChange(() => {
+    if (guestFollow()) return;
     refreshFromSync();
   });
 

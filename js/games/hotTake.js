@@ -11,11 +11,17 @@ import {
   simulateLobbyVotes,
   getMajorityOption,
   commitHotTakePlay,
+  commitHotTakeVote,
   allHotTakeVotesIn,
+  resetHotTakeAfterGame,
 } from "../core/hotTakeSession.js";
 import { awardHotTakeVotes, EVENING_POINTS } from "../core/scoring.js";
-import { gameCumulativeScoresHtml, refreshGameScoresBox } from "../core/gameScores.js";
-import { getActivePlayers } from "../core/players.js";
+import {
+  applyMatchScoreDeltas,
+  gameCumulativeScoresHtml,
+  refreshGameScoresBox,
+} from "../core/gameScores.js";
+import { getActivePlayers, getActivePlayerNames } from "../core/players.js";
 import { getLocalDisplayName, recordHotTakePlayed, setLastGame } from "../core/state.js";
 import { setLobbyPlaying, setLobbyWaiting } from "../core/lobby.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
@@ -30,6 +36,7 @@ import {
   isLobbyHost,
   onGameSessionChange,
   completeGameSession,
+  hotTakeToRemote,
 } from "../core/gameSync.js";
 
 export function mountHotTake(app) {
@@ -152,7 +159,24 @@ export function mountHotTake(app) {
   }
 
   function canChangeVote() {
-    return phase === "voting" && !isEveningGameplayPaused();
+    return phase === "voting" && !isEveningGameplayPaused() && myVote == null;
+  }
+
+  function hotTakeSessionScores() {
+    return getHotTakeSession().matchScores || {};
+  }
+
+  function hotTakeLastRoundFromSession() {
+    return getHotTakeSession().lastRound || null;
+  }
+
+  function buildHotTakeLastRound(award) {
+    if (!award?.pointsAwarded) return null;
+    return {
+      majority: award.majority,
+      pointsAwarded: true,
+      deltas: award.deltas || {},
+    };
   }
 
   function hotTakeAwardSummaryHtml(voteResult, { pointsAwarded = false } = {}) {
@@ -203,13 +227,21 @@ export function mountHotTake(app) {
     revealInFlight = true;
     try {
       takeScored = true;
-      lastAward = awardHotTakeVotes(votesToScore, HOT_TAKE_OPTIONS);
+      let matchScores = getHotTakeSession().matchScores || {};
+      let lastRound = getHotTakeSession().lastRound || null;
+      if (canAwardThisTake()) {
+        lastAward = awardHotTakeVotes(votesToScore, HOT_TAKE_OPTIONS);
+        matchScores = applyMatchScoreDeltas(matchScores, lastAward.deltas || {});
+        lastRound = buildHotTakeLastRound(lastAward);
+      }
       await commitHotTakePlay(
         {
           phase: "reveal",
           takeScored: true,
           votes: votesToScore,
           voteEndsAt: null,
+          matchScores,
+          lastRound,
         },
         { withEveningScores: mp && isLobbyHost() }
       );
@@ -267,6 +299,12 @@ export function mountHotTake(app) {
     await goToReveal();
   }
 
+  function countPlayersVoted(votesMap = votes) {
+    return getActivePlayerNames().filter(
+      (name) => votesMap[name] != null && votesMap[name] !== ""
+    ).length;
+  }
+
   function render() {
     syncFromSession();
     const take = takeLabel(TAKES[takeIdx]);
@@ -285,10 +323,7 @@ export function mountHotTake(app) {
         : "Choisis ton camp !";
     const voteOptionsHint =
       "Valide = d'accord · Acceptable = bof · Criminel = pas d'accord";
-    const voteHintExtra =
-      phase === "voting" && canChangeVote()
-        ? " · Tu peux changer ton vote tant que le vote est ouvert."
-        : "";
+    const voteHintExtra = "";
 
     let phaseHtml = "";
 
@@ -301,7 +336,7 @@ export function mountHotTake(app) {
 
     if (phase === "voting") {
       const canVote = canChangeVote();
-      const votedCount = Object.keys(votes).length;
+      const votedCount = countPlayersVoted();
       const totalPlayers = getActivePlayers().length;
       phaseHtml = `
         <p class="label-upper label-upper--muted">Vote simultané</p>
@@ -333,7 +368,9 @@ export function mountHotTake(app) {
       const voteResult = getMajorityOption(revealVotes, HOT_TAKE_OPTIONS);
       const crownOpt = voteResult.majority;
       const awardHtml = hotTakeAwardSummaryHtml(voteResult, {
-        pointsAwarded: Boolean(lastAward?.pointsAwarded),
+        pointsAwarded: Boolean(
+          lastAward?.pointsAwarded || hotTakeLastRoundFromSession()?.pointsAwarded
+        ),
       });
       phaseHtml = `
         <h3 class="section-title">Résultats du vote</h3>
@@ -353,7 +390,11 @@ export function mountHotTake(app) {
             </div>`;
         }).join("")}
         ${hotTakePlayerVotesHtml(revealVotes)}
-        ${gameCumulativeScoresHtml({ gameLabel: "Hot Take", title: "Cumul des scores" })}
+        ${gameCumulativeScoresHtml({
+          gameLabel: "Hot Take",
+          title: "Cumul des scores",
+          scores: hotTakeSessionScores(),
+        })}
         ${
           host
             ? `<button type="button" class="btn btn-primary btn--spaced" id="next-take">
@@ -399,7 +440,7 @@ export function mountHotTake(app) {
           voteCommitInFlight = choice;
           render();
           try {
-            await commitHotTakePlay({ votes: { ...votes } });
+            await commitHotTakeVote(choice);
           } finally {
             voteCommitInFlight = null;
             syncFromSession();
@@ -439,9 +480,14 @@ export function mountHotTake(app) {
           title: "Hot Take",
           summary: `${total} prises · dernière majorité : ${lastAward?.majority || "-"}`,
         });
+        const resetHt = await resetHotTakeAfterGame();
         if (mp) {
           try {
-            await completeGameSession({ gameId: "hottake", screen: "results", state: {} });
+            await completeGameSession({
+              gameId: "hottake",
+              screen: "results",
+              state: { hotTake: hotTakeToRemote(resetHt) },
+            });
           } catch (e) {
             console.warn("REVEAL completeGameSession:", e);
             navigate("results", { navStack: ["home", "lobby", "game-select", "results"] });
@@ -460,7 +506,7 @@ export function mountHotTake(app) {
   }
 
   function patchVotingChrome() {
-    const votedCount = Object.keys(votes).length;
+    const votedCount = countPlayersVoted();
     const totalPlayers = getActivePlayers().length;
     const forceBtn = app.querySelector("#hottake-force");
     if (forceBtn) {
@@ -479,7 +525,11 @@ export function mountHotTake(app) {
     if (shouldSkipFullRender(prevPhase, prevTake)) {
       if (phase === "voting") patchVotingChrome();
       if (phase === "reveal") {
-        refreshGameScoresBox(app, { gameLabel: "Hot Take", title: "Cumul des scores" });
+        refreshGameScoresBox(app, {
+          gameLabel: "Hot Take",
+          title: "Cumul des scores",
+          scores: hotTakeSessionScores(),
+        });
       }
       return;
     }

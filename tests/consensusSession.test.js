@@ -1,0 +1,80 @@
+import { describe, it } from "node:test";
+import assert from "node:assert/strict";
+import { CONSENSUS_DEFAULT_SLIDER_VALUE } from "../data/consensus.js";
+import {
+  applyConsensusDefaultAnswers,
+  clampConsensusValue,
+  isConsensusAnswerForRound,
+  stripStaleConsensusAnswers,
+} from "../js/core/consensusAnswerUtils.js";
+
+describe("clampConsensusValue", () => {
+  it("utilise 50 % par défaut pour null / undefined / vide", () => {
+    assert.equal(clampConsensusValue(null), CONSENSUS_DEFAULT_SLIDER_VALUE);
+    assert.equal(clampConsensusValue(undefined), CONSENSUS_DEFAULT_SLIDER_VALUE);
+    assert.equal(clampConsensusValue(""), CONSENSUS_DEFAULT_SLIDER_VALUE);
+    assert.equal(clampConsensusValue("nope"), CONSENSUS_DEFAULT_SLIDER_VALUE);
+  });
+
+  it("conserve 0 % si choisi explicitement", () => {
+    assert.equal(clampConsensusValue(0), 0);
+    assert.equal(clampConsensusValue("0"), 0);
+  });
+});
+
+describe("isConsensusAnswerForRound", () => {
+  it("ignore submittedAt sans questionIdx (réponse stale)", () => {
+    assert.equal(
+      isConsensusAnswerForRound({ value: 0, submittedAt: 1, questionIdx: null }, 1),
+      false
+    );
+    assert.equal(
+      isConsensusAnswerForRound({ value: 80, submittedAt: 1, questionIdx: 0 }, 1),
+      false
+    );
+  });
+
+  it("accepte une réponse validée pour la manche courante", () => {
+    assert.equal(
+      isConsensusAnswerForRound(
+        { value: 65, submittedAt: 2, questionIdx: 1 },
+        1
+      ),
+      true
+    );
+  });
+});
+
+describe("stripStaleConsensusAnswers", () => {
+  it("purge les réponses d'une manche précédente", () => {
+    const out = stripStaleConsensusAnswers(
+      {
+        Alice: { value: 0, submittedAt: 1, questionIdx: 1 },
+        Bob: { value: 70, submittedAt: 2, questionIdx: 2 },
+      },
+      2
+    );
+    assert.equal(out.Alice, undefined);
+    assert.equal(out.Bob?.value, 70);
+  });
+});
+
+describe("applyConsensusDefaultAnswers", () => {
+  it("impute 50 % aux joueurs actifs sans réponse validée", () => {
+    const out = applyConsensusDefaultAnswers(
+      {
+        phase: "question",
+        questionIdx: 0,
+        answers: {
+          Alice: { value: 40, submittedAt: 1, questionIdx: 0 },
+        },
+        matchScores: {},
+      },
+      ["Alice", "Bob"]
+    );
+    assert.equal(out.answers.Alice.value, 40);
+    assert.equal(out.answers.Bob.value, CONSENSUS_DEFAULT_SLIDER_VALUE);
+    assert.equal(out.answers.Bob.imputed, true);
+    assert.equal(out.answers.Bob.questionIdx, 0);
+  });
+});

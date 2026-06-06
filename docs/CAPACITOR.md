@@ -85,12 +85,15 @@ Le code utilise `getAuthRedirectUrl()` : redirect web en navigateur, deep link e
 
 ## Turnstile en WebView
 
+`capacitor.config.ts` : `androidScheme` et **`iosScheme`** = `'https'` → WebView en `https://localhost` (requis pour Turnstile sur iPhone ; sans `iosScheme`, iOS utilise `capacitor://localhost` et le captcha échoue).
+
 Ajouter dans le widget Cloudflare les hostnames :
 
 - `localhost`
 - `127.0.0.1`
+- `julie-lepine.github.io` (version web)
 
-Puis tester login / signup sur téléphone réel.
+Puis `npm run cap:sync` et tester login / signup sur téléphone réel.
 
 ---
 

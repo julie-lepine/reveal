@@ -58,6 +58,15 @@ export function mountTierNight(app) {
     if (unplaced().length === 0) void finishGame();
   }
 
+  function unplaceItem(item) {
+    const next = { ...placed };
+    Object.keys(next).forEach((t) => {
+      next[t] = (next[t] || []).filter((x) => x !== item);
+    });
+    placed = next;
+    render();
+  }
+
   async function finishGame() {
     if (finished) return;
     finished = true;
@@ -132,13 +141,21 @@ export function mountTierNight(app) {
                 ${(placed[tier] || [])
                   .map(
                     (item) => `
-                  <span class="tier-chip" style="--tier-color:${TIER_COLORS[tier]}">${escapeHtml(item)}</span>`
+                  <button type="button" class="tier-chip" data-item="${escapeHtml(item)}"
+                    style="--tier-color:${TIER_COLORS[tier]}"
+                    title="Retirer du classement">${escapeHtml(item)}</button>`
                   )
                   .join("")}
               </div>
             </div>`
           ).join("")}
         </div>
+
+        ${
+          waitingLobby
+            ? ""
+            : `<p class="hint tier-unplace-hint">Touche une tuile classée pour la remettre en bas · glisse ou utilise les boutons pour classer.</p>`
+        }
 
         ${waitingLobby ? lobbyWaitHtml() : ""}
 
@@ -233,6 +250,13 @@ export function mountTierNight(app) {
         if (dragItem) placeItem(dragItem, row.getAttribute("data-tier"));
         dragItem = null;
         clearTierDropHighlight();
+      });
+    });
+
+    app.querySelectorAll(".tier-chip").forEach((chip) => {
+      chip.addEventListener("click", () => {
+        const item = chip.getAttribute("data-item");
+        if (item) unplaceItem(item);
       });
     });
 

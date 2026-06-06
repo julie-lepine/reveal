@@ -47,6 +47,8 @@ export function mountTrivia(app) {
   let npcTimers = [];
   let npcRoundKey = "";
   let revealInFlight = false;
+  let answerCommitInFlight = false;
+  let pendingAnswerIndex = null;
 
   const localName = getLocalDisplayName();
   const mp = isGameSyncActive();
@@ -68,17 +70,19 @@ export function mountTrivia(app) {
   }
 
   function myAnswerIndex() {
+    if (pendingAnswerIndex != null) return pendingAnswerIndex;
     return answers[localName]?.answerIndex ?? null;
   }
 
   function waitingMessage() {
     if (phase !== "question") return "";
     if (myAnswerIndex() != null) {
+      if (answerCommitInFlight) return "Envoi de ta réponse…";
       return trivia.allAnswersIn()
         ? "Tout le monde a répondu. Révélation en cours…"
-        : "En attente des autres joueurs… tu peux encore changer ta réponse.";
+        : "Réponse enregistrée — tu peux encore la modifier · en attente des autres…";
     }
-    return "Choisis ta réponse. Tu peux la modifier tant que tout le monde n'a pas répondu.";
+    return "Choisis ta réponse (tu pourras la modifier avant la révélation).";
   }
 
   function pickNpcAnswerIndex(question) {
@@ -144,7 +148,6 @@ export function mountTrivia(app) {
       await trivia.commitPlay({
         ...session,
         phase: "reveal",
-        questionEndsAt: null,
       });
     } finally {
       revealInFlight = false;
@@ -305,7 +308,6 @@ export function mountTrivia(app) {
       const claimed = {
         ...live,
         phase: "final",
-        questionEndsAt: null,
         podiumApplied: true,
       };
       if (mp) {
@@ -326,7 +328,6 @@ export function mountTrivia(app) {
     const finalSession = {
       ...trivia.getSession(),
       phase: "final",
-      questionEndsAt: null,
       podiumApplied: true,
       results: { standings },
     };
@@ -371,6 +372,7 @@ export function mountTrivia(app) {
           questionIdx,
           totalQuestions,
           selectedAnswer: myAnswerIndex(),
+          locked: answerCommitInFlight,
           waitingMessage: waitingMessage(),
         })}
         <div data-trivia-live-board>
@@ -449,12 +451,34 @@ export function mountTrivia(app) {
       app.querySelectorAll("[data-trivia-answer]").forEach((btn) => {
         btn.addEventListener("click", async () => {
           if (trivia.getSession().phase !== "question" || isEveningGameplayPaused()) return;
-          await trivia.commitAnswer(Number(btn.getAttribute("data-trivia-answer")));
-          if (trivia.allAnswersIn() && (!mp || isLobbyHost())) {
-            await goToReveal();
+          if (answerCommitInFlight) return;
+          const choice = Number(btn.getAttribute("data-trivia-answer"));
+          if (!Number.isInteger(choice)) return;
+          if (
+            myAnswerIndex() === choice &&
+            trivia.getSession().answers?.[localName]?.answerIndex === choice
+          ) {
             return;
           }
+
+          pendingAnswerIndex = choice;
+          answerCommitInFlight = true;
           render();
+
+          try {
+            await trivia.commitAnswer(choice);
+            syncFromSession();
+            if (trivia.allAnswersIn() && (!mp || isLobbyHost())) {
+              await goToReveal();
+              return;
+            }
+          } catch {
+            syncFromSession();
+          } finally {
+            pendingAnswerIndex = null;
+            answerCommitInFlight = false;
+            render();
+          }
         });
       });
       app.querySelector("#btn-trivia-force")?.addEventListener("click", () => {
@@ -532,6 +556,10 @@ export function mountTrivia(app) {
     const prevPhase = phase;
     const prevQuestion = questionIdx;
     syncFromSession();
+    if (prevQuestion !== questionIdx || prevPhase !== phase) {
+      pendingAnswerIndex = null;
+      answerCommitInFlight = false;
+    }
     if (phase === "question" && isLobbyHost() && trivia.allAnswersIn()) {
       void goToReveal();
     }

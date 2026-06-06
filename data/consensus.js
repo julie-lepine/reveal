@@ -1,7 +1,10 @@
-export const CONSENSUS_TIMER_SEC = 15;
 export const CONSENSUS_QUESTION_COUNT_PRESETS = [5, 10, 15, 20];
 export const CONSENSUS_REVEAL_PENDING_MS = 650;
+/** Délai max avant abandon d'un patch Supabase (révélation, etc.). */
+export const CONSENSUS_SYNC_PATCH_TIMEOUT_MS = 20000;
 export const CONSENSUS_LOBBY_PODIUM_POINTS = [50, 25, 10];
+/** Position neutre du slider ; imputée si le joueur ne valide pas avant la révélation. */
+export const CONSENSUS_DEFAULT_SLIDER_VALUE = 50;
 
 export const CONSENSUS_MODES = [
   {

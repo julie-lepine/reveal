@@ -139,5 +139,3 @@ export const TIER_COLORS = {
   D: "#A78BFA",
 };
 
-/** Temps pour classer toute la tier list (1 min 30) */
-export const TIER_NIGHT_TIMER_SEC = 90;

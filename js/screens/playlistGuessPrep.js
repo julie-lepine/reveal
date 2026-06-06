@@ -9,6 +9,7 @@ import {
   isLocalPlaylistGuessHost,
   lobbyPlayersWithIds,
   markPlaylistGuessLobbyStarted,
+  getPlaylistGuessEntryScreen,
   setPlaylistGuessReady,
   setPlaylistGuessRoundCount,
   simulatePlaylistGuessReady,
@@ -17,6 +18,7 @@ import { getLobbyParticipants } from "../core/lobby.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
 import { rulesButtonHtml } from "../core/gameRulesUi.js";
 import { isGameSyncActive, isLobbyHost, onGameSessionChange } from "../core/gameSync.js";
+import { prepGuestFollowOnSession, runPrepGameLaunch } from "../core/mpLaunch.js";
 import { navigate } from "../core/router.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
 import { bindNav } from "./nav.js";
@@ -123,8 +125,10 @@ export function mountPlaylistGuessPrep(app) {
       return;
     }
     try {
-      await markPlaylistGuessLobbyStarted();
-      navigate("playlistguess", {
+      await runPrepGameLaunch({
+        btn: app.querySelector("#btn-start-game"),
+        launch: markPlaylistGuessLobbyStarted,
+        gameScreen: "playlistguess",
         navStack: ["home", "lobby", "game-select", "playlistguess-prep", "playlistguess"],
       });
     } catch (e) {
@@ -210,7 +214,14 @@ export function mountPlaylistGuessPrep(app) {
 
   render();
 
+  const guestFollow = prepGuestFollowOnSession({
+    prepScreen: "playlistguess-prep",
+    getEntryScreen: getPlaylistGuessEntryScreen,
+    buildNavStack: (entry) => ["home", "lobby", "game-select", "playlistguess-prep", entry],
+  });
+
   const unsub = onGameSessionChange(() => {
+    if (guestFollow()) return;
     refreshRoundChips();
     refreshReadySection();
   });

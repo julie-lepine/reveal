@@ -1,6 +1,10 @@
 import { GUESS_LIE_ROUNDS } from "../../data/guessLies.js";
 import { getActivePlayerNames, getActivePlayers } from "./players.js";
 import { getLocalDisplayName, getState } from "./state.js";
+import {
+  navigateAfterGameLaunch,
+  runLaunchButton,
+} from "./mpLaunch.js";
 
 export function getGuessLieSession() {
   return getState().guessLie;
@@ -38,7 +42,18 @@ export function getGuessLieRounds() {
 export function getGuessLieEntryScreen() {
   if (!hasLocalSubmission()) return "guesslie-menu";
   if (!allLobbySubmitted()) return "guesslie-wait";
+  if (!getGuessLieSession().lobbyComplete) return "guesslie-wait";
   return "guesslie";
+}
+
+/** Lancement depuis le salon d'attente ou le menu (solo + MP avec secours local). */
+export async function handleGuessLieLaunch(btn) {
+  return runLaunchButton(btn, async () => {
+    const { markGuessLieLobbyComplete } = await import("./state.js");
+    const result = await markGuessLieLobbyComplete();
+    navigateAfterGameLaunch({ gameScreen: "guesslie", result });
+    return result;
+  });
 }
 
 export function fallbackForPlayer(playerName) {

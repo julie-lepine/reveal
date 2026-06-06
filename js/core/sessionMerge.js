@@ -80,13 +80,130 @@ export function mergeHotTakeCustomTakes(localList, remoteList, localAuthor) {
   });
 }
 
+/**
+ * Deck Hot Take / Dilemma : null en prep (customs modifiables).
+ * En partie lancée, deck figé — remote prioritaire.
+ */
+export function mergeCustomGameDeck(local = {}, remote = {}) {
+  const started = Boolean(local.lobbyStarted || remote.lobbyStarted);
+  if (!started) return null;
+  if (Array.isArray(remote.deck) && remote.deck.length) return remote.deck;
+  if (Array.isArray(local.deck) && local.deck.length) return local.deck;
+  return remote.deck ?? local.deck ?? null;
+}
+
+/** Fusion deck côté blob session (patch serveur). */
+export function mergeRemoteCustomGameDeck(cur = {}, inc = {}) {
+  const started = Boolean(cur?.lobbyStarted || inc?.lobbyStarted);
+  if (!started) return null;
+  if (Array.isArray(inc?.deck)) return inc.deck;
+  if (inc?.deck === null && !cur?.lobbyStarted) return null;
+  return inc?.deck ?? cur?.deck ?? null;
+}
+
+/** Patch invité : uniquement des votes — ne doit pas écraser phase / scoring / manche. */
+export function isVotesOnlyGamePatch(inc = {}) {
+  const keys = Object.keys(inc);
+  return keys.length === 1 && keys[0] === "votes";
+}
+
+/** Patch invité : uniquement des réponses (Consensus, Trivia). */
+export function isAnswersOnlyGamePatch(inc = {}) {
+  const keys = Object.keys(inc);
+  return keys.length === 1 && keys[0] === "answers";
+}
+
+/** Nouvelle manche Consensus : index avancé ou réponses distantes vidées après une manche précédente. */
+export function isNewConsensusQuestionRound(cur, inc) {
+  if (!inc) return false;
+  if (inc.phase !== "question" || inc.questionIdx == null) return false;
+  if (Object.keys(inc.answers || {}).length !== 0) return false;
+
+  if (cur?.questionIdx != null && inc.questionIdx !== cur.questionIdx) return true;
+
+  const curHasAnswers = Object.keys(cur?.answers || {}).length > 0;
+  if (!curHasAnswers) return false;
+
+  return (
+    cur?.questionIdx == null ||
+    cur?.phase === "reveal" ||
+    cur?.phase === "reveal-pending" ||
+    cur?.phase === "final" ||
+    !cur?.phase ||
+    cur?.phase !== "question"
+  );
+}
+
+/** Évite qu'un patch « question » tardif écrase reveal-pending / reveal (Consensus). */
+const CONSENSUS_PHASE_RANK = {
+  question: 0,
+  "reveal-pending": 1,
+  reveal: 2,
+  final: 3,
+};
+
+export function mergeConsensusPhase(curPhase, incPhase, { newQuestionRound = false } = {}) {
+  if (newQuestionRound) return incPhase ?? curPhase ?? null;
+  const curRank = CONSENSUS_PHASE_RANK[curPhase] ?? -1;
+  const incRank = CONSENSUS_PHASE_RANK[incPhase] ?? -1;
+  if (curRank < 0) return incPhase ?? curPhase ?? null;
+  if (incRank < 0) return curPhase ?? null;
+  return incRank >= curRank ? incPhase : curPhase;
+}
+
+const TRIVIA_PHASE_RANK = {
+  question: 0,
+  reveal: 1,
+  final: 2,
+};
+
+export function mergeTriviaPhase(curPhase, incPhase, { newQuestionRound = false } = {}) {
+  if (newQuestionRound) return incPhase ?? curPhase ?? null;
+  const curRank = TRIVIA_PHASE_RANK[curPhase] ?? -1;
+  const incRank = TRIVIA_PHASE_RANK[incPhase] ?? -1;
+  if (curRank < 0) return incPhase ?? curPhase ?? null;
+  if (incRank < 0) return curPhase ?? null;
+  return incRank >= curRank ? incPhase : curPhase;
+}
+
+/** Garde la réponse la plus récente (changement de réponse en phase question). */
+export function pickLatestTriviaAnswer(localAnswer, remoteAnswer) {
+  if (!localAnswer) return remoteAnswer || null;
+  if (!remoteAnswer) return localAnswer;
+  return (remoteAnswer.answeredAt || 0) >= (localAnswer.answeredAt || 0)
+    ? remoteAnswer
+    : localAnswer;
+}
+
+export function mergeTriviaAnswersUid(curAnswers = {}, incAnswers = {}) {
+  const merged = { ...curAnswers };
+  Object.entries(incAnswers).forEach(([uid, incoming]) => {
+    merged[uid] = pickLatestTriviaAnswer(merged[uid], incoming);
+  });
+  return merged;
+}
+
+/** Ne jamais régresser reveal → voting (course réseau vote / révélation hôte). */
+export function mergeForwardGamePhase(curPhase, incPhase) {
+  if (curPhase === "reveal" && incPhase === "voting") return "reveal";
+  if (incPhase == null || incPhase === "") return curPhase ?? null;
+  return incPhase;
+}
+
 /** État dilemma pour patchGameState (inc = patch client, cur = serveur). */
 export function mergeDilemmaPatchState(curDm, incDm, localAuthor, { mergeReadyUid, mergeVotes }) {
   if (!curDm) return incDm;
   if (!incDm) return curDm;
+  if (isVotesOnlyGamePatch(incDm)) {
+    return {
+      ...curDm,
+      votes: mergeVotes(curDm, incDm),
+    };
+  }
   return {
     ...curDm,
     ...incDm,
+    phase: mergeForwardGamePhase(curDm.phase, incDm.phase),
     ready: mergeReadyUid(curDm, incDm),
     votes: mergeVotes(curDm, incDm),
     customDilemmas: mergeDilemmaCustomDilemmas(
@@ -94,6 +211,7 @@ export function mergeDilemmaPatchState(curDm, incDm, localAuthor, { mergeReadyUi
       curDm.customDilemmas || [],
       localAuthor
     ),
+    deck: mergeRemoteCustomGameDeck(curDm, incDm),
   };
 }
 
@@ -101,9 +219,16 @@ export function mergeDilemmaPatchState(curDm, incDm, localAuthor, { mergeReadyUi
 export function mergeHotTakePatchState(curHt, incHt, localAuthor, { mergeReadyUid, mergeVotes }) {
   if (!curHt) return incHt;
   if (!incHt) return curHt;
+  if (isVotesOnlyGamePatch(incHt)) {
+    return {
+      ...curHt,
+      votes: mergeVotes(curHt, incHt),
+    };
+  }
   return {
     ...curHt,
     ...incHt,
+    phase: mergeForwardGamePhase(curHt.phase, incHt.phase),
     ready: mergeReadyUid(curHt, incHt),
     votes: mergeVotes(curHt, incHt),
     customTakes: mergeHotTakeCustomTakes(
@@ -111,5 +236,77 @@ export function mergeHotTakePatchState(curHt, incHt, localAuthor, { mergeReadyUi
       curHt.customTakes || [],
       localAuthor
     ),
+    deck: mergeRemoteCustomGameDeck(curHt, incHt),
+  };
+}
+
+/** État consensus pour patchGameState. */
+export function mergeConsensusPatchState(
+  cur,
+  inc,
+  { mergeReadyUid, mergeAnswers, newQuestionRound = false }
+) {
+  if (!cur) return inc;
+  if (!inc) return cur;
+  if (isAnswersOnlyGamePatch(inc)) {
+    return { ...cur, answers: mergeAnswers(cur, inc) };
+  }
+  return {
+    ...cur,
+    ...inc,
+    phase: mergeConsensusPhase(cur.phase, inc.phase, { newQuestionRound }),
+    ready: mergeReadyUid(cur, inc),
+    answers: mergeAnswers(cur, inc),
+  };
+}
+
+/** État trivia pour patchGameState. */
+export function mergeTriviaPatchState(
+  cur,
+  inc,
+  { mergeReadyUid, mergeAnswers, newQuestionRound = false }
+) {
+  if (!cur) return inc;
+  if (!inc) return cur;
+  if (isAnswersOnlyGamePatch(inc)) {
+    return { ...cur, answers: mergeAnswers(cur, inc) };
+  }
+  return {
+    ...cur,
+    ...inc,
+    phase: mergeTriviaPhase(cur.phase, inc.phase, { newQuestionRound }),
+    ready: mergeReadyUid(cur, inc),
+    answers: mergeAnswers(cur, inc),
+  };
+}
+
+/** État speed vote pour patchGameState. */
+export function mergeSpeedVotePatchState(cur, inc, { mergeReadyUid, mergeVotes }) {
+  if (!cur) return inc;
+  if (!inc) return cur;
+  if (isVotesOnlyGamePatch(inc)) {
+    return { ...cur, votes: mergeVotes(cur, inc) };
+  }
+  return {
+    ...cur,
+    ...inc,
+    phase: mergeForwardGamePhase(cur.phase, inc.phase),
+    ready: mergeReadyUid(cur, inc),
+    votes: mergeVotes(cur, inc),
+  };
+}
+
+/** État truth meter pour patchGameState. */
+export function mergeTruthMeterPatchState(cur, inc, { mergeReadyUid, mergeVotes }) {
+  if (!cur) return inc;
+  if (!inc) return cur;
+  if (isVotesOnlyGamePatch(inc)) {
+    return { ...cur, votes: mergeVotes(cur, inc) };
+  }
+  return {
+    ...cur,
+    ...inc,
+    ready: mergeReadyUid(cur, inc),
+    votes: mergeVotes(cur, inc),
   };
 }

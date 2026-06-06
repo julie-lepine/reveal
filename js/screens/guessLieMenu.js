@@ -4,8 +4,8 @@ import {
 } from "../core/guessLieSession.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
 import { isGameSyncActive, isLobbyHost } from "../core/gameSync.js";
-import { markGuessLieLobbyComplete } from "../core/state.js";
-import { navigate } from "../core/router.js";
+import { handleGuessLieLaunch } from "../core/guessLieSession.js";
+import { isLobbyHost } from "../core/gameSync.js";
 import { pageShell } from "../core/ui.js";
 import { bindNav } from "./nav.js";
 
@@ -63,11 +63,8 @@ export function mountGuessLieMenu(app) {
   bindNav(app);
 
   app.querySelector("#btn-play")?.addEventListener("click", async () => {
-    if (isGameSyncActive()) {
-      if (isLobbyHost()) await markGuessLieLobbyComplete();
-      return;
-    }
-    navigate("guesslie", { reset: true });
+    if (isGameSyncActive() && !isLobbyHost()) return;
+    await handleGuessLieLaunch(app.querySelector("#btn-play"));
   });
 
   return null;

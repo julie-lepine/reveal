@@ -41,7 +41,6 @@ export function renderConsensusSetup({
       <p class="hot-take-duration">
         <strong>${prep.requested}</strong> question${prep.requested > 1 ? "s" : ""}
         · ${escapeHtml(prep.durationLabel)}
-        <span class="muted"> · ${prep.questionTimeSec}s par question</span>
       </p>
       <p class="hint">Banque disponible : ${prep.poolSize} question${prep.poolSize > 1 ? "s" : ""}</p>
       ${!isHost ? `<p class="hint">Seul l'hôte peut modifier les réglages.</p>` : ""}

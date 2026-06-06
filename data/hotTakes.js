@@ -153,6 +153,7 @@ export const HOT_TAKE_FORBIDDEN_WORDS = [
   "tranny",
   "faggot",
   "fag",
+  "pd",
 ];
 
 export const HOT_TAKE_MODERATION_NOTICE =

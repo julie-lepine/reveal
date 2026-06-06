@@ -26,17 +26,21 @@ export function awardHotTakeVotes(votes, options) {
   if (!majority || tied) return summary;
 
   summary.pointsAwarded = true;
+  const deltas = {};
   Object.entries(votes).forEach(([name, choice]) => {
     if (choice === majority) {
       addScore(name, EVENING_POINTS.WIN);
       bumpPlayerStat(name, "hotTakeMajorityWins", 1);
       summary.majorityWinners.push(name);
+      deltas[name] = EVENING_POINTS.WIN;
     } else {
       addScore(name, EVENING_POINTS.BONUS);
       bumpPlayerStat(name, "hotTakeDissentWins", 1);
       summary.dissenters.push(name);
+      deltas[name] = EVENING_POINTS.BONUS;
     }
   });
+  summary.deltas = deltas;
 
   return summary;
 }
@@ -86,6 +90,7 @@ export function awardTruthMeterRound(votes, author, authorEstimate) {
     closeVoters: [],
     authorPoints: 0,
     voterPoints: 0,
+    deltas: {},
   };
 
   if (gap >= TRUTH_METER_BLUFF_GAP) {
@@ -93,10 +98,12 @@ export function awardTruthMeterRound(votes, author, authorEstimate) {
     bumpPlayerStat(author, "truthMeterBluffWins", 1);
     summary.bluffWin = true;
     summary.authorPoints = EVENING_POINTS.BONUS;
+    summary.deltas[author] = EVENING_POINTS.BONUS;
   } else if (gap <= TRUTH_METER_CONSENSUS_GAP) {
     addScore(author, EVENING_POINTS.WIN);
     summary.consensus = true;
     summary.authorPoints = EVENING_POINTS.WIN;
+    summary.deltas[author] = EVENING_POINTS.WIN;
   }
 
   let closest = null;
@@ -115,6 +122,7 @@ export function awardTruthMeterRound(votes, author, authorEstimate) {
     addScore(closest, pts);
     summary.mindReader = closest;
     summary.voterPoints = pts;
+    summary.deltas[closest] = (summary.deltas[closest] || 0) + pts;
     if (bestDist <= TRUTH_METER_CLOSE_DISTANCE) {
       summary.closeVoters.push(closest);
     }
@@ -135,6 +143,7 @@ export function awardDilemmaRound(votes) {
     pctB,
     majorityWinners: [],
     pointsAwarded: EVENING_POINTS.WIN,
+    deltas: {},
   };
 
   if (!majority) return summary;
@@ -145,6 +154,7 @@ export function awardDilemmaRound(votes) {
       addScore(name, EVENING_POINTS.WIN);
       bumpPlayerStat(name, "dilemmaMajorityPicks", 1);
       summary.majorityWinners.push(name);
+      summary.deltas[name] = EVENING_POINTS.WIN;
     } else {
       bumpPlayerStat(name, "dilemmaMinorityPicks", 1);
     }

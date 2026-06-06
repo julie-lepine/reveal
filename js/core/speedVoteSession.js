@@ -18,10 +18,12 @@ import {
   isGameSyncActive,
   isLobbyHost,
   syncSpeedVoteSession,
-  pushGameSession,
   allMembersReady,
   speedVoteToRemote,
+  patchGameState,
+  userIdForName,
 } from "./gameSync.js";
+import { launchGameWithSync, commitHostGamePlay } from "./mpLaunch.js";
 
 function defaultSession() {
   return {
@@ -149,14 +151,13 @@ export async function markSpeedVoteLobbyStarted() {
     lobbyStarted: true,
     ...votingPayloadForRound(0, deck),
   };
-  saveStatePatch({ speedVoteGame: next });
-  if (isGameSyncActive() && isLobbyHost()) {
-    await pushGameSession({
-      screen: "speedvote",
-      gameId: "speedvote",
-      state: { speedVote: speedVoteToRemote(next) },
-    });
-  }
+  return launchGameWithSync({
+    screen: "speedvote",
+    gameId: "speedvote",
+    mode: "push",
+    applyLocal: () => saveStatePatch({ speedVoteGame: next }),
+    getRemoteState: () => ({ speedVote: speedVoteToRemote(next) }),
+  });
 }
 
 export async function startSpeedVoteRound(roundIdx) {
@@ -214,9 +215,30 @@ export function simulateSpeedVoteReady(onUpdate) {
 }
 
 export async function commitSpeedVotePlay(patch, patchOpts = {}) {
-  const session = { ...getSpeedVoteSession(), ...patch };
-  await syncSpeedVoteSession(session, patchOpts);
-  return session;
+  return commitHostGamePlay({
+    patch,
+    gameId: "speedvote",
+    stateKey: "speedVote",
+    getSession: getSpeedVoteSession,
+    saveLocal: (session) => saveStatePatch({ speedVoteGame: session }),
+    toRemote: speedVoteToRemote,
+    patchOpts,
+  });
+}
+
+/** MP : envoie uniquement le vote local. */
+export async function commitSpeedVoteVote(choice) {
+  const localName = getLocalDisplayName();
+  const session = getSpeedVoteSession();
+  if (session.votes?.[localName] != null && session.votes[localName] !== "") {
+    return session.votes[localName];
+  }
+  const votes = { ...(session.votes || {}), [localName]: choice };
+  saveStatePatch({ speedVoteGame: { ...session, votes } });
+  if (!isGameSyncActive()) return choice;
+  const uid = userIdForName(localName) || localName;
+  await patchGameState({ speedVote: { votes: { [uid]: choice } } });
+  return choice;
 }
 
 export function allSpeedVoteVotesIn() {

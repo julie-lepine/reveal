@@ -16,13 +16,18 @@ import {
   truthLabel,
   validateAffirmation,
   commitTruthMeterPlay,
+  commitTruthMeterVote,
   allTruthMeterVotesIn,
   simulateTruthMeterVotes,
   computeRoundMetrics,
   filterVoterVotes,
 } from "../core/truthMeterSession.js";
 import { awardTruthMeterRound, EVENING_POINTS } from "../core/scoring.js";
-import { gameCumulativeScoresHtml, refreshGameScoresBox } from "../core/gameScores.js";
+import {
+  applyMatchScoreDeltas,
+  gameCumulativeScoresHtml,
+  refreshGameScoresBox,
+} from "../core/gameScores.js";
 import { getActivePlayers } from "../core/players.js";
 import { getLocalDisplayName, recordTruthMeterPlayed, setLastGame } from "../core/state.js";
 import { setLobbyPlaying, setLobbyWaiting } from "../core/lobby.js";
@@ -66,6 +71,12 @@ function sliderBlockHtml({
 function blurAffirmationInput(container) {
   const textEl = container?.querySelector("#affirmation-text");
   if (textEl && document.activeElement === textEl) textEl.blur();
+}
+
+function clampPct(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return 50;
+  return Math.max(0, Math.min(100, Math.round(n)));
 }
 
 function bindSlider(app, id, { onInput, disabled, onInteract } = {}) {
@@ -213,10 +224,51 @@ export function mountTruthMeter(app) {
     if (voteCommitInFlight != null && fromSession[localName] == null) {
       fromSession[localName] = voteCommitInFlight;
     }
+    if (
+      fromSession[localName] == null &&
+      localName !== author &&
+      phase === "voting"
+    ) {
+      const pending = getPendingVoteValue();
+      if (Number.isFinite(pending)) fromSession[localName] = pending;
+    }
     if (!mp && Object.keys(fromSession).length === 0 && Object.keys(votes).length > 0) {
       fromSession = { ...votes };
     }
     return filterVoterVotes(fromSession, author);
+  }
+
+  function allVotesReadyForReveal() {
+    if (allTruthMeterVotesIn()) return true;
+    const author = getCurrentAuthor() || affirmation?.author;
+    if (localName === author) return allTruthMeterVotesIn();
+    const merged = { ...(getTruthMeterSession().votes || {}) };
+    if (voteCommitInFlight != null) merged[localName] = voteCommitInFlight;
+    else if (phase === "voting" && merged[localName] == null) {
+      const pending = getPendingVoteValue();
+      if (Number.isFinite(pending)) merged[localName] = pending;
+    }
+    const voters = getVoterNames();
+    return voters.every((n) => merged[n] != null && Number.isFinite(merged[n]));
+  }
+
+  async function ensureLocalVoteCommitted() {
+    const author = getCurrentAuthor() || affirmation?.author;
+    if (localName === author) return;
+    if (myVote != null || voteCommitInFlight != null) return;
+    if (phase !== "voting") return;
+    const choice = getPendingVoteValue();
+    if (!Number.isFinite(choice)) return;
+    myVote = choice;
+    votes = { ...votes, [localName]: choice };
+    if (mp) {
+      voteCommitInFlight = choice;
+      try {
+        await commitTruthMeterVote(choice);
+      } finally {
+        voteCommitInFlight = null;
+      }
+    }
   }
 
   function alreadyScoredThisRound() {
@@ -267,10 +319,56 @@ export function mountTruthMeter(app) {
         : "";
 
     return `
-      <div class="truth-meter__spread">
+      <div class="truth-meter__spread" id="truth-reveal-spread">
         ${rows}
         ${authorRow}
       </div>`;
+  }
+
+  function revealAwardLinesHtml(metrics, aff) {
+    const awardLine = metrics.bluffWin
+      ? `<p class="hint">🎭 Bluff réussi ! Écart <strong>${metrics.gap}</strong> - <strong>${escapeHtml(aff.author)}</strong> +${EVENING_POINTS.BONUS} pts</p>`
+      : metrics.consensus
+        ? `<p class="hint">🤝 Consensus - <strong>${escapeHtml(aff.author)}</strong> +${EVENING_POINTS.WIN} pts (écart ${metrics.gap}).</p>`
+        : `<p class="hint">Écart auteur/groupe : <strong>${metrics.gap}</strong> pts</p>`;
+    const mindLine = metrics.mindReader
+      ? `<p class="hint">🧠 Le plus proche : <strong>${escapeHtml(metrics.mindReader)}</strong> +${metrics.voterPoints || EVENING_POINTS.WIN} pts</p>`
+      : "";
+    return awardLine + mindLine;
+  }
+
+  function revealMetricsForDisplay() {
+    const authorName = affirmation?.author;
+    const votesToShow = votesForAward();
+    const sessionRound = getTruthMeterSession().lastRound;
+    return {
+      votesToShow,
+      metrics: {
+        ...buildRevealMetrics(votesToShow, authorName),
+        ...(sessionRound || lastAward || {}),
+      },
+    };
+  }
+
+  function refreshRevealDom() {
+    if (phase !== "reveal" || !affirmation) return;
+    const { votesToShow, metrics } = revealMetricsForDisplay();
+
+    const spreadEl = app.querySelector("#truth-reveal-spread");
+    if (spreadEl) {
+      spreadEl.outerHTML = spreadHtml(votesToShow, authorRevealed);
+    }
+
+    const awardsEl = app.querySelector("#truth-reveal-awards");
+    if (awardsEl) {
+      awardsEl.innerHTML = revealAwardLinesHtml(metrics, affirmation);
+    }
+
+    refreshGameScoresBox(app, {
+      gameLabel: "TruthMeter",
+      title: "Cumul des scores",
+      scores: truthMeterSessionScores(),
+    });
   }
 
   function animateRevealGauge(targetPct) {
@@ -297,6 +395,7 @@ export function mountTruthMeter(app) {
         revealAnimId = null;
         authorRevealed = true;
         if (authorPin) authorPin.classList.remove("hidden");
+        refreshRevealDom();
       }
     };
     cancelRevealAnim();
@@ -316,6 +415,24 @@ export function mountTruthMeter(app) {
     }
   }
 
+  function truthMeterSessionScores() {
+    return getTruthMeterSession().matchScores || {};
+  }
+
+  function buildTruthMeterLastRound(award) {
+    if (!award || (!award.deltas || !Object.keys(award.deltas).length)) return null;
+    return {
+      bluffWin: Boolean(award.bluffWin),
+      consensus: Boolean(award.consensus),
+      mindReader: award.mindReader || null,
+      gap: award.gap,
+      groupAvg: award.groupAvg,
+      authorPoints: award.authorPoints || 0,
+      voterPoints: award.voterPoints || 0,
+      deltas: award.deltas || {},
+    };
+  }
+
   async function transitionToReveal() {
     if (alreadyScoredThisRound()) {
       if (!mp && phase !== "reveal") {
@@ -329,19 +446,25 @@ export function mountTruthMeter(app) {
 
     revealInFlight = true;
     try {
+      await ensureLocalVoteCommitted();
       const author = affirmation?.author;
       const votesToScore = votesForAward();
       const est = authorEstimate;
 
       roundScored = true;
+      let matchScores = getTruthMeterSession().matchScores || {};
+      let lastRound = getTruthMeterSession().lastRound || null;
       if (author && (!mp || isLobbyHost())) {
         lastAward = awardTruthMeterRound(votesToScore, author, est);
+        matchScores = applyMatchScoreDeltas(matchScores, lastAward.deltas || {});
+        lastRound = buildTruthMeterLastRound(lastAward);
       } else if (!lastAward && author) {
         lastAward = {
           ...computeRoundMetrics(votesToScore, est),
           bluffWin: false,
           consensus: false,
           mindReader: null,
+          deltas: {},
         };
       }
       await commitTruthMeterPlay(
@@ -350,6 +473,8 @@ export function mountTruthMeter(app) {
           roundScored: true,
           votes: votesToScore,
           voteEndsAt: null,
+          matchScores,
+          lastRound,
         },
         { withEveningScores: mp && isLobbyHost() && Boolean(author) }
       );
@@ -359,6 +484,13 @@ export function mountTruthMeter(app) {
         render();
         const avg = lastAward?.groupAvg ?? computeRoundMetrics(votesToScore, est).groupAvg;
         animateRevealGauge(avg);
+      } else {
+        syncFromSession();
+        phase = "reveal";
+        render();
+        const avg = lastAward?.groupAvg ?? computeRoundMetrics(votesToScore, est).groupAvg;
+        authorRevealed = false;
+        requestAnimationFrame(() => animateRevealGauge(avg));
       }
     } finally {
       revealInFlight = false;
@@ -390,6 +522,7 @@ export function mountTruthMeter(app) {
   /** Filet de sécurité hôte : clôt la manche même si un votant est absent. */
   async function forceReveal() {
     if (mp && !isLobbyHost()) return;
+    await ensureLocalVoteCommitted();
     await goToRevealPending();
   }
 
@@ -490,21 +623,8 @@ export function mountTruthMeter(app) {
     }
 
     if (phase === "reveal" && affirmation) {
-      const authorName = affirmation.author;
-      const votesToShow = votesForAward();
-      const metrics = {
-        ...buildRevealMetrics(votesToShow, authorName),
-        ...(lastAward || {}),
-      };
+      const { metrics, votesToShow } = revealMetricsForDisplay();
       const verdictPct = metrics.groupAvg;
-      const awardLine = metrics.bluffWin
-        ? `<p class="hint">🎭 Bluff réussi ! Écart <strong>${metrics.gap}</strong> - <strong>${escapeHtml(affirmation.author)}</strong> +${EVENING_POINTS.BONUS} pts</p>`
-        : metrics.consensus
-          ? `<p class="hint">🤝 Consensus - <strong>${escapeHtml(affirmation.author)}</strong> +${EVENING_POINTS.WIN} pts (écart ${metrics.gap}).</p>`
-          : `<p class="hint">Écart auteur/groupe : <strong>${metrics.gap}</strong> pts</p>`;
-      const mindLine = metrics.mindReader
-        ? `<p class="hint">🧠 Le plus proche : <strong>${escapeHtml(metrics.mindReader)}</strong> +${metrics.voterPoints || EVENING_POINTS.WIN} pts</p>`
-        : "";
 
       phaseHtml = `
         <h3 class="section-title">TruthMeter</h3>
@@ -525,11 +645,14 @@ export function mountTruthMeter(app) {
             <span>Faux</span>
             <span>Vrai</span>
           </div>
-          ${awardLine}
-          ${mindLine}
+          <div id="truth-reveal-awards">${revealAwardLinesHtml(metrics, affirmation)}</div>
         </div>
         ${spreadHtml(votesToShow, authorRevealed)}
-        ${gameCumulativeScoresHtml({ gameLabel: "TruthMeter", title: "Cumul des scores" })}
+        ${gameCumulativeScoresHtml({
+          gameLabel: "TruthMeter",
+          title: "Cumul des scores",
+          scores: truthMeterSessionScores(),
+        })}
         ${
           host
             ? `<button type="button" class="btn btn-primary btn--spaced" id="next-round">
@@ -635,8 +758,8 @@ export function mountTruthMeter(app) {
           voteCommitInFlight = choice;
           render();
           try {
-            await commitTruthMeterPlay({ votes });
-            if (allTruthMeterVotesIn() && isLobbyHost()) await goToRevealPending();
+            await commitTruthMeterVote(choice);
+            if (allVotesReadyForReveal() && isLobbyHost()) await goToRevealPending();
           } finally {
             voteCommitInFlight = null;
           }
@@ -802,14 +925,24 @@ export function mountTruthMeter(app) {
     captureVoteDraftFromDom();
     syncFromSession();
 
-    if (phase === "voting" && isLobbyHost() && allTruthMeterVotesIn()) {
-      void goToRevealPending();
+    if (phase === "voting" && isLobbyHost() && allVotesReadyForReveal()) {
+      void (async () => {
+        await ensureLocalVoteCommitted();
+        await goToRevealPending();
+      })();
       return;
     }
 
     if (shouldSkipFullRender(prevPhase, prevRound)) {
       if (phase === "reveal" || phase === "voting") {
-        refreshGameScoresBox(app, { gameLabel: "TruthMeter", title: "Cumul des scores" });
+        refreshGameScoresBox(app, {
+          gameLabel: "TruthMeter",
+          title: "Cumul des scores",
+          scores: truthMeterSessionScores(),
+        });
+      }
+      if (phase === "reveal") {
+        refreshRevealDom();
       }
       return;
     }

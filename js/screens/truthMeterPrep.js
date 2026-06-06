@@ -1,5 +1,6 @@
 import {
   allTruthMeterReady,
+  getTruthMeterEntryScreen,
   getTruthMeterSession,
   isLocalTruthMeterHost,
   markTruthMeterLobbyStarted,
@@ -12,6 +13,7 @@ import { getLocalDisplayName } from "../core/state.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
 import { rulesButtonHtml } from "../core/gameRulesUi.js";
 import { isGameSyncActive, isLobbyHost, onGameSessionChange } from "../core/gameSync.js";
+import { prepGuestFollowOnSession, runPrepGameLaunch } from "../core/mpLaunch.js";
 import { navigate } from "../core/router.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
 import { bindNav } from "./nav.js";
@@ -83,19 +85,19 @@ export function mountTruthMeterPrep(app) {
       });
       return;
     }
-    const btn = app.querySelector("#btn-start-game");
-    if (btn) btn.disabled = true;
     try {
-      await markTruthMeterLobbyStarted();
-      navigate("truthmeter", { navStack: TRUTH_METER_NAV });
+      await runPrepGameLaunch({
+        btn: app.querySelector("#btn-start-game"),
+        launch: markTruthMeterLobbyStarted,
+        gameScreen: "truthmeter",
+        navStack: TRUTH_METER_NAV,
+      });
     } catch (e) {
       console.warn("REVEAL start TruthMeter:", e);
       await showAppAlert(e.message || "Impossible de lancer TruthMeter.", {
         title: "TruthMeter",
         icon: "⚠️",
       });
-    } finally {
-      if (btn) btn.disabled = false;
     }
   }
 
@@ -185,11 +187,15 @@ export function mountTruthMeterPrep(app) {
 
   render();
 
-  const unsub = onGameSessionChange((row) => {
+  const guestFollow = prepGuestFollowOnSession({
+    prepScreen: "truthmeter-prep",
+    getEntryScreen: getTruthMeterEntryScreen,
+    buildNavStack: () => TRUTH_METER_NAV,
+  });
+
+  const unsub = onGameSessionChange(() => {
+    if (guestFollow()) return;
     refreshReadySection();
-    if (row?.screen === "truthmeter" || getTruthMeterSession().lobbyStarted) {
-      navigate("truthmeter", { navStack: TRUTH_METER_NAV });
-    }
   });
 
   return () => {

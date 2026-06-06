@@ -11,12 +11,22 @@ import {
 import { navigate, getCurrentScreen } from "./router.js";
 import { getLobbyParticipants, getLobbyStatus } from "./lobby.js";
 import { getActivePlayerNames, getActivePlayers } from "./players.js";
+import { mergeMatchScoresLocal } from "./gameScores.js";
 import {
   mergeReadyMapsLocal,
   mergeDilemmaCustomDilemmas,
   mergeHotTakeCustomTakes,
   mergeDilemmaPatchState,
   mergeHotTakePatchState,
+  mergeConsensusPatchState,
+  mergeTriviaPatchState,
+  mergeTruthMeterPatchState,
+  mergeSpeedVotePatchState,
+  mergeConsensusPhase,
+  pickLatestTriviaAnswer,
+  mergeTriviaAnswersUid,
+  isNewConsensusQuestionRound,
+  mergeCustomGameDeck,
 } from "./sessionMerge.js";
 import { buildRecapsFromPlacements, getTierNightSession } from "./tierNightSession.js";
 import {
@@ -36,8 +46,12 @@ import {
   dehydratePlaylistGuessDeck,
   rehydratePlaylistGuessDeck,
 } from "./deckCodec.js";
-import { scalePollIntervalMs } from "../config/syncConfig.js";
+import { scalePollIntervalMs, SYNC_PATCH_TIMEOUT_MS } from "../config/syncConfig.js";
 import { FIL_ROUGE_ENABLED } from "../../data/filRouge.js";
+import { GUESS_LIE_SYNC_PATCH_TIMEOUT_MS } from "../../data/guessLies.js";
+import { pickRemotePlayFields } from "./playPatch.js";
+
+export { pickRemotePlayFields, PLAY_PATCH_EXCLUDE } from "./playPatch.js";
 
 let cachedRow = null;
 let lastSessionSig = "";
@@ -96,6 +110,20 @@ let suppressSessionScreen = null;
 
 const MENU_SCREENS = new Set(["home", "lobby", "game-select", "settings"]);
 export const POST_GAME_SCREENS = new Set(["results", "leaderboard"]);
+export const DEFAULT_SYNC_PATCH_TIMEOUT_MS = SYNC_PATCH_TIMEOUT_MS;
+
+export function withPatchTimeout(promise, ms = DEFAULT_SYNC_PATCH_TIMEOUT_MS, message) {
+  if (!ms || ms <= 0) return promise;
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => {
+      setTimeout(
+        () => reject(new Error(message || "Synchronisation trop longue.")),
+        ms
+      );
+    }),
+  ]);
+}
 
 /** Retour forcé vers le jeu qu'un invité a volontairement quitté (suppress actif). */
 function isSuppressedGameReturn(targetScreen) {
@@ -353,6 +381,8 @@ function mapConsensusAnswersByName(answersByUid = {}) {
       value: val.value,
       timestamp: val.timestamp || 0,
       submittedAt: val.submittedAt || null,
+      questionIdx: val.questionIdx ?? null,
+      imputed: Boolean(val.imputed),
     };
     if (!prev) {
       out[name] = next;
@@ -373,6 +403,8 @@ function mapConsensusAnswersByUid(answersByName = {}) {
         value: val.value,
         timestamp: val.timestamp || 0,
         submittedAt: val.submittedAt || null,
+        questionIdx: val.questionIdx ?? null,
+        imputed: Boolean(val.imputed),
       };
     }
   });
@@ -432,6 +464,13 @@ export function hotTakeToRemote(session) {
       session.voteTimerRemaining != null ? session.voteTimerRemaining : null,
     intermissionEndsAt: session.intermissionEndsAt || null,
     takeScored: Boolean(session.takeScored),
+    matchScores: scoresToRemote(session.matchScores || {}),
+    lastRound: session.lastRound
+      ? {
+          ...session.lastRound,
+          deltas: scoresToRemote(session.lastRound.deltas || {}),
+        }
+      : null,
   };
 }
 
@@ -453,6 +492,13 @@ export function hotTakeFromRemote(remote) {
       remote.voteTimerRemaining != null ? remote.voteTimerRemaining : null,
     intermissionEndsAt: remote.intermissionEndsAt || null,
     takeScored: Boolean(remote.takeScored),
+    matchScores: scoresFromRemote(remote.matchScores || {}),
+    lastRound: remote.lastRound
+      ? {
+          ...remote.lastRound,
+          deltas: scoresFromRemote(remote.lastRound.deltas || {}),
+        }
+      : null,
   };
 }
 
@@ -529,7 +575,10 @@ function mergeHotTakeGameLocal(local, remote) {
     votes,
     ready,
     customTakes,
+    deck: mergeCustomGameDeck(local, remote),
     takeScored: mergeRoundFlag(local.takeScored, remote.takeScored, newVoteRound),
+    matchScores: mergeMatchScoresLocal(local.matchScores || {}, remote.matchScores || {}),
+    lastRound: remote.lastRound ?? local.lastRound ?? null,
   };
 }
 
@@ -604,19 +653,11 @@ function isNewSpeedVoteVoteRoundUid(cur, inc) {
 
 function isNewTriviaQuestionRound(cur, inc) {
   if (!inc) return false;
-  if (
+  return (
     inc.phase === "question" &&
     inc.questionIdx != null &&
     cur?.questionIdx != null &&
     inc.questionIdx !== cur.questionIdx &&
-    Object.keys(inc.answers || {}).length === 0
-  ) {
-    return true;
-  }
-  return (
-    inc.phase === "question" &&
-    inc.questionEndsAt &&
-    inc.questionEndsAt !== cur?.questionEndsAt &&
     Object.keys(inc.answers || {}).length === 0
   );
 }
@@ -632,17 +673,9 @@ function mergeRemoteTriviaAnswersUid(cur, inc) {
     inc?.phase === "final" ||
     cur?.phase === "final"
   ) {
-    return { ...curAnswers, ...incAnswers };
+    return mergeTriviaAnswersUid(curAnswers, incAnswers);
   }
   return incAnswers;
-}
-
-function pickLatestTriviaAnswer(localAnswer, remoteAnswer) {
-  if (!localAnswer) return remoteAnswer || null;
-  if (!remoteAnswer) return localAnswer;
-  return (remoteAnswer.answeredAt || 0) >= (localAnswer.answeredAt || 0)
-    ? remoteAnswer
-    : localAnswer;
 }
 
 function mergeTriviaGameLocal(local, remote) {
@@ -681,42 +714,6 @@ function mergeTriviaGameLocal(local, remote) {
 
 function isNewTriviaQuestionRoundUid(cur, inc) {
   return isNewTriviaQuestionRound(cur, inc);
-}
-
-function isNewConsensusQuestionRound(cur, inc) {
-  if (!inc) return false;
-  if (
-    inc.phase === "question" &&
-    inc.questionIdx != null &&
-    cur?.questionIdx != null &&
-    inc.questionIdx !== cur.questionIdx &&
-    Object.keys(inc.answers || {}).length === 0
-  ) {
-    return true;
-  }
-  return (
-    inc.phase === "question" &&
-    inc.questionEndsAt &&
-    inc.questionEndsAt !== cur?.questionEndsAt &&
-    Object.keys(inc.answers || {}).length === 0
-  );
-}
-
-/** Évite qu'un patch « question » tardif écrase reveal-pending / reveal (sync multijoueur). */
-const CONSENSUS_PHASE_RANK = {
-  question: 0,
-  "reveal-pending": 1,
-  reveal: 2,
-  final: 3,
-};
-
-function mergeConsensusPhase(curPhase, incPhase, { newQuestionRound = false } = {}) {
-  if (newQuestionRound) return incPhase ?? curPhase ?? null;
-  const curRank = CONSENSUS_PHASE_RANK[curPhase] ?? -1;
-  const incRank = CONSENSUS_PHASE_RANK[incPhase] ?? -1;
-  if (curRank < 0) return incPhase ?? curPhase ?? null;
-  if (incRank < 0) return curPhase ?? null;
-  return incRank >= curRank ? incPhase : curPhase;
 }
 
 function pickLatestConsensusAnswer(localAnswer, remoteAnswer) {
@@ -763,20 +760,12 @@ function mergeConsensusGameLocal(local, remote) {
     !remote.lobbyStarted && !local.lobbyStarted
       ? mergeReadyMapsLocal(local.ready || {}, remote.ready || {}, getActivePlayerNames())
       : remote.ready || {};
-  const mergedAnswers = mapConsensusAnswersByName(
-    Object.fromEntries(
-      Object.entries({ ...remoteAnswers, ...localAnswers }).map(([key, val]) => [
-        userIdForName(key) || key,
-        val,
-      ])
-    )
-  );
   return {
     ...local,
     ...remote,
     ready,
     phase: mergeConsensusPhase(local.phase, remote.phase, { newQuestionRound }),
-    answers: mergedAnswers,
+    answers,
     matchScores: scoresFromRemote({
       ...scoresToRemote(local.matchScores || {}),
       ...scoresToRemote(remote.matchScores || {}),
@@ -926,7 +915,10 @@ function mergeDilemmaGameLocal(local, remote) {
     ready,
     votes,
     customDilemmas,
+    deck: mergeCustomGameDeck(local, remote),
     roundScored: mergeRoundFlag(local.roundScored, remote.roundScored, newVoteRound),
+    matchScores: mergeMatchScoresLocal(local.matchScores || {}, remote.matchScores || {}),
+    lastRound: remote.lastRound ?? local.lastRound ?? null,
   };
 }
 
@@ -981,6 +973,9 @@ function mergeTruthMeterGameLocal(local, remote) {
     if (lv != null && votes[name] == null) votes[name] = lv;
   } else if (remote.phase === "reveal" || remote.phase === "reveal-pending") {
     votes = { ...remoteVotes };
+    const name = getLocalDisplayName();
+    const lv = localVotes[name];
+    if (lv != null && votes[name] == null) votes[name] = lv;
   } else if (local.phase === "reveal" || local.phase === "reveal-pending") {
     votes = { ...localVotes, ...remoteVotes };
   }
@@ -994,6 +989,8 @@ function mergeTruthMeterGameLocal(local, remote) {
     votes,
     ready,
     roundScored: mergeRoundFlag(local.roundScored, remote.roundScored, newVoteRound),
+    matchScores: mergeMatchScoresLocal(local.matchScores || {}, remote.matchScores || {}),
+    lastRound: remote.lastRound ?? local.lastRound ?? null,
   };
 }
 
@@ -1012,6 +1009,13 @@ export function truthMeterToRemote(session) {
     votes: mapVotesByUid(session.votes || {}),
     voteEndsAt: session.voteEndsAt || null,
     roundScored: Boolean(session.roundScored),
+    matchScores: scoresToRemote(session.matchScores || {}),
+    lastRound: session.lastRound
+      ? {
+          ...session.lastRound,
+          deltas: scoresToRemote(session.lastRound.deltas || {}),
+        }
+      : null,
   };
 }
 
@@ -1031,6 +1035,13 @@ export function truthMeterFromRemote(remote) {
     votes: mapVotesByName(remote.votes || {}),
     voteEndsAt: remote.voteEndsAt || null,
     roundScored: Boolean(remote.roundScored),
+    matchScores: scoresFromRemote(remote.matchScores || {}),
+    lastRound: remote.lastRound
+      ? {
+          ...remote.lastRound,
+          deltas: scoresFromRemote(remote.lastRound.deltas || {}),
+        }
+      : null,
   };
 }
 
@@ -1040,13 +1051,11 @@ export function consensusToRemote(session) {
     lobbyStarted: Boolean(session.lobbyStarted),
     selectedModeId: session.selectedModeId || "standard",
     questionCount: session.questionCount ?? 5,
-    questionTimeSec: session.questionTimeSec ?? 15,
     deck: session.deck ? dehydrateConsensusDeck(session.deck) : null,
     questionIdx: session.questionIdx ?? 0,
     phase: session.phase || null,
     currentQuestion: session.currentQuestion || null,
     answers: mapConsensusAnswersByUid(session.answers || {}),
-    questionEndsAt: session.questionEndsAt || null,
     roundScored: Boolean(session.roundScored),
     matchScores: scoresToRemote(session.matchScores || {}),
     lastRound: session.lastRound
@@ -1071,6 +1080,20 @@ export function consensusToRemote(session) {
   };
 }
 
+/** Patch léger révélation : pas de re-envoi du deck / prep. */
+export function consensusRevealToRemote(session) {
+  const remote = consensusToRemote(session);
+  return {
+    phase: remote.phase,
+    questionIdx: remote.questionIdx,
+    currentQuestion: remote.currentQuestion,
+    answers: remote.answers,
+    matchScores: remote.matchScores,
+    roundScored: remote.roundScored,
+    lastRound: remote.lastRound,
+  };
+}
+
 export function consensusFromRemote(remote) {
   if (!remote) return null;
   return {
@@ -1078,13 +1101,11 @@ export function consensusFromRemote(remote) {
     lobbyStarted: Boolean(remote.lobbyStarted),
     selectedModeId: remote.selectedModeId || "standard",
     questionCount: remote.questionCount ?? 5,
-    questionTimeSec: remote.questionTimeSec ?? 15,
     deck: remote.deck ? rehydrateConsensusDeck(remote.deck) : null,
     questionIdx: remote.questionIdx ?? 0,
     phase: remote.phase || null,
     currentQuestion: remote.currentQuestion || null,
     answers: mapConsensusAnswersByName(remote.answers || {}),
-    questionEndsAt: remote.questionEndsAt || null,
     roundScored: Boolean(remote.roundScored),
     matchScores: scoresFromRemote(remote.matchScores || {}),
     lastRound: remote.lastRound
@@ -1115,13 +1136,11 @@ export function triviaToRemote(session) {
     lobbyStarted: Boolean(session.lobbyStarted),
     selectedThemeId: session.selectedThemeId || "random",
     questionCount: session.questionCount ?? 5,
-    questionTimeSec: session.questionTimeSec ?? 15,
     deck: session.deck ? dehydrateTriviaDeck(session.deck) : null,
     questionIdx: session.questionIdx ?? 0,
     phase: session.phase || null,
     currentQuestion: session.currentQuestion || null,
     answers: mapTriviaAnswersByUid(session.answers || {}),
-    questionEndsAt: session.questionEndsAt || null,
     questionScored: Boolean(session.questionScored),
     matchScores: scoresToRemote(session.matchScores || {}),
     lastRound: session.lastRound
@@ -1148,13 +1167,11 @@ export function triviaFromRemote(remote) {
     lobbyStarted: Boolean(remote.lobbyStarted),
     selectedThemeId: remote.selectedThemeId || "random",
     questionCount: remote.questionCount ?? 5,
-    questionTimeSec: remote.questionTimeSec ?? 15,
     deck: remote.deck ? rehydrateTriviaDeck(remote.deck) : null,
     questionIdx: remote.questionIdx ?? 0,
     phase: remote.phase || null,
     currentQuestion: remote.currentQuestion || null,
     answers: mapTriviaAnswersByName(remote.answers || {}),
-    questionEndsAt: remote.questionEndsAt || null,
     questionScored: Boolean(remote.questionScored),
     matchScores: scoresFromRemote(remote.matchScores || {}),
     lastRound: remote.lastRound
@@ -1220,6 +1237,16 @@ export function dilemmaToRemote(session) {
     roundScored: Boolean(session.roundScored),
     blindMode: Boolean(session.blindMode),
     pausedBy: session.pausedBy ? userIdForName(session.pausedBy) || session.pausedBy : null,
+    matchScores: scoresToRemote(session.matchScores || {}),
+    lastRound: session.lastRound
+      ? {
+          ...session.lastRound,
+          deltas: scoresToRemote(session.lastRound.deltas || {}),
+          majorityWinners: (session.lastRound.majorityWinners || []).map(
+            (name) => userIdForName(name) || name
+          ),
+        }
+      : null,
   };
 }
 
@@ -1251,6 +1278,16 @@ export function dilemmaFromRemote(remote) {
     roundScored: Boolean(remote.roundScored),
     blindMode: Boolean(remote.blindMode),
     pausedBy: remote.pausedBy ? nameForUserId(remote.pausedBy) || remote.pausedBy : null,
+    matchScores: scoresFromRemote(remote.matchScores || {}),
+    lastRound: remote.lastRound
+      ? {
+          ...remote.lastRound,
+          deltas: scoresFromRemote(remote.lastRound.deltas || {}),
+          majorityWinners: (remote.lastRound.majorityWinners || []).map(
+            (uid) => nameForUserId(uid) || uid
+          ),
+        }
+      : null,
   };
 }
 
@@ -1593,6 +1630,16 @@ function scoresFromRemote(remote = {}) {
     out[name] = prev == null ? val : Math.max(prev, val);
   });
   return out;
+}
+
+/** Fusion des matchScores côté blob session (clés uid). */
+function mergeRemoteMatchScoresUid(cur = {}, inc = {}) {
+  const merged = { ...cur };
+  Object.entries(inc).forEach(([uid, val]) => {
+    if (typeof val !== "number" || !Number.isFinite(val)) return;
+    merged[uid] = Math.max(merged[uid] || 0, val);
+  });
+  return merged;
 }
 
 function gameScoresToRemote(byGame = {}) {
@@ -2289,8 +2336,7 @@ export async function startGameSession(gameId, screen, state) {
   return row;
 }
 
-export async function pushGameSession({ screen, gameId, state }) {
-  if (!isGameSyncActive()) return null;
+async function pushGameSessionInner({ screen, gameId, state }) {
   const lobbyId = getState().lobby.id;
   const current = cachedRow?.state || {};
   const nextState = state ? { ...current, ...state } : current;
@@ -2302,13 +2348,79 @@ export async function pushGameSession({ screen, gameId, state }) {
   // L'update ne renvoie plus `state` : on le rattache localement (on vient de l'écrire).
   if (row) row = { ...row, state: nextState };
   else row = await fetchGameSessionByLobby(lobbyId);
-  if (!row) return null;
+  if (!row) {
+    throw new Error("Impossible de synchroniser la partie (session introuvable).");
+  }
   applyRemoteSession(row);
   if (screen) handleSessionRoute(row);
   return row;
 }
 
+export async function pushGameSession({
+  screen,
+  gameId,
+  state,
+  timeoutMs = DEFAULT_SYNC_PATCH_TIMEOUT_MS,
+  alertOnFailure = true,
+} = {}) {
+  if (!isGameSyncActive()) return null;
+  try {
+    return await withPatchTimeout(
+      pushGameSessionInner({ screen, gameId, state }),
+      timeoutMs
+    );
+  } catch (err) {
+    console.warn("pushGameSession:", err);
+    if (alertOnFailure) {
+      const { showAppAlert } = await import("./dialog.js");
+      await showAppAlert(
+        err?.message || "Impossible de synchroniser la partie.",
+        { title: "Connexion", icon: "📡" }
+      );
+    }
+    return null;
+  }
+}
+
+export function guessLieLobbyStartToRemote() {
+  return {
+    lobbyComplete: true,
+    roundIdx: 0,
+    phase: "voting",
+    votes: {},
+    roundScored: false,
+  };
+}
+
+const GUESS_LIE_MP_PATCH_OPTS = {
+  gameId: "guesslie",
+  screen: "guesslie",
+  timeoutMs: GUESS_LIE_SYNC_PATCH_TIMEOUT_MS || SYNC_PATCH_TIMEOUT_MS,
+};
+
+/** MP : lancement lobby (phase + roundIdx) sans renvoyer tout le blob submissions. */
+export async function commitGuessLieLobbyStart() {
+  const { commitMultiplayerLaunch } = await import("./mpLaunch.js");
+  return commitMultiplayerLaunch({
+    screen: "guesslie",
+    gameId: "guesslie",
+    state: { guessLie: guessLieLobbyStartToRemote() },
+    mode: "patch",
+    timeoutMs: GUESS_LIE_MP_PATCH_OPTS.timeoutMs,
+  });
+}
+
 export async function patchGameState(
+  stateMerge,
+  { screen, gameId, withEveningScores = false, timeoutMs = DEFAULT_SYNC_PATCH_TIMEOUT_MS } = {}
+) {
+  return withPatchTimeout(
+    patchGameStateInner(stateMerge, { screen, gameId, withEveningScores }),
+    timeoutMs
+  );
+}
+
+async function patchGameStateInner(
   stateMerge,
   { screen, gameId, withEveningScores = false } = {}
 ) {
@@ -2325,12 +2437,17 @@ export async function patchGameState(
     const hostId = getSupabaseUserId();
     if (!hostId) throw new Error("Session requise.");
     if (isLobbyHost()) {
+      const cachedSession = getCachedGameSession();
       freshRow = await upsertGameSession({
         lobbyId,
-        gameId: gameId || "menu",
-        screen: screen || "game-select",
+        gameId: gameId || cachedSession?.game_id || "consensus",
+        screen: screen || cachedSession?.screen || "game-select",
         hostId,
-        state: { ...eveningStateToRemote(), ...stateMerge },
+        state: {
+          ...(cachedRow?.state || cachedSession?.state || {}),
+          ...eveningStateToRemote(),
+          ...stateMerge,
+        },
       });
     } else {
       throw new Error(
@@ -2363,6 +2480,13 @@ export async function patchGameState(
         incHt.takeScored,
         newHtVote
       );
+      nextState.hotTake.matchScores = mergeRemoteMatchScoresUid(
+        curHt.matchScores || {},
+        incHt.matchScores || {}
+      );
+      if (incHt.lastRound != null) {
+        nextState.hotTake.lastRound = incHt.lastRound;
+      }
     }
   }
   if (mergePayload.speedVote) {
@@ -2371,10 +2495,10 @@ export async function patchGameState(
     const newSvVote = curSv && incSv ? isNewSpeedVoteVoteRoundUid(curSv, incSv) : false;
     nextState.speedVote = curSv
       ? {
-          ...curSv,
-          ...incSv,
-          ready: mergeRemoteReadyUid(curSv, incSv),
-          votes: mergeRemoteSpeedVoteVotesUid(curSv, incSv),
+          ...mergeSpeedVotePatchState(curSv, incSv, {
+            mergeReadyUid: mergeRemoteReadyUid,
+            mergeVotes: mergeRemoteSpeedVoteVotesUid,
+          }),
           roundScored: mergeRoundFlag(curSv.roundScored, incSv.roundScored, newSvVote),
         }
       : incSv;
@@ -2385,10 +2509,11 @@ export async function patchGameState(
     const newTriviaQ = curTrivia && incTrivia ? isNewTriviaQuestionRoundUid(curTrivia, incTrivia) : false;
     nextState.trivia = curTrivia
       ? {
-          ...curTrivia,
-          ...incTrivia,
-          ready: mergeRemoteReadyUid(curTrivia, incTrivia),
-          answers: mergeRemoteTriviaAnswersUid(curTrivia, incTrivia),
+          ...mergeTriviaPatchState(curTrivia, incTrivia, {
+            mergeReadyUid: mergeRemoteReadyUid,
+            mergeAnswers: mergeRemoteTriviaAnswersUid,
+            newQuestionRound: newTriviaQ,
+          }),
           matchScores: { ...(curTrivia.matchScores || {}), ...(incTrivia.matchScores || {}) },
           questionScored: mergeRoundFlag(
             curTrivia.questionScored,
@@ -2409,11 +2534,13 @@ export async function patchGameState(
     const newTmVote = curTm && incTm ? isNewTruthMeterVoteRound(curTm, incTm) : false;
     nextState.truthMeter = curTm
       ? {
-          ...curTm,
-          ...incTm,
-          ready: mergeRemoteReadyUid(curTm, incTm),
-          votes: mergeRemoteTruthMeterVotesUid(curTm, incTm),
+          ...mergeTruthMeterPatchState(curTm, incTm, {
+            mergeReadyUid: mergeRemoteReadyUid,
+            mergeVotes: mergeRemoteTruthMeterVotesUid,
+          }),
           roundScored: mergeRoundFlag(curTm.roundScored, incTm.roundScored, newTmVote),
+          matchScores: mergeRemoteMatchScoresUid(curTm.matchScores || {}, incTm.matchScores || {}),
+          lastRound: incTm.lastRound != null ? incTm.lastRound : curTm.lastRound,
         }
       : incTm;
   }
@@ -2426,13 +2553,11 @@ export async function patchGameState(
         : false;
     nextState.consensus = curConsensus
       ? {
-          ...curConsensus,
-          ...incConsensus,
-          ready: mergeRemoteReadyUid(curConsensus, incConsensus),
-          phase: mergeConsensusPhase(curConsensus.phase, incConsensus.phase, {
+          ...mergeConsensusPatchState(curConsensus, incConsensus, {
+            mergeReadyUid: mergeRemoteReadyUid,
+            mergeAnswers: mergeRemoteConsensusAnswersUid,
             newQuestionRound: newConsensusQ,
           }),
-          answers: mergeRemoteConsensusAnswersUid(curConsensus, incConsensus),
           matchScores: scoresFromRemote({
             ...(curConsensus.matchScores || {}),
             ...(incConsensus.matchScores || {}),
@@ -2475,6 +2600,13 @@ export async function patchGameState(
         incDm.roundScored,
         newDmVote
       );
+      nextState.dilemma.matchScores = mergeRemoteMatchScoresUid(
+        curDm.matchScores || {},
+        incDm.matchScores || {}
+      );
+      if (incDm.lastRound != null) {
+        nextState.dilemma.lastRound = incDm.lastRound;
+      }
     }
   }
   if (mergePayload.tierNight) {
@@ -2696,10 +2828,13 @@ export async function syncGuessLieSession(extra = {}, patchOpts = {}) {
 }
 
 export async function commitGuessLiePlay(patch, { screen, withEveningScores = false } = {}) {
-  const gl = await syncGuessLieSession(patch, { withEveningScores });
-  if (screen && isGameSyncActive()) {
-    await pushGameSession({ screen, gameId: "guesslie", state: { guessLie: guessLieToRemote(gl) } });
-  }
+  const gl = { ...getState().guessLie, ...patch };
+  saveStatePatch({ guessLie: gl });
+  if (!isGameSyncActive() || !isLobbyHost()) return gl;
+  await patchGameState(
+    { guessLie: pickRemotePlayFields(guessLieToRemote(gl), patch) },
+    { screen: screen || "guesslie", gameId: "guesslie", withEveningScores }
+  );
   return gl;
 }
 

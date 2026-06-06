@@ -4,6 +4,7 @@ import {
   getSpeedVoteSession,
   isLocalSpeedVoteHost,
   markSpeedVoteLobbyStarted,
+  getSpeedVoteEntryScreen,
   setSpeedVoteReady,
   setSpeedVoteRoundCount,
   setSpeedVoteTheme,
@@ -18,6 +19,7 @@ import { getLocalDisplayName } from "../core/state.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
 import { rulesButtonHtml } from "../core/gameRulesUi.js";
 import { isGameSyncActive, isLobbyHost, onGameSessionChange } from "../core/gameSync.js";
+import { prepGuestFollowOnSession, runPrepGameLaunch } from "../core/mpLaunch.js";
 import { navigate } from "../core/router.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
 import { bindNav } from "./nav.js";
@@ -113,9 +115,10 @@ export function mountSpeedVotePrep(app) {
   }
 
   async function onStartGame() {
-    if (!isLobbyHost()) return;
-    await markSpeedVoteLobbyStarted();
-    navigate("speedvote", {
+    await runPrepGameLaunch({
+      btn: app.querySelector("#btn-start-game"),
+      launch: markSpeedVoteLobbyStarted,
+      gameScreen: "speedvote",
       navStack: ["home", "lobby", "game-select", "speedvote-prep", "speedvote"],
     });
   }
@@ -265,7 +268,14 @@ export function mountSpeedVotePrep(app) {
 
   render();
 
+  const guestFollow = prepGuestFollowOnSession({
+    prepScreen: "speedvote-prep",
+    getEntryScreen: getSpeedVoteEntryScreen,
+    buildNavStack: (entry) => ["home", "lobby", "game-select", "speedvote-prep", entry],
+  });
+
   const unsub = onGameSessionChange(() => {
+    if (guestFollow()) return;
     refreshFromSync();
   });
 

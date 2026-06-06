@@ -4,16 +4,22 @@ import {
   getDilemmaSession,
   getDilemmaRounds,
   commitDilemmaPlay,
+  commitDilemmaVote,
   allDilemmaVotesIn,
   simulateDilemmaLobbyVotes,
   countDilemmaResults,
   startDilemmaRound,
+  resetDilemmaAfterGame,
 } from "../core/dilemmaSession.js";
 import { awardDilemmaRound } from "../core/scoring.js";
-import { gameCumulativeScoresHtml } from "../core/gameScores.js";
+import {
+  applyMatchScoreDeltas,
+  gameCumulativeScoresHtml,
+  refreshGameScoresBox,
+} from "../core/gameScores.js";
 import { getLocalDisplayName, recordDilemmaPlayed, setLastGame } from "../core/state.js";
 import { getLobbyParticipants } from "../core/lobby.js";
-import { getActivePlayers } from "../core/players.js";
+import { getActivePlayers, getActivePlayerNames } from "../core/players.js";
 import { setLobbyPlaying, setLobbyWaiting } from "../core/lobby.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
 import { navigate } from "../core/router.js";
@@ -27,6 +33,7 @@ import {
   isLobbyHost,
   onGameSessionChange,
   completeGameSession,
+  dilemmaToRemote,
 } from "../core/gameSync.js";
 
 const DILEMMA_VS_SRC = "js/games/dilemma-vs.svg";
@@ -116,6 +123,19 @@ export function mountDilemma(app) {
     return roundScored || Boolean(getDilemmaSession().roundScored);
   }
 
+  function dilemmaSessionScores() {
+    return getDilemmaSession().matchScores || {};
+  }
+
+  function buildDilemmaLastRound(award) {
+    if (!award?.majorityWinners?.length) return null;
+    return {
+      majority: award.majority,
+      majorityWinners: award.majorityWinners,
+      deltas: award.deltas || {},
+    };
+  }
+
   async function transitionToReveal() {
     if (phase !== "voting") return;
     if (alreadyScoredThisRound()) return;
@@ -125,13 +145,19 @@ export function mountDilemma(app) {
     revealInFlight = true;
     try {
       roundScored = true;
+      let matchScores = getDilemmaSession().matchScores || {};
+      let lastRound = getDilemmaSession().lastRound || null;
       lastAward = awardDilemmaRound(votes);
+      matchScores = applyMatchScoreDeltas(matchScores, lastAward.deltas || {});
+      lastRound = buildDilemmaLastRound(lastAward);
       await commitDilemmaPlay(
         {
           phase: "reveal",
           roundScored: true,
           votes,
           voteEndsAt: null,
+          matchScores,
+          lastRound,
         },
         { withEveningScores: mp && isLobbyHost() }
       );
@@ -177,17 +203,22 @@ export function mountDilemma(app) {
         title: "Dilemma",
         summary: `${total} dilemmes · dernière manche ${pctA}% option A`,
       });
+      const resetDm = await resetDilemmaAfterGame();
       if (mp) {
         try {
-          await completeGameSession({ gameId: "dilemma", screen: "results", state: {} });
+          await completeGameSession({
+            gameId: "dilemma",
+            screen: "results",
+            state: { dilemma: dilemmaToRemote(resetDm) },
+          });
         } catch (e) {
           console.warn("REVEAL completeGameSession:", e);
           navigate("results", { navStack: ["home", "lobby", "game-select", "results"] });
         }
       } else {
         setLobbyWaiting();
-        navigate("results", { navStack: ["home", "lobby", "game-select", "results"] });
       }
+      navigate("results", { navStack: ["home", "lobby", "game-select", "results"] });
     }
   }
 
@@ -232,11 +263,13 @@ export function mountDilemma(app) {
     const awardWinners =
       lastAward?.majorityWinners?.length > 0
         ? lastAward.majorityWinners
-        : majority
-          ? Object.entries(votes)
-              .filter(([, choice]) => choice === majority)
-              .map(([name]) => name)
-          : [];
+        : getDilemmaSession().lastRound?.majorityWinners?.length > 0
+          ? getDilemmaSession().lastRound.majorityWinners
+          : majority
+            ? Object.entries(votes)
+                .filter(([, choice]) => choice === majority)
+                .map(([name]) => name)
+            : [];
     const awardLine = awardWinners.length
       ? `<p class="hint">🏆 Victoire (majorité) - <strong>+${DILEMMA_POINTS_MAJORITY_WIN} pts</strong> : ${awardWinners.map((n) => escapeHtml(n)).join(", ")}</p>`
       : "";
@@ -249,7 +282,11 @@ export function mountDilemma(app) {
       <h3 class="section-title">Résultats</h3>
       ${dividedBanner}
       ${awardLine}
-      ${gameCumulativeScoresHtml({ gameLabel: "Dilemma", title: "Cumul des scores" })}
+      ${gameCumulativeScoresHtml({
+        gameLabel: "Dilemma",
+        title: "Cumul des scores",
+        scores: dilemmaSessionScores(),
+      })}
       <div class="dilemma__result-row ${majority === "A" ? "dilemma__result-row--winner" : ""}">
         <div class="dilemma__result-head">
           <span>Option A</span>
@@ -293,6 +330,12 @@ export function mountDilemma(app) {
       }`;
   }
 
+  function countPlayersVoted(votesMap = votes) {
+    return getActivePlayerNames().filter(
+      (name) => votesMap[name] === "A" || votesMap[name] === "B"
+    ).length;
+  }
+
   function votingPhaseHtml() {
     const host = !mp || isLobbyHost();
     const voteHint = mp
@@ -305,12 +348,12 @@ export function mountDilemma(app) {
         ? "Les autres votent…"
         : "Choisis ton camp !";
 
-    const votedCount = Object.keys(votes).length;
-    const totalPlayers = getLobbyParticipants().length;
+    const votedCount = countPlayersVoted();
+    const totalPlayers = getActivePlayers().length;
     return `
       <p class="label-upper label-upper--muted">Vote simultané</p>
       ${voteTapHtml()}
-      <p class="hint">${voteHint}${canChangeVote() ? " · Tu peux changer ton vote tant que le vote est ouvert." : ""}</p>
+      <p class="hint">${voteHint}</p>
       ${
         host
           ? `<button type="button" class="btn btn-secondary btn--spaced" id="dilemma-force">
@@ -321,7 +364,7 @@ export function mountDilemma(app) {
   }
 
   function canChangeVote() {
-    return phase === "voting" && !isEveningGameplayPaused();
+    return phase === "voting" && !isEveningGameplayPaused() && myVote == null;
   }
 
   function render() {
@@ -362,7 +405,7 @@ export function mountDilemma(app) {
           voteCommitInFlight = choice;
           render();
           try {
-            await commitDilemmaPlay({ votes: { ...votes } });
+            await commitDilemmaVote(choice);
           } finally {
             voteCommitInFlight = null;
             syncFromSession();
@@ -400,7 +443,7 @@ export function mountDilemma(app) {
   }
 
   function patchVotingChrome() {
-    const votedCount = Object.keys(votes).length;
+    const votedCount = countPlayersVoted();
     const totalPlayers = getActivePlayers().length;
     const forceBtn = app.querySelector("#dilemma-force");
     if (forceBtn) {
@@ -428,6 +471,14 @@ export function mountDilemma(app) {
       render();
       const { pctA, pctB } = countDilemmaResults(votes);
       animateRevealBars(pctA, pctB);
+      return;
+    }
+    if (phase === "reveal" && prevPhase === "reveal") {
+      refreshGameScoresBox(app, {
+        gameLabel: "Dilemma",
+        title: "Cumul des scores",
+        scores: dilemmaSessionScores(),
+      });
       return;
     }
     if (shouldSkipFullRender(prevPhase, prevRound)) {

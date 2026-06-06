@@ -2,6 +2,28 @@ import { getSortedActivePlayers } from "./players.js";
 import { getCurrentSessionScoreMap, getState } from "./state.js";
 import { escapeHtml } from "./ui.js";
 
+/** Scores cumulés d'une manche → map joueur (partie en cours). */
+export function applyMatchScoreDeltas(scores = {}, deltas = {}) {
+  const next = { ...scores };
+  Object.entries(deltas).forEach(([name, pts]) => {
+    if (typeof pts === "number" && Number.isFinite(pts) && pts > 0) {
+      next[name] = (next[name] || 0) + pts;
+    }
+  });
+  return next;
+}
+
+/** Fusion locale des matchScores (sync multijoueur, max par joueur). */
+export function mergeMatchScoresLocal(local = {}, remote = {}) {
+  const merged = { ...local };
+  Object.entries(remote).forEach(([name, pts]) => {
+    if (typeof pts === "number" && Number.isFinite(pts)) {
+      merged[name] = Math.max(merged[name] || 0, pts);
+    }
+  });
+  return merged;
+}
+
 function gameScoresBoxRowsHtml(players, scores) {
   return players
     .map((p, i) => {
@@ -115,8 +137,12 @@ export function gameCumulativeScoresHtml({
   gameId = null,
   gameLabel = null,
   title = "Cumul des scores",
+  scores: scoresOverride = null,
 } = {}) {
-  const scores = getCurrentSessionScoreMap(gameId);
+  const scores =
+    scoresOverride && typeof scoresOverride === "object"
+      ? scoresOverride
+      : getCurrentSessionScoreMap(gameId);
   const players = getSortedActivePlayers();
   if (!players.length) return "";
 
@@ -133,9 +159,13 @@ export function refreshGameScoresBox(app, {
   gameId = null,
   gameLabel = null,
   title = "Cumul des scores",
+  scores: scoresOverride = null,
 } = {}) {
   if (!app) return;
-  const scores = getCurrentSessionScoreMap(gameId);
+  const scores =
+    scoresOverride && typeof scoresOverride === "object"
+      ? scoresOverride
+      : getCurrentSessionScoreMap(gameId);
   const players = getSortedActivePlayers();
   if (!players.length) return;
 

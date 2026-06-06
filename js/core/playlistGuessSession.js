@@ -13,11 +13,11 @@ import {
   isGameSyncActive,
   isLobbyHost,
   syncPlaylistGuessSession,
-  pushGameSession,
   playlistGuessToRemote,
   allMembersReady,
   userIdForName,
 } from "./gameSync.js";
+import { launchGameWithSync, commitHostGamePlay } from "./mpLaunch.js";
 
 /** Identifiant stable pour les votes (aligné lobby Supabase + invités). */
 export function participantVoteId(participant) {
@@ -170,15 +170,14 @@ export async function markPlaylistGuessLobbyStarted() {
     deck,
     ...votingPayloadForRound(0),
   };
-  saveStatePatch({ playlistGuessGame: next });
 
-  if (isGameSyncActive() && isLobbyHost()) {
-    await pushGameSession({
-      screen: "playlistguess",
-      gameId: "playlistguess",
-      state: { playlistGuess: playlistGuessToRemote(next) },
-    });
-  }
+  return launchGameWithSync({
+    screen: "playlistguess",
+    gameId: "playlistguess",
+    mode: "push",
+    applyLocal: () => saveStatePatch({ playlistGuessGame: next }),
+    getRemoteState: () => ({ playlistGuess: playlistGuessToRemote(next) }),
+  });
 }
 
 export function getPlaylistGuessDeck() {
@@ -209,12 +208,20 @@ export async function startPlaylistGuessRound(roundIdx) {
 
 export async function commitPlaylistGuessPlay(patch, patchOpts = {}) {
   const base = getPlaylistGuessSession();
-  const next = { ...base, ...patch };
-  if (next.phase === "voting" && patch.votes === undefined) {
-    next.votes = getEffectivePlaylistGuessVotes(base);
+  const mergedPatch = { ...patch };
+  const nextPhase = patch.phase ?? base.phase;
+  if (nextPhase === "voting" && patch.votes === undefined) {
+    mergedPatch.votes = getEffectivePlaylistGuessVotes(base);
   }
-  await syncPlaylistGuessSession(next, patchOpts);
-  return next;
+  return commitHostGamePlay({
+    patch: mergedPatch,
+    gameId: "playlistguess",
+    stateKey: "playlistGuess",
+    getSession: getPlaylistGuessSession,
+    saveLocal: (session) => saveStatePatch({ playlistGuessGame: session }),
+    toRemote: playlistGuessToRemote,
+    patchOpts,
+  });
 }
 
 /** Votes de la manche en cours (uid normalisé, sans reliquats nom/ancienne manche). */

@@ -26,8 +26,8 @@ Dans `js/core/gameSync.js` :
 |-----|------------|---------------------------|
 | Hot Take | `takeScored` | `isNewHotTakeVoteRound` (`takeIdx`, `voteEndsAt`) |
 | SpeedVote | `roundScored` | `isNewSpeedVoteVoteRound` (`roundIdx`, `voteEndsAt`) |
-| Trivia | `questionScored`, `podiumApplied` | `isNewTriviaQuestionRound` (`questionIdx`, `questionEndsAt`) |
-| Consensus | `roundScored`, `podiumApplied` | `isNewConsensusQuestionRound` (`questionIdx`, `questionEndsAt`) |
+| Trivia | `questionScored`, `podiumApplied` | `isNewTriviaQuestionRound` (`questionIdx`, réponses vidées) |
+| Consensus | `roundScored`, `podiumApplied` | `isNewConsensusQuestionRound` (`questionIdx`, réponses vidées) |
 | Dilemma | `roundScored` | `isNewDilemmaVoteRound` (`roundIdx`, `voteEndsAt`) |
 | TruthMeter | `roundScored` | `isNewTruthMeterVoteRound` (`roundIdx`, `voteEndsAt`) |
 | VibeCheck | `roundScored` | `isNewPlaylistGuessVoteRound` (`roundIdx`, `voteEndsAt`) |

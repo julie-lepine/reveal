@@ -64,7 +64,6 @@ export function renderTriviaSetup({
       <p class="hot-take-duration">
         <strong>${prep.requested}</strong> question${prep.requested > 1 ? "s" : ""}
         · ${escapeHtml(prep.durationLabel)}
-        <span class="muted"> · ${prep.questionTimeSec}s par question</span>
       </p>
       ${!isHost ? `<p class="hint">Seul l'hote peut modifier les reglages.</p>` : ""}
     </div>

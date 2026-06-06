@@ -4,6 +4,7 @@ import { getLocalDisplayName } from "../core/state.js";
 import { showAppAlert } from "../core/dialog.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
 import { isGameSyncActive, isLobbyHost, onGameSessionChange } from "../core/gameSync.js";
+import { prepGuestFollowOnSession, runPrepGameLaunch } from "../core/mpLaunch.js";
 import { navigate } from "../core/router.js";
 import { pageShell } from "../core/ui.js";
 import { bindNav } from "./nav.js";
@@ -40,9 +41,10 @@ export function mountConsensusSetup(app) {
       );
       return;
     }
-    const result = await consensus.startLobbyGame();
-    if (!result.ok) return;
-    navigate("consensus", {
+    await runPrepGameLaunch({
+      btn: app.querySelector("#btn-consensus-start"),
+      launch: () => consensus.startLobbyGame(),
+      gameScreen: "consensus",
       navStack: ["home", "lobby", "game-select", "consensus-prep", "consensus"],
     });
   }
@@ -113,14 +115,14 @@ export function mountConsensusSetup(app) {
 
   render();
 
+  const guestFollow = prepGuestFollowOnSession({
+    prepScreen: "consensus-prep",
+    getEntryScreen: () => consensus.getEntryScreen(),
+    buildNavStack: (entry) => ["home", "lobby", "game-select", "consensus-prep", entry],
+  });
+
   const unsub = onGameSessionChange(() => {
-    const entry = consensus.getEntryScreen();
-    if (entry !== "consensus-prep") {
-      navigate(entry, {
-        navStack: ["home", "lobby", "game-select", "consensus-prep", entry],
-      });
-      return;
-    }
+    if (guestFollow()) return;
     render();
   });
 

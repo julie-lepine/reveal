@@ -44,6 +44,8 @@ export const GUESS_LIE_ROUNDS = [
 
 export const GUESS_LIE_DETECTIVE_POINTS = EVENING_POINTS.WIN;
 export const GUESS_LIE_LIAR_POINTS = EVENING_POINTS.BONUS;
+/** Timeout patch Supabase (lancement lobby / sync MP). */
+export const GUESS_LIE_SYNC_PATCH_TIMEOUT_MS = 20000;
 export const GUESS_LIE_VOTE_TIMER_SEC = 30;
 /** Moins de ce ratio de détectives → bonus menteur */
 export const GUESS_LIE_LIAR_BONUS_THRESHOLD = 0.5;

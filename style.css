@@ -1024,7 +1024,24 @@ button.game-card{
   border-radius:8px;
   color:var(--tier-color);
   background:color-mix(in srgb,var(--tier-color) 12%,transparent);
-  border:1px solid color-mix(in srgb,var(--tier-color) 28%,transparent);
+  border:1px dashed color-mix(in srgb,var(--tier-color) 28%,transparent);
+  cursor:pointer;
+  font-family:inherit;
+  line-height:1.3;
+  touch-action:manipulation;
+  -webkit-tap-highlight-color:transparent;
+  appearance:none;
+  -webkit-appearance:none;
+}
+
+.tier-chip:active{
+  transform:scale(0.96);
+  background:color-mix(in srgb,var(--tier-color) 22%,transparent);
+}
+
+.tier-unplace-hint{
+  margin:12px 0 4px;
+  font-size:12px;
 }
 
 .unplaced{
@@ -1544,22 +1561,6 @@ select.field-input option{
   width:100%;
   height:100%;
   object-fit:cover;
-}
-
-.tier-timer-wrap{
-  display:flex;
-  flex-direction:column;
-  align-items:center;
-  gap:6px;
-  margin:0 auto 20px;
-}
-
-.tier-timer-label{
-  font-size:12px;
-  font-weight:700;
-  color:rgba(255,255,255,.45);
-  text-transform:uppercase;
-  letter-spacing:.06em;
 }
 
 .recap-list{

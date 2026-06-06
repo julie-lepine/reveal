@@ -20,10 +20,12 @@ import {
   isGameSyncActive,
   isLobbyHost,
   syncHotTakeSession,
-  pushGameSession,
   allMembersReady,
   hotTakeToRemote,
+  patchGameState,
+  userIdForName,
 } from "./gameSync.js";
+import { launchGameWithSync, commitHostGamePlay } from "./mpLaunch.js";
 import { mergeHotTakeCustomTakes } from "./sessionMerge.js";
 
 function defaultSession() {
@@ -42,6 +44,8 @@ function defaultSession() {
     voteTimerRemaining: null,
     intermissionEndsAt: null,
     takeScored: false,
+    matchScores: {},
+    lastRound: null,
   };
 }
 
@@ -281,7 +285,6 @@ export function simulateHotTakeReady(onUpdate) {
 
 export async function markHotTakeLobbyStarted() {
   buildHotTakeDeck();
-  const session = getHotTakeSession();
   const next = {
     ...getHotTakeSession(),
     lobbyStarted: true,
@@ -290,15 +293,22 @@ export async function markHotTakeLobbyStarted() {
     votes: {},
     voteEndsAt: null,
     intermissionEndsAt: null,
+    matchScores: {},
+    lastRound: null,
   };
-  saveStatePatch({ hotTakeGame: next });
-  if (isGameSyncActive() && isLobbyHost()) {
-    await pushGameSession({
-      screen: "hottake",
-      gameId: "hottake",
-      state: { hotTake: hotTakeToRemote(next) },
-    });
-  }
+  return launchGameWithSync({
+    screen: "hottake",
+    gameId: "hottake",
+    mode: "push",
+    beforeCommit: async () => {
+      if (isGameSyncActive() && isLobbyHost()) {
+        const { setLobbyPlaying } = await import("./lobby.js");
+        await setLobbyPlaying("hottake");
+      }
+    },
+    applyLocal: () => saveStatePatch({ hotTakeGame: next }),
+    getRemoteState: () => ({ hotTake: hotTakeToRemote(next) }),
+  });
 }
 
 export async function pauseHotTakeVote(pausedByName, remainingSec) {
@@ -347,10 +357,49 @@ export async function resetHotTakeSession() {
   await syncHotTakeSession(defaultSession());
 }
 
+/** Prep propre après une partie : garde thème / manches, efface customs et deck. */
+export function hotTakePrepAfterGameReset() {
+  const session = getHotTakeSession();
+  return {
+    ...defaultSession(),
+    selectedThemeId: session.selectedThemeId || HOT_TAKE_CATALOG_ID,
+    roundCount: session.roundCount ?? 5,
+  };
+}
+
+/** Fin de partie : purge les takes custom pour tout le lobby (hôte sync). */
+export async function resetHotTakeAfterGame() {
+  const next = hotTakePrepAfterGameReset();
+  if (isGameSyncActive() && isLobbyHost()) {
+    await syncHotTakeSession(next);
+  } else {
+    saveStatePatch({ hotTakeGame: next });
+  }
+  return next;
+}
+
 export async function commitHotTakePlay(patch, patchOpts = {}) {
-  const session = { ...getHotTakeSession(), ...patch };
-  await syncHotTakeSession(session, patchOpts);
-  return session;
+  return commitHostGamePlay({
+    patch,
+    gameId: "hottake",
+    stateKey: "hotTake",
+    getSession: getHotTakeSession,
+    saveLocal: (session) => saveStatePatch({ hotTakeGame: session }),
+    toRemote: hotTakeToRemote,
+    patchOpts,
+  });
+}
+
+/** Invité MP : envoie uniquement son vote (évite d'écraser phase reveal de l'hôte). */
+export async function commitHotTakeVote(choice) {
+  const localName = getLocalDisplayName();
+  const session = getHotTakeSession();
+  const votes = { ...(session.votes || {}), [localName]: choice };
+  saveStatePatch({ hotTakeGame: { ...session, votes } });
+  if (!isGameSyncActive()) return { ...session, votes };
+  const uid = userIdForName(localName) || localName;
+  await patchGameState({ hotTake: { votes: { [uid]: choice } } });
+  return { ...session, votes };
 }
 
 export function getHotTakeVotesForUi() {

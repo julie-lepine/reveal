@@ -6,7 +6,6 @@ import {
   TRIVIA_QUESTION_COUNT_PRESETS,
   TRIVIA_RANDOM_THEME_ID,
   TRIVIA_THEMES,
-  TRIVIA_TIMER_SEC,
   getTriviaQuestionPool,
   getTriviaThemeLabel,
 } from "../../data/trivia.js";
@@ -17,10 +16,14 @@ import {
   allMembersReady,
   isGameSyncActive,
   isLobbyHost,
-  pushGameSession,
   syncTriviaSession,
   triviaToRemote,
+  patchGameState,
+  userIdForName,
 } from "./gameSync.js";
+import { launchGameWithSync, commitHostGamePlay } from "./mpLaunch.js";
+
+const TRIVIA_ESTIMATE_SEC_PER_QUESTION = 40;
 
 function defaultSession() {
   return {
@@ -28,13 +31,11 @@ function defaultSession() {
     lobbyStarted: false,
     selectedThemeId: TRIVIA_RANDOM_THEME_ID,
     questionCount: 5,
-    questionTimeSec: TRIVIA_TIMER_SEC,
     deck: null,
     questionIdx: 0,
     phase: null,
     currentQuestion: null,
     answers: {},
-    questionEndsAt: null,
     questionScored: false,
     matchScores: {},
     lastRound: null,
@@ -43,8 +44,8 @@ function defaultSession() {
   };
 }
 
-function estimateTriviaDurationLabel(questionCount, questionTimeSec = TRIVIA_TIMER_SEC) {
-  const totalSec = questionCount * (questionTimeSec + 5);
+function estimateTriviaDurationLabel(questionCount) {
+  const totalSec = questionCount * TRIVIA_ESTIMATE_SEC_PER_QUESTION;
   if (totalSec < 60) return `~${totalSec}s`;
   const minutes = Math.max(1, Math.round(totalSec / 60));
   return `~${minutes} min`;
@@ -66,7 +67,6 @@ function buildQuestionStartPatch(session, questionIdx) {
     phase: "question",
     currentQuestion: deck[questionIdx] || null,
     answers: {},
-    questionEndsAt: new Date(Date.now() + TRIVIA_TIMER_SEC * 1000).toISOString(),
     questionScored: false,
     lastRound: null,
     results: null,
@@ -110,7 +110,6 @@ export function getTriviaPrepSummary() {
     themeLabel: getTriviaThemeLabel(themeId),
     poolSize,
     requested,
-    questionTimeSec: TRIVIA_TIMER_SEC,
     durationLabel: estimateTriviaDurationLabel(requested),
     launchable: poolSize >= requested,
     missing: Math.max(0, requested - poolSize),
@@ -210,7 +209,6 @@ export function buildTriviaReplaySession(session = getTriviaSession()) {
     ...base,
     selectedThemeId: session.selectedThemeId || TRIVIA_RANDOM_THEME_ID,
     questionCount: session.questionCount ?? 5,
-    questionTimeSec: session.questionTimeSec ?? TRIVIA_TIMER_SEC,
   };
 }
 
@@ -238,15 +236,14 @@ export async function markTriviaLobbyStarted() {
   if (!started.ok) return started;
   const next = started.session;
 
-  saveStatePatch({ triviaGame: next });
-  if (isGameSyncActive() && isLobbyHost()) {
-    await pushGameSession({
-      screen: "trivia",
-      gameId: "trivia",
-      state: { trivia: triviaToRemote(next) },
-    });
-  }
-  return { ok: true, session: next };
+  const result = await launchGameWithSync({
+    screen: "trivia",
+    gameId: "trivia",
+    mode: "push",
+    applyLocal: () => saveStatePatch({ triviaGame: next }),
+    getRemoteState: () => ({ trivia: triviaToRemote(next) }),
+  });
+  return { ...result, ok: result.ok !== false, session: next };
 }
 
 export async function startTriviaQuestion(questionIdx) {
@@ -256,33 +253,62 @@ export async function startTriviaQuestion(questionIdx) {
 }
 
 export async function commitTriviaPlay(patch, { screen } = {}) {
-  const session = { ...getTriviaSession(), ...patch };
-  const next = await syncTriviaSession(session);
-  if (screen && isGameSyncActive()) {
-    await pushGameSession({
-      screen,
-      gameId: "trivia",
-      state: { trivia: triviaToRemote(next) },
-    });
-  }
-  return next;
+  return commitHostGamePlay({
+    patch,
+    gameId: "trivia",
+    screen: screen || "trivia",
+    stateKey: "trivia",
+    getSession: getTriviaSession,
+    saveLocal: (session) => saveStatePatch({ triviaGame: session }),
+    toRemote: triviaToRemote,
+  });
 }
 
 export async function commitTriviaAnswer(answerIndex) {
   const session = getTriviaSession();
   const localName = getLocalDisplayName();
+  if (session.phase !== "question") {
+    return session.answers?.[localName] || null;
+  }
+  if (!Number.isInteger(answerIndex)) {
+    throw new Error("Réponse invalide.");
+  }
+  const prev = session.answers?.[localName];
+  if (prev?.answerIndex === answerIndex) {
+    return prev;
+  }
+  const nextAnswer = {
+    answerIndex,
+    answeredAt: Date.now(),
+  };
   const nextAnswers = {
     ...(session.answers || {}),
-    [localName]: {
-      answerIndex,
-      answeredAt: Date.now(),
-    },
+    [localName]: nextAnswer,
   };
-  await syncTriviaSession({
-    ...session,
-    answers: nextAnswers,
-  });
-  return nextAnswers[localName];
+  saveStatePatch({ triviaGame: { ...session, answers: nextAnswers } });
+  if (!isGameSyncActive()) return nextAnswer;
+  const uid = userIdForName(localName) || localName;
+  try {
+    await patchGameState({
+      trivia: {
+        answers: {
+          [uid]: {
+            answerIndex: nextAnswer.answerIndex,
+            answeredAt: nextAnswer.answeredAt,
+          },
+        },
+      },
+    });
+  } catch (err) {
+    console.warn("commitTriviaAnswer:", err);
+    const { showAppAlert } = await import("./dialog.js");
+    await showAppAlert(err?.message || "Impossible d'envoyer ta réponse.", {
+      title: "Connexion",
+      icon: "📡",
+    });
+    throw err;
+  }
+  return nextAnswer;
 }
 
 export function getTriviaWaitingPlayers() {
@@ -381,5 +407,4 @@ export function applyTriviaLobbyPodium(session = getTriviaSession()) {
 export {
   TRIVIA_QUESTION_COUNT_PRESETS,
   TRIVIA_RANDOM_THEME_ID,
-  TRIVIA_TIMER_SEC,
 };

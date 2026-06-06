@@ -1,20 +1,21 @@
-import { getLocalDisplayName, markGuessLieLobbyComplete } from "../core/state.js";
+import { getLocalDisplayName } from "../core/state.js";
 import {
   allLobbySubmitted,
+  getGuessLieEntryScreen,
   getGuessLieSession,
   getLobbyMemberNames,
+  handleGuessLieLaunch,
 } from "../core/guessLieSession.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
-import { navigate } from "../core/router.js";
+import { prepGuestFollowOnSession } from "../core/mpLaunch.js";
 import { escapeHtml, logoHtml, pageShell } from "../core/ui.js";
 import { bindNav } from "./nav.js";
-import { isGameSyncActive, isLobbyHost, onGameSessionChange } from "../core/gameSync.js";
+import { isLobbyHost, onGameSessionChange } from "../core/gameSync.js";
 
 export function mountGuessLieLobbyWait(app) {
   if (!requireLobbyPlay()) return null;
 
   const localName = getLocalDisplayName();
-  const mp = isGameSyncActive();
 
   function render() {
     const session = getGuessLieSession();
@@ -64,13 +65,22 @@ export function mountGuessLieLobbyWait(app) {
     bindNav(app);
 
     app.querySelector("#btn-start")?.addEventListener("click", async () => {
-      await markGuessLieLobbyComplete();
-      if (!mp) navigate("guesslie", { reset: true });
+      await handleGuessLieLaunch(app.querySelector("#btn-start"));
     });
   }
 
+  const guestFollow = prepGuestFollowOnSession({
+    prepScreen: "guesslie-wait",
+    getEntryScreen: getGuessLieEntryScreen,
+  });
+
+  function onSessionUpdate() {
+    if (guestFollow()) return;
+    render();
+  }
+
   render();
-  const unsub = onGameSessionChange(() => render());
+  const unsub = onGameSessionChange(onSessionUpdate);
 
   return () => {
     unsub();

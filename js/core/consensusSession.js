@@ -2,7 +2,7 @@ import {
   CONSENSUS_MODES,
   CONSENSUS_LOBBY_PODIUM_POINTS,
   CONSENSUS_QUESTION_COUNT_PRESETS,
-  CONSENSUS_TIMER_SEC,
+  CONSENSUS_SYNC_PATCH_TIMEOUT_MS,
   decorateConsensusQuestionForMode,
   getConsensusModeLabel,
   getConsensusQuestionPool,
@@ -16,10 +16,24 @@ import {
   isGameSyncActive,
   isLobbyHost,
   playerKeyToDisplayName,
-  pushGameSession,
   syncConsensusSession,
   consensusToRemote,
+  patchGameState,
+  userIdForName,
+  consensusRevealToRemote,
 } from "./gameSync.js";
+import { launchGameWithSync, commitHostGamePlay } from "./mpLaunch.js";
+import {
+  applyConsensusDefaultAnswers as applyConsensusDefaultAnswersCore,
+  clampConsensusValue,
+  isConsensusAnswerForRound,
+  stripStaleConsensusAnswers,
+} from "./consensusAnswerUtils.js";
+
+export { clampConsensusValue, isConsensusAnswerForRound } from "./consensusAnswerUtils.js";
+
+/** Estimation prep uniquement (plus de chrono en partie). */
+const CONSENSUS_ESTIMATE_SEC_PER_QUESTION = 45;
 
 function defaultSession() {
   return {
@@ -27,13 +41,11 @@ function defaultSession() {
     lobbyStarted: false,
     selectedModeId: "standard",
     questionCount: 5,
-    questionTimeSec: CONSENSUS_TIMER_SEC,
     deck: null,
     questionIdx: 0,
     phase: null,
     currentQuestion: null,
     answers: {},
-    questionEndsAt: null,
     roundScored: false,
     matchScores: {},
     lastRound: null,
@@ -41,8 +53,8 @@ function defaultSession() {
   };
 }
 
-function estimateConsensusDurationLabel(questionCount, questionTimeSec = CONSENSUS_TIMER_SEC) {
-  const totalSec = questionCount * (questionTimeSec + 7);
+function estimateConsensusDurationLabel(questionCount) {
+  const totalSec = questionCount * CONSENSUS_ESTIMATE_SEC_PER_QUESTION;
   if (totalSec < 60) return `~${totalSec}s`;
   const minutes = Math.max(1, Math.round(totalSec / 60));
   return `~${minutes} min`;
@@ -69,7 +81,6 @@ function buildQuestionStartPatch(session, questionIdx) {
       questionIdx
     ),
     answers: {},
-    questionEndsAt: new Date(Date.now() + CONSENSUS_TIMER_SEC * 1000).toISOString(),
     roundScored: false,
     lastRound: null,
   };
@@ -100,8 +111,16 @@ function computeModes(values) {
     .sort((a, b) => a - b);
 }
 
-export function clampConsensusValue(value) {
-  return Math.max(0, Math.min(100, Math.round(Number(value) || 0)));
+function stripAnswersForRound(answers = {}, questionIdx = 0) {
+  return stripStaleConsensusAnswers(normalizeConsensusAnswers(answers), questionIdx);
+}
+
+export function applyConsensusDefaultAnswers(
+  session,
+  playerNames = getActivePlayerNames()
+) {
+  const base = normalizeConsensusSession(session);
+  return applyConsensusDefaultAnswersCore(base, playerNames);
 }
 
 export function formatConsensusScore(value) {
@@ -169,9 +188,16 @@ function normalizeConsensusLastRound(lastRound) {
 
 export function normalizeConsensusSession(session) {
   if (!session) return defaultSession();
+  const questionIdx = session.questionIdx ?? 0;
+  const answers =
+    session.phase === "question" ||
+    session.phase === "reveal-pending" ||
+    session.phase === "reveal"
+      ? stripAnswersForRound(session.answers || {}, questionIdx)
+      : normalizeConsensusAnswers(session.answers || {});
   return {
     ...session,
-    answers: normalizeConsensusAnswers(session.answers || {}),
+    answers,
     matchScores: normalizeConsensusScores(session.matchScores || {}),
     lastRound: normalizeConsensusLastRound(session.lastRound),
   };
@@ -210,7 +236,6 @@ export function getConsensusPrepSummary() {
     modeLabel: getConsensusModeLabel(getConsensusModeId()),
     poolSize,
     requested,
-    questionTimeSec: CONSENSUS_TIMER_SEC,
     durationLabel: estimateConsensusDurationLabel(requested),
     launchable: poolSize >= requested,
     missing: Math.max(0, requested - poolSize),
@@ -304,7 +329,6 @@ export function buildConsensusReplaySession(session = getConsensusSession()) {
     ...base,
     selectedModeId: session.selectedModeId || "standard",
     questionCount: session.questionCount ?? 5,
-    questionTimeSec: session.questionTimeSec ?? CONSENSUS_TIMER_SEC,
   };
 }
 
@@ -331,15 +355,15 @@ export async function markConsensusLobbyStarted() {
   const started = createStartedConsensusSession();
   if (!started.ok) return started;
   const next = started.session;
-  saveStatePatch({ consensusGame: next });
-  if (isGameSyncActive() && isLobbyHost()) {
-    await pushGameSession({
-      screen: "consensus",
-      gameId: "consensus",
-      state: { consensus: consensusToRemote(next) },
-    });
-  }
-  return { ok: true, session: next };
+
+  const result = await launchGameWithSync({
+    screen: "consensus",
+    gameId: "consensus",
+    mode: "push",
+    applyLocal: () => saveStatePatch({ consensusGame: next }),
+    getRemoteState: () => ({ consensus: consensusToRemote(next) }),
+  });
+  return { ...result, ok: result.ok !== false, session: next };
 }
 
 export async function startConsensusQuestion(questionIdx) {
@@ -349,47 +373,96 @@ export async function startConsensusQuestion(questionIdx) {
 }
 
 export async function commitConsensusPlay(patch, { screen } = {}) {
-  const session = { ...getConsensusSession(), ...patch };
-  const next = await syncConsensusSession(session);
-  if (screen && isGameSyncActive()) {
-    await pushGameSession({
-      screen,
-      gameId: "consensus",
-      state: { consensus: consensusToRemote(next) },
-    });
-  }
-  return next;
+  return commitHostGamePlay({
+    patch,
+    gameId: "consensus",
+    screen: screen || "consensus",
+    stateKey: "consensus",
+    getSession: getConsensusSession,
+    saveLocal: (session) => saveStatePatch({ consensusGame: session }),
+    toRemote: consensusToRemote,
+  });
+}
+
+const CONSENSUS_MP_PATCH_OPTS = {
+  gameId: "consensus",
+  screen: "consensus",
+  timeoutMs: CONSENSUS_SYNC_PATCH_TIMEOUT_MS,
+};
+
+/** MP : patch phase seule (reveal-pending) — évite le blob complet. */
+export async function commitConsensusPhase(phase) {
+  const session = { ...getConsensusSession(), phase };
+  saveStatePatch({ consensusGame: session });
+  if (!isGameSyncActive()) return session;
+  await patchGameState({ consensus: { phase } }, CONSENSUS_MP_PATCH_OPTS);
+  return session;
+}
+
+/** MP : patch révélation (scores + réponses imputées, sans deck). */
+export async function commitConsensusReveal(scoredSession) {
+  const revealSession = { ...scoredSession, phase: "reveal" };
+  saveStatePatch({ consensusGame: revealSession });
+  if (!isGameSyncActive()) return revealSession;
+  await patchGameState(
+    { consensus: consensusRevealToRemote(revealSession) },
+    CONSENSUS_MP_PATCH_OPTS
+  );
+  return revealSession;
 }
 
 export async function commitConsensusAnswer(value, { submitted = false } = {}) {
   const session = getConsensusSession();
   const localName = getLocalDisplayName();
+  const questionIdx = session.questionIdx ?? 0;
   const previous = session.answers?.[localName] || null;
+  if (submitted && isConsensusAnswerForRound(previous, questionIdx)) {
+    return previous;
+  }
   const nextAnswer = {
     value: clampConsensusValue(value),
     timestamp: Date.now(),
     submittedAt: submitted ? Date.now() : previous?.submittedAt || null,
+    questionIdx,
+    imputed: false,
   };
-  const nextAnswers = {
-    ...(session.answers || {}),
-    [localName]: nextAnswer,
-  };
-  await syncConsensusSession({
-    ...session,
-    answers: nextAnswers,
+  const nextAnswers = stripAnswersForRound(session.answers || {}, questionIdx);
+  nextAnswers[localName] = nextAnswer;
+  saveStatePatch({ consensusGame: { ...session, answers: nextAnswers } });
+  if (!isGameSyncActive()) return nextAnswer;
+  const uid = userIdForName(localName) || localName;
+  await patchGameState({
+    consensus: {
+      answers: {
+        [uid]: {
+          value: nextAnswer.value,
+          timestamp: nextAnswer.timestamp,
+          submittedAt: nextAnswer.submittedAt,
+          questionIdx: nextAnswer.questionIdx,
+          imputed: nextAnswer.imputed,
+        },
+      },
+    },
   });
   return nextAnswer;
 }
 
 export function getConsensusWaitingPlayers() {
-  const answers = getConsensusSession().answers || {};
-  return getActivePlayers().filter((player) => !answers[player.name]?.submittedAt);
+  const session = getConsensusSession();
+  const questionIdx = session.questionIdx ?? 0;
+  return getActivePlayers().filter(
+    (player) => !isConsensusAnswerForRound(session.answers?.[player.name], questionIdx)
+  );
 }
 
 export function allConsensusAnswersIn() {
-  const answers = getConsensusSession().answers || {};
+  const session = getConsensusSession();
+  const questionIdx = session.questionIdx ?? 0;
   const names = getActivePlayerNames();
-  return names.length > 0 && names.every((name) => Boolean(answers[name]?.submittedAt));
+  return (
+    names.length > 0 &&
+    names.every((name) => isConsensusAnswerForRound(session.answers?.[name], questionIdx))
+  );
 }
 
 function getExtremesReference(values, target) {
@@ -416,13 +489,14 @@ function getExtremesReference(values, target) {
 }
 
 export function scoreConsensusRound(session = getConsensusSession()) {
-  session = normalizeConsensusSession(session);
+  session = applyConsensusDefaultAnswers(normalizeConsensusSession(session));
   if (session.roundScored && session.lastRound) {
     return session;
   }
+  const questionIdx = session.questionIdx ?? 0;
   const currentScores = createConsensusScores(session.matchScores || {});
   const entries = Object.entries(session.answers || {})
-    .filter(([, answer]) => Number.isFinite(answer?.value))
+    .filter(([, answer]) => isConsensusAnswerForRound(answer, questionIdx))
     .map(([name, answer]) => ({
       name,
       value: clampConsensusValue(answer.value),
@@ -547,5 +621,4 @@ export function applyConsensusLobbyPodium(session = getConsensusSession()) {
 
 export {
   CONSENSUS_QUESTION_COUNT_PRESETS,
-  CONSENSUS_TIMER_SEC,
 };

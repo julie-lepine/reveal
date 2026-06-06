@@ -9,6 +9,9 @@ export const EGRESS_RELAX_POLL_ON_LOCALHOST = true;
 /** Multiplicateur des intervalles de polling en dev local (ex. 3 → 2 s devient ~6 s). */
 export const LOCALHOST_POLL_MULTIPLIER = 3;
 
+/** Timeout par défaut des patches / push Supabase (lancement, sync MP). */
+export const SYNC_PATCH_TIMEOUT_MS = 20000;
+
 export function isLocalDevEnvironment() {
   if (typeof location === "undefined") return false;
   const h = location.hostname;
