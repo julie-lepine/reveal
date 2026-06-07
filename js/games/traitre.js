@@ -9,6 +9,8 @@ import {
   commitTraitrePlay,
   commitTraitreVote,
   countTraitreVotes,
+  countTraitreVotesCast,
+  normalizeTraitreVotes,
   getCurrentTraitreSpeaker,
   getMyTraitreWord,
   getTraitreEntryScreen,
@@ -148,17 +150,18 @@ export function mountTraitre(app) {
 
     resolveInFlight = true;
     try {
-      let votesToUse = { ...(s.votes || {}) };
+      const aliveNow = s.alive || [];
+      let votesToUse = normalizeTraitreVotes(s.votes || {}, aliveNow);
       if (!mp) {
-        (s.alive || []).forEach((name) => {
+        aliveNow.forEach((name) => {
           if (votesToUse[name] == null) {
-            const pool = (s.alive || []).filter((n) => n !== name);
+            const pool = aliveNow.filter((n) => n !== name);
             if (pool.length) votesToUse[name] = pool[Math.floor(Math.random() * pool.length)];
           }
         });
       }
 
-      const { leaders, isTie } = countTraitreVotes(votesToUse, s.alive || []);
+      const { leaders, isTie } = countTraitreVotes(votesToUse, aliveNow);
       if (isTie) {
         await commitTraitrePlay({
           ...s,
@@ -171,7 +174,7 @@ export function mountTraitre(app) {
       const patch = buildTraitreEliminationPatch({ ...s, votes: votesToUse }, eliminatedName);
       let merged = { ...s, ...patch, votes: votesToUse };
       if (patch.phase === "final" && (!mp || isLobbyHost())) {
-        awardTraitreGame(merged);
+        merged = awardTraitreGame(merged);
         recordTraitrePlayed();
         setLastGame({
           gameId: "traitre",
@@ -181,7 +184,6 @@ export function mountTraitre(app) {
               ? `Victoire du traître · ${s.impostorName}`
               : `Traître éliminé · ${eliminatedName}`,
         });
-        merged = getTraitreSession();
       }
       await commitTraitrePlay(merged, {
         withEveningScores: patch.phase === "final" && mp && isLobbyHost(),
@@ -306,7 +308,7 @@ export function mountTraitre(app) {
             : `<p class="hint">En attente du choix de l'hôte…</p>`
         }`;
     } else if (phase === "vote") {
-      const votedCount = Object.keys(votes).filter((n) => alive.includes(n) && votes[n]).length;
+      const votedCount = countTraitreVotesCast(votes, alive);
       phaseHtml = `
         <div class="card">
           <p class="card-heading">Vote d'élimination</p>
@@ -418,7 +420,7 @@ export function mountTraitre(app) {
     });
 
     app.querySelector("#btn-force-vote")?.addEventListener("click", () => {
-      void resolveVoteRound();
+      void resolveVoteRound().then(() => render());
     });
 
     app.querySelector("#btn-traitre-exit")?.addEventListener("click", () => {

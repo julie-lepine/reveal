@@ -5602,46 +5602,118 @@ body{
   background: rgba(255, 255, 255, 0.06);
 }
 
-.traitre-order {
+.traitre-order__list {
   list-style: none;
   padding: 0;
-  margin: 0.75rem 0;
+  margin: 0.5rem 0 0;
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
+  counter-reset: traitre-speak;
 }
 
-.traitre-order li {
+.traitre-order__item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
   padding: 0.5rem 0.75rem;
   border-radius: var(--radius-sm, 8px);
   background: rgba(255, 255, 255, 0.04);
 }
 
-.traitre-order li.is-current {
+.traitre-order__item::before {
+  content: counter(traitre-speak) ".";
+  counter-increment: traitre-speak;
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.5);
+  min-width: 1.25rem;
+  flex-shrink: 0;
+}
+
+.traitre-order__item--active {
   background: rgba(255, 200, 80, 0.15);
   border: 1px solid rgba(255, 200, 80, 0.35);
   font-weight: 600;
 }
 
-.traitre-order li.is-eliminated {
-  opacity: 0.45;
-  text-decoration: line-through;
+.traitre-order__item--done {
+  opacity: 0.55;
 }
 
-.traitre-vote {
+.traitre-order__item .recap-card__avatar {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  font-size: 16px;
+}
+
+.traitre-order__now {
+  margin-top: 0.75rem;
+}
+
+.traitre-vote-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  margin: 16px 0;
+}
+
+.traitre-vote-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 10px;
+  border-radius: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.05);
+  color: #fff;
+  cursor: pointer;
+  min-height: 88px;
+  touch-action: manipulation;
+  -webkit-appearance: none;
+  appearance: none;
+  font: inherit;
+  transition: border-color 0.15s, transform 0.1s;
+}
+
+.traitre-vote-btn:active {
+  transform: scale(0.97);
+}
+
+.traitre-vote-btn--active {
+  border-color: #fbbf24;
+  box-shadow: 0 0 0 1px #fbbf24, 0 8px 24px rgba(0, 0, 0, 0.25);
+}
+
+.traitre-vote-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.traitre-vote-btn .recap-card__avatar {
+  width: 44px;
+  height: 44px;
+  font-size: 22px;
+}
+
+.traitre-vote-btn span:last-child {
+  font-weight: 700;
+  font-size: 13px;
+  text-align: center;
+  line-height: 1.2;
+}
+
+.traitre-vote-tie {
+  margin-top: 0.5rem;
+}
+
+.traitre-decision-btns {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
-  margin: 0.75rem 0;
-}
-
-.traitre-vote .btn {
-  width: 100%;
-  text-align: left;
-}
-
-.traitre-vote .btn.is-selected {
-  outline: 2px solid var(--accent, #ffc850);
+  margin-top: 0.75rem;
 }
 
 .traitre-decision {

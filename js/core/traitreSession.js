@@ -20,8 +20,10 @@ import {
   traitreToRemote,
   patchGameState,
   userIdForName,
+  nameForUserId,
 } from "./gameSync.js";
 import { launchGameWithSync, commitHostGamePlay, commitPrepReadyToggle } from "./mpLaunch.js";
+import { normalizeKeyedVotes } from "./sessionMerge.js";
 
 function defaultSession() {
   return {
@@ -215,16 +217,31 @@ export function allTraitreDealAcksIn(session = getTraitreSession()) {
   return alive.length > 0 && alive.every((name) => session.dealAcks?.[name]);
 }
 
+/** Votes indexés par pseudo (sync multijoueur peut envoyer des UUID). */
+export function normalizeTraitreVotes(votes = {}, alive = []) {
+  return normalizeKeyedVotes(votes, alive, (key) => {
+    const mapped = nameForUserId(key);
+    if (mapped) return mapped;
+    return alive.includes(String(key)) ? String(key) : null;
+  });
+}
+
+export function countTraitreVotesCast(votes = {}, alive = []) {
+  const normalized = normalizeTraitreVotes(votes, alive);
+  return alive.filter((name) => normalized[name]).length;
+}
+
 export function allTraitreVotesIn(session = getTraitreSession()) {
   const alive = session.alive || [];
-  const votes = session.votes || {};
+  const votes = normalizeTraitreVotes(session.votes || {}, alive);
   return alive.length > 0 && alive.every((name) => votes[name] != null && votes[name] !== "");
 }
 
 export function countTraitreVotes(votes = {}, alive = []) {
+  const normalized = normalizeTraitreVotes(votes, alive);
   const counts = {};
   alive.forEach((name) => {
-    const target = votes[name];
+    const target = normalized[name];
     if (!target || !alive.includes(target)) return;
     counts[target] = (counts[target] || 0) + 1;
   });
@@ -262,7 +279,7 @@ export function buildTraitreEliminationPatch(session, eliminatedName) {
       phase: "final",
       impostorRevealed: true,
       winner: "civilians",
-      lastVoteSnapshot: { ...(session.votes || {}) },
+      lastVoteSnapshot: normalizeTraitreVotes(session.votes || {}, session.alive || []),
     };
   }
 
@@ -294,7 +311,8 @@ export function buildTraitreTieRevotePatch(session) {
 }
 
 export function awardTraitreGame(session = getTraitreSession()) {
-  if (session.scoresApplied) return session.lastRound || null;
+  if (session.scoresApplied) return session;
+
   const impostor = session.impostorName;
   const deltas = {};
   const summary = {
@@ -313,26 +331,30 @@ export function awardTraitreGame(session = getTraitreSession()) {
     bumpPlayerStat(impostor, "traitreWins", 1);
   } else if (session.winner === "civilians" && impostor) {
     deltas[impostor] = 0;
-    const snapshot = session.lastVoteSnapshot || {};
-    getActivePlayerNames().forEach((name) => {
-      if (name === impostor) return;
-      if (snapshot[name] === impostor) {
-        deltas[name] = TRAITRE_POINTS.CIVIL_CORRECT_VOTE;
-        addScore(name, TRAITRE_POINTS.CIVIL_CORRECT_VOTE);
-        bumpPlayerStat(name, "traitreDetections", 1);
-      }
+    const voters = [
+      ...(session.alive || []),
+      ...(session.eliminated || []),
+      session.lastEliminated,
+    ].filter(Boolean);
+    const snapshot = normalizeTraitreVotes(session.lastVoteSnapshot || {}, [
+      ...new Set(voters),
+    ]);
+    Object.entries(snapshot).forEach(([name, target]) => {
+      if (name === impostor || target !== impostor) return;
+      deltas[name] = TRAITRE_POINTS.CIVIL_CORRECT_VOTE;
+      addScore(name, TRAITRE_POINTS.CIVIL_CORRECT_VOTE);
+      bumpPlayerStat(name, "traitreDetections", 1);
     });
   }
 
   summary.deltas = deltas;
-  saveStatePatch({
-    traitreGame: {
-      ...getTraitreSession(),
-      scoresApplied: true,
-      lastRound: summary,
-    },
-  });
-  return summary;
+  const updated = {
+    ...session,
+    scoresApplied: true,
+    lastRound: summary,
+  };
+  saveStatePatch({ traitreGame: updated });
+  return updated;
 }
 
 export function getTraitreEntryScreen() {

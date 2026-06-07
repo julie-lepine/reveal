@@ -93,7 +93,7 @@ export function mountPlaylistGuessPrep(app) {
   function refreshRoundChips() {
     const session = getPlaylistGuessSession();
     const roundCount = session.roundCount ?? PLAYLIST_GUESS_ROUND_DEFAULT;
-    const isHost = isLocalPlaylistGuessHost();
+    const isHost = isLobbyHost();
     app.querySelectorAll("[data-pg-round]").forEach((btn) => {
       const value = Number(btn.getAttribute("data-pg-round"));
       btn.classList.toggle("theme-chip--active", roundCount === value);

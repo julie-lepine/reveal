@@ -26,6 +26,8 @@ import {
   mergeTriviaAnswersUid,
   normalizeDilemmaEntry,
   normalizeHotTakeEntry,
+  normalizeKeyedVotes,
+  normalizePlayerKeyedMap,
 } from "../js/core/sessionMerge.js";
 
 describe("mergeReadyMapsLocal", () => {
@@ -342,6 +344,47 @@ describe("normalize entries", () => {
   it("normalizeHotTakeEntry accepte string legacy", () => {
     const t = normalizeHotTakeEntry("  hello  ");
     assert.equal(t.text, "hello");
+  });
+});
+
+describe("normalizePlayerKeyedMap", () => {
+  const players = ["Admin", "mozilla", "Joulaille", "ios"];
+
+  it("conserve les clés déjà en pseudo", () => {
+    const map = { Admin: "VALIDE", mozilla: "CRIMINEL" };
+    assert.deepEqual(normalizePlayerKeyedMap(map, players), map);
+  });
+
+  it("résout les UUID vers pseudo", () => {
+    const map = { u1: "VALIDE", u2: "ACCEPTABLE", u3: "CRIMINEL", u4: "VALIDE" };
+    const resolve = (k) => ({ u1: "Admin", u2: "mozilla", u3: "Joulaille", u4: "ios" }[k] || null);
+    assert.deepEqual(normalizePlayerKeyedMap(map, players, resolve), {
+      Admin: "VALIDE",
+      mozilla: "ACCEPTABLE",
+      Joulaille: "CRIMINEL",
+      ios: "VALIDE",
+    });
+  });
+});
+
+describe("normalizeKeyedVotes", () => {
+  const alive = ["Admin", "mozilla", "Joulaille", "ios"];
+  const uid = { Admin: "u1", mozilla: "u2", Joulaille: "u3", ios: "u4" };
+
+  it("conserve les votes indexés par pseudo", () => {
+    const votes = { Admin: "ios", mozilla: "ios", Joulaille: "Admin", ios: "Joulaille" };
+    assert.deepEqual(normalizeKeyedVotes(votes, alive), votes);
+  });
+
+  it("résout les UUID vers pseudo via resolveKey", () => {
+    const votes = { u1: "u4", u2: "u4", u3: "u1", u4: "u3" };
+    const resolve = (k) => ({ u1: "Admin", u2: "mozilla", u3: "Joulaille", u4: "ios" }[k] || null);
+    assert.deepEqual(normalizeKeyedVotes(votes, alive, resolve), {
+      Admin: "ios",
+      mozilla: "ios",
+      Joulaille: "Admin",
+      ios: "Joulaille",
+    });
   });
 });
 

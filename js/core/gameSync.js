@@ -32,6 +32,7 @@ import {
   mergeTriviaAnswersUid,
   isNewConsensusQuestionRound,
   mergeCustomGameDeck,
+  normalizePlayerKeyedMap,
 } from "./sessionMerge.js";
 import { buildRecapsFromPlacements, getTierNightSession } from "./tierNightSession.js";
 import {
@@ -313,6 +314,15 @@ export function playerKeyToDisplayName(key) {
   return nameForUserId(key) || null;
 }
 
+/** Votes / réponses indexés par uid ou pseudo → clés = pseudos actifs. */
+export function normalizePlayerVotesMap(votes = {}, playerNames = getActivePlayerNames()) {
+  return normalizePlayerKeyedMap(votes, playerNames, (key) => {
+    const mapped = playerKeyToDisplayName(key);
+    if (mapped) return mapped;
+    return playerNames.includes(String(key)) ? String(key) : null;
+  });
+}
+
 function mapReadyByName(readyByUid = {}) {
   const out = {};
   Object.entries(readyByUid).forEach(([uid, val]) => {
@@ -332,12 +342,7 @@ function mapReadyByUid(readyByName = {}) {
 }
 
 function mapVotesByName(votesByUid = {}) {
-  const out = {};
-  Object.entries(votesByUid).forEach(([uid, val]) => {
-    const name = nameForUserId(uid) || uid;
-    if (val != null) out[name] = val;
-  });
-  return out;
+  return normalizePlayerVotesMap(votesByUid);
 }
 
 function mapVotesByUid(votesByName = {}) {
@@ -559,13 +564,11 @@ function mergeHotTakeGameLocal(local, remote) {
   if (newVoteRound) {
     votes = remoteVotes;
   } else if (remote.phase === "voting") {
-    votes = { ...remoteVotes };
-    const name = getLocalDisplayName();
-    const lv = localVotes[name];
-    if (lv != null) votes[name] = lv;
+    votes = { ...remoteVotes, ...localVotes };
   } else if (remote.phase === "reveal" || local.phase === "reveal") {
     votes = { ...remoteVotes, ...localVotes };
   }
+  votes = normalizePlayerVotesMap(votes);
   const ready =
     !remote.lobbyStarted && !local.lobbyStarted
       ? mergeReadyMapsLocal(local.ready || {}, remote.ready || {}, getActivePlayerNames())
@@ -634,12 +637,11 @@ function mergeSpeedVoteGameLocal(local, remote) {
   if (newVoteRound) {
     votes = remoteVotes;
   } else if (remote.phase === "voting") {
-    votes = { ...remoteVotes };
-    const name = getLocalDisplayName();
-    if (localVotes[name] != null) votes[name] = localVotes[name];
+    votes = { ...remoteVotes, ...localVotes };
   } else if (remote.phase === "reveal" || local.phase === "reveal") {
     votes = { ...remoteVotes, ...localVotes };
   }
+  votes = normalizePlayerVotesMap(votes);
   const ready =
     !remote.lobbyStarted && !local.lobbyStarted
       ? mergeReadyMapsLocal(local.ready || {}, remote.ready || {}, getActivePlayerNames())
@@ -961,12 +963,11 @@ function mergeDilemmaGameLocal(local, remote) {
   if (newVoteRound) {
     votes = remoteVotes;
   } else if (remote.phase === "voting") {
-    votes = { ...remoteVotes };
-    const name = getLocalDisplayName();
-    if (localVotes[name] != null) votes[name] = localVotes[name];
+    votes = { ...remoteVotes, ...localVotes };
   } else if (remote.phase === "reveal" || local.phase === "reveal") {
     votes = { ...remoteVotes, ...localVotes };
   }
+  votes = normalizePlayerVotesMap(votes);
   return {
     ...local,
     ...remote,
@@ -1029,19 +1030,17 @@ function mergeTruthMeterGameLocal(local, remote) {
   let votes = remoteVotes;
   if (newVoteRound) {
     votes = remoteVotes;
-  } else if (remote.phase === "voting") {
-    votes = { ...remoteVotes };
-    const name = getLocalDisplayName();
-    const lv = localVotes[name];
-    if (lv != null && votes[name] == null) votes[name] = lv;
-  } else if (remote.phase === "reveal" || remote.phase === "reveal-pending") {
-    votes = { ...remoteVotes };
-    const name = getLocalDisplayName();
-    const lv = localVotes[name];
-    if (lv != null && votes[name] == null) votes[name] = lv;
-  } else if (local.phase === "reveal" || local.phase === "reveal-pending") {
-    votes = { ...localVotes, ...remoteVotes };
+  } else if (remote.phase === "voting" || local.phase === "voting") {
+    votes = { ...remoteVotes, ...localVotes };
+  } else if (
+    remote.phase === "reveal" ||
+    remote.phase === "reveal-pending" ||
+    local.phase === "reveal" ||
+    local.phase === "reveal-pending"
+  ) {
+    votes = { ...remoteVotes, ...localVotes };
   }
+  votes = normalizePlayerVotesMap(votes);
   const ready =
     !remote.lobbyStarted && !local.lobbyStarted
       ? mergeReadyMapsLocal(local.ready || {}, remote.ready || {}, getActivePlayerNames())

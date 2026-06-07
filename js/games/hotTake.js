@@ -13,6 +13,7 @@ import {
   commitHotTakePlay,
   commitHotTakeVote,
   allHotTakeVotesIn,
+  getHotTakeVotesForUi,
   resetHotTakeAfterGame,
 } from "../core/hotTakeSession.js";
 import { awardHotTakeVotes, EVENING_POINTS } from "../core/scoring.js";
@@ -71,7 +72,7 @@ export function mountHotTake(app) {
 
   /** Votes complets pour le scoring (session sync), pas le snapshot local du clic. */
   function votesForAward() {
-    const fromSession = { ...(getHotTakeSession().votes || {}) };
+    const fromSession = { ...getHotTakeVotesForUi() };
     if (voteCommitInFlight != null && fromSession[localName] == null) {
       fromSession[localName] = voteCommitInFlight;
     }
@@ -95,7 +96,7 @@ export function mountHotTake(app) {
     const s = getHotTakeSession();
     if (s.takeIdx != null) takeIdx = s.takeIdx;
     if (s.phase) phase = s.phase;
-    votes = { ...(s.votes || {}) };
+    votes = { ...getHotTakeVotesForUi() };
 
     if (phase !== "voting") {
       myVote = null;
@@ -299,10 +300,13 @@ export function mountHotTake(app) {
     await goToReveal();
   }
 
-  function countPlayersVoted(votesMap = votes) {
-    return getActivePlayerNames().filter(
-      (name) => votesMap[name] != null && votesMap[name] !== ""
-    ).length;
+  function countPlayersVoted() {
+    const base = getHotTakeVotesForUi();
+    if (voteCommitInFlight != null) {
+      base[localName] = voteCommitInFlight;
+    }
+    const names = getActivePlayerNames();
+    return names.filter((name) => base[name] != null && base[name] !== "").length;
   }
 
   function render() {

@@ -71,7 +71,7 @@ export function mountSpeedVotePrep(app) {
     const session = getSpeedVoteSession();
     const themeId = session.selectedThemeId || SPEED_VOTE_CATALOG_ID;
     const roundCount = session.roundCount ?? 5;
-    const isHost = isLocalSpeedVoteHost();
+    const isHost = isLobbyHost();
     const prep = getSpeedVotePrepSummary();
 
     app.querySelectorAll("[data-theme]").forEach((btn) => {

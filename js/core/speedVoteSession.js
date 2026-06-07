@@ -22,6 +22,7 @@ import {
   speedVoteToRemote,
   patchGameState,
   userIdForName,
+  normalizePlayerVotesMap,
 } from "./gameSync.js";
 import { launchGameWithSync, commitHostGamePlay, commitPrepReadyToggle } from "./mpLaunch.js";
 
@@ -244,9 +245,9 @@ export async function commitSpeedVoteVote(choice) {
   return choice;
 }
 
-export function allSpeedVoteVotesIn() {
-  const votes = getSpeedVoteSession().votes || {};
+export function allSpeedVoteVotesIn(session = getSpeedVoteSession()) {
   const names = getActivePlayerNames();
+  const votes = normalizePlayerVotesMap(session.votes || {}, names);
   return names.length > 0 && names.every((name) => votes[name] != null && votes[name] !== "");
 }
 

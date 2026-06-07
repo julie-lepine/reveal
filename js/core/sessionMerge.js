@@ -378,6 +378,38 @@ export function mergeTruthMeterPatchState(cur, inc, { mergeReadyUid, mergeVotes,
   };
 }
 
+/** Map clé uid/pseudo → valeur ; clés de sortie = pseudos dans `players`. */
+export function normalizePlayerKeyedMap(map = {}, players = [], resolveKey = (k) => k) {
+  const playerSet = new Set(players.map(String));
+  const out = {};
+  for (const [key, val] of Object.entries(map)) {
+    if (val == null || val === "") continue;
+    const resolved = resolveKey(key);
+    const name = resolved != null ? String(resolved) : "";
+    if (name && playerSet.has(name)) {
+      out[name] = val;
+    }
+  }
+  return out;
+}
+
+/** Votes indexés par clé (pseudo ou uid) → clés = pseudos dans `alive`. */
+export function normalizeKeyedVotes(votes = {}, alive = [], resolveKey = (k) => k) {
+  const aliveSet = new Set(alive.map(String));
+  const out = {};
+  for (const [voterKey, targetKey] of Object.entries(votes)) {
+    const voterRaw = resolveKey(voterKey);
+    const voter = voterRaw != null ? String(voterRaw) : "";
+    if (!voter || !aliveSet.has(voter)) continue;
+    const targetRaw = resolveKey(targetKey);
+    const target = targetRaw != null ? String(targetRaw) : "";
+    if (target && aliveSet.has(target)) {
+      out[voter] = target;
+    }
+  }
+  return out;
+}
+
 export function isNewTraitreVoteRound(cur, inc) {
   if (!inc) return false;
   if (inc.phase === "vote" && cur?.phase !== "vote") return true;

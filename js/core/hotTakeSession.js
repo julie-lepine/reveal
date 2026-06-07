@@ -24,6 +24,7 @@ import {
   hotTakeToRemote,
   patchGameState,
   userIdForName,
+  normalizePlayerVotesMap,
 } from "./gameSync.js";
 import { launchGameWithSync, commitHostGamePlay, commitPrepReadyToggle } from "./mpLaunch.js";
 import { mergeHotTakeCustomTakes } from "./sessionMerge.js";
@@ -406,16 +407,22 @@ export async function commitHotTakeVote(choice) {
 }
 
 export function getHotTakeVotesForUi() {
-  return getHotTakeSession().votes || {};
+  return normalizePlayerVotesMap(getHotTakeSession().votes || {});
+}
+
+export function countHotTakeVotesCast(session = getHotTakeSession()) {
+  const names = getActivePlayerNames();
+  const votes = normalizePlayerVotesMap(session.votes || {}, names);
+  return names.filter((name) => votes[name] != null && votes[name] !== "").length;
 }
 
 export function countHotTakeVotes() {
-  return Object.keys(getHotTakeVotesForUi()).length;
+  return countHotTakeVotesCast();
 }
 
-export function allHotTakeVotesIn() {
-  const votes = getHotTakeSession().votes || {};
+export function allHotTakeVotesIn(session = getHotTakeSession()) {
   const names = getActivePlayerNames();
+  const votes = normalizePlayerVotesMap(session.votes || {}, names);
   return names.length > 0 && names.every((name) => votes[name] != null && votes[name] !== "");
 }
 

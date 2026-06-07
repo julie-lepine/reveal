@@ -13,6 +13,7 @@ import {
   truthMeterToRemote,
   patchGameState,
   userIdForName,
+  normalizePlayerVotesMap,
 } from "./gameSync.js";
 import { launchGameWithSync, commitHostGamePlay, commitPrepReadyToggle } from "./mpLaunch.js";
 
@@ -221,16 +222,16 @@ export async function commitTruthMeterVote(choice) {
   return choice;
 }
 
-export function allTruthMeterVotesIn() {
-  const session = getTruthMeterSession();
+export function allTruthMeterVotesIn(session = getTruthMeterSession()) {
   const voters = getVoterNames();
   if (!voters.length) return true;
-  const votes = session.votes || {};
+  const votes = normalizePlayerVotesMap(session.votes || {}, voters);
   return voters.every((n) => votes[n] != null && Number.isFinite(votes[n]));
 }
 
-export function countTruthMeterVotes() {
-  return Object.keys(getTruthMeterSession().votes || {}).length;
+export function countTruthMeterVotes(session = getTruthMeterSession()) {
+  const voters = getVoterNames();
+  return Object.keys(normalizePlayerVotesMap(session.votes || {}, voters)).length;
 }
 
 export function getTruthMeterEntryScreen() {

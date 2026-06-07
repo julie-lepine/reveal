@@ -20,6 +20,7 @@ import {
   dilemmaToRemote,
   patchGameState,
   userIdForName,
+  normalizePlayerVotesMap,
 } from "./gameSync.js";
 import { launchGameWithSync, commitHostGamePlay, commitPrepReadyToggle } from "./mpLaunch.js";
 import { checkHotTakeModeration, getModerationNotice } from "./hotTakeSession.js";
@@ -363,11 +364,11 @@ export async function clearDilemmaPause() {
   await syncDilemmaSession({ ...session, pausedBy: null });
 }
 
-export function allDilemmaVotesIn() {
-  const session = getDilemmaSession();
+export function allDilemmaVotesIn(session = getDilemmaSession()) {
   const names = getActivePlayerNames();
   if (!names.length) return false;
-  return names.every((n) => session.votes[n] === "A" || session.votes[n] === "B");
+  const votes = normalizePlayerVotesMap(session.votes || {}, names);
+  return names.every((n) => votes[n] === "A" || votes[n] === "B");
 }
 
 export function getDilemmaEntryScreen() {
