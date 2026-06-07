@@ -66,14 +66,16 @@ Puis ▶ Run dans Xcode (ou *Product → Clean Build Folder* si comportement biz
 
 ---
 
-## D. Auth & Turnstile (WebView iOS)
+## D. Auth (app native — sans Turnstile)
 
-- [ ] 🧪 **Connexion email** + mot de passe (widget Turnstile visible, pas d’erreur 600010 en console Safari si tu branches le Mac)
+Turnstile est **désactivé en app native** (WKWebView iOS incompatible). Login, inscription et invité **sans** widget Cloudflare.
+
+- [ ] 🧪 **Connexion email** + mot de passe (pas de widget Turnstile)
 - [ ] 🧪 **Inscription** email
-- [ ] 🧪 **Invité** + pseudo + code lobby (Turnstile sur le flux invité si affiché)
+- [ ] 🧪 **Invité** + pseudo + code lobby
 - [ ] 🧪 **Mot de passe oublié** : saisie email → mail reçu (Resend)
 
-Réf. Turnstile : `capacitor.config.ts` → `iosScheme: 'https'` (sinon `capacitor://localhost` et captcha bloqué). Hostnames Cloudflare : `localhost`, `127.0.0.1`, `julie-lepine.github.io`. Après modif : `npm run cap:sync` + rebuild Xcode.
+> **Supabase** : si **Attack Protection → Captcha** est activé, l’auth native échoue (pas de token). Désactiver le captcha Supabase ou le garder OFF — voir [CAPACITOR.md](./CAPACITOR.md) § Turnstile.
 
 ---
 

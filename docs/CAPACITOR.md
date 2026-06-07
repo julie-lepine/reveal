@@ -83,17 +83,18 @@ Le code utilise `getAuthRedirectUrl()` : redirect web en navigateur, deep link e
 
 ---
 
-## Turnstile en WebView
+## Turnstile (Cloudflare)
 
-`capacitor.config.ts` : `androidScheme` et **`iosScheme`** = `'https'` → WebView en `https://localhost` (requis pour Turnstile sur iPhone ; sans `iosScheme`, iOS utilise `capacitor://localhost` et le captcha échoue).
+| Plateforme | Turnstile |
+|------------|-----------|
+| **Web** (GitHub Pages, navigateur) | ✅ widget + token envoyé à Supabase |
+| **App native** (Capacitor) | ❌ désactivé (`isNativeApp()` → `isTurnstileRequired()` false) |
 
-Ajouter dans le widget Cloudflare les hostnames :
+Turnstile n’est **pas fiable** en WKWebView iOS (même avec `iosScheme: 'https'`). L’app native n’affiche pas le widget et n’envoie pas de `captchaToken`.
 
-- `localhost`
-- `127.0.0.1`
-- `julie-lepine.github.io` (version web)
+**Supabase → Authentication → Attack Protection** : le captcha Turnstile ne doit **pas** être obligatoire pour les requêtes sans token, sinon login / invité échouent en app native. En pratique : captcha **désactivé** dans Supabase, protection web assurée côté client (widget) + rate limiting Supabase ; ou accepter captcha OFF partout si tu privilégies l’app store.
 
-Puis `npm run cap:sync` et tester login / signup sur téléphone réel.
+Hostnames Cloudflare (version web) : `julie-lepine.github.io`, `localhost` (dev local).
 
 ---
 

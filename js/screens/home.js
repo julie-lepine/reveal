@@ -709,13 +709,21 @@ export function mountHome(app) {
       if (!isLoggedIn()) return;
       const btn = e.target.closest("#btn-join-lobby");
       btn.disabled = true;
-      const res = await joinLobby(app.querySelector("#join-code")?.value);
-      btn.disabled = false;
-      if (!res.ok) {
-        await showAppAlert(res.error, { title: "Rejoindre le lobby", icon: "⚠️" });
-        return;
+      try {
+        const res = await joinLobby(app.querySelector("#join-code")?.value);
+        if (!res.ok) {
+          await showAppAlert(res.error, { title: "Rejoindre le lobby", icon: "⚠️" });
+          return;
+        }
+        navigate("lobby");
+      } catch (err) {
+        await showAppAlert(err?.message || "Impossible de rejoindre le lobby.", {
+          title: "Rejoindre le lobby",
+          icon: "⚠️",
+        });
+      } finally {
+        btn.disabled = false;
       }
-      navigate("lobby");
       return;
     }
 
@@ -734,29 +742,41 @@ export function mountHome(app) {
       btn.disabled = true;
       errEl?.classList.add("hidden");
 
-      const captchaToken =
-        isTurnstileRequired() && isTurnstileSolved("guest") ? getTurnstileToken("guest") : null;
-      const res = await joinLobbyAsGuest(codeEl?.value, nameEl?.value, captchaToken);
-      btn.disabled = isTurnstileRequired() && !isGuest() ? !isTurnstileSolved("guest") : false;
+      try {
+        const captchaToken =
+          isTurnstileRequired() && isTurnstileSolved("guest") ? getTurnstileToken("guest") : null;
+        const res = await joinLobbyAsGuest(codeEl?.value, nameEl?.value, captchaToken);
 
-      if (!res.ok) {
-        if (res.captcha && isGuest()) {
-          await setupGuestRejoinTurnstile({ requireSolved: true });
-          if (btn) btn.disabled = true;
-        } else if (res.captcha) {
-          resetTurnstile("guest");
-          if (btn) btn.disabled = true;
+        if (!res.ok) {
+          if (res.captcha && isGuest()) {
+            await setupGuestRejoinTurnstile({ requireSolved: true });
+            if (btn) btn.disabled = true;
+          } else if (res.captcha) {
+            resetTurnstile("guest");
+            if (btn) btn.disabled = true;
+          } else {
+            btn.disabled = false;
+          }
+          if (errEl) {
+            errEl.textContent = res.error;
+            errEl.classList.remove("hidden");
+          } else {
+            await showAppAlert(res.error, { title: "Rejoindre", icon: "⚠️" });
+          }
+          scheduleRender(true);
+          return;
         }
+        navigate("lobby");
+      } catch (err) {
+        btn.disabled = false;
+        const msg = err?.message || "Impossible de rejoindre le lobby.";
         if (errEl) {
-          errEl.textContent = res.error;
+          errEl.textContent = msg;
           errEl.classList.remove("hidden");
         } else {
-          await showAppAlert(res.error, { title: "Rejoindre", icon: "⚠️" });
+          await showAppAlert(msg, { title: "Rejoindre", icon: "⚠️" });
         }
-        scheduleRender(true);
-        return;
       }
-      navigate("lobby");
       return;
     }
 
