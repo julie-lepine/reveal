@@ -25,8 +25,15 @@ import {
   mergeTruthMeterPatchState,
   mergeForwardGamePhase,
   mergeTraitrePhase,
+  mergeHotTakePhase,
+  mergeDilemmaPhase,
+  mergeSpeedVotePhase,
+  isNewHotTakeVoteRound,
+  isNewDilemmaVoteRound,
+  isNewSpeedVoteVoteRound,
   isNewTraitreVoteRound,
   isSubmissionsOnlyGamePatch,
+  mergeGuessLieSubmissions,
   mergeConsensusPhase,
   pickLatestTriviaAnswer,
   mergeTriviaAnswersUid,
@@ -513,25 +520,6 @@ export function hotTakeFromRemote(remote) {
   };
 }
 
-/** Nouvelle manche de vote (chrono relancé, votes vidés côté hôte). */
-function isNewHotTakeVoteRound(cur, inc) {
-  if (
-    inc?.phase === "voting" &&
-    inc?.takeIdx != null &&
-    cur?.takeIdx != null &&
-    inc.takeIdx !== cur.takeIdx &&
-    Object.keys(inc.votes || {}).length === 0
-  ) {
-    return true;
-  }
-  return (
-    inc?.phase === "voting" &&
-    inc?.voteEndsAt &&
-    inc.voteEndsAt !== cur?.voteEndsAt &&
-    Object.keys(inc.votes || {}).length === 0
-  );
-}
-
 /** Fusion des votes uid (écriture patch) - évite d’écraser les votes des autres joueurs. */
 function mergeRemoteHotTakeVotesUid(cur, inc) {
   const curVotes = cur?.votes || {};
@@ -581,6 +569,7 @@ function mergeHotTakeGameLocal(local, remote) {
   return {
     ...local,
     ...remote,
+    phase: mergeHotTakePhase(local, remote),
     votes,
     ready,
     customTakes,
@@ -589,24 +578,6 @@ function mergeHotTakeGameLocal(local, remote) {
     matchScores: mergeMatchScoresLocal(local.matchScores || {}, remote.matchScores || {}),
     lastRound: remote.lastRound ?? local.lastRound ?? null,
   };
-}
-
-function isNewSpeedVoteVoteRound(cur, inc) {
-  if (
-    inc?.phase === "voting" &&
-    inc?.roundIdx != null &&
-    cur?.roundIdx != null &&
-    inc.roundIdx !== cur.roundIdx &&
-    Object.keys(inc.votes || {}).length === 0
-  ) {
-    return true;
-  }
-  return (
-    inc?.phase === "voting" &&
-    inc?.voteEndsAt &&
-    inc.voteEndsAt !== cur?.voteEndsAt &&
-    Object.keys(inc.votes || {}).length === 0
-  );
 }
 
 function isNewHotTakeVoteRoundUid(cur, inc) {
@@ -649,6 +620,7 @@ function mergeSpeedVoteGameLocal(local, remote) {
   return {
     ...local,
     ...remote,
+    phase: mergeSpeedVotePhase(local, remote),
     votes,
     ready,
     roundScored: mergeRoundFlag(local.roundScored, remote.roundScored, newVoteRound),
@@ -860,24 +832,6 @@ function isNewConsensusQuestionRoundUid(cur, inc) {
   return isNewConsensusQuestionRound(cur, inc);
 }
 
-function isNewDilemmaVoteRound(cur, inc) {
-  if (
-    inc?.phase === "voting" &&
-    inc?.roundIdx != null &&
-    cur?.roundIdx != null &&
-    inc.roundIdx !== cur.roundIdx &&
-    Object.keys(inc.votes || {}).length === 0
-  ) {
-    return true;
-  }
-  return (
-    inc?.phase === "voting" &&
-    inc?.voteEndsAt &&
-    inc.voteEndsAt !== cur?.voteEndsAt &&
-    Object.keys(inc.votes || {}).length === 0
-  );
-}
-
 function isNewDilemmaVoteRoundUid(cur, inc) {
   return isNewDilemmaVoteRound(cur, inc);
 }
@@ -933,6 +887,8 @@ function mergeGuessLieGameLocal(local, remote) {
   return {
     ...local,
     ...remote,
+    sessionId: remote.sessionId ?? local.sessionId ?? getState().lobbyCode ?? null,
+    submissions: mergeGuessLieSubmissions(local.submissions, remote.submissions),
     phase: newVoteRound
       ? (remote.phase ?? local.phase)
       : mergeForwardGamePhase(local.phase, remote.phase),
@@ -971,6 +927,7 @@ function mergeDilemmaGameLocal(local, remote) {
   return {
     ...local,
     ...remote,
+    phase: mergeDilemmaPhase(local, remote),
     ready,
     votes,
     customDilemmas,
@@ -1652,13 +1609,8 @@ function mergePlaylistGuessGameLocal(local, remote) {
   let votes = remoteVotes;
   if (newVoteRound) {
     votes = remoteVotes;
-  } else if (remote.phase === "voting") {
-    votes = { ...remoteVotes };
-    const localUid =
-      getSupabaseUserId() || userIdForName(getLocalDisplayName()) || getLocalDisplayName();
-    if (localVotes[localUid] != null && votes[localUid] == null) {
-      votes[localUid] = localVotes[localUid];
-    }
+  } else if (remote.phase === "voting" || local.phase === "voting") {
+    votes = { ...remoteVotes, ...localVotes };
   } else if (remote.phase === "reveal" || local.phase === "reveal") {
     votes = { ...remoteVotes, ...localVotes };
   }
@@ -1732,7 +1684,7 @@ export function guessLieToRemote(gl) {
 export function guessLieFromRemote(remote) {
   if (!remote) return null;
   return {
-    sessionId: remote.sessionId,
+    sessionId: remote.sessionId ?? getState().lobbyCode ?? null,
     submissions: mapSubmissionsByName(remote.submissions || {}),
     lobbyComplete: Boolean(remote.lobbyComplete),
     currentRound: remote.roundIdx ?? 0,
@@ -2833,6 +2785,9 @@ async function patchGameStateInner(
       ? {
           ...curGl,
           ...incGl,
+          submissions: incGl.submissions
+            ? { ...(curGl.submissions || {}), ...(incGl.submissions || {}) }
+            : curGl.submissions,
           phase: newGlRound
             ? (incGl.phase ?? curGl.phase)
             : mergeForwardGamePhase(curGl.phase, incGl.phase),

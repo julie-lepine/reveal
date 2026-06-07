@@ -722,8 +722,8 @@ export function getGlobalStats() {
 }
 
 function syncGuessLieSession() {
+  if (!state.lobbyCode) return;
   if (state.guessLie.sessionId !== state.lobbyCode) {
-    state.guessLie = emptyGuessLie();
     state.guessLie.sessionId = state.lobbyCode;
     save();
   }
@@ -765,6 +765,7 @@ function applyGuessLieLobbyCompleteLocal() {
 
 export async function markGuessLieLobbyComplete() {
   syncGuessLieSession();
+  applyGuessLieLobbyCompleteLocal();
   const { launchGameWithSync } = await import("./mpLaunch.js");
   const { guessLieLobbyStartToRemote } = await import("./gameSync.js");
   return launchGameWithSync({

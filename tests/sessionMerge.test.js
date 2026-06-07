@@ -10,6 +10,12 @@ import {
   mergeCustomGameDeck,
   mergeRemoteCustomGameDeck,
   mergeForwardGamePhase,
+  mergeHotTakePhase,
+  mergeDilemmaPhase,
+  mergeSpeedVotePhase,
+  isNewHotTakeVoteRound,
+  isNewDilemmaVoteRound,
+  isNewSpeedVoteVoteRound,
   isVotesOnlyGamePatch,
   isAnswersOnlyGamePatch,
   mergeConsensusPatchState,
@@ -27,6 +33,7 @@ import {
   normalizeDilemmaEntry,
   normalizeHotTakeEntry,
   normalizeKeyedVotes,
+  mergeGuessLieSubmissions,
   normalizePlayerKeyedMap,
 } from "../js/core/sessionMerge.js";
 
@@ -149,22 +156,72 @@ describe("mergeHotTakePatchState", () => {
     assert.equal(out.votes.u3, "Acceptable");
   });
 
-  it("patch complet ne régresse pas reveal → voting", () => {
+  it("patch complet ne régresse pas reveal → voting (vote tardif)", () => {
     const cur = { phase: "reveal", takeScored: true, votes: {} };
     const inc = { phase: "voting", takeScored: false, votes: { u1: "Valide" } };
     const out = mergeHotTakePatchState(cur, inc, "Alice", { mergeReadyUid, mergeVotes });
     assert.equal(out.phase, "reveal");
     assert.equal(out.votes.u1, "Valide");
   });
+
+  it("autorise reveal → voting sur nouvelle take (votes vidés)", () => {
+    const cur = {
+      phase: "reveal",
+      takeIdx: 0,
+      takeScored: true,
+      votes: { u1: "Valide", u2: "Criminel" },
+    };
+    const inc = {
+      phase: "voting",
+      takeIdx: 1,
+      takeScored: false,
+      votes: {},
+      voteEndsAt: "2026-06-07T12:00:00.000Z",
+    };
+    const out = mergeHotTakePatchState(cur, inc, "Alice", {
+      mergeReadyUid,
+      mergeVotes: () => ({}),
+    });
+    assert.equal(out.phase, "voting");
+    assert.equal(out.takeIdx, 1);
+    assert.equal(out.takeScored, false);
+  });
 });
 
 describe("mergeForwardGamePhase", () => {
-  it("bloque reveal → voting", () => {
+  it("bloque reveal → voting (même manche)", () => {
     assert.equal(mergeForwardGamePhase("reveal", "voting"), "reveal");
   });
 
   it("accepte voting → reveal", () => {
     assert.equal(mergeForwardGamePhase("voting", "reveal"), "reveal");
+  });
+});
+
+describe("mergeHotTakePhase", () => {
+  it("autorise reveal → voting quand takeIdx avance", () => {
+    const cur = { phase: "reveal", takeIdx: 2, votes: { u1: "Valide" } };
+    const inc = { phase: "voting", takeIdx: 3, votes: {}, voteEndsAt: "t2" };
+    assert.equal(mergeHotTakePhase(cur, inc), "voting");
+    assert.equal(isNewHotTakeVoteRound(cur, inc), true);
+  });
+});
+
+describe("mergeDilemmaPhase", () => {
+  it("autorise reveal → voting quand roundIdx avance", () => {
+    const cur = { phase: "reveal", roundIdx: 1, votes: { u1: "A" } };
+    const inc = { phase: "voting", roundIdx: 2, votes: {}, voteEndsAt: "t2" };
+    assert.equal(mergeDilemmaPhase(cur, inc), "voting");
+    assert.equal(isNewDilemmaVoteRound(cur, inc), true);
+  });
+});
+
+describe("mergeSpeedVotePhase", () => {
+  it("autorise reveal → voting quand roundIdx avance", () => {
+    const cur = { phase: "reveal", roundIdx: 0, votes: { u1: "Alice" } };
+    const inc = { phase: "voting", roundIdx: 1, votes: {}, voteEndsAt: "t2" };
+    assert.equal(mergeSpeedVotePhase(cur, inc), "voting");
+    assert.equal(isNewSpeedVoteVoteRound(cur, inc), true);
   });
 });
 
@@ -442,5 +499,27 @@ describe("mergeTruthMeterPhase", () => {
 
   it("accepte voting → reveal-pending", () => {
     assert.equal(mergeTruthMeterPhase("voting", "reveal-pending"), "reveal-pending");
+  });
+});
+
+describe("mergeGuessLieSubmissions", () => {
+  it("unionne local et remote sans perdre d'entrée", () => {
+    const local = {
+      Admin: { statements: ["a", "b", "c"], lie: 1 },
+      mozilla: { statements: ["d", "e", "f"], lie: 0 },
+    };
+    const remote = {
+      mozilla: { statements: ["d2", "e2", "f2"], lie: 2 },
+      Joulaille: { statements: ["g", "h", "i"], lie: 1 },
+    };
+    const out = mergeGuessLieSubmissions(local, remote);
+    assert.equal(out.Admin.lie, 1);
+    assert.equal(out.mozilla.lie, 2);
+    assert.equal(out.Joulaille.statements[0], "g");
+  });
+
+  it("conserve le local si le remote est vide", () => {
+    const local = { Admin: { statements: ["a", "b", "c"], lie: 0 } };
+    assert.deepEqual(mergeGuessLieSubmissions(local, {}), local);
   });
 });

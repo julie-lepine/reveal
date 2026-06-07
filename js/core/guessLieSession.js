@@ -51,7 +51,7 @@ export async function handleGuessLieLaunch(btn) {
   return runLaunchButton(btn, async () => {
     const { markGuessLieLobbyComplete } = await import("./state.js");
     const result = await markGuessLieLobbyComplete();
-    navigateAfterGameLaunch({ gameScreen: "guesslie", result });
+    navigateAfterGameLaunch({ gameScreen: "guesslie", result, forceNavigate: true });
     return result;
   });
 }

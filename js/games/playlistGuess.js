@@ -4,6 +4,7 @@ import {
   getPlaylistGuessDeck,
   getCurrentPlaylistGuessRound,
   commitPlaylistGuessPlay,
+  commitPlaylistGuessVote,
   allPlaylistGuessVotesIn,
   getEffectivePlaylistGuessVotes,
   simulatePlaylistGuessVotes,
@@ -336,8 +337,7 @@ export function mountPlaylistGuess(app) {
     app.querySelector("#confirm")?.addEventListener("click", async () => {
       if (selected === null) return;
       if (mp) {
-        const votes = { ...getEffectivePlaylistGuessVotes(), [localUid]: selected };
-        await commitPlaylistGuessPlay({ votes });
+        await commitPlaylistGuessVote(selected);
         await tryAdvanceToReveal();
       } else {
         phase = "reveal";

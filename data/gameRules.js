@@ -160,7 +160,7 @@ export const GAME_RULES = {
   traitre: {
     title: "Le Traître",
     emoji: "🎭",
-    but: "Tous reçoivent un mot secret — sauf un, qui a un mot proche. À l'oral, donnez des indices sans prononcer votre mot. Trouvez le traître avant qu'il ne finisse dans le duo final.",
+    but: "Tous reçoivent un mot secret - sauf un, qui a un mot proche. À l'oral, donnez des indices sans prononcer votre mot. Trouvez le traître avant qu'il ne finisse dans le duo final.",
     etapes: [
       "4 joueurs minimum. L'app distribue un mot secret à chacun (le traître a un mot voisin, ex. Android / iOS).",
       "Manche 1 : chaque joueur dit un indice à voix haute, dans l'ordre affiché sur l'app.",

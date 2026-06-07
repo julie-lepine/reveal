@@ -16,6 +16,7 @@ import {
   playlistGuessToRemote,
   allMembersReady,
   userIdForName,
+  patchGameState,
 } from "./gameSync.js";
 import { launchGameWithSync, commitHostGamePlay, commitPrepReadyToggle } from "./mpLaunch.js";
 
@@ -237,6 +238,18 @@ export function getEffectivePlaylistGuessVotes(session = getPlaylistGuessSession
     if (pick != null && pick !== "") out[p.userId] = pick;
   });
   return out;
+}
+
+/** Invité MP : envoie uniquement son vote (évite d'écraser l'état de l'hôte). */
+export async function commitPlaylistGuessVote(targetPlayerId) {
+  const localUid = getLocalParticipantId();
+  const session = getPlaylistGuessSession();
+  if (session.phase !== "voting") return null;
+  const votes = { ...getEffectivePlaylistGuessVotes(session), [localUid]: targetPlayerId };
+  saveStatePatch({ playlistGuessGame: { ...session, votes } });
+  if (!isGameSyncActive()) return votes;
+  await patchGameState({ playlistGuess: { votes: { [localUid]: targetPlayerId } } });
+  return votes;
 }
 
 /** Tous les joueurs du lobby ont voté (auto-vote autorisé, personne n'est exclu). */

@@ -125,6 +125,15 @@ export function isSubmissionsOnlyGamePatch(inc = {}) {
   return keys.length === 1 && keys[0] === "submissions";
 }
 
+/** Soumissions Guess The Lie : union locale + remote (ne jamais perdre une entrée valide). */
+export function mergeGuessLieSubmissions(localSubs = {}, remoteSubs = {}) {
+  const out = { ...localSubs };
+  Object.entries(remoteSubs).forEach(([name, val]) => {
+    if (val) out[name] = val;
+  });
+  return out;
+}
+
 /** Fusion de phase par rang (avance uniquement, sauf allowReset). */
 export function mergeRankedPhase(curPhase, incPhase, rankMap, { allowReset = false } = {}) {
   if (allowReset) return incPhase ?? curPhase ?? null;
@@ -238,6 +247,45 @@ export function mergeForwardGamePhase(curPhase, incPhase) {
   return incPhase;
 }
 
+/** Nouvelle manche Hot Take : take suivante ou chrono relancé, votes vidés. */
+export function isNewHotTakeVoteRound(cur, inc) {
+  if (!inc || inc.phase !== "voting") return false;
+  if (Object.keys(inc.votes || {}).length > 0) return false;
+  if (cur?.takeIdx != null && inc.takeIdx != null && inc.takeIdx !== cur.takeIdx) return true;
+  return Boolean(inc.voteEndsAt && inc.voteEndsAt !== cur?.voteEndsAt);
+}
+
+export function mergeHotTakePhase(cur, inc) {
+  if (isNewHotTakeVoteRound(cur, inc)) return inc?.phase ?? cur?.phase ?? null;
+  return mergeForwardGamePhase(cur?.phase, inc?.phase);
+}
+
+/** Nouvelle manche Dilemma : round suivant ou chrono relancé, votes vidés. */
+export function isNewDilemmaVoteRound(cur, inc) {
+  if (!inc || inc.phase !== "voting") return false;
+  if (Object.keys(inc.votes || {}).length > 0) return false;
+  if (cur?.roundIdx != null && inc.roundIdx != null && inc.roundIdx !== cur.roundIdx) return true;
+  return Boolean(inc.voteEndsAt && inc.voteEndsAt !== cur?.voteEndsAt);
+}
+
+export function mergeDilemmaPhase(cur, inc) {
+  if (isNewDilemmaVoteRound(cur, inc)) return inc?.phase ?? cur?.phase ?? null;
+  return mergeForwardGamePhase(cur?.phase, inc?.phase);
+}
+
+/** Nouvelle manche Speed Vote : round suivant ou chrono relancé, votes vidés. */
+export function isNewSpeedVoteVoteRound(cur, inc) {
+  if (!inc || inc.phase !== "voting") return false;
+  if (Object.keys(inc.votes || {}).length > 0) return false;
+  if (cur?.roundIdx != null && inc.roundIdx != null && inc.roundIdx !== cur.roundIdx) return true;
+  return Boolean(inc.voteEndsAt && inc.voteEndsAt !== cur?.voteEndsAt);
+}
+
+export function mergeSpeedVotePhase(cur, inc) {
+  if (isNewSpeedVoteVoteRound(cur, inc)) return inc?.phase ?? cur?.phase ?? null;
+  return mergeForwardGamePhase(cur?.phase, inc?.phase);
+}
+
 /** État dilemma pour patchGameState (inc = patch client, cur = serveur). */
 export function mergeDilemmaPatchState(curDm, incDm, localAuthor, { mergeReadyUid, mergeVotes }) {
   if (!curDm) return incDm;
@@ -254,7 +302,7 @@ export function mergeDilemmaPatchState(curDm, incDm, localAuthor, { mergeReadyUi
   return {
     ...curDm,
     ...incDm,
-    phase: mergeForwardGamePhase(curDm.phase, incDm.phase),
+    phase: mergeDilemmaPhase(curDm, incDm),
     ready: mergeReadyUid(curDm, incDm),
     votes: mergeVotes(curDm, incDm),
     customDilemmas: mergeDilemmaCustomDilemmas(
@@ -282,7 +330,7 @@ export function mergeHotTakePatchState(curHt, incHt, localAuthor, { mergeReadyUi
   return {
     ...curHt,
     ...incHt,
-    phase: mergeForwardGamePhase(curHt.phase, incHt.phase),
+    phase: mergeHotTakePhase(curHt, incHt),
     ready: mergeReadyUid(curHt, incHt),
     votes: mergeVotes(curHt, incHt),
     customTakes: mergeHotTakeCustomTakes(
@@ -353,7 +401,7 @@ export function mergeSpeedVotePatchState(cur, inc, { mergeReadyUid, mergeVotes }
   return {
     ...cur,
     ...inc,
-    phase: mergeForwardGamePhase(cur.phase, inc.phase),
+    phase: mergeSpeedVotePhase(cur, inc),
     ready: mergeReadyUid(cur, inc),
     votes: mergeVotes(cur, inc),
   };

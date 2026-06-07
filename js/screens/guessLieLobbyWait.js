@@ -8,6 +8,7 @@ import {
 } from "../core/guessLieSession.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
 import { prepGuestFollowOnSession } from "../core/mpLaunch.js";
+import { navigate } from "../core/router.js";
 import { escapeHtml, logoHtml, pageShell } from "../core/ui.js";
 import { bindNav } from "./nav.js";
 import { isLobbyHost, onGameSessionChange } from "../core/gameSync.js";
@@ -16,11 +17,22 @@ export function mountGuessLieLobbyWait(app) {
   if (!requireLobbyPlay()) return null;
 
   const localName = getLocalDisplayName();
+  let launching = false;
+
+  function followIfStarted() {
+    const entry = getGuessLieEntryScreen();
+    if (entry === "guesslie-wait") return false;
+    navigate(entry, { reset: true });
+    return true;
+  }
 
   function render() {
+    if (launching) return;
+
     const session = getGuessLieSession();
     const members = getLobbyMemberNames();
     const allReady = allLobbySubmitted();
+    const started = Boolean(session.lobbyComplete);
 
     app.innerHTML = pageShell({
       back: false,
@@ -48,25 +60,41 @@ export function mountGuessLieLobbyWait(app) {
         </div>
 
         <p class="hint" id="wait-hint">
-          ${allReady ? "Tout le monde est prêt !" : "Les autres joueurs préparent leurs affirmations…"}
+          ${
+            started
+              ? "Lancement de la partie…"
+              : allReady
+                ? "Tout le monde est prêt !"
+                : "Les autres joueurs préparent leurs affirmations…"
+          }
         </p>
 
         ${
-          allReady && isLobbyHost()
+          allReady && isLobbyHost() && !started
             ? `<button type="button" class="btn btn-primary btn--spaced" id="btn-start">Lancer la partie →</button>`
-            : allReady
+            : allReady && !started
               ? `<button type="button" class="btn btn-secondary btn--spaced" disabled>En attente de l'hôte…</button>`
-              : `<button type="button" class="btn btn-secondary btn--spaced" disabled>En attente…</button>`
+              : started
+                ? `<button type="button" class="btn btn-secondary btn--spaced" disabled>Lancement…</button>`
+                : `<button type="button" class="btn btn-secondary btn--spaced" disabled>En attente…</button>`
         }
         <button type="button" class="btn btn-secondary btn--spaced" data-nav="game-select">Retour</button>
       `,
     });
 
     bindNav(app);
+  }
 
-    app.querySelector("#btn-start")?.addEventListener("click", async () => {
-      await handleGuessLieLaunch(app.querySelector("#btn-start"));
-    });
+  async function onStartClick(e) {
+    const btn = e.target.closest("#btn-start");
+    if (!btn || launching || getGuessLieSession().lobbyComplete) return;
+    launching = true;
+    try {
+      await handleGuessLieLaunch(btn);
+      followIfStarted();
+    } finally {
+      launching = false;
+    }
   }
 
   const guestFollow = prepGuestFollowOnSession({
@@ -75,14 +103,22 @@ export function mountGuessLieLobbyWait(app) {
   });
 
   function onSessionUpdate() {
+    if (launching) return;
     if (guestFollow()) return;
+    if (followIfStarted()) return;
     render();
   }
 
+  app.addEventListener("click", onStartClick);
   render();
+  if (followIfStarted()) {
+    return () => app.removeEventListener("click", onStartClick);
+  }
+
   const unsub = onGameSessionChange(onSessionUpdate);
 
   return () => {
     unsub();
+    app.removeEventListener("click", onStartClick);
   };
 }
