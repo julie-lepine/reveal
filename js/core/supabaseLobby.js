@@ -12,6 +12,11 @@ import {
 import { getCurrentScreen } from "./router.js";
 import { fetchGameSessionByLobby } from "./supabaseGame.js";
 import { scalePollIntervalMs } from "../config/syncConfig.js";
+import {
+  LOBBY_EXPIRED_JOIN_MSG,
+  LOBBY_HEARTBEAT_MIN_MS,
+  isLobbyJoinTooOld,
+} from "../config/lobbyLifecycle.js";
 
 const HOST_COLOR = "#A78BFA";
 const GUEST_COLOR = "#60A5FA";
@@ -20,6 +25,7 @@ let realtimeChannel = null;
 let lobbyPresencePollTimer = null;
 let presenceLobbyId = null;
 let lastLobbyBundleSig = "";
+let lastMemberHeartbeatAt = 0;
 const lobbyBundleListeners = new Set();
 
 /** Signature du lobby : ne notifier (donc re-render) que si quelque chose a réellement changé. */
@@ -121,7 +127,7 @@ async function fetchLobbyBundle(lobbyId, { withMessages = false } = {}) {
   const queries = [
     supabase
       .from("lobbies")
-      .select("id, code, status, game_id, host_id, nudge_at, nudge_for")
+      .select("id, code, status, game_id, host_id, nudge_at, nudge_for, last_activity_at")
       .eq("id", lobbyId)
       .single(),
     supabase
@@ -156,6 +162,7 @@ async function fetchLobbyBundle(lobbyId, { withMessages = false } = {}) {
     status: lobby.status || "waiting",
     gameId: lobby.game_id,
     hostId: lobby.host_id,
+    lastActivityAt: lobby.last_activity_at || null,
     nudgeAt: lobby.nudge_at ? new Date(lobby.nudge_at).getTime() : 0,
     nudgeForUserId: lobby.nudge_for || null,
     participants,
@@ -186,6 +193,7 @@ function applyLobbyToState(bundle) {
       status: bundle.status,
       gameId: bundle.gameId,
       hostId: bundle.hostId,
+      lastActivityAt: bundle.lastActivityAt || null,
       nudgeAt: bundle.nudgeAt || 0,
       nudgeForUserId: bundle.nudgeForUserId || null,
     },
@@ -218,6 +226,28 @@ export function startLobbyPresenceSync() {
   subscribeLobbyRealtime(() => notifyLobbyBundleUpdated());
 
   scheduleLobbyPresencePoll();
+  void pingLobbyMemberPresence();
+}
+
+/** Heartbeat : last_seen_at sur lobby_members (purge / présence). */
+export async function pingLobbyMemberPresence() {
+  const lobbyId = getState().lobby?.id;
+  const userId = getSupabaseUserId();
+  if (!lobbyId || !userId || !isSupabaseConfigured()) return;
+
+  const now = Date.now();
+  if (now - lastMemberHeartbeatAt < LOBBY_HEARTBEAT_MIN_MS) return;
+  lastMemberHeartbeatAt = now;
+
+  const { error } = await supabase
+    .from("lobby_members")
+    .update({ last_seen_at: new Date().toISOString() })
+    .eq("lobby_id", lobbyId)
+    .eq("user_id", userId);
+
+  if (error && !/last_seen_at|column/i.test(String(error.message || ""))) {
+    console.warn("REVEAL lobby heartbeat:", error.message || error);
+  }
 }
 
 /**
@@ -238,6 +268,7 @@ function scheduleLobbyPresencePoll() {
       return;
     }
     try {
+      await pingLobbyMemberPresence();
       await refreshLobbyFromSupabase();
     } catch (e) {
       if (!isLobbyGoneError(e)) {
@@ -251,6 +282,7 @@ function scheduleLobbyPresencePoll() {
 export function stopLobbyPresenceSync() {
   presenceLobbyId = null;
   lastLobbyBundleSig = "";
+  lastMemberHeartbeatAt = 0;
   if (lobbyPresencePollTimer) {
     clearTimeout(lobbyPresencePollTimer);
     lobbyPresencePollTimer = null;
@@ -335,6 +367,10 @@ export async function joinLobbySupabase(codeInput) {
       error:
         "Code introuvable. Vérifie le code auprès de l'hôte ou ouvre le lien d'invitation qu'il t'a envoyé.",
     };
+  }
+
+  if (isLobbyJoinTooOld(lobbyRow.last_activity_at)) {
+    return { ok: false, error: LOBBY_EXPIRED_JOIN_MSG };
   }
 
   const { data: existing } = await supabase

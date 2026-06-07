@@ -2908,6 +2908,10 @@ body.wizz-shake #app{
   --logo-border:linear-gradient(200deg, #A78BFA 0%, #6366F1 48%, #2B2D66 100%);
 }
 
+.game-tile__logo-wrap--traitre{
+  --logo-border:linear-gradient(145deg, #F97316 0%, #EF4444 48%, #2B2D66 100%);
+}
+
 .game-tile__logo-inner--emoji{
   align-items:center;
   justify-content:center;
@@ -5645,8 +5649,4 @@ body{
   flex-direction: column;
   gap: 0.5rem;
   margin-top: 0.75rem;
-}
-
-.game-tile.traitre {
-  --tile-accent: #9b59b6;
 }

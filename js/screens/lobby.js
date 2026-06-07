@@ -34,6 +34,7 @@ import { requireLobbyPlay } from "../core/gameGuard.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
 import { bindNav } from "./nav.js";
 import { showAppAlert } from "../core/dialog.js";
+import { getLobbyAutoCloseHint } from "../config/lobbyLifecycle.js";
 
 function participantsHtml(participants) {
   return participants
@@ -349,6 +350,7 @@ export function mountLobby(app) {
             · <button type="button" class="btn-link" id="copy-link">Copier le lien</button>
           </p>
           <p class="hint">${online ? "Partage le code ou le lien - les invités rejoignent sans compte." : "Démo locale : ouvre le lien sur le même appareil ou un autre onglet."}</p>
+          ${isHost && online ? `<p class="hint lobby-lifecycle-hint">${escapeHtml(getLobbyAutoCloseHint(getLobbyStatus()))}</p>` : ""}
         </div>
 
         <div class="chat-panel">

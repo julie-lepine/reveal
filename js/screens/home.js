@@ -655,7 +655,12 @@ export function mountHome(app) {
     }
 
     if (e.target.closest("#btn-logout")) {
-      await logout();
+      const res = await logout();
+      if (res?.cancelled) return;
+      if (res?.ok === false && res.error) {
+        await showAppAlert(res.error, { title: "Déconnexion", icon: "⚠️" });
+        return;
+      }
       scheduleRender(true);
       return;
     }

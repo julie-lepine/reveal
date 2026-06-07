@@ -265,16 +265,27 @@ export async function changeEmailPassword(_currentPassword, newPassword) {
 
 export async function logout() {
   if (isSupabaseConfigured()) {
-    const { hasActiveLobby, leaveLobby } = await import("./lobby.js");
+    const { hasActiveLobby, leaveLobby, confirmAndLeaveLobby } = await import("./lobby.js");
+    const { isLobbyHost } = await import("./gameSync.js");
     if (hasActiveLobby()) {
-      await leaveLobby({ navigateAway: false });
+      if (isLobbyHost()) {
+        const res = await confirmAndLeaveLobby({ navigateAway: false });
+        if (res.cancelled) {
+          return { ok: false, cancelled: true };
+        }
+        if (!res.ok) {
+          return { ok: false, error: res.error || "Impossible de fermer le lobby." };
+        }
+      } else {
+        await leaveLobby({ navigateAway: false });
+      }
     } else {
       stopMultiplayerSync();
       stopLobbyPresenceSync();
     }
     await signOutSupabase();
     saveStatePatch({ inLobby: false, lobby: null, lobbyCode: null });
-    return;
+    return { ok: true };
   }
   saveStatePatch({
     user: { email: null, name: null, loggedIn: false, isGuest: false, provider: null },
@@ -282,4 +293,5 @@ export async function logout() {
     lobby: null,
     lobbyCode: null,
   });
+  return { ok: true };
 }

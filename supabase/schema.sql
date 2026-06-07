@@ -18,7 +18,8 @@ create table if not exists public.lobbies (
   status text not null default 'waiting' check (status in ('waiting', 'playing')),
   game_id text,
   created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
+  updated_at timestamptz not null default now(),
+  last_activity_at timestamptz not null default now()
 );
 
 create index if not exists lobbies_code_idx on public.lobbies (upper(code));
@@ -34,6 +35,7 @@ create table if not exists public.lobby_members (
   is_host boolean not null default false,
   ready boolean not null default false,
   joined_at timestamptz not null default now(),
+  last_seen_at timestamptz not null default now(),
   unique (lobby_id, user_id)
 );
 
@@ -96,14 +98,15 @@ for each row execute function public.handle_new_user();
 
 -- Recherche lobby par code (pour rejoindre via QR / lien)
 create or replace function public.find_lobby_by_code(p_code text)
-returns table (id uuid, code text, status text, game_id text, host_id uuid)
+returns table (id uuid, code text, status text, game_id text, host_id uuid, last_activity_at timestamptz)
 language sql
 security definer
 set search_path = public
 as $$
-  select l.id, l.code, l.status, l.game_id, l.host_id
+  select l.id, l.code, l.status, l.game_id, l.host_id, l.last_activity_at
   from public.lobbies l
   where upper(trim(l.code)) = upper(trim(p_code))
+    and coalesce(l.last_activity_at, l.updated_at, l.created_at) > now() - interval '24 hours'
   limit 1;
 $$;
 

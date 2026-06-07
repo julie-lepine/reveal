@@ -11,7 +11,8 @@
    - `game_sessions`
 4. Exécute aussi **`supabase/game-sessions.sql`** (multijoueur des jeux). Si les invités ne peuvent pas synchroniser les mini-jeux (erreur `PGRST116` ou `406` sur `PATCH game_sessions`), réexécute au minimum la politique `game_sessions_update` (section `with check`) de ce fichier.
 5. Exécute **`supabase/lobby-nudge.sql`** (wizz hôte → joueurs pas prêts : colonnes `nudge_at`, `nudge_for` sur `lobbies`)
-6. ~~Exécute **`supabase/fil-rouge-private.sql`**~~ *(Mot interdit / Fil Rouge abandonné — optionnel, voir `data/filRouge.js` `FIL_ROUGE_ENABLED`)*
+6. Exécute **`supabase/lobby-lifecycle.sql`** (expiration, heartbeat `last_seen_at`, purge auto — voir ci-dessous)
+7. ~~Exécute **`supabase/fil-rouge-private.sql`**~~ *(Mot interdit / Fil Rouge abandonné — optionnel, voir `data/filRouge.js` `FIL_ROUGE_ENABLED`)*
 
 ## 2. Clés API
 
@@ -91,6 +92,34 @@ Résumé :
 2. Supabase → **Authentication → SMTP Settings** → `smtp.resend.com`
 3. Tester « Mot de passe oublié » depuis l’app
 
-## 7. Egress (quota « sortant »)
+## 7bis. Cycle de vie des lobbies (`lobby-lifecycle.sql`)
+
+Après migration SQL, l’app envoie un **heartbeat** (`last_seen_at`) toutes les ~60–120 s.
+
+| Règle | Durée |
+|--------|--------|
+| Refus de join (code expiré) | inactif > **24 h** |
+| Purge lobby `waiting` | inactif > **2 h** |
+| Purge lobby `playing` | inactif > **12 h** |
+| Purge `waiting` sans personne en ligne | **45 min** |
+| Purge sans aucun membre | immédiat (cron) |
+
+**Purge automatique** : active l’extension **pg_cron** (Database → Extensions), puis décommente le bloc `cron.schedule` en bas de `supabase/lobby-lifecycle.sql` (toutes les 15 min).
+
+Purge manuelle (SQL Editor) :
+
+```sql
+select public.purge_stale_lobbies();
+```
+
+Monitoring :
+
+```sql
+select * from public.lobby_lifecycle_audit limit 30;
+```
+
+Constantes alignées app ↔ SQL : `js/config/lobbyLifecycle.js`.
+
+## 8. Egress (quota « sortant »)
 
 Si le dashboard affiche **Egress > 100 %** avec une petite base : c’est surtout les **lectures répétées** de `game_sessions.state`, pas Realtime. Voir **[SUPABASE_EGRESS.md](./SUPABASE_EGRESS.md)** (réglages app, SQL de nettoyage, bonnes pratiques dev).

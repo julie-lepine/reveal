@@ -10,6 +10,7 @@ L’**egress** compte les octets renvoyés par l’API Postgres (REST), pas la t
 | Hôte : plus de refetch systématique du `state` avant chaque patch (méta + cache comme l’invité) | `loadSessionRowForPatch` |
 | Decks déshydratés dans `state` | `js/core/deckCodec.js` |
 | Lobby : pas de 100 messages par défaut | `js/core/supabaseLobby.js` |
+| Heartbeat présence + expiration lobbies | `js/config/lobbyLifecycle.js`, `supabase/lobby-lifecycle.sql` |
 | Localhost : polling espacé (×3) | `js/config/syncConfig.js` |
 
 Réglages dev : `js/config/syncConfig.js` (`EGRESS_RELAX_POLL_ON_LOCALHOST`, `LOCALHOST_POLL_MULTIPLIER`).
@@ -38,8 +39,14 @@ limit 20;
 Lobbies / sessions de test orphelins (à adapter avant `DELETE`) :
 
 ```sql
+-- Vue monitoring (lobby-lifecycle.sql)
+select * from public.lobby_lifecycle_audit limit 30;
+
+-- Purge automatique des lobbies expirés
+select public.purge_stale_lobbies();
+
 -- Lobbies sans membre (aperçu)
-select l.id, l.code, l.updated_at
+select l.id, l.code, l.last_activity_at
 from public.lobbies l
 where not exists (
   select 1 from public.lobby_members m where m.lobby_id = l.id
@@ -52,5 +59,6 @@ where not exists (
 ## Habitudes dev
 
 - Un onglet client en test solo ; fermer le lobby (hôte) en fin de session.
+- Les lobbies abandonnés sont purgés côté serveur (voir `lobby-lifecycle.sql`) — activer pg_cron en prod.
 - Éviter les F5 en boucle pendant un lobby actif (chaque boot refetch lobby + session).
 - Vérifier **Usage → Egress** (Database), pas seulement Realtime Messages.
