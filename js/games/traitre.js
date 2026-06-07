@@ -25,17 +25,15 @@ import { getLocalDisplayName, recordTraitrePlayed, setLastGame } from "../core/s
 import { setLobbyPlaying, setLobbyWaiting } from "../core/lobby.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
 import { rulesButtonHtml } from "../core/gameRulesUi.js";
-import { navigate, getCurrentScreen } from "../core/router.js";
+import { navigate } from "../core/router.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
 import { bindNav } from "../screens/nav.js";
 import { gameExitBarHtml, bindExitGame } from "../core/exitGame.js";
 import {
-  completeGameSession,
   isGameSyncActive,
   isLobbyHost,
   onGameSessionChange,
-  suppressSessionRoute,
-  traitreToRemote,
+  returnToGameSelect,
 } from "../core/gameSync.js";
 
 export function mountTraitre(app) {
@@ -178,11 +176,11 @@ export function mountTraitre(app) {
         recordTraitrePlayed();
         setLastGame({
           gameId: "traitre",
-          title: "Le Traître",
+          title: "Spot the fake",
           summary:
             patch.winner === "traitre"
-              ? `Victoire du traître · ${s.impostorName}`
-              : `Traître éliminé · ${eliminatedName}`,
+              ? `Victoire du fake · ${s.impostorName}`
+              : `Fake éliminé · ${eliminatedName}`,
         });
       }
       await commitTraitrePlay(merged, {
@@ -194,19 +192,17 @@ export function mountTraitre(app) {
   }
 
   async function finishAndExit() {
-    const s = getTraitreSession();
-    if (mp && isLobbyHost()) {
-      await completeGameSession({
-        gameId: "traitre",
-        screen: "game-select",
-        state: { traitre: traitreToRemote(s) },
-      });
-    } else if (!mp) {
+    try {
+      if (mp) {
+        await returnToGameSelect();
+        return;
+      }
       await setLobbyWaiting();
-    } else {
-      suppressSessionRoute(120000, getCurrentScreen());
+      navigate("game-select", { navStack: ["home", "lobby", "game-select"] });
+    } catch (e) {
+      console.warn("traitre exit:", e);
+      navigate("game-select", { navStack: ["home", "lobby", "game-select"] });
     }
-    navigate("game-select", { navStack: ["home", "lobby", "game-select"] });
   }
 
   function speakOrderHtml(session) {
@@ -312,7 +308,7 @@ export function mountTraitre(app) {
       phaseHtml = `
         <div class="card">
           <p class="card-heading">Vote d'élimination</p>
-          <p class="hint">${revotePending ? "Revote obligatoire." : "Qui est le traître ?"} ${votedCount}/${alive.length} vote(s).</p>
+          <p class="hint">${revotePending ? "Revote obligatoire." : "Qui est le fake ?"} ${votedCount}/${alive.length} vote(s).</p>
         </div>
         ${voteGridHtml()}
         ${
@@ -326,17 +322,17 @@ export function mountTraitre(app) {
       const deltas = lastRound.deltas || {};
       phaseHtml = `
         <div class="card traitre-final">
-          <p class="card-heading">${winner === "traitre" ? "Le traître gagne !" : "Le traître est démasqué !"}</p>
-          <p class="hint">Le traître était <strong>${escapeHtml(impostor || "?")}</strong>.</p>
+          <p class="card-heading">${winner === "traitre" ? "Le fake gagne !" : "Le fake est démasqué !"}</p>
+          <p class="hint">Le fake était <strong>${escapeHtml(impostor || "?")}</strong>.</p>
           ${
             pair
-              ? `<p class="hint">Mots : majorité « ${escapeHtml(pair.a)} » · traître « ${escapeHtml(pair.b)} » (${escapeHtml(pair.theme || "")})</p>`
+              ? `<p class="hint">Mots : majorité « ${escapeHtml(pair.a)} » · fake « ${escapeHtml(pair.b)} » (${escapeHtml(pair.theme || "")})</p>`
               : ""
           }
           ${
             winner === "traitre"
               ? `<p class="hint">+${TRAITRE_POINTS.INTRUS_WIN} pts victoire${voteSurvivals ? ` · +${voteSurvivals * TRAITRE_POINTS.INTRUS_SURVIVE_VOTE} pts survie` : ""}</p>`
-              : `<p class="hint">+${TRAITRE_POINTS.CIVIL_CORRECT_VOTE} pts pour ceux qui ont voté le traître au bon moment.</p>`
+              : `<p class="hint">+${TRAITRE_POINTS.CIVIL_CORRECT_VOTE} pts pour ceux qui ont voté le fake au bon moment.</p>`
           }
           <div class="traitre-delta-list">
             ${Object.entries(deltas)
@@ -364,10 +360,10 @@ export function mountTraitre(app) {
       scroll: true,
       content: `
         <div class="screen-title-row">
-          <p class="label-upper label-upper--gold">🎭 Le Traître</p>
+          <p class="label-upper label-upper--gold">🎭 Spot the fake</p>
           ${rulesButtonHtml("traitre")}
         </div>
-        <p class="hint">${alive.length} survivant(s) · manche indices ${speakRound}${voteSurvivals ? ` · ${voteSurvivals} vote(s) survécu(s) par le traître` : ""}</p>
+        <p class="hint">${alive.length} survivant(s) · manche indices ${speakRound}${voteSurvivals ? ` · ${voteSurvivals} vote(s) survécu(s) par le fake` : ""}</p>
         ${phaseHtml}
         ${gameExitBarHtml()}
       `,

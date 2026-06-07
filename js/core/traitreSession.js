@@ -18,10 +18,9 @@ import {
   isLobbyHost,
   syncTraitreSession,
   traitreToRemote,
-  patchGameState,
-  userIdForName,
-  nameForUserId,
 } from "./gameSync.js";
+import { patchGameStateWithFeedback } from "./patchGameStateFeedback.js";
+import { hostDistributeTraitreRoles } from "./traitrePrivate.js";
 import { launchGameWithSync, commitHostGamePlay, commitPrepReadyToggle } from "./mpLaunch.js";
 import { normalizeKeyedVotes } from "./sessionMerge.js";
 
@@ -172,6 +171,13 @@ export async function markTraitreLobbyStarted() {
     applyLocal: () => saveStatePatch({ traitreGame: next }),
     getRemoteState: () => ({ traitre: traitreToRemote(next) }),
   });
+  if (result.ok !== false && isGameSyncActive() && isLobbyHost()) {
+    try {
+      await hostDistributeTraitreRoles(next.pairId, next.impostorName, next.alive);
+    } catch (e) {
+      console.warn("REVEAL traitre roles:", e);
+    }
+  }
   return { ...result, ok: result.ok !== false, session: next };
 }
 
@@ -194,8 +200,9 @@ export async function commitTraitreDealAck() {
   const dealAcks = { ...(session.dealAcks || {}), [localName]: true };
   saveStatePatch({ traitreGame: { ...session, dealAcks } });
   if (!isGameSyncActive()) return dealAcks;
+  const { userIdForName } = await import("./gameSync.js");
   const uid = userIdForName(localName) || localName;
-  await patchGameState({ traitre: { dealAcks: { [uid]: true } } });
+  await patchGameStateWithFeedback({ traitre: { dealAcks: { [uid]: true } } });
   return dealAcks;
 }
 
@@ -206,9 +213,10 @@ export async function commitTraitreVote(targetName) {
   const votes = { ...(session.votes || {}), [localName]: targetName };
   saveStatePatch({ traitreGame: { ...session, votes } });
   if (!isGameSyncActive()) return targetName;
+  const { userIdForName } = await import("./gameSync.js");
   const uid = userIdForName(localName) || localName;
   const targetUid = userIdForName(targetName) || targetName;
-  await patchGameState({ traitre: { votes: { [uid]: targetUid } } });
+  await patchGameStateWithFeedback({ traitre: { votes: { [uid]: targetUid } } });
   return targetName;
 }
 

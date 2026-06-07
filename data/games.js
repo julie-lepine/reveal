@@ -2,7 +2,7 @@
 export const GAMES = [
   {
     id: "traitre-prep",
-    title: "Le Traître",
+    title: "Spot the fake",
     desc: "4 joueurs min. — mot secret, indices oraux, démasque l'intrus",
     emoji: "🎭",
     cssClass: "traitre",

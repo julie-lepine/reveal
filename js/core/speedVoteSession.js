@@ -24,6 +24,7 @@ import {
   userIdForName,
   normalizePlayerVotesMap,
 } from "./gameSync.js";
+import { patchGameStateWithFeedback } from "./patchGameStateFeedback.js";
 import { launchGameWithSync, commitHostGamePlay, commitPrepReadyToggle } from "./mpLaunch.js";
 
 function defaultSession() {
@@ -241,7 +242,7 @@ export async function commitSpeedVoteVote(choice) {
   saveStatePatch({ speedVoteGame: { ...session, votes } });
   if (!isGameSyncActive()) return choice;
   const uid = userIdForName(localName) || localName;
-  await patchGameState({ speedVote: { votes: { [uid]: choice } } });
+  await patchGameStateWithFeedback({ speedVote: { votes: { [uid]: choice } } });
   return choice;
 }
 

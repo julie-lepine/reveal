@@ -61,7 +61,7 @@ async function requireHostToLaunch() {
 
 export async function launchTraitrePrep() {
   const check = await requireMinLobbyPlayers(TRAITRE_MIN_PLAYERS, {
-    gameTitle: "Le Traître",
+    gameTitle: "Spot the fake",
     icon: "🎭",
   });
   if (!check.ok) return;
@@ -77,8 +77,8 @@ export async function launchTraitrePrep() {
       });
     } catch (e) {
       console.warn("REVEAL launch Traitre:", e);
-      await showAppAlert(e.message || "Impossible de lancer Le Traître.", {
-        title: "Le Traître",
+      await showAppAlert(e.message || "Impossible de lancer Spot the fake.", {
+        title: "Spot the fake",
         icon: "⚠️",
       });
     }

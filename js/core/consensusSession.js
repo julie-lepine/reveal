@@ -22,6 +22,7 @@ import {
   userIdForName,
   consensusRevealToRemote,
 } from "./gameSync.js";
+import { patchGameStateWithFeedback } from "./patchGameStateFeedback.js";
 import { launchGameWithSync, commitHostGamePlay, commitPrepReadyToggle } from "./mpLaunch.js";
 import {
   applyConsensusDefaultAnswers as applyConsensusDefaultAnswersCore,
@@ -435,7 +436,7 @@ export async function commitConsensusAnswer(value, { submitted = false } = {}) {
   saveStatePatch({ consensusGame: { ...session, answers: nextAnswers } });
   if (!isGameSyncActive()) return nextAnswer;
   const uid = userIdForName(localName) || localName;
-  await patchGameState({
+  await patchGameStateWithFeedback({
     consensus: {
       answers: {
         [uid]: {

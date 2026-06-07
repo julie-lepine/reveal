@@ -464,6 +464,7 @@ export function isNewTraitreVoteRound(cur, inc) {
   if (
     inc.phase === "vote" &&
     cur?.phase === "vote" &&
+    inc.revotePending &&
     Object.keys(inc.votes || {}).length === 0 &&
     Object.keys(cur?.votes || {}).length > 0
   ) {

@@ -18,6 +18,7 @@ import {
   userIdForName,
   patchGameState,
 } from "./gameSync.js";
+import { patchGameStateWithFeedback } from "./patchGameStateFeedback.js";
 import { launchGameWithSync, commitHostGamePlay, commitPrepReadyToggle } from "./mpLaunch.js";
 
 /** Identifiant stable pour les votes (aligné lobby Supabase + invités). */
@@ -248,7 +249,7 @@ export async function commitPlaylistGuessVote(targetPlayerId) {
   const votes = { ...getEffectivePlaylistGuessVotes(session), [localUid]: targetPlayerId };
   saveStatePatch({ playlistGuessGame: { ...session, votes } });
   if (!isGameSyncActive()) return votes;
-  await patchGameState({ playlistGuess: { votes: { [localUid]: targetPlayerId } } });
+  await patchGameStateWithFeedback({ playlistGuess: { votes: { [localUid]: targetPlayerId } } });
   return votes;
 }
 

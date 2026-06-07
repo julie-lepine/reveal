@@ -18,9 +18,9 @@ import {
   isLobbyHost,
   syncTriviaSession,
   triviaToRemote,
-  patchGameState,
   userIdForName,
 } from "./gameSync.js";
+import { patchGameStateWithFeedback } from "./patchGameStateFeedback.js";
 import { launchGameWithSync, commitHostGamePlay, commitPrepReadyToggle } from "./mpLaunch.js";
 
 const TRIVIA_ESTIMATE_SEC_PER_QUESTION = 40;
@@ -291,26 +291,16 @@ export async function commitTriviaAnswer(answerIndex) {
   saveStatePatch({ triviaGame: { ...session, answers: nextAnswers } });
   if (!isGameSyncActive()) return nextAnswer;
   const uid = userIdForName(localName) || localName;
-  try {
-    await patchGameState({
-      trivia: {
-        answers: {
-          [uid]: {
-            answerIndex: nextAnswer.answerIndex,
-            answeredAt: nextAnswer.answeredAt,
-          },
+  await patchGameStateWithFeedback({
+    trivia: {
+      answers: {
+        [uid]: {
+          answerIndex: nextAnswer.answerIndex,
+          answeredAt: nextAnswer.answeredAt,
         },
       },
-    });
-  } catch (err) {
-    console.warn("commitTriviaAnswer:", err);
-    const { showAppAlert } = await import("./dialog.js");
-    await showAppAlert(err?.message || "Impossible d'envoyer ta réponse.", {
-      title: "Connexion",
-      icon: "📡",
-    });
-    throw err;
-  }
+    },
+  });
   return nextAnswer;
 }
 

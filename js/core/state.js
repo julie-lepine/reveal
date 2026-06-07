@@ -80,6 +80,7 @@ const defaultState = () => ({
     dilemmasPlayed: 0,
     triviaGamesPlayed: 0,
     traitreGamesPlayed: 0,
+    guessLieGamesPlayed: 0,
     liesFound: 0,
     liesTotal: 0,
     tierNightsPlayed: 0,
@@ -508,6 +509,7 @@ export function defaultEveningStats() {
     dilemmasPlayed: 0,
     triviaGamesPlayed: 0,
     traitreGamesPlayed: 0,
+    guessLieGamesPlayed: 0,
   };
 }
 
@@ -675,6 +677,12 @@ export function recordTriviaPlayed() {
 export function recordTraitrePlayed() {
   recordEveningGameOnce("traitre", () => {
     state.stats.traitreGamesPlayed = (state.stats.traitreGamesPlayed || 0) + 1;
+  });
+}
+
+export function recordGuessLiePlayed() {
+  recordEveningGameOnce("guesslie", () => {
+    state.stats.guessLieGamesPlayed = (state.stats.guessLieGamesPlayed || 0) + 1;
   });
 }
 

@@ -21,6 +21,7 @@ import {
   leaveLobbySupabase,
   closeLobbySupabase,
   refreshLobbyFromSupabase,
+  isLocalStillLobbyMember,
   setLocalReadySupabase,
   setLobbyStatusSupabase,
   addLobbyMessageSupabase,
@@ -249,12 +250,17 @@ export async function reconcileLobbyMembership() {
     await refreshLobbyFromSupabase();
     const participants = getLobbyParticipants();
     if (!participants.length || !participants.some((p) => p.userId === uid)) {
+      const stillMember = await isLocalStillLobbyMember(lobbyId);
+      if (stillMember === true) return { cleared: false };
+      if (stillMember === null) return { cleared: false };
       forceClearClientLobbyState();
       return { cleared: true };
     }
     return { cleared: false };
   } catch (e) {
     console.warn("REVEAL reconcile lobby:", e.message || e);
+    const stillMember = await isLocalStillLobbyMember(lobbyId);
+    if (stillMember === true || stillMember === null) return { cleared: false };
     forceClearClientLobbyState();
     return { cleared: true };
   }

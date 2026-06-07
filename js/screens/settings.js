@@ -62,6 +62,7 @@ export function mountSettings(app) {
               <button type="button" class="emoji-picker__btn ${e === selectedEmoji ? "emoji-picker__btn--active" : ""}" data-emoji="${e}" aria-label="${e}">${e}</button>`
             ).join("")}
           </div>
+          <p class="auth-error hidden" id="emoji-error"></p>
           <p class="settings-ok hidden" id="emoji-ok">Emoji enregistré.</p>
         </div>
 
@@ -114,15 +115,24 @@ export function mountSettings(app) {
     app.querySelectorAll(".emoji-picker__btn").forEach((btn) => {
       btn.addEventListener("click", async () => {
         const emoji = btn.getAttribute("data-emoji");
+        const err = app.querySelector("#emoji-error");
+        const ok = app.querySelector("#emoji-ok");
         const res = await updateProfileEmoji(emoji);
-        if (!res.ok) return;
+        if (!res.ok) {
+          if (err) {
+            err.textContent = res.error || "Impossible d'enregistrer l'emoji.";
+            err.classList.remove("hidden");
+          }
+          ok?.classList.add("hidden");
+          return;
+        }
 
+        err?.classList.add("hidden");
         selectedEmoji = res.emoji;
         app.querySelector("#emoji-preview").textContent = res.emoji;
         app.querySelectorAll(".emoji-picker__btn").forEach((b) => {
           b.classList.toggle("emoji-picker__btn--active", b === btn);
         });
-        const ok = app.querySelector("#emoji-ok");
         ok?.classList.remove("hidden");
       });
     });

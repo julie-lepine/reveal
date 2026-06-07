@@ -51,6 +51,62 @@ function isLobbyGoneError(e) {
   );
 }
 
+/** Reprend une partie en cours après join / create (retry court). */
+async function restoreActiveGameSessionOnJoin(lobbyId) {
+  const delays = [0, 400, 1200];
+  for (const ms of delays) {
+    if (ms) await new Promise((r) => setTimeout(r, ms));
+    try {
+      const gameRow = await fetchGameSessionByLobby(lobbyId);
+      if (gameRow) {
+        applyRemoteSession(gameRow);
+        handleSessionRoute(gameRow);
+        return true;
+      }
+    } catch (e) {
+      console.warn("REVEAL restore game session on join:", e.message || e);
+    }
+  }
+  return false;
+}
+
+/**
+ * Vérifie côté serveur si le joueur local est encore dans lobby_members.
+ * @returns {boolean|null} true/false, ou null si la requête a échoué (ne pas expulser).
+ */
+export async function isLocalStillLobbyMember(lobbyId = getState().lobby?.id) {
+  const userId = getSupabaseUserId();
+  if (!lobbyId || !userId) return false;
+  const { data, error } = await supabase
+    .from("lobby_members")
+    .select("id")
+    .eq("lobby_id", lobbyId)
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (error) {
+    console.warn("REVEAL lobby membership check:", error.message || error);
+    return null;
+  }
+  return Boolean(data);
+}
+
+/** N'expulse que si le membre local n'existe plus (évite faux « lobby fermé » après sync profil). */
+async function handlePossibleLobbyGone(lobbyId, e) {
+  if (!isLobbyGoneError(e)) throw e;
+  const stillMember = await isLocalStillLobbyMember(lobbyId);
+  if (stillMember === true) {
+    console.warn("REVEAL lobby fetch failed but member still present:", e.message || e);
+    return false;
+  }
+  if (stillMember === null) {
+    console.warn("REVEAL lobby fetch failed, membership unclear:", e.message || e);
+    return false;
+  }
+  const { handleLobbyDissolvedForGuest } = await import("./lobby.js");
+  await handleLobbyDissolvedForGuest();
+  return false;
+}
+
 const DISPLAY_NAME_TAKEN_MSG =
   "Ce pseudo est déjà pris dans ce lobby, choisis-en un autre.";
 
@@ -337,12 +393,7 @@ export async function createLobbySupabase() {
   applyLobbyToState(bundle);
   const { startMultiplayerSync } = await import("./gameSync.js");
   startMultiplayerSync();
-  try {
-    const gameRow = await fetchGameSessionByLobby(lobby.id);
-    if (gameRow) applyRemoteSession(gameRow);
-  } catch {
-    /* ignore */
-  }
+  await restoreActiveGameSessionOnJoin(lobby.id);
 
   const gs = { ...getState().globalStats };
   gs.lobbiesCreated = (gs.lobbiesCreated || 0) + 1;
@@ -433,15 +484,7 @@ export async function joinLobbySupabase(codeInput) {
   applyLobbyToState(bundle);
   const { startMultiplayerSync } = await import("./gameSync.js");
   startMultiplayerSync();
-  try {
-    const gameRow = await fetchGameSessionByLobby(lobbyRow.id);
-    if (gameRow) {
-      applyRemoteSession(gameRow);
-      handleSessionRoute(gameRow);
-    }
-  } catch {
-    /* ignore */
-  }
+  await restoreActiveGameSessionOnJoin(lobbyRow.id);
   return { ok: true, code: bundle.code };
 }
 
@@ -453,12 +496,7 @@ export async function refreshLobbyFromSupabase({ withMessages = false } = {}) {
     applyLobbyToState(bundle);
     return true;
   } catch (e) {
-    if (isLobbyGoneError(e)) {
-      const { handleLobbyDissolvedForGuest } = await import("./lobby.js");
-      await handleLobbyDissolvedForGuest();
-      return false;
-    }
-    throw e;
+    return handlePossibleLobbyGone(lobbyId, e);
   }
 }
 
@@ -481,6 +519,13 @@ export async function closeLobbySupabase() {
     await deleteGameSession(lobbyId);
   } catch (e) {
     console.warn("REVEAL delete game session on close lobby:", e.message || e);
+  }
+
+  try {
+    const { clearTraitrePrivateForLobby } = await import("./traitrePrivate.js");
+    await clearTraitrePrivateForLobby(lobbyId);
+  } catch (e) {
+    console.warn("REVEAL clear traitre private:", e.message || e);
   }
 
   const { data, error } = await supabase.from("lobbies").delete().eq("id", lobbyId).select("id");
@@ -578,7 +623,7 @@ export async function updateLobbyMemberProfileSupabase({ displayName, emoji } = 
     }
     throw error;
   }
-  await refreshLobbyFromSupabase();
+  /* Realtime lobby_members met à jour tout le lobby ; évite double refresh + faux kick. */
 }
 
 export async function setLobbyStatusSupabase(status, gameId = null) {

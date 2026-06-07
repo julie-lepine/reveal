@@ -39,8 +39,8 @@ export function mountTraitrePrep(app) {
     const check = validateTraitreLaunch();
     if (!check.ok) {
       const { showAppAlert } = await import("../core/dialog.js");
-      await showAppAlert(`Le Traître nécessite au moins ${TRAITRE_MIN_PLAYERS} joueurs (${check.count} présents).`, {
-        title: "Le Traître",
+      await showAppAlert(`Spot the fake nécessite au moins ${TRAITRE_MIN_PLAYERS} joueurs (${check.count} présents).`, {
+        title: "Spot the fake",
         icon: "🎭",
       });
       return;
@@ -64,13 +64,13 @@ export function mountTraitrePrep(app) {
     app.innerHTML = pageShell({
       backTarget: "back",
       content: `
-        <p class="label-upper label-upper--gold">🎭 Le Traître</p>
+        <p class="label-upper label-upper--gold">🎭 Spot the fake</p>
         <div class="screen-title-row">
           <h2 class="screen-title">Préparation</h2>
           ${rulesButtonHtml("traitre")}
         </div>
         <p class="game-intro">
-          Mot secret pour tous… sauf un. Indices oraux, votes d'élimination, démasque le traître avant le duo final.
+          Mot secret pour tous… sauf un. Indices oraux, votes d'élimination, démasque le fake avant le duo final.
         </p>
         <p class="hint">${check.ok ? `${check.count} joueur(s) prêts à jouer.` : `Minimum ${TRAITRE_MIN_PLAYERS} joueurs requis (${check.count} présents).`}</p>
 
@@ -88,7 +88,7 @@ export function mountTraitrePrep(app) {
             poolEmptyLabel: `Minimum ${TRAITRE_MIN_PLAYERS} joueurs`,
             allReady,
             isHost,
-            launchLabel: "Lancer Le Traître →",
+            launchLabel: "Lancer Spot the fake →",
           })}
         </div>
       `,
@@ -121,7 +121,7 @@ export function mountTraitrePrep(app) {
         poolEmptyLabel: `Minimum ${TRAITRE_MIN_PLAYERS} joueurs`,
         allReady,
         isHost: isLobbyHost(),
-        launchLabel: "Lancer Le Traître →",
+        launchLabel: "Lancer Spot the fake →",
       }),
       onStartGame
     );

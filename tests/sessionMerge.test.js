@@ -479,9 +479,9 @@ describe("mergeTraitrePatchState", () => {
     assert.equal(out.votes.a, "b");
   });
 
-  it("nouvelle manche de vote efface les votes distants", () => {
-    const cur = { phase: "vote", votes: { a: "b", c: "d" } };
-    const inc = { phase: "vote", votes: {} };
+  it("revote (égalité) efface les votes distants", () => {
+    const cur = { phase: "vote", votes: { a: "b", c: "d" }, revoteCount: 0 };
+    const inc = { phase: "vote", votes: {}, revotePending: true, revoteCount: 1 };
     const out = mergeTraitrePatchState(cur, inc, {
       mergeReadyUid,
       mergeVotes,
@@ -489,6 +489,18 @@ describe("mergeTraitrePatchState", () => {
     });
     assert.deepEqual(out.votes, {});
     assert.equal(out.phase, "vote");
+  });
+
+  it("votes vides sans revotePending ne réinitialise pas", () => {
+    const cur = { phase: "vote", votes: { a: "b", c: "d" } };
+    const inc = { phase: "vote", votes: {} };
+    assert.equal(isNewTraitreVoteRound(cur, inc), false);
+    const out = mergeTraitrePatchState(cur, inc, {
+      mergeReadyUid,
+      mergeVotes,
+      newVoteRound: false,
+    });
+    assert.deepEqual(out.votes, { a: "b", c: "d" });
   });
 });
 

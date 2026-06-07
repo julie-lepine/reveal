@@ -22,6 +22,7 @@ import {
   userIdForName,
   normalizePlayerVotesMap,
 } from "./gameSync.js";
+import { patchGameStateWithFeedback } from "./patchGameStateFeedback.js";
 import { launchGameWithSync, commitHostGamePlay, commitPrepReadyToggle } from "./mpLaunch.js";
 import { checkHotTakeModeration, getModerationNotice } from "./hotTakeSession.js";
 import { mergeDilemmaCustomDilemmas, mergeAuthorOwnedCustomList, normalizeDilemmaEntry } from "./sessionMerge.js";
@@ -350,7 +351,7 @@ export async function commitDilemmaVote(choice) {
   saveStatePatch({ dilemmaGame: { ...session, votes } });
   if (!isGameSyncActive()) return { ...session, votes };
   const uid = userIdForName(localName) || localName;
-  await patchGameState({ dilemma: { votes: { [uid]: choice } } });
+  await patchGameStateWithFeedback({ dilemma: { votes: { [uid]: choice } } });
   return { ...session, votes };
 }
 

@@ -33,6 +33,8 @@ import {
   isNewSpeedVoteVoteRound,
   isNewTraitreVoteRound,
   isSubmissionsOnlyGamePatch,
+  isVotesOnlyGamePatch,
+  isAnswersOnlyGamePatch,
   mergeGuessLieSubmissions,
   mergeConsensusPhase,
   pickLatestTriviaAnswer,
@@ -668,8 +670,13 @@ function mergeTraitreGameLocal(local, remote) {
     ...local,
     ...remote,
     phase: mergeTraitrePhase(local.phase, remote.phase, { newVoteRound }),
-    impostorName: isLobbyHost() && local.impostorName ? local.impostorName : remote.impostorName,
-    isLocalImpostor: remote.isLocalImpostor ?? local.isLocalImpostor ?? false,
+    impostorName: (() => {
+      if (isLobbyHost() && local.impostorName) return local.impostorName;
+      if (remote.impostorRevealed && remote.impostorName) return remote.impostorName;
+      if (local.isLocalImpostor) return getLocalDisplayName();
+      return null;
+    })(),
+    isLocalImpostor: local.isLocalImpostor ?? remote.isLocalImpostor ?? false,
     votes,
     dealAcks,
     ready,
@@ -1448,15 +1455,14 @@ export function speedVoteFromRemote(remote) {
   };
 }
 
-function buildTraitreRolesByUid(session) {
-  const impostor = session.impostorName;
-  const names = session.alive?.length ? session.alive : getActivePlayerNames();
-  const out = {};
-  names.forEach((name) => {
-    const uid = userIdForName(name) || name;
-    out[uid] = name === impostor ? "b" : "a";
-  });
-  return out;
+function sanitizeTraitreMergeInc(curTr, incTr) {
+  if (!incTr || curTr?.impostorRevealed || incTr.impostorRevealed) return incTr;
+  const cleaned = { ...incTr };
+  delete cleaned.rolesByUid;
+  delete cleaned.impostorName;
+  delete cleaned.impostorUid;
+  delete cleaned.isLocalImpostor;
+  return cleaned;
 }
 
 export function traitreToRemote(session) {
@@ -1468,16 +1474,12 @@ export function traitreToRemote(session) {
   Object.entries(session.dealAcks || {}).forEach(([name, val]) => {
     if (val) dealAcks[userIdForName(name) || name] = true;
   });
-  return {
+  const revealed = Boolean(session.impostorRevealed);
+  const remote = {
     ready: mapReadyByUid(session.ready || {}),
     lobbyStarted: Boolean(session.lobbyStarted),
     phase: session.phase || null,
     pairId: session.pairId || null,
-    rolesByUid: session.impostorName ? buildTraitreRolesByUid(session) : {},
-    impostorName: session.impostorName || null,
-    impostorUid: session.impostorName
-      ? userIdForName(session.impostorName) || session.impostorName
-      : null,
     speakRound: session.speakRound ?? 1,
     speakerIndex: session.speakerIndex ?? 0,
     alive: [...(session.alive || [])],
@@ -1496,11 +1498,16 @@ export function traitreToRemote(session) {
         )
       : null,
     lastEliminated: session.lastEliminated || null,
-    impostorRevealed: Boolean(session.impostorRevealed),
+    impostorRevealed: revealed,
     winner: session.winner || null,
     scoresApplied: Boolean(session.scoresApplied),
     lastRound: session.lastRound || null,
   };
+  if (revealed && session.impostorName) {
+    remote.impostorName = session.impostorName;
+    remote.impostorUid = userIdForName(session.impostorName) || session.impostorName;
+  }
+  return remote;
 }
 
 export function traitreFromRemote(remote) {
@@ -1516,24 +1523,10 @@ export function traitreFromRemote(remote) {
     const name = nameForUserId(uid) || uid;
     if (val) dealAcks[name] = true;
   });
-  const localUid = userIdForName(getLocalDisplayName());
-  const rolesByUid = remote.rolesByUid || {};
-  let isLocalImpostor = false;
-  if (localUid && rolesByUid[localUid]) {
-    isLocalImpostor = rolesByUid[localUid] === "b";
-  } else {
-    const impostorUid = remote.impostorUid || null;
-    isLocalImpostor = Boolean(localUid && impostorUid && localUid === impostorUid);
-  }
   const revealed = Boolean(remote.impostorRevealed);
-  const host = isLobbyHost();
-  const impostorUid = remote.impostorUid || null;
-  const impostorName =
-    revealed || host
-      ? nameForUserId(impostorUid) || remote.impostorName || null
-      : isLocalImpostor
-        ? getLocalDisplayName()
-        : null;
+  const impostorName = revealed
+    ? nameForUserId(remote.impostorUid) || remote.impostorName || null
+    : null;
   let lastVoteSnapshot = null;
   if (remote.lastVoteSnapshot) {
     lastVoteSnapshot = {};
@@ -1548,7 +1541,7 @@ export function traitreFromRemote(remote) {
     lobbyStarted: Boolean(remote.lobbyStarted),
     phase: remote.phase || null,
     pairId: remote.pairId || null,
-    isLocalImpostor,
+    isLocalImpostor: false,
     impostorName,
     speakRound: remote.speakRound ?? 1,
     speakerIndex: remote.speakerIndex ?? 0,
@@ -1858,6 +1851,8 @@ function eveningStateToRemote() {
       truthMetersPlayed: stats.truthMetersPlayed || 0,
       consensusGamesPlayed: stats.consensusGamesPlayed || 0,
       dilemmasPlayed: stats.dilemmasPlayed || 0,
+      traitreGamesPlayed: stats.traitreGamesPlayed || 0,
+      guessLieGamesPlayed: stats.guessLieGamesPlayed || 0,
       liesFound: stats.liesFound || 0,
       liesTotal: stats.liesTotal || 0,
       tierNightsPlayed: stats.tierNightsPlayed || 0,
@@ -1967,6 +1962,11 @@ export function applyRemoteSession(row) {
     const remote = traitreFromRemote(st.traitre);
     const local = getState().traitreGame;
     patch.traitreGame = local ? mergeTraitreGameLocal(local, remote) : remote;
+    if (st.traitre.pairId && st.traitre.lobbyStarted) {
+      void import("./traitrePrivate.js").then(({ syncTraitrePrivateRole }) =>
+        syncTraitrePrivateRole(st.traitre.pairId, { notify: () => notify(row) })
+      );
+    }
   }
   if (st.trivia) {
     const remote = triviaFromRemote(st.trivia);
@@ -2161,7 +2161,10 @@ export function getEffectiveSessionScreen(row) {
     if (gid === "speedvote" || declared === "speedvote-prep") return "speedvote-prep";
   }
   if (st.traitre) {
-    if (st.traitre.lobbyStarted) return "traitre";
+    if (st.traitre.lobbyStarted) {
+      if (declared === "game-select" && getLobbyStatus() !== "playing") return "game-select";
+      return "traitre";
+    }
     if (gid === "traitre" || declared === "traitre-prep") return "traitre-prep";
   }
   if (st.trivia) {
@@ -2308,13 +2311,25 @@ function isEveningScoresOnlyMerge(stateMerge) {
   return keys.every((k) => EVENING_STATE_KEYS.has(k));
 }
 
+/** Patch concurrent (votes / réponses) : toujours relire le blob serveur avant merge. */
+function patchNeedsFreshSessionRow(mergePayload = {}) {
+  for (const inc of Object.values(mergePayload)) {
+    if (!inc || typeof inc !== "object") continue;
+    if (isVotesOnlyGamePatch(inc) || isAnswersOnlyGamePatch(inc)) return true;
+    if (Object.prototype.hasOwnProperty.call(inc, "votes")) return true;
+    if (Object.prototype.hasOwnProperty.call(inc, "dealAcks")) return true;
+  }
+  return false;
+}
+
 /**
  * Évite un fetch complet du blob `state` avant merge :
  * - patch scores seulement (hôte) : cache local,
  * - hôte ou invité avec cache : méta légère ; fetch complet seulement si `updated_at` a bougé
  *   (ex. vote invité) — sinon on retéléchargeait le blob à chaque action hôte (egress).
  */
-async function loadSessionRowForPatch(lobbyId, { scoresOnly = false } = {}) {
+async function loadSessionRowForPatch(lobbyId, { scoresOnly = false, forceFresh = false } = {}) {
+  if (forceFresh) return fetchGameSessionByLobby(lobbyId);
   const cached =
     cachedRow?.state && cachedRow.lobby_id === lobbyId ? cachedRow : null;
   if (cached && isLobbyHost() && scoresOnly) return cached;
@@ -2403,7 +2418,8 @@ async function syncTick() {
       if (cached) {
         if (await routeToActiveGameIfNeeded(cached)) return;
         const local = getCurrentScreen();
-        if (local !== cached.screen) handleSessionRoute(cached);
+        const effective = getEffectiveSessionScreen(cached);
+        if (effective && local !== effective) handleSessionRoute(cached);
       }
       return;
     }
@@ -2414,7 +2430,8 @@ async function syncTick() {
     scheduleSyncPoll();
     if (await routeToActiveGameIfNeeded(row)) return;
     const local = getCurrentScreen();
-    if (local !== row?.screen) handleSessionRoute(row);
+    const effective = getEffectiveSessionScreen(row);
+    if (effective && local !== effective) handleSessionRoute(row);
   } catch (e) {
     console.warn("REVEAL sync:", e.message || e);
   } finally {
@@ -2576,7 +2593,8 @@ async function patchGameStateInner(
     mergePayload = { ...stateMerge, ...eveningStateToRemote() };
   }
   const scoresOnly = isEveningScoresOnlyMerge(mergePayload);
-  let freshRow = await loadSessionRowForPatch(lobbyId, { scoresOnly });
+  const forceFresh = patchNeedsFreshSessionRow(mergePayload);
+  let freshRow = await loadSessionRowForPatch(lobbyId, { scoresOnly, forceFresh });
 
   if (!freshRow) {
     const hostId = getSupabaseUserId();
@@ -2650,7 +2668,7 @@ async function patchGameStateInner(
   }
   if (mergePayload.traitre) {
     const curTr = current.traitre;
-    const incTr = mergePayload.traitre;
+    const incTr = sanitizeTraitreMergeInc(curTr, mergePayload.traitre);
     const newTrVote = curTr && incTr ? isNewTraitreVoteRoundUid(curTr, incTr) : false;
     nextState.traitre = curTr
       ? mergeTraitrePatchState(curTr, incTr, {
@@ -2908,7 +2926,10 @@ export async function returnToGameSelect() {
     return true;
   }
 
-  suppressSessionRoute(120000, getCurrentScreen());
+  suppressSessionRoute(
+    120000,
+    getEffectiveSessionScreen(getCachedGameSession()) || getCurrentScreen()
+  );
   navigate("game-select", { navStack: ["home", "lobby", "game-select"] });
   return true;
 }
@@ -3008,7 +3029,8 @@ export async function commitGuessLieSubmission(playerName, payload) {
   saveStatePatch({ guessLie: gl });
   if (!isGameSyncActive()) return gl;
   const uid = userIdForName(playerName) || playerName;
-  await patchGameState(
+  const { patchGameStateWithFeedback } = await import("./patchGameStateFeedback.js");
+  await patchGameStateWithFeedback(
     { guessLie: { submissions: { [uid]: payload } } },
     { gameId: "guesslie", screen: "guesslie-setup" }
   );

@@ -17,7 +17,7 @@ import {
   nameForUserId,
   completeGameSession,
 } from "../core/gameSync.js";
-import { getLocalDisplayName, recordGuessLieRoundStats, setLastGame } from "../core/state.js";
+import { getLocalDisplayName, recordGuessLieRoundStats, recordGuessLiePlayed, setLastGame } from "../core/state.js";
 import { awardGuessLieRound, guessLieLiarWins } from "../core/scoring.js";
 import { gameCumulativeScoresHtml } from "../core/gameScores.js";
 import { setLobbyPlaying, setLobbyWaiting } from "../core/lobby.js";
@@ -192,6 +192,9 @@ export function mountGuessLie(app) {
     if (mp && !isLobbyHost()) return;
 
     if (roundIdx >= rounds.length - 1) {
+      if (!mp || isLobbyHost()) {
+        recordGuessLiePlayed();
+      }
       setLastGame({
         gameId: "guesslie",
         title: "Guess The Lie",

@@ -71,7 +71,7 @@ function eveningRecapHtml(recap) {
       ? `<span class="evening-recap__chip">🎶 ${recap.playlistGuesses} playlist${recap.playlistGuesses > 1 ? "s" : ""}</span>`
       : "",
     recap.traitreGames > 0
-      ? `<span class="evening-recap__chip">🎭 ${recap.traitreGames} Traître${recap.traitreGames > 1 ? "s" : ""}</span>`
+      ? `<span class="evening-recap__chip">🎭 ${recap.traitreGames} Spot the fake</span>`
       : "",
     recap.triviaGames > 0
       ? `<span class="evening-recap__chip">🧠 ${recap.triviaGames} Trivia${recap.triviaGames > 1 ? "s" : ""}</span>`

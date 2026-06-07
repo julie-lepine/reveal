@@ -15,6 +15,7 @@ import {
   userIdForName,
   normalizePlayerVotesMap,
 } from "./gameSync.js";
+import { patchGameStateWithFeedback } from "./patchGameStateFeedback.js";
 import { launchGameWithSync, commitHostGamePlay, commitPrepReadyToggle } from "./mpLaunch.js";
 
 function defaultSession() {
@@ -218,7 +219,7 @@ export async function commitTruthMeterVote(choice) {
   saveStatePatch({ truthMeterGame: { ...session, votes } });
   if (!isGameSyncActive()) return choice;
   const uid = userIdForName(localName) || localName;
-  await patchGameState({ truthMeter: { votes: { [uid]: choice } } });
+  await patchGameStateWithFeedback({ truthMeter: { votes: { [uid]: choice } } });
   return choice;
 }
 
