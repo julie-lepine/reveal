@@ -2,10 +2,10 @@
  * MOT INTERDIT (Fil Rouge) — jeu abandonné, code conservé pour évolution future.
  * Réactivation : passer FIL_ROUGE_ENABLED à true, puis décommenter les blocs
  * « FIL_ROUGE » dans main.js, gameSelect.js, lobby.js, gameSync.js et la doc Supabase.
- */
+
 export const FIL_ROUGE_ENABLED = false;
 
-/** Fil Rouge - Mot Interdit (couche persistante de soirée) */
+Fil Rouge - Mot Interdit (couche persistante de soirée) 
 
 import { FIL_ROUGE_POINTS } from "./eveningScoring.js";
 
@@ -41,10 +41,10 @@ export const FIL_ROUGE_TILE = {
   desc: "Fais prononcer ton mot sans te faire griller.",
 };
 
-/**
+
  * Pool de mots « jouables » : assez courants pour être glissés dans une conversation.
  * Liste de départ à affiner librement (ajout / retrait).
- */
+
 export const FIL_ROUGE_WORD_POOL = [
   "chien", "chat", "pizza", "soleil", "voiture", "café", "musique", "plage",
   "montagne", "fromage", "téléphone", "chaussure", "banane", "ordinateur",
@@ -58,7 +58,7 @@ export const FIL_ROUGE_WORD_POOL = [
   "fantôme", "licorne", "crayon", "ciseaux",
 ];
 
-/** Nombre de mots proposés à chaque joueur dans la liste déroulante. */
+Nombre de mots proposés à chaque joueur dans la liste déroulante. 
 export const FIL_ROUGE_WORD_CHOICE_COUNT = 10;
 
 function hashString(str) {
@@ -80,10 +80,10 @@ function mulberry32(seed) {
   };
 }
 
-/**
+
  * Sous-ensemble déterministe du pool pour un joueur donné (seed = son uid).
  * Stable au re-render et au reload ; deux joueurs distincts ont des listes différentes.
- */
+ 
 export function getFilRougeWordChoices(seed, count = FIL_ROUGE_WORD_CHOICE_COUNT) {
   const rng = mulberry32(hashString(seed || "fil-rouge"));
   const a = [...FIL_ROUGE_WORD_POOL];
@@ -98,3 +98,4 @@ export {
   HOT_TAKE_FORBIDDEN_WORDS as FIL_ROUGE_FORBIDDEN_WORDS,
   HOT_TAKE_MODERATION_NOTICE as FIL_ROUGE_MODERATION_NOTICE,
 } from "./hotTakes.js";
+*/
