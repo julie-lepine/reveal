@@ -29,6 +29,7 @@ import {
   onGameSessionChange,
   routeToActiveGameIfNeeded,
   isSessionRouteSuppressed,
+  tryFollowHostGameSession,
 } from "../core/gameSync.js";
 import { navigate, getCurrentScreen, getScreenParams } from "../core/router.js";
 import { escapeHtml, logoHtml, pageShell } from "../core/ui.js";
@@ -806,8 +807,9 @@ export function mountHome(app) {
   })();
 
   if (isGameSyncActive() && hasActiveLobby()) {
-    unsubSession = onGameSessionChange(async () => {
+    unsubSession = onGameSessionChange(async (row) => {
       if (getCurrentScreen() !== "home") return;
+      tryFollowHostGameSession(row);
       if (!isSessionRouteSuppressed()) {
         if (await routeToActiveGameIfNeeded()) return;
       }

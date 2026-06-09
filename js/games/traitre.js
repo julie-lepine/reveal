@@ -18,6 +18,7 @@ import {
   getTraitreSession,
   getTraitreSpeakOrder,
   getTraitreVoteTargets,
+  isTraitrePrivateRoleReady,
   simulateTraitreVotes,
 } from "../core/traitreSession.js";
 import { getLobbyParticipants } from "../core/lobby.js";
@@ -59,9 +60,24 @@ export function mountTraitre(app) {
   let winner = null;
   let voteSurvivals = 0;
   let resolveInFlight = false;
+  let roleSyncInFlight = false;
 
   const localName = getLocalDisplayName();
   const mp = isGameSyncActive();
+
+  async function ensurePrivateRole() {
+    if (!mp || isLobbyHost() || isTraitrePrivateRoleReady()) return;
+    if (roleSyncInFlight) return;
+    const pairId = getTraitreSession().pairId;
+    if (!pairId) return;
+    roleSyncInFlight = true;
+    try {
+      const { syncTraitrePrivateRole } = await import("../core/traitrePrivate.js");
+      await syncTraitrePrivateRole(pairId, { maxAttempts: 8, delayMs: 500 });
+    } finally {
+      roleSyncInFlight = false;
+    }
+  }
 
   function syncFromSession() {
     const s = getTraitreSession();
@@ -265,10 +281,12 @@ export function mountTraitre(app) {
     const pair = getTraitrePair(session);
     const myWord = getMyTraitreWord(session);
     const host = !mp || isLobbyHost();
+    const roleReady = isTraitrePrivateRoleReady(session);
     let phaseHtml = "";
 
     if (phase === "deal") {
-      phaseHtml = `
+      phaseHtml = roleReady
+        ? `
         <div class="card traitre-word-card">
           <p class="label-upper label-upper--gold">Ton mot secret</p>
           <p class="traitre-word">${escapeHtml(myWord || "…")}</p>
@@ -278,6 +296,11 @@ export function mountTraitre(app) {
               ? `<p class="hint">En attente des autres joueurs…</p>`
               : `<button type="button" class="btn btn-primary btn--spaced" id="btn-deal-ack">J'ai mémorisé mon mot</button>`
           }
+        </div>`
+        : `
+        <div class="card traitre-word-card">
+          <p class="label-upper label-upper--gold">Ton mot secret</p>
+          <p class="hint">Chargement de ton mot…</p>
         </div>`;
     } else if (phase === "speak") {
       phaseHtml = `
@@ -426,6 +449,7 @@ export function mountTraitre(app) {
 
   const unsub = onGameSessionChange(async () => {
     syncFromSession();
+    await ensurePrivateRole();
     if (phase === "deal") {
       await maybeAdvanceFromDeal();
     }
@@ -435,6 +459,7 @@ export function mountTraitre(app) {
     render();
   });
 
+  void ensurePrivateRole().then(() => render());
   render();
 
   return () => {

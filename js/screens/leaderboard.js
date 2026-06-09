@@ -3,7 +3,7 @@ import { getPlayerBadges } from "../core/badges.js";
 import { navigate } from "../core/router.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
 import { bindNav } from "./nav.js";
-import { isGameSyncActive, refreshEveningScoresFromSession } from "../core/gameSync.js";
+import { isGameSyncActive, refreshEveningScoresFromSession, onGameSessionChange, tryFollowHostGameSession } from "../core/gameSync.js";
 
 export function mountLeaderboard(app) {
   function renderBoard() {
@@ -70,9 +70,16 @@ export function mountLeaderboard(app) {
 
   renderBoard();
 
+  let unsubSession = () => {};
   if (isGameSyncActive()) {
     void refreshEveningScoresFromSession().then(() => renderBoard());
+    unsubSession = onGameSessionChange((row) => {
+      tryFollowHostGameSession(row);
+      renderBoard();
+    });
   }
 
-  return null;
+  return () => {
+    unsubSession();
+  };
 }

@@ -16,11 +16,15 @@ import {
   allMembersReady,
   isGameSyncActive,
   isLobbyHost,
+  nameForUserId,
   syncTraitreSession,
   traitreToRemote,
 } from "./gameSync.js";
 import { patchGameStateWithFeedback } from "./patchGameStateFeedback.js";
-import { hostDistributeTraitreRoles } from "./traitrePrivate.js";
+import {
+  clearTraitrePrivateForLobby,
+  hostDistributeTraitreRoles,
+} from "./traitrePrivate.js";
 import { launchGameWithSync, commitHostGamePlay, commitPrepReadyToggle } from "./mpLaunch.js";
 import { normalizeKeyedVotes } from "./sessionMerge.js";
 
@@ -47,7 +51,14 @@ function defaultSession() {
     winner: null,
     scoresApplied: false,
     lastRound: null,
+    privateRoleSynced: false,
   };
+}
+
+export function isTraitrePrivateRoleReady(session = getTraitreSession()) {
+  if (!isGameSyncActive()) return true;
+  if (isLobbyHost()) return true;
+  return Boolean(session.privateRoleSynced);
 }
 
 export function defaultTraitrePrepSession() {
@@ -160,10 +171,49 @@ export function createStartedTraitreSession() {
   };
 }
 
+async function distributeTraitreRolesForHost(session) {
+  const lobbyId = getState().lobby?.id;
+  if (!lobbyId) {
+    throw new Error("Lobby introuvable.");
+  }
+  await clearTraitrePrivateForLobby(lobbyId);
+  return hostDistributeTraitreRoles(session.pairId, session.impostorName, session.alive);
+}
+
 export async function markTraitreLobbyStarted() {
   const started = createStartedTraitreSession();
   if (!started.ok) return started;
-  const next = started.session;
+
+  const next = {
+    ...started.session,
+    privateRoleSynced: !isGameSyncActive() || isLobbyHost(),
+  };
+
+  if (isGameSyncActive() && isLobbyHost()) {
+    try {
+      const dist = await distributeTraitreRolesForHost(next);
+      if (!dist.ok) {
+        const { showAppAlert } = await import("./dialog.js");
+        await showAppAlert(
+          dist.error ||
+            "Impossible d'enregistrer les rôles secrets. Vérifie Supabase (traitre_private).",
+          { title: "Spot the fake", icon: "🎭" }
+        );
+      } else if (dist.error) {
+        const { showAppAlert } = await import("./dialog.js");
+        await showAppAlert(dist.error, { title: "Spot the fake", icon: "⚠️" });
+      }
+    } catch (e) {
+      console.warn("REVEAL traitre roles:", e);
+      const { showAppAlert } = await import("./dialog.js");
+      await showAppAlert(
+        e.message ||
+          "Impossible d'enregistrer les rôles secrets. Vérifie que traitre-private.sql est appliqué sur Supabase.",
+        { title: "Spot the fake", icon: "🎭" }
+      );
+    }
+  }
+
   const result = await launchGameWithSync({
     screen: "traitre",
     gameId: "traitre",
@@ -171,13 +221,6 @@ export async function markTraitreLobbyStarted() {
     applyLocal: () => saveStatePatch({ traitreGame: next }),
     getRemoteState: () => ({ traitre: traitreToRemote(next) }),
   });
-  if (result.ok !== false && isGameSyncActive() && isLobbyHost()) {
-    try {
-      await hostDistributeTraitreRoles(next.pairId, next.impostorName, next.alive);
-    } catch (e) {
-      console.warn("REVEAL traitre roles:", e);
-    }
-  }
   return { ...result, ok: result.ok !== false, session: next };
 }
 

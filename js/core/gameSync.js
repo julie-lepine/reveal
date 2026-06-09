@@ -173,6 +173,16 @@ function shouldApplySessionRoute(row, { fromScreen = null } = {}) {
   if (screen === current) return false;
   if (isCompatibleSessionScreen(screen, current)) return false;
 
+  // Hub / post-partie : les invités restent libres (home, settings, classement…).
+  if (isSessionHubScreen(screen)) {
+    return false;
+  }
+
+  // Paramétrage ou partie en cours : suivi obligatoire (ignore suppressSessionRoute).
+  if (shouldForceGuestFollowSession(screen)) {
+    return true;
+  }
+
   const routingSuppressed = Date.now() < suppressSessionRouteUntil;
   if (routingSuppressed && isSuppressedGameReturn(screen)) return false;
 
@@ -280,6 +290,35 @@ export function isCompatibleSessionScreen(sessionScreen, localScreen) {
 
 export function isOnGameSetupScreen(screen = getCurrentScreen()) {
   return GAME_SETUP_SCREENS.has(screen);
+}
+
+/** Hub soirée : pas de traction automatique des invités. */
+function isSessionHubScreen(screen) {
+  if (!screen) return false;
+  return screen === "game-select" || screen === "lobby" || POST_GAME_SCREENS.has(screen);
+}
+
+/** Paramétrage ou partie active : l'invité doit suivre l'hôte. */
+function shouldForceGuestFollowSession(screen) {
+  if (!screen) return false;
+  return isOnGameSetupScreen(screen) || isActiveGameSessionScreen(screen);
+}
+
+/** Filet pour écrans passifs (results, home…) : suit l'hôte si prep / partie. */
+export function tryFollowHostGameSession(row) {
+  if (!row || !isGameSyncActive() || isLobbyHost()) return false;
+  handleSessionRoute(row);
+  return true;
+}
+
+function clearSuppressIfFollowingHost(screen, current) {
+  if (
+    shouldForceGuestFollowSession(screen) ||
+    isSessionAdvancedFromSuppress(screen) ||
+    shouldFollowHostGameLaunch(current, screen)
+  ) {
+    clearSessionRouteSuppress();
+  }
 }
 
 export function getCachedGameSession() {
@@ -1964,7 +2003,11 @@ export function applyRemoteSession(row) {
     patch.traitreGame = local ? mergeTraitreGameLocal(local, remote) : remote;
     if (st.traitre.pairId && st.traitre.lobbyStarted) {
       void import("./traitrePrivate.js").then(({ syncTraitrePrivateRole }) =>
-        syncTraitrePrivateRole(st.traitre.pairId, { notify: () => notify(row) })
+        syncTraitrePrivateRole(st.traitre.pairId, {
+          maxAttempts: 8,
+          delayMs: 500,
+          notify: () => notify(row),
+        })
       );
     }
   }
@@ -2032,12 +2075,7 @@ export function applyRemoteSession(row) {
   if (shouldApplySessionRoute(row, { fromScreen: prevScreen })) {
     const screen = getEffectiveSessionScreen(row);
     const cur = getCurrentScreen();
-    if (
-      isSessionAdvancedFromSuppress(screen) ||
-      shouldFollowHostGameLaunch(cur, screen)
-    ) {
-      clearSessionRouteSuppress();
-    }
+    clearSuppressIfFollowingHost(screen, cur);
     handleSessionRoute(row, { fromScreen: prevScreen });
   }
 }
@@ -2152,6 +2190,16 @@ export function getEffectiveSessionScreen(row) {
   const st = row.state || {};
   const gid = row.game_id || null;
 
+  // Écran menu / post-partie déclaré par l'hôte : prioritaire sur lobbyStarted résiduel.
+  if (declared && (MENU_SCREENS.has(declared) || POST_GAME_SCREENS.has(declared))) {
+    return declared;
+  }
+
+  // Paramétrage déclaré : prioritaire sur un lobbyStarted stale.
+  if (declared && GAME_SETUP_SCREENS.has(declared)) {
+    return declared;
+  }
+
   if (st.hotTake) {
     if (st.hotTake.lobbyStarted) return "hottake";
     if (gid === "hottake" || declared === "hottake-prep") return "hottake-prep";
@@ -2186,10 +2234,6 @@ export function getEffectiveSessionScreen(row) {
   if (st.playlistGuess) {
     if (st.playlistGuess.lobbyStarted) return "playlistguess";
     if (gid === "playlistguess" || declared === "playlistguess-prep") return "playlistguess-prep";
-  }
-
-  if (declared && (MENU_SCREENS.has(declared) || POST_GAME_SCREENS.has(declared))) {
-    return declared;
   }
 
   const glPhase = st.guessLie?.phase;
@@ -2244,12 +2288,7 @@ export function handleSessionRoute(row, { fromScreen = null } = {}) {
   if (!shouldApplySessionRoute(row, { fromScreen })) return;
   const screen = getEffectiveSessionScreen(row);
   const current = getCurrentScreen();
-  if (
-    isSessionAdvancedFromSuppress(screen) ||
-    shouldFollowHostGameLaunch(current, screen)
-  ) {
-    clearSessionRouteSuppress();
-  }
+  clearSuppressIfFollowingHost(screen, current);
   routeToSessionScreen(screen, { force: true });
 }
 

@@ -23,7 +23,7 @@ import {
 import { setLobbyPlaying, setLobbyWaiting } from "../core/lobby.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
 import { navigate } from "../core/router.js";
-import { pageShell } from "../core/ui.js";
+import { pageShell, resetPageScroll } from "../core/ui.js";
 import { bindNav } from "../screens/nav.js";
 import { gameExitBarHtml, bindExitGame } from "../core/exitGame.js";
 // FIL_ROUGE (Mot interdit) — pause soirée ; isEveningGameplayPaused() = false si désactivé
@@ -80,6 +80,14 @@ export function mountPlaylistGuess(app) {
   let revealSummary = null;
   let revealAdvancing = false;
   let lastScoredRoundIdx = -1;
+  let lastScrollKey = "";
+
+  function scrollToTopIfNeeded(force = false) {
+    const key = `${roundIdx}:${phase}:${mp && getEffectivePlaylistGuessVotes(getPlaylistGuessSession())[localUid] != null ? "voted" : "open"}`;
+    if (!force && key === lastScrollKey) return;
+    lastScrollKey = key;
+    requestAnimationFrame(() => resetPageScroll(app));
+  }
 
   function currentRound() {
     return getCurrentPlaylistGuessRound() || deck[roundIdx];
@@ -259,6 +267,7 @@ export function mountPlaylistGuess(app) {
     if (!round) {
       app.innerHTML = pageShell({
         backTarget: "back",
+        scroll: true,
         content: `<p class="hint">Chargement de la manche…</p>`,
       });
       bindNav(app);
@@ -274,7 +283,7 @@ export function mountPlaylistGuess(app) {
       if (alreadyVoted) {
         body = `
           ${songGuessCardHtml(round, { players, selectedPlayerId: selected, readonly: true })}
-          <p class="hint">Vote enregistré - en attente des autres…</p>`;
+          <button type="button" class="btn btn-secondary btn--spaced" disabled aria-live="polite">Attendre des autres joueurs</button>`;
       } else {
         body = `
           ${songGuessCardHtml(round, { players, selectedPlayerId: selected })}
@@ -315,6 +324,7 @@ export function mountPlaylistGuess(app) {
 
     app.innerHTML = pageShell({
       backTarget: "back",
+      scroll: true,
       content: `
         <p class="label-upper label-upper--purple">🎵 Manche ${roundIdx + 1}/${total}</p>
         <div class="logo logo--sm"><h1>VIBECHECK</h1></div>
@@ -338,17 +348,22 @@ export function mountPlaylistGuess(app) {
       if (selected === null) return;
       if (mp) {
         await commitPlaylistGuessVote(selected);
+        render();
+        scrollToTopIfNeeded(true);
         await tryAdvanceToReveal();
       } else {
         phase = "reveal";
         await transitionToReveal();
         render();
+        scrollToTopIfNeeded(true);
       }
     });
 
     app.querySelector("#playlist-force")?.addEventListener("click", () => void forceReveal());
 
     app.querySelector("#next-round")?.addEventListener("click", () => void nextRound());
+
+    scrollToTopIfNeeded();
   }
 
   function onSyncUpdate() {

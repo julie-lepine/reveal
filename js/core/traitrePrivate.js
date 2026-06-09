@@ -57,13 +57,24 @@ export async function fetchMyTraitrePrivate(pairId) {
   return { is_impostor: Boolean(data.is_impostor), pair_id: data.pair_id };
 }
 
+async function resolvePlayerUid(name) {
+  const fromLobby = userIdForDisplayName(name);
+  if (fromLobby) return fromLobby;
+  const { userIdForName } = await import("./gameSync.js");
+  return userIdForName(name) || null;
+}
+
 /** Hôte : distribue le rôle fake à chaque joueur (table privée / localStorage). */
 export async function hostDistributeTraitreRoles(pairId, impostorName, playerNames = []) {
   const lobbyId = getState().lobby?.id;
-  if (!lobbyId || !pairId || !impostorName) return;
+  if (!lobbyId || !pairId || !impostorName) {
+    return { ok: false, written: 0, skippedNames: [], error: "Lobby ou partie invalide." };
+  }
 
   const names = playerNames.length ? playerNames : [];
-  if (!names.length) return;
+  if (!names.length) {
+    return { ok: false, written: 0, skippedNames: [], error: "Aucun joueur à assigner." };
+  }
 
   if (!isSupabaseConfigured()) {
     const bundle = {};
@@ -72,12 +83,17 @@ export async function hostDistributeTraitreRoles(pairId, impostorName, playerNam
       bundle[uid] = { pair_id: pairId, is_impostor: name === impostorName };
     });
     writeLocalBundle(lobbyId, bundle);
-    return;
+    return { ok: true, written: names.length, skippedNames: [] };
   }
 
+  const skippedNames = [];
+  let written = 0;
   for (const name of names) {
-    const uid = userIdForDisplayName(name);
-    if (!uid) continue;
+    const uid = await resolvePlayerUid(name);
+    if (!uid) {
+      skippedNames.push(name);
+      continue;
+    }
     const { error } = await supabase.from("traitre_private").upsert(
       {
         lobby_id: lobbyId,
@@ -88,7 +104,29 @@ export async function hostDistributeTraitreRoles(pairId, impostorName, playerNam
       { onConflict: "lobby_id,user_id" }
     );
     if (error) throw error;
+    written += 1;
   }
+
+  if (written === 0) {
+    return {
+      ok: false,
+      written: 0,
+      skippedNames,
+      error:
+        "Aucun rôle enregistré — vérifie que fil-rouge-private.sql et traitre-private.sql sont appliqués sur Supabase.",
+    };
+  }
+
+  if (skippedNames.length) {
+    return {
+      ok: true,
+      written,
+      skippedNames,
+      error: `Rôles partiels : joueurs sans compte (${skippedNames.join(", ")}).`,
+    };
+  }
+
+  return { ok: true, written, skippedNames: [] };
 }
 
 export async function clearTraitrePrivateForLobby(lobbyId) {
@@ -99,13 +137,7 @@ export async function clearTraitrePrivateForLobby(lobbyId) {
   if (error) console.warn("[traitre_private] clear:", error.message);
 }
 
-/** Invité : lit le rôle privé et met à jour traitreGame local. */
-export async function syncTraitrePrivateRole(pairId, { notify } = {}) {
-  if (!pairId || isLocalLobbyHost()) return;
-  const priv = await fetchMyTraitrePrivate(pairId);
-  if (!priv) return;
-
-  const session = getState().traitreGame || {};
+function applyTraitrePrivateRole(session, priv) {
   const isLocalImpostor = Boolean(priv.is_impostor);
   const revealed = Boolean(session.impostorRevealed);
   const impostorName = revealed
@@ -119,7 +151,32 @@ export async function syncTraitrePrivateRole(pairId, { notify } = {}) {
       ...session,
       isLocalImpostor,
       impostorName,
+      privateRoleSynced: true,
     },
   });
-  notify?.();
+}
+
+/** Invité : lit le rôle privé et met à jour traitreGame local (retry si distribution en cours). */
+export async function syncTraitrePrivateRole(
+  pairId,
+  { notify, maxAttempts = 6, delayMs = 400 } = {}
+) {
+  if (!pairId || isLocalLobbyHost()) return true;
+
+  const session = getState().traitreGame || {};
+  if (session.privateRoleSynced) return true;
+
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    const priv = await fetchMyTraitrePrivate(pairId);
+    if (priv) {
+      applyTraitrePrivateRole(getState().traitreGame || {}, priv);
+      notify?.();
+      return true;
+    }
+    if (attempt < maxAttempts - 1) {
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+  }
+
+  return false;
 }

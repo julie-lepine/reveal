@@ -37,9 +37,6 @@ export function mountGuessLieLobbyWait(app) {
     app.innerHTML = pageShell({
       back: false,
       content: `
-        <div class="logo logo--with-img">
-          ${logoHtml({ className: "app-logo app-logo--sm" })}
-        </div>
         <p class="label-upper label-upper--green">🕵️ Lobby Guess The Lie</p>
         <h2 class="screen-title">En attente des joueurs</h2>
         <p class="game-intro">
