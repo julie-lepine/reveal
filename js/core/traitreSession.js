@@ -253,6 +253,8 @@ export async function commitTraitreVote(targetName) {
   const localName = getLocalDisplayName();
   const session = getTraitreSession();
   if (session.phase !== "vote") return null;
+  const alive = session.alive || [];
+  if (!alive.includes(localName) || !alive.includes(targetName)) return null;
   const votes = { ...(session.votes || {}), [localName]: targetName };
   saveStatePatch({ traitreGame: { ...session, votes } });
   if (!isGameSyncActive()) return targetName;
@@ -270,11 +272,21 @@ export function allTraitreDealAcksIn(session = getTraitreSession()) {
 
 /** Votes indexés par pseudo (sync multijoueur peut envoyer des UUID). */
 export function normalizeTraitreVotes(votes = {}, alive = []) {
+  const activeNames = getActivePlayerNames();
   return normalizeKeyedVotes(votes, alive, (key) => {
     const mapped = nameForUserId(key);
     if (mapped) return mapped;
-    return alive.includes(String(key)) ? String(key) : null;
+    const s = String(key);
+    if (alive.includes(s)) return s;
+    if (activeNames.includes(s)) return s;
+    return null;
   });
+}
+
+export function getTraitrePendingVoters(session = getTraitreSession()) {
+  const alive = session.alive || [];
+  const normalized = normalizeTraitreVotes(session.votes || {}, alive);
+  return alive.filter((name) => !normalized[name]);
 }
 
 export function countTraitreVotesCast(votes = {}, alive = []) {

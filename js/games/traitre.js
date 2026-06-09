@@ -17,6 +17,7 @@ import {
   getTraitrePair,
   getTraitreSession,
   getTraitreSpeakOrder,
+  getTraitrePendingVoters,
   getTraitreVoteTargets,
   isTraitrePrivateRoleReady,
   simulateTraitreVotes,
@@ -253,7 +254,8 @@ export function mountTraitre(app) {
 
   function voteGridHtml() {
     const targets = getTraitreVoteTargets();
-    const myVote = votes[localName];
+    const normalizedVotes = normalizeTraitreVotes(votes, alive);
+    const myVote = normalizedVotes[localName];
     return `
       <div class="traitre-vote-grid">
         ${targets
@@ -327,17 +329,36 @@ export function mountTraitre(app) {
             : `<p class="hint">En attente du choix de l'hôte…</p>`
         }`;
     } else if (phase === "vote") {
-      const votedCount = countTraitreVotesCast(votes, alive);
+      const normalizedVotes = normalizeTraitreVotes(votes, alive);
+      const votedCount = countTraitreVotesCast(normalizedVotes, alive);
+      const isAlive = alive.includes(localName);
+      const pendingVoters = getTraitrePendingVoters({ ...session, votes: normalizedVotes });
       phaseHtml = `
         <div class="card">
           <p class="card-heading">Vote d'élimination</p>
           <p class="hint">${revotePending ? "Revote obligatoire." : "Qui est le fake ?"} ${votedCount}/${alive.length} vote(s).</p>
+          ${
+            eliminated.length
+              ? `<p class="hint">Éliminé(s) : ${eliminated.map((n) => escapeHtml(n)).join(", ")}</p>`
+              : ""
+          }
+          ${
+            host && pendingVoters.length
+              ? `<p class="hint">En attente : ${pendingVoters.map((n) => escapeHtml(n)).join(", ")}</p>`
+              : ""
+          }
         </div>
-        ${voteGridHtml()}
+        ${
+          isAlive
+            ? voteGridHtml()
+            : `<p class="hint">Tu as été éliminé — tu ne peux plus voter.</p>`
+        }
         ${
           host
             ? `<button type="button" class="btn btn-secondary btn--spaced" id="btn-force-vote">Clôturer le vote (${votedCount}/${alive.length})</button>`
-            : `<p class="hint">En attente des votes…</p>`
+            : isAlive
+              ? `<p class="hint">En attente des votes…</p>`
+              : `<p class="hint">En attente de la clôture du vote…</p>`
         }`;
     } else if (phase === "final") {
       const impostor = session.impostorName;
@@ -423,7 +444,7 @@ export function mountTraitre(app) {
 
     app.querySelectorAll("[data-traitre-vote]").forEach((btn) => {
       btn.addEventListener("click", async () => {
-        if (phase !== "vote") return;
+        if (phase !== "vote" || !alive.includes(localName)) return;
         const target = btn.getAttribute("data-traitre-vote");
         await commitTraitreVote(target);
         if (!mp) {

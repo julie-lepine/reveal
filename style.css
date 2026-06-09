@@ -3548,10 +3548,11 @@ body{
   justify-content:center;
   padding:max(20px, env(safe-area-inset-top, 0px)) 20px max(20px, env(safe-area-inset-bottom, 0px));
   opacity:0;
+  pointer-events:none;
   transition:opacity .25s ease;
 }
 
-.app-dialog--in{ opacity:1; }
+.app-dialog--in{ opacity:1; pointer-events:auto; }
 .app-dialog--out{ opacity:0; }
 
 .app-dialog__backdrop{

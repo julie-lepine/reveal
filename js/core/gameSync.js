@@ -42,6 +42,7 @@ import {
   isNewConsensusQuestionRound,
   mergeCustomGameDeck,
   normalizePlayerKeyedMap,
+  normalizeKeyedVotes,
 } from "./sessionMerge.js";
 import { buildRecapsFromPlacements, getTierNightSession } from "./tierNightSession.js";
 import {
@@ -238,7 +239,10 @@ const TIER_NIGHT_PREP_SCREENS = new Set(["tiernight-select", "tiernight-create"]
 
 export function isCompatibleSessionScreen(sessionScreen, localScreen) {
   if (sessionScreen === localScreen) return true;
-  if (sessionScreen === "guesslie-menu" && GUESS_LIE_PREP_SCREENS.has(localScreen)) return true;
+  /** Guess The Lie : prep par joueur (menu / setup / wait) — pas de traction entre ces écrans. */
+  if (GUESS_LIE_PREP_SCREENS.has(sessionScreen) && GUESS_LIE_PREP_SCREENS.has(localScreen)) {
+    return true;
+  }
   if (sessionScreen === "tiernight-select" && TIER_NIGHT_PREP_SCREENS.has(localScreen)) return true;
   /** Résultats ↔ classement : navigation locale sans forcer le retour via la session. */
   if (
@@ -682,21 +686,43 @@ function mergeRemoteTraitreVotesUid(cur, inc) {
   return incVotes;
 }
 
+/** Votes Spot the fake : uid ou pseudo → clés = survivants (`alive`). */
+function normalizeTraitreVotesMap(votes = {}, alive = []) {
+  const activeNames = getActivePlayerNames();
+  return normalizeKeyedVotes(votes, alive, (key) => {
+    const mapped = nameForUserId(key);
+    if (mapped) return mapped;
+    const s = String(key);
+    if (alive.includes(s)) return s;
+    if (activeNames.includes(s)) return s;
+    return null;
+  });
+}
+
 function mergeTraitreGameLocal(local, remote) {
   if (!remote) return local;
   if (!local) return remote;
   const newVoteRound = isNewTraitreVoteRound(local, remote);
   const remoteVotes = remote.votes || {};
   const localVotes = local.votes || {};
+  const aliveList = remote.alive?.length
+    ? [...remote.alive]
+    : [...(local.alive || getActivePlayerNames())];
   let votes = remoteVotes;
   if (newVoteRound) {
     votes = remoteVotes;
   } else if (remote.phase === "vote" || local.phase === "vote") {
-    votes = { ...remoteVotes };
-    const name = getLocalDisplayName();
-    if (localVotes[name] != null) votes[name] = localVotes[name];
+    votes = { ...remoteVotes, ...localVotes };
   } else if (remote.phase === "final" || local.phase === "final") {
     votes = { ...remoteVotes, ...localVotes };
+  }
+  if (
+    remote.phase === "vote" ||
+    local.phase === "vote" ||
+    remote.phase === "final" ||
+    local.phase === "final"
+  ) {
+    votes = normalizeTraitreVotesMap(votes, aliveList);
   }
   const remoteAcks = remote.dealAcks || {};
   const localAcks = local.dealAcks || {};
@@ -941,6 +967,7 @@ function mergeGuessLieGameLocal(local, remote) {
     votes,
     roundScored: mergeRoundFlag(local.roundScored, remote.roundScored, newVoteRound),
     statsRecordedRoundIdx: mergeMaxIndex(local.statsRecordedRoundIdx, remote.statsRecordedRoundIdx),
+    lobbyComplete: Boolean(local.lobbyComplete || remote.lobbyComplete),
   };
 }
 
@@ -1551,6 +1578,7 @@ export function traitreToRemote(session) {
 
 export function traitreFromRemote(remote) {
   if (!remote) return null;
+  const alive = [...(remote.alive || [])];
   const votes = {};
   Object.entries(remote.votes || {}).forEach(([voterUid, targetUid]) => {
     const voter = nameForUserId(voterUid) || voterUid;
@@ -1584,14 +1612,16 @@ export function traitreFromRemote(remote) {
     impostorName,
     speakRound: remote.speakRound ?? 1,
     speakerIndex: remote.speakerIndex ?? 0,
-    alive: [...(remote.alive || [])],
+    alive,
     eliminated: [...(remote.eliminated || [])],
-    votes,
+    votes: normalizeTraitreVotesMap(votes, alive),
     revotePending: Boolean(remote.revotePending),
     revoteCount: remote.revoteCount ?? 0,
     voteSurvivals: remote.voteSurvivals ?? 0,
     dealAcks,
-    lastVoteSnapshot,
+    lastVoteSnapshot: lastVoteSnapshot
+      ? normalizeTraitreVotesMap(lastVoteSnapshot, alive)
+      : null,
     lastEliminated: remote.lastEliminated || null,
     impostorRevealed: Boolean(remote.impostorRevealed),
     winner: remote.winner || null,
@@ -3071,7 +3101,7 @@ export async function commitGuessLieSubmission(playerName, payload) {
   const { patchGameStateWithFeedback } = await import("./patchGameStateFeedback.js");
   await patchGameStateWithFeedback(
     { guessLie: { submissions: { [uid]: payload } } },
-    { gameId: "guesslie", screen: "guesslie-setup" }
+    { gameId: "guesslie", screen: "guesslie-menu" }
   );
   return gl;
 }

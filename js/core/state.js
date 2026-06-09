@@ -773,7 +773,6 @@ function applyGuessLieLobbyCompleteLocal() {
 
 export async function markGuessLieLobbyComplete() {
   syncGuessLieSession();
-  applyGuessLieLobbyCompleteLocal();
   const { launchGameWithSync } = await import("./mpLaunch.js");
   const { guessLieLobbyStartToRemote } = await import("./gameSync.js");
   return launchGameWithSync({

@@ -67,6 +67,8 @@ if (joinCode) {
 
 initRouter(app);
 
+document.querySelectorAll(".app-dialog").forEach((el) => el.remove());
+
 registerScreen("welcome", mountWelcome);
 registerScreen("home", mountHome);
 registerScreen("reset-password", mountResetPassword);

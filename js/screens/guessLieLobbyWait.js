@@ -9,7 +9,7 @@ import {
 import { requireLobbyPlay } from "../core/gameGuard.js";
 import { prepGuestFollowOnSession } from "../core/mpLaunch.js";
 import { navigate } from "../core/router.js";
-import { escapeHtml, logoHtml, pageShell } from "../core/ui.js";
+import { escapeHtml, pageShell } from "../core/ui.js";
 import { bindNav } from "./nav.js";
 import { isLobbyHost, onGameSessionChange } from "../core/gameSync.js";
 
@@ -28,6 +28,10 @@ export function mountGuessLieLobbyWait(app) {
 
   function render() {
     if (launching) return;
+    if (getGuessLieSession().lobbyComplete) {
+      followIfStarted();
+      return;
+    }
 
     const session = getGuessLieSession();
     const members = getLobbyMemberNames();
@@ -84,13 +88,18 @@ export function mountGuessLieLobbyWait(app) {
 
   async function onStartClick(e) {
     const btn = e.target.closest("#btn-start");
-    if (!btn || launching || getGuessLieSession().lobbyComplete) return;
+    if (!btn || launching) return;
+    if (getGuessLieSession().lobbyComplete) {
+      followIfStarted();
+      return;
+    }
     launching = true;
     try {
       await handleGuessLieLaunch(btn);
       followIfStarted();
     } finally {
       launching = false;
+      render();
     }
   }
 

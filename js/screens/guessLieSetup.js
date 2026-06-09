@@ -1,18 +1,21 @@
 import { setLocalGuessLieSubmission } from "../core/state.js";
+import { hasLocalSubmission } from "../core/guessLieSession.js";
 import { navigate } from "../core/router.js";
-import { logoHtml, pageShell } from "../core/ui.js";
+import { pageShell } from "../core/ui.js";
 import { rulesButtonHtml } from "../core/gameRulesUi.js";
 import { bindNav } from "./nav.js";
 
 export function mountGuessLieSetup(app) {
+  if (hasLocalSubmission()) {
+    navigate("guesslie-wait", { reset: true });
+    return null;
+  }
+
   let lieIndex = null;
 
   app.innerHTML = pageShell({
     backTarget: "back",
     content: `
-      <div class="logo logo--with-img">
-        ${logoHtml({ className: "app-logo app-logo--sm" })}
-      </div>
       <p class="label-upper label-upper--green">🕵️ Guess The Lie</p>
       <div class="screen-title-row">
         <h2 class="screen-title">Prépare tes 3 affirmations</h2>
@@ -98,8 +101,13 @@ export function mountGuessLieSetup(app) {
   goBtn.addEventListener("click", async () => {
     const statements = inputs.map((el) => el.value.trim());
     if (statements.some((s) => !s) || lieIndex === null) return;
-    await setLocalGuessLieSubmission(statements, lieIndex);
-    navigate("guesslie-wait", { reset: true });
+    goBtn.disabled = true;
+    try {
+      await setLocalGuessLieSubmission(statements, lieIndex);
+      navigate("guesslie-wait", { reset: true });
+    } finally {
+      if (goBtn.isConnected) goBtn.disabled = false;
+    }
   });
 
   bindNav(app);

@@ -82,8 +82,9 @@ export function mountPlaylistGuess(app) {
   let lastScoredRoundIdx = -1;
   let lastScrollKey = "";
 
-  function scrollToTopIfNeeded(force = false) {
-    const key = `${roundIdx}:${phase}:${mp && getEffectivePlaylistGuessVotes(getPlaylistGuessSession())[localUid] != null ? "voted" : "open"}`;
+  /** Scroll en haut au début d'une manche (pas après validation du vote). */
+  function scrollToTopForRound(force = false) {
+    const key = `${roundIdx}:${phase}`;
     if (!force && key === lastScrollKey) return;
     lastScrollKey = key;
     requestAnimationFrame(() => resetPageScroll(app));
@@ -256,6 +257,7 @@ export function mountPlaylistGuess(app) {
     roundScored = false;
     revealSummary = null;
     render();
+    scrollToTopForRound(true);
   }
 
   function render() {
@@ -349,57 +351,64 @@ export function mountPlaylistGuess(app) {
       if (mp) {
         await commitPlaylistGuessVote(selected);
         render();
-        scrollToTopIfNeeded(true);
         await tryAdvanceToReveal();
       } else {
         phase = "reveal";
         await transitionToReveal();
         render();
-        scrollToTopIfNeeded(true);
       }
     });
 
     app.querySelector("#playlist-force")?.addEventListener("click", () => void forceReveal());
 
     app.querySelector("#next-round")?.addEventListener("click", () => void nextRound());
-
-    scrollToTopIfNeeded();
   }
 
   function onSyncUpdate() {
     const prevIdx = roundIdx;
     const prevPhase = phase;
     syncFromSession();
-    const advanced =
-      mp && (roundIdx !== prevIdx || (phase === "voting" && prevPhase === "reveal"));
-    if (advanced) {
+
+    const newRoundStarted = mp && roundIdx !== prevIdx;
+    const enteredVotingFromReveal = mp && phase === "voting" && prevPhase === "reveal";
+    const enteredRevealFromVoting = mp && phase === "reveal" && prevPhase === "voting";
+
+    if (newRoundStarted || enteredVotingFromReveal) {
       revealSummary = null;
-      selected = phase === "voting" ? null : selected;
+      selected = null;
+      render();
+      scrollToTopForRound(true);
+      return;
+    }
+
+    if (enteredRevealFromVoting) {
+      ensureRevealDisplay();
       render();
       return;
     }
-    if (phase === "reveal" && !revealSummary) {
-      ensureRevealDisplay();
-    }
+
     void tryAdvanceToReveal();
-    if (phase === "reveal" || phase === "voting") {
+
+    if (phase === "voting" && roundIdx === prevIdx && prevPhase === "voting") {
       refreshGameScoresBox(app, {
         gameId: "playlistguess",
         gameLabel: "VibeCheck",
         title: "Cumul des scores",
       });
-      if (phase === "voting" && roundIdx === prevIdx && prevPhase === phase) {
-        const votesNow = getEffectivePlaylistGuessVotes();
-        const forceBtn = app.querySelector("#playlist-force");
-        if (forceBtn) {
-          const votedCount = Object.keys(votesNow).length;
-          forceBtn.textContent = `Révéler maintenant (${votedCount} vote${votedCount > 1 ? "s" : ""})`;
-        }
-        const alreadyVoted = votesNow[localUid] != null;
-        if (alreadyVoted) return;
+      const votesNow = getEffectivePlaylistGuessVotes();
+      const forceBtn = app.querySelector("#playlist-force");
+      if (forceBtn) {
+        const votedCount = Object.keys(votesNow).length;
+        forceBtn.textContent = `Révéler maintenant (${votedCount} vote${votedCount > 1 ? "s" : ""})`;
       }
-      if (phase === "reveal" && revealSummary) return;
+      const alreadyVoted = mp && votesNow[localUid] != null;
+      if (alreadyVoted) return;
     }
+
+    if (phase === "reveal") {
+      ensureRevealDisplay();
+    }
+
     render();
   }
 

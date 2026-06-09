@@ -41,9 +41,8 @@ export function getGuessLieRounds() {
 
 export function getGuessLieEntryScreen() {
   if (!hasLocalSubmission()) return "guesslie-menu";
-  if (!allLobbySubmitted()) return "guesslie-wait";
-  if (!getGuessLieSession().lobbyComplete) return "guesslie-wait";
-  return "guesslie";
+  if (getGuessLieSession().lobbyComplete) return "guesslie";
+  return "guesslie-wait";
 }
 
 /** Lancement depuis le salon d'attente ou le menu (solo + MP avec secours local). */
