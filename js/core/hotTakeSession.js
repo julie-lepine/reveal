@@ -372,13 +372,12 @@ export function hotTakePrepAfterGameReset() {
   };
 }
 
-/** Fin de partie : purge les takes custom pour tout le lobby (hôte sync). */
-export async function resetHotTakeAfterGame() {
+/** Fin de partie : purge les takes custom pour tout le lobby. */
+export async function resetHotTakeAfterGame({ syncRemote = true } = {}) {
   const next = hotTakePrepAfterGameReset();
-  if (isGameSyncActive() && isLobbyHost()) {
+  saveStatePatch({ hotTakeGame: next });
+  if (syncRemote && isGameSyncActive() && isLobbyHost()) {
     await syncHotTakeSession(next);
-  } else {
-    saveStatePatch({ hotTakeGame: next });
   }
   return next;
 }

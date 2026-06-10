@@ -40,6 +40,8 @@ function defaultSession() {
     voteEndsAt: null,
     roundScored: false,
     modifier: "normal",
+    currentQuestion: null,
+    matchScores: {},
   };
 }
 

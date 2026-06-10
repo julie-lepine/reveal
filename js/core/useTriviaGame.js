@@ -1,6 +1,7 @@
 import {
   allTriviaAnswersIn,
   allTriviaReady,
+  countTriviaAnswersIn,
   applyTriviaLobbyPodium,
   buildTriviaDeck,
   buildTriviaReplaySession,
@@ -49,6 +50,7 @@ export function useTriviaGame() {
     isHost: isLocalTriviaHost,
     allReady: allTriviaReady,
     allAnswersIn: allTriviaAnswersIn,
+    countAnswersIn: countTriviaAnswersIn,
     setTheme: setTriviaTheme,
     setQuestionCount: setTriviaQuestionCount,
     setReady: setTriviaReady,

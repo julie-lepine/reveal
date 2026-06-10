@@ -13,7 +13,7 @@ import {
   startSpeedVoteRound,
 } from "../core/speedVoteSession.js";
 import { awardSpeedVoteRound } from "../core/scoring.js";
-import { gameCumulativeScoresHtml, refreshGameScoresBox } from "../core/gameScores.js";
+import { applyMatchScoreDeltas, gameCumulativeScoresHtml, refreshGameScoresBox } from "../core/gameScores.js";
 import { getLocalDisplayName, recordSpeedVotePlayed, setLastGame } from "../core/state.js";
 import { getLobbyParticipants } from "../core/lobby.js";
 import { getActivePlayers } from "../core/players.js";
@@ -95,10 +95,20 @@ export function mountSpeedVote(app) {
   function previewRoundAward() {
     const mod = getSpeedVoteModifier({ modifier });
     const { leaders } = countSpeedVoteResults(votes);
+    const pointsAwarded = SPEED_VOTE_POINTS_WINNER * mod.multiplier;
+    const deltas = {};
+    leaders.forEach((name) => {
+      deltas[name] = pointsAwarded;
+    });
     return {
       winners: leaders,
-      pointsAwarded: SPEED_VOTE_POINTS_WINNER * mod.multiplier,
+      pointsAwarded,
+      deltas,
     };
+  }
+
+  function speedVoteSessionScores() {
+    return getSpeedVoteSession().matchScores || {};
   }
 
   async function transitionToReveal() {
@@ -109,9 +119,11 @@ export function mountSpeedVote(app) {
     revealInFlight = true;
     try {
       takeScored = true;
+      let matchScores = getSpeedVoteSession().matchScores || {};
       if (!mp || isLobbyHost()) {
         const mod = getSpeedVoteModifier({ modifier });
         lastAward = awardSpeedVoteRound(votes, { multiplier: mod.multiplier });
+        matchScores = applyMatchScoreDeltas(matchScores, lastAward.deltas || {});
       } else {
         lastAward = previewRoundAward();
       }
@@ -121,6 +133,7 @@ export function mountSpeedVote(app) {
           roundScored: true,
           votes,
           voteEndsAt: null,
+          matchScores,
         },
         { withEveningScores: mp && isLobbyHost() }
       );
@@ -204,7 +217,11 @@ export function mountSpeedVote(app) {
     return `
       <h3 class="section-title">Résultats du vote</h3>
       ${awardHtml}
-      ${gameCumulativeScoresHtml({ gameLabel: "SpeedVote", title: "Cumul des scores" })}
+      ${gameCumulativeScoresHtml({
+        gameLabel: "SpeedVote",
+        title: "Cumul des scores",
+        scores: speedVoteSessionScores(),
+      })}
       ${bars}
       <div class="card card--votes">
         ${Object.entries(votes)
@@ -371,7 +388,11 @@ export function mountSpeedVote(app) {
     if (shouldSkipFullRender(prevPhase, prevRound)) {
       if (phase === "voting") patchVotingChrome();
       if (phase === "reveal") {
-        refreshGameScoresBox(app, { gameLabel: "SpeedVote", title: "Cumul des scores" });
+        refreshGameScoresBox(app, {
+          gameLabel: "SpeedVote",
+          title: "Cumul des scores",
+          scores: speedVoteSessionScores(),
+        });
       }
       return;
     }

@@ -22,6 +22,8 @@ import {
 } from "./gameSync.js";
 import { patchGameStateWithFeedback } from "./patchGameStateFeedback.js";
 import { launchGameWithSync, commitHostGamePlay, commitPrepReadyToggle } from "./mpLaunch.js";
+import { normalizeTriviaAnswersMap } from "./sessionMerge.js";
+import { playerKeyToDisplayName } from "./gameSync.js";
 
 const TRIVIA_ESTIMATE_SEC_PER_QUESTION = 40;
 
@@ -304,15 +306,46 @@ export async function commitTriviaAnswer(answerIndex) {
   return nextAnswer;
 }
 
+export function normalizeTriviaAnswers(answers = {}, players = getActivePlayerNames()) {
+  return normalizeTriviaAnswersMap(answers, players, (key) => {
+    const mapped = playerKeyToDisplayName(key);
+    if (mapped) return mapped;
+    return players.includes(String(key)) ? String(key) : null;
+  });
+}
+
+export function countTriviaAnswersIn(answers = getTriviaSession().answers) {
+  const normalized = normalizeTriviaAnswers(answers);
+  return getActivePlayerNames().filter((name) =>
+    Number.isInteger(normalized[name]?.answerIndex)
+  ).length;
+}
+
 export function getTriviaWaitingPlayers() {
-  const answers = getTriviaSession().answers || {};
-  return getActivePlayers().filter((player) => !answers[player.name]);
+  const answers = normalizeTriviaAnswers(getTriviaSession().answers || {});
+  return getActivePlayers().filter((player) => !Number.isInteger(answers[player.name]?.answerIndex));
 }
 
 export function allTriviaAnswersIn() {
-  const answers = getTriviaSession().answers || {};
+  const answers = normalizeTriviaAnswers(getTriviaSession().answers || {});
   const names = getActivePlayerNames();
-  return names.length > 0 && names.every((name) => answers[name] && Number.isInteger(answers[name].answerIndex));
+  return (
+    names.length > 0 &&
+    names.every((name) => Number.isInteger(answers[name]?.answerIndex))
+  );
+}
+
+function pickFastestTriviaPlayer(correctEntries) {
+  const timed = correctEntries.filter(
+    ([, answer]) => typeof answer?.answeredAt === "number" && Number.isFinite(answer.answeredAt)
+  );
+  if (!timed.length) return null;
+  timed.sort(([, a], [, b]) => a.answeredAt - b.answeredAt);
+  const best = timed[0][1].answeredAt;
+  const tied = timed.filter(([, a]) => a.answeredAt === best);
+  if (tied.length === 1) return tied[0][0];
+  const pick = tied[Math.floor(Math.random() * tied.length)];
+  return pick[0];
 }
 
 export function scoreTriviaRound(session = getTriviaSession()) {
@@ -329,17 +362,13 @@ export function scoreTriviaRound(session = getTriviaSession()) {
     };
   }
 
-  const answerEntries = Object.entries(session.answers || {}).filter(([, answer]) =>
+  const normalizedAnswers = normalizeTriviaAnswers(session.answers || {});
+  const answerEntries = Object.entries(normalizedAnswers).filter(([, answer]) =>
     Number.isInteger(answer?.answerIndex)
   );
   const correctEntries = answerEntries.filter(([, answer]) => answer.answerIndex === question.correct);
-  correctEntries.sort(
-    ([nameA, answerA], [nameB, answerB]) =>
-      (answerA?.answeredAt || Number.MAX_SAFE_INTEGER) -
-        (answerB?.answeredAt || Number.MAX_SAFE_INTEGER) || nameA.localeCompare(nameB)
-  );
 
-  const fastestPlayer = correctEntries[0]?.[0] || null;
+  const fastestPlayer = pickFastestTriviaPlayer(correctEntries);
   const deltas = {};
 
   correctEntries.forEach(([name]) => {
@@ -354,6 +383,7 @@ export function scoreTriviaRound(session = getTriviaSession()) {
 
   return {
     ...session,
+    answers: normalizedAnswers,
     questionScored: true,
     matchScores: currentScores,
     lastRound: {

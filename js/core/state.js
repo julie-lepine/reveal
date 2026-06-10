@@ -124,6 +124,7 @@ const defaultState = () => ({
     roundScored: false,
     modifier: "normal",
     currentQuestion: null,
+    matchScores: {},
   },
   traitreGame: {
     ready: {},
@@ -618,6 +619,15 @@ export function setLastGame(result) {
 
 export function getLastGame() {
   return state.lastGame;
+}
+
+/** Garde la fin de partie la plus récente (évite qu'un ancien lastGame écrase le dernier jeu). */
+export function mergeLastGameRecord(local, remote) {
+  if (!remote) return local ?? null;
+  if (!local) return remote;
+  const localAt = Number(local.at) || 0;
+  const remoteAt = Number(remote.at) || 0;
+  return remoteAt >= localAt ? remote : local;
 }
 
 /** Incrémente les stats de fin de partie une seule fois par gameId et par soirée. */

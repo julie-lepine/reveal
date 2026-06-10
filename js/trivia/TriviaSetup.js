@@ -1,5 +1,6 @@
 import { escapeHtml } from "../core/ui.js";
 import { rulesButtonHtml } from "../core/gameRulesUi.js";
+import { prepStartSlotHtml } from "../core/prepScreen.js";
 
 export function renderTriviaSetup({
   themeId,
@@ -86,10 +87,11 @@ export function renderTriviaSetup({
     </button>
 
     <div id="trivia-start-slot">
-      ${
-        allReady
-          ? `<button type="button" class="btn btn-primary btn--spaced" id="btn-trivia-start">Lancer le quiz</button>`
-          : '<button type="button" class="btn btn-secondary btn--spaced" disabled>En attente des joueurs…</button>'
-      }
+      ${prepStartSlotHtml({
+        allReady,
+        isHost,
+        launchLabel: "Lancer le quiz",
+        startButtonId: "btn-trivia-start",
+      })}
     </div>`;
 }

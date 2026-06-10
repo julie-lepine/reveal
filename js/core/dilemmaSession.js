@@ -277,13 +277,12 @@ export function dilemmaPrepAfterGameReset() {
   };
 }
 
-/** Fin de partie : purge les dilemmes custom pour tout le lobby (hôte sync). */
-export async function resetDilemmaAfterGame() {
+/** Fin de partie : purge les dilemmes custom pour tout le lobby. */
+export async function resetDilemmaAfterGame({ syncRemote = true } = {}) {
   const next = dilemmaPrepAfterGameReset();
-  if (isGameSyncActive() && isLobbyHost()) {
+  saveStatePatch({ dilemmaGame: next });
+  if (syncRemote && isGameSyncActive() && isLobbyHost()) {
     await syncDilemmaSession(next);
-  } else {
-    saveStatePatch({ dilemmaGame: next });
   }
   return next;
 }

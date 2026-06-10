@@ -359,9 +359,7 @@ export function mountTrivia(app) {
 
     let phaseHtml = "";
     if (phase === "question") {
-      const answeredCount = Object.values(answers).filter(
-        (a) => a && Number.isInteger(a.answerIndex)
-      ).length;
+      const answeredCount = trivia.countAnswersIn();
       const totalPlayers = getActivePlayers().length;
       phaseHtml = `
         ${renderTriviaQuestion({
@@ -419,6 +417,7 @@ export function mountTrivia(app) {
       phaseHtml = renderTriviaResults({
         standings,
         themeLabel: getTriviaThemeLabel(session.selectedThemeId),
+        showHostActions: !mp || isLobbyHost(),
       });
     }
 
@@ -543,9 +542,7 @@ export function mountTrivia(app) {
         deltaMap: phase === "reveal" ? lastRound?.deltas || {} : {},
       });
     }
-    const answeredCount = Object.values(answers).filter(
-      (a) => a && Number.isInteger(a.answerIndex)
-    ).length;
+    const answeredCount = trivia.countAnswersIn();
     const forceBtn = app.querySelector("#btn-trivia-force");
     if (forceBtn) {
       forceBtn.textContent = `Révéler maintenant (${answeredCount}/${getActivePlayers().length})`;

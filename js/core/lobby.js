@@ -45,6 +45,10 @@ import {
   clearSessionRouteSuppress,
   isSessionRouteSuppressed,
   getCachedGameSession,
+  getEffectiveSessionScreen,
+  isActiveGameSessionScreen,
+  isOnGameSetupScreen,
+  returnToGameSelect,
   // getFilRougeResumeScreen,
   routeToSessionScreen,
 } from "./gameSync.js";
@@ -298,22 +302,43 @@ export function goToLobby() {
   navigate("lobby", { navStack: ["home", "lobby"] });
 }
 
-/** Accueil / paramètres → menu jeux (ne force pas la reprise d’une partie en cours). */
+/**
+ * Après join / rejoin : partie ou prep en cours → jeu ; soirée lancée → menu jeux ; sinon → lobby.
+ */
+export async function navigateAfterLobbyJoin() {
+  if (!hasActiveLobby()) {
+    navigate("home", { reset: true });
+    return;
+  }
+  clearSessionRouteSuppress();
+  await routeToEveningHub({ rejoinActiveGame: true });
+}
+
+/** Menu jeux (action volontaire) : n’y reprend pas une partie en cours. */
 export async function returnToEveningGames() {
   if (!hasActiveLobby()) {
     navigate("home", { reset: true });
     return;
   }
 
-  clearSessionRouteSuppress();
-  await routeToEveningHub();
+  if (isGameSyncActive()) {
+    startMultiplayerSync();
+    const row = await refreshGameSession();
+    const screen = row ? getEffectiveSessionScreen(row) : null;
+    if (screen && (isActiveGameSessionScreen(screen) || isOnGameSetupScreen(screen))) {
+      await returnToGameSelect();
+      return;
+    }
+  }
+
+  await routeToEveningHub({ rejoinActiveGame: false });
 }
 
 export async function goToGameSelect() {
   await returnToEveningGames();
 }
 
-export async function routeToEveningHub() {
+export async function routeToEveningHub({ rejoinActiveGame = true } = {}) {
   if (!hasActiveLobby()) return false;
 
   saveStatePatch({ inLobby: true });
@@ -330,7 +355,7 @@ export async function routeToEveningHub() {
   if (isGameSyncActive()) {
     startMultiplayerSync();
     const row = await refreshGameSession();
-    if (await routeToActiveGameIfNeeded(row)) return true;
+    if (rejoinActiveGame && (await routeToActiveGameIfNeeded(row))) return true;
     // FIL_ROUGE (Mot interdit) — reprise setup/mission désactivée
     // const frScreen = getFilRougeResumeScreen();
     // if (frScreen) {

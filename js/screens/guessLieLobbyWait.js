@@ -7,6 +7,7 @@ import {
   handleGuessLieLaunch,
 } from "../core/guessLieSession.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
+import { isValidGuessLieSubmission } from "../core/sessionMerge.js";
 import { prepGuestFollowOnSession } from "../core/mpLaunch.js";
 import { navigate } from "../core/router.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
@@ -50,7 +51,7 @@ export function mountGuessLieLobbyWait(app) {
         <div class="card">
           ${members
             .map((name) => {
-              const ready = Boolean(session.submissions[name]);
+              const ready = isValidGuessLieSubmission(session.submissions[name]);
               return `
             <div class="lobby-player ${ready ? "lobby-player--ready" : ""}">
               <span class="lobby-player__status">${ready ? "✓" : "…"}</span>

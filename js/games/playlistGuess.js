@@ -33,6 +33,7 @@ import {
   isLobbyHost,
   onGameSessionChange,
   completeGameSession,
+  getCachedGameSession,
 } from "../core/gameSync.js";
 import { songGuessCardHtml } from "../playlistguess/SongGuessCard.js";
 import { revealResultCardHtml } from "../playlistguess/RevealOwnerCard.js";
@@ -364,10 +365,34 @@ export function mountPlaylistGuess(app) {
     app.querySelector("#next-round")?.addEventListener("click", () => void nextRound());
   }
 
+  /** Filet si le cache session a avancé avant playlistGuessGame local (sync Realtime / merge). */
+  function reconcilePhaseFromCachedSession() {
+    if (!mp) return;
+    const remote = getCachedGameSession()?.state?.playlistGuess;
+    if (!remote?.phase || remote.phase === phase) return;
+    phase = remote.phase;
+    if (remote.roundIdx != null) roundIdx = remote.roundIdx;
+    if (remote.phase === "reveal") {
+      roundScored = Boolean(remote.roundScored);
+    } else if (remote.phase === "voting") {
+      roundScored =
+        Boolean(remote.roundScored) && Object.keys(remote.votes || {}).length > 0
+          ? Boolean(remote.roundScored)
+          : false;
+    }
+  }
+
   function onSyncUpdate() {
+    const row = getCachedGameSession();
+    if (row?.screen === "results" && mp && !isLobbyHost()) {
+      navigate("results", { navStack: ["home", "lobby", "game-select", "results"] });
+      return;
+    }
+
     const prevIdx = roundIdx;
     const prevPhase = phase;
     syncFromSession();
+    reconcilePhaseFromCachedSession();
 
     const newRoundStarted = mp && roundIdx !== prevIdx;
     const enteredVotingFromReveal = mp && phase === "voting" && prevPhase === "reveal";

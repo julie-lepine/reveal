@@ -208,6 +208,27 @@ export async function commitTruthMeterPlay(patch, patchOpts = {}) {
   });
 }
 
+/** Soumission affirmation auteur : hôte via commitHostGamePlay, invité via patch étroit. */
+export async function commitTruthMeterAffirmation(text, authorEstimate) {
+  const localName = getLocalDisplayName();
+  const patch = {
+    affirmation: { text, author: localName },
+    authorEstimate,
+    phase: "display",
+    votes: {},
+    roundScored: false,
+  };
+  if (isGameSyncActive() && isLobbyHost()) {
+    return commitTruthMeterPlay(patch);
+  }
+  const session = getTruthMeterSession();
+  const next = { ...session, ...patch };
+  saveStatePatch({ truthMeterGame: next });
+  if (!isGameSyncActive()) return next;
+  await patchGameStateWithFeedback({ truthMeter: patch });
+  return next;
+}
+
 /** MP : envoie uniquement le vote local (évite d'écraser phase reveal de l'hôte). */
 export async function commitTruthMeterVote(choice) {
   const localName = getLocalDisplayName();

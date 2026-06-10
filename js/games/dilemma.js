@@ -34,6 +34,7 @@ import {
   onGameSessionChange,
   completeGameSession,
   dilemmaToRemote,
+  getCachedGameSession,
 } from "../core/gameSync.js";
 
 const DILEMMA_VS_SRC = "js/games/dilemma-vs.svg";
@@ -203,7 +204,7 @@ export function mountDilemma(app) {
         title: "Dilemma",
         summary: `${total} dilemmes · dernière manche ${pctA}% option A`,
       });
-      const resetDm = await resetDilemmaAfterGame();
+      const resetDm = await resetDilemmaAfterGame({ syncRemote: false });
       if (mp) {
         try {
           await completeGameSession({
@@ -452,6 +453,12 @@ export function mountDilemma(app) {
   }
 
   const unsub = onGameSessionChange(() => {
+    const row = getCachedGameSession();
+    if (row?.screen === "results" && mp && !isLobbyHost()) {
+      navigate("results", { navStack: ["home", "lobby", "game-select", "results"] });
+      return;
+    }
+
     const prevPhase = phase;
     const prevRound = roundIdx;
     syncFromSession();

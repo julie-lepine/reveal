@@ -15,6 +15,7 @@
  */
 import {
   DEFAULT_SYNC_PATCH_TIMEOUT_MS,
+  getCachedGameSession,
   isGameSyncActive,
   isLobbyHost,
   patchGameState,
@@ -157,6 +158,17 @@ export function navigateAfterGameLaunch({
  */
 export function prepGuestFollowOnSession({ prepScreen, getEntryScreen, buildNavStack }) {
   return () => {
+    if (isGameSyncActive() && !isLobbyHost()) {
+      const row = getCachedGameSession();
+      if (row?.screen === "results") {
+        navigate("results", { navStack: ["home", "lobby", "game-select", "results"] });
+        return true;
+      }
+      if (row?.screen === "leaderboard") {
+        navigate("leaderboard", { navStack: ["home", "lobby", "game-select", "leaderboard"] });
+        return true;
+      }
+    }
     const entry = getEntryScreen();
     if (entry === prepScreen) return false;
     navigate(entry, buildNavStack ? { navStack: buildNavStack(entry) } : { reset: true });

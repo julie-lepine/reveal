@@ -19,6 +19,7 @@ import {
   getLobby,
   isLobbyEveningStarted,
   returnToEveningGames,
+  navigateAfterLobbyJoin,
   confirmAndLeaveLobby,
   reconcileLobbyMembership,
   resetAppToCleanHome,
@@ -716,7 +717,7 @@ export function mountHome(app) {
           await showAppAlert(res.error, { title: "Rejoindre le lobby", icon: "⚠️" });
           return;
         }
-        navigate("lobby");
+        await navigateAfterLobbyJoin();
       } catch (err) {
         await showAppAlert(err?.message || "Impossible de rejoindre le lobby.", {
           title: "Rejoindre le lobby",
@@ -767,7 +768,7 @@ export function mountHome(app) {
           scheduleRender(true);
           return;
         }
-        navigate("lobby");
+        await navigateAfterLobbyJoin();
       } catch (err) {
         btn.disabled = false;
         const msg = err?.message || "Impossible de rejoindre le lobby.";

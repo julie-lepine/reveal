@@ -4,10 +4,13 @@ import {
   getLocalDisplayName,
   getState,
   saveStatePatch,
+  setLastGame,
+  mergeLastGameRecord,
   recordTierNightPlayed,
   resetGameSessionsOnly,
   defaultEveningStats,
 } from "./state.js";
+import { GAMES } from "../../data/games.js";
 import { navigate, getCurrentScreen } from "./router.js";
 import { getLobbyParticipants, getLobbyStatus } from "./lobby.js";
 import { getActivePlayerNames, getActivePlayers } from "./players.js";
@@ -36,9 +39,10 @@ import {
   isVotesOnlyGamePatch,
   isAnswersOnlyGamePatch,
   mergeGuessLieSubmissions,
+  isGuessLieLobbyReset,
   mergeConsensusPhase,
-  pickLatestTriviaAnswer,
   mergeTriviaAnswersUid,
+  normalizeTriviaAnswersMap,
   isNewConsensusQuestionRound,
   mergeCustomGameDeck,
   normalizePlayerKeyedMap,
@@ -128,6 +132,57 @@ const MENU_SCREENS = new Set(["home", "lobby", "game-select", "settings"]);
 export const POST_GAME_SCREENS = new Set(["results", "leaderboard"]);
 export const DEFAULT_SYNC_PATCH_TIMEOUT_MS = SYNC_PATCH_TIMEOUT_MS;
 
+const RESTARTABLE_SESSION_GAME_IDS = new Set([
+  "traitre",
+  "hottake",
+  "speedvote",
+  "trivia",
+  "truthmeter",
+  "consensus",
+  "dilemma",
+  "guesslie",
+  "playlistguess",
+  "tiernight",
+]);
+
+const SESSION_GAME_ID_TO_TILE = {
+  traitre: "traitre-prep",
+  hottake: "hottake-prep",
+  speedvote: "speedvote-prep",
+  trivia: "trivia-prep",
+  truthmeter: "truthmeter-prep",
+  consensus: "consensus-prep",
+  dilemma: "dilemma-prep",
+  guesslie: "guesslie",
+  playlistguess: "playlistguess-prep",
+  tiernight: "tiernight-select",
+};
+
+function titleForSessionGameId(gameId) {
+  const tileId = SESSION_GAME_ID_TO_TILE[gameId];
+  const catalog = GAMES.find((g) => g.id === tileId);
+  return catalog?.title || gameId;
+}
+
+/** Filet : écran résultats + game_id session si lastGame distant est obsolète. */
+function syncLastGameFromSessionRow(row) {
+  const gameId = row?.game_id;
+  if (!gameId || !RESTARTABLE_SESSION_GAME_IDS.has(gameId)) return;
+  if (!row.screen || !POST_GAME_SCREENS.has(row.screen)) return;
+
+  const remoteLast = row.state?.lastGame;
+  const local = getState().lastGame;
+  if (remoteLast?.gameId === gameId) return;
+
+  if (!local || local.gameId !== gameId) {
+    setLastGame({
+      gameId,
+      title: titleForSessionGameId(gameId),
+      summary: remoteLast?.gameId === gameId ? remoteLast.summary || "" : "",
+    });
+  }
+}
+
 export function withPatchTimeout(promise, ms = DEFAULT_SYNC_PATCH_TIMEOUT_MS, message) {
   if (!ms || ms <= 0) return promise;
   return Promise.race([
@@ -210,6 +265,9 @@ export function isGameSyncActive() {
 }
 
 export function isLobbyHost() {
+  const uid = getSupabaseUserId();
+  const hostId = getState().lobby?.hostId;
+  if (uid && hostId) return uid === hostId;
   const local = getState().lobby?.participants?.find((p) => p.isLocal);
   return Boolean(local?.isHost);
 }
@@ -299,7 +357,20 @@ export function isOnGameSetupScreen(screen = getCurrentScreen()) {
 /** Hub soirée : pas de traction automatique des invités. */
 function isSessionHubScreen(screen) {
   if (!screen) return false;
-  return screen === "game-select" || screen === "lobby" || POST_GAME_SCREENS.has(screen);
+  if (screen === "game-select" || screen === "lobby") return true;
+  if (POST_GAME_SCREENS.has(screen)) {
+    // Invité en partie ou en prépa : suit l'hôte vers résultats / classement.
+    if (
+      isGameSyncActive() &&
+      !isLobbyHost() &&
+      (isActiveGameSessionScreen(getCurrentScreen()) ||
+        isOnGameSetupScreen(getCurrentScreen()))
+    ) {
+      return false;
+    }
+    return true;
+  }
+  return false;
 }
 
 /** Paramétrage ou partie active : l'invité doit suivre l'hôte. */
@@ -406,18 +477,23 @@ function mapVotesByUid(votesByName = {}) {
   return out;
 }
 
-function mapTriviaAnswersByName(answersByUid = {}) {
-  const out = {};
-  Object.entries(answersByUid).forEach(([uid, val]) => {
-    const name = nameForUserId(uid) || uid;
-    if (val && Number.isInteger(val.answerIndex)) {
-      out[name] = {
-        answerIndex: val.answerIndex,
-        answeredAt: val.answeredAt || null,
-      };
-    }
+function normalizeTriviaAnswersForPlayers(answers = {}) {
+  const players = getActivePlayerNames();
+  return normalizeTriviaAnswersMap(answers, players, (key) => {
+    const mapped = playerKeyToDisplayName(key);
+    if (mapped) return mapped;
+    return players.includes(String(key)) ? String(key) : null;
   });
-  return out;
+}
+
+function mapTriviaAnswersByName(answersByUid = {}) {
+  return normalizeTriviaAnswersForPlayers(
+    Object.fromEntries(
+      Object.entries(answersByUid).filter(
+        ([, val]) => val && Number.isInteger(val.answerIndex)
+      )
+    )
+  );
 }
 
 function mapTriviaAnswersByUid(answersByName = {}) {
@@ -669,6 +745,7 @@ function mergeSpeedVoteGameLocal(local, remote) {
     votes,
     ready,
     roundScored: mergeRoundFlag(local.roundScored, remote.roundScored, newVoteRound),
+    matchScores: mergeMatchScoresLocal(local.matchScores || {}, remote.matchScores || {}),
   };
 }
 
@@ -793,10 +870,7 @@ function mergeTriviaGameLocal(local, remote) {
     remote.phase === "reveal" ||
     remote.phase === "final"
   ) {
-    answers = { ...remoteAnswers };
-    const me = getLocalDisplayName();
-    const mergedLocal = pickLatestTriviaAnswer(localAnswers[me], remoteAnswers[me]);
-    if (mergedLocal) answers[me] = mergedLocal;
+    answers = normalizeTriviaAnswersForPlayers({ ...localAnswers, ...remoteAnswers });
   }
   const ready =
     !remote.lobbyStarted && !local.lobbyStarted
@@ -944,6 +1018,8 @@ function mergeGuessLieGameLocal(local, remote) {
   if (!remote) return local;
   if (!local) return remote;
   const newVoteRound = isNewGuessLieVoteRound(local, remote);
+  const lobbyReset = isGuessLieLobbyReset(remote);
+  const inPrep = !remote.lobbyComplete && remote.phase == null;
   const remoteVotes = remote.votes || {};
   const localVotes = local.votes || {};
   let votes = remoteVotes;
@@ -960,14 +1036,20 @@ function mergeGuessLieGameLocal(local, remote) {
     ...local,
     ...remote,
     sessionId: remote.sessionId ?? local.sessionId ?? getState().lobbyCode ?? null,
-    submissions: mergeGuessLieSubmissions(local.submissions, remote.submissions),
+    submissions: mergeGuessLieSubmissions(local.submissions, remote.submissions, {
+      reset: lobbyReset,
+      prepPhase: inPrep && !lobbyReset,
+      localName: getLocalDisplayName(),
+    }),
     phase: newVoteRound
       ? (remote.phase ?? local.phase)
       : mergeForwardGamePhase(local.phase, remote.phase),
     votes,
     roundScored: mergeRoundFlag(local.roundScored, remote.roundScored, newVoteRound),
     statsRecordedRoundIdx: mergeMaxIndex(local.statsRecordedRoundIdx, remote.statsRecordedRoundIdx),
-    lobbyComplete: Boolean(local.lobbyComplete || remote.lobbyComplete),
+    lobbyComplete: inPrep
+      ? Boolean(remote.lobbyComplete)
+      : Boolean(local.lobbyComplete || remote.lobbyComplete),
   };
 }
 
@@ -1301,6 +1383,7 @@ export function speedVoteToRemote(session) {
     voteEndsAt: session.voteEndsAt || null,
     roundScored: Boolean(session.roundScored),
     modifier: session.modifier || "normal",
+    matchScores: scoresToRemote(session.matchScores || {}),
   };
 }
 
@@ -1518,6 +1601,7 @@ export function speedVoteFromRemote(remote) {
     voteEndsAt: remote.voteEndsAt || null,
     roundScored: Boolean(remote.roundScored),
     modifier: remote.modifier || "normal",
+    matchScores: scoresFromRemote(remote.matchScores || {}),
   };
 }
 
@@ -1689,6 +1773,9 @@ function mergePlaylistGuessGameLocal(local, remote) {
   return {
     ...local,
     ...remote,
+    phase: newVoteRound
+      ? (remote.phase ?? local.phase)
+      : mergeForwardGamePhase(local.phase, remote.phase),
     votes,
     ready,
     roundScored,
@@ -1943,7 +2030,7 @@ export function applyRemoteEveningState(st) {
     patch.stats = mergeEveningStats(getState().stats, st.stats);
   }
   if (st.lastGame !== undefined) {
-    patch.lastGame = st.lastGame;
+    patch.lastGame = mergeLastGameRecord(getState().lastGame, st.lastGame);
   }
   if (st.lastTierName && getState().tierNightGame) {
     patch.tierNightGame = { ...getState().tierNightGame, listName: st.lastTierName };
@@ -2012,6 +2099,7 @@ export function applyRemoteSession(row) {
   }
 
   const patch = {};
+  const prevPgPhase = getState().playlistGuessGame?.phase ?? null;
   const st = { ...(row.state || {}) };
   if (!FIL_ROUGE_ENABLED) {
     delete st.filRouge;
@@ -2094,11 +2182,16 @@ export function applyRemoteSession(row) {
     patch.filRougeGame = local ? mergeFilRougeLocal(local, remote) : remote;
   }
 
+  const pgPhaseChanged =
+    patch.playlistGuessGame?.phase != null &&
+    patch.playlistGuessGame.phase !== prevPgPhase;
+
   if (Object.keys(patch).length) saveStatePatch(patch);
 
   applyRemoteEveningState(st);
+  syncLastGameFromSessionRow(row);
 
-  if (sigUnchanged) return;
+  if (sigUnchanged && !pgPhaseChanged) return;
 
   notify(row);
 
@@ -2734,6 +2827,12 @@ async function patchGameStateInner(
           roundScored: mergeRoundFlag(curSv.roundScored, incSv.roundScored, newSvVote),
         }
       : incSv;
+    if (curSv && incSv && nextState.speedVote) {
+      nextState.speedVote.matchScores = mergeRemoteMatchScoresUid(
+        curSv.matchScores || {},
+        incSv.matchScores || {}
+      );
+    }
   }
   if (mergePayload.traitre) {
     const curTr = current.traitre;
@@ -2868,13 +2967,19 @@ async function patchGameStateInner(
       };
     } else {
     const newGlRound = curGl && incGl ? isNewGuessLieVoteRound(curGl, incGl) : false;
+    let mergedSubmissions = curGl?.submissions;
+    if (incGl?.submissions !== undefined) {
+      if (isGuessLieLobbyReset(incGl)) {
+        mergedSubmissions = {};
+      } else if (Object.keys(incGl.submissions || {}).length > 0) {
+        mergedSubmissions = { ...(curGl.submissions || {}), ...(incGl.submissions || {}) };
+      }
+    }
     nextState.guessLie = curGl
       ? {
           ...curGl,
           ...incGl,
-          submissions: incGl.submissions
-            ? { ...(curGl.submissions || {}), ...(incGl.submissions || {}) }
-            : curGl.submissions,
+          submissions: mergedSubmissions,
           phase: newGlRound
             ? (incGl.phase ?? curGl.phase)
             : mergeForwardGamePhase(curGl.phase, incGl.phase),

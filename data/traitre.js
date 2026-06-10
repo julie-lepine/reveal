@@ -9,8 +9,7 @@ export const TRAITRE_POINTS = {
 };
 
 export const TRAITRE_WORD_PAIRS = [
-  [
-    { id: "social_1", a: "TikTok", b: "Instagram", theme: "réseaux sociaux" },
+  { id: "social_1", a: "TikTok", b: "Instagram", theme: "réseaux sociaux" },
     { id: "social_2", a: "Snapchat", b: "BeReal", theme: "réseaux sociaux" },
     { id: "social_3", a: "Discord", b: "WhatsApp", theme: "messagerie" },
     { id: "social_4", a: "Reel", b: "Story", theme: "formats de contenu" },
@@ -73,8 +72,7 @@ export const TRAITRE_WORD_PAIRS = [
     { id: "culture_3", a: "Emoji", b: "Sticker", theme: "communication numérique" },
     { id: "culture_4", a: "Croissant", b: "Pain au chocolat", theme: "viennoiseries" },
     { id: "culture_5", a: "Pokémon", b: "Palworld", theme: "créatures de collection" },
-    { id: "culture_6", a: "Air Fryer", b: "Thermomix", theme: "électroménager tendance" }
-  ]  
+  { id: "culture_6", a: "Air Fryer", b: "Thermomix", theme: "électroménager tendance" },
 ];
 
 export function getTraitrePairById(id) {

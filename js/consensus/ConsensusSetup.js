@@ -1,5 +1,6 @@
 import { escapeHtml } from "../core/ui.js";
 import { rulesButtonHtml } from "../core/gameRulesUi.js";
+import { prepStartSlotHtml } from "../core/prepScreen.js";
 
 export function renderConsensusSetup({
   questionCount,
@@ -64,10 +65,11 @@ export function renderConsensusSetup({
     </button>
 
     <div id="consensus-start-slot">
-      ${
-        allReady
-          ? `<button type="button" class="btn btn-primary btn--spaced" id="btn-consensus-start">Lancer Consensus</button>`
-          : '<button type="button" class="btn btn-secondary btn--spaced" disabled>En attente des joueurs…</button>'
-      }
+      ${prepStartSlotHtml({
+        allReady,
+        isHost,
+        launchLabel: "Lancer Consensus",
+        startButtonId: "btn-consensus-start",
+      })}
     </div>`;
 }

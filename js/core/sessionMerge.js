@@ -125,11 +125,54 @@ export function isSubmissionsOnlyGamePatch(inc = {}) {
   return keys.length === 1 && keys[0] === "submissions";
 }
 
-/** Soumissions Guess The Lie : union locale + remote (ne jamais perdre une entrée valide). */
-export function mergeGuessLieSubmissions(localSubs = {}, remoteSubs = {}) {
+/** Soumission Guess The Lie complète (3 affirmations + mensonge). */
+export function isValidGuessLieSubmission(sub) {
+  if (!sub || !Array.isArray(sub.statements)) return false;
+  if (sub.statements.length < 3) return false;
+  if (!sub.statements.every((s) => String(s || "").trim())) return false;
+  const lie = sub.lie;
+  return Number.isInteger(lie) && lie >= 0 && lie <= 2;
+}
+
+/** Relance prep : soumissions vides côté serveur, partie pas encore démarrée. */
+export function isGuessLieLobbyReset(state) {
+  if (!state) return false;
+  if (state.lobbyComplete) return false;
+  if (state.phase != null && state.phase !== "idle") return false;
+  if (state.submissions === undefined) return false;
+  return Object.keys(state.submissions || {}).length === 0;
+}
+
+/**
+ * Soumissions Guess The Lie.
+ * - reset : purge locale (nouvelle partie)
+ * - prepPhase : le serveur fait foi ; garde la soumission locale optimiste du joueur courant
+ * - sinon (partie en cours) : union
+ */
+export function mergeGuessLieSubmissions(localSubs = {}, remoteSubs = {}, opts = {}) {
+  const { reset = false, prepPhase = false, localName = null } = opts;
+  if (reset) return {};
+
+  if (prepPhase) {
+    const out = {};
+    Object.entries(remoteSubs).forEach(([name, val]) => {
+      if (isValidGuessLieSubmission(val)) out[name] = val;
+    });
+    if (localName) {
+      const localEntry = localSubs[localName];
+      if (
+        isValidGuessLieSubmission(localEntry) &&
+        !isValidGuessLieSubmission(remoteSubs[localName])
+      ) {
+        out[localName] = localEntry;
+      }
+    }
+    return out;
+  }
+
   const out = { ...localSubs };
   Object.entries(remoteSubs).forEach(([name, val]) => {
-    if (val) out[name] = val;
+    if (isValidGuessLieSubmission(val)) out[name] = val;
   });
   return out;
 }
@@ -223,13 +266,38 @@ export function mergeTriviaPhase(curPhase, incPhase, { newQuestionRound = false 
   return incRank >= curRank ? incPhase : curPhase;
 }
 
+function triviaAnswerTimestamp(answer) {
+  const ts = answer?.answeredAt;
+  return typeof ts === "number" && Number.isFinite(ts) ? ts : null;
+}
+
 /** Garde la réponse la plus récente (changement de réponse en phase question). */
 export function pickLatestTriviaAnswer(localAnswer, remoteAnswer) {
   if (!localAnswer) return remoteAnswer || null;
   if (!remoteAnswer) return localAnswer;
-  return (remoteAnswer.answeredAt || 0) >= (localAnswer.answeredAt || 0)
-    ? remoteAnswer
-    : localAnswer;
+  const localAt = triviaAnswerTimestamp(localAnswer);
+  const remoteAt = triviaAnswerTimestamp(remoteAnswer);
+  if (localAt == null) return remoteAnswer;
+  if (remoteAt == null) return localAnswer;
+  return remoteAt >= localAt ? remoteAnswer : localAnswer;
+}
+
+/** Réponses trivia (uid ou pseudo) → clés = pseudos actifs ; garde la plus récente par joueur. */
+export function normalizeTriviaAnswersMap(answers = {}, players = [], resolveKey = (k) => k) {
+  const playerSet = new Set(players.map(String));
+  const out = {};
+  for (const [key, val] of Object.entries(answers)) {
+    if (!val || !Number.isInteger(val.answerIndex)) continue;
+    const resolved = resolveKey(key);
+    const name = resolved != null ? String(resolved) : "";
+    if (!name || !playerSet.has(name)) continue;
+    const next = {
+      answerIndex: val.answerIndex,
+      answeredAt: triviaAnswerTimestamp(val),
+    };
+    out[name] = pickLatestTriviaAnswer(out[name], next);
+  }
+  return out;
 }
 
 export function mergeTriviaAnswersUid(curAnswers = {}, incAnswers = {}) {

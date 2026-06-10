@@ -38,6 +38,7 @@ import {
   onGameSessionChange,
   completeGameSession,
   hotTakeToRemote,
+  getCachedGameSession,
 } from "../core/gameSync.js";
 
 export function mountHotTake(app) {
@@ -484,7 +485,7 @@ export function mountHotTake(app) {
           title: "Hot Take",
           summary: `${total} prises · dernière majorité : ${lastAward?.majority || "-"}`,
         });
-        const resetHt = await resetHotTakeAfterGame();
+        const resetHt = await resetHotTakeAfterGame({ syncRemote: false });
         if (mp) {
           try {
             await completeGameSession({
@@ -519,6 +520,12 @@ export function mountHotTake(app) {
   }
 
   const unsubGame = onGameSessionChange(() => {
+    const row = getCachedGameSession();
+    if (row?.screen === "results" && mp && !isLobbyHost()) {
+      navigate("results", { navStack: ["home", "lobby", "game-select", "results"] });
+      return;
+    }
+
     const prevPhase = phase;
     const prevTake = takeIdx;
     syncFromSession();

@@ -51,7 +51,7 @@ function isLobbyGoneError(e) {
   );
 }
 
-/** Reprend une partie en cours après join / create (retry court). */
+/** Charge la session de jeu en cours après join / create (sans router — voir navigateAfterLobbyJoin). */
 async function restoreActiveGameSessionOnJoin(lobbyId) {
   const delays = [0, 400, 1200];
   for (const ms of delays) {
@@ -60,7 +60,6 @@ async function restoreActiveGameSessionOnJoin(lobbyId) {
       const gameRow = await fetchGameSessionByLobby(lobbyId);
       if (gameRow) {
         applyRemoteSession(gameRow);
-        handleSessionRoute(gameRow);
         return true;
       }
     } catch (e) {

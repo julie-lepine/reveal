@@ -3,6 +3,8 @@ import { getLastGame, getState, saveStatePatch } from "./state.js";
 import {
   isGameSyncActive,
   isLobbyHost,
+  getCachedGameSession,
+  POST_GAME_SCREENS,
   startGameSession,
   hotTakeToRemote,
   traitreToRemote,
@@ -341,7 +343,34 @@ export async function restartGame(gameId) {
   await fn();
 }
 
-export function eveningRecapRestartButtonHtml(lastGame = getLastGame()) {
+/** lastGame local + filet session multijoueur (game_id sur écran résultats). */
+export function resolveLastGameForRestart() {
+  const last = getLastGame();
+  if (!isGameSyncActive()) return last;
+
+  const row = getCachedGameSession();
+  const sessionGameId = row?.game_id;
+  if (
+    !sessionGameId ||
+    !RESTART_HANDLERS[sessionGameId] ||
+    !row.screen ||
+    !POST_GAME_SCREENS.has(row.screen)
+  ) {
+    return last;
+  }
+
+  if (!last || last.gameId !== sessionGameId) {
+    return {
+      gameId: sessionGameId,
+      title: getRestartableGameTitle(sessionGameId),
+      summary: last?.gameId === sessionGameId ? last.summary || "" : "",
+    };
+  }
+
+  return last;
+}
+
+export function eveningRecapRestartButtonHtml(lastGame = resolveLastGameForRestart()) {
   if (!lastGame?.gameId || !RESTART_HANDLERS[lastGame.gameId]) return "";
   const title = getRestartableGameTitle(lastGame.gameId, lastGame.title);
   return `<button type="button" class="btn btn-secondary evening-recap__restart" data-restart-game="${escapeHtml(lastGame.gameId)}">Recommencer une partie de ${escapeHtml(title)}</button>`;

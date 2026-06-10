@@ -66,9 +66,13 @@ export function awardSpeedVoteRound(votes, { multiplier = 1 } = {}) {
       : [];
 
   const pointsAwarded = EVENING_POINTS.WIN * multiplier;
-  winners.forEach((name) => addScore(name, pointsAwarded));
+  const deltas = {};
+  winners.forEach((name) => {
+    addScore(name, pointsAwarded);
+    deltas[name] = pointsAwarded;
+  });
 
-  return { counts, winners, maxVotes: max, pointsAwarded };
+  return { counts, winners, maxVotes: max, pointsAwarded, deltas };
 }
 
 /** TruthMeter : au plus un bonus par joueur et par manche. */

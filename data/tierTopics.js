@@ -9,7 +9,7 @@ export const TIER_LISTS = [
     items: [
       "Se faire ghost",
       "Se tromper de message",
-      "Arriver en retard important",
+      "Arriver en retard à un RDV important",
       "Se faire griller en train de mentir",
       "Oublier un anniversaire",
       "Rater un examen",

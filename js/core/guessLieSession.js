@@ -1,5 +1,6 @@
 import { GUESS_LIE_ROUNDS } from "../../data/guessLies.js";
 import { getActivePlayerNames, getActivePlayers } from "./players.js";
+import { isValidGuessLieSubmission } from "./sessionMerge.js";
 import { getLocalDisplayName, getState } from "./state.js";
 import {
   navigateAfterGameLaunch,
@@ -12,7 +13,7 @@ export function getGuessLieSession() {
 
 export function hasLocalSubmission() {
   const session = getGuessLieSession();
-  return Boolean(session.submissions[getLocalDisplayName()]);
+  return isValidGuessLieSubmission(session.submissions[getLocalDisplayName()]);
 }
 
 export function getLobbyMembers() {
@@ -25,7 +26,7 @@ export function getLobbyMemberNames() {
 
 export function allLobbySubmitted() {
   const { submissions } = getGuessLieSession();
-  return getLobbyMemberNames().every((n) => submissions[n]);
+  return getLobbyMemberNames().every((n) => isValidGuessLieSubmission(submissions[n]));
 }
 
 export function getGuessLieRounds() {

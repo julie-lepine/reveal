@@ -1,5 +1,4 @@
 import { getEveningRecap } from "../core/eveningRecap.js";
-import { getLastGame } from "../core/state.js";
 import { getLobbyStatus, getLobbyGameId } from "../core/lobby.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
 import { navigate } from "../core/router.js";
@@ -8,6 +7,7 @@ import { bindNav } from "./nav.js";
 import {
   eveningRecapRestartButtonHtml,
   bindRestartGameButtons,
+  resolveLastGameForRestart,
 } from "../core/restartGame.js";
 import { eveningGameLeaderboardsHtml } from "../core/gameScores.js";
 import {
@@ -24,7 +24,7 @@ export function mountResults(app) {
 
   function render() {
     const recap = getEveningRecap();
-    const last = getLastGame();
+    const last = resolveLastGameForRestart();
     const status = getLobbyStatus();
     const gameId = getLobbyGameId();
 

@@ -38,6 +38,7 @@ import {
   launchGuessLieMenu,
   launchTierNightSelect,
   eveningRecapRestartButtonHtml,
+  resolveLastGameForRestart,
   restartGame,
 } from "../core/restartGame.js";
 // FIL_ROUGE (Mot interdit) — désactivé
@@ -107,8 +108,7 @@ function eveningRecapHtml(recap) {
     ? `<button type="button" class="evening-recap__link" data-nav="leaderboard">Voir le classement →</button>`
     : "";
 
-  const last = getLastGame();
-  const restartBtn = eveningRecapRestartButtonHtml(last);
+  const restartBtn = eveningRecapRestartButtonHtml(resolveLastGameForRestart());
 
   return `
     <div class="evening-recap card">
@@ -199,6 +199,11 @@ function gameSelectRenderSnapshot() {
 
 export function mountGameSelect(app) {
   if (!requireLobbyPlay()) return null;
+
+  app.innerHTML = pageShell({
+    backTarget: "home",
+    content: `<p class="hint">Chargement…</p>`,
+  });
 
   let unsubSession = () => {};
   let renderTimer = null;

@@ -27,7 +27,13 @@ export function mountTriviaSetup(app) {
   });
 
   async function onStartGame() {
-    if (!isLobbyHost()) return;
+    if (!isLobbyHost()) {
+      await showAppAlert("Seul l'hôte peut lancer le quiz.", {
+        title: "Trivia",
+        icon: "👑",
+      });
+      return;
+    }
     const validation = trivia.validateLaunchConfig();
     if (!validation.ok) {
       await showAppAlert(
@@ -91,7 +97,7 @@ export function mountTriviaSetup(app) {
         themes: trivia.getThemes(),
         questionCount: session.questionCount,
         countPresets: trivia.getQuestionCountPresets(),
-        isHost: trivia.isHost(),
+        isHost: isLobbyHost(),
         prep,
         members,
         readyMap: session.ready || {},

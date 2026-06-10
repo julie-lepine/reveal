@@ -15,6 +15,7 @@ import {
   getVoterNames,
   truthLabel,
   validateAffirmation,
+  commitTruthMeterAffirmation,
   commitTruthMeterPlay,
   commitTruthMeterVote,
   allTruthMeterVotesIn,
@@ -723,14 +724,19 @@ export function mountTruthMeter(app) {
         }
         draftText = check.text;
         draftEstimate = val;
-        await commitTruthMeterPlay({
-          affirmation: { text: check.text, author: localName },
-          authorEstimate: val,
-          phase: "display",
-          votes: {},
-          roundScored: false,
-        });
-        if (!mp) startDisplayPhase();
+        const btn = app.querySelector("#btn-submit-affirmation");
+        if (btn) btn.disabled = true;
+        try {
+          await commitTruthMeterAffirmation(check.text, val);
+          if (!mp) {
+            startDisplayPhase();
+          } else {
+            syncFromSession();
+            render();
+          }
+        } finally {
+          if (btn) btn.disabled = false;
+        }
       });
     }
 

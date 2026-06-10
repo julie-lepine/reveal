@@ -36,6 +36,7 @@ export function prepStartSlotHtml({
   allReady,
   isHost,
   launchLabel,
+  startButtonId = "btn-start-game",
   waitingHostLabel = "En attente de l'hôte…",
   waitingPlayersLabel = "En attente des joueurs…",
 }) {
@@ -43,10 +44,10 @@ export function prepStartSlotHtml({
     return `<button type="button" class="btn btn-secondary btn--spaced" disabled>${escapeHtml(poolEmptyLabel)}</button>`;
   }
   if (allReady && isHost) {
-    return `<button type="button" class="btn btn-primary btn--spaced" id="btn-start-game">${escapeHtml(launchLabel)}</button>`;
+    return `<button type="button" class="btn btn-primary btn--spaced" id="${escapeHtml(startButtonId)}">${escapeHtml(launchLabel)}</button>`;
   }
   if (allReady) {
-    return `<button type="button" class="btn btn-secondary btn--spaced" disabled>${escapeHtml(waitingHostLabel)}</button>`;
+    return `<p class="hint btn--spaced">${escapeHtml(waitingHostLabel)}</p>`;
   }
   return `<button type="button" class="btn btn-secondary btn--spaced" disabled>${escapeHtml(waitingPlayersLabel)}</button>`;
 }

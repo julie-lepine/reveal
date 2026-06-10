@@ -1502,7 +1502,7 @@ export const TRIVIA_QUESTIONS = [
     id: "food-015",
     theme: "food",
     question: "Quelle sauce accompagne traditionnellement les pâtes carbonara italiennes authentiques ?",
-    answers: ["Pesto","Tomate","Beurre","Crème"],
+    answers: ["Pesto","Aucune des trois, enfin !","Beurre","Crème"],
     correct: 3,
     difficulty: "easy",
   },

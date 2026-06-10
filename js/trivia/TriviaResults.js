@@ -7,7 +7,11 @@ function medalForRank(rank) {
   return "•";
 }
 
-export function renderTriviaResults({ standings = [], themeLabel = "Trivia" } = {}) {
+export function renderTriviaResults({
+  standings = [],
+  themeLabel = "Trivia",
+  showHostActions = true,
+} = {}) {
   const winner = standings[0] || null;
   return `
     <div class="card card--highlight trivia-results">
@@ -46,10 +50,14 @@ export function renderTriviaResults({ standings = [], themeLabel = "Trivia" } = 
           )
           .join("")}
       </div>
-      <div class="btn-row trivia-results__actions">
+      ${
+        showHostActions
+          ? `<div class="btn-row trivia-results__actions">
         <button type="button" class="btn btn-primary" data-trivia-action="replay">Rejouer</button>
         <button type="button" class="btn btn-accent" data-trivia-action="change-theme">Changer theme</button>
-      </div>
+      </div>`
+          : `<p class="hint">En attente de l'hôte pour relancer…</p>`
+      }
       <button type="button" class="btn btn-secondary btn--spaced" data-trivia-action="back-select">Retour au menu des jeux</button>
     </div>`;
 }

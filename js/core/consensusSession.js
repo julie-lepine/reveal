@@ -255,8 +255,7 @@ export function validateConsensusLaunchConfig(session = getConsensusSession()) {
 }
 
 export function isLocalConsensusHost() {
-  const local = getLobbyParticipants().find((player) => player.isLocal);
-  return local?.isHost !== false;
+  return isLobbyHost();
 }
 
 export async function setConsensusMode(modeId) {

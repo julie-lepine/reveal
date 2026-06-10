@@ -30,10 +30,13 @@ import {
   isNewTraitreVoteRound,
   pickLatestTriviaAnswer,
   mergeTriviaAnswersUid,
+  normalizeTriviaAnswersMap,
   normalizeDilemmaEntry,
   normalizeHotTakeEntry,
   normalizeKeyedVotes,
   mergeGuessLieSubmissions,
+  isGuessLieLobbyReset,
+  isValidGuessLieSubmission,
   normalizePlayerKeyedMap,
 } from "../js/core/sessionMerge.js";
 
@@ -335,6 +338,45 @@ describe("mergeTriviaPatchState answers-only", () => {
   });
 });
 
+describe("normalizeTriviaAnswersMap", () => {
+  const players = ["Admin", "Alex", "sarah"];
+  const uidToName = {
+    "uid-admin": "Admin",
+    "uid-alex": "Alex",
+    "uid-sarah": "sarah",
+  };
+
+  it("résout les uid vers les pseudos actifs", () => {
+    const answers = {
+      "uid-admin": { answerIndex: 1, answeredAt: 100 },
+      "uid-alex": { answerIndex: 2, answeredAt: 200 },
+    };
+    const out = normalizeTriviaAnswersMap(answers, players, (key) => uidToName[key] || null);
+    assert.equal(out.Admin.answerIndex, 1);
+    assert.equal(out.Alex.answerIndex, 2);
+    assert.equal(out.sarah, undefined);
+  });
+
+  it("fusionne pseudo et uid pour le même joueur en gardant la plus récente", () => {
+    const answers = {
+      Admin: { answerIndex: 0, answeredAt: 50 },
+      "uid-admin": { answerIndex: 3, answeredAt: 150 },
+    };
+    const out = normalizeTriviaAnswersMap(answers, players, (key) => uidToName[key] || key);
+    assert.equal(out.Admin.answerIndex, 3);
+    assert.equal(out.Admin.answeredAt, 150);
+  });
+
+  it("ignore les clés non résolues ou joueurs inactifs", () => {
+    const answers = {
+      "uid-unknown": { answerIndex: 1, answeredAt: 10 },
+      Ghost: { answerIndex: 2, answeredAt: 20 },
+    };
+    const out = normalizeTriviaAnswersMap(answers, players, (key) => uidToName[key] || key);
+    assert.deepEqual(out, {});
+  });
+});
+
 describe("pickLatestTriviaAnswer", () => {
   it("garde la réponse avec le answeredAt le plus récent", () => {
     const older = { answerIndex: 0, answeredAt: 100 };
@@ -515,14 +557,16 @@ describe("mergeTruthMeterPhase", () => {
 });
 
 describe("mergeGuessLieSubmissions", () => {
+  const valid = (statements, lie = 0) => ({ statements, lie });
+
   it("unionne local et remote sans perdre d'entrée", () => {
     const local = {
-      Admin: { statements: ["a", "b", "c"], lie: 1 },
-      mozilla: { statements: ["d", "e", "f"], lie: 0 },
+      Admin: valid(["a", "b", "c"], 1),
+      mozilla: valid(["d", "e", "f"], 0),
     };
     const remote = {
-      mozilla: { statements: ["d2", "e2", "f2"], lie: 2 },
-      Joulaille: { statements: ["g", "h", "i"], lie: 1 },
+      mozilla: valid(["d2", "e2", "f2"], 2),
+      Joulaille: valid(["g", "h", "i"], 1),
     };
     const out = mergeGuessLieSubmissions(local, remote);
     assert.equal(out.Admin.lie, 1);
@@ -530,8 +574,55 @@ describe("mergeGuessLieSubmissions", () => {
     assert.equal(out.Joulaille.statements[0], "g");
   });
 
-  it("conserve le local si le remote est vide", () => {
-    const local = { Admin: { statements: ["a", "b", "c"], lie: 0 } };
-    assert.deepEqual(mergeGuessLieSubmissions(local, {}), local);
+  it("purge le local quand reset (nouvelle partie)", () => {
+    const local = { sarah: valid(["a", "b", "c"]) };
+    assert.deepEqual(mergeGuessLieSubmissions(local, {}, { reset: true }), {});
+  });
+
+  it("en prep : le remote fait foi, pas de soumission fantôme locale", () => {
+    const local = { sarah: valid(["stale", "stale", "stale"]) };
+    const remote = { Admin: valid(["x", "y", "z"]) };
+    const out = mergeGuessLieSubmissions(local, remote, { prepPhase: true });
+    assert.equal(out.Admin.statements[0], "x");
+    assert.equal(out.sarah, undefined);
+  });
+
+  it("en prep : garde la soumission locale optimiste du joueur courant", () => {
+    const local = { sarah: valid(["mine", "mine", "mine"], 2) };
+    const remote = { Admin: valid(["x", "y", "z"]) };
+    const out = mergeGuessLieSubmissions(local, remote, {
+      prepPhase: true,
+      localName: "sarah",
+    });
+    assert.equal(out.sarah.lie, 2);
+    assert.equal(out.Admin.statements[0], "x");
+  });
+});
+
+describe("isGuessLieLobbyReset", () => {
+  it("détecte une relance avec soumissions vides", () => {
+    assert.equal(
+      isGuessLieLobbyReset({ lobbyComplete: false, phase: null, submissions: {} }),
+      true
+    );
+  });
+
+  it("ignore une partie en cours", () => {
+    assert.equal(
+      isGuessLieLobbyReset({ lobbyComplete: true, phase: "voting", submissions: {} }),
+      false
+    );
+  });
+});
+
+describe("isValidGuessLieSubmission", () => {
+  it("rejette les entrées vides ou incomplètes", () => {
+    assert.equal(isValidGuessLieSubmission({}), false);
+    assert.equal(isValidGuessLieSubmission({ statements: ["a", "b"], lie: 0 }), false);
+    assert.equal(isValidGuessLieSubmission({ statements: ["a", "b", ""], lie: 0 }), false);
+    assert.equal(
+      isValidGuessLieSubmission({ statements: ["a", "b", "c"], lie: 0 }),
+      true
+    );
   });
 });
