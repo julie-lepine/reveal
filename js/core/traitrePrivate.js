@@ -1,4 +1,4 @@
-/** Spot the fake — rôle imposteur privé (Supabase RLS ou localStorage hors ligne). */
+/** Spot the fake - rôle imposteur privé (Supabase RLS ou localStorage hors ligne). */
 import { supabase, isSupabaseConfigured } from "./supabaseClient.js";
 import { getSupabaseUserId } from "./supabaseAuth.js";
 import { getState, saveStatePatch, getLocalDisplayName } from "./state.js";
@@ -113,7 +113,7 @@ export async function hostDistributeTraitreRoles(pairId, impostorName, playerNam
       written: 0,
       skippedNames,
       error:
-        "Aucun rôle enregistré — vérifie que fil-rouge-private.sql et traitre-private.sql sont appliqués sur Supabase.",
+        "Aucun rôle enregistré - vérifie que fil-rouge-private.sql et traitre-private.sql sont appliqués sur Supabase.",
     };
   }
 

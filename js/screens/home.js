@@ -23,6 +23,9 @@ import {
   confirmAndLeaveLobby,
   reconcileLobbyMembership,
   resetAppToCleanHome,
+  tryRecoverLobbyFromServer,
+  peekServerLobbyForUser,
+  resumeEveningSession,
 } from "../core/lobby.js";
 import { getEveningRecap } from "../core/eveningRecap.js";
 import {
@@ -161,7 +164,7 @@ function homeStatsHtml() {
   return "";
 }
 
-function homeRenderSnapshot(authTab) {
+function homeRenderSnapshot(authTab, serverLobby = null) {
   const user = getUser();
   return JSON.stringify({
     tab: authTab,
@@ -170,6 +173,7 @@ function homeRenderSnapshot(authTab) {
     name: user?.name,
     inLobby: hasActiveLobby(),
     lobbyCode: getLobby()?.code,
+    serverLobbyCode: serverLobby?.code || null,
     recap: hasActiveLobby() ? getEveningRecap().participantCount : 0,
   });
 }
@@ -196,6 +200,7 @@ export function mountHome(app) {
   let renderInFlight = false;
   let lastSnapshot = "";
   let forgotCooldownTimer = null;
+  let pendingServerLobby = null;
 
   function startForgotCooldownTicker() {
     if (forgotCooldownTimer) return;
@@ -256,7 +261,7 @@ export function mountHome(app) {
   }
 
   async function renderIfNeeded(force = false) {
-    const snap = homeRenderSnapshot(authTab);
+    const snap = homeRenderSnapshot(authTab, pendingServerLobby);
     const { drafts, focusedId } = preserveInputDrafts();
     const typing = focusedId && drafts[focusedId] !== undefined;
 
@@ -448,7 +453,7 @@ export function mountHome(app) {
               <button type="button" class="btn btn-primary btn--spaced" id="btn-signup"${isTurnstileRequired() ? " disabled" : ""}>Créer mon compte</button>
             </div>
             <div id="auth-panel-guest" class="${authTab === "guest" ? "" : "hidden"}">
-              <p class="hint auth-form__guest-intro">Rejoins avec un code ou un lien d'invitation de l'hôte. Pas de compte requis — les invités ne peuvent pas créer de lobby.</p>
+              <p class="hint auth-form__guest-intro">Rejoins avec un code ou un lien d'invitation de l'hôte. Pas de compte requis - les invités ne peuvent pas créer de lobby.</p>
               <label class="field-label" for="guest-name">Ton pseudo</label>
               <input type="text" class="field-input" id="guest-name" placeholder="Ex : Alex" maxlength="24" />
               <label class="field-label" for="guest-code">Code d'invitation</label>
@@ -465,10 +470,17 @@ export function mountHome(app) {
           ${
             hasActiveLobby()
               ? `<button type="button" class="btn btn-accent btn--lobby-return" id="btn-return-lobby">
-            ${isLobbyEveningStarted() ? "Retour aux jeux" : "Retour au lobby"} <span class="muted">(${escapeHtml(getLobby().code)})</span>
+            ${isLobbyEveningStarted() ? "Reprendre la soirée" : "Retour au lobby"} <span class="muted">(${escapeHtml(getLobby().code)})</span>
           </button>
           <button type="button" class="btn btn-secondary btn--leave-lobby" id="btn-leave-lobby">Quitter le lobby</button>`
-              : ""
+              : pendingServerLobby?.code
+                ? `<div class="card card--highlight home-resume-card">
+            <p class="hint">Tu es encore dans le lobby <strong>${escapeHtml(pendingServerLobby.code)}</strong>${pendingServerLobby.status === "playing" ? " (partie en cours)" : ""}.</p>
+            <button type="button" class="btn btn-accent btn--spaced" id="btn-resume-evening">
+              Reprendre la soirée <span class="muted">(${escapeHtml(pendingServerLobby.code)})</span>
+            </button>
+          </div>`
+                : ""
           }
           ${
             canCreateLobby()
@@ -668,7 +680,34 @@ export function mountHome(app) {
     }
 
     if (e.target.closest("#btn-return-lobby")) {
-      void returnToEveningGames();
+      void returnToEveningGames({ rejoinActiveGame: true });
+      return;
+    }
+
+    if (e.target.closest("#btn-resume-evening")) {
+      const btn = e.target.closest("#btn-resume-evening");
+      btn.disabled = true;
+      try {
+        const recovered = await tryRecoverLobbyFromServer();
+        if (!recovered.ok) {
+          await showAppAlert("Impossible de retrouver ta soirée. Demande le code à l'hôte.", {
+            title: "Reprise",
+            icon: "⚠️",
+          });
+          pendingServerLobby = null;
+          scheduleRender(true);
+          return;
+        }
+        pendingServerLobby = null;
+        await resumeEveningSession({ force: true });
+      } catch (err) {
+        await showAppAlert(err?.message || "Impossible de reprendre la soirée.", {
+          title: "Reprise",
+          icon: "⚠️",
+        });
+      } finally {
+        if (btn?.isConnected) btn.disabled = false;
+      }
       return;
     }
 
@@ -805,6 +844,10 @@ export function mountHome(app) {
   void (async () => {
     const { cleared } = await reconcileLobbyMembership();
     if (cleared) scheduleRender(true);
+    if (!hasActiveLobby() && isLoggedIn() && isSupabaseConfigured()) {
+      pendingServerLobby = await peekServerLobbyForUser();
+      if (pendingServerLobby) scheduleRender(true);
+    }
   })();
 
   if (isGameSyncActive() && hasActiveLobby()) {

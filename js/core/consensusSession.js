@@ -394,7 +394,7 @@ const CONSENSUS_MP_PATCH_OPTS = {
   timeoutMs: CONSENSUS_SYNC_PATCH_TIMEOUT_MS,
 };
 
-/** MP : patch phase seule (reveal-pending) — évite le blob complet. */
+/** MP : patch phase seule (reveal-pending) - évite le blob complet. */
 export async function commitConsensusPhase(phase) {
   const session = { ...getConsensusSession(), phase };
   saveStatePatch({ consensusGame: session });

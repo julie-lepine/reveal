@@ -9,7 +9,7 @@
   --page-pad:16px;
   --touch-min:44px;
 
-  /* Couleurs — primaire rose (#ff3cac), secondaire indigo (#6366f1) */
+  /* Couleurs - primaire rose (#ff3cac), secondaire indigo (#6366f1) */
   --color-bg: #0d0f1e;
   --color-bg-deep: #05060f;
   --color-primary: #ff3cac;
@@ -228,7 +228,7 @@ body.has-top-ad .back{
   color:rgba(255,255,255,.7);
 }
 
-/* Actions de navigation / reprise — couleur secondaire indigo */
+/* Actions de navigation / reprise - couleur secondaire indigo */
 .btn-accent{
   background:var(--gradient-secondary);
   color:#fff;
@@ -3059,7 +3059,7 @@ body.wizz-shake #app{
   line-height:1.1;
 }
 
-/* Bouton central REVEAL — centré verticalement dans la barre */
+/* Bouton central REVEAL - centré verticalement dans la barre */
 .bottom-nav__item--logo{
   align-self:center;
   justify-content:center;
@@ -3538,7 +3538,7 @@ body{
   }
 }
 
-/* —— Pop-up REVEAL —— */
+/* -- Pop-up REVEAL -- */
 .app-dialog{
   position:fixed;
   inset:0;
@@ -4071,7 +4071,7 @@ body{
   color:rgba(255,255,255,.55);
 }
 
-/* —— Dilemma —— */
+/* -- Dilemma -- */
 .timer--dilemma{
   color:#FF3CAC;
   text-shadow:0 0 24px rgba(255,60,172,.4);
@@ -4280,7 +4280,7 @@ body{
   margin:0 4px;
 }
 
-/* === MOT INTERDIT (Fil Rouge) — styles conservés, jeu désactivé (data/filRouge.js) === */
+/* === MOT INTERDIT (Fil Rouge) - styles conservés, jeu désactivé (data/filRouge.js) === */
 .fil-rouge-banner{
   display:flex;
   align-items:center;
@@ -4864,7 +4864,7 @@ body{
   margin:8px 0 0;
 }
 
-/* —— Trivia —— */
+/* -- Trivia -- */
 .trivia-question-card{
   margin-bottom:14px;
 }

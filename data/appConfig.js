@@ -1,4 +1,4 @@
-/** Identifiants app native (Capacitor) — alignés avec capacitor.config.ts. */
+/** Identifiants app native (Capacitor) - alignés avec capacitor.config.ts. */
 export const APP_BUNDLE_ID = "com.reveal.partygames";
 
 /** Schéma URL pour deep links (auth Supabase, reset MDP). */

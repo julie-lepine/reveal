@@ -44,7 +44,7 @@ import { mountTrivia } from "./games/trivia.js";
 import { mountConsensus } from "./games/consensus.js";
 import { mountGuessLie } from "./games/guessLie.js";
 import { mountTierNight } from "./games/tierNight.js";
-// FIL_ROUGE (Mot interdit) — désactivé, voir data/filRouge.js
+// FIL_ROUGE (Mot interdit) - désactivé, voir data/filRouge.js
 // import { mountFilRougeSetup } from "./screens/filRougeSetup.js";
 // import { mountFilRougeMission } from "./screens/filRougeMission.js";
 // import { initFilRougeResultsListener } from "./core/filRougeResultsModal.js";

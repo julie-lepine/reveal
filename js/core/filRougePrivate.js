@@ -1,4 +1,4 @@
-/** MOT INTERDIT (Fil Rouge) — missions privées Supabase ; voir data/filRouge.js */
+/** MOT INTERDIT (Fil Rouge) - missions privées Supabase ; voir data/filRouge.js */
 import { FIL_ROUGE_ENABLED } from "../../data/filRouge.js";
 import { supabase, isSupabaseConfigured } from "./supabaseClient.js";
 import { getSupabaseUserId } from "./supabaseAuth.js";

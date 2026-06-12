@@ -1,5 +1,5 @@
 /**
- * Lancement multijoueur unifié — à réutiliser pour tout nouveau jeu.
+ * Lancement multijoueur unifié - à réutiliser pour tout nouveau jeu.
  *
  * Patterns :
  * - `launchGameWithSync` : sync remote d'abord, local ensuite, fallback + retry si échec
@@ -8,7 +8,7 @@
  * - `prepGuestFollowOnSession` : invités sur écran prep qui suivent l'hôte
  *
  * Modes sync :
- * - `patch` : patch léger via patchGameState (ex. Guess The Lie — contenu déjà sur le serveur)
+ * - `patch` : patch léger via patchGameState (ex. Guess The Lie - contenu déjà sur le serveur)
  * - `push` : blob complet via pushGameSession (ex. deck construit au lancement)
  *
  * En partie (hôte) : `commitHostGamePlay` + `pickRemotePlayFields` (playPatch.js)
@@ -29,7 +29,7 @@ import { getCurrentScreen, navigate } from "./router.js";
 export { DEFAULT_SYNC_PATCH_TIMEOUT_MS as SYNC_PATCH_TIMEOUT_MS };
 
 export const SYNC_SLOW_LAUNCH_MESSAGE =
-  "La sync est lente — la partie démarre chez toi. Les autres peuvent avoir un léger retard.";
+  "La sync est lente - la partie démarre chez toi. Les autres peuvent avoir un léger retard.";
 
 /**
  * Envoie l'état de lancement au serveur (patch léger ou push complet).

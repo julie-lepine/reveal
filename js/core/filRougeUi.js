@@ -1,4 +1,4 @@
-/** MOT INTERDIT (Fil Rouge) — UI conservée ; active si FIL_ROUGE_ENABLED dans data/filRouge.js */
+/** MOT INTERDIT (Fil Rouge) - UI conservée ; active si FIL_ROUGE_ENABLED dans data/filRouge.js */
 import {
   FIL_ROUGE_ENABLED,
   FIL_ROUGE_TILE,

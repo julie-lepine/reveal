@@ -1,6 +1,6 @@
-/** Le Traître — paires de mots (majorité = a, intrus = b). */
+/** Le Traître - paires de mots (majorité = a, intrus = b). */
 
-export const TRAITRE_MIN_PLAYERS = 4;
+export const TRAITRE_MIN_PLAYERS = 3;
 
 export const TRAITRE_POINTS = {
   INTRUS_WIN: 50,

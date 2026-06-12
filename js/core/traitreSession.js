@@ -61,6 +61,12 @@ export function isTraitrePrivateRoleReady(session = getTraitreSession()) {
   return Boolean(session.privateRoleSynced);
 }
 
+/** Phase « deal » : rôle privé + paire de mots résolue (évite l'affichage « … »). */
+export function isTraitreWordDealReady(session = getTraitreSession()) {
+  if (!isTraitrePrivateRoleReady(session)) return false;
+  return Boolean(getMyTraitreWord(session));
+}
+
 export function defaultTraitrePrepSession() {
   return defaultSession();
 }

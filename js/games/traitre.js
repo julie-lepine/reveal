@@ -20,6 +20,7 @@ import {
   getTraitrePendingVoters,
   getTraitreVoteTargets,
   isTraitrePrivateRoleReady,
+  isTraitreWordDealReady,
   simulateTraitreVotes,
 } from "../core/traitreSession.js";
 import { getLobbyParticipants } from "../core/lobby.js";
@@ -182,12 +183,13 @@ export function mountTraitre(app) {
           ...s,
           ...buildTraitreTieRevotePatch(s),
         });
+        render();
         return;
       }
 
       const eliminatedName = leaders[0];
       const patch = buildTraitreEliminationPatch({ ...s, votes: votesToUse }, eliminatedName);
-      let merged = { ...s, ...patch, votes: votesToUse };
+      let merged = { ...s, ...patch };
       if (patch.phase === "final" && (!mp || isLobbyHost())) {
         merged = awardTraitreGame(merged);
         recordTraitrePlayed();
@@ -203,6 +205,7 @@ export function mountTraitre(app) {
       await commitTraitrePlay(merged, {
         withEveningScores: patch.phase === "final" && mp && isLobbyHost(),
       });
+      render();
     } finally {
       resolveInFlight = false;
     }
@@ -227,7 +230,7 @@ export function mountTraitre(app) {
     const current = getCurrentTraitreSpeaker(session);
     return `
       <div class="traitre-order card">
-        <p class="card-heading">Ordre des indices — manche ${session.speakRound || 1}</p>
+        <p class="card-heading">Ordre des indices - manche ${session.speakRound || 1}</p>
         <ol class="traitre-order__list">
           ${order
             .map(
@@ -241,7 +244,7 @@ export function mountTraitre(app) {
         </ol>
         ${
           current
-            ? `<p class="hint traitre-order__now">C'est au tour de <strong>${escapeHtml(current)}</strong> — dis un indice à voix haute (sans prononcer ton mot).</p>`
+            ? `<p class="hint traitre-order__now">C'est au tour de <strong>${escapeHtml(current)}</strong> - dis un indice à voix haute (sans prononcer ton mot).</p>`
             : ""
         }
         ${
@@ -272,9 +275,20 @@ export function mountTraitre(app) {
       </div>
       ${
         revotePending
-          ? `<p class="hint traitre-vote-tie">Égalité au vote — <strong>revote obligatoire</strong>.</p>`
+          ? `<p class="hint traitre-vote-tie">Égalité au vote - <strong>revote obligatoire</strong>.</p>`
           : ""
       }`;
+  }
+
+  function traitrePhaseTitle(currentPhase) {
+    const titles = {
+      deal: "Mot secret",
+      speak: "Indices oraux",
+      decision: "Fin de manche 1",
+      vote: "Vote d'élimination",
+      final: "Résultat",
+    };
+    return titles[currentPhase] || "Partie";
   }
 
   function render() {
@@ -283,16 +297,16 @@ export function mountTraitre(app) {
     const pair = getTraitrePair(session);
     const myWord = getMyTraitreWord(session);
     const host = !mp || isLobbyHost();
-    const roleReady = isTraitrePrivateRoleReady(session);
+    const wordDealReady = isTraitreWordDealReady(session);
     let phaseHtml = "";
 
     if (phase === "deal") {
-      phaseHtml = roleReady
+      phaseHtml = wordDealReady
         ? `
         <div class="card traitre-word-card">
           <p class="label-upper label-upper--gold">Ton mot secret</p>
-          <p class="traitre-word">${escapeHtml(myWord || "…")}</p>
-          <p class="hint">Ne montre pas ton écran. Mémorise ce mot — tu devras donner un indice sans le prononcer.</p>
+          <p class="traitre-word">${escapeHtml(myWord)}</p>
+          <p class="hint">Ne montre pas ton écran. Mémorise ce mot - tu devras donner un indice sans le prononcer.</p>
           ${
             session.dealAcks?.[localName]
               ? `<p class="hint">En attente des autres joueurs…</p>`
@@ -351,7 +365,7 @@ export function mountTraitre(app) {
         ${
           isAlive
             ? voteGridHtml()
-            : `<p class="hint">Tu as été éliminé — tu ne peux plus voter.</p>`
+            : `<p class="hint">Tu as été éliminé - tu ne peux plus voter.</p>`
         }
         ${
           host
@@ -395,7 +409,7 @@ export function mountTraitre(app) {
 
     if (lastEliminated && phase === "speak" && speakRound > 1) {
       phaseHtml = `
-        <p class="hint traitre-elim-banner">${escapeHtml(lastEliminated)} a été éliminé — nouvelle manche d'indices.</p>
+        <p class="hint traitre-elim-banner">${escapeHtml(lastEliminated)} a été éliminé - nouvelle manche d'indices.</p>
         ${phaseHtml}`;
     }
 
@@ -403,8 +417,9 @@ export function mountTraitre(app) {
       backTarget: "back",
       scroll: true,
       content: `
+        <p class="label-upper label-upper--gold">🎭 Spot the fake</p>
         <div class="screen-title-row">
-          <p class="label-upper label-upper--gold">🎭 Spot the fake</p>
+          <h2 class="screen-title">${escapeHtml(traitrePhaseTitle(phase))}</h2>
           ${rulesButtonHtml("traitre")}
         </div>
         <p class="hint">${alive.length} survivant(s) · manche indices ${speakRound}${voteSurvivals ? ` · ${voteSurvivals} vote(s) survécu(s) par le fake` : ""}</p>
@@ -431,15 +446,15 @@ export function mountTraitre(app) {
     });
 
     app.querySelector("#btn-next-speaker")?.addEventListener("click", () => {
-      void advanceSpeaker();
+      void advanceSpeaker().then(() => render());
     });
 
     app.querySelector("#btn-continue")?.addEventListener("click", () => {
-      void continueSpeakRound();
+      void continueSpeakRound().then(() => render());
     });
 
     app.querySelector("#btn-vote-now")?.addEventListener("click", () => {
-      void startVoteFromDecision();
+      void startVoteFromDecision().then(() => render());
     });
 
     app.querySelectorAll("[data-traitre-vote]").forEach((btn) => {

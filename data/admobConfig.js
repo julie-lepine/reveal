@@ -1,4 +1,4 @@
-/** Configuration AdMob — IDs fournis par la console Google AdMob. */
+/** Configuration AdMob - IDs fournis par la console Google AdMob. */
 
 export const ADMOB_APP_IDS = {
   android: "ca-app-pub-6332424645114129~4800114696",
@@ -10,7 +10,7 @@ export const ADMOB_BANNER_IDS = {
   ios: "ca-app-pub-6332424645114129/9860869685",
 };
 
-/** IDs de test Google — à utiliser en dev (évite la suspension de compte). */
+/** IDs de test Google - à utiliser en dev (évite la suspension de compte). */
 export const ADMOB_TEST_BANNER_IDS = {
   android: "ca-app-pub-3940256099942544/6300978111",
   ios: "ca-app-pub-3940256099942544/2934735716",

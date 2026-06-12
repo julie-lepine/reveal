@@ -28,6 +28,7 @@ import {
   mergeTraitrePhase,
   mergeTruthMeterPhase,
   isNewTraitreVoteRound,
+  isStaleTraitreVotePatch,
   pickLatestTriviaAnswer,
   mergeTriviaAnswersUid,
   normalizeTriviaAnswersMap,
@@ -488,12 +489,31 @@ describe("normalizeKeyedVotes", () => {
 });
 
 describe("mergeTraitrePhase", () => {
-  it("bloque vote → speak", () => {
-    assert.equal(mergeTraitrePhase("vote", "speak"), "vote");
-  });
-
   it("accepte speak → vote", () => {
     assert.equal(mergeTraitrePhase("speak", "vote"), "vote");
+  });
+
+  it("accepte decision → speak (continuer après manche 1)", () => {
+    assert.equal(mergeTraitrePhase("decision", "speak"), "speak");
+  });
+
+  it("accepte vote → speak (nouvelle manche après élimination)", () => {
+    assert.equal(mergeTraitrePhase("vote", "speak"), "speak");
+  });
+
+  it("bloque final → speak", () => {
+    assert.equal(mergeTraitrePhase("final", "speak"), "final");
+  });
+
+  it("bloque speak → vote si patch vote obsolète (votes encore remplis)", () => {
+    assert.equal(
+      mergeTraitrePhase("speak", "vote", { staleVotePatch: true }),
+      "speak"
+    );
+  });
+
+  it("accepte speak → vote pour un nouveau vote (votes vidés)", () => {
+    assert.equal(mergeTraitrePhase("speak", "vote", { staleVotePatch: false }), "vote");
   });
 
   it("autorise reset de vote sur revote", () => {
@@ -544,6 +564,32 @@ describe("mergeTraitrePatchState", () => {
     });
     assert.deepEqual(out.votes, { a: "b", c: "d" });
   });
+
+  it("patch partiel sans pairId conserve la paire en cours", () => {
+    const cur = { phase: "deal", pairId: "social_1", lobbyStarted: true };
+    const inc = { phase: "deal", dealAcks: { uid_a: true } };
+    const out = mergeTraitrePatchState(cur, inc, { mergeReadyUid, mergeVotes });
+    assert.equal(out.pairId, "social_1");
+  });
+
+  it("pairId null distant ne remplace pas une paire locale", () => {
+    const cur = { phase: "deal", pairId: "social_1", lobbyStarted: true };
+    const inc = { phase: "deal", pairId: null, dealAcks: { uid_a: true } };
+    const out = mergeTraitrePatchState(cur, inc, { mergeReadyUid, mergeVotes });
+    assert.equal(out.pairId, "social_1");
+  });
+
+  it("patch vote stale ne régresse pas speak → vote", () => {
+    const cur = { phase: "speak", speakRound: 3, alive: ["a", "b", "c"], votes: {} };
+    const inc = {
+      phase: "vote",
+      speakRound: 2,
+      votes: { a: "b", b: "b", c: "a" },
+    };
+    assert.equal(isStaleTraitreVotePatch(cur, inc), true);
+    const out = mergeTraitrePatchState(cur, inc, { mergeReadyUid, mergeVotes });
+    assert.equal(out.phase, "speak");
+  });
 });
 
 describe("mergeTruthMeterPhase", () => {
@@ -553,6 +599,56 @@ describe("mergeTruthMeterPhase", () => {
 
   it("accepte voting → reveal-pending", () => {
     assert.equal(mergeTruthMeterPhase("voting", "reveal-pending"), "reveal-pending");
+  });
+
+  it("accepte reveal → writing (nouvelle manche)", () => {
+    assert.equal(mergeTruthMeterPhase("reveal", "writing"), "writing");
+    assert.equal(mergeTruthMeterPhase("reveal-pending", "writing"), "writing");
+  });
+
+  it("accepte reveal → writing avec newRound", () => {
+    assert.equal(mergeTruthMeterPhase("reveal", "writing", { newRound: true }), "writing");
+  });
+});
+
+describe("mergeTruthMeterPatchState", () => {
+  const mergeReadyUid = (cur, inc) => ({ ...cur?.ready, ...inc?.ready });
+  const mergeVotes = (cur, inc) => ({ ...cur?.votes, ...inc?.votes });
+
+  it("passe reveal → writing quand roundIdx avance", () => {
+    const cur = {
+      roundIdx: 0,
+      phase: "reveal",
+      affirmation: { text: "M1", author: "Alice" },
+      roundScored: true,
+    };
+    const inc = {
+      roundIdx: 1,
+      phase: "writing",
+      affirmation: null,
+      authorEstimate: null,
+      votes: {},
+      voteEndsAt: null,
+      roundScored: false,
+    };
+    const out = mergeTruthMeterPatchState(cur, inc, { mergeReadyUid, mergeVotes, newRound: true });
+    assert.equal(out.phase, "writing");
+    assert.equal(out.roundIdx, 1);
+    assert.equal(out.affirmation, null);
+  });
+
+  it("passe reveal → writing même sans flag newRound (roundIdx avancé)", () => {
+    const cur = { phase: "reveal", roundScored: true };
+    const inc = {
+      roundIdx: 1,
+      phase: "writing",
+      affirmation: null,
+      votes: {},
+      roundScored: false,
+    };
+    const out = mergeTruthMeterPatchState(cur, inc, { mergeReadyUid, mergeVotes });
+    assert.equal(out.phase, "writing");
+    assert.equal(out.roundIdx, 1);
   });
 });
 

@@ -1,4 +1,4 @@
-import { DILEMMA_POINTS_MAJORITY_WIN } from "../../data/dilemma.js";
+import { DILEMMA_POINTS_MAJORITY_WIN, DILEMMA_POINTS_TIE } from "../../data/dilemma.js";
 import {
   getDilemmaEntryScreen,
   getDilemmaSession,
@@ -10,6 +10,7 @@ import {
   countDilemmaResults,
   startDilemmaRound,
   resetDilemmaAfterGame,
+  consumePlayedCustomDilemma,
 } from "../core/dilemmaSession.js";
 import { awardDilemmaRound } from "../core/scoring.js";
 import {
@@ -26,7 +27,7 @@ import { navigate } from "../core/router.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
 import { bindNav } from "../screens/nav.js";
 import { gameExitBarHtml, bindExitGame } from "../core/exitGame.js";
-// FIL_ROUGE (Mot interdit) — pause soirée ; isEveningGameplayPaused() = false si désactivé
+// FIL_ROUGE (Mot interdit) - pause soirée ; isEveningGameplayPaused() = false si désactivé
 import { isEveningGameplayPaused } from "../core/filRougeSession.js";
 import {
   isGameSyncActive,
@@ -129,10 +130,12 @@ export function mountDilemma(app) {
   }
 
   function buildDilemmaLastRound(award) {
-    if (!award?.majorityWinners?.length) return null;
+    if (!award?.deltas || !Object.keys(award.deltas).length) return null;
     return {
       majority: award.majority,
-      majorityWinners: award.majorityWinners,
+      tie: Boolean(award.tie),
+      majorityWinners: award.majorityWinners || [],
+      tieWinners: award.tieWinners || [],
       deltas: award.deltas || {},
     };
   }
@@ -162,6 +165,9 @@ export function mountDilemma(app) {
         },
         { withEveningScores: mp && isLobbyHost() }
       );
+      if (currentDilemma) {
+        await consumePlayedCustomDilemma(currentDilemma);
+      }
 
       if (!mp) {
         phase = "reveal";
@@ -271,9 +277,21 @@ export function mountDilemma(app) {
                 .filter(([, choice]) => choice === majority)
                 .map(([name]) => name)
             : [];
+    const tieWinners =
+      lastAward?.tieWinners?.length > 0
+        ? lastAward.tieWinners
+        : getDilemmaSession().lastRound?.tieWinners?.length > 0
+          ? getDilemmaSession().lastRound.tieWinners
+          : !majority
+            ? Object.entries(votes)
+                .filter(([, choice]) => choice === "A" || choice === "B")
+                .map(([name]) => name)
+            : [];
     const awardLine = awardWinners.length
       ? `<p class="hint">🏆 Victoire (majorité) - <strong>+${DILEMMA_POINTS_MAJORITY_WIN} pts</strong> : ${awardWinners.map((n) => escapeHtml(n)).join(", ")}</p>`
-      : "";
+      : tieWinners.length
+        ? `<p class="hint">🤝 Égalité - <strong>+${DILEMMA_POINTS_TIE} pts</strong> : ${tieWinners.map((n) => escapeHtml(n)).join(", ")}</p>`
+        : "";
 
     const dividedBanner = divided
       ? `<p class="dilemma__divided">⚡ MANCHE LA PLUS DIVISÉE</p>`

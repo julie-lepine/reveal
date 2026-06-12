@@ -1,6 +1,6 @@
 import { escapeHtml } from "./ui.js";
 import { isLobbyHost } from "./gameSync.js";
-/** MOT INTERDIT (Fil Rouge) — modal résultats ; voir data/filRouge.js */
+/** MOT INTERDIT (Fil Rouge) - modal résultats ; voir data/filRouge.js */
 import { hostResumeAfterFilRougeResults } from "./filRougeSession.js";
 import { FIL_ROUGE_ENABLED, FIL_ROUGE_POINTS_MISSION } from "../../data/filRouge.js";
 import { getCurrentScreen } from "./router.js";

@@ -40,7 +40,7 @@ export const GAME_RULES = {
   hottake: {
     title: "HotTake",
     emoji: "🔥",
-    but: "Une opinion clivante : vote Valide, Acceptable ou Criminel — suis la majorité ou assume d'être le rebelle.",
+    but: "Une opinion clivante : vote Valide, Acceptable ou Criminel - suis la majorité ou assume d'être le rebelle.",
     etapes: [
       "Une affirmation s'affiche (ex. « Le sucré-salé, c'est non »).",
       "Chacun vote : Valide (d'accord), Acceptable (bof), ou Criminel (non).",
@@ -100,7 +100,7 @@ export const GAME_RULES = {
     ],
     points: [
       "Les joueurs du camp majoritaire : +10 pts.",
-      "En cas d'égalité, personne ne marque.",
+      "Égalité parfaite (50/50) : +5 pts pour chaque votant.",
     ],
     exemple:
       "« Sans téléphone 1 an, ou sans musique 1 an ? » 4 choisissent « sans musique » → ces 4 gagnent +10.",
@@ -162,7 +162,7 @@ export const GAME_RULES = {
     emoji: "🎭",
     but: "Tous reçoivent un mot secret - sauf un, qui a un mot proche. À l'oral, donnez des indices sans prononcer votre mot. Trouvez le fake avant qu'il ne finisse dans le duo final.",
     etapes: [
-      "4 joueurs minimum. L'app distribue un mot secret à chacun (le fake a un mot voisin, ex. Android / iOS).",
+      "3 joueurs minimum. L'app distribue un mot secret à chacun (le fake a un mot voisin, ex. Android / iOS).",
       "Manche 1 : chaque joueur dit un indice à voix haute, dans l'ordre affiché sur l'app.",
       "Fin de manche 1 : l'hôte choisit « Continuer » (nouvelle manche d'indices) ou « Voter ».",
       "À partir de la manche 2, un vote d'élimination est obligatoire après les indices.",

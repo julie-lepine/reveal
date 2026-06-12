@@ -51,7 +51,27 @@ function isLobbyGoneError(e) {
   );
 }
 
-/** Charge la session de jeu en cours après join / create (sans router — voir navigateAfterLobbyJoin). */
+const LAST_LOBBY_CODE_KEY = "reveal-last-lobby-code";
+const LAST_LOBBY_ID_KEY = "reveal-last-lobby-id";
+
+function rememberLobbyIdentity(bundle) {
+  try {
+    if (bundle?.code) sessionStorage.setItem(LAST_LOBBY_CODE_KEY, bundle.code);
+    if (bundle?.id) sessionStorage.setItem(LAST_LOBBY_ID_KEY, bundle.id);
+  } catch {
+    /* ignore */
+  }
+}
+
+function readRememberedLobbyId() {
+  try {
+    return sessionStorage.getItem(LAST_LOBBY_ID_KEY) || null;
+  } catch {
+    return null;
+  }
+}
+
+/** Charge la session de jeu en cours après join / create (sans router - voir navigateAfterLobbyJoin). */
 async function restoreActiveGameSessionOnJoin(lobbyId) {
   const delays = [0, 400, 1200];
   for (const ms of delays) {
@@ -67,6 +87,70 @@ async function restoreActiveGameSessionOnJoin(lobbyId) {
     }
   }
   return false;
+}
+
+/**
+ * Lobby actif côté serveur pour le joueur connecté (F5 / perte du localStorage).
+ * @returns {Promise<string|null>} lobby uuid
+ */
+export async function findServerLobbyIdForUser(userId = getSupabaseUserId()) {
+  if (!isSupabaseConfigured() || !userId) return null;
+
+  const { data, error } = await supabase
+    .from("lobby_members")
+    .select("lobby_id, joined_at, lobbies!inner(id, code, last_activity_at, status)")
+    .eq("user_id", userId)
+    .order("joined_at", { ascending: false })
+    .limit(8);
+
+  if (error) throw error;
+
+  for (const row of data || []) {
+    const lobby = row.lobbies;
+    if (!lobby?.id) continue;
+    if (isLobbyJoinTooOld(lobby.last_activity_at)) continue;
+    return lobby.id;
+  }
+
+  const remembered = readRememberedLobbyId();
+  if (remembered) {
+    const still = await isLocalStillLobbyMember(remembered);
+    if (still === true) return remembered;
+  }
+
+  return null;
+}
+
+/** Méta légère pour l'accueil (reprise sans appliquer l'état). */
+export async function peekServerLobbyForUser(userId = getSupabaseUserId()) {
+  try {
+    const lobbyId = await findServerLobbyIdForUser(userId);
+    if (!lobbyId) return null;
+    const { data, error } = await supabase
+      .from("lobbies")
+      .select("id, code, status, game_id")
+      .eq("id", lobbyId)
+      .maybeSingle();
+    if (error || !data) return null;
+    return data;
+  } catch (e) {
+    console.warn("REVEAL peek server lobby:", e.message || e);
+    return null;
+  }
+}
+
+/** Restaure lobby + session de jeu depuis Supabase (reconnexion après F5). */
+export async function recoverLobbyFromServer({ withMessages = false } = {}) {
+  const lobbyId = await findServerLobbyIdForUser();
+  if (!lobbyId) return { ok: false };
+
+  const bundle = await fetchLobbyBundle(lobbyId, { withMessages });
+  applyLobbyToState(bundle);
+  startLobbyPresenceSync();
+  const { startMultiplayerSync } = await import("./gameSync.js");
+  startMultiplayerSync();
+  await restoreActiveGameSessionOnJoin(lobbyId);
+  return { ok: true, code: bundle.code, lobbyId: bundle.id };
 }
 
 /**
@@ -238,6 +322,8 @@ function applyLobbyToState(bundle) {
   // Si le bundle n'a pas chargé les messages, on conserve ceux déjà en mémoire.
   const messages =
     bundle.messages !== undefined ? bundle.messages : getState().lobby?.messages || [];
+
+  rememberLobbyIdentity(bundle);
 
   saveStatePatch({
     lobby: {

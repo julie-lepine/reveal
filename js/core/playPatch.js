@@ -1,4 +1,4 @@
-/** Champs prep / blob lourd — exclus des patches en cours de partie. */
+/** Champs prep / blob lourd - exclus des patches en cours de partie. */
 export const PLAY_PATCH_EXCLUDE = new Set([
   "deck",
   "ready",

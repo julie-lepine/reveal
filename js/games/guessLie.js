@@ -26,7 +26,7 @@ import { navigate } from "../core/router.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
 import { bindNav } from "../screens/nav.js";
 import { gameExitBarHtml, bindExitGame } from "../core/exitGame.js";
-// FIL_ROUGE (Mot interdit) — pause soirée ; isEveningGameplayPaused() = false si désactivé
+// FIL_ROUGE (Mot interdit) - pause soirée ; isEveningGameplayPaused() = false si désactivé
 import { isEveningGameplayPaused } from "../core/filRougeSession.js";
 
 function revealFeedbackTitle({ isSubject, myCorrect, liarBonus }) {
@@ -377,7 +377,12 @@ export function mountGuessLie(app) {
     app.innerHTML = pageShell({
       backTarget: "back",
       content: `
-        <p class="label-upper label-upper--green">🕵️ Manche ${roundIdx + 1}/${total}</p>
+        <div class="game-header">
+          <div class="dots">${Array.from({ length: total }, (_, i) =>
+            `<span class="dot ${i === roundIdx ? "dot--active" : i < roundIdx ? "dot--done" : ""}"></span>`
+          ).join("")}</div>
+          <span class="muted">${roundIdx + 1}/${total}</span>
+        </div>
         <div class="logo logo--sm"><h1>GUESS THE LIE</h1></div>
         ${body}
         ${gameExitBarHtml()}

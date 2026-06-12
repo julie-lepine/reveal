@@ -82,7 +82,7 @@ export function mergeHotTakeCustomTakes(localList, remoteList, localAuthor) {
 
 /**
  * Deck Hot Take / Dilemma : null en prep (customs modifiables).
- * En partie lancée, deck figé — remote prioritaire.
+ * En partie lancée, deck figé - remote prioritaire.
  */
 export function mergeCustomGameDeck(local = {}, remote = {}) {
   const started = Boolean(local.lobbyStarted || remote.lobbyStarted);
@@ -101,7 +101,7 @@ export function mergeRemoteCustomGameDeck(cur = {}, inc = {}) {
   return inc?.deck ?? cur?.deck ?? null;
 }
 
-/** Patch invité : uniquement des votes — ne doit pas écraser phase / scoring / manche. */
+/** Patch invité : uniquement des votes - ne doit pas écraser phase / scoring / manche. */
 export function isVotesOnlyGamePatch(inc = {}) {
   const keys = Object.keys(inc);
   return keys.length === 1 && keys[0] === "votes";
@@ -195,8 +195,16 @@ const TRAITRE_PHASE_RANK = {
   final: 4,
 };
 
-export function mergeTraitrePhase(curPhase, incPhase, { newVoteRound = false } = {}) {
+export function mergeTraitrePhase(curPhase, incPhase, { newVoteRound = false, staleVotePatch = false } = {}) {
   if (newVoteRound) return incPhase ?? curPhase ?? null;
+  // Nouvelle manche d'indices : decision (fin M1) ou vote (élimination sans fin de partie)
+  if (incPhase === "speak" && (curPhase === "decision" || curPhase === "vote")) {
+    return "speak";
+  }
+  // Patch vote retardé avec votes encore remplis : ne pas régresser depuis speak
+  if (curPhase === "speak" && incPhase === "vote" && staleVotePatch) {
+    return "speak";
+  }
   return mergeRankedPhase(curPhase, incPhase, TRAITRE_PHASE_RANK);
 }
 
@@ -210,6 +218,10 @@ const TRUTH_METER_PHASE_RANK = {
 
 export function mergeTruthMeterPhase(curPhase, incPhase, { newRound = false } = {}) {
   if (newRound) return incPhase ?? curPhase ?? null;
+  // Nouvelle manche : reveal → writing (hôte « Joueur suivant »)
+  if (incPhase === "writing" && (curPhase === "reveal" || curPhase === "reveal-pending")) {
+    return "writing";
+  }
   return mergeRankedPhase(curPhase, incPhase, TRUTH_METER_PHASE_RANK);
 }
 
@@ -373,11 +385,14 @@ export function mergeDilemmaPatchState(curDm, incDm, localAuthor, { mergeReadyUi
     phase: mergeDilemmaPhase(curDm, incDm),
     ready: mergeReadyUid(curDm, incDm),
     votes: mergeVotes(curDm, incDm),
-    customDilemmas: mergeDilemmaCustomDilemmas(
-      incDm.customDilemmas || [],
-      curDm.customDilemmas || [],
-      localAuthor
-    ),
+    customDilemmas:
+      (curDm.lobbyStarted || incDm.lobbyStarted) && Array.isArray(incDm.customDilemmas)
+        ? incDm.customDilemmas.map(normalizeDilemmaEntry).filter(Boolean)
+        : mergeDilemmaCustomDilemmas(
+            incDm.customDilemmas || [],
+            curDm.customDilemmas || [],
+            localAuthor
+          ),
     deck: mergeRemoteCustomGameDeck(curDm, incDm),
   };
 }
@@ -541,6 +556,12 @@ export function isNewTraitreVoteRound(cur, inc) {
   return false;
 }
 
+/** Patch vote obsolète (votes encore présents) alors qu'une manche d'indices a démarré. */
+export function isStaleTraitreVotePatch(cur, inc) {
+  if (cur?.phase !== "speak" || inc?.phase !== "vote") return false;
+  return Object.keys(inc.votes || {}).length > 0;
+}
+
 /** État Le Traître pour patchGameState. */
 export function mergeTraitrePatchState(cur, inc, { mergeReadyUid, mergeVotes, newVoteRound = false }) {
   if (!cur) return inc;
@@ -561,7 +582,11 @@ export function mergeTraitrePatchState(cur, inc, { mergeReadyUid, mergeVotes, ne
   return {
     ...cur,
     ...inc,
-    phase: mergeTraitrePhase(cur.phase, inc.phase, { newVoteRound }),
+    phase: mergeTraitrePhase(cur.phase, inc.phase, {
+      newVoteRound,
+      staleVotePatch: isStaleTraitreVotePatch(cur, inc),
+    }),
+    pairId: inc.pairId || cur.pairId || null,
     ready: mergeReadyUid(cur, inc),
     votes: newVoteRound ? { ...(inc.votes || {}) } : mergeVotes(cur, inc),
     dealAcks: inc.dealAcks ? { ...(cur.dealAcks || {}), ...inc.dealAcks } : cur.dealAcks,

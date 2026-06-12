@@ -120,7 +120,7 @@ export function eveningGameLeaderboardsHtml() {
     blocks.push(gameLeaderboardCardHtml(titleHtml, players, gameScores[gid] || {}));
   });
 
-  // FIL_ROUGE (Mot interdit) — bloc classement désactivé
+  // FIL_ROUGE (Mot interdit) - bloc classement désactivé
   // const hasFilRouge = Object.values(filRougeScores).some((v) => Number(v) !== 0);
   // if (hasFilRouge) {
   //   blocks.push(gameLeaderboardCardHtml("🧵 Fil Rouge", players, filRougeScores));

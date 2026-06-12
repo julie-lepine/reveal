@@ -4,6 +4,7 @@ import {
   hasActiveLobby,
   confirmAndLeaveLobby,
   returnToEveningGames,
+  tryRecoverLobbyFromServer,
 } from "../core/lobby.js";
 import { canPlay } from "../core/auth.js";
 import {
@@ -42,12 +43,17 @@ export function goToEveningSettings() {
 }
 
 /** Retour au menu jeux (ou partie en cours) après profil / paramètres. */
-export function returnFromEveningProfile() {
+export async function returnFromEveningProfile() {
   if (!hasActiveLobby()) {
+    const recovered = await tryRecoverLobbyFromServer();
+    if (recovered.ok) {
+      await returnToEveningGames({ rejoinActiveGame: true });
+      return;
+    }
     goBack();
     return;
   }
-  void returnToEveningGames();
+  await returnToEveningGames({ rejoinActiveGame: true });
 }
 
 async function handleBackNavigation() {

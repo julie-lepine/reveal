@@ -17,9 +17,11 @@ import {
   getNotReadyParticipants,
   getLobbyNudge,
   sendLobbyNudgeToNotReady,
+  isLobbyEveningStarted,
 } from "../core/lobby.js";
 import { canCreateLobby } from "../core/auth.js";
 import { isSupabaseConfigured } from "../core/supabaseClient.js";
+import { onLobbyBundleUpdated } from "../core/supabaseLobby.js";
 import {
   isGameSyncActive,
   isLobbyHost,
@@ -27,6 +29,9 @@ import {
   startMultiplayerSync,
   routeToActiveGameIfNeeded,
   onGameSessionChange,
+  getEffectiveSessionScreen,
+  isActiveGameSessionScreen,
+  isOnGameSetupScreen,
 } from "../core/gameSync.js";
 import { navigate, getCurrentScreen } from "../core/router.js";
 import { triggerLobbyNudge } from "../core/nudge.js";
@@ -82,6 +87,7 @@ export function mountLobby(app) {
 
   let cleanupSim = null;
   let unsubSession = () => {};
+  let unsubBundle = () => {};
   let mounted = false;
   let lastNudgeSeen = 0;
   let wizzCooldownUntil = 0;
@@ -407,7 +413,9 @@ export function mountLobby(app) {
 
   (async () => {
     await ensureLobby();
-    await resetAllParticipantsReady();
+    if (!isLobbyEveningStarted()) {
+      await resetAllParticipantsReady();
+    }
     renderFull();
     if (isGameSyncActive()) {
       startMultiplayerSync();
@@ -415,10 +423,20 @@ export function mountLobby(app) {
       unsubSession = onGameSessionChange(async (row) => {
         if (!row) return;
         if (await routeToActiveGameIfNeeded(row)) return;
-        if (row.screen !== "game-select") return;
-        if (getLobbyStatus() !== "playing") return;
-        if (getCurrentScreen() !== "lobby") return;
-        navigate("game-select", { navStack: ["home", "lobby", "game-select"] });
+        const effective = getEffectiveSessionScreen(row);
+        if (getCurrentScreen() !== "lobby" || !effective) return;
+        if (isActiveGameSessionScreen(effective) || isOnGameSetupScreen(effective)) {
+          void routeToActiveGameIfNeeded(row);
+          return;
+        }
+        if (effective === "game-select" && getLobbyStatus() === "playing") {
+          navigate("game-select", { navStack: ["home", "lobby", "game-select"] });
+        }
+      });
+      unsubBundle = onLobbyBundleUpdated(() => {
+        if (getLobbyStatus() === "playing") {
+          void routeToActiveGameIfNeeded();
+        }
       });
     }
     cleanupSim = simulateLobbyJoins(onLobbyUpdate);
@@ -426,6 +444,7 @@ export function mountLobby(app) {
 
   return () => {
     unsubSession();
+    unsubBundle();
     if (cleanupSim) cleanupSim();
   };
 }

@@ -1,5 +1,5 @@
 /**
- * MOT INTERDIT (Fil Rouge) — jeu abandonné, code conservé pour évolution future.
+ * MOT INTERDIT (Fil Rouge) - jeu abandonné, code conservé pour évolution future.
  * Réactivation : passer FIL_ROUGE_ENABLED à true, puis décommenter les blocs
  * « FIL_ROUGE » dans main.js, gameSelect.js, lobby.js, gameSync.js et la doc Supabase.
  */

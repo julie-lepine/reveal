@@ -9,7 +9,7 @@ import { navigate } from "../core/router.js";
 import { escapeHtml, pageShell, resetPageScroll } from "../core/ui.js";
 import { bindNav } from "../screens/nav.js";
 import { gameExitBarHtml, bindExitGame } from "../core/exitGame.js";
-// FIL_ROUGE (Mot interdit) — pause soirée ; isEveningGameplayPaused() = false si désactivé
+// FIL_ROUGE (Mot interdit) - pause soirée ; isEveningGameplayPaused() = false si désactivé
 import { isEveningGameplayPaused } from "../core/filRougeSession.js";
 import {
   completeGameSession,
@@ -80,7 +80,7 @@ export function mountTrivia(app) {
       if (answerCommitInFlight) return "Envoi de ta réponse…";
       return trivia.allAnswersIn()
         ? "Tout le monde a répondu. Révélation en cours…"
-        : "Réponse enregistrée — tu peux encore la modifier · en attente des autres…";
+        : "Réponse enregistrée - tu peux encore la modifier · en attente des autres…";
     }
     return "Choisis ta réponse (tu pourras la modifier avant la révélation).";
   }

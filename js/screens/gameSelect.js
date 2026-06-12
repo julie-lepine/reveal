@@ -41,7 +41,7 @@ import {
   resolveLastGameForRestart,
   restartGame,
 } from "../core/restartGame.js";
-// FIL_ROUGE (Mot interdit) — désactivé
+// FIL_ROUGE (Mot interdit) - désactivé
 // import {
 //   filRougeGameSelectSectionHtml,
 //   bindFilRougeBox,

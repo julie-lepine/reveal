@@ -2,6 +2,7 @@ import { EVENING_POINTS, FIL_ROUGE_POINTS, tierNightPointsForRankDiff } from "..
 import { PLAYLIST_GUESS_POINTS } from "../../data/playlistGuess.js";
 import { filterVoterVotes, computeRoundMetrics } from "./truthMeterSession.js";
 import { countDilemmaResults } from "./dilemmaSession.js";
+import { DILEMMA_POINTS_TIE } from "../../data/dilemma.js";
 import {
   TRUTH_METER_BLUFF_GAP,
   TRUTH_METER_CONSENSUS_GAP,
@@ -145,12 +146,25 @@ export function awardDilemmaRound(votes) {
     divided,
     pctA,
     pctB,
+    tie: false,
     majorityWinners: [],
+    tieWinners: [],
     pointsAwarded: EVENING_POINTS.WIN,
     deltas: {},
   };
 
-  if (!majority) return summary;
+  if (!majority) {
+    summary.tie = true;
+    summary.pointsAwarded = DILEMMA_POINTS_TIE;
+    Object.entries(votes).forEach(([name, choice]) => {
+      if (choice !== "A" && choice !== "B") return;
+      addScore(name, DILEMMA_POINTS_TIE);
+      summary.tieWinners.push(name);
+      summary.deltas[name] = DILEMMA_POINTS_TIE;
+      if (divided) bumpPlayerStat(name, "dilemmaChaosRounds", 1);
+    });
+    return summary;
+  }
 
   Object.entries(votes).forEach(([name, choice]) => {
     if (choice !== "A" && choice !== "B") return;
@@ -231,7 +245,7 @@ export function guessLieLiarWins(correctCount, voterCount) {
   return correctCount * 2 < voterCount;
 }
 
-/** MOT INTERDIT (Fil Rouge) — désactivé, voir data/filRouge.js */
+/** MOT INTERDIT (Fil Rouge) - désactivé, voir data/filRouge.js */
 export function awardFilRougeMission(agentName) {
   // addFilRougeScore(agentName, FIL_ROUGE_POINTS.MISSION);
   // bumpPlayerStat(agentName, "filRougeMissionsValidated", 1);

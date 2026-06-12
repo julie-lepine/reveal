@@ -31,6 +31,8 @@ import {
   stopLobbyPresenceSync,
   onLobbyBundleUpdated,
   sendLobbyNudgeSupabase,
+  recoverLobbyFromServer,
+  peekServerLobbyForUser,
 } from "./supabaseLobby.js";
 import { showAppAlert, showAppConfirm } from "./dialog.js";
 import {
@@ -202,7 +204,13 @@ export async function resetAllParticipantsReady() {
 
 export function hasActiveLobby() {
   const lobby = getLobby();
-  if (!getState().inLobby || !lobby?.code || !lobby.participants?.length) {
+  if (!getState().inLobby || !lobby?.code) {
+    return false;
+  }
+  if (!lobby.participants?.length) {
+    if (isSupabaseConfigured() && lobby.id && getSupabaseUserId()) {
+      return true;
+    }
     return false;
   }
   if (isSupabaseConfigured()) {
@@ -214,6 +222,22 @@ export function hasActiveLobby() {
   return true;
 }
 
+/** Tente de restaurer le lobby depuis Supabase (compte connecté). */
+export async function tryRecoverLobbyFromServer() {
+  if (!isSupabaseConfigured() || !getSupabaseUserId()) {
+    return { ok: false };
+  }
+  try {
+    const res = await recoverLobbyFromServer();
+    return res.ok ? { ok: true, code: res.code } : { ok: false };
+  } catch (e) {
+    console.warn("REVEAL recover lobby:", e.message || e);
+    return { ok: false };
+  }
+}
+
+export { peekServerLobbyForUser };
+
 /** Nettoie un lobby fantôme en local (sans quitter Supabase côté serveur). */
 export function forceClearClientLobbyState() {
   stopMultiplayerSync();
@@ -223,12 +247,12 @@ export function forceClearClientLobbyState() {
 
 /**
  * Vérifie que le joueur local est encore membre du lobby (après F5 / nouvelle session anon).
- * @returns {{ cleared: boolean }}
+ * Restaure depuis Supabase si le localStorage a perdu l'état.
+ * @returns {{ cleared: boolean, recovered?: boolean }}
  */
 export async function reconcileLobbyMembership() {
-  if (!getState().inLobby) return { cleared: false };
-
   if (!isSupabaseConfigured()) {
+    if (!getState().inLobby) return { cleared: false };
     const lobby = getLobby();
     if (!lobby?.code || !lobby.participants?.length) {
       forceClearClientLobbyState();
@@ -237,10 +261,23 @@ export async function reconcileLobbyMembership() {
     return { cleared: false };
   }
 
-  const lobbyId = getLobby()?.id;
   const uid = getSupabaseUserId();
 
+  if (!getState().inLobby) {
+    if (uid) {
+      const recovered = await tryRecoverLobbyFromServer();
+      if (recovered.ok) return { cleared: false, recovered: true };
+    }
+    return { cleared: false };
+  }
+
+  const lobbyId = getLobby()?.id;
+
   if (!lobbyId) {
+    if (uid) {
+      const recovered = await tryRecoverLobbyFromServer();
+      if (recovered.ok) return { cleared: false, recovered: true };
+    }
     if (!uid) forceClearClientLobbyState();
     return { cleared: !uid };
   }
@@ -255,8 +292,13 @@ export async function reconcileLobbyMembership() {
     const participants = getLobbyParticipants();
     if (!participants.length || !participants.some((p) => p.userId === uid)) {
       const stillMember = await isLocalStillLobbyMember(lobbyId);
-      if (stillMember === true) return { cleared: false };
-      if (stillMember === null) return { cleared: false };
+      if (stillMember !== false) {
+        if (stillMember === true) {
+          const recovered = await tryRecoverLobbyFromServer();
+          if (recovered.ok) return { cleared: false, recovered: true };
+        }
+        return { cleared: false };
+      }
       forceClearClientLobbyState();
       return { cleared: true };
     }
@@ -264,7 +306,7 @@ export async function reconcileLobbyMembership() {
   } catch (e) {
     console.warn("REVEAL reconcile lobby:", e.message || e);
     const stillMember = await isLocalStillLobbyMember(lobbyId);
-    if (stillMember === true || stillMember === null) return { cleared: false };
+    if (stillMember !== false) return { cleared: false };
     forceClearClientLobbyState();
     return { cleared: true };
   }
@@ -314,10 +356,24 @@ export async function navigateAfterLobbyJoin() {
   await routeToEveningHub({ rejoinActiveGame: true });
 }
 
-/** Menu jeux (action volontaire) : n’y reprend pas une partie en cours. */
-export async function returnToEveningGames() {
+/** Menu jeux ou reprise de partie (accueil / paramètres). */
+export async function returnToEveningGames({ rejoinActiveGame = false } = {}) {
   if (!hasActiveLobby()) {
-    navigate("home", { reset: true });
+    if (rejoinActiveGame) {
+      const recovered = await tryRecoverLobbyFromServer();
+      if (!recovered.ok) {
+        navigate("home", { reset: true });
+        return;
+      }
+    } else {
+      navigate("home", { reset: true });
+      return;
+    }
+  }
+
+  if (rejoinActiveGame) {
+    clearSessionRouteSuppress();
+    await routeToEveningHub({ rejoinActiveGame: true });
     return;
   }
 
@@ -356,12 +412,18 @@ export async function routeToEveningHub({ rejoinActiveGame = true } = {}) {
     startMultiplayerSync();
     const row = await refreshGameSession();
     if (rejoinActiveGame && (await routeToActiveGameIfNeeded(row))) return true;
-    // FIL_ROUGE (Mot interdit) — reprise setup/mission désactivée
-    // const frScreen = getFilRougeResumeScreen();
-    // if (frScreen) {
-    //   routeToSessionScreen(frScreen, { force: true });
-    //   return true;
-    // }
+
+    if (rejoinActiveGame && row) {
+      const effective = getEffectiveSessionScreen(row);
+      if (
+        effective &&
+        (isActiveGameSessionScreen(effective) || isOnGameSetupScreen(effective))
+      ) {
+        routeToSessionScreen(effective, { force: true });
+        return true;
+      }
+    }
+
     if (!isLobbyEveningStarted()) {
       goToLobby();
       return true;
@@ -384,11 +446,14 @@ export async function routeToEveningHub({ rejoinActiveGame = true } = {}) {
  * @param {{ force?: boolean }} [options] - force=true au boot ; false si l’utilisateur est allé à l’accueil volontairement.
  */
 export async function resumeEveningSession({ force = false } = {}) {
-  if (!hasActiveLobby()) return false;
+  if (!hasActiveLobby()) {
+    const recovered = await tryRecoverLobbyFromServer();
+    if (!recovered.ok) return false;
+  }
   if (!force && isSessionRouteSuppressed()) return false;
 
   if (force) clearSessionRouteSuppress();
-  return routeToEveningHub();
+  return routeToEveningHub({ rejoinActiveGame: true });
 }
 
 export function getLobbyParticipants() {

@@ -237,6 +237,33 @@ export function mountDilemmaPrep(app) {
     app.querySelector("#btn-start-game")?.addEventListener("click", onStartGame);
   }
 
+  function customDilemmaCardHtml() {
+    const myCustoms = getMyCustomDilemmas();
+    if (myCustoms.length > 0) {
+      return `
+        <div class="card">
+          <p class="card-heading">Ton dilemme</p>
+          <p class="hint">Ton dilemme sera joué en priorité. Tu pourras en proposer un autre à la prochaine partie.</p>
+          ${customDilemmasListHtml()}
+          ${othersDilemmasHintHtml()}
+        </div>`;
+    }
+    return `
+        <div class="card">
+          <p class="card-heading">Ton dilemme</p>
+          <label class="field-label" for="dilemma-option-a">Option A</label>
+          <input type="text" class="field-input" id="dilemma-option-a" maxlength="120" placeholder="Ex : Ne plus jamais dormir" />
+          <label class="field-label" for="dilemma-option-b">Option B</label>
+          <div class="join-row">
+            <input type="text" class="field-input join-input" id="dilemma-option-b" maxlength="120" placeholder="Ex : Ne plus jamais manger chaud" />
+            <button type="button" class="btn btn-secondary join-btn" id="add-dilemma">+</button>
+          </div>
+          <p class="moderation-notice">${escapeHtml(moderationNotice)}</p>
+          <p class="auth-error hidden" id="dilemma-error"></p>
+          ${othersDilemmasHintHtml()}
+        </div>`;
+  }
+
   function render(preserveDraft = null) {
     const draft = preserveDraft ?? (mounted ? captureDraft() : null);
 
@@ -308,20 +335,7 @@ export function mountDilemmaPrep(app) {
           ${!isHost ? `<p class="hint">Seul l'hôte peut modifier les réglages.</p>` : ""}
         </div>
 
-        <div class="card">
-          <p class="card-heading">Ton dilemme</p>
-          <label class="field-label" for="dilemma-option-a">Option A</label>
-          <input type="text" class="field-input" id="dilemma-option-a" maxlength="120" placeholder="Ex : Ne plus jamais dormir" />
-          <label class="field-label" for="dilemma-option-b">Option B</label>
-          <div class="join-row">
-            <input type="text" class="field-input join-input" id="dilemma-option-b" maxlength="120" placeholder="Ex : Ne plus jamais manger chaud" />
-            <button type="button" class="btn btn-secondary join-btn" id="add-dilemma">+</button>
-          </div>
-          <p class="moderation-notice">${escapeHtml(moderationNotice)}</p>
-          <p class="auth-error hidden" id="dilemma-error"></p>
-          ${customDilemmasListHtml()}
-          ${othersDilemmasHintHtml()}
-        </div>
+        ${customDilemmaCardHtml()}
 
         <div class="card" id="dilemma-players">${playersReadySectionHtml(members, session.ready)}</div>
 
@@ -345,7 +359,7 @@ export function mountDilemmaPrep(app) {
     attr: "data-remove-dilemma",
     onRemove: async (id) => {
       await removeCustomDilemma(id);
-      refreshFromSync();
+      render(captureDraft());
     },
   });
 

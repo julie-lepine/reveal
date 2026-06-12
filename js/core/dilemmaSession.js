@@ -131,11 +131,11 @@ export function buildDilemmaDeck() {
     .filter(Boolean);
   const totalAvailable = bank.length + customs.length;
   const effective = resolveEffectiveRoundCount(session.roundCount ?? 8, totalAvailable);
-  // Les dilemmes des joueurs sont garantis (dans la limite des manches), le reste vient de la banque.
+  // Les dilemmes des joueurs en tête de partie (ordre aléatoire entre eux), puis la banque.
   const customsKept = shuffleArray(customs).slice(0, effective);
   const remaining = Math.max(0, effective - customsKept.length);
   const bankKept = shuffleArray(bank).slice(0, remaining);
-  const deck = shuffleArray([...customsKept, ...bankKept]);
+  const deck = [...customsKept, ...bankKept];
   const next = { ...session, deck };
   saveStatePatch({ dilemmaGame: next });
   return deck;
@@ -167,10 +167,39 @@ export function mergeCustomDilemmasLists(localList = [], remoteList = []) {
   });
 }
 
+export function isCustomDilemmaEntry(dilemma) {
+  if (!dilemma || typeof dilemma !== "object") return false;
+  if (dilemma.tier === "custom" || dilemma.author) return true;
+  const id = String(dilemma.id || "");
+  return id.startsWith("custom-");
+}
+
+/** Retire un dilemme custom joué (one-shot) ; sync distante si hôte MP. */
+export async function consumePlayedCustomDilemma(dilemma) {
+  if (!isCustomDilemmaEntry(dilemma) || !dilemma.id) return false;
+  const session = getDilemmaSession();
+  const prev = session.customDilemmas || [];
+  const next = prev
+    .map(normalizeCustomDilemma)
+    .filter(Boolean)
+    .filter((d) => d.id !== dilemma.id);
+  if (next.length === prev.length) return false;
+  if (isGameSyncActive() && isLobbyHost()) {
+    await syncDilemmaSession({ ...session, customDilemmas: next });
+  } else {
+    saveStatePatch({ dilemmaGame: { ...session, customDilemmas: next } });
+  }
+  return true;
+}
+
 export async function addCustomDilemma(optionA, optionB) {
   const a = String(optionA || "").trim();
   const b = String(optionB || "").trim();
   if (!a || !b) return { ok: false, error: "Les deux options sont requises." };
+
+  if (getMyCustomDilemmas().length >= 1) {
+    return { ok: false, error: "Tu as déjà soumis un dilemme pour cette partie." };
+  }
 
   const modA = checkHotTakeModeration(a);
   if (modA.blocked) return { ok: false, error: modA.message };
@@ -211,7 +240,7 @@ export async function removeCustomDilemma(dilemmaId) {
 
 export function getDilemmaRounds() {
   const session = getDilemmaSession();
-  if (session.deck?.length) return session.deck;
+  if (session.lobbyStarted && session.deck?.length) return session.deck;
   return buildDilemmaDeck();
 }
 
@@ -409,4 +438,6 @@ export {
   DILEMMA_ROUND_ALL,
   DILEMMA_CATALOG_ID,
   DILEMMA_VOTE_TIMER_SEC,
+  DILEMMA_POINTS_MAJORITY_WIN,
+  DILEMMA_POINTS_TIE,
 } from "../../data/dilemma.js";

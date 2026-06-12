@@ -211,7 +211,9 @@ export async function commitTruthMeterPlay(patch, patchOpts = {}) {
 /** Soumission affirmation auteur : hôte via commitHostGamePlay, invité via patch étroit. */
 export async function commitTruthMeterAffirmation(text, authorEstimate) {
   const localName = getLocalDisplayName();
+  const session = getTruthMeterSession();
   const patch = {
+    roundIdx: session.roundIdx ?? 0,
     affirmation: { text, author: localName },
     authorEstimate,
     phase: "display",
@@ -221,7 +223,6 @@ export async function commitTruthMeterAffirmation(text, authorEstimate) {
   if (isGameSyncActive() && isLobbyHost()) {
     return commitTruthMeterPlay(patch);
   }
-  const session = getTruthMeterSession();
   const next = { ...session, ...patch };
   saveStatePatch({ truthMeterGame: next });
   if (!isGameSyncActive()) return next;

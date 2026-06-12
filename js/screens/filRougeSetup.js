@@ -1,4 +1,4 @@
-/** MOT INTERDIT (Fil Rouge) — écran setup conservé ; voir data/filRouge.js */
+/** MOT INTERDIT (Fil Rouge) - écran setup conservé ; voir data/filRouge.js */
 import {
   FIL_ROUGE_ENABLED,
   FIL_ROUGE_MIN_PLAYERS,
