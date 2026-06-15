@@ -4,7 +4,8 @@ import {
 } from "../core/guessLieSession.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
 import { isGameSyncActive, isLobbyHost } from "../core/gameSync.js";
-import { handleGuessLieLaunch, navigateToGuessLiePlay } from "../core/guessLieSession.js";
+import { handleGuessLieLaunch, tryEnterGuessLiePlayFromWait } from "../core/guessLieSession.js";
+import { getCurrentScreen } from "../core/router.js";
 import { pageShell } from "../core/ui.js";
 import { bindNav } from "./nav.js";
 
@@ -66,7 +67,9 @@ export function mountGuessLieMenu(app) {
     const btn = app.querySelector("#btn-play");
     try {
       await handleGuessLieLaunch(btn);
-      navigateToGuessLiePlay();
+      if (getCurrentScreen() !== "guesslie") {
+        tryEnterGuessLiePlayFromWait();
+      }
     } catch (err) {
       console.warn("Guess The Lie launch:", err);
       const { showAppAlert } = await import("../core/dialog.js");

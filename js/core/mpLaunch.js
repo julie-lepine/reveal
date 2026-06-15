@@ -183,13 +183,11 @@ export function prepGuestFollowOnSession({ prepScreen, getEntryScreen, buildNavS
     const entry = getEntryScreen();
     if (entry === prepScreen) return false;
     if (entry === "guesslie") {
-      navigate("guesslie", {
+      return navigate("guesslie", {
         navStack: ["home", "lobby", "game-select", "guesslie-menu", "guesslie-wait", "guesslie"],
       });
-      return true;
     }
-    navigate(entry, buildNavStack ? { navStack: buildNavStack(entry) } : { reset: true });
-    return true;
+    return navigate(entry, buildNavStack ? { navStack: buildNavStack(entry) } : { reset: true });
   };
 }
 

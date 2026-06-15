@@ -1,9 +1,14 @@
 import { GUESS_LIE_ROUNDS } from "../../data/guessLies.js";
 import { getActivePlayerNames, getActivePlayers } from "./players.js";
 import { isValidGuessLieSubmission } from "./sessionMerge.js";
-import { getLocalDisplayName, getState } from "./state.js";
+import {
+  applyGuessLieLobbyCompleteLocal,
+  getLocalDisplayName,
+  getState,
+  syncGuessLieLobbyCompleteRemote,
+} from "./state.js";
 import { runLaunchButton } from "./mpLaunch.js";
-import { navigate } from "./router.js";
+import { getCurrentScreen, navigate } from "./router.js";
 
 export function getGuessLieSession() {
   return getState().guessLie;
@@ -11,7 +16,12 @@ export function getGuessLieSession() {
 
 export function hasLocalSubmission() {
   const session = getGuessLieSession();
-  return isValidGuessLieSubmission(session.submissions[getLocalDisplayName()]);
+  const subs = session.submissions || {};
+  const name = getLocalDisplayName();
+  if (isValidGuessLieSubmission(subs[name])) return true;
+  const lobbyName = getState().lobby?.participants?.find((p) => p.isLocal)?.name;
+  if (lobbyName && isValidGuessLieSubmission(subs[lobbyName])) return true;
+  return false;
 }
 
 export function getLobbyMembers() {
@@ -30,9 +40,10 @@ export function allLobbySubmitted() {
 export function getGuessLieRounds() {
   const { submissions } = getGuessLieSession();
   const memberNames = getLobbyMemberNames();
+  const subKeys = Object.keys(submissions || {});
   const playerNames = memberNames.length
-    ? memberNames
-    : Object.keys(submissions || {});
+    ? [...new Set([...memberNames, ...subKeys])]
+    : subKeys;
   return playerNames
     .filter((n) => isValidGuessLieSubmission(submissions[n]))
     .map((n) => ({
@@ -50,24 +61,61 @@ export function isGuessLieGameActive(session = getGuessLieSession()) {
 }
 
 export function getGuessLieEntryScreen() {
-  if (!hasLocalSubmission()) return "guesslie-menu";
   if (isGuessLieGameActive()) return "guesslie";
+  if (!hasLocalSubmission()) return "guesslie-menu";
   return "guesslie-wait";
 }
 
+export const GUESS_LIE_PLAY_NAV_STACK = [
+  "home",
+  "lobby",
+  "game-select",
+  "guesslie-menu",
+  "guesslie-wait",
+  "guesslie",
+];
+
 const GUESS_LIE_NAV_STACK = {
-  guesslie: ["home", "lobby", "game-select", "guesslie-menu", "guesslie-wait", "guesslie"],
+  guesslie: GUESS_LIE_PLAY_NAV_STACK,
   "guesslie-wait": ["home", "lobby", "game-select", "guesslie-menu", "guesslie-wait"],
   "guesslie-menu": ["home", "lobby", "game-select", "guesslie-menu"],
   "guesslie-setup": ["home", "lobby", "game-select", "guesslie-menu", "guesslie-setup"],
 };
 
-/** Navigation vers l'écran de vote (appelé après lancement ou reprise session). */
+function warnNavigateFailure(reason, extra = {}) {
+  console.warn(`Guess The Lie: ${reason}`, {
+    currentScreen: getCurrentScreen(),
+    entry: getGuessLieEntryScreen(),
+    rounds: getGuessLieRounds().length,
+    lobbyComplete: getGuessLieSession().lobbyComplete,
+    phase: getGuessLieSession().phase,
+    ...extra,
+  });
+}
+
+/** Navigation directe vers l'écran de vote (sans garde entry). */
+export function forceNavigateToGuessLiePlay() {
+  const ok = navigate("guesslie", { navStack: GUESS_LIE_PLAY_NAV_STACK });
+  if (!ok) warnNavigateFailure("navigate(guesslie) returned false");
+  return ok;
+}
+
+/** Navigation vers l'écran de vote (après lancement ou reprise session). */
 export function navigateToGuessLiePlay() {
-  if (getGuessLieEntryScreen() !== "guesslie") return false;
-  if (!getGuessLieRounds().length) return false;
-  navigate("guesslie", { navStack: GUESS_LIE_NAV_STACK.guesslie });
-  return true;
+  if (!isGuessLieGameActive()) return false;
+  if (!getGuessLieRounds().length) {
+    warnNavigateFailure("no rounds available");
+    return false;
+  }
+  return forceNavigateToGuessLiePlay();
+}
+
+/** Quitter le salon d'attente si la partie a démarré (retry si navigate a échoué). */
+export function tryEnterGuessLiePlayFromWait() {
+  if (!isGuessLieGameActive()) return false;
+  if (navigateToGuessLiePlay()) return true;
+  if (getCurrentScreen() !== "guesslie-wait") return true;
+  return forceNavigateToGuessLiePlay();
 }
 
 /** Boot / reprise : menu, wait ou partie selon l'état local. */
@@ -75,18 +123,18 @@ export function navigateToGuessLieEntry() {
   const entry = getGuessLieEntryScreen();
   if (entry === "guesslie-wait") return false;
   if (entry === "guesslie") return navigateToGuessLiePlay();
-  navigate(entry, {
+  const ok = navigate(entry, {
     navStack: GUESS_LIE_NAV_STACK[entry] || ["home", "lobby", "game-select", entry],
   });
-  return true;
+  return ok;
 }
 
 /** Lancement depuis le salon d'attente ou le menu (solo + MP). */
 export async function handleGuessLieLaunch(btn) {
   return runLaunchButton(btn, async () => {
-    const { markGuessLieLobbyComplete } = await import("./state.js");
-    await markGuessLieLobbyComplete();
-    navigateToGuessLiePlay();
+    applyGuessLieLobbyCompleteLocal();
+    tryEnterGuessLiePlayFromWait();
+    syncGuessLieLobbyCompleteRemote();
   });
 }
 

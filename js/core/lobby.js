@@ -56,7 +56,7 @@ import {
   routeToSessionScreen,
   isAppContentMounted,
 } from "./gameSync.js";
-import { isGuessLieGameActive, navigateToGuessLiePlay } from "./guessLieSession.js";
+import { isGuessLieGameActive, tryEnterGuessLiePlayFromWait } from "./guessLieSession.js";
 
 const MAX_PLAYERS = 10;
 
@@ -401,7 +401,7 @@ export async function goToGameSelect() {
 function resumeLocalGuessLiePlay() {
   if (!isGuessLieGameActive()) return false;
   if (isAppContentMounted()) return true;
-  return navigateToGuessLiePlay();
+  return tryEnterGuessLiePlayFromWait();
 }
 
 export async function routeToEveningHub({ rejoinActiveGame = true } = {}) {

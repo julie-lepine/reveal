@@ -6,12 +6,13 @@ import {
   getLobbyMemberNames,
   handleGuessLieLaunch,
   isGuessLieGameActive,
-  navigateToGuessLiePlay,
+  tryEnterGuessLiePlayFromWait,
 } from "../core/guessLieSession.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
 import { isValidGuessLieSubmission } from "../core/sessionMerge.js";
 import { prepGuestFollowOnSession } from "../core/mpLaunch.js";
 import { showAppAlert } from "../core/dialog.js";
+import { getCurrentScreen } from "../core/router.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
 import { bindNav } from "./nav.js";
 import { isLobbyHost, onGameSessionChange } from "../core/gameSync.js";
@@ -22,7 +23,7 @@ export function mountGuessLieLobbyWait(app) {
   const localName = getLocalDisplayName();
 
   function render() {
-    if (isGuessLieGameActive() && navigateToGuessLiePlay()) return;
+    if (tryEnterGuessLiePlayFromWait()) return;
 
     const session = getGuessLieSession();
     const members = getLobbyMemberNames();
@@ -76,12 +77,14 @@ export function mountGuessLieLobbyWait(app) {
     const btn = e.target.closest("#btn-start");
     if (!btn) return;
     if (isGuessLieGameActive()) {
-      navigateToGuessLiePlay();
+      tryEnterGuessLiePlayFromWait();
       return;
     }
     try {
       await handleGuessLieLaunch(btn);
-      navigateToGuessLiePlay();
+      if (getCurrentScreen() === "guesslie-wait") {
+        tryEnterGuessLiePlayFromWait();
+      }
     } catch (err) {
       console.warn("Guess The Lie launch:", err);
       await showAppAlert(err?.message || "Impossible de lancer la partie.", {
@@ -98,14 +101,14 @@ export function mountGuessLieLobbyWait(app) {
   });
 
   function onSessionUpdate() {
-    if (isGuessLieGameActive() && navigateToGuessLiePlay()) return;
+    if (tryEnterGuessLiePlayFromWait()) return;
     if (guestFollow()) return;
     render();
   }
 
   app.addEventListener("click", onStartClick);
   render();
-  if (isGuessLieGameActive() && navigateToGuessLiePlay()) {
+  if (tryEnterGuessLiePlayFromWait()) {
     return () => app.removeEventListener("click", onStartClick);
   }
 

@@ -1,4 +1,4 @@
-import { scheduleSave } from "./persist.js";
+import { flushSave, scheduleSave } from "./persist.js";
 import { DEFAULT_PROFILE_EMOJI } from "../../data/profileEmojis.js";
 
 const STORAGE_KEY = "reveal-app-state";
@@ -772,7 +772,7 @@ export function setGuessLieSubmission(playerName, payload) {
   save();
 }
 
-function applyGuessLieLobbyCompleteLocal() {
+export function applyGuessLieLobbyCompleteLocal() {
   syncGuessLieSession();
   state.guessLie.lobbyComplete = true;
   state.guessLie.roundIdx = 0;
@@ -780,24 +780,21 @@ function applyGuessLieLobbyCompleteLocal() {
   state.guessLie.votes = {};
   state.guessLie.roundScored = false;
   save();
+  flushSave();
 }
 
-export async function markGuessLieLobbyComplete() {
-  syncGuessLieSession();
-  applyGuessLieLobbyCompleteLocal();
-
-  const { isGameSyncActive, isLobbyHost, guessLieLobbyStartToRemote } = await import(
-    "./gameSync.js"
-  );
-  if (!isGameSyncActive() || !isLobbyHost()) {
-    return { ok: true };
-  }
-
-  const { commitMultiplayerLaunch } = await import("./mpLaunch.js");
-  const { setLobbyPlaying } = await import("./lobby.js");
-  const remotePayload = { guessLie: guessLieLobbyStartToRemote() };
-
+/** Sync MP en arrière-plan (lobby playing + patch game_sessions). */
+export function syncGuessLieLobbyCompleteRemote() {
   void (async () => {
+    const { isGameSyncActive, isLobbyHost, guessLieLobbyStartToRemote } = await import(
+      "./gameSync.js"
+    );
+    if (!isGameSyncActive() || !isLobbyHost()) return;
+
+    const { commitMultiplayerLaunch } = await import("./mpLaunch.js");
+    const { setLobbyPlaying } = await import("./lobby.js");
+    const remotePayload = { guessLie: guessLieLobbyStartToRemote() };
+
     try {
       await setLobbyPlaying("guesslie");
       await commitMultiplayerLaunch({
@@ -816,7 +813,11 @@ export async function markGuessLieLobbyComplete() {
       }).catch(() => {});
     }
   })();
+}
 
+export async function markGuessLieLobbyComplete() {
+  applyGuessLieLobbyCompleteLocal();
+  syncGuessLieLobbyCompleteRemote();
   return { ok: true };
 }
 
