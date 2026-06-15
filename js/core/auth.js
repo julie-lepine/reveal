@@ -193,7 +193,7 @@ export async function loginAsGuest(displayName, captchaToken = null) {
       provider: "guest",
     },
   });
-  return { ok: true };
+  return { ok: true, hadSession: false };
 }
 
 export async function updateProfileName(name) {

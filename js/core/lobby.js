@@ -33,6 +33,7 @@ import {
   sendLobbyNudgeSupabase,
   recoverLobbyFromServer,
   peekServerLobbyForUser,
+  getRememberedLobbyCode,
 } from "./supabaseLobby.js";
 import { showAppAlert, showAppConfirm } from "./dialog.js";
 import {
@@ -236,7 +237,7 @@ export async function tryRecoverLobbyFromServer() {
   }
 }
 
-export { peekServerLobbyForUser };
+export { peekServerLobbyForUser, getRememberedLobbyCode };
 
 /** Nettoie un lobby fantôme en local (sans quitter Supabase côté serveur). */
 export function forceClearClientLobbyState() {
@@ -560,15 +561,22 @@ export async function joinLobbyAsGuest(code, guestName, captchaToken = null) {
   const auth = await loginAsGuest(guestName, captchaToken);
   if (!auth.ok) return auth;
 
-  const nextCode = normalizeLobbyCode(code);
+  const joinCode =
+    normalizeLobbyCode(code) || normalizeLobbyCode(getLobby()?.code) || normalizeLobbyCode(getRememberedLobbyCode());
+
+  const nextCode = joinCode;
   const currentCode = normalizeLobbyCode(getLobby()?.code);
   if (hasActiveLobby() && currentCode && nextCode && currentCode !== nextCode) {
     await leaveLobby({ navigateAway: false });
   }
 
-  const res = await joinLobby(code);
+  const res = await joinLobby(joinCode);
   if (!res.ok) {
-    await clearGuestSessionAfterFailedJoin();
+    const sessionCleared = !auth.hadSession;
+    if (sessionCleared) {
+      await clearGuestSessionAfterFailedJoin();
+    }
+    return { ...res, sessionCleared };
   }
   return res;
 }

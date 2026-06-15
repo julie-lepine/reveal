@@ -311,6 +311,8 @@ export async function signInAsGuest(displayName, captchaToken = null) {
     };
   }
 
+  const hadSession = Boolean(user?.is_anonymous);
+
   if (!user) {
     const { isTurnstileRequired } = await import("./turnstile.js");
     if (isTurnstileRequired() && !captchaToken) {
@@ -359,7 +361,7 @@ export async function signInAsGuest(displayName, captchaToken = null) {
     },
   });
 
-  return { ok: true };
+  return { ok: true, hadSession };
 }
 
 /** Facebook (Meta) - aussi utilisé pour « Instagram » (OAuth Meta). */

@@ -71,6 +71,15 @@ function readRememberedLobbyId() {
   }
 }
 
+/** Dernier code lobby connu (reconnexion invité). */
+export function getRememberedLobbyCode() {
+  try {
+    return sessionStorage.getItem(LAST_LOBBY_CODE_KEY) || "";
+  } catch {
+    return "";
+  }
+}
+
 /** Charge la session de jeu en cours après join / create (sans router - voir navigateAfterLobbyJoin). */
 async function restoreActiveGameSessionOnJoin(lobbyId) {
   const delays = [0, 400, 1200];

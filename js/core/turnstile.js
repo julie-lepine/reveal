@@ -126,6 +126,15 @@ export function isTurnstileSolved(slot) {
   return Boolean(getTurnstileToken(slot));
 }
 
+export function isTurnstileMounted(slot) {
+  return slotState[slot].widgetId != null;
+}
+
+export function setTurnstileOnChange(slot, onChange) {
+  slotState[slot].onChange = typeof onChange === "function" ? onChange : null;
+  notifySlot(slot);
+}
+
 export function resetTurnstile(slot) {
   if (!isTurnstileRequired()) return;
   const state = slotState[slot];

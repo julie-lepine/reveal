@@ -26,6 +26,7 @@ import {
   mergeTraitrePatchState,
   mergeSpeedVotePatchState,
   mergeTruthMeterPatchState,
+  mergeTruthMeterPhase,
   mergeForwardGamePhase,
   mergeTraitrePhase,
   mergeHotTakePhase,

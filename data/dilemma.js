@@ -35,6 +35,16 @@ export const DILEMMA_DECKS = [
         optionB: "Ne plus jamais manger chaud",
       },
       {
+        id: "spotify-youtube",
+        optionA: "Perdre Spotify",
+        optionB: "Perdre YouTube",
+      },
+      {
+        id: "voice-note-call",
+        optionA: "Recevoir uniquement des vocaux",
+        optionB: "Recevoir uniquement des appels",
+      },
+      {
         id: "teleport-nude",
         optionA: "Téléportation mais toujours nu",
         optionB: "Vol mais à 1 km/h",
@@ -119,6 +129,67 @@ export const DILEMMA_DECKS = [
         optionA: "Avoir des goûts de luxe mais un budget étudiant",
         optionB: "Avoir un budget de luxe mais des goûts d'étudiant",
       },
+      {
+        id: "viral-cancel",
+        optionA: "Devenir viral une fois",
+        optionB: "Rester anonyme toute ta vie",
+      },
+      {
+        id: "horse-size-cat",
+        optionA: "Combattre un chat de la taille d'un cheval",
+        optionB: "Combattre 100 chevaux de la taille d'un chat",
+      },
+      {
+        id: "banana-slip",
+        optionA: "Glisser sur une peau de banane une fois par semaine",
+        optionB: "Éternuer à chaque selfie",
+      },
+      {
+        id: "random-costume",
+        optionA: "Porter un costume de pirate chaque lundi",
+        optionB: "Porter un costume de licorne chaque vendredi",
+      },
+      {
+        id: "villain-laugh",
+        optionA: "Rire comme un méchant de dessin animé",
+        optionB: "Marcher comme un mannequin",
+      },
+      
+      {
+        id: "cereal-water",
+        optionA: "Manger tes céréales avec de l'eau",
+        optionB: "Boire ton café avec du sel",
+      },
+      {
+        id: "cheese-rain",
+        optionA: "Qu'il pleuve du fromage râpé",
+        optionB: "Qu'il neige du popcorn",
+      },
+      {
+        id: "invisible-fart",
+        optionA: "Péter très fort mais sans odeur",
+        optionB: "Péter silencieusement mais avec une odeur atroce",
+      },
+      {
+        id: "frog-money",
+        optionA: "Recevoir 100 € à chaque grenouille touchée",
+        optionB: "Recevoir 100 € à chaque pigeon touché",
+      },
+      {
+        id: "theme-song",
+        optionA: "Avoir une musique de boss à chaque entrée dans une pièce",
+        optionB: "Avoir des rires enregistrés après chaque blague",
+      },
+      {
+        id: "clown-shadow",
+        optionA: "Avoir un clown qui te suit partout",
+        optionB: "Avoir ton ombre qui te parle",
+      },
+      {
+        id: "ai-boss",
+        optionA: "Ton patron est une IA",
+        optionB: "Ton collègue pref est une IA",
+      },
     ],
   },
   {
@@ -139,9 +210,137 @@ export const DILEMMA_DECKS = [
         tier: "impossible",
       },
       {
+        id: "itch-sneeze",
+        optionA: "Avoir le nez qui gratte à vie",
+        optionB: "Avoir une envie d'éternuer permanente",
+        tier: "impossible",
+      },
+      {
+        id: "queue-redlight",
+        optionA: "Faire la queue partout",
+        optionB: "Tomber sur tous les feux rouges",
+        tier: "impossible",
+      },
+      {
+        id: "cold-pillow",
+        optionA: "Dormir sur un oreiller humide",
+        optionB: "Dormir avec des miettes dans le lit",
+        tier: "impossible",
+      },
+      {
+        id: "sneeze-hiccup",
+        optionA: "Hoqueter à chaque éternuement",
+        optionB: "Éternuer à chaque hoquet",
+        tier: "impossible",
+      },
+      
+      {
+        id: "clown-elevator",
+        optionA: "Partager chaque ascenseur avec un clown silencieux",
+        optionB: "Partager chaque ascenseur avec un magicien bavard",
+        tier: "impossible",
+      },
+      {
+        id: "lego-floor",
+        optionA: "Marcher sur un Lego chaque matin",
+        optionB: "Te cogner le petit orteil chaque soir",
+        tier: "impossible",
+      },
+      {
+        id: "whisper-shout",
+        optionA: "Parler uniquement en chuchotant",
+        optionB: "Parler uniquement en criant",
+        tier: "impossible",
+      },
+      {
+        id: "sticky-hands",
+        optionA: "Avoir les mains collantes à vie",
+        optionB: "Avoir les pieds humides à vie",
+        tier: "impossible",
+      },
+      {
+        id: "alarm-hour",
+        optionA: "Entendre un réveil fantôme chaque nuit",
+        optionB: "Entendre une notification fantôme chaque heure",
+        tier: "impossible",
+      },
+      {
+        id: "wet-sleeves",
+        optionA: "Manches mouillées après chaque lavage de mains",
+        optionB: "Chaussettes humides après chaque douche",
+        tier: "impossible",
+      },
+      {
+        id: "door-handle",
+        optionA: "Toutes les poignées sont collantes",
+        optionB: "Tous les écrans sont gras",
+        tier: "impossible",
+      },
+      {
+        id: "cold-pizza",
+        optionA: "Pizza toujours froide",
+        optionB: "Frites toujours molles",
+        tier: "impossible",
+      },
+      {
+        id: "duck-shadow",
+        optionA: "Être suivi par un canard agressif",
+        optionB: "Être suivi par ton propre clone gênant",
+        tier: "impossible",
+      },
+      {
+        id: "warm-water",
+        optionA: "Boire uniquement de l'eau tiède",
+        optionB: "Boire uniquement du café froid",
+        tier: "impossible",
+      },
+      
+      {
+        id: "hair-food",
+        optionA: "Trouver un cheveu dans chaque repas",
+        optionB: "Trouver une coquille d'œuf dans chaque repas",
+        tier: "impossible",
+      },
+      {
+        id: "mustache-eyebrows",
+        optionA: "Avoir une moustache permanente",
+        optionB: "Avoir des sourcils géants",
+        tier: "impossible",
+      },
+      {
+        id: "one-song",
+        optionA: "Entendre la même chanson chaque jour",
+        optionB: "Entendre le même rire chaque jour",
+        tier: "impossible",
+      },
+      {
+        id: "sand-bed",
+        optionA: "Toujours avoir du sable dans ton lit",
+        optionB: "Toujours avoir un caillou dans ta chaussure",
+        tier: "impossible",
+      },
+      {
+        id: "ads-life",
+        optionA: "Voir une pub avant chaque repas",
+        optionB: "Voir une pub avant chaque douche",
+        tier: "impossible",
+      },
+      {
         id: "wet-socks",
         optionA: "Chaussettes mouillées à vie",
         optionB: "Cheveux collés à vie",
+        tier: "impossible",
+      },
+      {
+        id: "netflix-spoil",
+        optionA: "Spoiler toutes les séries",
+        optionB: "Être spoilé sur toutes les séries",
+        tier: "impossible",
+      },
+      {
+        id: "online-date",
+        optionA: "Premier rendez-vous en visio",
+        optionB: "Premier rendez-vous avec les parents présents",
         tier: "impossible",
       },
       {

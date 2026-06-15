@@ -25,8 +25,10 @@ import {
   resetAppToCleanHome,
   tryRecoverLobbyFromServer,
   peekServerLobbyForUser,
+  getRememberedLobbyCode,
   resumeEveningSession,
 } from "../core/lobby.js";
+import { getSupabaseUserId } from "../core/supabaseAuth.js";
 import { getEveningRecap } from "../core/eveningRecap.js";
 import {
   isGameSyncActive,
@@ -51,6 +53,8 @@ import {
   getTurnstileToken,
   isTurnstileSolved,
   resetTurnstile,
+  isTurnstileMounted,
+  setTurnstileOnChange,
 } from "../core/turnstile.js";
 
 function syncForgotPasswordButton(root) {
@@ -120,7 +124,12 @@ async function runPasswordResetEmailFlow(defaultEmail = "", { title, message, ic
   return { ok: true, cancelled: false, cooldownStarted: true };
 }
 
+function guestRejoinDefaultCode() {
+  return getLobby()?.code || getRememberedLobbyCode() || "";
+}
+
 function guestJoinPanelHtml({ leaveHint = false } = {}) {
+  const defaultCode = guestRejoinDefaultCode();
   return `
     <div class="card auth-form auth-form--guest auth-form--guest-rejoin">
       ${
@@ -131,7 +140,7 @@ function guestJoinPanelHtml({ leaveHint = false } = {}) {
       <label class="field-label" for="guest-rejoin-name">Ton pseudo</label>
       <input type="text" class="field-input" id="guest-rejoin-name" placeholder="Ex : Alex" maxlength="24" value="${escapeHtml(getUser()?.name || "")}" />
       <label class="field-label" for="guest-rejoin-code">Code d'invitation</label>
-      <input type="text" class="field-input" id="guest-rejoin-code" placeholder="6 caractères" maxlength="8" autocapitalize="characters" />
+      <input type="text" class="field-input" id="guest-rejoin-code" placeholder="6 caractères" maxlength="8" autocapitalize="characters" value="${escapeHtml(defaultCode)}" />
       <div id="guest-rejoin-turnstile" class="auth-turnstile-wrap"></div>
       <p class="auth-error hidden" id="guest-rejoin-error"></p>
       <button type="button" class="btn btn-primary btn--spaced" id="btn-guest-rejoin">Rejoindre la partie →</button>
@@ -293,14 +302,18 @@ export function mountHome(app) {
   async function setupAuthTurnstile() {
     removeTurnstile("login");
     removeTurnstile("signup");
-    removeTurnstile("guest");
 
-    if (isLoggedIn()) return;
+    if (isLoggedIn()) {
+      removeTurnstile("guest");
+      return;
+    }
 
     if (isGuest()) {
       await setupGuestRejoinTurnstile();
       return;
     }
+
+    removeTurnstile("guest");
 
     if (authTab === "login") {
       const container = app.querySelector("#login-turnstile");
@@ -359,11 +372,29 @@ export function mountHome(app) {
     }
   }
 
-  async function setupGuestRejoinTurnstile({ requireSolved = false } = {}) {
+  async function setupGuestRejoinTurnstile({ requireSolved = false, forceRemount = false } = {}) {
     if (!isGuest() || !isTurnstileRequired()) return;
 
     const container = app.querySelector("#guest-rejoin-turnstile");
     const btn = app.querySelector("#btn-guest-rejoin");
+
+    if (getSupabaseUserId()) {
+      container?.classList.add("hidden");
+      removeTurnstile("guest");
+      if (btn) btn.disabled = false;
+      return;
+    }
+
+    container?.classList.remove("hidden");
+
+    if (!forceRemount && isTurnstileMounted("guest") && container?.childElementCount > 0) {
+      setTurnstileOnChange("guest", (solved) => {
+        if (btn && requireSolved) btn.disabled = !solved;
+      });
+      if (btn && requireSolved) btn.disabled = !isTurnstileSolved("guest");
+      return;
+    }
+
     const mountRes = await mountTurnstile("guest", container, {
       onChange: (solved) => {
         if (btn && requireSolved) btn.disabled = !solved;
@@ -790,7 +821,7 @@ export function mountHome(app) {
 
         if (!res.ok) {
           if (res.captcha && isGuest()) {
-            await setupGuestRejoinTurnstile({ requireSolved: true });
+            await setupGuestRejoinTurnstile({ requireSolved: true, forceRemount: true });
             if (btn) btn.disabled = true;
           } else if (res.captcha) {
             resetTurnstile("guest");
@@ -804,7 +835,9 @@ export function mountHome(app) {
           } else {
             await showAppAlert(res.error, { title: "Rejoindre", icon: "⚠️" });
           }
-          scheduleRender(true);
+          if (res.sessionCleared || res.captcha) {
+            scheduleRender(true);
+          }
           return;
         }
         await navigateAfterLobbyJoin();
@@ -844,7 +877,7 @@ export function mountHome(app) {
   void (async () => {
     const { cleared } = await reconcileLobbyMembership();
     if (cleared) scheduleRender(true);
-    if (!hasActiveLobby() && isLoggedIn() && isSupabaseConfigured()) {
+    if (!hasActiveLobby() && isSupabaseConfigured() && getSupabaseUserId()) {
       pendingServerLobby = await peekServerLobbyForUser();
       if (pendingServerLobby) scheduleRender(true);
     }
