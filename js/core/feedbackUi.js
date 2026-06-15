@@ -1,6 +1,7 @@
 import { INSTAGRAM_HANDLE, INSTAGRAM_PROFILE_URL } from "../../data/appConfig.js";
 import { showAppRichDialog } from "./dialog.js";
 import { hasActiveLobby, isLobbyEveningStarted } from "./lobby.js";
+import { openExternalUrl } from "./openExternal.js";
 import { getCurrentScreen, onScreenChange } from "./router.js";
 import { onLobbyBundleUpdated } from "./supabaseLobby.js";
 import { escapeHtml } from "./ui.js";
@@ -24,7 +25,7 @@ function updateFeedbackFabVisibility() {
 }
 
 export function openInstagramProfile() {
-  window.open(INSTAGRAM_PROFILE_URL, "_blank", "noopener,noreferrer");
+  void openExternalUrl(INSTAGRAM_PROFILE_URL);
 }
 
 export function openFeedbackDialog() {
@@ -51,13 +52,22 @@ export function feedbackPromptCardHtml() {
         Bug, idée de jeu ou mot à ajouter ? Écris-nous sur Instagram
         <strong>@${escapeHtml(INSTAGRAM_HANDLE)}</strong>.
       </p>
-      <button type="button" class="btn btn-secondary btn--spaced" data-open-feedback-dm">Envoie un DM</button>
+      <a
+        class="btn btn-secondary btn--spaced"
+        href="${escapeHtml(INSTAGRAM_PROFILE_URL)}"
+        target="_blank"
+        rel="noopener noreferrer"
+        data-open-feedback-dm
+      >Envoie un DM</a>
     </div>`;
 }
 
 export function bindFeedbackPrompt(root) {
-  root.querySelector("[data-open-feedback-dm]")?.addEventListener("click", () => {
-    openFeedbackDialog();
+  root.querySelectorAll("[data-open-feedback-dm]").forEach((el) => {
+    el.addEventListener("click", (e) => {
+      e.preventDefault();
+      openInstagramProfile();
+    });
   });
 }
 

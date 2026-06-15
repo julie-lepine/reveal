@@ -12,7 +12,7 @@ import {
 import { loginAsGuest, isGuest } from "./auth.js";
 import { signOutSupabase, getSupabaseUserId } from "./supabaseAuth.js";
 import { syncAllPlayerScores } from "./players.js";
-import { navigate } from "./router.js";
+import { navigate, getCurrentScreen } from "./router.js";
 import { resetWelcomeSeen } from "./welcomeGate.js";
 import { isSupabaseConfigured, supabase } from "./supabaseClient.js";
 import {
@@ -412,7 +412,14 @@ export async function routeToEveningHub({ rejoinActiveGame = true } = {}) {
   if (isGameSyncActive()) {
     startMultiplayerSync();
     const row = await refreshGameSession();
-    if (rejoinActiveGame && (await routeToActiveGameIfNeeded(row))) return true;
+    if (rejoinActiveGame && (await routeToActiveGameIfNeeded(row, { force: true }))) {
+      const passive = getCurrentScreen();
+      if (passive === "home" || passive === "settings") {
+        if (!isLobbyEveningStarted()) goToLobby();
+        else navigate("game-select", { navStack: ["home", "lobby", "game-select"] });
+      }
+      return true;
+    }
 
     if (rejoinActiveGame && row) {
       const effective = getEffectiveSessionScreen(row);

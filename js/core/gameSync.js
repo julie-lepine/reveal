@@ -38,6 +38,7 @@ import {
   isNewTraitreVoteRound,
   isNewTraitreGame,
   isStaleTraitreVotePatch,
+  isTraitreVoteResetAfterTie,
   isSubmissionsOnlyGamePatch,
   isVotesOnlyGamePatch,
   isAnswersOnlyGamePatch,
@@ -769,7 +770,7 @@ function isNewTraitreVoteRoundUid(cur, inc) {
 function mergeRemoteTraitreVotesUid(cur, inc) {
   const curVotes = cur?.votes || {};
   const incVotes = inc?.votes || {};
-  if (isNewTraitreVoteRound(cur, inc)) return incVotes;
+  if (isNewTraitreVoteRound(cur, inc) || isTraitreVoteResetAfterTie(cur, inc)) return incVotes;
   if (inc?.phase === "vote" || cur?.phase === "vote") {
     return { ...curVotes, ...incVotes };
   }
@@ -806,13 +807,14 @@ function mergeTraitreGameLocal(local, remote) {
     };
   }
   const newVoteRound = isNewTraitreVoteRound(local, remote);
+  const tieVoteReset = isTraitreVoteResetAfterTie(local, remote);
   const remoteVotes = remote.votes || {};
   const localVotes = local.votes || {};
   const aliveList = remote.alive?.length
     ? [...remote.alive]
     : [...(local.alive || getActivePlayerNames())];
   let votes = remoteVotes;
-  if (newVoteRound) {
+  if (newVoteRound || tieVoteReset) {
     votes = remoteVotes;
   } else if (remote.phase === "vote" || local.phase === "vote") {
     votes = { ...remoteVotes, ...localVotes };
@@ -1680,6 +1682,7 @@ export function traitreToRemote(session) {
     votes: remoteVotes,
     revotePending: Boolean(session.revotePending),
     revoteCount: session.revoteCount ?? 0,
+    tieAfterVote: Boolean(session.tieAfterVote),
     voteSurvivals: session.voteSurvivals ?? 0,
     dealAcks,
     lastVoteSnapshot: session.lastVoteSnapshot
@@ -1744,6 +1747,7 @@ export function traitreFromRemote(remote) {
     votes: normalizeTraitreVotesMap(votes, alive),
     revotePending: Boolean(remote.revotePending),
     revoteCount: remote.revoteCount ?? 0,
+    tieAfterVote: Boolean(remote.tieAfterVote),
     voteSurvivals: remote.voteSurvivals ?? 0,
     dealAcks,
     lastVoteSnapshot: lastVoteSnapshot
@@ -2441,7 +2445,7 @@ export function getFilRougeResumeScreen() {
 }
 
 /** Renvoie l’invité (ou l’hôte) vers la partie en cours si une session active existe. */
-export async function routeToActiveGameIfNeeded(cachedRowOnly = null) {
+export async function routeToActiveGameIfNeeded(cachedRowOnly = null, { force = false } = {}) {
   if (!isGameSyncActive()) return false;
   const row =
     cachedRowOnly || (await refreshGameSession()) || getCachedGameSession();
@@ -2453,8 +2457,8 @@ export async function routeToActiveGameIfNeeded(cachedRowOnly = null) {
   }
   const current = getCurrentScreen();
   if (current === screen) return true;
-  if (isCompatibleSessionScreen(screen, current)) return true;
-  if (!shouldApplySessionRoute(row)) return false;
+  if (!force && isCompatibleSessionScreen(screen, current)) return true;
+  if (!force && !shouldApplySessionRoute(row)) return false;
   if (
     isSessionAdvancedFromSuppress(screen) ||
     shouldFollowHostGameLaunch(current, screen)

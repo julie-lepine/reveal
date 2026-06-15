@@ -43,6 +43,7 @@ function defaultSession() {
     votes: {},
     revotePending: false,
     revoteCount: 0,
+    tieAfterVote: false,
     voteSurvivals: 0,
     dealAcks: {},
     lastVoteSnapshot: null,
@@ -346,6 +347,7 @@ export function buildTraitreEliminationPatch(session, eliminatedName) {
     votes: {},
     revotePending: false,
     revoteCount: 0,
+    tieAfterVote: false,
   };
 
   if (eliminatedName === impostor) {
@@ -376,12 +378,16 @@ export function buildTraitreEliminationPatch(session, eliminatedName) {
   };
 }
 
-export function buildTraitreTieRevotePatch(session) {
+/** Égalité au vote : nouvelle manche d'indices (mêmes mots, mêmes rôles). */
+export function buildTraitreTieSpeakPatch(session) {
   return {
-    phase: "vote",
+    phase: "speak",
+    speakRound: (session.speakRound || 1) + 1,
+    speakerIndex: 0,
     votes: {},
-    revotePending: true,
-    revoteCount: (session.revoteCount || 0) + 1,
+    revotePending: false,
+    revoteCount: 0,
+    tieAfterVote: true,
   };
 }
 

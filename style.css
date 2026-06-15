@@ -5758,6 +5758,10 @@ body{
   line-height: 1.2;
 }
 
+.traitre-tie-speak-banner {
+  margin-bottom: 0.75rem;
+}
+
 .traitre-vote-tie {
   margin-top: 0.5rem;
 }

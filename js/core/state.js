@@ -139,6 +139,7 @@ const defaultState = () => ({
     votes: {},
     revotePending: false,
     revoteCount: 0,
+    tieAfterVote: false,
     voteSurvivals: 0,
     dealAcks: {},
     lastVoteSnapshot: null,

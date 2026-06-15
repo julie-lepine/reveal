@@ -4,7 +4,7 @@ import {
   allTraitreVotesIn,
   awardTraitreGame,
   buildTraitreEliminationPatch,
-  buildTraitreTieRevotePatch,
+  buildTraitreTieSpeakPatch,
   commitTraitreDealAck,
   commitTraitrePlay,
   commitTraitreVote,
@@ -56,7 +56,6 @@ export function mountTraitre(app) {
   let alive = [];
   let eliminated = [];
   let votes = {};
-  let revotePending = false;
   let lastEliminated = null;
   let impostorRevealed = false;
   let winner = null;
@@ -89,7 +88,6 @@ export function mountTraitre(app) {
     alive = [...(s.alive || [])];
     eliminated = [...(s.eliminated || [])];
     votes = { ...(s.votes || {}) };
-    revotePending = Boolean(s.revotePending);
     lastEliminated = s.lastEliminated || null;
     impostorRevealed = Boolean(s.impostorRevealed);
     winner = s.winner || null;
@@ -132,6 +130,7 @@ export function mountTraitre(app) {
       votes: {},
       revotePending: false,
       revoteCount: 0,
+      tieAfterVote: false,
     });
   }
 
@@ -155,6 +154,7 @@ export function mountTraitre(app) {
       votes: {},
       revotePending: false,
       revoteCount: 0,
+      tieAfterVote: false,
     });
   }
 
@@ -181,7 +181,7 @@ export function mountTraitre(app) {
       if (isTie) {
         await commitTraitrePlay({
           ...s,
-          ...buildTraitreTieRevotePatch(s),
+          ...buildTraitreTieSpeakPatch(s),
         });
         render();
         return;
@@ -225,10 +225,21 @@ export function mountTraitre(app) {
     }
   }
 
+  function tieSpeakBannerHtml(session) {
+    if (!session.tieAfterVote) return "";
+    return `
+      <div class="card card--highlight traitre-tie-speak-banner">
+        <p class="card-heading">Égalité au vote</p>
+        <p class="hint">Impossible de trancher : personne n'est éliminé.</p>
+        <p class="hint">Nouvelle manche d'indices avec les mêmes mots. Pense à un indice différent.</p>
+      </div>`;
+  }
+
   function speakOrderHtml(session) {
     const order = getTraitreSpeakOrder(session);
     const current = getCurrentTraitreSpeaker(session);
     return `
+      ${tieSpeakBannerHtml(session)}
       <div class="traitre-order card">
         <p class="card-heading">Ordre des indices - manche ${session.speakRound || 1}</p>
         <ol class="traitre-order__list">
@@ -248,7 +259,7 @@ export function mountTraitre(app) {
             : ""
         }
         ${
-          (session.speakRound || 1) > 1
+          (session.speakRound || 1) > 1 && !session.tieAfterVote
             ? `<p class="hint">Rappel : indices <strong>différents</strong> des manches précédentes.</p>`
             : ""
         }
@@ -272,12 +283,7 @@ export function mountTraitre(app) {
             </button>`;
           })
           .join("")}
-      </div>
-      ${
-        revotePending
-          ? `<p class="hint traitre-vote-tie">Égalité au vote - <strong>revote obligatoire</strong>.</p>`
-          : ""
-      }`;
+      </div>`;
   }
 
   function traitrePhaseTitle(currentPhase) {
@@ -349,7 +355,7 @@ export function mountTraitre(app) {
       phaseHtml = `
         <div class="card">
           <p class="card-heading">Vote d'élimination</p>
-          <p class="hint">${revotePending ? "Revote obligatoire." : "Qui est le fake ?"} ${votedCount}/${alive.length} vote(s).</p>
+          <p class="hint">Qui est le fake ? ${votedCount}/${alive.length} vote(s).</p>
           ${
             eliminated.length
               ? `<p class="hint">Éliminé(s) : ${eliminated.map((n) => escapeHtml(n)).join(", ")}</p>`

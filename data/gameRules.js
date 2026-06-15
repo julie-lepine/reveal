@@ -169,7 +169,7 @@ export const GAME_RULES = {
       "Fin de manche 1 : l'hôte choisit « Continuer » (nouvelle manche d'indices) ou « Voter ».",
       "À partir de la manche 2, un vote d'élimination est obligatoire après les indices.",
       "Les indices d'une nouvelle manche doivent être différents des précédents.",
-      "Égalité au vote : revote obligatoire jusqu'à départager.",
+      "Égalité au vote : nouvelle manche d'indices (mêmes mots) jusqu'à obtenir une majorité.",
       "La partie continue jusqu'à l'élimination du fake ou s'il reste dans les 2 derniers survivants.",
     ],
     points: [

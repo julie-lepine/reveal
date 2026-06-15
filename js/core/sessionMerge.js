@@ -599,6 +599,16 @@ export function isStaleTraitreVotePatch(cur, inc) {
   return Object.keys(inc.votes || {}).length > 0;
 }
 
+/** Égalité : vote → speak avec votes vidés (ne pas conserver l'ancien tour). */
+export function isTraitreVoteResetAfterTie(cur, inc) {
+  return (
+    inc?.phase === "speak" &&
+    cur?.phase === "vote" &&
+    Boolean(inc.tieAfterVote) &&
+    Object.keys(inc.votes || {}).length === 0
+  );
+}
+
 /** État Le Traître pour patchGameState. */
 export function mergeTraitrePatchState(
   cur,
@@ -630,6 +640,7 @@ export function mergeTraitrePatchState(
       dealAcks: { ...(cur.dealAcks || {}), ...inc.dealAcks },
     };
   }
+  const voteResetAfterTie = isTraitreVoteResetAfterTie(cur, inc);
   return {
     ...cur,
     ...inc,
@@ -639,7 +650,7 @@ export function mergeTraitrePatchState(
     }),
     pairId: inc.pairId || cur.pairId || null,
     ready: mergeReadyUid(cur, inc),
-    votes: newVoteRound ? { ...(inc.votes || {}) } : mergeVotes(cur, inc),
+    votes: newVoteRound || voteResetAfterTie ? { ...(inc.votes || {}) } : mergeVotes(cur, inc),
     dealAcks: inc.dealAcks ? { ...(cur.dealAcks || {}), ...inc.dealAcks } : cur.dealAcks,
   };
 }

@@ -30,6 +30,7 @@ import {
   isNewTraitreVoteRound,
   isNewTraitreGame,
   isStaleTraitreVotePatch,
+  isTraitreVoteResetAfterTie,
   pickLatestTriviaAnswer,
   mergeTriviaAnswersUid,
   normalizeTriviaAnswersMap,
@@ -583,16 +584,23 @@ describe("mergeTraitrePatchState", () => {
     assert.equal(out.votes.a, "b");
   });
 
-  it("revote (égalité) efface les votes distants", () => {
-    const cur = { phase: "vote", votes: { a: "b", c: "d" }, revoteCount: 0 };
-    const inc = { phase: "vote", votes: {}, revotePending: true, revoteCount: 1 };
+  it("égalité au vote → speak efface les votes distants", () => {
+    const cur = { phase: "vote", votes: { a: "b", c: "d" } };
+    const inc = {
+      phase: "speak",
+      speakRound: 3,
+      votes: {},
+      tieAfterVote: true,
+    };
+    assert.equal(isTraitreVoteResetAfterTie(cur, inc), true);
     const out = mergeTraitrePatchState(cur, inc, {
       mergeReadyUid,
       mergeVotes,
-      newVoteRound: isNewTraitreVoteRound(cur, inc),
+      newVoteRound: false,
     });
     assert.deepEqual(out.votes, {});
-    assert.equal(out.phase, "vote");
+    assert.equal(out.phase, "speak");
+    assert.equal(out.tieAfterVote, true);
   });
 
   it("votes vides sans revotePending ne réinitialise pas", () => {

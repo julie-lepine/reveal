@@ -711,7 +711,18 @@ export function mountHome(app) {
     }
 
     if (e.target.closest("#btn-return-lobby")) {
-      void returnToEveningGames({ rejoinActiveGame: true });
+      const btn = e.target.closest("#btn-return-lobby");
+      btn.disabled = true;
+      try {
+        await returnToEveningGames({ rejoinActiveGame: true });
+      } catch (err) {
+        await showAppAlert(err?.message || "Impossible de reprendre la soirée.", {
+          title: "Reprise",
+          icon: "⚠️",
+        });
+      } finally {
+        if (btn?.isConnected) btn.disabled = false;
+      }
       return;
     }
 
