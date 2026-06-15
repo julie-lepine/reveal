@@ -2,7 +2,7 @@ import { GUESS_LIE_ROUNDS } from "../../data/guessLies.js";
 import { getActivePlayerNames, getActivePlayers } from "./players.js";
 import { isValidGuessLieSubmission } from "./sessionMerge.js";
 import { getLocalDisplayName, getState } from "./state.js";
-import { navigateAfterGameLaunch, runLaunchButton } from "./mpLaunch.js";
+import { runLaunchButton } from "./mpLaunch.js";
 import { navigate } from "./router.js";
 
 export function getGuessLieSession() {
@@ -62,25 +62,31 @@ const GUESS_LIE_NAV_STACK = {
   "guesslie-setup": ["home", "lobby", "game-select", "guesslie-menu", "guesslie-setup"],
 };
 
-/** Navigation vers l'écran Guess The Lie adapté à l'état local (wait / menu / partie). */
+/** Navigation vers l'écran de vote (appelé après lancement ou reprise session). */
+export function navigateToGuessLiePlay() {
+  if (getGuessLieEntryScreen() !== "guesslie") return false;
+  if (!getGuessLieRounds().length) return false;
+  navigate("guesslie", { navStack: GUESS_LIE_NAV_STACK.guesslie });
+  return true;
+}
+
+/** Boot / reprise : menu, wait ou partie selon l'état local. */
 export function navigateToGuessLieEntry() {
   const entry = getGuessLieEntryScreen();
   if (entry === "guesslie-wait") return false;
+  if (entry === "guesslie") return navigateToGuessLiePlay();
   navigate(entry, {
     navStack: GUESS_LIE_NAV_STACK[entry] || ["home", "lobby", "game-select", entry],
   });
   return true;
 }
 
-/** Lancement depuis le salon d'attente ou le menu (solo + MP avec secours local). */
-export async function handleGuessLieLaunch(btn, { onLocalApplied } = {}) {
+/** Lancement depuis le salon d'attente ou le menu (solo + MP). */
+export async function handleGuessLieLaunch(btn) {
   return runLaunchButton(btn, async () => {
     const { markGuessLieLobbyComplete } = await import("./state.js");
-    const result = await markGuessLieLobbyComplete({ onLocalApplied });
-    if (!navigateToGuessLieEntry()) {
-      navigateAfterGameLaunch({ gameScreen: "guesslie", result, forceNavigate: true });
-    }
-    return result;
+    await markGuessLieLobbyComplete();
+    navigateToGuessLiePlay();
   });
 }
 

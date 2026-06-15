@@ -6,13 +6,12 @@ import {
   getLobbyMemberNames,
   handleGuessLieLaunch,
   isGuessLieGameActive,
-  navigateToGuessLieEntry,
+  navigateToGuessLiePlay,
 } from "../core/guessLieSession.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
 import { isValidGuessLieSubmission } from "../core/sessionMerge.js";
 import { prepGuestFollowOnSession } from "../core/mpLaunch.js";
 import { showAppAlert } from "../core/dialog.js";
-import { getCurrentScreen } from "../core/router.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
 import { bindNav } from "./nav.js";
 import { isLobbyHost, onGameSessionChange } from "../core/gameSync.js";
@@ -21,30 +20,9 @@ export function mountGuessLieLobbyWait(app) {
   if (!requireLobbyPlay()) return null;
 
   const localName = getLocalDisplayName();
-  let launching = false;
-
-  function followIfStarted() {
-    return navigateToGuessLieEntry();
-  }
-
-  function renderLaunchingShell() {
-    app.innerHTML = pageShell({
-      back: false,
-      content: `
-          <p class="label-upper label-upper--green">🕵️ Lobby Guess The Lie</p>
-          <h2 class="screen-title">En attente des joueurs</h2>
-          <p class="hint">Lancement de la partie…</p>
-          <button type="button" class="btn btn-secondary btn--spaced" disabled>Lancement…</button>
-        `,
-    });
-  }
 
   function render() {
-    if (followIfStarted()) return;
-    if (launching) {
-      renderLaunchingShell();
-      return;
-    }
+    if (isGuessLieGameActive() && navigateToGuessLiePlay()) return;
 
     const session = getGuessLieSession();
     const members = getLobbyMemberNames();
@@ -96,25 +74,21 @@ export function mountGuessLieLobbyWait(app) {
 
   async function onStartClick(e) {
     const btn = e.target.closest("#btn-start");
-    if (!btn || launching) return;
-    if (followIfStarted()) return;
-    launching = true;
-    renderLaunchingShell();
+    if (!btn) return;
+    if (isGuessLieGameActive()) {
+      navigateToGuessLiePlay();
+      return;
+    }
     try {
-      await handleGuessLieLaunch(btn, { onLocalApplied: followIfStarted });
-      followIfStarted();
+      await handleGuessLieLaunch(btn);
+      navigateToGuessLiePlay();
     } catch (err) {
       console.warn("Guess The Lie launch:", err);
       await showAppAlert(err?.message || "Impossible de lancer la partie.", {
         title: "Guess The Lie",
         icon: "⚠️",
       });
-    } finally {
-      launching = false;
-      if (getCurrentScreen() === "guesslie-wait") {
-        if (followIfStarted()) return;
-        if (!isGuessLieGameActive()) render();
-      }
+      render();
     }
   }
 
@@ -124,15 +98,14 @@ export function mountGuessLieLobbyWait(app) {
   });
 
   function onSessionUpdate() {
-    if (followIfStarted()) return;
-    if (launching) return;
+    if (isGuessLieGameActive() && navigateToGuessLiePlay()) return;
     if (guestFollow()) return;
     render();
   }
 
   app.addEventListener("click", onStartClick);
   render();
-  if (followIfStarted()) {
+  if (isGuessLieGameActive() && navigateToGuessLiePlay()) {
     return () => app.removeEventListener("click", onStartClick);
   }
 

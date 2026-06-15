@@ -56,7 +56,7 @@ import {
   routeToSessionScreen,
   isAppContentMounted,
 } from "./gameSync.js";
-import { getGuessLieEntryScreen, isGuessLieGameActive, navigateToGuessLieEntry } from "./guessLieSession.js";
+import { isGuessLieGameActive, navigateToGuessLiePlay } from "./guessLieSession.js";
 
 const MAX_PLAYERS = 10;
 
@@ -400,9 +400,8 @@ export async function goToGameSelect() {
 /** Reprise Guess The Lie si l'état local indique une partie en cours mais #app est vide (F5). */
 function resumeLocalGuessLiePlay() {
   if (!isGuessLieGameActive()) return false;
-  if (getGuessLieEntryScreen() !== "guesslie") return false;
   if (isAppContentMounted()) return true;
-  return navigateToGuessLieEntry();
+  return navigateToGuessLiePlay();
 }
 
 export async function routeToEveningHub({ rejoinActiveGame = true } = {}) {

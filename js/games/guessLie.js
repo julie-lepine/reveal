@@ -3,11 +3,9 @@ import {
   GUESS_LIE_LIAR_POINTS,
 } from "../../data/guessLies.js";
 import {
-  getGuessLieEntryScreen,
   getGuessLieRounds,
   simulateRoundVotes,
   getGuessLieSession,
-  navigateToGuessLieEntry,
 } from "../core/guessLieSession.js";
 import {
   isGameSyncActive,
@@ -38,15 +36,19 @@ function revealFeedbackTitle({ isSubject, myCorrect, liarBonus }) {
 export function mountGuessLie(app) {
   if (!requireLobbyPlay()) return null;
 
-  if (getGuessLieEntryScreen() !== "guesslie") {
-    navigateToGuessLieEntry();
-    return () => {};
-  }
-
   const rounds = getGuessLieRounds();
   if (!rounds.length) {
-    navigateToGuessLieEntry();
-    return () => {};
+    app.innerHTML = pageShell({
+      backTarget: "back",
+      content: `
+        <p class="label-upper label-upper--green">🕵️ Guess The Lie</p>
+        <h2 class="screen-title">Partie indisponible</h2>
+        <p class="hint">Les affirmations du lobby ne sont pas encore prêtes.</p>
+        <button type="button" class="btn btn-secondary btn--spaced" data-nav="guesslie-wait">Retour au salon</button>
+      `,
+    });
+    bindNav(app);
+    return null;
   }
 
   setLobbyPlaying("guesslie");

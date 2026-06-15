@@ -782,21 +782,42 @@ function applyGuessLieLobbyCompleteLocal() {
   save();
 }
 
-export async function markGuessLieLobbyComplete({ onLocalApplied } = {}) {
+export async function markGuessLieLobbyComplete() {
   syncGuessLieSession();
-  const { launchGameWithSync } = await import("./mpLaunch.js");
-  const { guessLieLobbyStartToRemote } = await import("./gameSync.js");
+  applyGuessLieLobbyCompleteLocal();
+
+  const { isGameSyncActive, isLobbyHost, guessLieLobbyStartToRemote } = await import(
+    "./gameSync.js"
+  );
+  if (!isGameSyncActive() || !isLobbyHost()) {
+    return { ok: true };
+  }
+
+  const { commitMultiplayerLaunch } = await import("./mpLaunch.js");
   const { setLobbyPlaying } = await import("./lobby.js");
-  return launchGameWithSync({
-    screen: "guesslie",
-    gameId: "guesslie",
-    mode: "patch",
-    localFirst: true,
-    onLocalApplied,
-    beforeCommit: () => setLobbyPlaying("guesslie"),
-    applyLocal: applyGuessLieLobbyCompleteLocal,
-    getRemoteState: () => ({ guessLie: guessLieLobbyStartToRemote() }),
-  });
+  const remotePayload = { guessLie: guessLieLobbyStartToRemote() };
+
+  void (async () => {
+    try {
+      await setLobbyPlaying("guesslie");
+      await commitMultiplayerLaunch({
+        screen: "guesslie",
+        gameId: "guesslie",
+        state: remotePayload,
+        mode: "patch",
+      });
+    } catch (err) {
+      console.warn("Guess The Lie sync:", err);
+      void commitMultiplayerLaunch({
+        screen: "guesslie",
+        gameId: "guesslie",
+        state: remotePayload,
+        mode: "patch",
+      }).catch(() => {});
+    }
+  })();
+
+  return { ok: true };
 }
 
 export function resetGuessLieSession() {
