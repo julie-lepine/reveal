@@ -25,10 +25,21 @@ Légende : ✅ fait dans le repo · ☐ à faire manuellement · 🧪 à tester 
 
 ## B. Comptes & consoles (manuel)
 
-- [ ] Compte **Google Play Console** (inscription ~25 €)
-- [ ] Compte **Apple Developer Program** (~99 €/an)
-- [x] Apps **AdMob** (Android + iOS) — IDs dans `data/admobConfig.js`
-- [ ] Lier **Play Console ↔ AdMob** (Android, recommandé — après publication sur le store)
+- [x] Compte **Google Play Console** (inscription ~25 €) — compte **Individuel** (`contact@revealthepartygame.fr`), juin 2026
+- [ ] **Play Console** — validation **identité Google** en cours (pièce d’identité / profil Payments)
+- [x] Compte **Apple Developer Program** (~99 €/an) — inscription juin 2026
+- [ ] **Apple Developer** — activation programme en cours (traitement paiement ~24–48 h, parfois 5 jours ouvrés)
+- [ ] Créer l’app **REVEAL** dans Play Console (`com.reveal.partygames`) — après validation identité
+- [ ] Créer **Bundle ID** + app dans **App Store Connect** — après activation Apple Developer
+- [x] Apps **AdMob** (Android + iOS) — IDs dans `data/admobConfig.js` ; apps REVEAL visibles dans AdMob
+- [ ] Lier **Play Console ↔ AdMob** (Android) — **après** 1ère release Play publique ; magasin d’apps AdMob = « — » tant que non lié ([doc](https://support.google.com/admob/answer/10037806?hl=fr))
+- [ ] Lier **App Store Connect ↔ AdMob** (iOS) — après 1ère release App Store
+
+> **DUNS / Organisation** : compte Play **Individuel** retenu (micro-entreprise EI récente, pas de DUNS Altares/Verif encore). Organisation + DUNS possible plus tard si besoin.
+
+> **Play Console — compte personnel** : test **fermé** **12 testeurs × 14 jours** avant demande d’accès production ([doc](https://support.google.com/googleplay/android-developer/answer/14151465)).
+
+> **Fiche store** : catégorie **Jeu → Casual (Décontracté)**.
 
 ---
 
@@ -44,7 +55,11 @@ Console : **Confidentialité et messages** → [Règlementations européennes](h
 - [x] URL politique de confidentialité dans le message : `https://revealthepartygame.fr/privacy.html`
 - [x] Textes boutons conformes TCF (ex. « J’accepte », « Refuser », « Gérer les options » — pas « Continuer »)
 - [ ] **En-tête → Logo** : vérifier après **liaison au store** (icône tirée du listing Play / App Store, pas de `resources/icon.png` direct)
-- [ ] Après publication store : **Applications** → passer **Non publiée** → **Publiée** et lier chaque app à sa fiche store ([doc AdMob](https://support.google.com/admob/answer/9989980?hl=fr))
+- [ ] Après publication store : **Applications** → **Paramètres** → **Magasins d’applications** → **Ajouter un magasin** (Google Play / App Store) — package `com.reveal.partygames` apparaît alors dans AdMob
+- [ ] **app-ads.txt** sur le site développeur ([doc](https://support.google.com/admob/answer/14538460?hl=fr)) :
+  - [ ] Publier `https://revealthepartygame.fr/app-ads.txt` (publisher `pub-6332424645114129`)
+  - [ ] Play Console → fiche app → **Site web du développeur** = `https://revealthepartygame.fr`
+  - [ ] AdMob → statut app-ads.txt **Validé** + **Vérifier l’application** (statut actuel AdMob Android : **Examen requis** — normal avant lien store + app-ads.txt)
 - [ ] Si test avec ciblage **Partout** : repasser **Pays soumis au RGPD** avant prod store
 
 ### Styles appliqués (éditeur AdMob — rappel)
@@ -185,7 +200,8 @@ Repo **hors** de ce dossier Party Games (pages statiques créées de ton côté)
   - [ ] `index.html` : pilule(s) ou bouton **Google Play** + **App Store** (URLs réelles une fois les apps publiées ; sinon libellé « Bientôt disponible »)
   - [ ] `mentions-legales.html` : courte section « Téléchargement » avec les mêmes liens
   - [x] Lien **Jouer en ligne** → `https://julie-lepine.github.io/reveal/` (présent sur le site)
-- [x] Vérifier que `privacy.html` est aligné avec `data/legalContent.js` (ce repo)
+- [x] Vérifier que `privacy.html` est aligné avec `data/legalContent.js` (ce repo) — contact `contact@revealthepartygame.fr`, Instagram en complément
+- [x] **`privacy.html` en ligne** à jour sur [revealthepartygame.fr](https://revealthepartygame.fr/privacy.html) (juin 2026)
 
 ### Publication OVH (manuel — pas Hostinger)
 
@@ -197,6 +213,7 @@ Repo **hors** de ce dossier Party Games (pages statiques créées de ton côté)
 - [x] 🧪 HTTPS OK : [accueil](https://revealthepartygame.fr/), [privacy](https://revealthepartygame.fr/privacy.html), [mentions](https://revealthepartygame.fr/mentions-legales.html) (juin 2026)
 - [x] `data/appConfig.js` → `PRIVACY_POLICY_PUBLIC_URL` =  
   `https://revealthepartygame.fr/privacy.html`
+- [ ] Publier **`app-ads.txt`** sur le repo légal OVH (voir **B bis**)
 - [ ] Fiches store : coller la même URL privacy dans Play Console + App Store Connect (au moment de la soumission)
 
 > **Alternative sans FTP OVH** : déployer le repo légal via **Cloudflare Pages** + CNAME `www` dans OVH — voir [LEGAL_SITE_OVH.md](./LEGAL_SITE_OVH.md).
@@ -210,15 +227,16 @@ Repo **hors** de ce dossier Party Games (pages statiques créées de ton côté)
 - [ ] Compléter **App Privacy** (Apple) : email, identifiants, pub AdMob, Supabase
 - [ ] Questionnaire **classification contenu** (Google)
 - [ ] Déclarer la **publicité** dans les deux consoles
-- [ ] Email de contact éditeur (fiche store + RGPD dans `data/legalContent.js`)
+- [x] Email de contact éditeur (fiche store + RGPD) — `contact@revealthepartygame.fr` (`data/appConfig.js`, `data/legalContent.js`)
+- [ ] **app-ads.txt** sur `revealthepartygame.fr` + site développeur dans fiche Play (AdMob prod)
 
 ---
 
 ## I. Soumission
 
-- [ ] **Play Store** : piste interne/fermée → production
-- [ ] **App Store** : TestFlight → soumission review
-- [ ] Après approbation : vérifier vraies pubs AdMob (plus les bannières test)
+- [ ] **Play Store** : créer app → test **fermé** (12 testeurs / 14 j) → accès production → production
+- [ ] **App Store** : Bundle ID → app Connect → TestFlight → soumission review
+- [ ] Après approbation : vérifier vraies pubs AdMob (`ADMOB_USE_TEST_ADS = false`) + lien store AdMob + app-ads.txt
 
 ---
 
@@ -239,7 +257,7 @@ Repo **hors** de ce dossier Party Games (pages statiques créées de ton côté)
 | Fichier | Rôle |
 |---------|------|
 | [data/admobConfig.js](../data/admobConfig.js) | IDs pub + mode test/prod |
-| [data/appConfig.js](../data/appConfig.js) | Bundle ID, deep link, URL privacy |
+| [data/appConfig.js](../data/appConfig.js) | Bundle ID, deep link, URL privacy, `CONTACT_EMAIL` |
 | [data/legalContent.js](../data/legalContent.js) | Texte RGPD in-app |
 | [privacy.html](../privacy.html) | Copie locale / GitHub Pages (legacy) ; **URL store** → domaine OVH via `appConfig.js` |
 | [LEGAL_SITE_OVH.md](./LEGAL_SITE_OVH.md) | Déployer le repo légal sur OVH (FTP / SSL / DNS) |
@@ -251,4 +269,9 @@ Repo **hors** de ce dossier Party Games (pages statiques créées de ton côté)
 
 ---
 
-**Prochaine action recommandée** : section **E** 🧪 — lobby multijoueur + soirée pilote ; puis **B** (comptes Play / Apple) ; **[IPHONE_TEST_CHECKLIST.md](./IPHONE_TEST_CHECKLIST.md)** (jour Mac).
+**Prochaine action recommandée** (juin 2026) :
+
+1. Attendre **validation identité Play** + **activation Apple Developer**
+2. Section **E** 🧪 — lobby multijoueur + soirée pilote ; préparer liste **12 testeurs** Play
+3. Publier **`app-ads.txt`** sur le site légal OVH
+4. Dès Play validé : créer app `com.reveal.partygames` + upload assets (**G**) ; Mac → **[IPHONE_TEST_CHECKLIST.md](./IPHONE_TEST_CHECKLIST.md)**

@@ -14,7 +14,10 @@ export const NATIVE_AUTH_REDIRECT = `${APP_URL_SCHEME}://auth/callback`;
 export const PRIVACY_POLICY_PUBLIC_URL =
   "https://revealthepartygame.fr/privacy.html";
 
-/** Profil Instagram (retours joueurs, bugs, idées). */
+/** Contact officiel (RGPD, store, mentions légales). */
+export const CONTACT_EMAIL = "contact@revealthepartygame.fr";
+
+/** Profil Instagram (retours informels, communauté). */
 export const INSTAGRAM_PROFILE_URL =
   "https://www.instagram.com/reveal.the.party.game/";
 

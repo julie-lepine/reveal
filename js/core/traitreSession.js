@@ -378,6 +378,11 @@ export function buildTraitreEliminationPatch(session, eliminatedName) {
   };
 }
 
+/** Manche d'indices après égalité au vote (bandeau visible pour tout le lobby). */
+export function isTraitreTieSpeakRound(session = getTraitreSession()) {
+  return session.phase === "speak" && Boolean(session.tieAfterVote);
+}
+
 /** Égalité au vote : nouvelle manche d'indices (mêmes mots, mêmes rôles). */
 export function buildTraitreTieSpeakPatch(session) {
   return {

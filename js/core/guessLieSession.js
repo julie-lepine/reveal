@@ -32,7 +32,7 @@ export function allLobbySubmitted() {
 export function getGuessLieRounds() {
   const { submissions } = getGuessLieSession();
   return getLobbyMemberNames()
-    .filter((n) => submissions[n])
+    .filter((n) => isValidGuessLieSubmission(submissions[n]))
     .map((n) => ({
       player: n,
       statements: submissions[n].statements,
@@ -40,9 +40,16 @@ export function getGuessLieRounds() {
     }));
 }
 
+/** Partie en cours (aligné sur resolveActivePlayScreen dans gameSync). */
+export function isGuessLieGameActive(session = getGuessLieSession()) {
+  if (session.lobbyComplete) return true;
+  const phase = session.phase;
+  return phase === "voting" || phase === "reveal";
+}
+
 export function getGuessLieEntryScreen() {
   if (!hasLocalSubmission()) return "guesslie-menu";
-  if (getGuessLieSession().lobbyComplete) return "guesslie";
+  if (isGuessLieGameActive()) return "guesslie";
   return "guesslie-wait";
 }
 

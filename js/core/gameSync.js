@@ -855,6 +855,7 @@ function mergeTraitreGameLocal(local, remote) {
     votes,
     dealAcks,
     ready,
+    tieAfterVote: tieVoteReset ? true : Boolean(remote.tieAfterVote),
   };
 }
 

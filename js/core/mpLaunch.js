@@ -89,6 +89,8 @@ export async function launchGameWithSync({
   getRemoteState,
   mode = "push",
   beforeCommit,
+  /** État local avant le patch serveur (Guess The Lie : évite la boucle wait → game → wait). */
+  localFirst = false,
   timeoutMs = DEFAULT_SYNC_PATCH_TIMEOUT_MS,
   fallbackMessage = SYNC_SLOW_LAUNCH_MESSAGE,
 }) {
@@ -104,17 +106,19 @@ export async function launchGameWithSync({
     return { ok: true };
   }
 
+  if (localFirst) applyLocal();
+
   const remoteState = getRemoteState();
   const commit = () =>
     commitMultiplayerLaunch({ screen, gameId, state: remoteState, mode, timeoutMs });
 
   try {
     await commit();
-    applyLocal();
+    if (!localFirst) applyLocal();
     return { ok: true };
   } catch (err) {
     console.warn(`Launch ${gameId}:`, err);
-    applyLocal();
+    if (!localFirst) applyLocal();
     void commit().catch(() => {});
     await showAppAlert(fallbackMessage, { title: "Connexion", icon: "📡" });
     return { ok: false, usedFallback: true, error: err };

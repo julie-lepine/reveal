@@ -1,10 +1,14 @@
 /** Contenu politique de confidentialité REVEAL (FR). */
 
-import { INSTAGRAM_HANDLE, INSTAGRAM_PROFILE_URL } from "./appConfig.js";
+import {
+  CONTACT_EMAIL,
+  INSTAGRAM_HANDLE,
+  INSTAGRAM_PROFILE_URL,
+} from "./appConfig.js";
 
 export const PRIVACY_POLICY = {
   title: "Politique de confidentialité",
-  updated: "30 mai 2026",
+  updated: "15 juin 2026",
   sections: [
     {
       heading: "Qui sommes-nous ?",
@@ -28,15 +32,15 @@ export const PRIVACY_POLICY = {
     },
     {
       heading: "Conservation",
-      body: "Les données de session et de lobby sont conservées le temps de la soirée et liées à votre compte Supabase. Vous pouvez demander la suppression de votre compte en nous contactant.",
+      body: `Les données de session et de lobby sont conservées le temps de la soirée et liées à votre compte Supabase. Vous pouvez demander la suppression de votre compte à ${CONTACT_EMAIL}.`,
     },
     {
       heading: "Vos droits (RGPD)",
-      body: `Vous disposez d'un droit d'accès, de rectification, d'effacement, de limitation et d'opposition. Pour exercer vos droits ou nous contacter : envoyez un message privé sur Instagram @${INSTAGRAM_HANDLE} (${INSTAGRAM_PROFILE_URL}).`,
+      body: `Vous disposez d'un droit d'accès, de rectification, d'effacement, de limitation et d'opposition. Pour exercer vos droits : écrivez à ${CONTACT_EMAIL}.`,
     },
     {
       heading: "Contact et retours",
-      body: `Bug, idée d'amélioration ou question sur l'app : vous pouvez nous écrire en DM sur Instagram @${INSTAGRAM_HANDLE} (${INSTAGRAM_PROFILE_URL}).`,
+      body: `Bug, idée d'amélioration ou question sur l'app : ${CONTACT_EMAIL}. Vous pouvez aussi nous écrire en DM sur Instagram @${INSTAGRAM_HANDLE} (${INSTAGRAM_PROFILE_URL}).`,
     },
     {
       heading: "Sécurité",

@@ -99,13 +99,13 @@ export function mountSettings(app) {
               : ""
         }
 
-        <div class="card settings-section">
+        <div class="card settings-section feedback-prompt">
           <h2 class="settings-section__title">Aide &amp; retours</h2>
-          <p class="hint settings-section__hint">
+          <p class="hint feedback-prompt__hint">
             Un bug, une idée de jeu ou un mot à ajouter ? Écris-nous sur Instagram
             <strong>@${escapeHtml(INSTAGRAM_HANDLE)}</strong>.
           </p>
-          <button type="button" class="btn btn-secondary btn--spaced" id="btn-feedback-dm">Envoie un DM</button>
+          <button type="button" class="btn btn-accent feedback-prompt__btn btn--spaced" id="btn-feedback-dm">Envoie un DM</button>
         </div>
 
         <div class="card settings-section">

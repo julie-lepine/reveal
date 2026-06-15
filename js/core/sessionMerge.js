@@ -601,12 +601,12 @@ export function isStaleTraitreVotePatch(cur, inc) {
 
 /** Égalité : vote → speak avec votes vidés (ne pas conserver l'ancien tour). */
 export function isTraitreVoteResetAfterTie(cur, inc) {
-  return (
-    inc?.phase === "speak" &&
-    cur?.phase === "vote" &&
-    Boolean(inc.tieAfterVote) &&
-    Object.keys(inc.votes || {}).length === 0
-  );
+  if (inc?.phase !== "speak" || cur?.phase !== "vote") return false;
+  if (Object.keys(inc.votes || {}).length > 0) return false;
+  if ((inc.speakRound ?? 1) <= (cur.speakRound ?? 1)) return false;
+  // Élimination : lastEliminated change ; égalité : inchangé (y compris null).
+  if (inc.lastEliminated !== cur?.lastEliminated) return false;
+  return true;
 }
 
 /** État Le Traître pour patchGameState. */
@@ -641,6 +641,11 @@ export function mergeTraitrePatchState(
     };
   }
   const voteResetAfterTie = isTraitreVoteResetAfterTie(cur, inc);
+  const tieAfterVote = voteResetAfterTie
+    ? true
+    : Object.prototype.hasOwnProperty.call(inc, "tieAfterVote")
+      ? Boolean(inc.tieAfterVote)
+      : Boolean(cur.tieAfterVote);
   return {
     ...cur,
     ...inc,
@@ -652,5 +657,6 @@ export function mergeTraitrePatchState(
     ready: mergeReadyUid(cur, inc),
     votes: newVoteRound || voteResetAfterTie ? { ...(inc.votes || {}) } : mergeVotes(cur, inc),
     dealAcks: inc.dealAcks ? { ...(cur.dealAcks || {}), ...inc.dealAcks } : cur.dealAcks,
+    tieAfterVote,
   };
 }

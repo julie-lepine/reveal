@@ -791,6 +791,7 @@ export async function markGuessLieLobbyComplete() {
     screen: "guesslie",
     gameId: "guesslie",
     mode: "patch",
+    localFirst: true,
     beforeCommit: () => setLobbyPlaying("guesslie"),
     applyLocal: applyGuessLieLobbyCompleteLocal,
     getRemoteState: () => ({ guessLie: guessLieLobbyStartToRemote() }),

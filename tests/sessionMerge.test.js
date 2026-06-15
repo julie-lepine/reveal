@@ -603,6 +603,34 @@ describe("mergeTraitrePatchState", () => {
     assert.equal(out.tieAfterVote, true);
   });
 
+  it("détecte l'égalité sans flag tieAfterVote (sync invités)", () => {
+    const cur = {
+      phase: "vote",
+      speakRound: 2,
+      lastEliminated: null,
+      votes: { a: "b", c: "b" },
+    };
+    const inc = { phase: "speak", speakRound: 3, votes: {}, lastEliminated: null };
+    assert.equal(isTraitreVoteResetAfterTie(cur, inc), true);
+    const out = mergeTraitrePatchState(cur, inc, {
+      mergeReadyUid,
+      mergeVotes,
+      newVoteRound: false,
+    });
+    assert.equal(out.tieAfterVote, true);
+  });
+
+  it("n'interprète pas une élimination comme une égalité", () => {
+    const cur = { phase: "vote", speakRound: 2, lastEliminated: null, votes: { a: "b" } };
+    const inc = {
+      phase: "speak",
+      speakRound: 3,
+      votes: {},
+      lastEliminated: "b",
+    };
+    assert.equal(isTraitreVoteResetAfterTie(cur, inc), false);
+  });
+
   it("votes vides sans revotePending ne réinitialise pas", () => {
     const cur = { phase: "vote", votes: { a: "b", c: "d" } };
     const inc = { phase: "vote", votes: {} };

@@ -46,26 +46,23 @@ export function openFeedbackDialog() {
 
 export function feedbackPromptCardHtml() {
   return `
-    <div class="card settings-section game-select-feedback">
+    <div class="card settings-section feedback-prompt game-select-feedback">
       <h2 class="settings-section__title">Un retour ?</h2>
-      <p class="hint settings-section__hint">
+      <p class="hint feedback-prompt__hint">
         Bug, idée de jeu ou mot à ajouter ? Écris-nous sur Instagram
         <strong>@${escapeHtml(INSTAGRAM_HANDLE)}</strong>.
       </p>
-      <a
-        class="btn btn-secondary btn--spaced"
-        href="${escapeHtml(INSTAGRAM_PROFILE_URL)}"
-        target="_blank"
-        rel="noopener noreferrer"
+      <button
+        type="button"
+        class="btn btn-accent feedback-prompt__btn btn--spaced"
         data-open-feedback-dm
-      >Envoie un DM</a>
+      >Envoie un DM</button>
     </div>`;
 }
 
 export function bindFeedbackPrompt(root) {
   root.querySelectorAll("[data-open-feedback-dm]").forEach((el) => {
-    el.addEventListener("click", (e) => {
-      e.preventDefault();
+    el.addEventListener("click", () => {
       openInstagramProfile();
     });
   });

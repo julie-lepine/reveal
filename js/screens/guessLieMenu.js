@@ -64,10 +64,20 @@ export function mountGuessLieMenu(app) {
 
   app.querySelector("#btn-play")?.addEventListener("click", async () => {
     if (isGameSyncActive() && !isLobbyHost()) return;
-    await handleGuessLieLaunch(app.querySelector("#btn-play"));
-    const entry = getGuessLieEntryScreen();
-    if (entry !== "guesslie-menu") {
-      navigate(entry, { reset: true });
+    const btn = app.querySelector("#btn-play");
+    try {
+      await handleGuessLieLaunch(btn);
+      const entry = getGuessLieEntryScreen();
+      if (entry !== "guesslie-menu") {
+        navigate(entry, { reset: true });
+      }
+    } catch (err) {
+      console.warn("Guess The Lie launch:", err);
+      const { showAppAlert } = await import("../core/dialog.js");
+      await showAppAlert(err?.message || "Impossible de lancer la partie.", {
+        title: "Guess The Lie",
+        icon: "⚠️",
+      });
     }
   });
 

@@ -200,6 +200,12 @@ body.has-top-ad .back{
   font-weight:800;
   font-size:16px;
   transition:transform .15s, opacity .15s;
+  text-decoration:none;
+  font-family:inherit;
+  -webkit-appearance:none;
+  appearance:none;
+  display:block;
+  text-align:center;
 }
 
 @media (hover:hover){
@@ -2183,6 +2189,22 @@ select.field-input option{
 
 .settings-section__hint{
   margin:0 0 14px;
+}
+
+.feedback-prompt__hint{
+  text-align:left;
+  margin:0 0 16px;
+  color:rgba(255,255,255,.55);
+  line-height:1.45;
+}
+
+.feedback-prompt__hint strong{
+  color:rgba(255,255,255,.82);
+  font-weight:700;
+}
+
+.feedback-prompt__btn{
+  margin-top:0;
 }
 
 .settings-social-hint{

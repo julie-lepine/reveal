@@ -20,6 +20,7 @@ import {
   getTraitrePendingVoters,
   getTraitreVoteTargets,
   isTraitrePrivateRoleReady,
+  isTraitreTieSpeakRound,
   isTraitreWordDealReady,
   simulateTraitreVotes,
 } from "../core/traitreSession.js";
@@ -226,7 +227,7 @@ export function mountTraitre(app) {
   }
 
   function tieSpeakBannerHtml(session) {
-    if (!session.tieAfterVote) return "";
+    if (!isTraitreTieSpeakRound(session)) return "";
     return `
       <div class="card card--highlight traitre-tie-speak-banner">
         <p class="card-heading">Égalité au vote</p>
@@ -259,7 +260,7 @@ export function mountTraitre(app) {
             : ""
         }
         ${
-          (session.speakRound || 1) > 1 && !session.tieAfterVote
+          (session.speakRound || 1) > 1 && !isTraitreTieSpeakRound(session)
             ? `<p class="hint">Rappel : indices <strong>différents</strong> des manches précédentes.</p>`
             : ""
         }

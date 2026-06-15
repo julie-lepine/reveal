@@ -5,11 +5,13 @@ import {
   getGuessLieSession,
   getLobbyMemberNames,
   handleGuessLieLaunch,
+  isGuessLieGameActive,
 } from "../core/guessLieSession.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
 import { isValidGuessLieSubmission } from "../core/sessionMerge.js";
 import { prepGuestFollowOnSession } from "../core/mpLaunch.js";
-import { navigate } from "../core/router.js";
+import { showAppAlert } from "../core/dialog.js";
+import { getCurrentScreen, navigate } from "../core/router.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
 import { bindNav } from "./nav.js";
 import { isLobbyHost, onGameSessionChange } from "../core/gameSync.js";
@@ -40,7 +42,7 @@ export function mountGuessLieLobbyWait(app) {
       });
       return;
     }
-    if (getGuessLieSession().lobbyComplete) {
+    if (isGuessLieGameActive()) {
       followIfStarted();
       return;
     }
@@ -48,7 +50,7 @@ export function mountGuessLieLobbyWait(app) {
     const session = getGuessLieSession();
     const members = getLobbyMemberNames();
     const allReady = allLobbySubmitted();
-    const started = Boolean(session.lobbyComplete);
+    const started = isGuessLieGameActive(session);
 
     app.innerHTML = pageShell({
       back: false,
@@ -101,17 +103,24 @@ export function mountGuessLieLobbyWait(app) {
   async function onStartClick(e) {
     const btn = e.target.closest("#btn-start");
     if (!btn || launching) return;
-    if (getGuessLieSession().lobbyComplete) {
+    if (isGuessLieGameActive()) {
       followIfStarted();
       return;
     }
     launching = true;
+    render();
     try {
       await handleGuessLieLaunch(btn);
       followIfStarted();
+    } catch (err) {
+      console.warn("Guess The Lie launch:", err);
+      await showAppAlert(err?.message || "Impossible de lancer la partie.", {
+        title: "Guess The Lie",
+        icon: "⚠️",
+      });
     } finally {
       launching = false;
-      render();
+      if (getCurrentScreen() === "guesslie-wait") render();
     }
   }
 
