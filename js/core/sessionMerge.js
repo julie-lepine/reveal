@@ -143,15 +143,22 @@ export function isGuessLieLobbyReset(state) {
   return Object.keys(state.submissions || {}).length === 0;
 }
 
+/** Reset prep distant applicable (n'annule pas un lancement local déjà confirmé). */
+export function shouldApplyGuessLieLobbyReset(local = {}, remote = {}) {
+  return isGuessLieLobbyReset(remote) && !local?.lobbyComplete;
+}
+
 /** Partie lancée si l'un des états le dit (évite régression quand le serveur est en retard). */
 export function mergeGuessLieLobbyComplete(local = {}, remote = {}, { lobbyReset = false } = {}) {
+  if (local.lobbyComplete) return true;
   if (lobbyReset) return Boolean(remote.lobbyComplete);
   return Boolean(local.lobbyComplete || remote.lobbyComplete);
 }
 
 /** Salon d'attente : aucune partie en cours sur les deux états. */
 export function isGuessLieInPrep(local = {}, remote = {}) {
-  if (mergeGuessLieLobbyComplete(local, remote, { lobbyReset: isGuessLieLobbyReset(remote) })) {
+  const lobbyReset = shouldApplyGuessLieLobbyReset(local, remote);
+  if (mergeGuessLieLobbyComplete(local, remote, { lobbyReset })) {
     return false;
   }
   return remote.phase == null && local.phase == null;
@@ -209,7 +216,12 @@ const TRAITRE_PHASE_RANK = {
   final: 4,
 };
 
-export function mergeTraitrePhase(curPhase, incPhase, { newVoteRound = false, staleVotePatch = false } = {}) {
+export function mergeTraitrePhase(
+  curPhase,
+  incPhase,
+  { newVoteRound = false, staleVotePatch = false, newGame = false } = {}
+) {
+  if (newGame) return incPhase ?? null;
   if (newVoteRound) return incPhase ?? curPhase ?? null;
   // Nouvelle manche d'indices : decision (fin M1) ou vote (élimination sans fin de partie)
   if (incPhase === "speak" && (curPhase === "decision" || curPhase === "vote")) {
@@ -570,6 +582,17 @@ export function isNewTraitreVoteRound(cur, inc) {
   return false;
 }
 
+/** Nouvelle partie Spot the fake (relance après fin ou retour prep). */
+export function isNewTraitreGame(cur, inc) {
+  if (!inc) return false;
+  if (inc.pairId && cur?.pairId && inc.pairId !== cur.pairId) return true;
+  if (cur?.phase === "final" && inc.phase === "deal") return true;
+  if (cur?.phase === "final" && !inc.lobbyStarted && (inc.phase == null || inc.phase === undefined)) {
+    return true;
+  }
+  return false;
+}
+
 /** Patch vote obsolète (votes encore présents) alors qu'une manche d'indices a démarré. */
 export function isStaleTraitreVotePatch(cur, inc) {
   if (cur?.phase !== "speak" || inc?.phase !== "vote") return false;
@@ -577,9 +600,23 @@ export function isStaleTraitreVotePatch(cur, inc) {
 }
 
 /** État Le Traître pour patchGameState. */
-export function mergeTraitrePatchState(cur, inc, { mergeReadyUid, mergeVotes, newVoteRound = false }) {
+export function mergeTraitrePatchState(
+  cur,
+  inc,
+  { mergeReadyUid, mergeVotes, newVoteRound = false, newGame = false } = {}
+) {
   if (!cur) return inc;
   if (!inc) return cur;
+  const newGameDetected = newGame || isNewTraitreGame(cur, inc);
+  if (newGameDetected) {
+    return {
+      ...inc,
+      phase: inc.phase ?? null,
+      ready: mergeReadyUid({}, inc),
+      votes: inc.votes || {},
+      dealAcks: inc.dealAcks || {},
+    };
+  }
   if (isReadyOnlyGamePatch(inc)) {
     return { ...cur, ready: mergeReadyUid(cur, inc) };
   }

@@ -36,12 +36,14 @@ import {
   isNewDilemmaVoteRound,
   isNewSpeedVoteVoteRound,
   isNewTraitreVoteRound,
+  isNewTraitreGame,
   isStaleTraitreVotePatch,
   isSubmissionsOnlyGamePatch,
   isVotesOnlyGamePatch,
   isAnswersOnlyGamePatch,
   mergeGuessLieSubmissions,
   isGuessLieLobbyReset,
+  shouldApplyGuessLieLobbyReset,
   mergeGuessLieLobbyComplete,
   isGuessLieInPrep,
   mergeConsensusPhase,
@@ -790,6 +792,19 @@ function normalizeTraitreVotesMap(votes = {}, alive = []) {
 function mergeTraitreGameLocal(local, remote) {
   if (!remote) return local;
   if (!local) return remote;
+  if (isNewTraitreGame(local, remote)) {
+    return {
+      ...remote,
+      impostorName: (() => {
+        if (isLobbyHost() && remote.impostorName) return remote.impostorName;
+        if (remote.impostorRevealed && remote.impostorName) return remote.impostorName;
+        if (remote.isLocalImpostor) return getLocalDisplayName();
+        return null;
+      })(),
+      isLocalImpostor: remote.isLocalImpostor ?? false,
+      privateRoleSynced: remote.privateRoleSynced ?? false,
+    };
+  }
   const newVoteRound = isNewTraitreVoteRound(local, remote);
   const remoteVotes = remote.votes || {};
   const localVotes = local.votes || {};
@@ -1034,7 +1049,7 @@ function mergeGuessLieGameLocal(local, remote) {
   if (!remote) return local;
   if (!local) return remote;
   const newVoteRound = isNewGuessLieVoteRound(local, remote);
-  const lobbyReset = isGuessLieLobbyReset(remote);
+  const lobbyReset = shouldApplyGuessLieLobbyReset(local, remote);
   const inPrep = isGuessLieInPrep(local, remote);
   const remoteVotes = remote.votes || {};
   const localVotes = local.votes || {};
@@ -2881,11 +2896,13 @@ async function patchGameStateInner(
     const curTr = current.traitre;
     const incTr = sanitizeTraitreMergeInc(curTr, mergePayload.traitre);
     const newTrVote = curTr && incTr ? isNewTraitreVoteRoundUid(curTr, incTr) : false;
+    const newTrGame = curTr && incTr ? isNewTraitreGame(curTr, incTr) : false;
     nextState.traitre = curTr
       ? mergeTraitrePatchState(curTr, incTr, {
           mergeReadyUid: mergeRemoteReadyUid,
           mergeVotes: mergeRemoteTraitreVotesUid,
           newVoteRound: newTrVote,
+          newGame: newTrGame,
         })
       : incTr;
   }
@@ -3012,13 +3029,13 @@ async function patchGameStateInner(
     const newGlRound = curGl && incGl ? isNewGuessLieVoteRound(curGl, incGl) : false;
     let mergedSubmissions = curGl?.submissions;
     if (incGl?.submissions !== undefined) {
-      if (isGuessLieLobbyReset(incGl)) {
+      if (shouldApplyGuessLieLobbyReset(curGl, incGl)) {
         mergedSubmissions = {};
       } else if (Object.keys(incGl.submissions || {}).length > 0) {
         mergedSubmissions = { ...(curGl.submissions || {}), ...(incGl.submissions || {}) };
       }
     }
-    const glLobbyReset = isGuessLieLobbyReset(incGl);
+    const glLobbyReset = shouldApplyGuessLieLobbyReset(curGl, incGl);
     nextState.guessLie = curGl
       ? {
           ...curGl,
@@ -3145,6 +3162,7 @@ export async function returnToGameSelect() {
     return true;
   }
 
+  resetLocalGamePrepState();
   suppressSessionRoute(
     120000,
     getEffectiveSessionScreen(getCachedGameSession()) || getCurrentScreen()

@@ -14,7 +14,7 @@ import {
   getCurrentTraitreSpeaker,
   getMyTraitreWord,
   getTraitreEntryScreen,
-  getTraitrePair,
+  getTraitreResultPair,
   getTraitreSession,
   getTraitreSpeakOrder,
   getTraitrePendingVoters,
@@ -294,7 +294,6 @@ export function mountTraitre(app) {
   function render() {
     syncFromSession();
     const session = getTraitreSession();
-    const pair = getTraitrePair(session);
     const myWord = getMyTraitreWord(session);
     const host = !mp || isLobbyHost();
     const wordDealReady = isTraitreWordDealReady(session);
@@ -375,21 +374,24 @@ export function mountTraitre(app) {
               : `<p class="hint">En attente de la clôture du vote…</p>`
         }`;
     } else if (phase === "final") {
-      const impostor = session.impostorName;
       const lastRound = session.lastRound || {};
+      const resultWinner = lastRound.winner ?? winner;
+      const resultImpostor = lastRound.impostorName ?? session.impostorName;
+      const resultPair = getTraitreResultPair(session);
+      const resultVoteSurvivals = lastRound.voteSurvivals ?? voteSurvivals;
       const deltas = lastRound.deltas || {};
       phaseHtml = `
         <div class="card traitre-final">
-          <p class="card-heading">${winner === "traitre" ? "Le fake gagne !" : "Le fake est démasqué !"}</p>
-          <p class="hint">Le fake était <strong>${escapeHtml(impostor || "?")}</strong>.</p>
+          <p class="card-heading">${resultWinner === "traitre" ? "Le fake gagne !" : "Le fake est démasqué !"}</p>
+          <p class="hint">Le fake était <strong>${escapeHtml(resultImpostor || "?")}</strong>.</p>
           ${
-            pair
-              ? `<p class="hint">Mots : majorité « ${escapeHtml(pair.a)} » · fake « ${escapeHtml(pair.b)} » (${escapeHtml(pair.theme || "")})</p>`
+            resultPair
+              ? `<p class="hint">Mots : majorité « ${escapeHtml(resultPair.a)} » · fake « ${escapeHtml(resultPair.b)} » (${escapeHtml(resultPair.theme || "")})</p>`
               : ""
           }
           ${
-            winner === "traitre"
-              ? `<p class="hint">+${TRAITRE_POINTS.INTRUS_WIN} pts victoire${voteSurvivals ? ` · +${voteSurvivals * TRAITRE_POINTS.INTRUS_SURVIVE_VOTE} pts survie` : ""}</p>`
+            resultWinner === "traitre"
+              ? `<p class="hint">+${TRAITRE_POINTS.INTRUS_WIN} pts victoire${resultVoteSurvivals ? ` · +${resultVoteSurvivals * TRAITRE_POINTS.INTRUS_SURVIVE_VOTE} pts survie` : ""}</p>`
               : `<p class="hint">+${TRAITRE_POINTS.CIVIL_CORRECT_VOTE} pts pour ceux qui ont voté le fake au bon moment.</p>`
           }
           <div class="traitre-delta-list">

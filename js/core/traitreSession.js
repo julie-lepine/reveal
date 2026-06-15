@@ -83,6 +83,12 @@ export function getTraitrePair(session = getTraitreSession()) {
   return getTraitrePairById(session.pairId);
 }
 
+/** Paire de mots figée pour l'écran résultat (évite une fuite si pairId change). */
+export function getTraitreResultPair(session = getTraitreSession()) {
+  const pairId = session.lastRound?.pairId ?? session.pairId;
+  return getTraitrePairById(pairId);
+}
+
 export function getMyTraitreWord(session = getTraitreSession()) {
   const pair = getTraitrePair(session);
   if (!pair) return null;
@@ -388,6 +394,7 @@ export function awardTraitreGame(session = getTraitreSession()) {
     winner: session.winner,
     impostorName: impostor,
     voteSurvivals: session.voteSurvivals || 0,
+    pairId: session.pairId,
     deltas: {},
   };
 

@@ -1,13 +1,19 @@
-import { INSTAGRAM_PROFILE_URL } from "../../data/appConfig.js";
+import { INSTAGRAM_HANDLE, INSTAGRAM_PROFILE_URL } from "../../data/appConfig.js";
 import { showAppRichDialog } from "./dialog.js";
-import { isLobbyEveningStarted } from "./lobby.js";
-import { onScreenChange } from "./router.js";
+import { hasActiveLobby, isLobbyEveningStarted } from "./lobby.js";
+import { getCurrentScreen, onScreenChange } from "./router.js";
 import { onLobbyBundleUpdated } from "./supabaseLobby.js";
+import { escapeHtml } from "./ui.js";
 
 let fabEl = null;
 
+/** Hub soirée : le bouton retour Insta reste visible entre deux parties. */
+const FEEDBACK_HUB_SCREENS = new Set(["game-select", "results", "leaderboard"]);
+
 function shouldShowFeedbackFab() {
-  return isLobbyEveningStarted();
+  if (!hasActiveLobby()) return false;
+  if (isLobbyEveningStarted()) return true;
+  return FEEDBACK_HUB_SCREENS.has(getCurrentScreen());
 }
 
 function updateFeedbackFabVisibility() {
@@ -34,6 +40,24 @@ export function openFeedbackDialog() {
     confirmLabel: "Envoie un DM",
   }).then((choice) => {
     if (choice === "ok") openInstagramProfile();
+  });
+}
+
+export function feedbackPromptCardHtml() {
+  return `
+    <div class="card settings-section game-select-feedback">
+      <h2 class="settings-section__title">Un retour ?</h2>
+      <p class="hint settings-section__hint">
+        Bug, idée de jeu ou mot à ajouter ? Écris-nous sur Instagram
+        <strong>@${escapeHtml(INSTAGRAM_HANDLE)}</strong>.
+      </p>
+      <button type="button" class="btn btn-secondary btn--spaced" data-open-feedback-dm">Envoie un DM</button>
+    </div>`;
+}
+
+export function bindFeedbackPrompt(root) {
+  root.querySelector("[data-open-feedback-dm]")?.addEventListener("click", () => {
+    openFeedbackDialog();
   });
 }
 

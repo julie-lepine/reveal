@@ -785,10 +785,12 @@ export async function markGuessLieLobbyComplete() {
   syncGuessLieSession();
   const { launchGameWithSync } = await import("./mpLaunch.js");
   const { guessLieLobbyStartToRemote } = await import("./gameSync.js");
+  const { setLobbyPlaying } = await import("./lobby.js");
   return launchGameWithSync({
     screen: "guesslie",
     gameId: "guesslie",
     mode: "patch",
+    beforeCommit: () => setLobbyPlaying("guesslie"),
     applyLocal: applyGuessLieLobbyCompleteLocal,
     getRemoteState: () => ({ guessLie: guessLieLobbyStartToRemote() }),
   });

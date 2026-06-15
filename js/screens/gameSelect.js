@@ -26,6 +26,7 @@ import { startLobbyPresenceSync } from "../core/supabaseLobby.js";
 import { hasActiveLobby } from "../core/lobby.js";
 import { getLastGame, getState } from "../core/state.js";
 // import { getFilRougeSession } from "../core/filRougeSession.js";
+import { bindFeedbackPrompt, feedbackPromptCardHtml } from "../core/feedbackUi.js";
 import {
   launchTraitrePrep,
   launchSpeedVotePrep,
@@ -271,10 +272,13 @@ export function mountGameSelect(app) {
       ${eveningRecapHtml(recap)}
 
       ${gameGridSection("🎮 Jeux disponibles", GAMES_AVAILABLE)}
+
+      ${feedbackPromptCardHtml()}
     `,
     });
 
     bindGameSelectEvents();
+    bindFeedbackPrompt(app);
   }
 
   // registerFilRougeRefresh(() => scheduleRender(true));

@@ -28,7 +28,18 @@ export function mountGuessLieLobbyWait(app) {
   }
 
   function render() {
-    if (launching) return;
+    if (launching) {
+      app.innerHTML = pageShell({
+        back: false,
+        content: `
+          <p class="label-upper label-upper--green">🕵️ Lobby Guess The Lie</p>
+          <h2 class="screen-title">En attente des joueurs</h2>
+          <p class="hint">Lancement de la partie…</p>
+          <button type="button" class="btn btn-secondary btn--spaced" disabled>Lancement…</button>
+        `,
+      });
+      return;
+    }
     if (getGuessLieSession().lobbyComplete) {
       followIfStarted();
       return;

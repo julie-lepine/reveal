@@ -28,6 +28,7 @@ import {
   mergeTraitrePhase,
   mergeTruthMeterPhase,
   isNewTraitreVoteRound,
+  isNewTraitreGame,
   isStaleTraitreVotePatch,
   pickLatestTriviaAnswer,
   mergeTriviaAnswersUid,
@@ -37,6 +38,7 @@ import {
   normalizeKeyedVotes,
   mergeGuessLieSubmissions,
   isGuessLieLobbyReset,
+  shouldApplyGuessLieLobbyReset,
   mergeGuessLieLobbyComplete,
   isGuessLieInPrep,
   isValidGuessLieSubmission,
@@ -521,6 +523,44 @@ describe("mergeTraitrePhase", () => {
   it("autorise reset de vote sur revote", () => {
     assert.equal(mergeTraitrePhase("vote", "vote", { newVoteRound: true }), "vote");
   });
+
+  it("accepte final → deal sur nouvelle partie", () => {
+    assert.equal(mergeTraitrePhase("final", "deal", { newGame: true }), "deal");
+  });
+
+  it("accepte final → null sur retour prep", () => {
+    assert.equal(mergeTraitrePhase("final", null, { newGame: true }), null);
+  });
+});
+
+describe("isNewTraitreGame", () => {
+  it("détecte un changement de paire de mots", () => {
+    assert.equal(
+      isNewTraitreGame({ pairId: "a", phase: "final" }, { pairId: "b", phase: "deal" }),
+      true
+    );
+  });
+
+  it("détecte relance final → deal", () => {
+    assert.equal(
+      isNewTraitreGame({ phase: "final", pairId: "a" }, { phase: "deal", pairId: "a" }),
+      true
+    );
+  });
+
+  it("détecte retour prep après fin de partie", () => {
+    assert.equal(
+      isNewTraitreGame(
+        { phase: "final", lobbyStarted: true },
+        { phase: null, lobbyStarted: false }
+      ),
+      true
+    );
+  });
+
+  it("ignore une avancée normale dans la même partie", () => {
+    assert.equal(isNewTraitreGame({ phase: "deal", pairId: "a" }, { phase: "speak", pairId: "a" }), false);
+  });
 });
 
 describe("mergeTraitrePatchState", () => {
@@ -591,6 +631,31 @@ describe("mergeTraitrePatchState", () => {
     assert.equal(isStaleTraitreVotePatch(cur, inc), true);
     const out = mergeTraitrePatchState(cur, inc, { mergeReadyUid, mergeVotes });
     assert.equal(out.phase, "speak");
+  });
+
+  it("remplace l'état local sur nouvelle partie", () => {
+    const cur = {
+      phase: "final",
+      pairId: "old_pair",
+      lobbyStarted: true,
+      winner: "civilians",
+      impostorRevealed: true,
+      votes: { a: "b" },
+    };
+    const inc = {
+      phase: "deal",
+      pairId: "new_pair",
+      lobbyStarted: true,
+      winner: null,
+      impostorRevealed: false,
+      votes: {},
+      dealAcks: {},
+    };
+    const out = mergeTraitrePatchState(cur, inc, { mergeReadyUid, mergeVotes });
+    assert.equal(out.phase, "deal");
+    assert.equal(out.pairId, "new_pair");
+    assert.deepEqual(out.votes, {});
+    assert.equal(out.winner, null);
   });
 });
 
@@ -710,13 +775,41 @@ describe("mergeGuessLieLobbyComplete", () => {
     assert.equal(mergeGuessLieLobbyComplete(local, remote), true);
   });
 
-  it("revient à false sur reset lobby", () => {
+  it("conserve le lancement local malgré un reset prep distant obsolète", () => {
     const local = { lobbyComplete: true, phase: "voting" };
     const remote = { lobbyComplete: false, phase: null, submissions: {} };
     assert.equal(
-      mergeGuessLieLobbyComplete(local, remote, { lobbyReset: true }),
+      mergeGuessLieLobbyComplete(local, remote, {
+        lobbyReset: shouldApplyGuessLieLobbyReset(local, remote),
+      }),
+      true
+    );
+    assert.equal(shouldApplyGuessLieLobbyReset(local, remote), false);
+  });
+
+  it("revient à false sur reset lobby quand le local est encore en prep", () => {
+    const local = { lobbyComplete: false, phase: null };
+    const remote = { lobbyComplete: false, phase: null, submissions: {} };
+    assert.equal(
+      mergeGuessLieLobbyComplete(local, remote, {
+        lobbyReset: shouldApplyGuessLieLobbyReset(local, remote),
+      }),
       false
     );
+  });
+});
+
+describe("shouldApplyGuessLieLobbyReset", () => {
+  it("ignore un snapshot prep vide si le local a déjà lancé", () => {
+    const local = { lobbyComplete: true, phase: "voting" };
+    const remote = { lobbyComplete: false, phase: null, submissions: {} };
+    assert.equal(shouldApplyGuessLieLobbyReset(local, remote), false);
+  });
+
+  it("applique le reset prep quand le local n'a pas encore lancé", () => {
+    const local = { lobbyComplete: false, phase: null };
+    const remote = { lobbyComplete: false, phase: null, submissions: {} };
+    assert.equal(shouldApplyGuessLieLobbyReset(local, remote), true);
   });
 });
 
