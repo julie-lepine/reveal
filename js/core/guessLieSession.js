@@ -31,7 +31,11 @@ export function allLobbySubmitted() {
 
 export function getGuessLieRounds() {
   const { submissions } = getGuessLieSession();
-  return getLobbyMemberNames()
+  const memberNames = getLobbyMemberNames();
+  const playerNames = memberNames.length
+    ? memberNames
+    : Object.keys(submissions || {});
+  return playerNames
     .filter((n) => isValidGuessLieSubmission(submissions[n]))
     .map((n) => ({
       player: n,

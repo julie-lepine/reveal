@@ -2124,6 +2124,7 @@ export async function refreshEveningScoresFromSession() {
 
 export function applyRemoteSession(row) {
   const prevScreen = cachedRow?.screen ?? null;
+  const prevGuessLie = getState().guessLie;
   const sig = sessionSignature(row);
   const sigUnchanged = sig === lastSessionSig;
   if (!sigUnchanged) lastSessionSig = sig;
@@ -2239,7 +2240,12 @@ export function applyRemoteSession(row) {
   applyRemoteEveningState(st);
   syncLastGameFromSessionRow(row);
 
-  if (sigUnchanged && !pgPhaseChanged) return;
+  const guessLiePlayChanged =
+    patch.guessLie &&
+    (Boolean(patch.guessLie.lobbyComplete) !== Boolean(prevGuessLie?.lobbyComplete) ||
+      (patch.guessLie.phase ?? null) !== (prevGuessLie?.phase ?? null));
+
+  if (sigUnchanged && !pgPhaseChanged && !guessLiePlayChanged) return;
 
   notify(row);
 
@@ -2300,10 +2306,18 @@ function navStackFor(screen) {
   return [...base, screen];
 }
 
+function isAppContentMounted() {
+  if (typeof document === "undefined") return true;
+  const app = document.getElementById("app");
+  return Boolean(app?.innerHTML?.trim());
+}
+
+export { isAppContentMounted };
+
 export function routeToSessionScreen(screen, { force = false } = {}) {
-  if (!screen || routing) return;
+  if (!screen || routing) return false;
   const current = getCurrentScreen();
-  if (!force && current === screen) return;
+  if (!force && current === screen) return isAppContentMounted();
 
   routing = true;
   try {
@@ -2319,6 +2333,7 @@ export function routeToSessionScreen(screen, { force = false } = {}) {
   } finally {
     routing = false;
   }
+  return isAppContentMounted();
 }
 
 export function suppressSessionRoute(ms = 45000, screen = getCachedGameSession()?.screen ?? null) {
@@ -2457,7 +2472,7 @@ export async function routeToActiveGameIfNeeded(cachedRowOnly = null, { force = 
     return false;
   }
   const current = getCurrentScreen();
-  if (current === screen) return true;
+  if (current === screen) return isAppContentMounted();
   if (!force && isCompatibleSessionScreen(screen, current)) return true;
   if (!force && !shouldApplySessionRoute(row)) return false;
   if (
@@ -2466,8 +2481,7 @@ export async function routeToActiveGameIfNeeded(cachedRowOnly = null, { force = 
   ) {
     clearSessionRouteSuppress();
   }
-  routeToSessionScreen(screen, { force: true });
-  return true;
+  return routeToSessionScreen(screen, { force: true });
 }
 
 export function handleSessionRoute(row, { fromScreen = null } = {}) {
@@ -2774,7 +2788,6 @@ export function guessLieLobbyStartToRemote() {
     lobbyComplete: true,
     roundIdx: 0,
     phase: "voting",
-    votes: {},
     roundScored: false,
   };
 }

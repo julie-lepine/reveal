@@ -23,34 +23,38 @@ export function mountGuessLieLobbyWait(app) {
   let launching = false;
 
   function followIfStarted() {
+    if (!isGuessLieGameActive()) return false;
     const entry = getGuessLieEntryScreen();
     if (entry === "guesslie-wait") return false;
     navigate(entry, { reset: true });
     return true;
   }
 
-  function render() {
-    if (launching) {
-      app.innerHTML = pageShell({
-        back: false,
-        content: `
+  function renderLaunchingShell() {
+    app.innerHTML = pageShell({
+      back: false,
+      content: `
           <p class="label-upper label-upper--green">🕵️ Lobby Guess The Lie</p>
           <h2 class="screen-title">En attente des joueurs</h2>
           <p class="hint">Lancement de la partie…</p>
           <button type="button" class="btn btn-secondary btn--spaced" disabled>Lancement…</button>
         `,
-      });
-      return;
-    }
+    });
+  }
+
+  function render() {
     if (isGuessLieGameActive()) {
       followIfStarted();
+      return;
+    }
+    if (launching) {
+      renderLaunchingShell();
       return;
     }
 
     const session = getGuessLieSession();
     const members = getLobbyMemberNames();
     const allReady = allLobbySubmitted();
-    const started = isGuessLieGameActive(session);
 
     app.innerHTML = pageShell({
       back: false,
@@ -76,22 +80,18 @@ export function mountGuessLieLobbyWait(app) {
 
         <p class="hint" id="wait-hint">
           ${
-            started
-              ? "Lancement de la partie…"
-              : allReady
-                ? "Tout le monde est prêt !"
-                : "Les autres joueurs préparent leurs affirmations…"
+            allReady
+              ? "Tout le monde est prêt !"
+              : "Les autres joueurs préparent leurs affirmations…"
           }
         </p>
 
         ${
-          allReady && isLobbyHost() && !started
+          allReady && isLobbyHost()
             ? `<button type="button" class="btn btn-primary btn--spaced" id="btn-start">Lancer la partie →</button>`
-            : allReady && !started
+            : allReady
               ? `<button type="button" class="btn btn-secondary btn--spaced" disabled>En attente de l'hôte…</button>`
-              : started
-                ? `<button type="button" class="btn btn-secondary btn--spaced" disabled>Lancement…</button>`
-                : `<button type="button" class="btn btn-secondary btn--spaced" disabled>En attente…</button>`
+              : `<button type="button" class="btn btn-secondary btn--spaced" disabled>En attente…</button>`
         }
         <button type="button" class="btn btn-secondary btn--spaced" data-nav="game-select">Retour</button>
       `,
@@ -108,10 +108,10 @@ export function mountGuessLieLobbyWait(app) {
       return;
     }
     launching = true;
-    render();
+    renderLaunchingShell();
     try {
       await handleGuessLieLaunch(btn);
-      followIfStarted();
+      if (followIfStarted()) return;
     } catch (err) {
       console.warn("Guess The Lie launch:", err);
       await showAppAlert(err?.message || "Impossible de lancer la partie.", {
@@ -120,7 +120,7 @@ export function mountGuessLieLobbyWait(app) {
       });
     } finally {
       launching = false;
-      if (getCurrentScreen() === "guesslie-wait") render();
+      if (getCurrentScreen() === "guesslie-wait" && !isGuessLieGameActive()) render();
     }
   }
 
@@ -130,9 +130,9 @@ export function mountGuessLieLobbyWait(app) {
   });
 
   function onSessionUpdate() {
+    if (followIfStarted()) return;
     if (launching) return;
     if (guestFollow()) return;
-    if (followIfStarted()) return;
     render();
   }
 

@@ -54,7 +54,9 @@ import {
   returnToGameSelect,
   // getFilRougeResumeScreen,
   routeToSessionScreen,
+  isAppContentMounted,
 } from "./gameSync.js";
+import { getGuessLieEntryScreen, isGuessLieGameActive } from "./guessLieSession.js";
 
 const MAX_PLAYERS = 10;
 
@@ -395,6 +397,18 @@ export async function goToGameSelect() {
   await returnToEveningGames();
 }
 
+/** Reprise Guess The Lie si l'état local indique une partie en cours mais #app est vide (F5). */
+function resumeLocalGuessLiePlay() {
+  if (!isGuessLieGameActive()) return false;
+  if (getGuessLieEntryScreen() !== "guesslie") return false;
+  if (isAppContentMounted()) return true;
+  navigate("guesslie", {
+    reset: true,
+    navStack: ["home", "lobby", "game-select", "guesslie"],
+  });
+  return isAppContentMounted();
+}
+
 export async function routeToEveningHub({ rejoinActiveGame = true } = {}) {
   if (!hasActiveLobby()) return false;
 
@@ -412,7 +426,11 @@ export async function routeToEveningHub({ rejoinActiveGame = true } = {}) {
   if (isGameSyncActive()) {
     startMultiplayerSync();
     const row = await refreshGameSession();
+    if (rejoinActiveGame && resumeLocalGuessLiePlay()) {
+      return true;
+    }
     if (rejoinActiveGame && (await routeToActiveGameIfNeeded(row, { force: true }))) {
+      resumeLocalGuessLiePlay();
       const passive = getCurrentScreen();
       if (passive === "home" || passive === "settings") {
         if (!isLobbyEveningStarted()) goToLobby();

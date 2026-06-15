@@ -35,9 +35,10 @@ export function registerScreen(id, renderFn) {
 }
 
 export function navigate(screenId, { reset = false, params = null, navStack: forcedStack = null } = {}) {
-  if (!appEl || !screens[screenId]) return;
+  if (!appEl || !screens[screenId]) return false;
 
   screenParams = params || {};
+  const screenBeforeMount = currentScreenId;
 
   if (currentCleanup) {
     currentCleanup();
@@ -54,9 +55,19 @@ export function navigate(screenId, { reset = false, params = null, navStack: for
     navStack.push(screenId);
   }
 
-  currentCleanup = screens[screenId](appEl) || null;
+  const cleanup = screens[screenId](appEl);
+  const redirected =
+    currentScreenId !== screenBeforeMount && currentScreenId !== screenId;
+  if (redirected) {
+    currentCleanup = typeof cleanup === "function" ? cleanup : currentCleanup;
+    requestAnimationFrame(() => resetPageScroll(appEl));
+    return true;
+  }
+
+  currentCleanup = cleanup || null;
   notifyScreenChange(screenId);
   requestAnimationFrame(() => resetPageScroll(appEl));
+  return true;
 }
 
 export function goBack(fallback = "home") {
