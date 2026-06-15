@@ -37,6 +37,8 @@ import {
   normalizeKeyedVotes,
   mergeGuessLieSubmissions,
   isGuessLieLobbyReset,
+  mergeGuessLieLobbyComplete,
+  isGuessLieInPrep,
   isValidGuessLieSubmission,
   normalizePlayerKeyedMap,
 } from "../js/core/sessionMerge.js";
@@ -692,6 +694,37 @@ describe("mergeGuessLieSubmissions", () => {
     });
     assert.equal(out.sarah.lie, 2);
     assert.equal(out.Admin.statements[0], "x");
+  });
+});
+
+describe("mergeGuessLieLobbyComplete", () => {
+  it("conserve le lancement local si le serveur est encore en prep", () => {
+    const local = { lobbyComplete: true, phase: "voting" };
+    const remote = { lobbyComplete: false, phase: null };
+    assert.equal(mergeGuessLieLobbyComplete(local, remote), true);
+  });
+
+  it("suit le lancement distant pour les invités", () => {
+    const local = { lobbyComplete: false, phase: null };
+    const remote = { lobbyComplete: true, phase: "voting" };
+    assert.equal(mergeGuessLieLobbyComplete(local, remote), true);
+  });
+
+  it("revient à false sur reset lobby", () => {
+    const local = { lobbyComplete: true, phase: "voting" };
+    const remote = { lobbyComplete: false, phase: null, submissions: {} };
+    assert.equal(
+      mergeGuessLieLobbyComplete(local, remote, { lobbyReset: true }),
+      false
+    );
+  });
+});
+
+describe("isGuessLieInPrep", () => {
+  it("n'est plus en prep après lancement local", () => {
+    const local = { lobbyComplete: true, phase: "voting" };
+    const remote = { lobbyComplete: false, phase: null };
+    assert.equal(isGuessLieInPrep(local, remote), false);
   });
 });
 

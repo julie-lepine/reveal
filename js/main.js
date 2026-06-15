@@ -50,6 +50,7 @@ import { mountTierNight } from "./games/tierNight.js";
 // import { initFilRougeResultsListener } from "./core/filRougeResultsModal.js";
 // import { initFilRougeValidationListener } from "./core/filRougeToast.js";
 import { initMultiplayerSyncVisibility } from "./core/gameSync.js";
+import { initFeedbackFab } from "./core/feedbackUi.js";
 
 const app = document.getElementById("app");
 
@@ -106,6 +107,7 @@ registerScreen("tiernight", mountTierNight);
 // registerScreen("filrouge-mission", mountFilRougeMission);
 
 initBottomNav();
+initFeedbackFab();
 initExitGameDelegation(app);
 initAds();
 initMultiplayerSyncVisibility();

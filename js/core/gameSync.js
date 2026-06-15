@@ -41,6 +41,8 @@ import {
   isAnswersOnlyGamePatch,
   mergeGuessLieSubmissions,
   isGuessLieLobbyReset,
+  mergeGuessLieLobbyComplete,
+  isGuessLieInPrep,
   mergeConsensusPhase,
   mergeTriviaAnswersUid,
   normalizeTriviaAnswersMap,
@@ -1032,7 +1034,7 @@ function mergeGuessLieGameLocal(local, remote) {
   if (!local) return remote;
   const newVoteRound = isNewGuessLieVoteRound(local, remote);
   const lobbyReset = isGuessLieLobbyReset(remote);
-  const inPrep = !remote.lobbyComplete && remote.phase == null;
+  const inPrep = isGuessLieInPrep(local, remote);
   const remoteVotes = remote.votes || {};
   const localVotes = local.votes || {};
   let votes = remoteVotes;
@@ -1060,9 +1062,7 @@ function mergeGuessLieGameLocal(local, remote) {
     votes,
     roundScored: mergeRoundFlag(local.roundScored, remote.roundScored, newVoteRound),
     statsRecordedRoundIdx: mergeMaxIndex(local.statsRecordedRoundIdx, remote.statsRecordedRoundIdx),
-    lobbyComplete: inPrep
-      ? Boolean(remote.lobbyComplete)
-      : Boolean(local.lobbyComplete || remote.lobbyComplete),
+    lobbyComplete: mergeGuessLieLobbyComplete(local, remote, { lobbyReset }),
   };
 }
 
@@ -2347,6 +2347,7 @@ function resolveActivePlayScreen(st, gid, declared) {
   if (st.dilemma?.lobbyStarted) return "dilemma";
   if (st.playlistGuess?.lobbyStarted) return "playlistguess";
 
+  if (st.guessLie?.lobbyComplete) return "guesslie";
   const glPhase = st.guessLie?.phase;
   if (glPhase && glPhase !== "idle" && glPhase !== "lobby") return "guesslie";
   if (st.tierNight?.game && !st.tierNight?.finished) return "tiernight";
@@ -3016,6 +3017,7 @@ async function patchGameStateInner(
         mergedSubmissions = { ...(curGl.submissions || {}), ...(incGl.submissions || {}) };
       }
     }
+    const glLobbyReset = isGuessLieLobbyReset(incGl);
     nextState.guessLie = curGl
       ? {
           ...curGl,
@@ -3030,6 +3032,7 @@ async function patchGameStateInner(
             curGl.statsRecordedRoundIdx,
             incGl.statsRecordedRoundIdx
           ),
+          lobbyComplete: mergeGuessLieLobbyComplete(curGl, incGl, { lobbyReset: glLobbyReset }),
         }
       : incGl;
     }

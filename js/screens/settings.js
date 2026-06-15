@@ -11,6 +11,8 @@ import { PROFILE_EMOJI_CHOICES } from "../../data/profileEmojis.js";
 import { hasActiveLobby, getLobby } from "../core/lobby.js";
 import { navigate } from "../core/router.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
+import { INSTAGRAM_HANDLE, INSTAGRAM_PROFILE_URL } from "../../data/appConfig.js";
+import { openFeedbackDialog } from "../core/feedbackUi.js";
 import { bindNav, goToEveningSettings, returnFromEveningProfile } from "./nav.js";
 
 export function mountSettings(app) {
@@ -98,8 +100,21 @@ export function mountSettings(app) {
         }
 
         <div class="card settings-section">
+          <h2 class="settings-section__title">Aide &amp; retours</h2>
+          <p class="hint settings-section__hint">
+            Un bug, une idée de jeu ou un mot à ajouter ? Écris-nous sur Instagram
+            <strong>@${escapeHtml(INSTAGRAM_HANDLE)}</strong>.
+          </p>
+          <button type="button" class="btn btn-secondary btn--spaced" id="btn-feedback-dm">Envoie un DM</button>
+        </div>
+
+        <div class="card settings-section">
           <h2 class="settings-section__title">Légal</h2>
           <p class="hint settings-section__hint">Politique de confidentialité (RGPD, AdMob, Supabase).</p>
+          <p class="hint settings-section__hint">
+            Contact RGPD :
+            <a href="${escapeHtml(INSTAGRAM_PROFILE_URL)}" target="_blank" rel="noopener noreferrer">@${escapeHtml(INSTAGRAM_HANDLE)}</a>
+          </p>
           <button type="button" class="btn btn-secondary btn--spaced" data-nav="privacy">Politique de confidentialité</button>
         </div>
       `,
@@ -135,6 +150,10 @@ export function mountSettings(app) {
         });
         ok?.classList.remove("hidden");
       });
+    });
+
+    app.querySelector("#btn-feedback-dm")?.addEventListener("click", () => {
+      openFeedbackDialog();
     });
 
     app.querySelector("#btn-save-name")?.addEventListener("click", async () => {

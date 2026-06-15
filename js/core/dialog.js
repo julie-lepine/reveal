@@ -68,9 +68,15 @@ export function showAppAlert(message, { title = "REVEAL", confirmLabel = "OK", i
 /**
  * Pop-up avec contenu HTML mis en forme (de confiance, non échappé).
  * Utilisée pour les fiches de règles. Panneau scrollable.
- * @returns {Promise<void>}
+ * @returns {Promise<void|"ok"|"cancel">}
  */
-export function showAppRichDialog({ title = "REVEAL", icon = "✨", bodyHtml = "", confirmLabel = "Compris !" } = {}) {
+export function showAppRichDialog({
+  title = "REVEAL",
+  icon = "✨",
+  bodyHtml = "",
+  confirmLabel = "Compris !",
+  cancelLabel = null,
+} = {}) {
   return new Promise((resolve) => {
     if (openDialog) {
       removeDialog(openDialog, () => {});
@@ -83,7 +89,14 @@ export function showAppRichDialog({ title = "REVEAL", icon = "✨", bodyHtml = "
     root.setAttribute("aria-modal", "true");
     root.setAttribute("aria-labelledby", "app-dialog-title");
 
-    const close = () => removeDialog(root, resolve);
+    const close = (result) => removeDialog(root, () => resolve(result));
+
+    const actionsHtml = cancelLabel
+      ? `<div class="app-dialog__actions">
+          <button type="button" class="btn btn-secondary app-dialog__btn" data-dialog-cancel>${escapeHtml(cancelLabel)}</button>
+          <button type="button" class="btn btn-primary app-dialog__btn" data-dialog-ok>${escapeHtml(confirmLabel)}</button>
+        </div>`
+      : `<button type="button" class="btn btn-primary app-dialog__btn" data-dialog-ok>${escapeHtml(confirmLabel)}</button>`;
 
     root.innerHTML = `
       <div class="app-dialog__backdrop" data-dialog-dismiss aria-hidden="true"></div>
@@ -92,20 +105,21 @@ export function showAppRichDialog({ title = "REVEAL", icon = "✨", bodyHtml = "
         <p class="app-dialog__icon" aria-hidden="true">${icon}</p>
         <p class="app-dialog__title" id="app-dialog-title">${escapeHtml(title)}</p>
         <div class="app-dialog__rich">${bodyHtml}</div>
-        <button type="button" class="btn btn-primary app-dialog__btn" data-dialog-ok>${escapeHtml(confirmLabel)}</button>
+        ${actionsHtml}
       </div>
     `;
 
-    root.querySelector("[data-dialog-ok]")?.addEventListener("click", close);
-    root.querySelector("[data-dialog-dismiss]")?.addEventListener("click", close);
+    root.querySelector("[data-dialog-ok]")?.addEventListener("click", () => close(cancelLabel ? "ok" : undefined));
+    root.querySelector("[data-dialog-cancel]")?.addEventListener("click", () => close("cancel"));
+    root.querySelector("[data-dialog-dismiss]")?.addEventListener("click", () => close(cancelLabel ? "cancel" : undefined));
     root.addEventListener("keydown", (e) => {
-      if (e.key === "Escape") close();
+      if (e.key === "Escape") close(cancelLabel ? "cancel" : undefined);
     });
 
     document.body.appendChild(root);
     openDialog = root;
     requestAnimationFrame(() => root.classList.add("app-dialog--in"));
-    root.querySelector("[data-dialog-ok]")?.focus();
+    (root.querySelector(cancelLabel ? "[data-dialog-cancel]" : "[data-dialog-ok]"))?.focus();
   });
 }
 

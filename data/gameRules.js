@@ -1,6 +1,8 @@
 // Fiches de règles affichées dans la modale « Règles » (écrans de paramétrage + cartes).
 // Contenu volontairement court et concret. Les points correspondent au barème réel des jeux.
 
+import { TRAITRE_MIN_PLAYERS } from "./traitre.js";
+
 export const GAME_RULES = {
   playlistguess: {
     title: "VibeCheck",
@@ -162,7 +164,7 @@ export const GAME_RULES = {
     emoji: "🎭",
     but: "Tous reçoivent un mot secret - sauf un, qui a un mot proche. À l'oral, donnez des indices sans prononcer votre mot. Trouvez le fake avant qu'il ne finisse dans le duo final.",
     etapes: [
-      "3 joueurs minimum. L'app distribue un mot secret à chacun (le fake a un mot voisin, ex. Android / iOS).",
+      `${TRAITRE_MIN_PLAYERS} joueurs minimum. L'app distribue un mot secret à chacun (le fake a un mot voisin, ex. Android / iOS).`,
       "Manche 1 : chaque joueur dit un indice à voix haute, dans l'ordre affiché sur l'app.",
       "Fin de manche 1 : l'hôte choisit « Continuer » (nouvelle manche d'indices) ou « Voter ».",
       "À partir de la manche 2, un vote d'élimination est obligatoire après les indices.",

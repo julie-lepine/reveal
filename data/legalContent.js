@@ -1,5 +1,7 @@
 /** Contenu politique de confidentialité REVEAL (FR). */
 
+import { INSTAGRAM_HANDLE, INSTAGRAM_PROFILE_URL } from "./appConfig.js";
+
 export const PRIVACY_POLICY = {
   title: "Politique de confidentialité",
   updated: "30 mai 2026",
@@ -30,7 +32,11 @@ export const PRIVACY_POLICY = {
     },
     {
       heading: "Vos droits (RGPD)",
-      body: "Vous disposez d'un droit d'accès, de rectification, d'effacement, de limitation et d'opposition. Pour exercer vos droits : contactez l'éditeur de l'application (adresse à compléter dans la fiche store).",
+      body: `Vous disposez d'un droit d'accès, de rectification, d'effacement, de limitation et d'opposition. Pour exercer vos droits ou nous contacter : envoyez un message privé sur Instagram @${INSTAGRAM_HANDLE} (${INSTAGRAM_PROFILE_URL}).`,
+    },
+    {
+      heading: "Contact et retours",
+      body: `Bug, idée d'amélioration ou question sur l'app : vous pouvez nous écrire en DM sur Instagram @${INSTAGRAM_HANDLE} (${INSTAGRAM_PROFILE_URL}).`,
     },
     {
       heading: "Sécurité",

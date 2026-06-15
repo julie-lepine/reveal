@@ -143,6 +143,20 @@ export function isGuessLieLobbyReset(state) {
   return Object.keys(state.submissions || {}).length === 0;
 }
 
+/** Partie lancée si l'un des états le dit (évite régression quand le serveur est en retard). */
+export function mergeGuessLieLobbyComplete(local = {}, remote = {}, { lobbyReset = false } = {}) {
+  if (lobbyReset) return Boolean(remote.lobbyComplete);
+  return Boolean(local.lobbyComplete || remote.lobbyComplete);
+}
+
+/** Salon d'attente : aucune partie en cours sur les deux états. */
+export function isGuessLieInPrep(local = {}, remote = {}) {
+  if (mergeGuessLieLobbyComplete(local, remote, { lobbyReset: isGuessLieLobbyReset(remote) })) {
+    return false;
+  }
+  return remote.phase == null && local.phase == null;
+}
+
 /**
  * Soumissions Guess The Lie.
  * - reset : purge locale (nouvelle partie)

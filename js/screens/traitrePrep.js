@@ -26,6 +26,24 @@ import { navigate } from "../core/router.js";
 import { pageShell } from "../core/ui.js";
 import { bindNav } from "./nav.js";
 
+function traitreMinPlayersCardHtml(playerCount) {
+  const minPlayersMet = playerCount >= TRAITRE_MIN_PLAYERS;
+  return `
+    <div class="fil-rouge-setup__req ${minPlayersMet ? "fil-rouge-setup__req--ok" : "fil-rouge-setup__req--warn"}" role="status">
+      <span class="fil-rouge-setup__req-icon" aria-hidden="true">👥</span>
+      <div class="fil-rouge-setup__req-body">
+        <p class="fil-rouge-setup__req-title">Minimum ${TRAITRE_MIN_PLAYERS} joueurs</p>
+        <p class="fil-rouge-setup__req-detail">
+          ${
+            minPlayersMet
+              ? `${playerCount} joueurs dans le lobby - c'est bon.`
+              : `<strong>${playerCount} / ${TRAITRE_MIN_PLAYERS}</strong> joueurs - invite encore <strong>${TRAITRE_MIN_PLAYERS - playerCount}</strong> personne${TRAITRE_MIN_PLAYERS - playerCount > 1 ? "s" : ""}.`
+          }
+        </p>
+      </div>
+    </div>`;
+}
+
 export function mountTraitrePrep(app) {
   if (!requireLobbyPlay()) return null;
 
@@ -39,10 +57,10 @@ export function mountTraitrePrep(app) {
     const check = validateTraitreLaunch();
     if (!check.ok) {
       const { showAppAlert } = await import("../core/dialog.js");
-      await showAppAlert(`Spot the fake nécessite au moins ${TRAITRE_MIN_PLAYERS} joueurs (${check.count} présents).`, {
-        title: "Spot the fake",
-        icon: "🎭",
-      });
+      await showAppAlert(
+        `Spot the fake se joue à au moins ${TRAITRE_MIN_PLAYERS} : mot secret, indices oraux, vote d'élimination.`,
+        { title: `${TRAITRE_MIN_PLAYERS} joueurs minimum`, icon: "👥" }
+      );
       return;
     }
     await runPrepGameLaunch({
@@ -71,8 +89,10 @@ export function mountTraitrePrep(app) {
         </div>
         <p class="game-intro">
           Mot secret pour tous… sauf un. Indices oraux, votes d'élimination, démasque le fake avant le duo final.
+          <span class="muted">${TRAITRE_MIN_PLAYERS} joueurs minimum.</span>
         </p>
-        <p class="hint">${check.ok ? `${check.count} joueur(s) prêts à jouer.` : `Minimum ${TRAITRE_MIN_PLAYERS} joueurs requis (${check.count} présents).`}</p>
+
+        <div id="traitre-min-players">${traitreMinPlayersCardHtml(members.length)}</div>
 
         <div class="card" id="traitre-players">
           ${playersReadySectionHtml(members, session.ready || {})}
@@ -85,7 +105,7 @@ export function mountTraitrePrep(app) {
         <div id="traitre-start-slot">
           ${prepStartSlotHtml({
             poolEmpty: !check.ok,
-            poolEmptyLabel: `Minimum ${TRAITRE_MIN_PLAYERS} joueurs`,
+            poolEmptyLabel: `Il faut au moins ${TRAITRE_MIN_PLAYERS} joueurs`,
             allReady,
             isHost,
             launchLabel: "Lancer Spot the fake →",
@@ -99,7 +119,7 @@ export function mountTraitrePrep(app) {
       void prepLobby.toggleReady({
         setReady: setTraitreReady,
         simulateReady: simulateTraitreReady,
-        render,
+        render: refreshReadySection,
       });
     });
     app.querySelector("#btn-start-game")?.addEventListener("click", () => {
@@ -112,13 +132,19 @@ export function mountTraitrePrep(app) {
     const members = getLobbyParticipants();
     updatePlayersReadyCard(app.querySelector("#traitre-players"), members, session.ready || {});
     updateReadyButton(app.querySelector("#btn-ready"), prepLobby.localReadyState());
+
+    const minCard = app.querySelector("#traitre-min-players");
+    if (minCard) {
+      minCard.innerHTML = traitreMinPlayersCardHtml(members.length);
+    }
+
     const allReady = allTraitreReady();
     const check = validateTraitreLaunch();
     updatePrepStartSlot(
       app.querySelector("#traitre-start-slot"),
       prepStartSlotHtml({
         poolEmpty: !check.ok,
-        poolEmptyLabel: `Minimum ${TRAITRE_MIN_PLAYERS} joueurs`,
+        poolEmptyLabel: `Il faut au moins ${TRAITRE_MIN_PLAYERS} joueurs`,
         allReady,
         isHost: isLobbyHost(),
         launchLabel: "Lancer Spot the fake →",

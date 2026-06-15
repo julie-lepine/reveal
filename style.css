@@ -3097,6 +3097,58 @@ body.wizz-shake #app{
   transform:scale(.94);
 }
 
+/* ─── Bouton retour / feedback (FAB) ─── */
+.feedback-fab{
+  position:fixed;
+  right:max(var(--page-pad), env(safe-area-inset-right, 0px));
+  bottom:calc(16px + env(safe-area-inset-bottom, 0px));
+  z-index:110;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  width:48px;
+  height:48px;
+  padding:0;
+  border-radius:999px;
+  border:1px solid rgba(255,255,255,.16);
+  background:linear-gradient(145deg, rgba(88,28,135,.92), rgba(13,15,30,.94));
+  box-shadow:0 8px 24px rgba(0,0,0,.35);
+  color:#fff;
+  font-size:22px;
+  line-height:1;
+  cursor:pointer;
+  transition:transform .15s ease, opacity .2s ease, box-shadow .15s ease;
+  -webkit-tap-highlight-color:transparent;
+}
+
+body.has-bottom-nav .feedback-fab{
+  bottom:calc(100px + env(safe-area-inset-bottom, 0px));
+}
+
+.feedback-fab--hidden{
+  opacity:0;
+  pointer-events:none;
+  transform:scale(.85);
+}
+
+.feedback-fab:active{
+  transform:scale(.92);
+}
+
+@media (hover:hover){
+  .feedback-fab:hover{
+    box-shadow:0 10px 28px rgba(0,0,0,.45);
+  }
+}
+
+.feedback-modal__text{
+  margin:0;
+  font-size:14px;
+  line-height:1.55;
+  color:rgba(255,255,255,.82);
+}
+
+
 /* ─── Game enhancements ─── */
 .hot-take-author{
   font-size:12px;

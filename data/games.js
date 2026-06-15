@@ -1,9 +1,11 @@
+import { TRAITRE_MIN_PLAYERS } from "./traitre.js";
+
 /** Catalogue des jeux affichés dans le menu. `enabled: false` → section « Bientôt » (gameSelect). */
 export const GAMES = [
   {
     id: "traitre-prep",
     title: "Spot the fake",
-    desc: "3 joueurs min. - mot secret, indices oraux, démasque l'intrus",
+    desc: `${TRAITRE_MIN_PLAYERS} joueurs min. - mot secret, indices oraux, démasque l'intrus`,
     emoji: "🎭",
     cssClass: "traitre",
     logo: "assets/games/traitre.png",
