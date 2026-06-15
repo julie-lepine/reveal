@@ -91,6 +91,8 @@ export async function launchGameWithSync({
   beforeCommit,
   /** État local avant le patch serveur (Guess The Lie : évite la boucle wait → game → wait). */
   localFirst = false,
+  /** Appelé juste après applyLocal (navigation immédiate sans attendre le patch). */
+  onLocalApplied,
   timeoutMs = DEFAULT_SYNC_PATCH_TIMEOUT_MS,
   fallbackMessage = SYNC_SLOW_LAUNCH_MESSAGE,
 }) {
@@ -98,15 +100,20 @@ export async function launchGameWithSync({
 
   if (!isGameSyncActive()) {
     applyLocal();
+    onLocalApplied?.();
     return { ok: true };
   }
 
   if (!isLobbyHost()) {
     applyLocal();
+    onLocalApplied?.();
     return { ok: true };
   }
 
-  if (localFirst) applyLocal();
+  if (localFirst) {
+    applyLocal();
+    onLocalApplied?.();
+  }
 
   const remoteState = getRemoteState();
   const commit = () =>
@@ -175,6 +182,12 @@ export function prepGuestFollowOnSession({ prepScreen, getEntryScreen, buildNavS
     }
     const entry = getEntryScreen();
     if (entry === prepScreen) return false;
+    if (entry === "guesslie") {
+      navigate("guesslie", {
+        navStack: ["home", "lobby", "game-select", "guesslie-menu", "guesslie-wait", "guesslie"],
+      });
+      return true;
+    }
     navigate(entry, buildNavStack ? { navStack: buildNavStack(entry) } : { reset: true });
     return true;
   };

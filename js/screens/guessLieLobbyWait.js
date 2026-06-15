@@ -6,12 +6,13 @@ import {
   getLobbyMemberNames,
   handleGuessLieLaunch,
   isGuessLieGameActive,
+  navigateToGuessLieEntry,
 } from "../core/guessLieSession.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
 import { isValidGuessLieSubmission } from "../core/sessionMerge.js";
 import { prepGuestFollowOnSession } from "../core/mpLaunch.js";
 import { showAppAlert } from "../core/dialog.js";
-import { getCurrentScreen, navigate } from "../core/router.js";
+import { getCurrentScreen } from "../core/router.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
 import { bindNav } from "./nav.js";
 import { isLobbyHost, onGameSessionChange } from "../core/gameSync.js";
@@ -23,11 +24,7 @@ export function mountGuessLieLobbyWait(app) {
   let launching = false;
 
   function followIfStarted() {
-    if (!isGuessLieGameActive()) return false;
-    const entry = getGuessLieEntryScreen();
-    if (entry === "guesslie-wait") return false;
-    navigate(entry, { reset: true });
-    return true;
+    return navigateToGuessLieEntry();
   }
 
   function renderLaunchingShell() {
@@ -43,10 +40,7 @@ export function mountGuessLieLobbyWait(app) {
   }
 
   function render() {
-    if (isGuessLieGameActive()) {
-      followIfStarted();
-      return;
-    }
+    if (followIfStarted()) return;
     if (launching) {
       renderLaunchingShell();
       return;
@@ -103,15 +97,12 @@ export function mountGuessLieLobbyWait(app) {
   async function onStartClick(e) {
     const btn = e.target.closest("#btn-start");
     if (!btn || launching) return;
-    if (isGuessLieGameActive()) {
-      followIfStarted();
-      return;
-    }
+    if (followIfStarted()) return;
     launching = true;
     renderLaunchingShell();
     try {
-      await handleGuessLieLaunch(btn);
-      if (followIfStarted()) return;
+      await handleGuessLieLaunch(btn, { onLocalApplied: followIfStarted });
+      followIfStarted();
     } catch (err) {
       console.warn("Guess The Lie launch:", err);
       await showAppAlert(err?.message || "Impossible de lancer la partie.", {
@@ -120,7 +111,10 @@ export function mountGuessLieLobbyWait(app) {
       });
     } finally {
       launching = false;
-      if (getCurrentScreen() === "guesslie-wait" && !isGuessLieGameActive()) render();
+      if (getCurrentScreen() === "guesslie-wait") {
+        if (followIfStarted()) return;
+        if (!isGuessLieGameActive()) render();
+      }
     }
   }
 

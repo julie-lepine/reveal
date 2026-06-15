@@ -56,7 +56,7 @@ import {
   routeToSessionScreen,
   isAppContentMounted,
 } from "./gameSync.js";
-import { getGuessLieEntryScreen, isGuessLieGameActive } from "./guessLieSession.js";
+import { getGuessLieEntryScreen, isGuessLieGameActive, navigateToGuessLieEntry } from "./guessLieSession.js";
 
 const MAX_PLAYERS = 10;
 
@@ -402,11 +402,7 @@ function resumeLocalGuessLiePlay() {
   if (!isGuessLieGameActive()) return false;
   if (getGuessLieEntryScreen() !== "guesslie") return false;
   if (isAppContentMounted()) return true;
-  navigate("guesslie", {
-    reset: true,
-    navStack: ["home", "lobby", "game-select", "guesslie"],
-  });
-  return isAppContentMounted();
+  return navigateToGuessLieEntry();
 }
 
 export async function routeToEveningHub({ rejoinActiveGame = true } = {}) {

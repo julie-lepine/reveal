@@ -7,6 +7,7 @@ import {
   getGuessLieRounds,
   simulateRoundVotes,
   getGuessLieSession,
+  navigateToGuessLieEntry,
 } from "../core/guessLieSession.js";
 import {
   isGameSyncActive,
@@ -37,16 +38,15 @@ function revealFeedbackTitle({ isSubject, myCorrect, liarBonus }) {
 export function mountGuessLie(app) {
   if (!requireLobbyPlay()) return null;
 
-  const entry = getGuessLieEntryScreen();
-  if (entry !== "guesslie") {
-    navigate(entry);
-    return null;
+  if (getGuessLieEntryScreen() !== "guesslie") {
+    navigateToGuessLieEntry();
+    return () => {};
   }
 
   const rounds = getGuessLieRounds();
   if (!rounds.length) {
-    navigate("guesslie-menu");
-    return null;
+    navigateToGuessLieEntry();
+    return () => {};
   }
 
   setLobbyPlaying("guesslie");

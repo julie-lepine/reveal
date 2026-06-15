@@ -782,7 +782,7 @@ function applyGuessLieLobbyCompleteLocal() {
   save();
 }
 
-export async function markGuessLieLobbyComplete() {
+export async function markGuessLieLobbyComplete({ onLocalApplied } = {}) {
   syncGuessLieSession();
   const { launchGameWithSync } = await import("./mpLaunch.js");
   const { guessLieLobbyStartToRemote } = await import("./gameSync.js");
@@ -792,6 +792,7 @@ export async function markGuessLieLobbyComplete() {
     gameId: "guesslie",
     mode: "patch",
     localFirst: true,
+    onLocalApplied,
     beforeCommit: () => setLobbyPlaying("guesslie"),
     applyLocal: applyGuessLieLobbyCompleteLocal,
     getRemoteState: () => ({ guessLie: guessLieLobbyStartToRemote() }),

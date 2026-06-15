@@ -2,10 +2,8 @@ import { GUESS_LIE_ROUNDS } from "../../data/guessLies.js";
 import { getActivePlayerNames, getActivePlayers } from "./players.js";
 import { isValidGuessLieSubmission } from "./sessionMerge.js";
 import { getLocalDisplayName, getState } from "./state.js";
-import {
-  navigateAfterGameLaunch,
-  runLaunchButton,
-} from "./mpLaunch.js";
+import { navigateAfterGameLaunch, runLaunchButton } from "./mpLaunch.js";
+import { navigate } from "./router.js";
 
 export function getGuessLieSession() {
   return getState().guessLie;
@@ -57,12 +55,31 @@ export function getGuessLieEntryScreen() {
   return "guesslie-wait";
 }
 
+const GUESS_LIE_NAV_STACK = {
+  guesslie: ["home", "lobby", "game-select", "guesslie-menu", "guesslie-wait", "guesslie"],
+  "guesslie-wait": ["home", "lobby", "game-select", "guesslie-menu", "guesslie-wait"],
+  "guesslie-menu": ["home", "lobby", "game-select", "guesslie-menu"],
+  "guesslie-setup": ["home", "lobby", "game-select", "guesslie-menu", "guesslie-setup"],
+};
+
+/** Navigation vers l'écran Guess The Lie adapté à l'état local (wait / menu / partie). */
+export function navigateToGuessLieEntry() {
+  const entry = getGuessLieEntryScreen();
+  if (entry === "guesslie-wait") return false;
+  navigate(entry, {
+    navStack: GUESS_LIE_NAV_STACK[entry] || ["home", "lobby", "game-select", entry],
+  });
+  return true;
+}
+
 /** Lancement depuis le salon d'attente ou le menu (solo + MP avec secours local). */
-export async function handleGuessLieLaunch(btn) {
+export async function handleGuessLieLaunch(btn, { onLocalApplied } = {}) {
   return runLaunchButton(btn, async () => {
     const { markGuessLieLobbyComplete } = await import("./state.js");
-    const result = await markGuessLieLobbyComplete();
-    navigateAfterGameLaunch({ gameScreen: "guesslie", result, forceNavigate: true });
+    const result = await markGuessLieLobbyComplete({ onLocalApplied });
+    if (!navigateToGuessLieEntry()) {
+      navigateAfterGameLaunch({ gameScreen: "guesslie", result, forceNavigate: true });
+    }
     return result;
   });
 }
