@@ -17,6 +17,9 @@ export async function openExternalUrl(url) {
     }
   }
 
+  const popup = window.open(url, "_blank", "noopener,noreferrer");
+  if (popup) return;
+
   const anchor = document.createElement("a");
   anchor.href = url;
   anchor.target = "_blank";
@@ -24,9 +27,4 @@ export async function openExternalUrl(url) {
   document.body.appendChild(anchor);
   anchor.click();
   anchor.remove();
-
-  const popup = window.open(url, "_blank", "noopener,noreferrer");
-  if (!popup && !isNativeApp()) {
-    window.location.assign(url);
-  }
 }

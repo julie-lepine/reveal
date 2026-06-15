@@ -5801,3 +5801,244 @@ body{
   gap: 0.5rem;
   margin-top: 0.75rem;
 }
+
+/* Spot the fake — écran résultat */
+.traitre-final {
+  overflow: hidden;
+  padding: 0;
+  border: 1px solid rgba(251, 191, 36, 0.22);
+  background:
+    radial-gradient(circle at 50% 0%, rgba(251, 191, 36, 0.1), transparent 58%),
+    rgba(255, 255, 255, 0.04);
+}
+
+.traitre-final--fake-caught {
+  border-color: rgba(74, 222, 128, 0.28);
+  background:
+    radial-gradient(circle at 50% 0%, rgba(74, 222, 128, 0.12), transparent 58%),
+    rgba(255, 255, 255, 0.04);
+}
+
+.traitre-final--fake-wins {
+  border-color: rgba(248, 113, 113, 0.32);
+  background:
+    radial-gradient(circle at 50% 0%, rgba(248, 113, 113, 0.14), transparent 58%),
+    rgba(255, 255, 255, 0.04);
+}
+
+.traitre-final__hero {
+  text-align: center;
+  padding: 1.35rem 1rem 0.85rem;
+}
+
+.traitre-final__emoji {
+  display: block;
+  margin-bottom: 0.45rem;
+  font-size: 2.6rem;
+  line-height: 1;
+}
+
+.traitre-final__title {
+  margin: 0;
+  font-size: 1.35rem;
+  font-weight: 800;
+  line-height: 1.25;
+  color: #fff;
+}
+
+.traitre-final__impostor {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  margin: 0 1rem 1rem;
+  padding: 0.9rem 1rem;
+  border-radius: 14px;
+  background: rgba(0, 0, 0, 0.24);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.traitre-final__impostor-avatar {
+  width: 2.75rem;
+  height: 2.75rem;
+  flex-shrink: 0;
+  font-size: 1.25rem;
+}
+
+.traitre-final__impostor-text {
+  min-width: 0;
+}
+
+.traitre-final__impostor-label {
+  display: block;
+  margin-bottom: 0.1rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.48);
+}
+
+.traitre-final__impostor-name {
+  font-size: 1.2rem;
+  font-weight: 800;
+  color: #fde68a;
+}
+
+.traitre-final--fake-caught .traitre-final__impostor-name {
+  color: #fca5a5;
+}
+
+.traitre-final__words {
+  margin: 0 1rem 1rem;
+  padding: 0.85rem 0.95rem;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.traitre-final__words-label {
+  margin: 0 0 0.65rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.traitre-final__word-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.55rem;
+}
+
+.traitre-final__word {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 0;
+  padding: 0.65rem 0.55rem;
+  border-radius: 12px;
+  text-align: center;
+}
+
+.traitre-final__word--majority {
+  background: rgba(34, 211, 238, 0.1);
+  border: 1px solid rgba(34, 211, 238, 0.22);
+}
+
+.traitre-final__word--fake {
+  background: rgba(248, 113, 113, 0.1);
+  border: 1px solid rgba(248, 113, 113, 0.24);
+}
+
+.traitre-final__word-role {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.traitre-final__word-value {
+  font-size: 0.95rem;
+  font-weight: 800;
+  line-height: 1.2;
+  color: #fff;
+  overflow-wrap: anywhere;
+}
+
+.traitre-final__theme {
+  margin: 0.65rem 0 0;
+  text-align: center;
+  font-size: 0.82rem;
+  color: rgba(255, 255, 255, 0.46);
+}
+
+.traitre-final__scores {
+  padding: 0 1rem 1.1rem;
+}
+
+.traitre-final__points-rule {
+  margin: 0 0 0.65rem;
+  font-size: 0.84rem;
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.traitre-final__no-points {
+  margin: 0;
+  text-align: center;
+}
+
+.traitre-final__fake-tag {
+  display: inline-block;
+  margin-left: 0.35rem;
+  padding: 0.1rem 0.4rem;
+  border-radius: 999px;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  vertical-align: middle;
+  color: #fecaca;
+  background: rgba(248, 113, 113, 0.18);
+}
+
+.traitre-delta-list {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.traitre-delta-list__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.65rem 0.75rem;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.traitre-delta-list__row--scored {
+  border-color: rgba(74, 222, 128, 0.22);
+  background: rgba(74, 222, 128, 0.07);
+}
+
+.traitre-delta-list__row--fake {
+  opacity: 0.82;
+}
+
+.traitre-delta-list__player {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  min-width: 0;
+}
+
+.traitre-delta-list__player .recap-card__avatar {
+  width: 2rem;
+  height: 2rem;
+  flex-shrink: 0;
+  font-size: 0.95rem;
+}
+
+.traitre-delta-list__name {
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.traitre-delta-list__pts {
+  flex-shrink: 0;
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+.traitre-delta-list__pts--gain {
+  color: #4ade80;
+}
+
+.traitre-delta-list__pts--zero {
+  color: rgba(255, 255, 255, 0.28);
+}
