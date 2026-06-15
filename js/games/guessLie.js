@@ -457,6 +457,7 @@ export function mountGuessLie(app) {
   const unsub = onGameSessionChange(onSyncUpdate);
 
   if (mp) {
+    render();
     onSyncUpdate();
   } else {
     beginRound();
