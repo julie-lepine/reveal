@@ -1038,6 +1038,9 @@ function mergeRemoteGuessLieVotes(cur, inc) {
   const curVotes = cur?.votes || {};
   const incVotes = inc?.votes || {};
   if (isNewGuessLieVoteRound(cur, inc)) return incVotes;
+  if (inc?.votes !== undefined) {
+    return { ...curVotes, ...incVotes };
+  }
   if (
     (inc?.phase === "voting" && cur?.phase === "voting") ||
     inc?.phase === "reveal" ||
@@ -1045,7 +1048,7 @@ function mergeRemoteGuessLieVotes(cur, inc) {
   ) {
     return { ...curVotes, ...incVotes };
   }
-  return incVotes;
+  return curVotes;
 }
 
 function mergeGuessLieGameLocal(local, remote) {
@@ -1059,12 +1062,10 @@ function mergeGuessLieGameLocal(local, remote) {
   let votes = remoteVotes;
   if (newVoteRound) {
     votes = remoteVotes;
-  } else if (remote.phase === "voting") {
-    votes = { ...remoteVotes };
+  } else {
+    votes = { ...remoteVotes, ...localVotes };
     const name = getLocalDisplayName();
     if (localVotes[name] != null) votes[name] = localVotes[name];
-  } else if (remote.phase === "reveal" || local.phase === "reveal") {
-    votes = { ...remoteVotes, ...localVotes };
   }
   return {
     ...local,

@@ -79,6 +79,10 @@ export function mountGuessLie(app) {
     return detectives.length > 0 && detectives.every((n) => votes[n] != null);
   }
 
+  function countDetectiveVotes(votes, round) {
+    return detectiveNamesForRound(round).filter((n) => votes[n] != null).length;
+  }
+
   async function transitionToReveal() {
     const gl = getGuessLieSession();
     if (roundScored || gl.roundScored) {
@@ -287,10 +291,28 @@ export function mountGuessLie(app) {
             <div class="liar-stage__scan"></div>
           </div>`;
       } else {
-        const committedVote = (getGuessLieSession().votes || {})[localName];
+        const votes = getGuessLieSession().votes || {};
+        const committedVote = votes[localName];
         const displayPick = selected !== null ? selected : committedVote;
+        const detectivesDone = allDetectivesVoted(votes, round);
+        const hasPendingChange = selected !== null && selected !== committedVote;
+        const voteHint = !committedVote && selected == null
+          ? "Choisis la lettre du mensonge."
+          : detectivesDone
+            ? "Tout le monde a voté !"
+            : committedVote != null && !hasPendingChange
+              ? "Vote enregistré — en attente des autres joueurs…"
+              : "Tu peux modifier ton vote avant de valider.";
+        const confirmDisabled =
+          displayPick == null || (committedVote != null && !hasPendingChange && !detectivesDone);
+        const confirmLabel = detectivesDone && committedVote != null && !hasPendingChange
+          ? "Tout le monde a voté !"
+          : committedVote != null && !hasPendingChange
+            ? "En attente des autres joueurs…"
+            : "Valider mon vote";
         body = `
           ${statementsBlock}
+          <p class="hint">${voteHint}</p>
           <div class="statements">
             ${round.statements
               .map((text, i) => {
@@ -303,20 +325,17 @@ export function mountGuessLie(app) {
               })
               .join("")}
           </div>
-          ${
-            committedVote != null
-              ? `<p class="hint">Vote enregistré — tu peux le modifier avant la révélation.</p>`
-              : ""
-          }
-          <button type="button" class="btn btn-primary" id="confirm" ${displayPick == null ? "disabled" : ""}>
-            ${committedVote != null && selected === null ? "Confirmer mon vote ✓" : "Valider mon vote"}
+          <button type="button" class="btn ${confirmDisabled ? "btn-secondary" : "btn-primary"}" id="confirm" ${confirmDisabled ? "disabled" : ""}>
+            ${confirmLabel}
           </button>`;
       }
       if (!mp || isLobbyHost()) {
-        const votedCount = Object.keys(getGuessLieSession().votes || {}).length;
+        const votes = getGuessLieSession().votes || {};
+        const votedCount = countDetectiveVotes(votes, round);
+        const totalDetectives = detectiveNamesForRound(round).length;
         body += `
           <button type="button" class="btn btn-secondary btn--spaced" id="guesslie-force">
-            Révéler maintenant (${votedCount} vote${votedCount > 1 ? "s" : ""})
+            Révéler maintenant (${votedCount}/${totalDetectives})
           </button>`;
       }
     }
@@ -324,6 +343,7 @@ export function mountGuessLie(app) {
     if (phase === "reveal" && revealResult) {
       const { all, correct, liarBonus } = revealResult;
       const myCorrect = correct.includes(localName);
+      const voterNames = Object.keys(all).filter((n) => n !== round.player);
 
       body = `
         <p class="game-intro">Manche de <strong>${escapeHtml(round.player)}</strong></p>
@@ -343,7 +363,7 @@ export function mountGuessLie(app) {
         </div>
         <div class="card card--feedback ${myCorrect && localName !== round.player ? "card--ok" : localName === round.player ? "card--ok" : "card--fail"}">
           <p class="feedback-title">${revealFeedbackTitle({ isSubject: localName === round.player, myCorrect, liarBonus })}</p>
-          <p class="feedback-sub">${correct.length} détective(s) sur ${Object.keys(all).length}${liarBonus ? ` · ${escapeHtml(round.player)} +${GUESS_LIE_LIAR_POINTS} pts` : ""}</p>
+          <p class="feedback-sub">${correct.length} détective(s) sur ${voterNames.length}${liarBonus ? ` · ${escapeHtml(round.player)} +${GUESS_LIE_LIAR_POINTS} pts` : ""}</p>
         </div>
         ${gameCumulativeScoresHtml({ gameId: "guesslie", gameLabel: "Guess The Lie", title: "Cumul des scores" })}
         <div class="card card--votes">
@@ -418,10 +438,13 @@ export function mountGuessLie(app) {
   }
 
   function patchVotingChrome() {
-    const votedCount = Object.keys(getGuessLieSession().votes || {}).length;
+    const round = currentRound();
+    const votes = getGuessLieSession().votes || {};
+    const votedCount = countDetectiveVotes(votes, round);
+    const totalDetectives = detectiveNamesForRound(round).length;
     const forceBtn = app.querySelector("#guesslie-force");
     if (forceBtn) {
-      forceBtn.textContent = `Révéler maintenant (${votedCount} vote${votedCount > 1 ? "s" : ""})`;
+      forceBtn.textContent = `Révéler maintenant (${votedCount}/${totalDetectives})`;
     }
   }
 
@@ -433,6 +456,11 @@ export function mountGuessLie(app) {
     const votesChanged = JSON.stringify(getGuessLieSession().votes || {}) !== prevVotes;
     const advanced =
       mp && (roundIdx !== prevIdx || (phase === "voting" && prevPhase === "reveal"));
+    if (phase === "reveal" && prevPhase === "voting") {
+      ensureRevealDisplay();
+      render();
+      return;
+    }
     if (advanced) {
       revealResult = null;
       selected = phase === "voting" ? null : selected;
