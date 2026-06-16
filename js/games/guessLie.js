@@ -3,6 +3,7 @@ import {
   GUESS_LIE_LIAR_POINTS,
 } from "../../data/guessLies.js";
 import {
+  commitGuessLieVote,
   getGuessLieRounds,
   simulateRoundVotes,
   getGuessLieSession,
@@ -18,7 +19,7 @@ import {
 } from "../core/gameSync.js";
 import { getLocalDisplayName, recordGuessLieRoundStats, recordGuessLiePlayed, setLastGame } from "../core/state.js";
 import { awardGuessLieRound, guessLieLiarWins } from "../core/scoring.js";
-import { gameCumulativeScoresHtml } from "../core/gameScores.js";
+import { gameCumulativeScoresHtml, refreshGameScoresBox } from "../core/gameScores.js";
 import { setLobbyPlaying, setLobbyWaiting } from "../core/lobby.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
 import { navigate } from "../core/router.js";
@@ -286,31 +287,14 @@ export function mountGuessLie(app) {
             <div class="liar-stage__scan"></div>
           </div>`;
       } else {
-        const alreadyVoted = mp && (getGuessLieSession().votes || {})[localName] != null;
-        if (alreadyVoted) {
-          body = `
-          ${statementsBlock}
-          <div class="statements statements--readonly">
-            ${round.statements
-              .map((text, i) => {
-                const cls =
-                  selected === i ? "statement statement--readonly statement--picked" : "statement statement--readonly";
-                return `
-              <div class="${cls}">
-                <span class="statement__letter">${String.fromCharCode(65 + i)}</span>
-                <span>${escapeHtml(text)}</span>
-              </div>`;
-              })
-              .join("")}
-          </div>
-          <p class="hint">Vote enregistré - en attente des autres détectives…</p>`;
-        } else {
-          body = `
+        const committedVote = (getGuessLieSession().votes || {})[localName];
+        const displayPick = selected !== null ? selected : committedVote;
+        body = `
           ${statementsBlock}
           <div class="statements">
             ${round.statements
               .map((text, i) => {
-                const cls = selected === i ? "statement statement--picked" : "statement";
+                const cls = displayPick === i ? "statement statement--picked" : "statement";
                 return `
               <button type="button" class="${cls}" data-pick="${i}">
                 <span class="statement__letter">${String.fromCharCode(65 + i)}</span>
@@ -319,8 +303,14 @@ export function mountGuessLie(app) {
               })
               .join("")}
           </div>
-          <button type="button" class="btn btn-primary" id="confirm" ${selected === null ? "disabled" : ""}>Valider mon vote</button>`;
-        }
+          ${
+            committedVote != null
+              ? `<p class="hint">Vote enregistré — tu peux le modifier avant la révélation.</p>`
+              : ""
+          }
+          <button type="button" class="btn btn-primary" id="confirm" ${displayPick == null ? "disabled" : ""}>
+            ${committedVote != null && selected === null ? "Confirmer mon vote ✓" : "Valider mon vote"}
+          </button>`;
       }
       if (!mp || isLobbyHost()) {
         const votedCount = Object.keys(getGuessLieSession().votes || {}).length;
@@ -355,7 +345,7 @@ export function mountGuessLie(app) {
           <p class="feedback-title">${revealFeedbackTitle({ isSubject: localName === round.player, myCorrect, liarBonus })}</p>
           <p class="feedback-sub">${correct.length} détective(s) sur ${Object.keys(all).length}${liarBonus ? ` · ${escapeHtml(round.player)} +${GUESS_LIE_LIAR_POINTS} pts` : ""}</p>
         </div>
-        ${gameCumulativeScoresHtml({ gameLabel: "Guess The Lie", title: "Cumul des scores" })}
+        ${gameCumulativeScoresHtml({ gameId: "guesslie", gameLabel: "Guess The Lie", title: "Cumul des scores" })}
         <div class="card card--votes">
           ${Object.entries(all)
             .map(
@@ -403,10 +393,12 @@ export function mountGuessLie(app) {
     });
 
     app.querySelector("#confirm")?.addEventListener("click", async () => {
-      if (selected === null) return;
+      const pick = selected ?? (getGuessLieSession().votes || {})[localName];
+      if (pick == null) return;
       if (mp) {
-        const votes = { ...(getGuessLieSession().votes || {}), [localName]: selected };
-        await commitGuessLiePlay({ votes });
+        selected = pick;
+        await commitGuessLieVote(pick);
+        render();
         await tryAdvanceToReveal();
       } else {
         phase = "reveal";
@@ -436,7 +428,9 @@ export function mountGuessLie(app) {
   function onSyncUpdate() {
     const prevIdx = roundIdx;
     const prevPhase = phase;
+    const prevVotes = JSON.stringify(getGuessLieSession().votes || {});
     syncFromGl();
+    const votesChanged = JSON.stringify(getGuessLieSession().votes || {}) !== prevVotes;
     const advanced =
       mp && (roundIdx !== prevIdx || (phase === "voting" && prevPhase === "reveal"));
     if (advanced) {
@@ -447,8 +441,15 @@ export function mountGuessLie(app) {
       return;
     }
     void tryAdvanceToReveal();
-    if (shouldSkipFullRender(prevIdx, prevPhase)) {
+    if (shouldSkipFullRender(prevIdx, prevPhase) && !votesChanged) {
       if (phase === "voting") patchVotingChrome();
+      if (phase === "reveal") {
+        refreshGameScoresBox(app, {
+          gameId: "guesslie",
+          gameLabel: "Guess The Lie",
+          title: "Cumul des scores",
+        });
+      }
       return;
     }
     render();

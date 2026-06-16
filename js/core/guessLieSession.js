@@ -5,8 +5,10 @@ import {
   applyGuessLieLobbyCompleteLocal,
   getLocalDisplayName,
   getState,
+  saveStatePatch,
   syncGuessLieLobbyCompleteRemote,
 } from "./state.js";
+import { isGameSyncActive, userIdForName } from "./gameSync.js";
 import { runLaunchButton } from "./mpLaunch.js";
 import { getCurrentScreen, navigate } from "./router.js";
 
@@ -127,6 +129,22 @@ export function navigateToGuessLieEntry() {
     navStack: GUESS_LIE_NAV_STACK[entry] || ["home", "lobby", "game-select", entry],
   });
   return ok;
+}
+
+/** MP : envoie uniquement le vote du joueur courant (comme Dilemma / Hot Take). */
+export async function commitGuessLieVote(pick) {
+  const localName = getLocalDisplayName();
+  const session = getGuessLieSession();
+  const votes = { ...(session.votes || {}), [localName]: pick };
+  saveStatePatch({ guessLie: { ...session, votes } });
+  if (!isGameSyncActive()) return { ...session, votes };
+  const uid = userIdForName(localName) || localName;
+  const { patchGameStateWithFeedback } = await import("./patchGameStateFeedback.js");
+  await patchGameStateWithFeedback(
+    { guessLie: { votes: { [uid]: pick } } },
+    { gameId: "guesslie", screen: "guesslie" }
+  );
+  return { ...session, votes };
 }
 
 /** Lancement depuis le salon d'attente ou le menu (solo + MP). */

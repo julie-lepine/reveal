@@ -2243,7 +2243,9 @@ export function applyRemoteSession(row) {
   const guessLiePlayChanged =
     patch.guessLie &&
     (Boolean(patch.guessLie.lobbyComplete) !== Boolean(prevGuessLie?.lobbyComplete) ||
-      (patch.guessLie.phase ?? null) !== (prevGuessLie?.phase ?? null));
+      (patch.guessLie.phase ?? null) !== (prevGuessLie?.phase ?? null) ||
+      JSON.stringify(patch.guessLie.votes || {}) !==
+        JSON.stringify(prevGuessLie?.votes || {}));
 
   if (sigUnchanged && !pgPhaseChanged && !guessLiePlayChanged) return;
 

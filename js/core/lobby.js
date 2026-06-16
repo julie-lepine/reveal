@@ -8,6 +8,7 @@ import {
   ensurePlayerScore,
   resetEveningState,
   beginGameScoreSession,
+  setActiveScoringGame,
 } from "./state.js";
 import { loginAsGuest, isGuest } from "./auth.js";
 import { signOutSupabase, getSupabaseUserId } from "./supabaseAuth.js";
@@ -168,7 +169,11 @@ export function getLobbyGameId() {
 }
 
 export async function setLobbyPlaying(gameId) {
-  beginGameScoreSession(gameId);
+  if (getState().gameScoreSessionGameId !== gameId) {
+    beginGameScoreSession(gameId);
+  } else {
+    setActiveScoringGame(gameId);
+  }
   if (isSupabaseConfigured() && getLobby()?.id) {
     await setLobbyStatusSupabase("playing", gameId);
     return;
