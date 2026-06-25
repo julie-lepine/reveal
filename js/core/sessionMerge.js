@@ -600,16 +600,12 @@ export function isNewTraitreGame(cur, inc) {
   if (!inc) return false;
   if (inc.pairId && cur?.pairId && inc.pairId !== cur.pairId) return true;
   if (cur?.phase === "final" && inc.phase === "deal") return true;
-  if (cur?.phase === "final" && !inc.lobbyStarted && (inc.phase == null || inc.phase === undefined)) {
-    return true;
-  }
-  // Recommencer / retour prep depuis une partie en cours (deal, speak, vote…)
-  if (
-    cur?.lobbyStarted &&
-    !inc.lobbyStarted &&
-    (inc.phase == null || inc.phase === undefined)
-  ) {
-    return true;
+  // Un retour prep envoie l'état remote complet (lobbyStarted: false explicite).
+  // Un patch étroit (dealAcks/ready/votes) omet la clé lobbyStarted : ne pas le
+  // confondre avec une nouvelle partie, sinon la map `ready` serait remise à zéro.
+  if (inc.lobbyStarted === false && (inc.phase == null || inc.phase === undefined)) {
+    if (cur?.phase === "final") return true;
+    if (cur?.lobbyStarted) return true;
   }
   return false;
 }

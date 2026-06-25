@@ -254,11 +254,16 @@ export function mountTraitre(app) {
 
       const { leaders, isTie } = countTraitreVotes(votesToUse, aliveNow);
       if (isTie) {
-        await commitTraitrePlay({
-          ...s,
-          ...buildTraitreTieSpeakPatch(s),
-        });
-        render();
+        // commitTraitrePlay sauvegarde l'état local avant le patch distant :
+        // on avale une erreur de sync pour ne pas bloquer le re-render hôte.
+        try {
+          await commitTraitrePlay({
+            ...s,
+            ...buildTraitreTieSpeakPatch(s),
+          });
+        } catch (e) {
+          console.warn("traitre tie resolve sync:", e);
+        }
         return;
       }
 
@@ -277,12 +282,19 @@ export function mountTraitre(app) {
               : `Fake éliminé · ${eliminatedName}`,
         });
       }
-      await commitTraitrePlay(merged, {
-        withEveningScores: patch.phase === "final" && mp && isLobbyHost(),
-      });
-      render();
+      // L'état final est déjà appliqué localement ; un échec du patch distant
+      // (patch « withEveningScores » plus lourd) ne doit pas priver l'hôte du
+      // re-render - sinon il reste bloqué sur l'écran de vote.
+      try {
+        await commitTraitrePlay(merged, {
+          withEveningScores: patch.phase === "final" && mp && isLobbyHost(),
+        });
+      } catch (e) {
+        console.warn("traitre resolve sync:", e);
+      }
     } finally {
       resolveInFlight = false;
+      render();
     }
   }
 
@@ -316,7 +328,7 @@ export function mountTraitre(app) {
     return `
       ${tieSpeakBannerHtml(session)}
       <div class="card traitre-speak-collective">
-        <p class="card-heading">Tour des mots — manche ${round}</p>
+        <p class="card-heading">Tour des mots - manche ${round}</p>
         <p class="hint traitre-speak-collective__lead">
           Chacun dit <strong>un indice à voix haute</strong>, dans l'ordre que vous voulez.
           Ne prononce pas ton mot secret.
@@ -377,7 +389,7 @@ export function mountTraitre(app) {
         ${
           host
             ? ""
-            : `<p class="hint traitre-host-hint">Choix de l'hôte — tu ne peux pas agir.</p>`
+            : `<p class="hint traitre-host-hint">Choix de l'hôte - tu ne peux pas agir.</p>`
         }
         <div class="traitre-decision-btns">
           <button type="button" class="btn btn-secondary btn--spaced" id="btn-continue"${disabledAttr}>Continuer (indices)</button>
@@ -399,23 +411,23 @@ export function mountTraitre(app) {
       phaseHtml = wordDealReady
         ? `
         <div class="card card--highlight traitre-deal-banner">
-          <p class="card-heading">Tour dédié — lis ton mot en privé</p>
+          <p class="card-heading">Tour dédié - lis ton mot en privé</p>
           <p class="hint">Chacun découvre son mot sur son téléphone, puis valide quand c'est mémorisé. Ne montre pas ton écran.</p>
           <p class="hint traitre-deal-progress">${dealAckCount}/${dealTotal} joueur(s) prêt(s)</p>
         </div>
         <div class="card traitre-word-card">
           <p class="label-upper label-upper--gold">Ton mot secret</p>
           <p class="traitre-word">${escapeHtml(myWord)}</p>
-          <p class="hint">Mémorise ce mot — tu devras donner un indice à voix haute sans le prononcer.</p>
+          <p class="hint">Mémorise ce mot - tu devras donner un indice à voix haute sans le prononcer.</p>
           ${
             session.dealAcks?.[localName]
-              ? `<p class="hint traitre-deal-wait">✓ Mot mémorisé — en attente des autres joueurs…</p>`
+              ? `<p class="hint traitre-deal-wait">✓ Mot mémorisé - en attente des autres joueurs…</p>`
               : `<button type="button" class="btn btn-primary btn--spaced" id="btn-deal-ack">J'ai mémorisé mon mot</button>`
           }
         </div>`
         : `
         <div class="card card--highlight traitre-deal-banner">
-          <p class="card-heading">Tour dédié — lis ton mot en privé</p>
+          <p class="card-heading">Tour dédié - lis ton mot en privé</p>
           <p class="hint">Chargement de la partie…</p>
         </div>
         <div class="card traitre-word-card">

@@ -11,7 +11,9 @@ Légende : ☐ à tester · ✅ OK · ❌ bug (noter en bas)
 |-----|---------------|-------------|
 | **Spot the fake** | Fin manche 1 : choix hôte visible (boutons désactivés invités) | ✅ patché |
 | **Spot the fake** | Clôture globale du vote par l'hôte (votes partiels OK) | ✅ patché |
+| **Spot the fake** | Fin de manche : résultat affiché chez l'hôte (re-render garanti même si sync KO) | ✅ patché |
 | **Spot the fake** | Phase révélation des mots : tour dédié + compteur prêts | ✅ patché |
+| **Spot the fake** | Révélation : un « prêt » (mot mémorisé) ne renvoie plus les autres en prep | ✅ patché |
 | **Spot the fake** | Tour des mots à l'oral : phase collective (plus de tour par tour) | ✅ patché |
 | **Spot the fake** | Recommencer : tous en prep + nouvelle paire de mots | ✅ patché |
 | **Spot the fake** | Points « majorité » | ⏸ reporté |
@@ -68,11 +70,18 @@ Légende : ☐ à tester · ✅ OK · ❌ bug (noter en bas)
 ### Clôture du vote (hôte)
 
 - [X] 🧪 **0 vote** : bouton « Clôturer le vote » désactivé
-- [KO] 🧪 **2/5 ont voté** : hôte clique « Clôturer » → résolution immédiate (seuls les votes exprimés comptent)
+- [ ] 🧪 **2/5 ont voté** : hôte clique « Clôturer » → résolution immédiate (seuls les votes exprimés comptent) — *re-render hôte corrigé, à revalider*
 - [X] 🧪 **Tous ont voté** : résolution auto **ou** clôture manuelle — les deux OK
 - [X] 🧪 **Égalité** (ex. 2 vs 2) : bandeau égalité + nouveau tour des mots
 - [X] 🧪 **Joueur non-hôte** : pas de bouton clôturer
 - [ ] 🧪 **Joueur éliminé** : ne vote pas ; clôture possible avec moins de votes que de survivants
+
+### Fin de manche — affichage résultat (hôte)
+
+- [ ] 🧪 **Fin de partie** (fake démasqué ou victoire fake) : l'écran **résultat s'affiche chez l'hôte** comme chez les invités
+- [ ] 🧪 **Clôture forcée** par l'hôte (2/5) menant à la fin : hôte voit bien le résultat (plus bloqué sur l'écran de vote)
+- [ ] 🧪 **Sync lente / KO** au moment du résultat : l'hôte affiche quand même le résultat (état local), pas d'écran figé sur le vote
+- [ ] 🧪 Dernier votant **non-hôte** : l'hôte bascule sur le résultat sans recharger
 
 ### Révélation des mots (début de partie) TOUT KO
 
@@ -81,6 +90,7 @@ Légende : ☐ à tester · ✅ OK · ❌ bug (noter en bas)
 - [ ] 🧪 Compteur **X/Y joueur(s) prêt(s)** visible et synchronisé
 - [ ] 🧪 Après validation : « ✓ Mot mémorisé — en attente des autres joueurs… »
 - [ ] 🧪 Dernier joueur valide → passage auto au **tour des mots à l'oral** (hôte)
+- [ ] 🧪 **Un joueur valide « J'ai mémorisé mon mot »** : les autres restent sur la révélation (ne sont **pas** renvoyés en Préparation, prêts conservés)
 
 ### Non-régression Spot the fake
 
@@ -127,9 +137,6 @@ Légende : ☐ à tester · ✅ OK · ❌ bug (noter en bas)
 
 ### Transfert d'hôte (menu jeux)
 
-- [ ] 🧪 **Hôte**, 3+ joueurs : bouton « Transférer l'hôte » visible sur la liste des jeux
-- [ ] 🧪 Pop-up : texte explicatif + liste déroulante des joueurs (sans soi)
-- [ ] 🧪 Confirmation → message chat « X est maintenant l'hôte »
 - [ ] 🧪 **Nouvel hôte** : peut lancer un jeu, modifier les réglages prep, piloter la manche en cours
 - [ ] 🧪 **Ancien hôte** : plus de boutons hôte ; peut quitter le lobby **sans** fermer la soirée
 - [ ] 🧪 **Invités** : voient le changement (couronne / couleur) sans recharger
@@ -147,7 +154,7 @@ Légende : ☐ à tester · ✅ OK · ❌ bug (noter en bas)
 
 ### Lancer quand même (prep MP, hôte)
 
-- [ ] 🧪 **5 joueurs, 3 prêts** (min. atteint) : hôte voit « Lancer quand même (3 joueurs) »
+- [x] 🧪 **5 joueurs, 3 prêts** (min. atteint) : hôte voit « Lancer quand même (3 joueurs) »
 - [ ] 🧪 Clic → modale liste **inclus** / **exclus** → confirmation
 - [ ] 🧪 Partie démarre pour les prêts + hôte ; les absents restent dans le lobby sans jouer
 - [ ] 🧪 **TruthMeter** : `authorOrder` = uniquement les participants (pas les absents)
@@ -191,9 +198,6 @@ Légende : ☐ à tester · ✅ OK · ❌ bug (noter en bas)
 
 ### Révélation (vote → résultats)
 
-- [ ] 🧪 **Manche 2+**, 5 joueurs, tous votent → révélation auto (hôte + invités)
-- [ ] 🧪 **Manche 2+**, hôte clique « Révéler maintenant (5/5) » → écran résultats immédiat
-- [ ] 🧪 **Manche suivante** → nouveau vote OK (pas de blocage)
 - [ ] 🧪 Partie complète jusqu'aux résultats finaux
 - [ ] 🧪 Réseau coupé au clic « Révéler » → toast erreur, pas d'écran figé sur 5/5
 - [ ] 🧪 Après erreur réseau, re-clic ou resync → révélation OK sans double points
@@ -236,15 +240,6 @@ Légende : ☐ à tester · ✅ OK · ❌ bug (noter en bas)
 ## Hot Take 🔥
 
 ### Ton outsider
-
-- [ ] 🧪 **Prep** : intro « troupeau (+10) / outsider (+15) » visible
-- [ ] 🧪 **Avant vote** : rappel « parfois mieux d'être outsider »
-- [ ] 🧪 **Phase vote** : tip +15 vs +10 affiché
-- [ ] 🧪 **Révélation** : bandeau outsider (solo ou camp) avec noms + points
-- [ ] 🧪 **Joueur local outsider** : message perso « pas dans le troupeau »
-- [ ] 🧪 **Joueur local troupeau** : message perso + rappel +15 outsiders
-- [ ] 🧪 **Liste votes** : tag « outsider » + 🔥 sur les camps minoritaires
-- [ ] 🧪 **Égalité** : aucun point, pas de bandeau outsider
 - [ ] 🧪 **Badge soirée** : « L'outsider en chef » sur le bon profil
 
 ---
