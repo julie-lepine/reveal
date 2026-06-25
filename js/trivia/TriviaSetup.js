@@ -13,6 +13,7 @@ export function renderTriviaSetup({
   readyMap = {},
   localReady = false,
   allReady = false,
+  launchSlot = {},
 } = {}) {
   return `
     <p class="label-upper label-upper--gold">🧠 Trivia Quiz</p>
@@ -87,11 +88,6 @@ export function renderTriviaSetup({
     </button>
 
     <div id="trivia-start-slot">
-      ${prepStartSlotHtml({
-        allReady,
-        isHost,
-        launchLabel: "Lancer le quiz",
-        startButtonId: "btn-trivia-start",
-      })}
+      ${prepStartSlotHtml(launchSlot)}
     </div>`;
 }

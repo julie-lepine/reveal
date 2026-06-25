@@ -43,7 +43,7 @@ function goHome() {
 }
 
 async function goGames() {
-  await returnToEveningGames();
+  await returnToEveningGames({ hubOnly: true });
 }
 
 function goResults() {

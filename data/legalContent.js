@@ -32,7 +32,11 @@ export const PRIVACY_POLICY = {
     },
     {
       heading: "Conservation",
-      body: `Les données de session et de lobby sont conservées le temps de la soirée et liées à votre compte Supabase. Vous pouvez demander la suppression de votre compte à ${CONTACT_EMAIL}.`,
+      body: `Les données de session et de lobby sont conservées le temps de la soirée et liées à votre compte Supabase. Vous pouvez demander la suppression de votre compte via la page dédiée (voir ci-dessous) ou par e-mail à ${CONTACT_EMAIL}.`,
+    },
+    {
+      heading: "Suppression de compte",
+      body: `Les comptes enregistrés (e-mail) peuvent être supprimés à tout moment. Envoyez une demande depuis l'application (Paramètres) ou depuis la page publique de suppression de compte. Nous effaçons le compte Supabase Auth, le profil (pseudo, emoji) et les données de jeu associées, sous 30 jours ouvrés. Le mode invité ne crée pas de compte permanent : les données de session expirent automatiquement.`,
     },
     {
       heading: "Vos droits (RGPD)",

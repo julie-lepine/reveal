@@ -18,13 +18,15 @@ import { getLocalDisplayName } from "../core/state.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
 import { rulesButtonHtml } from "../core/gameRulesUi.js";
 import { isLobbyHost, onGameSessionChange } from "../core/gameSync.js";
-import { prepGuestFollowOnSession, runPrepGameLaunch } from "../core/mpLaunch.js";
+import { prepGuestFollowOnSession } from "../core/mpLaunch.js";
+import { executePrepLaunch, prepLaunchSlotParams, DEFAULT_PREP_MIN_PLAYERS } from "../core/prepLaunch.js";
 import { createPrepLobbyController } from "../core/usePrepLobby.js";
 import {
   playersReadySectionHtml,
   prepStartSlotHtml,
   refreshPrepReadyUi,
   updatePrepStartSlot,
+  bindPrepLaunchButtons,
 } from "../core/prepScreen.js";
 import { navigate } from "../core/router.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
@@ -39,6 +41,21 @@ export function mountSpeedVotePrep(app) {
     localKey: localName,
     getReadyMap: () => getSpeedVoteSession().ready || {},
   });
+
+  function speedVoteStartSlotHtml(allReady, prep) {
+    const session = getSpeedVoteSession();
+    return prepStartSlotHtml(
+      prepLaunchSlotParams({
+        readyMap: session.ready || {},
+        allReady,
+        isHost: isLobbyHost(),
+        minPlayers: DEFAULT_PREP_MIN_PLAYERS,
+        poolEmpty: prep.effective === 0,
+        poolEmptyLabel: "Aucune question disponible",
+        launchLabel: "Lancer SpeedVote →",
+      })
+    );
+  }
 
   function refreshReadySection() {
     const session = getSpeedVoteSession();
@@ -56,14 +73,8 @@ export function mountSpeedVotePrep(app) {
 
     updatePrepStartSlot(
       app.querySelector("#speed-vote-start-slot"),
-      prepStartSlotHtml({
-        poolEmpty: prep.effective === 0,
-        poolEmptyLabel: "Aucune question disponible",
-        allReady,
-        isHost: isLobbyHost(),
-        launchLabel: "Lancer SpeedVote →",
-      }),
-      onStartGame
+      speedVoteStartSlotHtml(allReady, prep),
+      onLaunch
     );
   }
 
@@ -103,12 +114,19 @@ export function mountSpeedVotePrep(app) {
     refreshReadySection();
   }
 
-  async function onStartGame() {
-    await runPrepGameLaunch({
-      btn: app.querySelector("#btn-start-game"),
-      launch: markSpeedVoteLobbyStarted,
+  async function onLaunch({ force = false } = {}) {
+    const prep = getSpeedVotePrepSummary();
+    await executePrepLaunch({
+      force,
+      btn: app.querySelector(force ? "#btn-force-start-game" : "#btn-start-game"),
+      getReadyMap: () => getSpeedVoteSession().ready || {},
+      minPlayers: DEFAULT_PREP_MIN_PLAYERS,
+      gameTitle: "SpeedVote",
       gameScreen: "speedvote",
       navStack: ["home", "lobby", "game-select", "speedvote-prep", "speedvote"],
+      markStarted: markSpeedVoteLobbyStarted,
+      allReadyFn: allSpeedVoteReady,
+      poolEmpty: prep.effective === 0,
     });
   }
 
@@ -138,6 +156,8 @@ export function mountSpeedVotePrep(app) {
         render: refreshReadySection,
       });
     });
+
+    bindPrepLaunchButtons(app, { onLaunch });
   }
 
   function render() {
@@ -223,13 +243,7 @@ export function mountSpeedVotePrep(app) {
         </button>
 
         <div id="speed-vote-start-slot">
-          ${prepStartSlotHtml({
-            poolEmpty: prep.effective === 0,
-            poolEmptyLabel: "Aucune question disponible",
-            allReady,
-            isHost,
-            launchLabel: "Lancer SpeedVote →",
-          })}
+          ${speedVoteStartSlotHtml(allReady, prep)}
         </div>
       `,
     });

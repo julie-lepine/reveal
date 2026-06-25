@@ -58,6 +58,27 @@ describe("mergeReadyMapsLocal", () => {
     assert.equal(out.Alice, undefined);
     assert.equal(out.Bob, true);
   });
+
+  it("conserve « pas prêt » pour le joueur local même si le serveur est encore prêt", () => {
+    const out = mergeReadyMapsLocal(
+      { Alice: false },
+      { Alice: true, Bob: true },
+      ["Alice", "Bob"],
+      "Alice"
+    );
+    assert.equal(out.Alice, false);
+    assert.equal(out.Bob, true);
+  });
+
+  it("applique le prêt local pour le joueur local", () => {
+    const out = mergeReadyMapsLocal(
+      { Alice: true },
+      { Alice: false },
+      ["Alice"],
+      "Alice"
+    );
+    assert.equal(out.Alice, true);
+  });
 });
 
 describe("mergeDilemmaCustomDilemmas", () => {
@@ -562,6 +583,16 @@ describe("isNewTraitreGame", () => {
   it("ignore une avancée normale dans la même partie", () => {
     assert.equal(isNewTraitreGame({ phase: "deal", pairId: "a" }, { phase: "speak", pairId: "a" }), false);
   });
+
+  it("détecte retour prep depuis deal en cours", () => {
+    assert.equal(
+      isNewTraitreGame(
+        { phase: "deal", pairId: "social_1", lobbyStarted: true, alive: ["a", "b"] },
+        { phase: null, pairId: null, lobbyStarted: false, alive: [] }
+      ),
+      true
+    );
+  });
 });
 
 describe("mergeTraitrePatchState", () => {
@@ -655,6 +686,30 @@ describe("mergeTraitrePatchState", () => {
     const inc = { phase: "deal", pairId: null, dealAcks: { uid_a: true } };
     const out = mergeTraitrePatchState(cur, inc, { mergeReadyUid, mergeVotes });
     assert.equal(out.pairId, "social_1");
+  });
+
+  it("retour prep depuis deal efface pairId et phase", () => {
+    const cur = {
+      phase: "deal",
+      pairId: "social_1",
+      lobbyStarted: true,
+      alive: ["a", "b", "c"],
+      votes: { a: "b" },
+    };
+    const inc = {
+      phase: null,
+      pairId: null,
+      lobbyStarted: false,
+      alive: [],
+      ready: {},
+      votes: {},
+    };
+    const out = mergeTraitrePatchState(cur, inc, { mergeReadyUid, mergeVotes });
+    assert.equal(out.pairId, null);
+    assert.equal(out.phase, null);
+    assert.equal(out.lobbyStarted, false);
+    assert.deepEqual(out.votes, {});
+    assert.deepEqual(out.alive, []);
   });
 
   it("patch vote stale ne régresse pas speak → vote", () => {

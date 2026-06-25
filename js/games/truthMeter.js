@@ -22,6 +22,8 @@ import {
   simulateTruthMeterVotes,
   computeRoundMetrics,
   filterVoterVotes,
+  skipTruthMeterAuthorRound,
+  finishTruthMeterGameSession,
 } from "../core/truthMeterSession.js";
 import { awardTruthMeterRound, EVENING_POINTS } from "../core/scoring.js";
 import {
@@ -43,7 +45,6 @@ import {
   isGameSyncActive,
   isLobbyHost,
   onGameSessionChange,
-  completeGameSession,
 } from "../core/gameSync.js";
 
 function sliderBlockHtml({
@@ -568,6 +569,12 @@ export function mountTruthMeter(app) {
       } else {
         phaseHtml = `
           <p class="hint truth-meter__waiting">✍️ <strong>${escapeHtml(author || "…")}</strong> écrit son affirmation…</p>`;
+        if (host) {
+          phaseHtml += `
+          <button type="button" class="btn btn-secondary btn--spaced" id="truth-skip-author">
+            Passer cet auteur (absent)
+          </button>`;
+        }
       }
     }
 
@@ -786,6 +793,21 @@ export function mountTruthMeter(app) {
       });
     }
 
+    if (phase === "writing" && host && !isAuthor) {
+      app.querySelector("#truth-skip-author")?.addEventListener("click", async () => {
+        const btn = app.querySelector("#truth-skip-author");
+        if (btn) btn.disabled = true;
+        try {
+          const res = await skipTruthMeterAuthorRound();
+          if (res?.completed) return;
+          syncFromSession();
+          render();
+        } finally {
+          if (btn?.isConnected) btn.disabled = false;
+        }
+      });
+    }
+
     if (phase === "reveal") {
       const authorName = affirmation?.author;
       const verdictPct = buildRevealMetrics(votesForAward(), authorName).groupAvg;
@@ -899,23 +921,18 @@ export function mountTruthMeter(app) {
         }
         render();
       } else {
-        recordTruthMeterPlayed();
-        setLastGame({
-          gameId: "truthmeter",
-          title: "TruthMeter",
-          summary: `${total} manches · dernier verdict ${lastAward?.groupAvg ?? "-"}%`,
-        });
         if (mp) {
-          try {
-            await completeGameSession({ gameId: "truthmeter", screen: "results", state: {} });
-          } catch (e) {
-            console.warn("REVEAL completeGameSession:", e);
-            navigate("results", { navStack: ["home", "lobby", "game-select", "results"] });
-          }
+          await finishTruthMeterGameSession();
         } else {
+          recordTruthMeterPlayed();
+          setLastGame({
+            gameId: "truthmeter",
+            title: "TruthMeter",
+            summary: `${total} manches · dernier verdict ${lastAward?.groupAvg ?? "-"}%`,
+          });
           setLobbyWaiting();
+          navigate("results");
         }
-        navigate("results");
       }
     } finally {
       nextRoundInFlight = false;

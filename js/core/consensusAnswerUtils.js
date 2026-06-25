@@ -28,6 +28,22 @@ export function stripStaleConsensusAnswers(answers = {}, questionIdx = 0) {
 }
 
 /** Complète les joueurs actifs sans réponse validée avec la valeur neutre (50 %). */
+/** Fusionne deux réponses : une réponse validée (non imputée) l'emporte sur une imputée. */
+export function pickLatestConsensusAnswer(localAnswer, remoteAnswer) {
+  if (!localAnswer) return remoteAnswer || null;
+  if (!remoteAnswer) return localAnswer;
+
+  const localImputed = Boolean(localAnswer.imputed);
+  const remoteImputed = Boolean(remoteAnswer.imputed);
+  if (localImputed !== remoteImputed) {
+    return localImputed ? remoteAnswer : localAnswer;
+  }
+
+  return (remoteAnswer.timestamp || 0) >= (localAnswer.timestamp || 0)
+    ? remoteAnswer
+    : localAnswer;
+}
+
 export function applyConsensusDefaultAnswers(session, playerNames) {
   const questionIdx = session.questionIdx ?? 0;
   const nextAnswers = stripStaleConsensusAnswers(session.answers || {}, questionIdx);

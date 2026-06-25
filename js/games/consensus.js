@@ -10,7 +10,7 @@ import {
   saveStatePatch,
   setLastGame,
 } from "../core/state.js";
-import { showAppAlert } from "../core/dialog.js";
+import { showAppAlert, showAppConfirm } from "../core/dialog.js";
 import { navigate } from "../core/router.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
 import { bindNav } from "../screens/nav.js";
@@ -207,6 +207,28 @@ export function mountConsensus(app) {
   const localName = getLocalDisplayName();
   const mp = isGameSyncActive();
 
+  function consensusAnswerCounts(session) {
+    const qIdx = session.questionIdx ?? 0;
+    const totalPlayers = getActivePlayers().length;
+    const answeredCount = getActivePlayers().filter((p) =>
+      consensus.isAnswerForRound(session.answers?.[p.name], qIdx)
+    ).length;
+    return { qIdx, totalPlayers, answeredCount, missingCount: totalPlayers - answeredCount };
+  }
+
+  function consensusForceRevealChromeHtml(session) {
+    const { totalPlayers, answeredCount, missingCount } = consensusAnswerCounts(session);
+    const forceHint =
+      missingCount > 0
+        ? `<p class="hint consensus-force-hint" id="consensus-force-hint">${missingCount} joueur(s) sans réponse validée → 50 % par défaut si tu révèles maintenant.</p>`
+        : "";
+    return `
+      <button type="button" class="btn btn-secondary btn--spaced" id="btn-consensus-force">
+        Révéler maintenant (${answeredCount}/${totalPlayers})
+      </button>
+      ${forceHint}`;
+  }
+
   function clearNpcTimers() {
     npcTimers.forEach((timerId) => clearTimeout(timerId));
     npcTimers = [];
@@ -300,14 +322,19 @@ export function mountConsensus(app) {
   }
 
   function patchQuestionPhaseChrome(session) {
-    const qIdx = session.questionIdx ?? 0;
-    const answeredCount = getActivePlayers().filter((p) =>
-      consensus.isAnswerForRound(session.answers?.[p.name], qIdx)
-    ).length;
-    const totalPlayers = getActivePlayers().length;
+    const { answeredCount, totalPlayers, missingCount } = consensusAnswerCounts(session);
     const forceBtn = app.querySelector("#btn-consensus-force");
     if (forceBtn) {
       forceBtn.textContent = `Révéler maintenant (${answeredCount}/${totalPlayers})`;
+    }
+    const forceHint = app.querySelector("#consensus-force-hint");
+    if (forceHint) {
+      if (missingCount > 0) {
+        forceHint.textContent = `${missingCount} joueur(s) sans réponse validée → 50 % par défaut si tu révèles maintenant.`;
+        forceHint.hidden = false;
+      } else {
+        forceHint.hidden = true;
+      }
     }
     const boardHost = app.querySelector("[data-consensus-live-board]");
     if (boardHost) {
@@ -360,6 +387,7 @@ export function mountConsensus(app) {
   }
 
   async function commitLocalDraft({ submitted = false } = {}) {
+    if (submitted) captureDraftFromDom();
     const value = consensus.clampValue(draftValue);
     await consensus.commitAnswer(value, { submitted });
     answers = { ...(consensus.getSession().answers || {}) };
@@ -483,6 +511,20 @@ export function mountConsensus(app) {
   /** Filet de sécurité hôte : clôt la manche même si un joueur n'a pas validé sa réponse. */
   async function forceReveal() {
     if (mp && !isLobbyHost()) return;
+    const waiting = consensus.getWaitingPlayers();
+    if (waiting.length > 0) {
+      const names = waiting.map((player) => player.name).join(", ");
+      const confirmed = await showAppConfirm(
+        `${waiting.length} joueur(s) sans réponse validée (${names}) recevront 50 % par défaut. Continuer la révélation ?`,
+        {
+          title: "Révéler maintenant",
+          confirmLabel: "Révéler",
+          cancelLabel: "Annuler",
+          icon: "🤝",
+        }
+      );
+      if (!confirmed) return;
+    }
     if (!mp) {
       await fillMissingLocalAnswers();
     } else {
@@ -682,11 +724,6 @@ export function mountConsensus(app) {
 
     let phaseHtml = "";
     if (phase === "question") {
-      const qIdx = session.questionIdx ?? 0;
-      const answeredCount = getActivePlayers().filter((p) =>
-        consensus.isAnswerForRound(session.answers?.[p.name], qIdx)
-      ).length;
-      const totalPlayers = getActivePlayers().length;
       phaseHtml = `
         ${renderConsensusQuestion({
           question: currentQuestion,
@@ -705,9 +742,7 @@ export function mountConsensus(app) {
         </div>
         ${
           !mp || isLobbyHost()
-            ? `<button type="button" class="btn btn-secondary btn--spaced" id="btn-consensus-force">
-                Révéler maintenant (${answeredCount}/${totalPlayers})
-              </button>`
+            ? consensusForceRevealChromeHtml(session)
             : ""
         }`;
     } else if (phase === "reveal-pending") {

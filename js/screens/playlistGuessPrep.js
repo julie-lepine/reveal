@@ -13,14 +13,14 @@ import {
   setPlaylistGuessRoundCount,
   simulatePlaylistGuessReady,
 } from "../core/playlistGuessSession.js";
-import { getLobbyParticipants } from "../core/lobby.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
 import { rulesButtonHtml } from "../core/gameRulesUi.js";
 import { isLobbyHost, onGameSessionChange } from "../core/gameSync.js";
-import { prepGuestFollowOnSession, runPrepGameLaunch } from "../core/mpLaunch.js";
+import { prepGuestFollowOnSession } from "../core/mpLaunch.js";
+import { executePrepLaunch } from "../core/prepLaunch.js";
+import { prepLaunchSlotParams } from "../core/prepLaunch.js";
 import { createPrepLobbyController } from "../core/usePrepLobby.js";
 import {
-  playersReadySectionHtml,
   prepStartSlotHtml,
   refreshPrepReadyUi,
   updatePrepStartSlot,
@@ -75,18 +75,7 @@ export function mountPlaylistGuessPrep(app) {
 
     const startSlot = app.querySelector("#pg-start-slot");
     if (startSlot) {
-      const canStart = allReady && prep.minPlayersMet && prep.effective > 0;
-      updatePrepStartSlot(
-        startSlot,
-        prepStartSlotHtml({
-          poolEmpty: !prep.minPlayersMet,
-          poolEmptyLabel: `Il faut au moins ${PLAYLIST_GUESS_MIN_PLAYERS} joueurs`,
-          allReady: canStart,
-          isHost: isLobbyHost(),
-          launchLabel: "Lancer la partie →",
-        }),
-        onStartGame
-      );
+      updatePrepStartSlot(startSlot, pgStartSlotHtml(allReady, prep), onLaunch);
     }
   }
 
@@ -106,22 +95,54 @@ export function mountPlaylistGuessPrep(app) {
     }
   }
 
-  async function onStartGame() {
-    if (!isLobbyHost()) return;
-    if (getLobbyParticipants().length < PLAYLIST_GUESS_MIN_PLAYERS) {
-      const { showAppAlert } = await import("../core/dialog.js");
-      await showAppAlert(
-        `VibeCheck se joue à au moins ${PLAYLIST_GUESS_MIN_PLAYERS} : chaque manche, on vote à qui une chanson correspond le mieux.`,
-        { title: `${PLAYLIST_GUESS_MIN_PLAYERS} joueurs minimum`, icon: "👥" }
-      );
-      return;
-    }
+  function pgStartSlotHtml(allReady, prep) {
+    const session = getPlaylistGuessSession();
+    const members = lobbyPlayersWithIds();
+    const canStart = allReady && prep.minPlayersMet && prep.effective > 0;
+    return prepStartSlotHtml(
+      prepLaunchSlotParams({
+        participants: members,
+        readyMap: session.ready || {},
+        readyKey: (m) => m.userId,
+        allReady: canStart,
+        isHost: isLobbyHost(),
+        minPlayers: PLAYLIST_GUESS_MIN_PLAYERS,
+        poolEmpty: !prep.minPlayersMet || prep.effective === 0,
+        poolEmptyLabel: !prep.minPlayersMet
+          ? `Il faut au moins ${PLAYLIST_GUESS_MIN_PLAYERS} joueurs`
+          : "Aucune manche disponible",
+        launchLabel: "Lancer la partie →",
+      })
+    );
+  }
+
+  async function onLaunch({ force = false } = {}) {
+    const prep = getPlaylistGuessPrepSummary();
     try {
-      await runPrepGameLaunch({
-        btn: app.querySelector("#btn-start-game"),
-        launch: markPlaylistGuessLobbyStarted,
+      await executePrepLaunch({
+        force,
+        btn: app.querySelector(force ? "#btn-force-start-game" : "#btn-start-game"),
+        getReadyMap: () => getPlaylistGuessSession().ready || {},
+        participants: lobbyPlayersWithIds(),
+        readyKey: (m) => m.userId,
+        minPlayers: PLAYLIST_GUESS_MIN_PLAYERS,
+        gameTitle: "VibeCheck",
         gameScreen: "playlistguess",
         navStack: ["home", "lobby", "game-select", "playlistguess-prep", "playlistguess"],
+        markStarted: markPlaylistGuessLobbyStarted,
+        allReadyFn: () =>
+          allPlaylistGuessReady() && prep.minPlayersMet && prep.effective > 0,
+        poolEmpty: !prep.minPlayersMet || prep.effective === 0,
+        validateBeforeLaunch: (roster) => {
+          if (roster.length < PLAYLIST_GUESS_MIN_PLAYERS) {
+            return {
+              ok: false,
+              message: `VibeCheck se joue à au moins ${PLAYLIST_GUESS_MIN_PLAYERS} : chaque manche, on vote à qui une chanson correspond le mieux.`,
+              icon: "👥",
+            };
+          }
+          return { ok: true };
+        },
       });
     } catch (e) {
       const { showAppAlert } = await import("../core/dialog.js");

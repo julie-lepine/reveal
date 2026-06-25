@@ -26,6 +26,10 @@
   --shadow-secondary: 0 8px 28px rgba(99, 102, 241, 0.35);
 
   --focus-ring: var(--color-secondary-soft);
+
+  /* Bannière AdMob native (surchargé par js/core/ads.js) */
+  --ad-banner-height: 0px;
+  --ad-banner-buffer: 0px;
 }
 
 *{
@@ -63,15 +67,30 @@ body.has-bottom-nav .page{
 }
 
 body.has-top-ad .page{
-  padding-top:calc(var(--page-pad) + var(--ad-banner-height, 50px) + env(safe-area-inset-top, 0px));
+  padding-top:calc(
+    var(--page-pad)
+    + var(--ad-banner-height, 72px)
+    + var(--ad-banner-buffer, 8px)
+    + env(safe-area-inset-top, 0px)
+  );
 }
 
 body.has-top-ad.has-bottom-nav .page{
-  padding-top:calc(var(--page-pad) + var(--ad-banner-height, 50px) + env(safe-area-inset-top, 0px));
+  padding-top:calc(
+    var(--page-pad)
+    + var(--ad-banner-height, 72px)
+    + var(--ad-banner-buffer, 8px)
+    + env(safe-area-inset-top, 0px)
+  );
 }
 
 body.has-top-ad .back{
-  top:calc(12px + var(--ad-banner-height, 50px) + env(safe-area-inset-top, 0px));
+  top:calc(
+    12px
+    + var(--ad-banner-height, 72px)
+    + var(--ad-banner-buffer, 8px)
+    + env(safe-area-inset-top, 0px)
+  );
 }
 
 .privacy-section__title{
@@ -811,6 +830,90 @@ button.game-card{
   font-size:14px;
   text-transform:uppercase;
   letter-spacing:.02em;
+}
+
+.hot-take-vote-pill--outsider{
+  text-shadow:0 0 12px rgba(251,191,36,.35);
+}
+
+.hot-take-outsider-tip{
+  color:#FBBF24;
+  font-weight:600;
+}
+
+.hot-take-outsider-banner{
+  margin:0 0 14px;
+  padding:14px 16px;
+  border-radius:14px;
+  background:linear-gradient(135deg, rgba(251,191,36,.16), rgba(255,107,107,.12));
+  border:1px solid rgba(251,191,36,.35);
+  animation:consensus-rise-in .45s ease both;
+}
+
+.hot-take-outsider-banner--solo{
+  background:linear-gradient(135deg, rgba(255,107,107,.18), rgba(251,191,36,.14));
+  border-color:rgba(255,107,107,.4);
+}
+
+.hot-take-outsider-banner__kicker{
+  margin:0 0 4px;
+  font-size:11px;
+  font-weight:800;
+  letter-spacing:.06em;
+  text-transform:uppercase;
+  color:rgba(251,191,36,.95);
+}
+
+.hot-take-outsider-banner__title{
+  margin:0 0 6px;
+  font-size:18px;
+  font-weight:900;
+  color:#fff;
+}
+
+.hot-take-outsider-banner__body{
+  margin:0;
+  font-size:14px;
+  line-height:1.4;
+  color:rgba(255,255,255,.88);
+}
+
+.hot-take-outsider-local{
+  margin:0 0 12px;
+  padding:10px 12px;
+  border-radius:10px;
+  font-size:13px;
+  font-weight:700;
+  color:#FDE68A;
+  background:rgba(251,191,36,.12);
+  border:1px solid rgba(251,191,36,.28);
+}
+
+.hot-take-troupeau-local{
+  margin:0 0 10px;
+}
+
+.hot-take-outsider-tag{
+  display:inline-block;
+  margin-left:4px;
+  padding:2px 7px;
+  border-radius:999px;
+  font-size:10px;
+  font-weight:800;
+  letter-spacing:.04em;
+  text-transform:uppercase;
+  color:#FDE68A;
+  background:rgba(251,191,36,.16);
+  border:1px solid rgba(251,191,36,.28);
+  vertical-align:middle;
+}
+
+.player-row--outsider .player-name{
+  font-weight:800;
+}
+
+.result-row--outsider .progress-fill{
+  box-shadow:0 0 10px rgba(251,191,36,.25);
 }
 
 .result-row{ margin-bottom:14px; }
@@ -1767,6 +1870,12 @@ select.field-input option{
   font-weight:600;
 }
 
+.game-select-transfer-host{
+  display:block;
+  width:100%;
+  margin:0 0 16px;
+}
+
 /* ─── Landing / Auth ─── */
 .logo--landing{
   margin-top:16px;
@@ -2153,6 +2262,33 @@ select.field-input option{
 
 .game-exit-bar__btn{
   max-width:100%;
+}
+
+.game-resume{
+  margin-top:12px;
+  text-align:center;
+}
+
+.game-resume__countdown{
+  margin-top:8px;
+}
+
+.game-resume-banner{
+  margin-bottom:16px;
+  border:1px solid rgba(255,200,80,.35);
+  background:rgba(255,200,80,.08);
+}
+
+.game-resume-banner__title{
+  font-weight:700;
+  margin:0 0 6px;
+}
+
+.game-resume-banner__actions{
+  display:flex;
+  flex-wrap:wrap;
+  gap:10px;
+  margin-top:12px;
 }
 
 .game-exit-lobby{
@@ -5599,6 +5735,17 @@ body{
   color:rgba(255,255,255,.5);
 }
 
+.consensus-answer-list__imputed{
+  color:#FBBF24;
+  font-weight:600;
+}
+
+.consensus-force-hint{
+  margin-top:-6px;
+  margin-bottom:12px;
+  color:#FBBF24;
+}
+
 .consensus-answer-list__tags{
   display:flex;
   flex-wrap:wrap;
@@ -5675,6 +5822,33 @@ body{
   padding: 0.75rem 1rem;
   border-radius: var(--radius-md, 12px);
   background: rgba(255, 255, 255, 0.06);
+}
+
+.traitre-speak-collective__lead {
+  margin-top: 0.35rem;
+}
+
+.traitre-speak-collective__players {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.traitre-speak-collective__player {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--radius-sm, 8px);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.traitre-speak-collective__player .recap-card__avatar {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  font-size: 16px;
 }
 
 .traitre-order__list {
@@ -5793,6 +5967,30 @@ body{
   flex-direction: column;
   gap: 0.5rem;
   margin-top: 0.75rem;
+}
+
+.traitre-decision-btns .btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.traitre-host-hint {
+  text-align: center;
+  margin-bottom: 0.35rem;
+}
+
+.traitre-deal-banner {
+  margin-bottom: 0.75rem;
+}
+
+.traitre-deal-progress {
+  margin-top: 0.5rem;
+  margin-bottom: 0;
+  font-weight: 700;
+}
+
+.traitre-deal-wait {
+  color: rgba(74, 222, 128, 0.85);
 }
 
 .traitre-decision {

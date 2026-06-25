@@ -29,7 +29,8 @@ import {
   onGameSessionChange,
   refreshGameSession,
 } from "../core/gameSync.js";
-import { prepGuestFollowOnSession, runPrepGameLaunch } from "../core/mpLaunch.js";
+import { prepGuestFollowOnSession } from "../core/mpLaunch.js";
+import { executePrepLaunch, prepLaunchSlotParams, DEFAULT_PREP_MIN_PLAYERS } from "../core/prepLaunch.js";
 import { createPrepLobbyController } from "../core/usePrepLobby.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
 import {
@@ -41,6 +42,7 @@ import {
   updatePlayersReadyCard,
   updateReadyButton,
   updatePrepStartSlot,
+  bindPrepLaunchButtons,
 } from "../core/prepScreen.js";
 import { bindNav } from "./nav.js";
 
@@ -107,13 +109,18 @@ export function mountDilemmaPrep(app) {
   }
 
   function dilemmaStartSlotHtml(allReady, prep) {
-    return prepStartSlotHtml({
-      poolEmpty: prep.effective === 0,
-      poolEmptyLabel: "Aucun dilemme disponible",
-      allReady,
-      isHost: isLobbyHost(),
-      launchLabel: "Lancer Dilemma →",
-    });
+    const session = getDilemmaSession();
+    return prepStartSlotHtml(
+      prepLaunchSlotParams({
+        readyMap: session.ready || {},
+        allReady,
+        isHost: isLobbyHost(),
+        minPlayers: DEFAULT_PREP_MIN_PLAYERS,
+        poolEmpty: prep.effective === 0,
+        poolEmptyLabel: "Aucun dilemme disponible",
+        launchLabel: "Lancer Dilemma →",
+      })
+    );
   }
 
   function refreshReadySection() {
@@ -129,7 +136,7 @@ export function mountDilemmaPrep(app) {
     updatePrepStartSlot(
       app.querySelector("#dilemma-start-slot"),
       dilemmaStartSlotHtml(allReady, prep),
-      onStartGame
+      onLaunch
     );
   }
 
@@ -177,12 +184,19 @@ export function mountDilemmaPrep(app) {
     refreshReadySection();
   }
 
-  async function onStartGame() {
-    await runPrepGameLaunch({
-      btn: app.querySelector("#btn-start-game"),
-      launch: markDilemmaLobbyStarted,
+  async function onLaunch({ force = false } = {}) {
+    const prep = getDilemmaPrepSummary();
+    await executePrepLaunch({
+      force,
+      btn: app.querySelector(force ? "#btn-force-start-game" : "#btn-start-game"),
+      getReadyMap: () => getDilemmaSession().ready || {},
+      minPlayers: DEFAULT_PREP_MIN_PLAYERS,
+      gameTitle: "Dilemma",
       gameScreen: "dilemma",
       navStack: ["home", "lobby", "game-select", "dilemma-prep", "dilemma"],
+      markStarted: markDilemmaLobbyStarted,
+      allReadyFn: allDilemmaReady,
+      poolEmpty: prep.effective === 0,
     });
   }
 
@@ -234,7 +248,7 @@ export function mountDilemmaPrep(app) {
       });
     });
 
-    app.querySelector("#btn-start-game")?.addEventListener("click", onStartGame);
+    bindPrepLaunchButtons(app, { onLaunch });
   }
 
   function customDilemmaCardHtml() {

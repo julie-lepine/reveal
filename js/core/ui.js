@@ -40,6 +40,21 @@ export function resetPageScroll(root = document.getElementById("app")) {
   root.querySelectorAll(".page").forEach((page) => {
     page.scrollTop = 0;
   });
+  root.querySelectorAll(".container").forEach((el) => {
+    el.scrollTop = 0;
+  });
+}
+
+/** Double rAF : le layout WebView est prêt avant le reset (iOS / Android). */
+export function schedulePageScrollReset(root = document.getElementById("app")) {
+  if (!root || typeof requestAnimationFrame !== "function") {
+    resetPageScroll(root);
+    return;
+  }
+  requestAnimationFrame(() => {
+    resetPageScroll(root);
+    requestAnimationFrame(() => resetPageScroll(root));
+  });
 }
 
 export function logoHtml({ className = "app-logo", alt = "REVEAL" } = {}) {

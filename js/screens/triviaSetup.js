@@ -4,12 +4,14 @@ import { getLocalDisplayName } from "../core/state.js";
 import { showAppAlert } from "../core/dialog.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
 import { isLobbyHost, onGameSessionChange } from "../core/gameSync.js";
-import { prepGuestFollowOnSession, runPrepGameLaunch } from "../core/mpLaunch.js";
+import { prepGuestFollowOnSession } from "../core/mpLaunch.js";
+import { executePrepLaunch, prepLaunchSlotParams, DEFAULT_PREP_MIN_PLAYERS } from "../core/prepLaunch.js";
 import { createPrepLobbyController } from "../core/usePrepLobby.js";
 import { navigate } from "../core/router.js";
 import { pageShell } from "../core/ui.js";
 import { bindNav } from "./nav.js";
 import { renderTriviaSetup } from "../trivia/TriviaSetup.js";
+import { bindPrepLaunchButtons } from "../core/prepScreen.js";
 
 export function mountTriviaSetup(app) {
   if (!requireLobbyPlay()) return null;
@@ -26,14 +28,7 @@ export function mountTriviaSetup(app) {
     getReadyMap: () => trivia.getSession().ready || {},
   });
 
-  async function onStartGame() {
-    if (!isLobbyHost()) {
-      await showAppAlert("Seul l'hôte peut lancer le quiz.", {
-        title: "Trivia",
-        icon: "👑",
-      });
-      return;
-    }
+  async function onLaunch({ force = false } = {}) {
     const validation = trivia.validateLaunchConfig();
     if (!validation.ok) {
       await showAppAlert(
@@ -45,11 +40,16 @@ export function mountTriviaSetup(app) {
       );
       return;
     }
-    await runPrepGameLaunch({
-      btn: app.querySelector("#btn-trivia-start"),
-      launch: () => trivia.startLobbyGame(),
+    await executePrepLaunch({
+      force,
+      btn: app.querySelector(force ? "#btn-force-start-game" : "#btn-trivia-start"),
+      getReadyMap: () => trivia.getSession().ready || {},
+      minPlayers: DEFAULT_PREP_MIN_PLAYERS,
+      gameTitle: "Trivia",
       gameScreen: "trivia",
       navStack: ["home", "lobby", "game-select", "trivia-prep", "trivia"],
+      markStarted: () => trivia.startLobbyGame(),
+      allReadyFn: () => trivia.allReady(),
     });
   }
 
@@ -80,8 +80,9 @@ export function mountTriviaSetup(app) {
       });
     });
 
-    app.querySelector("#btn-trivia-start")?.addEventListener("click", () => {
-      void onStartGame();
+    bindPrepLaunchButtons(app, {
+      startButtonId: "btn-trivia-start",
+      onLaunch,
     });
   }
 
@@ -89,6 +90,14 @@ export function mountTriviaSetup(app) {
     const session = trivia.getSession();
     const prep = trivia.getPrepSummary();
     const members = getLobbyParticipants();
+    const launchSlot = prepLaunchSlotParams({
+      readyMap: session.ready || {},
+      allReady: trivia.allReady(),
+      isHost: isLobbyHost(),
+      minPlayers: DEFAULT_PREP_MIN_PLAYERS,
+      launchLabel: "Lancer le quiz",
+      startButtonId: "btn-trivia-start",
+    });
 
     app.innerHTML = pageShell({
       backTarget: "back",
@@ -103,6 +112,7 @@ export function mountTriviaSetup(app) {
         readyMap: session.ready || {},
         localReady: prepLobby.localReadyState(),
         allReady: trivia.allReady(),
+        launchSlot,
       }),
     });
 

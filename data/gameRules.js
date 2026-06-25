@@ -10,7 +10,7 @@ export const GAME_RULES = {
     but: "Une chanson tombe au hasard : votez pour la personne du groupe à qui elle correspond le mieux.",
     etapes: [
       "Une chanson s'affiche (titre, artiste, pochette).",
-      "Chacun vote pour un joueur du lobby (tu peux voter pour toi).",
+      "Chacun vote pour la personne du lobby à qui la chanson correspond le mieux (tu peux voter pour toi).",
       "La manche se termine quand tout le monde a voté.",
     ],
     points: [
@@ -42,19 +42,19 @@ export const GAME_RULES = {
   hottake: {
     title: "HotTake",
     emoji: "🔥",
-    but: "Une opinion clivante : vote Valide, Acceptable ou Criminel - suis la majorité ou assume d'être le rebelle.",
+    but: "Une opinion clivante : vote Valide, Acceptable ou Criminel - suis le troupeau (+10) ou assume ton côté outsider (+15).",
     etapes: [
       "Une affirmation s'affiche (ex. « Le sucré-salé, c'est non »).",
       "Chacun vote : Valide (d'accord), Acceptable (bof), ou Criminel (non).",
-      "On révèle la répartition des votes.",
+      "On révèle la répartition - et qui a joué outsider.",
     ],
     points: [
-      "Si une majorité se dégage : la majorité gagne +10 pts.",
-      "La minorité (les rebelles assumés) gagne +15 pts.",
+      "Si une majorité se dégage : le troupeau gagne +10 pts.",
+      "Les outsiders (minorité) gagnent +15 pts - c'est eux qui cartonnent.",
       "En cas d'égalité parfaite : personne ne marque.",
     ],
     exemple:
-      "5 votent « Valide », 1 « Criminel ». Les 5 gagnent +10, et le rebelle solo gagne +15.",
+      "5 votent « Valide », 1 « Criminel ». Les 5 du troupeau gagnent +10, l'outsider solo empoche +15.",
   },
 
   guesslie: {
@@ -113,13 +113,13 @@ export const GAME_RULES = {
     emoji: "📏",
     but: "Une affirmation chiffrée et un curseur Faux → Vrai : le groupe estime, l'auteur bluffe ou non. Minimum 2 joueurs.",
     etapes: [
-      "Un joueur fait une affirmation et garde son estimation secrète.",
-      "Le groupe place le curseur entre Faux et Vrai.",
-      "On compare l'estimation de l'auteur, la moyenne du groupe et la vérité.",
+      "Un joueur écrit une affirmation et garde son estimation secrète.",
+      "Chacun place son curseur entre Faux (0%) et Vrai (100%).",
+      "On compare l'estimation de l'auteur et la moyenne du groupe.",
     ],
     points: [
       "L'auteur : +15 si le groupe se trompe loin de son estimation (bluff réussi), +10 si le groupe tombe juste.",
-      "Le joueur le plus proche de la moyenne du groupe : +15 (pile dessus), sinon +10.",
+      "Le joueur le plus proche de la moyenne du groupe : +15 pts, sinon +10 pts.",
     ],
     exemple:
       "Léa affirme un chiffre. Le groupe vise très loin de son estimation → Léa a bluffé : +15.",
@@ -164,8 +164,8 @@ export const GAME_RULES = {
     emoji: "🎭",
     but: "Tous reçoivent un mot secret - sauf un, qui a un mot proche. À l'oral, donnez des indices sans prononcer votre mot. Trouvez le fake avant qu'il ne finisse dans le duo final.",
     etapes: [
-      `${TRAITRE_MIN_PLAYERS} joueurs minimum. L'app distribue un mot secret à chacun (le fake a un mot voisin, ex. Android / iOS).`,
-      "Manche 1 : chaque joueur dit un indice à voix haute, dans l'ordre affiché sur l'app.",
+      `${TRAITRE_MIN_PLAYERS} joueurs minimum. Tour de révélation : chacun lit son mot en privé sur son téléphone, puis valide.`,
+      "Manche 1 : chacun dit un indice à voix haute, dans l'ordre libre. L'hôte finalise le tour quand tout le monde a parlé.",
       "Fin de manche 1 : l'hôte choisit « Continuer » (nouvelle manche d'indices) ou « Voter ».",
       "À partir de la manche 2, un vote d'élimination est obligatoire après les indices.",
       "Les indices d'une nouvelle manche doivent être différents des précédents.",

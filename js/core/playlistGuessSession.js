@@ -50,13 +50,20 @@ export function getLocalParticipantId() {
 }
 
 export function lobbyPlayersWithIds() {
-  return getLobbyParticipants().map((p) => ({
+  const session = getPlaylistGuessSession();
+  const all = getLobbyParticipants().map((p) => ({
     userId: participantVoteId(p),
     name: p.name,
     color: p.color,
     emoji: p.emoji,
     isLocal: Boolean(p.isLocal),
+    isHost: Boolean(p.isHost),
   }));
+  if (session.participantNames?.length) {
+    const set = new Set(session.participantNames);
+    return all.filter((p) => set.has(p.name));
+  }
+  return all;
 }
 
 function activePlayerIds() {
@@ -159,8 +166,19 @@ function votingPayloadForRound(roundIdx) {
   };
 }
 
-export async function markPlaylistGuessLobbyStarted() {
-  const players = lobbyPlayersWithIds();
+export async function markPlaylistGuessLobbyStarted({ rosterNames } = {}) {
+  let players = getLobbyParticipants().map((p) => ({
+    userId: participantVoteId(p),
+    name: p.name,
+    color: p.color,
+    emoji: p.emoji,
+    isLocal: Boolean(p.isLocal),
+    isHost: Boolean(p.isHost),
+  }));
+  if (rosterNames?.length) {
+    const set = new Set(rosterNames);
+    players = players.filter((p) => set.has(p.name));
+  }
   if (players.length < PLAYLIST_GUESS_MIN_PLAYERS) {
     throw new Error("NOT_ENOUGH_PLAYERS");
   }
@@ -172,6 +190,7 @@ export async function markPlaylistGuessLobbyStarted() {
   const next = {
     ...session,
     lobbyStarted: true,
+    participantNames: players.map((p) => p.name),
     deck,
     ...votingPayloadForRound(0),
   };

@@ -11,6 +11,7 @@ export function renderConsensusSetup({
   readyMap = {},
   localReady = false,
   allReady = false,
+  launchSlot = {},
 } = {}) {
   return `
     <p class="label-upper label-upper--gold">🤝 Consensus</p>
@@ -65,11 +66,6 @@ export function renderConsensusSetup({
     </button>
 
     <div id="consensus-start-slot">
-      ${prepStartSlotHtml({
-        allReady,
-        isHost,
-        launchLabel: "Lancer Consensus",
-        startButtonId: "btn-consensus-start",
-      })}
+      ${prepStartSlotHtml(launchSlot)}
     </div>`;
 }

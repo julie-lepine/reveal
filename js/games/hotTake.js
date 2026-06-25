@@ -136,20 +136,21 @@ export function mountHotTake(app) {
     }, {});
   }
 
-  function hotTakePlayerVotesHtml(votesMap) {
+  function hotTakePlayerVotesHtml(votesMap, majority = null) {
     const players = getActivePlayers();
     if (!players.length) return "";
 
     const rows = players
       .map((p) => {
         const choice = votesMap[p.name];
+        const isOutsider = Boolean(majority && choice && choice !== majority);
         const voteHtml = choice
-          ? `<span class="hot-take-vote-pill" style="color:${HOT_TAKE_OPTION_COLORS[choice]}">${escapeHtml(choice)}</span>`
+          ? `<span class="hot-take-vote-pill ${isOutsider ? "hot-take-vote-pill--outsider" : ""}" style="color:${HOT_TAKE_OPTION_COLORS[choice]}">${escapeHtml(choice)}${isOutsider ? " 🔥" : ""}</span>`
           : `<span class="muted">Pas voté</span>`;
         return `
-          <div class="player-row player-row--compact">
+          <div class="player-row player-row--compact ${isOutsider ? "player-row--outsider" : ""}">
             <div class="avatar avatar--sm" style="background:${p.color}">${p.emoji}</div>
-            <span class="player-name">${escapeHtml(p.name)}</span>
+            <span class="player-name">${escapeHtml(p.name)}${isOutsider ? ` <span class="hot-take-outsider-tag">outsider</span>` : ""}</span>
             ${voteHtml}
           </div>`;
       })
@@ -178,18 +179,72 @@ export function mountHotTake(app) {
       majority: award.majority,
       pointsAwarded: true,
       deltas: award.deltas || {},
+      dissenters: award.dissenters || [],
+      majorityWinners: award.majorityWinners || [],
     };
   }
 
-  function hotTakeAwardSummaryHtml(voteResult, { pointsAwarded = false } = {}) {
+  function hotTakePlayersByCamp(votesMap, majority) {
+    if (!majority) {
+      return { outsiders: [], troupeau: [] };
+    }
+    const outsiders = [];
+    const troupeau = [];
+    getActivePlayers().forEach((player) => {
+      const choice = votesMap[player.name];
+      if (!choice) return;
+      if (choice === majority) troupeau.push(player.name);
+      else outsiders.push(player.name);
+    });
+    return { outsiders, troupeau };
+  }
+
+  function hotTakeRevealSummaryHtml(voteResult, votesMap, { pointsAwarded = false } = {}) {
     if (!voteResult) return "";
     if (voteResult.tied || !voteResult.majority) {
-      return `<p class="hint">Égalité - <strong>aucun point</strong> (pas de majorité ni de minorité).</p>`;
+      return `<p class="hint">Égalité - <strong>aucun point</strong> (pas de troupeau ni d'outsider).</p>`;
     }
-    const ptsLine = pointsAwarded
-      ? ` - majorité +${EVENING_POINTS.WIN} pts, minorité +${EVENING_POINTS.BONUS} pts`
-      : "";
-    return `<p class="hint">Majorité : <strong style="color:${HOT_TAKE_OPTION_COLORS[voteResult.majority]}">${voteResult.majority}</strong>${ptsLine}</p>`;
+
+    const majority = voteResult.majority;
+    const { outsiders, troupeau } = hotTakePlayersByCamp(votesMap, majority);
+    const namesHtml = (list) => list.map((name) => escapeHtml(name)).join(", ");
+    let banner = "";
+
+    if (pointsAwarded && outsiders.length) {
+      if (outsiders.length === 1) {
+        banner = `
+          <div class="hot-take-outsider-banner hot-take-outsider-banner--solo">
+            <p class="hot-take-outsider-banner__kicker">🔥 Outsider de la manche</p>
+            <p class="hot-take-outsider-banner__title">Seul·e face au monde</p>
+            <p class="hot-take-outsider-banner__body"><strong>${namesHtml(outsiders)}</strong> - respect · +${EVENING_POINTS.BONUS} pts</p>
+          </div>`;
+      } else {
+        banner = `
+          <div class="hot-take-outsider-banner">
+            <p class="hot-take-outsider-banner__kicker">🔥 Camp outsider</p>
+            <p class="hot-take-outsider-banner__title">Contre le troupeau</p>
+            <p class="hot-take-outsider-banner__body"><strong>${namesHtml(outsiders)}</strong> - +${EVENING_POINTS.BONUS} pts chacun·e</p>
+          </div>`;
+      }
+    }
+
+    const localIsOutsider = pointsAwarded && outsiders.includes(localName);
+    const localIsTroupeau = pointsAwarded && troupeau.includes(localName);
+    const localLine = localIsOutsider
+      ? `<p class="hot-take-outsider-local">T'es pas dans le troupeau - et c'est mieux pour ton score (+${EVENING_POINTS.BONUS}).</p>`
+      : localIsTroupeau
+        ? `<p class="hot-take-troupeau-local hint">Tu suis le troupeau (+${EVENING_POINTS.WIN}). Les outsiders ont pris +${EVENING_POINTS.BONUS}…</p>`
+        : "";
+
+    const troupeauLine = `<p class="hint">Troupeau : <strong style="color:${HOT_TAKE_OPTION_COLORS[majority]}">${majority}</strong>${
+      pointsAwarded ? ` - +${EVENING_POINTS.WIN} pts` : ""
+    }</p>`;
+
+    return `${banner}${localLine}${troupeauLine}`;
+  }
+
+  function hotTakeAwardSummaryHtml(voteResult, votesMap, options = {}) {
+    return hotTakeRevealSummaryHtml(voteResult, votesMap, options);
   }
 
   async function goToReveal() {
@@ -328,15 +383,17 @@ export function mountHotTake(app) {
         : "Choisis ton camp !";
     const voteOptionsHint =
       "Valide = d'accord · Acceptable = bof · Criminel = pas d'accord";
-    const voteHintExtra = "";
+    const outsiderTip = `<p class="hint hot-take-outsider-tip">💡 La minorité fait mieux que le troupeau (+${EVENING_POINTS.BONUS} vs +${EVENING_POINTS.WIN}). Ose le contre-pied ?</p>`;
 
     let phaseHtml = "";
 
     if (phase === "question") {
       phaseHtml = host
-        ? `<p class="hint">Vote simultané - lance le vote quand tout le monde est prêt.</p>
+        ? `<p class="hint hot-take-outsider-tip">Ici, parfois c'est mieux d'être outsider (+${EVENING_POINTS.BONUS} pts).</p>
+        <p class="hint">Vote simultané - lance le vote quand tout le monde est prêt.</p>
         <button type="button" class="btn btn-primary" id="start-vote">Lancer le vote →</button>`
-        : `<p class="hint">En attente que l'hôte lance le vote…</p>`;
+        : `<p class="hint hot-take-outsider-tip">Ici, parfois c'est mieux d'être outsider (+${EVENING_POINTS.BONUS} pts).</p>
+        <p class="hint">En attente que l'hôte lance le vote…</p>`;
     }
 
     if (phase === "voting") {
@@ -356,7 +413,8 @@ export function mountHotTake(app) {
           ).join("")}
         </div>
         <p class="hint">${voteOptionsHint}</p>
-        <p class="hint">${voteHint}${voteHintExtra}</p>
+        ${outsiderTip}
+        <p class="hint">${voteHint}</p>
         ${
           host
             ? `<button type="button" class="btn btn-secondary btn--spaced" id="hottake-force">
@@ -372,21 +430,23 @@ export function mountHotTake(app) {
       const revealTotal = Object.values(revealCounts).reduce((a, b) => a + b, 0);
       const voteResult = getMajorityOption(revealVotes, HOT_TAKE_OPTIONS);
       const crownOpt = voteResult.majority;
-      const awardHtml = hotTakeAwardSummaryHtml(voteResult, {
-        pointsAwarded: Boolean(
-          lastAward?.pointsAwarded || hotTakeLastRoundFromSession()?.pointsAwarded
-        ),
-      });
+      const pointsAwarded = Boolean(
+        lastAward?.pointsAwarded || hotTakeLastRoundFromSession()?.pointsAwarded
+      );
+      const awardHtml = hotTakeAwardSummaryHtml(voteResult, revealVotes, { pointsAwarded });
       phaseHtml = `
         <h3 class="section-title">Résultats du vote</h3>
         ${awardHtml}
         ${HOT_TAKE_OPTIONS.map((opt) => {
           const n = revealCounts[opt] || 0;
           const pct = revealTotal ? Math.round((n / revealTotal) * 100) : 0;
+          const isTroupeau = crownOpt && opt === crownOpt;
+          const isOutsiderCamp = crownOpt && opt !== crownOpt && n > 0;
+          const campLabel = isTroupeau ? " 👑" : isOutsiderCamp ? " 🔥" : "";
           return `
-            <div class="result-row">
+            <div class="result-row ${isOutsiderCamp ? "result-row--outsider" : ""}">
               <div class="result-row__head">
-                <span style="color:${HOT_TAKE_OPTION_COLORS[opt]}">${opt}${crownOpt && opt === crownOpt ? " 👑" : ""}</span>
+                <span style="color:${HOT_TAKE_OPTION_COLORS[opt]}">${opt}${campLabel}${isOutsiderCamp ? ` <span class="hot-take-outsider-tag">outsider</span>` : ""}</span>
                 <span class="muted">${n} vote${n > 1 ? "s" : ""} · ${pct}%</span>
               </div>
               <div class="progress">
@@ -394,7 +454,7 @@ export function mountHotTake(app) {
               </div>
             </div>`;
         }).join("")}
-        ${hotTakePlayerVotesHtml(revealVotes)}
+        ${hotTakePlayerVotesHtml(revealVotes, crownOpt)}
         ${gameCumulativeScoresHtml({
           gameLabel: "Hot Take",
           title: "Cumul des scores",
@@ -483,7 +543,7 @@ export function mountHotTake(app) {
         setLastGame({
           gameId: "hottake",
           title: "Hot Take",
-          summary: `${total} prises · dernière majorité : ${lastAward?.majority || "-"}`,
+          summary: `${total} prises · derniers outsiders : ${(lastAward?.dissenters || []).join(", ") || "-"}`,
         });
         const resetHt = await resetHotTakeAfterGame({ syncRemote: false });
         if (mp) {

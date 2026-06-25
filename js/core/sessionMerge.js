@@ -33,10 +33,23 @@ export function normalizeHotTakeEntry(entry) {
   };
 }
 
-/** En préparation : un joueur « prêt » côté local ou remote compte pour tous les actifs. */
-export function mergeReadyMapsLocal(localReady = {}, remoteReady = {}, activeNames = []) {
+/** En préparation : union optimiste pour les autres ; le joueur local garde son toggle (y compris « pas prêt »). */
+export function mergeReadyMapsLocal(
+  localReady = {},
+  remoteReady = {},
+  activeNames = [],
+  localName = null
+) {
   const merged = { ...remoteReady };
   activeNames.forEach((name) => {
+    if (localName && name === localName) {
+      if (localReady[name] !== undefined) {
+        merged[name] = Boolean(localReady[name]);
+      } else {
+        merged[name] = Boolean(remoteReady[name]);
+      }
+      return;
+    }
     if (localReady[name] || remoteReady[name]) merged[name] = true;
   });
   return merged;
@@ -588,6 +601,14 @@ export function isNewTraitreGame(cur, inc) {
   if (inc.pairId && cur?.pairId && inc.pairId !== cur.pairId) return true;
   if (cur?.phase === "final" && inc.phase === "deal") return true;
   if (cur?.phase === "final" && !inc.lobbyStarted && (inc.phase == null || inc.phase === undefined)) {
+    return true;
+  }
+  // Recommencer / retour prep depuis une partie en cours (deal, speak, vote…)
+  if (
+    cur?.lobbyStarted &&
+    !inc.lobbyStarted &&
+    (inc.phase == null || inc.phase === undefined)
+  ) {
     return true;
   }
   return false;

@@ -1,5 +1,5 @@
 import { PRIVACY_POLICY } from "../../data/legalContent.js";
-import { PRIVACY_POLICY_PUBLIC_URL } from "../../data/appConfig.js";
+import { PRIVACY_POLICY_PUBLIC_URL, ACCOUNT_DELETION_PUBLIC_URL } from "../../data/appConfig.js";
 import { getScreenParams } from "../core/router.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
 import { bindNav } from "./nav.js";
@@ -31,6 +31,10 @@ export function mountPrivacy(app) {
       <p class="hint privacy-external">
         URL publique (stores) :
         <a href="${escapeHtml(PRIVACY_POLICY_PUBLIC_URL)}" target="_blank" rel="noopener noreferrer">${escapeHtml(PRIVACY_POLICY_PUBLIC_URL)}</a>
+      </p>
+      <p class="hint privacy-external">
+        Suppression de compte :
+        <a href="${escapeHtml(ACCOUNT_DELETION_PUBLIC_URL)}" target="_blank" rel="noopener noreferrer">${escapeHtml(ACCOUNT_DELETION_PUBLIC_URL)}</a>
       </p>
     `,
   });

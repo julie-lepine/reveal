@@ -11,7 +11,8 @@ import { PROFILE_EMOJI_CHOICES } from "../../data/profileEmojis.js";
 import { hasActiveLobby, getLobby } from "../core/lobby.js";
 import { navigate } from "../core/router.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
-import { INSTAGRAM_HANDLE, INSTAGRAM_PROFILE_URL } from "../../data/appConfig.js";
+import { INSTAGRAM_HANDLE, INSTAGRAM_PROFILE_URL, ACCOUNT_DELETION_PUBLIC_URL } from "../../data/appConfig.js";
+import { openExternalUrl } from "../core/openExternal.js";
 import { openInstagramProfile } from "../core/feedbackUi.js";
 import { bindNav, goToEveningSettings, returnFromEveningProfile } from "./nav.js";
 
@@ -122,6 +123,11 @@ export function mountSettings(app) {
           >@${escapeHtml(INSTAGRAM_HANDLE)}</a>
           </p>
           <button type="button" class="btn btn-secondary btn--spaced" data-nav="privacy">Politique de confidentialité</button>
+          <button type="button" class="btn btn-secondary btn--spaced" id="btn-delete-account">Supprimer mon compte</button>
+          <p class="hint settings-section__hint">
+            Suppression définitive du compte e-mail et des données associées (voir aussi
+            <a href="${escapeHtml(ACCOUNT_DELETION_PUBLIC_URL)}" id="link-delete-account-web" target="_blank" rel="noopener noreferrer">la page web</a>).
+          </p>
         </div>
       `,
     });
@@ -161,6 +167,13 @@ export function mountSettings(app) {
     app.querySelector("#btn-feedback-dm")?.addEventListener("click", () => {
       openInstagramProfile();
     });
+
+    const openDeletionPage = (e) => {
+      e?.preventDefault();
+      openExternalUrl(ACCOUNT_DELETION_PUBLIC_URL);
+    };
+    app.querySelector("#btn-delete-account")?.addEventListener("click", openDeletionPage);
+    app.querySelector("#link-delete-account-web")?.addEventListener("click", openDeletionPage);
 
     app.querySelector("[data-open-instagram]")?.addEventListener("click", (e) => {
       e.preventDefault();

@@ -22,11 +22,17 @@ import {
 } from "../core/gameSync.js";
 import { navigate, getCurrentScreen } from "../core/router.js";
 import { isSupabaseConfigured } from "../core/supabaseClient.js";
-import { startLobbyPresenceSync } from "../core/supabaseLobby.js";
-import { hasActiveLobby } from "../core/lobby.js";
+import { startLobbyPresenceSync, onLobbyBundleUpdated } from "../core/supabaseLobby.js";
+import { hasActiveLobby, transferLobbyHost } from "../core/lobby.js";
 import { getLastGame, getState } from "../core/state.js";
 // import { getFilRougeSession } from "../core/filRougeSession.js";
 import { bindFeedbackPrompt, feedbackPromptCardHtml } from "../core/feedbackUi.js";
+import {
+  bindGameResumeBanner,
+  gameResumeBannerHtml,
+  getResumableSessionScreen,
+  shouldShowGameSelectResumeBanner,
+} from "../core/gameResume.js";
 import {
   launchTraitrePrep,
   launchSpeedVotePrep,
@@ -185,8 +191,10 @@ function gameGridSection(label, games) {
 function gameSelectRenderSnapshot() {
   const recap = getEveningRecap();
   const participants = getState().lobby?.participants || [];
+  const hostId = getState().lobby?.hostId || "";
   return JSON.stringify({
     n: participants.length,
+    hostId,
     recap: recap.hasActivity,
     ht: recap.hotTakes,
     sv: recap.speedVotes,
@@ -198,6 +206,16 @@ function gameSelectRenderSnapshot() {
   });
 }
 
+function transferHostButtonHtml() {
+  if (!isGameSyncActive() || !isLobbyHost()) return "";
+  const others = (getState().lobby?.participants || []).filter((p) => !p.isLocal);
+  if (!others.length) return "";
+  return `
+    <button type="button" class="btn btn-secondary game-select-transfer-host" data-transfer-host>
+      👑 Transférer l'hôte
+    </button>`;
+}
+
 export function mountGameSelect(app) {
   if (!requireLobbyPlay()) return null;
 
@@ -207,6 +225,7 @@ export function mountGameSelect(app) {
   });
 
   let unsubSession = () => {};
+  let unsubResumeBanner = () => {};
   let renderTimer = null;
   let renderInFlight = false;
   let lastSnapshot = "";
@@ -218,6 +237,13 @@ export function mountGameSelect(app) {
     const restartEl = e.target.closest("[data-restart-game]");
     if (restartEl) {
       void restartGame(restartEl.getAttribute("data-restart-game"));
+      return;
+    }
+
+    if (e.target.closest("[data-transfer-host]")) {
+      void transferLobbyHost().then((res) => {
+        if (res.ok) scheduleRender(true);
+      });
       return;
     }
 
@@ -261,13 +287,19 @@ export function mountGameSelect(app) {
 
   async function render() {
     const recap = getEveningRecap();
+    const resumeScreen = getResumableSessionScreen(getCachedGameSession());
+    const resumeBanner =
+      shouldShowGameSelectResumeBanner(resumeScreen) ? gameResumeBannerHtml(resumeScreen) : "";
+
     app.innerHTML = pageShell({
       backTarget: "home",
       content: `
+      ${resumeBanner}
       <p class="label-upper label-upper--gold">🎮 La soirée</p>
       <h2 class="screen-title">Choisir un jeu</h2>
       <p class="game-intro">Sélectionne une activité pour le lobby.</p>
       <button type="button" class="btn-link game-select-profile" data-nav="settings">Profil & paramètres</button>
+      ${transferHostButtonHtml()}
 
       ${eveningRecapHtml(recap)}
 
@@ -276,6 +308,11 @@ export function mountGameSelect(app) {
       ${feedbackPromptCardHtml()}
     `,
     });
+
+    unsubResumeBanner();
+    if (resumeScreen && shouldShowGameSelectResumeBanner(resumeScreen)) {
+      unsubResumeBanner = bindGameResumeBanner(app, resumeScreen);
+    }
 
     bindGameSelectEvents();
     bindFeedbackPrompt(app);
@@ -288,24 +325,32 @@ export function mountGameSelect(app) {
     startLobbyPresenceSync();
   }
 
+  const unsubLobby = onLobbyBundleUpdated(() => scheduleRender(false));
+
   if (isGameSyncActive()) {
     void (async () => {
-      if (await routeToActiveGameIfNeeded()) return;
-      const row = getCachedGameSession() ?? (await refreshGameSession());
-      if (row) handleSessionRoute(row);
+      await refreshGameSession();
       scheduleRender(true);
     })();
 
     unsubSession = onGameSessionChange(async (row) => {
-      if (row && (await routeToActiveGameIfNeeded(row))) return;
-      if (row) handleSessionRoute(row);
+      if (!row) return;
+      const resumeScreen = getResumableSessionScreen(row);
+      if (shouldShowGameSelectResumeBanner(resumeScreen)) {
+        scheduleRender(false);
+        return;
+      }
+      if (await routeToActiveGameIfNeeded(row)) return;
+      handleSessionRoute(row);
     });
   }
 
   return () => {
     // registerFilRougeRefresh(null);
     app.removeEventListener("click", onGameSelectClick);
+    unsubResumeBanner();
     unsubSession();
+    unsubLobby();
     if (renderTimer) clearTimeout(renderTimer);
   };
 }

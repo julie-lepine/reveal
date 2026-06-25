@@ -37,6 +37,10 @@ export function prepStartSlotHtml({
   isHost,
   launchLabel,
   startButtonId = "btn-start-game",
+  forceButtonId = "btn-force-start-game",
+  canForceLaunch = false,
+  readyCount = 0,
+  totalCount = 0,
   waitingHostLabel = "En attente de l'hôte…",
   waitingPlayersLabel = "En attente des joueurs…",
 }) {
@@ -49,15 +53,37 @@ export function prepStartSlotHtml({
   if (allReady) {
     return `<p class="hint btn--spaced">${escapeHtml(waitingHostLabel)}</p>`;
   }
+  if (canForceLaunch && isHost) {
+    return `
+      <p class="hint btn--spaced">${readyCount}/${totalCount} prêts</p>
+      <button type="button" class="btn btn-secondary btn--spaced" disabled>${escapeHtml(waitingPlayersLabel)}</button>
+      <button type="button" class="btn btn-primary btn--spaced" id="${escapeHtml(forceButtonId)}">Lancer quand même (${readyCount} joueur${readyCount > 1 ? "s" : ""}) →</button>`;
+  }
   return `<button type="button" class="btn btn-secondary btn--spaced" disabled>${escapeHtml(waitingPlayersLabel)}</button>`;
 }
 
-/** Met à jour le slot lancement et re-bind le bouton hôte. */
-export function updatePrepStartSlot(slotEl, html, onStartGame) {
+/** Met à jour le slot lancement et re-bind les boutons hôte. */
+export function updatePrepStartSlot(
+  slotEl,
+  html,
+  onLaunch,
+  { startButtonId = "btn-start-game", forceButtonId = "btn-force-start-game" } = {}
+) {
   if (!slotEl) return;
   slotEl.innerHTML = html;
-  slotEl.querySelector("#btn-start-game")?.addEventListener("click", () => {
-    void onStartGame();
+  bindPrepLaunchButtons(slotEl, { startButtonId, forceButtonId, onLaunch });
+}
+
+export function bindPrepLaunchButtons(
+  root,
+  { startButtonId = "btn-start-game", forceButtonId = "btn-force-start-game", onLaunch } = {}
+) {
+  if (!root || !onLaunch) return;
+  root.querySelector(`#${CSS.escape(startButtonId)}`)?.addEventListener("click", () => {
+    void onLaunch({ force: false });
+  });
+  root.querySelector(`#${CSS.escape(forceButtonId)}`)?.addEventListener("click", () => {
+    void onLaunch({ force: true });
   });
 }
 

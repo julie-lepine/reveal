@@ -1,4 +1,4 @@
-import { resetPageScroll } from "./ui.js";
+import { schedulePageScrollReset } from "./ui.js";
 
 let appEl = null;
 let currentCleanup = null;
@@ -60,13 +60,13 @@ export function navigate(screenId, { reset = false, params = null, navStack: for
     currentScreenId !== screenBeforeMount && currentScreenId !== screenId;
   if (redirected) {
     currentCleanup = typeof cleanup === "function" ? cleanup : currentCleanup;
-    requestAnimationFrame(() => resetPageScroll(appEl));
+    requestAnimationFrame(() => schedulePageScrollReset(appEl));
     return true;
   }
 
   currentCleanup = cleanup || null;
   notifyScreenChange(screenId);
-  requestAnimationFrame(() => resetPageScroll(appEl));
+  requestAnimationFrame(() => schedulePageScrollReset(appEl));
   return true;
 }
 
@@ -86,13 +86,13 @@ export function goBack(fallback = "home") {
     navStack.push(fallback);
     currentCleanup = screens[fallback](appEl) || null;
     notifyScreenChange(fallback);
-    requestAnimationFrame(() => resetPageScroll(appEl));
+    requestAnimationFrame(() => schedulePageScrollReset(appEl));
     return;
   }
 
   currentCleanup = screens[screenId](appEl) || null;
   notifyScreenChange(screenId);
-  requestAnimationFrame(() => resetPageScroll(appEl));
+  requestAnimationFrame(() => schedulePageScrollReset(appEl));
 }
 
 export function resetNav() {

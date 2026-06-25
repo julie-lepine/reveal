@@ -1,6 +1,7 @@
 import {
   TRUTH_METER_AFFIRMATION_MIN,
   TRUTH_METER_AFFIRMATION_MAX,
+  TRUTH_METER_MIN_PLAYERS,
 } from "../../data/truthMeter.js";
 import { checkHotTakeModeration } from "./hotTakeSession.js";
 import { getActivePlayerNames, getActivePlayers } from "./players.js";
@@ -71,9 +72,14 @@ export function getCurrentAuthor() {
   return order[session.roundIdx] || null;
 }
 
+export function getTruthMeterParticipantNames(session = getTruthMeterSession()) {
+  if (session.authorOrder?.length) return session.authorOrder;
+  return getActivePlayerNames();
+}
+
 export function getVoterNames() {
   const author = getCurrentAuthor();
-  return getActivePlayerNames().filter((n) => n !== author);
+  return getTruthMeterParticipantNames().filter((n) => n !== author);
 }
 
 /** Votes des juges uniquement - l'auteur ne participe pas au verdict du groupe. */
@@ -165,8 +171,11 @@ export function simulateTruthMeterReady(onUpdate) {
   return () => clearInterval(id);
 }
 
-export async function markTruthMeterLobbyStarted() {
-  const names = getActivePlayerNames();
+export async function markTruthMeterLobbyStarted({ rosterNames } = {}) {
+  const names = rosterNames?.length ? rosterNames : getActivePlayerNames();
+  if (names.length < TRUTH_METER_MIN_PLAYERS) {
+    throw new Error(`Il faut au moins ${TRUTH_METER_MIN_PLAYERS} joueurs pour TruthMeter.`);
+  }
   const next = {
     ...getTruthMeterSession(),
     lobbyStarted: true,
@@ -264,11 +273,63 @@ export function getTruthMeterEntryScreen() {
 }
 
 /** Votes NPC pour le mode local */
+export async function finishTruthMeterGameSession() {
+  const session = getTruthMeterSession();
+  const total = (session.authorOrder || []).length;
+  const { recordTruthMeterPlayed, setLastGame, setLobbyWaiting } = await import("./state.js");
+  const { completeGameSession } = await import("./gameSync.js");
+  const { navigate } = await import("./router.js");
+  const lastRound = session.lastRound;
+
+  recordTruthMeterPlayed();
+  setLastGame({
+    gameId: "truthmeter",
+    title: "TruthMeter",
+    summary: `${total} manches · dernier verdict ${lastRound?.groupAvg ?? "-"}%`,
+  });
+  if (isGameSyncActive()) {
+    try {
+      await completeGameSession({ gameId: "truthmeter", screen: "results", state: {} });
+    } catch (e) {
+      console.warn("REVEAL completeGameSession:", e);
+      navigate("results", { navStack: ["home", "lobby", "game-select", "results"] });
+    }
+  } else {
+    setLobbyWaiting();
+  }
+  navigate("results");
+}
+
+/** Hôte : passe la manche si l'auteur est absent (phase writing). */
+export async function skipTruthMeterAuthorRound() {
+  if (!isLobbyHost()) return { ok: false };
+  const session = getTruthMeterSession();
+  const order = session.authorOrder || [];
+  const total = order.length;
+  const nextIdx = (session.roundIdx ?? 0) + 1;
+
+  if (nextIdx >= total) {
+    await finishTruthMeterGameSession();
+    return { ok: true, completed: true };
+  }
+
+  await commitTruthMeterPlay({
+    roundIdx: nextIdx,
+    phase: "writing",
+    affirmation: null,
+    authorEstimate: null,
+    votes: {},
+    voteEndsAt: null,
+    roundScored: false,
+  });
+  return { ok: true, completed: false };
+}
+
 export function simulateTruthMeterVotes(localValue) {
   const author = getCurrentAuthor();
   const result = {};
   const local = getLocalDisplayName();
-  getActivePlayerNames().forEach((name) => {
+  getTruthMeterParticipantNames().forEach((name) => {
     if (name === author || name === local) return;
     const noise = Math.floor(Math.random() * 41) - 20;
     result[name] = Math.max(0, Math.min(100, localValue + noise));

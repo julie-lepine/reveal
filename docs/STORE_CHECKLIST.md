@@ -17,6 +17,7 @@ Légende : ✅ fait dans le repo · ☐ à faire manuellement · 🧪 à tester 
 - [x] Redirect Supabase natif (`getAuthRedirectUrl()` dans `supabaseAuth.js`)
 - [x] Patch natif auto : AdMob App ID, deep link, ATT iOS (`scripts/patchNative.mjs`)
 - [x] Politique de confidentialité : écran in-app + `privacy.html` — URL store `https://revealthepartygame.fr/privacy.html` (`data/appConfig.js`)
+- [x] **Suppression de compte** : page `suppression-compte.html` + bouton Paramètres — URL store `https://revealthepartygame.fr/suppression-compte.html` (`ACCOUNT_DELETION_PUBLIC_URL`)
 - [x] IDs AdMob configurés (`data/admobConfig.js`)
 - [x] Sources icône / splash : `resources/` (icon 1024², splash 2732², exports portrait iOS/Android) — voir [resources/README.md](../resources/README.md)
 - [x] Scripts assets : `assets:prepare` (secours), `assets:native`, `assets:sync`, `assets:all` (`package.json`)
@@ -26,16 +27,37 @@ Légende : ✅ fait dans le repo · ☐ à faire manuellement · 🧪 à tester 
 ## B. Comptes & consoles (manuel)
 
 - [x] Compte **Google Play Console** (inscription ~25 €) — compte **Individuel** (`contact@revealthepartygame.fr`), juin 2026
-- [ ] **Play Console** — validation **identité Google** en cours (pièce d’identité / profil Payments)
+- [x] **Play Console** — validation **identité Google** OK (juin 2026)
 - [x] Compte **Apple Developer Program** (~99 €/an) — inscription juin 2026
-- [ ] **Apple Developer** — activation programme en cours (traitement paiement ~24–48 h, parfois 5 jours ouvrés)
-- [ ] Créer l’app **REVEAL** dans Play Console (`com.reveal.partygames`) — après validation identité
-- [ ] Créer **Bundle ID** + app dans **App Store Connect** — après activation Apple Developer
+- [x] **Apple Developer** — programme actif (juin 2026)
+- [x] Créer l’app **REVEAL** dans Play Console (`com.reveal.partygames`) — juin 2026
+- [ ] Créer **Bundle ID** + app dans **App Store Connect** (`com.reveal.partygames`)
+
+### Play Console — progression fiche REVEAL (juin 2026)
+
+Menu : sélectionner l’app **REVEAL** en haut → pas le compte développeur global.
+
+| Étape | Menu Play Console | Statut |
+|-------|-------------------|--------|
+| Créer l’app (`com.reveal.partygames`, Jeu → Casual) | Tableau de bord | ✅ |
+| **Contenu de l’application** (privacy, suppression compte, annonces, sécurité des données…) | **Règles et programmes** → **Contenu de l’application** | ✅ juin 2026 |
+| Fiche Play Store (textes, icône, captures) | **Accroître le nombre d’utilisateurs** → **Fiche Play Store principale** | ✅ juin 2026 |
+| Site web du développeur | Fiche store → contact | ✅ `https://revealthepartygame.fr` |
+| Classification du contenu | **Règles et programmes** → **Classification du contenu** | ✅ juin 2026 |
+| Public cible | **Règles et programmes** → **Public cible** | ✅ juin 2026 |
+| AAB v1 déployé (test fermé **Bêta amis**) | **Tester et publier** → **Tests fermés** | ✅ v1.0 active (17 juin 2026) |
+| Testeurs **codes d'accès** (pas de lien opt-in) | **Tests fermés** → **Testeurs** → Codes d'accès | ✅ codes générés · ☐ partager + **12 testeurs** installés |
+| 12 testeurs × 14 jours | Test fermé actif | ☐ en cours après installations |
+
 - [x] Apps **AdMob** (Android + iOS) — IDs dans `data/admobConfig.js` ; apps REVEAL visibles dans AdMob
 - [ ] Lier **Play Console ↔ AdMob** (Android) — **après** 1ère release Play publique ; magasin d’apps AdMob = « — » tant que non lié ([doc](https://support.google.com/admob/answer/10037806?hl=fr))
 - [ ] Lier **App Store Connect ↔ AdMob** (iOS) — après 1ère release App Store
 
 > **DUNS / Organisation** : compte Play **Individuel** retenu (micro-entreprise EI récente, pas de DUNS Altares/Verif encore). Organisation + DUNS possible plus tard si besoin.
+
+> **Test fermé — codes d'accès** : pas de lien `play.google.com/apps/testing/…`. Testeurs → Play Store → Profil → **Paiements et abonnements** → **Utiliser un code** → code Play Console → installer REVEAL. (Liste d'emails = lien opt-in à la place.)
+
+> **Build AAB (juin 2026)** : keystore `reveal-release.jks` (hors repo) · `app-release.aab` · `versionCode` 1 / `versionName` 1.0 · `ADMOB_USE_TEST_ADS = false` · déclaration **ID publicitaire = Oui** (Publicité ou marketing). Build Gradle : désactiver scan HTTPS **Avast** si erreur PKIX.
 
 > **Play Console — compte personnel** : test **fermé** **12 testeurs × 14 jours** avant demande d’accès production ([doc](https://support.google.com/googleplay/android-developer/answer/14151465)).
 
@@ -123,25 +145,37 @@ npm run assets:sync      # icône/splash → android/ios + sync web (si assets p
 npm run cap:open:android   # ou cap:open:ios sur Mac
 ```
 
+### Android — debug USB (dev)
+
 - [x] 🧪 **Android** : Samsung Z Flip via **Android Studio** (projet `android/`, config `app`, débogage USB)
-- [ ] 🧪 **iPhone** (Mac + Xcode) — checklist détaillée : **[IPHONE_TEST_CHECKLIST.md](./IPHONE_TEST_CHECKLIST.md)**
-- [ ] 🧪 Auth email + invité + **lobby multijoueur** (2e client web ou 2e téléphone)
 - [x] 🧪 Reset mot de passe → **deep link** natif → écran nouveau MDP dans l’app (mail Resend OK ✅)
 - [x] 🧪 Bannière AdMob absente sur accueil/connexion ; visible à partir du lobby
 - [x] 🧪 Formulaire consentement pub (UE) — popup au lobby OK (juin 2026)
-- [ ] 🧪 Soirée pilote complète en APK/IPA debug
+
+### Android — bêta Play Store (build signé v1.0) ← **prochaine session debug**
+
+- [ ] 🧪 Installer via **code d'accès** Play Store (pas APK Android Studio)
+- [ ] 🧪 Auth email + invité + **lobby multijoueur** (2e client web ou 2e téléphone)
+- [ ] 🧪 **Soirée pilote** complète (build test fermé, conditions réelles)
+- [ ] 🧪 Pubs AdMob **prod** (`ADMOB_USE_TEST_ADS = false`) sur device bêta
+- [ ] Noter bugs / retours → correctifs → **AAB v2** (`versionCode` 2) si besoin
+
+### iOS ← **prochaine session build**
+
+- [ ] 🧪 **iPhone** (Mac + Xcode) — **[IPHONE_TEST_CHECKLIST.md](./IPHONE_TEST_CHECKLIST.md)**
+- [ ] Archive + TestFlight / App Store Connect
 
 ---
 
-## F. Avant build **production** store
+## F. Build **production** store
 
-- [ ] `data/admobConfig.js` → **`ADMOB_USE_TEST_ADS = false`**
-- [ ] `npm run cap:sync`
-- [ ] Incrémenter version :
-  - Android : `android/app/build.gradle` → `versionCode`, `versionName`
-  - iOS : Xcode → General → Version / Build
-- [ ] **Android** : keystore de signature + build **AAB** release
+- [x] `data/admobConfig.js` → **`ADMOB_USE_TEST_ADS = false`** (juin 2026)
+- [x] `npm run cap:sync` avant build AAB
+- [x] Version initiale : `android/app/build.gradle` → `versionCode` **1**, `versionName` **"1.0"**
+- [x] **Android** : keystore `reveal-release.jks` + **AAB** release (`app-release.aab`) — juin 2026
 - [ ] **iOS** : certificats + provisioning + Archive Xcode
+
+> **Mises à jour futures** : incrémenter `versionCode` (+1 obligatoire) et `versionName` à chaque nouvel upload Play.
 
 ---
 
@@ -157,14 +191,14 @@ npm run cap:open:android   # ou cap:open:ios sur Mac
   - `resources/splash_ios_1125x2436.png`
   - `resources/splash_ios_1242x2688.png`
   - Doc : [resources/README.md](../resources/README.md)
-- [ ] **Natif** : injecter icône + splash dans `android/` + `ios/` :
+- [x] **Natif** : icône + splash dans `android/` + `ios/` (juin 2026) :
   ```bash
-  npm run assets:sync
+  npm run assets:sync   # seulement si tu changes resources/icon.png ou splash.png
+  # ou npm run cap:sync seul après modif js/data uniquement
   ```
-  (équivalent : `npm run assets:native` puis `npm run cap:sync`)
   - [x] `cap:sync` + run Android Studio → app lancée sur téléphone (02 juin 2026)
   - [x] `assets:native` régénéré (splash plein écran Android 12+, `logoSplashScale 0.62`) — 🧪 logo au démarrage OK sur device (juin 2026)
-  - [x] Icône **1024×1024** validée dans `resources/icon.png` — relancer `assets:sync` si tu changes le PNG
+  - [x] Icône **1024×1024** validée dans `resources/icon.png`
   - ⚠️ **Node ≥ 22** obligatoire pour `cap sync`
   - ⚠️ `@capacitor/assets` peut échouer sur Windows (TLS / `sharp`) — autre réseau ou Mac
   - ⚠️ **Ne pas** lancer `npm run assets:prepare` : écrase icon/splash sans tagline
@@ -177,12 +211,13 @@ npm run cap:open:android   # ou cap:open:ios sur Mac
   - **iOS** (`store-assets/ios/`) — **1290×2796** (6,7") : mêmes 5 écrans
   - Doc : [store-assets/README.md](../store-assets/README.md)
 - [x] **Feature graphic** Android (1024×500) — `store-assets/android/feature-graphic.png` (fond sombre, logo `resources/icon-white.png`)
-- [ ] Upload **icône 1024** + captures dans **Play Console** + **App Store Connect** (au moment de la soumission) — source icône : `resources/icon.png` ✅
+- [x] Upload **icône 1024** + captures dans **Play Console** — juin 2026
+- [ ] Upload captures dans **App Store Connect** — `store-assets/ios/` (après création app iOS)
 - [x] Textes fiche store (titre, description, mots-clés, catégorie)
-- [x] **URL politique de confidentialité** (app + fiches store) :  
-  `https://revealthepartygame.fr/privacy.html`  
-  → définie dans `data/appConfig.js` (`PRIVACY_POLICY_PUBLIC_URL`) ; même URL à coller dans Play Console et App Store Connect
-- [x] 🧪 URL privacy répond en HTTPS (`https://revealthepartygame.fr/privacy.html`, juin 2026)
+- [x] **URL politique de confidentialité** : `https://revealthepartygame.fr/privacy.html` (`PRIVACY_POLICY_PUBLIC_URL`)
+- [x] **URL suppression de compte** : `https://revealthepartygame.fr/suppression-compte.html` (`ACCOUNT_DELETION_PUBLIC_URL`) — page à déployer OVH (**G bis**)
+- [x] 🧪 URL privacy répond en HTTPS (juin 2026)
+- [ ] 🧪 URL suppression-compte répond en HTTPS (après upload OVH)
 
 > **Rappel** : icône et splash **ne sont pas hébergés** sur GitHub Pages — ils sont embarqués dans l’APK/IPA (ou upload PNG 1024 direct sur App Store Connect).
 
@@ -196,6 +231,7 @@ Repo **hors** de ce dossier Party Games (pages statiques créées de ton côté)
 
 - [x] Repo Git du site légal créé
 - [x] Compléter les placeholders dans **mentions légales** (éditeur, adresse, SIRET, hébergeur, email)
+- [ ] **`suppression-compte.html` en ligne** — vérifier `https://revealthepartygame.fr/suppression-compte.html`
 - [ ] **Liens pour télécharger l’app** sur le site légal :
   - [ ] `index.html` : pilule(s) ou bouton **Google Play** + **App Store** (URLs réelles une fois les apps publiées ; sinon libellé « Bientôt disponible »)
   - [ ] `mentions-legales.html` : courte section « Téléchargement » avec les mêmes liens
@@ -211,10 +247,10 @@ Repo **hors** de ce dossier Party Games (pages statiques créées de ton côté)
 - [x] Fichiers en ligne : `index.html`, `privacy.html`, `mentions-legales.html`, `legal.css`, `reveal.png`
 - [x] **SSL** (Let’s Encrypt) actif
 - [x] 🧪 HTTPS OK : [accueil](https://revealthepartygame.fr/), [privacy](https://revealthepartygame.fr/privacy.html), [mentions](https://revealthepartygame.fr/mentions-legales.html) (juin 2026)
-- [x] `data/appConfig.js` → `PRIVACY_POLICY_PUBLIC_URL` =  
-  `https://revealthepartygame.fr/privacy.html`
+- [x] `data/appConfig.js` → `PRIVACY_POLICY_PUBLIC_URL` = `https://revealthepartygame.fr/privacy.html`
+- [x] `data/appConfig.js` → `ACCOUNT_DELETION_PUBLIC_URL` = `https://revealthepartygame.fr/suppression-compte.html`
+- [x] Play Console : **Contenu de l’application** complété (juin 2026)
 - [ ] Publier **`app-ads.txt`** sur le repo légal OVH (voir **B bis**)
-- [ ] Fiches store : coller la même URL privacy dans Play Console + App Store Connect (au moment de la soumission)
 
 > **Alternative sans FTP OVH** : déployer le repo légal via **Cloudflare Pages** + CNAME `www` dans OVH — voir [LEGAL_SITE_OVH.md](./LEGAL_SITE_OVH.md).
 
@@ -223,20 +259,28 @@ Repo **hors** de ce dossier Party Games (pages statiques créées de ton côté)
 ## H. Conformité & questionnaires store
 
 - [x] Politique de confidentialité **accessible en ligne** — [revealthepartygame.fr/privacy.html](https://revealthepartygame.fr/privacy.html) ; URL dans l’app ✅
+- [x] Page **suppression de compte** — URL dans Play Console ✅ (vérifier HTTPS en ligne)
 - [x] CMP **Google UMP** (message Règlementations européennes publié dans AdMob — section **B bis**)
+- [x] Play Console — **Contenu de l’application** (privacy, suppression compte, annonces, sécurité des données…) — juin 2026
+- [x] Play Console — **Classification du contenu** — juin 2026
+- [x] Play Console — **Public cible** — juin 2026
+- [x] Play Console — déclaration **identifiant publicitaire** (Oui → Publicité ou marketing) — juin 2026
 - [ ] Compléter **App Privacy** (Apple) : email, identifiants, pub AdMob, Supabase
-- [ ] Questionnaire **classification contenu** (Google)
-- [ ] Déclarer la **publicité** dans les deux consoles
-- [x] Email de contact éditeur (fiche store + RGPD) — `contact@revealthepartygame.fr` (`data/appConfig.js`, `data/legalContent.js`)
+- [ ] Déclarer la **publicité** App Store Connect
+- [x] Email de contact éditeur — `contact@revealthepartygame.fr`
 - [ ] **app-ads.txt** sur `revealthepartygame.fr` + site développeur dans fiche Play (AdMob prod)
 
 ---
 
 ## I. Soumission
 
-- [ ] **Play Store** : créer app → test **fermé** (12 testeurs / 14 j) → accès production → production
-- [ ] **App Store** : Bundle ID → app Connect → TestFlight → soumission review
-- [ ] Après approbation : vérifier vraies pubs AdMob (`ADMOB_USE_TEST_ADS = false`) + lien store AdMob + app-ads.txt
+- [x] App **REVEAL** créée dans Play Console (`com.reveal.partygames`)
+- [x] Play Console — **Contenu de l’application** entièrement complété (juin 2026)
+- [x] Play Store — **fiche store** complète (captures, icône, feature graphic) — juin 2026
+- [x] Play Store — **AAB v1** déployé en **test fermé** (« Bêta amis », codes d'accès) — 17 juin 2026
+- [ ] Play Store — **12 testeurs** (codes) installés + **14 jours** → demande **accès production** → production
+- [ ] **App Store** : Bundle ID → app Connect → build iOS → TestFlight → soumission review
+- [ ] Après publication prod : vérifier vraies pubs AdMob + lien store AdMob + app-ads.txt (`ADMOB_USE_TEST_ADS = false` ✅)
 
 ---
 
@@ -257,7 +301,8 @@ Repo **hors** de ce dossier Party Games (pages statiques créées de ton côté)
 | Fichier | Rôle |
 |---------|------|
 | [data/admobConfig.js](../data/admobConfig.js) | IDs pub + mode test/prod |
-| [data/appConfig.js](../data/appConfig.js) | Bundle ID, deep link, URL privacy, `CONTACT_EMAIL` |
+| [data/appConfig.js](../data/appConfig.js) | Bundle ID, deep link, URL privacy, URL suppression compte, `CONTACT_EMAIL` |
+| [legal-site-export/suppression-compte.html](../legal-site-export/suppression-compte.html) | Page à uploader sur OVH (Play Console) |
 | [data/legalContent.js](../data/legalContent.js) | Texte RGPD in-app |
 | [privacy.html](../privacy.html) | Copie locale / GitHub Pages (legacy) ; **URL store** → domaine OVH via `appConfig.js` |
 | [LEGAL_SITE_OVH.md](./LEGAL_SITE_OVH.md) | Déployer le repo légal sur OVH (FTP / SSL / DNS) |
@@ -269,9 +314,26 @@ Repo **hors** de ce dossier Party Games (pages statiques créées de ton côté)
 
 ---
 
-**Prochaine action recommandée** (juin 2026) :
+**Prochaine session** (juin 2026) :
 
-1. Attendre **validation identité Play** + **activation Apple Developer**
-2. Section **E** 🧪 — lobby multijoueur + soirée pilote ; préparer liste **12 testeurs** Play
-3. Publier **`app-ads.txt`** sur le site légal OVH
-4. Dès Play validé : créer app `com.reveal.partygames` + upload assets (**G**) ; Mac → **[IPHONE_TEST_CHECKLIST.md](./IPHONE_TEST_CHECKLIST.md)**
+### 1. Android — debug bêta Play Store
+
+1. Toi d'abord : Play Store → **Utiliser un code** → installer **REVEAL** v1.0
+2. Parcours complet : welcome, auth, lobby **multijoueur**, jeux, AdMob prod, UMP
+3. Partager **codes d'accès** (WhatsApp) — viser **12 testeurs** installés
+4. Noter les bugs → correctifs → si besoin **AAB v2** (`versionCode` 2, nouveau `cap:sync`, rebuild signé)
+
+### 2. iOS — build & test (Mac)
+
+1. **[IPHONE_TEST_CHECKLIST.md](./IPHONE_TEST_CHECKLIST.md)** : `cap:sync` → Xcode → Run iPhone
+2. Créer app **App Store Connect** + Bundle ID `com.reveal.partygames` (si pas fait)
+3. Archive → TestFlight
+
+### 3. En parallèle (non bloquant)
+
+- Publier **`app-ads.txt`** sur OVH (section **B bis**)
+- Vérifier `https://revealthepartygame.fr/suppression-compte.html`
+
+### Après 14 jours + 12 testeurs Play
+
+- Demande **accès production** → publication → lien AdMob + site légal

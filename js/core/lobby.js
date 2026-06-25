@@ -9,6 +9,7 @@ import {
   resetEveningState,
   beginGameScoreSession,
   setActiveScoringGame,
+  hasEveningStatsActivity,
 } from "./state.js";
 import { loginAsGuest, isGuest } from "./auth.js";
 import { signOutSupabase, getSupabaseUserId } from "./supabaseAuth.js";
@@ -35,8 +36,9 @@ import {
   recoverLobbyFromServer,
   peekServerLobbyForUser,
   getRememberedLobbyCode,
+  transferLobbyHostSupabase,
 } from "./supabaseLobby.js";
-import { showAppAlert, showAppConfirm } from "./dialog.js";
+import { showAppAlert, showAppConfirm, showTransferHostDialog } from "./dialog.js";
 import {
   stopMultiplayerSync,
   endGameSession,
@@ -52,6 +54,8 @@ import {
   getEffectiveSessionScreen,
   isActiveGameSessionScreen,
   isOnGameSetupScreen,
+  isOnPostGameScreen,
+  isLobbyHost,
   returnToGameSelect,
   // getFilRougeResumeScreen,
   routeToSessionScreen,
@@ -160,8 +164,34 @@ export function getLobbyStatus() {
   return getLobby()?.status || "waiting";
 }
 
+function hasRemoteEveningActivity() {
+  if (!isGameSyncActive()) return false;
+  const row = getCachedGameSession();
+  if (!row?.state) return false;
+  const st = row.state;
+  if (st.scores && Object.values(st.scores).some((n) => Number(n) > 0)) return true;
+  const s = st.stats || {};
+  return (
+    (s.hotTakesPlayed || 0) > 0 ||
+    (s.speedVotesPlayed || 0) > 0 ||
+    (s.playlistGuessesPlayed || 0) > 0 ||
+    (s.traitreGamesPlayed || 0) > 0 ||
+    (s.triviaGamesPlayed || 0) > 0 ||
+    (s.truthMetersPlayed || 0) > 0 ||
+    (s.consensusGamesPlayed || 0) > 0 ||
+    (s.dilemmasPlayed || 0) > 0 ||
+    (s.liesTotal || 0) > 0 ||
+    (s.tierNightsPlayed || 0) > 0 ||
+    (s.guessLieGamesPlayed || 0) > 0
+  );
+}
+
+/** Soirée lancée : statut playing OU déjà des parties / scores (entre deux jeux inclus). */
 export function isLobbyEveningStarted() {
-  return getLobbyStatus() === "playing";
+  if (getLobbyStatus() === "playing") return true;
+  if (hasEveningStatsActivity()) return true;
+  if (hasRemoteEveningActivity()) return true;
+  return false;
 }
 
 export function getLobbyGameId() {
@@ -179,6 +209,17 @@ export async function setLobbyPlaying(gameId) {
     return;
   }
   const lobby = { ...getLobby(), status: "playing", gameId };
+  saveStatePatch({ lobby });
+  if (lobby.code) publishOpenLobby(lobby.code, lobby);
+}
+
+/** Entre deux jeux (MP) : reste en soirée, retour au hub menu. */
+export async function setLobbyBetweenGames() {
+  if (isSupabaseConfigured() && getLobby()?.id) {
+    await setLobbyStatusSupabase("playing", "menu");
+    return;
+  }
+  const lobby = { ...getLobby(), status: "playing", gameId: "menu" };
   saveStatePatch({ lobby });
   if (lobby.code) publishOpenLobby(lobby.code, lobby);
 }
@@ -364,8 +405,11 @@ export async function navigateAfterLobbyJoin() {
   await routeToEveningHub({ rejoinActiveGame: true });
 }
 
-/** Menu jeux ou reprise de partie (accueil / paramètres). */
-export async function returnToEveningGames({ rejoinActiveGame = false } = {}) {
+/**
+ * Menu jeux ou reprise de partie (accueil / paramètres).
+ * @param {boolean} [hubOnly] - true pour l'onglet Jeux : menu sans quitter prep/partie.
+ */
+export async function returnToEveningGames({ rejoinActiveGame = false, hubOnly = false } = {}) {
   if (!hasActiveLobby()) {
     if (rejoinActiveGame) {
       const recovered = await tryRecoverLobbyFromServer();
@@ -385,10 +429,14 @@ export async function returnToEveningGames({ rejoinActiveGame = false } = {}) {
     return;
   }
 
-  if (isGameSyncActive()) {
+  if (!hubOnly && isGameSyncActive()) {
     startMultiplayerSync();
     const row = await refreshGameSession();
     const screen = row ? getEffectiveSessionScreen(row) : null;
+    if (screen && isOnPostGameScreen(screen) && isLobbyHost()) {
+      await returnToGameSelect();
+      return;
+    }
     if (screen && (isActiveGameSessionScreen(screen) || isOnGameSetupScreen(screen))) {
       await returnToGameSelect();
       return;
@@ -399,7 +447,7 @@ export async function returnToEveningGames({ rejoinActiveGame = false } = {}) {
 }
 
 export async function goToGameSelect() {
-  await returnToEveningGames();
+  await returnToEveningGames({ hubOnly: true });
 }
 
 /** Reprise Guess The Lie si l'état local indique une partie en cours mais #app est vide (F5). */
@@ -721,6 +769,71 @@ export async function leaveLobby({ navigateAway = true } = {}) {
   }
 
   applyLeaveLobbyLocal({ wasGuest, navigateAway });
+  return { ok: true };
+}
+
+/** Hôte MP : transfère le rôle à un autre joueur du lobby. */
+export async function transferLobbyHost() {
+  if (!isSupabaseConfigured() || !getLobby()?.id) {
+    return { ok: false, error: "Multijoueur en ligne requis." };
+  }
+  if (!isLocalLobbyHost()) {
+    return { ok: false, error: "Seul l'hôte peut transférer le rôle." };
+  }
+
+  const candidates = getLobbyParticipants()
+    .filter((p) => !p.isLocal && p.userId)
+    .map((p) => ({ userId: p.userId, name: p.name, emoji: p.emoji }));
+
+  if (!candidates.length) {
+    await showAppAlert("Ajoute au moins un autre joueur avant de transférer l'hôte.", {
+      title: "Transfert impossible",
+      icon: "👑",
+    });
+    return { ok: false, cancelled: true };
+  }
+
+  const choice = await showTransferHostDialog(candidates);
+  if (!choice.ok) return { ok: false, cancelled: true };
+
+  const target = candidates.find((p) => p.userId === choice.userId);
+  const confirmed = await showAppConfirm(
+    `Confirmer le transfert à ${target?.name || "ce joueur"} ?`,
+    {
+      title: "Transférer l'hôte",
+      confirmLabel: "Confirmer",
+      icon: "👑",
+    }
+  );
+  if (!confirmed) return { ok: false, cancelled: true };
+
+  const res = await transferLobbyHostSupabase(choice.userId);
+  if (!res.ok) {
+    await showAppAlert(res.error || "Transfert impossible.", { title: "Erreur", icon: "⚠️" });
+    return res;
+  }
+
+  if (isGameSyncActive()) {
+    try {
+      await refreshGameSession();
+    } catch (e) {
+      console.warn("REVEAL refresh game session after host transfer:", e);
+    }
+  }
+
+  try {
+    await addLobbyMessage(
+      `👑 ${target?.name || "Un joueur"} est maintenant l'hôte de la soirée.`
+    );
+  } catch {
+    /* message optionnel */
+  }
+
+  await showAppAlert(
+    `${target?.name || "Le joueur"} est maintenant l'hôte. Tu peux quitter le lobby sans fermer la soirée pour les autres.`,
+    { title: "Hôte transféré", icon: "✅" }
+  );
+
   return { ok: true };
 }
 

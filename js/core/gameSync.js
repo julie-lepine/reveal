@@ -12,7 +12,7 @@ import {
 } from "./state.js";
 import { GAMES } from "../../data/games.js";
 import { navigate, getCurrentScreen } from "./router.js";
-import { getLobbyParticipants, getLobbyStatus } from "./lobby.js";
+import { getLobbyParticipants, getLobbyStatus, isLobbyEveningStarted } from "./lobby.js";
 import { getActivePlayerNames, getActivePlayers } from "./players.js";
 import { mergeMatchScoresLocal } from "./gameScores.js";
 import {
@@ -77,6 +77,7 @@ import { scalePollIntervalMs, SYNC_PATCH_TIMEOUT_MS } from "../config/syncConfig
 import { FIL_ROUGE_ENABLED } from "../../data/filRouge.js";
 import { GUESS_LIE_SYNC_PATCH_TIMEOUT_MS } from "../../data/guessLies.js";
 import { pickRemotePlayFields } from "./playPatch.js";
+import { pickLatestConsensusAnswer } from "./consensusAnswerUtils.js";
 
 export { pickRemotePlayFields, PLAY_PATCH_EXCLUDE } from "./playPatch.js";
 
@@ -220,18 +221,26 @@ function isSessionAdvancedFromSuppress(targetScreen) {
   return true;
 }
 
-/** L'invité sur le menu jeux / lobby doit suivre l'hôte qui lance une partie. */
+/** L'invité sur le menu jeux / lobby / post-partie suit l'hôte qui lance prep ou partie. */
 function shouldFollowHostGameLaunch(current, targetScreen) {
-  if (!targetScreen || !isActiveGameSessionScreen(targetScreen)) return false;
+  if (!targetScreen) return false;
   if (current === "home" || current === "settings") return false;
   if (isSuppressedGameReturn(targetScreen)) return false;
-  return current === "game-select" || current === "lobby";
+
+  const fromHubOrPostGame =
+    current === "game-select" ||
+    current === "lobby" ||
+    POST_GAME_SCREENS.has(current);
+
+  if (!fromHubOrPostGame) return false;
+  if (isOnGameSetupScreen(targetScreen)) return true;
+  return isInProgressPlayScreen(targetScreen);
 }
 
 function shouldApplySessionRoute(row, { fromScreen = null } = {}) {
   const screen = getEffectiveSessionScreen(row);
   if (!screen) return false;
-  if (screen === "game-select" && getLobbyStatus() !== "playing") return false;
+  if (screen === "game-select" && !isLobbyEveningStarted()) return false;
   const current = getCurrentScreen();
   if (screen === current) return false;
   if (isCompatibleSessionScreen(screen, current)) return false;
@@ -240,7 +249,7 @@ function shouldApplySessionRoute(row, { fromScreen = null } = {}) {
   if (isSessionHubScreen(screen)) {
     if (
       screen === "game-select" &&
-      getLobbyStatus() === "playing" &&
+      isLobbyEveningStarted() &&
       (current === "home" || current === "lobby" || current === "settings")
     ) {
       return true;
@@ -323,11 +332,12 @@ export function isCompatibleSessionScreen(sessionScreen, localScreen) {
   ) {
     return true;
   }
-  /** Consulter le classement depuis le menu jeux / lobby sans être renvoyé. */
+  /** Consulter le classement depuis le menu jeux / lobby (soirée en attente uniquement). */
   if (
     localScreen === "leaderboard" &&
     (sessionScreen === "game-select" || sessionScreen === "lobby")
   ) {
+    if (isLobbyEveningStarted()) return false;
     return true;
   }
   /** Retour lobby volontaire depuis le menu jeux (suppress actif). */
@@ -395,7 +405,13 @@ function shouldForceGuestFollowSession(screen) {
 
 /** Filet pour écrans passifs (results, home…) : suit l'hôte si prep / partie. */
 export function tryFollowHostGameSession(row) {
-  if (!row || !isGameSyncActive() || isLobbyHost()) return false;
+  if (!isGameSyncActive() || isLobbyHost()) return false;
+  if (!row) {
+    if (isOnPostGameScreen(getCurrentScreen())) {
+      void routeToActiveGameIfNeeded(null, { force: true });
+    }
+    return false;
+  }
   handleSessionRoute(row);
   return true;
 }
@@ -541,8 +557,7 @@ function mapConsensusAnswersByName(answersByUid = {}) {
       out[name] = next;
       return;
     }
-    out[name] =
-      (next.timestamp || 0) >= (prev.timestamp || 0) ? next : prev;
+    out[name] = pickLatestConsensusAnswer(prev, next);
   });
   return out;
 }
@@ -694,7 +709,7 @@ function mergeHotTakeGameLocal(local, remote) {
   votes = normalizePlayerVotesMap(votes);
   const ready =
     !remote.lobbyStarted && !local.lobbyStarted
-      ? mergeReadyMapsLocal(local.ready || {}, remote.ready || {}, getActivePlayerNames())
+      ? mergeReadyMapsLocal(local.ready || {}, remote.ready || {}, getActivePlayerNames(), getLocalDisplayName())
       : remote.ready || {};
   const customTakes = mergeHotTakeCustomTakes(
     local.customTakes || [],
@@ -750,7 +765,7 @@ function mergeSpeedVoteGameLocal(local, remote) {
   votes = normalizePlayerVotesMap(votes);
   const ready =
     !remote.lobbyStarted && !local.lobbyStarted
-      ? mergeReadyMapsLocal(local.ready || {}, remote.ready || {}, getActivePlayerNames())
+      ? mergeReadyMapsLocal(local.ready || {}, remote.ready || {}, getActivePlayerNames(), getLocalDisplayName())
       : remote.ready || {};
   return {
     ...local,
@@ -796,14 +811,10 @@ function mergeTraitreGameLocal(local, remote) {
   if (isNewTraitreGame(local, remote)) {
     return {
       ...remote,
-      impostorName: (() => {
-        if (isLobbyHost() && remote.impostorName) return remote.impostorName;
-        if (remote.impostorRevealed && remote.impostorName) return remote.impostorName;
-        if (remote.isLocalImpostor) return getLocalDisplayName();
-        return null;
-      })(),
-      isLocalImpostor: remote.isLocalImpostor ?? false,
-      privateRoleSynced: remote.privateRoleSynced ?? false,
+      pairId: remote.pairId ?? null,
+      impostorName: remote.impostorRevealed ? remote.impostorName ?? null : null,
+      isLocalImpostor: false,
+      privateRoleSynced: false,
     };
   }
   const newVoteRound = isNewTraitreVoteRound(local, remote);
@@ -834,7 +845,7 @@ function mergeTraitreGameLocal(local, remote) {
   const dealAcks = { ...remoteAcks, ...localAcks };
   const ready =
     !remote.lobbyStarted && !local.lobbyStarted
-      ? mergeReadyMapsLocal(local.ready || {}, remote.ready || {}, getActivePlayerNames())
+      ? mergeReadyMapsLocal(local.ready || {}, remote.ready || {}, getActivePlayerNames(), getLocalDisplayName())
       : remote.ready || {};
   return {
     ...local,
@@ -908,7 +919,7 @@ function mergeTriviaGameLocal(local, remote) {
   }
   const ready =
     !remote.lobbyStarted && !local.lobbyStarted
-      ? mergeReadyMapsLocal(local.ready || {}, remote.ready || {}, getActivePlayerNames())
+      ? mergeReadyMapsLocal(local.ready || {}, remote.ready || {}, getActivePlayerNames(), getLocalDisplayName())
       : remote.ready || {};
   return {
     ...local,
@@ -923,14 +934,6 @@ function mergeTriviaGameLocal(local, remote) {
 
 function isNewTriviaQuestionRoundUid(cur, inc) {
   return isNewTriviaQuestionRound(cur, inc);
-}
-
-function pickLatestConsensusAnswer(localAnswer, remoteAnswer) {
-  if (!localAnswer) return remoteAnswer || null;
-  if (!remoteAnswer) return localAnswer;
-  return (remoteAnswer.timestamp || 0) >= (localAnswer.timestamp || 0)
-    ? remoteAnswer
-    : localAnswer;
 }
 
 function mergeRemoteConsensusAnswersUid(cur, inc) {
@@ -967,7 +970,7 @@ function mergeConsensusGameLocal(local, remote) {
   }
   const ready =
     !remote.lobbyStarted && !local.lobbyStarted
-      ? mergeReadyMapsLocal(local.ready || {}, remote.ready || {}, getActivePlayerNames())
+      ? mergeReadyMapsLocal(local.ready || {}, remote.ready || {}, getActivePlayerNames(), getLocalDisplayName())
       : remote.ready || {};
   return {
     ...local,
@@ -1094,7 +1097,8 @@ function mergeDilemmaGameLocal(local, remote) {
   const ready = mergeReadyMapsLocal(
     local.ready || {},
     remote.ready || {},
-    getActivePlayerNames()
+    getActivePlayerNames(),
+    me
   );
   const customDilemmas =
     remote.lobbyStarted || local.lobbyStarted
@@ -1193,7 +1197,7 @@ function mergeTruthMeterGameLocal(local, remote) {
   votes = normalizePlayerVotesMap(votes);
   const ready =
     !remote.lobbyStarted && !local.lobbyStarted
-      ? mergeReadyMapsLocal(local.ready || {}, remote.ready || {}, getActivePlayerNames())
+      ? mergeReadyMapsLocal(local.ready || {}, remote.ready || {}, getActivePlayerNames(), getLocalDisplayName())
       : remote.ready || {};
   return {
     ...local,
@@ -1811,7 +1815,7 @@ function mergePlaylistGuessGameLocal(local, remote) {
   }
   const ready =
     !remote.lobbyStarted && !local.lobbyStarted
-      ? mergeReadyMapsLocal(local.ready || {}, remote.ready || {}, getActivePlayerNames())
+      ? mergeReadyMapsLocal(local.ready || {}, remote.ready || {}, getActivePlayerNames(), getLocalDisplayName())
       : remote.ready || {};
   let roundScored = mergeRoundFlag(local.roundScored, remote.roundScored, newVoteRound);
   if (remote.phase === "voting" && newVoteRound) {
@@ -2150,6 +2154,8 @@ export function applyRemoteSession(row) {
 
   const patch = {};
   const prevPgPhase = getState().playlistGuessGame?.phase ?? null;
+  const prevDmPhase = getState().dilemmaGame?.phase ?? null;
+  const prevDmRoundIdx = getState().dilemmaGame?.roundIdx ?? null;
   const st = { ...(row.state || {}) };
   if (!FIL_ROUGE_ENABLED) {
     delete st.filRouge;
@@ -2248,7 +2254,12 @@ export function applyRemoteSession(row) {
       JSON.stringify(patch.guessLie.votes || {}) !==
         JSON.stringify(prevGuessLie?.votes || {}));
 
-  if (sigUnchanged && !pgPhaseChanged && !guessLiePlayChanged) return;
+  const dilemmaPlayChanged =
+    patch.dilemmaGame &&
+    ((patch.dilemmaGame.phase ?? null) !== prevDmPhase ||
+      (patch.dilemmaGame.roundIdx ?? null) !== prevDmRoundIdx);
+
+  if (sigUnchanged && !pgPhaseChanged && !guessLiePlayChanged && !dilemmaPlayChanged) return;
 
   notify(row);
 
@@ -2361,9 +2372,31 @@ export function isSessionRouteSuppressed() {
  */
 export function suppressRoutingForScoreView(ms = 15 * 60 * 1000) {
   const active = getEffectiveSessionScreen(getCachedGameSession());
-  if (active && isActiveGameSessionScreen(active)) {
+  // Prep : pas de suppress (l'invité doit pouvoir suivre l'hôte depuis Résultats / Classement).
+  if (active && isInProgressPlayScreen(active)) {
     suppressSessionRoute(ms, active);
   }
+}
+
+/** Partie en cours (écran de jeu, hors prep et post-partie). */
+export function isSessionInProgressPlay(screen) {
+  if (!screen || MENU_SCREENS.has(screen) || POST_GAME_SCREENS.has(screen)) return false;
+  if (isOnGameSetupScreen(screen)) return false;
+  return true;
+}
+
+function isInProgressPlayScreen(screen) {
+  return isSessionInProgressPlay(screen);
+}
+
+/** Prep ou partie en cours a reprendre (pas post-partie ni menu soiree). */
+export function getResumableSessionScreen(row = getCachedGameSession()) {
+  if (!row || !isGameSyncActive()) return null;
+  const screen = getEffectiveSessionScreen(row);
+  if (!screen || isOnPostGameScreen(screen)) return null;
+  if (screen === "game-select" && isLobbyEveningStarted()) return null;
+  if (isOnGameSetupScreen(screen) || isSessionInProgressPlay(screen)) return screen;
+  return null;
 }
 
 export function isActiveGameSessionScreen(screen) {
@@ -2377,7 +2410,8 @@ function resolveActivePlayScreen(st, gid, declared) {
   if (st.hotTake?.lobbyStarted) return "hottake";
   if (st.speedVote?.lobbyStarted) return "speedvote";
   if (st.traitre?.lobbyStarted) {
-    if (declared === "game-select" && getLobbyStatus() !== "playing") return "game-select";
+    if (declared === "traitre-prep") return null;
+    if (declared === "game-select" && !isLobbyEveningStarted()) return "game-select";
     return "traitre";
   }
   if (st.trivia?.lobbyStarted) return "trivia";
@@ -2399,18 +2433,26 @@ export function getEffectiveSessionScreen(row) {
   const st = row.state || {};
   const gid = row.game_id || null;
 
+  const activePlay = resolveActivePlayScreen(st, gid, declared);
+  if (activePlay) return activePlay;
+
+  if (declared && GAME_SETUP_SCREENS.has(declared)) return declared;
+
+  if (declared && !MENU_SCREENS.has(declared) && !POST_GAME_SCREENS.has(declared)) {
+    return declared;
+  }
+
+  // DB encore sur results alors que l'hôte a relancé (lobby en jeu).
+  if (declared && POST_GAME_SCREENS.has(declared) && isLobbyEveningStarted() && gid && gid !== "menu") {
+    const prep = SESSION_GAME_ID_TO_TILE[gid];
+    if (prep) return prep;
+  }
+
   if (declared && POST_GAME_SCREENS.has(declared)) {
     return declared;
   }
 
-  const activePlay = resolveActivePlayScreen(st, gid, declared);
-  if (activePlay) return activePlay;
-
   if (declared && MENU_SCREENS.has(declared)) {
-    return declared;
-  }
-
-  if (declared && GAME_SETUP_SCREENS.has(declared)) {
     return declared;
   }
 
@@ -2470,7 +2512,7 @@ export async function routeToActiveGameIfNeeded(cachedRowOnly = null, { force = 
     cachedRowOnly || (await refreshGameSession()) || getCachedGameSession();
   const screen = getEffectiveSessionScreen(row);
   if (!screen) return false;
-  const isEveningHub = screen === "game-select" && getLobbyStatus() === "playing";
+  const isEveningHub = screen === "game-select" && isLobbyEveningStarted();
   if (!isEveningHub && !isActiveGameSessionScreen(screen) && !isOnGameSetupScreen(screen)) {
     return false;
   }
@@ -2639,7 +2681,7 @@ async function syncTick() {
   try {
     const lobbyId = getState().lobby?.id;
     // Pas de session tant que la soirée n'est pas lancée - évite le polling inutile.
-    if (!getCachedGameSession() && getLobbyStatus() === "waiting") {
+    if (!getCachedGameSession() && !isLobbyEveningStarted()) {
       adjustPollBackoff(false);
       scheduleSyncPoll();
       return;
@@ -3138,8 +3180,8 @@ export async function completeGameSession({ gameId = "menu", screen = "results",
   const hostId = getSupabaseUserId();
   if (!hostId) return null;
 
-  const { setLobbyWaiting } = await import("./lobby.js");
-  await setLobbyWaiting();
+  const { setLobbyBetweenGames } = await import("./lobby.js");
+  await setLobbyBetweenGames();
 
   const row = await upsertGameSession({
     lobbyId,

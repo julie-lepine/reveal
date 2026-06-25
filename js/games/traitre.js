@@ -2,6 +2,7 @@ import { TRAITRE_POINTS } from "../../data/traitre.js";
 import {
   allTraitreDealAcksIn,
   allTraitreVotesIn,
+  countTraitreDealAcks,
   awardTraitreGame,
   buildTraitreEliminationPatch,
   buildTraitreTieSpeakPatch,
@@ -11,12 +12,10 @@ import {
   countTraitreVotes,
   countTraitreVotesCast,
   normalizeTraitreVotes,
-  getCurrentTraitreSpeaker,
   getMyTraitreWord,
   getTraitreEntryScreen,
   getTraitreResultPair,
   getTraitreSession,
-  getTraitreSpeakOrder,
   getTraitrePendingVoters,
   getTraitreVoteTargets,
   isTraitrePrivateRoleReady,
@@ -53,7 +52,6 @@ export function mountTraitre(app) {
 
   let phase = "deal";
   let speakRound = 1;
-  let speakerIndex = 0;
   let alive = [];
   let eliminated = [];
   let votes = {};
@@ -85,7 +83,6 @@ export function mountTraitre(app) {
     const s = getTraitreSession();
     phase = s.phase || "deal";
     speakRound = s.speakRound ?? 1;
-    speakerIndex = s.speakerIndex ?? 0;
     alive = [...(s.alive || [])];
     eliminated = [...(s.eliminated || [])];
     votes = { ...(s.votes || {}) };
@@ -185,16 +182,10 @@ export function mountTraitre(app) {
     });
   }
 
-  async function advanceSpeaker() {
+  async function finishSpeakRound() {
     if (mp && !isLobbyHost()) return;
     const s = getTraitreSession();
-    const order = getTraitreSpeakOrder(s);
-    const nextIndex = (s.speakerIndex || 0) + 1;
-    const basePatch = s.lastEliminated ? { lastEliminated: null } : {};
-    if (nextIndex < order.length) {
-      await commitTraitrePlay({ ...s, ...basePatch, speakerIndex: nextIndex });
-      return;
-    }
+    const basePatch = s.lastEliminated ? { lastEliminated: null, speakerIndex: 0 } : { speakerIndex: 0 };
     if (s.speakRound === 1) {
       await commitTraitrePlay({ ...s, ...basePatch, phase: "decision" });
       return;
@@ -234,17 +225,25 @@ export function mountTraitre(app) {
     });
   }
 
-  async function resolveVoteRound() {
+  async function resolveVoteRound({ force = false } = {}) {
     if (resolveInFlight) return;
     if (mp && !isLobbyHost()) return;
     const s = getTraitreSession();
-    if (s.phase !== "vote" || !allTraitreVotesIn(s)) return;
+    if (s.phase !== "vote") return;
+
+    const aliveNow = s.alive || [];
+    let votesToUse = normalizeTraitreVotes(s.votes || {}, aliveNow);
+    const votedCount = countTraitreVotesCast(votesToUse, aliveNow);
+
+    if (force) {
+      if (votedCount === 0) return;
+    } else if (!allTraitreVotesIn(s)) {
+      return;
+    }
 
     resolveInFlight = true;
     try {
-      const aliveNow = s.alive || [];
-      let votesToUse = normalizeTraitreVotes(s.votes || {}, aliveNow);
-      if (!mp) {
+      if (!mp && !force) {
         aliveNow.forEach((name) => {
           if (votesToUse[name] == null) {
             const pool = aliveNow.filter((n) => n !== name);
@@ -311,31 +310,30 @@ export function mountTraitre(app) {
       </div>`;
   }
 
-  function speakOrderHtml(session) {
-    const order = getTraitreSpeakOrder(session);
-    const current = getCurrentTraitreSpeaker(session);
+  function speakCollectiveHtml(session) {
+    const players = session.alive || [];
+    const round = session.speakRound || 1;
     return `
       ${tieSpeakBannerHtml(session)}
-      <div class="traitre-order card">
-        <p class="card-heading">Ordre des indices - manche ${session.speakRound || 1}</p>
-        <ol class="traitre-order__list">
-          ${order
+      <div class="card traitre-speak-collective">
+        <p class="card-heading">Tour des mots — manche ${round}</p>
+        <p class="hint traitre-speak-collective__lead">
+          Chacun dit <strong>un indice à voix haute</strong>, dans l'ordre que vous voulez.
+          Ne prononce pas ton mot secret.
+        </p>
+        <div class="traitre-speak-collective__players">
+          ${players
             .map(
-              (name, idx) => `
-            <li class="traitre-order__item ${name === current ? "traitre-order__item--active" : ""} ${idx < (session.speakerIndex || 0) ? "traitre-order__item--done" : ""}">
+              (name) => `
+            <div class="traitre-speak-collective__player">
               <span class="recap-card__avatar" style="background:${playerMeta(name).color}">${playerMeta(name).emoji}</span>
-              <span>${escapeHtml(name)}${name === current ? " · en cours" : ""}</span>
-            </li>`
+              <span>${escapeHtml(name)}</span>
+            </div>`
             )
             .join("")}
-        </ol>
+        </div>
         ${
-          current
-            ? `<p class="hint traitre-order__now">C'est au tour de <strong>${escapeHtml(current)}</strong> - dis un indice à voix haute (sans prononcer ton mot).</p>`
-            : ""
-        }
-        ${
-          (session.speakRound || 1) > 1 && !isTraitreTieSpeakRound(session)
+          round > 1 && !isTraitreTieSpeakRound(session)
             ? `<p class="hint">Rappel : indices <strong>différents</strong> des manches précédentes.</p>`
             : ""
         }
@@ -364,13 +362,27 @@ export function mountTraitre(app) {
 
   function traitrePhaseTitle(currentPhase) {
     const titles = {
-      deal: "Mot secret",
-      speak: "Indices oraux",
+      deal: "Révélation des mots",
+      speak: "Tour des mots à l'oral",
       decision: "Fin de manche 1",
       vote: "Vote d'élimination",
       final: "Résultat",
     };
     return titles[currentPhase] || "Partie";
+  }
+
+  function decisionBtnsHtml(host) {
+    const disabledAttr = host ? "" : " disabled";
+    return `
+        ${
+          host
+            ? ""
+            : `<p class="hint traitre-host-hint">Choix de l'hôte — tu ne peux pas agir.</p>`
+        }
+        <div class="traitre-decision-btns">
+          <button type="button" class="btn btn-secondary btn--spaced" id="btn-continue"${disabledAttr}>Continuer (indices)</button>
+          <button type="button" class="btn btn-primary btn--spaced" id="btn-vote-now"${disabledAttr}>Voter maintenant</button>
+        </div>`;
   }
 
   function render() {
@@ -382,32 +394,41 @@ export function mountTraitre(app) {
     let phaseHtml = "";
 
     if (phase === "deal") {
+      const dealAckCount = countTraitreDealAcks(session);
+      const dealTotal = alive.length;
       phaseHtml = wordDealReady
         ? `
+        <div class="card card--highlight traitre-deal-banner">
+          <p class="card-heading">Tour dédié — lis ton mot en privé</p>
+          <p class="hint">Chacun découvre son mot sur son téléphone, puis valide quand c'est mémorisé. Ne montre pas ton écran.</p>
+          <p class="hint traitre-deal-progress">${dealAckCount}/${dealTotal} joueur(s) prêt(s)</p>
+        </div>
         <div class="card traitre-word-card">
           <p class="label-upper label-upper--gold">Ton mot secret</p>
           <p class="traitre-word">${escapeHtml(myWord)}</p>
-          <p class="hint">Ne montre pas ton écran. Mémorise ce mot - tu devras donner un indice sans le prononcer.</p>
+          <p class="hint">Mémorise ce mot — tu devras donner un indice à voix haute sans le prononcer.</p>
           ${
             session.dealAcks?.[localName]
-              ? `<p class="hint">En attente des autres joueurs…</p>`
+              ? `<p class="hint traitre-deal-wait">✓ Mot mémorisé — en attente des autres joueurs…</p>`
               : `<button type="button" class="btn btn-primary btn--spaced" id="btn-deal-ack">J'ai mémorisé mon mot</button>`
           }
         </div>`
         : `
+        <div class="card card--highlight traitre-deal-banner">
+          <p class="card-heading">Tour dédié — lis ton mot en privé</p>
+          <p class="hint">Chargement de la partie…</p>
+        </div>
         <div class="card traitre-word-card">
           <p class="label-upper label-upper--gold">Ton mot secret</p>
           <p class="hint">Chargement de ton mot…</p>
         </div>`;
     } else if (phase === "speak") {
       phaseHtml = `
-        ${speakOrderHtml(session)}
+        ${speakCollectiveHtml(session)}
         ${
           host
-            ? `<button type="button" class="btn btn-primary btn--spaced" id="btn-next-speaker">
-                ${getCurrentTraitreSpeaker(session) ? "Indice suivant →" : "Commencer les indices →"}
-              </button>`
-            : `<p class="hint">En attente de l'hôte pour avancer…</p>`
+            ? `<button type="button" class="btn btn-primary btn--spaced" id="btn-finish-speak">Finaliser le tour des mots →</button>`
+            : `<p class="hint">En attente que l'hôte finalise le tour quand tout le monde a parlé…</p>`
         }`;
     } else if (phase === "decision") {
       phaseHtml = `
@@ -415,14 +436,7 @@ export function mountTraitre(app) {
           <p class="card-heading">Fin de la manche 1</p>
           <p class="hint">Continuer une manche d'indices ou passer au vote d'élimination ?</p>
         </div>
-        ${
-          host
-            ? `<div class="traitre-decision-btns">
-                <button type="button" class="btn btn-secondary btn--spaced" id="btn-continue">Continuer (indices)</button>
-                <button type="button" class="btn btn-primary btn--spaced" id="btn-vote-now">Voter maintenant</button>
-              </div>`
-            : `<p class="hint">En attente du choix de l'hôte…</p>`
-        }`;
+        ${decisionBtnsHtml(host)}`;
     } else if (phase === "vote") {
       const normalizedVotes = normalizeTraitreVotes(votes, alive);
       const votedCount = countTraitreVotesCast(normalizedVotes, alive);
@@ -450,7 +464,7 @@ export function mountTraitre(app) {
         }
         ${
           host
-            ? `<button type="button" class="btn btn-secondary btn--spaced" id="btn-force-vote">Clôturer le vote (${votedCount}/${alive.length})</button>`
+            ? `<button type="button" class="btn btn-secondary btn--spaced" id="btn-force-vote" ${votedCount === 0 ? "disabled" : ""}>Clôturer le vote (${votedCount}/${alive.length})</button>`
             : isAlive
               ? `<p class="hint">En attente des votes…</p>`
               : `<p class="hint">En attente de la clôture du vote…</p>`
@@ -477,7 +491,7 @@ export function mountTraitre(app) {
         ${
           phase === "final"
             ? ""
-            : `<p class="hint">${alive.length} survivant(s) · manche indices ${speakRound}${voteSurvivals ? ` · ${voteSurvivals} vote(s) survécu(s) par le fake` : ""}</p>`
+            : `<p class="hint">${alive.length} survivant(s) · tour des mots ${speakRound}${voteSurvivals ? ` · ${voteSurvivals} vote(s) survécu(s) par le fake` : ""}</p>`
         }
         ${phaseHtml}
         ${gameExitBarHtml()}
@@ -501,8 +515,8 @@ export function mountTraitre(app) {
       render();
     });
 
-    app.querySelector("#btn-next-speaker")?.addEventListener("click", () => {
-      void advanceSpeaker().then(() => render());
+    app.querySelector("#btn-finish-speak")?.addEventListener("click", () => {
+      void finishSpeakRound().then(() => render());
     });
 
     app.querySelector("#btn-continue")?.addEventListener("click", () => {
@@ -531,7 +545,7 @@ export function mountTraitre(app) {
     });
 
     app.querySelector("#btn-force-vote")?.addEventListener("click", () => {
-      void resolveVoteRound().then(() => render());
+      void resolveVoteRound({ force: true }).then(() => render());
     });
 
     app.querySelector("#btn-traitre-exit")?.addEventListener("click", () => {
@@ -540,6 +554,11 @@ export function mountTraitre(app) {
   }
 
   const unsub = onGameSessionChange(async () => {
+    const entry = getTraitreEntryScreen();
+    if (entry !== "traitre") {
+      navigate(entry);
+      return;
+    }
     syncFromSession();
     await ensurePrivateRole();
     if (phase === "deal") {

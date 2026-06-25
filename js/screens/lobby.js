@@ -32,6 +32,7 @@ import {
   getEffectiveSessionScreen,
   isActiveGameSessionScreen,
   isOnGameSetupScreen,
+  refreshGameSession,
 } from "../core/gameSync.js";
 import { navigate, getCurrentScreen } from "../core/router.js";
 import { triggerLobbyNudge } from "../core/nudge.js";
@@ -40,6 +41,10 @@ import { escapeHtml, pageShell } from "../core/ui.js";
 import { bindNav } from "./nav.js";
 import { showAppAlert } from "../core/dialog.js";
 import { getLobbyAutoCloseHint } from "../config/lobbyLifecycle.js";
+import {
+  getResumableSessionScreen,
+  mountGameResumeInterstitial,
+} from "../core/gameResume.js";
 
 function participantsHtml(participants) {
   return participants
@@ -85,6 +90,8 @@ function getLobbyStartLabel({ isHost, allReady, localReady }) {
 export function mountLobby(app) {
   if (!requireLobbyPlay()) return null;
 
+  let cleanupResume = () => {};
+  let lobbyMode = "normal";
   let cleanupSim = null;
   let unsubSession = () => {};
   let unsubBundle = () => {};
@@ -413,6 +420,39 @@ export function mountLobby(app) {
 
   (async () => {
     await ensureLobby();
+    if (isGameSyncActive()) {
+      startMultiplayerSync();
+      const row = await refreshGameSession();
+      const resumeScreen = getResumableSessionScreen(row);
+      if (resumeScreen) {
+        lobbyMode = "resume";
+        cleanupResume = mountGameResumeInterstitial(app, resumeScreen, {
+          allowStay: !isLobbyHost(),
+        });
+        unsubSession = onGameSessionChange(async (nextRow) => {
+          if (!nextRow) return;
+          const nextScreen = getResumableSessionScreen(nextRow);
+          if (!nextScreen) return;
+          if (getCurrentScreen() !== "lobby") return;
+          if (await routeToActiveGameIfNeeded(nextRow)) return;
+        });
+        unsubBundle = onLobbyBundleUpdated(() => {
+          if (getCurrentScreen() === "lobby" && lobbyMode === "resume") {
+            void routeToActiveGameIfNeeded();
+          }
+        });
+        return;
+      }
+
+      if (isLobbyEveningStarted()) {
+        navigate("game-select", { navStack: ["home", "lobby", "game-select"] });
+        return;
+      }
+    } else if (isLobbyEveningStarted()) {
+      navigate("game-select", { navStack: ["home", "lobby", "game-select"] });
+      return;
+    }
+
     if (!isLobbyEveningStarted()) {
       await resetAllParticipantsReady();
     }
@@ -429,12 +469,12 @@ export function mountLobby(app) {
           void routeToActiveGameIfNeeded(row);
           return;
         }
-        if (effective === "game-select" && getLobbyStatus() === "playing") {
+        if (effective === "game-select" && isLobbyEveningStarted()) {
           navigate("game-select", { navStack: ["home", "lobby", "game-select"] });
         }
       });
       unsubBundle = onLobbyBundleUpdated(() => {
-        if (getLobbyStatus() === "playing") {
+        if (isLobbyEveningStarted()) {
           void routeToActiveGameIfNeeded();
         }
       });
@@ -443,6 +483,7 @@ export function mountLobby(app) {
   })();
 
   return () => {
+    cleanupResume();
     unsubSession();
     unsubBundle();
     if (cleanupSim) cleanupSim();

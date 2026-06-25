@@ -235,10 +235,14 @@ export async function commitHostGamePlay({
   const session = { ...getSession(), ...patch };
   saveLocal(session);
   if (!isGameSyncActive() || !isLobbyHost()) return session;
-  await patchGameState(
-    { [stateKey]: pickRemotePlayFields(toRemote(session), patch) },
-    { gameId, screen: screen || gameId, ...patchOpts }
-  );
+  const remotePatch = { [stateKey]: pickRemotePlayFields(toRemote(session), patch) };
+  const opts = { gameId, screen: screen || gameId, ...patchOpts };
+  if (patchOpts.withPatchFeedback) {
+    const { patchGameStateWithFeedback } = await import("./patchGameStateFeedback.js");
+    await patchGameStateWithFeedback(remotePatch, opts);
+  } else {
+    await patchGameState(remotePatch, opts);
+  }
   return session;
 }
 

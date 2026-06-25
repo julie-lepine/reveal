@@ -25,7 +25,8 @@ import { getLocalDisplayName } from "../core/state.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
 import { rulesButtonHtml } from "../core/gameRulesUi.js";
 import { isLobbyHost, onGameSessionChange } from "../core/gameSync.js";
-import { prepGuestFollowOnSession, runPrepGameLaunch } from "../core/mpLaunch.js";
+import { prepGuestFollowOnSession } from "../core/mpLaunch.js";
+import { executePrepLaunch, prepLaunchSlotParams, DEFAULT_PREP_MIN_PLAYERS } from "../core/prepLaunch.js";
 import { createPrepLobbyController } from "../core/usePrepLobby.js";
 import { navigate } from "../core/router.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
@@ -38,6 +39,7 @@ import {
   updatePlayersReadyCard,
   updateReadyButton,
   updatePrepStartSlot,
+  bindPrepLaunchButtons,
 } from "../core/prepScreen.js";
 import { bindNav } from "./nav.js";
 
@@ -102,13 +104,18 @@ export function mountHotTakePrep(app) {
   }
 
   function hotTakeStartSlotHtml(allReady, prep) {
-    return prepStartSlotHtml({
-      poolEmpty: prep.effective === 0,
-      poolEmptyLabel: "Aucune take disponible",
-      allReady,
-      isHost: isLobbyHost(),
-      launchLabel: "Lancer Hot Take →",
-    });
+    const session = getHotTakeSession();
+    return prepStartSlotHtml(
+      prepLaunchSlotParams({
+        readyMap: session.ready || {},
+        allReady,
+        isHost: isLobbyHost(),
+        minPlayers: DEFAULT_PREP_MIN_PLAYERS,
+        poolEmpty: prep.effective === 0,
+        poolEmptyLabel: "Aucune take disponible",
+        launchLabel: "Lancer Hot Take →",
+      })
+    );
   }
 
   function refreshReadySection() {
@@ -123,7 +130,7 @@ export function mountHotTakePrep(app) {
     updatePrepStartSlot(
       app.querySelector("#hot-take-start-slot"),
       hotTakeStartSlotHtml(allReady, prep),
-      onStartGame
+      onLaunch
     );
 
     if (document.activeElement?.id !== "new-take") {
@@ -169,12 +176,19 @@ export function mountHotTakePrep(app) {
     restoreDraft(draft);
   }
 
-  async function onStartGame() {
-    await runPrepGameLaunch({
-      btn: app.querySelector("#btn-start-game"),
-      launch: markHotTakeLobbyStarted,
+  async function onLaunch({ force = false } = {}) {
+    const prep = getHotTakePrepSummary();
+    await executePrepLaunch({
+      force,
+      btn: app.querySelector(force ? "#btn-force-start-game" : "#btn-start-game"),
+      getReadyMap: () => getHotTakeSession().ready || {},
+      minPlayers: DEFAULT_PREP_MIN_PLAYERS,
+      gameTitle: "Hot Take",
       gameScreen: "hottake",
       navStack: ["home", "lobby", "game-select", "hottake-prep", "hottake"],
+      markStarted: markHotTakeLobbyStarted,
+      allReadyFn: allHotTakeReady,
+      poolEmpty: prep.effective === 0,
     });
   }
 
@@ -221,7 +235,7 @@ export function mountHotTakePrep(app) {
       });
     });
 
-    app.querySelector("#btn-start-game")?.addEventListener("click", onStartGame);
+    bindPrepLaunchButtons(app, { onLaunch });
   }
 
   function render(preserveDraft = null) {
@@ -257,7 +271,7 @@ export function mountHotTakePrep(app) {
           <h2 class="screen-title">Préparation</h2>
           ${rulesButtonHtml("hottake")}
         </div>
-        <p class="game-intro">L'admin choisit d'abord un thème, puis le nombre de manches. Ajoute tes takes si tu veux.</p>
+        <p class="game-intro">Opinions clivantes : suis le troupeau (+10) ou assume ton côté <strong>outsider</strong> (+15). L'admin choisit d'abord un thème, puis le nombre de manches. Ajoute tes takes si tu veux.</p>
 
         <div class="card">
           <p class="card-heading">Banque par thème</p>

@@ -720,6 +720,25 @@ export async function updateLobbyMemberProfileSupabase({ displayName, emoji } = 
   /* Realtime lobby_members met à jour tout le lobby ; évite double refresh + faux kick. */
 }
 
+/** Hôte : transfère le rôle à un autre membre du lobby (RPC atomique). */
+export async function transferLobbyHostSupabase(newHostUserId) {
+  const lobbyId = getState().lobby?.id;
+  const userId = getSupabaseUserId();
+  if (!lobbyId || !userId || !newHostUserId) {
+    return { ok: false, error: "Lobby ou joueur invalide." };
+  }
+
+  const { error } = await supabase.rpc("transfer_lobby_host", {
+    p_lobby_id: lobbyId,
+    p_new_host_user_id: newHostUserId,
+  });
+
+  if (error) return { ok: false, error: error.message };
+
+  await refreshLobbyFromSupabase();
+  return { ok: true };
+}
+
 export async function setLobbyStatusSupabase(status, gameId = null) {
   const lobbyId = getState().lobby?.id;
   if (!lobbyId) return;

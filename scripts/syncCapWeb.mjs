@@ -7,7 +7,7 @@ import path from "node:path";
 
 const root = process.cwd();
 const www = path.join(root, "www");
-const entries = ["index.html", "privacy.html", "style.css", "reveal.png", "js", "data", "assets", "css"];
+const entries = ["index.html", "privacy.html", "suppression-compte.html", "style.css", "reveal.png", "js", "data", "assets", "css"];
 
 function rmDir(dir) {
   if (!fs.existsSync(dir)) return;

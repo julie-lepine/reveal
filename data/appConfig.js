@@ -17,6 +17,16 @@ export const PRIVACY_POLICY_PUBLIC_URL =
 /** Contact officiel (RGPD, store, mentions légales). */
 export const CONTACT_EMAIL = "contact@revealthepartygame.fr";
 
+/**
+ * URL publique — demande de suppression de compte (Play Console / App Store).
+ * Déployer suppression-compte.html sur le même domaine que privacy.html.
+ */
+export const ACCOUNT_DELETION_PUBLIC_URL =
+  "https://revealthepartygame.fr/suppression-compte.html";
+
+/** Lien mailto prérempli pour la demande de suppression (page web + app). */
+export const ACCOUNT_DELETION_MAILTO = `mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent("Demande de suppression de compte REVEAL")}`;
+
 /** Profil Instagram (retours informels, communauté). */
 export const INSTAGRAM_PROFILE_URL =
   "https://www.instagram.com/reveal.the.party.game/";

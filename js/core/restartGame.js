@@ -1,5 +1,6 @@
 import { GAMES } from "../../data/games.js";
 import { getLastGame, getState, saveStatePatch } from "./state.js";
+import { clearTraitrePrivateForLobby } from "./traitrePrivate.js";
 import {
   isGameSyncActive,
   isLobbyHost,
@@ -73,6 +74,10 @@ export async function launchTraitrePrep() {
 
   if (isGameSyncActive()) {
     if (!(await requireHostToLaunch())) return;
+    const lobbyId = getState().lobby?.id;
+    if (lobbyId) {
+      await clearTraitrePrivateForLobby(lobbyId);
+    }
     try {
       await startGameSession("traitre", "traitre-prep", {
         traitre: traitreToRemote(tr),

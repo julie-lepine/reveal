@@ -148,8 +148,8 @@ export function simulateTraitreReady(onUpdate) {
   return () => clearInterval(id);
 }
 
-export function validateTraitreLaunch() {
-  const count = getActivePlayerNames().length;
+export function validateTraitreLaunch(rosterNames) {
+  const count = rosterNames?.length ?? getActivePlayerNames().length;
   return {
     ok: count >= TRAITRE_MIN_PLAYERS,
     count,
@@ -157,9 +157,9 @@ export function validateTraitreLaunch() {
   };
 }
 
-export function createStartedTraitreSession() {
-  const names = getActivePlayerNames();
-  const check = validateTraitreLaunch();
+export function createStartedTraitreSession(rosterNames) {
+  const names = rosterNames?.length ? rosterNames : getActivePlayerNames();
+  const check = validateTraitreLaunch(names);
   if (!check.ok) return { ok: false, ...check };
   const pair = pickRandomTraitrePair();
   const impostorName = names[Math.floor(Math.random() * names.length)];
@@ -193,8 +193,8 @@ async function distributeTraitreRolesForHost(session) {
   return hostDistributeTraitreRoles(session.pairId, session.impostorName, session.alive);
 }
 
-export async function markTraitreLobbyStarted() {
-  const started = createStartedTraitreSession();
+export async function markTraitreLobbyStarted({ rosterNames } = {}) {
+  const started = createStartedTraitreSession(rosterNames);
   if (!started.ok) return started;
 
   const next = {
@@ -281,6 +281,11 @@ export async function commitTraitreVote(targetName) {
 export function allTraitreDealAcksIn(session = getTraitreSession()) {
   const alive = session.alive || getActivePlayerNames();
   return alive.length > 0 && alive.every((name) => session.dealAcks?.[name]);
+}
+
+export function countTraitreDealAcks(session = getTraitreSession()) {
+  const alive = session.alive || getActivePlayerNames();
+  return alive.filter((name) => session.dealAcks?.[name]).length;
 }
 
 /** Votes indexés par pseudo (sync multijoueur peut envoyer des UUID). */

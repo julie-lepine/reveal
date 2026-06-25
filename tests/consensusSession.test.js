@@ -5,6 +5,7 @@ import {
   applyConsensusDefaultAnswers,
   clampConsensusValue,
   isConsensusAnswerForRound,
+  pickLatestConsensusAnswer,
   stripStaleConsensusAnswers,
 } from "../js/core/consensusAnswerUtils.js";
 
@@ -76,5 +77,33 @@ describe("applyConsensusDefaultAnswers", () => {
     assert.equal(out.answers.Bob.value, CONSENSUS_DEFAULT_SLIDER_VALUE);
     assert.equal(out.answers.Bob.imputed, true);
     assert.equal(out.answers.Bob.questionIdx, 0);
+  });
+});
+
+describe("pickLatestConsensusAnswer", () => {
+  it("préfère une réponse validée à une réponse imputée", () => {
+    const local = {
+      value: 72,
+      timestamp: 1000,
+      submittedAt: 1000,
+      questionIdx: 0,
+      imputed: false,
+    };
+    const remote = {
+      value: 50,
+      timestamp: 2000,
+      submittedAt: 2000,
+      questionIdx: 0,
+      imputed: true,
+    };
+    assert.deepEqual(pickLatestConsensusAnswer(local, remote), local);
+    assert.deepEqual(pickLatestConsensusAnswer(remote, local), local);
+  });
+
+  it("garde le timestamp le plus récent entre deux réponses non imputées", () => {
+    const older = { value: 40, timestamp: 100, submittedAt: 100, imputed: false };
+    const newer = { value: 60, timestamp: 200, submittedAt: 200, imputed: false };
+    assert.deepEqual(pickLatestConsensusAnswer(older, newer), newer);
+    assert.deepEqual(pickLatestConsensusAnswer(newer, older), newer);
   });
 });

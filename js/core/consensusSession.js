@@ -26,6 +26,7 @@ import { patchGameStateWithFeedback } from "./patchGameStateFeedback.js";
 import { launchGameWithSync, commitHostGamePlay, commitPrepReadyToggle } from "./mpLaunch.js";
 import {
   applyConsensusDefaultAnswers as applyConsensusDefaultAnswersCore,
+  pickLatestConsensusAnswer,
   clampConsensusValue,
   isConsensusAnswerForRound,
   stripStaleConsensusAnswers,
@@ -131,14 +132,6 @@ export function formatConsensusScore(value) {
 
 export function defaultConsensusPrepSession() {
   return defaultSession();
-}
-
-function pickLatestConsensusAnswer(localAnswer, remoteAnswer) {
-  if (!localAnswer) return remoteAnswer || null;
-  if (!remoteAnswer) return localAnswer;
-  return (remoteAnswer.timestamp || 0) >= (localAnswer.timestamp || 0)
-    ? remoteAnswer
-    : localAnswer;
 }
 
 function resolveConsensusPlayerName(key) {

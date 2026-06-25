@@ -121,8 +121,38 @@ export function mountDilemma(app) {
   }
 
   function alreadyScoredThisRound() {
+    const session = getDilemmaSession();
+    if (session.phase === "reveal" || session.roundScored) return true;
     if (phase !== "reveal") return false;
-    return roundScored || Boolean(getDilemmaSession().roundScored);
+    return roundScored || Boolean(session.roundScored);
+  }
+
+  function sessionInReveal() {
+    const session = getDilemmaSession();
+    return session.phase === "reveal" || Boolean(session.roundScored);
+  }
+
+  function enterRevealUi({ animate = true } = {}) {
+    syncFromSession();
+    if (!currentDilemma && ROUNDS[roundIdx]) currentDilemma = ROUNDS[roundIdx];
+    if (!lastAward && getDilemmaSession().lastRound) {
+      const lr = getDilemmaSession().lastRound;
+      lastAward = {
+        majority: lr.majority,
+        tie: Boolean(lr.tie),
+        majorityWinners: lr.majorityWinners || [],
+        tieWinners: lr.tieWinners || [],
+        deltas: lr.deltas || {},
+      };
+    }
+    revealAnimDone = false;
+    revealPctA = 0;
+    revealPctB = 0;
+    render();
+    if (animate && phase === "reveal") {
+      const { pctA, pctB } = countDilemmaResults(votes);
+      animateRevealBars(pctA, pctB);
+    }
   }
 
   function dilemmaSessionScores() {
@@ -141,17 +171,26 @@ export function mountDilemma(app) {
   }
 
   async function transitionToReveal() {
-    if (phase !== "voting") return;
-    if (alreadyScoredThisRound()) return;
-    if (mp && !isLobbyHost()) return;
     if (revealInFlight) return;
+    if (mp && !isLobbyHost()) return;
+
+    syncFromSession();
+
+    if (sessionInReveal() || alreadyScoredThisRound()) {
+      enterRevealUi();
+      return;
+    }
+
+    if (phase !== "voting") return;
 
     revealInFlight = true;
+    let awardedThisAttempt = false;
     try {
       roundScored = true;
       let matchScores = getDilemmaSession().matchScores || {};
       let lastRound = getDilemmaSession().lastRound || null;
       lastAward = awardDilemmaRound(votes);
+      awardedThisAttempt = true;
       matchScores = applyMatchScoreDeltas(matchScores, lastAward.deltas || {});
       lastRound = buildDilemmaLastRound(lastAward);
       await commitDilemmaPlay(
@@ -163,18 +202,20 @@ export function mountDilemma(app) {
           matchScores,
           lastRound,
         },
-        { withEveningScores: mp && isLobbyHost() }
+        { withEveningScores: mp && isLobbyHost(), withPatchFeedback: mp && isLobbyHost() }
       );
       if (currentDilemma) {
         await consumePlayedCustomDilemma(currentDilemma);
       }
-
-      if (!mp) {
-        phase = "reveal";
-        const { pctA, pctB } = countDilemmaResults(votes);
-        render();
-        animateRevealBars(pctA, pctB);
+      enterRevealUi();
+    } catch (err) {
+      syncFromSession();
+      if (sessionInReveal()) {
+        enterRevealUi();
+      } else if (awardedThisAttempt) {
+        roundScored = Boolean(getDilemmaSession().roundScored);
       }
+      console.warn("dilemma reveal:", err);
     } finally {
       revealInFlight = false;
     }
@@ -438,7 +479,7 @@ export function mountDilemma(app) {
           await goToReveal();
           return;
         }
-        render();
+        if (phase !== "reveal") render();
       });
     });
 
@@ -470,7 +511,7 @@ export function mountDilemma(app) {
     }
   }
 
-  const unsub = onGameSessionChange(() => {
+  const unsub = onGameSessionChange(async () => {
     const row = getCachedGameSession();
     if (row?.screen === "results" && mp && !isLobbyHost()) {
       navigate("results", { navStack: ["home", "lobby", "game-select", "results"] });
@@ -481,21 +522,21 @@ export function mountDilemma(app) {
     const prevRound = roundIdx;
     syncFromSession();
     if (!currentDilemma && ROUNDS[roundIdx]) currentDilemma = ROUNDS[roundIdx];
+
+    if (phase === "voting" && sessionInReveal()) {
+      enterRevealUi();
+      return;
+    }
+
     if (phase === "voting" && isLobbyHost() && allDilemmaVotesIn()) {
-      void goToReveal();
+      await goToReveal();
       return;
     }
     if (phase === "voting" && prevPhase !== "voting") {
       revealAnimDone = false;
     }
     if (phase === "reveal" && prevPhase !== "reveal") {
-      revealAnimDone = false;
-      revealPctA = 0;
-      revealPctB = 0;
-      if (!lastAward) lastAward = { ...countDilemmaResults(votes) };
-      render();
-      const { pctA, pctB } = countDilemmaResults(votes);
-      animateRevealBars(pctA, pctB);
+      enterRevealUi();
       return;
     }
     if (phase === "reveal" && prevPhase === "reveal") {

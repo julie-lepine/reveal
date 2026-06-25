@@ -59,6 +59,7 @@ export function renderConsensusResults({
       return {
         name,
         value: answer.value,
+        imputed: Boolean(answer.imputed),
         delta,
         distance,
         tags,
@@ -195,7 +196,9 @@ export function renderConsensusResults({
             <span class="consensus-answer-list__delta">+${formatScore(row.delta)}</span>
           </div>
           <div class="consensus-answer-list__meta">
-            <span>${formatScore(row.value)} / 100</span>
+            <span>${formatScore(row.value)} / 100${
+              row.imputed ? ` <span class="consensus-answer-list__imputed">· non validé</span>` : ""
+            }</span>
             <span>écart ${formatScore(row.distance)}</span>
           </div>
           ${

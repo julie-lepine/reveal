@@ -1,6 +1,6 @@
 # Site légal REVEAL sur revealthepartygame.fr (OVH)
 
-Repo **séparé** du projet Party Games (pages statiques : `index.html`, `privacy.html`, `mentions-legales.html`, `legal.css`, `reveal.png`).
+Repo **séparé** du projet Party Games (pages statiques : `index.html`, `privacy.html`, `suppression-compte.html`, `mentions-legales.html`, `legal.css`, `reveal.png`).
 
 Checklist associée : section **G bis** dans [STORE_CHECKLIST.md](./STORE_CHECKLIST.md).
 

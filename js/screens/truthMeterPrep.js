@@ -12,14 +12,17 @@ import { getLocalDisplayName } from "../core/state.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
 import { rulesButtonHtml } from "../core/gameRulesUi.js";
 import { isLobbyHost, onGameSessionChange } from "../core/gameSync.js";
-import { prepGuestFollowOnSession, runPrepGameLaunch } from "../core/mpLaunch.js";
+import { prepGuestFollowOnSession } from "../core/mpLaunch.js";
+import { executePrepLaunch } from "../core/prepLaunch.js";
 import { createPrepLobbyController } from "../core/usePrepLobby.js";
 import {
   playersReadySectionHtml,
   prepStartSlotHtml,
   refreshPrepReadyUi,
   updatePrepStartSlot,
+  bindPrepLaunchButtons,
 } from "../core/prepScreen.js";
+import { prepLaunchSlotParams } from "../core/prepLaunch.js";
 import { navigate } from "../core/router.js";
 import { pageShell } from "../core/ui.js";
 import { bindNav } from "./nav.js";
@@ -57,31 +60,40 @@ export function mountTruthMeterPrep(app) {
 
     updatePrepStartSlot(
       app.querySelector("#truth-meter-start-slot"),
-      prepStartSlotHtml({
-        poolEmpty: !ok,
-        poolEmptyLabel: `Il faut au moins ${TRUTH_METER_MIN_PLAYERS} joueurs`,
-        allReady,
-        isHost: isLobbyHost(),
-        launchLabel: "Lancer TruthMeter →",
-      }),
-      onStartGame
+      truthMeterStartSlotHtml(allReady, ok),
+      onLaunch
     );
   }
 
-  async function onStartGame() {
-    if (!isLobbyHost()) {
-      await showAppAlert("Seul l'hôte peut lancer la partie.", {
-        title: "TruthMeter",
-        icon: "👑",
-      });
-      return;
-    }
+  function truthMeterStartSlotHtml(allReady, ok) {
+    const session = getTruthMeterSession();
+    return prepStartSlotHtml(
+      prepLaunchSlotParams({
+        readyMap: session.ready || {},
+        allReady,
+        isHost: isLobbyHost(),
+        minPlayers: TRUTH_METER_MIN_PLAYERS,
+        poolEmpty: !ok,
+        poolEmptyLabel: `Il faut au moins ${TRUTH_METER_MIN_PLAYERS} joueurs`,
+        launchLabel: "Lancer TruthMeter →",
+      })
+    );
+  }
+
+  async function onLaunch({ force = false } = {}) {
+    const ok = minPlayersOk();
     try {
-      await runPrepGameLaunch({
-        btn: app.querySelector("#btn-start-game"),
-        launch: markTruthMeterLobbyStarted,
+      await executePrepLaunch({
+        force,
+        btn: app.querySelector(force ? "#btn-force-start-game" : "#btn-start-game"),
+        getReadyMap: () => getTruthMeterSession().ready || {},
+        minPlayers: TRUTH_METER_MIN_PLAYERS,
+        gameTitle: "TruthMeter",
         gameScreen: "truthmeter",
         navStack: TRUTH_METER_NAV,
+        markStarted: markTruthMeterLobbyStarted,
+        allReadyFn: allTruthMeterReady,
+        poolEmpty: !ok,
       });
     } catch (e) {
       console.warn("REVEAL start TruthMeter:", e);
@@ -125,13 +137,7 @@ export function mountTruthMeterPrep(app) {
         </button>
 
         <div id="truth-meter-start-slot">
-          ${prepStartSlotHtml({
-            poolEmpty: !ok,
-            poolEmptyLabel: `Il faut au moins ${TRUTH_METER_MIN_PLAYERS} joueurs`,
-            allReady,
-            isHost: isLobbyHost(),
-            launchLabel: "Lancer TruthMeter →",
-          })}
+          ${truthMeterStartSlotHtml(allReady, ok)}
         </div>
       `,
     });
@@ -144,9 +150,7 @@ export function mountTruthMeterPrep(app) {
         render: refreshReadySection,
       });
     });
-    app.querySelector("#btn-start-game")?.addEventListener("click", () => {
-      void onStartGame();
-    });
+    bindPrepLaunchButtons(app, { onLaunch });
   }
 
   render();

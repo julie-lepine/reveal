@@ -515,6 +515,27 @@ export function defaultEveningStats() {
   };
 }
 
+/** Au moins une partie ou des points enregistrés cette soirée (local). */
+export function hasEveningStatsActivity() {
+  const { stats, scores, eveningGamesRecorded } = getState();
+  if (eveningGamesRecorded && Object.keys(eveningGamesRecorded).length > 0) return true;
+  if (Object.values(scores || {}).some((n) => Number(n) > 0)) return true;
+  const s = stats || {};
+  return (
+    (s.hotTakesPlayed || 0) > 0 ||
+    (s.speedVotesPlayed || 0) > 0 ||
+    (s.playlistGuessesPlayed || 0) > 0 ||
+    (s.traitreGamesPlayed || 0) > 0 ||
+    (s.triviaGamesPlayed || 0) > 0 ||
+    (s.truthMetersPlayed || 0) > 0 ||
+    (s.consensusGamesPlayed || 0) > 0 ||
+    (s.dilemmasPlayed || 0) > 0 ||
+    (s.liesTotal || 0) > 0 ||
+    (s.tierNightsPlayed || 0) > 0 ||
+    (s.guessLieGamesPlayed || 0) > 0
+  );
+}
+
 /** Scores + stats de soirée + état des jeux - nouvelle partie / lobby. */
 export function resetEveningState() {
   resetScores();

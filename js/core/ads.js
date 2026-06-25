@@ -6,6 +6,7 @@ import {
   ADMOB_TEST_BANNER_IDS,
   ADMOB_USE_TEST_ADS,
   ADMOB_DEFAULT_BANNER_HEIGHT,
+  ADMOB_BANNER_BUFFER,
 } from "../../data/admobConfig.js";
 
 let initialized = false;
@@ -14,6 +15,7 @@ let initPromise = null;
 let admobModule = null;
 let lastSyncedAdScreen = null;
 let adSyncChain = Promise.resolve();
+let lastBannerHeightPx = ADMOB_DEFAULT_BANNER_HEIGHT;
 
 /** Écrans sans bannière (accueil, connexion, reset MDP). Layout via body.has-top-ad ailleurs. */
 const NO_AD_SCREENS = new Set(["welcome", "home", "reset-password"]);
@@ -22,12 +24,48 @@ function shouldShowAdForScreen(screenId) {
   return Boolean(screenId && !NO_AD_SCREENS.has(screenId));
 }
 
-function setTopAdLayout(active, heightPx = ADMOB_DEFAULT_BANNER_HEIGHT) {
-  document.body.classList.toggle("has-top-ad", active);
+/** Estimation hauteur bannière adaptive (formule Google ~16,4 % de la largeur, plafond 90). */
+function estimateAdaptiveBannerHeight() {
+  const w = Math.min(Math.max(window.innerWidth || 430, 320), 728);
+  return Math.min(Math.max(Math.round(w * 0.164), ADMOB_DEFAULT_BANNER_HEIGHT), 90);
+}
+
+/** Normalise la hauteur renvoyée par le SDK en px CSS. */
+function cssBannerHeight(rawHeight) {
+  if (rawHeight == null || rawHeight <= 0) {
+    return lastBannerHeightPx >= ADMOB_DEFAULT_BANNER_HEIGHT
+      ? lastBannerHeightPx
+      : estimateAdaptiveBannerHeight();
+  }
+
+  let h = Math.round(Number(rawHeight));
+  const dpr = window.devicePixelRatio || 1;
+
+  // Android : le plugin peut renvoyer des px physiques (valeur très élevée).
+  if (getNativePlatform() === "android" && dpr > 1 && h >= 100) {
+    const asCss = Math.round(h / dpr);
+    if (asCss >= 40 && asCss <= 120) h = asCss;
+  }
+
+  return Math.min(Math.max(h, 50), 120);
+}
+
+function setTopAdLayout(active, heightPx) {
   document.documentElement.style.setProperty(
-    "--ad-banner-height",
-    active ? `${Math.max(0, Math.round(heightPx))}px` : "0px"
+    "--ad-banner-buffer",
+    active ? `${ADMOB_BANNER_BUFFER}px` : "0px"
   );
+
+  if (!active) {
+    document.body.classList.remove("has-top-ad");
+    document.documentElement.style.setProperty("--ad-banner-height", "0px");
+    return;
+  }
+
+  const h = cssBannerHeight(heightPx);
+  lastBannerHeightPx = h;
+  document.body.classList.add("has-top-ad");
+  document.documentElement.style.setProperty("--ad-banner-height", `${h}px`);
 }
 
 function bannerAdId() {
@@ -133,18 +171,22 @@ async function showTopBanner() {
 
   try {
     if (bannerVisible && !cameFromNoAd) {
+      setTopAdLayout(true, lastBannerHeightPx);
       await AdMob.resumeBanner();
       if (!shouldShowAdForScreen(getCurrentScreen())) {
         await hideTopBanner();
         return;
       }
-      setTopAdLayout(true);
+      setTopAdLayout(true, lastBannerHeightPx);
       return;
     }
 
     if (bannerVisible || cameFromNoAd) {
       await removeBannerIfPresent(AdMob);
     }
+
+    // Réserver l'espace avant que la bannière native apparaisse (évite le rognage du haut).
+    setTopAdLayout(true, estimateAdaptiveBannerHeight());
 
     await AdMob.showBanner({
       adId,
@@ -160,7 +202,7 @@ async function showTopBanner() {
     }
 
     bannerVisible = true;
-    setTopAdLayout(true);
+    setTopAdLayout(true, lastBannerHeightPx);
   } catch (err) {
     console.warn("AdMob showBanner:", err);
     bannerVisible = false;
@@ -207,6 +249,8 @@ function enqueueAdSync(screenId) {
 
 export function initAds() {
   if (!isNativeApp()) return;
+
+  document.documentElement.style.setProperty("--ad-banner-buffer", "0px");
 
   onScreenChange((screenId) => {
     enqueueAdSync(screenId);

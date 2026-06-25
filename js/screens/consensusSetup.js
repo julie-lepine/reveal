@@ -3,13 +3,15 @@ import { getLobbyParticipants } from "../core/lobby.js";
 import { getLocalDisplayName } from "../core/state.js";
 import { showAppAlert } from "../core/dialog.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
-import { isLobbyHost, onGameSessionChange } from "../core/gameSync.js";
-import { prepGuestFollowOnSession, runPrepGameLaunch } from "../core/mpLaunch.js";
+import { onGameSessionChange } from "../core/gameSync.js";
+import { prepGuestFollowOnSession } from "../core/mpLaunch.js";
+import { executePrepLaunch, prepLaunchSlotParams, DEFAULT_PREP_MIN_PLAYERS } from "../core/prepLaunch.js";
 import { createPrepLobbyController } from "../core/usePrepLobby.js";
 import { navigate } from "../core/router.js";
 import { pageShell } from "../core/ui.js";
 import { bindNav } from "./nav.js";
 import { renderConsensusSetup } from "../consensus/ConsensusSetup.js";
+import { bindPrepLaunchButtons } from "../core/prepScreen.js";
 
 export function mountConsensusSetup(app) {
   if (!requireLobbyPlay()) return null;
@@ -26,8 +28,7 @@ export function mountConsensusSetup(app) {
     getReadyMap: () => consensus.getSession().ready || {},
   });
 
-  async function onStartGame() {
-    if (!isLobbyHost()) return;
+  async function onLaunch({ force = false } = {}) {
     const validation = consensus.validateLaunchConfig();
     if (!validation.ok) {
       await showAppAlert(
@@ -39,11 +40,16 @@ export function mountConsensusSetup(app) {
       );
       return;
     }
-    await runPrepGameLaunch({
-      btn: app.querySelector("#btn-consensus-start"),
-      launch: () => consensus.startLobbyGame(),
+    await executePrepLaunch({
+      force,
+      btn: app.querySelector(force ? "#btn-force-start-game" : "#btn-consensus-start"),
+      getReadyMap: () => consensus.getSession().ready || {},
+      minPlayers: DEFAULT_PREP_MIN_PLAYERS,
+      gameTitle: "Consensus",
       gameScreen: "consensus",
       navStack: ["home", "lobby", "game-select", "consensus-prep", "consensus"],
+      markStarted: () => consensus.startLobbyGame(),
+      allReadyFn: () => consensus.allReady(),
     });
   }
 
@@ -74,8 +80,9 @@ export function mountConsensusSetup(app) {
       });
     });
 
-    app.querySelector("#btn-consensus-start")?.addEventListener("click", () => {
-      void onStartGame();
+    bindPrepLaunchButtons(app, {
+      startButtonId: "btn-consensus-start",
+      onLaunch,
     });
   }
 
@@ -83,6 +90,14 @@ export function mountConsensusSetup(app) {
     const session = consensus.getSession();
     const prep = consensus.getPrepSummary();
     const members = getLobbyParticipants();
+    const launchSlot = prepLaunchSlotParams({
+      readyMap: session.ready || {},
+      allReady: consensus.allReady(),
+      isHost: consensus.isHost(),
+      minPlayers: DEFAULT_PREP_MIN_PLAYERS,
+      launchLabel: "Lancer Consensus",
+      startButtonId: "btn-consensus-start",
+    });
 
     app.innerHTML = pageShell({
       backTarget: "back",
@@ -97,6 +112,7 @@ export function mountConsensusSetup(app) {
         readyMap: session.ready || {},
         localReady: prepLobby.localReadyState(),
         allReady: consensus.allReady(),
+        launchSlot,
       }),
     });
 

@@ -13,7 +13,9 @@ import { getLocalDisplayName } from "../core/state.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
 import { rulesButtonHtml } from "../core/gameRulesUi.js";
 import { isLobbyHost, onGameSessionChange } from "../core/gameSync.js";
-import { prepGuestFollowOnSession, runPrepGameLaunch } from "../core/mpLaunch.js";
+import { prepGuestFollowOnSession } from "../core/mpLaunch.js";
+import { executePrepLaunch } from "../core/prepLaunch.js";
+import { prepLaunchSlotParams } from "../core/prepLaunch.js";
 import { createPrepLobbyController } from "../core/usePrepLobby.js";
 import {
   playersReadySectionHtml,
@@ -21,6 +23,7 @@ import {
   updatePlayersReadyCard,
   updateReadyButton,
   updatePrepStartSlot,
+  bindPrepLaunchButtons,
 } from "../core/prepScreen.js";
 import { navigate } from "../core/router.js";
 import { pageShell } from "../core/ui.js";
@@ -53,21 +56,45 @@ export function mountTraitrePrep(app) {
     getReadyMap: () => getTraitreSession().ready || {},
   });
 
-  async function onStartGame() {
-    const check = validateTraitreLaunch();
-    if (!check.ok) {
-      const { showAppAlert } = await import("../core/dialog.js");
-      await showAppAlert(
-        `Spot the fake se joue à au moins ${TRAITRE_MIN_PLAYERS} : mot secret, indices oraux, vote d'élimination.`,
-        { title: `${TRAITRE_MIN_PLAYERS} joueurs minimum`, icon: "👥" }
-      );
-      return;
-    }
-    await runPrepGameLaunch({
-      btn: app.querySelector("#btn-start-game"),
-      launch: markTraitreLobbyStarted,
+  function traitreStartSlotHtml(allReady, check) {
+    const session = getTraitreSession();
+    return prepStartSlotHtml(
+      prepLaunchSlotParams({
+        readyMap: session.ready || {},
+        allReady,
+        isHost: isLobbyHost(),
+        minPlayers: TRAITRE_MIN_PLAYERS,
+        poolEmpty: !check.ok,
+        poolEmptyLabel: `Il faut au moins ${TRAITRE_MIN_PLAYERS} joueurs`,
+        launchLabel: "Lancer Spot the fake →",
+      })
+    );
+  }
+
+  async function onLaunch({ force = false } = {}) {
+    const lobbyCheck = validateTraitreLaunch();
+    await executePrepLaunch({
+      force,
+      btn: app.querySelector(force ? "#btn-force-start-game" : "#btn-start-game"),
+      getReadyMap: () => getTraitreSession().ready || {},
+      minPlayers: TRAITRE_MIN_PLAYERS,
+      gameTitle: "Spot the fake",
       gameScreen: "traitre",
       navStack: ["home", "lobby", "game-select", "traitre-prep", "traitre"],
+      markStarted: markTraitreLobbyStarted,
+      allReadyFn: allTraitreReady,
+      poolEmpty: !lobbyCheck.ok,
+      validateBeforeLaunch: (roster) => {
+        const check = validateTraitreLaunch(roster);
+        if (!check.ok) {
+          return {
+            ok: false,
+            message: `Spot the fake se joue à au moins ${TRAITRE_MIN_PLAYERS} : mot secret, indices oraux, vote d'élimination.`,
+            icon: "👥",
+          };
+        }
+        return { ok: true };
+      },
     });
   }
 
@@ -103,13 +130,7 @@ export function mountTraitrePrep(app) {
         </button>
 
         <div id="traitre-start-slot">
-          ${prepStartSlotHtml({
-            poolEmpty: !check.ok,
-            poolEmptyLabel: `Il faut au moins ${TRAITRE_MIN_PLAYERS} joueurs`,
-            allReady,
-            isHost,
-            launchLabel: "Lancer Spot the fake →",
-          })}
+          ${traitreStartSlotHtml(allReady, check)}
         </div>
       `,
     });
@@ -122,9 +143,7 @@ export function mountTraitrePrep(app) {
         render: refreshReadySection,
       });
     });
-    app.querySelector("#btn-start-game")?.addEventListener("click", () => {
-      void onStartGame();
-    });
+    bindPrepLaunchButtons(app, { onLaunch });
   }
 
   function refreshReadySection() {
@@ -142,14 +161,8 @@ export function mountTraitrePrep(app) {
     const check = validateTraitreLaunch();
     updatePrepStartSlot(
       app.querySelector("#traitre-start-slot"),
-      prepStartSlotHtml({
-        poolEmpty: !check.ok,
-        poolEmptyLabel: `Il faut au moins ${TRAITRE_MIN_PLAYERS} joueurs`,
-        allReady,
-        isHost: isLobbyHost(),
-        launchLabel: "Lancer Spot the fake →",
-      }),
-      onStartGame
+      traitreStartSlotHtml(allReady, check),
+      onLaunch
     );
   }
 

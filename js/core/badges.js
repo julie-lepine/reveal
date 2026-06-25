@@ -4,7 +4,7 @@ import { getSortedActivePlayers } from "./players.js";
 const BADGE_RULES = [
   {
     id: "chaotic",
-    label: "Le plus chaotique",
+    label: "L'outsider en chef",
     pick: (stats) => (stats.hotTakeDissentWins || 0) + (stats.liesFooled || 0) * 2,
   },
   {
