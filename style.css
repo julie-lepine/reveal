@@ -504,6 +504,11 @@ body.has-top-ad .back{
   padding-left:calc(var(--touch-min) + 12px);
 }
 
+/* Bannière de reprise en tête d'écran : ne pas chevaucher le bouton retour */
+.page:has(.back) .container > .game-resume-banner:first-child{
+  margin-top:calc(var(--touch-min) + 12px);
+}
+
 .label-upper--hot{ color:rgba(255,107,107,.85); }
 .label-upper--green{ color:rgba(74,222,128,.85); }
 .label-upper--gold{ color:rgba(251,191,36,.85); }
@@ -2621,6 +2626,43 @@ select.field-input option{
   display:flex;
   align-items:center;
   justify-content:center;
+}
+
+.participant__avatar--editable{
+  padding:0;
+  cursor:pointer;
+  -webkit-tap-highlight-color:transparent;
+  transition:border-color .15s, transform .1s, box-shadow .15s;
+}
+
+.participant__avatar--editable:hover{
+  border-color:rgba(167,139,250,.6);
+  box-shadow:0 0 18px rgba(139,92,246,.3);
+}
+
+.participant__avatar--editable:active{
+  transform:scale(.94);
+}
+
+.participant__edit{
+  position:absolute;
+  bottom:-2px;
+  right:-2px;
+  width:22px;
+  height:22px;
+  border-radius:50%;
+  background:#8B5CF6;
+  color:#fff;
+  font-size:11px;
+  font-weight:900;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  border:2px solid #0D0F1E;
+}
+
+.participant--ready .participant__edit{
+  display:none;
 }
 
 .participant__name{
@@ -5741,7 +5783,7 @@ body{
 }
 
 .consensus-force-hint{
-  margin-top:-6px;
+  margin-top:10px;
   margin-bottom:12px;
   color:#FBBF24;
 }

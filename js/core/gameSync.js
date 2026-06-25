@@ -12,7 +12,7 @@ import {
 } from "./state.js";
 import { GAMES } from "../../data/games.js";
 import { navigate, getCurrentScreen } from "./router.js";
-import { getLobbyParticipants, getLobbyStatus, isLobbyEveningStarted } from "./lobby.js";
+import { getLobbyParticipants, getLobbyStatus, getLobbyGameId, isLobbyEveningStarted } from "./lobby.js";
 import { getActivePlayerNames, getActivePlayers } from "./players.js";
 import { mergeMatchScoresLocal } from "./gameScores.js";
 import {
@@ -2443,8 +2443,18 @@ export function getEffectiveSessionScreen(row) {
   }
 
   // DB encore sur results alors que l'hôte a relancé (lobby en jeu).
-  if (declared && POST_GAME_SCREENS.has(declared) && isLobbyEveningStarted() && gid && gid !== "menu") {
-    const prep = SESSION_GAME_ID_TO_TILE[gid];
+  // On se base sur le gameId du LOBBY (et non sur le game_id de la session, qui reste
+  // celui du jeu terminé) : après une fin de partie il vaut "menu", donc on laisse les
+  // résultats s'afficher ; lors d'une vraie relance il pointe le nouveau jeu → prépa.
+  const lobbyGid = getLobbyGameId();
+  if (
+    declared &&
+    POST_GAME_SCREENS.has(declared) &&
+    isLobbyEveningStarted() &&
+    lobbyGid &&
+    lobbyGid !== "menu"
+  ) {
+    const prep = SESSION_GAME_ID_TO_TILE[lobbyGid];
     if (prep) return prep;
   }
 
@@ -3183,9 +3193,15 @@ export async function completeGameSession({ gameId = "menu", screen = "results",
   const { setLobbyBetweenGames } = await import("./lobby.js");
   await setLobbyBetweenGames();
 
+  // Sur un écran post-partie, on écrit game_id = "menu" : sinon le game_id du jeu
+  // terminé reste en base et le routage le réinterprète en prépa (renvoi des invités
+  // vers la prépa au lieu des résultats). Robuste face à l'ordre d'arrivée des sync
+  // lobby/session, contrairement à une inférence basée sur le gameId du lobby.
+  const sessionGameId = POST_GAME_SCREENS.has(screen) ? "menu" : gameId;
+
   const row = await upsertGameSession({
     lobbyId,
-    gameId,
+    gameId: sessionGameId,
     screen,
     hostId,
     state: {

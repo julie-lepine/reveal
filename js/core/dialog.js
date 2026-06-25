@@ -6,6 +6,7 @@ import {
   isTurnstileSolved,
   getTurnstileToken,
 } from "./turnstile.js";
+import { PROFILE_EMOJI_CHOICES } from "../../data/profileEmojis.js";
 
 let openDialog = null;
 
@@ -379,5 +380,66 @@ export function showTransferHostDialog(
     openDialog = root;
     requestAnimationFrame(() => root.classList.add("app-dialog--in"));
     select?.focus();
+  });
+}
+
+/**
+ * Choix d'un emoji de profil. Le clic sur un emoji valide directement.
+ * @param {string} current emoji actuellement sélectionné
+ * @returns {Promise<{ ok: true, emoji: string } | { ok: false }>}
+ */
+export function showEmojiPickerDialog(
+  current = "",
+  { title = "Choisis ton emoji", icon = "🎭" } = {}
+) {
+  return new Promise((resolve) => {
+    if (openDialog) {
+      removeDialog(openDialog, () => {});
+      openDialog = null;
+    }
+
+    const grid = PROFILE_EMOJI_CHOICES.map(
+      (e) =>
+        `<button type="button" class="emoji-picker__btn ${e === current ? "emoji-picker__btn--active" : ""}" data-emoji="${e}" aria-label="${e}">${e}</button>`
+    ).join("");
+
+    const root = document.createElement("div");
+    root.className = "app-dialog";
+    root.setAttribute("role", "dialog");
+    root.setAttribute("aria-modal", "true");
+    root.setAttribute("aria-labelledby", "app-dialog-title");
+
+    const close = (result) => removeDialog(root, () => resolve(result));
+
+    root.innerHTML = `
+      <div class="app-dialog__backdrop" data-dialog-dismiss aria-hidden="true"></div>
+      <div class="app-dialog__panel app-dialog__panel--rich">
+        <div class="app-dialog__glow" aria-hidden="true"></div>
+        <p class="app-dialog__icon" aria-hidden="true">${icon}</p>
+        <p class="app-dialog__title" id="app-dialog-title">${escapeHtml(title)}</p>
+        <div class="app-dialog__rich">
+          <div class="emoji-picker" role="listbox" aria-label="Choisir un emoji">
+            ${grid}
+          </div>
+        </div>
+        <button type="button" class="btn btn-secondary app-dialog__btn" data-dialog-cancel>Annuler</button>
+      </div>
+    `;
+
+    root.querySelectorAll("[data-emoji]").forEach((btn) => {
+      btn.addEventListener("click", () =>
+        close({ ok: true, emoji: btn.getAttribute("data-emoji") })
+      );
+    });
+    root.querySelector("[data-dialog-cancel]")?.addEventListener("click", () => close({ ok: false }));
+    root.querySelector("[data-dialog-dismiss]")?.addEventListener("click", () => close({ ok: false }));
+    root.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") close({ ok: false });
+    });
+
+    document.body.appendChild(root);
+    openDialog = root;
+    requestAnimationFrame(() => root.classList.add("app-dialog--in"));
+    root.querySelector(".emoji-picker__btn--active, [data-emoji]")?.focus();
   });
 }

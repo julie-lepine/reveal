@@ -29,6 +29,7 @@ Légende : ☐ à tester · ✅ OK · ❌ bug (noter en bas)
 | **Global** | Rejoin mid-soirée : pas de reset lobby d'attente | ✅ patché |
 | **Consensus** | Réponses imputées (50 %) : avertissement hôte + label résultats + merge MP | ✅ patché |
 | **Hot Take** | Ton outsider : règles, prep, vote, bandeau révélation, badge | ✅ patché |
+| **Global** | Invité renvoyé en prépa au lieu des résultats en fin de partie (session post-partie écrite avec game_id = menu) | ✅ patché |
 | *(autres jeux)* | - | - |
 
 ---
@@ -166,17 +167,12 @@ Légende : ☐ à tester · ✅ OK · ❌ bug (noter en bas)
 
 ### TruthMeter — auteur absent
 
-- [ ] 🧪 Phase **writing**, auteur parti / inactif : hôte voit « Passer cet auteur (absent) »
-- [ ] 🧪 Clic → manche suivante pour tout le lobby (sans affirmation ni points pour l'auteur sauté)
 - [ ] 🧪 Dernier auteur sauté → résultats finaux
-- [ ] 🧪 Invité : pas de bouton passer ; sync OK après action hôte
-- [ ] 🧪 Phase **vote** : « Révéler maintenant » inchangé (filet déjà en place)
 
 ### Onglet Jeux & reprise (MP)
 
 - [ ] 🧪 **Partie en cours** : invité clique **Jeux** → menu des jeux **sans** reset des prêts prep / lobby
 - [ ] 🧪 **Partie en cours** : hôte clique **Jeux** → menu des jeux, partie **non** terminée pour le lobby
-- [ ] 🧪 **Invité** sur menu jeux pendant une manche : bandeau « X en cours » + **Rejoindre** / **Rester ici**
 - [ ] 🧪 **Rester ici** (invité) : pas renvoyé dans le jeu au prochain poll (15 min)
 - [ ] 🧪 **Lobby par erreur** (prep ou partie active) : écran « Jeu en cours » + retour auto ~2 s ou **Rejoindre maintenant**
 - [ ] 🧪 Lobby par erreur : **pas** de `resetAllParticipantsReady` tant qu'une session est active
@@ -185,10 +181,6 @@ Légende : ☐ à tester · ✅ OK · ❌ bug (noter en bas)
 
 ### Rejoin mid-soirée (4ᵉ joueur, entre deux jeux)
 
-- [ ] 🧪 **2 jeux joués** : tout le monde sur le **menu jeux** (pas lobby d'attente)
-- [ ] 🧪 **4ᵉ joueur rejoint** : il arrive sur le **menu jeux** (ou résultats), **pas** « Commencer la soirée » / « L'hôte va lancer la soirée… »
-- [ ] 🧪 Les **3 déjà là** restent sur le menu jeux (pas renvoyés au lobby d'attente)
-- [ ] 🧪 Accueil : bouton **« Reprendre la soirée »** (pas « Retour au lobby ») tant que la soirée a commencé
 - [ ] 🧪 **Reprise app** (F5) entre deux jeux → menu jeux, scores conservés
 - [ ] 🧪 Ouvrir l'écran lobby par erreur mid-soirée → redirection menu jeux (pas reset des prêts)
 
@@ -204,43 +196,9 @@ Légende : ☐ à tester · ✅ OK · ❌ bug (noter en bas)
 
 ---
 
-## Consensus 🤝
-
-### Validation de la réponse (slider)
-
-- [ ] 🧪 **Avant validation** : le **% affiché** correspond bien à la position du slider (pas seulement le doigt)
-- [ ] 🧪 Déplacer le slider **sans** cliquer « Valider ma réponse » → réponse **non** comptée
-- [ ] 🧪 Après **« Réponse enregistrée ✓ »** : slider verrouillé, le % affiché est **définitif**
-- [ ] 🧪 Geste vertical sur le slider interprété comme scroll → le % ne change pas (re-tester le réglage avant de valider)
-
-### Révélation (hôte, MP)
-
-- [ ] 🧪 Compteur **X/Y** sur « Révéler maintenant » se met à jour quand un joueur valide
-- [ ] 🧪 **X &lt; Y** : message d'avertissement « → 50 % par défaut si tu révèles maintenant »
-- [ ] 🧪 Clic **Révéler maintenant** avec joueurs manquants : modale de confirmation (noms + 50 % par défaut)
-- [ ] 🧪 **Annuler** la modale → manche toujours en cours, pas de révélation
-- [ ] 🧪 **Y/Y** sans clic force : révélation **auto** pour tout le lobby
-- [ ] 🧪 Invité : pas de bouton « Révéler maintenant »
-
-### Résultats & imputation
-
-- [ ] 🧪 Joueur sans validation forcée par l'hôte : ligne **« X / 100 · non validé »** (50 % imputé)
-- [ ] 🧪 Joueur ayant validé : **pas** de mention « non validé »
-- [ ] 🧪 **4+ joueurs**, manche complète : scores cohérents avec les réponses validées
-- [ ] 🧪 Manche suivante : nouveau slider à 50 %, validation OK
-
-### Non-régression Consensus
-
-- [ ] 🧪 Partie solo / local : NPC répondent, révélation auto OK
-- [ ] 🧪 Partie MP complète jusqu'au podium
-- [ ] 🧪 Réseau lent : pas d'écrasement d'une réponse validée (ex. 72) par un 50 imputé côté joueur
-
----
 
 ## Hot Take 🔥
-
-### Ton outsider
-- [ ] 🧪 **Badge soirée** : « L'outsider en chef » sur le bon profil
+- [ ] Fin de manche : renvoi sur prépa au lieu de résultats
 
 ---
 

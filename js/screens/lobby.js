@@ -19,7 +19,8 @@ import {
   sendLobbyNudgeToNotReady,
   isLobbyEveningStarted,
 } from "../core/lobby.js";
-import { canCreateLobby } from "../core/auth.js";
+import { canCreateLobby, updateProfileEmoji } from "../core/auth.js";
+import { getLocalEmoji } from "../core/state.js";
 import { isSupabaseConfigured } from "../core/supabaseClient.js";
 import { onLobbyBundleUpdated } from "../core/supabaseLobby.js";
 import {
@@ -39,7 +40,7 @@ import { triggerLobbyNudge } from "../core/nudge.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
 import { bindNav } from "./nav.js";
-import { showAppAlert } from "../core/dialog.js";
+import { showAppAlert, showEmojiPickerDialog } from "../core/dialog.js";
 import { getLobbyAutoCloseHint } from "../config/lobbyLifecycle.js";
 import {
   getResumableSessionScreen,
@@ -48,16 +49,24 @@ import {
 
 function participantsHtml(participants) {
   return participants
-    .map(
-      (p) => `
-    <div class="participant ${p.ready ? "participant--ready" : ""}">
-      <div class="participant__avatar" style="background:${p.color}">
+    .map((p) => {
+      const inner = `
         ${p.emoji}
-        ${p.ready ? '<span class="participant__check">✓</span>' : ""}
-      </div>
+        ${p.ready ? '<span class="participant__check">✓</span>' : ""}`;
+      const avatar = p.isLocal
+        ? `<button type="button" class="participant__avatar participant__avatar--editable" style="background:${p.color}" data-edit-emoji aria-label="Changer mon emoji" title="Changer mon emoji">
+        ${inner}
+        <span class="participant__edit" aria-hidden="true">✎</span>
+      </button>`
+        : `<div class="participant__avatar" style="background:${p.color}">
+        ${inner}
+      </div>`;
+      return `
+    <div class="participant ${p.ready ? "participant--ready" : ""}">
+      ${avatar}
       <span class="participant__name">${escapeHtml(p.name)}</span>
-    </div>`
-    )
+    </div>`;
+    })
     .join("");
 }
 
@@ -249,8 +258,28 @@ export function mountLobby(app) {
     refreshChat();
   }
 
+  async function openEmojiPicker() {
+    const res = await showEmojiPickerDialog(getLocalEmoji());
+    if (!res?.ok) return;
+    const saved = await updateProfileEmoji(res.emoji);
+    if (!saved.ok) {
+      await showAppAlert(saved.error || "Impossible d'enregistrer l'emoji.", {
+        title: "Erreur",
+        icon: "⚠️",
+      });
+      return;
+    }
+    refreshParticipants();
+  }
+
   function bindEvents(lobby) {
     bindNav(app);
+
+    app.querySelector(".participants-grid")?.addEventListener("click", (e) => {
+      if (e.target.closest("[data-edit-emoji]")) {
+        void openEmojiPicker();
+      }
+    });
 
     app.querySelector("#copy-code")?.addEventListener("click", async () => {
       const btn = app.querySelector("#copy-code");

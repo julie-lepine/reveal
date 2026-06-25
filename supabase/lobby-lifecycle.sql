@@ -211,7 +211,8 @@ revoke all on function public.purge_stale_lobbies() from public;
 
 -- ── Monitoring (aperçu lobbies à risque) ───────────────────────────────────
 
-create or replace view public.lobby_lifecycle_audit as
+create or replace view public.lobby_lifecycle_audit
+with (security_invoker = on) as
 select
   l.id,
   l.code,
@@ -231,3 +232,6 @@ order by l.last_activity_at asc nulls first;
 
 comment on view public.lobby_lifecycle_audit is
   'Lobbies triés par ancienneté d''activité — monitoring / nettoyage manuel.';
+
+-- Outil d'admin uniquement : pas d'accès depuis les clients anon/authenticated.
+revoke all on public.lobby_lifecycle_audit from anon, authenticated;
