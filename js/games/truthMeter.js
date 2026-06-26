@@ -244,12 +244,10 @@ export function mountTruthMeter(app) {
     if (allTruthMeterVotesIn()) return true;
     const author = getCurrentAuthor() || affirmation?.author;
     if (localName === author) return allTruthMeterVotesIn();
+    // Ne compter QUE le vote réellement validé (ou en cours d'envoi) de l'hôte :
+    // sa position de curseur non validée ne doit pas clôturer la manche pour tous.
     const merged = { ...(getTruthMeterSession().votes || {}) };
     if (voteCommitInFlight != null) merged[localName] = voteCommitInFlight;
-    else if (phase === "voting" && merged[localName] == null) {
-      const pending = getPendingVoteValue();
-      if (Number.isFinite(pending)) merged[localName] = pending;
-    }
     const voters = getVoterNames();
     return voters.every((n) => merged[n] != null && Number.isFinite(merged[n]));
   }

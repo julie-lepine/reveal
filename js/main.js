@@ -51,6 +51,7 @@ import { mountTierNight } from "./games/tierNight.js";
 // import { initFilRougeValidationListener } from "./core/filRougeToast.js";
 import { initMultiplayerSyncVisibility } from "./core/gameSync.js";
 import { initFeedbackFab } from "./core/feedbackUi.js";
+import { initHostNoticeListener } from "./core/hostNotice.js";
 
 const app = document.getElementById("app");
 
@@ -111,6 +112,7 @@ initFeedbackFab();
 initExitGameDelegation(app);
 initAds();
 initMultiplayerSyncVisibility();
+initHostNoticeListener();
 // initFilRougeResultsListener();
 // initFilRougeValidationListener();
 

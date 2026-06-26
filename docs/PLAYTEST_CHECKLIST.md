@@ -5,109 +5,6 @@ Légende : ☐ à tester · ✅ OK · ❌ bug (noter en bas)
 
 ---
 
-## Vue d'ensemble
-
-| Jeu | Patch / sujet | Statut code |
-|-----|---------------|-------------|
-| **Spot the fake** | Fin manche 1 : choix hôte visible (boutons désactivés invités) | ✅ patché |
-| **Spot the fake** | Clôture globale du vote par l'hôte (votes partiels OK) | ✅ patché |
-| **Spot the fake** | Fin de manche : résultat affiché chez l'hôte (re-render garanti même si sync KO) | ✅ patché |
-| **Spot the fake** | Phase révélation des mots : tour dédié + compteur prêts | ✅ patché |
-| **Spot the fake** | Révélation : un « prêt » (mot mémorisé) ne renvoie plus les autres en prep | ✅ patché |
-| **Spot the fake** | Tour des mots à l'oral : phase collective (plus de tour par tour) | ✅ patché |
-| **Spot the fake** | Recommencer : tous en prep + nouvelle paire de mots | ✅ patché |
-| **Spot the fake** | Points « majorité » | ⏸ reporté |
-| **Global (app native)** | Bannière pub : contenu non rogné sous la bannière | ✅ patché |
-| **Dilemma** | Hôte bloqué sur « Révéler maintenant 5/5 » (manche 2+) | ✅ patché |
-| **Global** | Scroll en haut à chaque changement d'écran | ✅ patché |
-| **Global** | Prep MP : « pas prêt » ne repasse pas « prêt » au poll | ✅ patché |
-| **Global** | Transfert volontaire du rôle d'hôte (menu jeux) | ✅ patché |
-| **Global** | Invités Résultats / Classement suivent le nouveau jeu | ✅ patché |
-| **Global** | Prep MP : lancer quand même (roster prêts + hôte) | ✅ patché |
-| **TruthMeter** | Hôte : passer auteur absent (phase writing) | ✅ patché |
-| **Global** | Onglet Jeux sans quitter prep/partie + reprise lobby | ✅ patché |
-| **Global** | Rejoin mid-soirée : pas de reset lobby d'attente | ✅ patché |
-| **Consensus** | Réponses imputées (50 %) : avertissement hôte + label résultats + merge MP | ✅ patché |
-| **Hot Take** | Ton outsider : règles, prep, vote, bandeau révélation, badge | ✅ patché |
-| **Global** | Invité renvoyé en prépa au lieu des résultats en fin de partie (session post-partie écrite avec game_id = menu) | ✅ patché |
-| *(autres jeux)* | - | - |
-
----
-
-## Spot the fake 🎭
-
-### Tour des mots à l'oral (phase collective)
-
-- [ ] 🧪 Titre écran : **« Tour des mots à l'oral »**
-- [ ] 🧪 Sous-titre : **« X survivant(s) · tour des mots N »**
-- [ ] 🧪 Carte : **« Tour des mots — manche N »** + consigne ordre libre (sans prononcer son mot)
-- [ ] 🧪 **Pas** de liste numérotée ni de joueur « en cours »
-- [ ] 🧪 Tous les survivants visibles en grille (avatars + prénoms)
-- [ ] 🧪 **Hôte** : bouton **« Finaliser le tour des mots → »** (un seul clic pour clôturer la manche)
-- [ ] 🧪 **Joueur non-hôte** : *« En attente que l'hôte finalise le tour quand tout le monde a parlé… »*
-- [ ] 🧪 **Manche 1** : finalisation → écran **« Fin de manche 1 »** pour tout le lobby
-- [ ] 🧪 **Manche 2+** : finalisation → phase **vote** pour tout le lobby
-- [ ] 🧪 **Manche 2+** : rappel « indices différents des manches précédentes »
-- [ ] 🧪 **Égalité au vote** : bandeau égalité puis retour tour des mots (mêmes mots)
-- [ ] 🧪 Sync multijoueur : invités voient la même UI sans recharger
-
-### Recommencer une partie (MP)
-
-- [ ] 🧪 Fin de partie → hôte **Recommencer une partie** → **tous** les joueurs arrivent sur **Préparation** (sans passer par Jeux)
-- [ ] 🧪 Invité encore sur l'écran de jeu (révélation / tour des mots) : bascule auto vers prep
-- [ ] 🧪 **2ᵉ lancement** : nouvelle paire de mots (différente de la partie précédente)
-- [ ] 🧪 Fake et civils n'ont **pas** tous le même mot secret
-- [ ] 🧪 Prêts / lancement 2ᵉ partie : sync OK pour tout le lobby
-
-### Fin de manche 1 — choix hôte
-
-- [X] 🧪 **4+ joueurs** : après le tour des mots de la manche 1, tous arrivent sur « Fin de manche 1 »
-- [ ] 🧪 **Joueur non-hôte** : voit « Continuer (indices) » et « Voter maintenant » **grisés**
-- [ ] 🧪 **Joueur non-hôte** : message « Choix de l'hôte — tu ne peux pas agir. »
-- [x] 🧪 **Hôte** : « Continuer » → tour des mots manche 2 pour tout le lobby
-- [x] 🧪 **Hôte** : « Voter maintenant » → phase vote pour tout le lobby
-- [X] 🧪 Sync multijoueur : les invités voient le changement sans recharger
-
-### Clôture du vote (hôte)
-
-- [X] 🧪 **0 vote** : bouton « Clôturer le vote » désactivé
-- [ ] 🧪 **2/5 ont voté** : hôte clique « Clôturer » → résolution immédiate (seuls les votes exprimés comptent) — *re-render hôte corrigé, à revalider*
-- [X] 🧪 **Tous ont voté** : résolution auto **ou** clôture manuelle — les deux OK
-- [X] 🧪 **Égalité** (ex. 2 vs 2) : bandeau égalité + nouveau tour des mots
-- [X] 🧪 **Joueur non-hôte** : pas de bouton clôturer
-- [ ] 🧪 **Joueur éliminé** : ne vote pas ; clôture possible avec moins de votes que de survivants
-
-### Fin de manche — affichage résultat (hôte)
-
-- [ ] 🧪 **Fin de partie** (fake démasqué ou victoire fake) : l'écran **résultat s'affiche chez l'hôte** comme chez les invités
-- [ ] 🧪 **Clôture forcée** par l'hôte (2/5) menant à la fin : hôte voit bien le résultat (plus bloqué sur l'écran de vote)
-- [ ] 🧪 **Sync lente / KO** au moment du résultat : l'hôte affiche quand même le résultat (état local), pas d'écran figé sur le vote
-- [ ] 🧪 Dernier votant **non-hôte** : l'hôte bascule sur le résultat sans recharger
-
-### Révélation des mots (début de partie) TOUT KO
-
-- [ ] 🧪 Titre écran : **« Révélation des mots »**
-- [ ] 🧪 Bandeau : « Tour dédié — lis ton mot en privé »
-- [ ] 🧪 Compteur **X/Y joueur(s) prêt(s)** visible et synchronisé
-- [ ] 🧪 Après validation : « ✓ Mot mémorisé — en attente des autres joueurs… »
-- [ ] 🧪 Dernier joueur valide → passage auto au **tour des mots à l'oral** (hôte)
-- [ ] 🧪 **Un joueur valide « J'ai mémorisé mon mot »** : les autres restent sur la révélation (ne sont **pas** renvoyés en Préparation, prêts conservés)
-
-### Non-régression Spot the fake
-
-- [X] 🧪 Partie complète M1 → continuer → tour des mots M2 → vote → élimination → suite
-- [ ] 🧪 Fake dans les 2 derniers → victoire fake + points
-- [X] 🧪 Fake éliminé → révélation + scores (+20 vote correct)
-- [X] 🧪 Égalité au vote → tour des mots supplémentaire
-- [X] 🧪 Minimum 3 joueurs : lancement OK
-- [ ] 🧪 Retour menu jeux sans bloquer le lobby
-
-### À faire plus tard (Spot the fake)
-
-- [ ] Points bonus « dans la majorité » (règle à définir)
-
----
-
 ## Global — bannière pub (app native) 📢
 
 - [ ] 🧪 **Lobby** : titre / contenu entièrement visible sous la bannière
@@ -123,12 +20,7 @@ Légende : ☐ à tester · ✅ OK · ❌ bug (noter en bas)
 
 ## Global — navigation & prep
 
-### Scroll en haut à chaque écran
-
-- [ ] 🧪 Lobby → prep → jeu → résultats : contenu toujours affiché depuis le haut
-- [ ] 🧪 Barre du bas (Accueil / Jeux / Résultats) : pas de scroll conservé
-- [ ] 🧪 Retour arrière (‹) : remonte en haut
-- [ ] 🧪 iPhone + Android (WebView)
+- [ ] Toast sur nouvel hote quand transfert 
 
 ### Bouton « Je suis prêt » (tous les preps MP)
 
@@ -136,38 +28,17 @@ Légende : ☐ à tester · ✅ OK · ❌ bug (noter en bas)
 - [ ] 🧪 Dilemma / SpeedVote / autre prep : même test
 - [ ] 🧪 Les autres joueurs peuvent toujours apparaître prêts pendant que tu ne l'es pas
 
-### Transfert d'hôte (menu jeux)
-
-- [ ] 🧪 **Nouvel hôte** : peut lancer un jeu, modifier les réglages prep, piloter la manche en cours
-- [ ] 🧪 **Ancien hôte** : plus de boutons hôte ; peut quitter le lobby **sans** fermer la soirée
-- [ ] 🧪 **Invités** : voient le changement (couronne / couleur) sans recharger
-- [ ] 🧪 Erreur si RPC non déployée : message clair (pas de crash)
-- [ ] 🧪 Spot the fake en cours : nouvel hôte peut faire avancer la partie
-
 ### Résultats / Classement → nouveau jeu (MP)
 
-- [ ] 🧪 Fin de partie → invité sur **Classement** → hôte relance un jeu → invité redirigé vers prep/jeu **sans** cliquer « Jeux »
-- [ ] 🧪 Même test invité sur **Résultats**
-- [ ] 🧪 Invité ouvre l'onglet **Classement** pendant la prep → suit quand l'hôte lance la partie
-- [ ] 🧪 Hôte part au menu via onglet **Jeux** (barre du bas) puis lance → invités suivent
+- [X] 🧪 Fin de partie → invité sur **Classement** → hôte relance un jeu → invité redirigé vers prep/jeu **sans** cliquer « Jeux »
+- [X] 🧪 Même test invité sur **Résultats**
 - [ ] 🧪 Enchaînement 2 jeux (Dilemma → SpeedVote) : aucun invité bloqué sur Classement
 - [ ] 🧪 Consulter Classement **pendant** une manche en cours → pas renvoyé dans le jeu (suppress OK)
 
 ### Lancer quand même (prep MP, hôte)
 
-- [x] 🧪 **5 joueurs, 3 prêts** (min. atteint) : hôte voit « Lancer quand même (3 joueurs) »
-- [ ] 🧪 Clic → modale liste **inclus** / **exclus** → confirmation
-- [ ] 🧪 Partie démarre pour les prêts + hôte ; les absents restent dans le lobby sans jouer
 - [ ] 🧪 **TruthMeter** : `authorOrder` = uniquement les participants (pas les absents)
 - [ ] 🧪 **Spot the fake** : `alive` = roster au lancement
-- [ ] 🧪 **VibeCheck** : votes ciblent uniquement les participants
-- [ ] 🧪 Tous prêts → bouton normal « Lancer » (pas de « quand même »)
-- [ ] 🧪 Moins que le minimum prêts → pas de bouton « quand même »
-- [ ] 🧪 Hot Take / Dilemma / SpeedVote / Consensus / Trivia : même flux hôte
-
-### TruthMeter — auteur absent
-
-- [ ] 🧪 Dernier auteur sauté → résultats finaux
 
 ### Onglet Jeux & reprise (MP)
 
@@ -179,37 +50,7 @@ Légende : ☐ à tester · ✅ OK · ❌ bug (noter en bas)
 - [ ] 🧪 **Quitter la partie** (bouton en jeu) : comportement inchangé - menu jeux + suppress invité OK
 - [ ] 🧪 Hôte lance un **nouveau** jeu depuis le menu pendant qu'un invité est sur **Jeux** : invité suit la prep
 
-### Rejoin mid-soirée (4ᵉ joueur, entre deux jeux)
-
-- [ ] 🧪 **Reprise app** (F5) entre deux jeux → menu jeux, scores conservés
-- [ ] 🧪 Ouvrir l'écran lobby par erreur mid-soirée → redirection menu jeux (pas reset des prêts)
-
 ---
-
-## Dilemma ⚖️
-
-### Révélation (vote → résultats)
-
-- [ ] 🧪 Partie complète jusqu'aux résultats finaux
-- [ ] 🧪 Réseau coupé au clic « Révéler » → toast erreur, pas d'écran figé sur 5/5
-- [ ] 🧪 Après erreur réseau, re-clic ou resync → révélation OK sans double points
-
----
-
 
 ## Hot Take 🔥
 - [ ] Fin de manche : renvoi sur prépa au lieu de résultats
-
----
-
-## Autres jeux
-
-*(Sections à compléter au fil des retours playtest.)*
-
----
-
-## Bugs rencontrés en retest
-
-| Date | Jeu | Device / joueurs | Étape | Description |
-|------|-----|------------------|-------|-------------|
-|      |     |                  |       |             |

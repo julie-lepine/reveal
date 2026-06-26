@@ -302,10 +302,9 @@ export function mountHotTake(app) {
         },
         { withEveningScores: mp && isLobbyHost() }
       );
-      if (!mp) {
-        phase = "reveal";
-        render();
-      }
+      syncFromSession();
+      phase = "reveal";
+      render();
     } finally {
       revealInFlight = false;
     }

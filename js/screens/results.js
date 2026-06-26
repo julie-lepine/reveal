@@ -108,7 +108,16 @@ export function mountResults(app) {
       tryFollowHostGameSession(row);
       render();
     });
-    unsubLobby = onLobbyBundleUpdated(() => render());
+    unsubLobby = onLobbyBundleUpdated(() => {
+      // Rattrapage : si l'hôte a relancé un jeu (lobby repassé en "playing" sur un
+      // vrai jeu) mais que l'event de session n'est pas arrivé jusqu'ici, on suit
+      // quand même l'hôte au lieu de rester bloqué sur le récap.
+      if (!isLobbyHost() && getLobbyStatus() === "playing") {
+        const gid = getLobbyGameId();
+        if (gid && gid !== "menu") void routeToActiveGameIfNeeded();
+      }
+      render();
+    });
   }
 
   return () => {

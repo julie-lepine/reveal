@@ -90,6 +90,44 @@ let routing = false;
 let pollTimer = null;
 let syncTickInFlight = false;
 
+// --- DIAGNOSTIC TEMPORAIRE : détection de boucle d'écriture sur game_sessions ---
+// À retirer une fois la boucle du reveal identifiée/corrigée.
+const __writeTimes = [];
+let __writeCircuitUntil = 0;
+let __loopTraced = false;
+function __trackSessionWrite(label, info) {
+  const now = Date.now();
+  __writeTimes.push(now);
+  while (__writeTimes.length && now - __writeTimes[0] > 3000) __writeTimes.shift();
+  const count = __writeTimes.length;
+
+  // Coupe-circuit : au-delà de 25 écritures / 3 s, on suspend 5 s pour éviter le gel.
+  if (now < __writeCircuitUntil) return true;
+  if (count > 25) {
+    __writeCircuitUntil = now + 5000;
+    console.error(
+      `[REVEAL-LOOP] coupe-circuit : ${count} écritures game_sessions en 3 s → suspendues 5 s`,
+      { label, ...info }
+    );
+    return true;
+  }
+
+  // Détection : au-delà de 10 écritures / 3 s, on logge la pile UNE fois.
+  if (count >= 10 && !__loopTraced) {
+    __loopTraced = true;
+    console.warn(
+      `[REVEAL-LOOP] ${count} écritures game_sessions en 3 s — label=${label}`,
+      info
+    );
+    console.trace("[REVEAL-LOOP] pile d'appel de l'écriture");
+    setTimeout(() => {
+      __loopTraced = false;
+    }, 5000);
+  }
+  return false;
+}
+// --- FIN DIAGNOSTIC TEMPORAIRE ---
+
 function mergeTruthy(localVal, remoteVal) {
   return Boolean(localVal) || Boolean(remoteVal);
 }
@@ -2127,6 +2165,48 @@ export async function refreshEveningScoresFromSession() {
   return row;
 }
 
+let confirmingMissingSession = false;
+
+/**
+ * Une session "nulle" (event DELETE Realtime, fetch raté) peut être transitoire :
+ * avant d'éjecter un invité (retour lobby + suppression du routage), on reconfirme
+ * par un fetch direct. Si la session existe toujours, on l'applique (le routage suit
+ * alors l'hôte normalement) au lieu de sortir le joueur de la partie par erreur.
+ */
+async function confirmMissingSessionThenRoute() {
+  if (confirmingMissingSession) return;
+  confirmingMissingSession = true;
+  try {
+    const lobbyId = getState().lobby?.id;
+    if (!lobbyId || !isGameSyncActive()) return;
+
+    let confirmedRow = null;
+    try {
+      confirmedRow = await fetchGameSessionByLobby(lobbyId);
+    } catch {
+      // Échec réseau ponctuel : on ne tranche pas (pas d'éjection sur un simple raté).
+      return;
+    }
+
+    if (confirmedRow) {
+      applyRemoteSession(confirmedRow);
+      return;
+    }
+
+    if (!isGameSyncActive()) return;
+    const current = getCurrentScreen();
+    if (isActiveGameSessionScreen(current) || isOnGameSetupScreen(current)) {
+      suppressSessionRoute(120000);
+      const { goToLobby } = await import("./lobby.js");
+      goToLobby();
+    } else if (isOnPostGameScreen(current)) {
+      routeToSessionScreen("game-select", { force: true });
+    }
+  } finally {
+    confirmingMissingSession = false;
+  }
+}
+
 export function applyRemoteSession(row) {
   const prevScreen = cachedRow?.screen ?? null;
   const prevGuessLie = getState().guessLie;
@@ -2141,13 +2221,7 @@ export function applyRemoteSession(row) {
   if (!row?.state) {
     if (!sigUnchanged) notify(row);
     if (!row && isGameSyncActive()) {
-      const current = getCurrentScreen();
-      if (isActiveGameSessionScreen(current) || isOnGameSetupScreen(current)) {
-        suppressSessionRoute(120000);
-        void import("./lobby.js").then(({ goToLobby }) => goToLobby());
-      } else if (isOnPostGameScreen(current)) {
-        routeToSessionScreen("game-select", { force: true });
-      }
+      void confirmMissingSessionThenRoute();
     }
     return;
   }
@@ -2819,6 +2893,15 @@ export async function pushGameSession({
   timeoutMs = DEFAULT_SYNC_PATCH_TIMEOUT_MS,
   alertOnFailure = true,
 } = {}) {
+  if (
+    __trackSessionWrite("pushGameSession", {
+      keys: Object.keys(state || {}),
+      screen,
+      gameId,
+    })
+  ) {
+    return null;
+  }
   if (!isGameSyncActive()) return null;
   try {
     return await withPatchTimeout(
@@ -2869,6 +2952,22 @@ export async function patchGameState(
   stateMerge,
   { screen, gameId, withEveningScores = false, timeoutMs = DEFAULT_SYNC_PATCH_TIMEOUT_MS } = {}
 ) {
+  if (
+    __trackSessionWrite("patchGameState", {
+      keys: Object.keys(stateMerge || {}),
+      stateKeys: Object.fromEntries(
+        Object.entries(stateMerge || {}).map(([k, v]) => [
+          k,
+          v && typeof v === "object" ? Object.keys(v) : v,
+        ])
+      ),
+      screen,
+      gameId,
+      withEveningScores,
+    })
+  ) {
+    return null;
+  }
   return withPatchTimeout(
     patchGameStateInner(stateMerge, { screen, gameId, withEveningScores }),
     timeoutMs
