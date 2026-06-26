@@ -5,6 +5,8 @@ Légende : ☐ à tester · ✅ OK · ❌ bug (noter en bas)
 
 ---
 
+- [ ] App qui plante au transfert d'hôte
+
 ## Global — bannière pub (app native) 📢
 
 - [ ] 🧪 **Lobby** : titre / contenu entièrement visible sous la bannière
@@ -18,20 +20,10 @@ Légende : ☐ à tester · ✅ OK · ❌ bug (noter en bas)
 
 ---
 
-## Global — navigation & prep
-
-- [ ] Toast sur nouvel hote quand transfert 
-
-### Bouton « Je suis prêt » (tous les preps MP)
-
-- [ ] 🧪 Hot Take : prête → **pas prête** → reste pas prête après 30 s
-- [ ] 🧪 Dilemma / SpeedVote / autre prep : même test
-- [ ] 🧪 Les autres joueurs peuvent toujours apparaître prêts pendant que tu ne l'es pas
-
 ### Résultats / Classement → nouveau jeu (MP)
 
-- [X] 🧪 Fin de partie → invité sur **Classement** → hôte relance un jeu → invité redirigé vers prep/jeu **sans** cliquer « Jeux »
-- [X] 🧪 Même test invité sur **Résultats**
+- [ ] 🧪 Fin de partie → invité sur **Classement** → hôte relance un jeu → invité redirigé vers prep/jeu **sans** cliquer « Jeux »
+- [ ] 🧪 Même test invité sur **Résultats**
 - [ ] 🧪 Enchaînement 2 jeux (Dilemma → SpeedVote) : aucun invité bloqué sur Classement
 - [ ] 🧪 Consulter Classement **pendant** une manche en cours → pas renvoyé dans le jeu (suppress OK)
 

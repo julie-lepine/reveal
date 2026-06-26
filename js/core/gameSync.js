@@ -91,9 +91,10 @@ let pollTimer = null;
 let syncTickInFlight = false;
 
 // --- DIAGNOSTIC TEMPORAIRE : détection de boucle d'écriture sur game_sessions ---
-// À retirer une fois la boucle du reveal identifiée/corrigée.
+// Sonde NON bloquante : elle ne fait que logger une pile d'appel quand un pic
+// d'écritures est détecté. Elle ne suspend JAMAIS les écritures (sinon une manche
+// normale resterait coincée). À retirer une fois la boucle corrigée et validée.
 const __writeTimes = [];
-let __writeCircuitUntil = 0;
 let __loopTraced = false;
 function __trackSessionWrite(label, info) {
   const now = Date.now();
@@ -101,19 +102,8 @@ function __trackSessionWrite(label, info) {
   while (__writeTimes.length && now - __writeTimes[0] > 3000) __writeTimes.shift();
   const count = __writeTimes.length;
 
-  // Coupe-circuit : au-delà de 25 écritures / 3 s, on suspend 5 s pour éviter le gel.
-  if (now < __writeCircuitUntil) return true;
-  if (count > 25) {
-    __writeCircuitUntil = now + 5000;
-    console.error(
-      `[REVEAL-LOOP] coupe-circuit : ${count} écritures game_sessions en 3 s → suspendues 5 s`,
-      { label, ...info }
-    );
-    return true;
-  }
-
-  // Détection : au-delà de 10 écritures / 3 s, on logge la pile UNE fois.
-  if (count >= 10 && !__loopTraced) {
+  // Détection : au-delà de 12 écritures / 3 s, on logge la pile UNE fois (anti-spam 5 s).
+  if (count >= 12 && !__loopTraced) {
     __loopTraced = true;
     console.warn(
       `[REVEAL-LOOP] ${count} écritures game_sessions en 3 s — label=${label}`,
@@ -3254,6 +3244,26 @@ async function patchGameStateInner(
   const patch = { state: nextState };
   if (screen) patch.screen = screen;
   if (gameId) patch.game_id = gameId;
+
+  // Anti-boucle d'écritures : si ce patch n'apporte AUCUN changement par rapport à la
+  // ligne serveur qu'on vient de relire (même state + même screen/game_id), on n'écrit
+  // pas. C'est le coupe-circuit central qui neutralise tout ping-pong (ex. deux hôtes
+  // après un transfert qui réagissent mutuellement à des sessions identiques, ou un
+  // listener qui relance un reveal déjà acté). Les vraies transitions changent toujours
+  // l'état (phase, votes, scores, voteEndsAt…) et passent donc normalement.
+  if (freshRow) {
+    const sameState = JSON.stringify(nextState) === JSON.stringify(freshRow.state || {});
+    const sameScreen = (screen || freshRow.screen) === freshRow.screen;
+    const sameGameId = (gameId || freshRow.game_id) === freshRow.game_id;
+    if (sameState && sameScreen && sameGameId) {
+      // Pas d'écriture, mais on resynchronise l'état local sur la ligne serveur (utile
+      // si ce client était en retard). applyRemoteSession sort tôt via `sigUnchanged`,
+      // donc aucune cascade `notify` → pas de réentrée.
+      applyRemoteSession(freshRow);
+      if (screen) handleSessionRoute(freshRow);
+      return freshRow;
+    }
+  }
 
   let row = await updateGameSession(lobbyId, patch);
   // L'update ne renvoie plus `state` : on le rattache localement (on vient de l'écrire).
