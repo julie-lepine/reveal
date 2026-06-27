@@ -29,6 +29,9 @@ import {
   mergeClutchPatchState,
   mergeClutchPhase,
   isNewClutchRound,
+  mergeWrongAnswerPatchState,
+  mergeWrongAnswerPhase,
+  isNewWrongAnswerRound,
   mergeTruthMeterPatchState,
   mergeTruthMeterPhase,
   mergeForwardGamePhase,
@@ -187,6 +190,7 @@ const RESTARTABLE_SESSION_GAME_IDS = new Set([
   "playlistguess",
   "tiernight",
   "clutch",
+  "wronganswer",
 ]);
 
 const SESSION_GAME_ID_TO_TILE = {
@@ -201,6 +205,7 @@ const SESSION_GAME_ID_TO_TILE = {
   playlistguess: "playlistguess-prep",
   tiernight: "tiernight-select",
   clutch: "clutch-prep",
+  wronganswer: "wronganswer-prep",
 };
 
 function titleForSessionGameId(gameId) {
@@ -368,6 +373,7 @@ const GAME_SETUP_SCREENS = new Set([
   "dilemma-prep",
   "playlistguess-prep",
   "clutch-prep",
+  "wronganswer-prep",
   "guesslie-menu",
   "guesslie-setup",
   "guesslie-wait",
@@ -936,6 +942,70 @@ function mergeClutchGameLocal(local, remote) {
     roundScored: mergeRoundFlag(local.roundScored, remote.roundScored, newRound),
     matchScores: mergeMatchScoresLocal(local.matchScores || {}, remote.matchScores || {}),
     lastRound: remote.lastRound ?? local.lastRound ?? null,
+  };
+}
+
+function isNewWrongAnswerRoundUid(cur, inc) {
+  return isNewWrongAnswerRound(cur, inc);
+}
+
+/** Réponses texte Wrong Answer Only (clé uid ou pseudo) → clés = pseudos actifs. */
+function normalizeWrongAnswerAnswers(answers = {}) {
+  const names = getActivePlayerNames();
+  return normalizePlayerKeyedMap(answers, names, (key) => {
+    const mapped = playerKeyToDisplayName(key);
+    if (mapped) return mapped;
+    return names.includes(String(key)) ? String(key) : null;
+  });
+}
+
+function mergeRemoteWrongAnswerAnswersUid(cur, inc) {
+  const curAnswers = cur?.answers || {};
+  const incAnswers = inc?.answers || {};
+  if (isNewWrongAnswerRound(cur, inc)) return incAnswers;
+  return { ...curAnswers, ...incAnswers };
+}
+
+/** Votes Wrong Answer Only (clé uid ou pseudo, valeur = uid/pseudo auteur voté). */
+function normalizeWrongAnswerVotes(votes = {}) {
+  return normalizePlayerVotesMap(votes);
+}
+
+function mergeRemoteWrongAnswerVotesUid(cur, inc) {
+  const curVotes = cur?.votes || {};
+  const incVotes = inc?.votes || {};
+  if (isNewWrongAnswerRound(cur, inc)) return incVotes;
+  return { ...curVotes, ...incVotes };
+}
+
+function mergeWrongAnswerGameLocal(local, remote) {
+  if (!remote) return local;
+  if (!local) return remote;
+  const newRound = isNewWrongAnswerRound(local, remote);
+  const remoteAnswers = remote.answers || {};
+  const localAnswers = local.answers || {};
+  const remoteVotes = remote.votes || {};
+  const localVotes = local.votes || {};
+  const answers = normalizeWrongAnswerAnswers(
+    newRound ? remoteAnswers : { ...remoteAnswers, ...localAnswers }
+  );
+  const votes = normalizeWrongAnswerVotes(
+    newRound ? remoteVotes : { ...remoteVotes, ...localVotes }
+  );
+  const ready =
+    !remote.lobbyStarted && !local.lobbyStarted
+      ? mergeReadyMapsLocal(local.ready || {}, remote.ready || {}, getActivePlayerNames(), getLocalDisplayName())
+      : remote.ready || {};
+  return {
+    ...local,
+    ...remote,
+    phase: mergeWrongAnswerPhase(local, remote, { newRound }),
+    answers,
+    votes,
+    ready,
+    roundScored: mergeRoundFlag(local.roundScored, remote.roundScored, newRound),
+    matchScores: mergeMatchScoresLocal(local.matchScores || {}, remote.matchScores || {}),
+    lastRound: newRound ? remote.lastRound ?? null : remote.lastRound ?? local.lastRound ?? null,
   };
 }
 
@@ -1893,6 +1963,83 @@ export function clutchFromRemote(remote) {
   };
 }
 
+export function wrongAnswerToRemote(session) {
+  const remoteAnswers = {};
+  Object.entries(session.answers || {}).forEach(([name, val]) => {
+    if (!val) return;
+    remoteAnswers[userIdForName(name) || name] = {
+      text: typeof val.text === "string" ? val.text : "",
+      at: typeof val.at === "number" ? val.at : null,
+    };
+  });
+  const remoteVotes = {};
+  Object.entries(session.votes || {}).forEach(([voter, target]) => {
+    if (target == null) return;
+    remoteVotes[userIdForName(voter) || voter] = userIdForName(target) || target;
+  });
+  return {
+    ready: mapReadyByUid(session.ready || {}),
+    lobbyStarted: Boolean(session.lobbyStarted),
+    roundCount: session.roundCount ?? 5,
+    deck: session.deck || null,
+    roundIdx: session.roundIdx ?? 0,
+    phase: session.phase || null,
+    currentPrompt: session.currentPrompt || null,
+    roundStartAt: session.roundStartAt || null,
+    answers: remoteAnswers,
+    votes: remoteVotes,
+    roundScored: Boolean(session.roundScored),
+    matchScores: scoresToRemote(session.matchScores || {}),
+    lastRound: session.lastRound
+      ? {
+          ...session.lastRound,
+          deltas: scoresToRemote(session.lastRound.deltas || {}),
+          counts: scoresToRemote(session.lastRound.counts || {}),
+        }
+      : null,
+  };
+}
+
+export function wrongAnswerFromRemote(remote) {
+  if (!remote) return null;
+  const answers = {};
+  Object.entries(remote.answers || {}).forEach(([uid, val]) => {
+    if (!val) return;
+    const name = nameForUserId(uid) || uid;
+    answers[name] = {
+      text: typeof val.text === "string" ? val.text : "",
+      at: typeof val.at === "number" ? val.at : null,
+    };
+  });
+  const votes = {};
+  Object.entries(remote.votes || {}).forEach(([voterUid, targetUid]) => {
+    if (targetUid == null) return;
+    const voter = nameForUserId(voterUid) || voterUid;
+    votes[voter] = nameForUserId(targetUid) || targetUid;
+  });
+  return {
+    ready: mapReadyByName(remote.ready || {}),
+    lobbyStarted: Boolean(remote.lobbyStarted),
+    roundCount: remote.roundCount ?? 5,
+    deck: remote.deck || null,
+    roundIdx: remote.roundIdx ?? 0,
+    phase: remote.phase || null,
+    currentPrompt: remote.currentPrompt || null,
+    roundStartAt: remote.roundStartAt || null,
+    answers,
+    votes,
+    roundScored: Boolean(remote.roundScored),
+    matchScores: scoresFromRemote(remote.matchScores || {}),
+    lastRound: remote.lastRound
+      ? {
+          ...remote.lastRound,
+          deltas: scoresFromRemote(remote.lastRound.deltas || {}),
+          counts: scoresFromRemote(remote.lastRound.counts || {}),
+        }
+      : null,
+  };
+}
+
 function sanitizeTraitreMergeInc(curTr, incTr) {
   if (!incTr || curTr?.impostorRevealed || incTr.impostorRevealed) return incTr;
   const cleaned = { ...incTr };
@@ -2429,6 +2576,10 @@ export function applyRemoteSession(row) {
   const prevPgPhase = getState().playlistGuessGame?.phase ?? null;
   const prevDmPhase = getState().dilemmaGame?.phase ?? null;
   const prevDmRoundIdx = getState().dilemmaGame?.roundIdx ?? null;
+  const prevWaPhase = getState().wrongAnswerGame?.phase ?? null;
+  const prevWaRoundIdx = getState().wrongAnswerGame?.roundIdx ?? null;
+  const prevWaAnswers = JSON.stringify(getState().wrongAnswerGame?.answers || {});
+  const prevWaVotes = JSON.stringify(getState().wrongAnswerGame?.votes || {});
   const st = { ...(row.state || {}) };
   if (!FIL_ROUGE_ENABLED) {
     delete st.filRouge;
@@ -2448,6 +2599,11 @@ export function applyRemoteSession(row) {
     const remote = clutchFromRemote(st.clutch);
     const local = getState().clutchGame;
     patch.clutchGame = local ? mergeClutchGameLocal(local, remote) : remote;
+  }
+  if (st.wrongAnswer) {
+    const remote = wrongAnswerFromRemote(st.wrongAnswer);
+    const local = getState().wrongAnswerGame;
+    patch.wrongAnswerGame = local ? mergeWrongAnswerGameLocal(local, remote) : remote;
   }
   if (st.traitre) {
     const remote = traitreFromRemote(st.traitre);
@@ -2532,7 +2688,16 @@ export function applyRemoteSession(row) {
     ((patch.dilemmaGame.phase ?? null) !== prevDmPhase ||
       (patch.dilemmaGame.roundIdx ?? null) !== prevDmRoundIdx);
 
-  const playChanged = Boolean(pgPhaseChanged || guessLiePlayChanged || dilemmaPlayChanged);
+  const wrongAnswerPlayChanged =
+    patch.wrongAnswerGame &&
+    ((patch.wrongAnswerGame.phase ?? null) !== prevWaPhase ||
+      (patch.wrongAnswerGame.roundIdx ?? null) !== prevWaRoundIdx ||
+      JSON.stringify(patch.wrongAnswerGame.answers || {}) !== prevWaAnswers ||
+      JSON.stringify(patch.wrongAnswerGame.votes || {}) !== prevWaVotes);
+
+  const playChanged = Boolean(
+    pgPhaseChanged || guessLiePlayChanged || dilemmaPlayChanged || wrongAnswerPlayChanged
+  );
 
   // Signature distante inchangée (souvent un simple touch `updated_at` sans modif de
   // `state`) et aucune transition locale en retard : l'état local reflète déjà le
@@ -2696,6 +2861,7 @@ function resolveActivePlayScreen(st, gid, declared) {
   if (st.hotTake?.lobbyStarted) return "hottake";
   if (st.speedVote?.lobbyStarted) return "speedvote";
   if (st.clutch?.lobbyStarted) return "clutch";
+  if (st.wrongAnswer?.lobbyStarted) return "wronganswer";
   if (st.traitre?.lobbyStarted) {
     if (declared === "traitre-prep") return null;
     if (declared === "game-select" && !isLobbyEveningStarted()) return "game-select";
@@ -2761,6 +2927,9 @@ export function getEffectiveSessionScreen(row) {
   }
   if (st.clutch) {
     if (gid === "clutch" || declared === "clutch-prep") return "clutch-prep";
+  }
+  if (st.wrongAnswer) {
+    if (gid === "wronganswer" || declared === "wronganswer-prep") return "wronganswer-prep";
   }
   if (st.traitre) {
     if (gid === "traitre" || declared === "traitre-prep") return "traitre-prep";
@@ -3311,6 +3480,33 @@ async function patchGameStateInner(
       }
     }
   }
+  if (mergePayload.wrongAnswer) {
+    const curWa = current.wrongAnswer;
+    const incWa = mergePayload.wrongAnswer;
+    const newWaRound = curWa && incWa ? isNewWrongAnswerRoundUid(curWa, incWa) : false;
+    nextState.wrongAnswer = curWa
+      ? {
+          ...mergeWrongAnswerPatchState(curWa, incWa, {
+            mergeReadyUid: mergeRemoteReadyUid,
+            mergeAnswers: mergeRemoteWrongAnswerAnswersUid,
+            mergeVotes: mergeRemoteWrongAnswerVotesUid,
+            newRound: newWaRound,
+          }),
+          roundScored: mergeRoundFlag(curWa.roundScored, incWa.roundScored, newWaRound),
+        }
+      : incWa;
+    if (curWa && incWa && nextState.wrongAnswer) {
+      nextState.wrongAnswer.matchScores = mergeRemoteMatchScoresUid(
+        curWa.matchScores || {},
+        incWa.matchScores || {}
+      );
+      if (newWaRound) {
+        nextState.wrongAnswer.lastRound = incWa.lastRound ?? null;
+      } else if (incWa.lastRound != null) {
+        nextState.wrongAnswer.lastRound = incWa.lastRound;
+      }
+    }
+  }
   if (mergePayload.traitre) {
     const curTr = current.traitre;
     const incTr = sanitizeTraitreMergeInc(curTr, mergePayload.traitre);
@@ -3643,6 +3839,14 @@ export async function syncClutchSession(extra = {}, patchOpts = {}) {
   saveStatePatch({ clutchGame: session });
   if (!isGameSyncActive()) return session;
   await patchGameState({ clutch: clutchToRemote(session) }, patchOpts);
+  return session;
+}
+
+export async function syncWrongAnswerSession(extra = {}, patchOpts = {}) {
+  const session = { ...getState().wrongAnswerGame, ...extra };
+  saveStatePatch({ wrongAnswerGame: session });
+  if (!isGameSyncActive()) return session;
+  await patchGameState({ wrongAnswer: wrongAnswerToRemote(session) }, patchOpts);
   return session;
 }
 

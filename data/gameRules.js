@@ -111,6 +111,25 @@ export const GAME_RULES = {
       "Cible 10 s. Léa tape à 9,8 s (écart 0,2), Tom à 10,5 s (écart 0,5). Léa finit 1re (+25), Tom 2e (+15).",
   },
 
+  wronganswer: {
+    title: "Wrong Answer Only",
+    emoji: "↩️",
+    but: "Donne la PIRE réponse possible à la question. Les réponses sont anonymes : le groupe vote pour la pire.",
+    etapes: [
+      "Une question s'affiche (ex. « Quel est le meilleur animal de compagnie ? »).",
+      "Chacun écrit en secret la pire réponse possible.",
+      "Les réponses sont mélangées et anonymisées.",
+      "Tout le monde vote pour la pire réponse (impossible de voter pour la sienne).",
+      "On révèle les auteurs et le décompte des votes.",
+    ],
+    points: [
+      "Chaque réponse rapporte 3 points par vote reçu.",
+      "Plus ta réponse est jugée mauvaise par le groupe, plus tu marques.",
+    ],
+    exemple:
+      "« Quel est le meilleur animal de compagnie ? » Tu réponds « Girafe. ». 4 joueurs votent pour ta réponse → tu gagnes +12 pts (4 × 3).",
+  },
+
   dilemma: {
     title: "Dilemma",
     emoji: "⚖️",
@@ -212,6 +231,7 @@ export const RULES_KEY_BY_NAV = {
   guesslie: "guesslie",
   "speedvote-prep": "speedvote",
   "clutch-prep": "clutch",
+  "wronganswer-prep": "wronganswer",
   "dilemma-prep": "dilemma",
   "truthmeter-prep": "truthmeter",
   "tiernight-select": "tiernight",

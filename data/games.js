@@ -81,6 +81,17 @@ export const GAMES = [
     badgeLabel: "Prochainement",
   },
   {
+    id: "wronganswer-prep",
+    title: "Wrong Answer Only",
+    desc: "Donne la pire réponse possible - les autres votent la pire",
+    emoji: "↩️",
+    cssClass: "wrong",
+    logo: "assets/games/wronganswer.png",
+    borderGradient:
+      "linear-gradient(145deg, #F472B6 0%, #A78BFA 48%, #2B2D66 100%)",
+    enabled: true,
+  },
+  {
     id: "dilemma-prep",
     title: "Dilemma",
     desc: "Dilemme A vs B - Choisis ton camp, défends-le… vote",

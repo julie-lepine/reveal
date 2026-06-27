@@ -75,6 +75,7 @@ const defaultState = () => ({
     hotTakesPlayed: 0,
     speedVotesPlayed: 0,
     clutchesPlayed: 0,
+    wrongAnswersPlayed: 0,
     playlistGuessesPlayed: 0,
     truthMetersPlayed: 0,
     consensusGamesPlayed: 0,
@@ -138,6 +139,21 @@ const defaultState = () => ({
     roundStartAt: null,
     roundEndsAt: null,
     taps: {},
+    roundScored: false,
+    matchScores: {},
+    lastRound: null,
+  },
+  wrongAnswerGame: {
+    ready: {},
+    lobbyStarted: false,
+    roundCount: 5,
+    deck: null,
+    roundIdx: 0,
+    phase: null,
+    currentPrompt: null,
+    roundStartAt: null,
+    answers: {},
+    votes: {},
     roundScored: false,
     matchScores: {},
     lastRound: null,
@@ -284,6 +300,7 @@ function loadState() {
       hotTakeGame: { ...defaultState().hotTakeGame, ...parsed.hotTakeGame },
       speedVoteGame: { ...defaultState().speedVoteGame, ...parsed.speedVoteGame },
       clutchGame: { ...defaultState().clutchGame, ...parsed.clutchGame },
+      wrongAnswerGame: { ...defaultState().wrongAnswerGame, ...parsed.wrongAnswerGame },
       traitreGame: { ...defaultState().traitreGame, ...parsed.traitreGame },
       playlistGuessGame: { ...defaultState().playlistGuessGame, ...parsed.playlistGuessGame },
       truthMeterGame: { ...defaultState().truthMeterGame, ...parsed.truthMeterGame },
@@ -523,6 +540,7 @@ export function defaultEveningStats() {
     tierNightsPlayed: 0,
     speedVotesPlayed: 0,
     clutchesPlayed: 0,
+    wrongAnswersPlayed: 0,
     playlistGuessesPlayed: 0,
     truthMetersPlayed: 0,
     consensusGamesPlayed: 0,
@@ -568,6 +586,7 @@ export function resetGameSessionsOnly() {
     hotTakeGame: { ...base.hotTakeGame },
     speedVoteGame: { ...base.speedVoteGame },
     clutchGame: { ...base.clutchGame },
+    wrongAnswerGame: { ...base.wrongAnswerGame },
     traitreGame: { ...base.traitreGame },
     playlistGuessGame: { ...base.playlistGuessGame },
     truthMeterGame: { ...base.truthMeterGame },
@@ -698,6 +717,12 @@ export function recordSpeedVotePlayed() {
 export function recordClutchPlayed() {
   recordEveningGameOnce("clutch", () => {
     state.stats.clutchesPlayed = (state.stats.clutchesPlayed || 0) + 1;
+  });
+}
+
+export function recordWrongAnswerPlayed() {
+  recordEveningGameOnce("wronganswer", () => {
+    state.stats.wrongAnswersPlayed = (state.stats.wrongAnswersPlayed || 0) + 1;
   });
 }
 

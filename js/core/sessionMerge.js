@@ -446,6 +446,57 @@ export function mergeClutchPatchState(cur, inc, { mergeReadyUid, mergeTaps }) {
   };
 }
 
+/** Nouvelle manche Wrong Answer Only : round suivant, réponses + votes vidés. */
+export function isNewWrongAnswerRound(cur, inc) {
+  if (!inc || inc.phase !== "answer") return false;
+  if (Object.keys(inc.answers || {}).length > 0) return false;
+  if (Object.keys(inc.votes || {}).length > 0) return false;
+  if (cur?.roundIdx != null && inc.roundIdx != null && inc.roundIdx !== cur.roundIdx) return true;
+  return Boolean(inc.roundStartAt && inc.roundStartAt !== cur?.roundStartAt);
+}
+
+const WRONG_ANSWER_PHASE_RANK = {
+  answer: 0,
+  voting: 1,
+  reveal: 2,
+};
+
+export function mergeWrongAnswerPhase(cur, inc, { newRound = false } = {}) {
+  if (newRound) return inc?.phase ?? cur?.phase ?? null;
+  const curRank = WRONG_ANSWER_PHASE_RANK[cur?.phase] ?? -1;
+  const incRank = WRONG_ANSWER_PHASE_RANK[inc?.phase] ?? -1;
+  if (curRank < 0) return inc?.phase ?? cur?.phase ?? null;
+  if (incRank < 0) return cur?.phase ?? null;
+  return incRank >= curRank ? inc.phase : cur.phase;
+}
+
+/** État Wrong Answer Only pour patchGameState. */
+export function mergeWrongAnswerPatchState(
+  cur,
+  inc,
+  { mergeReadyUid, mergeAnswers, mergeVotes, newRound = false }
+) {
+  if (!cur) return inc;
+  if (!inc) return cur;
+  if (isReadyOnlyGamePatch(inc)) {
+    return { ...cur, ready: mergeReadyUid(cur, inc) };
+  }
+  if (isAnswersOnlyGamePatch(inc)) {
+    return { ...cur, answers: mergeAnswers(cur, inc) };
+  }
+  if (isVotesOnlyGamePatch(inc)) {
+    return { ...cur, votes: mergeVotes(cur, inc) };
+  }
+  return {
+    ...cur,
+    ...inc,
+    phase: mergeWrongAnswerPhase(cur, inc, { newRound }),
+    ready: mergeReadyUid(cur, inc),
+    answers: mergeAnswers(cur, inc),
+    votes: mergeVotes(cur, inc),
+  };
+}
+
 /** État dilemma pour patchGameState (inc = patch client, cur = serveur). */
 export function mergeDilemmaPatchState(curDm, incDm, localAuthor, { mergeReadyUid, mergeVotes }) {
   if (!curDm) return incDm;

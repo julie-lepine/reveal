@@ -11,6 +11,7 @@ import {
   traitreToRemote,
   speedVoteToRemote,
   clutchToRemote,
+  wrongAnswerToRemote,
   triviaToRemote,
   truthMeterToRemote,
   consensusToRemote,
@@ -24,6 +25,7 @@ import { TRAITRE_MIN_PLAYERS } from "../../data/traitre.js";
 import { requireMinLobbyPlayers } from "./gameLaunchGuard.js";
 import { defaultSpeedVotePrepSession } from "./speedVoteSession.js";
 import { defaultClutchPrepSession } from "./clutchSession.js";
+import { defaultWrongAnswerPrepSession } from "./wrongAnswerSession.js";
 import { PLAYLIST_GUESS_MIN_PLAYERS } from "../../data/playlistGuess.js";
 import { defaultPlaylistGuessPrepSession } from "./playlistGuessSession.js";
 import { getLobbyParticipants } from "./lobby.js";
@@ -40,6 +42,7 @@ const GAME_ID_TO_TILE = {
   hottake: "hottake-prep",
   speedvote: "speedvote-prep",
   clutch: "clutch-prep",
+  wronganswer: "wronganswer-prep",
   trivia: "trivia-prep",
   truthmeter: "truthmeter-prep",
   consensus: "consensus-prep",
@@ -142,6 +145,29 @@ export async function launchClutchPrep() {
   }
 
   navigate("clutch-prep");
+}
+
+export async function launchWrongAnswerPrep() {
+  const wa = defaultWrongAnswerPrepSession();
+  saveStatePatch({ wrongAnswerGame: wa });
+
+  if (isGameSyncActive()) {
+    if (!(await requireHostToLaunch())) return;
+    try {
+      await startGameSession("wronganswer", "wronganswer-prep", {
+        wrongAnswer: wrongAnswerToRemote(wa),
+      });
+    } catch (e) {
+      console.warn("REVEAL launch Wrong Answer Only:", e);
+      await showAppAlert(e.message || "Impossible de lancer Wrong Answer Only.", {
+        title: "Wrong Answer Only",
+        icon: "⚠️",
+      });
+    }
+    return;
+  }
+
+  navigate("wronganswer-prep");
 }
 
 export async function launchPlaylistGuessPrep() {
@@ -360,6 +386,7 @@ const RESTART_HANDLERS = {
   hottake: launchHotTakePrep,
   speedvote: launchSpeedVotePrep,
   clutch: launchClutchPrep,
+  wronganswer: launchWrongAnswerPrep,
   trivia: launchTriviaPrep,
   truthmeter: launchTruthMeterPrep,
   consensus: launchConsensusPrep,

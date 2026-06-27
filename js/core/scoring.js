@@ -1,6 +1,7 @@
 import { EVENING_POINTS, FIL_ROUGE_POINTS, tierNightPointsForRankDiff } from "../../data/eveningScoring.js";
 import { PLAYLIST_GUESS_POINTS } from "../../data/playlistGuess.js";
 import { CLUTCH_PODIUM_POINTS } from "../../data/clutch.js";
+import { WRONG_ANSWER_POINTS_PER_VOTE } from "../../data/wrongAnswer.js";
 import { filterVoterVotes, computeRoundMetrics } from "./truthMeterSession.js";
 import { countDilemmaResults } from "./dilemmaSession.js";
 import { DILEMMA_POINTS_TIE } from "../../data/dilemma.js";
@@ -93,6 +94,35 @@ export function awardClutchRound(ranking = [], { podiumPoints = CLUTCH_PODIUM_PO
     deltas[entry.name] = pts;
   });
   return { ranking, deltas };
+}
+
+/**
+ * Wrong Answer Only : 3 points par vote reçu sur sa réponse.
+ * `answers` = { [name]: { text } } ; `votes` = { [voter]: targetName }.
+ */
+export function awardWrongAnswerRound(
+  answers = {},
+  votes = {},
+  { pointsPerVote = WRONG_ANSWER_POINTS_PER_VOTE } = {}
+) {
+  const counts = {};
+  Object.keys(answers).forEach((name) => {
+    counts[name] = 0;
+  });
+  Object.values(votes).forEach((target) => {
+    if (target == null || counts[target] == null) return;
+    counts[target] += 1;
+  });
+
+  const deltas = {};
+  Object.entries(counts).forEach(([name, n]) => {
+    if (n <= 0) return;
+    const pts = n * pointsPerVote;
+    addScore(name, pts);
+    deltas[name] = pts;
+  });
+
+  return { counts, deltas };
 }
 
 /** TruthMeter : au plus un bonus par joueur et par manche. */
