@@ -405,16 +405,16 @@ export function mergeSpeedVotePhase(cur, inc) {
   return mergeForwardGamePhase(cur?.phase, inc?.phase);
 }
 
-/** Nouvelle manche Race to Zero : round suivant ou nouveau chrono, taps vidés. */
-export function isNewRaceToZeroRound(cur, inc) {
+/** Nouvelle manche Clutch : round suivant ou nouveau chrono, taps vidés. */
+export function isNewClutchRound(cur, inc) {
   if (!inc || inc.phase !== "active") return false;
   if (Object.keys(inc.taps || {}).length > 0) return false;
   if (cur?.roundIdx != null && inc.roundIdx != null && inc.roundIdx !== cur.roundIdx) return true;
   return Boolean(inc.roundStartAt && inc.roundStartAt !== cur?.roundStartAt);
 }
 
-export function mergeRaceToZeroPhase(cur, inc) {
-  if (isNewRaceToZeroRound(cur, inc)) return inc?.phase ?? cur?.phase ?? null;
+export function mergeClutchPhase(cur, inc) {
+  if (isNewClutchRound(cur, inc)) return inc?.phase ?? cur?.phase ?? null;
   // Ne jamais régresser reveal → active (course réseau tap / révélation hôte).
   if (cur?.phase === "reveal" && inc?.phase === "active") return "reveal";
   if (inc?.phase == null || inc?.phase === "") return cur?.phase ?? null;
@@ -427,8 +427,8 @@ export function isTapsOnlyGamePatch(inc = {}) {
   return keys.length === 1 && keys[0] === "taps";
 }
 
-/** État Race to Zero pour patchGameState. */
-export function mergeRaceToZeroPatchState(cur, inc, { mergeReadyUid, mergeTaps }) {
+/** État Clutch pour patchGameState. */
+export function mergeClutchPatchState(cur, inc, { mergeReadyUid, mergeTaps }) {
   if (!cur) return inc;
   if (!inc) return cur;
   if (isReadyOnlyGamePatch(inc)) {
@@ -440,7 +440,7 @@ export function mergeRaceToZeroPatchState(cur, inc, { mergeReadyUid, mergeTaps }
   return {
     ...cur,
     ...inc,
-    phase: mergeRaceToZeroPhase(cur, inc),
+    phase: mergeClutchPhase(cur, inc),
     ready: mergeReadyUid(cur, inc),
     taps: mergeTaps(cur, inc),
   };

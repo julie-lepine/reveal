@@ -1,4 +1,4 @@
-import { GAMES_AVAILABLE } from "../../data/games.js";
+import { GAMES_AVAILABLE, GAMES_COMING_SOON } from "../../data/games.js";
 import { RULES_KEY_BY_NAV } from "../../data/gameRules.js";
 import { rulesIconButtonHtml } from "../core/gameRulesUi.js";
 import { getEveningRecap } from "../core/eveningRecap.js";
@@ -36,7 +36,7 @@ import {
 import {
   launchTraitrePrep,
   launchSpeedVotePrep,
-  launchRaceToZeroPrep,
+  launchClutchPrep,
   launchPlaylistGuessPrep,
   launchTriviaPrep,
   launchTruthMeterPrep,
@@ -133,7 +133,7 @@ function buildGameSelectHandlers() {
   return {
     "traitre-prep": launchTraitrePrep,
     "speedvote-prep": launchSpeedVotePrep,
-    "racetozero-prep": launchRaceToZeroPrep,
+    "clutch-prep": launchClutchPrep,
     "playlistguess-prep": launchPlaylistGuessPrep,
     "trivia-prep": launchTriviaPrep,
     "truthmeter-prep": launchTruthMeterPrep,
@@ -313,6 +313,7 @@ export function mountGameSelect(app) {
       ${eveningRecapHtml(recap)}
 
       ${gameGridSection("🎮 Jeux disponibles", GAMES_AVAILABLE)}
+      ${gameGridSection("🔜 Prochainement", GAMES_COMING_SOON)}
 
       ${feedbackPromptCardHtml()}
     `,

@@ -1,13 +1,13 @@
 import {
-  allRaceToZeroReady,
-  getRaceToZeroPrepSummary,
-  getRaceToZeroSession,
-  getRaceToZeroEntryScreen,
-  markRaceToZeroLobbyStarted,
-  setRaceToZeroReady,
-  setRaceToZeroRoundCount,
-} from "../core/raceToZeroSession.js";
-import { RACE_TO_ZERO_ROUND_PRESETS } from "../../data/raceToZero.js";
+  allClutchReady,
+  getClutchPrepSummary,
+  getClutchSession,
+  getClutchEntryScreen,
+  markClutchLobbyStarted,
+  setClutchReady,
+  setClutchRoundCount,
+} from "../core/clutchSession.js";
+import { CLUTCH_ROUND_PRESETS } from "../../data/clutch.js";
 import { getLobbyParticipants } from "../core/lobby.js";
 import { getLocalDisplayName } from "../core/state.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
@@ -26,35 +26,35 @@ import {
 import { pageShell } from "../core/ui.js";
 import { bindNav } from "./nav.js";
 
-export function mountRaceToZeroPrep(app) {
+export function mountClutchPrep(app) {
   if (!requireLobbyPlay()) return null;
 
   const localName = getLocalDisplayName();
   const prepLobby = createPrepLobbyController({
     localKey: localName,
-    getReadyMap: () => getRaceToZeroSession().ready || {},
+    getReadyMap: () => getClutchSession().ready || {},
   });
 
   function startSlotHtml(allReady) {
-    const session = getRaceToZeroSession();
+    const session = getClutchSession();
     return prepStartSlotHtml(
       prepLaunchSlotParams({
         readyMap: session.ready || {},
         allReady,
         isHost: isLobbyHost(),
         minPlayers: DEFAULT_PREP_MIN_PLAYERS,
-        launchLabel: "Lancer Race to Zero →",
+        launchLabel: "Lancer Clutch →",
       })
     );
   }
 
   function refreshReadySection() {
-    const session = getRaceToZeroSession();
+    const session = getClutchSession();
     const members = getLobbyParticipants();
-    const allReady = allRaceToZeroReady();
+    const allReady = allClutchReady();
 
     refreshPrepReadyUi(app, {
-      playersSelector: "#race-zero-players",
+      playersSelector: "#clutch-players",
       readyBtnSelector: "#btn-ready",
       members,
       readyMap: session.ready || {},
@@ -62,14 +62,14 @@ export function mountRaceToZeroPrep(app) {
     });
 
     updatePrepStartSlot(
-      app.querySelector("#race-zero-start-slot"),
+      app.querySelector("#clutch-start-slot"),
       startSlotHtml(allReady),
       onLaunch
     );
   }
 
   function refreshRounds() {
-    const session = getRaceToZeroSession();
+    const session = getClutchSession();
     const roundCount = session.roundCount ?? 5;
     const isHost = isLobbyHost();
     app.querySelectorAll("[data-round]").forEach((btn) => {
@@ -88,13 +88,13 @@ export function mountRaceToZeroPrep(app) {
     await executePrepLaunch({
       force,
       btn: app.querySelector(force ? "#btn-force-start-game" : "#btn-start-game"),
-      getReadyMap: () => getRaceToZeroSession().ready || {},
+      getReadyMap: () => getClutchSession().ready || {},
       minPlayers: DEFAULT_PREP_MIN_PLAYERS,
-      gameTitle: "Race to Zero",
-      gameScreen: "racetozero",
-      navStack: ["home", "lobby", "game-select", "racetozero-prep", "racetozero"],
-      markStarted: markRaceToZeroLobbyStarted,
-      allReadyFn: allRaceToZeroReady,
+      gameTitle: "Clutch",
+      gameScreen: "clutch",
+      navStack: ["home", "lobby", "game-select", "clutch-prep", "clutch"],
+      markStarted: markClutchLobbyStarted,
+      allReadyFn: allClutchReady,
     });
   }
 
@@ -104,14 +104,14 @@ export function mountRaceToZeroPrep(app) {
     app.querySelectorAll("[data-round]").forEach((btn) => {
       btn.addEventListener("click", async () => {
         if (!isLobbyHost() || btn.disabled) return;
-        await setRaceToZeroRoundCount(Number(btn.getAttribute("data-round")));
+        await setClutchRoundCount(Number(btn.getAttribute("data-round")));
         render();
       });
     });
 
     app.querySelector("#btn-ready")?.addEventListener("click", () => {
       void prepLobby.toggleReady({
-        setReady: setRaceToZeroReady,
+        setReady: setClutchReady,
         render: refreshReadySection,
       });
     });
@@ -120,28 +120,28 @@ export function mountRaceToZeroPrep(app) {
   }
 
   function render() {
-    const session = getRaceToZeroSession();
+    const session = getClutchSession();
     const members = getLobbyParticipants();
-    const allReady = allRaceToZeroReady();
+    const allReady = allClutchReady();
     const localReady = prepLobby.localReadyState();
     const roundCount = session.roundCount ?? 5;
     const isHost = isLobbyHost();
-    const prep = getRaceToZeroPrepSummary();
+    const prep = getClutchPrepSummary();
 
     app.innerHTML = pageShell({
       backTarget: "back",
       content: `
-        <p class="label-upper label-upper--gold">💥 Race to Zero</p>
+        <p class="label-upper label-upper--gold">💥 Clutch</p>
         <div class="screen-title-row">
           <h2 class="screen-title">Préparation</h2>
-          ${rulesButtonHtml("racetozero")}
+          ${rulesButtonHtml("clutch")}
         </div>
-        <p class="game-intro">Un chrono caché part d'une cible (9 à 15 s). Tape ta cible pile au moment où il atteint 0. Le plus proche gagne.</p>
+        <p class="game-intro">Un chrono part de 0 et monte vers une cible (9 à 15 s). 2 s avant la cible, il disparaît : tape à l'instinct, au plus proche. Le plus précis gagne.</p>
 
         <div class="card">
           <p class="card-heading">Nombre de manches</p>
           <div class="theme-chips theme-chips--rounds">
-            ${RACE_TO_ZERO_ROUND_PRESETS.map(
+            ${CLUTCH_ROUND_PRESETS.map(
               (value) => `
               <button type="button" class="theme-chip ${roundCount === value ? "theme-chip--active" : ""}"
                 data-round="${value}" ${isHost ? "" : "disabled"}>
@@ -155,7 +155,7 @@ export function mountRaceToZeroPrep(app) {
           ${!isHost ? `<p class="hint">Seul l'hôte peut modifier les réglages.</p>` : ""}
         </div>
 
-        <div class="card" id="race-zero-players">
+        <div class="card" id="clutch-players">
           ${playersReadySectionHtml(members, session.ready || {})}
         </div>
 
@@ -163,7 +163,7 @@ export function mountRaceToZeroPrep(app) {
           ${localReady ? "Prêt ✓" : "Je suis prêt !"}
         </button>
 
-        <div id="race-zero-start-slot">
+        <div id="clutch-start-slot">
           ${startSlotHtml(allReady)}
         </div>
       `,
@@ -175,9 +175,9 @@ export function mountRaceToZeroPrep(app) {
   render();
 
   const guestFollow = prepGuestFollowOnSession({
-    prepScreen: "racetozero-prep",
-    getEntryScreen: getRaceToZeroEntryScreen,
-    buildNavStack: (entry) => ["home", "lobby", "game-select", "racetozero-prep", entry],
+    prepScreen: "clutch-prep",
+    getEntryScreen: getClutchEntryScreen,
+    buildNavStack: (entry) => ["home", "lobby", "game-select", "clutch-prep", entry],
   });
 
   const unsub = onGameSessionChange(() => {

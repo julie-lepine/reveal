@@ -74,7 +74,7 @@ const defaultState = () => ({
   stats: {
     hotTakesPlayed: 0,
     speedVotesPlayed: 0,
-    raceToZerosPlayed: 0,
+    clutchesPlayed: 0,
     playlistGuessesPlayed: 0,
     truthMetersPlayed: 0,
     consensusGamesPlayed: 0,
@@ -127,7 +127,7 @@ const defaultState = () => ({
     currentQuestion: null,
     matchScores: {},
   },
-  raceToZeroGame: {
+  clutchGame: {
     ready: {},
     lobbyStarted: false,
     roundCount: 5,
@@ -282,7 +282,7 @@ function loadState() {
       inLobby: parsed.inLobby || false,
       hotTakeGame: { ...defaultState().hotTakeGame, ...parsed.hotTakeGame },
       speedVoteGame: { ...defaultState().speedVoteGame, ...parsed.speedVoteGame },
-      raceToZeroGame: { ...defaultState().raceToZeroGame, ...parsed.raceToZeroGame },
+      clutchGame: { ...defaultState().clutchGame, ...parsed.clutchGame },
       traitreGame: { ...defaultState().traitreGame, ...parsed.traitreGame },
       playlistGuessGame: { ...defaultState().playlistGuessGame, ...parsed.playlistGuessGame },
       truthMeterGame: { ...defaultState().truthMeterGame, ...parsed.truthMeterGame },
@@ -521,7 +521,7 @@ export function defaultEveningStats() {
     liesTotal: 0,
     tierNightsPlayed: 0,
     speedVotesPlayed: 0,
-    raceToZerosPlayed: 0,
+    clutchesPlayed: 0,
     playlistGuessesPlayed: 0,
     truthMetersPlayed: 0,
     consensusGamesPlayed: 0,
@@ -566,7 +566,7 @@ export function resetGameSessionsOnly() {
   saveStatePatch({
     hotTakeGame: { ...base.hotTakeGame },
     speedVoteGame: { ...base.speedVoteGame },
-    raceToZeroGame: { ...base.raceToZeroGame },
+    clutchGame: { ...base.clutchGame },
     traitreGame: { ...base.traitreGame },
     playlistGuessGame: { ...base.playlistGuessGame },
     truthMeterGame: { ...base.truthMeterGame },
@@ -694,9 +694,9 @@ export function recordSpeedVotePlayed() {
   });
 }
 
-export function recordRaceToZeroPlayed() {
-  recordEveningGameOnce("racetozero", () => {
-    state.stats.raceToZerosPlayed = (state.stats.raceToZerosPlayed || 0) + 1;
+export function recordClutchPlayed() {
+  recordEveningGameOnce("clutch", () => {
+    state.stats.clutchesPlayed = (state.stats.clutchesPlayed || 0) + 1;
   });
 }
 

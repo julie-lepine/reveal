@@ -1,14 +1,14 @@
 import {
-  RACE_TO_ZERO_GRACE_MS,
-  pickRaceToZeroTarget,
-} from "../../data/raceToZero.js";
+  CLUTCH_GRACE_MS,
+  pickClutchTarget,
+} from "../../data/clutch.js";
 import { getActivePlayerNames } from "./players.js";
 import { getLocalDisplayName, getState, saveStatePatch } from "./state.js";
 import {
   isGameSyncActive,
-  syncRaceToZeroSession,
+  syncClutchSession,
   allMembersReady,
-  raceToZeroToRemote,
+  clutchToRemote,
   userIdForName,
 } from "./gameSync.js";
 import { patchGameStateWithFeedback } from "./patchGameStateFeedback.js";
@@ -31,25 +31,25 @@ function defaultSession() {
   };
 }
 
-export function getRaceToZeroSession() {
-  return getState().raceToZeroGame || defaultSession();
+export function getClutchSession() {
+  return getState().clutchGame || defaultSession();
 }
 
-export function defaultRaceToZeroPrepSession() {
+export function defaultClutchPrepSession() {
   return defaultSession();
 }
 
-export function getRaceToZeroRoundCount() {
-  return getRaceToZeroSession().roundCount ?? 5;
+export function getClutchRoundCount() {
+  return getClutchSession().roundCount ?? 5;
 }
 
-export async function setRaceToZeroRoundCount(count) {
-  const session = getRaceToZeroSession();
-  await syncRaceToZeroSession({ ...session, roundCount: count });
+export async function setClutchRoundCount(count) {
+  const session = getClutchSession();
+  await syncClutchSession({ ...session, roundCount: count });
 }
 
-export function getRaceToZeroPrepSummary() {
-  const requested = getRaceToZeroRoundCount();
+export function getClutchPrepSummary() {
+  const requested = getClutchRoundCount();
   return {
     requested,
     effective: requested,
@@ -59,115 +59,115 @@ export function getRaceToZeroPrepSummary() {
 
 /** Charge utile d'une nouvelle manche : cible aléatoire + fenêtre de clôture (cible + grâce). */
 function roundPayload(roundIdx) {
-  const targetMs = pickRaceToZeroTarget();
+  const targetMs = pickClutchTarget();
   const startAt = Date.now();
   return {
     roundIdx,
     phase: "active",
     targetMs,
     roundStartAt: new Date(startAt).toISOString(),
-    roundEndsAt: new Date(startAt + targetMs + RACE_TO_ZERO_GRACE_MS).toISOString(),
+    roundEndsAt: new Date(startAt + targetMs + CLUTCH_GRACE_MS).toISOString(),
     taps: {},
     roundScored: false,
     lastRound: null,
   };
 }
 
-export async function markRaceToZeroLobbyStarted() {
+export async function markClutchLobbyStarted() {
   const next = {
-    ...getRaceToZeroSession(),
+    ...getClutchSession(),
     lobbyStarted: true,
     ...roundPayload(0),
   };
   return launchGameWithSync({
-    screen: "racetozero",
-    gameId: "racetozero",
+    screen: "clutch",
+    gameId: "clutch",
     mode: "push",
-    applyLocal: () => saveStatePatch({ raceToZeroGame: next }),
-    getRemoteState: () => ({ raceToZero: raceToZeroToRemote(next) }),
+    applyLocal: () => saveStatePatch({ clutchGame: next }),
+    getRemoteState: () => ({ clutch: clutchToRemote(next) }),
   });
 }
 
-export async function startRaceToZeroRound(roundIdx) {
+export async function startClutchRound(roundIdx) {
   const next = {
-    ...getRaceToZeroSession(),
+    ...getClutchSession(),
     ...roundPayload(roundIdx),
   };
-  await syncRaceToZeroSession(next);
+  await syncClutchSession(next);
   return next;
 }
 
-export async function commitRaceToZeroPlay(patch, patchOpts = {}) {
+export async function commitClutchPlay(patch, patchOpts = {}) {
   return commitHostGamePlay({
     patch,
-    gameId: "racetozero",
-    stateKey: "raceToZero",
-    getSession: getRaceToZeroSession,
-    saveLocal: (session) => saveStatePatch({ raceToZeroGame: session }),
-    toRemote: raceToZeroToRemote,
+    gameId: "clutch",
+    stateKey: "clutch",
+    getSession: getClutchSession,
+    saveLocal: (session) => saveStatePatch({ clutchGame: session }),
+    toRemote: clutchToRemote,
     patchOpts,
   });
 }
 
-export async function setRaceToZeroReady(playerName, ready) {
+export async function setClutchReady(playerName, ready) {
   await commitPrepReadyToggle({
     readyKey: playerName,
     ready,
-    getSession: getRaceToZeroSession,
-    saveLocal: (session) => saveStatePatch({ raceToZeroGame: session }),
-    stateKey: "raceToZero",
-    gameId: "racetozero",
-    screen: "racetozero-prep",
+    getSession: getClutchSession,
+    saveLocal: (session) => saveStatePatch({ clutchGame: session }),
+    stateKey: "clutch",
+    gameId: "clutch",
+    screen: "clutch-prep",
   });
 }
 
-export function allRaceToZeroReady() {
-  const session = getRaceToZeroSession();
+export function allClutchReady() {
+  const session = getClutchSession();
   if (isGameSyncActive()) {
-    const remote = raceToZeroToRemote(session);
+    const remote = clutchToRemote(session);
     return allMembersReady(remote.ready || {});
   }
   return getActivePlayerNames().every((n) => session.ready[n]);
 }
 
 /** MP : envoie uniquement le tap local ({ ms, at }). Premier tap conservé. */
-export async function commitRaceToZeroTap(ms) {
+export async function commitClutchTap(ms) {
   const localName = getLocalDisplayName();
-  const session = getRaceToZeroSession();
+  const session = getClutchSession();
   if (session.taps?.[localName]?.ms != null) {
     return session.taps[localName];
   }
   const tap = { ms, at: Date.now() };
   const taps = { ...(session.taps || {}), [localName]: tap };
-  saveStatePatch({ raceToZeroGame: { ...session, taps } });
+  saveStatePatch({ clutchGame: { ...session, taps } });
   if (!isGameSyncActive()) return tap;
   const uid = userIdForName(localName) || localName;
-  await patchGameStateWithFeedback({ raceToZero: { taps: { [uid]: tap } } });
+  await patchGameStateWithFeedback({ clutch: { taps: { [uid]: tap } } });
   return tap;
 }
 
-export function hasLocalRaceToZeroTap(session = getRaceToZeroSession()) {
+export function hasLocalClutchTap(session = getClutchSession()) {
   const localName = getLocalDisplayName();
   return session.taps?.[localName]?.ms != null;
 }
 
-export function allRaceToZeroTapsIn(session = getRaceToZeroSession()) {
+export function allClutchTapsIn(session = getClutchSession()) {
   const names = getActivePlayerNames();
   const taps = session.taps || {};
   return names.length > 0 && names.every((n) => taps[n]?.ms != null);
 }
 
-export function getRaceToZeroEntryScreen() {
-  const session = getRaceToZeroSession();
-  if (!session.lobbyStarted) return "racetozero-prep";
-  return "racetozero";
+export function getClutchEntryScreen() {
+  const session = getClutchSession();
+  if (!session.lobbyStarted) return "clutch-prep";
+  return "clutch";
 }
 
 /**
- * Classe les joueurs par écart absolu au 0 (croissant). Les non-tappeurs sont
+ * Classe les joueurs par écart absolu à la cible (croissant). Les non-tappeurs sont
  * derniers (écart infini). Égalité d'écart départagée par le tap le plus tôt commit.
  */
-export function rankRaceToZeroResults(taps = {}, targetMs, playerNames = getActivePlayerNames()) {
+export function rankClutchResults(taps = {}, targetMs, playerNames = getActivePlayerNames()) {
   const entries = playerNames.map((name) => {
     const t = taps[name];
     const tapped = t && typeof t.ms === "number" && Number.isFinite(t.ms);

@@ -1,20 +1,21 @@
 import {
-  RACE_TO_ZERO_GRACE_MS,
-  formatRaceToZeroSeconds,
-  formatRaceToZeroGap,
-} from "../../data/raceToZero.js";
+  CLUTCH_GRACE_MS,
+  CLUTCH_HIDE_BEFORE_MS,
+  formatClutchSeconds,
+  formatClutchGap,
+} from "../../data/clutch.js";
 import {
-  getRaceToZeroEntryScreen,
-  getRaceToZeroSession,
-  commitRaceToZeroTap,
-  commitRaceToZeroPlay,
-  allRaceToZeroTapsIn,
-  rankRaceToZeroResults,
-  startRaceToZeroRound,
-} from "../core/raceToZeroSession.js";
-import { awardRaceToZeroRound } from "../core/scoring.js";
+  getClutchEntryScreen,
+  getClutchSession,
+  commitClutchTap,
+  commitClutchPlay,
+  allClutchTapsIn,
+  rankClutchResults,
+  startClutchRound,
+} from "../core/clutchSession.js";
+import { awardClutchRound } from "../core/scoring.js";
 import { applyMatchScoreDeltas, gameCumulativeScoresHtml, refreshGameScoresBox } from "../core/gameScores.js";
-import { getLocalDisplayName, recordRaceToZeroPlayed, setLastGame } from "../core/state.js";
+import { getLocalDisplayName, recordClutchPlayed, setLastGame } from "../core/state.js";
 import { getLobbyParticipants } from "../core/lobby.js";
 import { getActivePlayerNames } from "../core/players.js";
 import { setLobbyPlaying, setLobbyWaiting } from "../core/lobby.js";
@@ -32,16 +33,16 @@ import {
   completeGameSession,
 } from "../core/gameSync.js";
 
-export function mountRaceToZero(app) {
+export function mountClutch(app) {
   if (!requireLobbyPlay()) return null;
 
-  const entry = getRaceToZeroEntryScreen();
-  if (entry !== "racetozero") {
+  const entry = getClutchEntryScreen();
+  if (entry !== "clutch") {
     navigate(entry);
     return null;
   }
 
-  void setLobbyPlaying("racetozero").catch(() => {});
+  void setLobbyPlaying("clutch").catch(() => {});
 
   let roundIdx = 0;
   let phase = "active";
@@ -56,14 +57,19 @@ export function mountRaceToZero(app) {
   let activeKey = null;
   let localWindowClosed = false;
   let graceTimer = null;
+  let clockRaf = null;
 
   const localName = getLocalDisplayName();
   const mp = isGameSyncActive();
-  const totalRounds = getRaceToZeroSession().roundCount ?? 5;
+  const totalRounds = getClutchSession().roundCount ?? 5;
 
   function myTapMs() {
     const t = taps[localName];
     return t && typeof t.ms === "number" ? t.ms : null;
+  }
+
+  function hideClockAtMs() {
+    return (targetMs || 0) - CLUTCH_HIDE_BEFORE_MS;
   }
 
   function clearGrace() {
@@ -71,13 +77,45 @@ export function mountRaceToZero(app) {
     graceTimer = null;
   }
 
+  function stopClock() {
+    if (clockRaf) cancelAnimationFrame(clockRaf);
+    clockRaf = null;
+  }
+
+  /** Anime le chrono visible montant jusqu'à (cible − 2 s), puis le masque. */
+  function startClock() {
+    stopClock();
+    const tick = () => {
+      if (phase !== "active" || localStart == null) {
+        stopClock();
+        return;
+      }
+      const clock = app.querySelector("#clutch-clock");
+      const sub = app.querySelector("#clutch-clock-sub");
+      if (!clock) {
+        stopClock();
+        return;
+      }
+      const elapsed = performance.now() - localStart;
+      if (elapsed >= hideClockAtMs()) {
+        clock.textContent = "👀";
+        if (sub) sub.textContent = "Bientôt… tape à la cible !";
+        stopClock();
+        return;
+      }
+      clock.textContent = formatClutchSeconds(Math.max(0, elapsed));
+      clockRaf = requestAnimationFrame(tick);
+    };
+    clockRaf = requestAnimationFrame(tick);
+  }
+
   function alreadyScoredThisRound() {
     if (phase !== "reveal") return false;
-    return takeScored || Boolean(getRaceToZeroSession().roundScored);
+    return takeScored || Boolean(getClutchSession().roundScored);
   }
 
   function syncFromSession() {
-    const s = getRaceToZeroSession();
+    const s = getClutchSession();
     if (s.roundIdx != null) roundIdx = s.roundIdx;
     if (s.phase) phase = s.phase;
     if (s.targetMs != null) targetMs = s.targetMs;
@@ -88,7 +126,7 @@ export function mountRaceToZero(app) {
 
   /** Démarre le chrono local d'une nouvelle manche active + programme la clôture (cible + grâce). */
   function ensureRoundTiming() {
-    const s = getRaceToZeroSession();
+    const s = getClutchSession();
     if (phase === "active") {
       const key = `${roundIdx}:${s.roundStartAt || ""}`;
       if (key !== activeKey) {
@@ -96,7 +134,7 @@ export function mountRaceToZero(app) {
         localStart = performance.now();
         localWindowClosed = false;
         clearGrace();
-        const windowMs = (targetMs || 0) + RACE_TO_ZERO_GRACE_MS;
+        const windowMs = (targetMs || 0) + CLUTCH_GRACE_MS;
         graceTimer = setTimeout(onGraceElapsed, windowMs);
       }
     } else {
@@ -124,18 +162,18 @@ export function mountRaceToZero(app) {
     revealInFlight = true;
     try {
       takeScored = true;
-      const session = getRaceToZeroSession();
+      const session = getClutchSession();
       const names = getActivePlayerNames();
-      const ranking = rankRaceToZeroResults(session.taps || {}, targetMs, names);
+      const ranking = rankClutchResults(session.taps || {}, targetMs, names);
       let matchScores = session.matchScores || {};
       if (!mp || canActAsHost()) {
-        lastAward = awardRaceToZeroRound(ranking);
+        lastAward = awardClutchRound(ranking);
         matchScores = applyMatchScoreDeltas(matchScores, lastAward.deltas || {});
       } else {
         lastAward = { ranking, deltas: {} };
       }
       const lastRoundData = { targetMs, ranking, deltas: lastAward.deltas || {} };
-      await commitRaceToZeroPlay(
+      await commitClutchPlay(
         {
           phase: "reveal",
           roundScored: true,
@@ -166,7 +204,7 @@ export function mountRaceToZero(app) {
   }
 
   function sessionScores() {
-    return getRaceToZeroSession().matchScores || {};
+    return getClutchSession().matchScores || {};
   }
 
   function activeHtml() {
@@ -175,24 +213,29 @@ export function mountRaceToZero(app) {
     const tappedCount = Object.values(taps).filter((t) => t?.ms != null).length;
     const totalPlayers = getActivePlayerNames().length;
 
-    const targetLabel = formatRaceToZeroSeconds(targetMs);
+    const targetLabel = formatClutchSeconds(targetMs);
+    const elapsedNow = localStart != null ? performance.now() - localStart : 0;
+    const hidden = elapsedNow >= hideClockAtMs();
+    const clockText = hidden ? "👀" : formatClutchSeconds(Math.max(0, elapsedNow));
+    const clockSub = hidden ? "Bientôt… tape à la cible !" : "Le chrono monte vers la cible";
+
     const status = localWindowClosed
       ? "Temps écoulé - en attente du verdict…"
       : tapped
         ? mp
-          ? allRaceToZeroTapsIn()
+          ? allClutchTapsIn()
             ? "Tout le monde a tapé !"
             : "C'est noté ! En attente des autres…"
           : "C'est noté !"
-        : "Concentre-toi… et tape au bon moment 💥";
+        : "Tape pile au moment où le chrono atteint la cible 💥";
 
     return `
       <div class="card card--speed" style="text-align:center">
-        <p class="label-upper label-upper--gold">🎯 Cible de la manche</p>
-        <p class="hot-take-text" style="font-size:2.2rem;font-weight:900">${escapeHtml(targetLabel)}</p>
-        <p class="hint">Le chrono est caché. Tape pile quand il atteint 0.</p>
+        <p class="label-upper label-upper--gold">🎯 Objectif : ${escapeHtml(targetLabel)}</p>
+        <p id="clutch-clock" style="font-size:2.8rem;font-weight:900;margin:.3rem 0;font-variant-numeric:tabular-nums">${escapeHtml(clockText)}</p>
+        <p class="hint" id="clutch-clock-sub">${escapeHtml(clockSub)}</p>
       </div>
-      <button type="button" id="race-zero-target"
+      <button type="button" id="clutch-target"
         ${tapped || localWindowClosed ? "disabled" : ""}
         style="width:220px;height:220px;margin:24px auto;display:flex;align-items:center;justify-content:center;
           border-radius:50%;border:none;cursor:${tapped || localWindowClosed ? "default" : "pointer"};
@@ -204,7 +247,7 @@ export function mountRaceToZero(app) {
       <p class="hint" style="text-align:center">${escapeHtml(status)}</p>
       ${
         host
-          ? `<button type="button" class="btn btn-secondary btn--spaced" id="race-zero-force">
+          ? `<button type="button" class="btn btn-secondary btn--spaced" id="clutch-force">
               Révéler maintenant (${tappedCount}/${totalPlayers})
             </button>`
           : ""
@@ -212,7 +255,7 @@ export function mountRaceToZero(app) {
   }
 
   function revealHtml() {
-    const ranking = lastRound?.ranking || rankRaceToZeroResults(taps, targetMs, getActivePlayerNames());
+    const ranking = lastRound?.ranking || rankClutchResults(taps, targetMs, getActivePlayerNames());
     const host = !mp || canActAsHost();
     const deltas = lastRound?.deltas || {};
 
@@ -222,7 +265,7 @@ export function mountRaceToZero(app) {
         const medal = entry.tapped && idx < 3 ? ["🥇", "🥈", "🥉"][idx] : "";
         const pts = deltas[entry.name];
         const gapLabel = entry.tapped
-          ? formatRaceToZeroGap(entry.ms, targetMs)
+          ? formatClutchGap(entry.ms, targetMs)
           : "pas tapé";
         return `
           <div class="result-row">
@@ -236,9 +279,9 @@ export function mountRaceToZero(app) {
 
     return `
       <h3 class="section-title">Verdict de la manche</h3>
-      <p class="hint">🎯 La cible était <strong>${escapeHtml(formatRaceToZeroSeconds(targetMs))}</strong></p>
+      <p class="hint">🎯 La cible était <strong>${escapeHtml(formatClutchSeconds(targetMs))}</strong></p>
       ${gameCumulativeScoresHtml({
-        gameLabel: "Race to Zero",
+        gameLabel: "Clutch",
         title: "Cumul des scores",
         scores: sessionScores(),
       })}
@@ -255,6 +298,7 @@ export function mountRaceToZero(app) {
   function render() {
     syncFromSession();
     ensureRoundTiming();
+    stopClock();
 
     let phaseHtml = "";
     if (phase === "active") phaseHtml = activeHtml();
@@ -269,7 +313,7 @@ export function mountRaceToZero(app) {
           ).join("")}</div>
           <span class="muted">${roundIdx + 1}/${totalRounds}</span>
         </div>
-        <div class="logo logo--sm"><h1>RACE TO ZERO 💥</h1></div>
+        <div class="logo logo--sm"><h1>CLUTCH 💥</h1></div>
         ${phaseHtml}
         ${gameExitBarHtml()}
       `,
@@ -278,42 +322,44 @@ export function mountRaceToZero(app) {
     bindNav(app);
     bindExitGame(app);
 
-    app.querySelector("#race-zero-target")?.addEventListener("click", () => {
+    if (phase === "active") startClock();
+
+    app.querySelector("#clutch-target")?.addEventListener("click", () => {
       if (phase !== "active" || myTapMs() != null || localWindowClosed || isEveningGameplayPaused()) {
         return;
       }
       const ms = Math.round(performance.now() - localStart);
       taps = { ...taps, [localName]: { ms, at: Date.now() } };
       render();
-      void commitRaceToZeroTap(ms).then(() => {
+      void commitClutchTap(ms).then(() => {
         if (!mp) {
           void goToReveal();
           return;
         }
-        if (allRaceToZeroTapsIn() && canActAsHost()) void goToReveal();
+        if (allClutchTapsIn() && canActAsHost()) void goToReveal();
       });
     });
 
-    app.querySelector("#race-zero-force")?.addEventListener("click", () => {
+    app.querySelector("#clutch-force")?.addEventListener("click", () => {
       void goToReveal();
     });
 
     app.querySelector("#next-round")?.addEventListener("click", withClickLock(async () => {
       if (roundIdx < totalRounds - 1) {
-        await startRaceToZeroRound(roundIdx + 1);
+        await startClutchRound(roundIdx + 1);
         syncFromSession();
         render();
       } else {
-        recordRaceToZeroPlayed();
+        recordClutchPlayed();
         const winner = (lastRound?.ranking || []).find((r) => r.tapped)?.name || "-";
         setLastGame({
-          gameId: "racetozero",
-          title: "Race to Zero",
+          gameId: "clutch",
+          title: "Clutch",
           summary: `${totalRounds} manches · dernier gagnant : ${winner}`,
         });
         if (mp) {
           try {
-            await completeGameSession({ gameId: "racetozero", screen: "results", state: {} });
+            await completeGameSession({ gameId: "clutch", screen: "results", state: {} });
           } catch (e) {
             console.warn("REVEAL completeGameSession:", e);
             navigate("results", { navStack: ["home", "lobby", "game-select", "results"] });
@@ -330,13 +376,13 @@ export function mountRaceToZero(app) {
     const prevPhase = phase;
     syncFromSession();
     ensureRoundTiming();
-    if (phase === "active" && canActAsHost() && allRaceToZeroTapsIn()) {
+    if (phase === "active" && canActAsHost() && allClutchTapsIn()) {
       void goToReveal();
       return;
     }
     if (phase === "reveal" && prevPhase === "reveal") {
       refreshGameScoresBox(app, {
-        gameLabel: "Race to Zero",
+        gameLabel: "Clutch",
         title: "Cumul des scores",
         scores: sessionScores(),
       });
@@ -349,6 +395,7 @@ export function mountRaceToZero(app) {
 
   return () => {
     clearGrace();
+    stopClock();
     unsub();
   };
 }

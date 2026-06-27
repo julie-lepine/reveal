@@ -26,9 +26,9 @@ import {
   mergeTriviaPatchState,
   mergeTraitrePatchState,
   mergeSpeedVotePatchState,
-  mergeRaceToZeroPatchState,
-  mergeRaceToZeroPhase,
-  isNewRaceToZeroRound,
+  mergeClutchPatchState,
+  mergeClutchPhase,
+  isNewClutchRound,
   mergeTruthMeterPatchState,
   mergeTruthMeterPhase,
   mergeForwardGamePhase,
@@ -186,7 +186,7 @@ const RESTARTABLE_SESSION_GAME_IDS = new Set([
   "guesslie",
   "playlistguess",
   "tiernight",
-  "racetozero",
+  "clutch",
 ]);
 
 const SESSION_GAME_ID_TO_TILE = {
@@ -200,7 +200,7 @@ const SESSION_GAME_ID_TO_TILE = {
   guesslie: "guesslie",
   playlistguess: "playlistguess-prep",
   tiernight: "tiernight-select",
-  racetozero: "racetozero-prep",
+  clutch: "clutch-prep",
 };
 
 function titleForSessionGameId(gameId) {
@@ -367,7 +367,7 @@ const GAME_SETUP_SCREENS = new Set([
   "consensus-prep",
   "dilemma-prep",
   "playlistguess-prep",
-  "racetozero-prep",
+  "clutch-prep",
   "guesslie-menu",
   "guesslie-setup",
   "guesslie-wait",
@@ -886,12 +886,12 @@ function mergeSpeedVoteGameLocal(local, remote) {
   };
 }
 
-function isNewRaceToZeroRoundUid(cur, inc) {
-  return isNewRaceToZeroRound(cur, inc);
+function isNewClutchRoundUid(cur, inc) {
+  return isNewClutchRound(cur, inc);
 }
 
-/** Taps Race to Zero (clé uid ou pseudo, valeur { ms, at }) → clés = pseudos actifs. */
-function normalizeRaceToZeroTaps(taps = {}) {
+/** Taps Clutch (clé uid ou pseudo, valeur { ms, at }) → clés = pseudos actifs. */
+function normalizeClutchTaps(taps = {}) {
   const names = getActivePlayerNames();
   return normalizePlayerKeyedMap(taps, names, (key) => {
     const mapped = playerKeyToDisplayName(key);
@@ -900,20 +900,20 @@ function normalizeRaceToZeroTaps(taps = {}) {
   });
 }
 
-function mergeRemoteRaceToZeroTapsUid(cur, inc) {
+function mergeRemoteClutchTapsUid(cur, inc) {
   const curTaps = cur?.taps || {};
   const incTaps = inc?.taps || {};
-  if (isNewRaceToZeroRound(cur, inc)) return incTaps;
+  if (isNewClutchRound(cur, inc)) return incTaps;
   if (inc?.phase === "active" || inc?.phase === "reveal" || cur?.phase === "reveal") {
     return { ...curTaps, ...incTaps };
   }
   return incTaps;
 }
 
-function mergeRaceToZeroGameLocal(local, remote) {
+function mergeClutchGameLocal(local, remote) {
   if (!remote) return local;
   if (!local) return remote;
-  const newRound = isNewRaceToZeroRound(local, remote);
+  const newRound = isNewClutchRound(local, remote);
   const remoteTaps = remote.taps || {};
   const localTaps = local.taps || {};
   let taps = remoteTaps;
@@ -922,7 +922,7 @@ function mergeRaceToZeroGameLocal(local, remote) {
   } else if (remote.phase === "active" || remote.phase === "reveal" || local.phase === "reveal") {
     taps = { ...remoteTaps, ...localTaps };
   }
-  taps = normalizeRaceToZeroTaps(taps);
+  taps = normalizeClutchTaps(taps);
   const ready =
     !remote.lobbyStarted && !local.lobbyStarted
       ? mergeReadyMapsLocal(local.ready || {}, remote.ready || {}, getActivePlayerNames(), getLocalDisplayName())
@@ -930,7 +930,7 @@ function mergeRaceToZeroGameLocal(local, remote) {
   return {
     ...local,
     ...remote,
-    phase: mergeRaceToZeroPhase(local, remote),
+    phase: mergeClutchPhase(local, remote),
     taps,
     ready,
     roundScored: mergeRoundFlag(local.roundScored, remote.roundScored, newRound),
@@ -1817,7 +1817,7 @@ export function speedVoteFromRemote(remote) {
   };
 }
 
-export function raceToZeroToRemote(session) {
+export function clutchToRemote(session) {
   const remoteTaps = {};
   Object.entries(session.taps || {}).forEach(([name, val]) => {
     if (!val) return;
@@ -1853,7 +1853,7 @@ export function raceToZeroToRemote(session) {
   };
 }
 
-export function raceToZeroFromRemote(remote) {
+export function clutchFromRemote(remote) {
   if (!remote) return null;
   const taps = {};
   Object.entries(remote.taps || {}).forEach(([uid, val]) => {
@@ -2442,10 +2442,10 @@ export function applyRemoteSession(row) {
     const local = getState().speedVoteGame;
     patch.speedVoteGame = local ? mergeSpeedVoteGameLocal(local, remote) : remote;
   }
-  if (st.raceToZero) {
-    const remote = raceToZeroFromRemote(st.raceToZero);
-    const local = getState().raceToZeroGame;
-    patch.raceToZeroGame = local ? mergeRaceToZeroGameLocal(local, remote) : remote;
+  if (st.clutch) {
+    const remote = clutchFromRemote(st.clutch);
+    const local = getState().clutchGame;
+    patch.clutchGame = local ? mergeClutchGameLocal(local, remote) : remote;
   }
   if (st.traitre) {
     const remote = traitreFromRemote(st.traitre);
@@ -2693,7 +2693,7 @@ export function isActiveGameSessionScreen(screen) {
 function resolveActivePlayScreen(st, gid, declared) {
   if (st.hotTake?.lobbyStarted) return "hottake";
   if (st.speedVote?.lobbyStarted) return "speedvote";
-  if (st.raceToZero?.lobbyStarted) return "racetozero";
+  if (st.clutch?.lobbyStarted) return "clutch";
   if (st.traitre?.lobbyStarted) {
     if (declared === "traitre-prep") return null;
     if (declared === "game-select" && !isLobbyEveningStarted()) return "game-select";
@@ -2757,8 +2757,8 @@ export function getEffectiveSessionScreen(row) {
   if (st.speedVote) {
     if (gid === "speedvote" || declared === "speedvote-prep") return "speedvote-prep";
   }
-  if (st.raceToZero) {
-    if (gid === "racetozero" || declared === "racetozero-prep") return "racetozero-prep";
+  if (st.clutch) {
+    if (gid === "clutch" || declared === "clutch-prep") return "clutch-prep";
   }
   if (st.traitre) {
     if (gid === "traitre" || declared === "traitre-prep") return "traitre-prep";
@@ -3286,26 +3286,26 @@ async function patchGameStateInner(
       );
     }
   }
-  if (mergePayload.raceToZero) {
-    const curRz = current.raceToZero;
-    const incRz = mergePayload.raceToZero;
-    const newRzRound = curRz && incRz ? isNewRaceToZeroRoundUid(curRz, incRz) : false;
-    nextState.raceToZero = curRz
+  if (mergePayload.clutch) {
+    const curRz = current.clutch;
+    const incRz = mergePayload.clutch;
+    const newRzRound = curRz && incRz ? isNewClutchRoundUid(curRz, incRz) : false;
+    nextState.clutch = curRz
       ? {
-          ...mergeRaceToZeroPatchState(curRz, incRz, {
+          ...mergeClutchPatchState(curRz, incRz, {
             mergeReadyUid: mergeRemoteReadyUid,
-            mergeTaps: mergeRemoteRaceToZeroTapsUid,
+            mergeTaps: mergeRemoteClutchTapsUid,
           }),
           roundScored: mergeRoundFlag(curRz.roundScored, incRz.roundScored, newRzRound),
         }
       : incRz;
-    if (curRz && incRz && nextState.raceToZero) {
-      nextState.raceToZero.matchScores = mergeRemoteMatchScoresUid(
+    if (curRz && incRz && nextState.clutch) {
+      nextState.clutch.matchScores = mergeRemoteMatchScoresUid(
         curRz.matchScores || {},
         incRz.matchScores || {}
       );
       if (incRz.lastRound != null) {
-        nextState.raceToZero.lastRound = incRz.lastRound;
+        nextState.clutch.lastRound = incRz.lastRound;
       }
     }
   }
@@ -3636,11 +3636,11 @@ export async function syncSpeedVoteSession(extra = {}, patchOpts = {}) {
   return session;
 }
 
-export async function syncRaceToZeroSession(extra = {}, patchOpts = {}) {
-  const session = { ...getState().raceToZeroGame, ...extra };
-  saveStatePatch({ raceToZeroGame: session });
+export async function syncClutchSession(extra = {}, patchOpts = {}) {
+  const session = { ...getState().clutchGame, ...extra };
+  saveStatePatch({ clutchGame: session });
   if (!isGameSyncActive()) return session;
-  await patchGameState({ raceToZero: raceToZeroToRemote(session) }, patchOpts);
+  await patchGameState({ clutch: clutchToRemote(session) }, patchOpts);
   return session;
 }
 

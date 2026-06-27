@@ -10,7 +10,7 @@ import {
   hotTakeToRemote,
   traitreToRemote,
   speedVoteToRemote,
-  raceToZeroToRemote,
+  clutchToRemote,
   triviaToRemote,
   truthMeterToRemote,
   consensusToRemote,
@@ -23,7 +23,7 @@ import { defaultTraitrePrepSession } from "./traitreSession.js";
 import { TRAITRE_MIN_PLAYERS } from "../../data/traitre.js";
 import { requireMinLobbyPlayers } from "./gameLaunchGuard.js";
 import { defaultSpeedVotePrepSession } from "./speedVoteSession.js";
-import { defaultRaceToZeroPrepSession } from "./raceToZeroSession.js";
+import { defaultClutchPrepSession } from "./clutchSession.js";
 import { PLAYLIST_GUESS_MIN_PLAYERS } from "../../data/playlistGuess.js";
 import { defaultPlaylistGuessPrepSession } from "./playlistGuessSession.js";
 import { getLobbyParticipants } from "./lobby.js";
@@ -39,7 +39,7 @@ const GAME_ID_TO_TILE = {
   traitre: "traitre-prep",
   hottake: "hottake-prep",
   speedvote: "speedvote-prep",
-  racetozero: "racetozero-prep",
+  clutch: "clutch-prep",
   trivia: "trivia-prep",
   truthmeter: "truthmeter-prep",
   consensus: "consensus-prep",
@@ -121,27 +121,27 @@ export async function launchSpeedVotePrep() {
   navigate("speedvote-prep");
 }
 
-export async function launchRaceToZeroPrep() {
-  const rz = defaultRaceToZeroPrepSession();
-  saveStatePatch({ raceToZeroGame: rz });
+export async function launchClutchPrep() {
+  const rz = defaultClutchPrepSession();
+  saveStatePatch({ clutchGame: rz });
 
   if (isGameSyncActive()) {
     if (!(await requireHostToLaunch())) return;
     try {
-      await startGameSession("racetozero", "racetozero-prep", {
-        raceToZero: raceToZeroToRemote(rz),
+      await startGameSession("clutch", "clutch-prep", {
+        clutch: clutchToRemote(rz),
       });
     } catch (e) {
-      console.warn("REVEAL launch Race to Zero:", e);
-      await showAppAlert(e.message || "Impossible de lancer Race to Zero.", {
-        title: "Race to Zero",
+      console.warn("REVEAL launch Clutch:", e);
+      await showAppAlert(e.message || "Impossible de lancer Clutch.", {
+        title: "Clutch",
         icon: "⚠️",
       });
     }
     return;
   }
 
-  navigate("racetozero-prep");
+  navigate("clutch-prep");
 }
 
 export async function launchPlaylistGuessPrep() {
@@ -359,7 +359,7 @@ const RESTART_HANDLERS = {
   traitre: launchTraitrePrep,
   hottake: launchHotTakePrep,
   speedvote: launchSpeedVotePrep,
-  racetozero: launchRaceToZeroPrep,
+  clutch: launchClutchPrep,
   trivia: launchTriviaPrep,
   truthmeter: launchTruthMeterPrep,
   consensus: launchConsensusPrep,

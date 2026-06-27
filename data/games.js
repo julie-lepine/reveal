@@ -69,15 +69,16 @@ export const GAMES = [
     enabled: true,
   },
   {
-    id: "racetozero-prep",
-    title: "Race to Zero",
-    desc: "Chrono caché - tape pile au moment où il atteint 0",
+    id: "clutch-prep",
+    title: "Clutch",
+    desc: "Le chrono monte puis disparaît - tape pile à la cible",
     emoji: "💥",
-    cssClass: "racezero",
-    logo: "assets/games/racetozero.png",
+    cssClass: "clutch",
+    logo: "assets/games/clutch.png",
     borderGradient:
       "linear-gradient(145deg, #FF6B6B 0%, #FF3CAC 48%, #2B2D66 100%)",
     enabled: true,
+    badgeLabel: "Prochainement",
   },
   {
     id: "dilemma-prep",
