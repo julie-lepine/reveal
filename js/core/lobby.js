@@ -113,7 +113,11 @@ function applyLeaveLobbyLocal({ wasGuest, navigateAway }) {
       isGuest: false,
       provider: null,
     };
-    sessionStorage.setItem("reveal-auth-tab", "guest");
+    try {
+      sessionStorage.setItem("reveal-auth-tab", "guest");
+    } catch {
+      /* storage indisponible */
+    }
   }
   resetEveningState();
   clearCachedGameSession();
@@ -378,8 +382,12 @@ export async function resetAppToCleanHome() {
   } catch {
     /* ignore */
   }
-  sessionStorage.removeItem("reveal-pending-join");
-  sessionStorage.setItem("reveal-auth-tab", "guest");
+  try {
+    sessionStorage.removeItem("reveal-pending-join");
+    sessionStorage.setItem("reveal-auth-tab", "guest");
+  } catch {
+    /* storage indisponible */
+  }
   window.location.reload();
 }
 
@@ -927,7 +935,7 @@ export function simulateLobbyJoins(onUpdate) {
 }
 
 export function getLobbyMessages() {
-  return getLobby().messages || [];
+  return getLobby()?.messages || [];
 }
 
 export async function addLobbyMessage(text) {
@@ -938,7 +946,7 @@ export async function addLobbyMessage(text) {
   const trimmed = text.trim();
   if (!trimmed) return;
   const messages = [
-    ...(getLobby().messages || []),
+    ...(getLobby()?.messages || []),
     { from: getLocalDisplayName(), text: trimmed, at: Date.now() },
   ];
   const lobby = { ...getLobby(), messages };

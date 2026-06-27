@@ -31,6 +31,7 @@ import { isEveningGameplayPaused } from "../core/filRougeSession.js";
 import {
   isGameSyncActive,
   isLobbyHost,
+  canActAsHost,
   onGameSessionChange,
   completeGameSession,
   getCachedGameSession,
@@ -69,7 +70,7 @@ export function mountPlaylistGuess(app) {
     return null;
   }
 
-  setLobbyPlaying("playlistguess");
+  void setLobbyPlaying("playlistguess").catch(() => {});
 
   const mp = isGameSyncActive();
   const localUid = getLocalParticipantId();
@@ -156,7 +157,7 @@ export function mountPlaylistGuess(app) {
       }
       return;
     }
-    if (mp && !isLobbyHost()) return;
+    if (mp && !canActAsHost()) return;
 
     setActiveScoringGame("playlistguess");
     roundScored = true;
@@ -174,7 +175,7 @@ export function mountPlaylistGuess(app) {
         voteEndsAt: null,
         roundScored: true,
       },
-      { withEveningScores: mp && isLobbyHost() }
+      { withEveningScores: mp && canActAsHost() }
     );
     phase = "reveal";
   }
@@ -182,7 +183,7 @@ export function mountPlaylistGuess(app) {
   async function tryAdvanceToReveal() {
     if (!mp || phase !== "voting" || revealAdvancing) return;
     const live = getPlaylistGuessSession();
-    if (!allPlaylistGuessVotesIn(live) || !isLobbyHost()) return;
+    if (!allPlaylistGuessVotesIn(live) || !canActAsHost()) return;
     if (live.phase === "reveal" || live.roundScored) return;
     revealAdvancing = true;
     try {
@@ -202,7 +203,7 @@ export function mountPlaylistGuess(app) {
 
   /** Filet de sécurité hôte : clôt la manche même si un joueur n'a pas voté. */
   async function forceReveal() {
-    if (mp && !isLobbyHost()) return;
+    if (mp && !canActAsHost()) return;
     if (getPlaylistGuessSession().phase === "reveal" || phase === "reveal") return;
     if (mp) {
       if (revealAdvancing || phase !== "voting") return;
@@ -221,7 +222,7 @@ export function mountPlaylistGuess(app) {
   }
 
   async function nextRound() {
-    if (mp && !isLobbyHost()) return;
+    if (mp && !canActAsHost()) return;
 
     if (roundIdx >= deck.length - 1) {
       recordPlaylistGuessPlayed();
@@ -292,7 +293,7 @@ export function mountPlaylistGuess(app) {
           ${songGuessCardHtml(round, { players, selectedPlayerId: selected })}
           <button type="button" class="btn btn-primary" id="confirm" ${selected === null ? "disabled" : ""}>Valider mon vote</button>`;
       }
-      if (!mp || isLobbyHost()) {
+      if (!mp || canActAsHost()) {
         const votedCount = Object.keys(votesNow).length;
         body += `
           <button type="button" class="btn btn-secondary btn--spaced" id="playlist-force">
@@ -317,7 +318,7 @@ export function mountPlaylistGuess(app) {
           title: "Cumul des scores",
         })}
         ${
-          !mp || isLobbyHost()
+          !mp || canActAsHost()
             ? `<button type="button" class="btn btn-primary btn--spaced" id="next-round">
           ${roundIdx >= total - 1 ? "Voir les résultats →" : "Manche suivante →"}
         </button>`

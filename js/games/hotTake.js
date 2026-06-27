@@ -26,6 +26,7 @@ import { getActivePlayers, getActivePlayerNames } from "../core/players.js";
 import { getLocalDisplayName, recordHotTakePlayed, setLastGame } from "../core/state.js";
 import { setLobbyPlaying, setLobbyWaiting } from "../core/lobby.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
+import { withClickLock } from "../core/actionLock.js";
 import { navigate } from "../core/router.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
 import { bindNav } from "../screens/nav.js";
@@ -35,6 +36,7 @@ import { isEveningGameplayPaused } from "../core/filRougeSession.js";
 import {
   isGameSyncActive,
   isLobbyHost,
+  canActAsHost,
   onGameSessionChange,
   completeGameSession,
   hotTakeToRemote,
@@ -56,7 +58,7 @@ export function mountHotTake(app) {
     return null;
   }
 
-  setLobbyPlaying("hottake");
+  void setLobbyPlaying("hottake").catch(() => {});
 
   let takeIdx = 0;
   let phase = "question";
@@ -90,7 +92,7 @@ export function mountHotTake(app) {
   }
 
   function canAwardThisTake() {
-    return !alreadyScoredThisTake() && (!mp || isLobbyHost());
+    return !alreadyScoredThisTake() && (!mp || canActAsHost());
   }
 
   function syncFromSession() {
@@ -127,6 +129,17 @@ export function mountHotTake(app) {
   function takeAuthorLine(take) {
     if (take.themeId !== "custom" || !take.author) return "";
     return `<p class="hot-take-author">Hot take de ${escapeHtml(take.author)}</p>`;
+  }
+
+  /**
+   * Auteur à exclure du verdict (majorité + points), comme TruthMeter exclut l'auteur.
+   * Uniquement les takes custom (vraie paternité) : les takes du pool reçoivent un
+   * `author` pseudo-aléatoire (round-robin) qui n'est pas une vraie paternité — l'exclure
+   * supprimerait à tort le vote d'un joueur à presque chaque manche.
+   */
+  function currentTakeVerdictAuthor() {
+    const take = takeLabel(TAKES[takeIdx]);
+    return take.themeId === "custom" && take.author ? take.author : null;
   }
 
   function voteCounts(votesMap = votes) {
@@ -287,7 +300,15 @@ export function mountHotTake(app) {
       let matchScores = getHotTakeSession().matchScores || {};
       let lastRound = getHotTakeSession().lastRound || null;
       if (canAwardThisTake()) {
-        lastAward = awardHotTakeVotes(votesToScore, HOT_TAKE_OPTIONS);
+        // Le vote de l'auteur (take custom) ne compte ni dans la majorité ni dans les
+        // points. Les votes commités (votesToScore) restent intacts pour l'affichage.
+        const verdictAuthor = currentTakeVerdictAuthor();
+        const votesForVerdict = verdictAuthor
+          ? Object.fromEntries(
+              Object.entries(votesToScore).filter(([name]) => name !== verdictAuthor)
+            )
+          : votesToScore;
+        lastAward = awardHotTakeVotes(votesForVerdict, HOT_TAKE_OPTIONS);
         matchScores = applyMatchScoreDeltas(matchScores, lastAward.deltas || {});
         lastRound = buildHotTakeLastRound(lastAward);
       }
@@ -300,7 +321,7 @@ export function mountHotTake(app) {
           matchScores,
           lastRound,
         },
-        { withEveningScores: mp && isLobbyHost() }
+        { withEveningScores: mp && canActAsHost() }
       );
       syncFromSession();
       phase = "reveal";
@@ -311,7 +332,7 @@ export function mountHotTake(app) {
   }
 
   async function startVotePhase() {
-    if (mp && !isLobbyHost()) return;
+    if (mp && !canActAsHost()) return;
     const endsAt = new Date(Date.now() + HOT_TAKE_TIMER_SEC * 1000).toISOString();
     if (mp) {
       await commitHotTakePlay({
@@ -331,7 +352,7 @@ export function mountHotTake(app) {
   }
 
   async function startNextTakeVote() {
-    if (mp && !isLobbyHost()) return;
+    if (mp && !canActAsHost()) return;
     await commitHotTakePlay({
       phase: "voting",
       takeIdx,
@@ -347,7 +368,7 @@ export function mountHotTake(app) {
 
   /** Filet de sécurité hôte : clôt le vote même si un joueur n'a pas voté. */
   async function forceReveal() {
-    if (mp && !isLobbyHost()) return;
+    if (mp && !canActAsHost()) return;
     if (!mp && !myVote) {
       myVote = HOT_TAKE_OPTIONS[0];
       votes = simulateLobbyVotes(myVote, HOT_TAKE_OPTIONS);
@@ -370,7 +391,7 @@ export function mountHotTake(app) {
     const total = TAKES.length;
     const counts = voteCounts();
     const totalVotes = Object.values(counts).reduce((a, b) => a + b, 0);
-    const host = !mp || isLobbyHost();
+    const host = !mp || canActAsHost();
     const voteHint = mp
       ? myVote
         ? allHotTakeVotesIn()
@@ -509,7 +530,7 @@ export function mountHotTake(app) {
             voteCommitInFlight = null;
             syncFromSession();
           }
-          if (allHotTakeVotesIn() && isLobbyHost()) {
+          if (allHotTakeVotesIn() && canActAsHost()) {
             await goToReveal();
             return;
           }
@@ -527,7 +548,7 @@ export function mountHotTake(app) {
       void forceReveal();
     });
 
-    app.querySelector("#next-take")?.addEventListener("click", async () => {
+    app.querySelector("#next-take")?.addEventListener("click", withClickLock(async () => {
       if (takeIdx < total - 1) {
         const nextIdx = takeIdx + 1;
         takeIdx = nextIdx;
@@ -561,7 +582,7 @@ export function mountHotTake(app) {
         }
         navigate("results");
       }
-    });
+    }));
   }
 
   function shouldSkipFullRender(prevPhase, prevTake) {
@@ -588,7 +609,7 @@ export function mountHotTake(app) {
     const prevPhase = phase;
     const prevTake = takeIdx;
     syncFromSession();
-    if (phase === "voting" && isLobbyHost() && allHotTakeVotesIn()) {
+    if (phase === "voting" && canActAsHost() && allHotTakeVotesIn()) {
       void goToReveal();
       return;
     }

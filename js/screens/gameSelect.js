@@ -192,6 +192,12 @@ function gameSelectRenderSnapshot() {
   const recap = getEveningRecap();
   const participants = getState().lobby?.participants || [];
   const hostId = getState().lobby?.hostId || "";
+  // Inclure l'état du bandeau « Rejoindre la partie en cours » : sinon un render
+  // non forcé l'ignorerait (la session est hors lobby state) et on devait forcer
+  // un innerHTML complet à chaque notif lobby. En le capturant, scheduleRender(false)
+  // suffit : on ne re-render que quand le bandeau apparaît/disparaît réellement.
+  const resumeScreen = getResumableSessionScreen(getCachedGameSession());
+  const resume = shouldShowGameSelectResumeBanner(resumeScreen) ? resumeScreen : null;
   return JSON.stringify({
     n: participants.length,
     hostId,
@@ -203,6 +209,7 @@ function gameSelectRenderSnapshot() {
     cs: recap.consensusGames,
     dl: recap.dilemmas,
     lastGame: getLastGame()?.gameId ?? null,
+    resume,
   });
 }
 
@@ -327,13 +334,15 @@ export function mountGameSelect(app) {
 
   const unsubLobby = onLobbyBundleUpdated(() => {
     // Quand l'hôte (re)lance un jeu, la maj lobby (status playing / game_id) arrive
-    // souvent avant la nouvelle ligne de session. On force un refetch de session pour que
-    // le bandeau « Rejoindre la partie en cours » apparaisse aussitôt, sans devoir
-    // repasser par l'Accueil (qui forçait jusqu'ici ce rafraîchissement).
+    // souvent avant la nouvelle ligne de session. On refetch la session pour que le
+    // bandeau « Rejoindre la partie en cours » apparaisse aussitôt, sans repasser par
+    // l'Accueil. scheduleRender(false) : le snapshot inclut désormais l'état du bandeau,
+    // donc on ne re-render que si quelque chose a réellement changé (plus de innerHTML
+    // complet forcé à chaque notif lobby).
     if (isGameSyncActive()) {
       void (async () => {
         await refreshGameSession();
-        scheduleRender(true);
+        scheduleRender(false);
       })();
       return;
     }

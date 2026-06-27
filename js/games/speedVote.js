@@ -19,6 +19,7 @@ import { getLobbyParticipants } from "../core/lobby.js";
 import { getActivePlayers } from "../core/players.js";
 import { setLobbyPlaying, setLobbyWaiting } from "../core/lobby.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
+import { withClickLock } from "../core/actionLock.js";
 import { navigate } from "../core/router.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
 import { bindNav } from "../screens/nav.js";
@@ -28,6 +29,7 @@ import { isEveningGameplayPaused } from "../core/filRougeSession.js";
 import {
   isGameSyncActive,
   isLobbyHost,
+  canActAsHost,
   onGameSessionChange,
   completeGameSession,
 } from "../core/gameSync.js";
@@ -47,7 +49,7 @@ export function mountSpeedVote(app) {
     return null;
   }
 
-  setLobbyPlaying("speedvote");
+  void setLobbyPlaying("speedvote").catch(() => {});
 
   let roundIdx = 0;
   let phase = "voting";
@@ -113,14 +115,14 @@ export function mountSpeedVote(app) {
 
   async function transitionToReveal() {
     if (alreadyScoredThisRound()) return;
-    if (mp && !isLobbyHost()) return;
+    if (mp && !canActAsHost()) return;
     if (revealInFlight) return;
 
     revealInFlight = true;
     try {
       takeScored = true;
       let matchScores = getSpeedVoteSession().matchScores || {};
-      if (!mp || isLobbyHost()) {
+      if (!mp || canActAsHost()) {
         const mod = getSpeedVoteModifier({ modifier });
         lastAward = awardSpeedVoteRound(votes, { multiplier: mod.multiplier });
         matchScores = applyMatchScoreDeltas(matchScores, lastAward.deltas || {});
@@ -135,7 +137,7 @@ export function mountSpeedVote(app) {
           voteEndsAt: null,
           matchScores,
         },
-        { withEveningScores: mp && isLobbyHost() }
+        { withEveningScores: mp && canActAsHost() }
       );
 
       if (!mp) {
@@ -153,7 +155,7 @@ export function mountSpeedVote(app) {
 
   /** Filet de sécurité hôte : clôt la manche même si un joueur n'a pas voté. */
   async function forceReveal() {
-    if (mp && !isLobbyHost()) return;
+    if (mp && !canActAsHost()) return;
     await goToReveal();
   }
 
@@ -186,7 +188,7 @@ export function mountSpeedVote(app) {
     const names = Object.keys(counts).sort(
       (a, b) => (counts[b] || 0) - (counts[a] || 0)
     );
-    const host = !mp || isLobbyHost();
+    const host = !mp || canActAsHost();
 
     const points = SPEED_VOTE_POINTS_WINNER * mod.multiplier;
     const awardHtml = leaders.length
@@ -247,7 +249,7 @@ export function mountSpeedVote(app) {
   function render() {
     syncFromSession();
     const total = QUESTIONS.length;
-    const host = !mp || isLobbyHost();
+    const host = !mp || canActAsHost();
     const mod = getSpeedVoteModifier({ modifier });
 
     const voteHint = mp
@@ -264,7 +266,9 @@ export function mountSpeedVote(app) {
 
     if (phase === "voting") {
       const votedCount = Object.keys(votes).length;
-      const totalPlayers = getVoteTargets().length;
+      // Dénominateur = votants attendus (joueurs actifs), cohérent avec
+      // allSpeedVoteVotesIn() et patchVotingChrome(), pas le nombre de cibles votables.
+      const totalPlayers = getActivePlayers().length;
       phaseHtml = `
         ${modifierBadgeHtml()}
         <p class="label-upper label-upper--muted">Vote simultané</p>
@@ -313,7 +317,7 @@ export function mountSpeedVote(app) {
         votes = { ...votes, [localName]: target };
         if (mp) {
           await commitSpeedVoteVote(target);
-          if (allSpeedVoteVotesIn() && isLobbyHost()) await goToReveal();
+          if (allSpeedVoteVotesIn() && canActAsHost()) await goToReveal();
           render();
         } else {
           votes = simulateSpeedVoteLobbyVotes(target);
@@ -326,7 +330,7 @@ export function mountSpeedVote(app) {
       void forceReveal();
     });
 
-    app.querySelector("#next-round")?.addEventListener("click", async () => {
+    app.querySelector("#next-round")?.addEventListener("click", withClickLock(async () => {
       if (roundIdx < total - 1) {
         const nextIdx = roundIdx + 1;
         if (mp && isLobbyHost()) {
@@ -356,7 +360,7 @@ export function mountSpeedVote(app) {
           navigate("results", { navStack: ["home", "lobby", "game-select", "results"] });
         }
       }
-    });
+    }));
 
   }
 
@@ -381,7 +385,7 @@ export function mountSpeedVote(app) {
     if (!currentQuestion && QUESTIONS[roundIdx]) {
       currentQuestion = QUESTIONS[roundIdx];
     }
-    if (phase === "voting" && isLobbyHost() && allSpeedVoteVotesIn()) {
+    if (phase === "voting" && canActAsHost() && allSpeedVoteVotesIn()) {
       void goToReveal();
       return;
     }

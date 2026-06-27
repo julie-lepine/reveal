@@ -23,6 +23,7 @@ import { getLobbyParticipants } from "../core/lobby.js";
 import { getActivePlayers, getActivePlayerNames } from "../core/players.js";
 import { setLobbyPlaying, setLobbyWaiting } from "../core/lobby.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
+import { withClickLock } from "../core/actionLock.js";
 import { navigate } from "../core/router.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
 import { bindNav } from "../screens/nav.js";
@@ -32,6 +33,7 @@ import { isEveningGameplayPaused } from "../core/filRougeSession.js";
 import {
   isGameSyncActive,
   isLobbyHost,
+  canActAsHost,
   onGameSessionChange,
   completeGameSession,
   dilemmaToRemote,
@@ -55,7 +57,7 @@ export function mountDilemma(app) {
     return null;
   }
 
-  setLobbyPlaying("dilemma");
+  void setLobbyPlaying("dilemma").catch(() => {});
 
   let roundIdx = 0;
   let phase = "voting";
@@ -69,8 +71,17 @@ export function mountDilemma(app) {
   let revealPctA = 0;
   let revealPctB = 0;
   let revealAnimDone = false;
+  let revealAnimId = null;
+  let unmounted = false;
   const localName = getLocalDisplayName();
   const mp = isGameSyncActive();
+
+  function cancelRevealAnim() {
+    if (revealAnimId) {
+      cancelAnimationFrame(revealAnimId);
+      revealAnimId = null;
+    }
+  }
 
   function syncFromSession() {
     const s = getDilemmaSession();
@@ -94,10 +105,15 @@ export function mountDilemma(app) {
 
   function animateRevealBars(targetA, targetB) {
     revealAnimDone = false;
+    cancelRevealAnim();
     const start = performance.now();
     const duration = 900;
 
     function frame(now) {
+      if (unmounted) {
+        revealAnimId = null;
+        return;
+      }
       const t = Math.min(1, (now - start) / duration);
       const ease = 1 - (1 - t) ** 3;
       revealPctA = Math.round(targetA * ease);
@@ -111,13 +127,14 @@ export function mountDilemma(app) {
       if (labelA) labelA.textContent = `${revealPctA}%`;
       if (labelB) labelB.textContent = `${revealPctB}%`;
       if (t < 1) {
-        requestAnimationFrame(frame);
+        revealAnimId = requestAnimationFrame(frame);
       } else {
+        revealAnimId = null;
         revealAnimDone = true;
         render();
       }
     }
-    requestAnimationFrame(frame);
+    revealAnimId = requestAnimationFrame(frame);
   }
 
   function alreadyScoredThisRound() {
@@ -172,7 +189,7 @@ export function mountDilemma(app) {
 
   async function transitionToReveal() {
     if (revealInFlight) return;
-    if (mp && !isLobbyHost()) return;
+    if (mp && !canActAsHost()) return;
 
     syncFromSession();
 
@@ -202,7 +219,7 @@ export function mountDilemma(app) {
           matchScores,
           lastRound,
         },
-        { withEveningScores: mp && isLobbyHost(), withPatchFeedback: mp && isLobbyHost() }
+        { withEveningScores: mp && canActAsHost(), withPatchFeedback: mp && canActAsHost() }
       );
       if (currentDilemma) {
         await consumePlayedCustomDilemma(currentDilemma);
@@ -227,12 +244,12 @@ export function mountDilemma(app) {
 
   /** Filet de sécurité hôte : clôt la manche même si un joueur n'a pas voté. */
   async function forceReveal() {
-    if (mp && !isLobbyHost()) return;
+    if (mp && !canActAsHost()) return;
     await goToReveal();
   }
 
   async function advanceRound() {
-    if (mp && !isLobbyHost()) return;
+    if (mp && !canActAsHost()) return;
     const total = ROUNDS.length;
     if (roundIdx < total - 1) {
       const nextIdx = roundIdx + 1;
@@ -301,7 +318,7 @@ export function mountDilemma(app) {
 
   function revealHtml() {
     const totalRounds = ROUNDS.length;
-    const host = !mp || isLobbyHost();
+    const host = !mp || canActAsHost();
     const { pctA, pctB, majority, divided, total } = countDilemmaResults(votes);
     const pctADisplay = revealAnimDone ? pctA : revealPctA;
     const pctBDisplay = revealAnimDone ? pctB : revealPctB;
@@ -397,7 +414,7 @@ export function mountDilemma(app) {
   }
 
   function votingPhaseHtml() {
-    const host = !mp || isLobbyHost();
+    const host = !mp || canActAsHost();
     const voteHint = mp
       ? myVote
         ? allDilemmaVotesIn()
@@ -470,7 +487,7 @@ export function mountDilemma(app) {
             voteCommitInFlight = null;
             syncFromSession();
           }
-          if (allDilemmaVotesIn() && isLobbyHost()) {
+          if (allDilemmaVotesIn() && canActAsHost()) {
             await goToReveal();
             return;
           }
@@ -487,9 +504,7 @@ export function mountDilemma(app) {
       void forceReveal();
     });
 
-    app.querySelector("#next-round")?.addEventListener("click", () => {
-      void advanceRound();
-    });
+    app.querySelector("#next-round")?.addEventListener("click", withClickLock(() => advanceRound()));
 
     if (phase === "reveal" && !revealAnimDone && revealPctA === 0 && revealPctB === 0) {
       const { pctA, pctB } = countDilemmaResults(votes);
@@ -528,7 +543,7 @@ export function mountDilemma(app) {
       return;
     }
 
-    if (phase === "voting" && isLobbyHost() && allDilemmaVotesIn()) {
+    if (phase === "voting" && canActAsHost() && allDilemmaVotesIn()) {
       await goToReveal();
       return;
     }
@@ -557,6 +572,8 @@ export function mountDilemma(app) {
   render();
 
   return () => {
+    unmounted = true;
+    cancelRevealAnim();
     unsub();
   };
 }

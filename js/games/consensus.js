@@ -2,6 +2,7 @@ import { CONSENSUS_DEFAULT_SLIDER_VALUE, CONSENSUS_REVEAL_PENDING_MS } from "../
 import { formatConsensusScore } from "../core/consensusSession.js";
 import { useConsensusGame } from "../core/useConsensusGame.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
+import { withClickLock } from "../core/actionLock.js";
 import { getActivePlayers } from "../core/players.js";
 import { goToGameSelect, setLobbyPlaying, setLobbyWaiting } from "../core/lobby.js";
 import {
@@ -22,6 +23,7 @@ import {
   consensusToRemote,
   isGameSyncActive,
   isLobbyHost,
+  canActAsHost,
   onGameSessionChange,
   refreshGameSession,
   returnToGameSelect,
@@ -183,7 +185,7 @@ export function mountConsensus(app) {
   }
 
   if (consensus.getSession().phase !== "final") {
-    void setLobbyPlaying("consensus");
+    void setLobbyPlaying("consensus").catch(() => {});
   }
 
   let phase = "question";
@@ -220,7 +222,7 @@ export function mountConsensus(app) {
     const { totalPlayers, answeredCount, missingCount } = consensusAnswerCounts(session);
     const forceHint =
       missingCount > 0
-        ? `<p class="hint consensus-force-hint" id="consensus-force-hint">${missingCount} joueur(s) sans réponse validée → 50 % par défaut si tu révèles maintenant.</p>`
+        ? `<p class="hint consensus-force-hint" id="consensus-force-hint">${missingCount} joueur(s) sans réponse validée ne seront pas comptés dans la moyenne (0 pt cette manche) si tu révèles maintenant.</p>`
         : "";
     return `
       <button type="button" class="btn btn-secondary btn--spaced" id="btn-consensus-force">
@@ -255,7 +257,7 @@ export function mountConsensus(app) {
 
   function scheduleRevealFromPending() {
     if (revealPendingTimeoutId || revealInFlight || phase !== "reveal-pending") return;
-    if (mp && !isLobbyHost()) return;
+    if (mp && !canActAsHost()) return;
     revealPendingTimeoutId = setTimeout(() => {
       revealPendingTimeoutId = null;
       void goToReveal();
@@ -330,7 +332,7 @@ export function mountConsensus(app) {
     const forceHint = app.querySelector("#consensus-force-hint");
     if (forceHint) {
       if (missingCount > 0) {
-        forceHint.textContent = `${missingCount} joueur(s) sans réponse validée → 50 % par défaut si tu révèles maintenant.`;
+        forceHint.textContent = `${missingCount} joueur(s) sans réponse validée ne seront pas comptés dans la moyenne (0 pt cette manche) si tu révèles maintenant.`;
         forceHint.hidden = false;
       } else {
         forceHint.hidden = true;
@@ -493,7 +495,7 @@ export function mountConsensus(app) {
       saveStatePatch({
         consensusGame: { ...consensus.getSession(), phase: "reveal-pending" },
       });
-      if (mp && isLobbyHost()) {
+      if (mp && canActAsHost()) {
         void consensus.commitPhase("reveal-pending").catch(() => {});
         await showAppAlert(
           "La sync est lente - la révélation continue chez toi. Les autres peuvent avoir un léger retard.",
@@ -510,7 +512,7 @@ export function mountConsensus(app) {
 
   /** Filet de sécurité hôte : clôt la manche même si un joueur n'a pas validé sa réponse. */
   async function forceReveal() {
-    if (mp && !isLobbyHost()) return;
+    if (mp && !canActAsHost()) return;
     const waiting = consensus.getWaitingPlayers();
     if (waiting.length > 0) {
       const names = waiting.map((player) => player.name).join(", ");
@@ -554,7 +556,7 @@ export function mountConsensus(app) {
       } catch (err) {
         syncFailed = true;
         console.warn("Consensus reveal sync:", err);
-        if (mp && isLobbyHost()) {
+        if (mp && canActAsHost()) {
           void syncRevealToRemote(revealSession).catch(() => {});
         }
       }
@@ -564,12 +566,12 @@ export function mountConsensus(app) {
       const fallback = consensus.scoreRound(consensus.getSession());
       saveStatePatch({ consensusGame: { ...fallback, phase: "reveal" } });
       syncFromSession();
-      if (mp && isLobbyHost()) {
+      if (mp && canActAsHost()) {
         void syncRevealToRemote(consensus.getSession()).catch(() => {});
       }
     } finally {
       revealInFlight = false;
-      if (syncFailed && mp && isLobbyHost()) {
+      if (syncFailed && mp && canActAsHost()) {
         await showAppAlert(
           "Les résultats s'affichent chez toi. Si les autres sont bloqués, vérifiez la connexion puis relancez une manche.",
           { title: "Sync révélation", icon: "📡" }
@@ -640,7 +642,7 @@ export function mountConsensus(app) {
   async function finishConsensusGame() {
     const live = consensus.getSession();
     if (live.podiumApplied) {
-      if (mp && isLobbyHost()) {
+      if (mp && canActAsHost()) {
         await completeGameSession({
           gameId: "consensus",
           screen: "consensus",
@@ -652,7 +654,7 @@ export function mountConsensus(app) {
 
     let standings = consensus.getPodiumAwards(consensus.buildStandings(live.matchScores || {}));
 
-    if (!mp || isLobbyHost()) {
+    if (!mp || canActAsHost()) {
       const claimed = {
         ...live,
         phase: "final",
@@ -682,7 +684,7 @@ export function mountConsensus(app) {
     clearNpcTimers();
     clearRevealPending();
 
-    if (mp && isLobbyHost()) {
+    if (mp && canActAsHost()) {
       await completeGameSession({
         gameId: "consensus",
         screen: "consensus",
@@ -741,7 +743,7 @@ export function mountConsensus(app) {
           })}
         </div>
         ${
-          !mp || isLobbyHost()
+          !mp || canActAsHost()
             ? consensusForceRevealChromeHtml(session)
             : ""
         }`;
@@ -766,7 +768,7 @@ export function mountConsensus(app) {
           deltaMap: lastRound?.deltas || {},
         })}
         ${
-          !mp || isLobbyHost()
+          !mp || canActAsHost()
             ? `<button type="button" class="btn btn-primary btn--spaced" id="btn-consensus-next">
                 ${questionIdx < totalQuestions - 1 ? "Question suivante →" : "Voir le podium →"}
               </button>`
@@ -824,7 +826,7 @@ export function mountConsensus(app) {
       app.querySelector("#btn-consensus-submit")?.addEventListener("click", async () => {
         if (answerState() === "submitted") return;
         await commitLocalDraft({ submitted: true });
-        if (consensus.allAnswersIn() && (!mp || isLobbyHost())) {
+        if (consensus.allAnswersIn() && (!mp || canActAsHost())) {
           await beginReveal();
         } else {
           render();
@@ -835,14 +837,14 @@ export function mountConsensus(app) {
       });
     }
 
-    app.querySelector("#btn-consensus-next")?.addEventListener("click", async () => {
+    app.querySelector("#btn-consensus-next")?.addEventListener("click", withClickLock(async () => {
       if (questionIdx < totalQuestions - 1) {
         await consensus.startQuestion(questionIdx + 1);
         render();
         return;
       }
       await finishConsensusGame();
-    });
+    }));
 
     app.querySelectorAll("[data-consensus-action]").forEach((btn) => {
       btn.addEventListener("click", async () => {
@@ -892,7 +894,7 @@ export function mountConsensus(app) {
     if (!roundChanged) captureDraftFromDom();
     if (
       phase === "question" &&
-      isLobbyHost() &&
+      canActAsHost() &&
       consensus.allAnswersIn() &&
       !revealInFlight &&
       !revealPendingInFlight &&
@@ -918,7 +920,7 @@ export function mountConsensus(app) {
 
   render();
 
-  if (mp && isLobbyHost() && consensus.getSession().phase === "reveal-pending") {
+  if (mp && canActAsHost() && consensus.getSession().phase === "reveal-pending") {
     scheduleRevealFromPending();
   }
 

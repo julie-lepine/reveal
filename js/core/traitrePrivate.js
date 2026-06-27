@@ -24,7 +24,11 @@ function readLocalBundle(lobbyId) {
 }
 
 function writeLocalBundle(lobbyId, bundle) {
-  localStorage.setItem(`${LOCAL_KEY}:${lobbyId}`, JSON.stringify(bundle));
+  try {
+    localStorage.setItem(`${LOCAL_KEY}:${lobbyId}`, JSON.stringify(bundle));
+  } catch {
+    /* quota plein / storage indisponible */
+  }
 }
 
 /** @returns {{ is_impostor: boolean, pair_id: string } | null} */

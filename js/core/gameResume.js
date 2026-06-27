@@ -142,7 +142,13 @@ export function mountGameResumeInterstitial(app, targetScreen, { allowStay = fal
   paint();
   tickId = setInterval(() => {
     remaining -= 1;
-    if (remaining <= 0) return;
+    if (remaining <= 0) {
+      if (tickId) {
+        clearInterval(tickId);
+        tickId = null;
+      }
+      return;
+    }
     const el = app.querySelector(".game-resume__countdown");
     if (el) el.textContent = `Retour automatique dans ${remaining} s...`;
   }, 1000);

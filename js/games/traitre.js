@@ -35,6 +35,7 @@ import { gameExitBarHtml, bindExitGame } from "../core/exitGame.js";
 import {
   isGameSyncActive,
   isLobbyHost,
+  canActAsHost,
   onGameSessionChange,
   returnToGameSelect,
 } from "../core/gameSync.js";
@@ -48,7 +49,7 @@ export function mountTraitre(app) {
     return null;
   }
 
-  setLobbyPlaying("traitre");
+  void setLobbyPlaying("traitre").catch(() => {});
 
   let phase = "deal";
   let speakRound = 1;
@@ -174,7 +175,7 @@ export function mountTraitre(app) {
 
   async function maybeAdvanceFromDeal() {
     if (phase !== "deal" || !allTraitreDealAcksIn()) return;
-    if (mp && !isLobbyHost()) return;
+    if (mp && !canActAsHost()) return;
     await commitTraitrePlay({
       ...getTraitreSession(),
       phase: "speak",
@@ -183,7 +184,7 @@ export function mountTraitre(app) {
   }
 
   async function finishSpeakRound() {
-    if (mp && !isLobbyHost()) return;
+    if (mp && !canActAsHost()) return;
     const s = getTraitreSession();
     const basePatch = s.lastEliminated ? { lastEliminated: null, speakerIndex: 0 } : { speakerIndex: 0 };
     if (s.speakRound === 1) {
@@ -202,7 +203,7 @@ export function mountTraitre(app) {
   }
 
   async function continueSpeakRound() {
-    if (mp && !isLobbyHost()) return;
+    if (mp && !canActAsHost()) return;
     const s = getTraitreSession();
     await commitTraitrePlay({
       ...s,
@@ -213,7 +214,7 @@ export function mountTraitre(app) {
   }
 
   async function startVoteFromDecision() {
-    if (mp && !isLobbyHost()) return;
+    if (mp && !canActAsHost()) return;
     const s = getTraitreSession();
     await commitTraitrePlay({
       ...s,
@@ -227,7 +228,7 @@ export function mountTraitre(app) {
 
   async function resolveVoteRound({ force = false } = {}) {
     if (resolveInFlight) return;
-    if (mp && !isLobbyHost()) return;
+    if (mp && !canActAsHost()) return;
     const s = getTraitreSession();
     if (s.phase !== "vote") return;
 
@@ -270,7 +271,7 @@ export function mountTraitre(app) {
       const eliminatedName = leaders[0];
       const patch = buildTraitreEliminationPatch({ ...s, votes: votesToUse }, eliminatedName);
       let merged = { ...s, ...patch };
-      if (patch.phase === "final" && (!mp || isLobbyHost())) {
+      if (patch.phase === "final" && (!mp || canActAsHost())) {
         merged = awardTraitreGame(merged);
         recordTraitrePlayed();
         setLastGame({
@@ -287,7 +288,7 @@ export function mountTraitre(app) {
       // re-render - sinon il reste bloqué sur l'écran de vote.
       try {
         await commitTraitrePlay(merged, {
-          withEveningScores: patch.phase === "final" && mp && isLobbyHost(),
+          withEveningScores: patch.phase === "final" && mp && canActAsHost(),
         });
       } catch (e) {
         console.warn("traitre resolve sync:", e);
@@ -401,7 +402,7 @@ export function mountTraitre(app) {
     syncFromSession();
     const session = getTraitreSession();
     const myWord = getMyTraitreWord(session);
-    const host = !mp || isLobbyHost();
+    const host = !mp || canActAsHost();
     const wordDealReady = isTraitreWordDealReady(session);
     let phaseHtml = "";
 
@@ -549,7 +550,7 @@ export function mountTraitre(app) {
           const merged = simulateTraitreVotes(target, s);
           await commitTraitrePlay({ ...s, votes: { ...merged, [localName]: target } });
         }
-        if (allTraitreVotesIn(getTraitreSession()) && (!mp || isLobbyHost())) {
+        if (allTraitreVotesIn(getTraitreSession()) && (!mp || canActAsHost())) {
           await resolveVoteRound();
         }
         render();
@@ -576,7 +577,7 @@ export function mountTraitre(app) {
     if (phase === "deal") {
       await maybeAdvanceFromDeal();
     }
-    if (phase === "vote" && isLobbyHost() && allTraitreVotesIn(getTraitreSession())) {
+    if (phase === "vote" && canActAsHost() && allTraitreVotesIn(getTraitreSession())) {
       await resolveVoteRound();
     }
     render();

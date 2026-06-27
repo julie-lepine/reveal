@@ -1,6 +1,7 @@
 import { getTriviaThemeLabel } from "../../data/trivia.js";
 import { useTriviaGame } from "../core/useTriviaGame.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
+import { withClickLock } from "../core/actionLock.js";
 import { getActivePlayers } from "../core/players.js";
 import { goToGameSelect, setLobbyPlaying, setLobbyWaiting } from "../core/lobby.js";
 import { getLocalDisplayName, recordTriviaPlayed, saveStatePatch, setLastGame } from "../core/state.js";
@@ -15,6 +16,7 @@ import {
   completeGameSession,
   isGameSyncActive,
   isLobbyHost,
+  canActAsHost,
   onGameSessionChange,
   returnToGameSelect,
   startGameSession,
@@ -35,7 +37,7 @@ export function mountTrivia(app) {
   }
 
   if (trivia.getSession().phase !== "final") {
-    void setLobbyPlaying("trivia");
+    void setLobbyPlaying("trivia").catch(() => {});
   }
 
   let phase = "question";
@@ -156,7 +158,7 @@ export function mountTrivia(app) {
 
   /** Filet de sécurité hôte : clôt la manche même si un joueur (AFK/déconnecté) n'a pas répondu. */
   async function forceReveal() {
-    if (mp && !isLobbyHost()) return;
+    if (mp && !canActAsHost()) return;
     if (!mp) await fillMissingLocalAnswers();
     await goToReveal();
   }
@@ -195,7 +197,7 @@ export function mountTrivia(app) {
   }
 
   function revealBlock() {
-    const correctLabel = currentQuestion
+    const correctLabel = currentQuestion?.answers?.[currentQuestion.correct] != null
       ? `${String.fromCharCode(65 + currentQuestion.correct)}. ${currentQuestion.answers[currentQuestion.correct]}`
       : "-";
     const deltas = lastRound?.deltas || {};
@@ -292,7 +294,7 @@ export function mountTrivia(app) {
   async function finishTriviaGame() {
     const live = trivia.getSession();
     if (live.podiumApplied) {
-      if (mp && isLobbyHost()) {
+      if (mp && canActAsHost()) {
         await completeGameSession({
           gameId: "trivia",
           screen: "trivia",
@@ -304,7 +306,7 @@ export function mountTrivia(app) {
 
     let standings = trivia.getPodiumAwards(trivia.buildStandings(live.matchScores || {}));
 
-    if (!mp || isLobbyHost()) {
+    if (!mp || canActAsHost()) {
       const claimed = {
         ...live,
         phase: "final",
@@ -334,7 +336,7 @@ export function mountTrivia(app) {
 
     clearNpcTimers();
 
-    if (mp && isLobbyHost()) {
+    if (mp && canActAsHost()) {
       await completeGameSession({
         gameId: "trivia",
         screen: "trivia",
@@ -380,7 +382,7 @@ export function mountTrivia(app) {
           })}
         </div>
         ${
-          !mp || isLobbyHost()
+          !mp || canActAsHost()
             ? `<button type="button" class="btn btn-secondary btn--spaced" id="btn-trivia-force">
                 Révéler maintenant (${answeredCount}/${totalPlayers})
               </button>`
@@ -407,7 +409,7 @@ export function mountTrivia(app) {
           deltaMap: lastRound?.deltas || {},
         })}
         ${
-          !mp || isLobbyHost()
+          !mp || canActAsHost()
             ? `<button type="button" class="btn btn-primary btn--spaced" id="btn-trivia-next">
                 ${questionIdx < totalQuestions - 1 ? "Question suivante →" : "Voir le podium →"}
               </button>`
@@ -467,7 +469,7 @@ export function mountTrivia(app) {
           try {
             await trivia.commitAnswer(choice);
             syncFromSession();
-            if (trivia.allAnswersIn() && (!mp || isLobbyHost())) {
+            if (trivia.allAnswersIn() && (!mp || canActAsHost())) {
               await goToReveal();
               return;
             }
@@ -485,13 +487,13 @@ export function mountTrivia(app) {
       });
     }
 
-    app.querySelector("#btn-trivia-next")?.addEventListener("click", async () => {
+    app.querySelector("#btn-trivia-next")?.addEventListener("click", withClickLock(async () => {
       if (questionIdx < totalQuestions - 1) {
         await trivia.startQuestion(questionIdx + 1);
         return;
       }
       await finishTriviaGame();
-    });
+    }));
 
     app.querySelectorAll("[data-trivia-action]").forEach((btn) => {
       btn.addEventListener("click", async () => {
@@ -557,7 +559,7 @@ export function mountTrivia(app) {
       pendingAnswerIndex = null;
       answerCommitInFlight = false;
     }
-    if (phase === "question" && isLobbyHost() && trivia.allAnswersIn()) {
+    if (phase === "question" && canActAsHost() && trivia.allAnswersIn()) {
       void goToReveal();
     }
     if (shouldSkipFullRender(prevPhase, prevQuestion)) {

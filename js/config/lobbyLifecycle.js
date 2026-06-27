@@ -9,6 +9,13 @@ export const LOBBY_JOIN_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 /** Heartbeat membre : intervalle minimum entre deux UPDATE last_seen_at. */
 export const LOBBY_HEARTBEAT_MIN_MS = 60 * 1000;
 
+/**
+ * Au-delà de ce délai sans heartbeat, un membre est considéré « absent » pour le repli
+ * d'hôte (contrôles de manche). Volontairement > 2× le heartbeat (60 s) pour éviter les
+ * faux positifs (deux hôtes agissants) : on tolère ~2 min avant de débloquer une manche.
+ */
+export const HOST_PRESENCE_STALE_MS = 120 * 1000;
+
 /** Purge serveur : lobby waiting inactif (h). */
 export const LOBBY_TTL_WAITING_HOURS = 2;
 

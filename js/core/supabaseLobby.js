@@ -15,6 +15,7 @@ import { scalePollIntervalMs } from "../config/syncConfig.js";
 import {
   LOBBY_EXPIRED_JOIN_MSG,
   LOBBY_HEARTBEAT_MIN_MS,
+  HOST_PRESENCE_STALE_MS,
   isLobbyJoinTooOld,
 } from "../config/lobbyLifecycle.js";
 
@@ -70,7 +71,23 @@ function lobbyBundleSignature(bundle) {
     ),
     m: (bundle.messages || []).length,
     lm: bundle.messages?.[bundle.messages.length - 1]?.at || 0,
+    // Bit dérivé « hôte présent » (et NON le last_seen_at brut, qui changerait à chaque
+    // heartbeat → tempête de notify). Ne bascule que quand l'hôte franchit le seuil de
+    // staleness : permet aux invités de re-render pour afficher/masquer le repli d'hôte.
+    hp: isHostPresentInBundle(bundle) ? 1 : 0,
   });
+}
+
+function isHostPresentInBundle(bundle) {
+  const participants = bundle.participants || [];
+  const host =
+    participants.find((p) => p.userId === bundle.hostId) ||
+    participants.find((p) => p.isHost);
+  if (!host) return false;
+  if (!host.lastSeenAt) return true; // colonne absente (legacy) → on ne déclenche pas le repli
+  const t = new Date(host.lastSeenAt).getTime();
+  if (!Number.isFinite(t)) return true;
+  return Date.now() - t < HOST_PRESENCE_STALE_MS;
 }
 
 function isLobbyGoneError(e) {
@@ -316,7 +333,10 @@ async function runCoalescedLobbyRefresh() {
     }
   } finally {
     lobbyRefreshInFlight = false;
-    notifyLobbyBundleUpdated();
+    // Pas de notify inconditionnel ici : refreshLobbyFromSupabase passe par
+    // applyLobbyToState qui ne notifie QUE si la signature du bundle a changé.
+    // Notifier ici réveillait tous les abonnés (re-render hub, refetch session…)
+    // à chaque heartbeat cosmétique, même quand rien d'utile n'avait bougé.
     if (lobbyRefreshQueued) {
       lobbyRefreshQueued = false;
       scheduleLobbyRefresh({ withMessages: lobbyRefreshWithMessages });
@@ -385,6 +405,7 @@ function mapMember(row, currentUserId) {
     ready: Boolean(row.ready),
     isHost: Boolean(row.is_host),
     isLocal: row.user_id === currentUserId,
+    lastSeenAt: row.last_seen_at || null,
   };
 }
 
@@ -403,7 +424,7 @@ async function fetchLobbyBundle(lobbyId, { withMessages = false } = {}) {
       .single(),
     supabase
       .from("lobby_members")
-      .select("user_id, display_name, emoji, color, ready, is_host, joined_at")
+      .select("user_id, display_name, emoji, color, ready, is_host, joined_at, last_seen_at")
       .eq("lobby_id", lobbyId)
       .order("joined_at"),
   ];

@@ -83,3 +83,56 @@ Légende : ☐ à tester · ✅ OK · ❌ bug (noter en bas)
 
 ## Hot Take 🔥
 - [ ] Fin de manche : renvoi sur prépa au lieu de résultats
+
+### Hot Take — auteur exclu du verdict *(corrigé ⚪)*
+
+- [ ] 🧪 Take **custom** (« Hot take de X ») : le vote de **X** ne compte **pas** dans la majorité ni dans les points (comme TruthMeter)
+- [ ] 🧪 Le vote de l'auteur reste **affiché** dans la liste des votes (juste non scoré)
+- [ ] 🧪 Take du **pool** (sans vraie paternité) : **tous** les votes comptent (l'auteur round-robin interne n'est pas exclu)
+
+---
+
+## Audit complet — corrections 🔧
+
+### 🔴 Robustesse / bugs logiques *(corrigés)*
+
+- [ ] 🧪 **Guess The Lie** : l'indice de vote reconnaît la lettre **A** (index 0) une fois choisie (plus « Choisis la lettre… » à tort)
+- [ ] 🧪 **Lobby** : aucun crash si `getLobby()` est null (messages / addMessage protégés par `?.`)
+- [ ] 🧪 **Stockage** : navigation privée / quota plein → pas de crash (`localStorage`/`sessionStorage` en `try/catch` : auth, reset mdp, traître, fil rouge, état jeu)
+
+### 🟠 Performance / synchro *(corrigés)*
+
+- [ ] 🧪 **Lobby (heartbeat cosmétique)** : pas de re-render hub / refetch session à chaque ping quand rien d'utile n'a changé (signature)
+- [ ] 🧪 **Menu des jeux** : le bandeau « Rejoindre » apparaît/disparaît via snapshot (plus de re-render forcé systématique)
+- [ ] 🧪 **Sync en jeu** : pas de réécriture `localStorage` inutile quand la signature distante est inchangée
+- [ ] 🧪 **Dilemma** : animation des barres annulée au démontage (plus de rAF orphelin) ; **reprise** : timer arrêté à 0 s
+
+### 🟡 Erreurs runtime *(corrigées)*
+
+- [ ] 🧪 **Trivia** : pas de crash si `answers` manquant (chaînage optionnel sur la bonne réponse)
+- [ ] 🧪 **Tous les jeux** : `setLobbyPlaying(...)` fire-and-forget ne génère plus de rejet de promesse non géré
+
+---
+
+## Repli d'hôte absent (MP) 👑 *(corrigé ⚪ — approche présence)*
+
+> Si l'hôte se déconnecte en pleine manche, un autre joueur peut désormais débloquer.
+> Détection par heartbeat : un hôte est « absent » après ~2 min sans ping (`HOST_PRESENCE_STALE_MS`).
+
+- [ ] 🧪 **Hôte présent** (cas normal) : comportement **strictement identique** à avant (l'acting-host = l'hôte réel)
+- [ ] 🧪 **Hôte se déconnecte** pendant une manche (vote/reveal) → après ~2 min, **un seul** invité (le présent au plus petit userId) voit apparaître **Révéler / Manche suivante** et peut débloquer
+- [ ] 🧪 L'invité de repli peut **révéler**, **scorer la manche** et passer à la **suivante** ; les autres suivent bien
+- [ ] 🧪 Fin de partie : l'invité de repli peut atteindre le **podium / résultats** si l'hôte est absent
+- [ ] 🧪 **Déterminisme** : un seul acting-host à la fois (pas de double reveal / double score) sur tous les jeux votants
+- [ ] 🧪 L'hôte **revient** (re-heartbeat) → il **reprend** la main, l'invité de repli perd les contrôles
+- [ ] 🧪 Contrôles restés **hôte-only** : relance « Rejouer » / réglages (Trivia, Consensus), rôle privé Traître — **pas** délégués à l'acting-host
+- [ ] 🧪 Tester sur les jeux votants : Consensus, Trivia, Dilemma, Hot Take, SpeedVote, Guess The Lie, TruthMeter, VibeCheck, Spot the fake
+
+### Débounce « manche suivante » *(corrigé ⚪)*
+
+- [ ] 🧪 Double-clic rapide sur **Manche suivante / Question suivante** ne saute **pas** de manche (helper `withClickLock`, 6 jeux)
+- [ ] 🧪 Le bouton se **désactive** pendant l'action puis disparaît au re-render
+
+### SpeedVote — compteur *(corrigé ⚪)*
+
+- [ ] 🧪 « Révéler maintenant (n/total) » : le **total** = nombre de votants attendus (joueurs actifs), cohérent entre l'affichage initial et la mise à jour

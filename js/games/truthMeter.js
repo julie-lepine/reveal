@@ -43,7 +43,7 @@ import { gameExitBarHtml, bindExitGame } from "../core/exitGame.js";
 import { isEveningGameplayPaused } from "../core/filRougeSession.js";
 import {
   isGameSyncActive,
-  isLobbyHost,
+  canActAsHost,
   onGameSessionChange,
 } from "../core/gameSync.js";
 
@@ -172,7 +172,7 @@ export function mountTruthMeter(app) {
     return null;
   }
 
-  setLobbyPlaying("truthmeter");
+  void setLobbyPlaying("truthmeter").catch(() => {});
 
   let phase = "writing";
   let roundIdx = 0;
@@ -277,7 +277,7 @@ export function mountTruthMeter(app) {
 
   function scheduleRevealFromPending() {
     if (revealPendingTimeoutId || revealInFlight || phase !== "reveal-pending") return;
-    if (mp && !isLobbyHost()) return;
+    if (mp && !canActAsHost()) return;
     revealPendingTimeoutId = setTimeout(() => {
       revealPendingTimeoutId = null;
       void transitionToReveal();
@@ -441,7 +441,7 @@ export function mountTruthMeter(app) {
       }
       return;
     }
-    if (mp && !isLobbyHost()) return;
+    if (mp && !canActAsHost()) return;
     if (revealInFlight) return;
 
     revealInFlight = true;
@@ -454,7 +454,7 @@ export function mountTruthMeter(app) {
       roundScored = true;
       let matchScores = getTruthMeterSession().matchScores || {};
       let lastRound = getTruthMeterSession().lastRound || null;
-      if (author && (!mp || isLobbyHost())) {
+      if (author && (!mp || canActAsHost())) {
         lastAward = awardTruthMeterRound(votesToScore, author, est);
         matchScores = applyMatchScoreDeltas(matchScores, lastAward.deltas || {});
         lastRound = buildTruthMeterLastRound(lastAward);
@@ -476,7 +476,7 @@ export function mountTruthMeter(app) {
           matchScores,
           lastRound,
         },
-        { withEveningScores: mp && isLobbyHost() && Boolean(author) }
+        { withEveningScores: mp && canActAsHost() && Boolean(author) }
       );
 
       if (!mp) {
@@ -502,7 +502,7 @@ export function mountTruthMeter(app) {
   }
 
   async function startVotingPhase() {
-    if (mp && !isLobbyHost()) return;
+    if (mp && !canActAsHost()) return;
     const endsAt = new Date(Date.now() + TRUTH_METER_VOTE_TIMER_SEC * 1000).toISOString();
     if (mp) {
       await commitTruthMeterPlay({
@@ -521,20 +521,20 @@ export function mountTruthMeter(app) {
 
   /** Filet de sécurité hôte : clôt la manche même si un votant est absent. */
   async function forceReveal() {
-    if (mp && !isLobbyHost()) return;
+    if (mp && !canActAsHost()) return;
     await ensureLocalVoteCommitted();
     await goToRevealPending();
   }
 
   async function startDisplayPhase() {
-    if (mp && !isLobbyHost()) return;
+    if (mp && !canActAsHost()) return;
     if (mp) {
       await commitTruthMeterPlay({ phase: "display", votes: {}, roundScored: false });
     } else {
       phase = "display";
       render();
       setTimeout(() => {
-        if (!mp || isLobbyHost()) startVotingPhase();
+        if (!mp || canActAsHost()) startVotingPhase();
       }, TRUTH_METER_DISPLAY_SEC * 1000);
     }
   }
@@ -544,7 +544,7 @@ export function mountTruthMeter(app) {
     const author = getCurrentAuthor() || affirmation?.author;
     const total = totalRounds();
     const isAuthor = localName === author;
-    const host = !mp || isLobbyHost();
+    const host = !mp || canActAsHost();
     let phaseHtml = "";
 
     if (phase === "writing") {
@@ -770,7 +770,7 @@ export function mountTruthMeter(app) {
           render();
           try {
             await commitTruthMeterVote(choice);
-            if (allVotesReadyForReveal() && isLobbyHost()) await goToRevealPending();
+            if (allVotesReadyForReveal() && canActAsHost()) await goToRevealPending();
           } finally {
             voteCommitInFlight = null;
           }
@@ -880,7 +880,7 @@ export function mountTruthMeter(app) {
 
   async function onNextRound() {
     if (nextRoundInFlight) return;
-    if (mp && !isLobbyHost()) return;
+    if (mp && !canActAsHost()) return;
 
     nextRoundInFlight = true;
     const btn = app.querySelector("#next-round");
@@ -955,7 +955,7 @@ export function mountTruthMeter(app) {
       draftText = "";
     }
 
-    if (phase === "voting" && isLobbyHost() && allVotesReadyForReveal()) {
+    if (phase === "voting" && canActAsHost() && allVotesReadyForReveal()) {
       void (async () => {
         await ensureLocalVoteCommitted();
         await goToRevealPending();
@@ -978,10 +978,10 @@ export function mountTruthMeter(app) {
     }
 
     render();
-    if (phase === "display" && prevPhase !== "display" && (!mp || isLobbyHost())) {
+    if (phase === "display" && prevPhase !== "display" && (!mp || canActAsHost())) {
       scheduleDisplayToVote();
     }
-    if (phase === "reveal-pending" && prevPhase !== "reveal-pending" && isLobbyHost()) {
+    if (phase === "reveal-pending" && prevPhase !== "reveal-pending" && canActAsHost()) {
       scheduleRevealFromPending();
     }
     if (phase === "reveal" && prevPhase !== "reveal") {
@@ -1000,7 +1000,7 @@ export function mountTruthMeter(app) {
 
   syncFromSession();
   render();
-  if (phase === "display" && (!mp || isLobbyHost())) {
+  if (phase === "display" && (!mp || canActAsHost())) {
     scheduleDisplayToVote();
   }
 

@@ -70,7 +70,7 @@ export function mountTierNight(app) {
   async function finishGame() {
     if (finished) return;
     finished = true;
-    setLobbyPlaying("tiernight");
+    void setLobbyPlaying("tiernight").catch(() => {});
 
     if (isGameSyncActive()) {
       const uid = getSupabaseUserId();

@@ -10,7 +10,7 @@ import {
 } from "../core/guessLieSession.js";
 import {
   isGameSyncActive,
-  isLobbyHost,
+  canActAsHost,
   onGameSessionChange,
   commitGuessLiePlay,
   getActiveMemberUserIds,
@@ -22,6 +22,7 @@ import { awardGuessLieRound, guessLieLiarWins } from "../core/scoring.js";
 import { gameCumulativeScoresHtml, refreshGameScoresBox } from "../core/gameScores.js";
 import { setLobbyPlaying, setLobbyWaiting } from "../core/lobby.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
+import { withClickLock } from "../core/actionLock.js";
 import { navigate } from "../core/router.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
 import { bindNav } from "../screens/nav.js";
@@ -52,7 +53,7 @@ export function mountGuessLie(app) {
     return null;
   }
 
-  setLobbyPlaying("guesslie");
+  void setLobbyPlaying("guesslie").catch(() => {});
 
   const mp = isGameSyncActive();
 
@@ -89,7 +90,7 @@ export function mountGuessLie(app) {
       if (!revealResult) setRevealDisplay(computeReveal());
       return;
     }
-    if (mp && !isLobbyHost()) return;
+    if (mp && !canActAsHost()) return;
 
     const result = computeReveal();
     const { correct, round, liarBonus } = result;
@@ -104,7 +105,7 @@ export function mountGuessLie(app) {
       liarBonus,
     });
 
-    if (recordStats && (!mp || isLobbyHost())) {
+    if (recordStats && (!mp || canActAsHost())) {
       recordGuessLieRoundStats(lieDetected);
     }
 
@@ -114,7 +115,7 @@ export function mountGuessLie(app) {
         roundScored: true,
         ...(recordStats ? { statsRecordedRoundIdx: roundIdx } : {}),
       },
-      { withEveningScores: mp && isLobbyHost() }
+      { withEveningScores: mp && canActAsHost() }
     );
 
     setRevealDisplay(result);
@@ -125,7 +126,7 @@ export function mountGuessLie(app) {
     const gl = getGuessLieSession();
     const votes = gl.votes || {};
     const round = currentRound();
-    if (!allDetectivesVoted(votes, round) || !isLobbyHost()) return;
+    if (!allDetectivesVoted(votes, round) || !canActAsHost()) return;
     if (gl.roundScored || roundScored) return;
     revealAdvancing = true;
     try {
@@ -169,7 +170,7 @@ export function mountGuessLie(app) {
 
   /** Filet de sécurité hôte : clôt la manche même si un détective n'a pas voté. */
   async function forceReveal() {
-    if (mp && !isLobbyHost()) return;
+    if (mp && !canActAsHost()) return;
     if (getGuessLieSession().roundScored || roundScored) return;
     if (mp) {
       if (revealAdvancing || phase !== "voting") return;
@@ -196,10 +197,10 @@ export function mountGuessLie(app) {
   }
 
   async function nextRound() {
-    if (mp && !isLobbyHost()) return;
+    if (mp && !canActAsHost()) return;
 
     if (roundIdx >= rounds.length - 1) {
-      if (!mp || isLobbyHost()) {
+      if (!mp || canActAsHost()) {
         recordGuessLiePlayed();
       }
       setLastGame({
@@ -296,7 +297,7 @@ export function mountGuessLie(app) {
         const displayPick = selected !== null ? selected : committedVote;
         const detectivesDone = allDetectivesVoted(votes, round);
         const hasPendingChange = selected !== null && selected !== committedVote;
-        const voteHint = !committedVote && selected == null
+        const voteHint = committedVote == null && selected == null
           ? "Choisis la lettre du mensonge."
           : detectivesDone
             ? "Tout le monde a voté !"
@@ -329,7 +330,7 @@ export function mountGuessLie(app) {
             ${confirmLabel}
           </button>`;
       }
-      if (!mp || isLobbyHost()) {
+      if (!mp || canActAsHost()) {
         const votes = getGuessLieSession().votes || {};
         const votedCount = countDetectiveVotes(votes, round);
         const totalDetectives = detectiveNamesForRound(round).length;
@@ -378,7 +379,7 @@ export function mountGuessLie(app) {
             .join("")}
         </div>
         ${
-          !mp || isLobbyHost()
+          !mp || canActAsHost()
             ? `<button type="button" class="btn btn-primary btn--spaced" id="next-round">
           ${roundIdx >= total - 1 ? "Voir les résultats →" : "Manche suivante →"}
         </button>`
@@ -429,7 +430,7 @@ export function mountGuessLie(app) {
 
     app.querySelector("#guesslie-force")?.addEventListener("click", () => void forceReveal());
 
-    app.querySelector("#next-round")?.addEventListener("click", nextRound);
+    app.querySelector("#next-round")?.addEventListener("click", withClickLock(nextRound));
   }
 
   function shouldSkipFullRender(prevIdx, prevPhase) {

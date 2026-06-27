@@ -1,5 +1,6 @@
 import { isSupabaseConfigured } from "./supabaseClient.js";
 import { getSupabaseUserId } from "./supabaseAuth.js";
+import { resolveActingHostUserId } from "./hostPresence.js";
 import {
   getLocalDisplayName,
   getState,
@@ -332,6 +333,23 @@ export function isLobbyHost() {
   if (uid && hostId) return uid === hostId;
   const local = getState().lobby?.participants?.find((p) => p.isLocal);
   return Boolean(local?.isHost);
+}
+
+/**
+ * Hôte effectif pour les contrôles de manche (révéler / manche suivante).
+ * Les contrôles host-only (lancement, scores de soirée) restent réservés au vrai hôte.
+ */
+export function getActingHostUserId() {
+  const lobby = getState().lobby;
+  return resolveActingHostUserId(lobby?.participants || [], lobby?.hostId || null);
+}
+
+/** Peut piloter les contrôles de manche : vrai hôte, ou repli si l'hôte est absent. */
+export function canActAsHost() {
+  if (isLobbyHost()) return true;
+  const uid = getSupabaseUserId();
+  if (!uid) return false;
+  return uid === getActingHostUserId();
 }
 
 /** Écrans de préparation (jeu choisi mais pas encore lancé). */
@@ -2362,11 +2380,6 @@ export function applyRemoteSession(row) {
     patch.playlistGuessGame?.phase != null &&
     patch.playlistGuessGame.phase !== prevPgPhase;
 
-  if (Object.keys(patch).length) saveStatePatch(patch);
-
-  applyRemoteEveningState(st);
-  syncLastGameFromSessionRow(row);
-
   const guessLiePlayChanged =
     patch.guessLie &&
     (Boolean(patch.guessLie.lobbyComplete) !== Boolean(prevGuessLie?.lobbyComplete) ||
@@ -2379,7 +2392,18 @@ export function applyRemoteSession(row) {
     ((patch.dilemmaGame.phase ?? null) !== prevDmPhase ||
       (patch.dilemmaGame.roundIdx ?? null) !== prevDmRoundIdx);
 
-  if (sigUnchanged && !pgPhaseChanged && !guessLiePlayChanged && !dilemmaPlayChanged) return;
+  const playChanged = Boolean(pgPhaseChanged || guessLiePlayChanged || dilemmaPlayChanged);
+
+  // Signature distante inchangée (souvent un simple touch `updated_at` sans modif de
+  // `state`) et aucune transition locale en retard : l'état local reflète déjà le
+  // distant. On évite alors la réécriture localStorage (JSON.stringify de tout le state)
+  // qui, multipliée par chaque push/poll, était un coût CPU inutile.
+  if (Object.keys(patch).length && (!sigUnchanged || playChanged)) saveStatePatch(patch);
+
+  applyRemoteEveningState(st);
+  syncLastGameFromSessionRow(row);
+
+  if (sigUnchanged && !playChanged) return;
 
   notify(row);
 

@@ -11,7 +11,11 @@ function loadStore() {
 }
 
 function saveStore(store) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
+  } catch {
+    /* quota plein / storage indisponible (Safari privé) */
+  }
 }
 
 export function hasEmailAccount(email) {
