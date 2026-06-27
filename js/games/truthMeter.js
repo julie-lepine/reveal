@@ -946,6 +946,15 @@ export function mountTruthMeter(app) {
     captureVoteDraftFromDom();
     syncFromSession();
 
+    // Nouvelle manche : on remet le curseur au neutre (50 %) pour TOUS, pas seulement
+    // l'hôte (onNextRound). Sinon, un invité qui devient auteur après avoir voté ouvrirait
+    // son curseur sur sa valeur précédente. Conditionné au roundIdx pour ne pas écraser la
+    // saisie en cours de l'auteur durant sa propre manche.
+    if (roundIdx !== prevRound) {
+      draftEstimate = 50;
+      draftText = "";
+    }
+
     if (phase === "voting" && isLobbyHost() && allVotesReadyForReveal()) {
       void (async () => {
         await ensureLocalVoteCommitted();

@@ -5,6 +5,7 @@ import {
   applyConsensusDefaultAnswers,
   clampConsensusValue,
   isConsensusAnswerForRound,
+  isScorableConsensusAnswer,
   pickLatestConsensusAnswer,
   stripStaleConsensusAnswers,
 } from "../js/core/consensusAnswerUtils.js";
@@ -42,6 +43,38 @@ describe("isConsensusAnswerForRound", () => {
         1
       ),
       true
+    );
+  });
+});
+
+describe("isScorableConsensusAnswer", () => {
+  it("accepte une vraie réponse validée pour la manche", () => {
+    assert.equal(
+      isScorableConsensusAnswer(
+        { value: 80, submittedAt: 1, questionIdx: 0, imputed: false },
+        0
+      ),
+      true
+    );
+  });
+
+  it("exclut une réponse imputée (joueur absent à 50 %)", () => {
+    assert.equal(
+      isScorableConsensusAnswer(
+        { value: 50, submittedAt: 1, questionIdx: 0, imputed: true },
+        0
+      ),
+      false
+    );
+  });
+
+  it("exclut une réponse d'une autre manche", () => {
+    assert.equal(
+      isScorableConsensusAnswer(
+        { value: 80, submittedAt: 1, questionIdx: 1, imputed: false },
+        0
+      ),
+      false
     );
   });
 });

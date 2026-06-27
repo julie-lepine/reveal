@@ -16,6 +16,7 @@
 import {
   DEFAULT_SYNC_PATCH_TIMEOUT_MS,
   getCachedGameSession,
+  getEffectiveSessionScreen,
   isGameSyncActive,
   isLobbyHost,
   patchGameState,
@@ -170,12 +171,16 @@ export function navigateAfterGameLaunch({
 export function prepGuestFollowOnSession({ prepScreen, getEntryScreen, buildNavStack }) {
   return () => {
     if (isGameSyncActive() && !isLobbyHost()) {
-      const row = getCachedGameSession();
-      if (row?.screen === "results") {
+      // On se base sur l'écran *effectif* (qui applique l'inférence lobby) et non sur
+      // `row.screen` brut : lors d'une relance, la ligne de session peut encore afficher
+      // "results" alors que le lobby joue déjà le nouveau jeu. Se fier au brut renverrait
+      // l'invité au podium au lieu de le laisser sur la prépa.
+      const effective = getEffectiveSessionScreen(getCachedGameSession());
+      if (effective === "results") {
         navigate("results", { navStack: ["home", "lobby", "game-select", "results"] });
         return true;
       }
-      if (row?.screen === "leaderboard") {
+      if (effective === "leaderboard") {
         navigate("leaderboard", { navStack: ["home", "lobby", "game-select", "leaderboard"] });
         return true;
       }

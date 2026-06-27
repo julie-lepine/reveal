@@ -515,7 +515,7 @@ export function mountConsensus(app) {
     if (waiting.length > 0) {
       const names = waiting.map((player) => player.name).join(", ");
       const confirmed = await showAppConfirm(
-        `${waiting.length} joueur(s) sans réponse validée (${names}) recevront 50 % par défaut. Continuer la révélation ?`,
+        `${waiting.length} joueur(s) sans réponse validée (${names}) ne seront pas comptés dans la moyenne (0 pt cette manche). Continuer la révélation ?`,
         {
           title: "Révéler maintenant",
           confirmLabel: "Révéler",

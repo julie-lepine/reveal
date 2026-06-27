@@ -29,6 +29,7 @@ import {
   pickLatestConsensusAnswer,
   clampConsensusValue,
   isConsensusAnswerForRound,
+  isScorableConsensusAnswer,
   stripStaleConsensusAnswers,
 } from "./consensusAnswerUtils.js";
 
@@ -492,8 +493,10 @@ export function scoreConsensusRound(session = getConsensusSession()) {
   }
   const questionIdx = session.questionIdx ?? 0;
   const currentScores = createConsensusScores(session.matchScores || {});
+  // Seules les vraies réponses comptent : un joueur absent (réponse imputée à 50 %)
+  // ne doit ni fausser la moyenne / médiane / ancre, ni recevoir de points.
   const entries = Object.entries(session.answers || {})
-    .filter(([, answer]) => isConsensusAnswerForRound(answer, questionIdx))
+    .filter(([, answer]) => isScorableConsensusAnswer(answer, questionIdx))
     .map(([name, answer]) => ({
       name,
       value: clampConsensusValue(answer.value),

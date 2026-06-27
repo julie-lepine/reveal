@@ -17,6 +17,15 @@ export function isConsensusAnswerForRound(answer, questionIdx) {
   return answer.questionIdx === questionIdx;
 }
 
+/**
+ * Réponse à prendre en compte pour le scoring : validée pour la manche ET non imputée.
+ * Les réponses imputées (joueur absent, 50 % par défaut) ne doivent ni peser dans la
+ * moyenne / médiane / ancre, ni rapporter de points.
+ */
+export function isScorableConsensusAnswer(answer, questionIdx) {
+  return isConsensusAnswerForRound(answer, questionIdx) && !answer?.imputed;
+}
+
 export function stripStaleConsensusAnswers(answers = {}, questionIdx = 0) {
   const out = {};
   Object.entries(answers).forEach(([name, answer]) => {

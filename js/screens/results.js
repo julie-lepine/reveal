@@ -1,7 +1,7 @@
 import { getEveningRecap } from "../core/eveningRecap.js";
 import { getLobbyStatus, getLobbyGameId } from "../core/lobby.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
-import { navigate } from "../core/router.js";
+import { navigate, getCurrentScreen } from "../core/router.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
 import { bindNav } from "./nav.js";
 import {
@@ -102,11 +102,13 @@ export function mountResults(app) {
       await refreshLobbyFromSupabase();
       await refreshEveningScoresFromSession();
       if (!isLobbyHost()) await routeToActiveGameIfNeeded();
-      render();
+      // Si le suivi de l'hôte a navigué ailleurs, ne pas réécrire #app (sinon on
+      // écrase l'écran fraîchement monté et l'invité semble bloqué sur le récap).
+      if (getCurrentScreen() === "results") render();
     })();
     unsubSession = onGameSessionChange((row) => {
       tryFollowHostGameSession(row);
-      render();
+      if (getCurrentScreen() === "results") render();
     });
     unsubLobby = onLobbyBundleUpdated(() => {
       // Rattrapage : si l'hôte a relancé un jeu (lobby repassé en "playing" sur un
@@ -116,7 +118,7 @@ export function mountResults(app) {
         const gid = getLobbyGameId();
         if (gid && gid !== "menu") void routeToActiveGameIfNeeded();
       }
-      render();
+      if (getCurrentScreen() === "results") render();
     });
   }
 

@@ -1,6 +1,6 @@
 import { getState } from "../core/state.js";
 import { getPlayerBadges } from "../core/badges.js";
-import { navigate } from "../core/router.js";
+import { navigate, getCurrentScreen } from "../core/router.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
 import { bindNav } from "./nav.js";
 import {
@@ -82,11 +82,13 @@ export function mountLeaderboard(app) {
     void (async () => {
       await refreshEveningScoresFromSession();
       if (!isLobbyHost()) await routeToActiveGameIfNeeded();
-      renderBoard();
+      // Si le suivi de l'hôte a navigué ailleurs (prépa / jeu), ne pas réécrire #app :
+      // renderBoard() écraserait l'écran fraîchement monté.
+      if (getCurrentScreen() === "leaderboard") renderBoard();
     })();
     unsubSession = onGameSessionChange((row) => {
       tryFollowHostGameSession(row);
-      renderBoard();
+      if (getCurrentScreen() === "leaderboard") renderBoard();
     });
   }
 

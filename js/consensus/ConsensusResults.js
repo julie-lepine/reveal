@@ -49,8 +49,13 @@ export function renderConsensusResults({
 
   const playerMap = playerMetaMap(players);
 
-  const rows = Object.entries(answers)
-    .filter(([, answer]) => Number.isFinite(answer?.value))
+  const finiteAnswers = Object.entries(answers).filter(([, answer]) =>
+    Number.isFinite(answer?.value)
+  );
+
+  // Présents : réponses réellement validées (les imputées à 50 % ne sont pas comptées).
+  const rows = finiteAnswers
+    .filter(([, answer]) => !answer?.imputed)
     .map(([key, answer]) => {
       const name = displayPlayerName(key);
       const delta = lastRound.deltas?.[name] ?? lastRound.deltas?.[key] ?? 0;
@@ -59,7 +64,6 @@ export function renderConsensusResults({
       return {
         name,
         value: answer.value,
-        imputed: Boolean(answer.imputed),
         delta,
         distance,
         tags,
@@ -68,6 +72,12 @@ export function renderConsensusResults({
       };
     })
     .sort((a, b) => b.delta - a.delta || a.distance - b.distance || a.name.localeCompare(b.name));
+
+  // Absents : pas de réponse validée → affichés à part, sans valeur ni écart ni points.
+  const absentRows = finiteAnswers
+    .filter(([, answer]) => answer?.imputed)
+    .map(([key]) => displayPlayerName(key))
+    .sort((a, b) => a.localeCompare(b));
 
   const spread =
     rows.length > 1 ? Math.max(...rows.map((row) => row.value)) - Math.min(...rows.map((row) => row.value)) : 0;
@@ -196,9 +206,7 @@ export function renderConsensusResults({
             <span class="consensus-answer-list__delta">+${formatScore(row.delta)}</span>
           </div>
           <div class="consensus-answer-list__meta">
-            <span>${formatScore(row.value)} / 100${
-              row.imputed ? ` <span class="consensus-answer-list__imputed">· non validé</span>` : ""
-            }</span>
+            <span>${formatScore(row.value)} / 100</span>
             <span>écart ${formatScore(row.distance)}</span>
           </div>
           ${
@@ -213,5 +221,20 @@ export function renderConsensusResults({
         </div>`
         )
         .join("")}
+      ${
+        absentRows.length
+          ? `<div class="consensus-answer-list__row consensus-answer-list__row--absent">
+              <div class="consensus-answer-list__head">
+                <span class="consensus-answer-list__name">${absentRows
+                  .map((name) => escapeHtml(name))
+                  .join(", ")}</span>
+                <span class="consensus-answer-list__delta consensus-answer-list__delta--muted">+0</span>
+              </div>
+              <div class="consensus-answer-list__meta">
+                <span class="consensus-answer-list__imputed">n'a pas répondu · non compté</span>
+              </div>
+            </div>`
+          : ""
+      }
     </div>`;
 }

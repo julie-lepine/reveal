@@ -16,7 +16,6 @@ export const TRIVIA_THEMES = [
   { id: "food", label: "Food" },
   { id: "general", label: "Culture Générale" },
   { id: "memes", label: "Internet / Mèmes" },
-  { id: "hottakes", label: "Hot Takes" },
   { id: TRIVIA_RANDOM_THEME_ID, label: "Aléatoire" },
 ];
 

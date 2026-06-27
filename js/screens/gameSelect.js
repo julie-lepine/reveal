@@ -325,7 +325,20 @@ export function mountGameSelect(app) {
     startLobbyPresenceSync();
   }
 
-  const unsubLobby = onLobbyBundleUpdated(() => scheduleRender(false));
+  const unsubLobby = onLobbyBundleUpdated(() => {
+    // Quand l'hôte (re)lance un jeu, la maj lobby (status playing / game_id) arrive
+    // souvent avant la nouvelle ligne de session. On force un refetch de session pour que
+    // le bandeau « Rejoindre la partie en cours » apparaisse aussitôt, sans devoir
+    // repasser par l'Accueil (qui forçait jusqu'ici ce rafraîchissement).
+    if (isGameSyncActive()) {
+      void (async () => {
+        await refreshGameSession();
+        scheduleRender(true);
+      })();
+      return;
+    }
+    scheduleRender(false);
+  });
 
   if (isGameSyncActive()) {
     void (async () => {

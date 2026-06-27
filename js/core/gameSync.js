@@ -288,12 +288,20 @@ function shouldApplySessionRoute(row, { fromScreen = null } = {}) {
     return false;
   }
 
+  // Sortie volontaire d'une prépa : l'invité a quitté CE jeu (suppression ciblée sur cet
+  // écran). On ne le force pas à y revenir tant que la session reste sur la même prépa,
+  // sinon il boucle dessus. Il suit quand même l'hôte vers un AUTRE écran (screen
+  // différent → isSuppressedGameReturn false), y compris une autre prépa.
+  const routingSuppressed = Date.now() < suppressSessionRouteUntil;
+  if (routingSuppressed && isOnGameSetupScreen(screen) && isSuppressedGameReturn(screen)) {
+    return false;
+  }
+
   // Paramétrage ou partie en cours : suivi obligatoire (ignore suppressSessionRoute).
   if (shouldForceGuestFollowSession(screen)) {
     return true;
   }
 
-  const routingSuppressed = Date.now() < suppressSessionRouteUntil;
   if (routingSuppressed && isSuppressedGameReturn(screen)) return false;
 
   const hostLaunchedFromMenu = fromScreen === "game-select" && screen !== "game-select";
@@ -2389,8 +2397,10 @@ export async function refreshGameSession() {
   const row = await fetchGameSessionByLobby(lobbyId);
   if (row) applyRemoteSession(row);
   else {
-    cachedRow = null;
-    notify(null);
+    // Session supprimée (hôte qui quitte une prépa / partie). On passe par
+    // applyRemoteSession(null) pour déclencher confirmMissingSessionThenRoute : sinon, via
+    // le polling, un invité resterait bloqué sur la prépa fantôme du jeu quitté.
+    applyRemoteSession(null);
     try {
       const { refreshLobbyFromSupabase } = await import("./supabaseLobby.js");
       await refreshLobbyFromSupabase();
