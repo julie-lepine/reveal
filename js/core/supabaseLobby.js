@@ -28,6 +28,36 @@ let lastLobbyBundleSig = "";
 let lastMemberHeartbeatAt = 0;
 const lobbyBundleListeners = new Set();
 
+/** Reconnexion Realtime : le socket peut mourir silencieusement (veille onglet, throttling
+ *  arrière-plan, coupure brève) sans que Supabase ne le recrée tout seul. */
+let realtimeOnUpdate = null;
+let realtimeReconnectTimer = null;
+let realtimeReconnectAttempts = 0;
+const REALTIME_RECONNECT_MAX_MS = 10000;
+
+function clearRealtimeReconnect() {
+  if (realtimeReconnectTimer) {
+    clearTimeout(realtimeReconnectTimer);
+    realtimeReconnectTimer = null;
+  }
+}
+
+/** Replanifie une souscription Realtime tant qu'on est censé être dans un lobby. */
+function scheduleRealtimeReconnect() {
+  if (realtimeReconnectTimer || !presenceLobbyId) return;
+  const delay = Math.min(
+    REALTIME_RECONNECT_MAX_MS,
+    1000 * Math.pow(2, realtimeReconnectAttempts)
+  );
+  realtimeReconnectAttempts += 1;
+  realtimeReconnectTimer = setTimeout(() => {
+    realtimeReconnectTimer = null;
+    if (!presenceLobbyId) return;
+    realtimeChannel = null;
+    subscribeLobbyRealtime(realtimeOnUpdate || (() => notifyLobbyBundleUpdated()));
+  }, delay);
+}
+
 /** Signature du lobby : ne notifier (donc re-render) que si quelque chose a réellement changé. */
 function lobbyBundleSignature(bundle) {
   return JSON.stringify({
@@ -249,6 +279,99 @@ function notifyLobbyBundleUpdated() {
   });
 }
 
+/**
+ * Coalescing des refetch lobby déclenchés par Realtime. Sans ça, chaque événement
+ * (heartbeat last_seen_at, touch last_activity_at, vote, message…) lançait un fetch
+ * complet lobbies + membres : sous une rafale (partie active à plusieurs), le thread
+ * principal des invités saturait et l'onglet freezait. On regroupe les rafales en un
+ * seul fetch, sans jamais plus d'une requête en vol.
+ */
+const LOBBY_REFRESH_DEBOUNCE_MS = 250;
+let lobbyRefreshTimer = null;
+let lobbyRefreshWithMessages = false;
+let lobbyRefreshInFlight = false;
+let lobbyRefreshQueued = false;
+
+function scheduleLobbyRefresh({ withMessages = false } = {}) {
+  if (withMessages) lobbyRefreshWithMessages = true;
+  if (lobbyRefreshInFlight) {
+    lobbyRefreshQueued = true;
+    return;
+  }
+  if (lobbyRefreshTimer) return;
+  lobbyRefreshTimer = setTimeout(runCoalescedLobbyRefresh, LOBBY_REFRESH_DEBOUNCE_MS);
+}
+
+async function runCoalescedLobbyRefresh() {
+  lobbyRefreshTimer = null;
+  if (!presenceLobbyId) return;
+  lobbyRefreshInFlight = true;
+  const withMessages = lobbyRefreshWithMessages;
+  lobbyRefreshWithMessages = false;
+  try {
+    await refreshLobbyFromSupabase({ withMessages });
+  } catch (e) {
+    if (!isLobbyGoneError(e)) {
+      console.warn("REVEAL coalesced lobby refresh:", e.message || e);
+    }
+  } finally {
+    lobbyRefreshInFlight = false;
+    notifyLobbyBundleUpdated();
+    if (lobbyRefreshQueued) {
+      lobbyRefreshQueued = false;
+      scheduleLobbyRefresh({ withMessages: lobbyRefreshWithMessages });
+    }
+  }
+}
+
+function cancelLobbyRefresh() {
+  if (lobbyRefreshTimer) {
+    clearTimeout(lobbyRefreshTimer);
+    lobbyRefreshTimer = null;
+  }
+  lobbyRefreshWithMessages = false;
+  lobbyRefreshQueued = false;
+}
+
+/**
+ * UPDATE lobbies « cosmétique » : seul last_activity_at / updated_at a bougé (déclenché
+ * par le trigger SQL touch_lobby_activity à CHAQUE écriture game_sessions / heartbeat).
+ * Ces UPDATE n'apportent rien à l'UI : on les ignore pour casser la tempête de refetch.
+ */
+function isMeaningfulLobbyUpdate(newRow) {
+  if (!newRow) return true;
+  const cur = getState().lobby;
+  if (!cur || cur.id !== newRow.id) return true;
+  const newNudgeAt = newRow.nudge_at ? new Date(newRow.nudge_at).getTime() : 0;
+  return (
+    (newRow.status || "waiting") !== (cur.status || "waiting") ||
+    (newRow.game_id ?? null) !== (cur.gameId ?? null) ||
+    (newRow.host_id ?? null) !== (cur.hostId ?? null) ||
+    newNudgeAt !== (cur.nudgeAt || 0) ||
+    (newRow.nudge_for ?? null) !== (cur.nudgeForUserId ?? null)
+  );
+}
+
+/**
+ * UPDATE lobby_members « cosmétique » : un heartbeat (last_seen_at) ne change ni le
+ * pseudo, ni l'emoji, ni le ready/host. On ne refetch que sur INSERT/DELETE ou un vrai
+ * changement de profil.
+ */
+function isMeaningfulMemberChange(payload) {
+  if (!payload || payload.eventType !== "UPDATE") return true;
+  const row = payload.new;
+  if (!row) return true;
+  const cur = getState().lobby?.participants?.find((p) => p.userId === row.user_id);
+  if (!cur) return true;
+  return (
+    row.display_name !== cur.name ||
+    row.emoji !== cur.emoji ||
+    row.color !== cur.color ||
+    Boolean(row.ready) !== Boolean(cur.ready) ||
+    Boolean(row.is_host) !== Boolean(cur.isHost)
+  );
+}
+
 function normalizeCode(code) {
   return code.trim().toUpperCase().replace(/\s/g, "");
 }
@@ -433,10 +556,13 @@ export function stopLobbyPresenceSync() {
   presenceLobbyId = null;
   lastLobbyBundleSig = "";
   lastMemberHeartbeatAt = 0;
+  realtimeReconnectAttempts = 0;
+  realtimeOnUpdate = null;
   if (lobbyPresencePollTimer) {
     clearTimeout(lobbyPresencePollTimer);
     lobbyPresencePollTimer = null;
   }
+  cancelLobbyRefresh();
   unsubscribeLobbyRealtime();
 }
 
@@ -776,6 +902,7 @@ export function subscribeLobbyRealtime(onUpdate) {
   const lobbyId = getState().lobby?.id;
   if (!lobbyId) return () => {};
 
+  realtimeOnUpdate = onUpdate;
   unsubscribeLobbyRealtime();
 
   realtimeChannel = supabase
@@ -783,22 +910,24 @@ export function subscribeLobbyRealtime(onUpdate) {
     .on(
       "postgres_changes",
       { event: "*", schema: "public", table: "lobby_members", filter: `lobby_id=eq.${lobbyId}` },
-      () => {
-        refreshLobbyFromSupabase().then(() => onUpdate?.());
+      (payload) => {
+        if (!isMeaningfulMemberChange(payload)) return;
+        scheduleLobbyRefresh();
       }
     )
     .on(
       "postgres_changes",
       { event: "*", schema: "public", table: "lobby_messages", filter: `lobby_id=eq.${lobbyId}` },
       () => {
-        refreshLobbyFromSupabase({ withMessages: true }).then(() => onUpdate?.());
+        scheduleLobbyRefresh({ withMessages: true });
       }
     )
     .on(
       "postgres_changes",
       { event: "UPDATE", schema: "public", table: "lobbies", filter: `id=eq.${lobbyId}` },
-      () => {
-        refreshLobbyFromSupabase().then(() => onUpdate?.());
+      (payload) => {
+        if (!isMeaningfulLobbyUpdate(payload.new)) return;
+        scheduleLobbyRefresh();
       }
     )
     .on(
@@ -846,14 +975,42 @@ export function subscribeLobbyRealtime(onUpdate) {
         onUpdate?.();
       }
     )
-    .subscribe();
+    .subscribe((status) => {
+      if (status === "SUBSCRIBED") {
+        realtimeReconnectAttempts = 0;
+        clearRealtimeReconnect();
+        // Au (re)branchement, on peut avoir raté des événements : on resynchronise
+        // et on route (suivi de l'hôte indépendamment de l'écran courant).
+        void refreshGameSession()
+          .then((row) => {
+            if (row) handleSessionRoute(row);
+          })
+          .catch(() => {});
+        return;
+      }
+      if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
+        scheduleRealtimeReconnect();
+      }
+    });
 
   return unsubscribeLobbyRealtime;
 }
 
 export function unsubscribeLobbyRealtime() {
+  clearRealtimeReconnect();
   if (realtimeChannel && supabase) {
     supabase.removeChannel(realtimeChannel);
     realtimeChannel = null;
   }
+}
+
+/**
+ * Force un canal Realtime frais (retour au premier plan, socket potentiellement étranglé
+ * par le navigateur en arrière-plan). No-op si on n'est pas dans un lobby.
+ */
+export function resubscribeLobbyRealtime() {
+  if (!presenceLobbyId) return;
+  realtimeReconnectAttempts = 0;
+  unsubscribeLobbyRealtime();
+  subscribeLobbyRealtime(realtimeOnUpdate || (() => notifyLobbyBundleUpdated()));
 }

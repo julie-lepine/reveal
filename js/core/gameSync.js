@@ -154,6 +154,9 @@ let syncPausedByHidden = false;
 const POLL_MS_MIN = 3000;
 const POLL_MS_MAX = 12000;
 const POLL_MS_DEFAULT = 4000;
+/** Soirée active, invité en attente sur un hub/menu : plafond de backoff plus bas pour
+ *  rattraper vite un lancement raté par le Realtime (sans atteindre les 12 s). */
+const POLL_MS_HUB_WAIT_MAX = 5000;
 /** Secours si Realtime silencieux en partie active. */
 const POLL_MS_ACTIVE = 2000;
 /** Realtime récent : on espace le polling (egress) sans sacrifier la réactivité perçue. */
@@ -2640,6 +2643,9 @@ export function initMultiplayerSyncVisibility() {
       scheduleSyncPoll();
       void syncTick();
       import("./supabaseLobby.js").then((m) => {
+        // Le socket Realtime a pu être étranglé/fermé en arrière-plan : on force un
+        // canal frais (le navigateur ne le recrée pas toujours seul) en plus du refresh.
+        m.resubscribeLobbyRealtime?.();
         m.refreshLobbyFromSupabase?.().catch(() => {});
       });
     }
@@ -2739,6 +2745,11 @@ function adjustPollBackoff(sigChanged) {
       scalePollIntervalMs(POLL_MS_MAX),
       Math.round(pollIntervalMs * 1.25)
     );
+  }
+  // Soirée lancée mais invité encore hors partie (menu jeux, lobby, résultats) : on
+  // garde un poll réactif pour suivre l'hôte même si le Realtime s'est tu.
+  if (isLobbyEveningStarted()) {
+    pollIntervalMs = Math.min(pollIntervalMs, scalePollIntervalMs(POLL_MS_HUB_WAIT_MAX));
   }
   pollIntervalMs = Math.max(scalePollIntervalMs(POLL_MS_MIN), pollIntervalMs);
 }
