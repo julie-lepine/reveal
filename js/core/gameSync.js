@@ -466,14 +466,59 @@ export function onGameSessionChange(fn) {
   return () => listeners.delete(fn);
 }
 
-function notify(row) {
-  listeners.forEach((fn) => {
+let notifying = false;
+let pendingNotifyRow = null;
+let hasPendingNotify = false;
+/** Garde-fou : borne le drain anti-réentrance (ne devrait jamais s'enchaîner autant). */
+const NOTIFY_MAX_DRAIN = 25;
+
+/**
+ * Exécute les listeners sur une COPIE du Set : un listener peut (dé)monter un écran,
+ * donc muter `listeners` en pleine itération. Sans la copie, un listener ajouté pendant
+ * la passe était revisité dans la même boucle → re-navigation/re-rendu en cascade
+ * (freeze Firefox / OOM invité). On gère aussi les listeners async pour ne pas laisser
+ * fuiter de rejets (`Uncaught (in promise): Failed to fetch`).
+ */
+function runNotify(row) {
+  for (const fn of [...listeners]) {
     try {
-      fn(row);
+      const ret = fn(row);
+      if (ret && typeof ret.then === "function") {
+        ret.catch((e) => console.warn("gameSync listener:", e?.message || e));
+      }
     } catch (e) {
-      console.warn("gameSync listener:", e);
+      console.warn("gameSync listener:", e?.message || e);
     }
-  });
+  }
+}
+
+/**
+ * Anti-réentrance : si un listener relance une notification synchrone (via navigate →
+ * mount → refresh), on ne récurse pas — on mémorise la dernière `row` et on la traite
+ * après la passe courante. Coupe l'emballement synchrone à la racine.
+ */
+function notify(row) {
+  if (notifying) {
+    pendingNotifyRow = row;
+    hasPendingNotify = true;
+    return;
+  }
+  notifying = true;
+  try {
+    runNotify(row);
+    let drain = 0;
+    while (hasPendingNotify && drain < NOTIFY_MAX_DRAIN) {
+      hasPendingNotify = false;
+      const next = pendingNotifyRow;
+      pendingNotifyRow = null;
+      runNotify(next);
+      drain += 1;
+    }
+    hasPendingNotify = false;
+    pendingNotifyRow = null;
+  } finally {
+    notifying = false;
+  }
 }
 
 export function userIdForName(name) {
