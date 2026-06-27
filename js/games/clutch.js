@@ -380,15 +380,21 @@ export function mountClutch(app) {
         const meta = playerMeta(entry.name);
         const medal = entry.tapped && idx < 3 ? ["🥇", "🥈", "🥉"][idx] : "";
         const pts = deltas[entry.name];
-        const gapLabel = entry.tapped
-          ? formatClutchGap(entry.ms, targetMs)
+        const posHtml = medal
+          ? medal
+          : `<span class="clutch-rank__num">${idx + 1}</span>`;
+        const detail = entry.tapped
+          ? `tapé à <strong>${escapeHtml(formatClutchSeconds(entry.ms))}</strong> · écart ${escapeHtml(formatClutchGap(entry.ms, targetMs))}`
           : "pas tapé";
         return `
-          <div class="result-row">
-            <div class="result-row__head">
-              <span style="color:${meta.color}">${medal ? `${medal} ` : ""}${escapeHtml(entry.name)}</span>
-              <span class="muted">${escapeHtml(gapLabel)}${pts ? ` · <strong>+${pts}</strong>` : ""}</span>
-            </div>
+          <div class="clutch-rank__row ${entry.tapped ? "" : "clutch-rank__row--out"}">
+            <span class="clutch-rank__pos">${posHtml}</span>
+            <span class="clutch-rank__avatar" style="--clutch-chip:${meta.color}">${meta.emoji}</span>
+            <span class="clutch-rank__body">
+              <span class="clutch-rank__name" style="color:${meta.color}">${escapeHtml(entry.name)}</span>
+              <span class="clutch-rank__detail">${detail}</span>
+            </span>
+            <span class="clutch-rank__pts ${pts ? "clutch-rank__pts--gain" : ""}">${pts ? `+${pts}` : "—"}</span>
           </div>`;
       })
       .join("");
@@ -396,12 +402,12 @@ export function mountClutch(app) {
     return `
       <h3 class="section-title">Verdict de la manche</h3>
       <p class="hint">🎯 La cible était <strong>${escapeHtml(formatClutchSeconds(targetMs))}</strong></p>
+      <div class="clutch-rank">${rows}</div>
       ${gameCumulativeScoresHtml({
         gameLabel: "Clutch",
         title: "Cumul des scores",
         scores: sessionScores(),
       })}
-      ${rows}
       ${
         host
           ? `<button type="button" class="btn btn-primary btn--spaced" id="next-round">

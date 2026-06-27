@@ -94,11 +94,11 @@ export const GAME_RULES = {
   clutch: {
     title: "Clutch",
     emoji: "💥",
-    but: "Un chrono part de 0 et monte vers une cible (7 à 20 s). Il disparaît juste avant la cible : tape pile à la cible. Le plus proche gagne.",
+    but: "Un chrono part de 0 et monte vers une cible (7 à 15 s). Il disparaît juste avant la cible : tape pile à la cible. Le plus proche gagne.",
     etapes: [
       "La cible de la manche s'affiche (ex. « 11,3 s »).",
       "Le chrono monte de 0 et reste visible…",
-      "…puis disparaît un peu avant la cible — un délai différent à chaque manche : tape à l'instinct au bon moment.",
+      "…puis disparaît un peu avant la cible - un délai différent à chaque manche : tape à l'instinct au bon moment.",
       "Taper avant ou après compte pareil : c'est l'écart absolu qui compte.",
       "La manche se clôt quand tout le monde a tapé (ou peu après la cible).",
     ],
