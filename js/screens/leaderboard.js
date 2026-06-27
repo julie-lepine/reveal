@@ -1,6 +1,6 @@
 import { getState } from "../core/state.js";
 import { getPlayerBadges } from "../core/badges.js";
-import { navigate, getCurrentScreen } from "../core/router.js";
+import { getCurrentScreen } from "../core/router.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
 import { bindNav } from "./nav.js";
 import {
@@ -66,13 +66,7 @@ export function mountLeaderboard(app) {
     `,
     });
 
-    bindNav(app, {
-      results: () => {
-        navigate("results", {
-          navStack: ["home", "lobby", "game-select", "results"],
-        });
-      },
-    });
+    bindNav(app);
   }
 
   renderBoard();

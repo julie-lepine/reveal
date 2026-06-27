@@ -5,8 +5,6 @@ Légende : ☐ à tester · ✅ OK · ❌ bug (noter en bas)
 
 ---
 
-- [ ] App qui plante au transfert d'hôte
-
 ## Global — bannière pub (app native) 📢
 
 - [ ] 🧪 **Lobby** : titre / contenu entièrement visible sous la bannière
@@ -28,19 +26,6 @@ Légende : ☐ à tester · ✅ OK · ❌ bug (noter en bas)
 - [ ] 🧪 Enchaînement 2 jeux (Dilemma → SpeedVote) : aucun invité bloqué sur Classement / Résultats
 - [ ] 🧪 Consulter Classement **pendant** une manche en cours → pas renvoyé dans le jeu (suppress OK)
 
-### Relance « Rejouer » (MP) — invité 🔁 *(corrigé)*
-
-- [ ] 🧪 Hôte clique **Rejouer** depuis le podium → invité (sur podium/résultats) arrive bien en **prépa** du jeu relancé (pas renvoyé au podium)
-- [ ] 🧪 Invité clique **prêt** en prépa juste après la relance → **reste** en prépa puis entre en jeu quand l'hôte lance (ne rebascule **pas** sur le podium)
-- [ ] 🧪 Tester sur **plusieurs jeux** (Consensus, TruthMeter, Dilemma, SpeedVote, Hot Take…) : comportement identique
-- [ ] 🧪 **Rejoindre la partie en cours** : invité au menu des jeux voit le bandeau « Rejoindre » apparaître **sans** repasser par l'Accueil dès que l'hôte (re)lance
-- [ ] 🧪 Fin de partie *normale* (hôte → Résultats) : l'invité suit toujours bien vers **Résultats** (non régressé par l'inférence lobby)
-
-### Lancer quand même (prep MP, hôte)
-
-- [ ] 🧪 **TruthMeter** : `authorOrder` = uniquement les participants (pas les absents)
-- [ ] 🧪 **Spot the fake** : `alive` = roster au lancement
-
 ### Onglet Jeux & reprise (MP)
 
 - [ ] 🧪 **Partie en cours** : invité clique **Jeux** → menu des jeux **sans** reset des prêts prep / lobby
@@ -51,100 +36,34 @@ Légende : ☐ à tester · ✅ OK · ❌ bug (noter en bas)
 - [ ] 🧪 **Quitter la partie** (bouton en jeu) : comportement inchangé - menu jeux + suppress invité OK
 - [ ] 🧪 Hôte lance un **nouveau** jeu depuis le menu pendant qu'un invité est sur **Jeux** : invité suit la prep
 
-### Retour arrière depuis une prépa (MP) 🔙 *(corrigé)*
-
-- [ ] 🧪 **Invité** entre en prépa puis **retour** (plus envie de jouer) → reste sur le **menu des jeux**, **pas** de loop qui le renvoie dans la prépa quittée
-- [ ] 🧪 Même test via l'onglet **Jeux** du bas (et pas seulement la flèche retour)
-- [ ] 🧪 Après être sorti, l'hôte lance un **autre** jeu → l'invité **suit** bien vers la nouvelle prépa (la suppression ne bloque que le jeu quitté)
-- [ ] 🧪 **Hôte** sort d'une prépa (retour) → session fermée ; l'invité encore en prépa est ramené au **lobby** (pas figé sur la prépa fantôme), y compris en polling (Realtime KO)
-- [ ] 🧪 Tester sur plusieurs jeux (Consensus, SpeedVote, Dilemma…)
-
----
-
-## Consensus 🤝 — joueur absent *(corrigé)*
-
-- [ ] 🧪 Un joueur ne répond pas → l'hôte force le reveal → l'absent **n'est pas** compté dans la moyenne (la moyenne reflète uniquement les présents)
-- [ ] 🧪 L'absent reçoit **0 pt** sur la manche mais **reste** au classement
-- [ ] 🧪 Reveal : l'absent apparaît en « n'a pas répondu · non compté » (pas de valeur 50 %, pas d'écart, pas de tags bonus)
-- [ ] 🧪 Message « Révéler maintenant » : libellé cohérent (« ne seront pas comptés », plus « recevront 50 % »)
-- [ ] 🧪 2 joueurs, 1 absent : la moyenne = la réponse du seul présent (et pas tirée vers 50 %)
-- [ ] 🧪 Tout le monde absent (force reveal) : manche non scorée, pas de plantage
-- [ ] 🧪 Tout le monde répond : scoring/moyenne inchangés (non-régression)
-
----
-
-## TruthMeter 📏 — curseur entre manches *(corrigé)*
-
-- [ ] 🧪 **Invité** qui a voté à une manche puis devient **auteur** à une manche suivante → son curseur d'auteur s'ouvre bien à **50 %** (et pas sur sa valeur précédente)
-- [ ] 🧪 Curseur de **vote** : toujours à 50 % au début de chaque manche (non régressé)
-- [ ] 🧪 La saisie en cours de l'auteur n'est **pas** réinitialisée pendant sa propre manche (reset seulement au changement de manche)
-
----
-
-## Hot Take 🔥
-- [ ] Fin de manche : renvoi sur prépa au lieu de résultats
-
-### Hot Take — auteur exclu du verdict *(corrigé ⚪)*
-
-- [ ] 🧪 Take **custom** (« Hot take de X ») : le vote de **X** ne compte **pas** dans la majorité ni dans les points (comme TruthMeter)
-- [ ] 🧪 Le vote de l'auteur reste **affiché** dans la liste des votes (juste non scoré)
-- [ ] 🧪 Take du **pool** (sans vraie paternité) : **tous** les votes comptent (l'auteur round-robin interne n'est pas exclu)
-
 ---
 
 ## Clutch 💥 — nouveau jeu
-
-> Chrono qui monte de 0 vers une cible (9–12 s), se masque un délai **aléatoire** avant la cible (1,5–3,5 s), tap à l'aveugle, podium 25/15/10 par manche.
-
-### Mécanique de base
-- [ ] 🧪 Prépa : choix 3 / 5 / 8 manches (hôte seul), invités voient le réglage se synchroniser
-- [ ] 🧪 Le chrono **monte** de 0 et reste visible, puis **disparaît** (👀) avant la cible
-- [ ] 🧪 Le délai de masquage **change à chaque manche** (pas toujours le même « avant la fin »)
-- [ ] 🧪 Cible toujours entre **9 s et 12 s** (jamais > 12 s)
-- [ ] 🧪 Tap autorisé **à tout moment** (chrono visible OU caché)
-- [ ] 🧪 Verdict : classement par écart absolu à la cible, podium **+25 / +15 / +10**
-- [ ] 🧪 Égalité d'écart → départage au **tap le plus tôt**
-- [ ] 🧪 Pas de tap dans les temps (grâce 3 s) → **0 pt**, joueur listé « pas tapé »
-- [ ] 🧪 La manche se **clôture toujours** seule à la fin de la grâce (pas de bouton « Révéler maintenant »)
-
-### Phase aveugle « fun »
-- [ ] 🧪 Bouton TAP qui **pulse** dès le masquage (s'arrête une fois tapé)
-- [ ] 🧪 Punchlines qui **défilent** (👀 Bientôt… / 😬 / 🫣 / 🔥) à vitesse constante
-- [ ] 🧪 **Vibration** au masquage et au tap (mobile)
-- [ ] 🧪 **Pop** du bouton quand le tap est validé (passage au vert)
-- [ ] 🧪 Chips « **X a tapé !** » visibles **uniquement** en phase aveugle (jamais quand le chrono est visible → pas de fuite d'estimation)
-- [ ] 🧪 `prefers-reduced-motion` : animations coupées, jeu toujours jouable
-
-### Multijoueur (plusieurs fenêtres)
-- [ ] 🧪 Tous les clients **masquent le chrono au même moment** (délai synchronisé par l'hôte)
-- [ ] 🧪 Un tap distant met à jour les chips « X a tapé ! » **sans** réinitialiser mon chrono/animation
-- [ ] 🧪 Quand tout le monde a tapé → reveal automatique (hôte), invités suivent
-- [ ] 🧪 Repli d'hôte absent : la manche se clôture quand même (grâce) et un invité peut **passer la manche**
 - [ ] 🧪 Menu « Prochainement » : tuile Clutch avec badge (quand `enabled:false`)
+- [ ] 🧪 **Décompte 3 · 2 · 1** au début de chaque manche : la cible `🎯 Objectif : X s` reste affichée, le bouton **TAP est désactivé/grisé**, puis le chrono démarre sa montée
+- [ ] 🧪 **Chrono au millième** : le compteur défile en `8,342 s` (3 décimales) pendant la phase visible
+- [ ] 🧪 Phase aveugle : le chrono se cache (`👀`) au délai aléatoire, punchlines + vibration, chips « X a tapé ! » uniquement caché
+- [ ] 🧪 **Verdict** : chaque joueur affiché « tapé à X,XXX s · écart ±Y,YY s » + classement + points (25/15/10)
+- [ ] 🧪 Tap impossible pendant le décompte (clic ignoré tant que le chrono n'a pas démarré)
+- [ ] 🧪 MP (plusieurs fenêtres) : décompte + montée cohérents par client ; tous voient le verdict après clôture (grâce 3 s)
+
+## Navigation scores (global) 📊🏆 — politique centralisée
+- [ ] 🧪 En **prépa** ou **en jeu** : onglets « Résultats » / « Classement » de la barre du bas **grisés + non cliquables**
+- [ ] 🧪 Sur accueil / menu jeux / lobby / résultats / classement / paramètres : onglets **cliquables**
+- [ ] 🧪 Hôte sur `game-select` : les autres joueurs peuvent **consulter** Résultats / Classement sans être réjectés
+- [ ] 🧪 L'hôte lance un jeu → les joueurs sont **transférés automatiquement** dans la prépa (et les onglets se grisent)
+- [ ] 🧪 Boutons in-screen « Résultats » / « Classement » / « Autre jeu » (results, leaderboard, game-select) : même règle, plus de renvoi intempestif vers `game-select`
+
+## TierNight 🏆 — placement & validation
+- [ ] 🧪 Placer une tuile **ne fait plus sauter la page en haut** ; la position de scroll est conservée à chaque placement/retrait
+- [ ] 🧪 **Aucun** bouton de validation tant que tous les items ne sont pas classés (plus de « Terminer maintenant »)
+- [ ] 🧪 Une fois **tout classé** : bouton **« Valider ma tierlist »** ; on peut encore réajuster les tuiles avant de valider
+- [ ] 🧪 La partie ne se clôture **que** sur clic « Valider ma tierlist » (plus de clôture auto au dernier placement)
+- [ ] 🧪 MP : après validation, attente du lobby puis bascule vers les résultats quand tout le monde a terminé
 
 ---
 
 ## Audit complet — corrections 🔧
-
-### 🔴 Robustesse / bugs logiques *(corrigés)*
-
-- [ ] 🧪 **Guess The Lie** : l'indice de vote reconnaît la lettre **A** (index 0) une fois choisie (plus « Choisis la lettre… » à tort)
-- [ ] 🧪 **Lobby** : aucun crash si `getLobby()` est null (messages / addMessage protégés par `?.`)
-- [ ] 🧪 **Stockage** : navigation privée / quota plein → pas de crash (`localStorage`/`sessionStorage` en `try/catch` : auth, reset mdp, traître, fil rouge, état jeu)
-
-### 🟠 Performance / synchro *(corrigés)*
-
-- [ ] 🧪 **Lobby (heartbeat cosmétique)** : pas de re-render hub / refetch session à chaque ping quand rien d'utile n'a changé (signature)
-- [ ] 🧪 **Menu des jeux** : le bandeau « Rejoindre » apparaît/disparaît via snapshot (plus de re-render forcé systématique)
-- [ ] 🧪 **Sync en jeu** : pas de réécriture `localStorage` inutile quand la signature distante est inchangée
-- [ ] 🧪 **Dilemma** : animation des barres annulée au démontage (plus de rAF orphelin) ; **reprise** : timer arrêté à 0 s
-
-### 🟡 Erreurs runtime *(corrigées)*
-
-- [ ] 🧪 **Trivia** : pas de crash si `answers` manquant (chaînage optionnel sur la bonne réponse)
-- [ ] 🧪 **Tous les jeux** : `setLobbyPlaying(...)` fire-and-forget ne génère plus de rejet de promesse non géré
-
----
 
 ## Repli d'hôte absent (MP) 👑 *(corrigé ⚪ — approche présence)*
 
@@ -160,11 +79,3 @@ Légende : ☐ à tester · ✅ OK · ❌ bug (noter en bas)
 - [ ] 🧪 Contrôles restés **hôte-only** : relance « Rejouer » / réglages (Trivia, Consensus), rôle privé Traître — **pas** délégués à l'acting-host
 - [ ] 🧪 Tester sur les jeux votants : Consensus, Trivia, Dilemma, Hot Take, SpeedVote, Guess The Lie, TruthMeter, VibeCheck, Spot the fake
 
-### Débounce « manche suivante » *(corrigé ⚪)*
-
-- [ ] 🧪 Double-clic rapide sur **Manche suivante / Question suivante** ne saute **pas** de manche (helper `withClickLock`, 6 jeux)
-- [ ] 🧪 Le bouton se **désactive** pendant l'action puis disparaît au re-render
-
-### SpeedVote — compteur *(corrigé ⚪)*
-
-- [ ] 🧪 « Révéler maintenant (n/total) » : le **total** = nombre de votants attendus (joueurs actifs), cohérent entre l'affichage initial et la mise à jour

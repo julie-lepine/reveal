@@ -3231,6 +3231,13 @@ body.wizz-shake #app{
   font-weight:700;
 }
 
+/* Onglets scores verrouillés (joueur en prépa / en jeu) : grisés + non cliquables. */
+.bottom-nav__item--disabled{
+  opacity:.38;
+  pointer-events:none;
+  cursor:default;
+}
+
 .bottom-nav__icon-wrap{
   width:40px;
   height:40px;

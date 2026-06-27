@@ -1,8 +1,8 @@
 import { APP_LOGO } from "../../data/branding.js";
 import { hasActiveLobby, returnToEveningGames } from "./lobby.js";
-import { navigate, onScreenChange, getCurrentScreen } from "./router.js";
+import { onScreenChange, getCurrentScreen } from "./router.js";
 import { goToEveningHome } from "../screens/nav.js";
-import { suppressRoutingForScoreView } from "./gameSync.js";
+import { goToScores, isScoresNavLocked } from "./navAccess.js";
 
 const TAB_HOME = "home";
 const TAB_GAMES = "games";
@@ -47,17 +47,11 @@ async function goGames() {
 }
 
 function goResults() {
-  if (hasActiveLobby()) {
-    suppressRoutingForScoreView();
-    navigate("results");
-  } else {
-    navigate("home", { reset: true });
-  }
+  goToScores("results");
 }
 
 function goFinal() {
-  if (hasActiveLobby()) suppressRoutingForScoreView();
-  navigate("leaderboard");
+  goToScores("leaderboard");
 }
 
 const TAB_ACTIONS = {
@@ -81,6 +75,21 @@ function syncActiveTab(screenId) {
   else setActiveTab(null);
 }
 
+/** Grise/verrouille Résultats + Classement quand le joueur est en prépa / en jeu. */
+function syncScoreTabsLock(screenId) {
+  const nav = document.getElementById("bottom-nav");
+  if (!nav) return;
+  const locked = isScoresNavLocked(screenId);
+  [TAB_RESULTS, TAB_FINAL].forEach((tab) => {
+    const el = nav.querySelector(`[data-tab="${tab}"]`);
+    if (!el) return;
+    el.classList.toggle("bottom-nav__item--disabled", locked);
+    el.setAttribute("aria-disabled", locked ? "true" : "false");
+    if (locked) el.setAttribute("tabindex", "-1");
+    else el.removeAttribute("tabindex");
+  });
+}
+
 /** Masqué uniquement sur le lobby d’attente (avant « Commencer »). */
 const SCREENS_WITHOUT_NAV = new Set(["lobby"]);
 
@@ -97,6 +106,7 @@ function updateNavVisibility(screenId) {
 function handleScreenChange(screenId) {
   updateNavVisibility(screenId);
   syncActiveTab(screenId);
+  syncScoreTabsLock(screenId);
 }
 
 export function initBottomNav() {
@@ -132,6 +142,7 @@ export function initBottomNav() {
 
   nav.querySelectorAll("[data-tab-nav]").forEach((btn) => {
     btn.addEventListener("click", () => {
+      if (btn.classList.contains("bottom-nav__item--disabled")) return;
       const tab = btn.getAttribute("data-tab-nav");
       TAB_ACTIONS[tab]?.();
     });

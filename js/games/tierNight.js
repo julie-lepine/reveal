@@ -16,7 +16,7 @@ import {
 import { getSupabaseUserId } from "../core/supabaseAuth.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
 import { navigate } from "../core/router.js";
-import { escapeHtml, pageShell, tierLogoHtml, bindTierLogos, resetPageScroll } from "../core/ui.js";
+import { escapeHtml, pageShell, tierLogoHtml, bindTierLogos } from "../core/ui.js";
 import { gameExitBarHtml, bindExitGame } from "../core/exitGame.js";
 import { bindNav } from "../screens/nav.js";
 
@@ -55,7 +55,6 @@ export function mountTierNight(app) {
     next[tier] = [...(next[tier] || []), item];
     placed = next;
     render();
-    if (unplaced().length === 0) void finishGame();
   }
 
   function unplaceItem(item) {
@@ -121,6 +120,9 @@ export function mountTierNight(app) {
   function render() {
     const remaining = unplaced();
     const waitingLobby = finished && isGameSyncActive();
+    // Conserve la position de scroll : render() remplace tout le DOM à chaque
+    // placement, donc on relit/restaure le scrollTop du conteneur scrollable.
+    const prevScroll = app.querySelector(".page")?.scrollTop || 0;
 
     app.innerHTML = pageShell({
       backTarget: "back",
@@ -182,9 +184,9 @@ export function mountTierNight(app) {
                   style="--tier-color:${TIER_COLORS[t]}">${t}</button>`
               ).join("")}
             </div>
-          </div>
-          <button type="button" class="btn btn-secondary btn--spaced" id="btn-finish-early">Terminer maintenant</button>`
-              : `<p class="hint tier-done-hint">Tous les items sont classés.</p>`
+          </div>`
+              : `<p class="hint tier-done-hint">Tous les items sont classés 🎉 Réajuste si besoin, puis valide.</p>
+          <button type="button" class="btn btn-primary btn--spaced" id="btn-validate">Valider ma tierlist</button>`
         }
         ${gameExitBarHtml()}
       `,
@@ -193,7 +195,8 @@ export function mountTierNight(app) {
     bindTierLogos(app);
     bindNav(app);
     bindExitGame(app);
-    resetPageScroll(app);
+    const page = app.querySelector(".page");
+    if (page) page.scrollTop = prevScroll;
     if (!finished) bindGameEvents(remaining);
   }
 
@@ -267,7 +270,7 @@ export function mountTierNight(app) {
       });
     });
 
-    app.querySelector("#btn-finish-early")?.addEventListener("click", finishGame);
+    app.querySelector("#btn-validate")?.addEventListener("click", finishGame);
   }
 
   const unsub = onGameSessionChange(async () => {

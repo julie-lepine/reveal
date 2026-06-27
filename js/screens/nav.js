@@ -17,6 +17,7 @@ import {
   suppressSessionRoute,
   getCachedGameSession,
 } from "../core/gameSync.js";
+import { goToScores } from "../core/navAccess.js";
 
 /** Accueil sans quitter le lobby (soirée en cours). */
 export function goToEveningHome() {
@@ -90,6 +91,13 @@ export async function handleNavTarget(target, handlers) {
   }
   if (handlers[target]) {
     await handlers[target]();
+    return;
+  }
+  // Accès centralisé aux scores : verrouillé en prépa / en jeu, libre ailleurs.
+  // (Les flux de fin de partie passent par un handler custom ci-dessus, donc
+  // ne sont pas concernés par ce verrou.)
+  if (target === "results" || target === "leaderboard") {
+    goToScores(target);
     return;
   }
   if (target === "home") {

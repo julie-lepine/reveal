@@ -11,6 +11,9 @@ export const CLUTCH_MAX_TARGET_MS = 15000;
 /** Fenêtre de grâce (invisible) après la cible : on accepte encore les taps puis clôture. */
 export const CLUTCH_GRACE_MS = 3000;
 
+/** Pré-décompte « 3 · 2 · 1 » avant le départ du chrono, pour mémoriser la cible. */
+export const CLUTCH_PRECOUNT_MS = 3000;
+
 /**
  * Délai de masquage du chrono avant la cible : tiré AU HASARD par manche dans
  * cette plage, pour qu'on ne puisse pas mémoriser un « toujours 2 s ».
@@ -40,6 +43,12 @@ export function pickClutchHideBefore() {
 export function formatClutchSeconds(ms) {
   if (ms == null || !Number.isFinite(ms)) return "—";
   return `${(ms / 1000).toFixed(1).replace(".", ",")} s`;
+}
+
+/** Libellé précis au millième (« 8,342 s ») — chrono et taps des joueurs. */
+export function formatClutchSecondsMs(ms) {
+  if (ms == null || !Number.isFinite(ms)) return "—";
+  return `${(ms / 1000).toFixed(3).replace(".", ",")} s`;
 }
 
 /** Écart signé lisible (« +0,4 s » / « -0,2 s »). */

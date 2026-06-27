@@ -1,7 +1,9 @@
 import {
   CLUTCH_GRACE_MS,
   CLUTCH_HIDE_BEFORE_MS,
+  CLUTCH_PRECOUNT_MS,
   formatClutchSeconds,
+  formatClutchSecondsMs,
   formatClutchGap,
 } from "../../data/clutch.js";
 import {
@@ -54,6 +56,7 @@ export function mountClutch(app) {
   let revealInFlight = false;
 
   let localStart = null;
+  let countdownEndsAt = null;
   let activeKey = null;
   let localWindowClosed = false;
   let graceTimer = null;
@@ -193,10 +196,40 @@ export function mountClutch(app) {
         stopClock();
         return;
       }
-      clock.textContent = formatClutchSeconds(Math.max(0, elapsed));
+      clock.textContent = formatClutchSecondsMs(Math.max(0, elapsed));
       clockRaf = requestAnimationFrame(tick);
     };
     clockRaf = requestAnimationFrame(tick);
+  }
+
+  /** Pré-décompte « 3 · 2 · 1 » : on affiche la cible, le chrono ne monte pas encore. */
+  function startCountdown() {
+    stopClock();
+    const tick = () => {
+      if (phase !== "active" || localStart != null) return;
+      const clock = app.querySelector("#clutch-clock");
+      if (!clock) {
+        stopClock();
+        return;
+      }
+      const remain = (countdownEndsAt || 0) - performance.now();
+      if (remain <= 0) {
+        beginClock();
+        return;
+      }
+      clock.textContent = String(Math.ceil(remain / 1000));
+      clockRaf = requestAnimationFrame(tick);
+    };
+    clockRaf = requestAnimationFrame(tick);
+  }
+
+  /** Fin du décompte : départ réel du chrono + programmation de la clôture (cible + grâce). */
+  function beginClock() {
+    localStart = performance.now();
+    clearGrace();
+    const windowMs = (targetMs || 0) + CLUTCH_GRACE_MS;
+    graceTimer = setTimeout(onGraceElapsed, windowMs);
+    render();
   }
 
   /** Maj légère en phase aveugle (tap distant) sans casser chrono/anim. */
@@ -227,13 +260,12 @@ export function mountClutch(app) {
       const key = `${roundIdx}:${s.roundStartAt || ""}`;
       if (key !== activeKey) {
         activeKey = key;
-        localStart = performance.now();
+        localStart = null;
+        countdownEndsAt = performance.now() + CLUTCH_PRECOUNT_MS;
         localWindowClosed = false;
         blindVibrated = false;
         clearCopyTimer();
         clearGrace();
-        const windowMs = (targetMs || 0) + CLUTCH_GRACE_MS;
-        graceTimer = setTimeout(onGraceElapsed, windowMs);
       }
     } else {
       clearGrace();
@@ -307,27 +339,38 @@ export function mountClutch(app) {
 
   function activeHtml() {
     const tapped = myTapMs() != null;
+    const counting = localStart == null;
 
     const targetLabel = formatClutchSeconds(targetMs);
     const elapsedNow = localStart != null ? performance.now() - localStart : 0;
-    const hidden = elapsedNow >= hideClockAtMs();
-    const clockText = hidden ? "👀" : formatClutchSeconds(Math.max(0, elapsedNow));
-    const clockSub = hidden
-      ? tapped
-        ? "👀 Chrono caché — en attente…"
-        : BLIND_LINES[0]
-      : "Le chrono monte vers la cible";
+    const hidden = !counting && elapsedNow >= hideClockAtMs();
+
+    const clockText = counting
+      ? String(Math.max(1, Math.ceil(((countdownEndsAt || performance.now()) - performance.now()) / 1000)))
+      : hidden
+        ? "👀"
+        : formatClutchSecondsMs(Math.max(0, elapsedNow));
+    const clockSub = counting
+      ? "Mémorise la cible… 🎯"
+      : hidden
+        ? tapped
+          ? "👀 Chrono caché — en attente…"
+          : BLIND_LINES[0]
+        : "Le chrono monte vers la cible";
 
     const status = localWindowClosed
       ? "Temps écoulé - en attente du verdict…"
-      : tapped
-        ? mp
-          ? allClutchTapsIn()
-            ? "Tout le monde a tapé !"
-            : "C'est noté ! En attente des autres…"
-          : "C'est noté !"
-        : "Tape pile au moment où le chrono atteint la cible 💥";
+      : counting
+        ? "Prépare-toi… le chrono démarre !"
+        : tapped
+          ? mp
+            ? allClutchTapsIn()
+              ? "Tout le monde a tapé !"
+              : "C'est noté ! En attente des autres…"
+            : "C'est noté !"
+          : "Tape pile au moment où le chrono atteint la cible 💥";
 
+    const btnDisabled = tapped || localWindowClosed || counting;
     const btnClasses = [
       "clutch-tap",
       tapped ? "clutch-tap--tapped" : "",
@@ -344,12 +387,12 @@ export function mountClutch(app) {
         <div class="clutch-tapped" id="clutch-tapped">${tappedChipsHtml(hidden)}</div>
       </div>
       <button type="button" id="clutch-target" class="${btnClasses}"
-        ${tapped || localWindowClosed ? "disabled" : ""}
+        ${btnDisabled ? "disabled" : ""}
         style="width:220px;height:220px;margin:24px auto;display:flex;align-items:center;justify-content:center;
-          border-radius:50%;border:none;cursor:${tapped || localWindowClosed ? "default" : "pointer"};
+          border-radius:50%;border:none;cursor:${btnDisabled ? "default" : "pointer"};
           font-size:1.4rem;font-weight:900;color:#fff;
           background:${tapped ? "linear-gradient(145deg,#34D399,#60A5FA)" : "radial-gradient(circle at 50% 35%, #FF6B6B 0%, #FF3CAC 55%, #2B2D66 100%)"};
-          box-shadow:0 12px 40px rgba(255,60,172,.35);opacity:${localWindowClosed && !tapped ? ".5" : "1"}">
+          box-shadow:0 12px 40px rgba(255,60,172,.35);opacity:${(localWindowClosed && !tapped) || counting ? ".5" : "1"}">
         ${tapped ? "✓ Tapé" : "TAP !"}
       </button>
       <p class="hint" style="text-align:center">${escapeHtml(status)}</p>`;
@@ -369,7 +412,7 @@ export function mountClutch(app) {
           ? medal
           : `<span class="clutch-rank__num">${idx + 1}</span>`;
         const detail = entry.tapped
-          ? `tapé à <strong>${escapeHtml(formatClutchSeconds(entry.ms))}</strong> · écart ${escapeHtml(formatClutchGap(entry.ms, targetMs))}`
+          ? `tapé à <strong>${escapeHtml(formatClutchSecondsMs(entry.ms))}</strong> · écart ${escapeHtml(formatClutchGap(entry.ms, targetMs))}`
           : "pas tapé";
         return `
           <div class="clutch-rank__row ${entry.tapped ? "" : "clutch-rank__row--out"}">
@@ -430,10 +473,19 @@ export function mountClutch(app) {
     bindNav(app);
     bindExitGame(app);
 
-    if (phase === "active") startClock();
+    if (phase === "active") {
+      if (localStart == null) startCountdown();
+      else startClock();
+    }
 
     app.querySelector("#clutch-target")?.addEventListener("click", () => {
-      if (phase !== "active" || myTapMs() != null || localWindowClosed || isEveningGameplayPaused()) {
+      if (
+        phase !== "active" ||
+        localStart == null ||
+        myTapMs() != null ||
+        localWindowClosed ||
+        isEveningGameplayPaused()
+      ) {
         return;
       }
       const ms = Math.round(performance.now() - localStart);

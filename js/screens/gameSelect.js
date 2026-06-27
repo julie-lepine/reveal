@@ -20,7 +20,7 @@ import {
   getCachedGameSession,
   routeToActiveGameIfNeeded,
 } from "../core/gameSync.js";
-import { navigate, getCurrentScreen } from "../core/router.js";
+import { getCurrentScreen } from "../core/router.js";
 import { isSupabaseConfigured } from "../core/supabaseClient.js";
 import { startLobbyPresenceSync, onLobbyBundleUpdated } from "../core/supabaseLobby.js";
 import { hasActiveLobby, transferLobbyHost } from "../core/lobby.js";
@@ -143,11 +143,6 @@ function buildGameSelectHandlers() {
     guesslie: launchGuessLieMenu,
     "tiernight-select": launchTierNightSelect,
     settings: () => goToEveningSettings(),
-    leaderboard: () => {
-      navigate("leaderboard", {
-        navStack: ["home", "lobby", "game-select", "leaderboard"],
-      });
-    },
   };
 }
 

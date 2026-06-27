@@ -1,7 +1,7 @@
 import { getEveningRecap } from "../core/eveningRecap.js";
 import { getLobbyStatus, getLobbyGameId } from "../core/lobby.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
-import { navigate, getCurrentScreen } from "../core/router.js";
+import { getCurrentScreen } from "../core/router.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
 import { bindNav } from "./nav.js";
 import {
@@ -14,7 +14,6 @@ import {
   isGameSyncActive,
   onGameSessionChange,
   refreshEveningScoresFromSession,
-  suppressRoutingForScoreView,
   tryFollowHostGameSession,
   routeToActiveGameIfNeeded,
   isLobbyHost,
@@ -82,14 +81,7 @@ export function mountResults(app) {
     `,
     });
 
-    bindNav(app, {
-      leaderboard: () => {
-        suppressRoutingForScoreView();
-        navigate("leaderboard", {
-          navStack: ["home", "lobby", "game-select", "results", "leaderboard"],
-        });
-      },
-    });
+    bindNav(app);
     bindRestartGameButtons(app);
   }
 
