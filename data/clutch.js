@@ -5,7 +5,7 @@
 export const CLUTCH_ROUND_PRESETS = [3, 5, 8];
 
 /** Cible aléatoire de la manche : entre 9 s et 12 s. */
-export const CLUTCH_MIN_TARGET_MS = 9000;
+export const CLUTCH_MIN_TARGET_MS = 7000;
 export const CLUTCH_MAX_TARGET_MS = 20000;
 
 /** Fenêtre de grâce (invisible) après la cible : on accepte encore les taps puis clôture. */
