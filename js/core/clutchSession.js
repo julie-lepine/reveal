@@ -1,6 +1,7 @@
 import {
   CLUTCH_GRACE_MS,
   pickClutchTarget,
+  pickClutchHideBefore,
 } from "../../data/clutch.js";
 import { getActivePlayerNames } from "./players.js";
 import { getLocalDisplayName, getState, saveStatePatch } from "./state.js";
@@ -57,14 +58,16 @@ export function getClutchPrepSummary() {
   };
 }
 
-/** Charge utile d'une nouvelle manche : cible aléatoire + fenêtre de clôture (cible + grâce). */
+/** Charge utile d'une nouvelle manche : cible + masquage aléatoires + fenêtre de clôture. */
 function roundPayload(roundIdx) {
   const targetMs = pickClutchTarget();
+  const hideBeforeMs = pickClutchHideBefore();
   const startAt = Date.now();
   return {
     roundIdx,
     phase: "active",
     targetMs,
+    hideBeforeMs,
     roundStartAt: new Date(startAt).toISOString(),
     roundEndsAt: new Date(startAt + targetMs + CLUTCH_GRACE_MS).toISOString(),
     taps: {},

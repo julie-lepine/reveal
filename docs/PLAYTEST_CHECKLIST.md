@@ -92,6 +92,38 @@ Légende : ☐ à tester · ✅ OK · ❌ bug (noter en bas)
 
 ---
 
+## Clutch 💥 — nouveau jeu
+
+> Chrono qui monte de 0 vers une cible (9–12 s), se masque un délai **aléatoire** avant la cible (1,5–3,5 s), tap à l'aveugle, podium 25/15/10 par manche.
+
+### Mécanique de base
+- [ ] 🧪 Prépa : choix 3 / 5 / 8 manches (hôte seul), invités voient le réglage se synchroniser
+- [ ] 🧪 Le chrono **monte** de 0 et reste visible, puis **disparaît** (👀) avant la cible
+- [ ] 🧪 Le délai de masquage **change à chaque manche** (pas toujours le même « avant la fin »)
+- [ ] 🧪 Cible toujours entre **9 s et 12 s** (jamais > 12 s)
+- [ ] 🧪 Tap autorisé **à tout moment** (chrono visible OU caché)
+- [ ] 🧪 Verdict : classement par écart absolu à la cible, podium **+25 / +15 / +10**
+- [ ] 🧪 Égalité d'écart → départage au **tap le plus tôt**
+- [ ] 🧪 Pas de tap dans les temps (grâce 3 s) → **0 pt**, joueur listé « pas tapé »
+
+### Phase aveugle « fun »
+- [ ] 🧪 Bouton TAP qui **pulse** dès le masquage (s'arrête une fois tapé)
+- [ ] 🧪 Punchlines qui **défilent** (👀 Bientôt… / 😬 / 🫣 / 🔥) à vitesse constante
+- [ ] 🧪 **Vibration** au masquage et au tap (mobile)
+- [ ] 🧪 **Pop** du bouton quand le tap est validé (passage au vert)
+- [ ] 🧪 Chips « **X a tapé !** » visibles **uniquement** en phase aveugle (jamais quand le chrono est visible → pas de fuite d'estimation)
+- [ ] 🧪 `prefers-reduced-motion` : animations coupées, jeu toujours jouable
+
+### Multijoueur (plusieurs fenêtres)
+- [ ] 🧪 Tous les clients **masquent le chrono au même moment** (délai synchronisé par l'hôte)
+- [ ] 🧪 Un tap distant met à jour les chips + compteur **sans** réinitialiser mon chrono/animation
+- [ ] 🧪 Compteur « Révéler maintenant (n/total) » cohérent (total = joueurs actifs)
+- [ ] 🧪 Quand tout le monde a tapé → reveal automatique (hôte), invités suivent
+- [ ] 🧪 Repli d'hôte absent : un invité peut **révéler / passer la manche**
+- [ ] 🧪 Menu « Prochainement » : tuile Clutch avec badge (quand `enabled:false`)
+
+---
+
 ## Audit complet — corrections 🔧
 
 ### 🔴 Robustesse / bugs logiques *(corrigés)*

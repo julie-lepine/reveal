@@ -58,10 +58,21 @@ export function mountClutch(app) {
   let localWindowClosed = false;
   let graceTimer = null;
   let clockRaf = null;
+  let hideBeforeMs = null;
+  let copyTimer = null;
+  let blindVibrated = false;
 
   const localName = getLocalDisplayName();
   const mp = isGameSyncActive();
   const totalRounds = getClutchSession().roundCount ?? 5;
+
+  // Punchlines qui défilent pendant la phase aveugle (vitesse fixe : ne révèle rien).
+  const BLIND_LINES = [
+    "👀 Bientôt…",
+    "😬 Concentre-toi…",
+    "🫣 Maintenant ?!",
+    "🔥 Au feeling !",
+  ];
 
   function myTapMs() {
     const t = taps[localName];
@@ -69,7 +80,11 @@ export function mountClutch(app) {
   }
 
   function hideClockAtMs() {
-    return (targetMs || 0) - CLUTCH_HIDE_BEFORE_MS;
+    return (targetMs || 0) - (hideBeforeMs || CLUTCH_HIDE_BEFORE_MS);
+  }
+
+  function currentlyHidden() {
+    return localStart != null && performance.now() - localStart >= hideClockAtMs();
   }
 
   function clearGrace() {
@@ -82,7 +97,84 @@ export function mountClutch(app) {
     clockRaf = null;
   }
 
-  /** Anime le chrono visible montant jusqu'à (cible − 2 s), puis le masque. */
+  function clearCopyTimer() {
+    if (copyTimer) clearInterval(copyTimer);
+    copyTimer = null;
+  }
+
+  function vibrate(ms) {
+    try {
+      navigator.vibrate?.(ms);
+    } catch {
+      /* pas de vibration dispo */
+    }
+  }
+
+  /** Liste (pseudos) des joueurs ayant déjà tapé sur la manche en cours. */
+  function tappedNames() {
+    return getActivePlayerNames().filter((n) => taps[n]?.ms != null);
+  }
+
+  /**
+   * Chips « X a tapé ! » — affichées UNIQUEMENT en phase aveugle. En phase visible
+   * elles fuiteraient l'estimation (on verrait le chrono ET le moment du tap).
+   */
+  function tappedChipsHtml(showBlind) {
+    if (!showBlind) return "";
+    const names = tappedNames();
+    if (!names.length) return "";
+    return names
+      .map((n) => {
+        const meta = playerMeta(n);
+        const label = n === localName ? "Toi" : n;
+        return `<span class="clutch-chip" style="--clutch-chip:${meta.color}">${meta.emoji} ${escapeHtml(label)} a tapé&nbsp;!</span>`;
+      })
+      .join("");
+  }
+
+  function refreshTappedChips() {
+    const box = app.querySelector("#clutch-tapped");
+    if (box) box.innerHTML = tappedChipsHtml(currentlyHidden());
+  }
+
+  /** Rotation des punchlines de suspense pendant la phase aveugle. */
+  function startBlindCopy() {
+    clearCopyTimer();
+    let i = 0;
+    const sub = app.querySelector("#clutch-clock-sub");
+    if (sub) sub.textContent = BLIND_LINES[0];
+    copyTimer = setInterval(() => {
+      const el = app.querySelector("#clutch-clock-sub");
+      if (!el || phase !== "active" || myTapMs() != null) {
+        clearCopyTimer();
+        return;
+      }
+      i = (i + 1) % BLIND_LINES.length;
+      el.textContent = BLIND_LINES[i];
+    }, 650);
+  }
+
+  /** Bascule l'UI en mode aveugle : chrono caché, bouton qui pulse, suspense, vibration. */
+  function enterBlind() {
+    const clock = app.querySelector("#clutch-clock");
+    if (clock) clock.textContent = "👀";
+    refreshTappedChips();
+    if (!blindVibrated) {
+      blindVibrated = true;
+      vibrate(60);
+    }
+    const sub = app.querySelector("#clutch-clock-sub");
+    const btn = app.querySelector("#clutch-target");
+    if (myTapMs() != null) {
+      clearCopyTimer();
+      if (sub) sub.textContent = "👀 Chrono caché — en attente…";
+      return;
+    }
+    btn?.classList.add("clutch-tap--blind");
+    startBlindCopy();
+  }
+
+  /** Anime le chrono visible montant jusqu'au masquage, puis bascule en phase aveugle. */
   function startClock() {
     stopClock();
     const tick = () => {
@@ -91,15 +183,13 @@ export function mountClutch(app) {
         return;
       }
       const clock = app.querySelector("#clutch-clock");
-      const sub = app.querySelector("#clutch-clock-sub");
       if (!clock) {
         stopClock();
         return;
       }
       const elapsed = performance.now() - localStart;
       if (elapsed >= hideClockAtMs()) {
-        clock.textContent = "👀";
-        if (sub) sub.textContent = "Bientôt… tape à la cible !";
+        enterBlind();
         stopClock();
         return;
       }
@@ -107,6 +197,16 @@ export function mountClutch(app) {
       clockRaf = requestAnimationFrame(tick);
     };
     clockRaf = requestAnimationFrame(tick);
+  }
+
+  /** Maj légère en phase aveugle (tap distant) sans casser chrono/anim. */
+  function refreshActiveLive() {
+    refreshTappedChips();
+    const force = app.querySelector("#clutch-force");
+    if (force) {
+      const tappedCount = tappedNames().length;
+      force.textContent = `Révéler maintenant (${tappedCount}/${getActivePlayerNames().length})`;
+    }
   }
 
   function alreadyScoredThisRound() {
@@ -119,6 +219,7 @@ export function mountClutch(app) {
     if (s.roundIdx != null) roundIdx = s.roundIdx;
     if (s.phase) phase = s.phase;
     if (s.targetMs != null) targetMs = s.targetMs;
+    if (s.hideBeforeMs != null) hideBeforeMs = s.hideBeforeMs;
     taps = { ...(s.taps || {}) };
     lastRound = s.lastRound ?? lastRound;
     takeScored = Boolean(s.roundScored);
@@ -133,6 +234,8 @@ export function mountClutch(app) {
         activeKey = key;
         localStart = performance.now();
         localWindowClosed = false;
+        blindVibrated = false;
+        clearCopyTimer();
         clearGrace();
         const windowMs = (targetMs || 0) + CLUTCH_GRACE_MS;
         graceTimer = setTimeout(onGraceElapsed, windowMs);
@@ -217,7 +320,11 @@ export function mountClutch(app) {
     const elapsedNow = localStart != null ? performance.now() - localStart : 0;
     const hidden = elapsedNow >= hideClockAtMs();
     const clockText = hidden ? "👀" : formatClutchSeconds(Math.max(0, elapsedNow));
-    const clockSub = hidden ? "Bientôt… tape à la cible !" : "Le chrono monte vers la cible";
+    const clockSub = hidden
+      ? tapped
+        ? "👀 Chrono caché — en attente…"
+        : BLIND_LINES[0]
+      : "Le chrono monte vers la cible";
 
     const status = localWindowClosed
       ? "Temps écoulé - en attente du verdict…"
@@ -229,13 +336,22 @@ export function mountClutch(app) {
           : "C'est noté !"
         : "Tape pile au moment où le chrono atteint la cible 💥";
 
+    const btnClasses = [
+      "clutch-tap",
+      tapped ? "clutch-tap--tapped" : "",
+      hidden && !tapped ? "clutch-tap--blind" : "",
+    ]
+      .filter(Boolean)
+      .join(" ");
+
     return `
-      <div class="card card--speed" style="text-align:center">
+      <div class="card card--speed clutch-clock-card ${hidden ? "clutch-clock-card--blind" : ""}" style="text-align:center">
         <p class="label-upper label-upper--gold">🎯 Objectif : ${escapeHtml(targetLabel)}</p>
-        <p id="clutch-clock" style="font-size:2.8rem;font-weight:900;margin:.3rem 0;font-variant-numeric:tabular-nums">${escapeHtml(clockText)}</p>
+        <p id="clutch-clock" class="clutch-clock" style="font-variant-numeric:tabular-nums">${escapeHtml(clockText)}</p>
         <p class="hint" id="clutch-clock-sub">${escapeHtml(clockSub)}</p>
+        <div class="clutch-tapped" id="clutch-tapped">${tappedChipsHtml(hidden)}</div>
       </div>
-      <button type="button" id="clutch-target"
+      <button type="button" id="clutch-target" class="${btnClasses}"
         ${tapped || localWindowClosed ? "disabled" : ""}
         style="width:220px;height:220px;margin:24px auto;display:flex;align-items:center;justify-content:center;
           border-radius:50%;border:none;cursor:${tapped || localWindowClosed ? "default" : "pointer"};
@@ -299,6 +415,7 @@ export function mountClutch(app) {
     syncFromSession();
     ensureRoundTiming();
     stopClock();
+    clearCopyTimer();
 
     let phaseHtml = "";
     if (phase === "active") phaseHtml = activeHtml();
@@ -330,6 +447,7 @@ export function mountClutch(app) {
       }
       const ms = Math.round(performance.now() - localStart);
       taps = { ...taps, [localName]: { ms, at: Date.now() } };
+      vibrate(35);
       render();
       void commitClutchTap(ms).then(() => {
         if (!mp) {
@@ -374,10 +492,17 @@ export function mountClutch(app) {
 
   const unsub = onGameSessionChange(() => {
     const prevPhase = phase;
+    const prevKey = activeKey;
     syncFromSession();
     ensureRoundTiming();
     if (phase === "active" && canActAsHost() && allClutchTapsIn()) {
       void goToReveal();
+      return;
+    }
+    // Tap distant pendant la même manche active : maj légère (chips + compteur)
+    // pour ne pas réinitialiser le chrono ni les animations.
+    if (phase === "active" && prevPhase === "active" && activeKey === prevKey) {
+      refreshActiveLive();
       return;
     }
     if (phase === "reveal" && prevPhase === "reveal") {
@@ -396,6 +521,7 @@ export function mountClutch(app) {
   return () => {
     clearGrace();
     stopClock();
+    clearCopyTimer();
     unsub();
   };
 }

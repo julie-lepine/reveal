@@ -134,6 +134,7 @@ const defaultState = () => ({
     roundIdx: 0,
     phase: null,
     targetMs: null,
+    hideBeforeMs: null,
     roundStartAt: null,
     roundEndsAt: null,
     taps: {},
