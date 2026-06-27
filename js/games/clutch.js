@@ -202,11 +202,6 @@ export function mountClutch(app) {
   /** Maj légère en phase aveugle (tap distant) sans casser chrono/anim. */
   function refreshActiveLive() {
     refreshTappedChips();
-    const force = app.querySelector("#clutch-force");
-    if (force) {
-      const tappedCount = tappedNames().length;
-      force.textContent = `Révéler maintenant (${tappedCount}/${getActivePlayerNames().length})`;
-    }
   }
 
   function alreadyScoredThisRound() {
@@ -312,9 +307,6 @@ export function mountClutch(app) {
 
   function activeHtml() {
     const tapped = myTapMs() != null;
-    const host = !mp || canActAsHost();
-    const tappedCount = Object.values(taps).filter((t) => t?.ms != null).length;
-    const totalPlayers = getActivePlayerNames().length;
 
     const targetLabel = formatClutchSeconds(targetMs);
     const elapsedNow = localStart != null ? performance.now() - localStart : 0;
@@ -360,14 +352,7 @@ export function mountClutch(app) {
           box-shadow:0 12px 40px rgba(255,60,172,.35);opacity:${localWindowClosed && !tapped ? ".5" : "1"}">
         ${tapped ? "✓ Tapé" : "TAP !"}
       </button>
-      <p class="hint" style="text-align:center">${escapeHtml(status)}</p>
-      ${
-        host
-          ? `<button type="button" class="btn btn-secondary btn--spaced" id="clutch-force">
-              Révéler maintenant (${tappedCount}/${totalPlayers})
-            </button>`
-          : ""
-      }`;
+      <p class="hint" style="text-align:center">${escapeHtml(status)}</p>`;
   }
 
   function revealHtml() {
@@ -462,10 +447,6 @@ export function mountClutch(app) {
         }
         if (allClutchTapsIn() && canActAsHost()) void goToReveal();
       });
-    });
-
-    app.querySelector("#clutch-force")?.addEventListener("click", () => {
-      void goToReveal();
     });
 
     app.querySelector("#next-round")?.addEventListener("click", withClickLock(async () => {

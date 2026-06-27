@@ -105,6 +105,7 @@ Légende : ☐ à tester · ✅ OK · ❌ bug (noter en bas)
 - [ ] 🧪 Verdict : classement par écart absolu à la cible, podium **+25 / +15 / +10**
 - [ ] 🧪 Égalité d'écart → départage au **tap le plus tôt**
 - [ ] 🧪 Pas de tap dans les temps (grâce 3 s) → **0 pt**, joueur listé « pas tapé »
+- [ ] 🧪 La manche se **clôture toujours** seule à la fin de la grâce (pas de bouton « Révéler maintenant »)
 
 ### Phase aveugle « fun »
 - [ ] 🧪 Bouton TAP qui **pulse** dès le masquage (s'arrête une fois tapé)
@@ -116,10 +117,9 @@ Légende : ☐ à tester · ✅ OK · ❌ bug (noter en bas)
 
 ### Multijoueur (plusieurs fenêtres)
 - [ ] 🧪 Tous les clients **masquent le chrono au même moment** (délai synchronisé par l'hôte)
-- [ ] 🧪 Un tap distant met à jour les chips + compteur **sans** réinitialiser mon chrono/animation
-- [ ] 🧪 Compteur « Révéler maintenant (n/total) » cohérent (total = joueurs actifs)
+- [ ] 🧪 Un tap distant met à jour les chips « X a tapé ! » **sans** réinitialiser mon chrono/animation
 - [ ] 🧪 Quand tout le monde a tapé → reveal automatique (hôte), invités suivent
-- [ ] 🧪 Repli d'hôte absent : un invité peut **révéler / passer la manche**
+- [ ] 🧪 Repli d'hôte absent : la manche se clôture quand même (grâce) et un invité peut **passer la manche**
 - [ ] 🧪 Menu « Prochainement » : tuile Clutch avec badge (quand `enabled:false`)
 
 ---
