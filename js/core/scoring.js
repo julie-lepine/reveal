@@ -1,5 +1,6 @@
 import { EVENING_POINTS, FIL_ROUGE_POINTS, tierNightPointsForRankDiff } from "../../data/eveningScoring.js";
 import { PLAYLIST_GUESS_POINTS } from "../../data/playlistGuess.js";
+import { RACE_TO_ZERO_PODIUM_POINTS } from "../../data/raceToZero.js";
 import { filterVoterVotes, computeRoundMetrics } from "./truthMeterSession.js";
 import { countDilemmaResults } from "./dilemmaSession.js";
 import { DILEMMA_POINTS_TIE } from "../../data/dilemma.js";
@@ -74,6 +75,24 @@ export function awardSpeedVoteRound(votes, { multiplier = 1 } = {}) {
   });
 
   return { counts, winners, maxVotes: max, pointsAwarded, deltas };
+}
+
+/**
+ * Race to Zero : le podium de la manche reçoit 25 / 15 / 10. Les non-tappeurs : 0.
+ * `ranking` doit déjà être trié (plus proche du 0 d'abord, égalité = tap le plus tôt).
+ */
+export function awardRaceToZeroRound(ranking = [], { podiumPoints = RACE_TO_ZERO_PODIUM_POINTS } = {}) {
+  const deltas = {};
+  let podiumIdx = 0;
+  ranking.forEach((entry) => {
+    if (!entry.tapped) return;
+    const pts = podiumPoints[podiumIdx];
+    podiumIdx += 1;
+    if (pts == null) return;
+    addScore(entry.name, pts);
+    deltas[entry.name] = pts;
+  });
+  return { ranking, deltas };
 }
 
 /** TruthMeter : au plus un bonus par joueur et par manche. */

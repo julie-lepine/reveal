@@ -91,6 +91,25 @@ export const GAME_RULES = {
       "« Qui rirait à un enterrement ? » La majorité vote Sarah → Sarah gagne +10.",
   },
 
+  racetozero: {
+    title: "Race to Zero",
+    emoji: "💥",
+    but: "Un chrono caché part d'une cible (9 à 15 s) et descend vers 0. Tape ta cible pile au moment où il atteint 0 : le plus proche gagne.",
+    etapes: [
+      "Une cible aléatoire s'affiche (ex. « 12,3 s »), puis le chrono est caché.",
+      "Estime mentalement le temps et tape ta cible pile à 0.",
+      "Taper avant ou après compte pareil : c'est l'écart absolu qui compte.",
+      "La manche se clôt quand tout le monde a tapé (ou peu après le 0).",
+    ],
+    points: [
+      "Podium de chaque manche : 1er +25, 2e +15, 3e +10.",
+      "Égalité d'écart : départage au tap enregistré le plus tôt.",
+      "Pas de tap à temps : 0 pt pour la manche.",
+    ],
+    exemple:
+      "Cible 10 s. Léa tape à 9,8 s (écart 0,2), Tom à 10,5 s (écart 0,5). Léa finit 1re (+25), Tom 2e (+15).",
+  },
+
   dilemma: {
     title: "Dilemma",
     emoji: "⚖️",
@@ -191,6 +210,7 @@ export const RULES_KEY_BY_NAV = {
   "hottake-prep": "hottake",
   guesslie: "guesslie",
   "speedvote-prep": "speedvote",
+  "racetozero-prep": "racetozero",
   "dilemma-prep": "dilemma",
   "truthmeter-prep": "truthmeter",
   "tiernight-select": "tiernight",

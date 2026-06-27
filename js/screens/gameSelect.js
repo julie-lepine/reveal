@@ -36,6 +36,7 @@ import {
 import {
   launchTraitrePrep,
   launchSpeedVotePrep,
+  launchRaceToZeroPrep,
   launchPlaylistGuessPrep,
   launchTriviaPrep,
   launchTruthMeterPrep,
@@ -132,6 +133,7 @@ function buildGameSelectHandlers() {
   return {
     "traitre-prep": launchTraitrePrep,
     "speedvote-prep": launchSpeedVotePrep,
+    "racetozero-prep": launchRaceToZeroPrep,
     "playlistguess-prep": launchPlaylistGuessPrep,
     "trivia-prep": launchTriviaPrep,
     "truthmeter-prep": launchTruthMeterPrep,

@@ -74,6 +74,7 @@ const defaultState = () => ({
   stats: {
     hotTakesPlayed: 0,
     speedVotesPlayed: 0,
+    raceToZerosPlayed: 0,
     playlistGuessesPlayed: 0,
     truthMetersPlayed: 0,
     consensusGamesPlayed: 0,
@@ -125,6 +126,20 @@ const defaultState = () => ({
     modifier: "normal",
     currentQuestion: null,
     matchScores: {},
+  },
+  raceToZeroGame: {
+    ready: {},
+    lobbyStarted: false,
+    roundCount: 5,
+    roundIdx: 0,
+    phase: null,
+    targetMs: null,
+    roundStartAt: null,
+    roundEndsAt: null,
+    taps: {},
+    roundScored: false,
+    matchScores: {},
+    lastRound: null,
   },
   traitreGame: {
     ready: {},
@@ -267,6 +282,7 @@ function loadState() {
       inLobby: parsed.inLobby || false,
       hotTakeGame: { ...defaultState().hotTakeGame, ...parsed.hotTakeGame },
       speedVoteGame: { ...defaultState().speedVoteGame, ...parsed.speedVoteGame },
+      raceToZeroGame: { ...defaultState().raceToZeroGame, ...parsed.raceToZeroGame },
       traitreGame: { ...defaultState().traitreGame, ...parsed.traitreGame },
       playlistGuessGame: { ...defaultState().playlistGuessGame, ...parsed.playlistGuessGame },
       truthMeterGame: { ...defaultState().truthMeterGame, ...parsed.truthMeterGame },
@@ -505,6 +521,7 @@ export function defaultEveningStats() {
     liesTotal: 0,
     tierNightsPlayed: 0,
     speedVotesPlayed: 0,
+    raceToZerosPlayed: 0,
     playlistGuessesPlayed: 0,
     truthMetersPlayed: 0,
     consensusGamesPlayed: 0,
@@ -549,6 +566,7 @@ export function resetGameSessionsOnly() {
   saveStatePatch({
     hotTakeGame: { ...base.hotTakeGame },
     speedVoteGame: { ...base.speedVoteGame },
+    raceToZeroGame: { ...base.raceToZeroGame },
     traitreGame: { ...base.traitreGame },
     playlistGuessGame: { ...base.playlistGuessGame },
     truthMeterGame: { ...base.truthMeterGame },
@@ -673,6 +691,12 @@ export function recordHotTakePlayed() {
 export function recordSpeedVotePlayed() {
   recordEveningGameOnce("speedvote", () => {
     state.stats.speedVotesPlayed = (state.stats.speedVotesPlayed || 0) + 1;
+  });
+}
+
+export function recordRaceToZeroPlayed() {
+  recordEveningGameOnce("racetozero", () => {
+    state.stats.raceToZerosPlayed = (state.stats.raceToZerosPlayed || 0) + 1;
   });
 }
 

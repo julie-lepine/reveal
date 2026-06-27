@@ -10,6 +10,7 @@ import {
   hotTakeToRemote,
   traitreToRemote,
   speedVoteToRemote,
+  raceToZeroToRemote,
   triviaToRemote,
   truthMeterToRemote,
   consensusToRemote,
@@ -22,6 +23,7 @@ import { defaultTraitrePrepSession } from "./traitreSession.js";
 import { TRAITRE_MIN_PLAYERS } from "../../data/traitre.js";
 import { requireMinLobbyPlayers } from "./gameLaunchGuard.js";
 import { defaultSpeedVotePrepSession } from "./speedVoteSession.js";
+import { defaultRaceToZeroPrepSession } from "./raceToZeroSession.js";
 import { PLAYLIST_GUESS_MIN_PLAYERS } from "../../data/playlistGuess.js";
 import { defaultPlaylistGuessPrepSession } from "./playlistGuessSession.js";
 import { getLobbyParticipants } from "./lobby.js";
@@ -37,6 +39,7 @@ const GAME_ID_TO_TILE = {
   traitre: "traitre-prep",
   hottake: "hottake-prep",
   speedvote: "speedvote-prep",
+  racetozero: "racetozero-prep",
   trivia: "trivia-prep",
   truthmeter: "truthmeter-prep",
   consensus: "consensus-prep",
@@ -116,6 +119,29 @@ export async function launchSpeedVotePrep() {
   }
 
   navigate("speedvote-prep");
+}
+
+export async function launchRaceToZeroPrep() {
+  const rz = defaultRaceToZeroPrepSession();
+  saveStatePatch({ raceToZeroGame: rz });
+
+  if (isGameSyncActive()) {
+    if (!(await requireHostToLaunch())) return;
+    try {
+      await startGameSession("racetozero", "racetozero-prep", {
+        raceToZero: raceToZeroToRemote(rz),
+      });
+    } catch (e) {
+      console.warn("REVEAL launch Race to Zero:", e);
+      await showAppAlert(e.message || "Impossible de lancer Race to Zero.", {
+        title: "Race to Zero",
+        icon: "⚠️",
+      });
+    }
+    return;
+  }
+
+  navigate("racetozero-prep");
 }
 
 export async function launchPlaylistGuessPrep() {
@@ -333,6 +359,7 @@ const RESTART_HANDLERS = {
   traitre: launchTraitrePrep,
   hottake: launchHotTakePrep,
   speedvote: launchSpeedVotePrep,
+  racetozero: launchRaceToZeroPrep,
   trivia: launchTriviaPrep,
   truthmeter: launchTruthMeterPrep,
   consensus: launchConsensusPrep,

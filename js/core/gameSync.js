@@ -26,6 +26,9 @@ import {
   mergeTriviaPatchState,
   mergeTraitrePatchState,
   mergeSpeedVotePatchState,
+  mergeRaceToZeroPatchState,
+  mergeRaceToZeroPhase,
+  isNewRaceToZeroRound,
   mergeTruthMeterPatchState,
   mergeTruthMeterPhase,
   mergeForwardGamePhase,
@@ -183,6 +186,7 @@ const RESTARTABLE_SESSION_GAME_IDS = new Set([
   "guesslie",
   "playlistguess",
   "tiernight",
+  "racetozero",
 ]);
 
 const SESSION_GAME_ID_TO_TILE = {
@@ -196,6 +200,7 @@ const SESSION_GAME_ID_TO_TILE = {
   guesslie: "guesslie",
   playlistguess: "playlistguess-prep",
   tiernight: "tiernight-select",
+  racetozero: "racetozero-prep",
 };
 
 function titleForSessionGameId(gameId) {
@@ -362,6 +367,7 @@ const GAME_SETUP_SCREENS = new Set([
   "consensus-prep",
   "dilemma-prep",
   "playlistguess-prep",
+  "racetozero-prep",
   "guesslie-menu",
   "guesslie-setup",
   "guesslie-wait",
@@ -877,6 +883,59 @@ function mergeSpeedVoteGameLocal(local, remote) {
     ready,
     roundScored: mergeRoundFlag(local.roundScored, remote.roundScored, newVoteRound),
     matchScores: mergeMatchScoresLocal(local.matchScores || {}, remote.matchScores || {}),
+  };
+}
+
+function isNewRaceToZeroRoundUid(cur, inc) {
+  return isNewRaceToZeroRound(cur, inc);
+}
+
+/** Taps Race to Zero (clé uid ou pseudo, valeur { ms, at }) → clés = pseudos actifs. */
+function normalizeRaceToZeroTaps(taps = {}) {
+  const names = getActivePlayerNames();
+  return normalizePlayerKeyedMap(taps, names, (key) => {
+    const mapped = playerKeyToDisplayName(key);
+    if (mapped) return mapped;
+    return names.includes(String(key)) ? String(key) : null;
+  });
+}
+
+function mergeRemoteRaceToZeroTapsUid(cur, inc) {
+  const curTaps = cur?.taps || {};
+  const incTaps = inc?.taps || {};
+  if (isNewRaceToZeroRound(cur, inc)) return incTaps;
+  if (inc?.phase === "active" || inc?.phase === "reveal" || cur?.phase === "reveal") {
+    return { ...curTaps, ...incTaps };
+  }
+  return incTaps;
+}
+
+function mergeRaceToZeroGameLocal(local, remote) {
+  if (!remote) return local;
+  if (!local) return remote;
+  const newRound = isNewRaceToZeroRound(local, remote);
+  const remoteTaps = remote.taps || {};
+  const localTaps = local.taps || {};
+  let taps = remoteTaps;
+  if (newRound) {
+    taps = remoteTaps;
+  } else if (remote.phase === "active" || remote.phase === "reveal" || local.phase === "reveal") {
+    taps = { ...remoteTaps, ...localTaps };
+  }
+  taps = normalizeRaceToZeroTaps(taps);
+  const ready =
+    !remote.lobbyStarted && !local.lobbyStarted
+      ? mergeReadyMapsLocal(local.ready || {}, remote.ready || {}, getActivePlayerNames(), getLocalDisplayName())
+      : remote.ready || {};
+  return {
+    ...local,
+    ...remote,
+    phase: mergeRaceToZeroPhase(local, remote),
+    taps,
+    ready,
+    roundScored: mergeRoundFlag(local.roundScored, remote.roundScored, newRound),
+    matchScores: mergeMatchScoresLocal(local.matchScores || {}, remote.matchScores || {}),
+    lastRound: remote.lastRound ?? local.lastRound ?? null,
   };
 }
 
@@ -1758,6 +1817,80 @@ export function speedVoteFromRemote(remote) {
   };
 }
 
+export function raceToZeroToRemote(session) {
+  const remoteTaps = {};
+  Object.entries(session.taps || {}).forEach(([name, val]) => {
+    if (!val) return;
+    remoteTaps[userIdForName(name) || name] = {
+      ms: typeof val.ms === "number" ? val.ms : null,
+      at: typeof val.at === "number" ? val.at : null,
+    };
+  });
+  return {
+    ready: mapReadyByUid(session.ready || {}),
+    lobbyStarted: Boolean(session.lobbyStarted),
+    roundCount: session.roundCount ?? 5,
+    roundIdx: session.roundIdx ?? 0,
+    phase: session.phase || null,
+    targetMs: session.targetMs ?? null,
+    roundStartAt: session.roundStartAt || null,
+    roundEndsAt: session.roundEndsAt || null,
+    taps: remoteTaps,
+    roundScored: Boolean(session.roundScored),
+    matchScores: scoresToRemote(session.matchScores || {}),
+    lastRound: session.lastRound
+      ? {
+          targetMs: session.lastRound.targetMs ?? null,
+          ranking: (session.lastRound.ranking || []).map((r) => ({
+            uid: userIdForName(r.name) || r.name,
+            ms: r.ms ?? null,
+            gap: Number.isFinite(r.gap) ? r.gap : null,
+            tapped: Boolean(r.tapped),
+          })),
+          deltas: scoresToRemote(session.lastRound.deltas || {}),
+        }
+      : null,
+  };
+}
+
+export function raceToZeroFromRemote(remote) {
+  if (!remote) return null;
+  const taps = {};
+  Object.entries(remote.taps || {}).forEach(([uid, val]) => {
+    if (!val) return;
+    const name = nameForUserId(uid) || uid;
+    taps[name] = {
+      ms: typeof val.ms === "number" ? val.ms : null,
+      at: typeof val.at === "number" ? val.at : null,
+    };
+  });
+  return {
+    ready: mapReadyByName(remote.ready || {}),
+    lobbyStarted: Boolean(remote.lobbyStarted),
+    roundCount: remote.roundCount ?? 5,
+    roundIdx: remote.roundIdx ?? 0,
+    phase: remote.phase || null,
+    targetMs: remote.targetMs ?? null,
+    roundStartAt: remote.roundStartAt || null,
+    roundEndsAt: remote.roundEndsAt || null,
+    taps,
+    roundScored: Boolean(remote.roundScored),
+    matchScores: scoresFromRemote(remote.matchScores || {}),
+    lastRound: remote.lastRound
+      ? {
+          targetMs: remote.lastRound.targetMs ?? null,
+          ranking: (remote.lastRound.ranking || []).map((r) => ({
+            name: nameForUserId(r.uid) || r.uid,
+            ms: r.ms ?? null,
+            gap: r.gap == null ? Infinity : r.gap,
+            tapped: Boolean(r.tapped),
+          })),
+          deltas: scoresFromRemote(remote.lastRound.deltas || {}),
+        }
+      : null,
+  };
+}
+
 function sanitizeTraitreMergeInc(curTr, incTr) {
   if (!incTr || curTr?.impostorRevealed || incTr.impostorRevealed) return incTr;
   const cleaned = { ...incTr };
@@ -2309,6 +2442,11 @@ export function applyRemoteSession(row) {
     const local = getState().speedVoteGame;
     patch.speedVoteGame = local ? mergeSpeedVoteGameLocal(local, remote) : remote;
   }
+  if (st.raceToZero) {
+    const remote = raceToZeroFromRemote(st.raceToZero);
+    const local = getState().raceToZeroGame;
+    patch.raceToZeroGame = local ? mergeRaceToZeroGameLocal(local, remote) : remote;
+  }
   if (st.traitre) {
     const remote = traitreFromRemote(st.traitre);
     const local = getState().traitreGame;
@@ -2555,6 +2693,7 @@ export function isActiveGameSessionScreen(screen) {
 function resolveActivePlayScreen(st, gid, declared) {
   if (st.hotTake?.lobbyStarted) return "hottake";
   if (st.speedVote?.lobbyStarted) return "speedvote";
+  if (st.raceToZero?.lobbyStarted) return "racetozero";
   if (st.traitre?.lobbyStarted) {
     if (declared === "traitre-prep") return null;
     if (declared === "game-select" && !isLobbyEveningStarted()) return "game-select";
@@ -2617,6 +2756,9 @@ export function getEffectiveSessionScreen(row) {
   }
   if (st.speedVote) {
     if (gid === "speedvote" || declared === "speedvote-prep") return "speedvote-prep";
+  }
+  if (st.raceToZero) {
+    if (gid === "racetozero" || declared === "racetozero-prep") return "racetozero-prep";
   }
   if (st.traitre) {
     if (gid === "traitre" || declared === "traitre-prep") return "traitre-prep";
@@ -3144,6 +3286,29 @@ async function patchGameStateInner(
       );
     }
   }
+  if (mergePayload.raceToZero) {
+    const curRz = current.raceToZero;
+    const incRz = mergePayload.raceToZero;
+    const newRzRound = curRz && incRz ? isNewRaceToZeroRoundUid(curRz, incRz) : false;
+    nextState.raceToZero = curRz
+      ? {
+          ...mergeRaceToZeroPatchState(curRz, incRz, {
+            mergeReadyUid: mergeRemoteReadyUid,
+            mergeTaps: mergeRemoteRaceToZeroTapsUid,
+          }),
+          roundScored: mergeRoundFlag(curRz.roundScored, incRz.roundScored, newRzRound),
+        }
+      : incRz;
+    if (curRz && incRz && nextState.raceToZero) {
+      nextState.raceToZero.matchScores = mergeRemoteMatchScoresUid(
+        curRz.matchScores || {},
+        incRz.matchScores || {}
+      );
+      if (incRz.lastRound != null) {
+        nextState.raceToZero.lastRound = incRz.lastRound;
+      }
+    }
+  }
   if (mergePayload.traitre) {
     const curTr = current.traitre;
     const incTr = sanitizeTraitreMergeInc(curTr, mergePayload.traitre);
@@ -3468,6 +3633,14 @@ export async function syncSpeedVoteSession(extra = {}, patchOpts = {}) {
   saveStatePatch({ speedVoteGame: session });
   if (!isGameSyncActive()) return session;
   await patchGameState({ speedVote: speedVoteToRemote(session) }, patchOpts);
+  return session;
+}
+
+export async function syncRaceToZeroSession(extra = {}, patchOpts = {}) {
+  const session = { ...getState().raceToZeroGame, ...extra };
+  saveStatePatch({ raceToZeroGame: session });
+  if (!isGameSyncActive()) return session;
+  await patchGameState({ raceToZero: raceToZeroToRemote(session) }, patchOpts);
   return session;
 }
 
