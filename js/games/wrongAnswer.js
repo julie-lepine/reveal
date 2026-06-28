@@ -27,6 +27,7 @@ import { escapeHtml, pageShell } from "../core/ui.js";
 import { bindNav } from "../screens/nav.js";
 import { gameExitBarHtml, bindExitGame } from "../core/exitGame.js";
 import { isEveningGameplayPaused } from "../core/filRougeSession.js";
+import { checkHotTakeModeration, getModerationNotice } from "../core/hotTakeSession.js";
 import {
   isGameSyncActive,
   canActAsHost,
@@ -235,6 +236,8 @@ export function mountWrongAnswer(app) {
               <textarea id="wrong-input" class="wrong-input" rows="2" maxlength="${WRONG_ANSWER_MAX_LEN}"
                 placeholder="Ex. « Girafe. »">${escapeHtml(draftText)}</textarea>
               <p class="hint wrong-input__count"><span id="wrong-count">${remaining}</span> caractères restants</p>
+              <p class="moderation-notice">${escapeHtml(getModerationNotice())}</p>
+              <p class="auth-error hidden" id="wrong-error"></p>
               <button type="button" class="btn btn-primary btn--spaced" id="wrong-submit">Valider ma réponse</button>
             </div>`
       }
@@ -388,6 +391,7 @@ export function mountWrongAnswer(app) {
         draftText = input.value;
         const countEl = app.querySelector("#wrong-count");
         if (countEl) countEl.textContent = String(WRONG_ANSWER_MAX_LEN - draftText.length);
+        app.querySelector("#wrong-error")?.classList.add("hidden");
       });
     }
 
@@ -395,6 +399,15 @@ export function mountWrongAnswer(app) {
       if (isEveningGameplayPaused() || myAnswerText()) return;
       const text = sanitizeWrongAnswer(draftText);
       if (!text) return;
+      const mod = checkHotTakeModeration(text);
+      if (mod.blocked) {
+        const errEl = app.querySelector("#wrong-error");
+        if (errEl) {
+          errEl.textContent = mod.message;
+          errEl.classList.remove("hidden");
+        }
+        return;
+      }
       await commitWrongAnswerAnswer(text);
       draftText = "";
       if (!mp) {

@@ -13,6 +13,7 @@ import {
 } from "./gameSync.js";
 import { patchGameStateWithFeedback } from "./patchGameStateFeedback.js";
 import { launchGameWithSync, commitHostGamePlay, commitPrepReadyToggle } from "./mpLaunch.js";
+import { checkHotTakeModeration } from "./hotTakeSession.js";
 
 function defaultSession() {
   return {
@@ -147,7 +148,9 @@ export async function commitWrongAnswerAnswer(text) {
   if (session.answers?.[localName]?.text) {
     return session.answers[localName];
   }
-  const answer = { text: sanitizeWrongAnswer(text), at: Date.now() };
+  const cleanText = sanitizeWrongAnswer(text);
+  if (!cleanText || checkHotTakeModeration(cleanText).blocked) return null;
+  const answer = { text: cleanText, at: Date.now() };
   const answers = { ...(session.answers || {}), [localName]: answer };
   saveStatePatch({ wrongAnswerGame: { ...session, answers } });
   if (!isGameSyncActive()) return answer;
