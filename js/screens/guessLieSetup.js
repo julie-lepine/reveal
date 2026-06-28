@@ -3,6 +3,7 @@ import { hasLocalSubmission } from "../core/guessLieSession.js";
 import { navigate } from "../core/router.js";
 import { pageShell } from "../core/ui.js";
 import { rulesButtonHtml } from "../core/gameRulesUi.js";
+import { checkHotTakeModeration, getModerationNotice } from "../core/hotTakeSession.js";
 import { bindNav } from "./nav.js";
 
 export function mountGuessLieSetup(app) {
@@ -50,6 +51,9 @@ export function mountGuessLieSetup(app) {
 
       <p class="hint" id="setup-hint">Remplis les 3 champs et sélectionne le mensonge.</p>
 
+      <p class="moderation-notice">${getModerationNotice()}</p>
+      <p class="auth-error hidden" id="guesslie-error"></p>
+
       <button type="button" class="btn btn-primary btn--spaced" id="btn-go" disabled>
         GO - envoyer au lobby
       </button>
@@ -96,11 +100,25 @@ export function mountGuessLieSetup(app) {
     });
   });
 
-  inputs.forEach((el) => el?.addEventListener("input", validate));
+  inputs.forEach((el) =>
+    el?.addEventListener("input", () => {
+      app.querySelector("#guesslie-error")?.classList.add("hidden");
+      validate();
+    })
+  );
 
   goBtn.addEventListener("click", async () => {
     const statements = inputs.map((el) => el.value.trim());
     if (statements.some((s) => !s) || lieIndex === null) return;
+    const blocked = statements.map((s) => checkHotTakeModeration(s)).find((m) => m.blocked);
+    if (blocked) {
+      const errEl = app.querySelector("#guesslie-error");
+      if (errEl) {
+        errEl.textContent = blocked.message;
+        errEl.classList.remove("hidden");
+      }
+      return;
+    }
     goBtn.disabled = true;
     try {
       await setLocalGuessLieSubmission(statements, lieIndex);

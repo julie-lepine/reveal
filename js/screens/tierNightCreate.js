@@ -1,6 +1,7 @@
 import { addCustomTierList } from "../core/state.js";
 import { navigate } from "../core/router.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
+import { checkHotTakeModeration, getModerationNotice } from "../core/hotTakeSession.js";
 import { bindNav } from "./nav.js";
 
 export function mountTierNightCreate(app) {
@@ -23,6 +24,9 @@ export function mountTierNightCreate(app) {
       </div>
 
       <p class="hint" id="create-hint">Minimum 4 items, un par ligne.</p>
+
+      <p class="moderation-notice">${getModerationNotice()}</p>
+      <p class="auth-error hidden" id="tier-error"></p>
 
       <button type="button" class="btn btn-primary btn--spaced" id="btn-create" disabled>
         Créer et jouer →
@@ -53,13 +57,27 @@ export function mountTierNightCreate(app) {
     else hint.textContent = `${items.length} items - prêt à créer !`;
   }
 
-  [nameEl, emojiEl, itemsEl].forEach((el) => el?.addEventListener("input", validate));
+  [nameEl, emojiEl, itemsEl].forEach((el) =>
+    el?.addEventListener("input", () => {
+      app.querySelector("#tier-error")?.classList.add("hidden");
+      validate();
+    })
+  );
 
   createBtn.addEventListener("click", () => {
     const name = nameEl.value.trim();
     const items = parseItems();
     const emoji = emojiEl.value.trim() || "✨";
     if (!name || items.length < 4) return;
+    const blocked = [name, ...items].map((s) => checkHotTakeModeration(s)).find((m) => m.blocked);
+    if (blocked) {
+      const errEl = app.querySelector("#tier-error");
+      if (errEl) {
+        errEl.textContent = blocked.message;
+        errEl.classList.remove("hidden");
+      }
+      return;
+    }
     addCustomTierList({ name, items, emoji });
     navigate("tiernight");
   });
