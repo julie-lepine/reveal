@@ -97,6 +97,8 @@ const defaultState = () => ({
   eveningGamesRecorded: {},
   guessLie: emptyGuessLie(),
   tierNightTopicId: null,
+  tierNightMode: "consensus",
+  tierNightModifier: "normal",
   customTierLists: [],
   hotTakeGame: {
     customTakes: [],
@@ -262,6 +264,17 @@ const defaultState = () => ({
     closedByUid: null,
   },
   tierNightGame: { recaps: [], topicId: null, listName: "", controversialItem: null },
+  tierNightLiveGame: {
+    lobbyStarted: false,
+    topicId: null,
+    listName: "",
+    deck: null,
+    roundIdx: 0,
+    phase: null,
+    votes: {},
+    placements: {},
+    finished: false,
+  },
   openLobbies: {},
 });
 
@@ -308,6 +321,7 @@ function loadState() {
       triviaGame: { ...defaultState().triviaGame, ...parsed.triviaGame },
       filRougeGame: { ...defaultState().filRougeGame, ...parsed.filRougeGame },
       tierNightGame: { ...defaultState().tierNightGame, ...parsed.tierNightGame },
+      tierNightLiveGame: { ...defaultState().tierNightLiveGame, ...parsed.tierNightLiveGame },
       openLobbies: parsed.openLobbies || {},
       lastGame: parsed.lastGame || null,
       settings: { ...defaultSettings(), ...parsed.settings },
@@ -595,7 +609,10 @@ export function resetGameSessionsOnly() {
     filRougeGame: { ...base.filRougeGame },
     guessLie: { ...emptyGuessLie(), sessionId: getState().lobbyCode || null },
     tierNightTopicId: null,
+    tierNightMode: "consensus",
+    tierNightModifier: "normal",
     tierNightGame: { ...base.tierNightGame },
+    tierNightLiveGame: { ...base.tierNightLiveGame },
   });
 }
 
@@ -905,6 +922,24 @@ export function setTierNightTopicId(id) {
 
 export function getTierNightTopicId() {
   return state.tierNightTopicId;
+}
+
+export function setTierNightMode(mode) {
+  state.tierNightMode = mode || "consensus";
+  save();
+}
+
+export function getTierNightMode() {
+  return state.tierNightMode || "consensus";
+}
+
+export function setTierNightModifier(modifier) {
+  state.tierNightModifier = modifier || "normal";
+  save();
+}
+
+export function getTierNightModifier() {
+  return state.tierNightModifier || "normal";
 }
 
 export function addCustomTierList({ name, items, emoji = "✨" }) {

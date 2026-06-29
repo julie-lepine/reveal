@@ -34,6 +34,7 @@ const SCREEN_TO_TAB = {
   "tiernight-select": TAB_GAMES,
   "tiernight-create": TAB_GAMES,
   tiernight: TAB_GAMES,
+  "tiernight-live": TAB_GAMES,
   "tiernight-end": TAB_RESULTS,
   settings: TAB_HOME,
 };

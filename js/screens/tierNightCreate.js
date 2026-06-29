@@ -1,4 +1,4 @@
-import { addCustomTierList } from "../core/state.js";
+import { addCustomTierList, setTierNightMode, setTierNightModifier } from "../core/state.js";
 import { navigate } from "../core/router.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
 import { checkHotTakeModeration, getModerationNotice } from "../core/hotTakeSession.js";
@@ -78,6 +78,8 @@ export function mountTierNightCreate(app) {
       }
       return;
     }
+    setTierNightMode("consensus");
+    setTierNightModifier("normal");
     addCustomTierList({ name, items, emoji });
     navigate("tiernight");
   });

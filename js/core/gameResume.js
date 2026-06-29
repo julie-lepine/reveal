@@ -34,6 +34,7 @@ const SCREEN_LABELS = {
   "tiernight-select": "TierNight",
   "tiernight-create": "TierNight",
   tiernight: "TierNight",
+  "tiernight-live": "TierNight",
   "trivia-prep": "Trivia Quiz",
   trivia: "Trivia Quiz",
   "wronganswer-prep": "Wrong Answer Only",

@@ -1,8 +1,13 @@
-import { TIER_LEVELS } from "../../data/tierTopics.js";
-import { tierNightPointsForRankDiff } from "../../data/eveningScoring.js";
+import { TIER_LEVELS, getTierNightModifierById } from "../../data/tierTopics.js";
+import {
+  tierNightPointsForRankDiff,
+  tierNightReversePointsForRankDiff,
+  EVENING_POINTS,
+} from "../../data/eveningScoring.js";
 import { getActivePlayers } from "./players.js";
 import {
   getLocalDisplayName,
+  getTierNightModifier,
   addScore,
   bumpPlayerStat,
   saveStatePatch,
@@ -59,15 +64,18 @@ export function computeConsensusPlaced(recaps, items) {
   return consensus;
 }
 
-export function scoreConsensusProximity(localPlaced, consensus) {
+export function scoreConsensusProximity(localPlaced, consensus, { reverse = false } = {}) {
   const items = Object.values(localPlaced).flat();
   if (!items.length) return 0;
+  const pointsFn = reverse
+    ? tierNightReversePointsForRankDiff
+    : tierNightPointsForRankDiff;
   let total = 0;
   items.forEach((item) => {
     const localTier = tierOfItem(localPlaced, item);
     const consTier = tierOfItem(consensus, item);
     const diff = Math.abs(rankValue(localTier) - rankValue(consTier));
-    total += tierNightPointsForRankDiff(diff);
+    total += pointsFn(diff);
   });
   return Math.round(total / items.length);
 }
@@ -88,10 +96,42 @@ export function findMostControversialItem(recaps, items) {
 }
 
 function attachConsensusPoints(recaps, consensus) {
+  const modifier = getTierNightModifierById(getTierNightModifier());
+  const reverse = Boolean(modifier?.reverseScore);
   recaps.forEach((r) => {
-    r.consensusPoints = scoreConsensusProximity(r.placed, consensus);
+    r.consensusPoints = scoreConsensusProximity(r.placed, consensus, { reverse });
   });
   return recaps;
+}
+
+/**
+ * Bonus « Outsider » (#3) : sur l'item le plus clivant, le ou les joueurs les
+ * plus éloignés du consensus gagnent un bonus. Ajouté par-dessus la proximité.
+ */
+function attachOutsiderBonus(recaps, consensus, controversialItem) {
+  recaps.forEach((r) => {
+    r.outsiderBonus = 0;
+  });
+  if (!controversialItem) return;
+
+  const consRank = rankValue(tierOfItem(consensus, controversialItem));
+  const diffs = recaps.map((r) => {
+    const placedHere = Object.values(r.placed || {})
+      .flat()
+      .includes(controversialItem);
+    if (!placedHere) return -1;
+    return Math.abs(rankValue(tierOfItem(r.placed, controversialItem)) - consRank);
+  });
+
+  const maxDiff = Math.max(...diffs);
+  if (maxDiff < 1) return;
+
+  recaps.forEach((r, i) => {
+    if (diffs[i] === maxDiff) {
+      r.outsiderBonus = EVENING_POINTS.BONUS;
+      r.consensusPoints = (r.consensusPoints || 0) + EVENING_POINTS.BONUS;
+    }
+  });
 }
 
 /** Ajoute les points de manche au cumul soirée (une seule fois par partie). */
@@ -133,6 +173,7 @@ export function buildRecapsFromPlacements(topicId, listName, items, placementsBy
   const consensus = computeConsensusPlaced(recaps, items);
   const controversial = findMostControversialItem(recaps, items);
   attachConsensusPoints(recaps, consensus);
+  attachOutsiderBonus(recaps, consensus, controversial.item);
 
   finalizeTierNightRecapSave(recaps, {
     topicId,
@@ -184,6 +225,7 @@ export function buildRecapsWithSimulation(topicId, listName, items, localPlaced)
   const consensus = computeConsensusPlaced(recaps, items);
   const controversial = findMostControversialItem(recaps, items);
   attachConsensusPoints(recaps, consensus);
+  attachOutsiderBonus(recaps, consensus, controversial.item);
 
   finalizeTierNightRecapSave(recaps, {
     topicId,

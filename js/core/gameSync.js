@@ -2271,9 +2271,11 @@ export function guessLieFromRemote(remote) {
   };
 }
 
-export function tierNightToRemote({ topicId, game, placements, finished }) {
+export function tierNightToRemote({ topicId, game, placements, finished, mode, modifier }) {
   return {
     topicId: topicId || null,
+    mode: mode || "consensus",
+    modifier: modifier || "normal",
     game: game || null,
     placements: mapPlacementsByUid(placements || {}),
     finished: finished || {},
@@ -2297,6 +2299,7 @@ export function tierNightRecapToRemote(session) {
       color: r.color,
       placed: r.placed || {},
       consensusPoints: r.consensusPoints ?? 0,
+      outsiderBonus: r.outsiderBonus ?? 0,
     })),
     consensus: session.consensus || null,
     controversialItem: session.controversialItem ?? null,
@@ -2319,6 +2322,65 @@ export function applyTierNightRecapFromRemote(recap) {
     },
   });
   return true;
+}
+
+/* ----- Tier Night « En direct » (mode live temps réel) ----- */
+
+export function tierNightLiveToRemote(session) {
+  const remoteVotes = {};
+  Object.entries(session.votes || {}).forEach(([voter, tier]) => {
+    remoteVotes[userIdForName(voter) || voter] = tier;
+  });
+  return {
+    lobbyStarted: Boolean(session.lobbyStarted),
+    topicId: session.topicId || null,
+    listName: session.listName || "",
+    deck: session.deck || null,
+    roundIdx: session.roundIdx ?? 0,
+    phase: session.phase || null,
+    votes: remoteVotes,
+    finished: Boolean(session.finished),
+  };
+}
+
+export function tierNightLiveFromRemote(remote) {
+  if (!remote) return null;
+  const votes = {};
+  Object.entries(remote.votes || {}).forEach(([uid, tier]) => {
+    votes[nameForUserId(uid) || uid] = tier;
+  });
+  return {
+    lobbyStarted: Boolean(remote.lobbyStarted),
+    topicId: remote.topicId || null,
+    listName: remote.listName || "",
+    deck: remote.deck || null,
+    roundIdx: remote.roundIdx ?? 0,
+    phase: remote.phase || null,
+    votes,
+    finished: Boolean(remote.finished),
+  };
+}
+
+/** Merge additif des votes (reset uniquement sur nouvelle manche). */
+function mergeRemoteTierNightLiveVotesUid(cur, inc) {
+  if (isNewSpeedVoteVoteRound(cur, inc)) return inc?.votes || {};
+  return { ...(cur?.votes || {}), ...(inc?.votes || {}) };
+}
+
+function mergeTierNightLiveGameLocal(local, remote) {
+  if (!remote) return local;
+  if (!local) return remote;
+  const newRound = isNewSpeedVoteVoteRound(local, remote);
+  const votes = newRound
+    ? remote.votes || {}
+    : { ...(remote.votes || {}), ...(local.votes || {}) };
+  return {
+    ...local,
+    ...remote,
+    phase: mergeSpeedVotePhase(local, remote),
+    votes: normalizePlayerVotesMap(votes),
+    placements: local.placements || {},
+  };
 }
 
 export function scoresToRemote(scoresByName = {}) {
@@ -2641,6 +2703,8 @@ export function applyRemoteSession(row) {
   if (st.tierNight) {
     const tn = tierNightFromRemote(st.tierNight);
     if (tn.topicId != null) patch.tierNightTopicId = tn.topicId;
+    if (tn.mode) patch.tierNightMode = tn.mode;
+    if (tn.modifier) patch.tierNightModifier = tn.modifier;
     if (tn.recap?.recaps?.length) {
       const localName = getLocalDisplayName();
       const localPts =
@@ -2654,6 +2718,13 @@ export function applyRemoteSession(row) {
     } else if (tn.game) {
       patch.tierNightGame = { ...getState().tierNightGame, ...tn.game };
     }
+  }
+  if (st.tierNightLive) {
+    const remote = tierNightLiveFromRemote(st.tierNightLive);
+    const local = getState().tierNightLiveGame;
+    patch.tierNightLiveGame = local
+      ? mergeTierNightLiveGameLocal(local, remote)
+      : remote;
   }
   if (FIL_ROUGE_ENABLED && st.filRouge) {
     const remote = filRougeFromRemote(st.filRouge);
@@ -2753,6 +2824,7 @@ function navStackFor(screen) {
     "tiernight-select",
     "tiernight-create",
     "tiernight",
+    "tiernight-live",
     "tiernight-end",
     "results",
   ]);
@@ -2865,6 +2937,7 @@ function resolveActivePlayScreen(st, gid, declared) {
   if (st.guessLie?.lobbyComplete) return "guesslie";
   const glPhase = st.guessLie?.phase;
   if (glPhase && glPhase !== "idle" && glPhase !== "lobby") return "guesslie";
+  if (st.tierNightLive?.lobbyStarted && !st.tierNightLive?.finished) return "tiernight-live";
   if (st.tierNight?.game && !st.tierNight?.finished) return "tiernight";
   return null;
 }
@@ -3446,6 +3519,16 @@ async function patchGameStateInner(
       );
     }
   }
+  if (mergePayload.tierNightLive) {
+    const curTl = current.tierNightLive;
+    const incTl = mergePayload.tierNightLive;
+    nextState.tierNightLive = curTl
+      ? mergeSpeedVotePatchState(curTl, incTl, {
+          mergeReadyUid: mergeRemoteReadyUid,
+          mergeVotes: mergeRemoteTierNightLiveVotesUid,
+        })
+      : incTl;
+  }
   if (mergePayload.clutch) {
     const curRz = current.clutch;
     const incRz = mergePayload.clutch;
@@ -3941,11 +4024,15 @@ export async function commitGuessLiePlay(patch, { screen, withEveningScores = fa
 
 export async function syncTierNightSession(payload) {
   if (payload.topicId != null) saveStatePatch({ tierNightTopicId: payload.topicId });
+  if (payload.mode != null) saveStatePatch({ tierNightMode: payload.mode });
+  if (payload.modifier != null) saveStatePatch({ tierNightModifier: payload.modifier });
   if (payload.game) saveStatePatch({ tierNightGame: payload.game });
   if (!isGameSyncActive()) return;
   const cached = getTierNightRemote() || {};
   const remote = tierNightToRemote({
     topicId: payload.topicId ?? getState().tierNightTopicId,
+    mode: payload.mode ?? getState().tierNightMode,
+    modifier: payload.modifier ?? getState().tierNightModifier,
     game: payload.game ?? getState().tierNightGame,
     placements: payload.placements ?? cached.placements,
     finished: payload.finished ?? cached.finished,
@@ -3967,6 +4054,17 @@ export function allMembersReady(readyMapByUid) {
 
 export function getTierNightRemote() {
   return getCachedGameSession()?.state?.tierNight || null;
+}
+
+export async function syncTierNightLiveSession(extra = {}, patchOpts = {}) {
+  const session = { ...getState().tierNightLiveGame, ...extra };
+  saveStatePatch({ tierNightLiveGame: session });
+  if (!isGameSyncActive()) return;
+  await patchGameState({ tierNightLive: tierNightLiveToRemote(session) }, patchOpts);
+}
+
+export function getTierNightLiveRemote() {
+  return getCachedGameSession()?.state?.tierNightLive || null;
 }
 
 export function getTierNightLobbyProgress() {
@@ -4035,6 +4133,25 @@ export async function pushTierNightRecapToSession() {
   if (!recap) return;
   const tn = getTierNightRemote() || {};
   await patchGameState({ tierNight: { ...tn, recap } });
+}
+
+/**
+ * Hôte (mode live) : publie le récap, marque la partie live terminée et bascule
+ * tout le monde sur l'écran de résultats Tier Night.
+ */
+export async function finalizeTierNightLiveToResults() {
+  if (!isGameSyncActive() || !isLobbyHost()) return false;
+  const recap = tierNightRecapToRemote(getTierNightSession());
+  const tnRemote = getTierNightRemote() || {};
+  await patchGameState(
+    {
+      tierNight: { ...tnRemote, ...(recap ? { recap } : {}) },
+      tierNightLive: { finished: true },
+    },
+    { screen: "tiernight-end", gameId: "tiernight", withEveningScores: true }
+  );
+  navigate("tiernight-end");
+  return true;
 }
 
 /** Hôte : fin Tier Night - récap + scores + écran en un seul write. */

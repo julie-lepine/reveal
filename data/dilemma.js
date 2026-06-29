@@ -148,7 +148,7 @@ export const DILEMMA_DECKS = [
         optionA: "Rire comme un méchant de dessin animé",
         optionB: "Marcher comme un mannequin",
       },
-      
+
       {
         id: "cereal-water",
         optionA: "Manger tes céréales avec de l'eau",
@@ -302,7 +302,7 @@ export const DILEMMA_DECKS = [
         optionB: "Éternuer à chaque hoquet",
         tier: "impossible",
       },
-      
+
       {
         id: "clown-elevator",
         optionA: "Partager chaque ascenseur avec un clown silencieux",
@@ -363,7 +363,7 @@ export const DILEMMA_DECKS = [
         optionB: "Boire uniquement du café froid",
         tier: "impossible",
       },
-      
+
       {
         id: "hair-food",
         optionA: "Trouver un cheveu dans chaque repas",

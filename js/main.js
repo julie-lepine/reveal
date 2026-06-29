@@ -48,6 +48,7 @@ import { mountTrivia } from "./games/trivia.js";
 import { mountConsensus } from "./games/consensus.js";
 import { mountGuessLie } from "./games/guessLie.js";
 import { mountTierNight } from "./games/tierNight.js";
+import { mountTierNightLive } from "./games/tierNightLive.js";
 // FIL_ROUGE (Mot interdit) - désactivé, voir data/filRouge.js
 // import { mountFilRougeSetup } from "./screens/filRougeSetup.js";
 // import { mountFilRougeMission } from "./screens/filRougeMission.js";
@@ -112,6 +113,7 @@ registerScreen("consensus-prep", mountConsensusSetup);
 registerScreen("consensus", mountConsensus);
 registerScreen("guesslie", mountGuessLie);
 registerScreen("tiernight", mountTierNight);
+registerScreen("tiernight-live", mountTierNightLive);
 // registerScreen("filrouge-setup", mountFilRougeSetup);
 // registerScreen("filrouge-mission", mountFilRougeMission);
 

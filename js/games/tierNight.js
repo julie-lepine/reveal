@@ -1,6 +1,15 @@
-import { TIER_LEVELS, TIER_COLORS } from "../../data/tierTopics.js";
+import {
+  TIER_LEVELS,
+  TIER_COLORS,
+  getTierNightModifierById,
+} from "../../data/tierTopics.js";
 import { getTierListById } from "../core/tierLists.js";
-import { getTierNightTopicId, recordTierNightPlayed } from "../core/state.js";
+import { getActivePlayers } from "../core/players.js";
+import {
+  getTierNightTopicId,
+  getTierNightModifier,
+  recordTierNightPlayed,
+} from "../core/state.js";
 import { buildRecapsWithSimulation } from "../core/tierNightSession.js";
 import { setLobbyPlaying } from "../core/lobby.js";
 import {
@@ -34,6 +43,20 @@ export function mountTierNight(app) {
     navigate("tiernight-select");
     return null;
   }
+
+  const modifier = getTierNightModifierById(getTierNightModifier());
+  const activeTiers = Array.isArray(modifier.tiers) ? modifier.tiers : TIER_LEVELS;
+  const blind = Boolean(modifier.blind);
+
+  const isRoster = Boolean(list.roster);
+  const rosterEmoji = {};
+  if (isRoster) {
+    getActivePlayers().forEach((p) => {
+      rosterEmoji[p.name] = p.emoji;
+    });
+  }
+  const itemLabel = (item) =>
+    isRoster && rosterEmoji[item] ? `${rosterEmoji[item]} ${item}` : item;
 
   let placed = {};
   TIER_LEVELS.forEach((t) => {
@@ -134,29 +157,39 @@ export function mountTierNight(app) {
           <h1 class="tier-game-header__title">${escapeHtml(list.name)}</h1>
         </div>
 
+        ${
+          modifier.id !== "normal"
+            ? `<div class="tier-modifier-banner"><span class="tier-modifier-banner__emoji">${modifier.emoji}</span><span><strong>${escapeHtml(modifier.name)}</strong> · ${escapeHtml(modifier.desc)}</span></div>`
+            : ""
+        }
+
         <div class="tier-board">
-          ${TIER_LEVELS.map(
-            (tier) => `
+          ${activeTiers
+            .map(
+              (tier) => `
             <div class="tier-row" data-tier="${tier}">
               <span class="tier-label" style="--tier-color:${TIER_COLORS[tier]}">${tier}</span>
               <div class="tier-items">
                 ${(placed[tier] || [])
                   .map(
                     (item) => `
-                  <button type="button" class="tier-chip" data-item="${escapeHtml(item)}"
+                  <button type="button" class="tier-chip${blind ? " tier-chip--static" : ""}" data-item="${escapeHtml(item)}"
                     style="--tier-color:${TIER_COLORS[tier]}"
-                    title="Retirer du classement">${escapeHtml(item)}</button>`
+                    title="${blind ? "Classement verrouillé" : "Retirer du classement"}">${escapeHtml(itemLabel(item))}</button>`
                   )
                   .join("")}
               </div>
             </div>`
-          ).join("")}
+            )
+            .join("")}
         </div>
 
         ${
           waitingLobby
             ? ""
-            : `<p class="hint tier-unplace-hint">Touche une tuile classée pour la remettre en bas · glisse ou utilise les boutons pour classer.</p>`
+            : blind
+              ? `<p class="hint tier-unplace-hint">🙈 Mode à l'aveugle : une fois classée, une tuile ne bouge plus. Réfléchis bien !</p>`
+              : `<p class="hint tier-unplace-hint">Touche une tuile classée pour la remettre en bas · glisse ou utilise les boutons pour classer.</p>`
         }
 
         ${waitingLobby ? lobbyWaitHtml() : ""}
@@ -171,18 +204,20 @@ export function mountTierNight(app) {
             ${remaining
               .map(
                 (item) => `
-              <span class="unplaced-chip" draggable="true" data-item="${escapeHtml(item)}">${escapeHtml(item)}</span>`
+              <span class="unplaced-chip" draggable="true" data-item="${escapeHtml(item)}">${escapeHtml(itemLabel(item))}</span>`
               )
               .join("")}
           </div>
           <div class="quick-place">
-            <p class="quick-place__item">« ${escapeHtml(remaining[0])} » →</p>
+            <p class="quick-place__item">« ${escapeHtml(itemLabel(remaining[0]))} » →</p>
             <div class="quick-place__btns">
-              ${TIER_LEVELS.map(
-                (t) => `
+              ${activeTiers
+                .map(
+                  (t) => `
                 <button type="button" class="quick-tier-btn" data-quick-tier="${t}"
                   style="--tier-color:${TIER_COLORS[t]}">${t}</button>`
-              ).join("")}
+                )
+                .join("")}
             </div>
           </div>`
               : `<p class="hint tier-done-hint">Tous les items sont classés 🎉 Réajuste si besoin, puis valide.</p>
@@ -256,12 +291,14 @@ export function mountTierNight(app) {
       });
     });
 
-    app.querySelectorAll(".tier-chip").forEach((chip) => {
-      chip.addEventListener("click", () => {
-        const item = chip.getAttribute("data-item");
-        if (item) unplaceItem(item);
+    if (!blind) {
+      app.querySelectorAll(".tier-chip").forEach((chip) => {
+        chip.addEventListener("click", () => {
+          const item = chip.getAttribute("data-item");
+          if (item) unplaceItem(item);
+        });
       });
-    });
+    }
 
     app.querySelectorAll("[data-quick-tier]").forEach((btn) => {
       btn.addEventListener("click", () => {

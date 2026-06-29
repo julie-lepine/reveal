@@ -18,3 +18,10 @@ export function tierNightPointsForRankDiff(diff) {
   if (diff === 1) return EVENING_POINTS.WIN;
   return 0;
 }
+
+/** Tier Night (modifier « À contre-courant ») : plus tu t'éloignes, plus tu marques. */
+export function tierNightReversePointsForRankDiff(diff) {
+  if (diff >= 3) return EVENING_POINTS.BONUS;
+  if (diff === 2) return EVENING_POINTS.WIN;
+  return 0;
+}
