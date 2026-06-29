@@ -301,6 +301,8 @@ export function mountTierNightEnd(app) {
 
   return () => {
     unsubSession();
-    setLobbyWaiting();
+    // En MP, la fin de partie passe par completeGameSession (setLobbyBetweenGames) : ne pas
+    // repasser le lobby en "waiting" ici, sinon on annule l'état "en soirée" et on reset les prêt.
+    if (!isGameSyncActive()) setLobbyWaiting();
   };
 }

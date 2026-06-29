@@ -2594,8 +2594,14 @@ async function confirmMissingSessionThenRoute() {
     const current = getCurrentScreen();
     if (isActiveGameSessionScreen(current) || isOnGameSetupScreen(current)) {
       suppressSessionRoute(120000);
-      const { goToLobby } = await import("./lobby.js");
-      goToLobby();
+      // Soirée toujours lancée (l'hôte est juste revenu au menu des jeux) : on suit vers le
+      // hub plutôt que de renvoyer l'invité sur le lobby d'attente (clignotement + reset prêt).
+      if (isLobbyEveningStarted()) {
+        routeToSessionScreen("game-select", { force: true });
+      } else {
+        const { goToLobby } = await import("./lobby.js");
+        goToLobby();
+      }
     } else if (isOnPostGameScreen(current)) {
       routeToSessionScreen("game-select", { force: true });
     }
@@ -3812,8 +3818,11 @@ export async function endGameSession() {
   cachedRow = null;
   lastSessionSig = "";
   lastSessionUpdatedAt = "";
-  const { setLobbyWaiting } = await import("./lobby.js");
-  await setLobbyWaiting();
+  // Retour au menu des jeux : la soirée continue (statut "playing"), donc on NE repasse PAS
+  // le lobby en "waiting" (ce qui réinitialiserait les "prêt" et renverrait les invités sur
+  // l'écran d'attente). On garde l'évènement actif via setLobbyBetweenGames.
+  const { setLobbyBetweenGames } = await import("./lobby.js");
+  await setLobbyBetweenGames();
   notify(null);
 }
 
