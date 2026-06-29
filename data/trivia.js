@@ -485,7 +485,7 @@ export const TRIVIA_QUESTIONS = [
   {
     id: "music-029",
     theme: "music",
-    question: "Quel festival est connu pour accueillir de nombreux artistes EDM en Europe ?",
+    question: "Quel festival est connu pour accueillir de nombreux artistes électro en Europe ?",
     answers: ["Tomorrowland","Sunburn","Electric Daisy Carnival","Creamfields"],
     correct: 0,
     difficulty: "easy",

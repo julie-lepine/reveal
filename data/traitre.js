@@ -73,6 +73,50 @@ export const TRAITRE_WORD_PAIRS = [
     { id: "culture_4", a: "Croissant", b: "Pain au chocolat", theme: "viennoiseries" },
     { id: "culture_5", a: "Pokémon", b: "Palworld", theme: "créatures de collection" },
   { id: "culture_6", a: "Air Fryer", b: "Thermomix", theme: "électroménager tendance" },
+  { id: "culture_7", a: "Lego", b: "Playmobil", theme: "jouets de construction" },
+
+  { id: "social_6", a: "Threads", b: "Bluesky", theme: "réseaux sociaux" },
+  { id: "social_7", a: "YouTube", b: "Twitch", theme: "plateformes vidéo" },
+
+  { id: "gaming_101", a: "FIFA", b: "Pro Evolution Soccer", theme: "jeux de foot" },
+  { id: "gaming_11", a: "GTA", b: "Cyberpunk", theme: "mondes ouverts" },
+
+  { id: "stream_9", a: "Breaking Bad", b: "Narcos", theme: "séries" },
+  { id: "stream_10", a: "Game of Thrones", b: "House of the Dragon", theme: "fantasy" },
+
+  { id: "music_9", a: "Drake", b: "Kendrick Lamar", theme: "rap US" },
+  { id: "music_10", a: "Aya Nakamura", b: "Théodora", theme: "pop française" },
+
+  { id: "tech_8", a: "Windows", b: "macOS", theme: "systèmes d'exploitation" },
+  { id: "tech_9", a: "Android", b: "iOS", theme: "OS mobile" },
+
+  { id: "food_9", a: "Pizza", b: "Calzone", theme: "cuisine italienne" },
+  { id: "food_10", a: "Coca", b: "Pepsi", theme: "sodas" },
+  { id: "food_11", a: "Thé", b: "Café", theme: "boissons chaudes" },
+
+  { id: "lifestyle_9", a: "Métro", b: "Tram", theme: "transports en commun" },
+  { id: "lifestyle_10", a: "Vélo", b: "Trottinette", theme: "mobilité urbaine" },
+
+  { id: "sport_1", a: "Football", b: "Rugby", theme: "sport collectif" },
+  { id: "sport_2", a: "Tennis", b: "Padel", theme: "sport de raquette" },
+  { id: "sport_3", a: "Messi", b: "Ronaldo", theme: "stars du foot" },
+  { id: "sport_5", a: "Natation", b: "Plongée", theme: "sport aquatique" },
+
+  { id: "animals_1", a: "Chat", b: "Chien", theme: "animaux de compagnie" },
+  { id: "animals_2", a: "Lion", b: "Tigre", theme: "félins" },
+  { id: "animals_3", a: "Dauphin", b: "Requin", theme: "animaux marins" },
+  { id: "animals_4", a: "Perroquet", b: "Canari", theme: "oiseaux" },
+
+  { id: "travel_1", a: "Paris", b: "Londres", theme: "capitales européennes" },
+  { id: "travel_2", a: "Plage", b: "Montagne", theme: "vacances" },
+  { id: "travel_3", a: "Avion", b: "Train", theme: "transport longue distance" },
+  { id: "travel_4", a: "Italie", b: "Espagne", theme: "destinations européennes" },
+
+  { id: "school_1", a: "Maths", b: "Physique", theme: "matières scolaires" },
+  { id: "school_2", a: "Prof", b: "Surveillant", theme: "personnel scolaire" },
+
+  { id: "season_1", a: "Été", b: "Hiver", theme: "saisons" },
+  { id: "season_2", a: "Noël", b: "Nouvel An", theme: "fêtes de fin d'année" },
 ];
 
 export function getTraitrePairById(id) {

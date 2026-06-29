@@ -152,19 +152,23 @@ function gameTileMarkup(g) {
   const visual = gameTileVisualHtml(g);
   const badge = escapeHtml(g.badgeLabel || "Bientôt");
 
+  const rulesKey = RULES_KEY_BY_NAV[g.id];
+
   if (!g.enabled) {
     return `
-      <div class="game-tile game-tile--disabled ${escapeHtml(g.cssClass)}" aria-disabled="true">
-        ${visual}
-        <div class="game-tile__text">
-          <span class="game-tile__title">${escapeHtml(g.title)}</span>
-          <span class="game-tile__desc">${escapeHtml(g.desc)}</span>
-          <span class="badge badge--soon">${badge}</span>
+      <div class="game-tile-cell">
+        <div class="game-tile game-tile--disabled ${escapeHtml(g.cssClass)}" aria-disabled="true">
+          ${visual}
+          <div class="game-tile__text">
+            <span class="game-tile__title">${escapeHtml(g.title)}</span>
+            <span class="game-tile__desc">${escapeHtml(g.desc)}</span>
+            <span class="badge badge--soon">${badge}</span>
+          </div>
         </div>
+        ${rulesKey ? rulesIconButtonHtml(rulesKey) : ""}
       </div>`;
   }
 
-  const rulesKey = RULES_KEY_BY_NAV[g.id];
   return `
     <div class="game-tile-cell">
       <button type="button" class="game-tile ${escapeHtml(g.cssClass)}" data-nav="${escapeHtml(g.id)}">

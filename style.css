@@ -4413,44 +4413,6 @@ body{
   font-size:18px;
 }
 
-.dilemma__reactions{
-  display:flex;
-  flex-wrap:wrap;
-  gap:10px;
-  justify-content:center;
-  margin:16px 0 8px;
-}
-
-.dilemma__reaction{
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  width:56px;
-  height:56px;
-  padding:0;
-  border-radius:16px;
-  border:2px solid rgba(255,255,255,.14);
-  background:rgba(255,255,255,.05);
-  color:#fff;
-  cursor:pointer;
-  transition:border-color .15s,background .15s,transform .1s;
-}
-
-.dilemma__reaction:active{
-  transform:scale(.96);
-}
-
-.dilemma__reaction--active{
-  border-color:#FF3CAC;
-  background:rgba(255,60,172,.18);
-  box-shadow:0 0 16px rgba(255,60,172,.25);
-}
-
-.dilemma__reaction-emoji{
-  font-size:28px;
-  line-height:1;
-}
-
 .dilemma__result-row{
   margin-bottom:14px;
   padding:10px 12px;

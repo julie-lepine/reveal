@@ -1,4 +1,3 @@
-import { GUESS_LIE_ROUNDS } from "../../data/guessLies.js";
 import { getActivePlayerNames, getActivePlayers } from "./players.js";
 import { isValidGuessLieSubmission } from "./sessionMerge.js";
 import {
@@ -154,19 +153,6 @@ export async function handleGuessLieLaunch(btn) {
     tryEnterGuessLiePlayFromWait();
     syncGuessLieLobbyCompleteRemote();
   });
-}
-
-export function fallbackForPlayer(playerName) {
-  const preset = GUESS_LIE_ROUNDS.find((r) => r.player === playerName);
-  if (preset) return { statements: [...preset.statements], lie: preset.lie };
-  return {
-    statements: [
-      `${playerName} a déjà raté un devoir.`,
-      `${playerName} adore les sushis.`,
-      `${playerName} a un chat nommé Pixel.`,
-    ],
-    lie: 2,
-  };
 }
 
 /** Votes NPC pour une manche (index du mensonge) */

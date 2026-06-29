@@ -1,7 +1,4 @@
-import {
-  GUESS_LIE_DETECTIVE_POINTS,
-  GUESS_LIE_LIAR_POINTS,
-} from "../../data/guessLies.js";
+import { GUESS_LIE_LIAR_POINTS } from "../../data/guessLies.js";
 import {
   commitGuessLieVote,
   getGuessLieRounds,

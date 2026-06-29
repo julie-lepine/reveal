@@ -1668,10 +1668,6 @@ export function dilemmaToRemote(session) {
   Object.entries(session.votes || {}).forEach(([voter, choice]) => {
     remoteVotes[userIdForName(voter) || voter] = choice;
   });
-  const remoteReactions = {};
-  Object.entries(session.reactions || {}).forEach(([voter, reaction]) => {
-    remoteReactions[userIdForName(voter) || voter] = reaction;
-  });
   return {
     customDilemmas: session.customDilemmas || [],
     ready: mapReadyByUid(session.ready || {}),
@@ -1683,7 +1679,6 @@ export function dilemmaToRemote(session) {
     phase: session.phase || null,
     currentDilemma: session.currentDilemma || null,
     votes: remoteVotes,
-    reactions: remoteReactions,
     voteEndsAt: session.voteEndsAt || null,
     roundScored: Boolean(session.roundScored),
     blindMode: Boolean(session.blindMode),
@@ -1711,11 +1706,6 @@ export function dilemmaFromRemote(remote) {
     const voter = nameForUserId(voterUid) || voterUid;
     votes[voter] = choice;
   });
-  const reactions = {};
-  Object.entries(remote.reactions || {}).forEach(([voterUid, reaction]) => {
-    const voter = nameForUserId(voterUid) || voterUid;
-    reactions[voter] = reaction;
-  });
   return {
     customDilemmas: remote.customDilemmas || [],
     ready: mapReadyByName(remote.ready || {}),
@@ -1727,7 +1717,6 @@ export function dilemmaFromRemote(remote) {
     phase: remote.phase || null,
     currentDilemma: remote.currentDilemma || null,
     votes,
-    reactions,
     voteEndsAt: remote.voteEndsAt || null,
     roundScored: Boolean(remote.roundScored),
     blindMode: Boolean(remote.blindMode),

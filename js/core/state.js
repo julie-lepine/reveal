@@ -230,7 +230,6 @@ const defaultState = () => ({
     phase: null,
     currentDilemma: null,
     votes: {},
-    reactions: {},
     voteEndsAt: null,
     roundScored: false,
     blindMode: false,
