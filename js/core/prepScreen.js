@@ -1,5 +1,6 @@
 import { escapeHtml } from "./ui.js";
 import { getCurrentScreen } from "./router.js";
+import { isGameSyncActive, refreshGameSession } from "./gameSync.js";
 
 /** Carte « Joueurs prêts » (HTML initial). */
 export function playersReadySectionHtml(members, readyMap, { readyKey = (m) => m.name } = {}) {
@@ -25,6 +26,12 @@ export function updateReadyButton(btn, localReady) {
   if (!btn) return;
   btn.classList.toggle("btn-ready--active", Boolean(localReady));
   btn.textContent = localReady ? "Prêt ✓" : "Je suis prêt !";
+}
+
+/** Rafraîchit la session distante au montage d'un écran prep (état prêt / lancement). */
+export function syncPrepOnMount(refreshFromSync) {
+  if (!isGameSyncActive()) return;
+  void refreshGameSession().then(() => refreshFromSync?.());
 }
 
 /**

@@ -33,6 +33,10 @@ import { escapeHtml, pageShell } from "../core/ui.js";
 import { bindNav } from "../screens/nav.js";
 import { gameExitBarHtml, bindExitGame } from "../core/exitGame.js";
 import {
+  eveningRecapRestartButtonHtml,
+  bindRestartGameButtons,
+} from "../core/restartGame.js";
+import {
   isGameSyncActive,
   isLobbyHost,
   canActAsHost,
@@ -105,6 +109,7 @@ export function mountTraitre(app) {
     const resultPair = getTraitreResultPair(session);
     const resultVoteSurvivals = lastRound.voteSurvivals ?? voteSurvivals;
     const deltas = lastRound.deltas || {};
+    const breakdown = lastRound.breakdown || {};
     const fakeWon = resultWinner === "traitre";
     const impostorMeta = playerMeta(resultImpostor || "?");
 
@@ -113,13 +118,19 @@ export function mountTraitre(app) {
       .map(([name, pts]) => {
         const meta = playerMeta(name);
         const isFake = name === resultImpostor;
+        const detail = (breakdown[name] || [])
+          .map((b) => `${b.label} +${b.pts}`)
+          .join(" · ");
         return `
           <div class="traitre-delta-list__row ${pts > 0 ? "traitre-delta-list__row--scored" : ""} ${isFake ? "traitre-delta-list__row--fake" : ""}">
             <span class="traitre-delta-list__player">
               <span class="recap-card__avatar" style="background:${meta.color}">${meta.emoji}</span>
               <span class="traitre-delta-list__name">${escapeHtml(name)}${isFake ? '<span class="traitre-final__fake-tag">fake</span>' : ""}</span>
             </span>
-            <strong class="traitre-delta-list__pts ${pts > 0 ? "traitre-delta-list__pts--gain" : "traitre-delta-list__pts--zero"}">${pts > 0 ? `+${pts}` : "0"}</strong>
+            <span class="traitre-delta-list__score-col">
+              <strong class="traitre-delta-list__pts ${pts > 0 ? "traitre-delta-list__pts--gain" : "traitre-delta-list__pts--zero"}">${pts > 0 ? `+${pts}` : "0"}</strong>
+              ${detail ? `<span class="traitre-delta-list__detail hint">${escapeHtml(detail)}</span>` : ""}
+            </span>
           </div>`;
       })
       .join("");
@@ -143,8 +154,8 @@ export function mountTraitre(app) {
       : "";
 
     const pointsHint = fakeWon
-      ? `+${TRAITRE_POINTS.INTRUS_WIN} pts victoire${resultVoteSurvivals ? ` · +${resultVoteSurvivals * TRAITRE_POINTS.INTRUS_SURVIVE_VOTE} pts par vote survécu` : ""}`
-      : `+${TRAITRE_POINTS.CIVIL_CORRECT_VOTE} pts pour un vote correct sur le fake`;
+      ? `+${TRAITRE_POINTS.FAKE_WIN} victoire fake${resultVoteSurvivals ? ` · +${TRAITRE_POINTS.FAKE_SURVIVE_VOTE}/vote survécu` : ""}`
+      : `+${TRAITRE_POINTS.SURVIVOR} survivant · +${TRAITRE_POINTS.DETECTIVE_BONUS} détective · +${TRAITRE_POINTS.GOOD_INTUITION} bonne intuition · fake garde +${TRAITRE_POINTS.FAKE_SURVIVE_VOTE}/vote survécu`;
 
     return `
       <div class="card traitre-final ${fakeWon ? "traitre-final--fake-wins" : "traitre-final--fake-caught"}">
@@ -170,7 +181,10 @@ export function mountTraitre(app) {
           </div>
         </div>
       </div>
-      <button type="button" class="btn btn-primary btn--spaced" id="btn-traitre-exit">Retour au menu jeux</button>`;
+      <div class="btn-row btn-row--stack">
+        ${eveningRecapRestartButtonHtml({ gameId: "traitre", title: "Spot the fake" })}
+        <button type="button" class="btn btn-primary btn--spaced" id="btn-traitre-exit">Retour au menu jeux</button>
+      </div>`;
   }
 
   async function maybeAdvanceFromDeal() {
@@ -319,7 +333,7 @@ export function mountTraitre(app) {
       <div class="card card--highlight traitre-tie-speak-banner">
         <p class="card-heading">Égalité au vote</p>
         <p class="hint">Impossible de trancher : personne n'est éliminé.</p>
-        <p class="hint">Nouvelle manche d'indices avec les mêmes mots. Pense à un indice différent.</p>
+        <p class="hint">Nouveau tour d'indices avec les mêmes mots. Pense à un indice différent.</p>
       </div>`;
   }
 
@@ -329,7 +343,7 @@ export function mountTraitre(app) {
     return `
       ${tieSpeakBannerHtml(session)}
       <div class="card traitre-speak-collective">
-        <p class="card-heading">Tour des mots - manche ${round}</p>
+        <p class="card-heading">Tour des mots ${round}</p>
         <p class="hint traitre-speak-collective__lead">
           Chacun dit <strong>un indice à voix haute</strong>, dans l'ordre que vous voulez.
           Ne prononce pas ton mot secret.
@@ -347,7 +361,7 @@ export function mountTraitre(app) {
         </div>
         ${
           round > 1 && !isTraitreTieSpeakRound(session)
-            ? `<p class="hint">Rappel : indices <strong>différents</strong> des manches précédentes.</p>`
+            ? `<p class="hint">Rappel : indices <strong>différents</strong> des tours précédents.</p>`
             : ""
         }
       </div>`;
@@ -364,7 +378,7 @@ export function mountTraitre(app) {
             const active = myVote === p.name;
             return `
             <button type="button" class="traitre-vote-btn ${active ? "traitre-vote-btn--active" : ""}"
-              data-traitre-vote="${escapeHtml(p.name)}" ${myVote && !active ? "disabled" : ""}>
+              data-traitre-vote="${escapeHtml(p.name)}">
               <span class="recap-card__avatar" style="background:${p.color}">${p.emoji}</span>
               <span>${escapeHtml(p.name)}</span>
             </button>`;
@@ -377,7 +391,7 @@ export function mountTraitre(app) {
     const titles = {
       deal: "Révélation des mots",
       speak: "Tour des mots à l'oral",
-      decision: "Fin de manche 1",
+      decision: "Fin du tour 1",
       vote: "Vote d'élimination",
       final: "Résultat",
     };
@@ -446,8 +460,8 @@ export function mountTraitre(app) {
     } else if (phase === "decision") {
       phaseHtml = `
         <div class="card">
-          <p class="card-heading">Fin de la manche 1</p>
-          <p class="hint">Continuer une manche d'indices ou passer au vote d'élimination ?</p>
+          <p class="card-heading">Fin du tour 1</p>
+          <p class="hint">Continuer un tour d'indices ou passer au vote d'élimination ?</p>
         </div>
         ${decisionBtnsHtml(host)}`;
     } else if (phase === "vote") {
@@ -488,7 +502,7 @@ export function mountTraitre(app) {
 
     if (lastEliminated && phase === "speak" && speakRound > 1) {
       phaseHtml = `
-        <p class="hint traitre-elim-banner">${escapeHtml(lastEliminated)} a été éliminé - nouvelle manche d'indices.</p>
+        <p class="hint traitre-elim-banner">${escapeHtml(lastEliminated)} a été éliminé - nouveau tour d'indices.</p>
         ${phaseHtml}`;
     }
 
@@ -513,6 +527,7 @@ export function mountTraitre(app) {
 
     bindNav(app);
     bindExitGame(app);
+    if (phase === "final") bindRestartGameButtons(app);
 
     app.querySelector("#btn-deal-ack")?.addEventListener("click", async () => {
       await commitTraitreDealAck();

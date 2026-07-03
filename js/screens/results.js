@@ -10,6 +10,7 @@ import {
   resolveLastGameForRestart,
 } from "../core/restartGame.js";
 import { eveningGameLeaderboardsHtml } from "../core/gameScores.js";
+import { formatPlayerWithBadge } from "../core/badges.js";
 import {
   isGameSyncActive,
   onGameSessionChange,
@@ -67,7 +68,7 @@ export function mountResults(app) {
         <div class="evening-recap__chips">${chips || '<span class="hint">Lance un jeu !</span>'}</div>
         ${
           recap.top[0]
-            ? `<p class="evening-recap__meta">En tête : <strong>${escapeHtml(recap.top[0].name)}</strong> - ${recap.top[0].score} pts</p>`
+            ? `<p class="evening-recap__meta">En tête : <strong>${escapeHtml(formatPlayerWithBadge(recap.top[0].name))}</strong> — ${recap.top[0].score} pts</p>`
             : ""
         }
       </div>
@@ -85,19 +86,25 @@ export function mountResults(app) {
     bindRestartGameButtons(app);
   }
 
-  render();
-
   let unsubSession = () => {};
   let unsubLobby = () => {};
+
   if (isGameSyncActive()) {
-    void (async () => {
-      await refreshLobbyFromSupabase();
-      await refreshEveningScoresFromSession();
-      if (!isLobbyHost()) await routeToActiveGameIfNeeded();
-      // Si le suivi de l'hôte a navigué ailleurs, ne pas réécrire #app (sinon on
-      // écrase l'écran fraîchement monté et l'invité semble bloqué sur le récap).
-      if (getCurrentScreen() === "results") render();
-    })();
+    if (!isLobbyHost()) {
+      void (async () => {
+        await refreshLobbyFromSupabase();
+        await refreshEveningScoresFromSession();
+        await routeToActiveGameIfNeeded();
+        if (getCurrentScreen() === "results") render();
+      })();
+    } else {
+      render();
+      void (async () => {
+        await refreshLobbyFromSupabase();
+        await refreshEveningScoresFromSession();
+        if (getCurrentScreen() === "results") render();
+      })();
+    }
     unsubSession = onGameSessionChange((row) => {
       tryFollowHostGameSession(row);
       if (getCurrentScreen() === "results") render();
@@ -112,6 +119,8 @@ export function mountResults(app) {
       }
       if (getCurrentScreen() === "results") render();
     });
+  } else {
+    render();
   }
 
   return () => {

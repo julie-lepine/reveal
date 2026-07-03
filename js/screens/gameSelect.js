@@ -71,6 +71,9 @@ function eveningRecapHtml(recap) {
     recap.hotTakes > 0
       ? `<span class="evening-recap__chip">🔥 ${recap.hotTakes} hot take${recap.hotTakes > 1 ? "s" : ""}</span>`
       : "",
+    recap.guessLieGamesPlayed > 0
+      ? `<span class="evening-recap__chip">🕵️ ${recap.guessLieGamesPlayed} Guess the Lie${recap.guessLieGamesPlayed > 1 ? "s" : ""}</span>`
+      : "",
     recap.liesTotal > 0
       ? `<span class="evening-recap__chip">🕵️ ${recap.liesFound}/${recap.liesTotal} mensonges · ${recap.lieRate}</span>`
       : "",

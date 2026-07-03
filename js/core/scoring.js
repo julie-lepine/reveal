@@ -160,29 +160,33 @@ export function awardTruthMeterRound(votes, author, authorEstimate) {
     summary.deltas[author] = EVENING_POINTS.WIN;
   }
 
-  let closest = null;
+  let closest = [];
   let bestDist = Infinity;
   Object.entries(voterVotes).forEach(([name, v]) => {
     const d = Math.abs(v - groupAvg);
-    if (d < bestDist) {
+    if (d < bestDist - 1e-9) {
       bestDist = d;
-      closest = name;
+      closest = [name];
+    } else if (Math.abs(d - bestDist) < 1e-9) {
+      closest.push(name);
     }
   });
 
-  if (closest) {
+  if (closest.length) {
     const pts =
       bestDist <= TRUTH_METER_CLOSE_DISTANCE ? EVENING_POINTS.BONUS : EVENING_POINTS.WIN;
-    addScore(closest, pts);
-    summary.mindReader = closest;
+    closest.forEach((name) => {
+      addScore(name, pts);
+      summary.deltas[name] = (summary.deltas[name] || 0) + pts;
+      if (bestDist <= TRUTH_METER_CLOSE_DISTANCE) {
+        summary.closeVoters.push(name);
+      }
+      if (pts === EVENING_POINTS.BONUS) {
+        bumpPlayerStat(name, "truthMeterMindReaderWins", 1);
+      }
+    });
+    summary.mindReader = closest[0];
     summary.voterPoints = pts;
-    summary.deltas[closest] = (summary.deltas[closest] || 0) + pts;
-    if (bestDist <= TRUTH_METER_CLOSE_DISTANCE) {
-      summary.closeVoters.push(closest);
-    }
-    if (pts === EVENING_POINTS.BONUS) {
-      bumpPlayerStat(closest, "truthMeterMindReaderWins", 1);
-    }
   }
 
   return summary;

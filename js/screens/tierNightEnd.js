@@ -4,6 +4,7 @@ import {
   getTierNightSession,
   getTierNightRoundPointsSorted,
   getTierConsensus,
+  getTierNightScoreBreakdownForPlayer,
 } from "../core/tierNightSession.js";
 import { getTierListById } from "../core/tierLists.js";
 import { getTierNightTopicId } from "../core/state.js";
@@ -74,6 +75,47 @@ function consensusBoardHtml(consensus, labelFn = (i) => i) {
             </div>
           </div>`
         ).join("")}
+      </div>
+    </div>`;
+}
+
+function tierScoreBreakdownHtml(playerName, session, labelFn = (i) => i) {
+  const breakdown = getTierNightScoreBreakdownForPlayer(playerName, session);
+  if (!breakdown?.rows?.length) return "";
+
+  const rows = breakdown.rows
+    .map(
+      (row) => `
+        <div class="tier-score-breakdown__row">
+          <span class="tier-score-breakdown__item">${escapeHtml(labelFn(row.item))}</span>
+          <span class="tier-score-breakdown__tiers">toi ${row.localTier} · groupe ${row.consensusTier}</span>
+          <strong class="tier-score-breakdown__pts ${row.pts > 0 ? "tier-score-breakdown__pts--gain" : ""}">${row.pts > 0 ? `+${row.pts}` : "0"}</strong>
+        </div>`
+    )
+    .join("");
+
+  const outsiderLine =
+    breakdown.outsiderBonus > 0
+      ? `<div class="tier-score-breakdown__row tier-score-breakdown__row--bonus">
+          <span class="tier-score-breakdown__item">Bonus outsider</span>
+          <span class="tier-score-breakdown__tiers">item le plus clivant</span>
+          <strong class="tier-score-breakdown__pts tier-score-breakdown__pts--gain">+${breakdown.outsiderBonus}</strong>
+        </div>`
+      : "";
+
+  return `
+    <div class="card tier-score-breakdown">
+      <p class="card-heading">📋 Détail de tes points</p>
+      <p class="hint">Moyenne sur ${breakdown.itemCount} item(s) · ${
+        breakdown.reverse ? "mode à contre-courant" : "+15 même tier, +10 à 1 écart"
+      }</p>
+      <div class="tier-score-breakdown__list">
+        ${rows}
+        ${outsiderLine}
+        <div class="tier-score-breakdown__total">
+          <span>Total manche</span>
+          <strong>+${breakdown.total}</strong>
+        </div>
       </div>
     </div>`;
 }
@@ -202,6 +244,7 @@ export function mountTierNightEnd(app) {
         <p class="game-intro">« ${escapeHtml(session.listName || "Tier list")} » - +${session.localConsensusPoints ?? 0} pts consensus pour toi cette manche.</p>
         ${consensusBoardHtml(session.consensus, labelFn)}
         ${controversialHtml(session, recaps, labelFn)}
+        ${tierScoreBreakdownHtml(localName, session, labelFn)}
         ${tierNightRoundScoresHtml(roundSorted)}
         ${gameCumulativeScoresHtml({ gameId: "tiernight", gameLabel: "Tier Night", title: "Cumul des scores" })}
         <div class="recap-list">

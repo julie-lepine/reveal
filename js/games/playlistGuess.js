@@ -283,16 +283,14 @@ export function mountPlaylistGuess(app) {
 
     if (phase === "voting") {
       const votesNow = getEffectivePlaylistGuessVotes(getPlaylistGuessSession());
-      const alreadyVoted = mp && votesNow[localUid] != null;
-      if (alreadyVoted) {
-        body = `
-          ${songGuessCardHtml(round, { players, selectedPlayerId: selected, readonly: true })}
-          <button type="button" class="btn btn-secondary btn--spaced" disabled aria-live="polite">Attendre des autres joueurs</button>`;
-      } else {
-        body = `
-          ${songGuessCardHtml(round, { players, selectedPlayerId: selected })}
-          <button type="button" class="btn btn-primary" id="confirm" ${selected === null ? "disabled" : ""}>Valider mon vote</button>`;
-      }
+      const committedVote = votesNow[localUid];
+      const displayPick = selected !== null ? selected : committedVote ?? null;
+      const hasCommitted = mp && committedVote != null;
+      body = `
+          ${songGuessCardHtml(round, { players, selectedPlayerId: displayPick })}
+          <p class="hint">${hasCommitted && selected === null ? "Vote enregistré — tu peux encore modifier avant la révélation." : "Choisis le propriétaire de la playlist."}</p>
+          <button type="button" class="btn btn-primary" id="confirm" ${displayPick == null ? "disabled" : ""}>${hasCommitted && selected === null ? "Modifier mon vote" : "Valider mon vote"}</button>
+          <div class="screen-bottom-spacer" aria-hidden="true"></div>`;
       if (!mp || canActAsHost()) {
         const votedCount = Object.keys(votesNow).length;
         body += `
@@ -432,8 +430,6 @@ export function mountPlaylistGuess(app) {
         const votedCount = Object.keys(votesNow).length;
         forceBtn.textContent = `Révéler maintenant (${votedCount} vote${votedCount > 1 ? "s" : ""})`;
       }
-      const alreadyVoted = mp && votesNow[localUid] != null;
-      if (alreadyVoted) return;
     }
 
     if (phase === "reveal") {

@@ -92,7 +92,7 @@ export async function markTierNightLiveLobbyStarted({ topicId, listName, items }
 export async function commitTierNightLiveVote(tier) {
   const localName = getLocalDisplayName();
   const session = getTierNightLiveSession();
-  if (session.votes?.[localName]) return session.votes[localName];
+  if (session.phase !== "voting") return session.votes?.[localName] ?? null;
   const votes = { ...(session.votes || {}), [localName]: tier };
   saveStatePatch({ tierNightLiveGame: { ...session, votes } });
   if (!isGameSyncActive()) return tier;

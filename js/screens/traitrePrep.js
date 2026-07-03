@@ -12,7 +12,7 @@ import { getLobbyParticipants } from "../core/lobby.js";
 import { getLocalDisplayName } from "../core/state.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
 import { rulesButtonHtml } from "../core/gameRulesUi.js";
-import { isLobbyHost, onGameSessionChange } from "../core/gameSync.js";
+import { isLobbyHost, onGameSessionChange, isGameSyncActive } from "../core/gameSync.js";
 import { prepGuestFollowOnSession } from "../core/mpLaunch.js";
 import { executePrepLaunch } from "../core/prepLaunch.js";
 import { prepLaunchSlotParams } from "../core/prepLaunch.js";
@@ -24,6 +24,7 @@ import {
   updateReadyButton,
   updatePrepStartSlot,
   bindPrepLaunchButtons,
+  syncPrepOnMount,
 } from "../core/prepScreen.js";
 import { navigate } from "../core/router.js";
 import { pageShell } from "../core/ui.js";
@@ -172,18 +173,21 @@ export function mountTraitrePrep(app) {
     return null;
   }
 
+  const guestFollow = prepGuestFollowOnSession({
+    prepScreen: "traitre-prep",
+    getEntryScreen: getTraitreEntryScreen,
+    buildNavStack: (screen) => ["home", "lobby", "game-select", "traitre-prep", screen],
+  });
+
   const unsub = onGameSessionChange(() => {
-    prepGuestFollowOnSession({
-      prepScreen: "traitre-prep",
-      getEntryScreen: getTraitreEntryScreen,
-      buildNavStack: (screen) => ["home", "lobby", "game-select", "traitre-prep", screen],
-    });
+    if (guestFollow()) return;
     if (getTraitreEntryScreen() === "traitre-prep") {
       refreshReadySection();
     }
   });
 
   render();
+  syncPrepOnMount(refreshReadySection);
 
   return () => {
     prepLobby.dispose();

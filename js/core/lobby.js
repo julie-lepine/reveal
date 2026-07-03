@@ -60,6 +60,7 @@ import {
   // getFilRougeResumeScreen,
   routeToSessionScreen,
   isAppContentMounted,
+  refreshEveningScoresFromSession,
 } from "./gameSync.js";
 import { isGuessLieGameActive, tryEnterGuessLiePlayFromWait } from "./guessLieSession.js";
 
@@ -482,6 +483,7 @@ export async function routeToEveningHub({ rejoinActiveGame = true } = {}) {
   if (isGameSyncActive()) {
     startMultiplayerSync();
     const row = await refreshGameSession();
+    await refreshEveningScoresFromSession();
     if (rejoinActiveGame && resumeLocalGuessLiePlay()) {
       return true;
     }

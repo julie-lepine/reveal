@@ -1,9 +1,11 @@
 import { TIER_LEVELS, getTierNightModifierById } from "../../data/tierTopics.js";
+import { EVENING_POINTS } from "../../data/eveningScoring.js";
 import {
-  tierNightPointsForRankDiff,
-  tierNightReversePointsForRankDiff,
-  EVENING_POINTS,
-} from "../../data/eveningScoring.js";
+  buildTierNightScoreBreakdown,
+  tierNightPointsForItem,
+} from "./tierNightScoring.js";
+
+export { buildTierNightScoreBreakdown, tierNightPointsForItem, tierNightPointsHintText } from "./tierNightScoring.js";
 import { getActivePlayers } from "./players.js";
 import {
   getLocalDisplayName,
@@ -65,19 +67,18 @@ export function computeConsensusPlaced(recaps, items) {
 }
 
 export function scoreConsensusProximity(localPlaced, consensus, { reverse = false } = {}) {
-  const items = Object.values(localPlaced).flat();
-  if (!items.length) return 0;
-  const pointsFn = reverse
-    ? tierNightReversePointsForRankDiff
-    : tierNightPointsForRankDiff;
-  let total = 0;
-  items.forEach((item) => {
-    const localTier = tierOfItem(localPlaced, item);
-    const consTier = tierOfItem(consensus, item);
-    const diff = Math.abs(rankValue(localTier) - rankValue(consTier));
-    total += pointsFn(diff);
+  return buildTierNightScoreBreakdown(localPlaced, consensus, { reverse }).proximityTotal;
+}
+
+/** Détail des points pour un joueur (écran récap). */
+export function getTierNightScoreBreakdownForPlayer(playerName, session = getTierNightSession()) {
+  const recap = (session.recaps || []).find((r) => r.player === playerName);
+  if (!recap || !session.consensus) return null;
+  const modifier = getTierNightModifierById(getTierNightModifier());
+  return buildTierNightScoreBreakdown(recap.placed, session.consensus, {
+    reverse: Boolean(modifier?.reverseScore),
+    outsiderBonus: recap.outsiderBonus ?? 0,
   });
-  return Math.round(total / items.length);
 }
 
 /** Item avec le plus de désaccord entre joueurs */
@@ -143,7 +144,7 @@ function applyTierNightRoundScores(recaps) {
   const toScore = mp ? recaps : recaps.filter((r) => r.player === getLocalDisplayName());
 
   toScore.forEach((r) => {
-    const pts = r.consensusPoints ?? 0;
+    const pts = Math.max(0, r.consensusPoints ?? 0);
     addScore(r.player, pts);
     bumpPlayerStat(r.player, "tierConsensusPoints", pts);
     bumpPlayerStat(r.player, "tierNightsPlayed", 1);

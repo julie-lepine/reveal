@@ -1,9 +1,12 @@
 import {
   TRAITRE_MIN_PLAYERS,
-  TRAITRE_POINTS,
   pickRandomTraitrePair,
   getTraitrePairById,
 } from "../../data/traitre.js";
+import {
+  buildTraitreEliminationPatch,
+  computeTraitreScoreDeltas,
+} from "./traitreScoring.js";
 import { getActivePlayerNames, getActivePlayers } from "./players.js";
 import {
   addScore,
@@ -48,6 +51,7 @@ function defaultSession() {
     dealAcks: {},
     lastVoteSnapshot: null,
     lastEliminated: null,
+    intuitionAwards: {},
     impostorRevealed: false,
     winner: null,
     scoresApplied: false,
@@ -341,54 +345,14 @@ export function countTraitreVotes(votes = {}, alive = []) {
   };
 }
 
-export function buildTraitreEliminationPatch(session, eliminatedName) {
-  const impostor = session.impostorName;
-  const newEliminated = [...(session.eliminated || []), eliminatedName];
-  const newAlive = (session.alive || []).filter((n) => n !== eliminatedName);
-  const base = {
-    eliminated: newEliminated,
-    alive: newAlive,
-    lastEliminated: eliminatedName,
-    votes: {},
-    revotePending: false,
-    revoteCount: 0,
-    tieAfterVote: false,
-  };
-
-  if (eliminatedName === impostor) {
-    return {
-      ...base,
-      phase: "final",
-      impostorRevealed: true,
-      winner: "civilians",
-      lastVoteSnapshot: normalizeTraitreVotes(session.votes || {}, session.alive || []),
-    };
-  }
-
-  if (newAlive.length <= 2 && newAlive.includes(impostor)) {
-    return {
-      ...base,
-      phase: "final",
-      impostorRevealed: true,
-      winner: "traitre",
-    };
-  }
-
-  return {
-    ...base,
-    phase: "speak",
-    speakRound: (session.speakRound || 1) + 1,
-    speakerIndex: 0,
-    voteSurvivals: (session.voteSurvivals || 0) + 1,
-  };
-}
+export { buildTraitreEliminationPatch, computeTraitreScoreDeltas } from "./traitreScoring.js";
 
 /** Manche d'indices après égalité au vote (bandeau visible pour tout le lobby). */
 export function isTraitreTieSpeakRound(session = getTraitreSession()) {
   return session.phase === "speak" && Boolean(session.tieAfterVote);
 }
 
-/** Égalité au vote : nouvelle manche d'indices (mêmes mots, mêmes rôles). */
+/** Égalité au vote : nouveau tour d'indices (mêmes mots, mêmes rôles). */
 export function buildTraitreTieSpeakPatch(session) {
   return {
     phase: "speak",
@@ -404,42 +368,28 @@ export function buildTraitreTieSpeakPatch(session) {
 export function awardTraitreGame(session = getTraitreSession()) {
   if (session.scoresApplied) return session;
 
+  const scored = computeTraitreScoreDeltas(session);
+  const { deltas, breakdown } = scored;
   const impostor = session.impostorName;
-  const deltas = {};
-  const summary = {
-    winner: session.winner,
-    impostorName: impostor,
-    voteSurvivals: session.voteSurvivals || 0,
-    pairId: session.pairId,
-    deltas: {},
-  };
 
-  if (session.winner === "traitre" && impostor) {
-    const pts =
-      TRAITRE_POINTS.INTRUS_WIN +
-      (session.voteSurvivals || 0) * TRAITRE_POINTS.INTRUS_SURVIVE_VOTE;
-    deltas[impostor] = pts;
-    addScore(impostor, pts);
-    bumpPlayerStat(impostor, "traitreWins", 1);
-  } else if (session.winner === "civilians" && impostor) {
-    deltas[impostor] = 0;
-    const voters = [
-      ...(session.alive || []),
-      ...(session.eliminated || []),
-      session.lastEliminated,
-    ].filter(Boolean);
-    const snapshot = normalizeTraitreVotes(session.lastVoteSnapshot || {}, [
-      ...new Set(voters),
-    ]);
-    Object.entries(snapshot).forEach(([name, target]) => {
-      if (name === impostor || target !== impostor) return;
-      deltas[name] = TRAITRE_POINTS.CIVIL_CORRECT_VOTE;
-      addScore(name, TRAITRE_POINTS.CIVIL_CORRECT_VOTE);
+  Object.entries(deltas).forEach(([name, pts]) => {
+    if (pts <= 0) return;
+    addScore(name, pts);
+    if (name !== impostor && breakdown[name]?.some((b) => b.label === "Détective")) {
       bumpPlayerStat(name, "traitreDetections", 1);
-    });
+    }
+  });
+
+  if (session.winner === "traitre" && impostor && (deltas[impostor] || 0) > 0) {
+    bumpPlayerStat(impostor, "traitreWins", 1);
   }
 
-  summary.deltas = deltas;
+  const summary = {
+    ...scored,
+    deltas,
+    breakdown,
+  };
+
   const updated = {
     ...session,
     scoresApplied: true,

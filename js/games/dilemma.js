@@ -38,6 +38,7 @@ import {
   completeGameSession,
   dilemmaToRemote,
   getCachedGameSession,
+  refreshGameSession,
 } from "../core/gameSync.js";
 
 const DILEMMA_VS_SRC = "js/games/dilemma-vs.svg";
@@ -441,7 +442,7 @@ export function mountDilemma(app) {
   }
 
   function canChangeVote() {
-    return phase === "voting" && !isEveningGameplayPaused() && myVote == null;
+    return phase === "voting" && !isEveningGameplayPaused();
   }
 
   function render() {
@@ -512,9 +513,12 @@ export function mountDilemma(app) {
     }
   }
 
-  function shouldSkipFullRender(prevPhase, prevRound) {
+  function shouldSkipFullRender(prevPhase, prevRound, prevVotesJson) {
     if (phase !== prevPhase || roundIdx !== prevRound) return false;
-    return phase === "voting";
+    if (phase !== "voting") return false;
+    const votesNow = JSON.stringify(getDilemmaSession().votes || {});
+    if (votesNow !== prevVotesJson) return false;
+    return true;
   }
 
   function patchVotingChrome() {
@@ -535,6 +539,7 @@ export function mountDilemma(app) {
 
     const prevPhase = phase;
     const prevRound = roundIdx;
+    const prevVotesJson = JSON.stringify(getDilemmaSession().votes || {});
     syncFromSession();
     if (!currentDilemma && ROUNDS[roundIdx]) currentDilemma = ROUNDS[roundIdx];
 
@@ -562,7 +567,7 @@ export function mountDilemma(app) {
       });
       return;
     }
-    if (shouldSkipFullRender(prevPhase, prevRound)) {
+    if (shouldSkipFullRender(prevPhase, prevRound, prevVotesJson)) {
       patchVotingChrome();
       return;
     }

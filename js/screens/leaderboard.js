@@ -33,6 +33,7 @@ export function mountLeaderboard(app) {
               <div class="podium__col ${isFirst ? "podium__col--first" : ""}">
                 <div class="avatar avatar--md" style="background:${p.color}">${p.emoji}</div>
                 <span class="podium__name">${escapeHtml(p.name)}</span>
+                ${p.badge ? `<span class="podium__badge hint">${escapeHtml(p.badge)}</span>` : ""}
                 <div class="podium__bar" style="height:${heights[i]}px">
                   <span class="podium__rank">${labels[i]}</span>
                   <span class="podium__score">${scores[p.name] || 0}</span>
@@ -69,21 +70,26 @@ export function mountLeaderboard(app) {
     bindNav(app);
   }
 
-  renderBoard();
-
   let unsubSession = () => {};
   if (isGameSyncActive()) {
-    void (async () => {
-      await refreshEveningScoresFromSession();
-      if (!isLobbyHost()) await routeToActiveGameIfNeeded();
-      // Si le suivi de l'hôte a navigué ailleurs (prépa / jeu), ne pas réécrire #app :
-      // renderBoard() écraserait l'écran fraîchement monté.
-      if (getCurrentScreen() === "leaderboard") renderBoard();
-    })();
+    if (!isLobbyHost()) {
+      void (async () => {
+        await refreshEveningScoresFromSession();
+        await routeToActiveGameIfNeeded();
+        if (getCurrentScreen() === "leaderboard") renderBoard();
+      })();
+    } else {
+      renderBoard();
+      void refreshEveningScoresFromSession().then(() => {
+        if (getCurrentScreen() === "leaderboard") renderBoard();
+      });
+    }
     unsubSession = onGameSessionChange((row) => {
       tryFollowHostGameSession(row);
       if (getCurrentScreen() === "leaderboard") renderBoard();
     });
+  } else {
+    renderBoard();
   }
 
   return () => {

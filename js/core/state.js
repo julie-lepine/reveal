@@ -178,6 +178,7 @@ const defaultState = () => ({
     dealAcks: {},
     lastVoteSnapshot: null,
     lastEliminated: null,
+    intuitionAwards: {},
     impostorRevealed: false,
     winner: null,
     scoresApplied: false,

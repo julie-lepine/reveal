@@ -243,9 +243,6 @@ export async function commitTruthMeterAffirmation(text, authorEstimate) {
 export async function commitTruthMeterVote(choice) {
   const localName = getLocalDisplayName();
   const session = getTruthMeterSession();
-  if (session.votes?.[localName] != null && Number.isFinite(session.votes[localName])) {
-    return session.votes[localName];
-  }
   const votes = { ...(session.votes || {}), [localName]: choice };
   saveStatePatch({ truthMeterGame: { ...session, votes } });
   if (!isGameSyncActive()) return choice;

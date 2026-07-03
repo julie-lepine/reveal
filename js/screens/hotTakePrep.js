@@ -40,6 +40,7 @@ import {
   updateReadyButton,
   updatePrepStartSlot,
   bindPrepLaunchButtons,
+  syncPrepOnMount,
 } from "../core/prepScreen.js";
 import { bindNav } from "./nav.js";
 
@@ -358,6 +359,7 @@ export function mountHotTakePrep(app) {
   });
 
   render();
+  syncPrepOnMount(refreshFromSync);
 
   const guestFollow = prepGuestFollowOnSession({
     prepScreen: "hottake-prep",

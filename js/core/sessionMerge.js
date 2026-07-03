@@ -50,7 +50,11 @@ export function mergeReadyMapsLocal(
       }
       return;
     }
-    if (localReady[name] || remoteReady[name]) merged[name] = true;
+    if (remoteReady[name] !== undefined) {
+      merged[name] = Boolean(remoteReady[name]);
+    } else {
+      merged[name] = Boolean(localReady[name]);
+    }
   });
   return merged;
 }
@@ -264,6 +268,16 @@ export function mergeTruthMeterPhase(curPhase, incPhase, { newRound = false } = 
   return mergeRankedPhase(curPhase, incPhase, TRUTH_METER_PHASE_RANK);
 }
 
+/** Nouvelle partie Consensus (relance après fin ou retour prep). */
+export function isNewConsensusGame(cur, inc) {
+  if (!inc) return false;
+  if (inc.lobbyStarted === false && (inc.phase == null || inc.phase === undefined)) {
+    if (cur?.phase === "final") return true;
+    if (cur?.lobbyStarted) return true;
+  }
+  return false;
+}
+
 /** Nouvelle manche Consensus : index avancé ou réponses distantes vidées après une manche précédente. */
 export function isNewConsensusQuestionRound(cur, inc) {
   if (!inc) return false;
@@ -293,12 +307,15 @@ const CONSENSUS_PHASE_RANK = {
   final: 3,
 };
 
-export function mergeConsensusPhase(curPhase, incPhase, { newQuestionRound = false } = {}) {
-  if (newQuestionRound) return incPhase ?? curPhase ?? null;
+export function mergeConsensusPhase(curPhase, incPhase, { newQuestionRound = false, newGame = false } = {}) {
+  if (newGame || newQuestionRound) return incPhase ?? null;
   const curRank = CONSENSUS_PHASE_RANK[curPhase] ?? -1;
   const incRank = CONSENSUS_PHASE_RANK[incPhase] ?? -1;
   if (curRank < 0) return incPhase ?? curPhase ?? null;
-  if (incRank < 0) return curPhase ?? null;
+  if (incRank < 0) {
+    if (curPhase === "final" && incPhase == null) return null;
+    return curPhase ?? null;
+  }
   return incRank >= curRank ? incPhase : curPhase;
 }
 

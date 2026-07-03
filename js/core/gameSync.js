@@ -58,6 +58,7 @@ import {
   mergeTriviaAnswersUid,
   normalizeTriviaAnswersMap,
   isNewConsensusQuestionRound,
+  isNewConsensusGame,
   mergeCustomGameDeck,
   normalizePlayerKeyedMap,
   normalizeKeyedVotes,
@@ -1182,6 +1183,16 @@ function mergeRemoteConsensusAnswersUid(cur, inc) {
 function mergeConsensusGameLocal(local, remote) {
   if (!remote) return local;
   if (!local) return remote;
+  const newGame = isNewConsensusGame(local, remote);
+  if (newGame) {
+    const ready = mergeReadyMapsLocal(
+      {},
+      remote.ready || {},
+      getActivePlayerNames(),
+      getLocalDisplayName()
+    );
+    return { ...remote, ready };
+  }
   const newQuestionRound = isNewConsensusQuestionRound(local, remote);
   const remoteAnswers = remote.answers || {};
   const localAnswers = local.answers || {};
@@ -1207,7 +1218,7 @@ function mergeConsensusGameLocal(local, remote) {
     ...local,
     ...remote,
     ready,
-    phase: mergeConsensusPhase(local.phase, remote.phase, { newQuestionRound }),
+    phase: mergeConsensusPhase(local.phase, remote.phase, { newQuestionRound, newGame }),
     answers,
     matchScores: scoresFromRemote({
       ...scoresToRemote(local.matchScores || {}),
@@ -2073,6 +2084,7 @@ export function traitreToRemote(session) {
         )
       : null,
     lastEliminated: session.lastEliminated || null,
+    intuitionAwards: { ...(session.intuitionAwards || {}) },
     impostorRevealed: revealed,
     winner: session.winner || null,
     scoresApplied: Boolean(session.scoresApplied),
@@ -2133,6 +2145,7 @@ export function traitreFromRemote(remote) {
       ? normalizeTraitreVotesMap(lastVoteSnapshot, alive)
       : null,
     lastEliminated: remote.lastEliminated || null,
+    intuitionAwards: { ...(remote.intuitionAwards || {}) },
     impostorRevealed: Boolean(remote.impostorRevealed),
     winner: remote.winner || null,
     scoresApplied: Boolean(remote.scoresApplied),
@@ -2637,6 +2650,10 @@ export function applyRemoteSession(row) {
   const prevWaRoundIdx = getState().wrongAnswerGame?.roundIdx ?? null;
   const prevWaAnswers = JSON.stringify(getState().wrongAnswerGame?.answers || {});
   const prevWaVotes = JSON.stringify(getState().wrongAnswerGame?.votes || {});
+  const prevDmVotes = JSON.stringify(getState().dilemmaGame?.votes || {});
+  const prevHtVotes = JSON.stringify(getState().hotTakeGame?.votes || {});
+  const prevSvVotes = JSON.stringify(getState().speedVoteGame?.votes || {});
+  const prevTmVotes = JSON.stringify(getState().truthMeterGame?.votes || {});
   const st = { ...(row.state || {}) };
   if (!FIL_ROUGE_ENABLED) {
     delete st.filRouge;
@@ -2752,7 +2769,26 @@ export function applyRemoteSession(row) {
   const dilemmaPlayChanged =
     patch.dilemmaGame &&
     ((patch.dilemmaGame.phase ?? null) !== prevDmPhase ||
-      (patch.dilemmaGame.roundIdx ?? null) !== prevDmRoundIdx);
+      (patch.dilemmaGame.roundIdx ?? null) !== prevDmRoundIdx ||
+      JSON.stringify(patch.dilemmaGame.votes || {}) !== prevDmVotes);
+
+  const hotTakePlayChanged =
+    patch.hotTakeGame &&
+    ((patch.hotTakeGame.phase ?? null) !== (getState().hotTakeGame?.phase ?? null) ||
+      (patch.hotTakeGame.takeIdx ?? null) !== (getState().hotTakeGame?.takeIdx ?? null) ||
+      JSON.stringify(patch.hotTakeGame.votes || {}) !== prevHtVotes);
+
+  const speedVotePlayChanged =
+    patch.speedVoteGame &&
+    ((patch.speedVoteGame.phase ?? null) !== (getState().speedVoteGame?.phase ?? null) ||
+      (patch.speedVoteGame.roundIdx ?? null) !== (getState().speedVoteGame?.roundIdx ?? null) ||
+      JSON.stringify(patch.speedVoteGame.votes || {}) !== prevSvVotes);
+
+  const truthMeterPlayChanged =
+    patch.truthMeterGame &&
+    ((patch.truthMeterGame.phase ?? null) !== (getState().truthMeterGame?.phase ?? null) ||
+      (patch.truthMeterGame.roundIdx ?? null) !== (getState().truthMeterGame?.roundIdx ?? null) ||
+      JSON.stringify(patch.truthMeterGame.votes || {}) !== prevTmVotes);
 
   const wrongAnswerPlayChanged =
     patch.wrongAnswerGame &&
@@ -2762,7 +2798,13 @@ export function applyRemoteSession(row) {
       JSON.stringify(patch.wrongAnswerGame.votes || {}) !== prevWaVotes);
 
   const playChanged = Boolean(
-    pgPhaseChanged || guessLiePlayChanged || dilemmaPlayChanged || wrongAnswerPlayChanged
+    pgPhaseChanged ||
+      guessLiePlayChanged ||
+      dilemmaPlayChanged ||
+      hotTakePlayChanged ||
+      speedVotePlayChanged ||
+      truthMeterPlayChanged ||
+      wrongAnswerPlayChanged
   );
 
   // Signature distante inchangée (souvent un simple touch `updated_at` sans modif de
@@ -2930,7 +2972,6 @@ function resolveActivePlayScreen(st, gid, declared) {
   if (st.clutch?.lobbyStarted) return "clutch";
   if (st.wrongAnswer?.lobbyStarted) return "wronganswer";
   if (st.traitre?.lobbyStarted) {
-    if (declared === "traitre-prep") return null;
     if (declared === "game-select" && !isLobbyEveningStarted()) return "game-select";
     return "traitre";
   }
@@ -4056,9 +4097,13 @@ export function getActiveMemberUserIds() {
 }
 
 export function allMembersReady(readyMapByUid) {
-  const ids = getActiveMemberUserIds();
-  if (!ids.length) return false;
-  return ids.every((id) => readyMapByUid[id]);
+  const participants = getState().lobby?.participants || [];
+  if (!participants.length) return false;
+  return participants.every((p) => {
+    if (p.userId && readyMapByUid[p.userId]) return true;
+    if (p.name && readyMapByUid[p.name]) return true;
+    return false;
+  });
 }
 
 export function getTierNightRemote() {

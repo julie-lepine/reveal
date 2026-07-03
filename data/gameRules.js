@@ -180,7 +180,7 @@ export const GAME_RULES = {
       "Variante « À contre-courant » : c'est l'inverse, plus tu t'éloignes du consensus, plus tu marques.",
     ],
     exemple:
-      "Tu mets « McDo » en tier A. Le consensus du groupe le place aussi en A → +15 pour cet élément.",
+      "Tu mets « McDo » en tier A. Le consensus du groupe le place aussi en A → +15 pour cet élément. En récap, tu vois le détail item par item.",
   },
 
   trivia: {
@@ -189,7 +189,8 @@ export const GAME_RULES = {
     but: "Quiz de culture générale : réponds juste, et vite.",
     etapes: [
       "Une question à choix multiple s'affiche.",
-      "Chacun choisit sa réponse.",
+      "Chacun choisit sa réponse (modifiable avant la révélation).",
+      "Plus tu réponds vite et juste, plus tu marques de points bonus.",
       "On révèle la bonne réponse.",
     ],
     points: [
@@ -206,21 +207,22 @@ export const GAME_RULES = {
     but: "Tous reçoivent un mot secret - sauf un, qui a un mot proche. À l'oral, donnez des indices sans prononcer votre mot. Trouvez le fake avant qu'il ne finisse dans le duo final.",
     etapes: [
       `${TRAITRE_MIN_PLAYERS} joueurs minimum. Tour de révélation : chacun lit son mot en privé sur son téléphone, puis valide.`,
-      "Manche 1 : chacun dit un indice à voix haute, dans l'ordre libre. L'hôte finalise le tour quand tout le monde a parlé.",
-      "Fin de manche 1 : l'hôte choisit « Continuer » (nouvelle manche d'indices) ou « Voter ».",
-      "À partir de la manche 2, un vote d'élimination est obligatoire après les indices.",
-      "Les indices d'une nouvelle manche doivent être différents des précédents.",
-      "Égalité au vote : nouvelle manche d'indices (mêmes mots) jusqu'à obtenir une majorité.",
+      "Tour 1 : chacun dit un indice à voix haute, dans l'ordre libre. L'hôte finalise le tour quand tout le monde a parlé.",
+      "Fin du tour 1 : l'hôte choisit « Continuer » (nouveau tour d'indices) ou « Voter ».",
+      "À partir du tour 2, un vote d'élimination est obligatoire après les indices.",
+      "Les indices d'un nouveau tour doivent être différents des précédents.",
+      "Égalité au vote : nouveau tour d'indices (mêmes mots) jusqu'à obtenir une majorité.",
       "La partie continue jusqu'à l'élimination du fake ou s'il reste dans les 2 derniers survivants.",
     ],
     points: [
-      "Fake encore présent dans les 2 derniers : +50 pts (+10 pts par vote survécu, cumulés).",
-      "Fake éliminé : 0 pt pour lui.",
-      "Civil qui a voté pour le fake au vote de son élimination : +20 pts.",
-      "Les autres civils (mauvais vote ou pas le bon au bon moment) : 0 pt, même si le groupe gagne.",
+      "Fake encore présent dans les 2 derniers : +15 pts (+10 pts par vote survécu, cumulés).",
+      "Fake éliminé : +10 pts par vote survécu (0 pt s'il est tombé dès le premier vote).",
+      "Groupe gagne : +10 pts pour chaque survivant.",
+      "+15 pts en plus si tu as voté pour le fake au vote qui l'a éliminé (détective).",
+      "+10 pts si tu as été éliminé à tort alors que tu avais voté pour le fake (bonne intuition).",
     ],
     exemple:
-      "Mot majorité « Android », fake « iOS ». M1 : indices oraux. M2 : vote - le fake survit (+10). M3 : vote - Léa et Tom votent le fake, il est éliminé : Léa et Tom +20 chacun, les autres 0.",
+      "Mot majorité « Android », fake « iOS ». Tour 1 : indices oraux. Tour 2 : vote - le fake survit (+10). Tour 3 : vote - Léa et Tom éliminent le fake : Léa et Tom +25 chacun (+10 survivant +15 détective), les autres survivants +10, le fake garde +20 pour ses 2 votes survécus.",
   },
 };
 

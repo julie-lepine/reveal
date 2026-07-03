@@ -25,7 +25,8 @@ export function mergeMatchScoresLocal(local = {}, remote = {}) {
 }
 
 function gameScoresBoxRowsHtml(players, scores) {
-  return players
+  const sorted = [...players].sort((a, b) => (scores[b.name] || 0) - (scores[a.name] || 0));
+  return sorted
     .map((p, i) => {
       const pts = scores[p.name] || 0;
       return `
@@ -59,7 +60,7 @@ export function tierNightRoundScoresHtml(recaps, { title = "Points de la manche"
   return `
     <div class="card game-scores-box game-scores-box--round" data-scores="round">
       <p class="card-heading game-scores-box__title">${escapeHtml(title)}</p>
-      <p class="game-scores-box__game">Proximité au consensus du groupe</p>
+      <p class="game-scores-box__game">Moyenne proximité consensus (+15 / +10) · bonus outsider inclus</p>
       ${rows}
     </div>`;
 }
@@ -116,7 +117,7 @@ export function eveningGameLeaderboardsHtml() {
     const meta = GAME_LABELS[gid];
     if (!meta) return;
     const count = meta.statKey ? stats[meta.statKey] || 0 : 0;
-    const countLabel = count > 1 ? ` · ${count} parties` : "";
+    const countLabel = count > 0 ? ` · ${count} partie${count > 1 ? "s" : ""}` : "";
     const titleHtml = `${meta.emoji} ${escapeHtml(meta.title)}${countLabel}`;
     blocks.push(gameLeaderboardCardHtml(titleHtml, players, gameScores[gid] || {}));
   });

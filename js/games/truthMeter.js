@@ -41,6 +41,7 @@ import { bindNav } from "../screens/nav.js";
 import { gameExitBarHtml, bindExitGame } from "../core/exitGame.js";
 // FIL_ROUGE (Mot interdit) - pause soirée ; isEveningGameplayPaused() = false si désactivé
 import { isEveningGameplayPaused } from "../core/filRougeSession.js";
+import { rulesButtonHtml } from "../core/gameRulesUi.js";
 import {
   isGameSyncActive,
   canActAsHost,
@@ -677,7 +678,10 @@ export function mountTruthMeter(app) {
           ).join("")}</div>
           <span class="muted">${roundIdx + 1}/${total}</span>
         </div>
-        <div class="logo logo--sm"><h1>TRUTHMETER</h1></div>
+        <div class="screen-title-row">
+          <div class="logo logo--sm"><h1>TRUTHMETER</h1></div>
+          ${rulesButtonHtml("truthmeter")}
+        </div>
         ${author ? `<p class="hint">Auteur : <strong>${escapeHtml(author)}</strong></p>` : ""}
         ${phaseHtml}
         ${gameExitBarHtml()}
@@ -753,15 +757,14 @@ export function mountTruthMeter(app) {
     }
 
     if (phase === "voting" && !isAuthor) {
-      if (myVote == null) {
-        bindSlider(app, "vote-slider", {
-          onInput: (v) => {
-            draftEstimate = v;
-          },
-        });
-      }
+      bindSlider(app, "vote-slider", {
+        onInput: (v) => {
+          draftEstimate = v;
+        },
+        disabled: voteCommitInFlight != null,
+      });
       app.querySelector("#btn-confirm-vote")?.addEventListener("click", async () => {
-        if (myVote != null) return;
+        if (voteCommitInFlight != null) return;
         const choice = Number(app.querySelector("#vote-slider")?.value ?? 50);
         myVote = choice;
         votes = { ...votes, [localName]: choice };
@@ -861,10 +864,14 @@ export function mountTruthMeter(app) {
   }
 
   /** Évite de détruire le textarea / slider à chaque poll multijoueur. */
-  function shouldSkipFullRender(prevPhase, prevRound) {
+  function shouldSkipFullRender(prevPhase, prevRound, prevVotesJson) {
     if (phase !== prevPhase || roundIdx !== prevRound) return false;
     if (phase === "writing" && getCurrentAuthor() === localName) return true;
-    if (phase === "voting") return true;
+    if (phase === "voting") {
+      const votesNow = JSON.stringify(getTruthMeterSession().votes || {});
+      if (votesNow !== prevVotesJson) return false;
+      return true;
+    }
     if (phase === "reveal-pending") return true;
     if (phase === "reveal") return true;
     return false;
@@ -942,6 +949,7 @@ export function mountTruthMeter(app) {
   const unsubGame = onGameSessionChange(() => {
     const prevPhase = phase;
     const prevRound = roundIdx;
+    const prevVotesJson = JSON.stringify(getTruthMeterSession().votes || {});
     captureAuthorDraftFromDom();
     captureVoteDraftFromDom();
     syncFromSession();
@@ -963,7 +971,7 @@ export function mountTruthMeter(app) {
       return;
     }
 
-    if (shouldSkipFullRender(prevPhase, prevRound)) {
+    if (shouldSkipFullRender(prevPhase, prevRound, prevVotesJson)) {
       if (phase === "reveal" || phase === "voting") {
         refreshGameScoresBox(app, {
           gameLabel: "TruthMeter",

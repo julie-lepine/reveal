@@ -1,11 +1,16 @@
 /** Le Traître - paires de mots (majorité = a, intrus = b). */
 
+import { EVENING_POINTS } from "./eveningScoring.js";
+
 export const TRAITRE_MIN_PLAYERS = 3;
 
+/** Barème harmonisé sur EVENING_POINTS (WIN +10, BONUS +15). */
 export const TRAITRE_POINTS = {
-  INTRUS_WIN: 30,
-  INTRUS_SURVIVE_VOTE: 10,
-  CIVIL_CORRECT_VOTE: 20,
+  FAKE_WIN: EVENING_POINTS.BONUS,
+  FAKE_SURVIVE_VOTE: EVENING_POINTS.WIN,
+  SURVIVOR: EVENING_POINTS.WIN,
+  DETECTIVE_BONUS: EVENING_POINTS.BONUS,
+  GOOD_INTUITION: EVENING_POINTS.WIN,
 };
 
 export const TRAITRE_WORD_PAIRS = [

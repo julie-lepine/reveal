@@ -20,6 +20,7 @@ export function getEveningRecap() {
   const consensusGames = stats.consensusGamesPlayed || 0;
   const dilemmas = stats.dilemmasPlayed || 0;
   const liesTotal = stats.liesTotal || 0;
+  const guessLieGamesPlayed = stats.guessLieGamesPlayed || 0;
   const liesFound = stats.liesFound || 0;
   const tierNights = stats.tierNightsPlayed || 0;
   const lastTier = tierNightGame?.listName || null;
@@ -49,6 +50,7 @@ export function getEveningRecap() {
     dilemmas,
     liesFound,
     liesTotal,
+    guessLieGamesPlayed,
     lieRate: getLieSuccessRate(),
     tierNights,
     lastTier,

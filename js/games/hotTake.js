@@ -41,6 +41,7 @@ import {
   completeGameSession,
   hotTakeToRemote,
   getCachedGameSession,
+  refreshGameSession,
 } from "../core/gameSync.js";
 
 export function mountHotTake(app) {
@@ -175,7 +176,7 @@ export function mountHotTake(app) {
   }
 
   function canChangeVote() {
-    return phase === "voting" && !isEveningGameplayPaused() && myVote == null;
+    return phase === "voting" && !isEveningGameplayPaused();
   }
 
   function hotTakeSessionScores() {
@@ -262,6 +263,10 @@ export function mountHotTake(app) {
 
   async function goToReveal() {
     if (revealInFlight) return;
+    if (mp && canActAsHost()) {
+      await refreshGameSession();
+      syncFromSession();
+    }
     const votesToScore = votesForAward();
 
     if (alreadyScoredThisTake()) {
@@ -585,9 +590,12 @@ export function mountHotTake(app) {
     }));
   }
 
-  function shouldSkipFullRender(prevPhase, prevTake) {
+  function shouldSkipFullRender(prevPhase, prevTake, prevVotesJson) {
     if (phase !== prevPhase || takeIdx !== prevTake) return false;
-    return phase === "voting" || phase === "reveal";
+    if (phase !== "voting" && phase !== "reveal") return false;
+    const votesNow = JSON.stringify(getHotTakeSession().votes || {});
+    if (votesNow !== prevVotesJson) return false;
+    return true;
   }
 
   function patchVotingChrome() {
@@ -608,12 +616,13 @@ export function mountHotTake(app) {
 
     const prevPhase = phase;
     const prevTake = takeIdx;
+    const prevVotesJson = JSON.stringify(getHotTakeSession().votes || {});
     syncFromSession();
     if (phase === "voting" && canActAsHost() && allHotTakeVotesIn()) {
       void goToReveal();
       return;
     }
-    if (shouldSkipFullRender(prevPhase, prevTake)) {
+    if (shouldSkipFullRender(prevPhase, prevTake, prevVotesJson)) {
       if (phase === "voting") patchVotingChrome();
       if (phase === "reveal") {
         refreshGameScoresBox(app, {

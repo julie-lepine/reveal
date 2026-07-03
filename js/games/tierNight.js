@@ -11,6 +11,7 @@ import {
   recordTierNightPlayed,
 } from "../core/state.js";
 import { buildRecapsWithSimulation } from "../core/tierNightSession.js";
+import { tierNightPointsHintText } from "../core/tierNightScoring.js";
 import { setLobbyPlaying } from "../core/lobby.js";
 import {
   isGameSyncActive,
@@ -161,6 +162,12 @@ export function mountTierNight(app) {
           modifier.id !== "normal"
             ? `<div class="tier-modifier-banner"><span class="tier-modifier-banner__emoji">${modifier.emoji}</span><span><strong>${escapeHtml(modifier.name)}</strong> · ${escapeHtml(modifier.desc)}</span></div>`
             : ""
+        }
+
+        ${
+          waitingLobby
+            ? ""
+            : `<p class="hint tier-points-hint">${escapeHtml(tierNightPointsHintText({ reverse: modifier.reverseScore }))}</p>`
         }
 
         <div class="tier-board">

@@ -32,6 +32,7 @@ import {
   canActAsHost,
   onGameSessionChange,
   completeGameSession,
+  refreshGameSession,
 } from "../core/gameSync.js";
 
 export function mountSpeedVote(app) {
@@ -364,9 +365,12 @@ export function mountSpeedVote(app) {
 
   }
 
-  function shouldSkipFullRender(prevPhase, prevRound) {
+  function shouldSkipFullRender(prevPhase, prevRound, prevVotesJson) {
     if (phase !== prevPhase || roundIdx !== prevRound) return false;
-    return phase === "voting" || phase === "reveal";
+    if (phase !== "voting" && phase !== "reveal") return false;
+    const votesNow = JSON.stringify(getSpeedVoteSession().votes || {});
+    if (votesNow !== prevVotesJson) return false;
+    return true;
   }
 
   function patchVotingChrome() {
@@ -381,6 +385,7 @@ export function mountSpeedVote(app) {
   const unsub = onGameSessionChange(() => {
     const prevPhase = phase;
     const prevRound = roundIdx;
+    const prevVotesJson = JSON.stringify(getSpeedVoteSession().votes || {});
     syncFromSession();
     if (!currentQuestion && QUESTIONS[roundIdx]) {
       currentQuestion = QUESTIONS[roundIdx];
@@ -389,7 +394,7 @@ export function mountSpeedVote(app) {
       void goToReveal();
       return;
     }
-    if (shouldSkipFullRender(prevPhase, prevRound)) {
+    if (shouldSkipFullRender(prevPhase, prevRound, prevVotesJson)) {
       if (phase === "voting") patchVotingChrome();
       if (phase === "reveal") {
         refreshGameScoresBox(app, {

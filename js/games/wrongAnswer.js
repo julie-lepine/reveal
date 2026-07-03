@@ -427,7 +427,7 @@ export function mountWrongAnswer(app) {
 
     app.querySelectorAll("[data-vote]").forEach((btn) => {
       btn.addEventListener("click", () => {
-        if (isEveningGameplayPaused() || myVote() != null) return;
+        if (isEveningGameplayPaused() || phase !== "voting") return;
         const target = btn.getAttribute("data-vote");
         if (target === localName) return;
         selectedTarget = target;
@@ -436,7 +436,7 @@ export function mountWrongAnswer(app) {
     });
 
     app.querySelector("#wrong-confirm-vote")?.addEventListener("click", async () => {
-      if (isEveningGameplayPaused() || myVote() != null) return;
+      if (isEveningGameplayPaused() || phase !== "voting") return;
       const target = selectedTarget;
       if (target == null || target === localName) return;
       await commitWrongAnswerVote(target);

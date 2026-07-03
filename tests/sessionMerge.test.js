@@ -55,8 +55,13 @@ describe("mergeReadyMapsLocal", () => {
 
   it("ne marque pas prêt un joueur absent des deux maps", () => {
     const out = mergeReadyMapsLocal({}, { Bob: true }, ["Alice", "Bob"]);
-    assert.equal(out.Alice, undefined);
+    assert.equal(out.Alice, false);
     assert.equal(out.Bob, true);
+  });
+
+  it("suit le remote « pas prêt » pour les autres joueurs", () => {
+    const out = mergeReadyMapsLocal({ Bob: true }, { Bob: false }, ["Alice", "Bob"]);
+    assert.equal(out.Bob, false);
   });
 
   it("conserve « pas prêt » pour le joueur local même si le serveur est encore prêt", () => {
@@ -313,6 +318,10 @@ describe("mergeConsensusPhase", () => {
 
   it("bloque reveal-pending → question", () => {
     assert.equal(mergeConsensusPhase("reveal-pending", "question"), "reveal-pending");
+  });
+
+  it("repasse final → null sur retour prep", () => {
+    assert.equal(mergeConsensusPhase("final", null, { newGame: true }), null);
   });
 });
 
