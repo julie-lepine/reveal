@@ -6,7 +6,6 @@ import {
   toggleLocalReady,
   simulateLobbyJoins,
   addLobbyMessage,
-  getLobbyJoinUrl,
   getLobbyStatus,
   MAX_PLAYERS,
   createLobby,
@@ -14,10 +13,8 @@ import {
   resetAllParticipantsReady,
   goToGameSelect,
   allLobbyMembersReady,
-  getNotReadyParticipants,
-  getLobbyNudge,
-  sendLobbyNudgeToNotReady,
   isLobbyEveningStarted,
+  resetAppToCleanHome,
 } from "../core/lobby.js";
 import { canCreateLobby, updateProfileEmoji } from "../core/auth.js";
 import { getLocalEmoji } from "../core/state.js";
@@ -36,11 +33,10 @@ import {
   refreshGameSession,
 } from "../core/gameSync.js";
 import { navigate, getCurrentScreen } from "../core/router.js";
-import { triggerLobbyNudge } from "../core/nudge.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
 import { bindNav } from "./nav.js";
-import { showAppAlert, showEmojiPickerDialog } from "../core/dialog.js";
+import { showAppAlert, showAppConfirm, showEmojiPickerDialog } from "../core/dialog.js";
 import { getLobbyAutoCloseHint } from "../config/lobbyLifecycle.js";
 import {
   getResumableSessionScreen,
@@ -105,8 +101,6 @@ export function mountLobby(app) {
   let unsubSession = () => {};
   let unsubBundle = () => {};
   let mounted = false;
-  let lastNudgeSeen = 0;
-  let wizzCooldownUntil = 0;
 
   async function ensureLobby() {
     const lobby = getLobby();
@@ -162,18 +156,6 @@ export function mountLobby(app) {
     box.scrollTop = box.scrollHeight;
   }
 
-  function checkIncomingNudge() {
-    const { at, forUserId } = getLobbyNudge();
-    if (!at || at <= lastNudgeSeen) return;
-
-    const local = getLobbyParticipants().find((p) => p.isLocal);
-    if (!local || local.ready) return;
-    if (forUserId && forUserId !== local.userId) return;
-
-    lastNudgeSeen = at;
-    triggerLobbyNudge();
-  }
-
   function updateStartButton() {
     const participants = getLobbyParticipants();
     const local = participants.find((p) => p.isLocal);
@@ -206,25 +188,6 @@ export function mountLobby(app) {
     startBtn.innerHTML = `<span class="btn-start__icon">▶</span>${label}`;
   }
 
-  function updateHostControls() {
-    const notReadyGuests = getNotReadyParticipants().filter((p) => !p.isHost);
-    const wizzOnCooldown = Date.now() < wizzCooldownUntil;
-
-    updateStartButton();
-
-    const wizzBtn = app.querySelector("#btn-wizz");
-    if (wizzBtn) {
-      const canWizz = isSupabaseConfigured() && notReadyGuests.length > 0 && !wizzOnCooldown;
-      wizzBtn.disabled = !canWizz;
-      const names = notReadyGuests.map((p) => p.name).join(", ");
-      wizzBtn.title = canWizz
-        ? `Réveiller : ${names}`
-        : wizzOnCooldown
-          ? "Patiente quelques secondes…"
-          : "Personne à réveiller";
-    }
-  }
-
   function refreshParticipants() {
     const participants = getLobbyParticipants();
     const { ready, total } = getReadyCount();
@@ -249,8 +212,7 @@ export function mountLobby(app) {
         ${local?.ready ? "Prêt !" : "Je suis prêt !"}`;
     }
 
-    updateHostControls();
-    checkIncomingNudge();
+    updateStartButton();
   }
 
   function onLobbyUpdate() {
@@ -291,16 +253,6 @@ export function mountLobby(app) {
       }
     });
 
-    app.querySelector("#copy-link")?.addEventListener("click", async () => {
-      const btn = app.querySelector("#copy-link");
-      try {
-        await navigator.clipboard.writeText(getLobbyJoinUrl(lobby.code));
-        if (btn) btn.textContent = "Lien copié ✓";
-      } catch {
-        if (btn) btn.textContent = "Erreur";
-      }
-    });
-
     app.querySelector("#btn-ready")?.addEventListener("click", async () => {
       await toggleLocalReady();
       refreshParticipants();
@@ -328,18 +280,8 @@ export function mountLobby(app) {
           title: "Erreur",
           icon: "⚠️",
         });
-        updateHostControls();
+        updateStartButton();
       }
-    });
-
-    app.querySelector("#btn-wizz")?.addEventListener("click", async () => {
-      const res = await sendLobbyNudgeToNotReady();
-      if (!res.ok) {
-        await showAppAlert(res.error, { title: "Wizz", icon: "📳" });
-        return;
-      }
-      wizzCooldownUntil = Date.now() + 5000;
-      updateHostControls();
     });
 
     const sendChat = async () => {
@@ -355,6 +297,20 @@ export function mountLobby(app) {
     app.querySelector("#chat-input")?.addEventListener("keydown", (e) => {
       if (e.key === "Enter") sendChat();
     });
+
+    app.querySelector("#btn-lobby-reset-app")?.addEventListener("click", async () => {
+      const ok = await showAppConfirm(
+        "Si le lobby ne répond plus, ta session locale sera effacée. Tu pourras te reconnecter et rejoindre une nouvelle partie.",
+        {
+          title: "Réinitialiser REVEAL",
+          confirmLabel: "Réinitialiser",
+          cancelLabel: "Annuler",
+          icon: "🔄",
+        }
+      );
+      if (!ok) return;
+      await resetAppToCleanHome();
+    });
   }
 
   function renderFull() {
@@ -366,11 +322,7 @@ export function mountLobby(app) {
     const local = participants.find((p) => p.isLocal);
     const isHost = local?.isHost;
     const allReady = allLobbyMembersReady();
-    const notReadyGuests = getNotReadyParticipants().filter((p) => !p.isHost);
-    const joinUrl = getLobbyJoinUrl(lobby.code);
     const online = isSupabaseConfigured();
-
-    lastNudgeSeen = getLobbyNudge().at || 0;
 
     app.innerHTML = pageShell({
       backTarget: "home",
@@ -387,11 +339,7 @@ export function mountLobby(app) {
             <span class="invite-code">${escapeHtml(lobby.code)}</span>
             <button type="button" class="btn-icon" id="copy-code" aria-label="Copier le code">⧉</button>
           </div>
-          <p class="hint">
-            <a href="${escapeHtml(joinUrl)}" class="lobby-deep-link">Lien d'invitation</a>
-            · <button type="button" class="btn-link" id="copy-link">Copier le lien</button>
-          </p>
-          <p class="hint">${online ? "Partage le code ou le lien - les invités rejoignent sans compte." : "Démo locale : ouvre le lien sur le même appareil ou un autre onglet."}</p>
+          <p class="hint">${online ? "Partage le code - les invités rejoignent sans compte." : "Démo locale : partage le code avec les autres joueurs."}</p>
           ${isHost && online ? `<p class="hint lobby-lifecycle-hint">${escapeHtml(getLobbyAutoCloseHint(getLobbyStatus()))}</p>` : ""}
         </div>
 
@@ -412,13 +360,6 @@ export function mountLobby(app) {
           isHost
             ? `
         <div class="lobby-host-actions">
-          ${
-            online && notReadyGuests.length
-              ? `<button type="button" class="btn btn-wizz" id="btn-wizz" title="Réveiller les joueurs pas prêts">
-            📳 Wizz ! <span class="btn-wizz__count">${notReadyGuests.length} pas prêt</span>
-          </button>`
-              : ""
-          }
           <button type="button" class="btn btn-start ${allReady ? "" : "btn-start--waiting"}" id="btn-start" ${
             allReady ? "" : "disabled"
           }>
@@ -438,6 +379,10 @@ export function mountLobby(app) {
         }
 
         <p class="lobby-footer">${ready} / ${total} prêts · ${lobbyFooterHint(ready, total)}</p>
+
+        <p class="lobby-reset-wrap">
+          <button type="button" class="btn-link lobby-reset-link" id="btn-lobby-reset-app">Blocage ? Réinitialiser l'app</button>
+        </p>
       `,
     });
 

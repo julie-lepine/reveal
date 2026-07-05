@@ -47,7 +47,6 @@ Référence détaillée : [SUPABASE_SETUP.md](./SUPABASE_SETUP.md)
 - [ ] `supabase/schema.sql` exécuté
 - [ ] `supabase/game-sessions.sql`
 - [ ] ~~`supabase/fil-rouge-private.sql`~~ *(Mot interdit désactivé — uniquement si réactivation)*
-- [ ] `supabase/lobby-nudge.sql`
 - [ ] `supabase/lobby-lifecycle.sql` (+ pg_cron pour purge auto, voir SUPABASE_SETUP §7bis)
 - [ ] `supabase/lobby-members-unique-name.sql` (pseudo unique par lobby)
 - [ ] Correctifs RLS si besoin : `fix-rls-recursion.sql`, `fix-lobbies-insert.sql`, `lobby-host-close.sql`

@@ -3266,52 +3266,22 @@ select.field-input option{
   text-align:center;
 }
 
-.btn-wizz{
-  width:100%;
-  padding:14px 18px;
-  border-radius:16px;
-  border:2px solid rgba(251,191,36,.45);
-  background:linear-gradient(135deg,rgba(251,191,36,.25),rgba(245,158,11,.15));
-  color:#FDE68A;
-  font-weight:800;
-  font-size:15px;
-  cursor:pointer;
-  box-shadow:0 6px 20px rgba(251,191,36,.2);
-}
-
-.btn-wizz:disabled{
-  opacity:.4;
-  cursor:not-allowed;
-}
-
-.btn-wizz__count{
-  font-weight:600;
-  opacity:.9;
-}
-
-@keyframes wizz-shake-keyframes{
-  0%,100%{ transform:translate(0,0); }
-  10%{ transform:translate(-6px,2px) rotate(-1deg); }
-  20%{ transform:translate(6px,-2px) rotate(1deg); }
-  30%{ transform:translate(-5px,3px); }
-  40%{ transform:translate(5px,-1px); }
-  50%{ transform:translate(-4px,2px) rotate(-1deg); }
-  60%{ transform:translate(4px,-2px); }
-  70%{ transform:translate(-3px,1px); }
-  80%{ transform:translate(3px,-1px); }
-  90%{ transform:translate(-2px,0); }
-}
-
-body.wizz-shake,
-body.wizz-shake #app{
-  animation:wizz-shake-keyframes .55s ease-in-out;
-}
-
 .lobby-footer{
   text-align:center;
   font-size:12px;
   color:rgba(255,255,255,.35);
   margin-top:16px;
+}
+
+.lobby-reset-wrap{
+  text-align:center;
+  margin-top:12px;
+  margin-bottom:8px;
+}
+
+.lobby-reset-link{
+  font-size:12px;
+  color:rgba(255,255,255,.4);
 }
 
 /* ─── Récap soirée (menu jeux) ─── */
@@ -3894,11 +3864,6 @@ body.has-bottom-nav .feedback-fab{
 
 .text-ok{ color:#4ADE80; font-weight:800; }
 .text-fail{ color:#F87171; }
-
-.lobby-deep-link{
-  color:#A78BFA;
-  word-break:break-all;
-}
 
 .lobby-status-hint{
   margin-bottom:12px;

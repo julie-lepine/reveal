@@ -32,7 +32,6 @@ import {
   startLobbyPresenceSync,
   stopLobbyPresenceSync,
   onLobbyBundleUpdated,
-  sendLobbyNudgeSupabase,
   recoverLobbyFromServer,
   peekServerLobbyForUser,
   getRememberedLobbyCode,
@@ -880,25 +879,6 @@ export function allLobbyMembersReady() {
 
 export function getNotReadyParticipants() {
   return getLobbyParticipants().filter((p) => !p.ready);
-}
-
-export function getLobbyNudge() {
-  const lobby = getLobby();
-  return {
-    at: lobby?.nudgeAt || 0,
-    forUserId: lobby?.nudgeForUserId || null,
-  };
-}
-
-export async function sendLobbyNudgeToNotReady() {
-  if (!isSupabaseConfigured()) {
-    return { ok: false, error: "Wizz disponible avec le lobby en ligne (Supabase)." };
-  }
-  const notReady = getNotReadyParticipants().filter((p) => !p.isHost);
-  if (!notReady.length) {
-    return { ok: false, error: "Tout le monde est déjà prêt." };
-  }
-  return sendLobbyNudgeSupabase(null);
 }
 
 export function simulateLobbyJoins(onUpdate) {

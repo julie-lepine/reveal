@@ -109,7 +109,7 @@ Utilise l’**org / projet de test** actuel (egress : 1 onglet, fermer le lobby 
 
 - [ ] 🧪 **Créer lobby** (hôte) sur iPhone
 - [ ] 🧪 **Rejoindre** avec le 2ᵉ client (code ou lien d’invitation)
-- [ ] 🧪 Liste joueurs, prêt, wizz hôte
+- [ ] 🧪 Liste joueurs, prêt
 - [ ] 🧪 **Lancer une soirée** → menu jeux
 - [ ] 🧪 **1 jeu court** (ex. Hot Take ou Trivia) : sync votes / écran hôte ↔ invité
 - [ ] 🧪 **Fil Rouge** (optionnel) : setup + mission si tu l’utilises souvent

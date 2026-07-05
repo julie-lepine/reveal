@@ -64,8 +64,6 @@ function lobbyBundleSignature(bundle) {
   return JSON.stringify({
     s: bundle.status,
     g: bundle.gameId,
-    n: bundle.nudgeAt,
-    nf: bundle.nudgeForUserId,
     p: (bundle.participants || []).map(
       (x) => `${x.userId}:${x.name}:${x.emoji}:${x.ready ? 1 : 0}:${x.isHost ? 1 : 0}`
     ),
@@ -362,13 +360,10 @@ function isMeaningfulLobbyUpdate(newRow) {
   if (!newRow) return true;
   const cur = getState().lobby;
   if (!cur || cur.id !== newRow.id) return true;
-  const newNudgeAt = newRow.nudge_at ? new Date(newRow.nudge_at).getTime() : 0;
   return (
     (newRow.status || "waiting") !== (cur.status || "waiting") ||
     (newRow.game_id ?? null) !== (cur.gameId ?? null) ||
-    (newRow.host_id ?? null) !== (cur.hostId ?? null) ||
-    newNudgeAt !== (cur.nudgeAt || 0) ||
-    (newRow.nudge_for ?? null) !== (cur.nudgeForUserId ?? null)
+    (newRow.host_id ?? null) !== (cur.hostId ?? null)
   );
 }
 
@@ -419,7 +414,7 @@ async function fetchLobbyBundle(lobbyId, { withMessages = false } = {}) {
   const queries = [
     supabase
       .from("lobbies")
-      .select("id, code, status, game_id, host_id, nudge_at, nudge_for, last_activity_at")
+      .select("id, code, status, game_id, host_id, last_activity_at")
       .eq("id", lobbyId)
       .single(),
     supabase
@@ -455,8 +450,6 @@ async function fetchLobbyBundle(lobbyId, { withMessages = false } = {}) {
     gameId: lobby.game_id,
     hostId: lobby.host_id,
     lastActivityAt: lobby.last_activity_at || null,
-    nudgeAt: lobby.nudge_at ? new Date(lobby.nudge_at).getTime() : 0,
-    nudgeForUserId: lobby.nudge_for || null,
     participants,
   };
 
@@ -488,8 +481,6 @@ function applyLobbyToState(bundle) {
       gameId: bundle.gameId,
       hostId: bundle.hostId,
       lastActivityAt: bundle.lastActivityAt || null,
-      nudgeAt: bundle.nudgeAt || 0,
-      nudgeForUserId: bundle.nudgeForUserId || null,
     },
     lobbyCode: bundle.code,
     inLobby: true,
@@ -810,28 +801,6 @@ export async function setLocalReadySupabase(ready) {
 
   if (error) throw error;
   await refreshLobbyFromSupabase();
-}
-
-/** Hôte : wizz vers les joueurs non prêts (nudge_for null = tous les non-prêts). */
-export async function sendLobbyNudgeSupabase(targetUserId = null) {
-  const lobbyId = getState().lobby?.id;
-  const userId = getSupabaseUserId();
-  const isHost = getState().lobby?.participants?.some((p) => p.isLocal && p.isHost);
-  if (!lobbyId || !userId || !isHost) {
-    return { ok: false, error: "Seul l'hôte peut envoyer un wizz." };
-  }
-
-  const { error } = await supabase
-    .from("lobbies")
-    .update({
-      nudge_at: new Date().toISOString(),
-      nudge_for: targetUserId,
-    })
-    .eq("id", lobbyId);
-
-  if (error) return { ok: false, error: error.message };
-  await refreshLobbyFromSupabase();
-  return { ok: true };
 }
 
 export async function updateLobbyMemberProfileSupabase({ displayName, emoji } = {}) {

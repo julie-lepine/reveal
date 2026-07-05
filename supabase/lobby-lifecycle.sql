@@ -1,5 +1,5 @@
 -- REVEAL — cycle de vie des lobbies (expiration, heartbeat, purge)
--- SQL Editor → Run après schema.sql, game-sessions.sql, lobby-nudge.sql
+-- SQL Editor → Run après schema.sql, game-sessions.sql
 --
 -- Durées (alignées js/config/lobbyLifecycle.js) :
 --   join refusé si inactif > 24 h
