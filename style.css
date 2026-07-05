@@ -2904,11 +2904,8 @@ select.field-input option{
   grid-template-columns:repeat(auto-fit, minmax(min(44px, 100%), 1fr));
   gap:8px;
   margin-bottom:14px;
-  max-height:min(52vh, 280px);
-  overflow-y:auto;
   overflow-x:hidden;
   padding:4px 2px;
-  -webkit-overflow-scrolling:touch;
 }
 
 .emoji-picker__btn{
