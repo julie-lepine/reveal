@@ -2899,7 +2899,9 @@ select.field-input option{
 
 .emoji-picker{
   display:grid;
-  grid-template-columns:repeat(auto-fill, minmax(44px, 1fr));
+  width:100%;
+  box-sizing:border-box;
+  grid-template-columns:repeat(auto-fit, minmax(min(44px, 100%), 1fr));
   gap:8px;
   margin-bottom:14px;
   max-height:min(52vh, 280px);
@@ -2914,6 +2916,7 @@ select.field-input option{
   min-height:0;
   min-width:0;
   width:100%;
+  box-sizing:border-box;
   padding:0;
   border-radius:12px;
   border:1px solid rgba(255,255,255,.1);
