@@ -2899,7 +2899,7 @@ select.field-input option{
 
 .emoji-picker{
   display:grid;
-  grid-template-columns:repeat(8, 1fr);
+  grid-template-columns:repeat(auto-fill, minmax(44px, 1fr));
   gap:8px;
   margin-bottom:14px;
   max-height:min(52vh, 280px);
@@ -2911,13 +2911,18 @@ select.field-input option{
 
 .emoji-picker__btn{
   aspect-ratio:1;
-  min-height:40px;
+  min-height:0;
+  min-width:0;
+  width:100%;
   padding:0;
   border-radius:12px;
   border:1px solid rgba(255,255,255,.1);
   background:rgba(255,255,255,.05);
-  font-size:22px;
+  font-size:clamp(18px, 5vw, 22px);
   line-height:1;
+  display:flex;
+  align-items:center;
+  justify-content:center;
   cursor:pointer;
   transition:background .15s, border-color .15s, transform .1s;
   -webkit-tap-highlight-color:transparent;
