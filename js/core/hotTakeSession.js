@@ -1,4 +1,9 @@
 import {
+  isPlayerTextTooLong,
+  playerTextMaxError,
+  trimPlayerText,
+} from "../../data/playerTextLimits.js";
+import {
   HOT_TAKE_THEMES,
   HOT_TAKE_CATALOG_ID,
   HOT_TAKE_MIX_ID,
@@ -92,12 +97,12 @@ export function checkHotTakeModeration(text) {
 
 function normalizeTake(entry) {
   if (typeof entry === "string") {
-    const text = entry.trim();
+    const text = trimPlayerText(entry);
     if (!text) return null;
     return { id: `legacy-${text.slice(0, 24)}`, text, author: null, themeId: null };
   }
   if (!entry || typeof entry !== "object") return null;
-  const text = String(entry.text || "").trim();
+  const text = trimPlayerText(entry.text);
   if (!text) return null;
   return {
     id: entry.id || `custom-${text.slice(0, 24)}-${entry.author || "anon"}`,
@@ -204,7 +209,8 @@ export function countOtherPlayersCustomTakes() {
 }
 
 export async function addCustomTake(text) {
-  const trimmed = text.trim();
+  if (isPlayerTextTooLong(text)) return { ok: false, error: playerTextMaxError() };
+  const trimmed = trimPlayerText(text);
   if (!trimmed) return { ok: false, error: "Texte vide." };
 
   const mod = checkHotTakeModeration(trimmed);

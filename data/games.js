@@ -77,8 +77,8 @@ export const GAMES = [
     logo: "assets/games/clutch.png",
     borderGradient:
       "linear-gradient(145deg, #FF6B6B 0%, #FF3CAC 48%, #2B2D66 100%)",
-    enabled: false,
-    badgeLabel: "Prochainement",
+    enabled: true,
+   /* badgeLabel: "Prochainement",*/
   },
   {
     id: "wronganswer-prep",
@@ -89,8 +89,8 @@ export const GAMES = [
     logo: "assets/games/wronganswer.png",
     borderGradient:
       "linear-gradient(145deg, #F472B6 0%, #A78BFA 48%, #2B2D66 100%)",
-    enabled: false,
-    badgeLabel: "Prochainement",
+    enabled: true,
+   /* badgeLabel: "Prochainement",*/
   },
   {
     id: "dilemma-prep",

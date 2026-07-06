@@ -1,5 +1,6 @@
 import { flushSave, scheduleSave } from "./persist.js";
 import { DEFAULT_PROFILE_EMOJI } from "../../data/profileEmojis.js";
+import { trimPlayerText } from "../../data/playerTextLimits.js";
 
 const STORAGE_KEY = "reveal-app-state";
 
@@ -841,7 +842,7 @@ export async function setLocalGuessLieSubmission(statements, lieIndex) {
   const name = getLocalDisplayName();
   ensurePlayerScore(name);
   const payload = {
-    statements: statements.map((s) => s.trim()),
+    statements: statements.map((s) => trimPlayerText(s)),
     lie: lieIndex,
   };
   const { isGameSyncActive, commitGuessLieSubmission } = await import("./gameSync.js");

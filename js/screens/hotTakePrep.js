@@ -41,7 +41,11 @@ import {
   updatePrepStartSlot,
   bindPrepLaunchButtons,
   syncPrepOnMount,
+  charCountHtml,
+  bindCharCounter,
+  updateCharCount,
 } from "../core/prepScreen.js";
+import { PLAYER_TEXT_MAX_LEN } from "../../data/playerTextLimits.js";
 import { bindNav } from "./nav.js";
 
 export function mountHotTakePrep(app) {
@@ -54,6 +58,8 @@ export function mountHotTakePrep(app) {
     getReadyMap: () => getHotTakeSession().ready || {},
   });
   const moderationNotice = getModerationNotice();
+
+  let unbindCharCounter = () => {};
 
   function captureDraft() {
     const input = app.querySelector("#new-take");
@@ -226,6 +232,7 @@ export function mountHotTakePrep(app) {
       render(captureDraft());
       const input = app.querySelector("#new-take");
       if (input) input.value = "";
+      updateCharCount(input, app.querySelector("#new-take-count"));
     });
 
     app.querySelector("#btn-ready")?.addEventListener("click", () => {
@@ -237,6 +244,12 @@ export function mountHotTakePrep(app) {
     });
 
     bindPrepLaunchButtons(app, { onLaunch });
+
+    unbindCharCounter();
+    unbindCharCounter = bindCharCounter(
+      app.querySelector("#new-take"),
+      app.querySelector("#new-take-count")
+    );
   }
 
   function render(preserveDraft = null) {
@@ -272,7 +285,7 @@ export function mountHotTakePrep(app) {
           <h2 class="screen-title">Préparation</h2>
           ${rulesButtonHtml("hottake")}
         </div>
-        <p class="game-intro">Opinions clivantes : suis le troupeau (+10) ou assume ton côté <strong>outsider</strong> (+15). L'admin choisit d'abord un thème, puis le nombre de manches. Ajoute tes takes si tu veux.</p>
+        <p class="game-intro">Opinions clivantes : suis le troupeau (+10) ou assume ton côté <strong>outsider</strong> (+15). L'admin choisit d'abord un thème, puis le nombre de manches. Ajoute tes takes si tu veux. <span class="muted">(${PLAYER_TEXT_MAX_LEN} caractères max. par take)</span></p>
 
         <div class="card">
           <p class="card-heading">Banque par thème</p>
@@ -325,9 +338,10 @@ export function mountHotTakePrep(app) {
         <div class="card">
           <label class="field-label" for="new-take">Ta hot take</label>
           <div class="join-row">
-            <input type="text" class="field-input join-input" id="new-take" maxlength="120" placeholder="Ton opinion impopulaire…" />
+            <input type="text" class="field-input join-input" id="new-take" maxlength="${PLAYER_TEXT_MAX_LEN}" placeholder="Ton opinion impopulaire…" />
             <button type="button" class="btn btn-secondary join-btn" id="add-take">+</button>
           </div>
+          ${charCountHtml("new-take-count")}
           <p class="moderation-notice">${escapeHtml(moderationNotice)}</p>
           <p class="auth-error hidden" id="take-error"></p>
           ${customTakesListHtml()}
@@ -346,6 +360,7 @@ export function mountHotTakePrep(app) {
 
     bindEvents();
     restoreDraft(draft);
+    updateCharCount(app.querySelector("#new-take"), app.querySelector("#new-take-count"));
     mounted = true;
   }
 
@@ -378,6 +393,7 @@ export function mountHotTakePrep(app) {
   });
 
   return () => {
+    unbindCharCounter();
     unbindRemove();
     prepLobby.dispose();
     unsub();

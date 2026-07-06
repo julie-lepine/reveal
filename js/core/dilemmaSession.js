@@ -25,6 +25,11 @@ import {
 import { patchGameStateWithFeedback } from "./patchGameStateFeedback.js";
 import { launchGameWithSync, commitHostGamePlay, commitPrepReadyToggle } from "./mpLaunch.js";
 import { checkHotTakeModeration, getModerationNotice } from "./hotTakeSession.js";
+import {
+  isPlayerTextTooLong,
+  playerTextMaxError,
+  trimPlayerText,
+} from "../../data/playerTextLimits.js";
 import { mergeDilemmaCustomDilemmas, mergeAuthorOwnedCustomList, normalizeDilemmaEntry } from "./sessionMerge.js";
 
 function defaultSession() {
@@ -71,8 +76,8 @@ export function isLocalDilemmaHost() {
 
 export function normalizeCustomDilemma(entry) {
   if (!entry || typeof entry !== "object") return null;
-  const optionA = String(entry.optionA || "").trim();
-  const optionB = String(entry.optionB || "").trim();
+  const optionA = trimPlayerText(entry.optionA);
+  const optionB = trimPlayerText(entry.optionB);
   if (!optionA || !optionB) return null;
   return {
     id: entry.id || `custom-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -192,8 +197,11 @@ export async function consumePlayedCustomDilemma(dilemma) {
 }
 
 export async function addCustomDilemma(optionA, optionB) {
-  const a = String(optionA || "").trim();
-  const b = String(optionB || "").trim();
+  if (isPlayerTextTooLong(optionA) || isPlayerTextTooLong(optionB)) {
+    return { ok: false, error: playerTextMaxError() };
+  }
+  const a = trimPlayerText(optionA);
+  const b = trimPlayerText(optionB);
   if (!a || !b) return { ok: false, error: "Les deux options sont requises." };
 
   if (getMyCustomDilemmas().length >= 1) {

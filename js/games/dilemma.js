@@ -40,6 +40,7 @@ import {
   getCachedGameSession,
   refreshGameSession,
 } from "../core/gameSync.js";
+import { voteConfirmChrome, pickForVoteConfirm } from "../core/voteConfirm.js";
 
 const DILEMMA_VS_SRC = "js/games/dilemma-vs.svg";
 
@@ -62,7 +63,10 @@ export function mountDilemma(app) {
 
   let roundIdx = 0;
   let phase = "voting";
+  /** Vote validé (session). */
   let myVote = null;
+  /** Choix local avant « Valider mon vote ». */
+  let selected = null;
   let votes = {};
   let voteCommitInFlight = null;
   let lastAward = null;
@@ -90,9 +94,11 @@ export function mountDilemma(app) {
     if (s.phase) phase = s.phase;
     if (s.currentDilemma) currentDilemma = s.currentDilemma;
     votes = { ...(s.votes || {}) };
+    if (s.phase !== "voting") {
+      selected = null;
+    }
     if (voteCommitInFlight != null) {
       myVote = voteCommitInFlight;
-      votes = { ...votes, [localName]: voteCommitInFlight };
     } else {
       myVote = votes[localName] ?? null;
     }
@@ -256,6 +262,7 @@ export function mountDilemma(app) {
       const nextIdx = roundIdx + 1;
       await startDilemmaRound(nextIdx);
       syncFromSession();
+      selected = null;
       revealAnimDone = false;
       revealPctA = 0;
       revealPctB = 0;
@@ -301,18 +308,18 @@ export function mountDilemma(app) {
       </div>`;
   }
 
-  function voteTapHtml() {
+  function voteTapHtml(displayPick) {
     return `
       <div class="dilemma__taps">
-        <button type="button" class="dilemma__tap dilemma__tap--a ${myVote === "A" ? "dilemma__tap--picked" : ""}"
+        <button type="button" class="dilemma__tap dilemma__tap--a ${displayPick === "A" ? "dilemma__tap--picked" : ""}"
           data-vote="A">
           <span class="dilemma__tap-label">Option A</span>
-          ${myVote === "A" ? '<span class="dilemma__tap-check">✓</span>' : ""}
+          ${displayPick === "A" ? '<span class="dilemma__tap-check">✓</span>' : ""}
         </button>
-        <button type="button" class="dilemma__tap dilemma__tap--b ${myVote === "B" ? "dilemma__tap--picked" : ""}"
+        <button type="button" class="dilemma__tap dilemma__tap--b ${displayPick === "B" ? "dilemma__tap--picked" : ""}"
           data-vote="B">
           <span class="dilemma__tap-label">Option B</span>
-          ${myVote === "B" ? '<span class="dilemma__tap-check">✓</span>' : ""}
+          ${displayPick === "B" ? '<span class="dilemma__tap-check">✓</span>' : ""}
         </button>
       </div>`;
   }
@@ -416,22 +423,22 @@ export function mountDilemma(app) {
 
   function votingPhaseHtml() {
     const host = !mp || canActAsHost();
-    const voteHint = mp
-      ? myVote
-        ? allDilemmaVotesIn()
-          ? "Tout le monde a voté !"
-          : "En attente des autres…"
-        : "Choisis ton camp !"
-      : myVote
-        ? "Les autres votent…"
-        : "Choisis ton camp !";
+    const allIn = allDilemmaVotesIn();
+    const confirm = voteConfirmChrome({
+      selected,
+      committed: myVote,
+      allIn,
+      emptyHint: "Choisis ton camp !",
+    });
 
     const votedCount = countPlayersVoted();
     const totalPlayers = getActivePlayers().length;
     return `
       <p class="label-upper label-upper--muted">Vote simultané</p>
-      ${voteTapHtml()}
-      <p class="hint">${voteHint}</p>
+      ${voteTapHtml(confirm.displayPick)}
+      <p class="hint">${escapeHtml(confirm.hint)}</p>
+      <button type="button" class="btn ${confirm.confirmClass} btn--spaced" id="dilemma-confirm"
+        ${confirm.confirmDisabled ? "disabled" : ""}>${escapeHtml(confirm.confirmLabel)}</button>
       ${
         host
           ? `<button type="button" class="btn btn-secondary btn--spaced" id="dilemma-force">
@@ -439,6 +446,33 @@ export function mountDilemma(app) {
             </button>`
           : ""
       }`;
+  }
+
+  async function submitVote(pick) {
+    if (pick == null || voteCommitInFlight != null) return;
+    if (mp) {
+      voteCommitInFlight = pick;
+      render();
+      try {
+        await commitDilemmaVote(pick);
+        selected = null;
+        myVote = pick;
+      } finally {
+        voteCommitInFlight = null;
+        syncFromSession();
+      }
+      if (allDilemmaVotesIn() && canActAsHost()) {
+        await goToReveal();
+        return;
+      }
+    } else {
+      myVote = pick;
+      selected = null;
+      votes = simulateDilemmaLobbyVotes(pick);
+      await goToReveal();
+      return;
+    }
+    if (phase !== "reveal") render();
   }
 
   function canChangeVote() {
@@ -473,32 +507,15 @@ export function mountDilemma(app) {
     bindExitGame(app);
 
     app.querySelectorAll("[data-vote]").forEach((btn) => {
-      btn.addEventListener("click", async () => {
+      btn.addEventListener("click", () => {
         if (!canChangeVote()) return;
-        const choice = btn.getAttribute("data-vote");
-        if (choice === myVote && votes[localName] === choice) return;
-        myVote = choice;
-        votes = { ...votes, [localName]: choice };
-        if (mp) {
-          voteCommitInFlight = choice;
-          render();
-          try {
-            await commitDilemmaVote(choice);
-          } finally {
-            voteCommitInFlight = null;
-            syncFromSession();
-          }
-          if (allDilemmaVotesIn() && canActAsHost()) {
-            await goToReveal();
-            return;
-          }
-        } else {
-          votes = simulateDilemmaLobbyVotes(choice);
-          await goToReveal();
-          return;
-        }
-        if (phase !== "reveal") render();
+        selected = btn.getAttribute("data-vote");
+        render();
       });
+    });
+
+    app.querySelector("#dilemma-confirm")?.addEventListener("click", () => {
+      void submitVote(pickForVoteConfirm(selected, myVote));
     });
 
     app.querySelector("#dilemma-force")?.addEventListener("click", () => {

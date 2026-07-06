@@ -2,10 +2,12 @@
  * Fusions d'état multijoueur (prêt, customs par auteur) - testables sans Supabase.
  */
 
+import { trimPlayerText } from "../../data/playerTextLimits.js";
+
 export function normalizeDilemmaEntry(entry) {
   if (!entry || typeof entry !== "object") return null;
-  const optionA = String(entry.optionA || "").trim();
-  const optionB = String(entry.optionB || "").trim();
+  const optionA = trimPlayerText(entry.optionA);
+  const optionB = trimPlayerText(entry.optionB);
   if (!optionA || !optionB) return null;
   return {
     id: entry.id || `custom-${optionA}-${optionB}`,
@@ -18,12 +20,12 @@ export function normalizeDilemmaEntry(entry) {
 
 export function normalizeHotTakeEntry(entry) {
   if (typeof entry === "string") {
-    const text = entry.trim();
+    const text = trimPlayerText(entry);
     if (!text) return null;
     return { id: `legacy-${text.slice(0, 24)}`, text, author: null, themeId: null };
   }
   if (!entry || typeof entry !== "object") return null;
-  const text = String(entry.text || "").trim();
+  const text = trimPlayerText(entry.text);
   if (!text) return null;
   return {
     id: entry.id || `custom-${text.slice(0, 24)}-${entry.author || "anon"}`,

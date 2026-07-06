@@ -359,7 +359,8 @@ export function mountTierNightLive(app) {
 
   if (isGameSyncActive()) {
     const session = getTierNightLiveSession();
-    if (!getCachedGameSession()?.state?.tierNightLive?.lobbyStarted) {
+    const remoteStarted = Boolean(getCachedGameSession()?.state?.tierNightLive?.lobbyStarted);
+    if (!session.lobbyStarted && !remoteStarted) {
       navigate("tiernight-select");
       return null;
     }

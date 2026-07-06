@@ -6,11 +6,13 @@ import {
   userIdForName,
   normalizePlayerVotesMap,
   tierNightLiveToRemote,
+  tierNightToRemote,
   patchGameState,
 } from "./gameSync.js";
 import { patchGameStateWithFeedback } from "./patchGameStateFeedback.js";
 import { launchGameWithSync, commitHostGamePlay } from "./mpLaunch.js";
 import { buildRecapsFromPlacements } from "./tierNightSession.js";
+import { medianTierFromRanks } from "./tierNightScoring.js";
 import { setLobbyPlaying } from "./lobby.js";
 
 const TIER_RANK = { S: 0, A: 1, B: 2, C: 3, D: 4 };
@@ -54,22 +56,46 @@ export function getTierNightLiveSession() {
 export function consensusTierForVotes(votesByName) {
   const ranks = Object.values(votesByName || {})
     .filter(Boolean)
-    .map((t) => TIER_RANK[t] ?? 4)
-    .sort((a, b) => a - b);
+    .map((t) => TIER_RANK[t] ?? 4);
   if (!ranks.length) return null;
-  const mid = ranks[Math.floor(ranks.length / 2)];
-  return TIER_LEVELS[mid] || "C";
+  return medianTierFromRanks(ranks);
 }
 
 function votingPayload(roundIdx) {
   return { roundIdx, phase: "voting", votes: {} };
 }
 
+function tierNightLiveResetRemote() {
+  return tierNightLiveToRemote({
+    lobbyStarted: false,
+    finished: true,
+    phase: "done",
+    votes: {},
+    roundIdx: 0,
+    topicId: null,
+    listName: "",
+    deck: null,
+    placements: {},
+  });
+}
+
+function tierNightClassicResetRemote() {
+  return tierNightToRemote({
+    topicId: null,
+    mode: "consensus",
+    modifier: "normal",
+    lobbyStarted: false,
+    placements: {},
+    finished: {},
+    game: null,
+  });
+}
+
 /** Lancement MP (hôte) : construit le deck partagé et démarre la 1re manche. */
 export async function markTierNightLiveLobbyStarted({ topicId, listName, items }) {
   const deck = shuffle(items);
   const next = {
-    ...getTierNightLiveSession(),
+    ...defaultLive(),
     lobbyStarted: true,
     topicId,
     listName,
@@ -83,8 +109,15 @@ export async function markTierNightLiveLobbyStarted({ topicId, listName, items }
     gameId: "tiernight",
     mode: "push",
     beforeCommit: () => setLobbyPlaying("tiernight"),
-    applyLocal: () => saveStatePatch({ tierNightLiveGame: next }),
-    getRemoteState: () => ({ tierNightLive: tierNightLiveToRemote(next) }),
+    applyLocal: () =>
+      saveStatePatch({
+        tierNightLiveGame: next,
+        tierNightGame: { recaps: [], topicId: null, listName: "", controversialItem: null },
+      }),
+    getRemoteState: () => ({
+      tierNightLive: tierNightLiveToRemote(next),
+      tierNight: tierNightClassicResetRemote(),
+    }),
   });
 }
 
@@ -160,6 +193,37 @@ export async function markTierNightLiveFinished() {
 
 export function resetTierNightLive() {
   saveStatePatch({ tierNightLiveGame: defaultLive() });
+}
+
+/** Lancement MP Rank it / Classe le groupe (hôte). */
+export async function markTierNightClassicStarted({ topicId, mode, modifier }) {
+  saveStatePatch({
+    tierNightTopicId: topicId,
+    tierNightMode: mode,
+    tierNightModifier: modifier,
+    tierNightGame: { recaps: [], topicId: null, listName: "", controversialItem: null },
+    tierNightLiveGame: defaultLive(),
+  });
+  const remoteTierNight = tierNightToRemote({
+    topicId,
+    mode,
+    modifier,
+    lobbyStarted: true,
+    placements: {},
+    finished: {},
+    game: true,
+  });
+  return launchGameWithSync({
+    screen: "tiernight",
+    gameId: "tiernight",
+    mode: "push",
+    beforeCommit: () => setLobbyPlaying("tiernight"),
+    applyLocal: () => {},
+    getRemoteState: () => ({
+      tierNight: remoteTierNight,
+      tierNightLive: tierNightLiveResetRemote(),
+    }),
+  });
 }
 
 export { votingPayload as tierNightLiveVotingPayload };

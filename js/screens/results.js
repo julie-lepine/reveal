@@ -13,6 +13,7 @@ import { eveningGameLeaderboardsHtml } from "../core/gameScores.js";
 import { formatPlayerWithBadge } from "../core/badges.js";
 import {
   isGameSyncActive,
+  isSessionRouteSuppressed,
   onGameSessionChange,
   refreshEveningScoresFromSession,
   tryFollowHostGameSession,
@@ -90,30 +91,22 @@ export function mountResults(app) {
   let unsubLobby = () => {};
 
   if (isGameSyncActive()) {
-    if (!isLobbyHost()) {
-      void (async () => {
-        await refreshLobbyFromSupabase();
-        await refreshEveningScoresFromSession();
-        await routeToActiveGameIfNeeded();
-        if (getCurrentScreen() === "results") render();
-      })();
-    } else {
-      render();
-      void (async () => {
-        await refreshLobbyFromSupabase();
-        await refreshEveningScoresFromSession();
-        if (getCurrentScreen() === "results") render();
-      })();
-    }
+    render();
+    void (async () => {
+      await refreshLobbyFromSupabase();
+      await refreshEveningScoresFromSession();
+      if (getCurrentScreen() === "results") render();
+    })();
     unsubSession = onGameSessionChange((row) => {
       tryFollowHostGameSession(row);
       if (getCurrentScreen() === "results") render();
     });
     unsubLobby = onLobbyBundleUpdated(() => {
-      // Rattrapage : si l'hôte a relancé un jeu (lobby repassé en "playing" sur un
-      // vrai jeu) mais que l'event de session n'est pas arrivé jusqu'ici, on suit
-      // quand même l'hôte au lieu de rester bloqué sur le récap.
-      if (!isLobbyHost() && getLobbyStatus() === "playing") {
+      if (
+        !isLobbyHost() &&
+        !isSessionRouteSuppressed() &&
+        getLobbyStatus() === "playing"
+      ) {
         const gid = getLobbyGameId();
         if (gid && gid !== "menu") void routeToActiveGameIfNeeded();
       }

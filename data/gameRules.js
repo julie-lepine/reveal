@@ -167,12 +167,12 @@ export const GAME_RULES = {
   tiernight: {
     title: "TierNight",
     emoji: "🏆",
-    but: "Classe des éléments en tiers (S / A / B / C / D) en visant le consensus du groupe. Plusieurs modes : Consensus, Classe le groupe (les items sont les joueurs) et En direct (item par item).",
+    but: "Classe des éléments en tiers (S / A / B / C / D) en visant le consensus du groupe. Plusieurs modes : Rank it, Classe le groupe (les items sont les joueurs) et En direct (item par item).",
     etapes: [
       "Choisis un mode, puis une tier list (ou un thème pour « Classe le groupe »).",
-      "Mode Consensus : choisis une variante (Classique, S & D seulement, À contre-courant, À l'aveugle).",
+      "Mode Rank it : choisis une variante (Classique, S & D seulement, À contre-courant, À l'aveugle).",
       "Chacun classe les éléments de S à D.",
-      "On révèle le classement consensus, l'item le plus clivant et le board du groupe (téléchargeable).",
+      "On révèle le classement consensus, l'item le plus clivant et le board du groupe.",
     ],
     points: [
       "Chaque élément placé au même tier que le consensus (ou mieux) : +15 pts. À un tier d'écart : +10. Au-delà : 0.",

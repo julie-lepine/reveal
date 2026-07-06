@@ -17,6 +17,10 @@ import { getLobbyParticipants, getLobbyStatus, getLobbyGameId, isLobbyEveningSta
 import { getActivePlayerNames, getActivePlayers } from "./players.js";
 import { mergeMatchScoresLocal } from "./gameScores.js";
 import {
+  applyRemotePlayerStats,
+  playerStatsToRemote,
+} from "./playerStatsSync.js";
+import {
   mergeReadyMapsLocal,
   mergeDilemmaCustomDilemmas,
   mergeHotTakeCustomTakes,
@@ -270,6 +274,10 @@ function shouldFollowHostGameLaunch(current, targetScreen) {
   if (current === "home" || current === "settings") return false;
   if (isSuppressedGameReturn(targetScreen)) return false;
 
+  if (POST_GAME_SCREENS.has(current) && isSessionRouteSuppressed()) {
+    return isSessionAdvancedFromSuppress(targetScreen);
+  }
+
   const fromHubOrPostGame =
     current === "game-select" ||
     current === "lobby" ||
@@ -280,6 +288,11 @@ function shouldFollowHostGameLaunch(current, targetScreen) {
   return isInProgressPlayScreen(targetScreen);
 }
 
+/** Consultation volontaire des scores : ne pas rerouter vers prep/partie en cours. */
+function isBrowsingScoresWithRouteSuppress(screen = getCurrentScreen()) {
+  return POST_GAME_SCREENS.has(screen) && isSessionRouteSuppressed();
+}
+
 function shouldApplySessionRoute(row, { fromScreen = null } = {}) {
   const screen = getEffectiveSessionScreen(row);
   if (!screen) return false;
@@ -287,6 +300,13 @@ function shouldApplySessionRoute(row, { fromScreen = null } = {}) {
   const current = getCurrentScreen();
   if (screen === current) return false;
   if (isCompatibleSessionScreen(screen, current)) return false;
+
+  if (isBrowsingScoresWithRouteSuppress(current)) {
+    if (isSessionAdvancedFromSuppress(screen)) return true;
+    if (POST_GAME_SCREENS.has(screen)) return false;
+    if (shouldForceGuestFollowSession(screen)) return false;
+    return false;
+  }
 
   // Hub / post-partie : les invités restent libres (home, settings, classement…).
   if (isSessionHubScreen(screen)) {
@@ -311,6 +331,9 @@ function shouldApplySessionRoute(row, { fromScreen = null } = {}) {
 
   // Paramétrage ou partie en cours : suivi obligatoire (ignore suppressSessionRoute).
   if (shouldForceGuestFollowSession(screen)) {
+    if (isBrowsingScoresWithRouteSuppress(current)) {
+      return isSessionAdvancedFromSuppress(screen);
+    }
     return true;
   }
 
@@ -402,6 +425,15 @@ export function isCompatibleSessionScreen(sessionScreen, localScreen) {
   ) {
     return true;
   }
+  /** Scores depuis le menu jeux / lobby en soirée : navigation locale libre. */
+  if (
+    (localScreen === "results" || localScreen === "leaderboard") &&
+    (sessionScreen === "game-select" ||
+      sessionScreen === "lobby" ||
+      POST_GAME_SCREENS.has(sessionScreen))
+  ) {
+    return true;
+  }
   /** Consulter le classement depuis le menu jeux / lobby (soirée en attente uniquement). */
   if (
     localScreen === "leaderboard" &&
@@ -473,17 +505,26 @@ function shouldForceGuestFollowSession(screen) {
   return isOnGameSetupScreen(screen) || isActiveGameSessionScreen(screen);
 }
 
-/** Filet pour écrans passifs (results, home…) : suit l'hôte si prep / partie. */
+/** Filet pour écrans passifs (results, home…) : suit l'hôte vers résultats en fin de partie. */
 export function tryFollowHostGameSession(row) {
   if (!isGameSyncActive() || isLobbyHost()) return false;
-  if (!row) {
-    if (isOnPostGameScreen(getCurrentScreen())) {
-      void routeToActiveGameIfNeeded(null, { force: true });
-    }
-    return false;
-  }
+  if (!row) return false;
+  const declared = row.screen;
+  if (!declared || !POST_GAME_SCREENS.has(declared)) return false;
+  const local = getCurrentScreen();
+  if (!isActiveGameSessionScreen(local) && !isOnGameSetupScreen(local)) return false;
   handleSessionRoute(row);
   return true;
+}
+
+function maybeRouteToSessionScreen(row) {
+  const local = getCurrentScreen();
+  const effective = getEffectiveSessionScreen(row);
+  if (!effective || local === effective) return;
+  if (isBrowsingScoresWithRouteSuppress(local) && !isSessionAdvancedFromSuppress(effective)) {
+    return;
+  }
+  handleSessionRoute(row);
 }
 
 function clearSuppressIfFollowingHost(screen, current) {
@@ -2284,12 +2325,21 @@ export function guessLieFromRemote(remote) {
   };
 }
 
-export function tierNightToRemote({ topicId, game, placements, finished, mode, modifier }) {
+export function tierNightToRemote({
+  topicId,
+  game,
+  placements,
+  finished,
+  mode,
+  modifier,
+  lobbyStarted,
+}) {
   return {
     topicId: topicId || null,
     mode: mode || "consensus",
     modifier: modifier || "normal",
-    game: game || null,
+    lobbyStarted: Boolean(lobbyStarted),
+    game: game ?? (lobbyStarted ? true : null),
     placements: mapPlacementsByUid(placements || {}),
     finished: finished || {},
   };
@@ -2416,6 +2466,8 @@ function scoresFromRemote(remote = {}) {
   return out;
 }
 
+export { playerStatsToRemote, applyRemotePlayerStats } from "./playerStatsSync.js";
+
 /** Fusion des matchScores côté blob session (clés uid). */
 function mergeRemoteMatchScoresUid(cur = {}, inc = {}) {
   const merged = { ...cur };
@@ -2496,6 +2548,7 @@ function eveningStateToRemote() {
     getState();
   const remote = {
     scores: scoresToRemote(getState().scores),
+    playerStats: playerStatsToRemote(getState().playerStats || {}, (name) => userIdForName(name) || name),
     gameScores: gameScoresToRemote(getState().gameScores || {}),
     gameScoreOrder: [...(getState().gameScoreOrder || [])],
     gameScoreSessionBaseline: scoresToRemote(gameScoreSessionBaseline || {}),
@@ -2541,6 +2594,7 @@ export function applyRemoteEveningState(st) {
 
   if (Object.keys(patch).length) saveStatePatch(patch);
   if (st.scores) applyRemoteLobbyScores(st.scores);
+  if (st.playerStats) applyRemotePlayerStats(st.playerStats, (uid) => playerKeyToDisplayName(uid));
   if (FIL_ROUGE_ENABLED && st.filRougeScores) applyRemoteFilRougeScores(st.filRougeScores);
   if (st.gameScores) applyRemoteGameScores(st.gameScores, st.gameScoreOrder);
   if (st.gameScoreSessionGameId !== undefined || st.gameScoreSessionBaseline) {
@@ -2572,6 +2626,9 @@ export async function refreshEveningScoresFromSession() {
   if (!isGameSyncActive()) return null;
   const row = await refreshGameSession();
   if (row?.state?.scores) applyRemoteLobbyScores(row.state.scores);
+  if (row?.state?.playerStats) {
+    applyRemotePlayerStats(row.state.playerStats, (uid) => playerKeyToDisplayName(uid));
+  }
   return row;
 }
 
@@ -2651,6 +2708,8 @@ export function applyRemoteSession(row) {
   const prevWaAnswers = JSON.stringify(getState().wrongAnswerGame?.answers || {});
   const prevWaVotes = JSON.stringify(getState().wrongAnswerGame?.votes || {});
   const prevDmVotes = JSON.stringify(getState().dilemmaGame?.votes || {});
+  const prevHtPhase = getState().hotTakeGame?.phase ?? null;
+  const prevHtTakeIdx = getState().hotTakeGame?.takeIdx ?? null;
   const prevHtVotes = JSON.stringify(getState().hotTakeGame?.votes || {});
   const prevSvVotes = JSON.stringify(getState().speedVoteGame?.votes || {});
   const prevTmVotes = JSON.stringify(getState().truthMeterGame?.votes || {});
@@ -2774,8 +2833,8 @@ export function applyRemoteSession(row) {
 
   const hotTakePlayChanged =
     patch.hotTakeGame &&
-    ((patch.hotTakeGame.phase ?? null) !== (getState().hotTakeGame?.phase ?? null) ||
-      (patch.hotTakeGame.takeIdx ?? null) !== (getState().hotTakeGame?.takeIdx ?? null) ||
+    ((patch.hotTakeGame.phase ?? null) !== prevHtPhase ||
+      (patch.hotTakeGame.takeIdx ?? null) !== prevHtTakeIdx ||
       JSON.stringify(patch.hotTakeGame.votes || {}) !== prevHtVotes);
 
   const speedVotePlayChanged =
@@ -2925,16 +2984,20 @@ export function isSessionRouteSuppressed() {
 }
 
 /**
- * Consulter le classement / les résultats pendant une partie en cours.
+ * Consulter le classement / les résultats pendant une soirée en cours.
  * On suspend le routage auto vers le jeu courant (sinon le prochain tick de polling
  * renverrait l'utilisateur dans la partie au bout de quelques secondes), tout en
  * gardant la bascule automatique si l'hôte lance/avance vers un AUTRE écran.
  */
 export function suppressRoutingForScoreView(ms = 15 * 60 * 1000) {
-  const active = getEffectiveSessionScreen(getCachedGameSession());
-  // Prep : pas de suppress (l'invité doit pouvoir suivre l'hôte depuis Résultats / Classement).
-  if (active && isInProgressPlayScreen(active)) {
+  const row = getCachedGameSession();
+  const active = row ? getEffectiveSessionScreen(row) : null;
+  if (active && (isInProgressPlayScreen(active) || isOnGameSetupScreen(active))) {
     suppressSessionRoute(ms, active);
+    return;
+  }
+  if (isGameSyncActive()) {
+    suppressSessionRoute(ms, active || row?.screen || "game-select");
   }
 }
 
@@ -2985,7 +3048,7 @@ function resolveActivePlayScreen(st, gid, declared) {
   const glPhase = st.guessLie?.phase;
   if (glPhase && glPhase !== "idle" && glPhase !== "lobby") return "guesslie";
   if (st.tierNightLive?.lobbyStarted && !st.tierNightLive?.finished) return "tiernight-live";
-  if (st.tierNight?.game && !st.tierNight?.finished) return "tiernight";
+  if (st.tierNight?.lobbyStarted && !st.tierNight?.recap) return "tiernight";
   return null;
 }
 
@@ -2994,6 +3057,19 @@ export function getEffectiveSessionScreen(row) {
   const declared = row.screen || null;
   const st = row.state || {};
   const gid = row.game_id || null;
+  const local = getCurrentScreen();
+
+  if (declared && POST_GAME_SCREENS.has(declared)) {
+    if (POST_GAME_SCREENS.has(local) || isSessionRouteSuppressed()) {
+      return declared;
+    }
+    const lobbyGid = getLobbyGameId();
+    if (isLobbyEveningStarted() && lobbyGid && lobbyGid !== "menu") {
+      const prep = SESSION_GAME_ID_TO_TILE[lobbyGid];
+      if (prep) return prep;
+    }
+    return declared;
+  }
 
   const activePlay = resolveActivePlayScreen(st, gid, declared);
   if (activePlay) return activePlay;
@@ -3002,22 +3078,6 @@ export function getEffectiveSessionScreen(row) {
 
   if (declared && !MENU_SCREENS.has(declared) && !POST_GAME_SCREENS.has(declared)) {
     return declared;
-  }
-
-  // DB encore sur results alors que l'hôte a relancé (lobby en jeu).
-  // On se base sur le gameId du LOBBY (et non sur le game_id de la session, qui reste
-  // celui du jeu terminé) : après une fin de partie il vaut "menu", donc on laisse les
-  // résultats s'afficher ; lors d'une vraie relance il pointe le nouveau jeu → prépa.
-  const lobbyGid = getLobbyGameId();
-  if (
-    declared &&
-    POST_GAME_SCREENS.has(declared) &&
-    isLobbyEveningStarted() &&
-    lobbyGid &&
-    lobbyGid !== "menu"
-  ) {
-    const prep = SESSION_GAME_ID_TO_TILE[lobbyGid];
-    if (prep) return prep;
   }
 
   if (declared && POST_GAME_SCREENS.has(declared)) {
@@ -3096,6 +3156,13 @@ export async function routeToActiveGameIfNeeded(cachedRowOnly = null, { force = 
   }
   const current = getCurrentScreen();
   if (current === screen) return isAppContentMounted();
+  if (
+    !force &&
+    isBrowsingScoresWithRouteSuppress(current) &&
+    !isSessionAdvancedFromSuppress(screen)
+  ) {
+    return false;
+  }
   if (!force && isCompatibleSessionScreen(screen, current)) return true;
   if (!force && !shouldApplySessionRoute(row)) return false;
   if (
@@ -3159,6 +3226,7 @@ function isRecentGameSessionRealtime() {
 
 const EVENING_STATE_KEYS = new Set([
   "scores",
+  "playerStats",
   "filRougeScores",
   "gameScores",
   "gameScoreOrder",
@@ -3287,9 +3355,7 @@ async function syncTick() {
       const cached = getCachedGameSession();
       if (cached) {
         if (await routeToActiveGameIfNeeded(cached)) return;
-        const local = getCurrentScreen();
-        const effective = getEffectiveSessionScreen(cached);
-        if (effective && local !== effective) handleSessionRoute(cached);
+        maybeRouteToSessionScreen(cached);
       }
       return;
     }
@@ -3299,9 +3365,7 @@ async function syncTick() {
     adjustPollBackoff(sessionSignature(row) !== prevSig);
     scheduleSyncPoll();
     if (await routeToActiveGameIfNeeded(row)) return;
-    const local = getCurrentScreen();
-    const effective = getEffectiveSessionScreen(row);
-    if (effective && local !== effective) handleSessionRoute(row);
+    maybeRouteToSessionScreen(row);
   } catch (e) {
     console.warn("REVEAL sync:", e.message || e);
   } finally {
@@ -3868,6 +3932,36 @@ export async function endGameSession() {
 }
 
 /** Fin de partie : écran résultats pour tout le lobby (upsert, pas delete+update). */
+function deactivatePlayFlagsInSessionState(state = {}) {
+  const st = { ...state };
+  const lobbyStartedGames = [
+    "hotTake",
+    "speedVote",
+    "clutch",
+    "wrongAnswer",
+    "traitre",
+    "trivia",
+    "truthMeter",
+    "consensus",
+    "dilemma",
+    "playlistGuess",
+    "tierNight",
+    "tierNightLive",
+  ];
+  lobbyStartedGames.forEach((key) => {
+    if (st[key] && typeof st[key] === "object") {
+      st[key] = { ...st[key], lobbyStarted: false };
+    }
+  });
+  if (st.guessLie && typeof st.guessLie === "object") {
+    st.guessLie = { ...st.guessLie, lobbyComplete: false, phase: "idle" };
+  }
+  if (st.tierNight && typeof st.tierNight === "object") {
+    st.tierNight = { ...st.tierNight, lobbyStarted: false, finished: true };
+  }
+  return st;
+}
+
 export async function completeGameSession({ gameId = "menu", screen = "results", state = {} } = {}) {
   if (!isGameSyncActive()) return null;
   const lobbyId = getState().lobby.id;
@@ -3882,16 +3976,19 @@ export async function completeGameSession({ gameId = "menu", screen = "results",
   // vers la prépa au lieu des résultats). Robuste face à l'ordre d'arrivée des sync
   // lobby/session, contrairement à une inférence basée sur le gameId du lobby.
   const sessionGameId = POST_GAME_SCREENS.has(screen) ? "menu" : gameId;
+  const priorState = cachedRow?.state || {};
+  const sessionState = deactivatePlayFlagsInSessionState({
+    ...priorState,
+    ...eveningStateToRemote(),
+    ...(state || {}),
+  });
 
   const row = await upsertGameSession({
     lobbyId,
     gameId: sessionGameId,
     screen,
     hostId,
-    state: {
-      ...eveningStateToRemote(),
-      ...(state || {}),
-    },
+    state: sessionState,
   });
   applyRemoteSession(row);
   routeToSessionScreen(screen, { force: true });
@@ -4086,6 +4183,7 @@ export async function syncTierNightSession(payload) {
     game: payload.game ?? getState().tierNightGame,
     placements: payload.placements ?? cached.placements,
     finished: payload.finished ?? cached.finished,
+    lobbyStarted: payload.lobbyStarted ?? cached.lobbyStarted ?? true,
   });
   await patchGameState({ tierNight: remote }, { screen: payload.screen, gameId: "tiernight" });
 }
@@ -4137,6 +4235,17 @@ export function allTierNightMembersFinished(finishedMap) {
   if (!ids.length) return false;
   const map = finishedMap ?? getTierNightRemote()?.finished ?? {};
   return ids.every((id) => map[id]);
+}
+
+export function countTierNightMembersFinished(finishedMap) {
+  const map = finishedMap ?? getTierNightRemote()?.finished ?? {};
+  return getActiveMemberUserIds().filter((id) => map[id]).length;
+}
+
+export function canForceTierNightResults() {
+  const finished = countTierNightMembersFinished();
+  const total = getActiveMemberUserIds().length;
+  return finished > 0 && finished < total;
 }
 
 function tierNightLocalRecapsComplete(session, list) {
@@ -4209,9 +4318,10 @@ export async function finalizeTierNightLiveToResults() {
 }
 
 /** Hôte : fin Tier Night - récap + scores + écran en un seul write. */
-export async function advanceTierNightToResultsWhenReady(list) {
+export async function advanceTierNightToResultsWhenReady(list, { force = false } = {}) {
   if (!isGameSyncActive() || !isLobbyHost()) return false;
-  if (!allTierNightMembersFinished()) return false;
+  if (!force && !allTierNightMembersFinished()) return false;
+  if (force && countTierNightMembersFinished() === 0) return false;
 
   await ensureTierNightRecapsFromRemote(list);
   const recap = tierNightRecapToRemote(getTierNightSession());

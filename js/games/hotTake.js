@@ -43,6 +43,7 @@ import {
   getCachedGameSession,
   refreshGameSession,
 } from "../core/gameSync.js";
+import { voteConfirmChrome, pickForVoteConfirm } from "../core/voteConfirm.js";
 
 export function mountHotTake(app) {
   if (!requireLobbyPlay()) return null;
@@ -63,7 +64,10 @@ export function mountHotTake(app) {
 
   let takeIdx = 0;
   let phase = "question";
+  /** Vote validé (session). */
   let myVote = null;
+  /** Choix local avant « Valider mon vote ». */
+  let selected = null;
   let votes = {};
   let lastAward = null;
   let takeScored = false;
@@ -92,6 +96,26 @@ export function mountHotTake(app) {
     return takeScored || Boolean(getHotTakeSession().takeScored);
   }
 
+  function sessionInReveal() {
+    const session = getHotTakeSession();
+    return session.phase === "reveal" || Boolean(session.takeScored);
+  }
+
+  function enterRevealUi() {
+    syncFromSession();
+    if (!lastAward && hotTakeLastRoundFromSession()) {
+      const lr = hotTakeLastRoundFromSession();
+      lastAward = {
+        majority: lr.majority,
+        pointsAwarded: Boolean(lr.pointsAwarded),
+        deltas: lr.deltas || {},
+        dissenters: lr.dissenters || [],
+        majorityWinners: lr.majorityWinners || [],
+      };
+    }
+    render();
+  }
+
   function canAwardThisTake() {
     return !alreadyScoredThisTake() && (!mp || canActAsHost());
   }
@@ -104,13 +128,11 @@ export function mountHotTake(app) {
 
     if (phase !== "voting") {
       myVote = null;
+      selected = null;
+    } else if (voteCommitInFlight != null) {
+      myVote = voteCommitInFlight;
     } else {
-      if (voteCommitInFlight != null) {
-        myVote = voteCommitInFlight;
-        votes = { ...votes, [localName]: voteCommitInFlight };
-      } else {
-        myVote = votes[localName] ?? null;
-      }
+      myVote = votes[localName] ?? null;
     }
     takeScored = Boolean(s.takeScored);
     if (phase === "voting" && !takeScored) {
@@ -270,18 +292,15 @@ export function mountHotTake(app) {
     const votesToScore = votesForAward();
 
     if (alreadyScoredThisTake()) {
-      if (phase !== "reveal") {
-        phase = "reveal";
-        if (!mp) {
-          await commitHotTakePlay({
-            phase: "reveal",
-            takeScored: true,
-            votes: votesToScore,
-            voteEndsAt: null,
-          });
-        }
-        render();
+      if (mp && getHotTakeSession().phase !== "reveal") {
+        await commitHotTakePlay({
+          phase: "reveal",
+          takeScored: true,
+          votes: votesToScore,
+          voteEndsAt: null,
+        });
       }
+      enterRevealUi();
       return;
     }
 
@@ -294,8 +313,8 @@ export function mountHotTake(app) {
         });
       } else {
         phase = "reveal";
-        render();
       }
+      enterRevealUi();
       return;
     }
 
@@ -326,11 +345,13 @@ export function mountHotTake(app) {
           matchScores,
           lastRound,
         },
-        { withEveningScores: mp && canActAsHost() }
+        {
+          withEveningScores: mp && canActAsHost(),
+          withPatchFeedback: mp && canActAsHost(),
+        }
       );
-      syncFromSession();
       phase = "reveal";
-      render();
+      enterRevealUi();
     } finally {
       revealInFlight = false;
     }
@@ -351,6 +372,7 @@ export function mountHotTake(app) {
     } else {
       phase = "voting";
       myVote = null;
+      selected = null;
       votes = {};
       render();
     }
@@ -367,6 +389,7 @@ export function mountHotTake(app) {
       intermissionEndsAt: null,
       pausedBy: null,
     });
+    selected = null;
     syncFromSession();
     render();
   }
@@ -375,10 +398,39 @@ export function mountHotTake(app) {
   async function forceReveal() {
     if (mp && !canActAsHost()) return;
     if (!mp && !myVote) {
-      myVote = HOT_TAKE_OPTIONS[0];
-      votes = simulateLobbyVotes(myVote, HOT_TAKE_OPTIONS);
+      const pick = pickForVoteConfirm(selected, myVote) ?? HOT_TAKE_OPTIONS[0];
+      myVote = pick;
+      votes = simulateLobbyVotes(pick, HOT_TAKE_OPTIONS);
     }
     await goToReveal();
+  }
+
+  async function submitVote(pick) {
+    if (pick == null || voteCommitInFlight != null) return;
+    if (mp) {
+      voteCommitInFlight = pick;
+      render();
+      try {
+        await commitHotTakeVote(pick);
+        selected = null;
+        myVote = pick;
+      } finally {
+        voteCommitInFlight = null;
+        syncFromSession();
+      }
+      if (allHotTakeVotesIn() && canActAsHost()) {
+        await goToReveal();
+        return;
+      }
+    } else {
+      myVote = pick;
+      selected = null;
+      votes = simulateLobbyVotes(pick, HOT_TAKE_OPTIONS);
+      render();
+      await goToReveal();
+      return;
+    }
+    render();
   }
 
   function countPlayersVoted() {
@@ -397,15 +449,6 @@ export function mountHotTake(app) {
     const counts = voteCounts();
     const totalVotes = Object.values(counts).reduce((a, b) => a + b, 0);
     const host = !mp || canActAsHost();
-    const voteHint = mp
-      ? myVote
-        ? allHotTakeVotesIn()
-          ? "Tout le monde a voté !"
-          : "En attente des autres joueurs…"
-        : "Choisis ton camp !"
-      : myVote
-        ? "Les autres votent en même temps (NPC)."
-        : "Choisis ton camp !";
     const voteOptionsHint =
       "Valide = d'accord · Acceptable = bof · Criminel = pas d'accord";
     const outsiderTip = `<p class="hint hot-take-outsider-tip">💡 La minorité fait mieux que le troupeau (+${EVENING_POINTS.BONUS} vs +${EVENING_POINTS.WIN}). Ose le contre-pied ?</p>`;
@@ -425,21 +468,30 @@ export function mountHotTake(app) {
       const canVote = canChangeVote();
       const votedCount = countPlayersVoted();
       const totalPlayers = getActivePlayers().length;
+      const allIn = allHotTakeVotesIn();
+      const confirm = voteConfirmChrome({
+        selected,
+        committed: myVote,
+        allIn,
+        emptyHint: "Choisis ton camp !",
+      });
       phaseHtml = `
         <p class="label-upper label-upper--muted">Vote simultané</p>
         <div class="vote-buttons">
           ${HOT_TAKE_OPTIONS.map(
             (opt) => `
-            <button type="button" class="vote-btn ${myVote === opt ? "vote-btn--active" : ""}"
+            <button type="button" class="vote-btn ${confirm.displayPick === opt ? "vote-btn--active" : ""}"
               data-vote="${opt}" style="--vote-color:${HOT_TAKE_OPTION_COLORS[opt]}"
               ${canVote ? "" : "disabled"}>
-              ${opt}${myVote === opt ? " ✓" : ""}
+              ${opt}${confirm.displayPick === opt ? " ✓" : ""}
             </button>`
           ).join("")}
         </div>
         <p class="hint">${voteOptionsHint}</p>
         ${outsiderTip}
-        <p class="hint">${voteHint}</p>
+        <p class="hint">${escapeHtml(confirm.hint)}</p>
+        <button type="button" class="btn ${confirm.confirmClass} btn--spaced" id="hottake-confirm"
+          ${confirm.confirmDisabled ? "disabled" : ""}>${escapeHtml(confirm.confirmLabel)}</button>
         ${
           host
             ? `<button type="button" class="btn btn-secondary btn--spaced" id="hottake-force">
@@ -520,33 +572,15 @@ export function mountHotTake(app) {
     app.querySelector("#start-vote")?.addEventListener("click", () => startVotePhase());
 
     app.querySelectorAll("[data-vote]").forEach((btn) => {
-      btn.addEventListener("click", async () => {
+      btn.addEventListener("click", () => {
         if (!canChangeVote()) return;
-        const choice = btn.getAttribute("data-vote");
-        if (choice === myVote && votes[localName] === choice) return;
-        myVote = choice;
-        votes = { ...votes, [localName]: choice };
-        if (mp) {
-          voteCommitInFlight = choice;
-          render();
-          try {
-            await commitHotTakeVote(choice);
-          } finally {
-            voteCommitInFlight = null;
-            syncFromSession();
-          }
-          if (allHotTakeVotesIn() && canActAsHost()) {
-            await goToReveal();
-            return;
-          }
-        } else {
-          votes = simulateLobbyVotes(choice, HOT_TAKE_OPTIONS);
-          render();
-          await goToReveal();
-          return;
-        }
+        selected = btn.getAttribute("data-vote");
         render();
       });
+    });
+
+    app.querySelector("#hottake-confirm")?.addEventListener("click", () => {
+      void submitVote(pickForVoteConfirm(selected, myVote));
     });
 
     app.querySelector("#hottake-force")?.addEventListener("click", () => {
@@ -558,6 +592,7 @@ export function mountHotTake(app) {
         const nextIdx = takeIdx + 1;
         takeIdx = nextIdx;
         myVote = null;
+        selected = null;
         votes = {};
         lastAward = null;
         takeScored = false;
@@ -592,7 +627,7 @@ export function mountHotTake(app) {
 
   function shouldSkipFullRender(prevPhase, prevTake, prevVotesJson) {
     if (phase !== prevPhase || takeIdx !== prevTake) return false;
-    if (phase !== "voting" && phase !== "reveal") return false;
+    if (phase !== "voting") return false;
     const votesNow = JSON.stringify(getHotTakeSession().votes || {});
     if (votesNow !== prevVotesJson) return false;
     return true;
@@ -618,19 +653,33 @@ export function mountHotTake(app) {
     const prevTake = takeIdx;
     const prevVotesJson = JSON.stringify(getHotTakeSession().votes || {});
     syncFromSession();
+
+    if (phase === "voting" && sessionInReveal()) {
+      enterRevealUi();
+      return;
+    }
+
     if (phase === "voting" && canActAsHost() && allHotTakeVotesIn()) {
       void goToReveal();
       return;
     }
+
+    if (phase === "reveal" && prevPhase !== "reveal") {
+      enterRevealUi();
+      return;
+    }
+
+    if (phase === "reveal" && prevPhase === "reveal") {
+      refreshGameScoresBox(app, {
+        gameLabel: "Hot Take",
+        title: "Cumul des scores",
+        scores: hotTakeSessionScores(),
+      });
+      return;
+    }
+
     if (shouldSkipFullRender(prevPhase, prevTake, prevVotesJson)) {
-      if (phase === "voting") patchVotingChrome();
-      if (phase === "reveal") {
-        refreshGameScoresBox(app, {
-          gameLabel: "Hot Take",
-          title: "Cumul des scores",
-          scores: hotTakeSessionScores(),
-        });
-      }
+      patchVotingChrome();
       return;
     }
     render();

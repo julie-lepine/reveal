@@ -43,6 +43,7 @@ import {
   onGameSessionChange,
   returnToGameSelect,
 } from "../core/gameSync.js";
+import { voteConfirmChrome, pickForVoteConfirm } from "../core/voteConfirm.js";
 
 export function mountTraitre(app) {
   if (!requireLobbyPlay()) return null;
@@ -60,6 +61,8 @@ export function mountTraitre(app) {
   let alive = [];
   let eliminated = [];
   let votes = {};
+  /** Cible locale avant « Valider mon vote » (phase vote). */
+  let selectedVote = null;
   let lastEliminated = null;
   let impostorRevealed = false;
   let winner = null;
@@ -91,6 +94,9 @@ export function mountTraitre(app) {
     alive = [...(s.alive || [])];
     eliminated = [...(s.eliminated || [])];
     votes = { ...(s.votes || {}) };
+    if (phase !== "vote") {
+      selectedVote = null;
+    }
     lastEliminated = s.lastEliminated || null;
     impostorRevealed = Boolean(s.impostorRevealed);
     winner = s.winner || null;
@@ -367,15 +373,13 @@ export function mountTraitre(app) {
       </div>`;
   }
 
-  function voteGridHtml() {
+  function voteGridHtml(displayPick) {
     const targets = getTraitreVoteTargets();
-    const normalizedVotes = normalizeTraitreVotes(votes, alive);
-    const myVote = normalizedVotes[localName];
     return `
       <div class="traitre-vote-grid">
         ${targets
           .map((p) => {
-            const active = myVote === p.name;
+            const active = displayPick === p.name;
             return `
             <button type="button" class="traitre-vote-btn ${active ? "traitre-vote-btn--active" : ""}"
               data-traitre-vote="${escapeHtml(p.name)}">
@@ -466,9 +470,17 @@ export function mountTraitre(app) {
         ${decisionBtnsHtml(host)}`;
     } else if (phase === "vote") {
       const normalizedVotes = normalizeTraitreVotes(votes, alive);
+      const committedVote = normalizedVotes[localName];
       const votedCount = countTraitreVotesCast(normalizedVotes, alive);
       const isAlive = alive.includes(localName);
       const pendingVoters = getTraitrePendingVoters({ ...session, votes: normalizedVotes });
+      const allIn = allTraitreVotesIn({ ...session, votes: normalizedVotes });
+      const confirm = voteConfirmChrome({
+        selected: selectedVote,
+        committed: committedVote,
+        allIn,
+        emptyHint: "Qui est le fake ?",
+      });
       phaseHtml = `
         <div class="card">
           <p class="card-heading">Vote d'élimination</p>
@@ -486,7 +498,10 @@ export function mountTraitre(app) {
         </div>
         ${
           isAlive
-            ? voteGridHtml()
+            ? `${voteGridHtml(confirm.displayPick)}
+          <p class="hint">${escapeHtml(confirm.hint)}</p>
+          <button type="button" class="btn ${confirm.confirmClass} btn--spaced" id="traitre-confirm-vote"
+            ${confirm.confirmDisabled ? "disabled" : ""}>${escapeHtml(confirm.confirmLabel)}</button>`
             : `<p class="hint">Tu as été éliminé - tu ne peux plus voter.</p>`
         }
         ${
@@ -556,20 +571,29 @@ export function mountTraitre(app) {
     });
 
     app.querySelectorAll("[data-traitre-vote]").forEach((btn) => {
-      btn.addEventListener("click", async () => {
+      btn.addEventListener("click", () => {
         if (phase !== "vote" || !alive.includes(localName)) return;
-        const target = btn.getAttribute("data-traitre-vote");
-        await commitTraitreVote(target);
-        if (!mp) {
-          const s = getTraitreSession();
-          const merged = simulateTraitreVotes(target, s);
-          await commitTraitrePlay({ ...s, votes: { ...merged, [localName]: target } });
-        }
-        if (allTraitreVotesIn(getTraitreSession()) && (!mp || canActAsHost())) {
-          await resolveVoteRound();
-        }
+        selectedVote = btn.getAttribute("data-traitre-vote");
         render();
       });
+    });
+
+    app.querySelector("#traitre-confirm-vote")?.addEventListener("click", async () => {
+      if (phase !== "vote" || !alive.includes(localName)) return;
+      const normalizedVotes = normalizeTraitreVotes(votes, alive);
+      const pick = pickForVoteConfirm(selectedVote, normalizedVotes[localName]);
+      if (pick == null) return;
+      await commitTraitreVote(pick);
+      selectedVote = null;
+      if (!mp) {
+        const s = getTraitreSession();
+        const merged = simulateTraitreVotes(pick, s);
+        await commitTraitrePlay({ ...s, votes: { ...merged, [localName]: pick } });
+      }
+      if (allTraitreVotesIn(getTraitreSession()) && (!mp || canActAsHost())) {
+        await resolveVoteRound();
+      }
+      render();
     });
 
     app.querySelector("#btn-force-vote")?.addEventListener("click", () => {

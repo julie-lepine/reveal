@@ -797,10 +797,13 @@ button.game-card{
 }
 
 .hot-take-text{
-  font-size:22px;
+  font-size:clamp(18px,4.5vw,22px);
   font-weight:800;
   line-height:1.4;
   margin:0;
+  overflow-wrap:anywhere;
+  word-break:break-word;
+  hyphens:auto;
 }
 
 .progress--timer{ margin-top:0; margin-bottom:20px; }
@@ -1023,6 +1026,8 @@ button.game-card{
   cursor:pointer;
   width:100%;
   transition:all .25s;
+  overflow-wrap:anywhere;
+  word-break:break-word;
 }
 
 .statement__letter{
@@ -4791,6 +4796,8 @@ body{
   font-weight:900;
   line-height:1.25;
   margin:0 0 12px;
+  overflow-wrap:anywhere;
+  word-break:break-word;
 }
 
 .dilemma__option--a{ color:#60A5FA; }
@@ -6971,6 +6978,7 @@ body{
 }
 .wrong-input:focus{ border-color:rgba(244,114,182,.8); }
 .wrong-input__count{ text-align:right; margin:6px 2px 0; }
+.field-char-count{ text-align:right; margin:4px 2px 10px; }
 
 .wrong-vote-list{
   display:flex;

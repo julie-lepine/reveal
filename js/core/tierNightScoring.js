@@ -17,6 +17,24 @@ function rankValue(tier) {
   return TIER_RANK[tier] ?? 4;
 }
 
+/** Rang médian (0=S … 4=D) ; pour N pair, moyenne des deux rangs centraux arrondie vers le bas. */
+export function medianTierRank(sortedRanks) {
+  if (!sortedRanks.length) return 2;
+  const n = sortedRanks.length;
+  if (n % 2 === 1) return sortedRanks[Math.floor(n / 2)];
+  return Math.floor((sortedRanks[n / 2 - 1] + sortedRanks[n / 2]) / 2);
+}
+
+export function tierRankToLetter(rank) {
+  const clamped = Math.max(0, Math.min(4, rank));
+  return TIER_LEVELS[clamped] || "C";
+}
+
+export function medianTierFromRanks(ranks) {
+  const sorted = [...ranks].sort((a, b) => a - b);
+  return tierRankToLetter(medianTierRank(sorted));
+}
+
 /** Points pour un item selon l'écart de tier local vs consensus. */
 export function tierNightPointsForItem(localTier, consensusTier, { reverse = false } = {}) {
   const diff = Math.abs(rankValue(localTier) - rankValue(consensusTier));

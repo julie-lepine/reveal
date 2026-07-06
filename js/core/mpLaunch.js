@@ -19,6 +19,7 @@ import {
   getEffectiveSessionScreen,
   isGameSyncActive,
   isLobbyHost,
+  canActAsHost,
   patchGameState,
   pushGameSession,
   userIdForName,
@@ -239,7 +240,8 @@ export async function commitHostGamePlay({
 }) {
   const session = { ...getSession(), ...patch };
   saveLocal(session);
-  if (!isGameSyncActive() || !isLobbyHost()) return session;
+  // Hôte effectif (repli si l'hôte est absent) : révéler / manche suivante doivent sync MP.
+  if (!isGameSyncActive() || !canActAsHost()) return session;
   const remotePatch = { [stateKey]: pickRemotePlayFields(toRemote(session), patch) };
   const opts = { gameId, screen: screen || gameId, ...patchOpts };
   if (patchOpts.withPatchFeedback) {

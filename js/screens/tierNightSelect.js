@@ -11,8 +11,18 @@ import {
   DEFAULT_TIER_NIGHT_MODIFIER,
 } from "../../data/tierTopics.js";
 import { navigate } from "../core/router.js";
-import { isGameSyncActive, isLobbyHost, syncTierNightSession } from "../core/gameSync.js";
-import { markTierNightLiveLobbyStarted } from "../core/tierNightLiveSession.js";
+import {
+  isGameSyncActive,
+  isLobbyHost,
+  onGameSessionChange,
+  getCachedGameSession,
+  getEffectiveSessionScreen,
+} from "../core/gameSync.js";
+import {
+  markTierNightLiveLobbyStarted,
+  markTierNightClassicStarted,
+} from "../core/tierNightLiveSession.js";
+import { navigateAfterGameLaunch, prepGuestFollowOnSession } from "../core/mpLaunch.js";
 import { escapeHtml, pageShell, tierLogoHtml, bindTierLogos } from "../core/ui.js";
 import { rulesButtonHtml } from "../core/gameRulesUi.js";
 import { bindNav } from "./nav.js";
@@ -117,19 +127,24 @@ export function mountTierNightSelect(app) {
     if (mode === "live") {
       const list = getTierListById(topicId);
       if (!list) return;
+      const result = isGameSyncActive()
+        ? await markTierNightLiveLobbyStarted({
+            topicId,
+            listName: list.name,
+            items: list.items,
+          })
+        : null;
       if (isGameSyncActive()) {
-        await markTierNightLiveLobbyStarted({
-          topicId,
-          listName: list.name,
-          items: list.items,
-        });
+        navigateAfterGameLaunch({ gameScreen: "tiernight-live", result });
+      } else {
+        navigate("tiernight-live");
       }
-      navigate("tiernight-live");
       return;
     }
 
     if (isGameSyncActive()) {
-      await syncTierNightSession({ topicId, mode, modifier, screen: "tiernight" });
+      const result = await markTierNightClassicStarted({ topicId, mode, modifier });
+      navigateAfterGameLaunch({ gameScreen: "tiernight", result });
     } else {
       navigate("tiernight");
     }
@@ -150,7 +165,7 @@ export function mountTierNightSelect(app) {
 
   function listStepHtml() {
     const live = selectedMode === "live";
-    const header = live ? "⚡ Mode En direct" : "🤝 Mode Consensus";
+    const header = live ? "⚡ Mode En direct" : "📊 Mode Rank it";
     const modifiersHtml = live
       ? ""
       : `<p class="field-label">Variante de manche</p>
@@ -240,7 +255,7 @@ export function mountTierNightSelect(app) {
       return;
     }
 
-    // step === "list" (consensus ou live)
+    // step === "list" (Rank it ou live)
     app.querySelectorAll("[data-modifier]").forEach((btn) => {
       btn.addEventListener("click", () => {
         selectedModifier = btn.getAttribute("data-modifier");
@@ -250,8 +265,18 @@ export function mountTierNightSelect(app) {
     bindTierGrid(app, (id) => startGame(id, selectedMode));
   }
 
+  const unsubSession = onGameSessionChange(
+    prepGuestFollowOnSession({
+      prepScreen: "tiernight-select",
+      getEntryScreen: () => getEffectiveSessionScreen(getCachedGameSession()),
+    })
+  );
+
   render();
-  return null;
+
+  return () => {
+    unsubSession?.();
+  };
 }
 
 function bindTierGrid(app, onSelect) {

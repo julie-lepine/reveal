@@ -8,8 +8,6 @@ import {
   refreshEveningScoresFromSession,
   onGameSessionChange,
   tryFollowHostGameSession,
-  routeToActiveGameIfNeeded,
-  isLobbyHost,
 } from "../core/gameSync.js";
 
 export function mountLeaderboard(app) {
@@ -72,18 +70,10 @@ export function mountLeaderboard(app) {
 
   let unsubSession = () => {};
   if (isGameSyncActive()) {
-    if (!isLobbyHost()) {
-      void (async () => {
-        await refreshEveningScoresFromSession();
-        await routeToActiveGameIfNeeded();
-        if (getCurrentScreen() === "leaderboard") renderBoard();
-      })();
-    } else {
-      renderBoard();
-      void refreshEveningScoresFromSession().then(() => {
-        if (getCurrentScreen() === "leaderboard") renderBoard();
-      });
-    }
+    renderBoard();
+    void refreshEveningScoresFromSession().then(() => {
+      if (getCurrentScreen() === "leaderboard") renderBoard();
+    });
     unsubSession = onGameSessionChange((row) => {
       tryFollowHostGameSession(row);
       if (getCurrentScreen() === "leaderboard") renderBoard();

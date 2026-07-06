@@ -366,7 +366,21 @@ export async function launchTierNightSelect() {
     if (!(await requireHostToLaunch())) return;
     try {
       await startGameSession("tiernight", "tiernight-select", {
-        tierNight: { topicId: null, game: null, placements: {}, finished: {} },
+        tierNight: {
+          topicId: null,
+          lobbyStarted: false,
+          placements: {},
+          finished: {},
+          game: null,
+          recap: null,
+        },
+        tierNightLive: {
+          lobbyStarted: false,
+          finished: true,
+          phase: "done",
+          votes: {},
+          roundIdx: 0,
+        },
       });
     } catch (e) {
       console.warn("REVEAL launch TierNight:", e);

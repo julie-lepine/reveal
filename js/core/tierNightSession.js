@@ -5,7 +5,15 @@ import {
   tierNightPointsForItem,
 } from "./tierNightScoring.js";
 
-export { buildTierNightScoreBreakdown, tierNightPointsForItem, tierNightPointsHintText } from "./tierNightScoring.js";
+export {
+  buildTierNightScoreBreakdown,
+  tierNightPointsForItem,
+  tierNightPointsHintText,
+  medianTierRank,
+  tierRankToLetter,
+  medianTierFromRanks,
+} from "./tierNightScoring.js";
+export { computeConsensusPlaced, recapHasPlacements } from "./tierNightConsensus.js";
 import { getActivePlayers } from "./players.js";
 import {
   getLocalDisplayName,
@@ -16,6 +24,7 @@ import {
   getState,
 } from "./state.js";
 import { isLobbyHost } from "./gameSync.js";
+import { computeConsensusPlaced, recapHasPlacements } from "./tierNightConsensus.js";
 
 const TIER_RANK = { S: 0, A: 1, B: 2, C: 3, D: 4 };
 
@@ -49,23 +58,6 @@ function isLocalLobbyHost() {
   return isLobbyHost();
 }
 
-/** Consensus = tier médian des joueurs pour chaque item */
-export function computeConsensusPlaced(recaps, items) {
-  const consensus = {};
-  TIER_LEVELS.forEach((t) => {
-    consensus[t] = [];
-  });
-
-  items.forEach((item) => {
-    const ranks = recaps.map((r) => rankValue(tierOfItem(r.placed, item)));
-    ranks.sort((a, b) => a - b);
-    const mid = ranks[Math.floor(ranks.length / 2)];
-    const tier = TIER_LEVELS[mid] || "C";
-    consensus[tier].push(item);
-  });
-  return consensus;
-}
-
 export function scoreConsensusProximity(localPlaced, consensus, { reverse = false } = {}) {
   return buildTierNightScoreBreakdown(localPlaced, consensus, { reverse }).proximityTotal;
 }
@@ -83,10 +75,12 @@ export function getTierNightScoreBreakdownForPlayer(playerName, session = getTie
 
 /** Item avec le plus de désaccord entre joueurs */
 export function findMostControversialItem(recaps, items) {
+  const participating = recaps.filter(recapHasPlacements);
+  if (!participating.length) return { item: items[0], spread: 0 };
   let best = items[0];
   let bestSpread = -1;
   items.forEach((item) => {
-    const ranks = recaps.map((r) => rankValue(tierOfItem(r.placed, item)));
+    const ranks = participating.map((r) => rankValue(tierOfItem(r.placed, item)));
     const spread = Math.max(...ranks) - Math.min(...ranks);
     if (spread > bestSpread) {
       bestSpread = spread;
@@ -100,6 +94,10 @@ function attachConsensusPoints(recaps, consensus) {
   const modifier = getTierNightModifierById(getTierNightModifier());
   const reverse = Boolean(modifier?.reverseScore);
   recaps.forEach((r) => {
+    if (!recapHasPlacements(r)) {
+      r.consensusPoints = 0;
+      return;
+    }
     r.consensusPoints = scoreConsensusProximity(r.placed, consensus, { reverse });
   });
   return recaps;
@@ -144,6 +142,7 @@ function applyTierNightRoundScores(recaps) {
   const toScore = mp ? recaps : recaps.filter((r) => r.player === getLocalDisplayName());
 
   toScore.forEach((r) => {
+    if (!recapHasPlacements(r)) return;
     const pts = Math.max(0, r.consensusPoints ?? 0);
     addScore(r.player, pts);
     bumpPlayerStat(r.player, "tierConsensusPoints", pts);

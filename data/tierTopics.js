@@ -141,15 +141,15 @@ export const TIER_COLORS = {
 
 /**
  * Modes de jeu Tier Night.
- * - consensus : flux classique (chacun classe, on calcule le médian du groupe).
+ * - consensus : flux classique Rank it (chacun classe, médiane du groupe).
  * - roster    : les items sont les joueurs du lobby (« classe le groupe »).
  * - live      : révélation item par item, vote en temps réel.
  */
 export const TIER_NIGHT_MODES = [
   {
     id: "consensus",
-    name: "Consensus",
-    emoji: "🤝",
+    name: "Rank it",
+    emoji: "📊",
     tagline: "Classe, puis compare au groupe",
     desc: "Chacun fait sa tier list. On calcule le classement médian du groupe et tu marques selon ta proximité.",
     needsList: true,

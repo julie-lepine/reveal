@@ -43,7 +43,11 @@ import {
   updateReadyButton,
   updatePrepStartSlot,
   bindPrepLaunchButtons,
+  charCountHtml,
+  bindCharCounter,
+  updateCharCount,
 } from "../core/prepScreen.js";
+import { PLAYER_TEXT_MAX_LEN } from "../../data/playerTextLimits.js";
 import { bindNav } from "./nav.js";
 
 export function mountDilemmaPrep(app) {
@@ -56,6 +60,7 @@ export function mountDilemmaPrep(app) {
     getReadyMap: () => getDilemmaSession().ready || {},
   });
   const moderationNotice = getModerationNotice();
+  let unbindCharCounters = () => {};
 
   function captureDraft() {
     return {
@@ -238,6 +243,8 @@ export function mountDilemmaPrep(app) {
       const inputB = app.querySelector("#dilemma-option-b");
       if (inputA) inputA.value = "";
       if (inputB) inputB.value = "";
+      updateCharCount(inputA, app.querySelector("#dilemma-option-a-count"));
+      updateCharCount(inputB, app.querySelector("#dilemma-option-b-count"));
     });
 
     app.querySelector("#btn-ready")?.addEventListener("click", () => {
@@ -249,6 +256,20 @@ export function mountDilemmaPrep(app) {
     });
 
     bindPrepLaunchButtons(app, { onLaunch });
+
+    unbindCharCounters();
+    const unbindA = bindCharCounter(
+      app.querySelector("#dilemma-option-a"),
+      app.querySelector("#dilemma-option-a-count")
+    );
+    const unbindB = bindCharCounter(
+      app.querySelector("#dilemma-option-b"),
+      app.querySelector("#dilemma-option-b-count")
+    );
+    unbindCharCounters = () => {
+      unbindA();
+      unbindB();
+    };
   }
 
   function customDilemmaCardHtml() {
@@ -266,12 +287,14 @@ export function mountDilemmaPrep(app) {
         <div class="card">
           <p class="card-heading">Ton dilemme</p>
           <label class="field-label" for="dilemma-option-a">Option A</label>
-          <input type="text" class="field-input" id="dilemma-option-a" maxlength="120" placeholder="Ex : Ne plus jamais dormir" />
+          <input type="text" class="field-input" id="dilemma-option-a" maxlength="${PLAYER_TEXT_MAX_LEN}" placeholder="Ex : Ne plus jamais dormir" />
+          ${charCountHtml("dilemma-option-a-count")}
           <label class="field-label" for="dilemma-option-b">Option B</label>
           <div class="join-row">
-            <input type="text" class="field-input join-input" id="dilemma-option-b" maxlength="120" placeholder="Ex : Ne plus jamais manger chaud" />
+            <input type="text" class="field-input join-input" id="dilemma-option-b" maxlength="${PLAYER_TEXT_MAX_LEN}" placeholder="Ex : Ne plus jamais manger chaud" />
             <button type="button" class="btn btn-secondary join-btn" id="add-dilemma">+</button>
           </div>
+          ${charCountHtml("dilemma-option-b-count")}
           <p class="moderation-notice">${escapeHtml(moderationNotice)}</p>
           <p class="auth-error hidden" id="dilemma-error"></p>
           ${othersDilemmasHintHtml()}
@@ -311,7 +334,7 @@ export function mountDilemmaPrep(app) {
           <h2 class="screen-title">Préparation</h2>
           ${rulesButtonHtml("dilemma")}
         </div>
-        <p class="game-intro">Choix impossible A vs B, reveal dès que tout le monde a choisi. Ajoute tes dilemmes si tu veux.</p>
+        <p class="game-intro">Choix impossible A vs B, reveal dès que tout le monde a choisi. Ajoute tes dilemmes si tu veux. <span class="muted">(${PLAYER_TEXT_MAX_LEN} caractères max. par option)</span></p>
 
         <div class="card">
           <p class="card-heading">Deck de dilemmes</p>
@@ -363,6 +386,14 @@ export function mountDilemmaPrep(app) {
 
     bindEvents();
     restoreDraft(draft);
+    updateCharCount(
+      app.querySelector("#dilemma-option-a"),
+      app.querySelector("#dilemma-option-a-count")
+    );
+    updateCharCount(
+      app.querySelector("#dilemma-option-b"),
+      app.querySelector("#dilemma-option-b-count")
+    );
     refreshDeckAndRounds();
     refreshReadySection();
     mounted = true;
@@ -400,6 +431,7 @@ export function mountDilemmaPrep(app) {
   });
 
   return () => {
+    unbindCharCounters();
     unbindRemove();
     prepLobby.dispose();
     unsub();

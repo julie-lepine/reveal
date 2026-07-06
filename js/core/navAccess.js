@@ -1,5 +1,5 @@
 import { getCurrentScreen, navigate } from "./router.js";
-import { isActiveGameSessionScreen } from "./gameSync.js";
+import { isActiveGameSessionScreen, suppressRoutingForScoreView } from "./gameSync.js";
 import { hasActiveLobby } from "./lobby.js";
 
 /**
@@ -24,8 +24,7 @@ const SCORES_NAV_STACK = {
 /**
  * Navigation centralisée vers un écran de scores, respectant le verrou.
  * Tous les boutons « Résultats » / « Classement » de l'app passent par ici
- * (barre du bas + boutons in-screen via handleNavTarget), donc plus aucune
- * gestion de suppress au cas par cas.
+ * (barre du bas + boutons in-screen via handleNavTarget).
  */
 export function goToScores(target) {
   if (target !== "results" && target !== "leaderboard") return false;
@@ -35,5 +34,6 @@ export function goToScores(target) {
     return false;
   }
   navigate(target, { navStack: SCORES_NAV_STACK[target] });
+  suppressRoutingForScoreView();
   return true;
 }

@@ -1,6 +1,25 @@
+import { PLAYER_TEXT_MAX_LEN, playerTextRemaining } from "../../data/playerTextLimits.js";
 import { escapeHtml } from "./ui.js";
 import { getCurrentScreen } from "./router.js";
 import { isGameSyncActive, refreshGameSession } from "./gameSync.js";
+
+/** Compteur « X caractères restants » sous un champ de saisie joueur. */
+export function charCountHtml(countId, max = PLAYER_TEXT_MAX_LEN) {
+  return `<p class="hint field-char-count" aria-live="polite"><span id="${countId}">${max}</span> caractères restants</p>`;
+}
+
+export function updateCharCount(input, countEl, max = PLAYER_TEXT_MAX_LEN) {
+  if (!input || !countEl) return;
+  countEl.textContent = String(playerTextRemaining(input.value, max));
+}
+
+export function bindCharCounter(input, countEl, max = PLAYER_TEXT_MAX_LEN) {
+  if (!input || !countEl) return () => {};
+  const update = () => updateCharCount(input, countEl, max);
+  input.addEventListener("input", update);
+  update();
+  return () => input.removeEventListener("input", update);
+}
 
 /** Carte « Joueurs prêts » (HTML initial). */
 export function playersReadySectionHtml(members, readyMap, { readyKey = (m) => m.name } = {}) {

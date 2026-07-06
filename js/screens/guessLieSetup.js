@@ -4,6 +4,15 @@ import { navigate } from "../core/router.js";
 import { pageShell } from "../core/ui.js";
 import { rulesButtonHtml } from "../core/gameRulesUi.js";
 import { checkHotTakeModeration, getModerationNotice } from "../core/hotTakeSession.js";
+import {
+  charCountHtml,
+  bindCharCounter,
+} from "../core/prepScreen.js";
+import {
+  isPlayerTextTooLong,
+  PLAYER_TEXT_MAX_LEN,
+  playerTextMaxError,
+} from "../../data/playerTextLimits.js";
 import { bindNav } from "./nav.js";
 
 export function mountGuessLieSetup(app) {
@@ -13,6 +22,7 @@ export function mountGuessLieSetup(app) {
   }
 
   let lieIndex = null;
+  let unbindCharCounters = () => {};
 
   app.innerHTML = pageShell({
     backTarget: "back",
@@ -24,17 +34,21 @@ export function mountGuessLieSetup(app) {
       </div>
       <p class="game-intro">
         Écris <strong>2 vérités</strong> et <strong>1 mensonge</strong> sur toi, puis choisis la lettre du mensonge.
+        <span class="muted"> (${PLAYER_TEXT_MAX_LEN} caractères max. par affirmation)</span>
       </p>
 
       <div class="card">
         <label class="field-label" for="stmt-0">Affirmation A</label>
-        <input type="text" class="field-input" id="stmt-0" maxlength="120" placeholder="Ex : J'ai vécu en Italie…" />
+        <input type="text" class="field-input" id="stmt-0" maxlength="${PLAYER_TEXT_MAX_LEN}" placeholder="Ex : J'ai vécu en Italie…" />
+        ${charCountHtml("stmt-0-count")}
 
         <label class="field-label" for="stmt-1">Affirmation B</label>
-        <input type="text" class="field-input" id="stmt-1" maxlength="120" placeholder="Ex : Je déteste le café…" />
+        <input type="text" class="field-input" id="stmt-1" maxlength="${PLAYER_TEXT_MAX_LEN}" placeholder="Ex : Je déteste le café…" />
+        ${charCountHtml("stmt-1-count")}
 
         <label class="field-label" for="stmt-2">Affirmation C</label>
-        <input type="text" class="field-input" id="stmt-2" maxlength="120" placeholder="Ex : J'ai un tatouage…" />
+        <input type="text" class="field-input" id="stmt-2" maxlength="${PLAYER_TEXT_MAX_LEN}" placeholder="Ex : J'ai un tatouage…" />
+        ${charCountHtml("stmt-2-count")}
       </div>
 
       <p class="field-label field-label--spaced">Laquelle est le mensonge ?</p>
@@ -68,6 +82,12 @@ export function mountGuessLieSetup(app) {
   const goBtn = app.querySelector("#btn-go");
   const hint = app.querySelector("#setup-hint");
   const lieButtons = app.querySelectorAll("[data-lie]");
+
+  unbindCharCounters();
+  const unsubs = inputs.map((input, i) =>
+    bindCharCounter(input, app.querySelector(`#stmt-${i}-count`))
+  );
+  unbindCharCounters = () => unsubs.forEach((u) => u());
 
   function updateLieButtons() {
     lieButtons.forEach((btn) => {
@@ -110,6 +130,14 @@ export function mountGuessLieSetup(app) {
   goBtn.addEventListener("click", async () => {
     const statements = inputs.map((el) => el.value.trim());
     if (statements.some((s) => !s) || lieIndex === null) return;
+    if (statements.some((s) => isPlayerTextTooLong(s))) {
+      const errEl = app.querySelector("#guesslie-error");
+      if (errEl) {
+        errEl.textContent = playerTextMaxError();
+        errEl.classList.remove("hidden");
+      }
+      return;
+    }
     const blocked = statements.map((s) => checkHotTakeModeration(s)).find((m) => m.blocked);
     if (blocked) {
       const errEl = app.querySelector("#guesslie-error");
@@ -131,5 +159,5 @@ export function mountGuessLieSetup(app) {
   bindNav(app);
 
   validate();
-  return null;
+  return () => unbindCharCounters();
 }

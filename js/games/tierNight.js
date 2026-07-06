@@ -22,6 +22,8 @@ import {
   ensureTierNightRecapsFromRemote,
   getTierNightLobbyProgress,
   refreshGameSession,
+  isLobbyHost,
+  canForceTierNightResults,
 } from "../core/gameSync.js";
 import { getSupabaseUserId } from "../core/supabaseAuth.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
@@ -121,6 +123,9 @@ export function mountTierNight(app) {
     const progress = getTierNightLobbyProgress();
     const doneCount = progress.filter((p) => p.done).length;
     const total = progress.length;
+    const host = isLobbyHost();
+    const canForce = host && canForceTierNightResults();
+    const waitingNames = progress.filter((p) => !p.done).map((p) => p.name);
     return `
       <div class="card tier-lobby-wait">
         <p class="card-heading">En attente du lobby</p>
@@ -138,7 +143,24 @@ export function mountTierNight(app) {
             )
             .join("")}
         </div>
+        ${
+          canForce
+            ? `<button type="button" class="btn btn-secondary btn--spaced" id="btn-tiernight-force">
+                Voir les résultats (${doneCount}/${total})
+              </button>
+              <p class="hint">${
+                waitingNames.length
+                  ? `${escapeHtml(waitingNames.join(", "))} n’${waitingNames.length > 1 ? "ont" : "a"} pas terminé et ne sera${waitingNames.length > 1 ? "ont" : ""} pas compté${waitingNames.length > 1 ? "s" : ""} dans le classement du groupe.`
+                  : "Les joueurs en attente ne seront pas comptés dans le classement du groupe."
+              }</p>`
+            : ""
+        }
       </div>`;
+  }
+
+  async function forceResults() {
+    if (!isLobbyHost()) return;
+    await advanceTierNightToResultsWhenReady(list, { force: true });
   }
 
   function render() {
@@ -240,6 +262,11 @@ export function mountTierNight(app) {
     const page = app.querySelector(".page");
     if (page) page.scrollTop = prevScroll;
     if (!finished) bindGameEvents(remaining);
+    if (waitingLobby) {
+      app.querySelector("#btn-tiernight-force")?.addEventListener("click", () => {
+        void forceResults();
+      });
+    }
   }
 
   function clearTierDropHighlight() {

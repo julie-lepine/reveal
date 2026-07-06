@@ -3,12 +3,10 @@ import {
   getTierNightRecaps,
   getTierNightSession,
   getTierNightRoundPointsSorted,
-  getTierConsensus,
   getTierNightScoreBreakdownForPlayer,
 } from "../core/tierNightSession.js";
 import { getTierListById } from "../core/tierLists.js";
 import { getTierNightTopicId } from "../core/state.js";
-import { exportTierBoardPng, downloadDataUrl } from "../core/tierExport.js";
 import { getLocalDisplayName, setLastGame } from "../core/state.js";
 import { setLobbyWaiting } from "../core/lobby.js";
 import {
@@ -158,17 +156,14 @@ function controversialHtml(session, recaps, labelFn = (i) => i) {
 }
 
 export function mountTierNightEnd(app) {
-  let phase = "recap";
   let session = getTierNightSession();
   let recaps = getTierNightRecaps();
   const localName = getLocalDisplayName();
-  let localRecap = recaps.find((r) => r.player === localName);
   let bootstrapping = false;
 
   function reloadSession() {
     session = getTierNightSession();
     recaps = getTierNightRecaps();
-    localRecap = recaps.find((r) => r.player === localName);
   }
 
   async function bootstrapRecaps() {
@@ -235,10 +230,7 @@ export function mountTierNightEnd(app) {
     reloadSession();
     const roundSorted = getTierNightRoundPointsSorted();
     const labelFn = makeItemLabel(session, recaps);
-    let content = "";
-
-    if (phase === "recap") {
-      content = `
+    const content = `
         <p class="label-upper label-upper--gold">🏆 Tier Night</p>
         <h2 class="screen-title">Récap des classements</h2>
         <p class="game-intro">« ${escapeHtml(session.listName || "Tier list")} » - +${session.localConsensusPoints ?? 0} pts consensus pour toi cette manche.</p>
@@ -273,54 +265,17 @@ export function mountTierNightEnd(app) {
             : `<p class="hint">Chargement des classements…</p>`}
         </div>
         ${eveningRecapRestartButtonHtml({ gameId: "tiernight", title: "TierNight" })}
-        <button type="button" class="btn btn-primary" id="btn-export-phase">Continuer →</button>`;
-    }
-
-    if (phase === "export") {
-      const hasConsensus = Boolean(session.consensus);
-      content = `
-        <p class="label-upper label-upper--gold">📸 Export</p>
-        <h2 class="screen-title">Les boards</h2>
-        <p class="game-intro">Télécharge le classement du groupe ou le tien en PNG.</p>
-        ${hasConsensus ? `<button type="button" class="btn btn-primary" id="btn-download-group">📊 Board du groupe</button>` : ""}
-        <button type="button" class="btn ${hasConsensus ? "btn-secondary btn--spaced" : "btn-primary"}" id="btn-download">🙋 Mon board</button>
-        ${eveningRecapRestartButtonHtml({ gameId: "tiernight", title: "TierNight" })}
-        <button type="button" class="btn btn-secondary btn--spaced" data-nav="results">Voir les résultats →</button>`;
-    }
+        <button type="button" class="btn btn-primary" data-nav="results">Voir les résultats →</button>`;
 
     app.innerHTML = pageShell({
-      back: phase === "recap" ? "back" : false,
+      backTarget: "back",
       content,
     });
 
     bindNav(app, { results: goToResults });
     bindRestartGameButtons(app);
 
-    app.querySelector("#btn-export-phase")?.addEventListener("click", () => {
-      phase = "export";
-      render();
-    });
-
-    app.querySelector("#btn-download")?.addEventListener("click", () => {
-      if (!localRecap) return;
-      const url = exportTierBoardPng({
-        listName: session.listName || "Tier list",
-        placed: localRecap.placed,
-      });
-      if (url) downloadDataUrl(url, `tier-${Date.now()}.png`);
-    });
-
-    app.querySelector("#btn-download-group")?.addEventListener("click", () => {
-      const consensus = session.consensus || getTierConsensus();
-      if (!consensus) return;
-      const url = exportTierBoardPng({
-        listName: `${session.listName || "Tier list"} — Le groupe`,
-        placed: consensus,
-      });
-      if (url) downloadDataUrl(url, `tier-groupe-${Date.now()}.png`);
-    });
-
-    if (phase === "recap" && isGameSyncActive()) {
+    if (isGameSyncActive()) {
       refreshGameScoresBox(app, {
         gameId: "tiernight",
         gameLabel: "Tier Night",
@@ -334,7 +289,7 @@ export function mountTierNightEnd(app) {
       navigate("results", { navStack: ["home", "lobby", "game-select", "results"] });
       return;
     }
-    if (phase === "recap" && (row?.state?.scores || row?.state?.tierNight?.recap)) {
+    if (row?.state?.scores || row?.state?.tierNight?.recap) {
       void bootstrapRecaps();
     }
   });
