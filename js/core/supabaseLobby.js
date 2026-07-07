@@ -406,7 +406,11 @@ export async function isLocalStillLobbyMember(lobbyId = getState().lobby?.id) {
   }
 
   const { data: authData } = await supabase.auth.getUser();
-
+  console.log("[AUTH VS INSERT]", {
+    auth: authData.user?.id,
+    insert: userId,
+  });
+  
 console.log("[DEBUG AUTH COMPARE]", {
   stateUserId: userId,
   authUserId: authData?.user?.id,
