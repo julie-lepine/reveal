@@ -19,6 +19,7 @@ import {
   HOST_PRESENCE_STALE_MS,
   isLobbyJoinTooOld,
 } from "../config/lobbyLifecycle.js";
+import { startLobbyHeartbeat } from "./lobbyHeartbeat.js";
 
 const HOST_COLOR = "#A78BFA";
 const GUEST_COLOR = "#60A5FA";
@@ -573,6 +574,14 @@ function applyLobbyToState(bundle) {
   }
   bundle.participants.forEach((p) => ensurePlayerScore(p.name));
   startLobbyPresenceSync();
+  bundle.participants.forEach((p) => ensurePlayerScore(p.name));
+
+  startLobbyPresenceSync();
+
+  if (getState().user?.isGuest) {
+    startLobbyHeartbeat();
+  }
+
   const sig = lobbyBundleSignature({ ...bundle, messages });
   if (sig !== lastLobbyBundleSig) {
     lastLobbyBundleSig = sig;

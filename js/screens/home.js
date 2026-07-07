@@ -795,7 +795,11 @@ export function mountHome(app) {
       try {
         const res = await joinLobby(app.querySelector("#join-code")?.value);
         if (!res.ok) {
-          await showAppAlert(res.error, { title: "Rejoindre le lobby", icon: "⚠️" });
+          const joinErrorMessage =
+            res.code === "display_name_taken"
+              ? "Ce pseudo est déjà utilisé dans ce lobby. Choisis-en un autre."
+              : res.error;
+          await showAppAlert(joinErrorMessage, { title: "Rejoindre le lobby", icon: "⚠️" });
           return;
         }
         await navigateAfterLobbyJoin();
@@ -831,6 +835,11 @@ export function mountHome(app) {
         const res = await joinLobbyAsGuest(codeEl?.value, nameEl?.value, captchaToken);
 
         if (!res.ok) {
+          const isDisplayNameTaken = res.code === "display_name_taken";
+          const joinErrorMessage = isDisplayNameTaken
+            ? "Ce pseudo est déjà utilisé dans ce lobby. Choisis-en un autre."
+            : res.error;
+
           if (res.captcha && isGuest()) {
             await setupGuestRejoinTurnstile({ requireSolved: true, forceRemount: true });
             if (btn) btn.disabled = true;
@@ -840,13 +849,22 @@ export function mountHome(app) {
           } else {
             btn.disabled = false;
           }
+
           if (errEl) {
-            errEl.textContent = res.error;
+            errEl.textContent = joinErrorMessage;
             errEl.classList.remove("hidden");
-          } else {
-            await showAppAlert(res.error, { title: "Rejoindre", icon: "⚠️" });
           }
+
+          if (isDisplayNameTaken && (res.sessionCleared || res.captcha || !errEl)) {
+            await showAppAlert(joinErrorMessage, { title: "Rejoindre", icon: "⚠️" });
+          } else if (!errEl) {
+            await showAppAlert(joinErrorMessage, { title: "Rejoindre", icon: "⚠️" });
+          }
+
           if (res.sessionCleared || res.captcha) {
+            if (isDisplayNameTaken) {
+              authTab = "guest";
+            }
             scheduleRender(true);
           }
           return;
