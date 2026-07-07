@@ -1,7 +1,7 @@
 import { supabase, isSupabaseConfigured } from "./supabaseClient.js";
 import { getSupabaseUserId } from "./supabaseAuth.js";
 import { getState, saveStatePatch, ensurePlayerScore } from "./state.js";
-import { saveGuestMembership, membershipFromBundle } from "./guestMembership.js";
+import { saveGuestMembership, membershipFromBundle, loadGuestMembership } from "./guestMembership.js";
 import { getLocalDisplayName, getLocalEmoji } from "./state.js";
 import {
   applyRemoteSession,
@@ -247,6 +247,82 @@ async function handlePossibleLobbyGone(lobbyId, e) {
 
 const DISPLAY_NAME_TAKEN_MSG =
   "Ce pseudo est déjà pris dans ce lobby, choisis-en un autre.";
+
+function displayNameTakenError() {
+  return { ok: false, code: "display_name_taken", error: DISPLAY_NAME_TAKEN_MSG };
+}
+
+function storedMembershipMatchesJoin(stored, lobbyId, code, displayName) {
+  if (!stored?.membershipId) return false;
+  if (stored.lobbyId !== lobbyId) return false;
+  if (normalizeCode(stored.lobbyCode) !== normalizeCode(code)) return false;
+  return (
+    stored.displayName.toLowerCase() === String(displayName || "").trim().toLowerCase()
+  );
+}
+
+/**
+ * Re-lie une membership invité orpheline au auth.uid() courant (RPC reclaim_guest_membership).
+ * @returns {Promise<{ ok: true, lobbyId: string, reclaimed?: boolean } | { ok: false, error: string }>}
+ */
+export async function reclaimGuestMembership({ membershipId, lobbyCode, displayName }) {
+  const memberId = membershipId;
+  const code = normalizeCode(lobbyCode);
+  const name = String(displayName || "").trim();
+
+  if (!memberId) {
+    return { ok: false, error: "Membership introuvable." };
+  }
+  if (code.length < 4) {
+    return { ok: false, error: "Code lobby invalide." };
+  }
+  if (name.length < 2) {
+    return { ok: false, error: "Pseudo invalide." };
+  }
+
+  const { data, error } = await supabase.rpc("reclaim_guest_membership", {
+    p_member_id: memberId,
+    p_code: code,
+    p_display_name: name,
+  });
+
+  if (error) {
+    return { ok: false, error: error.message || "Reclaim impossible." };
+  }
+
+  const row = Array.isArray(data) ? data[0] : data;
+  const lobbyId = row?.lobby_id;
+  if (!lobbyId) {
+    return { ok: false, error: "Reclaim impossible." };
+  }
+
+  return { ok: true, lobbyId, reclaimed: Boolean(row?.reclaimed) };
+}
+
+/** Tente un reclaim si le membership local correspond au lobby et au pseudo du join. */
+async function tryReclaimGuestMembershipForJoin(lobbyRow, code, displayName) {
+  const stored = loadGuestMembership();
+  if (!storedMembershipMatchesJoin(stored, lobbyRow.id, code, displayName)) {
+    return { ok: false };
+  }
+  return reclaimGuestMembership({
+    membershipId: stored.membershipId,
+    lobbyCode: code,
+    displayName,
+  });
+}
+
+async function completeLobbyJoin(lobbyId, { afterReclaim = false } = {}) {
+  const bundle = await fetchLobbyBundle(lobbyId, { withMessages: true });
+  applyLobbyToState(bundle);
+  const { startMultiplayerSync } = await import("./gameSync.js");
+  startMultiplayerSync();
+  await restoreActiveGameSessionOnJoin(lobbyId);
+  if (afterReclaim) {
+    await refreshGameSession();
+  }
+  return bundle;
+}
 
 export function isDuplicateLobbyDisplayNameError(error) {
   const code = error?.code || "";
@@ -662,6 +738,8 @@ export async function joinLobbySupabase(codeInput) {
     return { ok: false, error: LOBBY_EXPIRED_JOIN_MSG };
   }
 
+  let afterReclaim = false;
+
   const { data: existing } = await supabase
     .from("lobby_members")
     .select("id")
@@ -680,49 +758,51 @@ export async function joinLobbySupabase(codeInput) {
     }
 
     const displayName = getLocalDisplayName();
+    let membershipResolved = false;
+
     try {
       if (await isLobbyDisplayNameTaken(lobbyRow.id, displayName)) {
-        return {
-          ok: false,
-          code: "display_name_taken",
-          error: DISPLAY_NAME_TAKEN_MSG,
-        };
+        const reclaimRes = await tryReclaimGuestMembershipForJoin(lobbyRow, code, displayName);
+        if (!reclaimRes.ok) {
+          return displayNameTakenError();
+        }
+        membershipResolved = true;
+        afterReclaim = true;
       }
     } catch (e) {
       return { ok: false, error: e.message || "Impossible de vérifier le pseudo." };
     }
 
-    const { error: joinErr } = await supabase.from("lobby_members").insert({
-      lobby_id: lobbyRow.id,
-      user_id: userId,
-      display_name: displayName,
-      emoji: getLocalEmoji(),
-      color: GUEST_COLOR,
-      is_host: false,
-      ready: false,
-    });
+    if (!membershipResolved) {
+      const { error: joinErr } = await supabase.from("lobby_members").insert({
+        lobby_id: lobbyRow.id,
+        user_id: userId,
+        display_name: displayName,
+        emoji: getLocalEmoji(),
+        color: GUEST_COLOR,
+        is_host: false,
+        ready: false,
+      });
 
-    if (joinErr) {
-      if (isDuplicateLobbyDisplayNameError(joinErr)) {
-        return {
-          ok: false,
-          code: "display_name_taken",
-          error: DISPLAY_NAME_TAKEN_MSG,
-        };
+      if (joinErr) {
+        if (isDuplicateLobbyDisplayNameError(joinErr)) {
+          const reclaimRes = await tryReclaimGuestMembershipForJoin(lobbyRow, code, displayName);
+          if (!reclaimRes.ok) {
+            return displayNameTakenError();
+          }
+          afterReclaim = true;
+        } else {
+          return { ok: false, error: joinErr.message };
+        }
+      } else {
+        const gs = { ...getState().globalStats };
+        gs.playersJoined = (gs.playersJoined || 0) + 1;
+        saveStatePatch({ globalStats: gs });
       }
-      return { ok: false, error: joinErr.message };
     }
-
-    const gs = { ...getState().globalStats };
-    gs.playersJoined = (gs.playersJoined || 0) + 1;
-    saveStatePatch({ globalStats: gs });
   }
 
-  const bundle = await fetchLobbyBundle(lobbyRow.id, { withMessages: true });
-  applyLobbyToState(bundle);
-  const { startMultiplayerSync } = await import("./gameSync.js");
-  startMultiplayerSync();
-  await restoreActiveGameSessionOnJoin(lobbyRow.id);
+  const bundle = await completeLobbyJoin(lobbyRow.id, { afterReclaim });
   return { ok: true, code: bundle.code };
 }
 
