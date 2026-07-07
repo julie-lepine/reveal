@@ -913,19 +913,15 @@ console.log("[DEBUG CREATE LOBBY AUTH]", {
 
   if (lobbyErr) return { ok: false, error: lobbyErr.message };
 
-  const { data: memberData, error: memberErr } = await supabase
-  .from("lobby_members")
-  .insert({
-    lobby_id: lobby.id,
-    user_id: userId,
-    display_name: displayName,
-    emoji,
-    color: HOST_COLOR,
-    is_host: true,
-    ready: false,
-  })
-  .select()
-  .single();
+  const { data: memberData, error: memberErr } = await supabase.rpc(
+    "create_lobby_member",
+    {
+      p_lobby_id: lobby.id,
+      p_display_name: displayName,
+      p_emoji: emoji,
+      p_color: HOST_COLOR,
+    }
+  );
 
 console.log("[DEBUG MEMBER INSERT CREATE]", {
   lobbyId: lobby.id,
