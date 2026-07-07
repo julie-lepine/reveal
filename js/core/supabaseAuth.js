@@ -226,67 +226,87 @@ export async function reprocessAuthLaunchUrl() {
  * @returns {Promise<import("@supabase/supabase-js").Session|null>}
  */
 export async function ensureAnonymousSessionForRecovery() {
-  console.debug("[Lobby Recovery] ensureAnonymousSessionForRecovery start");
-
   if (!isSupabaseConfigured() || !supabase) {
     console.debug("[Lobby Recovery] supabase unavailable");
     return null;
   }
 
-  const user = getState().user;
-  console.debug("[Lobby Recovery] current user", user);
+  const stateUser = getState().user;
 
-  if (user?.loggedIn && user?.isGuest === false) {
-    console.debug("[Lobby Recovery] logged user, recovery disabled");
+  // Un vrai compte connecté ne doit jamais être remplacé par une session anon.
+  if (stateUser?.loggedIn && stateUser?.isGuest === false) {
+    console.debug("[Lobby Recovery] skipped: authenticated user");
     return null;
   }
 
-  const session = await recoverAuthSession();
+  // 1) Essayer de restaurer une session existante
+  try {
+    const session = await recoverAuthSession();
 
-  if (session?.user) {
-    await syncSessionToState(session);
-    console.debug("[Lobby Recovery] anonymous session restored");
-    return session;
+    if (session?.user?.id) {
+      await syncSessionToState(session);
+
+      console.debug("[Lobby Recovery] existing session restored", {
+        userId: session.user.id,
+        anonymous: session.user.is_anonymous ?? false,
+      });
+
+      return session;
+    }
+  } catch (e) {
+    console.warn(
+      "[Lobby Recovery] restore session failed",
+      e.message || e
+    );
   }
 
-  console.debug("[Lobby Recovery] no valid session, checking membership");
-
+  // 2) Pas de session -> vérifier qu'on a bien une membership à récupérer
   const membership = loadGuestMembership();
 
-  console.debug(
-    "[Lobby Recovery] local membership",
-    membership
-  );
-
   if (!membership?.membershipId) {
-    console.debug("[Lobby Recovery] no membership found");
+    console.debug("[Lobby Recovery] no guest membership");
     return null;
   }
 
-  console.debug(
-    "[Lobby Recovery] creating anonymous recovery session"
-  );
+  console.debug("[Lobby Recovery] creating anonymous session", {
+    membershipId: membership.membershipId,
+  });
 
-  const { data, error } = await supabase.auth.signInAnonymously();
+  // 3) Créer une session anon Supabase
+  try {
+    const { data, error } = await supabase.auth.signInAnonymously();
 
-  if (error) {
-    console.debug(
-      "[Lobby Recovery] recovery failed",
-      error.message || error
+    if (error) {
+      console.warn(
+        "[Lobby Recovery] anonymous sign-in failed",
+        error.message || error
+      );
+      return null;
+    }
+
+    const nextSession = data?.session ?? null;
+
+    if (!nextSession?.user?.id) {
+      console.warn("[Lobby Recovery] no session returned after anon sign-in");
+      return null;
+    }
+
+    await syncSessionToState(nextSession);
+
+    console.debug("[Lobby Recovery] anonymous session created", {
+      userId: nextSession.user.id,
+      anonymous: nextSession.user.is_anonymous ?? false,
+    });
+
+    return nextSession;
+
+  } catch (e) {
+    console.warn(
+      "[Lobby Recovery] anonymous sign-in exception",
+      e.message || e
     );
     return null;
   }
-
-  const nextSession = data.session ?? null;
-
-  if (nextSession) {
-    await syncSessionToState(nextSession);
-    console.debug("[Lobby Recovery] anonymous session restored");
-  } else {
-    console.debug("[Lobby Recovery] no session returned after anonymous login");
-  }
-
-  return nextSession;
 }
 
 export async function initSupabaseAuth() {

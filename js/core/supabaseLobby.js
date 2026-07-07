@@ -393,11 +393,21 @@ export async function recoverLobbyFromServer({ withMessages = false } = {}) {
  */
 export async function isLocalStillLobbyMember(lobbyId = getState().lobby?.id) {
   const userId = getSupabaseUserId();
-  if (!lobbyId || !userId) return false;
+
+  console.log("[DEBUG membership check start]", {
+    lobbyId,
+    userId,
+    stateUser: getState().user,
+  });
+
+  if (!lobbyId || !userId) {
+    console.log("[DEBUG membership check skipped]");
+    return false;
+  }
 
   const { data, error } = await supabase
     .from("lobby_members")
-    .select("id")
+    .select("id,user_id,lobby_id")
     .eq("lobby_id", lobbyId)
     .eq("user_id", userId)
     .maybeSingle();
@@ -410,7 +420,10 @@ export async function isLocalStillLobbyMember(lobbyId = getState().lobby?.id) {
   });
 
   if (error) {
-    console.warn("REVEAL lobby membership check:", error.message || error);
+    console.warn(
+      "REVEAL lobby membership check:",
+      error.message || error
+    );
     return null;
   }
 
