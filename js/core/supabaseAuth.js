@@ -10,6 +10,7 @@ import {
 } from "./passwordResetCooldown.js";
 import { isNativeApp } from "./platform.js";
 import { NATIVE_AUTH_REDIRECT } from "../../data/appConfig.js";
+import { loadGuestMembership } from "./guestMembership.js";
 
 const PASSWORD_RECOVERY_KEY = "reveal-pending-password-reset";
 
@@ -217,6 +218,39 @@ export async function reprocessAuthLaunchUrl() {
     console.warn("REVEAL reprocessAuthLaunchUrl:", e?.message || e);
     return false;
   }
+}
+
+/**
+ * Session anon minimale pour recovery invité (peek/reclaim membership).
+ * Ne pas appeler au boot normal — uniquement dans un flux recovery.
+ * @returns {Promise<import("@supabase/supabase-js").Session|null>}
+ */
+export async function ensureAnonymousSessionForRecovery() {
+  if (!isSupabaseConfigured() || !supabase) return null;
+
+  const user = getState().user;
+  if (user?.loggedIn && user?.isGuest === false) return null;
+
+  const session = await recoverAuthSession();
+  if (session?.user) {
+    await syncSessionToState(session);
+    console.debug("[Lobby Recovery] anonymous session restored");
+    return session;
+  }
+
+  const membership = loadGuestMembership();
+  if (!membership?.membershipId) return null;
+
+  const { data, error } = await supabase.auth.signInAnonymously();
+  if (error) {
+    console.debug("[Lobby Recovery] recovery failed", error.message || error);
+    return null;
+  }
+
+  const nextSession = data.session ?? null;
+  if (nextSession) await syncSessionToState(nextSession);
+  if (nextSession) console.debug("[Lobby Recovery] anonymous session restored");
+  return nextSession;
 }
 
 export async function initSupabaseAuth() {

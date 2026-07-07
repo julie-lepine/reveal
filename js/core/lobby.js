@@ -12,7 +12,7 @@ import {
   hasEveningStatsActivity,
 } from "./state.js";
 import { loginAsGuest, isGuest } from "./auth.js";
-import { clearGuestMembership } from "./guestMembership.js";
+import { clearGuestMembership, loadGuestMembership } from "./guestMembership.js";
 import { signOutSupabase, getSupabaseUserId } from "./supabaseAuth.js";
 import { syncAllPlayerScores } from "./players.js";
 import { navigate, getCurrentScreen } from "./router.js";
@@ -277,14 +277,16 @@ export function hasActiveLobby() {
   return true;
 }
 
-/** Tente de restaurer le lobby depuis Supabase (compte connecté). */
+/** Tente de restaurer le lobby depuis Supabase (compte connecté ou invité via membership). */
 export async function tryRecoverLobbyFromServer() {
-  if (!isSupabaseConfigured() || !getSupabaseUserId()) {
+  if (!isSupabaseConfigured()) {
     return { ok: false };
   }
   try {
     const res = await recoverLobbyFromServer();
-    return res.ok ? { ok: true, code: res.code } : { ok: false };
+    return res.ok
+      ? { ok: true, code: res.code }
+      : { ok: false, staleMembership: Boolean(res.staleMembership) };
   } catch (e) {
     console.warn("REVEAL recover lobby:", e.message || e);
     return { ok: false };
@@ -298,6 +300,29 @@ export function forceClearClientLobbyState() {
   stopMultiplayerSync();
   clearCachedGameSession();
   saveStatePatch({ inLobby: false, lobby: null, lobbyCode: null });
+}
+
+/**
+ * Recovery invité quand uid absent : tente membership avant tout wipe local.
+ * @returns {Promise<{ cleared: boolean, recovered?: boolean }|null>} null si uid présent
+ */
+async function reconcileLobbyWhenUidMissing() {
+  if (loadGuestMembership()?.membershipId) {
+    console.debug("[Lobby Recovery] trying membership recovery");
+    const recovered = await tryRecoverLobbyFromServer();
+    if (recovered.ok) {
+      console.debug("[Lobby Recovery] restored lobby");
+      return { cleared: false, recovered: true };
+    }
+    if (!recovered.staleMembership) {
+      return { cleared: false };
+    }
+  }
+
+  console.debug("[Lobby Recovery] clearing stale lobby");
+  forceClearClientLobbyState();
+  if (loadGuestMembership()) clearGuestMembership();
+  return { cleared: true };
 }
 
 /**
@@ -333,13 +358,12 @@ export async function reconcileLobbyMembership() {
       const recovered = await tryRecoverLobbyFromServer();
       if (recovered.ok) return { cleared: false, recovered: true };
     }
-    if (!uid) forceClearClientLobbyState();
-    return { cleared: !uid };
+    if (!uid) return reconcileLobbyWhenUidMissing();
+    return { cleared: false };
   }
 
   if (!uid) {
-    forceClearClientLobbyState();
-    return { cleared: true };
+    return reconcileLobbyWhenUidMissing();
   }
 
   try {

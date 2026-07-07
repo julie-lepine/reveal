@@ -906,7 +906,7 @@ export function mountHome(app) {
   void (async () => {
     const { cleared } = await reconcileLobbyMembership();
     if (cleared) scheduleRender(true);
-    if (!hasActiveLobby() && isSupabaseConfigured() && getSupabaseUserId()) {
+    if (!hasActiveLobby() && isSupabaseConfigured()) {
       pendingServerLobby = await peekServerLobbyForUser();
       if (pendingServerLobby) scheduleRender(true);
     }

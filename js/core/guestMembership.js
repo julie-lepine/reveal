@@ -1,3 +1,5 @@
+import { getState } from "./state.js";
+
 const STORAGE_KEY = "reveal-guest-membership";
 
 /**
@@ -53,6 +55,13 @@ export function clearGuestMembership() {
   } catch {
     /* storage indisponible */
   }
+}
+
+/** Invité attendu : ignorer guestMembership pour les comptes email/OAuth connectés. */
+export function canUseGuestMembershipRecovery() {
+  const user = getState().user;
+  if (user?.loggedIn && user?.isGuest === false) return false;
+  return Boolean(loadGuestMembership()?.membershipId);
 }
 
 /**

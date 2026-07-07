@@ -1,7 +1,13 @@
 import { supabase, isSupabaseConfigured } from "./supabaseClient.js";
-import { getSupabaseUserId } from "./supabaseAuth.js";
+import { getSupabaseUserId, ensureAnonymousSessionForRecovery } from "./supabaseAuth.js";
 import { getState, saveStatePatch, ensurePlayerScore } from "./state.js";
-import { saveGuestMembership, membershipFromBundle, loadGuestMembership } from "./guestMembership.js";
+import {
+  saveGuestMembership,
+  membershipFromBundle,
+  loadGuestMembership,
+  clearGuestMembership,
+  canUseGuestMembershipRecovery,
+} from "./guestMembership.js";
 import { getLocalDisplayName, getLocalEmoji } from "./state.js";
 import {
   applyRemoteSession,
@@ -20,7 +26,6 @@ import {
   isLobbyJoinTooOld,
 } from "../config/lobbyLifecycle.js";
 import { startLobbyHeartbeat } from "./lobbyHeartbeat.js";
-
 const HOST_COLOR = "#A78BFA";
 const GUEST_COLOR = "#60A5FA";
 
@@ -145,13 +150,27 @@ async function restoreActiveGameSessionOnJoin(lobbyId) {
   return false;
 }
 
-/**
- * Lobby actif côté serveur pour le joueur connecté (F5 / perte du localStorage).
- * @returns {Promise<string|null>} lobby uuid
- */
-export async function findServerLobbyIdForUser(userId = getSupabaseUserId()) {
-  if (!isSupabaseConfigured() || !userId) return null;
+/** Invité attendu : ignorer guestMembership pour les comptes email/OAuth connectés. */
+export { canUseGuestMembershipRecovery } from "./guestMembership.js";
 
+/**
+ * @param {string} membershipId
+ * @returns {Promise<{ row?: object, notFound?: boolean, error?: boolean }>}
+ */
+async function peekLobbyByMembership(membershipId) {
+  const { data, error } = await supabase.rpc("peek_lobby_by_membership", {
+    p_member_id: membershipId,
+  });
+  if (error) {
+    console.warn("[Lobby Recovery] peek failed", error.message || error);
+    return { error: true };
+  }
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row?.lobby_id) return { notFound: true };
+  return { row };
+}
+
+async function findLobbyIdByUserId(userId) {
   const { data, error } = await supabase
     .from("lobby_members")
     .select("lobby_id, joined_at, lobbies!inner(id, code, last_activity_at, status)")
@@ -177,28 +196,184 @@ export async function findServerLobbyIdForUser(userId = getSupabaseUserId()) {
   return null;
 }
 
+async function findLobbyIdByGuestMembership() {
+  if (!canUseGuestMembershipRecovery()) return null;
+
+  const membership = loadGuestMembership();
+  if (!membership?.membershipId) return null;
+
+  console.debug("[Lobby Recovery] membership found");
+
+  const session = await ensureAnonymousSessionForRecovery();
+  if (!session?.user?.id) {
+    console.debug("[Lobby Recovery] recovery failed");
+    return null;
+  }
+
+  const peek = await peekLobbyByMembership(membership.membershipId);
+  if (peek.error) return null;
+  if (peek.notFound) return null;
+
+  console.debug("[Lobby Recovery] lobby found");
+  return peek.row.lobby_id;
+}
+
+/**
+ * Membership invité introuvable côté serveur (supprimée ou lobby expiré).
+ * @returns {Promise<boolean>}
+ */
+export async function isGuestMembershipDefinitivelyStale() {
+  if (!canUseGuestMembershipRecovery()) return false;
+
+  const membership = loadGuestMembership();
+  if (!membership?.membershipId) return false;
+
+  const session = await ensureAnonymousSessionForRecovery();
+  if (!session?.user?.id) return false;
+
+  const peek = await peekLobbyByMembership(membership.membershipId);
+  if (peek.error) return false;
+  return Boolean(peek.notFound);
+}
+
+/**
+ * Lobby actif côté serveur pour le joueur connecté (F5 / perte du localStorage).
+ * @returns {Promise<string|null>} lobby uuid
+ */
+export async function findServerLobbyIdForUser(userId = getSupabaseUserId()) {
+  if (!isSupabaseConfigured()) return null;
+
+  if (userId) {
+    const byUser = await findLobbyIdByUserId(userId);
+    if (byUser) return byUser;
+  }
+
+  if (!canUseGuestMembershipRecovery()) return null;
+  return findLobbyIdByGuestMembership();
+}
+
 /** Méta légère pour l'accueil (reprise sans appliquer l'état). */
 export async function peekServerLobbyForUser(userId = getSupabaseUserId()) {
   try {
-    const lobbyId = await findServerLobbyIdForUser(userId);
-    if (!lobbyId) return null;
-    const { data, error } = await supabase
-      .from("lobbies")
-      .select("id, code, status, game_id")
-      .eq("id", lobbyId)
-      .maybeSingle();
-    if (error || !data) return null;
-    return data;
+    if (userId && !canUseGuestMembershipRecovery()) {
+      const lobbyId = await findLobbyIdByUserId(userId);
+      if (lobbyId) {
+        const { data, error } = await supabase
+          .from("lobbies")
+          .select("id, code, status, game_id")
+          .eq("id", lobbyId)
+          .maybeSingle();
+        if (!error && data) return data;
+      }
+      return null;
+    }
+
+    if (userId) {
+      const lobbyId = await findLobbyIdByUserId(userId);
+      if (lobbyId) {
+        const { data, error } = await supabase
+          .from("lobbies")
+          .select("id, code, status, game_id")
+          .eq("id", lobbyId)
+          .maybeSingle();
+        if (!error && data) return data;
+      }
+    }
+
+    if (!canUseGuestMembershipRecovery()) return null;
+
+    const membership = loadGuestMembership();
+    if (!membership?.membershipId) return null;
+
+    await ensureAnonymousSessionForRecovery();
+    const peek = await peekLobbyByMembership(membership.membershipId);
+    if (peek.error || peek.notFound || !peek.row) return null;
+
+    return {
+      id: peek.row.lobby_id,
+      code: peek.row.code,
+      status: peek.row.status,
+      game_id: peek.row.game_id,
+      displayName: membership.displayName,
+    };
   } catch (e) {
     console.warn("REVEAL peek server lobby:", e.message || e);
     return null;
   }
 }
 
+/**
+ * Re-lie la membership invité au uid courant si nécessaire (avant fetchLobbyBundle).
+ * @returns {Promise<{ ok: boolean, reclaimed?: boolean, stale?: boolean }>}
+ */
+async function ensureGuestMembershipReclaimed(lobbyId) {
+  if (!canUseGuestMembershipRecovery()) return { ok: true, reclaimed: false };
+
+  const membership = loadGuestMembership();
+  if (!membership?.membershipId || membership.lobbyId !== lobbyId) {
+    return { ok: true, reclaimed: false };
+  }
+
+  const session = await ensureAnonymousSessionForRecovery();
+  if (!session?.user?.id) return { ok: false };
+
+  const uid = getSupabaseUserId();
+  const { data: memberRow, error } = await supabase
+    .from("lobby_members")
+    .select("user_id")
+    .eq("id", membership.membershipId)
+    .maybeSingle();
+
+  if (error) {
+    console.warn("[Lobby Recovery] membership check failed", error.message || error);
+    return { ok: false };
+  }
+  if (!memberRow) {
+    return { ok: false, stale: true };
+  }
+  if (memberRow.user_id === uid) {
+    return { ok: true, reclaimed: false };
+  }
+
+  const reclaim = await reclaimGuestMembership({
+    membershipId: membership.membershipId,
+    lobbyCode: membership.lobbyCode,
+    displayName: membership.displayName,
+  });
+
+  if (!reclaim.ok) {
+    console.debug("[Lobby Recovery] recovery failed", reclaim.error);
+    return { ok: false };
+  }
+
+  console.debug("[Lobby Recovery] reclaim success");
+  return { ok: true, reclaimed: Boolean(reclaim.reclaimed) };
+}
+
 /** Restaure lobby + session de jeu depuis Supabase (reconnexion après F5). */
 export async function recoverLobbyFromServer({ withMessages = false } = {}) {
+  const hadGuestMembership = canUseGuestMembershipRecovery();
   const lobbyId = await findServerLobbyIdForUser();
-  if (!lobbyId) return { ok: false };
+  if (!lobbyId) {
+    if (hadGuestMembership && (await isGuestMembershipDefinitivelyStale())) {
+      clearGuestMembership();
+      console.debug("[Lobby Recovery] recovery failed");
+      return { ok: false, staleMembership: true };
+    }
+    console.debug("[Lobby Recovery] recovery failed");
+    return { ok: false };
+  }
+
+  const reclaimResult = await ensureGuestMembershipReclaimed(lobbyId);
+  if (!reclaimResult.ok) {
+    if (reclaimResult.stale) {
+      clearGuestMembership();
+      console.debug("[Lobby Recovery] recovery failed");
+      return { ok: false, staleMembership: true };
+    }
+    console.debug("[Lobby Recovery] recovery failed");
+    return { ok: false };
+  }
 
   const bundle = await fetchLobbyBundle(lobbyId, { withMessages });
   applyLobbyToState(bundle);
@@ -206,6 +381,9 @@ export async function recoverLobbyFromServer({ withMessages = false } = {}) {
   const { startMultiplayerSync } = await import("./gameSync.js");
   startMultiplayerSync();
   await restoreActiveGameSessionOnJoin(lobbyId);
+  if (reclaimResult.reclaimed) {
+    await refreshGameSession();
+  }
   return { ok: true, code: bundle.code, lobbyId: bundle.id };
 }
 
@@ -574,14 +752,6 @@ function applyLobbyToState(bundle) {
   }
   bundle.participants.forEach((p) => ensurePlayerScore(p.name));
   startLobbyPresenceSync();
-  bundle.participants.forEach((p) => ensurePlayerScore(p.name));
-
-  startLobbyPresenceSync();
-
-  if (getState().user?.isGuest) {
-    startLobbyHeartbeat();
-  }
-
   const sig = lobbyBundleSignature({ ...bundle, messages });
   if (sig !== lastLobbyBundleSig) {
     lastLobbyBundleSig = sig;
