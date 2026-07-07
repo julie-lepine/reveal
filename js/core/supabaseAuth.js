@@ -226,30 +226,66 @@ export async function reprocessAuthLaunchUrl() {
  * @returns {Promise<import("@supabase/supabase-js").Session|null>}
  */
 export async function ensureAnonymousSessionForRecovery() {
-  if (!isSupabaseConfigured() || !supabase) return null;
+  console.debug("[Lobby Recovery] ensureAnonymousSessionForRecovery start");
+
+  if (!isSupabaseConfigured() || !supabase) {
+    console.debug("[Lobby Recovery] supabase unavailable");
+    return null;
+  }
 
   const user = getState().user;
-  if (user?.loggedIn && user?.isGuest === false) return null;
+  console.debug("[Lobby Recovery] current user", user);
+
+  if (user?.loggedIn && user?.isGuest === false) {
+    console.debug("[Lobby Recovery] logged user, recovery disabled");
+    return null;
+  }
 
   const session = await recoverAuthSession();
+
   if (session?.user) {
     await syncSessionToState(session);
     console.debug("[Lobby Recovery] anonymous session restored");
     return session;
   }
 
+  console.debug("[Lobby Recovery] no valid session, checking membership");
+
   const membership = loadGuestMembership();
-  if (!membership?.membershipId) return null;
+
+  console.debug(
+    "[Lobby Recovery] local membership",
+    membership
+  );
+
+  if (!membership?.membershipId) {
+    console.debug("[Lobby Recovery] no membership found");
+    return null;
+  }
+
+  console.debug(
+    "[Lobby Recovery] creating anonymous recovery session"
+  );
 
   const { data, error } = await supabase.auth.signInAnonymously();
+
   if (error) {
-    console.debug("[Lobby Recovery] recovery failed", error.message || error);
+    console.debug(
+      "[Lobby Recovery] recovery failed",
+      error.message || error
+    );
     return null;
   }
 
   const nextSession = data.session ?? null;
-  if (nextSession) await syncSessionToState(nextSession);
-  if (nextSession) console.debug("[Lobby Recovery] anonymous session restored");
+
+  if (nextSession) {
+    await syncSessionToState(nextSession);
+    console.debug("[Lobby Recovery] anonymous session restored");
+  } else {
+    console.debug("[Lobby Recovery] no session returned after anonymous login");
+  }
+
   return nextSession;
 }
 
