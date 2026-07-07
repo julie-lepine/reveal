@@ -1019,9 +1019,7 @@ export async function joinLobbySupabase(codeInput) {
         color: GUEST_COLOR,
         is_host: false,
         ready: false,
-      })
-      .select()
-      .single();
+      });
     
     console.log("[DEBUG MEMBER INSERT JOIN]", {
       lobbyId: lobbyRow.id,
