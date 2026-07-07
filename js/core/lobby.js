@@ -12,6 +12,7 @@ import {
   hasEveningStatsActivity,
 } from "./state.js";
 import { loginAsGuest, isGuest } from "./auth.js";
+import { clearGuestMembership } from "./guestMembership.js";
 import { signOutSupabase, getSupabaseUserId } from "./supabaseAuth.js";
 import { syncAllPlayerScores } from "./players.js";
 import { navigate, getCurrentScreen } from "./router.js";
@@ -121,6 +122,7 @@ function applyLeaveLobbyLocal({ wasGuest, navigateAway }) {
   }
   resetEveningState();
   clearCachedGameSession();
+  clearGuestMembership();
   saveStatePatch(patch);
   if (navigateAway) {
     navigate("home", { reset: true });
@@ -378,6 +380,7 @@ export async function resetAppToCleanHome() {
   try {
     localStorage.removeItem("reveal-app-state");
     localStorage.removeItem("reveal-auth-credentials");
+    clearGuestMembership();
     // localStorage.removeItem("reveal-fil-rouge-private");
   } catch {
     /* ignore */

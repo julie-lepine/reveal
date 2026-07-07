@@ -1,6 +1,7 @@
 import { supabase, isSupabaseConfigured } from "./supabaseClient.js";
 import { getSupabaseUserId } from "./supabaseAuth.js";
 import { getState, saveStatePatch, ensurePlayerScore } from "./state.js";
+import { saveGuestMembership, membershipFromBundle } from "./guestMembership.js";
 import { getLocalDisplayName, getLocalEmoji } from "./state.js";
 import {
   applyRemoteSession,
@@ -393,6 +394,7 @@ function normalizeCode(code) {
 
 function mapMember(row, currentUserId) {
   return {
+    membershipId: row.id,
     userId: row.user_id,
     name: row.display_name,
     emoji: row.emoji,
@@ -419,7 +421,7 @@ async function fetchLobbyBundle(lobbyId, { withMessages = false } = {}) {
       .single(),
     supabase
       .from("lobby_members")
-      .select("user_id, display_name, emoji, color, ready, is_host, joined_at, last_seen_at")
+      .select("id, user_id, display_name, emoji, color, ready, is_host, joined_at, last_seen_at")
       .eq("lobby_id", lobbyId)
       .order("joined_at"),
   ];
@@ -489,6 +491,10 @@ function applyLobbyToState(bundle) {
       sessionId: bundle.code,
     },
   });
+  if (getState().user?.isGuest) {
+    const membership = membershipFromBundle(bundle);
+    if (membership) saveGuestMembership(membership);
+  }
   bundle.participants.forEach((p) => ensurePlayerScore(p.name));
   startLobbyPresenceSync();
   const sig = lobbyBundleSignature({ ...bundle, messages });
