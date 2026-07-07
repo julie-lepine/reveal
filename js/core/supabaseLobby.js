@@ -882,6 +882,14 @@ async function generateUniqueCode() {
 
 export async function createLobbySupabase() {
   const userId = getSupabaseUserId();
+
+const { data: authCheck } = await supabase.auth.getUser();
+
+console.log("[DEBUG CREATE LOBBY AUTH]", {
+  localUserId: userId,
+  authUserId: authCheck?.user?.id,
+  isAnonymous: authCheck?.user?.is_anonymous,
+});
   if (!userId) return { ok: false, error: "Connecte-toi pour créer un lobby." };
 
   const code = await generateUniqueCode();
