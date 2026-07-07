@@ -405,6 +405,14 @@ export async function isLocalStillLobbyMember(lobbyId = getState().lobby?.id) {
     return false;
   }
 
+  const { data: authData } = await supabase.auth.getUser();
+
+console.log("[DEBUG AUTH COMPARE]", {
+  stateUserId: userId,
+  authUserId: authData?.user?.id,
+  isAnonymous: authData?.user?.is_anonymous,
+});
+
   const { data, error } = await supabase
     .from("lobby_members")
     .select("id,user_id,lobby_id")
