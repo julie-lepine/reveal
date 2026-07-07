@@ -394,16 +394,26 @@ export async function recoverLobbyFromServer({ withMessages = false } = {}) {
 export async function isLocalStillLobbyMember(lobbyId = getState().lobby?.id) {
   const userId = getSupabaseUserId();
   if (!lobbyId || !userId) return false;
+
   const { data, error } = await supabase
     .from("lobby_members")
     .select("id")
     .eq("lobby_id", lobbyId)
     .eq("user_id", userId)
     .maybeSingle();
+
+  console.log("[DEBUG membership result]", {
+    lobbyId,
+    userId,
+    data,
+    error,
+  });
+
   if (error) {
     console.warn("REVEAL lobby membership check:", error.message || error);
     return null;
   }
+
   return Boolean(data);
 }
 
