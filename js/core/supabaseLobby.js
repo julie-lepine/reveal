@@ -901,7 +901,9 @@ export async function createLobbySupabase() {
 
   if (lobbyErr) return { ok: false, error: lobbyErr.message };
 
-  const { error: memberErr } = await supabase.from("lobby_members").insert({
+  const { data: memberData, error: memberErr } = await supabase
+  .from("lobby_members")
+  .insert({
     lobby_id: lobby.id,
     user_id: userId,
     display_name: displayName,
@@ -909,7 +911,16 @@ export async function createLobbySupabase() {
     color: HOST_COLOR,
     is_host: true,
     ready: false,
-  });
+  })
+  .select()
+  .single();
+
+console.log("[DEBUG MEMBER INSERT CREATE]", {
+  lobbyId: lobby.id,
+  userId,
+  memberData,
+  memberErr,
+});
 
   if (memberErr) return { ok: false, error: memberErr.message };
 
@@ -983,8 +994,16 @@ export async function joinLobbySupabase(codeInput) {
       return { ok: false, error: e.message || "Impossible de vérifier le pseudo." };
     }
 
+    console.log("[DEBUG JOIN PATH]", {
+      existing,
+      displayName,
+      membershipResolved,
+    });
+
     if (!membershipResolved) {
-      const { error: joinErr } = await supabase.from("lobby_members").insert({
+      const { data: joinData, error: joinErr } = await supabase
+      .from("lobby_members")
+      .insert({
         lobby_id: lobbyRow.id,
         user_id: userId,
         display_name: displayName,
@@ -992,7 +1011,16 @@ export async function joinLobbySupabase(codeInput) {
         color: GUEST_COLOR,
         is_host: false,
         ready: false,
-      });
+      })
+      .select()
+      .single();
+    
+    console.log("[DEBUG MEMBER INSERT JOIN]", {
+      lobbyId: lobbyRow.id,
+      userId,
+      joinData,
+      joinErr,
+    });
 
       if (joinErr) {
         if (isDuplicateLobbyDisplayNameError(joinErr)) {
