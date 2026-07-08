@@ -960,7 +960,7 @@ console.log("[DEBUG MEMBER INSERT CREATE]", {
 }
 
 export async function joinLobbySupabase(codeInput) {
-  console.log("[DEBUG JOIN SUPABASE START]", { code });
+  console.log("[DEBUG JOIN SUPABASE START]", { codeInput });
   const userId = getSupabaseUserId();
   if (!userId) return { ok: false, error: "Connecte-toi ou rejoins en invité d'abord." };
 
