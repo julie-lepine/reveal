@@ -351,6 +351,11 @@ export async function initSupabaseAuth() {
   await handleAuthRedirectUrl(windowUrl);
 
   supabase.auth.onAuthStateChange((event, session) => {
+    console.debug("[DEBUG AUTH CHANGE]", {
+      event,
+      userId: session?.user?.id,
+      hasToken: !!session?.access_token
+    });
     void (async () => {
       await syncSessionToState(session);
       if (event === "PASSWORD_RECOVERY") {
@@ -364,6 +369,10 @@ export async function initSupabaseAuth() {
   });
 
   const session = await recoverAuthSession();
+  console.debug("[DEBUG RECOVER AUTH SESSION RESULT]", {
+    userId: session?.user?.id,
+    hasToken: !!session?.access_token
+  });
   if (session) await syncSessionToState(session);
 
   authInitFinished = true;
