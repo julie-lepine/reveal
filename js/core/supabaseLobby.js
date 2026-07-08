@@ -412,18 +412,13 @@ export async function isLocalStillLobbyMember(lobbyId = getState().lobby?.id) {
 
   const { data: authData } = await supabase.auth.getUser();
 
-  console.log("[DEBUG JOIN SUPABASE USER]", {
-    userId: user?.id,
-    anonymous: user?.is_anonymous,
+  console.log("[DEBUG AUTH COMPARE]", {
+    stateUserId: userId,
+    authUserId: authData?.user?.id,
+    isAnonymous: authData?.user?.is_anonymous,
   });
 
   const authUserId = authData?.user?.id;
-
-  console.log("[DEBUG AUTH COMPARE]", {
-    stateUserId: userId,
-    authUserId,
-    isAnonymous: authData?.user?.is_anonymous,
-  });
 
   // Auth absente : on ne peut pas conclure que le membre est parti
   if (!authUserId) {
