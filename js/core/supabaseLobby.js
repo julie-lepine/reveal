@@ -405,33 +405,37 @@ export async function isLocalStillLobbyMember(lobbyId = getState().lobby?.id) {
     stateUser: getState().user,
   });
 
-  if (!lobbyId || !userId) {
-    console.log("[DEBUG membership check skipped]");
-    return false;
+  if (!lobbyId) {
+    console.log("[DEBUG membership check skipped: no lobby]");
+    return null;
   }
 
   const { data: authData } = await supabase.auth.getUser();
-  console.log("[DEBUG JOIN AUTH]", {
-    authUserId: authData.user?.id,
-    insertUserId: userId
+
+  const authUserId = authData?.user?.id;
+
+  console.log("[DEBUG AUTH COMPARE]", {
+    stateUserId: userId,
+    authUserId,
+    isAnonymous: authData?.user?.is_anonymous,
   });
-  
-console.log("[DEBUG AUTH COMPARE]", {
-  stateUserId: userId,
-  authUserId: authData?.user?.id,
-  isAnonymous: authData?.user?.is_anonymous,
-});
+
+  // Auth absente : on ne peut pas conclure que le membre est parti
+  if (!authUserId) {
+    console.log("[DEBUG membership check skipped: no auth]");
+    return null;
+  }
 
   const { data, error } = await supabase
     .from("lobby_members")
     .select("id,user_id,lobby_id")
     .eq("lobby_id", lobbyId)
-    .eq("user_id", userId)
+    .eq("user_id", authUserId)
     .maybeSingle();
 
   console.log("[DEBUG membership result]", {
     lobbyId,
-    userId,
+    userId: authUserId,
     data,
     error,
   });
