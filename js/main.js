@@ -9,7 +9,7 @@ import {
   resumeEveningSession,
   reconcileLobbyMembership,
 } from "./core/lobby.js";
-import { initSupabaseAuth, isPasswordRecoveryPending } from "./core/supabaseAuth.js";
+import { initSupabaseAuth, isPasswordRecoveryPending, authReady } from "./core/supabaseAuth.js";
 import { shouldShowWelcome } from "./core/welcomeGate.js";
 import { mountResetPassword } from "./screens/resetPassword.js";
 import { mountWelcome } from "./screens/welcome.js";
@@ -129,6 +129,7 @@ initHostNoticeListener();
 async function boot() {
   await initDeepLinks();
   await initSupabaseAuth();
+  await authReady;
   await reconcileLobbyMembership();
   resetNav();
   if (isPasswordRecoveryPending()) {

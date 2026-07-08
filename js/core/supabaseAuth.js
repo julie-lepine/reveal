@@ -14,6 +14,31 @@ import { loadGuestMembership } from "./guestMembership.js";
 
 const PASSWORD_RECOVERY_KEY = "reveal-pending-password-reset";
 
+let authReadyResolve = null;
+let authInitFinished = false;
+let authInitialSessionSeen = false;
+let authReadyResolved = false;
+
+/**
+ * Résolue quand l'init Supabase auth est terminée (session restaurée si possible)
+ * ET que Supabase a émis `INITIAL_SESSION` (évite les races au boot).
+ */
+export const authReady = new Promise((resolve) => {
+  authReadyResolve = resolve;
+});
+
+function resolveAuthReadyIfComplete(reason = "unknown") {
+  if (authReadyResolved) return;
+  if (!authInitFinished || !authInitialSessionSeen) return;
+  authReadyResolved = true;
+  try {
+    console.debug("[Auth] ready", reason);
+  } catch {
+    /* ignore */
+  }
+  authReadyResolve?.();
+}
+
 export function getAuthRedirectUrl() {
   if (isNativeApp()) return NATIVE_AUTH_REDIRECT;
   const base = window.location.origin + window.location.pathname;
@@ -310,22 +335,36 @@ export async function ensureAnonymousSessionForRecovery() {
 }
 
 export async function initSupabaseAuth() {
-  if (!isSupabaseConfigured()) return;
+  if (!isSupabaseConfigured()) {
+    authInitFinished = true;
+    authInitialSessionSeen = true;
+    resolveAuthReadyIfComplete("disabled");
+    return;
+  }
 
   const windowUrl =
     window.location.href ||
     `${window.location.origin}${window.location.pathname}${window.location.search}${window.location.hash}`;
   await handleAuthRedirectUrl(windowUrl);
 
+  supabase.auth.onAuthStateChange((event, session) => {
+    void (async () => {
+      await syncSessionToState(session);
+      if (event === "PASSWORD_RECOVERY") {
+        setPasswordRecoveryPending();
+      }
+      if (event === "INITIAL_SESSION") {
+        authInitialSessionSeen = true;
+        resolveAuthReadyIfComplete("INITIAL_SESSION");
+      }
+    })();
+  });
+
   const session = await recoverAuthSession();
   if (session) await syncSessionToState(session);
 
-  supabase.auth.onAuthStateChange((event, session) => {
-    syncSessionToState(session);
-    if (event === "PASSWORD_RECOVERY") {
-      setPasswordRecoveryPending();
-    }
-  });
+  authInitFinished = true;
+  resolveAuthReadyIfComplete("init");
 }
 
 export function getSupabaseUserId() {

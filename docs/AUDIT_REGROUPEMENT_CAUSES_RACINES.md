@@ -55,18 +55,76 @@ Document de synthèse consolidant :
 
 **Mécanisme :** toute récupération (lobby, membership, reconnexion) dépend de la persistance du JWT anonyme (`supabaseUserId`). Pas de re-liaison lobby ↔ invité indépendante de cet UUID.
 
-| ID | Problème | Fichier / fonction | Scénario | Impact | Correction proposée |
-|----|----------|-------------------|----------|--------|---------------------|
-| **C-01** | Perte session anon → membership orpheline | `supabaseAuth.js`, `lobby.js`, `supabaseLobby.js` | JWT expiré / reset → nouveau `signInAnonymously()` → ancienne row `lobby_members` orpheline | Reconnexion impossible ; `display_name_taken` au re-join | Recovery par refresh token ; RPC re-liaison code+nom ; bouton hôte « libérer pseudo » |
-| **C-02** | `reconcileLobbyMembership` wipe si `!uid` | `lobby.js` — `reconcileLobbyMembership()` L338-340 | `inLobby` true mais uid momentanément absent au boot | Lobby effacé avant recovery | Attendre `recoverAuthSession()` avec timeout avant `forceClearClientLobbyState` |
-| **R-01** | = C-01 côté reconnexion | idem | idem | idem | idem |
-| **R-02** | Re-join `display_name_taken` | `supabaseLobby.js` — `joinLobbySupabase()` | Même pseudo, nouvel uid | Blocage join | idem C-01 |
-| **R-03** | = C-02 | `lobby.js` | Race auth au boot | idem C-02 | idem C-02 |
-| **R-05** / **L-03** | `peekServerLobbyForUser` invisible sans uid | `home.js` | Session cleared, pas de uid | Pas de carte « Reprendre la soirée » | Afficher rejoin par code même sans uid local ; guider reset ou re-auth |
-| **M-05a** | Échec join avec `hadSession: true` : auth conservée | `lobby.js` — `joinLobbyAsGuest()` | Join échoue mais session anon existante | Reste invité sans lobby, état ambigu | UX explicite + option sign out ; ou rollback conditionnel |
-| **ARCH-01** | Mode démo offline : pas de MP cross-device | `auth.js`, `lobby.js` | Invité local sans Supabase | Croit être en lobby, pas de sync réelle | Message explicite si Supabase non configuré |
+Point de référence :
+Les utilisateurs sont identifiés par leur UUID Supabase (`supabaseUserId`).
+Il n'existe pas de re-liaison lobby ↔ invité indépendante de cet UUID actuellement.
 
-**Symptômes utilisateur :** « Je ne peux plus rejoindre », pseudo pris, « Reprendre » absent, « Réinitialiser l’app » seul recours.
+## État actuel : Lobby / membership
+
+### Corrigé aujourd'hui
+- Création de lobby fonctionnelle
+- Création du membre host via RPC `create_lobby_member`
+- Join lobby fonctionnel pour :
+  - utilisateur connecté
+  - utilisateur anonyme
+- Correction RLS sur `lobby_members`
+- Ajout de la capacité pour un joueur de lire sa propre ligne après insertion (`auth.uid() = user_id`)
+- Validation que le blocage venait du `.select().single()` avec policy SELECT insuffisante
+- Policies finales attendues sur `lobby_members` :
+  - `members_insert_self`
+  - `members_select_same_lobby`
+  - `members_update_self`
+  - `members_delete_self`
+
+À vérifier :
+- suppression de l'ancienne policy de debug `debug_allow_insert_lobby_members`
+- remettre `.select().single()` après validation finale
+
+---
+
+| ID | Problème | Fichier / fonction | Scénario | Impact | Correction proposée | Statut |
+|----|----------|-------------------|----------|--------|---------------------|--------|
+| **C-01** | Perte session anon → membership orpheline | `supabaseAuth.js`, `lobby.js`, `supabaseLobby.js` | JWT expiré / reset → nouveau `signInAnonymously()` → ancienne row `lobby_members` orpheline | Reconnexion impossible ; `display_name_taken` au re-join | Recovery par refresh token ; RPC re-liaison code+nom ; bouton hôte « libérer pseudo » | ❌ À faire |
+| **C-02** | `reconcileLobbyMembership` wipe si `!uid` | `lobby.js` — `reconcileLobbyMembership()` L338-340 | `inLobby` true mais uid momentanément absent au boot | Lobby effacé avant recovery | Attendre `recoverAuthSession()` avec timeout avant `forceClearClientLobbyState` | ❌ À faire |
+| **R-01** | = C-01 côté reconnexion | idem | idem | idem | idem C-01 | ❌ À faire |
+| **R-02** | Re-join `display_name_taken` | `supabaseLobby.js` — `joinLobbySupabase()` | Même pseudo, nouvel uid | Blocage join | Gestion d'une ancienne membership ou récupération session | ⚠️ Partiellement traité |
+| **R-03** | = C-02 | `lobby.js` | Race auth au boot | idem C-02 | idem C-02 | ❌ À faire |
+| **R-05 / L-03** | `peekServerLobbyForUser` invisible sans uid | `home.js` | Session cleared, pas de uid | Pas de carte « Reprendre la soirée » | Afficher rejoin par code même sans uid local ; guider reset ou re-auth | ❌ À faire |
+| **M-05a** | Échec join avec `hadSession: true` : auth conservée | `lobby.js` — `joinLobbyAsGuest()` | Join échoue mais session anon existante | Reste invité sans lobby, état ambigu | UX explicite + option sign out ; ou rollback conditionnel | ❌ À faire |
+| **ARCH-01** | Mode démo offline : pas de MP cross-device | `auth.js`, `lobby.js` | Invité local sans Supabase | Croit être en lobby, pas de sync réelle | Message explicite si Supabase non configuré | ❌ À faire |
+
+---
+
+## Prochaine étape recommandée
+
+### Phase suivante : stabilisation lobby realtime
+
+À traiter avant les jeux :
+
+1. Vérifier synchronisation `lobby_members`
+   - arrivée d'un joueur visible instantanément
+   - départ d'un joueur supprimé
+   - refresh sans perte de lobby
+
+2. Gestion du ready
+   - update `ready`
+   - synchronisation realtime
+   - validation avant lancement
+
+3. Gestion recovery session anon
+   - éviter les memberships orphelines
+   - éviter suppression automatique au boot
+   - permettre reprise de soirée
+
+---
+
+## Symptômes utilisateur actuels à surveiller
+
+- « Je ne peux plus rejoindre »
+- « Mon pseudo est déjà pris »
+- « Reprendre la soirée » absent
+- « Réinitialiser l'app » seul recours
+- Lobby créé mais perdu après refresh/session
 
 ---
 

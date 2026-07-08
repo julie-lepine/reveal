@@ -1019,14 +1019,9 @@ export async function joinLobbySupabase(codeInput) {
         color: GUEST_COLOR,
         is_host: false,
         ready: false,
-      });
-    
-    console.log("[DEBUG MEMBER INSERT JOIN]", {
-      lobbyId: lobbyRow.id,
-      userId,
-      joinData,
-      joinErr,
-    });
+      })
+      .select()
+      .single();
 
       if (joinErr) {
         if (isDuplicateLobbyDisplayNameError(joinErr)) {
