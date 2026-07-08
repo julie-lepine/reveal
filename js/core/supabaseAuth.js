@@ -103,12 +103,22 @@ export async function clearStaleSupabaseSession(error) {
 
 async function recoverAuthSession() {
   if (!supabase) return null;
+
   const { data, error } = await supabase.auth.getSession();
+
+  console.debug("[DEBUG RECOVER RAW SESSION]", {
+    hasSession: !!data.session,
+    userId: data.session?.user?.id,
+    hasAccessToken: !!data.session?.access_token,
+    hasRefreshToken: !!data.session?.refresh_token,
+  });
+
   if (error) {
     console.warn("Supabase session:", error.message);
     await clearStaleSupabaseSession(error);
     return null;
   }
+
   return data.session ?? null;
 }
 
