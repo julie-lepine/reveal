@@ -368,20 +368,30 @@ export async function reconcileLobbyMembership() {
   }
 
   try {
+    if (!getSupabaseUserId()) {
+      return reconcileLobbyWhenUidMissing();
+    }
+  
     await refreshLobbyFromSupabase();
+  
     const participants = getLobbyParticipants();
+  
     if (!participants.length || !participants.some((p) => p.userId === uid)) {
       const stillMember = await isLocalStillLobbyMember(lobbyId);
+  
       if (stillMember !== false) {
         if (stillMember === true) {
           const recovered = await tryRecoverLobbyFromServer();
           if (recovered.ok) return { cleared: false, recovered: true };
         }
+  
         return { cleared: false };
       }
+  
       forceClearClientLobbyState();
       return { cleared: true };
     }
+  
     return { cleared: false };
   } catch (e) {
     console.warn("REVEAL reconcile lobby:", e.message || e);
