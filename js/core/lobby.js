@@ -368,7 +368,7 @@ export async function reconcileLobbyMembership() {
   }
 
   try {
-    if (!getSupabaseUserId()) {
+    if (!getSupabaseUserId() && loadGuestMembership()?.membershipId) {
       return reconcileLobbyWhenUidMissing();
     }
   
