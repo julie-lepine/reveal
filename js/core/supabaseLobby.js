@@ -412,6 +412,11 @@ export async function isLocalStillLobbyMember(lobbyId = getState().lobby?.id) {
 
   const { data: authData } = await supabase.auth.getUser();
 
+  console.log("[DEBUG JOIN SUPABASE USER]", {
+    userId: user?.id,
+    anonymous: user?.is_anonymous,
+  });
+
   const authUserId = authData?.user?.id;
 
   console.log("[DEBUG AUTH COMPARE]", {
@@ -955,6 +960,7 @@ console.log("[DEBUG MEMBER INSERT CREATE]", {
 }
 
 export async function joinLobbySupabase(codeInput) {
+  console.log("[DEBUG JOIN SUPABASE START]", { code });
   const userId = getSupabaseUserId();
   if (!userId) return { ok: false, error: "Connecte-toi ou rejoins en invité d'abord." };
 
