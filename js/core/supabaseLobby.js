@@ -353,7 +353,12 @@ async function ensureGuestMembershipReclaimed(lobbyId) {
 /** Restaure lobby + session de jeu depuis Supabase (reconnexion après F5). */
 export async function recoverLobbyFromServer({ withMessages = false } = {}) {
   const hadGuestMembership = canUseGuestMembershipRecovery();
+  console.debug("[DEBUG RECOVERY INPUT]", {
+    guestMembership: loadGuestMembership(),
+    canRecover: canUseGuestMembershipRecovery(),
+  });
   const lobbyId = await findServerLobbyIdForUser();
+  console.debug("[DEBUG RECOVERY LOBBY ID]", lobbyId);
   if (!lobbyId) {
     if (hadGuestMembership && (await isGuestMembershipDefinitivelyStale())) {
       clearGuestMembership();

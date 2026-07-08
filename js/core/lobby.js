@@ -310,6 +310,7 @@ async function reconcileLobbyWhenUidMissing() {
   if (loadGuestMembership()?.membershipId) {
     console.debug("[Lobby Recovery] trying membership recovery");
     const recovered = await tryRecoverLobbyFromServer();
+    console.debug("[DEBUG UID MISSING RECOVERY RESULT]", recovered);
     if (recovered.ok) {
       console.debug("[Lobby Recovery] restored lobby");
       return { cleared: false, recovered: true };
