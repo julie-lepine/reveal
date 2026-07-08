@@ -412,6 +412,13 @@ export async function isLocalStillLobbyMember(lobbyId = getState().lobby?.id) {
 
   const { data: authData } = await supabase.auth.getUser();
 
+  const { data: sessionData } = await supabase.auth.getSession();
+
+console.log("[DEBUG SESSION IN MEMBERSHIP]", {
+  sessionUserId: sessionData?.session?.user?.id,
+  hasToken: !!sessionData?.session?.access_token
+});
+
   console.log("[DEBUG AUTH COMPARE]", {
     stateUserId: userId,
     authUserId: authData?.user?.id,
