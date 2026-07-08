@@ -302,10 +302,13 @@ export async function ensureAnonymousSessionForRecovery() {
     const { data, error } = await supabase.auth.signInAnonymously();
 
     if (error) {
-      console.warn(
-        "[Lobby Recovery] anonymous sign-in failed",
-        error.message || error
-      );
+      console.warn("[Lobby Recovery] anonymous sign-in failed", {
+        error,
+        status: error.status,
+        message: error.message,
+        name: error.name,
+      });
+    
       return null;
     }
 
