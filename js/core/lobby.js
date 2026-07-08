@@ -620,9 +620,12 @@ export async function createLobby() {
 }
 
 export async function joinLobby(code) {
+  console.log("[DEBUG JOIN LOBBY START]", { code });
+
   resetEveningState();
 
   if (isSupabaseConfigured()) {
+    console.log("[DEBUG CALL JOIN SUPABASE]");
     return joinLobbySupabase(code);
   }
 
