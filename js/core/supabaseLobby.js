@@ -963,8 +963,16 @@ console.log("[DEBUG MEMBER INSERT CREATE]", {
 
 export async function joinLobbySupabase(codeInput) {
   console.log("[DEBUG JOIN SUPABASE START]", { codeInput });
-  const userId = getSupabaseUserId();
-  if (!userId) return { ok: false, error: "Connecte-toi ou rejoins en invité d'abord." };
+
+  const recoverySession = await ensureAnonymousSessionForRecovery();
+
+  const userId =
+    recoverySession?.user?.id ||
+    getSupabaseUserId();
+
+  if (!userId) {
+    return { ok: false, error: "Connecte-toi ou rejoins en invité d'abord." };
+  }
 
   const code = normalizeCode(codeInput);
   if (code.length < 4) return { ok: false, error: "Code invalide." };

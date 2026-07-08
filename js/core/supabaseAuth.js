@@ -251,6 +251,10 @@ export async function reprocessAuthLaunchUrl() {
  * @returns {Promise<import("@supabase/supabase-js").Session|null>}
  */
 export async function ensureAnonymousSessionForRecovery() {
+  console.debug("[Lobby Recovery CALLED]", {
+    stateUser: getState().user,
+    membership: loadGuestMembership()
+  });
   if (!isSupabaseConfigured() || !supabase) {
     console.debug("[Lobby Recovery] supabase unavailable");
     return null;
@@ -369,12 +373,18 @@ export async function initSupabaseAuth() {
   });
 
   const session = await recoverAuthSession();
+
   console.debug("[DEBUG RECOVER AUTH SESSION RESULT]", {
     userId: session?.user?.id,
     hasToken: !!session?.access_token
   });
-  if (session) await syncSessionToState(session);
-
+  
+  if (session) {
+    await syncSessionToState(session);
+  } else {
+    console.debug("[DEBUG WAITING FOR AUTH SIGNED_IN]");
+  }
+  
   authInitFinished = true;
   resolveAuthReadyIfComplete("init");
 }
