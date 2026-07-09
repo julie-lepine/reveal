@@ -218,6 +218,18 @@ async function findLobbyIdByGuestMembership() {
   return peek.row.lobby_id;
 }
 
+async function isGuestRecoveryCaptchaRequired() {
+  if (!canUseGuestMembershipRecovery()) return false;
+  try {
+    const { isTurnstileRequired } = await import("./turnstile.js");
+    if (!isTurnstileRequired()) return false;
+    const { data } = await supabase.auth.getSession();
+    return !data?.session?.user?.id;
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Membership invité introuvable côté serveur (supprimée ou lobby expiré).
  * @returns {Promise<boolean>}
@@ -244,6 +256,7 @@ export async function findServerLobbyIdForUser(userId = getSupabaseUserId()) {
   if (!isSupabaseConfigured()) return null;
 
   if (canUseGuestMembershipRecovery()) {
+    if (await isGuestRecoveryCaptchaRequired()) return null;
     try {
       const { data } = await supabase.auth.getSession();
       if (!data?.session?.user?.id) {
@@ -371,6 +384,10 @@ export async function recoverLobbyFromServer({ withMessages = false } = {}) {
   const lobbyId = await findServerLobbyIdForUser();
   console.debug("[DEBUG RECOVERY LOBBY ID]", lobbyId);
   if (!lobbyId) {
+    if (hadGuestMembership && (await isGuestRecoveryCaptchaRequired())) {
+      console.debug("[Lobby Recovery] recovery needs captcha");
+      return { ok: false, captchaRequired: true };
+    }
     if (hadGuestMembership && (await isGuestMembershipDefinitivelyStale())) {
       clearGuestMembership();
       console.debug("[Lobby Recovery] recovery failed");
@@ -484,6 +501,11 @@ async function handlePossibleLobbyGone(lobbyId, e) {
     if (loadGuestMembership()?.membershipId) {
       const recovered = await recoverLobbyFromServer();
       if (recovered.ok) return true;
+      if (recovered.captchaRequired) {
+        const { handleGuestRecoveryRequiresCaptcha } = await import("./lobby.js");
+        handleGuestRecoveryRequiresCaptcha();
+        return false;
+      }
     }
     return false;
   }

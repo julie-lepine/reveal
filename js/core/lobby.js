@@ -286,7 +286,11 @@ export async function tryRecoverLobbyFromServer() {
     const res = await recoverLobbyFromServer();
     return res.ok
       ? { ok: true, code: res.code }
-      : { ok: false, staleMembership: Boolean(res.staleMembership) };
+      : {
+          ok: false,
+          staleMembership: Boolean(res.staleMembership),
+          captchaRequired: Boolean(res.captchaRequired),
+        };
   } catch (e) {
     console.warn("REVEAL recover lobby:", e.message || e);
     return { ok: false };
@@ -302,6 +306,17 @@ export function forceClearClientLobbyState() {
   saveStatePatch({ inLobby: false, lobby: null, lobbyCode: null });
 }
 
+export function handleGuestRecoveryRequiresCaptcha() {
+  stopLobbyPresenceSync();
+  forceClearClientLobbyState();
+  try {
+    sessionStorage.setItem("reveal-auth-tab", "guest");
+  } catch {
+    /* storage indisponible */
+  }
+  navigate("home", { reset: true, params: { authTab: "guest" } });
+}
+
 /**
  * Recovery invité quand uid absent : tente membership avant tout wipe local.
  * @returns {Promise<{ cleared: boolean, recovered?: boolean }|null>} null si uid présent
@@ -314,6 +329,11 @@ async function reconcileLobbyWhenUidMissing() {
     if (recovered.ok) {
       console.debug("[Lobby Recovery] restored lobby");
       return { cleared: false, recovered: true };
+    }
+    if (recovered.captchaRequired) {
+      console.debug("[Lobby Recovery] captcha required for recovery");
+      handleGuestRecoveryRequiresCaptcha();
+      return { cleared: true, captchaRequired: true };
     }
     if (!recovered.staleMembership) {
       return { cleared: false };
