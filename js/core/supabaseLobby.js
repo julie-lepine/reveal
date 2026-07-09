@@ -751,6 +751,16 @@ async function fetchLobbyBundle(lobbyId, { withMessages = false } = {}) {
 
   const participants = (members || []).map((m) => mapMember(m, userId));
 
+  console.log("[DEBUG FETCH BUNDLE MEMBERS]", {
+    currentUserId: userId,
+    members: members?.map(m => ({
+      id: m.id,
+      user_id: m.user_id,
+      display_name: m.display_name,
+    })),
+    participants,
+  });
+  
   const bundle = {
     id: lobby.id,
     code: lobby.code,
