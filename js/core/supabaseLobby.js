@@ -380,8 +380,11 @@ export async function recoverLobbyFromServer({ withMessages = false } = {}) {
     return { ok: false };
   }
 
-  const bundle = await fetchLobbyBundle(lobbyId, { withMessages });
-  applyLobbyToState(bundle);
+  const bundle = await fetchLobbyBundle(lobbyId, {
+    withMessages,
+    currentUserId: getSupabaseUserId(),
+  });
+  applyLobbyToState(bundle, { persistGuestMembership: canUseGuestMembershipRecovery() });
   startLobbyPresenceSync();
   const { startMultiplayerSync } = await import("./gameSync.js");
   startMultiplayerSync();
@@ -409,10 +412,9 @@ export async function isLocalStillLobbyMember(lobbyId = getState().lobby?.id) {
     console.log("[DEBUG membership check skipped: no lobby]");
     return null;
   }
+  const { data: sessionData } = await supabase.auth.getSession();
 
   const { data: authData } = await supabase.auth.getUser();
-
-  const { data: sessionData } = await supabase.auth.getSession();
 
 console.log("[DEBUG SESSION IN MEMBERSHIP]", {
   sessionUserId: sessionData?.session?.user?.id,
@@ -542,9 +544,12 @@ async function tryReclaimGuestMembershipForJoin(lobbyRow, code, displayName) {
   });
 }
 
-async function completeLobbyJoin(lobbyId, { afterReclaim = false } = {}) {
-  const bundle = await fetchLobbyBundle(lobbyId, { withMessages: true });
-  applyLobbyToState(bundle);
+async function completeLobbyJoin(
+  lobbyId,
+  { afterReclaim = false, currentUserId = null, persistGuestMembership = false } = {}
+) {
+  const bundle = await fetchLobbyBundle(lobbyId, { withMessages: true, currentUserId });
+  applyLobbyToState(bundle, { persistGuestMembership });
   const { startMultiplayerSync } = await import("./gameSync.js");
   startMultiplayerSync();
   await restoreActiveGameSessionOnJoin(lobbyId);
@@ -717,8 +722,8 @@ function mapMember(row, currentUserId) {
  * ils ne changent qu'à l'envoi d'un message, géré séparément (Realtime + envoi).
  * On ne les charge que quand `withMessages` est explicitement demandé.
  */
-async function fetchLobbyBundle(lobbyId, { withMessages = false } = {}) {
-  const userId = getSupabaseUserId();
+async function fetchLobbyBundle(lobbyId, { withMessages = false, currentUserId = null } = {}) {
+  const userId = currentUserId || getSupabaseUserId();
   const queries = [
     supabase
       .from("lobbies")
@@ -782,7 +787,7 @@ async function fetchLobbyBundle(lobbyId, { withMessages = false } = {}) {
   return bundle;
 }
 
-function applyLobbyToState(bundle) {
+function applyLobbyToState(bundle, { persistGuestMembership = false } = {}) {
   // Si le bundle n'a pas chargé les messages, on conserve ceux déjà en mémoire.
   const messages =
     bundle.messages !== undefined ? bundle.messages : getState().lobby?.messages || [];
@@ -807,7 +812,7 @@ function applyLobbyToState(bundle) {
       sessionId: bundle.code,
     },
   });
-  if (getState().user?.isGuest) {
+  if (persistGuestMembership || getState().user?.isGuest) {
     const membership = membershipFromBundle(bundle);
     if (membership) saveGuestMembership(membership);
   }
@@ -958,8 +963,8 @@ console.log("[DEBUG MEMBER INSERT CREATE]", {
 
   if (memberErr) return { ok: false, error: memberErr.message };
 
-  const bundle = await fetchLobbyBundle(lobby.id, { withMessages: true });
-  applyLobbyToState(bundle);
+  const bundle = await fetchLobbyBundle(lobby.id, { withMessages: true, currentUserId: userId });
+  applyLobbyToState(bundle, { persistGuestMembership: getState().user?.isGuest === true });
   const { startMultiplayerSync } = await import("./gameSync.js");
   startMultiplayerSync();
   await restoreActiveGameSessionOnJoin(lobby.id);
@@ -1003,6 +1008,8 @@ export async function joinLobbySupabase(codeInput) {
   }
 
   let afterReclaim = false;
+  const persistGuestMembership =
+    recoverySession?.user?.is_anonymous === true || getState().user?.isGuest === true;
 
   const { data: existing } = await supabase
     .from("lobby_members")
@@ -1045,18 +1052,18 @@ export async function joinLobbySupabase(codeInput) {
 
     if (!membershipResolved) {
       const { data: joinData, error: joinErr } = await supabase
-      .from("lobby_members")
-      .insert({
-        lobby_id: lobbyRow.id,
-        user_id: userId,
-        display_name: displayName,
-        emoji: getLocalEmoji(),
-        color: GUEST_COLOR,
-        is_host: false,
-        ready: false,
-      })
-      .select()
-      .single();
+        .from("lobby_members")
+        .insert({
+          lobby_id: lobbyRow.id,
+          user_id: userId,
+          display_name: displayName,
+          emoji: getLocalEmoji(),
+          color: GUEST_COLOR,
+          is_host: false,
+          ready: false,
+        })
+        .select()
+        .single();
 
       if (joinErr) {
         if (isDuplicateLobbyDisplayNameError(joinErr)) {
@@ -1069,6 +1076,15 @@ export async function joinLobbySupabase(codeInput) {
           return { ok: false, error: joinErr.message };
         }
       } else {
+        if (persistGuestMembership) {
+          saveGuestMembership({
+            membershipId: joinData.id,
+            lobbyId: lobbyRow.id,
+            lobbyCode: code,
+            displayName,
+          });
+        }
+
         const gs = { ...getState().globalStats };
         gs.playersJoined = (gs.playersJoined || 0) + 1;
         saveStatePatch({ globalStats: gs });
@@ -1076,7 +1092,11 @@ export async function joinLobbySupabase(codeInput) {
     }
   }
 
-  const bundle = await completeLobbyJoin(lobbyRow.id, { afterReclaim });
+  const bundle = await completeLobbyJoin(lobbyRow.id, {
+    afterReclaim,
+    currentUserId: userId,
+    persistGuestMembership,
+  });
   return { ok: true, code: bundle.code };
 }
 
