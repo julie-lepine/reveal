@@ -342,8 +342,9 @@ export async function reconcileLobbyMembership() {
     return { cleared: false };
   }
 
-  const uid = getSupabaseUserId();
-
+  const liveUser = await getLiveSupabaseUserId();
+  const uid = liveUser || getSupabaseUserId();
+  
   if (!getState().inLobby) {
     if (uid) {
       const recovered = await tryRecoverLobbyFromServer();

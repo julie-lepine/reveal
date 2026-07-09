@@ -429,7 +429,7 @@ console.log("[DEBUG SESSION IN MEMBERSHIP]", {
 
   // Auth absente : on ne peut pas conclure que le membre est parti
   if (!authUserId) {
-    console.log("[DEBUG membership check skipped: no auth]");
+    console.warn("membership check skipped: no auth");
     return null;
   }
 
@@ -760,7 +760,7 @@ async function fetchLobbyBundle(lobbyId, { withMessages = false } = {}) {
     })),
     participants,
   });
-  
+
   const bundle = {
     id: lobby.id,
     code: lobby.code,
