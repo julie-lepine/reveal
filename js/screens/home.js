@@ -129,7 +129,11 @@ function guestRejoinDefaultCode() {
   return getLobby()?.code || getRememberedLobbyCode() || "";
 }
 
-function guestJoinPanelHtml({ leaveHint = false } = {}) {
+function guestJoinErrorHtml(id, message) {
+  return `<p class="auth-error${message ? "" : " hidden"}" id="${id}" role="alert">${escapeHtml(message || "")}</p>`;
+}
+
+function guestJoinPanelHtml({ leaveHint = false, error = "" } = {}) {
   const defaultCode = guestRejoinDefaultCode();
   return `
     <div class="card auth-form auth-form--guest auth-form--guest-rejoin">
@@ -143,9 +147,20 @@ function guestJoinPanelHtml({ leaveHint = false } = {}) {
       <label class="field-label" for="guest-rejoin-code">Code d'invitation</label>
       <input type="text" class="field-input" id="guest-rejoin-code" placeholder="6 caractères" maxlength="8" autocapitalize="characters" value="${escapeHtml(defaultCode)}" />
       <div id="guest-rejoin-turnstile" class="auth-turnstile-wrap"></div>
-      <p class="auth-error hidden" id="guest-rejoin-error"></p>
+      ${guestJoinErrorHtml("guest-rejoin-error", error)}
       <button type="button" class="btn btn-primary btn--spaced" id="btn-guest-rejoin">Rejoindre la partie →</button>
     </div>`;
+}
+
+function normalizeGuestJoinError(res) {
+  const message = String(res?.error || "");
+  if (res?.code === "display_name_taken") {
+    return "Ce pseudo est déjà utilisé dans ce lobby. Choisis-en un autre.";
+  }
+  if (/code (introuvable|invalide)|lobby introuvable/i.test(message)) {
+    return "Code incorrect ou lobby introuvable. Vérifie le code auprès de l'hôte.";
+  }
+  return message || "Impossible de rejoindre la partie.";
 }
 
 function homeStatsHtml() {
@@ -174,7 +189,7 @@ function homeStatsHtml() {
   return "";
 }
 
-function homeRenderSnapshot(authTab, serverLobby = null) {
+function homeRenderSnapshot(authTab, serverLobby = null, guestJoinError = "") {
   const user = getUser();
   return JSON.stringify({
     tab: authTab,
@@ -184,6 +199,7 @@ function homeRenderSnapshot(authTab, serverLobby = null) {
     inLobby: hasActiveLobby(),
     lobbyCode: getLobby()?.code,
     serverLobbyCode: serverLobby?.code || null,
+    guestJoinError,
     recap: hasActiveLobby() ? getEveningRecap().participantCount : 0,
   });
 }
@@ -211,6 +227,7 @@ export function mountHome(app) {
   let lastSnapshot = "";
   let forgotCooldownTimer = null;
   let pendingServerLobby = null;
+  let guestJoinError = "";
 
   function startForgotCooldownTicker() {
     if (forgotCooldownTimer) return;
@@ -271,7 +288,7 @@ export function mountHome(app) {
   }
 
   async function renderIfNeeded(force = false) {
-    const snap = homeRenderSnapshot(authTab, pendingServerLobby);
+    const snap = homeRenderSnapshot(authTab, pendingServerLobby, guestJoinError);
     const { drafts, focusedId } = preserveInputDrafts();
     const typing = focusedId && drafts[focusedId] !== undefined;
 
@@ -458,7 +475,7 @@ export function mountHome(app) {
               <button type="button" class="btn-link" id="btn-logout">Quitter la session</button>
             </div>
           </div>
-          ${guestJoinPanelHtml({ leaveHint: activeLobby })}`
+          ${guestJoinPanelHtml({ leaveHint: activeLobby, error: guestJoinError })}`
               : `
           <div class="auth-tabs">
             <button type="button" class="auth-tab ${authTab === "login" ? "auth-tab--active" : ""}" data-tab="login">Connexion</button>
@@ -501,7 +518,7 @@ export function mountHome(app) {
               <label class="field-label" for="guest-code">Code d'invitation</label>
               <input type="text" class="field-input" id="guest-code" placeholder="6 caractères" maxlength="8" autocapitalize="characters" />
               <div id="guest-turnstile" class="auth-turnstile-wrap"></div>
-              <p class="auth-error hidden" id="guest-error"></p>
+              ${guestJoinErrorHtml("guest-error", guestJoinError)}
               <button type="button" class="btn btn-primary btn--spaced" id="btn-guest-join">Rejoindre la partie →</button>
             </div>
           </div>
@@ -564,6 +581,7 @@ export function mountHome(app) {
     const tabBtn = e.target.closest("[data-tab]");
     if (tabBtn) {
       authTab = tabBtn.getAttribute("data-tab");
+      guestJoinError = "";
       scheduleRender(true);
       return;
     }
@@ -833,14 +851,16 @@ export function mountHome(app) {
 
       const liveUserId = await getLiveSupabaseUserId();
       if (isTurnstileRequired() && !liveUserId && !isTurnstileSolved("guest")) {
+        guestJoinError = "Valide la vérification anti-robot.";
         if (errEl) {
-          errEl.textContent = "Valide la vérification anti-robot.";
+          errEl.textContent = guestJoinError;
           errEl.classList.remove("hidden");
         }
         return;
       }
 
       btn.disabled = true;
+      guestJoinError = "";
       errEl?.classList.add("hidden");
 
       try {
@@ -850,9 +870,8 @@ export function mountHome(app) {
 
         if (!res.ok) {
           const isDisplayNameTaken = res.code === "display_name_taken";
-          const joinErrorMessage = isDisplayNameTaken
-            ? "Ce pseudo est déjà utilisé dans ce lobby. Choisis-en un autre."
-            : res.error;
+          const joinErrorMessage = normalizeGuestJoinError(res);
+          guestJoinError = joinErrorMessage;
 
           if (res.captcha && isGuest()) {
             await setupGuestRejoinTurnstile({ requireSolved: true, forceRemount: true });
@@ -883,10 +902,12 @@ export function mountHome(app) {
           }
           return;
         }
+        guestJoinError = "";
         await navigateAfterLobbyJoin();
       } catch (err) {
         btn.disabled = false;
         const msg = err?.message || "Impossible de rejoindre le lobby.";
+        guestJoinError = msg;
         if (errEl) {
           errEl.textContent = msg;
           errEl.classList.remove("hidden");

@@ -2678,7 +2678,13 @@ select.field-input option{
 .auth-error{
   color:#F87171;
   font-size:13px;
-  margin-top:8px;
+  line-height:1.4;
+  margin:10px 0 0;
+  padding:10px 12px;
+  border:1px solid rgba(248,113,113,.28);
+  border-radius:10px;
+  background:rgba(127,29,29,.18);
+  overflow-wrap:anywhere;
 }
 
 .auth-error.hidden,
