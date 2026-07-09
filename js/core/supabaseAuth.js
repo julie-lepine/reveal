@@ -260,7 +260,7 @@ export async function reprocessAuthLaunchUrl() {
  * Ne pas appeler au boot normal — uniquement dans un flux recovery.
  * @returns {Promise<import("@supabase/supabase-js").Session|null>}
  */
-export async function ensureAnonymousSessionForRecovery() {
+export async function ensureAnonymousSessionForRecovery(captchaToken = null) {
   console.debug("[Lobby Recovery CALLED]", {
     stateUser: getState().user,
     membership: loadGuestMembership()
@@ -312,8 +312,19 @@ export async function ensureAnonymousSessionForRecovery() {
   });
 
   // 3) Créer une session anon Supabase
+  const { isTurnstileRequired } = await import("./turnstile.js");
+  if (isTurnstileRequired() && !captchaToken) {
+    console.debug("[Lobby Recovery] captcha required");
+    return null;
+  }
+
   try {
-    const { data, error } = await supabase.auth.signInAnonymously();
+    const options = {};
+    if (captchaToken) options.captchaToken = captchaToken;
+
+    const { data, error } = await supabase.auth.signInAnonymously(
+      Object.keys(options).length ? { options } : undefined
+    );
 
     if (error) {
       console.warn("[Lobby Recovery] anonymous sign-in failed", {

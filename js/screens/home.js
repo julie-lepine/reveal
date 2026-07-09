@@ -28,7 +28,7 @@ import {
   getRememberedLobbyCode,
   resumeEveningSession,
 } from "../core/lobby.js";
-import { getSupabaseUserId } from "../core/supabaseAuth.js";
+import { getLiveSupabaseUserId } from "../core/supabaseAuth.js";
 import { getEveningRecap } from "../core/eveningRecap.js";
 import {
   isGameSyncActive,
@@ -378,7 +378,8 @@ export function mountHome(app) {
     const container = app.querySelector("#guest-rejoin-turnstile");
     const btn = app.querySelector("#btn-guest-rejoin");
 
-    if (getSupabaseUserId()) {
+    const liveUserId = await getLiveSupabaseUserId();
+    if (liveUserId) {
       container?.classList.add("hidden");
       removeTurnstile("guest");
       if (btn) btn.disabled = false;
@@ -818,7 +819,8 @@ export function mountHome(app) {
       const { nameEl, codeEl, errEl } = readGuestJoinFields();
       const btn = e.target.closest("#btn-guest-join, #btn-guest-rejoin");
 
-      if (!isGuest() && isTurnstileRequired() && !isTurnstileSolved("guest")) {
+      const liveUserId = await getLiveSupabaseUserId();
+      if (isTurnstileRequired() && !liveUserId && !isTurnstileSolved("guest")) {
         if (errEl) {
           errEl.textContent = "Valide la vérification anti-robot.";
           errEl.classList.remove("hidden");
