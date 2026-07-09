@@ -27,6 +27,7 @@ import {
   peekServerLobbyForUser,
   getRememberedLobbyCode,
   resumeEveningSession,
+  isGuestRecoveryCaptchaPending,
 } from "../core/lobby.js";
 import { getLiveSupabaseUserId } from "../core/supabaseAuth.js";
 import { getEveningRecap } from "../core/eveningRecap.js";
@@ -309,7 +310,10 @@ export function mountHome(app) {
     }
 
     if (isGuest()) {
-      await setupGuestRejoinTurnstile();
+      await setupGuestRejoinTurnstile({
+        requireSolved: isGuestRecoveryCaptchaPending(),
+        forceRemount: isGuestRecoveryCaptchaPending(),
+      });
       return;
     }
 

@@ -65,8 +65,26 @@ import {
 import { isGuessLieGameActive, tryEnterGuessLiePlayFromWait } from "./guessLieSession.js";
 
 const MAX_PLAYERS = 10;
+const GUEST_RECOVERY_CAPTCHA_KEY = "reveal-guest-recovery-captcha-required";
 
 let lobbyDissolveHandling = false;
+
+function setGuestRecoveryCaptchaRequired(required) {
+  try {
+    if (required) sessionStorage.setItem(GUEST_RECOVERY_CAPTCHA_KEY, "1");
+    else sessionStorage.removeItem(GUEST_RECOVERY_CAPTCHA_KEY);
+  } catch {
+    /* storage indisponible */
+  }
+}
+
+export function isGuestRecoveryCaptchaPending() {
+  try {
+    return sessionStorage.getItem(GUEST_RECOVERY_CAPTCHA_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
 
 function isLocalLobbyHost() {
   const uid = getSupabaseUserId();
@@ -284,6 +302,8 @@ export async function tryRecoverLobbyFromServer() {
   }
   try {
     const res = await recoverLobbyFromServer();
+    if (res.ok || res.staleMembership) setGuestRecoveryCaptchaRequired(false);
+    if (res.captchaRequired) setGuestRecoveryCaptchaRequired(true);
     return res.ok
       ? { ok: true, code: res.code }
       : {
@@ -309,6 +329,7 @@ export function forceClearClientLobbyState() {
 export function handleGuestRecoveryRequiresCaptcha() {
   stopLobbyPresenceSync();
   forceClearClientLobbyState();
+  setGuestRecoveryCaptchaRequired(true);
   try {
     sessionStorage.setItem("reveal-auth-tab", "guest");
   } catch {
@@ -323,6 +344,9 @@ export function handleGuestRecoveryRequiresCaptcha() {
  */
 async function reconcileLobbyWhenUidMissing() {
   if (loadGuestMembership()?.membershipId) {
+    if (isGuestRecoveryCaptchaPending()) {
+      return { cleared: false, captchaRequired: true };
+    }
     console.debug("[Lobby Recovery] trying membership recovery");
     const recovered = await tryRecoverLobbyFromServer();
     console.debug("[DEBUG UID MISSING RECOVERY RESULT]", recovered);
@@ -365,6 +389,9 @@ export async function reconcileLobbyMembership() {
   const liveUser = await getLiveSupabaseUserId();
   const hasGuestMembership = Boolean(loadGuestMembership()?.membershipId);
   const stateUser = getState().user;
+  if (!liveUser && hasGuestMembership && isGuestRecoveryCaptchaPending()) {
+    return { cleared: false, captchaRequired: true };
+  }
   if (!liveUser && hasGuestMembership && !(stateUser?.loggedIn && stateUser?.isGuest === false)) {
     return reconcileLobbyWhenUidMissing();
   }
@@ -708,6 +735,7 @@ function normalizeLobbyCode(code) {
 }
 
 export async function joinLobbyAsGuest(code, guestName, captchaToken = null) {
+  setGuestRecoveryCaptchaRequired(false);
   const auth = await loginAsGuest(guestName, captchaToken);
   if (!auth.ok) return auth;
 
