@@ -343,6 +343,12 @@ export async function reconcileLobbyMembership() {
   }
 
   const liveUser = await getLiveSupabaseUserId();
+  const hasGuestMembership = Boolean(loadGuestMembership()?.membershipId);
+  const stateUser = getState().user;
+  if (!liveUser && hasGuestMembership && !(stateUser?.loggedIn && stateUser?.isGuest === false)) {
+    return reconcileLobbyWhenUidMissing();
+  }
+
   const uid = liveUser || getSupabaseUserId();
 
   if (!getState().inLobby) {

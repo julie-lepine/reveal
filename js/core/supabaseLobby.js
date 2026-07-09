@@ -243,6 +243,17 @@ export async function isGuestMembershipDefinitivelyStale() {
 export async function findServerLobbyIdForUser(userId = getSupabaseUserId()) {
   if (!isSupabaseConfigured()) return null;
 
+  if (canUseGuestMembershipRecovery()) {
+    try {
+      const { data } = await supabase.auth.getSession();
+      if (!data?.session?.user?.id) {
+        return findLobbyIdByGuestMembership();
+      }
+    } catch {
+      return findLobbyIdByGuestMembership();
+    }
+  }
+
   if (userId) {
     const byUser = await findLobbyIdByUserId(userId);
     if (byUser) return byUser;
@@ -470,6 +481,10 @@ async function handlePossibleLobbyGone(lobbyId, e) {
   }
   if (stillMember === null) {
     console.warn("REVEAL lobby fetch failed, membership unclear:", e.message || e);
+    if (loadGuestMembership()?.membershipId) {
+      const recovered = await recoverLobbyFromServer();
+      if (recovered.ok) return true;
+    }
     return false;
   }
   const { handleLobbyDissolvedForGuest } = await import("./lobby.js");
