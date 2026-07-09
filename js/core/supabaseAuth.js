@@ -18,6 +18,9 @@ let authReadyResolve = null;
 let authInitFinished = false;
 let authInitialSessionSeen = false;
 let authReadyResolved = false;
+let pendingGuestDisplayName = null;
+
+const GUEST_DISPLAY_NAME_LOCK_MS = 15000;
 
 /**
  * Résolue quand l'init Supabase auth est terminée (session restaurée si possible)
@@ -130,6 +133,24 @@ function providerFromUser(user) {
   return p;
 }
 
+function lockGuestDisplayName(displayName, userId = null) {
+  pendingGuestDisplayName = {
+    displayName,
+    userId,
+    expiresAt: Date.now() + GUEST_DISPLAY_NAME_LOCK_MS,
+  };
+}
+
+function getLockedGuestDisplayName(userId) {
+  if (!pendingGuestDisplayName) return null;
+  if (pendingGuestDisplayName.expiresAt < Date.now()) {
+    pendingGuestDisplayName = null;
+    return null;
+  }
+  if (pendingGuestDisplayName.userId && pendingGuestDisplayName.userId !== userId) return null;
+  return pendingGuestDisplayName.displayName;
+}
+
 export async function syncSessionToState(session) {
   if (!session?.user) {
     saveStatePatch({
@@ -141,6 +162,7 @@ export async function syncSessionToState(session) {
 
   const user = session.user;
   const isAnonymous = user.is_anonymous === true;
+  const lockedGuestName = isAnonymous ? getLockedGuestDisplayName(user.id) : null;
   let profile = null;
 
   try {
@@ -150,6 +172,7 @@ export async function syncSessionToState(session) {
   }
 
   const name =
+    lockedGuestName ||
     profile?.display_name ||
     user.user_metadata?.display_name ||
     user.email?.split("@")[0] ||
@@ -160,7 +183,9 @@ export async function syncSessionToState(session) {
     user: {
       email: user.email || null,
       name,
-      emoji: profile?.emoji || user.user_metadata?.emoji || null,
+      emoji: lockedGuestName
+        ? getState().user?.emoji || profile?.emoji || user.user_metadata?.emoji || "🎭"
+        : profile?.emoji || user.user_metadata?.emoji || null,
       loggedIn: !isAnonymous,
       isGuest: isAnonymous,
       provider: providerFromUser(user),
@@ -487,10 +512,13 @@ export async function signInAsGuest(displayName, captchaToken = null) {
     return { ok: false, error: "Choisis un pseudo (2 caractères min.)." };
   }
 
+  lockGuestDisplayName(trimmed);
+
   let session = await recoverAuthSession();
   let user = session?.user ?? null;
 
   if (user && !user.is_anonymous) {
+    pendingGuestDisplayName = null;
     return {
       ok: false,
       error: "Tu es connecté avec un compte. Déconnecte-toi pour rejoindre en invité.",
@@ -498,6 +526,7 @@ export async function signInAsGuest(displayName, captchaToken = null) {
   }
 
   const hadSession = Boolean(user?.is_anonymous);
+  if (user?.id) lockGuestDisplayName(trimmed, user.id);
 
   if (!user) {
     const { isTurnstileRequired } = await import("./turnstile.js");
@@ -522,6 +551,7 @@ export async function signInAsGuest(displayName, captchaToken = null) {
     }
     user = data.user;
     session = data.session;
+    if (user?.id) lockGuestDisplayName(trimmed, user.id);
     if (session) await syncSessionToState(session);
   } else if (session) {
     await syncSessionToState(session);

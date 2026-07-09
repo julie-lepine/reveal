@@ -606,6 +606,18 @@ export function userIdForName(name) {
   return p?.userId || null;
 }
 
+export function getLocalParticipantUid() {
+  const local = getState().lobby?.participants?.find((p) => p.isLocal && p.userId);
+  if (local?.userId) return local.userId;
+  return getSupabaseUserId();
+}
+
+export function requireLocalParticipantUid() {
+  const uid = getLocalParticipantUid();
+  if (uid) return uid;
+  throw new Error("Synchronisation du joueur en cours. Réessaie dans un instant.");
+}
+
 export function nameForUserId(uid) {
   if (uid == null || uid === "") return null;
   const key = String(uid);

@@ -22,7 +22,7 @@ import {
   canActAsHost,
   patchGameState,
   pushGameSession,
-  userIdForName,
+  requireLocalParticipantUid,
 } from "./gameSync.js";
 import { pickRemotePlayFields } from "./playPatch.js";
 import { showAppAlert } from "./dialog.js";
@@ -267,10 +267,10 @@ export async function commitPrepReadyToggle({
   readyField = "ready",
 }) {
   const session = getSession();
+  const uid = isGameSyncActive() ? requireLocalParticipantUid() : null;
   const nextReady = { ...(session[readyField] || {}), [readyKey]: ready };
   saveLocal({ ...session, [readyField]: nextReady });
   if (!isGameSyncActive()) return nextReady;
-  const uid = userIdForName(readyKey) || readyKey;
   await patchGameState({ [stateKey]: { ready: { [uid]: ready } } }, { gameId, screen });
   return nextReady;
 }

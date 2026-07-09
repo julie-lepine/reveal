@@ -28,7 +28,7 @@ import {
   allMembersReady,
   hotTakeToRemote,
   patchGameState,
-  userIdForName,
+  requireLocalParticipantUid,
   normalizePlayerVotesMap,
 } from "./gameSync.js";
 import { patchGameStateWithFeedback } from "./patchGameStateFeedback.js";
@@ -404,10 +404,10 @@ export async function commitHotTakePlay(patch, patchOpts = {}) {
 export async function commitHotTakeVote(choice) {
   const localName = getLocalDisplayName();
   const session = getHotTakeSession();
+  const uid = isGameSyncActive() ? requireLocalParticipantUid() : null;
   const votes = { ...(session.votes || {}), [localName]: choice };
   saveStatePatch({ hotTakeGame: { ...session, votes } });
   if (!isGameSyncActive()) return { ...session, votes };
-  const uid = userIdForName(localName) || localName;
   await patchGameStateWithFeedback({ hotTake: { votes: { [uid]: choice } } });
   return { ...session, votes };
 }
