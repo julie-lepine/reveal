@@ -48,7 +48,11 @@ export function canPlay() {
 }
 
 export function canCreateLobby() {
-  return isLoggedIn();
+  const state = getState();
+  const hasJoinedLobby = Boolean(
+    state.inLobby && state.lobby?.code && (state.lobby.id || state.lobby.participants?.length)
+  );
+  return isLoggedIn() && !hasJoinedLobby;
 }
 
 export function getUser() {

@@ -650,6 +650,18 @@ export function parseJoinCodeFromHash() {
 }
 
 export async function createLobby() {
+  const activeLobby = hasActiveLobby() ? getLobby() : null;
+  if (activeLobby?.code) {
+    throw new Error(`Quitte le lobby ${activeLobby.code} avant d'en créer un nouveau.`);
+  }
+
+  if (isSupabaseConfigured()) {
+    const serverLobby = await peekServerLobbyForUser();
+    if (serverLobby?.code) {
+      throw new Error(`Tu es déjà dans le lobby ${serverLobby.code}. Quitte-le avant d'en créer un nouveau.`);
+    }
+  }
+
   resetEveningState();
 
   if (isSupabaseConfigured()) {

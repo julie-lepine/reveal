@@ -424,6 +424,12 @@ export function mountHome(app) {
     const user = getUser();
     const loggedIn = isLoggedIn();
     const guest = isGuest();
+    const activeLobby = hasActiveLobby();
+    const pendingServerLobbyCode = pendingServerLobby?.code || "";
+    const canStartNewLobby = canCreateLobby() && !pendingServerLobbyCode;
+    const createLobbyDisabledReason = pendingServerLobbyCode
+      ? `Reprends ou quitte le lobby ${pendingServerLobbyCode} avant d'en créer un nouveau.`
+      : "Quitte le lobby actuel avant d'en créer un nouveau.";
 
     app.innerHTML = pageShell({
       back: false,
@@ -452,7 +458,7 @@ export function mountHome(app) {
               <button type="button" class="btn-link" id="btn-logout">Quitter la session</button>
             </div>
           </div>
-          ${guestJoinPanelHtml({ leaveHint: hasActiveLobby() })}`
+          ${guestJoinPanelHtml({ leaveHint: activeLobby })}`
               : `
           <div class="auth-tabs">
             <button type="button" class="auth-tab ${authTab === "login" ? "auth-tab--active" : ""}" data-tab="login">Connexion</button>
@@ -504,23 +510,25 @@ export function mountHome(app) {
 
         <div class="lobby-actions">
           ${
-            hasActiveLobby()
+            activeLobby
               ? `<button type="button" class="btn btn-accent btn--lobby-return" id="btn-return-lobby">
             ${isLobbyEveningStarted() ? "Reprendre la soirée" : "Retour au lobby"} <span class="muted">(${escapeHtml(getLobby().code)})</span>
           </button>
           <button type="button" class="btn btn-secondary btn--leave-lobby" id="btn-leave-lobby">Quitter le lobby</button>`
-              : pendingServerLobby?.code
+              : pendingServerLobbyCode
                 ? `<div class="card card--highlight home-resume-card">
-            <p class="hint">Tu es encore dans le lobby <strong>${escapeHtml(pendingServerLobby.code)}</strong>${pendingServerLobby.status === "playing" ? " (partie en cours)" : ""}.</p>
+            <p class="hint">Tu es encore dans le lobby <strong>${escapeHtml(pendingServerLobbyCode)}</strong>${pendingServerLobby.status === "playing" ? " (partie en cours)" : ""}.</p>
             <button type="button" class="btn btn-accent btn--spaced" id="btn-resume-evening">
-              Reprendre la soirée <span class="muted">(${escapeHtml(pendingServerLobby.code)})</span>
+              Reprendre la soirée <span class="muted">(${escapeHtml(pendingServerLobbyCode)})</span>
             </button>
           </div>`
                 : ""
           }
           ${
-            canCreateLobby()
-              ? `<button type="button" class="btn btn-primary" id="btn-create-lobby">Créer un lobby</button>`
+            loggedIn
+              ? canStartNewLobby
+                ? `<button type="button" class="btn btn-primary" id="btn-create-lobby">Créer un lobby</button>`
+                : `<button type="button" class="btn btn-primary" id="btn-create-lobby" disabled aria-disabled="true" title="${escapeHtml(createLobbyDisabledReason)}">Créer un lobby</button>`
               : ""
           }
           ${
