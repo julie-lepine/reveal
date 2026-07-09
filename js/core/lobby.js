@@ -13,7 +13,7 @@ import {
 } from "./state.js";
 import { loginAsGuest, isGuest } from "./auth.js";
 import { clearGuestMembership, loadGuestMembership } from "./guestMembership.js";
-import { signOutSupabase, getSupabaseUserId } from "./supabaseAuth.js";
+import { signOutSupabase, getSupabaseUserId, getLiveSupabaseUserId } from "./supabaseAuth.js";
 import { syncAllPlayerScores } from "./players.js";
 import { navigate, getCurrentScreen } from "./router.js";
 import { resetWelcomeSeen } from "./welcomeGate.js";
@@ -344,7 +344,7 @@ export async function reconcileLobbyMembership() {
 
   const liveUser = await getLiveSupabaseUserId();
   const uid = liveUser || getSupabaseUserId();
-  
+
   if (!getState().inLobby) {
     if (uid) {
       const recovered = await tryRecoverLobbyFromServer();

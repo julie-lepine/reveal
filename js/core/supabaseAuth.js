@@ -403,6 +403,20 @@ export function getSupabaseUserId() {
   return getState().supabaseUserId || null;
 }
 
+export async function getLiveSupabaseUserId() {
+  if (!isSupabaseConfigured()) return null;
+
+  try {
+    const { data } = await supabase.auth.getSession();
+    return data.session?.user?.id || null;
+  } catch (e) {
+    console.warn("[AUTH] getLiveSupabaseUserId failed:", e.message || e);
+    return null;
+  }
+}
+
+
+
 export async function signUpWithEmail(email, password, displayName, captchaToken = null) {
   const options = {
     data: { display_name: displayName.trim().slice(0, 24) },
@@ -538,7 +552,6 @@ export async function signInWithOAuth(provider) {
 }
 
 export async function signOutSupabase() {
-  console.trace("[DEBUG SIGNOUT CALLED");
   if (!isSupabaseConfigured()) return;
   await supabase.auth.signOut();
   await syncSessionToState(null);
