@@ -694,7 +694,9 @@ export async function joinLobbyAsGuest(code, guestName, captchaToken = null) {
   }
 
   const res = await joinLobby(joinCode);
-  if (!res.ok) {
+
+  console.log("[JOIN RESULT]", res);
+    if (!res.ok) {
     const sessionCleared = !auth.hadSession;
     if (sessionCleared) {
       await clearGuestSessionAfterFailedJoin();

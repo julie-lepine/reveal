@@ -538,6 +538,7 @@ export async function signInWithOAuth(provider) {
 }
 
 export async function signOutSupabase() {
+  console.trace("[DEBUG SIGNOUT CALLED");
   if (!isSupabaseConfigured()) return;
   await supabase.auth.signOut();
   await syncSessionToState(null);
