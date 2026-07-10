@@ -4177,8 +4177,9 @@ function deactivatePlayFlagsInSessionState(state = {}) {
 export async function completeGameSession({ gameId = "menu", screen = "results", state = {} } = {}) {
   if (!isGameSyncActive()) return null;
   const lobbyId = getState().lobby.id;
-  const hostId = getSupabaseUserId();
-  if (!hostId) return null;
+  const actorId = getSupabaseUserId();
+  if (!actorId) return null;
+  const hostId = getState().lobby?.hostId || actorId;
 
   const { setLobbyBetweenGames } = await import("./lobby.js");
   await setLobbyBetweenGames();

@@ -4,9 +4,7 @@ import {
   isGameSyncActive,
   isLobbyHost,
   returnToGameSelect,
-  suppressSessionRoute,
 } from "./gameSync.js";
-import { navigate, getCurrentScreen } from "./router.js";
 import { resetGameSessionsOnly } from "./state.js";
 import { goToGameSelect, setLobbyWaiting } from "./lobby.js";
 
@@ -42,12 +40,7 @@ export async function exitGameToGameSelect() {
   if (!ok) return false;
 
   if (mp) {
-    if (host) {
-      await returnToGameSelect();
-    } else {
-      suppressSessionRoute(120000, getCurrentScreen());
-      navigate("game-select", { navStack: ["home", "lobby", "game-select"] });
-    }
+    await returnToGameSelect();
     return true;
   }
 

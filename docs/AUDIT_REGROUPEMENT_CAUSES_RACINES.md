@@ -194,12 +194,12 @@ Clôture QA :
 
 | ID | Problème | Fichier / fonction | Scénario | Impact | Correction proposée | Statut |
 |----|----------|-------------------|----------|--------|---------------------|--------|
-| **I-01** | `completeGameSession` mauvais `host_id` | `gameSync.js` L3965-3991 | Acting guest termine partie | Metadata / RLS incohérente | Persister `lobby.hostId` dans `host_id` | À traiter |
+| **I-01** | `completeGameSession` mauvais `host_id` | `gameSync.js` | Acting guest termine partie | Metadata / RLS incohérente | Persister `lobby.hostId` dans `host_id`, fallback sur acteur si absent | 🟡 Corrigé + tests ; QA acting host à faire |
 | **I-02** / **S-01** | Patch invité sans row `game_sessions` | `gameSync.js`, `mpLaunch.js` | Ready prep avant `startGameSession` | Erreur visible invité | No-op local si invité sans session distante | 🟡 Corrigé + tests ; QA à faire |
 | **I-08** | RLS : tout membre peut UPDATE session | `supabase/game-sessions.sql` | Client modifié | Triche / corruption | RPC merge serveur ou policies restrictives | À traiter |
 | **M-03b** / **SYN-09** | `launchGameWithSync` branche non-hôte | `mpLaunch.js` | Appel par erreur sur invité | UI locale divergente | Guard strict ; ne jamais applyLocal seul en MP | 🟡 Corrigé + tests ; QA à faire |
-| **M-06a** | Exit invité : pas `endGameSession` | `exitGame.js` — `exitGameToGameSelect()` | Quitter mid-game | Autres continuent (voulu) mais état local stale | + reset blobs locaux (voir P-02) | À traiter |
-| **M-06b** | `returnToGameSelect` asymétrique | `gameSync.js` | Hôte reset session ; invité suppress | Comportements différents | Documenter ; aligner reset local invité | À traiter |
+| **M-06a** | Exit invité : pas `endGameSession` | `exitGame.js` — `exitGameToGameSelect()` | Quitter mid-game | Autres continuent (voulu) mais état local stale | Chemin invité aligné sur `returnToGameSelect()` : suppress + reset blobs locaux | 🟡 Corrigé + tests ; QA à faire |
+| **M-06b** | `returnToGameSelect` asymétrique | `gameSync.js`, `nav.js` | Hôte reset session ; invité suppress | Comportements différents | `returnToGameSelect()` nettoie aussi l'invité ; retour depuis prep réutilise ce chemin | 🟡 Corrigé + tests ; QA à faire |
 | **L-01** | « Recommencer » visible mais bloqué | `restartGame.js` | Invité clique Recommencer | Alert « Seul l'hôte » | Masquer bouton pour non-hôte | 🟡 Corrigé + tests ; QA à faire |
 | **ARCH-03** | Acting host sans metadata correcte | `hostPresence.js`, jeux sous `canActAsHost()` | Hôte absent > ~2 min | Fin manche possible, metadata fausse | Combiner I-01 + policy acting host | À traiter |
 
@@ -218,7 +218,7 @@ Clôture QA :
 | **T-03** | Poll pausé en arrière-plan | `gameSync.js` — `initMultiplayerSyncVisibility()` | Tab hidden longtemps | Retard 3–12 s | Acceptable ; resubscribe au retour (déjà fait) |
 | **M-07** / **SYN-** | `guesslie-menu` sans listener local | `guessLieMenu.js` | Invité sur menu, hôte lance | Retard suivi vs autres preps | Ajouter `onGameSessionChange` + `prepGuestFollowOnSession` |
 | **M-08** / **SYN-13** | Redirect dans `mount*()` | `router.js`, `games/*.js` | Session désync | Flash UI, cleanup fragile | Router avant mount |
-| **P-02** / **M-06c** | Exit invité sans reset blobs jeu | `exitGame.js` vs `returnToGameSelect()` | Quit prep/play volontaire | Stale state + suppress | `resetLocalGamePrepState()` côté invité |
+| **P-02** / **M-06c** | Exit invité sans reset blobs jeu | `exitGame.js` vs `returnToGameSelect()` | Quit prep/play volontaire | Stale state + suppress | 🟡 Corrigé + tests ; QA à faire : `returnToGameSelect()` centralise suppress + reset blobs côté invité |
 | **SYN-28** / **L-nav** | `navAccess` suppress 15 min scores | `navAccess.js`, `gameSync.js` | Invité consulte classement, hôte relance | Pas de reroute nouvelle prep | Affiner `isSessionAdvancedFromSuppress` |
 | **ARCH-04** | Suppress actif + même prep | `gameSync.js` — `shouldApplySessionRoute()` L328-330 | Sortie volontaire prep | Boucle évitée (OK) mais re-entry stale | Combiner avec P-02 |
 | **ARCH-05** | `prepGuestFollowOnSession` fragile si `row.screen` en retard | `mpLaunch.js` | Relance pendant results | Mitigé par `getEffectiveSessionScreen` | Tests relance hôte |
@@ -373,8 +373,8 @@ La matrice ci-dessous liste les points encore ouverts ou résiduels. Les éléme
 | 1 Identité invité | — | — | — | ARCH-01 (hors QA Supabase) |
 | 2 Auth race | — | — | — | — |
 | 3 Multi-sources | — | — | M-14a (KO QA TierNight relance + flow invité tierlists) | — |
-| 4 Hôte/invité | — | I-01, I-02, I-08 | M-03b, M-06a-c | L-01 |
-| 5 Routing/timing | — | T-02, P-02 | T-01, T-03, M-07, M-08 | SYN-28 |
+| 4 Hôte/invité | — | I-01, I-02, I-08 | M-03b | L-01 |
+| 5 Routing/timing | — | T-02 | T-01, T-03, M-07, M-08 | SYN-28 |
 | 6 Async écrans | — | I-05 | SYN-13b, SYN-25 | SYN-05, M-08 |
 | 7 Erreurs silencieuses | — | I-07, M-09, M-11 | M-10, T-05, M-14b | SYN-26 |
 | 8 Reset incomplet | — | I-09, I-06 | SYN-15, SYN-16 | ARCH-09, ARCH-10 |
@@ -394,9 +394,9 @@ La matrice ci-dessous liste les points encore ouverts ou résiduels. Les éléme
 | 4 | I-06, P-01 | 8 | UX lobby invité dégradée |
 | 5 | I-01 | 4 | Fin partie acting host fragile |
 | 6 | I-08 | 4 | Sécurité intégrité session MP |
-| 7 | P-02, M-06c | 5 | Sortie volontaire / retour menu : risque de blobs locaux obsolètes hors flux déjà validés |
+| 7 | I-05, SYN-13b, SYN-25 | 6 | Navigation intermittente : listeners / redirects à durcir |
 | 8 | M-14a, SYN-14 | 3 | KO QA TierNight : hôte renvoyé vers ancien récap en 2e tierlist + invité saute le choix des tierlists ; suspendu pour avancer sur les autres tests |
-| 9 | T-02, P-02 | 5 | Navigation possible avant données complètes ou avec blobs locaux obsolètes |
+| 9 | T-02 | 5 | Navigation possible avant données complètes |
 | 10 | M-12 | 11 | Dette UX importante après les corrections de stabilité |
 
 ---

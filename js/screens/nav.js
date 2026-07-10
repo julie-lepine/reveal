@@ -76,9 +76,7 @@ async function handleBackNavigation() {
       const left = await leaveGameSetup();
       if (left) return;
     } else {
-      suppressSessionRoute();
-      navigate("game-select", { navStack: ["home", "lobby", "game-select"] });
-      return;
+      if (await returnToGameSelect()) return;
     }
   }
   goBack();
