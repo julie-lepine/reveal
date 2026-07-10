@@ -251,6 +251,43 @@ describe("tierNight config distante", () => {
     );
   });
 
+  it("laisse une nouvelle partie Rank it active battre un ancien recap distant", () => {
+    assert.equal(
+      shouldPreferTierNightEndRoute({
+        declared: "tiernight-end",
+        local: "tiernight",
+        localHasRecap: true,
+        state: {
+          tierNight: {
+            lobbyStarted: true,
+            recap: {
+              recaps: [{ player: "Alice", placed: { S: ["Alien"] } }],
+            },
+          },
+        },
+      }),
+      false
+    );
+  });
+
+  it("prefere le recap Rank it quand la partie est terminee", () => {
+    assert.equal(
+      shouldPreferTierNightEndRoute({
+        declared: "tiernight-end",
+        local: "tiernight",
+        state: {
+          tierNight: {
+            lobbyStarted: false,
+            recap: {
+              recaps: [{ player: "Alice", placed: { S: ["Alien"] } }],
+            },
+          },
+        },
+      }),
+      true
+    );
+  });
+
   it("laisse une nouvelle partie live active battre un ancien ecran recap", () => {
     assert.equal(
       shouldPreferTierNightEndRoute({

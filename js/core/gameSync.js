@@ -3133,7 +3133,7 @@ function resolveActivePlayScreen(st, gid, declared) {
   const glPhase = st.guessLie?.phase;
   if (glPhase && glPhase !== "idle" && glPhase !== "lobby") return "guesslie";
   if (st.tierNightLive?.lobbyStarted && !st.tierNightLive?.finished) return "tiernight-live";
-  if (st.tierNight?.lobbyStarted && !st.tierNight?.recap) return "tiernight";
+  if (st.tierNight?.lobbyStarted) return "tiernight";
   return null;
 }
 
@@ -4490,7 +4490,7 @@ export async function finalizeTierNightLiveToResults() {
   const tnRemote = getTierNightRemote() || {};
   await patchGameState(
     {
-      tierNight: { ...tnRemote, ...(recap ? { recap } : {}) },
+      tierNight: { ...tnRemote, lobbyStarted: false, ...(recap ? { recap } : {}) },
       tierNightLive: finishedTierNightLiveRemote(getState().tierNightLiveGame),
     },
     { screen: "tiernight-end", gameId: "tiernight", withEveningScores: true }
@@ -4509,7 +4509,7 @@ export async function advanceTierNightToResultsWhenReady(list, { force = false }
   const recap = tierNightRecapToRemote(getTierNightSession());
   const tnRemote = getTierNightRemote() || {};
   await patchGameState(
-    { tierNight: { ...tnRemote, ...(recap ? { recap } : {}) } },
+    { tierNight: { ...tnRemote, lobbyStarted: false, ...(recap ? { recap } : {}) } },
     { screen: "tiernight-end", gameId: "tiernight", withEveningScores: true }
   );
   navigate("tiernight-end");

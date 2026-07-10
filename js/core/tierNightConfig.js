@@ -48,9 +48,9 @@ function hasRemoteTierNightRecap(st = {}) {
   );
 }
 
-function hasActiveTierNightRun(st = {}, remoteHasRecap = false) {
+function hasActiveTierNightRun(st = {}) {
   const liveActive = Boolean(st?.tierNightLive?.lobbyStarted && !st?.tierNightLive?.finished);
-  const classicActive = Boolean(st?.tierNight?.lobbyStarted && !remoteHasRecap);
+  const classicActive = Boolean(st?.tierNight?.lobbyStarted);
   return liveActive || classicActive;
 }
 
@@ -62,7 +62,7 @@ export function shouldPreferTierNightEndRoute({
 } = {}) {
   const remoteHasRecap = hasRemoteTierNightRecap(state);
   if (declared === "tiernight-end") {
-    return !hasActiveTierNightRun(state, remoteHasRecap);
+    return !hasActiveTierNightRun(state);
   }
   if (declared === "tiernight-live" && remoteHasRecap) return true;
   return (
