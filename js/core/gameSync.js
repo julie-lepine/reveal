@@ -2446,6 +2446,7 @@ export function tierNightLiveToRemote(session) {
     roundIdx: session.roundIdx ?? 0,
     phase: session.phase || null,
     votes: mapVotesByUid(session.votes || {}),
+    placements: mapPlacementsByUid(session.placements || {}),
     finished: Boolean(session.finished),
   };
 }
@@ -2464,6 +2465,7 @@ export function tierNightLiveFromRemote(remote) {
     roundIdx: remote.roundIdx ?? 0,
     phase: remote.phase || null,
     votes,
+    placements: mapPlacementsByName(remote.placements || {}),
     finished: Boolean(remote.finished),
   };
 }
@@ -2481,12 +2483,25 @@ function mergeTierNightLiveGameLocal(local, remote) {
   const votes = newRound
     ? remote.votes || {}
     : { ...(remote.votes || {}), ...(local.votes || {}) };
+  const remotePlacements = remote.placements || {};
+  const remoteHasPlacements = Object.keys(remotePlacements).length > 0;
+  const isRemoteReset =
+    (!remote.lobbyStarted && remote.finished) ||
+    (remote.lobbyStarted &&
+      !remote.finished &&
+      remote.phase === "voting" &&
+      (remote.roundIdx ?? 0) === 0 &&
+      !remoteHasPlacements);
   return {
     ...local,
     ...remote,
     phase: mergeSpeedVotePhase(local, remote),
     votes: normalizePlayerVotesMap(votes),
-    placements: local.placements || {},
+    placements: isRemoteReset
+      ? remotePlacements
+      : remoteHasPlacements
+        ? { ...(local.placements || {}), ...remotePlacements }
+        : local.placements || {},
   };
 }
 

@@ -34,6 +34,7 @@ export function finishedTierNightLiveRemote() {
     roundIdx: 0,
     phase: "done",
     votes: {},
+    placements: {},
     finished: true,
   };
 }

@@ -134,6 +134,7 @@ describe("tierNight config distante", () => {
       roundIdx: 0,
       phase: "done",
       votes: {},
+      placements: {},
       finished: true,
     });
   });
