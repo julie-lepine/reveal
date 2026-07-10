@@ -13,6 +13,8 @@ export function getEveningRecap() {
 
   const hotTakes = stats.hotTakesPlayed || 0;
   const speedVotes = stats.speedVotesPlayed || 0;
+  const clutches = stats.clutchesPlayed || 0;
+  const wrongAnswers = stats.wrongAnswersPlayed || 0;
   const playlistGuesses = stats.playlistGuessesPlayed || 0;
   const traitreGames = stats.traitreGamesPlayed || 0;
   const triviaGames = stats.triviaGamesPlayed || 0;
@@ -28,6 +30,8 @@ export function getEveningRecap() {
   const hasActivity =
     hotTakes > 0 ||
     speedVotes > 0 ||
+    clutches > 0 ||
+    wrongAnswers > 0 ||
     playlistGuesses > 0 ||
     traitreGames > 0 ||
     triviaGames > 0 ||
@@ -42,6 +46,8 @@ export function getEveningRecap() {
     participantCount: participants.length,
     hotTakes,
     speedVotes,
+    clutches,
+    wrongAnswers,
     playlistGuesses,
     traitreGames,
     triviaGames,

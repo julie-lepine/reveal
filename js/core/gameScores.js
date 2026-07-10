@@ -72,6 +72,7 @@ const GAME_LABELS = {
   hottake: { title: "HotTake", emoji: "🔥", statKey: "hotTakesPlayed" },
   guesslie: { title: "Guess The Lie", emoji: "🕵️", statKey: "guessLieGamesPlayed" },
   speedvote: { title: "SpeedVote", emoji: "⚡", statKey: "speedVotesPlayed" },
+  clutch: { title: "Clutch", emoji: "🎯", statKey: "clutchesPlayed" },
   wronganswer: { title: "Wrong Answer Only", emoji: "↩️", statKey: "wrongAnswersPlayed" },
   dilemma: { title: "Dilemma", emoji: "⚖️", statKey: "dilemmasPlayed" },
   truthmeter: { title: "TruthMeter", emoji: "📏", statKey: "truthMetersPlayed" },

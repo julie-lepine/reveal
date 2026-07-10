@@ -13,12 +13,9 @@ import { eveningGameLeaderboardsHtml } from "../core/gameScores.js";
 import { formatPlayerWithBadge } from "../core/badges.js";
 import {
   isGameSyncActive,
-  isSessionRouteSuppressed,
   onGameSessionChange,
   refreshEveningScoresFromSession,
   tryFollowHostGameSession,
-  routeToActiveGameIfNeeded,
-  isLobbyHost,
 } from "../core/gameSync.js";
 import { refreshLobbyFromSupabase, onLobbyBundleUpdated } from "../core/supabaseLobby.js";
 
@@ -47,6 +44,8 @@ export function mountResults(app) {
         ? `<span class="evening-recap__chip">🕵️ ${recap.liesFound}/${recap.liesTotal}</span>`
         : "",
       recap.speedVotes > 0 ? `<span class="evening-recap__chip">⚡ ${recap.speedVotes}</span>` : "",
+      recap.clutches > 0 ? `<span class="evening-recap__chip">🎯 ${recap.clutches}</span>` : "",
+      recap.wrongAnswers > 0 ? `<span class="evening-recap__chip">↩️ ${recap.wrongAnswers}</span>` : "",
       recap.triviaGames > 0 ? `<span class="evening-recap__chip">🧠 ${recap.triviaGames}</span>` : "",
       recap.truthMeters > 0 ? `<span class="evening-recap__chip">📏 ${recap.truthMeters}</span>` : "",
       recap.consensusGames > 0 ? `<span class="evening-recap__chip">🤝 ${recap.consensusGames}</span>` : "",
@@ -102,14 +101,6 @@ export function mountResults(app) {
       if (getCurrentScreen() === "results") render();
     });
     unsubLobby = onLobbyBundleUpdated(() => {
-      if (
-        !isLobbyHost() &&
-        !isSessionRouteSuppressed() &&
-        getLobbyStatus() === "playing"
-      ) {
-        const gid = getLobbyGameId();
-        if (gid && gid !== "menu") void routeToActiveGameIfNeeded();
-      }
       if (getCurrentScreen() === "results") render();
     });
   } else {
