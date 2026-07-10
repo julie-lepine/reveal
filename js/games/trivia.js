@@ -298,7 +298,7 @@ export function mountTrivia(app) {
       if (mp && canActAsHost()) {
         await completeGameSession({
           gameId: "trivia",
-          screen: "trivia",
+          screen: "results",
           state: { trivia: triviaToRemote(live) },
         });
       }
@@ -340,7 +340,7 @@ export function mountTrivia(app) {
     if (mp && canActAsHost()) {
       await completeGameSession({
         gameId: "trivia",
-        screen: "trivia",
+        screen: "results",
         state: { trivia: triviaToRemote(finalSession) },
       });
       return;
@@ -349,7 +349,7 @@ export function mountTrivia(app) {
     if (!mp) {
       await setLobbyWaiting();
       saveStatePatch({ triviaGame: finalSession });
-      render();
+      navigate("results", { navStack: ["home", "lobby", "game-select", "results"] });
     }
   }
 
