@@ -48,6 +48,12 @@ function hasRemoteTierNightRecap(st = {}) {
   );
 }
 
+function hasActiveTierNightRun(st = {}, remoteHasRecap = false) {
+  const liveActive = Boolean(st?.tierNightLive?.lobbyStarted && !st?.tierNightLive?.finished);
+  const classicActive = Boolean(st?.tierNight?.lobbyStarted && !remoteHasRecap);
+  return liveActive || classicActive;
+}
+
 export function shouldPreferTierNightEndRoute({
   state = {},
   declared = null,
@@ -55,7 +61,9 @@ export function shouldPreferTierNightEndRoute({
   localHasRecap = false,
 } = {}) {
   const remoteHasRecap = hasRemoteTierNightRecap(state);
-  if (declared === "tiernight-end") return true;
+  if (declared === "tiernight-end") {
+    return !hasActiveTierNightRun(state, remoteHasRecap);
+  }
   if (declared === "tiernight-live" && remoteHasRecap) return true;
   return (
     local === "tiernight-end" &&

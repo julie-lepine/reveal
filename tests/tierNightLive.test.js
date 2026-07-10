@@ -233,4 +233,38 @@ describe("tierNight config distante", () => {
       false
     );
   });
+
+  it("laisse une nouvelle partie Rank it active battre un ancien ecran recap", () => {
+    assert.equal(
+      shouldPreferTierNightEndRoute({
+        declared: "tiernight-end",
+        local: "tiernight",
+        localHasRecap: true,
+        state: {
+          tierNight: {
+            lobbyStarted: true,
+            recap: null,
+          },
+        },
+      }),
+      false
+    );
+  });
+
+  it("laisse une nouvelle partie live active battre un ancien ecran recap", () => {
+    assert.equal(
+      shouldPreferTierNightEndRoute({
+        declared: "tiernight-end",
+        local: "tiernight-live",
+        localHasRecap: true,
+        state: {
+          tierNightLive: {
+            lobbyStarted: true,
+            finished: false,
+          },
+        },
+      }),
+      false
+    );
+  });
 });
