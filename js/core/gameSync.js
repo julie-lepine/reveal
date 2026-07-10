@@ -4385,6 +4385,41 @@ function tierNightLocalRecapsComplete(session, list) {
   return recaps.some((r) => Object.values(r.placed || {}).flat().length > 0);
 }
 
+function tierNightPlacedItemsCount(placements = {}) {
+  return Object.values(placements || {}).reduce(
+    (sum, placed) => sum + Object.values(placed || {}).flat().length,
+    0
+  );
+}
+
+function tierNightPlacementsByName(placements = {}) {
+  const byName = {};
+  const participants = getLobbyParticipants();
+  participants.forEach((p) => {
+    if (placements[p.name]) byName[p.name] = placements[p.name];
+    else if (p.userId && placements[p.userId]) byName[p.name] = placements[p.userId];
+  });
+  Object.entries(placements || {}).forEach(([key, placed]) => {
+    if (!placed || byName[key]) return;
+    const known = participants.some((p) => p.name === key || p.userId === key);
+    if (!known) byName[key] = placed;
+  });
+  return byName;
+}
+
+function buildTierNightRecapFromLiveSession(live, list = null) {
+  const liveItems = Array.isArray(live?.deck) ? live.deck : [];
+  const livePlacements = tierNightPlacementsByName(live?.placements || {});
+  if (!liveItems.length || tierNightPlacedItemsCount(livePlacements) <= 0) return null;
+  const built = buildRecapsFromPlacements(
+    live.topicId || list?.id || null,
+    live.listName || list?.name || "Tier list",
+    liveItems,
+    livePlacements
+  );
+  return built.some((r) => Object.values(r.placed || {}).flat().length > 0) ? built : null;
+}
+
 export async function ensureTierNightRecapsFromRemote(list) {
   if (isGameSyncActive()) {
     await refreshGameSession();
@@ -4399,22 +4434,10 @@ export async function ensureTierNightRecapsFromRemote(list) {
   }
 
   const live = getState().tierNightLiveGame;
-  const liveItems = Array.isArray(live?.deck) ? live.deck : [];
-  const livePlacements = live?.placements || {};
-  const liveHasPlacements = Object.values(livePlacements).some((placed) =>
-    Object.values(placed || {}).flat().length > 0
-  );
-  if (liveItems.length && liveHasPlacements) {
-    const built = buildRecapsFromPlacements(
-      live.topicId || list?.id || null,
-      live.listName || list?.name || "Tier list",
-      liveItems,
-      livePlacements
-    );
-    if (built.some((r) => Object.values(r.placed || {}).flat().length > 0)) {
-      recordTierNightPlayed();
-      return;
-    }
+  const liveBuilt = buildTierNightRecapFromLiveSession(live, list);
+  if (liveBuilt) {
+    recordTierNightPlayed();
+    return;
   }
 
   if (!list) return;
@@ -4424,11 +4447,7 @@ export async function ensureTierNightRecapsFromRemote(list) {
     return;
   }
 
-  const placements = tn.placements || {};
-  const byName = {};
-  getLobbyParticipants().forEach((p) => {
-    if (p.userId && placements[p.userId]) byName[p.name] = placements[p.userId];
-  });
+  const byName = tierNightPlacementsByName(tn.placements || {});
 
   const built = buildRecapsFromPlacements(list.id, list.name, list.items, byName);
   if (built.some((r) => Object.values(r.placed || {}).flat().length > 0)) {
@@ -4451,7 +4470,14 @@ export async function pushTierNightRecapToSession() {
  */
 export async function finalizeTierNightLiveToResults() {
   if (!isGameSyncActive() || !isLobbyHost()) return false;
-  const recap = tierNightRecapToRemote(getTierNightSession());
+  let recap = tierNightRecapToRemote(getTierNightSession());
+  if (!recap) {
+    const liveBuilt = buildTierNightRecapFromLiveSession(getState().tierNightLiveGame);
+    if (liveBuilt) {
+      recordTierNightPlayed();
+      recap = tierNightRecapToRemote(getTierNightSession());
+    }
+  }
   const tnRemote = getTierNightRemote() || {};
   await patchGameState(
     {
