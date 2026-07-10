@@ -24,3 +24,16 @@ export function tierNightConfigPatchFromRemoteState(st = {}) {
 
   return patch;
 }
+
+export function finishedTierNightLiveRemote() {
+  return {
+    lobbyStarted: false,
+    topicId: null,
+    listName: "",
+    deck: null,
+    roundIdx: 0,
+    phase: "done",
+    votes: {},
+    finished: true,
+  };
+}

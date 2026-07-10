@@ -92,7 +92,10 @@ import { FIL_ROUGE_ENABLED } from "../../data/filRouge.js";
 import { GUESS_LIE_SYNC_PATCH_TIMEOUT_MS } from "../../data/guessLies.js";
 import { pickRemotePlayFields } from "./playPatch.js";
 import { pickLatestConsensusAnswer } from "./consensusAnswerUtils.js";
-import { tierNightConfigPatchFromRemoteState } from "./tierNightConfig.js";
+import {
+  finishedTierNightLiveRemote,
+  tierNightConfigPatchFromRemoteState,
+} from "./tierNightConfig.js";
 
 export { pickRemotePlayFields, PLAY_PATCH_EXCLUDE } from "./playPatch.js";
 
@@ -4394,7 +4397,7 @@ export async function finalizeTierNightLiveToResults() {
   await patchGameState(
     {
       tierNight: { ...tnRemote, ...(recap ? { recap } : {}) },
-      tierNightLive: { finished: true },
+      tierNightLive: finishedTierNightLiveRemote(),
     },
     { screen: "tiernight-end", gameId: "tiernight", withEveningScores: true }
   );

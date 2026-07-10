@@ -4,7 +4,10 @@ import {
   mergeSpeedVotePatchState,
   isNewSpeedVoteVoteRound,
 } from "../js/core/sessionMerge.js";
-import { tierNightConfigPatchFromRemoteState } from "../js/core/tierNightConfig.js";
+import {
+  finishedTierNightLiveRemote,
+  tierNightConfigPatchFromRemoteState,
+} from "../js/core/tierNightConfig.js";
 
 // Réplique exacte du merge des votes live (gameSync.mergeRemoteTierNightLiveVotesUid) :
 // additif pendant une manche, reset uniquement sur une nouvelle manche.
@@ -119,5 +122,18 @@ describe("tierNight config distante", () => {
     });
 
     assert.equal(patch.tierNightTopicId, "roster:fun");
+  });
+
+  it("publie une fin live complete pour ne pas conserver lobbyStarted", () => {
+    assert.deepEqual(finishedTierNightLiveRemote(), {
+      lobbyStarted: false,
+      topicId: null,
+      listName: "",
+      deck: null,
+      roundIdx: 0,
+      phase: "done",
+      votes: {},
+      finished: true,
+    });
   });
 });

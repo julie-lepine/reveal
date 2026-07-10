@@ -177,7 +177,7 @@ Clôture QA :
 | **I-04** / **S-04** / **SYN-02** | Stats soirée incomplètes en MP | `gameSync.js` — `eveningStateToRemote()` | `clutchesPlayed`, `wrongAnswersPlayed` absents du remote | Récap différent hôte/invité | Inclure tous champs stats dans remote | ✅ Corrigé + tests |
 | **SYN-03** | `eveningGamesRecorded` local-only | `state.js` — `recordEveningGameOnce()` | Chaque client compte indépendamment | Stats gonflées | Sync dedup map ou dedup serveur | ✅ Corrigé + QA validée |
 | **M-13** / **SYN-20** | `hasEveningStatsActivity()` incomplet | `state.js`, `lobby.js` | Clutch/Wrong Answer seuls joués | UI « pas d’activité » | Aligner conditions avec `defaultEveningStats()` | ✅ Corrigé + tests |
-| **M-14a** / **SYN-14** | Topic TierNight éclaté | `state.js`, `gameSync.js`, `tierNightLiveSession.js` | Classic vs live | Topic incohérent après sync partiel | Source unique topic + apply cohérent | ✅ Corrigé + tests, QA à valider |
+| **M-14a** / **SYN-14** | Topic TierNight éclaté | `state.js`, `gameSync.js`, `tierNightLiveSession.js` | Classic vs live | Topic incohérent après sync partiel | Source unique topic + apply cohérent | 🟡 Corrigé + tests ; QA Rank it validée, bug finalisation live hôte patché, QA live à refaire |
 | **M-02b** | Clés vote/prêt uid vs name | `gameSync.js`, `*-Session.js` | Fallback `userIdForName \|\| name` | Doublons jusqu’au refresh | Canonicaliser sur uid | ✅ Corrigé + QA validée |
 | **ARCH-02** | Écran local vs session distante | `router.js`, `gameSync.js`, `games/trivia.js` | Routing vs affichage | Invité sur écran ≠ session serveur | Documenter ; réduire exceptions suppress | 🟡 Partiellement corrigé : post-game/résultats stabilisés, Trivia repasse par son podium avant `results`, QA Trivia à faire |
 | **SYN-29** | Jeu terminé sans point absent des résultats | `state.js` — `recordEveningGameOnce()`, `gameScoreOrder` | Hot Take / autre jeu avec 0 point | Carte du jeu absente dans Résultats | Créer l'entrée résultat dès qu'un jeu est compté | ✅ Corrigé + QA validée |
@@ -370,7 +370,7 @@ La matrice ci-dessous liste les points encore ouverts ou résiduels. Les éléme
 |-------|----------|-----------|-------|--------|
 | 1 Identité invité | C-01, C-02 | R-01–R-03, L-03 | M-05a | ARCH-01 |
 | 2 Auth race | — | M-01, M-02a, S-02 | — | — |
-| 3 Multi-sources | — | — | M-03a (résiduel), ARCH-02 (résiduel QA Trivia podium → results), M-14a (QA TierNight à valider) | — |
+| 3 Multi-sources | — | — | M-03a (résiduel), ARCH-02 (résiduel QA Trivia podium → results), M-14a (QA TierNight live à valider) | — |
 | 4 Hôte/invité | — | I-01, I-02, I-08 | M-03b, M-06a-c | L-01 |
 | 5 Routing/timing | — | T-02, P-02 | T-01, T-03, M-07, M-08 | SYN-28 |
 | 6 Async écrans | — | I-05 | SYN-13b, SYN-25 | SYN-05, M-08 |
@@ -393,7 +393,7 @@ La matrice ci-dessous liste les points encore ouverts ou résiduels. Les éléme
 | 5 | I-01 | 4 | Fin partie acting host fragile |
 | 6 | I-08 | 4 | Sécurité intégrité session MP |
 | 7 | ARCH-02 | 3, 5 | Résiduel à valider sur le flux Trivia podium → résultats communs |
-| 8 | M-14a, SYN-14 | 3 | QA réelle à valider sur le topic TierNight classic/live |
+| 8 | M-14a, SYN-14 | 3 | QA live à valider sur le topic TierNight après validation Rank it |
 | 9 | T-02, P-02 | 5 | Navigation possible avant données complètes ou avec blobs locaux obsolètes |
 | 10 | M-12 | 11 | Dette UX importante après les corrections de stabilité |
 
