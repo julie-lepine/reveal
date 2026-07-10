@@ -109,7 +109,7 @@ function gameLeaderboardCardHtml(titleHtml, players, scoreMap) {
 
 /** Classement de chaque jeu joué dans la soirée (+ bloc Fil Rouge). */
 export function eveningGameLeaderboardsHtml() {
-  const { gameScores = {}, gameScoreOrder = [], stats = {}, filRougeScores = {} } = getState();
+  const { gameScores = {}, gameScoreOrder = [], filRougeScores = {} } = getState();
   const players = getSortedActivePlayers();
   if (!players.length) return "";
 
@@ -117,9 +117,7 @@ export function eveningGameLeaderboardsHtml() {
   gameScoreOrder.forEach((gid) => {
     const meta = GAME_LABELS[gid];
     if (!meta) return;
-    const count = meta.statKey ? stats[meta.statKey] || 0 : 0;
-    const countLabel = count > 0 ? ` · ${count} partie${count > 1 ? "s" : ""}` : "";
-    const titleHtml = `${meta.emoji} ${escapeHtml(meta.title)}${countLabel}`;
+    const titleHtml = `${meta.emoji} ${escapeHtml(meta.title)}`;
     blocks.push(gameLeaderboardCardHtml(titleHtml, players, gameScores[gid] || {}));
   });
 

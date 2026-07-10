@@ -4,6 +4,7 @@ import {
   mergeSpeedVotePatchState,
   isNewSpeedVoteVoteRound,
 } from "../js/core/sessionMerge.js";
+import { tierNightConfigPatchFromRemoteState } from "../js/core/tierNightConfig.js";
 
 // Réplique exacte du merge des votes live (gameSync.mergeRemoteTierNightLiveVotesUid) :
 // additif pendant une manche, reset uniquement sur une nouvelle manche.
@@ -61,5 +62,62 @@ describe("tierNightLive — merge des votes", () => {
     const out = merge(cur, inc);
     assert.deepEqual(out.votes, { u1: "A", u2: "D" });
     assert.equal(out.phase, "reveal");
+  });
+});
+
+describe("tierNight config distante", () => {
+  it("applique topicId null pour effacer un ancien topic local", () => {
+    const patch = tierNightConfigPatchFromRemoteState({
+      tierNight: {
+        topicId: null,
+        mode: "consensus",
+        modifier: "normal",
+      },
+    });
+
+    assert.deepEqual(patch, {
+      tierNightTopicId: null,
+      tierNightMode: "consensus",
+      tierNightModifier: "normal",
+    });
+  });
+
+  it("fait primer la session live active sur le reset classic", () => {
+    const patch = tierNightConfigPatchFromRemoteState({
+      tierNight: {
+        topicId: null,
+        mode: "consensus",
+        modifier: "normal",
+      },
+      tierNightLive: {
+        lobbyStarted: true,
+        finished: false,
+        topicId: "movies",
+      },
+    });
+
+    assert.deepEqual(patch, {
+      tierNightTopicId: "movies",
+      tierNightMode: "live",
+      tierNightModifier: "normal",
+    });
+  });
+
+  it("reprend le topic du recap pour l'ecran de fin", () => {
+    const patch = tierNightConfigPatchFromRemoteState({
+      tierNight: {
+        topicId: null,
+        recap: {
+          topicId: "roster:fun",
+        },
+      },
+      tierNightLive: {
+        lobbyStarted: true,
+        finished: true,
+        topicId: "stale-live",
+      },
+    });
+
+    assert.equal(patch.tierNightTopicId, "roster:fun");
   });
 });

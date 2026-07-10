@@ -92,6 +92,7 @@ import { FIL_ROUGE_ENABLED } from "../../data/filRouge.js";
 import { GUESS_LIE_SYNC_PATCH_TIMEOUT_MS } from "../../data/guessLies.js";
 import { pickRemotePlayFields } from "./playPatch.js";
 import { pickLatestConsensusAnswer } from "./consensusAnswerUtils.js";
+import { tierNightConfigPatchFromRemoteState } from "./tierNightConfig.js";
 
 export { pickRemotePlayFields, PLAY_PATCH_EXCLUDE } from "./playPatch.js";
 
@@ -2828,11 +2829,10 @@ export function applyRemoteSession(row) {
     const local = getState().playlistGuessGame;
     patch.playlistGuessGame = local ? mergePlaylistGuessGameLocal(local, remote) : remote;
   }
+  Object.assign(patch, tierNightConfigPatchFromRemoteState(st));
+
   if (st.tierNight) {
     const tn = tierNightFromRemote(st.tierNight);
-    if (tn.topicId != null) patch.tierNightTopicId = tn.topicId;
-    if (tn.mode) patch.tierNightMode = tn.mode;
-    if (tn.modifier) patch.tierNightModifier = tn.modifier;
     if (tn.recap?.recaps?.length) {
       const localName = getLocalDisplayName();
       const localPts =
