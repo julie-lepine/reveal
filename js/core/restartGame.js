@@ -466,6 +466,7 @@ export function resolveLastGameForRestart() {
 }
 
 export function eveningRecapRestartButtonHtml(lastGame = resolveLastGameForRestart()) {
+  if (isGameSyncActive() && !isLobbyHost()) return "";
   if (!lastGame?.gameId || !RESTART_HANDLERS[lastGame.gameId]) return "";
   const title = getRestartableGameTitle(lastGame.gameId, lastGame.title);
   return `<button type="button" class="btn btn-secondary evening-recap__restart" data-restart-game="${escapeHtml(lastGame.gameId)}">Recommencer une partie de ${escapeHtml(title)}</button>`;

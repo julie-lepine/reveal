@@ -146,12 +146,12 @@ Clôture QA :
 - S-02 validé sur Hot Take : vote immédiat accepté, compteur hôte OK, pas de doublon pseudo + uid observé.
 - Tests complémentaires des autres jeux validés côté QA : pas de symptôme visible de vote/prêt invisible ou doublon merge.
 
-| ID | Problème | Fichier / fonction | Scénario | Impact | Correction proposée |
-|----|----------|-------------------|----------|--------|---------------------|
-| **M-01** | Race nom profil vs pseudo join | `supabaseAuth.js` — `initSupabaseAuth()`, `syncSessionToState()`, `signInAsGuest()` | Profil Supabase écrase `user.name` après join | Pseudo lobby ≠ affiché | Ne pas écraser name si join récent ; séquentialiser auth |
-| **P-03** | = M-01 côté perte état | idem | idem | idem | idem |
-| **M-02a** | `userIdForName()` null → clé name | `gameSync.js` — `userIdForName()`, `mpLaunch.js` — `commitPrepReadyToggle()` | Participants stale après join | Votes/prêts clé name au lieu uid | Toujours utiliser `getSupabaseUserId()` ; bloquer actions MP jusqu’au refresh participants |
-| **S-02** | = M-02a | `hotTakeSession.js` — `commitHotTakeVote()` | Vote avant refresh lobby | Doublon clés vote | idem |
+| ID | Problème | Fichier / fonction | Scénario | Impact | Correction proposée | Statut |
+|----|----------|-------------------|----------|--------|---------------------|--------|
+| **M-01** | Race nom profil vs pseudo join | `supabaseAuth.js` — `initSupabaseAuth()`, `syncSessionToState()`, `signInAsGuest()` | Profil Supabase écrase `user.name` après join | Pseudo lobby ≠ affiché | Ne pas écraser name si join récent ; séquentialiser auth | ✅ Corrigé + QA validée |
+| **P-03** | = M-01 côté perte état | idem | idem | idem | idem | ✅ Corrigé + QA validée |
+| **M-02a** | `userIdForName()` null → clé name | `gameSync.js` — `userIdForName()`, `mpLaunch.js` — `commitPrepReadyToggle()` | Participants stale après join | Votes/prêts clé name au lieu uid | Toujours utiliser `getSupabaseUserId()` ; bloquer actions MP jusqu’au refresh participants | ✅ Corrigé + QA validée |
+| **S-02** | = M-02a | `hotTakeSession.js` — `commitHotTakeVote()` | Vote avant refresh lobby | Doublon clés vote | idem | ✅ Corrigé + QA validée |
 
 **Symptômes utilisateur :** pseudo incorrect ; vote/prêt invisible ; doublons merge.
 
@@ -168,18 +168,20 @@ Clôture QA :
 - Résultats par jeu : un jeu terminé apparaît même sans point marqué ; réparation prévue pour les soirées déjà dans cet état.
 - Clés joueur : écritures Supabase canonicalisées sur `userId`; les pseudos restent côté UI/local.
 - Pages résultats / classement : reroute intempestive vers `game-select` corrigée pour les écrans post-partie.
-- Trivia : podium final conservé sur l'écran `trivia`, puis passage explicite vers l'écran commun `results` ; QA dédiée encore à valider.
+- Trivia : podium final conservé sur l'écran `trivia`, puis passage explicite vers l'écran commun `results` ; QA validée.
+- Cause 3 considérée clôturée pour les flux validés, hors TierNight isolé en KO QA.
+- TierNight : KO QA au 2026-07-10. Résidus confirmés : l'hôte est encore renvoyé vers l'ancien récap pendant le tri de sa seconde tierlist ; l'invité ne voit pas l'écran de choix des tierlists et passe directement du choix des modes à la saisie de sa tierlist. Les patchs précédents restent testés mais ne résolvent pas le scénario réel ; investigation suspendue pour avancer sur les autres tests.
 
 | ID | Problème | Fichier / fonction | Scénario | Impact | Correction proposée | Statut |
 |----|----------|-------------------|----------|--------|---------------------|--------|
-| **M-03a** / **S-03** / **SYN-07** | Triple source : local / cache / Supabase | `state.js`, `gameSync.js` — `applyRemoteSession()`, `patchGameStateInner()` | Patch concurrent hôte/invité | Divergence transitoire phase/votes | Tests intégration merge ; documenter autorité | 🟡 Partiellement réduit : merges/votes/résultats renforcés, dette d'architecture restante |
+| **M-03a** / **S-03** / **SYN-07** | Triple source : local / cache / Supabase | `state.js`, `gameSync.js` — `applyRemoteSession()`, `patchGameStateInner()` | Patch concurrent hôte/invité | Divergence transitoire phase/votes | Tests intégration merge ; documenter autorité | ✅ Stabilisé sur les flux QA validés ; dette d'architecture suivie hors Cause 3 |
 | **I-03** / **P-04** | `activeScoringGameId` non reset | `state.js` — `resetScores()`, `getActiveScoringGame()` | Reset soirée puis nouvelle partie | Points crédités au mauvais jeu | `activeScoringGameId = null` dans reset | ✅ Corrigé + test |
 | **I-04** / **S-04** / **SYN-02** | Stats soirée incomplètes en MP | `gameSync.js` — `eveningStateToRemote()` | `clutchesPlayed`, `wrongAnswersPlayed` absents du remote | Récap différent hôte/invité | Inclure tous champs stats dans remote | ✅ Corrigé + tests |
 | **SYN-03** | `eveningGamesRecorded` local-only | `state.js` — `recordEveningGameOnce()` | Chaque client compte indépendamment | Stats gonflées | Sync dedup map ou dedup serveur | ✅ Corrigé + QA validée |
 | **M-13** / **SYN-20** | `hasEveningStatsActivity()` incomplet | `state.js`, `lobby.js` | Clutch/Wrong Answer seuls joués | UI « pas d’activité » | Aligner conditions avec `defaultEveningStats()` | ✅ Corrigé + tests |
-| **M-14a** / **SYN-14** | Topic TierNight éclaté | `state.js`, `gameSync.js`, `tierNightLiveSession.js` | Classic vs live | Topic incohérent après sync partiel | Source unique topic + apply cohérent | 🟡 Corrigé + tests ; QA Rank it validée, finalisation live autonome + routage relance actif > ancien récap + listeners TierNight sur écran effectif + garde Realtime obsolète + bootstrap récap + reset relance + contrat `lobbyStarted` actif/terminé + `runId` anti-fin/récap local obsolète + garde route `tiernight-end` valide seulement avec vrai récap distant + snapshot live/placements fallback patchés, QA live à refaire |
+| **M-14a** / **SYN-14** | Topic TierNight éclaté | `state.js`, `gameSync.js`, `tierNightLiveSession.js`, `tierNightSelect.js` | Classic vs live + relance | Topic/routing incohérent après sync partiel | Hôte renvoyé vers ancien récap pendant la 2e tierlist ; invité saute le choix des tierlists | Source unique topic + routage par run courant + flow invité choix mode → choix tierlist → saisie | ❌ KO QA : tests unitaires OK mais scénario réel non résolu ; investigation suspendue, à reprendre plus tard |
 | **M-02b** | Clés vote/prêt uid vs name | `gameSync.js`, `*-Session.js` | Fallback `userIdForName \|\| name` | Doublons jusqu’au refresh | Canonicaliser sur uid | ✅ Corrigé + QA validée |
-| **ARCH-02** | Écran local vs session distante | `router.js`, `gameSync.js`, `games/trivia.js` | Routing vs affichage | Invité sur écran ≠ session serveur | Documenter ; réduire exceptions suppress | 🟡 Partiellement corrigé : post-game/résultats stabilisés, Trivia repasse par son podium avant `results`, QA Trivia à faire |
+| **ARCH-02** | Écran local vs session distante | `router.js`, `gameSync.js`, `games/trivia.js` | Routing vs affichage | Invité sur écran ≠ session serveur | Documenter ; réduire exceptions suppress | ✅ Corrigé + QA validée sur résultats / classement / Trivia podium → results |
 | **SYN-29** | Jeu terminé sans point absent des résultats | `state.js` — `recordEveningGameOnce()`, `gameScoreOrder` | Hot Take / autre jeu avec 0 point | Carte du jeu absente dans Résultats | Créer l'entrée résultat dès qu'un jeu est compté | ✅ Corrigé + QA validée |
 
 **Symptômes utilisateur :** scores/récap incohérents ; points au mauvais jeu.
@@ -190,16 +192,16 @@ Clôture QA :
 
 **Mécanisme :** `isLobbyHost()` vs `canActAsHost()` ; plusieurs chemins supposent hôte réel ou traitent invité comme hôte local sans commit serveur.
 
-| ID | Problème | Fichier / fonction | Scénario | Impact | Correction proposée |
-|----|----------|-------------------|----------|--------|---------------------|
-| **I-01** | `completeGameSession` mauvais `host_id` | `gameSync.js` L3965-3991 | Acting guest termine partie | Metadata / RLS incohérente | Persister `lobby.hostId` dans `host_id` |
-| **I-02** / **S-01** | Patch invité sans row `game_sessions` | `gameSync.js` — `patchGameStateInner()` L3573-3577 | Ready prep avant `startGameSession` | Erreur visible invité | Queue/retry ; no-op ready pré-session |
-| **I-08** | RLS : tout membre peut UPDATE session | `supabase/game-sessions.sql` | Client modifié | Triche / corruption | RPC merge serveur ou policies restrictives |
-| **M-03b** / **SYN-09** | `launchGameWithSync` branche non-hôte | `mpLaunch.js` L109-112 | Appel par erreur sur invité | UI locale divergente | Guard strict ; ne jamais applyLocal seul en MP |
-| **M-06a** | Exit invité : pas `endGameSession` | `exitGame.js` — `exitGameToGameSelect()` | Quitter mid-game | Autres continuent (voulu) mais état local stale | + reset blobs locaux (voir P-02) |
-| **M-06b** | `returnToGameSelect` asymétrique | `gameSync.js` | Hôte reset session ; invité suppress | Comportements différents | Documenter ; aligner reset local invité |
-| **L-01** | « Recommencer » visible mais bloqué | `restartGame.js` | Invité clique Recommencer | Alert « Seul l'hôte » | Masquer bouton pour non-hôte |
-| **ARCH-03** | Acting host sans metadata correcte | `hostPresence.js`, jeux sous `canActAsHost()` | Hôte absent > ~2 min | Fin manche possible, metadata fausse | Combiner I-01 + policy acting host |
+| ID | Problème | Fichier / fonction | Scénario | Impact | Correction proposée | Statut |
+|----|----------|-------------------|----------|--------|---------------------|--------|
+| **I-01** | `completeGameSession` mauvais `host_id` | `gameSync.js` L3965-3991 | Acting guest termine partie | Metadata / RLS incohérente | Persister `lobby.hostId` dans `host_id` | À traiter |
+| **I-02** / **S-01** | Patch invité sans row `game_sessions` | `gameSync.js`, `mpLaunch.js` | Ready prep avant `startGameSession` | Erreur visible invité | No-op local si invité sans session distante | 🟡 Corrigé + tests ; QA à faire |
+| **I-08** | RLS : tout membre peut UPDATE session | `supabase/game-sessions.sql` | Client modifié | Triche / corruption | RPC merge serveur ou policies restrictives | À traiter |
+| **M-03b** / **SYN-09** | `launchGameWithSync` branche non-hôte | `mpLaunch.js` | Appel par erreur sur invité | UI locale divergente | Guard strict ; ne jamais applyLocal seul en MP | 🟡 Corrigé + tests ; QA à faire |
+| **M-06a** | Exit invité : pas `endGameSession` | `exitGame.js` — `exitGameToGameSelect()` | Quitter mid-game | Autres continuent (voulu) mais état local stale | + reset blobs locaux (voir P-02) | À traiter |
+| **M-06b** | `returnToGameSelect` asymétrique | `gameSync.js` | Hôte reset session ; invité suppress | Comportements différents | Documenter ; aligner reset local invité | À traiter |
+| **L-01** | « Recommencer » visible mais bloqué | `restartGame.js` | Invité clique Recommencer | Alert « Seul l'hôte » | Masquer bouton pour non-hôte | 🟡 Corrigé + tests ; QA à faire |
+| **ARCH-03** | Acting host sans metadata correcte | `hostPresence.js`, jeux sous `canActAsHost()` | Hôte absent > ~2 min | Fin manche possible, metadata fausse | Combiner I-01 + policy acting host | À traiter |
 
 **Symptômes utilisateur :** erreur prep ; fin partie acting host ; triche théorique ; asymétrie quit/return.
 
@@ -368,9 +370,9 @@ La matrice ci-dessous liste les points encore ouverts ou résiduels. Les éléme
 
 | Cause | Critique | Important | Moyen | Faible |
 |-------|----------|-----------|-------|--------|
-| 1 Identité invité | C-01, C-02 | R-01–R-03, L-03 | M-05a | ARCH-01 |
-| 2 Auth race | — | M-01, M-02a, S-02 | — | — |
-| 3 Multi-sources | — | — | M-03a (résiduel), ARCH-02 (résiduel QA Trivia podium → results), M-14a (QA TierNight live à valider) | — |
+| 1 Identité invité | — | — | — | ARCH-01 (hors QA Supabase) |
+| 2 Auth race | — | — | — | — |
+| 3 Multi-sources | — | — | M-14a (KO QA TierNight relance + flow invité tierlists) | — |
 | 4 Hôte/invité | — | I-01, I-02, I-08 | M-03b, M-06a-c | L-01 |
 | 5 Routing/timing | — | T-02, P-02 | T-01, T-03, M-07, M-08 | SYN-28 |
 | 6 Async écrans | — | I-05 | SYN-13b, SYN-25 | SYN-05, M-08 |
@@ -392,8 +394,8 @@ La matrice ci-dessous liste les points encore ouverts ou résiduels. Les éléme
 | 4 | I-06, P-01 | 8 | UX lobby invité dégradée |
 | 5 | I-01 | 4 | Fin partie acting host fragile |
 | 6 | I-08 | 4 | Sécurité intégrité session MP |
-| 7 | ARCH-02 | 3, 5 | Résiduel à valider sur le flux Trivia podium → résultats communs |
-| 8 | M-14a, SYN-14 | 3 | QA live à valider sur le topic TierNight après validation Rank it |
+| 7 | P-02, M-06c | 5 | Sortie volontaire / retour menu : risque de blobs locaux obsolètes hors flux déjà validés |
+| 8 | M-14a, SYN-14 | 3 | KO QA TierNight : hôte renvoyé vers ancien récap en 2e tierlist + invité saute le choix des tierlists ; suspendu pour avancer sur les autres tests |
 | 9 | T-02, P-02 | 5 | Navigation possible avant données complètes ou avec blobs locaux obsolètes |
 | 10 | M-12 | 11 | Dette UX importante après les corrections de stabilité |
 

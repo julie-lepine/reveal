@@ -107,9 +107,8 @@ export async function launchGameWithSync({
   }
 
   if (!isLobbyHost()) {
-    applyLocal();
-    onLocalApplied?.();
-    return { ok: true };
+    console.warn(`Launch ${gameId}: ignored on non-host client.`);
+    return { ok: false, skipped: true, notHost: true };
   }
 
   if (localFirst) {
@@ -267,10 +266,11 @@ export async function commitPrepReadyToggle({
   readyField = "ready",
 }) {
   const session = getSession();
-  const uid = isGameSyncActive() ? requireLocalParticipantUid() : null;
   const nextReady = { ...(session[readyField] || {}), [readyKey]: ready };
   saveLocal({ ...session, [readyField]: nextReady });
   if (!isGameSyncActive()) return nextReady;
+  if (!getCachedGameSession() && !isLobbyHost()) return nextReady;
+  const uid = requireLocalParticipantUid();
   await patchGameState({ [stateKey]: { ready: { [uid]: ready } } }, { gameId, screen });
   return nextReady;
 }
