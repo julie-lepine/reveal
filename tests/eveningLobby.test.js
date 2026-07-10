@@ -6,6 +6,7 @@ import {
   getActiveScoringGame,
   getState,
   hasEveningStatsActivity,
+  mergeEveningGamesRecorded,
   resetScores,
   saveStatePatch,
 } from "../js/core/state.js";
@@ -58,6 +59,15 @@ describe("hasEveningStatsActivity", () => {
       eveningGamesRecorded: {},
     });
     assert.equal(hasEveningStatsActivity(), true);
+  });
+
+  it("fusionne les jeux deja comptes sans regression", () => {
+    const merged = mergeEveningGamesRecorded(
+      { clutch: true, hottake: false },
+      { wronganswer: true, clutch: true }
+    );
+
+    assert.deepEqual(merged, { clutch: true, wronganswer: true });
   });
 
   it("resetScores oublie le jeu actif de scoring", () => {

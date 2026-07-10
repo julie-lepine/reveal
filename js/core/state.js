@@ -568,6 +568,21 @@ export function defaultEveningStats() {
 }
 
 /** Au moins une partie ou des points enregistrés cette soirée (local). */
+export function normalizeEveningGamesRecorded(recorded = {}) {
+  const out = {};
+  Object.entries(recorded || {}).forEach(([gameId, value]) => {
+    if (gameId && value) out[gameId] = true;
+  });
+  return out;
+}
+
+export function mergeEveningGamesRecorded(local = {}, remote = {}) {
+  return {
+    ...normalizeEveningGamesRecorded(local),
+    ...normalizeEveningGamesRecorded(remote),
+  };
+}
+
 export function hasEveningStatsActivity() {
   const { stats, scores, eveningGamesRecorded } = getState();
   if (eveningGamesRecorded && Object.keys(eveningGamesRecorded).length > 0) return true;

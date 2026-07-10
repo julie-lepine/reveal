@@ -7,6 +7,8 @@ import {
   saveStatePatch,
   setLastGame,
   mergeLastGameRecord,
+  mergeEveningGamesRecorded,
+  normalizeEveningGamesRecorded,
   recordTierNightPlayed,
   resetGameSessionsOnly,
   defaultEveningStats,
@@ -2556,8 +2558,14 @@ function applyRemoteFilRougeScores(remote) {
 }
 
 function eveningStateToRemote() {
-  const { stats, lastGame, tierNightGame, gameScoreSessionBaseline, gameScoreSessionGameId } =
-    getState();
+  const {
+    stats,
+    lastGame,
+    tierNightGame,
+    gameScoreSessionBaseline,
+    gameScoreSessionGameId,
+    eveningGamesRecorded,
+  } = getState();
   const remote = {
     scores: scoresToRemote(getState().scores),
     playerStats: playerStatsToRemote(getState().playerStats || {}, (name) => userIdForName(name) || name),
@@ -2565,6 +2573,7 @@ function eveningStateToRemote() {
     gameScoreOrder: [...(getState().gameScoreOrder || [])],
     gameScoreSessionBaseline: scoresToRemote(gameScoreSessionBaseline || {}),
     gameScoreSessionGameId: gameScoreSessionGameId || null,
+    eveningGamesRecorded: normalizeEveningGamesRecorded(eveningGamesRecorded || {}),
     stats: {
       hotTakesPlayed: stats.hotTakesPlayed || 0,
       speedVotesPlayed: stats.speedVotesPlayed || 0,
@@ -2599,6 +2608,12 @@ export function applyRemoteEveningState(st) {
   }
   if (st.lastGame !== undefined) {
     patch.lastGame = mergeLastGameRecord(getState().lastGame, st.lastGame);
+  }
+  if (st.eveningGamesRecorded && typeof st.eveningGamesRecorded === "object") {
+    patch.eveningGamesRecorded = mergeEveningGamesRecorded(
+      getState().eveningGamesRecorded,
+      st.eveningGamesRecorded
+    );
   }
   if (st.lastTierName && getState().tierNightGame) {
     patch.tierNightGame = { ...getState().tierNightGame, listName: st.lastTierName };
@@ -3248,6 +3263,7 @@ const EVENING_STATE_KEYS = new Set([
   "gameScoreOrder",
   "gameScoreSessionBaseline",
   "gameScoreSessionGameId",
+  "eveningGamesRecorded",
   "stats",
   "lastGame",
   "lastTierName",

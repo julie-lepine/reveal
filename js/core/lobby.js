@@ -193,11 +193,14 @@ function hasRemoteEveningActivity() {
   const row = getCachedGameSession();
   if (!row?.state) return false;
   const st = row.state;
+  if (st.eveningGamesRecorded && Object.keys(st.eveningGamesRecorded).length > 0) return true;
   if (st.scores && Object.values(st.scores).some((n) => Number(n) > 0)) return true;
   const s = st.stats || {};
   return (
     (s.hotTakesPlayed || 0) > 0 ||
     (s.speedVotesPlayed || 0) > 0 ||
+    (s.clutchesPlayed || 0) > 0 ||
+    (s.wrongAnswersPlayed || 0) > 0 ||
     (s.playlistGuessesPlayed || 0) > 0 ||
     (s.traitreGamesPlayed || 0) > 0 ||
     (s.triviaGamesPlayed || 0) > 0 ||
