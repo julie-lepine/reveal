@@ -2568,6 +2568,8 @@ function eveningStateToRemote() {
     stats: {
       hotTakesPlayed: stats.hotTakesPlayed || 0,
       speedVotesPlayed: stats.speedVotesPlayed || 0,
+      clutchesPlayed: stats.clutchesPlayed || 0,
+      wrongAnswersPlayed: stats.wrongAnswersPlayed || 0,
       playlistGuessesPlayed: stats.playlistGuessesPlayed || 0,
       triviaGamesPlayed: stats.triviaGamesPlayed || 0,
       truthMetersPlayed: stats.truthMetersPlayed || 0,

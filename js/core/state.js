@@ -531,6 +531,7 @@ export function bumpPlayerStat(playerName, key, amount = 1) {
 }
 
 export function resetScores() {
+  activeScoringGameId = null;
   const names = new Set([
     ...Object.keys(state.scores),
     ...Object.keys(state.filRougeScores),
@@ -575,6 +576,8 @@ export function hasEveningStatsActivity() {
   return (
     (s.hotTakesPlayed || 0) > 0 ||
     (s.speedVotesPlayed || 0) > 0 ||
+    (s.clutchesPlayed || 0) > 0 ||
+    (s.wrongAnswersPlayed || 0) > 0 ||
     (s.playlistGuessesPlayed || 0) > 0 ||
     (s.traitreGamesPlayed || 0) > 0 ||
     (s.triviaGamesPlayed || 0) > 0 ||

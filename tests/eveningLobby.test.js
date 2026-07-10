@@ -1,6 +1,14 @@
 import { describe, it, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
-import { hasEveningStatsActivity, getState, saveStatePatch, defaultEveningStats } from "../js/core/state.js";
+import {
+  beginGameScoreSession,
+  defaultEveningStats,
+  getActiveScoringGame,
+  getState,
+  hasEveningStatsActivity,
+  resetScores,
+  saveStatePatch,
+} from "../js/core/state.js";
 
 describe("hasEveningStatsActivity", () => {
   let snapshot;
@@ -34,5 +42,30 @@ describe("hasEveningStatsActivity", () => {
       eveningGamesRecorded: {},
     });
     assert.equal(hasEveningStatsActivity(), true);
+  });
+
+  it("vrai après Clutch ou Wrong Answer", () => {
+    saveStatePatch({
+      stats: { ...defaultEveningStats(), clutchesPlayed: 1 },
+      scores: {},
+      eveningGamesRecorded: {},
+    });
+    assert.equal(hasEveningStatsActivity(), true);
+
+    saveStatePatch({
+      stats: { ...defaultEveningStats(), wrongAnswersPlayed: 1 },
+      scores: {},
+      eveningGamesRecorded: {},
+    });
+    assert.equal(hasEveningStatsActivity(), true);
+  });
+
+  it("resetScores oublie le jeu actif de scoring", () => {
+    beginGameScoreSession("hottake");
+    assert.equal(getActiveScoringGame(), "hottake");
+
+    resetScores();
+
+    assert.equal(getActiveScoringGame(), null);
   });
 });

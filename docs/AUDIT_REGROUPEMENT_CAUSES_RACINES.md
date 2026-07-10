@@ -140,6 +140,12 @@ Clôture QA :
 
 **Mécanisme :** `onAuthStateChange` appelle `syncSessionToState()` sans coordination avec `signInAsGuest()` qui écrit le pseudo au join.
 
+État QA :
+- M-01 / P-03 validés : le pseudo invité reste stable au join, refresh et recovery.
+- M-02a validé sur le chemin critique `commitPrepReadyToggle()` : le prêt immédiat est visible côté hôte.
+- S-02 validé sur Hot Take : vote immédiat accepté, compteur hôte OK, pas de doublon pseudo + uid observé.
+- Tests complémentaires des autres jeux validés côté QA : pas de symptôme visible de vote/prêt invisible ou doublon merge.
+
 | ID | Problème | Fichier / fonction | Scénario | Impact | Correction proposée |
 |----|----------|-------------------|----------|--------|---------------------|
 | **M-01** | Race nom profil vs pseudo join | `supabaseAuth.js` — `initSupabaseAuth()`, `syncSessionToState()`, `signInAsGuest()` | Profil Supabase écrase `user.name` après join | Pseudo lobby ≠ affiché | Ne pas écraser name si join récent ; séquentialiser auth |
