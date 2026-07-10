@@ -251,10 +251,11 @@ export function mountGameSelect(app) {
 
     if (e.target.closest("#game-resume-banner-join")) {
       e.preventDefault();
-      const resumeScreen = getResumableSessionScreen(getCachedGameSession());
-      if (shouldShowGameSelectResumeBanner(resumeScreen)) {
-        void rejoinGameResumeTarget(resumeScreen);
-      }
+      const btn = e.target.closest("#game-resume-banner-join");
+      const resumeScreen =
+        btn?.getAttribute("data-resume-screen") ||
+        getResumableSessionScreen(getCachedGameSession());
+      void rejoinGameResumeTarget(resumeScreen);
       return;
     }
 

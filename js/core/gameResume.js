@@ -81,13 +81,14 @@ export function gameResumeInterstitialHtml({
 export function gameResumeBannerHtml(screen) {
   if (!screen || !isSessionInProgressPlay(screen)) return "";
   const label = gameLabelForScreen(screen);
+  const escapedScreen = escapeHtml(screen);
   return `
     <div class="game-resume-banner card" role="status">
       <p class="game-resume-banner__title">🎮 ${escapeHtml(label)} en cours</p>
       <p class="hint">Tu peux rejoindre la partie ou rester sur le menu des jeux.</p>
       <div class="game-resume-banner__actions">
-        <button type="button" class="btn btn-primary btn--compact" id="game-resume-banner-join">Rejoindre</button>
-        <button type="button" class="btn btn-secondary btn--compact" id="game-resume-banner-stay">Rester ici</button>
+        <button type="button" class="btn btn-primary btn--compact" id="game-resume-banner-join" data-resume-screen="${escapedScreen}">Rejoindre</button>
+        <button type="button" class="btn btn-secondary btn--compact" id="game-resume-banner-stay" data-resume-screen="${escapedScreen}">Rester ici</button>
       </div>
     </div>`;
 }
@@ -96,7 +97,8 @@ export async function rejoinGameResumeTarget(targetScreen) {
   clearSessionRouteSuppress();
   if (await routeToActiveGameIfNeeded(null, { force: true })) return true;
   if (!targetScreen) return false;
-  return routeToSessionScreen(targetScreen, { force: true });
+  routeToSessionScreen(targetScreen, { force: true });
+  return true;
 }
 
 export function stayOnGameResumeTarget() {

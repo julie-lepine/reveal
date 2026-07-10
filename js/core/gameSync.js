@@ -185,6 +185,7 @@ const REALTIME_RECENT_MS = 10000;
 let suppressSessionRouteUntil = 0;
 /** Écran de session ignoré pendant la suppression (retour invité au menu jeux). */
 let suppressSessionScreen = null;
+let suppressSessionSig = "";
 
 const MENU_SCREENS = new Set(["home", "lobby", "game-select", "settings"]);
 export const POST_GAME_SCREENS = new Set(["results", "leaderboard"]);
@@ -263,6 +264,9 @@ function isSuppressedGameReturn(targetScreen) {
   if (Date.now() >= suppressSessionRouteUntil || !suppressSessionScreen || !targetScreen) {
     return false;
   }
+  if (suppressSessionSig && sessionSignature(getCachedGameSession()) !== suppressSessionSig) {
+    return false;
+  }
   if (targetScreen === suppressSessionScreen) return true;
   return isCompatibleSessionScreen(suppressSessionScreen, targetScreen);
 }
@@ -270,6 +274,9 @@ function isSuppressedGameReturn(targetScreen) {
 /** L'hôte a lancé un autre jeu / écran : l'invité doit suivre malgré suppress. */
 function isSessionAdvancedFromSuppress(targetScreen) {
   if (!suppressSessionScreen || !targetScreen) return false;
+  if (suppressSessionSig && sessionSignature(getCachedGameSession()) !== suppressSessionSig) {
+    return true;
+  }
   if (targetScreen === suppressSessionScreen) return false;
   if (isCompatibleSessionScreen(suppressSessionScreen, targetScreen)) return false;
   return true;
@@ -3127,11 +3134,13 @@ export function routeToSessionScreen(screen, { force = false } = {}) {
 export function suppressSessionRoute(ms = 45000, screen = getCachedGameSession()?.screen ?? null) {
   suppressSessionRouteUntil = Date.now() + ms;
   suppressSessionScreen = screen;
+  suppressSessionSig = sessionSignature(getCachedGameSession());
 }
 
 export function clearSessionRouteSuppress() {
   suppressSessionRouteUntil = 0;
   suppressSessionScreen = null;
+  suppressSessionSig = "";
 }
 
 export function isSessionRouteSuppressed() {
