@@ -4398,6 +4398,25 @@ export async function ensureTierNightRecapsFromRemote(list) {
     return;
   }
 
+  const live = getState().tierNightLiveGame;
+  const liveItems = Array.isArray(live?.deck) ? live.deck : [];
+  const livePlacements = live?.placements || {};
+  const liveHasPlacements = Object.values(livePlacements).some((placed) =>
+    Object.values(placed || {}).flat().length > 0
+  );
+  if (liveItems.length && liveHasPlacements) {
+    const built = buildRecapsFromPlacements(
+      live.topicId || list?.id || null,
+      live.listName || list?.name || "Tier list",
+      liveItems,
+      livePlacements
+    );
+    if (built.some((r) => Object.values(r.placed || {}).flat().length > 0)) {
+      recordTierNightPlayed();
+      return;
+    }
+  }
+
   if (!list) return;
 
   const session = getTierNightSession();
@@ -4437,7 +4456,7 @@ export async function finalizeTierNightLiveToResults() {
   await patchGameState(
     {
       tierNight: { ...tnRemote, ...(recap ? { recap } : {}) },
-      tierNightLive: finishedTierNightLiveRemote(),
+      tierNightLive: finishedTierNightLiveRemote(getState().tierNightLiveGame),
     },
     { screen: "tiernight-end", gameId: "tiernight", withEveningScores: true }
   );

@@ -25,16 +25,17 @@ export function tierNightConfigPatchFromRemoteState(st = {}) {
   return patch;
 }
 
-export function finishedTierNightLiveRemote() {
+export function finishedTierNightLiveRemote(session = null) {
+  const preserve = session && typeof session === "object";
   return {
     lobbyStarted: false,
-    topicId: null,
-    listName: "",
-    deck: null,
+    topicId: preserve ? session.topicId ?? null : null,
+    listName: preserve ? session.listName || "" : "",
+    deck: preserve ? session.deck || null : null,
     roundIdx: 0,
     phase: "done",
     votes: {},
-    placements: {},
+    placements: preserve ? session.placements || {} : {},
     finished: true,
   };
 }

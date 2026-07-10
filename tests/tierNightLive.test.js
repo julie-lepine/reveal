@@ -139,6 +139,34 @@ describe("tierNight config distante", () => {
     });
   });
 
+  it("peut conserver le deck et les placements live pour reconstruire le recap", () => {
+    assert.deepEqual(
+      finishedTierNightLiveRemote({
+        topicId: "movies",
+        listName: "Films",
+        deck: ["Alien"],
+        placements: {
+          Alice: { S: ["Alien"] },
+          Bob: { B: ["Alien"] },
+        },
+      }),
+      {
+        lobbyStarted: false,
+        topicId: "movies",
+        listName: "Films",
+        deck: ["Alien"],
+        roundIdx: 0,
+        phase: "done",
+        votes: {},
+        placements: {
+          Alice: { S: ["Alien"] },
+          Bob: { B: ["Alien"] },
+        },
+        finished: true,
+      }
+    );
+  });
+
   it("prefere le recap si un vieux snapshot live contient deja le recap", () => {
     assert.equal(
       shouldPreferTierNightEndRoute({
