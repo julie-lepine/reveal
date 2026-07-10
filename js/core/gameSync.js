@@ -2400,7 +2400,7 @@ export function tierNightFromRemote(remote) {
 
 /** Récap Tier Night partagé (hôte → invités via game_sessions.state.tierNight.recap). */
 export function tierNightRecapToRemote(session) {
-  if (!session?.recaps?.length) return null;
+  if (!session?.recaps?.length || !tierNightRecapHasPlacements(session)) return null;
   return {
     topicId: session.topicId ?? null,
     listName: session.listName ?? "",
@@ -2417,6 +2417,12 @@ export function tierNightRecapToRemote(session) {
     controversialSpread: session.controversialSpread ?? 0,
     scoresApplied: Boolean(session.scoresApplied),
   };
+}
+
+function tierNightRecapHasPlacements(recapLike = {}) {
+  return (recapLike.recaps || []).some(
+    (r) => tierNightPlacedItemsCount(r.placed || {}) > 0
+  );
 }
 
 export function applyTierNightRecapFromRemote(recap) {
@@ -4428,7 +4434,7 @@ export async function ensureTierNightRecapsFromRemote(list) {
   const tn = getTierNightRemote();
   if (!tn) return;
 
-  if (tn.recap?.recaps?.length) {
+  if (tn.recap?.recaps?.length && tierNightRecapHasPlacements(tn.recap)) {
     applyTierNightRecapFromRemote(tn.recap);
     return;
   }
