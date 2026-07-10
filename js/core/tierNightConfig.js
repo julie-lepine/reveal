@@ -51,5 +51,9 @@ export function shouldPreferTierNightEndRoute({
   const remoteHasRecap = hasRemoteTierNightRecap(state);
   if (declared === "tiernight-end") return true;
   if (declared === "tiernight-live" && remoteHasRecap) return true;
-  return local === "tiernight-end" && (localHasRecap || remoteHasRecap);
+  return (
+    local === "tiernight-end" &&
+    (declared == null || declared === "tiernight-live") &&
+    (localHasRecap || remoteHasRecap)
+  );
 }

@@ -175,4 +175,16 @@ describe("tierNight config distante", () => {
       true
     );
   });
+
+  it("ne bloque pas une relance vers la selection TierNight", () => {
+    assert.equal(
+      shouldPreferTierNightEndRoute({
+        declared: "tiernight-select",
+        local: "tiernight-end",
+        localHasRecap: true,
+        state: {},
+      }),
+      false
+    );
+  });
 });
