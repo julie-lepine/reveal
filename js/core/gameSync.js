@@ -364,6 +364,14 @@ function sessionSignature(row) {
   return `${row.screen}|${JSON.stringify(row.state || {})}`;
 }
 
+function isOlderSessionRow(row) {
+  if (!row?.updated_at || !lastSessionUpdatedAt) return false;
+  const incoming = Date.parse(row.updated_at);
+  const current = Date.parse(lastSessionUpdatedAt);
+  if (!Number.isFinite(incoming) || !Number.isFinite(current)) return false;
+  return incoming < current;
+}
+
 export function isGameSyncActive() {
   return isSupabaseConfigured() && Boolean(getState().lobby?.id);
 }
@@ -2757,6 +2765,8 @@ async function confirmMissingSessionThenRoute() {
 }
 
 export function applyRemoteSession(row) {
+  if (isOlderSessionRow(row)) return;
+
   const prevScreen = cachedRow?.screen ?? null;
   const prevGuessLie = getState().guessLie;
   const sig = sessionSignature(row);
