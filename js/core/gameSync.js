@@ -4383,6 +4383,8 @@ export async function ensureTierNightRecapsFromRemote(list) {
     return;
   }
 
+  if (!list) return;
+
   const session = getTierNightSession();
   if (tierNightLocalRecapsComplete(session, list)) {
     return;

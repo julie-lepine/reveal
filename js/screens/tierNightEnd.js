@@ -172,10 +172,9 @@ export function mountTierNightEnd(app) {
     try {
       const topicId = getTierNightTopicId();
       const list = topicId ? getTierListById(topicId) : null;
-      if (!list) return;
 
       if (isGameSyncActive()) {
-        const maxAttempts = isLobbyHost() ? 1 : 12;
+        const maxAttempts = 12;
         for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
           await ensureTierNightRecapsFromRemote(list);
           reloadSession();
@@ -184,7 +183,7 @@ export function mountTierNightEnd(app) {
             getTierNightRecaps().some(
               (r) => Object.values(r.placed || {}).flat().length > 0
             );
-          if (ready || isLobbyHost()) break;
+          if (ready) break;
           await new Promise((r) => setTimeout(r, 450));
         }
         if (!isLobbyHost()) {
