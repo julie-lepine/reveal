@@ -39,6 +39,17 @@ export function navigate(screenId, { reset = false, params = null, navStack: for
 
   screenParams = params || {};
   const screenBeforeMount = currentScreenId;
+  if (
+    screenId === "game-select" &&
+    (screenBeforeMount === "results" || screenBeforeMount === "leaderboard")
+  ) {
+    console.trace("[DEBUG SCORE ROUTE TO GAME SELECT]", {
+      from: screenBeforeMount,
+      to: screenId,
+      reset,
+      forcedStack,
+    });
+  }
 
   if (currentCleanup) {
     currentCleanup();
