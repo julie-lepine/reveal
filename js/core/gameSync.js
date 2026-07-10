@@ -2676,6 +2676,10 @@ async function confirmMissingSessionThenRoute() {
 
     if (!isGameSyncActive()) return;
     const current = getCurrentScreen();
+    if (isOnPostGameScreen(current)) {
+      suppressSessionRoute(120000);
+      return;
+    }
     if (isActiveGameSessionScreen(current) || isOnGameSetupScreen(current)) {
       suppressSessionRoute(120000);
       // Soirée toujours lancée (l'hôte est juste revenu au menu des jeux) : on suit vers le
@@ -2686,8 +2690,6 @@ async function confirmMissingSessionThenRoute() {
         const { goToLobby } = await import("./lobby.js");
         goToLobby();
       }
-    } else if (isOnPostGameScreen(current)) {
-      routeToSessionScreen("game-select", { force: true });
     }
   } finally {
     confirmingMissingSession = false;
