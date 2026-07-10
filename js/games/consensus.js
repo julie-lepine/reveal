@@ -28,6 +28,7 @@ import {
   refreshGameSession,
   returnToGameSelect,
   startGameSession,
+  stopGameSessionListenerOnPostGame,
 } from "../core/gameSync.js";
 import { renderConsensusQuestion } from "../consensus/ConsensusQuestion.js";
 import { renderConsensusResults } from "../consensus/ConsensusResults.js";
@@ -887,7 +888,13 @@ export function mountConsensus(app) {
     return false;
   }
 
-  const unsub = onGameSessionChange(() => {
+  const unsub = onGameSessionChange((row) => {
+    if (stopGameSessionListenerOnPostGame(row, { cleanup: () => {
+      clearNpcTimers();
+      clearRevealPending();
+      if (renderTimer) clearTimeout(renderTimer);
+    } })) return;
+
     const prevPhase = phase;
     const prevQuestion = questionIdx;
     const roundChanged = syncFromSession();

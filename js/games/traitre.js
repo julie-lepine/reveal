@@ -42,6 +42,7 @@ import {
   canActAsHost,
   onGameSessionChange,
   returnToGameSelect,
+  stopGameSessionListenerOnPostGame,
 } from "../core/gameSync.js";
 import { voteConfirmChrome, pickForVoteConfirm } from "../core/voteConfirm.js";
 
@@ -605,7 +606,9 @@ export function mountTraitre(app) {
     });
   }
 
-  const unsub = onGameSessionChange(async () => {
+  const unsub = onGameSessionChange(async (row) => {
+    if (stopGameSessionListenerOnPostGame(row)) return;
+
     const entry = getTraitreEntryScreen();
     if (entry !== "traitre") {
       navigate(entry);

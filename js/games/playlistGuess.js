@@ -30,11 +30,11 @@ import { gameExitBarHtml, bindExitGame } from "../core/exitGame.js";
 import { isEveningGameplayPaused } from "../core/filRougeSession.js";
 import {
   isGameSyncActive,
-  isLobbyHost,
   canActAsHost,
   onGameSessionChange,
   completeGameSession,
   getCachedGameSession,
+  stopGameSessionListenerOnPostGame,
 } from "../core/gameSync.js";
 import { songGuessCardHtml } from "../playlistguess/SongGuessCard.js";
 import { revealResultCardHtml } from "../playlistguess/RevealOwnerCard.js";
@@ -386,12 +386,8 @@ export function mountPlaylistGuess(app) {
     }
   }
 
-  function onSyncUpdate() {
-    const row = getCachedGameSession();
-    if (row?.screen === "results" && mp && !isLobbyHost()) {
-      navigate("results", { navStack: ["home", "lobby", "game-select", "results"] });
-      return;
-    }
+  function onSyncUpdate(row = getCachedGameSession()) {
+    if (stopGameSessionListenerOnPostGame(row)) return;
 
     const prevIdx = roundIdx;
     const prevPhase = phase;

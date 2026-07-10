@@ -23,6 +23,7 @@ import {
   canActAsHost,
   onGameSessionChange,
   getCachedGameSession,
+  stopGameSessionListenerOnPostGame,
   finalizeTierNightLiveToResults,
 } from "../core/gameSync.js";
 import { setLobbyPlaying } from "../core/lobby.js";
@@ -322,6 +323,8 @@ function mountMp(app, list) {
   }
 
   const unsub = onGameSessionChange((row) => {
+    if (stopGameSessionListenerOnPostGame(row)) return;
+
     if (row?.screen === "tiernight-end" || getTierNightLiveSession().finished) {
       navigate("tiernight-end");
       return;

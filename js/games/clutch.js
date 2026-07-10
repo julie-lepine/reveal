@@ -33,6 +33,7 @@ import {
   canActAsHost,
   onGameSessionChange,
   completeGameSession,
+  stopGameSessionListenerOnPostGame,
 } from "../core/gameSync.js";
 
 export function mountClutch(app) {
@@ -529,7 +530,12 @@ export function mountClutch(app) {
     }));
   }
 
-  const unsub = onGameSessionChange(() => {
+  const unsub = onGameSessionChange((row) => {
+    if (stopGameSessionListenerOnPostGame(row, { cleanup: () => {
+      clearGrace();
+      stopClock();
+    } })) return;
+
     const prevPhase = phase;
     const prevKey = activeKey;
     syncFromSession();

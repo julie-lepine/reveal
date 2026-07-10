@@ -20,6 +20,7 @@ import {
   onGameSessionChange,
   returnToGameSelect,
   startGameSession,
+  stopGameSessionListenerOnPostGame,
   triviaToRemote,
 } from "../core/gameSync.js";
 import { renderTriviaQuestion } from "../trivia/TriviaQuestion.js";
@@ -551,7 +552,9 @@ export function mountTrivia(app) {
     }
   }
 
-  const unsub = onGameSessionChange(() => {
+  const unsub = onGameSessionChange((row) => {
+    if (stopGameSessionListenerOnPostGame(row, { cleanup: clearNpcTimers })) return;
+
     const prevPhase = phase;
     const prevQuestion = questionIdx;
     syncFromSession();

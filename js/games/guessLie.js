@@ -13,6 +13,7 @@ import {
   getActiveMemberUserIds,
   nameForUserId,
   completeGameSession,
+  stopGameSessionListenerOnPostGame,
 } from "../core/gameSync.js";
 import { getLocalDisplayName, recordGuessLieRoundStats, recordGuessLiePlayed, setLastGame } from "../core/state.js";
 import { awardGuessLieRound, guessLieLiarWins } from "../core/scoring.js";
@@ -446,7 +447,9 @@ export function mountGuessLie(app) {
     }
   }
 
-  function onSyncUpdate() {
+  function onSyncUpdate(row) {
+    if (stopGameSessionListenerOnPostGame(row)) return;
+
     const prevIdx = roundIdx;
     const prevPhase = phase;
     const prevVotes = JSON.stringify(getGuessLieSession().votes || {});

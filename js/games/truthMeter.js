@@ -46,6 +46,7 @@ import {
   isGameSyncActive,
   canActAsHost,
   onGameSessionChange,
+  stopGameSessionListenerOnPostGame,
 } from "../core/gameSync.js";
 
 function sliderBlockHtml({
@@ -946,7 +947,13 @@ export function mountTruthMeter(app) {
     }
   }
 
-  const unsubGame = onGameSessionChange(() => {
+  const unsubGame = onGameSessionChange((row) => {
+    if (stopGameSessionListenerOnPostGame(row, { cleanup: () => {
+      if (displayTimeoutId) clearTimeout(displayTimeoutId);
+      if (revealPendingTimeoutId) clearTimeout(revealPendingTimeoutId);
+      cancelRevealAnim();
+    } })) return;
+
     const prevPhase = phase;
     const prevRound = roundIdx;
     const prevVotesJson = JSON.stringify(getTruthMeterSession().votes || {});

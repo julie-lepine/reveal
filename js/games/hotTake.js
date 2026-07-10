@@ -35,12 +35,11 @@ import { gameExitBarHtml, bindExitGame } from "../core/exitGame.js";
 import { isEveningGameplayPaused } from "../core/filRougeSession.js";
 import {
   isGameSyncActive,
-  isLobbyHost,
   canActAsHost,
   onGameSessionChange,
   completeGameSession,
   hotTakeToRemote,
-  getCachedGameSession,
+  stopGameSessionListenerOnPostGame,
   refreshGameSession,
 } from "../core/gameSync.js";
 import { voteConfirmChrome, pickForVoteConfirm } from "../core/voteConfirm.js";
@@ -642,12 +641,8 @@ export function mountHotTake(app) {
     }
   }
 
-  const unsubGame = onGameSessionChange(() => {
-    const row = getCachedGameSession();
-    if (row?.screen === "results" && mp && !isLobbyHost()) {
-      navigate("results", { navStack: ["home", "lobby", "game-select", "results"] });
-      return;
-    }
+  const unsubGame = onGameSessionChange((row) => {
+    if (stopGameSessionListenerOnPostGame(row)) return;
 
     const prevPhase = phase;
     const prevTake = takeIdx;

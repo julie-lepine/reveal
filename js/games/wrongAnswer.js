@@ -33,6 +33,7 @@ import {
   canActAsHost,
   onGameSessionChange,
   completeGameSession,
+  stopGameSessionListenerOnPostGame,
 } from "../core/gameSync.js";
 
 export function mountWrongAnswer(app) {
@@ -497,7 +498,9 @@ export function mountWrongAnswer(app) {
     return max > 0 ? best : null;
   }
 
-  const unsub = onGameSessionChange(() => {
+  const unsub = onGameSessionChange((row) => {
+    if (stopGameSessionListenerOnPostGame(row)) return;
+
     const prevPhase = phase;
     const prevRound = roundIdx;
     syncFromSession();

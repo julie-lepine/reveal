@@ -32,6 +32,7 @@ import {
   canActAsHost,
   onGameSessionChange,
   completeGameSession,
+  stopGameSessionListenerOnPostGame,
   refreshGameSession,
 } from "../core/gameSync.js";
 
@@ -382,7 +383,9 @@ export function mountSpeedVote(app) {
     }
   }
 
-  const unsub = onGameSessionChange(() => {
+  const unsub = onGameSessionChange((row) => {
+    if (stopGameSessionListenerOnPostGame(row)) return;
+
     const prevPhase = phase;
     const prevRound = roundIdx;
     const prevVotesJson = JSON.stringify(getSpeedVoteSession().votes || {});

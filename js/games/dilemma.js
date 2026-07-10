@@ -32,12 +32,11 @@ import { gameExitBarHtml, bindExitGame } from "../core/exitGame.js";
 import { isEveningGameplayPaused } from "../core/filRougeSession.js";
 import {
   isGameSyncActive,
-  isLobbyHost,
   canActAsHost,
   onGameSessionChange,
   completeGameSession,
   dilemmaToRemote,
-  getCachedGameSession,
+  stopGameSessionListenerOnPostGame,
   refreshGameSession,
 } from "../core/gameSync.js";
 import { voteConfirmChrome, pickForVoteConfirm } from "../core/voteConfirm.js";
@@ -547,12 +546,8 @@ export function mountDilemma(app) {
     }
   }
 
-  const unsub = onGameSessionChange(async () => {
-    const row = getCachedGameSession();
-    if (row?.screen === "results" && mp && !isLobbyHost()) {
-      navigate("results", { navStack: ["home", "lobby", "game-select", "results"] });
-      return;
-    }
+  const unsub = onGameSessionChange(async (row) => {
+    if (stopGameSessionListenerOnPostGame(row, { cleanup: cancelRevealAnim })) return;
 
     const prevPhase = phase;
     const prevRound = roundIdx;

@@ -4025,6 +4025,18 @@ export function isOnPostGameScreen(screen = getCurrentScreen()) {
   return POST_GAME_SCREENS.has(screen);
 }
 
+/** Stoppe un ancien listener de jeu quand la session distante est déjà en post-partie. */
+export function stopGameSessionListenerOnPostGame(
+  row = getCachedGameSession(),
+  { cleanup } = {}
+) {
+  const screen = row?.screen || null;
+  if (!isOnPostGameScreen(screen)) return false;
+  if (typeof cleanup === "function") cleanup();
+  routeToSessionScreen(screen, { force: true });
+  return true;
+}
+
 /** Retour au menu jeux (hôte : ferme la session ; invité : navigation locale). */
 export async function returnToGameSelect() {
   if (!isGameSyncActive()) return false;

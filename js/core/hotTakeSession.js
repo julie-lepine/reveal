@@ -408,7 +408,11 @@ export async function commitHotTakeVote(choice) {
   const votes = { ...(session.votes || {}), [localName]: choice };
   saveStatePatch({ hotTakeGame: { ...session, votes } });
   if (!isGameSyncActive()) return { ...session, votes };
-  await patchGameStateWithFeedback({ hotTake: { votes: { [uid]: choice } } });
+  const remoteVotes = { [uid]: choice };
+  if (localName && localName !== uid) {
+    remoteVotes[localName] = choice;
+  }
+  await patchGameStateWithFeedback({ hotTake: { votes: remoteVotes } });
   return { ...session, votes };
 }
 
