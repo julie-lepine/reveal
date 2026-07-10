@@ -175,7 +175,7 @@ describe("tierNight config distante", () => {
         state: {
           tierNight: {
             recap: {
-              recaps: [{ player: "Alice" }],
+              recaps: [{ player: "Alice", placed: { S: ["Alien"] } }],
             },
           },
           tierNightLive: {
@@ -188,7 +188,7 @@ describe("tierNight config distante", () => {
     );
   });
 
-  it("ignore un vieux live quand le client est deja au recap local", () => {
+  it("ne bloque pas une nouvelle session live active depuis un ancien recap local", () => {
     assert.equal(
       shouldPreferTierNightEndRoute({
         declared: "tiernight-live",
@@ -201,7 +201,24 @@ describe("tierNight config distante", () => {
           },
         },
       }),
-      true
+      false
+    );
+  });
+
+  it("ignore un recap distant sans placements reels", () => {
+    assert.equal(
+      shouldPreferTierNightEndRoute({
+        declared: "tiernight-live",
+        local: "tiernight-live",
+        state: {
+          tierNight: {
+            recap: {
+              recaps: [{ player: "Alice", placed: {} }],
+            },
+          },
+        },
+      }),
+      false
     );
   });
 

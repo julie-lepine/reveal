@@ -41,7 +41,11 @@ export function finishedTierNightLiveRemote(session = null) {
 }
 
 function hasRemoteTierNightRecap(st = {}) {
-  return Boolean(st?.tierNight?.recap?.recaps?.length);
+  return Boolean(
+    st?.tierNight?.recap?.recaps?.some((r) =>
+      Object.values(r.placed || {}).flat().length > 0
+    )
+  );
 }
 
 export function shouldPreferTierNightEndRoute({
@@ -55,7 +59,7 @@ export function shouldPreferTierNightEndRoute({
   if (declared === "tiernight-live" && remoteHasRecap) return true;
   return (
     local === "tiernight-end" &&
-    (declared == null || declared === "tiernight-live") &&
+    declared == null &&
     (localHasRecap || remoteHasRecap)
   );
 }

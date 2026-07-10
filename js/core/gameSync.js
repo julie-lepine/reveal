@@ -429,13 +429,6 @@ export function isCompatibleSessionScreen(sessionScreen, localScreen) {
     return true;
   }
   if (sessionScreen === "tiernight-select" && TIER_NIGHT_PREP_SCREENS.has(localScreen)) return true;
-  if (
-    sessionScreen === "tiernight-live" &&
-    localScreen === "tiernight-end" &&
-    hasLocalTierNightRecap()
-  ) {
-    return true;
-  }
   /** Résultats ↔ classement : navigation locale sans forcer le retour via la session. */
   if (
     (sessionScreen === "results" && localScreen === "leaderboard") ||
