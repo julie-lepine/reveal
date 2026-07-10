@@ -11,6 +11,10 @@ export function renderTriviaResults({
   standings = [],
   themeLabel = "Trivia",
   showHostActions = true,
+  showContinueAction = true,
+  continueAction = "back-select",
+  continueLabel = "Retour au menu des jeux",
+  waitingText = "En attente de l'hote pour relancer...",
 } = {}) {
   const winner = standings[0] || null;
   return `
@@ -56,8 +60,12 @@ export function renderTriviaResults({
         <button type="button" class="btn btn-primary" data-trivia-action="replay">Rejouer</button>
         <button type="button" class="btn btn-accent" data-trivia-action="change-theme">Changer theme</button>
       </div>`
-          : `<p class="hint">En attente de l'hôte pour relancer…</p>`
+          : `<p class="hint">${escapeHtml(waitingText)}</p>`
       }
-      <button type="button" class="btn btn-secondary btn--spaced" data-trivia-action="back-select">Retour au menu des jeux</button>
+      ${
+        showContinueAction
+          ? `<button type="button" class="btn btn-secondary btn--spaced" data-trivia-action="${escapeHtml(continueAction)}">${escapeHtml(continueLabel)}</button>`
+          : ""
+      }
     </div>`;
 }

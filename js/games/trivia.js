@@ -295,13 +295,7 @@ export function mountTrivia(app) {
   async function finishTriviaGame() {
     const live = trivia.getSession();
     if (live.podiumApplied) {
-      if (mp && canActAsHost()) {
-        await completeGameSession({
-          gameId: "trivia",
-          screen: "results",
-          state: { trivia: triviaToRemote(live) },
-        });
-      }
+      render();
       return;
     }
 
@@ -338,6 +332,28 @@ export function mountTrivia(app) {
     clearNpcTimers();
 
     if (mp && canActAsHost()) {
+      await trivia.commitPlay(finalSession, { screen: "trivia" });
+      render();
+      return;
+    }
+
+    if (!mp) {
+      saveStatePatch({ triviaGame: finalSession });
+      render();
+    }
+  }
+
+  async function showEveningResults() {
+    const finalSession = {
+      ...trivia.getSession(),
+      phase: "final",
+      podiumApplied: true,
+    };
+
+    clearNpcTimers();
+
+    if (mp) {
+      if (!canActAsHost()) return;
       await completeGameSession({
         gameId: "trivia",
         screen: "results",
@@ -346,11 +362,9 @@ export function mountTrivia(app) {
       return;
     }
 
-    if (!mp) {
-      await setLobbyWaiting();
-      saveStatePatch({ triviaGame: finalSession });
-      navigate("results", { navStack: ["home", "lobby", "game-select", "results"] });
-    }
+    await setLobbyWaiting();
+    saveStatePatch({ triviaGame: finalSession });
+    navigate("results", { navStack: ["home", "lobby", "game-select", "results"] });
   }
 
   function render() {
@@ -421,6 +435,10 @@ export function mountTrivia(app) {
         standings,
         themeLabel: getTriviaThemeLabel(session.selectedThemeId),
         showHostActions: !mp || isLobbyHost(),
+        showContinueAction: !mp || canActAsHost(),
+        continueAction: "show-results",
+        continueLabel: "Voir les resultats",
+        waitingText: "En attente de l'hote pour afficher les resultats...",
       });
     }
 
@@ -513,6 +531,10 @@ export function mountTrivia(app) {
           } else {
             await goToGameSelect();
           }
+          return;
+        }
+        if (action === "show-results") {
+          await showEveningResults();
         }
       });
     });

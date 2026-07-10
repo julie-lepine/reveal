@@ -7,7 +7,7 @@ Document de synthèse consolidant :
 - le parcours invité simulé étape par étape ;
 - les points absents ou implicites du premier regroupement.
 
-**Mode : lecture seule — aucune modification de code.**  
+**Mode : document de suivi — mis à jour au fil des patchs et validations QA.**
 **Stack réelle :** vanilla JS + Supabase (Postgres + Realtime)
 
 **Identité invité :** `state.user.isGuest` + `state.supabaseUserId` (auth anonyme Supabase). Pas de `guestId` ni `roomId`.
@@ -161,16 +161,26 @@ Clôture QA :
 
 **Mécanisme :** même donnée dans localStorage, `cachedRow`, Postgres, variables closure d’écran ; merges différents selon le chemin.
 
-| ID | Problème | Fichier / fonction | Scénario | Impact | Correction proposée |
-|----|----------|-------------------|----------|--------|---------------------|
-| **M-03a** / **S-03** / **SYN-07** | Triple source : local / cache / Supabase | `state.js`, `gameSync.js` — `applyRemoteSession()`, `patchGameStateInner()` | Patch concurrent hôte/invité | Divergence transitoire phase/votes | Tests intégration merge ; documenter autorité |
-| **I-03** / **P-04** | `activeScoringGameId` non reset | `state.js` — `resetScores()`, `getActiveScoringGame()` | Reset soirée puis nouvelle partie | Points crédités au mauvais jeu | `activeScoringGameId = null` dans reset |
-| **I-04** / **S-04** / **SYN-02** | Stats soirée incomplètes en MP | `gameSync.js` — `eveningStateToRemote()` | `clutchesPlayed`, `wrongAnswersPlayed` absents du remote | Récap différent hôte/invité | Inclure tous champs stats dans remote |
-| **SYN-03** | `eveningGamesRecorded` local-only | `state.js` — `recordEveningGameOnce()` | Chaque client compte indépendamment | Stats gonflées | Sync dedup map ou dedup serveur |
-| **M-13** / **SYN-20** | `hasEveningStatsActivity()` incomplet | `state.js` | Clutch/Wrong Answer seuls joués | UI « pas d’activité » | Aligner conditions avec `defaultEveningStats()` |
-| **M-14a** / **SYN-14** | Topic TierNight éclaté | `state.js`, `gameSync.js`, `tierNightLiveSession.js` | Classic vs live | Topic incohérent après sync partiel | Source unique topic + apply cohérent |
-| **M-02b** | Clés vote/prêt uid vs name | `gameSync.js`, `*-Session.js` | Fallback `userIdForName \|\| name` | Doublons jusqu’au refresh | Canonicaliser sur uid |
-| **ARCH-02** | Écran local vs session distante | `router.js`, `gameSync.js` | Routing vs affichage | Invité sur écran ≠ session serveur | Documenter ; réduire exceptions suppress |
+État patch / QA :
+- `activeScoringGameId` reset : corrigé et couvert par test.
+- Stats soirée MP : `clutchesPlayed`, `wrongAnswersPlayed` et activité distante alignés.
+- `eveningGamesRecorded` : synchronisé dans l'état distant, fusionné sans régression locale.
+- Résultats par jeu : un jeu terminé apparaît même sans point marqué ; réparation prévue pour les soirées déjà dans cet état.
+- Clés joueur : écritures Supabase canonicalisées sur `userId`; les pseudos restent côté UI/local.
+- Pages résultats / classement : reroute intempestive vers `game-select` corrigée pour les écrans post-partie.
+- Trivia : podium final conservé sur l'écran `trivia`, puis passage explicite vers l'écran commun `results` ; QA dédiée encore à valider.
+
+| ID | Problème | Fichier / fonction | Scénario | Impact | Correction proposée | Statut |
+|----|----------|-------------------|----------|--------|---------------------|--------|
+| **M-03a** / **S-03** / **SYN-07** | Triple source : local / cache / Supabase | `state.js`, `gameSync.js` — `applyRemoteSession()`, `patchGameStateInner()` | Patch concurrent hôte/invité | Divergence transitoire phase/votes | Tests intégration merge ; documenter autorité | 🟡 Partiellement réduit : merges/votes/résultats renforcés, dette d'architecture restante |
+| **I-03** / **P-04** | `activeScoringGameId` non reset | `state.js` — `resetScores()`, `getActiveScoringGame()` | Reset soirée puis nouvelle partie | Points crédités au mauvais jeu | `activeScoringGameId = null` dans reset | ✅ Corrigé + test |
+| **I-04** / **S-04** / **SYN-02** | Stats soirée incomplètes en MP | `gameSync.js` — `eveningStateToRemote()` | `clutchesPlayed`, `wrongAnswersPlayed` absents du remote | Récap différent hôte/invité | Inclure tous champs stats dans remote | ✅ Corrigé + tests |
+| **SYN-03** | `eveningGamesRecorded` local-only | `state.js` — `recordEveningGameOnce()` | Chaque client compte indépendamment | Stats gonflées | Sync dedup map ou dedup serveur | ✅ Corrigé + QA validée |
+| **M-13** / **SYN-20** | `hasEveningStatsActivity()` incomplet | `state.js`, `lobby.js` | Clutch/Wrong Answer seuls joués | UI « pas d’activité » | Aligner conditions avec `defaultEveningStats()` | ✅ Corrigé + tests |
+| **M-14a** / **SYN-14** | Topic TierNight éclaté | `state.js`, `gameSync.js`, `tierNightLiveSession.js` | Classic vs live | Topic incohérent après sync partiel | Source unique topic + apply cohérent | 🔲 À traiter |
+| **M-02b** | Clés vote/prêt uid vs name | `gameSync.js`, `*-Session.js` | Fallback `userIdForName \|\| name` | Doublons jusqu’au refresh | Canonicaliser sur uid | ✅ Corrigé + QA validée |
+| **ARCH-02** | Écran local vs session distante | `router.js`, `gameSync.js`, `games/trivia.js` | Routing vs affichage | Invité sur écran ≠ session serveur | Documenter ; réduire exceptions suppress | 🟡 Partiellement corrigé : post-game/résultats stabilisés, Trivia repasse par son podium avant `results`, QA Trivia à faire |
+| **SYN-29** | Jeu terminé sans point absent des résultats | `state.js` — `recordEveningGameOnce()`, `gameScoreOrder` | Hot Take / autre jeu avec 0 point | Carte du jeu absente dans Résultats | Créer l'entrée résultat dès qu'un jeu est compté | ✅ Corrigé + QA validée |
 
 **Symptômes utilisateur :** scores/récap incohérents ; points au mauvais jeu.
 
@@ -354,11 +364,13 @@ Join mid-game (T-01)
 
 ## Matrice cause → gravité
 
+La matrice ci-dessous liste les points encore ouverts ou résiduels. Les éléments corrigés restent historisés dans chaque section de cause.
+
 | Cause | Critique | Important | Moyen | Faible |
 |-------|----------|-----------|-------|--------|
 | 1 Identité invité | C-01, C-02 | R-01–R-03, L-03 | M-05a | ARCH-01 |
 | 2 Auth race | — | M-01, M-02a, S-02 | — | — |
-| 3 Multi-sources | — | I-03, I-04 | M-03a, M-13, M-14a, M-02b | SYN-03, ARCH-02 |
+| 3 Multi-sources | — | — | M-03a (résiduel), M-14a, ARCH-02 (résiduel QA Trivia podium → results) | — |
 | 4 Hôte/invité | — | I-01, I-02, I-08 | M-03b, M-06a-c | L-01 |
 | 5 Routing/timing | — | T-02, P-02 | T-01, T-03, M-07, M-08 | SYN-28 |
 | 6 Async écrans | — | I-05 | SYN-13b, SYN-25 | SYN-05, M-08 |
@@ -370,20 +382,20 @@ Join mid-game (T-01)
 
 ---
 
-## Top 10 corrections prioritaires (inchangé, enrichi)
+## Top 10 corrections prioritaires (état actuel)
 
 | # | ID(s) | Cause | Pourquoi |
 |---|-------|-------|----------|
-| 1 | C-01, R-01, R-02, L-03 | 1 | Bloque définitivement les invités |
-| 2 | C-02, R-03 | 1 | Éjecte à tort des membres valides |
-| 3 | I-02, S-01 | 4 | Erreur immédiate en prep invité |
-| 4 | I-07, S-05 | 7 | Seul jeu avec launch non fiable |
-| 5 | I-05, SYN-13b, SYN-25 | 6 | Bugs intermittents navigation |
-| 6 | I-03 | 3, 8 | Scores soirée corrompus après reset |
-| 7 | I-04, SYN-03 | 3 | Récap incohérent hôte/invités |
-| 8 | I-06, P-01 | 8 | UX lobby invité dégradée |
-| 9 | I-01 | 4 | Fin partie acting host fragile |
-| 10 | I-08 | 4 | Sécurité intégrité session MP |
+| 1 | I-02, S-01 | 4 | Erreur immédiate en prep invité |
+| 2 | I-07, S-05 | 7 | Seul jeu avec launch non fiable |
+| 3 | I-05, SYN-13b, SYN-25 | 6 | Bugs intermittents navigation |
+| 4 | I-06, P-01 | 8 | UX lobby invité dégradée |
+| 5 | I-01 | 4 | Fin partie acting host fragile |
+| 6 | I-08 | 4 | Sécurité intégrité session MP |
+| 7 | M-14a, SYN-14 | 3 | Dernier point Cause 3 non traité : topic TierNight classic/live |
+| 8 | ARCH-02 | 3, 5 | Résiduel à valider sur le flux Trivia podium → résultats communs |
+| 9 | T-02, P-02 | 5 | Navigation possible avant données complètes ou avec blobs locaux obsolètes |
+| 10 | M-12 | 11 | Dette UX importante après les corrections de stabilité |
 
 ---
 
