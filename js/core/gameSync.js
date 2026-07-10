@@ -3251,6 +3251,22 @@ const EVENING_STATE_KEYS = new Set([
   "lastTierName",
 ]);
 
+const GAME_PLAY_STATE_KEYS = new Set([
+  "hotTake",
+  "speedVote",
+  "clutch",
+  "wrongAnswer",
+  "traitre",
+  "trivia",
+  "truthMeter",
+  "consensus",
+  "dilemma",
+  "guessLie",
+  "playlistGuess",
+  "tierNight",
+  "tierNightLive",
+]);
+
 function isEveningScoresOnlyMerge(stateMerge) {
   if (!stateMerge || typeof stateMerge !== "object") return false;
   const keys = Object.keys(stateMerge);
@@ -3259,6 +3275,11 @@ function isEveningScoresOnlyMerge(stateMerge) {
 }
 
 /** Patch concurrent (votes / réponses) : toujours relire le blob serveur avant merge. */
+function isLateGamePatchAfterPostGame(row, stateMerge = {}) {
+  if (!row || !POST_GAME_SCREENS.has(row.screen)) return false;
+  return Object.keys(stateMerge || {}).some((key) => GAME_PLAY_STATE_KEYS.has(key));
+}
+
 function patchNeedsFreshSessionRow(mergePayload = {}) {
   for (const inc of Object.values(mergePayload)) {
     if (!inc || typeof inc !== "object") continue;
@@ -3594,6 +3615,11 @@ async function patchGameStateInner(
   if (freshRow) {
     cachedRow = freshRow;
     lastSessionSig = sessionSignature(freshRow);
+  }
+
+  if (isLateGamePatchAfterPostGame(freshRow, mergePayload)) {
+    applyRemoteSession(freshRow);
+    return freshRow;
   }
 
   const current = freshRow?.state || cachedRow?.state || {};
