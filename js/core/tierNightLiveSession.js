@@ -14,11 +14,13 @@ import { launchGameWithSync, commitHostGamePlay } from "./mpLaunch.js";
 import { buildRecapsFromPlacements } from "./tierNightSession.js";
 import { medianTierFromRanks } from "./tierNightScoring.js";
 import { setLobbyPlaying } from "./lobby.js";
+import { createTierNightRunId } from "./tierNightConfig.js";
 
 const TIER_RANK = { S: 0, A: 1, B: 2, C: 3, D: 4 };
 
 function defaultLive() {
   return {
+    runId: null,
     lobbyStarted: false,
     topicId: null,
     listName: "",
@@ -67,6 +69,7 @@ function votingPayload(roundIdx) {
 
 function tierNightLiveResetRemote() {
   return tierNightLiveToRemote({
+    runId: null,
     lobbyStarted: false,
     finished: true,
     phase: "done",
@@ -81,6 +84,7 @@ function tierNightLiveResetRemote() {
 
 function tierNightClassicResetRemote() {
   return tierNightToRemote({
+    runId: null,
     topicId: null,
     mode: "consensus",
     modifier: "normal",
@@ -93,9 +97,11 @@ function tierNightClassicResetRemote() {
 
 /** Lancement MP (hôte) : construit le deck partagé et démarre la 1re manche. */
 export async function markTierNightLiveLobbyStarted({ topicId, listName, items }) {
+  const runId = createTierNightRunId();
   const deck = shuffle(items);
   const next = {
     ...defaultLive(),
+    runId,
     lobbyStarted: true,
     topicId,
     listName,
@@ -112,7 +118,7 @@ export async function markTierNightLiveLobbyStarted({ topicId, listName, items }
     applyLocal: () =>
       saveStatePatch({
         tierNightLiveGame: next,
-        tierNightGame: { recaps: [], topicId: null, listName: "", controversialItem: null },
+        tierNightGame: { runId, recaps: [], topicId: null, listName: "", controversialItem: null },
       }),
     getRemoteState: () => ({
       tierNightLive: tierNightLiveToRemote(next),
@@ -197,14 +203,16 @@ export function resetTierNightLive() {
 
 /** Lancement MP Rank it / Classe le groupe (hôte). */
 export async function markTierNightClassicStarted({ topicId, mode, modifier }) {
+  const runId = createTierNightRunId();
   saveStatePatch({
     tierNightTopicId: topicId,
     tierNightMode: mode,
     tierNightModifier: modifier,
-    tierNightGame: { recaps: [], topicId: null, listName: "", controversialItem: null },
+    tierNightGame: { runId, recaps: [], topicId: null, listName: "", controversialItem: null },
     tierNightLiveGame: defaultLive(),
   });
   const remoteTierNight = tierNightToRemote({
+    runId,
     topicId,
     mode,
     modifier,

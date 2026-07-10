@@ -2375,6 +2375,7 @@ export function guessLieFromRemote(remote) {
 }
 
 export function tierNightToRemote({
+  runId,
   topicId,
   game,
   placements,
@@ -2384,6 +2385,7 @@ export function tierNightToRemote({
   lobbyStarted,
 }) {
   return {
+    runId: runId || null,
     topicId: topicId || null,
     mode: mode || "consensus",
     modifier: modifier || "normal",
@@ -2403,6 +2405,7 @@ export function tierNightFromRemote(remote) {
 export function tierNightRecapToRemote(session) {
   if (!session?.recaps?.length || !tierNightRecapHasPlacements(session)) return null;
   return {
+    runId: session.runId ?? null,
     topicId: session.topicId ?? null,
     listName: session.listName ?? "",
     recaps: session.recaps.map((r) => ({
@@ -2446,6 +2449,7 @@ export function applyTierNightRecapFromRemote(recap) {
 
 export function tierNightLiveToRemote(session) {
   return {
+    runId: session.runId || null,
     lobbyStarted: Boolean(session.lobbyStarted),
     topicId: session.topicId || null,
     listName: session.listName || "",
@@ -2465,6 +2469,7 @@ export function tierNightLiveFromRemote(remote) {
     votes[nameForUserId(uid) || uid] = tier;
   });
   return {
+    runId: remote.runId || null,
     lobbyStarted: Boolean(remote.lobbyStarted),
     topicId: remote.topicId || null,
     listName: remote.listName || "",
@@ -3363,6 +3368,15 @@ function isLateGamePatchAfterPostGame(row, stateMerge = {}) {
   return Object.keys(stateMerge || {}).some((key) => GAME_PLAY_STATE_KEYS.has(key));
 }
 
+function isStaleTierNightEndPatch(row, stateMerge = {}, screen = null) {
+  if (screen !== "tiernight-end") return false;
+  const incoming = stateMerge?.tierNight;
+  if (!incoming || typeof incoming !== "object") return false;
+  const currentRunId = row?.state?.tierNight?.runId || null;
+  if (!currentRunId) return false;
+  return (incoming.runId || null) !== currentRunId;
+}
+
 function patchNeedsFreshSessionRow(mergePayload = {}) {
   for (const inc of Object.values(mergePayload)) {
     if (!inc || typeof inc !== "object") continue;
@@ -3701,6 +3715,11 @@ async function patchGameStateInner(
   }
 
   if (isLateGamePatchAfterPostGame(freshRow, mergePayload)) {
+    applyRemoteSession(freshRow);
+    return freshRow;
+  }
+
+  if (isStaleTierNightEndPatch(freshRow, mergePayload, screen)) {
     applyRemoteSession(freshRow);
     return freshRow;
   }
@@ -4312,6 +4331,7 @@ export async function syncTierNightSession(payload) {
   if (!isGameSyncActive()) return;
   const cached = getTierNightRemote() || {};
   const remote = tierNightToRemote({
+    runId: payload.runId ?? getState().tierNightGame?.runId ?? cached.runId ?? null,
     topicId: payload.topicId ?? getState().tierNightTopicId,
     mode: payload.mode ?? getState().tierNightMode,
     modifier: payload.modifier ?? getState().tierNightModifier,
@@ -4488,13 +4508,14 @@ export async function finalizeTierNightLiveToResults() {
     }
   }
   const tnRemote = getTierNightRemote() || {};
-  await patchGameState(
+  const row = await patchGameState(
     {
       tierNight: { ...tnRemote, lobbyStarted: false, ...(recap ? { recap } : {}) },
       tierNightLive: finishedTierNightLiveRemote(getState().tierNightLiveGame),
     },
     { screen: "tiernight-end", gameId: "tiernight", withEveningScores: true }
   );
+  if (getEffectiveSessionScreen(row) !== "tiernight-end") return false;
   navigate("tiernight-end");
   return true;
 }
@@ -4508,10 +4529,11 @@ export async function advanceTierNightToResultsWhenReady(list, { force = false }
   await ensureTierNightRecapsFromRemote(list);
   const recap = tierNightRecapToRemote(getTierNightSession());
   const tnRemote = getTierNightRemote() || {};
-  await patchGameState(
+  const row = await patchGameState(
     { tierNight: { ...tnRemote, lobbyStarted: false, ...(recap ? { recap } : {}) } },
     { screen: "tiernight-end", gameId: "tiernight", withEveningScores: true }
   );
+  if (getEffectiveSessionScreen(row) !== "tiernight-end") return false;
   navigate("tiernight-end");
   return true;
 }

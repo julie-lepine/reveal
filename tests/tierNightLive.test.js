@@ -127,6 +127,7 @@ describe("tierNight config distante", () => {
 
   it("publie une fin live complete pour ne pas conserver lobbyStarted", () => {
     assert.deepEqual(finishedTierNightLiveRemote(), {
+      runId: null,
       lobbyStarted: false,
       topicId: null,
       listName: "",
@@ -142,6 +143,7 @@ describe("tierNight config distante", () => {
   it("peut conserver le deck et les placements live pour reconstruire le recap", () => {
     assert.deepEqual(
       finishedTierNightLiveRemote({
+        runId: "run-1",
         topicId: "movies",
         listName: "Films",
         deck: ["Alien"],
@@ -151,6 +153,7 @@ describe("tierNight config distante", () => {
         },
       }),
       {
+        runId: "run-1",
         lobbyStarted: false,
         topicId: "movies",
         listName: "Films",

@@ -28,6 +28,7 @@ export function tierNightConfigPatchFromRemoteState(st = {}) {
 export function finishedTierNightLiveRemote(session = null) {
   const preserve = session && typeof session === "object";
   return {
+    runId: preserve ? session.runId ?? null : null,
     lobbyStarted: false,
     topicId: preserve ? session.topicId ?? null : null,
     listName: preserve ? session.listName || "" : "",
@@ -38,6 +39,11 @@ export function finishedTierNightLiveRemote(session = null) {
     placements: preserve ? session.placements || {} : {},
     finished: true,
   };
+}
+
+export function createTierNightRunId() {
+  if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
+  return `tiernight-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
 function hasRemoteTierNightRecap(st = {}) {

@@ -36,7 +36,7 @@ import { defaultConsensusPrepSession } from "./consensusSession.js";
 import { defaultDilemmaPrepSession } from "./dilemmaSession.js";
 import { showAppAlert } from "./dialog.js";
 import { escapeHtml } from "./ui.js";
-import { finishedTierNightLiveRemote } from "./tierNightConfig.js";
+import { createTierNightRunId, finishedTierNightLiveRemote } from "./tierNightConfig.js";
 
 const GAME_ID_TO_TILE = {
   traitre: "traitre-prep",
@@ -363,8 +363,10 @@ export async function launchGuessLieMenu() {
 }
 
 export async function launchTierNightSelect() {
-  const tierNightReset = { recaps: [], topicId: null, listName: "", controversialItem: null };
+  const runId = createTierNightRunId();
+  const tierNightReset = { runId, recaps: [], topicId: null, listName: "", controversialItem: null };
   const tierNightLiveReset = {
+    runId,
     lobbyStarted: false,
     topicId: null,
     listName: "",
@@ -389,6 +391,7 @@ export async function launchTierNightSelect() {
     try {
       await startGameSession("tiernight", "tiernight-select", {
         tierNight: {
+          runId,
           topicId: null,
           mode: "consensus",
           modifier: "normal",
@@ -398,7 +401,7 @@ export async function launchTierNightSelect() {
           game: null,
           recap: null,
         },
-        tierNightLive: finishedTierNightLiveRemote(),
+        tierNightLive: finishedTierNightLiveRemote({ runId }),
       });
     } catch (e) {
       console.warn("REVEAL launch TierNight:", e);
