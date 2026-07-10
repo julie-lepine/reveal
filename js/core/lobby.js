@@ -543,7 +543,7 @@ export async function returnToEveningGames({ rejoinActiveGame = false, hubOnly =
     }
   }
 
-  await routeToEveningHub({ rejoinActiveGame: false });
+  await routeToEveningHub({ rejoinActiveGame: false, allowPostGameExit: hubOnly });
 }
 
 export async function goToGameSelect() {
@@ -557,7 +557,10 @@ function resumeLocalGuessLiePlay() {
   return tryEnterGuessLiePlayFromWait();
 }
 
-export async function routeToEveningHub({ rejoinActiveGame = true } = {}) {
+export async function routeToEveningHub({
+  rejoinActiveGame = true,
+  allowPostGameExit = false,
+} = {}) {
   if (!hasActiveLobby()) return false;
 
   saveStatePatch({ inLobby: true });
@@ -603,7 +606,7 @@ export async function routeToEveningHub({ rejoinActiveGame = true } = {}) {
       goToLobby();
       return true;
     }
-    if (isOnPostGameScreen(getCurrentScreen())) return true;
+    if (!allowPostGameExit && isOnPostGameScreen(getCurrentScreen())) return true;
     navigate("game-select", { navStack: ["home", "lobby", "game-select"] });
     return true;
   }
@@ -613,7 +616,7 @@ export async function routeToEveningHub({ rejoinActiveGame = true } = {}) {
     return true;
   }
 
-  if (isOnPostGameScreen(getCurrentScreen())) return true;
+  if (!allowPostGameExit && isOnPostGameScreen(getCurrentScreen())) return true;
   navigate("game-select", { navStack: ["home", "lobby", "game-select"] });
   return true;
 }
