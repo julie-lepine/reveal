@@ -23,6 +23,7 @@ import {
   canActAsHost,
   onGameSessionChange,
   getCachedGameSession,
+  getEffectiveSessionScreen,
   stopGameSessionListenerOnPostGame,
   finalizeTierNightLiveToResults,
 } from "../core/gameSync.js";
@@ -325,7 +326,8 @@ function mountMp(app, list) {
   const unsub = onGameSessionChange((row) => {
     if (stopGameSessionListenerOnPostGame(row)) return;
 
-    if (row?.screen === "tiernight-end" || getTierNightLiveSession().finished) {
+    const effective = getEffectiveSessionScreen(row);
+    if (effective === "tiernight-end" || getTierNightLiveSession().finished) {
       navigate("tiernight-end");
       return;
     }

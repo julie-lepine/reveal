@@ -22,6 +22,7 @@ import {
   ensureTierNightRecapsFromRemote,
   getTierNightLobbyProgress,
   refreshGameSession,
+  getEffectiveSessionScreen,
   isLobbyHost,
   canForceTierNightResults,
 } from "../core/gameSync.js";
@@ -346,7 +347,7 @@ export function mountTierNight(app) {
 
   const unsub = onGameSessionChange(async () => {
     const row = getCachedGameSession();
-    if (row?.screen === "tiernight-end") {
+    if (getEffectiveSessionScreen(row) === "tiernight-end") {
       await refreshGameSession();
       await ensureTierNightRecapsFromRemote(list);
       navigate("tiernight-end");
@@ -364,5 +365,4 @@ export function mountTierNight(app) {
     unsub();
   };
 }
-
 
