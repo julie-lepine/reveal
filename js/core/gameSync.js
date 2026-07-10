@@ -303,6 +303,10 @@ function isBrowsingScoresWithRouteSuppress(screen = getCurrentScreen()) {
 function shouldApplySessionRoute(row, { fromScreen = null } = {}) {
   const screen = getEffectiveSessionScreen(row);
   if (!screen) return false;
+  if (screen === "tiernight-end" && !canRouteToTierNightEnd(row)) {
+    warnBlockedTierNightEndRoute(row, "shouldApplySessionRoute");
+    return false;
+  }
   if (screen === "game-select" && !isLobbyEveningStarted()) return false;
   const current = getCurrentScreen();
   if (screen === current) return false;
@@ -427,7 +431,39 @@ const GUESS_LIE_PREP_SCREENS = new Set(["guesslie-menu", "guesslie-setup", "gues
 const TIER_NIGHT_PREP_SCREENS = new Set(["tiernight-select", "tiernight-create"]);
 
 function hasLocalTierNightRecap() {
-  return Boolean(getState().tierNightGame?.recaps?.length);
+  const local = getState().tierNightGame;
+  if (!local?.recaps?.length) return false;
+  const remote = getCachedGameSession()?.state?.tierNight;
+  if (remote?.lobbyStarted) return false;
+  const localRunId = local.runId || null;
+  const remoteRunId = remote?.runId || null;
+  if (localRunId && remoteRunId && localRunId !== remoteRunId) return false;
+  return true;
+}
+
+export function canRouteToTierNightEnd(row) {
+  const tn = row?.state?.tierNight;
+  if (!tn || typeof tn !== "object") return false;
+  if (tn.lobbyStarted) return false;
+  const recap = tn.recap;
+  if (!recap?.recaps?.some((r) => tierNightPlacedItemsCount(r.placed || {}) > 0)) {
+    return false;
+  }
+  const runId = tn.runId || null;
+  const recapRunId = recap.runId || null;
+  return !runId || !recapRunId || runId === recapRunId;
+}
+
+function warnBlockedTierNightEndRoute(row, source) {
+  console.warn("[TierNight Route Blocked]", {
+    source,
+    screen: row?.screen,
+    current: getCurrentScreen(),
+    lobbyStarted: Boolean(row?.state?.tierNight?.lobbyStarted),
+    runId: row?.state?.tierNight?.runId || null,
+    recapRunId: row?.state?.tierNight?.recap?.runId || null,
+    hasRecap: Boolean(row?.state?.tierNight?.recap?.recaps?.length),
+  });
 }
 
 export function isCompatibleSessionScreen(sessionScreen, localScreen) {
@@ -2393,6 +2429,7 @@ export function tierNightToRemote({
     game: game ?? (lobbyStarted ? true : null),
     placements: mapPlacementsByUid(placements || {}),
     finished: finished || {},
+    recap: null,
   };
 }
 
@@ -2804,6 +2841,10 @@ export function applyRemoteSession(row) {
   const prevHtVotes = JSON.stringify(getState().hotTakeGame?.votes || {});
   const prevSvVotes = JSON.stringify(getState().speedVoteGame?.votes || {});
   const prevTmVotes = JSON.stringify(getState().truthMeterGame?.votes || {});
+  const prevTierNightRunId = getState().tierNightGame?.runId ?? null;
+  const prevTierNightRecaps = JSON.stringify(getState().tierNightGame?.recaps || []);
+  const prevTierNightLiveRunId = getState().tierNightLiveGame?.runId ?? null;
+  const prevTierNightLivePhase = getState().tierNightLiveGame?.phase ?? null;
   const st = { ...(row.state || {}) };
   if (!FIL_ROUGE_ENABLED) {
     delete st.filRouge;
@@ -2877,7 +2918,19 @@ export function applyRemoteSession(row) {
 
   if (st.tierNight) {
     const tn = tierNightFromRemote(st.tierNight);
-    if (tn.recap?.recaps?.length) {
+    const localRunId = getState().tierNightGame?.runId || null;
+    const remoteRunId = tn.runId || null;
+    const recapRunId = tn.recap?.runId || null;
+    const recapMatchesRun =
+      !remoteRunId || !recapRunId || remoteRunId === recapRunId;
+    const recapMatchesLocal =
+      !localRunId || !recapRunId || localRunId === recapRunId;
+    if (
+      tn.recap?.recaps?.length &&
+      !tn.lobbyStarted &&
+      recapMatchesRun &&
+      recapMatchesLocal
+    ) {
       const localName = getLocalDisplayName();
       const localPts =
         tn.recap.recaps.find((r) => r.player === localName)?.consensusPoints ?? 0;
@@ -2946,6 +2999,16 @@ export function applyRemoteSession(row) {
       JSON.stringify(patch.wrongAnswerGame.answers || {}) !== prevWaAnswers ||
       JSON.stringify(patch.wrongAnswerGame.votes || {}) !== prevWaVotes);
 
+  const tierNightPlayChanged =
+    patch.tierNightGame &&
+    ((patch.tierNightGame.runId ?? null) !== prevTierNightRunId ||
+      JSON.stringify(patch.tierNightGame.recaps || []) !== prevTierNightRecaps);
+
+  const tierNightLivePlayChanged =
+    patch.tierNightLiveGame &&
+    ((patch.tierNightLiveGame.runId ?? null) !== prevTierNightLiveRunId ||
+      (patch.tierNightLiveGame.phase ?? null) !== prevTierNightLivePhase);
+
   const playChanged = Boolean(
     pgPhaseChanged ||
       guessLiePlayChanged ||
@@ -2953,7 +3016,9 @@ export function applyRemoteSession(row) {
       hotTakePlayChanged ||
       speedVotePlayChanged ||
       truthMeterPlayChanged ||
-      wrongAnswerPlayChanged
+      wrongAnswerPlayChanged ||
+      tierNightPlayChanged ||
+      tierNightLivePlayChanged
   );
 
   // Signature distante inchangée (souvent un simple touch `updated_at` sans modif de
@@ -3157,7 +3222,12 @@ export function getEffectiveSessionScreen(row) {
       localHasRecap: hasLocalTierNightRecap(),
     })
   ) {
-    return "tiernight-end";
+    if (canRouteToTierNightEnd(row)) return "tiernight-end";
+  }
+
+  if (declared === "tiernight-end" && !canRouteToTierNightEnd(row)) {
+    const activePlay = resolveActivePlayScreen(st, gid, declared);
+    return activePlay || null;
   }
 
   if (declared && POST_GAME_SCREENS.has(declared)) {

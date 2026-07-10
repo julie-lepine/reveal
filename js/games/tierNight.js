@@ -25,6 +25,7 @@ import {
   getEffectiveSessionScreen,
   isLobbyHost,
   canForceTierNightResults,
+  canRouteToTierNightEnd,
 } from "../core/gameSync.js";
 import { getSupabaseUserId } from "../core/supabaseAuth.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
@@ -345,9 +346,9 @@ export function mountTierNight(app) {
     app.querySelector("#btn-validate")?.addEventListener("click", finishGame);
   }
 
-  const unsub = onGameSessionChange(async () => {
-    const row = getCachedGameSession();
+  const unsub = onGameSessionChange(async (row) => {
     if (getEffectiveSessionScreen(row) === "tiernight-end") {
+      if (!canRouteToTierNightEnd(row)) return;
       await refreshGameSession();
       await ensureTierNightRecapsFromRemote(list);
       navigate("tiernight-end");
@@ -365,4 +366,3 @@ export function mountTierNight(app) {
     unsub();
   };
 }
-
