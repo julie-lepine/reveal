@@ -175,7 +175,8 @@ const POLL_MS_MAX = 12000;
 const POLL_MS_DEFAULT = 4000;
 /** Soirée active, invité en attente sur un hub/menu : plafond de backoff plus bas pour
  *  rattraper vite un lancement raté par le Realtime (sans atteindre les 12 s). */
-const POLL_MS_HUB_WAIT_MAX = 5000;
+const POLL_MS_HUB_WAIT_MIN = 1000;
+const POLL_MS_HUB_WAIT_MAX = 1500;
 /** Secours si Realtime silencieux en partie active. */
 const POLL_MS_ACTIVE = 2000;
 /** Realtime récent : on espace le polling (egress) sans sacrifier la réactivité perçue. */
@@ -3531,7 +3532,12 @@ function adjustPollBackoff(sigChanged) {
   if (isLobbyEveningStarted()) {
     pollIntervalMs = Math.min(pollIntervalMs, scalePollIntervalMs(POLL_MS_HUB_WAIT_MAX));
   }
-  pollIntervalMs = Math.max(scalePollIntervalMs(POLL_MS_MIN), pollIntervalMs);
+  const waitingOnHub =
+    isLobbyEveningStarted() &&
+    !isActiveGameSessionScreen(getCurrentScreen()) &&
+    !isOnGameSetupScreen(getCurrentScreen());
+  const minPollMs = waitingOnHub ? POLL_MS_HUB_WAIT_MIN : POLL_MS_MIN;
+  pollIntervalMs = Math.max(scalePollIntervalMs(minPollMs), pollIntervalMs);
 }
 
 async function syncTick() {

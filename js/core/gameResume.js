@@ -1,10 +1,13 @@
 import { escapeHtml, pageShell } from "./ui.js";
 import {
   clearSessionRouteSuppress,
+  applyRemoteSession,
+  getCachedGameSession,
   getResumableSessionScreen,
   isGameSyncActive,
   isLobbyHost,
   isOnGameSetupScreen,
+  refreshGameSession,
   isSessionInProgressPlay,
   routeToActiveGameIfNeeded,
   routeToSessionScreen,
@@ -95,9 +98,13 @@ export function gameResumeBannerHtml(screen) {
 
 export async function rejoinGameResumeTarget(targetScreen) {
   clearSessionRouteSuppress();
-  if (await routeToActiveGameIfNeeded(null, { force: true })) return true;
   if (!targetScreen) return false;
+  const cached = getCachedGameSession();
+  if (cached?.state) applyRemoteSession(cached);
   routeToSessionScreen(targetScreen, { force: true });
+  void refreshGameSession().then((row) => {
+    if (row) void routeToActiveGameIfNeeded(row, { force: true });
+  });
   return true;
 }
 

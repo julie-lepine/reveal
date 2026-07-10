@@ -244,6 +244,7 @@ export function mountGameSelect(app) {
   let renderTimer = null;
   let renderInFlight = false;
   let lastSnapshot = "";
+  const catchupTimers = new Set();
   const navHandlers = buildGameSelectHandlers();
 
   function onGameSelectClick(e) {
@@ -298,6 +299,19 @@ export function mountGameSelect(app) {
       renderTimer = null;
       void renderIfNeeded(force);
     }, delay);
+  }
+
+  function scheduleSessionCatchup() {
+    [0, 250, 800, 1500].forEach((delay) => {
+      const timer = setTimeout(async () => {
+        catchupTimers.delete(timer);
+        if (getCurrentScreen() !== "game-select" || !isGameSyncActive()) return;
+        const row = await refreshGameSession();
+        if (row && (await routeToActiveGameIfNeeded(row))) return;
+        scheduleRender(false);
+      }, delay);
+      catchupTimers.add(timer);
+    });
   }
 
   async function renderIfNeeded(force = false) {
@@ -365,10 +379,7 @@ export function mountGameSelect(app) {
     // donc on ne re-render que si quelque chose a réellement changé (plus de innerHTML
     // complet forcé à chaque notif lobby).
     if (isGameSyncActive()) {
-      void (async () => {
-        await refreshGameSession();
-        scheduleRender(false);
-      })();
+      scheduleSessionCatchup();
       return;
     }
     scheduleRender(false);
@@ -399,5 +410,7 @@ export function mountGameSelect(app) {
     unsubSession();
     unsubLobby();
     if (renderTimer) clearTimeout(renderTimer);
+    catchupTimers.forEach((timer) => clearTimeout(timer));
+    catchupTimers.clear();
   };
 }
