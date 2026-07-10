@@ -6,6 +6,7 @@ import {
 } from "../js/core/sessionMerge.js";
 import {
   finishedTierNightLiveRemote,
+  shouldPreferTierNightEndRoute,
   tierNightConfigPatchFromRemoteState,
 } from "../js/core/tierNightConfig.js";
 
@@ -135,5 +136,43 @@ describe("tierNight config distante", () => {
       votes: {},
       finished: true,
     });
+  });
+
+  it("prefere le recap si un vieux snapshot live contient deja le recap", () => {
+    assert.equal(
+      shouldPreferTierNightEndRoute({
+        declared: "tiernight-live",
+        local: "tiernight-live",
+        state: {
+          tierNight: {
+            recap: {
+              recaps: [{ player: "Alice" }],
+            },
+          },
+          tierNightLive: {
+            lobbyStarted: true,
+            finished: false,
+          },
+        },
+      }),
+      true
+    );
+  });
+
+  it("ignore un vieux live quand le client est deja au recap local", () => {
+    assert.equal(
+      shouldPreferTierNightEndRoute({
+        declared: "tiernight-live",
+        local: "tiernight-end",
+        localHasRecap: true,
+        state: {
+          tierNightLive: {
+            lobbyStarted: true,
+            finished: false,
+          },
+        },
+      }),
+      true
+    );
   });
 });

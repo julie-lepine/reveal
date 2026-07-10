@@ -37,3 +37,19 @@ export function finishedTierNightLiveRemote() {
     finished: true,
   };
 }
+
+function hasRemoteTierNightRecap(st = {}) {
+  return Boolean(st?.tierNight?.recap?.recaps?.length);
+}
+
+export function shouldPreferTierNightEndRoute({
+  state = {},
+  declared = null,
+  local = null,
+  localHasRecap = false,
+} = {}) {
+  const remoteHasRecap = hasRemoteTierNightRecap(state);
+  if (declared === "tiernight-end") return true;
+  if (declared === "tiernight-live" && remoteHasRecap) return true;
+  return local === "tiernight-end" && (localHasRecap || remoteHasRecap);
+}

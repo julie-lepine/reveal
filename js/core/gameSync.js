@@ -94,6 +94,7 @@ import { pickRemotePlayFields } from "./playPatch.js";
 import { pickLatestConsensusAnswer } from "./consensusAnswerUtils.js";
 import {
   finishedTierNightLiveRemote,
+  shouldPreferTierNightEndRoute,
   tierNightConfigPatchFromRemoteState,
 } from "./tierNightConfig.js";
 
@@ -417,6 +418,10 @@ const GUESS_LIE_PREP_SCREENS = new Set(["guesslie-menu", "guesslie-setup", "gues
 /** Tier Night : création locale possible depuis tiernight-select. */
 const TIER_NIGHT_PREP_SCREENS = new Set(["tiernight-select", "tiernight-create"]);
 
+function hasLocalTierNightRecap() {
+  return Boolean(getState().tierNightGame?.recaps?.length);
+}
+
 export function isCompatibleSessionScreen(sessionScreen, localScreen) {
   if (sessionScreen === localScreen) return true;
   /** Guess The Lie : prep par joueur (menu / setup / wait) - pas de traction entre ces écrans. */
@@ -424,6 +429,13 @@ export function isCompatibleSessionScreen(sessionScreen, localScreen) {
     return true;
   }
   if (sessionScreen === "tiernight-select" && TIER_NIGHT_PREP_SCREENS.has(localScreen)) return true;
+  if (
+    sessionScreen === "tiernight-live" &&
+    localScreen === "tiernight-end" &&
+    hasLocalTierNightRecap()
+  ) {
+    return true;
+  }
   /** Résultats ↔ classement : navigation locale sans forcer le retour via la session. */
   if (
     (sessionScreen === "results" && localScreen === "leaderboard") ||
@@ -3107,6 +3119,17 @@ export function getEffectiveSessionScreen(row) {
   const st = row.state || {};
   const gid = row.game_id || null;
   const local = getCurrentScreen();
+
+  if (
+    shouldPreferTierNightEndRoute({
+      state: st,
+      declared,
+      local,
+      localHasRecap: hasLocalTierNightRecap(),
+    })
+  ) {
+    return "tiernight-end";
+  }
 
   if (declared && POST_GAME_SCREENS.has(declared)) {
     if (POST_GAME_SCREENS.has(local) || isSessionRouteSuppressed()) {
