@@ -3,7 +3,7 @@ import { getActivePlayerNames } from "./players.js";
 import { getLocalDisplayName, getState, saveStatePatch } from "./state.js";
 import {
   isGameSyncActive,
-  userIdForName,
+  requireLocalParticipantUid,
   normalizePlayerVotesMap,
   tierNightLiveToRemote,
   tierNightToRemote,
@@ -129,7 +129,7 @@ export async function commitTierNightLiveVote(tier) {
   const votes = { ...(session.votes || {}), [localName]: tier };
   saveStatePatch({ tierNightLiveGame: { ...session, votes } });
   if (!isGameSyncActive()) return tier;
-  const uid = userIdForName(localName) || localName;
+  const uid = requireLocalParticipantUid();
   await patchGameStateWithFeedback(
     { tierNightLive: { votes: { [uid]: tier } } },
     { gameId: "tiernight", screen: "tiernight-live" }

@@ -19,7 +19,7 @@ import {
   allMembersReady,
   dilemmaToRemote,
   patchGameState,
-  userIdForName,
+  requireLocalParticipantUid,
   normalizePlayerVotesMap,
 } from "./gameSync.js";
 import { patchGameStateWithFeedback } from "./patchGameStateFeedback.js";
@@ -384,7 +384,7 @@ export async function commitDilemmaVote(choice) {
   const votes = { ...(session.votes || {}), [localName]: choice };
   saveStatePatch({ dilemmaGame: { ...session, votes } });
   if (!isGameSyncActive()) return { ...session, votes };
-  const uid = userIdForName(localName) || localName;
+  const uid = requireLocalParticipantUid();
   await patchGameStateWithFeedback({ dilemma: { votes: { [uid]: choice } } });
   return { ...session, votes };
 }

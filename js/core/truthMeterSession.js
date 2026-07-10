@@ -13,7 +13,7 @@ import {
   allMembersReady,
   truthMeterToRemote,
   patchGameState,
-  userIdForName,
+  requireLocalParticipantUid,
   normalizePlayerVotesMap,
 } from "./gameSync.js";
 import { patchGameStateWithFeedback } from "./patchGameStateFeedback.js";
@@ -246,7 +246,7 @@ export async function commitTruthMeterVote(choice) {
   const votes = { ...(session.votes || {}), [localName]: choice };
   saveStatePatch({ truthMeterGame: { ...session, votes } });
   if (!isGameSyncActive()) return choice;
-  const uid = userIdForName(localName) || localName;
+  const uid = requireLocalParticipantUid();
   await patchGameStateWithFeedback({ truthMeter: { votes: { [uid]: choice } } });
   return choice;
 }

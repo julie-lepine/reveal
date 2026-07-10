@@ -7,7 +7,7 @@ import {
   saveStatePatch,
   syncGuessLieLobbyCompleteRemote,
 } from "./state.js";
-import { isGameSyncActive, userIdForName } from "./gameSync.js";
+import { isGameSyncActive, requireLocalParticipantUid } from "./gameSync.js";
 import { runLaunchButton } from "./mpLaunch.js";
 import { getCurrentScreen, navigate } from "./router.js";
 
@@ -137,7 +137,7 @@ export async function commitGuessLieVote(pick) {
   const votes = { ...(session.votes || {}), [localName]: pick };
   saveStatePatch({ guessLie: { ...session, votes } });
   if (!isGameSyncActive()) return { ...session, votes };
-  const uid = userIdForName(localName) || localName;
+  const uid = requireLocalParticipantUid();
   const { patchGameStateWithFeedback } = await import("./patchGameStateFeedback.js");
   await patchGameStateWithFeedback(
     { guessLie: { votes: { [uid]: pick } } },

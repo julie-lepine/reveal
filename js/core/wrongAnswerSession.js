@@ -9,7 +9,8 @@ import {
   syncWrongAnswerSession,
   allMembersReady,
   wrongAnswerToRemote,
-  userIdForName,
+  requireLocalParticipantUid,
+  requirePlayerUid,
 } from "./gameSync.js";
 import { patchGameStateWithFeedback } from "./patchGameStateFeedback.js";
 import { launchGameWithSync, commitHostGamePlay, commitPrepReadyToggle } from "./mpLaunch.js";
@@ -154,7 +155,7 @@ export async function commitWrongAnswerAnswer(text) {
   const answers = { ...(session.answers || {}), [localName]: answer };
   saveStatePatch({ wrongAnswerGame: { ...session, answers } });
   if (!isGameSyncActive()) return answer;
-  const uid = userIdForName(localName) || localName;
+  const uid = requireLocalParticipantUid();
   await patchGameStateWithFeedback(
     { wrongAnswer: { answers: { [uid]: answer } } },
     { gameId: "wronganswer", screen: "wronganswer" }
@@ -169,8 +170,8 @@ export async function commitWrongAnswerVote(targetName) {
   const votes = { ...(session.votes || {}), [localName]: targetName };
   saveStatePatch({ wrongAnswerGame: { ...session, votes } });
   if (!isGameSyncActive()) return votes;
-  const uid = userIdForName(localName) || localName;
-  const targetUid = userIdForName(targetName) || targetName;
+  const uid = requireLocalParticipantUid();
+  const targetUid = requirePlayerUid(targetName);
   await patchGameStateWithFeedback(
     { wrongAnswer: { votes: { [uid]: targetUid } } },
     { gameId: "wronganswer", screen: "wronganswer" }

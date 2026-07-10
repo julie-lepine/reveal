@@ -10,7 +10,7 @@ import {
   syncClutchSession,
   allMembersReady,
   clutchToRemote,
-  userIdForName,
+  requireLocalParticipantUid,
 } from "./gameSync.js";
 import { patchGameStateWithFeedback } from "./patchGameStateFeedback.js";
 import { launchGameWithSync, commitHostGamePlay, commitPrepReadyToggle } from "./mpLaunch.js";
@@ -144,7 +144,7 @@ export async function commitClutchTap(ms) {
   const taps = { ...(session.taps || {}), [localName]: tap };
   saveStatePatch({ clutchGame: { ...session, taps } });
   if (!isGameSyncActive()) return tap;
-  const uid = userIdForName(localName) || localName;
+  const uid = requireLocalParticipantUid();
   await patchGameStateWithFeedback({ clutch: { taps: { [uid]: tap } } });
   return tap;
 }

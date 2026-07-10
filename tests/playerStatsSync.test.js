@@ -16,7 +16,7 @@ const LOBBY = {
   ],
 };
 
-const nameToUid = (name) => (name === "Alice" ? "uid-alice" : name === "Bob" ? "uid-bob" : name);
+const nameToUid = (name) => (name === "Alice" ? "uid-alice" : name === "Bob" ? "uid-bob" : null);
 const uidToName = (uid) =>
   uid === "uid-alice" ? "Alice" : uid === "uid-bob" ? "Bob" : null;
 
@@ -74,4 +74,17 @@ describe("playerStats sync MP", () => {
     assert.equal(badges.Alice, "Le détective");
     assert.equal(badges.Bob, "L'imposteur");
   });
+
+  it("n'envoie pas de cle pseudo quand le joueur n'a pas d'uid", () => {
+    const remote = playerStatsToRemote(
+      {
+        Alice: { liesDetected: 3 },
+        Ghost: { liesDetected: 99 },
+      },
+      nameToUid
+    );
+
+    assert.deepEqual(remote, { "uid-alice": { liesDetected: 3 } });
+  });
+
 });

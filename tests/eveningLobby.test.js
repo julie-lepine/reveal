@@ -7,6 +7,9 @@ import {
   getState,
   hasEveningStatsActivity,
   mergeEveningGamesRecorded,
+  recordHotTakePlayed,
+  recordSpeedVotePlayed,
+  recordWrongAnswerPlayed,
   resetScores,
   saveStatePatch,
 } from "../js/core/state.js";
@@ -68,6 +71,39 @@ describe("hasEveningStatsActivity", () => {
     );
 
     assert.deepEqual(merged, { clutch: true, wronganswer: true });
+  });
+
+  it("affiche les jeux termines meme sans point marque", () => {
+    saveStatePatch({
+      stats: defaultEveningStats(),
+      gameScores: {},
+      gameScoreOrder: [],
+      eveningGamesRecorded: {},
+    });
+
+    recordHotTakePlayed();
+    recordSpeedVotePlayed();
+    recordWrongAnswerPlayed();
+
+    assert.deepEqual(getState().gameScoreOrder, ["hottake", "speedvote", "wronganswer"]);
+    assert.deepEqual(getState().gameScores.hottake, {});
+    assert.deepEqual(getState().gameScores.speedvote, {});
+    assert.deepEqual(getState().gameScores.wronganswer, {});
+  });
+
+  it("repare un jeu deja compte mais absent des resultats", () => {
+    saveStatePatch({
+      stats: { ...defaultEveningStats(), hotTakesPlayed: 1 },
+      gameScores: {},
+      gameScoreOrder: [],
+      eveningGamesRecorded: { hottake: true },
+    });
+
+    recordHotTakePlayed();
+
+    assert.deepEqual(getState().gameScoreOrder, ["hottake"]);
+    assert.deepEqual(getState().gameScores.hottake, {});
+    assert.equal(getState().stats.hotTakesPlayed, 1);
   });
 
   it("resetScores oublie le jeu actif de scoring", () => {

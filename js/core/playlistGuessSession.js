@@ -24,7 +24,9 @@ import { launchGameWithSync, commitHostGamePlay, commitPrepReadyToggle } from ".
 /** Identifiant stable pour les votes (aligné lobby Supabase + invités). */
 export function participantVoteId(participant) {
   if (!participant) return "";
-  return participant.userId || userIdForName(participant.name) || participant.name;
+  const uid = participant.userId || userIdForName(participant.name);
+  if (uid) return uid;
+  return !isGameSyncActive() ? participant.name : "";
 }
 
 function defaultSession() {
@@ -46,7 +48,7 @@ export function getLocalParticipantId() {
   const uid = getSupabaseUserId();
   if (uid) return uid;
   const local = getLobbyParticipants().find((p) => p.isLocal);
-  return participantVoteId(local) || userIdForName(getLocalDisplayName()) || getLocalDisplayName();
+  return participantVoteId(local) || (!isGameSyncActive() ? getLocalDisplayName() : "");
 }
 
 export function lobbyPlayersWithIds() {

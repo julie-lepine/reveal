@@ -18,7 +18,7 @@ import {
   isLobbyHost,
   syncTriviaSession,
   triviaToRemote,
-  userIdForName,
+  requireLocalParticipantUid,
 } from "./gameSync.js";
 import { patchGameStateWithFeedback } from "./patchGameStateFeedback.js";
 import { launchGameWithSync, commitHostGamePlay, commitPrepReadyToggle } from "./mpLaunch.js";
@@ -292,7 +292,7 @@ export async function commitTriviaAnswer(answerIndex) {
   };
   saveStatePatch({ triviaGame: { ...session, answers: nextAnswers } });
   if (!isGameSyncActive()) return nextAnswer;
-  const uid = userIdForName(localName) || localName;
+  const uid = requireLocalParticipantUid();
   await patchGameStateWithFeedback({
     trivia: {
       answers: {

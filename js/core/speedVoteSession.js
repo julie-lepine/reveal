@@ -21,7 +21,7 @@ import {
   allMembersReady,
   speedVoteToRemote,
   patchGameState,
-  userIdForName,
+  requireLocalParticipantUid,
   normalizePlayerVotesMap,
 } from "./gameSync.js";
 import { patchGameStateWithFeedback } from "./patchGameStateFeedback.js";
@@ -243,7 +243,7 @@ export async function commitSpeedVoteVote(choice) {
   const votes = { ...(session.votes || {}), [localName]: choice };
   saveStatePatch({ speedVoteGame: { ...session, votes } });
   if (!isGameSyncActive()) return choice;
-  const uid = userIdForName(localName) || localName;
+  const uid = requireLocalParticipantUid();
   await patchGameStateWithFeedback({ speedVote: { votes: { [uid]: choice } } });
   return choice;
 }

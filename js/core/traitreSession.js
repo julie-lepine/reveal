@@ -20,6 +20,8 @@ import {
   isGameSyncActive,
   isLobbyHost,
   nameForUserId,
+  requireLocalParticipantUid,
+  requirePlayerUid,
   syncTraitreSession,
   traitreToRemote,
 } from "./gameSync.js";
@@ -260,8 +262,7 @@ export async function commitTraitreDealAck() {
   const dealAcks = { ...(session.dealAcks || {}), [localName]: true };
   saveStatePatch({ traitreGame: { ...session, dealAcks } });
   if (!isGameSyncActive()) return dealAcks;
-  const { userIdForName } = await import("./gameSync.js");
-  const uid = userIdForName(localName) || localName;
+  const uid = requireLocalParticipantUid();
   await patchGameStateWithFeedback({ traitre: { dealAcks: { [uid]: true } } });
   return dealAcks;
 }
@@ -275,9 +276,8 @@ export async function commitTraitreVote(targetName) {
   const votes = { ...(session.votes || {}), [localName]: targetName };
   saveStatePatch({ traitreGame: { ...session, votes } });
   if (!isGameSyncActive()) return targetName;
-  const { userIdForName } = await import("./gameSync.js");
-  const uid = userIdForName(localName) || localName;
-  const targetUid = userIdForName(targetName) || targetName;
+  const uid = requireLocalParticipantUid();
+  const targetUid = requirePlayerUid(targetName);
   await patchGameStateWithFeedback({ traitre: { votes: { [uid]: targetUid } } });
   return targetName;
 }

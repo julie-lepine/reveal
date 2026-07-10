@@ -678,13 +678,16 @@ export function getCurrentSessionScoreMap(gameId = getActiveScoringGame()) {
 function creditGameScore(playerName, points) {
   const gid = getActiveScoringGame();
   if (!gid) return;
-  if (!state.gameScores[gid]) {
-    state.gameScores[gid] = {};
-    if (!state.gameScoreOrder.includes(gid)) {
-      state.gameScoreOrder = [...state.gameScoreOrder, gid];
-    }
-  }
+  ensureGameScoreEntry(gid);
   state.gameScores[gid][playerName] = (state.gameScores[gid][playerName] || 0) + points;
+}
+
+function ensureGameScoreEntry(gameId) {
+  if (!gameId) return;
+  if (!state.gameScores[gameId]) state.gameScores[gameId] = {};
+  if (!state.gameScoreOrder.includes(gameId)) {
+    state.gameScoreOrder = [...state.gameScoreOrder, gameId];
+  }
 }
 
 export function addScore(playerName, points) {
@@ -730,6 +733,7 @@ export function mergeLastGameRecord(local, remote) {
 export function recordEveningGameOnce(gameId, apply) {
   if (!gameId || typeof apply !== "function") return false;
   if (!state.eveningGamesRecorded) state.eveningGamesRecorded = {};
+  ensureGameScoreEntry(gameId);
   if (state.eveningGamesRecorded[gameId]) return false;
   state.eveningGamesRecorded[gameId] = true;
   apply();

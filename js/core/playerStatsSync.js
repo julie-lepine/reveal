@@ -21,7 +21,8 @@ export function playerStatsToRemote(playerStatsByName = {}, nameToUid = (name) =
   const out = {};
   Object.entries(playerStatsByName).forEach(([name, stats]) => {
     if (!stats || typeof stats !== "object") return;
-    const uid = nameToUid(name) || name;
+    const uid = nameToUid(name);
+    if (!uid) return;
     const remoteStats = {};
     Object.entries(stats).forEach(([key, val]) => {
       if (typeof val === "number" && Number.isFinite(val)) remoteStats[key] = val;

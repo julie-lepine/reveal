@@ -61,13 +61,13 @@ export function normalizeFilRougeWord(word) {
 
 function participantUids() {
   return getLobbyParticipants()
-    .map((p) => p.userId || userIdForName(p.name) || p.name)
+    .map((p) => p.userId || userIdForName(p.name))
     .filter(Boolean);
 }
 
 function participantByUid(uid) {
   return getLobbyParticipants().find(
-    (p) => (p.userId || userIdForName(p.name) || p.name) === uid
+    (p) => (p.userId || userIdForName(p.name)) === uid
   );
 }
 
@@ -335,7 +335,8 @@ export function buildFilRougeResultsSnapshot() {
   const pending = [];
 
   participants.forEach((p) => {
-    const uid = p.userId || userIdForName(p.name) || p.name;
+    const uid = p.userId || userIdForName(p.name);
+    if (!uid) return;
     const v = validations[uid];
     const entry = { name: p.name, uid, emoji: p.emoji, color: p.color };
     if (v?.status === FIL_ROUGE_VALIDATION.VALIDATED) validated.push(entry);

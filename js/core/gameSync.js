@@ -605,7 +605,9 @@ function notify(row) {
 
 export function userIdForName(name) {
   const p = getState().lobby?.participants?.find((x) => x.name === name);
-  return p?.userId || null;
+  if (p?.userId) return p.userId;
+  if (name && name === getLocalDisplayName()) return getSupabaseUserId();
+  return null;
 }
 
 export function getLocalParticipantUid() {
@@ -618,6 +620,12 @@ export function requireLocalParticipantUid() {
   const uid = getLocalParticipantUid();
   if (uid) return uid;
   throw new Error("Synchronisation du joueur en cours. Réessaie dans un instant.");
+}
+
+export function requirePlayerUid(name) {
+  const uid = userIdForName(name);
+  if (uid) return uid;
+  throw new Error("Synchronisation des joueurs en cours. Réessaie dans un instant.");
 }
 
 export function nameForUserId(uid) {
@@ -658,7 +666,8 @@ function mapReadyByName(readyByUid = {}) {
 function mapReadyByUid(readyByName = {}) {
   const out = {};
   Object.entries(readyByName).forEach(([name, val]) => {
-    const uid = userIdForName(name) || name;
+    const uid = playerKeyToRemoteUid(name);
+    if (!uid) return;
     out[uid] = Boolean(val);
   });
   return out;
@@ -671,8 +680,43 @@ function mapVotesByName(votesByUid = {}) {
 function mapVotesByUid(votesByName = {}) {
   const out = {};
   Object.entries(votesByName).forEach(([name, val]) => {
-    const uid = userIdForName(name) || name;
+    const uid = playerKeyToRemoteUid(name);
+    if (!uid) return;
     if (val != null) out[uid] = val;
+  });
+  return out;
+}
+
+function playerKeyToRemoteUid(key) {
+  if (key == null || key === "") return null;
+  const raw = String(key);
+  if (getState().lobby?.participants?.some((p) => p.userId === raw)) return raw;
+  if (getSupabaseUserId() === raw) return raw;
+  return userIdForName(raw);
+}
+
+function playerNamesToUids(names = []) {
+  return (names || []).map((name) => playerKeyToRemoteUid(name)).filter(Boolean);
+}
+
+function mapTargetVotesByUid(votesByName = {}) {
+  const out = {};
+  Object.entries(votesByName || {}).forEach(([voter, target]) => {
+    if (target == null) return;
+    const voterUid = playerKeyToRemoteUid(voter);
+    const targetUid = playerKeyToRemoteUid(target);
+    if (voterUid && targetUid) out[voterUid] = targetUid;
+  });
+  return out;
+}
+
+function mapValuesByUid(valuesByName = {}, normalizeValue = (val) => val) {
+  const out = {};
+  Object.entries(valuesByName || {}).forEach(([name, val]) => {
+    const uid = playerKeyToRemoteUid(name);
+    if (!uid) return;
+    const normalized = normalizeValue(val, name);
+    if (normalized != null) out[uid] = normalized;
   });
   return out;
 }
@@ -699,7 +743,8 @@ function mapTriviaAnswersByName(answersByUid = {}) {
 function mapTriviaAnswersByUid(answersByName = {}) {
   const out = {};
   Object.entries(answersByName).forEach(([name, val]) => {
-    const uid = userIdForName(name) || name;
+    const uid = playerKeyToRemoteUid(name);
+    if (!uid) return;
     if (val && Number.isInteger(val.answerIndex)) {
       out[uid] = {
         answerIndex: val.answerIndex,
@@ -735,7 +780,8 @@ function mapConsensusAnswersByName(answersByUid = {}) {
 function mapConsensusAnswersByUid(answersByName = {}) {
   const out = {};
   Object.entries(answersByName).forEach(([name, val]) => {
-    const uid = userIdForName(name) || name;
+    const uid = playerKeyToRemoteUid(name);
+    if (!uid) return;
     if (val && Number.isFinite(val.value)) {
       out[uid] = {
         value: val.value,
@@ -761,7 +807,8 @@ function mapSubmissionsByName(subsByUid = {}) {
 function mapSubmissionsByUid(subsByName = {}) {
   const out = {};
   Object.entries(subsByName).forEach(([name, val]) => {
-    const uid = userIdForName(name) || name;
+    const uid = playerKeyToRemoteUid(name);
+    if (!uid) return;
     if (val) out[uid] = val;
   });
   return out;
@@ -779,7 +826,8 @@ function mapPlacementsByName(placementsByUid = {}) {
 function mapPlacementsByUid(placementsByName = {}) {
   const out = {};
   Object.entries(placementsByName).forEach(([name, val]) => {
-    const uid = userIdForName(name) || name;
+    const uid = playerKeyToRemoteUid(name);
+    if (!uid) return;
     if (val) out[uid] = val;
   });
   return out;
@@ -790,7 +838,7 @@ export function hotTakeToRemote(session) {
     customTakes: session.customTakes || [],
     ready: mapReadyByUid(session.ready || {}),
     lobbyStarted: Boolean(session.lobbyStarted),
-    pausedBy: session.pausedBy ? userIdForName(session.pausedBy) || session.pausedBy : null,
+    pausedBy: session.pausedBy ? userIdForName(session.pausedBy) : null,
     selectedThemeId: session.selectedThemeId || "catalog",
     roundCount: session.roundCount ?? 5,
     deck: session.deck || null,
@@ -1578,18 +1626,10 @@ export function consensusToRemote(session) {
       ? {
           ...session.lastRound,
           deltas: scoresToRemote(session.lastRound.deltas || {}),
-          precisionPlayers: (session.lastRound.precisionPlayers || []).map(
-            (name) => userIdForName(name) || name
-          ),
-          closestPlayers: (session.lastRound.closestPlayers || []).map(
-            (name) => userIdForName(name) || name
-          ),
-          intuitionPlayers: (session.lastRound.intuitionPlayers || []).map(
-            (name) => userIdForName(name) || name
-          ),
-          consensusPlayers: (session.lastRound.consensusPlayers || []).map(
-            (name) => userIdForName(name) || name
-          ),
+          precisionPlayers: playerNamesToUids(session.lastRound.precisionPlayers || []),
+          closestPlayers: playerNamesToUids(session.lastRound.closestPlayers || []),
+          intuitionPlayers: playerNamesToUids(session.lastRound.intuitionPlayers || []),
+          consensusPlayers: playerNamesToUids(session.lastRound.consensusPlayers || []),
         }
       : null,
     podiumApplied: Boolean(session.podiumApplied),
@@ -1662,11 +1702,9 @@ export function triviaToRemote(session) {
     lastRound: session.lastRound
       ? {
           ...session.lastRound,
-          correctPlayers: (session.lastRound.correctPlayers || []).map(
-            (name) => userIdForName(name) || name
-          ),
+          correctPlayers: playerNamesToUids(session.lastRound.correctPlayers || []),
           fastestPlayer: session.lastRound.fastestPlayer
-            ? userIdForName(session.lastRound.fastestPlayer) || session.lastRound.fastestPlayer
+            ? userIdForName(session.lastRound.fastestPlayer)
             : null,
           deltas: scoresToRemote(session.lastRound.deltas || {}),
         }
@@ -1708,10 +1746,6 @@ export function triviaFromRemote(remote) {
 }
 
 export function speedVoteToRemote(session) {
-  const remoteVotes = {};
-  Object.entries(session.votes || {}).forEach(([voter, target]) => {
-    remoteVotes[userIdForName(voter) || voter] = userIdForName(target) || target;
-  });
   return {
     ready: mapReadyByUid(session.ready || {}),
     lobbyStarted: Boolean(session.lobbyStarted),
@@ -1721,7 +1755,7 @@ export function speedVoteToRemote(session) {
     roundIdx: session.roundIdx ?? 0,
     phase: session.phase || null,
     currentQuestion: session.currentQuestion || null,
-    votes: remoteVotes,
+    votes: mapTargetVotesByUid(session.votes || {}),
     voteEndsAt: session.voteEndsAt || null,
     roundScored: Boolean(session.roundScored),
     modifier: session.modifier || "normal",
@@ -1730,10 +1764,6 @@ export function speedVoteToRemote(session) {
 }
 
 export function dilemmaToRemote(session) {
-  const remoteVotes = {};
-  Object.entries(session.votes || {}).forEach(([voter, choice]) => {
-    remoteVotes[userIdForName(voter) || voter] = choice;
-  });
   return {
     customDilemmas: session.customDilemmas || [],
     ready: mapReadyByUid(session.ready || {}),
@@ -1744,22 +1774,18 @@ export function dilemmaToRemote(session) {
     roundIdx: session.roundIdx ?? 0,
     phase: session.phase || null,
     currentDilemma: session.currentDilemma || null,
-    votes: remoteVotes,
+    votes: mapVotesByUid(session.votes || {}),
     voteEndsAt: session.voteEndsAt || null,
     roundScored: Boolean(session.roundScored),
     blindMode: Boolean(session.blindMode),
-    pausedBy: session.pausedBy ? userIdForName(session.pausedBy) || session.pausedBy : null,
+    pausedBy: session.pausedBy ? userIdForName(session.pausedBy) : null,
     matchScores: scoresToRemote(session.matchScores || {}),
     lastRound: session.lastRound
       ? {
           ...session.lastRound,
           deltas: scoresToRemote(session.lastRound.deltas || {}),
-          majorityWinners: (session.lastRound.majorityWinners || []).map(
-            (name) => userIdForName(name) || name
-          ),
-          tieWinners: (session.lastRound.tieWinners || []).map(
-            (name) => userIdForName(name) || name
-          ),
+          majorityWinners: playerNamesToUids(session.lastRound.majorityWinners || []),
+          tieWinners: playerNamesToUids(session.lastRound.tieWinners || []),
         }
       : null,
   };
@@ -1806,17 +1832,15 @@ export function dilemmaFromRemote(remote) {
 function mapFilRougeValidationsToUid(validations = {}) {
   const out = {};
   Object.entries(validations).forEach(([key, val]) => {
-    const uid = userIdForName(key) || key;
+    const uid = playerKeyToRemoteUid(key);
+    if (!uid) return;
     out[uid] = val;
   });
   return out;
 }
 
 export function filRougeToRemote(session) {
-  const submissions = {};
-  Object.entries(session.submissions || {}).forEach(([k, v]) => {
-    submissions[userIdForName(k) || k] = v;
-  });
+  const submissions = mapValuesByUid(session.submissions || {});
   return {
     status: session.status || "idle",
     submissions,
@@ -1825,7 +1849,7 @@ export function filRougeToRemote(session) {
     resultsSnapshot: session.resultsSnapshot || null,
     closedAt: session.closedAt || null,
     closedByUid: session.closedByUid
-      ? userIdForName(session.closedByUid) || session.closedByUid
+      ? playerKeyToRemoteUid(session.closedByUid)
       : null,
   };
 }
@@ -1946,7 +1970,9 @@ export function clutchToRemote(session) {
   const remoteTaps = {};
   Object.entries(session.taps || {}).forEach(([name, val]) => {
     if (!val) return;
-    remoteTaps[userIdForName(name) || name] = {
+    const uid = playerKeyToRemoteUid(name);
+    if (!uid) return;
+    remoteTaps[uid] = {
       ms: typeof val.ms === "number" ? val.ms : null,
       at: typeof val.at === "number" ? val.at : null,
     };
@@ -1967,12 +1993,18 @@ export function clutchToRemote(session) {
     lastRound: session.lastRound
       ? {
           targetMs: session.lastRound.targetMs ?? null,
-          ranking: (session.lastRound.ranking || []).map((r) => ({
-            uid: userIdForName(r.name) || r.name,
-            ms: r.ms ?? null,
-            gap: Number.isFinite(r.gap) ? r.gap : null,
-            tapped: Boolean(r.tapped),
-          })),
+          ranking: (session.lastRound.ranking || [])
+            .map((r) => {
+              const uid = playerKeyToRemoteUid(r.name);
+              if (!uid) return null;
+              return {
+                uid,
+                ms: r.ms ?? null,
+                gap: Number.isFinite(r.gap) ? r.gap : null,
+                tapped: Boolean(r.tapped),
+              };
+            })
+            .filter(Boolean),
           deltas: scoresToRemote(session.lastRound.deltas || {}),
         }
       : null,
@@ -2022,15 +2054,12 @@ export function wrongAnswerToRemote(session) {
   const remoteAnswers = {};
   Object.entries(session.answers || {}).forEach(([name, val]) => {
     if (!val) return;
-    remoteAnswers[userIdForName(name) || name] = {
+    const uid = playerKeyToRemoteUid(name);
+    if (!uid) return;
+    remoteAnswers[uid] = {
       text: typeof val.text === "string" ? val.text : "",
       at: typeof val.at === "number" ? val.at : null,
     };
-  });
-  const remoteVotes = {};
-  Object.entries(session.votes || {}).forEach(([voter, target]) => {
-    if (target == null) return;
-    remoteVotes[userIdForName(voter) || voter] = userIdForName(target) || target;
   });
   return {
     ready: mapReadyByUid(session.ready || {}),
@@ -2042,7 +2071,7 @@ export function wrongAnswerToRemote(session) {
     currentPrompt: session.currentPrompt || null,
     roundStartAt: session.roundStartAt || null,
     answers: remoteAnswers,
-    votes: remoteVotes,
+    votes: mapTargetVotesByUid(session.votes || {}),
     roundScored: Boolean(session.roundScored),
     matchScores: scoresToRemote(session.matchScores || {}),
     lastRound: session.lastRound
@@ -2106,14 +2135,8 @@ function sanitizeTraitreMergeInc(curTr, incTr) {
 }
 
 export function traitreToRemote(session) {
-  const remoteVotes = {};
-  Object.entries(session.votes || {}).forEach(([voter, target]) => {
-    remoteVotes[userIdForName(voter) || voter] = userIdForName(target) || target;
-  });
-  const dealAcks = {};
-  Object.entries(session.dealAcks || {}).forEach(([name, val]) => {
-    if (val) dealAcks[userIdForName(name) || name] = true;
-  });
+  const remoteVotes = mapTargetVotesByUid(session.votes || {});
+  const dealAcks = mapValuesByUid(session.dealAcks || {}, (val) => (val ? true : null));
   const revealed = Boolean(session.impostorRevealed);
   const remote = {
     ready: mapReadyByUid(session.ready || {}),
@@ -2131,12 +2154,7 @@ export function traitreToRemote(session) {
     voteSurvivals: session.voteSurvivals ?? 0,
     dealAcks,
     lastVoteSnapshot: session.lastVoteSnapshot
-      ? Object.fromEntries(
-          Object.entries(session.lastVoteSnapshot).map(([voter, target]) => [
-            userIdForName(voter) || voter,
-            userIdForName(target) || target,
-          ])
-        )
+      ? mapTargetVotesByUid(session.lastVoteSnapshot)
       : null,
     lastEliminated: session.lastEliminated || null,
     intuitionAwards: { ...(session.intuitionAwards || {}) },
@@ -2147,7 +2165,7 @@ export function traitreToRemote(session) {
   };
   if (revealed && session.impostorName) {
     remote.impostorName = session.impostorName;
-    remote.impostorUid = userIdForName(session.impostorName) || session.impostorName;
+    remote.impostorUid = playerKeyToRemoteUid(session.impostorName);
   }
   return remote;
 }
@@ -2404,10 +2422,6 @@ export function applyTierNightRecapFromRemote(recap) {
 /* ----- Tier Night « En direct » (mode live temps réel) ----- */
 
 export function tierNightLiveToRemote(session) {
-  const remoteVotes = {};
-  Object.entries(session.votes || {}).forEach(([voter, tier]) => {
-    remoteVotes[userIdForName(voter) || voter] = tier;
-  });
   return {
     lobbyStarted: Boolean(session.lobbyStarted),
     topicId: session.topicId || null,
@@ -2415,7 +2429,7 @@ export function tierNightLiveToRemote(session) {
     deck: session.deck || null,
     roundIdx: session.roundIdx ?? 0,
     phase: session.phase || null,
-    votes: remoteVotes,
+    votes: mapVotesByUid(session.votes || {}),
     finished: Boolean(session.finished),
   };
 }
@@ -2463,7 +2477,8 @@ function mergeTierNightLiveGameLocal(local, remote) {
 export function scoresToRemote(scoresByName = {}) {
   const out = {};
   Object.entries(scoresByName).forEach(([name, val]) => {
-    const uid = userIdForName(name) || name;
+    const uid = playerKeyToRemoteUid(name);
+    if (!uid) return;
     if (typeof val === "number" && Number.isFinite(val)) out[uid] = val;
   });
   return out;
@@ -2568,7 +2583,7 @@ function eveningStateToRemote() {
   } = getState();
   const remote = {
     scores: scoresToRemote(getState().scores),
-    playerStats: playerStatsToRemote(getState().playerStats || {}, (name) => userIdForName(name) || name),
+    playerStats: playerStatsToRemote(getState().playerStats || {}, (name) => playerKeyToRemoteUid(name)),
     gameScores: gameScoresToRemote(getState().gameScores || {}),
     gameScoreOrder: [...(getState().gameScoreOrder || [])],
     gameScoreSessionBaseline: scoresToRemote(gameScoreSessionBaseline || {}),
@@ -4211,7 +4226,7 @@ export async function commitGuessLieSubmission(playerName, payload) {
   gl.submissions = { ...(gl.submissions || {}), [playerName]: payload };
   saveStatePatch({ guessLie: gl });
   if (!isGameSyncActive()) return gl;
-  const uid = userIdForName(playerName) || playerName;
+  const uid = requirePlayerUid(playerName);
   const { patchGameStateWithFeedback } = await import("./patchGameStateFeedback.js");
   await patchGameStateWithFeedback(
     { guessLie: { submissions: { [uid]: payload } } },

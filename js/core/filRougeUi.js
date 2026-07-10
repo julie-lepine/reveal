@@ -63,7 +63,7 @@ export function filRougeBannerHtml() {
 }
 
 function playerStatusLine(p, validations) {
-  const uid = p.userId || userIdForName(p.name) || p.name;
+  const uid = p.userId || userIdForName(p.name);
   const v = validations[uid];
   if (v?.status === FIL_ROUGE_VALIDATION.VALIDATED) {
     return `<span class="fil-rouge-box__player fil-rouge-box__player--done">${escapeHtml(p.name)} ✓</span>`;

@@ -10,6 +10,10 @@ function userIdForDisplayName(name) {
   return p?.userId || null;
 }
 
+function localPrivateKeyForName(name) {
+  return userIdForDisplayName(name) || name;
+}
+
 function isLocalLobbyHost() {
   return Boolean(getState().lobby?.participants?.some((p) => p.isLocal && p.isHost));
 }
@@ -83,7 +87,7 @@ export async function hostDistributeTraitreRoles(pairId, impostorName, playerNam
   if (!isSupabaseConfigured()) {
     const bundle = {};
     names.forEach((name) => {
-      const uid = userIdForDisplayName(name) || name;
+      const uid = localPrivateKeyForName(name);
       bundle[uid] = { pair_id: pairId, is_impostor: name === impostorName };
     });
     writeLocalBundle(lobbyId, bundle);
