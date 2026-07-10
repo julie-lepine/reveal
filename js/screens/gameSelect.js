@@ -31,7 +31,9 @@ import {
   bindGameResumeBanner,
   gameResumeBannerHtml,
   getResumableSessionScreen,
+  rejoinGameResumeTarget,
   shouldShowGameSelectResumeBanner,
+  stayOnGameResumeTarget,
 } from "../core/gameResume.js";
 import {
   launchTraitrePrep,
@@ -246,6 +248,21 @@ export function mountGameSelect(app) {
 
   function onGameSelectClick(e) {
     if (getCurrentScreen() !== "game-select") return;
+
+    if (e.target.closest("#game-resume-banner-join")) {
+      e.preventDefault();
+      const resumeScreen = getResumableSessionScreen(getCachedGameSession());
+      if (shouldShowGameSelectResumeBanner(resumeScreen)) {
+        void rejoinGameResumeTarget(resumeScreen);
+      }
+      return;
+    }
+
+    if (e.target.closest("#game-resume-banner-stay")) {
+      e.preventDefault();
+      stayOnGameResumeTarget();
+      return;
+    }
 
     const restartEl = e.target.closest("[data-restart-game]");
     if (restartEl) {

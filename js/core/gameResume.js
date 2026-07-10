@@ -92,6 +92,17 @@ export function gameResumeBannerHtml(screen) {
     </div>`;
 }
 
+export async function rejoinGameResumeTarget(targetScreen) {
+  clearSessionRouteSuppress();
+  if (await routeToActiveGameIfNeeded(null, { force: true })) return true;
+  if (!targetScreen) return false;
+  return routeToSessionScreen(targetScreen, { force: true });
+}
+
+export function stayOnGameResumeTarget() {
+  suppressRoutingForScoreView();
+}
+
 /**
  * Ecran plein page (lobby par erreur) : reprise auto vers prep / partie.
  * @returns {() => void} cleanup
@@ -115,9 +126,7 @@ export function mountGameResumeInterstitial(app, targetScreen, { allowStay = fal
     if (disposed) return;
     cleanup();
     if (!isGameSyncActive()) return;
-    clearSessionRouteSuppress();
-    if (await routeToActiveGameIfNeeded(null, { force: true })) return;
-    routeToSessionScreen(targetScreen, { force: true });
+    await rejoinGameResumeTarget(targetScreen);
   };
 
   const paint = () => {
@@ -136,9 +145,7 @@ export function mountGameResumeInterstitial(app, targetScreen, { allowStay = fal
     });
     app.querySelector("#game-resume-stay")?.addEventListener("click", () => {
       cleanup();
-      if (isSessionInProgressPlay(targetScreen)) {
-        suppressRoutingForScoreView();
-      }
+      if (isSessionInProgressPlay(targetScreen)) stayOnGameResumeTarget();
     });
   };
 
@@ -168,13 +175,11 @@ export function bindGameResumeBanner(app, targetScreen) {
   if (!targetScreen || !isSessionInProgressPlay(targetScreen)) return () => {};
 
   const rejoin = async () => {
-    clearSessionRouteSuppress();
-    if (await routeToActiveGameIfNeeded(null, { force: true })) return;
-    routeToSessionScreen(targetScreen, { force: true });
+    await rejoinGameResumeTarget(targetScreen);
   };
 
   const onJoin = () => void rejoin();
-  const onStay = () => suppressRoutingForScoreView();
+  const onStay = () => stayOnGameResumeTarget();
 
   app.querySelector("#game-resume-banner-join")?.addEventListener("click", onJoin);
   app.querySelector("#game-resume-banner-stay")?.addEventListener("click", onStay);
