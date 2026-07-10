@@ -33,7 +33,7 @@ export function goToScores(target) {
     navigate("home", { reset: true });
     return false;
   }
-  navigate(target, { navStack: SCORES_NAV_STACK[target] });
   suppressRoutingForScoreView();
+  navigate(target, { navStack: SCORES_NAV_STACK[target] });
   return true;
 }

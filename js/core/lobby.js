@@ -603,6 +603,7 @@ export async function routeToEveningHub({ rejoinActiveGame = true } = {}) {
       goToLobby();
       return true;
     }
+    if (isOnPostGameScreen(getCurrentScreen())) return true;
     navigate("game-select", { navStack: ["home", "lobby", "game-select"] });
     return true;
   }
@@ -612,6 +613,7 @@ export async function routeToEveningHub({ rejoinActiveGame = true } = {}) {
     return true;
   }
 
+  if (isOnPostGameScreen(getCurrentScreen())) return true;
   navigate("game-select", { navStack: ["home", "lobby", "game-select"] });
   return true;
 }
