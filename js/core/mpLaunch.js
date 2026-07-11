@@ -27,6 +27,9 @@ import {
 import { pickRemotePlayFields } from "./playPatch.js";
 import { showAppAlert } from "./dialog.js";
 import { getCurrentScreen, navigate } from "./router.js";
+import { computePrepReadyToggle } from "./prepReadyMaps.js";
+
+export { computePrepReadyToggle } from "./prepReadyMaps.js";
 
 export { DEFAULT_SYNC_PATCH_TIMEOUT_MS as SYNC_PATCH_TIMEOUT_MS };
 
@@ -266,11 +269,37 @@ export async function commitPrepReadyToggle({
   readyField = "ready",
 }) {
   const session = getSession();
-  const nextReady = { ...(session[readyField] || {}), [readyKey]: ready };
+  const { previousReady, nextReady } = computePrepReadyToggle(
+    session,
+    readyField,
+    readyKey,
+    ready
+  );
   saveLocal({ ...session, [readyField]: nextReady });
   if (!isGameSyncActive()) return nextReady;
   if (!getCachedGameSession() && !isLobbyHost()) return nextReady;
-  const uid = requireLocalParticipantUid();
-  await patchGameState({ [stateKey]: { ready: { [uid]: ready } } }, { gameId, screen });
-  return nextReady;
+
+  let uid;
+  try {
+    uid = requireLocalParticipantUid();
+  } catch (err) {
+    saveLocal({ ...session, [readyField]: previousReady });
+    await showAppAlert(
+      err?.message || "Synchronisation du joueur en cours. Réessaie dans un instant.",
+      { title: "Connexion", icon: "📡" }
+    );
+    return previousReady;
+  }
+
+  try {
+    const { patchGameStateWithFeedback } = await import("./patchGameStateFeedback.js");
+    await patchGameStateWithFeedback(
+      { [stateKey]: { ready: { [uid]: ready } } },
+      { gameId, screen }
+    );
+    return nextReady;
+  } catch {
+    saveLocal({ ...session, [readyField]: previousReady });
+    return previousReady;
+  }
 }
