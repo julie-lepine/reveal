@@ -894,42 +894,41 @@ export function applyGuessLieLobbyCompleteLocal() {
   flushSave();
 }
 
-/** Sync MP en arrière-plan (lobby playing + patch game_sessions). */
-export function syncGuessLieLobbyCompleteRemote() {
-  void (async () => {
-    const { isGameSyncActive, isLobbyHost, guessLieLobbyStartToRemote } = await import(
-      "./gameSync.js"
-    );
-    if (!isGameSyncActive() || !isLobbyHost()) return;
+/** Sync MP attendable (lobby playing + patch game_sessions). */
+export async function syncGuessLieLobbyCompleteRemote() {
+  const { isGameSyncActive, isLobbyHost, guessLieLobbyStartToRemote } = await import(
+    "./gameSync.js"
+  );
+  if (!isGameSyncActive() || !isLobbyHost()) return { ok: true, skipped: true };
 
-    const { commitMultiplayerLaunch } = await import("./mpLaunch.js");
-    const { setLobbyPlaying } = await import("./lobby.js");
-    const remotePayload = { guessLie: guessLieLobbyStartToRemote() };
+  const { commitMultiplayerLaunch } = await import("./mpLaunch.js");
+  const { setLobbyPlaying } = await import("./lobby.js");
+  const remotePayload = { guessLie: guessLieLobbyStartToRemote() };
 
-    try {
-      await setLobbyPlaying("guesslie");
-      await commitMultiplayerLaunch({
-        screen: "guesslie",
-        gameId: "guesslie",
-        state: remotePayload,
-        mode: "patch",
-      });
-    } catch (err) {
-      console.warn("Guess The Lie sync:", err);
-      void commitMultiplayerLaunch({
-        screen: "guesslie",
-        gameId: "guesslie",
-        state: remotePayload,
-        mode: "patch",
-      }).catch(() => {});
-    }
-  })();
+  try {
+    await setLobbyPlaying("guesslie");
+    await commitMultiplayerLaunch({
+      screen: "guesslie",
+      gameId: "guesslie",
+      state: remotePayload,
+      mode: "patch",
+    });
+    return { ok: true };
+  } catch (err) {
+    console.warn("Guess The Lie sync:", err);
+    void commitMultiplayerLaunch({
+      screen: "guesslie",
+      gameId: "guesslie",
+      state: remotePayload,
+      mode: "patch",
+    }).catch(() => {});
+    return { ok: false, usedFallback: true, error: err };
+  }
 }
 
 export async function markGuessLieLobbyComplete() {
   applyGuessLieLobbyCompleteLocal();
-  syncGuessLieLobbyCompleteRemote();
-  return { ok: true };
+  return syncGuessLieLobbyCompleteRemote();
 }
 
 export function resetGuessLieSession() {

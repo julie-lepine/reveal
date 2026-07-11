@@ -250,7 +250,7 @@ Clôture QA :
 
 | ID | Problème | Fichier / fonction | Scénario | Impact | Correction proposée |
 |----|----------|-------------------|----------|--------|---------------------|
-| **I-07** / **S-05** / **SYN-08** | Guess The Lie fire-and-forget | `guessLieSession.js`, `state.js` — `syncGuessLieLobbyCompleteRemote()` | Patch échoue au launch | Hôte en jeu, invités sur wait | Migrer vers `launchGameWithSync` |
+| **I-07** / **S-05** / **SYN-08** | Guess The Lie fire-and-forget | `guessLieSession.js`, `state.js` — `syncGuessLieLobbyCompleteRemote()` | Patch échoue au launch | Hôte en jeu, invités sur wait | 🟡 Corrigé + tests ; QA à faire : lancement via `launchGameWithSync`, sync legacy attendable |
 | **M-09** / **T-04** / **SYN-11** | `commitPrepReadyToggle` sans try/catch | `mpLaunch.js` | Timeout patch ready | Rejection silencieuse | try/catch + rollback + toast |
 | **M-10** / **SYN-10** | `syncPrepOnMount` sans catch | `prepScreen.js`, `dilemmaPrep.js`, `leaderboard.js` | Réseau down au mount | UI stale | `.catch()` + feedback |
 | **M-11** / **SYN-17** | `restartGame` reset local avant remote | `restartGame.js` | `startGameSession` throw | Hôte prep vide, remote ancien | Remote d’abord ou rollback |
@@ -301,7 +301,7 @@ Clôture QA :
 | **ARCH-15** | `__writeTimes` diagnostic temporaire | `gameSync.js` | Prod | Bruit / confusion | Retirer ou flag dev |
 | **SYN-27** / **ARCH-16** | `JSON.stringify` hot paths | `gameSync.js` — `applyRemoteSession()` | Poll fréquent | CPU mobile | Compare shallow / hash champs play |
 | **ARCH-17** | Boilerplate prep screens | `*-prep.js` | Nouveau prep | Oublier guest follow | Composant prep base |
-| **I-07** | Guess Lie hors pattern unifié | (voir cause 7) | idem | idem | idem |
+| **I-07** | Guess Lie hors pattern unifié | (voir cause 7) | idem | idem | ✅ Corrigé via Cause 7 ; QA à faire |
 
 **Symptômes utilisateur :** indirect — maintenance, régressions cross-jeux, perf mobile.
 
@@ -376,7 +376,7 @@ La matrice ci-dessous liste les points encore ouverts ou résiduels. Les éléme
 | 4 Hôte/invité | — | I-01, I-02, I-08 | M-03b | L-01 |
 | 5 Routing/timing | — | T-02 | T-01, T-03, M-07, M-08 | SYN-28 |
 | 6 Async écrans | — | I-05 | SYN-13b, SYN-25 | SYN-05, M-08 |
-| 7 Erreurs silencieuses | — | I-07, M-09, M-11 | M-10, T-05, M-14b | SYN-26 |
+| 7 Erreurs silencieuses | — | M-09, M-11 | M-10, T-05, M-14b | SYN-26 |
 | 8 Reset incomplet | — | I-09, I-06 | SYN-15, SYN-16 | ARCH-09, ARCH-10 |
 | 9 Monolithe/dup | — | — | SYN-12, SYN-22–24 | ARCH-11–17, SYN-21, SYN-27 |
 | 10 Dette | — | — | — | ARCH-18–20, SYN-19 |
@@ -389,7 +389,7 @@ La matrice ci-dessous liste les points encore ouverts ou résiduels. Les éléme
 | # | ID(s) | Cause | Pourquoi |
 |---|-------|-------|----------|
 | 1 | I-02, S-01 | 4 | Erreur immédiate en prep invité |
-| 2 | I-07, S-05 | 7 | Seul jeu avec launch non fiable |
+| 2 | M-09, M-11 | 7 | Erreurs réseau restantes sur ready / restart |
 | 3 | I-05, SYN-13b, SYN-25 | 6 | Bugs intermittents navigation |
 | 4 | I-06, P-01 | 8 | UX lobby invité dégradée |
 | 5 | I-01 | 4 | Fin partie acting host fragile |

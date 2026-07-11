@@ -5,10 +5,14 @@ import {
   getLocalDisplayName,
   getState,
   saveStatePatch,
-  syncGuessLieLobbyCompleteRemote,
 } from "./state.js";
-import { isGameSyncActive, requireLocalParticipantUid } from "./gameSync.js";
-import { runLaunchButton } from "./mpLaunch.js";
+import {
+  guessLieLobbyStartToRemote,
+  isGameSyncActive,
+  isLobbyHost,
+  requireLocalParticipantUid,
+} from "./gameSync.js";
+import { launchGameWithSync, runLaunchButton } from "./mpLaunch.js";
 import { getCurrentScreen, navigate } from "./router.js";
 
 export function getGuessLieSession() {
@@ -149,9 +153,27 @@ export async function commitGuessLieVote(pick) {
 /** Lancement depuis le salon d'attente ou le menu (solo + MP). */
 export async function handleGuessLieLaunch(btn) {
   return runLaunchButton(btn, async () => {
+    if (isGameSyncActive()) {
+      if (!isLobbyHost()) return { ok: false, skipped: true, notHost: true };
+      return launchGameWithSync({
+        screen: "guesslie",
+        gameId: "guesslie",
+        mode: "patch",
+        localFirst: true,
+        beforeCommit: async () => {
+          const { setLobbyPlaying } = await import("./lobby.js");
+          await setLobbyPlaying("guesslie");
+        },
+        applyLocal: applyGuessLieLobbyCompleteLocal,
+        onLocalApplied: tryEnterGuessLiePlayFromWait,
+        getRemoteState: () => ({ guessLie: guessLieLobbyStartToRemote() }),
+        fallbackMessage:
+          "La sync est lente - Guess The Lie démarre chez toi. Les autres peuvent avoir un léger retard.",
+      });
+    }
     applyGuessLieLobbyCompleteLocal();
     tryEnterGuessLiePlayFromWait();
-    syncGuessLieLobbyCompleteRemote();
+    return { ok: true };
   });
 }
 
