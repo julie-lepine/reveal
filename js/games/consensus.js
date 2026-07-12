@@ -644,11 +644,16 @@ export function mountConsensus(app) {
     const live = consensus.getSession();
     if (live.podiumApplied) {
       if (mp && canActAsHost()) {
-        await completeGameSession({
-          gameId: "consensus",
-          screen: "consensus",
-          state: { consensus: consensusToRemote(live) },
-        });
+        try {
+          await completeGameSession({
+            gameId: "consensus",
+            screen: "results",
+            state: { consensus: consensusToRemote(live) },
+          });
+        } catch (e) {
+          console.warn("REVEAL completeGameSession:", e);
+          navigate("results", { navStack: ["home", "lobby", "game-select", "results"] });
+        }
       }
       return;
     }
@@ -686,11 +691,16 @@ export function mountConsensus(app) {
     clearRevealPending();
 
     if (mp && canActAsHost()) {
-      await completeGameSession({
-        gameId: "consensus",
-        screen: "consensus",
-        state: { consensus: consensusToRemote(finalSession) },
-      });
+      try {
+        await completeGameSession({
+          gameId: "consensus",
+          screen: "results",
+          state: { consensus: consensusToRemote(finalSession) },
+        });
+      } catch (e) {
+        console.warn("REVEAL completeGameSession:", e);
+        navigate("results", { navStack: ["home", "lobby", "game-select", "results"] });
+      }
       return;
     }
 

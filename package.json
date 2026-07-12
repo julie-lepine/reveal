@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --test tests/sessionMerge.test.js tests/deckCodec.test.js tests/consensusSession.test.js tests/mpLaunch.test.js tests/triviaDeck.test.js tests/prepLaunch.test.js tests/prepReadyToggle.test.js tests/eveningLobby.test.js tests/hostPresence.test.js tests/tierNightLive.test.js tests/traitreSession.test.js tests/tierNightScoring.test.js tests/tierNightConsensus.test.js tests/badges.test.js tests/voteConfirm.test.js tests/playerStatsSync.test.js tests/recoveryMembership.test.js tests/syncErrorMessage.test.js tests/restartGameRollback.test.js",
+    "test": "node --test tests/sessionMerge.test.js tests/deckCodec.test.js tests/consensusSession.test.js tests/consensusPostGame.test.js tests/mpLaunch.test.js tests/triviaDeck.test.js tests/prepLaunch.test.js tests/prepReadyToggle.test.js tests/eveningLobby.test.js tests/hostPresence.test.js tests/tierNightLive.test.js tests/traitreSession.test.js tests/tierNightScoring.test.js tests/tierNightConsensus.test.js tests/badges.test.js tests/voteConfirm.test.js tests/playerStatsSync.test.js tests/recoveryMembership.test.js tests/syncErrorMessage.test.js tests/restartGameRollback.test.js",
     "assets:prepare": "powershell -ExecutionPolicy Bypass -File scripts/prepareStoreAssets.ps1",
     "assets:native": "npx @capacitor/assets generate --assetPath resources --splashBackgroundColor \"#0A0F1C\" --splashBackgroundColorDark \"#0A0F1C\" --iconBackgroundColor \"#0A0F1C\" --logoSplashScale 0.62",
     "assets:sync": "npm run assets:native && npm run cap:sync",
