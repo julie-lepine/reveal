@@ -1,6 +1,7 @@
 import { GAMES } from "../../data/games.js";
 import { getLastGame, getState, saveStatePatch } from "./state.js";
 import { clearTraitrePrivateForLobby } from "./traitrePrivate.js";
+import { snapshotStatePatch } from "./restartGameRollback.js";
 import {
   isGameSyncActive,
   isLobbyHost,
@@ -28,7 +29,6 @@ import { defaultClutchPrepSession } from "./clutchSession.js";
 import { defaultWrongAnswerPrepSession } from "./wrongAnswerSession.js";
 import { PLAYLIST_GUESS_MIN_PLAYERS } from "../../data/playlistGuess.js";
 import { defaultPlaylistGuessPrepSession } from "./playlistGuessSession.js";
-import { getLobbyParticipants } from "./lobby.js";
 import { defaultTriviaPrepSession } from "./triviaSession.js";
 import { TRUTH_METER_MIN_PLAYERS } from "../../data/truthMeter.js";
 import { defaultTruthMeterPrepSession } from "./truthMeterSession.js";
@@ -69,6 +69,37 @@ async function requireHostToLaunch() {
   return false;
 }
 
+/**
+ * MP : patch local puis startGameSession ; rollback du snapshot en cas d'échec.
+ * Gardes hôte / joueurs doivent être passées avant l'appel.
+ */
+async function commitPrepSessionLaunch({
+  statePatch,
+  gameId,
+  screen,
+  remoteState,
+  alertTitle,
+  alertFallback,
+  logLabel,
+  afterSuccess,
+}) {
+  const patchKeys = Object.keys(statePatch);
+  const previousPatch = snapshotStatePatch(getState(), patchKeys);
+  saveStatePatch(statePatch);
+
+  try {
+    await startGameSession(gameId, screen, remoteState);
+    if (afterSuccess) await afterSuccess();
+  } catch (e) {
+    console.warn(`REVEAL launch ${logLabel}:`, e);
+    saveStatePatch(previousPatch);
+    await showAppAlert(e.message || alertFallback, {
+      title: alertTitle,
+      icon: "⚠️",
+    });
+  }
+}
+
 export async function launchTraitrePrep() {
   const check = await requireMinLobbyPlayers(TRAITRE_MIN_PLAYERS, {
     gameTitle: "Spot the fake",
@@ -77,98 +108,92 @@ export async function launchTraitrePrep() {
   if (!check.ok) return;
 
   const tr = defaultTraitrePrepSession();
-  saveStatePatch({ traitreGame: tr });
 
-  if (isGameSyncActive()) {
-    if (!(await requireHostToLaunch())) return;
-    const lobbyId = getState().lobby?.id;
-    if (lobbyId) {
-      await clearTraitrePrivateForLobby(lobbyId);
-    }
-    try {
-      await startGameSession("traitre", "traitre-prep", {
-        traitre: traitreToRemote(tr),
-      });
-    } catch (e) {
-      console.warn("REVEAL launch Traitre:", e);
-      await showAppAlert(e.message || "Impossible de lancer Spot the fake.", {
-        title: "Spot the fake",
-        icon: "⚠️",
-      });
-    }
+  if (!isGameSyncActive()) {
+    saveStatePatch({ traitreGame: tr });
+    navigate("traitre-prep");
     return;
   }
 
-  navigate("traitre-prep");
+  if (!(await requireHostToLaunch())) return;
+
+  const lobbyId = getState().lobby?.id;
+  await commitPrepSessionLaunch({
+    statePatch: { traitreGame: tr },
+    gameId: "traitre",
+    screen: "traitre-prep",
+    remoteState: { traitre: traitreToRemote(tr) },
+    alertTitle: "Spot the fake",
+    alertFallback: "Impossible de lancer Spot the fake.",
+    logLabel: "Traitre",
+    afterSuccess: lobbyId ? () => clearTraitrePrivateForLobby(lobbyId) : undefined,
+  });
 }
 
 export async function launchSpeedVotePrep() {
   const sv = defaultSpeedVotePrepSession();
-  saveStatePatch({ speedVoteGame: sv });
 
-  if (isGameSyncActive()) {
-    if (!(await requireHostToLaunch())) return;
-    try {
-      await startGameSession("speedvote", "speedvote-prep", {
-        speedVote: speedVoteToRemote(sv),
-      });
-    } catch (e) {
-      console.warn("REVEAL launch SpeedVote:", e);
-      await showAppAlert(e.message || "Impossible de lancer SpeedVote.", {
-        title: "SpeedVote",
-        icon: "⚠️",
-      });
-    }
+  if (!isGameSyncActive()) {
+    saveStatePatch({ speedVoteGame: sv });
+    navigate("speedvote-prep");
     return;
   }
 
-  navigate("speedvote-prep");
+  if (!(await requireHostToLaunch())) return;
+
+  await commitPrepSessionLaunch({
+    statePatch: { speedVoteGame: sv },
+    gameId: "speedvote",
+    screen: "speedvote-prep",
+    remoteState: { speedVote: speedVoteToRemote(sv) },
+    alertTitle: "SpeedVote",
+    alertFallback: "Impossible de lancer SpeedVote.",
+    logLabel: "SpeedVote",
+  });
 }
 
 export async function launchClutchPrep() {
   const rz = defaultClutchPrepSession();
-  saveStatePatch({ clutchGame: rz });
 
-  if (isGameSyncActive()) {
-    if (!(await requireHostToLaunch())) return;
-    try {
-      await startGameSession("clutch", "clutch-prep", {
-        clutch: clutchToRemote(rz),
-      });
-    } catch (e) {
-      console.warn("REVEAL launch Clutch:", e);
-      await showAppAlert(e.message || "Impossible de lancer Clutch.", {
-        title: "Clutch",
-        icon: "⚠️",
-      });
-    }
+  if (!isGameSyncActive()) {
+    saveStatePatch({ clutchGame: rz });
+    navigate("clutch-prep");
     return;
   }
 
-  navigate("clutch-prep");
+  if (!(await requireHostToLaunch())) return;
+
+  await commitPrepSessionLaunch({
+    statePatch: { clutchGame: rz },
+    gameId: "clutch",
+    screen: "clutch-prep",
+    remoteState: { clutch: clutchToRemote(rz) },
+    alertTitle: "Clutch",
+    alertFallback: "Impossible de lancer Clutch.",
+    logLabel: "Clutch",
+  });
 }
 
 export async function launchWrongAnswerPrep() {
   const wa = defaultWrongAnswerPrepSession();
-  saveStatePatch({ wrongAnswerGame: wa });
 
-  if (isGameSyncActive()) {
-    if (!(await requireHostToLaunch())) return;
-    try {
-      await startGameSession("wronganswer", "wronganswer-prep", {
-        wrongAnswer: wrongAnswerToRemote(wa),
-      });
-    } catch (e) {
-      console.warn("REVEAL launch Wrong Answer Only:", e);
-      await showAppAlert(e.message || "Impossible de lancer Wrong Answer Only.", {
-        title: "Wrong Answer Only",
-        icon: "⚠️",
-      });
-    }
+  if (!isGameSyncActive()) {
+    saveStatePatch({ wrongAnswerGame: wa });
+    navigate("wronganswer-prep");
     return;
   }
 
-  navigate("wronganswer-prep");
+  if (!(await requireHostToLaunch())) return;
+
+  await commitPrepSessionLaunch({
+    statePatch: { wrongAnswerGame: wa },
+    gameId: "wronganswer",
+    screen: "wronganswer-prep",
+    remoteState: { wrongAnswer: wrongAnswerToRemote(wa) },
+    alertTitle: "Wrong Answer Only",
+    alertFallback: "Impossible de lancer Wrong Answer Only.",
+    logLabel: "Wrong Answer Only",
+  });
 }
 
 export async function launchPlaylistGuessPrep() {
@@ -179,71 +204,68 @@ export async function launchPlaylistGuessPrep() {
   if (!check.ok) return;
 
   const pg = defaultPlaylistGuessPrepSession();
-  saveStatePatch({ playlistGuessGame: pg });
 
-  if (isGameSyncActive()) {
-    if (!(await requireHostToLaunch())) return;
-    try {
-      await startGameSession("playlistguess", "playlistguess-prep", {
-        playlistGuess: playlistGuessToRemote(pg),
-      });
-    } catch (e) {
-      console.warn("REVEAL launch Playlist Guess:", e);
-      await showAppAlert(e.message || "Impossible de lancer le jeu.", {
-        title: "VibeCheck",
-        icon: "⚠️",
-      });
-    }
+  if (!isGameSyncActive()) {
+    saveStatePatch({ playlistGuessGame: pg });
+    navigate("playlistguess-prep");
     return;
   }
 
-  navigate("playlistguess-prep");
+  if (!(await requireHostToLaunch())) return;
+
+  await commitPrepSessionLaunch({
+    statePatch: { playlistGuessGame: pg },
+    gameId: "playlistguess",
+    screen: "playlistguess-prep",
+    remoteState: { playlistGuess: playlistGuessToRemote(pg) },
+    alertTitle: "VibeCheck",
+    alertFallback: "Impossible de lancer le jeu.",
+    logLabel: "Playlist Guess",
+  });
 }
 
 export async function launchDilemmaPrep() {
   const dm = defaultDilemmaPrepSession();
-  saveStatePatch({ dilemmaGame: dm });
 
-  if (isGameSyncActive()) {
-    if (!(await requireHostToLaunch())) return;
-    try {
-      await startGameSession("dilemma", "dilemma-prep", {
-        dilemma: dilemmaToRemote(dm),
-      });
-    } catch (e) {
-      console.warn("REVEAL launch Dilemma:", e);
-      await showAppAlert(e.message || "Impossible de lancer Dilemma.", {
-        title: "Dilemma",
-        icon: "⚠️",
-      });
-    }
+  if (!isGameSyncActive()) {
+    saveStatePatch({ dilemmaGame: dm });
+    navigate("dilemma-prep");
     return;
   }
 
-  navigate("dilemma-prep");
+  if (!(await requireHostToLaunch())) return;
+
+  await commitPrepSessionLaunch({
+    statePatch: { dilemmaGame: dm },
+    gameId: "dilemma",
+    screen: "dilemma-prep",
+    remoteState: { dilemma: dilemmaToRemote(dm) },
+    alertTitle: "Dilemma",
+    alertFallback: "Impossible de lancer Dilemma.",
+    logLabel: "Dilemma",
+  });
 }
 
 export async function launchTriviaPrep() {
   const trivia = defaultTriviaPrepSession();
-  saveStatePatch({ triviaGame: trivia });
 
-  if (isGameSyncActive()) {
-    if (!(await requireHostToLaunch())) return;
-    try {
-      await startGameSession("trivia", "trivia-prep", {
-        trivia: triviaToRemote(trivia),
-      });
-    } catch (e) {
-      console.warn("REVEAL launch Trivia:", e);
-      await showAppAlert(e.message || "Impossible de lancer Trivia.", {
-        title: "Trivia",
-        icon: "⚠️",
-      });
-    }
+  if (!isGameSyncActive()) {
+    saveStatePatch({ triviaGame: trivia });
+    navigate("trivia-prep");
     return;
   }
 
-  navigate("trivia-prep");
+  if (!(await requireHostToLaunch())) return;
+
+  await commitPrepSessionLaunch({
+    statePatch: { triviaGame: trivia },
+    gameId: "trivia",
+    screen: "trivia-prep",
+    remoteState: { trivia: triviaToRemote(trivia) },
+    alertTitle: "Trivia",
+    alertFallback: "Impossible de lancer Trivia.",
+    logLabel: "Trivia",
+  });
 }
 
 export async function launchTruthMeterPrep() {
@@ -254,48 +276,46 @@ export async function launchTruthMeterPrep() {
   if (!check.ok) return;
 
   const tm = defaultTruthMeterPrepSession();
-  saveStatePatch({ truthMeterGame: tm });
 
-  if (isGameSyncActive()) {
-    if (!(await requireHostToLaunch())) return;
-    try {
-      await startGameSession("truthmeter", "truthmeter-prep", {
-        truthMeter: truthMeterToRemote(tm),
-      });
-    } catch (e) {
-      console.warn("REVEAL launch TruthMeter:", e);
-      await showAppAlert(e.message || "Impossible de lancer TruthMeter.", {
-        title: "TruthMeter",
-        icon: "⚠️",
-      });
-    }
+  if (!isGameSyncActive()) {
+    saveStatePatch({ truthMeterGame: tm });
+    navigate("truthmeter-prep");
     return;
   }
 
-  navigate("truthmeter-prep");
+  if (!(await requireHostToLaunch())) return;
+
+  await commitPrepSessionLaunch({
+    statePatch: { truthMeterGame: tm },
+    gameId: "truthmeter",
+    screen: "truthmeter-prep",
+    remoteState: { truthMeter: truthMeterToRemote(tm) },
+    alertTitle: "TruthMeter",
+    alertFallback: "Impossible de lancer TruthMeter.",
+    logLabel: "TruthMeter",
+  });
 }
 
 export async function launchConsensusPrep() {
   const consensus = defaultConsensusPrepSession();
-  saveStatePatch({ consensusGame: consensus });
 
-  if (isGameSyncActive()) {
-    if (!(await requireHostToLaunch())) return;
-    try {
-      await startGameSession("consensus", "consensus-prep", {
-        consensus: consensusToRemote(consensus),
-      });
-    } catch (e) {
-      console.warn("REVEAL launch Consensus:", e);
-      await showAppAlert(e.message || "Impossible de lancer Consensus.", {
-        title: "Consensus",
-        icon: "⚠️",
-      });
-    }
+  if (!isGameSyncActive()) {
+    saveStatePatch({ consensusGame: consensus });
+    navigate("consensus-prep");
     return;
   }
 
-  navigate("consensus-prep");
+  if (!(await requireHostToLaunch())) return;
+
+  await commitPrepSessionLaunch({
+    statePatch: { consensusGame: consensus },
+    gameId: "consensus",
+    screen: "consensus-prep",
+    remoteState: { consensus: consensusToRemote(consensus) },
+    alertTitle: "Consensus",
+    alertFallback: "Impossible de lancer Consensus.",
+    logLabel: "Consensus",
+  });
 }
 
 export async function launchHotTakePrep() {
@@ -314,23 +334,24 @@ export async function launchHotTakePrep() {
     intermissionEndsAt: null,
     takeScored: false,
   };
-  saveStatePatch({ hotTakeGame: ht });
 
-  if (isGameSyncActive()) {
-    if (!(await requireHostToLaunch())) return;
-    try {
-      await startGameSession("hottake", "hottake-prep", { hotTake: hotTakeToRemote(ht) });
-    } catch (e) {
-      console.warn("REVEAL launch Hot Take:", e);
-      await showAppAlert(e.message || "Impossible de lancer Hot Take.", {
-        title: "Hot Take",
-        icon: "⚠️",
-      });
-    }
+  if (!isGameSyncActive()) {
+    saveStatePatch({ hotTakeGame: ht });
+    navigate("hottake-prep");
     return;
   }
 
-  navigate("hottake-prep");
+  if (!(await requireHostToLaunch())) return;
+
+  await commitPrepSessionLaunch({
+    statePatch: { hotTakeGame: ht },
+    gameId: "hottake",
+    screen: "hottake-prep",
+    remoteState: { hotTake: hotTakeToRemote(ht) },
+    alertTitle: "Hot Take",
+    alertFallback: "Impossible de lancer Hot Take.",
+    logLabel: "Hot Take",
+  });
 }
 
 export async function launchGuessLieMenu() {
@@ -343,23 +364,24 @@ export async function launchGuessLieMenu() {
     votes: {},
     roundScored: false,
   };
-  saveStatePatch({ guessLie: gl });
 
-  if (isGameSyncActive()) {
-    if (!(await requireHostToLaunch())) return;
-    try {
-      await startGameSession("guesslie", "guesslie-menu", { guessLie: guessLieToRemote(gl) });
-    } catch (e) {
-      console.warn("REVEAL launch Guess The Lie:", e);
-      await showAppAlert(e.message || "Impossible de lancer Guess The Lie.", {
-        title: "Guess The Lie",
-        icon: "⚠️",
-      });
-    }
+  if (!isGameSyncActive()) {
+    saveStatePatch({ guessLie: gl });
+    navigate("guesslie-menu");
     return;
   }
 
-  navigate("guesslie-menu");
+  if (!(await requireHostToLaunch())) return;
+
+  await commitPrepSessionLaunch({
+    statePatch: { guessLie: gl },
+    gameId: "guesslie",
+    screen: "guesslie-menu",
+    remoteState: { guessLie: guessLieToRemote(gl) },
+    alertTitle: "Guess The Lie",
+    alertFallback: "Impossible de lancer Guess The Lie.",
+    logLabel: "Guess The Lie",
+  });
 }
 
 export async function launchTierNightSelect() {
@@ -377,44 +399,44 @@ export async function launchTierNightSelect() {
     placements: {},
     finished: false,
   };
-  const resetTierNightForLaunch = () => saveStatePatch({
+  const statePatch = {
     tierNightTopicId: null,
     tierNightMode: "consensus",
     tierNightModifier: "normal",
     tierNightGame: tierNightReset,
     tierNightLiveGame: tierNightLiveReset,
-  });
+  };
 
-  if (isGameSyncActive()) {
-    if (!(await requireHostToLaunch())) return;
-    resetTierNightForLaunch();
-    try {
-      await startGameSession("tiernight", "tiernight-select", {
-        tierNight: {
-          runId,
-          topicId: null,
-          mode: "consensus",
-          modifier: "normal",
-          lobbyStarted: false,
-          placements: {},
-          finished: {},
-          game: null,
-          recap: null,
-        },
-        tierNightLive: finishedTierNightLiveRemote({ runId }),
-      });
-    } catch (e) {
-      console.warn("REVEAL launch TierNight:", e);
-      await showAppAlert(e.message || "Impossible de lancer TierNight.", {
-        title: "TierNight",
-        icon: "⚠️",
-      });
-    }
+  if (!isGameSyncActive()) {
+    saveStatePatch(statePatch);
+    navigate("tiernight-select");
     return;
   }
 
-  resetTierNightForLaunch();
-  navigate("tiernight-select");
+  if (!(await requireHostToLaunch())) return;
+
+  await commitPrepSessionLaunch({
+    statePatch,
+    gameId: "tiernight",
+    screen: "tiernight-select",
+    remoteState: {
+      tierNight: {
+        runId,
+        topicId: null,
+        mode: "consensus",
+        modifier: "normal",
+        lobbyStarted: false,
+        placements: {},
+        finished: {},
+        game: null,
+        recap: null,
+      },
+      tierNightLive: finishedTierNightLiveRemote({ runId }),
+    },
+    alertTitle: "TierNight",
+    alertFallback: "Impossible de lancer TierNight.",
+    logLabel: "TierNight",
+  });
 }
 
 const RESTART_HANDLERS = {
