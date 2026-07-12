@@ -37,3 +37,20 @@ export function isAuthCaptchaError(message) {
 export function isAuthRateLimitError(message) {
   return /rate limit|too many requests|email.*limit/i.test(String(message || "").toLowerCase());
 }
+
+/** Messages réseau / sync patch en français pour l’UI. */
+export function formatSyncErrorMessage(message) {
+  const raw = String(message || "").trim();
+  if (!raw) return "Impossible de synchroniser.";
+
+  const m = raw.toLowerCase();
+  if (
+    /failed to fetch|networkerror|network request failed|load failed|fetch failed|net::err|err_internet_disconnected|err_network_changed/.test(
+      m
+    )
+  ) {
+    return "Connexion impossible. Vérifie ton réseau et réessaie.";
+  }
+
+  return raw;
+}

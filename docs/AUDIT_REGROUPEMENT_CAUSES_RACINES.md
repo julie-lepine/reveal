@@ -195,7 +195,7 @@ Clôture QA :
 | ID | Problème | Fichier / fonction | Scénario | Impact | Correction proposée | Statut |
 |----|----------|-------------------|----------|--------|---------------------|--------|
 | **I-01** | `completeGameSession` mauvais `host_id` | `gameSync.js` | Acting guest termine partie | Metadata / RLS incohérente | Persister `lobby.hostId` dans `host_id`, fallback sur acteur si absent | 🟡 Corrigé + tests ; QA acting host à faire |
-| **I-02** / **S-01** | Patch invité sans row `game_sessions` | `gameSync.js`, `mpLaunch.js` | Ready prep avant `startGameSession` | Erreur visible invité | No-op local si invité sans session distante | 🟡 Corrigé + tests ; QA à faire |
+| **I-02** / **S-01** | Patch invité sans row `game_sessions` | `gameSync.js`, `mpLaunch.js` | Ready prep avant `startGameSession` | Erreur visible invité | No-op local si invité sans session distante | ✅ Corrigé + QA validée (prep invité sans session, 2026-07-11) |
 | **I-08** | RLS : tout membre peut UPDATE session | `supabase/game-sessions.sql` | Client modifié | Triche / corruption | RPC merge serveur ou policies restrictives | À traiter |
 | **M-03b** / **SYN-09** | `launchGameWithSync` branche non-hôte | `mpLaunch.js` | Appel par erreur sur invité | UI locale divergente | Guard strict ; ne jamais applyLocal seul en MP | 🟡 Corrigé + tests ; QA à faire |
 | **M-06a** | Exit invité : pas `endGameSession` | `exitGame.js` — `exitGameToGameSelect()` | Quitter mid-game | Autres continuent (voulu) mais état local stale | Chemin invité aligné sur `returnToGameSelect()` ; bouton Rejoindre réhydrate depuis le cache puis navigue immédiatement | 🟡 Corrigé + tests ; QA rejoin banner à refaire |
@@ -248,18 +248,19 @@ Clôture QA :
 
 **Mécanisme :** `void (async...)`, `.then()` sans `.catch()`, optimistic local sans rollback.
 
-| ID | Problème | Fichier / fonction | Scénario | Impact | Correction proposée |
-|----|----------|-------------------|----------|--------|---------------------|
-| **I-07** / **S-05** / **SYN-08** | Guess The Lie fire-and-forget | `guessLieSession.js`, `state.js` — `syncGuessLieLobbyCompleteRemote()` | Patch échoue au launch | Hôte en jeu, invités sur wait | 🟡 Corrigé + tests ; QA à faire : lancement via `launchGameWithSync`, sync legacy attendable |
-| **M-09** / **T-04** / **SYN-11** | `commitPrepReadyToggle` sans try/catch | `mpLaunch.js` | Timeout patch ready | Rejection silencieuse | try/catch + rollback + toast |
-| **M-10** / **SYN-10** | `syncPrepOnMount` sans catch | `prepScreen.js`, `dilemmaPrep.js`, `leaderboard.js` | Réseau down au mount | UI stale | `.catch()` + feedback |
-| **M-11** / **SYN-17** | `restartGame` reset local avant remote | `restartGame.js` | `startGameSession` throw | Hôte prep vide, remote ancien | Remote d’abord ou rollback |
-| **M-04b** / **SYN-18** | `withPatchTimeout` timers non cleared | `gameSync.js` | Votes intensifs | Accumulation timers | `clearTimeout` dans finally |
-| **T-05** | Vote optimistic vs patch timeout | `hotTakeSession.js` — `commitHotTakeVote()` | Patch 20 s timeout | Vote local ≠ serveur | Rollback ou indicateur « sync… » |
-| **SYN-26** | `clutch.js` tap sans catch | `clutch.js` | Tap sync fail | Unhandled rejection | `.catch()` sur handler |
-| **M-14b** / **SYN-09b** | `onLocalApplied` absent si `localFirst: false` | `mpLaunch.js` L124-127 | Succès remote sans callback | Navigation manquante | Appeler `onLocalApplied` après succès |
-| **ARCH-07** | Realtime catch `.catch(() => {})` silencieux | `supabaseLobby.js` L978 | Erreur refresh | Pas de feedback | Log + retry UI optionnel |
-| **ARCH-08** | `commitMultiplayerLaunch` retry `void commit().catch()` | `mpLaunch.js` L131 | Launch fallback | Échec silencieux second commit | Metric / notify user |
+| ID | Problème | Fichier / fonction | Scénario | Impact | Correction proposée | Statut |
+|----|----------|-------------------|----------|--------|---------------------|--------|
+| **I-07** / **S-05** / **SYN-08** | Guess The Lie fire-and-forget | `guessLieSession.js`, `state.js` — `syncGuessLieLobbyCompleteRemote()` | Patch échoue au launch | Hôte en jeu, invités sur wait | `launchGameWithSync` + sync legacy attendable | ✅ Corrigé + QA validée (2026-07-11) |
+| **M-09** / **T-04** / **SYN-11** | `commitPrepReadyToggle` sans try/catch | `mpLaunch.js`, `prepReadyMaps.js` | Timeout / offline patch ready | Prêt local ≠ serveur ; rejet silencieux | try/catch + rollback + `patchGameStateWithFeedback` | ✅ Corrigé + QA validée (2026-07-11) : blocs A/C/D/E ; B sauf message réseau brut |
+| **L-09** | Message patch réseau incompréhensible | `patchGameStateFeedback.js` | Offline → toggle prêt (Q-B1) | Alert « TypeError: failed to fetch » | Message FR générique (ex. « Connexion impossible. Vérifie ton réseau. ») | À traiter |
+| **M-10** / **SYN-10** | `syncPrepOnMount` sans catch | `prepScreen.js`, `dilemmaPrep.js`, `leaderboard.js` | Réseau down au mount | UI stale | `.catch()` + feedback | À traiter |
+| **M-11** / **SYN-17** | `restartGame` reset local avant remote | `restartGame.js` | `startGameSession` throw | Hôte prep vide, remote ancien | Remote d’abord ou rollback | À traiter |
+| **M-04b** / **SYN-18** | `withPatchTimeout` timers non cleared | `gameSync.js` | Votes intensifs | Accumulation timers | `clearTimeout` dans finally | À traiter |
+| **T-05** | Vote optimistic vs patch timeout | `hotTakeSession.js` — `commitHotTakeVote()` | Patch 20 s timeout | Vote local ≠ serveur | Rollback ou indicateur « sync… » | À traiter |
+| **SYN-26** | `clutch.js` tap sans catch | `clutch.js` | Tap sync fail | Unhandled rejection | `.catch()` sur handler | À traiter |
+| **M-14b** / **SYN-09b** | `onLocalApplied` absent si `localFirst: false` | `mpLaunch.js` L124-127 | Succès remote sans callback | Navigation manquante | Appeler `onLocalApplied` après succès | À traiter |
+| **ARCH-07** | Realtime catch `.catch(() => {})` silencieux | `supabaseLobby.js` L978 | Erreur refresh | Pas de feedback | Log + retry UI optionnel | À traiter |
+| **ARCH-08** | `commitMultiplayerLaunch` retry `void commit().catch()` | `mpLaunch.js` L131 | Launch fallback | Échec silencieux second commit | Metric / notify user | À traiter |
 
 **Symptômes utilisateur :** prêt/vote local non sync ; invités bloqués Guess Lie ; promises non gérées.
 
@@ -301,7 +302,7 @@ Clôture QA :
 | **ARCH-15** | `__writeTimes` diagnostic temporaire | `gameSync.js` | Prod | Bruit / confusion | Retirer ou flag dev |
 | **SYN-27** / **ARCH-16** | `JSON.stringify` hot paths | `gameSync.js` — `applyRemoteSession()` | Poll fréquent | CPU mobile | Compare shallow / hash champs play |
 | **ARCH-17** | Boilerplate prep screens | `*-prep.js` | Nouveau prep | Oublier guest follow | Composant prep base |
-| **I-07** | Guess Lie hors pattern unifié | (voir cause 7) | idem | idem | ✅ Corrigé via Cause 7 ; QA à faire |
+| **I-07** | Guess Lie hors pattern unifié | (voir cause 7) | idem | idem | `launchGameWithSync` | ✅ Corrigé + QA validée (2026-07-11) |
 
 **Symptômes utilisateur :** indirect — maintenance, régressions cross-jeux, perf mobile.
 
@@ -388,16 +389,22 @@ La matrice ci-dessous liste les points encore ouverts ou résiduels. Les éléme
 
 | # | ID(s) | Cause | Pourquoi |
 |---|-------|-------|----------|
-| 1 | I-02, S-01 | 4 | Erreur immédiate en prep invité |
-| 2 | M-09, M-11 | 7 | Erreurs réseau restantes sur ready / restart |
+| 1 | L-09 | 7, 11 | Message réseau brut (`failed to fetch`) sur patch sync — reste QA M-09 |
+| 2 | M-11, SYN-17 | 7 | « Recommencer » : reset local avant remote si `startGameSession` échoue |
 | 3 | I-05, SYN-13b, SYN-25 | 6 | Bugs intermittents navigation |
 | 4 | I-06, P-01 | 8 | UX lobby invité dégradée |
 | 5 | I-01 | 4 | Fin partie acting host fragile |
 | 6 | I-08 | 4 | Sécurité intégrité session MP |
 | 7 | I-05, SYN-13b, SYN-25 | 6 | Navigation intermittente : listeners / redirects à durcir |
-| 8 | M-14a, SYN-14 | 3 | KO QA TierNight : hôte renvoyé vers ancien récap en 2e tierlist + invité saute le choix des tierlists ; suspendu pour avancer sur les autres tests |
+| 8 | M-14a, SYN-14 | 3 | KO QA TierNight — suspendu |
 | 9 | T-02 | 5 | Navigation possible avant données complètes |
-| 10 | M-12 | 11 | Dette UX importante après les corrections de stabilité |
+| 10 | M-12 | 11 | Dette UX : lien `#join=` sans auto-join |
+
+### Clôtures récentes (2026-07-11)
+
+- **I-07 / S-05 / SYN-08** — Guess The Lie : `launchGameWithSync`, QA E1 OK
+- **M-09 / T-04 / SYN-11** — Toggle prêt prep : rollback + feedback ; QA blocs A/C/D/E + B (hors message réseau)
+- **I-02 / S-01** — Prep invité sans `game_sessions` : QA bloc C OK
 
 ---
 
