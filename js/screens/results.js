@@ -15,6 +15,7 @@ import {
   isGameSyncActive,
   onGameSessionChange,
   refreshEveningScoresFromSession,
+  routeToActiveGameIfNeeded,
   tryFollowHostGameSession,
 } from "../core/gameSync.js";
 import { refreshLobbyFromSupabase, onLobbyBundleUpdated } from "../core/supabaseLobby.js";
@@ -96,8 +97,10 @@ export function mountResults(app) {
       await refreshEveningScoresFromSession();
       if (getCurrentScreen() === "results") render();
     })();
-    unsubSession = onGameSessionChange((row) => {
-      tryFollowHostGameSession(row);
+    unsubSession = onGameSessionChange(async (row) => {
+      if (!row) return;
+      if (tryFollowHostGameSession(row)) return;
+      if (await routeToActiveGameIfNeeded(row)) return;
       if (getCurrentScreen() === "results") render();
     });
     unsubLobby = onLobbyBundleUpdated(() => {
