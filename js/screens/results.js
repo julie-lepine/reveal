@@ -68,7 +68,7 @@ export function mountResults(app) {
         <div class="evening-recap__chips">${chips || '<span class="hint">Lance un jeu !</span>'}</div>
         ${
           recap.top[0]
-            ? `<p class="evening-recap__meta">En tête : <strong>${escapeHtml(formatPlayerWithBadge(recap.top[0].name))}</strong> — ${recap.top[0].score} pts</p>`
+            ? `<p class="evening-recap__meta">En tête : <strong>${escapeHtml(formatPlayerWithBadge(recap.top[0].name))}</strong> - ${recap.top[0].score} pts</p>`
             : ""
         }
       </div>

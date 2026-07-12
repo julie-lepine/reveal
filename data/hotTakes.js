@@ -253,7 +253,7 @@ export const HOT_TAKE_FORBIDDEN_WORDS = [
 ];
 
 export const HOT_TAKE_MODERATION_NOTICE =
-  "Les insultes et termes racistes, homophobes, transphobes ou haineux sont interdits. Si ta hot take en contient, elle sera refusée.";
+  "Les insultes et termes racistes, homophobes, transphobes ou haineux sont interdits. Si ton texte en contient, il sera refusé.";
 
 /** @deprecated - utiliser getThemeBankTexts */
 export const HOT_TAKES = getCatalogTakes();

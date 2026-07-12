@@ -38,17 +38,19 @@ export function isAuthRateLimitError(message) {
   return /rate limit|too many requests|email.*limit/i.test(String(message || "").toLowerCase());
 }
 
+const SYNC_NETWORK_ERROR_RE =
+  /failed to fetch|networkerror|network request failed|load failed|fetch failed|net::err|err_internet_disconnected|err_network_changed/;
+
+export function isSyncNetworkError(message) {
+  return SYNC_NETWORK_ERROR_RE.test(String(message || "").toLowerCase());
+}
+
 /** Messages réseau / sync patch en français pour l’UI. */
 export function formatSyncErrorMessage(message) {
   const raw = String(message || "").trim();
   if (!raw) return "Impossible de synchroniser.";
 
-  const m = raw.toLowerCase();
-  if (
-    /failed to fetch|networkerror|network request failed|load failed|fetch failed|net::err|err_internet_disconnected|err_network_changed/.test(
-      m
-    )
-  ) {
+  if (isSyncNetworkError(raw)) {
     return "Connexion impossible. Vérifie ton réseau et réessaie.";
   }
 

@@ -1,4 +1,5 @@
 import { escapeHtml } from "./ui.js";
+import { formatSyncErrorMessage, isSyncNetworkError } from "./authErrors.js";
 import {
   isTurnstileRequired,
   mountTurnstile,
@@ -33,6 +34,11 @@ export function showAppAlert(message, { title = "REVEAL", confirmLabel = "OK", i
       openDialog = null;
     }
 
+    const networkError = isSyncNetworkError(message);
+    const displayTitle = networkError ? "Connexion" : title;
+    const displayIcon = networkError ? "📡" : icon;
+    const displayMessage = formatSyncErrorMessage(message);
+
     const root = document.createElement("div");
     root.className = "app-dialog";
     root.setAttribute("role", "alertdialog");
@@ -46,9 +52,9 @@ export function showAppAlert(message, { title = "REVEAL", confirmLabel = "OK", i
       <div class="app-dialog__backdrop" data-dialog-dismiss aria-hidden="true"></div>
       <div class="app-dialog__panel">
         <div class="app-dialog__glow" aria-hidden="true"></div>
-        <p class="app-dialog__icon" aria-hidden="true">${icon}</p>
-        <p class="app-dialog__title" id="app-dialog-title">${escapeHtml(title)}</p>
-        <p class="app-dialog__message" id="app-dialog-msg">${escapeHtml(message)}</p>
+        <p class="app-dialog__icon" aria-hidden="true">${displayIcon}</p>
+        <p class="app-dialog__title" id="app-dialog-title">${escapeHtml(displayTitle)}</p>
+        <p class="app-dialog__message" id="app-dialog-msg">${escapeHtml(displayMessage)}</p>
         <button type="button" class="btn btn-primary app-dialog__btn" data-dialog-ok>${escapeHtml(confirmLabel)}</button>
       </div>
     `;
