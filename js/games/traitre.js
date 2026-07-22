@@ -119,10 +119,19 @@ export function mountTraitre(app) {
     const breakdown = lastRound.breakdown || {};
     const fakeWon = resultWinner === "traitre";
     const impostorMeta = playerMeta(resultImpostor || "?");
+    const localLost = fakeWon && Boolean(localName) && localName !== resultImpostor;
+    const resultEmoji = localLost ? "😔" : fakeWon ? "🥳" : "🎯";
+    const showHostActions = !mp || isLobbyHost();
 
-    const scoreRows = Object.entries(deltas)
-      .sort(([, a], [, b]) => b - a)
-      .map(([name, pts]) => {
+    const scoreNames = [
+      ...new Set(
+        [...(session.alive || []), ...(session.eliminated || []), resultImpostor].filter(Boolean)
+      ),
+    ].sort((a, b) => (deltas[b] || 0) - (deltas[a] || 0));
+
+    const scoreRows = scoreNames
+      .map((name) => {
+        const pts = deltas[name] || 0;
         const meta = playerMeta(name);
         const isFake = name === resultImpostor;
         const detail = (breakdown[name] || [])
@@ -164,10 +173,17 @@ export function mountTraitre(app) {
       ? `+${TRAITRE_POINTS.FAKE_WIN} victoire fake${resultVoteSurvivals ? ` · +${TRAITRE_POINTS.FAKE_SURVIVE_VOTE}/vote survécu` : ""}`
       : `+${TRAITRE_POINTS.SURVIVOR} survivant · +${TRAITRE_POINTS.DETECTIVE_BONUS} détective · +${TRAITRE_POINTS.GOOD_INTUITION} bonne intuition · fake garde +${TRAITRE_POINTS.FAKE_SURVIVE_VOTE}/vote survécu`;
 
+    const actionsHtml = showHostActions
+      ? `<div class="btn-row btn-row--stack">
+        ${eveningRecapRestartButtonHtml({ gameId: "traitre", title: "Spot the fake" })}
+        <button type="button" class="btn btn-primary" id="btn-traitre-exit">Retour au menu jeux</button>
+      </div>`
+      : `<p class="hint">En attente de l'hôte pour recommencer ou quitter…</p>`;
+
     return `
       <div class="card traitre-final ${fakeWon ? "traitre-final--fake-wins" : "traitre-final--fake-caught"}">
         <div class="traitre-final__hero">
-          <span class="traitre-final__emoji" aria-hidden="true">${fakeWon ? "🥳" : "🎯"}</span>
+          <span class="traitre-final__emoji" aria-hidden="true">${resultEmoji}</span>
           <p class="traitre-final__title">${fakeWon ? "Le fake gagne !" : "Le fake est démasqué !"}</p>
         </div>
 
@@ -188,10 +204,7 @@ export function mountTraitre(app) {
           </div>
         </div>
       </div>
-      <div class="btn-row btn-row--stack">
-        ${eveningRecapRestartButtonHtml({ gameId: "traitre", title: "Spot the fake" })}
-        <button type="button" class="btn btn-primary btn--spaced" id="btn-traitre-exit">Retour au menu jeux</button>
-      </div>`;
+      ${actionsHtml}`;
   }
 
   async function maybeAdvanceFromDeal() {
@@ -537,7 +550,11 @@ export function mountTraitre(app) {
             : `<p class="hint">${alive.length} survivant(s) · tour des mots ${speakRound}${voteSurvivals ? ` · ${voteSurvivals} vote(s) survécu(s) par le fake` : ""}</p>`
         }
         ${phaseHtml}
-        ${gameExitBarHtml()}
+        ${
+          phase === "final" && (!mp || isLobbyHost())
+            ? ""
+            : gameExitBarHtml()
+        }
       `,
     });
 

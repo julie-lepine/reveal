@@ -169,7 +169,7 @@ Clôture QA :
 - Clés joueur : écritures Supabase canonicalisées sur `userId`; les pseudos restent côté UI/local.
 - Pages résultats / classement : reroute intempestive vers `game-select` corrigée pour les écrans post-partie.
 - Trivia : podium final conservé sur l'écran `trivia`, puis passage explicite vers l'écran commun `results` ; QA validée.
-- Consensus fin MP : `completeGameSession({ screen: "results" })` corrige l'inférence erronée vers `consensus-prep` (2026-07-12) ; régression produit : podium in-game sauté → volet 1 post-partie à redéfinir (résultat jeu → action → récap).
+- Consensus / Hot Take fin MP : parcours podium in-game → « Voir les résultats » → récap soirée (**I-PG-01** clôturé QA 2026-07-22) ; Trivia déjà sur ce contrat.
 - Cause 3 considérée clôturée pour les flux validés, hors TierNight isolé en KO QA.
 - TierNight : KO QA au 2026-07-10. Résidus confirmés : l'hôte est encore renvoyé vers l'ancien récap pendant le tri de sa seconde tierlist ; l'invité ne voit pas l'écran de choix des tierlists et passe directement du choix des modes à la saisie de sa tierlist. Les patchs précédents restent testés mais ne résolvent pas le scénario réel ; investigation suspendue pour avancer sur les autres tests.
 
@@ -182,7 +182,7 @@ Clôture QA :
 | **M-13** / **SYN-20** | `hasEveningStatsActivity()` incomplet | `state.js`, `lobby.js` | Clutch/Wrong Answer seuls joués | UI « pas d’activité » | Aligner conditions avec `defaultEveningStats()` | ✅ Corrigé + tests |
 | **M-14a** / **SYN-14** | Topic TierNight éclaté | `state.js`, `gameSync.js`, `tierNightLiveSession.js`, `tierNightSelect.js` | Classic vs live + relance | Topic/routing incohérent après sync partiel | Hôte renvoyé vers ancien récap pendant la 2e tierlist ; invité saute le choix des tierlists | Source unique topic + routage par run courant + flow invité choix mode → choix tierlist → saisie | ❌ KO QA : tests unitaires OK mais scénario réel non résolu ; investigation suspendue, à reprendre plus tard |
 | **M-02b** | Clés vote/prêt uid vs name | `gameSync.js`, `*-Session.js` | Fallback `userIdForName \|\| name` | Doublons jusqu’au refresh | Canonicaliser sur uid | ✅ Corrigé + QA validée |
-| **ARCH-02** | Écran local vs session distante | `router.js`, `gameSync.js`, `games/consensus.js`, `games/trivia.js` | Routing vs affichage ; fin Consensus avec `screen: "results"` | Invité sur écran ≠ session ; prep Consensus réinférée (corrigé) ; podium jeu sauté (régression volet 1) | Distinction résultat jeu / récap soirée ; voir **I-PG-01** | 🟡 Partiel : inférence prep OK ; parcours fin de jeu à reprendre |
+| **ARCH-02** | Écran local vs session distante | `router.js`, `gameSync.js`, `games/consensus.js`, `games/hotTake.js`, `games/trivia.js` | Routing vs affichage ; fin de partie | Invité sur écran ≠ session ; prep réinférée (corrigé) ; podium sauté (corrigé I-PG-01) | Contrat Trivia : stay-on-game puis `completeGameSession(results)` | ✅ Consensus + Hot Take + Trivia alignés (I-PG-01, 2026-07-22) |
 | **SYN-29** | Jeu terminé sans point absent des résultats | `state.js` — `recordEveningGameOnce()`, `gameScoreOrder` | Hot Take / autre jeu avec 0 point | Carte du jeu absente dans Résultats | Créer l'entrée résultat dès qu'un jeu est compté | ✅ Corrigé + QA validée |
 
 **Symptômes utilisateur :** scores/récap incohérents ; points au mauvais jeu.
@@ -238,7 +238,7 @@ Clôture QA :
 | **M-08** / **SYN-13** | Redirect dans `mount*()` | `router.js`, `games/*.js` | Session désync | Flash UI, cleanup fragile | Router avant mount | À traiter |
 | **P-02** / **M-06c** | Exit invité sans reset blobs jeu | `exitGame.js` vs `returnToGameSelect()` | Quit prep/play volontaire | Stale state + suppress | `returnToGameSelect()` centralise suppress + reset blobs côté invité | ✅ Corrigé + validé QA (avec M-06a/M-06b, 2026-07-22) |
 | **SYN-28** / **L-nav** | Suivi invité hub / post-partie | `gameSync.js` — `guestMustFollowSession`, `shouldApplySessionRoute`, `applyRemoteSession`, `handleSessionRoute` ; `home.js`, `results.js`, `leaderboard.js` | Invité sur `results`/`leaderboard`/`home`/`game-select`, hôte relance prep | Banner lobby à jour mais pas de nav vers `*-prep` ; F5 seul recours | Invariant `mustFollow` + retry `sig_unchanged` + contrat retour booléen `routeLog` ; tests `guestMustFollow`, `shouldApplyReturnContract`, suppress/sig | ✅ Corrigé + validé QA (2026-07-22) ; `settings` hors scope |
-| **I-PG-01** | Confusion résultat jeu vs récap soirée | `completeGameSession()`, `games/consensus.js`, `games/hotTake.js`, `mountResults` | Fin de partie MP | Podium in-game sauté ; `screen: "results"` = récap global immédiat | Parcours : résultat jeu → action explicite → récap ou hub ; **sans** `sessionGameId` optionnel tant que non validé | À traiter (volet 1 — diagnostic validé, pas codé) |
+| **I-PG-01** | Confusion résultat jeu vs récap soirée | `games/consensus.js`, `games/hotTake.js`, `games/trivia.js` | Fin de partie MP | Podium in-game sauté ; `screen: "results"` immédiat | Stay-on-game `phase: "final"` + CTA « Voir les résultats » → `completeGameSession({ screen: "results" })` ; `game_id: "menu"` inchangé | ✅ Corrigé + validé QA (Consensus A + Hot Take B2, 2026-07-22) ; autres jeux hors scope |
 | **ARCH-04** | Suppress actif + même prep | `gameSync.js` — `shouldApplySessionRoute()` L328-330 | Sortie volontaire prep | Boucle évitée (OK) mais re-entry stale | Combiner avec P-02 | À traiter |
 | **ARCH-05** | `prepGuestFollowOnSession` fragile si `row.screen` en retard | `mpLaunch.js` | Relance pendant results | Mitigé par `getEffectiveSessionScreen` + `guestMustFollow` / retry sig | Tests relance hôte (couverts via SYN-28) | 🟡 Mitigé par SYN-28 ; retard Event A (lobby) vs Event B (session) hors scope routing |
 
@@ -273,7 +273,7 @@ Clôture QA :
 | **M-09** / **T-04** / **SYN-11** | `commitPrepReadyToggle` sans try/catch | `mpLaunch.js`, `prepReadyMaps.js` | Timeout / offline patch ready | Prêt local ≠ serveur ; rejet silencieux | try/catch + rollback + `patchGameStateWithFeedback` | ✅ Corrigé + QA validée (2026-07-11) ; bloc B (message réseau) clôturé avec L-09 (2026-07-12) |
 | **L-09** | Message patch / alerte réseau incompréhensible | `authErrors.js`, `dialog.js`, `patchGameStateFeedback.js` | Offline / fetch fail | Alert « TypeError: failed to fetch » ; titre jeu incohérent | `formatSyncErrorMessage` + titre « Connexion » si erreur réseau | ✅ Corrigé + QA (2026-07-12) |
 | **M-10** / **SYN-10** | `syncPrepOnMount` sans catch | `prepScreen.js`, `dilemmaPrep.js`, `leaderboard.js` | Réseau down au mount | UI stale | `.catch()` + feedback | À traiter |
-| **M-11** / **SYN-17** | `restartGame` reset local avant remote | `restartGame.js`, `restartGameRollback.js` | `startGameSession` throw | Hôte prep vide, remote ancien | Snapshot + rollback en catch ; clear Traitre private après succès | ✅ Corrigé + tests (2026-07-12) ; QA M-11 à faire ; risque résiduel `setLobbyPlaying` avant upsert (hors scope) |
+| **M-11** / **SYN-17** | `restartGame` reset local avant remote | `restartGame.js`, `restartGameRollback.js` | `startGameSession` throw | Hôte prep vide, remote ancien | Snapshot + rollback en catch ; clear Traitre private après succès | ✅ Corrigé + validé QA (2026-07-22) ; résidu hors scope : lobby `playing` si upsert échoue après `setLobbyPlaying` |
 | **M-04b** / **SYN-18** | `withPatchTimeout` timers non cleared | `gameSync.js` | Votes intensifs | Accumulation timers | `clearTimeout` dans finally | À traiter |
 | **T-05** | Vote optimistic vs patch timeout | `hotTakeSession.js` — `commitHotTakeVote()` | Patch 20 s timeout | Vote local ≠ serveur | Rollback ou indicateur « sync… » | À traiter |
 | **SYN-26** | `clutch.js` tap sans catch | `clutch.js` | Tap sync fail | Unhandled rejection | `.catch()` sur handler | À traiter |
@@ -394,7 +394,7 @@ La matrice ci-dessous liste les points encore ouverts ou résiduels. Les éléme
 | 2 Auth race | — | — | — | — |
 | 3 Multi-sources | — | — | M-14a (KO QA TierNight relance + flow invité tierlists) | — |
 | 4 Hôte/invité | — | I-08 | — | ARCH-03 (policy acting host) |
-| 5 Routing/timing | — | I-PG-01, T-02 | T-01, T-03, M-07, M-08 | — |
+| 5 Routing/timing | — | T-02 | T-01, T-03, M-07, M-08 | — |
 | 6 Async écrans | — | I-05 | SYN-13b, SYN-25 | SYN-05, M-08 |
 | 7 Erreurs silencieuses | — | — | M-10, T-05, M-14b | SYN-26 |
 | 8 Reset incomplet | — | I-09, I-06 | SYN-15, SYN-16 | ARCH-09, ARCH-10 |
@@ -408,16 +408,16 @@ La matrice ci-dessous liste les points encore ouverts ou résiduels. Les éléme
 
 | # | ID(s) | Cause | Pourquoi |
 |---|-------|-------|----------|
-| 1 | I-PG-01 | 3, 5 | Parcours fin de partie : distinguer résultat jeu / récap soirée / hub (Consensus + Hot Take) |
-| 2 | M-11 | 7 | QA « Recommencer » : rollback local si `startGameSession` échoue |
-| 3 | I-05, SYN-13b, SYN-25 | 6 | Bugs intermittents navigation |
-| 4 | I-06, P-01 | 8 | UX lobby invité dégradée |
-| 5 | I-08 | 4 | Sécurité intégrité session MP (RLS UPDATE) |
-| 6 | ARCH-03 | 4 | Policy acting host (metadata I-01 OK) |
+| 1 | I-05, SYN-13b, SYN-25 | 6 | Bugs intermittents navigation (handlers post-unmount) |
+| 2 | I-06, P-01 | 8 | UX lobby invité : ready reset au remount |
+| 3 | I-08 | 4 | Sécurité intégrité session MP (RLS UPDATE) |
+| 4 | ARCH-03 | 4 | Policy acting host (metadata I-01 OK) |
+| 5 | M-07 | 5 | `guesslie-menu` sans listener de suivi session |
+| 6 | T-02 | 5 | Navigation possible avant données complètes |
 | 7 | M-14a, SYN-14 | 3 | KO QA TierNight — suspendu |
-| 8 | T-02 | 5 | Navigation possible avant données complètes |
-| 9 | M-07 | 5 | `guesslie-menu` sans listener de suivi session |
-| 10 | M-12 | 11 | Dette UX : lien `#join=` sans auto-join |
+| 8 | M-12 | 11 | Dette UX : lien `#join=` sans auto-join |
+| 9 | M-10, T-05 | 7 | Sync silencieuse / vote optimistic |
+| 10 | SYN-22–24 | 9 | Duplication sync / launch (dette) |
 
 ### Clôtures récentes (2026-07-11)
 
@@ -430,7 +430,7 @@ La matrice ci-dessous liste les points encore ouverts ou résiduels. Les éléme
 - **L-09** — Messages réseau FR (`formatSyncErrorMessage`, titre « Connexion » dans `showAppAlert`)
 - **M-09** — Clôture complète (message réseau inclus)
 - **M-11 / SYN-17** — `commitPrepSessionLaunch` + rollback 12 jeux ; Traitre : clear private après succès ; tests `restartGameRollback`
-- **Consensus prep** — `finishConsensusGame` → `screen: "results"` + `game_id=menu` (inférence `consensus-prep` corrigée) ; régression podium → **I-PG-01** volet 1
+- **Consensus prep** — `finishConsensusGame` → `screen: "results"` + `game_id=menu` (inférence `consensus-prep` corrigée) ; régression podium → **I-PG-01** (clôturé 2026-07-22)
 - **SYN-28 volet 2 (partiel)** — `results.js` / `leaderboard.js` : `routeToActiveGameIfNeeded` ; tests `postGameScreenFollow` (QA complète → 2026-07-22)
 
 ### Clôtures récentes (2026-07-22)
@@ -448,14 +448,21 @@ La matrice ci-dessous liste les points encore ouverts ou résiduels. Les éléme
   - **M-06a** (+ **P-02 / M-06c**) — exit mid-game + bandeau Rejoindre
   - **I-01** — acting host / `host_id` = hôte réel du lobby
   - Résidus Cause 4 : **I-08** (RLS), **ARCH-03** (policy acting host)
+- **I-PG-01** — Fin de partie podium → récap soirée ; QA validée :
+  - **Consensus (étape A)** — `finishConsensusGame` stay-on-game + `showEveningResults`
+  - **Hot Take (B2)** — phase `"final"` + podium + reset uniquement à la clôture
+  - Trivia déjà conforme ; autres jeux hors scope ; ne pas rouvrir sans régression démontrée
+- **M-11 / SYN-17** — Rollback « Recommencer » si `startGameSession` échoue ; QA validée ; ne pas rouvrir sauf régression
+  - Résidu hors scope : lobby peut rester `playing` si upsert échoue après `setLobbyPlaying`
+- **Hygiène logs SYN-28** — retrait instrumentation temporaire `[SESSION-ROUTE]` / `hub-prep-v5` ; contrat `routeLog → boolean` conservé
 
 ### Résidus connus (hors scope des patchs 2026-07-22)
 
-- **I-PG-01 volet 1** — Parcours fin de partie à redéfinir avant tout `sessionGameId` optionnel dans `completeGameSession`
-- **M-11** — `startGameSession` peut laisser le lobby en `playing` si l'upsert échoue après `setLobbyPlaying` (Event A lobby avant Event B session ; hors scope routing SYN-28)
+- **M-11 résidu** — lobby `playing` si upsert échoue après `setLobbyPlaying` (hors rollback local)
 - **L-09 partiel** — `pushGameSession` dans `gameSync.js` affiche encore `err.message` brut (hors périmètre patch)
-- **Dette debug** — logs temporaires `[SESSION-ROUTE]` / `hub-prep-v5` à retirer après campagne ; logs `[DEBUG JOIN LOBERY START]` dans `lobby.js`
+- **Dette debug** — logs `[DEBUG JOIN LOBERY START]` dans `lobby.js` (hors campagne SESSION-ROUTE)
 - **SYN-28 hors scope** — écran `settings` ; retard éventuel lobby `playing` vs row `game_sessions` encore menu (Cas B)
+- **I-PG-01 hors scope** — autres jeux qui clôturent encore directement vers `results` sans podium dédié (pas touchés sans preuve)
 
 ---
 
@@ -474,6 +481,7 @@ Non listés comme problèmes — présents dans les audits comme points positifs
 | `handleLobbyDissolvedForGuest` + guard | `lobby.js` |
 | `prepGuestFollowOnSession` + `getEffectiveSessionScreen` | `mpLaunch.js`, `gameSync.js` |
 | Suivi hub/post-partie : `guestMustFollowSession` + `routeToActiveGameIfNeeded` | `gameSync.js`, `results.js`, `leaderboard.js`, `home.js`, `gameSelect.js` |
+| Podium in-game → récap soirée (Trivia / Consensus / Hot Take) | `games/trivia.js`, `games/consensus.js`, `games/hotTake.js` |
 | Debounce lobby refresh 250 ms | `supabaseLobby.js` |
 | **R-04** — reprise F5 OK si JWT intact | Parcours invité (happy path) |
 | Cartographie listeners / tables Supabase | Parcours invité (doc) |

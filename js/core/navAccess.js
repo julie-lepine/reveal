@@ -33,13 +33,6 @@ export function goToScores(target) {
     navigate("home", { reset: true });
     return false;
   }
-  console.log("[SESSION-ROUTE]", {
-    t: Date.now(),
-    source: "goToScores",
-    phase: "voluntary_scores_nav",
-    target,
-    from: getCurrentScreen(),
-  });
   suppressRoutingForScoreView();
   navigate(target, { navStack: SCORES_NAV_STACK[target] });
   return true;

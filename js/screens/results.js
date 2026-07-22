@@ -100,59 +100,14 @@ export function mountResults(app) {
     })();
     unsubSession = onGameSessionChange(async (row) => {
       if (!row) return;
-      console.log("[SESSION-ROUTE]", {
-        t: Date.now(),
-        source: "results/onGameSessionChange",
-        phase: "listener_entry",
-        declared: row.screen ?? null,
-        gameId: row.game_id ?? null,
-        updatedAt: row.updated_at ?? null,
-        stateKeys: row.state && typeof row.state === "object" ? Object.keys(row.state) : [],
-        current: getCurrentScreen(),
-        lobbyGameId: getLobbyGameId(),
-        lobbyStatus: getLobbyStatus(),
-      });
       if (tryFollowHostGameSession(row)) {
-        console.log("[SESSION-ROUTE]", {
-          t: Date.now(),
-          source: "results/onGameSessionChange",
-          phase: "tryFollowHostGameSession_handled",
-          current: getCurrentScreen(),
-        });
         return;
       }
       const routed = await routeToActiveGameIfNeeded(row);
-      console.log("[SESSION-ROUTE]", {
-        t: Date.now(),
-        source: "results/onGameSessionChange",
-        phase: "after_routeToActiveGameIfNeeded",
-        routed,
-        current: getCurrentScreen(),
-        declared: row.screen ?? null,
-        gameId: row.game_id ?? null,
-      });
       if (routed) return;
       if (getCurrentScreen() === "results") render();
     });
     unsubLobby = onLobbyBundleUpdated(() => {
-      console.log("[SESSION-ROUTE]", {
-        t: Date.now(),
-        source: "results/onLobbyBundleUpdated",
-        phase: "event_A_render_only",
-        lobbyGameId: getLobbyGameId(),
-        lobbyStatus: getLobbyStatus(),
-        current: getCurrentScreen(),
-        sessionCache: (() => {
-          const row = getCachedGameSession();
-          return row
-            ? {
-                game_id: row.game_id ?? null,
-                screen: row.screen ?? null,
-                updated_at: row.updated_at ?? null,
-              }
-            : null;
-        })(),
-      });
       if (getCurrentScreen() === "results") render();
     });
   } else {

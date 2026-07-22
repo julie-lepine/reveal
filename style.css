@@ -1614,6 +1614,14 @@ button.game-card{
   justify-content:center;
 }
 
+.btn-row--stack{
+  grid-template-columns:1fr;
+}
+
+.btn-row--stack .evening-recap__restart{
+  margin:0;
+}
+
 .btn-row--tier-end{
   grid-template-columns:1fr 1fr;
 }
@@ -3396,7 +3404,7 @@ select.field-input option{
 .evening-recap__meta{
   font-size:12px;
   color:rgba(255,255,255,.4);
-  margin:0;
+  margin:0 0 10px;
 }
 
 .evening-recap__chips{

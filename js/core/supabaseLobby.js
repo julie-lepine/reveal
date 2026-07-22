@@ -847,11 +847,6 @@ function applyLobbyToState(bundle, { persistGuestMembership = false } = {}) {
 
   rememberLobbyIdentity(bundle);
 
-  const prevLobby = getState().lobby;
-  const prevGameId = prevLobby?.gameId ?? null;
-  const nextGameId = bundle.gameId ?? null;
-  const lobbyGameChanged = prevGameId !== nextGameId;
-
   saveStatePatch({
     lobby: {
       id: bundle.id,
@@ -871,21 +866,7 @@ function applyLobbyToState(bundle, { persistGuestMembership = false } = {}) {
     },
   });
 
-  if (lobbyGameChanged) {
-    const cached = getCachedGameSession();
-    // TEMP : départager Cas A (session hottake-prep) vs Cas B (lobby hottake / session menu).
-    console.log("[SESSION-ROUTE]", {
-      source: "lobby_game_changed",
-      patch: "hub-prep-v4",
-      currentScreen: getCurrentScreen(),
-      lobbyGameId: nextGameId,
-      lobbyStatus: bundle.status ?? null,
-      prevLobbyGameId: prevGameId,
-      cachedSessionGameId: cached?.game_id ?? null,
-      cachedSessionScreen: cached?.screen ?? null,
-      cachedSessionUpdatedAt: cached?.updated_at ?? null,
-    });
-  }  if (persistGuestMembership || getState().user?.isGuest) {
+  if (persistGuestMembership || getState().user?.isGuest) {
     const membership = membershipFromBundle(bundle);
     if (membership) saveGuestMembership(membership);
   }
@@ -1400,29 +1381,7 @@ export function subscribeLobbyRealtime(onUpdate) {
       "postgres_changes",
       { event: "UPDATE", schema: "public", table: "lobbies", filter: `id=eq.${lobbyId}` },
       (payload) => {
-        const meaningful = isMeaningfulLobbyUpdate(payload.new);
-        console.log("[SESSION-ROUTE]", {
-          t: Date.now(),
-          source: "supabaseLobby/realtime/lobbies",
-          phase: "event_A_lobby_update",
-          meaningful,
-          lobbyGameIdIncoming: payload.new?.game_id ?? null,
-          lobbyStatusIncoming: payload.new?.status ?? null,
-          lobbyGameIdCached: getState().lobby?.gameId ?? null,
-          lobbyStatusCached: getState().lobby?.status ?? null,
-          sessionCache: (() => {
-            const row = getCachedGameSession();
-            return row
-              ? {
-                  game_id: row.game_id ?? null,
-                  screen: row.screen ?? null,
-                  updated_at: row.updated_at ?? null,
-                }
-              : null;
-          })(),
-          current: getCurrentScreen(),
-        });
-        if (!meaningful) return;
+        const meaningful = isMeaningfulLobbyUpdate(payload.new);        if (!meaningful) return;
         scheduleLobbyRefresh();
       }
     )
@@ -1457,77 +1416,12 @@ export function subscribeLobbyRealtime(onUpdate) {
            * Le payload Realtime contient déjà la ligne complète (state inclus) :
            * on l'applique directement au lieu de refaire un aller-retour DB. Ça
            * réduit la latence et évite que 6 clients refetchent en même temps.
-           */
-          console.log("[SESSION-ROUTE]", {
-            source: "remote_session_received",
-            patch: "hub-prep-v5",
-            via: "realtime/game_sessions",
-            traceId: null,
-            eventType: payload.eventType,
-            gameId: payload.new?.game_id ?? null,
-            declaredScreen: payload.new?.screen ?? null,
-            updatedAt: payload.new?.updated_at ?? null,
-            lobbyGameId: getState().lobby?.gameId ?? null,
-            lobbyStatus: getState().lobby?.status ?? null,
-            currentScreen: getCurrentScreen(),
-            hasState: payload.new?.state !== undefined,
-          });
-          console.log("[SESSION-ROUTE]", {
-            t: Date.now(),
-            source: "supabaseLobby/realtime/game_sessions",
-            phase: "event_B_before_apply",
-            eventType: payload.eventType,
-            declared: payload.new?.screen ?? null,
-            gameId: payload.new?.game_id ?? null,
-            updatedAt: payload.new?.updated_at ?? null,
-            hasState: payload.new?.state !== undefined,
-            stateIsNull: payload.new?.state === null,
-            stateKeys:
-              payload.new?.state && typeof payload.new.state === "object"
-                ? Object.keys(payload.new.state)
-                : [],
-            cacheBefore: (() => {
-              const row = getCachedGameSession();
-              return row
-                ? {
-                    game_id: row.game_id ?? null,
-                    screen: row.screen ?? null,
-                    updated_at: row.updated_at ?? null,
-                  }
-                : null;
-            })(),
-            current: getCurrentScreen(),
-            applyPath:
-              payload.new && payload.new.state !== undefined
-                ? "applyRemoteSession_inline"
-                : "refreshGameSession_fallback",
-          });
-          if (payload.new && payload.new.state !== undefined) {
+           */          if (payload.new && payload.new.state !== undefined) {
             applyRemoteSession(payload.new);
           } else {
             await refreshGameSession();
           }
-          const row = getCachedGameSession();
-          console.log("[SESSION-ROUTE]", {
-            t: Date.now(),
-            source: "supabaseLobby/realtime/game_sessions",
-            phase: "event_B_before_handleSessionRoute",
-            declared: row?.screen ?? null,
-            gameId: row?.game_id ?? null,
-            updatedAt: row?.updated_at ?? null,
-            stateKeys: row?.state && typeof row.state === "object" ? Object.keys(row.state) : [],
-            current: getCurrentScreen(),
-          });
-          if (row) handleSessionRoute(row, { debugSource: "supabaseLobby/realtime/handle" });
-          console.log("[SESSION-ROUTE]", {
-            t: Date.now(),
-            source: "supabaseLobby/realtime/game_sessions",
-            phase: "event_B_after_handleSessionRoute",
-            current: getCurrentScreen(),
-            declared: getCachedGameSession()?.screen ?? null,
-            gameId: getCachedGameSession()?.game_id ?? null,
-          });
-        } catch (e) {
+          const row = getCachedGameSession();          if (row) handleSessionRoute(row, { debugSource: "supabaseLobby/realtime/handle" });        } catch (e) {
           console.warn("REVEAL realtime game_sessions:", e.message || e);
         }
         onUpdate?.();
