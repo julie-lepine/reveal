@@ -327,10 +327,37 @@ function isSuppressedGameReturn(targetScreen) {
 /** L'hôte a lancé un autre jeu / écran : l'invité doit suivre malgré suppress. */
 function isSessionAdvancedFromSuppress(targetScreen) {
   if (!suppressSessionScreen || !targetScreen) return false;
+
+  // Signature de session différente de celle mémorisée à l'ouverture des scores
+  // (relance, autre jeu, nouvel état de prep…).
   if (suppressSessionSig && sessionSignature(getCachedGameSession()) !== suppressSessionSig) {
     return true;
   }
+
   if (targetScreen === suppressSessionScreen) return false;
+
+  /**
+   * Prep / partie active : avancement réel depuis une consultation de scores ouverte
+   * hors session active (hub / post-partie), ou sans signature mémorisée (aucune
+   * session active au clic). Ne pas passer par isCompatibleSessionScreen(hub, prep) :
+   * cette API signifie « ne pas ramener de la prep vers le hub », pas « la prep
+   * n'est pas un lancement depuis le hub ».
+   */
+  if (shouldForceGuestFollowSession(targetScreen)) {
+    if (
+      !suppressSessionSig ||
+      suppressSessionScreen === "game-select" ||
+      suppressSessionScreen === "lobby" ||
+      POST_GAME_SCREENS.has(suppressSessionScreen)
+    ) {
+      return true;
+    }
+    // Suppress pris sur une autre prep/partie : l'hôte a changé d'écran actif.
+    if (shouldForceGuestFollowSession(suppressSessionScreen)) {
+      return true;
+    }
+  }
+
   if (isCompatibleSessionScreen(suppressSessionScreen, targetScreen)) return false;
   return true;
 }
