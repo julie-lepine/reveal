@@ -35,7 +35,6 @@ import {
   isGameSyncActive,
   onGameSessionChange,
   routeToActiveGameIfNeeded,
-  isSessionRouteSuppressed,
   tryFollowHostGameSession,
 } from "../core/gameSync.js";
 import { navigate, getCurrentScreen, getScreenParams } from "../core/router.js";
@@ -951,9 +950,8 @@ export function mountHome(app) {
     unsubSession = onGameSessionChange(async (row) => {
       if (getCurrentScreen() !== "home") return;
       tryFollowHostGameSession(row);
-      if (!isSessionRouteSuppressed()) {
-        if (await routeToActiveGameIfNeeded()) return;
-      }
+      // Ne pas court-circuiter sur isSessionRouteSuppressed : shouldApply/mustFollow décide.
+      if (await routeToActiveGameIfNeeded(row)) return;
       scheduleRender(false);
     });
   }

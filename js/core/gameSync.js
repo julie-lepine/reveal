@@ -194,12 +194,46 @@ let sessionRouteSeq = 0;
 
 console.log("[SESSION-ROUTE]", {
   source: "gameSync-module-load",
-  patch: "hub-prep-v4",
+  patch: "hub-prep-v5",
   t: Date.now(),
 });
 
 /** Dernière raison renvoyée par shouldApplySessionRoute (pour logs imbriqués). */
 let lastSessionRouteDecisionReason = "";
+
+/** Trace bout-en-bout d'un événement session → navigation. */
+let activeSessionRouteTraceId = null;
+let sessionRouteTraceSeq = 0;
+
+function beginSessionRouteTrace(prefix = "sr") {
+  activeSessionRouteTraceId = `${prefix}-${Date.now()}-${++sessionRouteTraceSeq}`;
+  return activeSessionRouteTraceId;
+}
+
+function traceSessionRoute(source, fields = {}) {
+  console.log("[SESSION-ROUTE]", {
+    source,
+    patch: "hub-prep-v5",
+    traceId: activeSessionRouteTraceId,
+    currentScreen: getCurrentScreen(),
+    lobbyGameId: getLobbyGameId(),
+    ...fields,
+  });
+}
+
+/**
+ * Invariant : invité encore dans le lobby + cible prep/play + écran local différent
+ * → suivi automatique (results, leaderboard, home, game-select…).
+ */
+function guestMustFollowSession(targetScreen, currentScreen = getCurrentScreen()) {
+  if (!targetScreen) return false;
+  if (isLobbyHost()) return false;
+  if (!isGameSyncActive()) return false;
+  if (!getState().inLobby || !getState().lobby?.id) return false;
+  if (!shouldForceGuestFollowSession(targetScreen)) return false;
+  if (currentScreen === targetScreen) return false;
+  return true;
+}
 
 function sessionRouteCacheSnapshot(row = cachedRow) {
   if (!row) return null;
@@ -449,8 +483,19 @@ function isBrowsingScoresWithRouteSuppress(screen = getCurrentScreen()) {
 function shouldApplySessionRoute(row, { fromScreen = null, debugSource = null } = {}) {
   const source = debugSource || "shouldApplySessionRoute";
   const screen = getEffectiveSessionScreen(row);
+  const current = getCurrentScreen();
   const routeLog = (allowed, reason, extra = {}) => {
     lastSessionRouteDecisionReason = reason;
+    traceSessionRoute(source, {
+      phase: "decision",
+      targetScreen: screen,
+      gameId: row?.game_id ?? null,
+      allowed,
+      reason,
+      nestedReason: extra.nestedReason ?? null,
+      mustFollow: extra.mustFollow ?? guestMustFollowSession(screen, current),
+      ...extra,
+    });
     return logSessionRouteDecision(source, row, allowed, reason, { effective: screen, ...extra });
   };
 
@@ -462,10 +507,19 @@ function shouldApplySessionRoute(row, { fromScreen = null, debugSource = null } 
   if (screen === "game-select" && !isLobbyEveningStarted()) {
     return routeLog(false, "game_select_evening_not_started");
   }
-  const current = getCurrentScreen();
   if (screen === current) return routeLog(false, "already_on_target_screen");
   if (isCompatibleSessionScreen(screen, current)) {
     return routeLog(false, "compatible_session_screen_no_nav");
+  }
+
+  // Invariant générique invité : prep/play distante + écran local différent → suivre.
+  // La consultation scores ne bloque que si la session n'a PAS avancé depuis le suppress.
+  const mustFollow = guestMustFollowSession(screen, current);
+  if (mustFollow) {
+    if (isBrowsingScoresWithRouteSuppress(current) && !isSessionAdvancedFromSuppress(screen)) {
+      return routeLog(false, "scores_suppress_blocks_must_follow", { mustFollow: true });
+    }
+    return routeLog(true, "guest_must_follow", { mustFollow: true });
   }
 
   if (isBrowsingScoresWithRouteSuppress(current)) {
@@ -516,8 +570,6 @@ function shouldApplySessionRoute(row, { fromScreen = null, debugSource = null } 
   }
 
   // Paramétrage ou partie en cours : suivi obligatoire (ignore suppressSessionRoute).
-  // Retry autorisé même si la session distante (sig) a déjà été observée : l'écran
-  // local peut encore être results après un premier refus (ex. suppress).
   if (shouldForceGuestFollowSession(screen)) {
     if (isBrowsingScoresWithRouteSuppress(current)) {
       return routeLog(
@@ -2996,8 +3048,24 @@ async function confirmMissingSessionThenRoute() {
 }
 
 export function applyRemoteSession(row) {
+  const traceId = beginSessionRouteTrace("apply");
   const cacheBefore = sessionRouteCacheSnapshot();
+  const effectiveIn = row ? getEffectiveSessionScreen(row) : null;
+  traceSessionRoute("applyRemoteSession", {
+    phase: "enter",
+    targetScreen: effectiveIn,
+    gameId: row?.game_id ?? null,
+    declaredScreen: row?.screen ?? null,
+    cacheBefore,
+  });
   if (isOlderSessionRow(row)) {
+    traceSessionRoute("applyRemoteSession", {
+      phase: "exit",
+      allowed: false,
+      reason: "older_session_row_ignored",
+      targetScreen: effectiveIn,
+      gameId: row?.game_id ?? null,
+    });
     logSessionRouteDecision("applyRemoteSession", row, false, "older_session_row_ignored", {
       cacheBefore,
       incomingUpdatedAt: row?.updated_at ?? null,
@@ -3248,25 +3316,44 @@ export function applyRemoteSession(row) {
       notified: false,
       cacheAfter: sessionRouteCacheSnapshot(row),
     });
-    // Session déjà observée ≠ navigation déjà réussie : si l'écran local n'est
-    // toujours pas la cible force-follow (ex. premier refus sous suppress), on retente.
+    // Session déjà observée ≠ navigation déjà réussie : retenter si mustFollow.
     const effective = getEffectiveSessionScreen(row);
     const current = getCurrentScreen();
+    const mustFollow = guestMustFollowSession(effective, current);
+    traceSessionRoute("applyRemoteSession", {
+      phase: "sig_unchanged_retry_gate",
+      targetScreen: effective,
+      gameId: row?.game_id ?? null,
+      mustFollow,
+      allowed: null,
+      reason: "sig_unchanged_early_exit",
+    });
     if (
-      effective &&
-      current !== effective &&
-      shouldForceGuestFollowSession(effective) &&
+      mustFollow &&
       shouldApplySessionRoute(row, {
         fromScreen: prevScreen,
         debugSource: "applyRemoteSession/sig_unchanged_retry",
       })
     ) {
       clearSuppressIfFollowingHost(effective, current);
+      traceSessionRoute("applyRemoteSession", {
+        phase: "before_handleSessionRoute",
+        targetScreen: effective,
+        gameId: row?.game_id ?? null,
+        allowed: true,
+        reason: "sig_unchanged_must_follow_retry",
+      });
       handleSessionRoute(row, {
         fromScreen: prevScreen,
         debugSource: "applyRemoteSession/sig_unchanged_handle",
       });
     }
+    traceSessionRoute("applyRemoteSession", {
+      phase: "exit",
+      targetScreen: effective,
+      gameId: row?.game_id ?? null,
+      reason: "sig_unchanged_early_exit",
+    });
     return;
   }
 
@@ -3277,9 +3364,22 @@ export function applyRemoteSession(row) {
   });
   notify(row);
 
+  traceSessionRoute("applyRemoteSession", {
+    phase: "before_shouldApplySessionRoute",
+    targetScreen: getEffectiveSessionScreen(row),
+    gameId: row?.game_id ?? null,
+  });
   const routeAllowed = shouldApplySessionRoute(row, {
     fromScreen: prevScreen,
     debugSource: "applyRemoteSession/shouldApply",
+  });
+  traceSessionRoute("applyRemoteSession", {
+    phase: "after_shouldApplySessionRoute",
+    targetScreen: getEffectiveSessionScreen(row),
+    gameId: row?.game_id ?? null,
+    allowed: routeAllowed,
+    reason: lastSessionRouteDecisionReason,
+    nestedReason: lastSessionRouteDecisionReason,
   });
   logSessionRouteDecision("applyRemoteSession", row, routeAllowed, "post_notify_route_gate", {
     prevScreen,
@@ -3291,8 +3391,22 @@ export function applyRemoteSession(row) {
     const screen = getEffectiveSessionScreen(row);
     const cur = getCurrentScreen();
     clearSuppressIfFollowingHost(screen, cur);
+    traceSessionRoute("applyRemoteSession", {
+      phase: "before_handleSessionRoute",
+      targetScreen: screen,
+      gameId: row?.game_id ?? null,
+      allowed: true,
+      reason: lastSessionRouteDecisionReason,
+    });
     handleSessionRoute(row, { fromScreen: prevScreen, debugSource: "applyRemoteSession/handle" });
   }
+  traceSessionRoute("applyRemoteSession", {
+    phase: "exit",
+    targetScreen: getEffectiveSessionScreen(row),
+    gameId: row?.game_id ?? null,
+    allowed: routeAllowed,
+    reason: lastSessionRouteDecisionReason,
+  });
 }
 
 export async function refreshGameSession() {
@@ -3301,7 +3415,7 @@ export async function refreshGameSession() {
   const row = await fetchGameSessionByLobby(lobbyId);
   console.log("[SESSION-ROUTE]", {
     source: "remote_session_received",
-    patch: "hub-prep-v4",
+    patch: "hub-prep-v5",
     via: "refreshGameSession",
     gameId: row?.game_id ?? null,
     declaredScreen: row?.screen ?? null,
@@ -3368,6 +3482,12 @@ export { isAppContentMounted };
 
 export function routeToSessionScreen(screen, { force = false } = {}) {
   if (!screen || routing) {
+    traceSessionRoute("routeToSessionScreen", {
+      phase: "blocked",
+      targetScreen: screen,
+      allowed: false,
+      reason: !screen ? "no_screen" : "routing_lock_busy",
+    });
     logSessionRouteDecision(
       "routeToSessionScreen",
       getCachedGameSession(),
@@ -3382,6 +3502,13 @@ export function routeToSessionScreen(screen, { force = false } = {}) {
 
   routing = true;
   try {
+    traceSessionRoute("routeToSessionScreen", {
+      phase: "before_navigate",
+      targetScreen: screen,
+      allowed: true,
+      reason: "navigate_exec",
+      from: current,
+    });
     logSessionRouteDecision("routeToSessionScreen", getCachedGameSession(), true, "navigate_exec", {
       requested: screen,
       force,
@@ -3399,6 +3526,13 @@ export function routeToSessionScreen(screen, { force = false } = {}) {
   } finally {
     routing = false;
   }
+  traceSessionRoute("routeToSessionScreen", {
+    phase: "after_navigate",
+    targetScreen: screen,
+    allowed: true,
+    reason: "navigate_done",
+    currentScreenAfter: getCurrentScreen(),
+  });
   return isAppContentMounted();
 }
 
@@ -3670,7 +3804,21 @@ export async function routeToActiveGameIfNeeded(cachedRowOnly = null, { force = 
 export function handleSessionRoute(row, { fromScreen = null, debugSource = null } = {}) {
   const source = debugSource || "handleSessionRoute";
   const screen = getEffectiveSessionScreen(row);
+  traceSessionRoute(source, {
+    phase: "enter",
+    targetScreen: screen,
+    gameId: row?.game_id ?? null,
+    fromScreen,
+  });
   if (!shouldApplySessionRoute(row, { fromScreen, debugSource: `${source}/shouldApply` })) {
+    traceSessionRoute(source, {
+      phase: "exit",
+      targetScreen: screen,
+      gameId: row?.game_id ?? null,
+      allowed: false,
+      reason: "should_apply_session_route_false",
+      nestedReason: lastSessionRouteDecisionReason,
+    });
     logSessionRouteDecision(source, row, false, "should_apply_session_route_false", {
       effective: screen,
       fromScreen,
@@ -3682,8 +3830,23 @@ export function handleSessionRoute(row, { fromScreen = null, debugSource = null 
   }
   const current = getCurrentScreen();
   clearSuppressIfFollowingHost(screen, current);
+  traceSessionRoute(source, {
+    phase: "before_routeToSessionScreen",
+    targetScreen: screen,
+    gameId: row?.game_id ?? null,
+    allowed: true,
+    reason: lastSessionRouteDecisionReason,
+  });
   logSessionRouteDecision(source, row, true, "navigate", { effective: screen, fromScreen });
   routeToSessionScreen(screen, { force: true });
+  traceSessionRoute(source, {
+    phase: "after_routeToSessionScreen",
+    targetScreen: screen,
+    gameId: row?.game_id ?? null,
+    allowed: true,
+    reason: "navigate",
+    currentScreenAfter: getCurrentScreen(),
+  });
 }
 
 /** Polling de secours si Realtime ne pousse pas l’événement (fréquent en local). */

@@ -1460,8 +1460,9 @@ export function subscribeLobbyRealtime(onUpdate) {
            */
           console.log("[SESSION-ROUTE]", {
             source: "remote_session_received",
-            patch: "hub-prep-v4",
+            patch: "hub-prep-v5",
             via: "realtime/game_sessions",
+            traceId: null,
             eventType: payload.eventType,
             gameId: payload.new?.game_id ?? null,
             declaredScreen: payload.new?.screen ?? null,

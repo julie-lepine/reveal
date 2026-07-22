@@ -3525,7 +3525,8 @@ select.field-input option{
 .game-grid .game-tile.tier,
 .game-grid .game-tile.blindtest,
 .game-grid .game-tile.wrong,
-.game-grid .game-tile.playlist{
+.game-grid .game-tile.playlist,
+.game-grid .game-tile.clutch{
   background:transparent;
 }
 
