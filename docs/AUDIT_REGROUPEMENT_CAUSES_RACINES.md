@@ -300,12 +300,12 @@ Revue code (2026-07-22) : **I-06 / ARCH-09** corrigés (mount non destructif) ; 
 | ID | Problème | Fichier / fonction | Scénario | Impact | Correction proposée | Statut |
 |----|----------|-------------------|----------|--------|---------------------|--------|
 | **I-09** / **SYN-06** | `renameLocalPlayer` incomplet | `state.js` — `renameLocalPlayer()` | Rename mid-soirée | Votes/scores orphelins | Migrer tous `*Game` + `gameScores` | 🟡 Partiel : scores/stats + HotTake/Dilemma/Consensus/GuessLie submissions/TierNight recaps OK ; manque `gameScores` + plusieurs `*Game` |
-| **I-06** / **P-01** | Reset ready à chaque mount lobby | `screens/lobby.js`, `lobby.js` — `resetAllParticipantsReady()` | Retour lobby avant soirée | Prêt local perdu | Reset seulement création lobby / action hôte | ✅ Corrigé (2026-07-22) : mount → `reconcileLobbyReadyOnMount()` (non destructif) |
+| **I-06** / **P-01** | Reset ready à chaque mount lobby | `screens/lobby.js`, `lobby.js` — `resetAllParticipantsReady()` | Retour lobby avant soirée | Prêt local perdu | Reset seulement création lobby / action hôte | ✅ Corrigé + **QA validée** (2026-07-22) : mount → `reconcileLobbyReadyOnMount()` (non destructif) |
 | **P-02** | Exit invité blobs non cleared | `exitGame.js` | Quit partie | Stale prep state | `resetLocalGamePrepState()` via `returnToGameSelect()` | ✅ / 🔁 Doublon M-06a–c (clôturé QA 2026-07-22) |
 | **SYN-15** | `applyRemotePlayerStats` double merge | `playerStatsSync.js` | Noms stale remote | State bloat | Merge participants only | À traiter |
 | **SYN-16** | `applyRemoteLobbyScores` idem | `gameSync.js` | Anciens membres | Scores fantômes | Filtrer par participants actifs | À traiter |
 | **I-03** | (aussi cause 3) reset scoring module | `state.js` | Reset scores | mauvais bucket | `activeScoringGameId = null` dans reset | ✅ Corrigé + test (voir cause 3) |
-| **ARCH-09** | `resetAllParticipantsReady` seulement local en Supabase | `lobby.js`, `lobbyReadyMount.js` | Remount lobby | Ready DB peut différer | Sync ready depuis serveur au mount | ✅ Léger (2026-07-22) : refresh bundle au mount, pas de wipe DB |
+| **ARCH-09** | `resetAllParticipantsReady` seulement local en Supabase | `lobby.js`, `lobbyReadyMount.js` | Remount lobby | Ready DB peut différer | Sync ready depuis serveur au mount | ✅ Léger + **QA validée** (2026-07-22) : refresh bundle au mount, pas de wipe DB |
 | **ARCH-10** | Leave lobby : `clearCachedGameSession` timing | `lobby.js` — `leaveLobby()` | Leave mid-game | Cache stale bref | Ordre stop sync → clear → navigate | 🟡 Partiel : sync stoppé d’abord ; cache clear seulement après `await leaveLobbySupabase()` |
 
 **Symptômes utilisateur :** état incohérent après rename/quit/remount.
@@ -482,7 +482,13 @@ La matrice ci-dessous liste les points encore ouverts ou résiduels **après rev
 
 Comparaison tickets encore ouverts ↔ code actuel (aucune fermeture automatique hors constat) :
 
-- **I-06 / P-01** + **ARCH-09** — ✅ Corrigé : mount lobby non destructif (`reconcileLobbyReadyOnMount`) ; refresh bundle serveur sans wipe ; tests `lobbyReadyMount`
+- **I-06 / P-01** + **ARCH-09** — ✅ Corrigé + **QA validée** (2026-07-22 soir) :
+  - Invité prêt → quitte lobby → revient → reste prêt
+  - Remount répété / refresh page / sync croisée ready serveur OK
+  - Nouveau lobby / nouvel invité non prêt sans écraser les autres
+  - Lancement soirée inchangé ; multi-joueurs OK ; console propre
+  - Non applicable QA : « hôte quitte lobby » (ferme pour tous) ; « retour lobby après jeu » (pas de retour lobby une fois la soirée lancée)
+  - **Ne plus rouvrir / ne plus modifier ce périmètre** sans régression démontrée
 - **SYN-25** — ✅ Corrigé : `guessLieMenu.js` listener + cleanup ; early redirect suivi via **M-08**
 - **M-07** — ✅ confirmé corrigé (déjà noté) ; retiré du Top 10 / matrice ouverte
 - **L-02** — ✅ Turnstile rejoin skip si session anon live

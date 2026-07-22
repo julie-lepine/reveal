@@ -102,15 +102,41 @@ export function mountTierNight(app) {
 
     if (isGameSyncActive()) {
       const uid = getSupabaseUserId();
-      const row = getCachedGameSession();
-      const tn = row?.state?.tierNight || {};
-      const placements = { ...(tn.placements || {}), [uid]: placed };
-      const done = { ...(tn.finished || {}), [uid]: true };
-      await syncTierNightSession({
-        topicId: list.id,
-        placements,
-        finished: done,
-      });
+      if (!uid) return;
+
+      if (isLobbyHost()) {
+        const row = getCachedGameSession();
+        const tn = row?.state?.tierNight || {};
+        const placements = { ...(tn.placements || {}), [uid]: placed };
+        const done = { ...(tn.finished || {}), [uid]: true };
+        await syncTierNightSession({
+          topicId: list.id,
+          placements,
+          finished: done,
+        });
+      } else {
+        // I-08 : deux contributions atomiques uid-only
+        const { getState } = await import("../core/state.js");
+        const lobbyId = getState()?.lobby?.id;
+        if (!lobbyId) return;
+        const { rpcContributeGameSessionPlayer } = await import("../core/gameSessionRpc.js");
+        const { applyRemoteSession } = await import("../core/gameSync.js");
+        const { fetchGameSessionByLobby } = await import("../core/supabaseGame.js");
+        await rpcContributeGameSessionPlayer({
+          lobbyId,
+          game: "tiernight",
+          kind: "placement",
+          value: placed,
+        });
+        const row = await rpcContributeGameSessionPlayer({
+          lobbyId,
+          game: "tiernight",
+          kind: "finished",
+          value: true,
+        });
+        const full = row?.state ? row : await fetchGameSessionByLobby(lobbyId);
+        if (full) applyRemoteSession(full);
+      }
       if (!alive) return;
 
       render();

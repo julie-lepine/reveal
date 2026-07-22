@@ -99,6 +99,10 @@ import {
 } from "./tierNightConfig.js";
 
 export { pickRemotePlayFields, PLAY_PATCH_EXCLUDE } from "./playPatch.js";
+import {
+  detectPlayerContribution,
+  stateKeyToGameId,
+} from "./playerContribution.js";
 
 let cachedRow = null;
 let lastSessionSig = "";
@@ -3946,12 +3950,93 @@ export async function patchGameState(
   );
 }
 
+/**
+ * I-08 : invité / acting host — jamais d'UPDATE direct game_sessions.
+ * Contributions simples → RPC contribute ; acting play → RPC host-play.
+ */
+async function patchGameStateAsNonHost(
+  stateMerge,
+  { screen, gameId, withEveningScores = false } = {}
+) {
+  const lobbyId = getState().lobby.id;
+  const uid = getSupabaseUserId();
+  if (!uid) throw new Error("Session requise.");
+
+  if (withEveningScores) {
+    throw new Error("Scores de soirée réservés à l'hôte.");
+  }
+
+  const contribution = detectPlayerContribution(stateMerge, uid);
+  if (contribution) {
+    const {
+      rpcContributeGameSessionPlayer,
+    } = await import("./gameSessionRpc.js");
+    const row = await rpcContributeGameSessionPlayer({
+      lobbyId,
+      game: contribution.game,
+      kind: contribution.kind,
+      value: contribution.value,
+    });
+    if (!row) throw new Error("Contribution refusée.");
+    // RPC peut ne pas renvoyer state selon PostgREST ; recharger si besoin
+    let full = row;
+    if (!row.state) {
+      full = (await fetchGameSessionByLobby(lobbyId)) || row;
+    }
+    applyRemoteSession(full);
+    return full;
+  }
+
+  // Acting host : play patch contrôlé (pas d'UPDATE libre)
+  if (canActAsHost()) {
+    const keys = Object.keys(stateMerge || {});
+    if (keys.length !== 1) {
+      throw new Error("Patch acting host : un seul jeu à la fois.");
+    }
+    const stateKey = keys[0];
+    const game = stateKeyToGameId(stateKey);
+    if (!game) {
+      throw new Error("Jeu non autorisé pour acting host.");
+    }
+    const playPatch = stateMerge[stateKey];
+    if (!playPatch || typeof playPatch !== "object") {
+      throw new Error("Patch play invalide.");
+    }
+    const { rpcApplyActingHostPlay } = await import("./gameSessionRpc.js");
+    const row = await rpcApplyActingHostPlay({
+      lobbyId,
+      action: "merge_play",
+      game,
+      playPatch,
+      screen: screen || null,
+      gameId: gameId || null,
+    });
+    let full = row;
+    if (!row?.state) {
+      full = (await fetchGameSessionByLobby(lobbyId)) || row;
+    }
+    applyRemoteSession(full);
+    if (screen) handleSessionRoute(full);
+    return full;
+  }
+
+  throw new Error(
+    "Action non autorisée : utilise une contribution joueur ou attends l'hôte."
+  );
+}
+
 async function patchGameStateInner(
   stateMerge,
   { screen, gameId, withEveningScores = false } = {}
 ) {
   if (!isGameSyncActive()) return null;
   const lobbyId = getState().lobby.id;
+
+  // I-08 : seul l'hôte réel conserve updateGameSession
+  if (!isLobbyHost()) {
+    return patchGameStateAsNonHost(stateMerge, { screen, gameId, withEveningScores });
+  }
+
   let mergePayload = stateMerge;
   if (withEveningScores && isLobbyHost()) {
     mergePayload = { ...stateMerge, ...eveningStateToRemote() };
@@ -4383,6 +4468,21 @@ export async function completeGameSession({ gameId = "menu", screen = "results",
   const lobbyId = getState().lobby.id;
   const actorId = getSupabaseUserId();
   if (!actorId) return null;
+
+  // ARCH-03 / I-08 : acting host → RPC dédiée (pas d'upsert / pas de scores client)
+  if (!isLobbyHost()) {
+    if (!canActAsHost()) return null;
+    const { rpcCompleteGameSessionAsActor } = await import("./gameSessionRpc.js");
+    const row = await rpcCompleteGameSessionAsActor({ lobbyId, screen });
+    let full = row;
+    if (!row?.state) {
+      full = (await fetchGameSessionByLobby(lobbyId)) || row;
+    }
+    applyRemoteSession(full);
+    routeToSessionScreen(screen, { force: true });
+    return full;
+  }
+
   const hostId = getState().lobby?.hostId || actorId;
 
   const { setLobbyBetweenGames } = await import("./lobby.js");

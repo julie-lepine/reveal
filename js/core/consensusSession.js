@@ -14,6 +14,7 @@ import {
   allMembersReady,
   isGameSyncActive,
   isLobbyHost,
+  canActAsHost,
   playerKeyToDisplayName,
   syncConsensusSession,
   consensusToRemote,
@@ -391,7 +392,7 @@ const CONSENSUS_MP_PATCH_OPTS = {
 export async function commitConsensusPhase(phase) {
   const session = { ...getConsensusSession(), phase };
   saveStatePatch({ consensusGame: session });
-  if (!isGameSyncActive()) return session;
+  if (!isGameSyncActive() || !canActAsHost()) return session;
   await patchGameState({ consensus: { phase } }, CONSENSUS_MP_PATCH_OPTS);
   return session;
 }
@@ -400,7 +401,7 @@ export async function commitConsensusPhase(phase) {
 export async function commitConsensusReveal(scoredSession) {
   const revealSession = { ...scoredSession, phase: "reveal" };
   saveStatePatch({ consensusGame: revealSession });
-  if (!isGameSyncActive()) return revealSession;
+  if (!isGameSyncActive() || !canActAsHost()) return revealSession;
   await patchGameState(
     { consensus: consensusRevealToRemote(revealSession) },
     CONSENSUS_MP_PATCH_OPTS

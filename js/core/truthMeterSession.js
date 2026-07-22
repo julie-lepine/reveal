@@ -217,7 +217,7 @@ export async function commitTruthMeterPlay(patch, patchOpts = {}) {
   });
 }
 
-/** Soumission affirmation auteur : hôte via commitHostGamePlay, invité via patch étroit. */
+/** Soumission affirmation auteur : hôte via commitHostGamePlay, invité via RPC dédiée. */
 export async function commitTruthMeterAffirmation(text, authorEstimate) {
   const localName = getLocalDisplayName();
   const session = getTruthMeterSession();
@@ -235,8 +235,20 @@ export async function commitTruthMeterAffirmation(text, authorEstimate) {
   const next = { ...session, ...patch };
   saveStatePatch({ truthMeterGame: next });
   if (!isGameSyncActive()) return next;
-  await patchGameStateWithFeedback({ truthMeter: patch });
-  return next;
+
+  const lobbyId = getState().lobby?.id;
+  if (!lobbyId) return next;
+  const { rpcSubmitTruthMeterAffirmation } = await import("./gameSessionRpc.js");
+  const { applyRemoteSession } = await import("./gameSync.js");
+  const { fetchGameSessionByLobby } = await import("./supabaseGame.js");
+  const row = await rpcSubmitTruthMeterAffirmation({
+    lobbyId,
+    text,
+    authorEstimate,
+  });
+  const full = row?.state ? row : await fetchGameSessionByLobby(lobbyId);
+  if (full) applyRemoteSession(full);
+  return getTruthMeterSession();
 }
 
 /** MP : envoie uniquement le vote local (évite d'écraser phase reveal de l'hôte). */

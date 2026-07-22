@@ -226,11 +226,30 @@ export async function addCustomDilemma(optionA, optionB) {
     [],
     getLocalDisplayName()
   );
-  await syncDilemmaSession({
-    ...session,
-    customDilemmas: merged,
-    deck: null,
+  saveStatePatch({ dilemmaGame: { ...session, customDilemmas: merged, deck: null } });
+  if (!isGameSyncActive()) return { ok: true };
+
+  if (isLobbyHost()) {
+    await syncDilemmaSession({
+      ...session,
+      customDilemmas: merged,
+      deck: null,
+    });
+    return { ok: true };
+  }
+
+  const lobbyId = getState().lobby?.id;
+  if (!lobbyId) return { ok: true };
+  const { rpcUpsertPlayerCustomEntry } = await import("./gameSessionRpc.js");
+  const { applyRemoteSession } = await import("./gameSync.js");
+  const { fetchGameSessionByLobby } = await import("./supabaseGame.js");
+  const row = await rpcUpsertPlayerCustomEntry({
+    lobbyId,
+    game: "dilemma",
+    entry,
   });
+  const full = row?.state ? row : await fetchGameSessionByLobby(lobbyId);
+  if (full) applyRemoteSession(full);
   return { ok: true };
 }
 
@@ -241,7 +260,26 @@ export async function removeCustomDilemma(dilemmaId) {
     .map(normalizeCustomDilemma)
     .filter(Boolean)
     .filter((d) => !(d.id === dilemmaId && (d.author || me) === me));
-  await syncDilemmaSession({ ...session, customDilemmas: next, deck: null });
+  saveStatePatch({ dilemmaGame: { ...session, customDilemmas: next, deck: null } });
+  if (!isGameSyncActive()) return { ok: true };
+
+  if (isLobbyHost()) {
+    await syncDilemmaSession({ ...session, customDilemmas: next, deck: null });
+    return { ok: true };
+  }
+
+  const lobbyId = getState().lobby?.id;
+  if (!lobbyId) return { ok: true };
+  const { rpcDeletePlayerCustomEntry } = await import("./gameSessionRpc.js");
+  const { applyRemoteSession } = await import("./gameSync.js");
+  const { fetchGameSessionByLobby } = await import("./supabaseGame.js");
+  const row = await rpcDeletePlayerCustomEntry({
+    lobbyId,
+    game: "dilemma",
+    entryId: dilemmaId,
+  });
+  const full = row?.state ? row : await fetchGameSessionByLobby(lobbyId);
+  if (full) applyRemoteSession(full);
   return { ok: true };
 }
 

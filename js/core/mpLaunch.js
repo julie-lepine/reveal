@@ -292,10 +292,12 @@ export async function commitPrepReadyToggle({
   }
 
   try {
+    // I-08 : ready invité sans screen/gameId (RPC contribute via patchGameState)
     const { patchGameStateWithFeedback } = await import("./patchGameStateFeedback.js");
+    const patchOpts = isLobbyHost() ? { gameId, screen } : {};
     await patchGameStateWithFeedback(
       { [stateKey]: { ready: { [uid]: ready } } },
-      { gameId, screen }
+      patchOpts
     );
     return nextReady;
   } catch {

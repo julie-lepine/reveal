@@ -227,11 +227,30 @@ export async function addCustomTake(text) {
     [],
     getLocalDisplayName()
   );
-  await syncHotTakeSession({
-    ...session,
-    customTakes: merged,
-    deck: null,
+  saveStatePatch({ hotTakeGame: { ...session, customTakes: merged, deck: null } });
+  if (!isGameSyncActive()) return { ok: true };
+
+  if (isLobbyHost()) {
+    await syncHotTakeSession({
+      ...session,
+      customTakes: merged,
+      deck: null,
+    });
+    return { ok: true };
+  }
+
+  const lobbyId = getState().lobby?.id;
+  if (!lobbyId) return { ok: true };
+  const { rpcUpsertPlayerCustomEntry } = await import("./gameSessionRpc.js");
+  const { applyRemoteSession } = await import("./gameSync.js");
+  const { fetchGameSessionByLobby } = await import("./supabaseGame.js");
+  const row = await rpcUpsertPlayerCustomEntry({
+    lobbyId,
+    game: "hottake",
+    entry,
   });
+  const full = row?.state ? row : await fetchGameSessionByLobby(lobbyId);
+  if (full) applyRemoteSession(full);
   return { ok: true };
 }
 
@@ -242,7 +261,26 @@ export async function removeCustomTake(takeId) {
     .map(normalizeTake)
     .filter(Boolean)
     .filter((t) => !(t.id === takeId && (t.author || me) === me));
-  await syncHotTakeSession({ ...session, customTakes: next, deck: null });
+  saveStatePatch({ hotTakeGame: { ...session, customTakes: next, deck: null } });
+  if (!isGameSyncActive()) return { ok: true };
+
+  if (isLobbyHost()) {
+    await syncHotTakeSession({ ...session, customTakes: next, deck: null });
+    return { ok: true };
+  }
+
+  const lobbyId = getState().lobby?.id;
+  if (!lobbyId) return { ok: true };
+  const { rpcDeletePlayerCustomEntry } = await import("./gameSessionRpc.js");
+  const { applyRemoteSession } = await import("./gameSync.js");
+  const { fetchGameSessionByLobby } = await import("./supabaseGame.js");
+  const row = await rpcDeletePlayerCustomEntry({
+    lobbyId,
+    game: "hottake",
+    entryId: takeId,
+  });
+  const full = row?.state ? row : await fetchGameSessionByLobby(lobbyId);
+  if (full) applyRemoteSession(full);
   return { ok: true };
 }
 
@@ -409,9 +447,6 @@ export async function commitHotTakeVote(choice) {
   saveStatePatch({ hotTakeGame: { ...session, votes } });
   if (!isGameSyncActive()) return { ...session, votes };
   const remoteVotes = { [uid]: choice };
-  if (localName && localName !== uid) {
-    remoteVotes[localName] = choice;
-  }
   await patchGameStateWithFeedback({ hotTake: { votes: remoteVotes } });
   return { ...session, votes };
 }
