@@ -2337,10 +2337,12 @@ select.field-input option{
   margin-bottom:12px;
 }
 
-.game-select-profile-row{
+.game-select-actions{
   display:flex;
+  flex-wrap:wrap;
   align-items:center;
   justify-content:center;
+  gap:8px;
   margin:0 0 12px;
 }
 
@@ -2430,7 +2432,44 @@ select.field-input option{
   line-height:1;
 }
 
-.game-select-party-settings,
+.game-select-party-settings{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  min-height:36px;
+  padding:6px 12px;
+  border-radius:12px;
+  border:1px solid transparent;
+  background:
+    linear-gradient(rgba(99,102,241,.10), rgba(99,102,241,.10)) padding-box,
+    linear-gradient(135deg, rgba(129,140,248,.5), rgba(99,102,241,.55)) border-box;
+  color:rgba(255,255,255,.78);
+  font-size:13px;
+  font-weight:600;
+  font-family:inherit;
+  cursor:pointer;
+  -webkit-tap-highlight-color:transparent;
+  text-decoration:none;
+  transition:background .15s ease, box-shadow .15s ease, transform .1s ease;
+}
+
+.game-select-party-settings:active{
+  transform:scale(.97);
+  background:
+    linear-gradient(rgba(99,102,241,.18), rgba(99,102,241,.18)) padding-box,
+    linear-gradient(135deg, rgba(129,140,248,.85), rgba(99,102,241,.9)) border-box;
+  box-shadow:0 0 16px rgba(99,102,241,.28);
+}
+
+@media (hover:hover) and (pointer:fine){
+  .game-select-party-settings:hover{
+    background:
+      linear-gradient(rgba(99,102,241,.16), rgba(99,102,241,.16)) padding-box,
+      linear-gradient(135deg, rgba(129,140,248,.8), rgba(99,102,241,.85)) border-box;
+    box-shadow:0 0 14px rgba(99,102,241,.24);
+  }
+}
+
 .game-select-transfer-host{
   display:block;
   width:100%;
@@ -3517,7 +3556,7 @@ select.field-input option{
 
 /* ─── Jeux vignettes ─── */
 .game-grid__label{
-  font-size:11px;
+  font-size:13px;
   font-weight:800;
   letter-spacing:.12em;
   text-transform:uppercase;

@@ -99,7 +99,7 @@ Clôture QA :
 | **R-03** | = C-02 | `lobby.js` | Race auth au boot | idem C-02 | idem C-02 | ✅ Corrigé + validé QA |
 | **R-05 / L-03** | `peekServerLobbyForUser` invisible sans uid | `home.js` | Session cleared, pas de uid | Pas de carte « Reprendre la soirée » | Afficher rejoin par code même sans uid local ; guider reset ou re-auth | ✅ Corrigé + validé QA |
 | **M-05a** | Échec join avec `hadSession: true` : auth conservée | `lobby.js` — `joinLobbyAsGuest()` | Join échoue mais session anon existante | Reste invité sans lobby, état ambigu | UX explicite + option sign out ; ou rollback conditionnel | ✅ Corrigé + validé QA |
-| **ARCH-01** | Mode démo offline : pas de MP cross-device | `auth.js`, `lobby.js` | Invité local sans Supabase | Croit être en lobby, pas de sync réelle | Message explicite si Supabase non configuré | ↪️ Reporté : hors QA Supabase Cause 1 |
+| **ARCH-01** | Mode démo offline : pas de MP cross-device | `auth.js`, `lobby.js`, `screens/lobby.js` | Invité local sans Supabase | Croit être en lobby, pas de sync réelle | Message explicite si Supabase non configuré | 🟡 Partiel : hint « Démo locale… » présent ; pas d’avertissement explicite « pas de MP cross-device » ; hors QA Supabase Cause 1 |
 
 ---
 
@@ -233,9 +233,9 @@ Clôture QA :
 |----|----------|-------------------|----------|--------|---------------------|--------|
 | **T-01** | Session absente au retry 0 ms au join | `supabaseLobby.js` — `restoreActiveGameSessionOnJoin()` | Join mid-game | Fenêtre sans session 0–400 ms | Retry plus agressif ou await obligatoire avant route | À traiter |
 | **M-04** / **T-02** | Realtime SUBSCRIBED catch-up agressif | `supabaseLobby.js` L974-977 | Reconnexion Realtime | Navigation avant paint lobby | Debounce route au subscribe ; loader interstitiel | À traiter |
-| **T-03** | Poll pausé en arrière-plan | `gameSync.js` — `initMultiplayerSyncVisibility()` | Tab hidden longtemps | Retard 3–12 s | Acceptable ; resubscribe au retour (déjà fait) | Accepté |
+| **T-03** | Poll pausé en arrière-plan | `gameSync.js` — `initMultiplayerSyncVisibility()` | Tab hidden longtemps | Retard 3–12 s | Acceptable ; resubscribe au retour (déjà fait) | 🔄 Accepté / requalifié — dette produit volontaire ; ne plus prioriser |
 | **M-07** / **SYN-** | `guesslie-menu` sans listener local + hub post-soumission inutile | `guessLieMenu.js` | Invité déjà prêt bloqué sur « Salon d'attente… » | Retard suivi / friction UX | Redirect auto vers `guesslie-wait` + `onGameSessionChange` / `prepGuestFollowOnSession` | ✅ Corrigé (2026-07-22) |
-| **M-08** / **SYN-13** | Redirect dans `mount*()` | `router.js`, `games/*.js` | Session désync | Flash UI, cleanup fragile | Router avant mount | À traiter |
+| **M-08** / **SYN-13** | Redirect dans `mount*()` | `router.js`, `games/*.js`, `guessLieMenu.js` | Session désync | Flash UI, cleanup fragile | Router avant mount | À traiter (résidu early redirect Guess Lie inclus) |
 | **P-02** / **M-06c** | Exit invité sans reset blobs jeu | `exitGame.js` vs `returnToGameSelect()` | Quit prep/play volontaire | Stale state + suppress | `returnToGameSelect()` centralise suppress + reset blobs côté invité | ✅ Corrigé + validé QA (avec M-06a/M-06b, 2026-07-22) |
 | **SYN-28** / **L-nav** | Suivi invité hub / post-partie | `gameSync.js` — `guestMustFollowSession`, `shouldApplySessionRoute`, `applyRemoteSession`, `handleSessionRoute` ; `home.js`, `results.js`, `leaderboard.js` | Invité sur `results`/`leaderboard`/`home`/`game-select`, hôte relance prep | Banner lobby à jour mais pas de nav vers `*-prep` ; F5 seul recours | Invariant `mustFollow` + retry `sig_unchanged` + contrat retour booléen `routeLog` ; tests `guestMustFollow`, `shouldApplyReturnContract`, suppress/sig | ✅ Corrigé + validé QA (2026-07-22) ; `settings` hors scope |
 | **I-PG-01** | Confusion résultat jeu vs récap soirée | `games/consensus.js`, `games/hotTake.js`, `games/trivia.js` | Fin de partie MP | Podium in-game sauté ; `screen: "results"` immédiat | Stay-on-game `phase: "final"` + CTA « Voir les résultats » → `completeGameSession({ screen: "results" })` ; `game_id: "menu"` inchangé | ✅ Corrigé + validé QA (Consensus A + Hot Take B2, 2026-07-22) ; autres jeux hors scope |
@@ -253,17 +253,17 @@ Clôture QA :
 | ID | Problème | Fichier / fonction | Scénario | Impact | Correction proposée | Statut |
 |----|----------|-------------------|----------|--------|---------------------|--------|
 | **I-05** / **P-05** | Handlers async post-unmount | `traitre.js`, `tierNight.js`, `dilemma.js` | Nav rapide mid-sync | navigate/render fantôme | `mountAlive` / `alive` / `unmounted` + guards post-`await` (résidus `resolveVoteRound` finally, `advanceTierNight…` `isMounted`, RAF dilemma) | ✅ Corrigé + clôturé (2026-07-22) |
-| **SYN-05** | Listeners Fil Rouge globaux sans unsub | `filRougeToast.js`, `filRougeResultsModal.js` | Si réactivé | Work + rejections forever | Cleanup ou guard écran | À traiter |
+| **SYN-05** | Listeners Fil Rouge globaux sans unsub | `filRougeToast.js`, `filRougeResultsModal.js` | Si réactivé | Work + rejections forever | Cleanup ou guard écran | À traiter (dormant : `FIL_ROUGE_ENABLED=false`) ; lié à ARCH-18 |
 | **SYN-13b** | Confusion Retour vs Quitter (reroute après « sortie ») | `traitre.js` / routing suppress — ticket initial : listener après sortie | Interprété à tort comme bug de re-pull | — | Contrat produit clarifié (voir ci-dessous) | ✅ QA validée / faux positif de qualification (contrat produit clarifié, 2026-07-22) |
-| **SYN-25** | `mountGuessLieMenu` return null sans cleanup | `guessLieMenu.js` | Navigate away pendant click | Handler sans listener session | Retourner cleanup ; listener follow | À traiter |
-| **ARCH-06** | Transitions rapides : handlers multiples en vol | `gameSync.js` listeners + router | Double mount | État incohérent | AbortController / mounted par écran | À traiter |
-| **M-08** | Early redirect mount sans cleanup propre | `router.js` L59-64 | Redirect imbriqué | `currentCleanup` ambigu | Routing pré-mount | À traiter |
+| **SYN-25** | `mountGuessLieMenu` return null sans cleanup | `guessLieMenu.js` | Navigate away pendant click | Handler sans listener session | Retourner cleanup ; listener follow | ✅ Corrigé (2026-07-22) : listener + `unsub` sur chemin interactif ; early `return null` post-redirect → suivi via **M-08** |
+| **ARCH-06** | Transitions rapides : handlers multiples en vol | `gameSync.js` listeners + router | Double mount | État incohérent | AbortController / mounted par écran | À traiter (guards partiels Traitre / Dilemma / TierNight) |
+| **M-08** | Early redirect mount sans cleanup propre | `router.js` L59-64 | Redirect imbriqué | `currentCleanup` ambigu | Routing pré-mount | 🔁 Doublon de **M-08 / SYN-13** (cause 5) — une seule fiche |
 
 **SYN-13b — contrat produit retenu (clôture) :**
 - **Retour** : sortie temporaire ; le joueur reste membre de la partie ; il continue à suivre la progression lorsque la partie avance.
 - **Quitter la partie → Menu des jeux** : sortie définitive du jeu courant ; le joueur ne revient plus dans ce jeu ; il rejoint automatiquement les jeux suivants.
 - QA : les deux comportements sont conformes. Plus de scénario fonctionnel reproductible justifiant de maintenir SYN-13b ouvert.
-- **Indépendants (ne pas fusionner) :** I-05, SYN-25, bug Fake / scoring.
+- **Indépendants (ne pas fusionner) :** I-05, M-08 (résidu redirect), bug Fake / scoring.
 
 **Symptômes utilisateur :** bugs intermittents ; navigation fantôme.
 
@@ -277,14 +277,14 @@ Clôture QA :
 |----|----------|-------------------|----------|--------|---------------------|--------|
 | **I-07** / **S-05** / **SYN-08** | Guess The Lie fire-and-forget | `guessLieSession.js`, `state.js` — `syncGuessLieLobbyCompleteRemote()` | Patch échoue au launch | Hôte en jeu, invités sur wait | `launchGameWithSync` + sync legacy attendable | ✅ Corrigé + QA validée (2026-07-11) |
 | **M-09** / **T-04** / **SYN-11** | `commitPrepReadyToggle` sans try/catch | `mpLaunch.js`, `prepReadyMaps.js` | Timeout / offline patch ready | Prêt local ≠ serveur ; rejet silencieux | try/catch + rollback + `patchGameStateWithFeedback` | ✅ Corrigé + QA validée (2026-07-11) ; bloc B (message réseau) clôturé avec L-09 (2026-07-12) |
-| **L-09** | Message patch / alerte réseau incompréhensible | `authErrors.js`, `dialog.js`, `patchGameStateFeedback.js` | Offline / fetch fail | Alert « TypeError: failed to fetch » ; titre jeu incohérent | `formatSyncErrorMessage` + titre « Connexion » si erreur réseau | ✅ Corrigé + QA (2026-07-12) |
-| **M-10** / **SYN-10** | `syncPrepOnMount` sans catch | `prepScreen.js`, `dilemmaPrep.js`, `leaderboard.js` | Réseau down au mount | UI stale | `.catch()` + feedback | À traiter |
+| **L-09** | Message patch / alerte réseau incompréhensible | `authErrors.js`, `dialog.js`, `patchGameStateFeedback.js` | Offline / fetch fail | Alert « TypeError: failed to fetch » ; titre jeu incohérent | `formatSyncErrorMessage` + titre « Connexion » si erreur réseau | ✅ Corrigé + QA (2026-07-12) ; 🟡 résidu mineur : `pushGameSession` passe encore `err.message` (reformatté ensuite par `showAppAlert`) |
+| **M-10** / **SYN-10** | `syncPrepOnMount` sans catch | `prepScreen.js`, `dilemmaPrep.js`, `leaderboard.js` | Réseau down au mount | UI stale | `.catch()` + feedback | À traiter (confirmé code 2026-07-22) |
 | **M-11** / **SYN-17** | `restartGame` reset local avant remote | `restartGame.js`, `restartGameRollback.js` | `startGameSession` throw | Hôte prep vide, remote ancien | Snapshot + rollback en catch ; clear Traitre private après succès | ✅ Corrigé + validé QA (2026-07-22) ; résidu hors scope : lobby `playing` si upsert échoue après `setLobbyPlaying` |
-| **M-04b** / **SYN-18** | `withPatchTimeout` timers non cleared | `gameSync.js` | Votes intensifs | Accumulation timers | `clearTimeout` dans finally | À traiter |
-| **T-05** | Vote optimistic vs patch timeout | `hotTakeSession.js` — `commitHotTakeVote()` | Patch 20 s timeout | Vote local ≠ serveur | Rollback ou indicateur « sync… » | À traiter |
+| **M-04b** / **SYN-18** | `withPatchTimeout` timers non cleared | `gameSync.js` | Votes intensifs | Accumulation timers | `clearTimeout` dans finally | À traiter (confirmé : `Promise.race` sans `clearTimeout`) |
+| **T-05** | Vote optimistic vs patch timeout | `hotTakeSession.js` — `commitHotTakeVote()` | Patch 20 s timeout | Vote local ≠ serveur | Rollback ou indicateur « sync… » | À traiter (optimistic local sans rollback) |
 | **SYN-26** | `clutch.js` tap sans catch | `clutch.js` | Tap sync fail | Unhandled rejection | `.catch()` sur handler | À traiter |
-| **M-14b** / **SYN-09b** | `onLocalApplied` absent si `localFirst: false` | `mpLaunch.js` L124-127 | Succès remote sans callback | Navigation manquante | Appeler `onLocalApplied` après succès | À traiter |
-| **ARCH-07** | Realtime catch `.catch(() => {})` silencieux | `supabaseLobby.js` L978 | Erreur refresh | Pas de feedback | Log + retry UI optionnel | À traiter |
+| **M-14b** / **SYN-09b** | `onLocalApplied` absent si `localFirst: false` | `mpLaunch.js` L124-127 | Succès remote sans callback | Navigation manquante | Appeler `onLocalApplied` après succès | À traiter (latent : Guess Lie use `localFirst: true`) |
+| **ARCH-07** | Realtime catch `.catch(() => {})` silencieux | `supabaseLobby.js` (catch-up `SUBSCRIBED`) | Erreur refresh | Pas de feedback | Log + retry UI optionnel | À traiter |
 | **ARCH-08** | `commitMultiplayerLaunch` retry `void commit().catch()` | `mpLaunch.js` L131 | Launch fallback | Échec silencieux second commit | Metric / notify user | À traiter |
 
 **Symptômes utilisateur :** prêt/vote local non sync ; invités bloqués Guess Lie ; promises non gérées.
@@ -295,16 +295,18 @@ Clôture QA :
 
 **Mécanisme :** rename, reset soirée, leave game ne touchent pas tous les champs.
 
-| ID | Problème | Fichier / fonction | Scénario | Impact | Correction proposée |
-|----|----------|-------------------|----------|--------|---------------------|
-| **I-09** / **SYN-06** | `renameLocalPlayer` incomplet | `state.js` L430-499 | Rename mid-soirée | Votes/scores orphelins | Migrer tous `*Game` + `gameScores` |
-| **I-06** / **P-01** | Reset ready à chaque mount lobby | `lobby.js`, `screens/lobby.js` L430-432 | Retour lobby avant soirée | Prêt local perdu | Reset seulement création lobby / action hôte |
-| **P-02** | Exit invité blobs non cleared | `exitGame.js` | Quit partie | Stale prep state | `resetLocalGamePrepState()` |
-| **SYN-15** | `applyRemotePlayerStats` double merge | `playerStatsSync.js` | Noms stale remote | State bloat | Merge participants only |
-| **SYN-16** | `applyRemoteLobbyScores` idem | `gameSync.js` | Anciens membres | Scores fantômes | Filtrer par participants actifs |
-| **I-03** | (aussi cause 3) reset scoring module | `state.js` | Reset scores | mauvais bucket | voir cause 3 |
-| **ARCH-09** | `resetAllParticipantsReady` seulement local en Supabase | `lobby.js` L243-249 | Remount lobby | Ready DB peut différer | Sync ready depuis serveur au mount |
-| **ARCH-10** | Leave lobby : `clearCachedGameSession` timing | `gameSync.js` | Leave mid-game | Cache stale bref | Ordre stop sync → clear → navigate |
+Revue code (2026-07-22) : **P-02** et **I-03** déjà couverts ailleurs ; **I-09** partiel ; **I-06 / ARCH-09** toujours ouverts au remount lobby.
+
+| ID | Problème | Fichier / fonction | Scénario | Impact | Correction proposée | Statut |
+|----|----------|-------------------|----------|--------|---------------------|--------|
+| **I-09** / **SYN-06** | `renameLocalPlayer` incomplet | `state.js` — `renameLocalPlayer()` | Rename mid-soirée | Votes/scores orphelins | Migrer tous `*Game` + `gameScores` | 🟡 Partiel : scores/stats + HotTake/Dilemma/Consensus/GuessLie submissions/TierNight recaps OK ; manque `gameScores` + plusieurs `*Game` |
+| **I-06** / **P-01** | Reset ready à chaque mount lobby | `screens/lobby.js`, `lobby.js` — `resetAllParticipantsReady()` | Retour lobby avant soirée | Prêt local perdu | Reset seulement création lobby / action hôte | À traiter (confirmé : reset à chaque mount si soirée non démarrée) |
+| **P-02** | Exit invité blobs non cleared | `exitGame.js` | Quit partie | Stale prep state | `resetLocalGamePrepState()` via `returnToGameSelect()` | ✅ / 🔁 Doublon M-06a–c (clôturé QA 2026-07-22) |
+| **SYN-15** | `applyRemotePlayerStats` double merge | `playerStatsSync.js` | Noms stale remote | State bloat | Merge participants only | À traiter |
+| **SYN-16** | `applyRemoteLobbyScores` idem | `gameSync.js` | Anciens membres | Scores fantômes | Filtrer par participants actifs | À traiter |
+| **I-03** | (aussi cause 3) reset scoring module | `state.js` | Reset scores | mauvais bucket | `activeScoringGameId = null` dans reset | ✅ Corrigé + test (voir cause 3) |
+| **ARCH-09** | `resetAllParticipantsReady` seulement local en Supabase | `lobby.js` | Remount lobby | Ready DB peut différer | Sync ready depuis serveur au mount | À traiter (couplé I-06) |
+| **ARCH-10** | Leave lobby : `clearCachedGameSession` timing | `lobby.js` — `leaveLobby()` | Leave mid-game | Cache stale bref | Ordre stop sync → clear → navigate | 🟡 Partiel : sync stoppé d’abord ; cache clear seulement après `await leaveLobbySupabase()` |
 
 **Symptômes utilisateur :** état incohérent après rename/quit/remount.
 
@@ -312,21 +314,21 @@ Clôture QA :
 
 ## Cause 9 — Couche sync monolithique et duplication
 
-**Mécanisme :** `gameSync.js` ~4300 lignes ; patterns non factorisés entre jeux.
+**Mécanisme :** `gameSync.js` ~4800+ lignes ; patterns non factorisés entre jeux.
 
-| ID | Problème | Fichier / fonction | Scénario | Impact | Correction proposée |
-|----|----------|-------------------|----------|--------|---------------------|
-| **ARCH-11** | Monolithe `gameSync.js` | `gameSync.js` | Toute évolution | Régression, review difficile | Split merge / routing / serializers |
-| **ARCH-12** | `isLocalLobbyHost()` ×3 | `lobby.js`, `traitrePrivate.js`, `tierNightSession.js` | Checks divergents | Comportement offline vs MP | Une seule export `isLobbyHost()` |
-| **ARCH-13** | `userIdForDisplayName()` duplicate | `traitrePrivate.js` | Lookup participant | Incohérence mapping | Réutiliser `userIdForName()` |
-| **SYN-22** | 11× `launch*Prep()` identiques | `restartGame.js` | Fix un jeu | Oublier les 10 autres | Helper local `commitPrepSessionLaunch` (M-11) ; factory optionnelle plus tard | 🟡 Réduit par M-11 (2026-07-12) |
-| **SYN-23** | 10× `sync*Session` wrappers | `gameSync.js` | idem | Drift error handling | Helper générique |
-| **SYN-24** | Pattern vote/reveal dupliqué | `games/*.js`, `sessionMerge.js` | Nouveau jeu | Copy-paste bugs | Hook `useGameSessionSync` vanilla |
-| **M-05b** / **SYN-12** | Double `startMultiplayerSync` lobby | `screens/lobby.js` L398 + L435 | Mount lobby | Churn polling | Un seul appel |
-| **SYN-21** / **ARCH-14** | `__trackSessionWrite` no-op | `gameSync.js` | Attente throttling | Fausse protection | Retirer ou implémenter |
-| **ARCH-15** | `__writeTimes` diagnostic temporaire | `gameSync.js` | Prod | Bruit / confusion | Retirer ou flag dev |
-| **SYN-27** / **ARCH-16** | `JSON.stringify` hot paths | `gameSync.js` — `applyRemoteSession()` | Poll fréquent | CPU mobile | Compare shallow / hash champs play |
-| **ARCH-17** | Boilerplate prep screens | `*-prep.js` | Nouveau prep | Oublier guest follow | Composant prep base |
+| ID | Problème | Fichier / fonction | Scénario | Impact | Correction proposée | Statut |
+|----|----------|-------------------|----------|--------|---------------------|--------|
+| **ARCH-11** | Monolithe `gameSync.js` | `gameSync.js` (~4829 LOC) | Toute évolution | Régression, review difficile | Split merge / routing / serializers | À traiter (dette) |
+| **ARCH-12** | `isLocalLobbyHost()` ×3 | `lobby.js`, `traitrePrivate.js`, `tierNightSession.js` | Checks divergents | Comportement offline vs MP | Une seule export `isLobbyHost()` | À traiter (logiques divergentes confirmées) |
+| **ARCH-13** | `userIdForDisplayName()` duplicate | `traitrePrivate.js` | Lookup participant | Incohérence mapping | Réutiliser `userIdForName()` | À traiter |
+| **SYN-22** | 11× `launch*Prep()` identiques | `restartGame.js` | Fix un jeu | Oublier les 10 autres | Helper local `commitPrepSessionLaunch` (M-11) ; factory optionnelle plus tard | 🟡 Réduit par M-11 (2026-07-12) ; ~12 wrappers restent |
+| **SYN-23** | 10× `sync*Session` wrappers | `gameSync.js` | idem | Drift error handling | Helper générique | À traiter (~14 wrappers) |
+| **SYN-24** | Pattern vote/reveal dupliqué | `games/*.js`, `sessionMerge.js` | Nouveau jeu | Copy-paste bugs | Hook `useGameSessionSync` vanilla | À traiter |
+| **M-05b** / **SYN-12** | Double `startMultiplayerSync` lobby | `screens/lobby.js` | Mount lobby | Churn polling | Un seul appel | À traiter (L417 + L454 si pas de resume) |
+| **SYN-21** / **ARCH-14** | `__trackSessionWrite` no-op / faux throttle | `gameSync.js` | Attente throttling | Fausse protection | Retirer ou implémenter | 🟡 Partiel : log loop warn ≥12/3s ; toujours `return false` (pas de throttle) |
+| **ARCH-15** | `__writeTimes` diagnostic temporaire | `gameSync.js` | Prod | Bruit / confusion | Retirer ou flag dev | À traiter |
+| **SYN-27** / **ARCH-16** | `JSON.stringify` hot paths | `gameSync.js` — `applyRemoteSession()` | Poll fréquent | CPU mobile | Compare shallow / hash champs play | À traiter |
+| **ARCH-17** | Boilerplate prep screens | `*-prep.js`, `prepScreen.js` | Nouveau prep | Oublier guest follow | Composant prep base | 🟡 Partiel : helpers partagés ; chaque prep duplique encore le mount |
 | **I-07** | Guess Lie hors pattern unifié | (voir cause 7) | idem | idem | `launchGameWithSync` | ✅ Corrigé + QA validée (2026-07-11) |
 
 **Symptômes utilisateur :** indirect — maintenance, régressions cross-jeux, perf mobile.
@@ -335,27 +337,27 @@ Clôture QA :
 
 ## Cause 10 — Dette technique et code mort
 
-| ID | Problème | Fichier | Scénario | Impact | Correction proposée |
-|----|----------|---------|----------|--------|---------------------|
-| **ARCH-18** | Fil Rouge désactivé, code conservé | `data/filRouge.js`, `filRouge*.js`, `main.js` | Réactivation | Listeners globaux non nettoyés | Supprimer ou feature flag propre |
-| **SYN-19** / **L-dead** | `recordLieGuess` jamais appelé | `state.js` | — | Confusion | Supprimer ou brancher |
-| **L-dead-2** | `markGuessLieLobbyComplete` unused | `state.js` | — | idem | Supprimer |
-| **ARCH-19** | Stats soirée commentées home | `home.js` — `homeStatsHtml()` | — | Dead code UI | Supprimer ou réactiver |
-| **F-01** | Mode démo sans Supabase | `auth.js`, `lobby.js` | Test local | Pas de MP (voir ARCH-01) | Message UI |
-| **ARCH-20** | `openLobbies` localStorage parallèle | `lobby.js` | Demo same-browser | Confusion prod vs demo | Isoler demo mode |
-| **SYN-21** | Branche morte `__trackSessionWrite` | `gameSync.js` | — | Lisibilité | Nettoyer |
+| ID | Problème | Fichier | Scénario | Impact | Correction proposée | Statut |
+|----|----------|---------|----------|--------|---------------------|--------|
+| **ARCH-18** | Fil Rouge désactivé, code conservé | `data/filRouge.js`, `filRouge*.js`, `main.js` | Réactivation | Listeners globaux non nettoyés | Supprimer ou feature flag propre | À traiter (lié SYN-05) |
+| **SYN-19** / **L-dead** | `recordLieGuess` jamais appelé | `state.js` | — | Confusion | Supprimer ou brancher | À traiter (zéro call site ; live = `recordGuessLieRoundStats`) |
+| **L-dead-2** | `markGuessLieLobbyComplete` unused | `state.js` | — | idem | Supprimer | À traiter (launch via `applyGuessLieLobbyCompleteLocal`) |
+| **ARCH-19** | Stats soirée commentées home | `home.js` — `homeStatsHtml()` | — | Dead code UI | Supprimer ou réactiver | À traiter |
+| **F-01** | Mode démo sans Supabase | `auth.js`, `lobby.js` | Test local | Pas de MP (voir ARCH-01) | Message UI | 🔁 Doublon / voir **ARCH-01** (🟡 partiel) |
+| **ARCH-20** | `openLobbies` localStorage parallèle | `lobby.js` | Demo same-browser | Confusion prod vs demo | Isoler demo mode | À traiter |
+| **SYN-21** | Branche morte `__trackSessionWrite` | `gameSync.js` | — | Lisibilité | Nettoyer | 🔁 Doublon **SYN-21 / ARCH-14** (cause 9) |
 
 ---
 
 ## Cause 11 — Friction produit / UX amplifiant les failles techniques
 
-| ID | Problème | Fichier | Scénario | Impact | Correction proposée |
-|----|----------|---------|----------|--------|---------------------|
-| **M-12** | Lien `#join=` sans auto-join | `main.js`, `home.js` | Ouverture lien | Friction ; reste sur home | Auto-join si pseudo+code ; CTA explicite |
-| **L-02** | Turnstile sur rejoin inutile | `home.js`, `turnstile.js` | Session anon existante | Friction rejoin | Skip captcha si `hadSession` |
-| **L-04** | « Réinitialiser l'app » = seul recours | `lobby.js`, `home.js` | Blocage invité | UX dégradée | Fix cause 1 réduit le besoin |
-| **ARCH-21** | Invité ne peut pas créer lobby | `auth.js` — `canCreateLobby()` | — | Comportement voulu | Copy UI claire |
-| **ARCH-22** | Pas de feedback sync lente invité | Global | Poll seul actif | Impression freeze | Indicateur « Sync… » / latence |
+| ID | Problème | Fichier | Scénario | Impact | Correction proposée | Statut |
+|----|----------|---------|----------|--------|---------------------|--------|
+| **M-12** | Lien `#join=` sans auto-join | `main.js`, `home.js` | Ouverture lien | Friction ; reste sur home | Auto-join si pseudo+code ; CTA explicite | À traiter (préremplissage seul) |
+| **L-02** | Turnstile sur rejoin inutile | `home.js`, `supabaseAuth.js` | Session anon existante | Friction rejoin | Skip captcha si `hadSession` | ✅ Corrigé (skip si `getLiveSupabaseUserId` / session anon) |
+| **L-04** | « Réinitialiser l'app » = seul recours | `lobby.js`, `home.js` | Blocage invité | UX dégradée | Fix cause 1 réduit le besoin | 🟡 Partiel : Cause 1 a réduit le besoin ; bouton encore très visible |
+| **ARCH-21** | Invité ne peut pas créer lobby | `auth.js` — `canCreateLobby()` | — | Comportement voulu | Copy UI claire | 🔄 Requalifié — règle produit ; copy déjà claire |
+| **ARCH-22** | Pas de feedback sync lente invité | Global | Poll seul actif | Impression freeze | Indicateur « Sync… » / latence | À traiter |
 
 ---
 
@@ -392,38 +394,42 @@ Join mid-game (T-01)
 
 ## Matrice cause → gravité
 
-La matrice ci-dessous liste les points encore ouverts ou résiduels. Les éléments corrigés restent historisés dans chaque section de cause.
+La matrice ci-dessous liste les points encore ouverts ou résiduels **après revue code 2026-07-22**. Les éléments corrigés / requalifiés restent historisés dans chaque section de cause.
 
 | Cause | Critique | Important | Moyen | Faible |
 |-------|----------|-----------|-------|--------|
-| 1 Identité invité | — | — | — | ARCH-01 (hors QA Supabase) |
+| 1 Identité invité | — | — | — | ARCH-01 (🟡 partiel, hors QA Supabase) |
 | 2 Auth race | — | — | — | — |
-| 3 Multi-sources | — | — | M-14a (KO QA TierNight relance + flow invité tierlists) | — |
-| 4 Hôte/invité | — | I-08 | — | ARCH-03 (policy acting host) |
-| 5 Routing/timing | — | T-02 | T-01, T-03, M-07, M-08 | — |
-| 6 Async écrans | — | — | SYN-25 | SYN-05, M-08 |
-| 7 Erreurs silencieuses | — | — | M-10, T-05, M-14b | SYN-26 |
-| 8 Reset incomplet | — | I-09, I-06 | SYN-15, SYN-16 | ARCH-09, ARCH-10 |
-| 9 Monolithe/dup | — | — | SYN-12, SYN-22–24 | ARCH-11–17, SYN-21, SYN-27 |
-| 10 Dette | — | — | — | ARCH-18–20, SYN-19 |
-| 11 UX | — | M-12 | ARCH-22 | L-02, L-04 |
+| 3 Multi-sources | — | — | M-14a (KO QA TierNight — suspendu) | — |
+| 4 Hôte/invité | — | I-08 | — | ARCH-03 (🟡 policy acting host) |
+| 5 Routing/timing | — | T-02 | T-01, M-08, ARCH-04 | ARCH-05 (🟡 mitigé SYN-28) |
+| 6 Async écrans | — | — | ARCH-06 | SYN-05 (dormant) |
+| 7 Erreurs silencieuses | — | — | M-10, T-05, M-14b, M-04b | SYN-26, ARCH-07, ARCH-08 |
+| 8 Reset incomplet | — | I-06 | I-09 (🟡), SYN-15, SYN-16 | ARCH-09, ARCH-10 (🟡) |
+| 9 Monolithe/dup | — | — | SYN-12, SYN-23–24 | ARCH-11–16, SYN-21 (🟡), SYN-22 (🟡), ARCH-17 (🟡), SYN-27 |
+| 10 Dette | — | — | — | ARCH-18–20, SYN-19, L-dead-2 |
+| 11 UX | — | M-12 | ARCH-22 | L-04 (🟡) |
+
+**Requalifiés / clôturés hors matrice :** T-03 (accepté), L-02 (corrigé), ARCH-21 (contrat produit), SYN-25 / M-07 (corrigés), P-02 / I-03 (déjà couverts).
 
 ---
 
-## Top 10 corrections prioritaires (état actuel)
+## Top 10 corrections prioritaires (état actuel — post-revue 2026-07-22)
 
 | # | ID(s) | Cause | Pourquoi |
 |---|-------|-------|----------|
-| 1 | SYN-25 | 6 | Guess Lie menu : cleanup / listener post-unmount ; I-05 clôturé |
-| 2 | I-06, P-01 | 8 | UX lobby invité : ready reset au remount |
-| 3 | I-08 | 4 | Sécurité intégrité session MP (RLS UPDATE) |
-| 4 | ARCH-03 | 4 | Policy acting host (metadata I-01 OK) |
-| 5 | M-07 | 5 | `guesslie-menu` sans listener — ✅ corrigé (redirect wait + follow) |
-| 6 | T-02 | 5 | Navigation possible avant données complètes |
-| 7 | M-14a, SYN-14 | 3 | KO QA TierNight — suspendu |
-| 8 | M-12 | 11 | Dette UX : lien `#join=` sans auto-join |
-| 9 | M-10, T-05 | 7 | Sync silencieuse / vote optimistic |
-| 10 | SYN-22–24 | 9 | Duplication sync / launch (dette) |
+| 1 | **I-06 / P-01** (+ ARCH-09) | 8 | Remount lobby efface les prêts — UX invité concrète, code confirmé |
+| 2 | **I-08** | 4 | Sécurité : tout membre peut UPDATE `game_sessions` |
+| 3 | **ARCH-03** | 4 | Policy acting host manquante (metadata I-01 OK) ; traiter avec/après I-08 |
+| 4 | **T-01** + **M-04 / T-02** | 5 | Join / Realtime : route possible avant données complètes |
+| 5 | **M-08 / SYN-13** | 5 | Redirects in-mount (remplace SYN-25 comme vrai résidu Guess Lie / préps) |
+| 6 | **M-10** + **T-05** + **SYN-26** | 7 | Sync silencieuse / optimistic sans rollback |
+| 7 | **I-09 / SYN-06** | 8 | Rename mid-soirée incomplet — corruption d’état partielle |
+| 8 | **M-12** | 11 | Lien `#join=` sans auto-join |
+| 9 | **ARCH-04** | 5 | Re-entry prep bloquée par suppress après sortie volontaire |
+| 10 | **M-05b / SYN-12** | 9 | Double `startMultiplayerSync` au mount lobby (rapide) ; **alt.** M-14a si priorité TierNight |
+
+**Retirés du Top 10 :** SYN-25, M-07 (✅ corrigés) ; SYN-22–24 (dette, après bugs). **M-14a** reste ouvert / suspendu hors Top sauf priorité produit explicite.
 
 ### Clôtures récentes (2026-07-11)
 
@@ -445,12 +451,12 @@ La matrice ci-dessous liste les points encore ouverts ou résiduels. Les éléme
   - `traitre.js` : `resolveVoteRound` `finally` ne `render()` plus si `!mountAlive`
   - `tierNight.js` / `advanceTierNightToResultsWhenReady` : option `isMounted` sur finishGame, forceResults, listener session
   - `dilemma.js` : guard `unmounted` avant `render()` de la dernière frame RAF
-  - Flags de mount déjà en place ; ne pas fusionner avec SYN-25 ni Fake/scoring
+  - Flags de mount déjà en place ; ne pas fusionner avec M-08 (redirect) ni Fake/scoring
 - **SYN-13b** — ✅ QA validée / faux positif de qualification (contrat produit clarifié)
   - **Retour** = sortie temporaire (reste membre, suit la progression)
   - **Quitter → Menu des jeux** = sortie définitive du jeu courant (pas de retour dans ce jeu ; suit les jeux suivants)
   - Les QA confirment les deux comportements ; plus de scénario fonctionnel reproductible
-  - Ne pas fusionner avec **I-05**, **SYN-25**, ni le bug Fake / scoring
+  - Ne pas fusionner avec **I-05**, **M-08**, ni le bug Fake / scoring
 - **SYN-28** — Suivi invité générique hub/post-partie sans F5 ; QA validée (`results` / `leaderboard` / `home` / `game-select` → `*-prep`)
   - `guestMustFollowSession` + early allow dans `shouldApplySessionRoute`
   - retry navigation sur `sig_unchanged` si écran local ≠ cible force-follow
@@ -472,13 +478,28 @@ La matrice ci-dessous liste les points encore ouverts ou résiduels. Les éléme
   - Résidu hors scope : lobby peut rester `playing` si upsert échoue après `setLobbyPlaying`
 - **Hygiène logs SYN-28** — retrait instrumentation temporaire `[SESSION-ROUTE]` / `hub-prep-v5` ; contrat `routeLog → boolean` conservé
 
+### Revue code vs audit (2026-07-22, soir)
+
+Comparaison tickets encore ouverts ↔ code actuel (aucune fermeture automatique hors constat) :
+
+- **SYN-25** — ✅ Corrigé : `guessLieMenu.js` listener + cleanup ; early redirect suivi via **M-08**
+- **M-07** — ✅ confirmé corrigé (déjà noté) ; retiré du Top 10 / matrice ouverte
+- **L-02** — ✅ Turnstile rejoin skip si session anon live
+- **T-03** — 🔄 Accepté / requalifié (dette volontaire)
+- **ARCH-21** — 🔄 Requalifié (règle produit, copy OK)
+- **P-02** (cause 8) / **I-03** — ✅ / 🔁 déjà couverts (M-06 / cause 3)
+- **F-01** — 🔁 voir ARCH-01 ; **SYN-21** cause 10 — 🔁 voir ARCH-14
+- Confirmés **toujours ouverts** : I-06, I-08, T-01, T-02, M-08, M-10, T-05, SYN-26, M-14a, M-12, ARCH-04, SYN-12, etc. (voir matrice)
+
 ### Résidus connus (hors scope des patchs 2026-07-22)
 
 - **M-11 résidu** — lobby `playing` si upsert échoue après `setLobbyPlaying` (hors rollback local)
-- **L-09 partiel** — `pushGameSession` dans `gameSync.js` affiche encore `err.message` brut (hors périmètre patch)
+- **L-09 partiel** — `pushGameSession` passe encore `err.message` ; reformattage réseau déjà dans `showAppAlert`
 - **Dette debug** — logs `[DEBUG JOIN LOBERY START]` dans `lobby.js` (hors campagne SESSION-ROUTE)
 - **SYN-28 hors scope** — écran `settings` ; retard éventuel lobby `playing` vs row `game_sessions` encore menu (Cas B)
 - **I-PG-01 hors scope** — autres jeux qui clôturent encore directement vers `results` sans podium dédié (pas touchés sans preuve)
+- **M-14a** — KO QA TierNight toujours présent dans le code ; investigation suspendue
+- **ARCH-05** — mitigé SYN-28 ; course Event A (lobby) vs Event B (session) hors scope routing
 
 ---
 
@@ -550,4 +571,4 @@ Non listés comme problèmes — présents dans les audits comme points positifs
 
 ---
 
-*Document généré à partir des audits du 2026-07-06. Dernière mise à jour suivi : 2026-07-22.*
+*Document généré à partir des audits du 2026-07-06. Dernière mise à jour suivi : 2026-07-22 (revue code vs tickets ouverts).*

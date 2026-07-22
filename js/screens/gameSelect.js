@@ -250,9 +250,17 @@ function gameSelectHeaderHtml() {
 function partySettingsButtonHtml() {
   if (!isGameSyncActive() || !isLobbyHost()) return "";
   return `
-    <button type="button" class="btn btn-secondary game-select-party-settings" data-party-settings>
-      ⚙️ Paramètres de partie
-    </button>`;
+      <button type="button" class="game-select-party-settings" data-party-settings>
+        ⚙️ Paramètres de partie
+      </button>`;
+}
+
+function gameSelectActionsHtml() {
+  return `
+    <div class="game-select-actions">
+      <button type="button" class="game-select-profile" data-nav="settings">Profil & paramètres</button>
+      ${partySettingsButtonHtml()}
+    </div>`;
 }
 
 export function mountGameSelect(app) {
@@ -386,10 +394,7 @@ export function mountGameSelect(app) {
       ${gameSelectHeaderHtml()}
       <h2 class="screen-title">Choisir un jeu</h2>
       <p class="game-intro">Sélectionne une activité pour le lobby.</p>
-      <div class="game-select-profile-row">
-        <button type="button" class="game-select-profile" data-nav="settings">Profil & paramètres</button>
-      </div>
-      ${partySettingsButtonHtml()}
+      ${gameSelectActionsHtml()}
 
       ${eveningRecapHtml(recap)}
 
