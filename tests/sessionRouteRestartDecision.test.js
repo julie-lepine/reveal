@@ -91,8 +91,9 @@ function isBrowsingScoresWithRouteSuppress(local, suppressed) {
 }
 
 function isSessionAdvancedFromSuppress(targetScreen, suppressScreen, suppressSig, currentSig) {
+  void suppressSig;
+  void currentSig;
   if (!suppressScreen || !targetScreen) return false;
-  if (suppressSig && currentSig !== suppressSig) return true;
   if (targetScreen === suppressScreen) return false;
   return true;
 }

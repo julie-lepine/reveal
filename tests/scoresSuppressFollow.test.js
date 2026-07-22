@@ -86,9 +86,9 @@ function routeDecisionUnderScoresSuppress({
   return { routed: true, reason: "navigate" };
 }
 
-/** Miroir de isSessionAdvancedFromSuppress (gameSync.js) après patch hub-prep-v3. */
+/** Miroir de isSessionAdvancedFromSuppress (gameSync.js) : famille d'écran, pas sig state. */
 function isSessionAdvancedFromSuppress(targetScreen, { suppressScreen, suppressSig, cachedRow }) {
-  const currentSig = sessionSignature(cachedRow);
+  void sessionSignature(cachedRow);
   const forceFollow = shouldForceGuestFollowSession(targetScreen);
   const suppressFromHubOrPost =
     suppressScreen === "game-select" ||
@@ -103,11 +103,10 @@ function isSessionAdvancedFromSuppress(targetScreen, { suppressScreen, suppressS
   if (!suppressScreen) {
     return forceFollow;
   }
-  if (suppressSig && currentSig !== suppressSig) return true;
   if (sameScreen) return false;
   if (forceFollow && (!suppressSig || suppressFromHubOrPost)) return true;
-  if (forceFollow && shouldForceGuestFollowSession(suppressScreen)) return true;
   if (compatible) return false;
+  if (forceFollow && shouldForceGuestFollowSession(suppressScreen)) return true;
   return true;
 }
 

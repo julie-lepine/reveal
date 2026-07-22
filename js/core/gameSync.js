@@ -274,19 +274,21 @@ export function withPatchTimeout(promise, ms = DEFAULT_SYNC_PATCH_TIMEOUT_MS, me
   ]);
 }
 
-/** Retour forcé vers le jeu qu'un invité a volontairement quitté (suppress actif). */
+/**
+ * Retour forcé vers le jeu qu'un invité a volontairement quitté (suppress actif).
+ * Critère = famille d'écran (même screen / prep-jeu compatible), pas le blob state :
+ * votes, soumissions, timers ne doivent pas lever le suppress.
+ */
 function isSuppressedGameReturn(targetScreen) {
   if (Date.now() >= suppressSessionRouteUntil || !suppressSessionScreen || !targetScreen) {
-    return false;
-  }
-  if (suppressSessionSig && sessionSignature(getCachedGameSession()) !== suppressSessionSig) {
     return false;
   }
   if (targetScreen === suppressSessionScreen) return true;
   /**
    * Ne pas réutiliser isCompatibleSessionScreen(hub, prep) : cette API signifie
    * « ne pas ramener de la prep vers le hub », pas « la prep est le même retour
-   * volontaire ». Limiter aux familles prep/jeu réellement compatibles.
+   * volontaire ». Limiter aux familles prep/jeu réellement compatibles
+   * (ex. Guess Lie menu/setup/wait).
    */
   if (
     shouldForceGuestFollowSession(suppressSessionScreen) &&
@@ -298,9 +300,14 @@ function isSuppressedGameReturn(targetScreen) {
   return false;
 }
 
-/** L'hôte a lancé un autre jeu / écran : l'invité doit suivre malgré suppress. */
+/**
+ * L'hôte a avancé la soirée : l'invité doit suivre malgré suppress.
+ * Avancée = autre jeu / hors famille d'écran — pas une mutation de state
+ * sur le même screen (ni une transition compatible type Guess Lie).
+ * Prep → play du même jeu n'est pas « compatible » ici : branche
+ * force_follow_from_other_active (suppress levé, invité suit).
+ */
 function isSessionAdvancedFromSuppress(targetScreen) {
-  const currentSig = sessionSignature(getCachedGameSession());
   const forceFollow = shouldForceGuestFollowSession(targetScreen);
   const suppressFromHubOrPost =
     suppressSessionScreen === "game-select" ||
@@ -308,9 +315,6 @@ function isSessionAdvancedFromSuppress(targetScreen) {
     POST_GAME_SCREENS.has(suppressSessionScreen);
   const sameScreen = Boolean(
     suppressSessionScreen && targetScreen && targetScreen === suppressSessionScreen
-  );
-  const sameSig = Boolean(
-    suppressSessionSig && currentSig && currentSig === suppressSessionSig
   );
   const compatible = Boolean(
     suppressSessionScreen &&
@@ -333,21 +337,18 @@ function isSessionAdvancedFromSuppress(targetScreen) {
     branch = forceFollow
       ? "force_follow_without_suppress_baseline"
       : "no_baseline_non_force_follow";
-  } else if (suppressSessionSig && currentSig !== suppressSessionSig) {
-    result = true;
-    branch = "sig_changed";
   } else if (sameScreen) {
     result = false;
     branch = "same_suppress_screen";
   } else if (forceFollow && (!suppressSessionSig || suppressFromHubOrPost)) {
     result = true;
     branch = "force_follow_from_hub_or_empty_sig";
-  } else if (forceFollow && shouldForceGuestFollowSession(suppressSessionScreen)) {
-    result = true;
-    branch = "force_follow_from_other_active";
   } else if (compatible) {
     result = false;
     branch = "compatible_not_advanced";
+  } else if (forceFollow && shouldForceGuestFollowSession(suppressSessionScreen)) {
+    result = true;
+    branch = "force_follow_from_other_active";
   } else {
     result = true;
     branch = "fallback_advanced";
