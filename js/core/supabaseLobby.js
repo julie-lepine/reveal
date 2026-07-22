@@ -831,6 +831,20 @@ function applyLobbyToState(bundle, { persistGuestMembership = false } = {}) {
   const messages =
     bundle.messages !== undefined ? bundle.messages : getState().lobby?.messages || [];
 
+  const localUid = getSupabaseUserId();
+  if (
+    localUid &&
+    Array.isArray(bundle.participants) &&
+    !bundle.participants.some((p) => p.userId === localUid)
+  ) {
+    // Membership absente du bundle (kick) — ne pas réécrire un lobby fantôme.
+    setTimeout(() => {
+      if (!getState().inLobby) return;
+      void import("./lobby.js").then(({ handleKickedFromLobby }) => handleKickedFromLobby());
+    }, 0);
+    return;
+  }
+
   rememberLobbyIdentity(bundle);
 
   saveStatePatch({

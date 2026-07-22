@@ -390,6 +390,158 @@ export function showTransferHostDialog(
 }
 
 /**
+ * Menu hôte : paramètres de partie (transfert / gestion joueurs).
+ * @returns {Promise<{ ok: true, action: "transfer"|"players" } | { ok: false }>}
+ */
+export function showPartySettingsDialog({ canTransferHost = true } = {}) {
+  return new Promise((resolve) => {
+    if (openDialog) {
+      removeDialog(openDialog, () => {});
+      openDialog = null;
+    }
+
+    const root = document.createElement("div");
+    root.className = "app-dialog";
+    root.setAttribute("role", "dialog");
+    root.setAttribute("aria-modal", "true");
+    root.setAttribute("aria-labelledby", "app-dialog-title");
+
+    const close = (result) => removeDialog(root, () => resolve(result));
+
+    const transferBtn = canTransferHost
+      ? `<button type="button" class="btn btn-secondary app-dialog__menu-btn" data-party-action="transfer">
+          👑 Transférer l'hôte
+        </button>`
+      : `<button type="button" class="btn btn-secondary app-dialog__menu-btn" data-party-action="transfer" disabled title="Ajoute un autre joueur">
+          👑 Transférer l'hôte
+        </button>`;
+
+    root.innerHTML = `
+      <div class="app-dialog__backdrop" data-dialog-dismiss aria-hidden="true"></div>
+      <div class="app-dialog__panel app-dialog__panel--rich">
+        <div class="app-dialog__glow" aria-hidden="true"></div>
+        <p class="app-dialog__icon" aria-hidden="true">⚙️</p>
+        <p class="app-dialog__title" id="app-dialog-title">Paramètres de partie</p>
+        <div class="app-dialog__rich app-dialog__menu">
+          ${transferBtn}
+          <button type="button" class="btn btn-secondary app-dialog__menu-btn" data-party-action="players">
+            👥 Gestion des joueurs
+          </button>
+        </div>
+        <button type="button" class="btn btn-primary app-dialog__btn" data-dialog-cancel>Fermer</button>
+      </div>
+    `;
+
+    root.querySelectorAll("[data-party-action]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        if (btn.disabled) return;
+        const action = btn.getAttribute("data-party-action");
+        if (action === "transfer" || action === "players") {
+          close({ ok: true, action });
+        }
+      });
+    });
+    root.querySelector("[data-dialog-cancel]")?.addEventListener("click", () => close({ ok: false }));
+    root.querySelector("[data-dialog-dismiss]")?.addEventListener("click", () => close({ ok: false }));
+    root.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") close({ ok: false });
+    });
+
+    document.body.appendChild(root);
+    openDialog = root;
+    requestAnimationFrame(() => root.classList.add("app-dialog--in"));
+    root.querySelector("[data-party-action]:not([disabled]), [data-dialog-cancel]")?.focus();
+  });
+}
+
+function lobbyPlayersListHtml(participants, { canKick }) {
+  const rows = (participants || [])
+    .map((p) => {
+      const kickable = canKick && p.userId && !p.isLocal && !p.isHost;
+      const badge = p.isHost ? `<span class="lobby-manage__badge">Hôte</span>` : "";
+      const kickBtn = kickable
+        ? `<button type="button" class="btn btn-secondary btn--compact lobby-manage__kick" data-kick-user="${escapeHtml(p.userId)}" data-kick-name="${escapeHtml(p.name)}">Retirer</button>`
+        : "";
+      return `
+        <div class="lobby-manage__row">
+          <span class="lobby-manage__avatar" style="background:${escapeHtml(p.color || "#60A5FA")}">${p.emoji || "👤"}</span>
+          <span class="lobby-manage__name">${escapeHtml(p.name || "Joueur")}${badge}</span>
+          ${kickBtn}
+        </div>`;
+    })
+    .join("");
+  return rows || `<p class="hint">Aucun joueur.</p>`;
+}
+
+/**
+ * Liste des joueurs du lobby ; l'hôte peut en retirer.
+ * Rouvre la liste après un kick tant que le panneau n'est pas fermé.
+ */
+export async function showLobbyPlayersManageDialog({
+  getParticipants,
+  maxPlayers = 8,
+  canKick = false,
+  onKick,
+} = {}) {
+  for (;;) {
+    const participants = typeof getParticipants === "function" ? getParticipants() : [];
+    const total = participants.length;
+    const choice = await new Promise((resolve) => {
+      if (openDialog) {
+        removeDialog(openDialog, () => {});
+        openDialog = null;
+      }
+
+      const root = document.createElement("div");
+      root.className = "app-dialog";
+      root.setAttribute("role", "dialog");
+      root.setAttribute("aria-modal", "true");
+      root.setAttribute("aria-labelledby", "app-dialog-title");
+
+      const close = (result) => removeDialog(root, () => resolve(result));
+
+      root.innerHTML = `
+        <div class="app-dialog__backdrop" data-dialog-dismiss aria-hidden="true"></div>
+        <div class="app-dialog__panel app-dialog__panel--rich">
+          <div class="app-dialog__glow" aria-hidden="true"></div>
+          <p class="app-dialog__icon" aria-hidden="true">👥</p>
+          <p class="app-dialog__title" id="app-dialog-title">Gestion des joueurs</p>
+          <p class="app-dialog__message lobby-manage__count">${total} / ${maxPlayers} participants</p>
+          <div class="app-dialog__rich lobby-manage__list">
+            ${lobbyPlayersListHtml(participants, { canKick })}
+          </div>
+          <button type="button" class="btn btn-primary app-dialog__btn" data-dialog-cancel>Fermer</button>
+        </div>
+      `;
+
+      root.querySelectorAll("[data-kick-user]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          close({
+            ok: true,
+            kickUserId: btn.getAttribute("data-kick-user"),
+            kickName: btn.getAttribute("data-kick-name") || "",
+          });
+        });
+      });
+      root.querySelector("[data-dialog-cancel]")?.addEventListener("click", () => close({ ok: false }));
+      root.querySelector("[data-dialog-dismiss]")?.addEventListener("click", () => close({ ok: false }));
+      root.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") close({ ok: false });
+      });
+
+      document.body.appendChild(root);
+      openDialog = root;
+      requestAnimationFrame(() => root.classList.add("app-dialog--in"));
+      root.querySelector("[data-dialog-cancel]")?.focus();
+    });
+
+    if (!choice?.ok || !choice.kickUserId) return;
+    if (typeof onKick !== "function") return;
+    await onKick(choice.kickUserId, choice.kickName);
+  }
+}
+
+/**
  * Choix d'un emoji de profil. Le clic sur un emoji valide directement.
  * @param {string} current emoji actuellement sélectionné
  * @returns {Promise<{ ok: true, emoji: string } | { ok: false }>}

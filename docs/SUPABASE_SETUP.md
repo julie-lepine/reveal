@@ -12,7 +12,8 @@
 4. Exécute aussi **`supabase/game-sessions.sql`** (multijoueur des jeux). Si les invités ne peuvent pas synchroniser les mini-jeux (erreur `PGRST116` ou `406` sur `PATCH game_sessions`), réexécute au minimum la politique `game_sessions_update` (section `with check`) de ce fichier.
 5. Exécute **`supabase/lobby-lifecycle.sql`** (expiration, heartbeat `last_seen_at`, purge auto — voir ci-dessous)
 6. Exécute **`supabase/transfer-lobby-host.sql`** (transfert volontaire du rôle d'hôte depuis le menu jeux)
-7. ~~Exécute **`supabase/fil-rouge-private.sql`**~~ *(Mot interdit / Fil Rouge abandonné — optionnel, voir `data/filRouge.js` `FIL_ROUGE_ENABLED`)*
+7. Exécute **`supabase/kick-lobby-member.sql`** (l'hôte peut retirer un joueur au lobby / entre deux jeux)
+8. ~~Exécute **`supabase/fil-rouge-private.sql`**~~ *(Mot interdit / Fil Rouge abandonné — optionnel, voir `data/filRouge.js` `FIL_ROUGE_ENABLED`)*
 
 ## 2. Clés API
 

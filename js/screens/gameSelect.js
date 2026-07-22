@@ -23,7 +23,7 @@ import {
 import { getCurrentScreen } from "../core/router.js";
 import { isSupabaseConfigured } from "../core/supabaseClient.js";
 import { startLobbyPresenceSync, onLobbyBundleUpdated } from "../core/supabaseLobby.js";
-import { hasActiveLobby, transferLobbyHost } from "../core/lobby.js";
+import { hasActiveLobby, openPartySettings } from "../core/lobby.js";
 import { getLastGame, getState } from "../core/state.js";
 // import { getFilRougeSession } from "../core/filRougeSession.js";
 import { bindFeedbackPrompt, feedbackPromptCardHtml } from "../core/feedbackUi.js";
@@ -221,13 +221,11 @@ function gameSelectRenderSnapshot() {
   });
 }
 
-function transferHostButtonHtml() {
+function partySettingsButtonHtml() {
   if (!isGameSyncActive() || !isLobbyHost()) return "";
-  const others = (getState().lobby?.participants || []).filter((p) => !p.isLocal);
-  if (!others.length) return "";
   return `
-    <button type="button" class="btn btn-secondary game-select-transfer-host" data-transfer-host>
-      👑 Transférer l'hôte
+    <button type="button" class="btn btn-secondary game-select-party-settings" data-party-settings>
+      ⚙️ Paramètres de partie
     </button>`;
 }
 
@@ -272,8 +270,8 @@ export function mountGameSelect(app) {
       return;
     }
 
-    if (e.target.closest("[data-transfer-host]")) {
-      void transferLobbyHost().then((res) => {
+    if (e.target.closest("[data-party-settings]")) {
+      void openPartySettings().then((res) => {
         if (res.ok) scheduleRender(true);
       });
       return;
@@ -344,7 +342,7 @@ export function mountGameSelect(app) {
       <h2 class="screen-title">Choisir un jeu</h2>
       <p class="game-intro">Sélectionne une activité pour le lobby.</p>
       <button type="button" class="btn-link game-select-profile" data-nav="settings">Profil & paramètres</button>
-      ${transferHostButtonHtml()}
+      ${partySettingsButtonHtml()}
 
       ${eveningRecapHtml(recap)}
 
