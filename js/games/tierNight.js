@@ -114,7 +114,7 @@ export function mountTierNight(app) {
       if (!alive) return;
 
       render();
-      await advanceTierNightToResultsWhenReady(list);
+      await advanceTierNightToResultsWhenReady(list, { isMounted: () => alive });
       return;
     }
 
@@ -165,7 +165,10 @@ export function mountTierNight(app) {
 
   async function forceResults() {
     if (!isLobbyHost()) return;
-    await advanceTierNightToResultsWhenReady(list, { force: true });
+    await advanceTierNightToResultsWhenReady(list, {
+      force: true,
+      isMounted: () => alive,
+    });
   }
 
   function render() {
@@ -361,8 +364,9 @@ export function mountTierNight(app) {
       return;
     }
     if (finished && isGameSyncActive()) {
+      if (!alive) return;
       render();
-      await advanceTierNightToResultsWhenReady(list);
+      await advanceTierNightToResultsWhenReady(list, { isMounted: () => alive });
     }
   });
 

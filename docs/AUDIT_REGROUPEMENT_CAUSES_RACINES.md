@@ -234,7 +234,7 @@ Clôture QA :
 | **T-01** | Session absente au retry 0 ms au join | `supabaseLobby.js` — `restoreActiveGameSessionOnJoin()` | Join mid-game | Fenêtre sans session 0–400 ms | Retry plus agressif ou await obligatoire avant route | À traiter |
 | **M-04** / **T-02** | Realtime SUBSCRIBED catch-up agressif | `supabaseLobby.js` L974-977 | Reconnexion Realtime | Navigation avant paint lobby | Debounce route au subscribe ; loader interstitiel | À traiter |
 | **T-03** | Poll pausé en arrière-plan | `gameSync.js` — `initMultiplayerSyncVisibility()` | Tab hidden longtemps | Retard 3–12 s | Acceptable ; resubscribe au retour (déjà fait) | Accepté |
-| **M-07** / **SYN-** | `guesslie-menu` sans listener local | `guessLieMenu.js` | Invité sur menu, hôte lance | Retard suivi vs autres preps | Ajouter `onGameSessionChange` + `prepGuestFollowOnSession` | À traiter |
+| **M-07** / **SYN-** | `guesslie-menu` sans listener local + hub post-soumission inutile | `guessLieMenu.js` | Invité déjà prêt bloqué sur « Salon d'attente… » | Retard suivi / friction UX | Redirect auto vers `guesslie-wait` + `onGameSessionChange` / `prepGuestFollowOnSession` | ✅ Corrigé (2026-07-22) |
 | **M-08** / **SYN-13** | Redirect dans `mount*()` | `router.js`, `games/*.js` | Session désync | Flash UI, cleanup fragile | Router avant mount | À traiter |
 | **P-02** / **M-06c** | Exit invité sans reset blobs jeu | `exitGame.js` vs `returnToGameSelect()` | Quit prep/play volontaire | Stale state + suppress | `returnToGameSelect()` centralise suppress + reset blobs côté invité | ✅ Corrigé + validé QA (avec M-06a/M-06b, 2026-07-22) |
 | **SYN-28** / **L-nav** | Suivi invité hub / post-partie | `gameSync.js` — `guestMustFollowSession`, `shouldApplySessionRoute`, `applyRemoteSession`, `handleSessionRoute` ; `home.js`, `results.js`, `leaderboard.js` | Invité sur `results`/`leaderboard`/`home`/`game-select`, hôte relance prep | Banner lobby à jour mais pas de nav vers `*-prep` ; F5 seul recours | Invariant `mustFollow` + retry `sig_unchanged` + contrat retour booléen `routeLog` ; tests `guestMustFollow`, `shouldApplyReturnContract`, suppress/sig | ✅ Corrigé + validé QA (2026-07-22) ; `settings` hors scope |
@@ -250,14 +250,20 @@ Clôture QA :
 
 **Mécanisme :** `unsub()` retire le listener ; promesses async en vol continuent après navigate away.
 
-| ID | Problème | Fichier / fonction | Scénario | Impact | Correction proposée |
-|----|----------|-------------------|----------|--------|---------------------|
-| **I-05** / **P-05** | Handlers async post-unmount | `traitre.js`, `tierNight.js`, `dilemma.js` | Nav rapide mid-sync | navigate/render fantôme | `let mounted = true` + early return |
-| **SYN-05** | Listeners Fil Rouge globaux sans unsub | `filRougeToast.js`, `filRougeResultsModal.js` | Si réactivé | Work + rejections forever | Cleanup ou guard écran |
-| **SYN-13b** | `traitre.js` listener reroute après sortie | `traitre.js` — `onGameSessionChange` L608-612 | Invité quitte traitre volontairement | Renvoyé vers traitre | Guard suppress + check écran intentionnel |
-| **SYN-25** | `mountGuessLieMenu` return null sans cleanup | `guessLieMenu.js` | Navigate away pendant click | Handler sans listener session | Retourner cleanup ; listener follow |
-| **ARCH-06** | Transitions rapides : handlers multiples en vol | `gameSync.js` listeners + router | Double mount | État incohérent | AbortController / mounted par écran |
-| **M-08** | Early redirect mount sans cleanup propre | `router.js` L59-64 | Redirect imbriqué | `currentCleanup` ambigu | Routing pré-mount |
+| ID | Problème | Fichier / fonction | Scénario | Impact | Correction proposée | Statut |
+|----|----------|-------------------|----------|--------|---------------------|--------|
+| **I-05** / **P-05** | Handlers async post-unmount | `traitre.js`, `tierNight.js`, `dilemma.js` | Nav rapide mid-sync | navigate/render fantôme | `mountAlive` / `alive` / `unmounted` + guards post-`await` (résidus `resolveVoteRound` finally, `advanceTierNight…` `isMounted`, RAF dilemma) | ✅ Corrigé + clôturé (2026-07-22) |
+| **SYN-05** | Listeners Fil Rouge globaux sans unsub | `filRougeToast.js`, `filRougeResultsModal.js` | Si réactivé | Work + rejections forever | Cleanup ou guard écran | À traiter |
+| **SYN-13b** | Confusion Retour vs Quitter (reroute après « sortie ») | `traitre.js` / routing suppress — ticket initial : listener après sortie | Interprété à tort comme bug de re-pull | — | Contrat produit clarifié (voir ci-dessous) | ✅ QA validée / faux positif de qualification (contrat produit clarifié, 2026-07-22) |
+| **SYN-25** | `mountGuessLieMenu` return null sans cleanup | `guessLieMenu.js` | Navigate away pendant click | Handler sans listener session | Retourner cleanup ; listener follow | À traiter |
+| **ARCH-06** | Transitions rapides : handlers multiples en vol | `gameSync.js` listeners + router | Double mount | État incohérent | AbortController / mounted par écran | À traiter |
+| **M-08** | Early redirect mount sans cleanup propre | `router.js` L59-64 | Redirect imbriqué | `currentCleanup` ambigu | Routing pré-mount | À traiter |
+
+**SYN-13b — contrat produit retenu (clôture) :**
+- **Retour** : sortie temporaire ; le joueur reste membre de la partie ; il continue à suivre la progression lorsque la partie avance.
+- **Quitter la partie → Menu des jeux** : sortie définitive du jeu courant ; le joueur ne revient plus dans ce jeu ; il rejoint automatiquement les jeux suivants.
+- QA : les deux comportements sont conformes. Plus de scénario fonctionnel reproductible justifiant de maintenir SYN-13b ouvert.
+- **Indépendants (ne pas fusionner) :** I-05, SYN-25, bug Fake / scoring.
 
 **Symptômes utilisateur :** bugs intermittents ; navigation fantôme.
 
@@ -395,7 +401,7 @@ La matrice ci-dessous liste les points encore ouverts ou résiduels. Les éléme
 | 3 Multi-sources | — | — | M-14a (KO QA TierNight relance + flow invité tierlists) | — |
 | 4 Hôte/invité | — | I-08 | — | ARCH-03 (policy acting host) |
 | 5 Routing/timing | — | T-02 | T-01, T-03, M-07, M-08 | — |
-| 6 Async écrans | — | I-05 | SYN-13b, SYN-25 | SYN-05, M-08 |
+| 6 Async écrans | — | — | SYN-25 | SYN-05, M-08 |
 | 7 Erreurs silencieuses | — | — | M-10, T-05, M-14b | SYN-26 |
 | 8 Reset incomplet | — | I-09, I-06 | SYN-15, SYN-16 | ARCH-09, ARCH-10 |
 | 9 Monolithe/dup | — | — | SYN-12, SYN-22–24 | ARCH-11–17, SYN-21, SYN-27 |
@@ -408,11 +414,11 @@ La matrice ci-dessous liste les points encore ouverts ou résiduels. Les éléme
 
 | # | ID(s) | Cause | Pourquoi |
 |---|-------|-------|----------|
-| 1 | I-05, SYN-13b, SYN-25 | 6 | Bugs intermittents navigation (handlers post-unmount) |
+| 1 | SYN-25 | 6 | Guess Lie menu : cleanup / listener post-unmount ; I-05 clôturé |
 | 2 | I-06, P-01 | 8 | UX lobby invité : ready reset au remount |
 | 3 | I-08 | 4 | Sécurité intégrité session MP (RLS UPDATE) |
 | 4 | ARCH-03 | 4 | Policy acting host (metadata I-01 OK) |
-| 5 | M-07 | 5 | `guesslie-menu` sans listener de suivi session |
+| 5 | M-07 | 5 | `guesslie-menu` sans listener — ✅ corrigé (redirect wait + follow) |
 | 6 | T-02 | 5 | Navigation possible avant données complètes |
 | 7 | M-14a, SYN-14 | 3 | KO QA TierNight — suspendu |
 | 8 | M-12 | 11 | Dette UX : lien `#join=` sans auto-join |
@@ -435,6 +441,16 @@ La matrice ci-dessous liste les points encore ouverts ou résiduels. Les éléme
 
 ### Clôtures récentes (2026-07-22)
 
+- **I-05 / P-05** — ✅ Corrigé + clôturé : résidus post-démontage fermés
+  - `traitre.js` : `resolveVoteRound` `finally` ne `render()` plus si `!mountAlive`
+  - `tierNight.js` / `advanceTierNightToResultsWhenReady` : option `isMounted` sur finishGame, forceResults, listener session
+  - `dilemma.js` : guard `unmounted` avant `render()` de la dernière frame RAF
+  - Flags de mount déjà en place ; ne pas fusionner avec SYN-25 ni Fake/scoring
+- **SYN-13b** — ✅ QA validée / faux positif de qualification (contrat produit clarifié)
+  - **Retour** = sortie temporaire (reste membre, suit la progression)
+  - **Quitter → Menu des jeux** = sortie définitive du jeu courant (pas de retour dans ce jeu ; suit les jeux suivants)
+  - Les QA confirment les deux comportements ; plus de scénario fonctionnel reproductible
+  - Ne pas fusionner avec **I-05**, **SYN-25**, ni le bug Fake / scoring
 - **SYN-28** — Suivi invité générique hub/post-partie sans F5 ; QA validée (`results` / `leaderboard` / `home` / `game-select` → `*-prep`)
   - `guestMustFollowSession` + early allow dans `shouldApplySessionRoute`
   - retry navigation sur `sig_unchanged` si écran local ≠ cible force-follow

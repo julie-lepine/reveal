@@ -137,6 +137,7 @@ export function mountDilemma(app) {
       } else {
         revealAnimId = null;
         revealAnimDone = true;
+        if (unmounted) return;
         render();
       }
     }

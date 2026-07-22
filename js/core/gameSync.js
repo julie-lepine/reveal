@@ -4796,18 +4796,22 @@ export async function finalizeTierNightLiveToResults() {
 }
 
 /** Hôte : fin Tier Night - récap + scores + écran en un seul write. */
-export async function advanceTierNightToResultsWhenReady(list, { force = false } = {}) {
+export async function advanceTierNightToResultsWhenReady(list, { force = false, isMounted = null } = {}) {
   if (!isGameSyncActive() || !isLobbyHost()) return false;
   if (!force && !allTierNightMembersFinished()) return false;
   if (force && countTierNightMembersFinished() === 0) return false;
 
+  const stillMounted = () => typeof isMounted !== "function" || isMounted();
+
   await ensureTierNightRecapsFromRemote(list);
+  if (!stillMounted()) return false;
   const recap = tierNightRecapToRemote(getTierNightSession());
   const tnRemote = getTierNightRemote() || {};
   const row = await patchGameState(
     { tierNight: { ...tnRemote, lobbyStarted: false, ...(recap ? { recap } : {}) } },
     { screen: "tiernight-end", gameId: "tiernight", withEveningScores: true }
   );
+  if (!stillMounted()) return false;
   if (getEffectiveSessionScreen(row) !== "tiernight-end") return false;
   navigate("tiernight-end");
   return true;

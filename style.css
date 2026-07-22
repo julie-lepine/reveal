@@ -2350,19 +2350,35 @@ select.field-input option{
   min-height:36px;
   padding:6px 12px;
   border-radius:12px;
-  border:1px solid rgba(255,255,255,.12);
-  background:rgba(255,255,255,.06);
-  color:rgba(255,255,255,.7);
+  border:1px solid transparent;
+  background:
+    linear-gradient(rgba(255,60,172,.10), rgba(255,60,172,.10)) padding-box,
+    linear-gradient(135deg, rgba(255,107,107,.5), rgba(255,60,172,.55)) border-box;
+  color:rgba(255,255,255,.78);
   font-size:13px;
   font-weight:600;
   font-family:inherit;
   cursor:pointer;
   -webkit-tap-highlight-color:transparent;
   text-decoration:none;
+  transition:background .15s ease, box-shadow .15s ease, transform .1s ease;
 }
 
 .game-select-profile:active{
   transform:scale(.97);
+  background:
+    linear-gradient(rgba(255,60,172,.18), rgba(255,60,172,.18)) padding-box,
+    linear-gradient(135deg, rgba(255,107,107,.85), rgba(255,60,172,.9)) border-box;
+  box-shadow:0 0 16px rgba(255,60,172,.25);
+}
+
+@media (hover:hover) and (pointer:fine){
+  .game-select-profile:hover{
+    background:
+      linear-gradient(rgba(255,60,172,.16), rgba(255,60,172,.16)) padding-box,
+      linear-gradient(135deg, rgba(255,107,107,.8), rgba(255,60,172,.85)) border-box;
+    box-shadow:0 0 14px rgba(255,60,172,.22);
+  }
 }
 
 .game-select-header{

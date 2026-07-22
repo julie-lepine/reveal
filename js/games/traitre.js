@@ -331,6 +331,7 @@ export function mountTraitre(app) {
       }
     } finally {
       resolveInFlight = false;
+      if (!mountAlive) return;
       render();
     }
   }

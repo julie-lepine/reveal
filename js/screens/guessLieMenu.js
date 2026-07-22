@@ -1,21 +1,25 @@
 import {
-  allLobbySubmitted,
+  getGuessLieEntryScreen,
   hasLocalSubmission,
 } from "../core/guessLieSession.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
-import { isGameSyncActive, isLobbyHost } from "../core/gameSync.js";
-import { handleGuessLieLaunch, tryEnterGuessLiePlayFromWait } from "../core/guessLieSession.js";
-import { getCurrentScreen } from "../core/router.js";
+import { onGameSessionChange } from "../core/gameSync.js";
+import { prepGuestFollowOnSession } from "../core/mpLaunch.js";
+import { navigate } from "../core/router.js";
 import { pageShell } from "../core/ui.js";
 import { bindNav } from "./nav.js";
 
+/**
+ * Point d'entrée Guess The Lie : uniquement pour préparer ses affirmations.
+ * Après soumission, tout le monde (hôte + invité) attend sur guesslie-wait.
+ */
 export function mountGuessLieMenu(app) {
   if (!requireLobbyPlay()) return null;
 
-  let disposed = false;
-  const ready = hasLocalSubmission();
-  const lobbyFull = allLobbySubmitted();
-  const canLaunch = !isGameSyncActive() || isLobbyHost();
+  if (hasLocalSubmission()) {
+    navigate("guesslie-wait", { reset: true });
+    return null;
+  }
 
   app.innerHTML = pageShell({
     backTarget: "back",
@@ -23,9 +27,7 @@ export function mountGuessLieMenu(app) {
       <p class="label-upper label-upper--green">🕵️ Guess The Lie</p>
       <h2 class="screen-title">Prêt pour la partie ?</h2>
 
-      ${
-        !ready
-          ? `<button type="button" class="card card--clickable card--highlight" data-nav="guesslie-setup">
+      <button type="button" class="card card--clickable card--highlight" data-nav="guesslie-setup">
         <div class="card-row">
           <span class="card-row__icon">🕵️</span>
           <div class="card-row__text">
@@ -34,61 +36,30 @@ export function mountGuessLieMenu(app) {
           </div>
           <span class="card-row__chevron">›</span>
         </div>
-      </button>`
-          : ""
-      }
+      </button>
 
-      ${
-        ready && !lobbyFull
-          ? `<button type="button" class="btn btn-primary btn--spaced" data-nav="guesslie-wait">
-          Salon d'attente du lobby →
-        </button>`
-          : ""
-      }
-
-      ${
-        ready && lobbyFull && canLaunch
-          ? `<button type="button" class="btn btn-primary btn--spaced" id="btn-play">
-          Lancer la partie →
-        </button>`
-          : ready && lobbyFull
-            ? `<button type="button" class="btn btn-secondary btn--spaced" disabled>En attente que l'hôte lance la partie</button>`
-            : ""
-      }
-
-      ${
-        ready
-          ? `<p class="hint">${lobbyFull ? "Tout le lobby est prêt." : "En attente des autres joueurs…"}</p>`
-          : `<p class="hint">Commence par préparer tes affirmations.</p>`
-      }
+      <p class="hint">Commence par préparer tes affirmations.</p>
     `,
   });
 
   bindNav(app);
 
-  app.querySelector("#btn-play")?.addEventListener("click", async () => {
-    if (isGameSyncActive() && !isLobbyHost()) return;
-    const btn = app.querySelector("#btn-play");
-    try {
-      await handleGuessLieLaunch(btn);
-      if (disposed) return;
-      if (getCurrentScreen() !== "guesslie-menu") return;
-      tryEnterGuessLiePlayFromWait();
-    } catch (err) {
-      console.warn("Guess The Lie launch:", err);
-      if (disposed) return;
-      if (getCurrentScreen() !== "guesslie-menu") return;
-      const { showAppAlert } = await import("../core/dialog.js");
-      if (disposed) return;
-      if (getCurrentScreen() !== "guesslie-menu") return;
-      await showAppAlert(err?.message || "Impossible de lancer la partie.", {
-        title: "Guess The Lie",
-        icon: "⚠️",
-      });
-    }
+  const guestFollow = prepGuestFollowOnSession({
+    prepScreen: "guesslie-menu",
+    getEntryScreen: getGuessLieEntryScreen,
   });
 
+  function onSessionUpdate() {
+    if (hasLocalSubmission()) {
+      navigate("guesslie-wait", { reset: true });
+      return;
+    }
+    guestFollow();
+  }
+
+  const unsub = onGameSessionChange(onSessionUpdate);
+
   return () => {
-    disposed = true;
+    unsub();
   };
 }

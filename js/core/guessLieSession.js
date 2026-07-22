@@ -126,7 +126,6 @@ export function tryEnterGuessLiePlayFromWait() {
 /** Boot / reprise : menu, wait ou partie selon l'état local. */
 export function navigateToGuessLieEntry() {
   const entry = getGuessLieEntryScreen();
-  if (entry === "guesslie-wait") return false;
   if (entry === "guesslie") return navigateToGuessLiePlay();
   const ok = navigate(entry, {
     navStack: GUESS_LIE_NAV_STACK[entry] || ["home", "lobby", "game-select", entry],
