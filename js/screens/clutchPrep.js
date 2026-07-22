@@ -136,7 +136,7 @@ export function mountClutchPrep(app) {
           <h2 class="screen-title">Préparation</h2>
           ${rulesButtonHtml("clutch")}
         </div>
-        <p class="game-intro">Un chrono part de 0 et monte vers une cible (7 à 15 s). Il disparaît un peu avant la cible — un délai différent à chaque manche : tape à l'instinct, au plus proche. Le plus précis gagne.</p>
+        <p class="game-intro">Un chrono part de 0 et monte vers une cible (7 à 15 s). Il disparaît un peu avant la cible - un délai différent à chaque manche : tape à l'instinct, au plus proche. Le plus précis gagne.</p>
 
         <div class="card">
           <p class="card-heading">Nombre de manches</p>

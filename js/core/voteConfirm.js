@@ -17,7 +17,7 @@ export function voteConfirmChrome({
       : allIn
         ? "Tout le monde a voté !"
         : committed != null && !hasPendingChange
-          ? "Vote enregistré — en attente des autres joueurs…"
+          ? "Vote enregistré - en attente des autres joueurs…"
           : "Tu peux modifier ton vote avant de valider.";
   const confirmDisabled =
     displayPick == null || (committed != null && !hasPendingChange && !allIn);

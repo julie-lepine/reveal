@@ -288,7 +288,7 @@ export function mountPlaylistGuess(app) {
       const hasCommitted = mp && committedVote != null;
       body = `
           ${songGuessCardHtml(round, { players, selectedPlayerId: displayPick })}
-          <p class="hint">${hasCommitted && selected === null ? "Vote enregistré — tu peux encore modifier avant la révélation." : "Choisis le propriétaire de la playlist."}</p>
+          <p class="hint">${hasCommitted && selected === null ? "Vote enregistré - tu peux encore modifier avant la révélation." : "Choisis le propriétaire de la playlist."}</p>
           <button type="button" class="btn btn-primary" id="confirm" ${displayPick == null ? "disabled" : ""}>${hasCommitted && selected === null ? "Modifier mon vote" : "Valider mon vote"}</button>
           <div class="screen-bottom-spacer" aria-hidden="true"></div>`;
       if (!mp || canActAsHost()) {

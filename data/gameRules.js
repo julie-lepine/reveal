@@ -34,7 +34,7 @@ export const GAME_RULES = {
     points: [
       "Plus tu es proche du consensus du groupe, plus tu marques sur la manche.",
       "Bonus : précision +5, plus proche +15, intuition +5, mode du groupe +5.",
-      "À la fin, le podium reprend le cumul des manches — sans bonus supplémentaire.",
+      "À la fin, le podium reprend le cumul des manches - sans bonus supplémentaire.",
     ],
     exemple:
       "« À quel point la pizza ananas est acceptable ? » Le groupe tourne autour de 35. Tu as mis 33 : tu es tout proche → top score sur la manche.",

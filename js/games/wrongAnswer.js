@@ -217,7 +217,7 @@ export function mountWrongAnswer(app) {
       ? mp
         ? allWrongAnswersIn()
           ? "Tout le monde a répondu !"
-          : `Réponse envoyée — en attente des autres (${answeredCount}/${total})…`
+          : `Réponse envoyée - en attente des autres (${answeredCount}/${total})…`
         : "Réponse envoyée !"
       : "Donne la pire réponse possible, en secret 🤫";
 
@@ -281,7 +281,7 @@ export function mountWrongAnswer(app) {
     const hint = voted
       ? allWrongAnswerVotesIn()
         ? "Tout le monde a voté !"
-        : `Vote enregistré — en attente des autres (${votedCount}/${total})…`
+        : `Vote enregistré - en attente des autres (${votedCount}/${total})…`
       : "Vote pour la PIRE réponse (tu ne peux pas voter pour la tienne).";
 
     const confirmDisabled = displayPick == null || displayPick === localName || voted;
@@ -330,7 +330,7 @@ export function mountWrongAnswer(app) {
               <span class="wrong-reveal-row__author" style="color:${meta.color}">${escapeHtml(row.name)}${isWorst ? " 👑" : ""}</span>
             </span>
             <span class="wrong-reveal-row__votes">${row.n} vote${row.n > 1 ? "s" : ""}</span>
-            <span class="wrong-reveal-row__pts ${pts ? "wrong-reveal-row__pts--gain" : ""}">${pts ? `+${pts}` : "—"}</span>
+            <span class="wrong-reveal-row__pts ${pts ? "wrong-reveal-row__pts--gain" : ""}">${pts ? `+${pts}` : "-"}</span>
           </div>`;
       })
       .join("");

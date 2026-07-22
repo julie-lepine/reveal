@@ -48,7 +48,7 @@ export function prepLaunchSlotParams({
 export async function confirmForcePrepLaunch({ gameTitle, roster, excluded }) {
   const excludedBlock =
     excluded.length > 0
-      ? `\n\nPas prêts — exclus de cette partie :\n${excluded.map((n) => `• ${n}`).join("\n")}`
+      ? `\n\nPas prêts - exclus de cette partie :\n${excluded.map((n) => `• ${n}`).join("\n")}`
       : "";
   const includedBlock = roster.map((n) => `• ${n}`).join("\n");
   return showAppConfirm(

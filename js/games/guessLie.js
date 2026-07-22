@@ -302,7 +302,7 @@ export function mountGuessLie(app) {
           : detectivesDone
             ? "Tout le monde a voté !"
             : committedVote != null && !hasPendingChange
-              ? "Vote enregistré — en attente des autres joueurs…"
+              ? "Vote enregistré - en attente des autres joueurs…"
               : "Tu peux modifier ton vote avant de valider.";
         const confirmDisabled =
           displayPick == null || (committedVote != null && !hasPendingChange && !detectivesDone);

@@ -171,7 +171,7 @@ export function mountClutch(app) {
     const btn = app.querySelector("#clutch-target");
     if (myTapMs() != null) {
       clearCopyTimer();
-      if (sub) sub.textContent = "👀 Chrono caché — en attente…";
+      if (sub) sub.textContent = "👀 Chrono caché - en attente…";
       return;
     }
     btn?.classList.add("clutch-tap--blind");
@@ -355,7 +355,7 @@ export function mountClutch(app) {
       ? "Mémorise la cible… 🎯"
       : hidden
         ? tapped
-          ? "👀 Chrono caché — en attente…"
+          ? "👀 Chrono caché - en attente…"
           : BLIND_LINES[0]
         : "Le chrono monte vers la cible";
 
@@ -423,7 +423,7 @@ export function mountClutch(app) {
               <span class="clutch-rank__name" style="color:${meta.color}">${escapeHtml(entry.name)}</span>
               <span class="clutch-rank__detail">${detail}</span>
             </span>
-            <span class="clutch-rank__pts ${pts ? "clutch-rank__pts--gain" : ""}">${pts ? `+${pts}` : "—"}</span>
+            <span class="clutch-rank__pts ${pts ? "clutch-rank__pts--gain" : ""}">${pts ? `+${pts}` : "-"}</span>
           </div>`;
       })
       .join("");
