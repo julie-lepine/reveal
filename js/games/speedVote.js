@@ -141,7 +141,7 @@ export function mountSpeedVote(app) {
           voteEndsAt: null,
           matchScores,
         },
-        { withEveningScores: mp && canActAsHost() }
+        { withEveningScores: mp && isLobbyHost() }
       );
 
       if (!mp) {

@@ -324,7 +324,7 @@ export function mountTraitre(app) {
       // re-render - sinon il reste bloqué sur l'écran de vote.
       try {
         await commitTraitrePlay(merged, {
-          withEveningScores: patch.phase === "final" && mp && canActAsHost(),
+          withEveningScores: patch.phase === "final" && mp && isLobbyHost(),
         });
       } catch (e) {
         console.warn("traitre resolve sync:", e);

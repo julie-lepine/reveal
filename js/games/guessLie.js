@@ -8,6 +8,7 @@ import {
 import {
   isGameSyncActive,
   canActAsHost,
+  isLobbyHost,
   onGameSessionChange,
   getActingHostUiRefreshToken,
   commitGuessLiePlay,
@@ -115,7 +116,7 @@ export function mountGuessLie(app) {
         roundScored: true,
         ...(recordStats ? { statsRecordedRoundIdx: roundIdx } : {}),
       },
-      { withEveningScores: mp && canActAsHost() }
+      { withEveningScores: mp && isLobbyHost() }
     );
 
     setRevealDisplay(result);

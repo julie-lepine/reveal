@@ -45,6 +45,7 @@ import { rulesButtonHtml } from "../core/gameRulesUi.js";
 import {
   isGameSyncActive,
   canActAsHost,
+  isLobbyHost,
   onGameSessionChange,
   getActingHostUiRefreshToken,
   stopGameSessionListenerOnPostGame,
@@ -480,7 +481,7 @@ export function mountTruthMeter(app) {
           matchScores,
           lastRound,
         },
-        { withEveningScores: mp && canActAsHost() && Boolean(author) }
+        { withEveningScores: mp && isLobbyHost() && Boolean(author) }
       );
 
       if (!mp) {

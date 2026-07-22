@@ -31,6 +31,7 @@ import { isEveningGameplayPaused } from "../core/filRougeSession.js";
 import {
   isGameSyncActive,
   canActAsHost,
+  isLobbyHost,
   onGameSessionChange,
   completeGameSession,
   getCachedGameSession,
@@ -175,7 +176,7 @@ export function mountPlaylistGuess(app) {
         voteEndsAt: null,
         roundScored: true,
       },
-      { withEveningScores: mp && canActAsHost() }
+      { withEveningScores: mp && isLobbyHost() }
     );
     phase = "reveal";
   }

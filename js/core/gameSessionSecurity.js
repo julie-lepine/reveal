@@ -72,3 +72,33 @@ export function isContributePairAllowed(game, kind) {
   if (k === "placement" || k === "finished") return g === "tiernight";
   return false;
 }
+
+/** Message client aligné sur le refus evening scores (hôte réel only). */
+export const EVENING_SCORES_RESERVED_MSG = "Scores de soirée réservés à l'hôte.";
+
+/**
+ * Chemin non-hôte réel (`patchGameStateAsNonHost`) :
+ * - pas de flag evening → OK, play éventuel
+ * - flag evening + acting host → OK mais drop evening (RPC refuse scores/soirée ;
+ *   matchScores restent dans le playPatch whitelist)
+ * - flag evening + invité ordinaire → erreur (popup observée en QA)
+ *
+ * Ne confère pas l'identité d'hôte : evening reste réservé à l'hôte réel
+ * (`isLobbyHost` + UPDATE direct).
+ */
+export function resolveNonHostEveningScoresPolicy({
+  withEveningScores = false,
+  canActAsHost = false,
+} = {}) {
+  if (!withEveningScores) {
+    return { ok: true, dropEveningScores: false };
+  }
+  if (canActAsHost) {
+    return { ok: true, dropEveningScores: true };
+  }
+  return {
+    ok: false,
+    dropEveningScores: true,
+    error: EVENING_SCORES_RESERVED_MSG,
+  };
+}

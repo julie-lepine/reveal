@@ -31,6 +31,7 @@ import { isEveningGameplayPaused } from "../core/filRougeSession.js";
 import {
   isGameSyncActive,
   canActAsHost,
+  isLobbyHost,
   onGameSessionChange,
   completeGameSession,
   stopGameSessionListenerOnPostGame,
@@ -313,7 +314,7 @@ export function mountClutch(app) {
           matchScores,
           lastRound: lastRoundData,
         },
-        { withEveningScores: mp && canActAsHost() }
+        { withEveningScores: mp && isLobbyHost() }
       );
       if (!mp) {
         phase = "reveal";

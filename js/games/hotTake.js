@@ -37,6 +37,7 @@ import { isEveningGameplayPaused } from "../core/filRougeSession.js";
 import {
   isGameSyncActive,
   canActAsHost,
+  isLobbyHost,
   onGameSessionChange,
   getActingHostUiRefreshToken,
   completeGameSession,
@@ -463,7 +464,7 @@ export function mountHotTake(app) {
           lastRound,
         },
         {
-          withEveningScores: mp && canActAsHost(),
+          withEveningScores: mp && isLobbyHost(),
           withPatchFeedback: mp && canActAsHost(),
         }
       );

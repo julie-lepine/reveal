@@ -104,6 +104,10 @@ import {
   detectPlayerContribution,
   stateKeyToGameId,
 } from "./playerContribution.js";
+import {
+  resolveNonHostEveningScoresPolicy,
+  EVENING_SCORES_RESERVED_MSG,
+} from "./gameSessionSecurity.js";
 
 let cachedRow = null;
 let lastSessionSig = "";
@@ -4041,8 +4045,15 @@ async function patchGameStateAsNonHost(
   const uid = getSupabaseUserId();
   if (!uid) throw new Error("Session requise.");
 
-  if (withEveningScores) {
-    throw new Error("Scores de soirée réservés à l'hôte.");
+  // Evening scores = hôte réel only (UPDATE direct). Les jeux passaient souvent
+  // withEveningScores: canActAsHost() → popup bloquante alors que merge_play est OK.
+  // Aligné RPC apply_acting_host_play (refuse scores/soirée, autorise matchScores).
+  const eveningPolicy = resolveNonHostEveningScoresPolicy({
+    withEveningScores,
+    canActAsHost: canActAsHost(),
+  });
+  if (!eveningPolicy.ok) {
+    throw new Error(eveningPolicy.error || EVENING_SCORES_RESERVED_MSG);
   }
 
   const contribution = detectPlayerContribution(stateMerge, uid);

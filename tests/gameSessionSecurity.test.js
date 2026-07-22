@@ -5,6 +5,8 @@ import {
   isActingHostServerLike,
   isContributePairAllowed,
   resolveActingHostServerLike,
+  resolveNonHostEveningScoresPolicy,
+  EVENING_SCORES_RESERVED_MSG,
 } from "../js/core/gameSessionSecurity.js";
 
 const NOW = 1_000_000_000_000;
@@ -84,5 +86,36 @@ describe("whitelist contribute game/kind", () => {
     assert.equal(isContributePairAllowed("clutch", "vote"), false);
     assert.equal(isContributePairAllowed("tiernightlive", "placement"), false);
     assert.equal(isContributePairAllowed("menu", "ready"), false);
+  });
+});
+
+describe("resolveNonHostEveningScoresPolicy (ARCH-03)", () => {
+  it("sans flag evening → OK, pas de drop", () => {
+    const r = resolveNonHostEveningScoresPolicy({
+      withEveningScores: false,
+      canActAsHost: false,
+    });
+    assert.equal(r.ok, true);
+    assert.equal(r.dropEveningScores, false);
+  });
+
+  it("acting host + flag evening → OK play, drop evening (pas de popup)", () => {
+    const r = resolveNonHostEveningScoresPolicy({
+      withEveningScores: true,
+      canActAsHost: true,
+    });
+    assert.equal(r.ok, true);
+    assert.equal(r.dropEveningScores, true);
+    assert.equal(r.error, undefined);
+  });
+
+  it("invité ordinaire + flag evening → erreur exacte de la popup QA", () => {
+    const r = resolveNonHostEveningScoresPolicy({
+      withEveningScores: true,
+      canActAsHost: false,
+    });
+    assert.equal(r.ok, false);
+    assert.equal(r.error, EVENING_SCORES_RESERVED_MSG);
+    assert.equal(r.error, "Scores de soirée réservés à l'hôte.");
   });
 });

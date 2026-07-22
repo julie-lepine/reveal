@@ -30,6 +30,7 @@ import { checkHotTakeModeration, getModerationNotice } from "../core/hotTakeSess
 import {
   isGameSyncActive,
   canActAsHost,
+  isLobbyHost,
   onGameSessionChange,
   completeGameSession,
   stopGameSessionListenerOnPostGame,
@@ -196,7 +197,7 @@ export function mountWrongAnswer(app) {
           matchScores,
           lastRound: lastRoundData,
         },
-        { withEveningScores: mp && canActAsHost() }
+        { withEveningScores: mp && isLobbyHost() }
       );
       // commitWrongAnswerPlay a déjà sauvegardé localement : render() relit la session.
       render();

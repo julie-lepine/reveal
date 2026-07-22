@@ -33,6 +33,7 @@ import { isEveningGameplayPaused } from "../core/filRougeSession.js";
 import {
   isGameSyncActive,
   canActAsHost,
+  isLobbyHost,
   onGameSessionChange,
   getActingHostUiRefreshToken,
   completeGameSession,
@@ -228,7 +229,7 @@ export function mountDilemma(app) {
           matchScores,
           lastRound,
         },
-        { withEveningScores: mp && canActAsHost(), withPatchFeedback: mp && canActAsHost() }
+        { withEveningScores: mp && isLobbyHost(), withPatchFeedback: mp && canActAsHost() }
       );
       if (unmounted) return;
       if (currentDilemma) {
