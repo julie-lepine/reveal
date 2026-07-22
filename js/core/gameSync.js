@@ -194,7 +194,7 @@ let sessionRouteSeq = 0;
 
 console.log("[SESSION-ROUTE]", {
   source: "gameSync-module-load",
-  patch: "hub-prep-v2",
+  patch: "hub-prep-v3",
   t: Date.now(),
 });
 
@@ -353,21 +353,25 @@ function isSessionAdvancedFromSuppress(targetScreen) {
   let result = false;
   let branch = "default_false";
 
-  if (!suppressSessionScreen || !targetScreen) {
+  if (!targetScreen) {
     result = false;
-    branch = "missing_suppress_or_target";
+    branch = "missing_target";
+  } else if (!suppressSessionScreen) {
+    /**
+     * Suppress actif (timer) mais baseline perdue (écran/sig null) : ne jamais
+     * bloquer un vrai forceFollow. Une row post-partie seule reste false.
+     */
+    result = forceFollow;
+    branch = forceFollow
+      ? "force_follow_without_suppress_baseline"
+      : "no_baseline_non_force_follow";
   } else if (suppressSessionSig && currentSig !== suppressSessionSig) {
-    // Signature différente de celle mémorisée à l'ouverture des scores.
     result = true;
     branch = "sig_changed";
   } else if (sameScreen) {
     result = false;
     branch = "same_suppress_screen";
   } else if (forceFollow && (!suppressSessionSig || suppressFromHubOrPost)) {
-    /**
-     * Prep / partie depuis hub / post-partie, ou sans sig mémorisée (aucune session
-     * active au clic). Ne pas utiliser isCompatibleSessionScreen(hub, prep).
-     */
     result = true;
     branch = "force_follow_from_hub_or_empty_sig";
   } else if (forceFollow && shouldForceGuestFollowSession(suppressSessionScreen)) {
@@ -383,7 +387,7 @@ function isSessionAdvancedFromSuppress(targetScreen) {
 
   console.log("[SESSION-ROUTE]", {
     source: "isSessionAdvancedFromSuppress",
-    patch: "hub-prep-v2",
+    patch: "hub-prep-v3",
     targetScreen,
     suppressScreen: suppressSessionScreen,
     suppressSig: suppressSessionSig || null,
@@ -395,6 +399,8 @@ function isSessionAdvancedFromSuppress(targetScreen) {
     compatible,
     branch,
     result,
+    suppressedUntil: suppressSessionRouteUntil,
+    suppressedActive: Date.now() < suppressSessionRouteUntil,
   });
 
   return result;
@@ -2946,11 +2952,13 @@ async function confirmMissingSessionThenRoute() {
     if (!isGameSyncActive()) return;
     const current = getCurrentScreen();
     if (isOnPostGameScreen(current)) {
-      suppressSessionRoute(120000);
+      // Toujours mémoriser un écran de référence : un timer sans baseline laisse
+      // isBrowsingScoresWithRouteSuppress actif tout en cassant isSessionAdvancedFromSuppress.
+      suppressSessionRoute(120000, current || "results");
       return;
     }
     if (isActiveGameSessionScreen(current) || isOnGameSetupScreen(current)) {
-      suppressSessionRoute(120000);
+      suppressSessionRoute(120000, current);
       // Soirée toujours lancée (l'hôte est juste revenu au menu des jeux) : on suit vers le
       // hub plutôt que de renvoyer l'invité sur le lobby d'attente (clignotement + reset prêt).
       if (isLobbyEveningStarted()) {
@@ -3344,7 +3352,9 @@ export function routeToSessionScreen(screen, { force = false } = {}) {
 
 export function suppressSessionRoute(ms = 45000, screen = getCachedGameSession()?.screen ?? null) {
   suppressSessionRouteUntil = Date.now() + ms;
-  suppressSessionScreen = screen;
+  // Ne jamais activer le timer avec une baseline nulle : sinon isSessionRouteSuppressed()
+  // reste true alors que isSessionAdvancedFromSuppress ne peut plus décider.
+  suppressSessionScreen = screen ?? getCurrentScreen() ?? "game-select";
   suppressSessionSig = sessionSignature(getCachedGameSession());
 }
 

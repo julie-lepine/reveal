@@ -86,31 +86,28 @@ function routeDecisionUnderScoresSuppress({
   return { routed: true, reason: "navigate" };
 }
 
-/** Miroir de isSessionAdvancedFromSuppress (gameSync.js) après patch. */
+/** Miroir de isSessionAdvancedFromSuppress (gameSync.js) après patch hub-prep-v3. */
 function isSessionAdvancedFromSuppress(targetScreen, { suppressScreen, suppressSig, cachedRow }) {
-  if (!suppressScreen || !targetScreen) return false;
+  const currentSig = sessionSignature(cachedRow);
+  const forceFollow = shouldForceGuestFollowSession(targetScreen);
+  const suppressFromHubOrPost =
+    suppressScreen === "game-select" ||
+    suppressScreen === "lobby" ||
+    POST_GAME_SCREENS.has(suppressScreen);
+  const sameScreen = Boolean(suppressScreen && targetScreen && targetScreen === suppressScreen);
+  const compatible = Boolean(
+    suppressScreen && targetScreen && isCompatibleSessionScreen(suppressScreen, targetScreen)
+  );
 
-  if (suppressSig && sessionSignature(cachedRow) !== suppressSig) {
-    return true;
+  if (!targetScreen) return false;
+  if (!suppressScreen) {
+    return forceFollow;
   }
-
-  if (targetScreen === suppressScreen) return false;
-
-  if (shouldForceGuestFollowSession(targetScreen)) {
-    if (
-      !suppressSig ||
-      suppressScreen === "game-select" ||
-      suppressScreen === "lobby" ||
-      POST_GAME_SCREENS.has(suppressScreen)
-    ) {
-      return true;
-    }
-    if (shouldForceGuestFollowSession(suppressScreen)) {
-      return true;
-    }
-  }
-
-  if (isCompatibleSessionScreen(suppressScreen, targetScreen)) return false;
+  if (suppressSig && currentSig !== suppressSig) return true;
+  if (sameScreen) return false;
+  if (forceFollow && (!suppressSig || suppressFromHubOrPost)) return true;
+  if (forceFollow && shouldForceGuestFollowSession(suppressScreen)) return true;
+  if (compatible) return false;
   return true;
 }
 
@@ -169,6 +166,36 @@ describe("goToScores suppress vs host launch", () => {
     });
     assert.equal(decision.routed, true);
     assert.equal(decision.reason, "navigate");
+  });
+
+  it("1b. suppressScreen null + suppressSig null + hottake-prep → advanced true", () => {
+    assert.equal(
+      isSessionAdvancedFromSuppress("hottake-prep", {
+        suppressScreen: null,
+        suppressSig: null,
+        cachedRow: hotTakePrepRow,
+      }),
+      true
+    );
+    const decision = routeDecisionUnderScoresSuppress({
+      effective: "hottake-prep",
+      suppressScreen: null,
+      suppressSig: null,
+      cachedRow: hotTakePrepRow,
+    });
+    assert.equal(decision.routed, true);
+    assert.equal(decision.reason, "navigate");
+  });
+
+  it("1c. suppressScreen null + target results → advanced false (rester sur scores)", () => {
+    assert.equal(
+      isSessionAdvancedFromSuppress("results", {
+        suppressScreen: null,
+        suppressSig: null,
+        cachedRow: resultsRow,
+      }),
+      false
+    );
   });
 
   it("2. results → même session/signature : navigation bloquée", () => {
