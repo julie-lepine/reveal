@@ -45,6 +45,57 @@ import {
 } from "../core/gameSync.js";
 import { voteConfirmChrome, pickForVoteConfirm } from "../core/voteConfirm.js";
 
+function buildHotTakeStandings(matchScores = {}) {
+  return [...getActivePlayers()]
+    .map((player) => ({
+      ...player,
+      score: Number(matchScores[player.name]) || 0,
+    }))
+    .sort((a, b) => b.score - a.score || a.name.localeCompare(b.name))
+    .map((player, index) => ({
+      ...player,
+      rank: index + 1,
+    }));
+}
+
+function finalHotTakeResultsHtml({
+  standings = [],
+  showContinueAction = true,
+  continueAction = "show-results",
+  continueLabel = "Voir les résultats",
+  waitingText = "En attente de l'hôte pour afficher les résultats…",
+} = {}) {
+  const winner = standings[0] || null;
+  return `
+    <div class="card card--highlight hottake-final">
+      <p class="label-upper label-upper--hot">🔥 Hot Take</p>
+      <h3 class="section-title">Podium final</h3>
+      ${
+        winner
+          ? `<p class="hint hottake-final__summary">👑 <strong>${escapeHtml(winner.name)}</strong> remporte la partie avec <strong>${winner.score} pts</strong>.</p>`
+          : ""
+      }
+      <div class="trivia-results__podium">
+        ${standings
+          .map(
+            (player) => `
+          <div class="trivia-results__row ${player.rank <= 3 ? "trivia-results__row--winner" : ""} ${player.rank === 1 ? "trivia-results__row--champion" : ""}">
+            <span class="trivia-results__medal">${player.rank === 1 ? "🥇" : player.rank === 2 ? "🥈" : player.rank === 3 ? "🥉" : "•"}</span>
+            <div class="avatar avatar--sm" style="background:${player.color}">${player.emoji}</div>
+            <span class="player-name trivia-results__name">${escapeHtml(player.name)}</span>
+            <span class="trivia-results__score">${player.score} pts</span>
+          </div>`
+          )
+          .join("")}
+      </div>
+      ${
+        showContinueAction
+          ? `<button type="button" class="btn btn-primary btn--spaced" data-hottake-action="${escapeHtml(continueAction)}">${escapeHtml(continueLabel)}</button>`
+          : `<p class="hint">${escapeHtml(waitingText)}</p>`
+      }
+    </div>`;
+}
+
 export function mountHotTake(app) {
   if (!requireLobbyPlay()) return null;
 
@@ -60,7 +111,9 @@ export function mountHotTake(app) {
     return null;
   }
 
-  void setLobbyPlaying("hottake").catch(() => {});
+  if (getHotTakeSession().phase !== "final") {
+    void setLobbyPlaying("hottake").catch(() => {});
+  }
 
   let takeIdx = 0;
   let phase = "question";
@@ -286,6 +339,63 @@ export function mountHotTake(app) {
 
   function hotTakeAwardSummaryHtml(voteResult, votesMap, options = {}) {
     return hotTakeRevealSummaryHtml(voteResult, votesMap, options);
+  }
+
+  async function finishHotTakeGame() {
+    const live = getHotTakeSession();
+    if (live.phase === "final") {
+      render();
+      return;
+    }
+
+    const standings = buildHotTakeStandings(live.matchScores || {});
+    if (!mp || canActAsHost()) {
+      recordHotTakePlayed();
+      setLastGame({
+        gameId: "hottake",
+        title: "Hot Take",
+        summary: `${TAKES.length} prises · gagnant : ${standings[0]?.name || "-"}`,
+      });
+    }
+
+    const finalSession = {
+      ...live,
+      phase: "final",
+    };
+
+    if (mp && canActAsHost()) {
+      await commitHotTakePlay(finalSession, { screen: "hottake" });
+      render();
+      return;
+    }
+
+    if (!mp) {
+      await commitHotTakePlay(finalSession);
+      render();
+    }
+  }
+
+  async function showEveningResults() {
+    if (mp && !canActAsHost()) return;
+
+    const resetHt = await resetHotTakeAfterGame({ syncRemote: false });
+
+    if (mp) {
+      try {
+        await completeGameSession({
+          gameId: "hottake",
+          screen: "results",
+          state: { hotTake: hotTakeToRemote(resetHt) },
+        });
+      } catch (e) {
+        console.warn("REVEAL completeGameSession:", e);
+        navigate("results", { navStack: ["home", "lobby", "game-select", "results"] });
+      }
+      return;
+    }
+
+    await setLobbyWaiting();
+    navigate("results", { navStack: ["home", "lobby", "game-select", "results"] });
   }
 
   async function goToReveal() {
@@ -545,15 +655,35 @@ export function mountHotTake(app) {
         ${
           host
             ? `<button type="button" class="btn btn-primary btn--spaced" id="next-take">
-          ${takeIdx < total - 1 ? "Prochain Hot Take →" : "Voir les résultats →"}
+          ${takeIdx < total - 1 ? "Prochain Hot Take →" : "Voir le podium →"}
         </button>`
             : `<p class="hint">En attente de l'hôte pour la suite…</p>`
         }`;
     }
 
-    app.innerHTML = pageShell({
-      backTarget: "back",
-      content: `
+    if (phase === "final") {
+      phaseHtml = finalHotTakeResultsHtml({
+        standings: buildHotTakeStandings(hotTakeSessionScores()),
+        showContinueAction: !mp || canActAsHost(),
+        continueAction: "show-results",
+        continueLabel: "Voir les résultats",
+        waitingText: "En attente de l'hôte pour afficher les résultats…",
+      });
+    }
+
+    const mainContent =
+      phase === "final"
+        ? `
+        <div class="game-header">
+          <div class="dots">${TAKES.map((_, i) =>
+            `<span class="dot ${i === takeIdx ? "dot--active" : i < takeIdx ? "dot--done" : ""}"></span>`
+          ).join("")}</div>
+          <span class="muted">${Math.min(takeIdx + 1, total)}/${total}</span>
+        </div>
+        <div class="logo logo--sm"><h1>HOT TAKE</h1></div>
+        ${phaseHtml}
+        ${gameExitBarHtml()}`
+        : `
         <div class="game-header">
           <div class="dots">${TAKES.map((_, i) =>
             `<span class="dot ${i === takeIdx ? "dot--active" : i < takeIdx ? "dot--done" : ""}"></span>`
@@ -567,8 +697,11 @@ export function mountHotTake(app) {
           <p class="hot-take-text">"${escapeHtml(take.text)}"</p>
         </div>
         ${phaseHtml}
-        ${gameExitBarHtml()}
-      `,
+        ${gameExitBarHtml()}`;
+
+    app.innerHTML = pageShell({
+      backTarget: "back",
+      content: mainContent,
     });
 
     bindNav(app);
@@ -604,30 +737,18 @@ export function mountHotTake(app) {
         await startNextTakeVote();
         render();
       } else {
-        recordHotTakePlayed();
-        setLastGame({
-          gameId: "hottake",
-          title: "Hot Take",
-          summary: `${total} prises · derniers outsiders : ${(lastAward?.dissenters || []).join(", ") || "-"}`,
-        });
-        const resetHt = await resetHotTakeAfterGame({ syncRemote: false });
-        if (mp) {
-          try {
-            await completeGameSession({
-              gameId: "hottake",
-              screen: "results",
-              state: { hotTake: hotTakeToRemote(resetHt) },
-            });
-          } catch (e) {
-            console.warn("REVEAL completeGameSession:", e);
-            navigate("results", { navStack: ["home", "lobby", "game-select", "results"] });
-          }
-        } else {
-          setLobbyWaiting();
-        }
-        navigate("results");
+        await finishHotTakeGame();
       }
     }));
+
+    app.querySelectorAll("[data-hottake-action]").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const action = btn.getAttribute("data-hottake-action");
+        if (action === "show-results") {
+          await showEveningResults();
+        }
+      });
+    });
   }
 
   function shouldSkipFullRender(prevPhase, prevTake, prevVotesJson) {
