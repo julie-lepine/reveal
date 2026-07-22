@@ -227,11 +227,14 @@ export function mountDilemma(app) {
         },
         { withEveningScores: mp && canActAsHost(), withPatchFeedback: mp && canActAsHost() }
       );
+      if (unmounted) return;
       if (currentDilemma) {
         await consumePlayedCustomDilemma(currentDilemma);
+        if (unmounted) return;
       }
       enterRevealUi();
     } catch (err) {
+      if (unmounted) return;
       syncFromSession();
       if (sessionInReveal()) {
         enterRevealUi();
@@ -260,6 +263,7 @@ export function mountDilemma(app) {
     if (roundIdx < total - 1) {
       const nextIdx = roundIdx + 1;
       await startDilemmaRound(nextIdx);
+      if (unmounted) return;
       syncFromSession();
       selected = null;
       revealAnimDone = false;
@@ -276,6 +280,7 @@ export function mountDilemma(app) {
         summary: `${total} dilemmes · dernière manche ${pctA}% option A`,
       });
       const resetDm = await resetDilemmaAfterGame({ syncRemote: false });
+      if (unmounted) return;
       if (mp) {
         try {
           await completeGameSession({
@@ -285,11 +290,13 @@ export function mountDilemma(app) {
           });
         } catch (e) {
           console.warn("REVEAL completeGameSession:", e);
+          if (unmounted) return;
           navigate("results", { navStack: ["home", "lobby", "game-select", "results"] });
         }
       } else {
         setLobbyWaiting();
       }
+      if (unmounted) return;
       navigate("results", { navStack: ["home", "lobby", "game-select", "results"] });
     }
   }
@@ -454,12 +461,14 @@ export function mountDilemma(app) {
       render();
       try {
         await commitDilemmaVote(pick);
+        if (unmounted) return;
         selected = null;
         myVote = pick;
       } finally {
         voteCommitInFlight = null;
-        syncFromSession();
+        if (!unmounted) syncFromSession();
       }
+      if (unmounted) return;
       if (allDilemmaVotesIn() && canActAsHost()) {
         await goToReveal();
         return;
@@ -547,6 +556,7 @@ export function mountDilemma(app) {
   }
 
   const unsub = onGameSessionChange(async (row) => {
+    if (unmounted) return;
     if (stopGameSessionListenerOnPostGame(row, { cleanup: cancelRevealAnim })) return;
 
     const prevPhase = phase;
@@ -562,6 +572,7 @@ export function mountDilemma(app) {
 
     if (phase === "voting" && canActAsHost() && allDilemmaVotesIn()) {
       await goToReveal();
+      if (unmounted) return;
       return;
     }
     if (phase === "voting" && prevPhase !== "voting") {

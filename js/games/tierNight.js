@@ -69,6 +69,7 @@ export function mountTierNight(app) {
   });
   let dragItem = null;
   let finished = false;
+  let alive = true;
 
   function unplaced() {
     const allPlaced = Object.values(placed).flat();
@@ -110,6 +111,7 @@ export function mountTierNight(app) {
         placements,
         finished: done,
       });
+      if (!alive) return;
 
       render();
       await advanceTierNightToResultsWhenReady(list);
@@ -118,6 +120,7 @@ export function mountTierNight(app) {
 
     buildRecapsWithSimulation(list.id, list.name, list.items, placed);
     recordTierNightPlayed();
+    if (!alive) return;
     navigate("tiernight-end");
   }
 
@@ -347,10 +350,13 @@ export function mountTierNight(app) {
   }
 
   const unsub = onGameSessionChange(async (row) => {
+    if (!alive) return;
     if (getEffectiveSessionScreen(row) === "tiernight-end") {
       if (!canRouteToTierNightEnd(row)) return;
       await refreshGameSession();
+      if (!alive) return;
       await ensureTierNightRecapsFromRemote(list);
+      if (!alive) return;
       navigate("tiernight-end");
       return;
     }
@@ -363,6 +369,7 @@ export function mountTierNight(app) {
   render();
 
   return () => {
+    alive = false;
     unsub();
   };
 }

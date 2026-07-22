@@ -400,6 +400,18 @@ function shouldApplySessionRoute(row, { fromScreen = null, debugSource = null } 
     return routeLog(false, "compatible_session_screen_no_nav");
   }
 
+  // Sortie volontaire (returnToGameSelect) : prioritaire sur guest_must_follow /
+  // force_follow tant que l'invité est sur un hub et que la session n'a pas avancé
+  // vers un autre écran (isSuppressedGameReturn false si autre jeu / autre prep).
+  const onVoluntaryExitHub =
+    current === "game-select" ||
+    current === "home" ||
+    current === "lobby" ||
+    current === "settings";
+  if (onVoluntaryExitHub && isSuppressedGameReturn(screen)) {
+    return routeLog(false, "voluntary_exit_suppress_hub");
+  }
+
   // Invariant générique invité : prep/play distante + écran local différent → suivre.
   // La consultation scores ne bloque que si la session n'a PAS avancé depuis le suppress.
   const mustFollow = guestMustFollowSession(screen, current);

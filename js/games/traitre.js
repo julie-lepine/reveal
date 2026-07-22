@@ -70,6 +70,8 @@ export function mountTraitre(app) {
   let voteSurvivals = 0;
   let resolveInFlight = false;
   let roleSyncInFlight = false;
+  /** Évite effets UI après démontage (I-05). Distinct du tableau `alive` (joueurs). */
+  let mountAlive = true;
 
   const localName = getLocalDisplayName();
   const mp = isGameSyncActive();
@@ -564,6 +566,7 @@ export function mountTraitre(app) {
 
     app.querySelector("#btn-deal-ack")?.addEventListener("click", async () => {
       await commitTraitreDealAck();
+      if (!mountAlive) return;
       if (!mp) {
         const s = getTraitreSession();
         const acks = { ...(s.dealAcks || {}) };
@@ -571,21 +574,32 @@ export function mountTraitre(app) {
           acks[n] = true;
         });
         await commitTraitrePlay({ ...s, dealAcks: acks });
+        if (!mountAlive) return;
       }
       await maybeAdvanceFromDeal();
+      if (!mountAlive) return;
       render();
     });
 
     app.querySelector("#btn-finish-speak")?.addEventListener("click", () => {
-      void finishSpeakRound().then(() => render());
+      void finishSpeakRound().then(() => {
+        if (!mountAlive) return;
+        render();
+      });
     });
 
     app.querySelector("#btn-continue")?.addEventListener("click", () => {
-      void continueSpeakRound().then(() => render());
+      void continueSpeakRound().then(() => {
+        if (!mountAlive) return;
+        render();
+      });
     });
 
     app.querySelector("#btn-vote-now")?.addEventListener("click", () => {
-      void startVoteFromDecision().then(() => render());
+      void startVoteFromDecision().then(() => {
+        if (!mountAlive) return;
+        render();
+      });
     });
 
     app.querySelectorAll("[data-traitre-vote]").forEach((btn) => {
@@ -602,20 +616,26 @@ export function mountTraitre(app) {
       const pick = pickForVoteConfirm(selectedVote, normalizedVotes[localName]);
       if (pick == null) return;
       await commitTraitreVote(pick);
+      if (!mountAlive) return;
       selectedVote = null;
       if (!mp) {
         const s = getTraitreSession();
         const merged = simulateTraitreVotes(pick, s);
         await commitTraitrePlay({ ...s, votes: { ...merged, [localName]: pick } });
+        if (!mountAlive) return;
       }
       if (allTraitreVotesIn(getTraitreSession()) && (!mp || canActAsHost())) {
         await resolveVoteRound();
+        if (!mountAlive) return;
       }
       render();
     });
 
     app.querySelector("#btn-force-vote")?.addEventListener("click", () => {
-      void resolveVoteRound({ force: true }).then(() => render());
+      void resolveVoteRound({ force: true }).then(() => {
+        if (!mountAlive) return;
+        render();
+      });
     });
 
     app.querySelector("#btn-traitre-exit")?.addEventListener("click", () => {
@@ -624,28 +644,37 @@ export function mountTraitre(app) {
   }
 
   const unsub = onGameSessionChange(async (row) => {
+    if (!mountAlive) return;
     if (stopGameSessionListenerOnPostGame(row)) return;
 
     const entry = getTraitreEntryScreen();
     if (entry !== "traitre") {
+      if (!mountAlive) return;
       navigate(entry);
       return;
     }
     syncFromSession();
     await ensurePrivateRole();
+    if (!mountAlive) return;
     if (phase === "deal") {
       await maybeAdvanceFromDeal();
+      if (!mountAlive) return;
     }
     if (phase === "vote" && canActAsHost() && allTraitreVotesIn(getTraitreSession())) {
       await resolveVoteRound();
+      if (!mountAlive) return;
     }
     render();
   });
 
-  void ensurePrivateRole().then(() => render());
+  void ensurePrivateRole().then(() => {
+    if (!mountAlive) return;
+    render();
+  });
   render();
 
   return () => {
+    mountAlive = false;
     unsub();
   };
 }

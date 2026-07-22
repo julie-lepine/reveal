@@ -12,6 +12,7 @@ import { bindNav } from "./nav.js";
 export function mountGuessLieMenu(app) {
   if (!requireLobbyPlay()) return null;
 
+  let disposed = false;
   const ready = hasLocalSubmission();
   const lobbyFull = allLobbySubmitted();
 
@@ -67,12 +68,16 @@ export function mountGuessLieMenu(app) {
     const btn = app.querySelector("#btn-play");
     try {
       await handleGuessLieLaunch(btn);
-      if (getCurrentScreen() !== "guesslie") {
-        tryEnterGuessLiePlayFromWait();
-      }
+      if (disposed) return;
+      if (getCurrentScreen() !== "guesslie-menu") return;
+      tryEnterGuessLiePlayFromWait();
     } catch (err) {
       console.warn("Guess The Lie launch:", err);
+      if (disposed) return;
+      if (getCurrentScreen() !== "guesslie-menu") return;
       const { showAppAlert } = await import("../core/dialog.js");
+      if (disposed) return;
+      if (getCurrentScreen() !== "guesslie-menu") return;
       await showAppAlert(err?.message || "Impossible de lancer la partie.", {
         title: "Guess The Lie",
         icon: "⚠️",
@@ -80,5 +85,7 @@ export function mountGuessLieMenu(app) {
     }
   });
 
-  return null;
+  return () => {
+    disposed = true;
+  };
 }
