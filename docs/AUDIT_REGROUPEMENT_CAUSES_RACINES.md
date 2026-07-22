@@ -136,7 +136,7 @@ Clôture QA :
 
 ---
 
-## Cause 2 — Course entre auth et état local (écrasement profil)
+## Cause 2 — Course entre auth et état local (écrasement profil) ✅ Corrigé + QA validée
 
 **Mécanisme :** `onAuthStateChange` appelle `syncSessionToState()` sans coordination avec `signInAsGuest()` qui écrit le pseudo au join.
 
@@ -193,16 +193,25 @@ Clôture QA :
 
 **Mécanisme :** `isLobbyHost()` vs `canActAsHost()` ; plusieurs chemins supposent hôte réel ou traitent invité comme hôte local sans commit serveur.
 
+État patch / QA (2026-07-22) :
+- **L-01** — bouton « Recommencer » masqué pour non-hôte ; visible côté hôte.
+- **M-03b** — guard launch : invité ne démarre pas une UI locale divergente ; seul l’hôte lance.
+- **M-06b** — `returnToGameSelect` : hôte reset session remote ; invité quitte sans terminer pour les autres, peut suivre une relance.
+- **M-06a** — exit mid-game invité sans `endGameSession` ; bandeau « Rejoindre la partie en cours » + reprise immédiate depuis le cache.
+- **I-01** — acting host termine la partie : `host_id` = hôte réel du lobby ; QA acting host OK.
+- **I-02** déjà clôturé (2026-07-11).
+- Ouverts : **I-08** (RLS UPDATE session), **ARCH-03** (policy acting host — metadata I-01 OK, couche policy encore à traiter).
+
 | ID | Problème | Fichier / fonction | Scénario | Impact | Correction proposée | Statut |
 |----|----------|-------------------|----------|--------|---------------------|--------|
-| **I-01** | `completeGameSession` mauvais `host_id` | `gameSync.js` | Acting guest termine partie | Metadata / RLS incohérente | Persister `lobby.hostId` dans `host_id`, fallback sur acteur si absent | 🟡 Corrigé + tests ; QA acting host à faire |
+| **I-01** | `completeGameSession` mauvais `host_id` | `gameSync.js` | Acting guest termine partie | Metadata / RLS incohérente | Persister `lobby.hostId` dans `host_id`, fallback sur acteur si absent | ✅ Corrigé + validé QA (acting host, 2026-07-22) |
 | **I-02** / **S-01** | Patch invité sans row `game_sessions` | `gameSync.js`, `mpLaunch.js` | Ready prep avant `startGameSession` | Erreur visible invité | No-op local si invité sans session distante | ✅ Corrigé + QA validée (prep invité sans session, 2026-07-11) |
 | **I-08** | RLS : tout membre peut UPDATE session | `supabase/game-sessions.sql` | Client modifié | Triche / corruption | RPC merge serveur ou policies restrictives | À traiter |
-| **M-03b** / **SYN-09** | `launchGameWithSync` branche non-hôte | `mpLaunch.js` | Appel par erreur sur invité | UI locale divergente | Guard strict ; ne jamais applyLocal seul en MP | 🟡 Corrigé + tests ; QA à faire |
-| **M-06a** | Exit invité : pas `endGameSession` | `exitGame.js` — `exitGameToGameSelect()` | Quitter mid-game | Autres continuent (voulu) mais état local stale | Chemin invité aligné sur `returnToGameSelect()` ; bouton Rejoindre réhydrate depuis le cache puis navigue immédiatement | 🟡 Corrigé + tests ; QA rejoin banner à refaire |
-| **M-06b** | `returnToGameSelect` asymétrique | `gameSync.js`, `nav.js` | Hôte reset session ; invité suppress | Comportements différents | `returnToGameSelect()` nettoie aussi l'invité ; retour depuis prep réutilise ce chemin | 🟡 Corrigé + tests ; QA à faire |
-| **L-01** | « Recommencer » visible mais bloqué | `restartGame.js` | Invité clique Recommencer | Alert « Seul l'hôte » | Masquer bouton pour non-hôte | 🟡 Corrigé + tests ; QA à faire |
-| **ARCH-03** | Acting host sans metadata correcte | `hostPresence.js`, jeux sous `canActAsHost()` | Hôte absent > ~2 min | Fin manche possible, metadata fausse | Combiner I-01 + policy acting host | À traiter |
+| **M-03b** / **SYN-09** | `launchGameWithSync` branche non-hôte | `mpLaunch.js` | Appel par erreur sur invité | UI locale divergente | Guard strict ; ne jamais applyLocal seul en MP | ✅ Corrigé + validé QA (2026-07-22) |
+| **M-06a** | Exit invité : pas `endGameSession` | `exitGame.js` — `exitGameToGameSelect()` | Quitter mid-game | Autres continuent (voulu) mais état local stale | Chemin invité aligné sur `returnToGameSelect()` ; bouton Rejoindre réhydrate depuis le cache puis navigue immédiatement | ✅ Corrigé + validé QA (rejoin banner, 2026-07-22) |
+| **M-06b** | `returnToGameSelect` asymétrique | `gameSync.js`, `nav.js` | Hôte reset session ; invité suppress | Comportements différents | `returnToGameSelect()` nettoie aussi l'invité ; retour depuis prep réutilise ce chemin | ✅ Corrigé + validé QA (2026-07-22) |
+| **L-01** | « Recommencer » visible mais bloqué | `restartGame.js` | Invité clique Recommencer | Alert « Seul l'hôte » | Masquer bouton pour non-hôte | ✅ Corrigé + validé QA (2026-07-22) |
+| **ARCH-03** | Acting host sans metadata correcte | `hostPresence.js`, jeux sous `canActAsHost()` | Hôte absent > ~2 min | Fin manche possible, metadata fausse | Combiner I-01 + policy acting host | 🟡 Partiel : metadata `host_id` (I-01) validée QA ; policy acting host encore à traiter |
 
 **Symptômes utilisateur :** erreur prep ; fin partie acting host ; triche théorique ; asymétrie quit/return.
 
@@ -212,6 +221,14 @@ Clôture QA :
 
 **Mécanisme :** `shouldApplySessionRoute`, `suppressSessionRoute`, `getEffectiveSessionScreen` ; Realtime vs poll.
 
+État patch / QA (SYN-28, 2026-07-22) :
+- Invariant générique `guestMustFollowSession` : invité encore membre + sync actif + cible prep/play + écran local ≠ cible → suivi obligatoire depuis `results`, `leaderboard`, `home`, `game-select`.
+- `sig_unchanged` ne bloque plus une retentative si `mustFollow` (session déjà observée ≠ navigation réussie).
+- Suppress scores : avancement détecté même avec baseline `suppressScreen`/`suppressSig` nulle ; `suppressSessionRoute` n’enregistre plus un timer sans écran.
+- Listener `home` : plus de court-circuit sur `isSessionRouteSuppressed()` avant `routeToActiveGameIfNeeded`.
+- **Cause racine finale QA :** `routeLog` renvoyait `logSessionRouteDecision()` (`undefined`) → `handleSessionRoute` traitait `guest_must_follow` comme refus (`allowed: false`, `nestedReason: "guest_must_follow"`). Correctif : `routeLog` retourne le booléen `allowed`.
+- QA validée : relance hôte (ex. Hot Take / Speed Vote) depuis `results` / `leaderboard` / `home` / `game-select` → invité rejoint `*-prep` sans F5 ; hors lobby / même écran → pas de navigation.
+
 | ID | Problème | Fichier / fonction | Scénario | Impact | Correction proposée | Statut |
 |----|----------|-------------------|----------|--------|---------------------|--------|
 | **T-01** | Session absente au retry 0 ms au join | `supabaseLobby.js` — `restoreActiveGameSessionOnJoin()` | Join mid-game | Fenêtre sans session 0–400 ms | Retry plus agressif ou await obligatoire avant route | À traiter |
@@ -219,11 +236,11 @@ Clôture QA :
 | **T-03** | Poll pausé en arrière-plan | `gameSync.js` — `initMultiplayerSyncVisibility()` | Tab hidden longtemps | Retard 3–12 s | Acceptable ; resubscribe au retour (déjà fait) | Accepté |
 | **M-07** / **SYN-** | `guesslie-menu` sans listener local | `guessLieMenu.js` | Invité sur menu, hôte lance | Retard suivi vs autres preps | Ajouter `onGameSessionChange` + `prepGuestFollowOnSession` | À traiter |
 | **M-08** / **SYN-13** | Redirect dans `mount*()` | `router.js`, `games/*.js` | Session désync | Flash UI, cleanup fragile | Router avant mount | À traiter |
-| **P-02** / **M-06c** | Exit invité sans reset blobs jeu | `exitGame.js` vs `returnToGameSelect()` | Quit prep/play volontaire | Stale state + suppress | `returnToGameSelect()` centralise suppress + reset blobs côté invité | 🟡 Corrigé + tests ; QA rejoin banner à refaire |
-| **SYN-28** / **L-nav** | Suivi invité depuis écrans post-partie | `results.js`, `leaderboard.js`, `navAccess.js`, `gameSync.js` | Invité sur `results`/`leaderboard`, hôte relance prep | F5 seul recours ; suppress bloquait parfois le suivi | `routeToActiveGameIfNeeded(row)` dans listeners post-partie (pattern `game-select`) ; conserver `tryFollowHostGameSession` | 🟡 Volet 2 corrigé (2026-07-12) + tests ; QA Q1–Q6 à faire ; `settings` hors scope |
+| **P-02** / **M-06c** | Exit invité sans reset blobs jeu | `exitGame.js` vs `returnToGameSelect()` | Quit prep/play volontaire | Stale state + suppress | `returnToGameSelect()` centralise suppress + reset blobs côté invité | ✅ Corrigé + validé QA (avec M-06a/M-06b, 2026-07-22) |
+| **SYN-28** / **L-nav** | Suivi invité hub / post-partie | `gameSync.js` — `guestMustFollowSession`, `shouldApplySessionRoute`, `applyRemoteSession`, `handleSessionRoute` ; `home.js`, `results.js`, `leaderboard.js` | Invité sur `results`/`leaderboard`/`home`/`game-select`, hôte relance prep | Banner lobby à jour mais pas de nav vers `*-prep` ; F5 seul recours | Invariant `mustFollow` + retry `sig_unchanged` + contrat retour booléen `routeLog` ; tests `guestMustFollow`, `shouldApplyReturnContract`, suppress/sig | ✅ Corrigé + validé QA (2026-07-22) ; `settings` hors scope |
 | **I-PG-01** | Confusion résultat jeu vs récap soirée | `completeGameSession()`, `games/consensus.js`, `games/hotTake.js`, `mountResults` | Fin de partie MP | Podium in-game sauté ; `screen: "results"` = récap global immédiat | Parcours : résultat jeu → action explicite → récap ou hub ; **sans** `sessionGameId` optionnel tant que non validé | À traiter (volet 1 — diagnostic validé, pas codé) |
 | **ARCH-04** | Suppress actif + même prep | `gameSync.js` — `shouldApplySessionRoute()` L328-330 | Sortie volontaire prep | Boucle évitée (OK) mais re-entry stale | Combiner avec P-02 | À traiter |
-| **ARCH-05** | `prepGuestFollowOnSession` fragile si `row.screen` en retard | `mpLaunch.js` | Relance pendant results | Mitigé par `getEffectiveSessionScreen` | Tests relance hôte | À traiter |
+| **ARCH-05** | `prepGuestFollowOnSession` fragile si `row.screen` en retard | `mpLaunch.js` | Relance pendant results | Mitigé par `getEffectiveSessionScreen` + `guestMustFollow` / retry sig | Tests relance hôte (couverts via SYN-28) | 🟡 Mitigé par SYN-28 ; retard Event A (lobby) vs Event B (session) hors scope routing |
 
 **Symptômes utilisateur :** retard vs hôte ; bloqué sur écran ; rerouté intempestif.
 
@@ -376,8 +393,8 @@ La matrice ci-dessous liste les points encore ouverts ou résiduels. Les éléme
 | 1 Identité invité | — | — | — | ARCH-01 (hors QA Supabase) |
 | 2 Auth race | — | — | — | — |
 | 3 Multi-sources | — | — | M-14a (KO QA TierNight relance + flow invité tierlists) | — |
-| 4 Hôte/invité | — | I-01, I-02, I-08 | M-03b | L-01 |
-| 5 Routing/timing | — | I-PG-01, T-02 | T-01, T-03, M-07, M-08 | SYN-28 |
+| 4 Hôte/invité | — | I-08 | — | ARCH-03 (policy acting host) |
+| 5 Routing/timing | — | I-PG-01, T-02 | T-01, T-03, M-07, M-08 | — |
 | 6 Async écrans | — | I-05 | SYN-13b, SYN-25 | SYN-05, M-08 |
 | 7 Erreurs silencieuses | — | — | M-10, T-05, M-14b | SYN-26 |
 | 8 Reset incomplet | — | I-09, I-06 | SYN-15, SYN-16 | ARCH-09, ARCH-10 |
@@ -392,14 +409,14 @@ La matrice ci-dessous liste les points encore ouverts ou résiduels. Les éléme
 | # | ID(s) | Cause | Pourquoi |
 |---|-------|-------|----------|
 | 1 | I-PG-01 | 3, 5 | Parcours fin de partie : distinguer résultat jeu / récap soirée / hub (Consensus + Hot Take) |
-| 2 | SYN-28 | 5 | QA volet 2 : invité post-partie suit l'hôte sans F5 |
-| 3 | M-11 | 7 | QA « Recommencer » : rollback local si `startGameSession` échoue |
-| 4 | I-05, SYN-13b, SYN-25 | 6 | Bugs intermittents navigation |
-| 5 | I-06, P-01 | 8 | UX lobby invité dégradée |
-| 6 | I-01 | 4 | Fin partie acting host fragile |
-| 7 | I-08 | 4 | Sécurité intégrité session MP |
-| 8 | M-14a, SYN-14 | 3 | KO QA TierNight — suspendu |
-| 9 | T-02 | 5 | Navigation possible avant données complètes |
+| 2 | M-11 | 7 | QA « Recommencer » : rollback local si `startGameSession` échoue |
+| 3 | I-05, SYN-13b, SYN-25 | 6 | Bugs intermittents navigation |
+| 4 | I-06, P-01 | 8 | UX lobby invité dégradée |
+| 5 | I-08 | 4 | Sécurité intégrité session MP (RLS UPDATE) |
+| 6 | ARCH-03 | 4 | Policy acting host (metadata I-01 OK) |
+| 7 | M-14a, SYN-14 | 3 | KO QA TierNight — suspendu |
+| 8 | T-02 | 5 | Navigation possible avant données complètes |
+| 9 | M-07 | 5 | `guesslie-menu` sans listener de suivi session |
 | 10 | M-12 | 11 | Dette UX : lien `#join=` sans auto-join |
 
 ### Clôtures récentes (2026-07-11)
@@ -414,14 +431,31 @@ La matrice ci-dessous liste les points encore ouverts ou résiduels. Les éléme
 - **M-09** — Clôture complète (message réseau inclus)
 - **M-11 / SYN-17** — `commitPrepSessionLaunch` + rollback 12 jeux ; Traitre : clear private après succès ; tests `restartGameRollback`
 - **Consensus prep** — `finishConsensusGame` → `screen: "results"` + `game_id=menu` (inférence `consensus-prep` corrigée) ; régression podium → **I-PG-01** volet 1
-- **SYN-28 volet 2** — `results.js` / `leaderboard.js` : `routeToActiveGameIfNeeded` après `tryFollowHostGameSession` ; tests `postGameScreenFollow`
+- **SYN-28 volet 2 (partiel)** — `results.js` / `leaderboard.js` : `routeToActiveGameIfNeeded` ; tests `postGameScreenFollow` (QA complète → 2026-07-22)
 
-### Résidus connus (hors scope des patchs 2026-07-12)
+### Clôtures récentes (2026-07-22)
+
+- **SYN-28** — Suivi invité générique hub/post-partie sans F5 ; QA validée (`results` / `leaderboard` / `home` / `game-select` → `*-prep`)
+  - `guestMustFollowSession` + early allow dans `shouldApplySessionRoute`
+  - retry navigation sur `sig_unchanged` si écran local ≠ cible force-follow
+  - suppress scores / home listener (plus de gate `isSessionRouteSuppressed` avant route)
+  - **contrat `routeLog` → booléen `allowed`** (bug : `undefined` → `handleSessionRoute` refusait malgré `guest_must_follow`)
+  - tests : `guestMustFollow`, `shouldApplyReturnContract`, `scoresSuppressFollow`, `sessionRouteSigRetry`
+- **Cause 4 (asymétrie hôte/invité)** — QA validée :
+  - **L-01** — « Recommencer » masqué pour invité
+  - **M-03b / SYN-09** — guard launch non-hôte
+  - **M-06b** — `returnToGameSelect` hôte vs invité
+  - **M-06a** (+ **P-02 / M-06c**) — exit mid-game + bandeau Rejoindre
+  - **I-01** — acting host / `host_id` = hôte réel du lobby
+  - Résidus Cause 4 : **I-08** (RLS), **ARCH-03** (policy acting host)
+
+### Résidus connus (hors scope des patchs 2026-07-22)
 
 - **I-PG-01 volet 1** — Parcours fin de partie à redéfinir avant tout `sessionGameId` optionnel dans `completeGameSession`
-- **M-11** — `startGameSession` peut laisser le lobby en `playing` si l'upsert échoue après `setLobbyPlaying` (non couvert par le rollback local)
+- **M-11** — `startGameSession` peut laisser le lobby en `playing` si l'upsert échoue après `setLobbyPlaying` (Event A lobby avant Event B session ; hors scope routing SYN-28)
 - **L-09 partiel** — `pushGameSession` dans `gameSync.js` affiche encore `err.message` brut (hors périmètre patch)
-- **Dette debug** — logs `[DEBUG JOIN LOBERY START]` dans `lobby.js`
+- **Dette debug** — logs temporaires `[SESSION-ROUTE]` / `hub-prep-v5` à retirer après campagne ; logs `[DEBUG JOIN LOBERY START]` dans `lobby.js`
+- **SYN-28 hors scope** — écran `settings` ; retard éventuel lobby `playing` vs row `game_sessions` encore menu (Cas B)
 
 ---
 
@@ -439,7 +473,7 @@ Non listés comme problèmes — présents dans les audits comme points positifs
 | `confirmMissingSessionThenRoute` | `gameSync.js` |
 | `handleLobbyDissolvedForGuest` + guard | `lobby.js` |
 | `prepGuestFollowOnSession` + `getEffectiveSessionScreen` | `mpLaunch.js`, `gameSync.js` |
-| Suivi post-partie : `tryFollowHostGameSession` + `routeToActiveGameIfNeeded` | `results.js`, `leaderboard.js` |
+| Suivi hub/post-partie : `guestMustFollowSession` + `routeToActiveGameIfNeeded` | `gameSync.js`, `results.js`, `leaderboard.js`, `home.js`, `gameSelect.js` |
 | Debounce lobby refresh 250 ms | `supabaseLobby.js` |
 | **R-04** — reprise F5 OK si JWT intact | Parcours invité (happy path) |
 | Cartographie listeners / tables Supabase | Parcours invité (doc) |
@@ -492,4 +526,4 @@ Non listés comme problèmes — présents dans les audits comme points positifs
 
 ---
 
-*Document généré à partir des audits du 2026-07-06. Dernière mise à jour suivi : 2026-07-12.*
+*Document généré à partir des audits du 2026-07-06. Dernière mise à jour suivi : 2026-07-22.*

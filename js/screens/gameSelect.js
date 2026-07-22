@@ -59,13 +59,21 @@ import {
 //   registerFilRougeRefresh,
 // } from "../core/filRougeUi.js";
 
+function lobbyPlayersMetaHtml(count) {
+  const n = Number(count) || 0;
+  const label = n <= 1 ? "joueur" : "joueurs";
+  return `<p class="evening-recap__meta">${n} ${label} dans le lobby</p>`;
+}
+
 function eveningRecapHtml(recap) {
+  const playersMeta = lobbyPlayersMetaHtml(recap.participantCount);
+
   if (!recap.hasActivity) {
     return `
       <div class="evening-recap evening-recap--empty card">
         <p class="evening-recap__title">📋 Récap de la soirée</p>
         <p class="evening-recap__empty">La soirée commence… lance un premier jeu !</p>
-        <p class="evening-recap__meta">${recap.participantCount} joueur(s) dans le lobby</p>
+        ${playersMeta}
       </div>`;
   }
 
@@ -127,6 +135,7 @@ function eveningRecapHtml(recap) {
   return `
     <div class="evening-recap card">
       <p class="evening-recap__title">📋 Récap de la soirée</p>
+      ${playersMeta}
       <div class="evening-recap__chips">${chips}</div>
       ${leader}
       ${lastTier}

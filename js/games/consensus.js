@@ -136,7 +136,14 @@ function bindConsensusSlider(app, { onInput, disabled = false } = {}) {
   update();
 }
 
-function finalConsensusResultsHtml({ standings = [] } = {}) {
+function finalConsensusResultsHtml({
+  standings = [],
+  showHostActions = true,
+  showContinueAction = true,
+  continueAction = "show-results",
+  continueLabel = "Voir les résultats",
+  waitingText = "En attente de l'hôte pour afficher les résultats…",
+} = {}) {
   const winner = standings[0] || null;
   return `
     <div class="card card--highlight consensus-final">
@@ -160,11 +167,20 @@ function finalConsensusResultsHtml({ standings = [] } = {}) {
           )
           .join("")}
       </div>
-      <div class="btn-row consensus-final__actions">
+      ${
+        showHostActions
+          ? `<div class="btn-row consensus-final__actions">
         <button type="button" class="btn btn-primary" data-consensus-action="replay">Rejouer</button>
         <button type="button" class="btn btn-accent" data-consensus-action="change-settings">Changer réglages</button>
       </div>
-      <button type="button" class="btn btn-secondary btn--spaced" data-consensus-action="back-select">Retour au menu des jeux</button>
+      <button type="button" class="btn btn-secondary btn--spaced" data-consensus-action="back-select">Retour au menu des jeux</button>`
+          : `<p class="hint">${escapeHtml(waitingText)}</p>`
+      }
+      ${
+        showContinueAction
+          ? `<button type="button" class="btn btn-primary btn--spaced" data-consensus-action="${escapeHtml(continueAction)}">${escapeHtml(continueLabel)}</button>`
+          : ""
+      }
     </div>`;
 }
 
@@ -636,18 +652,7 @@ export function mountConsensus(app) {
   async function finishConsensusGame() {
     const live = consensus.getSession();
     if (live.podiumApplied) {
-      if (mp && canActAsHost()) {
-        try {
-          await completeGameSession({
-            gameId: "consensus",
-            screen: "results",
-            state: { consensus: consensusToRemote(live) },
-          });
-        } catch (e) {
-          console.warn("REVEAL completeGameSession:", e);
-          navigate("results", { navStack: ["home", "lobby", "game-select", "results"] });
-        }
-      }
+      render();
       return;
     }
 
@@ -684,6 +689,30 @@ export function mountConsensus(app) {
     clearRevealPending();
 
     if (mp && canActAsHost()) {
+      await consensus.commitPlay(finalSession, { screen: "consensus" });
+      render();
+      return;
+    }
+
+    if (!mp) {
+      await setLobbyWaiting();
+      saveStatePatch({ consensusGame: finalSession });
+      render();
+    }
+  }
+
+  async function showEveningResults() {
+    const finalSession = {
+      ...consensus.getSession(),
+      phase: "final",
+      podiumApplied: true,
+    };
+
+    clearNpcTimers();
+    clearRevealPending();
+
+    if (mp) {
+      if (!canActAsHost()) return;
       try {
         await completeGameSession({
           gameId: "consensus",
@@ -697,11 +726,9 @@ export function mountConsensus(app) {
       return;
     }
 
-    if (!mp) {
-      await setLobbyWaiting();
-      saveStatePatch({ consensusGame: finalSession });
-      render();
-    }
+    await setLobbyWaiting();
+    saveStatePatch({ consensusGame: finalSession });
+    navigate("results", { navStack: ["home", "lobby", "game-select", "results"] });
   }
 
   function render() {
@@ -780,7 +807,14 @@ export function mountConsensus(app) {
         }`;
     } else {
       phaseHtml = `
-        ${finalConsensusResultsHtml({ standings })}
+        ${finalConsensusResultsHtml({
+          standings,
+          showHostActions: !mp || isLobbyHost(),
+          showContinueAction: !mp || canActAsHost(),
+          continueAction: "show-results",
+          continueLabel: "Voir les résultats",
+          waitingText: "En attente de l'hôte pour afficher les résultats…",
+        })}
         ${renderConsensusScoreboard({
           standings,
           title: "Classement final Consensus",
@@ -853,6 +887,10 @@ export function mountConsensus(app) {
     app.querySelectorAll("[data-consensus-action]").forEach((btn) => {
       btn.addEventListener("click", async () => {
         const action = btn.getAttribute("data-consensus-action");
+        if (action === "show-results") {
+          await showEveningResults();
+          return;
+        }
         if (action === "replay") {
           await replayConsensus();
           return;

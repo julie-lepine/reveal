@@ -117,7 +117,6 @@ export const HOT_TAKE_THEMES = [
       "Répondre trop vite à un crush, c'est montrer trop d'intérêt.",
       "Les couples qui publient tout sur les réseaux cachent quelque chose.",
       "Rester ami avec son ex, c'est jouer avec le feu.",
-      "Le premier qui dit « je t'aime » a déjà perdu.",
       "Un date sans dessert n'est pas un vrai date.",
       "Les gens qui disent « on verra où ça nous mène » savent très bien que ça ne mène nulle part.",
       "Offrir des fleurs, c'est offrir une plante mourante.",
