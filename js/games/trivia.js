@@ -27,6 +27,7 @@ import {
 import { renderTriviaQuestion } from "../trivia/TriviaQuestion.js";
 import { renderTriviaResults } from "../trivia/TriviaResults.js";
 import { renderTriviaScoreboard } from "../trivia/TriviaScoreboard.js";
+import { arch03AhLogSkipDecision } from "../core/arch03ActingHostDebug.js";
 
 export function mountTrivia(app) {
   if (!requireLobbyPlay()) return null;
@@ -591,7 +592,15 @@ export function mountTrivia(app) {
     }
     const actingHostUiRefresh =
       getActingHostUiRefreshToken() !== ahTokenBefore;
-    if (shouldSkipFullRender(prevPhase, prevQuestion) && !actingHostUiRefresh) {
+    const skipFull = shouldSkipFullRender(prevPhase, prevQuestion);
+    arch03AhLogSkipDecision("trivia", {
+      decision: skipFull && !actingHostUiRefresh ? "skip-full-render" : "full-render",
+      skipFull,
+      actingHostUiRefresh,
+      canActAsHost: canActAsHost(),
+      phase,
+    });
+    if (skipFull && !actingHostUiRefresh) {
       patchQuestionChrome();
       return;
     }

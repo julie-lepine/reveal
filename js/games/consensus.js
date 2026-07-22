@@ -34,6 +34,7 @@ import {
 import { renderConsensusQuestion } from "../consensus/ConsensusQuestion.js";
 import { renderConsensusResults } from "../consensus/ConsensusResults.js";
 import { renderConsensusScoreboard } from "../consensus/ConsensusScoreboard.js";
+import { arch03AhLogSkipDecision } from "../core/arch03ActingHostDebug.js";
 
 function questionKeyOf(session) {
   return `${session.questionIdx ?? 0}:${session.currentQuestion?.id || "none"}`;
@@ -957,7 +958,15 @@ export function mountConsensus(app) {
     }
     const actingHostUiRefresh =
       getActingHostUiRefreshToken() !== ahTokenBefore;
-    if (shouldSkipFullRender(prevPhase, prevQuestion) && !actingHostUiRefresh) {
+    const skipFull = shouldSkipFullRender(prevPhase, prevQuestion);
+    arch03AhLogSkipDecision("consensus", {
+      decision: skipFull && !actingHostUiRefresh ? "skip-full-render" : "full-render",
+      skipFull,
+      actingHostUiRefresh,
+      canActAsHost: canActAsHost(),
+      phase,
+    });
+    if (skipFull && !actingHostUiRefresh) {
       if (phase === "question") patchQuestionPhaseChrome(consensus.getSession());
       return;
     }

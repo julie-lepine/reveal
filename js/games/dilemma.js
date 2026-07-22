@@ -41,6 +41,7 @@ import {
   refreshGameSession,
 } from "../core/gameSync.js";
 import { voteConfirmChrome, pickForVoteConfirm } from "../core/voteConfirm.js";
+import { arch03AhLogSkipDecision } from "../core/arch03ActingHostDebug.js";
 
 const DILEMMA_VS_SRC = "js/games/dilemma-vs.svg";
 
@@ -587,7 +588,16 @@ export function mountDilemma(app) {
     }
     const actingHostUiRefresh =
       getActingHostUiRefreshToken() !== ahTokenBefore;
+    const skipFull = shouldSkipFullRender(prevPhase, prevRound, prevVotesJson);
+    const canAct = canActAsHost();
     if (phase === "reveal" && prevPhase === "reveal" && !actingHostUiRefresh) {
+      arch03AhLogSkipDecision("dilemma", {
+        decision: "early-return-reveal-scores-only",
+        skipFull,
+        actingHostUiRefresh,
+        canActAsHost: canAct,
+        phase,
+      });
       refreshGameScoresBox(app, {
         gameLabel: "Dilemma",
         title: "Cumul des scores",
@@ -595,10 +605,24 @@ export function mountDilemma(app) {
       });
       return;
     }
-    if (shouldSkipFullRender(prevPhase, prevRound, prevVotesJson) && !actingHostUiRefresh) {
+    if (skipFull && !actingHostUiRefresh) {
+      arch03AhLogSkipDecision("dilemma", {
+        decision: "skip-full-render",
+        skipFull,
+        actingHostUiRefresh,
+        canActAsHost: canAct,
+        phase,
+      });
       patchVotingChrome();
       return;
     }
+    arch03AhLogSkipDecision("dilemma", {
+      decision: "full-render",
+      skipFull,
+      actingHostUiRefresh,
+      canActAsHost: canAct,
+      phase,
+    });
     render();
   });
 

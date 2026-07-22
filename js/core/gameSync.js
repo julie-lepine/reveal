@@ -1,6 +1,7 @@
 import { isSupabaseConfigured } from "./supabaseClient.js";
 import { getSupabaseUserId } from "./supabaseAuth.js";
 import { resolveActingHostUserId } from "./hostPresence.js";
+import { arch03AhLog } from "./arch03ActingHostDebug.js";
 import {
   getLocalDisplayName,
   getState,
@@ -543,10 +544,41 @@ export function getActingHostUserId() {
 
 /** Peut piloter les contrôles de manche : vrai hôte, ou repli si l'hôte est absent. */
 export function canActAsHost() {
-  if (isLobbyHost()) return true;
+  const isRealHost = isLobbyHost();
+  if (isRealHost) {
+    if (arch03AhRenderPass) {
+      arch03AhLog("canActAsHost @render", {
+        result: true,
+        reason: "isLobbyHost",
+        uid: getSupabaseUserId() || null,
+        actingHostUserId: getActingHostUserId(),
+      });
+    }
+    return true;
+  }
   const uid = getSupabaseUserId();
-  if (!uid) return false;
-  return uid === getActingHostUserId();
+  if (!uid) {
+    if (arch03AhRenderPass) {
+      arch03AhLog("canActAsHost @render", {
+        result: false,
+        reason: "no-uid",
+        uid: null,
+        actingHostUserId: getActingHostUserId(),
+      });
+    }
+    return false;
+  }
+  const acting = getActingHostUserId();
+  const result = uid === acting;
+  if (arch03AhRenderPass) {
+    arch03AhLog("canActAsHost @render", {
+      result,
+      reason: result ? "uid===acting" : "uid!==acting",
+      uid,
+      actingHostUserId: acting,
+    });
+  }
+  return result;
 }
 
 /** Écrans de préparation (jeu choisi mais pas encore lancé). */
@@ -751,6 +783,8 @@ export function onGameSessionChange(fn) {
  * forcer un render si ce token a bougé (sinon boutons host invisibles).
  */
 let actingHostUiRefreshToken = 0;
+/** TEMP ARCH03-AH : active les logs canActAsHost pendant un notify/render. */
+let arch03AhRenderPass = false;
 
 export function getActingHostUiRefreshToken() {
   return actingHostUiRefreshToken;
@@ -761,7 +795,18 @@ export function getActingHostUiRefreshToken() {
  * Appelé quand le lobby détecte un changement d'acting host (hôte stale / retour).
  */
 export function nudgeSessionListenersForActingHost() {
+  const tokenBefore = actingHostUiRefreshToken;
   actingHostUiRefreshToken += 1;
+  const tokenAfter = actingHostUiRefreshToken;
+  arch03AhLog("nudgeSessionListenersForActingHost CALLED", {
+    tokenBefore,
+    tokenAfter,
+    cachedRowScreen: cachedRow?.screen || null,
+    cachedRowGameId: cachedRow?.game_id || null,
+    listenerCount: listeners.size,
+    actingHostUserId: getActingHostUserId(),
+    localUid: getSupabaseUserId() || null,
+  });
   notify(cachedRow);
 }
 
@@ -779,15 +824,29 @@ const NOTIFY_MAX_DRAIN = 25;
  * fuiter de rejets (`Uncaught (in promise): Failed to fetch`).
  */
 function runNotify(row) {
-  for (const fn of [...listeners]) {
-    try {
-      const ret = fn(row);
-      if (ret && typeof ret.then === "function") {
-        ret.catch((e) => console.warn("gameSync listener:", e?.message || e));
+  const snapshot = [...listeners];
+  arch03AhLog("session listeners fire", {
+    listenerCount: snapshot.length,
+    token: actingHostUiRefreshToken,
+    rowScreen: row?.screen || null,
+    rowGameId: row?.game_id || null,
+    actingHostUserId: getActingHostUserId(),
+    localUid: getSupabaseUserId() || null,
+  });
+  arch03AhRenderPass = true;
+  try {
+    for (const fn of snapshot) {
+      try {
+        const ret = fn(row);
+        if (ret && typeof ret.then === "function") {
+          ret.catch((e) => console.warn("gameSync listener:", e?.message || e));
+        }
+      } catch (e) {
+        console.warn("gameSync listener:", e?.message || e);
       }
-    } catch (e) {
-      console.warn("gameSync listener:", e?.message || e);
     }
+  } finally {
+    arch03AhRenderPass = false;
   }
 }
 

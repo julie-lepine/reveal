@@ -45,6 +45,7 @@ import {
   refreshGameSession,
 } from "../core/gameSync.js";
 import { voteConfirmChrome, pickForVoteConfirm } from "../core/voteConfirm.js";
+import { arch03AhLogSkipDecision } from "../core/arch03ActingHostDebug.js";
 
 function buildHotTakeStandings(matchScores = {}) {
   return [...getActivePlayers()]
@@ -795,8 +796,19 @@ export function mountHotTake(app) {
 
     const actingHostUiRefresh =
       getActingHostUiRefreshToken() !== ahTokenBefore;
+    const skipFull = shouldSkipFullRender(prevPhase, prevTake, prevVotesJson);
+    const canAct = canActAsHost();
 
     if (phase === "reveal" && prevPhase === "reveal" && !actingHostUiRefresh) {
+      arch03AhLogSkipDecision("hotTake", {
+        decision: "early-return-reveal-scores-only",
+        skipFull,
+        actingHostUiRefresh,
+        ahTokenBefore,
+        ahTokenNow: getActingHostUiRefreshToken(),
+        canActAsHost: canAct,
+        phase,
+      });
       refreshGameScoresBox(app, {
         gameLabel: "Hot Take",
         title: "Cumul des scores",
@@ -805,10 +817,28 @@ export function mountHotTake(app) {
       return;
     }
 
-    if (shouldSkipFullRender(prevPhase, prevTake, prevVotesJson) && !actingHostUiRefresh) {
+    if (skipFull && !actingHostUiRefresh) {
+      arch03AhLogSkipDecision("hotTake", {
+        decision: "skip-full-render",
+        skipFull,
+        actingHostUiRefresh,
+        ahTokenBefore,
+        ahTokenNow: getActingHostUiRefreshToken(),
+        canActAsHost: canAct,
+        phase,
+      });
       patchVotingChrome();
       return;
     }
+    arch03AhLogSkipDecision("hotTake", {
+      decision: "full-render",
+      skipFull,
+      actingHostUiRefresh,
+      ahTokenBefore,
+      ahTokenNow: getActingHostUiRefreshToken(),
+      canActAsHost: canAct,
+      phase,
+    });
     render();
   });
 

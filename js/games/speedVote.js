@@ -36,6 +36,7 @@ import {
   stopGameSessionListenerOnPostGame,
   refreshGameSession,
 } from "../core/gameSync.js";
+import { arch03AhLogSkipDecision } from "../core/arch03ActingHostDebug.js";
 
 export function mountSpeedVote(app) {
   if (!requireLobbyPlay()) return null;
@@ -401,7 +402,15 @@ export function mountSpeedVote(app) {
     }
     const actingHostUiRefresh =
       getActingHostUiRefreshToken() !== ahTokenBefore;
-    if (shouldSkipFullRender(prevPhase, prevRound, prevVotesJson) && !actingHostUiRefresh) {
+    const skipFull = shouldSkipFullRender(prevPhase, prevRound, prevVotesJson);
+    arch03AhLogSkipDecision("speedVote", {
+      decision: skipFull && !actingHostUiRefresh ? "skip-full-render" : "full-render",
+      skipFull,
+      actingHostUiRefresh,
+      canActAsHost: canActAsHost(),
+      phase,
+    });
+    if (skipFull && !actingHostUiRefresh) {
       if (phase === "voting") patchVotingChrome();
       if (phase === "reveal") {
         refreshGameScoresBox(app, {

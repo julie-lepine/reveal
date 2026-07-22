@@ -16,6 +16,7 @@ import {
   completeGameSession,
   stopGameSessionListenerOnPostGame,
 } from "../core/gameSync.js";
+import { arch03AhLogSkipDecision } from "../core/arch03ActingHostDebug.js";
 import { getLocalDisplayName, recordGuessLieRoundStats, recordGuessLiePlayed, setLastGame } from "../core/state.js";
 import { awardGuessLieRound, guessLieLiarWins } from "../core/scoring.js";
 import { gameCumulativeScoresHtml, refreshGameScoresBox } from "../core/gameScores.js";
@@ -474,7 +475,19 @@ export function mountGuessLie(app) {
       return;
     }
     void tryAdvanceToReveal();
-    if (shouldSkipFullRender(prevIdx, prevPhase) && !votesChanged && !actingHostUiRefresh) {
+    const skipFull = shouldSkipFullRender(prevIdx, prevPhase);
+    arch03AhLogSkipDecision("guessLie", {
+      decision:
+        skipFull && !votesChanged && !actingHostUiRefresh
+          ? "skip-full-render"
+          : "full-render",
+      skipFull,
+      votesChanged,
+      actingHostUiRefresh,
+      canActAsHost: canActAsHost(),
+      phase,
+    });
+    if (skipFull && !votesChanged && !actingHostUiRefresh) {
       if (phase === "voting") patchVotingChrome();
       if (phase === "reveal") {
         refreshGameScoresBox(app, {

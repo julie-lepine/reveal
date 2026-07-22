@@ -16,8 +16,10 @@ import {
   getCachedGameSession,
   isActiveGameSessionScreen,
   nudgeSessionListenersForActingHost,
+  getActingHostUserId,
 } from "./gameSync.js";
-import { didActingHostChange } from "./hostPresence.js";
+import { didActingHostChange, resolveActingHostUserId } from "./hostPresence.js";
+import { arch03AhLog, arch03AhHostAgeMs } from "./arch03ActingHostDebug.js";
 import { getCurrentScreen } from "./router.js";
 import { fetchGameSessionByLobby } from "./supabaseGame.js";
 import { scalePollIntervalMs } from "../config/syncConfig.js";
@@ -850,12 +852,46 @@ function applyLobbyToState(bundle, { persistGuestMembership = false } = {}) {
   rememberLobbyIdentity(bundle);
 
   const prevLobby = getState().lobby;
+  const now = Date.now();
+  const actingHostBefore = resolveActingHostUserId(
+    prevLobby?.participants || [],
+    prevLobby?.hostId || null,
+    now
+  );
+  const actingHostAfterResolved = resolveActingHostUserId(
+    bundle.participants || [],
+    bundle.hostId || null,
+    now
+  );
   const actingHostChanged = didActingHostChange(
     prevLobby?.participants,
     prevLobby?.hostId,
     bundle.participants,
-    bundle.hostId
+    bundle.hostId,
+    now
   );
+
+  const hostParticipant =
+    (bundle.participants || []).find((p) => p.userId === bundle.hostId) ||
+    (bundle.participants || []).find((p) => p.isHost) ||
+    null;
+  const hostLastSeenAt = hostParticipant?.lastSeenAt ?? null;
+  arch03AhLog("applyLobbyToState", {
+    hostId: bundle.hostId || null,
+    hostLastSeenAt,
+    hostAgeMs: arch03AhHostAgeMs(hostLastSeenAt, now),
+    hostPresentBit: isHostPresentInBundle(bundle) ? 1 : 0,
+    actingHostBefore,
+    actingHostAfterResolved,
+    didActingHostChange: actingHostChanged,
+    localUid: getSupabaseUserId() || null,
+    participantLastSeen: (bundle.participants || []).map((p) => ({
+      userId: p.userId,
+      lastSeenAt: p.lastSeenAt || null,
+      ageMs: arch03AhHostAgeMs(p.lastSeenAt, now),
+      isHost: Boolean(p.isHost),
+    })),
+  });
 
   saveStatePatch({
     lobby: {
@@ -888,10 +924,23 @@ function applyLobbyToState(bundle, { persistGuestMembership = false } = {}) {
     notifyLobbyBundleUpdated();
   }
 
+  // TEMP ARCH03-AH : getActingHostUserId() après patch state
+  arch03AhLog("getActingHostUserId after state patch", {
+    before: actingHostBefore,
+    after: getActingHostUserId(),
+    didActingHostChange: actingHostChanged,
+  });
+
   // ARCH-03 : les écrans jeu n'écoutent que onGameSessionChange — pousser un
   // re-render quand l'acting host bascule (sinon contrôles host invisibles).
   if (actingHostChanged) {
+    arch03AhLog("will call nudgeSessionListenersForActingHost", {
+      actingHostBefore,
+      actingHostAfter: getActingHostUserId(),
+    });
     nudgeSessionListenersForActingHost();
+  } else {
+    arch03AhLog("skip nudge (didActingHostChange=false)");
   }
 }
 
@@ -945,14 +994,28 @@ function scheduleLobbyPresencePoll() {
   const delay = scalePollIntervalMs(inGame ? 20000 : 12000);
   lobbyPresencePollTimer = setTimeout(async () => {
     lobbyPresencePollTimer = null;
+    const screen = getCurrentScreen();
     if (typeof document !== "undefined" && document.hidden) {
+      arch03AhLog("presence poll skipped (document.hidden)", {
+        screen,
+        inGame,
+        delayMs: delay,
+      });
       if (presenceLobbyId) scheduleLobbyPresencePoll();
       return;
     }
+    arch03AhLog("presence poll tick", {
+      screen,
+      inGame,
+      delayMs: delay,
+      lobbyId: presenceLobbyId,
+      localUid: getSupabaseUserId() || null,
+    });
     try {
       await pingLobbyMemberPresence();
       await refreshLobbyFromSupabase();
     } catch (e) {
+      arch03AhLog("presence poll error", { message: e?.message || String(e) });
       if (!isLobbyGoneError(e)) {
         console.warn("REVEAL lobby presence poll:", e.message || e);
       }

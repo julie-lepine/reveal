@@ -49,6 +49,7 @@ import {
   getActingHostUiRefreshToken,
   stopGameSessionListenerOnPostGame,
 } from "../core/gameSync.js";
+import { arch03AhLogSkipDecision } from "../core/arch03ActingHostDebug.js";
 
 function sliderBlockHtml({
   id,
@@ -982,7 +983,15 @@ export function mountTruthMeter(app) {
 
     const actingHostUiRefresh =
       getActingHostUiRefreshToken() !== ahTokenBefore;
-    if (shouldSkipFullRender(prevPhase, prevRound, prevVotesJson) && !actingHostUiRefresh) {
+    const skipFull = shouldSkipFullRender(prevPhase, prevRound, prevVotesJson);
+    arch03AhLogSkipDecision("truthMeter", {
+      decision: skipFull && !actingHostUiRefresh ? "skip-full-render" : "full-render",
+      skipFull,
+      actingHostUiRefresh,
+      canActAsHost: canActAsHost(),
+      phase,
+    });
+    if (skipFull && !actingHostUiRefresh) {
       if (phase === "reveal" || phase === "voting") {
         refreshGameScoresBox(app, {
           gameLabel: "TruthMeter",
