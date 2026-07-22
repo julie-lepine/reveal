@@ -188,6 +188,58 @@ let suppressSessionRouteUntil = 0;
 let suppressSessionScreen = null;
 let suppressSessionSig = "";
 
+/** TEMPORAIRE — diagnostic navigation post-partie → relance (retirer une fois SYN-28 clos). */
+let sessionRouteLogDepth = 0;
+let sessionRouteSeq = 0;
+
+function sessionRouteCacheSnapshot(row = cachedRow) {
+  if (!row) return null;
+  return {
+    game_id: row.game_id ?? null,
+    screen: row.screen ?? null,
+    updated_at: row.updated_at ?? null,
+    sig: sessionSignature(row),
+    stateKeys: row.state && typeof row.state === "object" ? Object.keys(row.state) : [],
+  };
+}
+
+function logSessionRouteDecision(source, row, allowed, reason, extra = {}) {
+  sessionRouteLogDepth += 1;
+  try {
+    const declared = row?.screen ?? null;
+    const payload = {
+      t: Date.now(),
+      seq: ++sessionRouteSeq,
+      source,
+      allowed: allowed ?? null,
+      reason,
+      current: getCurrentScreen(),
+      declared,
+      effective:
+        extra.effective ??
+        (sessionRouteLogDepth === 1 && row ? getEffectiveSessionScreen(row) : undefined),
+      gameId: row?.game_id ?? null,
+      lobbyGameId: getLobbyGameId(),
+      lobbyStatus: getLobbyStatus(),
+      isHost: isLobbyHost(),
+      sig: row ? sessionSignature(row) : null,
+      updatedAt: row?.updated_at ?? null,
+      lastSessionUpdatedAt,
+      lastSessionSig,
+      cache: sessionRouteCacheSnapshot(),
+      suppressed: isSessionRouteSuppressed(),
+      suppressScreen: suppressSessionScreen,
+      suppressSig: suppressSessionSig || null,
+      browsingScoresSuppress: isBrowsingScoresWithRouteSuppress(),
+      ...extra,
+    };
+    // console.log (pas info) : Firefox masque souvent le niveau Info par défaut.
+    console.log("[SESSION-ROUTE]", payload);
+  } finally {
+    sessionRouteLogDepth -= 1;
+  }
+}
+
 const MENU_SCREENS = new Set(["home", "lobby", "game-select", "settings"]);
 export const POST_GAME_SCREENS = new Set(["results", "leaderboard"]);
 export const DEFAULT_SYNC_PATCH_TIMEOUT_MS = SYNC_PATCH_TIMEOUT_MS;
@@ -308,23 +360,37 @@ function isBrowsingScoresWithRouteSuppress(screen = getCurrentScreen()) {
   return POST_GAME_SCREENS.has(screen) && isSessionRouteSuppressed();
 }
 
-function shouldApplySessionRoute(row, { fromScreen = null } = {}) {
+function shouldApplySessionRoute(row, { fromScreen = null, debugSource = null } = {}) {
+  const source = debugSource || "shouldApplySessionRoute";
   const screen = getEffectiveSessionScreen(row);
-  if (!screen) return false;
+  const routeLog = (allowed, reason, extra = {}) =>
+    logSessionRouteDecision(source, row, allowed, reason, { effective: screen, ...extra });
+
+  if (!screen) return routeLog(false, "no_effective_screen");
   if (screen === "tiernight-end" && !canRouteToTierNightEnd(row)) {
     warnBlockedTierNightEndRoute(row, "shouldApplySessionRoute");
-    return false;
+    return routeLog(false, "tiernight_end_not_ready");
   }
-  if (screen === "game-select" && !isLobbyEveningStarted()) return false;
+  if (screen === "game-select" && !isLobbyEveningStarted()) {
+    return routeLog(false, "game_select_evening_not_started");
+  }
   const current = getCurrentScreen();
-  if (screen === current) return false;
-  if (isCompatibleSessionScreen(screen, current)) return false;
+  if (screen === current) return routeLog(false, "already_on_target_screen");
+  if (isCompatibleSessionScreen(screen, current)) {
+    return routeLog(false, "compatible_session_screen_no_nav");
+  }
 
   if (isBrowsingScoresWithRouteSuppress(current)) {
-    if (isSessionAdvancedFromSuppress(screen)) return true;
-    if (POST_GAME_SCREENS.has(screen)) return false;
-    if (shouldForceGuestFollowSession(screen)) return false;
-    return false;
+    if (isSessionAdvancedFromSuppress(screen)) {
+      return routeLog(true, "scores_suppress_bypass_session_advanced");
+    }
+    if (POST_GAME_SCREENS.has(screen)) {
+      return routeLog(false, "scores_suppress_stay_post_game");
+    }
+    if (shouldForceGuestFollowSession(screen)) {
+      return routeLog(false, "scores_suppress_blocks_force_follow");
+    }
+    return routeLog(false, "scores_suppress_blocks");
   }
 
   // Hub / post-partie : les invités restent libres (home, settings, classement…).
@@ -334,9 +400,9 @@ function shouldApplySessionRoute(row, { fromScreen = null } = {}) {
       isLobbyEveningStarted() &&
       (current === "home" || current === "lobby" || current === "settings")
     ) {
-      return true;
+      return routeLog(true, "hub_game_select_from_passive");
     }
-    return false;
+    return routeLog(false, "session_hub_screen_guest_free");
   }
 
   // Sortie volontaire d'une prépa : l'invité a quitté CE jeu (suppression ciblée sur cet
@@ -345,30 +411,37 @@ function shouldApplySessionRoute(row, { fromScreen = null } = {}) {
   // différent → isSuppressedGameReturn false), y compris une autre prépa.
   const routingSuppressed = Date.now() < suppressSessionRouteUntil;
   if (routingSuppressed && isOnGameSetupScreen(screen) && isSuppressedGameReturn(screen)) {
-    return false;
+    return routeLog(false, "voluntary_prep_exit_suppress");
   }
 
   // Paramétrage ou partie en cours : suivi obligatoire (ignore suppressSessionRoute).
   if (shouldForceGuestFollowSession(screen)) {
     if (isBrowsingScoresWithRouteSuppress(current)) {
-      return isSessionAdvancedFromSuppress(screen);
+      return routeLog(
+        isSessionAdvancedFromSuppress(screen),
+        "force_follow_under_scores_suppress"
+      );
     }
-    return true;
+    return routeLog(true, "force_follow_prep_or_play");
   }
 
-  if (routingSuppressed && isSuppressedGameReturn(screen)) return false;
+  if (routingSuppressed && isSuppressedGameReturn(screen)) {
+    return routeLog(false, "suppressed_game_return");
+  }
 
   const hostLaunchedFromMenu = fromScreen === "game-select" && screen !== "game-select";
   const sessionAdvanced = isSessionAdvancedFromSuppress(screen);
 
   if (routingSuppressed) {
-    if (current === "home" || current === "settings") return false;
-    if (sessionAdvanced || hostLaunchedFromMenu || shouldFollowHostGameLaunch(current, screen)) {
-      return true;
+    if (current === "home" || current === "settings") {
+      return routeLog(false, "routing_suppressed_passive_menu");
     }
-    return false;
+    if (sessionAdvanced || hostLaunchedFromMenu || shouldFollowHostGameLaunch(current, screen)) {
+      return routeLog(true, "routing_suppressed_bypass");
+    }
+    return routeLog(false, "routing_suppressed");
   }
-  return true;
+  return routeLog(true, "allow");
 }
 
 function sessionSignature(row) {
@@ -2815,7 +2888,15 @@ async function confirmMissingSessionThenRoute() {
 }
 
 export function applyRemoteSession(row) {
-  if (isOlderSessionRow(row)) return;
+  const cacheBefore = sessionRouteCacheSnapshot();
+  if (isOlderSessionRow(row)) {
+    logSessionRouteDecision("applyRemoteSession", row, false, "older_session_row_ignored", {
+      cacheBefore,
+      incomingUpdatedAt: row?.updated_at ?? null,
+      lastSessionUpdatedAt,
+    });
+    return;
+  }
 
   const prevScreen = cachedRow?.screen ?? null;
   const prevGuessLie = getState().guessLie;
@@ -2827,8 +2908,22 @@ export function applyRemoteSession(row) {
 
   cachedRow = row;
 
+  logSessionRouteDecision("applyRemoteSession", row, null, "cache_updated", {
+    cacheBefore,
+    cacheAfter: sessionRouteCacheSnapshot(row),
+    prevScreen,
+    sigUnchanged,
+    hasState: row?.state != null,
+    stateIsObject: row?.state != null && typeof row.state === "object",
+  });
+
   if (!row?.state) {
-    if (!sigUnchanged) notify(row);
+    if (!sigUnchanged) {
+      logSessionRouteDecision("applyRemoteSession", row, null, "notify_without_state", {
+        prevScreen,
+      });
+      notify(row);
+    }
     if (!row && isGameSyncActive()) {
       void confirmMissingSessionThenRoute();
     }
@@ -3038,15 +3133,38 @@ export function applyRemoteSession(row) {
   applyRemoteEveningState(st);
   syncLastGameFromSessionRow(row);
 
-  if (sigUnchanged && !playChanged) return;
+  if (sigUnchanged && !playChanged) {
+    logSessionRouteDecision("applyRemoteSession", row, null, "sig_unchanged_early_exit", {
+      playChanged,
+      prevScreen,
+      notified: false,
+      cacheAfter: sessionRouteCacheSnapshot(row),
+    });
+    return;
+  }
 
+  logSessionRouteDecision("applyRemoteSession", row, null, "notify_dispatch", {
+    prevScreen,
+    playChanged,
+    sigUnchanged,
+  });
   notify(row);
 
-  if (shouldApplySessionRoute(row, { fromScreen: prevScreen })) {
+  const routeAllowed = shouldApplySessionRoute(row, {
+    fromScreen: prevScreen,
+    debugSource: "applyRemoteSession/shouldApply",
+  });
+  logSessionRouteDecision("applyRemoteSession", row, routeAllowed, "post_notify_route_gate", {
+    prevScreen,
+    playChanged,
+    notified: true,
+    cacheAfter: sessionRouteCacheSnapshot(row),
+  });
+  if (routeAllowed) {
     const screen = getEffectiveSessionScreen(row);
     const cur = getCurrentScreen();
     clearSuppressIfFollowingHost(screen, cur);
-    handleSessionRoute(row, { fromScreen: prevScreen });
+    handleSessionRoute(row, { fromScreen: prevScreen, debugSource: "applyRemoteSession/handle" });
   }
 }
 
@@ -3111,12 +3229,26 @@ function isAppContentMounted() {
 export { isAppContentMounted };
 
 export function routeToSessionScreen(screen, { force = false } = {}) {
-  if (!screen || routing) return false;
+  if (!screen || routing) {
+    logSessionRouteDecision(
+      "routeToSessionScreen",
+      getCachedGameSession(),
+      false,
+      !screen ? "no_screen" : "routing_lock_busy",
+      { requested: screen, force }
+    );
+    return false;
+  }
   const current = getCurrentScreen();
   if (!force && current === screen) return isAppContentMounted();
 
   routing = true;
   try {
+    logSessionRouteDecision("routeToSessionScreen", getCachedGameSession(), true, "navigate_exec", {
+      requested: screen,
+      force,
+      from: current,
+    });
     if (screen === "game-select") {
       navigate("game-select", { navStack: navStackFor("game-select") });
     } else if (screen === "lobby") {
@@ -3157,13 +3289,26 @@ export function isSessionRouteSuppressed() {
 export function suppressRoutingForScoreView(ms = 15 * 60 * 1000) {
   const row = getCachedGameSession();
   const active = row ? getEffectiveSessionScreen(row) : null;
-  if (active && (isInProgressPlayScreen(active) || isOnGameSetupScreen(active))) {
-    suppressSessionRoute(ms, active);
-    return;
-  }
-  if (isGameSyncActive()) {
-    suppressSessionRoute(ms, active || row?.screen || "game-select");
-  }
+  const screenToSuppress =
+    active && (isInProgressPlayScreen(active) || isOnGameSetupScreen(active))
+      ? active
+      : isGameSyncActive()
+        ? active || row?.screen || "game-select"
+        : null;
+  if (!screenToSuppress) return;
+  suppressSessionRoute(ms, screenToSuppress);
+  console.log("[SESSION-ROUTE]", {
+    t: Date.now(),
+    source: "suppressRoutingForScoreView",
+    phase: "suppress_activated",
+    ms,
+    suppressScreen: suppressSessionScreen,
+    suppressSig: suppressSessionSig || null,
+    active,
+    declared: row?.screen ?? null,
+    current: getCurrentScreen(),
+    until: suppressSessionRouteUntil,
+  });
 }
 
 /** Partie en cours (écran de jeu, hors prep et post-partie). */
@@ -3241,14 +3386,21 @@ export function getEffectiveSessionScreen(row) {
   }
 
   if (declared && POST_GAME_SCREENS.has(declared)) {
+    const skippedActivePlay = resolveActivePlayScreen(st, gid, declared);
+    const lobbyGid = getLobbyGameId();
+    const lobbyPrep =
+      isLobbyEveningStarted() && lobbyGid && lobbyGid !== "menu"
+        ? SESSION_GAME_ID_TO_TILE[lobbyGid] || null
+        : null;
     if (POST_GAME_SCREENS.has(local) || isSessionRouteSuppressed()) {
+      logSessionRouteDecision("getEffectiveSessionScreen", row, null, "post_game_local_short_circuit", {
+        effective: declared,
+        skippedActivePlay,
+        lobbyPrep,
+      });
       return declared;
     }
-    const lobbyGid = getLobbyGameId();
-    if (isLobbyEveningStarted() && lobbyGid && lobbyGid !== "menu") {
-      const prep = SESSION_GAME_ID_TO_TILE[lobbyGid];
-      if (prep) return prep;
-    }
+    if (lobbyPrep) return lobbyPrep;
     return declared;
   }
 
@@ -3326,40 +3478,60 @@ export function getFilRougeResumeScreen() {
 
 /** Renvoie l’invité (ou l’hôte) vers la partie en cours si une session active existe. */
 export async function routeToActiveGameIfNeeded(cachedRowOnly = null, { force = false } = {}) {
-  if (!isGameSyncActive()) return false;
+  const source = "routeToActiveGameIfNeeded";
+  if (!isGameSyncActive()) {
+    logSessionRouteDecision(source, cachedRowOnly, false, "game_sync_inactive", { force });
+    return false;
+  }
   const row =
     cachedRowOnly || (await refreshGameSession()) || getCachedGameSession();
   const screen = getEffectiveSessionScreen(row);
-  if (!screen) return false;
+  const routeLog = (allowed, reason, extra = {}) =>
+    logSessionRouteDecision(source, row, allowed, reason, { effective: screen, force, ...extra });
+
+  if (!screen) return routeLog(false, "no_effective_screen");
   const isEveningHub = screen === "game-select" && isLobbyEveningStarted();
   if (!isEveningHub && !isActiveGameSessionScreen(screen) && !isOnGameSetupScreen(screen)) {
-    return false;
+    return routeLog(false, "effective_screen_post_game_only");
   }
   const current = getCurrentScreen();
-  if (current === screen) return isAppContentMounted();
+  if (current === screen) return routeLog(isAppContentMounted(), "already_on_target_screen");
   if (
     !force &&
     isBrowsingScoresWithRouteSuppress(current) &&
     !isSessionAdvancedFromSuppress(screen)
   ) {
-    return false;
+    return routeLog(false, "scores_suppress_blocks");
   }
-  if (!force && isCompatibleSessionScreen(screen, current)) return true;
-  if (!force && !shouldApplySessionRoute(row)) return false;
+  if (!force && isCompatibleSessionScreen(screen, current)) {
+    return routeLog(true, "compatible_session_screen_no_nav");
+  }
+  if (!force && !shouldApplySessionRoute(row, { debugSource: `${source}/shouldApply` })) {
+    return routeLog(false, "should_apply_session_route_false");
+  }
   if (
     isSessionAdvancedFromSuppress(screen) ||
     shouldFollowHostGameLaunch(current, screen)
   ) {
     clearSessionRouteSuppress();
   }
+  routeLog(true, "navigate");
   return routeToSessionScreen(screen, { force: true });
 }
 
-export function handleSessionRoute(row, { fromScreen = null } = {}) {
-  if (!shouldApplySessionRoute(row, { fromScreen })) return;
+export function handleSessionRoute(row, { fromScreen = null, debugSource = null } = {}) {
+  const source = debugSource || "handleSessionRoute";
   const screen = getEffectiveSessionScreen(row);
+  if (!shouldApplySessionRoute(row, { fromScreen, debugSource: `${source}/shouldApply` })) {
+    logSessionRouteDecision(source, row, false, "should_apply_session_route_false", {
+      effective: screen,
+      fromScreen,
+    });
+    return;
+  }
   const current = getCurrentScreen();
   clearSuppressIfFollowingHost(screen, current);
+  logSessionRouteDecision(source, row, true, "navigate", { effective: screen, fromScreen });
   routeToSessionScreen(screen, { force: true });
 }
 
@@ -3571,12 +3743,21 @@ async function syncTick() {
       scheduleSyncPoll();
       const cached = getCachedGameSession();
       if (cached) {
+        logSessionRouteDecision("syncTick", cached, null, "meta_unchanged_use_cache", {
+          metaUpdatedAt: meta.updated_at,
+        });
         if (await routeToActiveGameIfNeeded(cached)) return;
         maybeRouteToSessionScreen(cached);
       }
       return;
     }
 
+    logSessionRouteDecision("syncTick", getCachedGameSession(), null, "meta_changed_or_missing_refresh", {
+      metaUpdatedAt: meta?.updated_at ?? null,
+      lastSessionUpdatedAt,
+      metaScreen: meta?.screen ?? null,
+      metaGameId: meta?.game_id ?? null,
+    });
     const row = await refreshGameSession();
     if (!row) return;
     adjustPollBackoff(sessionSignature(row) !== prevSig);

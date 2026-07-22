@@ -1,11 +1,11 @@
 // WRONG ANSWER ONLY ↩️ - chaque manche affiche une question, chacun écrit SECRÈTEMENT
 // la pire réponse possible. Les réponses sont anonymisées, puis tout le monde vote pour
-// la pire. Score : 3 points par vote reçu sur sa réponse.
+// la pire. Podium de la manche : 1er +25, 2e +15, 3e +10 (par nb de votes ; ex-aequo → réponse la plus tôt).
 
 export const WRONG_ANSWER_ROUND_PRESETS = [3, 5, 8];
 
-/** Points attribués à un auteur par vote reçu sur sa réponse. */
-export const WRONG_ANSWER_POINTS_PER_VOTE = 3;
+/** Points attribués au podium de CHAQUE manche (top 1 / 2 / 3 par votes reçus). */
+export const WRONG_ANSWER_PODIUM_POINTS = [25, 15, 10];
 
 /** Longueur maximale d'une réponse saisie. */
 export const WRONG_ANSWER_MAX_LEN = 80;

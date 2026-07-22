@@ -1,6 +1,5 @@
 import {
   WRONG_ANSWER_MAX_LEN,
-  WRONG_ANSWER_POINTS_PER_VOTE,
   pickWrongAnswerNpcAnswer,
 } from "../../data/wrongAnswer.js";
 import {

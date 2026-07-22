@@ -123,11 +123,12 @@ export const GAME_RULES = {
       "On révèle les auteurs et le décompte des votes.",
     ],
     points: [
-      "Chaque réponse rapporte 3 points par vote reçu.",
-      "Plus ta réponse est jugée mauvaise par le groupe, plus tu marques.",
+      "Podium de chaque manche : 1re pire réponse +25, 2e +15, 3e +10.",
+      "Classement par nombre de votes ; ex-aequo départagé par la réponse envoyée la plus tôt.",
+      "Sans vote sur ta réponse : 0 pt pour la manche.",
     ],
     exemple:
-      "« Quel est le meilleur animal de compagnie ? » Tu réponds « Girafe. ». 4 joueurs votent pour ta réponse → tu gagnes +12 pts (4 × 3).",
+      "« Quel est le meilleur animal de compagnie ? » Ta « Girafe » finit 1re aux votes → +25 pts. Le 2e et le 3e de la manche prennent +15 et +10.",
   },
 
   dilemma: {

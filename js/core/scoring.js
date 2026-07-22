@@ -1,7 +1,8 @@
 import { EVENING_POINTS, FIL_ROUGE_POINTS, tierNightPointsForRankDiff } from "../../data/eveningScoring.js";
 import { PLAYLIST_GUESS_POINTS } from "../../data/playlistGuess.js";
 import { CLUTCH_PODIUM_POINTS } from "../../data/clutch.js";
-import { WRONG_ANSWER_POINTS_PER_VOTE } from "../../data/wrongAnswer.js";
+import { WRONG_ANSWER_PODIUM_POINTS } from "../../data/wrongAnswer.js";
+import { computeWrongAnswerRoundAward } from "./wrongAnswerScoring.js";
 import { filterVoterVotes, computeRoundMetrics } from "./truthMeterSession.js";
 import { countDilemmaResults } from "./dilemmaSession.js";
 import { DILEMMA_POINTS_TIE } from "../../data/dilemma.js";
@@ -96,33 +97,22 @@ export function awardClutchRound(ranking = [], { podiumPoints = CLUTCH_PODIUM_PO
   return { ranking, deltas };
 }
 
+export { rankWrongAnswerResults } from "./wrongAnswerScoring.js";
+
 /**
- * Wrong Answer Only : 3 points par vote reçu sur sa réponse.
- * `answers` = { [name]: { text } } ; `votes` = { [voter]: targetName }.
+ * Wrong Answer Only : podium de la manche 25 / 15 / 10 pour le top 3 (votes reçus).
+ * `answers` = { [name]: { text, at? } } ; `votes` = { [voter]: targetName }.
  */
 export function awardWrongAnswerRound(
   answers = {},
   votes = {},
-  { pointsPerVote = WRONG_ANSWER_POINTS_PER_VOTE } = {}
+  { podiumPoints = WRONG_ANSWER_PODIUM_POINTS } = {}
 ) {
-  const counts = {};
-  Object.keys(answers).forEach((name) => {
-    counts[name] = 0;
-  });
-  Object.values(votes).forEach((target) => {
-    if (target == null || counts[target] == null) return;
-    counts[target] += 1;
-  });
-
-  const deltas = {};
-  Object.entries(counts).forEach(([name, n]) => {
-    if (n <= 0) return;
-    const pts = n * pointsPerVote;
+  const award = computeWrongAnswerRoundAward(answers, votes, { podiumPoints });
+  Object.entries(award.deltas).forEach(([name, pts]) => {
     addScore(name, pts);
-    deltas[name] = pts;
   });
-
-  return { counts, deltas };
+  return award;
 }
 
 /** TruthMeter : au plus un bonus par joueur et par manche. */

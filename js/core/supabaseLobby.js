@@ -1333,7 +1333,29 @@ export function subscribeLobbyRealtime(onUpdate) {
       "postgres_changes",
       { event: "UPDATE", schema: "public", table: "lobbies", filter: `id=eq.${lobbyId}` },
       (payload) => {
-        if (!isMeaningfulLobbyUpdate(payload.new)) return;
+        const meaningful = isMeaningfulLobbyUpdate(payload.new);
+        console.log("[SESSION-ROUTE]", {
+          t: Date.now(),
+          source: "supabaseLobby/realtime/lobbies",
+          phase: "event_A_lobby_update",
+          meaningful,
+          lobbyGameIdIncoming: payload.new?.game_id ?? null,
+          lobbyStatusIncoming: payload.new?.status ?? null,
+          lobbyGameIdCached: getState().lobby?.gameId ?? null,
+          lobbyStatusCached: getState().lobby?.status ?? null,
+          sessionCache: (() => {
+            const row = getCachedGameSession();
+            return row
+              ? {
+                  game_id: row.game_id ?? null,
+                  screen: row.screen ?? null,
+                  updated_at: row.updated_at ?? null,
+                }
+              : null;
+          })(),
+          current: getCurrentScreen(),
+        });
+        if (!meaningful) return;
         scheduleLobbyRefresh();
       }
     )
@@ -1369,13 +1391,61 @@ export function subscribeLobbyRealtime(onUpdate) {
            * on l'applique directement au lieu de refaire un aller-retour DB. Ça
            * réduit la latence et évite que 6 clients refetchent en même temps.
            */
+          console.log("[SESSION-ROUTE]", {
+            t: Date.now(),
+            source: "supabaseLobby/realtime/game_sessions",
+            phase: "event_B_before_apply",
+            eventType: payload.eventType,
+            declared: payload.new?.screen ?? null,
+            gameId: payload.new?.game_id ?? null,
+            updatedAt: payload.new?.updated_at ?? null,
+            hasState: payload.new?.state !== undefined,
+            stateIsNull: payload.new?.state === null,
+            stateKeys:
+              payload.new?.state && typeof payload.new.state === "object"
+                ? Object.keys(payload.new.state)
+                : [],
+            cacheBefore: (() => {
+              const row = getCachedGameSession();
+              return row
+                ? {
+                    game_id: row.game_id ?? null,
+                    screen: row.screen ?? null,
+                    updated_at: row.updated_at ?? null,
+                  }
+                : null;
+            })(),
+            current: getCurrentScreen(),
+            applyPath:
+              payload.new && payload.new.state !== undefined
+                ? "applyRemoteSession_inline"
+                : "refreshGameSession_fallback",
+          });
           if (payload.new && payload.new.state !== undefined) {
             applyRemoteSession(payload.new);
           } else {
             await refreshGameSession();
           }
           const row = getCachedGameSession();
-          if (row) handleSessionRoute(row);
+          console.log("[SESSION-ROUTE]", {
+            t: Date.now(),
+            source: "supabaseLobby/realtime/game_sessions",
+            phase: "event_B_before_handleSessionRoute",
+            declared: row?.screen ?? null,
+            gameId: row?.game_id ?? null,
+            updatedAt: row?.updated_at ?? null,
+            stateKeys: row?.state && typeof row.state === "object" ? Object.keys(row.state) : [],
+            current: getCurrentScreen(),
+          });
+          if (row) handleSessionRoute(row, { debugSource: "supabaseLobby/realtime/handle" });
+          console.log("[SESSION-ROUTE]", {
+            t: Date.now(),
+            source: "supabaseLobby/realtime/game_sessions",
+            phase: "event_B_after_handleSessionRoute",
+            current: getCurrentScreen(),
+            declared: getCachedGameSession()?.screen ?? null,
+            gameId: getCachedGameSession()?.game_id ?? null,
+          });
         } catch (e) {
           console.warn("REVEAL realtime game_sessions:", e.message || e);
         }
