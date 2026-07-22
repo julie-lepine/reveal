@@ -7,7 +7,9 @@ import {
   resolveActingHostServerLike,
   resolveNonHostEveningScoresPolicy,
   EVENING_SCORES_RESERVED_MSG,
+  validateActingHostPlayPatch,
 } from "../js/core/gameSessionSecurity.js";
+import { pickRemotePlayFields } from "../js/core/playPatch.js";
 
 const NOW = 1_000_000_000_000;
 const iso = (msAgo) => new Date(NOW - msAgo).toISOString();
@@ -117,5 +119,58 @@ describe("resolveNonHostEveningScoresPolicy (ARCH-03)", () => {
     assert.equal(r.ok, false);
     assert.equal(r.error, EVENING_SCORES_RESERVED_MSG);
     assert.equal(r.error, "Scores de soirée réservés à l'hôte.");
+  });
+});
+
+describe("validateActingHostPlayPatch (Hot Take reveal)", () => {
+  it("accepte le payload reveal Hot Take (phase + takeScored + matchScores + lastRound)", () => {
+    const playPatch = pickRemotePlayFields(
+      {
+        phase: "reveal",
+        takeScored: true,
+        votes: { u1: "A" },
+        voteEndsAt: null,
+        matchScores: { u1: 2 },
+        lastRound: { majority: "A", deltas: { u1: 2 } },
+        deck: [{ id: 1 }],
+        lobbyStarted: true,
+      },
+      {
+        phase: "reveal",
+        takeScored: true,
+        votes: { u1: "A" },
+        voteEndsAt: null,
+        matchScores: { u1: 2 },
+        lastRound: { majority: "A", deltas: { u1: 2 } },
+      }
+    );
+    assert.deepEqual(Object.keys(playPatch).sort(), [
+      "lastRound",
+      "matchScores",
+      "phase",
+      "takeScored",
+      "voteEndsAt",
+      "votes",
+    ]);
+    assert.equal(validateActingHostPlayPatch(playPatch).ok, true);
+  });
+
+  it("accepte next Hot Take (intermissionEndsAt + takeScored)", () => {
+    const playPatch = {
+      phase: "voting",
+      takeIdx: 1,
+      votes: {},
+      takeScored: false,
+      voteEndsAt: "2026-01-01T00:00:00.000Z",
+      intermissionEndsAt: null,
+      pausedBy: null,
+    };
+    assert.equal(validateActingHostPlayPatch(playPatch).ok, true);
+  });
+
+  it("refuse un champ evening / hors whitelist", () => {
+    assert.equal(validateActingHostPlayPatch({ scores: { a: 1 } }).ok, false);
+    assert.equal(validateActingHostPlayPatch({ scores: { a: 1 } }).key, "scores");
+    assert.equal(validateActingHostPlayPatch({ unknownField: 1 }).ok, false);
   });
 });

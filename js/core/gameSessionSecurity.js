@@ -77,6 +77,64 @@ export function isContributePairAllowed(game, kind) {
 export const EVENING_SCORES_RESERVED_MSG = "Scores de soirée réservés à l'hôte.";
 
 /**
+ * Miroir de la whitelist `apply_acting_host_play` (merge_play).
+ * Garder aligné avec supabase/game-sessions-i08-arch03.sql (+ hotfix takeScored).
+ */
+export const ACTING_HOST_PLAY_ALLOWED_KEYS = new Set([
+  "phase",
+  "roundIdx",
+  "takeIdx",
+  "questionIdx",
+  "votes",
+  "voteEndsAt",
+  "roundScored",
+  "takeScored",
+  "pausedBy",
+  "taps",
+  "answers",
+  "dealAcks",
+  "currentDilemma",
+  "currentTake",
+  "affirmation",
+  "authorEstimate",
+  "finished",
+  "placements",
+  "matchScores",
+  "lastRound",
+  "roundResults",
+  "speakEndsAt",
+  "answerEndsAt",
+  "displayEndsAt",
+  "forceReveal",
+  "allAnswered",
+  "podium",
+  "final",
+  "deckCursor",
+  "itemIdx",
+  "tierVotes",
+  "accumulated",
+  "currentItem",
+  "itemsLeft",
+  "revealIndex",
+  "scored",
+  "intermissionEndsAt",
+  "voteTimerRemaining",
+]);
+
+/** @returns {{ ok: true } | { ok: false, key: string }} */
+export function validateActingHostPlayPatch(playPatch) {
+  if (!playPatch || typeof playPatch !== "object") {
+    return { ok: false, key: "(invalid)" };
+  }
+  for (const key of Object.keys(playPatch)) {
+    if (!ACTING_HOST_PLAY_ALLOWED_KEYS.has(key)) {
+      return { ok: false, key };
+    }
+  }
+  return { ok: true };
+}
+
+/**
  * Chemin non-hôte réel (`patchGameStateAsNonHost`) :
  * - pas de flag evening → OK, play éventuel
  * - flag evening + acting host → OK mais drop evening (RPC refuse scores/soirée ;

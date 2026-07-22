@@ -107,7 +107,9 @@ import {
 import {
   resolveNonHostEveningScoresPolicy,
   EVENING_SCORES_RESERVED_MSG,
+  validateActingHostPlayPatch,
 } from "./gameSessionSecurity.js";
+import { arch03RevealLog } from "./arch03RevealDebug.js";
 
 let cachedRow = null;
 let lastSessionSig = "";
@@ -3284,6 +3286,16 @@ export function applyRemoteSession(row) {
     return;
   }
 
+  if (hotTakePlayChanged) {
+    arch03RevealLog("applyRemoteSession hotTake changed (server/realtime)", {
+      phase: patch.hotTakeGame?.phase ?? null,
+      takeScored: patch.hotTakeGame?.takeScored ?? null,
+      takeIdx: patch.hotTakeGame?.takeIdx ?? null,
+      updated_at: row?.updated_at || null,
+      screen: row?.screen || null,
+    });
+  }
+
   notify(row);
   const routeAllowed = shouldApplySessionRoute(row, {
     fromScreen: prevScreen,
@@ -4045,6 +4057,18 @@ async function patchGameStateAsNonHost(
   const uid = getSupabaseUserId();
   if (!uid) throw new Error("Session requise.");
 
+  arch03RevealLog("patchGameStateAsNonHost enter", {
+    localUserId: uid,
+    hostUserId: getState().lobby?.hostId || null,
+    actingHostUserId: getActingHostUserId(),
+    isLobbyHost: isLobbyHost(),
+    canActAsHost: canActAsHost(),
+    withEveningScoresBefore: withEveningScores,
+    stateKeys: Object.keys(stateMerge || {}),
+    playKeys: Object.keys(stateMerge?.[Object.keys(stateMerge || {})[0]] || {}),
+    sessionUpdatedAt: cachedRow?.updated_at || null,
+  });
+
   // Evening scores = hôte réel only (UPDATE direct). Les jeux passaient souvent
   // withEveningScores: canActAsHost() → popup bloquante alors que merge_play est OK.
   // Aligné RPC apply_acting_host_play (refuse scores/soirée, autorise matchScores).
@@ -4052,12 +4076,23 @@ async function patchGameStateAsNonHost(
     withEveningScores,
     canActAsHost: canActAsHost(),
   });
+  arch03RevealLog("resolveNonHostEveningScoresPolicy", {
+    withEveningScoresBefore: withEveningScores,
+    withEveningScoresAfterNormalization: false,
+    dropEveningScores: eveningPolicy.dropEveningScores,
+    ok: eveningPolicy.ok,
+    error: eveningPolicy.error || null,
+  });
   if (!eveningPolicy.ok) {
+    arch03RevealLog("THROW evening scores popup", {
+      error: eveningPolicy.error || EVENING_SCORES_RESERVED_MSG,
+    });
     throw new Error(eveningPolicy.error || EVENING_SCORES_RESERVED_MSG);
   }
 
   const contribution = detectPlayerContribution(stateMerge, uid);
   if (contribution) {
+    arch03RevealLog("route contribute_game_session_player", contribution);
     const {
       rpcContributeGameSessionPlayer,
     } = await import("./gameSessionRpc.js");
@@ -4092,19 +4127,49 @@ async function patchGameStateAsNonHost(
     if (!playPatch || typeof playPatch !== "object") {
       throw new Error("Patch play invalide.");
     }
-    const { rpcApplyActingHostPlay } = await import("./gameSessionRpc.js");
-    const row = await rpcApplyActingHostPlay({
-      lobbyId,
+    const keyCheck = validateActingHostPlayPatch(playPatch);
+    arch03RevealLog("apply_acting_host_play CALL", {
+      rpc: "apply_acting_host_play",
       action: "merge_play",
       game,
+      playPatchKeys: Object.keys(playPatch),
       playPatch,
+      keyCheck,
       screen: screen || null,
       gameId: gameId || null,
+      sessionUpdatedAtBefore: cachedRow?.updated_at || null,
     });
+    const { rpcApplyActingHostPlay } = await import("./gameSessionRpc.js");
+    let row;
+    try {
+      row = await rpcApplyActingHostPlay({
+        lobbyId,
+        action: "merge_play",
+        game,
+        playPatch,
+        screen: screen || null,
+        gameId: gameId || null,
+      });
+    } catch (err) {
+      arch03RevealLog("apply_acting_host_play ERROR", {
+        message: err?.message || String(err),
+        code: err?.code || null,
+        details: err?.details || null,
+        hint: err?.hint || null,
+        status: err?.status || null,
+      });
+      throw err;
+    }
     let full = row;
     if (!row?.state) {
       full = (await fetchGameSessionByLobby(lobbyId)) || row;
     }
+    arch03RevealLog("apply_acting_host_play OK", {
+      updated_at: full?.updated_at || null,
+      screen: full?.screen || null,
+      phase: full?.state?.[stateKey]?.phase ?? full?.state?.hotTake?.phase ?? null,
+      takeScored: full?.state?.[stateKey]?.takeScored ?? full?.state?.hotTake?.takeScored ?? null,
+    });
     applyRemoteSession(full);
     if (screen) handleSessionRoute(full);
     return full;

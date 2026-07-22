@@ -730,8 +730,9 @@ declare
   v_patch jsonb := '{}'::jsonb;
   v_key text;
   v_val jsonb;
-  v_allowed text[] := array[
+      v_allowed text[] := array[
     'phase','roundIdx','takeIdx','questionIdx','votes','voteEndsAt','roundScored',
+    'takeScored','intermissionEndsAt','voteTimerRemaining',
     'pausedBy','taps','answers','dealAcks','currentDilemma','currentTake',
     'affirmation','authorEstimate','finished','placements','matchScores','lastRound',
     'roundResults','speakEndsAt','answerEndsAt','displayEndsAt','forceReveal',

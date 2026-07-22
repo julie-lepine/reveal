@@ -38,6 +38,7 @@ import {
   isGameSyncActive,
   canActAsHost,
   isLobbyHost,
+  getActingHostUserId,
   onGameSessionChange,
   getActingHostUiRefreshToken,
   completeGameSession,
@@ -45,8 +46,10 @@ import {
   stopGameSessionListenerOnPostGame,
   refreshGameSession,
 } from "../core/gameSync.js";
+import { getSupabaseUserId } from "../core/supabaseAuth.js";
 import { voteConfirmChrome, pickForVoteConfirm } from "../core/voteConfirm.js";
 import { arch03AhLogSkipDecision } from "../core/arch03ActingHostDebug.js";
+import { arch03RevealLog } from "../core/arch03RevealDebug.js";
 
 function buildHotTakeStandings(matchScores = {}) {
   return [...getActivePlayers()]
@@ -403,6 +406,14 @@ export function mountHotTake(app) {
 
   async function goToReveal() {
     if (revealInFlight) return;
+    arch03RevealLog("goToReveal handler", {
+      localUserId: getSupabaseUserId() || null,
+      actingHostUserId: getActingHostUserId(),
+      isLobbyHost: isLobbyHost(),
+      canActAsHost: canActAsHost(),
+      phaseBefore: phase,
+      takeScored,
+    });
     if (mp && canActAsHost()) {
       await refreshGameSession();
       syncFromSession();
@@ -411,36 +422,50 @@ export function mountHotTake(app) {
 
     if (alreadyScoredThisTake()) {
       if (mp && getHotTakeSession().phase !== "reveal") {
-        await commitHotTakePlay({
-          phase: "reveal",
-          takeScored: true,
-          votes: votesToScore,
-          voteEndsAt: null,
-        });
+        try {
+          await commitHotTakePlay({
+            phase: "reveal",
+            takeScored: true,
+            votes: votesToScore,
+            voteEndsAt: null,
+          });
+        } catch {
+          syncFromSession();
+          render();
+          return;
+        }
       }
       enterRevealUi();
+      arch03RevealLog("enterRevealUi reason", { reason: "already-scored" });
       return;
     }
 
     if (!canAwardThisTake()) {
       if (mp) {
-        await commitHotTakePlay({
-          phase: "reveal",
-          votes: votesToScore,
-          voteEndsAt: null,
-        });
+        try {
+          await commitHotTakePlay({
+            phase: "reveal",
+            votes: votesToScore,
+            voteEndsAt: null,
+          });
+        } catch {
+          syncFromSession();
+          render();
+          return;
+        }
       } else {
         phase = "reveal";
       }
       enterRevealUi();
+      arch03RevealLog("enterRevealUi reason", { reason: "no-award" });
       return;
     }
 
     revealInFlight = true;
     try {
-      takeScored = true;
       let matchScores = getHotTakeSession().matchScores || {};
       let lastRound = getHotTakeSession().lastRound || null;
+      let award = null;
       if (canAwardThisTake()) {
         // Le vote de l'auteur (take custom) ne compte ni dans la majorité ni dans les
         // points. Les votes commités (votesToScore) restent intacts pour l'affichage.
@@ -450,10 +475,20 @@ export function mountHotTake(app) {
               Object.entries(votesToScore).filter(([name]) => name !== verdictAuthor)
             )
           : votesToScore;
-        lastAward = awardHotTakeVotes(votesForVerdict, HOT_TAKE_OPTIONS);
-        matchScores = applyMatchScoreDeltas(matchScores, lastAward.deltas || {});
-        lastRound = buildHotTakeLastRound(lastAward);
+        award = awardHotTakeVotes(votesForVerdict, HOT_TAKE_OPTIONS);
+        matchScores = applyMatchScoreDeltas(matchScores, award.deltas || {});
+        lastRound = buildHotTakeLastRound(award);
       }
+      const eveningFlag = mp && isLobbyHost();
+      arch03RevealLog("goToReveal commit payload", {
+        withEveningScores: eveningFlag,
+        withEveningScoresSource: "mp && isLobbyHost()",
+        buildProof: "hotTake.js withEveningScores uses isLobbyHost (not canActAsHost)",
+        phase: "reveal",
+        takeScored: true,
+        hasMatchScores: Boolean(matchScores),
+        hasLastRound: Boolean(lastRound),
+      });
       await commitHotTakePlay(
         {
           phase: "reveal",
@@ -464,12 +499,27 @@ export function mountHotTake(app) {
           lastRound,
         },
         {
-          withEveningScores: mp && isLobbyHost(),
+          withEveningScores: eveningFlag,
           withPatchFeedback: mp && canActAsHost(),
         }
       );
+      // Uniquement après succès serveur (MP) : syncFromSession lit l'état autoritaire
+      if (award) lastAward = award;
+      takeScored = true;
       phase = "reveal";
       enterRevealUi();
+      arch03RevealLog("enterRevealUi reason", {
+        reason: "server-confirmed-reveal",
+        phaseAfter: getHotTakeSession().phase,
+        takeScoredAfter: getHotTakeSession().takeScored,
+      });
+    } catch (err) {
+      arch03RevealLog("goToReveal aborted — stay on voting", {
+        message: err?.message || String(err),
+        phaseNow: getHotTakeSession().phase,
+      });
+      syncFromSession();
+      render();
     } finally {
       revealInFlight = false;
     }
@@ -498,15 +548,25 @@ export function mountHotTake(app) {
 
   async function startNextTakeVote() {
     if (mp && !canActAsHost()) return;
-    await commitHotTakePlay({
-      phase: "voting",
-      takeIdx,
-      votes: {},
-      takeScored: false,
-      voteEndsAt: new Date(Date.now() + HOT_TAKE_TIMER_SEC * 1000).toISOString(),
-      intermissionEndsAt: null,
-      pausedBy: null,
-    });
+    try {
+      await commitHotTakePlay({
+        phase: "voting",
+        takeIdx,
+        votes: {},
+        takeScored: false,
+        voteEndsAt: new Date(Date.now() + HOT_TAKE_TIMER_SEC * 1000).toISOString(),
+        intermissionEndsAt: null,
+        pausedBy: null,
+      });
+    } catch (err) {
+      arch03RevealLog("startNextTakeVote aborted", {
+        message: err?.message || String(err),
+        phaseNow: getHotTakeSession().phase,
+      });
+      syncFromSession();
+      render();
+      return;
+    }
     selected = null;
     syncFromSession();
     render();
@@ -514,6 +574,13 @@ export function mountHotTake(app) {
 
   /** Filet de sécurité hôte : clôt le vote même si un joueur n'a pas voté. */
   async function forceReveal() {
+    arch03RevealLog("forceReveal click", {
+      localUserId: getSupabaseUserId() || null,
+      actingHostUserId: getActingHostUserId(),
+      isLobbyHost: isLobbyHost(),
+      canActAsHost: canActAsHost(),
+      phaseBefore: phase,
+    });
     if (mp && !canActAsHost()) return;
     if (!mp && !myVote) {
       const pick = pickForVoteConfirm(selected, myVote) ?? HOT_TAKE_OPTIONS[0];

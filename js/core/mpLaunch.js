@@ -20,6 +20,7 @@ import {
   isGameSyncActive,
   isLobbyHost,
   canActAsHost,
+  getActingHostUserId,
   patchGameState,
   pushGameSession,
   requireLocalParticipantUid,
@@ -28,6 +29,10 @@ import { pickRemotePlayFields } from "./playPatch.js";
 import { showAppAlert } from "./dialog.js";
 import { getCurrentScreen, navigate } from "./router.js";
 import { computePrepReadyToggle } from "./prepReadyMaps.js";
+import { arch03RevealLog } from "./arch03RevealDebug.js";
+import { validateActingHostPlayPatch } from "./gameSessionSecurity.js";
+import { getSupabaseUserId } from "./supabaseAuth.js";
+import { getState } from "./state.js";
 
 export { computePrepReadyToggle } from "./prepReadyMaps.js";
 
@@ -240,19 +245,76 @@ export async function commitHostGamePlay({
   toRemote,
   patchOpts = {},
 }) {
-  const session = { ...getSession(), ...patch };
-  saveLocal(session);
-  // Hôte effectif (repli si l'hôte est absent) : révéler / manche suivante doivent sync MP.
-  if (!isGameSyncActive() || !canActAsHost()) return session;
-  const remotePatch = { [stateKey]: pickRemotePlayFields(toRemote(session), patch) };
-  const opts = { gameId, screen: screen || gameId, ...patchOpts };
-  if (patchOpts.withPatchFeedback) {
-    const { patchGameStateWithFeedback } = await import("./patchGameStateFeedback.js");
-    await patchGameStateWithFeedback(remotePatch, opts);
-  } else {
-    await patchGameState(remotePatch, opts);
+  const prev = getSession();
+  const session = { ...prev, ...patch };
+
+  // Solo / non acting : local only
+  if (!isGameSyncActive() || !canActAsHost()) {
+    saveLocal(session);
+    return session;
   }
-  return session;
+
+  const playPatch = pickRemotePlayFields(toRemote(session), patch);
+  const remotePatch = { [stateKey]: playPatch };
+  const opts = { gameId, screen: screen || gameId, ...patchOpts };
+  const withEveningScoresRaw = Boolean(opts.withEveningScores);
+  const cached = getCachedGameSession();
+  const validation = validateActingHostPlayPatch(playPatch);
+
+  arch03RevealLog("commitHostGamePlay before RPC", {
+    gameId,
+    stateKey,
+    localUserId: getSupabaseUserId() || null,
+    hostUserId: getState().lobby?.hostId || null,
+    actingHostUserId: getActingHostUserId(),
+    isLobbyHost: isLobbyHost(),
+    canActAsHost: canActAsHost(),
+    withEveningScores: withEveningScoresRaw,
+    withPatchFeedback: Boolean(opts.withPatchFeedback),
+    phaseBefore: prev?.phase ?? null,
+    phaseAfterLocalIntent: session?.phase ?? null,
+    playPatchKeys: Object.keys(playPatch),
+    playPatchValidation: validation,
+    sessionUpdatedAt: cached?.updated_at || null,
+    // Preuve build : call site doit envoyer isLobbyHost() pour evening
+    eveningCallSiteHint:
+      withEveningScoresRaw && !isLobbyHost()
+        ? "UNEXPECTED: withEveningScores true sans isLobbyHost"
+        : withEveningScoresRaw
+          ? "evening=true (hôte réel)"
+          : "evening=false (attendu acting host)",
+  });
+
+  if (!validation.ok && !isLobbyHost()) {
+    arch03RevealLog("commitHostGamePlay BLOCKED local whitelist", validation);
+  }
+
+  try {
+    // ARCH-03 : pas de saveLocal avant confirmation serveur (évite reveal fantôme + F5 rollback)
+    if (patchOpts.withPatchFeedback) {
+      const { patchGameStateWithFeedback } = await import("./patchGameStateFeedback.js");
+      await patchGameStateWithFeedback(remotePatch, opts);
+    } else {
+      await patchGameState(remotePatch, opts);
+    }
+  } catch (err) {
+    saveLocal(prev);
+    arch03RevealLog("commitHostGamePlay RPC FAILED — local rolled back", {
+      message: err?.message || String(err),
+      code: err?.code || null,
+      details: err?.details || null,
+      hint: err?.hint || null,
+      phaseRestored: prev?.phase ?? null,
+    });
+    throw err;
+  }
+
+  arch03RevealLog("commitHostGamePlay RPC OK — server authoritative", {
+    phaseNow: getSession()?.phase ?? null,
+    sessionUpdatedAt: getCachedGameSession()?.updated_at || null,
+    navigationNote: "UI doit sync via applyRemoteSession / onGameSessionChange",
+  });
+  return getSession();
 }
 
 /**
