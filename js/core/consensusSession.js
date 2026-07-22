@@ -1,6 +1,5 @@
 import {
   CONSENSUS_MODES,
-  CONSENSUS_LOBBY_PODIUM_POINTS,
   CONSENSUS_QUESTION_COUNT_PRESETS,
   CONSENSUS_SYNC_PATCH_TIMEOUT_MS,
   decorateConsensusQuestionForMode,
@@ -542,7 +541,7 @@ export function scoreConsensusRound(session = getConsensusSession()) {
       precisionPlayers.push(entry.name);
     }
     if (Math.abs(distance - closestDist) < 1e-9) {
-      total += 10;
+      total += 15;
       closestPlayers.push(entry.name);
     }
 
@@ -552,11 +551,11 @@ export function scoreConsensusRound(session = getConsensusSession()) {
         : entry.value >= reference.sideThreshold
       : Math.abs(entry.value - medianExact) <= 5;
     if (intuitionMatch) {
-      total += 2;
+      total += 5;
       intuitionPlayers.push(entry.name);
     }
     if (modes.includes(entry.value)) {
-      total += 3;
+      total += 5;
       consensusPlayers.push(entry.name);
     }
 
@@ -605,16 +604,23 @@ export function getConsensusPodiumAwards(standings = buildConsensusStandings()) 
   return standings.map((player, index) => ({
     ...player,
     rank: index + 1,
-    lobbyBonus: CONSENSUS_LOBBY_PODIUM_POINTS[index] || 0,
+    lobbyBonus: 0,
   }));
 }
 
+/**
+ * Crédite le cumul `matchScores` à la soirée (une fois).
+ * Pas de bonus podium supplémentaire — les points de manches sont la seule source.
+ */
 export function applyConsensusLobbyPodium(session = getConsensusSession()) {
   const standings = getConsensusPodiumAwards(
     buildConsensusStandings(session.matchScores || {})
   );
   standings.forEach((player) => {
-    if (player.lobbyBonus > 0) addScore(player.name, player.lobbyBonus);
+    const pts = player.score;
+    if (typeof pts === "number" && Number.isFinite(pts) && pts > 0) {
+      addScore(player.name, pts);
+    }
   });
   return standings;
 }

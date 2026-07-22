@@ -7,7 +7,7 @@ export const DILEMMA_VOTE_TIMER_SEC = 10;
 export const DILEMMA_REVEAL_HOLD_SEC = 3;
 export const DILEMMA_SPLIT_THRESHOLD = 8;
 /** Points si le joueur a voté avec la majorité (victoire de manche). */
-export const DILEMMA_POINTS_MAJORITY_WIN = EVENING_POINTS.WIN;
+export const DILEMMA_POINTS_MAJORITY_WIN = EVENING_POINTS.BONUS;
 /** Points pour chaque joueur en cas d'égalité parfaite A/B. */
 export const DILEMMA_POINTS_TIE = 5;
 export const DILEMMA_ROUND_PRESETS = [5, 8, 12];

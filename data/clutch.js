@@ -25,7 +25,7 @@ export const CLUTCH_HIDE_MAX_MS = 3500;
 export const CLUTCH_HIDE_BEFORE_MS = 2000;
 
 /** Points attribués au podium de CHAQUE manche (top 1 / 2 / 3). */
-export const CLUTCH_PODIUM_POINTS = [25, 15, 10];
+export const CLUTCH_PODIUM_POINTS = [15, 10, 5];
 
 /** Tire une cible aléatoire (ms) dans la plage autorisée. */
 export function pickClutchTarget() {

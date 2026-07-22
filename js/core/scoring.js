@@ -5,7 +5,8 @@ import { WRONG_ANSWER_PODIUM_POINTS } from "../../data/wrongAnswer.js";
 import { computeWrongAnswerRoundAward } from "./wrongAnswerScoring.js";
 import { filterVoterVotes, computeRoundMetrics } from "./truthMeterSession.js";
 import { countDilemmaResults } from "./dilemmaSession.js";
-import { DILEMMA_POINTS_TIE } from "../../data/dilemma.js";
+import { DILEMMA_POINTS_MAJORITY_WIN, DILEMMA_POINTS_TIE } from "../../data/dilemma.js";
+import { HOT_TAKE_POINTS_TIE } from "../../data/hotTakes.js";
 import {
   TRUTH_METER_BLUFF_GAP,
   TRUTH_METER_CONSENSUS_GAP,
@@ -24,10 +25,24 @@ export function awardHotTakeVotes(votes, options) {
     counts,
     dissenters: [],
     majorityWinners: [],
+    tieWinners: [],
     pointsAwarded: false,
   };
 
-  if (!majority || tied) return summary;
+  if (tied) {
+    summary.pointsAwarded = true;
+    const deltas = {};
+    Object.entries(votes).forEach(([name, choice]) => {
+      if (!choice) return;
+      addScore(name, HOT_TAKE_POINTS_TIE);
+      summary.tieWinners.push(name);
+      deltas[name] = HOT_TAKE_POINTS_TIE;
+    });
+    summary.deltas = deltas;
+    return summary;
+  }
+
+  if (!majority) return summary;
 
   summary.pointsAwarded = true;
   const deltas = {};
@@ -80,7 +95,7 @@ export function awardSpeedVoteRound(votes, { multiplier = 1 } = {}) {
 }
 
 /**
- * Clutch : le podium de la manche reçoit 25 / 15 / 10. Les non-tappeurs : 0.
+ * Clutch : le podium de la manche reçoit 15 / 10 / 5. Les non-tappeurs : 0.
  * `ranking` doit déjà être trié (plus proche de la cible d'abord, égalité = tap le plus tôt).
  */
 export function awardClutchRound(ranking = [], { podiumPoints = CLUTCH_PODIUM_POINTS } = {}) {
@@ -100,7 +115,7 @@ export function awardClutchRound(ranking = [], { podiumPoints = CLUTCH_PODIUM_PO
 export { rankWrongAnswerResults } from "./wrongAnswerScoring.js";
 
 /**
- * Wrong Answer Only : podium de la manche 25 / 15 / 10 pour le top 3 (votes reçus).
+ * Wrong Answer Only : podium de la manche 15 / 10 / 5 pour le top 3 (votes reçus).
  * `answers` = { [name]: { text, at? } } ; `votes` = { [voter]: targetName }.
  */
 export function awardWrongAnswerRound(
@@ -192,7 +207,7 @@ export function awardDilemmaRound(votes) {
     tie: false,
     majorityWinners: [],
     tieWinners: [],
-    pointsAwarded: EVENING_POINTS.WIN,
+    pointsAwarded: DILEMMA_POINTS_MAJORITY_WIN,
     deltas: {},
   };
 
@@ -212,10 +227,10 @@ export function awardDilemmaRound(votes) {
   Object.entries(votes).forEach(([name, choice]) => {
     if (choice !== "A" && choice !== "B") return;
     if (choice === majority) {
-      addScore(name, EVENING_POINTS.WIN);
+      addScore(name, DILEMMA_POINTS_MAJORITY_WIN);
       bumpPlayerStat(name, "dilemmaMajorityPicks", 1);
       summary.majorityWinners.push(name);
-      summary.deltas[name] = EVENING_POINTS.WIN;
+      summary.deltas[name] = DILEMMA_POINTS_MAJORITY_WIN;
     } else {
       bumpPlayerStat(name, "dilemmaMinorityPicks", 1);
     }

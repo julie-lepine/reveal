@@ -232,6 +232,8 @@ export const HOT_TAKE_INTERMISSION_SEC = 5;
 export const HOT_TAKE_POINTS_MAJORITY = EVENING_POINTS.WIN;
 /** @deprecated */
 export const HOT_TAKE_POINTS_DISSENT = EVENING_POINTS.BONUS;
+/** Points pour chaque votant en cas d'égalité parfaite (pas de majorité). */
+export const HOT_TAKE_POINTS_TIE = 5;
 
 export const HOT_TAKE_FORBIDDEN_WORDS = [
   "nègre",

@@ -40,7 +40,7 @@ describe("rankWrongAnswerResults", () => {
 });
 
 describe("computeWrongAnswerRoundAward", () => {
-  it("attribue le podium 25 / 15 / 10", () => {
+  it("attribue le podium 15 / 10 / 5", () => {
     const answers = {
       Alice: { text: "a", at: 1 },
       Bob: { text: "b", at: 2 },
@@ -77,6 +77,6 @@ describe("computeWrongAnswerRoundAward", () => {
     };
     const votes = { Alice: "Alice", Bob: "Alice" };
     const { deltas } = computeWrongAnswerRoundAward(answers, votes);
-    assert.deepEqual(deltas, { Alice: 25 });
+    assert.deepEqual(deltas, { Alice: 15 });
   });
 });

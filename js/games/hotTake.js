@@ -2,6 +2,7 @@ import {
   HOT_TAKE_OPTIONS,
   HOT_TAKE_OPTION_COLORS,
   HOT_TAKE_TIMER_SEC,
+  HOT_TAKE_POINTS_TIE,
 } from "../../data/hotTakes.js";
 
 import {
@@ -212,10 +213,12 @@ export function mountHotTake(app) {
     if (!award?.pointsAwarded) return null;
     return {
       majority: award.majority,
+      tied: Boolean(award.tied),
       pointsAwarded: true,
       deltas: award.deltas || {},
       dissenters: award.dissenters || [],
       majorityWinners: award.majorityWinners || [],
+      tieWinners: award.tieWinners || [],
     };
   }
 
@@ -237,6 +240,9 @@ export function mountHotTake(app) {
   function hotTakeRevealSummaryHtml(voteResult, votesMap, { pointsAwarded = false } = {}) {
     if (!voteResult) return "";
     if (voteResult.tied || !voteResult.majority) {
+      if (pointsAwarded) {
+        return `<p class="hint">Égalité - <strong>+${HOT_TAKE_POINTS_TIE} pts</strong> pour tout le monde.</p>`;
+      }
       return `<p class="hint">Égalité - <strong>aucun point</strong> (pas de troupeau ni d'outsider).</p>`;
     }
 

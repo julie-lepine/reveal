@@ -144,7 +144,7 @@ function finalConsensusResultsHtml({ standings = [] } = {}) {
       <h3 class="section-title">Podium final</h3>
       ${
         winner
-          ? `<p class="hint consensus-final__summary">👑 <strong>${escapeHtml(winner.name)}</strong> remporte la partie et gagne <strong>+${winner.lobbyBonus} pts lobby</strong>.</p>`
+          ? `<p class="hint consensus-final__summary">👑 <strong>${escapeHtml(winner.name)}</strong> remporte la partie avec <strong>${formatConsensusScore(winner.score)} pts</strong>.</p>`
           : ""
       }
       <div class="trivia-results__podium">
@@ -156,13 +156,6 @@ function finalConsensusResultsHtml({ standings = [] } = {}) {
             <div class="avatar avatar--sm" style="background:${player.color}">${player.emoji}</div>
             <span class="player-name trivia-results__name">${escapeHtml(player.name)}</span>
             <span class="trivia-results__score">${formatConsensusScore(player.score)} pts</span>
-            <span class="trivia-results__bonus">${
-              player.rank === 1
-                ? `👑 +${player.lobbyBonus} pts lobby`
-                : player.lobbyBonus > 0
-                  ? `+${player.lobbyBonus} pts lobby`
-                  : "0 pt lobby"
-            }</span>
           </div>`
           )
           .join("")}

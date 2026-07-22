@@ -3,8 +3,8 @@ import { EVENING_POINTS } from "./eveningScoring.js";
 export const TRIVIA_RANDOM_THEME_ID = "random";
 export const TRIVIA_QUESTION_COUNT_PRESETS = [5, 10, 15, 20];
 export const TRIVIA_POINTS_CORRECT = EVENING_POINTS.WIN;
-export const TRIVIA_POINTS_FASTEST = EVENING_POINTS.WIN;
-export const TRIVIA_LOBBY_PODIUM_POINTS = [50, 25, 10];
+export const TRIVIA_POINTS_FASTEST = 5;
+export const TRIVIA_LOBBY_PODIUM_POINTS = [15, 10, 5];
 
 export const TRIVIA_THEMES = [
   { id: "cinema", label: "Cinéma" },

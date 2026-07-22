@@ -32,8 +32,9 @@ export const GAME_RULES = {
       "On révèle tout et on compare au consensus du groupe.",
     ],
     points: [
-      "Plus tu es proche du consensus du groupe, plus tu montes dans le classement du jeu.",
-      "À la fin, le podium reçoit un bonus de soirée : +50 / +25 / +10 pts.",
+      "Plus tu es proche du consensus du groupe, plus tu marques sur la manche.",
+      "Bonus : précision +5, plus proche +15, intuition +5, mode du groupe +5.",
+      "À la fin, le podium reprend le cumul des manches — sans bonus supplémentaire.",
     ],
     exemple:
       "« À quel point la pizza ananas est acceptable ? » Le groupe tourne autour de 35. Tu as mis 33 : tu es tout proche → top score sur la manche.",
@@ -51,7 +52,7 @@ export const GAME_RULES = {
     points: [
       "Si une majorité se dégage : le troupeau gagne +10 pts.",
       "Les outsiders (minorité) gagnent +15 pts - c'est eux qui cartonnent.",
-      "En cas d'égalité parfaite : personne ne marque.",
+      "En cas d'égalité parfaite : +5 pts pour tout le monde.",
     ],
     exemple:
       "5 votent « Valide », 1 « Criminel ». Les 5 du troupeau gagnent +10, l'outsider solo empoche +15.",
@@ -103,12 +104,12 @@ export const GAME_RULES = {
       "La manche se clôt quand tout le monde a tapé (ou peu après la cible).",
     ],
     points: [
-      "Podium de chaque manche : 1er +25, 2e +15, 3e +10.",
+      "Podium de chaque manche : 1er +15, 2e +10, 3e +5.",
       "Égalité d'écart : départage au tap enregistré le plus tôt.",
       "Pas de tap à temps : 0 pt pour la manche.",
     ],
     exemple:
-      "Cible 10 s. Léa tape à 9,8 s (écart 0,2), Tom à 10,5 s (écart 0,5). Léa finit 1re (+25), Tom 2e (+15).",
+      "Cible 10 s. Léa tape à 9,8 s (écart 0,2), Tom à 10,5 s (écart 0,5). Léa finit 1re (+15), Tom 2e (+10).",
   },
 
   wronganswer: {
@@ -123,12 +124,12 @@ export const GAME_RULES = {
       "On révèle les auteurs et le décompte des votes.",
     ],
     points: [
-      "Podium de chaque manche : 1re pire réponse +25, 2e +15, 3e +10.",
+      "Podium de chaque manche : 1re pire réponse +15, 2e +10, 3e +5.",
       "Classement par nombre de votes ; ex-aequo départagé par la réponse envoyée la plus tôt.",
       "Sans vote sur ta réponse : 0 pt pour la manche.",
     ],
     exemple:
-      "« Quel est le meilleur animal de compagnie ? » Ta « Girafe » finit 1re aux votes → +25 pts. Le 2e et le 3e de la manche prennent +15 et +10.",
+      "« Quel est le meilleur animal de compagnie ? » Ta « Girafe » finit 1re aux votes → +15 pts. Le 2e et le 3e de la manche prennent +10 et +5.",
   },
 
   dilemma: {
@@ -141,11 +142,11 @@ export const GAME_RULES = {
       "On révèle la répartition.",
     ],
     points: [
-      "Les joueurs du camp majoritaire : +10 pts.",
+      "Les joueurs du camp majoritaire : +15 pts.",
       "Égalité parfaite (50/50) : +5 pts pour chaque votant.",
     ],
     exemple:
-      "« Sans téléphone 1 an, ou sans musique 1 an ? » 4 choisissent « sans musique » → ces 4 gagnent +10.",
+      "« Sans téléphone 1 an, ou sans musique 1 an ? » 4 choisissent « sans musique » → ces 4 gagnent +15.",
   },
 
   truthmeter: {
@@ -195,11 +196,11 @@ export const GAME_RULES = {
       "On révèle la bonne réponse.",
     ],
     points: [
-      "Pendant la partie : bonne réponse +10, et le plus rapide à répondre juste +10 (classement du jeu).",
-      "À la fin, le podium reçoit un bonus de soirée : +50 / +25 / +10 pts.",
+      "Pendant la partie : bonne réponse +10, et le plus rapide à répondre juste +5 (classement du jeu).",
+      "À la fin, le podium reçoit un bonus de soirée : +15 / +10 / +5 pts.",
     ],
     exemple:
-      "« Capitale de l'Australie ? » Tu réponds Canberra en premier et juste → +10 (bonne) +10 (rapide).",
+      "« Capitale de l'Australie ? » Tu réponds Canberra en premier et juste → +10 (bonne) +5 (rapide).",
   },
 
   traitre: {
