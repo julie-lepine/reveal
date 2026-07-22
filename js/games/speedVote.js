@@ -31,6 +31,7 @@ import {
   isLobbyHost,
   canActAsHost,
   onGameSessionChange,
+  getActingHostUiRefreshToken,
   completeGameSession,
   stopGameSessionListenerOnPostGame,
   refreshGameSession,
@@ -389,6 +390,7 @@ export function mountSpeedVote(app) {
     const prevPhase = phase;
     const prevRound = roundIdx;
     const prevVotesJson = JSON.stringify(getSpeedVoteSession().votes || {});
+    const ahTokenBefore = getActingHostUiRefreshToken();
     syncFromSession();
     if (!currentQuestion && QUESTIONS[roundIdx]) {
       currentQuestion = QUESTIONS[roundIdx];
@@ -397,7 +399,9 @@ export function mountSpeedVote(app) {
       void goToReveal();
       return;
     }
-    if (shouldSkipFullRender(prevPhase, prevRound, prevVotesJson)) {
+    const actingHostUiRefresh =
+      getActingHostUiRefreshToken() !== ahTokenBefore;
+    if (shouldSkipFullRender(prevPhase, prevRound, prevVotesJson) && !actingHostUiRefresh) {
       if (phase === "voting") patchVotingChrome();
       if (phase === "reveal") {
         refreshGameScoresBox(app, {

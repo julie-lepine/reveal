@@ -1,7 +1,11 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { HOST_PRESENCE_STALE_MS } from "../js/config/lobbyLifecycle.js";
-import { isMemberPresent, resolveActingHostUserId } from "../js/core/hostPresence.js";
+import {
+  isMemberPresent,
+  resolveActingHostUserId,
+  didActingHostChange,
+} from "../js/core/hostPresence.js";
 
 const NOW = 1_000_000_000_000;
 const iso = (msAgo) => new Date(NOW - msAgo).toISOString();
@@ -67,5 +71,68 @@ describe("resolveActingHostUserId", () => {
 
   it("renvoie hostId si la liste de participants est vide", () => {
     assert.equal(resolveActingHostUserId([], "host", NOW), "host");
+  });
+
+  it("aligne le tri UUID sur ORDER BY user_id::text (cas QA Mozilla/Brave)", () => {
+    // Brave < Mozilla en ordre lexicographique uuid::text
+    const mozilla = "e3e8e71f-1d27-4c2c-a8df-b062c531155d";
+    const brave = "6c690ad3-7485-4352-bd78-7f27d756ba05";
+    const participants = [
+      { userId: "host", isHost: true, lastSeenAt: iso(HOST_PRESENCE_STALE_MS + 1) },
+      { userId: mozilla, lastSeenAt: iso(1_000) },
+      { userId: brave, lastSeenAt: iso(1_000) },
+    ];
+    assert.equal(resolveActingHostUserId(participants, "host", NOW), brave);
+  });
+});
+
+describe("didActingHostChange", () => {
+  it("false si l'hôte reste présent", () => {
+    const participants = [
+      { userId: "host", isHost: true, lastSeenAt: iso(5_000) },
+      { userId: "guest-a", lastSeenAt: iso(5_000) },
+    ];
+    assert.equal(
+      didActingHostChange(participants, "host", participants, "host", NOW),
+      false
+    );
+  });
+
+  it("true quand l'hôte passe de présent à stale", () => {
+    const prev = [
+      { userId: "host", isHost: true, lastSeenAt: iso(5_000) },
+      { userId: "guest-a", lastSeenAt: iso(5_000) },
+    ];
+    const next = [
+      { userId: "host", isHost: true, lastSeenAt: iso(HOST_PRESENCE_STALE_MS + 1) },
+      { userId: "guest-a", lastSeenAt: iso(5_000) },
+    ];
+    assert.equal(didActingHostChange(prev, "host", next, "host", NOW), true);
+  });
+
+  it("true quand l'hôte revient (acting host rebascule)", () => {
+    const prev = [
+      { userId: "host", isHost: true, lastSeenAt: iso(HOST_PRESENCE_STALE_MS + 1) },
+      { userId: "guest-a", lastSeenAt: iso(5_000) },
+    ];
+    const next = [
+      { userId: "host", isHost: true, lastSeenAt: iso(1_000) },
+      { userId: "guest-a", lastSeenAt: iso(5_000) },
+    ];
+    assert.equal(didActingHostChange(prev, "host", next, "host", NOW), true);
+  });
+
+  it("false si seul un heartbeat d'invité change sans bascule d'acting host", () => {
+    const prev = [
+      { userId: "host", isHost: true, lastSeenAt: iso(HOST_PRESENCE_STALE_MS + 1) },
+      { userId: "guest-a", lastSeenAt: iso(5_000) },
+      { userId: "guest-b", lastSeenAt: iso(5_000) },
+    ];
+    const next = [
+      { userId: "host", isHost: true, lastSeenAt: iso(HOST_PRESENCE_STALE_MS + 1) },
+      { userId: "guest-a", lastSeenAt: iso(1_000) },
+      { userId: "guest-b", lastSeenAt: iso(2_000) },
+    ];
+    assert.equal(didActingHostChange(prev, "host", next, "host", NOW), false);
   });
 });

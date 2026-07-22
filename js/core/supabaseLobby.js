@@ -15,7 +15,9 @@ import {
   refreshGameSession,
   getCachedGameSession,
   isActiveGameSessionScreen,
+  nudgeSessionListenersForActingHost,
 } from "./gameSync.js";
+import { didActingHostChange } from "./hostPresence.js";
 import { getCurrentScreen } from "./router.js";
 import { fetchGameSessionByLobby } from "./supabaseGame.js";
 import { scalePollIntervalMs } from "../config/syncConfig.js";
@@ -847,6 +849,14 @@ function applyLobbyToState(bundle, { persistGuestMembership = false } = {}) {
 
   rememberLobbyIdentity(bundle);
 
+  const prevLobby = getState().lobby;
+  const actingHostChanged = didActingHostChange(
+    prevLobby?.participants,
+    prevLobby?.hostId,
+    bundle.participants,
+    bundle.hostId
+  );
+
   saveStatePatch({
     lobby: {
       id: bundle.id,
@@ -876,6 +886,12 @@ function applyLobbyToState(bundle, { persistGuestMembership = false } = {}) {
   if (sig !== lastLobbyBundleSig) {
     lastLobbyBundleSig = sig;
     notifyLobbyBundleUpdated();
+  }
+
+  // ARCH-03 : les écrans jeu n'écoutent que onGameSessionChange — pousser un
+  // re-render quand l'acting host bascule (sinon contrôles host invisibles).
+  if (actingHostChanged) {
+    nudgeSessionListenersForActingHost();
   }
 }
 

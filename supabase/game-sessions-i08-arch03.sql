@@ -39,7 +39,8 @@ grant execute on function public.is_lobby_host(uuid) to authenticated;
  * - seuil 120 s
  * - last_seen_at IS NULL => membre considéré PRÉSENT (legacy / pas de faux acting)
  * - host présent => seul le host réel
- * - host absent => min(user_id) parmi membres éligibles présents
+ * - host absent => plus petit user_id::text parmi membres éligibles présents
+ *   (ORDER BY … LIMIT 1 — pas min(uuid), absent en PostgreSQL)
  */
 create or replace function public.is_acting_host(p_lobby_id uuid)
 returns boolean
@@ -87,15 +88,18 @@ begin
     return v_uid = v_host_id;
   end if;
 
-  -- Hôte absent : élection déterministe
-  select min(m.user_id) into v_elected
-  from public.lobby_members m
-  where m.lobby_id = p_lobby_id
-    and m.user_id is not null
+  -- Hôte absent : élection déterministe (compatible UUID)
+  select lm.user_id
+  into v_elected
+  from public.lobby_members lm
+  where lm.lobby_id = p_lobby_id
+    and lm.user_id is not null
     and (
-      m.last_seen_at is null
-      or m.last_seen_at >= (now() - v_stale)
-    );
+      lm.last_seen_at is null
+      or lm.last_seen_at >= (now() - v_stale)
+    )
+  order by lm.user_id::text asc
+  limit 1;
 
   return v_elected is not null and v_uid = v_elected;
 end;

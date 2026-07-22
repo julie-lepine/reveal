@@ -38,6 +38,7 @@ import {
   isGameSyncActive,
   canActAsHost,
   onGameSessionChange,
+  getActingHostUiRefreshToken,
   completeGameSession,
   hotTakeToRemote,
   stopGameSessionListenerOnPostGame,
@@ -774,6 +775,7 @@ export function mountHotTake(app) {
     const prevPhase = phase;
     const prevTake = takeIdx;
     const prevVotesJson = JSON.stringify(getHotTakeSession().votes || {});
+    const ahTokenBefore = getActingHostUiRefreshToken();
     syncFromSession();
 
     if (phase === "voting" && sessionInReveal()) {
@@ -791,7 +793,10 @@ export function mountHotTake(app) {
       return;
     }
 
-    if (phase === "reveal" && prevPhase === "reveal") {
+    const actingHostUiRefresh =
+      getActingHostUiRefreshToken() !== ahTokenBefore;
+
+    if (phase === "reveal" && prevPhase === "reveal" && !actingHostUiRefresh) {
       refreshGameScoresBox(app, {
         gameLabel: "Hot Take",
         title: "Cumul des scores",
@@ -800,7 +805,7 @@ export function mountHotTake(app) {
       return;
     }
 
-    if (shouldSkipFullRender(prevPhase, prevTake, prevVotesJson)) {
+    if (shouldSkipFullRender(prevPhase, prevTake, prevVotesJson) && !actingHostUiRefresh) {
       patchVotingChrome();
       return;
     }

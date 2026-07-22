@@ -28,6 +28,20 @@ export function resolveActingHostUserId(participants = [], hostId = null, now = 
   const present = participants
     .filter((p) => p.userId && isMemberPresent(p, now))
     .map((p) => p.userId)
-    .sort();
+    // Aligné SQL is_acting_host : ORDER BY user_id::text ASC
+    .sort((a, b) => String(a).localeCompare(String(b)));
   return present[0] || host?.userId || hostId;
+}
+
+/** True si l'identité acting host change entre deux snapshots lobby. */
+export function didActingHostChange(
+  prevParticipants,
+  prevHostId,
+  nextParticipants,
+  nextHostId,
+  now = Date.now()
+) {
+  const prev = resolveActingHostUserId(prevParticipants || [], prevHostId, now);
+  const next = resolveActingHostUserId(nextParticipants || [], nextHostId, now);
+  return prev !== next;
 }

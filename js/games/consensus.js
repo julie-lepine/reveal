@@ -25,6 +25,7 @@ import {
   isLobbyHost,
   canActAsHost,
   onGameSessionChange,
+  getActingHostUiRefreshToken,
   refreshGameSession,
   returnToGameSelect,
   startGameSession,
@@ -938,6 +939,7 @@ export function mountConsensus(app) {
 
     const prevPhase = phase;
     const prevQuestion = questionIdx;
+    const ahTokenBefore = getActingHostUiRefreshToken();
     const roundChanged = syncFromSession();
     if (!roundChanged) captureDraftFromDom();
     if (
@@ -953,7 +955,9 @@ export function mountConsensus(app) {
     if (phase === "reveal-pending") {
       scheduleRevealFromPending();
     }
-    if (shouldSkipFullRender(prevPhase, prevQuestion)) {
+    const actingHostUiRefresh =
+      getActingHostUiRefreshToken() !== ahTokenBefore;
+    if (shouldSkipFullRender(prevPhase, prevQuestion) && !actingHostUiRefresh) {
       if (phase === "question") patchQuestionPhaseChrome(consensus.getSession());
       return;
     }

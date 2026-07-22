@@ -18,6 +18,7 @@ import {
   isLobbyHost,
   canActAsHost,
   onGameSessionChange,
+  getActingHostUiRefreshToken,
   returnToGameSelect,
   startGameSession,
   stopGameSessionListenerOnPostGame,
@@ -579,6 +580,7 @@ export function mountTrivia(app) {
 
     const prevPhase = phase;
     const prevQuestion = questionIdx;
+    const ahTokenBefore = getActingHostUiRefreshToken();
     syncFromSession();
     if (prevQuestion !== questionIdx || prevPhase !== phase) {
       pendingAnswerIndex = null;
@@ -587,7 +589,9 @@ export function mountTrivia(app) {
     if (phase === "question" && canActAsHost() && trivia.allAnswersIn()) {
       void goToReveal();
     }
-    if (shouldSkipFullRender(prevPhase, prevQuestion)) {
+    const actingHostUiRefresh =
+      getActingHostUiRefreshToken() !== ahTokenBefore;
+    if (shouldSkipFullRender(prevPhase, prevQuestion) && !actingHostUiRefresh) {
       patchQuestionChrome();
       return;
     }

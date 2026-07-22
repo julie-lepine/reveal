@@ -34,6 +34,7 @@ import {
   isGameSyncActive,
   canActAsHost,
   onGameSessionChange,
+  getActingHostUiRefreshToken,
   completeGameSession,
   dilemmaToRemote,
   stopGameSessionListenerOnPostGame,
@@ -563,6 +564,7 @@ export function mountDilemma(app) {
     const prevPhase = phase;
     const prevRound = roundIdx;
     const prevVotesJson = JSON.stringify(getDilemmaSession().votes || {});
+    const ahTokenBefore = getActingHostUiRefreshToken();
     syncFromSession();
     if (!currentDilemma && ROUNDS[roundIdx]) currentDilemma = ROUNDS[roundIdx];
 
@@ -583,7 +585,9 @@ export function mountDilemma(app) {
       enterRevealUi();
       return;
     }
-    if (phase === "reveal" && prevPhase === "reveal") {
+    const actingHostUiRefresh =
+      getActingHostUiRefreshToken() !== ahTokenBefore;
+    if (phase === "reveal" && prevPhase === "reveal" && !actingHostUiRefresh) {
       refreshGameScoresBox(app, {
         gameLabel: "Dilemma",
         title: "Cumul des scores",
@@ -591,7 +595,7 @@ export function mountDilemma(app) {
       });
       return;
     }
-    if (shouldSkipFullRender(prevPhase, prevRound, prevVotesJson)) {
+    if (shouldSkipFullRender(prevPhase, prevRound, prevVotesJson) && !actingHostUiRefresh) {
       patchVotingChrome();
       return;
     }

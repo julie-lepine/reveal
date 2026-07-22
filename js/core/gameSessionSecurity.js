@@ -26,7 +26,8 @@ export function resolveActingHostServerLike(members, hostId, nowMs = Date.now())
   const present = members
     .filter((m) => m.userId && isPresent(m))
     .map((m) => m.userId)
-    .sort();
+    // Aligné SQL : ORDER BY user_id::text ASC LIMIT 1
+    .sort((a, b) => String(a).localeCompare(String(b)));
   return present[0] || hostId;
 }
 

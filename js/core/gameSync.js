@@ -745,6 +745,26 @@ export function onGameSessionChange(fn) {
   return () => listeners.delete(fn);
 }
 
+/**
+ * Token incrémenté quand l'acting host change (présence lobby).
+ * Les écrans jeu qui skippent le full-render sur votes inchangés doivent
+ * forcer un render si ce token a bougé (sinon boutons host invisibles).
+ */
+let actingHostUiRefreshToken = 0;
+
+export function getActingHostUiRefreshToken() {
+  return actingHostUiRefreshToken;
+}
+
+/**
+ * Re-pousse la session cached aux listeners d'écran jeu.
+ * Appelé quand le lobby détecte un changement d'acting host (hôte stale / retour).
+ */
+export function nudgeSessionListenersForActingHost() {
+  actingHostUiRefreshToken += 1;
+  notify(cachedRow);
+}
+
 let notifying = false;
 let pendingNotifyRow = null;
 let hasPendingNotify = false;

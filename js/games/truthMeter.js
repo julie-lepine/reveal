@@ -46,6 +46,7 @@ import {
   isGameSyncActive,
   canActAsHost,
   onGameSessionChange,
+  getActingHostUiRefreshToken,
   stopGameSessionListenerOnPostGame,
 } from "../core/gameSync.js";
 
@@ -957,6 +958,7 @@ export function mountTruthMeter(app) {
     const prevPhase = phase;
     const prevRound = roundIdx;
     const prevVotesJson = JSON.stringify(getTruthMeterSession().votes || {});
+    const ahTokenBefore = getActingHostUiRefreshToken();
     captureAuthorDraftFromDom();
     captureVoteDraftFromDom();
     syncFromSession();
@@ -978,7 +980,9 @@ export function mountTruthMeter(app) {
       return;
     }
 
-    if (shouldSkipFullRender(prevPhase, prevRound, prevVotesJson)) {
+    const actingHostUiRefresh =
+      getActingHostUiRefreshToken() !== ahTokenBefore;
+    if (shouldSkipFullRender(prevPhase, prevRound, prevVotesJson) && !actingHostUiRefresh) {
       if (phase === "reveal" || phase === "voting") {
         refreshGameScoresBox(app, {
           gameLabel: "TruthMeter",

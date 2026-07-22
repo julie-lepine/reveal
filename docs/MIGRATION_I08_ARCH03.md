@@ -50,7 +50,7 @@ with check (public.is_lobby_member(lobby_id));
 | `submit_truth_meter_affirmation` | auteur du round | affirmation + phase display |
 | `apply_acting_host_play` | host réel **ou** `is_acting_host` | merge play whitelist / set_screen borné |
 | `complete_game_session_as_actor` | host réel **ou** acting | between-games + session menu ; `host_id` = vrai hôte ; pas de scores client |
-| `is_acting_host(lobby)` | lecture | élection serveur 120 s |
+| `is_acting_host(lobby)` | lecture | élection serveur 120 s ; `ORDER BY user_id::text` (pas `min(uuid)`) |
 
 ## Droits
 
@@ -59,6 +59,14 @@ with check (public.is_lobby_member(lobby_id));
 | Host réel | Oui | `update` / `upsert` / `delete` existants |
 | Acting host | **Non** | `apply_acting_host_play`, `complete_game_session_as_actor` |
 | Joueur | **Non** | contribute / customs / truth meter affirmation |
+
+### Hotfix ARCH-03 (QA — erreur `42883 function min(uuid) does not exist`)
+
+Si `game-sessions-i08-arch03.sql` a déjà été appliqué avec l’ancien `min(uuid)` :
+
+→ exécuter uniquement **`supabase/game-sessions-arch03-fix-is-acting-host.sql`**
+
+Ne pas retoucher la policy host-only.
 
 ## `last_seen_at IS NULL`
 

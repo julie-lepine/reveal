@@ -9,6 +9,7 @@ import {
   isGameSyncActive,
   canActAsHost,
   onGameSessionChange,
+  getActingHostUiRefreshToken,
   commitGuessLiePlay,
   getActiveMemberUserIds,
   nameForUserId,
@@ -453,8 +454,11 @@ export function mountGuessLie(app) {
     const prevIdx = roundIdx;
     const prevPhase = phase;
     const prevVotes = JSON.stringify(getGuessLieSession().votes || {});
+    const ahTokenBefore = getActingHostUiRefreshToken();
     syncFromGl();
     const votesChanged = JSON.stringify(getGuessLieSession().votes || {}) !== prevVotes;
+    const actingHostUiRefresh =
+      getActingHostUiRefreshToken() !== ahTokenBefore;
     const advanced =
       mp && (roundIdx !== prevIdx || (phase === "voting" && prevPhase === "reveal"));
     if (phase === "reveal" && prevPhase === "voting") {
@@ -470,7 +474,7 @@ export function mountGuessLie(app) {
       return;
     }
     void tryAdvanceToReveal();
-    if (shouldSkipFullRender(prevIdx, prevPhase) && !votesChanged) {
+    if (shouldSkipFullRender(prevIdx, prevPhase) && !votesChanged && !actingHostUiRefresh) {
       if (phase === "voting") patchVotingChrome();
       if (phase === "reveal") {
         refreshGameScoresBox(app, {
