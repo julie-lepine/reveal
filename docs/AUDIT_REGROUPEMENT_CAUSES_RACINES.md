@@ -295,17 +295,17 @@ Clôture QA :
 
 **Mécanisme :** rename, reset soirée, leave game ne touchent pas tous les champs.
 
-Revue code (2026-07-22) : **P-02** et **I-03** déjà couverts ailleurs ; **I-09** partiel ; **I-06 / ARCH-09** toujours ouverts au remount lobby.
+Revue code (2026-07-22) : **I-06 / ARCH-09** corrigés (mount non destructif) ; **P-02** et **I-03** déjà couverts ailleurs ; **I-09** partiel.
 
 | ID | Problème | Fichier / fonction | Scénario | Impact | Correction proposée | Statut |
 |----|----------|-------------------|----------|--------|---------------------|--------|
 | **I-09** / **SYN-06** | `renameLocalPlayer` incomplet | `state.js` — `renameLocalPlayer()` | Rename mid-soirée | Votes/scores orphelins | Migrer tous `*Game` + `gameScores` | 🟡 Partiel : scores/stats + HotTake/Dilemma/Consensus/GuessLie submissions/TierNight recaps OK ; manque `gameScores` + plusieurs `*Game` |
-| **I-06** / **P-01** | Reset ready à chaque mount lobby | `screens/lobby.js`, `lobby.js` — `resetAllParticipantsReady()` | Retour lobby avant soirée | Prêt local perdu | Reset seulement création lobby / action hôte | À traiter (confirmé : reset à chaque mount si soirée non démarrée) |
+| **I-06** / **P-01** | Reset ready à chaque mount lobby | `screens/lobby.js`, `lobby.js` — `resetAllParticipantsReady()` | Retour lobby avant soirée | Prêt local perdu | Reset seulement création lobby / action hôte | ✅ Corrigé (2026-07-22) : mount → `reconcileLobbyReadyOnMount()` (non destructif) |
 | **P-02** | Exit invité blobs non cleared | `exitGame.js` | Quit partie | Stale prep state | `resetLocalGamePrepState()` via `returnToGameSelect()` | ✅ / 🔁 Doublon M-06a–c (clôturé QA 2026-07-22) |
 | **SYN-15** | `applyRemotePlayerStats` double merge | `playerStatsSync.js` | Noms stale remote | State bloat | Merge participants only | À traiter |
 | **SYN-16** | `applyRemoteLobbyScores` idem | `gameSync.js` | Anciens membres | Scores fantômes | Filtrer par participants actifs | À traiter |
 | **I-03** | (aussi cause 3) reset scoring module | `state.js` | Reset scores | mauvais bucket | `activeScoringGameId = null` dans reset | ✅ Corrigé + test (voir cause 3) |
-| **ARCH-09** | `resetAllParticipantsReady` seulement local en Supabase | `lobby.js` | Remount lobby | Ready DB peut différer | Sync ready depuis serveur au mount | À traiter (couplé I-06) |
+| **ARCH-09** | `resetAllParticipantsReady` seulement local en Supabase | `lobby.js`, `lobbyReadyMount.js` | Remount lobby | Ready DB peut différer | Sync ready depuis serveur au mount | ✅ Léger (2026-07-22) : refresh bundle au mount, pas de wipe DB |
 | **ARCH-10** | Leave lobby : `clearCachedGameSession` timing | `lobby.js` — `leaveLobby()` | Leave mid-game | Cache stale bref | Ordre stop sync → clear → navigate | 🟡 Partiel : sync stoppé d’abord ; cache clear seulement après `await leaveLobbySupabase()` |
 
 **Symptômes utilisateur :** état incohérent après rename/quit/remount.
@@ -405,7 +405,7 @@ La matrice ci-dessous liste les points encore ouverts ou résiduels **après rev
 | 5 Routing/timing | — | T-02 | T-01, M-08, ARCH-04 | ARCH-05 (🟡 mitigé SYN-28) |
 | 6 Async écrans | — | — | ARCH-06 | SYN-05 (dormant) |
 | 7 Erreurs silencieuses | — | — | M-10, T-05, M-14b, M-04b | SYN-26, ARCH-07, ARCH-08 |
-| 8 Reset incomplet | — | I-06 | I-09 (🟡), SYN-15, SYN-16 | ARCH-09, ARCH-10 (🟡) |
+| 8 Reset incomplet | — | — | I-09 (🟡), SYN-15, SYN-16 | ARCH-10 (🟡) |
 | 9 Monolithe/dup | — | — | SYN-12, SYN-23–24 | ARCH-11–16, SYN-21 (🟡), SYN-22 (🟡), ARCH-17 (🟡), SYN-27 |
 | 10 Dette | — | — | — | ARCH-18–20, SYN-19, L-dead-2 |
 | 11 UX | — | M-12 | ARCH-22 | L-04 (🟡) |
@@ -418,18 +418,18 @@ La matrice ci-dessous liste les points encore ouverts ou résiduels **après rev
 
 | # | ID(s) | Cause | Pourquoi |
 |---|-------|-------|----------|
-| 1 | **I-06 / P-01** (+ ARCH-09) | 8 | Remount lobby efface les prêts — UX invité concrète, code confirmé |
-| 2 | **I-08** | 4 | Sécurité : tout membre peut UPDATE `game_sessions` |
-| 3 | **ARCH-03** | 4 | Policy acting host manquante (metadata I-01 OK) ; traiter avec/après I-08 |
-| 4 | **T-01** + **M-04 / T-02** | 5 | Join / Realtime : route possible avant données complètes |
-| 5 | **M-08 / SYN-13** | 5 | Redirects in-mount (remplace SYN-25 comme vrai résidu Guess Lie / préps) |
-| 6 | **M-10** + **T-05** + **SYN-26** | 7 | Sync silencieuse / optimistic sans rollback |
-| 7 | **I-09 / SYN-06** | 8 | Rename mid-soirée incomplet — corruption d’état partielle |
-| 8 | **M-12** | 11 | Lien `#join=` sans auto-join |
-| 9 | **ARCH-04** | 5 | Re-entry prep bloquée par suppress après sortie volontaire |
-| 10 | **M-05b / SYN-12** | 9 | Double `startMultiplayerSync` au mount lobby (rapide) ; **alt.** M-14a si priorité TierNight |
+| 1 | **I-08** | 4 | Sécurité : tout membre peut UPDATE `game_sessions` |
+| 2 | **ARCH-03** | 4 | Policy acting host manquante (metadata I-01 OK) ; traiter avec/après I-08 |
+| 3 | **T-01** + **M-04 / T-02** | 5 | Join / Realtime : route possible avant données complètes |
+| 4 | **M-08 / SYN-13** | 5 | Redirects in-mount (résidu Guess Lie / préps) |
+| 5 | **M-10** + **T-05** + **SYN-26** | 7 | Sync silencieuse / optimistic sans rollback |
+| 6 | **I-09 / SYN-06** | 8 | Rename mid-soirée incomplet — corruption d’état partielle |
+| 7 | **M-12** | 11 | Lien `#join=` sans auto-join |
+| 8 | **ARCH-04** | 5 | Re-entry prep bloquée par suppress après sortie volontaire |
+| 9 | **M-05b / SYN-12** | 9 | Double `startMultiplayerSync` au mount lobby |
+| 10 | **M-14a / SYN-14** | 3 | KO QA TierNight — suspendu ; remonter si priorité produit |
 
-**Retirés du Top 10 :** SYN-25, M-07 (✅ corrigés) ; SYN-22–24 (dette, après bugs). **M-14a** reste ouvert / suspendu hors Top sauf priorité produit explicite.
+**Retirés du Top 10 :** I-06 / P-01 + ARCH-09 (✅ 2026-07-22) ; SYN-25, M-07 (✅) ; SYN-22–24 (dette).
 
 ### Clôtures récentes (2026-07-11)
 
@@ -482,6 +482,7 @@ La matrice ci-dessous liste les points encore ouverts ou résiduels **après rev
 
 Comparaison tickets encore ouverts ↔ code actuel (aucune fermeture automatique hors constat) :
 
+- **I-06 / P-01** + **ARCH-09** — ✅ Corrigé : mount lobby non destructif (`reconcileLobbyReadyOnMount`) ; refresh bundle serveur sans wipe ; tests `lobbyReadyMount`
 - **SYN-25** — ✅ Corrigé : `guessLieMenu.js` listener + cleanup ; early redirect suivi via **M-08**
 - **M-07** — ✅ confirmé corrigé (déjà noté) ; retiré du Top 10 / matrice ouverte
 - **L-02** — ✅ Turnstile rejoin skip si session anon live
@@ -489,7 +490,7 @@ Comparaison tickets encore ouverts ↔ code actuel (aucune fermeture automatique
 - **ARCH-21** — 🔄 Requalifié (règle produit, copy OK)
 - **P-02** (cause 8) / **I-03** — ✅ / 🔁 déjà couverts (M-06 / cause 3)
 - **F-01** — 🔁 voir ARCH-01 ; **SYN-21** cause 10 — 🔁 voir ARCH-14
-- Confirmés **toujours ouverts** : I-06, I-08, T-01, T-02, M-08, M-10, T-05, SYN-26, M-14a, M-12, ARCH-04, SYN-12, etc. (voir matrice)
+- Confirmés **toujours ouverts** : I-08, T-01, T-02, M-08, M-10, T-05, SYN-26, M-14a, M-12, ARCH-04, SYN-12, etc. (voir matrice)
 
 ### Résidus connus (hors scope des patchs 2026-07-22)
 

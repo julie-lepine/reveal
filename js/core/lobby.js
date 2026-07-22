@@ -70,6 +70,10 @@ import {
   refreshEveningScoresFromSession,
 } from "./gameSync.js";
 import { isGuessLieGameActive, tryEnterGuessLiePlayFromWait } from "./guessLieSession.js";
+import {
+  mapParticipantsReadyFalse,
+  shouldReconcileLobbyReadyFromServer,
+} from "./lobbyReadyMount.js";
 import { MAX_PLAYERS } from "../config/lobbyLifecycle.js";
 
 const GUEST_RECOVERY_CAPTCHA_KEY = "reveal-guest-recovery-captcha-required";
@@ -265,7 +269,7 @@ export async function setLobbyWaiting() {
     return;
   }
   const lobby = { ...getLobby(), status: "waiting", gameId: null };
-  const participants = (lobby.participants || []).map((p) => ({ ...p, ready: false }));
+  const participants = mapParticipantsReadyFalse(lobby.participants);
   const next = { ...lobby, participants };
   saveStatePatch({ lobby: next });
   if (next.code) publishOpenLobby(next.code, next);
@@ -280,10 +284,31 @@ export async function resetAllParticipantsReady() {
     return;
   }
 
-  const participants = lobby.participants.map((p) => ({ ...p, ready: false }));
+  const participants = mapParticipantsReadyFalse(lobby.participants);
   const next = { ...lobby, participants };
   saveStatePatch({ lobby: next });
   if (next.code) publishOpenLobby(next.code, next);
+}
+
+/**
+ * Mount / remount du lobby : non destructif pour `ready`.
+ * Sous Supabase, réhydrate depuis le bundle serveur (ARCH-09 léger) sans écraser
+ * le serveur avec un ready local par défaut. Ne wipe jamais les prêts.
+ */
+export async function reconcileLobbyReadyOnMount() {
+  if (
+    !shouldReconcileLobbyReadyFromServer({
+      supabaseConfigured: isSupabaseConfigured(),
+      lobbyId: getLobby()?.id,
+    })
+  ) {
+    return;
+  }
+  try {
+    await refreshLobbyFromSupabase();
+  } catch (e) {
+    console.warn("REVEAL lobby ready reconcile:", e?.message || e);
+  }
 }
 
 export function hasActiveLobby() {

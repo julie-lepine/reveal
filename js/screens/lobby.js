@@ -10,7 +10,7 @@ import {
   MAX_PLAYERS,
   createLobby,
   hasActiveLobby,
-  resetAllParticipantsReady,
+  reconcileLobbyReadyOnMount,
   goToGameSelect,
   allLobbyMembersReady,
   isLobbyEveningStarted,
@@ -447,7 +447,7 @@ export function mountLobby(app) {
     }
 
     if (!isLobbyEveningStarted()) {
-      await resetAllParticipantsReady();
+      await reconcileLobbyReadyOnMount();
     }
     renderFull();
     if (isGameSyncActive()) {
