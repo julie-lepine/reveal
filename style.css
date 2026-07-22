@@ -491,7 +491,8 @@ body.has-top-ad .back{
 }
 
 /* Titre d’écran : ne pas chevaucher le bouton retour */
-.page:has(.back) .container > .label-upper:first-child{
+.page:has(.back) .container > .label-upper:first-child,
+.page:has(.back) .container > .game-select-header:first-child{
   padding-left:calc(var(--touch-min) + 12px);
   min-height:var(--touch-min);
   display:flex;
@@ -2333,6 +2334,55 @@ select.field-input option{
   margin:-4px 0 12px;
   font-size:14px;
   font-weight:600;
+}
+
+.game-select-header{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  margin-bottom:18px;
+}
+
+.game-select-header .label-upper{
+  margin-bottom:0;
+  flex:1;
+  min-width:0;
+}
+
+.game-select-code-chip{
+  flex-shrink:0;
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  min-height:36px;
+  padding:6px 10px 6px 12px;
+  border-radius:12px;
+  border:1px solid rgba(255,255,255,.12);
+  background:rgba(255,255,255,.06);
+  color:inherit;
+  cursor:pointer;
+  -webkit-tap-highlight-color:transparent;
+}
+
+.game-select-code-chip:active{
+  transform:scale(.97);
+}
+
+.game-select-code-chip__code{
+  font-size:14px;
+  font-weight:900;
+  letter-spacing:3px;
+  background:linear-gradient(135deg,#FF6B6B,#FF3CAC);
+  -webkit-background-clip:text;
+  background-clip:text;
+  -webkit-text-fill-color:transparent;
+}
+
+.game-select-code-chip__icon{
+  font-size:14px;
+  color:rgba(255,255,255,.65);
+  line-height:1;
 }
 
 .game-select-party-settings,

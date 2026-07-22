@@ -847,6 +847,11 @@ function applyLobbyToState(bundle, { persistGuestMembership = false } = {}) {
 
   rememberLobbyIdentity(bundle);
 
+  const prevLobby = getState().lobby;
+  const prevGameId = prevLobby?.gameId ?? null;
+  const nextGameId = bundle.gameId ?? null;
+  const lobbyGameChanged = prevGameId !== nextGameId;
+
   saveStatePatch({
     lobby: {
       id: bundle.id,
@@ -865,7 +870,22 @@ function applyLobbyToState(bundle, { persistGuestMembership = false } = {}) {
       sessionId: bundle.code,
     },
   });
-  if (persistGuestMembership || getState().user?.isGuest) {
+
+  if (lobbyGameChanged) {
+    const cached = getCachedGameSession();
+    // TEMP : départager Cas A (session hottake-prep) vs Cas B (lobby hottake / session menu).
+    console.log("[SESSION-ROUTE]", {
+      source: "lobby_game_changed",
+      patch: "hub-prep-v4",
+      currentScreen: getCurrentScreen(),
+      lobbyGameId: nextGameId,
+      lobbyStatus: bundle.status ?? null,
+      prevLobbyGameId: prevGameId,
+      cachedSessionGameId: cached?.game_id ?? null,
+      cachedSessionScreen: cached?.screen ?? null,
+      cachedSessionUpdatedAt: cached?.updated_at ?? null,
+    });
+  }  if (persistGuestMembership || getState().user?.isGuest) {
     const membership = membershipFromBundle(bundle);
     if (membership) saveGuestMembership(membership);
   }
@@ -1438,6 +1458,19 @@ export function subscribeLobbyRealtime(onUpdate) {
            * on l'applique directement au lieu de refaire un aller-retour DB. Ça
            * réduit la latence et évite que 6 clients refetchent en même temps.
            */
+          console.log("[SESSION-ROUTE]", {
+            source: "remote_session_received",
+            patch: "hub-prep-v4",
+            via: "realtime/game_sessions",
+            eventType: payload.eventType,
+            gameId: payload.new?.game_id ?? null,
+            declaredScreen: payload.new?.screen ?? null,
+            updatedAt: payload.new?.updated_at ?? null,
+            lobbyGameId: getState().lobby?.gameId ?? null,
+            lobbyStatus: getState().lobby?.status ?? null,
+            currentScreen: getCurrentScreen(),
+            hasState: payload.new?.state !== undefined,
+          });
           console.log("[SESSION-ROUTE]", {
             t: Date.now(),
             source: "supabaseLobby/realtime/game_sessions",

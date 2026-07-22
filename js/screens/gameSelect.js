@@ -23,7 +23,7 @@ import {
 import { getCurrentScreen } from "../core/router.js";
 import { isSupabaseConfigured } from "../core/supabaseClient.js";
 import { startLobbyPresenceSync, onLobbyBundleUpdated } from "../core/supabaseLobby.js";
-import { hasActiveLobby, openPartySettings } from "../core/lobby.js";
+import { getLobby, hasActiveLobby, openPartySettings } from "../core/lobby.js";
 import { getLastGame, getState } from "../core/state.js";
 // import { getFilRougeSession } from "../core/filRougeSession.js";
 import { bindFeedbackPrompt, feedbackPromptCardHtml } from "../core/feedbackUi.js";
@@ -209,6 +209,7 @@ function gameSelectRenderSnapshot() {
   return JSON.stringify({
     n: participants.length,
     hostId,
+    code: getLobby()?.code || "",
     recap: recap.hasActivity,
     ht: recap.hotTakes,
     sv: recap.speedVotes,
@@ -219,6 +220,22 @@ function gameSelectRenderSnapshot() {
     lastGame: getLastGame()?.gameId ?? null,
     resume,
   });
+}
+
+function gameSelectHeaderHtml() {
+  const code = getLobby()?.code || "";
+  const codeChip = code
+    ? `<button type="button" class="game-select-code-chip" id="game-select-copy-code" data-code="${escapeHtml(code)}" aria-label="Copier le code ${escapeHtml(code)}">
+        <span class="game-select-code-chip__code">${escapeHtml(code)}</span>
+        <span class="game-select-code-chip__icon" aria-hidden="true">⧉</span>
+      </button>`
+    : "";
+
+  return `
+    <div class="game-select-header">
+      <p class="label-upper label-upper--gold">🎮 La soirée</p>
+      ${codeChip}
+    </div>`;
 }
 
 function partySettingsButtonHtml() {
@@ -261,6 +278,25 @@ export function mountGameSelect(app) {
     if (e.target.closest("#game-resume-banner-stay")) {
       e.preventDefault();
       stayOnGameResumeTarget();
+      return;
+    }
+
+    const copyBtn = e.target.closest("#game-select-copy-code");
+    if (copyBtn) {
+      e.preventDefault();
+      const code = copyBtn.getAttribute("data-code") || getLobby()?.code || "";
+      const icon = copyBtn.querySelector(".game-select-code-chip__icon");
+      void (async () => {
+        try {
+          await navigator.clipboard.writeText(code);
+          if (icon) icon.textContent = "✓";
+        } catch {
+          if (icon) icon.textContent = "!";
+        }
+        setTimeout(() => {
+          if (icon) icon.textContent = "⧉";
+        }, 1200);
+      })();
       return;
     }
 
@@ -338,7 +374,7 @@ export function mountGameSelect(app) {
       backTarget: "home",
       content: `
       ${resumeBanner}
-      <p class="label-upper label-upper--gold">🎮 La soirée</p>
+      ${gameSelectHeaderHtml()}
       <h2 class="screen-title">Choisir un jeu</h2>
       <p class="game-intro">Sélectionne une activité pour le lobby.</p>
       <button type="button" class="btn-link game-select-profile" data-nav="settings">Profil & paramètres</button>

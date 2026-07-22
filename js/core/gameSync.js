@@ -3299,6 +3299,17 @@ export async function refreshGameSession() {
   const lobbyId = getState().lobby?.id;
   if (!lobbyId) return null;
   const row = await fetchGameSessionByLobby(lobbyId);
+  console.log("[SESSION-ROUTE]", {
+    source: "remote_session_received",
+    patch: "hub-prep-v4",
+    via: "refreshGameSession",
+    gameId: row?.game_id ?? null,
+    declaredScreen: row?.screen ?? null,
+    updatedAt: row?.updated_at ?? null,
+    lobbyGameId: getState().lobby?.gameId ?? null,
+    lobbyStatus: getState().lobby?.status ?? null,
+    currentScreen: getCurrentScreen(),
+  });
   if (row) applyRemoteSession(row);
   else {
     // Session supprimée (hôte qui quitte une prépa / partie). On passe par
@@ -3964,6 +3975,16 @@ export async function startGameSession(gameId, screen, state) {
       ...filRougePreserve,
       ...(state || {}),
     },
+  });
+  console.log("[SESSION-ROUTE]", {
+    source: "host_startGameSession_upsert_result",
+    patch: "hub-prep-v4",
+    requestedGameId: gameId,
+    requestedScreen: screen,
+    returnedGameId: row?.game_id ?? null,
+    returnedScreen: row?.screen ?? null,
+    returnedUpdatedAt: row?.updated_at ?? null,
+    lobbyGameId: getState().lobby?.gameId ?? null,
   });
   applyRemoteSession(row);
   routeToSessionScreen(screen, { force: true });
