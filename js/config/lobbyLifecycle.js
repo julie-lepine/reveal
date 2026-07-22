@@ -3,6 +3,12 @@
  * Le join est refusé côté serveur (find_lobby_by_code) au-delà de JOIN_MAX_AGE.
  */
 
+/** Plafond de joueurs par lobby (UI + gate join client). */
+export const MAX_PLAYERS = 8;
+
+/** Message renvoyé quand le lobby est plein. */
+export const LOBBY_FULL_MSG = "Nombre de joueurs max atteint pour ce lobby";
+
 /** Refus de rejoindre si last_activity > 24 h (RPC find_lobby_by_code). */
 export const LOBBY_JOIN_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 

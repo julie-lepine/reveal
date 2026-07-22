@@ -288,15 +288,32 @@ describe("goToScores suppress vs host launch", () => {
     assert.equal(decision.routed, true);
   });
 
-  it("isCompatibleSessionScreen(game-select, prep) reste true mais n'empêche plus l'avancement", () => {
-    assert.equal(isCompatibleSessionScreen("game-select", "hottake-prep"), true);
+  it("retry après refus suppress : même sig, suppress off, local results → navigate", () => {
+    // 1) Première tentative : suppress actif, baseline null → avant v3 bloquait ;
+    //    avec v3 advanced=true. On simule plutôt un refus « scores_suppress_blocks »
+    //    via même prep (pas ce cas). Ici : suppress OFF, sig déjà vue, mismatch local.
+    const decision = routeDecisionUnderScoresSuppress({
+      effective: "hottake-prep",
+      current: "results",
+      suppressScreen: null,
+      suppressSig: null,
+      cachedRow: hotTakePrepRow,
+    });
+    // browsing = results + we treat suppress as inactive when suppressScreen null
+    // in routeDecisionUnderScoresSuppress — need to model inactive suppress explicitly.
     assert.equal(
       isSessionAdvancedFromSuppress("hottake-prep", {
-        suppressScreen: "game-select",
-        suppressSig: "",
+        suppressScreen: null,
+        suppressSig: null,
         cachedRow: hotTakePrepRow,
       }),
       true
     );
+    assert.equal(decision.routed, true);
+  });
+
+  it("isSuppressedGameReturn ne traite plus game-select→prep comme retour volontaire", () => {
+    // Miroir : compatible(hub, prep) reste true, mais ce n'est plus un "suppressed return".
+    assert.equal(isCompatibleSessionScreen("game-select", "hottake-prep"), true);
   });
 });

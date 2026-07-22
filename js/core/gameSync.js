@@ -194,9 +194,12 @@ let sessionRouteSeq = 0;
 
 console.log("[SESSION-ROUTE]", {
   source: "gameSync-module-load",
-  patch: "hub-prep-v3",
+  patch: "hub-prep-v4",
   t: Date.now(),
 });
+
+/** Dernière raison renvoyée par shouldApplySessionRoute (pour logs imbriqués). */
+let lastSessionRouteDecisionReason = "";
 
 function sessionRouteCacheSnapshot(row = cachedRow) {
   if (!row) return null;
@@ -327,7 +330,19 @@ function isSuppressedGameReturn(targetScreen) {
     return false;
   }
   if (targetScreen === suppressSessionScreen) return true;
-  return isCompatibleSessionScreen(suppressSessionScreen, targetScreen);
+  /**
+   * Ne pas réutiliser isCompatibleSessionScreen(hub, prep) : cette API signifie
+   * « ne pas ramener de la prep vers le hub », pas « la prep est le même retour
+   * volontaire ». Limiter aux familles prep/jeu réellement compatibles.
+   */
+  if (
+    shouldForceGuestFollowSession(suppressSessionScreen) &&
+    shouldForceGuestFollowSession(targetScreen) &&
+    isCompatibleSessionScreen(suppressSessionScreen, targetScreen)
+  ) {
+    return true;
+  }
+  return false;
 }
 
 /** L'hôte a lancé un autre jeu / écran : l'invité doit suivre malgré suppress. */
@@ -387,7 +402,7 @@ function isSessionAdvancedFromSuppress(targetScreen) {
 
   console.log("[SESSION-ROUTE]", {
     source: "isSessionAdvancedFromSuppress",
-    patch: "hub-prep-v3",
+    patch: "hub-prep-v4",
     targetScreen,
     suppressScreen: suppressSessionScreen,
     suppressSig: suppressSessionSig || null,
@@ -434,8 +449,10 @@ function isBrowsingScoresWithRouteSuppress(screen = getCurrentScreen()) {
 function shouldApplySessionRoute(row, { fromScreen = null, debugSource = null } = {}) {
   const source = debugSource || "shouldApplySessionRoute";
   const screen = getEffectiveSessionScreen(row);
-  const routeLog = (allowed, reason, extra = {}) =>
-    logSessionRouteDecision(source, row, allowed, reason, { effective: screen, ...extra });
+  const routeLog = (allowed, reason, extra = {}) => {
+    lastSessionRouteDecisionReason = reason;
+    return logSessionRouteDecision(source, row, allowed, reason, { effective: screen, ...extra });
+  };
 
   if (!screen) return routeLog(false, "no_effective_screen");
   if (screen === "tiernight-end" && !canRouteToTierNightEnd(row)) {
@@ -499,6 +516,8 @@ function shouldApplySessionRoute(row, { fromScreen = null, debugSource = null } 
   }
 
   // Paramétrage ou partie en cours : suivi obligatoire (ignore suppressSessionRoute).
+  // Retry autorisé même si la session distante (sig) a déjà été observée : l'écran
+  // local peut encore être results après un premier refus (ex. suppress).
   if (shouldForceGuestFollowSession(screen)) {
     if (isBrowsingScoresWithRouteSuppress(current)) {
       return routeLog(
@@ -506,7 +525,10 @@ function shouldApplySessionRoute(row, { fromScreen = null, debugSource = null } 
         "force_follow_under_scores_suppress"
       );
     }
-    return routeLog(true, "force_follow_prep_or_play");
+    return routeLog(true, "force_follow_prep_or_play", {
+      localScreenMismatch: current !== screen,
+      sigMatchesLast: sessionSignature(row) === lastSessionSig,
+    });
   }
 
   if (routingSuppressed && isSuppressedGameReturn(screen)) {
@@ -3226,6 +3248,25 @@ export function applyRemoteSession(row) {
       notified: false,
       cacheAfter: sessionRouteCacheSnapshot(row),
     });
+    // Session déjà observée ≠ navigation déjà réussie : si l'écran local n'est
+    // toujours pas la cible force-follow (ex. premier refus sous suppress), on retente.
+    const effective = getEffectiveSessionScreen(row);
+    const current = getCurrentScreen();
+    if (
+      effective &&
+      current !== effective &&
+      shouldForceGuestFollowSession(effective) &&
+      shouldApplySessionRoute(row, {
+        fromScreen: prevScreen,
+        debugSource: "applyRemoteSession/sig_unchanged_retry",
+      })
+    ) {
+      clearSuppressIfFollowingHost(effective, current);
+      handleSessionRoute(row, {
+        fromScreen: prevScreen,
+        debugSource: "applyRemoteSession/sig_unchanged_handle",
+      });
+    }
     return;
   }
 
@@ -3599,7 +3640,11 @@ export async function routeToActiveGameIfNeeded(cachedRowOnly = null, { force = 
     return routeLog(true, "compatible_session_screen_no_nav");
   }
   if (!force && !shouldApplySessionRoute(row, { debugSource: `${source}/shouldApply` })) {
-    return routeLog(false, "should_apply_session_route_false");
+    return routeLog(false, "should_apply_session_route_false", {
+      nestedReason: lastSessionRouteDecisionReason,
+      localScreenMismatch: current !== screen,
+      sigMatchesLast: row ? sessionSignature(row) === lastSessionSig : null,
+    });
   }
   if (
     isSessionAdvancedFromSuppress(screen) ||
@@ -3618,6 +3663,9 @@ export function handleSessionRoute(row, { fromScreen = null, debugSource = null 
     logSessionRouteDecision(source, row, false, "should_apply_session_route_false", {
       effective: screen,
       fromScreen,
+      nestedReason: lastSessionRouteDecisionReason,
+      localScreenMismatch: getCurrentScreen() !== screen,
+      sigMatchesLast: row ? sessionSignature(row) === lastSessionSig : null,
     });
     return;
   }

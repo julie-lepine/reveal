@@ -21,8 +21,10 @@ import { fetchGameSessionByLobby } from "./supabaseGame.js";
 import { scalePollIntervalMs } from "../config/syncConfig.js";
 import {
   LOBBY_EXPIRED_JOIN_MSG,
+  LOBBY_FULL_MSG,
   LOBBY_HEARTBEAT_MIN_MS,
   HOST_PRESENCE_STALE_MS,
+  MAX_PLAYERS,
   isLobbyJoinTooOld,
 } from "../config/lobbyLifecycle.js";
 import { startLobbyHeartbeat } from "./lobbyHeartbeat.js";
@@ -1061,8 +1063,8 @@ export async function joinLobbySupabase(codeInput) {
     });
     if (countErr) return { ok: false, error: countErr.message };
 
-    if ((memberCount ?? 0) >= 10) {
-      return { ok: false, error: "Le lobby est complet (10 joueurs max)." };
+    if ((memberCount ?? 0) >= MAX_PLAYERS) {
+      return { ok: false, error: LOBBY_FULL_MSG };
     }
 
     const displayName = getLocalDisplayName();
@@ -1272,6 +1274,25 @@ export async function transferLobbyHostSupabase(newHostUserId) {
   return { ok: true };
 }
 
+/** Hôte : retire un membre du lobby (RPC kick_lobby_member). */
+export async function kickLobbyMemberSupabase(targetUserId) {
+  const lobbyId = getState().lobby?.id;
+  const userId = getSupabaseUserId();
+  if (!lobbyId || !userId || !targetUserId) {
+    return { ok: false, error: "Lobby ou joueur invalide." };
+  }
+
+  const { error } = await supabase.rpc("kick_lobby_member", {
+    p_lobby_id: lobbyId,
+    p_target_user_id: targetUserId,
+  });
+
+  if (error) return { ok: false, error: error.message };
+
+  await refreshLobbyFromSupabase();
+  return { ok: true };
+}
+
 export async function setLobbyStatusSupabase(status, gameId = null) {
   const lobbyId = getState().lobby?.id;
   if (!lobbyId) return;
@@ -1318,6 +1339,18 @@ export function subscribeLobbyRealtime(onUpdate) {
       "postgres_changes",
       { event: "*", schema: "public", table: "lobby_members", filter: `lobby_id=eq.${lobbyId}` },
       (payload) => {
+        const removedUid = payload?.eventType === "DELETE" ? payload.old?.user_id : null;
+        const localUid = getSupabaseUserId();
+        if (removedUid && localUid && removedUid === localUid) {
+          // Laisser un tick au DELETE lobby (fermeture hôte) pour éviter un faux « kické ».
+          setTimeout(() => {
+            if (!getState().inLobby) return;
+            void import("./lobby.js").then(({ handleKickedFromLobby }) =>
+              handleKickedFromLobby()
+            );
+          }, 180);
+          return;
+        }
         if (!isMeaningfulMemberChange(payload)) return;
         scheduleLobbyRefresh();
       }

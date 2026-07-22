@@ -37,8 +37,15 @@ import {
   peekServerLobbyForUser,
   getRememberedLobbyCode,
   transferLobbyHostSupabase,
+  kickLobbyMemberSupabase,
 } from "./supabaseLobby.js";
-import { showAppAlert, showAppConfirm, showTransferHostDialog } from "./dialog.js";
+import {
+  showAppAlert,
+  showAppConfirm,
+  showTransferHostDialog,
+  showPartySettingsDialog,
+  showLobbyPlayersManageDialog,
+} from "./dialog.js";
 import {
   stopMultiplayerSync,
   endGameSession,
@@ -63,11 +70,12 @@ import {
   refreshEveningScoresFromSession,
 } from "./gameSync.js";
 import { isGuessLieGameActive, tryEnterGuessLiePlayFromWait } from "./guessLieSession.js";
+import { MAX_PLAYERS } from "../config/lobbyLifecycle.js";
 
-const MAX_PLAYERS = 10;
 const GUEST_RECOVERY_CAPTCHA_KEY = "reveal-guest-recovery-captcha-required";
 
 let lobbyDissolveHandling = false;
+let lobbyKickHandling = false;
 
 function setGuestRecoveryCaptchaRequired(required) {
   try {
@@ -807,7 +815,7 @@ async function clearGuestSessionAfterFailedJoin() {
 
 /** Invité : l'hôte a fermé le lobby (realtime ou refresh). */
 export async function handleLobbyDissolvedForGuest() {
-  if (lobbyDissolveHandling) return;
+  if (lobbyDissolveHandling || lobbyKickHandling) return;
   if (!getState().inLobby) return;
   if (isLocalLobbyHost()) return;
 
@@ -822,6 +830,29 @@ export async function handleLobbyDissolvedForGuest() {
   await showAppAlert("L'hôte a quitté le lobby.", { title: "Lobby fermé", icon: "👋" });
 
   lobbyDissolveHandling = false;
+  navigate("home", { reset: true });
+}
+
+/** Invité : retiré du lobby par l'hôte (kick). */
+export async function handleKickedFromLobby() {
+  if (lobbyKickHandling || lobbyDissolveHandling) return;
+  if (!getState().inLobby) return;
+  if (isLocalLobbyHost()) return;
+
+  lobbyKickHandling = true;
+  stopMultiplayerSync();
+  stopLobbyPresenceSync();
+
+  const wasGuest = isGuest();
+  await signOutAnonGuestIfNeeded(wasGuest);
+  applyLeaveLobbyLocal({ wasGuest, navigateAway: false });
+
+  await showAppAlert("Tu as été retiré du lobby par l'hôte.", {
+    title: "Retiré du lobby",
+    icon: "👋",
+  });
+
+  lobbyKickHandling = false;
   navigate("home", { reset: true });
 }
 
@@ -962,6 +993,93 @@ export async function transferLobbyHost() {
   );
 
   return { ok: true };
+}
+
+/** Lobby d'attente ou hub entre deux jeux (pas mid-manche). */
+export function canManageLobbyRoster() {
+  const status = getLobbyStatus();
+  const gameId = getLobbyGameId();
+  return status === "waiting" || !gameId || gameId === "menu";
+}
+
+/** Hôte MP : retire un joueur du lobby (libère une place). */
+export async function kickLobbyMember(targetUserId, { confirmName = "" } = {}) {
+  if (!isSupabaseConfigured() || !getLobby()?.id) {
+    return { ok: false, error: "Multijoueur en ligne requis." };
+  }
+  if (!isLocalLobbyHost()) {
+    return { ok: false, error: "Seul l'hôte peut retirer un joueur." };
+  }
+  if (!canManageLobbyRoster()) {
+    return {
+      ok: false,
+      error: "Tu ne peux retirer un joueur qu'au lobby ou entre deux jeux.",
+    };
+  }
+  if (!targetUserId) {
+    return { ok: false, error: "Joueur invalide." };
+  }
+
+  const target =
+    getLobbyParticipants().find((p) => p.userId === targetUserId) || null;
+  const label = confirmName || target?.name || "ce joueur";
+
+  const confirmed = await showAppConfirm(
+    `Retirer ${label} du lobby ? La place sera libérée.`,
+    {
+      title: "Retirer du lobby",
+      confirmLabel: "Retirer",
+      cancelLabel: "Annuler",
+      icon: "🚪",
+    }
+  );
+  if (!confirmed) return { ok: false, cancelled: true };
+
+  const res = await kickLobbyMemberSupabase(targetUserId);
+  if (!res.ok) {
+    await showAppAlert(res.error || "Impossible de retirer ce joueur.", {
+      title: "Erreur",
+      icon: "⚠️",
+    });
+    return res;
+  }
+
+  return { ok: true };
+}
+
+/**
+ * Menu hôte sur le hub jeux : transfert d'hôte + gestion des joueurs.
+ * @returns {Promise<{ ok: boolean, cancelled?: boolean, action?: string }>}
+ */
+export async function openPartySettings() {
+  if (!isSupabaseConfigured() || !getLobby()?.id) {
+    return { ok: false, error: "Multijoueur en ligne requis." };
+  }
+  if (!isLocalLobbyHost()) {
+    return { ok: false, error: "Réservé à l'hôte." };
+  }
+
+  const others = getLobbyParticipants().filter((p) => !p.isLocal && p.userId);
+  const choice = await showPartySettingsDialog({
+    canTransferHost: others.length > 0,
+  });
+  if (!choice?.ok) return { ok: false, cancelled: true };
+
+  if (choice.action === "transfer") {
+    return transferLobbyHost();
+  }
+
+  if (choice.action === "players") {
+    await showLobbyPlayersManageDialog({
+      getParticipants: () => getLobbyParticipants(),
+      maxPlayers: MAX_PLAYERS,
+      canKick: canManageLobbyRoster(),
+      onKick: (userId, name) => kickLobbyMember(userId, { confirmName: name }),
+    });
+    return { ok: true, action: "players" };
+  }
+
+  return { ok: false, cancelled: true };
 }
 
 export async function setLocalReady(ready) {
