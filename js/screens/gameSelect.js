@@ -386,7 +386,9 @@ export function mountGameSelect(app) {
       ${gameSelectHeaderHtml()}
       <h2 class="screen-title">Choisir un jeu</h2>
       <p class="game-intro">Sélectionne une activité pour le lobby.</p>
-      <button type="button" class="btn-link game-select-profile" data-nav="settings">Profil & paramètres</button>
+      <div class="game-select-profile-row">
+        <button type="button" class="game-select-profile" data-nav="settings">Profil & paramètres</button>
+      </div>
       ${partySettingsButtonHtml()}
 
       ${eveningRecapHtml(recap)}

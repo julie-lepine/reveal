@@ -2337,11 +2337,31 @@ select.field-input option{
   margin-bottom:12px;
 }
 
+.game-select-profile-row{
+  display:flex;
+  align-items:center;
+  margin:0 0 12px;
+}
+
 .game-select-profile{
-  display:inline-block;
-  margin:-4px 0 12px;
-  font-size:14px;
+  display:inline-flex;
+  align-items:center;
+  min-height:36px;
+  padding:6px 12px;
+  border-radius:12px;
+  border:1px solid rgba(255,255,255,.12);
+  background:rgba(255,255,255,.06);
+  color:rgba(255,255,255,.7);
+  font-size:13px;
   font-weight:600;
+  font-family:inherit;
+  cursor:pointer;
+  -webkit-tap-highlight-color:transparent;
+  text-decoration:none;
+}
+
+.game-select-profile:active{
+  transform:scale(.97);
 }
 
 .game-select-header{
