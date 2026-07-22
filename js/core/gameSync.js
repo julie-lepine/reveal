@@ -496,7 +496,11 @@ function shouldApplySessionRoute(row, { fromScreen = null, debugSource = null } 
       mustFollow: extra.mustFollow ?? guestMustFollowSession(screen, current),
       ...extra,
     });
-    return logSessionRouteDecision(source, row, allowed, reason, { effective: screen, ...extra });
+    // Contrat : shouldApplySessionRoute retourne un booléen (allowed).
+    // Ne pas renvoyer logSessionRouteDecision (undefined) — handleSessionRoute
+    // et applyRemoteSession testent if (!decision) / if (routeAllowed).
+    logSessionRouteDecision(source, row, allowed, reason, { effective: screen, ...extra });
+    return allowed;
   };
 
   if (!screen) return routeLog(false, "no_effective_screen");
@@ -3810,7 +3814,21 @@ export function handleSessionRoute(row, { fromScreen = null, debugSource = null 
     gameId: row?.game_id ?? null,
     fromScreen,
   });
-  if (!shouldApplySessionRoute(row, { fromScreen, debugSource: `${source}/shouldApply` })) {
+  const decision = shouldApplySessionRoute(row, {
+    fromScreen,
+    debugSource: `${source}/shouldApply`,
+  });
+  console.log("[SESSION-ROUTE]", {
+    source: "shouldApplySessionRoute_raw_result",
+    patch: "hub-prep-v5",
+    traceId: activeSessionRouteTraceId,
+    decision,
+    decisionType: typeof decision,
+    decisionAllowed: decision?.allowed,
+    decisionReason: decision?.reason,
+    lastReason: lastSessionRouteDecisionReason,
+  });
+  if (!decision) {
     traceSessionRoute(source, {
       phase: "exit",
       targetScreen: screen,
