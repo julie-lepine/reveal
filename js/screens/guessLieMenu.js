@@ -15,6 +15,7 @@ export function mountGuessLieMenu(app) {
   let disposed = false;
   const ready = hasLocalSubmission();
   const lobbyFull = allLobbySubmitted();
+  const canLaunch = !isGameSyncActive() || isLobbyHost();
 
   app.innerHTML = pageShell({
     backTarget: "back",
@@ -46,11 +47,13 @@ export function mountGuessLieMenu(app) {
       }
 
       ${
-        ready && lobbyFull
+        ready && lobbyFull && canLaunch
           ? `<button type="button" class="btn btn-primary btn--spaced" id="btn-play">
           Lancer la partie →
         </button>`
-          : ""
+          : ready && lobbyFull
+            ? `<button type="button" class="btn btn-secondary btn--spaced" disabled>En attente que l'hôte lance la partie</button>`
+            : ""
       }
 
       ${

@@ -63,7 +63,7 @@ export function mountGuessLieLobbyWait(app) {
           allReady && isLobbyHost()
             ? `<button type="button" class="btn btn-primary btn--spaced" id="btn-start">Lancer la partie →</button>`
             : allReady
-              ? `<button type="button" class="btn btn-secondary btn--spaced" disabled>En attente de l'hôte…</button>`
+              ? `<button type="button" class="btn btn-secondary btn--spaced" disabled>En attente que l'hôte lance la partie</button>`
               : `<button type="button" class="btn btn-secondary btn--spaced" disabled>En attente…</button>`
         }
         <button type="button" class="btn btn-secondary btn--spaced" data-nav="game-select">Retour</button>

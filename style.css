@@ -2340,6 +2340,7 @@ select.field-input option{
 .game-select-profile-row{
   display:flex;
   align-items:center;
+  justify-content:center;
   margin:0 0 12px;
 }
 
