@@ -192,6 +192,12 @@ let suppressSessionSig = "";
 let sessionRouteLogDepth = 0;
 let sessionRouteSeq = 0;
 
+console.log("[SESSION-ROUTE]", {
+  source: "gameSync-module-load",
+  patch: "hub-prep-v2",
+  t: Date.now(),
+});
+
 function sessionRouteCacheSnapshot(row = cachedRow) {
   if (!row) return null;
   return {
@@ -326,40 +332,72 @@ function isSuppressedGameReturn(targetScreen) {
 
 /** L'hôte a lancé un autre jeu / écran : l'invité doit suivre malgré suppress. */
 function isSessionAdvancedFromSuppress(targetScreen) {
-  if (!suppressSessionScreen || !targetScreen) return false;
+  const currentSig = sessionSignature(getCachedGameSession());
+  const forceFollow = shouldForceGuestFollowSession(targetScreen);
+  const suppressFromHubOrPost =
+    suppressSessionScreen === "game-select" ||
+    suppressSessionScreen === "lobby" ||
+    POST_GAME_SCREENS.has(suppressSessionScreen);
+  const sameScreen = Boolean(
+    suppressSessionScreen && targetScreen && targetScreen === suppressSessionScreen
+  );
+  const sameSig = Boolean(
+    suppressSessionSig && currentSig && currentSig === suppressSessionSig
+  );
+  const compatible = Boolean(
+    suppressSessionScreen &&
+      targetScreen &&
+      isCompatibleSessionScreen(suppressSessionScreen, targetScreen)
+  );
 
-  // Signature de session différente de celle mémorisée à l'ouverture des scores
-  // (relance, autre jeu, nouvel état de prep…).
-  if (suppressSessionSig && sessionSignature(getCachedGameSession()) !== suppressSessionSig) {
-    return true;
+  let result = false;
+  let branch = "default_false";
+
+  if (!suppressSessionScreen || !targetScreen) {
+    result = false;
+    branch = "missing_suppress_or_target";
+  } else if (suppressSessionSig && currentSig !== suppressSessionSig) {
+    // Signature différente de celle mémorisée à l'ouverture des scores.
+    result = true;
+    branch = "sig_changed";
+  } else if (sameScreen) {
+    result = false;
+    branch = "same_suppress_screen";
+  } else if (forceFollow && (!suppressSessionSig || suppressFromHubOrPost)) {
+    /**
+     * Prep / partie depuis hub / post-partie, ou sans sig mémorisée (aucune session
+     * active au clic). Ne pas utiliser isCompatibleSessionScreen(hub, prep).
+     */
+    result = true;
+    branch = "force_follow_from_hub_or_empty_sig";
+  } else if (forceFollow && shouldForceGuestFollowSession(suppressSessionScreen)) {
+    result = true;
+    branch = "force_follow_from_other_active";
+  } else if (compatible) {
+    result = false;
+    branch = "compatible_not_advanced";
+  } else {
+    result = true;
+    branch = "fallback_advanced";
   }
 
-  if (targetScreen === suppressSessionScreen) return false;
+  console.log("[SESSION-ROUTE]", {
+    source: "isSessionAdvancedFromSuppress",
+    patch: "hub-prep-v2",
+    targetScreen,
+    suppressScreen: suppressSessionScreen,
+    suppressSig: suppressSessionSig || null,
+    currentSig: currentSig || null,
+    forceFollow,
+    suppressFromHubOrPost,
+    sameScreen,
+    sameSig,
+    compatible,
+    branch,
+    result,
+  });
 
-  /**
-   * Prep / partie active : avancement réel depuis une consultation de scores ouverte
-   * hors session active (hub / post-partie), ou sans signature mémorisée (aucune
-   * session active au clic). Ne pas passer par isCompatibleSessionScreen(hub, prep) :
-   * cette API signifie « ne pas ramener de la prep vers le hub », pas « la prep
-   * n'est pas un lancement depuis le hub ».
-   */
-  if (shouldForceGuestFollowSession(targetScreen)) {
-    if (
-      !suppressSessionSig ||
-      suppressSessionScreen === "game-select" ||
-      suppressSessionScreen === "lobby" ||
-      POST_GAME_SCREENS.has(suppressSessionScreen)
-    ) {
-      return true;
-    }
-    // Suppress pris sur une autre prep/partie : l'hôte a changé d'écran actif.
-    if (shouldForceGuestFollowSession(suppressSessionScreen)) {
-      return true;
-    }
-  }
-
-  if (isCompatibleSessionScreen(suppressSessionScreen, targetScreen)) return false;
-  return true;
+  return result;
 }
 
 /** L'invité sur le menu jeux / lobby / post-partie suit l'hôte qui lance prep ou partie. */
@@ -408,16 +446,29 @@ function shouldApplySessionRoute(row, { fromScreen = null, debugSource = null } 
   }
 
   if (isBrowsingScoresWithRouteSuppress(current)) {
-    if (isSessionAdvancedFromSuppress(screen)) {
-      return routeLog(true, "scores_suppress_bypass_session_advanced");
+    const advancedFromSuppress = isSessionAdvancedFromSuppress(screen);
+    if (advancedFromSuppress) {
+      return routeLog(true, "scores_suppress_bypass_session_advanced", {
+        advancedFromSuppress,
+      });
     }
     if (POST_GAME_SCREENS.has(screen)) {
-      return routeLog(false, "scores_suppress_stay_post_game");
+      return routeLog(false, "scores_suppress_stay_post_game", {
+        advancedFromSuppress,
+      });
     }
     if (shouldForceGuestFollowSession(screen)) {
-      return routeLog(false, "scores_suppress_blocks_force_follow");
+      return routeLog(false, "scores_suppress_blocks_force_follow", {
+        advancedFromSuppress,
+        suppressScreen: suppressSessionScreen,
+        suppressSig: suppressSessionSig || null,
+      });
     }
-    return routeLog(false, "scores_suppress_blocks");
+    return routeLog(false, "scores_suppress_blocks", {
+      advancedFromSuppress,
+      suppressScreen: suppressSessionScreen,
+      suppressSig: suppressSessionSig || null,
+    });
   }
 
   // Hub / post-partie : les invités restent libres (home, settings, classement…).
@@ -3528,7 +3579,11 @@ export async function routeToActiveGameIfNeeded(cachedRowOnly = null, { force = 
     isBrowsingScoresWithRouteSuppress(current) &&
     !isSessionAdvancedFromSuppress(screen)
   ) {
-    return routeLog(false, "scores_suppress_blocks");
+    return routeLog(false, "scores_suppress_blocks", {
+      advancedFromSuppress: false,
+      suppressScreen: suppressSessionScreen,
+      suppressSig: suppressSessionSig || null,
+    });
   }
   if (!force && isCompatibleSessionScreen(screen, current)) {
     return routeLog(true, "compatible_session_screen_no_nav");
