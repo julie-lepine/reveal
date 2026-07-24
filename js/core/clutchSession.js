@@ -11,8 +11,9 @@ import {
   allMembersReady,
   clutchToRemote,
   requireLocalParticipantUid,
+  patchGameState,
 } from "./gameSync.js";
-import { patchGameStateWithFeedback } from "./patchGameStateFeedback.js";
+import { formatSyncErrorMessage } from "./authErrors.js";
 import { launchGameWithSync, commitHostGamePlay, commitPrepReadyToggle } from "./mpLaunch.js";
 import { computeClutchTapApply } from "./clutchTapCommit.js";
 
@@ -134,7 +135,7 @@ export function allClutchReady() {
   return getActivePlayerNames().every((n) => session.ready[n]);
 }
 
-/** MP : envoie uniquement le tap local ({ ms, at }). Premier tap conservé. Rollback si sync échoue. */
+/** MP : envoie uniquement le tap local ({ ms, at }). Premier tap conservé. Rollback avant feedback. */
 export async function commitClutchTap(ms) {
   const localName = getLocalDisplayName();
   const session = getClutchSession();
@@ -150,11 +151,22 @@ export async function commitClutchTap(ms) {
   if (!isGameSyncActive()) return resolved;
   const uid = requireLocalParticipantUid();
   try {
-    await patchGameStateWithFeedback({ clutch: { taps: { [uid]: resolved } } });
+    await patchGameState({ clutch: { taps: { [uid]: resolved } } });
     return resolved;
   } catch (err) {
+    // Rollback AVANT l’alerte pour que syncFromSession / grace ne voient plus le tap fantôme.
     const current = getClutchSession();
     saveStatePatch({ clutchGame: { ...current, taps: previousTaps } });
+    console.warn("REVEAL clutch tap:", err);
+    try {
+      const { showAppAlert } = await import("./dialog.js");
+      await showAppAlert(formatSyncErrorMessage(err?.message), {
+        title: "Connexion",
+        icon: "📡",
+      });
+    } catch {
+      /* ignore UI */
+    }
     throw err;
   }
 }

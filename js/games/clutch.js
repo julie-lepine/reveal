@@ -15,6 +15,7 @@ import {
   rankClutchResults,
   startClutchRound,
 } from "../core/clutchSession.js";
+import { resolveClutchTapCommitFailureUi } from "../core/clutchTapCommit.js";
 import { awardClutchRound } from "../core/scoring.js";
 import { applyMatchScoreDeltas, gameCumulativeScoresHtml, refreshGameScoresBox } from "../core/gameScores.js";
 import { getLocalDisplayName, recordClutchPlayed, setLastGame } from "../core/state.js";
@@ -64,6 +65,7 @@ export function mountClutch(app) {
   let countdownEndsAt = null;
   let activeKey = null;
   let localWindowClosed = false;
+  let tapCommitInFlight = false;
   let graceTimer = null;
   let clockRaf = null;
   let hideBeforeMs = null;
@@ -253,7 +255,12 @@ export function mountClutch(app) {
     if (s.phase) phase = s.phase;
     if (s.targetMs != null) targetMs = s.targetMs;
     if (s.hideBeforeMs != null) hideBeforeMs = s.hideBeforeMs;
-    taps = { ...(s.taps || {}) };
+    const sessionTaps = { ...(s.taps || {}) };
+    // Pendant un commit en vol, conserver le tap optimiste local (render() resync sinon).
+    if (tapCommitInFlight && taps[localName]?.ms != null && sessionTaps[localName]?.ms == null) {
+      sessionTaps[localName] = taps[localName];
+    }
+    taps = sessionTaps;
     lastRound = s.lastRound ?? lastRound;
     takeScored = Boolean(s.roundScored);
   }
@@ -375,7 +382,7 @@ export function mountClutch(app) {
             : "C'est noté !"
           : "Tape pile au moment où le chrono atteint la cible 💥";
 
-    const btnDisabled = tapped || localWindowClosed || counting;
+    const btnDisabled = tapped || localWindowClosed || counting || tapCommitInFlight;
     const btnClasses = [
       "clutch-tap",
       tapped ? "clutch-tap--tapped" : "",
@@ -489,11 +496,13 @@ export function mountClutch(app) {
         localStart == null ||
         myTapMs() != null ||
         localWindowClosed ||
+        tapCommitInFlight ||
         isEveningGameplayPaused()
       ) {
         return;
       }
       const ms = Math.round(performance.now() - localStart);
+      tapCommitInFlight = true;
       taps = { ...taps, [localName]: { ms, at: Date.now() } };
       vibrate(35);
       render();
@@ -506,7 +515,13 @@ export function mountClutch(app) {
           if (allClutchTapsIn() && canActAsHost()) void goToReveal();
         })
         .catch(() => {
-          // Feedback déjà affiché par patchGameStateWithFeedback ; rollback session → UI.
+          // Session déjà rollback dans commitClutchTap ; rouvre la fenêtre de tap.
+          const ui = resolveClutchTapCommitFailureUi();
+          tapCommitInFlight = ui.tapCommitInFlight;
+          localWindowClosed = ui.localWindowClosed;
+        })
+        .finally(() => {
+          tapCommitInFlight = false;
           syncFromSession();
           render();
         });
