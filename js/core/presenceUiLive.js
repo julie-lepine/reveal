@@ -66,6 +66,8 @@ export function shouldNudgeClaimHubUi(prevEligible, nextEligible) {
 
 /**
  * Décision notif acting host (sans DOM).
+ * `fromElectionNudge` : appelé uniquement depuis nudge d'élection — ne pas laisser
+ * un seed bundle (wasActing déjà true) avaler la transition.
  * ack uniquement après show (appelant).
  */
 export function decideActingHostNotice({
@@ -75,20 +77,55 @@ export function decideActingHostNotice({
   token,
   ackedTokens,
   inActivePlaySession,
+  fromElectionNudge = false,
+  dialogOpen = false,
 }) {
   if (!isActing || isRealHost) {
-    return { show: false, pending: false, nextWasActing: isActing };
+    return {
+      show: false,
+      pending: false,
+      nextWasActing: isActing,
+      deferReason: !isActing ? "not-acting" : "real-host",
+    };
   }
   if (!Number.isFinite(token) || ackedTokens.has(token)) {
-    return { show: false, pending: false, nextWasActing: isActing };
+    return {
+      show: false,
+      pending: false,
+      nextWasActing: isActing,
+      deferReason: "token-acked-or-invalid",
+    };
   }
-  // Transition vers acting : pas déjà acting avant ce nudge d'élection
-  const became = isActing && wasActing !== true;
+  // Élection nudge : toujours candidat si acting guest (même si seed a mis wasActing=true).
+  const became = fromElectionNudge || wasActing !== true;
   if (!became) {
-    return { show: false, pending: false, nextWasActing: isActing };
+    return {
+      show: false,
+      pending: false,
+      nextWasActing: isActing,
+      deferReason: "no-transition",
+    };
   }
   if (!inActivePlaySession) {
-    return { show: false, pending: true, nextWasActing: isActing };
+    return {
+      show: false,
+      pending: true,
+      nextWasActing: isActing,
+      deferReason: "not-active-session-screen",
+    };
   }
-  return { show: true, pending: false, nextWasActing: isActing };
+  if (dialogOpen) {
+    return {
+      show: false,
+      pending: true,
+      nextWasActing: isActing,
+      deferReason: "dialog-open",
+    };
+  }
+  return {
+    show: true,
+    pending: false,
+    nextWasActing: isActing,
+    deferReason: null,
+  };
 }

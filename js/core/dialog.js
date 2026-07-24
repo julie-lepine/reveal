@@ -12,6 +12,11 @@ import { getState } from "./state.js";
 
 let openDialog = null;
 
+/** True si une modale app est actuellement montée. */
+export function isAppDialogOpen() {
+  return Boolean(openDialog);
+}
+
 function removeDialog(root, resolve) {
   root.classList.remove("app-dialog--in");
   root.classList.add("app-dialog--out");

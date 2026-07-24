@@ -2,6 +2,7 @@ import { isSupabaseConfigured } from "./supabaseClient.js";
 import { getSupabaseUserId } from "./supabaseAuth.js";
 import { resolveActingHostUserId } from "./hostPresence.js";
 import { arch03AhLog } from "./arch03ActingHostDebug.js";
+import { arch03LiveLog } from "./presenceUiLive.js";
 import {
   getLocalDisplayName,
   getState,
@@ -811,6 +812,13 @@ export function nudgeSessionListenersForActingHost() {
     tokenAfter,
     cachedRowScreen: cachedRow?.screen || null,
     cachedRowGameId: cachedRow?.game_id || null,
+    listenerCount: listeners.size,
+    actingHostUserId: getActingHostUserId(),
+    localUid: getSupabaseUserId() || null,
+  });
+  arch03LiveLog("ARCH03-LIVE", "screen refresh requested/completed", {
+    phase: "nudge-notify",
+    token: tokenAfter,
     listenerCount: listeners.size,
     actingHostUserId: getActingHostUserId(),
     localUid: getSupabaseUserId() || null,

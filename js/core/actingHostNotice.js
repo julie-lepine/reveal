@@ -9,11 +9,12 @@ import {
   getCachedGameSession,
   isGameSyncActive,
   isLobbyHost,
+  canActAsHost,
   POST_GAME_SCREENS,
 } from "./gameSync.js";
 import { getSupabaseUserId } from "./supabaseAuth.js";
 import { getCurrentScreen } from "./router.js";
-import { showAppAlert } from "./dialog.js";
+import { showAppAlert, isAppDialogOpen } from "./dialog.js";
 import { onLobbyBundleUpdated } from "./supabaseLobby.js";
 import { arch03LiveLog, decideActingHostNotice, hostAgeMs } from "./presenceUiLive.js";
 import { getState } from "./state.js";
@@ -22,7 +23,7 @@ import { getState } from "./state.js";
 let wasActing = null;
 /** Tokens pour lesquels la notif a été affichée (ack post-display uniquement). */
 const notifiedTokens = new Set();
-/** Élection vue hors manche : à flush au prochain écran de jeu. */
+/** Élection vue hors manche / dialog ouvert : à flush plus tard. */
 let pendingNoticeToken = null;
 let noticeOpen = false;
 let bundleUnsub = null;
@@ -68,16 +69,30 @@ function hostAgeFromLobby() {
   return hostAgeMs(host?.lastSeenAt);
 }
 
-/** @returns {Promise<boolean>} true si la modale a été présentée */
-async function showActingHostNotice() {
+function liveSnapshot(extra = {}) {
+  return {
+    localUserId: getSupabaseUserId() || null,
+    actingHostUserId: getActingHostUserId(),
+    canActAsHost: canActAsHost(),
+    isLobbyHost: isLobbyHost(),
+    wasActing,
+    token: getActingHostUiRefreshToken(),
+    pendingNoticeToken,
+    currentScreen: getCurrentScreen(),
+    activeSessionScreen: isInActivePlaySession(),
+    dialogOpen: isAppDialogOpen(),
+    hostAgeMs: hostAgeFromLobby(),
+    ...extra,
+  };
+}
+
+/** @returns {Promise<boolean>} true si la modale a été présentée jusqu'à fermeture */
+async function showActingHostNotice(token) {
   if (noticeOpen) return false;
+  if (isAppDialogOpen()) return false;
   noticeOpen = true;
   arch03LiveLog("ARCH03-LIVE", "notice requested/shown", {
-    phase: "requested",
-    localUserId: getSupabaseUserId() || null,
-    token: pendingNoticeToken ?? getActingHostUiRefreshToken(),
-    currentScreen: getCurrentScreen(),
-    hostAgeMs: hostAgeFromLobby(),
+    ...liveSnapshot({ token, phase: "requested" }),
   });
   try {
     await showAppAlert(
@@ -89,9 +104,7 @@ async function showActingHostNotice() {
       }
     );
     arch03LiveLog("ARCH03-LIVE", "notice requested/shown", {
-      phase: "shown",
-      localUserId: getSupabaseUserId() || null,
-      currentScreen: getCurrentScreen(),
+      ...liveSnapshot({ token, phase: "shown" }),
     });
     return true;
   } catch {
@@ -103,23 +116,28 @@ async function showActingHostNotice() {
 
 async function presentNoticeForToken(token) {
   if (!Number.isFinite(token) || notifiedTokens.has(token)) return false;
-  const shown = await showActingHostNotice();
+  const shown = await showActingHostNotice(token);
   if (shown) {
     notifiedTokens.add(token);
     if (pendingNoticeToken === token) pendingNoticeToken = null;
     arch03LiveLog("ARCH03-LIVE", "notice token current/acked", {
-      current: token,
-      acked: true,
-      ackedTokens: [...notifiedTokens],
-      localUserId: getSupabaseUserId() || null,
+      ...liveSnapshot({ current: token, acked: true }),
+    });
+  } else {
+    // Échec d'ouverture : garder pending, ne pas ack
+    pendingNoticeToken = token;
+    arch03LiveLog("ARCH03-LIVE", "notice deferred reason", {
+      ...liveSnapshot({
+        token,
+        reason: isAppDialogOpen() || noticeOpen ? "dialog-busy" : "show-failed",
+      }),
     });
   }
   return shown;
 }
 
 /**
- * Si un nudge est arrivé hors manche / avant que l'écran jeu soit prêt.
- * Appelé après élection et au seed lobby en session active.
+ * Si un nudge est arrivé hors manche / dialog ouvert / avant listener.
  */
 export function flushPendingActingHostNotice() {
   if (!isGameSyncActive() || isLobbyHost()) return;
@@ -128,14 +146,21 @@ export function flushPendingActingHostNotice() {
     pendingNoticeToken = null;
     return;
   }
-  if (!isInActivePlaySession()) return;
+  if (!isInActivePlaySession()) {
+    arch03LiveLog("ARCH03-LIVE", "notice deferred reason", {
+      ...liveSnapshot({ reason: "flush-not-active-session" }),
+    });
+    return;
+  }
+  if (isAppDialogOpen() || noticeOpen) {
+    arch03LiveLog("ARCH03-LIVE", "notice deferred reason", {
+      ...liveSnapshot({ reason: "flush-dialog-open" }),
+    });
+    return;
+  }
   const token = pendingNoticeToken;
-  arch03LiveLog("ARCH03-LIVE", "notice token current/acked", {
-    current: token,
-    acked: notifiedTokens.has(token),
-    pendingFlush: true,
-    localUserId: getSupabaseUserId() || null,
-    currentScreen: getCurrentScreen(),
+  arch03LiveLog("ARCH03-LIVE", "notice eligibility", {
+    ...liveSnapshot({ phase: "flush", token }),
   });
   void presentNoticeForToken(token);
 }
@@ -158,23 +183,31 @@ export function onActingHostElection(token) {
     token,
     ackedTokens: notifiedTokens,
     inActivePlaySession: isInActivePlaySession(),
+    fromElectionNudge: true,
+    dialogOpen: isAppDialogOpen() || noticeOpen,
   });
 
   arch03LiveLog("ARCH03-LIVE", "acting transition", {
-    localUserId: getSupabaseUserId() || null,
-    oldActing: prev,
-    newActing: acting,
-    became: decision.show || decision.pending,
-    hostAgeMs: hostAgeFromLobby(),
-    currentScreen: getCurrentScreen(),
-    token,
-    acked: notifiedTokens.has(token),
-    inActivePlaySession: isInActivePlaySession(),
+    ...liveSnapshot({
+      oldActing: prev,
+      newActing: acting,
+      became: decision.show || decision.pending,
+      token,
+      acked: notifiedTokens.has(token),
+      deferReason: decision.deferReason,
+    }),
+  });
+  arch03LiveLog("ARCH03-LIVE", "notice eligibility", {
+    ...liveSnapshot({
+      show: decision.show,
+      pending: decision.pending,
+      deferReason: decision.deferReason,
+      token,
+    }),
   });
 
   wasActing = decision.nextWasActing;
 
-  // Plus acting (hôte revenu, autre élu…) : abandonner le pending sans afficher
   if (!acting) {
     pendingNoticeToken = null;
     return;
@@ -182,6 +215,9 @@ export function onActingHostElection(token) {
 
   if (decision.pending) {
     pendingNoticeToken = token;
+    arch03LiveLog("ARCH03-LIVE", "notice deferred reason", {
+      ...liveSnapshot({ token, reason: decision.deferReason }),
+    });
     return;
   }
   if (!decision.show) return;
@@ -194,6 +230,9 @@ export function initActingHostNoticeListener() {
   resetActingHostNoticeState();
   if (isGameSyncActive()) {
     wasActing = isLocalActingNow();
+    arch03LiveLog("ARCH03-LIVE", "acting seed", {
+      ...liveSnapshot({ phase: "init" }),
+    });
   }
 
   if (bundleUnsub) {
@@ -205,15 +244,10 @@ export function initActingHostNoticeListener() {
       resetActingHostNoticeState();
       return;
     }
-    // Seed silencieux dès que le lobby est connu (avant le nudge d'élection)
     if (wasActing === null) {
       wasActing = isLocalActingNow();
-      arch03LiveLog("ARCH03-LIVE", "notice token current/acked", {
-        phase: "seed",
-        wasActing,
-        token: getActingHostUiRefreshToken(),
-        localUserId: getSupabaseUserId() || null,
-        currentScreen: getCurrentScreen(),
+      arch03LiveLog("ARCH03-LIVE", "acting seed", {
+        ...liveSnapshot({ phase: "bundle" }),
       });
     }
     flushPendingActingHostNotice();

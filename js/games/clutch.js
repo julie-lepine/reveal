@@ -35,7 +35,10 @@ import {
   onGameSessionChange,
   completeGameSession,
   stopGameSessionListenerOnPostGame,
+  getActingHostUiRefreshToken,
+  needsActingHostUiRefresh,
 } from "../core/gameSync.js";
+import { arch03LiveLog } from "../core/presenceUiLive.js";
 
 export function mountClutch(app) {
   if (!requireLobbyPlay()) return null;
@@ -531,6 +534,8 @@ export function mountClutch(app) {
     }));
   }
 
+  let lastAckedActingHostToken = getActingHostUiRefreshToken();
+
   const unsub = onGameSessionChange((row) => {
     if (stopGameSessionListenerOnPostGame(row, { cleanup: () => {
       clearGrace();
@@ -539,19 +544,33 @@ export function mountClutch(app) {
 
     const prevPhase = phase;
     const prevKey = activeKey;
+    const ahTokenNow = getActingHostUiRefreshToken();
+    const actingHostUiRefresh = needsActingHostUiRefresh(
+      lastAckedActingHostToken,
+      ahTokenNow
+    );
     syncFromSession();
     ensureRoundTiming();
     if (phase === "active" && canActAsHost() && allClutchTapsIn()) {
+      lastAckedActingHostToken = ahTokenNow;
       void goToReveal();
       return;
     }
     // Tap distant pendant la même manche active : maj légère (chips + compteur)
     // pour ne pas réinitialiser le chrono ni les animations.
-    if (phase === "active" && prevPhase === "active" && activeKey === prevKey) {
+    // ARCH-03 : ne pas skipper si l'acting host vient de basculer (boutons host).
+    if (
+      phase === "active" &&
+      prevPhase === "active" &&
+      activeKey === prevKey &&
+      !actingHostUiRefresh
+    ) {
+      lastAckedActingHostToken = ahTokenNow;
       refreshActiveLive();
       return;
     }
-    if (phase === "reveal" && prevPhase === "reveal") {
+    if (phase === "reveal" && prevPhase === "reveal" && !actingHostUiRefresh) {
+      lastAckedActingHostToken = ahTokenNow;
       refreshGameScoresBox(app, {
         gameLabel: "Clutch",
         title: "Cumul des scores",
@@ -559,7 +578,14 @@ export function mountClutch(app) {
       });
       return;
     }
+    arch03LiveLog("ARCH03-LIVE", "screen refresh requested/completed", {
+      phase: "clutch-full-render",
+      actingHostUiRefresh,
+      token: ahTokenNow,
+      canActAsHost: canActAsHost(),
+    });
     render();
+    lastAckedActingHostToken = ahTokenNow;
   });
 
   render();

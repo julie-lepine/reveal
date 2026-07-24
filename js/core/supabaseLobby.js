@@ -966,32 +966,32 @@ function applyLobbyToState(bundle, { persistGuestMembership = false } = {}) {
   }
   lastClaimEligible = claimEligibleAfter;
 
-  const sig = lobbyBundleSignature({ ...bundle, messages }, now);
-  if (sig !== lastLobbyBundleSig) {
-    lastLobbyBundleSig = sig;
-    notifyLobbyBundleUpdated();
-  } else if (claimHubNudge) {
-    // Transition d'éligibilité sans autre changement de signature (filet)
-    notifyLobbyBundleUpdated();
-  }
-
-  // TEMP ARCH03-AH : getActingHostUserId() après patch state
-  arch03AhLog("getActingHostUserId after state patch", {
-    before: actingHostBefore,
-    after: getActingHostUserId(),
-    didActingHostChange: actingHostChanged,
-  });
-
-  // ARCH-03 : les écrans jeu n'écoutent que onGameSessionChange — pousser un
-  // re-render quand l'acting host bascule (sinon contrôles host invisibles).
+  // ARCH-03 : nudge acting AVANT notifyLobby — sinon le seed wasActing dans
+  // onLobbyBundleUpdated voit déjà le nouvel acting host et avale false→true.
   if (actingHostChanged) {
     arch03AhLog("will call nudgeSessionListenersForActingHost", {
       actingHostBefore,
       actingHostAfter: getActingHostUserId(),
     });
+    arch03LiveLog("ARCH03-LIVE", "poll acting resolution", {
+      localUserId: localUid || null,
+      actingHostBefore,
+      actingHostAfter: getActingHostUserId(),
+      hostAgeMs: hostAgeMs(hostLastSeenAt, now),
+      currentScreen: getCurrentScreen(),
+      hp: isHostPresentInBundle(bundle, now, HOST_PRESENCE_STALE_MS) ? 1 : 0,
+    });
     nudgeSessionListenersForActingHost();
   } else {
     arch03AhLog("skip nudge (didActingHostChange=false)");
+  }
+
+  const sig = lobbyBundleSignature({ ...bundle, messages }, now);
+  if (sig !== lastLobbyBundleSig) {
+    lastLobbyBundleSig = sig;
+    notifyLobbyBundleUpdated();
+  } else if (claimHubNudge) {
+    notifyLobbyBundleUpdated();
   }
 }
 

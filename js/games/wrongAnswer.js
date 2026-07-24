@@ -34,6 +34,8 @@ import {
   onGameSessionChange,
   completeGameSession,
   stopGameSessionListenerOnPostGame,
+  getActingHostUiRefreshToken,
+  needsActingHostUiRefresh,
 } from "../core/gameSync.js";
 
 export function mountWrongAnswer(app) {
@@ -498,11 +500,18 @@ export function mountWrongAnswer(app) {
     return max > 0 ? best : null;
   }
 
+  let lastAckedActingHostToken = getActingHostUiRefreshToken();
+
   const unsub = onGameSessionChange((row) => {
     if (stopGameSessionListenerOnPostGame(row)) return;
 
     const prevPhase = phase;
     const prevRound = roundIdx;
+    const ahTokenNow = getActingHostUiRefreshToken();
+    const actingHostUiRefresh = needsActingHostUiRefresh(
+      lastAckedActingHostToken,
+      ahTokenNow
+    );
     syncFromSession();
 
     // Nouvelle manche poussée par l'hôte : on repart d'une saisie / sélection vierge.
@@ -515,16 +524,19 @@ export function mountWrongAnswer(app) {
     // Filets hôte : avancer automatiquement quand tout le monde a répondu / voté.
     if (mp && canActAsHost()) {
       if (phase === "answer" && allWrongAnswersIn()) {
+        lastAckedActingHostToken = ahTokenNow;
         void transitionToVoting();
         return;
       }
       if (phase === "voting" && allWrongAnswerVotesIn() && !roundScored) {
+        lastAckedActingHostToken = ahTokenNow;
         void transitionToReveal();
         return;
       }
     }
 
-    if (phase === "reveal" && prevPhase === "reveal") {
+    if (phase === "reveal" && prevPhase === "reveal" && !actingHostUiRefresh) {
+      lastAckedActingHostToken = ahTokenNow;
       refreshGameScoresBox(app, {
         gameLabel: "Wrong Answer Only",
         title: "Cumul des scores",
@@ -534,6 +546,7 @@ export function mountWrongAnswer(app) {
     }
 
     render();
+    lastAckedActingHostToken = ahTokenNow;
   });
 
   render();
