@@ -20,6 +20,7 @@ import { navigate, getCurrentScreen } from "./router.js";
 import { getLobbyParticipants, getLobbyStatus, getLobbyGameId, isLobbyEveningStarted } from "./lobby.js";
 import { getActivePlayerNames, getActivePlayers } from "./players.js";
 import { mergeMatchScoresLocal } from "./gameScores.js";
+import { mergeClutchTapsFrozen } from "./clutchTapCommit.js";
 import {
   applyRemotePlayerStats,
   playerStatsToRemote,
@@ -1326,9 +1327,10 @@ function mergeRemoteClutchTapsUid(cur, inc) {
   const incTaps = inc?.taps || {};
   if (isNewClutchRound(cur, inc)) return incTaps;
   if (inc?.phase === "active" || inc?.phase === "reveal" || cur?.phase === "reveal") {
-    return { ...curTaps, ...incTaps };
+    // First tap wins — never replace a frozen click with a late/recomputed patch.
+    return mergeClutchTapsFrozen(curTaps, incTaps);
   }
-  return incTaps;
+  return mergeClutchTapsFrozen(curTaps, incTaps);
 }
 
 function mergeClutchGameLocal(local, remote) {
@@ -1340,8 +1342,9 @@ function mergeClutchGameLocal(local, remote) {
   let taps = remoteTaps;
   if (newRound) {
     taps = remoteTaps;
-  } else if (remote.phase === "active" || remote.phase === "reveal" || local.phase === "reveal") {
-    taps = { ...remoteTaps, ...localTaps };
+  } else {
+    // Remote first, then local only fills missing keys (in-flight optimistic).
+    taps = mergeClutchTapsFrozen(remoteTaps, localTaps);
   }
   taps = normalizeClutchTaps(taps);
   const ready =

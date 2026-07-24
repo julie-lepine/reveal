@@ -15,7 +15,7 @@ import {
   rankClutchResults,
   startClutchRound,
 } from "../core/clutchSession.js";
-import { resolveClutchTapCommitFailureUi } from "../core/clutchTapCommit.js";
+import { resolveClutchTapCommitFailureUi, preferInFlightClutchTap } from "../core/clutchTapCommit.js";
 import { awardClutchRound } from "../core/scoring.js";
 import { applyMatchScoreDeltas, gameCumulativeScoresHtml, refreshGameScoresBox } from "../core/gameScores.js";
 import { getLocalDisplayName, recordClutchPlayed, setLastGame } from "../core/state.js";
@@ -256,11 +256,7 @@ export function mountClutch(app) {
     if (s.targetMs != null) targetMs = s.targetMs;
     if (s.hideBeforeMs != null) hideBeforeMs = s.hideBeforeMs;
     const sessionTaps = { ...(s.taps || {}) };
-    // Pendant un commit en vol, conserver le tap optimiste local (render() resync sinon).
-    if (tapCommitInFlight && taps[localName]?.ms != null && sessionTaps[localName]?.ms == null) {
-      sessionTaps[localName] = taps[localName];
-    }
-    taps = sessionTaps;
+    taps = preferInFlightClutchTap(sessionTaps, taps, localName, tapCommitInFlight);
     lastRound = s.lastRound ?? lastRound;
     takeScored = Boolean(s.roundScored);
   }
@@ -501,12 +497,15 @@ export function mountClutch(app) {
       ) {
         return;
       }
-      const ms = Math.round(performance.now() - localStart);
+      const tap = {
+        ms: Math.round(performance.now() - localStart),
+        at: Date.now(),
+      };
       tapCommitInFlight = true;
-      taps = { ...taps, [localName]: { ms, at: Date.now() } };
+      taps = { ...taps, [localName]: tap };
       vibrate(35);
       render();
-      void commitClutchTap(ms)
+      void commitClutchTap(tap)
         .then(() => {
           if (!mp) {
             void goToReveal();

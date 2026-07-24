@@ -135,15 +135,14 @@ export function allClutchReady() {
   return getActivePlayerNames().every((n) => session.ready[n]);
 }
 
-/** MP : envoie uniquement le tap local ({ ms, at }). Premier tap conservé. Rollback avant feedback. */
-export async function commitClutchTap(ms) {
+/** MP : envoie le tap figé au clic ({ ms, at }). Aucun recalcul. Rollback avant feedback. */
+export async function commitClutchTap(tapInput) {
   const localName = getLocalDisplayName();
   const session = getClutchSession();
-  const tap = { ms, at: Date.now() };
   const { alreadyTapped, previousTaps, nextTaps, tap: resolved } = computeClutchTapApply(
     session,
     localName,
-    tap
+    tapInput
   );
   if (alreadyTapped) return resolved;
 
@@ -154,7 +153,6 @@ export async function commitClutchTap(ms) {
     await patchGameState({ clutch: { taps: { [uid]: resolved } } });
     return resolved;
   } catch (err) {
-    // Rollback AVANT l’alerte pour que syncFromSession / grace ne voient plus le tap fantôme.
     const current = getClutchSession();
     saveStatePatch({ clutchGame: { ...current, taps: previousTaps } });
     console.warn("REVEAL clutch tap:", err);
