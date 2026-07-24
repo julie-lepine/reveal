@@ -497,13 +497,19 @@ export function mountClutch(app) {
       taps = { ...taps, [localName]: { ms, at: Date.now() } };
       vibrate(35);
       render();
-      void commitClutchTap(ms).then(() => {
-        if (!mp) {
-          void goToReveal();
-          return;
-        }
-        if (allClutchTapsIn() && canActAsHost()) void goToReveal();
-      });
+      void commitClutchTap(ms)
+        .then(() => {
+          if (!mp) {
+            void goToReveal();
+            return;
+          }
+          if (allClutchTapsIn() && canActAsHost()) void goToReveal();
+        })
+        .catch(() => {
+          // Feedback déjà affiché par patchGameStateWithFeedback ; rollback session → UI.
+          syncFromSession();
+          render();
+        });
     });
 
     app.querySelector("#next-round")?.addEventListener("click", withClickLock(async () => {

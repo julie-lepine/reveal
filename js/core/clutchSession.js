@@ -14,6 +14,7 @@ import {
 } from "./gameSync.js";
 import { patchGameStateWithFeedback } from "./patchGameStateFeedback.js";
 import { launchGameWithSync, commitHostGamePlay, commitPrepReadyToggle } from "./mpLaunch.js";
+import { computeClutchTapApply } from "./clutchTapCommit.js";
 
 function defaultSession() {
   return {
@@ -133,20 +134,29 @@ export function allClutchReady() {
   return getActivePlayerNames().every((n) => session.ready[n]);
 }
 
-/** MP : envoie uniquement le tap local ({ ms, at }). Premier tap conservé. */
+/** MP : envoie uniquement le tap local ({ ms, at }). Premier tap conservé. Rollback si sync échoue. */
 export async function commitClutchTap(ms) {
   const localName = getLocalDisplayName();
   const session = getClutchSession();
-  if (session.taps?.[localName]?.ms != null) {
-    return session.taps[localName];
-  }
   const tap = { ms, at: Date.now() };
-  const taps = { ...(session.taps || {}), [localName]: tap };
-  saveStatePatch({ clutchGame: { ...session, taps } });
-  if (!isGameSyncActive()) return tap;
+  const { alreadyTapped, previousTaps, nextTaps, tap: resolved } = computeClutchTapApply(
+    session,
+    localName,
+    tap
+  );
+  if (alreadyTapped) return resolved;
+
+  saveStatePatch({ clutchGame: { ...session, taps: nextTaps } });
+  if (!isGameSyncActive()) return resolved;
   const uid = requireLocalParticipantUid();
-  await patchGameStateWithFeedback({ clutch: { taps: { [uid]: tap } } });
-  return tap;
+  try {
+    await patchGameStateWithFeedback({ clutch: { taps: { [uid]: resolved } } });
+    return resolved;
+  } catch (err) {
+    const current = getClutchSession();
+    saveStatePatch({ clutchGame: { ...current, taps: previousTaps } });
+    throw err;
+  }
 }
 
 export function hasLocalClutchTap(session = getClutchSession()) {
