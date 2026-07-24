@@ -111,6 +111,12 @@ import {
   validateActingHostPlayPatch,
 } from "./gameSessionSecurity.js";
 import { arch03RevealLog } from "./arch03RevealDebug.js";
+import {
+  planGuessLiePlayWrite,
+  buildGuessLieActingPlayFields,
+} from "./guessLiePlayCommit.js";
+
+export { planGuessLiePlayWrite, buildGuessLieActingPlayFields } from "./guessLiePlayCommit.js";
 
 let cachedRow = null;
 let lastSessionSig = "";
@@ -4865,15 +4871,79 @@ export async function syncGuessLieSession(extra = {}, patchOpts = {}) {
   return gl;
 }
 
+/**
+ * Commit play Guess The Lie (reveal / manche suivante).
+ * - Hôte réel : patchGameState (UPDATE direct), evening scores OK si demandé.
+ * - Acting host : apply_acting_host_play via patchGameStateAsNonHost ; pas de save avant RPC.
+ * - Invité : no-op (pas de fantôme local).
+ */
 export async function commitGuessLiePlay(patch, { screen, withEveningScores = false } = {}) {
-  const gl = { ...getState().guessLie, ...patch };
-  saveStatePatch({ guessLie: gl });
-  if (!isGameSyncActive() || !isLobbyHost()) return gl;
-  await patchGameState(
-    { guessLie: pickRemotePlayFields(guessLieToRemote(gl), patch) },
-    { screen: screen || "guesslie", gameId: "guesslie", withEveningScores }
-  );
-  return gl;
+  const plan = planGuessLiePlayWrite({
+    isSyncActive: isGameSyncActive(),
+    isRealHost: isLobbyHost(),
+    canAct: canActAsHost(),
+    withEveningScores,
+  });
+  const screenOut = screen || "guesslie";
+
+  if (plan.channel === "local") {
+    const gl = { ...getState().guessLie, ...patch };
+    saveStatePatch({ guessLie: gl });
+    return gl;
+  }
+
+  if (plan.channel === "noop") {
+    return getState().guessLie;
+  }
+
+  if (plan.channel === "patchGameState") {
+    // Comportement hôte réel conservé (save local puis sync)
+    const gl = { ...getState().guessLie, ...patch };
+    saveStatePatch({ guessLie: gl });
+    await patchGameState(
+      { guessLie: pickRemotePlayFields(guessLieToRemote(gl), patch) },
+      {
+        screen: screenOut,
+        gameId: "guesslie",
+        withEveningScores: plan.withEveningScores,
+      }
+    );
+    return getState().guessLie;
+  }
+
+  // actingRpc — miroir commitHostGamePlay : pas de saveLocal avant confirmation
+  const session = { ...getState().guessLie, ...patch };
+  const playPatch = buildGuessLieActingPlayFields(guessLieToRemote(session), patch);
+  const keyCheck = validateActingHostPlayPatch(playPatch);
+  if (!keyCheck.ok) {
+    throw new Error(`Champ play Guess Lie non autorisé pour acting host: ${keyCheck.key}`);
+  }
+
+  try {
+    const { patchGameStateWithFeedback } = await import("./patchGameStateFeedback.js");
+    await patchGameStateWithFeedback(
+      { guessLie: playPatch },
+      {
+        screen: screenOut,
+        gameId: "guesslie",
+        withEveningScores: false,
+      }
+    );
+  } catch (err) {
+    // prev intact — aucun saveStatePatch avant succès
+    throw err;
+  }
+
+  // applyRemoteSession a synchronisé ; clés local-only (hors whitelist RPC)
+  if (patch.statsRecordedRoundIdx != null) {
+    saveStatePatch({
+      guessLie: {
+        ...getState().guessLie,
+        statsRecordedRoundIdx: patch.statsRecordedRoundIdx,
+      },
+    });
+  }
+  return getState().guessLie;
 }
 
 export async function syncTierNightSession(payload) {
