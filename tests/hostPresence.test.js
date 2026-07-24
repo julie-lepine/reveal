@@ -5,6 +5,7 @@ import {
   isMemberPresent,
   resolveActingHostUserId,
   didActingHostChange,
+  detectActingHostTransition,
   needsActingHostUiRefresh,
 } from "../js/core/hostPresence.js";
 
@@ -135,6 +136,80 @@ describe("didActingHostChange", () => {
       { userId: "guest-b", lastSeenAt: iso(2_000) },
     ];
     assert.equal(didActingHostChange(prev, "host", next, "host", NOW), false);
+  });
+
+  it("PIÈGE QA v95 : même lastSeenAt hôte figé + now qui avance → didActingHostChange avale la transition", () => {
+    // Hôte lastSeen figé à t0 ; invité continue de battre. Seul `now` avance (poll 100s → 120s).
+    const t0 = NOW;
+    const hostLastSeen = new Date(t0).toISOString();
+    const t100 = t0 + 100_000;
+    const t120 = t0 + 120_001;
+    const snapAt = (now) => [
+      { userId: "host", isHost: true, lastSeenAt: hostLastSeen },
+      { userId: "guest-a", lastSeenAt: new Date(now - 1_000).toISOString() },
+    ];
+    const at100 = snapAt(t100);
+    const at120 = snapAt(t120);
+    // Même logique que le bug : re-resolve(prev, now) === resolve(next, now) avec le même now
+    assert.equal(
+      didActingHostChange(at100, "host", at120, "host", t120),
+      false,
+      "re-resolve des deux côtés avec le même now avale la bascule"
+    );
+    assert.equal(resolveActingHostUserId(at100, "host", t100), "host");
+    assert.equal(resolveActingHostUserId(at120, "host", t120), "guest-a");
+  });
+});
+
+describe("detectActingHostTransition", () => {
+  it("détecte ancien hôte → candidat au premier poll stale (100s→120s, lastSeen hôte figé)", () => {
+    const t0 = NOW;
+    const hostLastSeen = new Date(t0).toISOString();
+    const t100 = t0 + 100_000;
+    const t120 = t0 + 120_001;
+    const snapAt = (now) => [
+      { userId: "host", isHost: true, lastSeenAt: hostLastSeen },
+      { userId: "guest-a", lastSeenAt: new Date(now - 1_000).toISOString() },
+    ];
+
+    // Poll ~100s : host encore acting, mémoriser
+    const at100 = detectActingHostTransition("host", snapAt(t100), "host", t100);
+    assert.equal(at100.before, "host");
+    assert.equal(at100.after, "host");
+    assert.equal(at100.changed, false);
+
+    // Poll ~120s : stored before = ancien hôte, after = candidat
+    const at120 = detectActingHostTransition("host", snapAt(t120), "host", t120);
+    assert.equal(at120.before, "host", "actingHostBefore doit rester l'ancien hôte");
+    assert.equal(at120.after, "guest-a");
+    assert.equal(at120.changed, true);
+
+    // Échoue si on avait déjà mémorisé le candidat (bug QA v95)
+    const swallowed = detectActingHostTransition("guest-a", snapAt(t120), "host", t120);
+    assert.equal(swallowed.before, "guest-a");
+    assert.equal(swallowed.after, "guest-a");
+    assert.equal(swallowed.changed, false);
+  });
+
+  it("ne nudge pas au premier apply (stored null)", () => {
+    const participants = [
+      { userId: "host", isHost: true, lastSeenAt: iso(5_000) },
+      { userId: "guest-a", lastSeenAt: iso(5_000) },
+    ];
+    const t = detectActingHostTransition(null, participants, "host", NOW);
+    assert.equal(t.before, null);
+    assert.equal(t.after, "host");
+    assert.equal(t.changed, false);
+  });
+
+  it("ne mute pas d'état externe (resolve pur)", () => {
+    const participants = [
+      { userId: "host", isHost: true, lastSeenAt: iso(HOST_PRESENCE_STALE_MS + 1) },
+      { userId: "guest-a", lastSeenAt: iso(1_000) },
+    ];
+    const snapshot = JSON.stringify(participants);
+    detectActingHostTransition("host", participants, "host", NOW);
+    assert.equal(JSON.stringify(participants), snapshot);
   });
 });
 

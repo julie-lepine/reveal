@@ -39,7 +39,11 @@ export function resolveActingHostUserId(
   return present[0] || host?.userId || hostId;
 }
 
-/** True si l'identité acting host change entre deux snapshots lobby. */
+/** True si l'identité acting host change entre deux snapshots lobby.
+ * ⚠ Ne pas utiliser avec le même `now` pour détecter un franchissement de seuil
+ * temporel : prev et next ont souvent le même lastSeenAt figé → before===after.
+ * Préférer `detectActingHostTransition(storedBefore, ...)`.
+ */
 export function didActingHostChange(
   prevParticipants,
   prevHostId,
@@ -50,6 +54,32 @@ export function didActingHostChange(
   const prev = resolveActingHostUserId(prevParticipants || [], prevHostId, now);
   const next = resolveActingHostUserId(nextParticipants || [], nextHostId, now);
   return prev !== next;
+}
+
+/**
+ * Transition acting host : compare un acting host **mémorisé** (dernier apply)
+ * au resolve du bundle entrant avec `now` courant.
+ * C'est la seule façon de détecter hostAge 100s→120s quand lastSeenAt ne bouge pas.
+ */
+export function detectActingHostTransition(
+  storedActingHostUserId,
+  nextParticipants,
+  nextHostId,
+  now = Date.now(),
+  staleMs = HOST_PRESENCE_STALE_MS
+) {
+  const after = resolveActingHostUserId(
+    nextParticipants || [],
+    nextHostId || null,
+    now,
+    staleMs
+  );
+  const before = storedActingHostUserId ?? null;
+  return {
+    before,
+    after,
+    changed: before != null && before !== after,
+  };
 }
 
 /**

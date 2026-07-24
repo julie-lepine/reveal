@@ -18,7 +18,7 @@ import {
   nudgeSessionListenersForActingHost,
   getActingHostUserId,
 } from "./gameSync.js";
-import { didActingHostChange, resolveActingHostUserId } from "./hostPresence.js";
+import { detectActingHostTransition, resolveActingHostUserId } from "./hostPresence.js";
 import { arch03AhLog, arch03AhHostAgeMs } from "./arch03ActingHostDebug.js";
 import { getCurrentScreen } from "./router.js";
 import { fetchGameSessionByLobby } from "./supabaseGame.js";
@@ -52,6 +52,12 @@ const lobbyBundleListeners = new Set();
 /** Éligibilité claim observée (null = pas encore seed). Transition → bump token hub. */
 let lastClaimEligible = null;
 let claimHubUiToken = 0;
+/**
+ * Dernier acting host appliqué (pas un re-resolve live).
+ * Indispensable : lastSeenAt hôte est figé, seul `now` avance — comparer deux
+ * resolve(..., now) au même tick avale la transition 100s→120s.
+ */
+let lastAppliedActingHostUserId = null;
 
 /** Token consultable par le hub si un notify a été manqué (listener absent). */
 export function getClaimHubUiToken() {
@@ -869,23 +875,28 @@ function applyLobbyToState(bundle, { persistGuestMembership = false } = {}) {
 
   const prevLobby = getState().lobby;
   const now = Date.now();
-  const actingHostBefore = resolveActingHostUserId(
-    prevLobby?.participants || [],
-    prevLobby?.hostId || null,
-    now
-  );
-  const actingHostAfterResolved = resolveActingHostUserId(
+  // Capture BEFORE toute mutation state / saveStatePatch.
+  // BEFORE = dernier acting mémorisé — JAMAIS re-resolve(prev, now) qui avale
+  // la transition dès que hostAge franchit 120s avec le même lastSeenAt figé.
+  // AFTER = resolve pur depuis le bundle entrant (aucune mutation state).
+  const transition = detectActingHostTransition(
+    lastAppliedActingHostUserId,
     bundle.participants || [],
     bundle.hostId || null,
     now
   );
-  const actingHostChanged = didActingHostChange(
-    prevLobby?.participants,
-    prevLobby?.hostId,
-    bundle.participants,
-    bundle.hostId,
-    now
-  );
+  let actingHostBefore = transition.before;
+  let actingHostAfterResolved = transition.after;
+  let actingHostChanged = transition.changed;
+  if (actingHostBefore == null) {
+    // Premier apply / après reset : seed sans nudge
+    actingHostBefore = resolveActingHostUserId(
+      prevLobby?.participants || [],
+      prevLobby?.hostId || null,
+      now
+    );
+    actingHostChanged = false;
+  }
 
   const hostParticipant =
     (bundle.participants || []).find((p) => p.userId === bundle.hostId) ||
@@ -936,6 +947,7 @@ function applyLobbyToState(bundle, { persistGuestMembership = false } = {}) {
       gameId: bundle.gameId,
       hostId: bundle.hostId,
       lastActivityAt: bundle.lastActivityAt || null,
+      actingHostUserId: actingHostAfterResolved,
     },
     lobbyCode: bundle.code,
     inLobby: true,
@@ -944,6 +956,7 @@ function applyLobbyToState(bundle, { persistGuestMembership = false } = {}) {
       sessionId: bundle.code,
     },
   });
+  lastAppliedActingHostUserId = actingHostAfterResolved;
 
   if (persistGuestMembership || getState().user?.isGuest) {
     const membership = membershipFromBundle(bundle);
@@ -971,12 +984,13 @@ function applyLobbyToState(bundle, { persistGuestMembership = false } = {}) {
   if (actingHostChanged) {
     arch03AhLog("will call nudgeSessionListenersForActingHost", {
       actingHostBefore,
-      actingHostAfter: getActingHostUserId(),
+      actingHostAfter: actingHostAfterResolved,
     });
     arch03LiveLog("ARCH03-LIVE", "poll acting resolution", {
       localUserId: localUid || null,
       actingHostBefore,
-      actingHostAfter: getActingHostUserId(),
+      actingHostAfter: actingHostAfterResolved,
+      didActingHostChange: true,
       hostAgeMs: hostAgeMs(hostLastSeenAt, now),
       currentScreen: getCurrentScreen(),
       hp: isHostPresentInBundle(bundle, now, HOST_PRESENCE_STALE_MS) ? 1 : 0,
@@ -1080,6 +1094,7 @@ export function stopLobbyPresenceSync() {
   lastLobbyBundleSig = "";
   lastMemberHeartbeatAt = 0;
   lastClaimEligible = null;
+  lastAppliedActingHostUserId = null;
   realtimeReconnectAttempts = 0;
   realtimeOnUpdate = null;
   if (lobbyPresencePollTimer) {
