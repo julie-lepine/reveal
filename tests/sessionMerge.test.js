@@ -47,9 +47,9 @@ import {
 } from "../js/core/sessionMerge.js";
 
 describe("mergeReadyMapsLocal", () => {
-  it("unionne prêt local et remote pour les joueurs actifs", () => {
+  it("prend le remote pour les autres ; absent remote = pas prêt (pas de revive local)", () => {
     const out = mergeReadyMapsLocal({ Alice: true }, { Bob: true }, ["Alice", "Bob"]);
-    assert.equal(out.Alice, true);
+    assert.equal(out.Alice, false);
     assert.equal(out.Bob, true);
   });
 

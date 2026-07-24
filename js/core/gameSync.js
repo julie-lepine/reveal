@@ -4635,7 +4635,8 @@ function deactivatePlayFlagsInSessionState(state = {}) {
   ];
   lobbyStartedGames.forEach((key) => {
     if (st[key] && typeof st[key] === "object") {
-      st[key] = { ...st[key], lobbyStarted: false };
+      // Invalide les prêts prep de la partie terminée (évite stale local / F5 après Recommencer).
+      st[key] = { ...st[key], lobbyStarted: false, ready: {} };
     }
   });
   if (st.guessLie && typeof st.guessLie === "object") {

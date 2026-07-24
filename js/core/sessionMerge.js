@@ -35,7 +35,11 @@ export function normalizeHotTakeEntry(entry) {
   };
 }
 
-/** En préparation : union optimiste pour les autres ; le joueur local garde son toggle (y compris « pas prêt »). */
+/**
+ * Prêt prep : le remote fait foi (clé absente = pas prêt) — hôte et invités alignés.
+ * Optimism local uniquement si la clé existe déjà côté remote, ou si le local force « pas prêt »
+ * (toggle en vol). Ne jamais réutiliser un ready local stale après « Recommencer » (remote {}).
+ */
 export function mergeReadyMapsLocal(
   localReady = {},
   remoteReady = {},
@@ -44,19 +48,13 @@ export function mergeReadyMapsLocal(
 ) {
   const merged = { ...remoteReady };
   activeNames.forEach((name) => {
-    if (localName && name === localName) {
-      if (localReady[name] !== undefined) {
+    if (localName && name === localName && localReady[name] !== undefined) {
+      if (remoteReady[name] !== undefined || localReady[name] === false) {
         merged[name] = Boolean(localReady[name]);
-      } else {
-        merged[name] = Boolean(remoteReady[name]);
+        return;
       }
-      return;
     }
-    if (remoteReady[name] !== undefined) {
-      merged[name] = Boolean(remoteReady[name]);
-    } else {
-      merged[name] = Boolean(localReady[name]);
-    }
+    merged[name] = remoteReady[name] !== undefined ? Boolean(remoteReady[name]) : false;
   });
   return merged;
 }
