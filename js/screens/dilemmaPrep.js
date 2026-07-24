@@ -27,7 +27,6 @@ import {
   isGameSyncActive,
   isLobbyHost,
   onGameSessionChange,
-  refreshGameSession,
 } from "../core/gameSync.js";
 import { prepGuestFollowOnSession } from "../core/mpLaunch.js";
 import { executePrepLaunch, prepLaunchSlotParams, DEFAULT_PREP_MIN_PLAYERS } from "../core/prepLaunch.js";
@@ -46,6 +45,7 @@ import {
   charCountHtml,
   bindCharCounter,
   updateCharCount,
+  syncPrepOnMount,
 } from "../core/prepScreen.js";
 import { PLAYER_TEXT_MAX_LEN } from "../../data/playerTextLimits.js";
 import { bindNav } from "./nav.js";
@@ -410,9 +410,7 @@ export function mountDilemmaPrep(app) {
 
   render();
 
-  if (isGameSyncActive()) {
-    void refreshGameSession().then(() => refreshFromSync());
-  }
+  syncPrepOnMount(refreshFromSync);
 
   const guestFollow = prepGuestFollowOnSession({
     prepScreen: "dilemma-prep",

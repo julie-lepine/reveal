@@ -10,6 +10,7 @@ import {
   routeToActiveGameIfNeeded,
   tryFollowHostGameSession,
 } from "../core/gameSync.js";
+import { formatSyncErrorMessage } from "../core/authErrors.js";
 
 export function mountLeaderboard(app) {
   function renderBoard() {
@@ -72,9 +73,18 @@ export function mountLeaderboard(app) {
   let unsubSession = () => {};
   if (isGameSyncActive()) {
     renderBoard();
-    void refreshEveningScoresFromSession().then(() => {
-      if (getCurrentScreen() === "leaderboard") renderBoard();
-    });
+    void refreshEveningScoresFromSession()
+      .then(() => {
+        if (getCurrentScreen() === "leaderboard") renderBoard();
+      })
+      .catch(async (err) => {
+        console.warn("REVEAL leaderboard refresh:", err);
+        const { showAppAlert } = await import("../core/dialog.js");
+        await showAppAlert(formatSyncErrorMessage(err?.message), {
+          title: "Connexion",
+          icon: "📡",
+        });
+      });
     unsubSession = onGameSessionChange(async (row) => {
       if (!row) return;
       if (tryFollowHostGameSession(row)) return;

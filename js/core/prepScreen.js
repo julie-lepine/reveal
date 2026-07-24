@@ -2,6 +2,8 @@ import { PLAYER_TEXT_MAX_LEN, playerTextRemaining } from "../../data/playerTextL
 import { escapeHtml } from "./ui.js";
 import { getCurrentScreen } from "./router.js";
 import { isGameSyncActive, refreshGameSession } from "./gameSync.js";
+import { formatSyncErrorMessage } from "./authErrors.js";
+import { runSyncPrepOnMount } from "./syncPrepMount.js";
 
 /** Compteur « X caractères restants » sous un champ de saisie joueur. */
 export function charCountHtml(countId, max = PLAYER_TEXT_MAX_LEN) {
@@ -47,10 +49,26 @@ export function updateReadyButton(btn, localReady) {
   btn.textContent = localReady ? "Prêt ✓" : "Je suis prêt !";
 }
 
-/** Rafraîchit la session distante au montage d'un écran prep (état prêt / lancement). */
+async function defaultMountSyncError(err) {
+  console.warn("REVEAL syncPrepOnMount:", err);
+  const { showAppAlert } = await import("./dialog.js");
+  await showAppAlert(formatSyncErrorMessage(err?.message), {
+    title: "Connexion",
+    icon: "📡",
+  });
+}
+
+/**
+ * Rafraîchit la session distante au montage d'un écran prep (état prêt / lancement).
+ * M-10 : catch les rejets (réseau / timeout) — pas de rejection non gérée ; feedback léger.
+ */
 export function syncPrepOnMount(refreshFromSync) {
-  if (!isGameSyncActive()) return;
-  void refreshGameSession().then(() => refreshFromSync?.());
+  return runSyncPrepOnMount({
+    isActive: isGameSyncActive,
+    refresh: refreshGameSession,
+    refreshFromSync,
+    reportError: defaultMountSyncError,
+  });
 }
 
 /**
