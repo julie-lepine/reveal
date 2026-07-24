@@ -40,6 +40,19 @@ import {
   isHostPresentAt,
   shouldNudgeClaimHubUi,
 } from "./presenceUiLive.js";
+import {
+  JOIN_SESSION_RESTORE_DELAYS_MS,
+  SUBSCRIBED_ROUTE_DEBOUNCE_MS,
+  shouldRouteAfterRealtimeSubscribed,
+  createDebouncedCallback,
+} from "./joinSessionHydrate.js";
+
+export {
+  JOIN_SESSION_RESTORE_DELAYS_MS,
+  shouldRouteAfterRealtimeSubscribed,
+  planLobbyJoinSyncOrder,
+} from "./joinSessionHydrate.js";
+
 const HOST_COLOR = "#A78BFA";
 const GUEST_COLOR = "#60A5FA";
 
@@ -48,6 +61,8 @@ let lobbyPresencePollTimer = null;
 let presenceLobbyId = null;
 let lastLobbyBundleSig = "";
 let lastMemberHeartbeatAt = 0;
+/** T-01/T-02 : true pendant restore session au join (bloque route SUBSCRIBED). */
+let joinSessionHydrating = false;
 const lobbyBundleListeners = new Set();
 /** Éligibilité claim observée (null = pas encore seed). Transition → bump token hub. */
 let lastClaimEligible = null;
@@ -160,10 +175,21 @@ export function getRememberedLobbyCode() {
   }
 }
 
+/** T-01/T-02 : true pendant restore session au join (bloque route SUBSCRIBED). */
+export function isJoinSessionHydrating() {
+  return joinSessionHydrating;
+}
+
+/** Debounce catch-up SUBSCRIBED uniquement (events INSERT/UPDATE inchangés). */
+const subscribedCatchUpRoute = createDebouncedCallback((row) => {
+  if (!row) return;
+  if (!shouldRouteAfterRealtimeSubscribed({ joinSessionHydrating })) return;
+  handleSessionRoute(row, { debugSource: "supabaseLobby/realtime/subscribed" });
+}, SUBSCRIBED_ROUTE_DEBOUNCE_MS);
+
 /** Charge la session de jeu en cours après join / create (sans router - voir navigateAfterLobbyJoin). */
 async function restoreActiveGameSessionOnJoin(lobbyId) {
-  const delays = [0, 400, 1200];
-  for (const ms of delays) {
+  for (const ms of JOIN_SESSION_RESTORE_DELAYS_MS) {
     if (ms) await new Promise((r) => setTimeout(r, ms));
     try {
       const gameRow = await fetchGameSessionByLobby(lobbyId);
@@ -176,6 +202,24 @@ async function restoreActiveGameSessionOnJoin(lobbyId) {
     }
   }
   return false;
+}
+
+/**
+ * T-01 : hydrate session puis démarre le sync (jamais l'inverse).
+ * Bloque le catch-up SUBSCRIBED pendant la restore.
+ */
+async function hydrateSessionThenStartSync(lobbyId, { afterReclaim = false } = {}) {
+  joinSessionHydrating = true;
+  try {
+    await restoreActiveGameSessionOnJoin(lobbyId);
+    if (afterReclaim) {
+      await refreshGameSession();
+    }
+  } finally {
+    joinSessionHydrating = false;
+  }
+  const { startMultiplayerSync } = await import("./gameSync.js");
+  startMultiplayerSync();
 }
 
 /** Invité attendu : ignorer guestMembership pour les comptes email/OAuth connectés. */
@@ -442,12 +486,7 @@ export async function recoverLobbyFromServer({ withMessages = false } = {}) {
   });
   applyLobbyToState(bundle, { persistGuestMembership: canUseGuestMembershipRecovery() });
   startLobbyPresenceSync();
-  const { startMultiplayerSync } = await import("./gameSync.js");
-  startMultiplayerSync();
-  await restoreActiveGameSessionOnJoin(lobbyId);
-  if (reclaimResult.reclaimed) {
-    await refreshGameSession();
-  }
+  await hydrateSessionThenStartSync(lobbyId, { afterReclaim: reclaimResult.reclaimed });
   return { ok: true, code: bundle.code, lobbyId: bundle.id };
 }
 
@@ -615,12 +654,7 @@ async function completeLobbyJoin(
 ) {
   const bundle = await fetchLobbyBundle(lobbyId, { withMessages: true, currentUserId });
   applyLobbyToState(bundle, { persistGuestMembership });
-  const { startMultiplayerSync } = await import("./gameSync.js");
-  startMultiplayerSync();
-  await restoreActiveGameSessionOnJoin(lobbyId);
-  if (afterReclaim) {
-    await refreshGameSession();
-  }
+  await hydrateSessionThenStartSync(lobbyId, { afterReclaim });
   return bundle;
 }
 
@@ -1095,6 +1129,8 @@ export function stopLobbyPresenceSync() {
   lastMemberHeartbeatAt = 0;
   lastClaimEligible = null;
   lastAppliedActingHostUserId = null;
+  joinSessionHydrating = false;
+  subscribedCatchUpRoute.cancel();
   realtimeReconnectAttempts = 0;
   realtimeOnUpdate = null;
   if (lobbyPresencePollTimer) {
@@ -1165,9 +1201,7 @@ console.log("[DEBUG MEMBER INSERT CREATE]", {
 
   const bundle = await fetchLobbyBundle(lobby.id, { withMessages: true, currentUserId: userId });
   applyLobbyToState(bundle, { persistGuestMembership: getState().user?.isGuest === true });
-  const { startMultiplayerSync } = await import("./gameSync.js");
-  startMultiplayerSync();
-  await restoreActiveGameSessionOnJoin(lobby.id);
+  await hydrateSessionThenStartSync(lobby.id);
 
   const gs = { ...getState().globalStats };
   gs.lobbiesCreated = (gs.lobbiesCreated || 0) + 1;
@@ -1596,11 +1630,14 @@ export function subscribeLobbyRealtime(onUpdate) {
       if (status === "SUBSCRIBED") {
         realtimeReconnectAttempts = 0;
         clearRealtimeReconnect();
-        // Au (re)branchement, on peut avoir raté des événements : on resynchronise
-        // et on route (suivi de l'hôte indépendamment de l'écran courant).
+        // Catch-up (re)branchement : refresh cache toujours ; route debouncée
+        // et bloquée pendant hydrate join (T-01/T-02). Events INSERT/UPDATE
+        // ci-dessus routent immédiatement — sans debounce.
         void refreshGameSession()
           .then((row) => {
-            if (row) handleSessionRoute(row);
+            if (!shouldRouteAfterRealtimeSubscribed({ joinSessionHydrating })) return;
+            if (!row) return;
+            subscribedCatchUpRoute.schedule(row);
           })
           .catch(() => {});
         return;
@@ -1615,6 +1652,7 @@ export function subscribeLobbyRealtime(onUpdate) {
 
 export function unsubscribeLobbyRealtime() {
   clearRealtimeReconnect();
+  subscribedCatchUpRoute.cancel();
   if (realtimeChannel && supabase) {
     supabase.removeChannel(realtimeChannel);
     realtimeChannel = null;
