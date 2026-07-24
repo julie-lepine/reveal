@@ -12,6 +12,7 @@ import {
 import { handleNavTarget, goToEveningSettings } from "./nav.js";
 import {
   isGameSyncActive,
+  isLobbyHost,
   onGameSessionChange,
   handleSessionRoute,
   refreshGameSession,
@@ -23,6 +24,7 @@ import { getCurrentScreen } from "../core/router.js";
 import { isSupabaseConfigured } from "../core/supabaseClient.js";
 import { startLobbyPresenceSync, onLobbyBundleUpdated } from "../core/supabaseLobby.js";
 import { getLobby, hasActiveLobby, openPartySettings } from "../core/lobby.js";
+import { clientMayOfferHostClaim } from "../core/hostClaimOffer.js";
 import { getLastGame, getState } from "../core/state.js";
 // import { getFilRougeSession } from "../core/filRougeSession.js";
 import { bindFeedbackPrompt, feedbackPromptCardHtml } from "../core/feedbackUi.js";
@@ -217,6 +219,8 @@ function gameSelectRenderSnapshot() {
   return JSON.stringify({
     n: participants.length,
     hostId,
+    localIsHost: isLobbyHost(),
+    mayClaim: clientMayOfferHostClaim(),
     code: getLobby()?.code || "",
     recap: recap.hasActivity,
     ht: recap.hotTakes,
@@ -247,12 +251,21 @@ function gameSelectHeaderHtml() {
 }
 
 function partySettingsButtonHtml() {
-  // Visible pour tout le monde en MP : non-hôte → offre claim ARCH-03b si éligible
-  // (openPartySettings n'affiche l'UI admin qu'après autorisation)
-  if (!isGameSyncActive()) return "";
+  // Admin : uniquement le vrai hôte (hostId). Pas de bouton trompeur pour les invités.
+  if (!isGameSyncActive() || !isLobbyHost()) return "";
   return `
       <button type="button" class="game-select-party-settings" data-party-settings>
         ⚙️ Paramètres de partie
+      </button>`;
+}
+
+/** CTA distinct ARCH-03b : offre claim sans réutiliser le libellé admin. */
+function reclaimHostCtaHtml() {
+  if (!isGameSyncActive() || isLobbyHost()) return "";
+  if (!clientMayOfferHostClaim()) return "";
+  return `
+      <button type="button" class="game-select-reclaim-host" data-claim-host>
+        👑 Reprendre l'animation
       </button>`;
 }
 
@@ -261,6 +274,7 @@ function gameSelectActionsHtml() {
     <div class="game-select-actions">
       <button type="button" class="game-select-profile" data-nav="settings">Profil & paramètres</button>
       ${partySettingsButtonHtml()}
+      ${reclaimHostCtaHtml()}
     </div>`;
 }
 
@@ -328,6 +342,15 @@ export function mountGameSelect(app) {
       void openPartySettings().then((res) => {
         if (res.ok || res.claimed) scheduleRender(true);
       });
+      return;
+    }
+
+    if (e.target.closest("[data-claim-host]")) {
+      void (async () => {
+        const { ensureLobbyHostOrOfferClaim } = await import("../core/hostClaimOffer.js");
+        const access = await ensureLobbyHostOrOfferClaim({ reason: "reclaim-cta" });
+        if (access.ok || access.claimed) scheduleRender(true);
+      })();
       return;
     }
 

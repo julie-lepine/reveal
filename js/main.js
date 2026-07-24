@@ -57,6 +57,7 @@ import { mountTierNightLive } from "./games/tierNightLive.js";
 import { initMultiplayerSyncVisibility } from "./core/gameSync.js";
 import { initFeedbackFab } from "./core/feedbackUi.js";
 import { initHostNoticeListener } from "./core/hostNotice.js";
+import { initActingHostNoticeListener } from "./core/actingHostNotice.js";
 
 const app = document.getElementById("app");
 
@@ -123,6 +124,7 @@ initExitGameDelegation(app);
 initAds();
 initMultiplayerSyncVisibility();
 initHostNoticeListener();
+initActingHostNoticeListener();
 // initFilRougeResultsListener();
 // initFilRougeValidationListener();
 

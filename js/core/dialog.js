@@ -8,6 +8,7 @@ import {
   getTurnstileToken,
 } from "./turnstile.js";
 import { PROFILE_EMOJI_CHOICES } from "../../data/profileEmojis.js";
+import { getState } from "./state.js";
 
 let openDialog = null;
 
@@ -472,10 +473,14 @@ export function showPartySettingsDialog({ canTransferHost = true } = {}) {
 }
 
 function lobbyPlayersListHtml(participants, { canKick }) {
+  const hostId = getState().lobby?.hostId || null;
   const rows = (participants || [])
     .map((p) => {
-      const kickable = canKick && p.userId && !p.isLocal && !p.isHost;
-      const badge = p.isHost ? `<span class="lobby-manage__badge">Hôte</span>` : "";
+      const isHost = Boolean(
+        (hostId && p.userId && p.userId === hostId) || (!hostId && p.isHost)
+      );
+      const kickable = canKick && p.userId && !p.isLocal && !isHost;
+      const badge = isHost ? `<span class="lobby-manage__badge">Hôte</span>` : "";
       const kickBtn = kickable
         ? `<button type="button" class="btn btn-secondary btn--compact lobby-manage__kick" data-kick-user="${escapeHtml(p.userId)}" data-kick-name="${escapeHtml(p.name)}">Retirer</button>`
         : "";

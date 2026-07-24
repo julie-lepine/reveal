@@ -2453,6 +2453,29 @@ select.field-input option{
   transition:background .15s ease, box-shadow .15s ease, transform .1s ease;
 }
 
+.game-select-reclaim-host{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  min-height:36px;
+  padding:6px 12px;
+  border-radius:12px;
+  border:1px solid rgba(251,191,36,.35);
+  background:rgba(251,191,36,.08);
+  color:rgba(253,230,138,.92);
+  font-size:13px;
+  font-weight:600;
+  font-family:inherit;
+  cursor:pointer;
+  -webkit-tap-highlight-color:transparent;
+  text-decoration:none;
+  transition:background .15s ease, box-shadow .15s ease, transform .1s ease;
+}
+
+.game-select-reclaim-host:active{
+  transform:scale(.98);
+}
+
 .game-select-party-settings:active{
   transform:scale(.97);
   background:

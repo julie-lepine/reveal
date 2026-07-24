@@ -45,9 +45,12 @@ import {
   mountGameResumeInterstitial,
 } from "../core/gameResume.js";
 
-function participantsHtml(participants, { canKick = false } = {}) {
+function participantsHtml(participants, { canKick = false, hostId = null } = {}) {
   return participants
     .map((p) => {
+      const isHost = Boolean(
+        (hostId && p.userId && p.userId === hostId) || (!hostId && p.isHost)
+      );
       const inner = `
         ${p.emoji}
         ${p.ready ? '<span class="participant__check">✓</span>' : ""}`;
@@ -59,7 +62,7 @@ function participantsHtml(participants, { canKick = false } = {}) {
         : `<div class="participant__avatar" style="background:${p.color}">
         ${inner}
       </div>`;
-      const kickable = canKick && p.userId && !p.isLocal && !p.isHost;
+      const kickable = canKick && p.userId && !p.isLocal && !isHost;
       const kickBtn = kickable
         ? `<button type="button" class="participant__kick" data-kick-user="${escapeHtml(p.userId)}" data-kick-name="${escapeHtml(p.name)}" aria-label="Retirer ${escapeHtml(p.name)}">Retirer</button>`
         : "";
@@ -166,7 +169,7 @@ export function mountLobby(app) {
   function updateStartButton() {
     const participants = getLobbyParticipants();
     const local = participants.find((p) => p.isLocal);
-    const isHost = Boolean(local?.isHost);
+    const isHost = isLobbyHost();
     const localReady = Boolean(local?.ready);
     const allReady = allLobbyMembersReady();
     const label = getLobbyStartLabel({ isHost, allReady, localReady });
@@ -201,12 +204,13 @@ export function mountLobby(app) {
     const local = participants.find((p) => p.isLocal);
     const canKick =
       isSupabaseConfigured() && isLobbyHost() && canManageLobbyRoster();
+    const hostId = getLobby()?.hostId || null;
 
     const countEl = app.querySelector(".lobby-count");
     if (countEl) countEl.textContent = `${total} / ${MAX_PLAYERS} participants connectés`;
 
     const grid = app.querySelector(".participants-grid");
-    if (grid) grid.innerHTML = participantsHtml(participants, { canKick });
+    if (grid) grid.innerHTML = participantsHtml(participants, { canKick, hostId });
 
     const footer = app.querySelector(".lobby-footer");
     if (footer) {
@@ -338,10 +342,11 @@ export function mountLobby(app) {
     const participants = getLobbyParticipants();
     const { ready, total } = getReadyCount();
     const local = participants.find((p) => p.isLocal);
-    const isHost = local?.isHost;
+    const isHost = isLobbyHost();
     const allReady = allLobbyMembersReady();
     const online = isSupabaseConfigured();
     const canKick = online && isLobbyHost() && canManageLobbyRoster();
+    const hostId = lobby?.hostId || null;
 
     app.innerHTML = pageShell({
       backTarget: "home",
@@ -349,7 +354,7 @@ export function mountLobby(app) {
         <p class="lobby-count">${total} / ${MAX_PLAYERS} participants connectés</p>
 
         <div class="participants-wrap">
-          <div class="participants-grid">${participantsHtml(participants, { canKick })}</div>
+          <div class="participants-grid">${participantsHtml(participants, { canKick, hostId })}</div>
         </div>
 
         <div class="invite-card">

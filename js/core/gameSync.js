@@ -816,6 +816,10 @@ export function nudgeSessionListenersForActingHost() {
     localUid: getSupabaseUserId() || null,
   });
   notify(cachedRow);
+  // Notification UX acting host (une fois / token) — hors chemin claim lobby
+  void import("./actingHostNotice.js")
+    .then((m) => m.onActingHostElection(tokenAfter))
+    .catch(() => {});
 }
 
 let notifying = false;
