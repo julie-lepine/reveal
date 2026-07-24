@@ -45,3 +45,12 @@ export function didActingHostChange(
   const next = resolveActingHostUserId(nextParticipants || [], nextHostId, now);
   return prev !== next;
 }
+
+/**
+ * Bypass shouldSkipFullRender : compare le token courant au dernier token
+ * **acquitté après un full-render**, pas à une lecture « before » dans le même tick.
+ * (Le nudge incrémente puis notify : before/after dans le listener seraient égaux.)
+ */
+export function needsActingHostUiRefresh(ackedToken, currentToken) {
+  return ackedToken !== currentToken;
+}

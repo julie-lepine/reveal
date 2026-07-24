@@ -19,6 +19,7 @@ import {
   canActAsHost,
   onGameSessionChange,
   getActingHostUiRefreshToken,
+  needsActingHostUiRefresh,
   returnToGameSelect,
   startGameSession,
   stopGameSessionListenerOnPostGame,
@@ -576,12 +577,18 @@ export function mountTrivia(app) {
     }
   }
 
+  let lastAckedActingHostToken = getActingHostUiRefreshToken();
+
   const unsub = onGameSessionChange((row) => {
     if (stopGameSessionListenerOnPostGame(row, { cleanup: clearNpcTimers })) return;
 
     const prevPhase = phase;
     const prevQuestion = questionIdx;
-    const ahTokenBefore = getActingHostUiRefreshToken();
+    const ahTokenNow = getActingHostUiRefreshToken();
+    const actingHostUiRefresh = needsActingHostUiRefresh(
+      lastAckedActingHostToken,
+      ahTokenNow
+    );
     syncFromSession();
     if (prevQuestion !== questionIdx || prevPhase !== phase) {
       pendingAnswerIndex = null;
@@ -590,8 +597,6 @@ export function mountTrivia(app) {
     if (phase === "question" && canActAsHost() && trivia.allAnswersIn()) {
       void goToReveal();
     }
-    const actingHostUiRefresh =
-      getActingHostUiRefreshToken() !== ahTokenBefore;
     const skipFull = shouldSkipFullRender(prevPhase, prevQuestion);
     arch03AhLogSkipDecision("trivia", {
       decision: skipFull && !actingHostUiRefresh ? "skip-full-render" : "full-render",
@@ -605,9 +610,11 @@ export function mountTrivia(app) {
       return;
     }
     render();
+    lastAckedActingHostToken = ahTokenNow;
   });
 
   render();
+  lastAckedActingHostToken = getActingHostUiRefreshToken();
 
   return () => {
     clearNpcTimers();

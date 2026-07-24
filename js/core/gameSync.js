@@ -785,8 +785,8 @@ export function onGameSessionChange(fn) {
 
 /**
  * Token incrémenté quand l'acting host change (présence lobby).
- * Les écrans jeu qui skippent le full-render sur votes inchangés doivent
- * forcer un render si ce token a bougé (sinon boutons host invisibles).
+ * Les écrans jeu comparent ce token à un ack local mis à jour UNIQUEMENT
+ * après un full-render réussi (voir needsActingHostUiRefresh).
  */
 let actingHostUiRefreshToken = 0;
 /** TEMP ARCH03-AH : active les logs canActAsHost pendant un notify/render. */
@@ -795,6 +795,8 @@ let arch03AhRenderPass = false;
 export function getActingHostUiRefreshToken() {
   return actingHostUiRefreshToken;
 }
+
+export { needsActingHostUiRefresh } from "./hostPresence.js";
 
 /**
  * Re-pousse la session cached aux listeners d'écran jeu.

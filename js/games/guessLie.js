@@ -11,6 +11,7 @@ import {
   isLobbyHost,
   onGameSessionChange,
   getActingHostUiRefreshToken,
+  needsActingHostUiRefresh,
   commitGuessLiePlay,
   getActiveMemberUserIds,
   nameForUserId,
@@ -450,28 +451,34 @@ export function mountGuessLie(app) {
     }
   }
 
+  let lastAckedActingHostToken = getActingHostUiRefreshToken();
+
   function onSyncUpdate(row) {
     if (stopGameSessionListenerOnPostGame(row)) return;
 
     const prevIdx = roundIdx;
     const prevPhase = phase;
     const prevVotes = JSON.stringify(getGuessLieSession().votes || {});
-    const ahTokenBefore = getActingHostUiRefreshToken();
+    const ahTokenNow = getActingHostUiRefreshToken();
+    const actingHostUiRefresh = needsActingHostUiRefresh(
+      lastAckedActingHostToken,
+      ahTokenNow
+    );
     syncFromGl();
     const votesChanged = JSON.stringify(getGuessLieSession().votes || {}) !== prevVotes;
-    const actingHostUiRefresh =
-      getActingHostUiRefreshToken() !== ahTokenBefore;
     const advanced =
       mp && (roundIdx !== prevIdx || (phase === "voting" && prevPhase === "reveal"));
     if (phase === "reveal" && prevPhase === "voting") {
       ensureRevealDisplay();
       render();
+      lastAckedActingHostToken = ahTokenNow;
       return;
     }
     if (advanced) {
       revealResult = null;
       selected = phase === "voting" ? null : selected;
       render();
+      lastAckedActingHostToken = ahTokenNow;
       void tryAdvanceToReveal();
       return;
     }
@@ -500,12 +507,14 @@ export function mountGuessLie(app) {
       return;
     }
     render();
+    lastAckedActingHostToken = ahTokenNow;
   }
 
   const unsub = onGameSessionChange(onSyncUpdate);
 
   if (mp) {
     render();
+    lastAckedActingHostToken = getActingHostUiRefreshToken();
     onSyncUpdate();
   } else {
     beginRound();

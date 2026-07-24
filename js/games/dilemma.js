@@ -36,6 +36,7 @@ import {
   isLobbyHost,
   onGameSessionChange,
   getActingHostUiRefreshToken,
+  needsActingHostUiRefresh,
   completeGameSession,
   dilemmaToRemote,
   stopGameSessionListenerOnPostGame,
@@ -559,6 +560,8 @@ export function mountDilemma(app) {
     }
   }
 
+  let lastAckedActingHostToken = getActingHostUiRefreshToken();
+
   const unsub = onGameSessionChange(async (row) => {
     if (unmounted) return;
     if (stopGameSessionListenerOnPostGame(row, { cleanup: cancelRevealAnim })) return;
@@ -566,12 +569,17 @@ export function mountDilemma(app) {
     const prevPhase = phase;
     const prevRound = roundIdx;
     const prevVotesJson = JSON.stringify(getDilemmaSession().votes || {});
-    const ahTokenBefore = getActingHostUiRefreshToken();
+    const ahTokenNow = getActingHostUiRefreshToken();
+    const actingHostUiRefresh = needsActingHostUiRefresh(
+      lastAckedActingHostToken,
+      ahTokenNow
+    );
     syncFromSession();
     if (!currentDilemma && ROUNDS[roundIdx]) currentDilemma = ROUNDS[roundIdx];
 
     if (phase === "voting" && sessionInReveal()) {
       enterRevealUi();
+      lastAckedActingHostToken = ahTokenNow;
       return;
     }
 
@@ -585,10 +593,9 @@ export function mountDilemma(app) {
     }
     if (phase === "reveal" && prevPhase !== "reveal") {
       enterRevealUi();
+      lastAckedActingHostToken = ahTokenNow;
       return;
     }
-    const actingHostUiRefresh =
-      getActingHostUiRefreshToken() !== ahTokenBefore;
     const skipFull = shouldSkipFullRender(prevPhase, prevRound, prevVotesJson);
     const canAct = canActAsHost();
     if (phase === "reveal" && prevPhase === "reveal" && !actingHostUiRefresh) {
@@ -625,9 +632,11 @@ export function mountDilemma(app) {
       phase,
     });
     render();
+    lastAckedActingHostToken = ahTokenNow;
   });
 
   render();
+  lastAckedActingHostToken = getActingHostUiRefreshToken();
 
   return () => {
     unmounted = true;

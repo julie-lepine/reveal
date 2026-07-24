@@ -41,6 +41,7 @@ import {
   getActingHostUserId,
   onGameSessionChange,
   getActingHostUiRefreshToken,
+  needsActingHostUiRefresh,
   completeGameSession,
   hotTakeToRemote,
   stopGameSessionListenerOnPostGame,
@@ -838,17 +839,25 @@ export function mountHotTake(app) {
     }
   }
 
+  /** Acquitté seulement après full-render (ou enterRevealUi), jamais au début du listener. */
+  let lastAckedActingHostToken = getActingHostUiRefreshToken();
+
   const unsubGame = onGameSessionChange((row) => {
     if (stopGameSessionListenerOnPostGame(row)) return;
 
     const prevPhase = phase;
     const prevTake = takeIdx;
     const prevVotesJson = JSON.stringify(getHotTakeSession().votes || {});
-    const ahTokenBefore = getActingHostUiRefreshToken();
+    const ahTokenNow = getActingHostUiRefreshToken();
+    const actingHostUiRefresh = needsActingHostUiRefresh(
+      lastAckedActingHostToken,
+      ahTokenNow
+    );
     syncFromSession();
 
     if (phase === "voting" && sessionInReveal()) {
       enterRevealUi();
+      lastAckedActingHostToken = ahTokenNow;
       return;
     }
 
@@ -859,11 +868,10 @@ export function mountHotTake(app) {
 
     if (phase === "reveal" && prevPhase !== "reveal") {
       enterRevealUi();
+      lastAckedActingHostToken = ahTokenNow;
       return;
     }
 
-    const actingHostUiRefresh =
-      getActingHostUiRefreshToken() !== ahTokenBefore;
     const skipFull = shouldSkipFullRender(prevPhase, prevTake, prevVotesJson);
     const canAct = canActAsHost();
 
@@ -872,8 +880,8 @@ export function mountHotTake(app) {
         decision: "early-return-reveal-scores-only",
         skipFull,
         actingHostUiRefresh,
-        ahTokenBefore,
-        ahTokenNow: getActingHostUiRefreshToken(),
+        lastAckedActingHostToken,
+        ahTokenNow,
         canActAsHost: canAct,
         phase,
       });
@@ -890,8 +898,8 @@ export function mountHotTake(app) {
         decision: "skip-full-render",
         skipFull,
         actingHostUiRefresh,
-        ahTokenBefore,
-        ahTokenNow: getActingHostUiRefreshToken(),
+        lastAckedActingHostToken,
+        ahTokenNow,
         canActAsHost: canAct,
         phase,
       });
@@ -902,16 +910,18 @@ export function mountHotTake(app) {
       decision: "full-render",
       skipFull,
       actingHostUiRefresh,
-      ahTokenBefore,
-      ahTokenNow: getActingHostUiRefreshToken(),
+      lastAckedActingHostToken,
+      ahTokenNow,
       canActAsHost: canAct,
       phase,
     });
     render();
+    lastAckedActingHostToken = ahTokenNow;
   });
 
   syncFromSession();
   render();
+  lastAckedActingHostToken = getActingHostUiRefreshToken();
 
   return () => {
     unsubGame();

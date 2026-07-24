@@ -32,6 +32,7 @@ import {
   canActAsHost,
   onGameSessionChange,
   getActingHostUiRefreshToken,
+  needsActingHostUiRefresh,
   completeGameSession,
   stopGameSessionListenerOnPostGame,
   refreshGameSession,
@@ -385,13 +386,19 @@ export function mountSpeedVote(app) {
     }
   }
 
+  let lastAckedActingHostToken = getActingHostUiRefreshToken();
+
   const unsub = onGameSessionChange((row) => {
     if (stopGameSessionListenerOnPostGame(row)) return;
 
     const prevPhase = phase;
     const prevRound = roundIdx;
     const prevVotesJson = JSON.stringify(getSpeedVoteSession().votes || {});
-    const ahTokenBefore = getActingHostUiRefreshToken();
+    const ahTokenNow = getActingHostUiRefreshToken();
+    const actingHostUiRefresh = needsActingHostUiRefresh(
+      lastAckedActingHostToken,
+      ahTokenNow
+    );
     syncFromSession();
     if (!currentQuestion && QUESTIONS[roundIdx]) {
       currentQuestion = QUESTIONS[roundIdx];
@@ -400,8 +407,6 @@ export function mountSpeedVote(app) {
       void goToReveal();
       return;
     }
-    const actingHostUiRefresh =
-      getActingHostUiRefreshToken() !== ahTokenBefore;
     const skipFull = shouldSkipFullRender(prevPhase, prevRound, prevVotesJson);
     arch03AhLogSkipDecision("speedVote", {
       decision: skipFull && !actingHostUiRefresh ? "skip-full-render" : "full-render",
@@ -422,9 +427,11 @@ export function mountSpeedVote(app) {
       return;
     }
     render();
+    lastAckedActingHostToken = ahTokenNow;
   });
 
   render();
+  lastAckedActingHostToken = getActingHostUiRefreshToken();
 
   return () => {
     unsub();

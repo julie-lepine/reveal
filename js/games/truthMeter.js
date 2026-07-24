@@ -48,6 +48,7 @@ import {
   isLobbyHost,
   onGameSessionChange,
   getActingHostUiRefreshToken,
+  needsActingHostUiRefresh,
   stopGameSessionListenerOnPostGame,
 } from "../core/gameSync.js";
 import { arch03AhLogSkipDecision } from "../core/arch03ActingHostDebug.js";
@@ -950,6 +951,8 @@ export function mountTruthMeter(app) {
     }
   }
 
+  let lastAckedActingHostToken = getActingHostUiRefreshToken();
+
   const unsubGame = onGameSessionChange((row) => {
     if (stopGameSessionListenerOnPostGame(row, { cleanup: () => {
       if (displayTimeoutId) clearTimeout(displayTimeoutId);
@@ -960,7 +963,11 @@ export function mountTruthMeter(app) {
     const prevPhase = phase;
     const prevRound = roundIdx;
     const prevVotesJson = JSON.stringify(getTruthMeterSession().votes || {});
-    const ahTokenBefore = getActingHostUiRefreshToken();
+    const ahTokenNow = getActingHostUiRefreshToken();
+    const actingHostUiRefresh = needsActingHostUiRefresh(
+      lastAckedActingHostToken,
+      ahTokenNow
+    );
     captureAuthorDraftFromDom();
     captureVoteDraftFromDom();
     syncFromSession();
@@ -982,8 +989,6 @@ export function mountTruthMeter(app) {
       return;
     }
 
-    const actingHostUiRefresh =
-      getActingHostUiRefreshToken() !== ahTokenBefore;
     const skipFull = shouldSkipFullRender(prevPhase, prevRound, prevVotesJson);
     arch03AhLogSkipDecision("truthMeter", {
       decision: skipFull && !actingHostUiRefresh ? "skip-full-render" : "full-render",
@@ -1007,6 +1012,7 @@ export function mountTruthMeter(app) {
     }
 
     render();
+    lastAckedActingHostToken = ahTokenNow;
     if (phase === "display" && prevPhase !== "display" && (!mp || canActAsHost())) {
       scheduleDisplayToVote();
     }
@@ -1029,6 +1035,7 @@ export function mountTruthMeter(app) {
 
   syncFromSession();
   render();
+  lastAckedActingHostToken = getActingHostUiRefreshToken();
   if (phase === "display" && (!mp || canActAsHost())) {
     scheduleDisplayToVote();
   }

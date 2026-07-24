@@ -26,6 +26,7 @@ import {
   canActAsHost,
   onGameSessionChange,
   getActingHostUiRefreshToken,
+  needsActingHostUiRefresh,
   refreshGameSession,
   returnToGameSelect,
   startGameSession,
@@ -931,6 +932,8 @@ export function mountConsensus(app) {
     return false;
   }
 
+  let lastAckedActingHostToken = getActingHostUiRefreshToken();
+
   const unsub = onGameSessionChange((row) => {
     if (stopGameSessionListenerOnPostGame(row, { cleanup: () => {
       clearNpcTimers();
@@ -940,7 +943,11 @@ export function mountConsensus(app) {
 
     const prevPhase = phase;
     const prevQuestion = questionIdx;
-    const ahTokenBefore = getActingHostUiRefreshToken();
+    const ahTokenNow = getActingHostUiRefreshToken();
+    const actingHostUiRefresh = needsActingHostUiRefresh(
+      lastAckedActingHostToken,
+      ahTokenNow
+    );
     const roundChanged = syncFromSession();
     if (!roundChanged) captureDraftFromDom();
     if (
@@ -956,8 +963,6 @@ export function mountConsensus(app) {
     if (phase === "reveal-pending") {
       scheduleRevealFromPending();
     }
-    const actingHostUiRefresh =
-      getActingHostUiRefreshToken() !== ahTokenBefore;
     const skipFull = shouldSkipFullRender(prevPhase, prevQuestion);
     arch03AhLogSkipDecision("consensus", {
       decision: skipFull && !actingHostUiRefresh ? "skip-full-render" : "full-render",
@@ -974,12 +979,14 @@ export function mountConsensus(app) {
     const questionChanged =
       phase === "question" && questionIdx !== lastRenderedQuestionIdx;
     scheduleRender({
-      force: phaseChanged || phase !== "question",
+      force: phaseChanged || phase !== "question" || actingHostUiRefresh,
       scrollTop: phaseChanged || questionChanged,
     });
+    lastAckedActingHostToken = ahTokenNow;
   });
 
   render();
+  lastAckedActingHostToken = getActingHostUiRefreshToken();
 
   if (mp && canActAsHost() && consensus.getSession().phase === "reveal-pending") {
     scheduleRevealFromPending();

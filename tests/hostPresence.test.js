@@ -5,6 +5,7 @@ import {
   isMemberPresent,
   resolveActingHostUserId,
   didActingHostChange,
+  needsActingHostUiRefresh,
 } from "../js/core/hostPresence.js";
 
 const NOW = 1_000_000_000_000;
@@ -134,5 +135,18 @@ describe("didActingHostChange", () => {
       { userId: "guest-b", lastSeenAt: iso(2_000) },
     ];
     assert.equal(didActingHostChange(prev, "host", next, "host", NOW), false);
+  });
+});
+
+describe("needsActingHostUiRefresh", () => {
+  it("nudge 0→1 force un full-render tant que non acquitté", () => {
+    assert.equal(needsActingHostUiRefresh(0, 1), true);
+    assert.equal(needsActingHostUiRefresh(1, 1), false);
+    assert.equal(needsActingHostUiRefresh(1, 2), true);
+  });
+
+  it("après ack du token courant, les cycles suivants skippent", () => {
+    const acked = 1;
+    assert.equal(needsActingHostUiRefresh(acked, 1), false);
   });
 });
