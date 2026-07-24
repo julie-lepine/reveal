@@ -600,6 +600,8 @@ export function mountHotTake(app) {
         await commitHotTakeVote(pick);
         selected = null;
         myVote = pick;
+      } catch {
+        // Feedback déjà affiché ; rollback session dans commitHotTakeVote.
       } finally {
         voteCommitInFlight = null;
         syncFromSession();

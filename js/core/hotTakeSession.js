@@ -32,6 +32,7 @@ import {
   normalizePlayerVotesMap,
 } from "./gameSync.js";
 import { patchGameStateWithFeedback } from "./patchGameStateFeedback.js";
+import { computeHotTakeVoteApply } from "./hotTakeVoteCommit.js";
 import { launchGameWithSync, commitHostGamePlay, commitPrepReadyToggle } from "./mpLaunch.js";
 import { mergeHotTakeCustomTakes } from "./sessionMerge.js";
 
@@ -438,17 +439,23 @@ export async function commitHotTakePlay(patch, patchOpts = {}) {
   });
 }
 
-/** Invité MP : envoie uniquement son vote (évite d'écraser phase reveal de l'hôte). */
+/** Invité MP : envoie uniquement son vote (évite d'écraser phase reveal de l'hôte). Rollback si sync échoue. */
 export async function commitHotTakeVote(choice) {
   const localName = getLocalDisplayName();
   const session = getHotTakeSession();
-  const uid = isGameSyncActive() ? requireLocalParticipantUid() : null;
-  const votes = { ...(session.votes || {}), [localName]: choice };
-  saveStatePatch({ hotTakeGame: { ...session, votes } });
-  if (!isGameSyncActive()) return { ...session, votes };
-  const remoteVotes = { [uid]: choice };
-  await patchGameStateWithFeedback({ hotTake: { votes: remoteVotes } });
-  return { ...session, votes };
+  const { previousVotes, nextVotes } = computeHotTakeVoteApply(session, localName, choice);
+  saveStatePatch({ hotTakeGame: { ...session, votes: nextVotes } });
+  if (!isGameSyncActive()) return { ...session, votes: nextVotes };
+
+  try {
+    const uid = requireLocalParticipantUid();
+    await patchGameStateWithFeedback({ hotTake: { votes: { [uid]: choice } } });
+    return { ...session, votes: nextVotes };
+  } catch (err) {
+    const current = getHotTakeSession();
+    saveStatePatch({ hotTakeGame: { ...current, votes: previousVotes } });
+    throw err;
+  }
 }
 
 export function getHotTakeVotesForUi() {
