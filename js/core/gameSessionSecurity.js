@@ -5,14 +5,22 @@
 
 export const HOST_PRESENCE_STALE_SECONDS = 120;
 
+/** Miroir SQL claim_lobby_host_if_stale (seuil transfert réel). */
+export const HOST_TRANSFER_STALE_SECONDS = 300;
+
 /**
  * Élection acting host alignée sur is_acting_host SQL / hostPresence.js
  * @param {{ userId: string, lastSeenAt: string|null, isHost?: boolean }[]} members
  * @param {string} hostId
  * @param {number} nowMs
+ * @param {number} [staleMs]
  */
-export function resolveActingHostServerLike(members, hostId, nowMs = Date.now()) {
-  const staleMs = HOST_PRESENCE_STALE_SECONDS * 1000;
+export function resolveActingHostServerLike(
+  members,
+  hostId,
+  nowMs = Date.now(),
+  staleMs = HOST_PRESENCE_STALE_SECONDS * 1000
+) {
   const isPresent = (m) => {
     if (!m?.lastSeenAt) return true;
     const t = new Date(m.lastSeenAt).getTime();
@@ -31,9 +39,26 @@ export function resolveActingHostServerLike(members, hostId, nowMs = Date.now())
   return present[0] || hostId;
 }
 
-export function isActingHostServerLike(uid, members, hostId, nowMs = Date.now()) {
+export function isActingHostServerLike(
+  uid,
+  members,
+  hostId,
+  nowMs = Date.now(),
+  staleMs = HOST_PRESENCE_STALE_SECONDS * 1000
+) {
   if (!uid) return false;
-  return resolveActingHostServerLike(members, hostId, nowMs) === uid;
+  return resolveActingHostServerLike(members, hostId, nowMs, staleMs) === uid;
+}
+
+/** Éligibilité claim transfert (seuil 5 min) — miroir serveur, UX only. */
+export function isClaimHostCandidateServerLike(uid, members, hostId, nowMs = Date.now()) {
+  return isActingHostServerLike(
+    uid,
+    members,
+    hostId,
+    nowMs,
+    HOST_TRANSFER_STALE_SECONDS * 1000
+  );
 }
 
 /** Whitelist kind/game pour contribute (miroir SQL). */

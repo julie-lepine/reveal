@@ -1368,6 +1368,25 @@ export async function transferLobbyHostSupabase(newHostUserId) {
   return { ok: true };
 }
 
+/**
+ * ARCH-03b : claim atomique du rôle hôte si host stale ≥ 5 min (RPC serveur).
+ * Ne met pas à jour le state local avant confirmation + refresh.
+ */
+export async function claimLobbyHostIfStaleSupabase() {
+  const lobbyId = getState().lobby?.id;
+  const userId = getSupabaseUserId();
+  if (!lobbyId || !userId) {
+    return { ok: false, error: "Lobby ou session invalide." };
+  }
+
+  const { data, error } = await supabase.rpc("claim_lobby_host_if_stale", {
+    p_lobby_id: lobbyId,
+  });
+
+  if (error) return { ok: false, error: error.message };
+  return { ok: true, claimed: data !== false };
+}
+
 /** Hôte : retire un membre du lobby (RPC kick_lobby_member). */
 export async function kickLobbyMemberSupabase(targetUserId) {
   const lobbyId = getState().lobby?.id;

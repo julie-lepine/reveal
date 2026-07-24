@@ -200,7 +200,7 @@ Clôture QA :
 - **M-06a** — exit mid-game invité sans `endGameSession` ; bandeau « Rejoindre la partie en cours » + reprise immédiate depuis le cache.
 - **I-01** — acting host termine la partie : `host_id` = hôte réel du lobby ; QA acting host OK.
 - **I-02** déjà clôturé (2026-07-11).
-- Ouverts : **I-08** (RLS UPDATE session), **ARCH-03** (policy acting host — metadata I-01 OK, couche policy encore à traiter).
+- Ouverts : **I-08** (RLS UPDATE session), **ARCH-03** (acting host technique session — en cours QA), **ARCH-03b** (reprise confirmée du lobby host).
 
 | ID | Problème | Fichier / fonction | Scénario | Impact | Correction proposée | Statut |
 |----|----------|-------------------|----------|--------|---------------------|--------|
@@ -211,7 +211,8 @@ Clôture QA :
 | **M-06a** | Exit invité : pas `endGameSession` | `exitGame.js` — `exitGameToGameSelect()` | Quitter mid-game | Autres continuent (voulu) mais état local stale | Chemin invité aligné sur `returnToGameSelect()` ; bouton Rejoindre réhydrate depuis le cache puis navigue immédiatement | ✅ Corrigé + validé QA (rejoin banner, 2026-07-22) |
 | **M-06b** | `returnToGameSelect` asymétrique | `gameSync.js`, `nav.js` | Hôte reset session ; invité suppress | Comportements différents | `returnToGameSelect()` nettoie aussi l'invité ; retour depuis prep réutilise ce chemin | ✅ Corrigé + validé QA (2026-07-22) |
 | **L-01** | « Recommencer » visible mais bloqué | `restartGame.js` | Invité clique Recommencer | Alert « Seul l'hôte » | Masquer bouton pour non-hôte | ✅ Corrigé + validé QA (2026-07-22) |
-| **ARCH-03** | Acting host sans metadata correcte | `hostPresence.js`, jeux sous `canActAsHost()` | Hôte absent > ~2 min | Fin manche possible, metadata fausse | Combiner I-01 + policy acting host | 🟡 Partiel : metadata `host_id` (I-01) validée QA ; policy acting host encore à traiter |
+| **ARCH-03** | Acting host technique (manche) | `hostPresence.js`, `canActAsHost()`, RPC `apply_acting_host_play` / `complete_…_as_actor` | Hôte absent > ~2 min | Débloque reveal / complete ; **pas** admin lobby | Séparer acting session vs host lobby | 🟡 Ouvert : acting session en QA ; hub admin → **ARCH-03b** |
+| **ARCH-03b** | Reprise confirmée du `lobbies.host_id` | `claim_lobby_host_if_stale`, `hostClaimOffer.js` | Hôte stale ≥ 5 min + action hub (launch / params) | Modal explicite → claim atomique ; pas de transfert silencieux ; pas de reclaim auto | RPC + offre à la demande | 🟡 Implémenté client/SQL ; QA manuelle à faire |
 
 **Symptômes utilisateur :** erreur prep ; fin partie acting host ; triche théorique ; asymétrie quit/return.
 
@@ -401,7 +402,7 @@ La matrice ci-dessous liste les points encore ouverts ou résiduels **après rev
 | 1 Identité invité | — | — | — | ARCH-01 (🟡 partiel, hors QA Supabase) |
 | 2 Auth race | — | — | — | — |
 | 3 Multi-sources | — | — | M-14a (KO QA TierNight — suspendu) | — |
-| 4 Hôte/invité | — | I-08 | — | ARCH-03 (🟡 policy acting host) |
+| 4 Hôte/invité | — | I-08 | — | ARCH-03 (🟡 acting session), ARCH-03b (🟡 claim lobby) |
 | 5 Routing/timing | — | T-02 | T-01, M-08, ARCH-04 | ARCH-05 (🟡 mitigé SYN-28) |
 | 6 Async écrans | — | — | ARCH-06 | SYN-05 (dormant) |
 | 7 Erreurs silencieuses | — | — | M-10, T-05, M-14b, M-04b | SYN-26, ARCH-07, ARCH-08 |
@@ -419,7 +420,7 @@ La matrice ci-dessous liste les points encore ouverts ou résiduels **après rev
 | # | ID(s) | Cause | Pourquoi |
 |---|-------|-------|----------|
 | 1 | **I-08** | 4 | Sécurité : tout membre peut UPDATE `game_sessions` |
-| 2 | **ARCH-03** | 4 | Policy acting host manquante (metadata I-01 OK) ; traiter avec/après I-08 |
+| 2 | **ARCH-03** / **ARCH-03b** | 4 | Acting session (120 s) vs claim lobby confirmé (≥ 5 min) ; I-08 lié |
 | 3 | **T-01** + **M-04 / T-02** | 5 | Join / Realtime : route possible avant données complètes |
 | 4 | **M-08 / SYN-13** | 5 | Redirects in-mount (résidu Guess Lie / préps) |
 | 5 | **M-10** + **T-05** + **SYN-26** | 7 | Sync silencieuse / optimistic sans rollback |
@@ -469,7 +470,7 @@ La matrice ci-dessous liste les points encore ouverts ou résiduels **après rev
   - **M-06b** — `returnToGameSelect` hôte vs invité
   - **M-06a** (+ **P-02 / M-06c**) — exit mid-game + bandeau Rejoindre
   - **I-01** — acting host / `host_id` = hôte réel du lobby
-  - Résidus Cause 4 : **I-08** (RLS), **ARCH-03** (policy acting host)
+  - Résidus Cause 4 : **I-08** (RLS), **ARCH-03** (acting session 120 s, ouvert), **ARCH-03b** (claim lobby ≥ 5 min, implémenté — QA manuelle)
 - **I-PG-01** — Fin de partie podium → récap soirée ; QA validée :
   - **Consensus (étape A)** — `finishConsensusGame` stay-on-game + `showEveningResults`
   - **Hot Take (B2)** — phase `"final"` + podium + reset uniquement à la clôture

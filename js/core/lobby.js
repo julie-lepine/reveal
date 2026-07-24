@@ -1074,21 +1074,34 @@ export async function kickLobbyMember(targetUserId, { confirmName = "" } = {}) {
 
 /**
  * Menu hôte sur le hub jeux : transfert d'hôte + gestion des joueurs.
- * @returns {Promise<{ ok: boolean, cancelled?: boolean, action?: string }>}
+ * Garde ARCH-03b : jamais d'UI admin avant hôte réel ou claim réussi.
+ * @returns {Promise<{ ok: boolean, cancelled?: boolean, action?: string, claimed?: boolean }>}
  */
 export async function openPartySettings() {
   if (!isSupabaseConfigured() || !getLobby()?.id) {
     return { ok: false, error: "Multijoueur en ligne requis." };
   }
+  let claimed = false;
   if (!isLocalLobbyHost()) {
-    return { ok: false, error: "Réservé à l'hôte." };
+    // Await complet avant showPartySettingsDialog → aucun flash admin
+    const { ensureLobbyHostOrOfferClaim } = await import("./hostClaimOffer.js");
+    const access = await ensureLobbyHostOrOfferClaim({ reason: "party-settings" });
+    if (!access.ok) {
+      return {
+        ok: false,
+        cancelled: Boolean(access.cancelled),
+        claimed: false,
+        error: access.error || "Réservé à l'hôte.",
+      };
+    }
+    claimed = Boolean(access.claimed);
   }
 
   const others = getLobbyParticipants().filter((p) => !p.isLocal && p.userId);
   const choice = await showPartySettingsDialog({
     canTransferHost: others.length > 0,
   });
-  if (!choice?.ok) return { ok: false, cancelled: true };
+  if (!choice?.ok) return { ok: false, cancelled: true, claimed };
 
   if (choice.action === "transfer") {
     return transferLobbyHost();
@@ -1101,10 +1114,10 @@ export async function openPartySettings() {
       canKick: canManageLobbyRoster(),
       onKick: (userId, name) => kickLobbyMember(userId, { confirmName: name }),
     });
-    return { ok: true, action: "players" };
+    return { ok: true, action: "players", claimed };
   }
 
-  return { ok: false, cancelled: true };
+  return { ok: false, cancelled: true, claimed };
 }
 
 export async function setLocalReady(ready) {

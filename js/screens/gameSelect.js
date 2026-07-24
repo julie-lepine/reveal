@@ -12,7 +12,6 @@ import {
 import { handleNavTarget, goToEveningSettings } from "./nav.js";
 import {
   isGameSyncActive,
-  isLobbyHost,
   onGameSessionChange,
   handleSessionRoute,
   refreshGameSession,
@@ -248,7 +247,9 @@ function gameSelectHeaderHtml() {
 }
 
 function partySettingsButtonHtml() {
-  if (!isGameSyncActive() || !isLobbyHost()) return "";
+  // Visible pour tout le monde en MP : non-hôte → offre claim ARCH-03b si éligible
+  // (openPartySettings n'affiche l'UI admin qu'après autorisation)
+  if (!isGameSyncActive()) return "";
   return `
       <button type="button" class="game-select-party-settings" data-party-settings>
         ⚙️ Paramètres de partie
@@ -325,7 +326,7 @@ export function mountGameSelect(app) {
 
     if (e.target.closest("[data-party-settings]")) {
       void openPartySettings().then((res) => {
-        if (res.ok) scheduleRender(true);
+        if (res.ok || res.claimed) scheduleRender(true);
       });
       return;
     }

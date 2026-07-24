@@ -62,11 +62,9 @@ export function getRestartableGameTitle(gameId, fallbackTitle) {
 async function requireHostToLaunch() {
   if (!isGameSyncActive()) return true;
   if (isLobbyHost()) return true;
-  await showAppAlert("Seul l'hôte peut lancer une partie.", {
-    title: "Action réservée",
-    icon: "👑",
-  });
-  return false;
+  const { ensureLobbyHostOrOfferClaim } = await import("./hostClaimOffer.js");
+  const access = await ensureLobbyHostOrOfferClaim({ reason: "launch" });
+  return access.ok;
 }
 
 /**

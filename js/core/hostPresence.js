@@ -5,11 +5,11 @@ import { HOST_PRESENCE_STALE_MS } from "../config/lobbyLifecycle.js";
  * `lastSeenAt` absent (colonne legacy non migrée) → considéré présent, pour ne
  * jamais déclencher le repli d'hôte par erreur.
  */
-export function isMemberPresent(participant, now = Date.now()) {
+export function isMemberPresent(participant, now = Date.now(), staleMs = HOST_PRESENCE_STALE_MS) {
   if (!participant?.lastSeenAt) return true;
   const t = new Date(participant.lastSeenAt).getTime();
   if (!Number.isFinite(t)) return true;
-  return now - t < HOST_PRESENCE_STALE_MS;
+  return now - t < staleMs;
 }
 
 /**
@@ -18,15 +18,21 @@ export function isMemberPresent(participant, now = Date.now()) {
  * - Hôte absent/déconnecté (heartbeat périmé) → repli déterministe sur le membre présent
  *   au plus petit userId. Déterministe = tous les clients désignent le même acting-host,
  *   donc pas de double déclenchement.
+ * @param {number} [staleMs] seuil présence (120 s acting / 5 min claim transfert)
  */
-export function resolveActingHostUserId(participants = [], hostId = null, now = Date.now()) {
+export function resolveActingHostUserId(
+  participants = [],
+  hostId = null,
+  now = Date.now(),
+  staleMs = HOST_PRESENCE_STALE_MS
+) {
   if (!participants.length) return hostId;
   const host =
     participants.find((p) => p.userId === hostId) ||
     participants.find((p) => p.isHost);
-  if (host && isMemberPresent(host, now)) return host.userId || hostId;
+  if (host && isMemberPresent(host, now, staleMs)) return host.userId || hostId;
   const present = participants
-    .filter((p) => p.userId && isMemberPresent(p, now))
+    .filter((p) => p.userId && isMemberPresent(p, now, staleMs))
     .map((p) => p.userId)
     // Aligné SQL is_acting_host : ORDER BY user_id::text ASC
     .sort((a, b) => String(a).localeCompare(String(b)));

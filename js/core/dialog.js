@@ -185,6 +185,23 @@ export function showAppConfirm(
 }
 
 /**
+ * ARCH-03b — offre de reprise du rôle hôte (pas de transfert silencieux).
+ * @returns {Promise<boolean>} true = « Reprendre le rôle d'hôte »
+ */
+export function showClaimHostDialog({ inactiveMinutes = 5 } = {}) {
+  const mins = Math.max(1, Number(inactiveMinutes) || 5);
+  return showAppConfirm(
+    `L'hôte est inactif depuis ${mins} minutes. Pour continuer la soirée, vous pouvez reprendre le rôle d'hôte. Vous aurez accès au choix des jeux et aux paramètres de la partie.`,
+    {
+      title: "L'hôte semble absent",
+      confirmLabel: "Reprendre le rôle d'hôte",
+      cancelLabel: "Plus tard",
+      icon: "👑",
+    }
+  );
+}
+
+/**
  * Saisie d’email dans une modale (ex. mot de passe oublié).
  * @returns {Promise<{ ok: true, value: string } | { ok: false }>}
  */

@@ -22,6 +22,12 @@ export const LOBBY_HEARTBEAT_MIN_MS = 60 * 1000;
  */
 export const HOST_PRESENCE_STALE_MS = 120 * 1000;
 
+/**
+ * ARCH-03b : seuil pour proposer / accepter un transfert réel de `lobbies.host_id`.
+ * Volontairement > acting technique (120 s) pour éviter un transfert après une pause courte.
+ */
+export const HOST_TRANSFER_STALE_MS = 5 * 60 * 1000;
+
 /** Purge serveur : lobby waiting inactif (h). */
 export const LOBBY_TTL_WAITING_HOURS = 2;
 
