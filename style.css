@@ -1237,12 +1237,6 @@ button.game-card{
   box-shadow:0 0 0 2px #FBBF24, 0 0 10px rgba(251,191,36,.6);
 }
 
-.tier-controversial__outsider{
-  margin-top:10px;
-  font-size:.88rem;
-  color:rgba(255,255,255,.75);
-}
-
 .tier-points-hint{
   margin:0 0 12px;
   padding:10px 12px;
@@ -1323,6 +1317,7 @@ button.game-card{
   line-height:1.2;
 }
 
+.tier-controversial__outsider{
   margin:12px 0 0;
   font-size:13px;
   font-weight:700;
