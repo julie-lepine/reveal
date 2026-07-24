@@ -28,10 +28,18 @@ import {
   LOBBY_FULL_MSG,
   LOBBY_HEARTBEAT_MIN_MS,
   HOST_PRESENCE_STALE_MS,
+  HOST_TRANSFER_STALE_MS,
   MAX_PLAYERS,
   isLobbyJoinTooOld,
 } from "../config/lobbyLifecycle.js";
 import { startLobbyHeartbeat } from "./lobbyHeartbeat.js";
+import {
+  arch03LiveLog,
+  computeClaimEligible,
+  hostAgeMs,
+  isHostPresentAt,
+  shouldNudgeClaimHubUi,
+} from "./presenceUiLive.js";
 const HOST_COLOR = "#A78BFA";
 const GUEST_COLOR = "#60A5FA";
 
@@ -41,6 +49,14 @@ let presenceLobbyId = null;
 let lastLobbyBundleSig = "";
 let lastMemberHeartbeatAt = 0;
 const lobbyBundleListeners = new Set();
+/** Éligibilité claim observée (null = pas encore seed). Transition → bump token hub. */
+let lastClaimEligible = null;
+let claimHubUiToken = 0;
+
+/** Token consultable par le hub si un notify a été manqué (listener absent). */
+export function getClaimHubUiToken() {
+  return claimHubUiToken;
+}
 
 /** Reconnexion Realtime : le socket peut mourir silencieusement (veille onglet, throttling
  *  arrière-plan, coupure brève) sans que Supabase ne le recrée tout seul. */
@@ -73,7 +89,7 @@ function scheduleRealtimeReconnect() {
 }
 
 /** Signature du lobby : ne notifier (donc re-render) que si quelque chose a réellement changé. */
-function lobbyBundleSignature(bundle) {
+function lobbyBundleSignature(bundle, now = Date.now()) {
   return JSON.stringify({
     s: bundle.status,
     g: bundle.gameId,
@@ -82,23 +98,23 @@ function lobbyBundleSignature(bundle) {
     ),
     m: (bundle.messages || []).length,
     lm: bundle.messages?.[bundle.messages.length - 1]?.at || 0,
-    // Bit dérivé « hôte présent » (et NON le last_seen_at brut, qui changerait à chaque
-    // heartbeat → tempête de notify). Ne bascule que quand l'hôte franchit le seuil de
-    // staleness : permet aux invités de re-render pour afficher/masquer le repli d'hôte.
-    hp: isHostPresentInBundle(bundle) ? 1 : 0,
+    // Bits dérivés (pas last_seen_at brut) — basculent aux seuils 120 s / 300 s.
+    hp: isHostPresentInBundle(bundle, now, HOST_PRESENCE_STALE_MS) ? 1 : 0,
+    hc: isHostPresentInBundle(bundle, now, HOST_TRANSFER_STALE_MS) ? 1 : 0,
   });
 }
 
-function isHostPresentInBundle(bundle) {
+function isHostPresentInBundle(
+  bundle,
+  now = Date.now(),
+  staleMs = HOST_PRESENCE_STALE_MS
+) {
   const participants = bundle.participants || [];
   const host =
     participants.find((p) => p.userId === bundle.hostId) ||
     participants.find((p) => p.isHost);
   if (!host) return false;
-  if (!host.lastSeenAt) return true; // colonne absente (legacy) → on ne déclenche pas le repli
-  const t = new Date(host.lastSeenAt).getTime();
-  if (!Number.isFinite(t)) return true;
-  return Date.now() - t < HOST_PRESENCE_STALE_MS;
+  return isHostPresentAt(host.lastSeenAt, now, staleMs);
 }
 
 function isLobbyGoneError(e) {
@@ -876,21 +892,38 @@ function applyLobbyToState(bundle, { persistGuestMembership = false } = {}) {
     (bundle.participants || []).find((p) => p.isHost) ||
     null;
   const hostLastSeenAt = hostParticipant?.lastSeenAt ?? null;
+  const claimEligibleBefore = lastClaimEligible;
+  const claimEligibleAfter = computeClaimEligible({
+    participants: bundle.participants || [],
+    hostId: bundle.hostId || null,
+    localUserId: localUid || null,
+    now,
+    isRealHost: Boolean(localUid && bundle.hostId && localUid === bundle.hostId),
+  });
+  const claimHubNudge = shouldNudgeClaimHubUi(claimEligibleBefore, claimEligibleAfter);
   arch03AhLog("applyLobbyToState", {
     hostId: bundle.hostId || null,
     hostLastSeenAt,
     hostAgeMs: arch03AhHostAgeMs(hostLastSeenAt, now),
-    hostPresentBit: isHostPresentInBundle(bundle) ? 1 : 0,
+    hostPresentBit: isHostPresentInBundle(bundle, now, HOST_PRESENCE_STALE_MS) ? 1 : 0,
+    hostClaimPresentBit: isHostPresentInBundle(bundle, now, HOST_TRANSFER_STALE_MS) ? 1 : 0,
     actingHostBefore,
     actingHostAfterResolved,
     didActingHostChange: actingHostChanged,
-    localUid: getSupabaseUserId() || null,
+    localUid: localUid || null,
     participantLastSeen: (bundle.participants || []).map((p) => ({
       userId: p.userId,
       lastSeenAt: p.lastSeenAt || null,
       ageMs: arch03AhHostAgeMs(p.lastSeenAt, now),
       isHost: Boolean(p.isHost),
     })),
+  });
+  arch03LiveLog("ARCH03B-LIVE", "claim eligibility before/after", {
+    localUserId: localUid || null,
+    hostAgeMs: hostAgeMs(hostLastSeenAt, now),
+    claimEligibleBefore,
+    claimEligibleAfter,
+    currentScreen: getCurrentScreen(),
   });
 
   saveStatePatch({
@@ -918,9 +951,27 @@ function applyLobbyToState(bundle, { persistGuestMembership = false } = {}) {
   }
   bundle.participants.forEach((p) => ensurePlayerScore(p.name));
   startLobbyPresenceSync();
-  const sig = lobbyBundleSignature({ ...bundle, messages });
+
+  if (claimHubNudge) {
+    claimHubUiToken += 1;
+    arch03LiveLog("ARCH03B-LIVE", "hub UI nudge", {
+      localUserId: localUid || null,
+      claimEligibleBefore,
+      claimEligibleAfter,
+      claimHubUiToken,
+      hostAgeMs: hostAgeMs(hostLastSeenAt, now),
+      currentScreen: getCurrentScreen(),
+      listenerCount: lobbyBundleListeners.size,
+    });
+  }
+  lastClaimEligible = claimEligibleAfter;
+
+  const sig = lobbyBundleSignature({ ...bundle, messages }, now);
   if (sig !== lastLobbyBundleSig) {
     lastLobbyBundleSig = sig;
+    notifyLobbyBundleUpdated();
+  } else if (claimHubNudge) {
+    // Transition d'éligibilité sans autre changement de signature (filet)
     notifyLobbyBundleUpdated();
   }
 
@@ -1028,6 +1079,7 @@ export function stopLobbyPresenceSync() {
   presenceLobbyId = null;
   lastLobbyBundleSig = "";
   lastMemberHeartbeatAt = 0;
+  lastClaimEligible = null;
   realtimeReconnectAttempts = 0;
   realtimeOnUpdate = null;
   if (lobbyPresencePollTimer) {

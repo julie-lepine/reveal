@@ -818,7 +818,16 @@ export function nudgeSessionListenersForActingHost() {
   notify(cachedRow);
   // Notification UX acting host (une fois / token) — hors chemin claim lobby
   void import("./actingHostNotice.js")
-    .then((m) => m.onActingHostElection(tokenAfter))
+    .then((m) => {
+      arch03AhLog("acting notice after nudge", {
+        token: tokenAfter,
+        listenerCount: listeners.size,
+        actingHostUserId: getActingHostUserId(),
+        localUid: getSupabaseUserId() || null,
+      });
+      m.onActingHostElection(tokenAfter);
+      m.flushPendingActingHostNotice?.();
+    })
     .catch(() => {});
 }
 

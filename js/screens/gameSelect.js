@@ -22,10 +22,11 @@ import {
 } from "../core/gameSync.js";
 import { getCurrentScreen } from "../core/router.js";
 import { isSupabaseConfigured } from "../core/supabaseClient.js";
-import { startLobbyPresenceSync, onLobbyBundleUpdated } from "../core/supabaseLobby.js";
+import { startLobbyPresenceSync, onLobbyBundleUpdated, getClaimHubUiToken } from "../core/supabaseLobby.js";
 import { getLobby, hasActiveLobby, openPartySettings } from "../core/lobby.js";
 import { clientMayOfferHostClaim } from "../core/hostClaimOffer.js";
 import { getLastGame, getState } from "../core/state.js";
+import { arch03LiveLog } from "../core/presenceUiLive.js";
 // import { getFilRougeSession } from "../core/filRougeSession.js";
 import { bindFeedbackPrompt, feedbackPromptCardHtml } from "../core/feedbackUi.js";
 import {
@@ -221,6 +222,7 @@ function gameSelectRenderSnapshot() {
     hostId,
     localIsHost: isLobbyHost(),
     mayClaim: clientMayOfferHostClaim(),
+    claimHubTok: getClaimHubUiToken(),
     code: getLobby()?.code || "",
     recap: recap.hasActivity,
     ht: recap.hotTakes,
@@ -446,17 +448,19 @@ export function mountGameSelect(app) {
   }
 
   const unsubLobby = onLobbyBundleUpdated(() => {
-    // Quand l'hôte (re)lance un jeu, la maj lobby (status playing / game_id) arrive
-    // souvent avant la nouvelle ligne de session. On refetch la session pour que le
-    // bandeau « Rejoindre la partie en cours » apparaisse aussitôt, sans repasser par
-    // l'Accueil. scheduleRender(false) : le snapshot inclut désormais l'état du bandeau,
-    // donc on ne re-render que si quelque chose a réellement changé (plus de innerHTML
-    // complet forcé à chaque notif lobby).
+    // Toujours re-évaluer le snapshot hub (mayClaim / claimHubTok) — le catchup
+    // session seul ne suffit pas quand seul un bit de présence (hc/hp) bascule.
+    const mayClaim = clientMayOfferHostClaim();
+    arch03LiveLog("ARCH03B-LIVE", "hub UI nudge", {
+      phase: "game-select-lobby-listener",
+      mayClaim,
+      claimHubTok: getClaimHubUiToken(),
+      currentScreen: getCurrentScreen(),
+    });
+    scheduleRender(false);
     if (isGameSyncActive()) {
       scheduleSessionCatchup();
-      return;
     }
-    scheduleRender(false);
   });
 
   if (isGameSyncActive()) {

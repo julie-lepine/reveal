@@ -5,6 +5,7 @@
  */
 import {
   getActingHostUserId,
+  getActingHostUiRefreshToken,
   getCachedGameSession,
   isGameSyncActive,
   isLobbyHost,
@@ -14,17 +15,22 @@ import { getSupabaseUserId } from "./supabaseAuth.js";
 import { getCurrentScreen } from "./router.js";
 import { showAppAlert } from "./dialog.js";
 import { onLobbyBundleUpdated } from "./supabaseLobby.js";
+import { arch03LiveLog, decideActingHostNotice, hostAgeMs } from "./presenceUiLive.js";
+import { getState } from "./state.js";
 
-/** null = pas encore initialisé (pas de toast au seed). */
+/** null = pas encore seedé depuis un bundle lobby. */
 let wasActing = null;
-/** Tokens pour lesquels la notif a été **affichée** (ack post-display uniquement). */
+/** Tokens pour lesquels la notif a été affichée (ack post-display uniquement). */
 const notifiedTokens = new Set();
+/** Élection vue hors manche : à flush au prochain écran de jeu. */
+let pendingNoticeToken = null;
 let noticeOpen = false;
 let bundleUnsub = null;
 
 function resetActingHostNoticeState() {
   wasActing = null;
   notifiedTokens.clear();
+  pendingNoticeToken = null;
   noticeOpen = false;
 }
 
@@ -34,7 +40,6 @@ function isLocalActingNow() {
   return getActingHostUserId() === uid;
 }
 
-/** Uniquement pendant une manche / session de jeu active (pas hub, pas post-partie). */
 function isInActivePlaySession() {
   const row = getCachedGameSession();
   const sessionScreen = row?.screen;
@@ -55,10 +60,25 @@ function isInActivePlaySession() {
   return true;
 }
 
+function hostAgeFromLobby() {
+  const lobby = getState().lobby;
+  const host =
+    (lobby?.participants || []).find((p) => p.userId === lobby?.hostId) ||
+    (lobby?.participants || []).find((p) => p.isHost);
+  return hostAgeMs(host?.lastSeenAt);
+}
+
 /** @returns {Promise<boolean>} true si la modale a été présentée */
 async function showActingHostNotice() {
   if (noticeOpen) return false;
   noticeOpen = true;
+  arch03LiveLog("ARCH03-LIVE", "notice requested/shown", {
+    phase: "requested",
+    localUserId: getSupabaseUserId() || null,
+    token: pendingNoticeToken ?? getActingHostUiRefreshToken(),
+    currentScreen: getCurrentScreen(),
+    hostAgeMs: hostAgeFromLobby(),
+  });
   try {
     await showAppAlert(
       "Vous pouvez terminer cette manche pour que la partie continue.",
@@ -68,6 +88,11 @@ async function showActingHostNotice() {
         icon: "⏳",
       }
     );
+    arch03LiveLog("ARCH03-LIVE", "notice requested/shown", {
+      phase: "shown",
+      localUserId: getSupabaseUserId() || null,
+      currentScreen: getCurrentScreen(),
+    });
     return true;
   } catch {
     return false;
@@ -76,10 +101,47 @@ async function showActingHostNotice() {
   }
 }
 
+async function presentNoticeForToken(token) {
+  if (!Number.isFinite(token) || notifiedTokens.has(token)) return false;
+  const shown = await showActingHostNotice();
+  if (shown) {
+    notifiedTokens.add(token);
+    if (pendingNoticeToken === token) pendingNoticeToken = null;
+    arch03LiveLog("ARCH03-LIVE", "notice token current/acked", {
+      current: token,
+      acked: true,
+      ackedTokens: [...notifiedTokens],
+      localUserId: getSupabaseUserId() || null,
+    });
+  }
+  return shown;
+}
+
+/**
+ * Si un nudge est arrivé hors manche / avant que l'écran jeu soit prêt.
+ * Appelé après élection et au seed lobby en session active.
+ */
+export function flushPendingActingHostNotice() {
+  if (!isGameSyncActive() || isLobbyHost()) return;
+  if (!Number.isFinite(pendingNoticeToken)) return;
+  if (!isLocalActingNow()) {
+    pendingNoticeToken = null;
+    return;
+  }
+  if (!isInActivePlaySession()) return;
+  const token = pendingNoticeToken;
+  arch03LiveLog("ARCH03-LIVE", "notice token current/acked", {
+    current: token,
+    acked: notifiedTokens.has(token),
+    pendingFlush: true,
+    localUserId: getSupabaseUserId() || null,
+    currentScreen: getCurrentScreen(),
+  });
+  void presentNoticeForToken(token);
+}
+
 /**
  * Appelé après incrément du token d'élection (nudge acting host).
- * Une seule notification par token, uniquement sur transition non-acting → acting.
- * L'ack token n'est enregistré qu'après affichage effectif.
  */
 export function onActingHostElection(token) {
   if (!isGameSyncActive()) {
@@ -88,40 +150,72 @@ export function onActingHostElection(token) {
   }
 
   const acting = isLocalActingNow();
-  // Seed : mémoriser sans afficher ni ack (évite toast au mount / F5 mid-élection)
-  if (wasActing === null) {
-    wasActing = acting;
+  const prev = wasActing;
+  const decision = decideActingHostNotice({
+    wasActing: prev,
+    isActing: acting,
+    isRealHost: isLobbyHost(),
+    token,
+    ackedTokens: notifiedTokens,
+    inActivePlaySession: isInActivePlaySession(),
+  });
+
+  arch03LiveLog("ARCH03-LIVE", "acting transition", {
+    localUserId: getSupabaseUserId() || null,
+    oldActing: prev,
+    newActing: acting,
+    became: decision.show || decision.pending,
+    hostAgeMs: hostAgeFromLobby(),
+    currentScreen: getCurrentScreen(),
+    token,
+    acked: notifiedTokens.has(token),
+    inActivePlaySession: isInActivePlaySession(),
+  });
+
+  wasActing = decision.nextWasActing;
+
+  // Plus acting (hôte revenu, autre élu…) : abandonner le pending sans afficher
+  if (!acting) {
+    pendingNoticeToken = null;
     return;
   }
 
-  const becameActing = wasActing === false && acting === true;
-  wasActing = acting;
+  if (decision.pending) {
+    pendingNoticeToken = token;
+    return;
+  }
+  if (!decision.show) return;
 
-  if (!becameActing) return;
-  if (isLobbyHost()) return; // vrai hôte : jamais cette notif
-  if (!Number.isFinite(token) || notifiedTokens.has(token)) return;
-  // Hors manche : pas d'affichage, pas d'ack (une future élection / nouveau token pourra notifier)
-  if (!isInActivePlaySession()) return;
-
-  void (async () => {
-    const shown = await showActingHostNotice();
-    if (shown) notifiedTokens.add(token);
-  })();
+  pendingNoticeToken = token;
+  void presentNoticeForToken(token);
 }
 
 export function initActingHostNoticeListener() {
   resetActingHostNoticeState();
-  wasActing = isGameSyncActive() ? isLocalActingNow() : null;
-  // Ne pas pré-ack le token courant : le seed wasActing suffit pour bloquer un faux toast.
+  if (isGameSyncActive()) {
+    wasActing = isLocalActingNow();
+  }
 
   if (bundleUnsub) {
     bundleUnsub();
     bundleUnsub = null;
   }
   bundleUnsub = onLobbyBundleUpdated(() => {
-    // Sortie de session / lobby : purger l'état pour ne pas survivre au prochain lobby
     if (!isGameSyncActive()) {
       resetActingHostNoticeState();
+      return;
     }
+    // Seed silencieux dès que le lobby est connu (avant le nudge d'élection)
+    if (wasActing === null) {
+      wasActing = isLocalActingNow();
+      arch03LiveLog("ARCH03-LIVE", "notice token current/acked", {
+        phase: "seed",
+        wasActing,
+        token: getActingHostUiRefreshToken(),
+        localUserId: getSupabaseUserId() || null,
+        currentScreen: getCurrentScreen(),
+      });
+    }
+    flushPendingActingHostNotice();
   });
 }
