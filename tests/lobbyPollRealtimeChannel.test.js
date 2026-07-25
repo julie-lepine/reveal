@@ -1,5 +1,5 @@
 /**
- * Cycle de vie canal Realtime sondages — coalesce, CLOSED, pas de remove sur CHANNEL_ERROR.
+ * Cycle de vie canal Realtime sondages — coalesce, degraded keep vs join-reply replace.
  */
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
@@ -11,6 +11,7 @@ import {
   shouldSkipPollChannelRebuild,
   pollRealtimeReconnectDelayMs,
   POLL_REALTIME_RECONNECT_DELAYS_MS,
+  isJoinReplyChannelError,
 } from "../js/core/lobbyPollChannel.js";
 import {
   isRealtimeActivePollClose,
@@ -23,10 +24,14 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 import { inspectLobbyIdForRealtimeFilter as inspectLobbyId } from "../js/core/lobbyPollRealtimeDiagnose.js";
 
 /**
- * @param {{ syncSubscribe?: boolean|string, autoSubscribe?: boolean }} [opts]
+ * @param {{ syncSubscribe?: boolean|string, autoSubscribe?: boolean, initialState?: string }} [opts]
  */
 function makeMockRealtime(opts = {}) {
-  const { syncSubscribe = false, autoSubscribe = true } = opts;
+  const {
+    syncSubscribe = false,
+    autoSubscribe = true,
+    initialState = "joining",
+  } = opts;
   const channels = [];
   const removed = [];
   const builds = [];
@@ -49,6 +54,7 @@ function makeMockRealtime(opts = {}) {
     const filters = [];
     const ch = {
       topic,
+      state: initialState,
       __pollSubscribeCallCount: 0,
       on(_type, cfg, cb) {
         filters.push({ table: cfg.table, filter: cfg.filter });
@@ -59,15 +65,22 @@ function makeMockRealtime(opts = {}) {
       subscribe(cb) {
         listeners.status = cb;
         if (syncSubscribe === true) {
+          ch.state = "joined";
           cb("SUBSCRIBED");
         } else if (syncSubscribe === "error") {
           cb("CHANNEL_ERROR", { message: "mock error" });
         } else if (autoSubscribe) {
-          queueMicrotask(() => cb("SUBSCRIBED"));
+          queueMicrotask(() => {
+            ch.state = "joined";
+            cb("SUBSCRIBED");
+          });
         }
         return ch;
       },
       _emitStatus(status, err) {
+        if (status === "SUBSCRIBED") ch.state = "joined";
+        if (status === "TIMED_OUT") ch.state = "errored";
+        // CHANNEL_ERROR : l'appelant fixe ch.state (joining=A, errored=B)
         listeners.status?.(status, err);
       },
       _filters: filters,
@@ -94,6 +107,16 @@ function makeMockRealtime(opts = {}) {
     holdNextRemove,
   };
 }
+
+describe("isJoinReplyChannelError", () => {
+  it("joining + CHANNEL_ERROR → true ; errored → false", () => {
+    assert.equal(isJoinReplyChannelError("CHANNEL_ERROR", "joining"), true);
+    assert.equal(isJoinReplyChannelError("CHANNEL_ERROR", "errored"), false);
+    assert.equal(isJoinReplyChannelError("TIMED_OUT", "joining"), false);
+    assert.equal(isJoinReplyChannelError("TIMED_OUT", "errored"), false);
+    assert.equal(isJoinReplyChannelError("CHANNEL_ERROR", null), false);
+  });
+});
 
 describe("shouldSkipPollChannelRebuild", () => {
   it("skip si même config et subscribing|subscribed|degraded", () => {
@@ -137,7 +160,7 @@ describe("pollRealtimeReconnectDelayMs", () => {
 });
 
 describe("lobbyPollChannel lifecycle", () => {
-  it("cas exact : SUBSCRIBING + rebuild identique → pas de remove ; CHANNEL_ERROR sans recreate", async () => {
+  it("phx_error (state=errored) → degraded keep ; pas de replace", async () => {
     let involuntary = 0;
     const mock = makeMockRealtime({ autoSubscribe: false });
     const ctrl = createPollChannelController({
@@ -150,41 +173,84 @@ describe("lobbyPollChannel lifecycle", () => {
       },
     });
 
-    // 1-2. build gen, SUBSCRIBING
     await ctrl.requestRebuild("L", null, { reason: "boot" });
     assert.equal(ctrl.getState().subscriptionStatus, "subscribing");
     assert.equal(mock.builds.length, 1);
     const topic7 = mock.channels[0].topic;
 
-    // 3-4. rebuild identique → coalesce, aucun remove/build
     await ctrl.requestRebuild("L", null, { reason: "refetch_open_false" });
     await ctrl.requestRebuild("L", null, { reason: "auth_emit" });
     assert.equal(mock.builds.length, 1);
     assert.equal(mock.removed.length, 0);
     assert.equal(mock.channels[0].topic, topic7);
 
-    // 5. SUBSCRIBED
     mock.channels[0]._emitStatus("SUBSCRIBED");
     assert.equal(ctrl.getState().subscriptionStatus, "subscribed");
 
-    // 6-7. CHANNEL_ERROR temporaire → degraded, pas de remove, pas de reconnect manuel
-    mock.channels[0]._emitStatus("CHANNEL_ERROR", {
-      message: "unmatched topic",
-    });
+    // Famille B : constructeur a déjà passé state → errored
+    mock.channels[0].state = "errored";
+    mock.channels[0]._emitStatus("CHANNEL_ERROR", { message: "transport" });
     assert.equal(ctrl.getState().subscriptionStatus, "degraded");
     assert.equal(mock.builds.length, 1);
     assert.equal(mock.removed.length, 0);
     assert.equal(involuntary, 0);
 
-    // Rebuild identique pendant degraded → encore coalesce
     await ctrl.requestRebuild("L", null, { reason: "refetch_again" });
     assert.equal(mock.builds.length, 1);
     assert.equal(mock.removed.length, 0);
 
-    // 8-9. cleanup volontaire → CLOSED ignoré (pas involuntary)
     await ctrl.dispose();
     assert.equal(involuntary, 0);
     assert.equal(ctrl.getState().subscriptionStatus, "idle");
+  });
+
+  it("join-reply (state=joining) → replace via onInvoluntaryClosed", async () => {
+    let involuntary = 0;
+    const mock = makeMockRealtime({ autoSubscribe: false });
+    const ctrl = createPollChannelController({
+      createChannel: mock.createChannel,
+      removeChannel: mock.removeChannel,
+      onPollsEvent: () => {},
+      onVotesEvent: () => {},
+      onInvoluntaryClosed: () => {
+        involuntary += 1;
+      },
+    });
+
+    await ctrl.requestRebuild("L", null, { reason: "boot" });
+    assert.equal(mock.channels[0].state, "joining");
+
+    mock.channels[0].state = "joining";
+    mock.channels[0]._emitStatus("CHANNEL_ERROR", {
+      message: "ignored-text-not-a-criterion",
+    });
+
+    assert.equal(ctrl.getState().subscriptionStatus, "error");
+    await new Promise((r) => setTimeout(r, 0));
+    assert.equal(involuntary, 1);
+    assert.equal(mock.removed.length, 1);
+    await ctrl.dispose();
+  });
+
+  it("TIMED_OUT → degraded keep (recovery interne)", async () => {
+    let involuntary = 0;
+    const mock = makeMockRealtime({ autoSubscribe: false });
+    const ctrl = createPollChannelController({
+      createChannel: mock.createChannel,
+      removeChannel: mock.removeChannel,
+      onPollsEvent: () => {},
+      onVotesEvent: () => {},
+      onInvoluntaryClosed: () => {
+        involuntary += 1;
+      },
+    });
+
+    await ctrl.requestRebuild("L", null);
+    mock.channels[0]._emitStatus("TIMED_OUT");
+    assert.equal(ctrl.getState().subscriptionStatus, "degraded");
+    assert.equal(involuntary, 0);
+    assert.equal(mock.removed.length, 0);
+    await ctrl.dispose();
   });
 
   it("CLOSED involontaire → onInvoluntaryClosed une fois", async () => {
@@ -325,7 +391,7 @@ describe("lobbyPollChannel lifecycle", () => {
 });
 
 describe("boot auth + reconnect contrat source", () => {
-  it("CHANNEL_ERROR ne schedule pas reconnect ; CLOSED oui", () => {
+  it("join-reply replace ; phx_error keep ; CLOSED reconnect", () => {
     const storeSrc = readFileSync(
       join(__dirname, "../js/core/lobbyPollStore.js"),
       "utf8"
@@ -335,9 +401,12 @@ describe("boot auth + reconnect contrat source", () => {
       "utf8"
     );
     assert.match(storeSrc, /onInvoluntaryClosed/);
+    assert.match(chSrc, /isJoinReplyChannelError/);
+    assert.match(chSrc, /join_reply_error_replace/);
     assert.match(chSrc, /subscriptionStatus = "degraded"/);
     assert.match(chSrc, /onInvoluntaryClosed/);
     assert.doesNotMatch(chSrc, /onTerminalError/);
+    assert.doesNotMatch(chSrc, /unmatched topic/);
     assert.match(storeSrc, /await authReadyForSync/);
 
     const mainSrc = readFileSync(join(__dirname, "../js/main.js"), "utf8");

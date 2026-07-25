@@ -159,8 +159,8 @@ function resetPollRealtimeReconnectBackoff() {
 }
 
 /**
- * Reconnect manuel uniquement après CLOSED involontaire
- * (pas sur CHANNEL_ERROR — retry interne Supabase).
+ * Reconnect manuel après CLOSED involontaire ou join-reply sans recovery
+ * (CHANNEL_ERROR + state joining). Pas sur phx_error / TIMED_OUT (retry interne).
  */
 function schedulePollRealtimeReconnect() {
   if (!started || !authGatePassed || pollReconnectTimer) return;

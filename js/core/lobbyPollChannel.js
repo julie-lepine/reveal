@@ -5,8 +5,9 @@
  * - topic unique par génération
  * - channel assigné AVANT .subscribe()
  * - skip / coalesce si même config et subscribing|subscribed|degraded
- * - CHANNEL_ERROR / TIMED_OUT : pas de remove (retry interne Supabase)
- * - CLOSED involontaire seul → reconnect manuel
+ * - CHANNEL_ERROR + state===errored / TIMED_OUT : keep (retry interne realtime-js 2.11.2)
+ * - CHANNEL_ERROR + state===joining : join-reply sans recovery → replace
+ * - CLOSED involontaire → reconnect manuel
  * - remove capture la ref, marquage intentionalClose
  * - un seul .subscribe() par instance
  * - rejoin-watch (instrum.) : observe rejoin Phoenix 30s après 1er CHANNEL_ERROR
@@ -14,7 +15,7 @@
 import { serializeRealtimeErr } from "./lobbyPollRealtimeDiagnose.js";
 import { attachPollChannelRejoinWatch } from "./lobbyPollRejoinWatch.js";
 
-/** Délais reconnect manuel (CLOSED involontaire uniquement). */
+/** Délais reconnect manuel (CLOSED / join-reply sans recovery). */
 export const POLL_REALTIME_RECONNECT_DELAYS_MS = [1000, 2000, 5000, 10000];
 
 export function pollRealtimeReconnectDelayMs(attemptIndex) {
@@ -23,6 +24,18 @@ export function pollRealtimeReconnectDelayMs(attemptIndex) {
     Math.min(attemptIndex, POLL_REALTIME_RECONNECT_DELAYS_MS.length - 1)
   );
   return POLL_REALTIME_RECONNECT_DELAYS_MS[i];
+}
+
+/**
+ * Famille join-reply (realtime-js 2.11.2) : CHANNEL_ERROR sans transition
+ * vers `errored` / scheduleTimeout — state reste `joining`.
+ * Discriminant structurel uniquement (pas err.message).
+ *
+ * @param {string} status
+ * @param {string|null|undefined} realtimeChannelState
+ */
+export function isJoinReplyChannelError(status, realtimeChannelState) {
+  return status === "CHANNEL_ERROR" && realtimeChannelState === "joining";
 }
 
 /**
@@ -415,6 +428,9 @@ export function createPollChannelController(deps) {
         /* ignore watch errors */
       }
 
+      const realtimeState =
+        builder && typeof builder === "object" ? builder.state ?? null : null;
+
       if (
         status === "CHANNEL_ERROR" ||
         status === "TIMED_OUT" ||
@@ -422,6 +438,7 @@ export function createPollChannelController(deps) {
       ) {
         console.warn("[POLL-RT] subscription status", {
           status,
+          realtimeState,
           errorName: err?.name,
           errorMessage: err?.message,
           errorCause: err?.cause,
@@ -437,6 +454,7 @@ export function createPollChannelController(deps) {
       } else if (lifecycleDebugEnabled()) {
         console.info("[POLL-RT] subscription status", {
           status,
+          realtimeState,
           lobbyId,
           topic,
           channelGen: myGen,
@@ -461,8 +479,36 @@ export function createPollChannelController(deps) {
         return;
       }
 
+      // Famille A (realtime-js 2.11.2) : join-reply error, state reste joining,
+      // aucun scheduleTimeout — replace (même voie que CLOSED involontaire).
+      if (isJoinReplyChannelError(status, realtimeState)) {
+        subscriptionStatus = "error";
+        onStatusChange("error");
+        lifecycleLog("join_reply_error_replace", {
+          requestedGeneration: myGen,
+          lobbyId,
+          votesPollId: nextVotes,
+          realtimeState,
+          status,
+        });
+        console.warn("[POLL-RT] join_reply_error_replace", {
+          lobbyId,
+          topic,
+          channelGen: myGen,
+          realtimeState,
+          votesPollId: nextVotes,
+        });
+        void (async () => {
+          if (channel !== builder || myGen !== channelGen) return;
+          await removeCurrentChannel({ intentionalRemoval: true });
+          if (myGen !== channelGen) return;
+          onInvoluntaryClosed();
+        })();
+        return;
+      }
+
+      // Famille B (phx_error → errored) et TIMED_OUT : retry interne armé.
       if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
-        // Retry interne Supabase — ne pas remove/rebuild
         subscriptionStatus = "degraded";
         onStatusChange("degraded");
         lifecycleLog("degraded_keep_channel", {
@@ -470,6 +516,7 @@ export function createPollChannelController(deps) {
           lobbyId,
           votesPollId: nextVotes,
           status,
+          realtimeState,
           errorMessage: err?.message,
         });
         return;
