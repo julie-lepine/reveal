@@ -219,6 +219,7 @@ export function shouldRestoreOptimisticVote({
 
 /**
  * UPDATE/DELETE Realtime lobby_polls = fermeture du poll actif local.
+ * Ne dépend PAS exclusivement de payload.old.status (REPLICA IDENTITY partielle).
  * @param {{ eventType?: string, event?: string, new?: object, old?: object }} payload
  * @param {string|null} activePollId
  */
@@ -231,9 +232,55 @@ export function isRealtimeActivePollClose(payload, activePollId) {
   if (!id || String(id) !== String(activePollId)) return false;
 
   if (eventType === "DELETE") return true;
-  if (rowNew?.status === "closed") return true;
-  if (rowOld?.status === "open" && rowNew && rowNew.status !== "open") return true;
+
+  // Contrat robuste : UPDATE du poll actif + new non-open OU closed_at
+  if (eventType === "UPDATE" || !eventType) {
+    if (rowNew?.closed_at) return true;
+    if (rowNew && rowNew.status != null && rowNew.status !== "open") return true;
+    // Complément si old.status dispo
+    if (rowOld?.status === "open" && rowNew && rowNew.status !== "open") {
+      return true;
+    }
+  }
   return false;
+}
+
+/**
+ * INSERT d'un poll open pour le lobby courant.
+ * @param {{ eventType?: string, event?: string, new?: object }} payload
+ * @param {string} lobbyId
+ */
+export function isRealtimeOpenPollInsert(payload, lobbyId) {
+  if (!lobbyId) return false;
+  const eventType = payload?.eventType || payload?.event || "";
+  if (eventType !== "INSERT") return false;
+  const row = payload?.new;
+  if (!row?.id) return false;
+  if (String(row.lobby_id) !== String(lobbyId)) return false;
+  if (row.status != null && row.status !== "open") return false;
+  return true;
+}
+
+/**
+ * Pastille : nouveau poll id distinct du dernier vu, sheet fermé.
+ */
+export function computeUnseenPollOnNewId({
+  pollId,
+  lastSeenPollId,
+  sheetOpen,
+  localCreate,
+  isInitialHydrate,
+}) {
+  if (!pollId || localCreate || isInitialHydrate) {
+    return { unseenPoll: false, lastSeenPollId: pollId || lastSeenPollId };
+  }
+  if (sheetOpen) {
+    return { unseenPoll: false, lastSeenPollId: pollId };
+  }
+  if (String(pollId) === String(lastSeenPollId || "")) {
+    return { unseenPoll: false, lastSeenPollId };
+  }
+  return { unseenPoll: true, lastSeenPollId };
 }
 
 /**

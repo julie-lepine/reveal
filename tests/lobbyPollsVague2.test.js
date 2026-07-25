@@ -21,6 +21,8 @@ import {
   shouldRefetchOnVoteRealtime,
   shouldRestoreOptimisticVote,
   isRealtimeActivePollClose,
+  isRealtimeOpenPollInsert,
+  computeUnseenPollOnNewId,
   channelRebuildCancelsDebounce,
 } from "../js/core/lobbyPollLogic.js";
 import {
@@ -230,6 +232,82 @@ describe("lobbyPoll courses & Realtime guards", () => {
       isRealtimeActivePollClose({ eventType: "DELETE", old: { id: "p1" } }, "p1"),
       true
     );
+    // REPLICA IDENTITY partielle : pas de old.status
+    assert.equal(
+      isRealtimeActivePollClose(
+        {
+          eventType: "UPDATE",
+          old: { id: "p1" },
+          new: { id: "p1", status: "closed" },
+        },
+        "p1"
+      ),
+      true
+    );
+    assert.equal(
+      isRealtimeActivePollClose(
+        {
+          eventType: "UPDATE",
+          old: { id: "p1" },
+          new: { id: "p1", status: "open", closed_at: "2026-01-01T00:00:00Z" },
+        },
+        "p1"
+      ),
+      true
+    );
+  });
+
+  it("détecte INSERT poll open pour le lobby", () => {
+    assert.equal(
+      isRealtimeOpenPollInsert(
+        {
+          eventType: "INSERT",
+          new: { id: "p2", lobby_id: "L", status: "open" },
+        },
+        "L"
+      ),
+      true
+    );
+    assert.equal(
+      isRealtimeOpenPollInsert(
+        { eventType: "UPDATE", new: { id: "p2", lobby_id: "L", status: "open" } },
+        "L"
+      ),
+      false
+    );
+  });
+
+  it("pastille : nouveau id + sheet fermé → unseen ; hydrate / sheet ouvert → non", () => {
+    assert.deepEqual(
+      computeUnseenPollOnNewId({
+        pollId: "B",
+        lastSeenPollId: "A",
+        sheetOpen: false,
+        localCreate: false,
+        isInitialHydrate: false,
+      }),
+      { unseenPoll: true, lastSeenPollId: "A" }
+    );
+    assert.deepEqual(
+      computeUnseenPollOnNewId({
+        pollId: "B",
+        lastSeenPollId: "A",
+        sheetOpen: true,
+        localCreate: false,
+        isInitialHydrate: false,
+      }),
+      { unseenPoll: false, lastSeenPollId: "B" }
+    );
+    assert.equal(
+      computeUnseenPollOnNewId({
+        pollId: "A",
+        lastSeenPollId: null,
+        sheetOpen: false,
+        localCreate: false,
+        isInitialHydrate: true,
+      }).unseenPoll,
+      false
+    );
   });
 
   it("fetch obsolète après close / gen plus récente n'applique pas", () => {
@@ -256,13 +334,11 @@ describe("lobbyPoll courses & Realtime guards", () => {
   it("rebuild canal ne cancel pas le debounce (contrat)", () => {
     assert.equal(channelRebuildCancelsDebounce(), false);
     const src = readFileSync(join(__dirname, "../js/core/lobbyPollStore.js"), "utf8");
-    const clearStart = src.indexOf("function clearChannel");
-    const clearEnd = src.indexOf("function schedulePollRefetch", clearStart);
-    const clearBody = src.slice(clearStart, clearEnd);
-    assert.doesNotMatch(clearBody, /debounceTimer/);
     assert.match(src, /handleLobbyPollsRealtime/);
     assert.match(src, /applyActivePollClosedLocally/);
     assert.match(src, /schedulePollRefetch\(lobbyId\)/);
+    assert.match(src, /createPollChannelController/);
+    assert.doesNotMatch(src, /function clearChannel/);
   });
 
   it("ne restaure pas un vote optimistic après changement de lobby/poll", () => {
@@ -294,11 +370,13 @@ describe("lobbyPoll courses & Realtime guards", () => {
   });
 
   it("source : votes filtrés par poll_id ; close invalide les fetch", () => {
-    const src = readFileSync(join(__dirname, "../js/core/lobbyPollStore.js"), "utf8");
-    assert.match(src, /filter:\s*`poll_id=eq\.\$\{/);
-    assert.match(src, /filter:\s*`lobby_id=eq\.\$\{lobbyId\}`/);
-    assert.match(src, /invalidatePollFetches/);
-    assert.match(src, /isRealtimeActivePollClose/);
+    const storeSrc = readFileSync(join(__dirname, "../js/core/lobbyPollStore.js"), "utf8");
+    const chSrc = readFileSync(join(__dirname, "../js/core/lobbyPollChannel.js"), "utf8");
+    assert.match(chSrc, /filter:\s*`poll_id=eq\.\$\{/);
+    assert.match(chSrc, /filter:\s*`lobby_id=eq\.\$\{lobbyId\}`/);
+    assert.match(storeSrc, /invalidatePollFetches/);
+    assert.match(storeSrc, /isRealtimeActivePollClose/);
+    assert.match(storeSrc, /isRealtimeOpenPollInsert/);
   });
 });
 
@@ -330,10 +408,11 @@ describe("lobbyPoll UI CTA formulaire + pastille", () => {
     assert.match(fabSrc, /feedback-fab__badge--poll/);
   });
 
-  it("vote seul ne doit pas passer par noteActivePollAppeared id change", () => {
+  it("vote seul ne doit pas recalculer pastille sans changement d'id", () => {
     const src = readFileSync(join(__dirname, "../js/core/lobbyPollStore.js"), "utf8");
-    assert.match(src, /if \(prevId !== poll\.id\)/);
-    assert.match(src, /noteActivePollAppeared/);
+    assert.match(src, /const isNewId = prevId !== poll\.id/);
+    assert.match(src, /computeUnseenPollOnNewId/);
+    assert.match(src, /lastSeenPollId/);
   });
 });
 
@@ -346,15 +425,18 @@ describe("lobbyPoll close ciblé poll_id (contrat client)", () => {
   });
 
   it("initLobbyPollSync est idempotent (guard started)", () => {
-    const src = readFileSync(join(__dirname, "../js/core/lobbyPollStore.js"), "utf8");
-    assert.match(src, /if \(started\) return/);
-    assert.match(src, /channelLobbyId === lobbyId/);
-    assert.match(src, /channelVotesPollId === nextVotesId/);
+    const storeSrc = readFileSync(join(__dirname, "../js/core/lobbyPollStore.js"), "utf8");
+    const chSrc = readFileSync(join(__dirname, "../js/core/lobbyPollChannel.js"), "utf8");
+    assert.match(storeSrc, /if \(started\) return/);
+    assert.match(chSrc, /channelLobbyId === lobbyId/);
+    assert.match(chSrc, /channelVotesPollId === nextVotes/);
+    assert.match(chSrc, /myGen !== channelGen/);
+    assert.match(chSrc, /await removeChannel/);
   });
 
   it("changement de lobby nettoie via syncToCurrentLobby", () => {
     const src = readFileSync(join(__dirname, "../js/core/lobbyPollStore.js"), "utf8");
-    assert.match(src, /clearChannel/);
+    assert.match(src, /tearDownChannel/);
     assert.match(src, /nextId !== store\.lobbyId/);
   });
 
