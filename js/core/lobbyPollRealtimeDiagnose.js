@@ -145,12 +145,16 @@ export async function runPollRealtimeIsolationProbes(supabase, lobbyId, opts = {
 }
 
 export function pollRtIsolateEnabled() {
+  // Probes A/B/C désactivées après diagnostic (pub/filtre OK).
+  // Réactivation manuelle uniquement : localStorage reveal-poll-rt-isolate=1
+  // ET décommenter le return ci-dessous si besoin ponctuel.
   try {
-    return (
-      typeof localStorage !== "undefined" &&
-      localStorage.getItem("reveal-poll-rt-isolate") === "1"
-    );
+    if (localStorage.getItem("reveal-poll-rt-isolate") === "1") {
+      // Isolates volontairement off — le flag ne relance plus les probes.
+      return false;
+    }
   } catch {
-    return false;
+    /* ignore */
   }
+  return false;
 }

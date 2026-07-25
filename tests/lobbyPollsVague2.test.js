@@ -374,7 +374,8 @@ describe("lobbyPoll courses & Realtime guards", () => {
     const chSrc = readFileSync(join(__dirname, "../js/core/lobbyPollChannel.js"), "utf8");
     assert.match(chSrc, /poll_id=eq\.\$\{nextVotes\}/);
     assert.match(chSrc, /lobby_id=eq\.\$\{lobbyId\}/);
-    assert.match(chSrc, /votes listener skipped/);
+    assert.match(chSrc, /nextVotes != null/);
+    assert.match(chSrc, /degraded/);
     assert.match(storeSrc, /invalidatePollFetches/);
     assert.match(storeSrc, /isRealtimeActivePollClose/);
     assert.match(storeSrc, /isRealtimeOpenPollInsert/);
@@ -431,9 +432,10 @@ describe("lobbyPoll close ciblé poll_id (contrat client)", () => {
     assert.match(storeSrc, /if \(started\) return/);
     assert.match(storeSrc, /await authReadyForSync/);
     assert.match(storeSrc, /schedulePollRealtimeReconnect/);
+    assert.match(storeSrc, /onInvoluntaryClosed/);
     assert.match(chSrc, /shouldSkipPollChannelRebuild/);
     assert.match(chSrc, /subscriptionStatus === "subscribing"/);
-    assert.match(chSrc, /status === "CLOSED"/);
+    assert.match(chSrc, /subscriptionStatus === "degraded"/);
     assert.match(chSrc, /channel = builder/);
   });
 

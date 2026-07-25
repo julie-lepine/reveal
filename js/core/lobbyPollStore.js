@@ -136,6 +136,7 @@ function clearPollRealtimeReconnect() {
     clearTimeout(pollReconnectTimer);
     pollReconnectTimer = null;
   }
+  channelCtrl?.setReconnectTimerActive?.(false);
 }
 
 function resetPollRealtimeReconnectBackoff() {
@@ -144,8 +145,8 @@ function resetPollRealtimeReconnectBackoff() {
 }
 
 /**
- * Reconnect borné après CHANNEL_ERROR / TIMED_OUT / CLOSED du canal actif.
- * Un seul timer ; ignore si module stoppé ou lobby changé.
+ * Reconnect manuel uniquement après CLOSED involontaire
+ * (pas sur CHANNEL_ERROR — retry interne Supabase).
  */
 function schedulePollRealtimeReconnect() {
   if (!started || !authGatePassed || pollReconnectTimer) return;
@@ -157,10 +158,12 @@ function schedulePollRealtimeReconnect() {
     reconnectAttempt: pollReconnectAttempts,
     reconnectDelay: delay,
     authReadyResolved: isAuthReadyResolved(),
+    reason: "involuntary_closed",
   });
   pollReconnectAttempts += 1;
   pollReconnectTimer = setTimeout(() => {
     pollReconnectTimer = null;
+    channelCtrl?.setReconnectTimerActive?.(false);
     void (async () => {
       if (!started || !authGatePassed) return;
       if (store.lobbyId !== lobbyIdAtSchedule) return;
@@ -174,9 +177,10 @@ function schedulePollRealtimeReconnect() {
         reconnectAttempt: pollReconnectAttempts,
         reconnectDelay: delay,
       });
-      queueVotesSubscription();
+      queueVotesSubscription({ reason: "reconnect_after_closed" });
     })();
   }, delay);
+  channelCtrl?.setReconnectTimerActive?.(true);
 }
 
 function emit() {
@@ -329,7 +333,7 @@ function applyOpenPollSnapshot(poll, opts = {}) {
   }
 
   // Rebuild canal hors stack Realtime (queue sérialisée)
-  queueVotesSubscription();
+  queueVotesSubscription({ reason: "sync" });
 }
 
 /**
@@ -351,7 +355,7 @@ export function applyActivePollClosedLocally(
     unseenPoll: false,
   });
   suppressUnseenForPollId = null;
-  queueVotesSubscription();
+  queueVotesSubscription({ reason: "sync" });
   if (scheduleRefetch && lobbyId) {
     schedulePollRefetch(lobbyId);
   }
@@ -430,20 +434,19 @@ function ensureChannelController() {
     onSubscribed: () => {
       resetPollRealtimeReconnectBackoff();
     },
-    onTerminalError: () => {
+    onInvoluntaryClosed: () => {
       schedulePollRealtimeReconnect();
     },
     log: (tag, data) => pollRtLog(tag, data),
-    // Diagnostic probes A/B/C uniquement (reveal-poll-rt-isolate=1)
-    getSupabase: () => supabase,
   });
   return channelCtrl;
 }
 
-function queueVotesSubscription() {
+function queueVotesSubscription({ reason = "queueVotesSubscription" } = {}) {
   if (!authGatePassed) {
     pollRtLog("queueVotesSubscription blocked (auth gate)", {
       authReadyResolved: isAuthReadyResolved(),
+      reason,
     });
     return;
   }
@@ -455,12 +458,14 @@ function queueVotesSubscription() {
   const pollId =
     store.activePoll?.status === "open" ? store.activePoll.id : null;
   const ctrl = ensureChannelController();
-  void ctrl.requestRebuild(lobbyId, pollId).then(() => {
+  void ctrl.requestRebuild(lobbyId, pollId, { reason }).then(() => {
     const st = ctrl.getState();
-    if (st.subscriptionStatus === "subscribed") {
-      setStore({ subscriptionStatus: "subscribed" });
-    } else if (st.subscriptionStatus === "subscribing") {
-      setStore({ subscriptionStatus: "subscribing" });
+    if (
+      st.subscriptionStatus === "subscribed" ||
+      st.subscriptionStatus === "subscribing" ||
+      st.subscriptionStatus === "degraded"
+    ) {
+      setStore({ subscriptionStatus: st.subscriptionStatus });
     } else if (st.subscriptionStatus === "error") {
       setStore({ subscriptionStatus: "error" });
     } else if (!lobbyId) {
@@ -502,7 +507,7 @@ export async function refreshLobbyPoll(lobbyId, { quiet = false } = {}) {
       loading: false,
       error: quiet ? store.error : null,
     });
-    queueVotesSubscription();
+    queueVotesSubscription({ reason: "refresh_no_lobby" });
     return;
   }
 
@@ -533,7 +538,7 @@ export async function refreshLobbyPoll(lobbyId, { quiet = false } = {}) {
         error: null,
         unseenPoll: false,
       });
-      queueVotesSubscription();
+      queueVotesSubscription({ reason: "sync" });
       return;
     }
 
@@ -548,7 +553,7 @@ export async function refreshLobbyPoll(lobbyId, { quiet = false } = {}) {
         error: null,
         unseenPoll: false,
       });
-      queueVotesSubscription();
+      queueVotesSubscription({ reason: "sync" });
       return;
     }
 
@@ -599,7 +604,7 @@ export async function refreshLobbyPoll(lobbyId, { quiet = false } = {}) {
       setStore({ unseenPoll: false });
     }
 
-    queueVotesSubscription();
+    queueVotesSubscription({ reason: "sync" });
   } catch (e) {
     console.warn("REVEAL lobbyPoll fetch:", e?.message || e);
     if (
@@ -676,7 +681,7 @@ function syncToCurrentLobby() {
   } else {
     setStore({ lobbyId });
   }
-  queueVotesSubscription();
+  queueVotesSubscription({ reason: "syncToCurrentLobby" });
   void refreshLobbyPoll(lobbyId);
 }
 
@@ -824,7 +829,7 @@ export async function createLobbyPollFromCatalog(selectedCatalogIds) {
       unseenPoll: false,
     });
     hasHydratedPollOnce = true;
-    queueVotesSubscription();
+    queueVotesSubscription({ reason: "sync" });
     void refreshLobbyPoll(lobbyId, { quiet: true });
     return { ok: true, poll };
   } catch (e) {
