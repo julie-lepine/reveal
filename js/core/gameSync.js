@@ -92,6 +92,7 @@ import {
   rehydratePlaylistGuessDeck,
 } from "./deckCodec.js";
 import { scalePollIntervalMs, SYNC_PATCH_TIMEOUT_MS } from "../config/syncConfig.js";
+import { withPatchTimeout } from "./withPatchTimeout.js";
 import { FIL_ROUGE_ENABLED } from "../../data/filRouge.js";
 import { GUESS_LIE_SYNC_PATCH_TIMEOUT_MS } from "../../data/guessLies.js";
 import { pickRemotePlayFields } from "./playPatch.js";
@@ -102,6 +103,7 @@ import {
   tierNightConfigPatchFromRemoteState,
 } from "./tierNightConfig.js";
 
+export { withPatchTimeout };
 export { pickRemotePlayFields, PLAY_PATCH_EXCLUDE } from "./playPatch.js";
 import {
   detectPlayerContribution,
@@ -279,19 +281,6 @@ function syncLastGameFromSessionRow(row) {
       summary: remoteLast?.gameId === gameId ? remoteLast.summary || "" : "",
     });
   }
-}
-
-export function withPatchTimeout(promise, ms = DEFAULT_SYNC_PATCH_TIMEOUT_MS, message) {
-  if (!ms || ms <= 0) return promise;
-  return Promise.race([
-    promise,
-    new Promise((_, reject) => {
-      setTimeout(
-        () => reject(new Error(message || "Synchronisation trop longue.")),
-        ms
-      );
-    }),
-  ]);
 }
 
 /**
