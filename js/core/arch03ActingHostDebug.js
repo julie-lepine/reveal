@@ -1,12 +1,28 @@
 /**
- * TEMP ARCH-03 — logs diagnostic acting-host UI.
+ * Diagnostic acting-host UI (ARCH-03).
+ * Activation : localStorage.setItem('reveal-acting-host-debug','1')
  * Filtrer la console : ARCH03-AH
- * À retirer après QA (ne pas laisser en prod).
  */
-export const ARCH03_AH_DEBUG = true;
+export const ACTING_HOST_DEBUG_KEY = "reveal-acting-host-debug";
+
+export function actingHostDebugEnabled() {
+  try {
+    return (
+      typeof localStorage !== "undefined" &&
+      localStorage.getItem(ACTING_HOST_DEBUG_KEY) === "1"
+    );
+  } catch {
+    return false;
+  }
+}
+
+/** @deprecated Use actingHostDebugEnabled() */
+export function isArch03AhDebug() {
+  return actingHostDebugEnabled();
+}
 
 export function arch03AhLog(step, data = undefined) {
-  if (!ARCH03_AH_DEBUG) return;
+  if (!actingHostDebugEnabled()) return;
   if (data === undefined) {
     console.info(`[ARCH03-AH] ${step}`);
     return;

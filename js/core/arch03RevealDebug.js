@@ -1,12 +1,12 @@
 /**
- * TEMP ARCH-03 — traçage flux « Révéler maintenant » / acting host play.
+ * Diagnostic flux « Révéler maintenant » / acting host play (ARCH-03).
+ * Activation : localStorage.setItem('reveal-acting-host-debug','1')
  * Filtrer la console : ARCH03-REVEAL
- * À retirer après QA.
  */
-export const ARCH03_REVEAL_DEBUG = true;
+import { actingHostDebugEnabled } from "./arch03ActingHostDebug.js";
 
 export function arch03RevealLog(step, data = undefined) {
-  if (!ARCH03_REVEAL_DEBUG) return;
+  if (!actingHostDebugEnabled()) return;
   if (data === undefined) {
     console.info(`[ARCH03-REVEAL] ${step}`);
     return;

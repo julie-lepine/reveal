@@ -3,8 +3,9 @@
  * N'altère pas la stratégie degraded_keep_channel.
  *
  * Logs : [POLL-RT] rejoin-watch
- * Activation auto sur canal poll (toujours, car CHANNEL_ERROR l'est déjà).
+ * Activation : reveal-poll-rt-debug=1 (ou opts.force pour les tests).
  */
+import { pollRtInstanceDebugEnabled } from "./lobbyPollRtInstanceRegistry.js";
 
 const WATCH_MS = 30_000;
 const POLL_STATE_MS = 1_000;
@@ -27,6 +28,14 @@ export function getPhoenixChannel(realtimeChannel) {
   return adapter.channel || null;
 }
 
+function noopWatch() {
+  return {
+    noteStatus() {},
+    noteRemove() {},
+    dispose() {},
+  };
+}
+
 /**
  * @param {object} realtimeChannel
  * @param {{
@@ -36,14 +45,14 @@ export function getPhoenixChannel(realtimeChannel) {
  *   votesPollId?: string|null,
  *   channelId?: string|null,
  * }} meta
+ * @param {{ force?: boolean }} [opts]
  */
-export function attachPollChannelRejoinWatch(realtimeChannel, meta) {
+export function attachPollChannelRejoinWatch(realtimeChannel, meta, opts = {}) {
+  if (!opts.force && !pollRtInstanceDebugEnabled()) {
+    return noopWatch();
+  }
   if (!realtimeChannel || typeof realtimeChannel !== "object") {
-    return {
-      noteStatus() {},
-      noteRemove() {},
-      dispose() {},
-    };
+    return noopWatch();
   }
 
   const t0 =

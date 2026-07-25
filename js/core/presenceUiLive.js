@@ -1,14 +1,19 @@
 /**
- * Transitions présence → UI (ARCH-03 / ARCH-03b) — helpers purs + logs LIVE temporaires.
+ * Transitions présence → UI (ARCH-03 / ARCH-03b) — helpers purs.
+ * Logs LIVE : localStorage reveal-acting-host-debug=1
  * Filtrer console : ARCH03-LIVE / ARCH03B-LIVE
  */
 import { HOST_PRESENCE_STALE_MS, HOST_TRANSFER_STALE_MS } from "../config/lobbyLifecycle.js";
 import { resolveActingHostUserId } from "./hostPresence.js";
+import { actingHostDebugEnabled } from "./arch03ActingHostDebug.js";
 
-export const ARCH03_LIVE_DEBUG = true;
+/** @deprecated Use actingHostDebugEnabled() */
+export function isArch03LiveDebug() {
+  return actingHostDebugEnabled();
+}
 
 export function arch03LiveLog(tag, step, data = undefined) {
-  if (!ARCH03_LIVE_DEBUG) return;
+  if (!actingHostDebugEnabled()) return;
   const prefix = tag.startsWith("[") ? tag : `[${tag}]`;
   if (data === undefined) {
     console.info(`${prefix} ${step}`);

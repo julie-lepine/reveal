@@ -278,7 +278,7 @@ function runJoinReplyReplacementCatchup(meta = {}) {
   const lobbyId = meta.lobbyId || store.lobbyId;
   const expectedGen = meta.channelGen ?? null;
 
-  console.info("[POLL-RT] replacement_catchup_start", {
+  pollRtLog("replacement_catchup_start", {
     lobbyId,
     oldChannelGen: null,
     newChannelGen: expectedGen,
@@ -336,7 +336,7 @@ function runJoinReplyReplacementCatchup(meta = {}) {
       ) {
         return;
       }
-      console.info("[POLL-RT] replacement_catchup_applied", {
+      pollRtLog("replacement_catchup_applied", {
         lobbyId,
         oldChannelGen: null,
         newChannelGen: channelCtrl?.getState()?.channelGen ?? expectedGen,

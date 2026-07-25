@@ -228,8 +228,9 @@ export function createPollChannelController(deps) {
     });
   }
 
-  /** Chronologie replace join-reply — toujours visible (QA). */
+  /** Chronologie replace join-reply — debug only (reveal-poll-rt-debug). */
   function replaceChronology(step, extra = {}) {
+    if (!lifecycleDebugEnabled()) return;
     const topics = channelTopics();
     const payload = {
       lobbyId: extra.lobbyId ?? channelLobbyId,
@@ -709,29 +710,43 @@ export function createPollChannelController(deps) {
         status === "TIMED_OUT" ||
         status === "CLOSED"
       ) {
-        console.warn("[POLL-RT] subscription status", {
-          status,
-          realtimeState,
-          errorName: err?.name,
-          errorMessage: err?.message,
-          errorCause: err?.cause,
-          errorContext: err?.context,
-          serialized: serializeRealtimeErr(err),
-          lobbyId,
-          logicalTopic: topic,
-          internalTopic: builder?.topic ?? null,
-          topic,
-          votesPollId: nextVotes,
-          channelGen: myGen,
-          intentionalClose: intentional,
-          subscribeCallCount: builder.__pollSubscribeCallCount,
-          controllerId,
-          storeModuleInstanceId,
-          storeInstanceId,
-          isCurrentBuilder,
-          isCurrentGeneration,
-          ignoredReason,
-        });
+        // CLOSED intentionnel (remove/rebuild) : pas de warn prod.
+        if (!(status === "CLOSED" && intentional)) {
+          console.warn("[POLL-RT] subscription status", {
+            status,
+            realtimeState,
+            errorMessage: err?.message ?? null,
+            lobbyId,
+            channelGen: myGen,
+            intentionalClose: intentional,
+            ignoredReason,
+          });
+        }
+        if (lifecycleDebugEnabled()) {
+          console.warn("[POLL-RT] subscription status detail", {
+            status,
+            realtimeState,
+            errorName: err?.name,
+            errorMessage: err?.message,
+            errorCause: err?.cause,
+            errorContext: err?.context,
+            serialized: serializeRealtimeErr(err),
+            lobbyId,
+            logicalTopic: topic,
+            internalTopic: builder?.topic ?? null,
+            topic,
+            votesPollId: nextVotes,
+            channelGen: myGen,
+            intentionalClose: intentional,
+            subscribeCallCount: builder.__pollSubscribeCallCount,
+            controllerId,
+            storeModuleInstanceId,
+            storeInstanceId,
+            isCurrentBuilder,
+            isCurrentGeneration,
+            ignoredReason,
+          });
+        }
       } else if (lifecycleDebugEnabled()) {
         console.info("[POLL-RT] subscription status", {
           status,
@@ -811,15 +826,17 @@ export function createPollChannelController(deps) {
           reason: "join_reply_error_replace",
           status,
         });
-        console.warn("[POLL-RT] join_reply_error_replace", {
-          lobbyId,
-          topic,
-          logicalTopic: topic,
-          internalTopic: builder?.topic ?? null,
-          channelGen: myGen,
-          realtimeState,
-          votesPollId: nextVotes,
-        });
+        if (lifecycleDebugEnabled()) {
+          console.warn("[POLL-RT] join_reply_error_replace", {
+            lobbyId,
+            topic,
+            logicalTopic: topic,
+            internalTopic: builder?.topic ?? null,
+            channelGen: myGen,
+            realtimeState,
+            votesPollId: nextVotes,
+          });
+        }
         void (async () => {
           if (channel !== builder || myGen !== channelGen) return;
           await removeCurrentChannel({ intentionalRemoval: true });

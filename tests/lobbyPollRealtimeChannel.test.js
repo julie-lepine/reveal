@@ -656,31 +656,19 @@ describe("boot auth + reconnect contrat source", () => {
       join(__dirname, "../js/core/lobbyPollChannel.js"),
       "utf8"
     );
-    assert.match(storeSrc, /STORE_MODULE_INSTANCE_ID/);
-    assert.match(storeSrc, /__REVEAL_POLL_RT_INSTANCES__|lobbyPollRtInstanceRegistry/);
-    assert.match(chSrc, /controllerId/);
-    assert.match(chSrc, /subscribe_callback/);
-    assert.match(chSrc, /isCurrentBuilder/);
-    assert.match(chSrc, /CHANNEL_MODULE_INSTANCE_ID/);
-    assert.match(chSrc, /__pollLogicalTopic/);
-    assert.match(chSrc, /logicalTopic/);
-    assert.match(chSrc, /internalTopic/);
-    assert.doesNotMatch(chSrc, /builder\.topic\s*=/);
     assert.match(storeSrc, /onInvoluntaryClosed/);
     assert.match(storeSrc, /runJoinReplyReplacementCatchup/);
-    assert.match(storeSrc, /replacement_catchup_start/);
-    assert.match(storeSrc, /replacement_catchup_applied/);
     assert.match(storeSrc, /liveCatchup/);
+    assert.match(storeSrc, /pollRtLog\("replacement_catchup_start"/);
+    assert.match(storeSrc, /pollRtLog\("replacement_catchup_applied"/);
     assert.match(chSrc, /isJoinReplyChannelError/);
-    assert.match(chSrc, /join_reply_error_replace_start/);
-    assert.match(chSrc, /old_channel_removed/);
-    assert.match(chSrc, /replacement_build_start/);
-    assert.match(chSrc, /replacement_subscribed/);
+    assert.match(chSrc, /join_reply_error_replace/);
     assert.match(chSrc, /MAX_JOIN_REPLY_IMMEDIATE_REPLACES/);
     assert.match(chSrc, /subscriptionStatus = "degraded"/);
     assert.match(chSrc, /onInvoluntaryClosed/);
+    assert.match(chSrc, /__pollLogicalTopic/);
+    assert.doesNotMatch(chSrc, /builder\.topic\s*=/);
     assert.doesNotMatch(chSrc, /onTerminalError/);
-    assert.doesNotMatch(chSrc, /unmatched topic/);
     assert.match(storeSrc, /await authReadyForSync/);
 
     const mainSrc = readFileSync(join(__dirname, "../js/main.js"), "utf8");

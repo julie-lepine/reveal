@@ -16,12 +16,16 @@ describe("lobbyPollRejoinWatch", () => {
 
   it("attach sur mock sans Phoenix : no-op sûr + noteStatus", () => {
     const ch = { topic: "lobby-polls:x:1" };
-    const watch = attachPollChannelRejoinWatch(ch, {
-      channelGen: 1,
-      topic: ch.topic,
-      lobbyId: "L",
-      votesPollId: null,
-    });
+    const watch = attachPollChannelRejoinWatch(
+      ch,
+      {
+        channelGen: 1,
+        topic: ch.topic,
+        lobbyId: "L",
+        votesPollId: null,
+      },
+      { force: true }
+    );
     assert.equal(typeof watch.noteStatus, "function");
     watch.noteStatus("CHANNEL_ERROR", { message: "unmatched topic" });
     watch.noteStatus("CHANNEL_ERROR", { message: "unmatched topic" });
@@ -31,6 +35,18 @@ describe("lobbyPollRejoinWatch", () => {
       events.filter((e) => e.kind === "subscribe_callback").length,
       2
     );
+    watch.dispose();
+  });
+
+  it("sans force ni flag debug : no-op (pas d'hooks)", () => {
+    const ch = { topic: "lobby-polls:x:1" };
+    const watch = attachPollChannelRejoinWatch(ch, {
+      channelGen: 1,
+      topic: ch.topic,
+      lobbyId: "L",
+    });
+    watch.noteStatus("CHANNEL_ERROR");
+    assert.equal(ch.__pollRejoinWatch, undefined);
     watch.dispose();
   });
 
@@ -74,11 +90,15 @@ describe("lobbyPollRejoinWatch", () => {
         state: "errored",
       },
     };
-    const watch = attachPollChannelRejoinWatch(ch, {
-      channelGen: 2,
-      topic: "t",
-      lobbyId: "L",
-    });
+    const watch = attachPollChannelRejoinWatch(
+      ch,
+      {
+        channelGen: 2,
+        topic: "t",
+        lobbyId: "L",
+      },
+      { force: true }
+    );
     rejoinTimer.scheduleTimeout();
     phoenix.rejoin(10000);
     const kinds = ch.__pollRejoinWatch.getEvents().map((e) => e.kind);
