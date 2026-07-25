@@ -14,6 +14,7 @@ import { prepGuestFollowOnSession } from "../core/mpLaunch.js";
 import { showAppAlert } from "../core/dialog.js";
 import { getCurrentScreen } from "../core/router.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
+import { prepStartSlotHtml } from "../core/prepScreen.js";
 import { bindNav } from "./nav.js";
 import { isLobbyHost, onGameSessionChange } from "../core/gameSync.js";
 
@@ -28,9 +29,10 @@ export function mountGuessLieLobbyWait(app) {
     const session = getGuessLieSession();
     const members = getLobbyMemberNames();
     const allReady = allLobbySubmitted();
+    const isHost = isLobbyHost();
 
     app.innerHTML = pageShell({
-      back: false,
+      backTarget: "back",
       content: `
         <p class="label-upper label-upper--green">🕵️ Lobby Guess The Lie</p>
         <h2 class="screen-title">En attente des joueurs</h2>
@@ -59,14 +61,12 @@ export function mountGuessLieLobbyWait(app) {
           }
         </p>
 
-        ${
-          allReady && isLobbyHost()
-            ? `<button type="button" class="btn btn-primary btn--spaced" id="btn-start">Lancer la partie →</button>`
-            : allReady
-              ? `<button type="button" class="btn btn-secondary btn--spaced" disabled>En attente que l'hôte lance la partie</button>`
-              : `<button type="button" class="btn btn-secondary btn--spaced" disabled>En attente…</button>`
-        }
-        <button type="button" class="btn btn-secondary btn--spaced" data-nav="game-select">Retour</button>
+        ${prepStartSlotHtml({
+          allReady,
+          isHost,
+          launchLabel: "Lancer la partie →",
+          startButtonId: "btn-start",
+        })}
       `,
     });
 
