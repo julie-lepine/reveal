@@ -342,6 +342,8 @@ export function mountGameSelect(app) {
 
     if (e.target.closest("[data-party-settings]")) {
       void openPartySettings().then((res) => {
+        if (getCurrentScreen() !== "game-select") return;
+        if (res.action === "close" && res.ok) return;
         if (res.ok || res.claimed) scheduleRender(true);
       });
       return;
@@ -392,6 +394,7 @@ export function mountGameSelect(app) {
   }
 
   async function renderIfNeeded(force = false) {
+    if (getCurrentScreen() !== "game-select") return;
     const snap = gameSelectRenderSnapshot();
     if (!force && snap === lastSnapshot) return;
     if (renderInFlight) {
