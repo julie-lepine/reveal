@@ -11,7 +11,7 @@
  */
 import { GAMES_AVAILABLE } from "../../data/games.js";
 import { getLobby, getLobbyParticipants, hasActiveLobby } from "./lobby.js";
-import { getSupabaseUserId } from "./supabaseAuth.js";
+import { getSupabaseUserId, authReady, isAuthReadyResolved } from "./supabaseAuth.js";
 import { supabase, isSupabaseConfigured } from "./supabaseClient.js";
 import {
   getCachedGameSession,
@@ -40,7 +40,10 @@ import {
   isRealtimeOpenPollInsert,
   computeUnseenPollOnNewId,
 } from "./lobbyPollLogic.js";
-import { createPollChannelController } from "./lobbyPollChannel.js";
+import {
+  createPollChannelController,
+  pollRealtimeReconnectDelayMs,
+} from "./lobbyPollChannel.js";
 import {
   rpcCreateLobbyPoll,
   rpcCastLobbyPollVote,
@@ -85,6 +88,9 @@ function pollRtLog(tag, data = {}) {
       store.subscriptionStatus ??
       channelCtrl?.getState()?.subscriptionStatus ??
       null,
+    authReadyResolved: isAuthReadyResolved(),
+    reconnectAttempt: pollReconnectAttempts,
+    reconnectDelay: data.reconnectDelay ?? null,
     ...data,
   });
 }
@@ -117,6 +123,61 @@ let sheetOpenGetter = () => false;
 
 /** @type {ReturnType<typeof createPollChannelController>|null} */
 let channelCtrl = null;
+
+let pollReconnectTimer = null;
+let pollReconnectAttempts = 0;
+/** Promise auth injectable (tests). */
+let authReadyForSync = authReady;
+/** True après await authReady dans init — autorise subscribe. */
+let authGatePassed = false;
+
+function clearPollRealtimeReconnect() {
+  if (pollReconnectTimer) {
+    clearTimeout(pollReconnectTimer);
+    pollReconnectTimer = null;
+  }
+}
+
+function resetPollRealtimeReconnectBackoff() {
+  pollReconnectAttempts = 0;
+  clearPollRealtimeReconnect();
+}
+
+/**
+ * Reconnect borné après CHANNEL_ERROR / TIMED_OUT / CLOSED du canal actif.
+ * Un seul timer ; ignore si module stoppé ou lobby changé.
+ */
+function schedulePollRealtimeReconnect() {
+  if (!started || !authGatePassed || pollReconnectTimer) return;
+  const lobbyIdAtSchedule = store.lobbyId;
+  if (!lobbyIdAtSchedule) return;
+
+  const delay = pollRealtimeReconnectDelayMs(pollReconnectAttempts);
+  pollRtLog("reconnect scheduled", {
+    reconnectAttempt: pollReconnectAttempts,
+    reconnectDelay: delay,
+    authReadyResolved: isAuthReadyResolved(),
+  });
+  pollReconnectAttempts += 1;
+  pollReconnectTimer = setTimeout(() => {
+    pollReconnectTimer = null;
+    void (async () => {
+      if (!started || !authGatePassed) return;
+      if (store.lobbyId !== lobbyIdAtSchedule) return;
+      try {
+        await authReadyForSync;
+      } catch {
+        return;
+      }
+      if (!started || store.lobbyId !== lobbyIdAtSchedule) return;
+      pollRtLog("reconnect fire", {
+        reconnectAttempt: pollReconnectAttempts,
+        reconnectDelay: delay,
+      });
+      queueVotesSubscription();
+    })();
+  }, delay);
+}
 
 function emit() {
   for (const fn of listeners) {
@@ -366,12 +427,24 @@ function ensureChannelController() {
     onStatusChange: (status) => {
       setStore({ subscriptionStatus: status });
     },
+    onSubscribed: () => {
+      resetPollRealtimeReconnectBackoff();
+    },
+    onTerminalError: () => {
+      schedulePollRealtimeReconnect();
+    },
     log: (tag, data) => pollRtLog(tag, data),
   });
   return channelCtrl;
 }
 
 function queueVotesSubscription() {
+  if (!authGatePassed) {
+    pollRtLog("queueVotesSubscription blocked (auth gate)", {
+      authReadyResolved: isAuthReadyResolved(),
+    });
+    return;
+  }
   const lobbyId = store.lobbyId;
   if (!lobbyId || !isSupabaseConfigured() || !supabase) {
     setStore({ subscriptionStatus: "idle" });
@@ -555,6 +628,7 @@ function invalidatePollFetches() {
 }
 
 async function tearDownChannel() {
+  clearPollRealtimeReconnect();
   if (channelCtrl) {
     await channelCtrl.dispose();
   }
@@ -562,8 +636,10 @@ async function tearDownChannel() {
 }
 
 function syncToCurrentLobby() {
+  if (!authGatePassed) return;
   const lobbyId = hasActiveLobby() ? getLobby()?.id || null : null;
   if (!lobbyId) {
+    resetPollRealtimeReconnectBackoff();
     void tearDownChannel();
     invalidatePollFetches();
     setStore({
@@ -583,6 +659,7 @@ function syncToCurrentLobby() {
   }
 
   if (store.lobbyId !== lobbyId) {
+    resetPollRealtimeReconnectBackoff();
     invalidatePollFetches();
     hasHydratedPollOnce = false;
     suppressUnseenForPollId = null;
@@ -601,11 +678,20 @@ function syncToCurrentLobby() {
   void refreshLobbyPoll(lobbyId);
 }
 
-export function initLobbyPollSync() {
+/**
+ * Démarre le sync polls après authReady.
+ * @param {{ authReadyPromise?: Promise<void> }} [opts] — injectable pour tests
+ */
+export async function initLobbyPollSync(opts = {}) {
   if (started) return;
   started = true;
-  syncToCurrentLobby();
+  authReadyForSync =
+    opts.authReadyPromise && typeof opts.authReadyPromise.then === "function"
+      ? opts.authReadyPromise
+      : authReady;
+
   unsubBundle = onLobbyBundleUpdated(() => {
+    if (!authGatePassed) return;
     const nextId = hasActiveLobby() ? getLobby()?.id || null : null;
     const chLobby = channelCtrl?.getState()?.channelLobbyId ?? null;
     if (nextId !== store.lobbyId || nextId !== chLobby) {
@@ -614,10 +700,20 @@ export function initLobbyPollSync() {
     }
     emit();
   });
-  unsubScreen = onScreenChange(() => emit());
+  unsubScreen = onScreenChange(() => {
+    if (authGatePassed) emit();
+  });
+
+  await authReadyForSync;
+  if (!started) return;
+  authGatePassed = true;
+  pollRtLog("auth gate passed", { authReadyResolved: true });
+  syncToCurrentLobby();
 }
 
 export function resetLobbyPollSyncForTests() {
+  clearPollRealtimeReconnect();
+  resetPollRealtimeReconnectBackoff();
   invalidatePollFetches();
   listeners.clear();
   unsubBundle?.();
@@ -625,6 +721,8 @@ export function resetLobbyPollSyncForTests() {
   unsubScreen?.();
   unsubScreen = null;
   started = false;
+  authGatePassed = false;
+  authReadyForSync = authReady;
   if (channelCtrl) {
     void channelCtrl.dispose();
     channelCtrl = null;
@@ -683,6 +781,19 @@ export function __testGetLastSeenPollId() {
 /** @internal */
 export function __testSetHasHydrated(v) {
   hasHydratedPollOnce = Boolean(v);
+}
+
+/** @internal */
+export function __testIsAuthGatePassed() {
+  return authGatePassed;
+}
+
+/** @internal */
+export function __testGetReconnectState() {
+  return {
+    attempts: pollReconnectAttempts,
+    hasTimer: Boolean(pollReconnectTimer),
+  };
 }
 
 /** @param {string[]} selectedCatalogIds */

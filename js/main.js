@@ -116,7 +116,7 @@ registerScreen("tiernight-live", mountTierNightLive);
 
 initBottomNav();
 initFeedbackFab();
-initLobbyPollSync();
+// initLobbyPollSync après authReady (voir boot) — évite subscribe Realtime sans JWT
 initExitGameDelegation(app);
 initAds();
 initMultiplayerSyncVisibility();
@@ -129,6 +129,8 @@ async function boot() {
   await initDeepLinks();
   await initSupabaseAuth();
   await authReady;
+  // Premier subscribe polls uniquement après session Supabase prête
+  void initLobbyPollSync();
   await reconcileLobbyMembership();
   resetNav();
   if (isPasswordRecoveryPending()) {

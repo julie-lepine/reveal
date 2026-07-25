@@ -31,6 +31,11 @@ export const authReady = new Promise((resolve) => {
   authReadyResolve = resolve;
 });
 
+/** True une fois `authReady` résolu (session initiale + init terminée). */
+export function isAuthReadyResolved() {
+  return authReadyResolved;
+}
+
 function resolveAuthReadyIfComplete(reason = "unknown") {
   if (authReadyResolved) return;
   if (!authInitFinished || !authInitialSessionSeen) return;

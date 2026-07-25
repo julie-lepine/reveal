@@ -424,14 +424,16 @@ describe("lobbyPoll close ciblé poll_id (contrat client)", () => {
     assert.doesNotMatch(src, /reason:\s*[\"']launch[\"']/);
   });
 
-  it("initLobbyPollSync est idempotent (guard started)", () => {
+  it("initLobbyPollSync est idempotent (guard started) + skip subscribing", () => {
     const storeSrc = readFileSync(join(__dirname, "../js/core/lobbyPollStore.js"), "utf8");
     const chSrc = readFileSync(join(__dirname, "../js/core/lobbyPollChannel.js"), "utf8");
     assert.match(storeSrc, /if \(started\) return/);
-    assert.match(chSrc, /channelLobbyId === lobbyId/);
-    assert.match(chSrc, /channelVotesPollId === nextVotes/);
-    assert.match(chSrc, /myGen !== channelGen/);
-    assert.match(chSrc, /await removeChannel/);
+    assert.match(storeSrc, /await authReadyForSync/);
+    assert.match(storeSrc, /schedulePollRealtimeReconnect/);
+    assert.match(chSrc, /shouldSkipPollChannelRebuild/);
+    assert.match(chSrc, /subscriptionStatus === "subscribing"/);
+    assert.match(chSrc, /status === "CLOSED"/);
+    assert.match(chSrc, /channel = builder/);
   });
 
   it("changement de lobby nettoie via syncToCurrentLobby", () => {

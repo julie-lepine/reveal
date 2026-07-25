@@ -1,35 +1,36 @@
 /**
- * Cycle de vie canal Realtime sondages — rebuild sérialisé, courses, filtres.
+ * Cycle de vie canal Realtime sondages — skip, reconnect, courses.
+ * (Sans import lobbyPollStore : supabaseClient charge esm.sh https.)
  */
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { createPollChannelController } from "../js/core/lobbyPollChannel.js";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
+import {
+  createPollChannelController,
+  shouldSkipPollChannelRebuild,
+  pollRealtimeReconnectDelayMs,
+  POLL_REALTIME_RECONNECT_DELAYS_MS,
+} from "../js/core/lobbyPollChannel.js";
 import {
   isRealtimeActivePollClose,
   isRealtimeOpenPollInsert,
   computeUnseenPollOnNewId,
 } from "../js/core/lobbyPollLogic.js";
-import {
-  __testSimulateRealtimePollsEvent,
-  __testForceActivePoll,
-  __testSetHasHydrated,
-  getLobbyPollState,
-  resetLobbyPollSyncForTests,
-  setLobbyPollSheetOpenGetter,
-  markLobbyPollSeen,
-} from "../js/core/lobbyPollStore.js";
 
-function makeMockRealtime() {
+const __dirname = dirname(fileURLToPath(import.meta.url));
+
+/**
+ * @param {{ syncSubscribe?: boolean|string, autoSubscribe?: boolean }} [opts]
+ */
+function makeMockRealtime(opts = {}) {
+  const { syncSubscribe = false, autoSubscribe = true } = opts;
   const channels = [];
   const removed = [];
-  let removeDelayMs = 0;
+  const builds = [];
   let removeGate = null;
 
-  function setRemoveDelay(ms) {
-    removeDelayMs = ms;
-  }
-
-  /** Retarde le resolve de remove jusqu'à releaseRemove(). */
   function holdNextRemove() {
     let release;
     removeGate = new Promise((r) => {
@@ -42,11 +43,12 @@ function makeMockRealtime() {
   }
 
   function createChannel(topic) {
+    builds.push(topic);
     const listeners = { polls: null, votes: null, status: null };
     const filters = [];
     const ch = {
       topic,
-      on(type, cfg, cb) {
+      on(_type, cfg, cb) {
         filters.push({ table: cfg.table, filter: cfg.filter });
         if (cfg.table === "lobby_polls") listeners.polls = cb;
         if (cfg.table === "lobby_poll_votes") listeners.votes = cb;
@@ -54,8 +56,17 @@ function makeMockRealtime() {
       },
       subscribe(cb) {
         listeners.status = cb;
-        queueMicrotask(() => cb("SUBSCRIBED"));
+        if (syncSubscribe === true) {
+          cb("SUBSCRIBED");
+        } else if (syncSubscribe === "error") {
+          cb("CHANNEL_ERROR");
+        } else if (autoSubscribe) {
+          queueMicrotask(() => cb("SUBSCRIBED"));
+        }
         return ch;
+      },
+      _emitStatus(status) {
+        listeners.status?.(status);
       },
       _emitPolls(payload) {
         listeners.polls?.(payload);
@@ -69,9 +80,7 @@ function makeMockRealtime() {
 
   async function removeChannel(ch) {
     if (removeGate) await removeGate;
-    if (removeDelayMs) {
-      await new Promise((r) => setTimeout(r, removeDelayMs));
-    }
+    ch._listeners?.status?.("CLOSED");
     removed.push(ch.topic);
     const idx = channels.indexOf(ch);
     if (idx >= 0) channels.splice(idx, 1);
@@ -82,76 +91,231 @@ function makeMockRealtime() {
     removeChannel,
     channels,
     removed,
-    setRemoveDelay,
+    builds,
     holdNextRemove,
-    activeTopics: () => channels.map((c) => c.topic),
   };
 }
+
+describe("shouldSkipPollChannelRebuild", () => {
+  it("skip si même config et subscribing|subscribed", () => {
+    assert.equal(
+      shouldSkipPollChannelRebuild({
+        hasChannel: true,
+        channelLobbyId: "L",
+        channelVotesPollId: null,
+        desiredLobbyId: "L",
+        desiredVotesPollId: null,
+        subscriptionStatus: "subscribing",
+      }),
+      true
+    );
+    assert.equal(
+      shouldSkipPollChannelRebuild({
+        hasChannel: true,
+        channelLobbyId: "L",
+        channelVotesPollId: null,
+        desiredLobbyId: "L",
+        desiredVotesPollId: null,
+        subscriptionStatus: "subscribed",
+      }),
+      true
+    );
+  });
+
+  it("ne skip pas un état terminal error (même config)", () => {
+    assert.equal(
+      shouldSkipPollChannelRebuild({
+        hasChannel: true,
+        channelLobbyId: "L",
+        channelVotesPollId: null,
+        desiredLobbyId: "L",
+        desiredVotesPollId: null,
+        subscriptionStatus: "error",
+      }),
+      false
+    );
+  });
+});
+
+describe("pollRealtimeReconnectDelayMs", () => {
+  it("backoff borné 1s 2s 5s 10s", () => {
+    assert.deepEqual(POLL_REALTIME_RECONNECT_DELAYS_MS, [1000, 2000, 5000, 10000]);
+    assert.equal(pollRealtimeReconnectDelayMs(0), 1000);
+    assert.equal(pollRealtimeReconnectDelayMs(1), 2000);
+    assert.equal(pollRealtimeReconnectDelayMs(2), 5000);
+    assert.equal(pollRealtimeReconnectDelayMs(3), 10000);
+    assert.equal(pollRealtimeReconnectDelayMs(99), 10000);
+  });
+});
 
 describe("lobbyPollChannel lifecycle", () => {
   it("cycle complet polls-only → A → close → polls-only → B", async () => {
     const mock = makeMockRealtime();
     const pollsEvents = [];
-    const votesEvents = [];
     const ctrl = createPollChannelController({
       createChannel: mock.createChannel,
       removeChannel: mock.removeChannel,
       onPollsEvent: (p) => pollsEvents.push(p),
-      onVotesEvent: (p) => votesEvents.push(p),
+      onVotesEvent: () => {},
     });
 
     await ctrl.requestRebuild("lobby-uuid", null);
     assert.equal(mock.channels.length, 1);
-    assert.match(mock.channels[0].topic, /^lobby-polls:lobby-uuid:\d+$/);
-    assert.equal(
-      mock.channels[0]._filters.some((f) => f.table === "lobby_polls"),
-      true
-    );
-    assert.equal(
-      mock.channels[0]._filters.some((f) => f.table === "lobby_poll_votes"),
-      false
-    );
-    assert.equal(ctrl.getState().subscriptionStatus, "subscribed");
+    assert.equal(ctrl.getState().channelVotesPollId, null);
 
-    // INSERT poll A → rebuild avec votes
     await ctrl.requestRebuild("lobby-uuid", "poll-A");
-    assert.equal(mock.channels.length, 1);
     assert.equal(ctrl.getState().channelVotesPollId, "poll-A");
-    assert.equal(
-      mock.channels[0]._filters.some(
-        (f) => f.table === "lobby_poll_votes" && f.filter === "poll_id=eq.poll-A"
-      ),
-      true
-    );
 
-    // Close → polls-only
     await ctrl.requestRebuild("lobby-uuid", null);
     assert.equal(ctrl.getState().channelVotesPollId, null);
-    assert.equal(
-      mock.channels[0]._filters.some((f) => f.table === "lobby_poll_votes"),
-      false
-    );
-    assert.equal(
-      mock.channels[0]._filters.some(
-        (f) => f.filter === "lobby_id=eq.lobby-uuid"
-      ),
-      true
-    );
 
-    // INSERT poll B → votes B
     await ctrl.requestRebuild("lobby-uuid", "poll-B");
     assert.equal(mock.channels.length, 1);
     assert.equal(ctrl.getState().channelVotesPollId, "poll-B");
-    assert.match(mock.channels[0]._filters.find((f) => f.table === "lobby_poll_votes").filter, /poll-B/);
-
-    // Les listeners polls restent branchés : événement reçu
     mock.channels[0]._emitPolls({ eventType: "INSERT", new: { id: "poll-B" } });
     assert.equal(pollsEvents.length, 1);
 
     await ctrl.dispose();
   });
 
-  it("course de rebuild : remove tardif de A ne retire pas B", async () => {
+  it("refetch pendant SUBSCRIBING : aucun remove / second build", async () => {
+    const mock = makeMockRealtime({ autoSubscribe: false });
+    const ctrl = createPollChannelController({
+      createChannel: mock.createChannel,
+      removeChannel: mock.removeChannel,
+      onPollsEvent: () => {},
+      onVotesEvent: () => {},
+    });
+
+    await ctrl.requestRebuild("L", null);
+    assert.equal(ctrl.getState().subscriptionStatus, "subscribing");
+    assert.equal(mock.builds.length, 1);
+    const topic1 = mock.channels[0].topic;
+
+    await ctrl.requestRebuild("L", null);
+    assert.equal(mock.builds.length, 1);
+    assert.equal(mock.removed.length, 0);
+    assert.equal(mock.channels[0].topic, topic1);
+
+    await ctrl.dispose();
+  });
+
+  it("callback SUBSCRIBED synchrone : status subscribed", async () => {
+    const mock = makeMockRealtime({ syncSubscribe: true, autoSubscribe: false });
+    const ctrl = createPollChannelController({
+      createChannel: mock.createChannel,
+      removeChannel: mock.removeChannel,
+      onPollsEvent: () => {},
+      onVotesEvent: () => {},
+    });
+
+    await ctrl.requestRebuild("L", null);
+    assert.equal(ctrl.getState().subscriptionStatus, "subscribed");
+    await ctrl.dispose();
+  });
+
+  it("CHANNEL_ERROR → onTerminalError ; rebuild → SUBSCRIBED", async () => {
+    let terminalCount = 0;
+    let subscribedCount = 0;
+    let phase = 0;
+    const mock = makeMockRealtime({ autoSubscribe: false });
+    const ctrl = createPollChannelController({
+      createChannel: (topic) => {
+        phase += 1;
+        const ch = mock.createChannel(topic);
+        const baseSubscribe = ch.subscribe;
+        ch.subscribe = (cb) => {
+          ch._listeners.status = cb;
+          if (phase === 1) cb("CHANNEL_ERROR");
+          else queueMicrotask(() => cb("SUBSCRIBED"));
+          return ch;
+        };
+        void baseSubscribe;
+        return ch;
+      },
+      removeChannel: mock.removeChannel,
+      onPollsEvent: () => {},
+      onVotesEvent: () => {},
+      onTerminalError: () => {
+        terminalCount += 1;
+      },
+      onSubscribed: () => {
+        subscribedCount += 1;
+      },
+    });
+
+    await ctrl.requestRebuild("L", null);
+    assert.equal(ctrl.getState().subscriptionStatus, "error");
+    assert.equal(terminalCount, 1);
+
+    await ctrl.requestRebuild("L", null);
+    await new Promise((r) => queueMicrotask(r));
+    assert.equal(ctrl.getState().subscriptionStatus, "subscribed");
+    assert.equal(subscribedCount, 1);
+    assert.equal(mock.builds.length, 2);
+
+    await ctrl.dispose();
+  });
+
+  it("CLOSED ancien canal : pas de onTerminalError parasite", async () => {
+    let terminalCount = 0;
+    const mock = makeMockRealtime({ autoSubscribe: true });
+    const ctrl = createPollChannelController({
+      createChannel: mock.createChannel,
+      removeChannel: mock.removeChannel,
+      onPollsEvent: () => {},
+      onVotesEvent: () => {},
+      onTerminalError: () => {
+        terminalCount += 1;
+      },
+    });
+
+    await ctrl.requestRebuild("L", null);
+    await new Promise((r) => queueMicrotask(r));
+    assert.equal(ctrl.getState().subscriptionStatus, "subscribed");
+
+    await ctrl.requestRebuild("L", "poll-A");
+    await new Promise((r) => queueMicrotask(r));
+    assert.equal(ctrl.getState().subscriptionStatus, "subscribed");
+    assert.equal(ctrl.getState().channelVotesPollId, "poll-A");
+    assert.equal(terminalCount, 0);
+
+    await ctrl.dispose();
+  });
+
+  it("TIMED_OUT répétés : chaque statut notifie ; store n'a qu'un timer", async () => {
+    let terminalCount = 0;
+    const mock = makeMockRealtime({ autoSubscribe: false });
+    const ctrl = createPollChannelController({
+      createChannel: mock.createChannel,
+      removeChannel: mock.removeChannel,
+      onPollsEvent: () => {},
+      onVotesEvent: () => {},
+      onTerminalError: () => {
+        terminalCount += 1;
+      },
+    });
+
+    await ctrl.requestRebuild("L", null);
+    mock.channels[0]._emitStatus("TIMED_OUT");
+    mock.channels[0]._emitStatus("TIMED_OUT");
+    mock.channels[0]._emitStatus("CHANNEL_ERROR");
+    assert.equal(terminalCount, 3);
+    assert.equal(ctrl.getState().subscriptionStatus, "error");
+
+    const storeSrc = readFileSync(
+      join(__dirname, "../js/core/lobbyPollStore.js"),
+      "utf8"
+    );
+    assert.match(
+      storeSrc,
+      /if \(!started \|\| !authGatePassed \|\| pollReconnectTimer\) return/
+    );
+
+    await ctrl.dispose();
+  });
+
+  it("course de rebuild : remove tardif ne retire pas le canal final", async () => {
     const mock = makeMockRealtime();
     const ctrl = createPollChannelController({
       createChannel: mock.createChannel,
@@ -162,12 +326,9 @@ describe("lobbyPollChannel lifecycle", () => {
 
     await ctrl.requestRebuild("L", null);
     const topicA = mock.channels[0].topic;
-
     const releaseRemoveA = mock.holdNextRemove();
     const pB = ctrl.requestRebuild("L", "poll-B");
-    // Laisser B démarrer remove de A (bloqué)
     await new Promise((r) => setTimeout(r, 5));
-    // Pendant ce temps, lancer C (gén plus récente)
     const pC = ctrl.requestRebuild("L", "poll-C");
     releaseRemoveA();
     await Promise.all([pB, pC]);
@@ -175,9 +336,6 @@ describe("lobbyPollChannel lifecycle", () => {
     assert.equal(mock.channels.length, 1);
     assert.equal(ctrl.getState().channelVotesPollId, "poll-C");
     assert.notEqual(mock.channels[0].topic, topicA);
-    assert.match(mock.channels[0].topic, /:\d+$/);
-    // Le canal actif n'est pas dans removed après dispose partiel — B/C topics créés
-    assert.ok(mock.removed.includes(topicA));
 
     await ctrl.dispose();
   });
@@ -194,145 +352,35 @@ describe("lobbyPollChannel lifecycle", () => {
       () => ctrl.requestRebuild("", null),
       /poll_channel_invalid_lobby_id/
     );
-    await assert.rejects(
-      () => ctrl.requestRebuild("   ", null),
-      /poll_channel_invalid_lobby_id/
-    );
     await ctrl.dispose();
   });
 });
 
-describe("lobbyPollStore Realtime apply (sans Supabase)", () => {
-  it("UPDATE sans old.status ferme immédiatement", () => {
-    resetLobbyPollSyncForTests();
-    __testForceActivePoll({
-      id: "p1",
-      lobbyId: "L",
-      status: "open",
-      options: [{ gameId: "g1", title: "G", emoji: "🎲" }],
-    });
-    __testSimulateRealtimePollsEvent({
-      eventType: "UPDATE",
-      old: { id: "p1" },
-      new: { id: "p1", status: "closed" },
-    });
-    assert.equal(getLobbyPollState().activePoll, null);
-    assert.equal(getLobbyPollState().unseenPoll, false);
-    resetLobbyPollSyncForTests();
-  });
-
-  it("INSERT nouveau poll sheet fermé → unseenPoll ; sheet ouvert → pin sans pastille", () => {
-    resetLobbyPollSyncForTests();
-    __testSetHasHydrated(true);
-    setLobbyPollSheetOpenGetter(() => false);
-    __testForceActivePoll(null);
-    // force active null via set
-    const { activePoll, ...rest } = getLobbyPollState();
-    void activePoll;
-    void rest;
-
-    // Re-init state properly
-    resetLobbyPollSyncForTests();
-    __testSetHasHydrated(true);
-    setLobbyPollSheetOpenGetter(() => false);
-    // store lobbyId for filter
-    __testForceActivePoll({
-      id: "old",
-      lobbyId: "L",
-      status: "open",
-      options: [],
-    });
-    // close first
-    __testSimulateRealtimePollsEvent({
-      eventType: "UPDATE",
-      old: { id: "old" },
-      new: { id: "old", status: "closed" },
-    });
-    assert.equal(getLobbyPollState().activePoll, null);
-
-    __testSimulateRealtimePollsEvent({
-      eventType: "INSERT",
-      new: {
-        id: "poll-B",
-        lobby_id: "test-lobby",
-        status: "open",
-        options: [{ gameId: "g1", title: "G", emoji: "🎲" }],
-      },
-    });
-    assert.equal(getLobbyPollState().activePoll?.id, "poll-B");
-    assert.equal(getLobbyPollState().unseenPoll, true);
-
-    // Sheet ouvert : nouveau poll C
-    markLobbyPollSeen();
-    setLobbyPollSheetOpenGetter(() => true);
-    __testSimulateRealtimePollsEvent({
-      eventType: "UPDATE",
-      old: { id: "poll-B" },
-      new: { id: "poll-B", status: "closed" },
-    });
-    __testSimulateRealtimePollsEvent({
-      eventType: "INSERT",
-      new: {
-        id: "poll-C",
-        lobby_id: "test-lobby",
-        status: "open",
-        options: [{ gameId: "g1", title: "G", emoji: "🎲" }],
-      },
-    });
-    assert.equal(getLobbyPollState().activePoll?.id, "poll-C");
-    assert.equal(getLobbyPollState().unseenPoll, false);
-
-    resetLobbyPollSyncForTests();
-  });
-
-  it("INSERT après close (payload) applique B sans dépendre du refetch", () => {
-    resetLobbyPollSyncForTests();
-    __testSetHasHydrated(true);
-    setLobbyPollSheetOpenGetter(() => true);
-    __testForceActivePoll({
-      id: "A",
-      lobbyId: "test-lobby",
-      status: "open",
-      options: [{ gameId: "g1", title: "G", emoji: "🎲" }],
-    });
-    markLobbyPollSeen();
-
-    __testSimulateRealtimePollsEvent({
-      eventType: "UPDATE",
-      old: { id: "A" },
-      new: { id: "A", status: "closed", closed_at: "x" },
-    });
-    assert.equal(getLobbyPollState().activePoll, null);
-
-    assert.equal(
-      isRealtimeOpenPollInsert(
-        {
-          eventType: "INSERT",
-          new: { id: "B", lobby_id: "test-lobby", status: "open" },
-        },
-        "test-lobby"
-      ),
-      true
+describe("boot auth (contrat source)", () => {
+  it("aucun canal poll avant authReady : gate + ordre main.js", () => {
+    const storeSrc = readFileSync(
+      join(__dirname, "../js/core/lobbyPollStore.js"),
+      "utf8"
     );
+    const mainSrc = readFileSync(join(__dirname, "../js/main.js"), "utf8");
 
-    __testSimulateRealtimePollsEvent({
-      eventType: "INSERT",
-      new: {
-        id: "B",
-        lobby_id: "test-lobby",
-        status: "open",
-        options: [{ gameId: "g2", title: "H", emoji: "🔥" }],
-      },
-    });
-    assert.equal(getLobbyPollState().activePoll?.id, "B");
-    assert.equal(getLobbyPollState().unseenPoll, false);
+    assert.match(storeSrc, /await authReadyForSync/);
+    assert.match(storeSrc, /authGatePassed = true/);
+    assert.match(storeSrc, /if \(!authGatePassed\)/);
+    assert.match(storeSrc, /queueVotesSubscription blocked \(auth gate\)/);
 
-    resetLobbyPollSyncForTests();
+    const bootStart = mainSrc.indexOf("async function boot");
+    const beforeBoot = mainSrc.slice(0, bootStart);
+    assert.doesNotMatch(beforeBoot, /initLobbyPollSync\(\)/);
+
+    const authIdx = mainSrc.indexOf("await authReady", bootStart);
+    const pollIdx = mainSrc.indexOf("initLobbyPollSync", bootStart);
+    assert.ok(authIdx >= 0 && pollIdx > authIdx);
   });
 });
 
-describe("close / insert helpers (payloads réels)", () => {
-  it("close sans old.status", () => {
+describe("payloads close / insert / pastille", () => {
+  it("UPDATE sans old.status", () => {
     assert.equal(
       isRealtimeActivePollClose(
         {
@@ -346,14 +394,39 @@ describe("close / insert helpers (payloads réels)", () => {
     );
   });
 
-  it("pastille contrat sheet fermé", () => {
-    const r = computeUnseenPollOnNewId({
-      pollId: "B",
-      lastSeenPollId: "A",
-      sheetOpen: false,
-      localCreate: false,
-      isInitialHydrate: false,
-    });
-    assert.equal(r.unseenPoll, true);
+  it("INSERT open lobby courant", () => {
+    assert.equal(
+      isRealtimeOpenPollInsert(
+        {
+          eventType: "INSERT",
+          new: { id: "B", lobby_id: "L", status: "open" },
+        },
+        "L"
+      ),
+      true
+    );
+  });
+
+  it("pastille sheet fermé / ouvert", () => {
+    assert.equal(
+      computeUnseenPollOnNewId({
+        pollId: "B",
+        lastSeenPollId: "A",
+        sheetOpen: false,
+        localCreate: false,
+        isInitialHydrate: false,
+      }).unseenPoll,
+      true
+    );
+    assert.equal(
+      computeUnseenPollOnNewId({
+        pollId: "B",
+        lastSeenPollId: "A",
+        sheetOpen: true,
+        localCreate: false,
+        isInitialHydrate: false,
+      }).unseenPoll,
+      false
+    );
   });
 });

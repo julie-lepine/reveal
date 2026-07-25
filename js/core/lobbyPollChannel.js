@@ -3,18 +3,51 @@
  *
  * Règles :
  * - topic unique par génération (évite collision remove/create même nom)
+ * - channel assigné AVANT .subscribe() (callback sync safe)
+ * - skip rebuild si même config et status subscribing|subscribed
  * - remove capture la référence exacte, await, puis create
- * - rebuilds sérialisés ; un cleanup ancien ne retire jamais un canal plus récent
+ * - rebuilds sérialisés ; CLOSED d'un ancien canal ignoré (gén / ref)
  * - lobby_polls toujours branché ; votes seulement si votesPollId
  */
+
+/** Délais reconnect : 1s → 2s → 5s → 10s max. */
+export const POLL_REALTIME_RECONNECT_DELAYS_MS = [1000, 2000, 5000, 10000];
+
+export function pollRealtimeReconnectDelayMs(attemptIndex) {
+  const i = Math.max(0, Math.min(attemptIndex, POLL_REALTIME_RECONNECT_DELAYS_MS.length - 1));
+  return POLL_REALTIME_RECONNECT_DELAYS_MS[i];
+}
+
+/**
+ * Skip rebuild si config identique et canal encore en connexion / connecté.
+ * Un état terminal (error, idle, …) autorise le remplacement.
+ */
+export function shouldSkipPollChannelRebuild({
+  hasChannel,
+  channelLobbyId,
+  channelVotesPollId,
+  desiredLobbyId,
+  desiredVotesPollId,
+  subscriptionStatus,
+}) {
+  if (!hasChannel) return false;
+  if (channelLobbyId !== desiredLobbyId) return false;
+  const nextVotes = desiredVotesPollId || null;
+  if (channelVotesPollId !== nextVotes) return false;
+  return (
+    subscriptionStatus === "subscribing" || subscriptionStatus === "subscribed"
+  );
+}
 
 /**
  * @param {object} deps
  * @param {(topic: string) => { on: Function, subscribe: Function }} deps.createChannel
  * @param {(ch: object) => Promise<void>|void} deps.removeChannel
- * @param {(payload: object) => void} deps.onPollsEvent
- * @param {(payload: object) => void} deps.onVotesEvent
+ * @param {(payload: object, lobbyId: string) => void} deps.onPollsEvent
+ * @param {(payload: object, lobbyId: string) => void} deps.onVotesEvent
  * @param {(status: string) => void} [deps.onStatusChange]
+ * @param {() => void} [deps.onSubscribed]
+ * @param {() => void} [deps.onTerminalError]
  * @param {(tag: string, data: object) => void} [deps.log]
  */
 export function createPollChannelController(deps) {
@@ -24,6 +57,8 @@ export function createPollChannelController(deps) {
     onPollsEvent,
     onVotesEvent,
     onStatusChange = () => {},
+    onSubscribed = () => {},
+    onTerminalError = () => {},
     log = () => {},
   } = deps;
 
@@ -51,18 +86,23 @@ export function createPollChannelController(deps) {
     }
   }
 
-  async function removeCurrentChannel() {
+  async function removeCurrentChannel({ intentionalRemoval = true } = {}) {
     const toRemove = channel;
     const removedGen = channelGen;
     channel = null;
     if (!toRemove) {
-      log("remove channel", { ...snapshot(), skipped: true });
+      log("remove channel", {
+        ...snapshot(),
+        skipped: true,
+        intentionalRemoval,
+      });
       return { removedGen, removed: null };
     }
     log("remove channel", {
       ...snapshot(),
       topic: toRemove.topic,
       removedGen,
+      intentionalRemoval,
     });
     try {
       await removeChannel(toRemove);
@@ -77,9 +117,15 @@ export function createPollChannelController(deps) {
    * @param {string|null} votesPollId
    */
   function requestRebuild(lobbyId, votesPollId = null) {
+    const nextVotes = votesPollId || null;
+    const sameConfiguration =
+      Boolean(channel) &&
+      channelLobbyId === lobbyId &&
+      channelVotesPollId === nextVotes;
     log("rebuild requested", {
       lobbyId,
-      votesPollId,
+      votesPollId: nextVotes,
+      sameConfiguration,
       ...snapshot(),
     });
     rebuildChain = rebuildChain
@@ -89,11 +135,12 @@ export function createPollChannelController(deps) {
   }
 
   async function rebuild(lobbyId, votesPollId = null) {
-    if (!lobbyId) {
-      await removeCurrentChannel();
+    if (lobbyId == null) {
+      await removeCurrentChannel({ intentionalRemoval: true });
       channelLobbyId = null;
       channelVotesPollId = null;
       subscriptionStatus = "idle";
+      onStatusChange("idle");
       log("rebuild idle", snapshot());
       return snapshot();
     }
@@ -102,19 +149,25 @@ export function createPollChannelController(deps) {
     const nextVotes = votesPollId || null;
 
     if (
-      channel &&
-      channelLobbyId === lobbyId &&
-      channelVotesPollId === nextVotes &&
-      subscriptionStatus === "subscribed"
+      shouldSkipPollChannelRebuild({
+        hasChannel: Boolean(channel),
+        channelLobbyId,
+        channelVotesPollId,
+        desiredLobbyId: lobbyId,
+        desiredVotesPollId: nextVotes,
+        subscriptionStatus,
+      })
     ) {
-      log("rebuild skipped (already matching)", snapshot());
+      log("rebuild skipped (already matching)", {
+        sameConfiguration: true,
+        ...snapshot(),
+      });
       return snapshot();
     }
 
     const myGen = ++channelGen;
-    await removeCurrentChannel();
+    await removeCurrentChannel({ intentionalRemoval: true });
 
-    // Cleanup ancien : ne pas créer si une rebuild plus récente a gagné
     if (myGen !== channelGen) {
       log("rebuild aborted (stale gen after remove)", {
         myGen,
@@ -189,9 +242,22 @@ export function createPollChannelController(deps) {
       );
     }
 
-    const ch = builder.subscribe((status) => {
-      // Ignorer les callbacks d'un canal déjà retiré / gén stale
-      if (channel !== ch || myGen !== channelGen) return;
+    // Assigner AVANT .subscribe() : un SUBSCRIBED synchrone doit voir channel === builder
+    channel = builder;
+    if (channel && typeof channel === "object") {
+      channel.topic = topic;
+    }
+
+    builder.subscribe((status) => {
+      if (channel !== builder || myGen !== channelGen) {
+        log("subscribe status ignored (stale)", {
+          subscriptionStatus: status,
+          intentionalRemoval: channel !== builder,
+          channelGen: myGen,
+          currentGen: channelGen,
+        });
+        return;
+      }
       log("subscribe status", {
         lobbyId,
         channelLobbyId,
@@ -203,16 +269,23 @@ export function createPollChannelController(deps) {
       if (status === "SUBSCRIBED") {
         subscriptionStatus = "subscribed";
         onStatusChange("subscribed");
-      } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+        onSubscribed();
+      } else if (
+        status === "CHANNEL_ERROR" ||
+        status === "TIMED_OUT" ||
+        status === "CLOSED"
+      ) {
         subscriptionStatus = "error";
         onStatusChange("error");
+        onTerminalError();
       }
     });
 
-    // Si une rebuild plus récente a démarré pendant create, retirer ce canal
     if (myGen !== channelGen) {
+      const stale = builder;
+      channel = null;
       try {
-        await removeChannel(ch);
+        await removeChannel(stale);
       } catch {
         /* ignore */
       }
@@ -220,17 +293,16 @@ export function createPollChannelController(deps) {
       return snapshot();
     }
 
-    channel = ch;
-    channel.topic = topic;
     return snapshot();
   }
 
   async function dispose() {
     channelGen += 1;
-    await removeCurrentChannel();
+    await removeCurrentChannel({ intentionalRemoval: true });
     channelLobbyId = null;
     channelVotesPollId = null;
     subscriptionStatus = "idle";
+    onStatusChange("idle");
   }
 
   return {
