@@ -10,11 +10,11 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 
 | | |
 |---|---|
-| **Fait** | T-01/T-02 · M-08 · ready Recommencer · **M-10 / T-05 / SYN-26** (QA OK) |
-| **Prochain** | **I-09 / SYN-06** — rename mid-soirée incomplet |
-| **Ensuite** | M-12 · ARCH-04 · SYN-12 |
+| **Fait** | T-01/T-02 · M-08 · ready Recommencer · M-10 / T-05 / SYN-26 · **I-09 / SYN-06** (QA terrain OK) |
+| **Prochain** | **M-12** — `#join=` sans auto-join |
+| **Ensuite** | ARCH-04 · SYN-12 · M-04b |
 
-**Résidus séparés :** UI Guess Lie avant `await` · `statsRecordedRoundIdx` · loader UI join · pré-résolution `get*EntryScreen` · votes optimistic autres jeux (dilemma / speedVote / …) · `results.js` mount refresh
+**Résidus séparés :** UI Guess Lie avant `await` · `statsRecordedRoundIdx` · loader UI join · pré-résolution `get*EntryScreen` · votes optimistic autres jeux (dilemma / speedVote / …) · `results.js` mount refresh · échec remote rename (doc QA I-09)
 
 **Surveiller :** Clutch taps figés sous latence · ready prep après Recommencer · Cause 4 seulement si régression
 
@@ -24,16 +24,16 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 
 | # | ID | Cause | Problème | Note |
 |---|----|-------|----------|------|
-| 1 | **I-09 / SYN-06** | 8 | Rename mid-soirée incomplet | 🟡 partiel |
-| 2 | **M-12** | 11 | `#join=` sans auto-join | |
-| 3 | **ARCH-04** | 5 | Re-entry prep bloquée par suppress | |
-| 4 | **SYN-12 / M-05b** | 9 | Double `startMultiplayerSync` au mount lobby | |
-| 5 | **M-14a / SYN-14** | 3 | TierNight topic / routing | ❌ KO QA — suspendu |
-| 6 | **ARCH-06** | 6 | Handlers async multiples en vol | Dette |
-| 7 | Guess Lie UX | 4/7 | UI avant await ; stats round local-only | Post I-08 |
-| 8 | Loader UI join | 5/11 | Interstitiel join | Hors T-01/T-02 |
-| 9 | Pré-résolution entry screens | 5 | `get*EntryScreen` (filet M-08 conservé) | Hors M-08 |
-| 10 | **M-04b / SYN-18** | 7 | Timers `withPatchTimeout` non cleared | Résidu Cause 7 |
+| 1 | **M-12** | 11 | `#join=` sans auto-join | **prochain** |
+| 2 | **ARCH-04** | 5 | Re-entry prep bloquée par suppress | |
+| 3 | **SYN-12 / M-05b** | 9 | Double `startMultiplayerSync` au mount lobby | |
+| 4 | **M-14a / SYN-14** | 3 | TierNight topic / routing | ❌ KO QA — suspendu |
+| 5 | **ARCH-06** | 6 | Handlers async multiples en vol | Dette |
+| 6 | Guess Lie UX | 4/7 | UI avant await ; stats round local-only | Post I-08 |
+| 7 | Loader UI join | 5/11 | Interstitiel join | Hors T-01/T-02 |
+| 8 | Pré-résolution entry screens | 5 | `get*EntryScreen` (filet M-08 conservé) | Hors M-08 |
+| 9 | **M-04b / SYN-18** | 7 | Timers `withPatchTimeout` non cleared | Résidu Cause 7 |
+| 10 | **SYN-15 / SYN-16** | 8 | Merge stats/scores stale | Après I-09 |
 
 ### Autres ouverts (hors Top 10)
 
@@ -64,7 +64,7 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 | 5 | Routing + timing sync | ✅ M-08 | ARCH-04 |
 | 6 | Async écrans | Partiel | ARCH-06 ; SYN-05 dormant |
 | 7 | Sync silencieuse / fire-and-forget | Partiel | M-04b, ARCH-07/08… (**M-10 / T-05 / SYN-26** ✅) |
-| 8 | Reset / migration incomplète | Partiel | **I-09**, SYN-15/16 |
+| 8 | Reset / migration incomplète | Partiel | **I-09 ✅** ; SYN-15/16 |
 | 9 | Sync monolithe / duplication | Dette | SYN-12, ARCH-11… |
 | 10 | Code mort | Dette | Fil Rouge, dead exports |
 | 11 | Friction UX | Partiel | **M-12**, ARCH-22 |
@@ -94,7 +94,7 @@ Colonnes réduites : le détail fichier / fix proposé vit dans le code ou les c
 
 | ID | Problème | Note |
 |----|----------|------|
-| **I-09 / SYN-06** | Rename ne migre pas tous les blobs | 🟡 scores/stats OK ; manque `gameScores` + plusieurs `*Game` |
+| **I-09 / SYN-06** | Rename mid-soirée — migration blobs locaux | ✅ QA terrain — `renameLocalPlayer` complet (`state.js`) |
 | **SYN-15 / SYN-16** | Merge stats/scores avec noms stale | |
 | **ARCH-10** | Cache session clear trop tard au leave | 🟡 |
 
@@ -103,7 +103,7 @@ Colonnes réduites : le détail fichier / fix proposé vit dans le code ou les c
 | ID | Cause | Problème |
 |----|-------|----------|
 | **M-14a** | 3 | TierNight : hôte → ancien récap 2e liste ; invité saute choix tierlists — ❌ suspendu |
-| **M-12** | 11 | Lien `#join=` préremplit seulement |
+| **M-12** | 11 | Lien `#join=` préremplit seulement — **prochain** |
 | **SYN-12** | 9 | Double `startMultiplayerSync` mount lobby |
 | **ARCH-06** | 6 | Double mount / handlers en vol |
 | **ARCH-01** | 1 | Démo locale sans avertissement MP |
@@ -114,6 +114,7 @@ Colonnes réduites : le détail fichier / fix proposé vit dans le code ou les c
 
 | Date | IDs | Commit / note |
 |------|-----|---------------|
+| 07-25 | **I-09 / SYN-06** | ✅ QA terrain — `renameLocalPlayer` migre `gameScores` / baseline / `*Game` (clés, valeurs, tableaux, scalaires) ; collisions `preferOld` / `maxStats` / `or` ; tests `renameLocalPlayer.test.js` |
 | 07-25 | **M-10 / SYN-10** | ✅ QA — `bb8f71c` : catch `syncPrepOnMount` + leaderboard ; `syncPrepMount.js` |
 | 07-25 | **T-05** | ✅ QA — `faeb33f` : rollback vote Hot Take (`hotTakeVoteCommit.js`) |
 | 07-25 | **SYN-26** | ✅ QA — `428ced1` → `66f08c0` → `4856b7e` : catch/rollback tap ; retapable ; **freeze `{ms,at}` au clic** + merge first-wins |
@@ -179,11 +180,11 @@ Pas de re-travail sauf régression. Doublons notés une seule fois.
 | 5 | T-01/02, T-03↻, M-07, M-08, P-02, SYN-28, I-PG-01 |
 | 6 | I-05, SYN-13b↻, SYN-25 |
 | 7 | I-07, M-09, L-09, M-11, **M-10**, **T-05**, **SYN-26** |
-| 8 | I-06, P-02, ARCH-09 |
+| 8 | I-06, P-02, ARCH-09, **I-09 / SYN-06** |
 | 11 | L-02, ARCH-21↻ |
 
 ↻ = accepté / requalifié (pas un bug à fixer)
 
 ---
 
-*Suivi vivant. Dernière MAJ : 2026-07-25 — M-10 / T-05 / SYN-26 clôturés QA ; prochain = I-09.*
+*Suivi vivant. Dernière MAJ : 2026-07-25 — I-09 / SYN-06 clôturé QA terrain ; prochain = M-12.*
