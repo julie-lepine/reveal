@@ -14,6 +14,18 @@
  */
 import { serializeRealtimeErr } from "./lobbyPollRealtimeDiagnose.js";
 import { attachPollChannelRejoinWatch } from "./lobbyPollRejoinWatch.js";
+import {
+  pollRtInstanceDebugEnabled,
+  makePollRtInstanceId,
+  upsertPollRtRegistryEntry,
+  markPollRtRegistryDisposed,
+  logPollRtInstance,
+  countPollRtRegistryTotal,
+  countPollRtRegistryActive,
+} from "./lobbyPollRtInstanceRegistry.js";
+
+/** Une fois par évaluation de ce module (distinct si double graphe). */
+export const CHANNEL_MODULE_INSTANCE_ID = makePollRtInstanceId("chmod");
 
 /** Délais reconnect manuel (CLOSED ; join-reply seulement si circuit anti-boucle ouvert). */
 export const POLL_REALTIME_RECONNECT_DELAYS_MS = [1000, 2000, 5000, 10000];
@@ -68,18 +80,16 @@ export function shouldSkipPollChannelRebuild({
 }
 
 function lifecycleDebugEnabled() {
-  try {
-    return (
-      typeof localStorage !== "undefined" &&
-      localStorage.getItem("reveal-poll-rt-debug") === "1"
-    );
-  } catch {
-    return false;
-  }
+  return pollRtInstanceDebugEnabled();
 }
 
 /**
  * @param {object} deps
+ * @param {{
+ *   storeModuleInstanceId?: string|null,
+ *   storeInstanceId?: string|null,
+ *   storeStarted?: boolean|null,
+ * }} [deps.identity]
  */
 export function createPollChannelController(deps) {
   const {
@@ -92,7 +102,14 @@ export function createPollChannelController(deps) {
     /** Reconnect manuel — uniquement CLOSED involontaire */
     onInvoluntaryClosed = () => {},
     log = () => {},
+    identity = {},
   } = deps;
+
+  const controllerId = makePollRtInstanceId("ctrl");
+  const controllerCreatedAt = Date.now();
+  const storeModuleInstanceId = identity.storeModuleInstanceId ?? null;
+  const storeInstanceId = identity.storeInstanceId ?? null;
+  let disposed = false;
 
   let channel = null;
   let channelLobbyId = null;
@@ -109,6 +126,48 @@ export function createPollChannelController(deps) {
   /** Remplacements join-reply immédiats sans SUBSCRIBED depuis le dernier succès. */
   let joinReplyImmediateStreak = 0;
 
+  function syncRegistry(patch = {}) {
+    upsertPollRtRegistryEntry(controllerId, {
+      storeModuleInstanceId,
+      storeInstanceId,
+      channelModuleInstanceId: CHANNEL_MODULE_INSTANCE_ID,
+      controllerId,
+      controllerCreatedAt,
+      createdAt: controllerCreatedAt,
+      disposedAt: disposed ? Date.now() : null,
+      started: identity.storeStarted ?? null,
+      lobbyId: channelLobbyId,
+      channelGen,
+      channelId: channel?.__pollChannelId || null,
+      topic: channel?.topic || null,
+      status: subscriptionStatus,
+      joinReplyImmediateStreak,
+      active: !disposed,
+      ...patch,
+    });
+  }
+
+  function instanceLog(event, extra = {}) {
+    logPollRtInstance(event, {
+      storeModuleInstanceId,
+      storeInstanceId,
+      channelModuleInstanceId: CHANNEL_MODULE_INSTANCE_ID,
+      controllerId,
+      controllerCreatedAt,
+      channelId: extra.channelId ?? channel?.__pollChannelId ?? null,
+      channelGen: extra.channelGen ?? channelGen,
+      lobbyId: extra.lobbyId ?? channelLobbyId,
+      topic: extra.topic ?? channel?.topic ?? null,
+      status: extra.status ?? subscriptionStatus,
+      channelState: extra.channelState ?? subscriptionStatus,
+      started: identity.storeStarted ?? null,
+      reason: extra.reason ?? lastBuildReason,
+      joinReplyImmediateStreak,
+      disposed,
+      ...extra,
+    });
+  }
+
   function snapshot() {
     return {
       channelLobbyId,
@@ -121,6 +180,10 @@ export function createPollChannelController(deps) {
       inFlightDesire,
       lastBuildReason,
       joinReplyImmediateStreak,
+      controllerId,
+      controllerCreatedAt,
+      storeModuleInstanceId,
+      storeInstanceId,
     };
   }
 
@@ -136,6 +199,9 @@ export function createPollChannelController(deps) {
       reconnectTimerActive,
       lobbyId: extra.lobbyId ?? channelLobbyId,
       votesPollId: extra.votesPollId ?? channelVotesPollId,
+      controllerId,
+      storeModuleInstanceId,
+      storeInstanceId,
       stack,
       ...extra,
     });
@@ -152,11 +218,26 @@ export function createPollChannelController(deps) {
       channelState: extra.channelState ?? subscriptionStatus,
       reason: extra.reason ?? lastBuildReason,
       joinReplyImmediateStreak,
+      controllerId,
+      storeModuleInstanceId,
+      storeInstanceId,
+      channelId: extra.channelId ?? channel?.__pollChannelId ?? null,
+      registryTotal: countPollRtRegistryTotal(),
+      registryActiveForLobby: countPollRtRegistryActive(
+        extra.lobbyId ?? channelLobbyId
+      ),
       ...extra,
     };
     console.info(`[POLL-RT] ${step}`, payload);
     lifecycleLog(step, payload);
   }
+
+  syncRegistry();
+  instanceLog("controller_created", {
+    reason: "createPollChannelController",
+    status: "idle",
+    channelState: "idle",
+  });
 
   function assertLobbyId(lobbyId) {
     if (!lobbyId || typeof lobbyId !== "string" || !lobbyId.trim()) {
@@ -171,6 +252,8 @@ export function createPollChannelController(deps) {
   async function removeCurrentChannel({ intentionalRemoval = true } = {}) {
     const toRemove = channel;
     const removedGen = channelGen;
+    const removedTopic = toRemove?.topic || null;
+    const removedChannelId = toRemove?.__pollChannelId || null;
     channel = null;
     if (!toRemove) {
       log("remove channel", {
@@ -188,6 +271,13 @@ export function createPollChannelController(deps) {
       toRemove.__pollIntentionalClose = true;
       toRemove.__pollClosedGen = removedGen;
     }
+    instanceLog("channel_remove_start", {
+      reason: intentionalRemoval ? "intentional_remove" : "remove",
+      channelGen: removedGen,
+      topic: removedTopic,
+      channelId: removedChannelId,
+      intentionalRemoval,
+    });
     log("remove channel", {
       ...snapshot(),
       topic: toRemove.topic,
@@ -214,6 +304,14 @@ export function createPollChannelController(deps) {
     } catch (e) {
       log("remove channel error", { message: e?.message || String(e) });
     }
+    instanceLog("channel_remove_done", {
+      reason: intentionalRemoval ? "intentional_remove" : "remove",
+      channelGen: removedGen,
+      topic: removedTopic,
+      channelId: removedChannelId,
+      intentionalRemoval,
+    });
+    syncRegistry({ channelId: null, topic: null });
     return { removedGen, removed: toRemove };
   }
 
@@ -385,6 +483,18 @@ export function createPollChannelController(deps) {
 
     const topic = `lobby-polls:${lobbyId}:${myGen}`;
     const pollsFilter = `lobby_id=eq.${lobbyId}`;
+    const channelId = `poll-ch-${controllerId}-${myGen}`;
+
+    instanceLog("channel_build_start", {
+      reason,
+      lobbyId,
+      channelGen: myGen,
+      topic,
+      channelId,
+      status: "subscribing",
+      channelState: "subscribing",
+      votesPollId: nextVotes,
+    });
 
     log("build channel", {
       reason,
@@ -408,7 +518,8 @@ export function createPollChannelController(deps) {
     if (builder && typeof builder === "object") {
       builder.topic = topic;
       builder.__pollSubscribeCallCount = 0;
-      builder.__pollChannelId = `poll-ch-${myGen}`;
+      builder.__pollChannelId = channelId;
+      builder.__pollControllerId = controllerId;
     }
 
     builder = builder.on(
@@ -452,6 +563,14 @@ export function createPollChannelController(deps) {
 
     // Assigner AVANT .subscribe()
     channel = builder;
+    syncRegistry({
+      lobbyId,
+      channelGen: myGen,
+      channelId,
+      topic,
+      status: "subscribing",
+      active: true,
+    });
 
     builder.__pollSubscribeCallCount =
       (builder.__pollSubscribeCallCount || 0) + 1;
@@ -474,6 +593,36 @@ export function createPollChannelController(deps) {
 
     builder.subscribe((status, err) => {
       const intentional = Boolean(builder.__pollIntentionalClose);
+      const isCurrentBuilder = channel === builder;
+      const isCurrentGeneration = myGen === channelGen;
+      let ignoredReason = null;
+      if (!isCurrentBuilder) ignoredReason = "channel_ !==_builder";
+      else if (!isCurrentGeneration) ignoredReason = "myGen_!==_channelGen";
+
+      // Avant toute garde stale — visible même si callback ignoré ensuite.
+      instanceLog("subscribe_callback", {
+        reason: lastBuildReason,
+        lobbyId,
+        channelGen: myGen,
+        currentChannelGen: channelGen,
+        topic,
+        channelId: builder.__pollChannelId || null,
+        status,
+        channelState: builder?.state ?? null,
+        isCurrentBuilder,
+        isCurrentGeneration,
+        ignoredReason,
+        intentionalClose: intentional,
+        disposed,
+      });
+      syncRegistry({
+        status: isCurrentBuilder && isCurrentGeneration ? subscriptionStatus : status,
+        channelGen: isCurrentBuilder && isCurrentGeneration ? channelGen : myGen,
+        topic,
+        channelId: builder.__pollChannelId || null,
+        lastSubscribeStatus: status,
+        lastSubscribeIgnoredReason: ignoredReason,
+      });
 
       try {
         rejoinWatch.noteStatus(status, err);
@@ -503,6 +652,12 @@ export function createPollChannelController(deps) {
           channelGen: myGen,
           intentionalClose: intentional,
           subscribeCallCount: builder.__pollSubscribeCallCount,
+          controllerId,
+          storeModuleInstanceId,
+          storeInstanceId,
+          isCurrentBuilder,
+          isCurrentGeneration,
+          ignoredReason,
         });
       } else if (lifecycleDebugEnabled()) {
         console.info("[POLL-RT] subscription status", {
@@ -511,17 +666,18 @@ export function createPollChannelController(deps) {
           lobbyId,
           topic,
           channelGen: myGen,
+          controllerId,
         });
       }
 
-      if (channel !== builder || myGen !== channelGen) {
+      if (!isCurrentBuilder || !isCurrentGeneration) {
         log("subscribe status ignored (stale)", {
           subscriptionStatus: status,
-          intentionalRemoval: channel !== builder || intentional,
+          intentionalRemoval: !isCurrentBuilder || intentional,
           channelGen: myGen,
           currentGen: channelGen,
+          ignoredReason,
         });
-        // Callbacks stale toujours chroniqués par rejoin-watch ci-dessus
         return;
       }
 
@@ -529,12 +685,15 @@ export function createPollChannelController(deps) {
         subscriptionStatus = "subscribed";
         joinReplyImmediateStreak = 0;
         onStatusChange("subscribed");
+        syncRegistry({ status: "subscribed", joinReplyImmediateStreak: 0 });
         const subMeta = {
           reason: lastBuildReason,
           lobbyId,
           channelGen: myGen,
           votesPollId: nextVotes,
           topic,
+          controllerId,
+          channelId: builder.__pollChannelId || null,
         };
         if (lastBuildReason === "join_reply_error_replace") {
           replaceChronology("replacement_subscribed", {
@@ -545,6 +704,7 @@ export function createPollChannelController(deps) {
             votesPollId: nextVotes,
             channelState: "subscribed",
             reason: lastBuildReason,
+            channelId: builder.__pollChannelId || null,
           });
         }
         onSubscribed(subMeta);
@@ -671,6 +831,11 @@ export function createPollChannelController(deps) {
   }
 
   async function dispose() {
+    instanceLog("controller_dispose_start", {
+      reason: "dispose",
+      status: subscriptionStatus,
+    });
+    disposed = true;
     channelGen += 1;
     inFlightDesire = null;
     joinReplyImmediateStreak = 0;
@@ -680,6 +845,19 @@ export function createPollChannelController(deps) {
     channelVotesPollId = null;
     subscriptionStatus = "idle";
     onStatusChange("idle");
+    markPollRtRegistryDisposed(controllerId, {
+      storeModuleInstanceId,
+      storeInstanceId,
+      channelModuleInstanceId: CHANNEL_MODULE_INSTANCE_ID,
+      status: "disposed",
+      channelGen,
+      joinReplyImmediateStreak: 0,
+    });
+    instanceLog("controller_disposed", {
+      reason: "dispose",
+      status: "disposed",
+      channelState: "idle",
+    });
     lifecycleLog("dispose", {});
   }
 
@@ -688,7 +866,28 @@ export function createPollChannelController(deps) {
     dispose,
     getState: snapshot,
     setReconnectTimerActive,
+    controllerId,
     /** @internal */
     _awaitIdle: () => rebuildChain.catch(() => {}),
   };
 }
+
+// Diagnostic : évaluation module channel (debug only).
+logPollRtInstance("module_evaluated", {
+  storeModuleInstanceId: null,
+  storeInstanceId: null,
+  channelModuleInstanceId: CHANNEL_MODULE_INSTANCE_ID,
+  controllerId: null,
+  channelId: null,
+  channelGen: null,
+  lobbyId: null,
+  topic: null,
+  status: "channel_module",
+  channelState: null,
+  started: null,
+  reason: "lobbyPollChannel_module",
+  origin: {
+    importMetaUrl:
+      typeof import.meta !== "undefined" ? import.meta.url : null,
+  },
+});

@@ -54,7 +54,15 @@ import {
 import {
   createPollChannelController,
   pollRealtimeReconnectDelayMs,
+  CHANNEL_MODULE_INSTANCE_ID,
 } from "./lobbyPollChannel.js";
+import {
+  makePollRtInstanceId,
+  logPollRtInstance,
+  collectPollRtModuleOrigin,
+  upsertPollRtRegistryEntry,
+  pollRtInstanceDebugEnabled,
+} from "./lobbyPollRtInstanceRegistry.js";
 import {
   rpcCreateLobbyPoll,
   rpcCastLobbyPollVote,
@@ -71,37 +79,59 @@ const listeners = new Set();
 
 const initialCommitting = () => ({ create: false, vote: false, close: false });
 
+/** Une fois par évaluation de ce module. */
+export const STORE_MODULE_INSTANCE_ID = makePollRtInstanceId("storemod");
+export const STORE_INSTANCE_ID = makePollRtInstanceId("store");
+export const STORE_CREATED_AT = Date.now();
+
 /** Logs [POLL-RT] : activer via localStorage.setItem('reveal-poll-rt-debug','1') */
 function pollRtEnabled() {
-  try {
-    return (
-      typeof localStorage !== "undefined" &&
-      localStorage.getItem("reveal-poll-rt-debug") === "1"
-    );
-  } catch {
-    return false;
-  }
+  return pollRtInstanceDebugEnabled();
+}
+
+function storeInstanceLog(event, extra = {}) {
+  const st = channelCtrl?.getState?.() || {};
+  logPollRtInstance(event, {
+    storeModuleInstanceId: STORE_MODULE_INSTANCE_ID,
+    storeInstanceId: STORE_INSTANCE_ID,
+    storeCreatedAt: STORE_CREATED_AT,
+    channelModuleInstanceId: CHANNEL_MODULE_INSTANCE_ID,
+    controllerId: st.controllerId ?? channelCtrl?.controllerId ?? null,
+    channelId: extra.channelId ?? null,
+    channelGen: extra.channelGen ?? st.channelGen ?? null,
+    lobbyId: extra.lobbyId ?? store?.lobbyId ?? null,
+    topic: extra.topic ?? st.topic ?? null,
+    status: extra.status ?? store?.subscriptionStatus ?? st.subscriptionStatus,
+    channelState: extra.channelState ?? st.subscriptionStatus ?? null,
+    started: typeof started === "boolean" ? started : false,
+    reason: extra.reason ?? null,
+    ...extra,
+  });
 }
 
 function pollRtLog(tag, data = {}) {
   if (!pollRtEnabled()) return;
+  const st = channelCtrl?.getState?.() || {};
   console.info(`[POLL-RT] ${tag}`, {
-    lobbyId: store.lobbyId,
-    channelLobbyId: channelCtrl?.getState()?.channelLobbyId ?? null,
-    activePollId: store.activePoll?.id ?? null,
-    channelVotesPollId: channelCtrl?.getState()?.channelVotesPollId ?? null,
+    lobbyId: store?.lobbyId ?? null,
+    channelLobbyId: st.channelLobbyId ?? null,
+    activePollId: store?.activePoll?.id ?? null,
+    channelVotesPollId: st.channelVotesPollId ?? null,
     eventType: data.eventType ?? null,
     newPollId: data.newPollId ?? null,
     oldStatus: data.oldStatus ?? null,
     newStatus: data.newStatus ?? null,
     subscriptionStatus:
       data.subscriptionStatus ??
-      store.subscriptionStatus ??
-      channelCtrl?.getState()?.subscriptionStatus ??
+      store?.subscriptionStatus ??
+      st.subscriptionStatus ??
       null,
     authReadyResolved: isAuthReadyResolved(),
     reconnectAttempt: pollReconnectAttempts,
     reconnectDelay: data.reconnectDelay ?? null,
+    storeModuleInstanceId: STORE_MODULE_INSTANCE_ID,
+    storeInstanceId: STORE_INSTANCE_ID,
+    controllerId: st.controllerId ?? channelCtrl?.controllerId ?? null,
     ...data,
   });
 }
@@ -149,6 +179,37 @@ let authGatePassed = false;
 /** Coalesce catch-up join-reply (même lobby). */
 let joinReplyCatchupInFlight = null;
 let joinReplyCatchupLobbyId = null;
+
+// Diagnostic : évaluation module (debug only) — après bindings locales.
+storeInstanceLog("module_evaluated", {
+  reason: "lobbyPollStore_module",
+  status: "idle",
+  channelState: null,
+  origin: collectPollRtModuleOrigin(
+    typeof import.meta !== "undefined" ? import.meta.url : null
+  ),
+});
+storeInstanceLog("store_created", {
+  reason: "lobbyPollStore_bind",
+  status: "idle",
+  storeCreatedAt: STORE_CREATED_AT,
+});
+upsertPollRtRegistryEntry(`store:${STORE_INSTANCE_ID}`, {
+  storeModuleInstanceId: STORE_MODULE_INSTANCE_ID,
+  storeInstanceId: STORE_INSTANCE_ID,
+  controllerId: null,
+  createdAt: STORE_CREATED_AT,
+  disposedAt: null,
+  started: false,
+  lobbyId: null,
+  channelGen: null,
+  channelId: null,
+  topic: null,
+  status: "store_bound",
+  joinReplyImmediateStreak: null,
+  active: true,
+  kind: "store",
+});
 
 function clearPollRealtimeReconnect() {
   if (pollReconnectTimer) {
@@ -523,7 +584,14 @@ function handleLobbyVotesRealtime(payload, lobbyId) {
 }
 
 function ensureChannelController() {
-  if (channelCtrl) return channelCtrl;
+  if (channelCtrl) {
+    storeInstanceLog("controller_reused", {
+      reason: "ensureChannelController",
+      controllerId: channelCtrl.controllerId ?? channelCtrl.getState?.()?.controllerId,
+      status: channelCtrl.getState?.()?.subscriptionStatus,
+    });
+    return channelCtrl;
+  }
   channelCtrl = createPollChannelController({
     createChannel: (topic) => {
       if (!supabase) throw new Error("no_supabase");
@@ -537,6 +605,16 @@ function ensureChannelController() {
     onVotesEvent: (payload, lobbyId) => handleLobbyVotesRealtime(payload, lobbyId),
     onStatusChange: (status) => {
       setStore({ subscriptionStatus: status });
+      upsertPollRtRegistryEntry(
+        channelCtrl?.controllerId || channelCtrl?.getState?.()?.controllerId,
+        {
+          status,
+          started,
+          lobbyId: store.lobbyId,
+          storeModuleInstanceId: STORE_MODULE_INSTANCE_ID,
+          storeInstanceId: STORE_INSTANCE_ID,
+        }
+      );
     },
     onSubscribed: (meta) => {
       resetPollRealtimeReconnectBackoff();
@@ -548,6 +626,17 @@ function ensureChannelController() {
       schedulePollRealtimeReconnect();
     },
     log: (tag, data) => pollRtLog(tag, data),
+    identity: {
+      storeModuleInstanceId: STORE_MODULE_INSTANCE_ID,
+      storeInstanceId: STORE_INSTANCE_ID,
+      storeStarted: started,
+    },
+  });
+  upsertPollRtRegistryEntry(`store:${STORE_INSTANCE_ID}`, {
+    controllerId: channelCtrl.controllerId,
+    started,
+    lobbyId: store.lobbyId,
+    active: true,
   });
   return channelCtrl;
 }
@@ -840,16 +929,33 @@ function invalidatePollFetches() {
 }
 
 async function tearDownChannel() {
+  storeInstanceLog("store_teardown", {
+    reason: "tearDownChannel",
+    lobbyId: store.lobbyId,
+    status: store.subscriptionStatus,
+  });
   clearPollRealtimeReconnect();
   if (channelCtrl) {
     await channelCtrl.dispose();
   }
   setStore({ subscriptionStatus: "idle" });
+  upsertPollRtRegistryEntry(`store:${STORE_INSTANCE_ID}`, {
+    lobbyId: null,
+    status: "store_teardown",
+    channelGen: null,
+    channelId: null,
+    topic: null,
+  });
 }
 
 function syncToCurrentLobby() {
   if (!authGatePassed) return;
   const lobbyId = hasActiveLobby() ? getLobby()?.id || null : null;
+  storeInstanceLog("sync_to_lobby", {
+    reason: "syncToCurrentLobby",
+    lobbyId,
+    status: store.subscriptionStatus,
+  });
   if (!lobbyId) {
     resetPollRealtimeReconnectBackoff();
     void tearDownChannel();
@@ -895,7 +1001,19 @@ function syncToCurrentLobby() {
  * @param {{ authReadyPromise?: Promise<void> }} [opts] — injectable pour tests
  */
 export async function initLobbyPollSync(opts = {}) {
-  if (started) return;
+  storeInstanceLog("init_poll_sync_called", {
+    reason: "initLobbyPollSync",
+    started,
+    status: store.subscriptionStatus,
+  });
+  if (started) {
+    storeInstanceLog("init_poll_sync_skipped_started", {
+      reason: "already_started",
+      started: true,
+      status: store.subscriptionStatus,
+    });
+    return;
+  }
   started = true;
   authReadyForSync =
     opts.authReadyPromise && typeof opts.authReadyPromise.then === "function"
@@ -945,6 +1063,10 @@ export async function initLobbyPollSync(opts = {}) {
   if (!started) return;
   authGatePassed = true;
   pollRtLog("auth gate passed", { authReadyResolved: true });
+  upsertPollRtRegistryEntry(`store:${STORE_INSTANCE_ID}`, {
+    started: true,
+    active: true,
+  });
   syncToCurrentLobby();
 }
 

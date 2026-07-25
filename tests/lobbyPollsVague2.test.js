@@ -429,7 +429,8 @@ describe("lobbyPoll close ciblé poll_id (contrat client)", () => {
   it("initLobbyPollSync est idempotent (guard started) + skip subscribing", () => {
     const storeSrc = readFileSync(join(__dirname, "../js/core/lobbyPollStore.js"), "utf8");
     const chSrc = readFileSync(join(__dirname, "../js/core/lobbyPollChannel.js"), "utf8");
-    assert.match(storeSrc, /if \(started\) return/);
+    assert.match(storeSrc, /if \(started\) \{/);
+    assert.match(storeSrc, /init_poll_sync_skipped_started/);
     assert.match(storeSrc, /await authReadyForSync/);
     assert.match(storeSrc, /schedulePollRealtimeReconnect/);
     assert.match(storeSrc, /onInvoluntaryClosed/);

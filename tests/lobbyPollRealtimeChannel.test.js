@@ -497,6 +497,12 @@ describe("boot auth + reconnect contrat source", () => {
       join(__dirname, "../js/core/lobbyPollChannel.js"),
       "utf8"
     );
+    assert.match(storeSrc, /STORE_MODULE_INSTANCE_ID/);
+    assert.match(storeSrc, /__REVEAL_POLL_RT_INSTANCES__|lobbyPollRtInstanceRegistry/);
+    assert.match(chSrc, /controllerId/);
+    assert.match(chSrc, /subscribe_callback/);
+    assert.match(chSrc, /isCurrentBuilder/);
+    assert.match(chSrc, /CHANNEL_MODULE_INSTANCE_ID/);
     assert.match(storeSrc, /onInvoluntaryClosed/);
     assert.match(storeSrc, /runJoinReplyReplacementCatchup/);
     assert.match(storeSrc, /replacement_catchup_start/);
