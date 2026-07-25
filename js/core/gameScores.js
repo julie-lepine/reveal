@@ -4,6 +4,9 @@ import { escapeHtml } from "./ui.js";
 import {
   sortAndRankByScore,
 } from "./competitionRank.js";
+import { resolveEveningGameScoreOrder } from "./gameScoreOrder.js";
+
+export { mergeGameScoreOrder, resolveEveningGameScoreOrder } from "./gameScoreOrder.js";
 
 /** Scores cumulés d'une manche → map joueur (partie en cours). */
 export function applyMatchScoreDeltas(scores = {}, deltas = {}) {
@@ -120,12 +123,22 @@ function gameLeaderboardCardHtml(titleHtml, players, scoreMap) {
 
 /** Classement de chaque jeu joué dans la soirée (+ bloc Fil Rouge). */
 export function eveningGameLeaderboardsHtml() {
-  const { gameScores = {}, gameScoreOrder = [], filRougeScores = {} } = getState();
+  const {
+    gameScores = {},
+    gameScoreOrder = [],
+    eveningGamesRecorded = {},
+    filRougeScores = {},
+  } = getState();
   const players = getSortedActivePlayers();
   if (!players.length) return "";
 
   const blocks = [];
-  gameScoreOrder.forEach((gid) => {
+  const order = resolveEveningGameScoreOrder({
+    gameScoreOrder,
+    gameScores,
+    eveningGamesRecorded,
+  });
+  order.forEach((gid) => {
     const meta = GAME_LABELS[gid];
     if (!meta) return;
     const titleHtml = `${meta.emoji} ${escapeHtml(meta.title)}`;

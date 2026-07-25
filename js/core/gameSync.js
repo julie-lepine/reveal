@@ -20,6 +20,7 @@ import { navigate, getCurrentScreen } from "./router.js";
 import { getLobbyParticipants, getLobbyStatus, getLobbyGameId, isLobbyEveningStarted } from "./lobby.js";
 import { getActivePlayerNames, getActivePlayers } from "./players.js";
 import { mergeMatchScoresLocal } from "./gameScores.js";
+import { mergeGameScoreOrder } from "./gameScoreOrder.js";
 import { mergeClutchTapsFrozen } from "./clutchTapCommit.js";
 import {
   applyRemotePlayerStats,
@@ -2876,8 +2877,15 @@ function applyRemoteGameScores(remote, order) {
     });
     merged[gid] = prev;
   });
-  const patch = { gameScores: merged };
-  if (Array.isArray(order) && order.length) patch.gameScoreOrder = order;
+  const patch = {
+    gameScores: merged,
+    gameScoreOrder: mergeGameScoreOrder(
+      getState().gameScoreOrder,
+      Array.isArray(order) ? order : [],
+      Object.keys(merged),
+      Object.keys(getState().eveningGamesRecorded || {})
+    ),
+  };
   saveStatePatch(patch);
 }
 

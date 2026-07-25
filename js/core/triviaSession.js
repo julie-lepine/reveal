@@ -11,7 +11,7 @@ import {
 } from "../../data/trivia.js";
 import { getActivePlayerNames, getActivePlayers } from "./players.js";
 import { getLobbyParticipants } from "./lobby.js";
-import { addScore, getLocalDisplayName, getState, saveStatePatch } from "./state.js";
+import { addScore, getLocalDisplayName, getState, saveStatePatch, setActiveScoringGame } from "./state.js";
 import {
   allMembersReady,
   isGameSyncActive,
@@ -25,6 +25,7 @@ import { launchGameWithSync, commitHostGamePlay, commitPrepReadyToggle } from ".
 import { normalizeTriviaAnswersMap } from "./sessionMerge.js";
 import { playerKeyToDisplayName } from "./gameSync.js";
 import { podiumPointsForRank, withCompetitionRanks } from "./competitionRank.js";
+import { triviaEveningPoints } from "./triviaScoring.js";
 
 const TRIVIA_ESTIMATE_SEC_PER_QUESTION = 40;
 
@@ -419,10 +420,15 @@ export function getTriviaPodiumAwards(standings = buildTriviaStandings()) {
   }));
 }
 
+/**
+ * Crédite à la soirée le cumul quiz (`matchScores`) + le bonus podium (une fois).
+ */
 export function applyTriviaLobbyPodium(session = getTriviaSession()) {
+  setActiveScoringGame("trivia");
   const standings = getTriviaPodiumAwards(buildTriviaStandings(session.matchScores || {}));
   standings.forEach((player) => {
-    if (player.lobbyBonus > 0) addScore(player.name, player.lobbyBonus);
+    const total = triviaEveningPoints(player);
+    if (total > 0) addScore(player.name, total);
   });
   return standings;
 }

@@ -13,6 +13,33 @@ import {
   resetScores,
   saveStatePatch,
 } from "../js/core/state.js";
+import {
+  mergeGameScoreOrder,
+  resolveEveningGameScoreOrder,
+} from "../js/core/gameScoreOrder.js";
+
+describe("mergeGameScoreOrder / resolveEveningGameScoreOrder", () => {
+  it("n'écrase pas une order locale plus complète par une remote courte", () => {
+    assert.deepEqual(
+      mergeGameScoreOrder(
+        ["trivia", "consensus", "hottake"],
+        ["trivia", "hottake", "wronganswer"]
+      ),
+      ["trivia", "consensus", "hottake", "wronganswer"]
+    );
+  });
+
+  it("réaffiche un jeu présent dans gameScores ou eveningGamesRecorded hors order", () => {
+    assert.deepEqual(
+      resolveEveningGameScoreOrder({
+        gameScoreOrder: ["trivia", "hottake", "wronganswer"],
+        gameScores: { trivia: {}, consensus: { Alice: 12 }, hottake: {}, wronganswer: {} },
+        eveningGamesRecorded: { consensus: true, trivia: true },
+      }),
+      ["trivia", "hottake", "wronganswer", "consensus"]
+    );
+  });
+});
 
 describe("hasEveningStatsActivity", () => {
   let snapshot;

@@ -4,6 +4,7 @@ import {
   medalForCompetitionRank,
   winnersAtRank,
 } from "../core/competitionRank.js";
+import { triviaEveningPoints } from "../core/triviaScoring.js";
 
 export function renderTriviaResults({
   standings = [],
@@ -17,11 +18,11 @@ export function renderTriviaResults({
   const winners = winnersAtRank(standings, 1);
   const winnerNames = formatNameList(winners.map((w) => w.name));
   const multi = winners.length > 1;
-  const bonus = winners[0]?.lobbyBonus || 0;
+  const eveningTotal = winners[0] ? triviaEveningPoints(winners[0]) : 0;
   const summary = winnerNames
     ? multi
-      ? `<p class="hint trivia-results__summary">👑 <strong>${escapeHtml(winnerNames)}</strong> remportent la partie et gagnent chacun <strong>+${bonus} pts lobby</strong>.</p>`
-      : `<p class="hint trivia-results__summary">👑 <strong>${escapeHtml(winnerNames)}</strong> remporte la partie et gagne <strong>+${bonus} pts lobby</strong>.</p>`
+      ? `<p class="hint trivia-results__summary">👑 <strong>${escapeHtml(winnerNames)}</strong> remportent la partie — <strong>+${eveningTotal} pts</strong> soirée chacun (quiz + bonus podium).</p>`
+      : `<p class="hint trivia-results__summary">👑 <strong>${escapeHtml(winnerNames)}</strong> remporte la partie — <strong>+${eveningTotal} pts</strong> soirée (quiz + bonus podium).</p>`
     : "";
 
   return `
@@ -32,8 +33,9 @@ export function renderTriviaResults({
       ${summary}
       <div class="trivia-results__podium">
         ${standings
-          .map(
-            (player) => `
+          .map((player) => {
+            const eveningPts = triviaEveningPoints(player);
+            return `
           <div class="trivia-results__row ${player.rank <= 3 ? "trivia-results__row--winner" : ""} ${player.rank === 1 ? "trivia-results__row--champion" : ""}">
             ${
               player.rank === 1
@@ -47,14 +49,12 @@ export function renderTriviaResults({
             <span class="player-name trivia-results__name">${escapeHtml(player.name)}</span>
             <span class="trivia-results__score">${player.score} pts quiz</span>
             <span class="trivia-results__bonus">${
-              player.rank === 1
-                ? `👑 +${player.lobbyBonus} pts lobby`
-                : player.lobbyBonus > 0
-                  ? `+${player.lobbyBonus} pts lobby`
-                  : "0 pt lobby"
+              player.lobbyBonus > 0
+                ? `${player.rank === 1 ? "👑 " : ""}+${player.lobbyBonus} bonus → +${eveningPts} soirée`
+                : `→ +${eveningPts} soirée`
             }</span>
-          </div>`
-          )
+          </div>`;
+          })
           .join("")}
       </div>
       ${

@@ -13,7 +13,7 @@ describe("barèmes soirée (constantes)", () => {
     assert.deepEqual(WRONG_ANSWER_PODIUM_POINTS, [15, 10, 5]);
   });
 
-  it("Trivia : rapide +5, podium soirée 15/10/5", () => {
+  it("Trivia : rapide +5, bonus podium soirée 15/10/5 (en plus du cumul quiz)", () => {
     assert.equal(TRIVIA_POINTS_FASTEST, 5);
     assert.deepEqual(TRIVIA_LOBBY_PODIUM_POINTS, [15, 10, 5]);
   });

@@ -195,8 +195,8 @@ export const GAME_RULES = {
       "On révèle la bonne réponse.",
     ],
     points: [
-      "Pendant la partie : bonne réponse +10, et le plus rapide à répondre juste +5 (classement du jeu).",
-      "À la fin, le podium reçoit un bonus de soirée : +15 / +10 / +5 pts selon le rang.",
+      "Pendant la partie : bonne réponse +10, et le plus rapide à répondre juste +5.",
+      "À la fin, le cumul quiz est crédité à la soirée, plus un bonus podium : +15 / +10 / +5 selon le rang.",
       "Ex æquo au score quiz : même rang et même bonus (1, 1, 3) — deux 1ers reçoivent +15 chacun.",
     ],
     exemple:

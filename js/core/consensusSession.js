@@ -9,7 +9,7 @@ import {
 } from "../../data/consensus.js";
 import { getActivePlayerNames, getActivePlayers } from "./players.js";
 import { getLobbyParticipants } from "./lobby.js";
-import { addScore, getLocalDisplayName, getState, saveStatePatch } from "./state.js";
+import { addScore, getLocalDisplayName, getState, saveStatePatch, setActiveScoringGame } from "./state.js";
 import { withCompetitionRanks } from "./competitionRank.js";
 import {
   allMembersReady,
@@ -614,6 +614,7 @@ export function getConsensusPodiumAwards(standings = buildConsensusStandings()) 
  * Pas de bonus podium supplémentaire — les points de manches sont la seule source.
  */
 export function applyConsensusLobbyPodium(session = getConsensusSession()) {
+  setActiveScoringGame("consensus");
   const standings = getConsensusPodiumAwards(
     buildConsensusStandings(session.matchScores || {})
   );
