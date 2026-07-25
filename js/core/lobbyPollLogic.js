@@ -290,3 +290,26 @@ export function computeUnseenPollOnNewId({
 export function channelRebuildCancelsDebounce() {
   return false;
 }
+
+/**
+ * Garde catch-up post join-reply replace (génération / lobby / module).
+ */
+export function shouldApplyReplacementCatchup({
+  expectedChannelGen,
+  currentChannelGen,
+  catchupLobbyId,
+  storeLobbyId,
+  started,
+}) {
+  if (!started) return false;
+  if (!catchupLobbyId || !storeLobbyId) return false;
+  if (String(catchupLobbyId) !== String(storeLobbyId)) return false;
+  if (
+    expectedChannelGen != null &&
+    currentChannelGen != null &&
+    expectedChannelGen !== currentChannelGen
+  ) {
+    return false;
+  }
+  return true;
+}

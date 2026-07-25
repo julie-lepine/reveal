@@ -6,6 +6,7 @@
  * - lobby_polls toujours écouté (filter lobby_id)
  * - lobby_poll_votes seulement si activePollId
  * - removeChannel await sur la référence capturée avant create
+ * - join-reply (CHANNEL_ERROR + joining) : replace immédiat + catch-up HTTP au SUBSCRIBED
  *
  * INSERT/UPDATE close appliqués immédiatement au store (pas uniquement via refetch).
  */
@@ -48,6 +49,7 @@ import {
   isRealtimeActivePollClose,
   isRealtimeOpenPollInsert,
   computeUnseenPollOnNewId,
+  shouldApplyReplacementCatchup,
 } from "./lobbyPollLogic.js";
 import {
   createPollChannelController,
@@ -144,6 +146,9 @@ let pollReconnectAttempts = 0;
 let authReadyForSync = authReady;
 /** True après await authReady dans init — autorise subscribe. */
 let authGatePassed = false;
+/** Coalesce catch-up join-reply (même lobby). */
+let joinReplyCatchupInFlight = null;
+let joinReplyCatchupLobbyId = null;
 
 function clearPollRealtimeReconnect() {
   if (pollReconnectTimer) {
@@ -159,8 +164,8 @@ function resetPollRealtimeReconnectBackoff() {
 }
 
 /**
- * Reconnect manuel après CLOSED involontaire ou join-reply sans recovery
- * (CHANNEL_ERROR + state joining). Pas sur phx_error / TIMED_OUT (retry interne).
+ * Reconnect manuel après CLOSED involontaire uniquement
+ * (ou join-reply si circuit anti-boucle ouvert). Pas sur phx_error / TIMED_OUT.
  */
 function schedulePollRealtimeReconnect() {
   if (!started || !authGatePassed || pollReconnectTimer) return;
@@ -195,6 +200,94 @@ function schedulePollRealtimeReconnect() {
     })();
   }, delay);
   channelCtrl?.setReconnectTimerActive?.(true);
+}
+
+/**
+ * Catch-up HTTP après replace join-reply (SUBSCRIBED).
+ * Traité comme récupération live (pas hydrate initial) pour la pastille.
+ * @param {{
+ *   lobbyId?: string|null,
+ *   channelGen?: number|null,
+ *   votesPollId?: string|null,
+ *   topic?: string|null,
+ *   reason?: string|null,
+ * }} meta
+ */
+function runJoinReplyReplacementCatchup(meta = {}) {
+  const lobbyId = meta.lobbyId || store.lobbyId;
+  const expectedGen = meta.channelGen ?? null;
+
+  console.info("[POLL-RT] replacement_catchup_start", {
+    lobbyId,
+    oldChannelGen: null,
+    newChannelGen: expectedGen,
+    topic: meta.topic ?? channelCtrl?.getState()?.topic ?? null,
+    votesPollId: meta.votesPollId ?? store.activePoll?.id ?? null,
+    channelState: channelCtrl?.getState()?.subscriptionStatus ?? null,
+    reason: meta.reason || "join_reply_error_replace",
+  });
+
+  if (
+    !shouldApplyReplacementCatchup({
+      expectedChannelGen: expectedGen,
+      currentChannelGen: channelCtrl?.getState()?.channelGen ?? null,
+      catchupLobbyId: lobbyId,
+      storeLobbyId: store.lobbyId,
+      started,
+    })
+  ) {
+    pollRtLog("replacement_catchup_skipped", {
+      lobbyId,
+      expectedGen,
+      currentGen: channelCtrl?.getState()?.channelGen ?? null,
+    });
+    return Promise.resolve();
+  }
+
+  if (joinReplyCatchupInFlight && joinReplyCatchupLobbyId === lobbyId) {
+    pollRtLog("replacement_catchup_coalesced", { lobbyId });
+    return joinReplyCatchupInFlight;
+  }
+
+  joinReplyCatchupLobbyId = lobbyId;
+  joinReplyCatchupInFlight = (async () => {
+    try {
+      await refreshLobbyPoll(lobbyId, {
+        quiet: true,
+        liveCatchup: true,
+        expectedChannelGen: expectedGen,
+      });
+      if (
+        !shouldApplyReplacementCatchup({
+          expectedChannelGen: expectedGen,
+          currentChannelGen: channelCtrl?.getState()?.channelGen ?? null,
+          catchupLobbyId: lobbyId,
+          storeLobbyId: store.lobbyId,
+          started,
+        })
+      ) {
+        return;
+      }
+      console.info("[POLL-RT] replacement_catchup_applied", {
+        lobbyId,
+        oldChannelGen: null,
+        newChannelGen: channelCtrl?.getState()?.channelGen ?? expectedGen,
+        topic: channelCtrl?.getState()?.topic ?? meta.topic ?? null,
+        votesPollId: store.activePoll?.id ?? null,
+        channelState: channelCtrl?.getState()?.subscriptionStatus ?? null,
+        reason: meta.reason || "join_reply_error_replace",
+        activePollId: store.activePoll?.id ?? null,
+        unseenPoll: store.unseenPoll,
+      });
+    } finally {
+      if (joinReplyCatchupLobbyId === lobbyId) {
+        joinReplyCatchupInFlight = null;
+        joinReplyCatchupLobbyId = null;
+      }
+    }
+  })();
+
+  return joinReplyCatchupInFlight;
 }
 
 function emit() {
@@ -445,8 +538,11 @@ function ensureChannelController() {
     onStatusChange: (status) => {
       setStore({ subscriptionStatus: status });
     },
-    onSubscribed: () => {
+    onSubscribed: (meta) => {
       resetPollRealtimeReconnectBackoff();
+      if (meta?.reason === "join_reply_error_replace") {
+        void runJoinReplyReplacementCatchup(meta);
+      }
     },
     onInvoluntaryClosed: () => {
       schedulePollRealtimeReconnect();
@@ -561,10 +657,33 @@ export function getLobbyPollUnseen() {
 
 /**
  * @param {string|null} lobbyId
- * @param {{ quiet?: boolean }} [opts]
+ * @param {{
+ *   quiet?: boolean,
+ *   liveCatchup?: boolean,
+ *   expectedChannelGen?: number|null,
+ * }} [opts]
  */
-export async function refreshLobbyPoll(lobbyId, { quiet = false } = {}) {
-  pollRtLog("refetch start", { lobbyId, quiet });
+export async function refreshLobbyPoll(
+  lobbyId,
+  { quiet = false, liveCatchup = false, expectedChannelGen = null } = {}
+) {
+  pollRtLog("refetch start", { lobbyId, quiet, liveCatchup, expectedChannelGen });
+
+  const channelGenStillCurrent = () => {
+    if (expectedChannelGen == null) return true;
+    return channelCtrl?.getState()?.channelGen === expectedChannelGen;
+  };
+
+  if (!channelGenStillCurrent()) {
+    pollRtLog("refetch result", {
+      lobbyId,
+      skipped: true,
+      reason: "stale_channel_gen_before",
+      expectedChannelGen,
+    });
+    return;
+  }
+
   if (!lobbyId || !isSupabaseConfigured()) {
     invalidatePollFetches();
     setStore({
@@ -589,14 +708,19 @@ export async function refreshLobbyPoll(lobbyId, { quiet = false } = {}) {
         currentGen: fetchGen,
         requestedLobbyId: lobbyId,
         storeLobbyId: store.lobbyId,
-      })
+      }) ||
+      !channelGenStillCurrent()
     ) {
-      pollRtLog("refetch result", { lobbyId, skipped: true, reason: "stale_gen" });
+      pollRtLog("refetch result", {
+        lobbyId,
+        skipped: true,
+        reason: channelGenStillCurrent() ? "stale_gen" : "stale_channel_gen",
+      });
       return;
     }
 
     if (!row) {
-      pollRtLog("refetch result", { lobbyId, open: false });
+      pollRtLog("refetch result", { lobbyId, open: false, liveCatchup });
       setStore({
         lobbyId,
         activePoll: null,
@@ -611,7 +735,12 @@ export async function refreshLobbyPoll(lobbyId, { quiet = false } = {}) {
 
     const poll = normalizeLobbyPollRow(row);
     if (!poll || poll.status !== "open") {
-      pollRtLog("refetch result", { lobbyId, open: false, status: poll?.status });
+      pollRtLog("refetch result", {
+        lobbyId,
+        open: false,
+        status: poll?.status,
+        liveCatchup,
+      });
       setStore({
         lobbyId,
         activePoll: null,
@@ -631,9 +760,16 @@ export async function refreshLobbyPoll(lobbyId, { quiet = false } = {}) {
         currentGen: fetchGen,
         requestedLobbyId: lobbyId,
         storeLobbyId: store.lobbyId,
-      })
+      }) ||
+      !channelGenStillCurrent()
     ) {
-      pollRtLog("refetch result", { lobbyId, skipped: true, reason: "stale_gen_votes" });
+      pollRtLog("refetch result", {
+        lobbyId,
+        skipped: true,
+        reason: channelGenStillCurrent()
+          ? "stale_gen_votes"
+          : "stale_channel_gen_votes",
+      });
       return;
     }
 
@@ -644,6 +780,7 @@ export async function refreshLobbyPoll(lobbyId, { quiet = false } = {}) {
       open: true,
       newPollId: poll.id,
       isNewId,
+      liveCatchup,
     });
 
     setStore({
@@ -660,7 +797,8 @@ export async function refreshLobbyPoll(lobbyId, { quiet = false } = {}) {
         lastSeenPollId,
         sheetOpen: isSheetOpen(),
         localCreate: suppressUnseenForPollId === poll.id,
-        isInitialHydrate: !hasHydratedPollOnce,
+        // Catch-up post replace = récupération live, pas hydrate boot/F5.
+        isInitialHydrate: liveCatchup ? false : !hasHydratedPollOnce,
       });
       lastSeenPollId = badge.lastSeenPollId;
       hasHydratedPollOnce = true;
@@ -671,7 +809,7 @@ export async function refreshLobbyPoll(lobbyId, { quiet = false } = {}) {
       setStore({ unseenPoll: false });
     }
 
-    queueVotesSubscription({ reason: "sync" });
+    queueVotesSubscription({ reason: liveCatchup ? "catchup_sync" : "sync" });
   } catch (e) {
     console.warn("REVEAL lobbyPoll fetch:", e?.message || e);
     if (
@@ -824,6 +962,8 @@ export function resetLobbyPollSyncForTests() {
   socketProbesStarted = false;
   pollSubscribeInFlight = null;
   pollSubscribeInFlightKey = null;
+  joinReplyCatchupInFlight = null;
+  joinReplyCatchupLobbyId = null;
   started = false;
   authGatePassed = false;
   authReadyForSync = authReady;

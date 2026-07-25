@@ -6,7 +6,7 @@
  * - channel assigné AVANT .subscribe()
  * - skip / coalesce si même config et subscribing|subscribed|degraded
  * - CHANNEL_ERROR + state===errored / TIMED_OUT : keep (retry interne realtime-js 2.11.2)
- * - CHANNEL_ERROR + state===joining : join-reply sans recovery → replace
+ * - CHANNEL_ERROR + state===joining : join-reply → replace immédiat + catch-up HTTP au SUBSCRIBED
  * - CLOSED involontaire → reconnect manuel
  * - remove capture la ref, marquage intentionalClose
  * - un seul .subscribe() par instance
@@ -15,8 +15,14 @@
 import { serializeRealtimeErr } from "./lobbyPollRealtimeDiagnose.js";
 import { attachPollChannelRejoinWatch } from "./lobbyPollRejoinWatch.js";
 
-/** Délais reconnect manuel (CLOSED / join-reply sans recovery). */
+/** Délais reconnect manuel (CLOSED ; join-reply seulement si circuit anti-boucle ouvert). */
 export const POLL_REALTIME_RECONNECT_DELAYS_MS = [1000, 2000, 5000, 10000];
+
+/**
+ * Remplacements immédiats join-reply successifs sans SUBSCRIBED :
+ * au-delà → fallback reconnect différé (évite boucle remove/create).
+ */
+export const MAX_JOIN_REPLY_IMMEDIATE_REPLACES = 3;
 
 export function pollRealtimeReconnectDelayMs(attemptIndex) {
   const i = Math.max(
@@ -98,6 +104,10 @@ export function createPollChannelController(deps) {
   /** @type {{ lobbyId: string|null, votesPollId: string|null }|null} */
   let inFlightDesire = null;
   let reconnectTimerActive = false;
+  /** Raison du dernier rebuild (passée à onSubscribed). */
+  let lastBuildReason = null;
+  /** Remplacements join-reply immédiats sans SUBSCRIBED depuis le dernier succès. */
+  let joinReplyImmediateStreak = 0;
 
   function snapshot() {
     return {
@@ -109,6 +119,8 @@ export function createPollChannelController(deps) {
       topic: channel?.topic || null,
       reconnectTimerActive,
       inFlightDesire,
+      lastBuildReason,
+      joinReplyImmediateStreak,
     };
   }
 
@@ -127,6 +139,23 @@ export function createPollChannelController(deps) {
       stack,
       ...extra,
     });
+  }
+
+  /** Chronologie replace join-reply — toujours visible (QA). */
+  function replaceChronology(step, extra = {}) {
+    const payload = {
+      lobbyId: extra.lobbyId ?? channelLobbyId,
+      oldChannelGen: extra.oldChannelGen ?? null,
+      newChannelGen: extra.newChannelGen ?? channelGen,
+      topic: extra.topic ?? channel?.topic ?? null,
+      votesPollId: extra.votesPollId ?? channelVotesPollId,
+      channelState: extra.channelState ?? subscriptionStatus,
+      reason: extra.reason ?? lastBuildReason,
+      joinReplyImmediateStreak,
+      ...extra,
+    };
+    console.info(`[POLL-RT] ${step}`, payload);
+    lifecycleLog(step, payload);
   }
 
   function assertLobbyId(lobbyId) {
@@ -191,11 +220,13 @@ export function createPollChannelController(deps) {
   /**
    * @param {string|null} lobbyId
    * @param {string|null} votesPollId
-   * @param {{ reason?: string }} [opts]
+   * @param {{ reason?: string, replacedChannelGen?: number|null }} [opts]
    */
   function requestRebuild(lobbyId, votesPollId = null, opts = {}) {
     const reason = opts.reason || "requestRebuild";
     const nextVotes = votesPollId || null;
+    const replacedChannelGen =
+      opts.replacedChannelGen != null ? opts.replacedChannelGen : null;
 
     const sameAsCurrent = shouldSkipPollChannelRebuild({
       hasChannel: Boolean(channel),
@@ -251,7 +282,9 @@ export function createPollChannelController(deps) {
     inFlightDesire = { lobbyId, votesPollId: nextVotes };
     rebuildChain = rebuildChain
       .catch(() => {})
-      .then(() => rebuild(lobbyId, votesPollId, reason))
+      .then(() =>
+        rebuild(lobbyId, votesPollId, reason, { replacedChannelGen })
+      )
       .finally(() => {
         if (
           inFlightDesire &&
@@ -264,12 +297,18 @@ export function createPollChannelController(deps) {
     return rebuildChain;
   }
 
-  async function rebuild(lobbyId, votesPollId = null, reason = "rebuild") {
+  async function rebuild(
+    lobbyId,
+    votesPollId = null,
+    reason = "rebuild",
+    { replacedChannelGen = null } = {}
+  ) {
     if (lobbyId == null) {
       await removeCurrentChannel({ intentionalRemoval: true });
       channelLobbyId = null;
       channelVotesPollId = null;
       subscriptionStatus = "idle";
+      lastBuildReason = reason;
       onStatusChange("idle");
       log("rebuild idle", snapshot());
       lifecycleLog("rebuild_idle", { reason });
@@ -302,13 +341,27 @@ export function createPollChannelController(deps) {
       return snapshot();
     }
 
+    const oldGenForLog =
+      replacedChannelGen != null ? replacedChannelGen : channelGen;
     const myGen = ++channelGen;
+    lastBuildReason = reason;
     lifecycleLog("rebuild_start", {
       reason,
       requestedGeneration: myGen,
       lobbyId,
       votesPollId: nextVotes,
     });
+    if (reason === "join_reply_error_replace") {
+      replaceChronology("replacement_build_start", {
+        lobbyId,
+        oldChannelGen: oldGenForLog,
+        newChannelGen: myGen,
+        topic: `lobby-polls:${lobbyId}:${myGen}`,
+        votesPollId: nextVotes,
+        channelState: "subscribing",
+        reason,
+      });
+    }
 
     await removeCurrentChannel({ intentionalRemoval: true });
 
@@ -474,21 +527,43 @@ export function createPollChannelController(deps) {
 
       if (status === "SUBSCRIBED") {
         subscriptionStatus = "subscribed";
+        joinReplyImmediateStreak = 0;
         onStatusChange("subscribed");
-        onSubscribed();
+        const subMeta = {
+          reason: lastBuildReason,
+          lobbyId,
+          channelGen: myGen,
+          votesPollId: nextVotes,
+          topic,
+        };
+        if (lastBuildReason === "join_reply_error_replace") {
+          replaceChronology("replacement_subscribed", {
+            lobbyId,
+            oldChannelGen: null,
+            newChannelGen: myGen,
+            topic,
+            votesPollId: nextVotes,
+            channelState: "subscribed",
+            reason: lastBuildReason,
+          });
+        }
+        onSubscribed(subMeta);
         return;
       }
 
-      // Famille A (realtime-js 2.11.2) : join-reply error, state reste joining,
-      // aucun scheduleTimeout — replace (même voie que CLOSED involontaire).
+      // Famille A (realtime-js 2.11.2) : join-reply error, state reste joining.
+      // Remplacement immédiat sérialisé (pas le reconnect différé CLOSED).
       if (isJoinReplyChannelError(status, realtimeState)) {
         subscriptionStatus = "error";
         onStatusChange("error");
-        lifecycleLog("join_reply_error_replace", {
-          requestedGeneration: myGen,
+        replaceChronology("join_reply_error_replace_start", {
           lobbyId,
+          oldChannelGen: myGen,
+          newChannelGen: channelGen,
+          topic,
           votesPollId: nextVotes,
-          realtimeState,
+          channelState: realtimeState,
+          reason: "join_reply_error_replace",
           status,
         });
         console.warn("[POLL-RT] join_reply_error_replace", {
@@ -501,8 +576,36 @@ export function createPollChannelController(deps) {
         void (async () => {
           if (channel !== builder || myGen !== channelGen) return;
           await removeCurrentChannel({ intentionalRemoval: true });
+          replaceChronology("old_channel_removed", {
+            lobbyId,
+            oldChannelGen: myGen,
+            newChannelGen: channelGen,
+            topic,
+            votesPollId: nextVotes,
+            channelState: subscriptionStatus,
+            reason: "join_reply_error_replace",
+          });
           if (myGen !== channelGen) return;
-          onInvoluntaryClosed();
+
+          if (joinReplyImmediateStreak >= MAX_JOIN_REPLY_IMMEDIATE_REPLACES) {
+            replaceChronology("join_reply_replace_circuit_open", {
+              lobbyId,
+              oldChannelGen: myGen,
+              newChannelGen: channelGen,
+              topic,
+              votesPollId: nextVotes,
+              channelState: subscriptionStatus,
+              reason: "join_reply_error_replace",
+              maxImmediate: MAX_JOIN_REPLY_IMMEDIATE_REPLACES,
+            });
+            onInvoluntaryClosed();
+            return;
+          }
+          joinReplyImmediateStreak += 1;
+          await requestRebuild(lobbyId, nextVotes, {
+            reason: "join_reply_error_replace",
+            replacedChannelGen: myGen,
+          });
         })();
         return;
       }
@@ -570,6 +673,8 @@ export function createPollChannelController(deps) {
   async function dispose() {
     channelGen += 1;
     inFlightDesire = null;
+    joinReplyImmediateStreak = 0;
+    lastBuildReason = null;
     await removeCurrentChannel({ intentionalRemoval: true });
     channelLobbyId = null;
     channelVotesPollId = null;

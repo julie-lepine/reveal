@@ -12,11 +12,13 @@ import {
   pollRealtimeReconnectDelayMs,
   POLL_REALTIME_RECONNECT_DELAYS_MS,
   isJoinReplyChannelError,
+  MAX_JOIN_REPLY_IMMEDIATE_REPLACES,
 } from "../js/core/lobbyPollChannel.js";
 import {
   isRealtimeActivePollClose,
   isRealtimeOpenPollInsert,
   computeUnseenPollOnNewId,
+  shouldApplyReplacementCatchup,
 } from "../js/core/lobbyPollLogic.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -204,7 +206,85 @@ describe("lobbyPollChannel lifecycle", () => {
     assert.equal(ctrl.getState().subscriptionStatus, "idle");
   });
 
-  it("join-reply (state=joining) → replace via onInvoluntaryClosed", async () => {
+  it("join-reply (state=joining) → replace immédiat, pas de timer reconnect", async () => {
+    let involuntary = 0;
+    /** @type {object[]} */
+    const subscribedMeta = [];
+    const mock = makeMockRealtime({ autoSubscribe: false });
+    const ctrl = createPollChannelController({
+      createChannel: mock.createChannel,
+      removeChannel: mock.removeChannel,
+      onPollsEvent: () => {},
+      onVotesEvent: () => {},
+      onSubscribed: (meta) => {
+        subscribedMeta.push(meta);
+      },
+      onInvoluntaryClosed: () => {
+        involuntary += 1;
+      },
+    });
+
+    await ctrl.requestRebuild("L", null, { reason: "boot" });
+    const genBefore = ctrl.getState().channelGen;
+    assert.equal(mock.channels[0].state, "joining");
+    assert.equal(mock.builds.length, 1);
+
+    mock.channels[0].state = "joining";
+    mock.channels[0]._emitStatus("CHANNEL_ERROR", {
+      message: "ignored-text-not-a-criterion",
+    });
+
+    assert.equal(ctrl.getState().subscriptionStatus, "error");
+    await new Promise((r) => setTimeout(r, 0));
+    await ctrl._awaitIdle();
+
+    assert.equal(involuntary, 0, "pas de onInvoluntaryClosed (reconnect différé)");
+    assert.equal(mock.removed.length, 1);
+    assert.equal(mock.builds.length, 2, "nouveau canal créé immédiatement");
+    assert.ok(ctrl.getState().channelGen > genBefore);
+    assert.equal(ctrl.getState().hasChannel, true);
+    assert.equal(ctrl.getState().subscriptionStatus, "subscribing");
+    assert.equal(ctrl.getState().lastBuildReason, "join_reply_error_replace");
+    assert.equal(ctrl.getState().joinReplyImmediateStreak, 1);
+
+    mock.channels[0].state = "joined";
+    mock.channels[0]._emitStatus("SUBSCRIBED");
+    assert.equal(ctrl.getState().subscriptionStatus, "subscribed");
+    assert.equal(ctrl.getState().joinReplyImmediateStreak, 0);
+    assert.equal(subscribedMeta.length, 1);
+    assert.equal(subscribedMeta[0].reason, "join_reply_error_replace");
+    assert.equal(subscribedMeta[0].lobbyId, "L");
+
+    await ctrl.dispose();
+  });
+
+  it("join-reply avec votesPollId → remplacement conserve le désir votes", async () => {
+    const mock = makeMockRealtime({ autoSubscribe: false });
+    const ctrl = createPollChannelController({
+      createChannel: mock.createChannel,
+      removeChannel: mock.removeChannel,
+      onPollsEvent: () => {},
+      onVotesEvent: () => {},
+      onInvoluntaryClosed: () => {},
+    });
+
+    await ctrl.requestRebuild("L", "poll-A", { reason: "boot" });
+    mock.channels[0].state = "joining";
+    mock.channels[0]._emitStatus("CHANNEL_ERROR");
+    await new Promise((r) => setTimeout(r, 0));
+    await ctrl._awaitIdle();
+
+    assert.equal(ctrl.getState().channelVotesPollId, "poll-A");
+    assert.equal(mock.builds.length, 2);
+    const votesFilters = mock.channels[0]._filters.filter(
+      (f) => f.table === "lobby_poll_votes"
+    );
+    assert.equal(votesFilters.length, 1);
+    assert.match(votesFilters[0].filter, /poll_id=eq\.poll-A/);
+    await ctrl.dispose();
+  });
+
+  it("plusieurs join-reply successifs → sérialisé, circuit puis reconnect différé", async () => {
     let involuntary = 0;
     const mock = makeMockRealtime({ autoSubscribe: false });
     const ctrl = createPollChannelController({
@@ -218,17 +298,34 @@ describe("lobbyPollChannel lifecycle", () => {
     });
 
     await ctrl.requestRebuild("L", null, { reason: "boot" });
-    assert.equal(mock.channels[0].state, "joining");
 
+    for (let i = 0; i < MAX_JOIN_REPLY_IMMEDIATE_REPLACES; i += 1) {
+      const ch = mock.channels[0];
+      assert.ok(ch, `canal actif avant join-reply #${i + 1}`);
+      ch.state = "joining";
+      ch._emitStatus("CHANNEL_ERROR");
+      await new Promise((r) => setTimeout(r, 0));
+      await ctrl._awaitIdle();
+      assert.equal(involuntary, 0);
+    }
+
+    assert.equal(
+      ctrl.getState().joinReplyImmediateStreak,
+      MAX_JOIN_REPLY_IMMEDIATE_REPLACES
+    );
+    assert.equal(mock.builds.length, 1 + MAX_JOIN_REPLY_IMMEDIATE_REPLACES);
+
+    // Encore un join-reply → circuit open → onInvoluntaryClosed, pas de build immédiat
+    const buildsBeforeCircuit = mock.builds.length;
     mock.channels[0].state = "joining";
-    mock.channels[0]._emitStatus("CHANNEL_ERROR", {
-      message: "ignored-text-not-a-criterion",
-    });
-
-    assert.equal(ctrl.getState().subscriptionStatus, "error");
+    mock.channels[0]._emitStatus("CHANNEL_ERROR");
     await new Promise((r) => setTimeout(r, 0));
+    await ctrl._awaitIdle();
+
     assert.equal(involuntary, 1);
-    assert.equal(mock.removed.length, 1);
+    assert.equal(mock.builds.length, buildsBeforeCircuit);
+    assert.equal(ctrl.getState().hasChannel, false);
+
     await ctrl.dispose();
   });
 
@@ -391,7 +488,7 @@ describe("lobbyPollChannel lifecycle", () => {
 });
 
 describe("boot auth + reconnect contrat source", () => {
-  it("join-reply replace ; phx_error keep ; CLOSED reconnect", () => {
+  it("join-reply replace immédiat + catch-up ; phx_error keep ; CLOSED reconnect", () => {
     const storeSrc = readFileSync(
       join(__dirname, "../js/core/lobbyPollStore.js"),
       "utf8"
@@ -401,8 +498,16 @@ describe("boot auth + reconnect contrat source", () => {
       "utf8"
     );
     assert.match(storeSrc, /onInvoluntaryClosed/);
+    assert.match(storeSrc, /runJoinReplyReplacementCatchup/);
+    assert.match(storeSrc, /replacement_catchup_start/);
+    assert.match(storeSrc, /replacement_catchup_applied/);
+    assert.match(storeSrc, /liveCatchup/);
     assert.match(chSrc, /isJoinReplyChannelError/);
-    assert.match(chSrc, /join_reply_error_replace/);
+    assert.match(chSrc, /join_reply_error_replace_start/);
+    assert.match(chSrc, /old_channel_removed/);
+    assert.match(chSrc, /replacement_build_start/);
+    assert.match(chSrc, /replacement_subscribed/);
+    assert.match(chSrc, /MAX_JOIN_REPLY_IMMEDIATE_REPLACES/);
     assert.match(chSrc, /subscriptionStatus = "degraded"/);
     assert.match(chSrc, /onInvoluntaryClosed/);
     assert.doesNotMatch(chSrc, /onTerminalError/);
@@ -423,6 +528,84 @@ describe("boot auth + reconnect contrat source", () => {
       "utf8"
     );
     assert.match(diag, /Probes A\/B\/C désactivées/);
+  });
+});
+
+describe("replacement catch-up guards + pastille live", () => {
+  it("shouldApplyReplacementCatchup refuse gen / lobby stale", () => {
+    assert.equal(
+      shouldApplyReplacementCatchup({
+        expectedChannelGen: 2,
+        currentChannelGen: 2,
+        catchupLobbyId: "L",
+        storeLobbyId: "L",
+        started: true,
+      }),
+      true
+    );
+    assert.equal(
+      shouldApplyReplacementCatchup({
+        expectedChannelGen: 2,
+        currentChannelGen: 3,
+        catchupLobbyId: "L",
+        storeLobbyId: "L",
+        started: true,
+      }),
+      false
+    );
+    assert.equal(
+      shouldApplyReplacementCatchup({
+        expectedChannelGen: 2,
+        currentChannelGen: 2,
+        catchupLobbyId: "L",
+        storeLobbyId: "OTHER",
+        started: true,
+      }),
+      false
+    );
+    assert.equal(
+      shouldApplyReplacementCatchup({
+        expectedChannelGen: 2,
+        currentChannelGen: 2,
+        catchupLobbyId: "L",
+        storeLobbyId: "L",
+        started: false,
+      }),
+      false
+    );
+  });
+
+  it("catch-up live → pastille si sheet fermé (pas hydrate initial)", () => {
+    assert.equal(
+      computeUnseenPollOnNewId({
+        pollId: "p-new",
+        lastSeenPollId: null,
+        sheetOpen: false,
+        localCreate: false,
+        isInitialHydrate: false,
+      }).unseenPoll,
+      true
+    );
+    assert.equal(
+      computeUnseenPollOnNewId({
+        pollId: "p-new",
+        lastSeenPollId: null,
+        sheetOpen: false,
+        localCreate: false,
+        isInitialHydrate: true,
+      }).unseenPoll,
+      false
+    );
+    assert.equal(
+      computeUnseenPollOnNewId({
+        pollId: "p-new",
+        lastSeenPollId: null,
+        sheetOpen: false,
+        localCreate: true,
+        isInitialHydrate: false,
+      }).unseenPoll,
+      false
+    );
   });
 });
 
