@@ -45,6 +45,7 @@ import {
   getResumableSessionScreen,
   mountGameResumeInterstitial,
 } from "../core/gameResume.js";
+import { planLobbyMountMultiplayerSync } from "../core/lobbyMountSyncPlan.js";
 
 function participantsHtml(participants, { canKick = false, hostId = null } = {}) {
   return participants
@@ -404,10 +405,17 @@ export function mountLobby(app) {
   (async () => {
     await ensureLobby();
     if (isGameSyncActive()) {
+      // SYN-12 : un seul start (pre-refresh) pour waiting / resume / evening→game-select
       startMultiplayerSync();
       const row = await refreshGameSession();
       const resumeScreen = getResumableSessionScreen(row);
-      if (resumeScreen) {
+      const mountPlan = planLobbyMountMultiplayerSync({
+        syncActive: true,
+        hasResumeScreen: Boolean(resumeScreen),
+        eveningStarted: isLobbyEveningStarted(),
+      });
+
+      if (mountPlan.earlyReturn === "resume") {
         lobbyMode = "resume";
         cleanupResume = mountGameResumeInterstitial(app, resumeScreen, {
           allowStay: !isLobbyHost(),
@@ -427,7 +435,7 @@ export function mountLobby(app) {
         return;
       }
 
-      if (isLobbyEveningStarted()) {
+      if (mountPlan.earlyReturn === "evening-redirect") {
         navigate("game-select", { navStack: ["home", "lobby", "game-select"] });
         return;
       }
@@ -441,7 +449,7 @@ export function mountLobby(app) {
     }
     renderFull();
     if (isGameSyncActive()) {
-      startMultiplayerSync();
+      // SYN-12 : pas de second startMultiplayerSync — déjà démarré pre-refresh
       void routeToActiveGameIfNeeded();
       unsubSession = onGameSessionChange(async (row) => {
         if (!row) return;

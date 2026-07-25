@@ -17,9 +17,12 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 
 | | Contenu |
 |--|---------|
-| **Fait** | T-01/T-02 · M-08 · ready Recommencer · M-10 / T-05 / SYN-26 · I-09 · M-12 · ARCH-04 (QA terrain) |
-| **Prochain** | **SYN-12 / M-05b** — double `startMultiplayerSync` au mount lobby |
-| **Ensuite** | M-04b · SYN-15/16 |
+| **Fait** | T-01/T-02 · M-08 · ready Recommencer · M-10 / T-05 / SYN-26 · I-09 · M-12 · ARCH-04 (QA terrain) · **SYN-12 / M-05b** (patch mount lobby) |
+| **Prochain** | **M-04b / SYN-18** — timers `withPatchTimeout` non cleared |
+| **Ensuite** | **SYN-15 / SYN-16** |
+
+**Hors file audit (même journée)**  
+Sondages in-chat (`lobby_polls` / UI chat) — feature produit, pas un ticket cause racine. Ne pas confondre avec SYN-12.
 
 **Résidus (hors file prioritaire)**  
 UI Guess Lie avant `await` · `statsRecordedRoundIdx` · loader UI join · pré-résolution `get*EntryScreen` · votes optimistic (dilemma / speedVote / …) · `results.js` mount refresh · échec remote rename (doc QA I-09)
@@ -35,15 +38,14 @@ Clutch taps figés sous latence · ready prep après Recommencer · Cause 4 seul
 
 | # | ID | Cause | Problème | Statut |
 |---|----|-------|----------|--------|
-| 1 | **SYN-12 / M-05b** | 9 | Double `startMultiplayerSync` au mount lobby | **Prochain** |
-| 2 | **M-14a / SYN-14** | 3 | TierNight topic / routing | ❌ KO QA — suspendu |
-| 3 | **ARCH-06** | 6 | Handlers async multiples en vol | Dette |
-| 4 | Guess Lie UX | 4/7 | UI avant await ; stats round local-only | Post I-08 |
-| 5 | Loader UI join | 5/11 | Interstitiel join | Hors T-01/T-02 |
-| 6 | Pré-résolution entry screens | 5 | `get*EntryScreen` (filet M-08 conservé) | Hors M-08 |
-| 7 | **M-04b / SYN-18** | 7 | Timers `withPatchTimeout` non cleared | Résidu Cause 7 |
-| 8 | **SYN-15 / SYN-16** | 8 | Merge stats/scores stale | Après I-09 |
-| 9 | **ARCH-22** | 11 | Pas de feedback sync lente | Ouvert |
+| 1 | **M-04b / SYN-18** | 7 | Timers `withPatchTimeout` non cleared | **Prochain** |
+| 2 | **SYN-15 / SYN-16** | 8 | Merge stats/scores stale | Après I-09 |
+| 3 | **M-14a / SYN-14** | 3 | TierNight topic / routing | ❌ KO QA — suspendu |
+| 4 | **ARCH-06** | 6 | Handlers async multiples en vol | Dette |
+| 5 | Guess Lie UX | 4/7 | UI avant await ; stats round local-only | Post I-08 |
+| 6 | Loader UI join | 5/11 | Interstitiel join | Hors T-01/T-02 |
+| 7 | Pré-résolution entry screens | 5 | `get*EntryScreen` (filet M-08 conservé) | Hors M-08 |
+| 8 | **ARCH-22** | 11 | Pas de feedback sync lente | Ouvert |
 
 ### Autres ouverts
 
@@ -73,7 +75,7 @@ Clutch taps figés sous latence · ready prep après Recommencer · Cause 4 seul
 | 6 | Async écrans | Partiel | ARCH-06 ; SYN-05 dormant |
 | 7 | Sync silencieuse / fire-and-forget | Partiel | M-04b, ARCH-07/08… (M-10 / T-05 / SYN-26 ✅) |
 | 8 | Reset / migration incomplète | Partiel | I-09 ✅ ; SYN-15/16 |
-| 9 | Sync monolithe / duplication | Dette | SYN-12, ARCH-11… |
+| 9 | Sync monolithe / duplication | Dette | SYN-12 ✅ ; ARCH-11… |
 | 10 | Code mort | Dette | Fil Rouge, dead exports |
 | 11 | Friction UX | Partiel | M-12 ✅ (canal lien abandonné) ; ARCH-22 |
 
@@ -81,7 +83,7 @@ Clutch taps figés sous latence · ready prep après Recommencer · Cause 4 seul
 
 ## Détail des tickets ouverts
 
-Le détail fichier / fix proposé vit dans le code ou les commits.
+SYN-12 : diagnostic + plan ci-dessous. Les autres : détail fichier / fix dans le code ou les commits.
 
 ### Cause 5 — Routing / timing
 
@@ -105,12 +107,22 @@ Le détail fichier / fix proposé vit dans le code ou les commits.
 | **SYN-15 / SYN-16** | Merge stats/scores avec noms stale | Ouvert |
 | **ARCH-10** | Cache session clear trop tard au leave | 🟡 |
 
+### Cause 9 — SYN-12 / M-05b ✅
+
+| | |
+|--|--|
+| **Cause** | IIFE `mountLobby` : start ① pre-refresh (tous chemins sync) + start ② post-`renderFull` (salle d’attente) |
+| **Fix** | Suppression de ② ; branches resume / evening via `planLobbyMountMultiplayerSync` ; ① conservé |
+| **Où** | `js/screens/lobby.js` + `js/core/lobbyMountSyncPlan.js` · tests `lobbyMountSyncPlan.test.js` |
+| **QA** | En attente terrain (create/join, F5, remount, rejoin mid-game, visibility) |
+
+---
+
 ### Autres causes
 
 | ID | Cause | Problème |
 |----|-------|----------|
 | **M-14a** | 3 | TierNight : hôte → ancien récap 2e liste ; invité saute choix tierlists — ❌ suspendu |
-| **SYN-12** | 9 | Double `startMultiplayerSync` mount lobby |
 | **ARCH-06** | 6 | Double mount / handlers en vol |
 | **ARCH-01** | 1 | Démo locale sans avertissement MP |
 
@@ -122,6 +134,7 @@ Ne pas rouvrir sans **régression démontrée**.
 
 | Date | IDs | Note |
 |------|-----|------|
+| 07-25 | **SYN-12 / M-05b** | ✅ patch — un seul `startMultiplayerSync` mount lobby ; `lobbyMountSyncPlan` + tests |
 | 07-25 | **ARCH-04** | ✅ QA terrain — bandeau Rejoindre étendu aux prep ; `isResumableSessionDestination` partagé |
 | 07-25 | **M-12** | ✅ cleanup — canal `#join=` abandonné (décision produit) |
 | 07-25 | **I-09 / SYN-06** | ✅ QA terrain — `renameLocalPlayer` migre scores / baseline / `*Game` ; tests dédiés |
@@ -206,8 +219,9 @@ Pas de re-travail sauf régression. `↻` = accepté / requalifié (pas un bug �
 | 6 | I-05, SYN-13b↻, SYN-25 |
 | 7 | I-07, M-09, L-09, M-11, M-10, T-05, SYN-26 |
 | 8 | I-06, P-02, ARCH-09, I-09 / SYN-06 |
+| 9 | SYN-12 / M-05b |
 | 11 | L-02, ARCH-21↻, M-12 (cleanup `#join=`, pas auto-join) |
 
 ---
 
-*Suivi vivant · Dernière MAJ : 2026-07-25 — ARCH-04 ✅ QA terrain · prochain = SYN-12*
+*Suivi vivant · Dernière MAJ : 2026-07-25 (soir) — SYN-12 ✅ · prochain = M-04b*
