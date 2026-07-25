@@ -8,7 +8,16 @@
  * - remove capture la référence exacte, await, puis create
  * - rebuilds sérialisés ; CLOSED d'un ancien canal ignoré (gén / ref)
  * - lobby_polls toujours branché ; votes seulement si votesPollId
+ *
+ * Diagnostic temporaire : logs status+err, config filter, probes A/B/C
+ * (localStorage reveal-poll-rt-isolate=1).
  */
+import {
+  inspectLobbyIdForRealtimeFilter,
+  pollRtIsolateEnabled,
+  runPollRealtimeIsolationProbes,
+  serializeRealtimeErr,
+} from "./lobbyPollRealtimeDiagnose.js";
 
 /** Délais reconnect : 1s → 2s → 5s → 10s max. */
 export const POLL_REALTIME_RECONNECT_DELAYS_MS = [1000, 2000, 5000, 10000];
@@ -49,6 +58,7 @@ export function shouldSkipPollChannelRebuild({
  * @param {() => void} [deps.onSubscribed]
  * @param {() => void} [deps.onTerminalError]
  * @param {(tag: string, data: object) => void} [deps.log]
+ * @param {() => object|null} [deps.getSupabase] — pour probes A/B/C uniquement
  */
 export function createPollChannelController(deps) {
   const {
@@ -60,6 +70,7 @@ export function createPollChannelController(deps) {
     onSubscribed = () => {},
     onTerminalError = () => {},
     log = () => {},
+    getSupabase = () => null,
   } = deps;
 
   let channel = null;
@@ -68,6 +79,7 @@ export function createPollChannelController(deps) {
   let subscriptionStatus = "idle";
   let channelGen = 0;
   let rebuildChain = Promise.resolve();
+  let isolateProbesDone = false;
 
   function snapshot() {
     return {
@@ -134,6 +146,24 @@ export function createPollChannelController(deps) {
     return rebuildChain;
   }
 
+  async function maybeRunIsolationProbes(lobbyId) {
+    if (isolateProbesDone || !pollRtIsolateEnabled()) return;
+    const sb = getSupabase?.();
+    if (!sb) {
+      console.log("[POLL-RT] isolate skipped (no supabase)");
+      return;
+    }
+    isolateProbesDone = true;
+    try {
+      await runPollRealtimeIsolationProbes(sb, lobbyId, {
+        removeChannel,
+        log: (tag, data) => console.log(`[POLL-RT] ${tag}`, data),
+      });
+    } catch (e) {
+      console.log("[POLL-RT] isolate probes failed", serializeRealtimeErr(e));
+    }
+  }
+
   async function rebuild(lobbyId, votesPollId = null) {
     if (lobbyId == null) {
       await removeCurrentChannel({ intentionalRemoval: true });
@@ -177,12 +207,31 @@ export function createPollChannelController(deps) {
       return snapshot();
     }
 
+    // Probes A/B/C une seule fois (flag isolate) — n'altère pas la config applicative
+    await maybeRunIsolationProbes(lobbyId);
+    if (myGen !== channelGen) return snapshot();
+
     subscriptionStatus = "subscribing";
     onStatusChange("subscribing");
     channelLobbyId = lobbyId;
     channelVotesPollId = nextVotes;
 
     const topic = `lobby-polls:${lobbyId}:${myGen}`;
+    const lobbyIdInspect = inspectLobbyIdForRealtimeFilter(lobbyId);
+    const pollsFilter = `lobby_id=eq.${lobbyId}`;
+
+    console.log("[POLL-RT] postgres_changes config", {
+      event: "*",
+      schema: "public",
+      table: "lobby_polls",
+      filter: pollsFilter,
+      lobbyId,
+      lobbyIdType: typeof lobbyId,
+      ...lobbyIdInspect,
+      votesListenerWillBind: Boolean(nextVotes),
+      votesPollId: nextVotes,
+    });
+
     log("build channel", {
       lobbyId,
       channelLobbyId,
@@ -191,41 +240,49 @@ export function createPollChannelController(deps) {
       topic,
       channelGen: myGen,
       subscriptionStatus,
+      lobbyIdInspect,
     });
 
     let builder = createChannel(topic);
-    builder = builder.on(
-      "postgres_changes",
-      {
+
+    const pollsCfg = {
+      event: "*",
+      schema: "public",
+      table: "lobby_polls",
+      filter: pollsFilter,
+    };
+    builder = builder.on("postgres_changes", pollsCfg, (payload) => {
+      log("polls event", {
+        lobbyId,
+        channelLobbyId,
+        channelVotesPollId,
+        activePollId: nextVotes,
+        eventType: payload?.eventType || payload?.event,
+        newPollId: payload?.new?.id,
+        oldStatus: payload?.old?.status,
+        newStatus: payload?.new?.status,
+        subscriptionStatus,
+      });
+      onPollsEvent(payload, lobbyId);
+    });
+
+    // Garde stricte : jamais poll_id=eq.null / undefined
+    if (nextVotes != null && String(nextVotes).trim() !== "") {
+      const votesFilter = `poll_id=eq.${nextVotes}`;
+      console.log("[POLL-RT] postgres_changes votes config", {
         event: "*",
         schema: "public",
-        table: "lobby_polls",
-        filter: `lobby_id=eq.${lobbyId}`,
-      },
-      (payload) => {
-        log("polls event", {
-          lobbyId,
-          channelLobbyId,
-          channelVotesPollId,
-          activePollId: nextVotes,
-          eventType: payload?.eventType || payload?.event,
-          newPollId: payload?.new?.id,
-          oldStatus: payload?.old?.status,
-          newStatus: payload?.new?.status,
-          subscriptionStatus,
-        });
-        onPollsEvent(payload, lobbyId);
-      }
-    );
-
-    if (nextVotes) {
+        table: "lobby_poll_votes",
+        filter: votesFilter,
+        votesPollId: nextVotes,
+      });
       builder = builder.on(
         "postgres_changes",
         {
           event: "*",
           schema: "public",
           table: "lobby_poll_votes",
-          filter: `poll_id=eq.${nextVotes}`,
+          filter: votesFilter,
         },
         (payload) => {
           log("votes event", {
@@ -240,6 +297,13 @@ export function createPollChannelController(deps) {
           onVotesEvent(payload, lobbyId);
         }
       );
+    } else {
+      console.log("[POLL-RT] votes listener skipped", {
+        reason: "no activePollId",
+        votesPollId: nextVotes,
+        wouldHaveBeenInvalid:
+          nextVotes == null ? "poll_id=eq.null|undefined avoided" : null,
+      });
     }
 
     // Assigner AVANT .subscribe() : un SUBSCRIBED synchrone doit voir channel === builder
@@ -248,7 +312,21 @@ export function createPollChannelController(deps) {
       channel.topic = topic;
     }
 
-    builder.subscribe((status) => {
+    builder.subscribe((status, err) => {
+      console.log("[POLL-RT] subscription status", {
+        status,
+        error: err,
+        errorName: err?.name,
+        errorMessage: err?.message,
+        errorCause: err?.cause,
+        errorContext: err?.context,
+        serialized: serializeRealtimeErr(err),
+        lobbyId,
+        topic,
+        votesPollId: nextVotes,
+        channelGen: myGen,
+      });
+
       if (channel !== builder || myGen !== channelGen) {
         log("subscribe status ignored (stale)", {
           subscriptionStatus: status,
@@ -265,6 +343,7 @@ export function createPollChannelController(deps) {
         activePollId: nextVotes,
         subscriptionStatus: status,
         channelGen: myGen,
+        error: serializeRealtimeErr(err),
       });
       if (status === "SUBSCRIBED") {
         subscriptionStatus = "subscribed";

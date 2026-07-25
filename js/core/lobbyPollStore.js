@@ -434,6 +434,8 @@ function ensureChannelController() {
       schedulePollRealtimeReconnect();
     },
     log: (tag, data) => pollRtLog(tag, data),
+    // Diagnostic probes A/B/C uniquement (reveal-poll-rt-isolate=1)
+    getSupabase: () => supabase,
   });
   return channelCtrl;
 }

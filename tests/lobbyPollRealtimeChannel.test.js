@@ -379,6 +379,56 @@ describe("boot auth (contrat source)", () => {
   });
 });
 
+describe("pollRealtimeDiagnose helpers", () => {
+  it("inspectLobbyId distingue UUID et code court", async () => {
+    const { inspectLobbyIdForRealtimeFilter } = await import(
+      "../js/core/lobbyPollRealtimeDiagnose.js"
+    );
+    const uuid = inspectLobbyIdForRealtimeFilter(
+      "a1b2c3d4-e5f6-4890-abcd-ef1234567890"
+    );
+    assert.equal(uuid.looksLikeUuid, true);
+    assert.equal(uuid.looksLikeShortCode, false);
+    assert.equal(
+      uuid.filter,
+      "lobby_id=eq.a1b2c3d4-e5f6-4890-abcd-ef1234567890"
+    );
+
+    const code = inspectLobbyIdForRealtimeFilter("AB12CD");
+    assert.equal(code.looksLikeShortCode, true);
+    assert.equal(code.looksLikeUuid, false);
+  });
+
+  it("votes listener : nextVotes null ne produit pas poll_id=eq.null", () => {
+    const mock = makeMockRealtime({ autoSubscribe: false });
+    const filters = [];
+    const ctrl = createPollChannelController({
+      createChannel: (topic) => {
+        const ch = mock.createChannel(topic);
+        const origOn = ch.on.bind(ch);
+        ch.on = (type, cfg, cb) => {
+          filters.push(cfg);
+          return origOn(type, cfg, cb);
+        };
+        return ch;
+      },
+      removeChannel: mock.removeChannel,
+      onPollsEvent: () => {},
+      onVotesEvent: () => {},
+    });
+    return ctrl.requestRebuild("a1b2c3d4-e5f6-4890-abcd-ef1234567890", null).then(() => {
+      assert.equal(filters.length, 1);
+      assert.equal(filters[0].table, "lobby_polls");
+      assert.equal(
+        filters[0].filter,
+        "lobby_id=eq.a1b2c3d4-e5f6-4890-abcd-ef1234567890"
+      );
+      assert.ok(!filters.some((f) => String(f.filter || "").includes("null")));
+      return ctrl.dispose();
+    });
+  });
+});
+
 describe("payloads close / insert / pastille", () => {
   it("UPDATE sans old.status", () => {
     assert.equal(

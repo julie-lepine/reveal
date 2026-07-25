@@ -372,8 +372,9 @@ describe("lobbyPoll courses & Realtime guards", () => {
   it("source : votes filtrés par poll_id ; close invalide les fetch", () => {
     const storeSrc = readFileSync(join(__dirname, "../js/core/lobbyPollStore.js"), "utf8");
     const chSrc = readFileSync(join(__dirname, "../js/core/lobbyPollChannel.js"), "utf8");
-    assert.match(chSrc, /filter:\s*`poll_id=eq\.\$\{/);
-    assert.match(chSrc, /filter:\s*`lobby_id=eq\.\$\{lobbyId\}`/);
+    assert.match(chSrc, /poll_id=eq\.\$\{nextVotes\}/);
+    assert.match(chSrc, /lobby_id=eq\.\$\{lobbyId\}/);
+    assert.match(chSrc, /votes listener skipped/);
     assert.match(storeSrc, /invalidatePollFetches/);
     assert.match(storeSrc, /isRealtimeActivePollClose/);
     assert.match(storeSrc, /isRealtimeOpenPollInsert/);
