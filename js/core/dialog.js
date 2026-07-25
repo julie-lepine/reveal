@@ -450,6 +450,9 @@ export function showPartySettingsDialog({ canTransferHost = true } = {}) {
           <button type="button" class="btn btn-secondary app-dialog__menu-btn" data-party-action="players">
             👥 Gestion des joueurs
           </button>
+          <button type="button" class="btn btn-secondary app-dialog__menu-btn app-dialog__menu-btn--danger" data-party-action="close">
+            🚪 Fermer le lobby
+          </button>
         </div>
         <button type="button" class="btn btn-primary app-dialog__btn" data-dialog-cancel>Fermer</button>
       </div>
@@ -459,7 +462,7 @@ export function showPartySettingsDialog({ canTransferHost = true } = {}) {
       btn.addEventListener("click", () => {
         if (btn.disabled) return;
         const action = btn.getAttribute("data-party-action");
-        if (action === "transfer" || action === "players") {
+        if (action === "transfer" || action === "players" || action === "close") {
           close({ ok: true, action });
         }
       });

@@ -4889,6 +4889,12 @@ body{
   cursor:not-allowed;
 }
 
+.app-dialog__menu-btn--danger{
+  color:#fecaca;
+  border-color:color-mix(in srgb,var(--color-primary-hot) 45%,transparent);
+  background:color-mix(in srgb,var(--color-primary-hot) 12%,rgba(255,255,255,.02));
+}
+
 .lobby-manage__count{
   margin:-4px 0 8px !important;
   font-size:14px;

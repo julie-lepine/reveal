@@ -1059,9 +1059,9 @@ export async function kickLobbyMember(targetUserId, { confirmName = "" } = {}) {
 }
 
 /**
- * Menu hôte sur le hub jeux : transfert d'hôte + gestion des joueurs.
+ * Menu hôte sur le hub jeux : transfert d'hôte, gestion des joueurs, fermer le lobby.
  * Garde ARCH-03b : jamais d'UI admin avant hôte réel ou claim réussi.
- * @returns {Promise<{ ok: boolean, cancelled?: boolean, action?: string, claimed?: boolean }>}
+ * @returns {Promise<{ ok: boolean, cancelled?: boolean, action?: string, claimed?: boolean, error?: string }>}
  */
 export async function openPartySettings() {
   if (!isSupabaseConfigured() || !getLobby()?.id) {
@@ -1101,6 +1101,11 @@ export async function openPartySettings() {
       onKick: (userId, name) => kickLobbyMember(userId, { confirmName: name }),
     });
     return { ok: true, action: "players", claimed };
+  }
+
+  if (choice.action === "close") {
+    const res = await confirmAndLeaveLobby({ navigateAway: true });
+    return { ...res, action: "close", claimed };
   }
 
   return { ok: false, cancelled: true, claimed };
