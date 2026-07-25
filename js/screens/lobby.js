@@ -18,6 +18,7 @@ import {
   kickLobbyMember,
   canManageLobbyRoster,
 } from "../core/lobby.js";
+import { mountChatPanel, CHAT_MAX_LENGTH } from "../core/chatPanel.js";
 import { canCreateLobby, updateProfileEmoji } from "../core/auth.js";
 import { getLocalEmoji } from "../core/state.js";
 import { isSupabaseConfigured } from "../core/supabaseClient.js";
@@ -111,28 +112,13 @@ export function mountLobby(app) {
   let unsubSession = () => {};
   let unsubBundle = () => {};
   let mounted = false;
+  let chatPanel = null;
 
   async function ensureLobby() {
     const lobby = getLobby();
     if (lobby?.code && lobby.participants?.length) return;
     if (hasActiveLobby()) return;
     if (canCreateLobby()) await createLobby();
-  }
-
-  function renderMessages() {
-    const messages = getLobbyMessages();
-    if (!messages.length) {
-      return `<p class="chat-empty">Aucun message pour l'instant.</p>`;
-    }
-    return messages
-      .map(
-        (m) => `
-      <div class="chat-msg">
-        <span class="chat-msg__from">${escapeHtml(m.from)}</span>
-        <span class="chat-msg__text">${escapeHtml(m.text)}</span>
-      </div>`
-      )
-      .join("");
   }
 
   function captureChatState() {
@@ -160,10 +146,23 @@ export function mountLobby(app) {
   }
 
   function refreshChat() {
-    const box = app.querySelector("#chat-messages");
-    if (!box) return;
-    box.innerHTML = renderMessages();
-    box.scrollTop = box.scrollHeight;
+    chatPanel?.refresh();
+  }
+
+  function remountChatPanel() {
+    chatPanel?.cleanup();
+    chatPanel = null;
+    const messagesEl = app.querySelector("#chat-messages");
+    const inputEl = app.querySelector("#chat-input");
+    const sendEl = app.querySelector("#chat-send");
+    if (!messagesEl || !inputEl || !sendEl) return;
+    chatPanel = mountChatPanel(app, {
+      messagesEl,
+      inputEl,
+      sendEl,
+      getMessages: getLobbyMessages,
+      sendMessage: addLobbyMessage,
+    });
   }
 
   function updateStartButton() {
@@ -306,20 +305,6 @@ export function mountLobby(app) {
       }
     });
 
-    const sendChat = async () => {
-      const input = app.querySelector("#chat-input");
-      if (!input?.value.trim()) return;
-      await addLobbyMessage(input.value);
-      input.value = "";
-      refreshChat();
-      input.focus();
-    };
-
-    app.querySelector("#chat-send")?.addEventListener("click", sendChat);
-    app.querySelector("#chat-input")?.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") sendChat();
-    });
-
     app.querySelector("#btn-lobby-reset-app")?.addEventListener("click", async () => {
       const ok = await showAppConfirm(
         "Si le lobby ne répond plus, ta session locale sera effacée. Tu pourras te reconnecter et rejoindre une nouvelle partie.",
@@ -368,9 +353,9 @@ export function mountLobby(app) {
         </div>
 
         <div class="chat-panel">
-          <div class="chat-messages" id="chat-messages">${renderMessages()}</div>
+          <div class="chat-messages" id="chat-messages"></div>
           <div class="chat-box">
-            <input type="text" class="chat-box__input" id="chat-input" placeholder="Un message…" maxlength="200" autocomplete="off" />
+            <input type="text" class="chat-box__input" id="chat-input" placeholder="Un message…" maxlength="${CHAT_MAX_LENGTH}" autocomplete="off" />
             <button type="button" class="chat-box__send" id="chat-send" aria-label="Envoyer">➤</button>
           </div>
         </div>
@@ -411,7 +396,7 @@ export function mountLobby(app) {
     });
 
     bindEvents(lobby);
-    refreshChat();
+    remountChatPanel();
     restoreChatState(chatState);
     mounted = true;
   }
@@ -481,6 +466,8 @@ export function mountLobby(app) {
   })();
 
   return () => {
+    chatPanel?.cleanup();
+    chatPanel = null;
     cleanupResume();
     unsubSession();
     unsubBundle();

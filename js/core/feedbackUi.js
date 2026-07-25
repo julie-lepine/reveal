@@ -1,47 +1,66 @@
 import { INSTAGRAM_HANDLE, INSTAGRAM_PROFILE_URL } from "../../data/appConfig.js";
-import { showAppRichDialog } from "./dialog.js";
-import { hasActiveLobby, isLobbyEveningStarted } from "./lobby.js";
+import { isChatFabAllowedScreen } from "./chatFabScreens.js";
+import { mountChatPanel } from "./chatPanel.js";
+import {
+  formatUnreadBadge,
+  getChatLobbyKey,
+  initChatUnreadTracking,
+  markMessagesRead,
+  onChatUnreadChange,
+  syncChatUnread,
+} from "./chatUnread.js";
+import { hasActiveLobby, getLobby, getLobbyMessages, addLobbyMessage } from "./lobby.js";
 import { openExternalUrl } from "./openExternal.js";
 import { getCurrentScreen, onScreenChange } from "./router.js";
 import { onLobbyBundleUpdated } from "./supabaseLobby.js";
 import { escapeHtml } from "./ui.js";
 
+export { CHAT_FAB_ALLOWED_SCREENS, isChatFabAllowedScreen } from "./chatFabScreens.js";
+
 let fabEl = null;
+let badgeEl = null;
+let sheetRoot = null;
+let sheetPanel = null;
+let chatInstance = null;
+let unsubMessages = null;
+let sheetOpen = false;
+let bodyOverflowPrev = "";
 
-/** Hub soirée : le bouton retour Insta reste visible entre deux parties. */
-const FEEDBACK_HUB_SCREENS = new Set(["game-select", "results", "leaderboard"]);
+export function isChatSheetOpen() {
+  return sheetOpen;
+}
 
-function shouldShowFeedbackFab() {
+function shouldShowChatFab() {
   if (!hasActiveLobby()) return false;
-  if (isLobbyEveningStarted()) return true;
-  return FEEDBACK_HUB_SCREENS.has(getCurrentScreen());
+  return isChatFabAllowedScreen(getCurrentScreen());
 }
 
 function updateFeedbackFabVisibility() {
   if (!fabEl) return;
-  const show = shouldShowFeedbackFab();
+  const show = shouldShowChatFab();
   fabEl.classList.toggle("feedback-fab--hidden", !show);
   fabEl.hidden = !show;
+  if (!show && sheetOpen) {
+    closeChatSheet();
+  }
+}
+
+function updateFabBadge(count) {
+  if (!badgeEl) return;
+  const label = formatUnreadBadge(count);
+  if (!label) {
+    badgeEl.hidden = true;
+    badgeEl.textContent = "";
+    fabEl?.setAttribute("aria-label", "Ouvrir le chat");
+    return;
+  }
+  badgeEl.hidden = false;
+  badgeEl.textContent = label;
+  fabEl?.setAttribute("aria-label", `Ouvrir le chat, ${label} non lus`);
 }
 
 export function openInstagramProfile() {
   void openExternalUrl(INSTAGRAM_PROFILE_URL);
-}
-
-export function openFeedbackDialog() {
-  void showAppRichDialog({
-    title: "Un retour ?",
-    icon: "💬",
-    bodyHtml: `
-      <p class="feedback-modal__text">
-        Tu joues à REVEAL ? J'aimerais avoir ton avis : bug, idée de mini-jeu, mot trop facile…
-        Envoie-moi un DM sur Insta, je réponds dès que je peux.
-      </p>`,
-    cancelLabel: "Plus tard",
-    confirmLabel: "Envoie un DM",
-  }).then((choice) => {
-    if (choice === "ok") openInstagramProfile();
-  });
 }
 
 export function feedbackPromptCardHtml() {
@@ -68,6 +87,126 @@ export function bindFeedbackPrompt(root) {
   });
 }
 
+function onSheetKeydown(e) {
+  if (e.key === "Escape") {
+    e.preventDefault();
+    closeChatSheet();
+  }
+}
+
+function cleanupSheetDom() {
+  unsubMessages?.();
+  unsubMessages = null;
+  chatInstance?.cleanup();
+  chatInstance = null;
+  if (sheetRoot) {
+    sheetRoot.removeEventListener("keydown", onSheetKeydown);
+    sheetRoot.remove();
+  }
+  sheetRoot = null;
+  sheetPanel = null;
+  document.body.style.overflow = bodyOverflowPrev;
+  bodyOverflowPrev = "";
+  sheetOpen = false;
+}
+
+export function closeChatSheet() {
+  if (!sheetOpen && !sheetRoot) return;
+  const returnFocus = fabEl && !fabEl.hidden ? fabEl : null;
+  cleanupSheetDom();
+  void syncChatUnread();
+  if (returnFocus) {
+    try {
+      returnFocus.focus();
+    } catch {
+      /* ignore */
+    }
+  }
+}
+
+function openChatSheet() {
+  if (sheetOpen) return;
+  if (typeof document === "undefined") return;
+
+  sheetOpen = true;
+  bodyOverflowPrev = document.body.style.overflow;
+  document.body.style.overflow = "hidden";
+
+  sheetRoot = document.createElement("div");
+  sheetRoot.className = "chat-sheet";
+  sheetRoot.setAttribute("role", "presentation");
+  sheetRoot.innerHTML = `
+    <div class="chat-sheet__backdrop" data-chat-sheet-dismiss aria-hidden="true"></div>
+    <div
+      class="chat-sheet__panel"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Chat"
+      tabindex="-1"
+    >
+      <div class="chat-sheet__header">
+        <h2 class="chat-sheet__title">Chat</h2>
+        <button type="button" class="chat-sheet__close" data-chat-sheet-dismiss aria-label="Fermer">✕</button>
+      </div>
+      <div class="chat-messages chat-sheet__messages" id="chat-sheet-messages"></div>
+      <div class="chat-box chat-sheet__box">
+        <input
+          type="text"
+          class="chat-box__input"
+          id="chat-sheet-input"
+          placeholder="Un message…"
+          maxlength="200"
+          autocomplete="off"
+        />
+        <button type="button" class="chat-box__send" id="chat-sheet-send" aria-label="Envoyer">➤</button>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(sheetRoot);
+  sheetPanel = sheetRoot.querySelector(".chat-sheet__panel");
+
+  const messagesEl = sheetRoot.querySelector("#chat-sheet-messages");
+  const inputEl = sheetRoot.querySelector("#chat-sheet-input");
+  const sendEl = sheetRoot.querySelector("#chat-sheet-send");
+
+  chatInstance = mountChatPanel(sheetRoot, {
+    messagesEl,
+    inputEl,
+    sendEl,
+    getMessages: getLobbyMessages,
+    sendMessage: addLobbyMessage,
+    onAfterSend: () => {
+      markMessagesRead(getLobbyMessages(), getChatLobbyKey(getLobby()));
+      void syncChatUnread();
+    },
+  });
+
+  // Marquer lus seulement après rendu réussi de la liste.
+  markMessagesRead(getLobbyMessages(), getChatLobbyKey(getLobby()));
+  void syncChatUnread();
+
+  unsubMessages = onLobbyBundleUpdated(() => {
+    chatInstance?.refresh();
+    if (sheetOpen) {
+      markMessagesRead(getLobbyMessages(), getChatLobbyKey(getLobby()));
+      void syncChatUnread();
+    }
+  });
+
+  sheetRoot.querySelectorAll("[data-chat-sheet-dismiss]").forEach((el) => {
+    el.addEventListener("click", () => closeChatSheet());
+  });
+
+  sheetRoot.addEventListener("keydown", onSheetKeydown);
+
+  requestAnimationFrame(() => {
+    sheetRoot?.classList.add("chat-sheet--in");
+    sheetPanel?.focus();
+    chatInstance?.focusInput();
+  });
+}
+
 export function initFeedbackFab() {
   if (fabEl || typeof document === "undefined") return;
 
@@ -75,14 +214,27 @@ export function initFeedbackFab() {
   fabEl.type = "button";
   fabEl.id = "feedback-fab";
   fabEl.className = "feedback-fab feedback-fab--hidden";
-  fabEl.setAttribute("aria-label", "Envoyer un retour");
+  fabEl.setAttribute("aria-label", "Ouvrir le chat");
   fabEl.hidden = true;
-  fabEl.textContent = "💬";
-  fabEl.addEventListener("click", openFeedbackDialog);
+  fabEl.innerHTML = `
+    <span class="feedback-fab__icon" aria-hidden="true">💬</span>
+    <span class="feedback-fab__badge" hidden></span>
+  `;
+  badgeEl = fabEl.querySelector(".feedback-fab__badge");
+
+  fabEl.addEventListener("click", () => {
+    // Ouverture async légère : pas de travail sync lourd.
+    queueMicrotask(() => openChatSheet());
+  });
 
   document.body.appendChild(fabEl);
   updateFeedbackFabVisibility();
 
   onScreenChange(() => updateFeedbackFabVisibility());
   onLobbyBundleUpdated(() => updateFeedbackFabVisibility());
+
+  initChatUnreadTracking({ isChatSheetOpen: () => sheetOpen });
+  onChatUnreadChange((count) => updateFabBadge(count));
+  updateFabBadge(0);
+  void syncChatUnread();
 }

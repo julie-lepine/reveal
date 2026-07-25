@@ -839,7 +839,7 @@ async function fetchLobbyBundle(lobbyId, { withMessages = false, currentUserId =
     queries.push(
       supabase
         .from("lobby_messages")
-        .select("display_name, body, created_at, user_id")
+        .select("id, display_name, body, created_at, user_id")
         .eq("lobby_id", lobbyId)
         .order("created_at", { ascending: true })
         .limit(100)
@@ -877,9 +877,11 @@ async function fetchLobbyBundle(lobbyId, { withMessages = false, currentUserId =
 
   if (withMessages) {
     bundle.messages = (msgRes?.data || []).map((m) => ({
+      id: m.id,
       from: m.display_name,
       text: m.body,
       at: new Date(m.created_at).getTime(),
+      userId: m.user_id || null,
     }));
   }
 

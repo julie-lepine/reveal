@@ -1201,13 +1201,26 @@ export async function addLobbyMessage(text) {
   }
   const trimmed = text.trim();
   if (!trimmed) return;
+  const at = Date.now();
   const messages = [
     ...(getLobby()?.messages || []),
-    { from: getLocalDisplayName(), text: trimmed, at: Date.now() },
+    {
+      id: `local-${at}-${Math.random().toString(36).slice(2, 10)}`,
+      from: getLocalDisplayName(),
+      text: trimmed,
+      at,
+      userId: getSupabaseUserId() || "local",
+    },
   ];
   const lobby = { ...getLobby(), messages };
   saveStatePatch({ lobby });
   if (lobby.code) publishOpenLobby(lobby.code, lobby);
+  try {
+    const { notifyLocalChatMessagesChanged } = await import("./chatUnread.js");
+    notifyLocalChatMessagesChanged();
+  } catch {
+    /* unread optionnel */
+  }
 }
 
 function incrementGlobalStat(key) {
