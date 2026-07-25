@@ -24,6 +24,7 @@ import {
 } from "./supabaseLobby.js";
 import { stopMultiplayerSync } from "./gameSync.js";
 import { isPasswordRecoveryPending } from "./supabaseAuth.js";
+import { normalizeGuestEmoji } from "../../data/profileEmojis.js";
 
 export function isLoggedIn() {
   const user = getState().user;
@@ -179,19 +180,21 @@ export async function loginWithSocial(provider) {
   return { ok: true };
 }
 
-export async function loginAsGuest(displayName, captchaToken = null) {
+export async function loginAsGuest(displayName, captchaToken = null, emoji = null) {
   if (isSupabaseConfigured()) {
-    return sbGuest(displayName, captchaToken);
+    return sbGuest(displayName, captchaToken, emoji);
   }
 
   const name = displayName.trim().slice(0, 24);
   if (name.length < 2) {
     return { ok: false, error: "Choisis un pseudo (2 caractères min.)." };
   }
+  const chosenEmoji = normalizeGuestEmoji(emoji);
   saveStatePatch({
     user: {
       email: null,
       name,
+      emoji: chosenEmoji,
       loggedIn: false,
       isGuest: true,
       provider: "guest",

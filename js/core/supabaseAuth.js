@@ -11,6 +11,7 @@ import {
 import { isNativeApp } from "./platform.js";
 import { NATIVE_AUTH_REDIRECT } from "../../data/appConfig.js";
 import { loadGuestMembership } from "./guestMembership.js";
+import { normalizeGuestEmoji } from "../../data/profileEmojis.js";
 
 const PASSWORD_RECOVERY_KEY = "reveal-pending-password-reset";
 
@@ -504,7 +505,7 @@ function guestAuthErrorMessage(error) {
   return formatAuthErrorMessage(msg) || "Connexion invité impossible.";
 }
 
-export async function signInAsGuest(displayName, captchaToken = null) {
+export async function signInAsGuest(displayName, captchaToken = null, emoji = null) {
   const trimmed = String(displayName || "")
     .trim()
     .slice(0, 24);
@@ -512,6 +513,7 @@ export async function signInAsGuest(displayName, captchaToken = null) {
     return { ok: false, error: "Choisis un pseudo (2 caractères min.)." };
   }
 
+  const chosenEmoji = normalizeGuestEmoji(emoji);
   lockGuestDisplayName(trimmed);
 
   let session = await recoverAuthSession();
@@ -562,7 +564,7 @@ export async function signInAsGuest(displayName, captchaToken = null) {
   await upsertProfile({
     userId: user.id,
     displayName: trimmed,
-    emoji: "🎭",
+    emoji: chosenEmoji,
   });
 
   saveStatePatch({
@@ -570,7 +572,7 @@ export async function signInAsGuest(displayName, captchaToken = null) {
     user: {
       email: null,
       name: trimmed,
-      emoji: "🎭",
+      emoji: chosenEmoji,
       loggedIn: false,
       isGuest: true,
       provider: "guest",

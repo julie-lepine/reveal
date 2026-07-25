@@ -40,7 +40,9 @@ import {
 import { navigate, getCurrentScreen, getScreenParams } from "../core/router.js";
 import { escapeHtml, logoHtml, pageShell } from "../core/ui.js";
 import { handleNavTarget, goToEveningSettings } from "./nav.js";
-import { showAppAlert, showAppConfirm, showAppEmailPrompt } from "../core/dialog.js";
+import { showAppAlert, showAppConfirm, showAppEmailPrompt, showEmojiPickerDialog } from "../core/dialog.js";
+import { getLocalEmoji } from "../core/state.js";
+import { DEFAULT_GUEST_EMOJI, normalizeGuestEmoji } from "../../data/profileEmojis.js";
 import {
   getPasswordResetCooldownRemainingMs,
   passwordResetCooldownMessage,
@@ -132,7 +134,17 @@ function guestJoinErrorHtml(id, message) {
   return `<p class="auth-error${message ? "" : " hidden"}" id="${id}" role="alert">${escapeHtml(message || "")}</p>`;
 }
 
-function guestJoinPanelHtml({ leaveHint = false, error = "" } = {}) {
+function guestEmojiPickerHtml(emoji, { btnId = "guest-emoji-btn" } = {}) {
+  const chosen = normalizeGuestEmoji(emoji);
+  return `
+      <label class="field-label" for="${btnId}">Ton emoji</label>
+      <div class="emoji-picker-preview">
+        <button type="button" class="emoji-picker-preview__avatar" id="${btnId}" data-guest-emoji aria-label="Choisir ton emoji" title="Choisir ton emoji">${chosen}</button>
+        <span class="hint">Appuie pour changer</span>
+      </div>`;
+}
+
+function guestJoinPanelHtml({ leaveHint = false, error = "", emoji = DEFAULT_GUEST_EMOJI } = {}) {
   const defaultCode = guestRejoinDefaultCode();
   return `
     <div class="card auth-form auth-form--guest auth-form--guest-rejoin">
@@ -143,6 +155,7 @@ function guestJoinPanelHtml({ leaveHint = false, error = "" } = {}) {
       }
       <label class="field-label" for="guest-rejoin-name">Ton pseudo</label>
       <input type="text" class="field-input" id="guest-rejoin-name" placeholder="Ex : Alex" maxlength="24" value="${escapeHtml(getUser()?.name || "")}" />
+      ${guestEmojiPickerHtml(emoji, { btnId: "guest-rejoin-emoji-btn" })}
       <label class="field-label" for="guest-rejoin-code">Code d'invitation</label>
       <input type="text" class="field-input" id="guest-rejoin-code" placeholder="6 caractères" maxlength="8" autocapitalize="characters" value="${escapeHtml(defaultCode)}" />
       <div id="guest-rejoin-turnstile" class="auth-turnstile-wrap"></div>
@@ -227,6 +240,22 @@ export function mountHome(app) {
   let forgotCooldownTimer = null;
   let pendingServerLobby = null;
   let guestJoinError = "";
+  let selectedGuestEmoji = normalizeGuestEmoji(
+    isGuest() ? getLocalEmoji() : DEFAULT_GUEST_EMOJI
+  );
+
+  function syncGuestEmojiPreview() {
+    app.querySelectorAll("[data-guest-emoji]").forEach((btn) => {
+      btn.textContent = selectedGuestEmoji;
+    });
+  }
+
+  async function openGuestEmojiPicker() {
+    const res = await showEmojiPickerDialog(selectedGuestEmoji);
+    if (!res?.ok) return;
+    selectedGuestEmoji = normalizeGuestEmoji(res.emoji);
+    syncGuestEmojiPreview();
+  }
 
   function startForgotCooldownTicker() {
     if (forgotCooldownTimer) return;
@@ -468,13 +497,13 @@ export function mountHome(app) {
             : guest
               ? `
           <div class="auth-welcome card auth-welcome--guest">
-            <p class="auth-welcome__hi">Invité : <strong>${escapeHtml(user.name)}</strong> 🎭</p>
+            <p class="auth-welcome__hi">Invité : <strong>${escapeHtml(user.name)}</strong> ${escapeHtml(getLocalEmoji())}</p>
             <div class="auth-welcome__actions">
               <button type="button" class="btn btn-secondary btn--compact" data-nav="settings">Paramètres</button>
               <button type="button" class="btn-link" id="btn-logout">Quitter la session</button>
             </div>
           </div>
-          ${guestJoinPanelHtml({ leaveHint: activeLobby, error: guestJoinError })}`
+          ${guestJoinPanelHtml({ leaveHint: activeLobby, error: guestJoinError, emoji: selectedGuestEmoji })}`
               : `
           <div class="auth-tabs">
             <button type="button" class="auth-tab ${authTab === "login" ? "auth-tab--active" : ""}" data-tab="login">Connexion</button>
@@ -514,6 +543,7 @@ export function mountHome(app) {
               <p class="hint auth-form__guest-intro">Rejoins avec un code ou un lien d'invitation de l'hôte. Pas de compte requis - les invités ne peuvent pas créer de lobby.</p>
               <label class="field-label" for="guest-name">Ton pseudo</label>
               <input type="text" class="field-input" id="guest-name" placeholder="Ex : Alex" maxlength="24" />
+              ${guestEmojiPickerHtml(selectedGuestEmoji, { btnId: "guest-emoji-btn" })}
               <label class="field-label" for="guest-code">Code d'invitation</label>
               <input type="text" class="field-input" id="guest-code" placeholder="6 caractères" maxlength="8" autocapitalize="characters" />
               <div id="guest-turnstile" class="auth-turnstile-wrap"></div>
@@ -582,6 +612,11 @@ export function mountHome(app) {
       authTab = tabBtn.getAttribute("data-tab");
       guestJoinError = "";
       scheduleRender(true);
+      return;
+    }
+
+    if (e.target.closest("[data-guest-emoji]")) {
+      void openGuestEmojiPicker();
       return;
     }
 
@@ -865,7 +900,12 @@ export function mountHome(app) {
       try {
         const captchaToken =
           isTurnstileRequired() && isTurnstileSolved("guest") ? getTurnstileToken("guest") : null;
-        const res = await joinLobbyAsGuest(codeEl?.value, nameEl?.value, captchaToken);
+        const res = await joinLobbyAsGuest(
+          codeEl?.value,
+          nameEl?.value,
+          captchaToken,
+          selectedGuestEmoji
+        );
 
         if (!res.ok) {
           const isDisplayNameTaken = res.code === "display_name_taken";

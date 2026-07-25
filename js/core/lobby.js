@@ -787,9 +787,9 @@ function normalizeLobbyCode(code) {
     .replace(/\s/g, "");
 }
 
-export async function joinLobbyAsGuest(code, guestName, captchaToken = null) {
+export async function joinLobbyAsGuest(code, guestName, captchaToken = null, emoji = null) {
   setGuestRecoveryCaptchaRequired(false);
-  const auth = await loginAsGuest(guestName, captchaToken);
+  const auth = await loginAsGuest(guestName, captchaToken, emoji);
   if (!auth.ok) return auth;
 
   const joinCode =
