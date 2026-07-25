@@ -46,6 +46,10 @@ import {
   shouldRouteAfterRealtimeSubscribed,
   createDebouncedCallback,
 } from "./joinSessionHydrate.js";
+import {
+  shouldSkipLobbyRealtimeResubscribe,
+  shouldApplyLobbySubscribeStatus,
+} from "./lobbyRealtimeGate.js";
 
 export {
   JOIN_SESSION_RESTORE_DELAYS_MS,
@@ -86,6 +90,127 @@ let realtimeReconnectTimer = null;
 let realtimeReconnectAttempts = 0;
 const REALTIME_RECONNECT_MAX_MS = 10000;
 
+/** idle | subscribing | subscribed | error — canal lobby realtime partagé */
+let lobbyRealtimeStatus = "idle";
+let lobbyChannelLobbyId = null;
+/** Génération du canal lobby (invalide les callbacks / waiters obsolètes). */
+let lobbyChannelGen = 0;
+const lobbyRealtimeStatusListeners = new Set();
+
+function emitLobbyRealtimeStatus(status, extra = {}) {
+  lobbyRealtimeStatus = status;
+  const payload = {
+    lobbyId: lobbyChannelLobbyId,
+    gen: lobbyChannelGen,
+    ...extra,
+  };
+  for (const fn of lobbyRealtimeStatusListeners) {
+    try {
+      fn(status, payload);
+    } catch (e) {
+      console.warn("REVEAL lobbyRealtimeStatus listener:", e);
+    }
+  }
+}
+
+export function getLobbyRealtimeStatus() {
+  return lobbyRealtimeStatus;
+}
+
+export function getLobbyRealtimeMeta() {
+  return {
+    status: lobbyRealtimeStatus,
+    lobbyId: lobbyChannelLobbyId,
+    gen: lobbyChannelGen,
+    hasChannel: Boolean(realtimeChannel),
+  };
+}
+
+export function isLobbyRealtimeSubscribed(forLobbyId = null) {
+  if (lobbyRealtimeStatus !== "subscribed" || !realtimeChannel) return false;
+  if (forLobbyId != null && String(lobbyChannelLobbyId) !== String(forLobbyId)) {
+    return false;
+  }
+  return true;
+}
+
+export function onLobbyRealtimeStatus(fn) {
+  lobbyRealtimeStatusListeners.add(fn);
+  return () => lobbyRealtimeStatusListeners.delete(fn);
+}
+
+/**
+ * Attend SUBSCRIBED du canal lobby pour un lobbyId donné (sérialisation défensive poll).
+ *
+ * Timeout : ok=false, reason=timeout — le caller NE DOIT PAS ouvrir le poll
+ * (évite de réintroduire la course socket). Un futur SUBSCRIBED matching
+ * pourra réveiller via onLobbyRealtimeStatus.
+ *
+ * @param {{ timeoutMs?: number, lobbyId?: string|null }} [opts]
+ */
+export function whenLobbyRealtimeReady({ timeoutMs = 12000, lobbyId: wantId } = {}) {
+  const desiredLobbyId = wantId || getState().lobby?.id || null;
+  if (!desiredLobbyId || !getState().inLobby) {
+    return Promise.resolve({ ok: true, reason: "no_lobby", lobbyId: desiredLobbyId, gen: lobbyChannelGen });
+  }
+  if (isLobbyRealtimeSubscribed(desiredLobbyId)) {
+    return Promise.resolve({
+      ok: true,
+      reason: "already",
+      lobbyId: lobbyChannelLobbyId,
+      gen: lobbyChannelGen,
+    });
+  }
+  const minGen = lobbyChannelGen;
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = (result) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      unsub();
+      resolve(result);
+    };
+    const timer = setTimeout(() => {
+      finish({
+        ok: false,
+        reason: "timeout",
+        status: lobbyRealtimeStatus,
+        lobbyId: desiredLobbyId,
+        gen: lobbyChannelGen,
+      });
+    }, timeoutMs);
+    const unsub = onLobbyRealtimeStatus((status, meta) => {
+      if (status === "idle" && meta?.reason === "teardown") {
+        finish({
+          ok: false,
+          reason: "teardown",
+          lobbyId: desiredLobbyId,
+          gen: meta.gen,
+        });
+        return;
+      }
+      if (status !== "subscribed") return;
+      if (String(meta?.lobbyId) !== String(desiredLobbyId)) return;
+      if (meta?.gen != null && meta.gen < minGen) return;
+      finish({
+        ok: true,
+        reason: "subscribed",
+        lobbyId: meta.lobbyId,
+        gen: meta.gen,
+      });
+    });
+    if (isLobbyRealtimeSubscribed(desiredLobbyId)) {
+      finish({
+        ok: true,
+        reason: "race_already",
+        lobbyId: lobbyChannelLobbyId,
+        gen: lobbyChannelGen,
+      });
+    }
+  });
+}
+
 function clearRealtimeReconnect() {
   if (realtimeReconnectTimer) {
     clearTimeout(realtimeReconnectTimer);
@@ -105,6 +230,9 @@ function scheduleRealtimeReconnect() {
     realtimeReconnectTimer = null;
     if (!presenceLobbyId) return;
     realtimeChannel = null;
+    lobbyChannelLobbyId = null;
+    // autorise reconstruction (status error/idle, pas coalesce)
+    emitLobbyRealtimeStatus("idle", { reason: "reconnect_prepare" });
     subscribeLobbyRealtime(realtimeOnUpdate || (() => notifyLobbyBundleUpdated()));
   }, delay);
 }
@@ -1050,11 +1178,36 @@ export function startLobbyPresenceSync() {
   if (!isSupabaseConfigured() || !getState().inLobby || !getState().lobby?.id) return;
 
   const lobbyId = getState().lobby.id;
-  if (presenceLobbyId === lobbyId && realtimeChannel) return;
 
-  stopLobbyPresenceSync();
+  // Singleton / coalesce : déjà branché (ou en cours) sur ce lobby
+  if (
+    shouldSkipLobbyRealtimeResubscribe({
+      desiredLobbyId: lobbyId,
+      activeLobbyId: presenceLobbyId,
+      hasChannel: Boolean(realtimeChannel),
+      subscriptionStatus: lobbyRealtimeStatus,
+    }) &&
+    presenceLobbyId === lobbyId
+  ) {
+    if (typeof localStorage !== "undefined" && localStorage.getItem("reveal-rt-socket-debug") === "1") {
+      console.info("[RT-LOBBY] startLobbyPresenceSync coalesced", {
+        lobbyId,
+        lobbyRealtimeStatus,
+        topic: realtimeChannel?.topic,
+        gen: lobbyChannelGen,
+      });
+    }
+    return;
+  }
+
+  if (presenceLobbyId && presenceLobbyId !== lobbyId) {
+    stopLobbyPresenceSync();
+  } else if (realtimeChannel && presenceLobbyId === lobbyId) {
+    // Canal mort / error : retirer seulement le canal, pas tout le sync state
+    unsubscribeLobbyRealtime();
+  }
+
   presenceLobbyId = lobbyId;
-
   subscribeLobbyRealtime(() => notifyLobbyBundleUpdated());
 
   scheduleLobbyPresencePoll();
@@ -1547,10 +1700,65 @@ export function subscribeLobbyRealtime(onUpdate) {
   if (!lobbyId) return () => {};
 
   realtimeOnUpdate = onUpdate;
-  unsubscribeLobbyRealtime();
 
-  realtimeChannel = supabase
-    .channel(`lobby:${lobbyId}`)
+  const debug =
+    typeof localStorage !== "undefined" &&
+    localStorage.getItem("reveal-rt-socket-debug") === "1";
+
+  // Coalesce uniquement si canal vivant (subscribing|subscribed) du même lobbyId
+  if (
+    shouldSkipLobbyRealtimeResubscribe({
+      desiredLobbyId: lobbyId,
+      activeLobbyId: lobbyChannelLobbyId,
+      hasChannel: Boolean(realtimeChannel),
+      subscriptionStatus: lobbyRealtimeStatus,
+    })
+  ) {
+    if (debug) {
+      console.info("[RT-LOBBY] subscribeLobbyRealtime coalesced", {
+        lobbyId,
+        lobbyRealtimeStatus,
+        topic: realtimeChannel.topic,
+        subscribeCallCount: realtimeChannel.__lobbySubscribeCallCount ?? null,
+        gen: lobbyChannelGen,
+      });
+    }
+    return unsubscribeLobbyRealtime;
+  }
+
+  const topicsBefore = (() => {
+    try {
+      return (supabase.getChannels?.() || []).map((c) => c.topic);
+    } catch {
+      return [];
+    }
+  })();
+
+  if (debug) {
+    console.info("[RT-LOBBY] subscribeLobbyRealtime build", {
+      lobbyId,
+      reason: "subscribeLobbyRealtime",
+      previousTopic: realtimeChannel?.topic ?? null,
+      previousStatus: lobbyRealtimeStatus,
+      previousGen: lobbyChannelGen,
+      topicsBefore,
+      connectionState: supabase.realtime?.connectionState?.() ?? null,
+    });
+  }
+
+  unsubscribeLobbyRealtime({ reason: "replace" });
+
+  const myGen = ++lobbyChannelGen;
+  lobbyChannelLobbyId = lobbyId;
+  emitLobbyRealtimeStatus("subscribing", { gen: myGen });
+
+  const topic = `lobby:${lobbyId}`;
+  let builder = supabase.channel(topic);
+  builder.__lobbySubscribeCallCount = 0;
+  builder.__lobbyChannelId = `lobby-ch-${lobbyId}`;
+  builder.__lobbyGen = myGen;
+
+  builder = builder
     .on(
       "postgres_changes",
       { event: "*", schema: "public", table: "lobby_members", filter: `lobby_id=eq.${lobbyId}` },
@@ -1558,7 +1766,6 @@ export function subscribeLobbyRealtime(onUpdate) {
         const removedUid = payload?.eventType === "DELETE" ? payload.old?.user_id : null;
         const localUid = getSupabaseUserId();
         if (removedUid && localUid && removedUid === localUid) {
-          // Laisser un tick au DELETE lobby (fermeture hôte) pour éviter un faux « kické ».
           setTimeout(() => {
             if (!getState().inLobby) return;
             void import("./lobby.js").then(({ handleKickedFromLobby }) =>
@@ -1582,7 +1789,8 @@ export function subscribeLobbyRealtime(onUpdate) {
       "postgres_changes",
       { event: "UPDATE", schema: "public", table: "lobbies", filter: `id=eq.${lobbyId}` },
       (payload) => {
-        const meaningful = isMeaningfulLobbyUpdate(payload.new);        if (!meaningful) return;
+        const meaningful = isMeaningfulLobbyUpdate(payload.new);
+        if (!meaningful) return;
         scheduleLobbyRefresh();
       }
     )
@@ -1613,52 +1821,97 @@ export function subscribeLobbyRealtime(onUpdate) {
         try {
           const { pulseGameSessionRealtime } = await import("./gameSync.js");
           pulseGameSessionRealtime();
-          /**
-           * Le payload Realtime contient déjà la ligne complète (state inclus) :
-           * on l'applique directement au lieu de refaire un aller-retour DB. Ça
-           * réduit la latence et évite que 6 clients refetchent en même temps.
-           */          if (payload.new && payload.new.state !== undefined) {
+          if (payload.new && payload.new.state !== undefined) {
             applyRemoteSession(payload.new);
           } else {
             await refreshGameSession();
           }
-          const row = getCachedGameSession();          if (row) handleSessionRoute(row, { debugSource: "supabaseLobby/realtime/handle" });        } catch (e) {
+          const row = getCachedGameSession();
+          if (row) handleSessionRoute(row, { debugSource: "supabaseLobby/realtime/handle" });
+        } catch (e) {
           console.warn("REVEAL realtime game_sessions:", e.message || e);
         }
         onUpdate?.();
       }
-    )
-    .subscribe((status) => {
-      if (status === "SUBSCRIBED") {
-        realtimeReconnectAttempts = 0;
-        clearRealtimeReconnect();
-        // Catch-up (re)branchement : refresh cache toujours ; route debouncée
-        // et bloquée pendant hydrate join (T-01/T-02). Events INSERT/UPDATE
-        // ci-dessus routent immédiatement — sans debounce.
-        void refreshGameSession()
-          .then((row) => {
-            if (!shouldRouteAfterRealtimeSubscribed({ joinSessionHydrating })) return;
-            if (!row) return;
-            subscribedCatchUpRoute.schedule(row);
-          })
-          .catch(() => {});
-        return;
+    );
+
+  realtimeChannel = builder;
+  builder.__lobbySubscribeCallCount = 1;
+
+  builder.subscribe((status, err) => {
+    if (
+      !shouldApplyLobbySubscribeStatus({
+        eventGen: myGen,
+        currentGen: lobbyChannelGen,
+        channelRef: builder,
+        activeChannelRef: realtimeChannel,
+      })
+    ) {
+      if (debug) {
+        console.info("[RT-LOBBY] subscribe status ignored (stale gen/ref)", {
+          status,
+          myGen,
+          lobbyChannelGen,
+          lobbyId,
+        });
       }
-      if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
-        scheduleRealtimeReconnect();
-      }
-    });
+      return;
+    }
+
+    if (debug || status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+      console.info("[RT-LOBBY] subscribe status", {
+        status,
+        errorMessage: err?.message,
+        errorName: err?.name,
+        errorContext: err?.context,
+        lobbyId,
+        topic,
+        gen: myGen,
+        subscribeCallCount: builder.__lobbySubscribeCallCount,
+        connectionState: supabase.realtime?.connectionState?.() ?? null,
+      });
+    }
+
+    if (status === "SUBSCRIBED") {
+      realtimeReconnectAttempts = 0;
+      clearRealtimeReconnect();
+      emitLobbyRealtimeStatus("subscribed", { gen: myGen });
+      void refreshGameSession()
+        .then((row) => {
+          if (!shouldRouteAfterRealtimeSubscribed({ joinSessionHydrating })) return;
+          if (!row) return;
+          subscribedCatchUpRoute.schedule(row);
+        })
+        .catch(() => {});
+      return;
+    }
+    if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
+      emitLobbyRealtimeStatus("error", { gen: myGen });
+      scheduleRealtimeReconnect();
+    }
+  });
 
   return unsubscribeLobbyRealtime;
 }
 
-export function unsubscribeLobbyRealtime() {
+export function unsubscribeLobbyRealtime({ reason = "unsubscribe" } = {}) {
   clearRealtimeReconnect();
   subscribedCatchUpRoute.cancel();
   if (realtimeChannel && supabase) {
-    supabase.removeChannel(realtimeChannel);
-    realtimeChannel = null;
+    try {
+      realtimeChannel.__intentionalClose = true;
+      supabase.removeChannel(realtimeChannel);
+    } catch (e) {
+      console.warn("REVEAL lobby removeChannel:", e?.message || e);
+    }
   }
+  realtimeChannel = null;
+  lobbyChannelLobbyId = null;
+  // Invalide waiters / anciens SUBSCRIBED : bump gen sauf replace (bump fait après)
+  if (reason !== "replace") {
+    lobbyChannelGen += 1;
+  }
+  emitLobbyRealtimeStatus("idle", { reason, gen: lobbyChannelGen });
 }
 
 /**

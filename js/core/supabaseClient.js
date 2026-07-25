@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from "../config/supabase.js";
+import { installRealtimeSocketDiagnostics } from "./realtimeSocketDiagnose.js";
 
 export function isSupabaseConfigured() {
   if (!SUPABASE_URL || !SUPABASE_ANON_KEY) return false;
@@ -17,3 +18,11 @@ export const supabase = isSupabaseConfigured()
       },
     })
   : null;
+
+if (supabase) {
+  try {
+    installRealtimeSocketDiagnostics(supabase);
+  } catch (e) {
+    console.warn("REVEAL realtime socket diagnose:", e?.message || e);
+  }
+}

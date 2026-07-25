@@ -20,7 +20,16 @@ import {
   refreshGameSession,
 } from "./gameSync.js";
 import { getCurrentScreen, onScreenChange } from "./router.js";
-import { onLobbyBundleUpdated } from "./supabaseLobby.js";
+import { onLobbyBundleUpdated, whenLobbyRealtimeReady, getLobbyRealtimeStatus, onLobbyRealtimeStatus, getLobbyRealtimeMeta } from "./supabaseLobby.js";
+import {
+  rtSocketProbesEnabled,
+  runSharedSocketProbes,
+  pollShouldWaitForLobbyRealtime,
+} from "./realtimeSocketDiagnose.js";
+import {
+  decidePollAfterLobbyWait,
+  shouldWakePollOnLobbySubscribed,
+} from "./lobbyRealtimeGate.js";
 import { isChatFabAllowedScreen } from "./chatFabScreens.js";
 import {
   normalizeLobbyPollRow,
@@ -112,6 +121,11 @@ let debounceTimer = null;
 let started = false;
 let unsubBundle = null;
 let unsubScreen = null;
+let unsubLobbyRt = null;
+let socketProbesStarted = false;
+/** Coalesce des queueVotesSubscription concurrentes (même config). */
+let pollSubscribeInFlight = null;
+let pollSubscribeInFlightKey = null;
 /** Après premier hydrate d'un poll déjà open : pas de fausse alerte « nouveau ». */
 let hasHydratedPollOnce = false;
 /** poll id créé localement — pas de pastille. */
@@ -457,21 +471,74 @@ function queueVotesSubscription({ reason = "queueVotesSubscription" } = {}) {
   }
   const pollId =
     store.activePoll?.status === "open" ? store.activePoll.id : null;
+  const key = `${lobbyId}::${pollId || ""}`;
+  if (pollSubscribeInFlight && pollSubscribeInFlightKey === key) {
+    pollRtLog("queueVotesSubscription coalesced", { reason, key });
+    return pollSubscribeInFlight;
+  }
+
   const ctrl = ensureChannelController();
-  void ctrl.requestRebuild(lobbyId, pollId, { reason }).then(() => {
-    const st = ctrl.getState();
-    if (
-      st.subscriptionStatus === "subscribed" ||
-      st.subscriptionStatus === "subscribing" ||
-      st.subscriptionStatus === "degraded"
-    ) {
-      setStore({ subscriptionStatus: st.subscriptionStatus });
-    } else if (st.subscriptionStatus === "error") {
-      setStore({ subscriptionStatus: "error" });
-    } else if (!lobbyId) {
-      setStore({ subscriptionStatus: "idle" });
+  const waitedLobbyId = lobbyId;
+  const waitMeta = getLobbyRealtimeMeta();
+
+  pollSubscribeInFlightKey = key;
+  pollSubscribeInFlight = (async () => {
+    try {
+      // Sérialisation défensive : attendre SUBSCRIBED lobby (mitigation _onConnClose).
+      // Timeout → abandon_wait_future : on N'ouvre PAS le poll (évite la course).
+      // Un futur lobby_realtime_subscribed matching réveillera.
+      if (
+        pollShouldWaitForLobbyRealtime({
+          inLobby: hasActiveLobby(),
+          lobbyRealtimeStatus: getLobbyRealtimeStatus(),
+        })
+      ) {
+        pollRtLog("wait lobby realtime before poll channel", {
+          reason,
+          lobbyRealtimeStatus: getLobbyRealtimeStatus(),
+          waitedLobbyId,
+          minGen: waitMeta.gen,
+        });
+        const ready = await whenLobbyRealtimeReady({
+          timeoutMs: 12000,
+          lobbyId: waitedLobbyId,
+        });
+        pollRtLog("lobby realtime wait result", { reason, ...ready });
+        const decision = decidePollAfterLobbyWait({
+          readyOk: ready?.ok === true,
+          reason: ready?.reason,
+          waitedLobbyId,
+          storeLobbyId: store.lobbyId,
+          started,
+        });
+        if (decision.action !== "open_poll") {
+          pollRtLog("poll open deferred", decision);
+          return;
+        }
+      }
+
+      if (!started || store.lobbyId !== waitedLobbyId) return;
+
+      await ctrl.requestRebuild(waitedLobbyId, pollId, { reason });
+      const st = ctrl.getState();
+      if (
+        st.subscriptionStatus === "subscribed" ||
+        st.subscriptionStatus === "subscribing" ||
+        st.subscriptionStatus === "degraded"
+      ) {
+        setStore({ subscriptionStatus: st.subscriptionStatus });
+      } else if (st.subscriptionStatus === "error") {
+        setStore({ subscriptionStatus: "error" });
+      }
+    } finally {
+      if (pollSubscribeInFlightKey === key) {
+        pollSubscribeInFlight = null;
+        pollSubscribeInFlightKey = null;
+      }
     }
-  });
+  })();
+
+  return pollSubscribeInFlight;
 }
 
 /** Branché depuis feedbackUi pour pastille / create local. */
@@ -710,6 +777,31 @@ export async function initLobbyPollSync(opts = {}) {
   unsubScreen = onScreenChange(() => {
     if (authGatePassed) emit();
   });
+  unsubLobbyRt = onLobbyRealtimeStatus((status, meta) => {
+    if (!authGatePassed || status !== "subscribed") return;
+    if (
+      !shouldWakePollOnLobbySubscribed({
+        eventLobbyId: meta?.lobbyId,
+        storeLobbyId: store.lobbyId,
+        eventGen: meta?.gen,
+        minGen: null,
+      })
+    ) {
+      pollRtLog("lobby_realtime_subscribed ignored (lobby mismatch)", {
+        eventLobbyId: meta?.lobbyId,
+        storeLobbyId: store.lobbyId,
+        gen: meta?.gen,
+      });
+      return;
+    }
+    queueVotesSubscription({ reason: "lobby_realtime_subscribed" });
+    if (rtSocketProbesEnabled() && !socketProbesStarted && supabase) {
+      socketProbesStarted = true;
+      void runSharedSocketProbes(supabase, {
+        lobbyId: store.lobbyId || getLobby()?.id || null,
+      });
+    }
+  });
 
   await authReadyForSync;
   if (!started) return;
@@ -727,6 +819,11 @@ export function resetLobbyPollSyncForTests() {
   unsubBundle = null;
   unsubScreen?.();
   unsubScreen = null;
+  unsubLobbyRt?.();
+  unsubLobbyRt = null;
+  socketProbesStarted = false;
+  pollSubscribeInFlight = null;
+  pollSubscribeInFlightKey = null;
   started = false;
   authGatePassed = false;
   authReadyForSync = authReady;
