@@ -4153,6 +4153,108 @@ body.has-bottom-nav .feedback-fab{
   margin:0 12px 8px;
 }
 
+/* ─── Sondage pin (Vague 2) ─── */
+.chat-sheet__poll{
+  flex-shrink:0;
+  margin:0 12px 8px;
+  max-height:42%;
+  overflow-y:auto;
+  -webkit-overflow-scrolling:touch;
+}
+
+.chat-sheet__poll[hidden]{
+  display:none !important;
+}
+
+.lobby-poll{
+  padding:10px 12px;
+  border-radius:14px;
+  border:1px solid rgba(255,255,255,.14);
+  background:rgba(8,10,24,.72);
+}
+
+.lobby-poll__question{
+  margin:0 0 4px;
+  font-size:14px;
+  font-weight:800;
+  color:#fff;
+}
+
+.lobby-poll__hint,
+.lobby-poll__tally,
+.lobby-poll__leader{
+  margin:0 0 8px;
+  font-size:12px;
+}
+
+.lobby-poll__picks,
+.lobby-poll__votes{
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+  margin-bottom:8px;
+}
+
+.lobby-poll__opt{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  width:100%;
+  padding:8px 10px;
+  border-radius:10px;
+  border:1px solid rgba(255,255,255,.1);
+  background:rgba(255,255,255,.05);
+  color:#fff;
+  text-align:left;
+  cursor:pointer;
+  font:inherit;
+}
+
+.lobby-poll__opt--pick{
+  cursor:pointer;
+}
+
+.lobby-poll__opt--vote:disabled,
+.lobby-poll__submit:disabled,
+.lobby-poll__close:disabled{
+  opacity:.55;
+  cursor:default;
+}
+
+.lobby-poll__opt--mine{
+  border-color:rgba(255,60,172,.55);
+  background:rgba(255,60,172,.14);
+}
+
+.lobby-poll__emoji{
+  flex-shrink:0;
+  font-size:16px;
+}
+
+.lobby-poll__title{
+  flex:1;
+  min-width:0;
+  font-size:13px;
+  font-weight:650;
+}
+
+.lobby-poll__count{
+  flex-shrink:0;
+  font-size:13px;
+  font-weight:800;
+  color:rgba(255,255,255,.85);
+}
+
+.lobby-poll__submit{
+  width:100%;
+}
+
+.lobby-poll__close{
+  display:inline-block;
+  margin-top:2px;
+  font-size:12px;
+}
+
 
 /* ─── Game enhancements ─── */
 .hot-take-author{

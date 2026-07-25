@@ -56,6 +56,7 @@ import { mountTierNightLive } from "./games/tierNightLive.js";
 // import { initFilRougeValidationListener } from "./core/filRougeToast.js";
 import { initMultiplayerSyncVisibility } from "./core/gameSync.js";
 import { initFeedbackFab } from "./core/feedbackUi.js";
+import { initLobbyPollSync } from "./core/lobbyPollStore.js";
 import { initHostNoticeListener } from "./core/hostNotice.js";
 import { initActingHostNoticeListener } from "./core/actingHostNotice.js";
 
@@ -115,6 +116,7 @@ registerScreen("tiernight-live", mountTierNightLive);
 
 initBottomNav();
 initFeedbackFab();
+initLobbyPollSync();
 initExitGameDelegation(app);
 initAds();
 initMultiplayerSyncVisibility();
