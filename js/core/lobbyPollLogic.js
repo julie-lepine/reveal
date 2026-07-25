@@ -180,3 +180,39 @@ export function validatePollOptionsClient(options) {
   }
   return { ok: true };
 }
+
+/** Garde fetch async : ignore résultats obsolètes (close / autre lobby / gen plus récente). */
+export function shouldApplyPollFetchResult({
+  gen,
+  currentGen,
+  requestedLobbyId,
+  storeLobbyId,
+}) {
+  if (gen !== currentGen) return false;
+  if (!requestedLobbyId) return false;
+  if (storeLobbyId != null && storeLobbyId !== requestedLobbyId) return false;
+  return true;
+}
+
+/**
+ * Un événement Realtime votes ne doit refetch que s'il concerne le poll actif.
+ * Sans poll actif : ignorer (lobby_polls gère création/fermeture).
+ */
+export function shouldRefetchOnVoteRealtime({ activePollId, eventPollId }) {
+  if (!activePollId || !eventPollId) return false;
+  return String(activePollId) === String(eventPollId);
+}
+
+/** Rollback vote optimistic uniquement si on est encore sur le même poll/lobby. */
+export function shouldRestoreOptimisticVote({
+  votePollId,
+  voteLobbyId,
+  storePollId,
+  storeLobbyId,
+}) {
+  return (
+    Boolean(votePollId) &&
+    votePollId === storePollId &&
+    voteLobbyId === storeLobbyId
+  );
+}

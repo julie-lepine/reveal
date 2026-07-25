@@ -1,15 +1,24 @@
 /**
  * Vague 2 — store unique sondages + fetch + Realtime.
  *
- * Realtime : canal dédié `lobby-polls:${lobbyId}` (pas via scheduleLobbyRefresh) :
- * les polls ne sont pas dans le bundle lobby. onLobbyBundleUpdated sert seulement
- * à resync lobbyId / membres actifs (recalcul votes actifs sans refetch systématique).
+ * Realtime (un seul canal / lobby) :
+ * - lobby_polls  → filter `lobby_id=eq.${lobbyId}`
+ * - lobby_poll_votes → filter `poll_id=eq.${activePollId}` seulement si poll open
+ *   (rebuild du canal quand l'id du poll actif change ; pas de 2e canal)
+ *
+ * scheduleLobbyRefresh n'est pas utilisé : les polls ne sont pas dans le bundle lobby.
+ * onLobbyBundleUpdated = resync lobbyId + recalcul membres actifs.
  */
 import { GAMES_AVAILABLE } from "../../data/games.js";
 import { getLobby, getLobbyParticipants, hasActiveLobby } from "./lobby.js";
 import { getSupabaseUserId } from "./supabaseAuth.js";
 import { supabase, isSupabaseConfigured } from "./supabaseClient.js";
-import { getCachedGameSession, isLobbyHost, canActAsHost } from "./gameSync.js";
+import {
+  getCachedGameSession,
+  isLobbyHost,
+  canActAsHost,
+  refreshGameSession,
+} from "./gameSync.js";
 import { getCurrentScreen, onScreenChange } from "./router.js";
 import { onLobbyBundleUpdated } from "./supabaseLobby.js";
 import { isChatFabAllowedScreen } from "./chatFabScreens.js";
@@ -24,6 +33,9 @@ import {
   buildPollOptionsSnapshot,
   validatePollOptionsClient,
   localScreenAllowsPollCreate,
+  shouldApplyPollFetchResult,
+  shouldRefetchOnVoteRealtime,
+  shouldRestoreOptimisticVote,
 } from "./lobbyPollLogic.js";
 import {
   rpcCreateLobbyPoll,
@@ -32,7 +44,10 @@ import {
   fetchOpenLobbyPoll,
   fetchLobbyPollVotes,
 } from "./lobbyPollRpc.js";
-import { formatLobbyPollRpcError } from "./lobbyPollErrors.js";
+import {
+  extractLobbyPollErrorCode,
+  formatLobbyPollRpcError,
+} from "./lobbyPollErrors.js";
 
 const listeners = new Set();
 
@@ -50,6 +65,8 @@ let store = {
 
 let channel = null;
 let channelLobbyId = null;
+/** poll_id pour lequel le listener votes est branché (null = pas de listener votes). */
+let channelVotesPollId = null;
 let fetchGen = 0;
 let debounceTimer = null;
 let started = false;
@@ -163,9 +180,11 @@ function clearChannel() {
   }
   channel = null;
   channelLobbyId = null;
+  channelVotesPollId = null;
 }
 
 function schedulePollRefetch(lobbyId) {
+  if (!lobbyId) return;
   if (debounceTimer) clearTimeout(debounceTimer);
   debounceTimer = setTimeout(() => {
     debounceTimer = null;
@@ -173,60 +192,82 @@ function schedulePollRefetch(lobbyId) {
   }, 120);
 }
 
-function subscribeLobbyPolls(lobbyId) {
+/**
+ * Un canal unique : rebuild si lobbyId ou pollId (votes) change.
+ * @param {string} lobbyId
+ * @param {string|null} votesPollId
+ */
+function subscribeLobbyPolls(lobbyId, votesPollId = null) {
   if (!isSupabaseConfigured() || !supabase || !lobbyId) {
     setStore({ subscriptionStatus: "idle" });
     return;
   }
-  if (channel && channelLobbyId === lobbyId) return;
+  const nextVotesId = votesPollId || null;
+  if (
+    channel &&
+    channelLobbyId === lobbyId &&
+    channelVotesPollId === nextVotesId
+  ) {
+    return;
+  }
 
   clearChannel();
   setStore({ subscriptionStatus: "subscribing" });
   channelLobbyId = lobbyId;
+  channelVotesPollId = nextVotesId;
 
-  channel = supabase
-    .channel(`lobby-polls:${lobbyId}`)
-    .on(
-      "postgres_changes",
-      {
-        event: "*",
-        schema: "public",
-        table: "lobby_polls",
-        filter: `lobby_id=eq.${lobbyId}`,
-      },
-      () => schedulePollRefetch(lobbyId)
-    )
-    .on(
+  let builder = supabase.channel(`lobby-polls:${lobbyId}`).on(
+    "postgres_changes",
+    {
+      event: "*",
+      schema: "public",
+      table: "lobby_polls",
+      filter: `lobby_id=eq.${lobbyId}`,
+    },
+    () => schedulePollRefetch(lobbyId)
+  );
+
+  if (nextVotesId) {
+    builder = builder.on(
       "postgres_changes",
       {
         event: "*",
         schema: "public",
         table: "lobby_poll_votes",
+        filter: `poll_id=eq.${nextVotesId}`,
       },
       (payload) => {
-        const pollId =
-          payload?.new?.poll_id ||
-          payload?.old?.poll_id ||
-          store.activePoll?.id;
-        if (!pollId || !store.activePoll || pollId !== store.activePoll.id) {
-          // Vote d'un autre poll ou pas encore d'actif : refetch léger si open connu
-          if (store.activePoll || payload?.new?.poll_id) {
-            schedulePollRefetch(lobbyId);
-          }
+        const eventPollId = payload?.new?.poll_id || payload?.old?.poll_id;
+        if (
+          !shouldRefetchOnVoteRealtime({
+            activePollId: store.activePoll?.id,
+            eventPollId,
+          })
+        ) {
           return;
         }
         schedulePollRefetch(lobbyId);
       }
-    )
-    .subscribe((status) => {
-      if (channelLobbyId !== lobbyId) return;
-      if (status === "SUBSCRIBED") {
-        setStore({ subscriptionStatus: "subscribed" });
-      } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
-        setStore({ subscriptionStatus: "error" });
-        console.warn("REVEAL lobbyPoll channel:", status);
-      }
-    });
+    );
+  }
+
+  channel = builder.subscribe((status) => {
+    if (channelLobbyId !== lobbyId) return;
+    if (status === "SUBSCRIBED") {
+      setStore({ subscriptionStatus: "subscribed" });
+    } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+      setStore({ subscriptionStatus: "error" });
+      console.warn("REVEAL lobbyPoll channel:", status);
+    }
+  });
+}
+
+function syncVotesSubscription() {
+  const lobbyId = store.lobbyId;
+  if (!lobbyId) return;
+  const pollId =
+    store.activePoll?.status === "open" ? store.activePoll.id : null;
+  subscribeLobbyPolls(lobbyId, pollId);
 }
 
 /**
@@ -235,6 +276,7 @@ function subscribeLobbyPolls(lobbyId) {
  */
 export async function refreshLobbyPoll(lobbyId, { quiet = false } = {}) {
   if (!lobbyId || !isSupabaseConfigured()) {
+    invalidatePollFetches();
     setStore({
       lobbyId: lobbyId || null,
       activePoll: null,
@@ -242,6 +284,7 @@ export async function refreshLobbyPoll(lobbyId, { quiet = false } = {}) {
       loading: false,
       error: quiet ? store.error : null,
     });
+    syncVotesSubscription();
     return;
   }
 
@@ -250,7 +293,16 @@ export async function refreshLobbyPoll(lobbyId, { quiet = false } = {}) {
 
   try {
     const row = await fetchOpenLobbyPoll(lobbyId);
-    if (gen !== fetchGen) return;
+    if (
+      !shouldApplyPollFetchResult({
+        gen,
+        currentGen: fetchGen,
+        requestedLobbyId: lobbyId,
+        storeLobbyId: store.lobbyId,
+      })
+    ) {
+      return;
+    }
 
     if (!row) {
       setStore({
@@ -260,12 +312,34 @@ export async function refreshLobbyPoll(lobbyId, { quiet = false } = {}) {
         loading: false,
         error: null,
       });
+      syncVotesSubscription();
       return;
     }
 
     const poll = normalizeLobbyPollRow(row);
+    if (!poll || poll.status !== "open") {
+      setStore({
+        lobbyId,
+        activePoll: null,
+        votesAllByUserId: {},
+        loading: false,
+        error: null,
+      });
+      syncVotesSubscription();
+      return;
+    }
+
     const votes = await fetchLobbyPollVotes(poll.id);
-    if (gen !== fetchGen) return;
+    if (
+      !shouldApplyPollFetchResult({
+        gen,
+        currentGen: fetchGen,
+        requestedLobbyId: lobbyId,
+        storeLobbyId: store.lobbyId,
+      })
+    ) {
+      return;
+    }
 
     setStore({
       lobbyId,
@@ -274,10 +348,19 @@ export async function refreshLobbyPoll(lobbyId, { quiet = false } = {}) {
       loading: false,
       error: null,
     });
+    syncVotesSubscription();
   } catch (e) {
     console.warn("REVEAL lobbyPoll fetch:", e?.message || e);
-    if (gen !== fetchGen) return;
-    // Ne casse pas le chat : erreur isolée
+    if (
+      !shouldApplyPollFetchResult({
+        gen,
+        currentGen: fetchGen,
+        requestedLobbyId: lobbyId,
+        storeLobbyId: store.lobbyId,
+      })
+    ) {
+      return;
+    }
     setStore({
       lobbyId,
       loading: false,
@@ -286,11 +369,20 @@ export async function refreshLobbyPoll(lobbyId, { quiet = false } = {}) {
   }
 }
 
+/** Invalide tout fetch en vol (close / leave lobby). */
+function invalidatePollFetches() {
+  fetchGen += 1;
+  if (debounceTimer) {
+    clearTimeout(debounceTimer);
+    debounceTimer = null;
+  }
+}
+
 function syncToCurrentLobby() {
   const lobbyId = hasActiveLobby() ? getLobby()?.id || null : null;
   if (!lobbyId) {
     clearChannel();
-    fetchGen += 1;
+    invalidatePollFetches();
     setStore({
       lobbyId: null,
       activePoll: null,
@@ -304,6 +396,7 @@ function syncToCurrentLobby() {
   }
 
   if (store.lobbyId !== lobbyId) {
+    invalidatePollFetches();
     setStore({
       lobbyId,
       activePoll: null,
@@ -311,7 +404,7 @@ function syncToCurrentLobby() {
       committing: initialCommitting(),
     });
   }
-  subscribeLobbyPolls(lobbyId);
+  subscribeLobbyPolls(lobbyId, store.activePoll?.id || null);
   void refreshLobbyPoll(lobbyId);
 }
 
@@ -325,7 +418,6 @@ export function initLobbyPollSync() {
       syncToCurrentLobby();
       return;
     }
-    // Membres changés → recalcul dérivés (votes actifs)
     emit();
   });
   unsubScreen = onScreenChange(() => emit());
@@ -333,9 +425,7 @@ export function initLobbyPollSync() {
 
 export function resetLobbyPollSyncForTests() {
   clearChannel();
-  if (debounceTimer) clearTimeout(debounceTimer);
-  debounceTimer = null;
-  fetchGen += 1;
+  invalidatePollFetches();
   listeners.clear();
   unsubBundle?.();
   unsubBundle = null;
@@ -351,6 +441,16 @@ export function resetLobbyPollSyncForTests() {
     subscriptionStatus: "idle",
     committing: initialCommitting(),
   };
+}
+
+/** @internal tests */
+export function __testGetFetchGen() {
+  return fetchGen;
+}
+
+/** @internal tests */
+export function __testInvalidateFetches() {
+  invalidatePollFetches();
 }
 
 /** @param {string[]} selectedCatalogIds */
@@ -375,13 +475,23 @@ export async function createLobbyPollFromCatalog(selectedCatalogIds) {
       committing: { create: false },
       error: null,
     });
+    syncVotesSubscription();
     void refreshLobbyPoll(lobbyId, { quiet: true });
     return { ok: true, poll };
   } catch (e) {
     console.warn("REVEAL createLobbyPoll:", e);
     setStore({ committing: { create: false } });
+    const code = extractLobbyPollErrorCode(e);
+    if (code === "poll_creation_not_allowed_in_current_phase") {
+      try {
+        await refreshGameSession();
+      } catch (err) {
+        console.warn("REVEAL refreshGameSession after poll create deny:", err);
+      }
+      emit();
+    }
     void refreshLobbyPoll(lobbyId, { quiet: true });
-    return { ok: false, error: formatLobbyPollRpcError(e), raw: e };
+    return { ok: false, error: formatLobbyPollRpcError(e), raw: e, code };
   }
 }
 
@@ -390,10 +500,13 @@ export async function castLobbyPollVote(gameId) {
     return { ok: false, error: "already_committing" };
   }
   const poll = store.activePoll;
+  const lobbyId = store.lobbyId;
   const uid = getSupabaseUserId();
   if (!poll?.id || !uid) return { ok: false, error: "no_poll" };
 
   const prev = store.votesAllByUserId;
+  const votePollId = poll.id;
+  const voteLobbyId = lobbyId;
   setStore({
     committing: { vote: true },
     votesAllByUserId: applyVoteUpsert(prev, uid, gameId),
@@ -407,11 +520,24 @@ export async function castLobbyPollVote(gameId) {
     return { ok: true };
   } catch (e) {
     console.warn("REVEAL castLobbyPollVote:", e);
-    setStore({
-      committing: { vote: false },
-      votesAllByUserId: prev,
-    });
-    void refreshLobbyPoll(store.lobbyId, { quiet: true });
+    if (
+      shouldRestoreOptimisticVote({
+        votePollId,
+        voteLobbyId,
+        storePollId: store.activePoll?.id,
+        storeLobbyId: store.lobbyId,
+      })
+    ) {
+      setStore({
+        committing: { vote: false },
+        votesAllByUserId: prev,
+      });
+    } else {
+      setStore({ committing: { vote: false } });
+    }
+    if (store.lobbyId) {
+      void refreshLobbyPoll(store.lobbyId, { quiet: true });
+    }
     return { ok: false, error: formatLobbyPollRpcError(e), raw: e };
   }
 }
@@ -428,11 +554,22 @@ export async function closeLobbyPollExplicit() {
     const res = await rpcCloseLobbyPoll({ pollId: poll.id, reason: "explicit" });
     const outcome = res?.outcome || null;
     if (outcome === "closed" || outcome === "already_closed") {
+      // Invalide les fetch en vol avant d'effacer — évite résurrection du pin.
+      invalidatePollFetches();
       setStore({
         activePoll: null,
         votesAllByUserId: {},
         committing: { close: false },
       });
+      syncVotesSubscription();
+    } else if (outcome === "poll_not_found") {
+      invalidatePollFetches();
+      setStore({
+        activePoll: null,
+        votesAllByUserId: {},
+        committing: { close: false },
+      });
+      syncVotesSubscription();
     } else {
       setStore({ committing: { close: false } });
       void refreshLobbyPoll(store.lobbyId, { quiet: true });

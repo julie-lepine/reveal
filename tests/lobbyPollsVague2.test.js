@@ -17,8 +17,14 @@ import {
   remotePhaseAllowsPollCreate,
   buildPollOptionsSnapshot,
   validatePollOptionsClient,
+  shouldApplyPollFetchResult,
+  shouldRefetchOnVoteRealtime,
+  shouldRestoreOptimisticVote,
 } from "../js/core/lobbyPollLogic.js";
-import { extractLobbyPollErrorCode, lobbyPollErrorMessage } from "../js/core/lobbyPollErrors.js";
+import {
+  extractLobbyPollErrorCode,
+  lobbyPollErrorMessage,
+} from "../js/core/lobbyPollErrors.js";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
@@ -176,6 +182,94 @@ describe("lobbyPoll erreurs RPC", () => {
   });
 });
 
+describe("lobbyPoll courses & Realtime guards", () => {
+  it("ignore événement vote d'un autre poll (pas de refetch store courant)", () => {
+    assert.equal(
+      shouldRefetchOnVoteRealtime({ activePollId: "p1", eventPollId: "p2" }),
+      false
+    );
+    assert.equal(
+      shouldRefetchOnVoteRealtime({ activePollId: "p1", eventPollId: "p1" }),
+      true
+    );
+    assert.equal(
+      shouldRefetchOnVoteRealtime({ activePollId: null, eventPollId: "p1" }),
+      false
+    );
+  });
+
+  it("fetch obsolète après close / gen plus récente n'applique pas", () => {
+    assert.equal(
+      shouldApplyPollFetchResult({
+        gen: 3,
+        currentGen: 4,
+        requestedLobbyId: "L",
+        storeLobbyId: "L",
+      }),
+      false
+    );
+    assert.equal(
+      shouldApplyPollFetchResult({
+        gen: 4,
+        currentGen: 4,
+        requestedLobbyId: "L",
+        storeLobbyId: "L",
+      }),
+      true
+    );
+    assert.equal(
+      shouldApplyPollFetchResult({
+        gen: 4,
+        currentGen: 4,
+        requestedLobbyId: "L1",
+        storeLobbyId: "L2",
+      }),
+      false
+    );
+  });
+
+  it("ne restaure pas un vote optimistic après changement de lobby/poll", () => {
+    assert.equal(
+      shouldRestoreOptimisticVote({
+        votePollId: "p1",
+        voteLobbyId: "L1",
+        storePollId: "p1",
+        storeLobbyId: "L2",
+      }),
+      false
+    );
+    assert.equal(
+      shouldRestoreOptimisticVote({
+        votePollId: "p1",
+        voteLobbyId: "L1",
+        storePollId: "p1",
+        storeLobbyId: "L1",
+      }),
+      true
+    );
+  });
+
+  it("message métier phase distante (pas générique)", () => {
+    const msg = lobbyPollErrorMessage({
+      message: "poll_creation_not_allowed_in_current_phase",
+    });
+    assert.match(msg, /partie ou préparation/i);
+    assert.equal(
+      extractLobbyPollErrorCode({ message: "poll_creation_not_allowed_in_current_phase" }),
+      "poll_creation_not_allowed_in_current_phase"
+    );
+  });
+
+  it("source : votes filtrés par poll_id ; close invalide les fetch", () => {
+    const src = readFileSync(join(__dirname, "../js/core/lobbyPollStore.js"), "utf8");
+    assert.match(src, /filter:\s*`poll_id=eq\.\$\{/);
+    assert.match(src, /filter:\s*`lobby_id=eq\.\$\{lobbyId\}`/);
+    assert.match(src, /invalidatePollFetches/);
+    assert.match(src, /refreshGameSession/);
+    assert.match(src, /shouldRefetchOnVoteRealtime/);
+  });
+});
+
 describe("lobbyPoll close ciblé poll_id (contrat client)", () => {
   it("store appelle close avec reason explicit (source)", () => {
     const src = readFileSync(join(__dirname, "../js/core/lobbyPollStore.js"), "utf8");
@@ -188,6 +282,7 @@ describe("lobbyPoll close ciblé poll_id (contrat client)", () => {
     const src = readFileSync(join(__dirname, "../js/core/lobbyPollStore.js"), "utf8");
     assert.match(src, /if \(started\) return/);
     assert.match(src, /channelLobbyId === lobbyId/);
+    assert.match(src, /channelVotesPollId === nextVotesId/);
   });
 
   it("changement de lobby nettoie via syncToCurrentLobby", () => {
