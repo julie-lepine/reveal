@@ -1153,15 +1153,6 @@ export const TRIVIA_QUESTIONS = [
     difficulty: "medium",
   },
 
-  {
-    id: "videogames-024",
-    theme: "videogames",
-    question: "Dans Mario Kart, quel objet te fait lancer des carapaces rouges ?",
-    answers: ["Étoile","Carapace rouge","Champignon","Éclair"],
-    correct: 1,
-    difficulty: "easy",
-  },
-
   /* TV SHOWS */
   {
     id: "series-001",

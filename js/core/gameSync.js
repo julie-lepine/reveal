@@ -3481,13 +3481,19 @@ function isInProgressPlayScreen(screen) {
   return isSessionInProgressPlay(screen);
 }
 
+/** Prep ou play reprenable (gate unique — bandeau game-select + getResumableSessionScreen). */
+export function isResumableSessionDestination(screen) {
+  if (!screen) return false;
+  return isOnGameSetupScreen(screen) || isSessionInProgressPlay(screen);
+}
+
 /** Prep ou partie en cours a reprendre (pas post-partie ni menu soiree). */
 export function getResumableSessionScreen(row = getCachedGameSession()) {
   if (!row || !isGameSyncActive()) return null;
   const screen = getEffectiveSessionScreen(row);
   if (!screen || isOnPostGameScreen(screen)) return null;
   if (screen === "game-select" && isLobbyEveningStarted()) return null;
-  if (isOnGameSetupScreen(screen) || isSessionInProgressPlay(screen)) return screen;
+  if (isResumableSessionDestination(screen)) return screen;
   return null;
 }
 

@@ -7,6 +7,7 @@ import {
   isGameSyncActive,
   isLobbyHost,
   isOnGameSetupScreen,
+  isResumableSessionDestination,
   refreshGameSession,
   isSessionInProgressPlay,
   routeToActiveGameIfNeeded,
@@ -81,14 +82,36 @@ export function gameResumeInterstitialHtml({
     </div>`;
 }
 
-export function gameResumeBannerHtml(screen) {
-  if (!screen || !isSessionInProgressPlay(screen)) return "";
+/**
+ * Destination de bandeau : délègue à isResumableSessionDestination (gameSync).
+ * Appeler avec le résultat de getResumableSessionScreen.
+ */
+export function isGameSelectResumeBannerScreen(screen) {
+  return isResumableSessionDestination(screen);
+}
+
+function resumeBannerHint(screen) {
+  if (isOnGameSetupScreen(screen)) {
+    return "Tu peux rejoindre la préparation ou rester sur le menu des jeux.";
+  }
+  return "Tu peux rejoindre la partie ou rester sur le menu des jeux.";
+}
+
+function resumeBannerTitle(screen) {
   const label = gameLabelForScreen(screen);
+  if (isOnGameSetupScreen(screen)) {
+    return `🎮 ${label} — préparation`;
+  }
+  return `🎮 ${label} en cours`;
+}
+
+export function gameResumeBannerHtml(screen) {
+  if (!isGameSelectResumeBannerScreen(screen)) return "";
   const escapedScreen = escapeHtml(screen);
   return `
     <div class="game-resume-banner card" role="status">
-      <p class="game-resume-banner__title">🎮 ${escapeHtml(label)} en cours</p>
-      <p class="hint">Tu peux rejoindre la partie ou rester sur le menu des jeux.</p>
+      <p class="game-resume-banner__title">${escapeHtml(resumeBannerTitle(screen))}</p>
+      <p class="hint">${escapeHtml(resumeBannerHint(screen))}</p>
       <div class="game-resume-banner__actions">
         <button type="button" class="btn btn-primary btn--compact" id="game-resume-banner-join" data-resume-screen="${escapedScreen}">Rejoindre</button>
         <button type="button" class="btn btn-secondary btn--compact" id="game-resume-banner-stay" data-resume-screen="${escapedScreen}">Rester ici</button>
@@ -179,9 +202,9 @@ export function mountGameResumeInterstitial(app, targetScreen, { allowStay = fal
   return cleanup;
 }
 
-/** Bandeau menu jeux (invité, partie en cours). */
+/** Bandeau menu jeux (invité, prep ou partie reprenable). */
 export function bindGameResumeBanner(app, targetScreen) {
-  if (!targetScreen || !isSessionInProgressPlay(targetScreen)) return () => {};
+  if (!isGameSelectResumeBannerScreen(targetScreen)) return () => {};
 
   const rejoin = async () => {
     await rejoinGameResumeTarget(targetScreen);
@@ -201,8 +224,7 @@ export function bindGameResumeBanner(app, targetScreen) {
 
 export function shouldShowGameSelectResumeBanner(screen) {
   return (
-    Boolean(screen) &&
-    isSessionInProgressPlay(screen) &&
+    isGameSelectResumeBannerScreen(screen) &&
     isGameSyncActive() &&
     !isLobbyHost()
   );
