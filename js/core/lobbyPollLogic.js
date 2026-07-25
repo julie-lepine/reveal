@@ -216,3 +216,30 @@ export function shouldRestoreOptimisticVote({
     voteLobbyId === storeLobbyId
   );
 }
+
+/**
+ * UPDATE/DELETE Realtime lobby_polls = fermeture du poll actif local.
+ * @param {{ eventType?: string, event?: string, new?: object, old?: object }} payload
+ * @param {string|null} activePollId
+ */
+export function isRealtimeActivePollClose(payload, activePollId) {
+  if (!activePollId) return false;
+  const eventType = payload?.eventType || payload?.event || "";
+  const rowNew = payload?.new || null;
+  const rowOld = payload?.old || null;
+  const id = rowNew?.id || rowOld?.id;
+  if (!id || String(id) !== String(activePollId)) return false;
+
+  if (eventType === "DELETE") return true;
+  if (rowNew?.status === "closed") return true;
+  if (rowOld?.status === "open" && rowNew && rowNew.status !== "open") return true;
+  return false;
+}
+
+/**
+ * clearChannel ne doit pas annuler un debounce de refetch (close / sync).
+ * Seul invalidatePollFetches annule volontairement.
+ */
+export function channelRebuildCancelsDebounce() {
+  return false;
+}

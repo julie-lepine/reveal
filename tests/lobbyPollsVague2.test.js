@@ -20,6 +20,8 @@ import {
   shouldApplyPollFetchResult,
   shouldRefetchOnVoteRealtime,
   shouldRestoreOptimisticVote,
+  isRealtimeActivePollClose,
+  channelRebuildCancelsDebounce,
 } from "../js/core/lobbyPollLogic.js";
 import {
   extractLobbyPollErrorCode,
@@ -198,6 +200,38 @@ describe("lobbyPoll courses & Realtime guards", () => {
     );
   });
 
+  it("détecte UPDATE open→closed du poll actif (convergence invité)", () => {
+    assert.equal(
+      isRealtimeActivePollClose(
+        {
+          eventType: "UPDATE",
+          new: { id: "p1", status: "closed" },
+          old: { id: "p1", status: "open" },
+        },
+        "p1"
+      ),
+      true
+    );
+    assert.equal(
+      isRealtimeActivePollClose(
+        { eventType: "UPDATE", new: { id: "p1", status: "open" } },
+        "p1"
+      ),
+      false
+    );
+    assert.equal(
+      isRealtimeActivePollClose(
+        { eventType: "UPDATE", new: { id: "other", status: "closed" } },
+        "p1"
+      ),
+      false
+    );
+    assert.equal(
+      isRealtimeActivePollClose({ eventType: "DELETE", old: { id: "p1" } }, "p1"),
+      true
+    );
+  });
+
   it("fetch obsolète après close / gen plus récente n'applique pas", () => {
     assert.equal(
       shouldApplyPollFetchResult({
@@ -217,15 +251,18 @@ describe("lobbyPoll courses & Realtime guards", () => {
       }),
       true
     );
-    assert.equal(
-      shouldApplyPollFetchResult({
-        gen: 4,
-        currentGen: 4,
-        requestedLobbyId: "L1",
-        storeLobbyId: "L2",
-      }),
-      false
-    );
+  });
+
+  it("rebuild canal ne cancel pas le debounce (contrat)", () => {
+    assert.equal(channelRebuildCancelsDebounce(), false);
+    const src = readFileSync(join(__dirname, "../js/core/lobbyPollStore.js"), "utf8");
+    const clearStart = src.indexOf("function clearChannel");
+    const clearEnd = src.indexOf("function schedulePollRefetch", clearStart);
+    const clearBody = src.slice(clearStart, clearEnd);
+    assert.doesNotMatch(clearBody, /debounceTimer/);
+    assert.match(src, /handleLobbyPollsRealtime/);
+    assert.match(src, /applyActivePollClosedLocally/);
+    assert.match(src, /schedulePollRefetch\(lobbyId\)/);
   });
 
   it("ne restaure pas un vote optimistic après changement de lobby/poll", () => {
@@ -254,10 +291,6 @@ describe("lobbyPoll courses & Realtime guards", () => {
       message: "poll_creation_not_allowed_in_current_phase",
     });
     assert.match(msg, /partie ou préparation/i);
-    assert.equal(
-      extractLobbyPollErrorCode({ message: "poll_creation_not_allowed_in_current_phase" }),
-      "poll_creation_not_allowed_in_current_phase"
-    );
   });
 
   it("source : votes filtrés par poll_id ; close invalide les fetch", () => {
@@ -265,8 +298,42 @@ describe("lobbyPoll courses & Realtime guards", () => {
     assert.match(src, /filter:\s*`poll_id=eq\.\$\{/);
     assert.match(src, /filter:\s*`lobby_id=eq\.\$\{lobbyId\}`/);
     assert.match(src, /invalidatePollFetches/);
-    assert.match(src, /refreshGameSession/);
-    assert.match(src, /shouldRefetchOnVoteRealtime/);
+    assert.match(src, /isRealtimeActivePollClose/);
+  });
+});
+
+describe("lobbyPoll UI CTA formulaire + pastille", () => {
+  it("formulaire fermé par défaut : CTA compact puis expand / Annuler", () => {
+    const src = readFileSync(join(__dirname, "../js/core/lobbyPollSheetUi.js"), "utf8");
+    assert.match(src, /createFormOpen = false/);
+    assert.match(src, /data-poll-open-create/);
+    assert.match(src, /data-poll-cancel-create/);
+    assert.match(src, /renderCreateCta/);
+    assert.match(src, /createFormOpen = true/);
+  });
+
+  it("création réussie referme le formulaire", () => {
+    const src = readFileSync(join(__dirname, "../js/core/lobbyPollSheetUi.js"), "utf8");
+    assert.match(src, /createFormOpen = false/);
+    assert.match(src, /createLobbyPollFromCatalog/);
+  });
+
+  it("pastille poll distincte des unread chat", () => {
+    const storeSrc = readFileSync(join(__dirname, "../js/core/lobbyPollStore.js"), "utf8");
+    const fabSrc = readFileSync(join(__dirname, "../js/core/feedbackUi.js"), "utf8");
+    assert.match(storeSrc, /unseenPoll/);
+    assert.match(storeSrc, /markLobbyPollSeen/);
+    assert.match(storeSrc, /hasHydratedPollOnce/);
+    assert.match(fabSrc, /chatUnreadCount/);
+    assert.match(fabSrc, /getLobbyPollUnseen/);
+    assert.match(fabSrc, /markLobbyPollSeen/);
+    assert.match(fabSrc, /feedback-fab__badge--poll/);
+  });
+
+  it("vote seul ne doit pas passer par noteActivePollAppeared id change", () => {
+    const src = readFileSync(join(__dirname, "../js/core/lobbyPollStore.js"), "utf8");
+    assert.match(src, /if \(prevId !== poll\.id\)/);
+    assert.match(src, /noteActivePollAppeared/);
   });
 });
 

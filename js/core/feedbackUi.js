@@ -15,6 +15,12 @@ import { getCurrentScreen, onScreenChange } from "./router.js";
 import { onLobbyBundleUpdated } from "./supabaseLobby.js";
 import { escapeHtml } from "./ui.js";
 import { mountLobbyPollInChatSheet } from "./lobbyPollSheetUi.js";
+import {
+  onLobbyPollChange,
+  getLobbyPollUnseen,
+  markLobbyPollSeen,
+  setLobbyPollSheetOpenGetter,
+} from "./lobbyPollStore.js";
 
 export { CHAT_FAB_ALLOWED_SCREENS, isChatFabAllowedScreen } from "./chatFabScreens.js";
 
@@ -25,8 +31,11 @@ let sheetPanel = null;
 let chatInstance = null;
 let unsubMessages = null;
 let unsubPollUi = null;
+let unsubPollBadge = null;
 let sheetOpen = false;
 let bodyOverflowPrev = "";
+/** Compteur messages non lus (indépendant de unseenPoll). */
+let chatUnreadCount = 0;
 
 export function isChatSheetOpen() {
   return sheetOpen;
@@ -47,18 +56,36 @@ function updateFeedbackFabVisibility() {
   }
 }
 
-function updateFabBadge(count) {
-  if (!badgeEl) return;
-  const label = formatUnreadBadge(count);
-  if (!label) {
+function updateFabBadge() {
+  if (!badgeEl || !fabEl) return;
+  const unseenPoll = getLobbyPollUnseen();
+  const chatN = chatUnreadCount;
+  const show = chatN > 0 || unseenPoll;
+
+  if (!show) {
     badgeEl.hidden = true;
     badgeEl.textContent = "";
-    fabEl?.setAttribute("aria-label", "Ouvrir le chat");
+    badgeEl.classList.remove("feedback-fab__badge--poll");
+    fabEl.setAttribute("aria-label", "Ouvrir le chat");
     return;
   }
+
   badgeEl.hidden = false;
-  badgeEl.textContent = label;
-  fabEl?.setAttribute("aria-label", `Ouvrir le chat, ${label} non lus`);
+  if (chatN > 0) {
+    const label = formatUnreadBadge(chatN);
+    badgeEl.textContent = label;
+    badgeEl.classList.toggle("feedback-fab__badge--poll", unseenPoll && !label);
+    fabEl.setAttribute(
+      "aria-label",
+      unseenPoll
+        ? `Ouvrir le chat, ${label} non lus, sondage en cours`
+        : `Ouvrir le chat, ${label} non lus`
+    );
+  } else {
+    badgeEl.textContent = "";
+    badgeEl.classList.add("feedback-fab__badge--poll");
+    fabEl.setAttribute("aria-label", "Ouvrir le chat, nouveau sondage");
+  }
 }
 
 export function openInstagramProfile() {
@@ -133,6 +160,8 @@ function openChatSheet() {
   if (typeof document === "undefined") return;
 
   sheetOpen = true;
+  markLobbyPollSeen();
+  updateFabBadge();
   bodyOverflowPrev = document.body.style.overflow;
   document.body.style.overflow = "hidden";
 
@@ -241,7 +270,13 @@ export function initFeedbackFab() {
   onLobbyBundleUpdated(() => updateFeedbackFabVisibility());
 
   initChatUnreadTracking({ isChatSheetOpen: () => sheetOpen });
-  onChatUnreadChange((count) => updateFabBadge(count));
-  updateFabBadge(0);
+  onChatUnreadChange((count) => {
+    chatUnreadCount = Number(count) || 0;
+    updateFabBadge();
+  });
+  setLobbyPollSheetOpenGetter(() => sheetOpen);
+  unsubPollBadge?.();
+  unsubPollBadge = onLobbyPollChange(() => updateFabBadge());
+  updateFabBadge();
   void syncChatUnread();
 }

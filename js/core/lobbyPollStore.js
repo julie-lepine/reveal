@@ -36,6 +36,7 @@ import {
   shouldApplyPollFetchResult,
   shouldRefetchOnVoteRealtime,
   shouldRestoreOptimisticVote,
+  isRealtimeActivePollClose,
 } from "./lobbyPollLogic.js";
 import {
   rpcCreateLobbyPoll,
@@ -61,6 +62,8 @@ let store = {
   error: null,
   subscriptionStatus: "idle",
   committing: initialCommitting(),
+  /** Pastille FAB : poll open non consulté (indépendant des messages non lus). */
+  unseenPoll: false,
 };
 
 let channel = null;
@@ -72,6 +75,10 @@ let debounceTimer = null;
 let started = false;
 let unsubBundle = null;
 let unsubScreen = null;
+/** Après premier hydrate d'un poll déjà open : pas de fausse alerte « nouveau ». */
+let hasHydratedPollOnce = false;
+/** poll id créé localement (sheet ouvert) — pas de pastille. */
+let suppressUnseenForPollId = null;
 
 function emit() {
   for (const fn of listeners) {
@@ -193,6 +200,85 @@ function schedulePollRefetch(lobbyId) {
 }
 
 /**
+ * Fermeture distante (ou locale déjà appliquée côté serveur) :
+ * vide le store immédiatement puis refetch (filet nouvel open).
+ * clearChannel ne touche PAS au debounce — le refetch post-close reste planifié.
+ */
+export function applyActivePollClosedLocally(lobbyId, { scheduleRefetch = true } = {}) {
+  invalidatePollFetches();
+  setStore({
+    activePoll: null,
+    votesAllByUserId: {},
+    committing: { ...store.committing, close: false },
+    unseenPoll: false,
+  });
+  suppressUnseenForPollId = null;
+  syncVotesSubscription();
+  if (scheduleRefetch && lobbyId) {
+    schedulePollRefetch(lobbyId);
+  }
+}
+
+function handleLobbyPollsRealtime(lobbyId, payload) {
+  if (isRealtimeActivePollClose(payload, store.activePoll?.id)) {
+    applyActivePollClosedLocally(lobbyId, { scheduleRefetch: true });
+    return;
+  }
+  schedulePollRefetch(lobbyId);
+}
+
+function noteActivePollAppeared(poll, { localCreate = false } = {}) {
+  if (!poll?.id) return;
+  const sheetOpen =
+    typeof window !== "undefined" &&
+    (() => {
+      try {
+        // Évite cycle import feedbackUi ↔ store : getter injecté
+        return sheetOpenGetter?.() === true;
+      } catch {
+        return false;
+      }
+    })();
+
+  if (localCreate || suppressUnseenForPollId === poll.id) {
+    suppressUnseenForPollId = poll.id;
+    setStore({ unseenPoll: false });
+    hasHydratedPollOnce = true;
+    return;
+  }
+
+  if (!hasHydratedPollOnce) {
+    // Premier hydrate (boot / F5) : pas de fausse alerte « nouveau sondage »
+    hasHydratedPollOnce = true;
+    setStore({ unseenPoll: false });
+    return;
+  }
+
+  if (!sheetOpen) {
+    setStore({ unseenPoll: true });
+  } else {
+    setStore({ unseenPoll: false });
+  }
+}
+
+let sheetOpenGetter = () => false;
+
+/** Branché depuis feedbackUi pour pastille / create local. */
+export function setLobbyPollSheetOpenGetter(fn) {
+  sheetOpenGetter = typeof fn === "function" ? fn : () => false;
+}
+
+export function markLobbyPollSeen() {
+  if (store.unseenPoll) {
+    setStore({ unseenPoll: false });
+  }
+}
+
+export function getLobbyPollUnseen() {
+  return Boolean(store.unseenPoll);
+}
+
+/**
  * Un canal unique : rebuild si lobbyId ou pollId (votes) change.
  * @param {string} lobbyId
  * @param {string|null} votesPollId
@@ -224,7 +310,7 @@ function subscribeLobbyPolls(lobbyId, votesPollId = null) {
       table: "lobby_polls",
       filter: `lobby_id=eq.${lobbyId}`,
     },
-    () => schedulePollRefetch(lobbyId)
+    (payload) => handleLobbyPollsRealtime(lobbyId, payload)
   );
 
   if (nextVotesId) {
@@ -311,6 +397,7 @@ export async function refreshLobbyPoll(lobbyId, { quiet = false } = {}) {
         votesAllByUserId: {},
         loading: false,
         error: null,
+        unseenPoll: false,
       });
       syncVotesSubscription();
       return;
@@ -324,6 +411,7 @@ export async function refreshLobbyPoll(lobbyId, { quiet = false } = {}) {
         votesAllByUserId: {},
         loading: false,
         error: null,
+        unseenPoll: false,
       });
       syncVotesSubscription();
       return;
@@ -341,6 +429,7 @@ export async function refreshLobbyPoll(lobbyId, { quiet = false } = {}) {
       return;
     }
 
+    const prevId = store.activePoll?.id || null;
     setStore({
       lobbyId,
       activePoll: poll,
@@ -348,6 +437,11 @@ export async function refreshLobbyPoll(lobbyId, { quiet = false } = {}) {
       loading: false,
       error: null,
     });
+    if (prevId !== poll.id) {
+      noteActivePollAppeared(poll, { localCreate: false });
+    } else if (!hasHydratedPollOnce) {
+      hasHydratedPollOnce = true;
+    }
     syncVotesSubscription();
   } catch (e) {
     console.warn("REVEAL lobbyPoll fetch:", e?.message || e);
@@ -391,17 +485,23 @@ function syncToCurrentLobby() {
       error: null,
       subscriptionStatus: "idle",
       committing: initialCommitting(),
+      unseenPoll: false,
     });
+    hasHydratedPollOnce = false;
+    suppressUnseenForPollId = null;
     return;
   }
 
   if (store.lobbyId !== lobbyId) {
     invalidatePollFetches();
+    hasHydratedPollOnce = false;
+    suppressUnseenForPollId = null;
     setStore({
       lobbyId,
       activePoll: null,
       votesAllByUserId: {},
       committing: initialCommitting(),
+      unseenPoll: false,
     });
   }
   subscribeLobbyPolls(lobbyId, store.activePoll?.id || null);
@@ -440,17 +540,34 @@ export function resetLobbyPollSyncForTests() {
     error: null,
     subscriptionStatus: "idle",
     committing: initialCommitting(),
+    unseenPoll: false,
   };
+  hasHydratedPollOnce = false;
+  suppressUnseenForPollId = null;
+  sheetOpenGetter = () => false;
 }
 
 /** @internal tests */
-export function __testGetFetchGen() {
-  return fetchGen;
+export function __testForceActivePoll(poll, votes = {}) {
+  setStore({
+    lobbyId: store.lobbyId || "test-lobby",
+    activePoll: poll,
+    votesAllByUserId: votes,
+    unseenPoll: true,
+    committing: initialCommitting(),
+  });
+  hasHydratedPollOnce = true;
+}
+
+/** @internal tests — simule close Realtime invité */
+export function __testSimulateRealtimeClose(payload) {
+  const lobbyId = store.lobbyId || "test-lobby";
+  handleLobbyPollsRealtime(lobbyId, payload);
 }
 
 /** @internal tests */
-export function __testInvalidateFetches() {
-  invalidatePollFetches();
+export function __testIsDebouncePending() {
+  return Boolean(debounceTimer);
 }
 
 /** @param {string[]} selectedCatalogIds */
@@ -469,12 +586,15 @@ export async function createLobbyPollFromCatalog(selectedCatalogIds) {
   try {
     const row = await rpcCreateLobbyPoll({ lobbyId, options });
     const poll = normalizeLobbyPollRow(row);
+    suppressUnseenForPollId = poll?.id || null;
     setStore({
       activePoll: poll,
       votesAllByUserId: {},
       committing: { create: false },
       error: null,
+      unseenPoll: false,
     });
+    hasHydratedPollOnce = true;
     syncVotesSubscription();
     void refreshLobbyPoll(lobbyId, { quiet: true });
     return { ok: true, poll };
@@ -554,22 +674,9 @@ export async function closeLobbyPollExplicit() {
     const res = await rpcCloseLobbyPoll({ pollId: poll.id, reason: "explicit" });
     const outcome = res?.outcome || null;
     if (outcome === "closed" || outcome === "already_closed") {
-      // Invalide les fetch en vol avant d'effacer — évite résurrection du pin.
-      invalidatePollFetches();
-      setStore({
-        activePoll: null,
-        votesAllByUserId: {},
-        committing: { close: false },
-      });
-      syncVotesSubscription();
+      applyActivePollClosedLocally(store.lobbyId, { scheduleRefetch: true });
     } else if (outcome === "poll_not_found") {
-      invalidatePollFetches();
-      setStore({
-        activePoll: null,
-        votesAllByUserId: {},
-        committing: { close: false },
-      });
-      syncVotesSubscription();
+      applyActivePollClosedLocally(store.lobbyId, { scheduleRefetch: true });
     } else {
       setStore({ committing: { close: false } });
       void refreshLobbyPoll(store.lobbyId, { quiet: true });

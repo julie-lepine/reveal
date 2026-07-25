@@ -1,5 +1,6 @@
 /**
  * Vague 2 — UI sondage dans le sheet chat (pas de 2e FAB / sheet / store).
+ * Formulaire de création replié : CTA compact → expand.
  */
 import { escapeHtml } from "./ui.js";
 import { showAppAlert } from "./dialog.js";
@@ -9,11 +10,26 @@ import {
   createLobbyPollFromCatalog,
   castLobbyPollVote,
   closeLobbyPollExplicit,
+  markLobbyPollSeen,
 } from "./lobbyPollStore.js";
 
 let hostEl = null;
 let unsub = null;
 let createDraftIds = new Set();
+/** Formulaire création ouvert (après clic CTA). */
+let createFormOpen = false;
+
+export function resetLobbyPollSheetUiForTests() {
+  createDraftIds = new Set();
+  createFormOpen = false;
+  hostEl = null;
+  unsub?.();
+  unsub = null;
+}
+
+export function isLobbyPollCreateFormOpen() {
+  return createFormOpen;
+}
 
 function leaderLabel(leader, options) {
   if (!leader || leader.kind === "none") return "";
@@ -24,6 +40,15 @@ function leaderLabel(leader, options) {
     return `Égalité (${leader.maxVotes} vote${leader.maxVotes > 1 ? "s" : ""}) : ${names}`;
   }
   return `En tête : ${titleOf(leader.gameIds[0])} (${leader.maxVotes})`;
+}
+
+function renderCreateCta() {
+  return `
+    <div class="lobby-poll lobby-poll--cta">
+      <button type="button" class="btn btn-accent lobby-poll__cta" data-poll-open-create>
+        À quoi on joue après ?
+      </button>
+    </div>`;
 }
 
 function renderCreateForm(snap) {
@@ -46,9 +71,14 @@ function renderCreateForm(snap) {
       <p class="lobby-poll__question">À quoi on joue après ?</p>
       <p class="hint lobby-poll__hint">Choisis au moins 2 jeux, puis lance le sondage.</p>
       <div class="lobby-poll__picks">${checks}</div>
-      <button type="button" class="btn btn-accent lobby-poll__submit" data-poll-create ${busy ? "disabled" : ""}>
-        ${busy ? "Création…" : "Lancer le sondage"}
-      </button>
+      <div class="lobby-poll__actions">
+        <button type="button" class="btn btn-accent lobby-poll__submit" data-poll-create ${busy ? "disabled" : ""}>
+          ${busy ? "Création…" : "Lancer le sondage"}
+        </button>
+        <button type="button" class="btn-link lobby-poll__cancel" data-poll-cancel-create ${busy ? "disabled" : ""}>
+          Annuler
+        </button>
+      </div>
     </div>`;
 }
 
@@ -94,10 +124,6 @@ function renderOpenPoll(snap) {
     </div>`;
 }
 
-function renderIdleCreateHint() {
-  return "";
-}
-
 export function renderLobbyPollSheet(rootEl) {
   if (!rootEl) return;
   const snap = getLobbyPollSnapshot();
@@ -105,19 +131,28 @@ export function renderLobbyPollSheet(rootEl) {
 
   if (snap.activePoll && snap.activePoll.status === "open") {
     createDraftIds = new Set();
+    createFormOpen = false;
     rootEl.innerHTML = renderOpenPoll(snap);
     rootEl.hidden = false;
     return;
   }
 
-  if (d.showCreateCta) {
+  if (!d.showCreateCta) {
+    createFormOpen = false;
+    createDraftIds = new Set();
+    rootEl.innerHTML = "";
+    rootEl.hidden = true;
+    return;
+  }
+
+  if (createFormOpen) {
     rootEl.innerHTML = renderCreateForm(snap);
     rootEl.hidden = false;
     return;
   }
 
-  rootEl.innerHTML = renderIdleCreateHint();
-  rootEl.hidden = true;
+  rootEl.innerHTML = renderCreateCta();
+  rootEl.hidden = false;
 }
 
 function bindLobbyPollSheet(rootEl) {
@@ -137,6 +172,19 @@ function bindLobbyPollSheet(rootEl) {
     const t = e.target;
     if (!(t instanceof Element)) return;
 
+    if (t.closest("[data-poll-open-create]")) {
+      createFormOpen = true;
+      renderLobbyPollSheet(rootEl);
+      return;
+    }
+
+    if (t.closest("[data-poll-cancel-create]")) {
+      createFormOpen = false;
+      createDraftIds = new Set();
+      renderLobbyPollSheet(rootEl);
+      return;
+    }
+
     const createBtn = t.closest("[data-poll-create]");
     if (createBtn) {
       const ids = [...createDraftIds];
@@ -146,6 +194,10 @@ function bindLobbyPollSheet(rootEl) {
           title: "Sondage",
           icon: "📊",
         });
+        if (hostEl) renderLobbyPollSheet(hostEl);
+      } else {
+        createFormOpen = false;
+        createDraftIds = new Set();
       }
       return;
     }
@@ -193,6 +245,8 @@ export function mountLobbyPollInChatSheet(sheetRoot) {
   }
 
   hostEl = slot;
+  createFormOpen = false;
+  markLobbyPollSeen();
   bindLobbyPollSheet(slot);
   renderLobbyPollSheet(slot);
 
@@ -205,5 +259,6 @@ export function mountLobbyPollInChatSheet(sheetRoot) {
     unsub?.();
     unsub = null;
     hostEl = null;
+    createFormOpen = false;
   };
 }

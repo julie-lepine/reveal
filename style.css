@@ -4249,10 +4249,38 @@ body.has-bottom-nav .feedback-fab{
   width:100%;
 }
 
+.lobby-poll__actions{
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+  align-items:stretch;
+}
+
+.lobby-poll__cta{
+  width:100%;
+  font-size:13px;
+  padding:10px 12px;
+}
+
+.lobby-poll__cancel{
+  font-size:12px;
+  align-self:center;
+}
+
 .lobby-poll__close{
   display:inline-block;
   margin-top:2px;
   font-size:12px;
+}
+
+.feedback-fab__badge--poll{
+  min-width:10px;
+  width:10px;
+  height:10px;
+  padding:0;
+  border-radius:50%;
+  background:#FF3CAC;
+  box-shadow:0 0 0 2px rgba(10,12,28,.9);
 }
 
 
