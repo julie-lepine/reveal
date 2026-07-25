@@ -1,6 +1,9 @@
 import { getSortedActivePlayers } from "./players.js";
 import { getCurrentSessionScoreMap, getState } from "./state.js";
 import { escapeHtml } from "./ui.js";
+import {
+  sortAndRankByScore,
+} from "./competitionRank.js";
 
 /** Scores cumulés d'une manche → map joueur (partie en cours). */
 export function applyMatchScoreDeltas(scores = {}, deltas = {}) {
@@ -24,17 +27,22 @@ export function mergeMatchScoresLocal(local = {}, remote = {}) {
   return merged;
 }
 
+/** @internal exporté pour tests — rangs compétition d’une score box. */
+export function rankPlayersByScoreMap(players, scores) {
+  return sortAndRankByScore(players, (p) => scores[p.name] || 0);
+}
+
 function gameScoresBoxRowsHtml(players, scores) {
-  const sorted = [...players].sort((a, b) => (scores[b.name] || 0) - (scores[a.name] || 0));
-  return sorted
-    .map((p, i) => {
+  const ranked = rankPlayersByScoreMap(players, scores);
+  return ranked
+    .map((p) => {
       const pts = scores[p.name] || 0;
       return `
         <div class="game-scores-box__row">
-          <span class="game-scores-box__rank">${i + 1}</span>
+          <span class="game-scores-box__rank">${p.rank}</span>
           <div class="avatar avatar--sm" style="background:${p.color}">${p.emoji}</div>
           <span class="player-name game-scores-box__name">${escapeHtml(p.name)}</span>
-          <span class="player-score ${i === 0 ? "player-score--gold" : ""}">${pts}</span>
+          <span class="player-score ${p.rank === 1 && pts > 0 ? "player-score--gold" : ""}">${pts}</span>
         </div>`;
     })
     .join("");
@@ -43,16 +51,21 @@ function gameScoresBoxRowsHtml(players, scores) {
 /** Points consensus de la manche Tier Night (tous les joueurs). */
 export function tierNightRoundScoresHtml(recaps, { title = "Points de la manche" } = {}) {
   if (!recaps?.length) return "";
-  const sorted = [...recaps].sort((a, b) => (b.consensusPoints ?? 0) - (a.consensusPoints ?? 0));
-  const rows = sorted
-    .map((r, i) => {
+  const sorted = [...recaps].sort(
+    (a, b) =>
+      (b.consensusPoints ?? 0) - (a.consensusPoints ?? 0) ||
+      String(a.player || "").localeCompare(String(b.player || ""))
+  );
+  const ranked = withCompetitionRanks(sorted, (r) => r.consensusPoints ?? 0);
+  const rows = ranked
+    .map((r) => {
       const pts = r.consensusPoints ?? 0;
       return `
         <div class="game-scores-box__row">
-          <span class="game-scores-box__rank">${i + 1}</span>
+          <span class="game-scores-box__rank">${r.rank}</span>
           <div class="avatar avatar--sm" style="background:${r.color}">${r.emoji}</div>
           <span class="player-name game-scores-box__name">${escapeHtml(r.player)}</span>
-          <span class="player-score ${i === 0 ? "player-score--gold" : ""}">+${pts}</span>
+          <span class="player-score ${r.rank === 1 && pts > 0 ? "player-score--gold" : ""}">+${pts}</span>
         </div>`;
     })
     .join("");
@@ -81,16 +94,14 @@ const GAME_LABELS = {
 };
 
 function gameLeaderboardRowsHtml(players, scoreMap) {
-  const sorted = [...players].sort(
-    (a, b) => (scoreMap[b.name] || 0) - (scoreMap[a.name] || 0)
-  );
-  return sorted
-    .map((p, i) => {
+  const ranked = rankPlayersByScoreMap(players, scoreMap);
+  return ranked
+    .map((p) => {
       const pts = scoreMap[p.name] || 0;
-      const gold = i === 0 && pts > 0 ? "player-score--gold" : "";
+      const gold = p.rank === 1 && pts > 0 ? "player-score--gold" : "";
       return `
         <div class="game-scores-box__row">
-          <span class="game-scores-box__rank">${i + 1}</span>
+          <span class="game-scores-box__rank">${p.rank}</span>
           <div class="avatar avatar--sm" style="background:${p.color}">${p.emoji}</div>
           <span class="player-name game-scores-box__name">${escapeHtml(p.name)}</span>
           <span class="player-score ${gold}">${pts}</span>

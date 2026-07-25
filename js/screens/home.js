@@ -134,13 +134,35 @@ function guestJoinErrorHtml(id, message) {
   return `<p class="auth-error${message ? "" : " hidden"}" id="${id}" role="alert">${escapeHtml(message || "")}</p>`;
 }
 
-function guestEmojiPickerHtml(emoji, { btnId = "guest-emoji-btn" } = {}) {
+function guestEmojiPickerHtml(emoji, { btnId = "guest-emoji-btn", compact = false } = {}) {
   const chosen = normalizeGuestEmoji(emoji);
   return `
       <label class="field-label" for="${btnId}">Ton emoji</label>
-      <div class="emoji-picker-preview">
+      <div class="emoji-picker-preview${compact ? " emoji-picker-preview--compact" : ""}">
         <button type="button" class="emoji-picker-preview__avatar" id="${btnId}" data-guest-emoji aria-label="Choisir ton emoji" title="Choisir ton emoji">${chosen}</button>
-        <span class="hint">Appuie pour changer</span>
+        ${compact ? "" : `<span class="hint">Appuie pour changer</span>`}
+      </div>`;
+}
+
+function guestJoinFieldsHtml({
+  nameId,
+  codeId,
+  emojiBtnId,
+  emoji,
+  nameValue = "",
+  codeValue = "",
+} = {}) {
+  return `
+      <label class="field-label" for="${nameId}">Ton pseudo</label>
+      <input type="text" class="field-input" id="${nameId}" placeholder="Ex : Alex" maxlength="24" value="${escapeHtml(nameValue)}" />
+      <div class="guest-join-meta">
+        <div class="guest-join-meta__emoji">
+          ${guestEmojiPickerHtml(emoji, { btnId: emojiBtnId, compact: true })}
+        </div>
+        <div class="guest-join-meta__code">
+          <label class="field-label" for="${codeId}">Code d'invitation</label>
+          <input type="text" class="field-input" id="${codeId}" placeholder="6 caractères" maxlength="8" autocapitalize="characters" value="${escapeHtml(codeValue)}" />
+        </div>
       </div>`;
 }
 
@@ -151,13 +173,16 @@ function guestJoinPanelHtml({ leaveHint = false, error = "", emoji = DEFAULT_GUE
       ${
         leaveHint
           ? `<p class="hint auth-form__guest-intro auth-form__guest-intro--warn">Tu es encore lié à un lobby (${escapeHtml(getLobby()?.code || "?")}). Utilise « Quitter le lobby » ou rejoins avec le code ci-dessous.</p>`
-          : `<p class="hint auth-form__guest-intro">Entre le code de la partie et ton pseudo pour rejoindre le lobby.</p>`
+          : `<p class="hint auth-form__guest-intro">Rejoins avec un code ou un lien d'invitation de l'hôte. Pas de compte requis - les invités ne peuvent pas créer de lobby.</p>`
       }
-      <label class="field-label" for="guest-rejoin-name">Ton pseudo</label>
-      <input type="text" class="field-input" id="guest-rejoin-name" placeholder="Ex : Alex" maxlength="24" value="${escapeHtml(getUser()?.name || "")}" />
-      ${guestEmojiPickerHtml(emoji, { btnId: "guest-rejoin-emoji-btn" })}
-      <label class="field-label" for="guest-rejoin-code">Code d'invitation</label>
-      <input type="text" class="field-input" id="guest-rejoin-code" placeholder="6 caractères" maxlength="8" autocapitalize="characters" value="${escapeHtml(defaultCode)}" />
+      ${guestJoinFieldsHtml({
+        nameId: "guest-rejoin-name",
+        codeId: "guest-rejoin-code",
+        emojiBtnId: "guest-rejoin-emoji-btn",
+        emoji,
+        nameValue: getUser()?.name || "",
+        codeValue: defaultCode,
+      })}
       <div id="guest-rejoin-turnstile" class="auth-turnstile-wrap"></div>
       ${guestJoinErrorHtml("guest-rejoin-error", error)}
       <button type="button" class="btn btn-primary btn--spaced" id="btn-guest-rejoin">Rejoindre la partie →</button>
@@ -222,7 +247,6 @@ function clearStuckDialogs() {
 }
 
 export function mountHome(app) {
-  const pendingJoin = sessionStorage.getItem("reveal-pending-join");
   const tabAfterLeave = sessionStorage.getItem("reveal-auth-tab");
   const routeAuthTab = getScreenParams()?.authTab;
   let authTab =
@@ -230,7 +254,7 @@ export function mountHome(app) {
     (routeAuthTab === "login" || routeAuthTab === "signup" || routeAuthTab === "guest"
       ? routeAuthTab
       : null) ||
-    (pendingJoin ? "guest" : "login");
+    "login";
   if (tabAfterLeave) sessionStorage.removeItem("reveal-auth-tab");
 
   let unsubSession = () => {};
@@ -333,10 +357,6 @@ export function mountHome(app) {
       paint();
       lastSnapshot = snap;
       restoreInputDrafts({ drafts, focusedId });
-      if (pendingJoin && !sessionStorage.getItem("reveal-pending-join")) {
-        const { codeEl } = readGuestJoinFields();
-        if (codeEl) codeEl.value = pendingJoin;
-      }
       syncForgotPasswordButton(app);
       if (getPasswordResetCooldownRemainingMs() > 0) startForgotCooldownTicker();
       await setupAuthTurnstile();
@@ -541,11 +561,12 @@ export function mountHome(app) {
             </div>
             <div id="auth-panel-guest" class="${authTab === "guest" ? "" : "hidden"}">
               <p class="hint auth-form__guest-intro">Rejoins avec un code ou un lien d'invitation de l'hôte. Pas de compte requis - les invités ne peuvent pas créer de lobby.</p>
-              <label class="field-label" for="guest-name">Ton pseudo</label>
-              <input type="text" class="field-input" id="guest-name" placeholder="Ex : Alex" maxlength="24" />
-              ${guestEmojiPickerHtml(selectedGuestEmoji, { btnId: "guest-emoji-btn" })}
-              <label class="field-label" for="guest-code">Code d'invitation</label>
-              <input type="text" class="field-input" id="guest-code" placeholder="6 caractères" maxlength="8" autocapitalize="characters" />
+              ${guestJoinFieldsHtml({
+                nameId: "guest-name",
+                codeId: "guest-code",
+                emojiBtnId: "guest-emoji-btn",
+                emoji: selectedGuestEmoji,
+              })}
               <div id="guest-turnstile" class="auth-turnstile-wrap"></div>
               ${guestJoinErrorHtml("guest-error", guestJoinError)}
               <button type="button" class="btn btn-primary btn--spaced" id="btn-guest-join">Rejoindre la partie →</button>
@@ -993,14 +1014,6 @@ export function mountHome(app) {
       // Ne pas court-circuiter sur isSessionRouteSuppressed : shouldApply/mustFollow décide.
       if (await routeToActiveGameIfNeeded(row)) return;
       scheduleRender(false);
-    });
-  }
-
-  if (pendingJoin) {
-    sessionStorage.removeItem("reveal-pending-join");
-    requestAnimationFrame(() => {
-      const { codeEl } = readGuestJoinFields();
-      if (codeEl) codeEl.value = pendingJoin;
     });
   }
 

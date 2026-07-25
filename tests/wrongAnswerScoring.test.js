@@ -25,7 +25,7 @@ describe("rankWrongAnswerResults", () => {
     );
   });
 
-  it("départage l'ex-aequo par at croissant", () => {
+  it("ne départage pas l'ex-aequo par at (ordre de nom stable)", () => {
     const answers = {
       Alice: { text: "a", at: 200 },
       Bob: { text: "b", at: 100 },
@@ -34,7 +34,11 @@ describe("rankWrongAnswerResults", () => {
     const ranking = rankWrongAnswerResults(answers, votes);
     assert.deepEqual(
       ranking.map((r) => r.name),
-      ["Bob", "Alice"]
+      ["Alice", "Bob"]
+    );
+    assert.deepEqual(
+      ranking.map((r) => r.votes),
+      [2, 2]
     );
   });
 });
@@ -78,5 +82,46 @@ describe("computeWrongAnswerRoundAward", () => {
     const votes = { Alice: "Alice", Bob: "Alice" };
     const { deltas } = computeWrongAnswerRoundAward(answers, votes);
     assert.deepEqual(deltas, { Alice: 15 });
+  });
+
+  it("ex æquo en tête : même +15, suivant saute au palier 3 (+5)", () => {
+    const answers = {
+      Alice: { text: "a", at: 200 },
+      Bob: { text: "b", at: 100 },
+      Carol: { text: "c", at: 50 },
+    };
+    const votes = {
+      Alice: "Alice",
+      Bob: "Bob",
+      Carol: "Alice",
+      Dave: "Bob",
+      Eve: "Carol",
+    };
+    const { deltas } = computeWrongAnswerRoundAward(answers, votes);
+    assert.deepEqual(deltas, {
+      Alice: WRONG_ANSWER_PODIUM_POINTS[0],
+      Bob: WRONG_ANSWER_PODIUM_POINTS[0],
+      Carol: WRONG_ANSWER_PODIUM_POINTS[2],
+    });
+  });
+
+  it("ex æquo en 2e : même +10, plus de slot +5", () => {
+    const answers = {
+      Alice: { text: "a", at: 1 },
+      Bob: { text: "b", at: 2 },
+      Carol: { text: "c", at: 3 },
+    };
+    const votes = {
+      Alice: "Alice",
+      Bob: "Alice",
+      Carol: "Bob",
+      Dave: "Carol",
+    };
+    const { deltas } = computeWrongAnswerRoundAward(answers, votes);
+    assert.deepEqual(deltas, {
+      Alice: WRONG_ANSWER_PODIUM_POINTS[0],
+      Bob: WRONG_ANSWER_PODIUM_POINTS[1],
+      Carol: WRONG_ANSWER_PODIUM_POINTS[1],
+    });
   });
 });

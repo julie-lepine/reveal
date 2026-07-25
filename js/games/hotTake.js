@@ -24,6 +24,13 @@ import {
   refreshGameScoresBox,
 } from "../core/gameScores.js";
 import { getActivePlayers, getActivePlayerNames } from "../core/players.js";
+import {
+  formatNameList,
+  formatWinnersLabel,
+  medalForCompetitionRank,
+  winnersAtRank,
+  withCompetitionRanks,
+} from "../core/competitionRank.js";
 import { getLocalDisplayName, recordHotTakePlayed, setLastGame } from "../core/state.js";
 import { setLobbyPlaying, setLobbyWaiting } from "../core/lobby.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
@@ -53,16 +60,13 @@ import { arch03AhLogSkipDecision } from "../core/arch03ActingHostDebug.js";
 import { arch03RevealLog } from "../core/arch03RevealDebug.js";
 
 function buildHotTakeStandings(matchScores = {}) {
-  return [...getActivePlayers()]
+  const sorted = [...getActivePlayers()]
     .map((player) => ({
       ...player,
       score: Number(matchScores[player.name]) || 0,
     }))
-    .sort((a, b) => b.score - a.score || a.name.localeCompare(b.name))
-    .map((player, index) => ({
-      ...player,
-      rank: index + 1,
-    }));
+    .sort((a, b) => b.score - a.score || a.name.localeCompare(b.name));
+  return withCompetitionRanks(sorted, (p) => p.score);
 }
 
 function finalHotTakeResultsHtml({
@@ -72,22 +76,26 @@ function finalHotTakeResultsHtml({
   continueLabel = "Voir les résultats",
   waitingText = "En attente de l'hôte pour afficher les résultats…",
 } = {}) {
-  const winner = standings[0] || null;
+  const winners = winnersAtRank(standings, 1);
+  const winnerNames = formatNameList(winners.map((w) => w.name));
+  const multi = winners.length > 1;
+  const score = winners[0]?.score ?? 0;
+  const summary = winnerNames
+    ? multi
+      ? `<p class="hint hottake-final__summary">👑 <strong>${escapeHtml(winnerNames)}</strong> remportent la partie avec <strong>${score} pts</strong>.</p>`
+      : `<p class="hint hottake-final__summary">👑 <strong>${escapeHtml(winnerNames)}</strong> remporte la partie avec <strong>${score} pts</strong>.</p>`
+    : "";
   return `
     <div class="card card--highlight hottake-final">
       <p class="label-upper label-upper--hot">🔥 Hot Take</p>
       <h3 class="section-title">Podium final</h3>
-      ${
-        winner
-          ? `<p class="hint hottake-final__summary">👑 <strong>${escapeHtml(winner.name)}</strong> remporte la partie avec <strong>${winner.score} pts</strong>.</p>`
-          : ""
-      }
+      ${summary}
       <div class="trivia-results__podium">
         ${standings
           .map(
             (player) => `
           <div class="trivia-results__row ${player.rank <= 3 ? "trivia-results__row--winner" : ""} ${player.rank === 1 ? "trivia-results__row--champion" : ""}">
-            <span class="trivia-results__medal">${player.rank === 1 ? "🥇" : player.rank === 2 ? "🥈" : player.rank === 3 ? "🥉" : "•"}</span>
+            <span class="trivia-results__medal">${medalForCompetitionRank(player.rank)}</span>
             <div class="avatar avatar--sm" style="background:${player.color}">${player.emoji}</div>
             <span class="player-name trivia-results__name">${escapeHtml(player.name)}</span>
             <span class="trivia-results__score">${player.score} pts</span>
@@ -361,7 +369,7 @@ export function mountHotTake(app) {
       setLastGame({
         gameId: "hottake",
         title: "Hot Take",
-        summary: `${TAKES.length} prises · gagnant : ${standings[0]?.name || "-"}`,
+        summary: `${TAKES.length} prises · ${formatWinnersLabel(standings)}`,
       });
     }
 

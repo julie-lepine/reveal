@@ -10,6 +10,7 @@ import {
 import { getActivePlayerNames, getActivePlayers } from "./players.js";
 import { getLobbyParticipants } from "./lobby.js";
 import { addScore, getLocalDisplayName, getState, saveStatePatch } from "./state.js";
+import { withCompetitionRanks } from "./competitionRank.js";
 import {
   allMembersReady,
   isGameSyncActive,
@@ -602,9 +603,8 @@ export function buildConsensusStandings(matchScores = getConsensusSession().matc
 }
 
 export function getConsensusPodiumAwards(standings = buildConsensusStandings()) {
-  return standings.map((player, index) => ({
+  return withCompetitionRanks(standings, (p) => p.score).map((player) => ({
     ...player,
-    rank: index + 1,
     lobbyBonus: 0,
   }));
 }

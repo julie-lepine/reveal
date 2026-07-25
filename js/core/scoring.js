@@ -115,7 +115,8 @@ export function awardClutchRound(ranking = [], { podiumPoints = CLUTCH_PODIUM_PO
 export { rankWrongAnswerResults } from "./wrongAnswerScoring.js";
 
 /**
- * Wrong Answer Only : podium de la manche 15 / 10 / 5 pour le top 3 (votes reçus).
+ * Wrong Answer Only : podium de la manche 15 / 10 / 5 (votes reçus).
+ * Ex æquo : même palier ; l'index podium avance de la taille du groupe (1,1,3).
  * `answers` = { [name]: { text, at? } } ; `votes` = { [voter]: targetName }.
  */
 export function awardWrongAnswerRound(

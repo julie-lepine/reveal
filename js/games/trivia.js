@@ -3,6 +3,7 @@ import { useTriviaGame } from "../core/useTriviaGame.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
 import { withClickLock } from "../core/actionLock.js";
 import { getActivePlayers } from "../core/players.js";
+import { formatWinnersLabel } from "../core/competitionRank.js";
 import { goToGameSelect, setLobbyPlaying, setLobbyWaiting } from "../core/lobby.js";
 import { getLocalDisplayName, recordTriviaPlayed, saveStatePatch, setLastGame } from "../core/state.js";
 import { showAppAlert } from "../core/dialog.js";
@@ -321,7 +322,7 @@ export function mountTrivia(app) {
       setLastGame({
         gameId: "trivia",
         title: "Trivia Quiz",
-        summary: `${standings.length} joueur(s) · gagnant : ${standings[0]?.name || "-"}`,
+        summary: `${standings.length} joueur(s) · ${formatWinnersLabel(standings)}`,
       });
     }
 

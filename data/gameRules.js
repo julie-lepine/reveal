@@ -125,7 +125,6 @@ export const GAME_RULES = {
     ],
     points: [
       "Podium de chaque manche : 1re pire réponse +15, 2e +10, 3e +5.",
-      "Classement par nombre de votes ; ex-aequo départagé par la réponse envoyée la plus tôt.",
       "Sans vote sur ta réponse : 0 pt pour la manche.",
     ],
     exemple:
@@ -197,7 +196,8 @@ export const GAME_RULES = {
     ],
     points: [
       "Pendant la partie : bonne réponse +10, et le plus rapide à répondre juste +5 (classement du jeu).",
-      "À la fin, le podium reçoit un bonus de soirée : +15 / +10 / +5 pts.",
+      "À la fin, le podium reçoit un bonus de soirée : +15 / +10 / +5 pts selon le rang.",
+      "Ex æquo au score quiz : même rang et même bonus (1, 1, 3) — deux 1ers reçoivent +15 chacun.",
     ],
     exemple:
       "« Capitale de l'Australie ? » Tu réponds Canberra en premier et juste → +10 (bonne) +5 (rapide).",

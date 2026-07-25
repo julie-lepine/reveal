@@ -56,11 +56,11 @@ Dans l’app Meta (Facebook Login), ajoute les mêmes URLs dans **Valid OAuth Re
 
 | Profil | Créer lobby | Rejoindre |
 |--------|-------------|-----------|
-| Email / Facebook | Oui | Code ou lien `#join=CODE` |
-| Invité anonyme | Non | Code ou lien d’invitation (pseudo requis) |
+| Email / Facebook | Oui | Saisie manuelle du code |
+| Invité anonyme | Non | Saisie manuelle du code (pseudo requis) |
 
-- **Lien d’invitation** : `https://ton-site/#join=ABC123` (hash lu au chargement → onglet Invité prérempli).
-- **Lobby hôte** : code affiché + bouton « Copier le lien » (pas de scan QR dans l’app).
+- **Partage** : le lobby affiche le code + bouton pour **copier le code** (pas de lien d’invitation, pas de QR dans l’app).
+- Les anciens liens `#join=CODE` ne sont plus supportés : l’app les ignore (hash retiré, aucun préremplissage / auto-join).
 
 Sans `supabase.js` configuré, l’app reste en **mode démo locale** (localStorage + simulation de joueurs).
 
@@ -77,8 +77,8 @@ Le client charge `@supabase/supabase-js` via `esm.sh` dans le navigateur ; `npm 
 ## 6. Vérification rapide
 
 1. Lance l’app (Live Server ou `npx serve .`).
-2. Inscription email → créer un lobby → code + lien d’invitation visibles.
-3. Autre navigateur / navigation privée → onglet Invité → code ou lien → participants en temps réel.
+2. Inscription email → créer un lobby → code visible + bouton copier le code.
+3. Autre navigateur / navigation privée → onglet Invité → saisir le code → participants en temps réel.
 4. Facebook : redirection Meta puis retour sur l’app avec session active.
 
 ## 7. Emails (Resend + OVH)

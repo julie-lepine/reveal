@@ -676,20 +676,6 @@ export function getLobbyParticipants() {
   return getState().lobby?.participants || [];
 }
 
-export function getLobbyJoinUrl(code) {
-  const c = code || getLobby()?.code;
-  if (!c) return window.location.href.split("#")[0];
-  return `${window.location.origin}${window.location.pathname}#join=${encodeURIComponent(c)}`;
-}
-
-export function parseJoinCodeFromHash() {
-  const hash = window.location.hash.replace(/^#/, "");
-  const params = new URLSearchParams(hash.replace(/&/g, "&"));
-  if (params.has("join")) return params.get("join");
-  const m = hash.match(/^join=(.+)$/i);
-  return m ? decodeURIComponent(m[1]) : null;
-}
-
 export async function createLobby() {
   const activeLobby = hasActiveLobby() ? getLobby() : null;
   if (activeLobby?.code) {

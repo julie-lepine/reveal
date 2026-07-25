@@ -4,11 +4,11 @@ import { initAds } from "./core/ads.js";
 import { initExitGameDelegation } from "./core/exitGame.js";
 import { initDeepLinks } from "./core/deepLinks.js";
 import {
-  parseJoinCodeFromHash,
   hasActiveLobby,
   resumeEveningSession,
   reconcileLobbyMembership,
 } from "./core/lobby.js";
+import { stripLegacyJoinHashFromLocation } from "./core/legacyJoinHash.js";
 import { initSupabaseAuth, isPasswordRecoveryPending, authReady } from "./core/supabaseAuth.js";
 import { shouldShowWelcome } from "./core/welcomeGate.js";
 import { mountResetPassword } from "./screens/resetPassword.js";
@@ -65,13 +65,8 @@ if (!app) {
   throw new Error("Élément #app introuvable");
 }
 
-const joinCode = parseJoinCodeFromHash();
-if (joinCode) {
-  sessionStorage.setItem("reveal-pending-join", joinCode);
-  if (window.history.replaceState) {
-    window.history.replaceState(null, "", window.location.pathname + window.location.search);
-  }
-}
+// Ancien canal #join= abandonné : neutraliser l’URL sans pending / auto-join.
+stripLegacyJoinHashFromLocation();
 
 initRouter(app);
 

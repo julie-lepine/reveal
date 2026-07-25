@@ -2852,6 +2852,45 @@ select.field-input option{
 
 .auth-form__guest-intro{
   margin:0 0 14px;
+  line-height:1.45;
+  color:rgba(255,255,255,.45);
+}
+
+.guest-join-meta{
+  display:grid;
+  grid-template-columns:auto minmax(0, 1fr);
+  gap:12px;
+  align-items:end;
+}
+
+.guest-join-meta__emoji .field-label,
+.guest-join-meta__code .field-label{
+  margin-top:14px;
+}
+
+.guest-join-meta .emoji-picker-preview{
+  margin-bottom:0;
+}
+
+.guest-join-meta .emoji-picker-preview--compact{
+  display:block;
+}
+
+.guest-join-meta .emoji-picker-preview__avatar{
+  width:52px;
+  height:52px;
+  min-height:var(--touch-min);
+  background:rgba(255,255,255,.06);
+  border:1px solid rgba(255,255,255,.12);
+}
+
+.guest-join-meta .emoji-picker-preview__avatar:hover{
+  background:rgba(255,255,255,.1);
+  border-color:rgba(255,255,255,.2);
+}
+
+.guest-join-meta__code .field-input{
+  letter-spacing:.04em;
 }
 
 .auth-welcome--guest{

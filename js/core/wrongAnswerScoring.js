@@ -1,4 +1,5 @@
 import { WRONG_ANSWER_PODIUM_POINTS } from "../../data/wrongAnswer.js";
+import { podiumPointsForRank, withCompetitionRanks } from "./competitionRank.js";
 
 function countWrongAnswerVotes(answers = {}, votes = {}) {
   const counts = {};
@@ -13,25 +14,28 @@ function countWrongAnswerVotes(answers = {}, votes = {}) {
 }
 
 /**
- * Classe les auteurs par votes reçus (décroissant). Égalité départagée par `answers[name].at`
- * (réponse envoyée la plus tôt en premier). Les réponses sans vote sont exclues.
+ * Classe les auteurs par votes reçus (décroissant). Ex æquo : ordre de nom stable
+ * (affichage uniquement — n'influence pas les points). Les réponses sans vote sont exclues.
  */
 export function rankWrongAnswerResults(answers = {}, votes = {}) {
   const counts = countWrongAnswerVotes(answers, votes);
-  return Object.entries(counts)
+  const sorted = Object.entries(counts)
     .filter(([, n]) => n > 0)
     .map(([name, voteCount]) => ({
       name,
       votes: voteCount,
-      at: answers[name]?.at ?? Infinity,
     }))
     .sort((a, b) => {
       if (b.votes !== a.votes) return b.votes - a.votes;
-      return a.at - b.at;
+      return a.name.localeCompare(b.name);
     });
+  return withCompetitionRanks(sorted, (e) => e.votes);
 }
 
-/** Calcule counts, deltas et ranking sans écrire dans le state. */
+/**
+ * Calcule counts, deltas et ranking sans écrire dans le state.
+ * Ex æquo de votes : même rang compétition → même palier podium (1,1,3).
+ */
 export function computeWrongAnswerRoundAward(
   answers = {},
   votes = {},
@@ -40,12 +44,9 @@ export function computeWrongAnswerRoundAward(
   const counts = countWrongAnswerVotes(answers, votes);
   const ranking = rankWrongAnswerResults(answers, votes);
   const deltas = {};
-  let podiumIdx = 0;
   ranking.forEach((entry) => {
-    const pts = podiumPoints[podiumIdx];
-    podiumIdx += 1;
-    if (pts == null) return;
-    deltas[entry.name] = pts;
+    const pts = podiumPointsForRank(entry.rank, podiumPoints);
+    if (pts > 0) deltas[entry.name] = pts;
   });
   return { counts, deltas, ranking };
 }

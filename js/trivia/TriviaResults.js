@@ -1,11 +1,9 @@
 import { escapeHtml } from "../core/ui.js";
-
-function medalForRank(rank) {
-  if (rank === 1) return "🥇";
-  if (rank === 2) return "🥈";
-  if (rank === 3) return "🥉";
-  return "•";
-}
+import {
+  formatNameList,
+  medalForCompetitionRank,
+  winnersAtRank,
+} from "../core/competitionRank.js";
 
 export function renderTriviaResults({
   standings = [],
@@ -16,17 +14,22 @@ export function renderTriviaResults({
   continueLabel = "Retour au menu des jeux",
   waitingText = "En attente de l'hote pour relancer...",
 } = {}) {
-  const winner = standings[0] || null;
+  const winners = winnersAtRank(standings, 1);
+  const winnerNames = formatNameList(winners.map((w) => w.name));
+  const multi = winners.length > 1;
+  const bonus = winners[0]?.lobbyBonus || 0;
+  const summary = winnerNames
+    ? multi
+      ? `<p class="hint trivia-results__summary">👑 <strong>${escapeHtml(winnerNames)}</strong> remportent la partie et gagnent chacun <strong>+${bonus} pts lobby</strong>.</p>`
+      : `<p class="hint trivia-results__summary">👑 <strong>${escapeHtml(winnerNames)}</strong> remporte la partie et gagne <strong>+${bonus} pts lobby</strong>.</p>`
+    : "";
+
   return `
     <div class="card card--highlight trivia-results">
       <p class="label-upper label-upper--gold">🧠 Trivia Quiz</p>
       <h3 class="section-title">Podium final</h3>
       <p class="hint">Theme joue : ${escapeHtml(themeLabel)}</p>
-      ${
-        winner
-          ? `<p class="hint trivia-results__summary">👑 <strong>${escapeHtml(winner.name)}</strong> remporte la partie et gagne <strong>+${winner.lobbyBonus} pts lobby</strong>.</p>`
-          : ""
-      }
+      ${summary}
       <div class="trivia-results__podium">
         ${standings
           .map(
@@ -39,7 +42,7 @@ export function renderTriviaResults({
                   </div>`
                 : ""
             }
-            <span class="trivia-results__medal">${medalForRank(player.rank)}</span>
+            <span class="trivia-results__medal">${medalForCompetitionRank(player.rank)}</span>
             <div class="avatar avatar--sm" style="background:${player.color}">${player.emoji}</div>
             <span class="player-name trivia-results__name">${escapeHtml(player.name)}</span>
             <span class="trivia-results__score">${player.score} pts quiz</span>

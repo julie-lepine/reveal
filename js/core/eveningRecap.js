@@ -1,15 +1,18 @@
 import { getState, getLieSuccessRate } from "./state.js";
 import { getLobbyParticipants } from "./lobby.js";
 import { getSortedActivePlayers } from "./players.js";
+import { formatNameList, sortAndRankByScore } from "./competitionRank.js";
 
 export function getEveningRecap() {
   const { stats, scores, tierNightGame } = getState();
   const participants = getLobbyParticipants();
-  const sorted = getSortedActivePlayers();
-  const top = sorted
-    .filter((p) => (scores[p.name] || 0) > 0)
-    .slice(0, 3)
+  // Tri d’affichage local (score puis nom) — ne pas utiliser pour badges / métier.
+  const ranked = sortAndRankByScore(getSortedActivePlayers(), (p) => scores[p.name] || 0);
+  const top = ranked
+    .filter((p) => (scores[p.name] || 0) > 0 && p.rank <= 3)
     .map((p) => ({ ...p, score: scores[p.name] || 0 }));
+  const leaders = top.filter((p) => p.rank === 1);
+  const leadersLabel = formatNameList(leaders.map((p) => p.name));
 
   const hotTakes = stats.hotTakesPlayed || 0;
   const speedVotes = stats.speedVotesPlayed || 0;
@@ -61,6 +64,8 @@ export function getEveningRecap() {
     tierNights,
     lastTier,
     top,
+    leaders,
+    leadersLabel,
     hasActivity,
   };
 }

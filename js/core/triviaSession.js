@@ -24,6 +24,7 @@ import { patchGameStateWithFeedback } from "./patchGameStateFeedback.js";
 import { launchGameWithSync, commitHostGamePlay, commitPrepReadyToggle } from "./mpLaunch.js";
 import { normalizeTriviaAnswersMap } from "./sessionMerge.js";
 import { playerKeyToDisplayName } from "./gameSync.js";
+import { podiumPointsForRank, withCompetitionRanks } from "./competitionRank.js";
 
 const TRIVIA_ESTIMATE_SEC_PER_QUESTION = 40;
 
@@ -412,10 +413,9 @@ export function buildTriviaStandings(matchScores = getTriviaSession().matchScore
 }
 
 export function getTriviaPodiumAwards(standings = buildTriviaStandings()) {
-  return standings.map((player, index) => ({
+  return withCompetitionRanks(standings, (p) => p.score).map((player) => ({
     ...player,
-    rank: index + 1,
-    lobbyBonus: TRIVIA_LOBBY_PODIUM_POINTS[index] || 0,
+    lobbyBonus: podiumPointsForRank(player.rank, TRIVIA_LOBBY_PODIUM_POINTS),
   }));
 }
 

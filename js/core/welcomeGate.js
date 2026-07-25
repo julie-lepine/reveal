@@ -25,7 +25,6 @@ export function shouldShowWelcome() {
   if (isPasswordRecoveryPending()) return false;
   if (hasActiveLobby()) return false;
   if (isLoggedIn() || isGuest()) return false;
-  if (sessionStorage.getItem("reveal-pending-join")) return false;
   if (hasSeenWelcome()) return false;
   return true;
 }

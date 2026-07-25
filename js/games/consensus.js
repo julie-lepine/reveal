@@ -4,6 +4,12 @@ import { useConsensusGame } from "../core/useConsensusGame.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
 import { withClickLock } from "../core/actionLock.js";
 import { getActivePlayers } from "../core/players.js";
+import {
+  formatNameList,
+  formatWinnersLabel,
+  medalForCompetitionRank,
+  winnersAtRank,
+} from "../core/competitionRank.js";
 import { goToGameSelect, setLobbyPlaying, setLobbyWaiting } from "../core/lobby.js";
 import {
   getLocalDisplayName,
@@ -147,22 +153,26 @@ function finalConsensusResultsHtml({
   continueLabel = "Voir les résultats",
   waitingText = "En attente de l'hôte pour afficher les résultats…",
 } = {}) {
-  const winner = standings[0] || null;
+  const winners = winnersAtRank(standings, 1);
+  const winnerNames = formatNameList(winners.map((w) => w.name));
+  const multi = winners.length > 1;
+  const score = winners[0] != null ? formatConsensusScore(winners[0].score) : "0";
+  const summary = winnerNames
+    ? multi
+      ? `<p class="hint consensus-final__summary">👑 <strong>${escapeHtml(winnerNames)}</strong> remportent la partie avec <strong>${score} pts</strong>.</p>`
+      : `<p class="hint consensus-final__summary">👑 <strong>${escapeHtml(winnerNames)}</strong> remporte la partie avec <strong>${score} pts</strong>.</p>`
+    : "";
   return `
     <div class="card card--highlight consensus-final">
       <p class="label-upper label-upper--gold">🤝 Consensus</p>
       <h3 class="section-title">Podium final</h3>
-      ${
-        winner
-          ? `<p class="hint consensus-final__summary">👑 <strong>${escapeHtml(winner.name)}</strong> remporte la partie avec <strong>${formatConsensusScore(winner.score)} pts</strong>.</p>`
-          : ""
-      }
+      ${summary}
       <div class="trivia-results__podium">
         ${standings
           .map(
             (player) => `
           <div class="trivia-results__row ${player.rank <= 3 ? "trivia-results__row--winner" : ""} ${player.rank === 1 ? "trivia-results__row--champion" : ""}">
-            <span class="trivia-results__medal">${player.rank === 1 ? "🥇" : player.rank === 2 ? "🥈" : player.rank === 3 ? "🥉" : "•"}</span>
+            <span class="trivia-results__medal">${medalForCompetitionRank(player.rank)}</span>
             <div class="avatar avatar--sm" style="background:${player.color}">${player.emoji}</div>
             <span class="player-name trivia-results__name">${escapeHtml(player.name)}</span>
             <span class="trivia-results__score">${formatConsensusScore(player.score)} pts</span>
@@ -678,7 +688,7 @@ export function mountConsensus(app) {
       setLastGame({
         gameId: "consensus",
         title: "Consensus",
-        summary: `${standings.length} joueur(s) · gagnant : ${standings[0]?.name || "-"}`,
+        summary: `${standings.length} joueur(s) · ${formatWinnersLabel(standings)}`,
       });
     }
 
