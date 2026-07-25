@@ -49,11 +49,12 @@ Référence détaillée : [SUPABASE_SETUP.md](./SUPABASE_SETUP.md)
 - [ ] ~~`supabase/fil-rouge-private.sql`~~ *(Mot interdit désactivé — uniquement si réactivation)*
 - [ ] `supabase/lobby-lifecycle.sql` (+ pg_cron pour purge auto, voir SUPABASE_SETUP §7bis)
 - [ ] `supabase/lobby-members-unique-name.sql` (pseudo unique par lobby)
+- [ ] `supabase/lobby-polls.sql` (sondages prochain jeu — après I-08/ARCH-03 host helpers)
 - [ ] Correctifs RLS si besoin : `fix-rls-recursion.sql`, `fix-lobbies-insert.sql`, `lobby-host-close.sql`
 
 ### Realtime
 
-Réplication activée sur : `lobbies`, `lobby_members`, `lobby_messages`, `game_sessions` *(+ `fil_rouge_private` si Mot interdit réactivé)*
+Réplication activée sur : `lobbies`, `lobby_members`, `lobby_messages`, `game_sessions`, `lobby_polls`, `lobby_poll_votes` *(+ `fil_rouge_private` si Mot interdit réactivé)*
 
 ### Emails (Resend + OVH)
 
