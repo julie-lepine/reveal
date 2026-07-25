@@ -36,6 +36,7 @@ function makeMockRealtime(opts = {}) {
   } = opts;
   const channels = [];
   const removed = [];
+  const removedChannels = [];
   const builds = [];
   let removeGate = null;
 
@@ -54,8 +55,9 @@ function makeMockRealtime(opts = {}) {
     builds.push(topic);
     const listeners = { polls: null, votes: null, status: null };
     const filters = [];
+    // Simule realtime-js : topic interne = realtime:${logical}
     const ch = {
-      topic,
+      topic: `realtime:${topic}`,
       state: initialState,
       __pollSubscribeCallCount: 0,
       on(_type, cfg, cb) {
@@ -95,7 +97,8 @@ function makeMockRealtime(opts = {}) {
   async function removeChannel(ch) {
     if (removeGate) await removeGate;
     ch._listeners?.status?.("CLOSED");
-    removed.push(ch.topic);
+    removed.push(ch.__pollLogicalTopic || ch.topic);
+    removedChannels.push(ch);
     const idx = channels.indexOf(ch);
     if (idx >= 0) channels.splice(idx, 1);
   }
@@ -105,6 +108,7 @@ function makeMockRealtime(opts = {}) {
     removeChannel,
     channels,
     removed,
+    removedChannels,
     builds,
     holdNextRemove,
   };
@@ -487,6 +491,161 @@ describe("lobbyPollChannel lifecycle", () => {
   });
 });
 
+describe("RealtimeChannel.topic préservé (préfixe realtime:)", () => {
+  it("createChannel reçoit le topic logique ; .topic interne non muté", async () => {
+    const mock = makeMockRealtime({ syncSubscribe: true, autoSubscribe: false });
+    let topicWriteCount = 0;
+    const ctrl = createPollChannelController({
+      createChannel: (logical) => {
+        const ch = mock.createChannel(logical);
+        let internal = ch.topic;
+        Object.defineProperty(ch, "topic", {
+          configurable: true,
+          enumerable: true,
+          get() {
+            return internal;
+          },
+          set(_v) {
+            topicWriteCount += 1;
+            internal = _v;
+          },
+        });
+        return ch;
+      },
+      removeChannel: mock.removeChannel,
+      onPollsEvent: () => {},
+      onVotesEvent: () => {},
+    });
+
+    await ctrl.requestRebuild("L", null, { reason: "boot" });
+
+    assert.equal(mock.builds.length, 1);
+    assert.equal(mock.builds[0], "lobby-polls:L:1");
+    assert.equal(topicWriteCount, 0, "builder.topic ne doit jamais être réassigné");
+    assert.equal(mock.channels[0].topic, "realtime:lobby-polls:L:1");
+    assert.equal(mock.channels[0].__pollLogicalTopic, "lobby-polls:L:1");
+    assert.equal(ctrl.getState().logicalTopic, "lobby-polls:L:1");
+    assert.equal(ctrl.getState().topic, "lobby-polls:L:1");
+    assert.equal(ctrl.getState().internalTopic, "realtime:lobby-polls:L:1");
+    assert.ok(mock.channels[0].__pollChannelId);
+    assert.ok(mock.channels[0].__pollControllerId);
+
+    await ctrl.dispose();
+  });
+
+  it("replace join-reply : gen N→N+1, remove sur l'objet exact, un seul canal", async () => {
+    const mock = makeMockRealtime({ autoSubscribe: false });
+    const ctrl = createPollChannelController({
+      createChannel: mock.createChannel,
+      removeChannel: mock.removeChannel,
+      onPollsEvent: () => {},
+      onVotesEvent: () => {},
+      onInvoluntaryClosed: () => {},
+    });
+
+    await ctrl.requestRebuild("L", null, { reason: "boot" });
+    const genN = ctrl.getState().channelGen;
+    const oldChannel = mock.channels[0];
+    const oldInternal = oldChannel.topic;
+    assert.equal(oldInternal, `realtime:lobby-polls:L:${genN}`);
+
+    oldChannel.state = "joining";
+    oldChannel._emitStatus("CHANNEL_ERROR", { message: "unmatched topic" });
+    await new Promise((r) => setTimeout(r, 0));
+    await ctrl._awaitIdle();
+
+    assert.equal(mock.removedChannels.length, 1);
+    assert.equal(mock.removedChannels[0], oldChannel);
+    assert.equal(mock.builds.length, 2);
+    assert.equal(ctrl.getState().channelGen, genN + 1);
+    assert.equal(mock.channels.length, 1);
+    assert.equal(mock.builds[0], `lobby-polls:L:${genN}`);
+    assert.equal(mock.builds[1], `lobby-polls:L:${genN + 1}`);
+    assert.equal(
+      mock.channels[0].topic,
+      `realtime:lobby-polls:L:${genN + 1}`
+    );
+    assert.notEqual(mock.channels[0].topic, oldInternal);
+    assert.equal(
+      mock.channels[0].__pollLogicalTopic,
+      `lobby-polls:L:${genN + 1}`
+    );
+
+    await ctrl.dispose();
+  });
+
+  it("gardes stale : identité objet + channelGen (pas .topic)", async () => {
+    let involuntary = 0;
+    const mock = makeMockRealtime({ autoSubscribe: false });
+    const ctrl = createPollChannelController({
+      createChannel: mock.createChannel,
+      removeChannel: mock.removeChannel,
+      onPollsEvent: () => {},
+      onVotesEvent: () => {},
+      onInvoluntaryClosed: () => {
+        involuntary += 1;
+      },
+    });
+
+    await ctrl.requestRebuild("L", null, { reason: "boot" });
+    const stale = mock.channels[0];
+    stale.state = "joining";
+    stale._emitStatus("CHANNEL_ERROR");
+    await new Promise((r) => setTimeout(r, 0));
+    await ctrl._awaitIdle();
+
+    const current = mock.channels[0];
+    assert.notEqual(current, stale);
+    // Mutation du topic interne sur l'ancien objet ne doit pas affecter le nouveau.
+    stale.topic = "realtime:forged-stale-topic";
+    stale.state = "joining";
+    stale._emitStatus("CHANNEL_ERROR");
+    await new Promise((r) => setTimeout(r, 0));
+    await ctrl._awaitIdle();
+
+    assert.equal(involuntary, 0);
+    assert.equal(mock.channels[0], current);
+    assert.equal(ctrl.getState().subscriptionStatus, "subscribing");
+    assert.equal(
+      current.topic,
+      `realtime:lobby-polls:L:${ctrl.getState().channelGen}`
+    );
+
+    await ctrl.dispose();
+  });
+
+  it("catch-up meta uniquement après SUBSCRIBED post-replace", async () => {
+    /** @type {object[]} */
+    const subscribedMeta = [];
+    const mock = makeMockRealtime({ autoSubscribe: false });
+    const ctrl = createPollChannelController({
+      createChannel: mock.createChannel,
+      removeChannel: mock.removeChannel,
+      onPollsEvent: () => {},
+      onVotesEvent: () => {},
+      onSubscribed: (meta) => {
+        subscribedMeta.push(meta);
+      },
+      onInvoluntaryClosed: () => {},
+    });
+
+    await ctrl.requestRebuild("L", null, { reason: "boot" });
+    mock.channels[0].state = "joining";
+    mock.channels[0]._emitStatus("CHANNEL_ERROR");
+    await new Promise((r) => setTimeout(r, 0));
+    await ctrl._awaitIdle();
+
+    assert.equal(subscribedMeta.length, 0, "pas de onSubscribed avant SUBSCRIBED");
+    mock.channels[0]._emitStatus("SUBSCRIBED");
+    assert.equal(subscribedMeta.length, 1);
+    assert.equal(subscribedMeta[0].reason, "join_reply_error_replace");
+    assert.equal(subscribedMeta[0].logicalTopic, ctrl.getState().logicalTopic);
+    assert.match(String(subscribedMeta[0].internalTopic), /^realtime:lobby-polls:/);
+
+    await ctrl.dispose();
+  });
+});
+
 describe("boot auth + reconnect contrat source", () => {
   it("join-reply replace immédiat + catch-up ; phx_error keep ; CLOSED reconnect", () => {
     const storeSrc = readFileSync(
@@ -503,6 +662,10 @@ describe("boot auth + reconnect contrat source", () => {
     assert.match(chSrc, /subscribe_callback/);
     assert.match(chSrc, /isCurrentBuilder/);
     assert.match(chSrc, /CHANNEL_MODULE_INSTANCE_ID/);
+    assert.match(chSrc, /__pollLogicalTopic/);
+    assert.match(chSrc, /logicalTopic/);
+    assert.match(chSrc, /internalTopic/);
+    assert.doesNotMatch(chSrc, /builder\.topic\s*=/);
     assert.match(storeSrc, /onInvoluntaryClosed/);
     assert.match(storeSrc, /runJoinReplyReplacementCatchup/);
     assert.match(storeSrc, /replacement_catchup_start/);

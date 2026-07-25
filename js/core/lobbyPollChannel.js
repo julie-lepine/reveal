@@ -126,7 +126,15 @@ export function createPollChannelController(deps) {
   /** Remplacements join-reply immédiats sans SUBSCRIBED depuis le dernier succès. */
   let joinReplyImmediateStreak = 0;
 
+  function channelTopics(ch = channel) {
+    return {
+      logicalTopic: ch?.__pollLogicalTopic ?? null,
+      internalTopic: ch?.topic ?? null,
+    };
+  }
+
   function syncRegistry(patch = {}) {
+    const topics = channelTopics();
     upsertPollRtRegistryEntry(controllerId, {
       storeModuleInstanceId,
       storeInstanceId,
@@ -139,7 +147,9 @@ export function createPollChannelController(deps) {
       lobbyId: channelLobbyId,
       channelGen,
       channelId: channel?.__pollChannelId || null,
-      topic: channel?.topic || null,
+      topic: topics.logicalTopic,
+      logicalTopic: topics.logicalTopic,
+      internalTopic: topics.internalTopic,
       status: subscriptionStatus,
       joinReplyImmediateStreak,
       active: !disposed,
@@ -148,6 +158,7 @@ export function createPollChannelController(deps) {
   }
 
   function instanceLog(event, extra = {}) {
+    const topics = channelTopics();
     logPollRtInstance(event, {
       storeModuleInstanceId,
       storeInstanceId,
@@ -157,7 +168,9 @@ export function createPollChannelController(deps) {
       channelId: extra.channelId ?? channel?.__pollChannelId ?? null,
       channelGen: extra.channelGen ?? channelGen,
       lobbyId: extra.lobbyId ?? channelLobbyId,
-      topic: extra.topic ?? channel?.topic ?? null,
+      topic: extra.logicalTopic ?? extra.topic ?? topics.logicalTopic,
+      logicalTopic: extra.logicalTopic ?? topics.logicalTopic,
+      internalTopic: extra.internalTopic ?? topics.internalTopic,
       status: extra.status ?? subscriptionStatus,
       channelState: extra.channelState ?? subscriptionStatus,
       started: identity.storeStarted ?? null,
@@ -169,13 +182,18 @@ export function createPollChannelController(deps) {
   }
 
   function snapshot() {
+    const topics = channelTopics();
     return {
       channelLobbyId,
       channelVotesPollId,
       subscriptionStatus,
       channelGen,
       hasChannel: Boolean(channel),
-      topic: channel?.topic || null,
+      /** Topic logique applicatif (logs / debug). */
+      topic: topics.logicalTopic,
+      logicalTopic: topics.logicalTopic,
+      /** Propriété RealtimeChannel.topic préservée (préfixe realtime:). */
+      internalTopic: topics.internalTopic,
       reconnectTimerActive,
       inFlightDesire,
       lastBuildReason,
@@ -189,12 +207,15 @@ export function createPollChannelController(deps) {
 
   function lifecycleLog(reason, extra = {}) {
     if (!lifecycleDebugEnabled()) return;
+    const topics = channelTopics();
     const stack = new Error().stack;
     console.info("[POLL-RT] lifecycle", {
       reason,
       requestedGeneration: extra.requestedGeneration ?? null,
       currentGeneration: channelGen,
-      currentTopic: channel?.topic || null,
+      currentTopic: topics.logicalTopic,
+      logicalTopic: topics.logicalTopic,
+      internalTopic: topics.internalTopic,
       channelState: subscriptionStatus,
       reconnectTimerActive,
       lobbyId: extra.lobbyId ?? channelLobbyId,
@@ -209,11 +230,14 @@ export function createPollChannelController(deps) {
 
   /** Chronologie replace join-reply — toujours visible (QA). */
   function replaceChronology(step, extra = {}) {
+    const topics = channelTopics();
     const payload = {
       lobbyId: extra.lobbyId ?? channelLobbyId,
       oldChannelGen: extra.oldChannelGen ?? null,
       newChannelGen: extra.newChannelGen ?? channelGen,
-      topic: extra.topic ?? channel?.topic ?? null,
+      topic: extra.logicalTopic ?? extra.topic ?? topics.logicalTopic,
+      logicalTopic: extra.logicalTopic ?? topics.logicalTopic,
+      internalTopic: extra.internalTopic ?? topics.internalTopic,
       votesPollId: extra.votesPollId ?? channelVotesPollId,
       channelState: extra.channelState ?? subscriptionStatus,
       reason: extra.reason ?? lastBuildReason,
@@ -252,7 +276,8 @@ export function createPollChannelController(deps) {
   async function removeCurrentChannel({ intentionalRemoval = true } = {}) {
     const toRemove = channel;
     const removedGen = channelGen;
-    const removedTopic = toRemove?.topic || null;
+    const removedLogical = toRemove?.__pollLogicalTopic || null;
+    const removedInternal = toRemove?.topic || null;
     const removedChannelId = toRemove?.__pollChannelId || null;
     channel = null;
     if (!toRemove) {
@@ -274,20 +299,26 @@ export function createPollChannelController(deps) {
     instanceLog("channel_remove_start", {
       reason: intentionalRemoval ? "intentional_remove" : "remove",
       channelGen: removedGen,
-      topic: removedTopic,
+      logicalTopic: removedLogical,
+      internalTopic: removedInternal,
+      topic: removedLogical,
       channelId: removedChannelId,
       intentionalRemoval,
     });
     log("remove channel", {
       ...snapshot(),
-      topic: toRemove.topic,
+      topic: removedLogical,
+      logicalTopic: removedLogical,
+      internalTopic: removedInternal,
       removedGen,
       intentionalRemoval,
     });
     lifecycleLog("remove_start", {
       intentionalRemoval,
       requestedGeneration: removedGen,
-      currentTopic: toRemove.topic,
+      currentTopic: removedLogical,
+      logicalTopic: removedLogical,
+      internalTopic: removedInternal,
       subscribeCallCount: toRemove.__pollSubscribeCallCount ?? null,
     });
     try {
@@ -307,11 +338,18 @@ export function createPollChannelController(deps) {
     instanceLog("channel_remove_done", {
       reason: intentionalRemoval ? "intentional_remove" : "remove",
       channelGen: removedGen,
-      topic: removedTopic,
+      logicalTopic: removedLogical,
+      internalTopic: removedInternal,
+      topic: removedLogical,
       channelId: removedChannelId,
       intentionalRemoval,
     });
-    syncRegistry({ channelId: null, topic: null });
+    syncRegistry({
+      channelId: null,
+      topic: null,
+      logicalTopic: null,
+      internalTopic: null,
+    });
     return { removedGen, removed: toRemove };
   }
 
@@ -455,6 +493,8 @@ export function createPollChannelController(deps) {
         oldChannelGen: oldGenForLog,
         newChannelGen: myGen,
         topic: `lobby-polls:${lobbyId}:${myGen}`,
+        logicalTopic: `lobby-polls:${lobbyId}:${myGen}`,
+        internalTopic: null,
         votesPollId: nextVotes,
         channelState: "subscribing",
         reason,
@@ -489,6 +529,8 @@ export function createPollChannelController(deps) {
       reason,
       lobbyId,
       channelGen: myGen,
+      logicalTopic: topic,
+      internalTopic: null,
       topic,
       channelId,
       status: "subscribing",
@@ -503,6 +545,7 @@ export function createPollChannelController(deps) {
       channelVotesPollId: nextVotes,
       activePollId: nextVotes,
       topic,
+      logicalTopic: topic,
       channelGen: myGen,
       subscriptionStatus,
     });
@@ -512,15 +555,20 @@ export function createPollChannelController(deps) {
       lobbyId,
       votesPollId: nextVotes,
       currentTopic: topic,
+      logicalTopic: topic,
     });
 
     let builder = createChannel(topic);
     if (builder && typeof builder === "object") {
-      builder.topic = topic;
+      // Ne jamais muter RealtimeChannel.topic (doit rester realtime:${logical}).
+      builder.__pollLogicalTopic = topic;
       builder.__pollSubscribeCallCount = 0;
       builder.__pollChannelId = channelId;
       builder.__pollControllerId = controllerId;
     }
+
+    const internalTopic =
+      builder && typeof builder === "object" ? builder.topic ?? null : null;
 
     builder = builder.on(
       "postgres_changes",
@@ -568,8 +616,21 @@ export function createPollChannelController(deps) {
       channelGen: myGen,
       channelId,
       topic,
+      logicalTopic: topic,
+      internalTopic: builder?.topic ?? internalTopic,
       status: "subscribing",
       active: true,
+    });
+
+    instanceLog("channel_build_bound", {
+      reason,
+      lobbyId,
+      channelGen: myGen,
+      logicalTopic: topic,
+      internalTopic: builder?.topic ?? internalTopic,
+      topic,
+      channelId,
+      status: "subscribing",
     });
 
     builder.__pollSubscribeCallCount =
@@ -577,7 +638,8 @@ export function createPollChannelController(deps) {
     if (builder.__pollSubscribeCallCount !== 1) {
       console.warn("[POLL-RT] subscribeCallCount != 1", {
         count: builder.__pollSubscribeCallCount,
-        topic,
+        logicalTopic: topic,
+        internalTopic: builder?.topic ?? null,
       });
     }
 
@@ -586,6 +648,8 @@ export function createPollChannelController(deps) {
     const rejoinWatch = attachPollChannelRejoinWatch(builder, {
       channelGen: myGen,
       topic,
+      logicalTopic: topic,
+      internalTopic: builder?.topic ?? null,
       lobbyId,
       votesPollId: nextVotes,
       channelId: builder.__pollChannelId || null,
@@ -596,7 +660,7 @@ export function createPollChannelController(deps) {
       const isCurrentBuilder = channel === builder;
       const isCurrentGeneration = myGen === channelGen;
       let ignoredReason = null;
-      if (!isCurrentBuilder) ignoredReason = "channel_ !==_builder";
+      if (!isCurrentBuilder) ignoredReason = "channel_!==_builder";
       else if (!isCurrentGeneration) ignoredReason = "myGen_!==_channelGen";
 
       // Avant toute garde stale — visible même si callback ignoré ensuite.
@@ -605,6 +669,8 @@ export function createPollChannelController(deps) {
         lobbyId,
         channelGen: myGen,
         currentChannelGen: channelGen,
+        logicalTopic: topic,
+        internalTopic: builder?.topic ?? null,
         topic,
         channelId: builder.__pollChannelId || null,
         status,
@@ -616,9 +682,14 @@ export function createPollChannelController(deps) {
         disposed,
       });
       syncRegistry({
-        status: isCurrentBuilder && isCurrentGeneration ? subscriptionStatus : status,
+        status:
+          isCurrentBuilder && isCurrentGeneration
+            ? subscriptionStatus
+            : status,
         channelGen: isCurrentBuilder && isCurrentGeneration ? channelGen : myGen,
         topic,
+        logicalTopic: topic,
+        internalTopic: builder?.topic ?? null,
         channelId: builder.__pollChannelId || null,
         lastSubscribeStatus: status,
         lastSubscribeIgnoredReason: ignoredReason,
@@ -647,6 +718,8 @@ export function createPollChannelController(deps) {
           errorContext: err?.context,
           serialized: serializeRealtimeErr(err),
           lobbyId,
+          logicalTopic: topic,
+          internalTopic: builder?.topic ?? null,
           topic,
           votesPollId: nextVotes,
           channelGen: myGen,
@@ -664,7 +737,8 @@ export function createPollChannelController(deps) {
           status,
           realtimeState,
           lobbyId,
-          topic,
+          logicalTopic: topic,
+          internalTopic: builder?.topic ?? null,
           channelGen: myGen,
           controllerId,
         });
@@ -685,13 +759,20 @@ export function createPollChannelController(deps) {
         subscriptionStatus = "subscribed";
         joinReplyImmediateStreak = 0;
         onStatusChange("subscribed");
-        syncRegistry({ status: "subscribed", joinReplyImmediateStreak: 0 });
+        syncRegistry({
+          status: "subscribed",
+          joinReplyImmediateStreak: 0,
+          logicalTopic: topic,
+          internalTopic: builder?.topic ?? null,
+        });
         const subMeta = {
           reason: lastBuildReason,
           lobbyId,
           channelGen: myGen,
           votesPollId: nextVotes,
           topic,
+          logicalTopic: topic,
+          internalTopic: builder?.topic ?? null,
           controllerId,
           channelId: builder.__pollChannelId || null,
         };
@@ -701,6 +782,8 @@ export function createPollChannelController(deps) {
             oldChannelGen: null,
             newChannelGen: myGen,
             topic,
+            logicalTopic: topic,
+            internalTopic: builder?.topic ?? null,
             votesPollId: nextVotes,
             channelState: "subscribed",
             reason: lastBuildReason,
@@ -721,6 +804,8 @@ export function createPollChannelController(deps) {
           oldChannelGen: myGen,
           newChannelGen: channelGen,
           topic,
+          logicalTopic: topic,
+          internalTopic: builder?.topic ?? null,
           votesPollId: nextVotes,
           channelState: realtimeState,
           reason: "join_reply_error_replace",
@@ -729,6 +814,8 @@ export function createPollChannelController(deps) {
         console.warn("[POLL-RT] join_reply_error_replace", {
           lobbyId,
           topic,
+          logicalTopic: topic,
+          internalTopic: builder?.topic ?? null,
           channelGen: myGen,
           realtimeState,
           votesPollId: nextVotes,
@@ -741,6 +828,8 @@ export function createPollChannelController(deps) {
             oldChannelGen: myGen,
             newChannelGen: channelGen,
             topic,
+            logicalTopic: topic,
+            internalTopic: builder?.topic ?? null,
             votesPollId: nextVotes,
             channelState: subscriptionStatus,
             reason: "join_reply_error_replace",
@@ -753,6 +842,8 @@ export function createPollChannelController(deps) {
               oldChannelGen: myGen,
               newChannelGen: channelGen,
               topic,
+              logicalTopic: topic,
+              internalTopic: builder?.topic ?? null,
               votesPollId: nextVotes,
               channelState: subscriptionStatus,
               reason: "join_reply_error_replace",

@@ -283,6 +283,13 @@ function runJoinReplyReplacementCatchup(meta = {}) {
     oldChannelGen: null,
     newChannelGen: expectedGen,
     topic: meta.topic ?? channelCtrl?.getState()?.topic ?? null,
+    logicalTopic:
+      meta.logicalTopic ??
+      channelCtrl?.getState()?.logicalTopic ??
+      meta.topic ??
+      null,
+    internalTopic:
+      meta.internalTopic ?? channelCtrl?.getState()?.internalTopic ?? null,
     votesPollId: meta.votesPollId ?? store.activePoll?.id ?? null,
     channelState: channelCtrl?.getState()?.subscriptionStatus ?? null,
     reason: meta.reason || "join_reply_error_replace",
@@ -334,6 +341,8 @@ function runJoinReplyReplacementCatchup(meta = {}) {
         oldChannelGen: null,
         newChannelGen: channelCtrl?.getState()?.channelGen ?? expectedGen,
         topic: channelCtrl?.getState()?.topic ?? meta.topic ?? null,
+        logicalTopic: channelCtrl?.getState()?.logicalTopic ?? meta.topic ?? null,
+        internalTopic: channelCtrl?.getState()?.internalTopic ?? null,
         votesPollId: store.activePoll?.id ?? null,
         channelState: channelCtrl?.getState()?.subscriptionStatus ?? null,
         reason: meta.reason || "join_reply_error_replace",
