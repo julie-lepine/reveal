@@ -10,13 +10,13 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 
 | | |
 |---|---|
-| **Fait** | T-01/T-02 · M-08 · **faux ready après Recommencer** (`c27e604`, QA OK) |
-| **Prochain** | **M-10 / T-05 / SYN-26** — sync silencieuse |
-| **Ensuite** | I-09 · SYN-12 |
+| **Fait** | T-01/T-02 · M-08 · ready Recommencer · **M-10 / T-05 / SYN-26** (QA OK) |
+| **Prochain** | **I-09 / SYN-06** — rename mid-soirée incomplet |
+| **Ensuite** | M-12 · ARCH-04 · SYN-12 |
 
-**Résidus séparés :** UI Guess Lie avant `await` · `statsRecordedRoundIdx` · loader UI join · pré-résolution `get*EntryScreen`
+**Résidus séparés :** UI Guess Lie avant `await` · `statsRecordedRoundIdx` · loader UI join · pré-résolution `get*EntryScreen` · votes optimistic autres jeux (dilemma / speedVote / …) · `results.js` mount refresh
 
-**Surveiller :** régression ready prep après Recommencer · join mid-game · Cause 4 seulement si régression
+**Surveiller :** Clutch taps figés sous latence · ready prep après Recommencer · Cause 4 seulement si régression
 
 ---
 
@@ -24,24 +24,21 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 
 | # | ID | Cause | Problème | Note |
 |---|----|-------|----------|------|
-| 1 | **M-10** | 7 | `syncPrepOnMount` sans catch | |
-| 1 | **T-05** | 7 | Vote Hot Take optimistic sans rollback | |
-| 1 | **SYN-26** | 7 | `clutch.js` tap sans catch | |
-| 2 | **I-09 / SYN-06** | 8 | Rename mid-soirée incomplet | 🟡 partiel |
-| 3 | **M-12** | 11 | `#join=` sans auto-join | |
-| 4 | **ARCH-04** | 5 | Re-entry prep bloquée par suppress | |
-| 5 | **SYN-12 / M-05b** | 9 | Double `startMultiplayerSync` au mount lobby | |
-| 6 | **M-14a / SYN-14** | 3 | TierNight topic / routing | ❌ KO QA — suspendu |
-| 7 | **ARCH-06** | 6 | Handlers async multiples en vol | Dette |
-| 8 | Guess Lie UX | 4/7 | UI avant await ; stats round local-only | Post I-08 |
-| 9 | Loader UI join | 5/11 | Interstitiel join | Hors T-01/T-02 |
-| 10 | Pré-résolution entry screens | 5 | `get*EntryScreen` (filet M-08 conservé) | Hors M-08 |
+| 1 | **I-09 / SYN-06** | 8 | Rename mid-soirée incomplet | 🟡 partiel |
+| 2 | **M-12** | 11 | `#join=` sans auto-join | |
+| 3 | **ARCH-04** | 5 | Re-entry prep bloquée par suppress | |
+| 4 | **SYN-12 / M-05b** | 9 | Double `startMultiplayerSync` au mount lobby | |
+| 5 | **M-14a / SYN-14** | 3 | TierNight topic / routing | ❌ KO QA — suspendu |
+| 6 | **ARCH-06** | 6 | Handlers async multiples en vol | Dette |
+| 7 | Guess Lie UX | 4/7 | UI avant await ; stats round local-only | Post I-08 |
+| 8 | Loader UI join | 5/11 | Interstitiel join | Hors T-01/T-02 |
+| 9 | Pré-résolution entry screens | 5 | `get*EntryScreen` (filet M-08 conservé) | Hors M-08 |
+| 10 | **M-04b / SYN-18** | 7 | Timers `withPatchTimeout` non cleared | Résidu Cause 7 |
 
 ### Autres ouverts (hors Top 10)
 
 | ID | Cause | Problème | Statut |
 |----|-------|----------|--------|
-| **M-04b / SYN-18** | 7 | Timers `withPatchTimeout` non cleared | À traiter |
 | **M-14b / SYN-09b** | 7 | `onLocalApplied` si `localFirst: false` | Latent |
 | **ARCH-07** | 7 | Catch Realtime silencieux | À traiter |
 | **ARCH-08** | 7 | Retry launch silencieux | À traiter |
@@ -66,7 +63,7 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 | 4 | Asymétrie hôte / invité | ✅ QA (I-08, ARCH-03/03b) | UX Guess Lie séparée |
 | 5 | Routing + timing sync | ✅ M-08 | ARCH-04 |
 | 6 | Async écrans | Partiel | ARCH-06 ; SYN-05 dormant |
-| 7 | Sync silencieuse / fire-and-forget | Partiel | **M-10**, T-05, SYN-26… |
+| 7 | Sync silencieuse / fire-and-forget | Partiel | M-04b, ARCH-07/08… (**M-10 / T-05 / SYN-26** ✅) |
 | 8 | Reset / migration incomplète | Partiel | **I-09**, SYN-15/16 |
 | 9 | Sync monolithe / duplication | Dette | SYN-12, ARCH-11… |
 | 10 | Code mort | Dette | Fil Rouge, dead exports |
@@ -85,13 +82,10 @@ Colonnes réduites : le détail fichier / fix proposé vit dans le code ou les c
 | **ARCH-04** | Suppress + même prep → re-entry stale | `shouldApplySessionRoute` | Après P-02 |
 | **ARCH-05** | `row.screen` en retard vs lobby | `mpLaunch.js` | 🟡 mitigé ; hors scope routing |
 
-### Cause 7 — Sync silencieuse
+### Cause 7 — Sync silencieuse (résidus)
 
 | ID | Problème | Où |
 |----|----------|-----|
-| **M-10 / SYN-10** | `syncPrepOnMount` sans catch | prep screens, leaderboard |
-| **T-05** | Vote optimistic sans rollback | `hotTakeSession.js` |
-| **SYN-26** | Tap clutch sans catch | `clutch.js` |
 | **M-04b / SYN-18** | Timers timeout non cleared | `gameSync.js` |
 | **M-14b** | `onLocalApplied` manquant | `mpLaunch.js` |
 | **ARCH-07 / ARCH-08** | Catch / retry silencieux | Realtime, launch |
@@ -120,6 +114,9 @@ Colonnes réduites : le détail fichier / fix proposé vit dans le code ou les c
 
 | Date | IDs | Commit / note |
 |------|-----|---------------|
+| 07-25 | **M-10 / SYN-10** | ✅ QA — `bb8f71c` : catch `syncPrepOnMount` + leaderboard ; `syncPrepMount.js` |
+| 07-25 | **T-05** | ✅ QA — `faeb33f` : rollback vote Hot Take (`hotTakeVoteCommit.js`) |
+| 07-25 | **SYN-26** | ✅ QA — `428ced1` → `66f08c0` → `4856b7e` : catch/rollback tap ; retapable ; **freeze `{ms,at}` au clic** + merge first-wins |
 | 07-25 | **M-08 / SYN-13** | `6b85d84` — nested redirect / navStack / cleanup |
 | 07-25 | faux ready prep (Recommencer) | ✅ QA — `c27e604` : `mergeReadyMapsLocal` remote-authoritative + `ready: {}` fin de partie |
 | 07-25 | **T-01**, **T-02** | `5c1b61d` — hydrate → sync ; debounce SUBSCRIBED |
@@ -129,6 +126,16 @@ Colonnes réduites : le détail fichier / fix proposé vit dans le code ou les c
 | 07-11 | **I-07**, **M-09**, **I-02** | Guess Lie launch ; prep ready ; prep sans session |
 
 Ne pas rouvrir sans **régression démontrée**.
+
+### Cause 7 — bilan M-10 / T-05 / SYN-26
+
+| Ticket | Cause | Fix |
+|--------|-------|-----|
+| **M-10** | `void refresh…().then()` sans catch au mount | `runSyncPrepOnMount` + catch/feedback ; dilemma via helper ; leaderboard catch |
+| **T-05** | Vote Hot Take local avant patch ; UI gardait le vote | Snapshot + rollback ; catch UI (`hotTake.js`) |
+| **SYN-26** | Tap Clutch optimistic + rejet non géré ; puis dérive des `ms` sous latence | Rollback + `tapCommitInFlight` ; transport tap figé au clic ; `mergeClutchTapsFrozen` (first-wins) |
+
+**Hors scope volontaire :** rollback votes dilemma/speedVote/truthMeter ; `results.js` mount ; indicateur « Sync… » (ARCH-22).
 
 ### Contrat produit (SYN-13b)
 
@@ -155,6 +162,7 @@ Join mid-game (T-01 ✅) → SUBSCRIBED (T-02 ✅)
 - SYN-28 : `settings` hors scope ; course lobby `playing` vs session menu
 - I-PG-01 : autres jeux sans podium dédié (hors scope)
 - Policy debug lobby à purger côté Supabase si encore présente
+- Optimistic votes hors Hot Take (même trou que T-05, tickets séparés)
 
 ---
 
@@ -170,7 +178,7 @@ Pas de re-travail sauf régression. Doublons notés une seule fois.
 | 4 | I-01/02/08, M-03b, M-06a/b, L-01, ARCH-03/03b |
 | 5 | T-01/02, T-03↻, M-07, M-08, P-02, SYN-28, I-PG-01 |
 | 6 | I-05, SYN-13b↻, SYN-25 |
-| 7 | I-07, M-09, L-09, M-11 |
+| 7 | I-07, M-09, L-09, M-11, **M-10**, **T-05**, **SYN-26** |
 | 8 | I-06, P-02, ARCH-09 |
 | 11 | L-02, ARCH-21↻ |
 
@@ -178,4 +186,4 @@ Pas de re-travail sauf régression. Doublons notés une seule fois.
 
 ---
 
-*Suivi vivant. Dernière MAJ : 2026-07-25 — faux ready Recommencer clôturé QA (`c27e604`) ; prochain = M-10 / T-05.*
+*Suivi vivant. Dernière MAJ : 2026-07-25 — M-10 / T-05 / SYN-26 clôturés QA ; prochain = I-09.*

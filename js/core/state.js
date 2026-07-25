@@ -412,17 +412,192 @@ export function setLocalEmoji(emoji) {
   return { ok: true, emoji: chosen };
 }
 
-function mergeKeyedRecord(record, oldKey, newKey) {
+/**
+ * Collision policies for rename key moves (Alice → Alicia):
+ * - preferOld: keep the value under the name being renamed (authoritative local identity);
+ *   discard leftover under the target key. Used for snapshots / atomic choices.
+ * - preferNew: keep the value already under newKey (legacy alias of firstWins for taps if needed).
+ * - max: Math.max for concurrent numeric views of the same counter (aligns with scoresFromRemote).
+ * - or: boolean OR (ready / dealAcks).
+ * - maxStats: per-numeric-field Math.max for playerStats (aligns with mergePlayerStatsRecord).
+ *
+ * Note: `sum` is intentionally unused — cumulative maps can hold concurrent full copies of the
+ * same identity after a partial rename/sync; summing would double-count. Session deltas use
+ * total − baseline, so baseline must use the same preferOld pairing as gameScores.
+ */
+function mergeKeyedRecord(record, oldKey, newKey, mode = "preferOld") {
   if (!record || oldKey === newKey || record[oldKey] === undefined) return record;
   const next = { ...record };
-  if (next[newKey] !== undefined) {
-    if (typeof next[newKey] === "object" && next[newKey] !== null && typeof next[oldKey] === "object") {
-      next[newKey] = { ...next[oldKey], ...next[newKey] };
-    }
-  } else {
-    next[newKey] = next[oldKey];
-  }
+  const oldVal = next[oldKey];
   delete next[oldKey];
+  if (next[newKey] === undefined) {
+    next[newKey] = oldVal;
+    return next;
+  }
+  const newVal = next[newKey];
+  if (mode === "max") {
+    next[newKey] = Math.max(Number(newVal) || 0, Number(oldVal) || 0);
+  } else if (mode === "or") {
+    next[newKey] = Boolean(newVal) || Boolean(oldVal);
+  } else if (mode === "maxStats") {
+    next[newKey] = mergePlayerStatsOnRename(oldVal, newVal);
+  } else if (mode === "preferNew") {
+    // keep newVal
+  } else {
+    // preferOld / firstWins-from-moving-identity
+    next[newKey] = oldVal;
+  }
+  return next;
+}
+
+/** Per-counter max, same idea as playerStatsSync.mergePlayerStatsRecord. */
+function mergePlayerStatsOnRename(a = {}, b = {}) {
+  const keys = new Set([...Object.keys(a || {}), ...Object.keys(b || {})]);
+  const out = {};
+  keys.forEach((key) => {
+    const av = a?.[key];
+    const bv = b?.[key];
+    if (typeof av === "number" && typeof bv === "number") {
+      out[key] = Math.max(av, bv);
+    } else if (typeof bv === "number" && Number.isFinite(bv)) {
+      out[key] = bv;
+    } else if (typeof av === "number" && Number.isFinite(av)) {
+      out[key] = av;
+    }
+  });
+  return out;
+}
+
+/** Replace exact name values in a map (e.g. voter → target name). */
+function rewriteNameValues(record, oldName, newName) {
+  if (!record || typeof record !== "object") return record;
+  let changed = false;
+  const next = { ...record };
+  for (const [key, value] of Object.entries(next)) {
+    if (value === oldName) {
+      next[key] = newName;
+      changed = true;
+    }
+  }
+  return changed ? next : record;
+}
+
+/**
+ * Rename a map key then rewrite any values equal to the old pseudo.
+ * Key move happens once; value rewrite once — no derived recount.
+ * UUID keys are untouched because they never equal the display name string.
+ */
+function migrateNameKeyedMap(record, oldName, newName, mode = "preferOld") {
+  if (!record || typeof record !== "object") return record;
+  const keyed = mergeKeyedRecord(record, oldName, newName, mode);
+  return rewriteNameValues(keyed, oldName, newName);
+}
+
+/** Rename names in an array; drop duplicates after replacement (order preserved). */
+function migrateNameArray(arr, oldName, newName) {
+  if (!Array.isArray(arr)) return arr;
+  const seen = new Set();
+  const out = [];
+  for (const item of arr) {
+    const next = item === oldName ? newName : item;
+    if (seen.has(next)) continue;
+    seen.add(next);
+    out.push(next);
+  }
+  return out;
+}
+
+function migrateNameScalar(value, oldName, newName) {
+  return value === oldName ? newName : value;
+}
+
+/** gameScores: { [gameId]: { [playerName]: number } } — preferOld pairs with baseline. */
+function migrateNestedGameScores(gameScores, oldName, newName) {
+  if (!gameScores || typeof gameScores !== "object") return gameScores;
+  const next = { ...gameScores };
+  for (const gameId of Object.keys(next)) {
+    const inner = next[gameId];
+    if (inner && typeof inner === "object" && !Array.isArray(inner)) {
+      next[gameId] = mergeKeyedRecord(inner, oldName, newName, "preferOld");
+    }
+  }
+  return next;
+}
+
+/**
+ * Dedupe named entries after rename. `pickBetter(a, b)` returns the entry to keep
+ * when both resolve to the same display name.
+ */
+function migrateNamedEntries(arr, oldName, newName, pickBetter) {
+  if (!Array.isArray(arr)) return arr;
+  const byName = new Map();
+  const order = [];
+  for (const entry of arr) {
+    if (!entry || typeof entry !== "object") {
+      order.push({ kind: "raw", value: entry });
+      continue;
+    }
+    const next = entry.name === oldName ? { ...entry, name: newName } : { ...entry };
+    const key = next.name;
+    if (key == null) {
+      order.push({ kind: "raw", value: next });
+      continue;
+    }
+    if (!byName.has(key)) {
+      byName.set(key, next);
+      order.push({ kind: "named", key });
+    } else {
+      const kept = pickBetter ? pickBetter(byName.get(key), next) : byName.get(key);
+      byName.set(key, kept);
+    }
+  }
+  return order.map((slot) => (slot.kind === "raw" ? slot.value : byName.get(slot.key)));
+}
+
+/** Clutch ranking: keep best gap, then earliest tap (same order as rankClutchResults). */
+function pickBetterClutchRanking(a, b) {
+  const gapA = Number.isFinite(a.gap) ? a.gap : Infinity;
+  const gapB = Number.isFinite(b.gap) ? b.gap : Infinity;
+  if (gapA !== gapB) return gapA < gapB ? a : b;
+  const atA = Number.isFinite(a.at) ? a.at : Infinity;
+  const atB = Number.isFinite(b.at) ? b.at : Infinity;
+  return atA <= atB ? a : b;
+}
+
+/** Trivia standings: keep higher score, then better (lower) rank. */
+function pickBetterTriviaStanding(a, b) {
+  const scoreA = Number(a.score) || 0;
+  const scoreB = Number(b.score) || 0;
+  if (scoreA !== scoreB) return scoreA > scoreB ? a : b;
+  const rankA = Number.isFinite(a.rank) ? a.rank : Infinity;
+  const rankB = Number.isFinite(b.rank) ? b.rank : Infinity;
+  return rankA <= rankB ? a : b;
+}
+
+function migrateLastRoundNameMaps(lastRound, oldName, newName, opts = {}) {
+  if (!lastRound || typeof lastRound !== "object") return lastRound;
+  const next = { ...lastRound };
+  // lastRound deltas/counts are concurrent snapshots of one round — not fragments to add.
+  if (next.deltas) next.deltas = mergeKeyedRecord(next.deltas, oldName, newName, "preferOld");
+  if (next.counts) next.counts = mergeKeyedRecord(next.counts, oldName, newName, "preferOld");
+  if (next.answers) next.answers = mergeKeyedRecord(next.answers, oldName, newName, "preferOld");
+  if (next.votes) next.votes = migrateNameKeyedMap(next.votes, oldName, newName, "preferOld");
+  if (next.breakdown) {
+    next.breakdown = mergeKeyedRecord(next.breakdown, oldName, newName, "preferOld");
+  }
+  if (Array.isArray(next.ranking)) {
+    next.ranking = migrateNamedEntries(next.ranking, oldName, newName, pickBetterClutchRanking);
+  }
+  const arrayFields = opts.nameArrays || [];
+  for (const field of arrayFields) {
+    if (Array.isArray(next[field])) {
+      next[field] = migrateNameArray(next[field], oldName, newName);
+    }
+  }
+  const scalarFields = opts.nameScalars || [];
+  for (const field of scalarFields) {
+    next[field] = migrateNameScalar(next[field], oldName, newName);
+  }
   return next;
 }
 
@@ -436,47 +611,239 @@ export function renameLocalPlayer(newName) {
   const oldName = getLocalDisplayName();
   if (oldName === trimmed) return { ok: true, name: trimmed };
 
-  state.scores = mergeKeyedRecord(state.scores, oldName, trimmed);
-  state.filRougeScores = mergeKeyedRecord(state.filRougeScores, oldName, trimmed);
-  state.playerStats = mergeKeyedRecord(state.playerStats, oldName, trimmed);
+  // Cumulative evening totals: preferOld keeps the renaming identity's ledger (avoids
+  // double-count from orphan copies under the target name). Paired with baseline below.
+  state.scores = mergeKeyedRecord(state.scores, oldName, trimmed, "preferOld");
+  state.filRougeScores = mergeKeyedRecord(state.filRougeScores, oldName, trimmed, "preferOld");
+  state.playerStats = mergeKeyedRecord(state.playerStats, oldName, trimmed, "maxStats");
+  state.gameScores = migrateNestedGameScores(state.gameScores, oldName, trimmed);
+  // Snapshot for getCurrentSessionScoreMap: (gameScores[gid][n] − baseline[n]).
+  // Must preferOld like gameScores so a collision cannot invent a wrong in-game delta.
+  state.gameScoreSessionBaseline = mergeKeyedRecord(
+    state.gameScoreSessionBaseline,
+    oldName,
+    trimmed,
+    "preferOld"
+  );
 
-  if (state.guessLie?.submissions) {
-    state.guessLie.submissions = mergeKeyedRecord(state.guessLie.submissions, oldName, trimmed);
+  if (state.guessLie) {
+    if (state.guessLie.submissions) {
+      // Atomic { statements, lie } — never field-merge two submissions.
+      state.guessLie.submissions = mergeKeyedRecord(
+        state.guessLie.submissions,
+        oldName,
+        trimmed,
+        "preferOld"
+      );
+    }
+    if (state.guessLie.votes) {
+      state.guessLie.votes = mergeKeyedRecord(state.guessLie.votes, oldName, trimmed, "preferOld");
+    }
   }
 
   const ht = state.hotTakeGame;
   if (ht) {
-    if (ht.ready) ht.ready = mergeKeyedRecord(ht.ready, oldName, trimmed);
-    if (ht.votes) ht.votes = mergeKeyedRecord(ht.votes, oldName, trimmed);
-    if (ht.pausedBy === oldName) ht.pausedBy = trimmed;
+    if (ht.ready) ht.ready = mergeKeyedRecord(ht.ready, oldName, trimmed, "or");
+    if (ht.votes) ht.votes = mergeKeyedRecord(ht.votes, oldName, trimmed, "preferOld");
+    if (ht.matchScores) {
+      ht.matchScores = mergeKeyedRecord(ht.matchScores, oldName, trimmed, "preferOld");
+    }
+    ht.pausedBy = migrateNameScalar(ht.pausedBy, oldName, trimmed);
     if (Array.isArray(ht.customTakes)) {
       ht.customTakes = ht.customTakes.map((t) =>
         t?.author === oldName ? { ...t, author: trimmed } : t
       );
     }
+    if (ht.lastRound) {
+      ht.lastRound = migrateLastRoundNameMaps(ht.lastRound, oldName, trimmed, {
+        nameArrays: ["dissenters", "majorityWinners", "tieWinners"],
+      });
+    }
   }
 
   const dm = state.dilemmaGame;
   if (dm) {
-    if (dm.ready) dm.ready = mergeKeyedRecord(dm.ready, oldName, trimmed);
-    if (dm.votes) dm.votes = mergeKeyedRecord(dm.votes, oldName, trimmed);
-    if (dm.pausedBy === oldName) dm.pausedBy = trimmed;
+    if (dm.ready) dm.ready = mergeKeyedRecord(dm.ready, oldName, trimmed, "or");
+    if (dm.votes) dm.votes = mergeKeyedRecord(dm.votes, oldName, trimmed, "preferOld");
+    if (dm.matchScores) {
+      dm.matchScores = mergeKeyedRecord(dm.matchScores, oldName, trimmed, "preferOld");
+    }
+    dm.pausedBy = migrateNameScalar(dm.pausedBy, oldName, trimmed);
     if (Array.isArray(dm.customDilemmas)) {
       dm.customDilemmas = dm.customDilemmas.map((d) =>
         d?.author === oldName ? { ...d, author: trimmed } : d
       );
     }
+    if (dm.lastRound) {
+      dm.lastRound = migrateLastRoundNameMaps(dm.lastRound, oldName, trimmed, {
+        nameArrays: ["majorityWinners", "tieWinners"],
+      });
+    }
   }
 
   const consensus = state.consensusGame;
   if (consensus) {
-    if (consensus.ready) consensus.ready = mergeKeyedRecord(consensus.ready, oldName, trimmed);
-    if (consensus.answers) consensus.answers = mergeKeyedRecord(consensus.answers, oldName, trimmed);
-    if (consensus.matchScores) {
-      consensus.matchScores = mergeKeyedRecord(consensus.matchScores, oldName, trimmed);
+    if (consensus.ready) consensus.ready = mergeKeyedRecord(consensus.ready, oldName, trimmed, "or");
+    if (consensus.answers) {
+      consensus.answers = mergeKeyedRecord(consensus.answers, oldName, trimmed, "preferOld");
     }
-    if (consensus.lastRound?.deltas) {
-      consensus.lastRound.deltas = mergeKeyedRecord(consensus.lastRound.deltas, oldName, trimmed);
+    if (consensus.matchScores) {
+      consensus.matchScores = mergeKeyedRecord(consensus.matchScores, oldName, trimmed, "preferOld");
+    }
+    if (consensus.lastRound) {
+      consensus.lastRound = migrateLastRoundNameMaps(consensus.lastRound, oldName, trimmed, {
+        nameArrays: [
+          "precisionPlayers",
+          "closestPlayers",
+          "intuitionPlayers",
+          "consensusPlayers",
+        ],
+      });
+    }
+  }
+
+  const sv = state.speedVoteGame;
+  if (sv) {
+    if (sv.ready) sv.ready = mergeKeyedRecord(sv.ready, oldName, trimmed, "or");
+    // Votes: voter → target player name (key once, target value once).
+    if (sv.votes) sv.votes = migrateNameKeyedMap(sv.votes, oldName, trimmed, "preferOld");
+    if (sv.matchScores) {
+      sv.matchScores = mergeKeyedRecord(sv.matchScores, oldName, trimmed, "preferOld");
+    }
+  }
+
+  const clutch = state.clutchGame;
+  if (clutch) {
+    if (clutch.ready) clutch.ready = mergeKeyedRecord(clutch.ready, oldName, trimmed, "or");
+    // Renaming identity's tap wins over orphan under the target name.
+    if (clutch.taps) clutch.taps = mergeKeyedRecord(clutch.taps, oldName, trimmed, "preferOld");
+    if (clutch.matchScores) {
+      clutch.matchScores = mergeKeyedRecord(clutch.matchScores, oldName, trimmed, "preferOld");
+    }
+    if (clutch.lastRound) {
+      clutch.lastRound = migrateLastRoundNameMaps(clutch.lastRound, oldName, trimmed);
+    }
+  }
+
+  const wa = state.wrongAnswerGame;
+  if (wa) {
+    if (wa.ready) wa.ready = mergeKeyedRecord(wa.ready, oldName, trimmed, "or");
+    if (wa.answers) wa.answers = mergeKeyedRecord(wa.answers, oldName, trimmed, "preferOld");
+    if (wa.votes) wa.votes = migrateNameKeyedMap(wa.votes, oldName, trimmed, "preferOld");
+    if (wa.matchScores) {
+      wa.matchScores = mergeKeyedRecord(wa.matchScores, oldName, trimmed, "preferOld");
+    }
+    if (wa.lastRound) {
+      wa.lastRound = migrateLastRoundNameMaps(wa.lastRound, oldName, trimmed);
+    }
+  }
+
+  const traitre = state.traitreGame;
+  if (traitre) {
+    if (traitre.ready) traitre.ready = mergeKeyedRecord(traitre.ready, oldName, trimmed, "or");
+    if (traitre.dealAcks) {
+      traitre.dealAcks = mergeKeyedRecord(traitre.dealAcks, oldName, trimmed, "or");
+    }
+    if (traitre.intuitionAwards) {
+      traitre.intuitionAwards = mergeKeyedRecord(
+        traitre.intuitionAwards,
+        oldName,
+        trimmed,
+        "preferOld"
+      );
+    }
+    if (traitre.votes) {
+      traitre.votes = migrateNameKeyedMap(traitre.votes, oldName, trimmed, "preferOld");
+    }
+    if (traitre.lastVoteSnapshot) {
+      traitre.lastVoteSnapshot = migrateNameKeyedMap(
+        traitre.lastVoteSnapshot,
+        oldName,
+        trimmed,
+        "preferOld"
+      );
+    }
+    traitre.impostorName = migrateNameScalar(traitre.impostorName, oldName, trimmed);
+    traitre.lastEliminated = migrateNameScalar(traitre.lastEliminated, oldName, trimmed);
+    if (Array.isArray(traitre.alive)) {
+      traitre.alive = migrateNameArray(traitre.alive, oldName, trimmed);
+    }
+    if (Array.isArray(traitre.eliminated)) {
+      traitre.eliminated = migrateNameArray(traitre.eliminated, oldName, trimmed);
+    }
+    if (traitre.lastRound) {
+      traitre.lastRound = migrateLastRoundNameMaps(traitre.lastRound, oldName, trimmed, {
+        nameScalars: ["impostorName"],
+      });
+    }
+  }
+
+  const pg = state.playlistGuessGame;
+  if (pg) {
+    // Solo keys may equal display names; MP keys are UUIDs and never match oldName.
+    if (pg.ready) pg.ready = mergeKeyedRecord(pg.ready, oldName, trimmed, "or");
+    if (pg.votes) pg.votes = migrateNameKeyedMap(pg.votes, oldName, trimmed, "preferOld");
+    if (Array.isArray(pg.participantNames)) {
+      pg.participantNames = migrateNameArray(pg.participantNames, oldName, trimmed);
+    }
+  }
+
+  const tm = state.truthMeterGame;
+  if (tm) {
+    if (tm.ready) tm.ready = mergeKeyedRecord(tm.ready, oldName, trimmed, "or");
+    if (tm.votes) tm.votes = mergeKeyedRecord(tm.votes, oldName, trimmed, "preferOld");
+    if (tm.matchScores) {
+      tm.matchScores = mergeKeyedRecord(tm.matchScores, oldName, trimmed, "preferOld");
+    }
+    if (Array.isArray(tm.authorOrder)) {
+      tm.authorOrder = migrateNameArray(tm.authorOrder, oldName, trimmed);
+    }
+    if (tm.affirmation && typeof tm.affirmation === "object") {
+      tm.affirmation = {
+        ...tm.affirmation,
+        author: migrateNameScalar(tm.affirmation.author, oldName, trimmed),
+      };
+    }
+    if (tm.lastRound) {
+      tm.lastRound = migrateLastRoundNameMaps(tm.lastRound, oldName, trimmed, {
+        nameScalars: ["mindReader"],
+      });
+    }
+  }
+
+  const trivia = state.triviaGame;
+  if (trivia) {
+    if (trivia.ready) trivia.ready = mergeKeyedRecord(trivia.ready, oldName, trimmed, "or");
+    if (trivia.answers) {
+      trivia.answers = mergeKeyedRecord(trivia.answers, oldName, trimmed, "preferOld");
+    }
+    if (trivia.matchScores) {
+      trivia.matchScores = mergeKeyedRecord(trivia.matchScores, oldName, trimmed, "preferOld");
+    }
+    if (trivia.lastRound) {
+      trivia.lastRound = migrateLastRoundNameMaps(trivia.lastRound, oldName, trimmed, {
+        nameArrays: ["correctPlayers"],
+        nameScalars: ["fastestPlayer"],
+      });
+    }
+    if (Array.isArray(trivia.results?.standings)) {
+      trivia.results = {
+        ...trivia.results,
+        standings: migrateNamedEntries(
+          trivia.results.standings,
+          oldName,
+          trimmed,
+          pickBetterTriviaStanding
+        ),
+      };
+    }
+  }
+
+  const tnl = state.tierNightLiveGame;
+  if (tnl) {
+    if (tnl.votes) tnl.votes = mergeKeyedRecord(tnl.votes, oldName, trimmed, "preferOld");
+    if (tnl.placements) {
+      tnl.placements = mergeKeyedRecord(tnl.placements, oldName, trimmed, "preferOld");
     }
   }
 
@@ -490,7 +857,7 @@ export function renameLocalPlayer(newName) {
     state.lobby = {
       ...state.lobby,
       participants: state.lobby.participants.map((p) =>
-        p.isLocal ? { ...p, name: trimmed, emoji: p.isHost ? p.emoji : p.emoji } : p
+        p.isLocal ? { ...p, name: trimmed } : p
       ),
     };
   }
