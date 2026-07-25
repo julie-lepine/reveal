@@ -9,8 +9,10 @@
  * - CLOSED involontaire seul → reconnect manuel
  * - remove capture la ref, marquage intentionalClose
  * - un seul .subscribe() par instance
+ * - rejoin-watch (instrum.) : observe rejoin Phoenix 30s après 1er CHANNEL_ERROR
  */
 import { serializeRealtimeErr } from "./lobbyPollRealtimeDiagnose.js";
+import { attachPollChannelRejoinWatch } from "./lobbyPollRejoinWatch.js";
 
 /** Délais reconnect manuel (CLOSED involontaire uniquement). */
 export const POLL_REALTIME_RECONNECT_DELAYS_MS = [1000, 2000, 5000, 10000];
@@ -156,6 +158,15 @@ export function createPollChannelController(deps) {
       currentTopic: toRemove.topic,
       subscribeCallCount: toRemove.__pollSubscribeCallCount ?? null,
     });
+    try {
+      toRemove.__pollRejoinWatch?.noteRemove?.({
+        intentionalRemoval,
+        removedGen,
+      });
+      toRemove.__pollRejoinWatch?.dispose?.();
+    } catch {
+      /* ignore watch errors */
+    }
     try {
       await removeChannel(toRemove);
     } catch (e) {
@@ -385,8 +396,24 @@ export function createPollChannelController(deps) {
       });
     }
 
+    // Hooks rejoin AVANT subscribe : le 1er scheduleTimeout Phoenix
+    // se produit dans receive('error') avant/avec le callback app.
+    const rejoinWatch = attachPollChannelRejoinWatch(builder, {
+      channelGen: myGen,
+      topic,
+      lobbyId,
+      votesPollId: nextVotes,
+      channelId: builder.__pollChannelId || null,
+    });
+
     builder.subscribe((status, err) => {
       const intentional = Boolean(builder.__pollIntentionalClose);
+
+      try {
+        rejoinWatch.noteStatus(status, err);
+      } catch {
+        /* ignore watch errors */
+      }
 
       if (
         status === "CHANNEL_ERROR" ||
@@ -423,6 +450,7 @@ export function createPollChannelController(deps) {
           channelGen: myGen,
           currentGen: channelGen,
         });
+        // Callbacks stale toujours chroniqués par rejoin-watch ci-dessus
         return;
       }
 
@@ -471,6 +499,15 @@ export function createPollChannelController(deps) {
       const stale = builder;
       stale.__pollIntentionalClose = true;
       channel = null;
+      try {
+        stale.__pollRejoinWatch?.noteRemove?.({
+          intentionalRemoval: true,
+          reason: "stale_gen_discard",
+        });
+        stale.__pollRejoinWatch?.dispose?.();
+      } catch {
+        /* ignore */
+      }
       try {
         await removeChannel(stale);
       } catch {
