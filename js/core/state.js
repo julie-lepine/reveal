@@ -366,6 +366,27 @@ export function saveStatePatch(patch) {
   save();
 }
 
+/**
+ * SYN-15/16 — remplace les maps soirée après migrate roster (évite le shallow merge
+ * de saveStatePatch qui ne peut pas supprimer d'anciennes clés).
+ * @param {{
+ *   scores: Record<string, number>,
+ *   playerStats: Record<string, object>,
+ *   gameScores: Record<string, Record<string, number>>,
+ *   gameScoreSessionBaseline: Record<string, number>,
+ * }} maps
+ */
+export function replaceEveningScoreMaps(maps) {
+  if (!maps || typeof maps !== "object") return;
+  if (maps.scores) state.scores = maps.scores;
+  if (maps.playerStats) state.playerStats = maps.playerStats;
+  if (maps.gameScores) state.gameScores = maps.gameScores;
+  if (maps.gameScoreSessionBaseline) {
+    state.gameScoreSessionBaseline = maps.gameScoreSessionBaseline;
+  }
+  save();
+}
+
 export function getState() {
   return state;
 }

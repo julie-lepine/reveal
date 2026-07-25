@@ -1,6 +1,6 @@
 import { supabase, isSupabaseConfigured } from "./supabaseClient.js";
 import { getSupabaseUserId, ensureAnonymousSessionForRecovery } from "./supabaseAuth.js";
-import { getState, saveStatePatch, ensurePlayerScore } from "./state.js";
+import { getState, saveStatePatch, ensurePlayerScore, replaceEveningScoreMaps } from "./state.js";
 import {
   saveGuestMembership,
   membershipFromBundle,
@@ -19,6 +19,10 @@ import {
   getActingHostUserId,
 } from "./gameSync.js";
 import { detectActingHostTransition, resolveActingHostUserId } from "./hostPresence.js";
+import {
+  detectParticipantRenames,
+  migrateEveningMapsForRosterRenames,
+} from "./rosterRenameMigrate.js";
 import { arch03AhLog, arch03AhHostAgeMs } from "./arch03ActingHostDebug.js";
 import { getCurrentScreen } from "./router.js";
 import { fetchGameSessionByLobby } from "./supabaseGame.js";
@@ -1100,6 +1104,33 @@ function applyLobbyToState(bundle, { persistGuestMembership = false } = {}) {
     claimEligibleAfter,
     currentScreen: getCurrentScreen(),
   });
+
+  // SYN-15 / SYN-16 : migrate evening maps BEFORE lobby participants update.
+  // Preuve = même userId, display name changé (pas de prune hors roster).
+  const rosterRenames = detectParticipantRenames(
+    prevLobby?.participants || [],
+    bundle.participants || []
+  );
+  if (rosterRenames.length) {
+    const st = getState();
+    const migrated = migrateEveningMapsForRosterRenames(
+      {
+        scores: st.scores,
+        playerStats: st.playerStats,
+        gameScores: st.gameScores,
+        gameScoreSessionBaseline: st.gameScoreSessionBaseline,
+      },
+      rosterRenames
+    );
+    if (migrated.changed) {
+      replaceEveningScoreMaps({
+        scores: migrated.scores,
+        playerStats: migrated.playerStats,
+        gameScores: migrated.gameScores,
+        gameScoreSessionBaseline: migrated.gameScoreSessionBaseline,
+      });
+    }
+  }
 
   saveStatePatch({
     lobby: {
