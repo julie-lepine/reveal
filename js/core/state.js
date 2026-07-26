@@ -52,7 +52,6 @@ export const defaultPlayerStats = () => ({
   tierNightsPlayed: 0,
   truthMeterBluffWins: 0,
   truthMeterMindReaderWins: 0,
-  filRougeMissionsValidated: 0,
 });
 
 const defaultSettings = () => ({
@@ -63,7 +62,6 @@ const defaultState = () => ({
   supabaseUserId: null,
   settings: defaultSettings(),
   scores: {},
-  filRougeScores: {},
   /** Points par jeu : { [gameId]: { [playerName]: points } } (agrégé sur la soirée). */
   gameScores: {},
   /** Snapshot gameScores au démarrage de la partie en cours (affichage in-game). */
@@ -256,16 +254,6 @@ const defaultState = () => ({
     podiumApplied: false,
     results: null,
   },
-  filRougeGame: {
-    status: "idle",
-    submissions: {},
-    missionAcks: {},
-    validations: {},
-    resultsModalOpen: false,
-    resultsSnapshot: null,
-    closedAt: null,
-    closedByUid: null,
-  },
   tierNightGame: { recaps: [], topicId: null, listName: "", controversialItem: null },
   tierNightLiveGame: {
     lobbyStarted: false,
@@ -286,6 +274,47 @@ function generateLobbyCode() {
   return Array.from({ length: 6 }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
 }
 
+/**
+ * Retire les clés Fil Rouge d’un snapshot state chargé (pas de purge localStorage).
+ * Non mutant : renvoie le même objet s’il n’y a rien à retirer, sinon une copie
+ * superficielle avec clones ciblés des entrées playerStats concernées.
+ */
+export function stripLegacyFilRougeKeys(merged) {
+  if (!merged || typeof merged !== "object") return merged;
+
+  const hasTopFilRouge =
+    Object.prototype.hasOwnProperty.call(merged, "filRougeScores") ||
+    Object.prototype.hasOwnProperty.call(merged, "filRougeGame");
+
+  let nextPlayerStats = merged.playerStats;
+  let playerStatsChanged = false;
+  if (merged.playerStats && typeof merged.playerStats === "object") {
+    for (const [name, stats] of Object.entries(merged.playerStats)) {
+      if (
+        !stats ||
+        typeof stats !== "object" ||
+        !Object.prototype.hasOwnProperty.call(stats, "filRougeMissionsValidated")
+      ) {
+        continue;
+      }
+      if (!playerStatsChanged) {
+        nextPlayerStats = { ...merged.playerStats };
+        playerStatsChanged = true;
+      }
+      const { filRougeMissionsValidated: _drop, ...rest } = stats;
+      nextPlayerStats[name] = rest;
+    }
+  }
+
+  if (!hasTopFilRouge && !playerStatsChanged) return merged;
+
+  const out = { ...merged };
+  delete out.filRougeScores;
+  delete out.filRougeGame;
+  if (playerStatsChanged) out.playerStats = nextPlayerStats;
+  return out;
+}
+
 function loadState() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -296,7 +325,6 @@ function loadState() {
       ...base,
       ...parsed,
       scores: { ...base.scores, ...parsed.scores },
-      filRougeScores: { ...base.filRougeScores, ...parsed.filRougeScores },
       gameScores: { ...base.gameScores, ...parsed.gameScores },
       gameScoreSessionBaseline: {
         ...base.gameScoreSessionBaseline,
@@ -322,18 +350,19 @@ function loadState() {
       consensusGame: { ...defaultState().consensusGame, ...parsed.consensusGame },
       dilemmaGame: { ...defaultState().dilemmaGame, ...parsed.dilemmaGame },
       triviaGame: { ...defaultState().triviaGame, ...parsed.triviaGame },
-      filRougeGame: { ...defaultState().filRougeGame, ...parsed.filRougeGame },
       tierNightGame: { ...defaultState().tierNightGame, ...parsed.tierNightGame },
       tierNightLiveGame: { ...defaultState().tierNightLiveGame, ...parsed.tierNightLiveGame },
       openLobbies: parsed.openLobbies || {},
       lastGame: parsed.lastGame || null,
       settings: { ...defaultSettings(), ...parsed.settings },
     };
-    if (!merged.guessLie.sessionId) {
-      merged.guessLie.sessionId = merged.lobbyCode;
+    // Après fusion du snapshot, avant que le résultat ne devienne le state courant.
+    const cleaned = stripLegacyFilRougeKeys(merged);
+    if (!cleaned.guessLie.sessionId) {
+      cleaned.guessLie.sessionId = cleaned.lobbyCode;
     }
-    if (!merged.lobby.status) merged.lobby.status = "waiting";
-    return merged;
+    if (!cleaned.lobby.status) cleaned.lobby.status = "waiting";
+    return cleaned;
   } catch {
     return defaultState();
   }
@@ -358,9 +387,6 @@ export function saveStatePatch(patch) {
   if (patch.lobby) state.lobby = { ...state.lobby, ...patch.lobby };
   if (patch.user) state.user = { ...state.user, ...patch.user };
   if (patch.globalStats) state.globalStats = { ...state.globalStats, ...patch.globalStats };
-  if (patch.filRougeScores) {
-    state.filRougeScores = { ...state.filRougeScores, ...patch.filRougeScores };
-  }
   if (patch.gameScores) state.gameScores = { ...state.gameScores, ...patch.gameScores };
   if (patch.playerStats) state.playerStats = { ...state.playerStats, ...patch.playerStats };
   if (patch.settings) state.settings = { ...state.settings, ...patch.settings };
@@ -636,7 +662,6 @@ export function renameLocalPlayer(newName) {
   // Cumulative evening totals: preferOld keeps the renaming identity's ledger (avoids
   // double-count from orphan copies under the target name). Paired with baseline below.
   state.scores = mergeKeyedRecord(state.scores, oldName, trimmed, "preferOld");
-  state.filRougeScores = mergeKeyedRecord(state.filRougeScores, oldName, trimmed, "preferOld");
   state.playerStats = mergeKeyedRecord(state.playerStats, oldName, trimmed, "maxStats");
   state.gameScores = migrateNestedGameScores(state.gameScores, oldName, trimmed);
   // Snapshot for getCurrentSessionScoreMap: (gameScores[gid][n] − baseline[n]).
@@ -905,10 +930,6 @@ export function ensurePlayerScore(playerName) {
     state.scores[playerName] = 0;
     save();
   }
-  if (state.filRougeScores[playerName] === undefined) {
-    state.filRougeScores[playerName] = 0;
-    save();
-  }
   if (!state.playerStats[playerName]) {
     state.playerStats[playerName] = defaultPlayerStats();
     save();
@@ -930,11 +951,9 @@ export function resetScores() {
   activeScoringGameId = null;
   const names = new Set([
     ...Object.keys(state.scores),
-    ...Object.keys(state.filRougeScores),
   ]);
   names.forEach((name) => {
     state.scores[name] = 0;
-    state.filRougeScores[name] = 0;
     state.playerStats[name] = defaultPlayerStats();
   });
   state.gameScores = {};
@@ -1022,7 +1041,6 @@ export function resetGameSessionsOnly() {
     consensusGame: { ...base.consensusGame },
     dilemmaGame: { ...base.dilemmaGame },
     triviaGame: { ...base.triviaGame },
-    filRougeGame: { ...base.filRougeGame },
     guessLie: { ...emptyGuessLie(), sessionId: getState().lobbyCode || null },
     tierNightTopicId: null,
     tierNightMode: "consensus",
@@ -1091,16 +1109,6 @@ export function addScore(playerName, points) {
   state.scores[playerName] += points;
   creditGameScore(playerName, points);
   save();
-}
-
-export function addFilRougeScore(playerName, points) {
-  ensurePlayerScore(playerName);
-  state.filRougeScores[playerName] = (state.filRougeScores[playerName] || 0) + points;
-  save();
-}
-
-export function getFilRougeScores() {
-  return state.filRougeScores || {};
 }
 
 export function addLocalScore(points) {

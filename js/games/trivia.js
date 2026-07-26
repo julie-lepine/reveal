@@ -11,8 +11,6 @@ import { navigate } from "../core/router.js";
 import { escapeHtml, pageShell, resetPageScroll } from "../core/ui.js";
 import { bindNav } from "../screens/nav.js";
 import { gameExitBarHtml, bindExitGame } from "../core/exitGame.js";
-// FIL_ROUGE (Mot interdit) - pause soirée ; isEveningGameplayPaused() = false si désactivé
-import { isEveningGameplayPaused } from "../core/filRougeSession.js";
 import {
   completeGameSession,
   isGameSyncActive,
@@ -474,7 +472,7 @@ export function mountTrivia(app) {
     if (phase === "question") {
       app.querySelectorAll("[data-trivia-answer]").forEach((btn) => {
         btn.addEventListener("click", async () => {
-          if (trivia.getSession().phase !== "question" || isEveningGameplayPaused()) return;
+          if (trivia.getSession().phase !== "question") return;
           if (answerCommitInFlight) return;
           const choice = Number(btn.getAttribute("data-trivia-answer"));
           if (!Number.isInteger(choice)) return;

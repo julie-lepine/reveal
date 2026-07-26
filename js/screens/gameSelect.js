@@ -16,7 +16,6 @@ import {
   onGameSessionChange,
   handleSessionRoute,
   refreshGameSession,
-  // refreshFilRougeFromSession,
   getCachedGameSession,
   routeToActiveGameIfNeeded,
 } from "../core/gameSync.js";
@@ -27,7 +26,6 @@ import { getLobby, hasActiveLobby, openPartySettings } from "../core/lobby.js";
 import { clientMayOfferHostClaim } from "../core/hostClaimOffer.js";
 import { getLastGame, getState } from "../core/state.js";
 import { arch03LiveLog } from "../core/presenceUiLive.js";
-// import { getFilRougeSession } from "../core/filRougeSession.js";
 import { bindFeedbackPrompt, feedbackPromptCardHtml } from "../core/feedbackUi.js";
 import {
   bindGameResumeBanner,
@@ -54,12 +52,6 @@ import {
   resolveLastGameForRestart,
   restartGame,
 } from "../core/restartGame.js";
-// FIL_ROUGE (Mot interdit) - désactivé
-// import {
-//   filRougeGameSelectSectionHtml,
-//   bindFilRougeBox,
-//   registerFilRougeRefresh,
-// } from "../core/filRougeUi.js";
 
 function lobbyPlayersMetaHtml(count) {
   const n = Number(count) || 0;
@@ -373,7 +365,6 @@ export function mountGameSelect(app) {
 
   function bindGameSelectEvents() {
     bindGameTileLogos(app);
-    // bindFilRougeBox(app);
   }
 
   function scheduleRender(force = false) {
@@ -448,7 +439,6 @@ export function mountGameSelect(app) {
     bindFeedbackPrompt(app);
   }
 
-  // registerFilRougeRefresh(() => scheduleRender(true));
   scheduleRender(true);
 
   if (isSupabaseConfigured() && hasActiveLobby()) {
@@ -490,7 +480,6 @@ export function mountGameSelect(app) {
   }
 
   return () => {
-    // registerFilRougeRefresh(null);
     app.removeEventListener("click", onGameSelectClick);
     unsubResumeBanner();
     unsubSession();

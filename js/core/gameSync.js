@@ -98,7 +98,6 @@ import {
 } from "./deckCodec.js";
 import { scalePollIntervalMs, SYNC_PATCH_TIMEOUT_MS } from "../config/syncConfig.js";
 import { withPatchTimeout } from "./withPatchTimeout.js";
-import { FIL_ROUGE_ENABLED } from "../../data/filRouge.js";
 import { GUESS_LIE_SYNC_PATCH_TIMEOUT_MS } from "../../data/guessLies.js";
 import { pickRemotePlayFields } from "./playPatch.js";
 import { pickLatestConsensusAnswer } from "./consensusAnswerUtils.js";
@@ -690,15 +689,8 @@ export function isCompatibleSessionScreen(sessionScreen, localScreen) {
   ) {
     return true;
   }
-  // FIL_ROUGE (Mot interdit) - écrans désactivés
-  // if (
-  //   sessionScreen === "game-select" &&
-  //   (localScreen === "filrouge-setup" || localScreen === "filrouge-mission")
-  // ) {
-  //   return true;
-  // }
   /**
-   * Hub soirée (screen DB = game-select) + Fil Rouge ou mini-jeu en parallèle :
+   * Hub soirée (screen DB = game-select) + mini-jeu en parallèle :
    * ne pas renvoyer vers le menu quand l'utilisateur est déjà en prep ou en partie.
    */
   if (sessionScreen === "game-select") {
@@ -2161,118 +2153,6 @@ export function dilemmaFromRemote(remote) {
   };
 }
 
-function mapFilRougeValidationsToUid(validations = {}) {
-  const out = {};
-  Object.entries(validations).forEach(([key, val]) => {
-    const uid = playerKeyToRemoteUid(key);
-    if (!uid) return;
-    out[uid] = val;
-  });
-  return out;
-}
-
-export function filRougeToRemote(session) {
-  const submissions = mapValuesByUid(session.submissions || {});
-  return {
-    status: session.status || "idle",
-    submissions,
-    validations: mapFilRougeValidationsToUid(session.validations || {}),
-    resultsModalOpen: Boolean(session.resultsModalOpen),
-    resultsSnapshot: session.resultsSnapshot || null,
-    closedAt: session.closedAt || null,
-    closedByUid: session.closedByUid
-      ? playerKeyToRemoteUid(session.closedByUid)
-      : null,
-  };
-}
-
-export function filRougeFromRemote(remote) {
-  if (!remote) return null;
-  return {
-    status: remote.status || "idle",
-    submissions: { ...(remote.submissions || {}) },
-    validations: { ...(remote.validations || {}) },
-    resultsModalOpen: Boolean(remote.resultsModalOpen),
-    resultsSnapshot: remote.resultsSnapshot || null,
-    closedAt: remote.closedAt || null,
-    closedByUid: remote.closedByUid || null,
-  };
-}
-
-const FIL_ROUGE_STATUS_RANK = { idle: 0, setup: 1, active: 2, completed: 3 };
-
-function filRougeStatusRank(status) {
-  return FIL_ROUGE_STATUS_RANK[status] ?? 0;
-}
-
-/** Relance ou reset : setup sans soumissions ni résultats → prioritaire sur « completed ». */
-function isFilRougeRoundReset(inc) {
-  return (
-    inc?.status === "setup" &&
-    inc?.submissions !== undefined &&
-    Object.keys(inc.submissions || {}).length === 0 &&
-    !inc?.resultsModalOpen &&
-    !inc?.resultsSnapshot
-  );
-}
-
-function pickFilRougeStatusFields(cur, inc) {
-  if (isFilRougeRoundReset(inc)) {
-    return {
-      status: "setup",
-      resultsModalOpen: false,
-      resultsSnapshot: null,
-      closedAt: null,
-      closedByUid: null,
-    };
-  }
-  const curRank = filRougeStatusRank(cur?.status);
-  const incRank = filRougeStatusRank(inc?.status);
-  const preferInc = incRank >= curRank;
-  const src = preferInc ? inc : cur;
-  return {
-    status: src?.status || cur?.status || inc?.status || "idle",
-    resultsModalOpen: Boolean(src?.resultsModalOpen),
-    resultsSnapshot: src?.resultsSnapshot ?? cur?.resultsSnapshot ?? inc?.resultsSnapshot ?? null,
-    closedAt: src?.closedAt ?? cur?.closedAt ?? inc?.closedAt ?? null,
-    closedByUid: src?.closedByUid ?? cur?.closedByUid ?? inc?.closedByUid ?? null,
-  };
-}
-
-function mergeFilRougeSubmissions(cur, inc) {
-  if (!inc || inc.submissions === undefined) return { ...(cur?.submissions || {}) };
-  const incSubs = inc.submissions || {};
-  if (Object.keys(incSubs).length === 0) return {};
-  return { ...(cur?.submissions || {}), ...incSubs };
-}
-
-function mergeFilRougeRemote(cur, inc) {
-  if (!inc) return cur;
-  if (!cur) return inc;
-  const reset = isFilRougeRoundReset(inc);
-  const statusFields = pickFilRougeStatusFields(cur, inc);
-  const merged = {
-    ...cur,
-    ...inc,
-    ...statusFields,
-    submissions: mergeFilRougeSubmissions(cur, inc),
-    validations: reset
-      ? { ...(inc.validations || {}) }
-      : { ...(cur.validations || {}), ...(inc.validations || {}) },
-  };
-  merged.missionAcks = reset ? {} : { ...(cur.missionAcks || {}) };
-  if (merged.status === "setup" && cur.status !== "setup") {
-    merged.missionAcks = {};
-  }
-  return merged;
-}
-
-function mergeFilRougeLocal(local, remote) {
-  if (!remote) return local;
-  if (!local) return remote;
-  return mergeFilRougeRemote(local, remote);
-}
-
 export function speedVoteFromRemote(remote) {
   if (!remote) return null;
   const votes = {};
@@ -2935,21 +2815,6 @@ export function applyRemoteLobbyScores(remote) {
   saveStatePatch({ scores: merged });
 }
 
-function applyRemoteFilRougeScores(remote) {
-  if (!remote || typeof remote !== "object") return;
-  const byName = scoresFromRemote(remote);
-  if (!Object.keys(byName).length) return;
-
-  const merged = { ...getState().filRougeScores };
-  getLobbyParticipants().forEach((p) => {
-    if (byName[p.name] != null) merged[p.name] = byName[p.name];
-  });
-  Object.entries(byName).forEach(([name, pts]) => {
-    merged[name] = pts;
-  });
-  saveStatePatch({ filRougeScores: merged });
-}
-
 function eveningStateToRemote() {
   const {
     stats,
@@ -2986,9 +2851,6 @@ function eveningStateToRemote() {
     lastGame: lastGame ? { ...lastGame } : null,
     lastTierName: tierNightGame?.listName || null,
   };
-  if (FIL_ROUGE_ENABLED) {
-    remote.filRougeScores = scoresToRemote(getState().filRougeScores || {});
-  }
   return remote;
 }
 
@@ -3017,7 +2879,6 @@ export function applyRemoteEveningState(st) {
   if (Object.keys(patch).length) saveStatePatch(patch);
   if (st.scores) applyRemoteLobbyScores(st.scores);
   if (st.playerStats) applyRemotePlayerStats(st.playerStats, (uid) => playerKeyToDisplayName(uid));
-  if (FIL_ROUGE_ENABLED && st.filRougeScores) applyRemoteFilRougeScores(st.filRougeScores);
   if (st.gameScores) applyRemoteGameScores(st.gameScores, st.gameScoreOrder);
   if (st.gameScoreSessionGameId !== undefined || st.gameScoreSessionBaseline) {
     const baselinePatch = {};
@@ -3150,9 +3011,6 @@ export function applyRemoteSession(row) {
   const prevTierNightLiveRunId = getState().tierNightLiveGame?.runId ?? null;
   const prevTierNightLivePhase = getState().tierNightLiveGame?.phase ?? null;
   const st = { ...(row.state || {}) };
-  if (!FIL_ROUGE_ENABLED) {
-    delete st.filRouge;
-  }
 
   if (st.hotTake) {
     const remote = hotTakeFromRemote(st.hotTake);
@@ -3254,11 +3112,6 @@ export function applyRemoteSession(row) {
     patch.tierNightLiveGame = local
       ? mergeTierNightLiveGameLocal(local, remote)
       : remote;
-  }
-  if (FIL_ROUGE_ENABLED && st.filRouge) {
-    const remote = filRougeFromRemote(st.filRouge);
-    const local = getState().filRougeGame;
-    patch.filRougeGame = local ? mergeFilRougeLocal(local, remote) : remote;
   }
 
   const pgPhaseChanged =
@@ -3645,26 +3498,6 @@ export function getEffectiveSessionScreen(row) {
   return declared;
 }
 
-/**
- * Écran Fil Rouge à restaurer au redémarrage de l'app, le cas échéant.
- * Le Fil Rouge est un jeu « de fond » : il ne doit pas être traité comme un écran de
- * partie actif dans le routage continu (sinon il volerait la vedette aux autres jeux),
- * mais à la reprise on ramène le joueur sur la config ou sa mission secrète non vue.
- * Renvoie null si rien à restaurer (mission déjà prise en compte, jeu terminé, etc.).
- */
-export function getFilRougeResumeScreen() {
-  if (!FIL_ROUGE_ENABLED) return null;
-  const fr = getCachedGameSession()?.state?.filRouge;
-  if (!fr) return null;
-  if (fr.status === "setup") return "filrouge-setup";
-  if (fr.status === "active") {
-    const uid = getSupabaseUserId();
-    const acked = uid ? getState().filRougeGame?.missionAcks?.[uid] : true;
-    if (uid && !acked) return "filrouge-mission";
-  }
-  return null;
-}
-
 /** Renvoie l’invité (ou l’hôte) vers la partie en cours si une session active existe. */
 export async function routeToActiveGameIfNeeded(cachedRowOnly = null, { force = false } = {}) {
   const source = "routeToActiveGameIfNeeded";
@@ -3773,7 +3606,6 @@ function isRecentGameSessionRealtime() {
 const EVENING_STATE_KEYS = new Set([
   "scores",
   "playerStats",
-  "filRougeScores",
   "gameScores",
   "gameScoreOrder",
   "gameScoreSessionBaseline",
@@ -3986,17 +3818,6 @@ export async function startGameSession(gameId, screen, state) {
 
   const { setLobbyPlaying } = await import("./lobby.js");
   await setLobbyPlaying(gameId);
-  const priorState = cachedRow?.state || {};
-  const filRougePreserve = FIL_ROUGE_ENABLED
-    ? (() => {
-        const localFr = getState().filRougeGame;
-        return priorState.filRouge != null
-          ? { filRouge: priorState.filRouge }
-          : localFr?.status && localFr.status !== "idle" && localFr.status !== "completed"
-            ? { filRouge: filRougeToRemote(localFr) }
-            : {};
-      })()
-    : {};
   const row = await upsertGameSession({
     lobbyId,
     gameId,
@@ -4004,7 +3825,6 @@ export async function startGameSession(gameId, screen, state) {
     hostId,
     state: {
       ...eveningStateToRemote(),
-      ...filRougePreserve,
       ...(state || {}),
     },
   });  applyRemoteSession(row);
@@ -4514,9 +4334,6 @@ async function patchGameStateInner(
         }
       : incConsensus;
   }
-  if (FIL_ROUGE_ENABLED && mergePayload.filRouge) {
-    nextState.filRouge = mergeFilRougeRemote(current.filRouge, mergePayload.filRouge);
-  }
   if (mergePayload.dilemma) {
     const curDm = current.dilemma;
     const incDm = mergePayload.dilemma;
@@ -4875,25 +4692,6 @@ export async function syncDilemmaSession(extra = {}, patchOpts = {}) {
   if (!isGameSyncActive()) return session;
   await patchGameState({ dilemma: dilemmaToRemote(session) }, patchOpts);
   return session;
-}
-
-export async function syncFilRougeSession(extra = {}, patchOpts = {}) {
-  if (!FIL_ROUGE_ENABLED) return getState().filRougeGame || null;
-  const session = { ...getState().filRougeGame, ...extra };
-  saveStatePatch({ filRougeGame: session });
-  if (!isGameSyncActive()) {
-    return session;
-  }
-  await patchGameState({ filRouge: filRougeToRemote(session) }, patchOpts);
-  return getState().filRougeGame || session;
-}
-
-/** Recharge l'état Fil Rouge depuis la session multijoueur (hôte + invités). */
-export async function refreshFilRougeFromSession() {
-  if (!FIL_ROUGE_ENABLED) return null;
-  if (!isGameSyncActive()) return getState().filRougeGame;
-  const row = await refreshGameSession();
-  return getState().filRougeGame;
 }
 
 export async function commitGuessLieSubmission(playerName, payload) {

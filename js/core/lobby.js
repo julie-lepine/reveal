@@ -64,7 +64,6 @@ import {
   isOnPostGameScreen,
   isLobbyHost,
   returnToGameSelect,
-  // getFilRougeResumeScreen,
   routeToSessionScreen,
   isAppContentMounted,
   refreshEveningScoresFromSession,
@@ -506,7 +505,6 @@ export async function resetAppToCleanHome() {
     localStorage.removeItem("reveal-app-state");
     localStorage.removeItem("reveal-auth-credentials");
     clearGuestMembership();
-    // localStorage.removeItem("reveal-fil-rouge-private");
   } catch {
     /* ignore */
   }

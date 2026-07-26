@@ -1,15 +1,10 @@
-/** Barème unifié de la soirée (classement lobby). Le Fil Rouge a son propre compteur. */
+/** Barème unifié de la soirée (classement lobby). */
 
 export const EVENING_POINTS = {
   /** Victoire standard de manche */
   WIN: 10,
   /** Récompense forte (dissent, menteur, bluff, consensus parfait tier…) */
   BONUS: 15,
-};
-
-/** Points Fil Rouge (Mot interdit - désactivé, voir data/filRouge.js FIL_ROUGE_ENABLED) */
-export const FIL_ROUGE_POINTS = {
-  MISSION: 50,
 };
 
 /** Tier Night : écart de rang vs consensus → points */

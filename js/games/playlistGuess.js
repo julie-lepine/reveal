@@ -26,8 +26,6 @@ import { navigate } from "../core/router.js";
 import { escapeHtml, pageShell, resetPageScroll } from "../core/ui.js";
 import { bindNav } from "../screens/nav.js";
 import { gameExitBarHtml, bindExitGame } from "../core/exitGame.js";
-// FIL_ROUGE (Mot interdit) - pause soirée ; isEveningGameplayPaused() = false si désactivé
-import { isEveningGameplayPaused } from "../core/filRougeSession.js";
 import {
   isGameSyncActive,
   canActAsHost,
@@ -251,7 +249,6 @@ export function mountPlaylistGuess(app) {
 
   async function submitVote(pick) {
     if (pick == null || voteCommitInFlight != null) return;
-    if (isEveningGameplayPaused()) return;
     if (mp) {
       voteCommitInFlight = pick;
       render();
@@ -417,7 +414,6 @@ export function mountPlaylistGuess(app) {
 
     app.querySelectorAll("[data-vote-id]").forEach((btn) => {
       btn.addEventListener("click", () => {
-        if (isEveningGameplayPaused()) return;
         if (phase !== "voting") return;
         selected = btn.getAttribute("data-vote-id");
         render();

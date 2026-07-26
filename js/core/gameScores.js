@@ -121,13 +121,12 @@ function gameLeaderboardCardHtml(titleHtml, players, scoreMap) {
     </div>`;
 }
 
-/** Classement de chaque jeu joué dans la soirée (+ bloc Fil Rouge). */
+/** Classement de chaque jeu joué dans la soirée. */
 export function eveningGameLeaderboardsHtml() {
   const {
     gameScores = {},
     gameScoreOrder = [],
     eveningGamesRecorded = {},
-    filRougeScores = {},
   } = getState();
   const order = resolveEveningGameScoreOrder({
     gameScoreOrder,
@@ -146,13 +145,6 @@ export function eveningGameLeaderboardsHtml() {
     const titleHtml = `${meta.emoji} ${escapeHtml(meta.title)}`;
     blocks.push(gameLeaderboardCardHtml(titleHtml, players, gameScores[gid] || {}));
   });
-
-  // FIL_ROUGE (Mot interdit) - bloc classement désactivé
-  // const hasFilRouge = Object.values(filRougeScores).some((v) => Number(v) !== 0);
-  // if (hasFilRouge) {
-  //   blocks.push(gameLeaderboardCardHtml("🧵 Fil Rouge", players, filRougeScores));
-  // }
-  void filRougeScores;
 
   if (!blocks.length) return "";
   return `

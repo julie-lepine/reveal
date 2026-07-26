@@ -1,4 +1,4 @@
-import { EVENING_POINTS, FIL_ROUGE_POINTS, tierNightPointsForRankDiff } from "../../data/eveningScoring.js";
+import { EVENING_POINTS, tierNightPointsForRankDiff } from "../../data/eveningScoring.js";
 import { PLAYLIST_GUESS_POINTS } from "../../data/playlistGuess.js";
 import { CLUTCH_PODIUM_POINTS } from "../../data/clutch.js";
 import { WRONG_ANSWER_PODIUM_POINTS } from "../../data/wrongAnswer.js";
@@ -12,10 +12,10 @@ import {
   TRUTH_METER_CONSENSUS_GAP,
   TRUTH_METER_CLOSE_DISTANCE,
 } from "../../data/truthMeter.js";
-import { addScore, addFilRougeScore, bumpPlayerStat } from "./state.js";
+import { addScore, bumpPlayerStat } from "./state.js";
 import { getMajorityOption } from "./hotTakeSession.js";
 
-export { EVENING_POINTS, FIL_ROUGE_POINTS, tierNightPointsForRankDiff };
+export { EVENING_POINTS, tierNightPointsForRankDiff };
 
 export function awardHotTakeVotes(votes, options) {
   const { majority, tied, counts } = getMajorityOption(votes, options);
@@ -302,12 +302,4 @@ export function awardGuessLieRound({ correct, liarName, liarBonus }) {
 export function guessLieLiarWins(correctCount, voterCount) {
   if (voterCount <= 0) return true;
   return correctCount * 2 < voterCount;
-}
-
-/** MOT INTERDIT (Fil Rouge) - désactivé, voir data/filRouge.js */
-export function awardFilRougeMission(agentName) {
-  // addFilRougeScore(agentName, FIL_ROUGE_POINTS.MISSION);
-  // bumpPlayerStat(agentName, "filRougeMissionsValidated", 1);
-  void agentName;
-  return { points: 0 };
 }

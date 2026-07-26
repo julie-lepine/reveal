@@ -25,7 +25,6 @@ import { navigate } from "../core/router.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
 import { bindNav } from "../screens/nav.js";
 import { gameExitBarHtml, bindExitGame } from "../core/exitGame.js";
-import { isEveningGameplayPaused } from "../core/filRougeSession.js";
 import { checkHotTakeModeration, getModerationNotice } from "../core/hotTakeSession.js";
 import {
   isGameSyncActive,
@@ -376,7 +375,7 @@ export function mountWrongAnswer(app) {
           ).join("")}</div>
           <span class="muted">${roundIdx + 1}/${totalRounds}</span>
         </div>
-        <div class="logo logo--sm"><h1>WRONG ANSWER ONLY ↩️</h1></div>
+        <div class="logo logo--sm"><h1>WRONG ANSWER ONLY</h1></div>
         ${phaseHtml}
         ${gameExitBarHtml()}
       `,
@@ -399,7 +398,7 @@ export function mountWrongAnswer(app) {
     }
 
     app.querySelector("#wrong-submit")?.addEventListener("click", async () => {
-      if (isEveningGameplayPaused() || myAnswerText()) return;
+      if (myAnswerText()) return;
       const text = sanitizeWrongAnswer(draftText);
       if (!text) return;
       const mod = checkHotTakeModeration(text);
@@ -430,7 +429,7 @@ export function mountWrongAnswer(app) {
 
     app.querySelectorAll("[data-vote]").forEach((btn) => {
       btn.addEventListener("click", () => {
-        if (isEveningGameplayPaused() || phase !== "voting") return;
+        if (phase !== "voting") return;
         const target = btn.getAttribute("data-vote");
         if (target === localName) return;
         selectedTarget = target;
@@ -439,7 +438,7 @@ export function mountWrongAnswer(app) {
     });
 
     app.querySelector("#wrong-confirm-vote")?.addEventListener("click", async () => {
-      if (isEveningGameplayPaused() || phase !== "voting") return;
+      if (phase !== "voting") return;
       const target = selectedTarget;
       if (target == null || target === localName) return;
       await commitWrongAnswerVote(target);

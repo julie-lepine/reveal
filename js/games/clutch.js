@@ -28,7 +28,6 @@ import { navigate } from "../core/router.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
 import { bindNav } from "../screens/nav.js";
 import { gameExitBarHtml, bindExitGame } from "../core/exitGame.js";
-import { isEveningGameplayPaused } from "../core/filRougeSession.js";
 import {
   isGameSyncActive,
   canActAsHost,
@@ -472,7 +471,7 @@ export function mountClutch(app) {
           ).join("")}</div>
           <span class="muted">${roundIdx + 1}/${totalRounds}</span>
         </div>
-        <div class="logo logo--sm"><h1>CLUTCH 💥</h1></div>
+        <div class="logo logo--sm"><h1>CLUTCH</h1></div>
         ${phaseHtml}
         ${gameExitBarHtml()}
       `,
@@ -492,8 +491,7 @@ export function mountClutch(app) {
         localStart == null ||
         myTapMs() != null ||
         localWindowClosed ||
-        tapCommitInFlight ||
-        isEveningGameplayPaused()
+        tapCommitInFlight
       ) {
         return;
       }
