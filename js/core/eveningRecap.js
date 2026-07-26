@@ -1,13 +1,13 @@
-import { getState, getLieSuccessRate } from "./state.js";
 import { getLobbyParticipants } from "./lobby.js";
-import { getSortedActivePlayers } from "./players.js";
+import { getSortedEveningStandingPlayers } from "./players.js";
 import { formatNameList, sortAndRankByScore } from "./competitionRank.js";
+import { getState, getLieSuccessRate } from "./state.js";
 
 export function getEveningRecap() {
   const { stats, scores, tierNightGame } = getState();
   const participants = getLobbyParticipants();
-  // Tri d’affichage local (score puis nom) — ne pas utiliser pour badges / métier.
-  const ranked = sortAndRankByScore(getSortedActivePlayers(), (p) => scores[p.name] || 0);
+  // Classement historique soirée (actifs + contributeurs partis) — pas le roster seul.
+  const ranked = sortAndRankByScore(getSortedEveningStandingPlayers(), (p) => scores[p.name] || 0);
   const top = ranked
     .filter((p) => (scores[p.name] || 0) > 0 && p.rank <= 3)
     .map((p) => ({ ...p, score: scores[p.name] || 0 }));

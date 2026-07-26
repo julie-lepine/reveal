@@ -1,4 +1,4 @@
-import { getSortedActivePlayers } from "./players.js";
+import { getSortedActivePlayers, getEveningStandingPlayers } from "./players.js";
 import { getCurrentSessionScoreMap, getState } from "./state.js";
 import { escapeHtml } from "./ui.js";
 import {
@@ -129,18 +129,20 @@ export function eveningGameLeaderboardsHtml() {
     eveningGamesRecorded = {},
     filRougeScores = {},
   } = getState();
-  const players = getSortedActivePlayers();
-  if (!players.length) return "";
-
-  const blocks = [];
   const order = resolveEveningGameScoreOrder({
     gameScoreOrder,
     gameScores,
     eveningGamesRecorded,
   });
+  if (!order.length && !getEveningStandingPlayers().length) return "";
+
+  const blocks = [];
   order.forEach((gid) => {
     const meta = GAME_LABELS[gid];
     if (!meta) return;
+    // Actifs + contributeurs de CE jeu (pas tous les historiques de la soirée).
+    const players = getEveningStandingPlayers({ gameId: gid });
+    if (!players.length) return;
     const titleHtml = `${meta.emoji} ${escapeHtml(meta.title)}`;
     blocks.push(gameLeaderboardCardHtml(titleHtml, players, gameScores[gid] || {}));
   });

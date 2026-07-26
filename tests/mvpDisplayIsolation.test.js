@@ -35,7 +35,7 @@ describe("MVP isolé du tri d’affichage", () => {
     const src = readFileSync(join(root, "js/core/players.js"), "utf8");
     const fn = src.slice(
       src.indexOf("export function getSortedActivePlayers"),
-      src.indexOf("export function pickRandomNpc")
+      src.indexOf("export function getEveningStandingPlayers")
     );
     assert.match(fn, /scores\[b\.name\].*scores\[a\.name\]/);
     assert.doesNotMatch(fn, /localeCompare/);

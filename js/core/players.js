@@ -1,5 +1,6 @@
 import { DEMO_NPC_PLAYERS } from "./demoPlayers.js";
 import { getLobbyParticipants, hasActiveLobby } from "./lobby.js";
+import { buildEveningStandingPlayers } from "./eveningStandings.js";
 import { getLocalDisplayName, getLocalEmoji, getState, ensurePlayerScore } from "./state.js";
 
 /** Joueurs actifs : lobby si présent, sinon NPC + local */
@@ -47,6 +48,32 @@ export function getSortedActivePlayers() {
   syncAllPlayerScores();
   return [...getActivePlayers()].sort(
     (a, b) => (scores[b.name] || 0) - (scores[a.name] || 0)
+  );
+}
+
+/**
+ * UX-HIST-01 — standings soirée : roster actif ∪ contributeurs historiques.
+ * Ne pas utiliser pour lobby / ready / présence / HUD in-game.
+ * @param {{ gameId?: string|null }} [opts]
+ */
+export function getEveningStandingPlayers({ gameId = null } = {}) {
+  const { scores = {}, gameScores = {} } = getState();
+  return buildEveningStandingPlayers({
+    activePlayers: getActivePlayers(),
+    scores,
+    gameScores,
+    gameId,
+  });
+}
+
+/** Tri par score soirée (sans ensurePlayerScore sur les historiques). */
+export function getSortedEveningStandingPlayers({ gameId = null } = {}) {
+  const { scores = {} } = getState();
+  const players = getEveningStandingPlayers({ gameId });
+  return [...players].sort(
+    (a, b) =>
+      (scores[b.name] || 0) - (scores[a.name] || 0) ||
+      String(a.name).localeCompare(String(b.name))
   );
 }
 

@@ -1,5 +1,6 @@
 import { getState } from "../core/state.js";
 import { getPlayerBadges } from "../core/badges.js";
+import { getSortedEveningStandingPlayers } from "../core/players.js";
 import { getCurrentScreen } from "../core/router.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
 import { bindNav } from "./nav.js";
@@ -21,9 +22,17 @@ import {
 export function mountLeaderboard(app) {
   function renderBoard() {
     const { scores } = getState();
-    // Badges déjà attribués via getSortedActivePlayers (score seul).
-    // Re-tri affichage local : nom uniquement pour ordre stable entre ex æquo.
-    const ranked = sortAndRankByScore(getPlayerBadges(), (p) => scores[p.name] || 0);
+    // UX-HIST-01 : standings soirée (actifs + contributeurs partis).
+    // Badges : uniquement ceux déjà calculés pour les actifs — pas de filtre de ligne.
+    const badgeByName = Object.fromEntries(
+      getPlayerBadges().map((p) => [p.name, p.badge || ""])
+    );
+    const standings = getSortedEveningStandingPlayers().map((p) => ({
+      ...p,
+      badge: badgeByName[p.name] || "",
+      score: scores[p.name] || 0,
+    }));
+    const ranked = sortAndRankByScore(standings, (p) => p.score);
     const podium = [ranked[1], ranked[0], ranked[2]].filter(Boolean);
     const leaders = winnersAtRank(ranked, 1);
     const tieHintText = formatCoLeadersHint(leaders);
