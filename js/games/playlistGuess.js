@@ -14,7 +14,7 @@ import {
   lobbyPlayersWithIds,
 } from "../core/playlistGuessSession.js";
 import { awardPlaylistGuessRound } from "../core/scoring.js";
-import { gameCumulativeScoresHtml, refreshGameScoresBox } from "../core/gameScores.js";
+import { gameCumulativeScoresHtml } from "../core/gameScores.js";
 import {
   setLastGame,
   recordPlaylistGuessPlayed,
@@ -344,7 +344,6 @@ export function mountPlaylistGuess(app) {
         ${confirm.confirmDisabled || voteCommitInFlight != null ? "disabled" : ""}>${escapeHtml(
           voteCommitInFlight != null ? "Envoi…" : confirm.confirmLabel
         )}</button>
-      ${gameExitBarHtml()}
       ${
         host
           ? `<button type="button" class="btn btn-secondary btn--spaced" id="playlist-force">
@@ -352,15 +351,7 @@ export function mountPlaylistGuess(app) {
             </button>`
           : ""
       }
-      ${
-        mp
-          ? gameCumulativeScoresHtml({
-              gameId: "playlistguess",
-              gameLabel: "VibeCheck",
-              title: "Cumul des scores",
-            })
-          : ""
-      }
+      ${gameExitBarHtml()}
       <div class="screen-bottom-spacer" aria-hidden="true"></div>`;
   }
 
@@ -522,11 +513,6 @@ export function mountPlaylistGuess(app) {
     if (phase === "voting" && roundIdx === prevIdx && prevPhase === "voting") {
       if (app.querySelector("#confirm")) {
         const votesJson = JSON.stringify(getEffectivePlaylistGuessVotes());
-        refreshGameScoresBox(app, {
-          gameId: "playlistguess",
-          gameLabel: "VibeCheck",
-          title: "Cumul des scores",
-        });
         if (votesJson !== prevVotesJson || myVote != null) {
           patchVotingChrome();
         }

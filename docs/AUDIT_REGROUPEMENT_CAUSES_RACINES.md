@@ -17,9 +17,9 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 
 | | Contenu |
 |--|---------|
-| **Fait** | … · UX-CLUTCH-01 ✅ QA · **UX-RESUME-BANNER** ✅ patch (dismiss « Rester ici ») |
-| **Prochain** | **UX-VIBE-01 / UX-VIBE-02** 🔧 patch → QA · QA terrain UX-RESUME-BANNER |
-| **Ensuite** | ARCH-06 / Cause 7 résidus · ARCH-07/08 · M-14b |
+| **Fait** | … · UX-RESUME-BANNER ✅ QA · **UX-VIBE-01 / UX-VIBE-02** ✅ QA |
+| **Prochain** | ARCH-06 / Cause 7 résidus |
+| **Ensuite** | ARCH-07/08 · M-14b |
 
 **Hors file audit**  
 Sondages in-chat (`lobby_polls` / UI chat) — feature produit, pas un ticket cause racine.
@@ -38,14 +38,12 @@ Clutch taps figés sous latence (SYN-26) · ready prep après Recommencer · Cau
 
 | # | ID | Cause | Problème | Statut |
 |---|----|-------|----------|--------|
-| 1 | **UX-VIBE-01** | 11/4 | VibeCheck : pas de feedback après « Valider mon vote » / compteurs | 🔧 patch |
-| 2 | **UX-VIBE-02** | 5/11 | VibeCheck : sortie menu en play (‹ / Jeux / exit enfoui) | 🔧 patch |
-| 3 | **ARCH-06** | 6 | Handlers async multiples en vol | Dette |
-| 4 | **M-14a / SYN-14** | 3 | TierNight topic / routing | ❌ KO QA — suspendu |
-| 5 | Guess Lie UX | 4/7 | UI avant await ; stats round local-only | Post I-08 |
-| 6 | Loader UI join | 5/11 | Interstitiel join | Hors T-01/T-02 |
-| 7 | Pré-résolution entry screens | 5 | `get*EntryScreen` (filet M-08 conservé) | Hors M-08 |
-| 8 | **ARCH-22** | 11 | Pas de feedback sync lente | Ouvert |
+| 1 | **ARCH-06** | 6 | Handlers async multiples en vol | Dette |
+| 2 | **M-14a / SYN-14** | 3 | TierNight topic / routing | ❌ KO QA — suspendu |
+| 3 | Guess Lie UX | 4/7 | UI avant await ; stats round local-only | Post I-08 |
+| 4 | Loader UI join | 5/11 | Interstitiel join | Hors T-01/T-02 |
+| 5 | Pré-résolution entry screens | 5 | `get*EntryScreen` (filet M-08 conservé) | Hors M-08 |
+| 6 | **ARCH-22** | 11 | Pas de feedback sync lente | Ouvert |
 
 ### Autres ouverts
 
@@ -70,20 +68,20 @@ Clutch taps figés sous latence (SYN-26) · ready prep après Recommencer · Cau
 | 1 | Identité invité / JWT | ✅ QA | ARCH-01 partiel |
 | 2 | Race auth / profil | ✅ QA | — |
 | 3 | Sources de vérité multiples | ✅ hors TierNight | **M-14a** suspendu · UX-CLUTCH-01 ✅ |
-| 4 | Asymétrie hôte / invité | ✅ QA | UX Guess Lie séparée · UX-VIBE-01 |
-| 5 | Routing + timing sync | ✅ | ARCH-05 mitigé · UX-VIBE-02 |
+| 4 | Asymétrie hôte / invité | ✅ QA | UX Guess Lie séparée |
+| 5 | Routing + timing sync | ✅ | ARCH-05 mitigé |
 | 6 | Async écrans | Partiel | ARCH-06 ; SYN-05 dormant |
 | 7 | Sync silencieuse / fire-and-forget | Partiel | ARCH-07/08, M-14b |
 | 8 | Reset / migration incomplète | Partiel | I-09 ✅ ; SYN-15/16 ✅ ; ARCH-10 |
 | 9 | Sync monolithe / duplication | Dette | ARCH-11… |
 | 10 | Code mort | Dette | Fil Rouge, dead exports |
-| 11 | Friction UX | Partiel | ARCH-22 ; L-04 · UX-VIBE-01/02 |
+| 11 | Friction UX | Partiel | ARCH-22 ; L-04 |
 
 ---
 
 ## Détail des tickets ouverts
 
-### Cause 11 / 4 — UX-VIBE-01 (VibeCheck vote)
+### Cause 11 / 4 — UX-VIBE-01 ✅ QA
 
 | | |
 |--|--|
@@ -91,17 +89,17 @@ Clutch taps figés sous latence (SYN-26) · ready prep après Recommencer · Cau
 | **Cause** | Pas de modèle `selected`/`committed` ; condition UI `hasCommitted && selected === null` impossible car `syncFromSession` remet `selected = serverPick` ; pas de `voteConfirmChrome` |
 | **Fix** | Aligner Hot Take/Dilemma : `myVote` + `selected = null` après commit ; `voteConfirmChrome` ; hint + force `(voted/total)` |
 | **Où** | `js/games/playlistGuess.js` · `voteConfirm.js` |
-| **QA** | Invité → bouton secondary « En attente… » ; compteur `x/y` tous ; hôte force `x/y` ; reveal auto |
+| **QA** | ✅ validé 2026-07-26 |
 
-### Cause 5 / 11 — UX-VIBE-02 (VibeCheck sortie menu)
+### Cause 5 / 11 — UX-VIBE-02 ✅ QA
 
 | | |
 |--|--|
 | **Problème** | Joueur ne peut pas rejoindre le menu des jeux pendant VibeCheck (‹ reboucle prep↔play ; exit enfoui ; Jeux sans suppress) |
 | **Décision** | ‹ en **play** = même flux que la barre d’exit (`exitGameToGameSelect` + confirm). Invité Jeux = `returnToGameSelect` (suppress). Hôte Jeux en play = confirm arrêt |
-| **Fix** | `handleBackNavigation` play → exit ; `goGames` play ; exit bar juste après le confirm (plus haut) ; tab `playlistguess` bottom nav |
+| **Fix** | `handleBackNavigation` play → exit ; `goGames` play ; ordre vote = Valider/Attente → Révéler → Arrêter ; cumul **reveal only** |
 | **Où** | `nav.js` · `bottomNav.js` · `playlistGuess.js` |
-| **QA** | ‹ + barre exit → menu ; invité reste hub + bandeau ; hôte arrête pour tous ; pas de boucle prep |
+| **QA** | ✅ validé 2026-07-26 (layout exit + cumul refine) |
 
 ### Cause 5 — Routing / timing
 
@@ -150,7 +148,7 @@ Clutch taps figés sous latence (SYN-26) · ready prep après Recommencer · Cau
 | **Hors scope** | Autres jeux live-roster · SYN-26 · UX-HIST-01 · `getActivePlayers` |
 | **QA** | ✅ validé 2026-07-26 |
 
-### Cause 11 — UX-RESUME-BANNER ✅ patch
+### Cause 11 — UX-RESUME-BANNER ✅ QA
 
 | | |
 |--|--|
@@ -159,7 +157,7 @@ Clutch taps figés sous latence (SYN-26) · ready prep après Recommencer · Cau
 | **Routing** | `suppressRoutingForScoreView` inchangé |
 | **Nouvelle session** | clear si `!éligible` ; re-show si clé `game:` / `family:` change |
 | **Résidu** | interstitial lobby `#game-resume-stay` hors scope |
-| **QA** | En attente terrain |
+| **QA** | ✅ validé 2026-07-26 |
 
 ### Cause 8 — autres
 
@@ -225,13 +223,13 @@ Clutch conserve son départage temporel (règle produit explicite inchangée).
 | 1 | C-01/02, R-01–05, M-05a |
 | 2 | M-01, P-03, M-02a, S-02 |
 | 3 | I-03/04, SYN-03, M-13, M-02b, ARCH-02, SYN-29, I-PG-01, ready stale Recommencer, UX-CLUTCH-01 |
-| 4 | I-01/02/08, M-03b, M-06a/b, L-01, ARCH-03/03b |
-| 5 | T-01/02, T-03↻, M-07, M-08, P-02, SYN-28, I-PG-01, ARCH-04 |
+| 4 | I-01/02/08, M-03b, M-06a/b, L-01, ARCH-03/03b, UX-VIBE-01 |
+| 5 | T-01/02, T-03↻, M-07, M-08, P-02, SYN-28, I-PG-01, ARCH-04, UX-VIBE-02 |
 | 6 | I-05, SYN-13b↻, SYN-25 |
 | 7 | I-07, M-09, L-09, M-11, M-10, T-05, SYN-26, M-04b / SYN-18 |
 | 8 | I-06, P-02, ARCH-09, I-09 / SYN-06, SYN-15 / SYN-16 |
 | 9 | SYN-12 / M-05b |
-| 11 | L-02, ARCH-21↻, M-12 (cleanup `#join=`, pas auto-join), UX-HIST-01 |
+| 11 | L-02, ARCH-21↻, M-12 (cleanup `#join=`, pas auto-join), UX-HIST-01, UX-RESUME-BANNER, UX-VIBE-01/02 |
 
 ---
 
@@ -250,4 +248,4 @@ Hors tickets prioritaires — à traiter si opportunité / régression :
 
 ---
 
-*Suivi vivant · Dernière MAJ : 2026-07-26 — UX-VIBE-01/02 🔧 patch · UX-RESUME-BANNER QA pending*
+*Suivi vivant · Dernière MAJ : 2026-07-26 — UX-VIBE-01 / UX-VIBE-02 ✅ QA*
