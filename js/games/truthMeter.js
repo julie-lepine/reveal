@@ -35,6 +35,7 @@ import { getActivePlayers } from "../core/players.js";
 import { getLocalDisplayName, recordTruthMeterPlayed, setLastGame } from "../core/state.js";
 import { setLobbyPlaying, setLobbyWaiting } from "../core/lobby.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
+import { createMountGuard } from "../core/mountLifecycle.js";
 import { navigate } from "../core/router.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
 import { bindNav } from "../screens/nav.js";
@@ -197,6 +198,7 @@ export function mountTruthMeter(app) {
   let revealInFlight = false;
   let authorFocusRound = -1;
   let suppressAuthorAutoFocus = false;
+  const mount = createMountGuard();
   const localName = getLocalDisplayName();
   const mp = isGameSyncActive();
 
@@ -284,6 +286,7 @@ export function mountTruthMeter(app) {
     if (mp && !canActAsHost()) return;
     revealPendingTimeoutId = setTimeout(() => {
       revealPendingTimeoutId = null;
+      if (!mount.isMounted()) return;
       void transitionToReveal();
     }, TRUTH_METER_REVEAL_PENDING_MS);
   }
@@ -355,6 +358,7 @@ export function mountTruthMeter(app) {
   }
 
   function refreshRevealDom() {
+    if (!mount.isMounted()) return;
     if (phase !== "reveal" || !affirmation) return;
     const { votesToShow, metrics } = revealMetricsForDisplay();
 
@@ -376,6 +380,7 @@ export function mountTruthMeter(app) {
   }
 
   function animateRevealGauge(targetPct) {
+    if (!mount.isMounted()) return;
     const fill = app.querySelector("#truth-gauge-fill");
     const pctEl = app.querySelector("#truth-gauge-pct");
     const authorPin = app.querySelector("#truth-gauge-author-pin");
@@ -388,6 +393,10 @@ export function mountTruthMeter(app) {
     const duration = 900;
 
     const step = (now) => {
+      if (!mount.isMounted()) {
+        revealAnimId = null;
+        return;
+      }
       const t = Math.min(1, (now - start) / duration);
       const eased = 1 - (1 - t) ** 3;
       const current = Math.round(targetPct * eased);
@@ -412,11 +421,12 @@ export function mountTruthMeter(app) {
         phase: "reveal-pending",
         voteEndsAt: null,
       });
-    } else {
-      phase = "reveal-pending";
-      render();
-      scheduleRevealFromPending();
+      return;
     }
+    if (!mount.isMounted()) return;
+    phase = "reveal-pending";
+    render();
+    scheduleRevealFromPending();
   }
 
   function truthMeterSessionScores() {
@@ -440,6 +450,7 @@ export function mountTruthMeter(app) {
   async function transitionToReveal() {
     if (alreadyScoredThisRound()) {
       if (!mp && phase !== "reveal") {
+        if (!mount.isMounted()) return;
         phase = "reveal";
         render();
       }
@@ -483,6 +494,7 @@ export function mountTruthMeter(app) {
         { withEveningScores: mp && isLobbyHost() && Boolean(author) }
       );
 
+      if (!mount.isMounted()) return;
       if (!mp) {
         phase = "reveal";
         render();
@@ -494,7 +506,10 @@ export function mountTruthMeter(app) {
         render();
         const avg = lastAward?.groupAvg ?? computeRoundMetrics(votesToScore, est).groupAvg;
         authorRevealed = false;
-        requestAnimationFrame(() => animateRevealGauge(avg));
+        requestAnimationFrame(() => {
+          if (!mount.isMounted()) return;
+          animateRevealGauge(avg);
+        });
       }
     } finally {
       revealInFlight = false;
@@ -515,18 +530,20 @@ export function mountTruthMeter(app) {
         roundScored: false,
         voteEndsAt: endsAt,
       });
-    } else {
-      phase = "voting";
-      myVote = null;
-      votes = {};
-      render();
+      return;
     }
+    if (!mount.isMounted()) return;
+    phase = "voting";
+    myVote = null;
+    votes = {};
+    render();
   }
 
   /** Filet de sécurité hôte : clôt la manche même si un votant est absent. */
   async function forceReveal() {
     if (mp && !canActAsHost()) return;
     await ensureLocalVoteCommitted();
+    if (!mount.isMounted()) return;
     await goToRevealPending();
   }
 
@@ -534,16 +551,19 @@ export function mountTruthMeter(app) {
     if (mp && !canActAsHost()) return;
     if (mp) {
       await commitTruthMeterPlay({ phase: "display", votes: {}, roundScored: false });
-    } else {
-      phase = "display";
-      render();
-      setTimeout(() => {
-        if (!mp || canActAsHost()) startVotingPhase();
-      }, TRUTH_METER_DISPLAY_SEC * 1000);
+      return;
     }
+    if (!mount.isMounted()) return;
+    phase = "display";
+    render();
+    setTimeout(() => {
+      if (!mount.isMounted()) return;
+      if (!mp || canActAsHost()) startVotingPhase();
+    }, TRUTH_METER_DISPLAY_SEC * 1000);
   }
 
   function render() {
+    if (!mount.isMounted()) return;
     syncFromSession();
     const author = getCurrentAuthor() || affirmation?.author;
     const total = totalRounds();
@@ -707,6 +727,7 @@ export function mountTruthMeter(app) {
         if (authorFocusRound !== roundIdx && !suppressAuthorAutoFocus) {
           authorFocusRound = roundIdx;
           requestAnimationFrame(() => {
+            if (!mount.isMounted()) return;
             if (suppressAuthorAutoFocus || phase !== "writing" || getCurrentAuthor() !== localName) {
               return;
             }
@@ -729,9 +750,10 @@ export function mountTruthMeter(app) {
         const val = Number(app.querySelector("#author-slider")?.value ?? 50);
         const check = validateAffirmation(text);
         if (!check.ok) {
-          await import("../core/dialog.js").then(({ showAppAlert }) =>
-            showAppAlert(check.error, { title: "Affirmation", icon: "⚠️" })
-          );
+          await import("../core/dialog.js").then(({ showAppAlert }) => {
+            if (!mount.isMounted()) return;
+            return showAppAlert(check.error, { title: "Affirmation", icon: "⚠️" });
+          });
           return;
         }
         draftText = check.text;
@@ -740,6 +762,7 @@ export function mountTruthMeter(app) {
         if (btn) btn.disabled = true;
         try {
           await commitTruthMeterAffirmation(check.text, val);
+          if (!mount.isMounted()) return;
           if (!mp) {
             startDisplayPhase();
           } else {
@@ -747,7 +770,7 @@ export function mountTruthMeter(app) {
             render();
           }
         } finally {
-          if (btn) btn.disabled = false;
+          if (mount.isMounted() && btn) btn.disabled = false;
         }
       });
     }
@@ -755,6 +778,7 @@ export function mountTruthMeter(app) {
     if (phase === "display" && host && !displayTimeoutId) {
       displayTimeoutId = setTimeout(() => {
         displayTimeoutId = null;
+        if (!mount.isMounted()) return;
         startVotingPhase();
       }, TRUTH_METER_DISPLAY_SEC * 1000);
     }
@@ -776,6 +800,7 @@ export function mountTruthMeter(app) {
           render();
           try {
             await commitTruthMeterVote(choice);
+            if (!mount.isMounted()) return;
             if (allVotesReadyForReveal() && canActAsHost()) await goToRevealPending();
           } finally {
             voteCommitInFlight = null;
@@ -787,7 +812,7 @@ export function mountTruthMeter(app) {
             goToRevealPending();
           }
         }
-        render();
+        if (mount.isMounted()) render();
       });
     }
 
@@ -803,6 +828,7 @@ export function mountTruthMeter(app) {
         if (btn) btn.disabled = true;
         try {
           const res = await skipTruthMeterAuthorRound();
+          if (!mount.isMounted()) return;
           if (res?.completed) return;
           syncFromSession();
           render();
@@ -816,7 +842,10 @@ export function mountTruthMeter(app) {
       const authorName = affirmation?.author;
       const verdictPct = buildRevealMetrics(votesForAward(), authorName).groupAvg;
       if (!revealAnimId && !authorRevealed && app.querySelector("#truth-gauge-fill")) {
-        requestAnimationFrame(() => animateRevealGauge(verdictPct));
+        requestAnimationFrame(() => {
+          if (!mount.isMounted()) return;
+          animateRevealGauge(verdictPct);
+        });
       }
     }
 
@@ -884,6 +913,7 @@ export function mountTruthMeter(app) {
     if (displayTimeoutId) return;
     displayTimeoutId = setTimeout(() => {
       displayTimeoutId = null;
+      if (!mount.isMounted()) return;
       startVotingPhase();
     }, TRUTH_METER_DISPLAY_SEC * 1000);
   }
@@ -925,13 +955,16 @@ export function mountTruthMeter(app) {
             voteEndsAt: null,
             roundScored: false,
           });
+          if (!mount.isMounted()) return;
           syncFromSession();
         }
+        if (!mount.isMounted()) return;
         render();
       } else {
         if (mp) {
           await finishTruthMeterGameSession();
         } else {
+          if (!mount.isMounted()) return;
           recordTruthMeterPlayed();
           setLastGame({
             gameId: "truthmeter",
@@ -944,6 +977,7 @@ export function mountTruthMeter(app) {
       }
     } finally {
       nextRoundInFlight = false;
+      if (!mount.isMounted()) return;
       const btnAfter = app.querySelector("#next-round");
       if (btnAfter) btnAfter.disabled = false;
     }
@@ -952,6 +986,7 @@ export function mountTruthMeter(app) {
   let lastAckedActingHostToken = getActingHostUiRefreshToken();
 
   const unsubGame = onGameSessionChange((row) => {
+    if (!mount.isMounted()) return;
     if (stopGameSessionListenerOnPostGame(row, { cleanup: () => {
       if (displayTimeoutId) clearTimeout(displayTimeoutId);
       if (revealPendingTimeoutId) clearTimeout(revealPendingTimeoutId);
@@ -982,6 +1017,7 @@ export function mountTruthMeter(app) {
     if (phase === "voting" && canActAsHost() && allVotesReadyForReveal()) {
       void (async () => {
         await ensureLocalVoteCommitted();
+        if (!mount.isMounted()) return;
         await goToRevealPending();
       })();
       return;
@@ -1021,7 +1057,10 @@ export function mountTruthMeter(app) {
       const authorName = affirmation?.author;
       const verdictPct = buildRevealMetrics(votesForAward(), authorName).groupAvg;
       authorRevealed = false;
-      requestAnimationFrame(() => animateRevealGauge(verdictPct));
+      requestAnimationFrame(() => {
+        if (!mount.isMounted()) return;
+        animateRevealGauge(verdictPct);
+      });
     }
   });
 
@@ -1039,6 +1078,7 @@ export function mountTruthMeter(app) {
   }
 
   return () => {
+    mount.dispose();
     app.removeEventListener("click", onAppClick);
     if (displayTimeoutId) clearTimeout(displayTimeoutId);
     if (revealPendingTimeoutId) clearTimeout(revealPendingTimeoutId);

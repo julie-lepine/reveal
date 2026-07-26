@@ -3,6 +3,7 @@ import { formatConsensusScore } from "../core/consensusSession.js";
 import { useConsensusGame } from "../core/useConsensusGame.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
 import { withClickLock } from "../core/actionLock.js";
+import { createMountGuard } from "../core/mountLifecycle.js";
 import { getActivePlayers } from "../core/players.js";
 import {
   formatNameList,
@@ -227,6 +228,7 @@ export function mountConsensus(app) {
   let lastRenderedPhase = "";
   let lastRenderedQuestionIdx = -1;
 
+  const mount = createMountGuard();
   const localName = getLocalDisplayName();
   const mp = isGameSyncActive();
 
@@ -281,6 +283,7 @@ export function mountConsensus(app) {
     if (mp && !canActAsHost()) return;
     revealPendingTimeoutId = setTimeout(() => {
       revealPendingTimeoutId = null;
+      if (!mount.isMounted()) return;
       void goToReveal();
     }, CONSENSUS_REVEAL_PENDING_MS);
   }
@@ -386,6 +389,7 @@ export function mountConsensus(app) {
     }
     renderTimer = setTimeout(() => {
       renderTimer = null;
+      if (!mount.isMounted()) return;
       render();
     }, 100);
   }
@@ -458,6 +462,7 @@ export function mountConsensus(app) {
       .forEach((player, index) => {
         const delayMs = 1600 + index * 550 + Math.floor(Math.random() * 2200);
         const timeoutId = setTimeout(async () => {
+          if (!mount.isMounted()) return;
           const live = consensus.getSession();
           if (live.phase !== "question") return;
           const qIdx = live.questionIdx ?? 0;
@@ -476,6 +481,7 @@ export function mountConsensus(app) {
             ...live,
             answers: nextAnswers,
           });
+          if (!mount.isMounted()) return;
           if (consensus.allAnswersIn()) {
             await beginReveal();
           } else {
@@ -518,14 +524,17 @@ export function mountConsensus(app) {
       });
       if (mp && canActAsHost()) {
         void consensus.commitPhase("reveal-pending").catch(() => {});
-        await showAppAlert(
-          "La sync est lente - la révélation continue chez toi. Les autres peuvent avoir un léger retard.",
-          { title: "Connexion", icon: "📡" }
-        );
+        if (mount.isMounted()) {
+          await showAppAlert(
+            "La sync est lente - la révélation continue chez toi. Les autres peuvent avoir un léger retard.",
+            { title: "Connexion", icon: "📡" }
+          );
+        }
       }
     } finally {
       revealPendingInFlight = false;
     }
+    if (!mount.isMounted()) return;
     syncFromSession();
     render();
     scheduleRevealFromPending();
@@ -546,7 +555,7 @@ export function mountConsensus(app) {
           icon: "🤝",
         }
       );
-      if (!confirmed) return;
+      if (!confirmed || !mount.isMounted()) return;
     }
     if (!mp) {
       await fillMissingLocalAnswers();
@@ -592,12 +601,14 @@ export function mountConsensus(app) {
       }
     } finally {
       revealInFlight = false;
+      if (!mount.isMounted()) return;
       if (syncFailed && mp && canActAsHost()) {
         await showAppAlert(
           "Les résultats s'affichent chez toi. Si les autres sont bloqués, vérifiez la connexion puis relancez une manche.",
           { title: "Sync révélation", icon: "📡" }
         );
       }
+      if (!mount.isMounted()) return;
       render();
     }
   }
@@ -614,12 +625,14 @@ export function mountConsensus(app) {
       await startGameSession("consensus", "consensus-prep", {
         consensus: consensusToRemote(configSession),
       });
+      if (!mount.isMounted()) return;
       navigate("consensus-prep", {
         navStack: ["home", "lobby", "game-select", "consensus-prep"],
       });
       return;
     }
 
+    if (!mount.isMounted()) return;
     saveStatePatch({ consensusGame: configSession });
     navigate("consensus-prep", {
       navStack: ["home", "lobby", "game-select", "consensus-prep"],
@@ -652,8 +665,10 @@ export function mountConsensus(app) {
         consensus: consensusToRemote(started.session),
       });
     } else {
+      if (!mount.isMounted()) return;
       saveStatePatch({ consensusGame: started.session });
       await setLobbyPlaying("consensus");
+      if (!mount.isMounted()) return;
       navigate("consensus", {
         navStack: ["home", "lobby", "game-select", "consensus"],
       });
@@ -663,6 +678,7 @@ export function mountConsensus(app) {
   async function finishConsensusGame() {
     const live = consensus.getSession();
     if (live.podiumApplied) {
+      if (!mount.isMounted()) return;
       render();
       return;
     }
@@ -701,12 +717,14 @@ export function mountConsensus(app) {
 
     if (mp && canActAsHost()) {
       await consensus.commitPlay(finalSession, { screen: "consensus" });
+      if (!mount.isMounted()) return;
       render();
       return;
     }
 
     if (!mp) {
       await setLobbyWaiting();
+      if (!mount.isMounted()) return;
       saveStatePatch({ consensusGame: finalSession });
       render();
     }
@@ -732,17 +750,20 @@ export function mountConsensus(app) {
         });
       } catch (e) {
         console.warn("REVEAL completeGameSession:", e);
+        if (!mount.isMounted()) return;
         navigate("results", { navStack: ["home", "lobby", "game-select", "results"] });
       }
       return;
     }
 
     await setLobbyWaiting();
+    if (!mount.isMounted()) return;
     saveStatePatch({ consensusGame: finalSession });
     navigate("results", { navStack: ["home", "lobby", "game-select", "results"] });
   }
 
   function render() {
+    if (!mount.isMounted()) return;
     const roundChanged = syncFromSession();
     if (!roundChanged) captureDraftFromDom();
     const session = consensus.getSession();
@@ -859,7 +880,10 @@ export function mountConsensus(app) {
     const newScrollEl = app.querySelector(".page--scroll");
     if (newScrollEl) newScrollEl.scrollTop = scrollTop;
     if (scrollToTop) {
-      requestAnimationFrame(() => scrollPageToTop());
+      requestAnimationFrame(() => {
+        if (!mount.isMounted()) return;
+        scrollPageToTop();
+      });
     }
     lastRenderedPhase = phase;
     lastRenderedQuestionIdx = questionIdx;
@@ -875,6 +899,7 @@ export function mountConsensus(app) {
       app.querySelector("#btn-consensus-submit")?.addEventListener("click", async () => {
         if (answerState() === "submitted") return;
         await commitLocalDraft({ submitted: true });
+        if (!mount.isMounted()) return;
         if (consensus.allAnswersIn() && (!mp || canActAsHost())) {
           await beginReveal();
         } else {
@@ -889,6 +914,7 @@ export function mountConsensus(app) {
     app.querySelector("#btn-consensus-next")?.addEventListener("click", withClickLock(async () => {
       if (questionIdx < totalQuestions - 1) {
         await consensus.startQuestion(questionIdx + 1);
+        if (!mount.isMounted()) return;
         render();
         return;
       }
@@ -943,6 +969,7 @@ export function mountConsensus(app) {
   let lastAckedActingHostToken = getActingHostUiRefreshToken();
 
   const unsub = onGameSessionChange((row) => {
+    if (!mount.isMounted()) return;
     if (stopGameSessionListenerOnPostGame(row, { cleanup: () => {
       clearNpcTimers();
       clearRevealPending();
@@ -1001,6 +1028,7 @@ export function mountConsensus(app) {
   }
 
   return () => {
+    mount.dispose();
     clearNpcTimers();
     clearRevealPending();
     if (renderTimer) clearTimeout(renderTimer);

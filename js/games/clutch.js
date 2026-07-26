@@ -24,6 +24,7 @@ import { getLobbyParticipants } from "../core/lobby.js";
 import { setLobbyPlaying, setLobbyWaiting } from "../core/lobby.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
 import { withClickLock } from "../core/actionLock.js";
+import { createMountGuard } from "../core/mountLifecycle.js";
 import { navigate } from "../core/router.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
 import { bindNav } from "../screens/nav.js";
@@ -71,6 +72,7 @@ export function mountClutch(app) {
   let copyTimer = null;
   let blindVibrated = false;
 
+  const mount = createMountGuard();
   const localName = getLocalDisplayName();
   const mp = isGameSyncActive();
   const totalRounds = getClutchSession().roundCount ?? 5;
@@ -153,6 +155,10 @@ export function mountClutch(app) {
     const sub = app.querySelector("#clutch-clock-sub");
     if (sub) sub.textContent = BLIND_LINES[0];
     copyTimer = setInterval(() => {
+      if (!mount.isMounted()) {
+        clearCopyTimer();
+        return;
+      }
       const el = app.querySelector("#clutch-clock-sub");
       if (!el || phase !== "active" || myTapMs() != null) {
         clearCopyTimer();
@@ -187,6 +193,10 @@ export function mountClutch(app) {
   function startClock() {
     stopClock();
     const tick = () => {
+      if (!mount.isMounted()) {
+        stopClock();
+        return;
+      }
       if (phase !== "active" || localStart == null) {
         stopClock();
         return;
@@ -212,6 +222,10 @@ export function mountClutch(app) {
   function startCountdown() {
     stopClock();
     const tick = () => {
+      if (!mount.isMounted()) {
+        stopClock();
+        return;
+      }
       if (phase !== "active" || localStart != null) return;
       const clock = app.querySelector("#clutch-clock");
       if (!clock) {
@@ -231,6 +245,7 @@ export function mountClutch(app) {
 
   /** Fin du décompte : départ réel du chrono + programmation de la clôture (cible + grâce). */
   function beginClock() {
+    if (!mount.isMounted()) return;
     localStart = performance.now();
     clearGrace();
     const windowMs = (targetMs || 0) + CLUTCH_GRACE_MS;
@@ -240,6 +255,7 @@ export function mountClutch(app) {
 
   /** Maj légère en phase aveugle (tap distant) sans casser chrono/anim. */
   function refreshActiveLive() {
+    if (!mount.isMounted()) return;
     refreshTappedChips();
   }
 
@@ -281,6 +297,7 @@ export function mountClutch(app) {
 
   function onGraceElapsed() {
     graceTimer = null;
+    if (!mount.isMounted()) return;
     if (phase !== "active") return;
     localWindowClosed = true;
     if (!mp || canActAsHost()) {
@@ -321,6 +338,7 @@ export function mountClutch(app) {
         },
         { withEveningScores: mp && isLobbyHost() }
       );
+      if (!mount.isMounted()) return;
       if (!mp) {
         phase = "reveal";
         lastRound = lastRoundData;
@@ -453,6 +471,7 @@ export function mountClutch(app) {
   }
 
   function render() {
+    if (!mount.isMounted()) return;
     syncFromSession();
     ensureRoundTiming();
     stopClock();
@@ -505,6 +524,7 @@ export function mountClutch(app) {
       render();
       void commitClutchTap(tap)
         .then(() => {
+          if (!mount.isMounted()) return;
           if (!mp) {
             void goToReveal();
             return;
@@ -512,6 +532,7 @@ export function mountClutch(app) {
           if (allClutchTapsIn() && canActAsHost()) void goToReveal();
         })
         .catch(() => {
+          if (!mount.isMounted()) return;
           // Session déjà rollback dans commitClutchTap ; rouvre la fenêtre de tap.
           const ui = resolveClutchTapCommitFailureUi();
           tapCommitInFlight = ui.tapCommitInFlight;
@@ -519,6 +540,7 @@ export function mountClutch(app) {
         })
         .finally(() => {
           tapCommitInFlight = false;
+          if (!mount.isMounted()) return;
           syncFromSession();
           render();
         });
@@ -527,6 +549,7 @@ export function mountClutch(app) {
     app.querySelector("#next-round")?.addEventListener("click", withClickLock(async () => {
       if (roundIdx < totalRounds - 1) {
         await startClutchRound(roundIdx + 1);
+        if (!mount.isMounted()) return;
         syncFromSession();
         render();
       } else {
@@ -542,9 +565,11 @@ export function mountClutch(app) {
             await completeGameSession({ gameId: "clutch", screen: "results", state: {} });
           } catch (e) {
             console.warn("REVEAL completeGameSession:", e);
+            if (!mount.isMounted()) return;
             navigate("results", { navStack: ["home", "lobby", "game-select", "results"] });
           }
         } else {
+          if (!mount.isMounted()) return;
           setLobbyWaiting();
           navigate("results", { navStack: ["home", "lobby", "game-select", "results"] });
         }
@@ -555,6 +580,7 @@ export function mountClutch(app) {
   let lastAckedActingHostToken = getActingHostUiRefreshToken();
 
   const unsub = onGameSessionChange((row) => {
+    if (!mount.isMounted()) return;
     if (stopGameSessionListenerOnPostGame(row, { cleanup: () => {
       clearGrace();
       stopClock();
@@ -609,6 +635,7 @@ export function mountClutch(app) {
   render();
 
   return () => {
+    mount.dispose();
     clearGrace();
     stopClock();
     clearCopyTimer();

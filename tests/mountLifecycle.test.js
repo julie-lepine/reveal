@@ -240,3 +240,198 @@ describe("ARCH-06 Vague B1 — contrats câblage", () => {
     );
   });
 });
+
+describe("ARCH-06 Vague B2 — timers / RAF + contrats", () => {
+  it("timeout déjà programmé puis dispose → aucun effet", async () => {
+    const mount = createMountGuard();
+    let ran = 0;
+    const id = setTimeout(() => {
+      if (!mount.isMounted()) return;
+      ran += 1;
+    }, 20);
+    mount.dispose();
+    await new Promise((r) => setTimeout(r, 40));
+    clearTimeout(id);
+    assert.equal(ran, 0);
+  });
+
+  it("timeout normal tant que monté", async () => {
+    const mount = createMountGuard();
+    let ran = 0;
+    await new Promise((resolve) => {
+      setTimeout(() => {
+        if (!mount.isMounted()) return;
+        ran += 1;
+        resolve();
+      }, 5);
+    });
+    assert.equal(ran, 1);
+    mount.dispose();
+  });
+
+  it("RAF déjà programmé puis dispose → aucune mutation ni frame suivante", async () => {
+    const mount = createMountGuard();
+    let mutations = 0;
+    let nextFrames = 0;
+    let rafId = 0;
+    const queue = [];
+
+    const requestAnimationFrame = (fn) => {
+      rafId += 1;
+      queue.push({ id: rafId, fn });
+      return rafId;
+    };
+    const cancelAnimationFrame = (id) => {
+      const idx = queue.findIndex((x) => x.id === id);
+      if (idx >= 0) queue.splice(idx, 1);
+    };
+
+    const tick = () => {
+      if (!mount.isMounted()) {
+        cancelAnimationFrame(rafId);
+        return;
+      }
+      mutations += 1;
+      rafId = requestAnimationFrame(tick);
+      nextFrames += 1;
+    };
+
+    rafId = requestAnimationFrame(tick);
+    mount.dispose();
+    // Exécute la frame déjà en file (comme un browser après cleanup)
+    while (queue.length) {
+      const job = queue.shift();
+      job.fn(0);
+    }
+    assert.equal(mutations, 0);
+    assert.equal(nextFrames, 0);
+    assert.equal(queue.length, 0);
+  });
+
+  it("RAF boucle tant que monté, stoppe au dispose sans reprogrammer", async () => {
+    const mount = createMountGuard();
+    let mutations = 0;
+    const queue = [];
+    let seq = 0;
+    const requestAnimationFrame = (fn) => {
+      seq += 1;
+      queue.push({ id: seq, fn });
+      return seq;
+    };
+
+    const tick = () => {
+      if (!mount.isMounted()) return;
+      mutations += 1;
+      if (mutations < 3) requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+    while (queue.length && mutations < 3) {
+      const job = queue.shift();
+      job.fn(0);
+    }
+    assert.equal(mutations, 3);
+    mount.dispose();
+    requestAnimationFrame(tick);
+    while (queue.length) {
+      const job = queue.shift();
+      job.fn(0);
+    }
+    assert.equal(mutations, 3);
+  });
+
+  it("commit serveur déjà parti termine ; mount mort reste silencieux", async () => {
+    const mount = createMountGuard();
+    let commitDone = false;
+    let ui = 0;
+    const gate = deferred();
+    const p = (async () => {
+      await gate.promise;
+      commitDone = true;
+      if (!mount.isMounted()) return;
+      ui += 1;
+    })();
+    mount.dispose();
+    gate.resolve();
+    await p;
+    assert.equal(commitDone, true);
+    assert.equal(ui, 0);
+  });
+
+  it("rejet après cleanup : pas d'unhandled, pas de feedback", async () => {
+    const mount = createMountGuard();
+    let feedback = 0;
+    const gate = deferred();
+    const p = (async () => {
+      try {
+        await gate.promise;
+        throw new Error("boom");
+      } catch {
+        if (!mount.isMounted()) return;
+        feedback += 1;
+      }
+    })();
+    mount.dispose();
+    gate.resolve();
+    await p;
+    assert.equal(feedback, 0);
+  });
+
+  it("void asyncFn listener : garde après await", async () => {
+    const mount = createMountGuard();
+    let ui = 0;
+    const gate = deferred();
+    void (async () => {
+      await gate.promise;
+      if (!mount.isMounted()) return;
+      ui += 1;
+    })();
+    mount.dispose();
+    gate.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+    assert.equal(ui, 0);
+  });
+
+  for (const file of [
+    "../js/games/consensus.js",
+    "../js/games/trivia.js",
+    "../js/games/clutch.js",
+    "../js/games/truthMeter.js",
+  ]) {
+    it(`${file} : createMountGuard + dispose en tête + render gate`, () => {
+      const s = readSrc(file);
+      assert.match(s, /createMountGuard/);
+      assert.match(s, /return \(\) => \{\s*\n\s*mount\.dispose\(\);/s);
+      assert.match(s, /function render\(\) \{\s*\n\s*if \(!mount\.isMounted\(\)\) return;/);
+    });
+  }
+
+  it("consensus : NPC timeout + reveal-pending + scheduleRender vérifient le guard", () => {
+    const s = readSrc("../js/games/consensus.js");
+    assert.match(s, /const timeoutId = setTimeout\(async \(\) => \{\s*\n\s*if \(!mount\.isMounted\(\)\) return;/s);
+    assert.match(s, /revealPendingTimeoutId = setTimeout\(\(\) => \{\s*\n\s*revealPendingTimeoutId = null;\s*\n\s*if \(!mount\.isMounted\(\)\) return;/s);
+    assert.match(s, /renderTimer = setTimeout\(\(\) => \{\s*\n\s*renderTimer = null;\s*\n\s*if \(!mount\.isMounted\(\)\) return;/s);
+  });
+
+  it("trivia : NPC timeout vérifie le guard avant et après commit", () => {
+    const s = readSrc("../js/games/trivia.js");
+    assert.match(
+      s,
+      /const timeoutId = setTimeout\(async \(\) => \{\s*\n\s*if \(!mount\.isMounted\(\)\) return;[\s\S]*?await trivia\.commitPlay\([\s\S]*?if \(!mount\.isMounted\(\)\) return;/
+    );
+  });
+
+  it("clutch : tick clock/countdown + grace + copyTimer vérifient le guard", () => {
+    const s = readSrc("../js/games/clutch.js");
+    assert.match(s, /const tick = \(\) => \{\s*\n\s*if \(!mount\.isMounted\(\)\) \{\s*\n\s*stopClock\(\);\s*\n\s*return;/s);
+    assert.match(s, /function onGraceElapsed\(\) \{\s*\n\s*graceTimer = null;\s*\n\s*if \(!mount\.isMounted\(\)\) return;/s);
+    assert.match(s, /copyTimer = setInterval\(\(\) => \{\s*\n\s*if \(!mount\.isMounted\(\)\) \{/s);
+  });
+
+  it("truthMeter : step RAF + reveal-pending + display timeouts vérifient le guard", () => {
+    const s = readSrc("../js/games/truthMeter.js");
+    assert.match(s, /const step = \(now\) => \{\s*\n\s*if \(!mount\.isMounted\(\)\) \{\s*\n\s*revealAnimId = null;\s*\n\s*return;/s);
+    assert.match(s, /revealPendingTimeoutId = setTimeout\(\(\) => \{\s*\n\s*revealPendingTimeoutId = null;\s*\n\s*if \(!mount\.isMounted\(\)\) return;/s);
+    assert.match(s, /displayTimeoutId = setTimeout\(\(\) => \{\s*\n\s*displayTimeoutId = null;\s*\n\s*if \(!mount\.isMounted\(\)\) return;/s);
+  });
+});
