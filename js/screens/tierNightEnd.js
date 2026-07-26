@@ -31,6 +31,7 @@ import {
   eveningRecapRestartButtonHtml,
   bindRestartGameButtons,
 } from "../core/restartGame.js";
+import { createMountGuard } from "../core/mountLifecycle.js";
 
 function tierOfItemIn(placed, item) {
   for (const tier of TIER_LEVELS) {
@@ -156,6 +157,7 @@ function controversialHtml(session, recaps, labelFn = (i) => i) {
 }
 
 export function mountTierNightEnd(app) {
+  const mount = createMountGuard();
   let session = getTierNightSession();
   let recaps = getTierNightRecaps();
   const localName = getLocalDisplayName();
@@ -176,7 +178,11 @@ export function mountTierNightEnd(app) {
       if (isGameSyncActive()) {
         const maxAttempts = 12;
         for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+          if (!mount.isMounted()) return;
+          if (!mount.isCurrentMount()) return;
           await ensureTierNightRecapsFromRemote(list);
+          if (!mount.isMounted()) return;
+          if (!mount.isCurrentMount()) return;
           reloadSession();
           const ready =
             getTierNightRecaps().length > 0 &&
@@ -186,10 +192,14 @@ export function mountTierNightEnd(app) {
           if (ready) break;
           await new Promise((r) => setTimeout(r, 450));
         }
+        if (!mount.isMounted()) return;
+        if (!mount.isCurrentMount()) return;
         if (!isLobbyHost()) {
           await refreshEveningScoresFromSession();
         }
       }
+      if (!mount.isMounted()) return;
+      if (!mount.isCurrentMount()) return;
       reloadSession();
       render();
     } finally {
@@ -198,6 +208,8 @@ export function mountTierNightEnd(app) {
   }
 
   async function goToResults() {
+    if (!mount.isMounted()) return;
+    if (!mount.isCurrentMount()) return;
     setLastGame({
       gameId: "tiernight",
       title: "Tier Night",
@@ -212,6 +224,8 @@ export function mountTierNightEnd(app) {
           await completeGameSession({ gameId: "tiernight", screen: "results", state: {} });
         } catch (e) {
           console.warn("REVEAL completeGameSession:", e);
+          if (!mount.isMounted()) return;
+          if (!mount.isCurrentMount()) return;
           navigate("results", resultsNav);
         }
       } else {
@@ -222,10 +236,14 @@ export function mountTierNightEnd(app) {
     }
 
     await setLobbyWaiting();
+    if (!mount.isMounted()) return;
+    if (!mount.isCurrentMount()) return;
     navigate("results", resultsNav);
   }
 
   function render() {
+    if (!mount.isMounted()) return;
+    if (!mount.isCurrentMount()) return;
     reloadSession();
     const roundSorted = getTierNightRoundPointsSorted();
     const labelFn = makeItemLabel(session, recaps);
@@ -284,10 +302,14 @@ export function mountTierNightEnd(app) {
   }
 
   const unsubSession = onGameSessionChange((row) => {
+    if (!mount.isMounted()) return;
+    if (!mount.isCurrentMount()) return;
     if (row?.screen === "results") {
       navigate("results", { navStack: ["home", "lobby", "game-select", "results"] });
       return;
     }
+    // Restart / prep : ne pas recharger un ancien récap hors écran end.
+    if (row?.screen && row.screen !== "tiernight-end") return;
     if (row?.state?.scores || row?.state?.tierNight?.recap) {
       void bootstrapRecaps();
     }
@@ -297,6 +319,7 @@ export function mountTierNightEnd(app) {
   void bootstrapRecaps();
 
   return () => {
+    mount.dispose();
     unsubSession();
     // En MP, la fin de partie passe par completeGameSession (setLobbyBetweenGames) : ne pas
     // repasser le lobby en "waiting" ici, sinon on annule l'état "en soirée" et on reset les prêt.

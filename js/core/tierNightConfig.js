@@ -77,3 +77,19 @@ export function shouldPreferTierNightEndRoute({
     (localHasRecap || remoteHasRecap)
   );
 }
+
+/** True si le récap distant correspond au run courant (sinon refuse la route end). */
+export function tierNightRecapBelongsToRun(tn = {}) {
+  const recap = tn?.recap;
+  if (!recap?.recaps?.length) return false;
+  const hasPlacements = recap.recaps.some((r) =>
+    Object.values(r.placed || {}).flat().length > 0
+  );
+  if (!hasPlacements) return false;
+  if (tn.lobbyStarted) return false;
+  const runId = tn.runId || null;
+  const recapRunId = recap.runId || null;
+  if (runId && recapRunId && runId !== recapRunId) return false;
+  if (runId && !recapRunId) return false;
+  return true;
+}

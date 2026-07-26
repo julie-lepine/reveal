@@ -18,7 +18,7 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 | | Contenu |
 |--|---------|
 | **Fait** | … · **ARCH-06 V1** ✅ QA · **mode B** 🔧 · **mode C** 🔧 (C0–C3) |
-| **Prochain** | ARCH-06 Traître host V2 |
+| **Prochain** | QA C2 (TierNight Recommencer — correctif) puis Traître host V2 |
 | **Ensuite** | Lobby IIFE / SYN-12 · clôture ARCH-06 si plus de résidu |
 
 **Hors file audit**  

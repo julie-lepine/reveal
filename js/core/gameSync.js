@@ -105,6 +105,7 @@ import {
   finishedTierNightLiveRemote,
   shouldPreferTierNightEndRoute,
   tierNightConfigPatchFromRemoteState,
+  tierNightRecapBelongsToRun,
 } from "./tierNightConfig.js";
 
 export { withPatchTimeout };
@@ -626,16 +627,7 @@ function hasLocalTierNightRecap() {
 }
 
 export function canRouteToTierNightEnd(row) {
-  const tn = row?.state?.tierNight;
-  if (!tn || typeof tn !== "object") return false;
-  if (tn.lobbyStarted) return false;
-  const recap = tn.recap;
-  if (!recap?.recaps?.some((r) => tierNightPlacedItemsCount(r.placed || {}) > 0)) {
-    return false;
-  }
-  const runId = tn.runId || null;
-  const recapRunId = recap.runId || null;
-  return !runId || !recapRunId || runId === recapRunId;
+  return tierNightRecapBelongsToRun(row?.state?.tierNight);
 }
 
 function warnBlockedTierNightEndRoute(row, source) {
@@ -3091,7 +3083,8 @@ export function applyRemoteSession(row) {
       tn.recap?.recaps?.length &&
       !tn.lobbyStarted &&
       recapMatchesRun &&
-      recapMatchesLocal
+      recapMatchesLocal &&
+      !(remoteRunId && !recapRunId)
     ) {
       const localName = getLocalDisplayName();
       const localPts =
@@ -3104,6 +3097,23 @@ export function applyRemoteSession(row) {
       };
     } else if (tn.game) {
       patch.tierNightGame = { ...getState().tierNightGame, ...tn.game };
+    } else if (!tn.lobbyStarted && (tn.recap == null || tn.recap === undefined)) {
+      // Recommencer / prep reset : effacer un récap local stale (run précédent).
+      const local = getState().tierNightGame || {};
+      const localHasRecap = Array.isArray(local.recaps) && local.recaps.length > 0;
+      const runChanged = remoteRunId && localRunId && remoteRunId !== localRunId;
+      if (localHasRecap || runChanged || (remoteRunId && localRunId !== remoteRunId)) {
+        patch.tierNightGame = {
+          runId: remoteRunId || null,
+          recaps: [],
+          topicId: tn.topicId ?? null,
+          listName: "",
+          controversialItem: null,
+          consensus: null,
+          localConsensusPoints: 0,
+          recapSynced: false,
+        };
+      }
     }
   }
   if (st.tierNightLive) {
@@ -4926,6 +4936,7 @@ export async function ensureTierNightRecapsFromRemote(list) {
   if (!tn) return;
 
   if (tn.recap?.recaps?.length && tierNightRecapHasPlacements(tn.recap)) {
+    if (!tierNightRecapBelongsToRun(tn)) return;
     applyTierNightRecapFromRemote(tn.recap);
     return;
   }
