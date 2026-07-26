@@ -435,3 +435,190 @@ describe("ARCH-06 Vague B2 — timers / RAF + contrats", () => {
     assert.match(s, /displayTimeoutId = setTimeout\(\(\) => \{\s*\n\s*displayTimeoutId = null;\s*\n\s*if \(!mount\.isMounted\(\)\) return;/s);
   });
 });
+
+describe("ARCH-06 Vague B3 — tierNightLive mountMp", () => {
+  function simulateTierLiveMpMount() {
+    const mount = createMountGuard();
+    const effects = {
+      renders: 0,
+      navigates: 0,
+      commitsStarted: 0,
+      commitsFinished: 0,
+      sessionEffects: 0,
+      feedback: 0,
+    };
+
+    async function transitionToReveal({ gate } = {}) {
+      effects.commitsStarted += 1;
+      await (gate ? gate.promise : Promise.resolve());
+      effects.commitsFinished += 1;
+      if (!mount.isMounted()) return { uiApplied: false };
+      effects.renders += 1;
+      return { uiApplied: true };
+    }
+
+    async function nextRound({ last = false, gate, fail = false } = {}) {
+      effects.commitsStarted += 1;
+      try {
+        await (gate ? gate.promise : Promise.resolve());
+        if (fail) throw new Error("finalize fail");
+        effects.commitsFinished += 1;
+      } catch (err) {
+        if (!mount.isMounted()) return { uiApplied: false, err };
+        effects.feedback += 1;
+        throw err;
+      }
+      if (!mount.isMounted()) return { uiApplied: false };
+      if (last) effects.navigates += 1;
+      else effects.renders += 1;
+      return { uiApplied: true };
+    }
+
+    function onGameSessionChange(handler) {
+      if (!mount.isMounted()) return;
+      handler();
+    }
+
+    return {
+      mount,
+      effects,
+      transitionToReveal,
+      nextRound,
+      onGameSessionChange,
+      cleanup() {
+        mount.dispose();
+      },
+    };
+  }
+
+  it("reveal qui termine après unmount → aucun render", async () => {
+    const screen = simulateTierLiveMpMount();
+    const gate = deferred();
+    const p = screen.transitionToReveal({ gate });
+    screen.cleanup();
+    gate.resolve();
+    const out = await p;
+    assert.equal(out.uiApplied, false);
+    assert.equal(screen.effects.commitsFinished, 1);
+    assert.equal(screen.effects.renders, 0);
+  });
+
+  it("next qui termine après unmount → aucune navigation", async () => {
+    const screen = simulateTierLiveMpMount();
+    const gate = deferred();
+    const p = screen.nextRound({ last: true, gate });
+    screen.cleanup();
+    gate.resolve();
+    const out = await p;
+    assert.equal(out.uiApplied, false);
+    assert.equal(screen.effects.commitsFinished, 1);
+    assert.equal(screen.effects.navigates, 0);
+  });
+
+  it("onGameSessionChange après dispose → aucun effet différé", async () => {
+    const screen = simulateTierLiveMpMount();
+    const gate = deferred();
+    screen.onGameSessionChange(() => {
+      void (async () => {
+        await gate.promise;
+        if (!screen.mount.isMounted()) return;
+        screen.effects.sessionEffects += 1;
+        screen.effects.renders += 1;
+        screen.effects.navigates += 1;
+      })();
+    });
+    screen.cleanup();
+    // Listener déjà lancé avant dispose : la garde dans l'async bloque.
+    gate.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+    assert.equal(screen.effects.sessionEffects, 0);
+    assert.equal(screen.effects.renders, 0);
+    assert.equal(screen.effects.navigates, 0);
+
+    // Callback synchrone après dispose : court-circuité.
+    screen.onGameSessionChange(() => {
+      screen.effects.sessionEffects += 1;
+    });
+    assert.equal(screen.effects.sessionEffects, 0);
+  });
+
+  it("commit déjà parti termine ; mount mort silencieux", async () => {
+    const screen = simulateTierLiveMpMount();
+    const gate = deferred();
+    const p = screen.transitionToReveal({ gate });
+    assert.equal(screen.effects.commitsStarted, 1);
+    screen.cleanup();
+    gate.resolve();
+    await p;
+    assert.equal(screen.effects.commitsFinished, 1);
+    assert.equal(screen.effects.renders, 0);
+  });
+
+  it("rejet après unmount : pas d'unhandled ni feedback", async () => {
+    const screen = simulateTierLiveMpMount();
+    const gate = deferred();
+    const p = screen.nextRound({ last: true, gate, fail: true });
+    screen.cleanup();
+    gate.resolve();
+    const out = await p;
+    assert.equal(out.uiApplied, false);
+    assert.equal(screen.effects.feedback, 0);
+    assert.equal(screen.effects.navigates, 0);
+  });
+
+  it("nouveau mount fonctionne normalement", async () => {
+    const oldScreen = simulateTierLiveMpMount();
+    const gate = deferred();
+    const stale = oldScreen.transitionToReveal({ gate });
+    oldScreen.cleanup();
+
+    const fresh = simulateTierLiveMpMount();
+    const ok = await fresh.transitionToReveal();
+    assert.equal(ok.uiApplied, true);
+    assert.equal(fresh.effects.renders, 1);
+
+    const nextOk = await fresh.nextRound({ last: true });
+    assert.equal(nextOk.uiApplied, true);
+    assert.equal(fresh.effects.navigates, 1);
+
+    gate.resolve();
+    await stale;
+    assert.equal(oldScreen.effects.renders, 0);
+  });
+
+  it("tierNightLive mountMp : createMountGuard + dispose + gates reveal/next/session", () => {
+    const s = readSrc("../js/games/tierNightLive.js");
+    assert.match(s, /function mountMp[\s\S]*createMountGuard\(\)/);
+    assert.match(s, /return \(\) => \{\s*\n\s*mount\.dispose\(\);\s*\n\s*unsub\(\);/s);
+    assert.match(s, /function render\(\) \{\s*\n\s*if \(!mount\.isMounted\(\)\) return;/);
+    assert.match(
+      s,
+      /await commitTierNightLivePlay\(\{ phase: "reveal", placements \}\);\s*\n\s*if \(!mount\.isMounted\(\)\) return;/s
+    );
+    assert.match(
+      s,
+      /await commitTierNightLivePlay\(tierNightLiveVotingPayload\(session\.roundIdx \+ 1\)\);\s*\n\s*if \(!mount\.isMounted\(\)\) return;/s
+    );
+    assert.match(
+      s,
+      /await finalizeTierNightLiveToResults\(\{ isMounted: \(\) => mount\.isMounted\(\) \}\)/
+    );
+    assert.match(s, /const unsub = onGameSessionChange\(\(row\) => \{\s*\n\s*if \(!mount\.isMounted\(\)\) return;/s);
+    // Solo inchangé : pas de createMountGuard dans mountSolo
+    const solo = s.slice(s.indexOf("function mountSolo"), s.indexOf("function mountMp"));
+    assert.equal(/createMountGuard/.test(solo), false);
+  });
+
+  it("finalizeTierNightLiveToResults : gate navigate via isMounted après patch", () => {
+    const s = readSrc("../js/core/gameSync.js");
+    assert.match(
+      s,
+      /export async function finalizeTierNightLiveToResults\(\{ isMounted = null \} = \{\}\)/
+    );
+    assert.match(
+      s,
+      /const row = await patchGameState\([\s\S]*?if \(!stillMounted\(\)\) return false;\s*\n\s*if \(getEffectiveSessionScreen\(row\) !== "tiernight-end"\) return false;\s*\n\s*navigate\("tiernight-end"\)/s
+    );
+  });
+});

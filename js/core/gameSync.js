@@ -4964,9 +4964,11 @@ export async function pushTierNightRecapToSession() {
 /**
  * Hôte (mode live) : publie le récap, marque la partie live terminée et bascule
  * tout le monde sur l'écran de résultats Tier Night.
+ * @param {{ isMounted?: () => boolean }} [opts] — ARCH-06 B3 : skip navigate si mount mort (commit déjà parti conservé).
  */
-export async function finalizeTierNightLiveToResults() {
+export async function finalizeTierNightLiveToResults({ isMounted = null } = {}) {
   if (!isGameSyncActive() || !isLobbyHost()) return false;
+  const stillMounted = () => typeof isMounted !== "function" || isMounted();
   let recap = tierNightRecapToRemote(getTierNightSession());
   if (!recap) {
     const liveBuilt = buildTierNightRecapFromLiveSession(getState().tierNightLiveGame);
@@ -4983,6 +4985,7 @@ export async function finalizeTierNightLiveToResults() {
     },
     { screen: "tiernight-end", gameId: "tiernight", withEveningScores: true }
   );
+  if (!stillMounted()) return false;
   if (getEffectiveSessionScreen(row) !== "tiernight-end") return false;
   navigate("tiernight-end");
   return true;

@@ -33,6 +33,7 @@ import { escapeHtml, pageShell, tierLogoHtml, bindTierLogos } from "../core/ui.j
 import { gameExitBarHtml, bindExitGame } from "../core/exitGame.js";
 import { bindNav } from "../screens/nav.js";
 import { withClickLock, createActionLock } from "../core/actionLock.js";
+import { createMountGuard } from "../core/mountLifecycle.js";
 
 const TIER_RANK = { S: 0, A: 1, B: 2, C: 3, D: 4 };
 
@@ -222,6 +223,8 @@ function mountMp(app, list) {
   /** ARCH-06 : partagé entre re-binds après render. */
   const nextRoundLock = createActionLock();
   const revealLock = createActionLock();
+  /** ARCH-06 Vague B3 : effets UI / navigate après unmount. */
+  const mount = createMountGuard();
 
   const players = () => getActivePlayers();
   const itemLabel = makeItemLabel(list, players());
@@ -240,6 +243,7 @@ function mountMp(app, list) {
     try {
       const placements = accumulatePlacements(session);
       await commitTierNightLivePlay({ phase: "reveal", placements });
+      if (!mount.isMounted()) return;
       reload();
       render();
     } finally {
@@ -251,18 +255,20 @@ function mountMp(app, list) {
     if (!canActAsHost()) return;
     if (session.roundIdx < total() - 1) {
       await commitTierNightLivePlay(tierNightLiveVotingPayload(session.roundIdx + 1));
+      if (!mount.isMounted()) return;
       reload();
       render();
     } else {
       buildTierNightLiveRecaps(session);
       recordTierNightPlayed();
-      await finalizeTierNightLiveToResults();
+      await finalizeTierNightLiveToResults({ isMounted: () => mount.isMounted() });
     }
   }
 
   async function pickTier(tier) {
     if (session.phase !== "voting" || myVote()) return;
     await commitTierNightLiveVote(tier);
+    if (!mount.isMounted()) return;
     reload();
     if (canActAsHost() && allTierNightLiveVotesIn()) {
       await transitionToReveal();
@@ -306,6 +312,7 @@ function mountMp(app, list) {
   }
 
   function render() {
+    if (!mount.isMounted()) return;
     const phaseHtml = session.phase === "reveal" ? revealPhaseHtml() : votingPhaseHtml();
     app.innerHTML = pageShell({
       backTarget: "back",
@@ -334,6 +341,7 @@ function mountMp(app, list) {
   }
 
   const unsub = onGameSessionChange((row) => {
+    if (!mount.isMounted()) return;
     if (stopGameSessionListenerOnPostGame(row)) return;
 
     const effective = getEffectiveSessionScreen(row);
@@ -352,6 +360,7 @@ function mountMp(app, list) {
   render();
 
   return () => {
+    mount.dispose();
     unsub();
   };
 }
