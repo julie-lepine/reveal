@@ -23,7 +23,7 @@ import {
 import { setLobbyPlaying, setLobbyWaiting } from "../core/lobby.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
 import { navigate } from "../core/router.js";
-import { pageShell, resetPageScroll } from "../core/ui.js";
+import { escapeHtml, pageShell, resetPageScroll } from "../core/ui.js";
 import { bindNav } from "../screens/nav.js";
 import { gameExitBarHtml, bindExitGame } from "../core/exitGame.js";
 // FIL_ROUGE (Mot interdit) - pause soirée ; isEveningGameplayPaused() = false si désactivé
@@ -37,6 +37,7 @@ import {
   getCachedGameSession,
   stopGameSessionListenerOnPostGame,
 } from "../core/gameSync.js";
+import { voteConfirmChrome, pickForVoteConfirm } from "../core/voteConfirm.js";
 import { songGuessCardHtml } from "../playlistguess/SongGuessCard.js";
 import { revealResultCardHtml } from "../playlistguess/RevealOwnerCard.js";
 
@@ -78,12 +79,17 @@ export function mountPlaylistGuess(app) {
 
   let roundIdx = 0;
   let phase = "voting";
+  /** Vote validé (session). */
+  let myVote = null;
+  /** Choix local avant « Valider mon vote ». */
   let selected = null;
+  let voteCommitInFlight = null;
   let roundScored = false;
   let revealSummary = null;
   let revealAdvancing = false;
   let lastScoredRoundIdx = -1;
   let lastScrollKey = "";
+  let unmounted = false;
 
   /** Scroll en haut au début d'une manche (pas après validation du vote). */
   function scrollToTopForRound(force = false) {
@@ -104,15 +110,21 @@ export function mountPlaylistGuess(app) {
     if (s.roundIdx != null) roundIdx = s.roundIdx;
     if (s.phase) phase = s.phase;
     const votesByUid = getEffectivePlaylistGuessVotes(s);
-    const serverPick = votesByUid[localUid];
+    const serverPick = votesByUid[localUid] ?? null;
+
     if (roundIdx !== prevIdx || (phase === "voting" && prevPhase === "reveal")) {
-      selected = serverPick != null ? serverPick : null;
-      lastScoredRoundIdx = -1;
-    } else if (serverPick != null) {
-      selected = serverPick;
-    } else if (phase === "voting" && prevPhase !== "voting") {
       selected = null;
+      myVote = serverPick;
+      lastScoredRoundIdx = -1;
+    } else if (phase !== "voting") {
+      selected = null;
+      myVote = null;
+    } else if (voteCommitInFlight != null) {
+      myVote = voteCommitInFlight;
+    } else {
+      myVote = serverPick;
     }
+
     if (s.phase === "voting") {
       roundScored = Boolean(s.roundScored) && Object.keys(s.votes || {}).length > 0
         ? Boolean(s.roundScored)
@@ -125,14 +137,29 @@ export function mountPlaylistGuess(app) {
     }
   }
 
+  function localPick() {
+    return pickForVoteConfirm(selected, myVote);
+  }
+
   function gatherVotes() {
     const round = currentRound();
     const s = getPlaylistGuessSession();
     const all = mp
       ? { ...getEffectivePlaylistGuessVotes(s) }
-      : { ...simulatePlaylistGuessVotes(round, selected) };
-    if (selected != null) all[localUid] = selected;
+      : { ...simulatePlaylistGuessVotes(round, localPick()) };
+    const pick = localPick();
+    if (pick != null) all[localUid] = pick;
     return all;
+  }
+
+  function countPlayersVoted(votesMap = getEffectivePlaylistGuessVotes()) {
+    const base = { ...votesMap };
+    if (voteCommitInFlight != null) base[localUid] = voteCommitInFlight;
+    else if (myVote != null) base[localUid] = myVote;
+    return lobbyPlayersWithIds().filter((p) => {
+      const pick = base[p.userId];
+      return pick != null && pick !== "";
+    }).length;
   }
 
   function buildSummary(votesByUid) {
@@ -189,7 +216,7 @@ export function mountPlaylistGuess(app) {
     revealAdvancing = true;
     try {
       await transitionToReveal();
-      render();
+      if (!unmounted) render();
     } finally {
       revealAdvancing = false;
     }
@@ -211,14 +238,43 @@ export function mountPlaylistGuess(app) {
       revealAdvancing = true;
       try {
         await transitionToReveal();
-        render();
+        if (!unmounted) render();
       } finally {
         revealAdvancing = false;
       }
     } else {
       phase = "reveal";
       await transitionToReveal();
+      if (!unmounted) render();
+    }
+  }
+
+  async function submitVote(pick) {
+    if (pick == null || voteCommitInFlight != null) return;
+    if (isEveningGameplayPaused()) return;
+    if (mp) {
+      voteCommitInFlight = pick;
       render();
+      try {
+        await commitPlaylistGuessVote(pick);
+        if (unmounted) return;
+        selected = null;
+        myVote = pick;
+      } catch {
+        // Feedback déjà affiché ; l’état revient via syncFromSession.
+      } finally {
+        voteCommitInFlight = null;
+        if (!unmounted) syncFromSession();
+      }
+      if (unmounted) return;
+      await tryAdvanceToReveal();
+      if (!unmounted && phase !== "reveal") render();
+    } else {
+      myVote = pick;
+      selected = null;
+      phase = "reveal";
+      await transitionToReveal();
+      if (!unmounted) render();
     }
   }
 
@@ -257,10 +313,55 @@ export function mountPlaylistGuess(app) {
     roundIdx = next;
     phase = "voting";
     selected = null;
+    myVote = null;
     roundScored = false;
     revealSummary = null;
     render();
     scrollToTopForRound(true);
+  }
+
+  function votingPhaseHtml(round, players) {
+    const votesNow = getEffectivePlaylistGuessVotes(getPlaylistGuessSession());
+    const votedCount = countPlayersVoted(votesNow);
+    const totalPlayers = players.length;
+    const allIn = mp ? allPlaylistGuessVotesIn() : false;
+    const confirm = voteConfirmChrome({
+      selected,
+      committed: myVote,
+      allIn,
+      emptyHint: "Choisis le propriétaire de la playlist.",
+    });
+    const waitingHint =
+      myVote != null && !confirm.hasPendingChange && !allIn && mp
+        ? `Vote enregistré - en attente des autres (${votedCount}/${totalPlayers})…`
+        : confirm.hint;
+    const host = !mp || canActAsHost();
+
+    return `
+      ${songGuessCardHtml(round, { players, selectedPlayerId: confirm.displayPick })}
+      <p class="hint">${escapeHtml(waitingHint)}</p>
+      <button type="button" class="btn ${confirm.confirmClass} btn--spaced" id="confirm"
+        ${confirm.confirmDisabled || voteCommitInFlight != null ? "disabled" : ""}>${escapeHtml(
+          voteCommitInFlight != null ? "Envoi…" : confirm.confirmLabel
+        )}</button>
+      ${gameExitBarHtml()}
+      ${
+        host
+          ? `<button type="button" class="btn btn-secondary btn--spaced" id="playlist-force">
+              Révéler maintenant (${votedCount}/${totalPlayers})
+            </button>`
+          : ""
+      }
+      ${
+        mp
+          ? gameCumulativeScoresHtml({
+              gameId: "playlistguess",
+              gameLabel: "VibeCheck",
+              title: "Cumul des scores",
+            })
+          : ""
+      }
+      <div class="screen-bottom-spacer" aria-hidden="true"></div>`;
   }
 
   function render() {
@@ -283,29 +384,7 @@ export function mountPlaylistGuess(app) {
     let body = "";
 
     if (phase === "voting") {
-      const votesNow = getEffectivePlaylistGuessVotes(getPlaylistGuessSession());
-      const committedVote = votesNow[localUid];
-      const displayPick = selected !== null ? selected : committedVote ?? null;
-      const hasCommitted = mp && committedVote != null;
-      body = `
-          ${songGuessCardHtml(round, { players, selectedPlayerId: displayPick })}
-          <p class="hint">${hasCommitted && selected === null ? "Vote enregistré - tu peux encore modifier avant la révélation." : "Choisis le propriétaire de la playlist."}</p>
-          <button type="button" class="btn btn-primary" id="confirm" ${displayPick == null ? "disabled" : ""}>${hasCommitted && selected === null ? "Modifier mon vote" : "Valider mon vote"}</button>
-          <div class="screen-bottom-spacer" aria-hidden="true"></div>`;
-      if (!mp || canActAsHost()) {
-        const votedCount = Object.keys(votesNow).length;
-        body += `
-          <button type="button" class="btn btn-secondary btn--spaced" id="playlist-force">
-            Révéler maintenant (${votedCount} vote${votedCount > 1 ? "s" : ""})
-          </button>`;
-      }
-      if (mp) {
-        body += gameCumulativeScoresHtml({
-          gameId: "playlistguess",
-          gameLabel: "VibeCheck",
-          title: "Cumul des scores",
-        });
-      }
+      body = votingPhaseHtml(round, players);
     }
 
     if (phase === "reveal" && revealSummary) {
@@ -322,7 +401,9 @@ export function mountPlaylistGuess(app) {
           ${roundIdx >= total - 1 ? "Voir les résultats →" : "Manche suivante →"}
         </button>`
             : `<p class="hint">En attente de l'hôte pour la suite…</p>`
-        }`;
+        }
+        ${gameExitBarHtml()}
+        <div class="screen-bottom-spacer" aria-hidden="true"></div>`;
     }
 
     app.innerHTML = pageShell({
@@ -337,7 +418,6 @@ export function mountPlaylistGuess(app) {
         </div>
         <div class="logo logo--sm"><h1>VIBECHECK</h1></div>
         ${body}
-        ${gameExitBarHtml()}
       `,
     });
 
@@ -347,27 +427,48 @@ export function mountPlaylistGuess(app) {
     app.querySelectorAll("[data-vote-id]").forEach((btn) => {
       btn.addEventListener("click", () => {
         if (isEveningGameplayPaused()) return;
+        if (phase !== "voting") return;
         selected = btn.getAttribute("data-vote-id");
         render();
       });
     });
 
-    app.querySelector("#confirm")?.addEventListener("click", async () => {
-      if (selected === null) return;
-      if (mp) {
-        await commitPlaylistGuessVote(selected);
-        render();
-        await tryAdvanceToReveal();
-      } else {
-        phase = "reveal";
-        await transitionToReveal();
-        render();
-      }
+    app.querySelector("#confirm")?.addEventListener("click", () => {
+      void submitVote(pickForVoteConfirm(selected, myVote));
     });
 
     app.querySelector("#playlist-force")?.addEventListener("click", () => void forceReveal());
 
     app.querySelector("#next-round")?.addEventListener("click", () => void nextRound());
+  }
+
+  function patchVotingChrome() {
+    const votesNow = getEffectivePlaylistGuessVotes();
+    const votedCount = countPlayersVoted(votesNow);
+    const totalPlayers = lobbyPlayersWithIds().length;
+    const forceBtn = app.querySelector("#playlist-force");
+    if (forceBtn) {
+      forceBtn.textContent = `Révéler maintenant (${votedCount}/${totalPlayers})`;
+    }
+    const allIn = allPlaylistGuessVotesIn();
+    const confirm = voteConfirmChrome({
+      selected,
+      committed: myVote,
+      allIn,
+      emptyHint: "Choisis le propriétaire de la playlist.",
+    });
+    const hintEl = app.querySelector(".hint");
+    if (hintEl && myVote != null && !confirm.hasPendingChange) {
+      hintEl.textContent = allIn
+        ? confirm.hint
+        : `Vote enregistré - en attente des autres (${votedCount}/${totalPlayers})…`;
+    }
+    const confirmBtn = app.querySelector("#confirm");
+    if (confirmBtn && voteCommitInFlight == null) {
+      confirmBtn.textContent = confirm.confirmLabel;
+      confirmBtn.disabled = confirm.confirmDisabled;
+      confirmBtn.className = `btn ${confirm.confirmClass} btn--spaced`;
+    }
   }
 
   /** Filet si le cache session a avancé avant playlistGuessGame local (sync Realtime / merge). */
@@ -388,10 +489,12 @@ export function mountPlaylistGuess(app) {
   }
 
   function onSyncUpdate(row = getCachedGameSession()) {
+    if (unmounted) return;
     if (stopGameSessionListenerOnPostGame(row)) return;
 
     const prevIdx = roundIdx;
     const prevPhase = phase;
+    const prevVotesJson = JSON.stringify(getEffectivePlaylistGuessVotes());
     syncFromSession();
     reconcilePhaseFromCachedSession();
 
@@ -402,6 +505,7 @@ export function mountPlaylistGuess(app) {
     if (newRoundStarted || enteredVotingFromReveal) {
       revealSummary = null;
       selected = null;
+      myVote = null;
       render();
       scrollToTopForRound(true);
       return;
@@ -416,16 +520,17 @@ export function mountPlaylistGuess(app) {
     void tryAdvanceToReveal();
 
     if (phase === "voting" && roundIdx === prevIdx && prevPhase === "voting") {
-      refreshGameScoresBox(app, {
-        gameId: "playlistguess",
-        gameLabel: "VibeCheck",
-        title: "Cumul des scores",
-      });
-      const votesNow = getEffectivePlaylistGuessVotes();
-      const forceBtn = app.querySelector("#playlist-force");
-      if (forceBtn) {
-        const votedCount = Object.keys(votesNow).length;
-        forceBtn.textContent = `Révéler maintenant (${votedCount} vote${votedCount > 1 ? "s" : ""})`;
+      if (app.querySelector("#confirm")) {
+        const votesJson = JSON.stringify(getEffectivePlaylistGuessVotes());
+        refreshGameScoresBox(app, {
+          gameId: "playlistguess",
+          gameLabel: "VibeCheck",
+          title: "Cumul des scores",
+        });
+        if (votesJson !== prevVotesJson || myVote != null) {
+          patchVotingChrome();
+        }
+        return;
       }
     }
 
@@ -447,6 +552,7 @@ export function mountPlaylistGuess(app) {
   }
 
   return () => {
+    unmounted = true;
     unsub();
     if (!mp) setLobbyWaiting();
   };

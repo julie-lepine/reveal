@@ -17,9 +17,9 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 
 | | Contenu |
 |--|---------|
-| **Fait** | … · SYN-15/16 ✅ · UX-HIST-01 ✅ · **UX-CLUTCH-01** ✅ patch |
-| **Prochain** | QA terrain UX-CLUTCH-01 · puis ARCH-06 / Cause 7 résidus |
-| **Ensuite** | ARCH-07/08 · M-14b |
+| **Fait** | … · UX-CLUTCH-01 ✅ QA · **UX-RESUME-BANNER** ✅ patch (dismiss « Rester ici ») |
+| **Prochain** | **UX-VIBE-01 / UX-VIBE-02** 🔧 patch → QA · QA terrain UX-RESUME-BANNER |
+| **Ensuite** | ARCH-06 / Cause 7 résidus · ARCH-07/08 · M-14b |
 
 **Hors file audit**  
 Sondages in-chat (`lobby_polls` / UI chat) — feature produit, pas un ticket cause racine.
@@ -38,12 +38,14 @@ Clutch taps figés sous latence (SYN-26) · ready prep après Recommencer · Cau
 
 | # | ID | Cause | Problème | Statut |
 |---|----|-------|----------|--------|
-| 1 | **ARCH-06** | 6 | Handlers async multiples en vol | Dette |
-| 2 | **M-14a / SYN-14** | 3 | TierNight topic / routing | ❌ KO QA — suspendu |
-| 3 | Guess Lie UX | 4/7 | UI avant await ; stats round local-only | Post I-08 |
-| 4 | Loader UI join | 5/11 | Interstitiel join | Hors T-01/T-02 |
-| 5 | Pré-résolution entry screens | 5 | `get*EntryScreen` (filet M-08 conservé) | Hors M-08 |
-| 6 | **ARCH-22** | 11 | Pas de feedback sync lente | Ouvert |
+| 1 | **UX-VIBE-01** | 11/4 | VibeCheck : pas de feedback après « Valider mon vote » / compteurs | 🔧 patch |
+| 2 | **UX-VIBE-02** | 5/11 | VibeCheck : sortie menu en play (‹ / Jeux / exit enfoui) | 🔧 patch |
+| 3 | **ARCH-06** | 6 | Handlers async multiples en vol | Dette |
+| 4 | **M-14a / SYN-14** | 3 | TierNight topic / routing | ❌ KO QA — suspendu |
+| 5 | Guess Lie UX | 4/7 | UI avant await ; stats round local-only | Post I-08 |
+| 6 | Loader UI join | 5/11 | Interstitiel join | Hors T-01/T-02 |
+| 7 | Pré-résolution entry screens | 5 | `get*EntryScreen` (filet M-08 conservé) | Hors M-08 |
+| 8 | **ARCH-22** | 11 | Pas de feedback sync lente | Ouvert |
 
 ### Autres ouverts
 
@@ -68,18 +70,38 @@ Clutch taps figés sous latence (SYN-26) · ready prep après Recommencer · Cau
 | 1 | Identité invité / JWT | ✅ QA | ARCH-01 partiel |
 | 2 | Race auth / profil | ✅ QA | — |
 | 3 | Sources de vérité multiples | ✅ hors TierNight | **M-14a** suspendu · UX-CLUTCH-01 ✅ |
-| 4 | Asymétrie hôte / invité | ✅ QA | UX Guess Lie séparée |
-| 5 | Routing + timing sync | ✅ | ARCH-05 mitigé |
+| 4 | Asymétrie hôte / invité | ✅ QA | UX Guess Lie séparée · UX-VIBE-01 |
+| 5 | Routing + timing sync | ✅ | ARCH-05 mitigé · UX-VIBE-02 |
 | 6 | Async écrans | Partiel | ARCH-06 ; SYN-05 dormant |
 | 7 | Sync silencieuse / fire-and-forget | Partiel | ARCH-07/08, M-14b |
 | 8 | Reset / migration incomplète | Partiel | I-09 ✅ ; SYN-15/16 ✅ ; ARCH-10 |
 | 9 | Sync monolithe / duplication | Dette | ARCH-11… |
 | 10 | Code mort | Dette | Fil Rouge, dead exports |
-| 11 | Friction UX | Partiel | ARCH-22 ; L-04 |
+| 11 | Friction UX | Partiel | ARCH-22 ; L-04 · UX-VIBE-01/02 |
 
 ---
 
 ## Détail des tickets ouverts
+
+### Cause 11 / 4 — UX-VIBE-01 (VibeCheck vote)
+
+| | |
+|--|--|
+| **Problème** | Après « Valider mon vote » : bouton reste primaire ; pas d’« en attente… » invité ; hôte sans `x/y` |
+| **Cause** | Pas de modèle `selected`/`committed` ; condition UI `hasCommitted && selected === null` impossible car `syncFromSession` remet `selected = serverPick` ; pas de `voteConfirmChrome` |
+| **Fix** | Aligner Hot Take/Dilemma : `myVote` + `selected = null` après commit ; `voteConfirmChrome` ; hint + force `(voted/total)` |
+| **Où** | `js/games/playlistGuess.js` · `voteConfirm.js` |
+| **QA** | Invité → bouton secondary « En attente… » ; compteur `x/y` tous ; hôte force `x/y` ; reveal auto |
+
+### Cause 5 / 11 — UX-VIBE-02 (VibeCheck sortie menu)
+
+| | |
+|--|--|
+| **Problème** | Joueur ne peut pas rejoindre le menu des jeux pendant VibeCheck (‹ reboucle prep↔play ; exit enfoui ; Jeux sans suppress) |
+| **Décision** | ‹ en **play** = même flux que la barre d’exit (`exitGameToGameSelect` + confirm). Invité Jeux = `returnToGameSelect` (suppress). Hôte Jeux en play = confirm arrêt |
+| **Fix** | `handleBackNavigation` play → exit ; `goGames` play ; exit bar juste après le confirm (plus haut) ; tab `playlistguess` bottom nav |
+| **Où** | `nav.js` · `bottomNav.js` · `playlistGuess.js` |
+| **QA** | ‹ + barre exit → menu ; invité reste hub + bandeau ; hôte arrête pour tous ; pas de boucle prep |
 
 ### Cause 5 — Routing / timing
 
@@ -116,7 +138,7 @@ Clutch taps figés sous latence (SYN-26) · ready prep après Recommencer · Cau
 | **Limite** | parti avec seul `ensurePlayerScore` (0) exclu ; collision pseudo/UID hors scope |
 | **QA** | ✅ validé 2026-07-26 |
 
-### Cause 3 — UX-CLUTCH-01 ✅ patch
+### Cause 3 — UX-CLUTCH-01 ✅ QA
 
 | | |
 |--|--|
@@ -126,6 +148,17 @@ Clutch taps figés sous latence (SYN-26) · ready prep après Recommencer · Cau
 | **Leave** | Reste dans le snapshot jusqu’au verdict |
 | **Rename** | I-09 migre `participants[].name` + taps ; résolution UID → nom live |
 | **Hors scope** | Autres jeux live-roster · SYN-26 · UX-HIST-01 · `getActivePlayers` |
+| **QA** | ✅ validé 2026-07-26 |
+
+### Cause 11 — UX-RESUME-BANNER ✅ patch
+
+| | |
+|--|--|
+| **Symptôme** | « Rester ici » sur bandeau game-select ne masquait pas le bandeau |
+| **Fix** | `resumeBannerDismissedKey` (mémoire) + gate dans `shouldShowGameSelectResumeBanner` + `scheduleRender(true)` |
+| **Routing** | `suppressRoutingForScoreView` inchangé |
+| **Nouvelle session** | clear si `!éligible` ; re-show si clé `game:` / `family:` change |
+| **Résidu** | interstitial lobby `#game-resume-stay` hors scope |
 | **QA** | En attente terrain |
 
 ### Cause 8 — autres
@@ -212,9 +245,9 @@ Hors tickets prioritaires — à traiter si opportunité / régression :
 - SYN-28 : `settings` hors scope ; course lobby `playing` vs session menu
 - I-PG-01 : autres jeux sans podium dédié (hors scope)
 - Policy debug lobby à purger côté Supabase si encore présente
-- Optimistic votes hors Hot Take (même trou que T-05, tickets séparés)
+- Optimistic votes hors Hot Take / VibeCheck (dilemma / speedVote / … — même trou que T-05)
 - Starts sync hydrate → hub hors `mountLobby` (résidu SYN-12, hors idempotence globale)
 
 ---
 
-*Suivi vivant · Dernière MAJ : 2026-07-26 — UX-CLUTCH-01 ✅ patch · QA terrain pending*
+*Suivi vivant · Dernière MAJ : 2026-07-26 — UX-VIBE-01/02 🔧 patch · UX-RESUME-BANNER QA pending*

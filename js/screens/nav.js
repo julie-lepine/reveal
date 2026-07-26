@@ -12,12 +12,14 @@ import {
   isLobbyHost,
   isOnGameSetupScreen,
   isOnPostGameScreen,
+  isSessionInProgressPlay,
   leaveGameSetup,
   returnToGameSelect,
   suppressSessionRoute,
   getCachedGameSession,
 } from "../core/gameSync.js";
 import { goToScores } from "../core/navAccess.js";
+import { exitGameToGameSelect } from "../core/exitGame.js";
 
 /** Accueil sans quitter le lobby (soirée en cours). */
 export function goToEveningHome() {
@@ -79,6 +81,11 @@ async function handleBackNavigation() {
       if (await returnToGameSelect()) return;
     }
   }
+  // UX-VIBE-02 / SYN-13b : ‹ en play = même flux que la barre d'exit (confirm).
+  if (isSessionInProgressPlay(getCurrentScreen())) {
+    await exitGameToGameSelect();
+    return;
+  }
   goBack();
 }
 
@@ -117,6 +124,10 @@ export async function handleNavTarget(target, handlers) {
   }
   if (target === "game-select" && isGameSyncActive()) {
     const screen = getCurrentScreen();
+    if (isSessionInProgressPlay(screen)) {
+      await exitGameToGameSelect();
+      return;
+    }
     if (isOnGameSetupScreen(screen) || isOnPostGameScreen(screen)) {
       if (await returnToGameSelect()) return;
     }

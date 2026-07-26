@@ -311,7 +311,12 @@ export function mountGameSelect(app) {
 
     if (e.target.closest("#game-resume-banner-stay")) {
       e.preventDefault();
-      stayOnGameResumeTarget();
+      const btn = e.target.closest("#game-resume-banner-stay");
+      const resumeScreen =
+        btn?.getAttribute("data-resume-screen") ||
+        getResumableSessionScreen(getCachedGameSession());
+      stayOnGameResumeTarget(resumeScreen);
+      scheduleRender(true);
       return;
     }
 

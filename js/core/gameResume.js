@@ -14,6 +14,11 @@ import {
   routeToSessionScreen,
   suppressRoutingForScoreView,
 } from "./gameSync.js";
+import {
+  clearResumeBannerDismiss,
+  dismissResumeBannerForSession,
+  shouldShowResumeBannerAfterDismiss,
+} from "./resumeBannerDismiss.js";
 import { bindNav } from "../screens/nav.js";
 
 const SCREEN_LABELS = {
@@ -120,6 +125,7 @@ export function gameResumeBannerHtml(screen) {
 }
 
 export async function rejoinGameResumeTarget(targetScreen) {
+  clearResumeBannerDismiss();
   clearSessionRouteSuppress();
   if (!targetScreen) return false;
   const cached = getCachedGameSession();
@@ -131,13 +137,23 @@ export async function rejoinGameResumeTarget(targetScreen) {
   return true;
 }
 
-export function stayOnGameResumeTarget() {
+/**
+ * Rester sur le hub : suppress auto-route (inchangé) + dismiss UI bandeau.
+ * @param {string|null} [resumeScreen] écran reprenable courant (sinon dérivé du cache)
+ */
+export function stayOnGameResumeTarget(resumeScreen = null) {
   suppressRoutingForScoreView();
+  const row = getCachedGameSession();
+  const screen =
+    resumeScreen || getResumableSessionScreen(row) || row?.screen || null;
+  dismissResumeBannerForSession(screen, row?.game_id ?? null);
 }
 
 /**
  * Ecran plein page (lobby par erreur) : reprise auto vers prep / partie.
  * @returns {() => void} cleanup
+ * NOTE (résidu) : « Rester ici » de l’interstitial (#game-resume-stay) ne masque
+ * pas l’UI plein écran — hors scope du fix bandeau game-select.
  */
 export function mountGameResumeInterstitial(app, targetScreen, { allowStay = false } = {}) {
   const gameLabel = gameLabelForScreen(targetScreen);
@@ -211,7 +227,7 @@ export function bindGameResumeBanner(app, targetScreen) {
   };
 
   const onJoin = () => void rejoin();
-  const onStay = () => stayOnGameResumeTarget();
+  const onStay = () => stayOnGameResumeTarget(targetScreen);
 
   app.querySelector("#game-resume-banner-join")?.addEventListener("click", onJoin);
   app.querySelector("#game-resume-banner-stay")?.addEventListener("click", onStay);
@@ -222,12 +238,30 @@ export function bindGameResumeBanner(app, targetScreen) {
   };
 }
 
-export function shouldShowGameSelectResumeBanner(screen) {
-  return (
+export function shouldShowGameSelectResumeBanner(screen, opts = {}) {
+  const syncActive = opts.syncActive ?? isGameSyncActive();
+  const isHost = opts.isHost ?? isLobbyHost();
+  const gameId =
+    opts.gameId !== undefined
+      ? opts.gameId
+      : getCachedGameSession()?.game_id ?? null;
+  const eligible =
+    Boolean(screen) &&
     isGameSelectResumeBannerScreen(screen) &&
-    isGameSyncActive() &&
-    !isLobbyHost()
-  );
+    syncActive &&
+    !isHost;
+  return shouldShowResumeBannerAfterDismiss({
+    eligible,
+    screen,
+    gameId,
+  });
 }
 
 export { getResumableSessionScreen };
+export {
+  clearResumeBannerDismiss,
+  dismissResumeBannerForSession,
+  resumeBannerSessionKey,
+  evaluateResumeBannerVisibility,
+  getResumeBannerDismissedKey,
+} from "./resumeBannerDismiss.js";

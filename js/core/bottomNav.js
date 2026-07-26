@@ -3,6 +3,13 @@ import { hasActiveLobby, returnToEveningGames } from "./lobby.js";
 import { onScreenChange, getCurrentScreen } from "./router.js";
 import { goToEveningHome } from "../screens/nav.js";
 import { goToScores, isScoresNavLocked } from "./navAccess.js";
+import {
+  isGameSyncActive,
+  isLobbyHost,
+  isSessionInProgressPlay,
+  returnToGameSelect,
+} from "./gameSync.js";
+import { exitGameToGameSelect } from "./exitGame.js";
 
 const TAB_HOME = "home";
 const TAB_GAMES = "games";
@@ -27,6 +34,16 @@ const SCREEN_TO_TAB = {
   consensus: TAB_GAMES,
   "dilemma-prep": TAB_GAMES,
   dilemma: TAB_GAMES,
+  "playlistguess-prep": TAB_GAMES,
+  playlistguess: TAB_GAMES,
+  "clutch-prep": TAB_GAMES,
+  clutch: TAB_GAMES,
+  "wronganswer-prep": TAB_GAMES,
+  wronganswer: TAB_GAMES,
+  "trivia-prep": TAB_GAMES,
+  trivia: TAB_GAMES,
+  "traitre-prep": TAB_GAMES,
+  traitre: TAB_GAMES,
   guesslie: TAB_GAMES,
   "guesslie-menu": TAB_GAMES,
   "guesslie-setup": TAB_GAMES,
@@ -44,6 +61,16 @@ function goHome() {
 }
 
 async function goGames() {
+  const screen = getCurrentScreen();
+  // UX-VIBE-02 : depuis une partie, même contrat que ‹ / barre exit (pas un hub nu sans suppress).
+  if (isGameSyncActive() && isSessionInProgressPlay(screen)) {
+    if (isLobbyHost()) {
+      await exitGameToGameSelect();
+      return;
+    }
+    await returnToGameSelect();
+    return;
+  }
   await returnToEveningGames({ hubOnly: true });
 }
 
