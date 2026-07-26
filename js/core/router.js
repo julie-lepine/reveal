@@ -1,4 +1,8 @@
 import { schedulePageScrollReset } from "./ui.js";
+import {
+  advanceMountGeneration,
+  resetMountGenerationForTests,
+} from "./mountLifecycle.js";
 
 let appEl = null;
 let currentCleanup = null;
@@ -73,6 +77,12 @@ function settleAfterNestedRedirect(requestedScreenId) {
   requestAnimationFrame(() => schedulePageScrollReset(appEl));
 }
 
+/** ARCH-06 C : avance la génération puis monte l'écran. */
+function mountScreen(screenId) {
+  advanceMountGeneration();
+  return screens[screenId](appEl);
+}
+
 export function navigate(screenId, { reset = false, params = null, navStack: forcedStack = null } = {}) {
   if (!appEl || !screens[screenId]) return false;
 
@@ -98,7 +108,7 @@ export function navigate(screenId, { reset = false, params = null, navStack: for
   syncMountDepth += 1;
   let cleanup;
   try {
-    cleanup = screens[screenId](appEl);
+    cleanup = mountScreen(screenId);
   } finally {
     syncMountDepth -= 1;
   }
@@ -146,7 +156,7 @@ export function goBack(fallback = "home") {
   if (!screens[screenId]) {
     navStack.length = 0;
     navStack.push(fallback);
-    currentCleanup = screens[fallback](appEl) || null;
+    currentCleanup = mountScreen(fallback) || null;
     notifyScreenChange(fallback);
     requestAnimationFrame(() => schedulePageScrollReset(appEl));
     return;
@@ -155,7 +165,7 @@ export function goBack(fallback = "home") {
   syncMountDepth += 1;
   let cleanup;
   try {
-    cleanup = screens[screenId](appEl);
+    cleanup = mountScreen(screenId);
   } finally {
     syncMountDepth -= 1;
   }
@@ -176,4 +186,5 @@ export function resetNav() {
   currentScreenId = "home";
   syncMountDepth = 0;
   nestedNavigateCompleted = false;
+  resetMountGenerationForTests();
 }

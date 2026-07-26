@@ -121,6 +121,7 @@ export function mountGuessLie(app) {
     );
 
     if (!mount.isMounted()) return;
+    if (!mount.isCurrentMount()) return;
     setRevealDisplay(result);
   }
 
@@ -135,6 +136,7 @@ export function mountGuessLie(app) {
     try {
       await transitionToReveal();
       if (!mount.isMounted()) return;
+      if (!mount.isCurrentMount()) return;
       render();
     } finally {
       revealAdvancing = false;
@@ -182,6 +184,7 @@ export function mountGuessLie(app) {
       try {
         await transitionToReveal();
         if (!mount.isMounted()) return;
+        if (!mount.isCurrentMount()) return;
         render();
       } finally {
         revealAdvancing = false;
@@ -190,6 +193,7 @@ export function mountGuessLie(app) {
       phase = "reveal";
       await transitionToReveal();
       if (!mount.isMounted()) return;
+      if (!mount.isCurrentMount()) return;
       render();
     }
   }
@@ -220,11 +224,13 @@ export function mountGuessLie(app) {
         } catch (e) {
           console.warn("REVEAL completeGameSession:", e);
           if (!mount.isMounted()) return;
+          if (!mount.isCurrentMount()) return;
           navigate("results", { navStack: ["home", "lobby", "game-select", "results"] });
         }
       } else {
         setLobbyWaiting();
         if (!mount.isMounted()) return;
+        if (!mount.isCurrentMount()) return;
         navigate("results");
       }
       return;
@@ -241,6 +247,7 @@ export function mountGuessLie(app) {
         { screen: "guesslie" }
       );
       if (!mount.isMounted()) return;
+      if (!mount.isCurrentMount()) return;
       render();
     } else {
       roundIdx = next;
@@ -250,6 +257,7 @@ export function mountGuessLie(app) {
 
   function render() {
     if (!mount.isMounted()) return;
+    if (!mount.isCurrentMount()) return;
     syncFromGl();
     ensureRevealDisplay();
 
@@ -429,12 +437,14 @@ export function mountGuessLie(app) {
         selected = pick;
         await commitGuessLieVote(pick);
         if (!mount.isMounted()) return;
+        if (!mount.isCurrentMount()) return;
         render();
         await tryAdvanceToReveal();
       } else {
         phase = "reveal";
         await transitionToReveal();
         if (!mount.isMounted()) return;
+        if (!mount.isCurrentMount()) return;
         render();
       }
     });
@@ -464,6 +474,7 @@ export function mountGuessLie(app) {
 
   function onSyncUpdate(row) {
     if (!mount.isMounted()) return;
+    if (!mount.isCurrentMount()) return;
     if (stopGameSessionListenerOnPostGame(row)) return;
 
     const prevIdx = roundIdx;

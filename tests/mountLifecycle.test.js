@@ -3,7 +3,13 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { createMountGuard } from "../js/core/mountLifecycle.js";
+import {
+  createMountGuard,
+  advanceMountGeneration,
+  getMountGenerationForTests,
+  resetMountGenerationForTests,
+  rejectIfStaleMount,
+} from "../js/core/mountLifecycle.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -230,13 +236,16 @@ describe("ARCH-06 Vague B1 — contrats câblage", () => {
     });
   }
 
-  it("playlistGuess nextRound recheck unmounted après await", () => {
+  it("playlistGuess nextRound recheck mount après await", () => {
     const s = readSrc("../js/games/playlistGuess.js");
     assert.match(s, /await startPlaylistGuessRound\(next\)/);
-    assert.match(s, /if \(mp\) \{\s*await startPlaylistGuessRound\(next\);\s*\}\s*if \(unmounted\) return;/s);
     assert.match(
       s,
-      /console\.warn\("REVEAL completeGameSession:", e\);\s*if \(unmounted\) return;/s
+      /if \(mp\) \{\s*await startPlaylistGuessRound\(next\);\s*\}\s*if \(!mount\.isMounted\(\)\) return;\s*if \(!mount\.isCurrentMount\(\)\) return;/s
+    );
+    assert.match(
+      s,
+      /console\.warn\("REVEAL completeGameSession:", e\);\s*if \(!mount\.isMounted\(\)\) return;\s*if \(!mount\.isCurrentMount\(\)\) return;/s
     );
   });
 });
@@ -423,16 +432,34 @@ describe("ARCH-06 Vague B2 — timers / RAF + contrats", () => {
 
   it("clutch : tick clock/countdown + grace + copyTimer vérifient le guard", () => {
     const s = readSrc("../js/games/clutch.js");
-    assert.match(s, /const tick = \(\) => \{\s*\n\s*if \(!mount\.isMounted\(\)\) \{\s*\n\s*stopClock\(\);\s*\n\s*return;/s);
-    assert.match(s, /function onGraceElapsed\(\) \{\s*\n\s*graceTimer = null;\s*\n\s*if \(!mount\.isMounted\(\)\) return;/s);
-    assert.match(s, /copyTimer = setInterval\(\(\) => \{\s*\n\s*if \(!mount\.isMounted\(\)\) \{/s);
+    assert.match(
+      s,
+      /const tick = \(\) => \{\s*\n\s*if \(!mount\.isMounted\(\) \|\| !mount\.isCurrentMount\(\)\) \{\s*\n\s*stopClock\(\);\s*\n\s*return;/s
+    );
+    assert.match(
+      s,
+      /function onGraceElapsed\(\) \{\s*\n\s*graceTimer = null;\s*\n\s*if \(!mount\.isMounted\(\)\) return;\s*\n\s*if \(!mount\.isCurrentMount\(\)\) return;/s
+    );
+    assert.match(
+      s,
+      /copyTimer = setInterval\(\(\) => \{\s*\n\s*if \(!mount\.isMounted\(\) \|\| !mount\.isCurrentMount\(\)\) \{/s
+    );
   });
 
   it("truthMeter : step RAF + reveal-pending + display timeouts vérifient le guard", () => {
     const s = readSrc("../js/games/truthMeter.js");
-    assert.match(s, /const step = \(now\) => \{\s*\n\s*if \(!mount\.isMounted\(\)\) \{\s*\n\s*revealAnimId = null;\s*\n\s*return;/s);
-    assert.match(s, /revealPendingTimeoutId = setTimeout\(\(\) => \{\s*\n\s*revealPendingTimeoutId = null;\s*\n\s*if \(!mount\.isMounted\(\)\) return;/s);
-    assert.match(s, /displayTimeoutId = setTimeout\(\(\) => \{\s*\n\s*displayTimeoutId = null;\s*\n\s*if \(!mount\.isMounted\(\)\) return;/s);
+    assert.match(
+      s,
+      /const step = \(now\) => \{\s*\n\s*if \(!mount\.isMounted\(\) \|\| !mount\.isCurrentMount\(\)\) \{\s*\n\s*revealAnimId = null;\s*\n\s*return;/s
+    );
+    assert.match(
+      s,
+      /revealPendingTimeoutId = setTimeout\(\(\) => \{\s*\n\s*revealPendingTimeoutId = null;\s*\n\s*if \(!mount\.isMounted\(\)\) return;\s*\n\s*if \(!mount\.isCurrentMount\(\)\) return;/s
+    );
+    assert.match(
+      s,
+      /displayTimeoutId = setTimeout\(\(\) => \{\s*\n\s*displayTimeoutId = null;\s*\n\s*if \(!mount\.isMounted\(\)\) return;\s*\n\s*if \(!mount\.isCurrentMount\(\)\) return;/s
+    );
   });
 });
 
@@ -602,23 +629,161 @@ describe("ARCH-06 Vague B3 — tierNightLive mountMp", () => {
     );
     assert.match(
       s,
-      /await finalizeTierNightLiveToResults\(\{ isMounted: \(\) => mount\.isMounted\(\) \}\)/
+      /await finalizeTierNightLiveToResults\(\{\s*shouldContinue: \(\) => mount\.isMounted\(\) && mount\.isCurrentMount\(\),\s*\}\)/s
     );
-    assert.match(s, /const unsub = onGameSessionChange\(\(row\) => \{\s*\n\s*if \(!mount\.isMounted\(\)\) return;/s);
+    assert.match(s, /const unsub = onGameSessionChange\(\(row\) => \{\s*\n\s*if \(!mount\.isMounted\(\)\) return;\s*\n\s*if \(!mount\.isCurrentMount\(\)\) return;/s);
     // Solo inchangé : pas de createMountGuard dans mountSolo
     const solo = s.slice(s.indexOf("function mountSolo"), s.indexOf("function mountMp"));
     assert.equal(/createMountGuard/.test(solo), false);
   });
 
-  it("finalizeTierNightLiveToResults : gate navigate via isMounted après patch", () => {
+  it("finalizeTierNightLiveToResults : shouldContinue gate navigate après patch", () => {
     const s = readSrc("../js/core/gameSync.js");
     assert.match(
       s,
-      /export async function finalizeTierNightLiveToResults\(\{ isMounted = null \} = \{\}\)/
+      /export async function finalizeTierNightLiveToResults\(\{ shouldContinue = null \} = \{\}\)/
     );
     assert.match(
       s,
-      /const row = await patchGameState\([\s\S]*?if \(!stillMounted\(\)\) return false;\s*\n\s*if \(getEffectiveSessionScreen\(row\) !== "tiernight-end"\) return false;\s*\n\s*navigate\("tiernight-end"\)/s
+      /const row = await patchGameState\([\s\S]*?if \(!canContinue\(\)\) return false;\s*\n\s*if \(getEffectiveSessionScreen\(row\) !== "tiernight-end"\) return false;\s*\n\s*navigate\("tiernight-end"\)/s
     );
+  });
+});
+
+describe("ARCH-06 Vague C0 — génération + isCurrentMount (transparent)", () => {
+  it("isCurrentMount true tant que génération stable et pas disposé", () => {
+    resetMountGenerationForTests();
+    advanceMountGeneration();
+    const g = createMountGuard();
+    assert.equal(g.isMounted(), true);
+    assert.equal(g.isCurrentMount(), true);
+    assert.equal(typeof g.generation, "undefined");
+  });
+
+  it("dispose : isMounted et isCurrentMount false", () => {
+    resetMountGenerationForTests();
+    advanceMountGeneration();
+    const g = createMountGuard();
+    g.dispose();
+    assert.equal(g.isMounted(), false);
+    assert.equal(g.isCurrentMount(), false);
+  });
+
+  it("advance sans dispose : isMounted true, isCurrentMount false", () => {
+    resetMountGenerationForTests();
+    advanceMountGeneration();
+    const g = createMountGuard();
+    advanceMountGeneration();
+    assert.equal(g.isMounted(), true);
+    assert.equal(g.isCurrentMount(), false);
+  });
+
+  it("rejectIfStaleMount distingue dispose vs génération", () => {
+    resetMountGenerationForTests();
+    advanceMountGeneration();
+    const disposed = createMountGuard();
+    disposed.dispose();
+    assert.equal(rejectIfStaleMount(disposed), true);
+
+    const staleGen = createMountGuard();
+    advanceMountGeneration();
+    assert.equal(staleGen.isMounted(), true);
+    assert.equal(rejectIfStaleMount(staleGen), true);
+
+    const current = createMountGuard();
+    assert.equal(rejectIfStaleMount(current), false);
+  });
+
+  it("remount same-screen via advance : ancien silencieux, nouveau courant", async () => {
+    resetMountGenerationForTests();
+    advanceMountGeneration();
+    const a = createMountGuard();
+    const gate = deferred();
+    let aUi = 0;
+    let bUi = 0;
+    const p = (async () => {
+      await gate.promise;
+      if (!a.isMounted()) return;
+      if (!a.isCurrentMount()) return;
+      aUi += 1;
+    })();
+    advanceMountGeneration();
+    const b = createMountGuard();
+    assert.equal(a.isCurrentMount(), false);
+    assert.equal(b.isCurrentMount(), true);
+    if (!b.isMounted()) throw new Error("b should be mounted");
+    if (!b.isCurrentMount()) throw new Error("b should be current");
+    bUi += 1;
+    gate.resolve();
+    await p;
+    assert.equal(aUi, 0);
+    assert.equal(bUi, 1);
+  });
+
+  it("plusieurs remounts : seule la dernière génération est courante", () => {
+    resetMountGenerationForTests();
+    const guards = [];
+    for (let i = 0; i < 5; i += 1) {
+      advanceMountGeneration();
+      guards.push(createMountGuard());
+    }
+    guards.forEach((g, i) => {
+      assert.equal(g.isCurrentMount(), i === guards.length - 1);
+    });
+  });
+
+  it("API publique : pas de .generation sur le guard", () => {
+    const g = createMountGuard();
+    assert.equal("generation" in g, false);
+    assert.equal(typeof getMountGenerationForTests(), "number");
+  });
+});
+
+describe("ARCH-06 Vague C1 — contrats double garde périmètre B", () => {
+  for (const file of [
+    "../js/games/hotTake.js",
+    "../js/games/wrongAnswer.js",
+    "../js/games/guessLie.js",
+    "../js/games/speedVote.js",
+    "../js/games/consensus.js",
+    "../js/games/trivia.js",
+    "../js/games/clutch.js",
+    "../js/games/truthMeter.js",
+    "../js/games/tierNightLive.js",
+    "../js/games/playlistGuess.js",
+  ]) {
+    it(`${file} : double-garde isMounted + isCurrentMount sur chemins session`, () => {
+      const s = readSrc(file);
+      assert.match(s, /createMountGuard/);
+      assert.match(
+        s,
+        /if \(!mount\.isMounted\(\)\) return;\s*\n\s*if \(!mount\.isCurrentMount\(\)\) return;/s
+      );
+    });
+  }
+
+  it("rejectIfStaleMount disponible sans être requis dans les jeux", () => {
+    assert.equal(typeof rejectIfStaleMount, "function");
+  });
+});
+
+describe("ARCH-06 Vague C2 — shouldContinue helpers", () => {
+  it("shouldContinue false après await → pas de navigate ; défaut true sans callback", async () => {
+    let navigates = 0;
+    let commits = 0;
+    async function fakeFinalize({ shouldContinue = null } = {}) {
+      const canContinue = () => typeof shouldContinue !== "function" || shouldContinue();
+      commits += 1;
+      await Promise.resolve();
+      if (!canContinue()) return false;
+      navigates += 1;
+      return true;
+    }
+    assert.equal(await fakeFinalize(), true);
+    assert.equal(navigates, 1);
+    navigates = 0;
+    assert.equal(await fakeFinalize({ shouldContinue: () => false }), false);
+    assert.equal(navigates, 0);
+    assert.equal(commits, 2);
   });
 });

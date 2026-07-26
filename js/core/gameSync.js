@@ -4964,11 +4964,13 @@ export async function pushTierNightRecapToSession() {
 /**
  * Hôte (mode live) : publie le récap, marque la partie live terminée et bascule
  * tout le monde sur l'écran de résultats Tier Night.
- * @param {{ isMounted?: () => boolean }} [opts] — ARCH-06 B3 : skip navigate si mount mort (commit déjà parti conservé).
+ * @param {{ shouldContinue?: () => boolean }} [opts]
+ *   ARCH-06 C2 : après le patch, skip navigate si l'appelant ne doit plus produire d'effet local.
+ *   Défaut : continuer (comportement historique). Ne bloque pas le patch déjà lancé.
  */
-export async function finalizeTierNightLiveToResults({ isMounted = null } = {}) {
+export async function finalizeTierNightLiveToResults({ shouldContinue = null } = {}) {
   if (!isGameSyncActive() || !isLobbyHost()) return false;
-  const stillMounted = () => typeof isMounted !== "function" || isMounted();
+  const canContinue = () => typeof shouldContinue !== "function" || shouldContinue();
   let recap = tierNightRecapToRemote(getTierNightSession());
   if (!recap) {
     const liveBuilt = buildTierNightRecapFromLiveSession(getState().tierNightLiveGame);
@@ -4985,29 +4987,37 @@ export async function finalizeTierNightLiveToResults({ isMounted = null } = {}) 
     },
     { screen: "tiernight-end", gameId: "tiernight", withEveningScores: true }
   );
-  if (!stillMounted()) return false;
+  if (!canContinue()) return false;
   if (getEffectiveSessionScreen(row) !== "tiernight-end") return false;
   navigate("tiernight-end");
   return true;
 }
 
 /** Hôte : fin Tier Night - récap + scores + écran en un seul write. */
-export async function advanceTierNightToResultsWhenReady(list, { force = false, isMounted = null } = {}) {
+export async function advanceTierNightToResultsWhenReady(
+  list,
+  { force = false, shouldContinue = null, isMounted = null } = {}
+) {
   if (!isGameSyncActive() || !isLobbyHost()) return false;
   if (!force && !allTierNightMembersFinished()) return false;
   if (force && countTierNightMembersFinished() === 0) return false;
 
-  const stillMounted = () => typeof isMounted !== "function" || isMounted();
+  // shouldContinue préféré (ARCH-06 C2) ; isMounted conservé comme alias de transition.
+  const canContinue = () => {
+    if (typeof shouldContinue === "function") return shouldContinue();
+    if (typeof isMounted === "function") return isMounted();
+    return true;
+  };
 
   await ensureTierNightRecapsFromRemote(list);
-  if (!stillMounted()) return false;
+  if (!canContinue()) return false;
   const recap = tierNightRecapToRemote(getTierNightSession());
   const tnRemote = getTierNightRemote() || {};
   const row = await patchGameState(
     { tierNight: { ...tnRemote, lobbyStarted: false, ...(recap ? { recap } : {}) } },
     { screen: "tiernight-end", gameId: "tiernight", withEveningScores: true }
   );
-  if (!stillMounted()) return false;
+  if (!canContinue()) return false;
   if (getEffectiveSessionScreen(row) !== "tiernight-end") return false;
   navigate("tiernight-end");
   return true;

@@ -360,6 +360,7 @@ export function mountHotTake(app) {
     const live = getHotTakeSession();
     if (live.phase === "final") {
       if (!mount.isMounted()) return;
+      if (!mount.isCurrentMount()) return;
       render();
       return;
     }
@@ -382,6 +383,7 @@ export function mountHotTake(app) {
     if (mp && canActAsHost()) {
       await commitHotTakePlay(finalSession, { screen: "hottake" });
       if (!mount.isMounted()) return;
+      if (!mount.isCurrentMount()) return;
       render();
       return;
     }
@@ -389,6 +391,7 @@ export function mountHotTake(app) {
     if (!mp) {
       await commitHotTakePlay(finalSession);
       if (!mount.isMounted()) return;
+      if (!mount.isCurrentMount()) return;
       render();
     }
   }
@@ -398,6 +401,7 @@ export function mountHotTake(app) {
 
     const resetHt = await resetHotTakeAfterGame({ syncRemote: false });
     if (!mount.isMounted()) return;
+    if (!mount.isCurrentMount()) return;
 
     if (mp) {
       try {
@@ -409,6 +413,7 @@ export function mountHotTake(app) {
       } catch (e) {
         console.warn("REVEAL completeGameSession:", e);
         if (!mount.isMounted()) return;
+        if (!mount.isCurrentMount()) return;
         navigate("results", { navStack: ["home", "lobby", "game-select", "results"] });
       }
       return;
@@ -416,6 +421,7 @@ export function mountHotTake(app) {
 
     await setLobbyWaiting();
     if (!mount.isMounted()) return;
+    if (!mount.isCurrentMount()) return;
     navigate("results", { navStack: ["home", "lobby", "game-select", "results"] });
   }
 
@@ -432,6 +438,7 @@ export function mountHotTake(app) {
     if (mp && canActAsHost()) {
       await refreshGameSession();
       if (!mount.isMounted()) return;
+      if (!mount.isCurrentMount()) return;
       syncFromSession();
     }
     const votesToScore = votesForAward();
@@ -447,12 +454,14 @@ export function mountHotTake(app) {
           });
         } catch {
           if (!mount.isMounted()) return;
+          if (!mount.isCurrentMount()) return;
           syncFromSession();
           render();
           return;
         }
       }
       if (!mount.isMounted()) return;
+      if (!mount.isCurrentMount()) return;
       enterRevealUi();
       arch03RevealLog("enterRevealUi reason", { reason: "already-scored" });
       return;
@@ -468,6 +477,7 @@ export function mountHotTake(app) {
           });
         } catch {
           if (!mount.isMounted()) return;
+          if (!mount.isCurrentMount()) return;
           syncFromSession();
           render();
           return;
@@ -476,6 +486,7 @@ export function mountHotTake(app) {
         phase = "reveal";
       }
       if (!mount.isMounted()) return;
+      if (!mount.isCurrentMount()) return;
       enterRevealUi();
       arch03RevealLog("enterRevealUi reason", { reason: "no-award" });
       return;
@@ -524,6 +535,7 @@ export function mountHotTake(app) {
         }
       );
       if (!mount.isMounted()) return;
+      if (!mount.isCurrentMount()) return;
       // Uniquement après succès serveur (MP) : syncFromSession lit l'état autoritaire
       if (award) lastAward = award;
       takeScored = true;
@@ -540,6 +552,7 @@ export function mountHotTake(app) {
         phaseNow: getHotTakeSession().phase,
       });
       if (!mount.isMounted()) return;
+      if (!mount.isCurrentMount()) return;
       syncFromSession();
       render();
     } finally {
@@ -565,6 +578,7 @@ export function mountHotTake(app) {
       selected = null;
       votes = {};
       if (!mount.isMounted()) return;
+      if (!mount.isCurrentMount()) return;
       render();
     }
   }
@@ -587,11 +601,13 @@ export function mountHotTake(app) {
         phaseNow: getHotTakeSession().phase,
       });
       if (!mount.isMounted()) return;
+      if (!mount.isCurrentMount()) return;
       syncFromSession();
       render();
       return;
     }
     if (!mount.isMounted()) return;
+    if (!mount.isCurrentMount()) return;
     selected = null;
     syncFromSession();
     render();
@@ -623,15 +639,17 @@ export function mountHotTake(app) {
       try {
         await commitHotTakeVote(pick);
         if (!mount.isMounted()) return;
+        if (!mount.isCurrentMount()) return;
         selected = null;
         myVote = pick;
       } catch {
         // Feedback déjà affiché ; rollback session dans commitHotTakeVote.
       } finally {
         voteCommitInFlight = null;
-        if (mount.isMounted()) syncFromSession();
+        if (mount.isMounted() && mount.isCurrentMount()) syncFromSession();
       }
       if (!mount.isMounted()) return;
+      if (!mount.isCurrentMount()) return;
       if (allHotTakeVotesIn() && canActAsHost()) {
         await goToReveal();
         return;
@@ -645,6 +663,7 @@ export function mountHotTake(app) {
       return;
     }
     if (!mount.isMounted()) return;
+    if (!mount.isCurrentMount()) return;
     render();
   }
 
@@ -659,6 +678,7 @@ export function mountHotTake(app) {
 
   function render() {
     if (!mount.isMounted()) return;
+    if (!mount.isCurrentMount()) return;
     syncFromSession();
     const take = takeLabel(TAKES[takeIdx]);
     const total = TAKES.length;
@@ -837,6 +857,7 @@ export function mountHotTake(app) {
         takeScored = false;
         await startNextTakeVote();
         if (!mount.isMounted()) return;
+        if (!mount.isCurrentMount()) return;
         render();
       } else {
         await finishHotTakeGame();
@@ -875,6 +896,7 @@ export function mountHotTake(app) {
 
   const unsubGame = onGameSessionChange((row) => {
     if (!mount.isMounted()) return;
+    if (!mount.isCurrentMount()) return;
     if (stopGameSessionListenerOnPostGame(row)) return;
 
     const prevPhase = phase;

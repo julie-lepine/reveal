@@ -155,7 +155,7 @@ export function mountClutch(app) {
     const sub = app.querySelector("#clutch-clock-sub");
     if (sub) sub.textContent = BLIND_LINES[0];
     copyTimer = setInterval(() => {
-      if (!mount.isMounted()) {
+      if (!mount.isMounted() || !mount.isCurrentMount()) {
         clearCopyTimer();
         return;
       }
@@ -193,7 +193,7 @@ export function mountClutch(app) {
   function startClock() {
     stopClock();
     const tick = () => {
-      if (!mount.isMounted()) {
+      if (!mount.isMounted() || !mount.isCurrentMount()) {
         stopClock();
         return;
       }
@@ -222,7 +222,7 @@ export function mountClutch(app) {
   function startCountdown() {
     stopClock();
     const tick = () => {
-      if (!mount.isMounted()) {
+      if (!mount.isMounted() || !mount.isCurrentMount()) {
         stopClock();
         return;
       }
@@ -246,6 +246,7 @@ export function mountClutch(app) {
   /** Fin du décompte : départ réel du chrono + programmation de la clôture (cible + grâce). */
   function beginClock() {
     if (!mount.isMounted()) return;
+    if (!mount.isCurrentMount()) return;
     localStart = performance.now();
     clearGrace();
     const windowMs = (targetMs || 0) + CLUTCH_GRACE_MS;
@@ -256,6 +257,7 @@ export function mountClutch(app) {
   /** Maj légère en phase aveugle (tap distant) sans casser chrono/anim. */
   function refreshActiveLive() {
     if (!mount.isMounted()) return;
+    if (!mount.isCurrentMount()) return;
     refreshTappedChips();
   }
 
@@ -298,6 +300,7 @@ export function mountClutch(app) {
   function onGraceElapsed() {
     graceTimer = null;
     if (!mount.isMounted()) return;
+    if (!mount.isCurrentMount()) return;
     if (phase !== "active") return;
     localWindowClosed = true;
     if (!mp || canActAsHost()) {
@@ -339,6 +342,7 @@ export function mountClutch(app) {
         { withEveningScores: mp && isLobbyHost() }
       );
       if (!mount.isMounted()) return;
+      if (!mount.isCurrentMount()) return;
       if (!mp) {
         phase = "reveal";
         lastRound = lastRoundData;
@@ -472,6 +476,7 @@ export function mountClutch(app) {
 
   function render() {
     if (!mount.isMounted()) return;
+    if (!mount.isCurrentMount()) return;
     syncFromSession();
     ensureRoundTiming();
     stopClock();
@@ -525,6 +530,7 @@ export function mountClutch(app) {
       void commitClutchTap(tap)
         .then(() => {
           if (!mount.isMounted()) return;
+          if (!mount.isCurrentMount()) return;
           if (!mp) {
             void goToReveal();
             return;
@@ -533,6 +539,7 @@ export function mountClutch(app) {
         })
         .catch(() => {
           if (!mount.isMounted()) return;
+          if (!mount.isCurrentMount()) return;
           // Session déjà rollback dans commitClutchTap ; rouvre la fenêtre de tap.
           const ui = resolveClutchTapCommitFailureUi();
           tapCommitInFlight = ui.tapCommitInFlight;
@@ -541,6 +548,7 @@ export function mountClutch(app) {
         .finally(() => {
           tapCommitInFlight = false;
           if (!mount.isMounted()) return;
+          if (!mount.isCurrentMount()) return;
           syncFromSession();
           render();
         });
@@ -550,6 +558,7 @@ export function mountClutch(app) {
       if (roundIdx < totalRounds - 1) {
         await startClutchRound(roundIdx + 1);
         if (!mount.isMounted()) return;
+        if (!mount.isCurrentMount()) return;
         syncFromSession();
         render();
       } else {
@@ -566,10 +575,12 @@ export function mountClutch(app) {
           } catch (e) {
             console.warn("REVEAL completeGameSession:", e);
             if (!mount.isMounted()) return;
+            if (!mount.isCurrentMount()) return;
             navigate("results", { navStack: ["home", "lobby", "game-select", "results"] });
           }
         } else {
           if (!mount.isMounted()) return;
+          if (!mount.isCurrentMount()) return;
           setLobbyWaiting();
           navigate("results", { navStack: ["home", "lobby", "game-select", "results"] });
         }
@@ -581,6 +592,7 @@ export function mountClutch(app) {
 
   const unsub = onGameSessionChange((row) => {
     if (!mount.isMounted()) return;
+    if (!mount.isCurrentMount()) return;
     if (stopGameSessionListenerOnPostGame(row, { cleanup: () => {
       clearGrace();
       stopClock();

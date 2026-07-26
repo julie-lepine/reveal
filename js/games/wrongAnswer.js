@@ -161,6 +161,7 @@ export function mountWrongAnswer(app) {
       );
       // commitWrongAnswerPlay a déjà sauvegardé localement la phase : render() la relit.
       if (!mount.isMounted()) return;
+      if (!mount.isCurrentMount()) return;
       render();
     } finally {
       transitionInFlight = false;
@@ -205,6 +206,7 @@ export function mountWrongAnswer(app) {
       );
       // commitWrongAnswerPlay a déjà sauvegardé localement : render() relit la session.
       if (!mount.isMounted()) return;
+      if (!mount.isCurrentMount()) return;
       render();
     } finally {
       transitionInFlight = false;
@@ -363,6 +365,7 @@ export function mountWrongAnswer(app) {
 
   function render() {
     if (!mount.isMounted()) return;
+    if (!mount.isCurrentMount()) return;
     syncFromSession();
 
     let phaseHtml = "";
@@ -417,12 +420,14 @@ export function mountWrongAnswer(app) {
       }
       await commitWrongAnswerAnswer(text);
       if (!mount.isMounted()) return;
+      if (!mount.isCurrentMount()) return;
       draftText = "";
       if (!mp) {
         // Mode solo : on complète les NPC puis on passe au vote.
         const filled = fillNpcAnswers();
         await commitWrongAnswerPlay({ answers: filled });
         if (!mount.isMounted()) return;
+        if (!mount.isCurrentMount()) return;
       }
       render();
       if (!mp) {
@@ -450,10 +455,12 @@ export function mountWrongAnswer(app) {
       if (target == null || target === localName) return;
       await commitWrongAnswerVote(target);
       if (!mount.isMounted()) return;
+      if (!mount.isCurrentMount()) return;
       if (!mp) {
         const filled = fillNpcVotes(getWrongAnswerSession().answers || {});
         await commitWrongAnswerPlay({ votes: filled });
         if (!mount.isMounted()) return;
+        if (!mount.isCurrentMount()) return;
       }
       render();
       if (!mp) {
@@ -469,6 +476,7 @@ export function mountWrongAnswer(app) {
       if (roundIdx < totalRounds - 1) {
         await startWrongAnswerRound(roundIdx + 1);
         if (!mount.isMounted()) return;
+        if (!mount.isCurrentMount()) return;
         syncFromSession();
         selectedTarget = null;
         draftText = "";
@@ -487,11 +495,13 @@ export function mountWrongAnswer(app) {
           } catch (e) {
             console.warn("REVEAL completeGameSession:", e);
             if (!mount.isMounted()) return;
+            if (!mount.isCurrentMount()) return;
             navigate("results", { navStack: ["home", "lobby", "game-select", "results"] });
           }
         } else {
           setLobbyWaiting();
           if (!mount.isMounted()) return;
+          if (!mount.isCurrentMount()) return;
           navigate("results", { navStack: ["home", "lobby", "game-select", "results"] });
         }
       }
@@ -515,6 +525,7 @@ export function mountWrongAnswer(app) {
 
   const unsub = onGameSessionChange((row) => {
     if (!mount.isMounted()) return;
+    if (!mount.isCurrentMount()) return;
     if (stopGameSessionListenerOnPostGame(row)) return;
 
     const prevPhase = phase;

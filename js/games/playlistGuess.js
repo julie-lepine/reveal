@@ -27,6 +27,7 @@ import { escapeHtml, pageShell, resetPageScroll } from "../core/ui.js";
 import { bindNav } from "../screens/nav.js";
 import { gameExitBarHtml, bindExitGame } from "../core/exitGame.js";
 import { withClickLock, createActionLock } from "../core/actionLock.js";
+import { createMountGuard } from "../core/mountLifecycle.js";
 import {
   isGameSyncActive,
   canActAsHost,
@@ -88,7 +89,7 @@ export function mountPlaylistGuess(app) {
   let revealAdvancing = false;
   let lastScoredRoundIdx = -1;
   let lastScrollKey = "";
-  let unmounted = false;
+  const mount = createMountGuard();
   /** ARCH-06 : partagé entre re-binds après render (pas un verrou DOM seul). */
   const nextRoundLock = createActionLock();
   const forceRevealLock = createActionLock();
@@ -218,7 +219,7 @@ export function mountPlaylistGuess(app) {
     revealAdvancing = true;
     try {
       await transitionToReveal();
-      if (!unmounted) render();
+      if (mount.isMounted() && mount.isCurrentMount()) render();
     } finally {
       revealAdvancing = false;
     }
@@ -240,14 +241,14 @@ export function mountPlaylistGuess(app) {
       revealAdvancing = true;
       try {
         await transitionToReveal();
-        if (!unmounted) render();
+        if (mount.isMounted() && mount.isCurrentMount()) render();
       } finally {
         revealAdvancing = false;
       }
     } else {
       phase = "reveal";
       await transitionToReveal();
-      if (!unmounted) render();
+      if (mount.isMounted() && mount.isCurrentMount()) render();
     }
   }
 
@@ -258,30 +259,33 @@ export function mountPlaylistGuess(app) {
       render();
       try {
         await commitPlaylistGuessVote(pick);
-        if (unmounted) return;
+        if (!mount.isMounted()) return;
+        if (!mount.isCurrentMount()) return;
         selected = null;
         myVote = pick;
       } catch {
         // Feedback déjà affiché ; l’état revient via syncFromSession.
       } finally {
         voteCommitInFlight = null;
-        if (!unmounted) syncFromSession();
+        if (mount.isMounted() && mount.isCurrentMount()) syncFromSession();
       }
-      if (unmounted) return;
+      if (!mount.isMounted()) return;
+      if (!mount.isCurrentMount()) return;
       await tryAdvanceToReveal();
-      if (!unmounted && phase !== "reveal") render();
+      if (mount.isMounted() && mount.isCurrentMount() && phase !== "reveal") render();
     } else {
       myVote = pick;
       selected = null;
       phase = "reveal";
       await transitionToReveal();
-      if (!unmounted) render();
+      if (mount.isMounted() && mount.isCurrentMount()) render();
     }
   }
 
   async function nextRound() {
     if (mp && !canActAsHost()) return;
-    if (unmounted) return;
+    if (!mount.isMounted()) return;
+    if (!mount.isCurrentMount()) return;
 
     if (roundIdx >= deck.length - 1) {
       recordPlaylistGuessPlayed();
@@ -299,12 +303,14 @@ export function mountPlaylistGuess(app) {
           });
         } catch (e) {
           console.warn("REVEAL completeGameSession:", e);
-          if (unmounted) return;
+          if (!mount.isMounted()) return;
+          if (!mount.isCurrentMount()) return;
           navigate("results", { navStack: ["home", "lobby", "game-select", "results"] });
         }
       } else {
         setLobbyWaiting();
-        if (unmounted) return;
+        if (!mount.isMounted()) return;
+        if (!mount.isCurrentMount()) return;
         navigate("results");
       }
       return;
@@ -314,7 +320,8 @@ export function mountPlaylistGuess(app) {
     if (mp) {
       await startPlaylistGuessRound(next);
     }
-    if (unmounted) return;
+    if (!mount.isMounted()) return;
+    if (!mount.isCurrentMount()) return;
     roundIdx = next;
     phase = "voting";
     selected = null;
@@ -490,7 +497,8 @@ export function mountPlaylistGuess(app) {
   }
 
   function onSyncUpdate(row = getCachedGameSession()) {
-    if (unmounted) return;
+    if (!mount.isMounted()) return;
+    if (!mount.isCurrentMount()) return;
     if (stopGameSessionListenerOnPostGame(row)) return;
 
     const prevIdx = roundIdx;
@@ -548,7 +556,7 @@ export function mountPlaylistGuess(app) {
   }
 
   return () => {
-    unmounted = true;
+    mount.dispose();
     unsub();
     if (!mp) setLobbyWaiting();
   };

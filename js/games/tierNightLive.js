@@ -244,6 +244,7 @@ function mountMp(app, list) {
       const placements = accumulatePlacements(session);
       await commitTierNightLivePlay({ phase: "reveal", placements });
       if (!mount.isMounted()) return;
+      if (!mount.isCurrentMount()) return;
       reload();
       render();
     } finally {
@@ -256,12 +257,15 @@ function mountMp(app, list) {
     if (session.roundIdx < total() - 1) {
       await commitTierNightLivePlay(tierNightLiveVotingPayload(session.roundIdx + 1));
       if (!mount.isMounted()) return;
+      if (!mount.isCurrentMount()) return;
       reload();
       render();
     } else {
       buildTierNightLiveRecaps(session);
       recordTierNightPlayed();
-      await finalizeTierNightLiveToResults({ isMounted: () => mount.isMounted() });
+      await finalizeTierNightLiveToResults({
+        shouldContinue: () => mount.isMounted() && mount.isCurrentMount(),
+      });
     }
   }
 
@@ -269,6 +273,7 @@ function mountMp(app, list) {
     if (session.phase !== "voting" || myVote()) return;
     await commitTierNightLiveVote(tier);
     if (!mount.isMounted()) return;
+    if (!mount.isCurrentMount()) return;
     reload();
     if (canActAsHost() && allTierNightLiveVotesIn()) {
       await transitionToReveal();
@@ -313,6 +318,7 @@ function mountMp(app, list) {
 
   function render() {
     if (!mount.isMounted()) return;
+    if (!mount.isCurrentMount()) return;
     const phaseHtml = session.phase === "reveal" ? revealPhaseHtml() : votingPhaseHtml();
     app.innerHTML = pageShell({
       backTarget: "back",
@@ -342,6 +348,7 @@ function mountMp(app, list) {
 
   const unsub = onGameSessionChange((row) => {
     if (!mount.isMounted()) return;
+    if (!mount.isCurrentMount()) return;
     if (stopGameSessionListenerOnPostGame(row)) return;
 
     const effective = getEffectiveSessionScreen(row);

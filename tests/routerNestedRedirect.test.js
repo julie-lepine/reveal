@@ -9,6 +9,10 @@ import {
   getCurrentScreen,
   getNavStack,
 } from "../js/core/router.js";
+import {
+  createMountGuard,
+  getMountGenerationForTests,
+} from "../js/core/mountLifecycle.js";
 
 function fakeApp() {
   return {
@@ -184,5 +188,75 @@ describe("M-08 / SYN-13 nested redirect in mount", () => {
 
     assert.equal(getCurrentScreen(), "screen-c");
     assert.deepEqual(getNavStack(), ["home", "screen-c"]);
+  });
+});
+
+describe("ARCH-06 Vague C0 — génération routeur", () => {
+  it("navigate same-screen avance la génération ; ancien mount non courant", () => {
+    let guardA = null;
+    let guardB = null;
+    let mounts = 0;
+    registerScreen("home", () => () => {});
+    registerScreen("play", () => {
+      mounts += 1;
+      const g = createMountGuard();
+      if (mounts === 1) guardA = g;
+      else guardB = g;
+      return () => g.dispose();
+    });
+
+    navigate("home", { reset: true });
+    const gen0 = getMountGenerationForTests();
+    navigate("play");
+    assert.ok(getMountGenerationForTests() > gen0);
+    assert.equal(guardA.isCurrentMount(), true);
+
+    navigate("play"); // remount same id
+    assert.equal(guardA.isMounted(), false);
+    assert.equal(guardA.isCurrentMount(), false);
+    assert.equal(guardB.isCurrentMount(), true);
+  });
+
+  it("nested navigate : guard A non courant, B courant (même sans dispose A)", () => {
+    let guardA = null;
+    let guardB = null;
+    registerScreen("home", () => () => {});
+    registerScreen("screen-a", () => {
+      guardA = createMountGuard();
+      navigate("screen-b");
+      return null; // pas de dispose — trou mode B
+    });
+    registerScreen("screen-b", () => {
+      guardB = createMountGuard();
+      return () => guardB.dispose();
+    });
+
+    navigate("home", { reset: true });
+    navigate("screen-a");
+    assert.equal(getCurrentScreen(), "screen-b");
+    assert.equal(guardA.isMounted(), true);
+    assert.equal(guardA.isCurrentMount(), false);
+    assert.equal(guardB.isCurrentMount(), true);
+  });
+
+  it("goBack avance la génération", () => {
+    let lastGuard = null;
+    registerScreen("home", () => {
+      lastGuard = createMountGuard();
+      return () => lastGuard.dispose();
+    });
+    registerScreen("play", () => {
+      lastGuard = createMountGuard();
+      return () => lastGuard.dispose();
+    });
+
+    navigate("home", { reset: true });
+    navigate("play");
+    const genPlay = getMountGenerationForTests();
+    const playGuard = lastGuard;
+    goBack();
+    assert.ok(getMountGenerationForTests() > genPlay);
+    assert.equal(playGuard.isCurrentMount(), false);
+    assert.equal(lastGuard.isCurrentMount(), true);
   });
 });

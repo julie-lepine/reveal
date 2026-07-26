@@ -124,6 +124,7 @@ export function mountTrivia(app) {
         const delayMs = 1800 + idx * 650 + Math.floor(Math.random() * 2600);
         const timeoutId = setTimeout(async () => {
           if (!mount.isMounted()) return;
+          if (!mount.isCurrentMount()) return;
           const live = trivia.getSession();
           if (live.phase !== "question") return;
           if ((live.answers || {})[player.name]) return;
@@ -136,6 +137,7 @@ export function mountTrivia(app) {
           };
           await trivia.commitPlay({ ...live, answers: nextAnswers });
           if (!mount.isMounted()) return;
+          if (!mount.isCurrentMount()) return;
           if (trivia.allAnswersIn()) {
             await goToReveal();
             return;
@@ -253,6 +255,7 @@ export function mountTrivia(app) {
         trivia: triviaToRemote(configSession),
       });
       if (!mount.isMounted()) return;
+      if (!mount.isCurrentMount()) return;
       navigate("trivia-prep", {
         navStack: ["home", "lobby", "game-select", "trivia-prep"],
       });
@@ -260,6 +263,7 @@ export function mountTrivia(app) {
     }
 
     if (!mount.isMounted()) return;
+    if (!mount.isCurrentMount()) return;
     saveStatePatch({ triviaGame: configSession });
     navigate("trivia-prep", {
       navStack: ["home", "lobby", "game-select", "trivia-prep"],
@@ -295,9 +299,11 @@ export function mountTrivia(app) {
     }
 
     if (!mount.isMounted()) return;
+    if (!mount.isCurrentMount()) return;
     saveStatePatch({ triviaGame: started.session });
     await setLobbyPlaying("trivia");
     if (!mount.isMounted()) return;
+    if (!mount.isCurrentMount()) return;
     navigate("trivia", {
       navStack: ["home", "lobby", "game-select", "trivia"],
     });
@@ -307,6 +313,7 @@ export function mountTrivia(app) {
     const live = trivia.getSession();
     if (live.podiumApplied) {
       if (!mount.isMounted()) return;
+      if (!mount.isCurrentMount()) return;
       render();
       return;
     }
@@ -346,12 +353,14 @@ export function mountTrivia(app) {
     if (mp && canActAsHost()) {
       await trivia.commitPlay(finalSession, { screen: "trivia" });
       if (!mount.isMounted()) return;
+      if (!mount.isCurrentMount()) return;
       render();
       return;
     }
 
     if (!mp) {
       if (!mount.isMounted()) return;
+      if (!mount.isCurrentMount()) return;
       saveStatePatch({ triviaGame: finalSession });
       render();
     }
@@ -377,6 +386,7 @@ export function mountTrivia(app) {
       } catch (e) {
         console.warn("REVEAL completeGameSession:", e);
         if (!mount.isMounted()) return;
+        if (!mount.isCurrentMount()) return;
         navigate("results", { navStack: ["home", "lobby", "game-select", "results"] });
       }
       return;
@@ -384,12 +394,14 @@ export function mountTrivia(app) {
 
     await setLobbyWaiting();
     if (!mount.isMounted()) return;
+    if (!mount.isCurrentMount()) return;
     saveStatePatch({ triviaGame: finalSession });
     navigate("results", { navStack: ["home", "lobby", "game-select", "results"] });
   }
 
   function render() {
     if (!mount.isMounted()) return;
+    if (!mount.isCurrentMount()) return;
     syncFromSession();
     const session = trivia.getSession();
     const totalQuestions = session.deck?.length || 0;
@@ -510,17 +522,18 @@ export function mountTrivia(app) {
           try {
             await trivia.commitAnswer(choice);
             if (!mount.isMounted()) return;
+            if (!mount.isCurrentMount()) return;
             syncFromSession();
             if (trivia.allAnswersIn() && (!mp || canActAsHost())) {
               await goToReveal();
               return;
             }
           } catch {
-            if (mount.isMounted()) syncFromSession();
+            if (mount.isMounted() && mount.isCurrentMount()) syncFromSession();
           } finally {
             pendingAnswerIndex = null;
             answerCommitInFlight = false;
-            if (mount.isMounted()) render();
+            if (mount.isMounted() && mount.isCurrentMount()) render();
           }
         });
       });
@@ -533,6 +546,7 @@ export function mountTrivia(app) {
       if (questionIdx < totalQuestions - 1) {
         await trivia.startQuestion(questionIdx + 1);
         if (!mount.isMounted()) return;
+        if (!mount.isCurrentMount()) return;
         render();
         return;
       }
@@ -603,6 +617,7 @@ export function mountTrivia(app) {
 
   const unsub = onGameSessionChange((row) => {
     if (!mount.isMounted()) return;
+    if (!mount.isCurrentMount()) return;
     if (stopGameSessionListenerOnPostGame(row, { cleanup: clearNpcTimers })) return;
 
     const prevPhase = phase;

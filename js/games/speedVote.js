@@ -147,6 +147,7 @@ export function mountSpeedVote(app) {
 
       if (!mp) {
         if (!mount.isMounted()) return;
+        if (!mount.isCurrentMount()) return;
         phase = "reveal";
         render();
       }
@@ -254,6 +255,7 @@ export function mountSpeedVote(app) {
 
   function render() {
     if (!mount.isMounted()) return;
+    if (!mount.isCurrentMount()) return;
     syncFromSession();
     const total = QUESTIONS.length;
     const host = !mp || canActAsHost();
@@ -325,8 +327,10 @@ export function mountSpeedVote(app) {
         if (mp) {
           await commitSpeedVoteVote(target);
           if (!mount.isMounted()) return;
+          if (!mount.isCurrentMount()) return;
           if (allSpeedVoteVotesIn() && canActAsHost()) await goToReveal();
           if (!mount.isMounted()) return;
+          if (!mount.isCurrentMount()) return;
           render();
         } else {
           votes = simulateSpeedVoteLobbyVotes(target);
@@ -347,9 +351,11 @@ export function mountSpeedVote(app) {
         } else {
           await startSpeedVoteRound(nextIdx);
           if (!mount.isMounted()) return;
+          if (!mount.isCurrentMount()) return;
           syncFromSession();
         }
         if (!mount.isMounted()) return;
+        if (!mount.isCurrentMount()) return;
         render();
       } else {
         recordSpeedVotePlayed();
@@ -365,11 +371,13 @@ export function mountSpeedVote(app) {
           } catch (e) {
             console.warn("REVEAL completeGameSession:", e);
             if (!mount.isMounted()) return;
+            if (!mount.isCurrentMount()) return;
             navigate("results", { navStack: ["home", "lobby", "game-select", "results"] });
           }
         } else {
           setLobbyWaiting();
           if (!mount.isMounted()) return;
+          if (!mount.isCurrentMount()) return;
           navigate("results", { navStack: ["home", "lobby", "game-select", "results"] });
         }
       }
@@ -398,6 +406,7 @@ export function mountSpeedVote(app) {
 
   const unsub = onGameSessionChange((row) => {
     if (!mount.isMounted()) return;
+    if (!mount.isCurrentMount()) return;
     if (stopGameSessionListenerOnPostGame(row)) return;
 
     const prevPhase = phase;
@@ -417,6 +426,7 @@ export function mountSpeedVote(app) {
       return;
     }
     if (!mount.isMounted()) return;
+    if (!mount.isCurrentMount()) return;
     const skipFull = shouldSkipFullRender(prevPhase, prevRound, prevVotesJson);
     arch03AhLogSkipDecision("speedVote", {
       decision: skipFull && !actingHostUiRefresh ? "skip-full-render" : "full-render",
