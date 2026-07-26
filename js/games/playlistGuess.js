@@ -281,6 +281,7 @@ export function mountPlaylistGuess(app) {
 
   async function nextRound() {
     if (mp && !canActAsHost()) return;
+    if (unmounted) return;
 
     if (roundIdx >= deck.length - 1) {
       recordPlaylistGuessPlayed();
@@ -298,10 +299,12 @@ export function mountPlaylistGuess(app) {
           });
         } catch (e) {
           console.warn("REVEAL completeGameSession:", e);
+          if (unmounted) return;
           navigate("results", { navStack: ["home", "lobby", "game-select", "results"] });
         }
       } else {
         setLobbyWaiting();
+        if (unmounted) return;
         navigate("results");
       }
       return;
@@ -311,6 +314,7 @@ export function mountPlaylistGuess(app) {
     if (mp) {
       await startPlaylistGuessRound(next);
     }
+    if (unmounted) return;
     roundIdx = next;
     phase = "voting";
     selected = null;

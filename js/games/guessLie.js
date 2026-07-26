@@ -25,6 +25,7 @@ import { gameCumulativeScoresHtml, refreshGameScoresBox } from "../core/gameScor
 import { setLobbyPlaying, setLobbyWaiting } from "../core/lobby.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
 import { withClickLock } from "../core/actionLock.js";
+import { createMountGuard } from "../core/mountLifecycle.js";
 import { navigate } from "../core/router.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
 import { bindNav } from "../screens/nav.js";
@@ -55,6 +56,7 @@ export function mountGuessLie(app) {
 
   void setLobbyPlaying("guesslie").catch(() => {});
 
+  const mount = createMountGuard();
   const mp = isGameSyncActive();
 
   let roundIdx = 0;
@@ -118,6 +120,7 @@ export function mountGuessLie(app) {
       { withEveningScores: mp && isLobbyHost() }
     );
 
+    if (!mount.isMounted()) return;
     setRevealDisplay(result);
   }
 
@@ -131,6 +134,7 @@ export function mountGuessLie(app) {
     revealAdvancing = true;
     try {
       await transitionToReveal();
+      if (!mount.isMounted()) return;
       render();
     } finally {
       revealAdvancing = false;
@@ -177,6 +181,7 @@ export function mountGuessLie(app) {
       revealAdvancing = true;
       try {
         await transitionToReveal();
+        if (!mount.isMounted()) return;
         render();
       } finally {
         revealAdvancing = false;
@@ -184,6 +189,7 @@ export function mountGuessLie(app) {
     } else {
       phase = "reveal";
       await transitionToReveal();
+      if (!mount.isMounted()) return;
       render();
     }
   }
@@ -213,10 +219,12 @@ export function mountGuessLie(app) {
           await completeGameSession({ gameId: "guesslie", screen: "results", state: {} });
         } catch (e) {
           console.warn("REVEAL completeGameSession:", e);
+          if (!mount.isMounted()) return;
           navigate("results", { navStack: ["home", "lobby", "game-select", "results"] });
         }
       } else {
         setLobbyWaiting();
+        if (!mount.isMounted()) return;
         navigate("results");
       }
       return;
@@ -232,6 +240,7 @@ export function mountGuessLie(app) {
         { roundIdx: next, phase: "voting", votes: {}, roundScored: false },
         { screen: "guesslie" }
       );
+      if (!mount.isMounted()) return;
       render();
     } else {
       roundIdx = next;
@@ -240,6 +249,7 @@ export function mountGuessLie(app) {
   }
 
   function render() {
+    if (!mount.isMounted()) return;
     syncFromGl();
     ensureRevealDisplay();
 
@@ -418,11 +428,13 @@ export function mountGuessLie(app) {
       if (mp) {
         selected = pick;
         await commitGuessLieVote(pick);
+        if (!mount.isMounted()) return;
         render();
         await tryAdvanceToReveal();
       } else {
         phase = "reveal";
         await transitionToReveal();
+        if (!mount.isMounted()) return;
         render();
       }
     });
@@ -451,6 +463,7 @@ export function mountGuessLie(app) {
   let lastAckedActingHostToken = getActingHostUiRefreshToken();
 
   function onSyncUpdate(row) {
+    if (!mount.isMounted()) return;
     if (stopGameSessionListenerOnPostGame(row)) return;
 
     const prevIdx = roundIdx;
@@ -518,6 +531,7 @@ export function mountGuessLie(app) {
   }
 
   return () => {
+    mount.dispose();
     unsub();
     if (!mp) setLobbyWaiting();
   };

@@ -21,6 +21,7 @@ import { getActivePlayerNames, getActivePlayers, getNpcPlayers } from "../core/p
 import { setLobbyPlaying, setLobbyWaiting } from "../core/lobby.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
 import { withClickLock } from "../core/actionLock.js";
+import { createMountGuard } from "../core/mountLifecycle.js";
 import { navigate } from "../core/router.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
 import { bindNav } from "../screens/nav.js";
@@ -48,6 +49,7 @@ export function mountWrongAnswer(app) {
 
   void setLobbyPlaying("wronganswer").catch(() => {});
 
+  const mount = createMountGuard();
   let roundIdx = 0;
   let phase = "answer";
   let currentPrompt = null;
@@ -158,6 +160,7 @@ export function mountWrongAnswer(app) {
         { screen: "wronganswer" }
       );
       // commitWrongAnswerPlay a déjà sauvegardé localement la phase : render() la relit.
+      if (!mount.isMounted()) return;
       render();
     } finally {
       transitionInFlight = false;
@@ -201,6 +204,7 @@ export function mountWrongAnswer(app) {
         { withEveningScores: mp && isLobbyHost() }
       );
       // commitWrongAnswerPlay a déjà sauvegardé localement : render() relit la session.
+      if (!mount.isMounted()) return;
       render();
     } finally {
       transitionInFlight = false;
@@ -358,6 +362,7 @@ export function mountWrongAnswer(app) {
   }
 
   function render() {
+    if (!mount.isMounted()) return;
     syncFromSession();
 
     let phaseHtml = "";
@@ -411,11 +416,13 @@ export function mountWrongAnswer(app) {
         return;
       }
       await commitWrongAnswerAnswer(text);
+      if (!mount.isMounted()) return;
       draftText = "";
       if (!mp) {
         // Mode solo : on complète les NPC puis on passe au vote.
         const filled = fillNpcAnswers();
         await commitWrongAnswerPlay({ answers: filled });
+        if (!mount.isMounted()) return;
       }
       render();
       if (!mp) {
@@ -442,9 +449,11 @@ export function mountWrongAnswer(app) {
       const target = selectedTarget;
       if (target == null || target === localName) return;
       await commitWrongAnswerVote(target);
+      if (!mount.isMounted()) return;
       if (!mp) {
         const filled = fillNpcVotes(getWrongAnswerSession().answers || {});
         await commitWrongAnswerPlay({ votes: filled });
+        if (!mount.isMounted()) return;
       }
       render();
       if (!mp) {
@@ -459,6 +468,7 @@ export function mountWrongAnswer(app) {
     app.querySelector("#next-round")?.addEventListener("click", withClickLock(async () => {
       if (roundIdx < totalRounds - 1) {
         await startWrongAnswerRound(roundIdx + 1);
+        if (!mount.isMounted()) return;
         syncFromSession();
         selectedTarget = null;
         draftText = "";
@@ -476,10 +486,12 @@ export function mountWrongAnswer(app) {
             await completeGameSession({ gameId: "wronganswer", screen: "results", state: {} });
           } catch (e) {
             console.warn("REVEAL completeGameSession:", e);
+            if (!mount.isMounted()) return;
             navigate("results", { navStack: ["home", "lobby", "game-select", "results"] });
           }
         } else {
           setLobbyWaiting();
+          if (!mount.isMounted()) return;
           navigate("results", { navStack: ["home", "lobby", "game-select", "results"] });
         }
       }
@@ -502,6 +514,7 @@ export function mountWrongAnswer(app) {
   let lastAckedActingHostToken = getActingHostUiRefreshToken();
 
   const unsub = onGameSessionChange((row) => {
+    if (!mount.isMounted()) return;
     if (stopGameSessionListenerOnPostGame(row)) return;
 
     const prevPhase = phase;
@@ -551,6 +564,7 @@ export function mountWrongAnswer(app) {
   render();
 
   return () => {
+    mount.dispose();
     unsub();
   };
 }

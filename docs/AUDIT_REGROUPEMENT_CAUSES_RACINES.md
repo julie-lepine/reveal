@@ -17,9 +17,9 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 
 | | Contenu |
 |--|---------|
-| **Fait** | … · UX-VIBE-01/02 ✅ · SYN-05/ARCH-18 ✅ · **ARCH-06 V1** 🔧 (locks launch/restart/next) |
-| **Prochain** | Cause 7 résidus (ARCH-07/08 · M-14b) · QA terrain ARCH-06 V1 |
-| **Ensuite** | ARCH-06 V2 (traitre host) · V3 unmount / lobby IIFE |
+| **Fait** | … · **ARCH-06 V1** ✅ QA · **ARCH-06 Vague B0+B1+B4** 🔧 (mount guard) |
+| **Prochain** | ARCH-06 Vague B2 (consensus/trivia/clutch/truthMeter) · puis B3 TierLive |
+| **Ensuite** | ARCH-06 Vague C (génération) · Cause 7 · Traître host / lobby IIFE |
 
 **Hors file audit**  
 Sondages in-chat (`lobby_polls` / UI chat) — feature produit, pas un ticket cause racine.
@@ -38,7 +38,7 @@ Clutch taps figés sous latence (SYN-26) · ready prep après Recommencer · Cau
 
 | # | ID | Cause | Problème | Statut |
 |---|----|-------|----------|--------|
-| 1 | **ARCH-06** | 6 | Handlers async multiples en vol | 🟡 V1 patch — QA / V2–V3 reportés |
+| 1 | **ARCH-06** | 6 | Handlers async / unmount / remount | 🟡 V1 ✅ · B0+B1+B4 🔧 · B2/B3/C/V2 ouverts |
 | 2 | **M-14a / SYN-14** | 3 | TierNight topic / routing | ❌ KO QA — suspendu |
 | 3 | Guess Lie UX | 4/7 | UI avant await ; stats round local-only | Post I-08 |
 | 4 | Loader UI join | 5/11 | Interstitiel join | Hors T-01/T-02 |
@@ -69,7 +69,7 @@ Clutch taps figés sous latence (SYN-26) · ready prep après Recommencer · Cau
 | 3 | Sources de vérité multiples | ✅ hors TierNight | **M-14a** suspendu · UX-CLUTCH-01 ✅ |
 | 4 | Asymétrie hôte / invité | ✅ QA | UX Guess Lie séparée |
 | 5 | Routing + timing sync | ✅ | ARCH-05 mitigé |
-| 6 | Async écrans | Partiel | **ARCH-06** 🟡 V1 |
+| 6 | Async écrans | Partiel | **ARCH-06** V1 ✅ · B0+B1+B4 🔧 · B2/B3/C ouverts |
 | 7 | Sync silencieuse / fire-and-forget | Partiel | ARCH-07/08, M-14b |
 | 8 | Reset / migration incomplète | Partiel | I-09 ✅ ; SYN-15/16 ✅ ; ARCH-10 |
 | 9 | Sync monolithe / duplication | Dette | ARCH-11… |
@@ -178,40 +178,38 @@ Clutch taps figés sous latence (SYN-26) · ready prep après Recommencer · Cau
 | **I-09 / SYN-06** | Rename mid-soirée — migration blobs locaux | ✅ QA |
 | **ARCH-10** | Cache session clear trop tard au leave | 🟡 |
 
-### Cause 6 — ARCH-06 🟡 V1 patch
+### Cause 6 — ARCH-06 🟡 partiel · V1 ✅ · Vague B (en cours)
 
 | | |
 |--|--|
-| **Symptôme** | Handlers async / mounts sans garde de réentrance → double lancement, double avance de manche, ou `render()` après démontage |
-| **État** | **Partiellement corrigé (V1)** — hotspots launch / restart / next PG+TierLive neutralisés |
-| **Stratégie V1** | `createActionLock()` = verrou **logique** (survit re-render/re-bind) ; `withClickLock(handler, { lock })` pour partage entre rebinds ; release toujours en `finally` |
-| **Où V1** | `actionLock.js` · `prepLaunch.js` · `prepScreen.js` · `restartGame.js` · `playlistGuess.js` · `tierNightLive.js` |
-| **Preuve** | `tests/arch06ActionLocks.test.js` · suite **675/675** |
+| **État** | **Pas clos.** V1 ✅ mode A · Vague **B0+B1+B4** livrée (garde unmount) · B2/B3/C/Traître/lobby ouverts |
+| **Primitive B** | `createMountGuard()` (`js/core/mountLifecycle.js`) — `isMounted` / `dispose` ; pas de timers, pas d’erreurs avalées, pas de router |
+| **Règle** | Après `await` : bloquer render / bind / navigate / mutation UI / feedback ancien écran. Commits serveur déjà partis **non** annulés. |
 
-#### Causes neutralisées (V1)
+#### Vague B0+B1+B4 (cette livraison)
 
-| Hotspot | Cause exacte | Fix |
-|---------|--------------|-----|
-| Prep launch | `updatePrepStartSlot` re-crée un bouton non disabled pendant `await markStarted` ; pas d’exclusivité sur l’action | `prepLaunchLock` dans `executePrepLaunch` (9+ preps) |
-| Recommencer | `bindRestartGameButtons` → `void restartGame` sans garde | `restartLock` dans `restartGame` |
-| PG next / force | bind plain après chaque `render()` | `nextRoundLock` / `forceRevealLock` + `withClickLock(..., { lock })` |
-| TierNight Live next | idem (+ `revealInFlight` déjà sur reveal) | `nextRoundLock` + `withClickLock` ; reveal click aussi sur `revealLock` |
+| Fichier | Effets UI bloqués | Commits conservés |
+|---------|-------------------|-------------------|
+| `hotTake.js` | `render()` gate + navigate / enterRevealUi / sync UI après await ; listener session | `commitHotTake*` / `completeGameSession` |
+| `wrongAnswer.js` | idem transitions + submits + next | `commitWrongAnswer*` |
+| `guessLie.js` | reveal display / render / navigate | `commitGuessLie*` / scoring avant await |
+| `speedVote.js` | render / navigate après vote & next | `commitSpeedVote*` |
+| `playlistGuess.js` (B4) | `nextRound` : recheck `unmounted` avant render/navigate | `startPlaylistGuessRound` / `completeGameSession` |
 
-#### Résidus reportés (hors V1)
+**Inchangés (déjà OK)** : traitre · tierNight · dilemma — pas d’uniformisation cosmétique.
 
-| Vague | Scope |
-|-------|--------|
-| **V2** | Actions hôte Traître (`continueSpeakRound`, `startVoteFromDecision`, …) — mode A |
-| **V3** | `unmounted` manquant sur 9 jeux · `mountLobby` IIFE (croise SYN-12) · mode C generation mount si régression |
-| Hors ARCH-06 | Votes optimistic (T-05 résidu) · ARCH-07/08 |
+**Preuve** : `tests/mountLifecycle.test.js` · suite **688/688**
 
-#### Trois modes (rappel)
+#### Suite ARCH-06
 
-| Mode | Définition | V1 |
-|------|------------|-----|
-| **A** | Double-clic / 2e tap pendant `await` | ✅ launch, restart, PG/TierLive next |
-| **B** | Async après unmount → `render()` | ❌ reporté V3 (sauf déjà I-05 traitre/tierNight/dilemma/PG) |
-| **C** | Remount same-screen stale closure | ❌ reporté si régression |
+| Vague | Scope | Statut |
+|-------|-------|--------|
+| V1 mode A | launch / restart / PG+TierLive next | ✅ QA |
+| B0+B1+B4 | guard + 4 jeux + gap PG | 🔧 livré → QA |
+| **B2** | consensus · trivia · clutch · truthMeter (RAF/timers) | Prochain |
+| **B3** | tierNightLive `mountMp` | Après B2 |
+| **C** | génération router (après design vs M-08 nested) | Après B |
+| V2 / lobby | Traître host · lobby IIFE/SYN-12 | Hors B/C |
 
 ### Autres causes
 
@@ -271,7 +269,7 @@ Clutch conserve son départage temporel (règle produit explicite inchangée).
 | 3 | I-03/04, SYN-03, M-13, M-02b, ARCH-02, SYN-29, I-PG-01, ready stale Recommencer, UX-CLUTCH-01 |
 | 4 | I-01/02/08, M-03b, M-06a/b, L-01, ARCH-03/03b, UX-VIBE-01 |
 | 5 | T-01/02, T-03↻, M-07, M-08, P-02, SYN-28, I-PG-01, ARCH-04, UX-VIBE-02 |
-| 6 | I-05, SYN-13b↻, SYN-25, **SYN-05 / ARCH-18** ✅ QA |
+| 6 | I-05, SYN-13b↻, SYN-25, **SYN-05 / ARCH-18** ✅, **ARCH-06 V1** ✅, **ARCH-06 B0+B1+B4** 🔧 (B2/B3/C ouverts) |
 | 7 | I-07, M-09, L-09, M-11, M-10, T-05, SYN-26, M-04b / SYN-18 |
 | 8 | I-06, P-02, ARCH-09, I-09 / SYN-06, SYN-15 / SYN-16 |
 | 9 | SYN-12 / M-05b |
@@ -296,4 +294,4 @@ Hors tickets prioritaires — à traiter si opportunité / régression :
 
 ---
 
-*Suivi vivant · Dernière MAJ : 2026-07-26 — ARCH-06 V1 patch*
+*Suivi vivant · Dernière MAJ : 2026-07-26 — ARCH-06 Vague B0+B1+B4 (ticket non clos)*

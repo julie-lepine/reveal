@@ -20,6 +20,7 @@ import { getActivePlayers } from "../core/players.js";
 import { setLobbyPlaying, setLobbyWaiting } from "../core/lobby.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
 import { withClickLock } from "../core/actionLock.js";
+import { createMountGuard } from "../core/mountLifecycle.js";
 import { navigate } from "../core/router.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
 import { bindNav } from "../screens/nav.js";
@@ -54,6 +55,7 @@ export function mountSpeedVote(app) {
 
   void setLobbyPlaying("speedvote").catch(() => {});
 
+  const mount = createMountGuard();
   let roundIdx = 0;
   let phase = "voting";
   let myVote = null;
@@ -144,6 +146,7 @@ export function mountSpeedVote(app) {
       );
 
       if (!mp) {
+        if (!mount.isMounted()) return;
         phase = "reveal";
         render();
       }
@@ -250,6 +253,7 @@ export function mountSpeedVote(app) {
   }
 
   function render() {
+    if (!mount.isMounted()) return;
     syncFromSession();
     const total = QUESTIONS.length;
     const host = !mp || canActAsHost();
@@ -320,7 +324,9 @@ export function mountSpeedVote(app) {
         votes = { ...votes, [localName]: target };
         if (mp) {
           await commitSpeedVoteVote(target);
+          if (!mount.isMounted()) return;
           if (allSpeedVoteVotesIn() && canActAsHost()) await goToReveal();
+          if (!mount.isMounted()) return;
           render();
         } else {
           votes = simulateSpeedVoteLobbyVotes(target);
@@ -340,8 +346,10 @@ export function mountSpeedVote(app) {
           await startSpeedVoteRound(nextIdx);
         } else {
           await startSpeedVoteRound(nextIdx);
+          if (!mount.isMounted()) return;
           syncFromSession();
         }
+        if (!mount.isMounted()) return;
         render();
       } else {
         recordSpeedVotePlayed();
@@ -356,10 +364,12 @@ export function mountSpeedVote(app) {
             await completeGameSession({ gameId: "speedvote", screen: "results", state: {} });
           } catch (e) {
             console.warn("REVEAL completeGameSession:", e);
+            if (!mount.isMounted()) return;
             navigate("results", { navStack: ["home", "lobby", "game-select", "results"] });
           }
         } else {
           setLobbyWaiting();
+          if (!mount.isMounted()) return;
           navigate("results", { navStack: ["home", "lobby", "game-select", "results"] });
         }
       }
@@ -387,6 +397,7 @@ export function mountSpeedVote(app) {
   let lastAckedActingHostToken = getActingHostUiRefreshToken();
 
   const unsub = onGameSessionChange((row) => {
+    if (!mount.isMounted()) return;
     if (stopGameSessionListenerOnPostGame(row)) return;
 
     const prevPhase = phase;
@@ -405,6 +416,7 @@ export function mountSpeedVote(app) {
       void goToReveal();
       return;
     }
+    if (!mount.isMounted()) return;
     const skipFull = shouldSkipFullRender(prevPhase, prevRound, prevVotesJson);
     arch03AhLogSkipDecision("speedVote", {
       decision: skipFull && !actingHostUiRefresh ? "skip-full-render" : "full-render",
@@ -432,6 +444,7 @@ export function mountSpeedVote(app) {
   lastAckedActingHostToken = getActingHostUiRefreshToken();
 
   return () => {
+    mount.dispose();
     unsub();
   };
 }

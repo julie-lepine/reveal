@@ -35,6 +35,7 @@ import { getLocalDisplayName, recordHotTakePlayed, setLastGame } from "../core/s
 import { setLobbyPlaying, setLobbyWaiting } from "../core/lobby.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
 import { withClickLock } from "../core/actionLock.js";
+import { createMountGuard } from "../core/mountLifecycle.js";
 import { navigate } from "../core/router.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
 import { bindNav } from "../screens/nav.js";
@@ -141,6 +142,7 @@ export function mountHotTake(app) {
   let revealInFlight = false;
   /** Vote en cours d’envoi - évite que la synchro efface l’UI avant la réponse serveur. */
   let voteCommitInFlight = null;
+  const mount = createMountGuard();
   const localName = getLocalDisplayName();
   const mp = isGameSyncActive();
 
@@ -357,6 +359,7 @@ export function mountHotTake(app) {
   async function finishHotTakeGame() {
     const live = getHotTakeSession();
     if (live.phase === "final") {
+      if (!mount.isMounted()) return;
       render();
       return;
     }
@@ -378,12 +381,14 @@ export function mountHotTake(app) {
 
     if (mp && canActAsHost()) {
       await commitHotTakePlay(finalSession, { screen: "hottake" });
+      if (!mount.isMounted()) return;
       render();
       return;
     }
 
     if (!mp) {
       await commitHotTakePlay(finalSession);
+      if (!mount.isMounted()) return;
       render();
     }
   }
@@ -392,6 +397,7 @@ export function mountHotTake(app) {
     if (mp && !canActAsHost()) return;
 
     const resetHt = await resetHotTakeAfterGame({ syncRemote: false });
+    if (!mount.isMounted()) return;
 
     if (mp) {
       try {
@@ -402,12 +408,14 @@ export function mountHotTake(app) {
         });
       } catch (e) {
         console.warn("REVEAL completeGameSession:", e);
+        if (!mount.isMounted()) return;
         navigate("results", { navStack: ["home", "lobby", "game-select", "results"] });
       }
       return;
     }
 
     await setLobbyWaiting();
+    if (!mount.isMounted()) return;
     navigate("results", { navStack: ["home", "lobby", "game-select", "results"] });
   }
 
@@ -423,6 +431,7 @@ export function mountHotTake(app) {
     });
     if (mp && canActAsHost()) {
       await refreshGameSession();
+      if (!mount.isMounted()) return;
       syncFromSession();
     }
     const votesToScore = votesForAward();
@@ -437,11 +446,13 @@ export function mountHotTake(app) {
             voteEndsAt: null,
           });
         } catch {
+          if (!mount.isMounted()) return;
           syncFromSession();
           render();
           return;
         }
       }
+      if (!mount.isMounted()) return;
       enterRevealUi();
       arch03RevealLog("enterRevealUi reason", { reason: "already-scored" });
       return;
@@ -456,6 +467,7 @@ export function mountHotTake(app) {
             voteEndsAt: null,
           });
         } catch {
+          if (!mount.isMounted()) return;
           syncFromSession();
           render();
           return;
@@ -463,6 +475,7 @@ export function mountHotTake(app) {
       } else {
         phase = "reveal";
       }
+      if (!mount.isMounted()) return;
       enterRevealUi();
       arch03RevealLog("enterRevealUi reason", { reason: "no-award" });
       return;
@@ -510,6 +523,7 @@ export function mountHotTake(app) {
           withPatchFeedback: mp && canActAsHost(),
         }
       );
+      if (!mount.isMounted()) return;
       // Uniquement après succès serveur (MP) : syncFromSession lit l'état autoritaire
       if (award) lastAward = award;
       takeScored = true;
@@ -525,6 +539,7 @@ export function mountHotTake(app) {
         message: err?.message || String(err),
         phaseNow: getHotTakeSession().phase,
       });
+      if (!mount.isMounted()) return;
       syncFromSession();
       render();
     } finally {
@@ -549,6 +564,7 @@ export function mountHotTake(app) {
       myVote = null;
       selected = null;
       votes = {};
+      if (!mount.isMounted()) return;
       render();
     }
   }
@@ -570,10 +586,12 @@ export function mountHotTake(app) {
         message: err?.message || String(err),
         phaseNow: getHotTakeSession().phase,
       });
+      if (!mount.isMounted()) return;
       syncFromSession();
       render();
       return;
     }
+    if (!mount.isMounted()) return;
     selected = null;
     syncFromSession();
     render();
@@ -604,14 +622,16 @@ export function mountHotTake(app) {
       render();
       try {
         await commitHotTakeVote(pick);
+        if (!mount.isMounted()) return;
         selected = null;
         myVote = pick;
       } catch {
         // Feedback déjà affiché ; rollback session dans commitHotTakeVote.
       } finally {
         voteCommitInFlight = null;
-        syncFromSession();
+        if (mount.isMounted()) syncFromSession();
       }
+      if (!mount.isMounted()) return;
       if (allHotTakeVotesIn() && canActAsHost()) {
         await goToReveal();
         return;
@@ -624,6 +644,7 @@ export function mountHotTake(app) {
       await goToReveal();
       return;
     }
+    if (!mount.isMounted()) return;
     render();
   }
 
@@ -637,6 +658,7 @@ export function mountHotTake(app) {
   }
 
   function render() {
+    if (!mount.isMounted()) return;
     syncFromSession();
     const take = takeLabel(TAKES[takeIdx]);
     const total = TAKES.length;
@@ -814,6 +836,7 @@ export function mountHotTake(app) {
         lastAward = null;
         takeScored = false;
         await startNextTakeVote();
+        if (!mount.isMounted()) return;
         render();
       } else {
         await finishHotTakeGame();
@@ -851,6 +874,7 @@ export function mountHotTake(app) {
   let lastAckedActingHostToken = getActingHostUiRefreshToken();
 
   const unsubGame = onGameSessionChange((row) => {
+    if (!mount.isMounted()) return;
     if (stopGameSessionListenerOnPostGame(row)) return;
 
     const prevPhase = phase;
@@ -932,6 +956,7 @@ export function mountHotTake(app) {
   lastAckedActingHostToken = getActingHostUiRefreshToken();
 
   return () => {
+    mount.dispose();
     unsubGame();
     if (!mp) setLobbyWaiting();
   };
