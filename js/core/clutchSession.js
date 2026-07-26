@@ -4,6 +4,7 @@ import {
   pickClutchHideBefore,
 } from "../../data/clutch.js";
 import { getActivePlayerNames } from "./players.js";
+import { getLobbyParticipants } from "./lobby.js";
 import { getLocalDisplayName, getState, saveStatePatch } from "./state.js";
 import {
   isGameSyncActive,
@@ -16,6 +17,23 @@ import {
 import { formatSyncErrorMessage } from "./authErrors.js";
 import { launchGameWithSync, commitHostGamePlay, commitPrepReadyToggle } from "./mpLaunch.js";
 import { computeClutchTapApply } from "./clutchTapCommit.js";
+import {
+  buildClutchParticipantsSnapshot,
+  resolveClutchParticipantNames,
+  clutchAllTapsIn,
+  rankClutchEntries,
+  sessionHasClutchParticipantSnapshot,
+} from "./clutchParticipants.js";
+
+export {
+  buildClutchParticipantsSnapshot,
+  normalizeClutchParticipantEntries,
+  resolveClutchParticipantNames,
+  clutchAllTapsIn,
+  rankClutchEntries,
+  sessionHasClutchParticipantSnapshot,
+  migrateClutchParticipantsRename,
+} from "./clutchParticipants.js";
 
 function defaultSession() {
   return {
@@ -31,6 +49,7 @@ function defaultSession() {
     roundScored: false,
     matchScores: {},
     lastRound: null,
+    participants: [],
   };
 }
 
@@ -78,11 +97,43 @@ function roundPayload(roundIdx) {
   };
 }
 
-export async function markClutchLobbyStarted() {
+function resolveLiveNameByUserId(uid) {
+  if (!uid) return null;
+  const p = getLobbyParticipants().find((x) => x.userId === uid);
+  return p?.name || null;
+}
+
+/**
+ * UX-CLUTCH-01 — participants de la session (snapshot), pas le lobby live.
+ * Legacy sans snapshot → actifs (compat uniquement).
+ */
+export function getClutchParticipantNames(session = getClutchSession()) {
+  return resolveClutchParticipantNames(session, {
+    activeNames: getActivePlayerNames(),
+    resolveNameByUserId: resolveLiveNameByUserId,
+  });
+}
+
+/**
+ * @param {{ rosterNames: string[] }} opts — obligatoire au lancement (force + normal).
+ * Pas de fallback silencieux vers le lobby : l’appelant doit transmettre le roster.
+ */
+export async function markClutchLobbyStarted({ rosterNames } = {}) {
+  const roster = Array.isArray(rosterNames)
+    ? rosterNames.map((n) => String(n || "").trim()).filter(Boolean)
+    : [];
+  if (!roster.length) {
+    throw new Error("CLUTCH_ROSTER_REQUIRED");
+  }
+  const participants = buildClutchParticipantsSnapshot(roster, getLobbyParticipants());
+  if (!participants.length) {
+    throw new Error("CLUTCH_ROSTER_REQUIRED");
+  }
   const next = {
     ...getClutchSession(),
     lobbyStarted: true,
     ...roundPayload(0),
+    participants,
   };
   return launchGameWithSync({
     screen: "clutch",
@@ -175,9 +226,10 @@ export function hasLocalClutchTap(session = getClutchSession()) {
 }
 
 export function allClutchTapsIn(session = getClutchSession()) {
-  const names = getActivePlayerNames();
-  const taps = session.taps || {};
-  return names.length > 0 && names.every((n) => taps[n]?.ms != null);
+  return clutchAllTapsIn(session, session.taps || {}, {
+    activeNames: getActivePlayerNames(),
+    resolveNameByUserId: resolveLiveNameByUserId,
+  });
 }
 
 export function getClutchEntryScreen() {
@@ -189,19 +241,12 @@ export function getClutchEntryScreen() {
 /**
  * Classe les joueurs par écart absolu à la cible (croissant). Les non-tappeurs sont
  * derniers (écart infini). Égalité d'écart départagée par le tap le plus tôt commit.
+ * `playerNames` doit être le snapshot (getClutchParticipantNames) — pas le lobby live.
  */
-export function rankClutchResults(taps = {}, targetMs, playerNames = getActivePlayerNames()) {
-  const entries = playerNames.map((name) => {
-    const t = taps[name];
-    const tapped = t && typeof t.ms === "number" && Number.isFinite(t.ms);
-    const ms = tapped ? t.ms : null;
-    const gap = tapped ? Math.abs(ms - targetMs) : Infinity;
-    const at = t && typeof t.at === "number" ? t.at : Infinity;
-    return { name, ms, gap, tapped, at };
-  });
-  entries.sort((a, b) => {
-    if (a.gap !== b.gap) return a.gap - b.gap;
-    return a.at - b.at;
-  });
-  return entries;
+export function rankClutchResults(
+  taps = {},
+  targetMs,
+  playerNames = getClutchParticipantNames()
+) {
+  return rankClutchEntries(taps, targetMs, playerNames);
 }

@@ -23,6 +23,11 @@ import { mergeMatchScoresLocal } from "./gameScores.js";
 import { mergeGameScoreOrder } from "./gameScoreOrder.js";
 import { mergeClutchTapsFrozen } from "./clutchTapCommit.js";
 import {
+  normalizeClutchParticipantEntries,
+  resolveClutchParticipantNames,
+  sessionHasClutchParticipantSnapshot,
+} from "./clutchParticipants.js";
+import {
   applyRemotePlayerStats,
   playerStatsToRemote,
 } from "./playerStatsSync.js";
@@ -1303,8 +1308,12 @@ function isNewClutchRoundUid(cur, inc) {
 }
 
 /** Taps Clutch (clé uid ou pseudo, valeur { ms, at }) → clés = pseudos actifs. */
-function normalizeClutchTaps(taps = {}) {
-  const names = getActivePlayerNames();
+function normalizeClutchTaps(taps = {}, allowedNames = null) {
+  // Snapshot participants when provided — never shrink to live lobby alone (leave mid-round).
+  const names =
+    Array.isArray(allowedNames) && allowedNames.length > 0
+      ? allowedNames
+      : getActivePlayerNames();
   return normalizePlayerKeyedMap(taps, names, (key) => {
     const mapped = playerKeyToDisplayName(key);
     if (mapped) return mapped;
@@ -1323,6 +1332,16 @@ function mergeRemoteClutchTapsUid(cur, inc) {
   return mergeClutchTapsFrozen(curTaps, incTaps);
 }
 
+function mergeClutchParticipantsLocal(local, remote) {
+  if (sessionHasClutchParticipantSnapshot(remote)) {
+    return normalizeClutchParticipantEntries(remote.participants);
+  }
+  if (sessionHasClutchParticipantSnapshot(local)) {
+    return normalizeClutchParticipantEntries(local.participants);
+  }
+  return normalizeClutchParticipantEntries(remote?.participants || local?.participants || []);
+}
+
 function mergeClutchGameLocal(local, remote) {
   if (!remote) return local;
   if (!local) return remote;
@@ -1336,7 +1355,15 @@ function mergeClutchGameLocal(local, remote) {
     // Remote first, then local only fills missing keys (in-flight optimistic).
     taps = mergeClutchTapsFrozen(remoteTaps, localTaps);
   }
-  taps = normalizeClutchTaps(taps);
+  const participants = mergeClutchParticipantsLocal(local, remote);
+  const allowNames = resolveClutchParticipantNames(
+    { participants },
+    {
+      activeNames: getActivePlayerNames(),
+      resolveNameByUserId: (uid) => nameForUserId(uid),
+    }
+  );
+  taps = normalizeClutchTaps(taps, allowNames);
   const ready =
     !remote.lobbyStarted && !local.lobbyStarted
       ? mergeReadyMapsLocal(local.ready || {}, remote.ready || {}, getActivePlayerNames(), getLocalDisplayName())
@@ -1347,6 +1374,7 @@ function mergeClutchGameLocal(local, remote) {
     phase: mergeClutchPhase(local, remote),
     taps,
     ready,
+    participants,
     roundScored: mergeRoundFlag(local.roundScored, remote.roundScored, newRound),
     matchScores: mergeMatchScoresLocal(local.matchScores || {}, remote.matchScores || {}),
     lastRound: remote.lastRound ?? local.lastRound ?? null,
@@ -2281,6 +2309,10 @@ export function clutchToRemote(session) {
       at: typeof val.at === "number" ? val.at : null,
     };
   });
+  const participants = normalizeClutchParticipantEntries(session.participants || []).map((p) => ({
+    uid: p.userId || null,
+    name: p.name,
+  }));
   return {
     ready: mapReadyByUid(session.ready || {}),
     lobbyStarted: Boolean(session.lobbyStarted),
@@ -2294,6 +2326,7 @@ export function clutchToRemote(session) {
     taps: remoteTaps,
     roundScored: Boolean(session.roundScored),
     matchScores: scoresToRemote(session.matchScores || {}),
+    participants,
     lastRound: session.lastRound
       ? {
           targetMs: session.lastRound.targetMs ?? null,
@@ -2326,6 +2359,12 @@ export function clutchFromRemote(remote) {
       at: typeof val.at === "number" ? val.at : null,
     };
   });
+  const participants = normalizeClutchParticipantEntries(
+    (remote.participants || []).map((p) => ({
+      userId: p?.uid ?? p?.userId ?? null,
+      name: p?.name || nameForUserId(p?.uid ?? p?.userId) || "",
+    }))
+  );
   return {
     ready: mapReadyByName(remote.ready || {}),
     lobbyStarted: Boolean(remote.lobbyStarted),
@@ -2339,6 +2378,7 @@ export function clutchFromRemote(remote) {
     taps,
     roundScored: Boolean(remote.roundScored),
     matchScores: scoresFromRemote(remote.matchScores || {}),
+    participants,
     lastRound: remote.lastRound
       ? {
           targetMs: remote.lastRound.targetMs ?? null,

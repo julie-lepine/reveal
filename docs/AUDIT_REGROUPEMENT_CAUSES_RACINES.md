@@ -17,8 +17,8 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 
 | | Contenu |
 |--|---------|
-| **Fait** | … · SYN-12 ✅ QA · M-04b ✅ · **SYN-15 / SYN-16** (migrate roster rename) |
-| **Prochain** | QA terrain SYN-15/16 · puis ARCH-06 / Cause 7 résidus |
+| **Fait** | … · SYN-15/16 ✅ · UX-HIST-01 ✅ · **UX-CLUTCH-01** ✅ patch |
+| **Prochain** | QA terrain UX-CLUTCH-01 · puis ARCH-06 / Cause 7 résidus |
 | **Ensuite** | ARCH-07/08 · M-14b |
 
 **Hors file audit**  
@@ -28,7 +28,7 @@ Sondages in-chat (`lobby_polls` / UI chat) — feature produit, pas un ticket ca
 UI Guess Lie avant `await` · `statsRecordedRoundIdx` · loader UI join · pré-résolution `get*EntryScreen` · votes optimistic (dilemma / speedVote / …) · `results.js` mount refresh · échec remote rename (doc QA I-09)
 
 **Surveiller**  
-Clutch taps figés sous latence · ready prep après Recommencer · Cause 4 seulement si régression · starts sync hors `mountLobby` (hydrate → hub, résidu SYN-12)
+Clutch taps figés sous latence (SYN-26) · ready prep après Recommencer · Cause 4 seulement si régression · starts sync hors `mountLobby` (hydrate → hub, résidu SYN-12)
 
 ---
 
@@ -67,7 +67,7 @@ Clutch taps figés sous latence · ready prep après Recommencer · Cause 4 seul
 |---|-------|------|----------------|
 | 1 | Identité invité / JWT | ✅ QA | ARCH-01 partiel |
 | 2 | Race auth / profil | ✅ QA | — |
-| 3 | Sources de vérité multiples | ✅ hors TierNight | **M-14a** suspendu |
+| 3 | Sources de vérité multiples | ✅ hors TierNight | **M-14a** suspendu · UX-CLUTCH-01 ✅ |
 | 4 | Asymétrie hôte / invité | ✅ QA | UX Guess Lie séparée |
 | 5 | Routing + timing sync | ✅ | ARCH-05 mitigé |
 | 6 | Async écrans | Partiel | ARCH-06 ; SYN-05 dormant |
@@ -96,7 +96,7 @@ Clutch taps figés sous latence · ready prep après Recommencer · Cause 4 seul
 
 **Hors scope volontaire :** rollback votes dilemma/speedVote/truthMeter · `results.js` mount · indicateur « Sync… » (ARCH-22)
 
-### Cause 8 — SYN-15 / SYN-16 ✅ patch
+### Cause 8 — SYN-15 / SYN-16 ✅ QA
 
 | | |
 |--|--|
@@ -104,7 +104,29 @@ Clutch taps figés sous latence · ready prep après Recommencer · Cause 4 seul
 | **Maps** | `scores`/`gameScores` = Math.max · `playerStats` = maxStats · baseline = preferOld (I-09) |
 | **Où** | `rosterRenameMigrate.js` · `replaceEveningScoreMaps` (`state.js`) · hook `supabaseLobby.js` |
 | **Hors scope** | filRouge (disabled) · applyRemote* · prune · I-09 local |
-| **QA** | En attente terrain (rename vu des autres devices) |
+| **QA** | ✅ terrain rename multi-device |
+
+### Cause 11 / affichage — UX-HIST-01 ✅ QA
+
+| | |
+|--|--|
+| **Fix** | `getEveningStandingPlayers` = actifs ∪ contributeurs (`scores !== 0` ou clé `gameScores[*]`) |
+| **Surfaces** | `eveningRecap` · `leaderboard` · `eveningGameLeaderboardsHtml` (par `gameId`) |
+| **Inchangé** | `getActivePlayers` / `getSortedActivePlayers` (lobby, ready, présence, HUD) |
+| **Limite** | parti avec seul `ensurePlayerScore` (0) exclu ; collision pseudo/UID hors scope |
+| **QA** | ✅ validé 2026-07-26 |
+
+### Cause 3 — UX-CLUTCH-01 ✅ patch
+
+| | |
+|--|--|
+| **Fix** | Snapshot `participants: [{ userId, name }]` figé au lancement ; gates via `getClutchParticipantNames` |
+| **Launch** | `executePrepLaunch` passe toujours `rosterNames` ; `markClutchLobbyStarted` exige le roster (`CLUTCH_ROSTER_REQUIRED`) |
+| **Wire** | `clutchToRemote` / `FromRemote` + merge non destructif |
+| **Leave** | Reste dans le snapshot jusqu’au verdict |
+| **Rename** | I-09 migre `participants[].name` + taps ; résolution UID → nom live |
+| **Hors scope** | Autres jeux live-roster · SYN-26 · UX-HIST-01 · `getActivePlayers` |
+| **QA** | En attente terrain |
 
 ### Cause 8 — autres
 
@@ -144,6 +166,8 @@ Join mid-game (T-01 ✅) → SUBSCRIBED (T-02 ✅)
 Mount lobby waiting (SYN-12 ✅) → 1× startMultiplayerSync pre-refresh
 
 Rename local (I-09 ✅) → roster observe rename (SYN-15/16 ✅) → maps evening migrées
+
+Standings soirée (UX-HIST-01 ✅) → getEveningStandingPlayers (pas getSortedActivePlayers)
 ```
 
 ### Décision produit — égalités Wrong Answer Only
@@ -167,14 +191,14 @@ Clutch conserve son départage temporel (règle produit explicite inchangée).
 |-------|-------------------|
 | 1 | C-01/02, R-01–05, M-05a |
 | 2 | M-01, P-03, M-02a, S-02 |
-| 3 | I-03/04, SYN-03, M-13, M-02b, ARCH-02, SYN-29, I-PG-01, ready stale Recommencer |
+| 3 | I-03/04, SYN-03, M-13, M-02b, ARCH-02, SYN-29, I-PG-01, ready stale Recommencer, UX-CLUTCH-01 |
 | 4 | I-01/02/08, M-03b, M-06a/b, L-01, ARCH-03/03b |
 | 5 | T-01/02, T-03↻, M-07, M-08, P-02, SYN-28, I-PG-01, ARCH-04 |
 | 6 | I-05, SYN-13b↻, SYN-25 |
 | 7 | I-07, M-09, L-09, M-11, M-10, T-05, SYN-26, M-04b / SYN-18 |
 | 8 | I-06, P-02, ARCH-09, I-09 / SYN-06, SYN-15 / SYN-16 |
 | 9 | SYN-12 / M-05b |
-| 11 | L-02, ARCH-21↻, M-12 (cleanup `#join=`, pas auto-join) |
+| 11 | L-02, ARCH-21↻, M-12 (cleanup `#join=`, pas auto-join), UX-HIST-01 |
 
 ---
 
@@ -193,4 +217,4 @@ Hors tickets prioritaires — à traiter si opportunité / régression :
 
 ---
 
-*Suivi vivant · Dernière MAJ : 2026-07-26 — SYN-15/16 ✅ patch · QA terrain rename multi-device*
+*Suivi vivant · Dernière MAJ : 2026-07-26 — UX-CLUTCH-01 ✅ patch · QA terrain pending*

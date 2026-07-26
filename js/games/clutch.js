@@ -14,13 +14,13 @@ import {
   allClutchTapsIn,
   rankClutchResults,
   startClutchRound,
+  getClutchParticipantNames,
 } from "../core/clutchSession.js";
 import { resolveClutchTapCommitFailureUi, preferInFlightClutchTap } from "../core/clutchTapCommit.js";
 import { awardClutchRound } from "../core/scoring.js";
 import { applyMatchScoreDeltas, gameCumulativeScoresHtml, refreshGameScoresBox } from "../core/gameScores.js";
 import { getLocalDisplayName, recordClutchPlayed, setLastGame } from "../core/state.js";
 import { getLobbyParticipants } from "../core/lobby.js";
-import { getActivePlayerNames } from "../core/players.js";
 import { setLobbyPlaying, setLobbyWaiting } from "../core/lobby.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
 import { withClickLock } from "../core/actionLock.js";
@@ -120,9 +120,9 @@ export function mountClutch(app) {
     }
   }
 
-  /** Liste (pseudos) des joueurs ayant déjà tapé sur la manche en cours. */
+  /** Liste (pseudos) des participants ayant déjà tapé sur la manche en cours. */
   function tappedNames() {
-    return getActivePlayerNames().filter((n) => taps[n]?.ms != null);
+    return getClutchParticipantNames().filter((n) => taps[n]?.ms != null);
   }
 
   /**
@@ -301,7 +301,7 @@ export function mountClutch(app) {
     try {
       takeScored = true;
       const session = getClutchSession();
-      const names = getActivePlayerNames();
+      const names = getClutchParticipantNames(session);
       const ranking = rankClutchResults(session.taps || {}, targetMs, names);
       let matchScores = session.matchScores || {};
       if (!mp || canActAsHost()) {
@@ -407,7 +407,7 @@ export function mountClutch(app) {
   }
 
   function revealHtml() {
-    const ranking = lastRound?.ranking || rankClutchResults(taps, targetMs, getActivePlayerNames());
+    const ranking = lastRound?.ranking || rankClutchResults(taps, targetMs, getClutchParticipantNames());
     const host = !mp || canActAsHost();
     const deltas = lastRound?.deltas || {};
 

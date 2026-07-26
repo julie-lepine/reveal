@@ -110,7 +110,7 @@ export async function executePrepLaunch({
     }
   }
 
-  const rosterNames = force ? roster : undefined;
+  const rosterNames = roster;
 
   return runPrepGameLaunch({
     btn,

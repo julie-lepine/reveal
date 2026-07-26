@@ -145,6 +145,7 @@ const defaultState = () => ({
     roundScored: false,
     matchScores: {},
     lastRound: null,
+    participants: [],
   },
   wrongAnswerGame: {
     ready: {},
@@ -740,6 +741,13 @@ export function renameLocalPlayer(newName) {
     if (clutch.taps) clutch.taps = mergeKeyedRecord(clutch.taps, oldName, trimmed, "preferOld");
     if (clutch.matchScores) {
       clutch.matchScores = mergeKeyedRecord(clutch.matchScores, oldName, trimmed, "preferOld");
+    }
+    if (Array.isArray(clutch.participants)) {
+      clutch.participants = clutch.participants.map((p) => {
+        if (!p || typeof p !== "object") return p;
+        if (p.name === oldName) return { ...p, name: trimmed };
+        return p;
+      });
     }
     if (clutch.lastRound) {
       clutch.lastRound = migrateLastRoundNameMaps(clutch.lastRound, oldName, trimmed);
