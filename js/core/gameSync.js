@@ -3509,13 +3509,18 @@ export function getEffectiveSessionScreen(row) {
 }
 
 /** Renvoie l’invité (ou l’hôte) vers la partie en cours si une session active existe. */
-export async function routeToActiveGameIfNeeded(cachedRowOnly = null, { force = false } = {}) {
+export async function routeToActiveGameIfNeeded(
+  cachedRowOnly = null,
+  { force = false, shouldContinue = null } = {}
+) {
+  const canContinue = () => typeof shouldContinue !== "function" || shouldContinue();
   const source = "routeToActiveGameIfNeeded";
   if (!isGameSyncActive()) {
     return false;
   }
   const row =
     cachedRowOnly || (await refreshGameSession()) || getCachedGameSession();
+  if (!canContinue()) return false;
   const screen = getEffectiveSessionScreen(row);
   const routeLog = (allowed, _reason, _extra = {}) => allowed;
 
@@ -3552,6 +3557,7 @@ export async function routeToActiveGameIfNeeded(cachedRowOnly = null, { force = 
   ) {
     clearSessionRouteSuppress();
   }
+  if (!canContinue()) return false;
   routeLog(true, "navigate");
   return routeToSessionScreen(screen, { force: true });
 }

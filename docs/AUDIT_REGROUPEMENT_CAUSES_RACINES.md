@@ -17,9 +17,9 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 
 | | Contenu |
 |--|---------|
-| **Fait** | … · **ARCH-06 V1/B/C** ✅ QA · **Traître host V2** 🔧 livré |
-| **Prochain** | QA terrain Traître host V2 |
-| **Ensuite** | Lobby IIFE / SYN-12 · clôture ARCH-06 si plus de résidu |
+| **Fait** | … · **ARCH-06 V1/B/C** ✅ · **Traître host V2** ✅ · **Lobby IIFE / SYN-12** 🔧 livré |
+| **Prochain** | QA terrain Lobby IIFE → **clôture ARCH-06** si OK |
+| **Ensuite** | — (ARCH-06 candidat clôture) |
 
 **Hors file audit**  
 Sondages in-chat (`lobby_polls` / UI chat) — feature produit, pas un ticket cause racine.
@@ -28,7 +28,7 @@ Sondages in-chat (`lobby_polls` / UI chat) — feature produit, pas un ticket ca
 UI Guess Lie avant `await` · `statsRecordedRoundIdx` · loader UI join · pré-résolution `get*EntryScreen` · votes optimistic (dilemma / speedVote / …) · `results.js` mount refresh · échec remote rename (doc QA I-09)
 
 **Surveiller**  
-Clutch taps figés sous latence (SYN-26) · ready prep après Recommencer · Cause 4 seulement si régression · starts sync hors `mountLobby` (hydrate → hub, résidu SYN-12)
+Clutch taps figés sous latence (SYN-26) · ready prep après Recommencer · Cause 4 seulement si régression · starts sync hydrate → hub hors `mountLobby` (hors périmètre lifecycle IIFE)
 
 ---
 
@@ -182,7 +182,7 @@ Clutch taps figés sous latence (SYN-26) · ready prep après Recommencer · Cau
 
 | | |
 |--|--|
-| **État** | **Pas clos.** V1 ✅ · mode B ✅ · mode C ✅ QA · **Traître host V2 livré** 🔧 · lobby IIFE/SYN-12 ouvert |
+| **État** | **Pas clos tant que QA lobby.** V1 ✅ · B ✅ · C ✅ · Traître V2 ✅ · **Lobby IIFE / SYN-12 livré** 🔧 |
 | **Primitive B/C** | `createMountGuard()` dans `mountLifecycle.js` : `isMounted` / `isCurrentMount` / `dispose` ; compteur de génération **dans** lifecycle ; routeur appelle seulement `advanceMountGeneration()` (pas l’inverse) |
 | **Règle post-await / listener** | `isMounted()` puis `isCurrentMount()` avant effet local ou nouveau commit. Commits déjà partis **non** annulés. Helpers métier : `shouldContinue()` opaque. |
 
@@ -190,21 +190,26 @@ Clutch taps figés sous latence (SYN-26) · ready prep après Recommencer · Cau
 
 | Vague | Contenu | Statut |
 |-------|---------|--------|
-| **C0** | Compteur + `advanceMountGeneration` + `isCurrentMount` + signal router | ✅ QA |
-| **C1** | Double garde sur périmètre B (hotTake…tierNightLive MP + playlistGuess) | ✅ QA |
-| **C2** | `finalizeTierNightLiveToResults({ shouldContinue })` ; `advanceTierNight…` | ✅ QA |
-| **C3** | Audit résiduel | ✅ QA |
+| **C0–C3** | génération + double garde + shouldContinue TierNight + inventaire | ✅ QA |
 
 #### Traître host V2 (étape 4)
 
 | | |
 |--|--|
 | **Scope** | `js/games/traitre.js` hôte + acting host (`canActAsHost`) |
-| **Mode A** | `createActionLock` / `withClickLock` : finish-speak, continue, vote-now, resolve/force, deal-advance, exit |
-| **Mode B/C** | `createMountGuard` remplace `mountAlive` ; double garde post-await + listener ; `dispose` + `unsub` |
-| **Helper** | `returnToGameSelect({ shouldContinue })` injecté depuis Traître (défaut `true`) |
-| **Hors scope** | lobby IIFE / SYN-12 · métier / scoring / RPC / RLS |
-| **Preuve** | `tests/arch06TraitreHostV2.test.js` |
+| **QA** | ✅ validé |
+
+#### Lobby IIFE / SYN-12 (étape 5)
+
+| | |
+|--|--|
+| **Scope** | `js/screens/lobby.js` bootstrap IIFE + listeners session/bundle |
+| **Mode B/C** | `createMountGuard` ; double garde post-await IIFE + listeners ; `dispose` en tête cleanup |
+| **Mode A** | `readyLock` / `startEveningLock` via `withClickLock` |
+| **Helpers** | `routeToActiveGameIfNeeded({ shouldContinue })` · `rejoinGameResumeTarget` · `mountGameResumeInterstitial` (défaut historique) |
+| **SYN-12** | contrat `planLobbyMountMultiplayerSync` inchangé (1× `startMultiplayerSync` pre-refresh) ; fuites post-await / remount corrigées |
+| **Hors scope** | starts sync hydrate→hub hors `mountLobby` (résidu doc) · SQL/RPC/RLS |
+| **Preuve** | `tests/arch06LobbyIife.test.js` · `tests/lobbyMountSyncPlan.test.js` |
 
 #### Suite ARCH-06
 
@@ -213,10 +218,12 @@ Clutch taps figés sous latence (SYN-26) · ready prep après Recommencer · Cau
 | V1 mode A | launch / restart / PG+TierLive next | ✅ QA |
 | mode B | B0–B4 | ✅ |
 | mode C | C0–C3 | ✅ QA |
-| **V2 Traître** | actions hôte | 🔧 livré → QA |
-| Lobby IIFE | SYN-12 | Prochain |
+| V2 Traître | actions hôte | ✅ QA |
+| **Lobby IIFE** | SYN-12 lifecycle | 🔧 livré → QA |
 
-**Preuve** : `tests/mountLifecycle.test.js` · `tests/routerNestedRedirect.test.js` · `tests/arch06TraitreHostV2.test.js`
+**Preuve** : `tests/mountLifecycle.test.js` · `tests/routerNestedRedirect.test.js` · `tests/arch06TraitreHostV2.test.js` · `tests/arch06LobbyIife.test.js`
+
+**Clôture** : après QA terrain lobby, ARCH-06 = entièrement clos (plus de résidu lifecycle A/B/C dans le périmètre).
 
 ### Autres causes
 
@@ -276,7 +283,7 @@ Clutch conserve son départage temporel (règle produit explicite inchangée).
 | 3 | I-03/04, SYN-03, M-13, M-02b, ARCH-02, SYN-29, I-PG-01, ready stale Recommencer, UX-CLUTCH-01 |
 | 4 | I-01/02/08, M-03b, M-06a/b, L-01, ARCH-03/03b, UX-VIBE-01 |
 | 5 | T-01/02, T-03↻, M-07, M-08, P-02, SYN-28, I-PG-01, ARCH-04, UX-VIBE-02 |
-| 6 | I-05, SYN-13b↻, SYN-25, **SYN-05 / ARCH-18** ✅, **ARCH-06 V1** ✅, **B** ✅, **C** ✅, **Traître V2** 🔧 (lobby IIFE ouvert) |
+| 6 | I-05, SYN-13b↻, SYN-25, **SYN-05 / ARCH-18** ✅, **ARCH-06** 🔧 (V1/B/C/Traître ✅ · Lobby IIFE livré → QA clôture) |
 | 7 | I-07, M-09, L-09, M-11, M-10, T-05, SYN-26, M-04b / SYN-18 |
 | 8 | I-06, P-02, ARCH-09, I-09 / SYN-06, SYN-15 / SYN-16 |
 | 9 | SYN-12 / M-05b |

@@ -124,15 +124,18 @@ export function gameResumeBannerHtml(screen) {
     </div>`;
 }
 
-export async function rejoinGameResumeTarget(targetScreen) {
+export async function rejoinGameResumeTarget(targetScreen, { shouldContinue = null } = {}) {
+  const canContinue = () => typeof shouldContinue !== "function" || shouldContinue();
   clearResumeBannerDismiss();
   clearSessionRouteSuppress();
   if (!targetScreen) return false;
+  if (!canContinue()) return false;
   const cached = getCachedGameSession();
   if (cached?.state) applyRemoteSession(cached);
   routeToSessionScreen(targetScreen, { force: true });
   void refreshGameSession().then((row) => {
-    if (row) void routeToActiveGameIfNeeded(row, { force: true });
+    if (!canContinue()) return;
+    if (row) void routeToActiveGameIfNeeded(row, { force: true, shouldContinue });
   });
   return true;
 }
@@ -155,7 +158,12 @@ export function stayOnGameResumeTarget(resumeScreen = null) {
  * NOTE (résidu) : « Rester ici » de l’interstitial (#game-resume-stay) ne masque
  * pas l’UI plein écran — hors scope du fix bandeau game-select.
  */
-export function mountGameResumeInterstitial(app, targetScreen, { allowStay = false } = {}) {
+export function mountGameResumeInterstitial(
+  app,
+  targetScreen,
+  { allowStay = false, shouldContinue = null } = {}
+) {
+  const canContinue = () => typeof shouldContinue !== "function" || shouldContinue();
   const gameLabel = gameLabelForScreen(targetScreen);
   const subtitle = resumeSubtitle(targetScreen);
   const autoRedirectMs = 2500;
@@ -174,10 +182,12 @@ export function mountGameResumeInterstitial(app, targetScreen, { allowStay = fal
     if (disposed) return;
     cleanup();
     if (!isGameSyncActive()) return;
-    await rejoinGameResumeTarget(targetScreen);
+    if (!canContinue()) return;
+    await rejoinGameResumeTarget(targetScreen, { shouldContinue });
   };
 
   const paint = () => {
+    if (!canContinue()) return;
     app.innerHTML = pageShell({
       backTarget: "back",
       content: gameResumeInterstitialHtml({
@@ -199,6 +209,7 @@ export function mountGameResumeInterstitial(app, targetScreen, { allowStay = fal
 
   paint();
   tickId = setInterval(() => {
+    if (disposed || !canContinue()) return;
     remaining -= 1;
     if (remaining <= 0) {
       if (tickId) {

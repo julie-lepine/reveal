@@ -35,7 +35,7 @@ import {
   isOnGameSetupScreen,
   refreshGameSession,
 } from "../core/gameSync.js";
-import { navigate, getCurrentScreen } from "../core/router.js";
+import { navigate } from "../core/router.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
 import { bindNav } from "./nav.js";
@@ -46,6 +46,8 @@ import {
   mountGameResumeInterstitial,
 } from "../core/gameResume.js";
 import { planLobbyMountMultiplayerSync } from "../core/lobbyMountSyncPlan.js";
+import { createMountGuard } from "../core/mountLifecycle.js";
+import { createActionLock, withClickLock } from "../core/actionLock.js";
 
 function participantsHtml(participants, { canKick = false, hostId = null } = {}) {
   return participants
@@ -107,12 +109,19 @@ function getLobbyStartLabel({ isHost, allReady, localReady }) {
 export function mountLobby(app) {
   if (!requireLobbyPlay()) return null;
 
+  /** ARCH-06 : vivacité + instance courante (IIFE / remount / SYN-12). */
+  const mount = createMountGuard();
+  const shouldContinue = () => mount.isMounted() && mount.isCurrentMount();
+  const startEveningLock = createActionLock();
+  const readyLock = createActionLock();
+
   let cleanupResume = () => {};
   let lobbyMode = "normal";
   let cleanupSim = null;
   let unsubSession = () => {};
   let unsubBundle = () => {};
-  let mounted = false;
+  /** Capture chat entre re-renders — distinct du lifecycle mount. */
+  let hasRenderedOnce = false;
   let chatPanel = null;
 
   async function ensureLobby() {
@@ -147,10 +156,14 @@ export function mountLobby(app) {
   }
 
   function refreshChat() {
+    if (!mount.isMounted()) return;
+    if (!mount.isCurrentMount()) return;
     chatPanel?.refresh();
   }
 
   function remountChatPanel() {
+    if (!mount.isMounted()) return;
+    if (!mount.isCurrentMount()) return;
     chatPanel?.cleanup();
     chatPanel = null;
     const messagesEl = app.querySelector("#chat-messages");
@@ -167,6 +180,8 @@ export function mountLobby(app) {
   }
 
   function updateStartButton() {
+    if (!mount.isMounted()) return;
+    if (!mount.isCurrentMount()) return;
     const participants = getLobbyParticipants();
     const local = participants.find((p) => p.isLocal);
     const isHost = isLobbyHost();
@@ -199,6 +214,8 @@ export function mountLobby(app) {
   }
 
   function refreshParticipants() {
+    if (!mount.isMounted()) return;
+    if (!mount.isCurrentMount()) return;
     const participants = getLobbyParticipants();
     const { ready, total } = getReadyCount();
     const local = participants.find((p) => p.isLocal);
@@ -229,14 +246,20 @@ export function mountLobby(app) {
   }
 
   function onLobbyUpdate() {
+    if (!mount.isMounted()) return;
+    if (!mount.isCurrentMount()) return;
     refreshParticipants();
     refreshChat();
   }
 
   async function openEmojiPicker() {
     const res = await showEmojiPickerDialog(getLocalEmoji());
+    if (!mount.isMounted()) return;
+    if (!mount.isCurrentMount()) return;
     if (!res?.ok) return;
     const saved = await updateProfileEmoji(res.emoji);
+    if (!mount.isMounted()) return;
+    if (!mount.isCurrentMount()) return;
     if (!saved.ok) {
       await showAppAlert(saved.error || "Impossible d'enregistrer l'emoji.", {
         title: "Erreur",
@@ -248,9 +271,13 @@ export function mountLobby(app) {
   }
 
   function bindEvents(lobby) {
+    if (!mount.isMounted()) return;
+    if (!mount.isCurrentMount()) return;
     bindNav(app);
 
     app.querySelector(".participants-grid")?.addEventListener("click", (e) => {
+      if (!mount.isMounted()) return;
+      if (!mount.isCurrentMount()) return;
       if (e.target.closest("[data-edit-emoji]")) {
         void openEmojiPicker();
         return;
@@ -260,6 +287,8 @@ export function mountLobby(app) {
         const userId = kickBtn.getAttribute("data-kick-user");
         const name = kickBtn.getAttribute("data-kick-name") || "";
         void kickLobbyMember(userId, { confirmName: name }).then((res) => {
+          if (!mount.isMounted()) return;
+          if (!mount.isCurrentMount()) return;
           if (res?.ok) refreshParticipants();
         });
       }
@@ -269,42 +298,58 @@ export function mountLobby(app) {
       const btn = app.querySelector("#copy-code");
       try {
         await navigator.clipboard.writeText(lobby.code);
+        if (!mount.isMounted()) return;
+        if (!mount.isCurrentMount()) return;
         if (btn) btn.textContent = "✓";
       } catch {
+        if (!mount.isMounted()) return;
+        if (!mount.isCurrentMount()) return;
         if (btn) btn.textContent = "!";
       }
     });
 
-    app.querySelector("#btn-ready")?.addEventListener("click", async () => {
-      await toggleLocalReady();
-      refreshParticipants();
-    });
+    app.querySelector("#btn-ready")?.addEventListener(
+      "click",
+      withClickLock(async () => {
+        await toggleLocalReady();
+        if (!mount.isMounted()) return;
+        if (!mount.isCurrentMount()) return;
+        refreshParticipants();
+      }, { lock: readyLock })
+    );
 
-    app.querySelector("#btn-start")?.addEventListener("click", async () => {
-      const startBtn = app.querySelector("#btn-start");
-      if (!allLobbyMembersReady()) {
-        await showAppAlert("Tous les joueurs doivent être prêts avant de commencer la soirée.", {
-          title: "Pas encore prêt",
-          icon: "⏳",
-        });
-        return;
-      }
-      if (startBtn?.disabled) return;
-      if (startBtn) startBtn.disabled = true;
-      try {
-        if (isGameSyncActive() && isLobbyHost()) {
-          await startGameSession("menu", "game-select", {});
-        } else {
-          await goToGameSelect();
+    app.querySelector("#btn-start")?.addEventListener(
+      "click",
+      withClickLock(async () => {
+        const startBtn = app.querySelector("#btn-start");
+        if (!allLobbyMembersReady()) {
+          await showAppAlert("Tous les joueurs doivent être prêts avant de commencer la soirée.", {
+            title: "Pas encore prêt",
+            icon: "⏳",
+          });
+          return;
         }
-      } catch (err) {
-        await showAppAlert(err.message || "Impossible de lancer la soirée.", {
-          title: "Erreur",
-          icon: "⚠️",
-        });
-        updateStartButton();
-      }
-    });
+        if (startBtn?.disabled) return;
+        if (startBtn) startBtn.disabled = true;
+        try {
+          if (isGameSyncActive() && isLobbyHost()) {
+            await startGameSession("menu", "game-select", {});
+          } else {
+            await goToGameSelect();
+          }
+        } catch (err) {
+          if (!mount.isMounted()) return;
+          if (!mount.isCurrentMount()) return;
+          await showAppAlert(err.message || "Impossible de lancer la soirée.", {
+            title: "Erreur",
+            icon: "⚠️",
+          });
+          if (!mount.isMounted()) return;
+          if (!mount.isCurrentMount()) return;
+          updateStartButton();
+        }
+      }, { lock: startEveningLock })
+    );
 
     app.querySelector("#btn-lobby-reset-app")?.addEventListener("click", async () => {
       const ok = await showAppConfirm(
@@ -316,13 +361,17 @@ export function mountLobby(app) {
           icon: "🔄",
         }
       );
+      if (!mount.isMounted()) return;
+      if (!mount.isCurrentMount()) return;
       if (!ok) return;
       await resetAppToCleanHome();
     });
   }
 
   function renderFull() {
-    const chatState = mounted ? captureChatState() : null;
+    if (!mount.isMounted()) return;
+    if (!mount.isCurrentMount()) return;
+    const chatState = hasRenderedOnce ? captureChatState() : null;
 
     const lobby = getLobby();
     const participants = getLobbyParticipants();
@@ -399,15 +448,20 @@ export function mountLobby(app) {
     bindEvents(lobby);
     remountChatPanel();
     restoreChatState(chatState);
-    mounted = true;
+    hasRenderedOnce = true;
   }
 
   (async () => {
     await ensureLobby();
+    if (!mount.isMounted()) return;
+    if (!mount.isCurrentMount()) return;
+
     if (isGameSyncActive()) {
       // SYN-12 : un seul start (pre-refresh) pour waiting / resume / evening→game-select
       startMultiplayerSync();
       const row = await refreshGameSession();
+      if (!mount.isMounted()) return;
+      if (!mount.isCurrentMount()) return;
       const resumeScreen = getResumableSessionScreen(row);
       const mountPlan = planLobbyMountMultiplayerSync({
         syncActive: true,
@@ -419,17 +473,21 @@ export function mountLobby(app) {
         lobbyMode = "resume";
         cleanupResume = mountGameResumeInterstitial(app, resumeScreen, {
           allowStay: !isLobbyHost(),
+          shouldContinue,
         });
         unsubSession = onGameSessionChange(async (nextRow) => {
+          if (!mount.isMounted()) return;
+          if (!mount.isCurrentMount()) return;
           if (!nextRow) return;
           const nextScreen = getResumableSessionScreen(nextRow);
           if (!nextScreen) return;
-          if (getCurrentScreen() !== "lobby") return;
-          if (await routeToActiveGameIfNeeded(nextRow)) return;
+          if (await routeToActiveGameIfNeeded(nextRow, { shouldContinue })) return;
         });
         unsubBundle = onLobbyBundleUpdated(() => {
-          if (getCurrentScreen() === "lobby" && lobbyMode === "resume") {
-            void routeToActiveGameIfNeeded();
+          if (!mount.isMounted()) return;
+          if (!mount.isCurrentMount()) return;
+          if (lobbyMode === "resume") {
+            void routeToActiveGameIfNeeded(null, { shouldContinue });
           }
         });
         return;
@@ -446,18 +504,24 @@ export function mountLobby(app) {
 
     if (!isLobbyEveningStarted()) {
       await reconcileLobbyReadyOnMount();
+      if (!mount.isMounted()) return;
+      if (!mount.isCurrentMount()) return;
     }
     renderFull();
     if (isGameSyncActive()) {
       // SYN-12 : pas de second startMultiplayerSync — déjà démarré pre-refresh
-      void routeToActiveGameIfNeeded();
+      void routeToActiveGameIfNeeded(null, { shouldContinue });
       unsubSession = onGameSessionChange(async (row) => {
+        if (!mount.isMounted()) return;
+        if (!mount.isCurrentMount()) return;
         if (!row) return;
-        if (await routeToActiveGameIfNeeded(row)) return;
+        if (await routeToActiveGameIfNeeded(row, { shouldContinue })) return;
+        if (!mount.isMounted()) return;
+        if (!mount.isCurrentMount()) return;
         const effective = getEffectiveSessionScreen(row);
-        if (getCurrentScreen() !== "lobby" || !effective) return;
+        if (!effective) return;
         if (isActiveGameSessionScreen(effective) || isOnGameSetupScreen(effective)) {
-          void routeToActiveGameIfNeeded(row);
+          void routeToActiveGameIfNeeded(row, { shouldContinue });
           return;
         }
         if (effective === "game-select" && isLobbyEveningStarted()) {
@@ -465,15 +529,20 @@ export function mountLobby(app) {
         }
       });
       unsubBundle = onLobbyBundleUpdated(() => {
+        if (!mount.isMounted()) return;
+        if (!mount.isCurrentMount()) return;
         if (isLobbyEveningStarted()) {
-          void routeToActiveGameIfNeeded();
+          void routeToActiveGameIfNeeded(null, { shouldContinue });
         }
       });
     }
+    if (!mount.isMounted()) return;
+    if (!mount.isCurrentMount()) return;
     cleanupSim = simulateLobbyJoins(onLobbyUpdate);
   })();
 
   return () => {
+    mount.dispose();
     chatPanel?.cleanup();
     chatPanel = null;
     cleanupResume();
