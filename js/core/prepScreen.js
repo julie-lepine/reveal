@@ -118,6 +118,11 @@ export function updatePrepStartSlot(
   bindPrepLaunchButtons(slotEl, { startButtonId, forceButtonId, onLaunch });
 }
 
+/**
+ * Bind hôte « Lancer » / « Lancer quand même ».
+ * L'exclusivité anti double-lancement est dans `executePrepLaunch` (verrou logique),
+ * pas sur le nœud bouton — `updatePrepStartSlot` peut re-créer le DOM pendant l'await.
+ */
 export function bindPrepLaunchButtons(
   root,
   { startButtonId = "btn-start-game", forceButtonId = "btn-force-start-game", onLaunch } = {}

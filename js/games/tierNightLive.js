@@ -32,6 +32,7 @@ import { navigate } from "../core/router.js";
 import { escapeHtml, pageShell, tierLogoHtml, bindTierLogos } from "../core/ui.js";
 import { gameExitBarHtml, bindExitGame } from "../core/exitGame.js";
 import { bindNav } from "../screens/nav.js";
+import { withClickLock, createActionLock } from "../core/actionLock.js";
 
 const TIER_RANK = { S: 0, A: 1, B: 2, C: 3, D: 4 };
 
@@ -218,6 +219,9 @@ function mountMp(app, list) {
   const localName = getLocalDisplayName();
   let session = getTierNightLiveSession();
   let revealInFlight = false;
+  /** ARCH-06 : partagé entre re-binds après render. */
+  const nextRoundLock = createActionLock();
+  const revealLock = createActionLock();
 
   const players = () => getActivePlayers();
   const itemLabel = makeItemLabel(list, players());
@@ -319,8 +323,14 @@ function mountMp(app, list) {
     app.querySelectorAll("[data-live-tier]").forEach((btn) => {
       btn.addEventListener("click", () => void pickTier(btn.getAttribute("data-live-tier")));
     });
-    app.querySelector("#live-reveal")?.addEventListener("click", () => void transitionToReveal());
-    app.querySelector("#live-next")?.addEventListener("click", () => void nextRound());
+    app.querySelector("#live-reveal")?.addEventListener(
+      "click",
+      withClickLock(() => transitionToReveal(), { lock: revealLock })
+    );
+    app.querySelector("#live-next")?.addEventListener(
+      "click",
+      withClickLock(() => nextRound(), { lock: nextRoundLock })
+    );
   }
 
   const unsub = onGameSessionChange((row) => {

@@ -37,6 +37,10 @@ import { defaultDilemmaPrepSession } from "./dilemmaSession.js";
 import { showAppAlert } from "./dialog.js";
 import { escapeHtml } from "./ui.js";
 import { createTierNightRunId, finishedTierNightLiveRemote } from "./tierNightConfig.js";
+import { createActionLock } from "./actionLock.js";
+
+/** ARCH-06 : exclusivité logique (survit au re-bind des boutons Recommencer). */
+const restartLock = createActionLock();
 
 const GAME_ID_TO_TILE = {
   traitre: "traitre-prep",
@@ -455,7 +459,8 @@ const RESTART_HANDLERS = {
 export async function restartGame(gameId) {
   const fn = RESTART_HANDLERS[gameId];
   if (!fn) return;
-  await fn();
+  const outcome = await restartLock.run(() => fn());
+  return outcome.ok ? outcome.value : undefined;
 }
 
 /** lastGame local + filet session multijoueur (game_id sur écran résultats). */
@@ -492,6 +497,11 @@ export function eveningRecapRestartButtonHtml(lastGame = resolveLastGameForResta
   return `<button type="button" class="btn btn-secondary evening-recap__restart" data-restart-game="${escapeHtml(lastGame.gameId)}">Recommencer une partie de ${escapeHtml(title)}</button>`;
 }
 
+/**
+ * Bind « Recommencer une partie de X ».
+ * L'exclusivité est dans `restartGame` (verrou logique), pas sur le nœud —
+ * un re-render peut re-créer le bouton pendant l'await.
+ */
 export function bindRestartGameButtons(root) {
   root.querySelectorAll("[data-restart-game]").forEach((el) => {
     el.addEventListener("click", () => {

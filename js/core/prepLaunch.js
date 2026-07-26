@@ -6,10 +6,14 @@ import { isLobbyHost } from "./gameSync.js";
 import { showAppAlert, showAppConfirm } from "./dialog.js";
 import { runPrepGameLaunch } from "./mpLaunch.js";
 import { buildLaunchRoster } from "./prepRoster.js";
+import { createActionLock } from "./actionLock.js";
 
 export { buildLaunchRoster } from "./prepRoster.js";
 
 export const DEFAULT_PREP_MIN_PLAYERS = 2;
+
+/** ARCH-06 : exclusivité logique (survit au re-bind du slot prep pendant l'await). */
+const prepLaunchLock = createActionLock();
 
 export function prepLaunchSlotParams({
   readyMap,
@@ -77,45 +81,49 @@ export async function executePrepLaunch({
   readyKey = (p) => p.name,
   participants = getLobbyParticipants(),
 }) {
-  if (!isLobbyHost()) {
-    await showAppAlert("Seul l'hôte peut lancer la partie.", { title: gameTitle, icon: "👑" });
-    return null;
-  }
-  if (poolEmpty) return null;
-
-  const readyMap = getReadyMap();
-  const { roster, excluded } = buildLaunchRoster(participants, readyMap, { readyKey });
-
-  if (!force) {
-    if (!allReadyFn()) return null;
-  } else {
-    if (roster.length < minPlayers) {
-      await showAppAlert(
-        `Il faut au moins ${minPlayers} joueur(s) prêt(s) pour lancer quand même (hôte inclus).`,
-        { title: gameTitle, icon: "⚠️" }
-      );
+  const outcome = await prepLaunchLock.run(async () => {
+    if (!isLobbyHost()) {
+      await showAppAlert("Seul l'hôte peut lancer la partie.", { title: gameTitle, icon: "👑" });
       return null;
     }
-    const ok = await confirmForcePrepLaunch({ gameTitle, roster, excluded });
-    if (!ok) return null;
-  }
+    if (poolEmpty) return null;
 
-  if (validateBeforeLaunch) {
-    const v = await validateBeforeLaunch(roster, { force });
-    if (v && v.ok === false) {
-      if (v.message) {
-        await showAppAlert(v.message, { title: gameTitle, icon: v.icon || "⚠️" });
+    const readyMap = getReadyMap();
+    const { roster, excluded } = buildLaunchRoster(participants, readyMap, { readyKey });
+
+    if (!force) {
+      if (!allReadyFn()) return null;
+    } else {
+      if (roster.length < minPlayers) {
+        await showAppAlert(
+          `Il faut au moins ${minPlayers} joueur(s) prêt(s) pour lancer quand même (hôte inclus).`,
+          { title: gameTitle, icon: "⚠️" }
+        );
+        return null;
       }
-      return v;
+      const ok = await confirmForcePrepLaunch({ gameTitle, roster, excluded });
+      if (!ok) return null;
     }
-  }
 
-  const rosterNames = roster;
+    if (validateBeforeLaunch) {
+      const v = await validateBeforeLaunch(roster, { force });
+      if (v && v.ok === false) {
+        if (v.message) {
+          await showAppAlert(v.message, { title: gameTitle, icon: v.icon || "⚠️" });
+        }
+        return v;
+      }
+    }
 
-  return runPrepGameLaunch({
-    btn,
-    launch: () => markStarted({ rosterNames }),
-    gameScreen,
-    navStack,
+    const rosterNames = roster;
+
+    return runPrepGameLaunch({
+      btn,
+      launch: () => markStarted({ rosterNames }),
+      gameScreen,
+      navStack,
+    });
   });
+  // Second appel concurrent (re-bind / double-clic) : pas d'erreur, pas de 2e launch.
+  return outcome.ok ? outcome.value : null;
 }

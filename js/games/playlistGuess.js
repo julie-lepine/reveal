@@ -26,6 +26,7 @@ import { navigate } from "../core/router.js";
 import { escapeHtml, pageShell, resetPageScroll } from "../core/ui.js";
 import { bindNav } from "../screens/nav.js";
 import { gameExitBarHtml, bindExitGame } from "../core/exitGame.js";
+import { withClickLock, createActionLock } from "../core/actionLock.js";
 import {
   isGameSyncActive,
   canActAsHost,
@@ -88,6 +89,9 @@ export function mountPlaylistGuess(app) {
   let lastScoredRoundIdx = -1;
   let lastScrollKey = "";
   let unmounted = false;
+  /** ARCH-06 : partagé entre re-binds après render (pas un verrou DOM seul). */
+  const nextRoundLock = createActionLock();
+  const forceRevealLock = createActionLock();
 
   /** Scroll en haut au début d'une manche (pas après validation du vote). */
   function scrollToTopForRound(force = false) {
@@ -424,9 +428,15 @@ export function mountPlaylistGuess(app) {
       void submitVote(pickForVoteConfirm(selected, myVote));
     });
 
-    app.querySelector("#playlist-force")?.addEventListener("click", () => void forceReveal());
+    app.querySelector("#playlist-force")?.addEventListener(
+      "click",
+      withClickLock(() => forceReveal(), { lock: forceRevealLock })
+    );
 
-    app.querySelector("#next-round")?.addEventListener("click", () => void nextRound());
+    app.querySelector("#next-round")?.addEventListener(
+      "click",
+      withClickLock(() => nextRound(), { lock: nextRoundLock })
+    );
   }
 
   function patchVotingChrome() {

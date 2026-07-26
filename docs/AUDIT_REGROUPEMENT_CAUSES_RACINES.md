@@ -17,9 +17,9 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 
 | | Contenu |
 |--|---------|
-| **Fait** | … · UX-RESUME-BANNER ✅ QA · **UX-VIBE-01 / UX-VIBE-02** ✅ QA · **SYN-05 / ARCH-18** ✅ (Fil Rouge app retiré) |
-| **Prochain** | ARCH-06 / Cause 7 résidus |
-| **Ensuite** | ARCH-07/08 · M-14b |
+| **Fait** | … · UX-VIBE-01/02 ✅ · SYN-05/ARCH-18 ✅ · **ARCH-06 V1** 🔧 (locks launch/restart/next) |
+| **Prochain** | Cause 7 résidus (ARCH-07/08 · M-14b) · QA terrain ARCH-06 V1 |
+| **Ensuite** | ARCH-06 V2 (traitre host) · V3 unmount / lobby IIFE |
 
 **Hors file audit**  
 Sondages in-chat (`lobby_polls` / UI chat) — feature produit, pas un ticket cause racine.
@@ -38,7 +38,7 @@ Clutch taps figés sous latence (SYN-26) · ready prep après Recommencer · Cau
 
 | # | ID | Cause | Problème | Statut |
 |---|----|-------|----------|--------|
-| 1 | **ARCH-06** | 6 | Handlers async multiples en vol | Dette |
+| 1 | **ARCH-06** | 6 | Handlers async multiples en vol | 🟡 V1 patch — QA / V2–V3 reportés |
 | 2 | **M-14a / SYN-14** | 3 | TierNight topic / routing | ❌ KO QA — suspendu |
 | 3 | Guess Lie UX | 4/7 | UI avant await ; stats round local-only | Post I-08 |
 | 4 | Loader UI join | 5/11 | Interstitiel join | Hors T-01/T-02 |
@@ -69,7 +69,7 @@ Clutch taps figés sous latence (SYN-26) · ready prep après Recommencer · Cau
 | 3 | Sources de vérité multiples | ✅ hors TierNight | **M-14a** suspendu · UX-CLUTCH-01 ✅ |
 | 4 | Asymétrie hôte / invité | ✅ QA | UX Guess Lie séparée |
 | 5 | Routing + timing sync | ✅ | ARCH-05 mitigé |
-| 6 | Async écrans | Partiel | ARCH-06 |
+| 6 | Async écrans | Partiel | **ARCH-06** 🟡 V1 |
 | 7 | Sync silencieuse / fire-and-forget | Partiel | ARCH-07/08, M-14b |
 | 8 | Reset / migration incomplète | Partiel | I-09 ✅ ; SYN-15/16 ✅ ; ARCH-10 |
 | 9 | Sync monolithe / duplication | Dette | ARCH-11… |
@@ -114,6 +114,19 @@ Clutch taps figés sous latence (SYN-26) · ready prep après Recommencer · Cau
 | **ARCH-07 / ARCH-08** | Catch / retry silencieux | Realtime, launch | Ouvert |
 
 **Hors scope volontaire :** rollback votes dilemma/speedVote/truthMeter · `results.js` mount · indicateur « Sync… » (ARCH-22)
+
+### Cause 6 / 10 — SYN-05 / ARCH-18 ✅ QA
+
+| | |
+|--|--|
+| **Problème** | Fil Rouge / Mot interdit dormant (`FIL_ROUGE_ENABLED`) : modules, sync, state, CSS et docs encore présents |
+| **Décision** | Abandon définitif — pas de stubs d’architecture ; suppression applicative en 3 vagues |
+| **Vague 1** | Modules UI/écrans orphelins ; gardes `isEveningGameplayPaused` retirées ; scoring mort ; CSS exclusif |
+| **Vague 2** | Branches `gameSync` / propriétés `state` ; `data/filRouge.js` ; `stripLegacyFilRougeKeys` (LS non mutant) |
+| **Vague 3** | CSS partagé → `prep-min-players*` ; message Traître ; docs actives ; tickets clôturés |
+| **Preuve** | Contrats `filRougeVague1/2/3Cleanup.test.js` · suite **661/661** |
+| **Hors scope** | SQL / table `fil_rouge_private` / clés RPC historiques / `is_lobby_host` — ops Supabase séparée |
+| **QA** | ✅ validé 2026-07-26 (suppression applicative ; pas de feature réactivable) |
 
 ### Cause 8 — SYN-15 / SYN-16 ✅ QA
 
@@ -165,12 +178,46 @@ Clutch taps figés sous latence (SYN-26) · ready prep après Recommencer · Cau
 | **I-09 / SYN-06** | Rename mid-soirée — migration blobs locaux | ✅ QA |
 | **ARCH-10** | Cache session clear trop tard au leave | 🟡 |
 
+### Cause 6 — ARCH-06 🟡 V1 patch
+
+| | |
+|--|--|
+| **Symptôme** | Handlers async / mounts sans garde de réentrance → double lancement, double avance de manche, ou `render()` après démontage |
+| **État** | **Partiellement corrigé (V1)** — hotspots launch / restart / next PG+TierLive neutralisés |
+| **Stratégie V1** | `createActionLock()` = verrou **logique** (survit re-render/re-bind) ; `withClickLock(handler, { lock })` pour partage entre rebinds ; release toujours en `finally` |
+| **Où V1** | `actionLock.js` · `prepLaunch.js` · `prepScreen.js` · `restartGame.js` · `playlistGuess.js` · `tierNightLive.js` |
+| **Preuve** | `tests/arch06ActionLocks.test.js` · suite **675/675** |
+
+#### Causes neutralisées (V1)
+
+| Hotspot | Cause exacte | Fix |
+|---------|--------------|-----|
+| Prep launch | `updatePrepStartSlot` re-crée un bouton non disabled pendant `await markStarted` ; pas d’exclusivité sur l’action | `prepLaunchLock` dans `executePrepLaunch` (9+ preps) |
+| Recommencer | `bindRestartGameButtons` → `void restartGame` sans garde | `restartLock` dans `restartGame` |
+| PG next / force | bind plain après chaque `render()` | `nextRoundLock` / `forceRevealLock` + `withClickLock(..., { lock })` |
+| TierNight Live next | idem (+ `revealInFlight` déjà sur reveal) | `nextRoundLock` + `withClickLock` ; reveal click aussi sur `revealLock` |
+
+#### Résidus reportés (hors V1)
+
+| Vague | Scope |
+|-------|--------|
+| **V2** | Actions hôte Traître (`continueSpeakRound`, `startVoteFromDecision`, …) — mode A |
+| **V3** | `unmounted` manquant sur 9 jeux · `mountLobby` IIFE (croise SYN-12) · mode C generation mount si régression |
+| Hors ARCH-06 | Votes optimistic (T-05 résidu) · ARCH-07/08 |
+
+#### Trois modes (rappel)
+
+| Mode | Définition | V1 |
+|------|------------|-----|
+| **A** | Double-clic / 2e tap pendant `await` | ✅ launch, restart, PG/TierLive next |
+| **B** | Async après unmount → `render()` | ❌ reporté V3 (sauf déjà I-05 traitre/tierNight/dilemma/PG) |
+| **C** | Remount same-screen stale closure | ❌ reporté si régression |
+
 ### Autres causes
 
 | ID | Cause | Problème |
 |----|-------|----------|
 | **M-14a** | 3 | TierNight : hôte → ancien récap 2e liste ; invité saute choix tierlists — ❌ suspendu |
-| **ARCH-06** | 6 | Double mount / handlers en vol |
 | **ARCH-01** | 1 | Démo locale sans avertissement MP |
 
 ---
@@ -224,11 +271,11 @@ Clutch conserve son départage temporel (règle produit explicite inchangée).
 | 3 | I-03/04, SYN-03, M-13, M-02b, ARCH-02, SYN-29, I-PG-01, ready stale Recommencer, UX-CLUTCH-01 |
 | 4 | I-01/02/08, M-03b, M-06a/b, L-01, ARCH-03/03b, UX-VIBE-01 |
 | 5 | T-01/02, T-03↻, M-07, M-08, P-02, SYN-28, I-PG-01, ARCH-04, UX-VIBE-02 |
-| 6 | I-05, SYN-13b↻, SYN-25, **SYN-05 / ARCH-18** (Fil Rouge : suppression applicative terminée ; SQL historique hors scope) |
+| 6 | I-05, SYN-13b↻, SYN-25, **SYN-05 / ARCH-18** ✅ QA |
 | 7 | I-07, M-09, L-09, M-11, M-10, T-05, SYN-26, M-04b / SYN-18 |
 | 8 | I-06, P-02, ARCH-09, I-09 / SYN-06, SYN-15 / SYN-16 |
 | 9 | SYN-12 / M-05b |
-| 10 | **SYN-05 / ARCH-18** (Fil Rouge app retiré ; SQL historique hors scope) |
+| 10 | **SYN-05 / ARCH-18** ✅ QA (Fil Rouge app ; SQL historique hors scope) |
 | 11 | L-02, ARCH-21↻, M-12 (cleanup `#join=`, pas auto-join), UX-HIST-01, UX-RESUME-BANNER, UX-VIBE-01/02 |
 
 ---
@@ -249,4 +296,4 @@ Hors tickets prioritaires — à traiter si opportunité / régression :
 
 ---
 
-*Suivi vivant · Dernière MAJ : 2026-07-26 — SYN-05 / ARCH-18 ✅ (suppression applicative Fil Rouge)*
+*Suivi vivant · Dernière MAJ : 2026-07-26 — ARCH-06 V1 patch*
