@@ -510,6 +510,11 @@ body.has-top-ad .back{
   margin-top:calc(var(--touch-min) + 12px);
 }
 
+/* Retour d’étape inline : ne pas chevaucher le bouton retour global */
+.page:has(.back) .container > .btn-back-inline:first-child{
+  margin-left:calc(var(--touch-min) + 12px);
+}
+
 .label-upper--hot{ color:rgba(255,107,107,.85); }
 .label-upper--green{ color:rgba(74,222,128,.85); }
 .label-upper--gold{ color:rgba(251,191,36,.85); }

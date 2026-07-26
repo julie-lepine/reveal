@@ -17,8 +17,8 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 
 | | Contenu |
 |--|---------|
-| **Fait** | … · **ARCH-06 V1** ✅ QA · **mode B** 🔧 · **mode C** 🔧 (C0–C3) |
-| **Prochain** | QA C2 (TierNight Recommencer — correctif) puis Traître host V2 |
+| **Fait** | … · **ARCH-06 V1/B/C** ✅ QA · **Traître host V2** 🔧 livré |
+| **Prochain** | QA terrain Traître host V2 |
 | **Ensuite** | Lobby IIFE / SYN-12 · clôture ARCH-06 si plus de résidu |
 
 **Hors file audit**  
@@ -182,23 +182,29 @@ Clutch taps figés sous latence (SYN-26) · ready prep après Recommencer · Cau
 
 | | |
 |--|--|
-| **État** | **Pas clos.** V1 ✅ · mode B ✅ · **mode C livré** (C0–C3) 🔧 · Traître host V2 · lobby IIFE/SYN-12 ouverts |
+| **État** | **Pas clos.** V1 ✅ · mode B ✅ · mode C ✅ QA · **Traître host V2 livré** 🔧 · lobby IIFE/SYN-12 ouvert |
 | **Primitive B/C** | `createMountGuard()` dans `mountLifecycle.js` : `isMounted` / `isCurrentMount` / `dispose` ; compteur de génération **dans** lifecycle ; routeur appelle seulement `advanceMountGeneration()` (pas l’inverse) |
 | **Règle post-await / listener** | `isMounted()` puis `isCurrentMount()` avant effet local ou nouveau commit. Commits déjà partis **non** annulés. Helpers métier : `shouldContinue()` opaque. |
 
-#### Mode C (cette livraison)
+#### Mode C
 
 | Vague | Contenu | Statut |
 |-------|---------|--------|
-| **C0** | Compteur + `advanceMountGeneration` + `isCurrentMount` + signal router ; transparent (aucun jeu) | 🔧 |
-| **C1** | Double garde sur périmètre B (hotTake…tierNightLive MP + playlistGuess) | 🔧 |
-| **C2** | `finalizeTierNightLiveToResults({ shouldContinue })` ; `advanceTierNight…` accepte `shouldContinue` (alias `isMounted`) | 🔧 |
-| **C3** | Audit résiduel (inventaire, pas Traître/lobby) | 🔧 |
+| **C0** | Compteur + `advanceMountGeneration` + `isCurrentMount` + signal router | ✅ QA |
+| **C1** | Double garde sur périmètre B (hotTake…tierNightLive MP + playlistGuess) | ✅ QA |
+| **C2** | `finalizeTierNightLiveToResults({ shouldContinue })` ; `advanceTierNight…` | ✅ QA |
+| **C3** | Audit résiduel | ✅ QA |
 
-**C3 inventaire (hors patch)**  
-Gardes encore fondées sur `getCurrentScreen() === id` : `prepScreen` delegation · `game-select` · `lobby` · `home` · `results` · `leaderboard` · `guesslie-wait`.  
-Sans `createMountGuard` jeu : `traitre` (alive métier) · `tierNight` (`alive`) · `dilemma` (`unmounted`) · `tierNightLive` solo.  
-→ Traître host = étape 4 · lobby IIFE = étape 5.
+#### Traître host V2 (étape 4)
+
+| | |
+|--|--|
+| **Scope** | `js/games/traitre.js` hôte + acting host (`canActAsHost`) |
+| **Mode A** | `createActionLock` / `withClickLock` : finish-speak, continue, vote-now, resolve/force, deal-advance, exit |
+| **Mode B/C** | `createMountGuard` remplace `mountAlive` ; double garde post-await + listener ; `dispose` + `unsub` |
+| **Helper** | `returnToGameSelect({ shouldContinue })` injecté depuis Traître (défaut `true`) |
+| **Hors scope** | lobby IIFE / SYN-12 · métier / scoring / RPC / RLS |
+| **Preuve** | `tests/arch06TraitreHostV2.test.js` |
 
 #### Suite ARCH-06
 
@@ -206,11 +212,11 @@ Sans `createMountGuard` jeu : `traitre` (alive métier) · `tierNight` (`alive`)
 |-------|-------|--------|
 | V1 mode A | launch / restart / PG+TierLive next | ✅ QA |
 | mode B | B0–B4 | ✅ |
-| **mode C** | C0–C3 | 🔧 livré → QA |
-| V2 Traître | actions hôte | Prochain |
-| Lobby IIFE | SYN-12 | Après Traître |
+| mode C | C0–C3 | ✅ QA |
+| **V2 Traître** | actions hôte | 🔧 livré → QA |
+| Lobby IIFE | SYN-12 | Prochain |
 
-**Preuve** : `tests/mountLifecycle.test.js` · `tests/routerNestedRedirect.test.js` (M-08 + gen)
+**Preuve** : `tests/mountLifecycle.test.js` · `tests/routerNestedRedirect.test.js` · `tests/arch06TraitreHostV2.test.js`
 
 ### Autres causes
 
@@ -270,7 +276,7 @@ Clutch conserve son départage temporel (règle produit explicite inchangée).
 | 3 | I-03/04, SYN-03, M-13, M-02b, ARCH-02, SYN-29, I-PG-01, ready stale Recommencer, UX-CLUTCH-01 |
 | 4 | I-01/02/08, M-03b, M-06a/b, L-01, ARCH-03/03b, UX-VIBE-01 |
 | 5 | T-01/02, T-03↻, M-07, M-08, P-02, SYN-28, I-PG-01, ARCH-04, UX-VIBE-02 |
-| 6 | I-05, SYN-13b↻, SYN-25, **SYN-05 / ARCH-18** ✅, **ARCH-06 V1** ✅, **B** ✅, **C** 🔧 (Traître/lobby ouverts) |
+| 6 | I-05, SYN-13b↻, SYN-25, **SYN-05 / ARCH-18** ✅, **ARCH-06 V1** ✅, **B** ✅, **C** ✅, **Traître V2** 🔧 (lobby IIFE ouvert) |
 | 7 | I-07, M-09, L-09, M-11, M-10, T-05, SYN-26, M-04b / SYN-18 |
 | 8 | I-06, P-02, ARCH-09, I-09 / SYN-06, SYN-15 / SYN-16 |
 | 9 | SYN-12 / M-05b |

@@ -4599,11 +4599,13 @@ export function stopGameSessionListenerOnPostGame(
 }
 
 /** Retour au menu jeux (hôte : ferme la session ; invité : navigation locale). */
-export async function returnToGameSelect() {
+export async function returnToGameSelect({ shouldContinue = null } = {}) {
+  const canContinue = () => typeof shouldContinue !== "function" || shouldContinue();
   if (!isGameSyncActive()) return false;
 
   if (isLobbyHost()) {
     await endGameSession();
+    if (!canContinue()) return false;
     resetLocalGamePrepState();
     routeToSessionScreen("game-select", { force: true });
     return true;
@@ -4614,6 +4616,7 @@ export async function returnToGameSelect() {
     120000,
     getEffectiveSessionScreen(getCachedGameSession()) || getCurrentScreen()
   );
+  if (!canContinue()) return false;
   navigate("game-select", { navStack: ["home", "lobby", "game-select"] });
   return true;
 }
