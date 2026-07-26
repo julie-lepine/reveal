@@ -5579,8 +5579,8 @@ body{
   cursor:pointer;
 }
 
-/* Bandeau min joueurs partagé (Traître, Playlist Guess) — classes historiques .fil-rouge-setup__req* */
-.fil-rouge-setup__req{
+/* Bandeau min joueurs partagé (Traître, Playlist Guess) */
+.prep-min-players{
   display:flex;
   align-items:flex-start;
   gap:12px;
@@ -5592,19 +5592,19 @@ body{
   box-shadow:0 0 24px rgba(251,191,36,.12);
 }
 
-.fil-rouge-setup__req--ok{
+.prep-min-players--ok{
   border-color:rgba(110,231,183,.4);
   background:linear-gradient(135deg, rgba(110,231,183,.14), rgba(74,222,128,.06));
   box-shadow:0 0 20px rgba(110,231,183,.1);
 }
 
-.fil-rouge-setup__req-icon{
+.prep-min-players__icon{
   font-size:28px;
   line-height:1;
   flex-shrink:0;
 }
 
-.fil-rouge-setup__req-title{
+.prep-min-players__title{
   margin:0 0 4px;
   font-size:15px;
   font-weight:800;
@@ -5612,23 +5612,23 @@ body{
   color:#FCD34D;
 }
 
-.fil-rouge-setup__req--ok .fil-rouge-setup__req-title{
+.prep-min-players--ok .prep-min-players__title{
   color:#6EE7B7;
 }
 
-.fil-rouge-setup__req-detail{
+.prep-min-players__detail{
   margin:0;
   font-size:14px;
   line-height:1.45;
   color:rgba(255,255,255,.88);
 }
 
-.fil-rouge-setup__req-detail strong{
+.prep-min-players__detail strong{
   color:#FDE68A;
   font-weight:800;
 }
 
-.fil-rouge-setup__req--ok .fil-rouge-setup__req-detail strong{
+.prep-min-players--ok .prep-min-players__detail strong{
   color:#A7F3D0;
 }
 

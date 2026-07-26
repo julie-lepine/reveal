@@ -20,14 +20,6 @@ const DELETED_MODULES = [
   "js/screens/filRougeMission.js",
 ];
 
-const SHARED_REQ_CLASSES = [
-  ".fil-rouge-setup__req{",
-  ".fil-rouge-setup__req--ok{",
-  ".fil-rouge-setup__req-icon{",
-  ".fil-rouge-setup__req-title{",
-  ".fil-rouge-setup__req-detail{",
-];
-
 function read(rel) {
   return readFileSync(join(root, rel), "utf8");
 }
@@ -96,15 +88,24 @@ describe("fil rouge vague 1 — contrats source", () => {
     assert.equal(main.includes("FIL_ROUGE"), false);
   });
 
-  it("classes CSS partagées Traître / Playlist Guess sont toujours présentes", () => {
+  it("classes CSS partagées Traître / Playlist Guess sont génériques (prep-min-players)", () => {
     const css = read("style.css");
-    for (const sel of SHARED_REQ_CLASSES) {
+    for (const sel of [
+      ".prep-min-players{",
+      ".prep-min-players--ok{",
+      ".prep-min-players__icon{",
+      ".prep-min-players__title{",
+      ".prep-min-players__detail{",
+    ]) {
       assert.ok(css.includes(sel), `manquant: ${sel}`);
     }
+    assert.equal(css.includes("fil-rouge-setup__req"), false);
     const traitre = read("js/screens/traitrePrep.js");
     const playlist = read("js/screens/playlistGuessPrep.js");
-    assert.ok(traitre.includes("fil-rouge-setup__req"));
-    assert.ok(playlist.includes("fil-rouge-setup__req"));
+    assert.ok(traitre.includes("prep-min-players"));
+    assert.ok(playlist.includes("prep-min-players"));
+    assert.equal(traitre.includes("fil-rouge"), false);
+    assert.equal(playlist.includes("fil-rouge"), false);
   });
 
   it("CSS exclusif Fil Rouge (banner / modal / mission) a été retiré", () => {

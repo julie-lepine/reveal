@@ -16,8 +16,9 @@
 6. Exécute **`supabase/transfer-lobby-host.sql`** (transfert volontaire du rôle d'hôte depuis le menu jeux)
 7. Exécute **`supabase/kick-lobby-member.sql`** (l'hôte peut retirer un joueur au lobby / entre deux jeux)
 8. Exécute **`supabase/lobby-polls.sql`** (sondages « prochain jeu » — tables + RPC ; dépend de `is_lobby_host` / `is_acting_host` I-08/ARCH-03)
-9. ~~Exécute **`supabase/fil-rouge-private.sql`**~~ *(Mot interdit / Fil Rouge abandonné — optionnel, voir `data/filRouge.js` `FIL_ROUGE_ENABLED`)*
+9. Exécute **`supabase/traitre-private.sql`** si tu joues à Spot the fake (dépend de `is_lobby_host`, fourni par `game-sessions-i08-arch03.sql`)
 
+> **Fil Rouge / Mot interdit** — suppression applicative terminée (plus de feature ni de flag dans l’app). Le script historique `supabase/fil-rouge-private.sql` peut encore exister en dépôt / sur un projet Supabase déjà provisionné ; ne pas l’exécuter pour une install neuve. Une éventuelle purge SQL (table / clés RPC) est une opération ops séparée, hors setup courant.
 ## 2. Clés API
 
 1. **Project Settings → API** : copie l’URL et la clé `anon` (publique).

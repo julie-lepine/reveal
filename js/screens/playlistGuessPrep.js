@@ -58,11 +58,11 @@ export function mountPlaylistGuessPrep(app) {
       const playerCount = members.length;
       const minPlayersMet = playerCount >= PLAYLIST_GUESS_MIN_PLAYERS;
       minCard.innerHTML = `
-        <div class="fil-rouge-setup__req ${minPlayersMet ? "fil-rouge-setup__req--ok" : "fil-rouge-setup__req--warn"}" role="status">
-          <span class="fil-rouge-setup__req-icon" aria-hidden="true">👥</span>
-          <div class="fil-rouge-setup__req-body">
-            <p class="fil-rouge-setup__req-title">Minimum ${PLAYLIST_GUESS_MIN_PLAYERS} joueurs</p>
-            <p class="fil-rouge-setup__req-detail">
+        <div class="prep-min-players ${minPlayersMet ? "prep-min-players--ok" : "prep-min-players--warn"}" role="status">
+          <span class="prep-min-players__icon" aria-hidden="true">👥</span>
+          <div class="prep-min-players__body">
+            <p class="prep-min-players__title">Minimum ${PLAYLIST_GUESS_MIN_PLAYERS} joueurs</p>
+            <p class="prep-min-players__detail">
               ${
                 minPlayersMet
                   ? `${playerCount} joueurs dans le lobby - c'est bon.`

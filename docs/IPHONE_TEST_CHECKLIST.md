@@ -112,7 +112,6 @@ Utilise l’**org / projet de test** actuel (egress : 1 onglet, fermer le lobby 
 - [ ] 🧪 Liste joueurs, prêt
 - [ ] 🧪 **Lancer une soirée** → menu jeux
 - [ ] 🧪 **1 jeu court** (ex. Hot Take ou Trivia) : sync votes / écran hôte ↔ invité
-- [ ] 🧪 **Fil Rouge** (optionnel) : setup + mission si tu l’utilises souvent
 - [ ] 🧪 **Quitter / fermer lobby** (hôte) → invité bien renvoyé
 - [ ] 🧪 **Reprendre** après kill app + réouverture (session / lobby selon ton scénario)
 

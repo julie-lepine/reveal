@@ -46,7 +46,8 @@ Référence détaillée : [SUPABASE_SETUP.md](./SUPABASE_SETUP.md)
 
 - [ ] `supabase/schema.sql` exécuté
 - [ ] `supabase/game-sessions.sql`
-- [ ] ~~`supabase/fil-rouge-private.sql`~~ *(Mot interdit désactivé — uniquement si réactivation)*
+- [ ] `supabase/game-sessions-i08-arch03.sql` (helpers host / RPC — dont `is_lobby_host`)
+- [ ] `supabase/traitre-private.sql` (Spot the fake — après `is_lobby_host`)
 - [ ] `supabase/lobby-lifecycle.sql` (+ pg_cron pour purge auto, voir SUPABASE_SETUP §7bis)
 - [ ] `supabase/lobby-members-unique-name.sql` (pseudo unique par lobby)
 - [ ] `supabase/lobby-polls.sql` (sondages prochain jeu — après I-08/ARCH-03 host helpers)
@@ -54,8 +55,7 @@ Référence détaillée : [SUPABASE_SETUP.md](./SUPABASE_SETUP.md)
 
 ### Realtime
 
-Réplication activée sur : `lobbies`, `lobby_members`, `lobby_messages`, `game_sessions`, `lobby_polls`, `lobby_poll_votes` *(+ `fil_rouge_private` si Mot interdit réactivé)*
-
+Réplication activée sur : `lobbies`, `lobby_members`, `lobby_messages`, `game_sessions`, `lobby_polls`, `lobby_poll_votes`
 ### Emails (Resend + OVH)
 
 Guide détaillé : **[RESEND_SETUP.md](./RESEND_SETUP.md)**
@@ -86,7 +86,7 @@ Guide détaillé : **[RESEND_SETUP.md](./RESEND_SETUP.md)**
 - [ ] Lancer **SpeedVote** ou **Consensus** (court)
 - [ ] **Arrêter la partie** → retour menu jeux → autre jeu
 - [ ] **Quitter le lobby** / réinitialiser l’app si besoin
-- [ ] Optionnel : TierNight *(Mot interdit / Fil Rouge : désactivé)*
+- [ ] Optionnel : TierNight
 
 ---
 

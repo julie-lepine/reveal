@@ -17,7 +17,7 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 
 | | Contenu |
 |--|---------|
-| **Fait** | … · UX-RESUME-BANNER ✅ QA · **UX-VIBE-01 / UX-VIBE-02** ✅ QA |
+| **Fait** | … · UX-RESUME-BANNER ✅ QA · **UX-VIBE-01 / UX-VIBE-02** ✅ QA · **SYN-05 / ARCH-18** ✅ (Fil Rouge app retiré) |
 | **Prochain** | ARCH-06 / Cause 7 résidus |
 | **Ensuite** | ARCH-07/08 · M-14b |
 
@@ -56,7 +56,6 @@ Clutch taps figés sous latence (SYN-26) · ready prep après Recommencer · Cau
 | **ARCH-05** | 5 | Course lobby vs session | 🟡 mitigé SYN-28 |
 | **ARCH-01 / F-01** | 1/10 | Démo offline sans MP | 🟡 partiel |
 | **L-04** | 11 | « Réinitialiser l’app » trop visible | 🟡 partiel |
-| **SYN-05 / ARCH-18** | 6/10 | Fil Rouge dormant | Dormant |
 | **ARCH-11–17, SYN-19–24, SYN-27** | 9–10 | Monolithe / dup / code mort | Dette |
 
 ---
@@ -70,11 +69,11 @@ Clutch taps figés sous latence (SYN-26) · ready prep après Recommencer · Cau
 | 3 | Sources de vérité multiples | ✅ hors TierNight | **M-14a** suspendu · UX-CLUTCH-01 ✅ |
 | 4 | Asymétrie hôte / invité | ✅ QA | UX Guess Lie séparée |
 | 5 | Routing + timing sync | ✅ | ARCH-05 mitigé |
-| 6 | Async écrans | Partiel | ARCH-06 ; SYN-05 dormant |
+| 6 | Async écrans | Partiel | ARCH-06 |
 | 7 | Sync silencieuse / fire-and-forget | Partiel | ARCH-07/08, M-14b |
 | 8 | Reset / migration incomplète | Partiel | I-09 ✅ ; SYN-15/16 ✅ ; ARCH-10 |
 | 9 | Sync monolithe / duplication | Dette | ARCH-11… |
-| 10 | Code mort | Dette | Fil Rouge, dead exports |
+| 10 | Code mort | Dette | dead exports (hors Fil Rouge app) |
 | 11 | Friction UX | Partiel | ARCH-22 ; L-04 |
 
 ---
@@ -123,7 +122,7 @@ Clutch taps figés sous latence (SYN-26) · ready prep après Recommencer · Cau
 | **Fix** | `detectParticipantRenames` + migrate two-phase dans `applyLobbyToState` (avant `saveStatePatch` lobby) |
 | **Maps** | `scores`/`gameScores` = Math.max · `playerStats` = maxStats · baseline = preferOld (I-09) |
 | **Où** | `rosterRenameMigrate.js` · `replaceEveningScoreMaps` (`state.js`) · hook `supabaseLobby.js` |
-| **Hors scope** | filRouge (disabled) · applyRemote* · prune · I-09 local |
+| **Hors scope** | applyRemote* · prune · I-09 local · résidus SQL Fil Rouge (ops séparée) |
 | **QA** | ✅ terrain rename multi-device |
 
 ### Cause 11 / affichage — UX-HIST-01 ✅ QA
@@ -225,10 +224,11 @@ Clutch conserve son départage temporel (règle produit explicite inchangée).
 | 3 | I-03/04, SYN-03, M-13, M-02b, ARCH-02, SYN-29, I-PG-01, ready stale Recommencer, UX-CLUTCH-01 |
 | 4 | I-01/02/08, M-03b, M-06a/b, L-01, ARCH-03/03b, UX-VIBE-01 |
 | 5 | T-01/02, T-03↻, M-07, M-08, P-02, SYN-28, I-PG-01, ARCH-04, UX-VIBE-02 |
-| 6 | I-05, SYN-13b↻, SYN-25 |
+| 6 | I-05, SYN-13b↻, SYN-25, **SYN-05 / ARCH-18** (Fil Rouge : suppression applicative terminée ; SQL historique hors scope) |
 | 7 | I-07, M-09, L-09, M-11, M-10, T-05, SYN-26, M-04b / SYN-18 |
 | 8 | I-06, P-02, ARCH-09, I-09 / SYN-06, SYN-15 / SYN-16 |
 | 9 | SYN-12 / M-05b |
+| 10 | **SYN-05 / ARCH-18** (Fil Rouge app retiré ; SQL historique hors scope) |
 | 11 | L-02, ARCH-21↻, M-12 (cleanup `#join=`, pas auto-join), UX-HIST-01, UX-RESUME-BANNER, UX-VIBE-01/02 |
 
 ---
@@ -245,7 +245,8 @@ Hors tickets prioritaires — à traiter si opportunité / régression :
 - Policy debug lobby à purger côté Supabase si encore présente
 - Optimistic votes hors Hot Take / VibeCheck (dilemma / speedVote / … — même trou que T-05)
 - Starts sync hydrate → hub hors `mountLobby` (résidu SYN-12, hors idempotence globale)
+- Fil Rouge : résidus SQL historiques (`fil-rouge-private.sql`, clés RPC) — ops Supabase séparée, non faite
 
 ---
 
-*Suivi vivant · Dernière MAJ : 2026-07-26 — UX-VIBE-01 / UX-VIBE-02 ✅ QA*
+*Suivi vivant · Dernière MAJ : 2026-07-26 — SYN-05 / ARCH-18 ✅ (suppression applicative Fil Rouge)*

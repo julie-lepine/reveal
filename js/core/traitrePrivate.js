@@ -121,7 +121,7 @@ export async function hostDistributeTraitreRoles(pairId, impostorName, playerNam
       written: 0,
       skippedNames,
       error:
-        "Aucun rôle enregistré - vérifie que fil-rouge-private.sql et traitre-private.sql sont appliqués sur Supabase.",
+        "Aucun rôle enregistré - vérifie que traitre-private.sql est appliqué sur Supabase (is_lobby_host via game-sessions-i08-arch03.sql).",
     };
   }
 
