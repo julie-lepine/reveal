@@ -3,6 +3,7 @@ import { getCurrentSessionScoreMap, getState } from "./state.js";
 import { escapeHtml } from "./ui.js";
 import {
   sortAndRankByScore,
+  withCompetitionRanks,
 } from "./competitionRank.js";
 import { resolveEveningGameScoreOrder } from "./gameScoreOrder.js";
 
