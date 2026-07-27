@@ -22,6 +22,7 @@ import {
   navigateAfterLobbyJoin,
   confirmAndLeaveLobby,
   leaveLobbyMembershipFromServer,
+  notifyVoluntaryLeaveFailure,
   reconcileLobbyMembership,
   resetAppToCleanHome,
   tryRecoverLobbyFromServer,
@@ -1219,10 +1220,7 @@ export function mountHome(app) {
       btn.disabled = false;
       if (res.cancelled) return;
       if (!res.ok) {
-        await showAppAlert(res.error || "Impossible de quitter le lobby.", {
-          title: "Quitter le lobby",
-          icon: "⚠️",
-        });
+        await notifyVoluntaryLeaveFailure(res);
         return;
       }
       // Après leave local : rafraîchir membership serveur (Vague C/D gèrent la sortie serveur).

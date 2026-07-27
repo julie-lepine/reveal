@@ -1,5 +1,5 @@
 import { APP_LOGO } from "../../data/branding.js";
-import { hasActiveLobby, openPartySettings, returnToEveningGames } from "./lobby.js";
+import { hasActiveLobby, openPartySettings, returnToEveningGames, isVoluntaryLeaveInFlight } from "./lobby.js";
 import {
   BOTTOM_NAV_TAB,
   resolveBottomNavTabs,
@@ -84,7 +84,7 @@ function goFinal() {
 
 /** Même flux que game-select → Paramètres (dialog hôte/membre). */
 async function goSettings() {
-  if (!hasActiveLobby()) return;
+  if (!hasActiveLobby() || isVoluntaryLeaveInFlight()) return;
   await openPartySettings();
 }
 

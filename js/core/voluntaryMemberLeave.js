@@ -1,0 +1,100 @@
+/**
+ * Sortie volontaire membre non-hôte — contrat d’échec distant strict.
+ * Module pur (deps injectées) pour tests sans charger Supabase / DOM.
+ */
+
+let voluntaryLeaveInFlight = false;
+
+export function isVoluntaryLeaveInFlight() {
+  return voluntaryLeaveInFlight;
+}
+
+/** Tests uniquement. */
+export function resetVoluntaryLeaveLockForTests() {
+  voluntaryLeaveInFlight = false;
+}
+
+/**
+ * Feedback échec leave volontaire (pas busy, pas cancel).
+ * @param {{ ok?: boolean, cancelled?: boolean, busy?: boolean }|null|undefined} res
+ * @param {{ showAppAlert: Function }} deps
+ */
+export async function notifyVoluntaryLeaveFailure(res, deps) {
+  if (!res || res.ok || res.cancelled || res.busy) return;
+  const alert = deps?.showAppAlert;
+  if (!alert) return;
+  await alert(
+    "La connexion a empêché la sortie du lobby. Réessaie dans quelques instants.",
+    {
+      title: "Impossible de quitter le lobby",
+      icon: "⚠️",
+    }
+  );
+}
+
+/**
+ * @param {{ navigateAway?: boolean }} [options]
+ * @param {{
+ *   getLobby: () => object|null|undefined,
+ *   isGuest: () => boolean,
+ *   isSupabaseConfigured: () => boolean,
+ *   leaveLobbySupabase: () => Promise<{ ok: boolean, error?: string }>,
+ *   stopMultiplayerSync: () => void,
+ *   stopLobbyPresenceSync: () => void,
+ *   signOutAnonGuestIfNeeded: (wasGuest: boolean) => Promise<void>|void,
+ *   clearLocalOpenLobbySlot: (code: string) => void,
+ *   applyLeaveLobbyLocal: (args: { wasGuest: boolean, navigateAway: boolean }) => void,
+ * }} deps
+ * @returns {Promise<{ ok: boolean, error?: string, busy?: boolean }>}
+ */
+export async function runVoluntaryMemberLeave(options = {}, deps) {
+  if (!deps) {
+    throw new Error("runVoluntaryMemberLeave: deps required");
+  }
+
+  const navigateAway = options.navigateAway !== false;
+
+  if (voluntaryLeaveInFlight) {
+    return { ok: false, busy: true };
+  }
+
+  voluntaryLeaveInFlight = true;
+  try {
+    const lobby = deps.getLobby();
+    const code = lobby?.code;
+    const wasGuest = deps.isGuest();
+    const remote = Boolean(deps.isSupabaseConfigured() && lobby?.id);
+
+    if (remote) {
+      let res;
+      try {
+        res = await deps.leaveLobbySupabase();
+      } catch (e) {
+        console.warn("REVEAL leaveLobbySupabase threw:", e?.message || e);
+        return { ok: false, error: e?.message || String(e) };
+      }
+      if (!res?.ok) {
+        console.warn("REVEAL leaveLobbySupabase:", res?.error);
+        return {
+          ok: false,
+          error: res?.error || "Impossible de quitter le lobby.",
+        };
+      }
+
+      deps.stopMultiplayerSync();
+      deps.stopLobbyPresenceSync();
+      await deps.signOutAnonGuestIfNeeded(wasGuest);
+      deps.applyLeaveLobbyLocal({ wasGuest, navigateAway });
+      return { ok: true };
+    }
+
+    // Offline / démo : aucune ligne lobby_members — cleanup local direct.
+    deps.stopMultiplayerSync();
+    deps.stopLobbyPresenceSync();
+    if (code) deps.clearLocalOpenLobbySlot(code);
+    deps.applyLeaveLobbyLocal({ wasGuest, navigateAway });
+    return { ok: true };
+  } finally {
+    voluntaryLeaveInFlight = false;
+  }
+}

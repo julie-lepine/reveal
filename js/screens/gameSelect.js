@@ -22,7 +22,7 @@ import {
 import { getCurrentScreen } from "../core/router.js";
 import { isSupabaseConfigured } from "../core/supabaseClient.js";
 import { startLobbyPresenceSync, onLobbyBundleUpdated, getClaimHubUiToken } from "../core/supabaseLobby.js";
-import { getLobby, hasActiveLobby, openPartySettings } from "../core/lobby.js";
+import { getLobby, hasActiveLobby, openPartySettings, isVoluntaryLeaveInFlight } from "../core/lobby.js";
 import { clientMayOfferHostClaim } from "../core/hostClaimOffer.js";
 import { getLastGame, getState } from "../core/state.js";
 import { arch03LiveLog } from "../core/presenceUiLive.js";
@@ -338,6 +338,7 @@ export function mountGameSelect(app) {
     }
 
     if (e.target.closest("[data-party-settings]")) {
+      if (isVoluntaryLeaveInFlight()) return;
       void openPartySettings().then((res) => {
         if (res.action === "close" || res.action === "leave") {
           if (res.ok) return;

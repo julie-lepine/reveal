@@ -57,12 +57,24 @@ import {
   SERVER_LEAVE_CONFIRM,
 } from "./lobbyServerLeave.js";
 import {
+  runVoluntaryMemberLeave,
+  notifyVoluntaryLeaveFailure as notifyLeaveFailureCore,
+  isVoluntaryLeaveInFlight,
+  resetVoluntaryLeaveLockForTests,
+} from "./voluntaryMemberLeave.js";
+import {
   showAppAlert,
   showAppConfirm,
   showTransferHostDialog,
   showPartySettingsDialog,
   showLobbyPlayersManageDialog,
 } from "./dialog.js";
+
+export {
+  isVoluntaryLeaveInFlight,
+  resetVoluntaryLeaveLockForTests,
+  runVoluntaryMemberLeave,
+} from "./voluntaryMemberLeave.js";
 import {
   stopMultiplayerSync,
   endGameSession,
@@ -922,11 +934,15 @@ export async function dissolveLobbyAsHost({ navigateAway = true } = {}) {
 }
 
 /** Confirmation puis sortie : hôte → dissolve ; membre → leave (soi uniquement). */
-export async function confirmAndLeaveLobby({ navigateAway = true } = {}) {
+export async function confirmAndLeaveLobby({ navigateAway = true } = {}, testDeps = null) {
   if (!hasActiveLobby()) return { ok: true };
 
+  const confirm = testDeps?.showAppConfirm ?? showAppConfirm;
+  const leaveFn = testDeps?.leaveLobby ?? leaveLobby;
+  const dissolveFn = testDeps?.dissolveLobbyAsHost ?? dissolveLobbyAsHost;
+
   if (isSupabaseConfigured() && isLocalLobbyHost()) {
-    const ok = await showAppConfirm(
+    const ok = await confirm(
       "Le lobby sera fermé pour tous les joueurs. Continuer ?",
       {
         title: "Quitter le lobby",
@@ -936,48 +952,57 @@ export async function confirmAndLeaveLobby({ navigateAway = true } = {}) {
       }
     );
     if (!ok) return { ok: false, cancelled: true };
-    return dissolveLobbyAsHost({ navigateAway });
+    return dissolveFn({ navigateAway });
   }
 
   const cfg = SERVER_LEAVE_CONFIRM.member;
-  const ok = await showAppConfirm(cfg.message, {
+  const ok = await confirm(cfg.message, {
     title: cfg.title,
     confirmLabel: cfg.confirmLabel,
     cancelLabel: cfg.cancelLabel,
     icon: cfg.icon,
   });
   if (!ok) return { ok: false, cancelled: true };
-  return leaveLobby({ navigateAway });
+  return leaveFn({ navigateAway });
+}
+
+/**
+ * Feedback échec leave volontaire (pas busy, pas cancel).
+ * @param {{ ok?: boolean, cancelled?: boolean, busy?: boolean, error?: string }|null|undefined} res
+ */
+export async function notifyVoluntaryLeaveFailure(res, testDeps = null) {
+  return notifyLeaveFailureCore(res, {
+    showAppAlert: testDeps?.showAppAlert ?? showAppAlert,
+  });
 }
 
 /**
  * Quitte le lobby sans supprimer le compte connecté.
- * Invité : retour à l’accueil (onglet Invité) pour rejoindre une autre partie.
+ * Invité / membre : runVoluntaryMemberLeave (contrat échec distant strict).
+ * Hôte : redirige vers confirmAndLeaveLobby → dissolve.
+ *
+ * Branche locale (pas de lobby.id Supabase) : démo / offline — cleanup immédiat
+ * sans DELETE distant (voir runVoluntaryMemberLeave).
  */
 export async function leaveLobby({ navigateAway = true } = {}) {
   if (isSupabaseConfigured() && getLobby()?.id && isLocalLobbyHost()) {
     return confirmAndLeaveLobby({ navigateAway });
   }
 
-  stopMultiplayerSync();
-  stopLobbyPresenceSync();
-
-  const lobby = getLobby();
-  const code = lobby?.code;
-  const wasGuest = isGuest();
-
-  if (isSupabaseConfigured() && lobby?.id) {
-    const res = await leaveLobbySupabase();
-    if (!res.ok) {
-      console.warn("REVEAL leaveLobbySupabase:", res.error);
+  return runVoluntaryMemberLeave(
+    { navigateAway },
+    {
+      getLobby,
+      isGuest,
+      isSupabaseConfigured,
+      leaveLobbySupabase,
+      stopMultiplayerSync,
+      stopLobbyPresenceSync,
+      signOutAnonGuestIfNeeded,
+      clearLocalOpenLobbySlot,
+      applyLeaveLobbyLocal,
     }
-    await signOutAnonGuestIfNeeded(wasGuest);
-  } else if (code) {
-    clearLocalOpenLobbySlot(code);
-  }
-
-  applyLeaveLobbyLocal({ wasGuest, navigateAway });
-  return { ok: true };
+  );
 }
 
 /**
@@ -1149,6 +1174,9 @@ export async function openPartySettings() {
     if (!choice?.ok) return { ok: false, cancelled: true };
     if (choice.action === "leave") {
       const res = await confirmAndLeaveLobby({ navigateAway: true });
+      if (!res.cancelled && !res.ok) {
+        await notifyVoluntaryLeaveFailure(res);
+      }
       return { ...res, action: "leave" };
     }
     return { ok: false, cancelled: true };

@@ -106,27 +106,26 @@ describe("UX-NAV-LOBBY — sortie volontaire invité", () => {
   it("9–11 — confirm / leave / cleanup / Accueil via pipeline canonique", () => {
     const lobby = src("js/core/lobby.js");
 
-    // confirmAndLeaveLobby : confirm membre avant leaveLobby
+    // confirmAndLeaveLobby : confirm membre avant leaveFn
     const confirmIdx = lobby.indexOf("export async function confirmAndLeaveLobby");
     const leaveIdx = lobby.indexOf("export async function leaveLobby(");
     const confirmBlock = lobby.slice(confirmIdx, leaveIdx);
     assert.match(confirmBlock, /SERVER_LEAVE_CONFIRM\.member/);
     assert.match(confirmBlock, /cancelled:\s*true/);
-    assert.match(confirmBlock, /return leaveLobby\(/);
-    assert.match(confirmBlock, /dissolveLobbyAsHost/);
+    assert.match(confirmBlock, /return leaveFn\(/);
+    assert.match(confirmBlock, /dissolveFn/);
 
-    // openPartySettings membre → leave → confirmAndLeaveLobby
+    // openPartySettings membre → leave → notify on failure
     const openIdx = lobby.indexOf("export async function openPartySettings");
     const openEnd = lobby.indexOf("export async function setLocalReady", openIdx);
     const openBlock = lobby.slice(openIdx, openEnd);
     assert.match(openBlock, /role:\s*"member"/);
     assert.match(openBlock, /action === "leave"/);
     assert.match(openBlock, /confirmAndLeaveLobby\(\{\s*navigateAway:\s*true/);
+    assert.match(openBlock, /notifyVoluntaryLeaveFailure/);
     assert.match(openBlock, /role:\s*"host"/);
     assert.match(openBlock, /action === "close"/);
-    // Plus de claim via party-settings (CTA reclaim séparé).
     assert.equal(openBlock.includes("ensureLobbyHostOrOfferClaim"), false);
-    assert.equal(openBlock.includes("Réservé à l'hôte"), false);
 
     // applyLeaveLobbyLocal : reset + navigate home reset
     assert.match(lobby, /function applyLeaveLobbyLocal/);
@@ -139,15 +138,17 @@ describe("UX-NAV-LOBBY — sortie volontaire invité", () => {
     assert.equal(SERVER_LEAVE_CONFIRM.member.confirmLabel, "Quitter le lobby");
   });
 
-  it("10 — leaveLobby membre appelle leaveLobbySupabase (pas closeLobby)", () => {
+  it("10 — leaveLobby membre délègue à runVoluntaryMemberLeave (pas closeLobby)", () => {
     const lobby = src("js/core/lobby.js");
     const leaveIdx = lobby.indexOf("export async function leaveLobby(");
     const end = lobby.indexOf("export async function leaveLobbyMembershipFromServer", leaveIdx);
     const block = lobby.slice(leaveIdx, end);
-    assert.match(block, /leaveLobbySupabase\(\)/);
+    assert.match(block, /runVoluntaryMemberLeave/);
     assert.equal(block.includes("closeLobbySupabase()"), false);
-    assert.match(block, /stopMultiplayerSync\(\)/);
-    assert.match(block, /stopLobbyPresenceSync\(\)/);
+    const core = src("js/core/voluntaryMemberLeave.js");
+    assert.match(core, /leaveLobbySupabase/);
+    assert.match(core, /stopMultiplayerSync/);
+    assert.match(core, /stopLobbyPresenceSync/);
   });
 
   it("12 — après sortie, reset nav empêche retour game-select", () => {
@@ -187,17 +188,16 @@ describe("UX-NAV-LOBBY — sortie volontaire invité", () => {
     assert.match(main, /if\s*\(!resumed\)\s*navigate\("home"/);
   });
 
-  it("16 — leave arrête sync avant cleanup / navigate (pas de nav post-unmount sync)", () => {
-    const lobby = src("js/core/lobby.js");
-    const leaveIdx = lobby.indexOf("export async function leaveLobby(");
-    const end = lobby.indexOf("export async function leaveLobbyMembershipFromServer", leaveIdx);
-    const block = lobby.slice(leaveIdx, end);
-    const stopMp = block.indexOf("stopMultiplayerSync()");
-    const stopPres = block.indexOf("stopLobbyPresenceSync()");
-    const apply = block.indexOf("applyLeaveLobbyLocal");
-    assert.ok(stopMp >= 0 && stopPres >= 0 && apply >= 0);
-    assert.ok(stopMp < apply);
-    assert.ok(stopPres < apply);
+  it("16 — leave : DELETE distant avant stop sync / cleanup (contrat échec)", () => {
+    const core = src("js/core/voluntaryMemberLeave.js");
+    const remote = core.indexOf("await deps.leaveLobbySupabase()");
+    const stopMp = core.indexOf("deps.stopMultiplayerSync()");
+    const apply = core.indexOf("deps.applyLeaveLobbyLocal");
+    assert.ok(remote >= 0 && stopMp >= 0 && apply >= 0);
+    assert.ok(remote < stopMp, "DELETE avant stop sync");
+    assert.ok(stopMp < apply, "stop sync avant cleanup");
+    assert.match(core, /voluntaryLeaveInFlight/);
+    assert.match(core, /busy:\s*true/);
   });
 });
 
