@@ -31,6 +31,10 @@ import { escapeHtml, pageShell } from "../core/ui.js";
 import { bindNav } from "../screens/nav.js";
 import { gameExitBarHtml, bindExitGame } from "../core/exitGame.js";
 import { voteConfirmChrome, pickForVoteConfirm } from "../core/voteConfirm.js";
+import {
+  maybeLogGuessLieOwnRoundVoteBug,
+  resetGuessLieIdentityDebugDedupe,
+} from "../core/guessLieIdentityDebug.js";
 
 function revealFeedbackTitle({ isSubject, myCorrect, liarBonus }) {
   if (isSubject) return liarBonus ? "Mensonge non trouvé 🥳" : "Mensonge trouvé 😭";
@@ -71,6 +75,7 @@ export function mountGuessLie(app) {
   let revealResult = null;
   let revealAdvancing = false;
   const localName = getLocalDisplayName();
+  resetGuessLieIdentityDebugDedupe();
 
   function currentRound() {
     return rounds[roundIdx] ?? rounds[0];
@@ -338,6 +343,16 @@ export function mountGuessLie(app) {
     }
 
     const isSubject = round.player === localName;
+
+    maybeLogGuessLieOwnRoundVoteBug({
+      round,
+      localNameClosure: localName,
+      isSubject,
+      roundIdx,
+      submissions: getGuessLieSession().submissions || {},
+      sessionId: getGuessLieSession().sessionId,
+    });
+
     let body = "";
 
     if (phase === "voting") {
