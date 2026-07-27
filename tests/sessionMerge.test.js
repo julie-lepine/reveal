@@ -897,6 +897,21 @@ describe("mergeGuessLieLobbyComplete", () => {
       false
     );
   });
+
+  it("revient à false sur restart légitime alors que local.lobbyComplete est encore true", () => {
+    const local = { lobbyComplete: true, phase: "idle", roundIdx: 2 };
+    const remote = {
+      lobbyComplete: false,
+      phase: null,
+      roundIdx: 0,
+      roundScored: false,
+      submissions: {},
+      votes: {},
+    };
+    const lobbyReset = shouldApplyGuessLieLobbyReset(local, remote);
+    assert.equal(lobbyReset, true);
+    assert.equal(mergeGuessLieLobbyComplete(local, remote, { lobbyReset }), false);
+  });
 });
 
 describe("shouldApplyGuessLieLobbyReset", () => {
@@ -910,6 +925,45 @@ describe("shouldApplyGuessLieLobbyReset", () => {
     const local = { lobbyComplete: false, phase: null };
     const remote = { lobbyComplete: false, phase: null, submissions: {} };
     assert.equal(shouldApplyGuessLieLobbyReset(local, remote), true);
+  });
+
+  it("applique le reset après fin de partie (local idle, lobbyComplete encore true)", () => {
+    const local = {
+      lobbyComplete: true,
+      phase: "idle",
+      roundIdx: 2,
+      roundScored: true,
+      submissions: { Alice: { statements: ["a", "b", "c"], lie: 0 } },
+      votes: { Bob: 1 },
+    };
+    const remote = {
+      lobbyComplete: false,
+      phase: null,
+      roundIdx: 0,
+      roundScored: false,
+      submissions: {},
+      votes: {},
+    };
+    assert.equal(shouldApplyGuessLieLobbyReset(local, remote), true);
+  });
+
+  it("ignore un reset prep pendant reveal inter-manche (roundScored true, pas idle)", () => {
+    const local = {
+      lobbyComplete: true,
+      phase: "reveal",
+      roundIdx: 1,
+      roundScored: true,
+      submissions: { Alice: { statements: ["a", "b", "c"], lie: 0 } },
+    };
+    const remote = {
+      lobbyComplete: false,
+      phase: null,
+      roundIdx: 0,
+      roundScored: false,
+      submissions: {},
+      votes: {},
+    };
+    assert.equal(shouldApplyGuessLieLobbyReset(local, remote), false);
   });
 });
 

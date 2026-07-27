@@ -1,5 +1,5 @@
 import { getActivePlayerNames, getActivePlayers } from "./players.js";
-import { isValidGuessLieSubmission } from "./sessionMerge.js";
+import { isGuessLiePlaySessionActive, isValidGuessLieSubmission } from "./sessionMerge.js";
 import {
   applyGuessLieLobbyCompleteLocal,
   getLocalDisplayName,
@@ -66,9 +66,7 @@ export function getGuessLieRounds() {
 
 /** Partie en cours (aligné sur resolveActivePlayScreen dans gameSync). */
 export function isGuessLieGameActive(session = getGuessLieSession()) {
-  if (session.lobbyComplete) return true;
-  const phase = session.phase;
-  return phase === "voting" || phase === "reveal";
+  return isGuessLiePlaySessionActive(session);
 }
 
 export function getGuessLieEntryScreen() {
