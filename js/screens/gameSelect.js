@@ -245,11 +245,11 @@ function gameSelectHeaderHtml() {
 }
 
 function partySettingsButtonHtml() {
-  // Admin : uniquement le vrai hôte (hostId). Pas de bouton trompeur pour les invités.
-  if (!isGameSyncActive() || !isLobbyHost()) return "";
+  // Accessible hôte + membre (sync MP) — actions différenciées dans openPartySettings.
+  if (!isGameSyncActive()) return "";
   return `
       <button type="button" class="game-select-party-settings" data-party-settings>
-        ⚙️ Paramètres de partie
+        ⚙️ Paramètres
       </button>`;
 }
 
@@ -276,7 +276,7 @@ export function mountGameSelect(app) {
   if (!requireLobbyPlay()) return null;
 
   app.innerHTML = pageShell({
-    backTarget: "home",
+    back: false,
     content: `<p class="hint">Chargement…</p>`,
   });
 
@@ -339,8 +339,10 @@ export function mountGameSelect(app) {
 
     if (e.target.closest("[data-party-settings]")) {
       void openPartySettings().then((res) => {
+        if (res.action === "close" || res.action === "leave") {
+          if (res.ok) return;
+        }
         if (getCurrentScreen() !== "game-select") return;
-        if (res.action === "close" && res.ok) return;
         if (res.ok || res.claimed) scheduleRender(true);
       });
       return;
@@ -413,7 +415,7 @@ export function mountGameSelect(app) {
       shouldShowGameSelectResumeBanner(resumeScreen) ? gameResumeBannerHtml(resumeScreen) : "";
 
     app.innerHTML = pageShell({
-      backTarget: "home",
+      back: false,
       content: `
       ${resumeBanner}
       ${gameSelectHeaderHtml()}

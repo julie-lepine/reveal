@@ -52,7 +52,10 @@ import {
   LOBBY_CREATE_ERROR,
   makeLobbyCreateError,
 } from "./lobbyCreateGuard.js";
-import { leaveLobbyMembershipFromServer as runServerOnlyLeave } from "./lobbyServerLeave.js";
+import {
+  leaveLobbyMembershipFromServer as runServerOnlyLeave,
+  SERVER_LEAVE_CONFIRM,
+} from "./lobbyServerLeave.js";
 import {
   showAppAlert,
   showAppConfirm,
@@ -918,7 +921,7 @@ export async function dissolveLobbyAsHost({ navigateAway = true } = {}) {
   return { ok: true };
 }
 
-/** Confirmation si hôte, sinon simple sortie du lobby. */
+/** Confirmation puis sortie : hôte → dissolve ; membre → leave (soi uniquement). */
 export async function confirmAndLeaveLobby({ navigateAway = true } = {}) {
   if (!hasActiveLobby()) return { ok: true };
 
@@ -936,6 +939,14 @@ export async function confirmAndLeaveLobby({ navigateAway = true } = {}) {
     return dissolveLobbyAsHost({ navigateAway });
   }
 
+  const cfg = SERVER_LEAVE_CONFIRM.member;
+  const ok = await showAppConfirm(cfg.message, {
+    title: cfg.title,
+    confirmLabel: cfg.confirmLabel,
+    cancelLabel: cfg.cancelLabel,
+    icon: cfg.icon,
+  });
+  if (!ok) return { ok: false, cancelled: true };
   return leaveLobby({ navigateAway });
 }
 
@@ -1122,35 +1133,33 @@ export async function kickLobbyMember(targetUserId, { confirmName = "" } = {}) {
 }
 
 /**
- * Menu hôte sur le hub jeux : transfert d'hôte, gestion des joueurs, fermer le lobby.
- * Garde ARCH-03b : jamais d'UI admin avant hôte réel ou claim réussi.
+ * Paramètres de partie (hub jeux + barre nav) — même flux pour hôte et membre.
+ * Hôte : transfert / joueurs / fermer le lobby.
+ * Membre : quitter le lobby (soi uniquement) — pas d’UI admin, pas de claim ici
+ * (claim = CTA « Reprendre l’animation » séparé, ARCH-03b).
  * @returns {Promise<{ ok: boolean, cancelled?: boolean, action?: string, claimed?: boolean, error?: string }>}
  */
 export async function openPartySettings() {
   if (!isSupabaseConfigured() || !getLobby()?.id) {
     return { ok: false, error: "Multijoueur en ligne requis." };
   }
-  let claimed = false;
+
   if (!isLocalLobbyHost()) {
-    // Await complet avant showPartySettingsDialog → aucun flash admin
-    const { ensureLobbyHostOrOfferClaim } = await import("./hostClaimOffer.js");
-    const access = await ensureLobbyHostOrOfferClaim({ reason: "party-settings" });
-    if (!access.ok) {
-      return {
-        ok: false,
-        cancelled: Boolean(access.cancelled),
-        claimed: false,
-        error: access.error || "Réservé à l'hôte.",
-      };
+    const choice = await showPartySettingsDialog({ role: "member" });
+    if (!choice?.ok) return { ok: false, cancelled: true };
+    if (choice.action === "leave") {
+      const res = await confirmAndLeaveLobby({ navigateAway: true });
+      return { ...res, action: "leave" };
     }
-    claimed = Boolean(access.claimed);
+    return { ok: false, cancelled: true };
   }
 
   const others = getLobbyParticipants().filter((p) => !p.isLocal && p.userId);
   const choice = await showPartySettingsDialog({
+    role: "host",
     canTransferHost: others.length > 0,
   });
-  if (!choice?.ok) return { ok: false, cancelled: true, claimed };
+  if (!choice?.ok) return { ok: false, cancelled: true };
 
   if (choice.action === "transfer") {
     return transferLobbyHost();
@@ -1163,15 +1172,15 @@ export async function openPartySettings() {
       canKick: canManageLobbyRoster(),
       onKick: (userId, name) => kickLobbyMember(userId, { confirmName: name }),
     });
-    return { ok: true, action: "players", claimed };
+    return { ok: true, action: "players" };
   }
 
   if (choice.action === "close") {
     const res = await confirmAndLeaveLobby({ navigateAway: true });
-    return { ...res, action: "close", claimed };
+    return { ...res, action: "close" };
   }
 
-  return { ok: false, cancelled: true, claimed };
+  return { ok: false, cancelled: true };
 }
 
 export async function setLocalReady(ready) {

@@ -17,15 +17,18 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 
 | | Contenu |
 |--|---------|
-| **Fait** | **Guess Lie** ✅ · **Sondages** ✅ · **ARCH-06** ✅ · **Membership A–D** ✅ · **M-14a / SYN-14** ✅ · **ARCH-22** ✅ · **Loader UI join** ✅ |
-| **Prochain** | **Pré-résolution `get*EntryScreen`** Vague A code — QA · Vague B ensuite |
+| **Fait (file prioritaire)** | Guess Lie · Sondages · ARCH-06 · Membership A–D · M-14a · ARCH-22 · Loader UI join · Pré-résolution entry screens — tous ✅ |
+| **Prochain** | **UX-NAV-LOBBY** — Home hors menu principal une fois en lobby |
 | **Ensuite** | Membership Vague E · ARCH-07/08 · L-04 |
 
-**Résidus (hors file prioritaire)**  
-votes optimistic (speedVote / …) · `results.js` mount refresh · échec remote rename (doc QA I-09) · membership Vague E · interstitiel join (Vague B) si régression perception
+**Décision produit (nouvelle)**  
+Une fois le lobby rejoint : **Accueil / Home n’est plus accessible depuis le menu principal**. Le lobby est le contexte de navigation jusqu’à Quitter (membre) ou Fermer (hôte).
+
+**Résidus**  
+votes optimistic (speedVote / …) · `results.js` mount · rename remote (I-09) · membership Vague E · Loader join interstitiel (non retenu) · pré-résolution B1 launch getter (non retenue)
 
 **Surveiller**  
-Clutch taps figés sous latence (SYN-26) · ready prep après Recommencer · starts sync hydrate → hub hors `mountLobby` (hors périmètre lifecycle IIFE)
+Clutch taps sous latence (SYN-26) · ready prep après Recommencer · starts sync hydrate → hub hors `mountLobby`
 
 ---
 
@@ -35,7 +38,7 @@ Clutch taps figés sous latence (SYN-26) · ready prep après Recommencer · sta
 
 | # | ID | Cause | Problème | Statut |
 |---|----|-------|----------|--------|
-| 1 | **Pré-résolution entry screens** | 5 | `get*EntryScreen` (filet M-08) | Vague A ✅ — B ouverte |
+| 1 | **UX-NAV-LOBBY** | 5/11 | Home inaccessible depuis le menu une fois en lobby | Ouvert — décision produit ; analyse avant GO |
 
 ### Autres ouverts
 
@@ -60,17 +63,27 @@ Clutch taps figés sous latence (SYN-26) · ready prep après Recommencer · sta
 | 2 | Race auth / profil | ✅ QA | — |
 | 3 | Sources de vérité multiples | ✅ hors TierNight M-14a | UX-CLUTCH-01 ✅ · **Membership A–D** ✅ · **M-14a** ✅ |
 | 4 | Asymétrie hôte / invité | ✅ QA | Guess Lie ✅ |
-| 5 | Routing + timing sync | ✅ | ARCH-05 mitigé |
-| 6 | Async écrans | ✅ QA | **ARCH-06** ✅ (Mode A/B/C · Traître V2 · Lobby IIFE · SYN-12) |
+| 5 | Routing + timing sync | ✅ | ARCH-05 mitigé · pré-résolution entry ✅ · **UX-NAV-LOBBY** |
+| 6 | Async écrans | ✅ QA | **ARCH-06** ✅ |
 | 7 | Sync silencieuse / fire-and-forget | Partiel | ARCH-07/08, M-14b |
 | 8 | Reset / migration incomplète | Partiel | I-09 ✅ ; SYN-15/16 ✅ ; ARCH-10 |
 | 9 | Sync monolithe / duplication | Dette | ARCH-11… |
 | 10 | Code mort | Dette | dead exports (hors Fil Rouge app) |
-| 11 | Friction UX | Partiel | **ARCH-22** ✅ · **Loader UI join** ✅ · L-04 |
+| 11 | Friction UX | Partiel | ARCH-22 ✅ · Loader UI join ✅ · L-04 · **UX-NAV-LOBBY** |
 
 ---
 
 ## Détail des tickets ouverts
+
+### Cause 5 / 11 — UX-NAV-LOBBY (Home hors menu une fois en lobby)
+
+| | |
+|--|--|
+| **Décision produit** | Après rejoindre un lobby, **Home n’est plus accessible depuis le menu principal**. Le **lobby** devient le hub de navigation jusqu’à sortie membership (Quitter / Fermer hôte). |
+| **Intention UX** | Fin du dual hub Accueil ↔ Lobby pendant une soirée active ; moins de confusion resume/create depuis Home alors qu’un lobby est déjà ouvert. |
+| **Conséquences probables (analyse à faire)** | Bottom nav / onglet Accueil · `navigate("home")` depuis jeux/settings · chrome Home membership (Resume / Créer) · boot `resumeEveningSession` · stacks `navStack` contenant `home` · leave → retour Home autorisé |
+| **Hors scope provisoire** | Changer les contrats Quitter/Retour jeu (SYN-13b) · membership A–D · M-08 · Realtime |
+| **Statut** | Ouvert — **décision produit actée** ; pas de GO code ; analyse navigation/layout avant implémentation |
 
 ### Cause 11 — ARCH-22 feedback sync lente (soft pending) ✅
 
@@ -97,18 +110,18 @@ Clutch taps figés sous latence (SYN-26) · ready prep après Recommencer · sta
 | **QA** | ✅ clos 2026-07-27 — Vague A suffisante ; Vague B (interstitiel) non ouverte |
 | **Ne pas rouvrir** | Sans régression perception (freeze join malgré soft label) |
 
-### Cause 5 — Pré-résolution `get*EntryScreen`
+### Cause 5 — Pré-résolution `get*EntryScreen` ✅
 
 | | |
 |--|--|
-| **Problème** | Mount play / prep asymétrique → nested redirect M-08 ; micro-saut / double mount |
-| **Intention** | Pré-résoudre avant mount inutile — **filet M-08 conservé** |
-| **Vague A** | ✅ Gardes entry au mount prep : Hot Take · SpeedVote · Clutch · WA · **VibeCheck** (`playlistGuessPrep` / `playlistguess-prep`) · Dilemma · TruthMeter — alignement Trivia/Consensus/Traître ; **pas** la finalisation du ticket |
-| **Vague B** | Pré-résolution aux call sites chauds (`navigate` play/prep) — pas dans `navigate()` |
-| **Vague C/D** | Guess Lie flash wait (opt.) · stacks/goBack (plus tard) |
-| **Hors scope** | Router core · M-08 · Guess Lie · membership · ARCH-05 · redirects play in-mount |
-| **Preuve A** | `tests/prepEntryGuardVagueA.test.js` · `routerNestedRedirect` verts |
-| **Statut** | Vague A code ✅ — QA terrain ; ticket ouvert (B reste) |
+| **Douleur initiale** | Mount d’un prep alors que la session est déjà lancée (ou inverse côté play) → nested redirect M-08 ; prep obsolète pouvait peindre / installer listeners avant redirect ; asymétrie entre preps (Trivia/Consensus/Traître avaient la garde, d’autres non) |
+| **Correctif livré (Vague A)** | Garde `get*EntryScreen` au mount **avant** paint / controllers / listeners : si entry ≠ prep → `navigate(entry); return null` |
+| **Sept preps couverts** | Hot Take · SpeedVote · Clutch · Wrong Answer · **VibeCheck** (`playlistGuessPrep` / `playlistguess-prep`) · Dilemma · TruthMeter — alignés sur Trivia / Consensus / Traître |
+| **Preuve** | `tests/prepEntryGuardVagueA.test.js` · `tests/routerNestedRedirect.test.js` (M-08) · suite **1001/1001** à livraison |
+| **Filets conservés** | Gardes prep Vague A · redirects play in-mount · `prepGuestFollowOnSession` (déjà getters) · **M-08** inchangé |
+| **Vague B (étudiée, non retenue)** | Pré-résolution aux call sites (`gameScreen` play du launch hôte → getter post-`lobbyStarted`). **ROI insuffisant** : pas de mauvaise destination observée ; `gameScreen` fixe reste une intention métier valide après lancement réussi ; B1 imposerait une contrainte d’ordre (getter jamais avant mark). **B2** (Trivia/Consensus open/replay, resume, sync, stacks) : **non lancée** — rouvrir seulement sur bug terrain reproductible |
+| **QA / clôture** | ✅ clos 2026-07-27 — Vague A suffit ; B1 documentée comme homogénéisation non prioritaire |
+| **Ne pas rouvrir** | Sans régression (prep peint alors que jeu déjà lancé / listeners installés avant redirect) |
 
 ### Cause 3 / 11 — Membership lobby orpheline (Créer bloqué) ✅ QA
 
@@ -327,6 +340,13 @@ Ne pas rouvrir sans **régression démontrée**.
 - **Retour** = sortie temporaire (reste membre, suit la progression)
 - **Quitter → Menu des jeux** = sortie définitive du jeu courant (suit les jeux suivants)
 
+### Contrat produit (UX-NAV-LOBBY) — 2026-07-27
+
+- **Sans lobby actif** : Accueil / Home reste l’entrée (créer / rejoindre / auth).
+- **Avec lobby actif** (membre ou hôte) : Home **n’est plus** une destination du menu principal ; le **lobby** est le contexte de navigation.
+- **Fin de membership** (Quitter membre / Fermer hôte) : retour possible vers Home.
+- **Ne pas confondre** avec SYN-13b (sortie temporaire d’un *jeu* vs sortie du *lobby*).
+
 ### Chaînes utiles
 
 ```
@@ -367,7 +387,7 @@ Clutch conserve son départage temporel (règle produit explicite inchangée).
 | 2 | M-01, P-03, M-02a, S-02 |
 | 3 | I-03/04, SYN-03, M-13, M-02b, ARCH-02, SYN-29, I-PG-01, ready stale Recommencer, UX-CLUTCH-01 · **M-15** · **L-05↻** · **Membership A–D** · **M-14a / SYN-14** |
 | 4 | I-01/02/08, M-03b, M-06a/b, L-01, ARCH-03/03b, UX-VIBE-01, **Guess Lie** |
-| 5 | T-01/02, T-03↻, M-07, M-08, P-02, SYN-28, I-PG-01, ARCH-04, UX-VIBE-02 |
+| 5 | T-01/02, T-03↻, M-07, M-08, P-02, SYN-28, I-PG-01, ARCH-04, UX-VIBE-02 · **Pré-résolution `get*EntryScreen`** (Vague A ; B1 non retenue) |
 | 6 | I-05, SYN-13b↻, SYN-25, **SYN-05 / ARCH-18** ✅, **ARCH-06** ✅ (Mode A/B/C · Traître V2 · Lobby IIFE · SYN-12) |
 | 7 | I-07, M-09, L-09, M-11, M-10, T-05, SYN-26, M-04b / SYN-18 |
 | 8 | I-06, P-02, ARCH-09, I-09 / SYN-06, SYN-15 / SYN-16 · **M-15** |
@@ -390,8 +410,9 @@ Hors tickets prioritaires — à traiter si opportunité / régression :
 - Optimistic votes hors Hot Take / VibeCheck / Dilemma (speedVote / … — même trou que T-05)
 - Starts sync hydrate → hub hors `mountLobby` (résidu SYN-12, hors idempotence globale)
 - Membership Vague E : contradiction cache+`none` · logout/snapshot · multi-onglets INSERT · flash UI post-leave
+- Homogénéisation launch hôte via getter post-mark (pré-résolution B1) — **étudiée, non retenue** (ROI insuffisant)
 - Fil Rouge : résidus SQL historiques (`fil-rouge-private.sql`, clés RPC) — ops Supabase séparée, non faite
 
 ---
 
-*Suivi vivant · Dernière MAJ : 2026-07-27 — Pré-résolution Vague A (gardes prep) code ✅*
+*Suivi vivant · Dernière MAJ : 2026-07-27 — UX-NAV-LOBBY (décision produit) · file prioritaire = Home hors menu en lobby*

@@ -3951,6 +3951,11 @@ button.emoji-picker-preview__avatar:active{
   font-weight:600;
   letter-spacing:.03em;
   line-height:1.1;
+  text-align:center;
+  max-width:100%;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
 }
 
 /* Bouton central REVEAL - centré verticalement dans la barre */

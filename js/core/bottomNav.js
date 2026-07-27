@@ -1,7 +1,10 @@
 import { APP_LOGO } from "../../data/branding.js";
-import { hasActiveLobby, returnToEveningGames } from "./lobby.js";
+import { hasActiveLobby, openPartySettings, returnToEveningGames } from "./lobby.js";
+import {
+  BOTTOM_NAV_TAB,
+  resolveBottomNavTabs,
+} from "./bottomNavItems.js";
 import { onScreenChange, getCurrentScreen } from "./router.js";
-import { goToEveningHome } from "../screens/nav.js";
 import { goToScores, isScoresNavLocked } from "./navAccess.js";
 import {
   isGameSyncActive,
@@ -11,19 +14,21 @@ import {
 } from "./gameSync.js";
 import { exitGameToGameSelect } from "./exitGame.js";
 
-const TAB_HOME = "home";
-const TAB_GAMES = "games";
-const TAB_LOGO = "logo";
-const TAB_RESULTS = "results";
-const TAB_FINAL = "final";
+const TAB_HOME = BOTTOM_NAV_TAB.HOME;
+const TAB_SETTINGS = BOTTOM_NAV_TAB.SETTINGS;
+const TAB_GAMES = BOTTOM_NAV_TAB.GAMES;
+const TAB_LOGO = BOTTOM_NAV_TAB.LOGO;
+const TAB_RESULTS = BOTTOM_NAV_TAB.RESULTS;
+const TAB_FINAL = BOTTOM_NAV_TAB.FINAL;
 
-/** Écran courant → onglet actif */
+/** Écran courant → onglet actif (Paramètres = action dialog, jamais destination). */
 const SCREEN_TO_TAB = {
   home: TAB_HOME,
   lobby: TAB_LOGO,
   "game-select": TAB_GAMES,
   leaderboard: TAB_FINAL,
   results: TAB_RESULTS,
+  settings: TAB_GAMES,
   "hottake-prep": TAB_GAMES,
   hottake: TAB_GAMES,
   "speedvote-prep": TAB_GAMES,
@@ -53,12 +58,7 @@ const SCREEN_TO_TAB = {
   tiernight: TAB_GAMES,
   "tiernight-live": TAB_GAMES,
   "tiernight-end": TAB_RESULTS,
-  settings: TAB_HOME,
 };
-
-function goHome() {
-  goToEveningHome();
-}
 
 async function goGames() {
   const screen = getCurrentScreen();
@@ -82,12 +82,82 @@ function goFinal() {
   goToScores("leaderboard");
 }
 
+/** Même flux que game-select → Paramètres (dialog hôte/membre). */
+async function goSettings() {
+  if (!hasActiveLobby()) return;
+  await openPartySettings();
+}
+
 const TAB_ACTIONS = {
-  [TAB_HOME]: goHome,
   [TAB_GAMES]: goGames,
   [TAB_RESULTS]: goResults,
   [TAB_FINAL]: goFinal,
+  [TAB_SETTINGS]: goSettings,
 };
+
+function tabButtonHtml(tabId) {
+  if (tabId === TAB_SETTINGS) {
+    return `
+    <button type="button" class="bottom-nav__item" data-tab="${TAB_SETTINGS}" data-tab-nav="${TAB_SETTINGS}" aria-label="Paramètres">
+      <span class="bottom-nav__icon-wrap"><span class="bottom-nav__icon" aria-hidden="true">⚙️</span></span>
+      <span class="bottom-nav__label">Paramètres</span>
+    </button>`;
+  }
+  if (tabId === TAB_HOME) {
+    return `
+    <button type="button" class="bottom-nav__item" data-tab="${TAB_HOME}" data-tab-nav="${TAB_HOME}" aria-label="Accueil">
+      <span class="bottom-nav__icon-wrap"><span class="bottom-nav__icon" aria-hidden="true">🏠</span></span>
+      <span class="bottom-nav__label">Accueil</span>
+    </button>`;
+  }
+  if (tabId === TAB_GAMES) {
+    return `
+    <button type="button" class="bottom-nav__item" data-tab="${TAB_GAMES}" data-tab-nav="${TAB_GAMES}" aria-label="Jeux">
+      <span class="bottom-nav__icon-wrap"><span class="bottom-nav__icon" aria-hidden="true">🎮</span></span>
+      <span class="bottom-nav__label">Jeux</span>
+    </button>`;
+  }
+  if (tabId === TAB_LOGO) {
+    return `
+    <div class="bottom-nav__item bottom-nav__item--logo" data-tab="${TAB_LOGO}" aria-hidden="true">
+      <span class="bottom-nav__logo-wrap">
+        <img src="${APP_LOGO}" alt="REVEAL" class="bottom-nav__logo" />
+      </span>
+    </div>`;
+  }
+  if (tabId === TAB_RESULTS) {
+    return `
+    <button type="button" class="bottom-nav__item" data-tab="${TAB_RESULTS}" data-tab-nav="${TAB_RESULTS}" aria-label="Résultats">
+      <span class="bottom-nav__icon-wrap"><span class="bottom-nav__icon" aria-hidden="true">📊</span></span>
+      <span class="bottom-nav__label">Résultats</span>
+    </button>`;
+  }
+  if (tabId === TAB_FINAL) {
+    return `
+    <button type="button" class="bottom-nav__item" data-tab="${TAB_FINAL}" data-tab-nav="${TAB_FINAL}" aria-label="Classement">
+      <span class="bottom-nav__icon-wrap"><span class="bottom-nav__icon" aria-hidden="true">🏆</span></span>
+      <span class="bottom-nav__label">Classement</span>
+    </button>`;
+  }
+  return "";
+}
+
+function bindNavClicks(nav) {
+  nav.querySelectorAll("[data-tab-nav]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      if (btn.classList.contains("bottom-nav__item--disabled")) return;
+      const tab = btn.getAttribute("data-tab-nav");
+      void TAB_ACTIONS[tab]?.();
+    });
+  });
+}
+
+function renderNavItems(nav) {
+  const inLobby = hasActiveLobby();
+  const tabs = resolveBottomNavTabs(inLobby);
+  nav.innerHTML = tabs.map((id) => tabButtonHtml(id)).join("");
+  bindNavClicks(nav);
+}
 
 function setActiveTab(tabId) {
   const nav = document.getElementById("bottom-nav");
@@ -125,10 +195,20 @@ function updateNavVisibility(screenId) {
   const nav = document.getElementById("bottom-nav");
   if (!nav) return;
 
-  const show = hasActiveLobby() && !SCREENS_WITHOUT_NAV.has(screenId);
+  const inLobby = hasActiveLobby();
+  const show = inLobby && !SCREENS_WITHOUT_NAV.has(screenId);
   nav.classList.toggle("bottom-nav--hidden", !show);
   nav.hidden = !show;
   document.body.classList.toggle("has-bottom-nav", show);
+
+  // Catalogue selon membership réelle (Accueil hors lobby / Paramètres en lobby).
+  const want = resolveBottomNavTabs(inLobby).join("|");
+  const have = [...nav.querySelectorAll("[data-tab]")]
+    .map((el) => el.getAttribute("data-tab"))
+    .join("|");
+  if (want !== have) {
+    renderNavItems(nav);
+  }
 }
 
 function handleScreenChange(screenId) {
@@ -143,39 +223,10 @@ export function initBottomNav() {
 
   nav.classList.add("bottom-nav--hidden");
   nav.hidden = true;
-
-  nav.innerHTML = `
-    <button type="button" class="bottom-nav__item" data-tab="${TAB_HOME}" data-tab-nav="${TAB_HOME}" aria-label="Accueil">
-      <span class="bottom-nav__icon-wrap"><span class="bottom-nav__icon" aria-hidden="true">🏠</span></span>
-      <span class="bottom-nav__label">Accueil</span>
-    </button>
-    <button type="button" class="bottom-nav__item" data-tab="${TAB_GAMES}" data-tab-nav="${TAB_GAMES}" aria-label="Jeux">
-      <span class="bottom-nav__icon-wrap"><span class="bottom-nav__icon" aria-hidden="true">🎮</span></span>
-      <span class="bottom-nav__label">Jeux</span>
-    </button>
-    <div class="bottom-nav__item bottom-nav__item--logo" data-tab="${TAB_LOGO}" aria-hidden="true">
-      <span class="bottom-nav__logo-wrap">
-        <img src="${APP_LOGO}" alt="REVEAL" class="bottom-nav__logo" />
-      </span>
-    </div>
-    <button type="button" class="bottom-nav__item" data-tab="${TAB_RESULTS}" data-tab-nav="${TAB_RESULTS}" aria-label="Résultats">
-      <span class="bottom-nav__icon-wrap"><span class="bottom-nav__icon" aria-hidden="true">📊</span></span>
-      <span class="bottom-nav__label">Résultats</span>
-    </button>
-    <button type="button" class="bottom-nav__item" data-tab="${TAB_FINAL}" data-tab-nav="${TAB_FINAL}" aria-label="Classement">
-      <span class="bottom-nav__icon-wrap"><span class="bottom-nav__icon" aria-hidden="true">🏆</span></span>
-      <span class="bottom-nav__label">Classement</span>
-    </button>
-  `;
-
-  nav.querySelectorAll("[data-tab-nav]").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      if (btn.classList.contains("bottom-nav__item--disabled")) return;
-      const tab = btn.getAttribute("data-tab-nav");
-      TAB_ACTIONS[tab]?.();
-    });
-  });
+  renderNavItems(nav);
 
   onScreenChange(handleScreenChange);
   handleScreenChange(getCurrentScreen());
 }
+
+export { resolveBottomNavTabs, isBottomNavTabVisible } from "./bottomNavItems.js";

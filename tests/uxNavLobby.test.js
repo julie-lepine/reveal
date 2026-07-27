@@ -1,0 +1,231 @@
+/**
+ * UX-NAV-LOBBY — Accueil hors menu en lobby, Paramètres unifiés, sortie invité.
+ */
+import { describe, it } from "node:test";
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+import {
+  BOTTOM_NAV_TAB,
+  isBottomNavTabVisible,
+  resolveBottomNavTabs,
+} from "../js/core/bottomNavItems.js";
+import { partySettingsActionsForRole } from "../js/core/partySettingsMenu.js";
+import { SERVER_LEAVE_CONFIRM } from "../js/core/lobbyServerLeave.js";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const ROOT = join(__dirname, "..");
+
+function src(rel) {
+  return readFileSync(join(ROOT, rel), "utf8");
+}
+
+describe("UX-NAV-LOBBY — catalogue menu", () => {
+  it("1 — hors lobby, Accueil est visible dans le menu", () => {
+    const tabs = resolveBottomNavTabs(false);
+    assert.ok(tabs.includes(BOTTOM_NAV_TAB.HOME));
+    assert.equal(isBottomNavTabVisible(false, BOTTOM_NAV_TAB.HOME), true);
+    assert.equal(isBottomNavTabVisible(false, BOTTOM_NAV_TAB.SETTINGS), false);
+  });
+
+  it("2 — en lobby, Accueil est absent du menu", () => {
+    const tabs = resolveBottomNavTabs(true);
+    assert.equal(tabs.includes(BOTTOM_NAV_TAB.HOME), false);
+    assert.equal(isBottomNavTabVisible(true, BOTTOM_NAV_TAB.HOME), false);
+  });
+
+  it("3 — en lobby, Paramètres est visible", () => {
+    const tabs = resolveBottomNavTabs(true);
+    assert.ok(tabs.includes(BOTTOM_NAV_TAB.SETTINGS));
+    assert.equal(isBottomNavTabVisible(true, BOTTOM_NAV_TAB.SETTINGS), true);
+  });
+
+  it("15 — barre : 5 slots stables (pas de 6e entrée Home+Settings)", () => {
+    assert.equal(resolveBottomNavTabs(false).length, 5);
+    assert.equal(resolveBottomNavTabs(true).length, 5);
+    const css = src("style.css");
+    const block = css.slice(
+      css.indexOf(".bottom-nav{"),
+      css.indexOf(".bottom-nav.bottom-nav--hidden")
+    );
+    assert.match(block, /grid-template-columns:\s*1fr 1fr auto 1fr 1fr/);
+    assert.match(block, /safe-area-inset-bottom/);
+  });
+});
+
+describe("UX-NAV-LOBBY — Paramètres unifiés", () => {
+  it("4 — entrée Paramètres (nav + game-select) appelle openPartySettings", () => {
+    const nav = src("js/core/bottomNav.js");
+    assert.match(nav, /openPartySettings/);
+    assert.match(nav, /TAB_SETTINGS[\s\S]*goSettings|goSettings[\s\S]*openPartySettings/);
+    assert.match(nav, /async function goSettings/);
+    assert.match(nav, /await openPartySettings\(\)/);
+
+    const gs = src("js/screens/gameSelect.js");
+    assert.match(gs, /data-party-settings/);
+    assert.match(gs, /openPartySettings\(\)/);
+    // Visible sync MP pour hôte ET membre (plus de filtre isLobbyHost).
+    const btnFn = gs.slice(
+      gs.indexOf("function partySettingsButtonHtml"),
+      gs.indexOf("function reclaimHostCtaHtml")
+    );
+    assert.match(btnFn, /isGameSyncActive\(\)/);
+    assert.equal(btnFn.includes("isLobbyHost()"), false);
+  });
+
+  it("5 — invité voit Quitter le lobby (pas Fermer)", () => {
+    const actions = partySettingsActionsForRole("member");
+    assert.deepEqual([...actions], ["leave"]);
+    assert.equal(actions.includes("close"), false);
+    const dialog = src("js/core/dialog.js");
+    assert.match(dialog, /Quitter le lobby/);
+    assert.match(dialog, /role !== "host"/);
+  });
+
+  it("6 — invité ne voit pas Fermer le lobby", () => {
+    assert.equal(partySettingsActionsForRole("member").includes("close"), false);
+    assert.equal(partySettingsActionsForRole("member").includes("transfer"), false);
+    assert.equal(partySettingsActionsForRole("member").includes("players"), false);
+  });
+
+  it("7 — hôte conserve fermeture / transfert / joueurs", () => {
+    assert.deepEqual([...partySettingsActionsForRole("host")], [
+      "transfer",
+      "players",
+      "close",
+    ]);
+  });
+
+  it("8 — hôte ne voit pas l’action leave réservée aux membres", () => {
+    assert.equal(partySettingsActionsForRole("host").includes("leave"), false);
+  });
+});
+
+describe("UX-NAV-LOBBY — sortie volontaire invité", () => {
+  it("9–11 — confirm / leave / cleanup / Accueil via pipeline canonique", () => {
+    const lobby = src("js/core/lobby.js");
+
+    // confirmAndLeaveLobby : confirm membre avant leaveLobby
+    const confirmIdx = lobby.indexOf("export async function confirmAndLeaveLobby");
+    const leaveIdx = lobby.indexOf("export async function leaveLobby(");
+    const confirmBlock = lobby.slice(confirmIdx, leaveIdx);
+    assert.match(confirmBlock, /SERVER_LEAVE_CONFIRM\.member/);
+    assert.match(confirmBlock, /cancelled:\s*true/);
+    assert.match(confirmBlock, /return leaveLobby\(/);
+    assert.match(confirmBlock, /dissolveLobbyAsHost/);
+
+    // openPartySettings membre → leave → confirmAndLeaveLobby
+    const openIdx = lobby.indexOf("export async function openPartySettings");
+    const openEnd = lobby.indexOf("export async function setLocalReady", openIdx);
+    const openBlock = lobby.slice(openIdx, openEnd);
+    assert.match(openBlock, /role:\s*"member"/);
+    assert.match(openBlock, /action === "leave"/);
+    assert.match(openBlock, /confirmAndLeaveLobby\(\{\s*navigateAway:\s*true/);
+    assert.match(openBlock, /role:\s*"host"/);
+    assert.match(openBlock, /action === "close"/);
+    // Plus de claim via party-settings (CTA reclaim séparé).
+    assert.equal(openBlock.includes("ensureLobbyHostOrOfferClaim"), false);
+    assert.equal(openBlock.includes("Réservé à l'hôte"), false);
+
+    // applyLeaveLobbyLocal : reset + navigate home reset
+    assert.match(lobby, /function applyLeaveLobbyLocal/);
+    assert.match(lobby, /inLobby:\s*false,\s*lobby:\s*null,\s*lobbyCode:\s*null/);
+    assert.match(lobby, /resetEveningState\(\)/);
+    assert.match(lobby, /clearCachedGameSession\(\)/);
+    assert.match(lobby, /clearGuestMembership\(\)/);
+    assert.match(lobby, /navigate\("home",\s*\{\s*reset:\s*true\s*\}\)/);
+
+    assert.equal(SERVER_LEAVE_CONFIRM.member.confirmLabel, "Quitter le lobby");
+  });
+
+  it("10 — leaveLobby membre appelle leaveLobbySupabase (pas closeLobby)", () => {
+    const lobby = src("js/core/lobby.js");
+    const leaveIdx = lobby.indexOf("export async function leaveLobby(");
+    const end = lobby.indexOf("export async function leaveLobbyMembershipFromServer", leaveIdx);
+    const block = lobby.slice(leaveIdx, end);
+    assert.match(block, /leaveLobbySupabase\(\)/);
+    assert.equal(block.includes("closeLobbySupabase()"), false);
+    assert.match(block, /stopMultiplayerSync\(\)/);
+    assert.match(block, /stopLobbyPresenceSync\(\)/);
+  });
+
+  it("12 — après sortie, reset nav empêche retour game-select", () => {
+    const lobby = src("js/core/lobby.js");
+    assert.match(lobby, /navigate\("home",\s*\{\s*reset:\s*true\s*\}\)/);
+    const router = src("js/core/router.js");
+    assert.match(router, /reset/);
+    // game-select n’expose plus de back vers home
+    const gs = src("js/screens/gameSelect.js");
+    assert.match(gs, /back:\s*false/);
+    assert.equal(/backTarget:\s*"home"/.test(gs), false);
+  });
+
+  it("13 — F5 en lobby : resume + catalogue sans Accueil", () => {
+    const main = src("js/main.js");
+    assert.match(main, /resumeEveningSession/);
+    assert.match(main, /hasActiveLobby/);
+    assert.deepEqual([...resolveBottomNavTabs(true)], [
+      "settings",
+      "games",
+      "logo",
+      "results",
+      "final",
+    ]);
+  });
+
+  it("14 — F5 après sortie : hors lobby → Accueil au catalogue, pas Paramètres", () => {
+    assert.deepEqual([...resolveBottomNavTabs(false)], [
+      "home",
+      "games",
+      "logo",
+      "results",
+      "final",
+    ]);
+    const main = src("js/main.js");
+    // Sans lobby actif, boot tombe sur Accueil (pas resume hub).
+    assert.match(main, /if\s*\(!resumed\)\s*navigate\("home"/);
+  });
+
+  it("16 — leave arrête sync avant cleanup / navigate (pas de nav post-unmount sync)", () => {
+    const lobby = src("js/core/lobby.js");
+    const leaveIdx = lobby.indexOf("export async function leaveLobby(");
+    const end = lobby.indexOf("export async function leaveLobbyMembershipFromServer", leaveIdx);
+    const block = lobby.slice(leaveIdx, end);
+    const stopMp = block.indexOf("stopMultiplayerSync()");
+    const stopPres = block.indexOf("stopLobbyPresenceSync()");
+    const apply = block.indexOf("applyLeaveLobbyLocal");
+    assert.ok(stopMp >= 0 && stopPres >= 0 && apply >= 0);
+    assert.ok(stopMp < apply);
+    assert.ok(stopPres < apply);
+  });
+});
+
+describe("UX-NAV-LOBBY — Accueil inaccessible en lobby (nav)", () => {
+  it("goToEveningHome en lobby redirige vers hub jeux (pas Accueil)", () => {
+    const nav = src("js/screens/nav.js");
+    const fn = nav.slice(
+      nav.indexOf("export async function goToEveningHome"),
+      nav.indexOf("export function goToEveningSettings")
+    );
+    assert.match(fn, /returnToEveningGames\(\{\s*hubOnly:\s*true\s*\}\)/);
+    assert.match(fn, /if\s*\(!hasActiveLobby\(\)\)/);
+    // Accueil uniquement hors lobby — pas de navigate home après le early-return.
+    const afterGuard = fn.slice(fn.indexOf("return;") + "return;".length);
+    assert.equal(afterGuard.includes('navigate("home"'), false);
+  });
+
+  it("settings en lobby : stack game-select (pas home)", () => {
+    const nav = src("js/screens/nav.js");
+    assert.match(
+      nav,
+      /navigate\("settings",\s*\{\s*navStack:\s*\["game-select",\s*"settings"\]\s*\}\)/
+    );
+  });
+
+  it("bottomNav n’appelle plus goToEveningHome", () => {
+    const bottom = src("js/core/bottomNav.js");
+    assert.equal(bottom.includes("goToEveningHome"), false);
+    assert.equal(bottom.includes("TAB_HOME"), true); // encore pour hors-lobby render
+  });
+});

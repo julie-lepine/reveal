@@ -9,6 +9,9 @@ import {
 } from "./turnstile.js";
 import { PROFILE_EMOJI_CHOICES } from "../../data/profileEmojis.js";
 import { getState } from "./state.js";
+import { partySettingsActionsForRole } from "./partySettingsMenu.js";
+
+export { partySettingsActionsForRole } from "./partySettingsMenu.js";
 
 let openDialog = null;
 
@@ -412,11 +415,41 @@ export function showTransferHostDialog(
   });
 }
 
+/** Actions du menu Paramètres de partie selon le rôle (hôte vs membre). */
+function partySettingsMenuHtml({ role = "host", canTransferHost = true } = {}) {
+  if (role !== "host") {
+    return `
+          <button type="button" class="btn btn-secondary app-dialog__menu-btn app-dialog__menu-btn--danger" data-party-action="leave">
+            🚪 Quitter le lobby
+          </button>`;
+  }
+
+  const transferBtn = canTransferHost
+    ? `<button type="button" class="btn btn-secondary app-dialog__menu-btn" data-party-action="transfer">
+          👑 Transférer l'hôte
+        </button>`
+    : `<button type="button" class="btn btn-secondary app-dialog__menu-btn" data-party-action="transfer" disabled title="Ajoute un autre joueur">
+          👑 Transférer l'hôte
+        </button>`;
+
+  return `
+          ${transferBtn}
+          <button type="button" class="btn btn-secondary app-dialog__menu-btn" data-party-action="players">
+            👥 Gestion des joueurs
+          </button>
+          <button type="button" class="btn btn-secondary app-dialog__menu-btn app-dialog__menu-btn--danger" data-party-action="close">
+            🚪 Fermer le lobby
+          </button>`;
+}
+
 /**
- * Menu hôte : paramètres de partie (transfert / gestion joueurs).
- * @returns {Promise<{ ok: true, action: "transfer"|"players" } | { ok: false }>}
+ * Menu paramètres de partie (hôte) ou sortie volontaire (membre).
+ * @returns {Promise<{ ok: true, action: "transfer"|"players"|"close"|"leave" } | { ok: false }>}
  */
-export function showPartySettingsDialog({ canTransferHost = true } = {}) {
+export function showPartySettingsDialog({
+  canTransferHost = true,
+  role = "host",
+} = {}) {
   return new Promise((resolve) => {
     if (openDialog) {
       removeDialog(openDialog, () => {});
@@ -430,14 +463,7 @@ export function showPartySettingsDialog({ canTransferHost = true } = {}) {
     root.setAttribute("aria-labelledby", "app-dialog-title");
 
     const close = (result) => removeDialog(root, () => resolve(result));
-
-    const transferBtn = canTransferHost
-      ? `<button type="button" class="btn btn-secondary app-dialog__menu-btn" data-party-action="transfer">
-          👑 Transférer l'hôte
-        </button>`
-      : `<button type="button" class="btn btn-secondary app-dialog__menu-btn" data-party-action="transfer" disabled title="Ajoute un autre joueur">
-          👑 Transférer l'hôte
-        </button>`;
+    const allowed = new Set(partySettingsActionsForRole(role));
 
     root.innerHTML = `
       <div class="app-dialog__backdrop" data-dialog-dismiss aria-hidden="true"></div>
@@ -446,13 +472,7 @@ export function showPartySettingsDialog({ canTransferHost = true } = {}) {
         <p class="app-dialog__icon" aria-hidden="true">⚙️</p>
         <p class="app-dialog__title" id="app-dialog-title">Paramètres de partie</p>
         <div class="app-dialog__rich app-dialog__menu">
-          ${transferBtn}
-          <button type="button" class="btn btn-secondary app-dialog__menu-btn" data-party-action="players">
-            👥 Gestion des joueurs
-          </button>
-          <button type="button" class="btn btn-secondary app-dialog__menu-btn app-dialog__menu-btn--danger" data-party-action="close">
-            🚪 Fermer le lobby
-          </button>
+          ${partySettingsMenuHtml({ role, canTransferHost })}
         </div>
         <button type="button" class="btn btn-primary app-dialog__btn" data-dialog-cancel>Fermer</button>
       </div>
@@ -462,7 +482,7 @@ export function showPartySettingsDialog({ canTransferHost = true } = {}) {
       btn.addEventListener("click", () => {
         if (btn.disabled) return;
         const action = btn.getAttribute("data-party-action");
-        if (action === "transfer" || action === "players" || action === "close") {
+        if (allowed.has(action)) {
           close({ ok: true, action });
         }
       });

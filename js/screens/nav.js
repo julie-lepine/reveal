@@ -21,17 +21,16 @@ import {
 import { goToScores } from "../core/navAccess.js";
 import { exitGameToGameSelect } from "../core/exitGame.js";
 
-/** Accueil sans quitter le lobby (soirée en cours). */
-export function goToEveningHome() {
+/** Accueil hors lobby ; en lobby actif le hub jeux remplace Accueil (UX-NAV-LOBBY). */
+export async function goToEveningHome() {
   if (!hasActiveLobby()) {
     navigate("home", { reset: true });
     return;
   }
-  suppressSessionRoute(120000, getCachedGameSession()?.screen ?? null);
-  navigate("home", { reset: true });
+  await returnToEveningGames({ hubOnly: true });
 }
 
-/** Paramètres sans quitter le lobby. */
+/** Paramètres profil sans quitter le lobby. */
 export function goToEveningSettings() {
   if (!canPlay()) {
     navigate("home", { reset: true });
@@ -39,7 +38,7 @@ export function goToEveningSettings() {
   }
   if (hasActiveLobby()) {
     suppressSessionRoute(120000, getCachedGameSession()?.screen ?? null);
-    navigate("settings", { navStack: ["home", "settings"] });
+    navigate("settings", { navStack: ["game-select", "settings"] });
     return;
   }
   navigate("settings", { navStack: ["home", "settings"] });
@@ -70,7 +69,7 @@ async function handleBackNavigation() {
     return;
   }
   if (getCurrentScreen() === "game-select") {
-    goToEveningHome();
+    // UX-NAV-LOBBY : Accueil n’est plus une destination depuis le hub jeux.
     return;
   }
   if (isGameSyncActive() && isOnGameSetupScreen(getCurrentScreen())) {
@@ -112,7 +111,7 @@ export async function handleNavTarget(target, handlers) {
       return;
     }
     if (hasActiveLobby()) {
-      goToEveningHome();
+      await goToEveningHome();
       return;
     }
     navigate("home", { reset: true });
