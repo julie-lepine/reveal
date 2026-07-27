@@ -14,6 +14,12 @@ import {
 } from "./gameSync.js";
 import { launchGameWithSync, runLaunchButton } from "./mpLaunch.js";
 import { getCurrentScreen, navigate } from "./router.js";
+import {
+  rollbackGuessLieOptimisticVote,
+  shouldDeferGuessLieVoteLocalWrite,
+} from "./guessLieVoteCommit.js";
+
+export { rollbackGuessLieOptimisticVote, shouldDeferGuessLieVoteLocalWrite } from "./guessLieVoteCommit.js";
 
 export function getGuessLieSession() {
   return getState().guessLie;
@@ -137,16 +143,39 @@ export function navigateToGuessLieEntry() {
 export async function commitGuessLieVote(pick) {
   const localName = getLocalDisplayName();
   const session = getGuessLieSession();
-  const votes = { ...(session.votes || {}), [localName]: pick };
-  saveStatePatch({ guessLie: { ...session, votes } });
-  if (!isGameSyncActive()) return { ...session, votes };
+  const previousVotes = session.votes || {};
+  const hadPrevious = Object.prototype.hasOwnProperty.call(previousVotes, localName);
+  const previousPick = hadPrevious ? previousVotes[localName] : null;
+
+  if (!shouldDeferGuessLieVoteLocalWrite(isGameSyncActive())) {
+    const votes = { ...previousVotes, [localName]: pick };
+    saveStatePatch({ guessLie: { ...session, votes } });
+    return { ...session, votes };
+  }
+
   const uid = requireLocalParticipantUid();
   const { patchGameStateWithFeedback } = await import("./patchGameStateFeedback.js");
-  await patchGameStateWithFeedback(
-    { guessLie: { votes: { [uid]: pick } } },
-    { gameId: "guesslie", screen: "guesslie" }
-  );
-  return { ...session, votes };
+  try {
+    await patchGameStateWithFeedback(
+      { guessLie: { votes: { [uid]: pick } } },
+      { gameId: "guesslie", screen: "guesslie" }
+    );
+  } catch (err) {
+    const live = getGuessLieSession();
+    const rolled = rollbackGuessLieOptimisticVote(live.votes, localName, pick, {
+      previousPick,
+      hadPrevious,
+    });
+    if (rolled !== live.votes) {
+      saveStatePatch({ guessLie: { ...live, votes: rolled } });
+    }
+    throw err;
+  }
+
+  const live = getGuessLieSession();
+  const votes = { ...(live.votes || {}), [localName]: pick };
+  saveStatePatch({ guessLie: { ...live, votes } });
+  return { ...live, votes };
 }
 
 /** Lancement depuis le salon d'attente ou le menu (solo + MP). */
