@@ -80,6 +80,7 @@ import {
   setTurnstileOnChange,
 } from "../core/turnstile.js";
 import { createMountGuard } from "../core/mountLifecycle.js";
+import { createSyncPending } from "../core/syncPending.js";
 
 function syncForgotPasswordButton(root) {
   const btn = root.querySelector("#btn-forgot-password");
@@ -188,8 +189,15 @@ function guestJoinFieldsHtml({
       </div>`;
 }
 
-function guestJoinPanelHtml({ leaveHint = false, error = "", emoji = DEFAULT_GUEST_EMOJI } = {}) {
+function guestJoinPanelHtml({
+  leaveHint = false,
+  error = "",
+  emoji = DEFAULT_GUEST_EMOJI,
+  joinLabel = "Rejoindre la partie →",
+  joinDisabled = false,
+} = {}) {
   const defaultCode = guestRejoinDefaultCode();
+  const disabledAttr = joinDisabled ? " disabled" : "";
   return `
     <div class="card auth-form auth-form--guest auth-form--guest-rejoin">
       ${
@@ -207,7 +215,7 @@ function guestJoinPanelHtml({ leaveHint = false, error = "", emoji = DEFAULT_GUE
       })}
       <div id="guest-rejoin-turnstile" class="auth-turnstile-wrap"></div>
       ${guestJoinErrorHtml("guest-rejoin-error", error)}
-      <button type="button" class="btn btn-primary btn--spaced" id="btn-guest-rejoin">Rejoindre la partie →</button>
+      <button type="button" class="btn btn-primary btn--spaced" id="btn-guest-rejoin"${disabledAttr}>${escapeHtml(joinLabel)}</button>
     </div>`;
 }
 
@@ -248,7 +256,13 @@ function homeStatsHtml() {
   return "";
 }
 
-function homeRenderSnapshot(authTab, chrome, guestJoinError = "") {
+function homeRenderSnapshot(
+  authTab,
+  chrome,
+  guestJoinError = "",
+  joinPendingVisible = false,
+  joinPendingActive = false
+) {
   const user = getUser();
   return JSON.stringify({
     tab: authTab,
@@ -262,6 +276,8 @@ function homeRenderSnapshot(authTab, chrome, guestJoinError = "") {
     createEnabled: Boolean(chrome?.createEnabled),
     showResume: Boolean(chrome?.showResume),
     guestJoinError,
+    joinPendingVisible: Boolean(joinPendingVisible),
+    joinPendingActive: Boolean(joinPendingActive),
     recap: hasActiveLobby() ? getEveningRecap().participantCount : 0,
   });
 }
@@ -346,6 +362,14 @@ function clearStuckDialogs() {
 export function mountHome(app) {
   const mount = createMountGuard();
   const shouldContinue = () => mount.isMounted() && mount.isCurrentMount();
+  /** Loader UI Join Vague A — soft « Rejoindre… » ; pas de lock métier. */
+  const syncPending = createSyncPending({
+    softDelayMs: 500,
+    onChange: () => {
+      if (!shouldContinue()) return;
+      scheduleRender(true);
+    },
+  });
 
   const tabAfterLeave = sessionStorage.getItem("reveal-auth-tab");
   const routeAuthTab = getScreenParams()?.authTab;
@@ -529,7 +553,14 @@ export function mountHome(app) {
   async function renderIfNeeded(force = false) {
     if (!shouldContinue()) return;
     const chrome = currentMembershipChrome();
-    const snap = homeRenderSnapshot(authTab, chrome, guestJoinError);
+    const pendingState = syncPending.getState();
+    const snap = homeRenderSnapshot(
+      authTab,
+      chrome,
+      guestJoinError,
+      pendingState.visible,
+      pendingState.token != null
+    );
     const { drafts, focusedId } = preserveInputDrafts();
     const typing = focusedId && drafts[focusedId] !== undefined;
 
@@ -684,6 +715,13 @@ export function mountHome(app) {
     const createLobbyDisabledReason =
       chrome.createDisabledReason ||
       "Quitte le lobby actuel avant d'en créer un nouveau.";
+    const joinPendingVisible = syncPending.getState().visible;
+    const joinPendingActive = syncPending.getState().token != null;
+    const joinLobbyLabel = joinPendingVisible ? "Rejoindre…" : "Rejoindre";
+    const guestJoinLabel = joinPendingVisible
+      ? "Rejoindre…"
+      : "Rejoindre la partie →";
+    const joinDisabledAttr = joinPendingActive ? " disabled" : "";
 
     app.innerHTML = pageShell({
       back: false,
@@ -712,7 +750,13 @@ export function mountHome(app) {
               <button type="button" class="btn-link" id="btn-logout">Quitter la session</button>
             </div>
           </div>
-          ${guestJoinPanelHtml({ leaveHint: activeLobby, error: guestJoinError, emoji: selectedGuestEmoji })}`
+          ${guestJoinPanelHtml({
+            leaveHint: activeLobby,
+            error: guestJoinError,
+            emoji: selectedGuestEmoji,
+            joinLabel: guestJoinLabel,
+            joinDisabled: joinPendingActive,
+          })}`
               : `
           <div class="auth-tabs">
             <button type="button" class="auth-tab ${authTab === "login" ? "auth-tab--active" : ""}" data-tab="login">Connexion</button>
@@ -758,7 +802,7 @@ export function mountHome(app) {
               })}
               <div id="guest-turnstile" class="auth-turnstile-wrap"></div>
               ${guestJoinErrorHtml("guest-error", guestJoinError)}
-              <button type="button" class="btn btn-primary btn--spaced" id="btn-guest-join">Rejoindre la partie →</button>
+              <button type="button" class="btn btn-primary btn--spaced" id="btn-guest-join"${joinDisabledAttr}>${escapeHtml(guestJoinLabel)}</button>
             </div>
           </div>
           `
@@ -778,7 +822,7 @@ export function mountHome(app) {
               ? `
           <div class="join-row">
             <input type="text" class="field-input join-input" id="join-code" placeholder="Code d'invitation" maxlength="8" />
-            <button type="button" class="btn btn-secondary join-btn" id="btn-join-lobby">Rejoindre</button>
+            <button type="button" class="btn btn-secondary join-btn" id="btn-join-lobby"${joinDisabledAttr}>${escapeHtml(joinLobbyLabel)}</button>
           </div>`
               : ""
           }
@@ -1239,6 +1283,7 @@ export function mountHome(app) {
       if (!isLoggedIn()) return;
       const btn = e.target.closest("#btn-join-lobby");
       btn.disabled = true;
+      const pendingToken = syncPending.start();
       try {
         const res = await joinLobby(app.querySelector("#join-code")?.value);
         if (!res.ok) {
@@ -1256,6 +1301,7 @@ export function mountHome(app) {
           icon: "⚠️",
         });
       } finally {
+        syncPending.end(pendingToken);
         btn.disabled = false;
       }
       return;
@@ -1278,6 +1324,7 @@ export function mountHome(app) {
       btn.disabled = true;
       guestJoinError = "";
       errEl?.classList.add("hidden");
+      const pendingToken = syncPending.start();
 
       try {
         const captchaToken =
@@ -1335,6 +1382,8 @@ export function mountHome(app) {
         } else {
           await showAppAlert(msg, { title: "Rejoindre", icon: "⚠️" });
         }
+      } finally {
+        syncPending.end(pendingToken);
       }
       return;
     }
@@ -1380,6 +1429,7 @@ export function mountHome(app) {
   }
 
   return () => {
+    syncPending.dispose();
     mount.dispose();
     app.removeEventListener("click", onHomeClick);
     unsubSession();
