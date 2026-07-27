@@ -13,6 +13,7 @@ import {
   tallyActiveResults,
   resolvePollLeader,
   canOfferPollCreate,
+  canCloseLobbyPoll,
   localScreenAllowsPollCreate,
   remotePhaseAllowsPollCreate,
   buildPollOptionsSnapshot,
@@ -84,6 +85,98 @@ describe("lobbyPoll normalize + votes", () => {
     const maj = resolvePollLeader({ x: 3, y: 1 });
     assert.equal(maj.kind, "majority");
     assert.deepEqual(maj.gameIds, ["x"]);
+  });
+});
+
+describe("lobbyPoll fermeture explicite", () => {
+  const openPoll = { id: "p1", createdBy: "creator-uid" };
+
+  it("hôte ou acting host peut fermer", () => {
+    assert.equal(
+      canCloseLobbyPoll({
+        uid: "other",
+        poll: openPoll,
+        isHost: true,
+        isActingHost: false,
+      }),
+      true
+    );
+    assert.equal(
+      canCloseLobbyPoll({
+        uid: "acting",
+        poll: openPoll,
+        isHost: false,
+        isActingHost: true,
+      }),
+      true
+    );
+  });
+
+  it("créateur non-hôte peut fermer", () => {
+    assert.equal(
+      canCloseLobbyPoll({
+        uid: "creator-uid",
+        poll: openPoll,
+        isHost: false,
+        isActingHost: false,
+      }),
+      true
+    );
+  });
+
+  it("membre tiers ne peut pas fermer", () => {
+    assert.equal(
+      canCloseLobbyPoll({
+        uid: "random",
+        poll: openPoll,
+        isHost: false,
+        isActingHost: false,
+      }),
+      false
+    );
+  });
+
+  it("refuse si poll absent, commit en cours ou createdBy null", () => {
+    assert.equal(
+      canCloseLobbyPoll({
+        uid: "creator-uid",
+        poll: null,
+        isHost: false,
+        isActingHost: false,
+      }),
+      false
+    );
+    assert.equal(
+      canCloseLobbyPoll({
+        uid: "creator-uid",
+        poll: openPoll,
+        isHost: false,
+        isActingHost: false,
+        committingClose: true,
+      }),
+      false
+    );
+    assert.equal(
+      canCloseLobbyPoll({
+        uid: "creator-uid",
+        poll: { id: "p1", createdBy: null },
+        isHost: false,
+        isActingHost: false,
+      }),
+      false
+    );
+  });
+
+  it("message métier close inclut le créateur", () => {
+    const msg = lobbyPollErrorMessage({
+      message: "Clôture réservée à l'hôte, au remplaçant ou au créateur du sondage.",
+    });
+    assert.match(msg, /créateur du sondage/i);
+  });
+
+  it("store dérive canCloseLobbyPoll (pas de logique inline dupliquée)", () => {
+    const storeSrc = readFileSync(join(__dirname, "../js/core/lobbyPollStore.js"), "utf8");
+    assert.match(storeSrc, /canCloseLobbyPoll\(/);
   });
 });
 

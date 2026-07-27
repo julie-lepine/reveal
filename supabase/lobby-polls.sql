@@ -471,8 +471,12 @@ begin
     raise exception 'Tu n''es pas membre de ce lobby.';
   end if;
 
-  if not (public.is_lobby_host(v_lobby_id) or public.is_acting_host(v_lobby_id)) then
-    raise exception 'Clôture réservée à l''hôte ou à l''acting host.';
+  if not (
+    public.is_lobby_host(v_lobby_id)
+    or public.is_acting_host(v_lobby_id)
+    or (v_poll.created_by is not null and v_poll.created_by = v_uid)
+  ) then
+    raise exception 'Clôture réservée à l''hôte, au remplaçant ou au créateur du sondage.';
   end if;
 
   -- Idempotent : ce poll précis déjà fermé
@@ -521,7 +525,7 @@ revoke all on function public.close_lobby_poll(uuid, text) from anon;
 grant execute on function public.close_lobby_poll(uuid, text) to authenticated;
 
 comment on function public.close_lobby_poll(uuid, text) is
-  'Vague 1 : ferme le sondage ciblé par poll_id (launch|explicit). Idempotent. Pas de close aveugle par lobby_id.';
+  'Vague 1 : ferme le sondage ciblé par poll_id (launch|explicit). Hôte, acting host ou créateur. Idempotent.';
 
 -- ---------------------------------------------------------------------------
 -- Realtime (optionnel si la publication existe déjà)

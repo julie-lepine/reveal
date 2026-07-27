@@ -15,21 +15,16 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 
 !!!!! QUID DE "JE CREE UN LOBBY", JE NE LE DEMARRE PAS, J'EN RELANCE UN AUTRE ET SUIS DONC COINCE CAR JE SUIS TJRS CONSIDERE DANS LE 1ER MAIS JE NE LE VOIS PAS DANS MON INTERFACE DE CO
 
-SONDAGE A FERMER PAR LE CREATEUR ET PAS QUE L HOTE
-
 ## Focus — 2026-07-27 (PM)
 
 | | Contenu |
 |--|---------|
-| **Fait** | **Guess Lie UX** ✅ · **L-05 invalidé** (pas de fantôme `lobby_members`) · **M-15** ouvert (identité fantôme Guess Lie / submissions) |
-| **Prochain** | **M-15a** confirmation terrain (`[GUESSLIE-ID]`) · **M-14a / SYN-14** (suspendu) ou **ARCH-22** |
+| **Fait** | **Guess Lie** ✅ clôturé · **Sondages in-chat** ✅ QA |
+| **Prochain** | **M-14a / SYN-14** (suspendu) ou **ARCH-22** |
 | **Ensuite** | Loader UI join · pré-résolution `get*EntryScreen` |
 
-**Hors file audit**  
-Sondages in-chat (`lobby_polls` / UI chat) — feature produit, pas un ticket cause racine.
-
 **Résidus (hors file prioritaire)**  
-loader UI join · pré-résolution `get*EntryScreen` · votes optimistic (dilemma / speedVote / …) · `results.js` mount refresh · échec remote rename (doc QA I-09) · instrumentation debug `[GUESSLIE-ID]` (optionnel, hors fix)
+loader UI join · pré-résolution `get*EntryScreen` · votes optimistic (dilemma / speedVote / …) · `results.js` mount refresh · échec remote rename (doc QA I-09)
 
 **Surveiller**  
 Clutch taps figés sous latence (SYN-26) · ready prep après Recommencer · starts sync hydrate → hub hors `mountLobby` (hors périmètre lifecycle IIFE)
@@ -42,11 +37,10 @@ Clutch taps figés sous latence (SYN-26) · ready prep après Recommencer · sta
 
 | # | ID | Cause | Problème | Statut |
 |---|----|-------|----------|--------|
-| 1 | **M-15** | 3/8 | Guess Lie — identité fantôme (submissions / merge / rounds) | **M-15a** QA terrain |
-| 2 | **M-14a / SYN-14** | 3 | TierNight topic / routing | ❌ KO QA — suspendu |
-| 3 | Loader UI join | 5/11 | Interstitiel join | Hors T-01/T-02 |
-| 4 | Pré-résolution entry screens | 5 | `get*EntryScreen` (filet M-08 conservé) | Hors M-08 |
-| 5 | **ARCH-22** | 11 | Pas de feedback sync lente | Ouvert |
+| 1 | **M-14a / SYN-14** | 3 | TierNight topic / routing | ❌ KO QA — suspendu |
+| 2 | Loader UI join | 5/11 | Interstitiel join | Hors T-01/T-02 |
+| 3 | Pré-résolution entry screens | 5 | `get*EntryScreen` (filet M-08 conservé) | Hors M-08 |
+| 4 | **ARCH-22** | 11 | Pas de feedback sync lente | Ouvert |
 
 ### Autres ouverts
 
@@ -69,12 +63,12 @@ Clutch taps figés sous latence (SYN-26) · ready prep après Recommencer · sta
 |---|-------|------|----------------|
 | 1 | Identité invité / JWT | ✅ QA | ARCH-01 partiel |
 | 2 | Race auth / profil | ✅ QA | — |
-| 3 | Sources de vérité multiples | Partiel | **M-14a** suspendu · **M-15** submissions GL · UX-CLUTCH-01 ✅ |
-| 4 | Asymétrie hôte / invité | ✅ QA | Guess Lie UX ✅ |
+| 3 | Sources de vérité multiples | Partiel | **M-14a** suspendu · UX-CLUTCH-01 ✅ |
+| 4 | Asymétrie hôte / invité | ✅ QA | Guess Lie ✅ |
 | 5 | Routing + timing sync | ✅ | ARCH-05 mitigé |
 | 6 | Async écrans | ✅ QA | **ARCH-06** ✅ (Mode A/B/C · Traître V2 · Lobby IIFE · SYN-12) |
 | 7 | Sync silencieuse / fire-and-forget | Partiel | ARCH-07/08, M-14b |
-| 8 | Reset / migration incomplète | Partiel | I-09 ✅ ; SYN-15/16 ✅ ; ARCH-10 · **M-15** reset submissions GL |
+| 8 | Reset / migration incomplète | Partiel | I-09 ✅ ; SYN-15/16 ✅ ; ARCH-10 |
 | 9 | Sync monolithe / duplication | Dette | ARCH-11… |
 | 10 | Code mort | Dette | dead exports (hors Fil Rouge app) |
 | 11 | Friction UX | Partiel | ARCH-22 ; L-04 |
@@ -83,161 +77,29 @@ Clutch taps figés sous latence (SYN-26) · ready prep après Recommencer · sta
 
 ## Détail des tickets ouverts
 
-### Cause 3 / 8 — M-15 — Guess Lie — identité fantôme (submissions / merge / rounds)
-
-**Identifiant :** `M-15` · **Causes :** 3 + 8 · **Statut :** **M-15a — confirmation terrain** (aucun patch M-15b/c/d avant log)
-
-Symptôme QA : après Recommencer, vote sur ses propres affirmations ; fantôme gameplay ; **pas** de fantôme `lobby_members` ; nouveau lobby corrige.
-
-Couches : (3–4) submissions distant/local → (6) `getGuessLieRounds()` produit la manche. Instrumentation `[GUESSLIE-ID]` ✅ acceptée.
-
-Découpage : **M-15a** preuve terrain (en cours) → M-15b purge restart → M-15c `getGuessLieRounds` → M-15d `isSubject`.
-
-**Règle patch :** cibler **uniquement la première couche fautive** confirmée par le log. Pas de triple patch préventif (purge + filtre roster + `isSubject`).
-
----
-
-#### M-15a — Protocole QA terrain (obligatoire avant patch)
-
-**Setup**
-
-| Rôle | Config |
-|------|--------|
-| Hôte | Navigateur normal |
-| Invité A | Normal |
-| Invité B (repro) | **Navigation privée** |
-
-**Scénario**
-
-1. Créer lobby · 3 joueurs · lancer Guess Lie.
-2. Jouer **partie 1 complète** (toutes les manches).
-3. Hôte : **Recommencer**.
-4. Tous : **nouvelles soumissions** prep.
-5. Hôte : lancer **partie 2**.
-6. Sur **invité B** (privé), au moment du symptôme (manche fantôme ou vote sur ses propres affirmations) : capturer le log.
-
-**Activation debug (invité concerné, avant ou dès la prep partie 2)**
-
-```js
-localStorage.setItem('reveal-guesslie-identity-debug', '1');
-location.reload();
-```
-
-Console : filtrer `[GUESSLIE-ID]`
-
-**Champs obligatoires du log** (objet complet `console.warn`)
-
-| Groupe | Champs |
-|--------|--------|
-| Couche | `firstGhostLayerHint`, `triggers` |
-| Session | `sessionId`, `phase`, `roundIdx`, `gameSessionRowId` |
-| Roster | `lobbyMemberNames`, `localParticipant`, `localParticipantUid` |
-| Identité locale | `getLocalDisplayName`, `getLocalPlayerName`, `localNameClosure` |
-| Submissions | `remoteSubmissionKeys`, `localSubmissionKeys`, `keysNotInLobbyRoster`, `localOnlyValidKeys`, `remoteOnlyValidKeys`, `keysForLocalIdentity` |
-| Rounds | `roundPlayers`, `roundPlayersNotInRoster`, `rounds` (avec `stmtHash`) |
-| Manche courante | `roundPlayer`, `roundPlayerUid`, `roundStmtHash`, `isSubject`, `isSubjectFormula` |
-
-Pas de texte brut des affirmations — hashes uniquement (`stmtHash` par clé dans `localSubmissionKeys` / `remoteSubmissionKeys`).
-
-**Points de capture recommandés**
-
-| Moment | Pourquoi |
-|--------|----------|
-| Fin prep partie 2 (avant lancement) | État submissions post-merge prep |
-| 1er render vote partie 2 | Symptôme UI |
-| Manche où l’invité voit boutons vote sur **ses** affirmations | Cas critique |
-
----
-
-#### M-15a — Arbre de classification (après log)
-
-**A. Distant fautif** — clé fantôme déjà dans `remoteSubmissionKeys` (`valid: true`, `inRoster: false` ou clé stale)
-
-À documenter dans le rapport :
-
-- Quand la clé aurait dû être purgée (fin partie 1 / Recommencer / lancement prep).
-- Payload restart reçu côté client : `getCachedGameSession()?.state?.guessLie` (submissions UID).
-- Résultat attendu de `shouldApplyGuessLieLobbyReset(local, remote)` au moment du merge.
-- Branche `patchGameStateInner` : est-ce que `incGl.submissions === {}` a conservé `curGl.submissions` ?
-
-→ Patch cible : **M-15b** uniquement.
-
-**B. Local fautif** — `remoteSubmissionKeys` propres ; clé dans `localSubmissionKeys` ou `localOnlyValidKeys`
-
-À documenter :
-
-- Origine probable : `localStorage` persistant · merge **play** (union) · réinjection **prep** sous `localName`.
-- Au moment du log : comparer `localOnlyValidKeys` vs `remoteOnlyValidKeys`.
-- Si prep : vérifier si `getLocalDisplayName()` ≠ `localParticipant.name` (double clé).
-
-→ Patch cible : **M-15b** (purge local au restart) et/ou merge prep — **pas** M-15c en premier.
-
-**C. Rounds fautifs** — distant **et** local propres (`keysNotInLobbyRoster` vide) mais `roundPlayersNotInRoster` non vide
-
-À documenter :
-
-- `rounds` dans le log = recalcul live ; l’écran play fige `const rounds = getGuessLieRounds()` **au mount** (`guessLie.js` L47) — vérifier décalage mount vs état courant.
-- Cache : `roundIdx` local vs session ; remount après sync ?
-- Source exacte de la liste affichée.
-
-→ Patch cible : selon source (remount / sync / construction rounds) — **pas** filtre roster aveugle.
-
-**D. Identité fautive** — aucune clé fantôme ; `isSubject === false` sur sa propre manche
-
-À documenter :
-
-- `round.player` vs `localNameClosure` (figé mount L77) vs `getLocalDisplayName()` live vs `localParticipant.name`.
-- `roundPlayerUid` vs `localParticipantUid` (match UID mais mismatch pseudo → cas identité pure).
-
-→ Patch cible : **M-15d** uniquement — **après** confirmation qu’aucune clé submission fantôme n’existe.
-
----
-
-#### M-15c — Vigilance avant filtre roster (documenter, ne pas implémenter)
-
-Une soumission valide peut **temporairement** exister sous une clé ∉ `lobbyMemberNames` si :
-
-| Cas | Risque filtre roster |
-|-----|---------------------|
-| Soumission optimiste prep avant ack remote | Clé locale du joueur courant — **légitime** |
-| Roster local en retard vs session (sync ordre inversé) | Faux positif purge |
-| Rename mid-soirée (I-09) | Ancienne clé migrée — maps soirée |
-| Joueur parti après soumission | Clé peut rester en session ; UX-HIST-01 scores |
-| Reconnexion / F5 mid-prep | Merge prep + localStorage |
-| `roundIdx` / ordre manches | Union roster+clés garantit ordre stable si clés = roster |
-
-**Conséquence :** M-15c (filtrer `getGuessLieRounds` par roster) n’est un filet **qu’après** purge confirmée (M-15b) ; sinon risque de masquer race sync légitime.
-
----
-
-#### M-15a — Critères de sortie
-
-| # | Critère |
-|---|---------|
-| OUT-1 | Log `[GUESSLIE-ID]` complet capturé au moment du symptôme |
-| OUT-2 | Classification A / B / C / D assignée avec preuve |
-| OUT-3 | `firstGhostLayerHint` confirmé ou corrigé par le log (pas seulement hypothèse code) |
-| OUT-4 | Patch unique recommandé (b, c ou d) — pas de combo |
-| OUT-5 | Si non-repro : noter config exacte + absence de log |
-
----
-
-### L-05 — Invalidé pour ce cas terrain
-
-Hypothèse membership orpheline `lobby_members` **invalidée**. Pas de L-05a–d pour ce bug.
-
----
-
-### Cause 4 / 7 — Guess Lie UX ✅ QA
+### Cause 3 / 4 / 7 / 8 — Guess Lie ✅ QA
 
 | | |
 |--|--|
-| **Problème** | **Vague A** : après « Valider mon vote », pas d’état « Envoi… » ; risque reveal sur vote optimiste non confirmé RPC. **Vague B1** : `recordGuessLieRoundStats` avant confirmation serveur |
-| **Fix Vague A** | Alignement VibeCheck : `voteCommitInFlight` + `myVote` + `voteConfirmChrome` ; `render()` avant `await` ; `shouldDeferGuessLieVoteLocalWrite` (pas de `saveStatePatch` MP avant RPC) ; garde `voteCommitInFlight` sur `tryAdvanceToReveal` ; rollback `rollbackGuessLieOptimisticVote` si RPC échoue |
-| **Fix Vague B1** | `recordGuessLieRoundStats` **après** `await commitGuessLiePlay` ; flag `statsRecordedRoundIdx` sur session |
-| **Où** | `js/games/guessLie.js` · `js/core/guessLieSession.js` · `js/core/guessLieVoteCommit.js` · `js/core/voteConfirm.js` |
-| **Preuve** | `tests/guessLieVoteUx.test.js` · `tests/guessLieVoteCommit.test.js` |
-| **Requalification** | Symptôme post-restart « vote sur ses propres affirmations » → **M-15** (submissions / merge), pas L-05 |
+| **Périmètre** | UX vote (Vague A/B1) · post-restart identité fantôme (M-15) · hypothèse L-05 |
+| **UX — Vague A** | `voteCommitInFlight` + `myVote` + `voteConfirmChrome` ; pas de `saveStatePatch` MP avant RPC ; garde reveal ; rollback si RPC échoue |
+| **UX — Vague B1** | `recordGuessLieRoundStats` **après** `await commitGuessLiePlay` |
+| **Où (UX)** | `js/games/guessLie.js` · `js/core/guessLieSession.js` · `js/core/guessLieVoteCommit.js` · `js/core/voteConfirm.js` |
+| **Preuve (UX)** | `tests/guessLieVoteUx.test.js` · `tests/guessLieVoteCommit.test.js` |
+| **M-15 — Symptôme initial** | Après Recommencer : vote sur ses propres affirmations ; manche fantôme ; **pas** de fantôme `lobby_members` ; nouveau lobby corrige |
+| **M-15 — Diagnostic** | Instrumentation `[GUESSLIE-ID]` (`guessLieGhostDiagnostic.js`, `guessLieIdentityDebug.js`) — diagnostic uniquement |
+| **M-15 — Clôture** | **Non reproduit** avec instrumentation (OUT-5) : symptôme non observé lors des passes QA M-15a ; **aucun patch** M-15b/c/d |
+| **L-05** | Hypothèse membership orpheline `lobby_members` **invalidée** pour ce repro — pas de L-05a–d |
+| **Réouverture** | Régression démontrée avec log `[GUESSLIE-ID]` complet + classification A/B/C/D |
+| **QA** | ✅ UX validé 2026-07-27 · ✅ fil Guess Lie clôturé 2026-07-27 |
+
+### FEATURE-LOBBY-POLL — Sondages in-chat ✅ QA
+
+| | |
+|--|--|
+| **Périmètre** | Sondages « prochain jeu » in-chat (`lobby_polls` / UI sheet FAB) — feature produit, hors file cause racine |
+| **Où** | `js/core/lobbyPoll*.js` · `supabase/lobby-polls.sql` |
+| **Preuve** | `tests/lobbyPollsAllowlist.test.js` · `tests/lobbyPollsVague2.test.js` · `tests/lobbyPollRejoinWatch.test.js` · `tests/lobbyPollRealtimeChannel.test.js` |
 | **QA** | ✅ validé 2026-07-27 |
 
 ### Cause 11 / 4 — UX-VIBE-01 ✅ QA
@@ -442,15 +304,15 @@ Clutch conserve son départage temporel (règle produit explicite inchangée).
 |-------|-------------------|
 | 1 | C-01/02, R-01–05, M-05a |
 | 2 | M-01, P-03, M-02a, S-02 |
-| 3 | I-03/04, SYN-03, M-13, M-02b, ARCH-02, SYN-29, I-PG-01, ready stale Recommencer, UX-CLUTCH-01 · **M-15 ouvert** |
-| 4 | I-01/02/08, M-03b, M-06a/b, L-01, ARCH-03/03b, UX-VIBE-01, **Guess Lie UX** |
+| 3 | I-03/04, SYN-03, M-13, M-02b, ARCH-02, SYN-29, I-PG-01, ready stale Recommencer, UX-CLUTCH-01 · **M-15** · **L-05↻** |
+| 4 | I-01/02/08, M-03b, M-06a/b, L-01, ARCH-03/03b, UX-VIBE-01, **Guess Lie** |
 | 5 | T-01/02, T-03↻, M-07, M-08, P-02, SYN-28, I-PG-01, ARCH-04, UX-VIBE-02 |
 | 6 | I-05, SYN-13b↻, SYN-25, **SYN-05 / ARCH-18** ✅, **ARCH-06** ✅ (Mode A/B/C · Traître V2 · Lobby IIFE · SYN-12) |
 | 7 | I-07, M-09, L-09, M-11, M-10, T-05, SYN-26, M-04b / SYN-18 |
-| 8 | I-06, P-02, ARCH-09, I-09 / SYN-06, SYN-15 / SYN-16 · **M-15 ouvert** |
+| 8 | I-06, P-02, ARCH-09, I-09 / SYN-06, SYN-15 / SYN-16 · **M-15** |
 | 9 | SYN-12 / M-05b |
 | 10 | **SYN-05 / ARCH-18** ✅ QA (Fil Rouge app ; SQL historique hors scope) |
-| 11 | L-02, ARCH-21↻, M-12 (cleanup `#join=`, pas auto-join), UX-HIST-01, UX-RESUME-BANNER, UX-VIBE-01/02 |
+| 11 | L-02, ARCH-21↻, M-12 (cleanup `#join=`, pas auto-join), UX-HIST-01, UX-RESUME-BANNER, UX-VIBE-01/02, **FEATURE-LOBBY-POLL** |
 
 ---
 
@@ -466,11 +328,9 @@ Hors tickets prioritaires — à traiter si opportunité / régression :
 - Policy debug lobby à purger côté Supabase si encore présente
 - Optimistic votes hors Hot Take / VibeCheck (dilemma / speedVote / … — même trou que T-05)
 - Starts sync hydrate → hub hors `mountLobby` (résidu SYN-12, hors idempotence globale)
-- Bug vote post-restart Guess Lie → **M-15** (submissions / merge), L-05 invalidé pour ce repro
-- Instrumentation debug `[GUESSLIE-ID]` (`guessLieIdentityDebug.js`) — optionnel, hors fix produit
 
 - Fil Rouge : résidus SQL historiques (`fil-rouge-private.sql`, clés RPC) — ops Supabase séparée, non faite
 
 ---
 
-*Suivi vivant · Dernière MAJ : 2026-07-27 — M-15a QA terrain (pas de patch b/c/d)*
+*Suivi vivant · Dernière MAJ : 2026-07-27 — Sondages in-chat ✅ QA*
