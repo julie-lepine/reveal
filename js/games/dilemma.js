@@ -41,6 +41,7 @@ import {
   refreshGameSession,
 } from "../core/gameSync.js";
 import { voteConfirmChrome, pickForVoteConfirm } from "../core/voteConfirm.js";
+import { createSyncPending } from "../core/syncPending.js";
 import { arch03AhLogSkipDecision } from "../core/arch03ActingHostDebug.js";
 
 const DILEMMA_VS_SRC = "js/games/dilemma-vs.svg";
@@ -81,6 +82,14 @@ export function mountDilemma(app) {
   let unmounted = false;
   const localName = getLocalDisplayName();
   const mp = isGameSyncActive();
+  /** ARCH-22 — soft « Envoi… » ; ne remplace pas voteCommitInFlight. */
+  const syncPending = createSyncPending({
+    softDelayMs: 500,
+    onChange: () => {
+      if (unmounted) return;
+      render();
+    },
+  });
 
   function cancelRevealAnim() {
     if (revealAnimId) {
@@ -442,12 +451,16 @@ export function mountDilemma(app) {
 
     const votedCount = countPlayersVoted();
     const totalPlayers = getActivePlayers().length;
+    const confirmBusy = voteCommitInFlight != null;
+    const confirmLabel = syncPending.getState().visible
+      ? "Envoi…"
+      : confirm.confirmLabel;
     return `
       <p class="label-upper label-upper--muted">Vote simultané</p>
       ${voteTapHtml(confirm.displayPick)}
       <p class="hint">${escapeHtml(confirm.hint)}</p>
       <button type="button" class="btn ${confirm.confirmClass} btn--spaced" id="dilemma-confirm"
-        ${confirm.confirmDisabled ? "disabled" : ""}>${escapeHtml(confirm.confirmLabel)}</button>
+        ${confirm.confirmDisabled || confirmBusy ? "disabled" : ""}>${escapeHtml(confirmLabel)}</button>
       ${
         host
           ? `<button type="button" class="btn btn-secondary btn--spaced" id="dilemma-force">
@@ -461,6 +474,7 @@ export function mountDilemma(app) {
     if (pick == null || voteCommitInFlight != null) return;
     if (mp) {
       voteCommitInFlight = pick;
+      const pendingToken = syncPending.start();
       render();
       try {
         await commitDilemmaVote(pick);
@@ -469,6 +483,7 @@ export function mountDilemma(app) {
         myVote = pick;
       } finally {
         voteCommitInFlight = null;
+        syncPending.end(pendingToken);
         if (!unmounted) syncFromSession();
       }
       if (unmounted) return;
@@ -638,6 +653,7 @@ export function mountDilemma(app) {
 
   return () => {
     unmounted = true;
+    syncPending.dispose();
     cancelRevealAnim();
     unsub();
   };

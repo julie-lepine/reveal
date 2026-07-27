@@ -28,6 +28,7 @@ import { bindNav } from "../screens/nav.js";
 import { gameExitBarHtml, bindExitGame } from "../core/exitGame.js";
 import { withClickLock, createActionLock } from "../core/actionLock.js";
 import { createMountGuard } from "../core/mountLifecycle.js";
+import { createSyncPending } from "../core/syncPending.js";
 import {
   isGameSyncActive,
   canActAsHost,
@@ -90,6 +91,14 @@ export function mountPlaylistGuess(app) {
   let lastScoredRoundIdx = -1;
   let lastScrollKey = "";
   const mount = createMountGuard();
+  /** ARCH-22 — soft « Envoi… » ; ne remplace pas voteCommitInFlight. */
+  const syncPending = createSyncPending({
+    softDelayMs: 500,
+    onChange: () => {
+      if (!mount.isMounted() || !mount.isCurrentMount()) return;
+      render();
+    },
+  });
   /** ARCH-06 : partagé entre re-binds après render (pas un verrou DOM seul). */
   const nextRoundLock = createActionLock();
   const forceRevealLock = createActionLock();
@@ -256,6 +265,7 @@ export function mountPlaylistGuess(app) {
     if (pick == null || voteCommitInFlight != null) return;
     if (mp) {
       voteCommitInFlight = pick;
+      const pendingToken = syncPending.start();
       render();
       try {
         await commitPlaylistGuessVote(pick);
@@ -267,6 +277,7 @@ export function mountPlaylistGuess(app) {
         // Feedback déjà affiché ; l’état revient via syncFromSession.
       } finally {
         voteCommitInFlight = null;
+        syncPending.end(pendingToken);
         if (mount.isMounted() && mount.isCurrentMount()) syncFromSession();
       }
       if (!mount.isMounted()) return;
@@ -348,14 +359,16 @@ export function mountPlaylistGuess(app) {
         ? `Vote enregistré - en attente des autres (${votedCount}/${totalPlayers})…`
         : confirm.hint;
     const host = !mp || canActAsHost();
+    const confirmBusy = voteCommitInFlight != null;
+    const confirmLabel = syncPending.getState().visible
+      ? "Envoi…"
+      : confirm.confirmLabel;
 
     return `
       ${songGuessCardHtml(round, { players, selectedPlayerId: confirm.displayPick })}
       <p class="hint">${escapeHtml(waitingHint)}</p>
       <button type="button" class="btn ${confirm.confirmClass} btn--spaced" id="confirm"
-        ${confirm.confirmDisabled || voteCommitInFlight != null ? "disabled" : ""}>${escapeHtml(
-          voteCommitInFlight != null ? "Envoi…" : confirm.confirmLabel
-        )}</button>
+        ${confirm.confirmDisabled || confirmBusy ? "disabled" : ""}>${escapeHtml(confirmLabel)}</button>
       ${
         host
           ? `<button type="button" class="btn btn-secondary btn--spaced" id="playlist-force">
@@ -476,6 +489,13 @@ export function mountPlaylistGuess(app) {
       confirmBtn.textContent = confirm.confirmLabel;
       confirmBtn.disabled = confirm.confirmDisabled;
       confirmBtn.className = `btn ${confirm.confirmClass} btn--spaced`;
+    } else if (confirmBtn && voteCommitInFlight != null) {
+      const pendingVisible = syncPending.getState().visible;
+      confirmBtn.textContent = pendingVisible ? "Envoi…" : confirm.confirmLabel;
+      confirmBtn.disabled = true;
+      confirmBtn.className = pendingVisible
+        ? "btn btn-secondary btn--spaced"
+        : `btn ${confirm.confirmClass} btn--spaced`;
     }
   }
 
@@ -556,6 +576,7 @@ export function mountPlaylistGuess(app) {
   }
 
   return () => {
+    syncPending.dispose();
     mount.dispose();
     unsub();
     if (!mp) setLobbyWaiting();

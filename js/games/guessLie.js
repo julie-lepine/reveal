@@ -26,6 +26,7 @@ import { setLobbyPlaying, setLobbyWaiting } from "../core/lobby.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
 import { withClickLock } from "../core/actionLock.js";
 import { createMountGuard } from "../core/mountLifecycle.js";
+import { createSyncPending } from "../core/syncPending.js";
 import { navigate } from "../core/router.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
 import { bindNav } from "../screens/nav.js";
@@ -63,6 +64,14 @@ export function mountGuessLie(app) {
 
   const mount = createMountGuard();
   const mp = isGameSyncActive();
+  /** ARCH-22 — soft « Envoi… » ; ne remplace pas voteCommitInFlight. */
+  const syncPending = createSyncPending({
+    softDelayMs: 500,
+    onChange: () => {
+      if (!mount.isMounted() || !mount.isCurrentMount()) return;
+      render();
+    },
+  });
 
   let roundIdx = 0;
   let phase = "voting";
@@ -295,6 +304,7 @@ export function mountGuessLie(app) {
     if (pick == null || voteCommitInFlight != null) return;
     if (mp) {
       voteCommitInFlight = pick;
+      const pendingToken = syncPending.start();
       render();
       try {
         await commitGuessLieVote(pick);
@@ -306,6 +316,7 @@ export function mountGuessLie(app) {
         // Feedback déjà affiché ; l'état revient via syncFromGl.
       } finally {
         voteCommitInFlight = null;
+        syncPending.end(pendingToken);
         if (mount.isMounted() && mount.isCurrentMount()) syncFromGl();
       }
       if (!mount.isMounted()) return;
@@ -397,6 +408,10 @@ export function mountGuessLie(app) {
           allIn: detectivesDone,
           emptyHint: "Choisis la lettre du mensonge.",
         });
+        const confirmBusy = voteCommitInFlight != null;
+        const confirmLabel = syncPending.getState().visible
+          ? "Envoi…"
+          : confirm.confirmLabel;
         body = `
           ${statementsBlock}
           <p class="hint">${escapeHtml(confirm.hint)}</p>
@@ -413,9 +428,7 @@ export function mountGuessLie(app) {
               .join("")}
           </div>
           <button type="button" class="btn ${confirm.confirmClass} btn--spaced" id="confirm"
-            ${confirm.confirmDisabled || voteCommitInFlight != null ? "disabled" : ""}>${escapeHtml(
-              voteCommitInFlight != null ? "Envoi…" : confirm.confirmLabel
-            )}</button>`;
+            ${confirm.confirmDisabled || confirmBusy ? "disabled" : ""}>${escapeHtml(confirmLabel)}</button>`;
       }
       if (!mp || canActAsHost()) {
         const votes = getGuessLieSession().votes || {};
@@ -541,9 +554,12 @@ export function mountGuessLie(app) {
       confirmBtn.disabled = confirm.confirmDisabled;
       confirmBtn.className = `btn ${confirm.confirmClass} btn--spaced`;
     } else if (confirmBtn && voteCommitInFlight != null) {
-      confirmBtn.textContent = "Envoi…";
+      const pendingVisible = syncPending.getState().visible;
+      confirmBtn.textContent = pendingVisible ? "Envoi…" : confirm.confirmLabel;
       confirmBtn.disabled = true;
-      confirmBtn.className = "btn btn-secondary btn--spaced";
+      confirmBtn.className = pendingVisible
+        ? "btn btn-secondary btn--spaced"
+        : `btn ${confirm.confirmClass} btn--spaced`;
     }
   }
 
@@ -621,6 +637,7 @@ export function mountGuessLie(app) {
   }
 
   return () => {
+    syncPending.dispose();
     mount.dispose();
     unsub();
     if (!mp) setLobbyWaiting();

@@ -28,6 +28,7 @@ import {
 import { pickRemotePlayFields } from "./playPatch.js";
 import { showAppAlert } from "./dialog.js";
 import { getCurrentScreen, navigate } from "./router.js";
+import { createSyncPending } from "./syncPending.js";
 import { computePrepReadyToggle } from "./prepReadyMaps.js";
 import { arch03RevealLog } from "./arch03RevealDebug.js";
 import { validateActingHostPlayPatch } from "./gameSessionSecurity.js";
@@ -141,16 +142,34 @@ export async function launchGameWithSync({
   }
 }
 
-/** Désactive un bouton pendant une action async (lancement, sync). */
-export async function runLaunchButton(btn, launchFn, { loadingLabel = "Lancement…" } = {}) {
+/**
+ * Désactive un bouton pendant une action async (lancement, sync).
+ * ARCH-22 : libellé « Lancement… » seulement après soft delay — pas de flash réseau rapide.
+ */
+export async function runLaunchButton(
+  btn,
+  launchFn,
+  { loadingLabel = "Lancement…", softDelayMs = 500 } = {}
+) {
   const prevLabel = btn?.textContent;
   if (btn) {
     btn.disabled = true;
-    btn.textContent = loadingLabel;
   }
+  const syncPending = createSyncPending({
+    softDelayMs,
+    onChange: (state) => {
+      if (!btn?.isConnected) return;
+      if (state.visible) {
+        btn.textContent = loadingLabel;
+      }
+    },
+  });
+  const token = syncPending.start();
   try {
     return await launchFn();
   } finally {
+    syncPending.end(token);
+    syncPending.dispose();
     if (btn?.isConnected) {
       btn.disabled = false;
       if (prevLabel) btn.textContent = prevLabel;

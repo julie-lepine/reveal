@@ -41,11 +41,14 @@ describe("Guess Lie UX Vague A — contrats source vote", () => {
     assert.match(src, /async function submitVote\(pick\)/);
   });
 
-  it("submitVote : render() avant await commitGuessLieVote", () => {
+  it("submitVote : lock + pending + render() avant await commitGuessLieVote", () => {
     const fn = src.slice(src.indexOf("async function submitVote"));
     const fnEnd = fn.indexOf("\n  function render()");
     const body = fn.slice(0, fnEnd);
-    assert.match(body, /voteCommitInFlight = pick;\s*\n\s*render\(\)/);
+    assert.match(
+      body,
+      /voteCommitInFlight = pick;\s*\n\s*const pendingToken = syncPending\.start\(\);\s*\n\s*render\(\)/
+    );
     assert.match(body, /await commitGuessLieVote\(pick\)/);
     assert.ok(body.indexOf("render()") < body.indexOf("await commitGuessLieVote"));
   });
@@ -54,8 +57,12 @@ describe("Guess Lie UX Vague A — contrats source vote", () => {
     assert.match(src, /if \(pick == null \|\| voteCommitInFlight != null\) return/);
   });
 
-  it("bouton Envoi… pendant in-flight", () => {
-    assert.match(src, /voteCommitInFlight != null \? "Envoi…"/);
+  it("bouton Envoi… seulement si soft pending visible", () => {
+    assert.match(
+      src,
+      /syncPending\.getState\(\)\.visible\s*\?\s*"Envoi…"\s*:\s*confirm\.confirmLabel/
+    );
+    assert.match(src, /pendingVisible \? "Envoi…" : confirm\.confirmLabel/);
   });
 
   it("syncFromGl ne copie plus selected depuis votes commités", () => {

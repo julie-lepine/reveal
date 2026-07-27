@@ -24,6 +24,7 @@ import {
   refreshGameScoresBox,
 } from "../core/gameScores.js";
 import { getActivePlayers, getActivePlayerNames } from "../core/players.js";
+import { createSyncPending } from "../core/syncPending.js";
 import {
   formatNameList,
   formatWinnersLabel,
@@ -143,6 +144,14 @@ export function mountHotTake(app) {
   /** Vote en cours d’envoi - évite que la synchro efface l’UI avant la réponse serveur. */
   let voteCommitInFlight = null;
   const mount = createMountGuard();
+  /** ARCH-22 — soft « Envoi… » ; ne remplace pas voteCommitInFlight. */
+  const syncPending = createSyncPending({
+    softDelayMs: 500,
+    onChange: () => {
+      if (!mount.isMounted() || !mount.isCurrentMount()) return;
+      render();
+    },
+  });
   const localName = getLocalDisplayName();
   const mp = isGameSyncActive();
 
@@ -635,6 +644,7 @@ export function mountHotTake(app) {
     if (pick == null || voteCommitInFlight != null) return;
     if (mp) {
       voteCommitInFlight = pick;
+      const pendingToken = syncPending.start();
       render();
       try {
         await commitHotTakeVote(pick);
@@ -646,6 +656,7 @@ export function mountHotTake(app) {
         // Feedback déjà affiché ; rollback session dans commitHotTakeVote.
       } finally {
         voteCommitInFlight = null;
+        syncPending.end(pendingToken);
         if (mount.isMounted() && mount.isCurrentMount()) syncFromSession();
       }
       if (!mount.isMounted()) return;
@@ -711,6 +722,10 @@ export function mountHotTake(app) {
         allIn,
         emptyHint: "Choisis ton camp !",
       });
+      const confirmBusy = voteCommitInFlight != null;
+      const confirmLabel = syncPending.getState().visible
+        ? "Envoi…"
+        : confirm.confirmLabel;
       phaseHtml = `
         <p class="label-upper label-upper--muted">Vote simultané</p>
         <div class="vote-buttons">
@@ -727,7 +742,7 @@ export function mountHotTake(app) {
         ${outsiderTip}
         <p class="hint">${escapeHtml(confirm.hint)}</p>
         <button type="button" class="btn ${confirm.confirmClass} btn--spaced" id="hottake-confirm"
-          ${confirm.confirmDisabled ? "disabled" : ""}>${escapeHtml(confirm.confirmLabel)}</button>
+          ${confirm.confirmDisabled || confirmBusy ? "disabled" : ""}>${escapeHtml(confirmLabel)}</button>
         ${
           host
             ? `<button type="button" class="btn btn-secondary btn--spaced" id="hottake-force">
@@ -978,6 +993,7 @@ export function mountHotTake(app) {
   lastAckedActingHostToken = getActingHostUiRefreshToken();
 
   return () => {
+    syncPending.dispose();
     mount.dispose();
     unsubGame();
     if (!mp) setLobbyWaiting();
