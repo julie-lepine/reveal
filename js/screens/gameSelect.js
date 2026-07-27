@@ -9,7 +9,7 @@ import {
   gameTileVisualHtml,
   bindGameTileLogos,
 } from "../core/ui.js";
-import { handleNavTarget, goToEveningSettings } from "./nav.js";
+import { handleNavTarget } from "./nav.js";
 import {
   isGameSyncActive,
   isLobbyHost,
@@ -22,7 +22,7 @@ import {
 import { getCurrentScreen } from "../core/router.js";
 import { isSupabaseConfigured } from "../core/supabaseClient.js";
 import { startLobbyPresenceSync, onLobbyBundleUpdated, getClaimHubUiToken } from "../core/supabaseLobby.js";
-import { getLobby, hasActiveLobby, openPartySettings, isVoluntaryLeaveInFlight } from "../core/lobby.js";
+import { getLobby, hasActiveLobby } from "../core/lobby.js";
 import { clientMayOfferHostClaim } from "../core/hostClaimOffer.js";
 import { getLastGame, getState } from "../core/state.js";
 import { arch03LiveLog } from "../core/presenceUiLive.js";
@@ -152,7 +152,6 @@ function buildGameSelectHandlers() {
     "hottake-prep": launchHotTakePrep,
     guesslie: launchGuessLieMenu,
     "tiernight-select": launchTierNightSelect,
-    settings: () => goToEveningSettings(),
   };
 }
 
@@ -244,15 +243,6 @@ function gameSelectHeaderHtml() {
     </div>`;
 }
 
-function partySettingsButtonHtml() {
-  // Accessible hôte + membre (sync MP) — actions différenciées dans openPartySettings.
-  if (!isGameSyncActive()) return "";
-  return `
-      <button type="button" class="game-select-party-settings" data-party-settings>
-        ⚙️ Paramètres
-      </button>`;
-}
-
 /** CTA distinct ARCH-03b : offre claim sans réutiliser le libellé admin. */
 function reclaimHostCtaHtml() {
   if (!isGameSyncActive() || isLobbyHost()) return "";
@@ -264,11 +254,11 @@ function reclaimHostCtaHtml() {
 }
 
 function gameSelectActionsHtml() {
+  const reclaim = reclaimHostCtaHtml();
+  if (!reclaim) return "";
   return `
     <div class="game-select-actions">
-      <button type="button" class="game-select-profile" data-nav="settings">Profil & paramètres</button>
-      ${partySettingsButtonHtml()}
-      ${reclaimHostCtaHtml()}
+      ${reclaim}
     </div>`;
 }
 
@@ -334,18 +324,6 @@ export function mountGameSelect(app) {
     const restartEl = e.target.closest("[data-restart-game]");
     if (restartEl) {
       void restartGame(restartEl.getAttribute("data-restart-game"));
-      return;
-    }
-
-    if (e.target.closest("[data-party-settings]")) {
-      if (isVoluntaryLeaveInFlight()) return;
-      void openPartySettings().then((res) => {
-        if (res.action === "close" || res.action === "leave") {
-          if (res.ok) return;
-        }
-        if (getCurrentScreen() !== "game-select") return;
-        if (res.ok || res.claimed) scheduleRender(true);
-      });
       return;
     }
 

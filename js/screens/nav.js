@@ -30,15 +30,18 @@ export async function goToEveningHome() {
   await returnToEveningGames({ hubOnly: true });
 }
 
-/** Paramètres profil sans quitter le lobby. */
+/** Paramètres : écran unique (profil + partie si lobby). */
 export function goToEveningSettings() {
   if (!canPlay()) {
     navigate("home", { reset: true });
     return;
   }
+  if (getCurrentScreen() === "settings") return;
+
   if (hasActiveLobby()) {
     suppressSessionRoute(120000, getCachedGameSession()?.screen ?? null);
-    navigate("settings", { navStack: ["game-select", "settings"] });
+    // Push sur la pile courante (game-select / results / leaderboard / …).
+    navigate("settings");
     return;
   }
   navigate("settings", { navStack: ["home", "settings"] });

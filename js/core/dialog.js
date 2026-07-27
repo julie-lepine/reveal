@@ -9,9 +9,6 @@ import {
 } from "./turnstile.js";
 import { PROFILE_EMOJI_CHOICES } from "../../data/profileEmojis.js";
 import { getState } from "./state.js";
-import { partySettingsActionsForRole } from "./partySettingsMenu.js";
-
-export { partySettingsActionsForRole } from "./partySettingsMenu.js";
 
 let openDialog = null;
 
@@ -412,91 +409,6 @@ export function showTransferHostDialog(
     openDialog = root;
     requestAnimationFrame(() => root.classList.add("app-dialog--in"));
     select?.focus();
-  });
-}
-
-/** Actions du menu Paramètres de partie selon le rôle (hôte vs membre). */
-function partySettingsMenuHtml({ role = "host", canTransferHost = true } = {}) {
-  if (role !== "host") {
-    return `
-          <button type="button" class="btn btn-secondary app-dialog__menu-btn app-dialog__menu-btn--danger" data-party-action="leave">
-            🚪 Quitter le lobby
-          </button>`;
-  }
-
-  const transferBtn = canTransferHost
-    ? `<button type="button" class="btn btn-secondary app-dialog__menu-btn" data-party-action="transfer">
-          👑 Transférer l'hôte
-        </button>`
-    : `<button type="button" class="btn btn-secondary app-dialog__menu-btn" data-party-action="transfer" disabled title="Ajoute un autre joueur">
-          👑 Transférer l'hôte
-        </button>`;
-
-  return `
-          ${transferBtn}
-          <button type="button" class="btn btn-secondary app-dialog__menu-btn" data-party-action="players">
-            👥 Gestion des joueurs
-          </button>
-          <button type="button" class="btn btn-secondary app-dialog__menu-btn app-dialog__menu-btn--danger" data-party-action="close">
-            🚪 Fermer le lobby
-          </button>`;
-}
-
-/**
- * Menu paramètres de partie (hôte) ou sortie volontaire (membre).
- * @returns {Promise<{ ok: true, action: "transfer"|"players"|"close"|"leave" } | { ok: false }>}
- */
-export function showPartySettingsDialog({
-  canTransferHost = true,
-  role = "host",
-} = {}) {
-  return new Promise((resolve) => {
-    if (openDialog) {
-      removeDialog(openDialog, () => {});
-      openDialog = null;
-    }
-
-    const root = document.createElement("div");
-    root.className = "app-dialog";
-    root.setAttribute("role", "dialog");
-    root.setAttribute("aria-modal", "true");
-    root.setAttribute("aria-labelledby", "app-dialog-title");
-
-    const close = (result) => removeDialog(root, () => resolve(result));
-    const allowed = new Set(partySettingsActionsForRole(role));
-
-    root.innerHTML = `
-      <div class="app-dialog__backdrop" data-dialog-dismiss aria-hidden="true"></div>
-      <div class="app-dialog__panel app-dialog__panel--rich">
-        <div class="app-dialog__glow" aria-hidden="true"></div>
-        <p class="app-dialog__icon" aria-hidden="true">⚙️</p>
-        <p class="app-dialog__title" id="app-dialog-title">Paramètres de partie</p>
-        <div class="app-dialog__rich app-dialog__menu">
-          ${partySettingsMenuHtml({ role, canTransferHost })}
-        </div>
-        <button type="button" class="btn btn-primary app-dialog__btn" data-dialog-cancel>Fermer</button>
-      </div>
-    `;
-
-    root.querySelectorAll("[data-party-action]").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        if (btn.disabled) return;
-        const action = btn.getAttribute("data-party-action");
-        if (allowed.has(action)) {
-          close({ ok: true, action });
-        }
-      });
-    });
-    root.querySelector("[data-dialog-cancel]")?.addEventListener("click", () => close({ ok: false }));
-    root.querySelector("[data-dialog-dismiss]")?.addEventListener("click", () => close({ ok: false }));
-    root.addEventListener("keydown", (e) => {
-      if (e.key === "Escape") close({ ok: false });
-    });
-
-    document.body.appendChild(root);
-    openDialog = root;
-    requestAnimationFrame(() => root.classList.add("app-dialog--in"));
-    root.querySelector("[data-party-action]:not([disabled]), [data-dialog-cancel]")?.focus();
   });
 }
 

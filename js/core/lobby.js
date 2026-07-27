@@ -66,8 +66,6 @@ import {
   showAppAlert,
   showAppConfirm,
   showTransferHostDialog,
-  showPartySettingsDialog,
-  showLobbyPlayersManageDialog,
 } from "./dialog.js";
 
 export {
@@ -1155,60 +1153,6 @@ export async function kickLobbyMember(targetUserId, { confirmName = "" } = {}) {
   }
 
   return { ok: true };
-}
-
-/**
- * Paramètres de partie (hub jeux + barre nav) — même flux pour hôte et membre.
- * Hôte : transfert / joueurs / fermer le lobby.
- * Membre : quitter le lobby (soi uniquement) — pas d’UI admin, pas de claim ici
- * (claim = CTA « Reprendre l’animation » séparé, ARCH-03b).
- * @returns {Promise<{ ok: boolean, cancelled?: boolean, action?: string, claimed?: boolean, error?: string }>}
- */
-export async function openPartySettings() {
-  if (!isSupabaseConfigured() || !getLobby()?.id) {
-    return { ok: false, error: "Multijoueur en ligne requis." };
-  }
-
-  if (!isLocalLobbyHost()) {
-    const choice = await showPartySettingsDialog({ role: "member" });
-    if (!choice?.ok) return { ok: false, cancelled: true };
-    if (choice.action === "leave") {
-      const res = await confirmAndLeaveLobby({ navigateAway: true });
-      if (!res.cancelled && !res.ok) {
-        await notifyVoluntaryLeaveFailure(res);
-      }
-      return { ...res, action: "leave" };
-    }
-    return { ok: false, cancelled: true };
-  }
-
-  const others = getLobbyParticipants().filter((p) => !p.isLocal && p.userId);
-  const choice = await showPartySettingsDialog({
-    role: "host",
-    canTransferHost: others.length > 0,
-  });
-  if (!choice?.ok) return { ok: false, cancelled: true };
-
-  if (choice.action === "transfer") {
-    return transferLobbyHost();
-  }
-
-  if (choice.action === "players") {
-    await showLobbyPlayersManageDialog({
-      getParticipants: () => getLobbyParticipants(),
-      maxPlayers: MAX_PLAYERS,
-      canKick: canManageLobbyRoster(),
-      onKick: (userId, name) => kickLobbyMember(userId, { confirmName: name }),
-    });
-    return { ok: true, action: "players" };
-  }
-
-  if (choice.action === "close") {
-    const res = await confirmAndLeaveLobby({ navigateAway: true });
-    return { ...res, action: "close" };
-  }
-
-  return { ok: false, cancelled: true };
 }
 
 export async function setLocalReady(ready) {

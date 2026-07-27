@@ -54,36 +54,24 @@ describe("UX-NAV-LOBBY — catalogue menu", () => {
   });
 });
 
-describe("UX-NAV-LOBBY — Paramètres unifiés", () => {
-  it("4 — entrée Paramètres (nav + game-select) appelle openPartySettings", () => {
+describe("UX-NAV-LOBBY — Paramètres (écran settings, pas modale)", () => {
+  it("4 — entrée Paramètres bottom nav → goToEveningSettings", () => {
     const nav = src("js/core/bottomNav.js");
-    assert.match(nav, /openPartySettings/);
-    assert.match(nav, /TAB_SETTINGS[\s\S]*goSettings|goSettings[\s\S]*openPartySettings/);
-    assert.match(nav, /async function goSettings/);
-    assert.match(nav, /await openPartySettings\(\)/);
-
-    const gs = src("js/screens/gameSelect.js");
-    assert.match(gs, /data-party-settings/);
-    assert.match(gs, /openPartySettings\(\)/);
-    // Visible sync MP pour hôte ET membre (plus de filtre isLobbyHost).
-    const btnFn = gs.slice(
-      gs.indexOf("function partySettingsButtonHtml"),
-      gs.indexOf("function reclaimHostCtaHtml")
-    );
-    assert.match(btnFn, /isGameSyncActive\(\)/);
-    assert.equal(btnFn.includes("isLobbyHost()"), false);
+    assert.match(nav, /goToEveningSettings/);
+    assert.equal(nav.includes("openPartySettings"), false);
+    assert.match(nav, /function goSettings/);
   });
 
-  it("5 — invité voit Quitter le lobby (pas Fermer)", () => {
+  it("5 — invité : action leave seule (helper rôle)", () => {
     const actions = partySettingsActionsForRole("member");
     assert.deepEqual([...actions], ["leave"]);
     assert.equal(actions.includes("close"), false);
-    const dialog = src("js/core/dialog.js");
-    assert.match(dialog, /Quitter le lobby/);
-    assert.match(dialog, /role !== "host"/);
+    const settings = src("js/screens/settings.js");
+    assert.match(settings, /data-settings-party="leave"/);
+    assert.match(settings, /Quitter le lobby/);
   });
 
-  it("6 — invité ne voit pas Fermer le lobby", () => {
+  it("6 — invité ne voit pas Fermer / transfert / joueurs (helper)", () => {
     assert.equal(partySettingsActionsForRole("member").includes("close"), false);
     assert.equal(partySettingsActionsForRole("member").includes("transfer"), false);
     assert.equal(partySettingsActionsForRole("member").includes("players"), false);
@@ -95,6 +83,10 @@ describe("UX-NAV-LOBBY — Paramètres unifiés", () => {
       "players",
       "close",
     ]);
+    const settings = src("js/screens/settings.js");
+    assert.match(settings, /data-settings-party="close"/);
+    assert.match(settings, /data-settings-party="transfer"/);
+    assert.match(settings, /data-settings-party="players"/);
   });
 
   it("8 — hôte ne voit pas l’action leave réservée aux membres", () => {
@@ -115,17 +107,10 @@ describe("UX-NAV-LOBBY — sortie volontaire invité", () => {
     assert.match(confirmBlock, /return leaveFn\(/);
     assert.match(confirmBlock, /dissolveFn/);
 
-    // openPartySettings membre → leave → notify on failure
-    const openIdx = lobby.indexOf("export async function openPartySettings");
-    const openEnd = lobby.indexOf("export async function setLocalReady", openIdx);
-    const openBlock = lobby.slice(openIdx, openEnd);
-    assert.match(openBlock, /role:\s*"member"/);
-    assert.match(openBlock, /action === "leave"/);
-    assert.match(openBlock, /confirmAndLeaveLobby\(\{\s*navigateAway:\s*true/);
-    assert.match(openBlock, /notifyVoluntaryLeaveFailure/);
-    assert.match(openBlock, /role:\s*"host"/);
-    assert.match(openBlock, /action === "close"/);
-    assert.equal(openBlock.includes("ensureLobbyHostOrOfferClaim"), false);
+    // settings : leave/close via confirmAndLeaveLobby + notify
+    const settings = src("js/screens/settings.js");
+    assert.match(settings, /confirmAndLeaveLobby\(\{\s*navigateAway:\s*true/);
+    assert.match(settings, /notifyVoluntaryLeaveFailure/);
 
     // applyLeaveLobbyLocal : reset + navigate home reset
     assert.match(lobby, /function applyLeaveLobbyLocal/);
@@ -215,12 +200,14 @@ describe("UX-NAV-LOBBY — Accueil inaccessible en lobby (nav)", () => {
     assert.equal(afterGuard.includes('navigate("home"'), false);
   });
 
-  it("settings en lobby : stack game-select (pas home)", () => {
+  it("settings en lobby : push navigate (conserve pile results/game-select)", () => {
     const nav = src("js/screens/nav.js");
-    assert.match(
-      nav,
-      /navigate\("settings",\s*\{\s*navStack:\s*\["game-select",\s*"settings"\]\s*\}\)/
+    const fn = nav.slice(
+      nav.indexOf("export function goToEveningSettings"),
+      nav.indexOf("export async function returnFromEveningProfile")
     );
+    assert.match(fn, /navigate\("settings"\)/);
+    assert.equal(fn.includes('["game-select", "settings"]'), false);
   });
 
   it("bottomNav n’appelle plus goToEveningHome", () => {

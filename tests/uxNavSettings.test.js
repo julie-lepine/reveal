@@ -1,0 +1,120 @@
+/**
+ * UX-NAV-SETTINGS — écran Paramètres unique (profil + partie).
+ */
+import { describe, it } from "node:test";
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+import {
+  BOTTOM_NAV_TAB,
+  isBottomNavTabVisible,
+  resolveBottomNavTabs,
+} from "../js/core/bottomNavItems.js";
+import {
+  lobbySettingsActionsForRole,
+  partySettingsActionsForRole,
+} from "../js/core/partySettingsMenu.js";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const ROOT = join(__dirname, "..");
+
+function src(rel) {
+  return readFileSync(join(ROOT, rel), "utf8");
+}
+
+describe("UX-NAV-SETTINGS — navigation", () => {
+  it("lobby actif → Paramètres bottom nav → goToEveningSettings (pas openPartySettings)", () => {
+    const nav = src("js/core/bottomNav.js");
+    assert.match(nav, /goToEveningSettings/);
+    assert.equal(nav.includes("openPartySettings"), false);
+    assert.match(nav, /settings:\s*TAB_SETTINGS/);
+    assert.equal(isBottomNavTabVisible(true, BOTTOM_NAV_TAB.SETTINGS), true);
+    assert.equal(isBottomNavTabVisible(true, BOTTOM_NAV_TAB.HOME), false);
+  });
+
+  it("hors lobby → Accueil dans le catalogue, pas Paramètres", () => {
+    assert.deepEqual([...resolveBottomNavTabs(false)], [
+      "home",
+      "games",
+      "logo",
+      "results",
+      "final",
+    ]);
+  });
+
+  it("goToEveningSettings en lobby pousse settings (pas de stack forcée game-select)", () => {
+    const nav = src("js/screens/nav.js");
+    const fn = nav.slice(
+      nav.indexOf("export function goToEveningSettings"),
+      nav.indexOf("export async function returnFromEveningProfile")
+    );
+    assert.match(fn, /navigate\("settings"\)/);
+    assert.equal(fn.includes('navStack: ["game-select"'), false);
+    assert.match(fn, /getCurrentScreen\(\) === "settings"/);
+  });
+});
+
+describe("UX-NAV-SETTINGS — game-select sans doublon", () => {
+  it("n’affiche plus Profil & paramètres ni Paramètres party", () => {
+    const gs = src("js/screens/gameSelect.js");
+    assert.equal(gs.includes("Profil & paramètres"), false);
+    assert.equal(gs.includes("data-party-settings"), false);
+    assert.equal(gs.includes("openPartySettings"), false);
+    assert.equal(gs.includes("partySettingsButtonHtml"), false);
+    assert.match(gs, /Reprendre l'animation|data-claim-host/);
+  });
+});
+
+describe("UX-NAV-SETTINGS — contenu écran", () => {
+  it("profil existant conservé + section Partie en cours conditionnelle", () => {
+    const settings = src("js/screens/settings.js");
+    assert.match(settings, /Emoji/);
+    assert.match(settings, /Pseudo/);
+    assert.match(settings, /Mot de passe/);
+    assert.match(settings, /Aide/);
+    assert.match(settings, /Légal/);
+    assert.match(settings, /btn-save-name/);
+    assert.match(settings, /updateProfileEmoji/);
+    assert.match(settings, /changeEmailPassword/);
+    assert.match(settings, /Partie en cours/);
+    assert.match(settings, /hasActiveLobby\(\)/);
+    assert.match(settings, /data-settings-party="leave"/);
+    assert.match(settings, /data-settings-party="close"/);
+    assert.match(settings, /data-settings-party="transfer"/);
+    assert.match(settings, /data-settings-party="players"/);
+    assert.match(settings, /confirmAndLeaveLobby/);
+    assert.match(settings, /notifyVoluntaryLeaveFailure/);
+    assert.match(settings, /transferLobbyHost/);
+    assert.match(settings, /showLobbyPlayersManageDialog/);
+    assert.equal(settings.includes("ensureLobbyHostOrOfferClaim"), false);
+    assert.equal(settings.includes("openPartySettings"), false);
+    assert.match(settings, /onLobbyBundleUpdated/);
+    assert.match(settings, /createMountGuard/);
+    assert.match(settings, /mount\.dispose/);
+  });
+
+  it("rôle hôte / membre via lobbySettingsActionsForRole", () => {
+    assert.deepEqual([...lobbySettingsActionsForRole("host")], [
+      "transfer",
+      "players",
+      "close",
+    ]);
+    assert.deepEqual([...lobbySettingsActionsForRole("member")], ["leave"]);
+    assert.equal(lobbySettingsActionsForRole("host").includes("leave"), false);
+    assert.equal(lobbySettingsActionsForRole("member").includes("close"), false);
+    // Alias rétrocompat tests / imports
+    assert.equal(partySettingsActionsForRole, lobbySettingsActionsForRole);
+  });
+});
+
+describe("UX-NAV-SETTINGS — modules morts retirés", () => {
+  it("openPartySettings et showPartySettingsDialog absents", () => {
+    const lobby = src("js/core/lobby.js");
+    assert.equal(lobby.includes("export async function openPartySettings"), false);
+    assert.equal(lobby.includes("showPartySettingsDialog"), false);
+    const dialog = src("js/core/dialog.js");
+    assert.equal(dialog.includes("showPartySettingsDialog"), false);
+    assert.equal(dialog.includes("Paramètres de partie"), false);
+  });
+});

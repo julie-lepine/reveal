@@ -1,5 +1,5 @@
 import { APP_LOGO } from "../../data/branding.js";
-import { hasActiveLobby, openPartySettings, returnToEveningGames, isVoluntaryLeaveInFlight } from "./lobby.js";
+import { hasActiveLobby, returnToEveningGames } from "./lobby.js";
 import {
   BOTTOM_NAV_TAB,
   resolveBottomNavTabs,
@@ -13,6 +13,7 @@ import {
   returnToGameSelect,
 } from "./gameSync.js";
 import { exitGameToGameSelect } from "./exitGame.js";
+import { goToEveningSettings } from "../screens/nav.js";
 
 const TAB_HOME = BOTTOM_NAV_TAB.HOME;
 const TAB_SETTINGS = BOTTOM_NAV_TAB.SETTINGS;
@@ -21,14 +22,14 @@ const TAB_LOGO = BOTTOM_NAV_TAB.LOGO;
 const TAB_RESULTS = BOTTOM_NAV_TAB.RESULTS;
 const TAB_FINAL = BOTTOM_NAV_TAB.FINAL;
 
-/** Écran courant → onglet actif (Paramètres = action dialog, jamais destination). */
+/** Écran courant → onglet actif (settings = onglet Paramètres en lobby). */
 const SCREEN_TO_TAB = {
   home: TAB_HOME,
   lobby: TAB_LOGO,
   "game-select": TAB_GAMES,
   leaderboard: TAB_FINAL,
   results: TAB_RESULTS,
-  settings: TAB_GAMES,
+  settings: TAB_SETTINGS,
   "hottake-prep": TAB_GAMES,
   hottake: TAB_GAMES,
   "speedvote-prep": TAB_GAMES,
@@ -82,10 +83,10 @@ function goFinal() {
   goToScores("leaderboard");
 }
 
-/** Même flux que game-select → Paramètres (dialog hôte/membre). */
-async function goSettings() {
-  if (!hasActiveLobby() || isVoluntaryLeaveInFlight()) return;
-  await openPartySettings();
+/** Onglet Paramètres → écran settings (plus de modale party). */
+function goSettings() {
+  if (!hasActiveLobby()) return;
+  goToEveningSettings();
 }
 
 const TAB_ACTIONS = {

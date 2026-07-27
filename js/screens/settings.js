@@ -8,50 +8,107 @@ import {
 } from "../core/auth.js";
 import { getLocalDisplayName, getLocalEmoji } from "../core/state.js";
 import { PROFILE_EMOJI_CHOICES } from "../../data/profileEmojis.js";
-import { hasActiveLobby, getLobby } from "../core/lobby.js";
-import { navigate } from "../core/router.js";
+import {
+  hasActiveLobby,
+  getLobby,
+  getLobbyParticipants,
+  confirmAndLeaveLobby,
+  notifyVoluntaryLeaveFailure,
+  transferLobbyHost,
+  canManageLobbyRoster,
+  kickLobbyMember,
+  isVoluntaryLeaveInFlight,
+} from "../core/lobby.js";
+import { isLobbyHost } from "../core/gameSync.js";
+import { isSupabaseConfigured } from "../core/supabaseClient.js";
+import { onLobbyBundleUpdated } from "../core/supabaseLobby.js";
+import { showLobbyPlayersManageDialog } from "../core/dialog.js";
+import { MAX_PLAYERS } from "../config/lobbyLifecycle.js";
+import { lobbySettingsActionsForRole } from "../core/partySettingsMenu.js";
+import { navigate, getCurrentScreen } from "../core/router.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
 import { INSTAGRAM_HANDLE, INSTAGRAM_PROFILE_URL, ACCOUNT_DELETION_PUBLIC_URL } from "../../data/appConfig.js";
 import { openExternalUrl } from "../core/openExternal.js";
 import { openInstagramProfile } from "../core/feedbackUi.js";
-import { bindNav, goToEveningSettings, returnFromEveningProfile } from "./nav.js";
+import { createMountGuard } from "../core/mountLifecycle.js";
+import { bindNav, returnFromEveningProfile } from "./nav.js";
 
-export function mountSettings(app) {
-  if (!canPlay()) {
-    navigate("home", { reset: true });
-    return null;
-  }
+function localLobbyRole() {
+  if (!hasActiveLobby()) return null;
+  return isLobbyHost() ? "host" : "member";
+}
 
-  const user = getUser();
-  const emailAccount = isEmailAccount();
+function partySectionSnapshot() {
+  if (!hasActiveLobby()) return "none";
+  const others = getLobbyParticipants().filter((p) => !p.isLocal && p.userId);
+  return JSON.stringify({
+    code: getLobby()?.code || "",
+    role: localLobbyRole(),
+    n: getLobbyParticipants().length,
+    canTransfer: others.length > 0,
+    canRoster: canManageLobbyRoster(),
+    sync: isSupabaseConfigured() && Boolean(getLobby()?.id),
+  });
+}
 
-  let selectedEmoji = getLocalEmoji();
+function partySectionHtml() {
+  if (!hasActiveLobby()) return "";
 
-  function render() {
-    selectedEmoji = getLocalEmoji();
-    const inLobby = hasActiveLobby();
-    const lobbyCode = inLobby ? getLobby()?.code : "";
+  const code = getLobby()?.code || "";
+  const role = localLobbyRole();
+  const actions = lobbySettingsActionsForRole(role || "member");
+  const others = getLobbyParticipants().filter((p) => !p.isLocal && p.userId);
+  const canTransfer = others.length > 0;
+  const mpReady = isSupabaseConfigured() && Boolean(getLobby()?.id);
 
-    app.innerHTML = pageShell({
-      back: !inLobby,
-      backTarget: inLobby ? "back" : "home",
-      content: `
-        <p class="label-upper">Paramètres</p>
-        <h1 class="page-title">Ton profil</h1>
-
-        ${
-          inLobby
-            ? `
-        <div class="card card--highlight settings-lobby-banner">
-          <p class="hint settings-lobby-banner__text">
-            Soirée en cours - lobby <strong>${escapeHtml(lobbyCode || "")}</strong>.
-            Tu restes connecté : pseudo et emoji s’appliquent pour tout le monde.
-          </p>
-          <button type="button" class="btn btn-accent btn--spaced" data-nav="evening-return">Retour aux jeux</button>
+  const hostActions = actions.includes("transfer")
+    ? `
+        <button type="button" class="btn btn-secondary btn--spaced settings-party__btn" data-settings-party="transfer"${
+          !mpReady || !canTransfer ? " disabled" : ""
+        } title="${canTransfer ? "" : "Ajoute un autre joueur"}">
+          👑 Transférer l'hôte
+        </button>
+        <button type="button" class="btn btn-secondary btn--spaced settings-party__btn" data-settings-party="players"${
+          !mpReady ? " disabled" : ""
+        }>
+          👥 Gestion des joueurs
+        </button>
+        <div class="settings-party__danger">
+          <button type="button" class="btn btn-secondary btn--spaced settings-party__btn settings-party__btn--danger" data-settings-party="close"${
+            !mpReady ? " disabled" : ""
+          }>
+            🚪 Fermer le lobby
+          </button>
         </div>`
-            : ""
-        }
+    : `
+        <div class="settings-party__danger">
+          <button type="button" class="btn btn-secondary btn--spaced settings-party__btn settings-party__btn--danger" data-settings-party="leave"${
+            !mpReady || isVoluntaryLeaveInFlight() ? " disabled" : ""
+          }>
+            🚪 Quitter le lobby
+          </button>
+        </div>`;
 
+  return `
+    <div class="card settings-section settings-party" id="settings-party-section">
+      <h2 class="settings-section__title">Partie en cours</h2>
+      <p class="hint settings-section__hint">
+        Lobby <strong>${escapeHtml(code || "—")}</strong>
+        ${role === "host" ? " · tu es l'hôte" : " · tu es membre"}
+      </p>
+      ${
+        !mpReady
+          ? `<p class="hint">Actions lobby disponibles en multijoueur en ligne.</p>`
+          : ""
+      }
+      <div class="settings-party__actions">
+        ${hostActions}
+      </div>
+    </div>`;
+}
+
+function profileSectionsHtml({ emailAccount, user, selectedEmoji }) {
+  return `
         <div class="card settings-section">
           <h2 class="settings-section__title">Emoji</h2>
           <p class="hint settings-section__hint">Affiché dans le lobby et les classements.</p>
@@ -128,23 +185,32 @@ export function mountSettings(app) {
             Suppression définitive du compte e-mail et des données associées (voir aussi
             <a href="${escapeHtml(ACCOUNT_DELETION_PUBLIC_URL)}" id="link-delete-account-web" target="_blank" rel="noopener noreferrer">la page web</a>).
           </p>
-        </div>
-      `,
-    });
+        </div>`;
+}
 
-    bindNav(app, {
-      "evening-return": () => returnFromEveningProfile(),
-    });
-    bindEvents();
+export function mountSettings(app) {
+  if (!canPlay()) {
+    navigate("home", { reset: true });
+    return null;
   }
 
-  function bindEvents() {
+  const mount = createMountGuard();
+  const user = getUser();
+  const emailAccount = isEmailAccount();
+
+  let selectedEmoji = getLocalEmoji();
+  let lastPartySnap = "";
+  let partyActionInFlight = false;
+
+  function bindProfileEvents() {
     app.querySelectorAll(".emoji-picker__btn").forEach((btn) => {
       btn.addEventListener("click", async () => {
+        if (!mount.isMounted()) return;
         const emoji = btn.getAttribute("data-emoji");
         const err = app.querySelector("#emoji-error");
         const ok = app.querySelector("#emoji-ok");
         const res = await updateProfileEmoji(emoji);
+        if (!mount.isMounted()) return;
         if (!res.ok) {
           if (err) {
             err.textContent = res.error || "Impossible d'enregistrer l'emoji.";
@@ -181,9 +247,11 @@ export function mountSettings(app) {
     });
 
     app.querySelector("#btn-save-name")?.addEventListener("click", async () => {
+      if (!mount.isMounted()) return;
       const err = app.querySelector("#name-error");
       const ok = app.querySelector("#name-ok");
       const res = await updateProfileName(app.querySelector("#settings-name").value);
+      if (!mount.isMounted()) return;
       if (!res.ok) {
         err.textContent = res.error;
         err.classList.remove("hidden");
@@ -196,6 +264,7 @@ export function mountSettings(app) {
     });
 
     app.querySelector("#btn-save-password")?.addEventListener("click", async () => {
+      if (!mount.isMounted()) return;
       const err = app.querySelector("#pwd-error");
       const ok = app.querySelector("#pwd-ok");
       err.classList.add("hidden");
@@ -212,6 +281,7 @@ export function mountSettings(app) {
       }
 
       const res = await changeEmailPassword(current, next);
+      if (!mount.isMounted()) return;
       if (!res.ok) {
         err.textContent = res.error;
         err.classList.remove("hidden");
@@ -225,6 +295,130 @@ export function mountSettings(app) {
     });
   }
 
+  async function onPartyAction(action) {
+    if (!mount.isMounted() || partyActionInFlight) return;
+    if (getCurrentScreen() !== "settings") return;
+
+    partyActionInFlight = true;
+    try {
+      if (action === "transfer") {
+        await transferLobbyHost();
+        if (mount.isMounted()) refreshPartySection(true);
+        return;
+      }
+      if (action === "players") {
+        await showLobbyPlayersManageDialog({
+          getParticipants: () => getLobbyParticipants(),
+          maxPlayers: MAX_PLAYERS,
+          canKick: canManageLobbyRoster(),
+          onKick: (userId, name) => kickLobbyMember(userId, { confirmName: name }),
+        });
+        if (mount.isMounted()) refreshPartySection(true);
+        return;
+      }
+      if (action === "close" || action === "leave") {
+        const res = await confirmAndLeaveLobby({ navigateAway: true });
+        if (!mount.isMounted()) return;
+        if (res.cancelled) {
+          refreshPartySection(true);
+          return;
+        }
+        if (!res.ok) {
+          await notifyVoluntaryLeaveFailure(res);
+          if (mount.isMounted()) refreshPartySection(true);
+          return;
+        }
+        // Succès : navigate Home (reset) via leave/dissolve — écran démonté.
+        return;
+      }
+    } finally {
+      partyActionInFlight = false;
+    }
+  }
+
+  function bindPartyEvents() {
+    app.querySelector("#settings-party-section")?.addEventListener("click", (e) => {
+      const btn = e.target.closest("[data-settings-party]");
+      if (!btn || btn.disabled) return;
+      const action = btn.getAttribute("data-settings-party");
+      void onPartyAction(action);
+    });
+  }
+
+  function refreshPartySection(force = false) {
+    if (!mount.isMounted()) return;
+    const snap = partySectionSnapshot();
+    if (!force && snap === lastPartySnap) return;
+    lastPartySnap = snap;
+
+    const existing = app.querySelector("#settings-party-section");
+    const html = partySectionHtml();
+    if (!html) {
+      existing?.remove();
+      return;
+    }
+    if (existing) {
+      existing.outerHTML = html;
+    } else {
+      // Après le dernier bloc profil (légal) — ou en fin de pageShell content
+      const legal = [...app.querySelectorAll(".settings-section")].pop();
+      if (legal) legal.insertAdjacentHTML("afterend", html);
+      else app.querySelector(".page")?.insertAdjacentHTML("beforeend", html);
+    }
+    bindPartyEvents();
+  }
+
+  function render() {
+    if (!mount.isMounted()) return;
+    selectedEmoji = getLocalEmoji();
+    const inLobby = hasActiveLobby();
+    const lobbyCode = inLobby ? getLobby()?.code : "";
+    lastPartySnap = partySectionSnapshot();
+
+    app.innerHTML = pageShell({
+      back: true,
+      backTarget: inLobby ? "back" : "home",
+      content: `
+        <p class="label-upper">Paramètres</p>
+        <h1 class="page-title">Paramètres</h1>
+
+        ${
+          inLobby
+            ? `
+        <div class="card card--highlight settings-lobby-banner">
+          <p class="hint settings-lobby-banner__text">
+            Soirée en cours - lobby <strong>${escapeHtml(lobbyCode || "")}</strong>.
+            Pseudo et emoji s’appliquent pour tout le monde.
+          </p>
+          <button type="button" class="btn btn-accent btn--spaced" data-nav="evening-return">Retour aux jeux</button>
+        </div>`
+            : ""
+        }
+
+        <p class="label-upper settings-profile-label">Profil</p>
+        ${profileSectionsHtml({ emailAccount, user, selectedEmoji })}
+
+        ${partySectionHtml()}
+      `,
+    });
+
+    bindNav(app, {
+      "evening-return": () => returnFromEveningProfile(),
+    });
+    bindProfileEvents();
+    bindPartyEvents();
+  }
+
   render();
-  return null;
+
+  const unsubLobby = onLobbyBundleUpdated(() => {
+    if (!mount.isMounted()) return;
+    if (getCurrentScreen() !== "settings") return;
+    refreshPartySection(false);
+  });
+
+  return () => {
+    mount.dispose();
+    unsubLobby();
+  };
 }
