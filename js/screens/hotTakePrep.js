@@ -51,6 +51,12 @@ import { bindNav } from "./nav.js";
 export function mountHotTakePrep(app) {
   if (!requireLobbyPlay()) return null;
 
+  const entry = getHotTakeEntryScreen();
+  if (entry !== "hottake-prep") {
+    navigate(entry);
+    return null;
+  }
+
   let mounted = false;
   const localName = getLocalDisplayName();
   const prepLobby = createPrepLobbyController({

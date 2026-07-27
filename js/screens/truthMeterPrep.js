@@ -34,6 +34,12 @@ const TRUTH_METER_NAV = ["home", "lobby", "game-select", "truthmeter-prep", "tru
 export function mountTruthMeterPrep(app) {
   if (!requireLobbyPlay()) return null;
 
+  const entry = getTruthMeterEntryScreen();
+  if (entry !== "truthmeter-prep") {
+    navigate(entry);
+    return null;
+  }
+
   const localName = getLocalDisplayName();
   const prepLobby = createPrepLobbyController({
     localKey: localName,

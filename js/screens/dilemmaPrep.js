@@ -48,10 +48,17 @@ import {
   syncPrepOnMount,
 } from "../core/prepScreen.js";
 import { PLAYER_TEXT_MAX_LEN } from "../../data/playerTextLimits.js";
+import { navigate } from "../core/router.js";
 import { bindNav } from "./nav.js";
 
 export function mountDilemmaPrep(app) {
   if (!requireLobbyPlay()) return null;
+
+  const entry = getDilemmaEntryScreen();
+  if (entry !== "dilemma-prep") {
+    navigate(entry);
+    return null;
+  }
 
   let mounted = false;
   const localName = getLocalDisplayName();

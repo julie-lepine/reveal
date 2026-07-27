@@ -24,10 +24,17 @@ import {
   bindPrepLaunchButtons,
 } from "../core/prepScreen.js";
 import { pageShell } from "../core/ui.js";
+import { navigate } from "../core/router.js";
 import { bindNav } from "./nav.js";
 
 export function mountWrongAnswerPrep(app) {
   if (!requireLobbyPlay()) return null;
+
+  const entry = getWrongAnswerEntryScreen();
+  if (entry !== "wronganswer-prep") {
+    navigate(entry);
+    return null;
+  }
 
   const localName = getLocalDisplayName();
   const prepLobby = createPrepLobbyController({

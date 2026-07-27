@@ -24,10 +24,17 @@ import {
   bindPrepLaunchButtons,
 } from "../core/prepScreen.js";
 import { pageShell } from "../core/ui.js";
+import { navigate } from "../core/router.js";
 import { bindNav } from "./nav.js";
 
 export function mountClutchPrep(app) {
   if (!requireLobbyPlay()) return null;
+
+  const entry = getClutchEntryScreen();
+  if (entry !== "clutch-prep") {
+    navigate(entry);
+    return null;
+  }
 
   const localName = getLocalDisplayName();
   const prepLobby = createPrepLobbyController({

@@ -1,5 +1,5 @@
 /**
- * Loader UI Join Vague A — chrome soft « Rejoindre… » sur Home (contrats source).
+ * Loader UI Join Vague A — chrome soft « Connexion… » sur Home (contrats source).
  * Pas de joinInFlight / locks métier : UX only via createSyncPending + paint.
  */
 import { describe, it, beforeEach, afterEach, mock } from "node:test";
@@ -33,7 +33,7 @@ describe("Loader UI Join Vague A — contrats source Home", () => {
     );
   });
 
-  it("paint : libellé « Rejoindre… » seulement si getState().visible", () => {
+  it("paint : libellé « Connexion… » seulement si getState().visible", () => {
     assert.match(
       src,
       /const joinPendingVisible = syncPending\.getState\(\)\.visible/
@@ -44,11 +44,11 @@ describe("Loader UI Join Vague A — contrats source Home", () => {
     );
     assert.match(
       src,
-      /const joinLobbyLabel = joinPendingVisible \? "Rejoindre…" : "Rejoindre"/
+      /const joinLobbyLabel = joinPendingVisible \? "Connexion…" : "Rejoindre"/
     );
     assert.match(
       src,
-      /const guestJoinLabel = joinPendingVisible\s*\?\s*"Rejoindre…"\s*:\s*"Rejoindre la partie →"/
+      /const guestJoinLabel = joinPendingVisible\s*\?\s*"Connexion…"\s*:\s*"Rejoindre la partie →"/
     );
     assert.match(src, /id="btn-join-lobby"\$\{joinDisabledAttr\}>\$\{escapeHtml\(joinLobbyLabel\)\}/);
     assert.match(src, /id="btn-guest-join"\$\{joinDisabledAttr\}>\$\{escapeHtml\(guestJoinLabel\)\}/);
@@ -57,7 +57,7 @@ describe("Loader UI Join Vague A — contrats source Home", () => {
   });
 
   it("pas de mutation textContent comme source de vérité pending", () => {
-    assert.doesNotMatch(src, /btn\.textContent\s*=\s*"Rejoindre…"/);
+    assert.doesNotMatch(src, /btn\.textContent\s*=\s*"Connexion…"/);
   });
 
   it("pas de joinInFlight (état métier dédié)", () => {

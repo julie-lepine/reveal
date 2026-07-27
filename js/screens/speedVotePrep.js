@@ -35,6 +35,12 @@ import { bindNav } from "./nav.js";
 export function mountSpeedVotePrep(app) {
   if (!requireLobbyPlay()) return null;
 
+  const entry = getSpeedVoteEntryScreen();
+  if (entry !== "speedvote-prep") {
+    navigate(entry);
+    return null;
+  }
+
   let mounted = false;
   const localName = getLocalDisplayName();
   const prepLobby = createPrepLobbyController({

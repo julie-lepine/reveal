@@ -17,12 +17,12 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 
 | | Contenu |
 |--|---------|
-| **Fait** | **Guess Lie** ✅ · **Sondages** ✅ · **ARCH-06** ✅ · **Membership A–D** ✅ · **M-14a / SYN-14** ✅ · **ARCH-22** ✅ |
-| **Prochain** | **Loader UI join** Vague A — QA terrain |
-| **Ensuite** | Pré-résolution `get*EntryScreen` · Vague E (résidus membership) · Vague B join si besoin |
+| **Fait** | **Guess Lie** ✅ · **Sondages** ✅ · **ARCH-06** ✅ · **Membership A–D** ✅ · **M-14a / SYN-14** ✅ · **ARCH-22** ✅ · **Loader UI join** ✅ |
+| **Prochain** | **Pré-résolution `get*EntryScreen`** Vague A code — QA · Vague B ensuite |
+| **Ensuite** | Membership Vague E · ARCH-07/08 · L-04 |
 
 **Résidus (hors file prioritaire)**  
-pré-résolution `get*EntryScreen` · votes optimistic (speedVote / …) · `results.js` mount refresh · échec remote rename (doc QA I-09) · membership Vague E (voir ticket)
+votes optimistic (speedVote / …) · `results.js` mount refresh · échec remote rename (doc QA I-09) · membership Vague E · interstitiel join (Vague B) si régression perception
 
 **Surveiller**  
 Clutch taps figés sous latence (SYN-26) · ready prep après Recommencer · starts sync hydrate → hub hors `mountLobby` (hors périmètre lifecycle IIFE)
@@ -35,8 +35,7 @@ Clutch taps figés sous latence (SYN-26) · ready prep après Recommencer · sta
 
 | # | ID | Cause | Problème | Statut |
 |---|----|-------|----------|--------|
-| 1 | **Loader UI join** | 5/11 | Interstitiel join | Ouvert — hors T-01/T-02 |
-| 2 | Pré-résolution entry screens | 5 | `get*EntryScreen` (filet M-08 conservé) | Hors M-08 |
+| 1 | **Pré-résolution entry screens** | 5 | `get*EntryScreen` (filet M-08) | Vague A ✅ — B ouverte |
 
 ### Autres ouverts
 
@@ -67,7 +66,7 @@ Clutch taps figés sous latence (SYN-26) · ready prep après Recommencer · sta
 | 8 | Reset / migration incomplète | Partiel | I-09 ✅ ; SYN-15/16 ✅ ; ARCH-10 |
 | 9 | Sync monolithe / duplication | Dette | ARCH-11… |
 | 10 | Code mort | Dette | dead exports (hors Fil Rouge app) |
-| 11 | Friction UX | Partiel | **ARCH-22** ✅ · L-04 · **Loader UI join** |
+| 11 | Friction UX | Partiel | **ARCH-22** ✅ · **Loader UI join** ✅ · L-04 |
 
 ---
 
@@ -86,17 +85,30 @@ Clutch taps figés sous latence (SYN-26) · ready prep après Recommencer · sta
 | **QA** | ✅ clos 2026-07-27 — B + C terrain |
 | **Ne pas rouvrir** | Sans régression démontrée (flash sous réseau rapide / libellé trop tôt) |
 
-### Cause 5 / 11 — Loader UI join
+### Cause 5 / 11 — Loader UI join ✅
 
 | | |
 |--|--|
 | **Symptôme** | Join code Home : await long avec seulement `btn.disabled` |
-| **Vague A** | Soft « Rejoindre… » via `createSyncPending` + paint (`#btn-join-lobby` · guest join/rejoin) — pas de `joinInFlight` |
+| **Vague A** | Soft « Connexion… » via `createSyncPending` + paint (`#btn-join-lobby` · guest join/rejoin) — pas de `joinInFlight` |
 | **Hors A** | Resume · Return · Create · interstitiel · T-01/T-02 · hydrate · Realtime · `navigateAfterLobbyJoin` |
 | **Où** | `js/screens/home.js` |
 | **Preuve** | `tests/homeJoinSyncPending.test.js` |
-| **Vague B** | Interstitiel seulement si QA A insuffisante |
-| **Statut** | Vague A code ✅ — QA terrain |
+| **QA** | ✅ clos 2026-07-27 — Vague A suffisante ; Vague B (interstitiel) non ouverte |
+| **Ne pas rouvrir** | Sans régression perception (freeze join malgré soft label) |
+
+### Cause 5 — Pré-résolution `get*EntryScreen`
+
+| | |
+|--|--|
+| **Problème** | Mount play / prep asymétrique → nested redirect M-08 ; micro-saut / double mount |
+| **Intention** | Pré-résoudre avant mount inutile — **filet M-08 conservé** |
+| **Vague A** | ✅ Gardes entry au mount prep : Hot Take · SpeedVote · Clutch · WA · **VibeCheck** (`playlistGuessPrep` / `playlistguess-prep`) · Dilemma · TruthMeter — alignement Trivia/Consensus/Traître ; **pas** la finalisation du ticket |
+| **Vague B** | Pré-résolution aux call sites chauds (`navigate` play/prep) — pas dans `navigate()` |
+| **Vague C/D** | Guess Lie flash wait (opt.) · stacks/goBack (plus tard) |
+| **Hors scope** | Router core · M-08 · Guess Lie · membership · ARCH-05 · redirects play in-mount |
+| **Preuve A** | `tests/prepEntryGuardVagueA.test.js` · `routerNestedRedirect` verts |
+| **Statut** | Vague A code ✅ — QA terrain ; ticket ouvert (B reste) |
 
 ### Cause 3 / 11 — Membership lobby orpheline (Créer bloqué) ✅ QA
 
@@ -361,7 +373,7 @@ Clutch conserve son départage temporel (règle produit explicite inchangée).
 | 8 | I-06, P-02, ARCH-09, I-09 / SYN-06, SYN-15 / SYN-16 · **M-15** |
 | 9 | SYN-12 / M-05b |
 | 10 | **SYN-05 / ARCH-18** ✅ QA (Fil Rouge app ; SQL historique hors scope) |
-| 11 | L-02, ARCH-21↻, M-12 (cleanup `#join=`, pas auto-join), UX-HIST-01, UX-RESUME-BANNER, UX-VIBE-01/02, **FEATURE-LOBBY-POLL** · **Membership A–D** · **ARCH-22** |
+| 11 | L-02, ARCH-21↻, M-12 (cleanup `#join=`, pas auto-join), UX-HIST-01, UX-RESUME-BANNER, UX-VIBE-01/02, **FEATURE-LOBBY-POLL** · **Membership A–D** · **ARCH-22** · **Loader UI join** |
 
 ---
 
@@ -382,4 +394,4 @@ Hors tickets prioritaires — à traiter si opportunité / régression :
 
 ---
 
-*Suivi vivant · Dernière MAJ : 2026-07-27 — Loader UI Join Vague A (code)*
+*Suivi vivant · Dernière MAJ : 2026-07-27 — Pré-résolution Vague A (gardes prep) code ✅*

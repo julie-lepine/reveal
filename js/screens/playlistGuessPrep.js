@@ -32,6 +32,12 @@ import { bindNav } from "./nav.js";
 export function mountPlaylistGuessPrep(app) {
   if (!requireLobbyPlay()) return null;
 
+  const entry = getPlaylistGuessEntryScreen();
+  if (entry !== "playlistguess-prep") {
+    navigate(entry);
+    return null;
+  }
+
   const localUid = getLocalParticipantId();
   const prepLobby = createPrepLobbyController({
     localKey: localUid,
