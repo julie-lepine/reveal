@@ -13,22 +13,21 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 
 ---
 
-## Focus — 2026-07-26
+!!!!! QUID DE "JE CREE UN LOBBY", JE NE LE DEMARRE PAS, J'EN RELANCE UN AUTRE ET SUIS DONC COINCE CAR JE SUIS TJRS CONSIDERE DANS LE 1ER MAIS JE NE LE VOIS PAS DANS MON INTERFACE DE CO
+
+## Focus — 2026-07-27 (PM)
 
 | | Contenu |
 |--|---------|
-| **Fait** | … · **ARCH-06** ✅ QA (V1 · B · C · Traître V2 · Lobby IIFE / SYN-12) |
-| **Prochain** | File d’attente restante (hors ARCH-06) |
-| **Ensuite** | — |
-
-**Hors file audit**  
-Sondages in-chat (`lobby_polls` / UI chat) — feature produit, pas un ticket cause racine.
+| **Fait** | **Guess Lie** ✅ clôturé · **Sondages in-chat** ✅ QA · **ARCH-06** ✅ QA |
+| **Prochain** | **M-14a / SYN-14** (suspendu) ou **ARCH-22** |
+| **Ensuite** | Loader UI join · pré-résolution `get*EntryScreen` |
 
 **Résidus (hors file prioritaire)**  
-UI Guess Lie avant `await` · `statsRecordedRoundIdx` · loader UI join · pré-résolution `get*EntryScreen` · votes optimistic (dilemma / speedVote / …) · `results.js` mount refresh · échec remote rename (doc QA I-09)
+loader UI join · pré-résolution `get*EntryScreen` · votes optimistic (dilemma / speedVote / …) · `results.js` mount refresh · échec remote rename (doc QA I-09)
 
 **Surveiller**  
-Clutch taps figés sous latence (SYN-26) · ready prep après Recommencer · Cause 4 seulement si régression · starts sync hydrate → hub hors `mountLobby` (hors périmètre lifecycle IIFE)
+Clutch taps figés sous latence (SYN-26) · ready prep après Recommencer · starts sync hydrate → hub hors `mountLobby` (hors périmètre lifecycle IIFE)
 
 ---
 
@@ -39,10 +38,9 @@ Clutch taps figés sous latence (SYN-26) · ready prep après Recommencer · Cau
 | # | ID | Cause | Problème | Statut |
 |---|----|-------|----------|--------|
 | 1 | **M-14a / SYN-14** | 3 | TierNight topic / routing | ❌ KO QA — suspendu |
-| 2 | Guess Lie UX | 4/7 | UI avant await ; stats round local-only | Post I-08 |
-| 3 | Loader UI join | 5/11 | Interstitiel join | Hors T-01/T-02 |
-| 4 | Pré-résolution entry screens | 5 | `get*EntryScreen` (filet M-08 conservé) | Hors M-08 |
-| 5 | **ARCH-22** | 11 | Pas de feedback sync lente | Ouvert |
+| 2 | Loader UI join | 5/11 | Interstitiel join | Hors T-01/T-02 |
+| 3 | Pré-résolution entry screens | 5 | `get*EntryScreen` (filet M-08 conservé) | Hors M-08 |
+| 4 | **ARCH-22** | 11 | Pas de feedback sync lente | Ouvert |
 
 ### Autres ouverts
 
@@ -65,10 +63,10 @@ Clutch taps figés sous latence (SYN-26) · ready prep après Recommencer · Cau
 |---|-------|------|----------------|
 | 1 | Identité invité / JWT | ✅ QA | ARCH-01 partiel |
 | 2 | Race auth / profil | ✅ QA | — |
-| 3 | Sources de vérité multiples | ✅ hors TierNight | **M-14a** suspendu · UX-CLUTCH-01 ✅ |
-| 4 | Asymétrie hôte / invité | ✅ QA | UX Guess Lie séparée |
+| 3 | Sources de vérité multiples | Partiel | **M-14a** suspendu · UX-CLUTCH-01 ✅ |
+| 4 | Asymétrie hôte / invité | ✅ QA | Guess Lie ✅ |
 | 5 | Routing + timing sync | ✅ | ARCH-05 mitigé |
-| 6 | Async écrans | Partiel | **ARCH-06** V1 ✅ · B ✅ · C 🔧 · Traître/lobby ouverts |
+| 6 | Async écrans | ✅ QA | **ARCH-06** ✅ (Mode A/B/C · Traître V2 · Lobby IIFE · SYN-12) |
 | 7 | Sync silencieuse / fire-and-forget | Partiel | ARCH-07/08, M-14b |
 | 8 | Reset / migration incomplète | Partiel | I-09 ✅ ; SYN-15/16 ✅ ; ARCH-10 |
 | 9 | Sync monolithe / duplication | Dette | ARCH-11… |
@@ -78,6 +76,31 @@ Clutch taps figés sous latence (SYN-26) · ready prep après Recommencer · Cau
 ---
 
 ## Détail des tickets ouverts
+
+### Cause 3 / 4 / 7 / 8 — Guess Lie ✅ QA
+
+| | |
+|--|--|
+| **Périmètre** | UX vote (Vague A/B1) · post-restart identité fantôme (M-15) · hypothèse L-05 |
+| **UX — Vague A** | `voteCommitInFlight` + `myVote` + `voteConfirmChrome` ; pas de `saveStatePatch` MP avant RPC ; garde reveal ; rollback si RPC échoue |
+| **UX — Vague B1** | `recordGuessLieRoundStats` **après** `await commitGuessLiePlay` |
+| **Où (UX)** | `js/games/guessLie.js` · `js/core/guessLieSession.js` · `js/core/guessLieVoteCommit.js` · `js/core/voteConfirm.js` |
+| **Preuve (UX)** | `tests/guessLieVoteUx.test.js` · `tests/guessLieVoteCommit.test.js` |
+| **M-15 — Symptôme initial** | Après Recommencer : vote sur ses propres affirmations ; manche fantôme ; **pas** de fantôme `lobby_members` ; nouveau lobby corrige |
+| **M-15 — Diagnostic** | Instrumentation `[GUESSLIE-ID]` (`guessLieGhostDiagnostic.js`, `guessLieIdentityDebug.js`) — diagnostic uniquement |
+| **M-15 — Clôture** | **Non reproduit** avec instrumentation (OUT-5) : symptôme non observé lors des passes QA M-15a ; **aucun patch** M-15b/c/d |
+| **L-05** | Hypothèse membership orpheline `lobby_members` **invalidée** pour ce repro — pas de L-05a–d |
+| **Réouverture** | Régression démontrée avec log `[GUESSLIE-ID]` complet + classification A/B/C/D |
+| **QA** | ✅ UX validé 2026-07-27 · ✅ fil Guess Lie clôturé 2026-07-27 |
+
+### FEATURE-LOBBY-POLL — Sondages in-chat ✅ QA
+
+| | |
+|--|--|
+| **Périmètre** | Sondages « prochain jeu » in-chat (`lobby_polls` / UI sheet FAB) — feature produit, hors file cause racine |
+| **Où** | `js/core/lobbyPoll*.js` · `supabase/lobby-polls.sql` |
+| **Preuve** | `tests/lobbyPollsAllowlist.test.js` · `tests/lobbyPollsVague2.test.js` · `tests/lobbyPollRejoinWatch.test.js` · `tests/lobbyPollRealtimeChannel.test.js` |
+| **QA** | ✅ validé 2026-07-27 |
 
 ### Cause 11 / 4 — UX-VIBE-01 ✅ QA
 
@@ -177,26 +200,55 @@ Clutch taps figés sous latence (SYN-26) · ready prep après Recommencer · Cau
 | **I-09 / SYN-06** | Rename mid-soirée — migration blobs locaux | ✅ QA |
 | **ARCH-10** | Cache session clear trop tard au leave | 🟡 |
 
-### Cause 6 — ARCH-06 ✅ QA · clos 2026-07-26
+### Cause 6 — ARCH-06 ✅ QA
 
 | | |
 |--|--|
-| **État** | **Clos.** Modes A/B/C · Traître host V2 · Lobby IIFE / SYN-12 — tous ✅ QA |
+| **État** | **Clos 2026-07-27.** Mode A ✅ · Mode B ✅ · Mode C ✅ · Traître V2 ✅ · Lobby IIFE ✅ · SYN-12 ✅ |
 | **Primitive B/C** | `createMountGuard()` dans `mountLifecycle.js` : `isMounted` / `isCurrentMount` / `dispose` ; compteur de génération **dans** lifecycle ; routeur appelle seulement `advanceMountGeneration()` (pas l’inverse) |
 | **Règle post-await / listener** | `isMounted()` puis `isCurrentMount()` avant effet local ou nouveau commit. Commits déjà partis **non** annulés. Helpers métier : `shouldContinue()` opaque. |
 | **Ne pas rouvrir** | Sans régression démontrée (handlers async / unmount / remount / double commit) |
 
-#### Livraisons
+#### Mode A
 
-| Vague | Scope | Statut |
-|-------|-------|--------|
-| V1 mode A | launch / restart / PG+TierLive next | ✅ QA |
-| mode B | B0–B4 | ✅ QA |
-| mode C | C0–C3 | ✅ QA |
-| V2 Traître | actions hôte + acting host | ✅ QA |
-| Lobby IIFE | SYN-12 lifecycle | ✅ QA |
+| | |
+|--|--|
+| **Scope** | launch / restart / PG+TierLive next · locks `withClickLock` (lobby ready/start, Traître hôte) |
+| **QA** | ✅ validé 2026-07-27 |
 
-**Preuve** : `tests/arch06ActionLocks.test.js` · `tests/mountLifecycle.test.js` · `tests/routerNestedRedirect.test.js` · `tests/arch06TraitreHostV2.test.js` · `tests/arch06LobbyIife.test.js` · `tests/lobbyMountSyncPlan.test.js`
+#### Mode B
+
+| Vague | Contenu | Statut |
+|-------|---------|--------|
+| **B0–B4** | `createMountGuard` · câblage · timers/RAF · tierNightLive | ✅ QA |
+
+#### Mode C
+
+| Vague | Contenu | Statut |
+|-------|---------|--------|
+| **C0–C3** | génération + double garde + shouldContinue TierNight + inventaire | ✅ QA |
+
+#### Traître host V2 (étape 4)
+
+| | |
+|--|--|
+| **Scope** | `js/games/traitre.js` hôte + acting host (`canActAsHost`) |
+| **QA** | ✅ validé 2026-07-27 |
+
+#### Lobby IIFE / SYN-12 (étape 5)
+
+| | |
+|--|--|
+| **Scope** | `js/screens/lobby.js` bootstrap IIFE + listeners session/bundle |
+| **Mode B/C** | `createMountGuard` ; double garde post-await IIFE + listeners ; `dispose` en tête cleanup |
+| **Mode A** | `readyLock` / `startEveningLock` via `withClickLock` |
+| **Helpers** | `routeToActiveGameIfNeeded({ shouldContinue })` · `rejoinGameResumeTarget` · `mountGameResumeInterstitial` (défaut historique) |
+| **SYN-12** | contrat `planLobbyMountMultiplayerSync` inchangé (1× `startMultiplayerSync` pre-refresh) ; fuites post-await / remount corrigées |
+| **Hors scope** | starts sync hydrate→hub hors `mountLobby` (résidu doc) · SQL/RPC/RLS |
+| **Preuve** | `tests/arch06LobbyIife.test.js` · `tests/lobbyMountSyncPlan.test.js` |
+| **QA** | ✅ validé 2026-07-27 |
+
+**Preuve globale** : `tests/mountLifecycle.test.js` · `tests/routerNestedRedirect.test.js` · `tests/arch06TraitreHostV2.test.js` · `tests/arch06LobbyIife.test.js` · `tests/arch06ActionLocks.test.js`
 
 **Résidu hors clôture** : starts sync hydrate → hub hors `mountLobby` (doc / opportunité, pas un trou lifecycle A/B/C du périmètre ARCH-06).
 
@@ -256,15 +308,15 @@ Clutch conserve son départage temporel (règle produit explicite inchangée).
 |-------|-------------------|
 | 1 | C-01/02, R-01–05, M-05a |
 | 2 | M-01, P-03, M-02a, S-02 |
-| 3 | I-03/04, SYN-03, M-13, M-02b, ARCH-02, SYN-29, I-PG-01, ready stale Recommencer, UX-CLUTCH-01 |
-| 4 | I-01/02/08, M-03b, M-06a/b, L-01, ARCH-03/03b, UX-VIBE-01 |
+| 3 | I-03/04, SYN-03, M-13, M-02b, ARCH-02, SYN-29, I-PG-01, ready stale Recommencer, UX-CLUTCH-01 · **M-15** · **L-05↻** |
+| 4 | I-01/02/08, M-03b, M-06a/b, L-01, ARCH-03/03b, UX-VIBE-01, **Guess Lie** |
 | 5 | T-01/02, T-03↻, M-07, M-08, P-02, SYN-28, I-PG-01, ARCH-04, UX-VIBE-02 |
-| 6 | I-05, SYN-13b↻, SYN-25, **SYN-05 / ARCH-18** ✅, **ARCH-06** ✅ QA (V1 · B · C · Traître V2 · Lobby IIFE) |
+| 6 | I-05, SYN-13b↻, SYN-25, **SYN-05 / ARCH-18** ✅, **ARCH-06** ✅ (Mode A/B/C · Traître V2 · Lobby IIFE · SYN-12) |
 | 7 | I-07, M-09, L-09, M-11, M-10, T-05, SYN-26, M-04b / SYN-18 |
-| 8 | I-06, P-02, ARCH-09, I-09 / SYN-06, SYN-15 / SYN-16 |
+| 8 | I-06, P-02, ARCH-09, I-09 / SYN-06, SYN-15 / SYN-16 · **M-15** |
 | 9 | SYN-12 / M-05b |
 | 10 | **SYN-05 / ARCH-18** ✅ QA (Fil Rouge app ; SQL historique hors scope) |
-| 11 | L-02, ARCH-21↻, M-12 (cleanup `#join=`, pas auto-join), UX-HIST-01, UX-RESUME-BANNER, UX-VIBE-01/02 |
+| 11 | L-02, ARCH-21↻, M-12 (cleanup `#join=`, pas auto-join), UX-HIST-01, UX-RESUME-BANNER, UX-VIBE-01/02, **FEATURE-LOBBY-POLL** |
 
 ---
 
@@ -280,8 +332,9 @@ Hors tickets prioritaires — à traiter si opportunité / régression :
 - Policy debug lobby à purger côté Supabase si encore présente
 - Optimistic votes hors Hot Take / VibeCheck (dilemma / speedVote / … — même trou que T-05)
 - Starts sync hydrate → hub hors `mountLobby` (résidu SYN-12, hors idempotence globale)
+
 - Fil Rouge : résidus SQL historiques (`fil-rouge-private.sql`, clés RPC) — ops Supabase séparée, non faite
 
 ---
 
-*Suivi vivant · Dernière MAJ : 2026-07-26 — ARCH-06 mode C C0–C3 (ticket non clos)*
+*Suivi vivant · Dernière MAJ : 2026-07-27 — Sondages in-chat ✅ QA*

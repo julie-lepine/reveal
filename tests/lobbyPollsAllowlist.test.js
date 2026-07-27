@@ -108,4 +108,11 @@ describe("close_lobby_poll contrat poll_id (Vague 1)", () => {
     assert.match(sql, /can_create_lobby_poll_phase/);
     assert.match(sql, /screen in \('results', 'leaderboard', 'game-select'\)/);
   });
+
+  it("close autorisé hôte, acting host ou créateur (created_by)", () => {
+    const body = extractCloseLobbyPollBody(readSql());
+    assert.match(body, /is_lobby_host\(v_lobby_id\)/);
+    assert.match(body, /is_acting_host\(v_lobby_id\)/);
+    assert.match(body, /v_poll\.created_by is not null and v_poll\.created_by = v_uid/);
+  });
 });

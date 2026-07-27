@@ -38,7 +38,7 @@ export function extractLobbyPollErrorCode(error) {
   if (/pas membre|not.*member|Tu n'es pas membre/i.test(raw)) {
     return "not_lobby_member";
   }
-  if (/Clôture réservée|hôte ou à l'acting|acting host/i.test(raw)) {
+  if (/Clôture réservée|hôte.*acting|créateur du sondage/i.test(raw)) {
     return "not_host_or_acting";
   }
   if (/Authentification requise/i.test(raw)) {
@@ -73,7 +73,7 @@ export function lobbyPollErrorMessage(error) {
     case "not_lobby_member":
       return "Tu n'es plus membre de ce lobby.";
     case "not_host_or_acting":
-      return "Seul l'hôte (ou le remplaçant) peut fermer le sondage.";
+      return "Seul l'hôte, le remplaçant ou le créateur du sondage peut le fermer.";
     case "auth_required":
       return "Connexion requise.";
     default:

@@ -160,15 +160,71 @@ export function isGuessLieLobbyReset(state) {
   return Object.keys(state.submissions || {}).length === 0;
 }
 
+/**
+ * Payload prep vierge typique d'un « Recommencer » hôte (round 0, pas de votes/score).
+ * Distinct d'un simple patch partiel en cours de partie.
+ */
+export function isGuessLieHostPrepRestart(remote = {}) {
+  if (!isGuessLieLobbyReset(remote)) return false;
+  if ((remote.roundIdx ?? 0) !== 0) return false;
+  if (Boolean(remote.roundScored)) return false;
+  if (Object.keys(remote.votes || {}).length > 0) return false;
+  return true;
+}
+
+/**
+ * Manche en cours à protéger : ne pas interpréter un vieux snapshot prep comme un restart.
+ */
+export function isGuessLieLocalPlayProtected(local = {}) {
+  if (local.phase === "voting") return true;
+  if (local.phase === "reveal" && !local.roundScored) return true;
+  return false;
+}
+
+/**
+ * Restart légitime Guess Lie : prep distante vierge après fin de partie locale.
+ * Repose sur phase `idle` (completeGameSession) avant la relance — pas un reveal inter-manche.
+ */
+export function isGuessLieLegitimateRestart(local = {}, remote = {}) {
+  if (!local?.lobbyComplete) return false;
+  if (!isGuessLieHostPrepRestart(remote)) return false;
+  if (isGuessLieLocalPlayProtected(local)) return false;
+  return local.phase === "idle";
+}
+
 /** Reset prep distant applicable (n'annule pas un lancement local déjà confirmé). */
 export function shouldApplyGuessLieLobbyReset(local = {}, remote = {}) {
-  return isGuessLieLobbyReset(remote) && !local?.lobbyComplete;
+  if (!isGuessLieLobbyReset(remote)) return false;
+  if (!local?.lobbyComplete) return true;
+  return isGuessLieLegitimateRestart(local, remote);
+}
+
+/**
+ * État local fusionné après reset prep (lobbyComplete false, round 0, soumissions vides).
+ * Couvre la phase reveal obsolète que mergeForwardGamePhase peut conserver côté gameSync.
+ */
+export function isGuessLieMergedPrepState(session = {}) {
+  if (!session || session.lobbyComplete) return false;
+  const roundIdx = session.roundIdx ?? session.currentRound ?? 0;
+  if (roundIdx !== 0) return false;
+  if (session.submissions === undefined) return false;
+  if (Object.keys(session.submissions || {}).length > 0) return false;
+  if (session.phase === "voting") return false;
+  return true;
+}
+
+/** Partie Guess Lie en cours (aligné resolveActivePlayScreen / entrée écran). */
+export function isGuessLiePlaySessionActive(session = {}) {
+  if (isGuessLieMergedPrepState(session)) return false;
+  if (session.lobbyComplete) return true;
+  const phase = session.phase;
+  return phase === "voting" || phase === "reveal";
 }
 
 /** Partie lancée si l'un des états le dit (évite régression quand le serveur est en retard). */
 export function mergeGuessLieLobbyComplete(local = {}, remote = {}, { lobbyReset = false } = {}) {
-  if (local.lobbyComplete) return true;
   if (lobbyReset) return Boolean(remote.lobbyComplete);
+  if (local.lobbyComplete) return true;
   return Boolean(local.lobbyComplete || remote.lobbyComplete);
 }
 

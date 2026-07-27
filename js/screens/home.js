@@ -21,15 +21,36 @@ import {
   returnToEveningGames,
   navigateAfterLobbyJoin,
   confirmAndLeaveLobby,
+  leaveLobbyMembershipFromServer,
   reconcileLobbyMembership,
   resetAppToCleanHome,
   tryRecoverLobbyFromServer,
-  peekServerLobbyForUser,
   getRememberedLobbyCode,
   resumeEveningSession,
   isGuestRecoveryCaptchaPending,
 } from "../core/lobby.js";
-import { getLiveSupabaseUserId } from "../core/supabaseAuth.js";
+import { queryActiveLobbyMembership } from "../core/lobbyMembershipFetch.js";
+import {
+  getMembershipSnapshot,
+  setMembershipSnapshot,
+  invalidateMembershipSnapshot,
+} from "../core/lobbyMembershipSnapshot.js";
+import {
+  deriveHomeMembershipChrome,
+  decideMembershipSnapshotWrite,
+} from "../core/homeMembershipChrome.js";
+import {
+  LOBBY_CREATE_ERROR,
+} from "../core/lobbyCreateGuard.js";
+import {
+  SERVER_LEAVE_CONFIRM,
+  LOBBY_SERVER_LEAVE_ERROR,
+} from "../core/lobbyServerLeave.js";
+import {
+  getLiveSupabaseUserId,
+  authReady,
+  isAuthReadyResolved,
+} from "../core/supabaseAuth.js";
 import { getEveningRecap } from "../core/eveningRecap.js";
 import {
   isGameSyncActive,
@@ -58,6 +79,7 @@ import {
   isTurnstileMounted,
   setTurnstileOnChange,
 } from "../core/turnstile.js";
+import { createMountGuard } from "../core/mountLifecycle.js";
 
 function syncForgotPasswordButton(root) {
   const btn = root.querySelector("#btn-forgot-password");
@@ -226,7 +248,7 @@ function homeStatsHtml() {
   return "";
 }
 
-function homeRenderSnapshot(authTab, serverLobby = null, guestJoinError = "") {
+function homeRenderSnapshot(authTab, chrome, guestJoinError = "") {
   const user = getUser();
   return JSON.stringify({
     tab: authTab,
@@ -235,10 +257,85 @@ function homeRenderSnapshot(authTab, serverLobby = null, guestJoinError = "") {
     name: user?.name,
     inLobby: hasActiveLobby(),
     lobbyCode: getLobby()?.code,
-    serverLobbyCode: serverLobby?.code || null,
+    membershipState: chrome?.state || null,
+    membershipCode: chrome?.membershipCode || null,
+    createEnabled: Boolean(chrome?.createEnabled),
+    showResume: Boolean(chrome?.showResume),
     guestJoinError,
     recap: hasActiveLobby() ? getEveningRecap().participantCount : 0,
   });
+}
+
+function homeMembershipActionsHtml(chrome) {
+  if (!chrome) return "";
+
+  if (chrome.state === "cached_active") {
+    const code = getLobby()?.code || chrome.membershipCode || "";
+    return `
+          <button type="button" class="btn btn-accent btn--lobby-return" id="btn-return-lobby">
+            ${isLobbyEveningStarted() ? "Reprendre la soirée" : "Retour au lobby"} <span class="muted">(${escapeHtml(code)})</span>
+          </button>
+          <button type="button" class="btn btn-secondary btn--leave-lobby" id="btn-leave-lobby">Quitter le lobby</button>`;
+  }
+
+  if (
+    chrome.state === "server_membership_recoverable" ||
+    chrome.state === "server_membership_unrecoverable"
+  ) {
+    const code = chrome.membershipCode || "";
+    const roleHint =
+      chrome.membershipRole === "host"
+        ? " (hôte)"
+        : chrome.membershipRole === "member"
+          ? ""
+          : "";
+    const leaveLabel = chrome.leaveServerLabel || "Quitter le lobby";
+    const busy = Boolean(chrome.serverLeaveBusy);
+    const disabledAttr = busy ? " disabled aria-disabled=\"true\"" : "";
+    return `
+          <div class="card card--highlight home-resume-card">
+            <p class="hint">${escapeHtml(chrome.primaryMessage || `Tu es encore dans le lobby ${code}.`)}${escapeHtml(roleHint)}</p>
+            ${
+              chrome.errorMessage
+                ? `<p class="auth-error" role="alert">${escapeHtml(chrome.errorMessage)}</p>`
+                : ""
+            }
+            <button type="button" class="btn btn-accent btn--spaced" id="btn-resume-evening"${disabledAttr}>
+              Reprendre la soirée <span class="muted">(${escapeHtml(code)})</span>
+            </button>
+            ${
+              chrome.showLeaveServer
+                ? `<button type="button" class="btn btn-secondary btn--leave-lobby" id="btn-leave-lobby-server"${disabledAttr}>${escapeHtml(leaveLabel)}</button>`
+                : ""
+            }
+          </div>`;
+  }
+
+  if (chrome.state === "checking") {
+    return `<p class="hint home-membership-checking">${escapeHtml(chrome.primaryMessage || "Vérification de ton lobby…")}</p>`;
+  }
+
+  if (
+    chrome.state === "check_failed" ||
+    chrome.state === "leave_confirmation_pending"
+  ) {
+    return `
+          <div class="card home-membership-check-failed">
+            <p class="hint">${escapeHtml(chrome.primaryMessage || "")}</p>
+            ${
+              chrome.errorMessage
+                ? `<p class="auth-error" role="alert">${escapeHtml(chrome.errorMessage)}</p>`
+                : ""
+            }
+            ${
+              chrome.showRetry
+                ? `<button type="button" class="btn btn-secondary btn--spaced" id="btn-membership-retry">Réessayer</button>`
+                : ""
+            }
+          </div>`;
+  }
+
+  return "";
 }
 
 /** Retire une modale bloquante restée dans le DOM. */
@@ -247,6 +344,9 @@ function clearStuckDialogs() {
 }
 
 export function mountHome(app) {
+  const mount = createMountGuard();
+  const shouldContinue = () => mount.isMounted() && mount.isCurrentMount();
+
   const tabAfterLeave = sessionStorage.getItem("reveal-auth-tab");
   const routeAuthTab = getScreenParams()?.authTab;
   let authTab =
@@ -262,11 +362,98 @@ export function mountHome(app) {
   let renderInFlight = false;
   let lastSnapshot = "";
   let forgotCooldownTimer = null;
-  let pendingServerLobby = null;
   let guestJoinError = "";
   let selectedGuestEmoji = normalizeGuestEmoji(
     isGuest() ? getLocalEmoji() : DEFAULT_GUEST_EMOJI
   );
+
+  /** Résolution membership serveur en cours (chrome `checking` si pas de found). */
+  let resolutionInProgress =
+    isSupabaseConfigured() && (isLoggedIn() || isGuest());
+  /** Échec Resume persistant avec found conservé. */
+  let resumeUnrecoverable = false;
+  let resumeErrorMessage = null;
+  /** unknown transitoire : found conservé (pas d’écriture snapshot unknown). */
+  let retainedFoundDespiteUnknown = false;
+  /** Anti double-clic Créer (pipeline unique). */
+  let createLobbyInFlight = false;
+  /** Vague D — leave/dissolve server-only en cours. */
+  let serverLeaveInFlight = false;
+  /** Mutation leave OK mais confirmation query unknown. */
+  let leaveConfirmationPending = false;
+
+  function currentMembershipChrome() {
+    return deriveHomeMembershipChrome({
+      hasActiveLobby: hasActiveLobby(),
+      snapshot: getMembershipSnapshot(),
+      resolutionInProgress,
+      authReady: !isSupabaseConfigured() || isAuthReadyResolved(),
+      supabaseConfigured: isSupabaseConfigured(),
+      loggedIn: isLoggedIn(),
+      shouldCheckMembership: isLoggedIn() || isGuest(),
+      resumeUnrecoverable,
+      resumeErrorMessage,
+      retainedFoundDespiteUnknown,
+      activeLobbyCode: getLobby()?.code || null,
+      leaveConfirmationPending,
+      serverLeaveInFlight,
+    });
+  }
+
+  function applyMembershipQueryResult(result) {
+    const decision = decideMembershipSnapshotWrite(
+      getMembershipSnapshot(),
+      result,
+      "home-query"
+    );
+    if (decision.action === "retain_found") {
+      retainedFoundDespiteUnknown = true;
+      return;
+    }
+    if (decision.action === "write") {
+      setMembershipSnapshot(decision.result, decision.source || "home-query");
+      retainedFoundDespiteUnknown = false;
+      if (decision.result.status === "none" || decision.result.status === "found") {
+        resumeUnrecoverable = false;
+        resumeErrorMessage = null;
+        leaveConfirmationPending = false;
+      }
+    }
+  }
+
+  async function resolveHomeMembership({ force = false } = {}) {
+    if (!isSupabaseConfigured()) {
+      resolutionInProgress = false;
+      return;
+    }
+    if (!isLoggedIn() && !isGuest()) {
+      resolutionInProgress = false;
+      return;
+    }
+
+    resolutionInProgress = true;
+    if (force && shouldContinue()) scheduleRender(true);
+
+    try {
+      if (!isAuthReadyResolved()) {
+        await authReady;
+        if (!shouldContinue()) return;
+      }
+      const result = await queryActiveLobbyMembership();
+      if (!shouldContinue()) return;
+      applyMembershipQueryResult(result);
+    } catch {
+      if (!shouldContinue()) return;
+      applyMembershipQueryResult({ status: "unknown" });
+    } finally {
+      if (shouldContinue()) {
+        resolutionInProgress = false;
+        scheduleRender(true);
+      } else {
+        resolutionInProgress = false;
+      }
+    }
+  }
 
   function syncGuestEmojiPreview() {
     app.querySelectorAll("[data-guest-emoji]").forEach((btn) => {
@@ -340,7 +527,9 @@ export function mountHome(app) {
   }
 
   async function renderIfNeeded(force = false) {
-    const snap = homeRenderSnapshot(authTab, pendingServerLobby, guestJoinError);
+    if (!shouldContinue()) return;
+    const chrome = currentMembershipChrome();
+    const snap = homeRenderSnapshot(authTab, chrome, guestJoinError);
     const { drafts, focusedId } = preserveInputDrafts();
     const typing = focusedId && drafts[focusedId] !== undefined;
 
@@ -354,7 +543,8 @@ export function mountHome(app) {
 
     renderInFlight = true;
     try {
-      paint();
+      if (!shouldContinue()) return;
+      paint(chrome);
       lastSnapshot = snap;
       restoreInputDrafts({ drafts, focusedId });
       syncForgotPasswordButton(app);
@@ -485,16 +675,15 @@ export function mountHome(app) {
    *  JS : import loginWithSocial + handler data-social dans onHomeClick.
    */
 
-  function paint() {
+  function paint(chrome = currentMembershipChrome()) {
     const user = getUser();
     const loggedIn = isLoggedIn();
     const guest = isGuest();
-    const activeLobby = hasActiveLobby();
-    const pendingServerLobbyCode = pendingServerLobby?.code || "";
-    const canStartNewLobby = canCreateLobby() && !pendingServerLobbyCode;
-    const createLobbyDisabledReason = pendingServerLobbyCode
-      ? `Reprends ou quitte le lobby ${pendingServerLobbyCode} avant d'en créer un nouveau.`
-      : "Quitte le lobby actuel avant d'en créer un nouveau.";
+    const activeLobby = chrome.state === "cached_active";
+    const canStartNewLobby = Boolean(chrome.createEnabled) && canCreateLobby();
+    const createLobbyDisabledReason =
+      chrome.createDisabledReason ||
+      "Quitte le lobby actuel avant d'en créer un nouveau.";
 
     app.innerHTML = pageShell({
       back: false,
@@ -576,21 +765,7 @@ export function mountHome(app) {
         }
 
         <div class="lobby-actions">
-          ${
-            activeLobby
-              ? `<button type="button" class="btn btn-accent btn--lobby-return" id="btn-return-lobby">
-            ${isLobbyEveningStarted() ? "Reprendre la soirée" : "Retour au lobby"} <span class="muted">(${escapeHtml(getLobby().code)})</span>
-          </button>
-          <button type="button" class="btn btn-secondary btn--leave-lobby" id="btn-leave-lobby">Quitter le lobby</button>`
-              : pendingServerLobbyCode
-                ? `<div class="card card--highlight home-resume-card">
-            <p class="hint">Tu es encore dans le lobby <strong>${escapeHtml(pendingServerLobbyCode)}</strong>${pendingServerLobby.status === "playing" ? " (partie en cours)" : ""}.</p>
-            <button type="button" class="btn btn-accent btn--spaced" id="btn-resume-evening">
-              Reprendre la soirée <span class="muted">(${escapeHtml(pendingServerLobbyCode)})</span>
-            </button>
-          </div>`
-                : ""
-          }
+          ${homeMembershipActionsHtml(chrome)}
           ${
             loggedIn
               ? canStartNewLobby
@@ -620,6 +795,7 @@ export function mountHome(app) {
   }
 
   async function onHomeClick(e) {
+    if (!shouldContinue()) return;
     if (getCurrentScreen() !== "home") return;
 
     const navEl = e.target.closest("[data-nav]");
@@ -692,6 +868,7 @@ export function mountHome(app) {
       }
       err?.classList.add("hidden");
       scheduleRender(true);
+      void resolveHomeMembership({ force: true });
       return;
     }
 
@@ -767,6 +944,7 @@ export function mountHome(app) {
         );
       }
       scheduleRender(true);
+      if (res.loggedIn) void resolveHomeMembership({ force: true });
       return;
     }
 
@@ -813,28 +991,178 @@ export function mountHome(app) {
     }
 
     if (e.target.closest("#btn-resume-evening")) {
+      if (serverLeaveInFlight) return;
       const btn = e.target.closest("#btn-resume-evening");
       btn.disabled = true;
       try {
         const recovered = await tryRecoverLobbyFromServer();
+        if (!shouldContinue()) return;
         if (!recovered.ok) {
-          await showAppAlert("Impossible de retrouver ta soirée. Demande le code à l'hôte.", {
+          const failMsg =
+            "Impossible de retrouver ta soirée. Demande le code à l'hôte.";
+          if (recovered.staleMembership) {
+            // Membership peut avoir disparu : re-query canonique ; none seulement si confirmé.
+            const requery = await queryActiveLobbyMembership();
+            if (!shouldContinue()) return;
+            applyMembershipQueryResult(requery);
+            if (getMembershipSnapshot()?.status === "none") {
+              resumeUnrecoverable = false;
+              resumeErrorMessage = null;
+            } else {
+              resumeUnrecoverable = true;
+              resumeErrorMessage = failMsg;
+            }
+          } else {
+            // Conserver found ; ne pas passer à none.
+            resumeUnrecoverable = true;
+            resumeErrorMessage = failMsg;
+          }
+          await showAppAlert(failMsg, {
             title: "Reprise",
             icon: "⚠️",
           });
-          pendingServerLobby = null;
+          if (!shouldContinue()) return;
           scheduleRender(true);
           return;
         }
-        pendingServerLobby = null;
+        resumeUnrecoverable = false;
+        resumeErrorMessage = null;
+        // Rafraîchir le snapshot found après hydrate (best-effort).
+        try {
+          const refreshed = await queryActiveLobbyMembership();
+          if (shouldContinue()) applyMembershipQueryResult(refreshed);
+        } catch {
+          /* ignore — found local snapshot suffit */
+        }
+        if (!shouldContinue()) return;
         await resumeEveningSession({ force: true });
+        if (!shouldContinue()) return;
+        scheduleRender(true);
       } catch (err) {
-        await showAppAlert(err?.message || "Impossible de reprendre la soirée.", {
+        if (!shouldContinue()) return;
+        resumeUnrecoverable = true;
+        resumeErrorMessage = err?.message || "Impossible de reprendre la soirée.";
+        await showAppAlert(resumeErrorMessage, {
           title: "Reprise",
           icon: "⚠️",
         });
+        if (!shouldContinue()) return;
+        scheduleRender(true);
       } finally {
         if (btn?.isConnected) btn.disabled = false;
+      }
+      return;
+    }
+
+    if (e.target.closest("#btn-membership-retry")) {
+      const btn = e.target.closest("#btn-membership-retry");
+      btn.disabled = true;
+      try {
+        leaveConfirmationPending = false;
+        await resolveHomeMembership({ force: true });
+      } finally {
+        if (btn?.isConnected) btn.disabled = false;
+      }
+      return;
+    }
+
+    if (e.target.closest("#btn-leave-lobby-server")) {
+      if (serverLeaveInFlight) return;
+      if (hasActiveLobby()) return;
+
+      const snap = getMembershipSnapshot();
+      const membership = snap?.status === "found" ? snap.membership : null;
+      if (!membership?.lobbyId || !membership?.role) return;
+
+      const confirmCfg =
+        membership.role === "host"
+          ? SERVER_LEAVE_CONFIRM.host
+          : SERVER_LEAVE_CONFIRM.member;
+      const confirmed = await showAppConfirm(confirmCfg.message, {
+        title: confirmCfg.title,
+        confirmLabel: confirmCfg.confirmLabel,
+        cancelLabel: confirmCfg.cancelLabel,
+        icon: confirmCfg.icon,
+      });
+      if (!confirmed) return;
+      if (!shouldContinue()) return;
+
+      serverLeaveInFlight = true;
+      scheduleRender(true);
+
+      try {
+        await leaveLobbyMembershipFromServer({
+          lobbyId: membership.lobbyId,
+          code: membership.code,
+          role: membership.role,
+        });
+        if (!shouldContinue()) return;
+
+        // Invalider l'ancien found avant confirmation — évite retain_found trompeur.
+        invalidateMembershipSnapshot();
+        retainedFoundDespiteUnknown = false;
+        leaveConfirmationPending = false;
+
+        const confirmResult = await queryActiveLobbyMembership();
+        if (!shouldContinue()) return;
+
+        if (confirmResult.status === "unknown") {
+          // Pas de faux none ; pas de found ressuscité.
+          leaveConfirmationPending = true;
+          applyMembershipQueryResult(confirmResult);
+          await showAppAlert(
+            "La sortie a probablement réussi, mais la vérification est impossible. Réessaie avant de créer un lobby.",
+            { title: "Vérification", icon: "⚠️" }
+          );
+          if (!shouldContinue()) return;
+          scheduleRender(true);
+          return;
+        }
+
+        leaveConfirmationPending = false;
+        applyMembershipQueryResult(confirmResult);
+
+        if (confirmResult.status === "found") {
+          await showAppAlert(
+            `Tu es encore rattaché au lobby ${confirmResult.membership?.code || "?"}. Créer reste indisponible.`,
+            { title: "Membership restante", icon: "ℹ️" }
+          );
+        }
+        if (!shouldContinue()) return;
+        scheduleRender(true);
+      } catch (err) {
+        if (!shouldContinue()) return;
+
+        if (err?.code === LOBBY_SERVER_LEAVE_ERROR.ROLE_MISMATCH) {
+          try {
+            const requery = await queryActiveLobbyMembership();
+            if (shouldContinue()) applyMembershipQueryResult(requery);
+          } catch {
+            /* ignore */
+          }
+          await showAppAlert(
+            err.message || "Ton rôle a changé. Actualisation effectuée.",
+            { title: "Rôle obsolète", icon: "⚠️" }
+          );
+          if (!shouldContinue()) return;
+          scheduleRender(true);
+          return;
+        }
+
+        // Échec mutation : conserver found, Créer off, retry possible.
+        await showAppAlert(
+          err?.message || "Impossible de quitter ou fermer le lobby.",
+          {
+            title:
+              membership.role === "host" ? "Fermer le lobby" : "Quitter le lobby",
+            icon: "⚠️",
+          }
+        );
+        if (!shouldContinue()) return;
+        scheduleRender(true);
+      } finally {
+        serverLeaveInFlight = false;
+        if (shouldContinue()) scheduleRender(true);
       }
       return;
     }
@@ -843,6 +1171,7 @@ export function mountHome(app) {
       const btn = e.target.closest("#btn-leave-lobby");
       btn.disabled = true;
       const res = await confirmAndLeaveLobby();
+      if (!shouldContinue()) return;
       btn.disabled = false;
       if (res.cancelled) return;
       if (!res.ok) {
@@ -852,24 +1181,56 @@ export function mountHome(app) {
         });
         return;
       }
+      // Après leave local : rafraîchir membership serveur (Vague C/D gèrent la sortie serveur).
+      void resolveHomeMembership({ force: true });
       scheduleRender(true);
       return;
     }
 
     if (e.target.closest("#btn-create-lobby")) {
-      if (!canCreateLobby()) return;
       const btn = e.target.closest("#btn-create-lobby");
+      // DOM disabled / chrome / canCreateLobby : triple garde synchrone.
+      if (btn?.disabled || btn?.getAttribute("aria-disabled") === "true") return;
+      if (!currentMembershipChrome().createEnabled || !canCreateLobby()) return;
+      if (createLobbyInFlight) return;
+      createLobbyInFlight = true;
       btn.disabled = true;
       try {
         await createLobby();
+        if (!shouldContinue()) return;
         navigate("lobby");
       } catch (err) {
+        if (!shouldContinue()) return;
+        if (err?.code === LOBBY_CREATE_ERROR.ALREADY_EXISTS) {
+          await showAppAlert(err.message || "Tu es déjà dans un lobby.", {
+            title: "Lobby existant",
+            icon: "⚠️",
+          });
+          if (!shouldContinue()) return;
+          scheduleRender(true);
+          return;
+        }
+        if (err?.code === LOBBY_CREATE_ERROR.CHECK_FAILED) {
+          await showAppAlert(
+            err.message || "Impossible de vérifier votre situation. Réessayez.",
+            {
+              title: "Vérification impossible",
+              icon: "⚠️",
+            }
+          );
+          if (!shouldContinue()) return;
+          scheduleRender(true);
+          return;
+        }
         await showAppAlert(err.message || "Impossible de créer le lobby.", {
           title: "Erreur",
           icon: "⚠️",
         });
+        if (!shouldContinue()) return;
+        scheduleRender(true);
       } finally {
-        btn.disabled = false;
+        createLobbyInFlight = false;
+        if (btn?.isConnected) btn.disabled = false;
       }
       return;
     }
@@ -1000,28 +1361,31 @@ export function mountHome(app) {
 
   void (async () => {
     const { cleared } = await reconcileLobbyMembership();
+    if (!shouldContinue()) return;
     if (cleared) scheduleRender(true);
-    if (!hasActiveLobby() && isSupabaseConfigured()) {
-      pendingServerLobby = await peekServerLobbyForUser();
-      if (pendingServerLobby) scheduleRender(true);
-    }
+    // Query canonique : snapshot écrit selon politique found/unknown ; paint si mount courant.
+    await resolveHomeMembership({ force: false });
   })();
 
   if (isGameSyncActive() && hasActiveLobby()) {
     unsubSession = onGameSessionChange(async (row) => {
+      if (!shouldContinue()) return;
       if (getCurrentScreen() !== "home") return;
       tryFollowHostGameSession(row);
       // Ne pas court-circuiter sur isSessionRouteSuppressed : shouldApply/mustFollow décide.
       if (await routeToActiveGameIfNeeded(row)) return;
+      if (!shouldContinue()) return;
       scheduleRender(false);
     });
   }
 
   return () => {
+    mount.dispose();
     app.removeEventListener("click", onHomeClick);
     unsubSession();
     if (renderTimer) clearTimeout(renderTimer);
     if (forgotCooldownTimer) clearInterval(forgotCooldownTimer);
     removeAllTurnstile();
+    // Snapshot membership volontairement non invalidé : survit au remount Home (même onglet).
   };
 }

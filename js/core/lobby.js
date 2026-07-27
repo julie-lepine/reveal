@@ -23,6 +23,9 @@ import {
   joinLobbySupabase,
   leaveLobbySupabase,
   closeLobbySupabase,
+  fetchLobbyHostIdById,
+  deleteOwnLobbyMembershipById,
+  closeLobbyByIdAsHost,
   refreshLobbyFromSupabase,
   isLocalStillLobbyMember,
   setLocalReadySupabase,
@@ -39,6 +42,17 @@ import {
   transferLobbyHostSupabase,
   kickLobbyMemberSupabase,
 } from "./supabaseLobby.js";
+import { queryActiveLobbyMembership } from "./lobbyMembershipFetch.js";
+import {
+  getMembershipSnapshot,
+  setMembershipSnapshot,
+} from "./lobbyMembershipSnapshot.js";
+import {
+  assertCanInsertLobby,
+  LOBBY_CREATE_ERROR,
+  makeLobbyCreateError,
+} from "./lobbyCreateGuard.js";
+import { leaveLobbyMembershipFromServer as runServerOnlyLeave } from "./lobbyServerLeave.js";
 import {
   showAppAlert,
   showAppConfirm,
@@ -674,17 +688,33 @@ export function getLobbyParticipants() {
   return getState().lobby?.participants || [];
 }
 
+/**
+ * Crée un lobby.
+ *
+ * Garde serveur (Vague C) : uniquement `queryActiveLobbyMembership()` —
+ * `found` / `unknown` → refus ; `none` → INSERT. `peekServerLobbyForUser`
+ * (filtre 24 h) n’est plus une garde de création.
+ *
+ * Limite : deux onglets peuvent encore INSERT en parallèle après deux `none`
+ * (pas de contrainte SQL uniques ici).
+ */
 export async function createLobby() {
   const activeLobby = hasActiveLobby() ? getLobby() : null;
   if (activeLobby?.code) {
-    throw new Error(`Quitte le lobby ${activeLobby.code} avant d'en créer un nouveau.`);
+    throw makeLobbyCreateError(
+      LOBBY_CREATE_ERROR.CACHE_ACTIVE,
+      `Quitte le lobby ${activeLobby.code} avant d'en créer un nouveau.`,
+      { lobbyCode: activeLobby.code }
+    );
   }
 
   if (isSupabaseConfigured()) {
-    const serverLobby = await peekServerLobbyForUser();
-    if (serverLobby?.code) {
-      throw new Error(`Tu es déjà dans le lobby ${serverLobby.code}. Quitte-le avant d'en créer un nouveau.`);
-    }
+    await assertCanInsertLobby({
+      hasActiveLobby: false,
+      queryActiveLobbyMembership,
+      getMembershipSnapshot,
+      setMembershipSnapshot,
+    });
   }
 
   resetEveningState();
@@ -937,6 +967,41 @@ export async function leaveLobby({ navigateAway = true } = {}) {
 
   applyLeaveLobbyLocal({ wasGuest, navigateAway });
   return { ok: true };
+}
+
+/**
+ * Vague D — quitter / fermer depuis une membership serveur sans cache hydraté.
+ * Identité : { lobbyId, code, role } du snapshot — pas state.lobby.
+ * Ne remplace pas leaveLobby / dissolveLobbyAsHost (pipeline cache-actif).
+ *
+ * @param {{ lobbyId: string, code?: string|null, role: "host"|"member" }} membership
+ * @returns {Promise<{ ok: true, action: "left"|"dissolved", lobbyId: string, code?: string|null }>}
+ */
+export async function leaveLobbyMembershipFromServer(membership) {
+  if (!isSupabaseConfigured()) {
+    const { makeLobbyServerLeaveError, LOBBY_SERVER_LEAVE_ERROR } = await import(
+      "./lobbyServerLeave.js"
+    );
+    throw makeLobbyServerLeaveError(
+      LOBBY_SERVER_LEAVE_ERROR.FAILED,
+      "Multijoueur en ligne requis."
+    );
+  }
+
+  return runServerOnlyLeave(
+    {
+      lobbyId: membership?.lobbyId,
+      code: membership?.code,
+      role: membership?.role,
+      hasActiveLobby: hasActiveLobby(),
+    },
+    {
+      getUserId: () => getSupabaseUserId() || null,
+      fetchLobbyHostId: fetchLobbyHostIdById,
+      deleteOwnMembership: deleteOwnLobbyMembershipById,
+      closeLobbyAsHost: closeLobbyByIdAsHost,
+    }
+  );
 }
 
 /** Hôte MP : transfère le rôle à un autre joueur du lobby. */

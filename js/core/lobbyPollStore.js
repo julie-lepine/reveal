@@ -40,6 +40,7 @@ import {
   tallyActiveResults,
   resolvePollLeader,
   canOfferPollCreate,
+  canCloseLobbyPoll,
   buildPollOptionsSnapshot,
   validatePollOptionsClient,
   localScreenAllowsPollCreate,
@@ -419,10 +420,13 @@ export function getLobbyPollDerived(state = store) {
     activePoll: state.activePoll,
   });
 
-  const canCloseExplicit =
-    Boolean(state.activePoll) &&
-    (isLobbyHost() || canActAsHost()) &&
-    !state.committing.close;
+  const canCloseExplicit = canCloseLobbyPoll({
+    uid,
+    poll: state.activePoll,
+    isHost: isLobbyHost(),
+    isActingHost: canActAsHost(),
+    committingClose: state.committing.close,
+  });
 
   const showCreateCta =
     canCreate &&

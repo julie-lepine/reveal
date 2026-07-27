@@ -30,6 +30,11 @@ import { navigate } from "../core/router.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
 import { bindNav } from "../screens/nav.js";
 import { gameExitBarHtml, bindExitGame } from "../core/exitGame.js";
+import { voteConfirmChrome, pickForVoteConfirm } from "../core/voteConfirm.js";
+import {
+  maybeLogGuessLieGhostDiagnostic,
+  resetGuessLieIdentityDebugDedupe,
+} from "../core/guessLieIdentityDebug.js";
 
 function revealFeedbackTitle({ isSubject, myCorrect, liarBonus }) {
   if (isSubject) return liarBonus ? "Mensonge non trouvé 🥳" : "Mensonge trouvé 😭";
@@ -61,11 +66,16 @@ export function mountGuessLie(app) {
 
   let roundIdx = 0;
   let phase = "voting";
+  /** Vote validé (session / UI). */
+  let myVote = null;
+  /** Choix local avant « Valider mon vote ». */
   let selected = null;
+  let voteCommitInFlight = null;
   let roundScored = false;
   let revealResult = null;
   let revealAdvancing = false;
   const localName = getLocalDisplayName();
+  resetGuessLieIdentityDebugDedupe();
 
   function currentRound() {
     return rounds[roundIdx] ?? rounds[0];
@@ -83,7 +93,14 @@ export function mountGuessLie(app) {
   }
 
   function countDetectiveVotes(votes, round) {
-    return detectiveNamesForRound(round).filter((n) => votes[n] != null).length;
+    const base = { ...votes };
+    if (voteCommitInFlight != null) base[localName] = voteCommitInFlight;
+    else if (myVote != null) base[localName] = myVote;
+    return detectiveNamesForRound(round).filter((n) => base[n] != null).length;
+  }
+
+  function localPick() {
+    return pickForVoteConfirm(selected, myVote);
   }
 
   async function transitionToReveal() {
@@ -107,10 +124,6 @@ export function mountGuessLie(app) {
       liarBonus,
     });
 
-    if (recordStats && (!mp || canActAsHost())) {
-      recordGuessLieRoundStats(lieDetected);
-    }
-
     await commitGuessLiePlay(
       {
         phase: "reveal",
@@ -122,11 +135,16 @@ export function mountGuessLie(app) {
 
     if (!mount.isMounted()) return;
     if (!mount.isCurrentMount()) return;
+
+    if (recordStats && (!mp || canActAsHost())) {
+      recordGuessLieRoundStats(lieDetected);
+    }
     setRevealDisplay(result);
   }
 
   async function tryAdvanceToReveal() {
     if (!mp || phase !== "voting" || revealAdvancing) return;
+    if (voteCommitInFlight != null) return;
     const gl = getGuessLieSession();
     const votes = gl.votes || {};
     const round = currentRound();
@@ -149,10 +167,25 @@ export function mountGuessLie(app) {
   }
 
   function syncFromGl() {
+    const prevIdx = roundIdx;
+    const prevPhase = phase;
     const gl = getGuessLieSession();
     if (gl.roundIdx != null) roundIdx = gl.roundIdx;
     if (gl.phase) phase = gl.phase;
-    if (gl.votes && gl.votes[localName] != null) selected = gl.votes[localName];
+    const serverPick = (gl.votes || {})[localName] ?? null;
+
+    if (roundIdx !== prevIdx || (phase === "voting" && prevPhase === "reveal")) {
+      selected = null;
+      myVote = serverPick;
+    } else if (phase !== "voting") {
+      selected = null;
+      myVote = null;
+    } else if (voteCommitInFlight != null) {
+      myVote = voteCommitInFlight;
+    } else {
+      myVote = serverPick;
+    }
+
     roundScored = Boolean(gl.roundScored);
   }
 
@@ -162,7 +195,8 @@ export function mountGuessLie(app) {
     const all = mp
       ? { ...(gl.votes || {}) }
       : { ...simulateRoundVotes(round, round.player) };
-    if (selected !== null && localName !== round.player) all[localName] = selected;
+    const pick = localPick();
+    if (pick != null && localName !== round.player) all[localName] = pick;
     const voters = Object.keys(all).filter((n) => n !== round.player);
     const correct = voters.filter((n) => all[n] === round.lie);
     const ratio = voters.length ? correct.length / voters.length : 0;
@@ -201,6 +235,7 @@ export function mountGuessLie(app) {
   function beginRound() {
     phase = "voting";
     selected = null;
+    myVote = null;
     roundScored = false;
     revealResult = null;
     render();
@@ -240,6 +275,7 @@ export function mountGuessLie(app) {
       roundIdx = next;
       phase = "voting";
       selected = null;
+      myVote = null;
       roundScored = false;
       revealResult = null;
       await commitGuessLiePlay(
@@ -252,6 +288,38 @@ export function mountGuessLie(app) {
     } else {
       roundIdx = next;
       beginRound();
+    }
+  }
+
+  async function submitVote(pick) {
+    if (pick == null || voteCommitInFlight != null) return;
+    if (mp) {
+      voteCommitInFlight = pick;
+      render();
+      try {
+        await commitGuessLieVote(pick);
+        if (!mount.isMounted()) return;
+        if (!mount.isCurrentMount()) return;
+        selected = null;
+        myVote = pick;
+      } catch {
+        // Feedback déjà affiché ; l'état revient via syncFromGl.
+      } finally {
+        voteCommitInFlight = null;
+        if (mount.isMounted() && mount.isCurrentMount()) syncFromGl();
+      }
+      if (!mount.isMounted()) return;
+      if (!mount.isCurrentMount()) return;
+      await tryAdvanceToReveal();
+      if (mount.isMounted() && mount.isCurrentMount() && phase !== "reveal") render();
+    } else {
+      myVote = pick;
+      selected = null;
+      phase = "reveal";
+      await transitionToReveal();
+      if (!mount.isMounted()) return;
+      if (!mount.isCurrentMount()) return;
+      render();
     }
   }
 
@@ -275,6 +343,17 @@ export function mountGuessLie(app) {
     }
 
     const isSubject = round.player === localName;
+
+    maybeLogGuessLieGhostDiagnostic({
+      round,
+      localNameClosure: localName,
+      isSubject,
+      roundIdx,
+      submissions: getGuessLieSession().submissions || {},
+      sessionId: getGuessLieSession().sessionId,
+      phase,
+    });
+
     let body = "";
 
     if (phase === "voting") {
@@ -311,31 +390,20 @@ export function mountGuessLie(app) {
           </div>`;
       } else {
         const votes = getGuessLieSession().votes || {};
-        const committedVote = votes[localName];
-        const displayPick = selected !== null ? selected : committedVote;
         const detectivesDone = allDetectivesVoted(votes, round);
-        const hasPendingChange = selected !== null && selected !== committedVote;
-        const voteHint = committedVote == null && selected == null
-          ? "Choisis la lettre du mensonge."
-          : detectivesDone
-            ? "Tout le monde a voté !"
-            : committedVote != null && !hasPendingChange
-              ? "Vote enregistré - en attente des autres joueurs…"
-              : "Tu peux modifier ton vote avant de valider.";
-        const confirmDisabled =
-          displayPick == null || (committedVote != null && !hasPendingChange && !detectivesDone);
-        const confirmLabel = detectivesDone && committedVote != null && !hasPendingChange
-          ? "Tout le monde a voté !"
-          : committedVote != null && !hasPendingChange
-            ? "En attente des autres joueurs…"
-            : "Valider mon vote";
+        const confirm = voteConfirmChrome({
+          selected,
+          committed: myVote,
+          allIn: detectivesDone,
+          emptyHint: "Choisis la lettre du mensonge.",
+        });
         body = `
           ${statementsBlock}
-          <p class="hint">${voteHint}</p>
+          <p class="hint">${escapeHtml(confirm.hint)}</p>
           <div class="statements">
             ${round.statements
               .map((text, i) => {
-                const cls = displayPick === i ? "statement statement--picked" : "statement";
+                const cls = confirm.displayPick === i ? "statement statement--picked" : "statement";
                 return `
               <button type="button" class="${cls}" data-pick="${i}">
                 <span class="statement__letter">${String.fromCharCode(65 + i)}</span>
@@ -344,9 +412,10 @@ export function mountGuessLie(app) {
               })
               .join("")}
           </div>
-          <button type="button" class="btn ${confirmDisabled ? "btn-secondary" : "btn-primary"}" id="confirm" ${confirmDisabled ? "disabled" : ""}>
-            ${confirmLabel}
-          </button>`;
+          <button type="button" class="btn ${confirm.confirmClass} btn--spaced" id="confirm"
+            ${confirm.confirmDisabled || voteCommitInFlight != null ? "disabled" : ""}>${escapeHtml(
+              voteCommitInFlight != null ? "Envoi…" : confirm.confirmLabel
+            )}</button>`;
       }
       if (!mp || canActAsHost()) {
         const votes = getGuessLieSession().votes || {};
@@ -425,28 +494,14 @@ export function mountGuessLie(app) {
 
     app.querySelectorAll("[data-pick]").forEach((btn) => {
       btn.addEventListener("click", () => {
+        if (phase !== "voting" || voteCommitInFlight != null) return;
         selected = Number(btn.getAttribute("data-pick"));
         render();
       });
     });
 
-    app.querySelector("#confirm")?.addEventListener("click", async () => {
-      const pick = selected ?? (getGuessLieSession().votes || {})[localName];
-      if (pick == null) return;
-      if (mp) {
-        selected = pick;
-        await commitGuessLieVote(pick);
-        if (!mount.isMounted()) return;
-        if (!mount.isCurrentMount()) return;
-        render();
-        await tryAdvanceToReveal();
-      } else {
-        phase = "reveal";
-        await transitionToReveal();
-        if (!mount.isMounted()) return;
-        if (!mount.isCurrentMount()) return;
-        render();
-      }
+    app.querySelector("#confirm")?.addEventListener("click", () => {
+      void submitVote(localPick());
     });
 
     app.querySelector("#guesslie-force")?.addEventListener("click", () => void forceReveal());
@@ -461,12 +516,34 @@ export function mountGuessLie(app) {
 
   function patchVotingChrome() {
     const round = currentRound();
+    if (!round || round.player === localName) return;
     const votes = getGuessLieSession().votes || {};
     const votedCount = countDetectiveVotes(votes, round);
     const totalDetectives = detectiveNamesForRound(round).length;
+    const detectivesDone = allDetectivesVoted(votes, round);
     const forceBtn = app.querySelector("#guesslie-force");
     if (forceBtn) {
       forceBtn.textContent = `Révéler maintenant (${votedCount}/${totalDetectives})`;
+    }
+    const confirm = voteConfirmChrome({
+      selected,
+      committed: myVote,
+      allIn: detectivesDone,
+      emptyHint: "Choisis la lettre du mensonge.",
+    });
+    const hintEl = app.querySelector(".hint");
+    if (hintEl && voteCommitInFlight == null) {
+      hintEl.textContent = confirm.hint;
+    }
+    const confirmBtn = app.querySelector("#confirm");
+    if (confirmBtn && voteCommitInFlight == null) {
+      confirmBtn.textContent = confirm.confirmLabel;
+      confirmBtn.disabled = confirm.confirmDisabled;
+      confirmBtn.className = `btn ${confirm.confirmClass} btn--spaced`;
+    } else if (confirmBtn && voteCommitInFlight != null) {
+      confirmBtn.textContent = "Envoi…";
+      confirmBtn.disabled = true;
+      confirmBtn.className = "btn btn-secondary btn--spaced";
     }
   }
 
@@ -497,7 +574,9 @@ export function mountGuessLie(app) {
     }
     if (advanced) {
       revealResult = null;
-      selected = phase === "voting" ? null : selected;
+      if (phase === "voting") {
+        selected = null;
+      }
       render();
       lastAckedActingHostToken = ahTokenNow;
       void tryAdvanceToReveal();

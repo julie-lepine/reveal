@@ -143,6 +143,29 @@ export function canOfferPollCreate({
 }
 
 /**
+ * Fermeture explicite : hôte, acting host ou créateur du sondage.
+ * @param {{
+ *   uid: string|null|undefined,
+ *   poll: { createdBy?: string|null }|null,
+ *   isHost: boolean,
+ *   isActingHost: boolean,
+ *   committingClose?: boolean,
+ * }} args
+ */
+export function canCloseLobbyPoll({
+  uid,
+  poll,
+  isHost,
+  isActingHost,
+  committingClose = false,
+}) {
+  if (!poll || committingClose) return false;
+  if (isHost || isActingHost) return true;
+  if (!uid || !poll.createdBy) return false;
+  return String(poll.createdBy) === String(uid);
+}
+
+/**
  * Snapshot options depuis le catalogue (pas de saisie libre gameId).
  * @param {Array<{ id: string, title: string, emoji: string }>} games
  * @param {string[]} selectedIds

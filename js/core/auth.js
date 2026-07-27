@@ -8,9 +8,11 @@ import {
   signOutSupabase,
   sendPasswordResetEmail as sbSendPasswordResetEmail,
   updatePassword,
+  getSupabaseUserId,
+  isPasswordRecoveryPending,
+  isAuthReadyResolved,
 } from "./supabaseAuth.js";
 import { upsertProfile } from "./supabaseProfile.js";
-import { getSupabaseUserId } from "./supabaseAuth.js";
 import {
   registerEmailAccount,
   verifyEmailAccount,
@@ -23,8 +25,9 @@ import {
   updateLobbyMemberProfileSupabase,
 } from "./supabaseLobby.js";
 import { stopMultiplayerSync } from "./gameSync.js";
-import { isPasswordRecoveryPending } from "./supabaseAuth.js";
 import { normalizeGuestEmoji } from "../../data/profileEmojis.js";
+import { getMembershipSnapshot } from "./lobbyMembershipSnapshot.js";
+import { canCreateLobbyFromInputs } from "./lobbyCreateGuard.js";
 
 export function isLoggedIn() {
   const user = getState().user;
@@ -53,7 +56,22 @@ export function canCreateLobby() {
   const hasJoinedLobby = Boolean(
     state.inLobby && state.lobby?.code && (state.lobby.id || state.lobby.participants?.length)
   );
-  return isLoggedIn() && !hasJoinedLobby;
+  if (!isLoggedIn() || hasJoinedLobby) return false;
+
+  // Offline / demo : pas de snapshot membership — inchangé.
+  if (!isSupabaseConfigured()) return true;
+
+  // Synchrone : snapshot none frais requis. L’INSERT re-query toujours (Vague C).
+  if (!isAuthReadyResolved()) return false;
+
+  const snapshot = getMembershipSnapshot();
+  return canCreateLobbyFromInputs({
+    loggedIn: true,
+    hasActiveLobby: false,
+    authReady: true,
+    supabaseConfigured: true,
+    snapshot,
+  });
 }
 
 export function getUser() {

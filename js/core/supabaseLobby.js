@@ -61,6 +61,25 @@ export {
   planLobbyJoinSyncOrder,
 } from "./joinSessionHydrate.js";
 
+/**
+ * Vague A — résolution membership serveur (ternaire).
+ * Home consomme Fetch/Snapshot ; createLobby utilise la query canonique (Vague C).
+ * peekServerLobbyForUser / findLobbyIdByUserId restent pour d’anciens flows
+ * (filtre 24 h + remember) — plus comme garde d’INSERT.
+ */
+export {
+  queryActiveLobbyMembership,
+  fetchLivingMembershipRowsForUser,
+  normalizePostgrestMembershipData,
+  normalizePostgrestMembershipRow,
+  ACTIVE_MEMBERSHIP_QUERY_LIMIT,
+} from "./lobbyMembershipFetch.js";
+export {
+  getMembershipSnapshot,
+  setMembershipSnapshot,
+  invalidateMembershipSnapshot,
+} from "./lobbyMembershipSnapshot.js";
+
 const HOST_COLOR = "#A78BFA";
 const GUEST_COLOR = "#60A5FA";
 
@@ -1532,17 +1551,59 @@ export async function refreshLobbyFromSupabase({ withMessages = false } = {}) {
   }
 }
 
-/** Hôte : supprime le lobby (membres et messages en cascade). */
-export async function closeLobbySupabase() {
-  const lobbyId = getState().lobby?.id;
-  const userId = getSupabaseUserId();
-  const hostId = getState().lobby?.hostId;
-  const isHostMember = getState().lobby?.participants?.some((p) => p.isLocal && p.isHost);
-  const isHost =
-    Boolean(userId && hostId && userId === hostId) ||
-    (isHostMember && !hostId);
+/**
+ * Vague D — host_id serveur pour un lobbyId (sans lire state.lobby).
+ * @returns {Promise<string|null>} host_id ou null si lobby absent / erreur non levée
+ */
+export async function fetchLobbyHostIdById(lobbyId) {
+  if (!lobbyId) return null;
+  const { data, error } = await supabase
+    .from("lobbies")
+    .select("host_id")
+    .eq("id", lobbyId)
+    .maybeSingle();
+  if (error) throw error;
+  return data?.host_id ?? null;
+}
 
-  if (!lobbyId || !isHost) {
+/**
+ * Vague D — retire la membership de l'utilisateur courant pour un lobbyId explicite.
+ * Ne lit pas state.lobby. Ne supprime pas le lobby.
+ */
+export async function deleteOwnLobbyMembershipById(lobbyId) {
+  const userId = getSupabaseUserId();
+  if (!lobbyId || !userId) {
+    return { ok: false, error: "Authentification ou lobbyId manquant." };
+  }
+
+  const { error } = await supabase
+    .from("lobby_members")
+    .delete()
+    .eq("lobby_id", lobbyId)
+    .eq("user_id", userId);
+
+  if (error) return { ok: false, error: error.message };
+  return { ok: true };
+}
+
+/**
+ * Vague D / cache — dissolution hôte par lobbyId explicite.
+ * Vérifie host_id serveur (pas state.lobby.hostId). RLS lobbies_delete_host en filet.
+ * Cascade memberships / messages via FK ; session jeu + traitre nettoyés best-effort.
+ */
+export async function closeLobbyByIdAsHost(lobbyId) {
+  const userId = getSupabaseUserId();
+  if (!lobbyId || !userId) {
+    return { ok: false, error: "Seul l'hôte peut fermer le lobby." };
+  }
+
+  let hostId;
+  try {
+    hostId = await fetchLobbyHostIdById(lobbyId);
+  } catch (e) {
+    return { ok: false, error: e?.message || "Impossible de vérifier l'hôte." };
+  }
+  if (!hostId || String(hostId) !== String(userId)) {
     return { ok: false, error: "Seul l'hôte peut fermer le lobby." };
   }
 
@@ -1572,20 +1633,21 @@ export async function closeLobbySupabase() {
   return { ok: true };
 }
 
-/** Quitte le lobby côté serveur (retire le membre local). */
+/** Hôte : supprime le lobby (membres et messages en cascade) — cache local. */
+export async function closeLobbySupabase() {
+  const lobbyId = getState().lobby?.id;
+  if (!lobbyId) {
+    return { ok: false, error: "Seul l'hôte peut fermer le lobby." };
+  }
+  return closeLobbyByIdAsHost(lobbyId);
+}
+
+/** Quitte le lobby côté serveur (retire le membre local) — cache local. */
 export async function leaveLobbySupabase() {
   const lobbyId = getState().lobby?.id;
   const userId = getSupabaseUserId();
   if (!lobbyId || !userId) return { ok: true };
-
-  const { error } = await supabase
-    .from("lobby_members")
-    .delete()
-    .eq("lobby_id", lobbyId)
-    .eq("user_id", userId);
-
-  if (error) return { ok: false, error: error.message };
-  return { ok: true };
+  return deleteOwnLobbyMembershipById(lobbyId);
 }
 
 export async function setLocalReadySupabase(ready) {

@@ -19,7 +19,7 @@ import {
   canManageLobbyRoster,
 } from "../core/lobby.js";
 import { mountChatPanel, CHAT_MAX_LENGTH } from "../core/chatPanel.js";
-import { canCreateLobby, updateProfileEmoji } from "../core/auth.js";
+import { canCreateLobby, updateProfileEmoji, isLoggedIn } from "../core/auth.js";
 import { getLocalEmoji } from "../core/state.js";
 import { isSupabaseConfigured } from "../core/supabaseClient.js";
 import { onLobbyBundleUpdated } from "../core/supabaseLobby.js";
@@ -128,7 +128,19 @@ export function mountLobby(app) {
     const lobby = getLobby();
     if (lobby?.code && lobby.participants?.length) return;
     if (hasActiveLobby()) return;
-    if (canCreateLobby()) await createLobby();
+    if (!isLoggedIn()) return;
+
+    // Offline : chrome synchrone historique. Online : createLobby centralise la garde C
+    // (ne pas se limiter à canCreateLobby() qui exige un snapshot none déjà frais).
+    if (!isSupabaseConfigured()) {
+      if (canCreateLobby()) await createLobby();
+      return;
+    }
+    try {
+      await createLobby();
+    } catch (e) {
+      console.warn("REVEAL ensureLobby create:", e?.code || e?.message || e);
+    }
   }
 
   function captureChatState() {
@@ -321,7 +333,6 @@ export function mountLobby(app) {
     app.querySelector("#btn-start")?.addEventListener(
       "click",
       withClickLock(async () => {
-        const startBtn = app.querySelector("#btn-start");
         if (!allLobbyMembersReady()) {
           await showAppAlert("Tous les joueurs doivent être prêts avant de commencer la soirée.", {
             title: "Pas encore prêt",
@@ -329,8 +340,6 @@ export function mountLobby(app) {
           });
           return;
         }
-        if (startBtn?.disabled) return;
-        if (startBtn) startBtn.disabled = true;
         try {
           if (isGameSyncActive() && isLobbyHost()) {
             await startGameSession("menu", "game-select", {});
