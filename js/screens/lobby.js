@@ -321,7 +321,6 @@ export function mountLobby(app) {
     app.querySelector("#btn-start")?.addEventListener(
       "click",
       withClickLock(async () => {
-        const startBtn = app.querySelector("#btn-start");
         if (!allLobbyMembersReady()) {
           await showAppAlert("Tous les joueurs doivent être prêts avant de commencer la soirée.", {
             title: "Pas encore prêt",
@@ -329,8 +328,6 @@ export function mountLobby(app) {
           });
           return;
         }
-        if (startBtn?.disabled) return;
-        if (startBtn) startBtn.disabled = true;
         try {
           if (isGameSyncActive() && isLobbyHost()) {
             await startGameSession("menu", "game-select", {});

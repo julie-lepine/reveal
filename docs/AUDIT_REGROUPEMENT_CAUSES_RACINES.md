@@ -13,13 +13,15 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 
 ---
 
-## Focus — 2026-07-26
+!!!!! QUID DE "JE CREE UN LOBBY", JE NE LE DEMARRE PAS, J'EN RELANCE UN AUTRE ET SUIS DONC COINCE CAR JE SUIS TJRS CONSIDERE DANS LE 1ER MAIS JE NE LE VOIS PAS DANS MON INTERFACE DE CO
+
+## Focus — 2026-07-27
 
 | | Contenu |
 |--|---------|
-| **Fait** | … · **ARCH-06 V1/B/C** ✅ · **Traître host V2** ✅ · **Lobby IIFE / SYN-12** 🔧 livré |
-| **Prochain** | QA terrain Lobby IIFE → **clôture ARCH-06** si OK |
-| **Ensuite** | — (ARCH-06 candidat clôture) |
+| **Fait** | **ARCH-06 entièrement** ✅ · **SYN-12** ✅ · **Mode A/B/C** ✅ · **Traître host V2** ✅ · **Lobby IIFE** ✅ |
+| **Prochain** | **M-14a / SYN-14** (TierNight — suspendu) ou **ARCH-22** |
+| **Ensuite** | Guess Lie UX · Loader UI join |
 
 **Hors file audit**  
 Sondages in-chat (`lobby_polls` / UI chat) — feature produit, pas un ticket cause racine.
@@ -38,12 +40,11 @@ Clutch taps figés sous latence (SYN-26) · ready prep après Recommencer · Cau
 
 | # | ID | Cause | Problème | Statut |
 |---|----|-------|----------|--------|
-| 1 | **ARCH-06** | 6 | Handlers async / unmount / remount | 🟡 V1 ✅ · B ✅ · C 🔧 · Traître/lobby ouverts |
-| 2 | **M-14a / SYN-14** | 3 | TierNight topic / routing | ❌ KO QA — suspendu |
-| 3 | Guess Lie UX | 4/7 | UI avant await ; stats round local-only | Post I-08 |
-| 4 | Loader UI join | 5/11 | Interstitiel join | Hors T-01/T-02 |
-| 5 | Pré-résolution entry screens | 5 | `get*EntryScreen` (filet M-08 conservé) | Hors M-08 |
-| 6 | **ARCH-22** | 11 | Pas de feedback sync lente | Ouvert |
+| 1 | **M-14a / SYN-14** | 3 | TierNight topic / routing | ❌ KO QA — suspendu |
+| 2 | Guess Lie UX | 4/7 | UI avant await ; stats round local-only | Post I-08 |
+| 3 | Loader UI join | 5/11 | Interstitiel join | Hors T-01/T-02 |
+| 4 | Pré-résolution entry screens | 5 | `get*EntryScreen` (filet M-08 conservé) | Hors M-08 |
+| 5 | **ARCH-22** | 11 | Pas de feedback sync lente | Ouvert |
 
 ### Autres ouverts
 
@@ -69,7 +70,7 @@ Clutch taps figés sous latence (SYN-26) · ready prep après Recommencer · Cau
 | 3 | Sources de vérité multiples | ✅ hors TierNight | **M-14a** suspendu · UX-CLUTCH-01 ✅ |
 | 4 | Asymétrie hôte / invité | ✅ QA | UX Guess Lie séparée |
 | 5 | Routing + timing sync | ✅ | ARCH-05 mitigé |
-| 6 | Async écrans | Partiel | **ARCH-06** V1 ✅ · B ✅ · C 🔧 · Traître/lobby ouverts |
+| 6 | Async écrans | ✅ QA | **ARCH-06** ✅ (Mode A/B/C · Traître V2 · Lobby IIFE · SYN-12) |
 | 7 | Sync silencieuse / fire-and-forget | Partiel | ARCH-07/08, M-14b |
 | 8 | Reset / migration incomplète | Partiel | I-09 ✅ ; SYN-15/16 ✅ ; ARCH-10 |
 | 9 | Sync monolithe / duplication | Dette | ARCH-11… |
@@ -178,13 +179,26 @@ Clutch taps figés sous latence (SYN-26) · ready prep après Recommencer · Cau
 | **I-09 / SYN-06** | Rename mid-soirée — migration blobs locaux | ✅ QA |
 | **ARCH-10** | Cache session clear trop tard au leave | 🟡 |
 
-### Cause 6 — ARCH-06 🟡 partiel · V1 ✅ · B ✅ · C 🔧 · Traître/lobby ouverts
+### Cause 6 — ARCH-06 ✅ QA
 
 | | |
 |--|--|
-| **État** | **Pas clos tant que QA lobby.** V1 ✅ · B ✅ · C ✅ · Traître V2 ✅ · **Lobby IIFE / SYN-12 livré** 🔧 |
+| **État** | **Clos 2026-07-27.** Mode A ✅ · Mode B ✅ · Mode C ✅ · Traître V2 ✅ · Lobby IIFE ✅ · SYN-12 ✅ |
 | **Primitive B/C** | `createMountGuard()` dans `mountLifecycle.js` : `isMounted` / `isCurrentMount` / `dispose` ; compteur de génération **dans** lifecycle ; routeur appelle seulement `advanceMountGeneration()` (pas l’inverse) |
 | **Règle post-await / listener** | `isMounted()` puis `isCurrentMount()` avant effet local ou nouveau commit. Commits déjà partis **non** annulés. Helpers métier : `shouldContinue()` opaque. |
+
+#### Mode A
+
+| | |
+|--|--|
+| **Scope** | launch / restart / PG+TierLive next · locks `withClickLock` (lobby ready/start, Traître hôte) |
+| **QA** | ✅ validé 2026-07-27 |
+
+#### Mode B
+
+| Vague | Contenu | Statut |
+|-------|---------|--------|
+| **B0–B4** | `createMountGuard` · câblage · timers/RAF · tierNightLive | ✅ QA |
 
 #### Mode C
 
@@ -197,7 +211,7 @@ Clutch taps figés sous latence (SYN-26) · ready prep après Recommencer · Cau
 | | |
 |--|--|
 | **Scope** | `js/games/traitre.js` hôte + acting host (`canActAsHost`) |
-| **QA** | ✅ validé |
+| **QA** | ✅ validé 2026-07-27 |
 
 #### Lobby IIFE / SYN-12 (étape 5)
 
@@ -210,20 +224,9 @@ Clutch taps figés sous latence (SYN-26) · ready prep après Recommencer · Cau
 | **SYN-12** | contrat `planLobbyMountMultiplayerSync` inchangé (1× `startMultiplayerSync` pre-refresh) ; fuites post-await / remount corrigées |
 | **Hors scope** | starts sync hydrate→hub hors `mountLobby` (résidu doc) · SQL/RPC/RLS |
 | **Preuve** | `tests/arch06LobbyIife.test.js` · `tests/lobbyMountSyncPlan.test.js` |
+| **QA** | ✅ validé 2026-07-27 |
 
-#### Suite ARCH-06
-
-| Vague | Scope | Statut |
-|-------|-------|--------|
-| V1 mode A | launch / restart / PG+TierLive next | ✅ QA |
-| mode B | B0–B4 | ✅ |
-| mode C | C0–C3 | ✅ QA |
-| V2 Traître | actions hôte | ✅ QA |
-| **Lobby IIFE** | SYN-12 lifecycle | 🔧 livré → QA |
-
-**Preuve** : `tests/mountLifecycle.test.js` · `tests/routerNestedRedirect.test.js` · `tests/arch06TraitreHostV2.test.js` · `tests/arch06LobbyIife.test.js`
-
-**Clôture** : après QA terrain lobby, ARCH-06 = entièrement clos (plus de résidu lifecycle A/B/C dans le périmètre).
+**Preuve globale** : `tests/mountLifecycle.test.js` · `tests/routerNestedRedirect.test.js` · `tests/arch06TraitreHostV2.test.js` · `tests/arch06LobbyIife.test.js` · `tests/arch06ActionLocks.test.js`
 
 ### Autres causes
 
@@ -283,7 +286,7 @@ Clutch conserve son départage temporel (règle produit explicite inchangée).
 | 3 | I-03/04, SYN-03, M-13, M-02b, ARCH-02, SYN-29, I-PG-01, ready stale Recommencer, UX-CLUTCH-01 |
 | 4 | I-01/02/08, M-03b, M-06a/b, L-01, ARCH-03/03b, UX-VIBE-01 |
 | 5 | T-01/02, T-03↻, M-07, M-08, P-02, SYN-28, I-PG-01, ARCH-04, UX-VIBE-02 |
-| 6 | I-05, SYN-13b↻, SYN-25, **SYN-05 / ARCH-18** ✅, **ARCH-06** 🔧 (V1/B/C/Traître ✅ · Lobby IIFE livré → QA clôture) |
+| 6 | I-05, SYN-13b↻, SYN-25, **SYN-05 / ARCH-18** ✅, **ARCH-06** ✅ (Mode A/B/C · Traître V2 · Lobby IIFE · SYN-12) |
 | 7 | I-07, M-09, L-09, M-11, M-10, T-05, SYN-26, M-04b / SYN-18 |
 | 8 | I-06, P-02, ARCH-09, I-09 / SYN-06, SYN-15 / SYN-16 |
 | 9 | SYN-12 / M-05b |
@@ -308,4 +311,4 @@ Hors tickets prioritaires — à traiter si opportunité / régression :
 
 ---
 
-*Suivi vivant · Dernière MAJ : 2026-07-26 — ARCH-06 mode C C0–C3 (ticket non clos)*
+*Suivi vivant · Dernière MAJ : 2026-07-27 — ARCH-06 clôturé (Mode A/B/C · Traître V2 · Lobby IIFE · SYN-12)*
