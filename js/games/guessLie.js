@@ -32,7 +32,7 @@ import { bindNav } from "../screens/nav.js";
 import { gameExitBarHtml, bindExitGame } from "../core/exitGame.js";
 import { voteConfirmChrome, pickForVoteConfirm } from "../core/voteConfirm.js";
 import {
-  maybeLogGuessLieOwnRoundVoteBug,
+  maybeLogGuessLieGhostDiagnostic,
   resetGuessLieIdentityDebugDedupe,
 } from "../core/guessLieIdentityDebug.js";
 
@@ -344,13 +344,14 @@ export function mountGuessLie(app) {
 
     const isSubject = round.player === localName;
 
-    maybeLogGuessLieOwnRoundVoteBug({
+    maybeLogGuessLieGhostDiagnostic({
       round,
       localNameClosure: localName,
       isSubject,
       roundIdx,
       submissions: getGuessLieSession().submissions || {},
       sessionId: getGuessLieSession().sessionId,
+      phase,
     });
 
     let body = "";

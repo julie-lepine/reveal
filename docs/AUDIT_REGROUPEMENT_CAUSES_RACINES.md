@@ -21,8 +21,8 @@ SONDAGE A FERMER PAR LE CREATEUR ET PAS QUE L HOTE
 
 | | Contenu |
 |--|---------|
-| **Fait** | **Guess Lie UX** ✅ · diagnostic **L-05 joueur fantôme** (requalif. bug vote post-restart) |
-| **Prochain** | **L-05** (conception lifecycle lobby/membership) · **M-14a / SYN-14** (TierNight — suspendu) ou **ARCH-22** |
+| **Fait** | **Guess Lie UX** ✅ · **L-05 invalidé** (pas de fantôme `lobby_members`) · **M-15** ouvert (identité fantôme Guess Lie / submissions) |
+| **Prochain** | **M-15a** confirmation terrain (`[GUESSLIE-ID]`) · **M-14a / SYN-14** (suspendu) ou **ARCH-22** |
 | **Ensuite** | Loader UI join · pré-résolution `get*EntryScreen` |
 
 **Hors file audit**  
@@ -42,7 +42,7 @@ Clutch taps figés sous latence (SYN-26) · ready prep après Recommencer · sta
 
 | # | ID | Cause | Problème | Statut |
 |---|----|-------|----------|--------|
-| 1 | **L-05** | 1/8 | Joueur fantôme — membership anonyme orpheline après déconnexion ou nouvelle session | Conception |
+| 1 | **M-15** | 3/8 | Guess Lie — identité fantôme (submissions / merge / rounds) | **M-15a** QA terrain |
 | 2 | **M-14a / SYN-14** | 3 | TierNight topic / routing | ❌ KO QA — suspendu |
 | 3 | Loader UI join | 5/11 | Interstitiel join | Hors T-01/T-02 |
 | 4 | Pré-résolution entry screens | 5 | `get*EntryScreen` (filet M-08 conservé) | Hors M-08 |
@@ -67,14 +67,14 @@ Clutch taps figés sous latence (SYN-26) · ready prep après Recommencer · sta
 
 | # | Cause | État | Ouvert notable |
 |---|-------|------|----------------|
-| 1 | Identité invité / JWT | Partiel | ARCH-01 partiel · **L-05** orphan membership |
+| 1 | Identité invité / JWT | ✅ QA | ARCH-01 partiel |
 | 2 | Race auth / profil | ✅ QA | — |
-| 3 | Sources de vérité multiples | ✅ hors TierNight | **M-14a** suspendu · UX-CLUTCH-01 ✅ |
+| 3 | Sources de vérité multiples | Partiel | **M-14a** suspendu · **M-15** submissions GL · UX-CLUTCH-01 ✅ |
 | 4 | Asymétrie hôte / invité | ✅ QA | Guess Lie UX ✅ |
 | 5 | Routing + timing sync | ✅ | ARCH-05 mitigé |
 | 6 | Async écrans | ✅ QA | **ARCH-06** ✅ (Mode A/B/C · Traître V2 · Lobby IIFE · SYN-12) |
 | 7 | Sync silencieuse / fire-and-forget | Partiel | ARCH-07/08, M-14b |
-| 8 | Reset / migration incomplète | Partiel | I-09 ✅ ; SYN-15/16 ✅ ; ARCH-10 · **L-05** prune roster |
+| 8 | Reset / migration incomplète | Partiel | I-09 ✅ ; SYN-15/16 ✅ ; ARCH-10 · **M-15** reset submissions GL |
 | 9 | Sync monolithe / duplication | Dette | ARCH-11… |
 | 10 | Code mort | Dette | dead exports (hors Fil Rouge app) |
 | 11 | Friction UX | Partiel | ARCH-22 ; L-04 |
@@ -83,176 +83,150 @@ Clutch taps figés sous latence (SYN-26) · ready prep après Recommencer · sta
 
 ## Détail des tickets ouverts
 
-### Cause 1 / 8 — L-05 — Joueur fantôme — membership anonyme orpheline après déconnexion ou nouvelle session
+### Cause 3 / 8 — M-15 — Guess Lie — identité fantôme (submissions / merge / rounds)
 
-**Identifiant :** `L-05` · **Causes :** 1 (identité invité) + 8 (reset / migration) · **Statut :** Conception — diagnostic confirmé 2026-07-27 · **Aucun patch applicatif avant validation de la stratégie.**
+**Identifiant :** `M-15` · **Causes :** 3 + 8 · **Statut :** **M-15a — confirmation terrain** (aucun patch M-15b/c/d avant log)
 
-#### Problème confirmé
+Symptôme QA : après Recommencer, vote sur ses propres affirmations ; fantôme gameplay ; **pas** de fantôme `lobby_members` ; nouveau lobby corrige.
 
-Une ligne `lobby_members` peut rester présente alors que le client correspondant n’est plus actif. Le roster affiche alors **deux identités pour un même humain** : l’ancienne membership fantôme et la nouvelle membership active.
+Couches : (3–4) submissions distant/local → (6) `getGuessLieRounds()` produit la manche. Instrumentation `[GUESSLIE-ID]` ✅ acceptée.
 
-**Scénario terrain confirmé (navigation privée) :**
+Découpage : **M-15a** preuve terrain (en cours) → M-15b purge restart → M-15c `getGuessLieRounds` → M-15d `isSubject`.
 
-1. Un invité rejoint un lobby depuis une fenêtre de navigation privée.
-2. Sa session anonyme possède un premier UID.
-3. La fenêtre privée est fermée **sans** appel fiable à `leaveLobbySupabase()`.
-4. La ligne `lobby_members` reste présente.
-5. Une nouvelle fenêtre privée crée un **nouvel UID** anonyme.
-6. Le reclaim ne peut pas fonctionner : le stockage local précédent (`reveal-guest-membership`) a disparu.
-7. Le même humain rejoint avec une **nouvelle membership**.
-8. Le roster contient l’ancienne identité fantôme **et** la nouvelle identité active.
+**Règle patch :** cibler **uniquement la première couche fautive** confirmée par le log. Pas de triple patch préventif (purge + filtre roster + `isSubject`).
 
-**Conséquence observée :** Guess Lie a interprété les deux lignes comme deux joueurs distincts et a produit une manche incohérente (affirmations / vote attribués à l’ancienne identité).
+---
 
-**Périmètre du ticket :** lifecycle **lobby / membership** uniquement. **Hors scope :** correctifs Guess Lie (`isSubject`, helpers UID, merge submissions) tant que la duplication roster n’est pas résolue.
+#### M-15a — Protocole QA terrain (obligatoire avant patch)
 
-#### Cause racine
+**Setup**
 
-| Mécanisme | Comportement actuel |
-|-----------|---------------------|
-| `leaveLobbySupabase()` | Ne s’exécute pas de manière fiable lors d’une fermeture d’onglet, d’un crash ou d’une perte réseau |
-| Heartbeat (`last_seen_at`) | Met uniquement `last_seen_at` à jour — **ne supprime jamais** la row |
-| Éviction individuelle | **Aucune** suppression automatique d’un membre stale |
-| Reclaim invité | Dépend du stockage local (`reveal-guest-membership`) + RPC `reclaim_guest_membership` |
-| Nouvelle session anonymous | Peut créer une **seconde** membership (`unique lobby_id+user_id`, `unique display_name` respectés) |
-| Purge serveur | `purge_stale_lobbies` supprime le **lobby entier** — pas un membre isolé mid-partie ; pg_cron souvent inactif |
-| UI lobby | Affiche tout le bundle sans filtre présence (`screens/lobby.js`) |
+| Rôle | Config |
+|------|--------|
+| Hôte | Navigateur normal |
+| Invité A | Normal |
+| Invité B (repro) | **Navigation privée** |
 
-#### Surfaces impactées (roster live)
+**Scénario**
 
-| Surface | Fonctions / modules | Exposition |
-|---------|---------------------|------------|
-| **Guess Lie** | `getLobbyMemberNames`, `getGuessLieRounds`, `allLobbySubmitted`, `isSubject` (pseudo) | **Élevée** |
-| **Tier Night** | `getActiveMemberUserIds`, `getTierNightLobbyProgress`, gates `finished` | **Élevée** |
-| **Votes / compteurs « tous les joueurs »** | `allMembersVoted`, `allMembersReady`, compteurs x/y dans les jeux MP | **Moyenne** |
-| **Ready maps** | `allMembersReady`, prep launch, merge ready post-Recommencer | **Moyenne** |
-| **Acting host** | `resolveActingHostUserId`, `isMemberPresent` (120 s) — fantôme peut compter comme « présent » si `lastSeenAt` null/legacy | **Moyenne** |
-| **Écran lobby** | `getLobbyParticipants`, ready count, kick | **Visibilité directe** |
-| **Jeux live-roster** | Hot Take, Dilemma, Speed Vote, Wrong Answer, Truth Meter, Consensus, Trivia, Playlist Guess — `getActivePlayers()` / `getActiveMemberUserIds()` | **Moyenne** |
-| **Clutch** | Snapshot `participants[]` figé au lancement (`clutchParticipants.js`) | **Faible en play** (post-launch) |
-| **Scores soirée** | `getEveningStandingPlayers` (UX-HIST-01) | **Hors scope suppression** — contributeurs historiques conservés volontairement |
+1. Créer lobby · 3 joueurs · lancer Guess Lie.
+2. Jouer **partie 1 complète** (toutes les manches).
+3. Hôte : **Recommencer**.
+4. Tous : **nouvelles soumissions** prep.
+5. Hôte : lancer **partie 2**.
+6. Sur **invité B** (privé), au moment du symptôme (manche fantôme ou vote sur ses propres affirmations) : capturer le log.
 
-#### Risque produit
+**Activation debug (invité concerné, avant ou dès la prep partie 2)**
 
-- Faux nombre de joueurs affiché et compté dans les gates.
-- Blocage « tous prêts » ou « tous ont voté » (fantôme attendu indéfiniment).
-- Rounds supplémentaires ou manches incohérentes (Guess Lie : union roster + clés submissions).
-- Affirmation ou vote attribué à une **ancienne identité** du même humain.
-- Acting host potentiellement faussé si présence mal interprétée.
-- Confusion visuelle dans le lobby (deux pseudos pour une personne).
+```js
+localStorage.setItem('reveal-guesslie-identity-debug', '1');
+location.reload();
+```
 
-#### Requalifications
+Console : filtrer `[GUESSLIE-ID]`
 
-| Ticket | Statut |
+**Champs obligatoires du log** (objet complet `console.warn`)
+
+| Groupe | Champs |
 |--------|--------|
-| **Guess Lie UX** | ✅ Validé — bug post-restart « vote sur ses propres affirmations » **requalifié L-05** |
-| **Instrumentation `[GUESSLIE-ID]`** | Debug optionnel derrière flag ; retrait possible en nettoyage séparé |
-| **Merge restart Guess Lie** | ✅ Déjà livré — indépendant de L-05 |
+| Couche | `firstGhostLayerHint`, `triggers` |
+| Session | `sessionId`, `phase`, `roundIdx`, `gameSessionRowId` |
+| Roster | `lobbyMemberNames`, `localParticipant`, `localParticipantUid` |
+| Identité locale | `getLocalDisplayName`, `getLocalPlayerName`, `localNameClosure` |
+| Submissions | `remoteSubmissionKeys`, `localSubmissionKeys`, `keysNotInLobbyRoster`, `localOnlyValidKeys`, `remoteOnlyValidKeys`, `keysForLocalIdentity` |
+| Rounds | `roundPlayers`, `roundPlayersNotInRoster`, `rounds` (avec `stmtHash`) |
+| Manche courante | `roundPlayer`, `roundPlayerUid`, `roundStmtHash`, `isSubject`, `isSubjectFormula` |
 
-#### Découpage recommandé (sous-tickets)
+Pas de texte brut des affirmations — hashes uniquement (`stmtHash` par clé dans `localSubmissionKeys` / `remoteSubmissionKeys`).
 
-| ID | Titre | Objectif | Contraintes |
-|----|-------|----------|-------------|
-| **L-05a** | Visibilité et action hôte | Exposer l’absence ; ne plus afficher un stale comme actif ; kick explicite | **Purement UX/lobby** — ne modifie **pas** les données de session jeu |
-| **L-05b** | Récupération membership invité | Reprise explicite et sûre d’une place existante après changement de session anonymous | Pseudo seul **≠** preuve d’identité — analyser usurpation, SQL, RPC, `reveal-guest-membership` |
-| **L-05c** | Éviction individuelle | Définir si/quand une row stale peut être supprimée ou marquée inactive | **Ne pas** réutiliser le seuil acting-host 120 s comme seuil de suppression ; distinguer absence temporaire / F5 / arrière-plan / session perdue / waiting vs playing / contributions existantes |
-| **L-05d** | Nettoyage maps de session | Étudier le retrait des UID absents du roster dans les structures de jeu | **Séparé de L-05c** — pas de prune auto avant matrice historique vs progression ; scores soirée historiques conservés (UX-HIST-01) |
+**Points de capture recommandés**
 
-##### L-05a — Visibilité et action hôte
+| Moment | Pourquoi |
+|--------|----------|
+| Fin prep partie 2 (avant lancement) | État submissions post-merge prep |
+| 1er render vote partie 2 | Symptôme UI |
+| Manche où l’invité voit boutons vote sur **ses** affirmations | Cas critique |
 
-- Indicateur visuel « Absent » / « Déconnecté » basé sur `last_seen_at`.
-- Fréquence de re-render / rafraîchissement (poll 12–20 s, realtime meaningful changes).
-- Action kick existante (`kick_lobby_member`) — rendre l’intention claire pour l’hôte.
-- Comportement si le joueur revient (heartbeat reprend) **avant** kick : retour visuel « actif ».
+---
 
-##### L-05b — Récupération membership invité
+#### M-15a — Arbre de classification (après log)
 
-- Cas : pseudo déjà présent mais membre stale → proposition « Reprendre cette place ».
-- Gardes anti-usurpation (compte non-anonymous, preuve membership, code lobby, etc.).
-- Contraintes SQL : `unique (lobby_id, user_id)`, `lobby_members_unique_name`.
-- RPC existante `reclaim_guest_membership` + `peek_lobby_by_membership` — étendre ou nouveau flow ?
-- Comportement **sans** accès à l’ancien UID ni `localStorage`.
+**A. Distant fautif** — clé fantôme déjà dans `remoteSubmissionKeys` (`valid: true`, `inRoster: false` ou clé stale)
 
-##### L-05c — Éviction individuelle
+À documenter dans le rapport :
 
-Proposer explicitement :
+- Quand la clé aurait dû être purgée (fin partie 1 / Recommencer / lancement prep).
+- Payload restart reçu côté client : `getCachedGameSession()?.state?.guessLie` (submissions UID).
+- Résultat attendu de `shouldApplyGuessLieLobbyReset(local, remote)` au moment du merge.
+- Branche `patchGameStateInner` : est-ce que `incGl.submissions === {}` a conservé `curGl.submissions` ?
 
-- Seuils et **grace period** (distincts de `HOST_PRESENCE_STALE_MS` = 120 s et `HOST_TRANSFER_STALE_MS` = 5 min).
-- Statut `inactive` vs `DELETE` immédiat.
-- Responsabilité : serveur (RPC/cron) vs action hôte vs les deux.
-- Conséquences sur ready, votes, submissions, scores, reprise mid-partie.
+→ Patch cible : **M-15b** uniquement.
 
-##### L-05d — Nettoyage maps de session
+**B. Local fautif** — `remoteSubmissionKeys` propres ; clé dans `localSubmissionKeys` ou `localOnlyValidKeys`
 
-Matrice à produire **avant** implémentation :
+À documenter :
 
-| Question | Exemples |
-|----------|----------|
-| Champs historiques (ne pas prune) | `scores`, `gameScores`, contributions UX-HIST-01 |
-| Champs progression (candidats prune) | ready maps, votes en cours, submissions prep, `finished` Tier Night |
-| Joueur temporairement absent | Doit-il disparaître des gates « tous voté » ? |
-| Scores / contributions du fantôme | Conserver soirée ; retirer des gates actifs seulement ? |
+- Origine probable : `localStorage` persistant · merge **play** (union) · réinjection **prep** sous `localName`.
+- Au moment du log : comparer `localOnlyValidKeys` vs `remoteOnlyValidKeys`.
+- Si prep : vérifier si `getLocalDisplayName()` ≠ `localParticipant.name` (double clé).
 
-#### Reproduction QA (inscrite)
+→ Patch cible : **M-15b** (purge local au restart) et/ou merge prep — **pas** M-15c en premier.
 
-**Cas principal — navigation privée**
+**C. Rounds fautifs** — distant **et** local propres (`keysNotInLobbyRoster` vide) mais `roundPlayersNotInRoster` non vide
 
-1. Créer un lobby.
-2. Rejoindre en invité depuis une fenêtre privée.
-3. Relever UID, pseudo et ligne `lobby_members`.
-4. Fermer brutalement la fenêtre **sans** « Quitter ».
-5. Vérifier : row présente, `last_seen_at` cesse d’évoluer.
-6. Rouvrir une **nouvelle** fenêtre privée.
-7. Rejoindre le même lobby.
-8. Vérifier : nouvel UID créé.
-9. Vérifier : **deux memberships simultanées** (ancienne fantôme + nouvelle active).
-10. Lancer plusieurs jeux — observer compteurs, ready, votes, rounds.
+À documenter :
 
-**Non-régressions indispensables**
+- `rounds` dans le log = recalcul live ; l’écran play fige `const rounds = getGuessLieRounds()` **au mount** (`guessLie.js` L47) — vérifier décalage mount vs état courant.
+- Cache : `roundIdx` local vs session ; remount après sync ?
+- Source exacte de la liste affichée.
 
-- F5 normal : le joueur reprend sa place (même UID / reclaim).
-- Coupure réseau courte : pas d’expulsion prématurée.
-- Arrière-plan mobile : pas de suppression abusive.
-- Leave explicite : membership supprimée.
-- Kick hôte : membership supprimée.
-- Scores historiques conservés (contrat UX-HIST-01).
-- **Aucun** traitement spécifique détectant la navigation privée.
+→ Patch cible : selon source (remount / sync / construction rounds) — **pas** filtre roster aveugle.
 
-#### Critères d’acceptation (ticket parent L-05)
+**D. Identité fautive** — aucune clé fantôme ; `isSubject === false` sur sa propre manche
+
+À documenter :
+
+- `round.player` vs `localNameClosure` (figé mount L77) vs `getLocalDisplayName()` live vs `localParticipant.name`.
+- `roundPlayerUid` vs `localParticipantUid` (match UID mais mismatch pseudo → cas identité pure).
+
+→ Patch cible : **M-15d** uniquement — **après** confirmation qu’aucune clé submission fantôme n’existe.
+
+---
+
+#### M-15c — Vigilance avant filtre roster (documenter, ne pas implémenter)
+
+Une soumission valide peut **temporairement** exister sous une clé ∉ `lobbyMemberNames` si :
+
+| Cas | Risque filtre roster |
+|-----|---------------------|
+| Soumission optimiste prep avant ack remote | Clé locale du joueur courant — **légitime** |
+| Roster local en retard vs session (sync ordre inversé) | Faux positif purge |
+| Rename mid-soirée (I-09) | Ancienne clé migrée — maps soirée |
+| Joueur parti après soumission | Clé peut rester en session ; UX-HIST-01 scores |
+| Reconnexion / F5 mid-prep | Merge prep + localStorage |
+| `roundIdx` / ordre manches | Union roster+clés garantit ordre stable si clés = roster |
+
+**Conséquence :** M-15c (filtrer `getGuessLieRounds` par roster) n’est un filet **qu’après** purge confirmée (M-15b) ; sinon risque de masquer race sync légitime.
+
+---
+
+#### M-15a — Critères de sortie
 
 | # | Critère |
 |---|---------|
-| AC-1 | Un membre dont le heartbeat a cessé est **visuellement distingué** de membre actif (L-05a livré ou spec validée). |
-| AC-2 | L’hôte peut **retirer** un membre absent sans ambiguïté (kick existant documenté + UX claire). |
-| AC-3 | Un invité dont la session anonymous a changé peut **reprendre** une membership stale de façon **explicite et sûre**, sans usurpation de compte connecté (L-05b). |
-| AC-4 | Aucune **deuxième membership** ne subsiste pour le même humain après rejoin réussi (roster = 1 entrée / personne physique en QA nav. privée). |
-| AC-5 | Les gates « tous prêts / tous voté » et les compteurs x/y **ignorent ou excluent** les membres évacués selon la spec L-05c/L-05d — sans bloquer une partie légitime. |
-| AC-6 | F5, coupure courte, arrière-plan mobile : **pas** d’expulsion ni de perte de place pour un joueur actif (non-régressions QA). |
-| AC-7 | Guess Lie (et jeux live-roster) ne produisent **plus** de manche incohérente due à une duplication roster (QA cas principal étapes 1–10). |
-| AC-8 | Scores et standings soirée **historiques** inchangés (UX-HIST-01) sauf décision produit explicite contraire. |
-| AC-9 | Aucun patch Guess Lie (`isSubject`, helpers UID) livré **en contournement** — correction au niveau membership. |
+| OUT-1 | Log `[GUESSLIE-ID]` complet capturé au moment du symptôme |
+| OUT-2 | Classification A / B / C / D assignée avec preuve |
+| OUT-3 | `firstGhostLayerHint` confirmé ou corrigé par le log (pas seulement hypothèse code) |
+| OUT-4 | Patch unique recommandé (b, c ou d) — pas de combo |
+| OUT-5 | Si non-repro : noter config exacte + absence de log |
 
-#### Ordre d’implémentation recommandé
+---
 
-```
-L-05a (visibilité + kick UX)  →  valeur immédiate, risque faible, pas de mutation session
-        ↓
-L-05b (reclaim explicite)     →  prévient la création de fantômes à la source
-        ↓
-L-05c (éviction individuelle) →  nettoie les fantômes existants ; spec seuils avant code
-        ↓
-L-05d (prune maps session)    →  après matrice historique vs progression ; dépend de L-05c
-```
+### L-05 — Invalidé pour ce cas terrain
 
-#### Fichiers de référence (sans patch)
+Hypothèse membership orpheline `lobby_members` **invalidée**. Pas de L-05a–d pour ce bug.
 
-`js/core/supabaseLobby.js` · `js/core/guestMembership.js` · `js/core/lobby.js` · `js/screens/lobby.js` · `js/core/hostPresence.js` · `js/core/gameSync.js` · `js/core/guessLieSession.js` · `js/config/lobbyLifecycle.js` · `supabase/lobby-lifecycle.sql` · `supabase/reclaim-guest-membership.sql`
-
-#### Décision actuelle
-
-- Guess Lie UX : **validé ✅** — aucun patch Guess Lie pour ce fantôme.
-- Instrumentation `[GUESSLIE-ID]` : flag debug ; retrait optionnel en nettoyage séparé.
-- **Prochain travail :** conception puis implémentation lifecycle lobby/membership (L-05a → b → c → d).
+---
 
 ### Cause 4 / 7 — Guess Lie UX ✅ QA
 
@@ -263,7 +237,7 @@ L-05d (prune maps session)    →  après matrice historique vs progression ; d�
 | **Fix Vague B1** | `recordGuessLieRoundStats` **après** `await commitGuessLiePlay` ; flag `statsRecordedRoundIdx` sur session |
 | **Où** | `js/games/guessLie.js` · `js/core/guessLieSession.js` · `js/core/guessLieVoteCommit.js` · `js/core/voteConfirm.js` |
 | **Preuve** | `tests/guessLieVoteUx.test.js` · `tests/guessLieVoteCommit.test.js` |
-| **Requalification** | Symptôme post-restart « vote sur ses propres affirmations » → **L-05** (joueur fantôme), pas périmètre UX vote |
+| **Requalification** | Symptôme post-restart « vote sur ses propres affirmations » → **M-15** (submissions / merge), pas L-05 |
 | **QA** | ✅ validé 2026-07-27 |
 
 ### Cause 11 / 4 — UX-VIBE-01 ✅ QA
@@ -466,14 +440,14 @@ Clutch conserve son départage temporel (règle produit explicite inchangée).
 
 | Cause | Fermés (sélection) |
 |-------|-------------------|
-| 1 | C-01/02, R-01–05, M-05a — **L-05 ouvert** |
+| 1 | C-01/02, R-01–05, M-05a |
 | 2 | M-01, P-03, M-02a, S-02 |
-| 3 | I-03/04, SYN-03, M-13, M-02b, ARCH-02, SYN-29, I-PG-01, ready stale Recommencer, UX-CLUTCH-01 |
+| 3 | I-03/04, SYN-03, M-13, M-02b, ARCH-02, SYN-29, I-PG-01, ready stale Recommencer, UX-CLUTCH-01 · **M-15 ouvert** |
 | 4 | I-01/02/08, M-03b, M-06a/b, L-01, ARCH-03/03b, UX-VIBE-01, **Guess Lie UX** |
 | 5 | T-01/02, T-03↻, M-07, M-08, P-02, SYN-28, I-PG-01, ARCH-04, UX-VIBE-02 |
 | 6 | I-05, SYN-13b↻, SYN-25, **SYN-05 / ARCH-18** ✅, **ARCH-06** ✅ (Mode A/B/C · Traître V2 · Lobby IIFE · SYN-12) |
 | 7 | I-07, M-09, L-09, M-11, M-10, T-05, SYN-26, M-04b / SYN-18 |
-| 8 | I-06, P-02, ARCH-09, I-09 / SYN-06, SYN-15 / SYN-16 — **L-05 ouvert** |
+| 8 | I-06, P-02, ARCH-09, I-09 / SYN-06, SYN-15 / SYN-16 · **M-15 ouvert** |
 | 9 | SYN-12 / M-05b |
 | 10 | **SYN-05 / ARCH-18** ✅ QA (Fil Rouge app ; SQL historique hors scope) |
 | 11 | L-02, ARCH-21↻, M-12 (cleanup `#join=`, pas auto-join), UX-HIST-01, UX-RESUME-BANNER, UX-VIBE-01/02 |
@@ -492,11 +466,11 @@ Hors tickets prioritaires — à traiter si opportunité / régression :
 - Policy debug lobby à purger côté Supabase si encore présente
 - Optimistic votes hors Hot Take / VibeCheck (dilemma / speedVote / … — même trou que T-05)
 - Starts sync hydrate → hub hors `mountLobby` (résidu SYN-12, hors idempotence globale)
-- Bug vote post-restart Guess Lie → **L-05** (joueur fantôme), pas correctif identité Guess Lie
+- Bug vote post-restart Guess Lie → **M-15** (submissions / merge), L-05 invalidé pour ce repro
 - Instrumentation debug `[GUESSLIE-ID]` (`guessLieIdentityDebug.js`) — optionnel, hors fix produit
 
 - Fil Rouge : résidus SQL historiques (`fil-rouge-private.sql`, clés RPC) — ops Supabase séparée, non faite
 
 ---
 
-*Suivi vivant · Dernière MAJ : 2026-07-27 — L-05 formalisé (conception) · Guess Lie UX clôturé*
+*Suivi vivant · Dernière MAJ : 2026-07-27 — M-15a QA terrain (pas de patch b/c/d)*
