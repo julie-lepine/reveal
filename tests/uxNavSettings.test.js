@@ -67,8 +67,18 @@ describe("UX-NAV-SETTINGS — game-select sans doublon", () => {
 });
 
 describe("UX-NAV-SETTINGS — contenu écran", () => {
-  it("profil existant conservé + section Partie en cours conditionnelle", () => {
+  it("profil / soirée / support en onglets ; soirée grisée hors lobby", () => {
     const settings = src("js/screens/settings.js");
+    assert.match(settings, /Personnalisation/);
+    assert.match(settings, /Soirée en cours/);
+    assert.match(settings, /Support/);
+    assert.match(settings, /data-settings-tab="\$\{TAB_PERSONNALISATION\}"|data-settings-tab="personnalisation"/);
+    assert.match(settings, /data-settings-tab="\$\{TAB_SOIREE\}"|data-settings-tab="soiree"/);
+    assert.match(settings, /data-settings-tab="\$\{TAB_SUPPORT\}"|data-settings-tab="support"/);
+    assert.match(settings, /TAB_PERSONNALISATION\s*=\s*"personnalisation"/);
+    assert.match(settings, /TAB_SOIREE\s*=\s*"soiree"/);
+    assert.match(settings, /TAB_SUPPORT\s*=\s*"support"/);
+    assert.match(settings, /settings-tabs__btn--disabled/);
     assert.match(settings, /Emoji/);
     assert.match(settings, /Pseudo/);
     assert.match(settings, /Mot de passe/);
@@ -78,6 +88,7 @@ describe("UX-NAV-SETTINGS — contenu écran", () => {
     assert.match(settings, /updateProfileEmoji/);
     assert.match(settings, /changeEmailPassword/);
     assert.match(settings, /Partie en cours/);
+    assert.match(settings, /Retour aux jeux/);
     assert.match(settings, /hasActiveLobby\(\)/);
     assert.match(settings, /data-settings-party="leave"/);
     assert.match(settings, /data-settings-party="close"/);
@@ -94,6 +105,12 @@ describe("UX-NAV-SETTINGS — contenu écran", () => {
     assert.match(settings, /mount\.dispose/);
   });
 
+  it("CSS onglets settings présents", () => {
+    const css = src("style.css");
+    assert.match(css, /\.settings-tabs\{/);
+    assert.match(css, /\.settings-tabs__btn--disabled/);
+  });
+
   it("rôle hôte / membre via lobbySettingsActionsForRole", () => {
     assert.deepEqual([...lobbySettingsActionsForRole("host")], [
       "transfer",
@@ -103,7 +120,6 @@ describe("UX-NAV-SETTINGS — contenu écran", () => {
     assert.deepEqual([...lobbySettingsActionsForRole("member")], ["leave"]);
     assert.equal(lobbySettingsActionsForRole("host").includes("leave"), false);
     assert.equal(lobbySettingsActionsForRole("member").includes("close"), false);
-    // Alias rétrocompat tests / imports
     assert.equal(partySettingsActionsForRole, lobbySettingsActionsForRole);
   });
 });

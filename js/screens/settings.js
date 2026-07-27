@@ -33,6 +33,10 @@ import { openInstagramProfile } from "../core/feedbackUi.js";
 import { createMountGuard } from "../core/mountLifecycle.js";
 import { bindNav, returnFromEveningProfile } from "./nav.js";
 
+const TAB_PERSONNALISATION = "personnalisation";
+const TAB_SOIREE = "soiree";
+const TAB_SUPPORT = "support";
+
 function localLobbyRole() {
   if (!hasActiveLobby()) return null;
   return isLobbyHost() ? "host" : "member";
@@ -51,9 +55,29 @@ function partySectionSnapshot() {
   });
 }
 
-function partySectionHtml() {
-  if (!hasActiveLobby()) return "";
+function settingsTabsHtml(activeTab, inLobby) {
+  const soireeDisabled = !inLobby;
+  return `
+    <div class="settings-tabs" role="tablist" aria-label="Sections des paramètres">
+      <button type="button" class="settings-tabs__btn${
+        activeTab === TAB_PERSONNALISATION ? " settings-tabs__btn--active" : ""
+      }" role="tab" data-settings-tab="${TAB_PERSONNALISATION}" aria-selected="${
+        activeTab === TAB_PERSONNALISATION ? "true" : "false"
+      }">Personnalisation</button>
+      <button type="button" class="settings-tabs__btn${
+        activeTab === TAB_SOIREE ? " settings-tabs__btn--active" : ""
+      }${soireeDisabled ? " settings-tabs__btn--disabled" : ""}" role="tab" data-settings-tab="${TAB_SOIREE}" aria-selected="${
+        activeTab === TAB_SOIREE ? "true" : "false"
+      }"${soireeDisabled ? ' aria-disabled="true" disabled title="Rejoins un lobby pour gérer la soirée"' : ""}>Soirée en cours</button>
+      <button type="button" class="settings-tabs__btn${
+        activeTab === TAB_SUPPORT ? " settings-tabs__btn--active" : ""
+      }" role="tab" data-settings-tab="${TAB_SUPPORT}" aria-selected="${
+        activeTab === TAB_SUPPORT ? "true" : "false"
+      }">Support</button>
+    </div>`;
+}
 
+function partySectionHtml() {
   const code = getLobby()?.code || "";
   const role = localLobbyRole();
   const actions = lobbySettingsActionsForRole(role || "member");
@@ -107,85 +131,119 @@ function partySectionHtml() {
     </div>`;
 }
 
-function profileSectionsHtml({ emailAccount, user, selectedEmoji }) {
+function soireePanelHtml(inLobby) {
+  if (!inLobby) {
+    return `
+      <div class="settings-panel settings-panel--soiree-disabled" id="settings-panel-soiree">
+        <div class="card settings-section">
+          <h2 class="settings-section__title">Soirée en cours</h2>
+          <p class="hint settings-section__hint">
+            Aucune soirée active. Rejoins ou crée un lobby pour gérer la partie ici.
+          </p>
+        </div>
+      </div>`;
+  }
+
+  const lobbyCode = getLobby()?.code || "";
   return `
-        <div class="card settings-section">
-          <h2 class="settings-section__title">Emoji</h2>
-          <p class="hint settings-section__hint">Affiché dans le lobby et les classements.</p>
-          <div class="emoji-picker-preview">
-            <span class="emoji-picker-preview__avatar" id="emoji-preview">${selectedEmoji}</span>
-            <span class="hint">Aperçu de ton avatar</span>
-          </div>
-          <div class="emoji-picker" role="listbox" aria-label="Choisir un emoji">
-            ${PROFILE_EMOJI_CHOICES.map(
-              (e) => `
-              <button type="button" class="emoji-picker__btn ${e === selectedEmoji ? "emoji-picker__btn--active" : ""}" data-emoji="${e}" aria-label="${e}">${e}</button>`
-            ).join("")}
-          </div>
-          <p class="auth-error hidden" id="emoji-error"></p>
-          <p class="settings-ok hidden" id="emoji-ok">Emoji enregistré.</p>
+    <div class="settings-panel" id="settings-panel-soiree">
+      <div class="card card--highlight settings-lobby-banner">
+        <p class="hint settings-lobby-banner__text">
+          Soirée en cours - lobby <strong>${escapeHtml(lobbyCode || "")}</strong>.
+          Pseudo et emoji s’appliquent pour tout le monde.
+        </p>
+        <button type="button" class="btn btn-accent btn--spaced" data-nav="evening-return">Retour aux jeux</button>
+      </div>
+      ${partySectionHtml()}
+    </div>`;
+}
+
+function personnalisationPanelHtml({ emailAccount, user, selectedEmoji }) {
+  return `
+    <div class="settings-panel" id="settings-panel-personnalisation">
+      <div class="card settings-section">
+        <h2 class="settings-section__title">Emoji</h2>
+        <p class="hint settings-section__hint">Affiché dans le lobby et les classements.</p>
+        <div class="emoji-picker-preview">
+          <span class="emoji-picker-preview__avatar" id="emoji-preview">${selectedEmoji}</span>
+          <span class="hint">Aperçu de ton avatar</span>
         </div>
-
-        <div class="card settings-section">
-          <h2 class="settings-section__title">Pseudo</h2>
-          <p class="hint settings-section__hint">Visible dans le lobby et les scores.</p>
-          <label class="field-label" for="settings-name">Ton pseudo</label>
-          <input type="text" class="field-input" id="settings-name" maxlength="24" value="${escapeHtml(getLocalDisplayName())}" />
-          <p class="auth-error hidden" id="name-error"></p>
-          <p class="settings-ok hidden" id="name-ok">Pseudo enregistré.</p>
-          <button type="button" class="btn btn-primary btn--spaced" id="btn-save-name">Enregistrer le pseudo</button>
+        <div class="emoji-picker" role="listbox" aria-label="Choisir un emoji">
+          ${PROFILE_EMOJI_CHOICES.map(
+            (e) => `
+            <button type="button" class="emoji-picker__btn ${e === selectedEmoji ? "emoji-picker__btn--active" : ""}" data-emoji="${e}" aria-label="${e}">${e}</button>`
+          ).join("")}
         </div>
+        <p class="auth-error hidden" id="emoji-error"></p>
+        <p class="settings-ok hidden" id="emoji-ok">Emoji enregistré.</p>
+      </div>
 
-        ${
-          emailAccount
-            ? `
-        <div class="card settings-section">
-          <h2 class="settings-section__title">Mot de passe</h2>
-          <p class="hint settings-section__hint">Compte ${escapeHtml(user.email)}</p>
-          <label class="field-label" for="pwd-current">Mot de passe actuel</label>
-          <input type="password" class="field-input" id="pwd-current" autocomplete="current-password" />
-          <label class="field-label" for="pwd-new">Nouveau mot de passe</label>
-          <input type="password" class="field-input" id="pwd-new" autocomplete="new-password" placeholder="4 caractères min." />
-          <label class="field-label" for="pwd-confirm">Confirmer</label>
-          <input type="password" class="field-input" id="pwd-confirm" autocomplete="new-password" />
-          <p class="auth-error hidden" id="pwd-error"></p>
-          <p class="settings-ok hidden" id="pwd-ok">Mot de passe mis à jour.</p>
-          <button type="button" class="btn btn-primary btn--spaced" id="btn-save-password">Changer le mot de passe</button>
-        </div>`
-            : user.loggedIn
-              ? `<p class="hint settings-social-hint">Compte ${escapeHtml(user.provider || "social")} - le mot de passe se gère chez le fournisseur.</p>`
-              : ""
-        }
+      <div class="card settings-section">
+        <h2 class="settings-section__title">Pseudo</h2>
+        <p class="hint settings-section__hint">Visible dans le lobby et les scores.</p>
+        <label class="field-label" for="settings-name">Ton pseudo</label>
+        <input type="text" class="field-input" id="settings-name" maxlength="24" value="${escapeHtml(getLocalDisplayName())}" />
+        <p class="auth-error hidden" id="name-error"></p>
+        <p class="settings-ok hidden" id="name-ok">Pseudo enregistré.</p>
+        <button type="button" class="btn btn-primary btn--spaced" id="btn-save-name">Enregistrer le pseudo</button>
+      </div>
 
-        <div class="card settings-section feedback-prompt">
-          <h2 class="settings-section__title">Aide &amp; retours</h2>
-          <p class="hint feedback-prompt__hint">
-            Un bug, une idée de jeu ou un mot à ajouter ? Écris-nous sur Instagram
-            <strong>@${escapeHtml(INSTAGRAM_HANDLE)}</strong>.
-          </p>
-          <button type="button" class="btn btn-accent feedback-prompt__btn btn--spaced" id="btn-feedback-dm">Envoie un DM</button>
-        </div>
+      ${
+        emailAccount
+          ? `
+      <div class="card settings-section">
+        <h2 class="settings-section__title">Mot de passe</h2>
+        <p class="hint settings-section__hint">Compte ${escapeHtml(user.email)}</p>
+        <label class="field-label" for="pwd-current">Mot de passe actuel</label>
+        <input type="password" class="field-input" id="pwd-current" autocomplete="current-password" />
+        <label class="field-label" for="pwd-new">Nouveau mot de passe</label>
+        <input type="password" class="field-input" id="pwd-new" autocomplete="new-password" placeholder="4 caractères min." />
+        <label class="field-label" for="pwd-confirm">Confirmer</label>
+        <input type="password" class="field-input" id="pwd-confirm" autocomplete="new-password" />
+        <p class="auth-error hidden" id="pwd-error"></p>
+        <p class="settings-ok hidden" id="pwd-ok">Mot de passe mis à jour.</p>
+        <button type="button" class="btn btn-primary btn--spaced" id="btn-save-password">Changer le mot de passe</button>
+      </div>`
+          : user.loggedIn
+            ? `<p class="hint settings-social-hint">Compte ${escapeHtml(user.provider || "social")} - le mot de passe se gère chez le fournisseur.</p>`
+            : ""
+      }
+    </div>`;
+}
 
-        <div class="card settings-section">
-          <h2 class="settings-section__title">Légal</h2>
-          <p class="hint settings-section__hint">Politique de confidentialité (RGPD, AdMob, Supabase).</p>
-          <p class="hint settings-section__hint">
-            Contact RGPD :
-          <a
-            class="settings-instagram-link"
-            href="${escapeHtml(INSTAGRAM_PROFILE_URL)}"
-            target="_blank"
-            rel="noopener noreferrer"
-            data-open-instagram
-          >@${escapeHtml(INSTAGRAM_HANDLE)}</a>
-          </p>
-          <button type="button" class="btn btn-secondary btn--spaced" data-nav="privacy">Politique de confidentialité</button>
-          <button type="button" class="btn btn-secondary btn--spaced" id="btn-delete-account">Supprimer mon compte</button>
-          <p class="hint settings-section__hint">
-            Suppression définitive du compte e-mail et des données associées (voir aussi
-            <a href="${escapeHtml(ACCOUNT_DELETION_PUBLIC_URL)}" id="link-delete-account-web" target="_blank" rel="noopener noreferrer">la page web</a>).
-          </p>
-        </div>`;
+function supportPanelHtml() {
+  return `
+    <div class="settings-panel" id="settings-panel-support">
+      <div class="card settings-section feedback-prompt">
+        <h2 class="settings-section__title">Aide &amp; retours</h2>
+        <p class="hint feedback-prompt__hint">
+          Un bug, une idée de jeu ou un mot à ajouter ? Écris-nous sur Instagram
+          <strong>@${escapeHtml(INSTAGRAM_HANDLE)}</strong>.
+        </p>
+        <button type="button" class="btn btn-accent feedback-prompt__btn btn--spaced" id="btn-feedback-dm">Envoie un DM</button>
+      </div>
+
+      <div class="card settings-section">
+        <h2 class="settings-section__title">Légal</h2>
+        <p class="hint settings-section__hint">Politique de confidentialité (RGPD, AdMob, Supabase).</p>
+        <p class="hint settings-section__hint">
+          Contact RGPD :
+        <a
+          class="settings-instagram-link"
+          href="${escapeHtml(INSTAGRAM_PROFILE_URL)}"
+          target="_blank"
+          rel="noopener noreferrer"
+          data-open-instagram
+        >@${escapeHtml(INSTAGRAM_HANDLE)}</a>
+        </p>
+        <button type="button" class="btn btn-secondary btn--spaced" data-nav="privacy">Politique de confidentialité</button>
+        <button type="button" class="btn btn-secondary btn--spaced" id="btn-delete-account">Supprimer mon compte</button>
+        <p class="hint settings-section__hint">
+          Suppression définitive du compte e-mail et des données associées (voir aussi
+          <a href="${escapeHtml(ACCOUNT_DELETION_PUBLIC_URL)}" id="link-delete-account-web" target="_blank" rel="noopener noreferrer">la page web</a>).
+        </p>
+      </div>
+    </div>`;
 }
 
 export function mountSettings(app) {
@@ -199,10 +257,12 @@ export function mountSettings(app) {
   const emailAccount = isEmailAccount();
 
   let selectedEmoji = getLocalEmoji();
+  let activeTab = TAB_PERSONNALISATION;
   let lastPartySnap = "";
+  let lastLobbyActive = hasActiveLobby();
   let partyActionInFlight = false;
 
-  function bindProfileEvents() {
+  function bindPersonnalisationEvents() {
     app.querySelectorAll(".emoji-picker__btn").forEach((btn) => {
       btn.addEventListener("click", async () => {
         if (!mount.isMounted()) return;
@@ -228,22 +288,6 @@ export function mountSettings(app) {
         });
         ok?.classList.remove("hidden");
       });
-    });
-
-    app.querySelector("#btn-feedback-dm")?.addEventListener("click", () => {
-      openInstagramProfile();
-    });
-
-    const openDeletionPage = (e) => {
-      e?.preventDefault();
-      openExternalUrl(ACCOUNT_DELETION_PUBLIC_URL);
-    };
-    app.querySelector("#btn-delete-account")?.addEventListener("click", openDeletionPage);
-    app.querySelector("#link-delete-account-web")?.addEventListener("click", openDeletionPage);
-
-    app.querySelector("[data-open-instagram]")?.addEventListener("click", (e) => {
-      e.preventDefault();
-      openInstagramProfile();
     });
 
     app.querySelector("#btn-save-name")?.addEventListener("click", async () => {
@@ -295,15 +339,34 @@ export function mountSettings(app) {
     });
   }
 
+  function bindSupportEvents() {
+    app.querySelector("#btn-feedback-dm")?.addEventListener("click", () => {
+      openInstagramProfile();
+    });
+
+    const openDeletionPage = (e) => {
+      e?.preventDefault();
+      openExternalUrl(ACCOUNT_DELETION_PUBLIC_URL);
+    };
+    app.querySelector("#btn-delete-account")?.addEventListener("click", openDeletionPage);
+    app.querySelector("#link-delete-account-web")?.addEventListener("click", openDeletionPage);
+
+    app.querySelector("[data-open-instagram]")?.addEventListener("click", (e) => {
+      e.preventDefault();
+      openInstagramProfile();
+    });
+  }
+
   async function onPartyAction(action) {
     if (!mount.isMounted() || partyActionInFlight) return;
     if (getCurrentScreen() !== "settings") return;
+    if (!hasActiveLobby()) return;
 
     partyActionInFlight = true;
     try {
       if (action === "transfer") {
         await transferLobbyHost();
-        if (mount.isMounted()) refreshPartySection(true);
+        if (mount.isMounted()) refreshSoireePanel(true);
         return;
       }
       if (action === "players") {
@@ -313,22 +376,21 @@ export function mountSettings(app) {
           canKick: canManageLobbyRoster(),
           onKick: (userId, name) => kickLobbyMember(userId, { confirmName: name }),
         });
-        if (mount.isMounted()) refreshPartySection(true);
+        if (mount.isMounted()) refreshSoireePanel(true);
         return;
       }
       if (action === "close" || action === "leave") {
         const res = await confirmAndLeaveLobby({ navigateAway: true });
         if (!mount.isMounted()) return;
         if (res.cancelled) {
-          refreshPartySection(true);
+          refreshSoireePanel(true);
           return;
         }
         if (!res.ok) {
           await notifyVoluntaryLeaveFailure(res);
-          if (mount.isMounted()) refreshPartySection(true);
+          if (mount.isMounted()) refreshSoireePanel(true);
           return;
         }
-        // Succès : navigate Home (reset) via leave/dissolve — écran démonté.
         return;
       }
     } finally {
@@ -336,44 +398,75 @@ export function mountSettings(app) {
     }
   }
 
-  function bindPartyEvents() {
+  function bindSoireeEvents() {
     app.querySelector("#settings-party-section")?.addEventListener("click", (e) => {
       const btn = e.target.closest("[data-settings-party]");
       if (!btn || btn.disabled) return;
-      const action = btn.getAttribute("data-settings-party");
-      void onPartyAction(action);
+      void onPartyAction(btn.getAttribute("data-settings-party"));
     });
   }
 
-  function refreshPartySection(force = false) {
-    if (!mount.isMounted()) return;
-    const snap = partySectionSnapshot();
-    if (!force && snap === lastPartySnap) return;
-    lastPartySnap = snap;
+  function bindTabEvents() {
+    app.querySelector(".settings-tabs")?.addEventListener("click", (e) => {
+      const btn = e.target.closest("[data-settings-tab]");
+      if (!btn || btn.disabled) return;
+      const tab = btn.getAttribute("data-settings-tab");
+      if (tab === TAB_SOIREE && !hasActiveLobby()) return;
+      if (tab === activeTab) return;
+      activeTab = tab;
+      render();
+    });
+  }
 
-    const existing = app.querySelector("#settings-party-section");
-    const html = partySectionHtml();
-    if (!html) {
-      existing?.remove();
+  function syncTabChrome(inLobby) {
+    const tabs = app.querySelector(".settings-tabs");
+    if (!tabs) return;
+    tabs.outerHTML = settingsTabsHtml(activeTab, inLobby);
+    bindTabEvents();
+  }
+
+  function refreshSoireePanel(force = false) {
+    if (!mount.isMounted()) return;
+    const inLobby = hasActiveLobby();
+    const snap = partySectionSnapshot();
+    const lobbyChanged = inLobby !== lastLobbyActive;
+
+    if (!force && snap === lastPartySnap && !lobbyChanged) return;
+    lastPartySnap = snap;
+    lastLobbyActive = inLobby;
+
+    if (!inLobby && activeTab === TAB_SOIREE) {
+      activeTab = TAB_PERSONNALISATION;
+      render();
       return;
     }
-    if (existing) {
-      existing.outerHTML = html;
-    } else {
-      // Après le dernier bloc profil (légal) — ou en fin de pageShell content
-      const legal = [...app.querySelectorAll(".settings-section")].pop();
-      if (legal) legal.insertAdjacentHTML("afterend", html);
-      else app.querySelector(".page")?.insertAdjacentHTML("beforeend", html);
+
+    syncTabChrome(inLobby);
+
+    if (activeTab !== TAB_SOIREE) return;
+
+    const panel = app.querySelector("#settings-panel-soiree");
+    if (!panel) {
+      render();
+      return;
     }
-    bindPartyEvents();
+    panel.outerHTML = soireePanelHtml(inLobby);
+    bindNav(app, {
+      "evening-return": () => returnFromEveningProfile(),
+    });
+    bindSoireeEvents();
   }
 
   function render() {
     if (!mount.isMounted()) return;
     selectedEmoji = getLocalEmoji();
     const inLobby = hasActiveLobby();
-    const lobbyCode = inLobby ? getLobby()?.code : "";
+    lastLobbyActive = inLobby;
     lastPartySnap = partySectionSnapshot();
+
+    if (!inLobby && activeTab === TAB_SOIREE) {
+      activeTab = TAB_PERSONNALISATION;
+    }
 
     app.innerHTML = pageShell({
       back: true,
@@ -381,32 +474,25 @@ export function mountSettings(app) {
       content: `
         <p class="label-upper">Paramètres</p>
         <h1 class="page-title">Paramètres</h1>
-
+        ${settingsTabsHtml(activeTab, inLobby)}
         ${
-          inLobby
-            ? `
-        <div class="card card--highlight settings-lobby-banner">
-          <p class="hint settings-lobby-banner__text">
-            Soirée en cours - lobby <strong>${escapeHtml(lobbyCode || "")}</strong>.
-            Pseudo et emoji s’appliquent pour tout le monde.
-          </p>
-          <button type="button" class="btn btn-accent btn--spaced" data-nav="evening-return">Retour aux jeux</button>
-        </div>`
-            : ""
+          activeTab === TAB_PERSONNALISATION
+            ? personnalisationPanelHtml({ emailAccount, user, selectedEmoji })
+            : activeTab === TAB_SOIREE
+              ? soireePanelHtml(inLobby)
+              : supportPanelHtml()
         }
-
-        <p class="label-upper settings-profile-label">Profil</p>
-        ${profileSectionsHtml({ emailAccount, user, selectedEmoji })}
-
-        ${partySectionHtml()}
       `,
     });
 
+    bindTabEvents();
     bindNav(app, {
       "evening-return": () => returnFromEveningProfile(),
     });
-    bindProfileEvents();
-    bindPartyEvents();
+
+    if (activeTab === TAB_PERSONNALISATION) bindPersonnalisationEvents();
+    if (activeTab === TAB_SOIREE) bindSoireeEvents();
+    if (activeTab === TAB_SUPPORT) bindSupportEvents();
   }
 
   render();
@@ -414,7 +500,7 @@ export function mountSettings(app) {
   const unsubLobby = onLobbyBundleUpdated(() => {
     if (!mount.isMounted()) return;
     if (getCurrentScreen() !== "settings") return;
-    refreshPartySection(false);
+    refreshSoireePanel(false);
   });
 
   return () => {
