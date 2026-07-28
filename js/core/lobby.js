@@ -49,6 +49,7 @@ import {
   commitMembershipRemoved,
   MEMBERSHIP_HYDRATION_SOURCE,
 } from "./lobbyMembershipAlign.js";
+import { beginPostLeaveHomeTransition } from "./homeMembershipLeaveTransition.js";
 import {
   getMembershipSnapshot,
   setMembershipSnapshot,
@@ -1128,7 +1129,8 @@ export async function dissolveLobbyAsHost({ navigateAway = true } = {}) {
     if (!res.ok) {
       return { ok: false, error: res.error };
     }
-    // Preuve : DELETE lobbies OK (cascade memberships) — retirer found hôte.
+    // E3 soft-hold puis preuve cascade — retirer found hôte.
+    beginPostLeaveHomeTransition();
     const hostUserId = getSupabaseUserId();
     if (hostUserId && lobbyId) {
       commitMembershipRemoved({ userId: hostUserId, lobbyId });
@@ -1212,6 +1214,7 @@ export async function leaveLobby({ navigateAway = true } = {}) {
       applyLeaveLobbyLocal,
       getUserId: getSupabaseUserId,
       commitMembershipRemoved,
+      beginPostLeaveHomeTransition,
     }
   );
 }
@@ -1249,7 +1252,8 @@ export async function leaveLobbyMembershipFromServer(membership) {
       closeLobbyAsHost: closeLobbyByIdAsHost,
     }
   ).then((result) => {
-    // Preuve : DELETE membership ou dissolve hôte OK (Vague D).
+    // E3 soft-hold puis preuve DELETE/dissolve OK (Vague D).
+    beginPostLeaveHomeTransition();
     const userId = getSupabaseUserId();
     if (userId && membership?.lobbyId) {
       commitMembershipRemoved({ userId, lobbyId: membership.lobbyId });

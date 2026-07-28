@@ -48,6 +48,11 @@ import {
 } from "../core/lobbyMembershipSnapshot.js";
 import { commitMembershipRemoved } from "../core/lobbyMembershipAlign.js";
 import {
+  isPostLeaveHomeTransitionActive,
+  getPostLeaveHomeTransitionGeneration,
+  endPostLeaveHomeTransition,
+} from "../core/homeMembershipLeaveTransition.js";
+import {
   deriveHomeMembershipChrome,
   decideMembershipSnapshotWrite,
 } from "../core/homeMembershipChrome.js";
@@ -354,6 +359,11 @@ function homeMembershipActionsHtml(chrome) {
           </div>`;
   }
 
+  if (chrome.state === "post_leave_transition") {
+    // E3 — soft-hold : pas de panneau checking, pas de Resume.
+    return "";
+  }
+
   if (chrome.state === "checking") {
     return `<p class="hint home-membership-checking">${escapeHtml(chrome.primaryMessage || "Vérification de ton lobby…")}</p>`;
   }
@@ -449,6 +459,7 @@ export function mountHome(app) {
       retainedFoundDespiteUnknown,
       activeLobbyCode: getLobby()?.code || null,
       leaveConfirmationPending,
+      postLeaveHomeTransition: isPostLeaveHomeTransitionActive(),
       serverLeaveInFlight,
       membershipReconciliationConflict,
     });
@@ -520,10 +531,14 @@ export function mountHome(app) {
       return;
     }
     const queryAuthGeneration = getMembershipAuthGeneration();
+    const leaveGen = isPostLeaveHomeTransitionActive()
+      ? getPostLeaveHomeTransitionGeneration()
+      : null;
 
     resolutionInProgress = true;
     if (force && shouldContinue()) scheduleRender(true);
 
+    let settledResult = null;
     try {
       if (!isAuthReadyResolved()) {
         await authReady;
@@ -547,6 +562,9 @@ export function mountHome(app) {
       if (queryUserId !== currentUserId || queryAuthGeneration !== currentAuthGeneration) {
         return;
       }
+      if (leaveGen != null && result?.status === "unknown") {
+        leaveConfirmationPending = true;
+      }
       applyMembershipQueryResult(result, {
         queryUserId,
         currentUserId,
@@ -560,6 +578,9 @@ export function mountHome(app) {
       if (queryUserId !== currentUserId || queryAuthGeneration !== currentAuthGeneration) {
         return;
       }
+      if (leaveGen != null) {
+        leaveConfirmationPending = true;
+      }
       applyMembershipQueryResult(
         { status: "unknown" },
         {
@@ -570,6 +591,10 @@ export function mountHome(app) {
         }
       );
     } finally {
+      if (leaveGen != null) {
+        // Après pending éventuel : évite frame checking (pending > postLeave > checking).
+        endPostLeaveHomeTransition(leaveGen);
+      }
       if (shouldContinue()) {
         resolutionInProgress = false;
         scheduleRender(true);
@@ -816,6 +841,8 @@ export function mountHome(app) {
     const createLobbyDisabledReason =
       chrome.createDisabledReason ||
       "Quitte le lobby actuel avant d'en créer un nouveau.";
+    const createLobbyLabel =
+      chrome.state === "post_leave_transition" ? "Finalisation…" : "Créer un lobby";
     const joinPendingVisible = syncPending.getState().visible;
     const joinPendingActive = syncPending.getState().token != null;
     const joinLobbyLabel = joinPendingVisible ? "Connexion…" : "Rejoindre";
@@ -921,8 +948,8 @@ export function mountHome(app) {
           ${
             loggedIn
               ? canStartNewLobby
-                ? `<button type="button" class="btn btn-primary" id="btn-create-lobby">Créer un lobby</button>`
-                : `<button type="button" class="btn btn-primary" id="btn-create-lobby" disabled aria-disabled="true" title="${escapeHtml(createLobbyDisabledReason)}">Créer un lobby</button>`
+                ? `<button type="button" class="btn btn-primary" id="btn-create-lobby">${escapeHtml(createLobbyLabel)}</button>`
+                : `<button type="button" class="btn btn-primary" id="btn-create-lobby" disabled aria-disabled="true" title="${escapeHtml(createLobbyDisabledReason)}">${escapeHtml(createLobbyLabel)}</button>`
               : ""
           }
           ${
@@ -1312,19 +1339,21 @@ export function mountHome(app) {
         if (!shouldContinue()) return;
 
         // Retirer le found B avant confirmation — évite retain_found trompeur (Vague D).
+        // beginPostLeave déjà fait dans leaveLobbyMembershipFromServer.
+        const leaveGen = getPostLeaveHomeTransitionGeneration();
         commitMembershipRemoved({
           userId: getSupabaseUserId(),
           lobbyId: membership.lobbyId,
         });
         retainedFoundDespiteUnknown = false;
-        leaveConfirmationPending = false;
 
         const confirmResult = await queryActiveLobbyMembership();
         if (!shouldContinue()) return;
 
         if (confirmResult.status === "unknown") {
-          // Pas de faux none ; pas de found ressuscité.
+          // Pas de faux none ; pas de found ressuscité. Pending avant fin soft-hold.
           leaveConfirmationPending = true;
+          endPostLeaveHomeTransition(leaveGen);
           applyMembershipQueryResult(confirmResult);
           await showAppAlert(
             "La sortie a probablement réussi, mais la vérification est impossible. Réessaie avant de créer un lobby.",
@@ -1337,6 +1366,7 @@ export function mountHome(app) {
 
         leaveConfirmationPending = false;
         applyMembershipQueryResult(confirmResult);
+        endPostLeaveHomeTransition(leaveGen);
 
         if (confirmResult.status === "found") {
           await showAppAlert(
@@ -1348,6 +1378,7 @@ export function mountHome(app) {
         scheduleRender(true);
       } catch (err) {
         if (!shouldContinue()) return;
+        endPostLeaveHomeTransition();
 
         if (err?.code === LOBBY_SERVER_LEAVE_ERROR.ROLE_MISMATCH) {
           try {

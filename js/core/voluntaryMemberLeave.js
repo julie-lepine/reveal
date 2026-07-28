@@ -46,6 +46,7 @@ export async function notifyVoluntaryLeaveFailure(res, deps) {
  *   applyLeaveLobbyLocal: (args: { wasGuest: boolean, navigateAway: boolean }) => void,
  *   getUserId?: () => string|null|undefined,
  *   commitMembershipRemoved?: (input: { userId: string, lobbyId?: string|null }) => unknown,
+ *   beginPostLeaveHomeTransition?: () => number,
  * }} deps
  * @returns {Promise<{ ok: boolean, error?: string, busy?: boolean }>}
  */
@@ -83,6 +84,9 @@ export async function runVoluntaryMemberLeave(options = {}, deps) {
           error: res?.error || "Impossible de quitter le lobby.",
         };
       }
+
+      // E3 — soft-hold Home avant invalidate snapshot (survit navigate/remount).
+      deps.beginPostLeaveHomeTransition?.();
 
       // Preuve : DELETE membership courant OK — retirer found(B) avant clear runtime.
       const userId = deps.getUserId?.() || null;
