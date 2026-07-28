@@ -69,9 +69,13 @@ describe("UX-NAV-SETTINGS — game-select sans doublon", () => {
 describe("UX-NAV-SETTINGS — contenu écran", () => {
   it("profil / soirée / support en onglets ; soirée grisée hors lobby", () => {
     const settings = src("js/screens/settings.js");
-    assert.match(settings, /Personnalisation/);
-    assert.match(settings, /Soirée en cours/);
+    assert.match(settings, /Profil/);
+    assert.match(settings, /Soirée/);
     assert.match(settings, /Support/);
+    assert.match(settings, /settings-tabs__cursor/);
+    assert.match(settings, /🎉/);
+    assert.match(settings, /✨/);
+    assert.match(settings, /💬/);
     assert.match(settings, /data-settings-tab="\$\{TAB_PERSONNALISATION\}"|data-settings-tab="personnalisation"/);
     assert.match(settings, /data-settings-tab="\$\{TAB_SOIREE\}"|data-settings-tab="soiree"/);
     assert.match(settings, /data-settings-tab="\$\{TAB_SUPPORT\}"|data-settings-tab="support"/);
@@ -108,7 +112,9 @@ describe("UX-NAV-SETTINGS — contenu écran", () => {
   it("CSS onglets settings présents", () => {
     const css = src("style.css");
     assert.match(css, /\.settings-tabs\{/);
+    assert.match(css, /\.settings-tabs__cursor/);
     assert.match(css, /\.settings-tabs__btn--disabled/);
+    assert.match(css, /--settings-tab-index/);
   });
 
   it("rôle hôte / membre via lobbySettingsActionsForRole", () => {

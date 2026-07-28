@@ -2997,32 +2997,73 @@ select.field-input option{
 }
 
 .settings-tabs{
+  --settings-tab-index:0;
+  --settings-tabs-pad:3px;
+  --settings-tabs-gap:2px;
+  position:relative;
   display:grid;
   grid-template-columns:repeat(3, minmax(0, 1fr));
-  gap:6px;
+  gap:var(--settings-tabs-gap);
   margin:0 0 16px;
+  padding:var(--settings-tabs-pad);
+  border-radius:14px;
+  border:1px solid rgba(255,255,255,.1);
+  background:rgba(255,255,255,.05);
+}
+
+.settings-tabs__cursor{
+  position:absolute;
+  z-index:0;
+  top:var(--settings-tabs-pad);
+  bottom:var(--settings-tabs-pad);
+  left:var(--settings-tabs-pad);
+  width:calc((100% - 2 * var(--settings-tabs-pad) - 2 * var(--settings-tabs-gap)) / 3);
+  border-radius:11px;
+  background:rgba(99,102,241,.28);
+  border:1px solid rgba(129,140,248,.45);
+  box-shadow:0 0 18px rgba(99,102,241,.22);
+  transform:translateX(calc(var(--settings-tab-index) * (100% + var(--settings-tabs-gap))));
+  transition:transform .22s ease;
+  pointer-events:none;
 }
 
 .settings-tabs__btn{
-  min-height:40px;
-  padding:8px 6px;
-  border-radius:12px;
-  border:1px solid rgba(255,255,255,.1);
-  background:rgba(255,255,255,.04);
+  position:relative;
+  z-index:1;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:5px;
+  min-height:44px;
+  padding:8px 4px;
+  border:none;
+  border-radius:11px;
+  background:transparent;
   color:rgba(255,255,255,.55);
-  font-size:11px;
+  font-size:12px;
   font-weight:650;
   font-family:inherit;
-  line-height:1.2;
+  line-height:1.15;
   cursor:pointer;
   -webkit-tap-highlight-color:transparent;
-  transition:color .15s, background .15s, border-color .15s, opacity .15s;
+  transition:color .15s, opacity .15s;
+}
+
+.settings-tabs__icon{
+  flex-shrink:0;
+  font-size:14px;
+  line-height:1;
+}
+
+.settings-tabs__label{
+  min-width:0;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
 }
 
 .settings-tabs__btn--active{
   color:#fff;
-  background:rgba(99,102,241,.22);
-  border-color:rgba(129,140,248,.4);
 }
 
 .settings-tabs__btn--disabled,
@@ -3035,7 +3076,6 @@ select.field-input option{
 @media (hover:hover) and (pointer:fine){
   .settings-tabs__btn:not(:disabled):not(.settings-tabs__btn--disabled):hover{
     color:rgba(255,255,255,.85);
-    background:rgba(255,255,255,.07);
   }
 }
 

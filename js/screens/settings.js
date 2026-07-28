@@ -55,25 +55,42 @@ function partySectionSnapshot() {
   });
 }
 
+function settingsTabIndex(activeTab) {
+  if (activeTab === TAB_SOIREE) return 0;
+  if (activeTab === TAB_PERSONNALISATION) return 1;
+  return 2;
+}
+
 function settingsTabsHtml(activeTab, inLobby) {
   const soireeDisabled = !inLobby;
+  const tabIndex = settingsTabIndex(activeTab);
   return `
-    <div class="settings-tabs" role="tablist" aria-label="Sections des paramètres">
-      <button type="button" class="settings-tabs__btn${
-        activeTab === TAB_PERSONNALISATION ? " settings-tabs__btn--active" : ""
-      }" role="tab" data-settings-tab="${TAB_PERSONNALISATION}" aria-selected="${
-        activeTab === TAB_PERSONNALISATION ? "true" : "false"
-      }">Personnalisation</button>
+    <div class="settings-tabs" role="tablist" aria-label="Sections des paramètres" style="--settings-tab-index:${tabIndex}">
+      <span class="settings-tabs__cursor" aria-hidden="true"></span>
       <button type="button" class="settings-tabs__btn${
         activeTab === TAB_SOIREE ? " settings-tabs__btn--active" : ""
       }${soireeDisabled ? " settings-tabs__btn--disabled" : ""}" role="tab" data-settings-tab="${TAB_SOIREE}" aria-selected="${
         activeTab === TAB_SOIREE ? "true" : "false"
-      }"${soireeDisabled ? ' aria-disabled="true" disabled title="Rejoins un lobby pour gérer la soirée"' : ""}>Soirée en cours</button>
+      }"${soireeDisabled ? ' aria-disabled="true" disabled title="Rejoins un lobby pour gérer la soirée"' : ""}>
+        <span class="settings-tabs__icon" aria-hidden="true">🎉</span>
+        <span class="settings-tabs__label">Soirée</span>
+      </button>
+      <button type="button" class="settings-tabs__btn${
+        activeTab === TAB_PERSONNALISATION ? " settings-tabs__btn--active" : ""
+      }" role="tab" data-settings-tab="${TAB_PERSONNALISATION}" aria-selected="${
+        activeTab === TAB_PERSONNALISATION ? "true" : "false"
+      }">
+        <span class="settings-tabs__icon" aria-hidden="true">✨</span>
+        <span class="settings-tabs__label">Profil</span>
+      </button>
       <button type="button" class="settings-tabs__btn${
         activeTab === TAB_SUPPORT ? " settings-tabs__btn--active" : ""
       }" role="tab" data-settings-tab="${TAB_SUPPORT}" aria-selected="${
         activeTab === TAB_SUPPORT ? "true" : "false"
-      }">Support</button>
+      }">
+        <span class="settings-tabs__icon" aria-hidden="true">💬</span>
+        <span class="settings-tabs__label">Support</span>
+      </button>
     </div>`;
 }
 
@@ -257,7 +274,7 @@ export function mountSettings(app) {
   const emailAccount = isEmailAccount();
 
   let selectedEmoji = getLocalEmoji();
-  let activeTab = TAB_PERSONNALISATION;
+  let activeTab = hasActiveLobby() ? TAB_SOIREE : TAB_PERSONNALISATION;
   let lastPartySnap = "";
   let lastLobbyActive = hasActiveLobby();
   let partyActionInFlight = false;
@@ -414,8 +431,43 @@ export function mountSettings(app) {
       if (tab === TAB_SOIREE && !hasActiveLobby()) return;
       if (tab === activeTab) return;
       activeTab = tab;
-      render();
+      paintTabChrome();
+      swapActivePanel();
     });
+  }
+
+  function paintTabChrome() {
+    const tabs = app.querySelector(".settings-tabs");
+    if (!tabs) return;
+    tabs.style.setProperty("--settings-tab-index", String(settingsTabIndex(activeTab)));
+    tabs.querySelectorAll("[data-settings-tab]").forEach((btn) => {
+      const on = btn.getAttribute("data-settings-tab") === activeTab;
+      btn.classList.toggle("settings-tabs__btn--active", on);
+      btn.setAttribute("aria-selected", on ? "true" : "false");
+    });
+  }
+
+  function swapActivePanel() {
+    const inLobby = hasActiveLobby();
+    selectedEmoji = getLocalEmoji();
+    const panel = app.querySelector(".settings-panel");
+    if (!panel) {
+      render();
+      return;
+    }
+    const html =
+      activeTab === TAB_PERSONNALISATION
+        ? personnalisationPanelHtml({ emailAccount, user, selectedEmoji })
+        : activeTab === TAB_SOIREE
+          ? soireePanelHtml(inLobby)
+          : supportPanelHtml();
+    panel.outerHTML = html;
+    bindNav(app, {
+      "evening-return": () => returnFromEveningProfile(),
+    });
+    if (activeTab === TAB_PERSONNALISATION) bindPersonnalisationEvents();
+    if (activeTab === TAB_SOIREE) bindSoireeEvents();
+    if (activeTab === TAB_SUPPORT) bindSupportEvents();
   }
 
   function syncTabChrome(inLobby) {
