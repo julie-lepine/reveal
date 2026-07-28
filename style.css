@@ -3360,6 +3360,10 @@ button.emoji-picker-preview__avatar:active{
   margin:-8px 0 16px;
 }
 
+.lobby-actions__intro{
+  margin:4px 0 12px;
+}
+
 .lobby-actions{
   margin:8px 0 28px;
 }

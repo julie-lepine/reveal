@@ -711,6 +711,7 @@ export function mountHome(app) {
     const user = getUser();
     const loggedIn = isLoggedIn();
     const guest = isGuest();
+    const membershipActionsHtml = homeMembershipActionsHtml(chrome);
     const activeLobby = chrome.state === "cached_active";
     const canStartNewLobby = Boolean(chrome.createEnabled) && canCreateLobby();
     const createLobbyDisabledReason =
@@ -767,6 +768,7 @@ export function mountHome(app) {
 
           <div class="card auth-form ${authTab === "guest" ? "auth-form--guest" : ""}">
             <div id="auth-panel-login" class="${authTab === "login" ? "" : "hidden"}">
+              <p class="hint auth-form__guest-intro">Connecte-toi pour créer ou rejoindre un lobby. Pas encore de compte ? Passe par Inscription, ou rejoins en Invité avec un code.</p>
               <label class="field-label" for="login-email">Email</label>
               <input type="email" class="field-input" id="login-email" placeholder="toi@email.com" />
               <label class="field-label" for="login-password">Mot de passe</label>
@@ -809,8 +811,14 @@ export function mountHome(app) {
           `
         }
 
+        ${
+          loggedIn && !membershipActionsHtml
+            ? `<p class="hint auth-form__guest-intro lobby-actions__intro">Prêt·e pour la soirée ? Crée un lobby pour inviter tes amis, ou entre un code pour rejoindre une partie.</p>`
+            : ""
+        }
+
         <div class="lobby-actions">
-          ${homeMembershipActionsHtml(chrome)}
+          ${membershipActionsHtml}
           ${
             loggedIn
               ? canStartNewLobby
@@ -827,7 +835,6 @@ export function mountHome(app) {
           </div>`
               : ""
           }
-          ${!loggedIn && !guest ? '<p class="hint">Seuls les comptes connectés peuvent créer un lobby.</p>' : ""}
         </div>
 
         ${homeStatsHtml()}
