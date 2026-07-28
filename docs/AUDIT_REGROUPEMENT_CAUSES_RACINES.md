@@ -13,22 +13,22 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 
 ---
 
-## Focus — 2026-07-27 (soir)
+## Focus — 2026-07-28
 
 | | Contenu |
 |--|---------|
-| **Fait (file prioritaire)** | Guess Lie · Sondages · ARCH-06 · Membership A–D · M-14a · ARCH-22 · Loader UI join · Pré-résolution entry screens — tous ✅ |
-| **Prochain** | **UX-NAV-LOBBY** — Home hors menu principal une fois en lobby |
-| **Ensuite** | Membership Vague E · ARCH-07/08 · L-04 |
+| **Fait (file prioritaire)** | Guess Lie · Sondages · ARCH-06 · Membership A–D · M-14a · ARCH-22 · Loader UI join · Pré-résolution entry screens · **UX-NAV-LOBBY (Vague A)** · **ARCH/BUG isolation lobby** · **SYN/ARCH join partiel B orpheline** — tous ✅ |
+| **Prochain** | **Membership Vague E** · QA terrain UX-NAV-LOBBY résidus |
+| **Ensuite** | ARCH-07/08 · L-04 |
 
-**Décision produit (nouvelle)**  
-Une fois le lobby rejoint : **Accueil / Home n’est plus accessible depuis le menu principal**. Le lobby est le contexte de navigation jusqu’à Quitter (membre) ou Fermer (hôte).
+**Décision produit (UX-NAV-LOBBY — actée + livrée Vague A)**  
+Une fois le lobby rejoint : **Accueil n’est plus dans le menu principal** (`resolveBottomNavTabs(inLobby)` remplace Home par Paramètres). Le hub soirée = **Jeux** (logo central) + Paramètres. Home reste la destination **après Quitter / Fermer** (`applyLeaveLobbyLocal` → `navigate("home", { reset: true })`).
 
 **Résidus**  
-votes optimistic (speedVote / …) · `results.js` mount · rename remote (I-09) · membership Vague E · Loader join interstitiel (non retenu) · pré-résolution B1 launch getter (non retenue)
+votes optimistic (speedVote / …) · `results.js` mount · rename remote (I-09) · membership Vague E · Loader join interstitiel (non retenu) · pré-résolution B1 launch getter (non retenue) · chemins programmatiques vers `home` en lobby (deep link / recovery) · revert RPC reclaim anonymous
 
 **Surveiller**  
-Clutch taps sous latence (SYN-26) · ready prep après Recommencer · starts sync hydrate → hub hors `mountLobby`
+Clutch taps sous latence (SYN-26) · ready prep après Recommencer · starts sync hydrate → hub hors `mountLobby` · conflit pending join vs chrome Home membership
 
 ---
 
@@ -38,7 +38,15 @@ Clutch taps sous latence (SYN-26) · ready prep après Recommencer · starts syn
 
 | # | ID | Cause | Problème | Statut |
 |---|----|-------|----------|--------|
-| 1 | **UX-NAV-LOBBY** | 5/11 | Home inaccessible depuis le menu une fois en lobby | Ouvert — décision produit ; analyse avant GO |
+| 1 | **Membership Vague E** | 3 | Contradiction cache + snapshot `none` · logout/snapshot · multi-onglets INSERT | Ouvert |
+
+### Clôturés récents (2026-07-28)
+
+| ID | Résumé | Statut |
+|----|--------|--------|
+| **UX-NAV-LOBBY** | Home hors menu en lobby · Settings unifié · leave volontaire | ✅ Vague A |
+| **ARCH/BUG boundary** | Isolation lobby / résidu partie après changement | ✅ QA |
+| **SYN/ARCH join partiel** | Compensation membership B orpheline · guestMembership · pending Home | ✅ QA 1097/1097 |
 
 ### Autres ouverts
 
@@ -63,27 +71,43 @@ Clutch taps sous latence (SYN-26) · ready prep après Recommencer · starts syn
 | 2 | Race auth / profil | ✅ QA | — |
 | 3 | Sources de vérité multiples | ✅ hors TierNight M-14a | UX-CLUTCH-01 ✅ · **Membership A–D** ✅ · **M-14a** ✅ |
 | 4 | Asymétrie hôte / invité | ✅ QA | Guess Lie ✅ |
-| 5 | Routing + timing sync | ✅ | ARCH-05 mitigé · pré-résolution entry ✅ · **UX-NAV-LOBBY** |
+| 5 | Routing + timing sync | ✅ | ARCH-05 mitigé · pré-résolution entry ✅ · **UX-NAV-LOBBY Vague A** ✅ |
 | 6 | Async écrans | ✅ QA | **ARCH-06** ✅ |
 | 7 | Sync silencieuse / fire-and-forget | Partiel | ARCH-07/08, M-14b |
 | 8 | Reset / migration incomplète | Partiel | I-09 ✅ ; SYN-15/16 ✅ ; ARCH-10 |
 | 9 | Sync monolithe / duplication | Dette | ARCH-11… |
 | 10 | Code mort | Dette | dead exports (hors Fil Rouge app) |
-| 11 | Friction UX | Partiel | ARCH-22 ✅ · Loader UI join ✅ · L-04 · **UX-NAV-LOBBY** |
+| 11 | Friction UX | Partiel | ARCH-22 ✅ · Loader UI join ✅ · L-04 · **UX-NAV-LOBBY Vague A** ✅ |
 
 ---
 
 ## Détail des tickets ouverts
 
-### Cause 5 / 11 — UX-NAV-LOBBY (Home hors menu une fois en lobby)
+### Cause 5 / 11 — UX-NAV-LOBBY (Home hors menu en lobby) ✅ Vague A
 
 | | |
 |--|--|
-| **Décision produit** | Après rejoindre un lobby, **Home n’est plus accessible depuis le menu principal**. Le **lobby** devient le hub de navigation jusqu’à sortie membership (Quitter / Fermer hôte). |
-| **Intention UX** | Fin du dual hub Accueil ↔ Lobby pendant une soirée active ; moins de confusion resume/create depuis Home alors qu’un lobby est déjà ouvert. |
-| **Conséquences probables (analyse à faire)** | Bottom nav / onglet Accueil · `navigate("home")` depuis jeux/settings · chrome Home membership (Resume / Créer) · boot `resumeEveningSession` · stacks `navStack` contenant `home` · leave → retour Home autorisé |
-| **Hors scope provisoire** | Changer les contrats Quitter/Retour jeu (SYN-13b) · membership A–D · M-08 · Realtime |
-| **Statut** | Ouvert — **décision produit actée** ; pas de GO code ; analyse navigation/layout avant implémentation |
+| **Décision produit** | Après rejoindre un lobby, **Home n’est plus dans le menu principal**. Hub soirée = **Jeux** + **Paramètres**. Sortie membership → retour Home (`navigate("home", { reset: true })`). |
+| **Livré (Vague A)** | `bottomNavItems.js` : hors lobby `[home, games, logo, results, final]` ; en lobby `[settings, games, logo, results, final]` · `nav.js` : `goToEveningHome()` → hub jeux si lobby actif · ‹ `game-select` sans retour Home · Settings unifié (leave membre / close hôte) · `game-select` : `back: false` |
+| **Home écran** | Non promu par le menu en lobby. Si monté (edge case), chrome `cached_active` (Retour au lobby). Leave / Fermer → reset → Home. |
+| **Home + join partiel** | `resolveHomeMembership` : retry pending compensation avant query · garde anti-restauration silencieuse de B · bandeau « Quitter B / Rejoindre B » si DELETE échoue (`membership_reconciliation_required`) |
+| **Où** | `bottomNavItems.js` · `bottomNav.js` · `nav.js` · `settings.js` · `partySettingsMenu.js` · `voluntaryMemberLeave.js` · `home.js` · `lobbyMembershipCompensation.js` |
+| **Preuve** | `tests/uxNavLobby.test.js` · `tests/voluntaryMemberLeave.test.js` · `tests/lobbyJoinCompensation.test.js` |
+| **QA** | ✅ Vague A 2026-07-28 |
+| **Résidus** | `navigate("home")` programmatique en lobby (recovery, captcha, gameGuard) · piles `navStack` legacy · QA terrain sortie/settings |
+| **Ne pas confondre** | SYN-13b (sortie temporaire d’un *jeu* vs sortie du *lobby*) |
+
+### Cause 3 / 5 / 8 — ARCH/BUG isolation lobby + SYN/ARCH join partiel ✅ QA
+
+| | |
+|--|--|
+| **Symptôme A** | Résidu de partie après changement de lobby (`cachedRow`, `lastGame`, teardown incomplet) |
+| **Fix A** | `lobbyBoundary.js` · `lobbyRuntime.js` · join transactionnel · gardes `gameSync` · `lastGame` scopé |
+| **Symptôme B** | Join B : mutation serveur OK, échec finalisation locale → membership B orpheline |
+| **Fix B** | Journal `lobbyJoinEffects` · compensation DELETE (insert ou reclaim) · restauration `guestMembership` · pending + retry Home |
+| **Preuve** | `tests/lobbyBoundarySession.test.js` · `tests/lobbyJoinCompensation.test.js` · **1097/1097** |
+| **QA** | ✅ 2026-07-28 |
+| **Résidus acceptés** | Pas de revert RPC anonymous · satellites post-DELETE · orphelin **création** lobby |
 
 ### Cause 11 — ARCH-22 feedback sync lente (soft pending) ✅
 
@@ -340,11 +364,13 @@ Ne pas rouvrir sans **régression démontrée**.
 - **Retour** = sortie temporaire (reste membre, suit la progression)
 - **Quitter → Menu des jeux** = sortie définitive du jeu courant (suit les jeux suivants)
 
-### Contrat produit (UX-NAV-LOBBY) — 2026-07-27
+### Contrat produit (UX-NAV-LOBBY) — 2026-07-27 · Vague A livrée 2026-07-28
 
-- **Sans lobby actif** : Accueil / Home reste l’entrée (créer / rejoindre / auth).
-- **Avec lobby actif** (membre ou hôte) : Home **n’est plus** une destination du menu principal ; le **lobby** est le contexte de navigation.
-- **Fin de membership** (Quitter membre / Fermer hôte) : retour possible vers Home.
+- **Sans lobby actif** : Accueil / Home dans le menu (`BOTTOM_NAV_TAB.HOME`).
+- **Avec lobby actif** (membre ou hôte) : Home **absent** du menu ; **Paramètres** à la place ; hub = onglet **Jeux** (`returnToEveningGames`).
+- **Fin de membership** (Quitter membre / Fermer hôte) : `navigate("home", { reset: true })` — Accueil redevient accessible.
+- **Écran Home en lobby** : non promu par le menu ; si monté (edge case), chrome `cached_active` (Retour au lobby) + membership query inchangée.
+- **Join partiel (Home)** : retry pending compensation **avant** `queryActiveLobbyMembership` ; garde anti-restauration silencieuse de B ; bandeau conflit « Quitter B / Rejoindre B » si DELETE échoue.
 - **Ne pas confondre** avec SYN-13b (sortie temporaire d’un *jeu* vs sortie du *lobby*).
 
 ### Chaînes utiles
@@ -385,15 +411,15 @@ Clutch conserve son départage temporel (règle produit explicite inchangée).
 |-------|-------------------|
 | 1 | C-01/02, R-01–05, M-05a |
 | 2 | M-01, P-03, M-02a, S-02 |
-| 3 | I-03/04, SYN-03, M-13, M-02b, ARCH-02, SYN-29, I-PG-01, ready stale Recommencer, UX-CLUTCH-01 · **M-15** · **L-05↻** · **Membership A–D** · **M-14a / SYN-14** |
+| 3 | I-03/04, SYN-03, M-13, M-02b, ARCH-02, SYN-29, I-PG-01, ready stale Recommencer, UX-CLUTCH-01 · **M-15** · **L-05↻** · **Membership A–D** · **M-14a / SYN-14** · **ARCH/BUG boundary** · **SYN/ARCH join partiel** |
 | 4 | I-01/02/08, M-03b, M-06a/b, L-01, ARCH-03/03b, UX-VIBE-01, **Guess Lie** |
-| 5 | T-01/02, T-03↻, M-07, M-08, P-02, SYN-28, I-PG-01, ARCH-04, UX-VIBE-02 · **Pré-résolution `get*EntryScreen`** (Vague A ; B1 non retenue) |
+| 5 | T-01/02, T-03↻, M-07, M-08, P-02, SYN-28, I-PG-01, ARCH-04, UX-VIBE-02 · **Pré-résolution `get*EntryScreen`** (Vague A ; B1 non retenue) · **UX-NAV-LOBBY Vague A** |
 | 6 | I-05, SYN-13b↻, SYN-25, **SYN-05 / ARCH-18** ✅, **ARCH-06** ✅ (Mode A/B/C · Traître V2 · Lobby IIFE · SYN-12) |
 | 7 | I-07, M-09, L-09, M-11, M-10, T-05, SYN-26, M-04b / SYN-18 |
 | 8 | I-06, P-02, ARCH-09, I-09 / SYN-06, SYN-15 / SYN-16 · **M-15** |
 | 9 | SYN-12 / M-05b |
 | 10 | **SYN-05 / ARCH-18** ✅ QA (Fil Rouge app ; SQL historique hors scope) |
-| 11 | L-02, ARCH-21↻, M-12 (cleanup `#join=`, pas auto-join), UX-HIST-01, UX-RESUME-BANNER, UX-VIBE-01/02, **FEATURE-LOBBY-POLL** · **Membership A–D** · **ARCH-22** · **Loader UI join** |
+| 11 | L-02, ARCH-21↻, M-12 (cleanup `#join=`, pas auto-join), UX-HIST-01, UX-RESUME-BANNER, UX-VIBE-01/02, **FEATURE-LOBBY-POLL** · **Membership A–D** · **ARCH-22** · **Loader UI join** · **UX-NAV-LOBBY Vague A** · **SYN/ARCH join partiel** |
 
 ---
 
@@ -410,9 +436,11 @@ Hors tickets prioritaires — à traiter si opportunité / régression :
 - Optimistic votes hors Hot Take / VibeCheck / Dilemma (speedVote / … — même trou que T-05)
 - Starts sync hydrate → hub hors `mountLobby` (résidu SYN-12, hors idempotence globale)
 - Membership Vague E : contradiction cache+`none` · logout/snapshot · multi-onglets INSERT · flash UI post-leave
+- UX-NAV-LOBBY résidus : `navigate("home")` programmatique en lobby · piles `navStack` legacy avec `"home"` · QA terrain sortie/settings
+- Join partiel : revert RPC reclaim anonymous · orphelin création lobby · E2E Supabase
 - Homogénéisation launch hôte via getter post-mark (pré-résolution B1) — **étudiée, non retenue** (ROI insuffisant)
 - Fil Rouge : résidus SQL historiques (`fil-rouge-private.sql`, clés RPC) — ops Supabase séparée, non faite
 
 ---
 
-*Suivi vivant · Dernière MAJ : 2026-07-27 — UX-NAV-LOBBY (décision produit) · file prioritaire = Home hors menu en lobby*
+*Suivi vivant · Dernière MAJ : 2026-07-28 — UX-NAV-LOBBY Vague A livrée · SYN/ARCH join partiel · ARCH/BUG boundary · prochain = Membership Vague E*
