@@ -40,13 +40,116 @@ const ALLOWED_HYDRATION_SOURCES = new Set(Object.values(MEMBERSHIP_HYDRATION_SOU
 const RUNTIME_AUTHORITATIVE_KEYS = ["lobbyStatus", "gameId", "code", "role"];
 
 /**
+ * Normalise une row membership déjà connue (RPC / INSERT / select id).
+ * Formes acceptées : PostgREST `{ id, lobby_id, joined_at, is_host, user_id }`,
+ * canonique `{ membershipId, lobbyId, joinedAt, role }`, tableau (1ʳᵉ ligne), id string.
+ *
+ * @param {unknown} raw
+ * @param {{ userId?: string|null, lobbyIdHint?: string|null }} [ctx]
+ * @returns {Partial<ActiveLobbyMembership>&{ lobbyId?: string }|null}
+ */
+export function normalizeCanonicalMembershipRow(raw, ctx = {}) {
+  if (raw == null) return null;
+  let row = raw;
+  if (Array.isArray(row)) row = row[0];
+  if (typeof row === "string" || typeof row === "number") {
+    const lobbyId = ctx.lobbyIdHint ? String(ctx.lobbyIdHint) : null;
+    if (!lobbyId) return null;
+    return { lobbyId, membershipId: String(row) };
+  }
+  if (!row || typeof row !== "object") return null;
+
+  const r = /** @type {Record<string, unknown>} */ (row);
+  const membershipId =
+    r.membershipId != null
+      ? String(r.membershipId)
+      : r.id != null
+        ? String(r.id)
+        : null;
+  const lobbyId =
+    r.lobbyId != null
+      ? String(r.lobbyId)
+      : r.lobby_id != null
+        ? String(r.lobby_id)
+        : ctx.lobbyIdHint
+          ? String(ctx.lobbyIdHint)
+          : null;
+  if (!lobbyId) return null;
+
+  /** @type {Partial<ActiveLobbyMembership> & { lobbyId: string }} */
+  const out = { lobbyId };
+  if (membershipId) out.membershipId = membershipId;
+  if (r.joinedAt != null) out.joinedAt = String(r.joinedAt);
+  else if (r.joined_at != null) out.joinedAt = String(r.joined_at);
+
+  if (r.role === "host" || r.role === "member") {
+    out.role = r.role;
+  } else if (typeof r.is_host === "boolean") {
+    out.role = r.is_host ? "host" : "member";
+  } else if (typeof r.isHost === "boolean") {
+    out.role = r.isHost ? "host" : "member";
+  }
+
+  if (r.hostId != null) out.hostId = String(r.hostId);
+  else if (r.host_id != null) out.hostId = String(r.host_id);
+
+  return out;
+}
+
+/**
+ * Bundle + row canonique optionnelle → ActiveLobbyMembership.
+ * Priorité canonique : membershipId, joinedAt, role ; bundle : code, status, gameId, hostId.
+ *
+ * @param {{
+ *   bundle?: object|null,
+ *   userId: string,
+ *   canonicalRow?: unknown,
+ * }} input
+ * @returns {ActiveLobbyMembership|null}
+ */
+export function buildHydratedMembership(input) {
+  const { bundle, userId, canonicalRow } = input;
+  const fromBundle = membershipFromHydratedBundle(bundle, userId);
+  const fromCanon = normalizeCanonicalMembershipRow(canonicalRow, {
+    userId,
+    lobbyIdHint: bundle?.id || fromBundle?.lobbyId || null,
+  });
+
+  if (!fromBundle && !fromCanon) return null;
+  if (!fromBundle) {
+    // Row seule sans code lobby → insuffisant pour un found Resume.
+    return null;
+  }
+  if (!fromCanon) return fromBundle;
+
+  if (fromCanon.lobbyId !== fromBundle.lobbyId) {
+    // Hydratation ciblée sur le bundle confirmé : ignorer une row d’un autre lobby.
+    return fromBundle;
+  }
+
+  /** @type {ActiveLobbyMembership} */
+  const merged = { ...fromBundle };
+  if (fromCanon.membershipId) merged.membershipId = fromCanon.membershipId;
+  if (fromCanon.joinedAt != null) merged.joinedAt = fromCanon.joinedAt;
+  if (fromCanon.role) merged.role = fromCanon.role;
+  if (fromCanon.hostId) merged.hostId = fromCanon.hostId;
+  return merged;
+}
+
+/**
  * @param {{
  *   id?: string,
  *   code?: string,
  *   status?: string|null,
  *   gameId?: string|null,
  *   hostId?: string|null,
- *   participants?: Array<{ userId?: string, isLocal?: boolean, isHost?: boolean, membershipId?: string }>,
+ *   participants?: Array<{
+ *     userId?: string,
+ *     isLocal?: boolean,
+ *     isHost?: boolean,
+ *     membershipId?: string,
+ *     joinedAt?: string|null,
+ *   }>,
  * }|null|undefined} bundle
  * @param {string|null|undefined} userId
  * @returns {ActiveLobbyMembership|null}
@@ -72,6 +175,9 @@ export function membershipFromHydratedBundle(bundle, userId) {
 
   if (local?.membershipId) {
     membership.membershipId = String(local.membershipId);
+  }
+  if (local?.joinedAt != null) {
+    membership.joinedAt = String(local.joinedAt);
   }
   if (bundle.hostId) {
     membership.hostId = String(bundle.hostId);
@@ -243,6 +349,7 @@ export function commitMembershipRemoved(input) {
  *   bundle: object,
  *   userId: string|null|undefined,
  *   source: string,
+ *   canonicalRow?: unknown,
  *   extraCount?: number,
  *   localLobbyId?: string|null,
  * }} input
@@ -251,7 +358,11 @@ export function alignMembershipSnapshotAfterLobbyHydration(input) {
   const userId = input.userId || getCurrentMembershipUserId();
   if (!userId) return { action: "skipped", reason: "no_user" };
 
-  const membership = membershipFromHydratedBundle(input.bundle, userId);
+  const membership = buildHydratedMembership({
+    bundle: input.bundle,
+    userId,
+    canonicalRow: input.canonicalRow,
+  });
   if (!membership) return { action: "skipped", reason: "no_membership_from_bundle" };
 
   return commitMembershipHydrated({

@@ -679,10 +679,19 @@ export async function recoverLobbyFromServer({ withMessages = false } = {}) {
     currentUserId: getSupabaseUserId(),
   });
   applyLobbyToState(bundle, { persistGuestMembership: canUseGuestMembershipRecovery() });
+  const guestMem = canUseGuestMembershipRecovery() ? loadGuestMembership() : null;
   alignMembershipSnapshotAfterLobbyHydration({
     bundle,
     userId: getSupabaseUserId(),
     source: MEMBERSHIP_HYDRATION_SOURCE.RECOVER_CONFIRMED,
+    canonicalRow:
+      guestMem?.lobbyId === lobbyId && guestMem?.membershipId
+        ? {
+            id: guestMem.membershipId,
+            lobby_id: lobbyId,
+            user_id: getSupabaseUserId(),
+          }
+        : null,
   });
   startLobbyPresenceSync();
   await hydrateSessionThenStartSync(lobbyId, { afterReclaim: reclaimResult.reclaimed });
@@ -1019,6 +1028,7 @@ function mapMember(row, currentUserId) {
     isHost: Boolean(row.is_host),
     isLocal: row.user_id === currentUserId,
     lastSeenAt: row.last_seen_at || null,
+    joinedAt: row.joined_at || null,
   };
 }
 
@@ -1103,9 +1113,11 @@ function applyLobbyToState(bundle, { persistGuestMembership = false } = {}) {
   if (
     localUid &&
     Array.isArray(bundle.participants) &&
+    bundle.participants.length > 0 &&
     !bundle.participants.some((p) => p.userId === localUid)
   ) {
-    // Membership absente du bundle (kick) — ne pas réécrire un lobby fantôme.
+    // Kick prouvé : roster non vide sans le joueur local.
+    // participants=[] ne suffit pas (bundle vide / partiel) — dissolve/gone gèrent autrement.
     setTimeout(() => {
       if (!getState().inLobby) return;
       void import("./lobby.js").then(({ handleKickedFromLobby }) => handleKickedFromLobby());
@@ -1465,6 +1477,7 @@ console.log("[DEBUG MEMBER INSERT CREATE]", {
     bundle,
     userId,
     source: MEMBERSHIP_HYDRATION_SOURCE.CREATE_CONFIRMED,
+    canonicalRow: memberData,
   });
   await hydrateSessionThenStartSync(lobby.id);
 
@@ -1513,15 +1526,19 @@ export async function joinLobbySupabase(codeInput, { joinEffects: externalEffect
   const persistGuestMembership =
     recoverySession?.user?.is_anonymous === true || getState().user?.isGuest === true;
 
+  /** @type {unknown} */
+  let membershipRow = null;
+
   const { data: existing } = await supabase
     .from("lobby_members")
-    .select("id")
+    .select("id, lobby_id, user_id, joined_at, is_host")
     .eq("lobby_id", lobbyRow.id)
     .eq("user_id", userId)
     .maybeSingle();
 
   if (existing) {
     recordPreexistingMembershipForJoin(joinEffects, existing, lobbyRow.id);
+    membershipRow = existing;
   }
 
   if (!existing) {
@@ -1547,6 +1564,11 @@ export async function joinLobbySupabase(codeInput, { joinEffects: externalEffect
         membershipResolved = true;
         afterReclaim = true;
         if (storedBeforeReclaim?.membershipId) {
+          membershipRow = {
+            id: storedBeforeReclaim.membershipId,
+            lobby_id: lobbyRow.id,
+            user_id: userId,
+          };
           recordMembershipReclaimForJoin(joinEffects, {
             membershipId: storedBeforeReclaim.membershipId,
             lobbyId: lobbyRow.id,
@@ -1588,6 +1610,11 @@ export async function joinLobbySupabase(codeInput, { joinEffects: externalEffect
           }
           afterReclaim = true;
           if (storedBeforeReclaim?.membershipId) {
+            membershipRow = {
+              id: storedBeforeReclaim.membershipId,
+              lobby_id: lobbyRow.id,
+              user_id: userId,
+            };
             recordMembershipReclaimForJoin(joinEffects, {
               membershipId: storedBeforeReclaim.membershipId,
               lobbyId: lobbyRow.id,
@@ -1598,6 +1625,7 @@ export async function joinLobbySupabase(codeInput, { joinEffects: externalEffect
           return { ok: false, error: joinErr.message, joinEffects };
         }
       } else {
+        membershipRow = joinData;
         recordMembershipInsertForJoin(joinEffects, joinData, lobbyRow.id);
 
         if (persistGuestMembership) {
@@ -1626,7 +1654,7 @@ export async function joinLobbySupabase(codeInput, { joinEffects: externalEffect
     persistGuestMembership,
     joinEffects,
   });
-  return { ok: true, code: bundle.code, joinEffects };
+  return { ok: true, code: bundle.code, joinEffects, membershipRow };
 }
 
 export async function refreshLobbyFromSupabase({ withMessages = false } = {}) {

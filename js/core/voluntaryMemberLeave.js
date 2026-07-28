@@ -44,6 +44,8 @@ export async function notifyVoluntaryLeaveFailure(res, deps) {
  *   signOutAnonGuestIfNeeded: (wasGuest: boolean) => Promise<void>|void,
  *   clearLocalOpenLobbySlot: (code: string) => void,
  *   applyLeaveLobbyLocal: (args: { wasGuest: boolean, navigateAway: boolean }) => void,
+ *   getUserId?: () => string|null|undefined,
+ *   commitMembershipRemoved?: (input: { userId: string, lobbyId?: string|null }) => unknown,
  * }} deps
  * @returns {Promise<{ ok: boolean, error?: string, busy?: boolean }>}
  */
@@ -62,6 +64,7 @@ export async function runVoluntaryMemberLeave(options = {}, deps) {
   try {
     const lobby = deps.getLobby();
     const code = lobby?.code;
+    const lobbyId = lobby?.id || null;
     const wasGuest = deps.isGuest();
     const remote = Boolean(deps.isSupabaseConfigured() && lobby?.id);
 
@@ -79,6 +82,12 @@ export async function runVoluntaryMemberLeave(options = {}, deps) {
           ok: false,
           error: res?.error || "Impossible de quitter le lobby.",
         };
+      }
+
+      // Preuve : DELETE membership courant OK — retirer found(B) avant clear runtime.
+      const userId = deps.getUserId?.() || null;
+      if (userId && lobbyId && deps.commitMembershipRemoved) {
+        deps.commitMembershipRemoved({ userId, lobbyId });
       }
 
       deps.stopMultiplayerSync();

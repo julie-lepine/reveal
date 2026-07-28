@@ -46,6 +46,7 @@ import {
 import { queryActiveLobbyMembership } from "./lobbyMembershipFetch.js";
 import {
   alignMembershipSnapshotAfterLobbyHydration,
+  commitMembershipRemoved,
   MEMBERSHIP_HYDRATION_SOURCE,
 } from "./lobbyMembershipAlign.js";
 import {
@@ -477,7 +478,7 @@ export function hasActiveLobby() {
 }
 
 /** E2 — promote snapshot après join Supabase finalisé (pas rollback / compensation). */
-function promoteMembershipSnapshotAfterJoinConfirmed() {
+function promoteMembershipSnapshotAfterJoinConfirmed(canonicalRow = null) {
   const userId = getSupabaseUserId();
   const lobby = getLobby();
   if (!userId || !lobby?.id || !lobby?.code) return;
@@ -493,6 +494,7 @@ function promoteMembershipSnapshotAfterJoinConfirmed() {
     },
     userId,
     source: MEMBERSHIP_HYDRATION_SOURCE.JOIN_CONFIRMED,
+    canonicalRow,
   });
 }
 
@@ -935,7 +937,7 @@ export async function joinLobby(code) {
       if (fromActiveLobby) {
         commitLobbyJoinTransition();
       }
-      promoteMembershipSnapshotAfterJoinConfirmed();
+      promoteMembershipSnapshotAfterJoinConfirmed(res.membershipRow || null);
       return res;
     }
 
@@ -1063,6 +1065,13 @@ export async function handleLobbyDissolvedForGuest() {
   stopMultiplayerSync();
   stopLobbyPresenceSync();
 
+  // Preuve : DELETE lobby (Realtime) ou membership absente confirmée (refresh gone).
+  const dissolvedLobbyId = getLobby()?.id || null;
+  const dissolvedUserId = getSupabaseUserId();
+  if (dissolvedUserId && dissolvedLobbyId) {
+    commitMembershipRemoved({ userId: dissolvedUserId, lobbyId: dissolvedLobbyId });
+  }
+
   const wasGuest = isGuest();
   await signOutAnonGuestIfNeeded(wasGuest);
   applyLeaveLobbyLocal({ wasGuest, navigateAway: false });
@@ -1073,7 +1082,7 @@ export async function handleLobbyDissolvedForGuest() {
   navigate("home", { reset: true });
 }
 
-/** Invité : retiré du lobby par l'hôte (kick). */
+/** Invité : retiré du lobby par l'hôte (kick) — membership locale absente côté serveur. */
 export async function handleKickedFromLobby() {
   if (lobbyKickHandling || lobbyDissolveHandling) return;
   if (!getState().inLobby) return;
@@ -1082,6 +1091,14 @@ export async function handleKickedFromLobby() {
   lobbyKickHandling = true;
   stopMultiplayerSync();
   stopLobbyPresenceSync();
+
+  // Preuve : DELETE lobby_members user_id === local (Realtime) ou uid absent du bundle.
+  // Ne s'applique jamais au kick d'un *autre* joueur (hôte reste dans le roster).
+  const kickedLobbyId = getLobby()?.id || null;
+  const kickedUserId = getSupabaseUserId();
+  if (kickedUserId && kickedLobbyId) {
+    commitMembershipRemoved({ userId: kickedUserId, lobbyId: kickedLobbyId });
+  }
 
   const wasGuest = isGuest();
   await signOutAnonGuestIfNeeded(wasGuest);
@@ -1103,12 +1120,18 @@ export async function dissolveLobbyAsHost({ navigateAway = true } = {}) {
 
   const lobby = getLobby();
   const code = lobby?.code;
+  const lobbyId = lobby?.id || null;
   const wasGuest = isGuest();
 
   if (isSupabaseConfigured() && lobby?.id) {
     const res = await closeLobbySupabase();
     if (!res.ok) {
       return { ok: false, error: res.error };
+    }
+    // Preuve : DELETE lobbies OK (cascade memberships) — retirer found hôte.
+    const hostUserId = getSupabaseUserId();
+    if (hostUserId && lobbyId) {
+      commitMembershipRemoved({ userId: hostUserId, lobbyId });
     }
     await signOutAnonGuestIfNeeded(wasGuest);
   } else if (code) {
@@ -1187,6 +1210,8 @@ export async function leaveLobby({ navigateAway = true } = {}) {
       signOutAnonGuestIfNeeded,
       clearLocalOpenLobbySlot,
       applyLeaveLobbyLocal,
+      getUserId: getSupabaseUserId,
+      commitMembershipRemoved,
     }
   );
 }
@@ -1224,6 +1249,11 @@ export async function leaveLobbyMembershipFromServer(membership) {
       closeLobbyAsHost: closeLobbyByIdAsHost,
     }
   ).then((result) => {
+    // Preuve : DELETE membership ou dissolve hôte OK (Vague D).
+    const userId = getSupabaseUserId();
+    if (userId && membership?.lobbyId) {
+      commitMembershipRemoved({ userId, lobbyId: membership.lobbyId });
+    }
     performLobbyBoundaryTeardown();
     return result;
   });

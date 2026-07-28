@@ -81,6 +81,10 @@ function makeTrackingDeps(overrides = {}) {
         navigations.push({ screen: "home", reset: true });
       }
     },
+    getUserId: () => "u-member",
+    commitMembershipRemoved: ({ userId, lobbyId }) => {
+      order.push(`commitMembershipRemoved:${userId}:${lobbyId}`);
+    },
   };
 
   for (const [k, v] of Object.entries(overrides)) {
@@ -110,6 +114,7 @@ describe("runVoluntaryMemberLeave — contrat échec", () => {
     assert.equal(res.ok, true);
     assert.deepEqual(order, [
       "leaveLobbySupabase",
+      "commitMembershipRemoved:u-member:lobby-1",
       "stopMultiplayerSync",
       "stopLobbyPresenceSync",
       "signOut:guest",

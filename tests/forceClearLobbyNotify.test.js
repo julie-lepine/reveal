@@ -82,14 +82,18 @@ function runForceClearContractSequence() {
 describe("forceClearClientLobbyState — contrat source", () => {
   it("notifie après mutations, une seule fois dans la fonction", () => {
     const body = forceClearFnBody();
-    assert.match(body, /stopMultiplayerSync\(\)/);
-    assert.match(body, /clearCachedGameSession\(\)/);
+    assert.match(body, /performLobbyBoundaryTeardown\(\)/);
     assert.match(body, /saveStatePatch\(\{\s*inLobby:\s*false/);
     assert.match(body, /notifyLobbyBundleUpdated\(\)/);
     const notifyIdx = body.lastIndexOf("notifyLobbyBundleUpdated()");
     const patchIdx = body.indexOf("saveStatePatch");
+    const teardownIdx = body.indexOf("performLobbyBoundaryTeardown()");
+    assert.ok(teardownIdx >= 0 && patchIdx > teardownIdx);
     assert.ok(patchIdx >= 0 && notifyIdx > patchIdx);
     assert.equal((body.match(/notifyLobbyBundleUpdated\(\)/g) || []).length, 1);
+    // Sync/clear restent dans le teardown partagé — pas d’invalidate snapshot ici.
+    assert.equal(body.includes("invalidateMembershipSnapshot"), false);
+    assert.equal(body.includes("commitMembershipRemoved"), false);
   });
 
   it("importe notifyLobbyBundleUpdated depuis supabaseLobby", () => {
