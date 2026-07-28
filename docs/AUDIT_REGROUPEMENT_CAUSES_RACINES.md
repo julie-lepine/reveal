@@ -16,9 +16,9 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 
 | | |
 |--|--|
-| **Maintenant** | **Membership Vague E5** — code livré · QA staging+terrain |
-| **Ensuite** | ARCH-07/08 · L-04 · UX-NAV-LOBBY résidus · E4 preuves dures reportées |
-| **Dernière clôture** | **Membership A→E4** ✅ (E3 QA · E4 smoke staging+UI) |
+| **Maintenant** | ARCH-07/08 · L-04 · UX-NAV-LOBBY résidus · E4 preuves dures reportées |
+| **Ensuite** | Cause 7 sync silencieuse · dette ARCH-11… |
+| **Dernière clôture** | **Membership A→E5** ✅ (E5 dissolve atomique · QA staging+terrain) |
 
 ---
 
@@ -28,15 +28,14 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 
 | ID | Cause | Problème | Statut |
 |----|-------|----------|--------|
-| **Membership E5** | 3 | Atomicité dissolve — `dissolve_lobby_atomically` · client unifié | Code livré · QA staging+terrain |
+| **ARCH-07** | 7 | Catch Realtime silencieux | Ouvert |
+| **ARCH-08** | 7 | Retry launch silencieux | Ouvert |
 
 ### Autres
 
 | ID | Cause | Problème | Statut |
 |----|-------|----------|--------|
 | **M-14b / SYN-09b** | 7 | `onLocalApplied` si `localFirst: false` | Latent |
-| **ARCH-07** | 7 | Catch Realtime silencieux | Ouvert |
-| **ARCH-08** | 7 | Retry launch silencieux | Ouvert |
 | **ARCH-10** | 8 | Clear cache leave lobby trop tard | 🟡 partiel |
 | **ARCH-05** | 5 | Course lobby vs session (`row.screen`) | 🟡 mitigé SYN-28 |
 | **ARCH-01 / F-01** | 1 | Démo offline sans avertissement MP | 🟡 partiel |
@@ -51,7 +50,7 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 |---|-------|------|----------------|
 | 1 | Identité invité / JWT | ✅ | ARCH-01 partiel |
 | 2 | Race auth / profil | ✅ | — |
-| 3 | Sources de vérité multiples | ✅ hors E5 QA | **Membership A–E5 code** · M-14a ✅ · Guess Lie ✅ |
+| 3 | Sources de vérité multiples | ✅ | **Membership A–E5 ✅** · M-14a ✅ · Guess Lie ✅ |
 | 4 | Asymétrie hôte / invité | ✅ | — |
 | 5 | Routing + timing sync | ✅ | ARCH-05 mitigé · UX-NAV ✅ |
 | 6 | Async écrans | ✅ | ARCH-06 ✅ |
@@ -65,7 +64,7 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 
 ## Détail — tickets ouverts
 
-### Cause 3 — Membership Vague E5
+### Cause 3 — Membership A→E5 ✅
 
 | Vague | Objectif | Statut |
 |-------|----------|--------|
@@ -74,13 +73,13 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 | **E2** | Alignement asymétrique cache ↔ snapshot · promote confirmé · `commitMembershipRemoved` après preuve · rows canoniques | ✅ QA 2026-07-28 |
 | **E3** | Leave polish · soft-hold `post_leave_transition` (pas de checking / faux `none`) | ✅ QA 2026-07-28 |
 | **E4** | Multi-onglets INSERT · `create_lobby_atomically` · UNIQUE `user_id` | ✅ smoke 2026-07-28 |
-| **E5** | Atomicité dissolve · `dissolve_lobby_atomically` · DISSOLVED/ALREADY_GONE/NOT_ALLOWED | Code · QA staging+terrain |
+| **E5** | Atomicité dissolve · `dissolve_lobby_atomically` · DISSOLVED/ALREADY_GONE/NOT_ALLOWED/CANONICAL_ELSEWHERE | ✅ QA 2026-07-28 |
 
 | | |
 |--|--|
-| **E5 livré** | RPC `dissolve_lobby_atomically` · `closeLobbyByIdAsHost` = un RPC · ALREADY_GONE succès · re-query membership post-transport · localStorage Traître hors SQL |
+| **E5 livré** | RPC `dissolve_lobby_atomically` · client unifié · ALREADY_GONE succès · `CANONICAL_ELSEWHERE` → recover Y · re-query membership post-transport |
 | **Où E5** | `supabase/lobby-membership-e5-*.sql` · `lobbyDissolveContract.js` · `supabaseLobby.js` · `lobby.js` · `traitrePrivate.js` |
-| **Preuve E5** | `lobbyMembershipVagueE5` · harness staging · runbook |
+| **Preuve E5** | `lobbyMembershipVagueE5` · staging + terrain 2026-07-28 |
 | **Ne pas confondre** | `endGameSession` → `deleteGameSession` (hors dissolve) · leave membre = DELETE membership |
 
 ### Cause 7 — Sync silencieuse
@@ -143,7 +142,7 @@ Ne pas rouvrir sans régression. Détail historique dans git / tests cités.
 
 | ID | Cause | Livré | Preuve / QA |
 |----|-------|-------|-------------|
-| **Membership E5** | 3 | `dissolve_lobby_atomically` · client unifié · ALREADY_GONE succès | `lobbyMembershipVagueE5` · QA staging+terrain **à faire** |
+| **Membership E5** | 3 | `dissolve_lobby_atomically` · ALREADY_GONE · CANONICAL_ELSEWHERE | `lobbyMembershipVagueE5` · staging+terrain 2026-07-28 |
 | **Membership E4** | 3 | Create atomique + UNIQUE user_id + mapping conflit + recover E2 | Staging e4-01/02 · smoke UI 2026-07-28 |
 | **Membership E3** | 3 | Soft-hold post-leave · pas de checking générique | `lobbyMembershipVagueE3` · QA terrain |
 | **Membership A→E2** | 3 | Query→chrome→create→leave · E1 scoped auth · E2 align asymétrique + remove après preuve | VagueA–E2 · 2026-07-28 |
@@ -176,7 +175,7 @@ Ne pas rouvrir sans régression. Détail historique dans git / tests cités.
 |-------|-------------------|
 | 1 | C-01/02, R-01–05, M-05a |
 | 2 | M-01, P-03, M-02a, S-02 |
-| 3 | I-03/04, SYN-03, M-13, M-02b, ARCH-02, SYN-29, I-PG-01, ready stale, UX-CLUTCH-01, M-15, L-05↻, **Membership A–E4**, M-14a, boundary, join partiel |
+| 3 | I-03/04, SYN-03, M-13, M-02b, ARCH-02, SYN-29, I-PG-01, ready stale, UX-CLUTCH-01, M-15, L-05↻, **Membership A–E5**, M-14a, boundary, join partiel |
 | 4 | I-01/02/08, M-03b, M-06a/b, L-01, ARCH-03/03b, UX-VIBE-01, Guess Lie |
 | 5 | T-01/02, T-03↻, M-07/08, P-02, SYN-28, ARCH-04, UX-VIBE-02, pré-résolution entry, UX-NAV-LOBBY |
 | 6 | I-05, SYN-13b↻, SYN-25, SYN-05/ARCH-18, ARCH-06 |
@@ -184,7 +183,7 @@ Ne pas rouvrir sans régression. Détail historique dans git / tests cités.
 | 8 | I-06, P-02, ARCH-09, I-09/SYN-06, SYN-15/16, M-15 |
 | 9 | SYN-12 / M-05b |
 | 10 | SYN-05 / ARCH-18 (Fil Rouge app) |
-| 11 | L-02, ARCH-21↻, M-12, UX-HIST/RESUME/VIBE, POLL, **Membership A–E4**, ARCH-22, Loader join, UX-NAV, join partiel |
+| 11 | L-02, ARCH-21↻, M-12, UX-HIST/RESUME/VIBE, POLL, **Membership A–E5**, ARCH-22, Loader join, UX-NAV, join partiel |
 
 ---
 
@@ -202,7 +201,6 @@ Hors file prioritaire — opportunité / régression :
 - Starts sync hydrate → hub hors `mountLobby` (hors périmètre ARCH-06)
 - UX-NAV : `navigate("home")` programmatique en lobby · `navStack` legacy · QA terrain
 - Membership **E4** (reporté) : course RPC pure ALREADY_EXISTS · join↔join concurrent · reclaim X/Y · JSON 23505 · e4-03/03b
-- Membership **E5** : QA staging+terrain (`dissolve_lobby_atomically` code livré)
 - Join partiel : revert RPC reclaim anonymous · orphelin **création** · E2E Supabase
 - Pré-résolution B1 (getter post-mark launch) — étudiée, **non retenue**
 - Loader join interstitiel — **non retenu**
@@ -212,4 +210,4 @@ Hors file prioritaire — opportunité / régression :
 
 ---
 
-*Suivi vivant · MAJ 2026-07-28 — **Membership E5 code livré** · prochain = QA staging+terrain E5*
+*Suivi vivant · MAJ 2026-07-28 — **Membership A→E5 ✅ QA** · prochain = ARCH-07/08 · L-04*
