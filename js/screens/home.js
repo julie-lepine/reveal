@@ -64,6 +64,7 @@ import {
   LOBBY_SERVER_LEAVE_ERROR,
 } from "../core/lobbyServerLeave.js";
 import {
+  getSupabaseUserId,
   getLiveSupabaseUserId,
   authReady,
   isAuthReadyResolved,
