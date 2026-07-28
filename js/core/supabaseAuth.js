@@ -158,11 +158,17 @@ function getLockedGuestDisplayName(userId) {
 }
 
 export async function syncSessionToState(session) {
+  const prevUserId = getState().supabaseUserId || null;
+
   if (!session?.user) {
     saveStatePatch({
       user: { email: null, name: null, emoji: null, loggedIn: false, isGuest: false, provider: null },
       supabaseUserId: null,
     });
+    const { handleMembershipAuthIdentityTransition } = await import(
+      "./lobbyMembershipSnapshot.js"
+    );
+    handleMembershipAuthIdentityTransition(prevUserId, null);
     return;
   }
 
@@ -197,6 +203,11 @@ export async function syncSessionToState(session) {
       provider: providerFromUser(user),
     },
   });
+
+  const { handleMembershipAuthIdentityTransition } = await import(
+    "./lobbyMembershipSnapshot.js"
+  );
+  handleMembershipAuthIdentityTransition(prevUserId, user.id);
 }
 
 /** Traite un retour auth (navigateur ou deep link `com.reveal.partygames://…`). */

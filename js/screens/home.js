@@ -44,6 +44,7 @@ import {
   getMembershipSnapshot,
   setMembershipSnapshot,
   invalidateMembershipSnapshot,
+  getMembershipAuthGeneration,
 } from "../core/lobbyMembershipSnapshot.js";
 import {
   deriveHomeMembershipChrome,
@@ -452,7 +453,7 @@ export function mountHome(app) {
     });
   }
 
-  function applyMembershipQueryResult(result) {
+  function applyMembershipQueryResult(result, identity = null) {
     let pending = getPendingLobbyMembershipCompensation();
     if (pending && result?.status === "none") {
       clearPendingLobbyMembershipCompensationIfMatches(pending.lobbyId);
@@ -472,14 +473,27 @@ export function mountHome(app) {
     const decision = decideMembershipSnapshotWrite(
       getMembershipSnapshot(),
       result,
-      "home-query"
+      "home-query",
+      identity
     );
-    if (decision.action === "retain_found") {
+    if (decision.action === "retain_found_same_identity") {
       retainedFoundDespiteUnknown = true;
       return;
     }
+    if (decision.action === "reject_stale_identity") {
+      return;
+    }
     if (decision.action === "write") {
-      setMembershipSnapshot(decision.result, decision.source || "home-query");
+      const writeUserId = identity?.currentUserId || getSupabaseUserId();
+      if (!writeUserId) return;
+      setMembershipSnapshot(
+        decision.result,
+        decision.source || "home-query",
+        writeUserId,
+        identity?.queryAuthGeneration != null
+          ? { authGeneration: identity.queryAuthGeneration }
+          : null
+      );
       retainedFoundDespiteUnknown = false;
       if (decision.result.status === "none" || decision.result.status === "found") {
         resumeUnrecoverable = false;
@@ -499,6 +513,13 @@ export function mountHome(app) {
       return;
     }
 
+    const queryUserId = getSupabaseUserId();
+    if (!queryUserId) {
+      resolutionInProgress = false;
+      return;
+    }
+    const queryAuthGeneration = getMembershipAuthGeneration();
+
     resolutionInProgress = true;
     if (force && shouldContinue()) scheduleRender(true);
 
@@ -507,6 +528,7 @@ export function mountHome(app) {
         await authReady;
         if (!shouldContinue()) return;
       }
+      if (getSupabaseUserId() !== queryUserId) return;
       if (isSupabaseConfigured()) {
         await retryPendingLobbyMembershipCompensation({
           deleteOwnLobbyMembershipById,
@@ -516,12 +538,36 @@ export function mountHome(app) {
           membershipReconciliationConflict = null;
         }
       }
+      if (getSupabaseUserId() !== queryUserId) return;
       const result = await queryActiveLobbyMembership();
       if (!shouldContinue()) return;
-      applyMembershipQueryResult(result);
+      const currentUserId = getSupabaseUserId();
+      const currentAuthGeneration = getMembershipAuthGeneration();
+      if (queryUserId !== currentUserId || queryAuthGeneration !== currentAuthGeneration) {
+        return;
+      }
+      applyMembershipQueryResult(result, {
+        queryUserId,
+        currentUserId,
+        queryAuthGeneration,
+        currentAuthGeneration,
+      });
     } catch {
       if (!shouldContinue()) return;
-      applyMembershipQueryResult({ status: "unknown" });
+      const currentUserId = getSupabaseUserId();
+      const currentAuthGeneration = getMembershipAuthGeneration();
+      if (queryUserId !== currentUserId || queryAuthGeneration !== currentAuthGeneration) {
+        return;
+      }
+      applyMembershipQueryResult(
+        { status: "unknown" },
+        {
+          queryUserId,
+          currentUserId,
+          queryAuthGeneration,
+          currentAuthGeneration,
+        }
+      );
     } finally {
       if (shouldContinue()) {
         resolutionInProgress = false;

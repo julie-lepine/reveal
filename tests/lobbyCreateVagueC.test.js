@@ -15,6 +15,10 @@ import {
   applyMembershipQueryToSnapshot,
 } from "../js/core/lobbyCreateGuard.js";
 import {
+  resetMembershipSnapshotTestState,
+  sameIdentity,
+} from "./helpers/membershipSnapshotTest.js";
+import {
   getMembershipSnapshot,
   setMembershipSnapshot,
   invalidateMembershipSnapshot,
@@ -41,25 +45,37 @@ const FOUND = {
   extraCount: 0,
 };
 
+const UID = "user-c-test-1111-2222";
+
+function guardDeps(overrides = {}) {
+  return {
+    hasActiveLobby: false,
+    getSupabaseUserId: () => UID,
+    getMembershipSnapshot,
+    setMembershipSnapshot,
+    ...overrides,
+  };
+}
+
 describe("lobbyCreateVagueC — assertCanInsertLobby", () => {
   beforeEach(() => {
-    invalidateMembershipSnapshot();
+    resetMembershipSnapshotTestState(UID);
   });
 
   it("1 — cache actif → refus sans query/INSERT", async () => {
     let queries = 0;
     await assert.rejects(
       () =>
-        assertCanInsertLobby({
-          hasActiveLobby: true,
-          activeLobbyCode: "ZZZZ",
-          queryActiveLobbyMembership: async () => {
-            queries += 1;
-            return { status: "none" };
-          },
-          getMembershipSnapshot,
-          setMembershipSnapshot,
-        }),
+        assertCanInsertLobby(
+          guardDeps({
+            hasActiveLobby: true,
+            activeLobbyCode: "ZZZZ",
+            queryActiveLobbyMembership: async () => {
+              queries += 1;
+              return { status: "none" };
+            },
+          })
+        ),
       (err) => err.code === LOBBY_CREATE_ERROR.CACHE_ACTIVE
     );
     assert.equal(queries, 0);
@@ -68,12 +84,11 @@ describe("lobbyCreateVagueC — assertCanInsertLobby", () => {
   it("2 — query found → refus + snapshot found", async () => {
     await assert.rejects(
       () =>
-        assertCanInsertLobby({
-          hasActiveLobby: false,
-          queryActiveLobbyMembership: async () => FOUND,
-          getMembershipSnapshot,
-          setMembershipSnapshot,
-        }),
+        assertCanInsertLobby(
+          guardDeps({
+            queryActiveLobbyMembership: async () => FOUND,
+          })
+        ),
       (err) =>
         err.code === LOBBY_CREATE_ERROR.ALREADY_EXISTS &&
         /ABCD/.test(err.message)
@@ -85,12 +100,11 @@ describe("lobbyCreateVagueC — assertCanInsertLobby", () => {
   it("3 — query unknown → refus sans « déjà dans un lobby »", async () => {
     await assert.rejects(
       () =>
-        assertCanInsertLobby({
-          hasActiveLobby: false,
-          queryActiveLobbyMembership: async () => ({ status: "unknown" }),
-          getMembershipSnapshot,
-          setMembershipSnapshot,
-        }),
+        assertCanInsertLobby(
+          guardDeps({
+            queryActiveLobbyMembership: async () => ({ status: "unknown" }),
+          })
+        ),
       (err) =>
         err.code === LOBBY_CREATE_ERROR.CHECK_FAILED &&
         !/déjà dans un lobby/i.test(err.message)
@@ -99,54 +113,50 @@ describe("lobbyCreateVagueC — assertCanInsertLobby", () => {
   });
 
   it("4 — query none → autorise (pas throw)", async () => {
-    const out = await assertCanInsertLobby({
-      hasActiveLobby: false,
-      queryActiveLobbyMembership: async () => ({ status: "none" }),
-      getMembershipSnapshot,
-      setMembershipSnapshot,
-    });
+    const out = await assertCanInsertLobby(
+      guardDeps({
+        queryActiveLobbyMembership: async () => ({ status: "none" }),
+      })
+    );
     assert.equal(out.status, "none");
     assert.equal(getMembershipSnapshot()?.status, "none");
   });
 
   it("5 — snapshot none ancien, query found → refus", async () => {
-    setMembershipSnapshot({ status: "none" }, "old");
+    setMembershipSnapshot({ status: "none" }, "old", UID);
     await assert.rejects(
       () =>
-        assertCanInsertLobby({
-          hasActiveLobby: false,
-          queryActiveLobbyMembership: async () => FOUND,
-          getMembershipSnapshot,
-          setMembershipSnapshot,
-        }),
+        assertCanInsertLobby(
+          guardDeps({
+            queryActiveLobbyMembership: async () => FOUND,
+          })
+        ),
       (err) => err.code === LOBBY_CREATE_ERROR.ALREADY_EXISTS
     );
     assert.equal(getMembershipSnapshot()?.status, "found");
   });
 
   it("6 — snapshot none, query unknown → refus", async () => {
-    setMembershipSnapshot({ status: "none" }, "old");
+    setMembershipSnapshot({ status: "none" }, "old", UID);
     await assert.rejects(
       () =>
-        assertCanInsertLobby({
-          hasActiveLobby: false,
-          queryActiveLobbyMembership: async () => ({ status: "unknown" }),
-          getMembershipSnapshot,
-          setMembershipSnapshot,
-        }),
+        assertCanInsertLobby(
+          guardDeps({
+            queryActiveLobbyMembership: async () => ({ status: "unknown" }),
+          })
+        ),
       (err) => err.code === LOBBY_CREATE_ERROR.CHECK_FAILED
     );
   });
 
   it("7 — found met à jour le snapshot", async () => {
-    setMembershipSnapshot({ status: "none" }, "x");
+    setMembershipSnapshot({ status: "none" }, "x", UID);
     try {
-      await assertCanInsertLobby({
-        hasActiveLobby: false,
-        queryActiveLobbyMembership: async () => FOUND,
-        getMembershipSnapshot,
-        setMembershipSnapshot,
-      });
+      await assertCanInsertLobby(
+        guardDeps({
+          queryActiveLobbyMembership: async () => FOUND,
+        })
+      );
     } catch {
       /* expected */
     }
@@ -156,16 +166,26 @@ describe("lobbyCreateVagueC — assertCanInsertLobby", () => {
   it("8 — unknown sans ancien found → check_failed snapshot", async () => {
     applyMembershipQueryToSnapshot(
       { status: "unknown" },
-      { getMembershipSnapshot, setMembershipSnapshot }
+      {
+        getMembershipSnapshot,
+        setMembershipSnapshot,
+        userId: UID,
+        queryAuthGeneration: 0,
+      }
     );
     assert.equal(getMembershipSnapshot()?.status, "unknown");
   });
 
   it("9 — unknown avec ancien found → retain", async () => {
-    setMembershipSnapshot(FOUND, "home");
+    setMembershipSnapshot(FOUND, "home", UID);
     const action = applyMembershipQueryToSnapshot(
       { status: "unknown" },
-      { getMembershipSnapshot, setMembershipSnapshot }
+      {
+        getMembershipSnapshot,
+        setMembershipSnapshot,
+        userId: UID,
+        queryAuthGeneration: 0,
+      }
     );
     assert.equal(action, "retained");
     assert.equal(getMembershipSnapshot()?.status, "found");
@@ -178,12 +198,11 @@ describe("lobbyCreateVagueC — assertCanInsertLobby", () => {
     };
     await assert.rejects(
       () =>
-        assertCanInsertLobby({
-          hasActiveLobby: false,
-          queryActiveLobbyMembership: async () => oldFound,
-          getMembershipSnapshot,
-          setMembershipSnapshot,
-        }),
+        assertCanInsertLobby(
+          guardDeps({
+            queryActiveLobbyMembership: async () => oldFound,
+          })
+        ),
       (err) => err.code === LOBBY_CREATE_ERROR.ALREADY_EXISTS
     );
   });
@@ -191,14 +210,13 @@ describe("lobbyCreateVagueC — assertCanInsertLobby", () => {
   it("query throw → unknown / CHECK_FAILED", async () => {
     await assert.rejects(
       () =>
-        assertCanInsertLobby({
-          hasActiveLobby: false,
-          queryActiveLobbyMembership: async () => {
-            throw new Error("net");
-          },
-          getMembershipSnapshot,
-          setMembershipSnapshot,
-        }),
+        assertCanInsertLobby(
+          guardDeps({
+            queryActiveLobbyMembership: async () => {
+              throw new Error("net");
+            },
+          })
+        ),
       (err) => err.code === LOBBY_CREATE_ERROR.CHECK_FAILED
     );
   });
@@ -206,7 +224,7 @@ describe("lobbyCreateVagueC — assertCanInsertLobby", () => {
 
 describe("lobbyCreateVagueC — canCreateLobby / staleness", () => {
   beforeEach(() => {
-    invalidateMembershipSnapshot();
+    resetMembershipSnapshotTestState(UID);
   });
 
   it("12 — snapshot null → faux", () => {
@@ -227,7 +245,7 @@ describe("lobbyCreateVagueC — canCreateLobby / staleness", () => {
       canCreateLobbyFromInputs({
         loggedIn: true,
         supabaseConfigured: true,
-        snapshot: { status: "unknown", checkedAt: Date.now() },
+        snapshot: { status: "unknown", userId: UID, checkedAt: Date.now() },
       }),
       false
     );
@@ -238,7 +256,12 @@ describe("lobbyCreateVagueC — canCreateLobby / staleness", () => {
       canCreateLobbyFromInputs({
         loggedIn: true,
         supabaseConfigured: true,
-        snapshot: { status: "found", checkedAt: Date.now(), membership: FOUND.membership },
+        snapshot: {
+          status: "found",
+          userId: UID,
+          checkedAt: Date.now(),
+          membership: FOUND.membership,
+        },
       }),
       false
     );
@@ -252,6 +275,7 @@ describe("lobbyCreateVagueC — canCreateLobby / staleness", () => {
         supabaseConfigured: true,
         snapshot: {
           status: "none",
+          userId: UID,
           checkedAt: now - MEMBERSHIP_SNAPSHOT_FRESH_MS - 1,
         },
         now,
@@ -275,7 +299,7 @@ describe("lobbyCreateVagueC — canCreateLobby / staleness", () => {
         hasActiveLobby: false,
         authReady: true,
         supabaseConfigured: true,
-        snapshot: { status: "none", checkedAt: now },
+        snapshot: { status: "none", userId: UID, checkedAt: now },
         now,
       }),
       true
@@ -300,7 +324,7 @@ describe("lobbyCreateVagueC — canCreateLobby / staleness", () => {
         loggedIn: true,
         supabaseConfigured: true,
         authReady: false,
-        snapshot: { status: "none", checkedAt: Date.now() },
+        snapshot: { status: "none", userId: UID, checkedAt: Date.now() },
       }),
       false
     );
@@ -374,14 +398,13 @@ describe("lobbyCreateVagueC — Home chrome + source", () => {
     mount.dispose();
     const shouldContinue = () => mount.isMounted() && mount.isCurrentMount();
 
-    setMembershipSnapshot(FOUND, "B");
+    setMembershipSnapshot(FOUND, "B", UID);
     if (shouldContinue()) {
-      await assertCanInsertLobby({
-        hasActiveLobby: false,
-        queryActiveLobbyMembership: async () => ({ status: "none" }),
-        getMembershipSnapshot,
-        setMembershipSnapshot,
-      });
+      await assertCanInsertLobby(
+        guardDeps({
+          queryActiveLobbyMembership: async () => ({ status: "none" }),
+        })
+      );
     }
     assert.equal(getMembershipSnapshot()?.status, "found");
   });
@@ -422,7 +445,12 @@ describe("lobbyCreateVagueC — Home chrome + source", () => {
 
 describe("lobbyCreateVagueC — decideMembershipSnapshotWrite source", () => {
   it("écrit avec source custom", () => {
-    const d = decideMembershipSnapshotWrite(null, { status: "none" }, "create-lobby-guard");
+    const d = decideMembershipSnapshotWrite(
+      null,
+      { status: "none" },
+      "create-lobby-guard",
+      sameIdentity(UID)
+    );
     assert.equal(d.action, "write");
     assert.equal(d.source, "create-lobby-guard");
   });

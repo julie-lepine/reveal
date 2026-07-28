@@ -18,7 +18,12 @@ import {
   getMembershipSnapshot,
   setMembershipSnapshot,
   invalidateMembershipSnapshot,
+  getMembershipSnapshotForUser,
 } from "../js/core/lobbyMembershipSnapshot.js";
+import {
+  resetMembershipSnapshotTestState,
+  clearMembershipSnapshotTestState,
+} from "./helpers/membershipSnapshotTest.js";
 
 const UID = "user-aaa-1111-2222-3333";
 const HOST_UID = UID;
@@ -275,7 +280,7 @@ describe("lobbyMembershipVagueA — queryActiveLobbyMembership (injectable)", ()
 
 describe("lobbyMembershipVagueA — snapshot", () => {
   beforeEach(() => {
-    invalidateMembershipSnapshot();
+    resetMembershipSnapshotTestState(UID);
   });
 
   it("R/W found", () => {
@@ -291,9 +296,11 @@ describe("lobbyMembershipVagueA — snapshot", () => {
         },
         extraCount: 0,
       },
-      "test"
+      "test",
+      UID
     );
     assert.equal(written.status, "found");
+    assert.equal(written.userId, UID);
     assert.equal(written.source, "test");
     assert.ok(typeof written.checkedAt === "number");
     const got = getMembershipSnapshot();
@@ -303,7 +310,7 @@ describe("lobbyMembershipVagueA — snapshot", () => {
   });
 
   it("unknown dans le snapshot", () => {
-    setMembershipSnapshot({ status: "unknown" }, "net-error");
+    setMembershipSnapshot({ status: "unknown" }, "net-error", UID);
     const got = getMembershipSnapshot();
     assert.equal(got.status, "unknown");
     assert.equal(got.membership, undefined);
@@ -312,18 +319,22 @@ describe("lobbyMembershipVagueA — snapshot", () => {
   });
 
   it("found → none retire membership + extraCount", () => {
-    setMembershipSnapshot({
-      status: "found",
-      membership: {
-        lobbyId: "L1",
-        code: "CODE",
-        lobbyStatus: "waiting",
-        gameId: null,
-        role: "member",
+    setMembershipSnapshot(
+      {
+        status: "found",
+        membership: {
+          lobbyId: "L1",
+          code: "CODE",
+          lobbyStatus: "waiting",
+          gameId: null,
+          role: "member",
+        },
+        extraCount: 2,
       },
-      extraCount: 2,
-    });
-    setMembershipSnapshot({ status: "none" }, "fresh-none");
+      "src",
+      UID
+    );
+    setMembershipSnapshot({ status: "none" }, "fresh-none", UID);
     const got = getMembershipSnapshot();
     assert.equal(got.status, "none");
     assert.equal(got.membership, undefined);
@@ -332,18 +343,22 @@ describe("lobbyMembershipVagueA — snapshot", () => {
   });
 
   it("found → unknown retire membership + extraCount", () => {
-    setMembershipSnapshot({
-      status: "found",
-      membership: {
-        lobbyId: "L1",
-        code: "CODE",
-        lobbyStatus: "waiting",
-        gameId: null,
-        role: "member",
+    setMembershipSnapshot(
+      {
+        status: "found",
+        membership: {
+          lobbyId: "L1",
+          code: "CODE",
+          lobbyStatus: "waiting",
+          gameId: null,
+          role: "member",
+        },
+        extraCount: 1,
       },
-      extraCount: 1,
-    });
-    setMembershipSnapshot({ status: "unknown" });
+      "src",
+      UID
+    );
+    setMembershipSnapshot({ status: "unknown" }, "src2", UID);
     const got = getMembershipSnapshot();
     assert.equal(got.status, "unknown");
     assert.equal(got.membership, undefined);
@@ -351,7 +366,7 @@ describe("lobbyMembershipVagueA — snapshot", () => {
   });
 
   it("invalidate → null", () => {
-    setMembershipSnapshot({ status: "none" });
+    setMembershipSnapshot({ status: "none" }, "src", UID);
     invalidateMembershipSnapshot();
     assert.equal(getMembershipSnapshot(), null);
   });
@@ -369,7 +384,8 @@ describe("lobbyMembershipVagueA — snapshot", () => {
         },
         extraCount: 0,
       },
-      "src-a"
+      "src-a",
+      UID
     );
 
     returned.status = "none";
@@ -387,6 +403,11 @@ describe("lobbyMembershipVagueA — snapshot", () => {
     assert.equal(again.membership.code, "ORIG");
     assert.equal(again.source, "src-a");
     assert.equal(again.extraCount, 0);
+  });
+
+  it("E1 — snapshot autre userId non exposé", () => {
+    setMembershipSnapshot({ status: "found", membership: { lobbyId: "L1", code: "X", lobbyStatus: null, gameId: null, role: "member" } }, "t", UID);
+    assert.equal(getMembershipSnapshotForUser("other-user"), null);
   });
 });
 

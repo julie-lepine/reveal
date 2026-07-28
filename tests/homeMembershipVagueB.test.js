@@ -9,6 +9,11 @@ import {
   decideMembershipSnapshotWrite,
 } from "../js/core/homeMembershipChrome.js";
 import {
+  UID_A,
+  sameIdentity,
+  resetMembershipSnapshotTestState,
+} from "./helpers/membershipSnapshotTest.js";
+import {
   getMembershipSnapshot,
   setMembershipSnapshot,
   invalidateMembershipSnapshot,
@@ -32,6 +37,7 @@ const FOUND_MEMBERSHIP = {
 
 const foundSnap = () => ({
   status: "found",
+  userId: UID_A,
   membership: { ...FOUND_MEMBERSHIP },
   extraCount: 0,
 });
@@ -120,8 +126,13 @@ describe("homeMembershipVagueB — machine d’états", () => {
   });
 
   it("6 — ancien found puis unknown → rétention (decide + chrome)", () => {
-    const decision = decideMembershipSnapshotWrite(foundSnap(), { status: "unknown" });
-    assert.equal(decision.action, "retain_found");
+    const decision = decideMembershipSnapshotWrite(
+      foundSnap(),
+      { status: "unknown" },
+      "membership-query",
+      sameIdentity()
+    );
+    assert.equal(decision.action, "retain_found_same_identity");
 
     const chrome = deriveHomeMembershipChrome({
       hasActiveLobby: false,
@@ -140,7 +151,12 @@ describe("homeMembershipVagueB — machine d’états", () => {
   });
 
   it("7 — ancien found puis none confirmé → disparition carte", () => {
-    const decision = decideMembershipSnapshotWrite(foundSnap(), { status: "none" });
+    const decision = decideMembershipSnapshotWrite(
+      foundSnap(),
+      { status: "none" },
+      "membership-query",
+      sameIdentity()
+    );
     assert.equal(decision.action, "write");
     assert.equal(decision.result.status, "none");
 
@@ -297,12 +313,12 @@ describe("homeMembershipVagueB — machine d’états", () => {
 
 describe("homeMembershipVagueB — snapshot + lifecycle", () => {
   beforeEach(() => {
-    invalidateMembershipSnapshot();
+    resetMembershipSnapshotTestState(UID_A);
     resetMountGenerationForTests();
   });
 
   it("10 — remount Home → snapshot mémoire réutilisé", () => {
-    setMembershipSnapshot(foundSnap(), "home-query");
+    setMembershipSnapshot(foundSnap(), "home-query", UID_A);
     const snap = getMembershipSnapshot();
     assert.equal(snap.status, "found");
     assert.equal(snap.membership.code, "ABCD");
@@ -321,23 +337,29 @@ describe("homeMembershipVagueB — snapshot + lifecycle", () => {
   });
 
   it("6b — apply politique : unknown ne wipe pas found en mémoire", () => {
-    setMembershipSnapshot(foundSnap(), "home-query");
-    const decision = decideMembershipSnapshotWrite(getMembershipSnapshot(), {
-      status: "unknown",
-    });
-    assert.equal(decision.action, "retain_found");
+    setMembershipSnapshot(foundSnap(), "home-query", UID_A);
+    const decision = decideMembershipSnapshotWrite(
+      getMembershipSnapshot(),
+      { status: "unknown" },
+      "home-query",
+      sameIdentity()
+    );
+    assert.equal(decision.action, "retain_found_same_identity");
     // Consommateur n’appelle pas set(unknown)
     assert.equal(getMembershipSnapshot().status, "found");
     assert.equal(getMembershipSnapshot().membership.code, "ABCD");
   });
 
   it("7b — none confirmé écrit et retire la carte", () => {
-    setMembershipSnapshot(foundSnap(), "home-query");
-    const decision = decideMembershipSnapshotWrite(getMembershipSnapshot(), {
-      status: "none",
-    });
+    setMembershipSnapshot(foundSnap(), "home-query", UID_A);
+    const decision = decideMembershipSnapshotWrite(
+      getMembershipSnapshot(),
+      { status: "none" },
+      "home-query",
+      sameIdentity()
+    );
     assert.equal(decision.action, "write");
-    setMembershipSnapshot(decision.result, decision.source);
+    setMembershipSnapshot(decision.result, decision.source, UID_A);
     assert.equal(getMembershipSnapshot().status, "none");
     assert.equal(getMembershipSnapshot().membership, undefined);
   });
@@ -354,7 +376,7 @@ describe("homeMembershipVagueB — snapshot + lifecycle", () => {
       extraCount: 0,
     };
     if (shouldContinue()) {
-      setMembershipSnapshot(lateResult, "stale");
+      setMembershipSnapshot(lateResult, "stale", UID_A);
     }
     assert.equal(getMembershipSnapshot(), null);
   });
@@ -365,17 +387,17 @@ describe("homeMembershipVagueB — snapshot + lifecycle", () => {
     advanceMountGeneration();
     const mount2 = createMountGuard();
 
-    setMembershipSnapshot({ status: "none" }, "mount2-early");
+    setMembershipSnapshot({ status: "none" }, "mount2-early", UID_A);
 
     // Résultat tardif mount1
     if (mount1.isMounted() && mount1.isCurrentMount()) {
-      setMembershipSnapshot(foundSnap(), "mount1-late");
+      setMembershipSnapshot(foundSnap(), "mount1-late", UID_A);
     }
     assert.equal(getMembershipSnapshot().status, "none");
 
     // Résultat mount2 courant
     if (mount2.isMounted() && mount2.isCurrentMount()) {
-      setMembershipSnapshot(foundSnap(), "mount2");
+      setMembershipSnapshot(foundSnap(), "mount2", UID_A);
     }
     assert.equal(getMembershipSnapshot().status, "found");
     assert.equal(getMembershipSnapshot().source, "mount2");
@@ -385,7 +407,7 @@ describe("homeMembershipVagueB — snapshot + lifecycle", () => {
   });
 
   it("unmount n’invalide pas le snapshot", () => {
-    setMembershipSnapshot(foundSnap(), "home-query");
+    setMembershipSnapshot(foundSnap(), "home-query", UID_A);
     const mount = createMountGuard();
     mount.dispose();
     // Home cleanup ne doit pas appeler invalidate — snapshot survit

@@ -19,6 +19,10 @@ import {
   canCreateLobbyFromInputs,
 } from "../js/core/lobbyCreateGuard.js";
 import {
+  resetMembershipSnapshotTestState,
+  sameIdentity,
+} from "./helpers/membershipSnapshotTest.js";
+import {
   getMembershipSnapshot,
   setMembershipSnapshot,
   invalidateMembershipSnapshot,
@@ -42,6 +46,7 @@ const HOST = {
   code: "HOST",
   role: "host",
 };
+const UID = "user-d-leave-1111-2222";
 
 function makeDeps(overrides = {}) {
   const calls = {
@@ -217,18 +222,23 @@ describe("lobbyServerLeaveVagueD — API", () => {
   });
 
   it("13 — succès + query none → snapshot none / Créer possible", () => {
-    setMembershipSnapshot({
-      status: "found",
-      membership: {
-        lobbyId: MEMBER.lobbyId,
-        code: MEMBER.code,
-        lobbyStatus: "waiting",
-        gameId: null,
-        role: "member",
+    resetMembershipSnapshotTestState(UID);
+    setMembershipSnapshot(
+      {
+        status: "found",
+        membership: {
+          lobbyId: MEMBER.lobbyId,
+          code: MEMBER.code,
+          lobbyStatus: "waiting",
+          gameId: null,
+          role: "member",
+        },
       },
-    });
+      "src",
+      UID
+    );
     invalidateMembershipSnapshot();
-    setMembershipSnapshot({ status: "none" }, "confirm");
+    setMembershipSnapshot({ status: "none" }, "confirm", UID);
     assert.equal(getMembershipSnapshot()?.status, "none");
     assert.equal(
       canCreateLobbyFromInputs({
@@ -243,6 +253,7 @@ describe("lobbyServerLeaveVagueD — API", () => {
   });
 
   it("14 — succès + query found → nouvelle membership affichée", () => {
+    resetMembershipSnapshotTestState(UID);
     invalidateMembershipSnapshot();
     const next = {
       status: "found",
@@ -255,7 +266,7 @@ describe("lobbyServerLeaveVagueD — API", () => {
       },
       extraCount: 0,
     };
-    setMembershipSnapshot(next, "confirm");
+    setMembershipSnapshot(next, "confirm", UID);
     const chrome = deriveHomeMembershipChrome({
       hasActiveLobby: false,
       snapshot: getMembershipSnapshot(),
@@ -297,7 +308,12 @@ describe("lobbyServerLeaveVagueD — API", () => {
   });
 
   it("17 — aucun faux none après mutation non confirmée", () => {
-    const decision = decideMembershipSnapshotWrite(null, { status: "unknown" });
+    const decision = decideMembershipSnapshotWrite(
+      null,
+      { status: "unknown" },
+      "confirm",
+      sameIdentity(UID)
+    );
     assert.equal(decision.action, "write");
     assert.notEqual(decision.result.status, "none");
     const chrome = deriveHomeMembershipChrome({
@@ -492,6 +508,7 @@ describe("lobbyServerLeaveVagueD — API", () => {
         supabaseConfigured: true,
         snapshot: {
           status: "found",
+          userId: UID,
           membership: {
             lobbyId: "L1",
             code: "X",
@@ -510,7 +527,7 @@ describe("lobbyServerLeaveVagueD — API", () => {
         hasActiveLobby: false,
         authReady: true,
         supabaseConfigured: true,
-        snapshot: { status: "none", checkedAt: Date.now() },
+        snapshot: { status: "none", userId: UID, checkedAt: Date.now() },
       }),
       true
     );
@@ -604,7 +621,7 @@ describe("lobbyServerLeaveVagueD — QA source", () => {
 
 describe("lobbyServerLeaveVagueD — concurrence documentée", () => {
   it("DELETE OK puis autre membership avant confirm → found pas none", () => {
-    // Cas : leave L1 OK → join/create ailleurs avant query → found L2
+    resetMembershipSnapshotTestState(UID);
     invalidateMembershipSnapshot();
     setMembershipSnapshot(
       {
@@ -617,7 +634,8 @@ describe("lobbyServerLeaveVagueD — concurrence documentée", () => {
           role: "member",
         },
       },
-      "confirm-after-race"
+      "confirm-after-race",
+      UID
     );
     assert.equal(getMembershipSnapshot()?.status, "found");
     assert.notEqual(getMembershipSnapshot()?.status, "none");

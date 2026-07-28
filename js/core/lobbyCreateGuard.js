@@ -1,18 +1,12 @@
 /**
  * Vague C — garde canonique de création de lobby (pure + décision injectable).
- *
- * SoT avant INSERT : `queryActiveLobbyMembership()` (Fetch runtime).
- * `found` / `unknown` → refus ; `none` → autorise la tentative d’INSERT.
- * Un snapshot `none` (même frais) ne suffit jamais seul : createLobby re-query toujours.
- *
- * Limite multi-onglets : deux clients peuvent obtenir `none` puis INSERT en parallèle ;
- * aucune contrainte SQL « un lobby vivant par user » n’est ajoutée ici (ticket serveur séparé).
- *
- * Politique snapshot found/unknown : même règle que Home (Vague B) — consommateur,
- * pas `setMembershipSnapshot` bas niveau.
+ * Vague E1 — décisions snapshot scoped par identité auth.
  */
+import {
+  getMembershipAuthGeneration,
+} from "./lobbyMembershipSnapshot.js";
 
-/** Fraîcheur chrome / canCreateLobby synchrone (pas une autorisation d’INSERT). */
+/** Fraîcheur chrome / canCreateLobby synchrone (pas une autorisation d'INSERT). */
 export const MEMBERSHIP_SNAPSHOT_FRESH_MS = 30_000;
 
 export const LOBBY_CREATE_ERROR = Object.freeze({
@@ -35,24 +29,63 @@ export function makeLobbyCreateError(code, message, extras = {}) {
 }
 
 /**
- * Décision d’écriture snapshot après query (Home / create).
- * `unknown` + ancien `found` → ne pas écraser.
+ * Décision d'écriture snapshot après query (Home / create).
  *
- * @param {{ status?: string, membership?: { code?: string } }|null|undefined} previous
+ * @param {{ status?: string, userId?: string, membership?: { code?: string } }|null|undefined} previous
  * @param {{ status?: string, membership?: object, extraCount?: number }|null|undefined} result
  * @param {string} [source]
+ * @param {{
+ *   queryUserId?: string|null,
+ *   currentUserId?: string|null,
+ *   queryAuthGeneration?: number|null,
+ *   currentAuthGeneration?: number|null,
+ * }|null|undefined} [identity]
  */
-export function decideMembershipSnapshotWrite(previous, result, source = "membership-query") {
+export function decideMembershipSnapshotWrite(
+  previous,
+  result,
+  source = "membership-query",
+  identity = null
+) {
   if (!result || typeof result !== "object" || !result.status) {
     return { action: "skip" };
   }
+
+  const queryUserId = identity?.queryUserId ?? null;
+  const currentUserId = identity?.currentUserId ?? null;
+  const queryAuthGeneration = identity?.queryAuthGeneration;
+  const currentAuthGeneration = identity?.currentAuthGeneration;
+
+  if (queryUserId && currentUserId && queryUserId !== currentUserId) {
+    return { action: "reject_stale_identity" };
+  }
+
+  if (
+    queryAuthGeneration != null &&
+    currentAuthGeneration != null &&
+    queryAuthGeneration !== currentAuthGeneration
+  ) {
+    return { action: "reject_stale_identity" };
+  }
+
+  const effectiveUserId = currentUserId || queryUserId;
+  if (!effectiveUserId) {
+    return { action: "skip" };
+  }
+
+  if (previous?.userId && previous.userId !== effectiveUserId) {
+    return { action: "reject_stale_identity" };
+  }
+
   if (
     result.status === "unknown" &&
     previous?.status === "found" &&
+    previous?.userId === effectiveUserId &&
     previous.membership?.code
   ) {
-    return { action: "retain_found" };
+    return { action: "retain_found_same_identity" };
   }
+
   return { action: "write", result, source };
 }
 
@@ -71,17 +104,7 @@ export function isMembershipSnapshotFresh(
 }
 
 /**
- * Dérivé synchrone — chrome / fast-fail. Pas une autorisation d’INSERT.
- *
- * @param {{
- *   loggedIn?: boolean,
- *   hasActiveLobby?: boolean,
- *   authReady?: boolean,
- *   supabaseConfigured?: boolean,
- *   snapshot?: { status?: string, checkedAt?: number }|null,
- *   now?: number,
- *   freshMs?: number,
- * }} input
+ * Dérivé synchrone — chrome / fast-fail. Pas une autorisation d'INSERT.
  */
 export function canCreateLobbyFromInputs(input = {}) {
   const loggedIn = Boolean(input.loggedIn);
@@ -94,18 +117,18 @@ export function canCreateLobbyFromInputs(input = {}) {
 
   if (!loggedIn || hasActiveLobby) return false;
 
-  // Offline : pas de snapshot membership — comportement historique.
   if (!supabaseConfigured) return true;
 
   if (!authReady) return false;
-  if (!snapshot || snapshot.status !== "none") return false;
+  if (!snapshot?.userId) return false;
+  if (snapshot.status !== "none") return false;
   if (!isMembershipSnapshotFresh(snapshot, now, freshMs)) return false;
   return true;
 }
 
 /**
- * Applique le résultat de query au snapshot (politique retain found).
- * @returns {"wrote"|"retained"|"skipped"}
+ * Applique le résultat de query au snapshot (politique retain found same identity).
+ * @returns {"wrote"|"retained"|"rejected"|"skipped"}
  */
 export function applyMembershipQueryToSnapshot(
   result,
@@ -113,16 +136,26 @@ export function applyMembershipQueryToSnapshot(
     getMembershipSnapshot,
     setMembershipSnapshot,
     source = "create-lobby-guard",
+    userId,
+    queryAuthGeneration,
   }
 ) {
+  const currentAuthGeneration = getMembershipAuthGeneration();
   const decision = decideMembershipSnapshotWrite(
     getMembershipSnapshot(),
     result,
-    source
+    source,
+    {
+      queryUserId: userId,
+      currentUserId: userId,
+      queryAuthGeneration,
+      currentAuthGeneration,
+    }
   );
-  if (decision.action === "retain_found") return "retained";
+  if (decision.action === "retain_found_same_identity") return "retained";
+  if (decision.action === "reject_stale_identity") return "rejected";
   if (decision.action === "write") {
-    setMembershipSnapshot(decision.result, decision.source);
+    setMembershipSnapshot(decision.result, decision.source, userId);
     return "wrote";
   }
   return "skipped";
@@ -130,15 +163,6 @@ export function applyMembershipQueryToSnapshot(
 
 /**
  * Garde avant INSERT — injectable / testable sans client Supabase CDN.
- *
- * @param {{
- *   hasActiveLobby?: boolean,
- *   activeLobbyCode?: string|null,
- *   queryActiveLobbyMembership: () => Promise<{ status: string, membership?: { code?: string } }>,
- *   getMembershipSnapshot: () => object|null,
- *   setMembershipSnapshot: (result: object, source?: string) => unknown,
- * }} deps
- * @returns {Promise<{ status: "none" }>}
  */
 export async function assertCanInsertLobby(deps) {
   if (deps.hasActiveLobby) {
@@ -157,6 +181,17 @@ export async function assertCanInsertLobby(deps) {
     );
   }
 
+  const queryUserId =
+    typeof deps.getSupabaseUserId === "function" ? deps.getSupabaseUserId() : deps.userId;
+  if (!queryUserId) {
+    throw makeLobbyCreateError(
+      LOBBY_CREATE_ERROR.CHECK_FAILED,
+      "Impossible de vérifier votre situation. Réessayez."
+    );
+  }
+
+  const queryAuthGeneration = getMembershipAuthGeneration();
+
   let result;
   try {
     result = await deps.queryActiveLobbyMembership();
@@ -168,10 +203,24 @@ export async function assertCanInsertLobby(deps) {
     result = { status: "unknown" };
   }
 
+  const currentUserId =
+    typeof deps.getSupabaseUserId === "function" ? deps.getSupabaseUserId() : queryUserId;
+  if (
+    currentUserId !== queryUserId ||
+    getMembershipAuthGeneration() !== queryAuthGeneration
+  ) {
+    throw makeLobbyCreateError(
+      LOBBY_CREATE_ERROR.CHECK_FAILED,
+      "Impossible de vérifier votre situation. Réessayez."
+    );
+  }
+
   applyMembershipQueryToSnapshot(result, {
     getMembershipSnapshot: deps.getMembershipSnapshot,
     setMembershipSnapshot: deps.setMembershipSnapshot,
     source: "create-lobby-guard",
+    userId: queryUserId,
+    queryAuthGeneration,
   });
 
   if (result.status === "found") {
@@ -184,7 +233,6 @@ export async function assertCanInsertLobby(deps) {
   }
 
   if (result.status !== "none") {
-    // unknown (ou statut inattendu) — jamais « déjà dans un lobby ».
     throw makeLobbyCreateError(
       LOBBY_CREATE_ERROR.CHECK_FAILED,
       "Impossible de vérifier votre situation. Réessayez."

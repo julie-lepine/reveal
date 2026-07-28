@@ -17,15 +17,15 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 
 | | Contenu |
 |--|---------|
-| **Fait (file prioritaire)** | Guess Lie · Sondages · ARCH-06 · Membership A–D · M-14a · ARCH-22 · Loader UI join · Pré-résolution entry screens · **UX-NAV-LOBBY (Vague A)** · **ARCH/BUG isolation lobby** · **SYN/ARCH join partiel B orpheline** — tous ✅ |
-| **Prochain** | **Membership Vague E** · QA terrain UX-NAV-LOBBY résidus |
+| **Fait (file prioritaire)** | Guess Lie · Sondages · ARCH-06 · Membership A–D · **Membership Vague E1** · M-14a · ARCH-22 · Loader UI join · Pré-résolution entry screens · **UX-NAV-LOBBY (Vague A)** · **ARCH/BUG isolation lobby** · **SYN/ARCH join partiel B orpheline** — tous ✅ |
+| **Prochain** | **Membership Vague E2–E5** (cache↔snapshot · leave polish · multi-onglets · SQL) · QA terrain UX-NAV-LOBBY résidus |
 | **Ensuite** | ARCH-07/08 · L-04 |
 
 **Décision produit (UX-NAV-LOBBY — actée + livrée Vague A)**  
 Une fois le lobby rejoint : **Accueil n’est plus dans le menu principal** (`resolveBottomNavTabs(inLobby)` remplace Home par Paramètres). Le hub soirée = **Jeux** (logo central) + Paramètres. Home reste la destination **après Quitter / Fermer** (`applyLeaveLobbyLocal` → `navigate("home", { reset: true })`).
 
 **Résidus**  
-votes optimistic (speedVote / …) · `results.js` mount · rename remote (I-09) · membership Vague E · Loader join interstitiel (non retenu) · pré-résolution B1 launch getter (non retenue) · chemins programmatiques vers `home` en lobby (deep link / recovery) · revert RPC reclaim anonymous
+votes optimistic (speedVote / …) · `results.js` mount · rename remote (I-09) · **Membership Vague E2–E5** · Loader join interstitiel (non retenu) · pré-résolution B1 launch getter (non retenue) · chemins programmatiques vers `home` en lobby (deep link / recovery) · revert RPC reclaim anonymous
 
 **Surveiller**  
 Clutch taps sous latence (SYN-26) · ready prep après Recommencer · starts sync hydrate → hub hors `mountLobby` · conflit pending join vs chrome Home membership
@@ -38,12 +38,13 @@ Clutch taps sous latence (SYN-26) · ready prep après Recommencer · starts syn
 
 | # | ID | Cause | Problème | Statut |
 |---|----|-------|----------|--------|
-| 1 | **Membership Vague E** | 3 | Contradiction cache + snapshot `none` · logout/snapshot · multi-onglets INSERT | Ouvert |
+| 1 | **Membership Vague E2–E5** | 3 | Contradiction cache + snapshot `none` · multi-onglets INSERT · leave polish · atomicité dissolve | Ouvert |
 
 ### Clôturés récents (2026-07-28)
 
 | ID | Résumé | Statut |
 |----|--------|--------|
+| **Membership Vague E1** | Snapshot scoped userId + gen auth · reject stale queries · chrome signed-out | ✅ QA 1119/1119 |
 | **UX-NAV-LOBBY** | Home hors menu en lobby · Settings unifié · leave volontaire | ✅ Vague A |
 | **ARCH/BUG boundary** | Isolation lobby / résidu partie après changement | ✅ QA |
 | **SYN/ARCH join partiel** | Compensation membership B orpheline · guestMembership · pending Home | ✅ QA 1097/1097 |
@@ -159,7 +160,19 @@ Clutch taps sous latence (SYN-26) · ready prep après Recommencer · starts syn
 | **Où** | `lobbyMembership*.js` · `lobbyCreateGuard.js` · `lobbyServerLeave.js` · `homeMembershipChrome.js` · `home.js` · `supabaseLobby.js` (by-id) |
 | **Preuve** | `tests/lobbyMembershipVagueA.test.js` · `homeMembershipVagueB.test.js` · `lobbyCreateVagueC.test.js` · `lobbyServerLeaveVagueD.test.js` |
 | **QA** | ✅ A–D validé 2026-07-27 (D terrain OK) |
-| **Résidus → E** | Contradiction cache actif + snapshot `none` · logout / snapshot · multi-onglets INSERT · flash UI invalidate→confirm · atomicité dissolve héritée |
+| **Résidus → E2–E5** | Contradiction cache actif + snapshot `none` · multi-onglets INSERT · flash UI invalidate→confirm · atomicité dissolve héritée · **logout/snapshot → E1 ✅** |
+
+### Cause 3 — Membership Vague E1 (snapshot scoped identité auth) ✅ QA
+
+| | |
+|--|--|
+| **Symptôme** | Logout A → login B : snapshot / chrome Resume / garde création de A survivait ou influençait B |
+| **Fix** | `userId` + `authGeneration` sur snapshot · lectures scoped (`getMembershipSnapshotForUser`) · `handleMembershipAuthIdentityTransition` central dans `syncSessionToState` · `retain_found_same_identity` · rejet queries tardives cross-user |
+| **Hors scope E1** | Sync cache actif ↔ snapshot (E2) · multi-onglets (E4) · leave polish (E3) · SQL atomicity (E5) |
+| **Où** | `lobbyMembershipSnapshot.js` · `lobbyCreateGuard.js` · `supabaseAuth.js` · `home.js` · `lobby.js` · `auth.js` |
+| **Preuve** | `tests/lobbyMembershipVagueE1.test.js` · suites A/B/C/D adaptées · **1119/1119** |
+| **QA** | ✅ E1 validé 2026-07-28 |
+| **Ne pas rouvrir** | Sans régression logout→login autre compte · snapshot cross-user · retain_found cross-user |
 
 ### Cause 3 — M-14a / SYN-14 TierNight topic / routing ✅ QA
 
@@ -411,7 +424,7 @@ Clutch conserve son départage temporel (règle produit explicite inchangée).
 |-------|-------------------|
 | 1 | C-01/02, R-01–05, M-05a |
 | 2 | M-01, P-03, M-02a, S-02 |
-| 3 | I-03/04, SYN-03, M-13, M-02b, ARCH-02, SYN-29, I-PG-01, ready stale Recommencer, UX-CLUTCH-01 · **M-15** · **L-05↻** · **Membership A–D** · **M-14a / SYN-14** · **ARCH/BUG boundary** · **SYN/ARCH join partiel** |
+| 3 | I-03/04, SYN-03, M-13, M-02b, ARCH-02, SYN-29, I-PG-01, ready stale Recommencer, UX-CLUTCH-01 · **M-15** · **L-05↻** · **Membership A–D** · **Membership Vague E1** · **M-14a / SYN-14** · **ARCH/BUG boundary** · **SYN/ARCH join partiel** |
 | 4 | I-01/02/08, M-03b, M-06a/b, L-01, ARCH-03/03b, UX-VIBE-01, **Guess Lie** |
 | 5 | T-01/02, T-03↻, M-07, M-08, P-02, SYN-28, I-PG-01, ARCH-04, UX-VIBE-02 · **Pré-résolution `get*EntryScreen`** (Vague A ; B1 non retenue) · **UX-NAV-LOBBY Vague A** |
 | 6 | I-05, SYN-13b↻, SYN-25, **SYN-05 / ARCH-18** ✅, **ARCH-06** ✅ (Mode A/B/C · Traître V2 · Lobby IIFE · SYN-12) |
@@ -419,7 +432,7 @@ Clutch conserve son départage temporel (règle produit explicite inchangée).
 | 8 | I-06, P-02, ARCH-09, I-09 / SYN-06, SYN-15 / SYN-16 · **M-15** |
 | 9 | SYN-12 / M-05b |
 | 10 | **SYN-05 / ARCH-18** ✅ QA (Fil Rouge app ; SQL historique hors scope) |
-| 11 | L-02, ARCH-21↻, M-12 (cleanup `#join=`, pas auto-join), UX-HIST-01, UX-RESUME-BANNER, UX-VIBE-01/02, **FEATURE-LOBBY-POLL** · **Membership A–D** · **ARCH-22** · **Loader UI join** · **UX-NAV-LOBBY Vague A** · **SYN/ARCH join partiel** |
+| 11 | L-02, ARCH-21↻, M-12 (cleanup `#join=`, pas auto-join), UX-HIST-01, UX-RESUME-BANNER, UX-VIBE-01/02, **FEATURE-LOBBY-POLL** · **Membership A–D** · **Membership Vague E1** · **ARCH-22** · **Loader UI join** · **UX-NAV-LOBBY Vague A** · **SYN/ARCH join partiel** |
 
 ---
 
@@ -435,7 +448,7 @@ Hors tickets prioritaires — à traiter si opportunité / régression :
 - Policy debug lobby à purger côté Supabase si encore présente
 - Optimistic votes hors Hot Take / VibeCheck / Dilemma (speedVote / … — même trou que T-05)
 - Starts sync hydrate → hub hors `mountLobby` (résidu SYN-12, hors idempotence globale)
-- Membership Vague E : contradiction cache+`none` · logout/snapshot · multi-onglets INSERT · flash UI post-leave
+- Membership Vague **E2–E5** : contradiction cache+`none` · multi-onglets INSERT · flash UI post-leave · atomicité dissolve — **E1 logout/snapshot ✅**
 - UX-NAV-LOBBY résidus : `navigate("home")` programmatique en lobby · piles `navStack` legacy avec `"home"` · QA terrain sortie/settings
 - Join partiel : revert RPC reclaim anonymous · orphelin création lobby · E2E Supabase
 - Homogénéisation launch hôte via getter post-mark (pré-résolution B1) — **étudiée, non retenue** (ROI insuffisant)
@@ -443,4 +456,4 @@ Hors tickets prioritaires — à traiter si opportunité / régression :
 
 ---
 
-*Suivi vivant · Dernière MAJ : 2026-07-28 — UX-NAV-LOBBY Vague A livrée · SYN/ARCH join partiel · ARCH/BUG boundary · prochain = Membership Vague E*
+*Suivi vivant · Dernière MAJ : 2026-07-28 — **Membership Vague E1 ✅** · UX-NAV-LOBBY Vague A · SYN/ARCH join partiel · ARCH/BUG boundary · prochain = Membership Vague E2*

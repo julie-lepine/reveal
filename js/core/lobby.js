@@ -838,6 +838,7 @@ export async function createLobby() {
     await assertCanInsertLobby({
       hasActiveLobby: false,
       queryActiveLobbyMembership,
+      getSupabaseUserId,
       getMembershipSnapshot,
       setMembershipSnapshot,
     });
