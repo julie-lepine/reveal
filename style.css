@@ -3036,6 +3036,10 @@ select.field-input option{
   margin:0 0 14px;
 }
 
+#btn-delete-account{
+  margin-bottom:14px;
+}
+
 .settings-tabs{
   --settings-tab-index:0;
   --settings-tabs-pad:3px;
