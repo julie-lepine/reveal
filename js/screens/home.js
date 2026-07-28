@@ -46,6 +46,7 @@ import {
   invalidateMembershipSnapshot,
   getMembershipAuthGeneration,
 } from "../core/lobbyMembershipSnapshot.js";
+import { commitMembershipRemoved } from "../core/lobbyMembershipAlign.js";
 import {
   deriveHomeMembershipChrome,
   decideMembershipSnapshotWrite,
@@ -1310,8 +1311,11 @@ export function mountHome(app) {
         });
         if (!shouldContinue()) return;
 
-        // Invalider l'ancien found avant confirmation — évite retain_found trompeur.
-        invalidateMembershipSnapshot();
+        // Retirer le found B avant confirmation — évite retain_found trompeur (Vague D).
+        commitMembershipRemoved({
+          userId: getSupabaseUserId(),
+          lobbyId: membership.lobbyId,
+        });
         retainedFoundDespiteUnknown = false;
         leaveConfirmationPending = false;
 

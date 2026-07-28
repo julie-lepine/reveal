@@ -540,7 +540,7 @@ describe("lobbyServerLeaveVagueD — API", () => {
       home.indexOf('if (e.target.closest("#btn-leave-lobby"))')
     );
     assert.match(block, /leaveLobbyMembershipFromServer/);
-    assert.match(block, /invalidateMembershipSnapshot/);
+    assert.match(block, /commitMembershipRemoved/);
     assert.match(block, /queryActiveLobbyMembership/);
   });
 });

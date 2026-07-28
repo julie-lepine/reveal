@@ -14,6 +14,9 @@ import { getState } from "./state.js";
  *   lobbyStatus: string|null,
  *   gameId: string|null,
  *   role: "host"|"member",
+ *   membershipId?: string,
+ *   hostId?: string|null,
+ *   joinedAt?: string|null,
  * }} ActiveLobbyMembership
  *
  * @typedef {{
@@ -35,13 +38,18 @@ let membershipAuthGeneration = 0;
 
 function shallowMembership(m) {
   if (!m || typeof m !== "object") return undefined;
-  return {
+  /** @type {ActiveLobbyMembership} */
+  const out = {
     lobbyId: m.lobbyId,
     code: m.code,
     lobbyStatus: m.lobbyStatus ?? null,
     gameId: m.gameId ?? null,
     role: m.role,
   };
+  if (m.membershipId) out.membershipId = m.membershipId;
+  if (m.hostId != null) out.hostId = m.hostId;
+  if (m.joinedAt != null) out.joinedAt = m.joinedAt;
+  return out;
 }
 
 /**

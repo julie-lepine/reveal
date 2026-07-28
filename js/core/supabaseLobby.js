@@ -20,6 +20,10 @@ import {
   clearCachedGameSessionUnlessForLobby,
 } from "./gameSync.js";
 import { resolveSessionRestoreOutcome } from "./lobbyBoundary.js";
+import {
+  alignMembershipSnapshotAfterLobbyHydration,
+  MEMBERSHIP_HYDRATION_SOURCE,
+} from "./lobbyMembershipAlign.js";
 import { captureLobbyRuntimeEpoch, isLobbyRuntimeEpochCurrent } from "./lobbyRuntime.js";
 import {
   createLobbyJoinEffects,
@@ -675,6 +679,11 @@ export async function recoverLobbyFromServer({ withMessages = false } = {}) {
     currentUserId: getSupabaseUserId(),
   });
   applyLobbyToState(bundle, { persistGuestMembership: canUseGuestMembershipRecovery() });
+  alignMembershipSnapshotAfterLobbyHydration({
+    bundle,
+    userId: getSupabaseUserId(),
+    source: MEMBERSHIP_HYDRATION_SOURCE.RECOVER_CONFIRMED,
+  });
   startLobbyPresenceSync();
   await hydrateSessionThenStartSync(lobbyId, { afterReclaim: reclaimResult.reclaimed });
   return { ok: true, code: bundle.code, lobbyId: bundle.id };
@@ -1451,6 +1460,11 @@ console.log("[DEBUG MEMBER INSERT CREATE]", {
 
   const bundle = await fetchLobbyBundle(lobby.id, { withMessages: true, currentUserId: userId });
   applyLobbyToState(bundle, { persistGuestMembership: getState().user?.isGuest === true });
+  alignMembershipSnapshotAfterLobbyHydration({
+    bundle,
+    userId,
+    source: MEMBERSHIP_HYDRATION_SOURCE.CREATE_CONFIRMED,
+  });
   await hydrateSessionThenStartSync(lobby.id);
 
   const gs = { ...getState().globalStats };
@@ -1620,6 +1634,11 @@ export async function refreshLobbyFromSupabase({ withMessages = false } = {}) {
   try {
     const bundle = await fetchLobbyBundle(lobbyId, { withMessages });
     applyLobbyToState(bundle);
+    alignMembershipSnapshotAfterLobbyHydration({
+      bundle,
+      userId: getSupabaseUserId(),
+      source: MEMBERSHIP_HYDRATION_SOURCE.REFRESH_CONFIRMED,
+    });
     return true;
   } catch (e) {
     return handlePossibleLobbyGone(lobbyId, e);

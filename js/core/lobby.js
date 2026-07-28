@@ -44,6 +44,10 @@ import {
 } from "./supabaseLobby.js";
 import { queryActiveLobbyMembership } from "./lobbyMembershipFetch.js";
 import {
+  alignMembershipSnapshotAfterLobbyHydration,
+  MEMBERSHIP_HYDRATION_SOURCE,
+} from "./lobbyMembershipAlign.js";
+import {
   getMembershipSnapshot,
   setMembershipSnapshot,
 } from "./lobbyMembershipSnapshot.js";
@@ -469,6 +473,26 @@ export function hasActiveLobby() {
     }
   }
   return true;
+}
+
+/** E2 — promote snapshot après join Supabase finalisé (pas rollback / compensation). */
+function promoteMembershipSnapshotAfterJoinConfirmed() {
+  const userId = getSupabaseUserId();
+  const lobby = getLobby();
+  if (!userId || !lobby?.id || !lobby?.code) return;
+
+  alignMembershipSnapshotAfterLobbyHydration({
+    bundle: {
+      id: lobby.id,
+      code: lobby.code,
+      status: lobby.status,
+      gameId: lobby.gameId,
+      hostId: lobby.hostId,
+      participants: lobby.participants,
+    },
+    userId,
+    source: MEMBERSHIP_HYDRATION_SOURCE.JOIN_CONFIRMED,
+  });
 }
 
 /** Tente de restaurer le lobby depuis Supabase (compte connecté ou invité via membership). */
@@ -906,6 +930,7 @@ export async function joinLobby(code) {
       if (fromActiveLobby) {
         commitLobbyJoinTransition();
       }
+      promoteMembershipSnapshotAfterJoinConfirmed();
       return res;
     }
 

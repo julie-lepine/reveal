@@ -28,6 +28,7 @@ import { stopMultiplayerSync } from "./gameSync.js";
 import { normalizeGuestEmoji } from "../../data/profileEmojis.js";
 import { getMembershipSnapshot } from "./lobbyMembershipSnapshot.js";
 import { canCreateLobbyFromInputs } from "./lobbyCreateGuard.js";
+import { hasActiveLobby } from "./lobby.js";
 
 export function isLoggedIn() {
   const user = getState().user;
@@ -52,11 +53,7 @@ export function canPlay() {
 }
 
 export function canCreateLobby() {
-  const state = getState();
-  const hasJoinedLobby = Boolean(
-    state.inLobby && state.lobby?.code && (state.lobby.id || state.lobby.participants?.length)
-  );
-  if (!isLoggedIn() || hasJoinedLobby) return false;
+  if (!isLoggedIn() || hasActiveLobby()) return false;
 
   // Offline / demo : pas de snapshot membership — inchangé.
   if (!isSupabaseConfigured()) return true;
