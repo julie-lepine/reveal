@@ -832,9 +832,9 @@ export function mountHome(app) {
 
         ${homeStatsHtml()}
 
-        <p class="home-reset-wrap">
-          <button type="button" class="btn-link home-reset-link" id="btn-reset-app">Problème d'affichage ? Réinitialiser l'app</button>
-        </p>
+        <div class="app-reset-bar">
+          <button type="button" class="btn-link app-reset-bar__link" id="btn-reset-app">Problème d'affichage ? Réinitialiser l'app</button>
+        </div>
       `,
     });
   }

@@ -448,9 +448,9 @@ export function mountLobby(app) {
 
         <p class="lobby-footer">${ready} / ${total} prêts · ${lobbyFooterHint(ready, total)}</p>
 
-        <p class="lobby-reset-wrap">
-          <button type="button" class="btn-link lobby-reset-link" id="btn-lobby-reset-app">Blocage ? Réinitialiser l'app</button>
-        </p>
+        <div class="app-reset-bar">
+          <button type="button" class="btn-link app-reset-bar__link" id="btn-lobby-reset-app">Blocage ? Réinitialiser l'app</button>
+        </div>
       `,
     });
 

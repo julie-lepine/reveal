@@ -89,6 +89,9 @@ describe("UX-NAV-SETTINGS — contenu écran", () => {
     assert.match(settings, /Pseudo/);
     assert.match(settings, /Mot de passe/);
     assert.match(settings, /Aide/);
+    assert.match(settings, /Dépannage/);
+    assert.match(settings, /btn-settings-reset-app/);
+    assert.match(settings, /resetAppToCleanHome/);
     assert.match(settings, /Légal/);
     assert.match(settings, /btn-save-name/);
     assert.match(settings, /updateProfileEmoji/);

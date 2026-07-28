@@ -18,11 +18,12 @@ import {
   canManageLobbyRoster,
   kickLobbyMember,
   isVoluntaryLeaveInFlight,
+  resetAppToCleanHome,
 } from "../core/lobby.js";
 import { isLobbyHost } from "../core/gameSync.js";
 import { isSupabaseConfigured } from "../core/supabaseClient.js";
 import { onLobbyBundleUpdated } from "../core/supabaseLobby.js";
-import { showLobbyPlayersManageDialog } from "../core/dialog.js";
+import { showAppConfirm, showLobbyPlayersManageDialog } from "../core/dialog.js";
 import { MAX_PLAYERS } from "../config/lobbyLifecycle.js";
 import { lobbySettingsActionsForRole } from "../core/partySettingsMenu.js";
 import { navigate, getCurrentScreen } from "../core/router.js";
@@ -241,6 +242,14 @@ function supportPanelHtml() {
       </div>
 
       <div class="card settings-section">
+        <h2 class="settings-section__title">Dépannage</h2>
+        <p class="hint settings-section__hint">
+          Affichage bloqué ou session coincée ? Efface les données locales et recharge l'app.
+        </p>
+        <button type="button" class="btn btn-secondary btn--spaced" id="btn-settings-reset-app">Problème d'affichage ? Réinitialiser l'app</button>
+      </div>
+
+      <div class="card settings-section">
         <h2 class="settings-section__title">Légal</h2>
         <p class="hint settings-section__hint">Politique de confidentialité (RGPD, AdMob, Supabase).</p>
         <p class="hint settings-section__hint">
@@ -358,6 +367,21 @@ export function mountSettings(app) {
   function bindSupportEvents() {
     app.querySelector("#btn-feedback-dm")?.addEventListener("click", () => {
       openInstagramProfile();
+    });
+
+    app.querySelector("#btn-settings-reset-app")?.addEventListener("click", async () => {
+      const ok = await showAppConfirm(
+        "Ta session et les données locales seront effacées. Tu pourras rejoindre une partie à nouveau.",
+        {
+          title: "Réinitialiser REVEAL",
+          confirmLabel: "Réinitialiser",
+          cancelLabel: "Annuler",
+          icon: "🔄",
+        }
+      );
+      if (!mount.isMounted()) return;
+      if (!ok) return;
+      await resetAppToCleanHome();
     });
 
     const openDeletionPage = (e) => {

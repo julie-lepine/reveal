@@ -2948,6 +2948,31 @@ select.field-input option{
   max-width:100%;
 }
 
+.app-reset-bar{
+  margin-top:20px;
+  padding-top:16px;
+  border-top:1px solid rgba(255,255,255,.08);
+  display:flex;
+  justify-content:center;
+}
+
+.app-reset-bar__link{
+  max-width:100%;
+  padding:4px 8px;
+  font-size:12px;
+  font-weight:500;
+  line-height:1.35;
+  color:rgba(255,255,255,.32);
+  text-align:center;
+  text-wrap:balance;
+}
+
+@media (hover:hover) and (pointer:fine){
+  .app-reset-bar__link:hover{
+    color:rgba(255,255,255,.55);
+  }
+}
+
 .game-resume{
   margin-top:12px;
   text-align:center;
@@ -3654,17 +3679,6 @@ button.emoji-picker-preview__avatar:active{
   font-size:12px;
   color:rgba(255,255,255,.35);
   margin-top:16px;
-}
-
-.lobby-reset-wrap{
-  text-align:center;
-  margin-top:12px;
-  margin-bottom:8px;
-}
-
-.lobby-reset-link{
-  font-size:12px;
-  color:rgba(255,255,255,.4);
 }
 
 /* ─── Récap soirée (menu jeux) ─── */
