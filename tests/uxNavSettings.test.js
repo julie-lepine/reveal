@@ -56,12 +56,14 @@ describe("UX-NAV-SETTINGS — navigation", () => {
 });
 
 describe("UX-NAV-SETTINGS — game-select sans doublon", () => {
-  it("n’affiche plus Profil & paramètres ni Paramètres party", () => {
+  it("n’affiche plus Profil & paramètres ni Paramètres party ni card feedback", () => {
     const gs = src("js/screens/gameSelect.js");
     assert.equal(gs.includes("Profil & paramètres"), false);
     assert.equal(gs.includes("data-party-settings"), false);
     assert.equal(gs.includes("openPartySettings"), false);
     assert.equal(gs.includes("partySettingsButtonHtml"), false);
+    assert.equal(gs.includes("feedbackPromptCardHtml"), false);
+    assert.equal(gs.includes("bindFeedbackPrompt"), false);
     assert.match(gs, /Reprendre l'animation|data-claim-host/);
   });
 });

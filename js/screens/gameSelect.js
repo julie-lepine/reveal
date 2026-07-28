@@ -26,7 +26,6 @@ import { getLobby, hasActiveLobby } from "../core/lobby.js";
 import { clientMayOfferHostClaim } from "../core/hostClaimOffer.js";
 import { getLastGame, getState } from "../core/state.js";
 import { arch03LiveLog } from "../core/presenceUiLive.js";
-import { bindFeedbackPrompt, feedbackPromptCardHtml } from "../core/feedbackUi.js";
 import {
   bindGameResumeBanner,
   gameResumeBannerHtml,
@@ -406,8 +405,6 @@ export function mountGameSelect(app) {
 
       ${gameGridSection("🎮 Jeux disponibles", GAMES_AVAILABLE)}
       ${gameGridSection("🔜 Prochainement", GAMES_COMING_SOON)}
-
-      ${feedbackPromptCardHtml()}
     `,
     });
 
@@ -417,7 +414,6 @@ export function mountGameSelect(app) {
     }
 
     bindGameSelectEvents();
-    bindFeedbackPrompt(app);
   }
 
   scheduleRender(true);
