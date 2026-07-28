@@ -32,6 +32,15 @@ import {
 } from "../core/lobby.js";
 import { queryActiveLobbyMembership } from "../core/lobbyMembershipFetch.js";
 import {
+  retryPendingLobbyMembershipCompensation,
+  getPendingLobbyMembershipCompensation,
+  shouldBlockMembershipQueryForPending,
+  buildMembershipReconciliationConflict,
+  resolvePendingMembershipByLeave,
+  clearPendingLobbyMembershipCompensationIfMatches,
+} from "../core/lobbyMembershipCompensation.js";
+import { deleteOwnLobbyMembershipById } from "../core/supabaseLobby.js";
+import {
   getMembershipSnapshot,
   setMembershipSnapshot,
   invalidateMembershipSnapshot,
@@ -286,6 +295,21 @@ function homeRenderSnapshot(
 function homeMembershipActionsHtml(chrome) {
   if (!chrome) return "";
 
+  if (chrome.state === "membership_reconciliation_required") {
+    const code = chrome.membershipCode || "?";
+    return `
+          <div class="card card--highlight home-resume-card" role="status">
+            <p class="hint">${escapeHtml(chrome.primaryMessage || `Une tentative de connexion au lobby ${code} n'a pas été finalisée.`)}</p>
+            ${
+              chrome.errorMessage
+                ? `<p class="auth-error" role="alert">${escapeHtml(chrome.errorMessage)}</p>`
+                : ""
+            }
+            <button type="button" class="btn btn-secondary btn--spaced" id="btn-pending-leave-remote">Quitter ${escapeHtml(code)}</button>
+            <button type="button" class="btn btn-accent" id="btn-pending-join-remote">Rejoindre ${escapeHtml(code)}</button>
+          </div>`;
+  }
+
   if (chrome.state === "cached_active") {
     const code = getLobby()?.code || chrome.membershipCode || "";
     return `
@@ -402,10 +426,12 @@ export function mountHome(app) {
   let retainedFoundDespiteUnknown = false;
   /** Anti double-clic Créer (pipeline unique). */
   let createLobbyInFlight = false;
-  /** Vague D — leave/dissolve server-only en cours. */
+  /** Leave/dissolve server-only en cours. */
   let serverLeaveInFlight = false;
   /** Mutation leave OK mais confirmation query unknown. */
   let leaveConfirmationPending = false;
+  /** Conflit local A / remote B non résolu (pending compensation). */
+  let membershipReconciliationConflict = null;
 
   function currentMembershipChrome() {
     return deriveHomeMembershipChrome({
@@ -422,10 +448,27 @@ export function mountHome(app) {
       activeLobbyCode: getLobby()?.code || null,
       leaveConfirmationPending,
       serverLeaveInFlight,
+      membershipReconciliationConflict,
     });
   }
 
   function applyMembershipQueryResult(result) {
+    let pending = getPendingLobbyMembershipCompensation();
+    if (pending && result?.status === "none") {
+      clearPendingLobbyMembershipCompensationIfMatches(pending.lobbyId);
+      membershipReconciliationConflict = null;
+      pending = null;
+    }
+    const localLobbyId = getLobby()?.id || null;
+    if (shouldBlockMembershipQueryForPending(pending, result, { localLobbyId })) {
+      membershipReconciliationConflict = buildMembershipReconciliationConflict(
+        pending,
+        result,
+        localLobbyId
+      );
+      return;
+    }
+    membershipReconciliationConflict = null;
     const decision = decideMembershipSnapshotWrite(
       getMembershipSnapshot(),
       result,
@@ -463,6 +506,15 @@ export function mountHome(app) {
       if (!isAuthReadyResolved()) {
         await authReady;
         if (!shouldContinue()) return;
+      }
+      if (isSupabaseConfigured()) {
+        await retryPendingLobbyMembershipCompensation({
+          deleteOwnLobbyMembershipById,
+        });
+        if (!shouldContinue()) return;
+        if (!getPendingLobbyMembershipCompensation()) {
+          membershipReconciliationConflict = null;
+        }
       }
       const result = await queryActiveLobbyMembership();
       if (!shouldContinue()) return;
@@ -1100,6 +1152,68 @@ export function mountHome(app) {
         });
         if (!shouldContinue()) return;
         scheduleRender(true);
+      } finally {
+        if (btn?.isConnected) btn.disabled = false;
+      }
+      return;
+    }
+
+    if (e.target.closest("#btn-pending-leave-remote")) {
+      const btn = e.target.closest("#btn-pending-leave-remote");
+      btn.disabled = true;
+      try {
+        const res = await resolvePendingMembershipByLeave({
+          deleteOwnLobbyMembershipById,
+        });
+        if (!shouldContinue()) return;
+        if (!res.ok) {
+          await showAppAlert(res.error || "Impossible de quitter ce lobby.", {
+            title: "Connexion inachevée",
+            icon: "⚠️",
+          });
+          if (!shouldContinue()) return;
+          scheduleRender(true);
+          return;
+        }
+        membershipReconciliationConflict = null;
+        await resolveHomeMembership({ force: true });
+      } finally {
+        if (btn?.isConnected) btn.disabled = false;
+      }
+      return;
+    }
+
+    if (e.target.closest("#btn-pending-join-remote")) {
+      const btn = e.target.closest("#btn-pending-join-remote");
+      btn.disabled = true;
+      try {
+        const code =
+          membershipReconciliationConflict?.remoteCode ||
+          currentMembershipChrome().membershipCode ||
+          "";
+        if (!code) {
+          await showAppAlert("Code lobby introuvable.", {
+            title: "Connexion inachevée",
+            icon: "⚠️",
+          });
+          return;
+        }
+        const joinRes = await joinLobby(code);
+        if (!shouldContinue()) return;
+        if (!joinRes?.ok) {
+          await showAppAlert(joinRes.error || "Impossible de rejoindre ce lobby.", {
+            title: "Connexion inachevée",
+            icon: "⚠️",
+          });
+          if (!shouldContinue()) return;
+          scheduleRender(true);
+          return;
+        }
+        clearPendingLobbyMembershipCompensationIfMatches(
+          membershipReconciliationConflict?.remoteLobbyId
+        );
+        membershipReconciliationConflict = null;
+        await navigateAfterLobbyJoin(joinRes.code);
       } finally {
         if (btn?.isConnected) btn.disabled = false;
       }

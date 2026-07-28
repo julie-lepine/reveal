@@ -87,7 +87,7 @@ describe("fil rouge vague 3 — CSS / message / docs", () => {
   it("JS runtime actif : pas de Fil Rouge hors stripLegacyFilRougeKeys", () => {
     const offenders = [];
     for (const file of walkJsFiles(join(root, "js"))) {
-      let src = readFileSync(file, "utf8");
+      let src = readFileSync(file, "utf8").replace(/\r\n/g, "\n");
       const norm = file.replace(/\\/g, "/");
       if (norm.endsWith("js/core/state.js")) {
         src = src

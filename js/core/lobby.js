@@ -101,6 +101,13 @@ import {
   shouldReconcileLobbyReadyFromServer,
 } from "./lobbyReadyMount.js";
 import { MAX_PLAYERS } from "../config/lobbyLifecycle.js";
+import { newOfflineLobbyInstanceId } from "./lobbyBoundary.js";
+import { bumpLobbyRuntimeGeneration } from "./lobbyRuntime.js";
+import {
+  createLobbyJoinEffects,
+  markLobbyJoinFinalized,
+} from "./lobbyJoinEffects.js";
+import { finalizeFailedJoinAttempt } from "./lobbyJoinFinalize.js";
 
 const GUEST_RECOVERY_CAPTCHA_KEY = "reveal-guest-recovery-captcha-required";
 
@@ -176,13 +183,119 @@ function applyLeaveLobbyLocal({ wasGuest, navigateAway }) {
       /* storage indisponible */
     }
   }
-  resetEveningState();
-  clearCachedGameSession();
+  performLobbyBoundaryTeardown();
   clearGuestMembership();
   saveStatePatch(patch);
   if (navigateAway) {
     navigate("home", { reset: true });
   }
+}
+
+/**
+ * Teardown local canonique à chaque frontière de lobby (commit).
+ * Ordre : invalider génération → arrêt sync → cache → reset soirée.
+ * lastGame : scope lobby (state.js) — non effacé ici.
+ */
+export function performLobbyBoundaryTeardown() {
+  bumpLobbyRuntimeGeneration();
+  stopMultiplayerSync();
+  stopLobbyPresenceSync();
+  clearCachedGameSession();
+  resetEveningState();
+}
+
+const EVENING_ROLLBACK_KEYS = [
+  "scores",
+  "stats",
+  "gameScores",
+  "gameScoreOrder",
+  "gameScoreSessionBaseline",
+  "gameScoreSessionGameId",
+  "eveningGamesRecorded",
+  "lastGame",
+  "guessLie",
+  "hotTakeGame",
+  "speedVoteGame",
+  "clutchGame",
+  "wrongAnswerGame",
+  "traitreGame",
+  "playlistGuessGame",
+  "truthMeterGame",
+  "consensusGame",
+  "dilemmaGame",
+  "triviaGame",
+  "tierNightGame",
+  "tierNightLiveGame",
+  "tierNightTopicId",
+  "tierNightMode",
+  "tierNightModifier",
+];
+
+function captureLobbyRollbackSnapshot() {
+  const s = getState();
+  /** @type {Record<string, unknown>} */
+  const patch = {
+    lobby: structuredClone(s.lobby),
+    lobbyCode: s.lobbyCode,
+    inLobby: s.inLobby,
+  };
+  for (const key of EVENING_ROLLBACK_KEYS) {
+    const value = s[key];
+    if (value && typeof value === "object") {
+      patch[key] = structuredClone(value);
+    } else {
+      patch[key] = value;
+    }
+  }
+  if (Array.isArray(s.gameScoreOrder)) {
+    patch.gameScoreOrder = [...s.gameScoreOrder];
+  }
+  return {
+    lobbyId: s.lobby?.id || null,
+    localInstanceId: s.lobby?.localInstanceId || null,
+    patch,
+  };
+}
+
+/** Préparation transition A → B : suspendre A sans détruire son état local. */
+function prepareLobbyJoinTransition() {
+  bumpLobbyRuntimeGeneration();
+  stopMultiplayerSync();
+  stopLobbyPresenceSync();
+}
+
+/** Commit après join/create réussi depuis un lobby actif : nettoyer la soirée de A. */
+function commitLobbyJoinTransition() {
+  resetEveningState();
+  bumpLobbyRuntimeGeneration();
+}
+
+/** Rollback si join/create échoue : rétablir A et sa sync. */
+async function rollbackLobbyJoinTransition(snapshot) {
+  bumpLobbyRuntimeGeneration();
+  stopMultiplayerSync();
+  stopLobbyPresenceSync();
+  clearCachedGameSession();
+  if (snapshot?.patch) {
+    saveStatePatch(snapshot.patch);
+  }
+  const canRestoreMp =
+    snapshot?.lobbyId && getState().inLobby && isSupabaseConfigured() && isGameSyncActive();
+  if (canRestoreMp) {
+    await refreshGameSession();
+    startMultiplayerSync();
+  }
+}
+
+/**
+ * Compensation serveur B puis rollback local A (ordre : compensation d'abord).
+ * @param {{ joinEffects?: import('./lobbyJoinEffects.js').LobbyJoinEffects|null, rollbackSnapshot?: object|null }} ctx
+ */
+async function runFinalizeFailedJoinAttempt(ctx) {
+  await finalizeFailedJoinAttempt(ctx, {
+    deleteOwnLobbyMembershipById,
+    rollbackLobbyJoinTransition,
+  });
 }
 
 function localParticipant(ready = false, { asHost = false } = {}) {
@@ -201,6 +314,7 @@ function publishOpenLobby(code, lobby) {
   const open = { ...(getState().openLobbies || {}) };
   open[code] = {
     code,
+    localInstanceId: lobby.localInstanceId || null,
     hostName: lobby.participants.find((p) => p.isHost)?.name || "Hôte",
     participants: lobby.participants
       .filter((p) => !p.isLocal)
@@ -383,8 +497,7 @@ export { peekServerLobbyForUser, getRememberedLobbyCode };
 
 /** Nettoie un lobby fantôme en local (sans quitter Supabase côté serveur). */
 export function forceClearClientLobbyState() {
-  stopMultiplayerSync();
-  clearCachedGameSession();
+  performLobbyBoundaryTeardown();
   saveStatePatch({ inLobby: false, lobby: null, lobbyCode: null });
 }
 
@@ -730,7 +843,7 @@ export async function createLobby() {
     });
   }
 
-  resetEveningState();
+  performLobbyBoundaryTeardown();
 
   if (isSupabaseConfigured()) {
     const res = await createLobbySupabase();
@@ -742,7 +855,15 @@ export async function createLobby() {
   const participants = [localParticipant(false, { asHost: true })];
   ensurePlayerScore(getLocalDisplayName());
   syncAllPlayerScores();
-  const lobby = { code, participants, messages: [], status: "waiting", gameId: null };
+  const localInstanceId = newOfflineLobbyInstanceId();
+  const lobby = {
+    code,
+    localInstanceId,
+    participants,
+    messages: [],
+    status: "waiting",
+    gameId: null,
+  };
   saveStatePatch({
     lobby,
     lobbyCode: code,
@@ -756,55 +877,91 @@ export async function createLobby() {
 export async function joinLobby(code) {
   console.log("[DEBUG JOIN LOBBY START]", { code });
 
-  resetEveningState();
+  const fromActiveLobby = hasActiveLobby();
+  const rollbackSnapshot = fromActiveLobby ? captureLobbyRollbackSnapshot() : null;
 
-  if (isSupabaseConfigured()) {
-    console.log("[DEBUG CALL JOIN SUPABASE]");
-    return joinLobbySupabase(code);
+  if (fromActiveLobby) {
+    prepareLobbyJoinTransition();
+  } else {
+    performLobbyBoundaryTeardown();
   }
 
-  const trimmed = code.trim().toUpperCase().replace(/\s/g, "");
-  if (trimmed.length < 4) return { ok: false, error: "Code invalide." };
+  try {
+    if (isSupabaseConfigured()) {
+      console.log("[DEBUG CALL JOIN SUPABASE]");
+      const joinEffects = createLobbyJoinEffects(loadGuestMembership());
+      let res;
+      try {
+        res = await joinLobbySupabase(code, { joinEffects });
+      } catch (joinErr) {
+        await runFinalizeFailedJoinAttempt({ joinEffects, rollbackSnapshot });
+        throw joinErr;
+      }
+      if (!res.ok) {
+        await runFinalizeFailedJoinAttempt({ joinEffects, rollbackSnapshot });
+        return res;
+      }
+      markLobbyJoinFinalized(joinEffects);
+      if (fromActiveLobby) {
+        commitLobbyJoinTransition();
+      }
+      return res;
+    }
 
-  const published = getOpenLobby(trimmed);
-  if (!published) {
-    return {
-      ok: false,
-      error:
-        "Code introuvable. Vérifie le code auprès de l'hôte ou ouvre le lien d'invitation qu'il t'a envoyé.",
+    const trimmed = code.trim().toUpperCase().replace(/\s/g, "");
+    if (trimmed.length < 4) {
+      if (rollbackSnapshot) await rollbackLobbyJoinTransition(rollbackSnapshot);
+      return { ok: false, error: "Code invalide." };
+    }
+
+    const published = getOpenLobby(trimmed);
+    if (!published) {
+      if (rollbackSnapshot) await rollbackLobbyJoinTransition(rollbackSnapshot);
+      return {
+        ok: false,
+        error:
+          "Code introuvable. Vérifie le code auprès de l'hôte ou ouvre le lien d'invitation qu'il t'a envoyé.",
+      };
+    }
+
+    const me = localParticipant(false, { asHost: false });
+    ensurePlayerScore(me.name);
+
+    const others = published.participants
+      .filter((p) => p.name !== me.name)
+      .map((p) => ({ ...p, ready: false, isLocal: false }));
+    const participants = [...others, { ...me, ready: false }];
+
+    const lobby = {
+      code: trimmed,
+      localInstanceId: published.localInstanceId || newOfflineLobbyInstanceId(),
+      participants,
+      messages: published.messages || [],
+      status: published.status || "waiting",
+      gameId: published.gameId || null,
     };
+
+    saveStatePatch({
+      lobbyCode: trimmed,
+      lobby,
+      inLobby: true,
+      guessLie: { sessionId: trimmed, submissions: {}, lobbyComplete: false, currentRound: 0 },
+    });
+
+    syncAllPlayerScores();
+
+    const gs = { ...getState().globalStats };
+    gs.playersJoined = (gs.playersJoined || 0) + 1;
+    saveStatePatch({ globalStats: gs });
+
+    if (fromActiveLobby) {
+      commitLobbyJoinTransition();
+    }
+
+    return { ok: true, code: trimmed };
+  } catch (err) {
+    throw err;
   }
-
-  const me = localParticipant(false, { asHost: false });
-  ensurePlayerScore(me.name);
-
-  const others = published.participants
-    .filter((p) => p.name !== me.name)
-    .map((p) => ({ ...p, ready: false, isLocal: false }));
-  const participants = [...others, { ...me, ready: false }];
-
-  const lobby = {
-    code: trimmed,
-    participants,
-    messages: published.messages || [],
-    status: published.status || "waiting",
-    gameId: published.gameId || null,
-  };
-
-  saveStatePatch({
-    lobbyCode: trimmed,
-    lobby,
-    inLobby: true,
-    guessLie: { sessionId: trimmed, submissions: {}, lobbyComplete: false, currentRound: 0 },
-  });
-
-  syncAllPlayerScores();
-
-  const gs = { ...getState().globalStats };
-  gs.playersJoined = (gs.playersJoined || 0) + 1;
-  saveStatePatch({ globalStats: gs });
-
-  return { ok: true, code: trimmed };
 }
 
 function normalizeLobbyCode(code) {
@@ -1035,7 +1192,10 @@ export async function leaveLobbyMembershipFromServer(membership) {
       deleteOwnMembership: deleteOwnLobbyMembershipById,
       closeLobbyAsHost: closeLobbyByIdAsHost,
     }
-  );
+  ).then((result) => {
+    performLobbyBoundaryTeardown();
+    return result;
+  });
 }
 
 /** Hôte MP : transfère le rôle à un autre joueur du lobby. */

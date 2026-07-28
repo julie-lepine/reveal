@@ -17,7 +17,17 @@ import {
   isActiveGameSessionScreen,
   nudgeSessionListenersForActingHost,
   getActingHostUserId,
+  clearCachedGameSessionUnlessForLobby,
 } from "./gameSync.js";
+import { resolveSessionRestoreOutcome } from "./lobbyBoundary.js";
+import { captureLobbyRuntimeEpoch, isLobbyRuntimeEpochCurrent } from "./lobbyRuntime.js";
+import {
+  createLobbyJoinEffects,
+  recordGuestMembershipWriteForJoin,
+  recordMembershipInsertForJoin,
+  recordMembershipReclaimForJoin,
+  recordPreexistingMembershipForJoin,
+} from "./lobbyJoinEffects.js";
 import { detectActingHostTransition, resolveActingHostUserId } from "./hostPresence.js";
 import {
   detectParticipantRenames,
@@ -340,19 +350,48 @@ const subscribedCatchUpRoute = createDebouncedCallback((row) => {
 
 /** Charge la session de jeu en cours après join / create (sans router - voir navigateAfterLobbyJoin). */
 async function restoreActiveGameSessionOnJoin(lobbyId) {
+  const epoch = captureLobbyRuntimeEpoch(lobbyId);
+  const attempts = [];
   for (const ms of JOIN_SESSION_RESTORE_DELAYS_MS) {
     if (ms) await new Promise((r) => setTimeout(r, ms));
+    if (!isLobbyRuntimeEpochCurrent(epoch)) {
+      return { status: "error" };
+    }
     try {
       const gameRow = await fetchGameSessionByLobby(lobbyId);
-      if (gameRow) {
-        applyRemoteSession(gameRow);
-        return true;
+      if (!isLobbyRuntimeEpochCurrent(epoch)) {
+        return { status: "error" };
       }
+      if (gameRow) {
+        attempts.push({ status: "found", row: gameRow });
+        applyRemoteSession(gameRow, { epoch });
+        return { status: "found", row: gameRow };
+      }
+      attempts.push({ status: "none" });
     } catch (e) {
+      attempts.push({ status: "error", error: e });
       console.warn("REVEAL restore game session on join:", e.message || e);
     }
   }
-  return false;
+
+  if (!isLobbyRuntimeEpochCurrent(epoch)) {
+    return { status: "error" };
+  }
+
+  const outcome = resolveSessionRestoreOutcome(attempts);
+  if (outcome.status === "none") {
+    const cached = getCachedGameSession();
+    if (cached?.lobby_id === lobbyId) {
+      applyRemoteSession(null, { epoch });
+    } else {
+      clearCachedGameSessionUnlessForLobby(lobbyId);
+    }
+    return outcome;
+  }
+  if (outcome.status === "error") {
+    clearCachedGameSessionUnlessForLobby(lobbyId);
+  }
+  return outcome;
 }
 
 /**
@@ -801,10 +840,16 @@ async function tryReclaimGuestMembershipForJoin(lobbyRow, code, displayName) {
 
 async function completeLobbyJoin(
   lobbyId,
-  { afterReclaim = false, currentUserId = null, persistGuestMembership = false } = {}
+  { afterReclaim = false, currentUserId = null, persistGuestMembership = false, joinEffects = null } = {}
 ) {
   const bundle = await fetchLobbyBundle(lobbyId, { withMessages: true, currentUserId });
   applyLobbyToState(bundle, { persistGuestMembership });
+  if (joinEffects && persistGuestMembership) {
+    const gm = loadGuestMembership();
+    if (gm?.lobbyId === lobbyId && gm.membershipId) {
+      recordGuestMembershipWriteForJoin(joinEffects, gm, saveGuestMembership);
+    }
+  }
   await hydrateSessionThenStartSync(lobbyId, { afterReclaim });
   return bundle;
 }
@@ -1415,8 +1460,10 @@ console.log("[DEBUG MEMBER INSERT CREATE]", {
   return { ok: true, code };
 }
 
-export async function joinLobbySupabase(codeInput) {
+export async function joinLobbySupabase(codeInput, { joinEffects: externalEffects } = {}) {
   console.log("[DEBUG JOIN SUPABASE START]", { codeInput });
+
+  const joinEffects = externalEffects || createLobbyJoinEffects(loadGuestMembership());
 
   const recoverySession = await ensureAnonymousSessionForRecovery();
 
@@ -1425,25 +1472,26 @@ export async function joinLobbySupabase(codeInput) {
     getSupabaseUserId();
 
   if (!userId) {
-    return { ok: false, error: "Connecte-toi ou rejoins en invité d'abord." };
+    return { ok: false, error: "Connecte-toi ou rejoins en invité d'abord.", joinEffects };
   }
 
   const code = normalizeCode(codeInput);
-  if (code.length < 4) return { ok: false, error: "Code invalide." };
+  if (code.length < 4) return { ok: false, error: "Code invalide.", joinEffects };
 
   const { data: rows, error: findErr } = await supabase.rpc("find_lobby_by_code", { p_code: code });
-  if (findErr) return { ok: false, error: findErr.message };
+  if (findErr) return { ok: false, error: findErr.message, joinEffects };
   const lobbyRow = rows?.[0];
   if (!lobbyRow) {
     return {
       ok: false,
       error:
         "Code introuvable. Vérifie le code auprès de l'hôte ou ouvre le lien d'invitation qu'il t'a envoyé.",
+      joinEffects,
     };
   }
 
   if (isLobbyJoinTooOld(lobbyRow.last_activity_at)) {
-    return { ok: false, error: LOBBY_EXPIRED_JOIN_MSG };
+    return { ok: false, error: LOBBY_EXPIRED_JOIN_MSG, joinEffects };
   }
 
   let afterReclaim = false;
@@ -1457,14 +1505,18 @@ export async function joinLobbySupabase(codeInput) {
     .eq("user_id", userId)
     .maybeSingle();
 
+  if (existing) {
+    recordPreexistingMembershipForJoin(joinEffects, existing, lobbyRow.id);
+  }
+
   if (!existing) {
     const { data: memberCount, error: countErr } = await supabase.rpc("get_lobby_member_count", {
       p_lobby_id: lobbyRow.id,
     });
-    if (countErr) return { ok: false, error: countErr.message };
+    if (countErr) return { ok: false, error: countErr.message, joinEffects };
 
     if ((memberCount ?? 0) >= MAX_PLAYERS) {
-      return { ok: false, error: LOBBY_FULL_MSG };
+      return { ok: false, error: LOBBY_FULL_MSG, joinEffects };
     }
 
     const displayName = getLocalDisplayName();
@@ -1472,15 +1524,23 @@ export async function joinLobbySupabase(codeInput) {
 
     try {
       if (await isLobbyDisplayNameTaken(lobbyRow.id, displayName)) {
+        const storedBeforeReclaim = loadGuestMembership();
         const reclaimRes = await tryReclaimGuestMembershipForJoin(lobbyRow, code, displayName);
         if (!reclaimRes.ok) {
-          return displayNameTakenError();
+          return { ...displayNameTakenError(), joinEffects };
         }
         membershipResolved = true;
         afterReclaim = true;
+        if (storedBeforeReclaim?.membershipId) {
+          recordMembershipReclaimForJoin(joinEffects, {
+            membershipId: storedBeforeReclaim.membershipId,
+            lobbyId: lobbyRow.id,
+            reclaimed: reclaimRes.reclaimed,
+          });
+        }
       }
     } catch (e) {
-      return { ok: false, error: e.message || "Impossible de vérifier le pseudo." };
+      return { ok: false, error: e.message || "Impossible de vérifier le pseudo.", joinEffects };
     }
 
     console.log("[DEBUG JOIN PATH]", {
@@ -1506,22 +1566,36 @@ export async function joinLobbySupabase(codeInput) {
 
       if (joinErr) {
         if (isDuplicateLobbyDisplayNameError(joinErr)) {
+          const storedBeforeReclaim = loadGuestMembership();
           const reclaimRes = await tryReclaimGuestMembershipForJoin(lobbyRow, code, displayName);
           if (!reclaimRes.ok) {
-            return displayNameTakenError();
+            return { ...displayNameTakenError(), joinEffects };
           }
           afterReclaim = true;
+          if (storedBeforeReclaim?.membershipId) {
+            recordMembershipReclaimForJoin(joinEffects, {
+              membershipId: storedBeforeReclaim.membershipId,
+              lobbyId: lobbyRow.id,
+              reclaimed: reclaimRes.reclaimed,
+            });
+          }
         } else {
-          return { ok: false, error: joinErr.message };
+          return { ok: false, error: joinErr.message, joinEffects };
         }
       } else {
+        recordMembershipInsertForJoin(joinEffects, joinData, lobbyRow.id);
+
         if (persistGuestMembership) {
-          saveGuestMembership({
-            membershipId: joinData.id,
-            lobbyId: lobbyRow.id,
-            lobbyCode: code,
-            displayName,
-          });
+          recordGuestMembershipWriteForJoin(
+            joinEffects,
+            {
+              membershipId: joinData.id,
+              lobbyId: lobbyRow.id,
+              lobbyCode: code,
+              displayName,
+            },
+            saveGuestMembership
+          );
         }
 
         const gs = { ...getState().globalStats };
@@ -1535,8 +1609,9 @@ export async function joinLobbySupabase(codeInput) {
     afterReclaim,
     currentUserId: userId,
     persistGuestMembership,
+    joinEffects,
   });
-  return { ok: true, code: bundle.code };
+  return { ok: true, code: bundle.code, joinEffects };
 }
 
 export async function refreshLobbyFromSupabase({ withMessages = false } = {}) {
@@ -1900,8 +1975,9 @@ export function subscribeLobbyRealtime(onUpdate) {
       "postgres_changes",
       { event: "*", schema: "public", table: "game_sessions", filter: `lobby_id=eq.${lobbyId}` },
       async (payload) => {
+        const epoch = captureLobbyRuntimeEpoch(lobbyId);
         if (payload.eventType === "DELETE") {
-          applyRemoteSession(null);
+          applyRemoteSession(null, { epoch });
           refreshLobbyFromSupabase()
             .catch((e) => {
               if (!isLobbyGoneError(e)) {
@@ -1915,10 +1991,11 @@ export function subscribeLobbyRealtime(onUpdate) {
           const { pulseGameSessionRealtime } = await import("./gameSync.js");
           pulseGameSessionRealtime();
           if (payload.new && payload.new.state !== undefined) {
-            applyRemoteSession(payload.new);
+            applyRemoteSession(payload.new, { epoch });
           } else {
-            await refreshGameSession();
+            await refreshGameSession(epoch);
           }
+          if (!isLobbyRuntimeEpochCurrent(epoch)) return;
           const row = getCachedGameSession();
           if (row) handleSessionRoute(row, { debugSource: "supabaseLobby/realtime/handle" });
         } catch (e) {

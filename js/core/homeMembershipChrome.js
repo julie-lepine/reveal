@@ -15,7 +15,7 @@ export { decideMembershipSnapshotWrite } from "./lobbyCreateGuard.js";
 export { leaveServerActionLabel } from "./lobbyServerLeave.js";
 
 /**
- * @typedef {"checking"|"none"|"cached_active"|"server_membership_recoverable"|"server_membership_unrecoverable"|"check_failed"|"leave_confirmation_pending"} HomeMembershipState
+ * @typedef {"checking"|"none"|"cached_active"|"server_membership_recoverable"|"server_membership_unrecoverable"|"check_failed"|"leave_confirmation_pending"|"membership_reconciliation_required"} HomeMembershipState
  *
  * @typedef {{
  *   lobbyId?: string,
@@ -78,6 +78,11 @@ const CREATE_DISABLED_LEAVE_PENDING =
  *   activeLobbyCode?: string|null,
  *   leaveConfirmationPending?: boolean,
  *   serverLeaveInFlight?: boolean,
+ *   membershipReconciliationConflict?: {
+ *     remoteLobbyId?: string,
+ *     remoteCode?: string|null,
+ *     localLobbyId?: string|null,
+ *   }|null,
  * }} input
  * @returns {HomeMembershipChrome}
  */
@@ -95,6 +100,7 @@ export function deriveHomeMembershipChrome(input = {}) {
   const activeLobbyCode = input.activeLobbyCode || null;
   const leaveConfirmationPending = Boolean(input.leaveConfirmationPending);
   const serverLeaveInFlight = Boolean(input.serverLeaveInFlight);
+  const reconciliation = input.membershipReconciliationConflict || null;
 
   const found =
     snapshot?.status === "found" && snapshot.membership?.code
@@ -123,6 +129,23 @@ export function deriveHomeMembershipChrome(input = {}) {
     checkStaleHint: false,
     serverLeaveBusy: serverLeaveInFlight,
   };
+
+  if (reconciliation?.remoteLobbyId) {
+    const code = reconciliation.remoteCode || "?";
+    return {
+      ...base,
+      state: "membership_reconciliation_required",
+      createEnabled: false,
+      createDisabledReason: `Résous la connexion inachevée au lobby ${code} avant d'en créer un nouveau.`,
+      membershipCode: code,
+      membershipLobbyId: reconciliation.remoteLobbyId,
+      primaryMessage: `Une tentative de connexion au lobby ${code} n'a pas été finalisée.`,
+      errorMessage:
+        reconciliation.localLobbyId
+          ? "Choisis de quitter ce lobby ou d'y revenir."
+          : "Choisis de quitter ce lobby ou d'y rejoindre.",
+    };
+  }
 
   if (hasActiveLobby) {
     return {

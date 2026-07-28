@@ -1,6 +1,7 @@
 import { flushSave, scheduleSave } from "./persist.js";
 import { DEFAULT_PROFILE_EMOJI } from "../../data/profileEmojis.js";
 import { trimPlayerText } from "../../data/playerTextLimits.js";
+import { getLastGameScopeKey, isLastGameInCurrentScope } from "./lobbyBoundary.js";
 
 const STORAGE_KEY = "reveal-app-state";
 
@@ -1115,13 +1116,18 @@ export function addLocalScore(points) {
   addScore(getLocalDisplayName(), points);
 }
 
+/** Dernière partie de la soirée / lobby courant (pas de l'installation). */
 export function setLastGame(result) {
-  state.lastGame = { ...result, at: Date.now() };
+  const scopeKey = getLastGameScopeKey(state.lobby, state.lobbyCode);
+  state.lastGame = { ...result, at: Date.now(), scopeKey };
   save();
 }
 
 export function getLastGame() {
-  return state.lastGame;
+  const last = state.lastGame;
+  const scopeKey = getLastGameScopeKey(state.lobby, state.lobbyCode);
+  if (!isLastGameInCurrentScope(last, scopeKey)) return null;
+  return last;
 }
 
 /** Garde la fin de partie la plus récente (évite qu'un ancien lastGame écrase le dernier jeu). */

@@ -124,6 +124,18 @@ import {
   planGuessLiePlayWrite,
   buildGuessLieActingPlayFields,
 } from "./guessLiePlayCommit.js";
+import {
+  canApplyRemoteSessionRow,
+  getLastGameScopeKey,
+  isSessionRowForLobby,
+  shouldClearCachedSessionForLobbyBoundary,
+  shouldExposeCachedSession,
+} from "./lobbyBoundary.js";
+import {
+  captureLobbyRuntimeEpoch,
+  isLobbyRuntimeEpochCurrent,
+  shouldApplyLobbyRuntimeResult,
+} from "./lobbyRuntime.js";
 
 export { planGuessLiePlayWrite, buildGuessLieActingPlayFields } from "./guessLiePlayCommit.js";
 
@@ -271,6 +283,9 @@ function titleForSessionGameId(gameId) {
 
 /** Filet : écran résultats + game_id session si lastGame distant est obsolète. */
 function syncLastGameFromSessionRow(row) {
+  const currentLobbyId = getState().lobby?.id;
+  if (!isSessionRowForLobby(row, currentLobbyId)) return;
+
   const gameId = row?.game_id;
   if (!gameId || !RESTARTABLE_SESSION_GAME_IDS.has(gameId)) return;
   if (!row.screen || !POST_GAME_SCREENS.has(row.screen)) return;
@@ -761,7 +776,13 @@ function clearSuppressIfFollowingHost(screen, current) {
   }
 }
 
+function currentLobbyIdForSession() {
+  return getState().lobby?.id || null;
+}
+
 export function getCachedGameSession() {
+  const lobbyId = currentLobbyIdForSession();
+  if (!shouldExposeCachedSession(cachedRow, lobbyId)) return null;
   return cachedRow;
 }
 
@@ -2854,7 +2875,12 @@ export function applyRemoteEveningState(st) {
     patch.stats = mergeEveningStats(getState().stats, st.stats);
   }
   if (st.lastGame !== undefined) {
-    patch.lastGame = mergeLastGameRecord(getState().lastGame, st.lastGame);
+    const scopeKey = getLastGameScopeKey(getState().lobby, getState().lobbyCode);
+    const remoteLast =
+      st.lastGame && typeof st.lastGame === "object"
+        ? { ...st.lastGame, scopeKey }
+        : st.lastGame;
+    patch.lastGame = mergeLastGameRecord(getState().lastGame, remoteLast);
   }
   if (st.eveningGamesRecorded && typeof st.eveningGamesRecorded === "object") {
     patch.eveningGamesRecorded = mergeEveningGamesRecorded(
@@ -2899,7 +2925,9 @@ export async function syncLobbyScores() {
 /** Recharge le classement depuis la session multijoueur (résultats / leaderboard). */
 export async function refreshEveningScoresFromSession() {
   if (!isGameSyncActive()) return null;
+  const lobbyId = currentLobbyIdForSession();
   const row = await refreshGameSession();
+  if (row && !isSessionRowForLobby(row, lobbyId)) return null;
   if (row?.state?.scores) applyRemoteLobbyScores(row.state.scores);
   if (row?.state?.playerStats) {
     applyRemotePlayerStats(row.state.playerStats, (uid) => playerKeyToDisplayName(uid));
@@ -2918,6 +2946,7 @@ let confirmingMissingSession = false;
 async function confirmMissingSessionThenRoute() {
   if (confirmingMissingSession) return;
   confirmingMissingSession = true;
+  const epoch = captureLobbyRuntimeEpoch(getState().lobby?.id || null);
   try {
     const lobbyId = getState().lobby?.id;
     if (!lobbyId || !isGameSyncActive()) return;
@@ -2926,12 +2955,13 @@ async function confirmMissingSessionThenRoute() {
     try {
       confirmedRow = await fetchGameSessionByLobby(lobbyId);
     } catch {
-      // Échec réseau ponctuel : on ne tranche pas (pas d'éjection sur un simple raté).
       return;
     }
 
+    if (!isLobbyRuntimeEpochCurrent(epoch)) return;
+
     if (confirmedRow) {
-      applyRemoteSession(confirmedRow);
+      applyRemoteSession(confirmedRow, { epoch });
       return;
     }
 
@@ -2959,8 +2989,24 @@ async function confirmMissingSessionThenRoute() {
   }
 }
 
-export function applyRemoteSession(row) {
+export function applyRemoteSession(row, { epoch = null } = {}) {
+  if (epoch && !isLobbyRuntimeEpochCurrent(epoch)) {
+    return;
+  }
+
   if (isOlderSessionRow(row)) {
+    return;
+  }
+
+  const currentLobbyId = currentLobbyIdForSession();
+  if (
+    row &&
+    epoch &&
+    !shouldApplyLobbyRuntimeResult(epoch, row.lobby_id, currentLobbyId)
+  ) {
+    return;
+  }
+  if (!canApplyRemoteSessionRow(row, currentLobbyId, cachedRow)) {
     return;
   }
 
@@ -3241,16 +3287,15 @@ export function applyRemoteSession(row) {
   }
 }
 
-export async function refreshGameSession() {
+export async function refreshGameSession(capturedEpoch = null) {
   const lobbyId = getState().lobby?.id;
   if (!lobbyId) return null;
+  const epoch = capturedEpoch || captureLobbyRuntimeEpoch(lobbyId);
   const row = await fetchGameSessionByLobby(lobbyId);
-  if (row) applyRemoteSession(row);
+  if (!isLobbyRuntimeEpochCurrent(epoch)) return null;
+  if (row) applyRemoteSession(row, { epoch });
   else {
-    // Session supprimée (hôte qui quitte une prépa / partie). On passe par
-    // applyRemoteSession(null) pour déclencher confirmMissingSessionThenRoute : sinon, via
-    // le polling, un invité resterait bloqué sur la prépa fantôme du jeu quitté.
-    applyRemoteSession(null);
+    applyRemoteSession(null, { epoch });
     try {
       const { refreshLobbyFromSupabase } = await import("./supabaseLobby.js");
       await refreshLobbyFromSupabase();
@@ -3382,6 +3427,7 @@ export function isResumableSessionDestination(screen) {
 /** Prep ou partie en cours a reprendre (pas post-partie ni menu soiree). */
 export function getResumableSessionScreen(row = getCachedGameSession()) {
   if (!row || !isGameSyncActive()) return null;
+  if (!isSessionRowForLobby(row, currentLobbyIdForSession())) return null;
   const screen = getEffectiveSessionScreen(row);
   if (!screen || isOnPostGameScreen(screen)) return null;
   if (screen === "game-select" && isLobbyEveningStarted()) return null;
@@ -3521,6 +3567,9 @@ export async function routeToActiveGameIfNeeded(
   const row =
     cachedRowOnly || (await refreshGameSession()) || getCachedGameSession();
   if (!canContinue()) return false;
+  if (row && !isSessionRowForLobby(row, currentLobbyIdForSession())) {
+    return false;
+  }
   const screen = getEffectiveSessionScreen(row);
   const routeLog = (allowed, _reason, _extra = {}) => allowed;
 
@@ -3762,6 +3811,7 @@ async function syncTick() {
   if (syncTickInFlight) return;
   syncTickInFlight = true;
   const prevSig = lastSessionSig;
+  const epoch = captureLobbyRuntimeEpoch(getState().lobby?.id || null);
   try {
     const lobbyId = getState().lobby?.id;
     // Pas de session tant que la soirée n'est pas lancée - évite le polling inutile.
@@ -3782,6 +3832,7 @@ async function syncTick() {
     if (meta && meta.updated_at && meta.updated_at === lastSessionUpdatedAt) {
       adjustPollBackoff(false);
       scheduleSyncPoll();
+      if (!isLobbyRuntimeEpochCurrent(epoch)) return;
       const cached = getCachedGameSession();
       if (cached) {
         if (await routeToActiveGameIfNeeded(cached)) return;
@@ -3789,7 +3840,8 @@ async function syncTick() {
       }
       return;
     }
-    const row = await refreshGameSession();
+    const row = await refreshGameSession(epoch);
+    if (!isLobbyRuntimeEpochCurrent(epoch)) return;
     if (!row) return;
     adjustPollBackoff(sessionSignature(row) !== prevSig);
     scheduleSyncPoll();
@@ -4586,6 +4638,23 @@ export function clearCachedGameSession() {
   lastSessionSig = "";
   lastSessionUpdatedAt = "";
   notify(null);
+}
+
+/** Invalide le cache s'il appartient à un autre lobby (frontière ou hydrate confirmée). */
+export function clearCachedGameSessionUnlessForLobby(lobbyId) {
+  if (shouldClearCachedSessionForLobbyBoundary(cachedRow, lobbyId)) {
+    clearCachedGameSession();
+  }
+}
+
+/** Tests uniquement — injecte une ligne cache sans passer par applyRemoteSession. */
+export function __setCachedGameSessionRowForTests(row) {
+  cachedRow = row;
+}
+
+/** Tests uniquement — remet le cache session à zéro. */
+export function __resetCachedGameSessionForTests() {
+  clearCachedGameSession();
 }
 
 export function isOnPostGameScreen(screen = getCurrentScreen()) {
