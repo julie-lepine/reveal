@@ -522,7 +522,7 @@ export function mountSettings(app) {
       back: true,
       backTarget: inLobby ? "back" : "home",
       content: `
-        <p class="label-upper">Paramètres</p>
+        <p class="label-upper label-upper--gold">⚙️ Paramètres</p>
         <h1 class="page-title">Paramètres</h1>
         ${settingsTabsHtml(activeTab, inLobby)}
         ${

@@ -42,8 +42,8 @@ export function mountLeaderboard(app) {
 
     app.innerHTML = pageShell({
     content: `
-      <p class="label-upper label-upper--gold">Fin de manche</p>
-      <div class="logo logo--sm"><h1>CLASSEMENT</h1></div>
+      <p class="label-upper label-upper--gold">🏆 Fin de manche</p>
+      <h2 class="screen-title">Podium de la soirée</h2>
       ${tieHint}
 
       <div class="podium">
