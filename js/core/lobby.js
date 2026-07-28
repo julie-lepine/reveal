@@ -36,6 +36,7 @@ import {
   startLobbyPresenceSync,
   stopLobbyPresenceSync,
   onLobbyBundleUpdated,
+  notifyLobbyBundleUpdated,
   recoverLobbyFromServer,
   peekServerLobbyForUser,
   getRememberedLobbyCode,
@@ -519,10 +520,14 @@ export async function tryRecoverLobbyFromServer() {
 
 export { peekServerLobbyForUser, getRememberedLobbyCode };
 
-/** Nettoie un lobby fantôme en local (sans quitter Supabase côté serveur). */
+/**
+ * Nettoie un lobby fantôme en local (sans quitter Supabase côté serveur).
+ * Notifie après mutations pour rafraîchir les écrans dérivés (ex. settings).
+ */
 export function forceClearClientLobbyState() {
   performLobbyBoundaryTeardown();
   saveStatePatch({ inLobby: false, lobby: null, lobbyCode: null });
+  notifyLobbyBundleUpdated();
 }
 
 export function handleGuestRecoveryRequiresCaptcha() {

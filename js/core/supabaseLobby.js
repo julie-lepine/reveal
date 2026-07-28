@@ -900,7 +900,8 @@ export function onLobbyBundleUpdated(fn) {
   return () => lobbyBundleListeners.delete(fn);
 }
 
-function notifyLobbyBundleUpdated() {
+/** Notifie les écrans dérivés du lobby (settings, FAB, etc.) après mutation state. */
+export function notifyLobbyBundleUpdated() {
   lobbyBundleListeners.forEach((fn) => {
     try {
       fn();

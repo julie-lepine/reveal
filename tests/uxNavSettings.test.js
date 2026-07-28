@@ -13,7 +13,6 @@ import {
 } from "../js/core/bottomNavItems.js";
 import {
   lobbySettingsActionsForRole,
-  partySettingsActionsForRole,
 } from "../js/core/partySettingsMenu.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -131,7 +130,18 @@ describe("UX-NAV-SETTINGS — contenu écran", () => {
     assert.deepEqual([...lobbySettingsActionsForRole("member")], ["leave"]);
     assert.equal(lobbySettingsActionsForRole("host").includes("leave"), false);
     assert.equal(lobbySettingsActionsForRole("member").includes("close"), false);
-    assert.equal(partySettingsActionsForRole, lobbySettingsActionsForRole);
+    const menu = src("js/core/partySettingsMenu.js");
+    assert.match(menu, /export function lobbySettingsActionsForRole/);
+    assert.equal(menu.includes("partySettingsActionsForRole"), false);
+  });
+
+  it("CSS morts game-select profile/party absents", () => {
+    const css = src("style.css");
+    const a11y = src("css/a11y.css");
+    assert.equal(css.includes("game-select-profile"), false);
+    assert.equal(css.includes("game-select-party-settings"), false);
+    assert.equal(a11y.includes("game-select-profile"), false);
+    assert.equal(a11y.includes("game-select-party-settings"), false);
   });
 });
 

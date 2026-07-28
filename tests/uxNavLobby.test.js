@@ -11,7 +11,9 @@ import {
   isBottomNavTabVisible,
   resolveBottomNavTabs,
 } from "../js/core/bottomNavItems.js";
-import { partySettingsActionsForRole } from "../js/core/partySettingsMenu.js";
+import {
+  lobbySettingsActionsForRole,
+} from "../js/core/partySettingsMenu.js";
 import { SERVER_LEAVE_CONFIRM } from "../js/core/lobbyServerLeave.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -63,7 +65,7 @@ describe("UX-NAV-LOBBY — Paramètres (écran settings, pas modale)", () => {
   });
 
   it("5 — invité : action leave seule (helper rôle)", () => {
-    const actions = partySettingsActionsForRole("member");
+    const actions = lobbySettingsActionsForRole("member");
     assert.deepEqual([...actions], ["leave"]);
     assert.equal(actions.includes("close"), false);
     const settings = src("js/screens/settings.js");
@@ -72,13 +74,13 @@ describe("UX-NAV-LOBBY — Paramètres (écran settings, pas modale)", () => {
   });
 
   it("6 — invité ne voit pas Fermer / transfert / joueurs (helper)", () => {
-    assert.equal(partySettingsActionsForRole("member").includes("close"), false);
-    assert.equal(partySettingsActionsForRole("member").includes("transfer"), false);
-    assert.equal(partySettingsActionsForRole("member").includes("players"), false);
+    assert.equal(lobbySettingsActionsForRole("member").includes("close"), false);
+    assert.equal(lobbySettingsActionsForRole("member").includes("transfer"), false);
+    assert.equal(lobbySettingsActionsForRole("member").includes("players"), false);
   });
 
   it("7 — hôte conserve fermeture / transfert / joueurs", () => {
-    assert.deepEqual([...partySettingsActionsForRole("host")], [
+    assert.deepEqual([...lobbySettingsActionsForRole("host")], [
       "transfer",
       "players",
       "close",
@@ -90,7 +92,7 @@ describe("UX-NAV-LOBBY — Paramètres (écran settings, pas modale)", () => {
   });
 
   it("8 — hôte ne voit pas l’action leave réservée aux membres", () => {
-    assert.equal(partySettingsActionsForRole("host").includes("leave"), false);
+    assert.equal(lobbySettingsActionsForRole("host").includes("leave"), false);
   });
 });
 

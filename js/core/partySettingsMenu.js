@@ -13,6 +13,3 @@ export function lobbySettingsActionsForRole(role) {
   }
   return Object.freeze(["leave"]);
 }
-
-/** @deprecated alias — préférer lobbySettingsActionsForRole */
-export const partySettingsActionsForRole = lobbySettingsActionsForRole;
