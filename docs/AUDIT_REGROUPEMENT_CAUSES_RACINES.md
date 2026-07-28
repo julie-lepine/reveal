@@ -16,9 +16,9 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 
 | | |
 |--|--|
-| **Maintenant** | **Membership Vague E3–E5** (leave flash UI · multi-onglets · SQL dissolve) |
-| **Ensuite** | ARCH-07/08 · L-04 · QA terrain UX-NAV-LOBBY résidus |
-| **Dernière clôture** | **Membership A→E2** ✅ QA · UX-NAV-LOBBY Vague A · isolation lobby · join partiel B |
+| **Maintenant** | **Membership Vague E5** — code livré · QA staging+terrain |
+| **Ensuite** | ARCH-07/08 · L-04 · UX-NAV-LOBBY résidus · E4 preuves dures reportées |
+| **Dernière clôture** | **Membership A→E4** ✅ (E3 QA · E4 smoke staging+UI) |
 
 ---
 
@@ -28,7 +28,7 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 
 | ID | Cause | Problème | Statut |
 |----|-------|----------|--------|
-| **Membership E3–E5** | 3 | E3 leave/flash UI invalidate→confirm · E4 multi-onglets INSERT · E5 atomicité dissolve | Ouvert (A–E2 ✅) |
+| **Membership E5** | 3 | Atomicité dissolve — `dissolve_lobby_atomically` · client unifié | Code livré · QA staging+terrain |
 
 ### Autres
 
@@ -51,7 +51,7 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 |---|-------|------|----------------|
 | 1 | Identité invité / JWT | ✅ | ARCH-01 partiel |
 | 2 | Race auth / profil | ✅ | — |
-| 3 | Sources de vérité multiples | ✅ hors E3–E5 | **Membership A–E2 ✅** · M-14a ✅ · Guess Lie ✅ |
+| 3 | Sources de vérité multiples | ✅ hors E5 QA | **Membership A–E5 code** · M-14a ✅ · Guess Lie ✅ |
 | 4 | Asymétrie hôte / invité | ✅ | — |
 | 5 | Routing + timing sync | ✅ | ARCH-05 mitigé · UX-NAV ✅ |
 | 6 | Async écrans | ✅ | ARCH-06 ✅ |
@@ -65,23 +65,23 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 
 ## Détail — tickets ouverts
 
-### Cause 3 — Membership Vague E3–E5
+### Cause 3 — Membership Vague E5
 
 | Vague | Objectif | Statut |
 |-------|----------|--------|
 | **A–D** | Query · chrome Home · garde create · leave server-only | ✅ QA 2026-07-27 |
 | **E1** | Snapshot scoped `userId` + `authGeneration` · reject stale · chrome signed-out | ✅ QA 2026-07-28 |
 | **E2** | Alignement asymétrique cache ↔ snapshot · promote confirmé · `commitMembershipRemoved` après preuve · rows canoniques | ✅ QA 2026-07-28 |
-| **E3** | Leave polish · flash UI invalidate→confirm (pas de faux `none` optimiste) | Ouvert |
-| **E4** | Multi-onglets INSERT / course création | Ouvert |
-| **E5** | Atomicité dissolve (SQL) | Ouvert |
+| **E3** | Leave polish · soft-hold `post_leave_transition` (pas de checking / faux `none`) | ✅ QA 2026-07-28 |
+| **E4** | Multi-onglets INSERT · `create_lobby_atomically` · UNIQUE `user_id` | ✅ smoke 2026-07-28 |
+| **E5** | Atomicité dissolve · `dissolve_lobby_atomically` · DISSOLVED/ALREADY_GONE/NOT_ALLOWED | Code · QA staging+terrain |
 
 | | |
 |--|--|
-| **E2 livré** | `lobbyMembershipAlign.js` · promote create/join/recover/refresh · remove après leave/dissolve/kick confirmés · pas d’invalidate sur force-clear/teardown · `canCreateLobby` ↔ `hasActiveLobby` |
-| **Où** | `lobbyMembership*.js` · `lobbyCreateGuard.js` · `lobbyServerLeave.js` · `homeMembershipChrome.js` · `voluntaryMemberLeave.js` · `lobby.js` · `supabaseLobby.js` |
-| **Preuve A–E2** | `lobbyMembershipVagueA` · `homeMembershipVagueB` · `lobbyCreateVagueC` · `lobbyServerLeaveVagueD` · `lobbyMembershipVagueE1` · `lobbyMembershipVagueE2` · **1168/1169** (fail Fil Rouge docs hors scope) |
-| **Ne pas confondre** | Join partiel B orpheline (compensation ✅) · force clear client-only (ne retire **pas** le snapshot) · flash leave = E3 |
+| **E5 livré** | RPC `dissolve_lobby_atomically` · `closeLobbyByIdAsHost` = un RPC · ALREADY_GONE succès · re-query membership post-transport · localStorage Traître hors SQL |
+| **Où E5** | `supabase/lobby-membership-e5-*.sql` · `lobbyDissolveContract.js` · `supabaseLobby.js` · `lobby.js` · `traitrePrivate.js` |
+| **Preuve E5** | `lobbyMembershipVagueE5` · harness staging · runbook |
+| **Ne pas confondre** | `endGameSession` → `deleteGameSession` (hors dissolve) · leave membre = DELETE membership |
 
 ### Cause 7 — Sync silencieuse
 
@@ -143,7 +143,10 @@ Ne pas rouvrir sans régression. Détail historique dans git / tests cités.
 
 | ID | Cause | Livré | Preuve / QA |
 |----|-------|-------|-------------|
-| **Membership A→E2** | 3 | Query→chrome→create→leave · E1 scoped auth · E2 align asymétrique + remove après preuve | VagueA–E2 · **1168/1169** · 2026-07-28 |
+| **Membership E5** | 3 | `dissolve_lobby_atomically` · client unifié · ALREADY_GONE succès | `lobbyMembershipVagueE5` · QA staging+terrain **à faire** |
+| **Membership E4** | 3 | Create atomique + UNIQUE user_id + mapping conflit + recover E2 | Staging e4-01/02 · smoke UI 2026-07-28 |
+| **Membership E3** | 3 | Soft-hold post-leave · pas de checking générique | `lobbyMembershipVagueE3` · QA terrain |
+| **Membership A→E2** | 3 | Query→chrome→create→leave · E1 scoped auth · E2 align asymétrique + remove après preuve | VagueA–E2 · 2026-07-28 |
 | **Membership E1** | 3 | Snapshot scoped auth · reject stale | `lobbyMembershipVagueE1` · 2026-07-28 |
 | **UX-NAV-LOBBY** | 5/11 | Home hors menu en lobby · Settings · leave | `uxNavLobby` · `voluntaryMemberLeave` |
 | **ARCH/BUG boundary** | 3/5/8 | Isolation lobby · teardown | `lobbyBoundarySession` |
@@ -173,7 +176,7 @@ Ne pas rouvrir sans régression. Détail historique dans git / tests cités.
 |-------|-------------------|
 | 1 | C-01/02, R-01–05, M-05a |
 | 2 | M-01, P-03, M-02a, S-02 |
-| 3 | I-03/04, SYN-03, M-13, M-02b, ARCH-02, SYN-29, I-PG-01, ready stale, UX-CLUTCH-01, M-15, L-05↻, **Membership A–E2**, M-14a, boundary, join partiel |
+| 3 | I-03/04, SYN-03, M-13, M-02b, ARCH-02, SYN-29, I-PG-01, ready stale, UX-CLUTCH-01, M-15, L-05↻, **Membership A–E4**, M-14a, boundary, join partiel |
 | 4 | I-01/02/08, M-03b, M-06a/b, L-01, ARCH-03/03b, UX-VIBE-01, Guess Lie |
 | 5 | T-01/02, T-03↻, M-07/08, P-02, SYN-28, ARCH-04, UX-VIBE-02, pré-résolution entry, UX-NAV-LOBBY |
 | 6 | I-05, SYN-13b↻, SYN-25, SYN-05/ARCH-18, ARCH-06 |
@@ -181,7 +184,7 @@ Ne pas rouvrir sans régression. Détail historique dans git / tests cités.
 | 8 | I-06, P-02, ARCH-09, I-09/SYN-06, SYN-15/16, M-15 |
 | 9 | SYN-12 / M-05b |
 | 10 | SYN-05 / ARCH-18 (Fil Rouge app) |
-| 11 | L-02, ARCH-21↻, M-12, UX-HIST/RESUME/VIBE, POLL, **Membership A–E2**, ARCH-22, Loader join, UX-NAV, join partiel |
+| 11 | L-02, ARCH-21↻, M-12, UX-HIST/RESUME/VIBE, POLL, **Membership A–E4**, ARCH-22, Loader join, UX-NAV, join partiel |
 
 ---
 
@@ -198,15 +201,15 @@ Hors file prioritaire — opportunité / régression :
 - I-PG-01 : autres jeux sans podium dédié
 - Starts sync hydrate → hub hors `mountLobby` (hors périmètre ARCH-06)
 - UX-NAV : `navigate("home")` programmatique en lobby · `navStack` legacy · QA terrain
-- Membership **E3** : flash UI post-leave (invalidate→confirm) — données déjà cohérentes (E2)
-- Membership **E4–E5** : multi-onglets INSERT · atomicité SQL dissolve
+- Membership **E4** (reporté) : course RPC pure ALREADY_EXISTS · join↔join concurrent · reclaim X/Y · JSON 23505 · e4-03/03b
+- Membership **E5** : QA staging+terrain (`dissolve_lobby_atomically` code livré)
 - Join partiel : revert RPC reclaim anonymous · orphelin **création** · E2E Supabase
 - Pré-résolution B1 (getter post-mark launch) — étudiée, **non retenue**
 - Loader join interstitiel — **non retenu**
 - Fil Rouge SQL historique — ops Supabase séparée · fail docs `filRougeVague3Cleanup` hors Membership
 
-**Surveiller** : Clutch taps sous latence (SYN-26) · ready prep après Recommencer · conflit pending join vs chrome Home membership
+**Surveiller** : Clutch taps sous latence (SYN-26) · ready prep après Recommencer · conflit pending join vs chrome Home membership · leave multi-onglets après dissolve (modale « connexion a empêché »)
 
 ---
 
-*Suivi vivant · MAJ 2026-07-28 — **Membership A→E2 ✅ QA** · prochain = Membership Vague E3*
+*Suivi vivant · MAJ 2026-07-28 — **Membership E5 code livré** · prochain = QA staging+terrain E5*

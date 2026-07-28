@@ -1,0 +1,72 @@
+-- =============================================================================
+-- E5 — Runbook dissolve_lobby_atomically
+-- =============================================================================
+--
+-- A. Appliquer la RPC
+--    Fichier : lobby-membership-e5-01-dissolve-lobby-atomically.sql
+--    Rollback : DROP FUNCTION IF EXISTS public.dissolve_lobby_atomically(uuid);
+--    Ne PAS toucher lobbies_delete_host.
+--
+-- B. Contrôles staging
+--    Fichier : lobby-membership-e5-staging-harness.sql
+--    Vérifier : signature, owner postgres, prosecdef, search_path='', grants
+--      anon EXECUTE = false · authenticated = true · service_role = true
+--    Scénarios 1–5 : DISSOLVED / ALREADY_GONE / NOT_ALLOWED / UNAUTHENTICATED
+--      + cascades + NOT_ALLOWED laisse les données.
+--    Arrêt si RPC manquante ou anon EXECUTE true.
+--
+-- C. Déployer le client
+--    Ship app avec closeLobbyByIdAsHost → rpc dissolve_lobby_atomically
+--    Vérif Network : un seul appel RPC dissolve (pas DELETE game_sessions
+--      puis DELETE lobbies sur fermeture hôte).
+--    Arrêt si PGRST202 / 404 RPC.
+--    Rollback app : revert release (RPC peut rester ; anciens clients DELETE OK).
+--
+-- D. QA terrain (checklist)
+--    [ ] Paramètres → Fermer le lobby
+--    [ ] Home cache actif → Quitter / Fermer
+--    [ ] Resume server-only → Fermer
+--    [ ] Logout avec lobby actif (hôte)
+--    [ ] Nav back / Accueil depuis écran lobby
+--    [ ] Deux onglets même hôte → un DISSOLVED, un ALREADY_GONE, pas d’alerte
+--        « connexion a empêché », pas de Resume fantôme
+--    [ ] Invité quitte pendant dissolve
+--    [ ] Invité en prep pendant fermeture
+--    [ ] Invité en play pendant fermeture
+--    [ ] (dev) timeout simulé après commit → re-query none → succès local Home
+--    [ ] (dev) timeout puis found autre lobby Y (onglet B create/join) →
+--        onglet A récupère Y (CANONICAL_ELSEWHERE), pas Home final, pas wipe Y
+--    [ ] Retour Home puis création d’un nouveau lobby
+--    [ ] Absence de carte Resume fantôme
+--
+-- Client — re-query post-transport (ne pas fusionner) :
+--    none                  → ALREADY_GONE → clear X → Home
+--    found même lobby host → retry/error
+--    found même lobby !host→ NOT_ALLOWED / reconcile
+--    found autre lobby Y   → CANONICAL_ELSEWHERE → drop X → recover Y → lobby
+--    unknown               → état protégé
+--
+-- CANONICAL_ELSEWHERE — vérifs terrain obligatoires :
+--    [ ] Clear X ciblé : snapshot Y / cache Y / Traître Y / auth intacts
+--    [ ] recover Y échoue : X ne réapparaît pas ; pas de faux none ;
+--        pas de Home succès ; Y reste cible (Resume / retry reconcile)
+--
+-- E. Observer les anciens clients
+--    DELETE direct lobbies (RLS lobbies_delete_host) toujours possible.
+--    Pas de révocation policy dans cette vague.
+--
+-- F. Déprécier helpers dissolution legacy (plus tard, hors E5 strict)
+--    Seulement après observation : retirer chemins multi-appels morts
+--    (déjà retirés du client E5). Ne pas confondre avec endGameSession
+--    → deleteGameSession (hors dissolution).
+--
+-- =============================================================================
+-- SELECT lobbies vs preuve post-timeout (doc client)
+-- =============================================================================
+-- Policies : lobbies_select_host (uid = host_id) · lobbies_select_member
+--   (is_lobby_member). Un SELECT .eq(id) → 0 row peut signifier absent OU
+--   masqué. E5 utilise queryActiveLobbyMembership (living membership JOIN
+--   lobbies) : none = preuve fiable « plus de membership vivante » pour
+--   traiter ALREADY_GONE après erreur transport.
+--   found Y ≠ X = CANONICAL_ELSEWHERE (hydratation Y), jamais ALREADY_GONE.
+-- =============================================================================

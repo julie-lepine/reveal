@@ -568,7 +568,9 @@ describe("lobbyServerLeaveVagueD — QA source", () => {
     );
     assert.equal(fn.includes("getState()"), false);
     assert.equal(fn.includes("lobby?.hostId"), false);
-    assert.match(fn, /fetchLobbyHostIdById/);
+    assert.match(fn, /dissolve_lobby_atomically/);
+    assert.equal(fn.includes("deleteGameSession"), false);
+    assert.equal(fn.includes("from(\"lobbies\").delete"), false);
   });
 
   it("leave server-only n'appelle pas forceClearClientLobbyState", () => {

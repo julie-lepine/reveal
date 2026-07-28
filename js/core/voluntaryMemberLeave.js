@@ -16,13 +16,21 @@ export function resetVoluntaryLeaveLockForTests() {
 
 /**
  * Feedback échec leave volontaire (pas busy, pas cancel).
- * @param {{ ok?: boolean, cancelled?: boolean, busy?: boolean }|null|undefined} res
+ * E5 : NOT_ALLOWED ne doit pas se masquer en « connexion a empêché ».
+ * @param {{ ok?: boolean, cancelled?: boolean, busy?: boolean, error?: string, status?: string }|null|undefined} res
  * @param {{ showAppAlert: Function }} deps
  */
 export async function notifyVoluntaryLeaveFailure(res, deps) {
   if (!res || res.ok || res.cancelled || res.busy) return;
   const alert = deps?.showAppAlert;
   if (!alert) return;
+  if (res.status === "NOT_ALLOWED") {
+    await alert(res.error || "Tu n'es pas l'hôte de ce lobby.", {
+      title: "Fermeture impossible",
+      icon: "⚠️",
+    });
+    return;
+  }
   await alert(
     "La connexion a empêché la sortie du lobby. Réessaie dans quelques instants.",
     {

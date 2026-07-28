@@ -50,16 +50,24 @@ import {
   commitMembershipRemoved,
   MEMBERSHIP_HYDRATION_SOURCE,
 } from "./lobbyMembershipAlign.js";
-import { beginPostLeaveHomeTransition } from "./homeMembershipLeaveTransition.js";
+import {
+  beginPostLeaveHomeTransition,
+  endPostLeaveHomeTransition,
+} from "./homeMembershipLeaveTransition.js";
 import {
   getMembershipSnapshot,
   setMembershipSnapshot,
+  invalidateMembershipSnapshot,
+  getMembershipAuthGeneration,
 } from "./lobbyMembershipSnapshot.js";
 import {
   assertCanInsertLobby,
+  applyMembershipQueryToSnapshot,
   LOBBY_CREATE_ERROR,
   makeLobbyCreateError,
 } from "./lobbyCreateGuard.js";
+import { LOBBY_DISSOLVE_STATUS } from "./lobbyDissolveContract.js";
+import { clearTraitrePrivateLocalForLobby } from "./traitrePrivate.js";
 import {
   leaveLobbyMembershipFromServer as runServerOnlyLeave,
   SERVER_LEAVE_CONFIRM,
@@ -1147,6 +1155,134 @@ export async function handleKickedFromLobby() {
   navigate("home", { reset: true });
 }
 
+/**
+ * E5 — après DISSOLVED / ALREADY_GONE (succès silencieux pour ALREADY_GONE).
+ */
+function applyHostDissolveLocalSuccess({ lobbyId, wasGuest, navigateAway }) {
+  beginPostLeaveHomeTransition();
+  const hostUserId = getSupabaseUserId();
+  if (hostUserId && lobbyId) {
+    commitMembershipRemoved({ userId: hostUserId, lobbyId });
+  }
+  clearTraitrePrivateLocalForLobby(lobbyId);
+  applyLeaveLobbyLocal({ wasGuest, navigateAway });
+}
+
+/**
+ * E5 — timeout dissolve X puis membership vivante Y (≠ X).
+ * Ordre : drop cache X (sans Home, sans soft-hold) → snapshot Y déjà appliqué
+ * en re-query → recover Y → goToLobby. Soft-hold bloquerait le chrome found Y.
+ *
+ * @returns {Promise<{ ok: boolean, status: string, code?: string, error?: string }>}
+ */
+async function reconcileHostDissolveCanonicalElsewhere({
+  attemptedLobbyId,
+  canonicalLobbyId = null,
+} = {}) {
+  // Ne pas beginPostLeave : post_leave > found masquerait Resume / bloquerait Y.
+  clearTraitrePrivateLocalForLobby(attemptedLobbyId);
+
+  const localId = getLobby()?.id;
+  if (localId && String(localId) === String(attemptedLobbyId)) {
+    // Drop X sans wipe auth invité (besoin session pour recover Y) ni navigate Home.
+    performLobbyBoundaryTeardown();
+    const guestMem = loadGuestMembership();
+    if (
+      guestMem?.lobbyId &&
+      String(guestMem.lobbyId) === String(attemptedLobbyId)
+    ) {
+      clearGuestMembership();
+    }
+    saveStatePatch({ inLobby: false, lobby: null, lobbyCode: null });
+  }
+
+  // commitMembershipRemoved(X) no-op si snapshot déjà found Y (lobby_mismatch).
+  const userId = getSupabaseUserId();
+  if (userId && attemptedLobbyId) {
+    commitMembershipRemoved({ userId, lobbyId: attemptedLobbyId });
+  }
+
+  endPostLeaveHomeTransition();
+
+  const recovered = await recoverLobbyFromServer({ withMessages: true });
+  if (!recovered?.ok) {
+    return {
+      ok: false,
+      status: LOBBY_DISSOLVE_STATUS.CANONICAL_ELSEWHERE,
+      error:
+        "Une autre soirée est active sur le serveur, mais la reconnexion a échoué. Réessaie depuis l'accueil.",
+      canonicalLobbyId: canonicalLobbyId || recovered?.lobbyId || null,
+    };
+  }
+
+  goToLobby();
+  return {
+    ok: true,
+    status: LOBBY_DISSOLVE_STATUS.CANONICAL_ELSEWHERE,
+    code: recovered.code,
+    canonicalLobbyId: recovered.lobbyId || canonicalLobbyId,
+  };
+}
+
+/**
+ * E5 — NOT_ALLOWED : pas de wipe succès ; relecture membership E2.
+ */
+async function reconcileHostDissolveNotAllowed(lobbyId) {
+  invalidateMembershipSnapshot();
+  const userId = getSupabaseUserId();
+  const queryAuthGeneration = getMembershipAuthGeneration();
+  const result = await queryActiveLobbyMembership(userId);
+
+  applyMembershipQueryToSnapshot(result, {
+    getMembershipSnapshot,
+    setMembershipSnapshot,
+    source: "e5-dissolve-not-allowed",
+    userId,
+    queryAuthGeneration,
+  });
+
+  if (result.status === "found" && result.membership?.lobbyId) {
+    const mid = result.membership.lobbyId;
+    if (String(mid) !== String(lobbyId)) {
+      return reconcileHostDissolveCanonicalElsewhere({
+        attemptedLobbyId: lobbyId,
+        canonicalLobbyId: mid,
+      });
+    }
+    await recoverLobbyFromServer({ withMessages: true });
+    return {
+      ok: false,
+      status: LOBBY_DISSOLVE_STATUS.NOT_ALLOWED,
+      error: "Tu n'es pas l'hôte de ce lobby. L'état a été resynchronisé.",
+    };
+  }
+
+  if (result.status === "none") {
+    // Lobby encore présent côté DEFINER, mais plus de membership vivante :
+    // pas de promotion dissolve ; clear local seulement si c’était ce lobby.
+    const localId = getLobby()?.id;
+    if (localId && String(localId) === String(lobbyId)) {
+      beginPostLeaveHomeTransition();
+      if (userId) commitMembershipRemoved({ userId, lobbyId });
+      clearTraitrePrivateLocalForLobby(lobbyId);
+      applyLeaveLobbyLocal({ wasGuest: isGuest(), navigateAway: true });
+    }
+    return {
+      ok: false,
+      status: LOBBY_DISSOLVE_STATUS.NOT_ALLOWED,
+      error: "Tu n'es pas l'hôte de ce lobby.",
+    };
+  }
+
+  return {
+    ok: false,
+    status: LOBBY_DISSOLVE_STATUS.NOT_ALLOWED,
+    unknown: true,
+    error:
+      "Fermeture refusée par le serveur, et la vérification membership a échoué. Réessaie.",
+  };
+}
+
 /** Hôte : supprime le lobby pour tout le monde. */
 export async function dissolveLobbyAsHost({ navigateAway = true } = {}) {
   stopMultiplayerSync();
@@ -1160,15 +1296,28 @@ export async function dissolveLobbyAsHost({ navigateAway = true } = {}) {
   if (isSupabaseConfigured() && lobby?.id) {
     const res = await closeLobbySupabase();
     if (!res.ok) {
-      return { ok: false, error: res.error };
+      if (res.status === LOBBY_DISSOLVE_STATUS.NOT_ALLOWED) {
+        return reconcileHostDissolveNotAllowed(lobbyId);
+      }
+      return {
+        ok: false,
+        error: res.error,
+        status: res.status ?? null,
+        unknown: Boolean(res.unknown),
+        retryable: Boolean(res.retryable),
+      };
     }
-    // E3 soft-hold puis preuve cascade — retirer found hôte.
-    beginPostLeaveHomeTransition();
-    const hostUserId = getSupabaseUserId();
-    if (hostUserId && lobbyId) {
-      commitMembershipRemoved({ userId: hostUserId, lobbyId });
+    if (res.status === LOBBY_DISSOLVE_STATUS.CANONICAL_ELSEWHERE) {
+      // Pas de signOut anon : session requise pour recover Y.
+      return reconcileHostDissolveCanonicalElsewhere({
+        attemptedLobbyId: lobbyId,
+        canonicalLobbyId: res.canonicalLobbyId ?? null,
+      });
     }
+    // E3 soft-hold — DISSOLVED et ALREADY_GONE (succès silencieux).
     await signOutAnonGuestIfNeeded(wasGuest);
+    applyHostDissolveLocalSuccess({ lobbyId, wasGuest, navigateAway });
+    return { ok: true, status: res.status };
   } else if (code) {
     clearLocalOpenLobbySlot(code);
   }
@@ -1284,12 +1433,22 @@ export async function leaveLobbyMembershipFromServer(membership) {
       deleteOwnMembership: deleteOwnLobbyMembershipById,
       closeLobbyAsHost: closeLobbyByIdAsHost,
     }
-  ).then((result) => {
-    // E3 soft-hold puis preuve DELETE/dissolve OK (Vague D).
+  ).then(async (result) => {
+    if (result?.action === "canonical_elsewhere") {
+      return reconcileHostDissolveCanonicalElsewhere({
+        attemptedLobbyId: membership?.lobbyId,
+        canonicalLobbyId: result.canonicalLobbyId ?? null,
+      });
+    }
+    // E3 soft-hold puis preuve DELETE/dissolve OK (Vague D / E5).
     beginPostLeaveHomeTransition();
     const userId = getSupabaseUserId();
     if (userId && membership?.lobbyId) {
       commitMembershipRemoved({ userId, lobbyId: membership.lobbyId });
+    }
+    // E5 — localStorage Traître uniquement (SQL CASCADE déjà fait côté dissolve).
+    if (result?.action === "dissolved" && membership?.lobbyId) {
+      clearTraitrePrivateLocalForLobby(membership.lobbyId);
     }
     performLobbyBoundaryTeardown();
     return result;

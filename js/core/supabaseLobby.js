@@ -33,6 +33,11 @@ import {
   getMembershipAuthGeneration,
 } from "./lobbyMembershipSnapshot.js";
 import { applyMembershipQueryToSnapshot } from "./lobbyCreateGuard.js";
+import {
+  LOBBY_DISSOLVE_STATUS,
+  mapDissolveLobbyRpcData,
+  interpretDissolveMembershipRequery,
+} from "./lobbyDissolveContract.js";
 import { captureLobbyRuntimeEpoch, isLobbyRuntimeEpochCurrent } from "./lobbyRuntime.js";
 import {
   createLobbyJoinEffects,
@@ -1785,51 +1790,61 @@ export async function deleteOwnLobbyMembershipById(lobbyId) {
 }
 
 /**
- * Vague D / cache — dissolution hôte par lobbyId explicite.
- * Vérifie host_id serveur (pas state.lobby.hostId). RLS lobbies_delete_host en filet.
- * Cascade memberships / messages via FK ; session jeu + traitre nettoyés best-effort.
+ * E5 — dissolution hôte via dissolve_lobby_atomically (un round-trip).
+ * DISSOLVED | ALREADY_GONE → ok. NOT_ALLOWED / UNAUTHENTICATED / malformé → !ok.
+ * Erreur transport → invalidate + query membership (pas SELECT lobbies RLS).
+ * Pas de deleteGameSession / clearTraitre SQL / DELETE direct / fetch host_id.
  */
 export async function closeLobbyByIdAsHost(lobbyId) {
-  const userId = getSupabaseUserId();
-  if (!lobbyId || !userId) {
-    return { ok: false, error: "Seul l'hôte peut fermer le lobby." };
-  }
-
-  let hostId;
-  try {
-    hostId = await fetchLobbyHostIdById(lobbyId);
-  } catch (e) {
-    return { ok: false, error: e?.message || "Impossible de vérifier l'hôte." };
-  }
-  if (!hostId || String(hostId) !== String(userId)) {
-    return { ok: false, error: "Seul l'hôte peut fermer le lobby." };
-  }
-
-  try {
-    const { deleteGameSession } = await import("./supabaseGame.js");
-    await deleteGameSession(lobbyId);
-  } catch (e) {
-    console.warn("REVEAL delete game session on close lobby:", e.message || e);
-  }
-
-  try {
-    const { clearTraitrePrivateForLobby } = await import("./traitrePrivate.js");
-    await clearTraitrePrivateForLobby(lobbyId);
-  } catch (e) {
-    console.warn("REVEAL clear traitre private:", e.message || e);
-  }
-
-  const { data, error } = await supabase.from("lobbies").delete().eq("id", lobbyId).select("id");
-  if (error) return { ok: false, error: error.message };
-  if (!data?.length) {
+  if (!lobbyId) {
     return {
       ok: false,
-      error:
-        "Le lobby n'a pas pu être supprimé (droits ou session). Reconnecte-toi avec le compte qui a créé la partie.",
+      status: null,
+      error: "Lobby manquant.",
+      malformed: true,
     };
   }
-  return { ok: true };
+
+  const { data, error } = await supabase.rpc("dissolve_lobby_atomically", {
+    p_lobby_id: lobbyId,
+  });
+
+  if (error) {
+    return reconcileDissolveAfterTransportError(lobbyId, {
+      ok: false,
+      status: null,
+      networkError: true,
+      error: error.message || "Impossible de fermer le lobby.",
+    });
+  }
+
+  return mapDissolveLobbyRpcData(data, lobbyId);
 }
+
+/**
+ * Timeout / réponse perdue après commit possible.
+ * Preuve absente = queryActiveLobbyMembership → none (JOIN living), pas
+ * `lobbies.select` (RLS host/member peut masquer une ligne encore présente).
+ * found autre lobby → CANONICAL_ELSEWHERE (pas ALREADY_GONE / pas Home wipe).
+ */
+async function reconcileDissolveAfterTransportError(lobbyId, transportFailure) {
+  invalidateMembershipSnapshot();
+  const userId = getSupabaseUserId();
+  const queryAuthGeneration = getMembershipAuthGeneration();
+  const result = await queryActiveLobbyMembership(userId);
+
+  applyMembershipQueryToSnapshot(result, {
+    getMembershipSnapshot,
+    setMembershipSnapshot,
+    source: "e5-dissolve-transport-requery",
+    userId,
+    queryAuthGeneration,
+  });
+
+  return interpretDissolveMembershipRequery(result, lobbyId);
+}
+
+export { LOBBY_DISSOLVE_STATUS, mapDissolveLobbyRpcData };
 
 /** Hôte : supprime le lobby (membres et messages en cascade) — cache local. */
 export async function closeLobbySupabase() {

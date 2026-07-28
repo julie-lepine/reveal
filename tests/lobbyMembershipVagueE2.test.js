@@ -455,6 +455,10 @@ describe("lobbyMembershipVagueE2 — contrats source", () => {
       src.indexOf("export async function dissolveLobbyAsHost"),
       src.indexOf("export async function confirmAndLeaveLobby")
     );
+    const dissolveSuccessHelper = src.slice(
+      src.indexOf("function applyHostDissolveLocalSuccess"),
+      src.indexOf("async function reconcileHostDissolveCanonicalElsewhere")
+    );
     const serverLeave = src.slice(
       src.indexOf("export async function leaveLobbyMembershipFromServer"),
       src.indexOf("export async function transferLobbyHost")
@@ -462,12 +466,13 @@ describe("lobbyMembershipVagueE2 — contrats source", () => {
 
     assert.match(dissolveGuest, /commitMembershipRemoved/);
     assert.match(kick, /commitMembershipRemoved/);
-    assert.match(dissolveHost, /commitMembershipRemoved/);
+    assert.match(dissolveHost, /applyHostDissolveLocalSuccess/);
+    assert.match(dissolveSuccessHelper, /commitMembershipRemoved/);
     assert.match(serverLeave, /commitMembershipRemoved/);
     // dissolve host only after closeLobbySupabase ok
     const closeIdx = dissolveHost.indexOf("closeLobbySupabase");
-    const removeIdx = dissolveHost.indexOf("commitMembershipRemoved");
-    assert.ok(closeIdx >= 0 && removeIdx > closeIdx);
+    const successIdx = dissolveHost.indexOf("applyHostDissolveLocalSuccess");
+    assert.ok(closeIdx >= 0 && successIdx > closeIdx);
   });
 
   it("Realtime kick : handleKicked seulement si removedUid === localUid", async () => {

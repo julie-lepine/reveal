@@ -137,9 +137,15 @@ export async function hostDistributeTraitreRoles(pairId, impostorName, playerNam
   return { ok: true, written, skippedNames: [] };
 }
 
-export async function clearTraitrePrivateForLobby(lobbyId) {
+/** E5 dissolve — localStorage seulement (SQL déjà CASCADE sur DELETE lobby). */
+export function clearTraitrePrivateLocalForLobby(lobbyId) {
   if (!lobbyId) return;
   localStorage.removeItem(`${LOCAL_KEY}:${lobbyId}`);
+}
+
+export async function clearTraitrePrivateForLobby(lobbyId) {
+  if (!lobbyId) return;
+  clearTraitrePrivateLocalForLobby(lobbyId);
   if (!isSupabaseConfigured()) return;
   const { error } = await supabase.from("traitre_private").delete().eq("lobby_id", lobbyId);
   if (error) console.warn("[traitre_private] clear:", error.message);

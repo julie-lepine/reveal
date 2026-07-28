@@ -262,14 +262,19 @@ describe("lobbyMembershipVagueE3 — soft-hold post-leave", () => {
 
     const lobby = readFileSync(join(root, "js/core/lobby.js"), "utf8");
     assert.match(lobby, /beginPostLeaveHomeTransition/);
+    const dissolveSuccess = lobby.slice(
+      lobby.indexOf("function applyHostDissolveLocalSuccess"),
+      lobby.indexOf("async function reconcileHostDissolveCanonicalElsewhere")
+    );
+    assert.ok(
+      dissolveSuccess.indexOf("beginPostLeaveHomeTransition") <
+        dissolveSuccess.indexOf("commitMembershipRemoved")
+    );
     const dissolve = lobby.slice(
       lobby.indexOf("export async function dissolveLobbyAsHost"),
       lobby.indexOf("export async function confirmAndLeaveLobby")
     );
-    assert.ok(
-      dissolve.indexOf("beginPostLeaveHomeTransition") <
-        dissolve.indexOf("commitMembershipRemoved")
-    );
+    assert.match(dissolve, /applyHostDissolveLocalSuccess/);
   });
 
   it("11 — postLeave + cached_active encore présent : soft-hold, pas de Resume / Retour", () => {
@@ -436,6 +441,10 @@ describe("lobbyMembershipVagueE3 — soft-hold post-leave", () => {
       lobby.indexOf("export async function dissolveLobbyAsHost"),
       lobby.indexOf("export async function confirmAndLeaveLobby")
     );
+    const dissolveSuccess = lobby.slice(
+      lobby.indexOf("function applyHostDissolveLocalSuccess"),
+      lobby.indexOf("async function reconcileHostDissolveCanonicalElsewhere")
+    );
     const serverOnly = lobby.slice(
       lobby.indexOf("export async function leaveLobbyMembershipFromServer"),
       lobby.indexOf("export async function transferLobbyHost")
@@ -459,10 +468,15 @@ describe("lobbyMembershipVagueE3 — soft-hold post-leave", () => {
     assert.equal(leaveFn.includes("beginPostLeaveHomeTransition()"), false);
     assert.match(leaveFn, /beginPostLeaveHomeTransition,/);
 
-    // Dissolve / server-only : exactement un appel begin chacun.
+    // Dissolve succès : un begin dans le helper, un appel helper depuis dissolve.
+    assert.equal(
+      (dissolveSuccess.match(/beginPostLeaveHomeTransition\(/g) || []).length,
+      1
+    );
+    assert.match(dissolve, /applyHostDissolveLocalSuccess/);
     assert.equal(
       (dissolve.match(/beginPostLeaveHomeTransition\(/g) || []).length,
-      1
+      0
     );
     assert.equal(
       (serverOnly.match(/beginPostLeaveHomeTransition\(/g) || []).length,

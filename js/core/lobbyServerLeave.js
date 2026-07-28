@@ -10,6 +10,8 @@
  * → query `found` (pas `none`) — correct.
  */
 
+import { LOBBY_DISSOLVE_STATUS } from "./lobbyDissolveContract.js";
+
 export const LOBBY_SERVER_LEAVE_ERROR = Object.freeze({
   INVALID_MEMBERSHIP: "LOBBY_SERVER_LEAVE_INVALID_MEMBERSHIP",
   AUTH_REQUIRED: "LOBBY_SERVER_LEAVE_AUTH_REQUIRED",
@@ -210,6 +212,16 @@ export async function leaveLobbyMembershipFromServer(input, deps) {
 
   if (resolved.action === "dissolved") {
     const res = await deps.closeLobbyAsHost(lobbyId);
+    if (res?.status === LOBBY_DISSOLVE_STATUS.CANONICAL_ELSEWHERE) {
+      return {
+        ok: true,
+        action: "canonical_elsewhere",
+        lobbyId,
+        code,
+        status: LOBBY_DISSOLVE_STATUS.CANONICAL_ELSEWHERE,
+        canonicalLobbyId: res.canonicalLobbyId ?? null,
+      };
+    }
     if (!res?.ok) {
       throw makeLobbyServerLeaveError(
         LOBBY_SERVER_LEAVE_ERROR.DISSOLVE_FAILED,
