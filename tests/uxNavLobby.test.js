@@ -154,21 +154,21 @@ describe("UX-NAV-LOBBY — sortie volontaire invité", () => {
     assert.match(main, /resumeEveningSession/);
     assert.match(main, /hasActiveLobby/);
     assert.deepEqual([...resolveBottomNavTabs(true)], [
-      "settings",
       "games",
-      "logo",
       "results",
+      "logo",
       "final",
+      "settings",
     ]);
   });
 
   it("14 — F5 après sortie : hors lobby → Accueil au catalogue, pas Paramètres", () => {
     assert.deepEqual([...resolveBottomNavTabs(false)], [
-      "home",
       "games",
-      "logo",
       "results",
+      "logo",
       "final",
+      "home",
     ]);
     const main = src("js/main.js");
     // Sans lobby actif, boot tombe sur Accueil (pas resume hub).

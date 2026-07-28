@@ -34,11 +34,11 @@ describe("UX-NAV-SETTINGS — navigation", () => {
 
   it("hors lobby → Accueil dans le catalogue, pas Paramètres", () => {
     assert.deepEqual([...resolveBottomNavTabs(false)], [
-      "home",
       "games",
-      "logo",
       "results",
+      "logo",
       "final",
+      "home",
     ]);
   });
 

@@ -19,19 +19,19 @@ export const BOTTOM_NAV_TAB = Object.freeze({
 export function resolveBottomNavTabs(inLobby) {
   if (inLobby) {
     return Object.freeze([
-      BOTTOM_NAV_TAB.SETTINGS,
       BOTTOM_NAV_TAB.GAMES,
-      BOTTOM_NAV_TAB.LOGO,
       BOTTOM_NAV_TAB.RESULTS,
+      BOTTOM_NAV_TAB.LOGO,
       BOTTOM_NAV_TAB.FINAL,
+      BOTTOM_NAV_TAB.SETTINGS,
     ]);
   }
   return Object.freeze([
-    BOTTOM_NAV_TAB.HOME,
     BOTTOM_NAV_TAB.GAMES,
-    BOTTOM_NAV_TAB.LOGO,
     BOTTOM_NAV_TAB.RESULTS,
+    BOTTOM_NAV_TAB.LOGO,
     BOTTOM_NAV_TAB.FINAL,
+    BOTTOM_NAV_TAB.HOME,
   ]);
 }
 
