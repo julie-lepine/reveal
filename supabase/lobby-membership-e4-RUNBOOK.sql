@@ -1,0 +1,67 @@
+-- =============================================================================
+-- E4 — Runbook production (checklist ops)
+-- Verdict courant : GO QA staging · NO-GO prod tant que harness staging non vert.
+-- =============================================================================
+--
+-- Étape 0 — STOP si staging non validé
+--   Condition d’arrêt : scénarios 1–5 harness non collés / fail.
+--   Rollback : N/A (rien en prod).
+--
+-- Étape 1 — Préflight prod (lecture seule)
+--   Fichier : lobby-membership-e4-00-preflight-duplicates.sql
+--   Vérif : duplicate_user_count = 0
+--   Arrêt si > 0 → résolution explicite (pas de purge silencieuse)
+--   Rollback : N/A
+--
+-- Étape 2 — e4-01 create_lobby_atomically
+--   Appliquer lobby-membership-e4-01-create-lobby-atomically.sql
+--   Vérif grants :
+--     SELECT has_function_privilege('anon','create_lobby_atomically(text,text,text)','EXECUTE');
+--       → false
+--     SELECT has_function_privilege('authenticated','create_lobby_atomically(text,text,text)','EXECUTE');
+--       → true
+--     prosecdef / search_path public / owner postgres
+--   Arrêt si RPC manquante ou anon EXECUTE true
+--   Rollback :
+--     DROP FUNCTION IF EXISTS public.create_lobby_atomically(text, text, text);
+--   Fenêtre : ancien client continue INSERT+create_lobby_member (courses possibles)
+--
+-- Étape 3 — e4-02 UNIQUE + reclaim
+--   Appliquer lobby-membership-e4-02-unique-user-index.sql
+--   Vérif :
+--     SELECT indexname FROM pg_indexes WHERE indexname = 'lobby_members_one_living_per_user';
+--   Arrêt si DO block RAISE (doublons) ou index absent
+--   Rollback :
+--     DROP INDEX IF EXISTS public.lobby_members_one_living_per_user;
+--     (reclaim : rejouer définition prod antérieure depuis reclaim-guest-membership.sql
+--      + snapshot create si besoin — préparer le SQL de rollback avant coup)
+--   Risque fenêtre : ancien create → lobby INSERT puis member UNIQUE fail → orphelin
+--     → déployer client E4 immédiatement après
+--
+-- Étape 4 — Déploiement client E4
+--   Ship app (GH Pages / stores) avec create_lobby_atomically
+--   Vérif : create home OK ; Network = rpc create_lobby_atomically
+--   Arrêt si create 404/PGRST202 (RPC absente)
+--   Rollback app : revert release (SQL 01/02 peuvent rester : UNIQUE ok)
+--
+-- Étape 5 — QA multi-onglets prod smoke
+--   2 onglets même compte : Créer / Créer → 1 lobby, reconnexion
+--   create puis join autre code → conflit mappé
+--   Arrêt si 23505 brut non mappé / orphelins host_id sans members
+--   Vérif orphelins :
+--     SELECT l.id, l.code FROM lobbies l
+--     WHERE NOT EXISTS (SELECT 1 FROM lobby_members m WHERE m.lobby_id = l.id)
+--       AND l.created_at > now() - interval '1 hour';
+--
+-- Étape 6 — Observation ancien RPC (Option A)
+--   Appliquer e4-03 (exception E4_RPC_DEPRECATED, grants gardés)
+--   Surveiller logs / messages contenant E4_RPC_DEPRECATED
+--   Arrêt : trop d’appels → allonger fenêtre, ne pas REVOKE
+--   Rollback : restaurer create-lobby-member.sql (snapshot prod)
+--
+-- Étape 7 — e4-03b REVOKE (Option B) — seulement si observation ≈ 0
+--   Appliquer lobby-membership-e4-03b-revoke-create-lobby-member.sql
+--   Vérif : authenticated EXECUTE create_lobby_member = false
+--   Rollback : GRANT EXECUTE … TO authenticated, anon (si besoin legacy)
+--
+-- =============================================================================

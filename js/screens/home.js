@@ -1447,10 +1447,13 @@ export function mountHome(app) {
       } catch (err) {
         if (!shouldContinue()) return;
         if (err?.code === LOBBY_CREATE_ERROR.ALREADY_EXISTS) {
-          await showAppAlert(err.message || "Tu es déjà dans un lobby.", {
-            title: "Lobby existant",
-            icon: "⚠️",
-          });
+          await showAppAlert(
+            err.message || "Une soirée est déjà active. Reconnexion…",
+            {
+              title: "Lobby existant",
+              icon: "⚠️",
+            }
+          );
           if (!shouldContinue()) return;
           scheduleRender(true);
           return;

@@ -24,6 +24,15 @@ import {
   alignMembershipSnapshotAfterLobbyHydration,
   MEMBERSHIP_HYDRATION_SOURCE,
 } from "./lobbyMembershipAlign.js";
+import { isLobbyMembersOneLivingPerUserConflict } from "./lobbyMembershipUniqueConflict.js";
+import { queryActiveLobbyMembership } from "./lobbyMembershipFetch.js";
+import {
+  invalidateMembershipSnapshot,
+  getMembershipSnapshot,
+  setMembershipSnapshot,
+  getMembershipAuthGeneration,
+} from "./lobbyMembershipSnapshot.js";
+import { applyMembershipQueryToSnapshot } from "./lobbyCreateGuard.js";
 import { captureLobbyRuntimeEpoch, isLobbyRuntimeEpochCurrent } from "./lobbyRuntime.js";
 import {
   createLobbyJoinEffects,
@@ -831,6 +840,14 @@ export async function reclaimGuestMembership({ membershipId, lobbyCode, displayN
   });
 
   if (error) {
+    if (isLobbyMembersOneLivingPerUserConflict(error)) {
+      return {
+        ok: false,
+        error:
+          "Tu es déjà dans une autre soirée. Quitte-la avant de reprendre cette place.",
+        code: "membership_already_elsewhere",
+      };
+    }
     return { ok: false, error: error.message || "Reclaim impossible." };
   }
 
@@ -1426,66 +1443,115 @@ async function generateUniqueCode() {
 export async function createLobbySupabase() {
   const userId = getSupabaseUserId();
 
-const { data: authCheck } = await supabase.auth.getUser();
+  const { data: authCheck } = await supabase.auth.getUser();
 
-console.log("[DEBUG CREATE LOBBY AUTH]", {
-  localUserId: userId,
-  authUserId: authCheck?.user?.id,
-  isAnonymous: authCheck?.user?.is_anonymous,
-});
+  console.log("[DEBUG CREATE LOBBY AUTH]", {
+    localUserId: userId,
+    authUserId: authCheck?.user?.id,
+    isAnonymous: authCheck?.user?.is_anonymous,
+  });
   if (!userId) return { ok: false, error: "Connecte-toi pour créer un lobby." };
 
-  const code = await generateUniqueCode();
   const displayName = getLocalDisplayName();
   const emoji = getLocalEmoji();
 
-  const { data: lobby, error: lobbyErr } = await supabase
-    .from("lobbies")
-    .insert({
-      code,
-      host_id: userId,
-      status: "waiting",
-      game_id: null,
-    })
-    .select("id, code, status, game_id, host_id")
-    .single();
+  // E4 — un seul round-trip atomique (plus INSERT lobbies + create_lobby_member).
+  const { data, error } = await supabase.rpc("create_lobby_atomically", {
+    p_display_name: displayName,
+    p_emoji: emoji,
+    p_color: HOST_COLOR,
+  });
 
-  if (lobbyErr) return { ok: false, error: lobbyErr.message };
-
-  const { data: memberData, error: memberErr } = await supabase.rpc(
-    "create_lobby_member",
-    {
-      p_lobby_id: lobby.id,
-      p_display_name: displayName,
-      p_emoji: emoji,
-      p_color: HOST_COLOR,
+  if (error) {
+    if (isLobbyMembersOneLivingPerUserConflict(error)) {
+      return { ok: true, alreadyExists: true, viaConstraint: true };
     }
-  );
+    return { ok: false, error: error.message || "Impossible de créer le lobby." };
+  }
 
-console.log("[DEBUG MEMBER INSERT CREATE]", {
-  lobbyId: lobby.id,
-  userId,
-  memberData,
-  memberErr,
-});
+  const status = data?.status;
+  if (status === "ALREADY_EXISTS") {
+    return {
+      ok: true,
+      alreadyExists: true,
+      lobbyId: data.lobby_id || null,
+      codeHint: data.lobby_code || null,
+      extraCount:
+        typeof data.extra_count === "number" ? data.extra_count : undefined,
+    };
+  }
 
-  if (memberErr) return { ok: false, error: memberErr.message };
+  if (status !== "CREATED" || !data?.lobby_id) {
+    return { ok: false, error: "Réponse create_lobby_atomically invalide." };
+  }
 
-  const bundle = await fetchLobbyBundle(lobby.id, { withMessages: true, currentUserId: userId });
-  applyLobbyToState(bundle, { persistGuestMembership: getState().user?.isGuest === true });
+  const lobbyId = data.lobby_id;
+  const code = data.lobby_code;
+  const memberData = data.member ?? null;
+
+  const bundle = await fetchLobbyBundle(lobbyId, {
+    withMessages: true,
+    currentUserId: userId,
+  });
+  applyLobbyToState(bundle, {
+    persistGuestMembership: getState().user?.isGuest === true,
+  });
   alignMembershipSnapshotAfterLobbyHydration({
     bundle,
     userId,
     source: MEMBERSHIP_HYDRATION_SOURCE.CREATE_CONFIRMED,
     canonicalRow: memberData,
   });
-  await hydrateSessionThenStartSync(lobby.id);
+  await hydrateSessionThenStartSync(lobbyId);
 
   const gs = { ...getState().globalStats };
   gs.lobbiesCreated = (gs.lobbiesCreated || 0) + 1;
   saveStatePatch({ globalStats: gs });
 
   return { ok: true, code };
+}
+
+/**
+ * E4 — ALREADY_EXISTS / conflit UNIQUE : re-query membership puis hydrate E2.
+ * N’écrit pas un faux snapshot found depuis la RPC seule.
+ * @returns {Promise<{ ok: true, code: string }|{ ok: false, error: string, unknown?: boolean }>}
+ */
+export async function recoverAfterMembershipAlreadyExists() {
+  invalidateMembershipSnapshot();
+  const userId = getSupabaseUserId();
+  const queryAuthGeneration = getMembershipAuthGeneration();
+  const result = await queryActiveLobbyMembership(userId);
+
+  applyMembershipQueryToSnapshot(result, {
+    getMembershipSnapshot,
+    setMembershipSnapshot,
+    source: "e4-already-exists-requery",
+    userId,
+    queryAuthGeneration,
+  });
+
+  if (result.status === "unknown") {
+    return {
+      ok: false,
+      error: "Impossible de vérifier ta soirée active. Réessaie.",
+      unknown: true,
+    };
+  }
+  if (result.status !== "found" || !result.membership?.lobbyId) {
+    return {
+      ok: false,
+      error: "Aucune soirée active retrouvée après conflit de création.",
+    };
+  }
+
+  const recovered = await recoverLobbyFromServer({ withMessages: true });
+  if (!recovered.ok) {
+    return {
+      ok: false,
+      error: "Une soirée est déjà active, mais la reconnexion a échoué.",
+    };
+  }
+  return { ok: true, code: recovered.code };
 }
 
 export async function joinLobbySupabase(codeInput, { joinEffects: externalEffects } = {}) {
@@ -1602,6 +1668,15 @@ export async function joinLobbySupabase(codeInput, { joinEffects: externalEffect
         .single();
 
       if (joinErr) {
+        if (isLobbyMembersOneLivingPerUserConflict(joinErr)) {
+          return {
+            ok: false,
+            error:
+              "Tu es déjà dans une autre soirée. Reconnexion à celle-ci…",
+            code: "membership_already_elsewhere",
+            joinEffects,
+          };
+        }
         if (isDuplicateLobbyDisplayNameError(joinErr)) {
           const storedBeforeReclaim = loadGuestMembership();
           const reclaimRes = await tryReclaimGuestMembershipForJoin(lobbyRow, code, displayName);

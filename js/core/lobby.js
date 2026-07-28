@@ -38,6 +38,7 @@ import {
   onLobbyBundleUpdated,
   notifyLobbyBundleUpdated,
   recoverLobbyFromServer,
+  recoverAfterMembershipAlreadyExists,
   peekServerLobbyForUser,
   getRememberedLobbyCode,
   transferLobbyHostSupabase,
@@ -853,8 +854,8 @@ export function getLobbyParticipants() {
  * `found` / `unknown` → refus ; `none` → INSERT. `peekServerLobbyForUser`
  * (filtre 24 h) n’est plus une garde de création.
  *
- * Limite : deux onglets peuvent encore INSERT en parallèle après deux `none`
- * (pas de contrainte SQL uniques ici).
+ * Vague E4 : INSERT autoritatif = RPC `create_lobby_atomically` (UNIQUE user_id).
+ * `assertCanInsertLobby` reste un pré-check UX, pas l’autorité finale.
  */
 export async function createLobby() {
   const activeLobby = hasActiveLobby() ? getLobby() : null;
@@ -881,6 +882,26 @@ export async function createLobby() {
   if (isSupabaseConfigured()) {
     const res = await createLobbySupabase();
     if (!res.ok) throw new Error(res.error);
+    if (res.alreadyExists) {
+      await showAppAlert("Une soirée est déjà active. Reconnexion…", {
+        title: "Lobby existant",
+        icon: "ℹ️",
+      });
+      const recovered = await recoverAfterMembershipAlreadyExists();
+      if (!recovered.ok) {
+        if (recovered.unknown) {
+          throw makeLobbyCreateError(
+            LOBBY_CREATE_ERROR.CHECK_FAILED,
+            recovered.error || "Impossible de vérifier votre situation. Réessayez."
+          );
+        }
+        throw makeLobbyCreateError(
+          LOBBY_CREATE_ERROR.ALREADY_EXISTS,
+          recovered.error || "Une soirée est déjà active."
+        );
+      }
+      return recovered.code;
+    }
     return res.code;
   }
 
@@ -932,6 +953,18 @@ export async function joinLobby(code) {
       }
       if (!res.ok) {
         await runFinalizeFailedJoinAttempt({ joinEffects, rollbackSnapshot });
+        // E4 — déjà membre ailleurs : re-query + hydrate soirée canonique.
+        if (res.code === "membership_already_elsewhere") {
+          const recovered = await recoverAfterMembershipAlreadyExists();
+          if (recovered.ok) {
+            return { ok: true, code: recovered.code, recoveredExisting: true };
+          }
+          return {
+            ok: false,
+            error: recovered.error || res.error,
+            code: recovered.unknown ? "membership_check_failed" : res.code,
+          };
+        }
         return res;
       }
       markLobbyJoinFinalized(joinEffects);
