@@ -30,6 +30,11 @@
   /* Bannière AdMob native (surchargé par js/core/ads.js) */
   --ad-banner-height: 0px;
   --ad-banner-buffer: 0px;
+
+  /* Espacement titre → contenu (h1 > h2 > h3) */
+  --heading-gap-h1: 18px;
+  --heading-gap-h2: 14px;
+  --heading-gap-h3: 12px;
 }
 
 *{
@@ -96,7 +101,7 @@ body.has-top-ad .back{
 .privacy-section__title{
   font-size:1rem;
   font-weight:700;
-  margin:0 0 .35rem;
+  margin:0 0 var(--heading-gap-h3);
 }
 
 .privacy-section__body{
@@ -470,7 +475,7 @@ body.has-top-ad .back{
   text-transform:uppercase;
   letter-spacing:2px;
   color:rgba(255,255,255,.45);
-  margin-bottom:18px;
+  margin-bottom:var(--heading-gap-h1);
   font-weight:700;
 }
 
@@ -497,7 +502,7 @@ body.has-top-ad .back{
   min-height:var(--touch-min);
   display:flex;
   align-items:center;
-  margin-bottom:18px;
+  margin-bottom:var(--heading-gap-h1);
 }
 
 .page:has(.back) .container > .lobby-count:first-child,
@@ -522,7 +527,7 @@ body.has-top-ad .back{
 
 .card-heading{
   font-weight:700;
-  margin:0 0 16px;
+  margin:0 0 var(--heading-gap-h3);
 }
 
 .card--clickable{
@@ -642,6 +647,16 @@ button.game-card{
   color:rgba(255,255,255,.35);
   font-size:13px;
   margin-top:12px;
+}
+
+/* Évite le double espacement quand un hint suit directement un titre */
+.page-title + .hint,
+.screen-title + .hint,
+.section-title + .hint,
+.section-title--sm + .hint,
+.settings-section__title + .hint,
+.privacy-section__title + .hint{
+  margin-top:0;
 }
 
 .game-header{
@@ -832,12 +847,12 @@ button.game-card{
 .section-title{
   font-size:18px;
   font-weight:800;
-  margin:0 0 16px;
+  margin:0 0 var(--heading-gap-h3);
 }
 
 .section-title--sm{
   font-size:15px;
-  margin:20px 0 10px;
+  margin:20px 0 var(--heading-gap-h3);
 }
 
 .hot-take-vote-pill{
@@ -948,7 +963,7 @@ button.game-card{
 }
 
 .game-scores-box__title{
-  margin-bottom:4px;
+  margin-bottom:var(--heading-gap-h3);
 }
 
 .game-scores-box__game{
@@ -1740,7 +1755,7 @@ button.game-card{
   font-size:28px;
   font-weight:900;
   text-align:center;
-  margin:0 0 12px;
+  margin:0 0 var(--heading-gap-h2);
   letter-spacing:-1px;
 }
 
@@ -2388,7 +2403,7 @@ select.field-input option{
   align-items:center;
   justify-content:space-between;
   gap:12px;
-  margin-bottom:18px;
+  margin-bottom:var(--heading-gap-h1);
 }
 
 .game-select-header .label-upper{
@@ -2978,7 +2993,7 @@ select.field-input option{
 .page-title{
   font-size:26px;
   font-weight:800;
-  margin:0 0 18px;
+  margin:0 0 var(--heading-gap-h1);
   letter-spacing:-.02em;
 }
 
@@ -2987,7 +3002,7 @@ select.field-input option{
 }
 
 .settings-section__title{
-  margin:0 0 6px;
+  margin:0 0 var(--heading-gap-h2);
   font-size:16px;
   font-weight:700;
 }
@@ -3655,7 +3670,7 @@ button.emoji-picker-preview__avatar:active{
   text-transform:uppercase;
   letter-spacing:.06em;
   color:rgba(255,255,255,.55);
-  margin:0 0 10px;
+  margin:0 0 var(--heading-gap-h3);
 }
 
 .evening-recap__empty{

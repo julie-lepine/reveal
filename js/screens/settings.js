@@ -179,6 +179,16 @@ function personnalisationPanelHtml({ emailAccount, user, selectedEmoji }) {
   return `
     <div class="settings-panel" id="settings-panel-personnalisation">
       <div class="card settings-section">
+        <h2 class="settings-section__title">Pseudo</h2>
+        <p class="hint settings-section__hint">Visible dans le lobby et les scores.</p>
+        <label class="field-label" for="settings-name">Ton pseudo</label>
+        <input type="text" class="field-input" id="settings-name" maxlength="24" value="${escapeHtml(getLocalDisplayName())}" />
+        <p class="auth-error hidden" id="name-error"></p>
+        <p class="settings-ok hidden" id="name-ok">Pseudo enregistré.</p>
+        <button type="button" class="btn btn-primary btn--spaced" id="btn-save-name">Enregistrer le pseudo</button>
+      </div>
+
+      <div class="card settings-section">
         <h2 class="settings-section__title">Emoji</h2>
         <p class="hint settings-section__hint">Affiché dans le lobby et les classements.</p>
         <div class="emoji-picker-preview">
@@ -193,16 +203,6 @@ function personnalisationPanelHtml({ emailAccount, user, selectedEmoji }) {
         </div>
         <p class="auth-error hidden" id="emoji-error"></p>
         <p class="settings-ok hidden" id="emoji-ok">Emoji enregistré.</p>
-      </div>
-
-      <div class="card settings-section">
-        <h2 class="settings-section__title">Pseudo</h2>
-        <p class="hint settings-section__hint">Visible dans le lobby et les scores.</p>
-        <label class="field-label" for="settings-name">Ton pseudo</label>
-        <input type="text" class="field-input" id="settings-name" maxlength="24" value="${escapeHtml(getLocalDisplayName())}" />
-        <p class="auth-error hidden" id="name-error"></p>
-        <p class="settings-ok hidden" id="name-ok">Pseudo enregistré.</p>
-        <button type="button" class="btn btn-primary btn--spaced" id="btn-save-name">Enregistrer le pseudo</button>
       </div>
 
       ${
