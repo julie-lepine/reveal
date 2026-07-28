@@ -3132,6 +3132,19 @@ select.field-input option{
   margin-top:0;
 }
 
+.settings-instagram-link{
+  color:rgba(255,255,255,.55);
+  font-weight:650;
+  text-decoration:underline;
+  text-underline-offset:2px;
+}
+
+@media (hover:hover) and (pointer:fine){
+  .settings-instagram-link:hover{
+    color:rgba(255,255,255,.85);
+  }
+}
+
 .settings-social-hint{
   margin:0 0 20px;
   text-align:center;

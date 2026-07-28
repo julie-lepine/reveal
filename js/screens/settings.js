@@ -256,8 +256,7 @@ function supportPanelHtml() {
         <button type="button" class="btn btn-secondary btn--spaced" data-nav="privacy">Politique de confidentialité</button>
         <button type="button" class="btn btn-secondary btn--spaced" id="btn-delete-account">Supprimer mon compte</button>
         <p class="hint settings-section__hint">
-          Suppression définitive du compte e-mail et des données associées (voir aussi
-          <a href="${escapeHtml(ACCOUNT_DELETION_PUBLIC_URL)}" id="link-delete-account-web" target="_blank" rel="noopener noreferrer">la page web</a>).
+          Suppression définitive du compte e-mail et des données associées.
         </p>
       </div>
     </div>`;
@@ -366,7 +365,6 @@ export function mountSettings(app) {
       openExternalUrl(ACCOUNT_DELETION_PUBLIC_URL);
     };
     app.querySelector("#btn-delete-account")?.addEventListener("click", openDeletionPage);
-    app.querySelector("#link-delete-account-web")?.addEventListener("click", openDeletionPage);
 
     app.querySelector("[data-open-instagram]")?.addEventListener("click", (e) => {
       e.preventDefault();
