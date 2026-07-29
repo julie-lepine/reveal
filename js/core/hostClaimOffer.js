@@ -8,10 +8,41 @@ import { getSupabaseUserId } from "./supabaseAuth.js";
 import { isGameSyncActive, isLobbyHost } from "./gameSync.js";
 import { resolveActingHostUserId } from "./hostPresence.js";
 import { showAppAlert, showClaimHostDialog } from "./dialog.js";
+import { getCurrentScreen } from "./router.js";
 import {
   claimLobbyHostIfStaleSupabase,
   refreshLobbyFromSupabase,
 } from "./supabaseLobby.js";
+
+function normalizeHostClaimRecoveryErrorForLog(error) {
+  if (error instanceof Error) {
+    return { errorName: error.name || "Error", errorMessage: error.message || String(error) };
+  }
+  if (typeof error === "string") {
+    return { errorName: "Error", errorMessage: error };
+  }
+  if (error == null) {
+    return { errorName: "Error", errorMessage: "null" };
+  }
+  try {
+    return { errorName: "Error", errorMessage: JSON.stringify(error) };
+  } catch {
+    return { errorName: "Error", errorMessage: String(error) };
+  }
+}
+
+function logHostClaimRecoveryFailure(error) {
+  const { errorName, errorMessage } = normalizeHostClaimRecoveryErrorForLog(error);
+  console.warn("[MP-RT] catch-up failed", {
+    event: "mp_rt_catchup_failed",
+    phase: "host_claim_recovery",
+    stage: "refresh_lobby",
+    attempt: 1,
+    currentScreen: getCurrentScreen(),
+    errorName,
+    errorMessage,
+  });
+}
 
 function hostInactiveMinutes(participants, hostId, now = Date.now()) {
   const host =
@@ -77,7 +108,11 @@ export async function ensureLobbyHostOrOfferClaim({ reason = "host-action" } = {
 
   const res = await claimLobbyHostIfStaleSupabase();
   if (!res.ok) {
-    await refreshLobbyFromSupabase().catch(() => {});
+    try {
+      await refreshLobbyFromSupabase();
+    } catch (error) {
+      logHostClaimRecoveryFailure(error);
+    }
     const msg = String(res.error || "");
     const hostBack = /encore actif/i.test(msg);
     await showAppAlert(
@@ -104,3 +139,8 @@ export async function ensureLobbyHostOrOfferClaim({ reason = "host-action" } = {
 
   return { ok: true, claimed: true, reason };
 }
+
+export {
+  normalizeHostClaimRecoveryErrorForLog as __testNormalizeHostClaimRecoveryErrorForLog,
+  logHostClaimRecoveryFailure as __testLogHostClaimRecoveryFailure,
+};

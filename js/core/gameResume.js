@@ -20,6 +20,8 @@ import {
   shouldShowResumeBannerAfterDismiss,
 } from "./resumeBannerDismiss.js";
 import { bindNav } from "../screens/nav.js";
+import { getCurrentScreen } from "./router.js";
+import { getState } from "./state.js";
 
 const SCREEN_LABELS = {
   "traitre-prep": "Spot the fake",
@@ -124,6 +126,38 @@ export function gameResumeBannerHtml(screen) {
     </div>`;
 }
 
+function normalizeGameResumeRefreshErrorForLog(error) {
+  if (error instanceof Error) {
+    return { errorName: error.name || "Error", errorMessage: error.message || String(error) };
+  }
+  if (typeof error === "string") {
+    return { errorName: "Error", errorMessage: error };
+  }
+  if (error == null) {
+    return { errorName: "Error", errorMessage: "null" };
+  }
+  try {
+    return { errorName: "Error", errorMessage: JSON.stringify(error) };
+  } catch {
+    return { errorName: "Error", errorMessage: String(error) };
+  }
+}
+
+function logGameResumeRefreshFailure(error, { targetScreen } = {}) {
+  const { errorName, errorMessage } = normalizeGameResumeRefreshErrorForLog(error);
+  console.warn("[MP-RT] catch-up failed", {
+    event: "mp_rt_catchup_failed",
+    phase: "game_resume",
+    stage: "refresh_session",
+    attempt: 1,
+    targetScreen: targetScreen ?? null,
+    currentScreen: getCurrentScreen(),
+    lobbyId: getState().lobby?.id ?? null,
+    errorName,
+    errorMessage,
+  });
+}
+
 export async function rejoinGameResumeTarget(targetScreen, { shouldContinue = null } = {}) {
   const canContinue = () => typeof shouldContinue !== "function" || shouldContinue();
   clearResumeBannerDismiss();
@@ -133,10 +167,16 @@ export async function rejoinGameResumeTarget(targetScreen, { shouldContinue = nu
   const cached = getCachedGameSession();
   if (cached?.state) applyRemoteSession(cached);
   routeToSessionScreen(targetScreen, { force: true });
-  void refreshGameSession().then((row) => {
-    if (!canContinue()) return;
-    if (row) void routeToActiveGameIfNeeded(row, { force: true, shouldContinue });
-  });
+  void refreshGameSession()
+    .then((row) => {
+      if (!canContinue()) return;
+      if (row) {
+        void routeToActiveGameIfNeeded(row, { force: true, shouldContinue });
+      }
+    })
+    .catch((error) => {
+      logGameResumeRefreshFailure(error, { targetScreen });
+    });
   return true;
 }
 
@@ -269,6 +309,10 @@ export function shouldShowGameSelectResumeBanner(screen, opts = {}) {
 }
 
 export { getResumableSessionScreen };
+export {
+  normalizeGameResumeRefreshErrorForLog as __testNormalizeGameResumeRefreshErrorForLog,
+  logGameResumeRefreshFailure as __testLogGameResumeRefreshFailure,
+};
 export {
   clearResumeBannerDismiss,
   dismissResumeBannerForSession,

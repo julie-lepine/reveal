@@ -16,9 +16,9 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 
 | | |
 |--|--|
-| **Maintenant** | M-14b · ARCH-07 P1/P2 |
-| **Ensuite** | dette ARCH-11… |
-| **Dernière clôture** | **UX-NAV-LOBBY** ✅ (Vague A + résidus acceptés · 2026-07-29) |
+| **Maintenant** | ARCH-10 · dette ARCH-11… |
+| **Ensuite** | ARCH-05 · ARCH-01 |
+| **Dernière clôture** | **ARCH-07 P1/P2** ✅ (observabilité résiduelle · 2026-07-29) |
 
 ---
 
@@ -32,7 +32,6 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 
 | ID | Cause | Problème | Statut |
 |----|-------|----------|--------|
-| **M-14b / SYN-09b** | 7 | `onLocalApplied` si `localFirst: false` | Latent |
 | **ARCH-10** | 8 | Clear cache leave lobby trop tard | 🟡 partiel |
 | **ARCH-05** | 5 | Course lobby vs session (`row.screen`) | 🟡 mitigé SYN-28 |
 | **ARCH-01 / F-01** | 1 | Démo offline sans avertissement MP | 🟡 partiel |
@@ -50,7 +49,7 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 | 4 | Asymétrie hôte / invité | ✅ | — |
 | 5 | Routing + timing sync | ✅ | ARCH-05 mitigé · **UX-NAV-LOBBY ✅** |
 | 6 | Async écrans | ✅ | ARCH-06 ✅ |
-| 7 | Sync silencieuse / fire-and-forget | Partiel | M-14b · ARCH-07 P1/P2 |
+| 7 | Sync silencieuse / fire-and-forget | ✅ | **M-14b ✅** · **ARCH-07 ✅** (P0+P1/P2) |
 | 8 | Reset / migration incomplète | Partiel | ARCH-10 · I-09/SYN-15/16 ✅ |
 | 9 | Sync monolithe / duplication | Dette | ARCH-11… |
 | 10 | Code mort | Dette | hors Fil Rouge app ✅ |
@@ -82,10 +81,18 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 
 | ID | Problème | Où | Statut |
 |----|----------|-----|--------|
-| **M-14b** | `onLocalApplied` manquant si `localFirst: false` | `mpLaunch.js` | Latent |
-| **ARCH-07 P1/P2** | Catch silencieux poll / claim / resume | `lobbyPollChannel.js` · `hostClaimOffer.js` · `gameResume.js` | Hors scope P0 ✅ |
 | **ARCH-08** | Retry launch silencieux | `mpLaunch.js` | ✅ 2026-07-29 |
-| **ARCH-07** | Catch Realtime / foreground silencieux | `supabaseLobby.js` · `gameSync.js` | ✅ 2026-07-29 |
+| **ARCH-07** | Catch Realtime / foreground / resume / claim / poll | voir détail | ✅ 2026-07-29 |
+
+#### M-14b / SYN-09b ✅ (2026-07-29)
+
+| | |
+|--|--|
+| **Livré** | Helper `applyLocalWithSideEffects()` — chaque `applyLocal` déclenche `onLocalApplied` une fois (remote-first succès + fallback, local-first, solo) |
+| **Où** | `js/core/mpLaunch.js` |
+| **Preuve** | `mpLaunchLaunch.test.js` (20) · bloc M-14b (8 tests) |
+| **Comportement** | Inchangé call sites actuels (Guess Lie reste `localFirst: true`) · contrat API corrigé pour usages futurs |
+| **Verdict** | Ne pas rouvrir sauf régression hook / double navigation launch |
 
 Hors scope volontaire : rollback votes dilemma/speedVote/truthMeter · `results.js` mount · ARCH-22 ✅.
 
@@ -99,7 +106,17 @@ Hors scope volontaire : rollback votes dilemma/speedVote/truthMeter · `results.
 | **Comportement** | Inchangé côté produit · pas de reconnect sur échec catch-up · polling / resubscribe / syncTick inchangés |
 | **Où** | `js/core/supabaseLobby.js` · `js/core/gameSync.js` |
 | **Preuve** | `tests/mpRtCatchup.test.js` (20) · suite 1254/1255 (fail Fil Rouge doc inchangé) |
-| **Hors scope livré** | P1 `lobbyPollChannel.js` · P2 `hostClaimOffer.js` · `gameResume.js` · `setLobbyPlaying` catches |
+| **Hors scope livré** | P1 `lobbyPollChannel.js` · P2 `hostClaimOffer.js` · `gameResume.js` · `setLobbyPlaying` catches (jeux) |
+
+#### ARCH-07 P1/P2 ✅ (2026-07-29)
+
+| | |
+|--|--|
+| **P2b** | `rejoinGameResumeTarget` — catch terminal refresh · log `[MP-RT]` `phase: game_resume` |
+| **P2a** | `ensureLobbyHostOrOfferClaim` — refresh recovery loggé · alerte claim inchangée |
+| **P1** | `requestRebuild` — `logPollRebuildChainFailure` · `[POLL-RT] rebuild failed` · file non empoisonnée |
+| **Preuve** | `arch07CatchupResidual.test.js` (10) |
+| **Hors scope** | `setLobbyPlaying(...).catch(() => {})` dans `js/games/*` (M-11) · `_awaitIdle` test helper |
 
 ### Cause 5 / 8 / 1 / 11 — partiels
 
@@ -172,6 +189,8 @@ Ne pas rouvrir sans régression. Détail historique dans git / tests cités.
 
 | ID | Cause | Livré | Preuve / QA |
 |----|-------|-------|-------------|
+| **ARCH-07 P1/P2** | 7 | Observabilité resume · claim · poll rebuild queue | `arch07CatchupResidual` (10) · 2026-07-29 |
+| **M-14b / SYN-09b** | 7 | Contrat `onLocalApplied` · helper centralisé | `mpLaunchLaunch.test.js` (20) · 2026-07-29 |
 | **UX-NAV-LOBBY** | 5/11 | Clôture définitive · Vague A + résidus acceptés | `uxNavLobby` · `uxNavSettings` · `voluntaryMemberLeave` · 2026-07-29 |
 | **ARCH-07** | 7 | Catch-up Realtime P0 · logs `[MP-RT]` · retry SUBSCRIBED ×1 · dédup in-flight | `mpRtCatchup.test.js` (20) · 2026-07-29 |
 | **L-04** | 11 | Reset app atténué · lien discret Home/Lobby · Dépannage Settings | `app-reset-bar` · `style.css` |
@@ -212,7 +231,7 @@ Ne pas rouvrir sans régression. Détail historique dans git / tests cités.
 | 4 | I-01/02/08, M-03b, M-06a/b, L-01, ARCH-03/03b, UX-VIBE-01, Guess Lie |
 | 5 | T-01/02, T-03↻, M-07/08, P-02, SYN-28, ARCH-04, UX-VIBE-02, pré-résolution entry, **UX-NAV-LOBBY** |
 | 6 | I-05, SYN-13b↻, SYN-25, SYN-05/ARCH-18, ARCH-06 |
-| 7 | I-07, M-09, L-09, M-11, M-10, T-05, SYN-26, M-04b/SYN-18, **ARCH-08**, **ARCH-07** |
+| 7 | I-07, M-09, L-09, M-11, M-10, T-05, SYN-26, M-04b/SYN-18, **ARCH-08**, **ARCH-07** (P0+P1/P2), **M-14b** |
 | 8 | I-06, P-02, ARCH-09, I-09/SYN-06, SYN-15/16, M-15 |
 | 9 | SYN-12 / M-05b |
 | 10 | SYN-05 / ARCH-18 (Fil Rouge app) |
@@ -242,4 +261,4 @@ Hors file prioritaire — opportunité / régression :
 
 ---
 
-*Suivi vivant · MAJ 2026-07-29 — **UX-NAV-LOBBY ✅ clôture définitive** · **L-04 ✅** · **ARCH-07 ✅** · prochain = **M-14b***
+*Suivi vivant · MAJ 2026-07-29 — **ARCH-07 ✅ complet (P0+P1/P2)** · **M-14b ✅** · Cause 7 clôturée · prochain = **ARCH-10***

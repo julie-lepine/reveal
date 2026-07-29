@@ -44,6 +44,41 @@ export function pollRealtimeReconnectDelayMs(attemptIndex) {
   return POLL_REALTIME_RECONNECT_DELAYS_MS[i];
 }
 
+export function normalizePollRebuildChainErrorForLog(error) {
+  if (error instanceof Error) {
+    return { errorName: error.name || "Error", errorMessage: error.message || String(error) };
+  }
+  if (typeof error === "string") {
+    return { errorName: "Error", errorMessage: error };
+  }
+  if (error == null) {
+    return { errorName: "Error", errorMessage: "null" };
+  }
+  try {
+    return { errorName: "Error", errorMessage: JSON.stringify(error) };
+  } catch {
+    return { errorName: "Error", errorMessage: String(error) };
+  }
+}
+
+/**
+ * @param {unknown} error
+ * @param {{ requestedLobbyId?: string|null, requestedVotesPollId?: string|null, requestedReason?: string|null }} [meta]
+ */
+export function logPollRebuildChainFailure(error, meta = {}) {
+  const { errorName, errorMessage } = normalizePollRebuildChainErrorForLog(error);
+  console.warn("[POLL-RT] rebuild failed", {
+    event: "poll_rt_rebuild_failed",
+    phase: "poll_rebuild_queue",
+    stage: "previous_chain",
+    requestedLobbyId: meta.requestedLobbyId ?? null,
+    requestedVotesPollId: meta.requestedVotesPollId ?? null,
+    requestedReason: meta.requestedReason ?? null,
+    errorName,
+    errorMessage,
+  });
+}
+
 /**
  * Famille join-reply (realtime-js 2.11.2) : CHANNEL_ERROR sans transition
  * vers `errored` / scheduleTimeout — state reste `joining`.
@@ -418,7 +453,13 @@ export function createPollChannelController(deps) {
 
     inFlightDesire = { lobbyId, votesPollId: nextVotes };
     rebuildChain = rebuildChain
-      .catch(() => {})
+      .catch((error) => {
+        logPollRebuildChainFailure(error, {
+          requestedLobbyId: lobbyId,
+          requestedVotesPollId: nextVotes,
+          requestedReason: reason,
+        });
+      })
       .then(() =>
         rebuild(lobbyId, votesPollId, reason, { replacedChannelGen })
       )
