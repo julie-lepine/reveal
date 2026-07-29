@@ -42,6 +42,37 @@ export { DEFAULT_SYNC_PATCH_TIMEOUT_MS as SYNC_PATCH_TIMEOUT_MS };
 export const SYNC_SLOW_LAUNCH_MESSAGE =
   "La sync est lente - la partie démarre chez toi. Les autres peuvent avoir un léger retard.";
 
+function logLaunchCommitFailure(
+  error,
+  { phase, attempt, gameId, screen, mode, localFirst }
+) {
+  console.warn("[MP-LAUNCH] commit failed", {
+    event: "mp_launch_commit_failed",
+    phase,
+    attempt,
+    gameId,
+    screen,
+    mode,
+    localFirst,
+    errorName: error?.name,
+    errorMessage: error?.message,
+  });
+}
+
+/** ARCH-08 : retry distant unique, non await, après échec du commit initial. */
+function retryLaunchCommitInBackground({ commit, gameId, screen, mode, localFirst }) {
+  void commit().catch((error) => {
+    logLaunchCommitFailure(error, {
+      phase: "background_retry",
+      attempt: 2,
+      gameId,
+      screen,
+      mode,
+      localFirst,
+    });
+  });
+}
+
 /**
  * Envoie l'état de lancement au serveur (patch léger ou push complet).
  * @param {'patch'|'push'} mode
@@ -128,18 +159,20 @@ export async function launchGameWithSync({
   const remoteState = getRemoteState();
   const commit = () =>
     commitMultiplayerLaunch({ screen, gameId, state: remoteState, mode, timeoutMs });
+  const launchLogContext = { gameId, screen, mode, localFirst };
 
   try {
     await commit();
-    if (!localFirst) applyLocal();
-    return { ok: true };
   } catch (err) {
-    console.warn(`Launch ${gameId}:`, err);
+    logLaunchCommitFailure(err, { ...launchLogContext, phase: "initial_commit", attempt: 1 });
     if (!localFirst) applyLocal();
-    void commit().catch(() => {});
+    retryLaunchCommitInBackground({ commit, ...launchLogContext });
     await showAppAlert(fallbackMessage, { title: "Connexion", icon: "📡" });
     return { ok: false, usedFallback: true, error: err };
   }
+
+  if (!localFirst) applyLocal();
+  return { ok: true };
 }
 
 /**
