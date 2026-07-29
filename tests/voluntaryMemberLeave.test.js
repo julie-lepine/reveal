@@ -89,6 +89,9 @@ function makeTrackingDeps(overrides = {}) {
       order.push("beginPostLeaveHomeTransition");
       return 1;
     },
+    invalidateCurrentLobbySessionCache: () => {
+      order.push("invalidateCurrentLobbySessionCache");
+    },
   };
 
   for (const [k, v] of Object.entries(overrides)) {
@@ -120,6 +123,7 @@ describe("runVoluntaryMemberLeave — contrat échec", () => {
       "leaveLobbySupabase",
       "beginPostLeaveHomeTransition",
       "commitMembershipRemoved:u-member:lobby-1",
+      "invalidateCurrentLobbySessionCache",
       "stopMultiplayerSync",
       "stopLobbyPresenceSync",
       "signOut:guest",

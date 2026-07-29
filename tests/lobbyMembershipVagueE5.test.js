@@ -196,18 +196,24 @@ describe("lobbyMembershipVagueE5 — contrats source", () => {
     assert.match(fn, /queryActiveLobbyMembership/);
   });
 
-  it("13 — dissolveLobbyAsHost : DISSOLVED/ALREADY_GONE → E3 + local Traître", () => {
+  it("13 — dissolveLobbyAsHost : DISSOLVED/ALREADY_GONE → E3 + invalidate + local Traître", () => {
     const lobby = read("js/core/lobby.js");
+    const dissolve = lobby.slice(
+      lobby.indexOf("export async function dissolveLobbyAsHost"),
+      lobby.indexOf("export async function confirmAndLeaveLobby")
+    );
+    assert.match(dissolve, /beginPostLeaveHomeTransition/);
+    assert.match(dissolve, /commitMembershipRemoved/);
+    assert.match(dissolve, /invalidateCurrentLobbySessionCache/);
     const start = lobby.indexOf("function applyHostDissolveLocalSuccess");
     const end = lobby.indexOf(
       "async function reconcileHostDissolveCanonicalElsewhere",
       start
     );
     const block = lobby.slice(start, end);
-    assert.match(block, /beginPostLeaveHomeTransition/);
-    assert.match(block, /commitMembershipRemoved/);
     assert.match(block, /clearTraitrePrivateLocalForLobby/);
     assert.match(block, /applyLeaveLobbyLocal/);
+    assert.equal(block.includes("commitMembershipRemoved"), false);
   });
 
   it("13b — CANONICAL_ELSEWHERE : drop X, recover Y, pas Home soft-hold", () => {

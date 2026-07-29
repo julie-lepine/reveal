@@ -465,9 +465,12 @@ describe("lobbyMembershipVagueE2 — contrats source", () => {
     );
 
     assert.match(dissolveGuest, /commitMembershipRemoved/);
+    assert.match(dissolveGuest, /invalidateCurrentLobbySessionCache/);
     assert.match(kick, /commitMembershipRemoved/);
+    assert.match(kick, /invalidateCurrentLobbySessionCache/);
     assert.match(dissolveHost, /applyHostDissolveLocalSuccess/);
-    assert.match(dissolveSuccessHelper, /commitMembershipRemoved/);
+    assert.match(dissolveHost, /commitMembershipRemoved/);
+    assert.match(dissolveHost, /invalidateCurrentLobbySessionCache/);
     assert.match(serverLeave, /commitMembershipRemoved/);
     // dissolve host only after closeLobbySupabase ok
     const closeIdx = dissolveHost.indexOf("closeLobbySupabase");

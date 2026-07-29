@@ -4679,12 +4679,25 @@ function resetLocalGamePrepState() {
   resetGameSessionsOnly();
 }
 
+function isSessionCacheEmpty() {
+  return cachedRow == null && lastSessionSig === "" && lastSessionUpdatedAt === "";
+}
+
 /** Vide le cache session multijoueur (après quit lobby). */
 export function clearCachedGameSession() {
+  if (isSessionCacheEmpty()) return;
   cachedRow = null;
   lastSessionSig = "";
   lastSessionUpdatedAt = "";
   notify(null);
+}
+
+/**
+ * ARCH-10 — invalidation précoce du cache session MP du lobby courant.
+ * Idempotent : ne stoppe pas sync, ne touche pas membership ni navigation.
+ */
+export function invalidateCurrentLobbySessionCache() {
+  clearCachedGameSession();
 }
 
 /** Invalide le cache s'il appartient à un autre lobby (frontière ou hydrate confirmée). */

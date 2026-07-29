@@ -93,6 +93,7 @@ import {
   stopMultiplayerSync,
   endGameSession,
   clearCachedGameSession,
+  invalidateCurrentLobbySessionCache,
   routeToActiveGameIfNeeded,
   refreshGameSession,
   startMultiplayerSync,
@@ -216,7 +217,7 @@ export function performLobbyBoundaryTeardown() {
   bumpLobbyRuntimeGeneration();
   stopMultiplayerSync();
   stopLobbyPresenceSync();
-  clearCachedGameSession();
+  invalidateCurrentLobbySessionCache();
   resetEveningState();
 }
 
@@ -1114,6 +1115,8 @@ export async function handleLobbyDissolvedForGuest() {
     commitMembershipRemoved({ userId: dissolvedUserId, lobbyId: dissolvedLobbyId });
   }
 
+  invalidateCurrentLobbySessionCache();
+
   const wasGuest = isGuest();
   await signOutAnonGuestIfNeeded(wasGuest);
   applyLeaveLobbyLocal({ wasGuest, navigateAway: false });
@@ -1142,6 +1145,8 @@ export async function handleKickedFromLobby() {
     commitMembershipRemoved({ userId: kickedUserId, lobbyId: kickedLobbyId });
   }
 
+  invalidateCurrentLobbySessionCache();
+
   const wasGuest = isGuest();
   await signOutAnonGuestIfNeeded(wasGuest);
   applyLeaveLobbyLocal({ wasGuest, navigateAway: false });
@@ -1159,11 +1164,6 @@ export async function handleKickedFromLobby() {
  * E5 — après DISSOLVED / ALREADY_GONE (succès silencieux pour ALREADY_GONE).
  */
 function applyHostDissolveLocalSuccess({ lobbyId, wasGuest, navigateAway }) {
-  beginPostLeaveHomeTransition();
-  const hostUserId = getSupabaseUserId();
-  if (hostUserId && lobbyId) {
-    commitMembershipRemoved({ userId: hostUserId, lobbyId });
-  }
   clearTraitrePrivateLocalForLobby(lobbyId);
   applyLeaveLobbyLocal({ wasGuest, navigateAway });
 }
@@ -1315,6 +1315,12 @@ export async function dissolveLobbyAsHost({ navigateAway = true } = {}) {
       });
     }
     // E3 soft-hold — DISSOLVED et ALREADY_GONE (succès silencieux).
+    beginPostLeaveHomeTransition();
+    const hostUserId = getSupabaseUserId();
+    if (hostUserId && lobbyId) {
+      commitMembershipRemoved({ userId: hostUserId, lobbyId });
+    }
+    invalidateCurrentLobbySessionCache();
     await signOutAnonGuestIfNeeded(wasGuest);
     applyHostDissolveLocalSuccess({ lobbyId, wasGuest, navigateAway });
     return { ok: true, status: res.status };
@@ -1397,6 +1403,7 @@ export async function leaveLobby({ navigateAway = true } = {}) {
       getUserId: getSupabaseUserId,
       commitMembershipRemoved,
       beginPostLeaveHomeTransition,
+      invalidateCurrentLobbySessionCache,
     }
   );
 }

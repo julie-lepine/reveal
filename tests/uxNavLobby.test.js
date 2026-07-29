@@ -118,7 +118,7 @@ describe("UX-NAV-LOBBY — sortie volontaire invité", () => {
     assert.match(lobby, /function applyLeaveLobbyLocal/);
     assert.match(lobby, /inLobby:\s*false,\s*lobby:\s*null,\s*lobbyCode:\s*null/);
     assert.match(lobby, /resetEveningState\(\)/);
-    assert.match(lobby, /clearCachedGameSession\(\)/);
+    assert.match(lobby, /invalidateCurrentLobbySessionCache\(\)/);
     assert.match(lobby, /clearGuestMembership\(\)/);
     assert.match(lobby, /navigate\("home",\s*\{\s*reset:\s*true\s*\}\)/);
 

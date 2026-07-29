@@ -55,6 +55,7 @@ export async function notifyVoluntaryLeaveFailure(res, deps) {
  *   getUserId?: () => string|null|undefined,
  *   commitMembershipRemoved?: (input: { userId: string, lobbyId?: string|null }) => unknown,
  *   beginPostLeaveHomeTransition?: () => number,
+ *   invalidateCurrentLobbySessionCache?: () => void,
  * }} deps
  * @returns {Promise<{ ok: boolean, error?: string, busy?: boolean }>}
  */
@@ -101,6 +102,8 @@ export async function runVoluntaryMemberLeave(options = {}, deps) {
       if (userId && lobbyId && deps.commitMembershipRemoved) {
         deps.commitMembershipRemoved({ userId, lobbyId });
       }
+
+      deps.invalidateCurrentLobbySessionCache?.();
 
       deps.stopMultiplayerSync();
       deps.stopLobbyPresenceSync();
