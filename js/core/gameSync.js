@@ -3637,6 +3637,41 @@ export function pulseGameSessionRealtime() {
   }
 }
 
+function normalizeForegroundCatchUpErrorForLog(error) {
+  if (error instanceof Error) {
+    return { errorName: error.name, errorMessage: error.message };
+  }
+  if (error == null) {
+    return { errorName: "Error", errorMessage: String(error) };
+  }
+  if (typeof error === "string") {
+    return { errorName: "Error", errorMessage: error };
+  }
+  try {
+    return { errorName: "Error", errorMessage: JSON.stringify(error) };
+  } catch {
+    return { errorName: "Error", errorMessage: String(error) };
+  }
+}
+
+function logForegroundLobbyRefreshFailure(error, lobbyModule) {
+  const { errorName, errorMessage } = normalizeForegroundCatchUpErrorForLog(error);
+  const meta = lobbyModule.getLobbyRealtimeMeta?.() ?? {};
+  console.warn("[MP-RT] catch-up failed", {
+    event: "mp_rt_catchup_failed",
+    phase: "foreground_refresh",
+    stage: "refresh_lobby",
+    attempt: 1,
+    lobbyId: getState().lobby?.id ?? null,
+    channelGeneration: meta.gen ?? null,
+    subscriptionStatus: meta.status ?? null,
+    currentScreen: getCurrentScreen(),
+    joinSessionHydrating: lobbyModule.isJoinSessionHydrating?.() ?? false,
+    errorName,
+    errorMessage,
+  });
+}
+
 /** Pause le polling quand l’onglet est en arrière-plan (egress + batterie). */
 export function initMultiplayerSyncVisibility() {
   if (syncVisibilityInit || typeof document === "undefined") return;
@@ -3658,11 +3693,23 @@ export function initMultiplayerSyncVisibility() {
         // Le socket Realtime a pu être étranglé/fermé en arrière-plan : on force un
         // canal frais (le navigateur ne le recrée pas toujours seul) en plus du refresh.
         m.resubscribeLobbyRealtime?.();
-        m.refreshLobbyFromSupabase?.().catch(() => {});
+        m.refreshLobbyFromSupabase?.().catch((error) => {
+          logForegroundLobbyRefreshFailure(error, m);
+        });
       });
     }
   });
 }
+
+/** Tests ARCH-07 — réinitialise le listener visibility (singleton). */
+export function __testResetSyncVisibilityForTests() {
+  syncVisibilityInit = false;
+  syncPausedByHidden = false;
+}
+
+/** Tests ARCH-07 — logger foreground (robustesse erreurs). */
+export { logForegroundLobbyRefreshFailure as __testLogForegroundLobbyRefreshFailure };
+export { normalizeForegroundCatchUpErrorForLog as __testNormalizeForegroundCatchUpErrorForLog };
 
 function isRecentGameSessionRealtime() {
   return Date.now() - lastGameSessionRealtimeAt < REALTIME_RECENT_MS;

@@ -12,13 +12,13 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 
 ---
 
-## Focus — 2026-07-28
+## Focus — 2026-07-29
 
 | | |
 |--|--|
-| **Maintenant** | ARCH-07/08 · L-04 · UX-NAV-LOBBY résidus · E4 preuves dures reportées |
-| **Ensuite** | Cause 7 sync silencieuse · dette ARCH-11… |
-| **Dernière clôture** | **Membership A→E5** ✅ (E5 dissolve atomique · QA staging+terrain) |
+| **Maintenant** | ARCH-07 · L-04 · UX-NAV-LOBBY résidus |
+| **Ensuite** | Cause 7 résidus (M-14b) · dette ARCH-11… |
+| **Dernière clôture** | **ARCH-08** ✅ (retry launch observable · QA terrain 2026-07-29) |
 
 ---
 
@@ -29,7 +29,6 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 | ID | Cause | Problème | Statut |
 |----|-------|----------|--------|
 | **ARCH-07** | 7 | Catch Realtime silencieux | Ouvert |
-| **ARCH-08** | 7 | Retry launch silencieux | Ouvert |
 
 ### Autres
 
@@ -54,7 +53,7 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 | 4 | Asymétrie hôte / invité | ✅ | — |
 | 5 | Routing + timing sync | ✅ | ARCH-05 mitigé · UX-NAV ✅ |
 | 6 | Async écrans | ✅ | ARCH-06 ✅ |
-| 7 | Sync silencieuse / fire-and-forget | Partiel | ARCH-07/08 · M-14b |
+| 7 | Sync silencieuse / fire-and-forget | Partiel | ARCH-07 · M-14b |
 | 8 | Reset / migration incomplète | Partiel | ARCH-10 · I-09/SYN-15/16 ✅ |
 | 9 | Sync monolithe / duplication | Dette | ARCH-11… |
 | 10 | Code mort | Dette | hors Fil Rouge app ✅ |
@@ -87,10 +86,43 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 | ID | Problème | Où | Statut |
 |----|----------|-----|--------|
 | **M-14b** | `onLocalApplied` manquant si `localFirst: false` | `mpLaunch.js` | Latent |
-| **ARCH-07** | Catch Realtime silencieux | Realtime | Ouvert |
-| **ARCH-08** | Retry launch silencieux | launch | Ouvert |
+| **ARCH-07** | Catch Realtime silencieux | Realtime | Ouvert — voir étude § ci-dessous |
+| **ARCH-08** | Retry launch silencieux | `mpLaunch.js` | ✅ 2026-07-29 |
 
 Hors scope volontaire : rollback votes dilemma/speedVote/truthMeter · `results.js` mount · ARCH-22 ✅.
+
+#### ARCH-08 ✅ (2026-07-29)
+
+| | |
+|--|--|
+| **Livré** | `logLaunchCommitFailure` · `retryLaunchCommitInBackground` · isolation `commit` / `applyLocal` (fallback uniquement si `commit()` échoue) |
+| **Comportement** | Inchangé : 1 commit + 1 retry immédiat non await · alerte « sync est lente » · pas de 2e feedback |
+| **Observabilité** | `console.warn` structuré `[MP-LAUNCH] commit failed` · `event: mp_launch_commit_failed` · `phase: initial_commit \| background_retry` |
+| **Où** | `js/core/mpLaunch.js` |
+| **Preuve** | `tests/mpLaunchLaunch.test.js` (12) · QA terrain fonctionnelle validée |
+| **Note QA logs** | DevTools Offline global + jeux à `beforeCommit` n’atteignent pas le catch ARCH-08 ; jeux sans `beforeCommit` (Clutch, Speed Vote, …) · vérifier bundle `mpLaunch.js` en Sources (`mp_launch_commit_failed`) |
+
+#### ARCH-07 — étude (2026-07-29)
+
+**Problème** : échecs Realtime / post-`SUBSCRIBED` / foreground avalés par `.catch(() => {})` — pas de log, pas de replanification catch-up visible.
+
+| Priorité | Fichier | Pattern | Symptôme si échec |
+|----------|---------|---------|-------------------|
+| **P0** | `supabaseLobby.js` ~2187–2193 | `refreshGameSession().then(…).catch(() => {})` après `SUBSCRIBED` | Invité bloqué prep/menu ; pas de route catch-up |
+| **P0** | `gameSync.js` ~3661 | `refreshLobbyFromSupabase?.().catch(() => {})` retour foreground | Désync temporaire après veille onglet |
+| **P1** | `lobbyPollChannel.js` ~420–421 | `rebuildChain.catch(() => {})` | Rebuild poll silencieux (polling filet) |
+| **P2** | `hostClaimOffer.js` ~80 | `refreshLobbyFromSupabase().catch(() => {})` | Claim hôte |
+| **P2** | `gameResume.js` ~136 | `void refreshGameSession().then(…)` **sans catch** | Uncaught promise possible |
+
+**Déjà instrumenté (hors patch strict)** : handlers `game_sessions` (`console.warn` ~2139–2140) · `CHANNEL_ERROR` / `TIMED_OUT` → `scheduleRealtimeReconnect()` · polling adaptatif `gameSync.js` · diagnostics `realtimeSocketDiagnose.js` · gate join `shouldRouteAfterRealtimeSubscribed` (T-01/T-02).
+
+**Scope minimal recommandé (aligné ARCH-08)** :
+1. Remplacer P0 `.catch(() => {})` par log structuré `[MP-RT]` / `event: mp_rt_catchup_failed` (phase `subscribed_catchup` \| `foreground_refresh`).
+2. P0 SUBSCRIBED : option replanifier catch-up (debounce existant `subscribedCatchUpRoute`) ou `scheduleRealtimeReconnect` si échec refresh — sans 2e feedback UI.
+3. P1 poll : log erreur rebuild **puis** continuer la chaîne (ne pas confondre reset vs échec).
+4. Tests : contrat source + unitaire mock `refreshGameSession` reject → log visible ; pas de test E2E Realtime obligatoire.
+
+**Hors scope ARCH-07** : `setLobbyPlaying(...).catch(() => {})` jeux (M-11) · ARCH-08 ✅ · bannière globale · refonte sync.
 
 ### Cause 5 / 8 / 1 / 11 — partiels
 
@@ -142,6 +174,7 @@ Ne pas rouvrir sans régression. Détail historique dans git / tests cités.
 
 | ID | Cause | Livré | Preuve / QA |
 |----|-------|-------|-------------|
+| **ARCH-08** | 7 | Retry launch observable · isolation commit/applyLocal · 1 retry immédiat | `mpLaunchLaunch.test.js` · QA terrain 2026-07-29 |
 | **Membership E5** | 3 | `dissolve_lobby_atomically` · ALREADY_GONE · CANONICAL_ELSEWHERE | `lobbyMembershipVagueE5` · staging+terrain 2026-07-28 |
 | **Membership E4** | 3 | Create atomique + UNIQUE user_id + mapping conflit + recover E2 | Staging e4-01/02 · smoke UI 2026-07-28 |
 | **Membership E3** | 3 | Soft-hold post-leave · pas de checking générique | `lobbyMembershipVagueE3` · QA terrain |
@@ -179,7 +212,7 @@ Ne pas rouvrir sans régression. Détail historique dans git / tests cités.
 | 4 | I-01/02/08, M-03b, M-06a/b, L-01, ARCH-03/03b, UX-VIBE-01, Guess Lie |
 | 5 | T-01/02, T-03↻, M-07/08, P-02, SYN-28, ARCH-04, UX-VIBE-02, pré-résolution entry, UX-NAV-LOBBY |
 | 6 | I-05, SYN-13b↻, SYN-25, SYN-05/ARCH-18, ARCH-06 |
-| 7 | I-07, M-09, L-09, M-11, M-10, T-05, SYN-26, M-04b/SYN-18 |
+| 7 | I-07, M-09, L-09, M-11, M-10, T-05, SYN-26, M-04b/SYN-18, **ARCH-08** |
 | 8 | I-06, P-02, ARCH-09, I-09/SYN-06, SYN-15/16, M-15 |
 | 9 | SYN-12 / M-05b |
 | 10 | SYN-05 / ARCH-18 (Fil Rouge app) |
@@ -210,4 +243,4 @@ Hors file prioritaire — opportunité / régression :
 
 ---
 
-*Suivi vivant · MAJ 2026-07-28 — **Membership A→E5 ✅ QA** · prochain = ARCH-07/08 · L-04*
+*Suivi vivant · MAJ 2026-07-29 — **ARCH-08 ✅ QA** · prochain = **ARCH-07** · L-04*

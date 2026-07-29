@@ -366,6 +366,182 @@ const subscribedCatchUpRoute = createDebouncedCallback((row) => {
   handleSessionRoute(row, { debugSource: "supabaseLobby/realtime/subscribed" });
 }, SUBSCRIBED_ROUTE_DEBOUNCE_MS);
 
+/** ARCH-07 : déduplique refresh/retry par lobby + gen canal (pas le debounce routing). */
+/** @type {Map<string, Promise<void>>} */
+const subscribedCatchUpInFlight = new Map();
+
+function subscribedCatchUpInFlightKey(lobbyId, channelGeneration) {
+  return `${lobbyId}:${channelGeneration}`;
+}
+
+function normalizeCatchUpErrorForLog(error) {
+  if (error instanceof Error) {
+    return { errorName: error.name, errorMessage: error.message };
+  }
+  if (error == null) {
+    return { errorName: "Error", errorMessage: String(error) };
+  }
+  if (typeof error === "string") {
+    return { errorName: "Error", errorMessage: error };
+  }
+  try {
+    return { errorName: "Error", errorMessage: JSON.stringify(error) };
+  } catch {
+    return { errorName: "Error", errorMessage: String(error) };
+  }
+}
+
+function logMpRtCatchUpFailure(
+  error,
+  {
+    phase,
+    stage,
+    attempt,
+    lobbyId,
+    channelGeneration,
+    subscriptionStatus,
+    currentScreen,
+    joinSessionHydrating: hydrating,
+  }
+) {
+  const { errorName, errorMessage } = normalizeCatchUpErrorForLog(error);
+  console.warn("[MP-RT] catch-up failed", {
+    event: "mp_rt_catchup_failed",
+    phase,
+    stage,
+    attempt,
+    lobbyId,
+    channelGeneration,
+    subscriptionStatus,
+    currentScreen,
+    joinSessionHydrating: hydrating,
+    errorName,
+    errorMessage,
+  });
+}
+
+function buildSubscribedCatchUpLogContext({ lobbyId, channelGeneration }) {
+  return {
+    phase: "subscribed_catchup",
+    lobbyId,
+    channelGeneration,
+    subscriptionStatus: lobbyRealtimeStatus,
+    currentScreen: getCurrentScreen(),
+    joinSessionHydrating,
+  };
+}
+
+/** @typedef {{ lobbyId: string, channelGeneration: number, capturedEpoch: import("./lobbyRuntime.js").LobbyRuntimeEpoch }} SubscribedCatchUpContext */
+
+function isSubscribedCatchUpContextValid({ lobbyId, channelGeneration, capturedEpoch }) {
+  if (!getState().inLobby) return false;
+  const currentLobbyId = getState().lobby?.id;
+  if (!currentLobbyId || String(currentLobbyId) !== String(lobbyId)) return false;
+  if (!presenceLobbyId || String(presenceLobbyId) !== String(lobbyId)) return false;
+  if (
+    !shouldApplyLobbySubscribeStatus({
+      eventGen: channelGeneration,
+      currentGen: lobbyChannelGen,
+      channelRef: realtimeChannel,
+      activeChannelRef: realtimeChannel,
+    })
+  ) {
+    return false;
+  }
+  if (capturedEpoch && !isLobbyRuntimeEpochCurrent(capturedEpoch)) return false;
+  return true;
+}
+
+async function refreshSubscribedCatchUpSession(context) {
+  const logBase = buildSubscribedCatchUpLogContext(context);
+  try {
+    return await refreshGameSession();
+  } catch (error) {
+    logMpRtCatchUpFailure(error, {
+      ...logBase,
+      stage: "refresh_session",
+      attempt: 1,
+    });
+    if (!isSubscribedCatchUpContextValid(context)) return null;
+    try {
+      return await refreshGameSession();
+    } catch (retryError) {
+      logMpRtCatchUpFailure(retryError, {
+        ...logBase,
+        stage: "refresh_session",
+        attempt: 2,
+      });
+      return null;
+    }
+  }
+}
+
+function scheduleSubscribedCatchUpRoute(row, context) {
+  const logBase = buildSubscribedCatchUpLogContext(context);
+  try {
+    if (!isSubscribedCatchUpContextValid(context)) return;
+    if (!shouldRouteAfterRealtimeSubscribed({ joinSessionHydrating })) return;
+    if (!row) return;
+    subscribedCatchUpRoute.schedule(row);
+  } catch (error) {
+    logMpRtCatchUpFailure(error, {
+      ...logBase,
+      stage: "schedule_route",
+      attempt: 1,
+    });
+  }
+}
+
+async function executeSubscribedSessionCatchUp({ lobbyId, channelGeneration }) {
+  const capturedEpoch = captureLobbyRuntimeEpoch(lobbyId);
+  const context = { lobbyId, channelGeneration, capturedEpoch };
+  const row = await refreshSubscribedCatchUpSession(context);
+  scheduleSubscribedCatchUpRoute(row, context);
+}
+
+/**
+ * ARCH-07 — catch-up session après SUBSCRIBED (refresh + gate routing, retry fetch borné).
+ * @param {{ lobbyId: string, channelGeneration: number }} params
+ */
+export async function runSubscribedSessionCatchUp({ lobbyId, channelGeneration }) {
+  const key = subscribedCatchUpInFlightKey(lobbyId, channelGeneration);
+  const existing = subscribedCatchUpInFlight.get(key);
+  if (existing) return existing;
+
+  const work = (async () => {
+    try {
+      await executeSubscribedSessionCatchUp({ lobbyId, channelGeneration });
+    } finally {
+      subscribedCatchUpInFlight.delete(key);
+    }
+  })();
+
+  subscribedCatchUpInFlight.set(key, work);
+  return work;
+}
+
+/** Tests ARCH-07 — logger catch-up (robustesse erreurs). */
+export { logMpRtCatchUpFailure as __testLogMpRtCatchUpFailure };
+export { normalizeCatchUpErrorForLog as __testNormalizeCatchUpErrorForLog };
+
+/** Tests ARCH-07 — reset in-flight catch-up SUBSCRIBED. */
+export function __testResetSubscribedCatchUpInFlightForTests() {
+  subscribedCatchUpInFlight.clear();
+}
+
+/**
+ * Tests ARCH-07 — patch état lobby realtime minimal pour gardes post-async.
+ * @param {Partial<{ presenceLobbyId: string|null, lobbyChannelGen: number, lobbyChannelLobbyId: string|null, lobbyRealtimeStatus: string, joinSessionHydrating: boolean, realtimeChannel: object|null }>} patch
+ */
+export function __testPatchSubscribedCatchUpLobbyState(patch) {
+  if ("presenceLobbyId" in patch) presenceLobbyId = patch.presenceLobbyId;
+  if ("lobbyChannelGen" in patch) lobbyChannelGen = patch.lobbyChannelGen;
+  if ("lobbyChannelLobbyId" in patch) lobbyChannelLobbyId = patch.lobbyChannelLobbyId;
+  if ("lobbyRealtimeStatus" in patch) lobbyRealtimeStatus = patch.lobbyRealtimeStatus;
+  if ("joinSessionHydrating" in patch) joinSessionHydrating = patch.joinSessionHydrating;
+  if ("realtimeChannel" in patch) realtimeChannel = patch.realtimeChannel;
+}
+
 /** Charge la session de jeu en cours après join / create (sans router - voir navigateAfterLobbyJoin). */
 async function restoreActiveGameSessionOnJoin(lobbyId) {
   const epoch = captureLobbyRuntimeEpoch(lobbyId);
@@ -2184,13 +2360,10 @@ export function subscribeLobbyRealtime(onUpdate) {
       realtimeReconnectAttempts = 0;
       clearRealtimeReconnect();
       emitLobbyRealtimeStatus("subscribed", { gen: myGen });
-      void refreshGameSession()
-        .then((row) => {
-          if (!shouldRouteAfterRealtimeSubscribed({ joinSessionHydrating })) return;
-          if (!row) return;
-          subscribedCatchUpRoute.schedule(row);
-        })
-        .catch(() => {});
+      void runSubscribedSessionCatchUp({
+        lobbyId,
+        channelGeneration: myGen,
+      });
       return;
     }
     if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
