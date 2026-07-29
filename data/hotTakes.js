@@ -160,7 +160,7 @@ export const HOT_TAKE_THEMES = [
       "Le mode sombre est objectivement supérieur.",
       "Garder son téléphone à 15 % de batterie est un mode de vie.",
       "Mettre son téléphone face contre table est une marque de respect.",
-      "Les gens qui n'utilisent pas de coque vivent dangereusement.",
+      "Les gens qui n'utilisent pas de coque de téléphone vivent dangereusement.",
       "Une story de plus de 30 secondes ne sera jamais regardée en entier.",
       "Désactiver les accusés de réception est un aveu.",
       "Garder des milliers de photos floues qu'on ne triera jamais est parfaitement normal.",

@@ -334,10 +334,204 @@ describe("ARCH-08 contrats source", () => {
     const runBtnStart = mpLaunchSrc.indexOf("export async function runLaunchButton");
     const launchBody = mpLaunchSrc.slice(launchFnStart, runBtnStart);
     assert.match(launchBody, /try \{\s*\r?\n\s*await commit\(\);/);
-    assert.match(launchBody, /if \(!localFirst\) applyLocal\(\);\s*\r?\n\s*return \{ ok: true \}/);
+    assert.match(
+      launchBody,
+      /if \(!localFirst\) applyLocalWithSideEffects\(\);\s*\r?\n\s*return \{ ok: true \}/
+    );
     assert.doesNotMatch(
       launchBody,
-      /try \{\s*\r?\n\s*await commit\(\);\s*\r?\n\s*if \(!localFirst\) applyLocal\(\);/
+      /try \{\s*\r?\n\s*await commit\(\);\s*\r?\n\s*if \(!localFirst\) applyLocalWithSideEffects\(\);/
     );
+  });
+});
+
+describe("M-14b onLocalApplied contract", () => {
+  /** @type {typeof console.warn} */
+  let origWarn;
+  /** @type {unknown[][]} */
+  let warnings;
+
+  beforeEach(() => {
+    pushGameSessionMock.mock.resetCalls();
+    patchGameStateMock.mock.resetCalls();
+    showAppAlertMock.mock.resetCalls();
+    isGameSyncActiveMock.mock.resetCalls();
+    isLobbyHostMock.mock.resetCalls();
+    isGameSyncActiveMock.mock.mockImplementation(() => true);
+    isLobbyHostMock.mock.mockImplementation(() => true);
+    pushGameSessionMock.mock.mockImplementation(async () => SESSION_ROW);
+    showAppAlertMock.mock.mockImplementation(async () => {});
+
+    warnings = [];
+    origWarn = console.warn;
+    console.warn = (...args) => {
+      warnings.push(args);
+      origWarn(...args);
+    };
+  });
+
+  afterEach(() => {
+    console.warn = origWarn;
+  });
+
+  function trackedSideEffects() {
+    /** @type {string[]} */
+    const events = [];
+    return {
+      events,
+      applyLocal: mock.fn(() => {
+        events.push("applyLocal");
+      }),
+      onLocalApplied: mock.fn(() => {
+        events.push("onLocalApplied");
+      }),
+    };
+  }
+
+  it("1. remote-first, commit réussi — applyLocal puis onLocalApplied une fois", async () => {
+    const { events, applyLocal, onLocalApplied } = trackedSideEffects();
+    const result = await launchGameWithSync(
+      baseLaunchOpts({ localFirst: false, applyLocal, onLocalApplied })
+    );
+
+    assert.equal(pushGameSessionMock.mock.callCount(), 1);
+    assert.equal(applyLocal.mock.callCount(), 1);
+    assert.equal(onLocalApplied.mock.callCount(), 1);
+    assert.deepEqual(events, ["applyLocal", "onLocalApplied"]);
+    assert.deepEqual(result, { ok: true });
+    assert.equal(result.usedFallback, undefined);
+    assert.equal(showAppAlertMock.mock.callCount(), 0);
+    assert.equal(findStructuredWarn(warnings, "background_retry"), undefined);
+  });
+
+  it("2. remote-first, commit échoué — fallback avec hook une fois", async () => {
+    const networkErr = new Error("network down");
+    pushSequence(networkErr, SESSION_ROW);
+
+    const { events, applyLocal, onLocalApplied } = trackedSideEffects();
+    const result = await launchGameWithSync(
+      baseLaunchOpts({ localFirst: false, applyLocal, onLocalApplied })
+    );
+    await flushBackgroundWork();
+
+    assert.equal(pushGameSessionMock.mock.callCount(), 2);
+    assert.equal(applyLocal.mock.callCount(), 1);
+    assert.equal(onLocalApplied.mock.callCount(), 1);
+    assert.deepEqual(events, ["applyLocal", "onLocalApplied"]);
+    assert.equal(result.ok, false);
+    assert.equal(result.usedFallback, true);
+    assert.equal(result.error, networkErr);
+    assert.equal(showAppAlertMock.mock.callCount(), 1);
+    assert.ok(findStructuredWarn(warnings, "initial_commit"));
+  });
+
+  it("3. local-first, commit réussi — hook une fois avant commit", async () => {
+    /** @type {string[]} */
+    const events = [];
+    const applyLocal = mock.fn(() => {
+      events.push("applyLocal");
+    });
+    const onLocalApplied = mock.fn(() => {
+      events.push("onLocalApplied");
+    });
+    pushGameSessionMock.mock.mockImplementation(async () => {
+      events.push("commit");
+      return SESSION_ROW;
+    });
+
+    const result = await launchGameWithSync(
+      baseLaunchOpts({ localFirst: true, applyLocal, onLocalApplied })
+    );
+
+    assert.deepEqual(events, ["applyLocal", "onLocalApplied", "commit"]);
+    assert.equal(applyLocal.mock.callCount(), 1);
+    assert.equal(onLocalApplied.mock.callCount(), 1);
+    assert.deepEqual(result, { ok: true });
+  });
+
+  it("4. local-first, commit échoué — hook une fois, pas de second appel fallback", async () => {
+    const initialErr = new Error("gl initial");
+    pushSequence(initialErr, new Error("gl retry"));
+
+    const { events, applyLocal, onLocalApplied } = trackedSideEffects();
+    const result = await launchGameWithSync(
+      baseLaunchOpts({ localFirst: true, applyLocal, onLocalApplied })
+    );
+    await flushBackgroundWork();
+
+    assert.equal(applyLocal.mock.callCount(), 1);
+    assert.equal(onLocalApplied.mock.callCount(), 1);
+    assert.deepEqual(events, ["applyLocal", "onLocalApplied"]);
+    assert.equal(result.usedFallback, true);
+    assert.equal(showAppAlertMock.mock.callCount(), 1);
+    assert.equal(pushGameSessionMock.mock.callCount(), 2);
+  });
+
+  it("5. solo / sync désactivée — applyLocal puis onLocalApplied", async () => {
+    isGameSyncActiveMock.mock.mockImplementation(() => false);
+
+    const { events, applyLocal, onLocalApplied } = trackedSideEffects();
+    const result = await launchGameWithSync(
+      baseLaunchOpts({ applyLocal, onLocalApplied })
+    );
+
+    assert.equal(pushGameSessionMock.mock.callCount(), 0);
+    assert.equal(applyLocal.mock.callCount(), 1);
+    assert.equal(onLocalApplied.mock.callCount(), 1);
+    assert.deepEqual(events, ["applyLocal", "onLocalApplied"]);
+    assert.deepEqual(result, { ok: true });
+  });
+
+  it("6. callback absent — pas de throw", async () => {
+    const applyLocal = mock.fn();
+    const result = await launchGameWithSync(
+      baseLaunchOpts({ localFirst: false, applyLocal, onLocalApplied: undefined })
+    );
+
+    assert.equal(applyLocal.mock.callCount(), 1);
+    assert.deepEqual(result, { ok: true });
+  });
+
+  it("7. ordre contractuel remote-first succès et fallback", async () => {
+    /** @type {string[]} */
+    const successEvents = [];
+    const successApply = mock.fn(() => successEvents.push("applyLocal"));
+    const successHook = mock.fn(() => successEvents.push("onLocalApplied"));
+    await launchGameWithSync(
+      baseLaunchOpts({
+        localFirst: false,
+        applyLocal: successApply,
+        onLocalApplied: successHook,
+      })
+    );
+    assert.deepEqual(successEvents, ["applyLocal", "onLocalApplied"]);
+
+    pushGameSessionMock.mock.resetCalls();
+    pushSequence(new Error("fail once"), SESSION_ROW);
+
+    /** @type {string[]} */
+    const fallbackEvents = [];
+    const fallbackApply = mock.fn(() => fallbackEvents.push("applyLocal"));
+    const fallbackHook = mock.fn(() => fallbackEvents.push("onLocalApplied"));
+    await launchGameWithSync(
+      baseLaunchOpts({
+        localFirst: false,
+        applyLocal: fallbackApply,
+        onLocalApplied: fallbackHook,
+      })
+    );
+    assert.deepEqual(fallbackEvents, ["applyLocal", "onLocalApplied"]);
+  });
+});
+
+describe("M-14b contrats source", () => {
+  it("applyLocalWithSideEffects centralise le couple applyLocal / onLocalApplied", () => {
+    const launchFnStart = mpLaunchSrc.indexOf("export async function launchGameWithSync");
+    const runBtnStart = mpLaunchSrc.indexOf("export async function runLaunchButton");
+    const launchBody = mpLaunchSrc.slice(launchFnStart, runBtnStart);
+    assert.match(launchBody, /const applyLocalWithSideEffects = \(\) => \{/);
+    assert.match(launchBody, /applyLocal\(\);\s*\r?\n\s*onLocalApplied\?\.\(\);/);
+    assert.doesNotMatch(launchBody, /if \(!localFirst\) applyLocal\(\);/);
+    assert.doesNotMatch(launchBody, /if \(localFirst\) \{\s*\r?\n\s*applyLocal\(\);/);
   });
 });

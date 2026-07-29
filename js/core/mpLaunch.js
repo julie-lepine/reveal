@@ -140,9 +140,13 @@ export async function launchGameWithSync({
 }) {
   if (beforeCommit) await beforeCommit();
 
-  if (!isGameSyncActive()) {
+  const applyLocalWithSideEffects = () => {
     applyLocal();
     onLocalApplied?.();
+  };
+
+  if (!isGameSyncActive()) {
+    applyLocalWithSideEffects();
     return { ok: true };
   }
 
@@ -152,8 +156,7 @@ export async function launchGameWithSync({
   }
 
   if (localFirst) {
-    applyLocal();
-    onLocalApplied?.();
+    applyLocalWithSideEffects();
   }
 
   const remoteState = getRemoteState();
@@ -165,13 +168,13 @@ export async function launchGameWithSync({
     await commit();
   } catch (err) {
     logLaunchCommitFailure(err, { ...launchLogContext, phase: "initial_commit", attempt: 1 });
-    if (!localFirst) applyLocal();
+    if (!localFirst) applyLocalWithSideEffects();
     retryLaunchCommitInBackground({ commit, ...launchLogContext });
     await showAppAlert(fallbackMessage, { title: "Connexion", icon: "📡" });
     return { ok: false, usedFallback: true, error: err };
   }
 
-  if (!localFirst) applyLocal();
+  if (!localFirst) applyLocalWithSideEffects();
   return { ok: true };
 }
 

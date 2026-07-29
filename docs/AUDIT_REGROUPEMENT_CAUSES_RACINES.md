@@ -16,9 +16,9 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 
 | | |
 |--|--|
-| **Maintenant** | ARCH-07 · L-04 · UX-NAV-LOBBY résidus |
-| **Ensuite** | Cause 7 résidus (M-14b) · dette ARCH-11… |
-| **Dernière clôture** | **ARCH-08** ✅ (retry launch observable · QA terrain 2026-07-29) |
+| **Maintenant** | M-14b · ARCH-07 P1/P2 |
+| **Ensuite** | dette ARCH-11… |
+| **Dernière clôture** | **UX-NAV-LOBBY** ✅ (Vague A + résidus acceptés · 2026-07-29) |
 
 ---
 
@@ -26,9 +26,7 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 
 ### Prioritaire
 
-| ID | Cause | Problème | Statut |
-|----|-------|----------|--------|
-| **ARCH-07** | 7 | Catch Realtime silencieux | Ouvert |
+*(aucun ticket L/ARCH prioritaire — voir « Autres »)*
 
 ### Autres
 
@@ -38,7 +36,6 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 | **ARCH-10** | 8 | Clear cache leave lobby trop tard | 🟡 partiel |
 | **ARCH-05** | 5 | Course lobby vs session (`row.screen`) | 🟡 mitigé SYN-28 |
 | **ARCH-01 / F-01** | 1 | Démo offline sans avertissement MP | 🟡 partiel |
-| **L-04** | 11 | « Réinitialiser l’app » trop visible | 🟡 partiel |
 | **ARCH-11–17, SYN-19–24, SYN-27** | 9–10 | Monolithe / dup / code mort | Dette |
 
 ---
@@ -51,13 +48,13 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 | 2 | Race auth / profil | ✅ | — |
 | 3 | Sources de vérité multiples | ✅ | **Membership A–E5 ✅** · M-14a ✅ · Guess Lie ✅ |
 | 4 | Asymétrie hôte / invité | ✅ | — |
-| 5 | Routing + timing sync | ✅ | ARCH-05 mitigé · UX-NAV ✅ |
+| 5 | Routing + timing sync | ✅ | ARCH-05 mitigé · **UX-NAV-LOBBY ✅** |
 | 6 | Async écrans | ✅ | ARCH-06 ✅ |
-| 7 | Sync silencieuse / fire-and-forget | Partiel | ARCH-07 · M-14b |
+| 7 | Sync silencieuse / fire-and-forget | Partiel | M-14b · ARCH-07 P1/P2 |
 | 8 | Reset / migration incomplète | Partiel | ARCH-10 · I-09/SYN-15/16 ✅ |
 | 9 | Sync monolithe / duplication | Dette | ARCH-11… |
 | 10 | Code mort | Dette | hors Fil Rouge app ✅ |
-| 11 | Friction UX | Partiel | L-04 · ARCH-22/Loader/UX-NAV ✅ |
+| 11 | Friction UX | Partiel | ARCH-22/Loader ✅ · **L-04 ✅** |
 
 ---
 
@@ -86,43 +83,23 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 | ID | Problème | Où | Statut |
 |----|----------|-----|--------|
 | **M-14b** | `onLocalApplied` manquant si `localFirst: false` | `mpLaunch.js` | Latent |
-| **ARCH-07** | Catch Realtime silencieux | Realtime | Ouvert — voir étude § ci-dessous |
+| **ARCH-07 P1/P2** | Catch silencieux poll / claim / resume | `lobbyPollChannel.js` · `hostClaimOffer.js` · `gameResume.js` | Hors scope P0 ✅ |
 | **ARCH-08** | Retry launch silencieux | `mpLaunch.js` | ✅ 2026-07-29 |
+| **ARCH-07** | Catch Realtime / foreground silencieux | `supabaseLobby.js` · `gameSync.js` | ✅ 2026-07-29 |
 
 Hors scope volontaire : rollback votes dilemma/speedVote/truthMeter · `results.js` mount · ARCH-22 ✅.
 
-#### ARCH-08 ✅ (2026-07-29)
+#### ARCH-07 ✅ (2026-07-29)
 
 | | |
 |--|--|
-| **Livré** | `logLaunchCommitFailure` · `retryLaunchCommitInBackground` · isolation `commit` / `applyLocal` (fallback uniquement si `commit()` échoue) |
-| **Comportement** | Inchangé : 1 commit + 1 retry immédiat non await · alerte « sync est lente » · pas de 2e feedback |
-| **Observabilité** | `console.warn` structuré `[MP-LAUNCH] commit failed` · `event: mp_launch_commit_failed` · `phase: initial_commit \| background_retry` |
-| **Où** | `js/core/mpLaunch.js` |
-| **Preuve** | `tests/mpLaunchLaunch.test.js` (12) · QA terrain fonctionnelle validée |
-| **Note QA logs** | DevTools Offline global + jeux à `beforeCommit` n’atteignent pas le catch ARCH-08 ; jeux sans `beforeCommit` (Clutch, Speed Vote, …) · vérifier bundle `mpLaunch.js` en Sources (`mp_launch_commit_failed`) |
-
-#### ARCH-07 — étude (2026-07-29)
-
-**Problème** : échecs Realtime / post-`SUBSCRIBED` / foreground avalés par `.catch(() => {})` — pas de log, pas de replanification catch-up visible.
-
-| Priorité | Fichier | Pattern | Symptôme si échec |
-|----------|---------|---------|-------------------|
-| **P0** | `supabaseLobby.js` ~2187–2193 | `refreshGameSession().then(…).catch(() => {})` après `SUBSCRIBED` | Invité bloqué prep/menu ; pas de route catch-up |
-| **P0** | `gameSync.js` ~3661 | `refreshLobbyFromSupabase?.().catch(() => {})` retour foreground | Désync temporaire après veille onglet |
-| **P1** | `lobbyPollChannel.js` ~420–421 | `rebuildChain.catch(() => {})` | Rebuild poll silencieux (polling filet) |
-| **P2** | `hostClaimOffer.js` ~80 | `refreshLobbyFromSupabase().catch(() => {})` | Claim hôte |
-| **P2** | `gameResume.js` ~136 | `void refreshGameSession().then(…)` **sans catch** | Uncaught promise possible |
-
-**Déjà instrumenté (hors patch strict)** : handlers `game_sessions` (`console.warn` ~2139–2140) · `CHANNEL_ERROR` / `TIMED_OUT` → `scheduleRealtimeReconnect()` · polling adaptatif `gameSync.js` · diagnostics `realtimeSocketDiagnose.js` · gate join `shouldRouteAfterRealtimeSubscribed` (T-01/T-02).
-
-**Scope minimal recommandé (aligné ARCH-08)** :
-1. Remplacer P0 `.catch(() => {})` par log structuré `[MP-RT]` / `event: mp_rt_catchup_failed` (phase `subscribed_catchup` \| `foreground_refresh`).
-2. P0 SUBSCRIBED : option replanifier catch-up (debounce existant `subscribedCatchUpRoute`) ou `scheduleRealtimeReconnect` si échec refresh — sans 2e feedback UI.
-3. P1 poll : log erreur rebuild **puis** continuer la chaîne (ne pas confondre reset vs échec).
-4. Tests : contrat source + unitaire mock `refreshGameSession` reject → log visible ; pas de test E2E Realtime obligatoire.
-
-**Hors scope ARCH-07** : `setLobbyPlaying(...).catch(() => {})` jeux (M-11) · ARCH-08 ✅ · bannière globale · refonte sync.
+| **Livré P0 A** | `runSubscribedSessionCatchUp` — refresh + routing séparés · retry immédiat unique (`refresh_session`) · dédup in-flight `lobbyId:channelGeneration` · gardes stale post-async |
+| **Livré P0 B** | Log `[MP-RT] catch-up failed` sur échec `refreshLobbyFromSupabase` foreground · pas de retry |
+| **Observabilité** | `event: mp_rt_catchup_failed` · `stage: refresh_session \| schedule_route \| refresh_lobby` · `phase: subscribed_catchup \| foreground_refresh` |
+| **Comportement** | Inchangé côté produit · pas de reconnect sur échec catch-up · polling / resubscribe / syncTick inchangés |
+| **Où** | `js/core/supabaseLobby.js` · `js/core/gameSync.js` |
+| **Preuve** | `tests/mpRtCatchup.test.js` (20) · suite 1254/1255 (fail Fil Rouge doc inchangé) |
+| **Hors scope livré** | P1 `lobbyPollChannel.js` · P2 `hostClaimOffer.js` · `gameResume.js` · `setLobbyPlaying` catches |
 
 ### Cause 5 / 8 / 1 / 11 — partiels
 
@@ -131,8 +108,29 @@ Hors scope volontaire : rollback votes dilemma/speedVote/truthMeter · `results.
 | **ARCH-05** | `row.screen` en retard vs lobby | 🟡 mitigé ; hors scope routing |
 | **ARCH-10** | Cache session clear trop tard au leave | 🟡 |
 | **ARCH-01** | Démo locale sans avertissement MP | 🟡 |
-| **L-04** | « Réinitialiser l’app » trop visible | 🟡 |
 
+#### L-04 ✅ (accepté — UI déjà livrée)
+
+Ticket historique : le bouton « Réinitialiser l’app » était trop proéminent sur les parcours principaux.
+
+| | |
+|--|--|
+| **Livré** | Lien discret `app-reset-bar` / `app-reset-bar__link` (12px, opacité faible) en bas de **Home** et **Lobby** · libellé contextualisé (« Problème d’affichage ? » / « Blocage ? ») |
+| **Settings** | Carte **Dépannage** avec bouton secondaire — **volontaire** : chemin support explicite, hors flux jeu |
+| **Garde** | Modale confirm avant `resetAppToCleanHome()` sur les 3 entrées |
+| **Verdict** | **Aucun chantier restant** — ne pas rouvrir sauf régression visuelle ou reset accidentel mesuré |
+
+#### UX-NAV-LOBBY ✅ (clôture définitive · 2026-07-29)
+
+Vague A livrée 2026-07-28 · résidus audit (navigate home / navStack / QA) **acceptés** 2026-07-29 — aucun chantier code restant.
+
+| | |
+|--|--|
+| **Livré Vague A** | Home hors bottom nav en lobby · Paramètres à la place · écran `settings` unique (profil + soirée + support) · leave invité pipeline canonique · hub Jeux sans Accueil |
+| **Où** | `bottomNavItems.js` · `bottomNav.js` · `nav.js` · `settings.js` · `lobby.js` · `voluntaryMemberLeave.js` |
+| **Preuve** | `uxNavLobby.test.js` · `uxNavSettings.test.js` · `voluntaryMemberLeave.test.js` |
+| **Résidus acceptés ↻** | `navigate("home")` post-teardown ou edges boot (`cached_active`) — comportement voulu · piles `navStack` explicites `["home","lobby",…]` — dette maintien, pas bug produit · QA terrain couverte par contrats source |
+| **Verdict** | **Ne pas rouvrir** sauf régression navigation démontrée (back incorrect, Home visible en lobby via menu, leave cassé) |
 ---
 
 ## Contrats produit (référence)
@@ -142,7 +140,7 @@ Hors scope volontaire : rollback votes dilemma/speedVote/truthMeter · `results.
 - **Retour** = sortie temporaire (reste membre, suit la progression)
 - **Quitter → Menu des jeux** = sortie définitive du jeu courant (suit les jeux suivants)
 
-### UX-NAV-LOBBY — Vague A ✅ 2026-07-28
+### UX-NAV-LOBBY — contrat produit (référence · ✅ clôturé)
 
 - **Sans lobby** : Home dans le menu (`BOTTOM_NAV_TAB.HOME`).
 - **Avec lobby** : Home **absent** ; **Paramètres** à la place ; hub = **Jeux**.
@@ -174,13 +172,15 @@ Ne pas rouvrir sans régression. Détail historique dans git / tests cités.
 
 | ID | Cause | Livré | Preuve / QA |
 |----|-------|-------|-------------|
+| **UX-NAV-LOBBY** | 5/11 | Clôture définitive · Vague A + résidus acceptés | `uxNavLobby` · `uxNavSettings` · `voluntaryMemberLeave` · 2026-07-29 |
+| **ARCH-07** | 7 | Catch-up Realtime P0 · logs `[MP-RT]` · retry SUBSCRIBED ×1 · dédup in-flight | `mpRtCatchup.test.js` (20) · 2026-07-29 |
+| **L-04** | 11 | Reset app atténué · lien discret Home/Lobby · Dépannage Settings | `app-reset-bar` · `style.css` |
 | **ARCH-08** | 7 | Retry launch observable · isolation commit/applyLocal · 1 retry immédiat | `mpLaunchLaunch.test.js` · QA terrain 2026-07-29 |
 | **Membership E5** | 3 | `dissolve_lobby_atomically` · ALREADY_GONE · CANONICAL_ELSEWHERE | `lobbyMembershipVagueE5` · staging+terrain 2026-07-28 |
 | **Membership E4** | 3 | Create atomique + UNIQUE user_id + mapping conflit + recover E2 | Staging e4-01/02 · smoke UI 2026-07-28 |
 | **Membership E3** | 3 | Soft-hold post-leave · pas de checking générique | `lobbyMembershipVagueE3` · QA terrain |
 | **Membership A→E2** | 3 | Query→chrome→create→leave · E1 scoped auth · E2 align asymétrique + remove après preuve | VagueA–E2 · 2026-07-28 |
 | **Membership E1** | 3 | Snapshot scoped auth · reject stale | `lobbyMembershipVagueE1` · 2026-07-28 |
-| **UX-NAV-LOBBY** | 5/11 | Home hors menu en lobby · Settings · leave | `uxNavLobby` · `voluntaryMemberLeave` |
 | **ARCH/BUG boundary** | 3/5/8 | Isolation lobby · teardown | `lobbyBoundarySession` |
 | **Join partiel B** | 3/5/8 | Compensation membership orpheline | `lobbyJoinCompensation` · 1097 |
 | **Membership A–D** | 3/11 | Query · chrome · create guard · server leave | VagueA–D tests · 2026-07-27 |
@@ -210,13 +210,13 @@ Ne pas rouvrir sans régression. Détail historique dans git / tests cités.
 | 2 | M-01, P-03, M-02a, S-02 |
 | 3 | I-03/04, SYN-03, M-13, M-02b, ARCH-02, SYN-29, I-PG-01, ready stale, UX-CLUTCH-01, M-15, L-05↻, **Membership A–E5**, M-14a, boundary, join partiel |
 | 4 | I-01/02/08, M-03b, M-06a/b, L-01, ARCH-03/03b, UX-VIBE-01, Guess Lie |
-| 5 | T-01/02, T-03↻, M-07/08, P-02, SYN-28, ARCH-04, UX-VIBE-02, pré-résolution entry, UX-NAV-LOBBY |
+| 5 | T-01/02, T-03↻, M-07/08, P-02, SYN-28, ARCH-04, UX-VIBE-02, pré-résolution entry, **UX-NAV-LOBBY** |
 | 6 | I-05, SYN-13b↻, SYN-25, SYN-05/ARCH-18, ARCH-06 |
-| 7 | I-07, M-09, L-09, M-11, M-10, T-05, SYN-26, M-04b/SYN-18, **ARCH-08** |
+| 7 | I-07, M-09, L-09, M-11, M-10, T-05, SYN-26, M-04b/SYN-18, **ARCH-08**, **ARCH-07** |
 | 8 | I-06, P-02, ARCH-09, I-09/SYN-06, SYN-15/16, M-15 |
 | 9 | SYN-12 / M-05b |
 | 10 | SYN-05 / ARCH-18 (Fil Rouge app) |
-| 11 | L-02, ARCH-21↻, M-12, UX-HIST/RESUME/VIBE, POLL, **Membership A–E5**, ARCH-22, Loader join, UX-NAV, join partiel |
+| 11 | L-02, ARCH-21↻, M-12, UX-HIST/RESUME/VIBE, POLL, **Membership A–E5**, ARCH-22, Loader join, **UX-NAV-LOBBY**, join partiel, **L-04** |
 
 ---
 
@@ -232,7 +232,6 @@ Hors file prioritaire — opportunité / régression :
 - SYN-28 : `settings` hors scope ; course lobby `playing` vs session menu
 - I-PG-01 : autres jeux sans podium dédié
 - Starts sync hydrate → hub hors `mountLobby` (hors périmètre ARCH-06)
-- UX-NAV : `navigate("home")` programmatique en lobby · `navStack` legacy · QA terrain
 - Membership **E4** (reporté) : course RPC pure ALREADY_EXISTS · join↔join concurrent · reclaim X/Y · JSON 23505 · e4-03/03b
 - Join partiel : revert RPC reclaim anonymous · orphelin **création** · E2E Supabase
 - Pré-résolution B1 (getter post-mark launch) — étudiée, **non retenue**
@@ -243,4 +242,4 @@ Hors file prioritaire — opportunité / régression :
 
 ---
 
-*Suivi vivant · MAJ 2026-07-29 — **ARCH-08 ✅ QA** · prochain = **ARCH-07** · L-04*
+*Suivi vivant · MAJ 2026-07-29 — **UX-NAV-LOBBY ✅ clôture définitive** · **L-04 ✅** · **ARCH-07 ✅** · prochain = **M-14b***
