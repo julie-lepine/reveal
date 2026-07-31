@@ -36,6 +36,7 @@ describe("deckCodec - trivia (réponses mélangées)", () => {
     const dry = dehydrateTriviaDeck([shuffled]);
     assert.equal(dry[0].r, base.id);
     assert.ok(Array.isArray(dry[0].a));
+    assert.equal(dry[0].k, shuffled.correct);
     assert.equal(dry[0].answers, undefined);
     assert.equal(dry[0].question, undefined);
   });

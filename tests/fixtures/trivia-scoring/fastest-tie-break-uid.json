@@ -1,0 +1,28 @@
+{
+  "correctIndex": 2,
+  "correctAnswer": "C",
+  "answers": {
+    "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa": { "answerIndex": 2, "answeredAt": 100 },
+    "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb": { "answerIndex": 2, "answeredAt": 100 }
+  },
+  "matchScores": {},
+  "expected": {
+    "matchScores": {
+      "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa": 15,
+      "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb": 10
+    },
+    "lastRound": {
+      "correctIndex": 2,
+      "correctAnswer": "C",
+      "correctPlayers": [
+        "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+        "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+      ],
+      "fastestPlayer": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+      "deltas": {
+        "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa": 15,
+        "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb": 10
+      }
+    }
+  }
+}

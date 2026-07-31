@@ -90,3 +90,15 @@ export async function rpcCompleteGameSessionAsActor({ lobbyId, screen = "results
   if (error) throw error;
   return asSessionRow(data);
 }
+
+/** BUG-TRIVIA-01B — reveal atomique (hôte réel + acting host). */
+export async function rpcRevealTriviaRound({ lobbyId, runId, questionIdx }) {
+  requireClient();
+  const { data, error } = await supabase.rpc("reveal_trivia_round", {
+    p_lobby_id: lobbyId,
+    p_run_id: runId,
+    p_question_idx: questionIdx,
+  });
+  if (error) throw error;
+  return asSessionRow(data);
+}

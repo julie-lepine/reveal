@@ -162,12 +162,10 @@ export function mountTrivia(app) {
     revealInFlight = true;
     clearNpcTimers();
     try {
-      // Relecture fraîche : réduit la fenêtre de course, pas d'atomicité complète (01B).
-      let live = mp ? await trivia.refreshForReveal() : initial;
-      const scored = trivia.scoreRound(live);
       if (mp && canActAsHost()) {
-        await trivia.commitRevealPlay(scored);
+        await trivia.commitRevealPlay();
       } else if (!mp) {
+        const scored = trivia.scoreRound(initial);
         saveStatePatch({
           triviaGame: { ...scored, phase: "reveal" },
         });
@@ -179,7 +177,7 @@ export function mountTrivia(app) {
     } catch (err) {
       console.warn("REVEAL trivia goToReveal:", err);
       syncFromSession();
-      await showAppAlert("Révélation impossible. Réessaie.", {
+      await showAppAlert(err?.message || "Révélation impossible. Réessaie.", {
         title: "Trivia",
         icon: "🧠",
       });

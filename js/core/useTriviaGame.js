@@ -10,7 +10,6 @@ import {
   commitTriviaPlay,
   commitTriviaRevealPlay,
   commitTriviaFinalPlay,
-  refreshTriviaSessionForReveal,
   createStartedTriviaSession,
   defaultTriviaPrepSession,
   getTriviaEntryScreen,
@@ -64,7 +63,6 @@ export function useTriviaGame() {
     commitPlay: commitTriviaPlay,
     commitRevealPlay: commitTriviaRevealPlay,
     commitFinalPlay: commitTriviaFinalPlay,
-    refreshForReveal: refreshTriviaSessionForReveal,
     commitAnswer: commitTriviaAnswer,
     defaultSession: defaultTriviaPrepSession,
   };

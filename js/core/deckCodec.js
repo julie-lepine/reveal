@@ -151,7 +151,8 @@ export function dehydrateTriviaDeck(deck) {
     }
     const perm = item.answers.map((ans) => bank.answers.indexOf(ans));
     if (perm.some((i) => i < 0)) return { c: item }; // réponse non résolvable -> inline
-    return { r: String(item.id), a: perm };
+    const correctDisplay = perm.indexOf(bank.correct);
+    return { r: String(item.id), a: perm, k: correctDisplay };
   });
 }
 

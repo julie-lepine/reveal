@@ -1549,6 +1549,13 @@ function isNewSpeedVoteVoteRoundUid(cur, inc) {
 
 function isNewTriviaQuestionRound(cur, inc) {
   if (!inc) return false;
+  if (
+    inc.runId &&
+    cur?.runId &&
+    inc.runId !== cur.runId
+  ) {
+    return true;
+  }
   return (
     inc.phase === "question" &&
     inc.questionIdx != null &&
@@ -2041,6 +2048,7 @@ export function triviaToRemote(session) {
     lobbyStarted: Boolean(session.lobbyStarted),
     selectedThemeId: session.selectedThemeId || "random",
     questionCount: session.questionCount ?? 5,
+    runId: session.runId || null,
     deck: session.deck ? dehydrateTriviaDeck(session.deck) : null,
     questionIdx: session.questionIdx ?? 0,
     phase: session.phase || null,
@@ -2072,6 +2080,7 @@ export function triviaFromRemote(remote) {
     lobbyStarted: Boolean(remote.lobbyStarted),
     selectedThemeId: remote.selectedThemeId || "random",
     questionCount: remote.questionCount ?? 5,
+    runId: remote.runId || null,
     deck,
     questionIdx,
     phase: remote.phase || null,

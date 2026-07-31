@@ -1,7 +1,5 @@
 import {
   TRIVIA_LOBBY_PODIUM_POINTS,
-  TRIVIA_POINTS_CORRECT,
-  TRIVIA_POINTS_FASTEST,
   prepareTriviaDeck,
   TRIVIA_QUESTION_COUNT_PRESETS,
   TRIVIA_RANDOM_THEME_ID,
@@ -30,9 +28,18 @@ import { triviaEveningPoints } from "./triviaScoring.js";
 import {
   buildTriviaFinalExplicitPatch,
   buildTriviaNextQuestionExplicitPatch,
-  buildTriviaRevealExplicitPatch,
   pickTriviaPlayFields,
 } from "./triviaPlayPatch.js";
+import { createTriviaRunId } from "./triviaRunId.js";
+import { scoreTriviaRoundFromAnswers } from "./triviaScoreEngine.js";
+import { mapTriviaRevealRpcError, validateTriviaRevealRequest } from "./triviaRevealErrors.js";
+import {
+  evaluateTriviaRevealRecovery,
+  isTriviaRevealBusinessError,
+  isTriviaRevealNetworkError,
+} from "./triviaRevealRecovery.js";
+import { applyRemoteSession } from "./gameSync.js";
+import { rpcRevealTriviaRound } from "./gameSessionRpc.js";
 
 const TRIVIA_ESTIMATE_SEC_PER_QUESTION = 40;
 
@@ -52,6 +59,7 @@ function defaultSession() {
     lastRound: null,
     podiumApplied: false,
     results: null,
+    runId: null,
   };
 }
 
@@ -239,6 +247,7 @@ export function createStartedTriviaSession(session = getTriviaSession()) {
         lobbyStarted: true,
         matchScores: createTriviaScores(),
         podiumApplied: false,
+        runId: createTriviaRunId(),
       },
       0
     ),
@@ -281,16 +290,6 @@ export async function startTriviaQuestion(questionIdx) {
   return localNext;
 }
 
-/**
- * Relecture fraîche serveur avant scoring reveal (MP).
- * Réduit la fenêtre de course local/serveur ; n' garantit pas l'atomicité (BUG-TRIVIA-01B).
- */
-export async function refreshTriviaSessionForReveal() {
-  if (!isGameSyncActive()) return getTriviaSession();
-  await refreshGameSession();
-  return getTriviaSession();
-}
-
 export async function commitTriviaPlay(patch, { screen } = {}) {
   return commitHostGamePlay({
     patch,
@@ -304,8 +303,53 @@ export async function commitTriviaPlay(patch, { screen } = {}) {
   });
 }
 
-export async function commitTriviaRevealPlay(scoredSession) {
-  return commitTriviaPlay(buildTriviaRevealExplicitPatch(scoredSession));
+/** BUG-TRIVIA-01B — reveal atomique via RPC (MP uniquement). */
+export async function commitTriviaRevealPlay() {
+  const session = getTriviaSession();
+  if (!isGameSyncActive()) {
+    throw new Error("commitTriviaRevealPlay requires MP sync");
+  }
+  const req = validateTriviaRevealRequest(session);
+  if (!req.ok) {
+    throw mapTriviaRevealRpcError(new Error(req.code));
+  }
+  const lobbyId = getState().lobby.id;
+  let networkError = null;
+  try {
+    const row = await rpcRevealTriviaRound({
+      lobbyId,
+      runId: req.runId,
+      questionIdx: req.questionIdx,
+    });
+    if (row) applyRemoteSession(row);
+    return getTriviaSession();
+  } catch (err) {
+    const mapped = mapTriviaRevealRpcError(err);
+    if (isTriviaRevealBusinessError(mapped)) {
+      throw mapped;
+    }
+    if (!isTriviaRevealNetworkError(err) && !isTriviaRevealNetworkError(mapped)) {
+      throw mapped;
+    }
+    networkError = mapped;
+  }
+
+  const freshRow = await refreshGameSession();
+  if (freshRow) applyRemoteSession(freshRow);
+  const recovery = evaluateTriviaRevealRecovery(freshRow?.state?.trivia, {
+    runId: req.runId,
+    questionIdx: req.questionIdx,
+  });
+  if (recovery.recovered) {
+    return getTriviaSession();
+  }
+  if (recovery.reason === "stale_run") {
+    throw mapTriviaRevealRpcError(new Error("TRIVIA_STALE_RUN"));
+  }
+  if (recovery.reason === "stale_question") {
+    throw mapTriviaRevealRpcError(new Error("TRIVIA_STALE_QUESTION"));
+  }
+  throw networkError || new Error("Révélation impossible.");
 }
 
 export async function commitTriviaFinalPlay() {
@@ -313,7 +357,6 @@ export async function commitTriviaFinalPlay() {
 }
 
 export {
-  buildTriviaRevealExplicitPatch,
   buildTriviaNextQuestionExplicitPatch,
   buildTriviaFinalExplicitPatch,
   pickTriviaPlayFields,
@@ -385,19 +428,6 @@ export function allTriviaAnswersIn() {
   );
 }
 
-function pickFastestTriviaPlayer(correctEntries) {
-  const timed = correctEntries.filter(
-    ([, answer]) => typeof answer?.answeredAt === "number" && Number.isFinite(answer.answeredAt)
-  );
-  if (!timed.length) return null;
-  timed.sort(([, a], [, b]) => a.answeredAt - b.answeredAt);
-  const best = timed[0][1].answeredAt;
-  const tied = timed.filter(([, a]) => a.answeredAt === best);
-  if (tied.length === 1) return tied[0][0];
-  const pick = tied[Math.floor(Math.random() * tied.length)];
-  return pick[0];
-}
-
 export function scoreTriviaRound(session = getTriviaSession()) {
   if (session.questionScored && session.lastRound) {
     return session;
@@ -413,36 +443,19 @@ export function scoreTriviaRound(session = getTriviaSession()) {
   }
 
   const normalizedAnswers = normalizeTriviaAnswers(session.answers || {});
-  const answerEntries = Object.entries(normalizedAnswers).filter(([, answer]) =>
-    Number.isInteger(answer?.answerIndex)
-  );
-  const correctEntries = answerEntries.filter(([, answer]) => answer.answerIndex === question.correct);
-
-  const fastestPlayer = pickFastestTriviaPlayer(correctEntries);
-  const deltas = {};
-
-  correctEntries.forEach(([name]) => {
-    currentScores[name] = (currentScores[name] || 0) + TRIVIA_POINTS_CORRECT;
-    deltas[name] = (deltas[name] || 0) + TRIVIA_POINTS_CORRECT;
+  const { matchScores, lastRound } = scoreTriviaRoundFromAnswers({
+    correctIndex: question.correct,
+    correctAnswer: question.answers?.[question.correct] || "",
+    answers: normalizedAnswers,
+    matchScores: currentScores,
   });
-
-  if (fastestPlayer) {
-    currentScores[fastestPlayer] = (currentScores[fastestPlayer] || 0) + TRIVIA_POINTS_FASTEST;
-    deltas[fastestPlayer] = (deltas[fastestPlayer] || 0) + TRIVIA_POINTS_FASTEST;
-  }
 
   return {
     ...session,
     answers: normalizedAnswers,
     questionScored: true,
-    matchScores: currentScores,
-    lastRound: {
-      correctIndex: question.correct,
-      correctAnswer: question.answers?.[question.correct] || "",
-      correctPlayers: correctEntries.map(([name]) => name),
-      fastestPlayer,
-      deltas,
-    },
+    matchScores,
+    lastRound,
   };
 }
 

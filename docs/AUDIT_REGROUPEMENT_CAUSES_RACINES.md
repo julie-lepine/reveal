@@ -16,9 +16,9 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 
 | | |
 |--|--|
-| **Maintenant** | 🔴 BUG-TRIVIA-01 · BUG-TRUTHMETER-01 · BUG-TIERNIGHT-04 · BUG-TIERNIGHT-05 |
-| **Ensuite** | 🟠 BUG-WAO-02/03/04 · BUG-TIERNIGHT-03 · BUG-TRUTHMETER-02 · **OPS-LOBBY-04** · ARCH-10 |
-| **Dernière clôture** | **BUG-LOBBY-XX** ✅ (diagnostic · runbook prod · 2026-07-31) |
+| **Maintenant** | 🔴 **BUG-TRIVIA-01B** · BUG-TRUTHMETER-01 · BUG-TIERNIGHT-04 · BUG-TIERNIGHT-05 |
+| **Ensuite** | 🟠 BUG-TRIVIA-01C · BUG-WAO-02/03/04 · BUG-TIERNIGHT-03 · BUG-TRUTHMETER-02 · **OPS-LOBBY-04** · ARCH-10 |
+| **Dernière clôture** | **BUG-TRIVIA-01A** ✅ (acting host Trivia · QA terrain 2026-07-31) |
 
 ---
 
@@ -28,7 +28,7 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 
 | ID | Cause | Problème | Priorité |
 |----|-------|----------|----------|
-| **BUG-TRIVIA-01** | 7 | Dernière question : réponses perdues · manche bloquée | 🔴 |
+| **BUG-TRIVIA-01** | 7 | Dernière question : réponses perdues · manche bloquée | 🔴 **01A ✅** · **01B** ouvert |
 | **BUG-TRUTHMETER-01** | 7 | Validations de vote intermittentes non prises en compte | 🔴 |
 | **BUG-TIERNIGHT-04** | 3/7 | Joueurs invisibles · listes désynchronisées entre appareils | 🔴 |
 | **BUG-TIERNIGHT-05** | 8 | Ancien vote repris après nouvelle partie | 🔴 |
@@ -71,7 +71,7 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 | 4 | Asymétrie hôte / invité | ✅ | — |
 | 5 | Routing + timing sync | ✅ | ARCH-05 mitigé · **UX-NAV-LOBBY ✅** |
 | 6 | Async écrans | Partiel | **BUG-WAO-02/03** 🟠 |
-| 7 | Sync silencieuse / fire-and-forget | Partiel | **BUG-TRIVIA-01** 🔴 · **BUG-TRUTHMETER-01** 🔴 · **BUG-TIERNIGHT-03** 🟠 · ARCH-07 ✅ · M-14b ✅ · ARCH-08 ✅ |
+| 7 | Sync silencieuse / fire-and-forget | Partiel | **BUG-TRIVIA-01B** 🔴 · **BUG-TRIVIA-01C** 🟠 · **BUG-TRUTHMETER-01** 🔴 · **BUG-TIERNIGHT-03** 🟠 · **BUG-TRIVIA-01A ✅** · ARCH-07 ✅ · M-14b ✅ · ARCH-08 ✅ |
 | 8 | Reset / migration incomplète | Partiel | **BUG-TIERNIGHT-05** 🔴 · **OPS-LOBBY-04** · **BUG-LOBBY-XX-E** · **BUG-TRUTHMETER-02** 🟠 · ARCH-10 · **BUG-LOBBY-XX ✅** · I-09/SYN-15/16 ✅ |
 | 9 | Sync monolithe / duplication | Dette | ARCH-11… |
 | 10 | Code mort | Dette | **FEATURE-VIBECHECK-01** ⚪ · hors Fil Rouge app ✅ |
@@ -187,6 +187,19 @@ Symptôme terrain : lobby inactif jamais fermé automatiquement. **Aucun correct
 | **Chantiers ouverts** | **OPS-LOBBY-04** activer pg_cron + job · **BUG-LOBBY-XX-E** client hôte à l'expiration · **BUG-LOBBY-XX-F** si Realtime invité KO (test 8B-2) · **GAME-LOBBY-01** ↻ politique heartbeat vs « inactif » (produit, séparé) |
 | **Verdict** | **Ne pas rouvrir BUG-LOBBY-XX** — rouvrir **OPS-LOBBY-04** ou **BUG-LOBBY-XX-E** selon résultats runbook prod |
 
+#### BUG-TRIVIA-01A ✅ (clôture QA terrain · 2026-07-31)
+
+Acting host Trivia : transitions `question → reveal → next → final` via patches explicites + validation SQL.
+
+| | |
+|--|--|
+| **Livré** | `triviaPlayPatch.js` · `commitTriviaPlay` · reveal/next/final builders · migration SQL · derive `currentQuestion` depuis `deck[questionIdx]` · alertes erreur réseau |
+| **Où** | `js/core/triviaPlayPatch.js` · `triviaSession.js` · `trivia.js` · `gameSync.js` · `gameSessionSecurity.js` · `supabase/game-sessions-trivia-01a-acting-host.sql` |
+| **Preuve** | `tests/triviaActingHostPlay.test.js` (18) · QA scénarios A/B/C acting host validés |
+| **Hors scope (01B/01C)** | Course hôte réel post-fresh-read · UX réponse invité · restart « Recommencer » · atomicité contribution tardive |
+| **Réserve acceptée ↻** | Bonus podium (+10/+5) pour joueur AFK sans réponse — barème actuel · ticket produit séparé si besoin |
+| **Verdict** | **Ne pas rouvrir 01A** sauf régression acting host démontrée |
+
 ### Soirée-test 2026-07-31 — tickets ouverts
 
 Retour terrain multi-jeux. Priorités : 🔴 critique · 🟠 haute · 🟡 moyenne · ⚪ produit.
@@ -196,7 +209,10 @@ Retour terrain multi-jeux. Priorités : 🔴 critique · 🟠 haute · 🟡 moye
 | ID | Problème | Analyse / attendu |
 |----|----------|-------------------|
 | ~~**BUG-LOBBY-XX**~~ | ~~Fermeture auto lobby inactif~~ | ✅ **Clôturé diagnostic 2026-07-31** — voir section BUG-LOBBY-XX ✅ · suite **OPS-LOBBY-04** |
-| **BUG-TRIVIA-01** | Dernière question bloquée | Sur la dernière question : certaines réponses jamais enregistrées · manche ne se termine plus · persiste après « Recommencer une partie ». Analyser : index de manche · condition de fin · sync réponses · acting host · reprise après restart. |
+| **BUG-TRIVIA-01** | Dernière question bloquée | **01A ✅** acting host (reveal / next / final) · QA 2026-07-31. **Reste ouvert** : **01B** course hôte réel au reveal · **01C** UX réponse invité · restart « Recommencer » · dernière question hôte réel présent. |
+| **BUG-TRIVIA-01A** | Acting host Trivia transitions | ✅ **Clôturé QA 2026-07-31** — patches explicites · SQL validate · derive `currentQuestion` · 18 tests. Réserve acceptée ↻ : bonus podium AFK sans participation (produit, hors 01A). |
+| **BUG-TRIVIA-01B** | Course read-modify-write reveal | Hôte réel : scoring sur snapshot `refreshForReveal` non atomique · réponse tardive après refresh ignorée au score · `patchGameStateInner` reveal sans `forceFresh`. |
+| **BUG-TRIVIA-01C** | UX réponse invité Trivia | `commitTriviaAnswer` alerte via `patchGameStateWithFeedback` mais handler clic `catch {}` vide · optimistic local sans rollback explicite. |
 | **BUG-TRUTHMETER-01** | Validations de vote instables | Plusieurs validations non prises en compte (intermittent). Analyser : validation locale · envoi RPC · sync · confirmations · doubles clics · pertes silencieuses. |
 | **BUG-TIERNIGHT-04** | Joueurs invisibles | Pendant certaines manches : certains joueurs ne voient plus un participant · listes différentes selon appareils. Vérifier sync listes joueurs pendant toute la manche. |
 | **BUG-TIERNIGHT-05** | Ancien vote repris dans nouvelle partie | Après nouvelle partie : sélection précédente réapparaît. Attendu : état entièrement vierge. Vérifier : reset local · reset Supabase · caches · état mémoire. |
@@ -272,6 +288,7 @@ Ne pas rouvrir sans régression. Détail historique dans git / tests cités.
 
 | ID | Cause | Livré | Preuve / QA |
 |----|-------|-------|-------------|
+| **BUG-TRIVIA-01A** | 7 | Acting host Trivia : reveal / next / final · patches explicites · derive `currentQuestion` | `triviaActingHostPlay.test.js` (18) · migration `game-sessions-trivia-01a-acting-host.sql` · QA terrain 2026-07-31 |
 | **BUG-LOBBY-XX** | 8 | Diagnostic + runbook prod validés · cause = purge pg_cron · gaps E/F documentés | Analyse 2026-07-31 · `lobby-lifecycle.sql` · `lobbyLifecycle.js` · runbook v3 |
 | **ARCH-07** | 7 | Clôture définitive P0+P1/P2 · observabilité sync complète | `mpRtCatchup` (20) · `arch07CatchupResidual` (10) · 2026-07-29 |
 | **M-14b / SYN-09b** | 7 | Contrat `onLocalApplied` · helper centralisé | `mpLaunchLaunch.test.js` (20) · 2026-07-29 |
@@ -340,8 +357,8 @@ Hors file prioritaire — opportunité / régression :
 - Loader join interstitiel — **non retenu**
 - Fil Rouge SQL historique — ops Supabase séparée · fail docs `filRougeVague3Cleanup` hors Membership
 
-**Surveiller** : Clutch taps sous latence (SYN-26) · ready prep après Recommencer · conflit pending join vs chrome Home membership · leave multi-onglets après dissolve (modale « connexion a empêché ») · **BUG-TRIVIA-01** dernière question après restart · **OPS-LOBBY-04** après runbook prod
+**Surveiller** : Clutch taps sous latence (SYN-26) · ready prep après Recommencer · conflit pending join vs chrome Home membership · leave multi-onglets après dissolve (modale « connexion a empêché ») · **BUG-TRIVIA-01B** reveal hôte réel · **BUG-TRIVIA-01C** · **OPS-LOBBY-04** après runbook prod
 
 ---
 
-*Suivi vivant · MAJ 2026-07-31 — **BUG-LOBBY-XX ✅ clôture diagnostic** · prochain = **BUG-TRIVIA-01** · suite lobby = **OPS-LOBBY-04***
+*Suivi vivant · MAJ 2026-07-31 — **BUG-TRIVIA-01A ✅ QA terrain** · prochain = **BUG-TRIVIA-01B** · suite lobby = **OPS-LOBBY-04***
