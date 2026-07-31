@@ -24,6 +24,7 @@ const getStateMock = mock.fn(() => ({
 mock.module("../js/core/gameSessionRpc.js", {
   namedExports: {
     rpcRevealTriviaRound: rpcRevealMock,
+    rpcSubmitTriviaAnswer: mock.fn(),
   },
 });
 

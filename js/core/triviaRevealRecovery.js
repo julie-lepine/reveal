@@ -51,3 +51,42 @@ export function evaluateTriviaRevealRecovery(remoteTrivia, expected) {
   }
   return { recovered: false, reason: "not_revealed" };
 }
+
+/**
+ * Recovery post-timeout pour submit_trivia_answer.
+ * @param {object|null|undefined} remoteTrivia
+ * @param {{ runId: string, questionIdx: number, answerIndex: number, localUid: string }} expected
+ */
+export function evaluateTriviaAnswerRecovery(remoteTrivia, expected) {
+  if (!remoteTrivia || typeof remoteTrivia !== "object") {
+    return { recovered: false, reason: "no_state" };
+  }
+  const remoteRunId = remoteTrivia.runId || null;
+  if (!remoteRunId || remoteRunId !== expected.runId) {
+    return { recovered: false, reason: "stale_run" };
+  }
+  const remoteIdx = remoteTrivia.questionIdx ?? 0;
+  if (remoteIdx !== expected.questionIdx) {
+    return { recovered: false, reason: "stale_question" };
+  }
+
+  const phase = remoteTrivia.phase || null;
+  const scored = Boolean(remoteTrivia.questionScored);
+  const uid = expected.localUid;
+  const remoteAnswer = uid ? remoteTrivia.answers?.[uid] : null;
+  const remoteIdxMatch =
+    remoteAnswer != null &&
+    Number.isInteger(remoteAnswer.answerIndex) &&
+    remoteAnswer.answerIndex === expected.answerIndex;
+
+  if (remoteIdxMatch && phase === "question" && !scored) {
+    return { recovered: true, reason: "answer_recorded" };
+  }
+  if (scored && (phase === "reveal" || phase === "final") && remoteTrivia.lastRound) {
+    return { recovered: true, reason: "auto_revealed" };
+  }
+  if (remoteIdxMatch && scored && (phase === "reveal" || phase === "final")) {
+    return { recovered: true, reason: "auto_revealed" };
+  }
+  return { recovered: false, reason: "answer_missing" };
+}

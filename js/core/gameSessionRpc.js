@@ -102,3 +102,23 @@ export async function rpcRevealTriviaRound({ lobbyId, runId, questionIdx }) {
   if (error) throw error;
   return asSessionRow(data);
 }
+
+/** BUG-TRIVIA-01B-bis — réponse atomique + auto-reveal serveur (tous les joueurs MP). */
+export async function rpcSubmitTriviaAnswer({
+  lobbyId,
+  runId,
+  questionIdx,
+  answerIndex,
+  answeredAt,
+}) {
+  requireClient();
+  const { data, error } = await supabase.rpc("submit_trivia_answer", {
+    p_lobby_id: lobbyId,
+    p_run_id: runId,
+    p_question_idx: questionIdx,
+    p_answer_index: answerIndex,
+    p_answered_at: answeredAt,
+  });
+  if (error) throw error;
+  return asSessionRow(data);
+}

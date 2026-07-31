@@ -1,6 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
+  evaluateTriviaAnswerRecovery,
   evaluateTriviaRevealRecovery,
   isTriviaRevealBusinessError,
   isTriviaRevealNetworkError,
@@ -47,5 +48,60 @@ describe("evaluateTriviaRevealRecovery", () => {
     );
     assert.equal(out.recovered, false);
     assert.equal(out.reason, "stale_run");
+  });
+});
+
+describe("evaluateTriviaAnswerRecovery", () => {
+  const base = {
+    runId: "run-a",
+    questionIdx: 1,
+    answerIndex: 2,
+    localUid: "uid-local",
+  };
+
+  it("timeout : réponse enregistrée, question ouverte", () => {
+    const out = evaluateTriviaAnswerRecovery(
+      {
+        runId: "run-a",
+        questionIdx: 1,
+        phase: "question",
+        questionScored: false,
+        answers: { "uid-local": { answerIndex: 2, answeredAt: 100 } },
+      },
+      base
+    );
+    assert.equal(out.recovered, true);
+    assert.equal(out.reason, "answer_recorded");
+  });
+
+  it("timeout : auto-reveal déjà fait", () => {
+    const out = evaluateTriviaAnswerRecovery(
+      {
+        runId: "run-a",
+        questionIdx: 1,
+        phase: "reveal",
+        questionScored: true,
+        lastRound: { correctIndex: 1 },
+        answers: { "uid-local": { answerIndex: 2, answeredAt: 100 } },
+      },
+      base
+    );
+    assert.equal(out.recovered, true);
+    assert.equal(out.reason, "auto_revealed");
+  });
+
+  it("timeout : réponse absente", () => {
+    const out = evaluateTriviaAnswerRecovery(
+      {
+        runId: "run-a",
+        questionIdx: 1,
+        phase: "question",
+        questionScored: false,
+        answers: {},
+      },
+      base
+    );
+    assert.equal(out.recovered, false);
+    assert.equal(out.reason, "answer_missing");
   });
 });

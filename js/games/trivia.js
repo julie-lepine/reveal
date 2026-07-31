@@ -553,10 +553,6 @@ export function mountTrivia(app) {
             if (!mount.isMounted()) return;
             if (!mount.isCurrentMount()) return;
             syncFromSession();
-            if (trivia.allAnswersIn() && (!mp || canActAsHost())) {
-              await goToReveal();
-              return;
-            }
           } catch {
             if (mount.isMounted() && mount.isCurrentMount()) syncFromSession();
           } finally {
@@ -673,11 +669,6 @@ export function mountTrivia(app) {
     if (prevQuestion !== questionIdx || prevPhase !== phase) {
       pendingAnswerIndex = null;
       answerCommitInFlight = false;
-    }
-    if (phase === "question" && canActAsHost() && trivia.allAnswersIn()) {
-      void goToReveal().catch((err) => {
-        console.warn("REVEAL trivia auto reveal:", err);
-      });
     }
     const skipFull = shouldSkipFullRender(prevPhase, prevQuestion);
     arch03AhLogSkipDecision("trivia", {

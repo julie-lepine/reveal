@@ -19,7 +19,6 @@ import {
   requireLocalParticipantUid,
   refreshGameSession,
 } from "./gameSync.js";
-import { patchGameStateWithFeedback } from "./patchGameStateFeedback.js";
 import { launchGameWithSync, commitHostGamePlay, commitPrepReadyToggle } from "./mpLaunch.js";
 import { normalizeTriviaAnswersMap } from "./sessionMerge.js";
 import { playerKeyToDisplayName } from "./gameSync.js";
@@ -32,14 +31,15 @@ import {
 } from "./triviaPlayPatch.js";
 import { createTriviaRunId } from "./triviaRunId.js";
 import { scoreTriviaRoundFromAnswers } from "./triviaScoreEngine.js";
-import { mapTriviaRevealRpcError, validateTriviaRevealRequest } from "./triviaRevealErrors.js";
+import { mapTriviaRevealRpcError, validateTriviaAnswerRequest, validateTriviaRevealRequest } from "./triviaRevealErrors.js";
 import {
+  evaluateTriviaAnswerRecovery,
   evaluateTriviaRevealRecovery,
   isTriviaRevealBusinessError,
   isTriviaRevealNetworkError,
 } from "./triviaRevealRecovery.js";
 import { applyRemoteSession } from "./gameSync.js";
-import { rpcRevealTriviaRound } from "./gameSessionRpc.js";
+import { rpcRevealTriviaRound, rpcSubmitTriviaAnswer } from "./gameSessionRpc.js";
 
 const TRIVIA_ESTIMATE_SEC_PER_QUESTION = 40;
 
@@ -60,6 +60,7 @@ function defaultSession() {
     podiumApplied: false,
     results: null,
     runId: null,
+    questionPlayerUids: null,
   };
 }
 
@@ -78,9 +79,18 @@ function createTriviaScores(base = {}) {
   return next;
 }
 
+function buildTriviaQuestionPlayerUids() {
+  if (!isGameSyncActive()) return null;
+  const uids = getLobbyParticipants()
+    .map((p) => p.userId)
+    .filter(Boolean)
+    .sort();
+  return uids.length ? uids : null;
+}
+
 function buildQuestionStartPatch(session, questionIdx) {
   const deck = session.deck || [];
-  return {
+  const patch = {
     ...session,
     questionIdx,
     phase: "question",
@@ -90,6 +100,9 @@ function buildQuestionStartPatch(session, questionIdx) {
     lastRound: null,
     results: null,
   };
+  const uids = buildTriviaQuestionPlayerUids();
+  if (uids) patch.questionPlayerUids = uids;
+  return patch;
 }
 
 export function defaultTriviaPrepSession() {
@@ -271,7 +284,10 @@ export async function markTriviaLobbyStarted() {
 
 export async function startTriviaQuestion(questionIdx) {
   const session = getTriviaSession();
-  const explicitPatch = buildTriviaNextQuestionExplicitPatch(questionIdx);
+  const explicitPatch = buildTriviaNextQuestionExplicitPatch(
+    questionIdx,
+    buildTriviaQuestionPlayerUids() || []
+  );
 
   if (!isGameSyncActive()) {
     const localNext = buildQuestionStartPatch(session, questionIdx);
@@ -372,31 +388,71 @@ export async function commitTriviaAnswer(answerIndex) {
     throw new Error("Réponse invalide.");
   }
   const prev = session.answers?.[localName];
-  if (prev?.answerIndex === answerIndex) {
+  if (prev?.answerIndex === answerIndex && !isGameSyncActive()) {
     return prev;
   }
-  const nextAnswer = {
-    answerIndex,
-    answeredAt: Date.now(),
-  };
-  const nextAnswers = {
-    ...(session.answers || {}),
-    [localName]: nextAnswer,
-  };
-  saveStatePatch({ triviaGame: { ...session, answers: nextAnswers } });
-  if (!isGameSyncActive()) return nextAnswer;
-  const uid = requireLocalParticipantUid();
-  await patchGameStateWithFeedback({
-    trivia: {
-      answers: {
-        [uid]: {
-          answerIndex: nextAnswer.answerIndex,
-          answeredAt: nextAnswer.answeredAt,
-        },
+
+  const answeredAt = Date.now();
+
+  if (!isGameSyncActive()) {
+    const nextAnswer = { answerIndex, answeredAt };
+    saveStatePatch({
+      triviaGame: {
+        ...session,
+        answers: { ...(session.answers || {}), [localName]: nextAnswer },
       },
-    },
+    });
+    return nextAnswer;
+  }
+
+  const req = validateTriviaAnswerRequest(session);
+  if (!req.ok) {
+    throw mapTriviaRevealRpcError(new Error(req.code));
+  }
+  const lobbyId = getState().lobby.id;
+  const localUid = requireLocalParticipantUid();
+  let networkError = null;
+  try {
+    const row = await rpcSubmitTriviaAnswer({
+      lobbyId,
+      runId: req.runId,
+      questionIdx: req.questionIdx,
+      answerIndex,
+      answeredAt,
+    });
+    if (row) applyRemoteSession(row);
+    const synced = getTriviaSession();
+    return synced.answers?.[localName] || { answerIndex, answeredAt };
+  } catch (err) {
+    const mapped = mapTriviaRevealRpcError(err);
+    if (isTriviaRevealBusinessError(mapped)) {
+      throw mapped;
+    }
+    if (!isTriviaRevealNetworkError(err) && !isTriviaRevealNetworkError(mapped)) {
+      throw mapped;
+    }
+    networkError = mapped;
+  }
+
+  const freshRow = await refreshGameSession();
+  if (freshRow) applyRemoteSession(freshRow);
+  const recovery = evaluateTriviaAnswerRecovery(freshRow?.state?.trivia, {
+    runId: req.runId,
+    questionIdx: req.questionIdx,
+    answerIndex,
+    localUid,
   });
-  return nextAnswer;
+  if (recovery.recovered) {
+    const synced = getTriviaSession();
+    return synced.answers?.[localName] || { answerIndex, answeredAt };
+  }
+  if (recovery.reason === "stale_run") {
+    throw mapTriviaRevealRpcError(new Error("TRIVIA_STALE_RUN"));
+  }
+  if (recovery.reason === "stale_question") {
+    throw mapTriviaRevealRpcError(new Error("TRIVIA_STALE_QUESTION"));
+  }
+  throw new Error("Enregistrement de la réponse impossible.");
 }
 
 export function normalizeTriviaAnswers(answers = {}, players = getActivePlayerNames()) {

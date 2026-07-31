@@ -90,6 +90,7 @@ describe("pickTriviaPlayFields — filtrage", () => {
       "lastRound",
       "phase",
       "questionIdx",
+      "questionPlayerUids",
       "questionScored",
     ]);
     assert.deepEqual(out.answers, {});

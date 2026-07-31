@@ -12,6 +12,7 @@ export const TRIVIA_PLAY_ALLOWED_KEYS = new Set([
   "lastRound",
   "answers",
   "podiumApplied",
+  "questionPlayerUids",
 ]);
 
 /** Clés interdites (prep, dérivables, ou hors contrat Trivia). */
@@ -80,6 +81,13 @@ export function pickTriviaPlayFields(fullRemote, explicitPatch) {
       out.podiumApplied = Boolean(explicitPatch.podiumApplied);
       continue;
     }
+    if (key === "questionPlayerUids") {
+      if (!Array.isArray(explicitPatch.questionPlayerUids)) {
+        throw new Error("Trivia: questionPlayerUids doit être un tableau");
+      }
+      out.questionPlayerUids = explicitPatch.questionPlayerUids;
+      continue;
+    }
     if (key === "lastRound") {
       if (explicitPatch.lastRound === null) {
         out.lastRound = null;
@@ -113,13 +121,14 @@ export function buildTriviaRevealExplicitPatch(scoredSession) {
 }
 
 /** Patch explicite reveal → question suivante. */
-export function buildTriviaNextQuestionExplicitPatch(nextQuestionIdx) {
+export function buildTriviaNextQuestionExplicitPatch(nextQuestionIdx, questionPlayerUids = []) {
   return {
     phase: "question",
     questionIdx: nextQuestionIdx,
     questionScored: false,
     lastRound: null,
     answers: {},
+    questionPlayerUids,
   };
 }
 

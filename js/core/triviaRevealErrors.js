@@ -6,7 +6,7 @@ const TRIVIA_REVEAL_ERROR_MESSAGES = {
   TRIVIA_INVALID_STATE: "État Trivia invalide côté serveur.",
   TRIVIA_RUN_REQUIRED: "Partie Trivia non initialisée (runId manquant).",
   TRIVIA_RPC_NOT_DEPLOYED:
-    "Révélation indisponible : migration SQL Trivia 01B non appliquée sur Supabase. Exécute supabase/game-sessions-trivia-01b-reveal-round.sql puis relance une partie.",
+    "Action Trivia indisponible : migrations SQL 01B / 01B-bis non appliquées sur Supabase. Exécute les scripts trivia puis relance une partie.",
 };
 
 export function triviaRevealErrorCode(err) {
@@ -16,7 +16,7 @@ export function triviaRevealErrorCode(err) {
   const msg = String(err?.message || err || "");
   if (
     msg.includes("Could not find the function") &&
-    msg.includes("reveal_trivia_round")
+    (msg.includes("reveal_trivia_round") || msg.includes("submit_trivia_answer"))
   ) {
     return "TRIVIA_RPC_NOT_DEPLOYED";
   }
@@ -47,4 +47,9 @@ export function validateTriviaRevealRequest(session) {
     runId: session.runId,
     questionIdx: session.questionIdx ?? 0,
   };
+}
+
+/** Même contrat stale run/question que reveal (01B-bis). */
+export function validateTriviaAnswerRequest(session) {
+  return validateTriviaRevealRequest(session);
 }

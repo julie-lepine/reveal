@@ -1599,7 +1599,11 @@ function mergeTriviaGameLocal(local, remote) {
     remote.phase === "reveal" ||
     remote.phase === "final"
   ) {
-    answers = normalizeTriviaAnswersForPlayers({ ...localAnswers, ...remoteAnswers });
+    if (remote.phase === "question" && isGameSyncActive()) {
+      answers = normalizeTriviaAnswersForPlayers(remoteAnswers);
+    } else {
+      answers = normalizeTriviaAnswersForPlayers({ ...localAnswers, ...remoteAnswers });
+    }
   }
   const ready =
     !remote.lobbyStarted && !local.lobbyStarted
@@ -2049,6 +2053,7 @@ export function triviaToRemote(session) {
     selectedThemeId: session.selectedThemeId || "random",
     questionCount: session.questionCount ?? 5,
     runId: session.runId || null,
+    questionPlayerUids: session.questionPlayerUids || null,
     deck: session.deck ? dehydrateTriviaDeck(session.deck) : null,
     questionIdx: session.questionIdx ?? 0,
     phase: session.phase || null,
@@ -2081,6 +2086,9 @@ export function triviaFromRemote(remote) {
     selectedThemeId: remote.selectedThemeId || "random",
     questionCount: remote.questionCount ?? 5,
     runId: remote.runId || null,
+    questionPlayerUids: Array.isArray(remote.questionPlayerUids)
+      ? remote.questionPlayerUids
+      : null,
     deck,
     questionIdx,
     phase: remote.phase || null,

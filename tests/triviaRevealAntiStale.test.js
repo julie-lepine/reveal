@@ -45,7 +45,16 @@ describe("mapTriviaRevealRpcError", () => {
       )
     );
     assert.equal(triviaRevealErrorCode(err), "TRIVIA_RPC_NOT_DEPLOYED");
-    assert.match(err.message, /migration SQL Trivia 01B/i);
+    assert.match(err.message, /01B/i);
+  });
+
+  it("mappe submit_trivia_answer absente", () => {
+    const err = mapTriviaRevealRpcError(
+      new Error(
+        "Could not find the function public.submit_trivia_answer(p_lobby_id, p_run_id, p_question_idx, p_answer_index, p_answered_at) in the schema cache"
+      )
+    );
+    assert.equal(triviaRevealErrorCode(err), "TRIVIA_RPC_NOT_DEPLOYED");
   });
 
   it("mappe TRIVIA_STALE_RUN", () => {
