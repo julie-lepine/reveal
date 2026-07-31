@@ -30,6 +30,12 @@ import { renderTriviaQuestion } from "../trivia/TriviaQuestion.js";
 import { renderTriviaResults } from "../trivia/TriviaResults.js";
 import { renderTriviaScoreboard } from "../trivia/TriviaScoreboard.js";
 import { arch03AhLogSkipDecision } from "../core/arch03ActingHostDebug.js";
+import {
+  resolveLocalTriviaAnswerIndex,
+  nextPendingAnswerAfterCommit,
+} from "../core/triviaAnswerUi.js";
+import { getSupabaseUserId } from "../core/supabaseAuth.js";
+import { mapTriviaRevealRpcError } from "../core/triviaRevealErrors.js";
 
 export function mountTrivia(app) {
   if (!requireLobbyPlay()) return null;
@@ -84,8 +90,12 @@ export function mountTrivia(app) {
   }
 
   function myAnswerIndex() {
-    if (pendingAnswerIndex != null) return pendingAnswerIndex;
-    return answers[localName]?.answerIndex ?? null;
+    return resolveLocalTriviaAnswerIndex({
+      pendingAnswerIndex,
+      answers,
+      localName,
+      localUid: getSupabaseUserId() || null,
+    });
   }
 
   function waitingMessage() {
@@ -537,32 +547,70 @@ export function mountTrivia(app) {
           if (answerCommitInFlight) return;
           const choice = Number(btn.getAttribute("data-trivia-answer"));
           if (!Number.isInteger(choice)) return;
-          if (
-            myAnswerIndex() === choice &&
-            trivia.getSession().answers?.[localName]?.answerIndex === choice
-          ) {
-            return;
-          }
+          console.info("[TRIVIA_ANSWER_CLICK]", {
+            choice,
+            phase: trivia.getSession().phase,
+            inFlight: answerCommitInFlight,
+            pending: pendingAnswerIndex,
+            selected: myAnswerIndex(),
+          });
+          const confirmedRemote = resolveLocalTriviaAnswerIndex({
+            pendingAnswerIndex: null,
+            answers: trivia.getSession().answers || {},
+            localName,
+            localUid: getSupabaseUserId() || null,
+          });
+          if (confirmedRemote === choice) return;
 
           pendingAnswerIndex = choice;
           answerCommitInFlight = true;
           render();
 
+          let commitOk = false;
           try {
+            console.info("[TRIVIA_ANSWER_SUBMIT_START]", {
+              choice,
+              phase: trivia.getSession().phase,
+              runId: trivia.getSession().runId,
+              questionIdx: trivia.getSession().questionIdx,
+            });
             await trivia.commitAnswer(choice);
+            commitOk = true;
+            console.info("[TRIVIA_ANSWER_RPC_SUCCESS]", { choice });
             if (!mount.isMounted()) return;
             if (!mount.isCurrentMount()) return;
             syncFromSession();
-          } catch {
+          } catch (err) {
+            console.warn("[TRIVIA_ANSWER_RPC_ERROR]", err?.code || err?.message || err);
             if (mount.isMounted() && mount.isCurrentMount()) syncFromSession();
+            const mapped = mapTriviaRevealRpcError(err);
+            const message =
+              mapped?.message ||
+              err?.message ||
+              "Impossible d'enregistrer ta réponse. Réessaie.";
+            await showAppAlert(message, { title: "Trivia", icon: "🧠" });
           } finally {
-            pendingAnswerIndex = null;
-            answerCommitInFlight = false;
-            if (mount.isMounted() && mount.isCurrentMount()) render();
+            if (mount.isMounted() && mount.isCurrentMount()) {
+              syncFromSession();
+              const confirmed = resolveLocalTriviaAnswerIndex({
+                pendingAnswerIndex: null,
+                answers,
+                localName,
+                localUid: getSupabaseUserId() || null,
+              });
+              pendingAnswerIndex = nextPendingAnswerAfterCommit({
+                commitOk,
+                pendingAnswerIndex: choice,
+                confirmedIndex: confirmed,
+              });
+              answerCommitInFlight = false;
+              render();
+            } else {
+              answerCommitInFlight = false;
+            }
           }
         });
-      });
-      app.querySelector("#btn-trivia-force")?.addEventListener("click", () => {
+      });      app.querySelector("#btn-trivia-force")?.addEventListener("click", () => {
         void forceReveal().catch((err) => {
           console.warn("REVEAL trivia forceReveal:", err);
         });

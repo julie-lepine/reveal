@@ -422,7 +422,11 @@ export async function commitTriviaAnswer(answerIndex) {
     });
     if (row) applyRemoteSession(row);
     const synced = getTriviaSession();
-    return synced.answers?.[localName] || { answerIndex, answeredAt };
+    return (
+      synced.answers?.[localName] ||
+      synced.answers?.[localUid] ||
+      { answerIndex, answeredAt }
+    );
   } catch (err) {
     const mapped = mapTriviaRevealRpcError(err);
     if (isTriviaRevealBusinessError(mapped)) {
@@ -444,7 +448,11 @@ export async function commitTriviaAnswer(answerIndex) {
   });
   if (recovery.recovered) {
     const synced = getTriviaSession();
-    return synced.answers?.[localName] || { answerIndex, answeredAt };
+    return (
+      synced.answers?.[localName] ||
+      synced.answers?.[localUid] ||
+      { answerIndex, answeredAt }
+    );
   }
   if (recovery.reason === "stale_run") {
     throw mapTriviaRevealRpcError(new Error("TRIVIA_STALE_RUN"));
