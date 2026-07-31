@@ -130,3 +130,14 @@ export function buildTriviaFinalExplicitPatch() {
     podiumApplied: true,
   };
 }
+
+/**
+ * BUG-TRIVIA-01A : currentQuestion n'est pas patché au serveur entre les manches.
+ * Tous les clients dérivent la question affichée depuis deck[questionIdx].
+ */
+export function deriveTriviaCurrentQuestion(deck, questionIdx, fallback = null) {
+  if (!Array.isArray(deck)) return fallback;
+  const idx = Number(questionIdx);
+  if (!Number.isInteger(idx) || idx < 0 || idx >= deck.length) return fallback;
+  return deck[idx] || fallback;
+}

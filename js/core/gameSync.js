@@ -120,6 +120,7 @@ import {
   validateActingHostPlayPatch,
 } from "./gameSessionSecurity.js";
 import { arch03RevealLog } from "./arch03RevealDebug.js";
+import { deriveTriviaCurrentQuestion } from "./triviaPlayPatch.js";
 import {
   planGuessLiePlayWrite,
   buildGuessLieActingPlayFields,
@@ -1577,11 +1578,15 @@ function mergeTriviaGameLocal(local, remote) {
   if (!remote) return local;
   if (!local) return remote;
   const newQuestionRound = isNewTriviaQuestionRound(local, remote);
+  const questionIdxChanged =
+    remote.questionIdx != null &&
+    local?.questionIdx != null &&
+    remote.questionIdx !== local.questionIdx;
   const remoteAnswers = remote.answers || {};
   const localAnswers = local.answers || {};
   let answers = remoteAnswers;
-  if (newQuestionRound) {
-    answers = remoteAnswers;
+  if (newQuestionRound || (questionIdxChanged && remote.phase === "question")) {
+    answers = normalizeTriviaAnswersForPlayers(remoteAnswers);
   } else if (
     remote.phase === "question" ||
     remote.phase === "reveal" ||
@@ -1593,11 +1598,18 @@ function mergeTriviaGameLocal(local, remote) {
     !remote.lobbyStarted && !local.lobbyStarted
       ? mergeReadyMapsLocal(local.ready || {}, remote.ready || {}, getActivePlayerNames(), getLocalDisplayName())
       : remote.ready || {};
+  const deck = remote.deck || local.deck;
+  const currentQuestion = deriveTriviaCurrentQuestion(
+    deck,
+    remote.questionIdx ?? 0,
+    remote.currentQuestion ?? local.currentQuestion ?? null
+  );
   return {
     ...local,
     ...remote,
     ready,
     answers,
+    currentQuestion,
     matchScores: { ...(remote.matchScores || {}) },
     questionScored: mergeRoundFlag(local.questionScored, remote.questionScored, newQuestionRound),
     podiumApplied: mergeRoundFlag(local.podiumApplied, remote.podiumApplied, newQuestionRound),
@@ -2053,15 +2065,21 @@ export function triviaToRemote(session) {
 
 export function triviaFromRemote(remote) {
   if (!remote) return null;
+  const deck = remote.deck ? rehydrateTriviaDeck(remote.deck) : null;
+  const questionIdx = remote.questionIdx ?? 0;
   return {
     ready: mapReadyByName(remote.ready || {}),
     lobbyStarted: Boolean(remote.lobbyStarted),
     selectedThemeId: remote.selectedThemeId || "random",
     questionCount: remote.questionCount ?? 5,
-    deck: remote.deck ? rehydrateTriviaDeck(remote.deck) : null,
-    questionIdx: remote.questionIdx ?? 0,
+    deck,
+    questionIdx,
     phase: remote.phase || null,
-    currentQuestion: remote.currentQuestion || null,
+    currentQuestion: deriveTriviaCurrentQuestion(
+      deck,
+      questionIdx,
+      remote.currentQuestion || null
+    ),
     answers: mapTriviaAnswersByName(remote.answers || {}),
     questionScored: Boolean(remote.questionScored),
     matchScores: scoresFromRemote(remote.matchScores || {}),

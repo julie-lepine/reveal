@@ -1,5 +1,6 @@
 import { getTriviaThemeLabel } from "../../data/trivia.js";
 import { useTriviaGame } from "../core/useTriviaGame.js";
+import { deriveTriviaCurrentQuestion } from "../core/triviaPlayPatch.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
 import { withClickLock } from "../core/actionLock.js";
 import { createMountGuard } from "../core/mountLifecycle.js";
@@ -72,7 +73,11 @@ export function mountTrivia(app) {
     const session = trivia.getSession();
     phase = session.phase || "question";
     questionIdx = session.questionIdx ?? 0;
-    currentQuestion = session.currentQuestion || null;
+    currentQuestion = deriveTriviaCurrentQuestion(
+      session.deck,
+      questionIdx,
+      session.currentQuestion || null
+    );
     answers = { ...(session.answers || {}) };
     matchScores = { ...(session.matchScores || {}) };
     lastRound = session.lastRound || null;

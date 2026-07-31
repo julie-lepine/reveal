@@ -13,6 +13,10 @@ import {
   mergeTriviaActingHostPlayShallow,
 } from "../js/core/gameSessionSecurity.js";
 import { mergeTriviaAnswersUid } from "../js/core/sessionMerge.js";
+import { deriveTriviaCurrentQuestion } from "../js/core/triviaPlayPatch.js";
+
+const Q0 = { id: "q0", correct: 0, answers: ["A0", "B0", "C0", "D0"], theme: "t1" };
+const Q1 = { id: "q1", correct: 1, answers: ["A1", "B1", "C1", "D1"], theme: "t1" };
 
 const UID_A = "11111111-1111-1111-1111-111111111111";
 const UID_B = "22222222-2222-2222-2222-222222222222";
@@ -267,6 +271,14 @@ describe("hôte réel — merge profond answers (non atomicité complète)", () 
     });
     const out = pickTriviaPlayFields(remote, explicit);
     assert.equal("answers" in out, false);
+  });
+});
+
+describe("deriveTriviaCurrentQuestion — ignore stale remote", () => {
+  it("prend deck[questionIdx] quand currentQuestion remote est obsolète", () => {
+    const deck = [Q0, Q1];
+    assert.equal(deriveTriviaCurrentQuestion(deck, 1, Q0)?.id, "q1");
+    assert.equal(deriveTriviaCurrentQuestion(deck, 1, Q0)?.answers?.[0], "A1");
   });
 });
 
