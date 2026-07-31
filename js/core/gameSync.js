@@ -4811,6 +4811,11 @@ export async function syncPlaylistGuessSession(extra = {}, patchOpts = {}) {
 }
 
 export async function syncTriviaSession(extra = {}, patchOpts = {}) {
+  if (patchOpts.inGameTransition) {
+    throw new Error(
+      "syncTriviaSession réservé à la préparation ; utiliser commitTriviaPlay en partie."
+    );
+  }
   const session = { ...getState().triviaGame, ...extra };
   saveStatePatch({ triviaGame: session });
   if (!isGameSyncActive()) return session;

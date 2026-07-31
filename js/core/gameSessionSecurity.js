@@ -144,7 +144,98 @@ export const ACTING_HOST_PLAY_ALLOWED_KEYS = new Set([
   "scored",
   "intermissionEndsAt",
   "voteTimerRemaining",
+  "questionScored",
+  "podiumApplied",
 ]);
+
+/**
+ * Validations Trivia acting host (miroir SQL validate_trivia_acting_host_patch).
+ * @param {object|null} serverTrivia état trivia serveur avant patch
+ * @param {object} playPatch patch distant filtré
+ * @returns {{ ok: true } | { ok: false, reason: string }}
+ */
+export function validateTriviaActingHostPlayPatch(serverTrivia = {}, playPatch = {}) {
+  if (!playPatch || typeof playPatch !== "object") {
+    return { ok: false, reason: "patch invalide" };
+  }
+
+  if (Object.prototype.hasOwnProperty.call(playPatch, "roundScored")) {
+    return { ok: false, reason: "roundScored interdit pour Trivia" };
+  }
+  if (
+    playPatch.questionScored != null &&
+    Object.prototype.hasOwnProperty.call(playPatch, "roundScored")
+  ) {
+    return { ok: false, reason: "questionScored et roundScored simultanés" };
+  }
+
+  const curPhase = serverTrivia?.phase ?? null;
+  const curIdx = Number(serverTrivia?.questionIdx ?? 0);
+  const questionCount = Number(serverTrivia?.questionCount ?? 5);
+  const lastQuestionIdx = Math.max(0, questionCount - 1);
+  const newPhase = playPatch.phase ?? null;
+  const newIdx =
+    playPatch.questionIdx != null ? Number(playPatch.questionIdx) : curIdx;
+
+  if (Object.prototype.hasOwnProperty.call(playPatch, "answers")) {
+    const answers = playPatch.answers;
+    if (answers == null || Array.isArray(answers) || typeof answers !== "object") {
+      return { ok: false, reason: "answers doit être un objet" };
+    }
+    if (Object.keys(answers).length !== 0) {
+      return { ok: false, reason: "answers doit être vide" };
+    }
+    if (curPhase !== "reveal") {
+      return { ok: false, reason: "reset answers uniquement depuis reveal" };
+    }
+    if (newPhase !== "question") {
+      return { ok: false, reason: "reset answers uniquement vers question" };
+    }
+    if (newIdx !== curIdx + 1) {
+      return { ok: false, reason: "questionIdx incohérent pour reset answers" };
+    }
+  }
+
+  if (playPatch.questionScored === true) {
+    if (curPhase !== "question") {
+      return { ok: false, reason: "questionScored:true uniquement depuis question" };
+    }
+    if (newPhase !== "reveal") {
+      return { ok: false, reason: "questionScored:true uniquement vers reveal" };
+    }
+  }
+
+  if (playPatch.questionScored === false) {
+    if (curPhase !== "reveal") {
+      return { ok: false, reason: "questionScored:false uniquement depuis reveal" };
+    }
+    if (newPhase !== "question") {
+      return { ok: false, reason: "questionScored:false uniquement vers question" };
+    }
+    if (newIdx !== curIdx + 1) {
+      return { ok: false, reason: "questionIdx incohérent pour nouvelle question" };
+    }
+  }
+
+  if (playPatch.podiumApplied === true) {
+    if (curPhase !== "reveal") {
+      return { ok: false, reason: "podiumApplied uniquement depuis reveal" };
+    }
+    if (newPhase !== "final") {
+      return { ok: false, reason: "podiumApplied uniquement vers final" };
+    }
+    if (curIdx !== lastQuestionIdx) {
+      return { ok: false, reason: "podiumApplied uniquement sur dernière question" };
+    }
+  }
+
+  return { ok: true };
+}
+
+/** Merge shallow trivia (miroir SQL ||) pour tests de préservation answers. */
+export function mergeTriviaActingHostPlayShallow(serverTrivia = {}, playPatch = {}) {
+  return { ...serverTrivia, ...playPatch };
+}
 
 /** @returns {{ ok: true } | { ok: false, key: string }} */
 export function validateActingHostPlayPatch(playPatch) {

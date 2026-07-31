@@ -53,6 +53,8 @@ export function mountTrivia(app) {
   let npcTimers = [];
   let npcRoundKey = "";
   let revealInFlight = false;
+  let finishInFlight = false;
+  let eveningPodiumApplied = false;
   let answerCommitInFlight = false;
   let pendingAnswerIndex = null;
 
@@ -150,16 +152,33 @@ export function mountTrivia(app) {
 
   async function goToReveal() {
     if (revealInFlight) return;
-    const live = trivia.getSession();
-    if (live.phase !== "question") return;
+    const initial = trivia.getSession();
+    if (initial.phase !== "question") return;
     revealInFlight = true;
-    const session = trivia.scoreRound(live);
     clearNpcTimers();
     try {
-      await trivia.commitPlay({
-        ...session,
-        phase: "reveal",
+      // Relecture fraîche : réduit la fenêtre de course, pas d'atomicité complète (01B).
+      let live = mp ? await trivia.refreshForReveal() : initial;
+      const scored = trivia.scoreRound(live);
+      if (mp && canActAsHost()) {
+        await trivia.commitRevealPlay(scored);
+      } else if (!mp) {
+        saveStatePatch({
+          triviaGame: { ...scored, phase: "reveal" },
+        });
+      }
+      if (!mount.isMounted()) return;
+      if (!mount.isCurrentMount()) return;
+      syncFromSession();
+      render();
+    } catch (err) {
+      console.warn("REVEAL trivia goToReveal:", err);
+      syncFromSession();
+      await showAppAlert("Révélation impossible. Réessaie.", {
+        title: "Trivia",
+        icon: "🧠",
       });
+      if (mount.isMounted() && mount.isCurrentMount()) render();
     } finally {
       revealInFlight = false;
     }
@@ -310,59 +329,66 @@ export function mountTrivia(app) {
   }
 
   async function finishTriviaGame() {
+    if (finishInFlight) return;
     const live = trivia.getSession();
-    if (live.podiumApplied) {
+    if (live.phase === "final" && eveningPodiumApplied) {
       if (!mount.isMounted()) return;
       if (!mount.isCurrentMount()) return;
       render();
       return;
     }
 
-    let standings = trivia.getPodiumAwards(trivia.buildStandings(live.matchScores || {}));
-
-    if (!mp || canActAsHost()) {
-      const claimed = {
-        ...live,
-        phase: "final",
-        podiumApplied: true,
-      };
-      if (mp) {
-        await trivia.commitPlay(claimed);
-      } else {
-        saveStatePatch({ triviaGame: claimed });
+    finishInFlight = true;
+    clearNpcTimers();
+    try {
+      if (mp && canActAsHost()) {
+        if (!live.podiumApplied) {
+          await trivia.commitFinalPlay();
+        }
+        if (!mount.isMounted()) return;
+        if (!mount.isCurrentMount()) return;
+        syncFromSession();
+        if (!eveningPodiumApplied) {
+          const standings = trivia.applyLobbyPodium(trivia.getSession());
+          recordTriviaPlayed();
+          setLastGame({
+            gameId: "trivia",
+            title: "Trivia Quiz",
+            summary: `${standings.length} joueur(s) · ${formatWinnersLabel(standings)}`,
+          });
+          eveningPodiumApplied = true;
+        }
+      } else if (!mp) {
+        const scoredSession = {
+          ...live,
+          phase: "final",
+          podiumApplied: true,
+        };
+        saveStatePatch({ triviaGame: scoredSession });
+        const standings = trivia.applyLobbyPodium(scoredSession);
+        recordTriviaPlayed();
+        setLastGame({
+          gameId: "trivia",
+          title: "Trivia Quiz",
+          summary: `${standings.length} joueur(s) · ${formatWinnersLabel(standings)}`,
+        });
+        eveningPodiumApplied = true;
       }
 
-      standings = trivia.applyLobbyPodium(trivia.getSession());
-      recordTriviaPlayed();
-      setLastGame({
-        gameId: "trivia",
-        title: "Trivia Quiz",
-        summary: `${standings.length} joueur(s) · ${formatWinnersLabel(standings)}`,
+      if (!mount.isMounted()) return;
+      if (!mount.isCurrentMount()) return;
+      syncFromSession();
+      render();
+    } catch (err) {
+      console.warn("REVEAL trivia finishTriviaGame:", err);
+      syncFromSession();
+      await showAppAlert("Impossible de terminer la partie. Réessaie.", {
+        title: "Trivia",
+        icon: "🧠",
       });
-    }
-
-    const finalSession = {
-      ...trivia.getSession(),
-      phase: "final",
-      podiumApplied: true,
-      results: { standings },
-    };
-
-    clearNpcTimers();
-
-    if (mp && canActAsHost()) {
-      await trivia.commitPlay(finalSession, { screen: "trivia" });
-      if (!mount.isMounted()) return;
-      if (!mount.isCurrentMount()) return;
-      render();
-      return;
-    }
-
-    if (!mp) {
-      if (!mount.isMounted()) return;
-      if (!mount.isCurrentMount()) return;
-      saveStatePatch({ triviaGame: finalSession });
-      render();
+      if (mount.isMounted() && mount.isCurrentMount()) render();
+    } finally {
+      finishInFlight = false;
     }
   }
 
@@ -538,19 +564,32 @@ export function mountTrivia(app) {
         });
       });
       app.querySelector("#btn-trivia-force")?.addEventListener("click", () => {
-        void forceReveal();
+        void forceReveal().catch((err) => {
+          console.warn("REVEAL trivia forceReveal:", err);
+        });
       });
     }
 
     app.querySelector("#btn-trivia-next")?.addEventListener("click", withClickLock(async () => {
-      if (questionIdx < totalQuestions - 1) {
-        await trivia.startQuestion(questionIdx + 1);
-        if (!mount.isMounted()) return;
-        if (!mount.isCurrentMount()) return;
-        render();
-        return;
+      try {
+        if (questionIdx < totalQuestions - 1) {
+          await trivia.startQuestion(questionIdx + 1);
+          if (!mount.isMounted()) return;
+          if (!mount.isCurrentMount()) return;
+          syncFromSession();
+          render();
+          return;
+        }
+        await finishTriviaGame();
+      } catch (err) {
+        console.warn("REVEAL trivia next question:", err);
+        syncFromSession();
+        await showAppAlert("Impossible de passer à la question suivante. Réessaie.", {
+          title: "Trivia",
+          icon: "🧠",
+        });
+        if (mount.isMounted() && mount.isCurrentMount()) render();
       }
-      await finishTriviaGame();
     }));
 
     app.querySelectorAll("[data-trivia-action]").forEach((btn) => {
@@ -633,7 +672,9 @@ export function mountTrivia(app) {
       answerCommitInFlight = false;
     }
     if (phase === "question" && canActAsHost() && trivia.allAnswersIn()) {
-      void goToReveal();
+      void goToReveal().catch((err) => {
+        console.warn("REVEAL trivia auto reveal:", err);
+      });
     }
     const skipFull = shouldSkipFullRender(prevPhase, prevQuestion);
     arch03AhLogSkipDecision("trivia", {

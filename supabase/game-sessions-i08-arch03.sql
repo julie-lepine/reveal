@@ -708,6 +708,90 @@ grant execute on function public.submit_truth_meter_affirmation(uuid, text, nume
 -- Acting host play (pas d'UPDATE libre)
 -- ---------------------------------------------------------------------------
 
+create or replace function public.validate_trivia_acting_host_patch(
+  p_current jsonb,
+  p_patch jsonb
+)
+returns void
+language plpgsql
+immutable
+as $$
+declare
+  v_cur_phase text := p_current ->> 'phase';
+  v_cur_idx int := coalesce((p_current ->> 'questionIdx')::int, 0);
+  v_qcount int := coalesce((p_current ->> 'questionCount')::int, 5);
+  v_last_idx int := greatest(0, v_qcount - 1);
+  v_new_phase text := p_patch ->> 'phase';
+  v_new_idx int;
+  v_answers jsonb;
+begin
+  if p_patch ? 'roundScored' then
+    raise exception 'Trivia: roundScored interdit';
+  end if;
+
+  if p_patch ? 'questionScored' and p_patch ? 'roundScored' then
+    raise exception 'Trivia: questionScored et roundScored simultanés interdits';
+  end if;
+
+  if p_patch ? 'answers' then
+    v_answers := p_patch -> 'answers';
+    if v_answers is null or jsonb_typeof(v_answers) <> 'object' then
+      raise exception 'Trivia: answers doit être un objet';
+    end if;
+    if v_answers <> '{}'::jsonb then
+      raise exception 'Trivia: answers doit être vide';
+    end if;
+    if v_cur_phase is distinct from 'reveal' then
+      raise exception 'Trivia: reset answers uniquement depuis reveal';
+    end if;
+    if v_new_phase is distinct from 'question' then
+      raise exception 'Trivia: reset answers uniquement vers question';
+    end if;
+    v_new_idx := coalesce((p_patch ->> 'questionIdx')::int, v_cur_idx);
+    if v_new_idx <> v_cur_idx + 1 then
+      raise exception 'Trivia: questionIdx incohérent pour reset answers';
+    end if;
+  end if;
+
+  if p_patch ? 'questionScored' then
+    if (p_patch ->> 'questionScored')::boolean is true then
+      if v_cur_phase is distinct from 'question' then
+        raise exception 'Trivia: questionScored:true uniquement depuis question';
+      end if;
+      if v_new_phase is distinct from 'reveal' then
+        raise exception 'Trivia: questionScored:true uniquement vers reveal';
+      end if;
+    elsif (p_patch ->> 'questionScored')::boolean is false then
+      if v_cur_phase is distinct from 'reveal' then
+        raise exception 'Trivia: questionScored:false uniquement depuis reveal';
+      end if;
+      if v_new_phase is distinct from 'question' then
+        raise exception 'Trivia: questionScored:false uniquement vers question';
+      end if;
+      v_new_idx := coalesce((p_patch ->> 'questionIdx')::int, v_cur_idx);
+      if v_new_idx <> v_cur_idx + 1 then
+        raise exception 'Trivia: questionIdx incohérent pour nouvelle question';
+      end if;
+    end if;
+  end if;
+
+  if p_patch ? 'podiumApplied' then
+    if coalesce((p_patch ->> 'podiumApplied')::boolean, false) is not true then
+      raise exception 'Trivia: podiumApplied doit être true';
+    end if;
+    if v_cur_phase is distinct from 'reveal' then
+      raise exception 'Trivia: podiumApplied uniquement depuis reveal';
+    end if;
+    if v_new_phase is distinct from 'final' then
+      raise exception 'Trivia: podiumApplied uniquement vers final';
+    end if;
+    if v_cur_idx <> v_last_idx then
+      raise exception 'Trivia: podiumApplied uniquement sur dernière question';
+    end if;
+  end if;
+end;
+$$;
+
 create or replace function public.apply_acting_host_play(
   p_lobby_id uuid,
   p_action text,
@@ -732,6 +816,7 @@ declare
   v_val jsonb;
       v_allowed text[] := array[
     'phase','roundIdx','takeIdx','questionIdx','votes','voteEndsAt','roundScored',
+    'questionScored','podiumApplied',
     'takeScored','intermissionEndsAt','voteTimerRemaining',
     'pausedBy','taps','answers','dealAcks','currentDilemma','currentTake',
     'affirmation','authorEstimate','finished','placements','matchScores','lastRound',
@@ -743,6 +828,7 @@ declare
     'hottake','dilemma','speedvote','clutch','wronganswer','traitre','playlistguess',
     'trivia','consensus','truthmeter','guesslie','tiernight','tiernight-live','tiernight-end'
   ];
+  v_trivia_current jsonb;
 begin
   if v_uid is null then
     raise exception 'Authentification requise.';
@@ -797,6 +883,11 @@ begin
       v_patch := v_patch || jsonb_build_object(v_key, v_val);
     end loop;
 
+    if v_game = 'trivia' then
+      v_trivia_current := coalesce(v_row.state -> v_state_key, '{}'::jsonb);
+      perform public.validate_trivia_acting_host_patch(v_trivia_current, v_patch);
+    end if;
+
     update public.game_sessions gs
     set state = jsonb_set(
           coalesce(gs.state, '{}'::jsonb),
@@ -833,6 +924,9 @@ begin
   return v_row;
 end;
 $$;
+
+revoke all on function public.validate_trivia_acting_host_patch(jsonb, jsonb) from public;
+grant execute on function public.validate_trivia_acting_host_patch(jsonb, jsonb) to authenticated;
 
 revoke all on function public.apply_acting_host_play(uuid, text, text, jsonb, text, text) from public;
 grant execute on function public.apply_acting_host_play(uuid, text, text, jsonb, text, text) to authenticated;

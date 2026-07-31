@@ -26,6 +26,11 @@ import {
   requireLocalParticipantUid,
 } from "./gameSync.js";
 import { pickRemotePlayFields } from "./playPatch.js";
+import { pickTriviaPlayFields } from "./triviaPlayPatch.js";
+import {
+  validateActingHostPlayPatch,
+  validateTriviaActingHostPlayPatch,
+} from "./gameSessionSecurity.js";
 import { showAppAlert } from "./dialog.js";
 import { getCurrentScreen, navigate } from "./router.js";
 import { createSyncPending } from "./syncPending.js";
@@ -298,6 +303,7 @@ export async function commitHostGamePlay({
   getSession,
   saveLocal,
   toRemote,
+  pickPlayFields = null,
   patchOpts = {},
 }) {
   const prev = getSession();
@@ -309,12 +315,22 @@ export async function commitHostGamePlay({
     return session;
   }
 
-  const playPatch = pickRemotePlayFields(toRemote(session), patch);
+  const pickFields =
+    pickPlayFields ||
+    (gameId === "trivia" ? pickTriviaPlayFields : pickRemotePlayFields);
+  const playPatch = pickFields(toRemote(session), patch);
   const remotePatch = { [stateKey]: playPatch };
   const opts = { gameId, screen: screen || gameId, ...patchOpts };
   const withEveningScoresRaw = Boolean(opts.withEveningScores);
   const cached = getCachedGameSession();
   const validation = validateActingHostPlayPatch(playPatch);
+  const triviaValidation =
+    gameId === "trivia" && !isLobbyHost()
+      ? validateTriviaActingHostPlayPatch(
+          cached?.state?.trivia || cached?.state?.[stateKey] || {},
+          playPatch
+        )
+      : { ok: true };
 
   arch03RevealLog("commitHostGamePlay before RPC", {
     gameId,
@@ -342,6 +358,10 @@ export async function commitHostGamePlay({
 
   if (!validation.ok && !isLobbyHost()) {
     arch03RevealLog("commitHostGamePlay BLOCKED local whitelist", validation);
+  }
+  if (!triviaValidation.ok && !isLobbyHost()) {
+    arch03RevealLog("commitHostGamePlay BLOCKED trivia transition", triviaValidation);
+    throw new Error(triviaValidation.reason || "Transition Trivia invalide.");
   }
 
   try {

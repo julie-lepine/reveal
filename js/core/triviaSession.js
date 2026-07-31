@@ -19,6 +19,7 @@ import {
   syncTriviaSession,
   triviaToRemote,
   requireLocalParticipantUid,
+  refreshGameSession,
 } from "./gameSync.js";
 import { patchGameStateWithFeedback } from "./patchGameStateFeedback.js";
 import { launchGameWithSync, commitHostGamePlay, commitPrepReadyToggle } from "./mpLaunch.js";
@@ -26,6 +27,12 @@ import { normalizeTriviaAnswersMap } from "./sessionMerge.js";
 import { playerKeyToDisplayName } from "./gameSync.js";
 import { podiumPointsForRank, withCompetitionRanks } from "./competitionRank.js";
 import { triviaEveningPoints } from "./triviaScoring.js";
+import {
+  buildTriviaFinalExplicitPatch,
+  buildTriviaNextQuestionExplicitPatch,
+  buildTriviaRevealExplicitPatch,
+  pickTriviaPlayFields,
+} from "./triviaPlayPatch.js";
 
 const TRIVIA_ESTIMATE_SEC_PER_QUESTION = 40;
 
@@ -254,9 +261,34 @@ export async function markTriviaLobbyStarted() {
 }
 
 export async function startTriviaQuestion(questionIdx) {
-  const next = buildQuestionStartPatch(getTriviaSession(), questionIdx);
-  await syncTriviaSession(next);
-  return next;
+  const session = getTriviaSession();
+  const explicitPatch = buildTriviaNextQuestionExplicitPatch(questionIdx);
+
+  if (!isGameSyncActive()) {
+    const localNext = buildQuestionStartPatch(session, questionIdx);
+    saveStatePatch({ triviaGame: localNext });
+    return localNext;
+  }
+
+  await commitTriviaPlay(explicitPatch);
+  const synced = getTriviaSession();
+  const localNext = {
+    ...synced,
+    currentQuestion: (synced.deck || [])[questionIdx] || null,
+    results: null,
+  };
+  saveStatePatch({ triviaGame: localNext });
+  return localNext;
+}
+
+/**
+ * Relecture fraîche serveur avant scoring reveal (MP).
+ * Réduit la fenêtre de course local/serveur ; n' garantit pas l'atomicité (BUG-TRIVIA-01B).
+ */
+export async function refreshTriviaSessionForReveal() {
+  if (!isGameSyncActive()) return getTriviaSession();
+  await refreshGameSession();
+  return getTriviaSession();
 }
 
 export async function commitTriviaPlay(patch, { screen } = {}) {
@@ -268,8 +300,24 @@ export async function commitTriviaPlay(patch, { screen } = {}) {
     getSession: getTriviaSession,
     saveLocal: (session) => saveStatePatch({ triviaGame: session }),
     toRemote: triviaToRemote,
+    pickPlayFields: pickTriviaPlayFields,
   });
 }
+
+export async function commitTriviaRevealPlay(scoredSession) {
+  return commitTriviaPlay(buildTriviaRevealExplicitPatch(scoredSession));
+}
+
+export async function commitTriviaFinalPlay() {
+  return commitTriviaPlay(buildTriviaFinalExplicitPatch());
+}
+
+export {
+  buildTriviaRevealExplicitPatch,
+  buildTriviaNextQuestionExplicitPatch,
+  buildTriviaFinalExplicitPatch,
+  pickTriviaPlayFields,
+};
 
 export async function commitTriviaAnswer(answerIndex) {
   const session = getTriviaSession();

@@ -12,13 +12,13 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 
 ---
 
-## Focus — 2026-07-29
+## Focus — 2026-07-31 (soirée-test)
 
 | | |
 |--|--|
-| **Maintenant** | ARCH-10 · dette ARCH-11… |
-| **Ensuite** | ARCH-05 · ARCH-01 |
-| **Dernière clôture** | **ARCH-07** ✅ (clôture définitive · P0+P1/P2 · 2026-07-29) |
+| **Maintenant** | 🔴 BUG-TRIVIA-01 · BUG-TRUTHMETER-01 · BUG-TIERNIGHT-04 · BUG-TIERNIGHT-05 |
+| **Ensuite** | 🟠 BUG-WAO-02/03/04 · BUG-TIERNIGHT-03 · BUG-TRUTHMETER-02 · **OPS-LOBBY-04** · ARCH-10 |
+| **Dernière clôture** | **BUG-LOBBY-XX** ✅ (diagnostic · runbook prod · 2026-07-31) |
 
 ---
 
@@ -26,12 +26,34 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 
 ### Prioritaire
 
-*(aucun ticket L/ARCH prioritaire — voir « Autres »)*
+| ID | Cause | Problème | Priorité |
+|----|-------|----------|----------|
+| **BUG-TRIVIA-01** | 7 | Dernière question : réponses perdues · manche bloquée | 🔴 |
+| **BUG-TRUTHMETER-01** | 7 | Validations de vote intermittentes non prises en compte | 🔴 |
+| **BUG-TIERNIGHT-04** | 3/7 | Joueurs invisibles · listes désynchronisées entre appareils | 🔴 |
+| **BUG-TIERNIGHT-05** | 8 | Ancien vote repris après nouvelle partie | 🔴 |
 
 ### Autres
 
-| ID | Cause | Problème | Statut |
-|----|-------|----------|--------|
+| ID | Cause | Problème | Priorité |
+|----|-------|----------|----------|
+| **BUG-WAO-02** | 6/11 | Clavier fermé quand un autre joueur envoie sa réponse | 🟠 |
+| **BUG-WAO-03** | 6/11 | Scroll réinitialisé en haut pendant les votes | 🟠 |
+| **BUG-WAO-04** | 11 | Validation d'une réponse vide possible | 🟠 |
+| **BUG-TIERNIGHT-03** | 7 | Révélation non automatique en mode direct | 🟠 |
+| **BUG-TRUTHMETER-02** | 3/8 | Changement de pseudo casse la saisie suivante | 🟠 |
+| **UX-CHAT-01** | 11 | Pas de message système au lancement d'un jeu | 🟡 |
+| **UX-CHAT-02** | 11 | Clavier s'ouvre automatiquement à l'ouverture du chat | 🟡 |
+| **UX-DEVICE-01** | 11 | Écran verrouillé pendant une partie (Wake Lock API) | 🟡 |
+| **GAME-SPEEDVOTE-01** | — | Gagnant +15 pts au lieu de +10 | 🟡 |
+| **GAME-WAO-01** | — | Revoir le barème Wrong Answer Only (doc d'abord) | 🟡 |
+| **FEATURE-DILEMMA-01** | — | Plusieurs dilemmes par joueur | 🟡 |
+| **FEATURE-TIERNIGHT-01** | — | Thèmes personnalisés (Classer le groupe) | 🟡 |
+| **FEATURE-TIERNIGHT-02** | — | Séries de tierlists par catégories | 🟡 |
+| **FEATURE-CHAT-03** | — | Bouton « Futur jeu aléatoire » dans le chat | 🟡 |
+| **OPS-LOBBY-04** | 8 | Activer pg_cron + job `reveal-purge-stale-lobbies` (suite BUG-LOBBY-XX) | 🟡 ops |
+| **BUG-LOBBY-XX-E** | 4/8 | Hôte non notifié quand lobby expiré / supprimé (suite BUG-LOBBY-XX) | 🟡 |
+| **FEATURE-VIBECHECK-01** | 10 | Suppression complète du jeu VibeCheck | ⚪ produit |
 | **ARCH-10** | 8 | Clear cache leave lobby trop tard | 🟡 partiel |
 | **ARCH-05** | 5 | Course lobby vs session (`row.screen`) | 🟡 mitigé SYN-28 |
 | **ARCH-01 / F-01** | 1 | Démo offline sans avertissement MP | 🟡 partiel |
@@ -45,15 +67,15 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 |---|-------|------|----------------|
 | 1 | Identité invité / JWT | ✅ | ARCH-01 partiel |
 | 2 | Race auth / profil | ✅ | — |
-| 3 | Sources de vérité multiples | ✅ | **Membership A–E5 ✅** · M-14a ✅ · Guess Lie ✅ |
+| 3 | Sources de vérité multiples | Partiel | **BUG-TIERNIGHT-04** 🔴 · **BUG-TRUTHMETER-02** 🟠 · **Membership A–E5 ✅** · M-14a ✅ · Guess Lie ✅ |
 | 4 | Asymétrie hôte / invité | ✅ | — |
 | 5 | Routing + timing sync | ✅ | ARCH-05 mitigé · **UX-NAV-LOBBY ✅** |
-| 6 | Async écrans | ✅ | ARCH-06 ✅ |
-| 7 | Sync silencieuse / fire-and-forget | ✅ | **ARCH-07 ✅** · **M-14b ✅** · **ARCH-08 ✅** |
-| 8 | Reset / migration incomplète | Partiel | ARCH-10 · I-09/SYN-15/16 ✅ |
+| 6 | Async écrans | Partiel | **BUG-WAO-02/03** 🟠 |
+| 7 | Sync silencieuse / fire-and-forget | Partiel | **BUG-TRIVIA-01** 🔴 · **BUG-TRUTHMETER-01** 🔴 · **BUG-TIERNIGHT-03** 🟠 · ARCH-07 ✅ · M-14b ✅ · ARCH-08 ✅ |
+| 8 | Reset / migration incomplète | Partiel | **BUG-TIERNIGHT-05** 🔴 · **OPS-LOBBY-04** · **BUG-LOBBY-XX-E** · **BUG-TRUTHMETER-02** 🟠 · ARCH-10 · **BUG-LOBBY-XX ✅** · I-09/SYN-15/16 ✅ |
 | 9 | Sync monolithe / duplication | Dette | ARCH-11… |
-| 10 | Code mort | Dette | hors Fil Rouge app ✅ |
-| 11 | Friction UX | Partiel | ARCH-22/Loader ✅ · **L-04 ✅** |
+| 10 | Code mort | Dette | **FEATURE-VIBECHECK-01** ⚪ · hors Fil Rouge app ✅ |
+| 11 | Friction UX | Partiel | **UX-CHAT-01/02** 🟡 · **UX-DEVICE-01** 🟡 · **BUG-WAO-04** 🟠 · ARCH-22/Loader ✅ · **L-04 ✅** |
 
 ---
 
@@ -151,6 +173,64 @@ Vague A livrée 2026-07-28 · résidus audit (navigate home / navStack / QA) **a
 | **Preuve** | `uxNavLobby.test.js` · `uxNavSettings.test.js` · `voluntaryMemberLeave.test.js` |
 | **Résidus acceptés ↻** | `navigate("home")` post-teardown ou edges boot (`cached_active`) — comportement voulu · piles `navStack` explicites `["home","lobby",…]` — dette maintien, pas bug produit · QA terrain couverte par contrats source |
 | **Verdict** | **Ne pas rouvrir** sauf régression navigation démontrée (back incorrect, Home visible en lobby via menu, leave cassé) |
+
+#### BUG-LOBBY-XX ✅ (clôture diagnostic · 2026-07-31)
+
+Symptôme terrain : lobby inactif jamais fermé automatiquement. **Aucun correctif code/SQL livré** — clôture = analyse + runbook prod validés.
+
+| | |
+|--|--|
+| **Cause racine (architecture)** | Pas de timer client. Purge serveur = `purge_stale_lobbies()` (`supabase/lobby-lifecycle.sql`) **non exposée aux clients** ; planification = **pg_cron manuel** (bloc `cron.schedule` commenté dans le repo · voir `SUPABASE_SETUP.md` §7bis) |
+| **Hypothèse prod H1** | Job `reveal-purge-stale-lobbies` probablement absent ou inactif — **à confirmer** via runbook SQL (étapes lecture seule 0–6) |
+| **Gaps secondaires (hors scope diagnostic)** | Hôte ignoré par `handleLobbyDissolvedForGuest()` (`isLocalLobbyHost()` → return) → **BUG-LOBBY-XX-E** · `lobbyHeartbeat.js` importé jamais appelé · vieillissement artificiel `lobbies.last_activity_at` impossible (`set_lobbies_timestamps()` force `now()`) |
+| **Runbook prod** | Validé v3 — R0 prioritaire (0 membre) · R3 conditionnel (membres seulement) · Realtime principal = DELETE ciblé 8B-2 · exécution dashboard **reste à faire** |
+| **Chantiers ouverts** | **OPS-LOBBY-04** activer pg_cron + job · **BUG-LOBBY-XX-E** client hôte à l'expiration · **BUG-LOBBY-XX-F** si Realtime invité KO (test 8B-2) · **GAME-LOBBY-01** ↻ politique heartbeat vs « inactif » (produit, séparé) |
+| **Verdict** | **Ne pas rouvrir BUG-LOBBY-XX** — rouvrir **OPS-LOBBY-04** ou **BUG-LOBBY-XX-E** selon résultats runbook prod |
+
+### Soirée-test 2026-07-31 — tickets ouverts
+
+Retour terrain multi-jeux. Priorités : 🔴 critique · 🟠 haute · 🟡 moyenne · ⚪ produit.
+
+#### 🔴 Critique
+
+| ID | Problème | Analyse / attendu |
+|----|----------|-------------------|
+| ~~**BUG-LOBBY-XX**~~ | ~~Fermeture auto lobby inactif~~ | ✅ **Clôturé diagnostic 2026-07-31** — voir section BUG-LOBBY-XX ✅ · suite **OPS-LOBBY-04** |
+| **BUG-TRIVIA-01** | Dernière question bloquée | Sur la dernière question : certaines réponses jamais enregistrées · manche ne se termine plus · persiste après « Recommencer une partie ». Analyser : index de manche · condition de fin · sync réponses · acting host · reprise après restart. |
+| **BUG-TRUTHMETER-01** | Validations de vote instables | Plusieurs validations non prises en compte (intermittent). Analyser : validation locale · envoi RPC · sync · confirmations · doubles clics · pertes silencieuses. |
+| **BUG-TIERNIGHT-04** | Joueurs invisibles | Pendant certaines manches : certains joueurs ne voient plus un participant · listes différentes selon appareils. Vérifier sync listes joueurs pendant toute la manche. |
+| **BUG-TIERNIGHT-05** | Ancien vote repris dans nouvelle partie | Après nouvelle partie : sélection précédente réapparaît. Attendu : état entièrement vierge. Vérifier : reset local · reset Supabase · caches · état mémoire. |
+
+#### 🟠 Haute
+
+| ID | Problème | Analyse / attendu |
+|----|----------|-------------------|
+| **BUG-WAO-02** | Clavier fermé pendant rédaction | Quand un autre joueur envoie sa réponse, le clavier disparaît · le joueur doit recliquer. Attendu : les mises à jour réseau ne doivent jamais faire perdre le focus du champ. |
+| **BUG-WAO-03** | Scroll réinitialisé pendant votes | Phase vote : quand d'autres joueurs votent, la liste revient en haut. Attendu : conserver la position de scroll lors des mises à jour temps réel. |
+| **BUG-WAO-04** | Réponses vides validables | Validation possible avec chaîne vide / espaces seuls. Attendu : bouton désactivé si longueur utile = 0. |
+| **BUG-TIERNIGHT-03** | Révélation non automatique | Mode direct : révélation ne passe parfois pas auto à l'étape suivante. Analyser sync de transition. |
+| **BUG-TRUTHMETER-02** | Changement de pseudo casse le jeu | Repro : lancer TruthMeter → changer pseudo → affirmation suivante : impossible d'écrire. L'UI garde l'ancien état (ex. « Joulaille » → « Joulaille la Goat »). Vérifier toutes les références utilisant `username` comme clé métier. |
+
+#### 🟡 Moyenne
+
+| ID | Problème | Analyse / attendu |
+|----|----------|-------------------|
+| **UX-CHAT-01** | Message système au lancement jeu | Joueurs dans le chat au moment du launch ne voient pas le changement. Attendu : message auto ex. « 🎮 L'hôte a lancé une partie de Trivia. » visible quelques secondes dans le chat. |
+| **UX-CHAT-02** | Clavier auto à l'ouverture chat | Le champ prend le focus immédiatement · clavier apparaît. Attendu : ouvrir le chat sans focus · clavier uniquement après clic volontaire. |
+| **UX-DEVICE-01** | Mise en veille pendant partie | Écran verrouillé si téléphone posé. À étudier : Screen Wake Lock API (ou équivalent) tant que lobby actif · relâcher au leave · fallback propre si API indisponible. |
+| **GAME-SPEEDVOTE-01** | Récompense gagnant | Gagnant : **+15 pts** au lieu de +10. Vérifier qu'aucune autre règle de score n'est impactée. |
+| **GAME-WAO-01** | Barème Wrong Answer Only | Barème actuel non convaincant en test. **Ne pas modifier le code immédiatement** — documenter le fonctionnement actuel puis proposer plusieurs variantes avant implémentation. |
+| **FEATURE-DILEMMA-01** | Plusieurs dilemmes par joueur | Actuellement 1 seul par joueur. Autoriser plusieurs propositions · le système doit rester cohérent avec plusieurs dilemmes d'un même auteur. |
+| **FEATURE-TIERNIGHT-01** | Thèmes personnalisés | Mode « Classer le groupe » : créer son propre thème (ex. « Qui survivrait le plus longtemps sur une île ? ») comme base de la tierlist. |
+| **FEATURE-TIERNIGHT-02** | Séries de tierlists | Plus de tierlists officielles · organisées par catégories · enchaînement de plusieurs tierlists dans une manche · révélation finale classement global. UX à définir. |
+| **FEATURE-CHAT-03** | Bouton « Futur jeu aléatoire » | Action rapide dans le chat : 🎲 Futur jeu aléatoire — proposer le prochain jeu aléatoire sans navigation classique. |
+
+#### ⚪ Produit
+
+| ID | Problème | Analyse / attendu |
+|----|----------|-------------------|
+| **FEATURE-VIBECHECK-01** | Suppression VibeCheck | Décision produit. Retrait : sélection · votes · navigation · assets · tests · stats associées éventuelles. |
+
 ---
 
 ## Contrats produit (référence)
@@ -192,6 +272,7 @@ Ne pas rouvrir sans régression. Détail historique dans git / tests cités.
 
 | ID | Cause | Livré | Preuve / QA |
 |----|-------|-------|-------------|
+| **BUG-LOBBY-XX** | 8 | Diagnostic + runbook prod validés · cause = purge pg_cron · gaps E/F documentés | Analyse 2026-07-31 · `lobby-lifecycle.sql` · `lobbyLifecycle.js` · runbook v3 |
 | **ARCH-07** | 7 | Clôture définitive P0+P1/P2 · observabilité sync complète | `mpRtCatchup` (20) · `arch07CatchupResidual` (10) · 2026-07-29 |
 | **M-14b / SYN-09b** | 7 | Contrat `onLocalApplied` · helper centralisé | `mpLaunchLaunch.test.js` (20) · 2026-07-29 |
 | **UX-NAV-LOBBY** | 5/11 | Clôture définitive · Vague A + résidus acceptés | `uxNavLobby` · `uxNavSettings` · `voluntaryMemberLeave` · 2026-07-29 |
@@ -234,7 +315,7 @@ Ne pas rouvrir sans régression. Détail historique dans git / tests cités.
 | 5 | T-01/02, T-03↻, M-07/08, P-02, SYN-28, ARCH-04, UX-VIBE-02, pré-résolution entry, **UX-NAV-LOBBY** |
 | 6 | I-05, SYN-13b↻, SYN-25, SYN-05/ARCH-18, ARCH-06 |
 | 7 | I-07, M-09, L-09, M-11, M-10, T-05, SYN-26, M-04b/SYN-18, **ARCH-08**, **ARCH-07** (P0+P1/P2), **M-14b** |
-| 8 | I-06, P-02, ARCH-09, I-09/SYN-06, SYN-15/16, M-15 |
+| 8 | I-06, P-02, ARCH-09, I-09/SYN-06, SYN-15/16, M-15, **BUG-LOBBY-XX ✅** |
 | 9 | SYN-12 / M-05b |
 | 10 | SYN-05 / ARCH-18 (Fil Rouge app) |
 | 11 | L-02, ARCH-21↻, M-12, UX-HIST/RESUME/VIBE, POLL, **Membership A–E5**, ARCH-22, Loader join, **UX-NAV-LOBBY**, join partiel, **L-04** |
@@ -245,8 +326,8 @@ Ne pas rouvrir sans régression. Détail historique dans git / tests cités.
 
 Hors file prioritaire — opportunité / régression :
 
-- Votes optimistic hors Hot Take / VibeCheck / Dilemma (speedVote / …)
-- `results.js` mount · rename remote résiduel
+- Votes optimistic hors Hot Take / VibeCheck / Dilemma (speedVote / …) — **BUG-TRUTHMETER-01** 🔴
+- `results.js` mount · rename remote résiduel — **BUG-TRUTHMETER-02** 🟠
 - Lobby `playing` si upsert échoue après `setLobbyPlaying` (M-11)
 - `pushGameSession` : `err.message` brut (L-09)
 - Logs debug join · policy debug lobby Supabase
@@ -259,8 +340,8 @@ Hors file prioritaire — opportunité / régression :
 - Loader join interstitiel — **non retenu**
 - Fil Rouge SQL historique — ops Supabase séparée · fail docs `filRougeVague3Cleanup` hors Membership
 
-**Surveiller** : Clutch taps sous latence (SYN-26) · ready prep après Recommencer · conflit pending join vs chrome Home membership · leave multi-onglets après dissolve (modale « connexion a empêché »)
+**Surveiller** : Clutch taps sous latence (SYN-26) · ready prep après Recommencer · conflit pending join vs chrome Home membership · leave multi-onglets après dissolve (modale « connexion a empêché ») · **BUG-TRIVIA-01** dernière question après restart · **OPS-LOBBY-04** après runbook prod
 
 ---
 
-*Suivi vivant · MAJ 2026-07-29 — **ARCH-07 ✅ clôture définitive** · Cause 7 ✅ · prochain = **ARCH-10***
+*Suivi vivant · MAJ 2026-07-31 — **BUG-LOBBY-XX ✅ clôture diagnostic** · prochain = **BUG-TRIVIA-01** · suite lobby = **OPS-LOBBY-04***
