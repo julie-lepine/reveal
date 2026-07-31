@@ -38,6 +38,16 @@ describe("validateTriviaRevealRequest — anti-stale client", () => {
 });
 
 describe("mapTriviaRevealRpcError", () => {
+  it("mappe fonction RPC absente (migration non appliquée)", () => {
+    const err = mapTriviaRevealRpcError(
+      new Error(
+        "Could not find the function public.reveal_trivia_round(p_lobby_id, p_question_idx, p_run_id) in the schema cache"
+      )
+    );
+    assert.equal(triviaRevealErrorCode(err), "TRIVIA_RPC_NOT_DEPLOYED");
+    assert.match(err.message, /migration SQL Trivia 01B/i);
+  });
+
   it("mappe TRIVIA_STALE_RUN", () => {
     const err = mapTriviaRevealRpcError(new Error("TRIVIA_STALE_RUN"));
     assert.equal(triviaRevealErrorCode(err), "TRIVIA_STALE_RUN");

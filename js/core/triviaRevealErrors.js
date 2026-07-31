@@ -5,6 +5,8 @@ const TRIVIA_REVEAL_ERROR_MESSAGES = {
   TRIVIA_INVALID_PHASE: "Impossible de révéler dans cette phase.",
   TRIVIA_INVALID_STATE: "État Trivia invalide côté serveur.",
   TRIVIA_RUN_REQUIRED: "Partie Trivia non initialisée (runId manquant).",
+  TRIVIA_RPC_NOT_DEPLOYED:
+    "Révélation indisponible : migration SQL Trivia 01B non appliquée sur Supabase. Exécute supabase/game-sessions-trivia-01b-reveal-round.sql puis relance une partie.",
 };
 
 export function triviaRevealErrorCode(err) {
@@ -12,6 +14,12 @@ export function triviaRevealErrorCode(err) {
     return err.code;
   }
   const msg = String(err?.message || err || "");
+  if (
+    msg.includes("Could not find the function") &&
+    msg.includes("reveal_trivia_round")
+  ) {
+    return "TRIVIA_RPC_NOT_DEPLOYED";
+  }
   for (const code of Object.keys(TRIVIA_REVEAL_ERROR_MESSAGES)) {
     if (msg.includes(code)) return code;
   }
