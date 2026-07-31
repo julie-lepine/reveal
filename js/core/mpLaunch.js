@@ -36,7 +36,6 @@ import { getCurrentScreen, navigate } from "./router.js";
 import { createSyncPending } from "./syncPending.js";
 import { computePrepReadyToggle } from "./prepReadyMaps.js";
 import { arch03RevealLog } from "./arch03RevealDebug.js";
-import { validateActingHostPlayPatch } from "./gameSessionSecurity.js";
 import { getSupabaseUserId } from "./supabaseAuth.js";
 import { getState } from "./state.js";
 
