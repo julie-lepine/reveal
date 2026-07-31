@@ -267,7 +267,7 @@ describe("commitTriviaAnswer — 01B-bis RPC", () => {
       },
     }));
 
-    await assert.rejects(() => commitTriviaAnswer(1), /impossible/i);
+    await assert.rejects(() => commitTriviaAnswer(1), /Impossible d'enregistrer/i);
     assert.equal(patchMock.mock.callCount(), 0);
   });
 
@@ -276,7 +276,7 @@ describe("commitTriviaAnswer — 01B-bis RPC", () => {
       throw new Error("TRIVIA_STALE_RUN");
     });
 
-    await assert.rejects(() => commitTriviaAnswer(1), /autre partie/i);
+    await assert.rejects(() => commitTriviaAnswer(1), /plus disponible/i);
     assert.equal(refreshMock.mock.callCount(), 0);
   });
 });

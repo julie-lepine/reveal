@@ -19,6 +19,18 @@ describe("isTriviaRevealNetworkError", () => {
     assert.equal(isTriviaRevealBusinessError(biz), true);
     assert.equal(isTriviaRevealNetworkError(biz), false);
   });
+
+  it("codes soft answer ne sont pas business (recovery réseau reste possible sur l'erreur d'origine)", () => {
+    const softUnavailable = Object.assign(new Error("Impossible"), {
+      code: "TRIVIA_ANSWER_UNAVAILABLE",
+    });
+    const softUnknown = Object.assign(new Error("Impossible"), {
+      code: "TRIVIA_ANSWER_UNKNOWN",
+    });
+    assert.equal(isTriviaRevealBusinessError(softUnavailable), false);
+    assert.equal(isTriviaRevealBusinessError(softUnknown), false);
+    assert.equal(isTriviaRevealNetworkError(new TypeError("Failed to fetch")), true);
+  });
 });
 
 describe("evaluateTriviaRevealRecovery", () => {

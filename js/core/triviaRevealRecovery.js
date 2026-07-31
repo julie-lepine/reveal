@@ -1,8 +1,14 @@
 import { triviaRevealErrorCode } from "./triviaRevealErrors.js";
 
+const TRIVIA_SOFT_ANSWER_CODES = new Set([
+  "TRIVIA_ANSWER_UNAVAILABLE",
+  "TRIVIA_ANSWER_UNKNOWN",
+]);
+
 /** Erreur RPC métier Trivia — pas de recovery timeout. */
 export function isTriviaRevealBusinessError(err) {
-  return Boolean(triviaRevealErrorCode(err));
+  const code = triviaRevealErrorCode(err);
+  return Boolean(code) && !TRIVIA_SOFT_ANSWER_CODES.has(code);
 }
 
 /**

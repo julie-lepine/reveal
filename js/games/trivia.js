@@ -2,7 +2,7 @@ import { getTriviaThemeLabel } from "../../data/trivia.js";
 import { useTriviaGame } from "../core/useTriviaGame.js";
 import { deriveTriviaCurrentQuestion } from "../core/triviaPlayPatch.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
-import { withClickLock } from "../core/actionLock.js";
+import { createActionLock, withClickLock } from "../core/actionLock.js";
 import { createMountGuard } from "../core/mountLifecycle.js";
 import { getActivePlayers } from "../core/players.js";
 import { formatWinnersLabel } from "../core/competitionRank.js";
@@ -32,10 +32,12 @@ import { renderTriviaScoreboard } from "../trivia/TriviaScoreboard.js";
 import { arch03AhLogSkipDecision } from "../core/arch03ActingHostDebug.js";
 import {
   resolveLocalTriviaAnswerIndex,
+  resolveConfirmedTriviaAnswerIndex,
   nextPendingAnswerAfterCommit,
+  buildTriviaAnswerWaitingMessage,
 } from "../core/triviaAnswerUi.js";
 import { getSupabaseUserId } from "../core/supabaseAuth.js";
-import { mapTriviaRevealRpcError } from "../core/triviaRevealErrors.js";
+import { mapTriviaAnswerRpcError } from "../core/triviaRevealErrors.js";
 
 export function mountTrivia(app) {
   if (!requireLobbyPlay()) return null;
@@ -64,6 +66,10 @@ export function mountTrivia(app) {
   let eveningPodiumApplied = false;
   let answerCommitInFlight = false;
   let pendingAnswerIndex = null;
+  /** Dernier envoi a échoué — pending conservé, hint honnête (01C). */
+  let answerCommitFailed = false;
+  let sessionRunId = trivia.getSession().runId || null;
+  const replayLaunchLock = createActionLock();
 
   const mount = createMountGuard();
   const localName = getLocalDisplayName();
@@ -98,15 +104,29 @@ export function mountTrivia(app) {
     });
   }
 
+  function myConfirmedAnswerIndex() {
+    return resolveConfirmedTriviaAnswerIndex({
+      answers,
+      localName,
+      localUid: getSupabaseUserId() || null,
+    });
+  }
+
+  function clearAnswerCommitUi({ keepPending = false } = {}) {
+    answerCommitFailed = false;
+    answerCommitInFlight = false;
+    if (!keepPending) pendingAnswerIndex = null;
+  }
+
   function waitingMessage() {
-    if (phase !== "question") return "";
-    if (myAnswerIndex() != null) {
-      if (answerCommitInFlight) return "Envoi de ta réponse…";
-      return trivia.allAnswersIn()
-        ? "Tout le monde a répondu. Révélation en cours…"
-        : "Réponse enregistrée - tu peux encore la modifier · en attente des autres…";
-    }
-    return "Choisis ta réponse (tu pourras la modifier avant la révélation).";
+    return buildTriviaAnswerWaitingMessage({
+      phase,
+      answerCommitInFlight,
+      confirmedIndex: myConfirmedAnswerIndex(),
+      pendingAnswerIndex,
+      answerCommitFailed,
+      allAnswersIn: trivia.allAnswersIn(),
+    });
   }
 
   function pickNpcAnswerIndex(question) {
@@ -274,71 +294,100 @@ export function mountTrivia(app) {
       </div>`;
   }
 
+  /**
+   * Relance MP via startGameSession — alerte hôte si échec, pas de patch local anticipé.
+   * @returns {Promise<boolean>} true si la session distante a démarré
+   */
+  async function startTriviaRemoteRestart(screen, triviaSession) {
+    try {
+      await startGameSession("trivia", screen, {
+        trivia: triviaToRemote(triviaSession),
+      });
+      clearAnswerCommitUi();
+      return true;
+    } catch (err) {
+      console.warn("REVEAL trivia restart session:", err);
+      await showAppAlert("Impossible de relancer Trivia pour le moment. Réessaie.", {
+        title: "Trivia",
+        icon: "🧠",
+      });
+      return false;
+    }
+  }
+
   async function openTriviaSetup(configSession) {
-    if (mp) {
-      if (!isLobbyHost()) {
-        await showAppAlert("Seul l'hote peut relancer le quiz.", {
-          title: "Action reservee",
-          icon: "👑",
+    const outcome = await replayLaunchLock.run(async () => {
+      if (mp) {
+        if (!isLobbyHost()) {
+          await showAppAlert("Seul l'hote peut relancer le quiz.", {
+            title: "Action reservee",
+            icon: "👑",
+          });
+          return;
+        }
+        const ok = await startTriviaRemoteRestart("trivia-prep", configSession);
+        if (!ok) return;
+        if (!mount.isMounted()) return;
+        if (!mount.isCurrentMount()) return;
+        navigate("trivia-prep", {
+          navStack: ["home", "lobby", "game-select", "trivia-prep"],
         });
         return;
       }
-      await startGameSession("trivia", "trivia-prep", {
-        trivia: triviaToRemote(configSession),
-      });
+
       if (!mount.isMounted()) return;
       if (!mount.isCurrentMount()) return;
+      saveStatePatch({ triviaGame: configSession });
+      clearAnswerCommitUi();
       navigate("trivia-prep", {
         navStack: ["home", "lobby", "game-select", "trivia-prep"],
       });
-      return;
-    }
-
-    if (!mount.isMounted()) return;
-    if (!mount.isCurrentMount()) return;
-    saveStatePatch({ triviaGame: configSession });
-    navigate("trivia-prep", {
-      navStack: ["home", "lobby", "game-select", "trivia-prep"],
     });
+    return outcome;
   }
 
   async function replayTrivia() {
-    const replaySession = trivia.buildReplaySession(trivia.getSession());
-    const started = trivia.createStartedSession(replaySession);
-    if (!started.ok) {
-      await showAppAlert(
-        `Il manque ${started.missing} question(s) pour rejouer ${started.requested} manche(s) sur le theme ${started.themeLabel}.`,
-        {
-          title: "Banque insuffisante",
-          icon: "🧠",
-        }
-      );
-      return;
-    }
-
-    if (mp) {
-      if (!isLobbyHost()) {
-        await showAppAlert("Seul l'hote peut relancer le quiz.", {
-          title: "Action reservee",
-          icon: "👑",
-        });
+    const outcome = await replayLaunchLock.run(async () => {
+      const replaySession = trivia.buildReplaySession(trivia.getSession());
+      // MP : ne pas persister le deck local avant confirmation startGameSession (01C).
+      const started = trivia.createStartedSession(replaySession, {
+        persistDeck: !mp,
+      });
+      if (!started.ok) {
+        await showAppAlert(
+          `Il manque ${started.missing} question(s) pour rejouer ${started.requested} manche(s) sur le theme ${started.themeLabel}.`,
+          {
+            title: "Banque insuffisante",
+            icon: "🧠",
+          }
+        );
         return;
       }
-      await startGameSession("trivia", "trivia", {
-        trivia: triviaToRemote(started.session),
-      });
-      return;
-    }
 
-    if (!mount.isMounted()) return;
-    if (!mount.isCurrentMount()) return;
-    saveStatePatch({ triviaGame: started.session });
-    await setLobbyPlaying("trivia");
-    if (!mount.isMounted()) return;
-    if (!mount.isCurrentMount()) return;
-    navigate("trivia", {
-      navStack: ["home", "lobby", "game-select", "trivia"],
+      if (mp) {
+        if (!isLobbyHost()) {
+          await showAppAlert("Seul l'hote peut relancer le quiz.", {
+            title: "Action reservee",
+            icon: "👑",
+          });
+          return;
+        }
+        await startTriviaRemoteRestart("trivia", started.session);
+        return;
+      }
+
+      if (!mount.isMounted()) return;
+      if (!mount.isCurrentMount()) return;
+      saveStatePatch({ triviaGame: started.session });
+      clearAnswerCommitUi();
+      await setLobbyPlaying("trivia");
+      if (!mount.isMounted()) return;
+      if (!mount.isCurrentMount()) return;
+      navigate("trivia", {
+        navStack: ["home", "lobby", "game-select", "trivia"],
+      });
     });
+    return outcome;
   }
 
   async function finishTriviaGame() {
@@ -442,6 +491,9 @@ export function mountTrivia(app) {
     if (!mount.isMounted()) return;
     if (!mount.isCurrentMount()) return;
     syncFromSession();
+    if (Number.isInteger(myConfirmedAnswerIndex())) {
+      answerCommitFailed = false;
+    }
     const session = trivia.getSession();
     const totalQuestions = session.deck?.length || 0;
     const standings = session.results?.standings || trivia.getPodiumAwards(trivia.buildStandings(matchScores));
@@ -562,6 +614,7 @@ export function mountTrivia(app) {
           });
           if (confirmedRemote === choice) return;
 
+          answerCommitFailed = false;
           pendingAnswerIndex = choice;
           answerCommitInFlight = true;
           render();
@@ -576,24 +629,24 @@ export function mountTrivia(app) {
             });
             await trivia.commitAnswer(choice);
             commitOk = true;
+            answerCommitFailed = false;
             console.info("[TRIVIA_ANSWER_RPC_SUCCESS]", { choice });
             if (!mount.isMounted()) return;
             if (!mount.isCurrentMount()) return;
             syncFromSession();
           } catch (err) {
             console.warn("[TRIVIA_ANSWER_RPC_ERROR]", err?.code || err?.message || err);
+            answerCommitFailed = true;
             if (mount.isMounted() && mount.isCurrentMount()) syncFromSession();
-            const mapped = mapTriviaRevealRpcError(err);
+            const mapped = mapTriviaAnswerRpcError(err);
             const message =
               mapped?.message ||
-              err?.message ||
               "Impossible d'enregistrer ta réponse. Réessaie.";
             await showAppAlert(message, { title: "Trivia", icon: "🧠" });
           } finally {
             if (mount.isMounted() && mount.isCurrentMount()) {
               syncFromSession();
-              const confirmed = resolveLocalTriviaAnswerIndex({
-                pendingAnswerIndex: null,
+              const confirmed = resolveConfirmedTriviaAnswerIndex({
                 answers,
                 localName,
                 localUid: getSupabaseUserId() || null,
@@ -603,6 +656,7 @@ export function mountTrivia(app) {
                 pendingAnswerIndex: choice,
                 confirmedIndex: confirmed,
               });
+              if (commitOk) answerCommitFailed = false;
               answerCommitInFlight = false;
               render();
             } else {
@@ -708,15 +762,20 @@ export function mountTrivia(app) {
 
     const prevPhase = phase;
     const prevQuestion = questionIdx;
+    const prevRunId = sessionRunId;
     const ahTokenNow = getActingHostUiRefreshToken();
     const actingHostUiRefresh = needsActingHostUiRefresh(
       lastAckedActingHostToken,
       ahTokenNow
     );
     syncFromSession();
-    if (prevQuestion !== questionIdx || prevPhase !== phase) {
-      pendingAnswerIndex = null;
-      answerCommitInFlight = false;
+    sessionRunId = trivia.getSession().runId || null;
+    if (
+      prevQuestion !== questionIdx ||
+      prevPhase !== phase ||
+      prevRunId !== sessionRunId
+    ) {
+      clearAnswerCommitUi();
     }
     const skipFull = shouldSkipFullRender(prevPhase, prevQuestion);
     arch03AhLogSkipDecision("trivia", {
@@ -740,6 +799,7 @@ export function mountTrivia(app) {
   return () => {
     mount.dispose();
     clearNpcTimers();
+    clearAnswerCommitUi();
     unsub();
   };
 }

@@ -31,7 +31,12 @@ import {
 } from "./triviaPlayPatch.js";
 import { createTriviaRunId } from "./triviaRunId.js";
 import { scoreTriviaRoundFromAnswers } from "./triviaScoreEngine.js";
-import { mapTriviaRevealRpcError, validateTriviaAnswerRequest, validateTriviaRevealRequest } from "./triviaRevealErrors.js";
+import {
+  mapTriviaAnswerRpcError,
+  mapTriviaRevealRpcError,
+  validateTriviaAnswerRequest,
+  validateTriviaRevealRequest,
+} from "./triviaRevealErrors.js";
 import {
   evaluateTriviaAnswerRecovery,
   evaluateTriviaRevealRecovery,
@@ -227,14 +232,14 @@ export function simulateTriviaReady(onUpdate) {
   return () => clearInterval(timerId);
 }
 
-export function buildTriviaDeck(session = getTriviaSession()) {
+export function buildTriviaDeck(session = getTriviaSession(), { persist = true } = {}) {
   const deckResult = prepareTriviaDeck(
     session.selectedThemeId || TRIVIA_RANDOM_THEME_ID,
     session.questionCount ?? 5
   );
   if (!deckResult.ok) return deckResult;
   const next = { ...session, deck: deckResult.deck };
-  saveStatePatch({ triviaGame: next });
+  if (persist) saveStatePatch({ triviaGame: next });
   return deckResult;
 }
 
@@ -247,9 +252,12 @@ export function buildTriviaReplaySession(session = getTriviaSession()) {
   };
 }
 
-export function createStartedTriviaSession(session = getTriviaSession()) {
+export function createStartedTriviaSession(
+  session = getTriviaSession(),
+  { persistDeck = true } = {}
+) {
   const replaySession = buildTriviaReplaySession(session);
-  const deckResult = buildTriviaDeck(replaySession);
+  const deckResult = buildTriviaDeck(replaySession, { persist: persistDeck });
   if (!deckResult.ok) return deckResult;
   return {
     ok: true,
@@ -407,7 +415,7 @@ export async function commitTriviaAnswer(answerIndex) {
 
   const req = validateTriviaAnswerRequest(session);
   if (!req.ok) {
-    throw mapTriviaRevealRpcError(new Error(req.code));
+    throw mapTriviaAnswerRpcError(new Error(req.code));
   }
   const lobbyId = getState().lobby.id;
   const localUid = requireLocalParticipantUid();
@@ -428,14 +436,11 @@ export async function commitTriviaAnswer(answerIndex) {
       { answerIndex, answeredAt }
     );
   } catch (err) {
-    const mapped = mapTriviaRevealRpcError(err);
-    if (isTriviaRevealBusinessError(mapped)) {
-      throw mapped;
+    if (isTriviaRevealNetworkError(err)) {
+      networkError = mapTriviaAnswerRpcError(err);
+    } else {
+      throw mapTriviaAnswerRpcError(err);
     }
-    if (!isTriviaRevealNetworkError(err) && !isTriviaRevealNetworkError(mapped)) {
-      throw mapped;
-    }
-    networkError = mapped;
   }
 
   const freshRow = await refreshGameSession();
@@ -455,12 +460,12 @@ export async function commitTriviaAnswer(answerIndex) {
     );
   }
   if (recovery.reason === "stale_run") {
-    throw mapTriviaRevealRpcError(new Error("TRIVIA_STALE_RUN"));
+    throw mapTriviaAnswerRpcError(new Error("TRIVIA_STALE_RUN"));
   }
   if (recovery.reason === "stale_question") {
-    throw mapTriviaRevealRpcError(new Error("TRIVIA_STALE_QUESTION"));
+    throw mapTriviaAnswerRpcError(new Error("TRIVIA_STALE_QUESTION"));
   }
-  throw new Error("Enregistrement de la réponse impossible.");
+  throw mapTriviaAnswerRpcError(networkError || new Error("TRIVIA_ANSWER_UNAVAILABLE"));
 }
 
 export function normalizeTriviaAnswers(answers = {}, players = getActivePlayerNames()) {
