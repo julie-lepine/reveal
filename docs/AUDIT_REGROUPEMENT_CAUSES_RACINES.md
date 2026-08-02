@@ -16,9 +16,9 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 
 | | |
 |--|--|
-| **Maintenant** | QA terrain **BUG-WAO-02/03** · 🟠 BUG-WAO-04 |
+| **Maintenant** | QA terrain **BUG-WAO-02** (re-fix) · 🟠 BUG-WAO-04 |
 | **Ensuite** | 🟠 BUG-TIERNIGHT-03 · BUG-TRUTHMETER-02 · **OPS-LOBBY-04** · **ARCH-23** · ARCH-10 · **UX-HOST-01** |
-| **Dernière clôture** | **BUG-TIERNIGHT-04** ✅ · **BUG-TIERNIGHT-05** ✅ (QA 2026-08-02) |
+| **Dernière clôture** | **BUG-WAO-03** ✅ (QA) · **BUG-TIERNIGHT-04** ✅ · **BUG-TIERNIGHT-05** ✅ |
 
 ---
 
@@ -28,8 +28,8 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 
 | ID | Cause | Problème | Priorité |
 |----|-------|----------|----------|
-| **BUG-WAO-02** | 6/11 | Clavier fermé pendant rédaction | 🟡 code OK · **QA terrain** |
-| **BUG-WAO-03** | 6/11 | Scroll réinitialisé pendant votes | 🟡 code OK · **QA terrain** |
+| **BUG-WAO-02** | 6/11 | Clavier fermé pendant rédaction | 🟡 re-fix code · **re-QA terrain** |
+| **BUG-WAO-03** | 6/11 | Scroll réinitialisé pendant votes | ✅ QA validé |
 
 ### Autres
 
@@ -68,7 +68,7 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 | 3 | Sources de vérité multiples | Partiel | **BUG-TIERNIGHT-04 ✅** · **BUG-TRUTHMETER-02** 🟠 · **Membership A–E5 ✅** · M-14a ✅ · Guess Lie ✅ |
 | 4 | Asymétrie hôte / invité | ✅ | — |
 | 5 | Routing + timing sync | ✅ | ARCH-05 mitigé · **UX-NAV-LOBBY ✅** |
-| 6 | Async écrans | Partiel | **BUG-WAO-02/03** 🟡 QA · **BUG-WAO-04** 🟠 |
+| 6 | Async écrans | Partiel | **BUG-WAO-02** 🟡 re-QA · **BUG-WAO-03** ✅ · **BUG-WAO-04** 🟠 |
 | 7 | Sync silencieuse / fire-and-forget | Partiel | **BUG-TRUTHMETER-01 ✅** (01A/01B) · **BUG-TIERNIGHT-03** 🟠 · **BUG-TRIVIA-01 ✅** (01A/01B/01B-bis/01C) · ARCH-07 ✅ · M-14b ✅ · ARCH-08 ✅ |
 | 8 | Reset / migration incomplète | Partiel | **BUG-TIERNIGHT-05 ✅** · **OPS-LOBBY-04** · **BUG-LOBBY-XX-E** · **BUG-TRUTHMETER-02** 🟠 · **ARCH-23** · ARCH-10 · **BUG-LOBBY-XX ✅** · I-09/SYN-15/16 ✅ |
 | 9 | Sync monolithe / duplication | Dette | ARCH-11… |
@@ -277,8 +277,8 @@ Retour terrain multi-jeux. Priorités : 🔴 critique · 🟠 haute · 🟡 moye
 
 | ID | Problème | Analyse / attendu |
 |----|----------|-------------------|
-| **BUG-WAO-02** | Clavier fermé pendant rédaction | **Corrigé code 2026-08-02** — `refreshWrongAnswerResponseProgress` · answers-only sans remplacer `#wrong-input`. **Reste : QA terrain**. |
-| **BUG-WAO-03** | Scroll réinitialisé pendant votes | **Corrigé code 2026-08-02** — `refreshWrongAnswerVoteProgress` · votes-only / sélection locale sans reconstruire `#wrong-vote-list`. **Reste : QA terrain**. |
+| **BUG-WAO-02** | Clavier fermé pendant rédaction | **Re-fix 2026-08-02** — cause : (1) `actingHostUiRefresh` forçait encore un full `render()` ; (2) `slot.innerHTML` du CTA hôte fermait le clavier iOS ; (3) bundle `www/` obsolète sans le 1er fix. Hard-gate `decideWrongAnswerRemoteUi` + bouton pré-monté + réattache `#wrong-input`. **Reste : re-QA terrain** (sync `www/` fait). |
+| **BUG-WAO-03** | Scroll réinitialisé pendant votes | ✅ QA validé — ne pas rouvrir. |
 | **BUG-WAO-04** | Réponses vides validables | Validation possible avec chaîne vide / espaces seuls. Attendu : bouton désactivé si longueur utile = 0. **Hors scope 02/03.** |
 | **BUG-TIERNIGHT-03** | Révélation non automatique | Mode direct : révélation ne passe parfois pas auto à l'étape suivante. Analyser sync de transition. |
 | **BUG-TRUTHMETER-02** | Changement de pseudo casse le jeu | Repro : lancer TruthMeter → changer pseudo → affirmation suivante : impossible d'écrire. L'UI garde l'ancien état (ex. « Joulaille » → « Joulaille la Goat »). Vérifier toutes les références utilisant `username` comme clé métier. |

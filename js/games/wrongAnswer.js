@@ -38,12 +38,19 @@ import {
   needsActingHostUiRefresh,
 } from "../core/gameSync.js";
 import {
-  shouldFullRenderWrongAnswer,
+  decideWrongAnswerRemoteUi,
+  rebuildRootPreservingNode,
   wrongAnswerComposeStatusText,
   wrongAnswerVoteStatusText,
   wrongAnswerConfirmVoteState,
   wrongAnswerAuthorNames,
 } from "../core/wrongAnswerUiRefresh.js";
+
+/** Logs ciblés : `globalThis.__REVEAL_DEBUG_WAO02 = true` puis reproduire le scénario. */
+function wao02Log(event, detail) {
+  if (typeof globalThis === "undefined" || !globalThis.__REVEAL_DEBUG_WAO02) return;
+  console.info("[WAO-02]", event, detail);
+}
 
 export function mountWrongAnswer(app) {
   if (!requireLobbyPlay()) return null;
@@ -227,6 +234,8 @@ export function mountWrongAnswer(app) {
     const answeredCount = getActivePlayerNames().filter((n) => answers[n]?.text).length;
     const total = getActivePlayerNames().length;
     const remaining = WRONG_ANSWER_MAX_LEN - (submitted ? myAnswerText().length : draftText.length);
+    const showHostForce = (!mp || canActAsHost()) && answeredCount > 0;
+    const forceVoteLabel = `Passer au vote (${answeredCount}/${total})`;
 
     const status = wrongAnswerComposeStatusText({
       submitted,
@@ -235,6 +244,19 @@ export function mountWrongAnswer(app) {
       answeredCount,
       total,
     });
+
+    // Pendant la rédaction : bouton toujours monté (hidden si inactif) pour que le
+    // refresh distant ne fasse jamais slot.innerHTML (blur clavier iOS / WebView).
+    let hostSlotInner = "";
+    if (!submitted) {
+      hostSlotInner = `<button type="button" class="btn btn-secondary btn--spaced" id="wrong-force-vote"${
+        showHostForce ? "" : " hidden"
+      }>${escapeHtml(forceVoteLabel)}</button>`;
+    } else if (showHostForce) {
+      hostSlotInner = `<button type="button" class="btn btn-secondary btn--spaced" id="wrong-force-vote">${escapeHtml(
+        forceVoteLabel
+      )}</button>`;
+    }
 
     return `
       <div class="card wrong-prompt">
@@ -257,15 +279,7 @@ export function mountWrongAnswer(app) {
             </div>`
       }
       <p class="hint" id="wrong-answer-status" style="text-align:center">${escapeHtml(status)}</p>
-      <div id="wrong-answer-host-slot">
-      ${
-        (!mp || canActAsHost()) && answeredCount > 0
-          ? `<button type="button" class="btn btn-secondary btn--spaced" id="wrong-force-vote">
-              Passer au vote (${answeredCount}/${total})
-            </button>`
-          : ""
-      }
-      </div>`;
+      <div id="wrong-answer-host-slot">${hostSlotInner}</div>`;
   }
 
   function votingHtml() {
@@ -378,13 +392,14 @@ export function mountWrongAnswer(app) {
       }`;
   }
 
-  /** BUG-WAO-02 — chrome phase réponse sans toucher #wrong-input. */
+  /** BUG-WAO-02 — chrome phase réponse sans toucher #wrong-input ni slot.innerHTML. */
   function refreshWrongAnswerResponseProgress() {
     if (!mount.isMounted() || !mount.isCurrentMount()) return;
     if (phase !== "answer") return;
     const answeredCount = getActivePlayerNames().filter((n) => answers[n]?.text).length;
     const total = getActivePlayerNames().length;
     const submitted = Boolean(myAnswerText());
+    const beforeInput = app.querySelector("#wrong-input");
     const statusEl = app.querySelector("#wrong-answer-status");
     if (statusEl) {
       statusEl.textContent = wrongAnswerComposeStatusText({
@@ -395,22 +410,20 @@ export function mountWrongAnswer(app) {
         total,
       });
     }
-    const slot = app.querySelector("#wrong-answer-host-slot");
-    if (!slot) return;
-    const showHost = (!mp || canActAsHost()) && answeredCount > 0;
-    let btn = app.querySelector("#wrong-force-vote");
-    if (showHost) {
-      const label = `Passer au vote (${answeredCount}/${total})`;
-      if (!btn) {
-        slot.innerHTML = `<button type="button" class="btn btn-secondary btn--spaced" id="wrong-force-vote">${label}</button>`;
-        btn = app.querySelector("#wrong-force-vote");
-        btn?.addEventListener("click", () => void transitionToVoting());
-      } else {
-        btn.textContent = label;
-      }
-    } else if (btn) {
-      slot.innerHTML = "";
+    const btn = app.querySelector("#wrong-force-vote");
+    if (btn) {
+      const showHost = (!mp || canActAsHost()) && answeredCount > 0;
+      btn.hidden = !showHost;
+      btn.textContent = `Passer au vote (${answeredCount}/${total})`;
     }
+    const afterInput = app.querySelector("#wrong-input");
+    wao02Log("refresh only", {
+      beforeEqualsAfter: beforeInput === afterInput,
+      answeredCount,
+      total,
+      submitted,
+      hadForceBtn: Boolean(btn),
+    });
   }
 
   /** BUG-WAO-03 — chrome phase vote sans reconstruire #wrong-vote-list. */
@@ -476,7 +489,7 @@ export function mountWrongAnswer(app) {
     return wrongAnswerAuthorNames(answers).join(",");
   }
 
-  function render() {
+  function render({ preserveComposeInput = false } = {}) {
     if (!mount.isMounted()) return;
     if (!mount.isCurrentMount()) return;
     syncFromSession();
@@ -486,7 +499,7 @@ export function mountWrongAnswer(app) {
     else if (phase === "voting") phaseHtml = votingHtml();
     else if (phase === "reveal") phaseHtml = revealHtml();
 
-    app.innerHTML = pageShell({
+    const shellHtml = pageShell({
       backTarget: "back",
       scroll: true,
       content: `
@@ -502,6 +515,30 @@ export function mountWrongAnswer(app) {
       `,
     });
 
+    // BUG-WAO-02 : si un full render reste nécessaire pendant la rédaction, réattacher
+    // le même nœud <textarea> (focus()/clavier mobile non fiables après recreation).
+    const wantPreserve =
+      preserveComposeInput ||
+      (phase === "answer" && !myAnswerText() && Boolean(app.querySelector("#wrong-input")));
+    const beforeInput = wantPreserve ? app.querySelector("#wrong-input") : null;
+    if (beforeInput) draftText = beforeInput.value ?? draftText;
+
+    let preserveMeta = null;
+    if (wantPreserve && beforeInput) {
+      preserveMeta = rebuildRootPreservingNode(app, shellHtml, "#wrong-input");
+      wao02Log(
+        preserveMeta.sameNode ? "textarea reused" : "textarea replaced",
+        {
+          path: preserveMeta.path,
+          sameNode: preserveMeta.sameNode,
+          phase,
+        }
+      );
+    } else {
+      wao02Log("layout rebuilt", { phase, preserveComposeInput: wantPreserve });
+      app.innerHTML = shellHtml;
+    }
+
     bindNav(app);
     bindExitGame(app);
     bindPhaseEvents();
@@ -509,7 +546,8 @@ export function mountWrongAnswer(app) {
 
   function bindPhaseEvents() {
     const input = app.querySelector("#wrong-input");
-    if (input) {
+    if (input && input.dataset.waoBound !== "1") {
+      input.dataset.waoBound = "1";
       input.addEventListener("input", () => {
         draftText = input.value;
         const countEl = app.querySelector("#wrong-count");
@@ -648,6 +686,7 @@ export function mountWrongAnswer(app) {
     const prevRound = roundIdx;
     const prevAuthorsSig = voteListAuthorsSig();
     const wasComposeForm = phase === "answer" && composeLayoutIsForm();
+    const beforeRemoteInput = app.querySelector("#wrong-input");
     const ahTokenNow = getActingHostUiRefreshToken();
     const actingHostUiRefresh = needsActingHostUiRefresh(
       lastAckedActingHostToken,
@@ -677,6 +716,7 @@ export function mountWrongAnswer(app) {
     }
 
     const submitted = Boolean(myAnswerText());
+    const composeFormAlive = composeLayoutIsForm();
     const composeLayoutMismatch =
       phase === "answer" &&
       ((wasComposeForm && submitted) || (!wasComposeForm && !submitted && prevPhase === "answer"));
@@ -687,23 +727,53 @@ export function mountWrongAnswer(app) {
       voteListAuthorsChanged = nextSig !== prevAuthorsSig;
     }
 
-    const needFull = shouldFullRenderWrongAnswer({
+    const decision = decideWrongAnswerRemoteUi({
+      prevPhase,
+      phase,
+      prevRound,
+      roundIdx,
+      composeFormAlive,
+      localSubmitted: submitted,
+      actingHostUiRefresh,
+      composeLayoutMismatch,
+      voteListAuthorsChanged,
+    });
+
+    wao02Log(decision.mode === "full" ? "render()" : "refresh only", {
+      reason: decision.reason,
       prevPhase,
       phase,
       prevRound,
       roundIdx,
       actingHostUiRefresh,
       composeLayoutMismatch,
+      composeFormAlive,
+      localSubmitted: submitted,
       voteListAuthorsChanged,
+      beforeInputAlive: Boolean(beforeRemoteInput),
     });
 
-    if (needFull) {
-      render();
+    if (decision.mode === "full") {
+      render({
+        preserveComposeInput:
+          phase === "answer" && composeFormAlive && !submitted,
+      });
+      const afterInput = app.querySelector("#wrong-input");
+      wao02Log(
+        beforeRemoteInput && afterInput && beforeRemoteInput === afterInput
+          ? "textarea reused"
+          : "textarea replaced",
+        {
+          sameNode: Boolean(
+            beforeRemoteInput && afterInput && beforeRemoteInput === afterInput
+          ),
+        }
+      );
       lastAckedActingHostToken = ahTokenNow;
       return;
     }
 
-    if (phase === "reveal" && prevPhase === "reveal") {
+    if (decision.mode === "refresh-reveal-scores") {
       lastAckedActingHostToken = ahTokenNow;
       refreshGameScoresBox(app, {
         gameLabel: "Wrong Answer Only",
@@ -713,19 +783,26 @@ export function mountWrongAnswer(app) {
       return;
     }
 
-    if (phase === "answer") {
+    if (decision.mode === "refresh-answer") {
       refreshWrongAnswerResponseProgress();
+      const afterInput = app.querySelector("#wrong-input");
+      wao02Log("textarea reused", {
+        sameNode: beforeRemoteInput === afterInput,
+        beforeEqualsAfter: beforeRemoteInput === afterInput,
+      });
       lastAckedActingHostToken = ahTokenNow;
       return;
     }
 
-    if (phase === "voting") {
+    if (decision.mode === "refresh-vote") {
       refreshWrongAnswerVoteProgress();
       lastAckedActingHostToken = ahTokenNow;
       return;
     }
 
-    render();
+    render({
+      preserveComposeInput: phase === "answer" && composeFormAlive && !submitted,
+    });
     lastAckedActingHostToken = ahTokenNow;
   });
 

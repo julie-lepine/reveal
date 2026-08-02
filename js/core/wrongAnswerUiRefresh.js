@@ -34,6 +34,94 @@ export function shouldFullRenderWrongAnswer(opts = {}) {
   return false;
 }
 
+/**
+ * Décision UI après sync distante.
+ * Contrat BUG-WAO-02 : pendant composition active (même phase/manche), jamais de full render
+ * — même si actingHostUiRefresh ou un faux positif composeLayoutMismatch.
+ *
+ * @returns {{ mode: "full"|"refresh-answer"|"refresh-vote"|"refresh-reveal-scores", reason: string }}
+ */
+export function decideWrongAnswerRemoteUi(opts = {}) {
+  const {
+    prevPhase,
+    phase,
+    prevRound,
+    roundIdx,
+    composeFormAlive = false,
+    localSubmitted = false,
+    actingHostUiRefresh = false,
+    composeLayoutMismatch = false,
+    voteListAuthorsChanged = false,
+  } = opts;
+
+  const samePhase = phase === prevPhase;
+  const sameRound = roundIdx === prevRound;
+
+  // Hard gate : answers-only (ou nudge acting-host) pendant rédaction.
+  if (
+    phase === "answer" &&
+    samePhase &&
+    sameRound &&
+    composeFormAlive &&
+    !localSubmitted
+  ) {
+    return { mode: "refresh-answer", reason: "compose-alive-answers-only" };
+  }
+
+  if (
+    shouldFullRenderWrongAnswer({
+      prevPhase,
+      phase,
+      prevRound,
+      roundIdx,
+      actingHostUiRefresh,
+      composeLayoutMismatch,
+      voteListAuthorsChanged,
+    })
+  ) {
+    return { mode: "full", reason: "structural" };
+  }
+
+  if (phase === "answer") return { mode: "refresh-answer", reason: "answer-chrome" };
+  if (phase === "voting") return { mode: "refresh-vote", reason: "vote-chrome" };
+  if (phase === "reveal" && prevPhase === "reveal") {
+    return { mode: "refresh-reveal-scores", reason: "reveal-scores" };
+  }
+  return { mode: "full", reason: "fallback" };
+}
+
+/**
+ * Après `root.innerHTML = …`, réattache le même nœud DOM pour `selector`
+ * (ex. #wrong-input) afin de conserver focus + clavier mobile.
+ *
+ * @param {ParentNode & { innerHTML: string, querySelector: Function }} root
+ * @param {string} html
+ * @param {string} selector
+ * @returns {{ before: Element|null, after: Element|null, sameNode: boolean, path: "reused"|"replaced"|"missing" }}
+ */
+export function rebuildRootPreservingNode(root, html, selector) {
+  const before = root.querySelector(selector);
+  root.innerHTML = html;
+  let after = root.querySelector(selector);
+  if (before && after && before !== after) {
+    after.replaceWith(before);
+    after = before;
+    return { before, after, sameNode: true, path: "reused" };
+  }
+  if (before && after && before === after) {
+    return { before, after, sameNode: true, path: "reused" };
+  }
+  if (!before && after) {
+    return { before: null, after, sameNode: false, path: "replaced" };
+  }
+  return {
+    before: before || null,
+    after: after || null,
+    sameNode: Boolean(before && after && before === after),
+    path: after ? "replaced" : "missing",
+  };
+}
+
 export function wrongAnswerComposeStatusText({
   submitted,
   mp,

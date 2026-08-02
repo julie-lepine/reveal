@@ -5,6 +5,8 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   shouldFullRenderWrongAnswer,
+  decideWrongAnswerRemoteUi,
+  rebuildRootPreservingNode,
   wrongAnswerComposeStatusText,
   wrongAnswerVoteStatusText,
   wrongAnswerConfirmVoteState,
@@ -102,6 +104,178 @@ describe("BUG-WAO-02/03 — shouldFullRenderWrongAnswer", () => {
   });
 });
 
+describe("BUG-WAO-02 — decideWrongAnswerRemoteUi hard gate composition", () => {
+  it("answers-only + formulaire vivant → refresh-answer (pas full)", () => {
+    const d = decideWrongAnswerRemoteUi({
+      prevPhase: "answer",
+      phase: "answer",
+      prevRound: 0,
+      roundIdx: 0,
+      composeFormAlive: true,
+      localSubmitted: false,
+    });
+    assert.equal(d.mode, "refresh-answer");
+    assert.equal(d.reason, "compose-alive-answers-only");
+  });
+
+  it("actingHostUiRefresh pendant rédaction → refresh-answer (pas full)", () => {
+    const d = decideWrongAnswerRemoteUi({
+      prevPhase: "answer",
+      phase: "answer",
+      prevRound: 0,
+      roundIdx: 0,
+      composeFormAlive: true,
+      localSubmitted: false,
+      actingHostUiRefresh: true,
+    });
+    assert.equal(d.mode, "refresh-answer");
+    assert.equal(d.reason, "compose-alive-answers-only");
+  });
+
+  it("faux positif composeLayoutMismatch pendant rédaction → refresh-answer", () => {
+    const d = decideWrongAnswerRemoteUi({
+      prevPhase: "answer",
+      phase: "answer",
+      prevRound: 0,
+      roundIdx: 0,
+      composeFormAlive: true,
+      localSubmitted: false,
+      composeLayoutMismatch: true,
+    });
+    assert.equal(d.mode, "refresh-answer");
+  });
+
+  it("soumission locale form→feedback → full", () => {
+    const d = decideWrongAnswerRemoteUi({
+      prevPhase: "answer",
+      phase: "answer",
+      prevRound: 0,
+      roundIdx: 0,
+      composeFormAlive: false,
+      localSubmitted: true,
+      composeLayoutMismatch: true,
+    });
+    assert.equal(d.mode, "full");
+  });
+
+  it("phase answer → voting → full", () => {
+    const d = decideWrongAnswerRemoteUi({
+      prevPhase: "answer",
+      phase: "voting",
+      prevRound: 0,
+      roundIdx: 0,
+      composeFormAlive: false,
+      localSubmitted: true,
+    });
+    assert.equal(d.mode, "full");
+  });
+});
+
+describe("BUG-WAO-02 — identité DOM #wrong-input (before === after)", () => {
+  /** Mini DOM suffisant pour querySelector / innerHTML / replaceWith. */
+  function miniDom(initialInner) {
+    function el(tag, attrs = {}, children = []) {
+      const node = {
+        tagName: tag.toUpperCase(),
+        id: attrs.id || "",
+        attrs: { ...attrs },
+        children: [...children],
+        parent: null,
+        get hidden() {
+          return Boolean(this.attrs.hidden);
+        },
+        set hidden(v) {
+          if (v) this.attrs.hidden = true;
+          else delete this.attrs.hidden;
+        },
+        get textContent() {
+          return this._text || "";
+        },
+        set textContent(v) {
+          this._text = String(v);
+        },
+        get value() {
+          return this._value || "";
+        },
+        set value(v) {
+          this._value = String(v);
+        },
+        querySelector(sel) {
+          if (sel.startsWith("#")) {
+            const id = sel.slice(1);
+            const walk = (n) => {
+              if (n.id === id) return n;
+              for (const c of n.children || []) {
+                const hit = walk(c);
+                if (hit) return hit;
+              }
+              return null;
+            };
+            return walk(this);
+          }
+          return null;
+        },
+        replaceWith(other) {
+          if (!this.parent) return;
+          const idx = this.parent.children.indexOf(this);
+          if (idx >= 0) {
+            this.parent.children[idx] = other;
+            other.parent = this.parent;
+            this.parent = null;
+          }
+        },
+        set innerHTML(html) {
+          this.children = [];
+          const m = String(html).match(/id="([^"]+)"/g) || [];
+          for (const piece of m) {
+            const id = piece.slice(4, -1);
+            const child = el(id === "wrong-input" ? "textarea" : "div", { id });
+            child.parent = this;
+            if (id === "wrong-input") child._value = "DRAFT";
+            this.children.push(child);
+          }
+        },
+        get innerHTML() {
+          return this.children.map((c) => `<${c.tagName} id="${c.id}">`).join("");
+        },
+      };
+      for (const c of node.children) c.parent = node;
+      return node;
+    }
+
+    const root = el("div", { id: "app" });
+    root.innerHTML = initialInner;
+    return root;
+  }
+
+  it("answers-only rebuild : beforeTextarea === afterTextarea", () => {
+    const app = miniDom(`<textarea id="wrong-input"></textarea><div id="wrong-answer-status"></div>`);
+    const before = app.querySelector("#wrong-input");
+    before.value = "ma pire idée";
+
+    const result = rebuildRootPreservingNode(
+      app,
+      `<div id="wrap"><textarea id="wrong-input"></textarea><div id="wrong-answer-status"></div></div>`,
+      "#wrong-input"
+    );
+
+    const after = app.querySelector("#wrong-input");
+    assert.equal(result.path, "reused");
+    assert.equal(result.sameNode, true);
+    assert.equal(before === after, true);
+    assert.equal(before === result.after, true);
+    assert.equal(after.value, "ma pire idée");
+  });
+
+  it("sans préservation : nouveau nœud (contraste)", () => {
+    const app = miniDom(`<textarea id="wrong-input"></textarea>`);
+    const before = app.querySelector("#wrong-input");
+    app.innerHTML = `<textarea id="wrong-input"></textarea>`;
+    const after = app.querySelector("#wrong-input");
+    assert.equal(before === after, false);
+  });
+});
+
 describe("BUG-WAO-02 — textes chrome composition", () => {
   it("en rédaction : message secret", () => {
     assert.match(
@@ -130,7 +304,6 @@ describe("BUG-WAO-02 — textes chrome composition", () => {
   });
 
   it("draft non compté dans le contrat status (seulement answeredCount passé)", () => {
-    // Le helper reçoit answeredCount déjà fondé sur answers confirmées.
     assert.equal(
       wrongAnswerComposeStatusText({
         submitted: true,
@@ -177,20 +350,30 @@ describe("BUG-WAO-03 — textes chrome vote", () => {
 });
 
 describe("BUG-WAO-02/03 — wiring wrongAnswer.js", () => {
-  it("expose refresh ciblés et ne full-render pas systématiquement au sync", () => {
+  it("expose refresh ciblés et hard-gate decideWrongAnswerRemoteUi", () => {
     const src = gameSrc();
     assert.match(src, /function refreshWrongAnswerResponseProgress/);
     assert.match(src, /function refreshWrongAnswerVoteProgress/);
-    assert.match(src, /shouldFullRenderWrongAnswer/);
+    assert.match(src, /decideWrongAnswerRemoteUi/);
+    assert.match(src, /rebuildRootPreservingNode/);
     assert.match(src, /id="wrong-input"/);
     assert.match(src, /id="wrong-vote-list"/);
     assert.match(src, /id="wrong-answer-status"/);
     assert.match(src, /id="wrong-vote-status"/);
-    // Sélection locale vote : refresh ciblé, pas render()
     assert.match(
       src,
       /selectedTarget = target;\s*[\s\S]*?refreshWrongAnswerVoteProgress\(\)/
     );
+  });
+
+  it("refresh réponse ne fait plus slot.innerHTML (bouton pré-monté)", () => {
+    const src = gameSrc();
+    const refreshFn = src.match(
+      /function refreshWrongAnswerResponseProgress\(\) \{[\s\S]*?\n  \}/
+    )?.[0];
+    assert.ok(refreshFn, "refreshWrongAnswerResponseProgress introuvable");
+    assert.equal(/slot\.innerHTML/.test(refreshFn), false);
+    assert.match(refreshFn, /btn\.hidden/);
   });
 
   it("ne force pas focus\(\) sur le textarea après sync distant", () => {
