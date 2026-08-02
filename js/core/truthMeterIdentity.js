@@ -1,16 +1,39 @@
 /**
  * BUG-TRUTHMETER-02 — identité auteur TruthMeter (UID canonique).
- * Helpers purs / testables. Ne modifie pas userIdForName global.
  *
- * Limite : une session legacy (pseudos seuls) sans roster ni preuve de rename
- * ne peut pas toujours être convertie avec certitude — jamais d'attribution arbitraire.
+ * Limite legacy : session pseudos seuls sans preuve → unresolved (jamais d'attribution arbitraire).
+ *
+ * Producteurs remote vers mergeTruthMeterGameLocal / mergeTruthMeterIdentityFields :
+ * - applyRemoteSession ← Realtime / poll / refresh : TOUJOURS snapshot complet
+ *   (row.state.truthMeter via truthMeterFromRemote). Clé absente n'arrive pas ;
+ *   affirmation est toujours présente (objet ou null). null = clear explicite.
+ * - patchGameState / acting-host : merge serveur (mergeTruthMeterPatchState) puis
+ *   retourne la row complète → même chemin snapshot pour les clients.
+ * - Remount / resume : fetch session complète → snapshot.
+ *
+ * Donc pour merge client : remote.affirmation === null est un CLEAR métier ;
+ * remote.affirmation === undefined ne devrait pas se produire après fromRemote.
  */
 
-/** @typedef {{ userId: string, name?: string, displayName?: string }} TruthMeterRosterEntry */
+/** @typedef {{ userId: string, name?: string, displayName?: string, lastSeenAt?: string|null }} TruthMeterRosterEntry */
+
+const hasOwn = (obj, key) =>
+  obj != null && Object.prototype.hasOwnProperty.call(obj, key);
+
+/** UUID Supabase — fast-path ordre canonique (forme 8-4-4-4-12 hex). */
+const UID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export function isCanonicalUidAuthorOrder(order) {
+  return (
+    Array.isArray(order) &&
+    order.length > 0 &&
+    order.every((e) => typeof e === "string" && UID_RE.test(e))
+  );
+}
 
 /**
  * @param {Array<{ userId?: string, name?: string }>} participants
- * @returns {{ ok: true, uids: string[] } | { ok: false, error: string }}
  */
 export function buildTruthMeterAuthorOrderUids(participants = []) {
   const uids = [];
@@ -37,11 +60,6 @@ export function buildTruthMeterAuthorOrderUids(participants = []) {
 }
 
 /**
- * Classification d'une entrée authorOrder / author :
- * - uid si match exact d'un userId connu du roster
- * - sinon name si match exact unique de display name
- * - sinon unresolved / ambiguous
- *
  * @param {string|null|undefined} entry
  * @param {TruthMeterRosterEntry[]} roster
  * @param {Array<{ userId: string, oldName: string, newName: string }>} [renames]
@@ -51,7 +69,7 @@ export function classifyTruthMeterIdentityEntry(entry, roster = [], renames = []
   if (!raw) return { kind: "empty", uid: null, reason: "empty" };
 
   const byUid = new Map();
-  const byName = new Map(); // name → [uids]
+  const byName = new Map();
   for (const r of roster || []) {
     const uid = r?.userId != null ? String(r.userId) : "";
     if (!uid) continue;
@@ -65,6 +83,9 @@ export function classifyTruthMeterIdentityEntry(entry, roster = [], renames = []
   if (byUid.has(raw)) {
     return { kind: "uid", uid: raw, reason: "roster-uid" };
   }
+  if (UID_RE.test(raw)) {
+    return { kind: "uid", uid: raw, reason: "canonical-uid-shape" };
+  }
 
   const nameHits = byName.get(raw) || [];
   if (nameHits.length === 1) {
@@ -74,10 +95,9 @@ export function classifyTruthMeterIdentityEntry(entry, roster = [], renames = []
     return { kind: "ambiguous", uid: null, reason: "duplicate-name" };
   }
 
-  // Preuve de rename (même userId) : oldName exact → uid
   const renameHits = (renames || []).filter((r) => r.oldName === raw || r.newName === raw);
   const renameUids = [...new Set(renameHits.map((r) => String(r.userId)).filter(Boolean))];
-  if (renameUids.length === 1 && byUid.has(renameUids[0])) {
+  if (renameUids.length === 1 && (byUid.has(renameUids[0]) || UID_RE.test(renameUids[0]))) {
     return { kind: "legacy-rename", uid: renameUids[0], reason: "rename-proof" };
   }
   if (renameUids.length > 1) {
@@ -89,28 +109,15 @@ export function classifyTruthMeterIdentityEntry(entry, roster = [], renames = []
 
 /**
  * Normalise authorOrder entrée par entrée.
- * localHintOrder : même runId + même longueur, peut fournir UIDs déjà migrés I-09→UID.
- *
- * @returns {{
- *   ok: boolean,
- *   order: string[],
- *   unresolved: Array<{ index: number, value: string, reason: string }>,
- *   changed: boolean,
- * }}
+ * PAS de hint positionnel (localHintOrder interdit / ignoré).
  */
 export function normalizeTruthMeterAuthorOrder(order = [], opts = {}) {
-  const {
-    roster = [],
-    renames = [],
-    localHintOrder = null,
-    requireFull = true,
-  } = opts;
+  const { roster = [], renames = [], requireFull = true } = opts;
   const src = Array.isArray(order) ? order : [];
-  const hints = Array.isArray(localHintOrder) ? localHintOrder : null;
-  const canUseHints =
-    hints &&
-    hints.length === src.length &&
-    hints.every((h) => roster.some((r) => String(r.userId) === String(h)));
+
+  if (isCanonicalUidAuthorOrder(src)) {
+    return { ok: true, order: src.map(String), unresolved: [], changed: false };
+  }
 
   const out = [];
   const unresolved = [];
@@ -121,12 +128,6 @@ export function normalizeTruthMeterAuthorOrder(order = [], opts = {}) {
     if (classified.uid) {
       if (String(entry) !== classified.uid) changed = true;
       out.push(classified.uid);
-      return;
-    }
-    if (canUseHints && hints[index] && roster.some((r) => String(r.userId) === String(hints[index]))) {
-      // Preuve locale certaine : même index, même longueur, UID connu du roster.
-      out.push(String(hints[index]));
-      changed = true;
       return;
     }
     unresolved.push({
@@ -141,62 +142,67 @@ export function normalizeTruthMeterAuthorOrder(order = [], opts = {}) {
   return { ok, order: out, unresolved, changed };
 }
 
-/**
- * Résout l'UID auteur courant (order[roundIdx] ou affirmation.authorUid / legacy).
- * @returns {{ uid: string|null, unresolved: boolean, reason?: string, legacy?: boolean }}
- */
-export function resolveTruthMeterAuthorUid(session = {}, opts = {}) {
+function resolveFromAuthorOrder(session, opts = {}) {
   const roster = opts.roster || [];
   const renames = opts.renames || [];
   const order = Array.isArray(session.authorOrder) ? session.authorOrder : [];
   const idx = session.roundIdx ?? 0;
-  const aff = session.affirmation && typeof session.affirmation === "object"
-    ? session.affirmation
-    : null;
-
-  if (aff?.authorUid) {
-    const c = classifyTruthMeterIdentityEntry(aff.authorUid, roster, renames);
-    if (c.uid) {
-      return { uid: c.uid, unresolved: false, reason: "affirmation-authorUid" };
-    }
-    // authorUid présent mais pas dans roster courant : toujours canonique si non-vide
-    if (String(aff.authorUid).trim()) {
-      return {
-        uid: String(aff.authorUid).trim(),
-        unresolved: false,
-        reason: "affirmation-authorUid-raw",
-      };
-    }
-  }
-
   const entry = order[idx];
-  if (entry != null && entry !== "") {
-    const norm = normalizeTruthMeterAuthorOrder(order, {
-      roster,
-      renames,
-      localHintOrder: opts.localHintOrder,
-    });
-    if (norm.ok && norm.order[idx]) {
-      return {
-        uid: norm.order[idx],
-        unresolved: false,
-        reason: "authorOrder",
-        legacy: String(entry) !== norm.order[idx],
-      };
-    }
-    const c = classifyTruthMeterIdentityEntry(entry, roster, renames);
-    if (c.uid) return { uid: c.uid, unresolved: false, reason: c.reason, legacy: c.kind !== "uid" };
+  if (entry == null || entry === "") {
+    return { uid: null, unresolved: true, reason: "no-author-order-entry" };
+  }
+  if (isCanonicalUidAuthorOrder(order)) {
     return {
-      uid: null,
-      unresolved: true,
-      reason: c.reason || "authorOrder-unresolved",
-      legacyValue: String(entry),
+      uid: String(order[idx]),
+      unresolved: false,
+      reason: "authorOrder-canonical",
     };
   }
+  const norm = normalizeTruthMeterAuthorOrder(order, { roster, renames });
+  if (norm.ok && norm.order[idx]) {
+    return {
+      uid: norm.order[idx],
+      unresolved: false,
+      reason: "authorOrder",
+      legacy: String(entry) !== norm.order[idx],
+    };
+  }
+  const c = classifyTruthMeterIdentityEntry(entry, roster, renames);
+  if (c.uid) {
+    return { uid: c.uid, unresolved: false, reason: c.reason, legacy: c.kind !== "uid" };
+  }
+  return {
+    uid: null,
+    unresolved: true,
+    reason: c.reason || "authorOrder-unresolved",
+    legacyValue: String(entry),
+  };
+}
 
-  if (aff?.author) {
+/** Auteur de l'affirmation déjà soumise (voting / reveal / display). */
+export function getSubmittedAffirmationAuthorUid(session = {}, opts = {}) {
+  const roster = opts.roster || [];
+  const renames = opts.renames || [];
+  const aff =
+    session.affirmation && typeof session.affirmation === "object"
+      ? session.affirmation
+      : null;
+  if (!aff) {
+    return { uid: null, unresolved: true, reason: "no-affirmation" };
+  }
+  if (aff.authorUid && String(aff.authorUid).trim()) {
+    const raw = String(aff.authorUid).trim();
+    const c = classifyTruthMeterIdentityEntry(raw, roster, renames);
+    if (c.uid) return { uid: c.uid, unresolved: false, reason: "affirmation-authorUid" };
+    if (UID_RE.test(raw)) {
+      return { uid: raw, unresolved: false, reason: "affirmation-authorUid-raw" };
+    }
+  }
+  if (aff.author) {
     const c = classifyTruthMeterIdentityEntry(aff.author, roster, renames);
-    if (c.uid) return { uid: c.uid, unresolved: false, reason: "affirmation-author-legacy", legacy: true };
+    if (c.uid) {
+      return { uid: c.uid, unresolved: false, reason: "affirmation-author-legacy", legacy: true };
+    }
     return {
       uid: null,
       unresolved: true,
@@ -204,27 +210,83 @@ export function resolveTruthMeterAuthorUid(session = {}, opts = {}) {
       legacyValue: String(aff.author),
     };
   }
-
-  return { uid: null, unresolved: true, reason: "no-author" };
+  return { uid: null, unresolved: true, reason: "affirmation-no-identity" };
 }
 
-export function isLocalTruthMeterAuthor(session, localUid, opts = {}) {
+/**
+ * Auteur attendu pour écrire le round courant (authorOrder[roundIdx]).
+ * Ne lit PAS une affirmation stale pour gouverner le writing.
+ */
+export function getCurrentWritingAuthorUid(session = {}, opts = {}) {
+  const fromOrder = resolveFromAuthorOrder(session, opts);
+  const phase = session.phase || null;
+  const aff = session.affirmation;
+
+  if (phase === "writing" && aff == null) {
+    return fromOrder;
+  }
+
+  if (phase === "writing" && aff != null) {
+    const submitted = getSubmittedAffirmationAuthorUid(session, opts);
+    if (
+      fromOrder.uid &&
+      submitted.uid &&
+      String(fromOrder.uid) !== String(submitted.uid)
+    ) {
+      tm02QaLog("author-disagreement", {
+        runId: session.runId || null,
+        phase,
+        roundIdx: session.roundIdx ?? null,
+        currentWritingAuthorUid: fromOrder.uid,
+        submittedAffirmationAuthorUid: submitted.uid,
+        reason: "writing-order-vs-affirmation",
+        source: "getCurrentWritingAuthorUid",
+      });
+      return {
+        ...fromOrder,
+        disagreement: true,
+        affirmationUid: submitted.uid,
+        reason: "writing-order-wins-disagreement",
+      };
+    }
+    return fromOrder.uid ? fromOrder : submitted;
+  }
+
+  if (aff != null) {
+    return getSubmittedAffirmationAuthorUid(session, opts);
+  }
+  return fromOrder;
+}
+
+/**
+ * Délègue phase-aware (writing vs affirmation soumise).
+ */
+export function resolveTruthMeterAuthorUid(session = {}, opts = {}) {
+  return getCurrentWritingAuthorUid(session, opts);
+}
+
+export function isLocalCurrentWritingAuthor(session, localUid, opts = {}) {
   if (!localUid) return false;
-  const resolved = resolveTruthMeterAuthorUid(session, opts);
+  const resolved = getCurrentWritingAuthorUid(session, opts);
   if (resolved.unresolved || !resolved.uid) return false;
   return String(resolved.uid) === String(localUid);
 }
 
-/**
- * Affichage : roster courant → snapshot affirmation.author → neutre.
- */
+/** Alias historique. */
+export function isLocalTruthMeterAuthor(session, localUid, opts = {}) {
+  return isLocalCurrentWritingAuthor(session, localUid, opts);
+}
+
 export function getTruthMeterAuthorDisplayName(session, opts = {}) {
   const {
     roster = [],
     nameForUid = () => null,
     unresolvedLabel = "Un joueur",
   } = opts;
-  const resolved = resolveTruthMeterAuthorUid(session, { roster, renames: opts.renames });
+  const resolved = getCurrentWritingAuthorUid(session, {
+    roster,
+    renames: opts.renames,
+  });
   if (resolved.uid) {
     const fromRoster = roster.find((r) => String(r.userId) === String(resolved.uid));
     const live = fromRoster?.name || fromRoster?.displayName || nameForUid(resolved.uid);
@@ -236,58 +298,95 @@ export function getTruthMeterAuthorDisplayName(session, opts = {}) {
 }
 
 /**
- * Merge ciblé identité : remote autoritaire sauf legacy remote + preuve locale même run.
+ * Merge identité TruthMeter.
+ * - Snapshot client : clé affirmation toujours présente après fromRemote ; null = clear.
+ * - Cross-run : local identité ignorée.
+ * - Ordre UID canonique : copie exacte, aucun hint.
  */
 export function mergeTruthMeterIdentityFields(local, remote, opts = {}) {
   if (!remote) return local;
   if (!local) return remote;
 
-  const runOk =
-    Boolean(local.runId) &&
-    Boolean(remote.runId) &&
-    local.runId === remote.runId;
+  const remoteRun = remote.runId || null;
+  const localRun = local.runId || null;
+  const crossRun =
+    Boolean(remoteRun) && Boolean(localRun) && remoteRun !== localRun;
 
   const roster = opts.roster || [];
   const renames = opts.renames || [];
 
-  let authorOrder = remote.authorOrder || [];
-  const remoteNorm = normalizeTruthMeterAuthorOrder(authorOrder, { roster, renames });
-  if (remoteNorm.ok) {
-    authorOrder = remoteNorm.order;
-  } else if (runOk && Array.isArray(local.authorOrder) && local.authorOrder.length === (remote.authorOrder || []).length) {
-    const withHint = normalizeTruthMeterAuthorOrder(remote.authorOrder || [], {
-      roster,
-      renames,
-      localHintOrder: local.authorOrder,
+  if (crossRun) {
+    tm02QaLog("cross-run-identity-discard", {
+      runId: remoteRun,
+      phase: remote.phase || null,
+      roundIdx: remote.roundIdx ?? null,
+      reason: "local-run-ignored",
+      source: "mergeTruthMeterIdentityFields",
+      localRunId: localRun,
     });
-    if (withHint.ok) authorOrder = withHint.order;
+    return {
+      authorOrder: Array.isArray(remote.authorOrder) ? [...remote.authorOrder] : [],
+      affirmation: hasOwn(remote, "affirmation") ? remote.affirmation : null,
+    };
   }
 
-  let affirmation = remote.affirmation ?? local.affirmation ?? null;
-  if (affirmation && typeof affirmation === "object") {
-    const next = { ...affirmation };
-    if (!next.authorUid) {
-      const resolved = resolveTruthMeterAuthorUid(
-        { ...remote, affirmation: next, authorOrder },
-        {
-          roster,
-          renames,
-          localHintOrder: runOk ? local.authorOrder : null,
-        }
-      );
-      if (!resolved.unresolved && resolved.uid) {
-        next.authorUid = resolved.uid;
-      } else if (runOk && local.affirmation?.authorUid) {
-        next.authorUid = local.affirmation.authorUid;
-      }
+  let authorOrder = Array.isArray(remote.authorOrder) ? remote.authorOrder : [];
+  if (isCanonicalUidAuthorOrder(authorOrder)) {
+    authorOrder = authorOrder.map(String);
+  } else {
+    const remoteNorm = normalizeTruthMeterAuthorOrder(authorOrder, { roster, renames });
+    if (remoteNorm.ok) {
+      authorOrder = remoteNorm.order;
     }
-    affirmation = next;
+  }
+
+  let affirmation;
+  if (hasOwn(remote, "affirmation")) {
+    affirmation = remote.affirmation;
+    if (affirmation === null && local?.affirmation) {
+      tm02QaLog("affirmation-clear-honored", {
+        runId: remoteRun,
+        phase: remote.phase || null,
+        roundIdx: remote.roundIdx ?? null,
+        reason: "remote-null-clears-local",
+        source: "mergeTruthMeterIdentityFields",
+        affirmationPresent: false,
+        affirmationAuthorUid: null,
+      });
+    }
+  } else {
+    affirmation = local.affirmation ?? null;
+  }
+
+  if (affirmation && typeof affirmation === "object" && !affirmation.authorUid) {
+    const resolved = getSubmittedAffirmationAuthorUid(
+      { ...remote, affirmation, authorOrder },
+      { roster, renames }
+    );
+    if (!resolved.unresolved && resolved.uid) {
+      affirmation = { ...affirmation, authorUid: resolved.uid };
+    }
   }
 
   return { authorOrder, affirmation };
 }
 
-/** Défensif : nouvelles écritures ne doivent pas sérialiser un ordre 100% non-UID si roster connu. */
+/** Champs run-scoped (ignorés du local si runId diffère). */
+export const TRUTH_METER_RUN_SCOPED_KEYS = [
+  "authorOrder",
+  "roundIdx",
+  "affirmation",
+  "authorEstimate",
+  "votes",
+  "voteEndsAt",
+  "roundScored",
+  "lastRound",
+  "phase",
+  "matchScores",
+  "runId",
+  "lobbyStarted",
+];
+
 export function assertTruthMeterAuthorOrderWire(order, rosterUids = []) {
   const uidSet = new Set((rosterUids || []).map(String));
   if (!uidSet.size) return { ok: true };
@@ -302,10 +401,94 @@ export function tm02Log(event, detail = {}) {
 }
 
 /**
- * I-09 local : migrer TruthMeter sans casser un authorOrder UID.
- * - entrées déjà UID (connues) : inchangées
- * - entrée = oldName + localUid connu : normaliser vers UID (pas seulement newName)
- * - affirmation.authorUid : jamais modifié ; author snapshot cosmétique
+ * Instrumentation re-QA — retirer après validation terrain (chercher TM-02-QA).
+ */
+export function tm02QaLog(event, detail = {}) {
+  if (typeof console === "undefined" || !console.info) return;
+  const safe = { ...detail };
+  delete safe.text;
+  delete safe.affirmationText;
+  console.info(`[TM-02-QA] ${event}`, safe);
+}
+
+/**
+ * @returns {{ status: string, uid: string|null, reason?: string }}
+ */
+export function classifyTruthMeterAuthorStatus(session, opts = {}) {
+  const {
+    roster = [],
+    isPresent = () => true,
+    rosterHydrated = true,
+  } = opts;
+  if (!rosterHydrated) {
+    return { status: "roster-loading", uid: null };
+  }
+  const writing = getCurrentWritingAuthorUid(session, { roster, renames: opts.renames });
+  if (writing.unresolved || !writing.uid) {
+    return { status: "unresolved", uid: null, reason: writing.reason };
+  }
+  const p = roster.find((r) => String(r.userId) === String(writing.uid));
+  if (!p) {
+    if (!roster.length) return { status: "roster-loading", uid: writing.uid };
+    return { status: "invalid-state", uid: writing.uid, reason: "not-in-roster" };
+  }
+  if (isPresent(p)) {
+    return { status: "resolved-present", uid: writing.uid };
+  }
+  return { status: "resolved-absent", uid: writing.uid };
+}
+
+export function evaluateTruthMeterSkipEligibility(session, opts = {}) {
+  const {
+    canActAsHost = false,
+    roster = [],
+    isPresent = () => true,
+    rosterHydrated = true,
+  } = opts;
+
+  if (!canActAsHost) {
+    return { ok: false, reason: "not-acting-host" };
+  }
+  if (session?.phase !== "writing") {
+    return { ok: false, reason: "wrong-phase" };
+  }
+  if (session?.affirmation != null) {
+    return { ok: false, reason: "affirmation-present" };
+  }
+  if (!rosterHydrated) {
+    return { ok: false, reason: "roster-loading", authorStatus: "roster-loading" };
+  }
+
+  const status = classifyTruthMeterAuthorStatus(session, {
+    roster,
+    isPresent,
+    rosterHydrated,
+    renames: opts.renames,
+  });
+
+  if (status.status !== "resolved-absent") {
+    return {
+      ok: false,
+      reason:
+        status.status === "resolved-present"
+          ? "author-present"
+          : status.status || "not-absent",
+      authorStatus: status.status,
+    };
+  }
+
+  return {
+    ok: true,
+    reason: "resolved-absent",
+    authorStatus: "resolved-absent",
+    expectedAuthorUid: status.uid,
+    runId: session.runId || null,
+    roundIdx: session.roundIdx ?? 0,
+  };
+}
+
+/**
+ * I-09 : ordre déjà UID → no-op (pas de dédup / reorder).
  */
 export function migrateTruthMeterIdentityOnRename(tm, opts = {}) {
   if (!tm || typeof tm !== "object") return tm;
@@ -318,23 +501,19 @@ export function migrateTruthMeterIdentityOnRename(tm, opts = {}) {
 
   let authorOrder = tm.authorOrder;
   if (Array.isArray(authorOrder)) {
-    const next = [];
-    const seen = new Set();
-    for (const entry of authorOrder) {
-      const s = entry == null ? "" : String(entry);
-      let out = s;
-      if (uidSet.has(s)) {
-        out = s;
-      } else if (s === oldName && localUid) {
-        out = String(localUid);
-      } else if (s === oldName) {
-        out = newName;
-      }
-      if (seen.has(out)) continue;
-      seen.add(out);
-      next.push(out);
+    if (isCanonicalUidAuthorOrder(authorOrder)) {
+      authorOrder = authorOrder.map(String);
+    } else if (authorOrder.every((e) => uidSet.has(String(e)) || UID_RE.test(String(e)))) {
+      authorOrder = authorOrder.map(String);
+    } else {
+      authorOrder = authorOrder.map((entry) => {
+        const s = entry == null ? "" : String(entry);
+        if (uidSet.has(s) || UID_RE.test(s)) return s;
+        if (s === oldName && localUid) return String(localUid);
+        if (s === oldName) return newName;
+        return s;
+      });
     }
-    authorOrder = next;
   }
 
   let affirmation = tm.affirmation;

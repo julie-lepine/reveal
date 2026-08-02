@@ -1927,14 +1927,19 @@ function mergeTruthMeterGameLocal(local, remote) {
     ? remote.lastRound ?? null
     : remote.lastRound ?? local.lastRound ?? null;
 
-  // BUG-TRUTHMETER-02 — identité ciblée (pas de préférence locale générale) :
-  // remote autoritaire pour phase/votes/scores ; UID distant valide autoritaire ;
-  // legacy distant + preuve locale même runId / même longueur → normalisation.
+  // BUG-TRUTHMETER-02 — identité ciblée :
+  // remote snapshot : affirmation null = clear ; cross-run ignore identité locale.
   const roster = (getState().lobby?.participants || []).map((p) => ({
     userId: p.userId,
     name: p.name,
+    lastSeenAt: p.lastSeenAt,
   }));
   const identity = mergeTruthMeterIdentityFields(local, remote, { roster });
+
+  // Cross-run : pas de votes / lastRound locaux de l'ancien run.
+  if (runChanged) {
+    votes = normalizePlayerVotesMap(remoteVotes);
+  }
 
   return {
     ...local,
@@ -1942,17 +1947,26 @@ function mergeTruthMeterGameLocal(local, remote) {
     phase: mergeTruthMeterPhase(local.phase, remote.phase, {
       newRound: newVoteRound || newRound || runChanged,
     }),
-    votes,
+    votes: runChanged ? normalizePlayerVotesMap(remote.votes || {}) : votes,
     ready,
     roundScored: mergeRoundFlag(
       local.roundScored,
       remote.roundScored,
       newVoteRound || runChanged
     ),
-    matchScores,
-    lastRound,
+    matchScores: runChanged
+      ? remote.matchScores || {}
+      : matchScores,
+    lastRound: runChanged
+      ? remote.lastRound ?? null
+      : lastRound,
     authorOrder: identity.authorOrder,
     affirmation: identity.affirmation,
+    authorEstimate: runChanged
+      ? remote.authorEstimate ?? null
+      : remote.authorEstimate !== undefined
+        ? remote.authorEstimate
+        : local.authorEstimate,
   };
 }
 

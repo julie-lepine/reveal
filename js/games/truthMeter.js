@@ -13,6 +13,7 @@ import {
   getTruthMeterSession,
   getCurrentAuthor,
   getCurrentTruthMeterAuthorUid,
+  getTruthMeterAuthorStatusNow,
   isLocalTruthMeterAuthorNow,
   getVoterNames,
   truthLabel,
@@ -32,7 +33,7 @@ import {
   mapTruthMeterRevealRpcError,
   applyTruthMeterEveningFromLastRound,
 } from "../core/truthMeterSession.js";
-import { tm02Log } from "../core/truthMeterIdentity.js";
+import { tm02Log, tm02QaLog } from "../core/truthMeterIdentity.js";
 import { awardTruthMeterRound, EVENING_POINTS } from "../core/scoring.js";
 import {
   applyMatchScoreDeltas,
@@ -229,6 +230,12 @@ export function mountTruthMeter(app) {
   function authorUnresolved() {
     const r = getCurrentTruthMeterAuthorUid();
     return Boolean(r?.unresolved);
+  }
+
+  function canShowSkipAbsent() {
+    if (!(!mp || canActAsHost())) return false;
+    const st = getTruthMeterAuthorStatusNow();
+    return st.status === "resolved-absent";
   }
 
   function cancelRevealAnim() {
@@ -690,14 +697,11 @@ export function mountTruthMeter(app) {
       });
       phaseHtml = `
         <p class="hint truth-meter__waiting">Impossible d’identifier l’auteur de cette manche (session ancienne ou ambiguë).</p>
-        <p class="hint">Recharge la session ou passe cet auteur si tu es hôte.</p>`;
+        <p class="hint">Recharge la session. Ne passe pas l’auteur tant que l’identité n’est pas résolue.</p>`;
       if (host) {
         phaseHtml += `
           <button type="button" class="btn btn-secondary btn--spaced" id="truth-reload-author">
             Recharger la session
-          </button>
-          <button type="button" class="btn btn-secondary btn--spaced" id="truth-skip-author">
-            Passer cet auteur (absent)
           </button>`;
       }
     } else if (phase === "writing") {
@@ -720,7 +724,7 @@ export function mountTruthMeter(app) {
       } else {
         phaseHtml = `
           <p class="hint truth-meter__waiting">✍️ <strong>${escapeHtml(author || "…")}</strong> écrit son affirmation…</p>`;
-        if (host) {
+        if (canShowSkipAbsent()) {
           phaseHtml += `
           <button type="button" class="btn btn-secondary btn--spaced" id="truth-skip-author">
             Passer cet auteur (absent)
@@ -1005,6 +1009,18 @@ export function mountTruthMeter(app) {
           const res = await skipTruthMeterAuthorRound();
           if (!mount.isMounted()) return;
           if (!mount.isCurrentMount()) return;
+          if (!res?.ok) {
+            tm02QaLog("skip-rejected", {
+              runId: getTruthMeterSession().runId,
+              phase,
+              roundIdx,
+              reason: res?.reason || "unknown",
+              source: "truthMeter-ui",
+            });
+            syncFromSession();
+            render();
+            return;
+          }
           if (res?.completed) return;
           syncFromSession();
           render();

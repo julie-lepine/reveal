@@ -16,7 +16,7 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 
 | | |
 |--|--|
-| **Maintenant** | QA terrain **BUG-TRUTHMETER-02** (implémenté — pas clôturé) |
+| **Maintenant** | Re-QA terrain **BUG-TRUTHMETER-02** (fix merge affirmation / split-brain) |
 | **Ensuite** | **OPS-LOBBY-04** · **ARCH-23** · ARCH-10 · **UX-HOST-01** |
 | **Dernière clôture** | **BUG-TIERNIGHT-03** ✅ (QA) · **BUG-WAO-04** ✅ · **BUG-WAO-02** ✅ · **BUG-WAO-03** ✅ · **BUG-TIERNIGHT-04** ✅ · **BUG-TIERNIGHT-05** ✅ |
 

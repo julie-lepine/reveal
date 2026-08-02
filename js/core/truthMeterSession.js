@@ -51,11 +51,16 @@ import {
 } from "./gameSessionRpc.js";
 import {
   buildTruthMeterAuthorOrderUids,
-  resolveTruthMeterAuthorUid,
+  getCurrentWritingAuthorUid,
+  getSubmittedAffirmationAuthorUid,
   isLocalTruthMeterAuthor,
   getTruthMeterAuthorDisplayName,
+  evaluateTruthMeterSkipEligibility,
+  classifyTruthMeterAuthorStatus,
   tm02Log,
+  tm02QaLog,
 } from "./truthMeterIdentity.js";
+import { isMemberPresent } from "./hostPresence.js";
 
 export {
   computeTruthMeterVoteApply,
@@ -129,7 +134,15 @@ export function getCurrentTruthMeterAuthorUid(session = getTruthMeterSession()) 
     userId: p.userId,
     name: p.name,
   }));
-  return resolveTruthMeterAuthorUid(session, { roster });
+  return getCurrentWritingAuthorUid(session, { roster });
+}
+
+export function getSubmittedTruthMeterAuthorUid(session = getTruthMeterSession()) {
+  const roster = (getState().lobby?.participants || []).map((p) => ({
+    userId: p.userId,
+    name: p.name,
+  }));
+  return getSubmittedAffirmationAuthorUid(session, { roster });
 }
 
 /** Display name de l'auteur courant (cosmétique). Identité = getCurrentTruthMeterAuthorUid. */
@@ -150,6 +163,8 @@ export function isLocalTruthMeterAuthorNow(session = getTruthMeterSession()) {
     const localName = getLocalDisplayName();
     const entry = (session.authorOrder || [])[session.roundIdx ?? 0];
     if (localName && entry != null && String(entry) === String(localName)) return true;
+    // Writing sans affirmation : uniquement l'entrée d'ordre (pas affirmation stale).
+    if (session.phase === "writing" && session.affirmation == null) return false;
     if (localName && session.affirmation?.author === localName) return true;
     return false;
   }
@@ -159,6 +174,20 @@ export function isLocalTruthMeterAuthorNow(session = getTruthMeterSession()) {
     name: p.name,
   }));
   return isLocalTruthMeterAuthor(session, localUid, { roster });
+}
+
+export function getTruthMeterAuthorStatusNow(session = getTruthMeterSession()) {
+  const participants = getState().lobby?.participants || [];
+  const roster = participants.map((p) => ({
+    userId: p.userId,
+    name: p.name,
+    lastSeenAt: p.lastSeenAt,
+  }));
+  return classifyTruthMeterAuthorStatus(session, {
+    roster,
+    rosterHydrated: participants.length > 0,
+    isPresent: (p) => isMemberPresent(p),
+  });
 }
 
 export function getTruthMeterParticipantNames(session = getTruthMeterSession()) {
@@ -176,7 +205,9 @@ export function getTruthMeterParticipantNames(session = getTruthMeterSession()) 
 }
 
 export function getVoterNames(session = getTruthMeterSession()) {
-  const authorUid = getCurrentTruthMeterAuthorUid(session).uid;
+  // Voting/reveal : exclure l'auteur de l'affirmation soumise (pas l'auteur writing stale).
+  const submitted = getSubmittedTruthMeterAuthorUid(session);
+  const authorUid = submitted.uid || getCurrentTruthMeterAuthorUid(session).uid;
   const participants = getState().lobby?.participants || [];
   if (authorUid && participants.length) {
     return participants
@@ -684,18 +715,60 @@ export async function finishTruthMeterGameSession() {
   navigate("results");
 }
 
-/** Hôte / acting host : passe la manche si l'auteur est absent ou irrésoluble (phase writing). */
+/** Hôte / acting host : passe la manche si l'auteur UID est réellement absent (phase writing). */
 export async function skipTruthMeterAuthorRound() {
-  // Aligné UI (canActAsHost) + commitHostGamePlay — pas isLobbyHost seul.
-  if (!canActAsHost()) return { ok: false, reason: "not-acting-host" };
   const session = getTruthMeterSession();
-  if (session.phase !== "writing") {
-    return { ok: false, reason: "wrong-phase" };
+  const participants = getState().lobby?.participants || [];
+  const roster = participants.map((p) => ({
+    userId: p.userId,
+    name: p.name,
+    lastSeenAt: p.lastSeenAt,
+  }));
+  const eligibility = evaluateTruthMeterSkipEligibility(session, {
+    canActAsHost: canActAsHost(),
+    roster,
+    rosterHydrated: participants.length > 0,
+    isPresent: (p) => isMemberPresent(p),
+  });
+  if (!eligibility.ok) {
+    tm02QaLog("skip-rejected", {
+      runId: session.runId || null,
+      phase: session.phase || null,
+      roundIdx: session.roundIdx ?? null,
+      reason: eligibility.reason,
+      authorStatus: eligibility.authorStatus || null,
+      source: "skipTruthMeterAuthorRound",
+    });
+    return { ok: false, reason: eligibility.reason };
   }
-  const order = session.authorOrder || [];
+
+  // Relecture anti-course : l'état distant/local peut avoir changé depuis le render.
+  const live = getTruthMeterSession();
+  const liveElig = evaluateTruthMeterSkipEligibility(live, {
+    canActAsHost: canActAsHost(),
+    roster,
+    rosterHydrated: participants.length > 0,
+    isPresent: (p) => isMemberPresent(p),
+  });
+  if (
+    !liveElig.ok ||
+    liveElig.runId !== eligibility.runId ||
+    liveElig.roundIdx !== eligibility.roundIdx ||
+    String(liveElig.expectedAuthorUid) !== String(eligibility.expectedAuthorUid)
+  ) {
+    tm02QaLog("skip-rejected", {
+      runId: live.runId || null,
+      phase: live.phase || null,
+      roundIdx: live.roundIdx ?? null,
+      reason: "state-changed-before-commit",
+      source: "skipTruthMeterAuthorRound",
+    });
+    return { ok: false, reason: "state-changed-before-commit" };
+  }
+
+  const order = live.authorOrder || [];
   const total = order.length;
-  const nextIdx = (session.roundIdx ?? 0) + 1;
-  // runId inchangé : commitTruthMeterPlay ne remplace pas runId (même run, curseur +1).
+  const nextIdx = (live.roundIdx ?? 0) + 1;
 
   if (nextIdx >= total) {
     await finishTruthMeterGameSession();

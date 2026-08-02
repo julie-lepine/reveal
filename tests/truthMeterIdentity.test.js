@@ -1,5 +1,5 @@
 /**
- * BUG-TRUTHMETER-02 — helpers identité auteur (purs).
+ * BUG-TRUTHMETER-02 — identité / merge (clear null, cross-run, no hint index).
  */
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
@@ -7,140 +7,127 @@ import {
   buildTruthMeterAuthorOrderUids,
   classifyTruthMeterIdentityEntry,
   normalizeTruthMeterAuthorOrder,
-  resolveTruthMeterAuthorUid,
-  isLocalTruthMeterAuthor,
+  getCurrentWritingAuthorUid,
+  getSubmittedAffirmationAuthorUid,
+  isLocalCurrentWritingAuthor,
   getTruthMeterAuthorDisplayName,
   mergeTruthMeterIdentityFields,
   migrateTruthMeterIdentityOnRename,
-  assertTruthMeterAuthorOrderWire,
+  isCanonicalUidAuthorOrder,
+  evaluateTruthMeterSkipEligibility,
+  classifyTruthMeterAuthorStatus,
 } from "../js/core/truthMeterIdentity.js";
 
+const UID_A = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
+const UID_B = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb";
+const UID_C = "cccccccc-cccc-cccc-cccc-cccccccccccc";
+
 const roster = [
-  { userId: "uid-a", name: "Alice" },
-  { userId: "uid-b", name: "Bob" },
-  { userId: "uid-c", name: "Cam" },
+  { userId: UID_A, name: "Alice" },
+  { userId: UID_B, name: "Bob" },
+  { userId: UID_C, name: "Cam" },
 ];
 
 describe("BUG-TRUTHMETER-02 truthMeterIdentity", () => {
   it("buildTruthMeterAuthorOrderUids: UIDs uniques, refuse UID manquant", () => {
     const ok = buildTruthMeterAuthorOrderUids([
-      { userId: "uid-a", name: "Alice" },
-      { userId: "uid-b", name: "Alice" }, // doublon display OK
-      { userId: "uid-a", name: "Alice" }, // doublon UID skip
+      { userId: UID_A, name: "Alice" },
+      { userId: UID_B, name: "Alice" },
+      { userId: UID_A, name: "Alice" },
     ]);
     assert.equal(ok.ok, true);
-    assert.deepEqual(ok.uids, ["uid-a", "uid-b"]);
-
-    const bad = buildTruthMeterAuthorOrderUids([
-      { userId: "uid-a" },
-      { userId: "", name: "X" },
-    ]);
-    assert.equal(bad.ok, false);
+    assert.deepEqual(ok.uids, [UID_A, UID_B]);
   });
 
-  it("1 ordre entièrement UID", () => {
-    const n = normalizeTruthMeterAuthorOrder(["uid-a", "uid-b"], { roster });
+  it("ordre entièrement UID : identité (roster incomplet OK)", () => {
+    const order = [UID_A, UID_B, UID_C];
+    assert.equal(isCanonicalUidAuthorOrder(order), true);
+    const n = normalizeTruthMeterAuthorOrder(order, { roster: [] });
     assert.equal(n.ok, true);
-    assert.deepEqual(n.order, ["uid-a", "uid-b"]);
+    assert.deepEqual(n.order, order);
     assert.equal(n.changed, false);
   });
 
-  it("2 ordre entièrement legacy résoluble", () => {
+  it("ordre legacy résoluble entrée par entrée", () => {
     const n = normalizeTruthMeterAuthorOrder(["Alice", "Bob"], { roster });
     assert.equal(n.ok, true);
-    assert.deepEqual(n.order, ["uid-a", "uid-b"]);
-    assert.equal(n.changed, true);
+    assert.deepEqual(n.order, [UID_A, UID_B]);
   });
 
-  it("3 ordre mixte", () => {
-    const n = normalizeTruthMeterAuthorOrder(["uid-a", "Bob"], { roster });
-    assert.equal(n.ok, true);
-    assert.deepEqual(n.order, ["uid-a", "uid-b"]);
-  });
-
-  it("4 pseudo absent → unresolved", () => {
-    const n = normalizeTruthMeterAuthorOrder(["Alice", "Zed"], { roster });
-    assert.equal(n.ok, false);
-    assert.equal(n.unresolved.length, 1);
-    assert.equal(n.unresolved[0].value, "Zed");
-  });
-
-  it("5 pseudo dupliqué → ambiguous, pas de choix arbitraire", () => {
-    const dupRoster = [
-      { userId: "uid-a", name: "Sam" },
-      { userId: "uid-b", name: "Sam" },
+  it("pseudo dupliqué → unresolved, pas de choix", () => {
+    const dup = [
+      { userId: UID_A, name: "Sam" },
+      { userId: UID_B, name: "Sam" },
     ];
-    const c = classifyTruthMeterIdentityEntry("Sam", dupRoster);
-    assert.equal(c.kind, "ambiguous");
-    assert.equal(c.uid, null);
-    const n = normalizeTruthMeterAuthorOrder(["Sam"], { roster: dupRoster });
-    assert.equal(n.ok, false);
+    assert.equal(classifyTruthMeterIdentityEntry("Sam", dup).kind, "ambiguous");
+    assert.equal(normalizeTruthMeterAuthorOrder(["Sam"], { roster: dup }).ok, false);
   });
 
-  it("6 renames sans preuve unique → unresolved", () => {
-    const n = normalizeTruthMeterAuthorOrder(["OldAlice"], {
+  it("interdit hint positionnel : même longueur ne contamine pas", () => {
+    const remote = ["OldA", "OldB"];
+    const localShuffle = [UID_B, UID_A];
+    const n = normalizeTruthMeterAuthorOrder(remote, {
       roster,
-      renames: [],
+      localHintOrder: localShuffle,
     });
     assert.equal(n.ok, false);
+    assert.ok(n.unresolved.length >= 1);
   });
 
-  it("7 hint local même run / même longueur résout", () => {
-    const n = normalizeTruthMeterAuthorOrder(["Alice", "Bob"], {
-      roster,
-      localHintOrder: ["uid-a", "uid-b"],
-    });
-    // déjà résolu via names ; avec noms absents :
-    const n2 = normalizeTruthMeterAuthorOrder(["OldA", "OldB"], {
-      roster,
-      localHintOrder: ["uid-a", "uid-b"],
-    });
-    assert.equal(n2.ok, true);
-    assert.deepEqual(n2.order, ["uid-a", "uid-b"]);
-    assert.equal(n.ok, true);
-  });
-
-  it("8 hint d'un autre run / longueur différente refusé", () => {
-    const n = normalizeTruthMeterAuthorOrder(["OldA", "OldB", "OldC"], {
-      roster,
-      localHintOrder: ["uid-a", "uid-b"],
-    });
-    assert.equal(n.ok, false);
-  });
-
-  it("9 longueur d'ordre différente refusée pour hints", () => {
-    const n = normalizeTruthMeterAuthorOrder(["OldA"], {
-      roster,
-      localHintOrder: ["uid-a", "uid-b"],
-    });
-    assert.equal(n.ok, false);
-  });
-
-  it("10 normalisation idempotente", () => {
-    const once = normalizeTruthMeterAuthorOrder(["Alice", "uid-b"], { roster });
-    const twice = normalizeTruthMeterAuthorOrder(once.order, { roster });
-    assert.deepEqual(twice.order, once.order);
-    assert.equal(twice.changed, false);
-  });
-
-  it("11 authorUid prioritaire sur author", () => {
-    const r = resolveTruthMeterAuthorUid(
+  it("writing + affirmation null → auteur via authorOrder[roundIdx]", () => {
+    const r = getCurrentWritingAuthorUid(
       {
-        authorOrder: ["uid-b"],
-        roundIdx: 0,
-        affirmation: { authorUid: "uid-a", author: "Bob", text: "x" },
+        phase: "writing",
+        affirmation: null,
+        authorOrder: [UID_A, UID_B, UID_C],
+        roundIdx: 1,
       },
       { roster }
     );
-    assert.equal(r.uid, "uid-a");
+    assert.equal(r.uid, UID_B);
     assert.equal(r.unresolved, false);
   });
 
-  it("12 désaccord UID / snapshot de nom : identité = UID", () => {
+  it("affirmation stale ne gouverne pas le writing", () => {
+    const r = getCurrentWritingAuthorUid(
+      {
+        phase: "writing",
+        affirmation: null,
+        authorOrder: [UID_A, UID_B],
+        roundIdx: 1,
+      },
+      { roster }
+    );
+    assert.equal(r.uid, UID_B);
+    // Même si on inventait une stale côté appelant, null clear = order only
+  });
+
+  it("voting + affirmation → auteur via affirmation.authorUid", () => {
+    const r = getCurrentWritingAuthorUid(
+      {
+        phase: "voting",
+        affirmation: { authorUid: UID_A, author: "Bob", text: "x" },
+        authorOrder: [UID_B, UID_A],
+        roundIdx: 0,
+      },
+      { roster }
+    );
+    assert.equal(r.uid, UID_A);
+    assert.equal(
+      getSubmittedAffirmationAuthorUid(
+        { affirmation: { authorUid: UID_A, author: "Bob", text: "x" } },
+        { roster }
+      ).uid,
+      UID_A
+    );
+  });
+
+  it("authorUid prioritaire sur snapshot author (désaccord)", () => {
     const name = getTruthMeterAuthorDisplayName(
       {
-        affirmation: { authorUid: "uid-a", author: "Bob", text: "x" },
-        authorOrder: ["uid-a"],
+        phase: "voting",
+        affirmation: { authorUid: UID_A, author: "Bob", text: "x" },
+        authorOrder: [UID_A],
         roundIdx: 0,
       },
       { roster, nameForUid: () => null }
@@ -148,99 +135,191 @@ describe("BUG-TRUTHMETER-02 truthMeterIdentity", () => {
     assert.equal(name, "Alice");
   });
 
-  it("13 ambiguïté : aucun choix arbitraire", () => {
-    const r = resolveTruthMeterAuthorUid(
-      {
-        authorOrder: ["Sam"],
-        roundIdx: 0,
-        affirmation: { author: "Sam", text: "x" },
-      },
-      {
-        roster: [
-          { userId: "u1", name: "Sam" },
-          { userId: "u2", name: "Sam" },
-        ],
-      }
-    );
-    assert.equal(r.unresolved, true);
-    assert.equal(r.uid, null);
-  });
-
-  it("isLocalTruthMeterAuthor par UID après rename cosmétique", () => {
-    const session = {
-      authorOrder: ["uid-a", "uid-b"],
-      roundIdx: 0,
-      affirmation: null,
-    };
-    assert.equal(isLocalTruthMeterAuthor(session, "uid-a", { roster }), true);
-    assert.equal(isLocalTruthMeterAuthor(session, "uid-b", { roster }), false);
-    // roster renommé
-    const renamed = [{ userId: "uid-a", name: "Alicia" }, { userId: "uid-b", name: "Bob" }];
-    assert.equal(isLocalTruthMeterAuthor(session, "uid-a", { roster: renamed }), true);
-  });
-
-  it("merge : remote UID autoritaire ; legacy + hint local même run", () => {
+  it("merge : remote affirmation null purge la locale", () => {
     const local = {
       runId: "run-1",
-      authorOrder: ["uid-a", "uid-b"],
-      affirmation: { authorUid: "uid-a", author: "Alicia", text: "hi" },
+      authorOrder: [UID_A, UID_B],
+      affirmation: { authorUid: UID_A, author: "Alice", text: "old" },
       phase: "writing",
+      roundIdx: 1,
     };
     const remote = {
       runId: "run-1",
-      authorOrder: ["Alice", "Bob"],
-      affirmation: { author: "Alice", text: "hi" },
+      authorOrder: [UID_A, UID_B],
+      affirmation: null,
       phase: "writing",
+      roundIdx: 1,
     };
     const merged = mergeTruthMeterIdentityFields(local, remote, { roster });
-    assert.deepEqual(merged.authorOrder, ["uid-a", "uid-b"]);
-    assert.equal(merged.affirmation.authorUid, "uid-a");
+    assert.equal(merged.affirmation, null);
+    assert.deepEqual(merged.authorOrder, [UID_A, UID_B]);
+    assert.equal(
+      getCurrentWritingAuthorUid({ ...remote, ...merged }, { roster }).uid,
+      UID_B
+    );
   });
 
-  it("merge : autre runId n'applique pas les hints locaux", () => {
+  it("merge : cross-run ignore affirmation locale", () => {
     const local = {
       runId: "run-old",
-      authorOrder: ["uid-a", "uid-b"],
-      affirmation: { authorUid: "uid-a", author: "Alice", text: "old" },
+      authorOrder: [UID_A, UID_B],
+      affirmation: { authorUid: UID_A, author: "Alice", text: "zombie" },
     };
     const remote = {
       runId: "run-new",
-      authorOrder: ["Ghost", "Bob"],
-      affirmation: { author: "Ghost", text: "new" },
+      authorOrder: [UID_B, UID_C, UID_A],
+      affirmation: null,
+      phase: "writing",
+      roundIdx: 0,
     };
     const merged = mergeTruthMeterIdentityFields(local, remote, { roster });
-    assert.ok(merged.authorOrder.includes("Ghost") || merged.authorOrder[0] === "Ghost");
-    assert.notEqual(merged.affirmation?.authorUid, "uid-a");
+    assert.equal(merged.affirmation, null);
+    assert.deepEqual(merged.authorOrder, [UID_B, UID_C, UID_A]);
   });
 
-  it("assertTruthMeterAuthorOrderWire refuse un ordre 100% noms", () => {
-    const a = assertTruthMeterAuthorOrderWire(["Alice", "Bob"], ["uid-a", "uid-b"]);
-    assert.equal(a.ok, false);
-    const b = assertTruthMeterAuthorOrderWire(["uid-a", "uid-b"], ["uid-a", "uid-b"]);
-    assert.equal(b.ok, true);
+  it("merge : remote UID exact même roster vide", () => {
+    const remote = {
+      runId: "r1",
+      authorOrder: [UID_C, UID_A, UID_B],
+      affirmation: null,
+    };
+    const local = {
+      runId: "r1",
+      authorOrder: ["Alice", "Bob", "Cam"],
+      affirmation: { authorUid: UID_A, text: "x" },
+    };
+    const merged = mergeTruthMeterIdentityFields(local, remote, { roster: [] });
+    assert.deepEqual(merged.authorOrder, [UID_C, UID_A, UID_B]);
+    assert.equal(merged.affirmation, null);
   });
 
-  it("I-09 migrate : UID order inchangé ; legacy → UID si localUid", () => {
+  it("trois clients simulés → même résultat après merge nouveau remote", () => {
+    const remote = {
+      runId: "run-new",
+      authorOrder: [UID_B, UID_A, UID_C],
+      affirmation: null,
+      phase: "writing",
+      roundIdx: 0,
+    };
+    const hostLocal = {
+      runId: "run-new",
+      authorOrder: [UID_B, UID_A, UID_C],
+      affirmation: null,
+    };
+    const guest1 = {
+      runId: "run-old",
+      authorOrder: [UID_A, UID_B, UID_C],
+      affirmation: { authorUid: UID_A, author: "Host", text: "old" },
+    };
+    const guest2 = {
+      runId: "run-old",
+      authorOrder: ["Alice", "Bob", "Cam"],
+      affirmation: { author: "Alice", text: "legacy" },
+    };
+    const m0 = mergeTruthMeterIdentityFields(hostLocal, remote, { roster });
+    const m1 = mergeTruthMeterIdentityFields(guest1, remote, { roster });
+    const m2 = mergeTruthMeterIdentityFields(guest2, remote, { roster });
+    assert.deepEqual(m0.authorOrder, m1.authorOrder);
+    assert.deepEqual(m1.authorOrder, m2.authorOrder);
+    assert.equal(m0.affirmation, null);
+    assert.equal(m1.affirmation, null);
+    assert.equal(m2.affirmation, null);
+    const session = { ...remote, ...m1 };
+    assert.equal(getCurrentWritingAuthorUid(session, { roster }).uid, UID_B);
+  });
+
+  it("rotation : writing round 0/1/2 sans stale", () => {
+    const order = [UID_A, UID_B, UID_C];
+    for (const idx of [0, 1, 2]) {
+      const uid = getCurrentWritingAuthorUid(
+        { phase: "writing", affirmation: null, authorOrder: order, roundIdx: idx },
+        { roster }
+      ).uid;
+      assert.equal(uid, order[idx]);
+    }
+  });
+
+  it("isLocalCurrentWritingAuthor après rename cosmétique", () => {
+    const session = {
+      phase: "writing",
+      affirmation: null,
+      authorOrder: [UID_A, UID_B],
+      roundIdx: 0,
+    };
+    const renamed = [{ userId: UID_A, name: "Alicia" }, { userId: UID_B, name: "Bob" }];
+    assert.equal(isLocalCurrentWritingAuthor(session, UID_A, { roster: renamed }), true);
+    assert.equal(isLocalCurrentWritingAuthor(session, UID_B, { roster: renamed }), false);
+  });
+
+  it("I-09 : ordre UID no-op (longueur préservée, pas de dédup)", () => {
     const tm = {
-      authorOrder: ["uid-a", "Bob"],
-      affirmation: { author: "Alice", text: "x" },
+      authorOrder: [UID_B, UID_A, UID_C],
+      affirmation: { authorUid: UID_A, author: "Alice", text: "x" },
     };
     const out = migrateTruthMeterIdentityOnRename(tm, {
       oldName: "Alice",
       newName: "Alicia",
-      localUid: "uid-a",
-      knownUids: ["uid-a", "uid-b"],
+      localUid: UID_A,
+      knownUids: [UID_A, UID_B, UID_C],
     });
-    assert.deepEqual(out.authorOrder, ["uid-a", "Bob"]);
-    assert.equal(out.affirmation.authorUid, "uid-a");
+    assert.deepEqual(out.authorOrder, [UID_B, UID_A, UID_C]);
+    assert.equal(out.affirmation.authorUid, UID_A);
     assert.equal(out.affirmation.author, "Alicia");
+  });
 
-    const uidOnly = migrateTruthMeterIdentityOnRename(
-      { authorOrder: ["uid-a", "uid-b"], affirmation: { authorUid: "uid-a", author: "Alice", text: "x" } },
-      { oldName: "Alice", newName: "Alicia", localUid: "uid-a", knownUids: ["uid-a", "uid-b"] }
+  it("skip : présent → refusé ; absent → ok ; unresolved → pas absent", () => {
+    const session = {
+      phase: "writing",
+      affirmation: null,
+      authorOrder: [UID_B, UID_A],
+      roundIdx: 0,
+      runId: "r1",
+    };
+    const present = evaluateTruthMeterSkipEligibility(session, {
+      canActAsHost: true,
+      roster,
+      rosterHydrated: true,
+      isPresent: () => true,
+    });
+    assert.equal(present.ok, false);
+    assert.equal(present.reason, "author-present");
+
+    const absent = evaluateTruthMeterSkipEligibility(session, {
+      canActAsHost: true,
+      roster,
+      rosterHydrated: true,
+      isPresent: (p) => String(p.userId) !== UID_B,
+    });
+    assert.equal(absent.ok, true);
+
+    const unresolved = evaluateTruthMeterSkipEligibility(
+      { ...session, authorOrder: ["Ghost"], roundIdx: 0 },
+      { canActAsHost: true, roster, rosterHydrated: true, isPresent: () => false }
     );
-    assert.deepEqual(uidOnly.authorOrder, ["uid-a", "uid-b"]);
-    assert.equal(uidOnly.affirmation.authorUid, "uid-a");
-    assert.equal(uidOnly.affirmation.author, "Alicia");
+    assert.equal(unresolved.ok, false);
+    assert.notEqual(unresolved.authorStatus, "resolved-absent");
+
+    assert.equal(
+      classifyTruthMeterAuthorStatus(session, {
+        roster,
+        rosterHydrated: true,
+        isPresent: () => true,
+      }).status,
+      "resolved-present"
+    );
+  });
+
+  it("skip refusé si affirmation déjà présente", () => {
+    const r = evaluateTruthMeterSkipEligibility(
+      {
+        phase: "writing",
+        affirmation: { authorUid: UID_A, text: "x" },
+        authorOrder: [UID_A],
+        roundIdx: 0,
+      },
+      { canActAsHost: true, roster, rosterHydrated: true, isPresent: () => false }
+    );
+    assert.equal(r.ok, false);
+    assert.equal(r.reason, "affirmation-present");
   });
 });
