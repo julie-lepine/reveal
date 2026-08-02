@@ -40,8 +40,6 @@ const SCREEN_TO_TAB = {
   consensus: TAB_GAMES,
   "dilemma-prep": TAB_GAMES,
   dilemma: TAB_GAMES,
-  "playlistguess-prep": TAB_GAMES,
-  playlistguess: TAB_GAMES,
   "clutch-prep": TAB_GAMES,
   clutch: TAB_GAMES,
   "wronganswer-prep": TAB_GAMES,

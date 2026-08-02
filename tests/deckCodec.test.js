@@ -7,12 +7,9 @@ import {
   rehydrateTriviaDeck,
   dehydrateDilemmaDeck,
   rehydrateDilemmaDeck,
-  dehydratePlaylistGuessDeck,
-  rehydratePlaylistGuessDeck,
 } from "../js/core/deckCodec.js";
 import { TRIVIA_QUESTIONS } from "../data/trivia.js";
 import { CONSENSUS_QUESTIONS } from "../data/consensus.js";
-import { PLAYLIST_GUESS_SONGS } from "../data/vibecheckSongs.js";
 
 describe("deckCodec - trivia (réponses mélangées)", () => {
   const base = TRIVIA_QUESTIONS[0];
@@ -68,19 +65,6 @@ describe("deckCodec - dilemma", () => {
     const back = rehydrateDilemmaDeck(dry);
     assert.equal(back[0].id, "sleep-hot");
     assert.deepEqual(back[1], custom);
-  });
-});
-
-describe("deckCodec - playlistGuess (song imbriquée)", () => {
-  it("réf par song.id et réhydrate la chanson de banque", () => {
-    const song = PLAYLIST_GUESS_SONGS[0];
-    const item = { song: { id: song.id, title: song.title, artist: song.artist, albumImage: song.albumImage } };
-    const dry = dehydratePlaylistGuessDeck([item]);
-    assert.equal(dry[0].r, song.id);
-    assert.equal(dry[0].song, undefined);
-    const back = rehydratePlaylistGuessDeck(dry);
-    assert.equal(back[0].song.id, song.id);
-    assert.equal(back[0].song.title, song.title);
   });
 });
 

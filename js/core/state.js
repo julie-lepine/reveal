@@ -77,7 +77,6 @@ const defaultState = () => ({
     speedVotesPlayed: 0,
     clutchesPlayed: 0,
     wrongAnswersPlayed: 0,
-    playlistGuessesPlayed: 0,
     truthMetersPlayed: 0,
     consensusGamesPlayed: 0,
     dilemmasPlayed: 0,
@@ -185,17 +184,6 @@ const defaultState = () => ({
     winner: null,
     scoresApplied: false,
     lastRound: null,
-  },
-  playlistGuessGame: {
-    ready: {},
-    lobbyStarted: false,
-    roundCount: 5,
-    deck: null,
-    roundIdx: 0,
-    phase: null,
-    votes: {},
-    voteEndsAt: null,
-    roundScored: false,
   },
   truthMeterGame: {
     ready: {},
@@ -348,7 +336,6 @@ function loadState() {
       clutchGame: { ...defaultState().clutchGame, ...parsed.clutchGame },
       wrongAnswerGame: { ...defaultState().wrongAnswerGame, ...parsed.wrongAnswerGame },
       traitreGame: { ...defaultState().traitreGame, ...parsed.traitreGame },
-      playlistGuessGame: { ...defaultState().playlistGuessGame, ...parsed.playlistGuessGame },
       truthMeterGame: { ...defaultState().truthMeterGame, ...parsed.truthMeterGame },
       consensusGame: { ...defaultState().consensusGame, ...parsed.consensusGame },
       dilemmaGame: { ...defaultState().dilemmaGame, ...parsed.dilemmaGame },
@@ -839,16 +826,6 @@ export function renameLocalPlayer(newName) {
     }
   }
 
-  const pg = state.playlistGuessGame;
-  if (pg) {
-    // Solo keys may equal display names; MP keys are UUIDs and never match oldName.
-    if (pg.ready) pg.ready = mergeKeyedRecord(pg.ready, oldName, trimmed, "or");
-    if (pg.votes) pg.votes = migrateNameKeyedMap(pg.votes, oldName, trimmed, "preferOld");
-    if (Array.isArray(pg.participantNames)) {
-      pg.participantNames = migrateNameArray(pg.participantNames, oldName, trimmed);
-    }
-  }
-
   const tm = state.truthMeterGame;
   if (tm) {
     if (tm.ready) tm.ready = mergeKeyedRecord(tm.ready, oldName, trimmed, "or");
@@ -984,7 +961,6 @@ export function defaultEveningStats() {
     speedVotesPlayed: 0,
     clutchesPlayed: 0,
     wrongAnswersPlayed: 0,
-    playlistGuessesPlayed: 0,
     truthMetersPlayed: 0,
     consensusGamesPlayed: 0,
     dilemmasPlayed: 0,
@@ -1020,7 +996,6 @@ export function hasEveningStatsActivity() {
     (s.speedVotesPlayed || 0) > 0 ||
     (s.clutchesPlayed || 0) > 0 ||
     (s.wrongAnswersPlayed || 0) > 0 ||
-    (s.playlistGuessesPlayed || 0) > 0 ||
     (s.traitreGamesPlayed || 0) > 0 ||
     (s.triviaGamesPlayed || 0) > 0 ||
     (s.truthMetersPlayed || 0) > 0 ||
@@ -1048,7 +1023,6 @@ export function resetGameSessionsOnly() {
     clutchGame: { ...base.clutchGame },
     wrongAnswerGame: { ...base.wrongAnswerGame },
     traitreGame: { ...base.traitreGame },
-    playlistGuessGame: { ...base.playlistGuessGame },
     truthMeterGame: { ...base.truthMeterGame },
     consensusGame: { ...base.consensusGame },
     dilemmaGame: { ...base.dilemmaGame },
@@ -1184,12 +1158,6 @@ export function recordClutchPlayed() {
 export function recordWrongAnswerPlayed() {
   recordEveningGameOnce("wronganswer", () => {
     state.stats.wrongAnswersPlayed = (state.stats.wrongAnswersPlayed || 0) + 1;
-  });
-}
-
-export function recordPlaylistGuessPlayed() {
-  recordEveningGameOnce("playlistguess", () => {
-    state.stats.playlistGuessesPlayed = (state.stats.playlistGuessesPlayed || 0) + 1;
   });
 }
 

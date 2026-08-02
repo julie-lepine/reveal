@@ -16,7 +16,6 @@ const GAME_SETUP_SCREENS = new Set([
   "speedvote-prep",
   "clutch-prep",
   "wronganswer-prep",
-  "playlistguess-prep",
   "trivia-prep",
   "truthmeter-prep",
   "consensus-prep",

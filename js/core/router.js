@@ -44,6 +44,10 @@ export function initRouter(app) {
   appEl = app;
 }
 
+export function isScreenRegistered(id) {
+  return Boolean(id && screens[id]);
+}
+
 export function registerScreen(id, renderFn) {
   screens[id] = renderFn;
 }

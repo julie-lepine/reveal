@@ -26,8 +26,6 @@ import { getState } from "./state.js";
 const SCREEN_LABELS = {
   "traitre-prep": "Spot the fake",
   traitre: "Spot the fake",
-  "playlistguess-prep": "VibeCheck",
-  playlistguess: "VibeCheck",
   "consensus-prep": "Consensus",
   consensus: "Consensus",
   "hottake-prep": "Hot Take",

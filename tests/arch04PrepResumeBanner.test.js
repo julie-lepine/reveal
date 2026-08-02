@@ -18,7 +18,6 @@ const GAME_SETUP = new Set([
   "truthmeter-prep",
   "consensus-prep",
   "dilemma-prep",
-  "playlistguess-prep",
   "clutch-prep",
   "wronganswer-prep",
   "guesslie-menu",

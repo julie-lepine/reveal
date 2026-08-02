@@ -39,7 +39,7 @@ function rulesBodyHtml(rules) {
     }`;
 }
 
-/** Ouvre la modale de règles pour une clé de jeu (ex. "playlistguess" ou un id de nav). */
+/** Ouvre la modale de règles pour une clé de jeu (ex. "consensus" ou un id de nav). */
 export function openGameRules(key) {
   const rules = getGameRules(key) || getGameRules(RULES_KEY_BY_NAV[key]);
   if (!rules) return;

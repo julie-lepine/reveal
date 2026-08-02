@@ -200,22 +200,6 @@ describe("UX-HOST-01 — hiérarchie reveal mid-round", () => {
     assert.ok(votesIdx >= 0 && votesIdx < actionIdx, "votes storytelling avant CTA");
   });
 
-  it("Playlist Guess : result → CTA → cumul", () => {
-    const file = src("js/games/playlistGuess.js");
-    const start = file.indexOf("revealResultCardHtml(revealSummary)");
-    const end = file.indexOf("app.innerHTML = pageShell", start);
-    const body = file.slice(start, end);
-    assertRevealHierarchy(
-      body,
-      {
-        manche: /revealResultCardHtml/,
-        action: /id="next-round"/,
-        cumul: /gameCumulativeScoresHtml\(/,
-      },
-      "Playlist Guess"
-    );
-  });
-
   it("Tier Night Live : déjà reveal → CTA, sans cumul box", () => {
     const file = src("js/games/tierNightLive.js");
     const start = file.indexOf("function revealPhaseHtml()");
@@ -240,7 +224,6 @@ describe("UX-HOST-01 — hiérarchie reveal mid-round", () => {
       ["js/games/speedVote.js", "next-round"],
       ["js/games/truthMeter.js", "next-round"],
       ["js/games/guessLie.js", "next-round"],
-      ["js/games/playlistGuess.js", "next-round"],
     ];
     for (const [rel, id] of checks) {
       const file = src(rel);

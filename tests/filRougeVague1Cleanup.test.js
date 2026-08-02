@@ -88,7 +88,7 @@ describe("fil rouge vague 1 — contrats source", () => {
     assert.equal(main.includes("FIL_ROUGE"), false);
   });
 
-  it("classes CSS partagées Traître / Playlist Guess sont génériques (prep-min-players)", () => {
+  it("classes CSS partagées Traître sont génériques (prep-min-players)", () => {
     const css = read("style.css");
     for (const sel of [
       ".prep-min-players{",
@@ -101,11 +101,8 @@ describe("fil rouge vague 1 — contrats source", () => {
     }
     assert.equal(css.includes("fil-rouge-setup__req"), false);
     const traitre = read("js/screens/traitrePrep.js");
-    const playlist = read("js/screens/playlistGuessPrep.js");
     assert.ok(traitre.includes("prep-min-players"));
-    assert.ok(playlist.includes("prep-min-players"));
     assert.equal(traitre.includes("fil-rouge"), false);
-    assert.equal(playlist.includes("fil-rouge"), false);
   });
 
   it("CSS exclusif Fil Rouge (banner / modal / mission) a été retiré", () => {

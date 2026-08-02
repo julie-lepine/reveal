@@ -16,10 +16,10 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 
 | | |
 |--|--|
-| **Maintenant** | **UX-HOST-01** — hiérarchie reveal mid-round (impl. · QA Pages) |
+| **Maintenant** | **FEATURE-VIBECHECK-01** — suppression VibeCheck |
 | **Ensuite** | UX-CHAT / DEVICE · GAME-* |
-| **Dernière clôture** | **BUG-LOBBY-XX-E** ✅ · **OPS-LOBBY-04** ✅ · **BUG-TRUTHMETER-02** ✅ (QA) · **BUG-TIERNIGHT-03** ✅ · **BUG-WAO-04** ✅ · **BUG-WAO-02** ✅ · **BUG-WAO-03** ✅ · **BUG-TIERNIGHT-04** ✅ · **BUG-TIERNIGHT-05** ✅ |
-| **En attente QA finale** | **ARCH-23** (SQL ✅) · **ARCH-10** mobile · **UX-HOST-01** QA Pages |
+| **Dernière clôture** | **UX-HOST-01** ✅ · **BUG-LOBBY-XX-E** ✅ · **OPS-LOBBY-04** ✅ · **BUG-TRUTHMETER-02** ✅ (QA) · **BUG-TIERNIGHT-03** ✅ · **BUG-WAO-04** ✅ · **BUG-WAO-02** ✅ · **BUG-WAO-03** ✅ · **BUG-TIERNIGHT-04** ✅ · **BUG-TIERNIGHT-05** ✅ |
+| **En attente QA finale** | **ARCH-23** (SQL ✅) · **ARCH-10** mobile |
 
 ---
 
@@ -29,7 +29,7 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 
 | ID | Cause | Problème | Priorité |
 |----|-------|----------|----------|
-| **UX-HOST-01** | 11 | CTA hôte — hiérarchie reveal mid-round | 🟢 impl. · QA Pages |
+| **FEATURE-VIBECHECK-01** | 10 | Suppression complète du jeu VibeCheck | 🟡 SQL ✅ · **audit + QA Pages** |
 
 ### Prioritaire (QA différée / finale)
 
@@ -51,7 +51,6 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 | **FEATURE-TIERNIGHT-01** | — | Thèmes personnalisés (Classer le groupe) | 🟡 |
 | **FEATURE-TIERNIGHT-02** | — | Séries de tierlists par catégories | 🟡 |
 | **FEATURE-CHAT-03** | — | Bouton « Futur jeu aléatoire » dans le chat | 🟡 |
-| **FEATURE-VIBECHECK-01** | 10 | Suppression complète du jeu VibeCheck | ⚪ produit |
 | **ARCH-05** | 5 | Route lobby vs session (`row.screen`) | 🟡 mitigé SYN-28 |
 | **ARCH-01 / F-01** | 1 | Démo offline sans avertissement MP | 🟡 partiel |
 | **ARCH-11–17, SYN-19–24, SYN-27** | 9–10 | Monolithe / dup / code mort | Dette |
@@ -69,12 +68,27 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 | 7 | Sync silencieuse / fire-and-forget | Partiel | **BUG-TRUTHMETER-01 ✅** (01A/01B) · **BUG-TIERNIGHT-03** ✅ · **BUG-TRIVIA-01 ✅** (01A/01B/01B-bis/01C) · ARCH-07 ✅ · M-14b ✅ · ARCH-08 ✅ |
 | 8 | Reset / migration incomplète | Partiel | **BUG-TIERNIGHT-05 ✅** · **OPS-LOBBY-04 ✅** · **BUG-LOBBY-XX-E ✅** · **BUG-TRUTHMETER-02 ✅** · **ARCH-23** · ARCH-10 · **BUG-LOBBY-XX ✅** · I-09/SYN-15/16 ✅ |
 | 9 | Sync monolithe / duplication | Dette | ARCH-11… |
-| 10 | Code mort | Dette | **FEATURE-VIBECHECK-01** ⚪ · hors Fil Rouge app ✅ |
+| 10 | Code mort | Dette | **FEATURE-VIBECHECK-01** 🟡 SQL ✅ · QA Pages · hors Fil Rouge app ✅ |
 | 11 | Friction UX | Partiel | **UX-CHAT-01/02** 🟡 · **UX-DEVICE-01** 🟡 · **UX-HOST-01** 🟡 · **BUG-WAO-04** ✅ · **ARCH-23** · ARCH-22/Loader ✅ · **L-04 ✅** |
 
 ---
 
 ## Détail — tickets ouverts
+
+### FEATURE-VIBECHECK-01 — Suppression VibeCheck / PlaylistGuess (🟡 SQL ✅ · audit + QA Pages)
+
+Retrait produit complet du jeu VibeCheck (`game_id` client `playlistguess`, écran `playlistguess-prep`). **VibeCheck = Playlist Guess** (même produit ; pas deux jeux).
+
+| | |
+|--|--|
+| **Fichiers supprimés** | `js/games/playlistGuess.js` · `js/screens/playlistGuessPrep.js` · `js/playlistguess/SongGuessCard.js` · `js/playlistguess/RevealOwnerCard.js` · `js/core/playlistGuessSession.js` · `js/core/playlistGuessRounds.js` · `data/playlistGuess.js` · `data/vibecheckSongs.js` · `assets/games/vibecheck.png` · `scripts/fetchVibeCheckCovers.mjs` · `tests/playlistGuessSyncPending.test.js` |
+| **Retiré (partagé)** | `data/games.js` (tile) · `data/gameRules.js` (règles + `RULES_KEY_BY_NAV`) · `js/main.js` (imports/`registerScreen`) · `gameSelect.js` (launcher + chip récap) · `bottomNav.js` · `chatFabScreens.js` · `gameResume.js` · `restartGame.js` · `gameSync.js` (~34 mappings to/from remote, merge, RESTARTABLE, evening keys, stats sync) · `deckCodec.js` (dehydrate/rehydrate) · `scoring.js` (`awardPlaylistGuessRound`) · `state.js` (state par défaut, migration rename, stats) · `lobby.js` · `eveningRecap.js` · `gameScores.js` · `playerContribution.js` · `gameSessionSecurity.js` · `style.css` (tile `.playlist` + bloc `/* VibeCheck */`) · `scripts/buildFeatureGraphic.mjs` (`GAME_LOGOS`) · `package.json` (script test) |
+| **Tests mis à jour** | `uxHost01RevealHierarchy` · `deckCodec` · `renameLocalPlayer` · `mountLifecycle` · `filRougeVague1/2/3Cleanup` · `prepEntryGuardVagueA` · `arch04PrepResumeBanner` · `chatInGameVagueA` · `arch06ActionLocks` · `sessionRouteRestartDecision` · `postGameScreenFollow` · **`featureVibecheck01OrphanSession`** (guards orphelins) |
+| **SQL** | Migration [`feature-vibecheck-01-remove-allowlist.sql`](../supabase/feature-vibecheck-01-remove-allowlist.sql) — **✅ appliquée** sur le projet Supabase cible · voir [`DEPLOYMENTS_SQL.md`](./DEPLOYMENTS_SQL.md) §10 |
+| **Orphelins** | Sessions `game_id='playlistguess'` : non DELETE · RPC refusent contribute / acting play / complete key · client : `isScreenRegistered` + fallback `routeToSessionScreen` → `game-select` (pas de bandeau reprise / navigate silencieux) |
+| **Hors scope** | Intermédiaires `android/app/build/…` · docs ADMOB/LAUNCH_CHECKLIST/MULTIPLAYER_MERGE (mentions historiques) · scores soirée déjà dans `scores{}` (conservés dans le total) · tuiles `GAME_LABELS` absentes → classement par jeu **non affiché** |
+| **Cap** | `npm run cap:sync` exécuté (www + android/ios public) · build natif **non** publié |
+| **Verdict** | Client + SQL ✅ · **ne pas clôturer** avant QA GitHub Pages (checklist audit) |
 
 ### Cause 3 — Membership A→E5 ✅
 
@@ -321,7 +335,7 @@ Retour terrain multi-jeux. Priorités : 🔴 critique · 🟠 haute · 🟡 moye
 | ID | Problème | Analyse / attendu |
 |----|----------|-------------------|
 | **ARCH-23** | Version cliente vs déploiement | Au boot et/ou au join lobby : comparer version locale à une version attendue (manifest / endpoint / config distante). Si décalage : bloquer le flux jeu et forcer reload, message du type « Une nouvelle version de REVEAL est disponible. Rechargez l'application pour continuer. ». Motive : soirées-test avec client GH Pages / PWA en retard sur migrations SQL → bugs indiagnosticables (ex. 01B-bis). |
-| **UX-HOST-01** | CTA hôte au-dessus du classement | ✅ implémenté — hiérarchie mid-round reveal → action → cumul · QA Pages ouverte · `uxHost01RevealHierarchy.test.js` |
+| **UX-HOST-01** | CTA hôte — hiérarchie reveal mid-round | ✅ QA validée · reveal → action → cumul · `uxHost01RevealHierarchy` |
 | **UX-CHAT-01** | Message système au lancement jeu | Joueurs dans le chat au moment du launch ne voient pas le changement. Attendu : message auto ex. « 🎮 L'hôte a lancé une partie de Trivia. » visible quelques secondes dans le chat. |
 | **UX-CHAT-02** | Clavier auto à l'ouverture chat | Le champ prend le focus immédiatement · clavier apparaît. Attendu : ouvrir le chat sans focus · clavier uniquement après clic volontaire. |
 | **UX-DEVICE-01** | Mise en veille pendant partie | Écran verrouillé si téléphone posé. À étudier : Screen Wake Lock API (ou équivalent) tant que lobby actif · relâcher au leave · fallback propre si API indisponible. |
@@ -336,7 +350,7 @@ Retour terrain multi-jeux. Priorités : 🔴 critique · 🟠 haute · 🟡 moye
 
 | ID | Problème | Analyse / attendu |
 |----|----------|-------------------|
-| **FEATURE-VIBECHECK-01** | Suppression VibeCheck | Décision produit. Retrait : sélection · votes · navigation · assets · tests · stats associées éventuelles. |
+| **FEATURE-VIBECHECK-01** | Suppression VibeCheck | Décision produit. Retrait : sélection · votes · navigation · assets · tests · stats associées. **Client + SQL ✅ 2026-08-02 · QA Pages en attente** — voir détail ci-dessous. |
 
 ---
 
@@ -463,4 +477,4 @@ Hors file prioritaire — opportunité / régression :
 
 ---
 
-*Suivi vivant · MAJ 2026-08-02 — **UX-HOST-01** impl. (reveal→action→cumul) · QA Pages ouverte · **ARCH-10** Pages ✅ · **ARCH-23** QA différée*
+*Suivi vivant · MAJ 2026-08-02 — **FEATURE-VIBECHECK-01** SQL ✅ · audit + QA Pages · **UX-HOST-01** ✅ · **ARCH-10** Pages ✅ · **ARCH-23** QA différée*

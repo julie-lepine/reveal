@@ -18,7 +18,6 @@ export function getEveningRecap() {
   const speedVotes = stats.speedVotesPlayed || 0;
   const clutches = stats.clutchesPlayed || 0;
   const wrongAnswers = stats.wrongAnswersPlayed || 0;
-  const playlistGuesses = stats.playlistGuessesPlayed || 0;
   const traitreGames = stats.traitreGamesPlayed || 0;
   const triviaGames = stats.triviaGamesPlayed || 0;
   const truthMeters = stats.truthMetersPlayed || 0;
@@ -35,7 +34,6 @@ export function getEveningRecap() {
     speedVotes > 0 ||
     clutches > 0 ||
     wrongAnswers > 0 ||
-    playlistGuesses > 0 ||
     traitreGames > 0 ||
     triviaGames > 0 ||
     truthMeters > 0 ||
@@ -51,7 +49,6 @@ export function getEveningRecap() {
     speedVotes,
     clutches,
     wrongAnswers,
-    playlistGuesses,
     traitreGames,
     triviaGames,
     truthMeters,

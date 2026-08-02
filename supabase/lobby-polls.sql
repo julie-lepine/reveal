@@ -3,6 +3,11 @@
 --               game-sessions.sql, game-sessions-i08-arch03.sql (is_lobby_host, is_acting_host).
 -- Réexécutable (create or replace / drop policy if exists).
 --
+-- FEATURE-VIBECHECK-01 : allowlist ci-dessous mise à jour (retrait playlistguess-prep) pour
+-- rester alignée avec data/games.js (test lobbyPollsAllowlist). Delta ops à appliquer en
+-- production via supabase/feature-vibecheck-01-remove-allowlist.sql (ne pas réexécuter ce
+-- fichier entier en prod pour ce seul changement).
+--
 -- Auth : les invités anonymes Supabase utilisent le rôle `authenticated` (comme les autres RPC).
 --
 -- Realtime (dashboard) : activer la réplication pour lobby_polls et lobby_poll_votes
@@ -113,7 +118,6 @@ as $$
   -- REVEAL_POLL_GAME_ALLOWLIST_BEGIN
   select array[
     'traitre-prep',
-    'playlistguess-prep',
     'consensus-prep',
     'hottake-prep',
     'guesslie',

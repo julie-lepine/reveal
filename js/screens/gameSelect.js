@@ -39,7 +39,6 @@ import {
   launchSpeedVotePrep,
   launchClutchPrep,
   launchWrongAnswerPrep,
-  launchPlaylistGuessPrep,
   launchTriviaPrep,
   launchTruthMeterPrep,
   launchConsensusPrep,
@@ -82,9 +81,6 @@ function eveningRecapHtml(recap) {
       : "",
     recap.speedVotes > 0
       ? `<span class="evening-recap__chip">⚡ ${recap.speedVotes} SpeedVote${recap.speedVotes > 1 ? "s" : ""}</span>`
-      : "",
-    recap.playlistGuesses > 0
-      ? `<span class="evening-recap__chip">🎶 ${recap.playlistGuesses} playlist${recap.playlistGuesses > 1 ? "s" : ""}</span>`
       : "",
     recap.traitreGames > 0
       ? `<span class="evening-recap__chip">🎭 ${recap.traitreGames} Spot the fake</span>`
@@ -143,7 +139,6 @@ function buildGameSelectHandlers() {
     "speedvote-prep": launchSpeedVotePrep,
     "clutch-prep": launchClutchPrep,
     "wronganswer-prep": launchWrongAnswerPrep,
-    "playlistguess-prep": launchPlaylistGuessPrep,
     "trivia-prep": launchTriviaPrep,
     "truthmeter-prep": launchTruthMeterPrep,
     "consensus-prep": launchConsensusPrep,

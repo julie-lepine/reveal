@@ -8,7 +8,6 @@ export const CHAT_FAB_ALLOWED_SCREENS = new Set([
   "speedvote-prep",
   "clutch-prep",
   "wronganswer-prep",
-  "playlistguess-prep",
   "truthmeter-prep",
   "dilemma-prep",
   "trivia-prep",

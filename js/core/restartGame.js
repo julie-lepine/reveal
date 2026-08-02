@@ -18,7 +18,6 @@ import {
   consensusToRemote,
   dilemmaToRemote,
   guessLieToRemote,
-  playlistGuessToRemote,
 } from "./gameSync.js";
 import { navigate } from "./router.js";
 import { defaultTraitrePrepSession } from "./traitreSession.js";
@@ -27,8 +26,6 @@ import { requireMinLobbyPlayers } from "./gameLaunchGuard.js";
 import { defaultSpeedVotePrepSession } from "./speedVoteSession.js";
 import { defaultClutchPrepSession } from "./clutchSession.js";
 import { defaultWrongAnswerPrepSession } from "./wrongAnswerSession.js";
-import { PLAYLIST_GUESS_MIN_PLAYERS } from "../../data/playlistGuess.js";
-import { defaultPlaylistGuessPrepSession } from "./playlistGuessSession.js";
 import { defaultTriviaPrepSession } from "./triviaSession.js";
 import { TRUTH_METER_MIN_PLAYERS } from "../../data/truthMeter.js";
 import { defaultTruthMeterPrepSession } from "./truthMeterSession.js";
@@ -53,7 +50,6 @@ const GAME_ID_TO_TILE = {
   consensus: "consensus-prep",
   dilemma: "dilemma-prep",
   guesslie: "guesslie",
-  playlistguess: "playlistguess-prep",
   tiernight: "tiernight-select",
 };
 
@@ -195,34 +191,6 @@ export async function launchWrongAnswerPrep() {
     alertTitle: "Wrong Answer Only",
     alertFallback: "Impossible de lancer Wrong Answer Only.",
     logLabel: "Wrong Answer Only",
-  });
-}
-
-export async function launchPlaylistGuessPrep() {
-  const check = await requireMinLobbyPlayers(PLAYLIST_GUESS_MIN_PLAYERS, {
-    gameTitle: "VibeCheck",
-    icon: "🎵",
-  });
-  if (!check.ok) return;
-
-  const pg = defaultPlaylistGuessPrepSession();
-
-  if (!isGameSyncActive()) {
-    saveStatePatch({ playlistGuessGame: pg });
-    navigate("playlistguess-prep");
-    return;
-  }
-
-  if (!(await requireHostToLaunch())) return;
-
-  await commitPrepSessionLaunch({
-    statePatch: { playlistGuessGame: pg },
-    gameId: "playlistguess",
-    screen: "playlistguess-prep",
-    remoteState: { playlistGuess: playlistGuessToRemote(pg) },
-    alertTitle: "VibeCheck",
-    alertFallback: "Impossible de lancer le jeu.",
-    logLabel: "Playlist Guess",
   });
 }
 
@@ -452,7 +420,6 @@ const RESTART_HANDLERS = {
   consensus: launchConsensusPrep,
   dilemma: launchDilemmaPrep,
   guesslie: launchGuessLieMenu,
-  playlistguess: launchPlaylistGuessPrep,
   tiernight: launchTierNightSelect,
 };
 

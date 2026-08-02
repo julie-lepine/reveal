@@ -171,7 +171,7 @@ describe("ARCH-06 Vague B0 — createMountGuard", () => {
     assert.equal(screen.effects.renders, 0);
   });
 
-  it("B4 schéma playlistGuess nextRound : pas de render/navigate après unmount", async () => {
+  it("B4 schéma nextRound générique : pas de render/navigate après unmount", async () => {
     const mount = createMountGuard();
     let renders = 0;
     let navigates = 0;
@@ -240,18 +240,6 @@ describe("ARCH-06 Vague B1 — contrats câblage", () => {
     });
   }
 
-  it("playlistGuess nextRound recheck mount après await", () => {
-    const s = readSrc("../js/games/playlistGuess.js");
-    assert.match(s, /await startPlaylistGuessRound\(next\)/);
-    assert.match(
-      s,
-      /if \(mp\) \{\s*await startPlaylistGuessRound\(next\);\s*\}\s*if \(!mount\.isMounted\(\)\) return;\s*if \(!mount\.isCurrentMount\(\)\) return;/s
-    );
-    assert.match(
-      s,
-      /console\.warn\("REVEAL completeGameSession:", e\);\s*if \(!mount\.isMounted\(\)\) return;\s*if \(!mount\.isCurrentMount\(\)\) return;/s
-    );
-  });
 });
 
 describe("ARCH-06 Vague B2 — timers / RAF + contrats", () => {
@@ -754,7 +742,6 @@ describe("ARCH-06 Vague C1 — contrats double garde périmètre B", () => {
     "../js/games/clutch.js",
     "../js/games/truthMeter.js",
     "../js/games/tierNightLive.js",
-    "../js/games/playlistGuess.js",
   ]) {
     it(`${file} : double-garde isMounted + isCurrentMount sur chemins session`, () => {
       const s = readSrc(file);

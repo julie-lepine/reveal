@@ -1,8 +1,7 @@
 /**
  * Pré-résolution Vague A — gardes entry au mount prep (alignement Trivia/Consensus/Traître).
- * Les 7 preps autrefois sans garde : Hot Take, SpeedVote, Clutch, Wrong Answer,
- * VibeCheck (= Playlist Guess / playlistguess-prep), Dilemma, TruthMeter.
- * Aucun écran `vibe-prep` distinct n’existe dans le catalogue.
+ * Les preps autrefois sans garde : Hot Take, SpeedVote, Clutch, Wrong Answer,
+ * Dilemma, TruthMeter.
  */
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
@@ -38,12 +37,6 @@ const PREP_GUARDS = [
     mount: "mountWrongAnswerPrep",
     prepId: "wronganswer-prep",
     entryFn: "getWrongAnswerEntryScreen",
-  },
-  {
-    file: "js/screens/playlistGuessPrep.js",
-    mount: "mountPlaylistGuessPrep",
-    prepId: "playlistguess-prep",
-    entryFn: "getPlaylistGuessEntryScreen",
   },
   {
     file: "js/screens/dilemmaPrep.js",

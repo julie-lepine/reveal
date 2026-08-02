@@ -14,17 +14,6 @@ export const GAMES = [
     enabled: true,
   },
   {
-    id: "playlistguess-prep",
-    title: "VibeCheck",
-    desc: "3 joueurs min. - une chanson, votez à qui elle correspond le mieux",
-    emoji: "🎵",
-    cssClass: "playlist",
-    logo: "assets/games/vibecheck.png",
-    borderGradient:
-      "linear-gradient(200deg, #A78BFA 0%, #6366F1 48%, #2B2D66 100%)",
-    enabled: true,
-  },
-  {
     id: "consensus-prep",
     title: "Consensus",
     desc: "Curseur 0 → 100 - pense comme le groupe, pas comme toi",

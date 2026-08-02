@@ -58,7 +58,6 @@ const GAME_PLAY_STATE_KEYS_EXPECTED = [
   "consensus",
   "dilemma",
   "guessLie",
-  "playlistGuess",
   "tierNight",
   "tierNightLive",
 ];

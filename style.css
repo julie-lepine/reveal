@@ -3781,7 +3781,6 @@ button.emoji-picker-preview__avatar:active{
 .game-grid .game-tile.tier,
 .game-grid .game-tile.blindtest,
 .game-grid .game-tile.wrong,
-.game-grid .game-tile.playlist,
 .game-grid .game-tile.clutch{
   background:transparent;
 }
@@ -3879,10 +3878,6 @@ button.emoji-picker-preview__avatar:active{
 
 .game-tile__logo-wrap--blindtest{
   --logo-border:linear-gradient(145deg, #6366F1 0%, #818CF8 48%, #2B2D66 100%);
-}
-
-.game-tile__logo-wrap--playlist{
-  --logo-border:linear-gradient(200deg, #A78BFA 0%, #6366F1 48%, #2B2D66 100%);
 }
 
 .game-tile__logo-wrap--traitre{
@@ -4600,123 +4595,6 @@ body.has-bottom-nav .feedback-fab{
 @keyframes timer-shake{
   0%,100%{ transform:scale(1); }
   50%{ transform:scale(1.06); }
-}
-
-/* ─── VibeCheck ─── */
-.label-upper--purple{
-  color:rgba(167,139,250,.9);
-}
-
-.hint--ok{
-  color:rgba(74,222,128,.9);
-}
-
-.hint--error{
-  color:#F87171;
-}
-
-.vibecheck-album{
-  width:100%;
-  max-width:280px;
-  aspect-ratio:1;
-  object-fit:cover;
-  border-radius:18px;
-  margin:0 auto 16px;
-  display:block;
-  box-shadow:var(--shadow-secondary);
-}
-
-.vibecheck-album--placeholder{
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  font-size:64px;
-  background:rgba(255,255,255,.06);
-  border:1px solid rgba(255,255,255,.1);
-}
-
-.vibecheck-song-card{
-  text-align:center;
-  border-radius:24px;
-}
-
-.vibecheck-song-card__title{
-  font-size:22px;
-  font-weight:800;
-  margin:0 0 6px;
-}
-
-.vibecheck-song-card__artist{
-  font-size:15px;
-  color:rgba(255,255,255,.65);
-  margin:0 0 16px;
-}
-
-.vibecheck-reveal-stage{
-  margin:12px 0 20px;
-}
-
-.vibecheck-vote__emoji{
-  margin-right:8px;
-}
-
-.vibecheck-song-card--mini{
-  padding:14px;
-}
-
-.vibecheck-album--mini{
-  width:120px;
-  max-width:120px;
-  margin:0 auto 10px;
-  font-size:36px;
-}
-
-.vibecheck-results{
-  display:flex;
-  flex-direction:column;
-  gap:12px;
-}
-
-.vibecheck-result-row__head{
-  display:flex;
-  justify-content:space-between;
-  align-items:baseline;
-  margin-bottom:6px;
-  gap:10px;
-}
-
-.vibecheck-result-row__name{
-  font-weight:700;
-}
-
-.vibecheck-result-row__votes{
-  font-size:13px;
-  color:rgba(255,255,255,.6);
-  white-space:nowrap;
-}
-
-.vibecheck-result-row--winner .vibecheck-result-row__votes{
-  color:#C4B5FD;
-  font-weight:700;
-}
-
-.vibecheck-result-bar{
-  height:10px;
-  border-radius:999px;
-  background:rgba(255,255,255,.08);
-  overflow:hidden;
-}
-
-.vibecheck-result-bar span{
-  display:block;
-  height:100%;
-  border-radius:999px;
-  background:linear-gradient(90deg,#6366F1,#A78BFA);
-  transition:width .4s ease;
-}
-
-.vibecheck-result-row--winner .vibecheck-result-bar span{
-  background:linear-gradient(90deg,#A78BFA,#F0ABFC);
 }
 
 /* ─── Mobile only (fin) ─── */
@@ -5679,7 +5557,7 @@ body{
   cursor:pointer;
 }
 
-/* Bandeau min joueurs partagé (Traître, Playlist Guess) */
+/* Bandeau min joueurs (Traître) */
 .prep-min-players{
   display:flex;
   align-items:flex-start;

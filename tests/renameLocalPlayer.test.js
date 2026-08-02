@@ -295,28 +295,6 @@ describe("renameLocalPlayer (I-09 / SYN-06)", () => {
     assert.equal(t.votes.Bob, "Alicia");
   });
 
-  it("playlistGuess migrates only exact pseudo keys/values; UUIDs untouched", () => {
-    // Distinction: mergeKeyedRecord only moves record[oldName]; UUID !== "Alice".
-    // rewriteNameValues only rewrites values === "Alice"; UUID targets stay.
-    seedAlice({
-      playlistGuessGame: {
-        ...getState().playlistGuessGame,
-        ready: { Alice: true, "uuid-bob": true },
-        votes: { Alice: "uuid-bob", "uuid-cam": "Alice", "uuid-dan": "uuid-eve" },
-        participantNames: ["Alice", "Bob", "Alice"],
-      },
-    });
-    renameLocalPlayer("Alicia");
-    const pg = getState().playlistGuessGame;
-    assert.equal(pg.ready.Alicia, true);
-    assert.equal(pg.ready["uuid-bob"], true);
-    assert.equal(pg.ready.Alice, undefined);
-    assert.equal(pg.votes.Alicia, "uuid-bob");
-    assert.equal(pg.votes["uuid-cam"], "Alicia");
-    assert.equal(pg.votes["uuid-dan"], "uuid-eve");
-    assert.deepEqual(pg.participantNames, ["Alicia", "Bob"]);
-  });
-
   it("migrates truthMeterGame authorOrder, affirmation.author, matchScores, lastRound", () => {
     seedAlice({
       truthMeterGame: {

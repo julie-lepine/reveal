@@ -16,7 +16,7 @@ import {
   defaultEveningStats,
 } from "./state.js";
 import { GAMES } from "../../data/games.js";
-import { navigate, getCurrentScreen } from "./router.js";
+import { navigate, getCurrentScreen, isScreenRegistered } from "./router.js";
 import { getLobbyParticipants, getLobbyStatus, getLobbyGameId, isLobbyEveningStarted } from "./lobby.js";
 import { getActivePlayerNames, getActivePlayers } from "./players.js";
 import { mergeMatchScoresLocal } from "./gameScores.js";
@@ -99,8 +99,6 @@ import {
   rehydrateTriviaDeck,
   dehydrateDilemmaDeck,
   rehydrateDilemmaDeck,
-  dehydratePlaylistGuessDeck,
-  rehydratePlaylistGuessDeck,
 } from "./deckCodec.js";
 import { scalePollIntervalMs, SYNC_PATCH_TIMEOUT_MS } from "../config/syncConfig.js";
 import { withPatchTimeout } from "./withPatchTimeout.js";
@@ -265,7 +263,6 @@ const RESTARTABLE_SESSION_GAME_IDS = new Set([
   "consensus",
   "dilemma",
   "guesslie",
-  "playlistguess",
   "tiernight",
   "clutch",
   "wronganswer",
@@ -280,7 +277,6 @@ const SESSION_GAME_ID_TO_TILE = {
   consensus: "consensus-prep",
   dilemma: "dilemma-prep",
   guesslie: "guesslie",
-  playlistguess: "playlistguess-prep",
   tiernight: "tiernight-select",
   clutch: "clutch-prep",
   wronganswer: "wronganswer-prep",
@@ -625,7 +621,6 @@ const GAME_SETUP_SCREENS = new Set([
   "truthmeter-prep",
   "consensus-prep",
   "dilemma-prep",
-  "playlistguess-prep",
   "clutch-prep",
   "wronganswer-prep",
   "guesslie-menu",
@@ -2603,109 +2598,6 @@ export function traitreFromRemote(remote) {
   };
 }
 
-function isNewPlaylistGuessVoteRound(cur, inc) {
-  if (!inc) return false;
-  if (
-    inc.phase === "voting" &&
-    inc.roundIdx != null &&
-    cur?.roundIdx != null &&
-    inc.roundIdx !== cur.roundIdx
-  ) {
-    return true;
-  }
-  return (
-    inc.phase === "voting" &&
-    inc.voteEndsAt &&
-    inc.voteEndsAt !== cur?.voteEndsAt &&
-    Object.keys(inc.votes || {}).length === 0
-  );
-}
-
-function mergeRemotePlaylistGuessVotesUid(cur, inc) {
-  const curVotes = cur?.votes || {};
-  const incVotes = inc?.votes || {};
-  if (isNewPlaylistGuessVoteRound(cur, inc)) return incVotes;
-  if (
-    (inc?.phase === "voting" && cur?.phase === "voting") ||
-    inc?.phase === "reveal" ||
-    cur?.phase === "reveal"
-  ) {
-    return { ...curVotes, ...incVotes };
-  }
-  return incVotes;
-}
-
-function mergePlaylistGuessGameLocal(local, remote) {
-  if (!remote) return local;
-  if (!local) return remote;
-  const newVoteRound = isNewPlaylistGuessVoteRound(local, remote);
-  const remoteVotes = remote.votes || {};
-  const localVotes = local.votes || {};
-  let votes = remoteVotes;
-  if (newVoteRound) {
-    votes = remoteVotes;
-  } else if (remote.phase === "voting" || local.phase === "voting") {
-    votes = { ...remoteVotes, ...localVotes };
-  } else if (remote.phase === "reveal" || local.phase === "reveal") {
-    votes = { ...remoteVotes, ...localVotes };
-  }
-  const ready =
-    !remote.lobbyStarted && !local.lobbyStarted
-      ? mergeReadyMapsLocal(local.ready || {}, remote.ready || {}, getActivePlayerNames(), getLocalDisplayName())
-      : remote.ready || {};
-  let roundScored = mergeRoundFlag(local.roundScored, remote.roundScored, newVoteRound);
-  if (remote.phase === "voting" && newVoteRound) {
-    roundScored = Boolean(remote.roundScored);
-  } else if (remote.phase === "voting" && Object.keys(remoteVotes).length === 0) {
-    roundScored = false;
-  }
-  return {
-    ...local,
-    ...remote,
-    phase: newVoteRound
-      ? (remote.phase ?? local.phase)
-      : mergeForwardGamePhase(local.phase, remote.phase),
-    votes,
-    ready,
-    roundScored,
-  };
-}
-
-export function playlistGuessToRemote(session) {
-  // Votes keyed by voter uid (durable, avoids name collisions)
-  const remoteVotes = { ...(session.votes || {}) };
-  return {
-    // Ready is keyed by userId already (durable, avoids name collisions)
-    ready: session.ready || {},
-    lobbyStarted: Boolean(session.lobbyStarted),
-    roundCount: session.roundCount ?? 5,
-    deck: session.deck ? dehydratePlaylistGuessDeck(session.deck) : null,
-    roundIdx: session.roundIdx ?? 0,
-    phase: session.phase || null,
-    votes: remoteVotes,
-    voteEndsAt: session.voteEndsAt || null,
-    roundScored: Boolean(session.roundScored),
-  };
-}
-
-export function playlistGuessFromRemote(remote) {
-  if (!remote) return null;
-  // Votes remain keyed by voter uid
-  const votes = { ...(remote.votes || {}) };
-  return {
-    // Ready map remains keyed by userId (no lossy name mapping)
-    ready: { ...(remote.ready || {}) },
-    lobbyStarted: Boolean(remote.lobbyStarted),
-    roundCount: remote.roundCount ?? 5,
-    deck: remote.deck ? rehydratePlaylistGuessDeck(remote.deck) : null,
-    roundIdx: remote.roundIdx ?? 0,
-    phase: remote.phase || null,
-    votes,
-    voteEndsAt: remote.voteEndsAt || null,
-    roundScored: Boolean(remote.roundScored),
-  };
-}
-
 export function guessLieToRemote(gl) {
   return {
     sessionId: gl.sessionId,
@@ -3000,7 +2892,6 @@ function eveningStateToRemote() {
       speedVotesPlayed: stats.speedVotesPlayed || 0,
       clutchesPlayed: stats.clutchesPlayed || 0,
       wrongAnswersPlayed: stats.wrongAnswersPlayed || 0,
-      playlistGuessesPlayed: stats.playlistGuessesPlayed || 0,
       triviaGamesPlayed: stats.triviaGamesPlayed || 0,
       truthMetersPlayed: stats.truthMetersPlayed || 0,
       consensusGamesPlayed: stats.consensusGamesPlayed || 0,
@@ -3181,7 +3072,6 @@ export function applyRemoteSession(row, { epoch = null } = {}) {
   }
 
   const patch = {};
-  const prevPgPhase = getState().playlistGuessGame?.phase ?? null;
   const prevDmPhase = getState().dilemmaGame?.phase ?? null;
   const prevDmRoundIdx = getState().dilemmaGame?.roundIdx ?? null;
   const prevWaPhase = getState().wrongAnswerGame?.phase ?? null;
@@ -3261,11 +3151,6 @@ export function applyRemoteSession(row, { epoch = null } = {}) {
     const local = getState().guessLie;
     patch.guessLie = local ? mergeGuessLieGameLocal(local, remote) : remote;
   }
-  if (st.playlistGuess) {
-    const remote = playlistGuessFromRemote(st.playlistGuess);
-    const local = getState().playlistGuessGame;
-    patch.playlistGuessGame = local ? mergePlaylistGuessGameLocal(local, remote) : remote;
-  }
   Object.assign(patch, tierNightConfigPatchFromRemoteState(st));
 
   if (st.tierNight) {
@@ -3340,10 +3225,6 @@ export function applyRemoteSession(row, { epoch = null } = {}) {
       : remote;
   }
 
-  const pgPhaseChanged =
-    patch.playlistGuessGame?.phase != null &&
-    patch.playlistGuessGame.phase !== prevPgPhase;
-
   const guessLiePlayChanged =
     patch.guessLie &&
     (Boolean(patch.guessLie.lobbyComplete) !== Boolean(prevGuessLie?.lobbyComplete) ||
@@ -3395,8 +3276,7 @@ export function applyRemoteSession(row, { epoch = null } = {}) {
       JSON.stringify(patch.tierNightLiveGame.votes || {}) !== prevTierNightLiveVotes);
 
   const playChanged = Boolean(
-    pgPhaseChanged ||
-      guessLiePlayChanged ||
+    guessLiePlayChanged ||
       dilemmaPlayChanged ||
       hotTakePlayChanged ||
       speedVotePlayChanged ||
@@ -3487,8 +3367,6 @@ function navStackFor(screen) {
     "hottake",
     "speedvote-prep",
     "speedvote",
-    "playlistguess-prep",
-    "playlistguess",
     "trivia-prep",
     "trivia",
     "truthmeter-prep",
@@ -3522,19 +3400,22 @@ export function routeToSessionScreen(screen, { force = false } = {}) {
   if (!screen || routing) {
     return false;
   }
+  // Session orpheline (jeu retiré) : hub soirée plutôt qu'un navigate silencieux en échec.
+  const target =
+    isScreenRegistered(screen) || screen === "lobby" ? screen : "game-select";
   const current = getCurrentScreen();
-  if (!force && current === screen) return isAppContentMounted();
+  if (!force && current === target) return isAppContentMounted();
 
   routing = true;
   try {
-    if (screen === "game-select") {
+    if (target === "game-select") {
       navigate("game-select", { navStack: navStackFor("game-select") });
-    } else if (screen === "lobby") {
+    } else if (target === "lobby") {
       navigate("lobby", { navStack: ["home", "lobby"] });
-    } else if (screen === "results") {
+    } else if (target === "results") {
       navigate("results", { navStack: navStackFor("results") });
     } else {
-      navigate(screen, { navStack: navStackFor(screen) });
+      navigate(target, { navStack: navStackFor(target) });
     }
   } finally {
     routing = false;
@@ -3583,6 +3464,8 @@ export function suppressRoutingForScoreView(ms = 15 * 60 * 1000) {
 export function isSessionInProgressPlay(screen) {
   if (!screen || MENU_SCREENS.has(screen) || POST_GAME_SCREENS.has(screen)) return false;
   if (isOnGameSetupScreen(screen)) return false;
+  // Jeux retirés du produit : écran non enregistré → jamais « en cours ».
+  if (!isScreenRegistered(screen)) return false;
   return true;
 }
 
@@ -3610,6 +3493,7 @@ export function getResumableSessionScreen(row = getCachedGameSession()) {
 export function isActiveGameSessionScreen(screen) {
   if (!screen || MENU_SCREENS.has(screen)) return false;
   if (POST_GAME_SCREENS.has(screen)) return false;
+  if (!isScreenRegistered(screen)) return false;
   return true;
 }
 
@@ -3627,7 +3511,6 @@ function resolveActivePlayScreen(st, gid, declared) {
   if (st.truthMeter?.lobbyStarted) return "truthmeter";
   if (st.consensus?.lobbyStarted) return "consensus";
   if (st.dilemma?.lobbyStarted) return "dilemma";
-  if (st.playlistGuess?.lobbyStarted) return "playlistguess";
 
   if (st.guessLie?.lobbyComplete) return "guesslie";
   const glPhase = st.guessLie?.phase;
@@ -3717,9 +3600,6 @@ export function getEffectiveSessionScreen(row) {
   }
   if (st.dilemma) {
     if (gid === "dilemma" || declared === "dilemma-prep") return "dilemma-prep";
-  }
-  if (st.playlistGuess) {
-    if (gid === "playlistguess" || declared === "playlistguess-prep") return "playlistguess-prep";
   }
 
   if (gid === "guesslie" || declared === "guesslie-menu") return "guesslie-menu";
@@ -3911,7 +3791,6 @@ const GAME_PLAY_STATE_KEYS = new Set([
   "consensus",
   "dilemma",
   "guessLie",
-  "playlistGuess",
   "tierNight",
   "tierNightLive",
 ]);
@@ -4688,30 +4567,6 @@ async function patchGameStateInner(
       : incGl;
     }
   }
-  if (mergePayload.playlistGuess) {
-    const curPg = current.playlistGuess;
-    const incPg = mergePayload.playlistGuess;
-    const newPgRound = curPg && incPg ? isNewPlaylistGuessVoteRound(curPg, incPg) : false;
-    let pgRoundScored = mergeRoundFlag(curPg.roundScored, incPg.roundScored, newPgRound);
-    if (incPg.phase === "voting" && newPgRound) {
-      pgRoundScored = Boolean(incPg.roundScored);
-    } else if (incPg.phase === "voting" && Object.keys(incPg.votes || {}).length === 0) {
-      pgRoundScored = false;
-    }
-    nextState.playlistGuess = curPg
-      ? {
-          ...curPg,
-          ...incPg,
-          phase: newPgRound
-            ? (incPg.phase ?? curPg.phase)
-            : mergeForwardGamePhase(curPg.phase, incPg.phase),
-          ready: mergeRemoteReadyUid(curPg, incPg),
-          votes: mergeRemotePlaylistGuessVotesUid(curPg, incPg),
-          roundScored: pgRoundScored,
-        }
-      : incPg;
-  }
-
   const patch = { state: nextState };
   if (screen) patch.screen = screen;
   if (gameId) patch.game_id = gameId;
@@ -4779,7 +4634,6 @@ function deactivatePlayFlagsInSessionState(state = {}) {
     "truthMeter",
     "consensus",
     "dilemma",
-    "playlistGuess",
     "tierNight",
     "tierNightLive",
   ];
@@ -4971,14 +4825,6 @@ export async function syncTraitreSession(extra = {}, patchOpts = {}) {
   saveStatePatch({ traitreGame: session });
   if (!isGameSyncActive()) return session;
   await patchGameState({ traitre: traitreToRemote(session) }, patchOpts);
-  return session;
-}
-
-export async function syncPlaylistGuessSession(extra = {}, patchOpts = {}) {
-  const session = { ...getState().playlistGuessGame, ...extra };
-  saveStatePatch({ playlistGuessGame: session });
-  if (!isGameSyncActive()) return session;
-  await patchGameState({ playlistGuess: playlistGuessToRemote(session) }, patchOpts);
   return session;
 }
 

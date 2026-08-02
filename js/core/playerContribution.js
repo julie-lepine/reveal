@@ -12,7 +12,6 @@ const STATE_KEY_TO_GAME = {
   clutch: "clutch",
   wrongAnswer: "wronganswer",
   traitre: "traitre",
-  playlistGuess: "playlistguess",
   trivia: "trivia",
   consensus: "consensus",
   truthMeter: "truthmeter",

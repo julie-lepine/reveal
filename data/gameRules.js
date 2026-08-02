@@ -4,24 +4,6 @@
 import { TRAITRE_MIN_PLAYERS } from "./traitre.js";
 
 export const GAME_RULES = {
-  playlistguess: {
-    title: "VibeCheck",
-    emoji: "🎵",
-    but: "Une chanson tombe au hasard : votez pour la personne du groupe à qui elle correspond le mieux.",
-    etapes: [
-      "Une chanson s'affiche (titre, artiste, pochette).",
-      "Chacun vote pour la personne du lobby à qui la chanson correspond le mieux (tu peux voter pour toi).",
-      "La manche se termine quand tout le monde a voté.",
-    ],
-    points: [
-      "Le(s) joueur(s) le plus voté(s) : +15 pts.",
-      "Tous ceux qui ont voté pour un joueur le plus voté : +10 pts.",
-      "Les deux se cumulent (jusqu'à +25 sur une manche).",
-    ],
-    exemple:
-      "« Djadja » tombe. 4 personnes votent Léa, 2 votent Tom. Léa gagne +15, et les 4 qui ont voté Léa gagnent +10 chacun.",
-  },
-
   consensus: {
     title: "Consensus",
     emoji: "🤝",
@@ -231,7 +213,6 @@ export const GAME_RULES = {
 /** Correspondance entre l'id de navigation (cartes / écrans) et la clé de règles. */
 export const RULES_KEY_BY_NAV = {
   "traitre-prep": "traitre",
-  "playlistguess-prep": "playlistguess",
   "consensus-prep": "consensus",
   "hottake-prep": "hottake",
   guesslie: "guesslie",

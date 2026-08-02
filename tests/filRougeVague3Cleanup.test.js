@@ -45,15 +45,12 @@ describe("fil rouge vague 3 — CSS / message / docs", () => {
     const css = read("style.css");
     assert.equal(css.includes("fil-rouge-setup__req"), false);
     assert.equal(css.includes("fil-rouge"), false);
-    for (const file of [
-      "js/screens/traitrePrep.js",
-      "js/screens/playlistGuessPrep.js",
-    ]) {
+    for (const file of ["js/screens/traitrePrep.js"]) {
       assert.equal(read(file).includes("fil-rouge"), false, file);
     }
   });
 
-  it("classes prep-min-players présentes et utilisées par Traître / Playlist Guess", () => {
+  it("classes prep-min-players présentes et utilisées par Traître", () => {
     const css = read("style.css");
     for (const sel of [
       ".prep-min-players{",
@@ -65,11 +62,9 @@ describe("fil rouge vague 3 — CSS / message / docs", () => {
       assert.ok(css.includes(sel), sel);
     }
     const traitre = read("js/screens/traitrePrep.js");
-    const playlist = read("js/screens/playlistGuessPrep.js");
     assert.ok(traitre.includes("prep-min-players"));
     assert.ok(traitre.includes("prep-min-players__icon"));
-    assert.ok(playlist.includes("prep-min-players"));
-    assert.ok(playlist.includes("prep-min-players__detail"));
+    assert.ok(traitre.includes("prep-min-players__detail"));
   });
 
   it("aucun message runtime actif ne mentionne fil-rouge-private.sql", () => {

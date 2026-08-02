@@ -18,7 +18,6 @@
 import { TRIVIA_QUESTIONS } from "../../data/trivia.js";
 import { CONSENSUS_QUESTIONS } from "../../data/consensus.js";
 import { getDilemmaDeckItems, DILEMMA_CATALOG_ID } from "../../data/dilemma.js";
-import { PLAYLIST_GUESS_SONGS } from "../../data/vibecheckSongs.js";
 
 function buildIndex(items) {
   const map = Object.create(null);
@@ -39,10 +38,6 @@ function consensusIndex() {
 let _dilemmaIdx;
 function dilemmaIndex() {
   return (_dilemmaIdx ||= buildIndex(getDilemmaDeckItems(DILEMMA_CATALOG_ID)));
-}
-let _songIdx;
-function songIndex() {
-  return (_songIdx ||= buildIndex(PLAYLIST_GUESS_SONGS));
 }
 
 /** Un élément déjà déshydraté ? (réf banque `{ r }` ou custom inline `{ c }`). */
@@ -94,46 +89,6 @@ export function dehydrateDilemmaDeck(deck) {
 }
 export function rehydrateDilemmaDeck(deck) {
   return rehydrateById(deck, dilemmaIndex());
-}
-
-// --- PlaylistGuess : item = { song: { id, title, artist, albumImage } } ------
-
-export function dehydratePlaylistGuessDeck(deck) {
-  if (!Array.isArray(deck)) return deck;
-  const index = songIndex();
-  return deck.map((item) => {
-    if (isRef(item)) return item;
-    const song = item && item.song;
-    if (song && song.id != null && index[String(song.id)]) {
-      return { r: String(song.id) };
-    }
-    return { c: item };
-  });
-}
-
-export function rehydratePlaylistGuessDeck(deck) {
-  if (!Array.isArray(deck)) return deck;
-  const index = songIndex();
-  return deck.map((entry) => {
-    if (entry && typeof entry === "object") {
-      if (typeof entry.r === "string") {
-        const song = index[entry.r];
-        if (song) {
-          return {
-            song: {
-              id: song.id,
-              title: song.title,
-              artist: song.artist,
-              albumImage: song.albumImage || null,
-            },
-          };
-        }
-        return { song: { id: entry.r, __missing: true } };
-      }
-      if ("c" in entry) return entry.c;
-    }
-    return entry;
-  });
 }
 
 // --- Trivia : les réponses sont mélangées par partie ------------------------

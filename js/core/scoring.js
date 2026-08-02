@@ -1,5 +1,4 @@
 import { EVENING_POINTS, tierNightPointsForRankDiff } from "../../data/eveningScoring.js";
-import { PLAYLIST_GUESS_POINTS } from "../../data/playlistGuess.js";
 import { CLUTCH_PODIUM_POINTS } from "../../data/clutch.js";
 import { WRONG_ANSWER_PODIUM_POINTS } from "../../data/wrongAnswer.js";
 import { computeWrongAnswerRoundAward } from "./wrongAnswerScoring.js";
@@ -239,48 +238,6 @@ export function awardDilemmaRound(votes) {
   });
 
   return summary;
-}
-
-/**
- * VibeCheck - les joueurs votent à qui la chanson correspond le mieux.
- * Le(s) plus voté(s) gagnent MOST_VOTED. Tout joueur ayant voté pour un
- * plus-voté (majorité) gagne MAJORITY. Les deux peuvent se cumuler.
- */
-export function awardPlaylistGuessRound({ votesByUid, resolveName }) {
-  const nameFor = (uid) => (resolveName ? resolveName(uid) : uid);
-  const entries = Object.entries(votesByUid || {}).filter(([, pick]) => pick != null && pick !== "");
-
-  const counts = {};
-  entries.forEach(([, pick]) => {
-    counts[pick] = (counts[pick] || 0) + 1;
-  });
-
-  let maxVotes = 0;
-  Object.values(counts).forEach((n) => {
-    if (n > maxVotes) maxVotes = n;
-  });
-  const leaders = Object.entries(counts)
-    .filter(([, n]) => n === maxVotes && maxVotes > 0)
-    .map(([uid]) => uid);
-  const leaderSet = new Set(leaders);
-
-  leaders.forEach((uid) => addScore(nameFor(uid), PLAYLIST_GUESS_POINTS.MOST_VOTED));
-
-  const majorityVoterUids = entries
-    .filter(([, pick]) => leaderSet.has(pick))
-    .map(([voterUid]) => voterUid);
-  majorityVoterUids.forEach((uid) => addScore(nameFor(uid), PLAYLIST_GUESS_POINTS.MAJORITY));
-
-  return {
-    counts,
-    leaders,
-    maxVotes,
-    totalVotes: entries.length,
-    winnerNames: leaders.map((uid) => nameFor(uid)),
-    majorityVoterUids,
-    mostVotedPoints: PLAYLIST_GUESS_POINTS.MOST_VOTED,
-    majorityPoints: PLAYLIST_GUESS_POINTS.MAJORITY,
-  };
 }
 
 export function awardGuessLieRound({ correct, liarName, liarBonus }) {

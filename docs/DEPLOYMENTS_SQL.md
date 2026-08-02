@@ -62,18 +62,19 @@ Sources : audit SQL du dépôt (`AUDIT-SQL-01`) + docs ops ([`SUPABASE_SETUP.md`
 | 2026-08-02 | [`ops-lobby-04-enable-purge-cron.sql`](../supabase/ops-lobby-04-enable-purge-cron.sql) | OPS-LOBBY-04 | ✅ | ✅ | [`ops-lobby-04-purge-cron-runbook.sql`](../supabase/tests/ops-lobby-04-purge-cron-runbook.sql) | Job `reveal-purge-stale-lobbies` */15 — QA terrain ✅ · voir §7 |
 | 2026-08-02 | [`lobby-closures-xx-e.sql`](../supabase/lobby-closures-xx-e.sql) | BUG-LOBBY-XX-E | ✅ | ✅ | [`lobby-closures-xx-e-runbook.sql`](../supabase/tests/lobby-closures-xx-e-runbook.sql) | Tombstones + dissolve/purge ; QA terrain ✅ · voir §8 |
 | 2026-08-02 | [`app-client-compatibility.sql`](../supabase/app-client-compatibility.sql) | ARCH-23 Vague 1 | ✅ | ✅ | — | Floor `min_client_compatibility_build=1` · **aucun bump cassant** · QA terrain ouverte · voir §9 |
+| ✅ Appliqué (projet cible) | [`feature-vibecheck-01-remove-allowlist.sql`](../supabase/feature-vibecheck-01-remove-allowlist.sql) | FEATURE-VIBECHECK-01 | ✅ | ✅ cible | — | Retrait `playlistguess` des allowlists serveur (poll · contribute · acting host play · complete session) · voir §10 |
 | Historique (date inconnue) | [`transfer-lobby-host.sql`](../supabase/transfer-lobby-host.sql) | Transfert hôte | ✅ probable | ✅ probable | — | |
 | Historique (date inconnue) | [`kick-lobby-member.sql`](../supabase/kick-lobby-member.sql) | Kick membre | ✅ probable | ✅ probable | — | |
 | Historique (date inconnue) | [`lobby-members-unique-name.sql`](../supabase/lobby-members-unique-name.sql) | Pseudo unique / lobby | ✅ probable | ✅ probable | — | Échoue si doublons restants |
 | Historique (date inconnue) | [`reclaim-guest-membership.sql`](../supabase/reclaim-guest-membership.sql) | Reclaim invité (fondation) | 🟡 État à vérifier | 🟡 État à vérifier | — | Corps reclaim ensuite enrichi par E4-02 |
-| Historique (date inconnue) | [`game-sessions-i08-arch03.sql`](../supabase/game-sessions-i08-arch03.sql) | I-08 / ARCH-03 | ✅ probable | ✅ probable | Voir [`MIGRATION_I08_ARCH03.md`](./MIGRATION_I08_ARCH03.md) | RPC contribute / customs / affirmation TM / acting host ; **ne pas réexécuter entier** après Trivia/TM ultérieurs |
+| Historique (date inconnue) | [`game-sessions-i08-arch03.sql`](../supabase/game-sessions-i08-arch03.sql) | I-08 / ARCH-03 | ✅ probable | ✅ probable | Voir [`MIGRATION_I08_ARCH03.md`](./MIGRATION_I08_ARCH03.md) | RPC contribute / customs / affirmation TM / acting host ; **ne pas réexécuter entier** après Trivia/TM ultérieurs · `playlistguess` retiré via [`feature-vibecheck-01-remove-allowlist.sql`](../supabase/feature-vibecheck-01-remove-allowlist.sql) (✅) |
 | Historique (date inconnue) | [`game-sessions-arch03-fix-is-acting-host.sql`](../supabase/game-sessions-arch03-fix-is-acting-host.sql) | Hotfix `min(uuid)` | 🟡 État à vérifier | 🟡 État à vérifier | — | Appliquer seulement si 42883 encore présent ; sinon corps déjà dans i08 actuel |
 | Historique (date inconnue) | [`game-sessions-arch03-hotfix-acting-play-keys.sql`](../supabase/game-sessions-arch03-hotfix-acting-play-keys.sql) | Whitelist Hot Take | 🟡 État à vérifier | 🟡 État à vérifier | — | **Remplacé** par Trivia-01A pour `apply_acting_host_play` — ne pas réexécuter après 01A |
 | Historique (date inconnue) | [`game-sessions-i08-policy-host-only.sql`](../supabase/game-sessions-i08-policy-host-only.sql) | I-08 étape 4 | ✅ probable | ✅ probable | [`MIGRATION_I08_ARCH03.md`](./MIGRATION_I08_ARCH03.md) | UPDATE `game_sessions` = host réel uniquement |
 | Historique (date inconnue) | [`claim-lobby-host-if-stale.sql`](../supabase/claim-lobby-host-if-stale.sql) | ARCH-03b claim hôte | 🟡 État à vérifier | 🟡 État à vérifier | — | Contrôler présence RPC au catalogue |
 | Historique (date inconnue) | [`traitre-private.sql`](../supabase/traitre-private.sql) | Spot the fake | ✅ probable | ✅ probable | — | Après `is_lobby_host` |
-| Historique (date inconnue) | [`lobby-polls.sql`](../supabase/lobby-polls.sql) | Sondages prochain jeu | ✅ probable | ✅ probable | — | Après I-08 host helpers |
-| Historique (date inconnue) | [`game-sessions-trivia-01a-acting-host.sql`](../supabase/game-sessions-trivia-01a-acting-host.sql) | BUG-TRIVIA-01A | ✅ probable | ✅ probable | — | QA terrain 2026-07-31 (doc audit) |
+| Historique (date inconnue) | [`lobby-polls.sql`](../supabase/lobby-polls.sql) | Sondages prochain jeu | ✅ probable | ✅ probable | — | Après I-08 host helpers · allowlist source mise à jour FEATURE-VIBECHECK-01 (retrait `playlistguess-prep`) ; delta prod = [`feature-vibecheck-01-remove-allowlist.sql`](../supabase/feature-vibecheck-01-remove-allowlist.sql) (✅) |
+| Historique (date inconnue) | [`game-sessions-trivia-01a-acting-host.sql`](../supabase/game-sessions-trivia-01a-acting-host.sql) | BUG-TRIVIA-01A | ✅ probable | ✅ probable | — | QA terrain 2026-07-31 (doc audit) · `playlistguess` retiré de `apply_acting_host_play` via [`feature-vibecheck-01-remove-allowlist.sql`](../supabase/feature-vibecheck-01-remove-allowlist.sql) (✅) |
 | Historique (date inconnue) | [`game-sessions-trivia-01b-reveal-round.sql`](../supabase/game-sessions-trivia-01b-reveal-round.sql) | BUG-TRIVIA-01B | ✅ probable | ✅ probable | [`trivia-01b-reveal-round-rollback.sql`](../supabase/tests/trivia-01b-reveal-round-rollback.sql) · [`trivia-01b-concurrency-runbook.sql`](../supabase/tests/trivia-01b-concurrency-runbook.sql) | Remplacé partiellement par 01B-bis pour `reveal_trivia_round` |
 | Historique (date inconnue) | [`game-sessions-trivia-01b-answer-auto-reveal.sql`](../supabase/game-sessions-trivia-01b-answer-auto-reveal.sql) | BUG-TRIVIA-01B-bis | ✅ probable | ✅ probable | [`trivia-01b-bis-answer-rollback.sql`](../supabase/tests/trivia-01b-bis-answer-rollback.sql) | Définition Trivia attendue |
 | Historique (date inconnue) | [`game-sessions-truthmeter-01b-reveal-round.sql`](../supabase/game-sessions-truthmeter-01b-reveal-round.sql) | BUG-TRUTHMETER-01B | ✅ probable | ✅ probable | [`truthmeter-01b-reveal-rollback.sql`](../supabase/tests/truthmeter-01b-reveal-rollback.sql) · [`truthmeter-01b-concurrency-runbook.sql`](../supabase/tests/truthmeter-01b-concurrency-runbook.sql) | Voir §4 — **ne pas réexécuter après 02** |
@@ -250,3 +251,22 @@ Canal principal = apps **iOS / Android**. Floor autoritaire = Supabase.
 4. Contrôler logs `[ARCH-23]` refus
 
 **Statut** : ✅ SQL appliquée · floor = **1** · **ne pas bumper** sans instruction · QA terrain ouverte · ticket **non clôturé**.
+
+---
+
+## 10. FEATURE-VIBECHECK-01 — Retrait VibeCheck / PlaylistGuess (allowlists serveur)
+
+Suppression produit du jeu VibeCheck (`game_id` client `playlistguess`, écran `playlistguess-prep`). Code client déjà retiré (sélection, nav, sync, scoring, assets, tests). Ce fichier ne touche que les **fonctions serveur** qui listaient explicitement `playlistguess`/`playlistGuess`.
+
+| Élément | Valeur |
+| ------- | ------ |
+| Migration | [`feature-vibecheck-01-remove-allowlist.sql`](../supabase/feature-vibecheck-01-remove-allowlist.sql) — **✅ appliquée** (projet Supabase cible, confirmé) |
+| Fonctions redéfinies | `reveal_poll_allowed_game_ids` · `game_session_state_key` · `game_session_expected_game_id` · `contribute_game_session_player` · `apply_acting_host_play` · `complete_game_session_as_actor` |
+| Effet | Retrait des entrées `playlistguess` / `playlistGuess` uniquement ; corps sinon identique aux versions actuellement en production |
+| Sessions orphelines | Aucune donnée supprimée/modifiée par ce fichier ; une session `game_id='playlistguess'` existante devient simplement injoignable via ces RPC (refus explicite) jusqu'à sa clôture naturelle (purge / dissolve / leave) |
+| Client | Ne propose plus ce jeu ; fallback hub si session orpheline (`isScreenRegistered` / `routeToSessionScreen` → `game-select`) |
+| Hors scope | Table `lobby_polls` / `game_sessions` (schéma inchangé) · aucun DELETE de lignes existantes |
+
+**Statut** : Client + SQL ✅ · ticket **non clôturé** — validation audit résiduel + QA GitHub Pages.
+
+---

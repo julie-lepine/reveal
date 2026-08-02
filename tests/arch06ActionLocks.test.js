@@ -149,7 +149,7 @@ describe("ARCH-06 — createActionLock / withClickLock", () => {
     assert.equal(calls, 1);
   });
 
-  it("4. transition suivante (schéma playlistGuess / tierNightLive) : une seule exécution", async () => {
+  it("4. transition suivante (schéma tierNightLive) : une seule exécution", async () => {
     const nextRoundLock = createActionLock();
     let transitions = 0;
     const gate = deferred();
@@ -229,20 +229,6 @@ describe("ARCH-06 — contrats source (câblage V1)", () => {
     assert.match(src, /restartLock\.run/);
     assert.match(src, /void restartGame\(id\)/);
     assert.match(src, /L'exclusivité est dans `restartGame`/);
-  });
-
-  it("4. playlistGuess : nextRound + forceReveal via withClickLock + lock partagé", () => {
-    const src = readSrc("../js/games/playlistGuess.js");
-    assert.match(src, /const nextRoundLock = createActionLock\(\)/);
-    assert.match(src, /const forceRevealLock = createActionLock\(\)/);
-    assert.match(
-      src,
-      /withClickLock\(\s*\(\)\s*=>\s*nextRound\(\)\s*,\s*\{\s*lock:\s*nextRoundLock\s*\}\)/
-    );
-    assert.match(
-      src,
-      /withClickLock\(\s*\(\)\s*=>\s*forceReveal\(\)\s*,\s*\{\s*lock:\s*forceRevealLock\s*\}\)/
-    );
   });
 
   it("4. tierNightLive : nextRound via withClickLock + lock partagé", () => {

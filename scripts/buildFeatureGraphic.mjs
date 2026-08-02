@@ -22,7 +22,6 @@ const GAME_LOGOS = [
   "dilemma",
   "guesslie",
   "trivia",
-  "vibecheck",
 ];
 
 function backgroundSvgBuffer() {

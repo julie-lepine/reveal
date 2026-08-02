@@ -273,7 +273,6 @@ const EVENING_ROLLBACK_KEYS = [
   "clutchGame",
   "wrongAnswerGame",
   "traitreGame",
-  "playlistGuessGame",
   "truthMeterGame",
   "consensusGame",
   "dilemmaGame",
@@ -407,7 +406,6 @@ function hasRemoteEveningActivity() {
     (s.speedVotesPlayed || 0) > 0 ||
     (s.clutchesPlayed || 0) > 0 ||
     (s.wrongAnswersPlayed || 0) > 0 ||
-    (s.playlistGuessesPlayed || 0) > 0 ||
     (s.traitreGamesPlayed || 0) > 0 ||
     (s.triviaGamesPlayed || 0) > 0 ||
     (s.truthMetersPlayed || 0) > 0 ||
