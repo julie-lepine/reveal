@@ -16,9 +16,9 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 
 | | |
 |--|--|
-| **Maintenant** | QA terrain **BUG-WAO-02** (re-fix) · 🟠 BUG-WAO-04 |
-| **Ensuite** | 🟠 BUG-TIERNIGHT-03 · BUG-TRUTHMETER-02 · **OPS-LOBBY-04** · **ARCH-23** · ARCH-10 · **UX-HOST-01** |
-| **Dernière clôture** | **BUG-WAO-03** ✅ (QA) · **BUG-TIERNIGHT-04** ✅ · **BUG-TIERNIGHT-05** ✅ |
+| **Maintenant** | QA terrain **BUG-WAO-04** · 🟠 BUG-TIERNIGHT-03 · BUG-TRUTHMETER-02 |
+| **Ensuite** | **OPS-LOBBY-04** · **ARCH-23** · ARCH-10 · **UX-HOST-01** |
+| **Dernière clôture** | **BUG-WAO-02** ✅ (QA) · **BUG-WAO-03** ✅ (QA) · **BUG-TIERNIGHT-04** ✅ · **BUG-TIERNIGHT-05** ✅ |
 
 ---
 
@@ -28,8 +28,7 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 
 | ID | Cause | Problème | Priorité |
 |----|-------|----------|----------|
-| **BUG-WAO-02** | 6/11 | Clavier fermé pendant rédaction | 🟡 re-fix code · **re-QA terrain** |
-| **BUG-WAO-03** | 6/11 | Scroll réinitialisé pendant votes | ✅ QA validé |
+| **BUG-WAO-04** | 11 | Validation d'une réponse vide possible | 🟠 code · **re-QA terrain** |
 
 ### Autres
 
@@ -37,7 +36,6 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 |----|-------|----------|----------|
 | **ARCH-23** | 8/11 | Détection version cliente + refresh obligatoire post-déploiement | 🟡 ops/UX |
 | **UX-HOST-01** | 11 | CTA hôte « manche / question suivante » au-dessus du classement (fin de manche) | 🟡 |
-| **BUG-WAO-04** | 11 | Validation d'une réponse vide possible | 🟠 |
 | **BUG-TIERNIGHT-03** | 7 | Révélation non automatique en mode direct | 🟠 |
 | **BUG-TRUTHMETER-02** | 3/8 | Changement de pseudo casse la saisie suivante | 🟠 |
 | **UX-CHAT-01** | 11 | Pas de message système au lancement d'un jeu | 🟡 |
@@ -68,7 +66,7 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 | 3 | Sources de vérité multiples | Partiel | **BUG-TIERNIGHT-04 ✅** · **BUG-TRUTHMETER-02** 🟠 · **Membership A–E5 ✅** · M-14a ✅ · Guess Lie ✅ |
 | 4 | Asymétrie hôte / invité | ✅ | — |
 | 5 | Routing + timing sync | ✅ | ARCH-05 mitigé · **UX-NAV-LOBBY ✅** |
-| 6 | Async écrans | Partiel | **BUG-WAO-02** 🟡 re-QA · **BUG-WAO-03** ✅ · **BUG-WAO-04** 🟠 |
+| 6 | Async écrans | Partiel | **BUG-WAO-02** ✅ · **BUG-WAO-03** ✅ · **BUG-WAO-04** 🟠 |
 | 7 | Sync silencieuse / fire-and-forget | Partiel | **BUG-TRUTHMETER-01 ✅** (01A/01B) · **BUG-TIERNIGHT-03** 🟠 · **BUG-TRIVIA-01 ✅** (01A/01B/01B-bis/01C) · ARCH-07 ✅ · M-14b ✅ · ARCH-08 ✅ |
 | 8 | Reset / migration incomplète | Partiel | **BUG-TIERNIGHT-05 ✅** · **OPS-LOBBY-04** · **BUG-LOBBY-XX-E** · **BUG-TRUTHMETER-02** 🟠 · **ARCH-23** · ARCH-10 · **BUG-LOBBY-XX ✅** · I-09/SYN-15/16 ✅ |
 | 9 | Sync monolithe / duplication | Dette | ARCH-11… |
@@ -277,9 +275,9 @@ Retour terrain multi-jeux. Priorités : 🔴 critique · 🟠 haute · 🟡 moye
 
 | ID | Problème | Analyse / attendu |
 |----|----------|-------------------|
-| **BUG-WAO-02** | Clavier fermé pendant rédaction | **Re-fix 2026-08-02** — cause : (1) `actingHostUiRefresh` forçait encore un full `render()` ; (2) `slot.innerHTML` du CTA hôte fermait le clavier iOS ; (3) bundle `www/` obsolète sans le 1er fix. Hard-gate `decideWrongAnswerRemoteUi` + bouton pré-monté + réattache `#wrong-input`. **Reste : re-QA terrain** (sync `www/` fait). |
+| **BUG-WAO-02** | Clavier fermé pendant rédaction | ✅ **QA validé 2026-08-02** — hard-gate composition · bouton host pré-monté · `#wrong-input` réattaché. Ne pas rouvrir. |
 | **BUG-WAO-03** | Scroll réinitialisé pendant votes | ✅ QA validé — ne pas rouvrir. |
-| **BUG-WAO-04** | Réponses vides validables | Validation possible avec chaîne vide / espaces seuls. Attendu : bouton désactivé si longueur utile = 0. **Hors scope 02/03.** |
+| **BUG-WAO-04** | Réponses vides validables | **Fix 2026-08-02** — `#wrong-submit` `disabled` si `trim` vide · sync sur `input` sans toucher le textarea (WAO-02) · défense `sanitize` inchangée. **Reste : re-QA terrain.** |
 | **BUG-TIERNIGHT-03** | Révélation non automatique | Mode direct : révélation ne passe parfois pas auto à l'étape suivante. Analyser sync de transition. |
 | **BUG-TRUTHMETER-02** | Changement de pseudo casse le jeu | Repro : lancer TruthMeter → changer pseudo → affirmation suivante : impossible d'écrire. L'UI garde l'ancien état (ex. « Joulaille » → « Joulaille la Goat »). Vérifier toutes les références utilisant `username` comme clé métier. |
 
@@ -424,4 +422,4 @@ Hors file prioritaire — opportunité / régression :
 
 ---
 
-*Suivi vivant · MAJ 2026-08-02 — **BUG-TRUTHMETER-01 ✅ QA** · prochain 🔴 = TierNight-04/05*
+*Suivi vivant · MAJ 2026-08-02 — **BUG-WAO-02 ✅ QA** · **BUG-WAO-04** code (re-QA)*

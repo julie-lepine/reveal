@@ -11,6 +11,7 @@ import {
   wrongAnswerVoteStatusText,
   wrongAnswerConfirmVoteState,
   wrongAnswerAuthorNames,
+  wrongAnswerSubmitDisabled,
 } from "../js/core/wrongAnswerUiRefresh.js";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -317,6 +318,21 @@ describe("BUG-WAO-02 — textes chrome composition", () => {
   });
 });
 
+describe("BUG-WAO-04 — submit désactivé si réponse vide", () => {
+  it("vide / espaces / null → disabled", () => {
+    assert.equal(wrongAnswerSubmitDisabled(""), true);
+    assert.equal(wrongAnswerSubmitDisabled("   "), true);
+    assert.equal(wrongAnswerSubmitDisabled("\n\t"), true);
+    assert.equal(wrongAnswerSubmitDisabled(null), true);
+    assert.equal(wrongAnswerSubmitDisabled(undefined), true);
+  });
+
+  it("texte utile → enabled", () => {
+    assert.equal(wrongAnswerSubmitDisabled("a"), false);
+    assert.equal(wrongAnswerSubmitDisabled("  girafe  "), false);
+  });
+});
+
 describe("BUG-WAO-03 — textes chrome vote", () => {
   it("compteur votes + confirm state", () => {
     assert.match(
@@ -364,6 +380,15 @@ describe("BUG-WAO-02/03 — wiring wrongAnswer.js", () => {
       src,
       /selectedTarget = target;\s*[\s\S]*?refreshWrongAnswerVoteProgress\(\)/
     );
+  });
+
+  it("BUG-WAO-04 — CTA submit gated + sync sur input", () => {
+    const src = gameSrc();
+    assert.match(src, /wrongAnswerSubmitDisabled/);
+    assert.match(src, /function syncWrongAnswerSubmitEnabled/);
+    assert.match(src, /syncWrongAnswerSubmitEnabled\(\)/);
+    assert.match(src, /id="wrong-submit"/);
+    assert.match(src, /submitDisabled \? " disabled"/);
   });
 
   it("refresh réponse ne fait plus slot.innerHTML (bouton pré-monté)", () => {

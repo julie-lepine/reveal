@@ -161,6 +161,14 @@ export function wrongAnswerConfirmVoteState({
   };
 }
 
+/**
+ * BUG-WAO-04 — bouton « Valider ma réponse » : désactivé si longueur utile = 0
+ * (vide ou espaces seuls). Aligné sur sanitizeWrongAnswer (trim).
+ */
+export function wrongAnswerSubmitDisabled(draftText) {
+  return String(draftText ?? "").trim().length === 0;
+}
+
 /** Auteurs ayant une réponse texte (clés stables pour la liste de vote). */
 export function wrongAnswerAuthorNames(answers = {}) {
   return Object.keys(answers || {})

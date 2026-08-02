@@ -44,6 +44,7 @@ import {
   wrongAnswerVoteStatusText,
   wrongAnswerConfirmVoteState,
   wrongAnswerAuthorNames,
+  wrongAnswerSubmitDisabled,
 } from "../core/wrongAnswerUiRefresh.js";
 
 /** Logs ciblés : `globalThis.__REVEAL_DEBUG_WAO02 = true` puis reproduire le scénario. */
@@ -258,6 +259,19 @@ export function mountWrongAnswer(app) {
       )}</button>`;
     }
 
+    // BUG-WAO-04 : CTA désactivé tant que longueur utile (trim) = 0.
+    const submitDisabled = wrongAnswerSubmitDisabled(draftText);
+    const formHtml = `<div class="wrong-answer-form" id="wrong-answer-form">
+              <textarea id="wrong-input" class="wrong-input" rows="2" maxlength="${WRONG_ANSWER_MAX_LEN}"
+                placeholder="Ex. « Girafe. »">${escapeHtml(draftText)}</textarea>
+              <p class="hint wrong-input__count"><span id="wrong-count">${remaining}</span> caractères restants</p>
+              <p class="moderation-notice">${escapeHtml(getModerationNotice())}</p>
+              <p class="auth-error hidden" id="wrong-error"></p>
+              <button type="button" class="btn ${submitDisabled ? "btn-secondary" : "btn-primary"} btn--spaced" id="wrong-submit"${
+                submitDisabled ? " disabled" : ""
+              }>Valider ma réponse</button>
+            </div>`;
+
     return `
       <div class="card wrong-prompt">
         <p class="label-upper label-upper--pink">↩️ La pire réponse</p>
@@ -269,14 +283,7 @@ export function mountWrongAnswer(app) {
               <p class="feedback-title">Ta pire réponse</p>
               <p class="feedback-sub">« ${escapeHtml(myAnswerText())} »</p>
             </div>`
-          : `<div class="wrong-answer-form" id="wrong-answer-form">
-              <textarea id="wrong-input" class="wrong-input" rows="2" maxlength="${WRONG_ANSWER_MAX_LEN}"
-                placeholder="Ex. « Girafe. »">${escapeHtml(draftText)}</textarea>
-              <p class="hint wrong-input__count"><span id="wrong-count">${remaining}</span> caractères restants</p>
-              <p class="moderation-notice">${escapeHtml(getModerationNotice())}</p>
-              <p class="auth-error hidden" id="wrong-error"></p>
-              <button type="button" class="btn btn-primary btn--spaced" id="wrong-submit">Valider ma réponse</button>
-            </div>`
+          : formHtml
       }
       <p class="hint" id="wrong-answer-status" style="text-align:center">${escapeHtml(status)}</p>
       <div id="wrong-answer-host-slot">${hostSlotInner}</div>`;
@@ -544,6 +551,16 @@ export function mountWrongAnswer(app) {
     bindPhaseEvents();
   }
 
+  /** BUG-WAO-04 — sync disabled du CTA sans toucher #wrong-input. */
+  function syncWrongAnswerSubmitEnabled() {
+    const submit = app.querySelector("#wrong-submit");
+    if (!submit) return;
+    const disabled = wrongAnswerSubmitDisabled(draftText);
+    submit.disabled = disabled;
+    submit.classList.toggle("btn-primary", !disabled);
+    submit.classList.toggle("btn-secondary", disabled);
+  }
+
   function bindPhaseEvents() {
     const input = app.querySelector("#wrong-input");
     if (input && input.dataset.waoBound !== "1") {
@@ -553,13 +570,15 @@ export function mountWrongAnswer(app) {
         const countEl = app.querySelector("#wrong-count");
         if (countEl) countEl.textContent = String(WRONG_ANSWER_MAX_LEN - draftText.length);
         app.querySelector("#wrong-error")?.classList.add("hidden");
+        syncWrongAnswerSubmitEnabled();
       });
     }
+    syncWrongAnswerSubmitEnabled();
 
     app.querySelector("#wrong-submit")?.addEventListener("click", async () => {
       if (myAnswerText()) return;
       const text = sanitizeWrongAnswer(draftText);
-      if (!text) return;
+      if (!text) return; // défense : bouton déjà disabled si vide
       const mod = checkHotTakeModeration(text);
       if (mod.blocked) {
         const errEl = app.querySelector("#wrong-error");
