@@ -122,3 +122,28 @@ export async function rpcSubmitTriviaAnswer({
   if (error) throw error;
   return asSessionRow(data);
 }
+
+/** BUG-TRUTHMETER-01B — reveal/scoring atomique (hôte réel + acting host). */
+export async function rpcRevealTruthMeterRound({ lobbyId, runId, roundIdx }) {
+  requireClient();
+  const { data, error } = await supabase.rpc("reveal_truth_meter_round", {
+    p_lobby_id: lobbyId,
+    p_run_id: runId,
+    p_round_idx: roundIdx,
+  });
+  if (error) throw error;
+  return asSessionRow(data);
+}
+
+/** BUG-TRUTHMETER-01B — vote atomique + auto-reveal serveur. */
+export async function rpcSubmitTruthMeterVote({ lobbyId, runId, roundIdx, value }) {
+  requireClient();
+  const { data, error } = await supabase.rpc("submit_truth_meter_vote", {
+    p_lobby_id: lobbyId,
+    p_run_id: runId,
+    p_round_idx: roundIdx,
+    p_value: value,
+  });
+  if (error) throw error;
+  return asSessionRow(data);
+}

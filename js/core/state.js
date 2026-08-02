@@ -207,6 +207,7 @@ const defaultState = () => ({
     votes: {},
     voteEndsAt: null,
     roundScored: false,
+    runId: null,
   },
   consensusGame: {
     ready: {},

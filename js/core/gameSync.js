@@ -1937,9 +1937,14 @@ export function truthMeterToRemote(session) {
     lastRound: session.lastRound
       ? {
           ...session.lastRound,
+          mindReader: session.lastRound.mindReader
+            ? playerKeyToRemoteUid(session.lastRound.mindReader) ||
+              session.lastRound.mindReader
+            : null,
           deltas: scoresToRemote(session.lastRound.deltas || {}),
         }
       : null,
+    runId: session.runId || null,
   };
 }
 
@@ -1963,9 +1968,13 @@ export function truthMeterFromRemote(remote) {
     lastRound: remote.lastRound
       ? {
           ...remote.lastRound,
+          mindReader: remote.lastRound.mindReader
+            ? nameForUserId(remote.lastRound.mindReader) || remote.lastRound.mindReader
+            : null,
           deltas: scoresFromRemote(remote.lastRound.deltas || {}),
         }
       : null,
+    runId: remote.runId || null,
   };
 }
 

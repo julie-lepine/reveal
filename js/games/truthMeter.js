@@ -18,12 +18,16 @@ import {
   commitTruthMeterAffirmation,
   commitTruthMeterPlay,
   commitTruthMeterVote,
+  commitTruthMeterReveal,
   allTruthMeterVotesIn,
   simulateTruthMeterVotes,
   computeRoundMetrics,
   filterVoterVotes,
   skipTruthMeterAuthorRound,
   finishTruthMeterGameSession,
+  resolveConfirmedTruthMeterVote,
+  mapTruthMeterRevealRpcError,
+  applyTruthMeterEveningFromLastRound,
 } from "../core/truthMeterSession.js";
 import { awardTruthMeterRound, EVENING_POINTS } from "../core/scoring.js";
 import {
@@ -192,6 +196,8 @@ export function mountTruthMeter(app) {
   let revealAnimId = null;
   let authorRevealed = false;
   let voteCommitInFlight = null;
+  /** @type {Promise<unknown>|null} */
+  let voteCommitPromise = null;
   let displayTimeoutId = null;
   let revealPendingTimeoutId = null;
   let nextRoundInFlight = false;
@@ -218,12 +224,20 @@ export function mountTruthMeter(app) {
     affirmation = s.affirmation || null;
     authorEstimate = s.authorEstimate;
     votes = { ...(s.votes || {}) };
-    myVote = votes[localName] ?? null;
-    if (voteCommitInFlight != null && phase === "voting" && myVote == null) {
-      myVote = voteCommitInFlight;
-      votes = { ...votes, [localName]: voteCommitInFlight };
-    }
+    // myVote = confirmation distante uniquement (01A) — pas le pending in-flight.
+    myVote = resolveConfirmedTruthMeterVote(s, localName);
     roundScored = Boolean(s.roundScored);
+  }
+
+  function myConfirmedVote() {
+    return resolveConfirmedTruthMeterVote(getTruthMeterSession(), localName);
+  }
+
+  function displayVoteValue() {
+    const confirmed = myConfirmedVote();
+    if (confirmed != null) return confirmed;
+    if (voteCommitInFlight != null) return voteCommitInFlight;
+    return draftEstimate;
   }
 
   function votesForAward() {
@@ -250,8 +264,6 @@ export function mountTruthMeter(app) {
     if (allTruthMeterVotesIn()) return true;
     const author = getCurrentAuthor() || affirmation?.author;
     if (localName === author) return allTruthMeterVotesIn();
-    // Ne compter QUE le vote réellement validé (ou en cours d'envoi) de l'hôte :
-    // sa position de curseur non validée ne doit pas clôturer la manche pour tous.
     const merged = { ...(getTruthMeterSession().votes || {}) };
     if (voteCommitInFlight != null) merged[localName] = voteCommitInFlight;
     const voters = getVoterNames();
@@ -261,19 +273,31 @@ export function mountTruthMeter(app) {
   async function ensureLocalVoteCommitted() {
     const author = getCurrentAuthor() || affirmation?.author;
     if (localName === author) return;
-    if (myVote != null || voteCommitInFlight != null) return;
+    if (voteCommitPromise) {
+      try {
+        await voteCommitPromise;
+      } catch {
+        /* alerte déjà gérée par le commit en vol */
+      }
+    }
+    if (myConfirmedVote() != null) return;
     if (phase !== "voting") return;
     const choice = getPendingVoteValue();
     if (!Number.isFinite(choice)) return;
-    myVote = choice;
-    votes = { ...votes, [localName]: choice };
     if (mp) {
       voteCommitInFlight = choice;
+      voteCommitPromise = commitTruthMeterVote(choice);
       try {
-        await commitTruthMeterVote(choice);
+        await voteCommitPromise;
+      } catch {
+        /* compensation + alerte dans commitTruthMeterVote */
       } finally {
         voteCommitInFlight = null;
+        voteCommitPromise = null;
       }
+    } else {
+      myVote = choice;
+      votes = { ...votes, [localName]: choice };
     }
   }
 
@@ -467,6 +491,60 @@ export function mountTruthMeter(app) {
     revealInFlight = true;
     try {
       await ensureLocalVoteCommitted();
+      if (!mount.isMounted()) return;
+      if (!mount.isCurrentMount()) return;
+
+      if (mp) {
+        // BUG-TRUTHMETER-01B — scoring serveur uniquement (pas de snapshot client).
+        if (getTruthMeterSession().phase === "reveal" && alreadyScoredThisRound()) {
+          syncFromSession();
+          phase = "reveal";
+          voteCommitInFlight = null;
+          voteCommitPromise = null;
+          render();
+          const avg = getTruthMeterSession().lastRound?.groupAvg ?? 0;
+          authorRevealed = false;
+          requestAnimationFrame(() => {
+            if (!mount.isMounted()) return;
+            if (!mount.isCurrentMount()) return;
+            animateRevealGauge(avg);
+          });
+          return;
+        }
+        try {
+          await commitTruthMeterReveal();
+        } catch (err) {
+          const mapped = mapTruthMeterRevealRpcError(err);
+          console.warn("REVEAL truthMeter reveal:", mapped);
+          const { showAppAlert } = await import("../core/dialog.js");
+          await showAppAlert(
+            mapped?.message || "Impossible de révéler cette manche.",
+            { title: "TruthMeter", icon: "📏" }
+          );
+          if (mount.isMounted() && mount.isCurrentMount()) {
+            syncFromSession();
+            render();
+          }
+          return;
+        }
+        if (!mount.isMounted()) return;
+        if (!mount.isCurrentMount()) return;
+        syncFromSession();
+        phase = "reveal";
+        voteCommitInFlight = null;
+        voteCommitPromise = null;
+        lastAward = getTruthMeterSession().lastRound || lastAward;
+        render();
+        const avg = getTruthMeterSession().lastRound?.groupAvg ?? 0;
+        authorRevealed = false;
+        requestAnimationFrame(() => {
+          if (!mount.isMounted()) return;
+          if (!mount.isCurrentMount()) return;
+          animateRevealGauge(avg);
+        });
+        return;
+      }
+
       const author = affirmation?.author;
       const votesToScore = votesForAward();
       const est = authorEstimate;
@@ -474,7 +552,7 @@ export function mountTruthMeter(app) {
       roundScored = true;
       let matchScores = getTruthMeterSession().matchScores || {};
       let lastRound = getTruthMeterSession().lastRound || null;
-      if (author && (!mp || canActAsHost())) {
+      if (author) {
         lastAward = awardTruthMeterRound(votesToScore, author, est);
         matchScores = applyMatchScoreDeltas(matchScores, lastAward.deltas || {});
         lastRound = buildTruthMeterLastRound(lastAward);
@@ -487,37 +565,21 @@ export function mountTruthMeter(app) {
           deltas: {},
         };
       }
-      await commitTruthMeterPlay(
-        {
-          phase: "reveal",
-          roundScored: true,
-          votes: votesToScore,
-          voteEndsAt: null,
-          matchScores,
-          lastRound,
-        },
-        { withEveningScores: mp && isLobbyHost() && Boolean(author) }
-      );
+      await commitTruthMeterPlay({
+        phase: "reveal",
+        roundScored: true,
+        votes: votesToScore,
+        voteEndsAt: null,
+        matchScores,
+        lastRound,
+      });
 
       if (!mount.isMounted()) return;
       if (!mount.isCurrentMount()) return;
-      if (!mp) {
-        phase = "reveal";
-        render();
-        const avg = lastAward?.groupAvg ?? computeRoundMetrics(votesToScore, est).groupAvg;
-        animateRevealGauge(avg);
-      } else {
-        syncFromSession();
-        phase = "reveal";
-        render();
-        const avg = lastAward?.groupAvg ?? computeRoundMetrics(votesToScore, est).groupAvg;
-        authorRevealed = false;
-        requestAnimationFrame(() => {
-          if (!mount.isMounted()) return;
-          if (!mount.isCurrentMount()) return;
-          animateRevealGauge(avg);
-        });
-      }
+      phase = "reveal";
+      render();
+      const avg = lastAward?.groupAvg ?? computeRoundMetrics(votesToScore, est).groupAvg;
+      animateRevealGauge(avg);
     } finally {
       revealInFlight = false;
     }
@@ -623,7 +685,13 @@ export function mountTruthMeter(app) {
     }
 
     if (phase === "voting" && affirmation) {
-      const voteLocked = myVote != null;
+      const confirmedVote = myConfirmedVote();
+      const sendingVote = voteCommitInFlight != null;
+      const voteLocked = confirmedVote != null;
+      const controlsDisabled = voteLocked || sendingVote;
+      let voteHint = "0 = Faux · 100 = Vrai";
+      if (sendingVote) voteHint = "Envoi de ton vote…";
+      else if (voteLocked) voteHint = "Vote enregistré - en attente des autres…";
       if (isAuthor) {
         phaseHtml = `
           <div class="card card--hot truth-meter__affirmation-card">
@@ -638,13 +706,15 @@ export function mountTruthMeter(app) {
           </div>
           ${sliderBlockHtml({
             id: "vote-slider",
-            value: myVote ?? 50,
-            disabled: voteLocked,
+            value: displayVoteValue() ?? 50,
+            disabled: controlsDisabled,
             question: "À quel point tu crois cette affirmation ?",
-            hint: voteLocked ? "Vote enregistré - en attente des autres…" : "0 = Faux · 100 = Vrai",
+            hint: voteHint,
           })}
           <button type="button" class="btn btn-primary btn--spaced" id="btn-confirm-vote"
-            ${voteLocked ? "disabled" : ""}>Valider mon vote</button>`;
+            ${controlsDisabled ? "disabled" : ""}>${
+              sendingVote ? "Envoi…" : voteLocked ? "Vote enregistré" : "Valider mon vote"
+            }</button>`;
       }
       if (host) {
         const votedCount = Object.keys(votesForAward()).length;
@@ -804,32 +874,47 @@ export function mountTruthMeter(app) {
         onInput: (v) => {
           draftEstimate = v;
         },
-        disabled: voteCommitInFlight != null,
+        disabled: voteCommitInFlight != null || myConfirmedVote() != null,
       });
       app.querySelector("#btn-confirm-vote")?.addEventListener("click", async () => {
-        if (voteCommitInFlight != null) return;
+        if (voteCommitInFlight != null || voteCommitPromise) return;
+        if (myConfirmedVote() != null) return;
         const choice = Number(app.querySelector("#vote-slider")?.value ?? 50);
-        myVote = choice;
-        votes = { ...votes, [localName]: choice };
+        if (!Number.isFinite(choice)) return;
         if (mp) {
           voteCommitInFlight = choice;
+          voteCommitPromise = commitTruthMeterVote(choice);
           render();
           try {
-            await commitTruthMeterVote(choice);
+            await voteCommitPromise;
             if (!mount.isMounted()) return;
             if (!mount.isCurrentMount()) return;
+            syncFromSession();
+            // Auto-reveal serveur (dernier vote) : ne pas repasser par reveal-pending.
+            if (getTruthMeterSession().phase === "reveal") {
+              voteCommitInFlight = null;
+              voteCommitPromise = null;
+              phase = "reveal";
+              render();
+              return;
+            }
             if (allVotesReadyForReveal() && canActAsHost()) await goToRevealPending();
+          } catch {
+            /* alerte + compensation dans commitTruthMeterVote */
+            if (mount.isMounted() && mount.isCurrentMount()) syncFromSession();
           } finally {
             voteCommitInFlight = null;
+            voteCommitPromise = null;
+            if (mount.isMounted() && mount.isCurrentMount()) render();
           }
         } else {
+          myVote = choice;
           votes = simulateTruthMeterVotes(choice);
           render();
           if (allTruthMeterVotesIn()) {
             goToRevealPending();
           }
         }
-        if (mount.isMounted() && mount.isCurrentMount()) render();
       });
     }
 
@@ -1037,6 +1122,22 @@ export function mountTruthMeter(app) {
     if (roundIdx !== prevRound) {
       draftEstimate = 50;
       draftText = "";
+      voteCommitInFlight = null;
+      voteCommitPromise = null;
+    }
+    if (phase !== prevPhase && phase !== "voting") {
+      voteCommitInFlight = null;
+      voteCommitPromise = null;
+    }
+    // Reveal distant : nettoyer pending / spinner 01A (vote tardif rejeté ou auto-reveal).
+    if (phase === "reveal" && prevPhase !== "reveal") {
+      voteCommitInFlight = null;
+      voteCommitPromise = null;
+      draftEstimate = myConfirmedVote() ?? draftEstimate;
+      lastAward = getTruthMeterSession().lastRound || lastAward;
+      if (mp && isLobbyHost()) {
+        applyTruthMeterEveningFromLastRound(getTruthMeterSession());
+      }
     }
 
     if (phase === "voting" && canActAsHost() && allVotesReadyForReveal()) {

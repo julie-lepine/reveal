@@ -5,19 +5,62 @@ import {
 } from "../../data/truthMeter.js";
 import { checkHotTakeModeration } from "./hotTakeSession.js";
 import { getActivePlayerNames, getActivePlayers } from "./players.js";
-import { getLocalDisplayName, getState, saveStatePatch } from "./state.js";
+import { addScore, bumpPlayerStat, getLocalDisplayName, getState, saveStatePatch } from "./state.js";
 import {
   isGameSyncActive,
   isLobbyHost,
   syncTruthMeterSession,
   allMembersReady,
   truthMeterToRemote,
-  patchGameState,
   requireLocalParticipantUid,
   normalizePlayerVotesMap,
+  applyRemoteSession,
+  refreshGameSession,
+  patchGameState,
 } from "./gameSync.js";
-import { patchGameStateWithFeedback } from "./patchGameStateFeedback.js";
 import { launchGameWithSync, commitHostGamePlay, commitPrepReadyToggle } from "./mpLaunch.js";
+import { formatSyncErrorMessage } from "./authErrors.js";
+import {
+  computeTruthMeterVoteApply,
+  compensateTruthMeterLocalVote,
+  isTruthMeterVoteNetworkUncertainty,
+  resolveConfirmedTruthMeterVote,
+} from "./truthMeterVoteCommit.js";
+import { createTruthMeterRunId } from "./truthMeterRunId.js";
+import {
+  mapTruthMeterRevealRpcError,
+  mapTruthMeterVoteRpcError,
+  validateTruthMeterRevealRequest,
+  validateTruthMeterVoteRequest,
+  isTruthMeterLateVoteError,
+} from "./truthMeterRevealErrors.js";
+import {
+  evaluateTruthMeterRevealRecovery,
+  evaluateTruthMeterVoteRecovery,
+  isTruthMeterRevealBusinessError,
+  isTruthMeterRevealNetworkError,
+} from "./truthMeterRevealRecovery.js";
+import { EVENING_POINTS } from "../../data/eveningScoring.js";
+import {
+  rpcRevealTruthMeterRound,
+  rpcSubmitTruthMeterVote,
+} from "./gameSessionRpc.js";
+
+export {
+  computeTruthMeterVoteApply,
+  compensateTruthMeterLocalVote,
+  resolveConfirmedTruthMeterVote,
+} from "./truthMeterVoteCommit.js";
+
+export {
+  mapTruthMeterVoteRpcError,
+  mapTruthMeterRevealRpcError,
+  isTruthMeterLateVoteError,
+  validateTruthMeterRevealRequest,
+} from "./truthMeterRevealErrors.js";
+
+/** @type {Set<string>} */
+const appliedEveningRoundKeys = new Set();
 
 function defaultSession() {
   return {
@@ -33,6 +76,7 @@ function defaultSession() {
     roundScored: false,
     matchScores: {},
     lastRound: null,
+    runId: null,
   };
 }
 
@@ -189,7 +233,10 @@ export async function markTruthMeterLobbyStarted({ rosterNames } = {}) {
     roundScored: false,
     matchScores: {},
     lastRound: null,
+    runId: createTruthMeterRunId(),
   };
+  // Nouvelle partie : autoriser à nouveau l'application soirée par manche
+  appliedEveningRoundKeys.clear();
   return launchGameWithSync({
     screen: "truthmeter",
     gameId: "truthmeter",
@@ -251,16 +298,240 @@ export async function commitTruthMeterAffirmation(text, authorEstimate) {
   return getTruthMeterSession();
 }
 
-/** MP : envoie uniquement le vote local (évite d'écraser phase reveal de l'hôte). */
+/** Applique deltas lastRound → scores soirée + stats (hôte réel, une fois par manche). */
+export function applyTruthMeterEveningFromLastRound(session = getTruthMeterSession()) {
+  const lastRound = session?.lastRound;
+  if (!lastRound?.deltas || typeof lastRound.deltas !== "object") return false;
+  const key = `${session.runId || ""}:${session.roundIdx ?? 0}`;
+  if (appliedEveningRoundKeys.has(key)) return false;
+  appliedEveningRoundKeys.add(key);
+  const author = session?.affirmation?.author || getCurrentAuthor();
+  Object.entries(lastRound.deltas).forEach(([name, pts]) => {
+    const n = Number(pts);
+    if (!Number.isFinite(n) || n <= 0) return;
+    addScore(name, n);
+  });
+  if (lastRound.bluffWin && author) {
+    bumpPlayerStat(author, "truthMeterBluffWins", 1);
+  }
+  if (lastRound.voterPoints === EVENING_POINTS.BONUS) {
+    Object.entries(lastRound.deltas).forEach(([name, pts]) => {
+      if (author && name === author) return;
+      if (Number(pts) > 0) bumpPlayerStat(name, "truthMeterMindReaderWins", 1);
+    });
+  }
+  return true;
+}
+
+/** BUG-TRUTHMETER-01B — reveal atomique via RPC (MP uniquement). */
+export async function commitTruthMeterReveal() {
+  const session = getTruthMeterSession();
+  if (!isGameSyncActive()) {
+    throw new Error("commitTruthMeterReveal requires MP sync");
+  }
+  const req = validateTruthMeterRevealRequest(session);
+  if (!req.ok) {
+    throw mapTruthMeterRevealRpcError(new Error(req.code));
+  }
+  const lobbyId = getState().lobby.id;
+  let networkError = null;
+  try {
+    const row = await rpcRevealTruthMeterRound({
+      lobbyId,
+      runId: req.runId,
+      roundIdx: req.roundIdx,
+    });
+    if (row) applyRemoteSession(row);
+    const synced = getTruthMeterSession();
+    if (isLobbyHost() && synced.roundScored && synced.lastRound) {
+      applyTruthMeterEveningFromLastRound(synced);
+      try {
+        await patchGameState(
+          {},
+          { gameId: "truthmeter", screen: "truthmeter", withEveningScores: true }
+        );
+      } catch (e) {
+        console.warn("REVEAL truthMeter evening scores:", e);
+      }
+    }
+    return synced;
+  } catch (err) {
+    const mapped = mapTruthMeterRevealRpcError(err);
+    if (isTruthMeterRevealBusinessError(mapped)) {
+      throw mapped;
+    }
+    if (!isTruthMeterRevealNetworkError(err) && !isTruthMeterRevealNetworkError(mapped)) {
+      throw mapped;
+    }
+    networkError = mapped;
+  }
+
+  const freshRow = await refreshGameSession();
+  if (freshRow) applyRemoteSession(freshRow);
+  const recovery = evaluateTruthMeterRevealRecovery(freshRow?.state?.truthMeter, {
+    runId: req.runId,
+    roundIdx: req.roundIdx,
+  });
+  if (recovery.recovered) {
+    const synced = getTruthMeterSession();
+    if (isLobbyHost() && synced.roundScored && synced.lastRound) {
+      applyTruthMeterEveningFromLastRound(synced);
+    }
+    return synced;
+  }
+  if (recovery.reason === "stale_run") {
+    throw mapTruthMeterRevealRpcError(new Error("TRUTHMETER_STALE_RUN"));
+  }
+  if (recovery.reason === "stale_round") {
+    throw mapTruthMeterRevealRpcError(new Error("TRUTHMETER_STALE_ROUND"));
+  }
+  throw networkError || new Error("Révélation impossible.");
+}
+
+/** MP : vote via submit_truth_meter_vote (FOR UPDATE + auto-reveal éventuel).
+ * Rollback ciblé si échec ; recovery refresh si timeout/incertitude. */
 export async function commitTruthMeterVote(choice) {
   const localName = getLocalDisplayName();
   const session = getTruthMeterSession();
-  const votes = { ...(session.votes || {}), [localName]: choice };
-  saveStatePatch({ truthMeterGame: { ...session, votes } });
+  if (!Number.isFinite(choice)) {
+    throw new Error("Vote invalide.");
+  }
+
+  const apply = computeTruthMeterVoteApply(session, localName, choice);
+  saveStatePatch({
+    truthMeterGame: { ...session, votes: apply.nextVotes },
+  });
+
   if (!isGameSyncActive()) return choice;
-  const uid = requireLocalParticipantUid();
-  await patchGameStateWithFeedback({ truthMeter: { votes: { [uid]: choice } } });
-  return choice;
+
+  const lobbyId = getState().lobby?.id;
+  if (!lobbyId) {
+    saveStatePatch({
+      truthMeterGame: {
+        ...getTruthMeterSession(),
+        votes: compensateTruthMeterLocalVote(getTruthMeterSession(), localName, apply),
+      },
+    });
+    throw new Error("Lobby introuvable.");
+  }
+
+  const voteReq = validateTruthMeterVoteRequest(session);
+  if (!voteReq.ok) {
+    saveStatePatch({
+      truthMeterGame: {
+        ...getTruthMeterSession(),
+        votes: compensateTruthMeterLocalVote(getTruthMeterSession(), localName, apply),
+      },
+    });
+    const mapped = mapTruthMeterVoteRpcError(new Error(voteReq.code));
+    const { showAppAlert } = await import("./dialog.js");
+    await showAppAlert(mapped.message, { title: "TruthMeter", icon: "📏" });
+    throw mapped;
+  }
+
+  const localUid = requireLocalParticipantUid();
+  let networkError = null;
+  try {
+    const row = await rpcSubmitTruthMeterVote({
+      lobbyId,
+      runId: voteReq.runId,
+      roundIdx: voteReq.roundIdx,
+      value: choice,
+    });
+    if (!row) throw new Error("Contribution refusée.");
+    let full = row;
+    if (!row.state) {
+      full = (await refreshGameSession()) || row;
+    }
+    if (full) applyRemoteSession(full);
+    const synced = getTruthMeterSession();
+    const confirmed = resolveConfirmedTruthMeterVote(synced, localName);
+    if (confirmed !== choice && synced.phase !== "reveal") {
+      saveStatePatch({
+        truthMeterGame: {
+          ...getTruthMeterSession(),
+          votes: {
+            ...(getTruthMeterSession().votes || {}),
+            [localName]: choice,
+          },
+        },
+      });
+    }
+    if (isLobbyHost() && synced.phase === "reveal" && synced.roundScored && synced.lastRound) {
+      applyTruthMeterEveningFromLastRound(synced);
+    }
+    return choice;
+  } catch (err) {
+    const mappedVote = mapTruthMeterVoteRpcError(err);
+    if (isTruthMeterLateVoteError(mappedVote) || isTruthMeterRevealBusinessError(mappedVote)) {
+      saveStatePatch({
+        truthMeterGame: {
+          ...getTruthMeterSession(),
+          votes: compensateTruthMeterLocalVote(getTruthMeterSession(), localName, apply),
+        },
+      });
+      try {
+        const fresh = await refreshGameSession();
+        if (fresh) applyRemoteSession(fresh);
+      } catch {
+        /* ignore */
+      }
+      console.warn("REVEAL truthMeter vote:", mappedVote);
+      const { showAppAlert } = await import("./dialog.js");
+      await showAppAlert(mappedVote.message, { title: "TruthMeter", icon: "📏" });
+      throw mappedVote;
+    }
+
+    if (
+      isTruthMeterVoteNetworkUncertainty(err) ||
+      isTruthMeterRevealNetworkError(err) ||
+      isTruthMeterRevealNetworkError(mappedVote)
+    ) {
+      try {
+        const fresh = await refreshGameSession();
+        if (fresh) applyRemoteSession(fresh);
+        const remoteTm = fresh?.state?.truthMeter;
+        const recovery = evaluateTruthMeterVoteRecovery(remoteTm, {
+          runId: voteReq.runId,
+          roundIdx: voteReq.roundIdx,
+          choice,
+          localUid,
+        });
+        if (recovery.recovered) {
+          const confirmed = resolveConfirmedTruthMeterVote(
+            getTruthMeterSession(),
+            localName
+          );
+          if (confirmed === choice || getTruthMeterSession().phase === "reveal") {
+            return choice;
+          }
+        }
+      } catch {
+        /* continue compensation */
+      }
+      networkError = mappedVote;
+    } else {
+      networkError = mappedVote;
+    }
+
+    const live = getTruthMeterSession();
+    saveStatePatch({
+      truthMeterGame: {
+        ...live,
+        votes: compensateTruthMeterLocalVote(live, localName, apply),
+      },
+    });
+
+    console.warn("REVEAL truthMeter vote:", networkError || err);
+    const { showAppAlert } = await import("./dialog.js");
+    await showAppAlert(
+      (networkError || mappedVote)?.message ||
+        formatSyncErrorMessage(err?.message) ||
+        "Impossible d'enregistrer ton vote. Réessaie.",
+      { title: "TruthMeter", icon: "📏" }
+    );
+    throw networkError || mappedVote || err;
+  }
 }
 
 export function allTruthMeterVotesIn(session = getTruthMeterSession()) {
