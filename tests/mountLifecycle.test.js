@@ -232,7 +232,11 @@ describe("ARCH-06 Vague B1 — contrats câblage", () => {
       assert.match(s, /createMountGuard/);
       assert.match(s, /mount\.dispose\(\)/);
       assert.match(s, /if \(!mount\.isMounted\(\)\) return;/);
-      assert.match(s, /function render\(\) \{\s*\n\s*if \(!mount\.isMounted\(\)\) return;/);
+      // WAO-02 : wrongAnswer render peut prendre des options ({ preserveComposeInput }).
+      assert.match(
+        s,
+        /function render\([^)]*\) \{\s*\n\s*if \(!mount\.isMounted\(\)\) return;/
+      );
     });
   }
 
@@ -617,12 +621,12 @@ describe("ARCH-06 Vague B3 — tierNightLive mountMp", () => {
   it("tierNightLive mountMp : createMountGuard + dispose + gates reveal/next/session", () => {
     const s = readSrc("../js/games/tierNightLive.js");
     assert.match(s, /function mountMp[\s\S]*createMountGuard\(\)/);
-    assert.match(s, /return \(\) => \{\s*\n\s*mount\.dispose\(\);\s*\n\s*unsub\(\);/s);
+    assert.match(s, /mount\.dispose\(\)/);
+    assert.match(s, /revealLockState\.reset\("unmount"\)/);
     assert.match(s, /function render\(\) \{\s*\n\s*if \(!mount\.isMounted\(\)\) return;/);
-    assert.match(
-      s,
-      /await commitTierNightLivePlay\(\{ phase: "reveal", placements \}\);\s*\n\s*if \(!mount\.isMounted\(\)\) return;/s
-    );
+    // BUG-TIERNIGHT-03 : reveal via helper sécurisé (plus de commit direct phase reveal ici)
+    assert.match(s, /commitTierNightLiveRevealSafely/);
+    assert.match(s, /runRevealSafely/);
     assert.match(
       s,
       /await commitTierNightLivePlay\(tierNightLiveVotingPayload\(session\.roundIdx \+ 1\)\);\s*\n\s*if \(!mount\.isMounted\(\)\) return;/s

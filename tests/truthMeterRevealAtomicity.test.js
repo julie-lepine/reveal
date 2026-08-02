@@ -35,7 +35,7 @@ describe("BUG-TRUTHMETER-01B — chemins MP sans score client", () => {
     const block = truthJs.slice(start, end);
     assert.match(block, /if \(mp\)/);
     assert.match(block, /commitTruthMeterReveal\(\)/);
-    const soloMarker = block.indexOf("const author = affirmation");
+    const soloMarker = block.indexOf("const author = authorLabel()");
     assert.ok(soloMarker > 0, "branche solo présente");
     const mpBranch = block.slice(0, soloMarker);
     assert.equal(/\bawardTruthMeterRound\b/.test(mpBranch), false);

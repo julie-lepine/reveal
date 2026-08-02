@@ -9,15 +9,21 @@ import {
 import { buildRecapsFromPlacements } from "../core/tierNightSession.js";
 import {
   getTierNightLiveSession,
-  accumulatePlacements,
   commitTierNightLivePlay,
   commitTierNightLiveVote,
+  commitTierNightLiveRevealSafely,
   allTierNightLiveVotesIn,
   getTierNightLiveVoteProgress,
   buildTierNightLiveRecaps,
   consensusTierForVotes,
   tierNightLiveVotingPayload,
 } from "../core/tierNightLiveSession.js";
+import {
+  createTierNightLiveRevealLock,
+  decideTierNightLiveRevealAction,
+  tierNightLiveRevealChromeState,
+  TIER_NIGHT_LIVE_REVEAL_AUTO_ALERT,
+} from "../core/tierNightLiveReveal.js";
 import {
   displayNameForTierNightUid,
   mapVotesForTierNightLiveUi,
@@ -34,6 +40,7 @@ import {
   finalizeTierNightLiveToResults,
   nameForUserId,
 } from "../core/gameSync.js";
+import { showAppAlert } from "../core/dialog.js";
 import { setLobbyPlaying } from "../core/lobby.js";
 import { navigate } from "../core/router.js";
 import { escapeHtml, pageShell, tierLogoHtml, bindTierLogos } from "../core/ui.js";
@@ -251,12 +258,15 @@ function mountSolo(app, list) {
 function mountMp(app, list) {
   const localName = getLocalDisplayName();
   let session = getTierNightLiveSession();
-  let revealInFlight = false;
+  /** BUG-TIERNIGHT-03 — verrou partagé auto + manuel (anti double patch). */
+  const revealLockState = createTierNightLiveRevealLock();
+  revealLockState.ensureSessionKey(session);
   /** ARCH-06 : partagé entre re-binds après render. */
   const nextRoundLock = createActionLock();
-  const revealLock = createActionLock();
+  const revealClickLock = createActionLock();
   /** ARCH-06 Vague B3 : effets UI / navigate après unmount. */
   const mount = createMountGuard();
+  let revealPendingUi = false;
 
   const players = () => expectedPlayersForLive(session);
   const itemLabel = makeItemLabel(list, players());
@@ -270,20 +280,143 @@ function mountMp(app, list) {
 
   function reload() {
     session = getTierNightLiveSession();
+    revealLockState.ensureSessionKey(session);
+    if (session.phase !== "voting") {
+      revealPendingUi = false;
+    }
   }
 
-  async function transitionToReveal() {
-    if (session.phase !== "voting" || !canActAsHost() || revealInFlight) return;
-    revealInFlight = true;
+  /** Chrome vote ciblé — pas de full render (préserve roster/chips 04/05). */
+  function refreshVotingChrome() {
+    if (!mount.isMounted() || !mount.isCurrentMount()) return;
+    if (session.phase !== "voting") return;
+    const host = canActAsHost();
+    const { confirmed: votedCount, expected: totalPlayers } = getTierNightLiveVoteProgress(session);
+    const allIn = allTierNightLiveVotesIn(session);
+    const chrome = tierNightLiveRevealChromeState({
+      allIn,
+      revealPending: revealPendingUi,
+      votedCount,
+      totalPlayers,
+      hasLocalVote: Boolean(myVote()),
+    });
+    const hintEl = app.querySelector(".hint");
+    if (hintEl) hintEl.textContent = chrome.hint;
+    const btn = app.querySelector("#live-reveal");
+    if (btn) {
+      btn.textContent = chrome.buttonLabel;
+      btn.disabled = chrome.buttonDisabled;
+    } else if (host && !revealPendingUi) {
+      // Bouton absent (premier paint sans host slot) — full render minimal via caller.
+    }
+  }
+
+  function setRevealPending(pending) {
+    revealPendingUi = Boolean(pending);
+    refreshVotingChrome();
+  }
+
+  /**
+   * Helper unique auto + `#live-reveal`.
+   * @param {{ source: "auto"|"auto-retry"|"manual" }} opts
+   */
+  async function runRevealSafely({ source }) {
+    reload();
+    const decision = decideTierNightLiveRevealAction({
+      phase: session.phase,
+      canActAsHost: canActAsHost(),
+      allVotesIn: allTierNightLiveVotesIn(session),
+      source,
+      inFlight: revealLockState.isInFlight(),
+      retryUsed: revealLockState.getRetryUsed(),
+    });
+
+    if (decision.action === "noop") {
+      return { ok: decision.reason === "already-reveal", reason: decision.reason };
+    }
+    if (decision.action === "await-inflight") {
+      return revealLockState.getInFlight();
+    }
+
+    const requireAllVotes = decision.requireAllVotes !== false;
+    const work = (async () => {
+      setRevealPending(true);
+      try {
+        let result = await commitTierNightLiveRevealSafely({
+          requireAllVotes,
+          source,
+        });
+
+        // Retry one-shot borné (auto uniquement) si encore voting après incertitude.
+        // Note : on est déjà dans la promesse in-flight → tester retryUsed, pas canAutoRetry().
+        if (
+          !result.ok &&
+          result.uncertain &&
+          source === "auto" &&
+          !revealLockState.getRetryUsed()
+        ) {
+          revealLockState.markRetryUsed();
+          reload();
+          if (
+            session.phase === "voting" &&
+            canActAsHost() &&
+            allTierNightLiveVotesIn(session)
+          ) {
+            result = await commitTierNightLiveRevealSafely({
+              requireAllVotes: true,
+              source: "auto-retry",
+            });
+          }
+        }
+
+        if (!mount.isMounted() || !mount.isCurrentMount()) return result;
+
+        reload();
+        if (result.ok || session.phase === "reveal") {
+          revealPendingUi = false;
+          render();
+          return { ...result, ok: true };
+        }
+
+        // Échec réel : chrome restauré, alerte hôte si auto (retry déjà tenté ou certain).
+        revealPendingUi = false;
+        if (source === "auto" || source === "auto-retry") {
+          revealLockState.markRetryUsed();
+          if (canActAsHost()) {
+            try {
+              await showAppAlert(TIER_NIGHT_LIVE_REVEAL_AUTO_ALERT, {
+                title: "Rank live",
+                icon: "⚡",
+              });
+            } catch {
+              /* ignore */
+            }
+          }
+        } else if (source === "manual" && result.error) {
+          try {
+            const { formatSyncErrorMessage } = await import("../core/authErrors.js");
+            await showAppAlert(formatSyncErrorMessage(result.error?.message), {
+              title: "Connexion",
+              icon: "📡",
+            });
+          } catch {
+            /* ignore */
+          }
+        }
+        render();
+        return result;
+      } finally {
+        if (getTierNightLiveSession().phase !== "reveal") {
+          revealPendingUi = false;
+        }
+      }
+    })();
+
+    revealLockState.begin(work);
     try {
-      const placements = accumulatePlacements(session);
-      await commitTierNightLivePlay({ phase: "reveal", placements });
-      if (!mount.isMounted()) return;
-      if (!mount.isCurrentMount()) return;
-      reload();
-      render();
+      return await work;
     } finally {
-      revealInFlight = false;
+      revealLockState.clearInFlightIf(work);
     }
   }
 
@@ -294,6 +427,7 @@ function mountMp(app, list) {
       if (!mount.isMounted()) return;
       if (!mount.isCurrentMount()) return;
       reload();
+      revealPendingUi = false;
       render();
     } else {
       buildTierNightLiveRecaps(session);
@@ -311,28 +445,43 @@ function mountMp(app, list) {
     if (!mount.isCurrentMount()) return;
     reload();
     if (canActAsHost() && allTierNightLiveVotesIn()) {
-      await transitionToReveal();
+      // Chrome all-in avant le commit (pas de return silencieux).
+      render();
+      await runRevealSafely({ source: "auto" });
       return;
     }
     render();
   }
 
+  function maybeAutoRevealFromSession(source = "auto") {
+    if (!canActAsHost()) return;
+    if (session.phase !== "voting") return;
+    if (!allTierNightLiveVotesIn()) return;
+    // Met à jour le chrome (Tout le monde a voté) puis lance le helper partagé.
+    render();
+    void runRevealSafely({ source });
+  }
+
   function votingPhaseHtml() {
     const host = canActAsHost();
     const { confirmed: votedCount, expected: totalPlayers } = getTierNightLiveVoteProgress(session);
-    const mine = myVote();
-    const hint = mine
-      ? allTierNightLiveVotesIn(session)
-        ? "Tout le monde a voté !"
-        : "En attente des autres joueurs…"
-      : "Choisis un tier !";
+    const allIn = allTierNightLiveVotesIn(session);
+    const chrome = tierNightLiveRevealChromeState({
+      allIn,
+      revealPending: revealPendingUi,
+      votedCount,
+      totalPlayers,
+      hasLocalVote: Boolean(myVote()),
+    });
     return `
       <p class="label-upper label-upper--muted">Vote simultané</p>
-      ${voteButtonsHtml(Boolean(mine), mine)}
-      <p class="hint">${hint}</p>
+      ${voteButtonsHtml(Boolean(myVote()), myVote())}
+      <p class="hint">${escapeHtml(chrome.hint)}</p>
       ${
         host
-          ? `<button type="button" class="btn btn-secondary btn--spaced" id="live-reveal">Révéler maintenant (${votedCount}/${totalPlayers})</button>`
+          ? `<button type="button" class="btn btn-secondary btn--spaced" id="live-reveal"${
+              chrome.buttonDisabled ? " disabled" : ""
+            }>${escapeHtml(chrome.buttonLabel)}</button>`
           : ""
       }`;
   }
@@ -372,7 +521,7 @@ function mountMp(app, list) {
     });
     app.querySelector("#live-reveal")?.addEventListener(
       "click",
-      withClickLock(() => transitionToReveal(), { lock: revealLock })
+      withClickLock(() => runRevealSafely({ source: "manual" }), { lock: revealClickLock })
     );
     app.querySelector("#live-next")?.addEventListener(
       "click",
@@ -391,17 +540,26 @@ function mountMp(app, list) {
       return;
     }
     reload();
+    if (session.phase === "reveal") {
+      revealPendingUi = false;
+      render();
+      return;
+    }
     if (session.phase === "voting" && canActAsHost() && allTierNightLiveVotesIn()) {
-      void transitionToReveal();
+      // Plus de `void transition + return` sans chrome : render all-in puis helper awaitable.
+      maybeAutoRevealFromSession("auto");
       return;
     }
     render();
   });
 
   render();
+  // Mount / catch-up : tous les votes déjà présents → auto-reveal acting host.
+  maybeAutoRevealFromSession("auto");
 
   return () => {
     mount.dispose();
+    revealLockState.reset("unmount");
     unsub();
   };
 }

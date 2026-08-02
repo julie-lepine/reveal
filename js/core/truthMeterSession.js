@@ -9,14 +9,18 @@ import { addScore, bumpPlayerStat, getLocalDisplayName, getState, saveStatePatch
 import {
   isGameSyncActive,
   isLobbyHost,
+  canActAsHost,
   syncTruthMeterSession,
   allMembersReady,
   truthMeterToRemote,
   requireLocalParticipantUid,
+  getLocalParticipantUid,
   normalizePlayerVotesMap,
   applyRemoteSession,
   refreshGameSession,
+  nameForUserId,
 } from "./gameSync.js";
+import { getLobbyParticipants } from "./lobby.js";
 import { launchGameWithSync, commitHostGamePlay, commitPrepReadyToggle } from "./mpLaunch.js";
 import { formatSyncErrorMessage } from "./authErrors.js";
 import {
@@ -45,6 +49,13 @@ import {
   rpcRevealTruthMeterRound,
   rpcSubmitTruthMeterVote,
 } from "./gameSessionRpc.js";
+import {
+  buildTruthMeterAuthorOrderUids,
+  resolveTruthMeterAuthorUid,
+  isLocalTruthMeterAuthor,
+  getTruthMeterAuthorDisplayName,
+  tm02Log,
+} from "./truthMeterIdentity.js";
 
 export {
   computeTruthMeterVoteApply,
@@ -113,20 +124,68 @@ export function truthLabel(pct) {
   return "Vrai";
 }
 
-export function getCurrentAuthor() {
-  const session = getTruthMeterSession();
-  const order = session.authorOrder || [];
-  return order[session.roundIdx] || null;
+export function getCurrentTruthMeterAuthorUid(session = getTruthMeterSession()) {
+  const roster = (getState().lobby?.participants || []).map((p) => ({
+    userId: p.userId,
+    name: p.name,
+  }));
+  return resolveTruthMeterAuthorUid(session, { roster });
+}
+
+/** Display name de l'auteur courant (cosmétique). Identité = getCurrentTruthMeterAuthorUid. */
+export function getCurrentAuthor(session = getTruthMeterSession()) {
+  const roster = (getState().lobby?.participants || []).map((p) => ({
+    userId: p.userId,
+    name: p.name,
+  }));
+  return getTruthMeterAuthorDisplayName(session, {
+    roster,
+    nameForUid: nameForUserId,
+  });
+}
+
+export function isLocalTruthMeterAuthorNow(session = getTruthMeterSession()) {
+  // Solo / offline : authorOrder reste name-keyed (pas de wire MP) — gate par pseudo local.
+  if (!isGameSyncActive()) {
+    const localName = getLocalDisplayName();
+    const entry = (session.authorOrder || [])[session.roundIdx ?? 0];
+    if (localName && entry != null && String(entry) === String(localName)) return true;
+    if (localName && session.affirmation?.author === localName) return true;
+    return false;
+  }
+  const localUid = getLocalParticipantUid();
+  const roster = (getState().lobby?.participants || []).map((p) => ({
+    userId: p.userId,
+    name: p.name,
+  }));
+  return isLocalTruthMeterAuthor(session, localUid, { roster });
 }
 
 export function getTruthMeterParticipantNames(session = getTruthMeterSession()) {
-  if (session.authorOrder?.length) return session.authorOrder;
-  return getActivePlayerNames();
+  const order = session.authorOrder || [];
+  if (!order.length) return getActivePlayerNames();
+  // Order peut être UID ou legacy name — résoudre en labels d'affichage.
+  return order.map((entry) => {
+    const asName = nameForUserId(entry);
+    if (asName) return asName;
+    const rosterHit = (getState().lobby?.participants || []).find(
+      (p) => p.name === entry || p.userId === entry
+    );
+    return rosterHit?.name || String(entry);
+  });
 }
 
-export function getVoterNames() {
-  const author = getCurrentAuthor();
-  return getTruthMeterParticipantNames().filter((n) => n !== author);
+export function getVoterNames(session = getTruthMeterSession()) {
+  const authorUid = getCurrentTruthMeterAuthorUid(session).uid;
+  const participants = getState().lobby?.participants || [];
+  if (authorUid && participants.length) {
+    return participants
+      .filter((p) => p.userId && String(p.userId) !== String(authorUid))
+      .map((p) => p.name)
+      .filter(Boolean);
+  }
+  const author = getCurrentAuthor(session);
+  return getTruthMeterParticipantNames(session).filter((n) => n !== author);
 }
 
 /** Votes des juges uniquement - l'auteur ne participe pas au verdict du groupe. */
@@ -219,14 +278,27 @@ export function simulateTruthMeterReady(onUpdate) {
 }
 
 export async function markTruthMeterLobbyStarted({ rosterNames } = {}) {
-  const names = rosterNames?.length ? rosterNames : getActivePlayerNames();
-  if (names.length < TRUTH_METER_MIN_PLAYERS) {
+  // BUG-TRUTHMETER-02 : authorOrder = UIDs uniquement (plus getActivePlayerNames).
+  let authorOrder;
+  if (isGameSyncActive()) {
+    const built = buildTruthMeterAuthorOrderUids(getLobbyParticipants());
+    if (!built.ok) throw new Error(built.error);
+    authorOrder = shuffleArray(built.uids);
+  } else {
+    // Solo / offline : pas d'UID lobby — conserver noms locaux (pas de wire MP).
+    const names = rosterNames?.length ? rosterNames : getActivePlayerNames();
+    if (names.length < TRUTH_METER_MIN_PLAYERS) {
+      throw new Error(`Il faut au moins ${TRUTH_METER_MIN_PLAYERS} joueurs pour TruthMeter.`);
+    }
+    authorOrder = shuffleArray(names);
+  }
+  if (authorOrder.length < TRUTH_METER_MIN_PLAYERS) {
     throw new Error(`Il faut au moins ${TRUTH_METER_MIN_PLAYERS} joueurs pour TruthMeter.`);
   }
   const next = {
     ...getTruthMeterSession(),
     lobbyStarted: true,
-    authorOrder: shuffleArray(names),
+    authorOrder,
     roundIdx: 0,
     phase: "writing",
     affirmation: null,
@@ -270,10 +342,33 @@ export async function commitTruthMeterPlay(patch, patchOpts = {}) {
 /** Soumission affirmation auteur : hôte via commitHostGamePlay, invité via RPC dédiée. */
 export async function commitTruthMeterAffirmation(text, authorEstimate) {
   const localName = getLocalDisplayName();
+  const localUid = isGameSyncActive()
+    ? requireLocalParticipantUid()
+    : getLocalParticipantUid() || localName;
   const session = getTruthMeterSession();
+  const expected = getCurrentTruthMeterAuthorUid(session);
+  if (isGameSyncActive()) {
+    if (expected.unresolved || !expected.uid) {
+      tm02Log("legacy-author-unresolved", {
+        runId: session.runId,
+        phase: session.phase,
+        roundIdx: session.roundIdx,
+        reason: expected.reason,
+        legacyValue: expected.legacyValue || null,
+      });
+      throw new Error("Auteur du round indéterminé. Recharge ou passe cet auteur.");
+    }
+    if (String(expected.uid) !== String(localUid)) {
+      throw new Error("Seul l'auteur du round peut soumettre l'affirmation.");
+    }
+  }
   const patch = {
     roundIdx: session.roundIdx ?? 0,
-    affirmation: { text, author: localName },
+    affirmation: {
+      text,
+      authorUid: localUid || undefined,
+      author: localName,
+    },
     authorEstimate,
     phase: "display",
     votes: {},
@@ -589,13 +684,18 @@ export async function finishTruthMeterGameSession() {
   navigate("results");
 }
 
-/** Hôte : passe la manche si l'auteur est absent (phase writing). */
+/** Hôte / acting host : passe la manche si l'auteur est absent ou irrésoluble (phase writing). */
 export async function skipTruthMeterAuthorRound() {
-  if (!isLobbyHost()) return { ok: false };
+  // Aligné UI (canActAsHost) + commitHostGamePlay — pas isLobbyHost seul.
+  if (!canActAsHost()) return { ok: false, reason: "not-acting-host" };
   const session = getTruthMeterSession();
+  if (session.phase !== "writing") {
+    return { ok: false, reason: "wrong-phase" };
+  }
   const order = session.authorOrder || [];
   const total = order.length;
   const nextIdx = (session.roundIdx ?? 0) + 1;
+  // runId inchangé : commitTruthMeterPlay ne remplace pas runId (même run, curseur +1).
 
   if (nextIdx >= total) {
     await finishTruthMeterGameSession();

@@ -21,6 +21,11 @@ import { getLobbyParticipants, getLobbyStatus, getLobbyGameId, isLobbyEveningSta
 import { getActivePlayerNames, getActivePlayers } from "./players.js";
 import { mergeMatchScoresLocal } from "./gameScores.js";
 import { hydrateTruthMeterMatchScores, isTruthMeterRemoteScoreAuthority } from "./truthMeterVoteCommit.js";
+import {
+  mergeTruthMeterIdentityFields,
+  assertTruthMeterAuthorOrderWire,
+  tm02Log,
+} from "./truthMeterIdentity.js";
 import { mergeGameScoreOrder } from "./gameScoreOrder.js";
 import { mergeClutchTapsFrozen } from "./clutchTapCommit.js";
 import {
@@ -1922,6 +1927,15 @@ function mergeTruthMeterGameLocal(local, remote) {
     ? remote.lastRound ?? null
     : remote.lastRound ?? local.lastRound ?? null;
 
+  // BUG-TRUTHMETER-02 — identité ciblée (pas de préférence locale générale) :
+  // remote autoritaire pour phase/votes/scores ; UID distant valide autoritaire ;
+  // legacy distant + preuve locale même runId / même longueur → normalisation.
+  const roster = (getState().lobby?.participants || []).map((p) => ({
+    userId: p.userId,
+    name: p.name,
+  }));
+  const identity = mergeTruthMeterIdentityFields(local, remote, { roster });
+
   return {
     ...local,
     ...remote,
@@ -1937,17 +1951,52 @@ function mergeTruthMeterGameLocal(local, remote) {
     ),
     matchScores,
     lastRound,
+    authorOrder: identity.authorOrder,
+    affirmation: identity.affirmation,
   };
 }
 
 export function truthMeterToRemote(session) {
+  const affirmation = session.affirmation
+    ? {
+        text: session.affirmation.text,
+        // BUG-TRUTHMETER-02 : authorUid canonique ; author = snapshot cosmétique.
+        ...(session.affirmation.authorUid
+          ? { authorUid: session.affirmation.authorUid }
+          : {}),
+        ...(session.affirmation.author != null
+          ? { author: session.affirmation.author }
+          : {}),
+      }
+    : null;
+  const rosterUids = (getLobbyParticipants() || [])
+    .map((p) => p.userId)
+    .filter(Boolean)
+    .map(String);
+  const order = session.authorOrder || [];
+  const wireCheck = assertTruthMeterAuthorOrderWire(order, rosterUids);
+  // Nouvelles écritures MP : order doit être UID. Legacy lu/écrit tel quel (compat).
+  if (
+    session.lobbyStarted &&
+    rosterUids.length &&
+    order.length &&
+    !wireCheck.ok
+  ) {
+    tm02Log("legacy-author-order-detected", {
+      runId: session.runId || null,
+      phase: session.phase || null,
+      roundIdx: session.roundIdx ?? null,
+      reason: "authorOrder-not-all-roster-uids",
+    });
+  }
   return {
     ready: mapReadyByUid(session.ready || {}),
     lobbyStarted: Boolean(session.lobbyStarted),
-    authorOrder: session.authorOrder || [],
+    // authorOrder : UIDs pour nouvelles parties ; legacy names lus tels quels.
+    authorOrder: order,
     roundIdx: session.roundIdx ?? 0,
     phase: session.phase || null,
-    affirmation: session.affirmation || null,
+    affirmation,
     authorEstimate:
       session.authorEstimate != null && Number.isFinite(session.authorEstimate)
         ? session.authorEstimate
@@ -1972,13 +2021,24 @@ export function truthMeterToRemote(session) {
 
 export function truthMeterFromRemote(remote) {
   if (!remote) return null;
+  const affirmation = remote.affirmation
+    ? {
+        text: remote.affirmation.text,
+        ...(remote.affirmation.authorUid
+          ? { authorUid: remote.affirmation.authorUid }
+          : {}),
+        ...(remote.affirmation.author != null
+          ? { author: remote.affirmation.author }
+          : {}),
+      }
+    : null;
   return {
     ready: mapReadyByName(remote.ready || {}),
     lobbyStarted: Boolean(remote.lobbyStarted),
     authorOrder: remote.authorOrder || [],
     roundIdx: remote.roundIdx ?? 0,
     phase: remote.phase || null,
-    affirmation: remote.affirmation || null,
+    affirmation,
     authorEstimate:
       remote.authorEstimate != null && Number.isFinite(remote.authorEstimate)
         ? remote.authorEstimate

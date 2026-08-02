@@ -12,6 +12,8 @@ import {
   getTruthMeterEntryScreen,
   getTruthMeterSession,
   getCurrentAuthor,
+  getCurrentTruthMeterAuthorUid,
+  isLocalTruthMeterAuthorNow,
   getVoterNames,
   truthLabel,
   validateAffirmation,
@@ -30,6 +32,7 @@ import {
   mapTruthMeterRevealRpcError,
   applyTruthMeterEveningFromLastRound,
 } from "../core/truthMeterSession.js";
+import { tm02Log } from "../core/truthMeterIdentity.js";
 import { awardTruthMeterRound, EVENING_POINTS } from "../core/scoring.js";
 import {
   applyMatchScoreDeltas,
@@ -54,6 +57,7 @@ import {
   getActingHostUiRefreshToken,
   needsActingHostUiRefresh,
   stopGameSessionListenerOnPostGame,
+  refreshGameSession,
 } from "../core/gameSync.js";
 import { arch03AhLogSkipDecision } from "../core/arch03ActingHostDebug.js";
 
@@ -208,10 +212,24 @@ export function mountTruthMeter(app) {
   let authorFocusRound = -1;
   let suppressAuthorAutoFocus = false;
   const mount = createMountGuard();
+  // Affichage cosmétique uniquement — identité métier = UID (isLocalTruthMeterAuthorNow).
   const localName = getLocalDisplayName();
   const mp = isGameSyncActive();
 
   const totalRounds = () => getTruthMeterSession().authorOrder?.length || getActivePlayers().length;
+
+  function isAuthorNow() {
+    return isLocalTruthMeterAuthorNow();
+  }
+
+  function authorLabel() {
+    return getCurrentAuthor() || affirmation?.author || "Un joueur";
+  }
+
+  function authorUnresolved() {
+    const r = getCurrentTruthMeterAuthorUid();
+    return Boolean(r?.unresolved);
+  }
 
   function cancelRevealAnim() {
     if (revealAnimId) {
@@ -245,21 +263,21 @@ export function mountTruthMeter(app) {
 
   /** Votes confirmés session pour scoring UI reveal (sans draft pending). */
   function confirmedVoterVotes() {
-    const author = affirmation?.author || getCurrentAuthor();
+    const author = authorLabel();
     return filterVoterVotes({ ...(getTruthMeterSession().votes || {}) }, author);
   }
 
   function votesForAward() {
-    const author = affirmation?.author || getCurrentAuthor();
+    const author = authorLabel();
     let fromSession = { ...(getTruthMeterSession().votes || {}) };
     // In-flight confirmé en cours d'envoi : utile pour ensureLocal / force reveal local,
     // pas pour le compteur hôte (voir countConfirmedTruthMeterVoterVotes).
-    if (voteCommitInFlight != null && fromSession[localName] == null) {
+    if (voteCommitInFlight != null && fromSession[localName] == null && !isAuthorNow()) {
       fromSession[localName] = voteCommitInFlight;
     }
     if (
       fromSession[localName] == null &&
-      localName !== author &&
+      !isAuthorNow() &&
       phase === "voting"
     ) {
       const pending = getPendingVoteValue();
@@ -273,8 +291,7 @@ export function mountTruthMeter(app) {
 
   function allVotesReadyForReveal() {
     if (allTruthMeterVotesIn()) return true;
-    const author = getCurrentAuthor() || affirmation?.author;
-    if (localName === author) return allTruthMeterVotesIn();
+    if (isAuthorNow()) return allTruthMeterVotesIn();
     const merged = { ...(getTruthMeterSession().votes || {}) };
     if (voteCommitInFlight != null) merged[localName] = voteCommitInFlight;
     const voters = getVoterNames();
@@ -282,8 +299,7 @@ export function mountTruthMeter(app) {
   }
 
   async function ensureLocalVoteCommitted() {
-    const author = getCurrentAuthor() || affirmation?.author;
-    if (localName === author) return;
+    if (isAuthorNow()) return;
     if (voteCommitPromise) {
       try {
         await voteCommitPromise;
@@ -333,7 +349,7 @@ export function mountTruthMeter(app) {
   }
 
   function spreadHtml(votesMap, showAuthor) {
-    const author = affirmation?.author;
+    const author = authorLabel();
     const rows = Object.entries(votesMap)
       .filter(([name]) => name !== author)
       .map(([name, v]) => {
@@ -562,14 +578,14 @@ export function mountTruthMeter(app) {
         return;
       }
 
-      const author = affirmation?.author;
+      const author = authorLabel();
       const votesToScore = votesForAward();
       const est = authorEstimate;
 
       roundScored = true;
       let matchScores = getTruthMeterSession().matchScores || {};
       let lastRound = getTruthMeterSession().lastRound || null;
-      if (author) {
+      if (author && !authorUnresolved()) {
         lastAward = awardTruthMeterRound(votesToScore, author, est);
         matchScores = applyMatchScoreDeltas(matchScores, lastAward.deltas || {});
         lastRound = buildTruthMeterLastRound(lastAward);
@@ -656,13 +672,35 @@ export function mountTruthMeter(app) {
     if (!mount.isMounted()) return;
     if (!mount.isCurrentMount()) return;
     syncFromSession();
-    const author = getCurrentAuthor() || affirmation?.author;
+    const author = authorLabel();
     const total = totalRounds();
-    const isAuthor = localName === author;
+    const isAuthor = isAuthorNow();
+    const unresolved = authorUnresolved();
     const host = !mp || canActAsHost();
     let phaseHtml = "";
 
-    if (phase === "writing") {
+    if (phase === "writing" && unresolved) {
+      const resolved = getCurrentTruthMeterAuthorUid();
+      tm02Log("legacy-author-unresolved", {
+        runId: getTruthMeterSession().runId,
+        phase,
+        roundIdx,
+        reason: resolved.reason || "unresolved",
+        legacyValue: resolved.legacyValue || null,
+      });
+      phaseHtml = `
+        <p class="hint truth-meter__waiting">Impossible d’identifier l’auteur de cette manche (session ancienne ou ambiguë).</p>
+        <p class="hint">Recharge la session ou passe cet auteur si tu es hôte.</p>`;
+      if (host) {
+        phaseHtml += `
+          <button type="button" class="btn btn-secondary btn--spaced" id="truth-reload-author">
+            Recharger la session
+          </button>
+          <button type="button" class="btn btn-secondary btn--spaced" id="truth-skip-author">
+            Passer cet auteur (absent)
+          </button>`;
+      }
+    } else if (phase === "writing") {
       if (isAuthor) {
         phaseHtml = `
           <p class="hint">Tu es l'auteur - écris une affirmation personnelle et place sa vérité.</p>
@@ -696,7 +734,7 @@ export function mountTruthMeter(app) {
         <div class="card card--hot truth-meter__affirmation-card">
           <p class="label-upper label-upper--hot">Affirmation</p>
           <p class="hot-take-text">"${escapeHtml(affirmation.text)}"</p>
-          <p class="hint">- ${escapeHtml(affirmation.author)}</p>
+          <p class="hint">- ${escapeHtml(author)}</p>
         </div>
         <p class="hint">${host ? "Le vote commence dans un instant…" : "Le vote va commencer…"}</p>`;
     }
@@ -719,7 +757,7 @@ export function mountTruthMeter(app) {
         phaseHtml = `
           <div class="card card--hot truth-meter__affirmation-card">
             <p class="hot-take-text">"${escapeHtml(affirmation.text)}"</p>
-            <p class="hint">- ${escapeHtml(affirmation.author)}</p>
+            <p class="hint">- ${escapeHtml(author)}</p>
           </div>
           ${sliderBlockHtml({
             id: "vote-slider",
@@ -831,7 +869,7 @@ export function mountTruthMeter(app) {
           requestAnimationFrame(() => {
             if (!mount.isMounted()) return;
             if (!mount.isCurrentMount()) return;
-            if (suppressAuthorAutoFocus || phase !== "writing" || getCurrentAuthor() !== localName) {
+            if (suppressAuthorAutoFocus || phase !== "writing" || !isAuthorNow()) {
               return;
             }
             if (document.activeElement?.closest(".truth-meter__slider-wrap")) return;
@@ -944,7 +982,22 @@ export function mountTruthMeter(app) {
       });
     }
 
-    if (phase === "writing" && host && !isAuthor) {
+    if (phase === "writing" && host && (!isAuthor || unresolved)) {
+      app.querySelector("#truth-reload-author")?.addEventListener("click", async () => {
+        const btn = app.querySelector("#truth-reload-author");
+        if (btn) btn.disabled = true;
+        try {
+          await refreshGameSession();
+          if (!mount.isMounted()) return;
+          if (!mount.isCurrentMount()) return;
+          syncFromSession();
+          render();
+        } catch (e) {
+          console.warn("[TM-02] reload after unresolved author failed", e);
+        } finally {
+          if (btn?.isConnected) btn.disabled = false;
+        }
+      });
       app.querySelector("#truth-skip-author")?.addEventListener("click", async () => {
         const btn = app.querySelector("#truth-skip-author");
         if (btn) btn.disabled = true;
@@ -979,7 +1032,7 @@ export function mountTruthMeter(app) {
   }
 
   function captureAuthorDraftFromDom() {
-    if (phase !== "writing" || getCurrentAuthor() !== localName) return;
+    if (phase !== "writing" || !isAuthorNow()) return;
     const textEl = app.querySelector("#affirmation-text");
     if (textEl) draftText = textEl.value;
     const slider = app.querySelector("#author-slider");
@@ -987,7 +1040,7 @@ export function mountTruthMeter(app) {
   }
 
   function captureVoteDraftFromDom() {
-    if (phase !== "voting" || getCurrentAuthor() === localName) return;
+    if (phase !== "voting" || isAuthorNow()) return;
     const slider = app.querySelector("#vote-slider");
     if (slider) draftEstimate = Number(slider.value);
   }
@@ -1022,7 +1075,7 @@ export function mountTruthMeter(app) {
   /** Évite de détruire le textarea / slider à chaque poll multijoueur. */
   function shouldSkipFullRender(prevPhase, prevRound) {
     if (phase !== prevPhase || roundIdx !== prevRound) return false;
-    if (phase === "writing" && getCurrentAuthor() === localName) return true;
+    if (phase === "writing" && isAuthorNow()) return true;
     if (phase === "voting") {
       // Comparer au dernier paint (pas au store pré-sync) : applyRemoteSession
       // a déjà écrit les votes avant onGameSessionChange.

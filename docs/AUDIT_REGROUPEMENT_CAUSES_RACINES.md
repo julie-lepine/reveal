@@ -16,9 +16,9 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 
 | | |
 |--|--|
-| **Maintenant** | QA terrain **BUG-WAO-04** · 🟠 BUG-TIERNIGHT-03 · BUG-TRUTHMETER-02 |
+| **Maintenant** | QA terrain **BUG-TRUTHMETER-02** (implémenté — pas clôturé) |
 | **Ensuite** | **OPS-LOBBY-04** · **ARCH-23** · ARCH-10 · **UX-HOST-01** |
-| **Dernière clôture** | **BUG-WAO-02** ✅ (QA) · **BUG-WAO-03** ✅ (QA) · **BUG-TIERNIGHT-04** ✅ · **BUG-TIERNIGHT-05** ✅ |
+| **Dernière clôture** | **BUG-TIERNIGHT-03** ✅ (QA) · **BUG-WAO-04** ✅ · **BUG-WAO-02** ✅ · **BUG-WAO-03** ✅ · **BUG-TIERNIGHT-04** ✅ · **BUG-TIERNIGHT-05** ✅ |
 
 ---
 
@@ -28,7 +28,7 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 
 | ID | Cause | Problème | Priorité |
 |----|-------|----------|----------|
-| **BUG-WAO-04** | 11 | Validation d'une réponse vide possible | 🟠 code · **re-QA terrain** |
+| **BUG-TRUTHMETER-02** | 3/8 | Changement de pseudo casse la saisie suivante | 🔧 QA |
 
 ### Autres
 
@@ -36,8 +36,6 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 |----|-------|----------|----------|
 | **ARCH-23** | 8/11 | Détection version cliente + refresh obligatoire post-déploiement | 🟡 ops/UX |
 | **UX-HOST-01** | 11 | CTA hôte « manche / question suivante » au-dessus du classement (fin de manche) | 🟡 |
-| **BUG-TIERNIGHT-03** | 7 | Révélation non automatique en mode direct | 🟠 |
-| **BUG-TRUTHMETER-02** | 3/8 | Changement de pseudo casse la saisie suivante | 🟠 |
 | **UX-CHAT-01** | 11 | Pas de message système au lancement d'un jeu | 🟡 |
 | **UX-CHAT-02** | 11 | Clavier s'ouvre automatiquement à l'ouverture du chat | 🟡 |
 | **UX-DEVICE-01** | 11 | Écran verrouillé pendant une partie (Wake Lock API) | 🟡 |
@@ -63,15 +61,15 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 |---|-------|------|----------------|
 | 1 | Identité invité / JWT | ✅ | ARCH-01 partiel |
 | 2 | Race auth / profil | ✅ | — |
-| 3 | Sources de vérité multiples | Partiel | **BUG-TIERNIGHT-04 ✅** · **BUG-TRUTHMETER-02** 🟠 · **Membership A–E5 ✅** · M-14a ✅ · Guess Lie ✅ |
+| 3 | Sources de vérité multiples | Partiel | **BUG-TIERNIGHT-04 ✅** · **BUG-TRUTHMETER-02** 🔧 QA · **Membership A–E5 ✅** · M-14a ✅ · Guess Lie ✅ |
 | 4 | Asymétrie hôte / invité | ✅ | — |
 | 5 | Routing + timing sync | ✅ | ARCH-05 mitigé · **UX-NAV-LOBBY ✅** |
-| 6 | Async écrans | Partiel | **BUG-WAO-02** ✅ · **BUG-WAO-03** ✅ · **BUG-WAO-04** 🟠 |
-| 7 | Sync silencieuse / fire-and-forget | Partiel | **BUG-TRUTHMETER-01 ✅** (01A/01B) · **BUG-TIERNIGHT-03** 🟠 · **BUG-TRIVIA-01 ✅** (01A/01B/01B-bis/01C) · ARCH-07 ✅ · M-14b ✅ · ARCH-08 ✅ |
-| 8 | Reset / migration incomplète | Partiel | **BUG-TIERNIGHT-05 ✅** · **OPS-LOBBY-04** · **BUG-LOBBY-XX-E** · **BUG-TRUTHMETER-02** 🟠 · **ARCH-23** · ARCH-10 · **BUG-LOBBY-XX ✅** · I-09/SYN-15/16 ✅ |
+| 6 | Async écrans | ✅ | **BUG-WAO-02** ✅ · **BUG-WAO-03** ✅ · **BUG-WAO-04** ✅ |
+| 7 | Sync silencieuse / fire-and-forget | Partiel | **BUG-TRUTHMETER-01 ✅** (01A/01B) · **BUG-TIERNIGHT-03** ✅ · **BUG-TRIVIA-01 ✅** (01A/01B/01B-bis/01C) · ARCH-07 ✅ · M-14b ✅ · ARCH-08 ✅ |
+| 8 | Reset / migration incomplète | Partiel | **BUG-TIERNIGHT-05 ✅** · **OPS-LOBBY-04** · **BUG-LOBBY-XX-E** · **BUG-TRUTHMETER-02** 🔧 QA · **ARCH-23** · ARCH-10 · **BUG-LOBBY-XX ✅** · I-09/SYN-15/16 ✅ |
 | 9 | Sync monolithe / duplication | Dette | ARCH-11… |
 | 10 | Code mort | Dette | **FEATURE-VIBECHECK-01** ⚪ · hors Fil Rouge app ✅ |
-| 11 | Friction UX | Partiel | **UX-CHAT-01/02** 🟡 · **UX-DEVICE-01** 🟡 · **UX-HOST-01** 🟡 · **BUG-WAO-04** 🟠 · **ARCH-23** · ARCH-22/Loader ✅ · **L-04 ✅** |
+| 11 | Friction UX | Partiel | **UX-CHAT-01/02** 🟡 · **UX-DEVICE-01** 🟡 · **UX-HOST-01** 🟡 · **BUG-WAO-04** ✅ · **ARCH-23** · ARCH-22/Loader ✅ · **L-04 ✅** |
 
 ---
 
@@ -277,9 +275,9 @@ Retour terrain multi-jeux. Priorités : 🔴 critique · 🟠 haute · 🟡 moye
 |----|----------|-------------------|
 | **BUG-WAO-02** | Clavier fermé pendant rédaction | ✅ **QA validé 2026-08-02** — hard-gate composition · bouton host pré-monté · `#wrong-input` réattaché. Ne pas rouvrir. |
 | **BUG-WAO-03** | Scroll réinitialisé pendant votes | ✅ QA validé — ne pas rouvrir. |
-| **BUG-WAO-04** | Réponses vides validables | **Fix 2026-08-02** — `#wrong-submit` `disabled` si `trim` vide · sync sur `input` sans toucher le textarea (WAO-02) · défense `sanitize` inchangée. **Reste : re-QA terrain.** |
-| **BUG-TIERNIGHT-03** | Révélation non automatique | Mode direct : révélation ne passe parfois pas auto à l'étape suivante. Analyser sync de transition. |
-| **BUG-TRUTHMETER-02** | Changement de pseudo casse le jeu | Repro : lancer TruthMeter → changer pseudo → affirmation suivante : impossible d'écrire. L'UI garde l'ancien état (ex. « Joulaille » → « Joulaille la Goat »). Vérifier toutes les références utilisant `username` comme clé métier. |
+| **BUG-WAO-04** | Réponses vides validables | ✅ **QA validé 2026-08-02** — `#wrong-submit` disabled si trim vide · sync input + refresh hôte · `cap:sync` + `?v=97`. Ne pas rouvrir. |
+| **BUG-TIERNIGHT-03** | Révélation non automatique | ✅ **QA validé 2026-08-02** — `commitTierNightLiveRevealSafely` · verrou auto/manuel · chrome pending · retry one-shot · recovery refresh. Item suivant reste manuel. Ne pas rouvrir. |
+| **BUG-TRUTHMETER-02** | Changement de pseudo casse le jeu | 🔧 **Implémenté — QA terrain obligatoire** (2026-08-02). `authorOrder` + `affirmation.authorUid` canoniques ; gate UI UID ; SQL `truth_meter_resolve_author_uid` ; pas de rewrite distant auto ; I-09 normalise legacy→UID. |
 
 #### 🟡 Moyenne
 
@@ -344,6 +342,10 @@ Ne pas rouvrir sans régression. Détail historique dans git / tests cités.
 
 | ID | Cause | Livré | Preuve / QA |
 |----|-------|-------|-------------|
+| **BUG-TIERNIGHT-03** | 7 | Auto-reveal Rank live sécurisé · verrou · recovery timeout · retry one-shot | QA terrain 2026-08-02 |
+| **BUG-WAO-04** | 11 | CTA « Valider » disabled si trim vide · sync input + refresh hôte | QA terrain 2026-08-02 |
+| **BUG-WAO-02** | 6/11 | Hard-gate composition · host CTA pré-monté · `#wrong-input` réattaché | QA terrain 2026-08-02 |
+| **BUG-WAO-03** | 6/11 | Chrome vote ciblé · scroll liste conservé | QA terrain 2026-08-02 |
 | **BUG-TRIVIA-01** | 7 | Parent 01A+01B+01B-bis+01C — reveal/answer atomiques · UX · replay | QA terrain 2026-07-31 |
 | **BUG-TRIVIA-01B** | 7 | Reveal atomique RPC · scoring partagé · late-answer UX · runbook concurrence | `triviaRevealAtomicity` · SQL rollback/runbook · QA 2026-07-31 |
 | **BUG-TRIVIA-01C** | 7 | Hint honnête · mapper answer · replay `startGameSession` sécurisé · persistDeck MP | `triviaAnswerUi` · `triviaAnswerErrors` · `triviaReplayRestart` · 2026-07-31 |
@@ -404,7 +406,7 @@ Ne pas rouvrir sans régression. Détail historique dans git / tests cités.
 Hors file prioritaire — opportunité / régression :
 
 - Votes optimistic hors Hot Take / VibeCheck / Dilemma (speedVote / …) — **BUG-TRUTHMETER-01 ✅** (01A/01B QA 2026-08-02)
-- `results.js` mount · rename remote résiduel — **BUG-TRUTHMETER-02** 🟠
+- `results.js` mount · rename remote résiduel — **BUG-TRUTHMETER-02** 🔧 QA
 - Lobby `playing` si upsert échoue après `setLobbyPlaying` (M-11)
 - `pushGameSession` : `err.message` brut (L-09)
 - Logs debug join · policy debug lobby Supabase
@@ -422,4 +424,4 @@ Hors file prioritaire — opportunité / régression :
 
 ---
 
-*Suivi vivant · MAJ 2026-08-02 — **BUG-WAO-02 ✅ QA** · **BUG-WAO-04** code (re-QA)*
+*Suivi vivant · MAJ 2026-08-02 — **BUG-TRUTHMETER-02** 🔧 implémenté (QA terrain) · prochain après clôture = **OPS-LOBBY-04***

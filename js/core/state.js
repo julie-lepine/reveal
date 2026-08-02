@@ -2,6 +2,7 @@ import { flushSave, scheduleSave } from "./persist.js";
 import { DEFAULT_PROFILE_EMOJI } from "../../data/profileEmojis.js";
 import { trimPlayerText } from "../../data/playerTextLimits.js";
 import { getLastGameScopeKey, isLastGameInCurrentScope } from "./lobbyBoundary.js";
+import { migrateTruthMeterIdentityOnRename } from "./truthMeterIdentity.js";
 
 const STORAGE_KEY = "reveal-app-state";
 
@@ -855,15 +856,20 @@ export function renameLocalPlayer(newName) {
     if (tm.matchScores) {
       tm.matchScores = mergeKeyedRecord(tm.matchScores, oldName, trimmed, "preferOld");
     }
-    if (Array.isArray(tm.authorOrder)) {
-      tm.authorOrder = migrateNameArray(tm.authorOrder, oldName, trimmed);
-    }
-    if (tm.affirmation && typeof tm.affirmation === "object") {
-      tm.affirmation = {
-        ...tm.affirmation,
-        author: migrateNameScalar(tm.affirmation.author, oldName, trimmed),
-      };
-    }
+    // BUG-TRUTHMETER-02 / I-09 : ne pas remplacer des UID ; préférer normaliser legacy → UID.
+    const localUid =
+      state.lobby?.participants?.find((p) => p.isLocal && p.userId)?.userId || null;
+    const knownUids = (state.lobby?.participants || [])
+      .map((p) => p.userId)
+      .filter(Boolean);
+    const migrated = migrateTruthMeterIdentityOnRename(tm, {
+      oldName,
+      newName: trimmed,
+      localUid,
+      knownUids,
+    });
+    tm.authorOrder = migrated.authorOrder;
+    tm.affirmation = migrated.affirmation;
     if (tm.lastRound) {
       tm.lastRound = migrateLastRoundNameMaps(tm.lastRound, oldName, trimmed, {
         nameScalars: ["mindReader"],

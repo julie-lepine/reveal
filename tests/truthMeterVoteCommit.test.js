@@ -154,10 +154,24 @@ describe("commitTruthMeterVote — mocks comportementaux", () => {
         truthMeterToRemote: mock.fn(),
         syncTruthMeterSession: mock.fn(),
         requireLocalParticipantUid: requireLocalUidMock,
+        getLocalParticipantUid: mock.fn(() => UID),
+        nameForUserId: mock.fn((uid) => (uid === UID ? "Alice" : null)),
         isLobbyHost: mock.fn(() => false),
+        canActAsHost: mock.fn(() => true),
         allMembersReady: mock.fn(),
         patchGameState: mock.fn(),
         normalizePlayerVotesMap: (votes) => votes || {},
+      },
+    });
+    // BUG-TRUTHMETER-02 : truthMeterSession importe lobby.js (sinon → supabaseClient https:).
+    mock.module("../js/core/lobby.js", {
+      namedExports: {
+        getLobbyParticipants: mock.fn(() => [
+          { userId: UID, name: "Alice" },
+          { userId: "uid-bob", name: "Bob" },
+        ]),
+        setLobbyPlaying: mock.fn(),
+        setLobbyWaiting: mock.fn(),
       },
     });
     mock.module("../js/core/state.js", {
@@ -191,7 +205,7 @@ describe("commitTruthMeterVote — mocks comportementaux", () => {
       },
     });
     mock.module("../js/core/hotTakeSession.js", {
-      namedExports: { checkHotTakeModeration: mock.fn(() => null) },
+      namedExports: { checkHotTakeModeration: mock.fn(() => ({ blocked: false })) },
     });
 
     const mod = await import("../js/core/truthMeterSession.js");
@@ -420,7 +434,10 @@ describe("contrats source — UI + contribute + ensureLocal", () => {
     const revealIdx = gameSrc.indexOf("async function transitionToReveal");
     const slice = gameSrc.slice(revealIdx, revealIdx + 2800);
     assert.match(slice, /commitTruthMeterReveal/);
-    const mpBranch = slice.slice(0, slice.indexOf("const author = affirmation"));
+    // Solo branch starts after MP early-return ; marqueur = scoring local.
+    const soloMarker = slice.indexOf("const author = authorLabel()");
+    assert.ok(soloMarker > 0, "solo authorLabel marker");
+    const mpBranch = slice.slice(0, soloMarker);
     assert.match(mpBranch, /if \(mp\)/);
     assert.equal(/\bawardTruthMeterRound\b/.test(mpBranch), false);
     assert.match(slice, /awardTruthMeterRound/); // solo conserve

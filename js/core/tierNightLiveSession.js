@@ -3,6 +3,10 @@ import { getActivePlayerNames } from "./players.js";
 import { getLobbyParticipants } from "./lobby.js";
 import { getLocalDisplayName, getState, saveStatePatch } from "./state.js";
 import {
+  isTierNightLiveRevealNetworkUncertainty,
+  evaluateTierNightLiveRevealRecovery,
+} from "./tierNightLiveReveal.js";
+import {
   isGameSyncActive,
   requireLocalParticipantUid,
   normalizePlayerVotesMap,
@@ -10,6 +14,8 @@ import {
   tierNightToRemote,
   userIdForName,
   nameForUserId,
+  canActAsHost,
+  refreshGameSession,
 } from "./gameSync.js";
 import { patchGameStateWithFeedback } from "./patchGameStateFeedback.js";
 import { launchGameWithSync, commitHostGamePlay } from "./mpLaunch.js";
@@ -233,6 +239,104 @@ export async function commitTierNightLivePlay(patch, patchOpts = {}) {
     toRemote: tierNightLiveToRemote,
     patchOpts,
   });
+}
+
+/**
+ * BUG-TIERNIGHT-03 — commit reveal avec recovery si résultat réseau incertain.
+ * N'alerte pas ici (l'UI décide auto vs manuel). Pas d'optimistic phase locale.
+ *
+ * @param {{ requireAllVotes?: boolean, source?: string }} [opts]
+ * @returns {Promise<{
+ *   ok: boolean,
+ *   session?: object,
+ *   recovered?: boolean,
+ *   reason?: string,
+ *   uncertain?: boolean,
+ *   error?: Error,
+ * }>}
+ */
+export async function commitTierNightLiveRevealSafely(opts = {}) {
+  const { requireAllVotes = true, source = "auto" } = opts;
+  const session = getTierNightLiveSession();
+
+  if (session.phase === "reveal" || session.phase === "done") {
+    return { ok: true, session, recovered: false, reason: "already-reveal" };
+  }
+  if (session.phase !== "voting") {
+    return { ok: false, reason: "wrong-phase" };
+  }
+  if (isGameSyncActive() && !canActAsHost()) {
+    return { ok: false, reason: "not-host" };
+  }
+  if (requireAllVotes && !allTierNightLiveVotesIn(session)) {
+    return { ok: false, reason: "incomplete" };
+  }
+
+  const runId = session.runId;
+  const roundIdx = session.roundIdx;
+  const placements = accumulatePlacements(session);
+
+  try {
+    const next = await commitTierNightLivePlay(
+      { phase: "reveal", placements },
+      // Feedback UI géré par le mount (alerte auto distincte du toast sync générique).
+      { withPatchFeedback: false }
+    );
+    return {
+      ok: true,
+      session: next || getTierNightLiveSession(),
+      recovered: false,
+      reason: "committed",
+      source,
+    };
+  } catch (err) {
+    console.warn("[TIERNIGHT-03] reveal commit failed", {
+      source,
+      message: err?.message || String(err),
+      code: err?.code || null,
+      uncertain: isTierNightLiveRevealNetworkUncertainty(err),
+    });
+
+    if (!isTierNightLiveRevealNetworkUncertainty(err)) {
+      return {
+        ok: false,
+        reason: "certain-failure",
+        uncertain: false,
+        error: err,
+      };
+    }
+
+    try {
+      const fresh = await refreshGameSession();
+      const remote = fresh?.state?.tierNightLive;
+      const recovery = evaluateTierNightLiveRevealRecovery(remote, {
+        runId,
+        roundIdx,
+      });
+      if (recovery.recovered) {
+        return {
+          ok: true,
+          session: getTierNightLiveSession(),
+          recovered: true,
+          reason: recovery.reason,
+        };
+      }
+      return {
+        ok: false,
+        reason: recovery.reason || "uncertain-still-voting",
+        uncertain: true,
+        error: err,
+      };
+    } catch (refreshErr) {
+      console.warn("[TIERNIGHT-03] reveal recovery refresh failed", refreshErr);
+      return {
+        ok: false,
+        reason: "uncertain-refresh-failed",
+        uncertain: true,
+        error: err,
+      };
+    }
+  }
 }
 
 /** Construit les recaps finaux à partir des placements accumulés (hôte). */

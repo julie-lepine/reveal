@@ -198,7 +198,7 @@ describe("contrats source — compteur + hydratation", () => {
 
   it("transitionToReveal MP : pas d’awardTruthMeterRound", () => {
     const start = gameSrc.indexOf("async function transitionToReveal");
-    const solo = gameSrc.indexOf("const author = affirmation", start);
+    const solo = gameSrc.indexOf("const author = authorLabel()", start);
     const mpBranch = gameSrc.slice(start, solo);
     assert.match(mpBranch, /commitTruthMeterReveal/);
     assert.equal(/\bawardTruthMeterRound\b/.test(mpBranch), false);

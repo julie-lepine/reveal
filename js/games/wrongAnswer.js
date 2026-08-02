@@ -423,6 +423,8 @@ export function mountWrongAnswer(app) {
       btn.hidden = !showHost;
       btn.textContent = `Passer au vote (${answeredCount}/${total})`;
     }
+    // BUG-WAO-04 : les refresh hôte (answers distants) doivent réaffirmer le CTA gated.
+    if (!submitted) syncWrongAnswerSubmitEnabled();
     const afterInput = app.querySelector("#wrong-input");
     wao02Log("refresh only", {
       beforeEqualsAfter: beforeInput === afterInput,
@@ -551,12 +553,15 @@ export function mountWrongAnswer(app) {
     bindPhaseEvents();
   }
 
-  /** BUG-WAO-04 — sync disabled du CTA sans toucher #wrong-input. */
+  /** BUG-WAO-04 — sync disabled du CTA depuis la valeur live du textarea (pas draft stale). */
   function syncWrongAnswerSubmitEnabled() {
     const submit = app.querySelector("#wrong-submit");
     if (!submit) return;
+    const input = app.querySelector("#wrong-input");
+    if (input) draftText = input.value ?? draftText;
     const disabled = wrongAnswerSubmitDisabled(draftText);
     submit.disabled = disabled;
+    submit.setAttribute("aria-disabled", disabled ? "true" : "false");
     submit.classList.toggle("btn-primary", !disabled);
     submit.classList.toggle("btn-secondary", disabled);
   }

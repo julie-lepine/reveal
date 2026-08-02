@@ -335,10 +335,55 @@ describe("renameLocalPlayer (I-09 / SYN-06)", () => {
     });
     renameLocalPlayer("Alicia");
     const tm = getState().truthMeterGame;
+    // Sans userId local : legacy name → nouveau pseudo (solo / guest sans UID).
     assert.deepEqual(tm.authorOrder, ["Bob", "Alicia", "Cam"]);
     assert.equal(tm.affirmation.author, "Alicia");
     assert.equal(tm.affirmation.text, "Alice loves pineapple");
     assert.equal(tm.matchScores.Alicia, 10);
+  });
+
+  it("TM-02: with local userId, legacy authorOrder/affirmation normalize to UID", () => {
+    seedAlice({
+      lobby: {
+        ...(getState().lobby || {}),
+        participants: [
+          { name: "Alice", isLocal: true, userId: "uid-alice", emoji: "🎭", color: "#A78BFA" },
+          { name: "Bob", isLocal: false, userId: "uid-bob", emoji: "🎲", color: "#34D399" },
+        ],
+      },
+      truthMeterGame: {
+        ...getState().truthMeterGame,
+        authorOrder: ["Bob", "Alice"],
+        affirmation: { text: "hi", author: "Alice" },
+      },
+    });
+    renameLocalPlayer("Alicia");
+    const tm = getState().truthMeterGame;
+    assert.deepEqual(tm.authorOrder, ["Bob", "uid-alice"]);
+    assert.equal(tm.affirmation.authorUid, "uid-alice");
+    assert.equal(tm.affirmation.author, "Alicia");
+  });
+
+  it("TM-02: UID authorOrder entries are not rewritten on rename", () => {
+    seedAlice({
+      lobby: {
+        ...(getState().lobby || {}),
+        participants: [
+          { name: "Alice", isLocal: true, userId: "uid-alice", emoji: "🎭", color: "#A78BFA" },
+          { name: "Bob", isLocal: false, userId: "uid-bob", emoji: "🎲", color: "#34D399" },
+        ],
+      },
+      truthMeterGame: {
+        ...getState().truthMeterGame,
+        authorOrder: ["uid-bob", "uid-alice"],
+        affirmation: { text: "hi", authorUid: "uid-alice", author: "Alice" },
+      },
+    });
+    renameLocalPlayer("Alicia");
+    const tm = getState().truthMeterGame;
+    assert.deepEqual(tm.authorOrder, ["uid-bob", "uid-alice"]);
+    assert.equal(tm.affirmation.authorUid, "uid-alice");
+    assert.equal(tm.affirmation.author, "Alicia");
   });
 
   it("trivia standings keep higher score on name collision", () => {

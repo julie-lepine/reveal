@@ -389,6 +389,12 @@ describe("BUG-WAO-02/03 — wiring wrongAnswer.js", () => {
     assert.match(src, /syncWrongAnswerSubmitEnabled\(\)/);
     assert.match(src, /id="wrong-submit"/);
     assert.match(src, /submitDisabled \? " disabled"/);
+    // Refresh chrome hôte (answers distants) réaffirme aussi le CTA.
+    const refreshFn = src.match(
+      /function refreshWrongAnswerResponseProgress\(\) \{[\s\S]*?\n  \}/
+    )?.[0];
+    assert.ok(refreshFn);
+    assert.match(refreshFn, /syncWrongAnswerSubmitEnabled\(\)/);
   });
 
   it("refresh réponse ne fait plus slot.innerHTML (bouton pré-monté)", () => {
