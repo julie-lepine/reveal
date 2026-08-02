@@ -783,18 +783,20 @@ export function mountHotTake(app) {
             </div>`;
         }).join("")}
         ${hotTakePlayerVotesHtml(revealVotes, crownOpt)}
-        ${gameCumulativeScoresHtml({
-          gameLabel: "Hot Take",
-          title: "Cumul des scores",
-          scores: hotTakeSessionScores(),
-        })}
+        <div class="reveal-mid-action">
         ${
           host
             ? `<button type="button" class="btn btn-primary btn--spaced" id="next-take">
           ${takeIdx < total - 1 ? "Prochain Hot Take →" : "Voir le podium →"}
         </button>`
             : `<p class="hint">En attente de l'hôte pour la suite…</p>`
-        }`;
+        }
+        </div>
+        ${gameCumulativeScoresHtml({
+          gameLabel: "Hot Take",
+          title: "Cumul des scores",
+          scores: hotTakeSessionScores(),
+        })}`;
     }
 
     if (phase === "final") {

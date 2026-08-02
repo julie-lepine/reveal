@@ -624,6 +624,16 @@ body.has-top-ad .back{
 }
 
 .btn--spaced{ margin-top:20px; }
+/* UX-HOST-01 — conclusion du reveal mid-round (CTA/hint) avant infos complémentaires */
+.reveal-mid-action{
+  margin-top:0.75rem;
+  margin-bottom:0.35rem;
+}
+.reveal-mid-action .btn--spaced{ margin-top:0.35rem; }
+.reveal-mid-action + .game-scores-box,
+.reveal-mid-action + .card.game-scores-box{
+  margin-top:1.1rem;
+}
 
 .game-card--disabled{
   opacity:.5;

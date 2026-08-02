@@ -842,18 +842,20 @@ export function mountConsensus(app) {
           lastRound,
           players: getActivePlayers(),
         })}
-        ${renderConsensusScoreboard({
-          standings,
-          title: "Classement en direct",
-          deltaMap: lastRound?.deltas || {},
-        })}
+        <div class="reveal-mid-action">
         ${
           !mp || canActAsHost()
             ? `<button type="button" class="btn btn-primary btn--spaced" id="btn-consensus-next">
                 ${questionIdx < totalQuestions - 1 ? "Question suivante →" : "Voir le podium →"}
               </button>`
             : `<p class="hint">En attente de l'hôte pour la suite…</p>`
-        }`;
+        }
+        </div>
+        ${renderConsensusScoreboard({
+          standings,
+          title: "Classement en direct",
+          deltaMap: lastRound?.deltas || {},
+        })}`;
     } else {
       phaseHtml = `
         ${finalConsensusResultsHtml({

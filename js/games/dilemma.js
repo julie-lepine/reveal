@@ -385,11 +385,6 @@ export function mountDilemma(app) {
       <h3 class="section-title">Résultats</h3>
       ${dividedBanner}
       ${awardLine}
-      ${gameCumulativeScoresHtml({
-        gameLabel: "Dilemma",
-        title: "Cumul des scores",
-        scores: dilemmaSessionScores(),
-      })}
       <div class="dilemma__result-row ${majority === "A" ? "dilemma__result-row--winner" : ""}">
         <div class="dilemma__result-head">
           <span>Option A</span>
@@ -424,13 +419,20 @@ export function mountDilemma(app) {
           })
           .join("")}
       </div>
+      <div class="reveal-mid-action">
       ${
         host
           ? `<button type="button" class="btn btn-primary btn--spaced" id="next-round">
           ${roundIdx < totalRounds - 1 ? "Manche suivante →" : "Voir les résultats →"}
         </button>`
           : `<p class="hint">En attente de l'hôte pour la suite…</p>`
-      }`;
+      }
+      </div>
+      ${gameCumulativeScoresHtml({
+        gameLabel: "Dilemma",
+        title: "Cumul des scores",
+        scores: dilemmaSessionScores(),
+      })}`;
   }
 
   function countPlayersVoted(votesMap = votes) {

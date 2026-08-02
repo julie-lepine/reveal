@@ -466,7 +466,6 @@ export function mountGuessLie(app) {
           <p class="feedback-title">${revealFeedbackTitle({ isSubject: localName === round.player, myCorrect, liarBonus })}</p>
           <p class="feedback-sub">${correct.length} détective(s) sur ${voterNames.length}${liarBonus ? ` · ${escapeHtml(round.player)} +${GUESS_LIE_LIAR_POINTS} pts` : ""}</p>
         </div>
-        ${gameCumulativeScoresHtml({ gameId: "guesslie", gameLabel: "Guess The Lie", title: "Cumul des scores" })}
         <div class="card card--votes">
           ${Object.entries(all)
             .map(
@@ -478,13 +477,16 @@ export function mountGuessLie(app) {
             )
             .join("")}
         </div>
+        <div class="reveal-mid-action">
         ${
           !mp || canActAsHost()
             ? `<button type="button" class="btn btn-primary btn--spaced" id="next-round">
           ${roundIdx >= total - 1 ? "Voir les résultats →" : "Manche suivante →"}
         </button>`
             : `<p class="hint">En attente de l'hôte pour la suite…</p>`
-        }`;
+        }
+        </div>
+        ${gameCumulativeScoresHtml({ gameId: "guesslie", gameLabel: "Guess The Lie", title: "Cumul des scores" })}`;
     }
 
     app.innerHTML = pageShell({

@@ -406,11 +406,7 @@ export function mountPlaylistGuess(app) {
     if (phase === "reveal" && revealSummary) {
       body = `
         ${revealResultCardHtml(revealSummary)}
-        ${gameCumulativeScoresHtml({
-          gameId: "playlistguess",
-          gameLabel: "VibeCheck",
-          title: "Cumul des scores",
-        })}
+        <div class="reveal-mid-action">
         ${
           !mp || canActAsHost()
             ? `<button type="button" class="btn btn-primary btn--spaced" id="next-round">
@@ -418,6 +414,12 @@ export function mountPlaylistGuess(app) {
         </button>`
             : `<p class="hint">En attente de l'hôte pour la suite…</p>`
         }
+        </div>
+        ${gameCumulativeScoresHtml({
+          gameId: "playlistguess",
+          gameLabel: "VibeCheck",
+          title: "Cumul des scores",
+        })}
         ${gameExitBarHtml()}
         <div class="screen-bottom-spacer" aria-hidden="true"></div>`;
     }

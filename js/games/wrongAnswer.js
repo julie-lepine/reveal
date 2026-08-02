@@ -385,18 +385,20 @@ export function mountWrongAnswer(app) {
         <p class="wrong-prompt__q">${escapeHtml((data.prompt || currentPrompt)?.prompt || "…")}</p>
       </div>
       <div class="wrong-reveal-list">${cards}</div>
-      ${gameCumulativeScoresHtml({
-        gameLabel: "Wrong Answer Only",
-        title: "Cumul des scores",
-        scores: sessionScores(),
-      })}
+      <div class="reveal-mid-action">
       ${
         !mp || canActAsHost()
           ? `<button type="button" class="btn btn-primary btn--spaced" id="next-round">
               ${roundIdx < totalRounds - 1 ? "Manche suivante →" : "Voir les résultats →"}
             </button>`
           : `<p class="hint">En attente de l'hôte pour la suite…</p>`
-      }`;
+      }
+      </div>
+      ${gameCumulativeScoresHtml({
+        gameLabel: "Wrong Answer Only",
+        title: "Cumul des scores",
+        scores: sessionScores(),
+      })}`;
   }
 
   /** BUG-WAO-02 — chrome phase réponse sans toucher #wrong-input ni slot.innerHTML. */

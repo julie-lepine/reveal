@@ -822,18 +822,20 @@ export function mountTruthMeter(app) {
           <div id="truth-reveal-awards">${revealAwardLinesHtml(metrics, affirmation)}</div>
         </div>
         ${spreadHtml(votesToShow, authorRevealed)}
-        ${gameCumulativeScoresHtml({
-          gameLabel: "TruthMeter",
-          title: "Cumul des scores",
-          scores: truthMeterSessionScores(),
-        })}
+        <div class="reveal-mid-action">
         ${
           host
             ? `<button type="button" class="btn btn-primary btn--spaced" id="next-round">
           ${roundIdx < total - 1 ? "Joueur suivant →" : "Voir les résultats →"}
         </button>`
             : `<p class="hint">En attente de l'hôte…</p>`
-        }`;
+        }
+        </div>
+        ${gameCumulativeScoresHtml({
+          gameLabel: "TruthMeter",
+          title: "Cumul des scores",
+          scores: truthMeterSessionScores(),
+        })}`;
     }
 
     app.innerHTML = pageShell({

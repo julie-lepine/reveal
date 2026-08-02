@@ -16,10 +16,10 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 
 | | |
 |--|--|
-| **Maintenant** | **ARCH-10** — clear cache leave lobby |
-| **Ensuite** | **UX-HOST-01** · UX-CHAT / DEVICE |
+| **Maintenant** | **UX-HOST-01** — hiérarchie reveal mid-round (impl. · QA Pages) |
+| **Ensuite** | UX-CHAT / DEVICE · GAME-* |
 | **Dernière clôture** | **BUG-LOBBY-XX-E** ✅ · **OPS-LOBBY-04** ✅ · **BUG-TRUTHMETER-02** ✅ (QA) · **BUG-TIERNIGHT-03** ✅ · **BUG-WAO-04** ✅ · **BUG-WAO-02** ✅ · **BUG-WAO-03** ✅ · **BUG-TIERNIGHT-04** ✅ · **BUG-TIERNIGHT-05** ✅ |
-| **En attente QA** | **ARCH-23** Vague 1 (SQL ✅ floor=1) — QA différée au prochain déploiement Android/iOS de test |
+| **En attente QA finale** | **ARCH-23** (SQL ✅) · **ARCH-10** mobile · **UX-HOST-01** QA Pages |
 
 ---
 
@@ -29,19 +29,19 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 
 | ID | Cause | Problème | Priorité |
 |----|-------|----------|----------|
-| **ARCH-10** | 8 | Clear cache leave lobby trop tard | 🟡 preuve tests · QA |
+| **UX-HOST-01** | 11 | CTA hôte — hiérarchie reveal mid-round | 🟢 impl. · QA Pages |
 
-### Prioritaire (QA différée)
+### Prioritaire (QA différée / finale)
 
 | ID | Cause | Problème | Priorité |
 |----|-------|----------|----------|
-| **ARCH-23** | 8/11 | Détection compatibilité client (natif) + hard gate | 🟡 Vague 1 · SQL ✅ · **QA différée** (prochain deploy natif de test) |
+| **ARCH-23** | 8/11 | Détection compatibilité client (natif) + hard gate | 🟡 Vague 1 · SQL ✅ · **QA différée** (deploy natif de test) |
+| **ARCH-10** | 8 | Clear cache leave lobby trop tard | 🟢 fonctionnel ✅ GH Pages · **mobile → QA finale** |
 
 ### Autres
 
 | ID | Cause | Problème | Priorité |
 |----|-------|----------|----------|
-| **UX-HOST-01** | 11 | CTA hôte « manche / question suivante » au-dessus du classement (fin de manche) | 🟡 |
 | **UX-CHAT-01** | 11 | Pas de message système au lancement d'un jeu | 🟡 |
 | **UX-CHAT-02** | 11 | Clavier s'ouvre automatiquement à l'ouverture du chat | 🟡 |
 | **UX-DEVICE-01** | 11 | Écran verrouillé pendant une partie (Wake Lock API) | 🟡 |
@@ -144,10 +144,10 @@ Hors scope volontaire (autres causes) : rollback votes dilemma/speedVote/truthMe
 |----|----------|------|
 | **ARCH-23** | Version cliente vs attendue · refresh forcé | 🟡 ouvert — post-mortem 01B-bis |
 | **ARCH-05** | `row.screen` en retard vs lobby | 🟡 mitigé ; hors scope routing |
-| **ARCH-10** | Cache session clear trop tard au leave | 🟡 preuve tests · QA ouverte |
+| **ARCH-10** | Cache session clear trop tard au leave | 🟢 QA Pages ✅ · mobile → QA finale |
 | **ARCH-01** | Démo locale sans avertissement MP | 🟡 |
 
-#### ARCH-10 — Invalidation précoce cache session MP (ouvert)
+#### ARCH-10 — Invalidation précoce cache session MP (ouvert · résidu mobile)
 
 Contrat : après leave/kick/dissolve **confirmé**, `invalidateCurrentLobbySessionCache()` avant `signOut` / teardown — évite UI stale pendant signOut lent.
 
@@ -155,8 +155,10 @@ Contrat : après leave/kick/dissolve **confirmé**, `invalidateCurrentLobbySessi
 |--|--|
 | **Livré (code)** | Helper `invalidateCurrentLobbySessionCache` · wiring leave volontaire · kick · dissolve hôte · XX-E exit · `performLobbyBoundaryTeardown` |
 | **Preuve** | `arch10SessionCache.test.js` (13) — miroir contrat + source (pas d’import `gameSync` Node) |
-| **Hors scope** | Leave server-only Vague D · QA terrain leave mid-game / A→B |
-| **Statut** | 🟡 code + tests · **pas clôturé** — QA terrain requise |
+| **QA Pages** | ✅ validé fonctionnellement (GitHub Pages) — leave / kick / dissolve / non-régression web |
+| **Résidu** | Contrôle **mobile** de non-régression (Capacitor / store test) **à inclure dans la QA finale** (même vague que ARCH-23 natif) |
+| **Hors scope** | Leave server-only Vague D |
+| **Statut** | 🟢 fonctionnel validé · **pas clôturé** tant que le check mobile QA finale n’est pas fait |
 
 #### ARCH-23 — Compatibilité client native + hard gate (Vague 1 · ouvert)
 
@@ -319,7 +321,7 @@ Retour terrain multi-jeux. Priorités : 🔴 critique · 🟠 haute · 🟡 moye
 | ID | Problème | Analyse / attendu |
 |----|----------|-------------------|
 | **ARCH-23** | Version cliente vs déploiement | Au boot et/ou au join lobby : comparer version locale à une version attendue (manifest / endpoint / config distante). Si décalage : bloquer le flux jeu et forcer reload, message du type « Une nouvelle version de REVEAL est disponible. Rechargez l'application pour continuer. ». Motive : soirées-test avec client GH Pages / PWA en retard sur migrations SQL → bugs indiagnosticables (ex. 01B-bis). |
-| **UX-HOST-01** | CTA hôte au-dessus du classement | En fin de manche (écran reveal / récap), le bouton hôte « Question / manche suivante » (ou équivalent podium) est **sous** le classement → scroll inutile. Attendu : CTA principal hôte **au-dessus** du classement, visible sans scroller. Périmètre : jeux avec reveal + standings + action hôte (ex. Trivia `btn-trivia-next`) · inventorier les autres jeux concernés avant patch. |
+| **UX-HOST-01** | CTA hôte au-dessus du classement | ✅ implémenté — hiérarchie mid-round reveal → action → cumul · QA Pages ouverte · `uxHost01RevealHierarchy.test.js` |
 | **UX-CHAT-01** | Message système au lancement jeu | Joueurs dans le chat au moment du launch ne voient pas le changement. Attendu : message auto ex. « 🎮 L'hôte a lancé une partie de Trivia. » visible quelques secondes dans le chat. |
 | **UX-CHAT-02** | Clavier auto à l'ouverture chat | Le champ prend le focus immédiatement · clavier apparaît. Attendu : ouvrir le chat sans focus · clavier uniquement après clic volontaire. |
 | **UX-DEVICE-01** | Mise en veille pendant partie | Écran verrouillé si téléphone posé. À étudier : Screen Wake Lock API (ou équivalent) tant que lobby actif · relâcher au leave · fallback propre si API indisponible. |
@@ -457,8 +459,8 @@ Hors file prioritaire — opportunité / régression :
 - Fil Rouge SQL historique — ops Supabase séparée · fail docs `filRougeVague3Cleanup` hors Membership
 - **ARCH-23** : clients / PWA / cache Pages en retard sur migrations (leçon 01B-bis)
 
-**Surveiller** : Clutch taps sous latence (SYN-26) · ready prep après Recommencer · conflit pending join vs chrome Home membership · leave multi-onglets après dissolve (modale « connexion a empêché ») · **ARCH-23** (clients stale post-deploy)
+**Surveiller** : Clutch taps sous latence (SYN-26) · ready prep après Recommencer · conflit pending join vs chrome Home membership · leave multi-onglets après dissolve · **ARCH-23** (clients stale) · **ARCH-10** non-régression mobile (QA finale)
 
 ---
 
-*Suivi vivant · MAJ 2026-08-02 — Focus **ARCH-10** · **ARCH-23** QA différée (SQL ✅ floor=1) · **XX-E ✅** · **OPS-04 ✅***
+*Suivi vivant · MAJ 2026-08-02 — **UX-HOST-01** impl. (reveal→action→cumul) · QA Pages ouverte · **ARCH-10** Pages ✅ · **ARCH-23** QA différée*

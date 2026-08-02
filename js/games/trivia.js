@@ -543,18 +543,20 @@ export function mountTrivia(app) {
           correctIndex: correctIdx,
         })}
         ${revealBlock()}
-        ${renderTriviaScoreboard({
-          standings,
-          title: "Classement en direct",
-          deltaMap: lastRound?.deltas || {},
-        })}
+        <div class="reveal-mid-action">
         ${
           !mp || canActAsHost()
             ? `<button type="button" class="btn btn-primary btn--spaced" id="btn-trivia-next">
                 ${questionIdx < totalQuestions - 1 ? "Question suivante →" : "Voir le podium →"}
               </button>`
             : `<p class="hint">En attente de l'hote pour la suite…</p>`
-        }`;
+        }
+        </div>
+        ${renderTriviaScoreboard({
+          standings,
+          title: "Classement en direct",
+          deltaMap: lastRound?.deltas || {},
+        })}`;
     } else {
       phaseHtml = renderTriviaResults({
         standings,

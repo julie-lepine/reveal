@@ -226,11 +226,6 @@ export function mountSpeedVote(app) {
     return `
       <h3 class="section-title">Résultats du vote</h3>
       ${awardHtml}
-      ${gameCumulativeScoresHtml({
-        gameLabel: "SpeedVote",
-        title: "Cumul des scores",
-        scores: speedVoteSessionScores(),
-      })}
       ${bars}
       <div class="card card--votes">
         ${Object.entries(votes)
@@ -244,13 +239,20 @@ export function mountSpeedVote(app) {
           })
           .join("")}
       </div>
+      <div class="reveal-mid-action">
       ${
         host
           ? `<button type="button" class="btn btn-primary btn--spaced" id="next-round">
           ${roundIdx < QUESTIONS.length - 1 ? "Prochaine question →" : "Voir les résultats →"}
         </button>`
           : `<p class="hint">En attente de l'hôte pour la suite…</p>`
-      }`;
+      }
+      </div>
+      ${gameCumulativeScoresHtml({
+        gameLabel: "SpeedVote",
+        title: "Cumul des scores",
+        scores: speedVoteSessionScores(),
+      })}`;
   }
 
   function render() {

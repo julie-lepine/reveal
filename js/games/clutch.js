@@ -460,18 +460,20 @@ export function mountClutch(app) {
       <h3 class="section-title">Verdict de la manche</h3>
       <p class="hint">🎯 La cible était <strong>${escapeHtml(formatClutchSeconds(targetMs))}</strong></p>
       <div class="clutch-rank">${rows}</div>
-      ${gameCumulativeScoresHtml({
-        gameLabel: "Clutch",
-        title: "Cumul des scores",
-        scores: sessionScores(),
-      })}
+      <div class="reveal-mid-action">
       ${
         host
           ? `<button type="button" class="btn btn-primary btn--spaced" id="next-round">
               ${roundIdx < totalRounds - 1 ? "Manche suivante →" : "Voir les résultats →"}
             </button>`
           : `<p class="hint">En attente de l'hôte pour la suite…</p>`
-      }`;
+      }
+      </div>
+      ${gameCumulativeScoresHtml({
+        gameLabel: "Clutch",
+        title: "Cumul des scores",
+        scores: sessionScores(),
+      })}`;
   }
 
   function render() {
