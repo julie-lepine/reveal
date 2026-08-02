@@ -20,6 +20,7 @@ import { navigate, getCurrentScreen } from "./router.js";
 import { getLobbyParticipants, getLobbyStatus, getLobbyGameId, isLobbyEveningStarted } from "./lobby.js";
 import { getActivePlayerNames, getActivePlayers } from "./players.js";
 import { mergeMatchScoresLocal } from "./gameScores.js";
+import { hydrateTruthMeterMatchScores, isTruthMeterRemoteScoreAuthority } from "./truthMeterVoteCommit.js";
 import { mergeGameScoreOrder } from "./gameScoreOrder.js";
 import { mergeClutchTapsFrozen } from "./clutchTapCommit.js";
 import {
@@ -1884,17 +1885,24 @@ function mergeTruthMeterGameLocal(local, remote) {
   if (!local) return remote;
   const newVoteRound = isNewTruthMeterVoteRound(local, remote);
   const newRound = isNewTruthMeterRound(local, remote);
+  const runChanged =
+    Boolean(remote.runId) &&
+    Boolean(local.runId) &&
+    remote.runId !== local.runId;
+  const remoteIsScoredAuthority = isTruthMeterRemoteScoreAuthority(local, remote);
+
   const remoteVotes = remote.votes || {};
   const localVotes = local.votes || {};
   let votes = remoteVotes;
-  if (newVoteRound) {
+  if (remoteIsScoredAuthority) {
+    // Reveal / nouveau run : la session serveur est la vérité (pas de merge optimiste).
+    votes = remoteVotes;
+  } else if (newVoteRound) {
     votes = remoteVotes;
   } else if (remote.phase === "voting" || local.phase === "voting") {
     votes = { ...remoteVotes, ...localVotes };
   } else if (
-    remote.phase === "reveal" ||
     remote.phase === "reveal-pending" ||
-    local.phase === "reveal" ||
     local.phase === "reveal-pending"
   ) {
     votes = { ...remoteVotes, ...localVotes };
@@ -1904,17 +1912,27 @@ function mergeTruthMeterGameLocal(local, remote) {
     !remote.lobbyStarted && !local.lobbyStarted
       ? mergeReadyMapsLocal(local.ready || {}, remote.ready || {}, getActivePlayerNames(), getLocalDisplayName())
       : remote.ready || {};
+
+  const matchScores = hydrateTruthMeterMatchScores(local, remote);
+  const lastRound = remoteIsScoredAuthority
+    ? remote.lastRound ?? null
+    : remote.lastRound ?? local.lastRound ?? null;
+
   return {
     ...local,
     ...remote,
     phase: mergeTruthMeterPhase(local.phase, remote.phase, {
-      newRound: newVoteRound || newRound,
+      newRound: newVoteRound || newRound || runChanged,
     }),
     votes,
     ready,
-    roundScored: mergeRoundFlag(local.roundScored, remote.roundScored, newVoteRound),
-    matchScores: mergeMatchScoresLocal(local.matchScores || {}, remote.matchScores || {}),
-    lastRound: remote.lastRound ?? local.lastRound ?? null,
+    roundScored: mergeRoundFlag(
+      local.roundScored,
+      remote.roundScored,
+      newVoteRound || runChanged
+    ),
+    matchScores,
+    lastRound,
   };
 }
 

@@ -16,7 +16,6 @@ import {
   normalizePlayerVotesMap,
   applyRemoteSession,
   refreshGameSession,
-  patchGameState,
 } from "./gameSync.js";
 import { launchGameWithSync, commitHostGamePlay, commitPrepReadyToggle } from "./mpLaunch.js";
 import { formatSyncErrorMessage } from "./authErrors.js";
@@ -25,6 +24,7 @@ import {
   compensateTruthMeterLocalVote,
   isTruthMeterVoteNetworkUncertainty,
   resolveConfirmedTruthMeterVote,
+  countConfirmedVoterVotesInMap,
 } from "./truthMeterVoteCommit.js";
 import { createTruthMeterRunId } from "./truthMeterRunId.js";
 import {
@@ -50,6 +50,9 @@ export {
   computeTruthMeterVoteApply,
   compensateTruthMeterLocalVote,
   resolveConfirmedTruthMeterVote,
+  countConfirmedVoterVotesInMap,
+  hydrateTruthMeterMatchScores,
+  isTruthMeterRemoteScoreAuthority,
 } from "./truthMeterVoteCommit.js";
 
 export {
@@ -344,15 +347,9 @@ export async function commitTruthMeterReveal() {
     if (row) applyRemoteSession(row);
     const synced = getTruthMeterSession();
     if (isLobbyHost() && synced.roundScored && synced.lastRound) {
+      // Soirée : cumul local idempotent. Pas de patchGameState evening ici —
+      // un RMW hôte post-reveal peut réécrire un blob stale et diverger des invités.
       applyTruthMeterEveningFromLastRound(synced);
-      try {
-        await patchGameState(
-          {},
-          { gameId: "truthmeter", screen: "truthmeter", withEveningScores: true }
-        );
-      } catch (e) {
-        console.warn("REVEAL truthMeter evening scores:", e);
-      }
     }
     return synced;
   } catch (err) {
@@ -541,9 +538,21 @@ export function allTruthMeterVotesIn(session = getTruthMeterSession()) {
   return voters.every((n) => votes[n] != null && Number.isFinite(votes[n]));
 }
 
+/**
+ * Compteur hôte « Révéler maintenant X/Y » — votes confirmés session uniquement
+ * (pas de draft / pending / in-flight).
+ */
+export function countConfirmedTruthMeterVoterVotes(
+  session = getTruthMeterSession(),
+  voterNames = getVoterNames()
+) {
+  const names = voterNames.length ? voterNames : getTruthMeterParticipantNames(session);
+  const votes = normalizePlayerVotesMap(session?.votes || {}, names);
+  return countConfirmedVoterVotesInMap(votes, names);
+}
+
 export function countTruthMeterVotes(session = getTruthMeterSession()) {
-  const voters = getVoterNames();
-  return Object.keys(normalizePlayerVotesMap(session.votes || {}, voters)).length;
+  return countConfirmedTruthMeterVoterVotes(session);
 }
 
 export function getTruthMeterEntryScreen() {

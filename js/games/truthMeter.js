@@ -20,6 +20,7 @@ import {
   commitTruthMeterVote,
   commitTruthMeterReveal,
   allTruthMeterVotesIn,
+  countConfirmedTruthMeterVoterVotes,
   simulateTruthMeterVotes,
   computeRoundMetrics,
   filterVoterVotes,
@@ -198,6 +199,8 @@ export function mountTruthMeter(app) {
   let voteCommitInFlight = null;
   /** @type {Promise<unknown>|null} */
   let voteCommitPromise = null;
+  /** Snapshot des votes déjà peints (détecte les votes distants après applyRemoteSession). */
+  let lastRenderedVotesJson = JSON.stringify({});
   let displayTimeoutId = null;
   let revealPendingTimeoutId = null;
   let nextRoundInFlight = false;
@@ -240,9 +243,17 @@ export function mountTruthMeter(app) {
     return draftEstimate;
   }
 
+  /** Votes confirmés session pour scoring UI reveal (sans draft pending). */
+  function confirmedVoterVotes() {
+    const author = affirmation?.author || getCurrentAuthor();
+    return filterVoterVotes({ ...(getTruthMeterSession().votes || {}) }, author);
+  }
+
   function votesForAward() {
     const author = affirmation?.author || getCurrentAuthor();
     let fromSession = { ...(getTruthMeterSession().votes || {}) };
+    // In-flight confirmé en cours d'envoi : utile pour ensureLocal / force reveal local,
+    // pas pour le compteur hôte (voir countConfirmedTruthMeterVoterVotes).
     if (voteCommitInFlight != null && fromSession[localName] == null) {
       fromSession[localName] = voteCommitInFlight;
     }
@@ -371,8 +382,9 @@ export function mountTruthMeter(app) {
 
   function revealMetricsForDisplay() {
     const authorName = affirmation?.author;
-    const votesToShow = votesForAward();
     const sessionRound = getTruthMeterSession().lastRound;
+    // Affichage reveal : préférer votes confirmés session (pas le draft pending).
+    const votesToShow = confirmedVoterVotes();
     return {
       votesToShow,
       metrics: {
@@ -444,6 +456,11 @@ export function mountTruthMeter(app) {
 
   async function goToRevealPending() {
     if (mp) {
+      const live = getTruthMeterSession();
+      if (live.phase === "reveal" || live.roundScored) {
+        syncFromSession();
+        return;
+      }
       await commitTruthMeterPlay({
         phase: "reveal-pending",
         voteEndsAt: null,
@@ -717,7 +734,10 @@ export function mountTruthMeter(app) {
             }</button>`;
       }
       if (host) {
-        const votedCount = Object.keys(votesForAward()).length;
+        const votedCount = countConfirmedTruthMeterVoterVotes(
+          getTruthMeterSession(),
+          getVoterNames()
+        );
         const totalVoters = getVoterNames().length;
         phaseHtml += `
           <button type="button" class="btn btn-secondary btn--spaced" id="truth-force">
@@ -1000,17 +1020,46 @@ export function mountTruthMeter(app) {
   }
 
   /** Évite de détruire le textarea / slider à chaque poll multijoueur. */
-  function shouldSkipFullRender(prevPhase, prevRound, prevVotesJson) {
+  function shouldSkipFullRender(prevPhase, prevRound) {
     if (phase !== prevPhase || roundIdx !== prevRound) return false;
     if (phase === "writing" && getCurrentAuthor() === localName) return true;
     if (phase === "voting") {
+      // Comparer au dernier paint (pas au store pré-sync) : applyRemoteSession
+      // a déjà écrit les votes avant onGameSessionChange.
       const votesNow = JSON.stringify(getTruthMeterSession().votes || {});
-      if (votesNow !== prevVotesJson) return false;
+      if (votesNow !== lastRenderedVotesJson) return false;
       return true;
     }
     if (phase === "reveal-pending") return true;
-    if (phase === "reveal") return true;
+    if (phase === "reveal") {
+      const scoresNow = JSON.stringify(getTruthMeterSession().matchScores || {});
+      const lastScores = lastRenderedVotesJson.startsWith("reveal:")
+        ? lastRenderedVotesJson.slice("reveal:".length)
+        : null;
+      // Re-render si matchScores distants changent (convergence post-reveal).
+      if (lastScores != null && scoresNow !== lastScores) return false;
+      return true;
+    }
     return false;
+  }
+
+  function markRenderedSessionSnapshot() {
+    if (phase === "reveal") {
+      lastRenderedVotesJson = `reveal:${JSON.stringify(getTruthMeterSession().matchScores || {})}`;
+    } else {
+      lastRenderedVotesJson = JSON.stringify(getTruthMeterSession().votes || {});
+    }
+  }
+
+  function refreshForceRevealCounter() {
+    const btn = app.querySelector("#truth-force");
+    if (!btn || phase !== "voting") return;
+    const votedCount = countConfirmedTruthMeterVoterVotes(
+      getTruthMeterSession(),
+      getVoterNames()
+    );
+    const totalVoters = getVoterNames().length;
+    btn.textContent = `Révéler maintenant (${votedCount}/${totalVoters})`;
   }
 
   function scheduleDisplayToVote() {
@@ -1105,7 +1154,6 @@ export function mountTruthMeter(app) {
 
     const prevPhase = phase;
     const prevRound = roundIdx;
-    const prevVotesJson = JSON.stringify(getTruthMeterSession().votes || {});
     const ahTokenNow = getActingHostUiRefreshToken();
     const actingHostUiRefresh = needsActingHostUiRefresh(
       lastAckedActingHostToken,
@@ -1124,6 +1172,7 @@ export function mountTruthMeter(app) {
       draftText = "";
       voteCommitInFlight = null;
       voteCommitPromise = null;
+      lastRenderedVotesJson = "";
     }
     if (phase !== prevPhase && phase !== "voting") {
       voteCommitInFlight = null;
@@ -1145,12 +1194,17 @@ export function mountTruthMeter(app) {
         await ensureLocalVoteCommitted();
         if (!mount.isMounted()) return;
         if (!mount.isCurrentMount()) return;
+        if (getTruthMeterSession().phase === "reveal") {
+          syncFromSession();
+          render();
+          return;
+        }
         await goToRevealPending();
       })();
       return;
     }
 
-    const skipFull = shouldSkipFullRender(prevPhase, prevRound, prevVotesJson);
+    const skipFull = shouldSkipFullRender(prevPhase, prevRound);
     arch03AhLogSkipDecision("truthMeter", {
       decision: skipFull && !actingHostUiRefresh ? "skip-full-render" : "full-render",
       skipFull,
@@ -1159,6 +1213,10 @@ export function mountTruthMeter(app) {
       phase,
     });
     if (skipFull && !actingHostUiRefresh) {
+      if (phase === "voting") {
+        refreshForceRevealCounter();
+        markRenderedSessionSnapshot();
+      }
       if (phase === "reveal" || phase === "voting") {
         refreshGameScoresBox(app, {
           gameLabel: "TruthMeter",
@@ -1168,11 +1226,13 @@ export function mountTruthMeter(app) {
       }
       if (phase === "reveal") {
         refreshRevealDom();
+        markRenderedSessionSnapshot();
       }
       return;
     }
 
     render();
+    markRenderedSessionSnapshot();
     lastAckedActingHostToken = ahTokenNow;
     if (phase === "display" && prevPhase !== "display" && (!mp || canActAsHost())) {
       scheduleDisplayToVote();
@@ -1200,6 +1260,7 @@ export function mountTruthMeter(app) {
 
   syncFromSession();
   render();
+  markRenderedSessionSnapshot();
   lastAckedActingHostToken = getActingHostUiRefreshToken();
   if (phase === "display" && (!mp || canActAsHost())) {
     scheduleDisplayToVote();

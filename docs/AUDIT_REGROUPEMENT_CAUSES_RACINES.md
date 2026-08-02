@@ -16,7 +16,7 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 
 | | |
 |--|--|
-| **Maintenant** | 🔴 **BUG-TRUTHMETER-01** (QA + migration prod 01B) · BUG-TIERNIGHT-04 · BUG-TIERNIGHT-05 |
+| **Maintenant** | 🔴 **BUG-TRUTHMETER-01** (re-QA terrain compteur+scores après fix) · BUG-TIERNIGHT-04 · BUG-TIERNIGHT-05 |
 | **Ensuite** | 🟠 BUG-WAO-02/03/04 · BUG-TIERNIGHT-03 · BUG-TRUTHMETER-02 · **OPS-LOBBY-04** · **ARCH-23** · ARCH-10 · **UX-HOST-01** |
 | **Dernière clôture** | **BUG-TRUTHMETER-01B** code 2026-08-02 (reveal atomique ; parent 01 ouvert jusqu’à QA+migration) · **01A** ✅ |
 
@@ -274,7 +274,7 @@ Retour terrain multi-jeux. Priorités : 🔴 critique · 🟠 haute · 🟡 moye
 | ~~**BUG-TRIVIA-01C**~~ | ~~UX réponse invité Trivia~~ | ✅ **Clôturé revue 2026-07-31** |
 | **BUG-TRUTHMETER-01** | Validations de vote instables (parent) | **01A** ✅ · **01B** ✅ code 2026-08-02 — `reveal_truth_meter_round` + `submit_truth_meter_vote` + `truth_meter_apply_reveal_scoring` (FOR UPDATE) · MP sans score client · auto-reveal Option A. **Parent ouvert** jusqu’à migration prod + QA terrain. |
 | ~~**BUG-TRUTHMETER-01A**~~ | ~~Faux succès UI / perte submit~~ | ✅ **Code 2026-08-02** |
-| ~~**BUG-TRUTHMETER-01B**~~ | ~~Course vote ↔ reveal~~ | ✅ **Code 2026-08-02** — SQL `game-sessions-truthmeter-01b-reveal-round.sql` · runbooks `supabase/tests/truthmeter-01b-*.sql` · `commitTruthMeterReveal`. Migration prod + QA à confirmer. |
+| ~~**BUG-TRUTHMETER-01B**~~ | ~~Course vote ↔ reveal~~ | ✅ **Code 2026-08-02** · fix QA 2026-08-02 (compteur `lastRenderedVotesJson` · `hydrateTruthMeterMatchScores` remplace Math.max post-reveal). Migration prod + **re-QA terrain** à confirmer. |
 | **BUG-TIERNIGHT-04** | Joueurs invisibles | Pendant certaines manches : certains joueurs ne voient plus un participant · listes différentes selon appareils. Vérifier sync listes joueurs pendant toute la manche. |
 | **BUG-TIERNIGHT-05** | Ancien vote repris dans nouvelle partie | Après nouvelle partie : sélection précédente réapparaît. Attendu : état entièrement vierge. Vérifier : reset local · reset Supabase · caches · état mémoire. |
 
@@ -429,4 +429,4 @@ Hors file prioritaire — opportunité / régression :
 
 ---
 
-*Suivi vivant · MAJ 2026-08-02 — **BUG-TRUTHMETER-01B** ✅ code · parent **01** 🔴 (migration+QA) · TierNight-04/05*
+*Suivi vivant · MAJ 2026-08-02 — **01B** fix QA compteur+hydrate · parent **01** 🔴 re-QA terrain · TierNight-04/05*

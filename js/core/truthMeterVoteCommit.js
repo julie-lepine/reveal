@@ -61,3 +61,38 @@ export function resolveConfirmedTruthMeterVote(session, localName) {
   const v = session?.votes?.[localName];
   return Number.isFinite(v) ? v : null;
 }
+
+/**
+ * Compte les votes confirmés parmi les votants attendus (clés déjà normalisées).
+ * Ne lit aucun draft UI.
+ */
+export function countConfirmedVoterVotesInMap(votes = {}, voterNames = []) {
+  return voterNames.filter((n) => Number.isFinite(votes?.[n])).length;
+}
+
+/** TruthMeter MP : remplace matchScores locaux dès que le serveur a scoré (ou nouveau run). */
+export function isTruthMeterRemoteScoreAuthority(local, remote) {
+  if (!remote) return false;
+  if (remote.runId && local?.runId && remote.runId !== local.runId) return true;
+  if (Boolean(remote.roundScored)) return true;
+  if (remote.phase === "reveal") return true;
+  return false;
+}
+
+function mergeMatchScoresMax(local = {}, remote = {}) {
+  const merged = { ...local };
+  Object.entries(remote).forEach(([name, pts]) => {
+    if (typeof pts === "number" && Number.isFinite(pts)) {
+      merged[name] = Math.max(merged[name] || 0, pts);
+    }
+  });
+  return merged;
+}
+
+/** Hydratation matchScores TruthMeter — remplacement si autorité serveur, sinon max. */
+export function hydrateTruthMeterMatchScores(local, remote) {
+  if (isTruthMeterRemoteScoreAuthority(local, remote)) {
+    return { ...(remote?.matchScores || {}) };
+  }
+  return mergeMatchScoresMax(local?.matchScores || {}, remote?.matchScores || {});
+}
