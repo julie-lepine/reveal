@@ -6,9 +6,8 @@ import {
 } from "../core/state.js";
 import {
   TIER_NIGHT_MODES,
-  TIER_NIGHT_MODIFIERS,
   TIER_NIGHT_ROSTER_TOPICS,
-  DEFAULT_TIER_NIGHT_MODIFIER,
+  DEFAULT_TIER_NIGHT_MODE,
 } from "../../data/tierTopics.js";
 import { navigate } from "../core/router.js";
 import {
@@ -80,17 +79,6 @@ function renderModeCard(mode) {
     </button>`;
 }
 
-function renderModifierChips(selected) {
-  return TIER_NIGHT_MODIFIERS.map(
-    (m) => `
-    <button type="button" class="tier-mod-chip ${m.id === selected ? "tier-mod-chip--active" : ""}"
-      data-modifier="${escapeHtml(m.id)}" title="${escapeHtml(m.desc)}">
-      <span class="tier-mod-chip__emoji">${m.emoji}</span>
-      <span class="tier-mod-chip__name">${escapeHtml(m.name)}</span>
-    </button>`
-  ).join("");
-}
-
 function renderRosterCard(topic) {
   return `
     <button type="button" class="tier-roster-card" data-roster="${escapeHtml(topic.id)}">
@@ -101,8 +89,7 @@ function renderRosterCard(topic) {
 
 export function mountTierNightSelect(app) {
   let step = "mode";
-  let selectedMode = "consensus";
-  let selectedModifier = DEFAULT_TIER_NIGHT_MODIFIER;
+  let selectedMode = DEFAULT_TIER_NIGHT_MODE;
 
   async function ensureHost() {
     if (isGameSyncActive() && !isLobbyHost()) {
@@ -118,7 +105,8 @@ export function mountTierNightSelect(app) {
   async function startGame(topicId, modeId) {
     if (!(await ensureHost())) return;
     const mode = modeId || selectedMode;
-    const modifier = mode === "consensus" ? selectedModifier : "normal";
+    // Variantes de manche retirées de l'UI : toujours normal.
+    const modifier = "normal";
 
     setTierNightMode(mode);
     setTierNightModifier(modifier);
@@ -142,6 +130,7 @@ export function mountTierNightSelect(app) {
       return;
     }
 
+    // roster → plateau partagé (state.tierNight / écran tiernight)
     if (isGameSyncActive()) {
       const result = await markTierNightClassicStarted({ topicId, mode, modifier });
       navigateAfterGameLaunch({ gameScreen: "tiernight", result });
@@ -157,34 +146,26 @@ export function mountTierNightSelect(app) {
         <h2 class="screen-title">Choisis un mode</h2>
         ${rulesButtonHtml("tiernight")}
       </div>
-      <p class="game-intro">Deux façons de jouer : classer des items ou classer le groupe.</p>
+      <p class="game-intro">Classe le groupe, ou vote en Rank live item par item.</p>
       <div class="tier-mode-list">
         ${TIER_NIGHT_MODES.map(renderModeCard).join("")}
       </div>`;
   }
 
   function listStepHtml() {
-    const live = selectedMode === "live";
-    const header = live ? "⚡ Mode En direct" : "📊 Mode Rank it";
-    const modifiersHtml = live
-      ? ""
-      : `<p class="field-label">Variante de manche</p>
-      <div class="tier-mod-row">${renderModifierChips(selectedModifier)}</div>`;
     return `
-      <p class="label-upper label-upper--gold">${header}</p>
+      <p class="label-upper label-upper--gold">⚡ Rank live</p>
       <div class="screen-title-row">
         <h2 class="screen-title">Choisis une tier list</h2>
         ${rulesButtonHtml("tiernight")}
       </div>
-
-      ${modifiersHtml}
 
       <button type="button" class="card card--clickable card--highlight card--create-tier" data-nav="tiernight-create">
         <div class="card-row">
           <span class="card-row__icon">➕</span>
           <div class="card-row__text">
             <p class="card-row__title">Créer ma tier list</p>
-            <p class="card-row__sub">Nom + items personnalisés</p>
+            <p class="card-row__sub">Puis jouer en Rank live</p>
           </div>
           <span class="card-row__chevron">›</span>
         </div>
@@ -255,14 +236,8 @@ export function mountTierNightSelect(app) {
       return;
     }
 
-    // step === "list" (Rank it ou live)
-    app.querySelectorAll("[data-modifier]").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        selectedModifier = btn.getAttribute("data-modifier");
-        render();
-      });
-    });
-    bindTierGrid(app, (id) => startGame(id, selectedMode));
+    // step === "list" (Rank live uniquement)
+    bindTierGrid(app, (id) => startGame(id, "live"));
   }
 
   const unsubSession = onGameSessionChange(

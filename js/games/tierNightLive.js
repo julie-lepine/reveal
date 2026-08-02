@@ -73,7 +73,7 @@ function makeItemLabel(list, players) {
 
 function headerHtml(list, idx, total) {
   return `
-    <p class="label-upper label-upper--gold">⚡ Tier Night · En direct</p>
+    <p class="label-upper label-upper--gold">⚡ Tier Night · Rank live</p>
     <div class="tier-game-header">
       <div class="tier-game-header__logo tier-logo-wrap--card">${tierLogoHtml(list, "tier-list-logo tier-list-logo--fill")}</div>
       <h1 class="tier-game-header__title">${escapeHtml(list.name)}</h1>

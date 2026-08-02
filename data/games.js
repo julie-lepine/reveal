@@ -117,7 +117,7 @@ export const GAMES = [
   {
     id: "tiernight-select",
     title: "TierNight",
-    desc: "Choisis une tier list, puis classe en S / A / B / C / D",
+    desc: "Classe le groupe ou Rank live — S / A / B / C / D",
     emoji: "🏆",
     cssClass: "tier",
     logo: "assets/games/tiernight.png",

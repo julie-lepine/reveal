@@ -74,23 +74,34 @@ describe("tierNight config distante", () => {
     const patch = tierNightConfigPatchFromRemoteState({
       tierNight: {
         topicId: null,
-        mode: "consensus",
+        mode: "roster",
         modifier: "normal",
       },
     });
 
     assert.deepEqual(patch, {
       tierNightTopicId: null,
-      tierNightMode: "consensus",
+      tierNightMode: "roster",
       tierNightModifier: "normal",
     });
+  });
+
+  it("normalise l'ancien mode Rank it (consensus) vers roster", () => {
+    const patch = tierNightConfigPatchFromRemoteState({
+      tierNight: {
+        topicId: "roster:apocalypse",
+        mode: "consensus",
+        modifier: "normal",
+      },
+    });
+    assert.equal(patch.tierNightMode, "roster");
   });
 
   it("fait primer la session live active sur le reset classic", () => {
     const patch = tierNightConfigPatchFromRemoteState({
       tierNight: {
         topicId: null,
-        mode: "consensus",
+        mode: "roster",
         modifier: "normal",
       },
       tierNightLive: {
@@ -239,7 +250,7 @@ describe("tierNight config distante", () => {
     );
   });
 
-  it("laisse une nouvelle partie Rank it active battre un ancien ecran recap", () => {
+  it("laisse une nouvelle partie plateau (Classe le groupe) active battre un ancien ecran recap", () => {
     assert.equal(
       shouldPreferTierNightEndRoute({
         declared: "tiernight-end",
@@ -256,7 +267,7 @@ describe("tierNight config distante", () => {
     );
   });
 
-  it("laisse une nouvelle partie Rank it active battre un ancien recap distant", () => {
+  it("laisse une nouvelle partie plateau active battre un ancien recap distant", () => {
     assert.equal(
       shouldPreferTierNightEndRoute({
         declared: "tiernight-end",
@@ -275,7 +286,7 @@ describe("tierNight config distante", () => {
     );
   });
 
-  it("prefere le recap Rank it quand la partie est terminee", () => {
+  it("prefere le recap plateau quand la partie est terminee", () => {
     assert.equal(
       shouldPreferTierNightEndRoute({
         declared: "tiernight-end",

@@ -2668,10 +2668,14 @@ export function tierNightToRemote({
   items,
   playerRoster,
 }) {
+  // Rank it (`consensus`) normalisé vers roster — plateau partagé Classe le groupe.
+  let normalizedMode = "roster";
+  if (mode === "live") normalizedMode = "live";
+  else if (mode === "roster") normalizedMode = "roster";
   return {
     runId: runId || null,
     topicId: topicId || null,
-    mode: mode || "consensus",
+    mode: normalizedMode,
     modifier: modifier || "normal",
     lobbyStarted: Boolean(lobbyStarted),
     game: game ?? (lobbyStarted ? true : null),

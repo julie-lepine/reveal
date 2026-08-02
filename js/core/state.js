@@ -97,7 +97,7 @@ const defaultState = () => ({
   eveningGamesRecorded: {},
   guessLie: emptyGuessLie(),
   tierNightTopicId: null,
-  tierNightMode: "consensus",
+  tierNightMode: "roster",
   tierNightModifier: "normal",
   customTierLists: [],
   hotTakeGame: {
@@ -364,6 +364,10 @@ function loadState() {
       cleaned.guessLie.sessionId = cleaned.lobbyCode;
     }
     if (!cleaned.lobby.status) cleaned.lobby.status = "waiting";
+    // Rank it retiré : anciennes valeurs locales `consensus` → roster
+    if (cleaned.tierNightMode === "consensus" || !cleaned.tierNightMode) {
+      cleaned.tierNightMode = "roster";
+    }
     return cleaned;
   } catch {
     return defaultState();
@@ -1045,7 +1049,7 @@ export function resetGameSessionsOnly() {
     triviaGame: { ...base.triviaGame },
     guessLie: { ...emptyGuessLie(), sessionId: getState().lobbyCode || null },
     tierNightTopicId: null,
-    tierNightMode: "consensus",
+    tierNightMode: "roster",
     tierNightModifier: "normal",
     tierNightGame: { ...base.tierNightGame },
     tierNightLiveGame: { ...base.tierNightLiveGame },
@@ -1358,13 +1362,20 @@ export function getTierNightTopicId() {
   return state.tierNightTopicId;
 }
 
+function normalizeStoredTierNightMode(mode) {
+  if (mode === "live") return "live";
+  if (mode === "roster") return "roster";
+  // Ancien Rank it (`consensus`) et valeurs inconnues → roster
+  return "roster";
+}
+
 export function setTierNightMode(mode) {
-  state.tierNightMode = mode || "consensus";
+  state.tierNightMode = normalizeStoredTierNightMode(mode);
   save();
 }
 
 export function getTierNightMode() {
-  return state.tierNightMode || "consensus";
+  return normalizeStoredTierNightMode(state.tierNightMode);
 }
 
 export function setTierNightModifier(modifier) {

@@ -101,7 +101,7 @@ function tierNightClassicResetRemote() {
   return tierNightToRemote({
     runId: null,
     topicId: null,
-    mode: "consensus",
+    mode: "roster",
     modifier: "normal",
     lobbyStarted: false,
     placements: {},
@@ -254,7 +254,7 @@ export function resetTierNightLive() {
   saveStatePatch({ tierNightLiveGame: defaultLive() });
 }
 
-/** Lancement MP Rank it / Classe le groupe (hôte). */
+/** Lancement MP Classe le groupe / plateau (hôte). */
 export async function markTierNightClassicStarted({ topicId, mode, modifier }) {
   const runId = createTierNightRunId();
   const playerRoster = buildTierNightPlayerRoster(getLobbyParticipants());

@@ -1,16 +1,28 @@
-import { addCustomTierList, setTierNightMode, setTierNightModifier } from "../core/state.js";
+import {
+  addCustomTierList,
+  setTierNightMode,
+  setTierNightModifier,
+} from "../core/state.js";
+import { getTierListById } from "../core/tierLists.js";
 import { navigate } from "../core/router.js";
-import { escapeHtml, pageShell } from "../core/ui.js";
+import {
+  isGameSyncActive,
+  isLobbyHost,
+} from "../core/gameSync.js";
+import { markTierNightLiveLobbyStarted } from "../core/tierNightLiveSession.js";
+import { navigateAfterGameLaunch } from "../core/mpLaunch.js";
+import { pageShell } from "../core/ui.js";
 import { checkHotTakeModeration, getModerationNotice } from "../core/hotTakeSession.js";
+import { showAppAlert } from "../core/dialog.js";
 import { bindNav } from "./nav.js";
 
 export function mountTierNightCreate(app) {
   app.innerHTML = pageShell({
     backTarget: "back",
     content: `
-      <p class="label-upper label-upper--gold">🏆 Tier Night</p>
+      <p class="label-upper label-upper--gold">⚡ Rank live</p>
       <h2 class="screen-title">Créer ma tier list</h2>
-      <p class="game-intro">Donne un nom et liste les items (un par ligne, 4 minimum).</p>
+      <p class="game-intro">Donne un nom et liste les items (un par ligne, 4 minimum). Tu joueras ensuite en Rank live.</p>
 
       <div class="card">
         <label class="field-label" for="tier-name">Nom de la tier list</label>
@@ -29,7 +41,7 @@ export function mountTierNightCreate(app) {
       <p class="auth-error hidden" id="tier-error"></p>
 
       <button type="button" class="btn btn-primary btn--spaced" id="btn-create" disabled>
-        Créer et jouer →
+        Créer et jouer en Rank live →
       </button>
     `,
   });
@@ -65,23 +77,46 @@ export function mountTierNightCreate(app) {
   );
 
   createBtn.addEventListener("click", () => {
-    const name = nameEl.value.trim();
-    const items = parseItems();
-    const emoji = emojiEl.value.trim() || "✨";
-    if (!name || items.length < 4) return;
-    const blocked = [name, ...items].map((s) => checkHotTakeModeration(s)).find((m) => m.blocked);
-    if (blocked) {
-      const errEl = app.querySelector("#tier-error");
-      if (errEl) {
-        errEl.textContent = blocked.message;
-        errEl.classList.remove("hidden");
+    void (async () => {
+      const name = nameEl.value.trim();
+      const items = parseItems();
+      const emoji = emojiEl.value.trim() || "✨";
+      if (!name || items.length < 4) return;
+      const blocked = [name, ...items].map((s) => checkHotTakeModeration(s)).find((m) => m.blocked);
+      if (blocked) {
+        const errEl = app.querySelector("#tier-error");
+        if (errEl) {
+          errEl.textContent = blocked.message;
+          errEl.classList.remove("hidden");
+        }
+        return;
       }
-      return;
-    }
-    setTierNightMode("consensus");
-    setTierNightModifier("normal");
-    addCustomTierList({ name, items, emoji });
-    navigate("tiernight");
+
+      if (isGameSyncActive() && !isLobbyHost()) {
+        await showAppAlert("Seul l'hôte peut créer une liste et lancer Rank live.", {
+          title: "Action réservée",
+          icon: "👑",
+        });
+        return;
+      }
+
+      setTierNightMode("live");
+      setTierNightModifier("normal");
+      const topicId = addCustomTierList({ name, items, emoji });
+      const list = getTierListById(topicId);
+      if (!list) return;
+
+      if (isGameSyncActive()) {
+        const result = await markTierNightLiveLobbyStarted({
+          topicId,
+          listName: list.name,
+          items: list.items,
+        });
+        navigateAfterGameLaunch({ gameScreen: "tiernight-live", result });
+      } else {
+        navigate("tiernight-live");
+      }
+    })();
   });
 
   bindNav(app);

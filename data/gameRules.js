@@ -168,20 +168,20 @@ export const GAME_RULES = {
   tiernight: {
     title: "TierNight",
     emoji: "🏆",
-    but: "Classe des éléments en tiers (S / A / B / C / D) en visant le consensus du groupe. Plusieurs modes : Rank it, Classe le groupe (les items sont les joueurs) et En direct (item par item).",
+    but: "Deux modes : Classe le groupe (les joueurs sont les items) et Rank live (vote item par item en temps réel).",
     etapes: [
-      "Choisis un mode, puis une tier list (ou un thème pour « Classe le groupe »).",
-      "Mode Rank it : choisis une variante (Classique, S & D seulement, À contre-courant, À l'aveugle).",
-      "Chacun classe les éléments de S à D.",
-      "On révèle le classement consensus, l'item le plus clivant et le board du groupe.",
+      "Choisis un mode : Classe le groupe ou Rank live.",
+      "Classe le groupe : choisis un thème, puis classe les joueurs de S à D.",
+      "Rank live : choisis (ou crée) une tier list ; tout le monde vote en même temps sur chaque item.",
+      "On révèle le classement du groupe, l'item le plus clivant et le board.",
     ],
     points: [
-      "Chaque élément placé au même tier que le consensus (ou mieux) : +15 pts. À un tier d'écart : +10. Au-delà : 0.",
+      "Chaque élément placé au même tier que le consensus du groupe : +15 pts. À un tier d'écart : +10. Au-delà : 0.",
       "Bonus Outsider : l'avis le plus tranché sur l'item le plus clivant rapporte +15 pts.",
-      "Variante « À contre-courant » : c'est l'inverse, plus tu t'éloignes du consensus, plus tu marques.",
+      "Rank live : votes simultanés item par item, puis consensus médian du groupe.",
     ],
     exemple:
-      "Tu mets « McDo » en tier A. Le consensus du groupe le place aussi en A → +15 pour cet élément. En récap, tu vois le détail item par item.",
+      "Classe le groupe : « Qui survit à l'apocalypse ? » — tu places Bob en S. Le groupe aussi → points de proximité. Rank live : tout le monde vote « Alien » en A en même temps.",
   },
 
   trivia: {

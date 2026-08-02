@@ -140,21 +140,13 @@ export const TIER_COLORS = {
 };
 
 /**
- * Modes de jeu Tier Night.
- * - consensus : flux classique Rank it (chacun classe, médiane du groupe).
- * - roster    : les items sont les joueurs du lobby (« classe le groupe »).
- * - live      : révélation item par item, vote en temps réel.
+ * Modes de jeu Tier Night (produit).
+ * - roster : Rank vos amis — « Classe le groupe » (items = joueurs, plateau tiernight).
+ * - live   : Rank live — item par item, vote temps réel.
+ *
+ * Ancien mode `consensus` (Rank it) retiré de l'UX ; normalisé vers `roster`.
  */
 export const TIER_NIGHT_MODES = [
-  {
-    id: "consensus",
-    name: "Rank it",
-    emoji: "📊",
-    tagline: "Classe, puis compare au groupe",
-    desc: "Chacun fait sa tier list. On calcule le classement médian du groupe et tu marques selon ta proximité.",
-    needsList: true,
-    minPlayers: 1,
-  },
   {
     id: "roster",
     name: "Classe le groupe",
@@ -167,7 +159,7 @@ export const TIER_NIGHT_MODES = [
   },
   {
     id: "live",
-    name: "En direct",
+    name: "Rank live",
     emoji: "⚡",
     tagline: "Item par item, en temps réel",
     desc: "On révèle les items un par un, tout le monde vote en même temps. Réactions immédiates garanties.",
@@ -176,15 +168,24 @@ export const TIER_NIGHT_MODES = [
   },
 ];
 
-export const DEFAULT_TIER_NIGHT_MODE = "consensus";
+export const DEFAULT_TIER_NIGHT_MODE = "roster";
+
+/** Compat : anciennes sessions / localStorage `consensus` → `roster`. */
+export function normalizeTierNightMode(mode) {
+  if (mode === "live") return "live";
+  if (mode === "roster") return "roster";
+  // consensus (Rank it) et valeurs inconnues → roster
+  return "roster";
+}
 
 export function getTierNightModeById(id) {
-  return TIER_NIGHT_MODES.find((m) => m.id === id) || TIER_NIGHT_MODES[0];
+  const normalized = normalizeTierNightMode(id);
+  return TIER_NIGHT_MODES.find((m) => m.id === normalized) || TIER_NIGHT_MODES[0];
 }
 
 /**
- * Modifiers de manche (mode consensus). Le modifier change la contrainte ou
- * le scoring d'une partie.
+ * Modifiers de manche (héritage Rank it). Plus exposés en UI ; le scoring /
+ * le plateau lisent encore `normal` (et éventuellement un vieux modifier local).
  */
 export const TIER_NIGHT_MODIFIERS = [
   {

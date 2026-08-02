@@ -403,7 +403,7 @@ export async function launchTierNightSelect() {
   };
   const statePatch = {
     tierNightTopicId: null,
-    tierNightMode: "consensus",
+    tierNightMode: "roster",
     tierNightModifier: "normal",
     tierNightGame: tierNightReset,
     tierNightLiveGame: tierNightLiveReset,
@@ -425,7 +425,7 @@ export async function launchTierNightSelect() {
       tierNight: {
         runId,
         topicId: null,
-        mode: "consensus",
+        mode: "roster",
         modifier: "normal",
         lobbyStarted: false,
         placements: {},
