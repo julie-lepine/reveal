@@ -1,5 +1,8 @@
 import { describe, it, beforeEach } from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import {
   CHAT_FAB_ALLOWED_SCREENS,
   isChatFabAllowedScreen,
@@ -18,6 +21,8 @@ import {
   setReadCursor,
 } from "../js/core/chatUnread.js";
 import { validateChatText, CHAT_MAX_LENGTH } from "../js/core/chatPanel.js";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const GAME_ROUTES = [
   "traitre",
@@ -219,5 +224,29 @@ describe("validateChatText", () => {
 
   it("rejette au-delà de 200", () => {
     assert.equal(validateChatText("x".repeat(CHAT_MAX_LENGTH + 1)).ok, false);
+  });
+});
+
+describe("UX-CHAT-02 — pas de focus input à l'ouverture du sheet", () => {
+  it("openChatSheet focus le panel, pas l'input", () => {
+    const src = readFileSync(
+      join(__dirname, "../js/core/feedbackUi.js"),
+      "utf8"
+    );
+    const openIdx = src.indexOf("function openChatSheet");
+    assert.ok(openIdx >= 0);
+    const rAFIdx = src.indexOf("requestAnimationFrame", openIdx);
+    assert.ok(rAFIdx > openIdx);
+    const block = src.slice(rAFIdx, rAFIdx + 280);
+    assert.match(block, /sheetPanel\?\.focus\(\)/);
+    assert.doesNotMatch(block, /focusInput/);
+  });
+
+  it("conserve le re-focus après envoi dans mountChatPanel", () => {
+    const src = readFileSync(
+      join(__dirname, "../js/core/chatPanel.js"),
+      "utf8"
+    );
+    assert.match(src, /async function sendChat[\s\S]*?inputEl\.focus\(\)/);
   });
 });

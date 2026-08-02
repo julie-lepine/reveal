@@ -238,8 +238,8 @@ function openChatSheet() {
 
   requestAnimationFrame(() => {
     sheetRoot?.classList.add("chat-sheet--in");
+    // Focus dialog (a11y / Escape) sans focus input — sinon clavier mobile à l'ouverture (UX-CHAT-02).
     sheetPanel?.focus();
-    chatInstance?.focusInput();
   });
 }
 
