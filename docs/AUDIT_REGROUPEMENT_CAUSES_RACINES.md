@@ -16,9 +16,9 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 
 | | |
 |--|--|
-| **Maintenant** | **UX-CHAT-01** — corrigé (annonce prep) · **QA Pages** · UX-DEVICE-01 |
-| **Ensuite** | backlog produit (FEATURE-* / GAME-WAO-01) |
-| **Dernière clôture** | **UX-CHAT-02** ✅ · **FEATURE-VIBECHECK-01** ✅ · **UX-HOST-01** ✅ |
+| **Maintenant** | **UX-DEVICE-01** · backlog produit (FEATURE-* / GAME-WAO-01) |
+| **Ensuite** | ARCH-23 QA natif · ARCH-10 QA mobile finale |
+| **Dernière clôture** | **UX-CHAT-01** ✅ · **UX-CHAT-02** ✅ · **FEATURE-VIBECHECK-01** ✅ · **UX-HOST-01** ✅ |
 | **En attente QA finale** | **ARCH-23** (SQL ✅) · **ARCH-10** mobile |
 
 ---
@@ -36,13 +36,12 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 
 | ID | Cause | Problème | Priorité |
 |----|-------|----------|----------|
-| **UX-CHAT-01** | 11 | Message chat au choix / entrée prep | 🟡 corrigé · **QA Pages** |
 | **UX-DEVICE-01** | 11 | Écran verrouillé pendant une partie (Wake Lock API) | 🟡 |
 | **GAME-WAO-01** | — | Revoir le barème Wrong Answer Only (doc d'abord) | 🟡 |
 | **FEATURE-DILEMMA-01** | — | Plusieurs dilemmes par joueur | 🟡 |
 | **FEATURE-TIERNIGHT-01** | — | Thèmes personnalisés (Classer le groupe) | 🟡 |
 | **FEATURE-TIERNIGHT-02** | — | Séries de tierlists par catégories | 🟡 |
-| **FEATURE-CHAT-03** | — | Bouton « Futur jeu aléatoire » dans le chat | 🟡 |
+| **FEATURE-CHAT-03** | — | Bouton « Futur jeu aléatoire » dans le chat - Visible par tous les joueurs, cliquable par l'hôte. Petite animation de "roulette" pour montrer le côté aléatoire du pick | 🟡 |
 | **ARCH-05** | 5 | Route lobby vs session (`row.screen`) | 🟡 mitigé SYN-28 |
 | **ARCH-01 / F-01** | 1 | Démo offline sans avertissement MP | 🟡 partiel |
 | **ARCH-11–17, SYN-19–24, SYN-27** | 9–10 | Monolithe / dup / code mort | Dette |
@@ -61,7 +60,7 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 | 8 | Reset / migration incomplète | Partiel | **BUG-TIERNIGHT-05 ✅** · **OPS-LOBBY-04 ✅** · **BUG-LOBBY-XX-E ✅** · **BUG-TRUTHMETER-02 ✅** · **ARCH-23** · ARCH-10 · **BUG-LOBBY-XX ✅** · I-09/SYN-15/16 ✅ |
 | 9 | Sync monolithe / duplication | Dette | ARCH-11… |
 | 10 | Code mort | Dette | **FEATURE-VIBECHECK-01 ✅** · hors Fil Rouge app ✅ |
-| 11 | Friction UX | Partiel | **UX-CHAT-01** 🟡 · **UX-DEVICE-01** 🟡 · **UX-CHAT-02 ✅** · **UX-HOST-01 ✅** · **BUG-WAO-04** ✅ · **ARCH-23** · ARCH-22/Loader ✅ · **L-04 ✅** |
+| 11 | Friction UX | Partiel | **UX-DEVICE-01** 🟡 · **UX-CHAT-01 ✅** · **UX-CHAT-02 ✅** · **UX-HOST-01 ✅** · **BUG-WAO-04** ✅ · **ARCH-23** · ARCH-22/Loader ✅ · **L-04 ✅** |
 
 ---
 
@@ -313,7 +312,7 @@ Retour terrain multi-jeux. Priorités : 🔴 critique · 🟠 haute · 🟡 moye
 |----|----------|-------------------|
 | **ARCH-23** | Version cliente vs déploiement | Au boot et/ou au join lobby : comparer version locale à une version attendue (manifest / endpoint / config distante). Si décalage : bloquer le flux jeu et forcer reload, message du type « Une nouvelle version de REVEAL est disponible. Rechargez l'application pour continuer. ». Motive : soirées-test avec client GH Pages / PWA en retard sur migrations SQL → bugs indiagnosticables (ex. 01B-bis). |
 | **UX-HOST-01** | CTA hôte — hiérarchie reveal mid-round | ✅ QA validée · reveal → action → cumul · `uxHost01RevealHierarchy` |
-| **UX-CHAT-01** | Message système au choix / prep | ✅ **Corrigé 2026-08-02** — annonce à `commitPrepSessionLaunch` (pas `launchGameWithSync`) · `🎮 L'hôte lance la préparation de {title}.` · Recommencer = oui · sondage close ≠ annonce · **nouvelle QA Pages**. |
+| ~~**UX-CHAT-01**~~ | ~~Message système au choix / prep~~ | ✅ **Clôturé QA Pages 2026-08-02** — annonce à `commitPrepSessionLaunch` · `🎮 L'hôte lance la préparation de {title}.` · Recommencer = oui · sondage close ≠ annonce. Ne pas rouvrir. |
 | **UX-CHAT-02** | Clavier auto à l'ouverture chat | ✅ **QA validée 2026-08-02** — `openChatSheet` focus panel seul · re-focus post-send · `chatInGameVagueA`. Ne pas rouvrir. |
 | **UX-DEVICE-01** | Mise en veille pendant partie | Écran verrouillé si téléphone posé. À étudier : Screen Wake Lock API (ou équivalent) tant que lobby actif · relâcher au leave · fallback propre si API indisponible. |
 | ~~**GAME-SPEEDVOTE-01**~~ | ~~Récompense gagnant~~ | ❌ **Annulé 2026-08-02** — barème actuel **+10** (`EVENING_POINTS.WIN`) déjà harmonisé ; +15 / podium 15-10-5 non retenus. |
@@ -364,6 +363,7 @@ Ne pas rouvrir sans régression. Détail historique dans git / tests cités.
 
 | ID | Cause | Livré | Preuve / QA |
 |----|-------|-------|-------------|
+| **UX-CHAT-01** | 11 | Annonce chat à l'entrée prep (`commitPrepSessionLaunch`) · titre catalogue | QA Pages 2026-08-02 · `uxChat01GameLaunchAnnounce` · `announceGameStartedInChat` |
 | **FEATURE-VIBECHECK-01** | 10 | Retrait produit VibeCheck (`playlistguess`) · allowlists SQL · fallback sessions orphelines | QA GitHub Pages 2026-08-02 · `featureVibecheck01OrphanSession` · SQL `feature-vibecheck-01-remove-allowlist` |
 | **UX-CHAT-02** | 11 | Sheet chat : pas de focus input à l'ouverture (clavier) | QA Pages 2026-08-02 · `chatInGameVagueA` |
 | **GAME-SPEEDVOTE-01** | — | Annulé — barème +10 conservé (harmonisé `EVENING_POINTS.WIN`) | Décision produit 2026-08-02 |
@@ -424,7 +424,7 @@ Ne pas rouvrir sans régression. Détail historique dans git / tests cités.
 | 8 | I-06, P-02, ARCH-09, I-09/SYN-06, SYN-15/16, M-15, **BUG-LOBBY-XX ✅** |
 | 9 | SYN-12 / M-05b |
 | 10 | SYN-05 / ARCH-18 (Fil Rouge app) |
-| 11 | L-02, ARCH-21↻, M-12, UX-HIST/RESUME/VIBE, POLL, **Membership A–E5**, ARCH-22, Loader join, **UX-NAV-LOBBY**, join partiel, **L-04** |
+| 11 | L-02, ARCH-21↻, M-12, UX-HIST/RESUME/VIBE, POLL, **Membership A–E5**, ARCH-22, Loader join, **UX-NAV-LOBBY**, join partiel, **L-04**, **UX-CHAT-01**, **UX-CHAT-02**, **UX-HOST-01** |
 
 ---
 
@@ -451,4 +451,4 @@ Hors file prioritaire — opportunité / régression :
 
 ---
 
-*Suivi vivant · MAJ 2026-08-02 — **UX-CHAT-02** ✅ · **FEATURE-VIBECHECK-01** ✅ · **UX-HOST-01** ✅ · **ARCH-10** Pages ✅ · **ARCH-23** QA différée*
+*Suivi vivant · MAJ 2026-08-02 — **UX-CHAT-01** ✅ · **UX-CHAT-02** ✅ · **FEATURE-VIBECHECK-01** ✅ · **UX-HOST-01** ✅ · **ARCH-10** Pages ✅ · **ARCH-23** QA différée · audit transversal relancé*
