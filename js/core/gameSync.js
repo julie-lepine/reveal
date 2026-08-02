@@ -15,7 +15,10 @@ import {
   resetGameSessionsOnly,
   defaultEveningStats,
 } from "./state.js";
-import { GAMES } from "../../data/games.js";
+import {
+  SESSION_GAME_ID_TO_TILE,
+  catalogTitleForSessionGameId,
+} from "./gameCatalogTitle.js";
 import { navigate, getCurrentScreen, isScreenRegistered } from "./router.js";
 import { getLobbyParticipants, getLobbyStatus, getLobbyGameId, isLobbyEveningStarted } from "./lobby.js";
 import { getActivePlayerNames, getActivePlayers } from "./players.js";
@@ -268,24 +271,8 @@ const RESTARTABLE_SESSION_GAME_IDS = new Set([
   "wronganswer",
 ]);
 
-const SESSION_GAME_ID_TO_TILE = {
-  traitre: "traitre-prep",
-  hottake: "hottake-prep",
-  speedvote: "speedvote-prep",
-  trivia: "trivia-prep",
-  truthmeter: "truthmeter-prep",
-  consensus: "consensus-prep",
-  dilemma: "dilemma-prep",
-  guesslie: "guesslie",
-  tiernight: "tiernight-select",
-  clutch: "clutch-prep",
-  wronganswer: "wronganswer-prep",
-};
-
 function titleForSessionGameId(gameId) {
-  const tileId = SESSION_GAME_ID_TO_TILE[gameId];
-  const catalog = GAMES.find((g) => g.id === tileId);
-  return catalog?.title || gameId;
+  return catalogTitleForSessionGameId(gameId) || gameId;
 }
 
 /** Filet : écran résultats + game_id session si lastGame distant est obsolète. */

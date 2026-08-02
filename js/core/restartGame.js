@@ -1,4 +1,6 @@
-import { GAMES } from "../../data/games.js";
+import {
+  catalogTitleForSessionGameId,
+} from "./gameCatalogTitle.js";
 import { getLastGame, getState, saveStatePatch } from "./state.js";
 import { clearTraitrePrivateForLobby } from "./traitrePrivate.js";
 import { snapshotStatePatch } from "./restartGameRollback.js";
@@ -39,24 +41,13 @@ import { createActionLock } from "./actionLock.js";
 /** ARCH-06 : exclusivité logique (survit au re-bind des boutons Recommencer). */
 const restartLock = createActionLock();
 
-const GAME_ID_TO_TILE = {
-  traitre: "traitre-prep",
-  hottake: "hottake-prep",
-  speedvote: "speedvote-prep",
-  clutch: "clutch-prep",
-  wronganswer: "wronganswer-prep",
-  trivia: "trivia-prep",
-  truthmeter: "truthmeter-prep",
-  consensus: "consensus-prep",
-  dilemma: "dilemma-prep",
-  guesslie: "guesslie",
-  tiernight: "tiernight-select",
-};
-
 export function getRestartableGameTitle(gameId, fallbackTitle) {
-  const tileId = GAME_ID_TO_TILE[gameId];
-  const catalog = GAMES.find((g) => g.id === tileId);
-  return catalog?.title || fallbackTitle || gameId || "Jeu";
+  return (
+    catalogTitleForSessionGameId(gameId) ||
+    fallbackTitle ||
+    gameId ||
+    "Jeu"
+  );
 }
 
 async function requireHostToLaunch() {

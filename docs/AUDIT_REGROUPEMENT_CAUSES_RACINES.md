@@ -16,9 +16,9 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 
 | | |
 |--|--|
-| **Maintenant** | **UX-CHAT-02** — QA Pages · UX-CHAT-01 · UX-DEVICE-01 |
+| **Maintenant** | **UX-CHAT-01** — code livré · QA Pages · UX-DEVICE-01 |
 | **Ensuite** | backlog produit (FEATURE-* / GAME-WAO-01) |
-| **Dernière clôture** | **FEATURE-VIBECHECK-01** ✅ · **UX-HOST-01** ✅ · **BUG-LOBBY-XX-E** ✅ · **OPS-LOBBY-04** ✅ · **BUG-TRUTHMETER-02** ✅ (QA) · **BUG-TIERNIGHT-03** ✅ · **BUG-WAO-04** ✅ · **BUG-WAO-02** ✅ · **BUG-WAO-03** ✅ · **BUG-TIERNIGHT-04** ✅ · **BUG-TIERNIGHT-05** ✅ |
+| **Dernière clôture** | **UX-CHAT-02** ✅ · **FEATURE-VIBECHECK-01** ✅ · **UX-HOST-01** ✅ |
 | **En attente QA finale** | **ARCH-23** (SQL ✅) · **ARCH-10** mobile |
 
 ---
@@ -36,8 +36,7 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 
 | ID | Cause | Problème | Priorité |
 |----|-------|----------|----------|
-| **UX-CHAT-01** | 11 | Pas de message système au lancement d'un jeu | 🟡 |
-| **UX-CHAT-02** | 11 | Clavier s'ouvre automatiquement à l'ouverture du chat | 🟡 code livré · **QA Pages** |
+| **UX-CHAT-01** | 11 | Pas de message système au lancement d'un jeu | 🟡 code livré · **QA Pages** |
 | **UX-DEVICE-01** | 11 | Écran verrouillé pendant une partie (Wake Lock API) | 🟡 |
 | **GAME-WAO-01** | — | Revoir le barème Wrong Answer Only (doc d'abord) | 🟡 |
 | **FEATURE-DILEMMA-01** | — | Plusieurs dilemmes par joueur | 🟡 |
@@ -62,7 +61,7 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 | 8 | Reset / migration incomplète | Partiel | **BUG-TIERNIGHT-05 ✅** · **OPS-LOBBY-04 ✅** · **BUG-LOBBY-XX-E ✅** · **BUG-TRUTHMETER-02 ✅** · **ARCH-23** · ARCH-10 · **BUG-LOBBY-XX ✅** · I-09/SYN-15/16 ✅ |
 | 9 | Sync monolithe / duplication | Dette | ARCH-11… |
 | 10 | Code mort | Dette | **FEATURE-VIBECHECK-01 ✅** · hors Fil Rouge app ✅ |
-| 11 | Friction UX | Partiel | **UX-CHAT-02** 🟡 QA · **UX-CHAT-01** 🟡 · **UX-DEVICE-01** 🟡 · **UX-HOST-01 ✅** · **BUG-WAO-04** ✅ · **ARCH-23** · ARCH-22/Loader ✅ · **L-04 ✅** |
+| 11 | Friction UX | Partiel | **UX-CHAT-01** 🟡 · **UX-DEVICE-01** 🟡 · **UX-CHAT-02 ✅** · **UX-HOST-01 ✅** · **BUG-WAO-04** ✅ · **ARCH-23** · ARCH-22/Loader ✅ · **L-04 ✅** |
 
 ---
 
@@ -314,8 +313,8 @@ Retour terrain multi-jeux. Priorités : 🔴 critique · 🟠 haute · 🟡 moye
 |----|----------|-------------------|
 | **ARCH-23** | Version cliente vs déploiement | Au boot et/ou au join lobby : comparer version locale à une version attendue (manifest / endpoint / config distante). Si décalage : bloquer le flux jeu et forcer reload, message du type « Une nouvelle version de REVEAL est disponible. Rechargez l'application pour continuer. ». Motive : soirées-test avec client GH Pages / PWA en retard sur migrations SQL → bugs indiagnosticables (ex. 01B-bis). |
 | **UX-HOST-01** | CTA hôte — hiérarchie reveal mid-round | ✅ QA validée · reveal → action → cumul · `uxHost01RevealHierarchy` |
-| **UX-CHAT-01** | Message système au lancement jeu | Joueurs dans le chat au moment du launch ne voient pas le changement. Attendu : message auto ex. « 🎮 L'hôte a lancé une partie de Trivia. » visible quelques secondes dans le chat. |
-| **UX-CHAT-02** | Clavier auto à l'ouverture chat | ✅ **Code 2026-08-02** — `openChatSheet` ne focus plus l'input (panel seul) · re-focus post-send conservé · `chatInGameVagueA` · **QA Pages en attente**. |
+| **UX-CHAT-01** | Message système au lancement jeu | ✅ **Code 2026-08-02** — `announceGameStartedInChat` via `launchGameWithSync` uniquement · texte `🎮 Une partie de {title} commence !` · titres `gameCatalogTitle` / `GAMES` · v1.1 replays `startGameSession` play documentés · **QA Pages en attente**. |
+| **UX-CHAT-02** | Clavier auto à l'ouverture chat | ✅ **QA validée 2026-08-02** — `openChatSheet` focus panel seul · re-focus post-send · `chatInGameVagueA`. Ne pas rouvrir. |
 | **UX-DEVICE-01** | Mise en veille pendant partie | Écran verrouillé si téléphone posé. À étudier : Screen Wake Lock API (ou équivalent) tant que lobby actif · relâcher au leave · fallback propre si API indisponible. |
 | ~~**GAME-SPEEDVOTE-01**~~ | ~~Récompense gagnant~~ | ❌ **Annulé 2026-08-02** — barème actuel **+10** (`EVENING_POINTS.WIN`) déjà harmonisé ; +15 / podium 15-10-5 non retenus. |
 | **GAME-WAO-01** | Barème Wrong Answer Only | Barème actuel non convaincant en test. **Ne pas modifier le code immédiatement** — documenter le fonctionnement actuel puis proposer plusieurs variantes avant implémentation. |
@@ -366,6 +365,7 @@ Ne pas rouvrir sans régression. Détail historique dans git / tests cités.
 | ID | Cause | Livré | Preuve / QA |
 |----|-------|-------|-------------|
 | **FEATURE-VIBECHECK-01** | 10 | Retrait produit VibeCheck (`playlistguess`) · allowlists SQL · fallback sessions orphelines | QA GitHub Pages 2026-08-02 · `featureVibecheck01OrphanSession` · SQL `feature-vibecheck-01-remove-allowlist` |
+| **UX-CHAT-02** | 11 | Sheet chat : pas de focus input à l'ouverture (clavier) | QA Pages 2026-08-02 · `chatInGameVagueA` |
 | **GAME-SPEEDVOTE-01** | — | Annulé — barème +10 conservé (harmonisé `EVENING_POINTS.WIN`) | Décision produit 2026-08-02 |
 | **BUG-TIERNIGHT-03** | 7 | Auto-reveal Rank live sécurisé · verrou · recovery timeout · retry one-shot | QA terrain 2026-08-02 |
 | **BUG-WAO-04** | 11 | CTA « Valider » disabled si trim vide · sync input + refresh hôte | QA terrain 2026-08-02 |
@@ -451,4 +451,4 @@ Hors file prioritaire — opportunité / régression :
 
 ---
 
-*Suivi vivant · MAJ 2026-08-02 — **FEATURE-VIBECHECK-01** ✅ · **UX-HOST-01** ✅ · **ARCH-10** Pages ✅ · **ARCH-23** QA différée*
+*Suivi vivant · MAJ 2026-08-02 — **UX-CHAT-02** ✅ · **FEATURE-VIBECHECK-01** ✅ · **UX-HOST-01** ✅ · **ARCH-10** Pages ✅ · **ARCH-23** QA différée*
