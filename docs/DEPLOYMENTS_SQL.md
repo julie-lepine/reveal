@@ -267,6 +267,6 @@ Suppression produit du jeu VibeCheck (`game_id` client `playlistguess`, écran `
 | Client | Ne propose plus ce jeu ; fallback hub si session orpheline (`isScreenRegistered` / `routeToSessionScreen` → `game-select`) |
 | Hors scope | Table `lobby_polls` / `game_sessions` (schéma inchangé) · aucun DELETE de lignes existantes |
 
-**Statut** : Client + SQL ✅ · ticket **non clôturé** — validation audit résiduel + QA GitHub Pages.
+**Statut** : Client + SQL + QA GitHub Pages ✅ · ticket **clôturé** (2026-08-02).
 
 ---

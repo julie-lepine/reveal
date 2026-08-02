@@ -16,20 +16,14 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 
 | | |
 |--|--|
-| **Maintenant** | **FEATURE-VIBECHECK-01** — suppression VibeCheck |
-| **Ensuite** | UX-CHAT / DEVICE · GAME-* |
-| **Dernière clôture** | **UX-HOST-01** ✅ · **BUG-LOBBY-XX-E** ✅ · **OPS-LOBBY-04** ✅ · **BUG-TRUTHMETER-02** ✅ (QA) · **BUG-TIERNIGHT-03** ✅ · **BUG-WAO-04** ✅ · **BUG-WAO-02** ✅ · **BUG-WAO-03** ✅ · **BUG-TIERNIGHT-04** ✅ · **BUG-TIERNIGHT-05** ✅ |
+| **Maintenant** | UX-CHAT / DEVICE · GAME-* |
+| **Ensuite** | backlog produit (FEATURE-*) |
+| **Dernière clôture** | **FEATURE-VIBECHECK-01** ✅ · **UX-HOST-01** ✅ · **BUG-LOBBY-XX-E** ✅ · **OPS-LOBBY-04** ✅ · **BUG-TRUTHMETER-02** ✅ (QA) · **BUG-TIERNIGHT-03** ✅ · **BUG-WAO-04** ✅ · **BUG-WAO-02** ✅ · **BUG-WAO-03** ✅ · **BUG-TIERNIGHT-04** ✅ · **BUG-TIERNIGHT-05** ✅ |
 | **En attente QA finale** | **ARCH-23** (SQL ✅) · **ARCH-10** mobile |
 
 ---
 
 ## File ouverte
-
-### Prioritaire
-
-| ID | Cause | Problème | Priorité |
-|----|-------|----------|----------|
-| **FEATURE-VIBECHECK-01** | 10 | Suppression complète du jeu VibeCheck | 🟡 SQL ✅ · **audit + QA Pages** |
 
 ### Prioritaire (QA différée / finale)
 
@@ -68,27 +62,12 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 | 7 | Sync silencieuse / fire-and-forget | Partiel | **BUG-TRUTHMETER-01 ✅** (01A/01B) · **BUG-TIERNIGHT-03** ✅ · **BUG-TRIVIA-01 ✅** (01A/01B/01B-bis/01C) · ARCH-07 ✅ · M-14b ✅ · ARCH-08 ✅ |
 | 8 | Reset / migration incomplète | Partiel | **BUG-TIERNIGHT-05 ✅** · **OPS-LOBBY-04 ✅** · **BUG-LOBBY-XX-E ✅** · **BUG-TRUTHMETER-02 ✅** · **ARCH-23** · ARCH-10 · **BUG-LOBBY-XX ✅** · I-09/SYN-15/16 ✅ |
 | 9 | Sync monolithe / duplication | Dette | ARCH-11… |
-| 10 | Code mort | Dette | **FEATURE-VIBECHECK-01** 🟡 SQL ✅ · QA Pages · hors Fil Rouge app ✅ |
+| 10 | Code mort | Dette | **FEATURE-VIBECHECK-01 ✅** · hors Fil Rouge app ✅ |
 | 11 | Friction UX | Partiel | **UX-CHAT-01/02** 🟡 · **UX-DEVICE-01** 🟡 · **UX-HOST-01** 🟡 · **BUG-WAO-04** ✅ · **ARCH-23** · ARCH-22/Loader ✅ · **L-04 ✅** |
 
 ---
 
 ## Détail — tickets ouverts
-
-### FEATURE-VIBECHECK-01 — Suppression VibeCheck / PlaylistGuess (🟡 SQL ✅ · audit + QA Pages)
-
-Retrait produit complet du jeu VibeCheck (`game_id` client `playlistguess`, écran `playlistguess-prep`). **VibeCheck = Playlist Guess** (même produit ; pas deux jeux).
-
-| | |
-|--|--|
-| **Fichiers supprimés** | `js/games/playlistGuess.js` · `js/screens/playlistGuessPrep.js` · `js/playlistguess/SongGuessCard.js` · `js/playlistguess/RevealOwnerCard.js` · `js/core/playlistGuessSession.js` · `js/core/playlistGuessRounds.js` · `data/playlistGuess.js` · `data/vibecheckSongs.js` · `assets/games/vibecheck.png` · `scripts/fetchVibeCheckCovers.mjs` · `tests/playlistGuessSyncPending.test.js` |
-| **Retiré (partagé)** | `data/games.js` (tile) · `data/gameRules.js` (règles + `RULES_KEY_BY_NAV`) · `js/main.js` (imports/`registerScreen`) · `gameSelect.js` (launcher + chip récap) · `bottomNav.js` · `chatFabScreens.js` · `gameResume.js` · `restartGame.js` · `gameSync.js` (~34 mappings to/from remote, merge, RESTARTABLE, evening keys, stats sync) · `deckCodec.js` (dehydrate/rehydrate) · `scoring.js` (`awardPlaylistGuessRound`) · `state.js` (state par défaut, migration rename, stats) · `lobby.js` · `eveningRecap.js` · `gameScores.js` · `playerContribution.js` · `gameSessionSecurity.js` · `style.css` (tile `.playlist` + bloc `/* VibeCheck */`) · `scripts/buildFeatureGraphic.mjs` (`GAME_LOGOS`) · `package.json` (script test) |
-| **Tests mis à jour** | `uxHost01RevealHierarchy` · `deckCodec` · `renameLocalPlayer` · `mountLifecycle` · `filRougeVague1/2/3Cleanup` · `prepEntryGuardVagueA` · `arch04PrepResumeBanner` · `chatInGameVagueA` · `arch06ActionLocks` · `sessionRouteRestartDecision` · `postGameScreenFollow` · **`featureVibecheck01OrphanSession`** (guards orphelins) |
-| **SQL** | Migration [`feature-vibecheck-01-remove-allowlist.sql`](../supabase/feature-vibecheck-01-remove-allowlist.sql) — **✅ appliquée** sur le projet Supabase cible · voir [`DEPLOYMENTS_SQL.md`](./DEPLOYMENTS_SQL.md) §10 |
-| **Orphelins** | Sessions `game_id='playlistguess'` : non DELETE · RPC refusent contribute / acting play / complete key · client : `isScreenRegistered` + fallback `routeToSessionScreen` → `game-select` (pas de bandeau reprise / navigate silencieux) |
-| **Hors scope** | Intermédiaires `android/app/build/…` · docs ADMOB/LAUNCH_CHECKLIST/MULTIPLAYER_MERGE (mentions historiques) · scores soirée déjà dans `scores{}` (conservés dans le total) · tuiles `GAME_LABELS` absentes → classement par jeu **non affiché** |
-| **Cap** | `npm run cap:sync` exécuté (www + android/ios public) · build natif **non** publié |
-| **Verdict** | Client + SQL ✅ · **ne pas clôturer** avant QA GitHub Pages (checklist audit) |
 
 ### Cause 3 — Membership A→E5 ✅
 
@@ -346,12 +325,6 @@ Retour terrain multi-jeux. Priorités : 🔴 critique · 🟠 haute · 🟡 moye
 | **FEATURE-TIERNIGHT-02** | Séries de tierlists | Plus de tierlists officielles · organisées par catégories · enchaînement de plusieurs tierlists dans une manche · révélation finale classement global. UX à définir. |
 | **FEATURE-CHAT-03** | Bouton « Futur jeu aléatoire » | Action rapide dans le chat : 🎲 Futur jeu aléatoire — proposer le prochain jeu aléatoire sans navigation classique. |
 
-#### ⚪ Produit
-
-| ID | Problème | Analyse / attendu |
-|----|----------|-------------------|
-| **FEATURE-VIBECHECK-01** | Suppression VibeCheck | Décision produit. Retrait : sélection · votes · navigation · assets · tests · stats associées. **Client + SQL ✅ 2026-08-02 · QA Pages en attente** — voir détail ci-dessous. |
-
 ---
 
 ## Contrats produit (référence)
@@ -393,6 +366,7 @@ Ne pas rouvrir sans régression. Détail historique dans git / tests cités.
 
 | ID | Cause | Livré | Preuve / QA |
 |----|-------|-------|-------------|
+| **FEATURE-VIBECHECK-01** | 10 | Retrait produit VibeCheck (`playlistguess`) · allowlists SQL · fallback sessions orphelines | QA GitHub Pages 2026-08-02 · `featureVibecheck01OrphanSession` · SQL `feature-vibecheck-01-remove-allowlist` |
 | **BUG-TIERNIGHT-03** | 7 | Auto-reveal Rank live sécurisé · verrou · recovery timeout · retry one-shot | QA terrain 2026-08-02 |
 | **BUG-WAO-04** | 11 | CTA « Valider » disabled si trim vide · sync input + refresh hôte | QA terrain 2026-08-02 |
 | **BUG-WAO-02** | 6/11 | Hard-gate composition · host CTA pré-monté · `#wrong-input` réattaché | QA terrain 2026-08-02 |
@@ -477,4 +451,4 @@ Hors file prioritaire — opportunité / régression :
 
 ---
 
-*Suivi vivant · MAJ 2026-08-02 — **FEATURE-VIBECHECK-01** SQL ✅ · audit + QA Pages · **UX-HOST-01** ✅ · **ARCH-10** Pages ✅ · **ARCH-23** QA différée*
+*Suivi vivant · MAJ 2026-08-02 — **FEATURE-VIBECHECK-01** ✅ · **UX-HOST-01** ✅ · **ARCH-10** Pages ✅ · **ARCH-23** QA différée*
