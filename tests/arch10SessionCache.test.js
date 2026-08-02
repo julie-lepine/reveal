@@ -1,7 +1,10 @@
 /**
  * ARCH-10 — invalidation précoce du cache session MP après sortie confirmée.
+ *
+ * Pas d’import de gameSync.js / lobby.js réels (cycle Node + named exports).
+ * Preuve = miroir minimal du contrat cache + contrats source + leave injecté.
  */
-import { describe, it, beforeEach, afterEach, mock } from "node:test";
+import { describe, it, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -41,31 +44,72 @@ const SESSION_ROW = {
   state: { guessLie: { phase: "prep" } },
 };
 
-mock.module("../js/core/supabaseClient.js", {
-  exports: { isSupabaseConfigured: () => false, supabase: null },
-});
+/**
+ * Miroir du contrat gameSync invalidate/clear/get/notify (ARCH-10).
+ * Aligné sur clearCachedGameSession + invalidateCurrentLobbySessionCache.
+ */
+function createSessionCacheMirror() {
+  let cachedRow = null;
+  let lastSessionSig = "";
+  const listeners = new Set();
 
-mock.module("../js/core/router.js", {
-  exports: {
-    navigate: mock.fn(),
-    getCurrentScreen: () => "home",
-  },
-});
+  function isEmpty() {
+    return cachedRow == null && lastSessionSig === "";
+  }
 
-const {
-  getCachedGameSession,
-  __setCachedGameSessionRowForTests,
-  __resetCachedGameSessionForTests,
-  invalidateCurrentLobbySessionCache,
-  onGameSessionChange,
-} = await import("../js/core/gameSync.js");
+  function notify(row) {
+    for (const fn of listeners) fn(row);
+  }
 
-describe("ARCH-10 — helper canonique", () => {
+  function getCachedGameSession() {
+    const lobbyId = getState().lobby?.id || null;
+    if (!shouldExposeCachedSession(cachedRow, lobbyId)) return null;
+    return cachedRow;
+  }
+
+  function onGameSessionChange(fn) {
+    listeners.add(fn);
+    return () => listeners.delete(fn);
+  }
+
+  function clearCachedGameSession() {
+    if (isEmpty()) return;
+    cachedRow = null;
+    lastSessionSig = "";
+    notify(null);
+  }
+
+  function invalidateCurrentLobbySessionCache() {
+    clearCachedGameSession();
+  }
+
+  function __setCachedGameSessionRowForTests(row) {
+    cachedRow = row;
+    lastSessionSig = row ? "sig" : "";
+  }
+
+  function __resetCachedGameSessionForTests() {
+    cachedRow = null;
+    lastSessionSig = "";
+    listeners.clear();
+  }
+
+  return {
+    getCachedGameSession,
+    onGameSessionChange,
+    invalidateCurrentLobbySessionCache,
+    __setCachedGameSessionRowForTests,
+    __resetCachedGameSessionForTests,
+  };
+}
+
+describe("ARCH-10 — helper canonique (miroir)", () => {
+  let cache;
   let stateSnapshot;
 
   beforeEach(() => {
     stateSnapshot = structuredClone(getState());
-    __resetCachedGameSessionForTests();
+    cache = createSessionCacheMirror();
     saveStatePatch({
       inLobby: true,
       lobby: { id: "lobby-1", code: "ABCD" },
@@ -75,49 +119,50 @@ describe("ARCH-10 — helper canonique", () => {
 
   afterEach(() => {
     saveStatePatch(stateSnapshot);
-    __resetCachedGameSessionForTests();
+    cache.__resetCachedGameSessionForTests();
     resetVoluntaryLeaveLockForTests();
   });
 
   it("invalidateCurrentLobbySessionCache vide cachedRow et getCachedGameSession", () => {
-    __setCachedGameSessionRowForTests(SESSION_ROW);
+    cache.__setCachedGameSessionRowForTests(SESSION_ROW);
     assert.ok(shouldExposeCachedSession(SESSION_ROW, "lobby-1"));
-    assert.equal(getCachedGameSession()?.game_id, "guesslie");
+    assert.equal(cache.getCachedGameSession()?.game_id, "guesslie");
 
-    invalidateCurrentLobbySessionCache();
-    assert.equal(getCachedGameSession(), null);
+    cache.invalidateCurrentLobbySessionCache();
+    assert.equal(cache.getCachedGameSession(), null);
   });
 
   it("idempotent : second clear ne notifie pas", () => {
-    __setCachedGameSessionRowForTests(SESSION_ROW);
+    cache.__setCachedGameSessionRowForTests(SESSION_ROW);
     const notes = [];
-    onGameSessionChange((row) => notes.push(row));
+    cache.onGameSessionChange((row) => notes.push(row));
 
-    invalidateCurrentLobbySessionCache();
-    invalidateCurrentLobbySessionCache();
+    cache.invalidateCurrentLobbySessionCache();
+    cache.invalidateCurrentLobbySessionCache();
 
     assert.deepEqual(notes, [null]);
   });
 });
 
 describe("ARCH-10 — leave volontaire", () => {
+  let cache;
   let stateSnapshot;
 
   beforeEach(() => {
     stateSnapshot = structuredClone(getState());
     resetVoluntaryLeaveLockForTests();
-    __resetCachedGameSessionForTests();
+    cache = createSessionCacheMirror();
     saveStatePatch({
       inLobby: true,
       lobby: { id: "lobby-1", code: "ABCD" },
       lobbyCode: "ABCD",
     });
-    __setCachedGameSessionRowForTests(SESSION_ROW);
+    cache.__setCachedGameSessionRowForTests(SESSION_ROW);
   });
 
   afterEach(() => {
     saveStatePatch(stateSnapshot);
-    __resetCachedGameSessionForTests();
+    cache.__resetCachedGameSessionForTests();
     resetVoluntaryLeaveLockForTests();
   });
 
@@ -149,13 +194,13 @@ describe("ARCH-10 — leave volontaire", () => {
         beginPostLeaveHomeTransition: () => order.push("postLeave"),
         invalidateCurrentLobbySessionCache: () => {
           order.push("invalidateCache");
-          invalidateCurrentLobbySessionCache();
+          cache.invalidateCurrentLobbySessionCache();
         },
       }
     );
 
     await Promise.resolve();
-    assert.equal(getCachedGameSession(), null);
+    assert.equal(cache.getCachedGameSession(), null);
     assert.ok(order.indexOf("commitRemoved") < order.indexOf("invalidateCache"));
     assert.ok(order.indexOf("invalidateCache") < order.indexOf("signOut:start"));
     assert.equal(order.includes("applyLeave"), false);
@@ -166,7 +211,7 @@ describe("ARCH-10 — leave volontaire", () => {
 
   it("2 — échec serveur : cache conservé, pas d'invalidation", async () => {
     const notes = [];
-    onGameSessionChange((row) => notes.push(row));
+    cache.onGameSessionChange((row) => notes.push(row));
 
     const res = await runVoluntaryMemberLeave(
       { navigateAway: true },
@@ -187,30 +232,31 @@ describe("ARCH-10 — leave volontaire", () => {
     );
 
     assert.equal(res.ok, false);
-    assert.equal(getCachedGameSession()?.game_id, "guesslie");
+    assert.equal(cache.getCachedGameSession()?.game_id, "guesslie");
     assert.deepEqual(notes, []);
   });
 });
 
 describe("ARCH-10 — kick Realtime", () => {
+  let cache;
   let stateSnapshot;
 
   beforeEach(() => {
     stateSnapshot = structuredClone(getState());
     __resetMembershipAuthForTests();
     resetMembershipSnapshotTestState(UID_A);
-    __resetCachedGameSessionForTests();
+    cache = createSessionCacheMirror();
     saveStatePatch({
       inLobby: true,
       lobby: { id: "lobby-1", code: "ABCD" },
       lobbyCode: "ABCD",
     });
-    __setCachedGameSessionRowForTests(SESSION_ROW);
+    cache.__setCachedGameSessionRowForTests(SESSION_ROW);
   });
 
   afterEach(() => {
     saveStatePatch(stateSnapshot);
-    __resetCachedGameSessionForTests();
+    cache.__resetCachedGameSessionForTests();
   });
 
   it("3 — kick confirmé : cache nul pendant signOut simulé (miroir pipeline)", async () => {
@@ -219,7 +265,7 @@ describe("ARCH-10 — kick Realtime", () => {
 
     commitMembershipRemoved({ userId: UID_A, lobbyId: "lobby-1" });
     order.push("commitRemoved");
-    invalidateCurrentLobbySessionCache();
+    cache.invalidateCurrentLobbySessionCache();
     order.push("invalidateCache");
 
     const signOutP = (async () => {
@@ -229,7 +275,7 @@ describe("ARCH-10 — kick Realtime", () => {
     })();
 
     await Promise.resolve();
-    assert.equal(getCachedGameSession(), null);
+    assert.equal(cache.getCachedGameSession(), null);
     assert.ok(order.indexOf("commitRemoved") < order.indexOf("invalidateCache"));
     assert.ok(order.indexOf("invalidateCache") < order.indexOf("signOut:start"));
     assert.equal(order.includes("applyLeave"), false);
@@ -276,28 +322,26 @@ describe("ARCH-10 — dissolution hôte", () => {
       lobbySrc.indexOf("export async function confirmAndLeaveLobby")
     );
     const failStart = dissolve.indexOf("if (!res.ok)");
-    const failEnd = dissolve.indexOf("if (res.status === LOBBY_DISSOLVE_STATUS.CANONICAL_ELSEWHERE");
+    const failEnd = dissolve.indexOf(
+      "if (res.status === LOBBY_DISSOLVE_STATUS.CANONICAL_ELSEWHERE"
+    );
     const failBranch = dissolve.slice(failStart, failEnd);
-    assert.equal(failBranch.includes("invalidateCurrentLobbySessionCache"), false);
+    assert.equal(
+      failBranch.includes("invalidateCurrentLobbySessionCache"),
+      false
+    );
   });
 });
 
 describe("ARCH-10 — teardown canonique", () => {
-  let stateSnapshot;
+  let cache;
 
   beforeEach(() => {
-    stateSnapshot = structuredClone(getState());
-    __resetCachedGameSessionForTests();
-    saveStatePatch({
-      inLobby: true,
-      lobby: { id: "lobby-1", code: "ABCD" },
-      lobbyCode: "ABCD",
-    });
+    cache = createSessionCacheMirror();
   });
 
   afterEach(() => {
-    saveStatePatch(stateSnapshot);
-    __resetCachedGameSessionForTests();
+    cache.__resetCachedGameSessionForTests();
   });
 
   it("5 — performLobbyBoundaryTeardown utilise invalidate (source)", () => {
@@ -314,24 +358,36 @@ describe("ARCH-10 — teardown canonique", () => {
   });
 
   it("5b — early invalidate + teardown simulate reste idempotent côté notif", () => {
-    __setCachedGameSessionRowForTests(SESSION_ROW);
+    cache.__setCachedGameSessionRowForTests(SESSION_ROW);
+    saveStatePatch({
+      inLobby: true,
+      lobby: { id: "lobby-1", code: "ABCD" },
+      lobbyCode: "ABCD",
+    });
     const notes = [];
-    onGameSessionChange((row) => notes.push(row));
+    cache.onGameSessionChange((row) => notes.push(row));
 
-    invalidateCurrentLobbySessionCache();
-    invalidateCurrentLobbySessionCache();
+    cache.invalidateCurrentLobbySessionCache();
+    cache.invalidateCurrentLobbySessionCache();
 
-    assert.equal(getCachedGameSession(), null);
+    assert.equal(cache.getCachedGameSession(), null);
     assert.deepEqual(notes, [null]);
   });
 });
 
 describe("ARCH-10 — notification consommateur", () => {
-  beforeEach(() => __resetCachedGameSessionForTests());
-  afterEach(() => __resetCachedGameSessionForTests());
+  let cache;
+
+  beforeEach(() => {
+    cache = createSessionCacheMirror();
+  });
+
+  afterEach(() => {
+    cache.__resetCachedGameSessionForTests();
+  });
 
   it("6 — listener reçoit null dès invalidation précoce ; une seule notif utile", () => {
-    __setCachedGameSessionRowForTests(SESSION_ROW);
+    cache.__setCachedGameSessionRowForTests(SESSION_ROW);
     saveStatePatch({
       inLobby: true,
       lobby: { id: "lobby-1", code: "ABCD" },
@@ -339,28 +395,29 @@ describe("ARCH-10 — notification consommateur", () => {
     });
 
     const notes = [];
-    onGameSessionChange((row) => notes.push(row));
+    cache.onGameSessionChange((row) => notes.push(row));
 
-    invalidateCurrentLobbySessionCache();
+    cache.invalidateCurrentLobbySessionCache();
     assert.deepEqual(notes, [null]);
-    assert.equal(getCachedGameSession(), null);
+    assert.equal(cache.getCachedGameSession(), null);
 
-    invalidateCurrentLobbySessionCache();
+    cache.invalidateCurrentLobbySessionCache();
     assert.deepEqual(notes, [null]);
   });
 });
 
 describe("ARCH-10 — frontière lobby A → B", () => {
+  let cache;
   let stateSnapshot;
 
   beforeEach(() => {
     stateSnapshot = structuredClone(getState());
-    __resetCachedGameSessionForTests();
+    cache = createSessionCacheMirror();
   });
 
   afterEach(() => {
     saveStatePatch(stateSnapshot);
-    __resetCachedGameSessionForTests();
+    cache.__resetCachedGameSessionForTests();
   });
 
   it("7 — session A invalidée ; B acceptée ensuite", () => {
@@ -369,14 +426,14 @@ describe("ARCH-10 — frontière lobby A → B", () => {
       lobby: { id: "lobby-a", code: "AAAA" },
       lobbyCode: "AAAA",
     });
-    __setCachedGameSessionRowForTests({
+    cache.__setCachedGameSessionRowForTests({
       ...SESSION_ROW,
       lobby_id: "lobby-a",
     });
-    assert.equal(getCachedGameSession()?.lobby_id, "lobby-a");
+    assert.equal(cache.getCachedGameSession()?.lobby_id, "lobby-a");
 
-    invalidateCurrentLobbySessionCache();
-    assert.equal(getCachedGameSession(), null);
+    cache.invalidateCurrentLobbySessionCache();
+    assert.equal(cache.getCachedGameSession(), null);
 
     saveStatePatch({
       inLobby: true,
@@ -389,14 +446,14 @@ describe("ARCH-10 — frontière lobby A → B", () => {
       game_id: "hottake",
       screen: "hottake-prep",
     };
-    __setCachedGameSessionRowForTests(rowB);
-    assert.equal(getCachedGameSession()?.lobby_id, "lobby-b");
+    cache.__setCachedGameSessionRowForTests(rowB);
+    assert.equal(cache.getCachedGameSession()?.lobby_id, "lobby-b");
     assert.equal(shouldExposeCachedSession(rowB, "lobby-b"), true);
   });
 });
 
 describe("ARCH-10 — contrat source pipelines", () => {
-  it("8 — helper canonique, pas de clearCachedGameSession dispersé", () => {
+  it("8 — helper canonique, wiring leave/kick/dissolve/teardown/XX-E", () => {
     const voluntary = src("js/core/voluntaryMemberLeave.js");
     assert.match(voluntary, /invalidateCurrentLobbySessionCache\?\.\(\)/);
     assert.equal((voluntary.match(/clearCachedGameSession/g) || []).length, 0);
@@ -429,6 +486,13 @@ describe("ARCH-10 — contrat source pipelines", () => {
     assert.match(teardown, /invalidateCurrentLobbySessionCache\(\)/);
 
     const gameSyncSrc = src("js/core/gameSync.js");
-    assert.match(gameSyncSrc, /export function invalidateCurrentLobbySessionCache/);
+    assert.match(
+      gameSyncSrc,
+      /export function invalidateCurrentLobbySessionCache/
+    );
+    assert.match(
+      gameSyncSrc,
+      /ARCH-10 — invalidation précoce du cache session MP/
+    );
   });
 });

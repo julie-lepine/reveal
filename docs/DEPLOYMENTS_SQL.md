@@ -61,7 +61,7 @@ Sources : audit SQL du dépôt (`AUDIT-SQL-01`) + docs ops ([`SUPABASE_SETUP.md`
 | Historique (date inconnue) | [`lobby-lifecycle.sql`](../supabase/lobby-lifecycle.sql) | Expiration / purge | ✅ probable | ✅ probable | — | Colonnes + purge historique ; **corps purge remplacé** par lobby-closures-xx-e (ne pas réexécuter lifecycle entier après XX-E) |
 | 2026-08-02 | [`ops-lobby-04-enable-purge-cron.sql`](../supabase/ops-lobby-04-enable-purge-cron.sql) | OPS-LOBBY-04 | ✅ | ✅ | [`ops-lobby-04-purge-cron-runbook.sql`](../supabase/tests/ops-lobby-04-purge-cron-runbook.sql) | Job `reveal-purge-stale-lobbies` */15 — QA terrain ✅ · voir §7 |
 | 2026-08-02 | [`lobby-closures-xx-e.sql`](../supabase/lobby-closures-xx-e.sql) | BUG-LOBBY-XX-E | ✅ | ✅ | [`lobby-closures-xx-e-runbook.sql`](../supabase/tests/lobby-closures-xx-e-runbook.sql) | Tombstones + dissolve/purge ; QA terrain ✅ · voir §8 |
-| — (non déployé) | [`app-client-compatibility.sql`](../supabase/app-client-compatibility.sql) | ARCH-23 Vague 1 | ⏳ | ⏳ | — | Floor `min_client_compatibility_build=1` · **ne pas bumper** sans instruction · voir §9 |
+| 2026-08-02 | [`app-client-compatibility.sql`](../supabase/app-client-compatibility.sql) | ARCH-23 Vague 1 | ✅ | ✅ | — | Floor `min_client_compatibility_build=1` · **aucun bump cassant** · QA terrain ouverte · voir §9 |
 | Historique (date inconnue) | [`transfer-lobby-host.sql`](../supabase/transfer-lobby-host.sql) | Transfert hôte | ✅ probable | ✅ probable | — | |
 | Historique (date inconnue) | [`kick-lobby-member.sql`](../supabase/kick-lobby-member.sql) | Kick membre | ✅ probable | ✅ probable | — | |
 | Historique (date inconnue) | [`lobby-members-unique-name.sql`](../supabase/lobby-members-unique-name.sql) | Pseudo unique / lobby | ✅ probable | ✅ probable | — | Échoue si doublons restants |
@@ -229,9 +229,9 @@ Canal principal = apps **iOS / Android**. Floor autoritaire = Supabase.
 
 | Élément | Valeur |
 | ------- | ------ |
-| Migration | [`app-client-compatibility.sql`](../supabase/app-client-compatibility.sql) — **⏳** |
+| Migration | [`app-client-compatibility.sql`](../supabase/app-client-compatibility.sql) — **✅ appliquée 2026-08-02** |
 | Table | `app_client_compatibility` (singleton id=1) |
-| Floor initial | `min_client_compatibility_build = **1**` (= `APP_COMPATIBILITY_BUILD` Vague 1) |
+| Floor actuel | `min_client_compatibility_build = **1**` (= `APP_COMPATIBILITY_BUILD` Vague 1) — **aucun bump cassant** |
 | RPC | `get_client_compatibility_config()` — grant **anon + authenticated** |
 | Client | `js/config/appCompatibility.js` · `clientCompatibility.js` · gate UI |
 | Heuristiques (centralisées) | `CLIENT_COMPAT_FRESH_MS` = 5 min · `CLIENT_COMPAT_TIMEOUT_MS` = 8 s · foreground ≥ 10 min hidden |
@@ -249,4 +249,4 @@ Canal principal = apps **iOS / Android**. Floor autoritaire = Supabase.
 3. Puis seulement `UPDATE … SET min_client_compatibility_build = N`  
 4. Contrôler logs `[ARCH-23]` refus
 
-**Statut** : ⏳ SQL non appliquée ; **ne pas bumper** le floor sans instruction.
+**Statut** : ✅ SQL appliquée · floor = **1** · **ne pas bumper** sans instruction · QA terrain ouverte · ticket **non clôturé**.

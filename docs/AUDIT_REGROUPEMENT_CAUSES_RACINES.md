@@ -16,9 +16,10 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 
 | | |
 |--|--|
-| **Maintenant** | **ARCH-23** Vague 1 livrée (socle) · **SQL ⏳** + QA terrain |
-| **Ensuite** | ARCH-10 · **UX-HOST-01** |
+| **Maintenant** | **ARCH-10** — clear cache leave lobby |
+| **Ensuite** | **UX-HOST-01** · UX-CHAT / DEVICE |
 | **Dernière clôture** | **BUG-LOBBY-XX-E** ✅ · **OPS-LOBBY-04** ✅ · **BUG-TRUTHMETER-02** ✅ (QA) · **BUG-TIERNIGHT-03** ✅ · **BUG-WAO-04** ✅ · **BUG-WAO-02** ✅ · **BUG-WAO-03** ✅ · **BUG-TIERNIGHT-04** ✅ · **BUG-TIERNIGHT-05** ✅ |
+| **En attente QA** | **ARCH-23** Vague 1 (SQL ✅ floor=1) — QA différée au prochain déploiement Android/iOS de test |
 
 ---
 
@@ -28,7 +29,13 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 
 | ID | Cause | Problème | Priorité |
 |----|-------|----------|----------|
-| **ARCH-23** | 8/11 | Détection compatibilité client (natif) + hard gate | 🟡 Vague 1 code prêt · SQL ⏳ · QA |
+| **ARCH-10** | 8 | Clear cache leave lobby trop tard | 🟡 preuve tests · QA |
+
+### Prioritaire (QA différée)
+
+| ID | Cause | Problème | Priorité |
+|----|-------|----------|----------|
+| **ARCH-23** | 8/11 | Détection compatibilité client (natif) + hard gate | 🟡 Vague 1 · SQL ✅ · **QA différée** (prochain deploy natif de test) |
 
 ### Autres
 
@@ -45,12 +52,9 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 | **FEATURE-TIERNIGHT-02** | — | Séries de tierlists par catégories | 🟡 |
 | **FEATURE-CHAT-03** | — | Bouton « Futur jeu aléatoire » dans le chat | 🟡 |
 | **FEATURE-VIBECHECK-01** | 10 | Suppression complète du jeu VibeCheck | ⚪ produit |
-| **ARCH-10** | 8 | Clear cache leave lobby trop tard | 🟡 partiel |
-| **ARCH-05** | 5 | Course lobby vs session (`row.screen`) | 🟡 mitigé SYN-28 |
+| **ARCH-05** | 5 | Route lobby vs session (`row.screen`) | 🟡 mitigé SYN-28 |
 | **ARCH-01 / F-01** | 1 | Démo offline sans avertissement MP | 🟡 partiel |
 | **ARCH-11–17, SYN-19–24, SYN-27** | 9–10 | Monolithe / dup / code mort | Dette |
-
----
 
 ## Carte des causes racines
 
@@ -140,8 +144,19 @@ Hors scope volontaire (autres causes) : rollback votes dilemma/speedVote/truthMe
 |----|----------|------|
 | **ARCH-23** | Version cliente vs attendue · refresh forcé | 🟡 ouvert — post-mortem 01B-bis |
 | **ARCH-05** | `row.screen` en retard vs lobby | 🟡 mitigé ; hors scope routing |
-| **ARCH-10** | Cache session clear trop tard au leave | 🟡 |
+| **ARCH-10** | Cache session clear trop tard au leave | 🟡 preuve tests · QA ouverte |
 | **ARCH-01** | Démo locale sans avertissement MP | 🟡 |
+
+#### ARCH-10 — Invalidation précoce cache session MP (ouvert)
+
+Contrat : après leave/kick/dissolve **confirmé**, `invalidateCurrentLobbySessionCache()` avant `signOut` / teardown — évite UI stale pendant signOut lent.
+
+| | |
+|--|--|
+| **Livré (code)** | Helper `invalidateCurrentLobbySessionCache` · wiring leave volontaire · kick · dissolve hôte · XX-E exit · `performLobbyBoundaryTeardown` |
+| **Preuve** | `arch10SessionCache.test.js` (13) — miroir contrat + source (pas d’import `gameSync` Node) |
+| **Hors scope** | Leave server-only Vague D · QA terrain leave mid-game / A→B |
+| **Statut** | 🟡 code + tests · **pas clôturé** — QA terrain requise |
 
 #### ARCH-23 — Compatibilité client native + hard gate (Vague 1 · ouvert)
 
@@ -150,12 +165,12 @@ Canal principal = **iOS / Android Capacitor**. Web = tests seulement. Autorité 
 | | |
 |--|--|
 | **Vague 1 livrée** | `APP_COMPATIBILITY_BUILD` (=1) · identité build · RPC/table floor · service `clientCompatibility` · gate UI · boot/create/join/resume/foreground · tests `arch23ClientCompatibility` |
-| **SQL** | [`app-client-compatibility.sql`](../supabase/app-client-compatibility.sql) — floor initial **1** (pas de bump prod dans cette vague) |
+| **SQL** | [`app-client-compatibility.sql`](../supabase/app-client-compatibility.sql) — **✅ appliquée** · floor **1** · aucun bump cassant |
 | **Stores** | `IOS_APP_STORE_URL` / `ANDROID_PLAY_STORE_URL` vides tant que non configurés (bouton « Mettre à jour » masqué) |
 | **Périmètre** | boot · create · join · resume · foreground — **pas** chaque write in-game mid-partie |
 | **Contrat retry** | `unknown` après incompatibilité confirmée → gate conservé + feedback réseau ; seul `compatible` lève le gate |
 | **Hors Vague 1** | Bumper le floor · publier stores · SW · feature flags · guard global writes in-game |
-| **Statut** | Code prêt (corrections pré-QA) · SQL à appliquer · **pas clôturé** — QA terrain requise |
+| **Statut** | Code + SQL prêts · **QA différée** au prochain déploiement Android/iOS de test · **pas clôturé** |
 
 #### L-04 ✅ (accepté — UI déjà livrée)
 
@@ -446,4 +461,4 @@ Hors file prioritaire — opportunité / régression :
 
 ---
 
-*Suivi vivant · MAJ 2026-08-02 — **ARCH-23 Vague 1** corrigée pré-QA (retry/unknown, codes, docs writes) · SQL ⏳ · **XX-E ✅** · **OPS-04 ✅***
+*Suivi vivant · MAJ 2026-08-02 — Focus **ARCH-10** · **ARCH-23** QA différée (SQL ✅ floor=1) · **XX-E ✅** · **OPS-04 ✅***
