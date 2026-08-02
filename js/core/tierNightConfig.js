@@ -33,6 +33,7 @@ export function finishedTierNightLiveRemote(session = null) {
     topicId: preserve ? session.topicId ?? null : null,
     listName: preserve ? session.listName || "" : "",
     deck: preserve ? session.deck || null : null,
+    playerRoster: preserve ? session.playerRoster || null : null,
     roundIdx: 0,
     phase: "done",
     votes: {},

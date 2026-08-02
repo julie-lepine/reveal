@@ -2665,6 +2665,8 @@ export function tierNightToRemote({
   mode,
   modifier,
   lobbyStarted,
+  items,
+  playerRoster,
 }) {
   return {
     runId: runId || null,
@@ -2673,6 +2675,8 @@ export function tierNightToRemote({
     modifier: modifier || "normal",
     lobbyStarted: Boolean(lobbyStarted),
     game: game ?? (lobbyStarted ? true : null),
+    items: Array.isArray(items) ? items : null,
+    playerRoster: Array.isArray(playerRoster) ? playerRoster : null,
     placements: mapPlacementsByUid(placements || {}),
     finished: finished || {},
     recap: null,
@@ -2737,6 +2741,7 @@ export function tierNightLiveToRemote(session) {
     topicId: session.topicId || null,
     listName: session.listName || "",
     deck: session.deck || null,
+    playerRoster: Array.isArray(session.playerRoster) ? session.playerRoster : null,
     roundIdx: session.roundIdx ?? 0,
     phase: session.phase || null,
     votes: mapVotesByUid(session.votes || {}),
@@ -2747,9 +2752,12 @@ export function tierNightLiveToRemote(session) {
 
 export function tierNightLiveFromRemote(remote) {
   if (!remote) return null;
+  const playerRoster = Array.isArray(remote.playerRoster) ? remote.playerRoster : null;
   const votes = {};
   Object.entries(remote.votes || {}).forEach(([uid, tier]) => {
-    votes[nameForUserId(uid) || uid] = tier;
+    // BUG-TIERNIGHT-04 : ne jamais dropper un vote si nameForUserId est null.
+    const snap = playerRoster?.find((r) => r.userId === uid);
+    votes[snap?.displayName || nameForUserId(uid) || uid] = tier;
   });
   return {
     runId: remote.runId || null,
@@ -2757,6 +2765,7 @@ export function tierNightLiveFromRemote(remote) {
     topicId: remote.topicId || null,
     listName: remote.listName || "",
     deck: remote.deck || null,
+    playerRoster,
     roundIdx: remote.roundIdx ?? 0,
     phase: remote.phase || null,
     votes,
@@ -2771,10 +2780,28 @@ function mergeRemoteTierNightLiveVotesUid(cur, inc) {
   return { ...(cur?.votes || {}), ...(inc?.votes || {}) };
 }
 
+function mergeTierNightLiveVotesPreserve(votes, playerRoster) {
+  // Ne pas passer par normalizePlayerVotesMap (drop si pseudo non résolu).
+  const out = {};
+  const byUid = new Map((playerRoster || []).map((r) => [r.userId, r.displayName]));
+  Object.entries(votes || {}).forEach(([key, val]) => {
+    if (val == null || val === "") return;
+    const k = String(key);
+    if (byUid.has(k)) {
+      out[byUid.get(k)] = val;
+      return;
+    }
+    const mapped = nameForUserId(k);
+    out[mapped || k] = val;
+  });
+  return out;
+}
+
 function mergeTierNightLiveGameLocal(local, remote) {
   if (!remote) return local;
   if (!local) return remote;
   const newRound = isNewSpeedVoteVoteRound(local, remote);
+  // BUG-TIERNIGHT-05 : local-first conservé volontairement (non corrigé dans 04).
   const votes = newRound
     ? remote.votes || {}
     : { ...(remote.votes || {}), ...(local.votes || {}) };
@@ -2787,11 +2814,16 @@ function mergeTierNightLiveGameLocal(local, remote) {
       remote.phase === "voting" &&
       (remote.roundIdx ?? 0) === 0 &&
       !remoteHasPlacements);
+  const playerRoster =
+    Array.isArray(remote.playerRoster) && remote.playerRoster.length
+      ? remote.playerRoster
+      : local.playerRoster || null;
   return {
     ...local,
     ...remote,
+    playerRoster,
     phase: mergeSpeedVotePhase(local, remote),
-    votes: normalizePlayerVotesMap(votes),
+    votes: mergeTierNightLiveVotesPreserve(votes, playerRoster),
     placements: isRemoteReset
       ? remotePlacements
       : remoteHasPlacements
@@ -3110,6 +3142,8 @@ export function applyRemoteSession(row, { epoch = null } = {}) {
   const prevTierNightRecaps = JSON.stringify(getState().tierNightGame?.recaps || []);
   const prevTierNightLiveRunId = getState().tierNightLiveGame?.runId ?? null;
   const prevTierNightLivePhase = getState().tierNightLiveGame?.phase ?? null;
+  const prevTierNightLiveRoundIdx = getState().tierNightLiveGame?.roundIdx ?? null;
+  const prevTierNightLiveVotes = JSON.stringify(getState().tierNightLiveGame?.votes || {});
   const st = { ...(row.state || {}) };
 
   if (st.hotTake) {
@@ -3203,8 +3237,24 @@ export function applyRemoteSession(row, { epoch = null } = {}) {
         localConsensusPoints: localPts,
         recapSynced: true,
       };
-    } else if (tn.game) {
-      patch.tierNightGame = { ...getState().tierNightGame, ...tn.game };
+    } else if (tn.lobbyStarted || tn.game) {
+      // BUG-TIERNIGHT-04 : hydrater runId + items + playerRoster (tn.game peut être `true`).
+      const local = getState().tierNightGame || {};
+      const gameObj = typeof tn.game === "object" && tn.game ? tn.game : {};
+      patch.tierNightGame = {
+        ...local,
+        ...gameObj,
+        runId: tn.runId ?? local.runId ?? null,
+        topicId: tn.topicId ?? local.topicId ?? null,
+        items:
+          Array.isArray(tn.items) && tn.items.length
+            ? tn.items
+            : local.items,
+        playerRoster:
+          Array.isArray(tn.playerRoster) && tn.playerRoster.length
+            ? tn.playerRoster
+            : local.playerRoster,
+      };
     } else if (!tn.lobbyStarted && (tn.recap == null || tn.recap === undefined)) {
       // Recommencer / prep reset : effacer un récap local stale (run précédent).
       const local = getState().tierNightGame || {};
@@ -3220,6 +3270,8 @@ export function applyRemoteSession(row, { epoch = null } = {}) {
           consensus: null,
           localConsensusPoints: 0,
           recapSynced: false,
+          items: null,
+          playerRoster: null,
         };
       }
     }
@@ -3282,7 +3334,9 @@ export function applyRemoteSession(row, { epoch = null } = {}) {
   const tierNightLivePlayChanged =
     patch.tierNightLiveGame &&
     ((patch.tierNightLiveGame.runId ?? null) !== prevTierNightLiveRunId ||
-      (patch.tierNightLiveGame.phase ?? null) !== prevTierNightLivePhase);
+      (patch.tierNightLiveGame.phase ?? null) !== prevTierNightLivePhase ||
+      (patch.tierNightLiveGame.roundIdx ?? null) !== prevTierNightLiveRoundIdx ||
+      JSON.stringify(patch.tierNightLiveGame.votes || {}) !== prevTierNightLiveVotes);
 
   const playChanged = Boolean(
     pgPhaseChanged ||
@@ -5013,15 +5067,19 @@ export async function syncTierNightSession(payload) {
   if (payload.game) saveStatePatch({ tierNightGame: payload.game });
   if (!isGameSyncActive()) return;
   const cached = getTierNightRemote() || {};
+  const localGame = getState().tierNightGame || {};
   const remote = tierNightToRemote({
-    runId: payload.runId ?? getState().tierNightGame?.runId ?? cached.runId ?? null,
+    runId: payload.runId ?? localGame.runId ?? cached.runId ?? null,
     topicId: payload.topicId ?? getState().tierNightTopicId,
     mode: payload.mode ?? getState().tierNightMode,
     modifier: payload.modifier ?? getState().tierNightModifier,
-    game: payload.game ?? getState().tierNightGame,
+    game: payload.game ?? localGame,
     placements: payload.placements ?? cached.placements,
     finished: payload.finished ?? cached.finished,
     lobbyStarted: payload.lobbyStarted ?? cached.lobbyStarted ?? true,
+    items: payload.items ?? cached.items ?? localGame.items ?? null,
+    playerRoster:
+      payload.playerRoster ?? cached.playerRoster ?? localGame.playerRoster ?? null,
   });
   await patchGameState({ tierNight: remote }, { screen: payload.screen, gameId: "tiernight" });
 }
@@ -5057,8 +5115,35 @@ export function getTierNightLiveRemote() {
   return getCachedGameSession()?.state?.tierNightLive || null;
 }
 
+export function getTierNightExpectedMemberUserIds() {
+  const remote = getTierNightRemote();
+  const roster = remote?.playerRoster;
+  if (Array.isArray(roster) && roster.length) {
+    return roster.map((r) => r.userId).filter(Boolean);
+  }
+  const local = getState().tierNightGame?.playerRoster;
+  if (Array.isArray(local) && local.length) {
+    return local.map((r) => r.userId).filter(Boolean);
+  }
+  return getActiveMemberUserIds();
+}
+
 export function getTierNightLobbyProgress() {
-  const finished = getTierNightRemote()?.finished || {};
+  const remote = getTierNightRemote() || {};
+  const finished = remote.finished || {};
+  const roster = remote.playerRoster || getState().tierNightGame?.playerRoster;
+  if (Array.isArray(roster) && roster.length) {
+    return roster.map((r) => {
+      const live = getLobbyParticipants().find((p) => p.userId === r.userId);
+      return {
+        name: r.displayName || live?.name || "Joueur",
+        emoji: live?.emoji || "👤",
+        color: live?.color || "#64748B",
+        userId: r.userId,
+        done: Boolean(r.userId && finished[r.userId]),
+      };
+    });
+  }
   return getLobbyParticipants().map((p) => ({
     name: p.name,
     emoji: p.emoji,
@@ -5069,7 +5154,7 @@ export function getTierNightLobbyProgress() {
 }
 
 export function allTierNightMembersFinished(finishedMap) {
-  const ids = getActiveMemberUserIds();
+  const ids = getTierNightExpectedMemberUserIds();
   if (!ids.length) return false;
   const map = finishedMap ?? getTierNightRemote()?.finished ?? {};
   return ids.every((id) => map[id]);
@@ -5077,12 +5162,12 @@ export function allTierNightMembersFinished(finishedMap) {
 
 export function countTierNightMembersFinished(finishedMap) {
   const map = finishedMap ?? getTierNightRemote()?.finished ?? {};
-  return getActiveMemberUserIds().filter((id) => map[id]).length;
+  return getTierNightExpectedMemberUserIds().filter((id) => map[id]).length;
 }
 
 export function canForceTierNightResults() {
   const finished = countTierNightMembersFinished();
-  const total = getActiveMemberUserIds().length;
+  const total = getTierNightExpectedMemberUserIds().length;
   return finished > 0 && finished < total;
 }
 

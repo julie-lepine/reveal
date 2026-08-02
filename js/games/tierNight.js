@@ -3,11 +3,12 @@ import {
   TIER_COLORS,
   getTierNightModifierById,
 } from "../../data/tierTopics.js";
-import { getTierListById } from "../core/tierLists.js";
+import { resolveTierNightClassicList } from "../core/tierLists.js";
 import { getActivePlayers } from "../core/players.js";
 import {
   getTierNightTopicId,
   getTierNightModifier,
+  getState,
   recordTierNightPlayed,
 } from "../core/state.js";
 import { buildRecapsWithSimulation } from "../core/tierNightSession.js";
@@ -43,7 +44,11 @@ export function mountTierNight(app) {
     return null;
   }
 
-  const list = getTierListById(topicId);
+  const sessionSnap =
+    getState().tierNightGame ||
+    getCachedGameSession()?.state?.tierNight ||
+    null;
+  const list = resolveTierNightClassicList(topicId, sessionSnap);
   if (!list) {
     navigate("tiernight-select");
     return null;
@@ -56,9 +61,17 @@ export function mountTierNight(app) {
   const isRoster = Boolean(list.roster);
   const rosterEmoji = {};
   if (isRoster) {
-    getActivePlayers().forEach((p) => {
-      rosterEmoji[p.name] = p.emoji;
-    });
+    const snap = list.playerRoster || [];
+    if (snap.length) {
+      snap.forEach((r) => {
+        const live = getActivePlayers().find((p) => p.name === r.displayName);
+        rosterEmoji[r.displayName] = live?.emoji || "👤";
+      });
+    } else {
+      getActivePlayers().forEach((p) => {
+        rosterEmoji[p.name] = p.emoji;
+      });
+    }
   }
   const itemLabel = (item) =>
     isRoster && rosterEmoji[item] ? `${rosterEmoji[item]} ${item}` : item;

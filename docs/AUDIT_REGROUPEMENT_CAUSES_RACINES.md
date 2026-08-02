@@ -16,9 +16,9 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 
 | | |
 |--|--|
-| **Maintenant** | 🔴 **BUG-TRUTHMETER-01** (re-QA terrain compteur+scores après fix) · BUG-TIERNIGHT-04 · BUG-TIERNIGHT-05 |
+| **Maintenant** | 🔴 BUG-TIERNIGHT-05 · QA terrain **BUG-TIERNIGHT-04** |
 | **Ensuite** | 🟠 BUG-WAO-02/03/04 · BUG-TIERNIGHT-03 · BUG-TRUTHMETER-02 · **OPS-LOBBY-04** · **ARCH-23** · ARCH-10 · **UX-HOST-01** |
-| **Dernière clôture** | **BUG-TRUTHMETER-01B** code 2026-08-02 (reveal atomique ; parent 01 ouvert jusqu’à QA+migration) · **01A** ✅ |
+| **Dernière clôture** | **BUG-TRUTHMETER-01** ✅ (01A · 01B · QA 2026-08-02) |
 
 ---
 
@@ -28,10 +28,7 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 
 | ID | Cause | Problème | Priorité |
 |----|-------|----------|----------|
-| **BUG-TRUTHMETER-01** | 7 | Validations de vote intermittentes (parent ; QA+migration) | 🔴 |
-| ~~**BUG-TRUTHMETER-01A**~~ | 7 | Soumission fiable + UI honnête | ✅ code 2026-08-02 |
-| ~~**BUG-TRUTHMETER-01B**~~ | 7 | Course atomique vote ↔ reveal/scoring | ✅ code 2026-08-02 · migration+QA pendantes |
-| **BUG-TIERNIGHT-04** | 3/7 | Joueurs invisibles · listes désynchronisées entre appareils | 🔴 |
+| **BUG-TIERNIGHT-04** | 3/7 | Joueurs invisibles · listes désynchronisées | 🟡 code OK · **QA terrain** |
 | **BUG-TIERNIGHT-05** | 8 | Ancien vote repris après nouvelle partie | 🔴 |
 
 ### Autres
@@ -74,7 +71,7 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 | 4 | Asymétrie hôte / invité | ✅ | — |
 | 5 | Routing + timing sync | ✅ | ARCH-05 mitigé · **UX-NAV-LOBBY ✅** |
 | 6 | Async écrans | Partiel | **BUG-WAO-02/03** 🟠 |
-| 7 | Sync silencieuse / fire-and-forget | Partiel | **BUG-TRUTHMETER-01** 🔴 · **BUG-TIERNIGHT-03** 🟠 · **BUG-TRIVIA-01 ✅** (01A/01B/01B-bis/01C) · ARCH-07 ✅ · M-14b ✅ · ARCH-08 ✅ |
+| 7 | Sync silencieuse / fire-and-forget | Partiel | **BUG-TRUTHMETER-01 ✅** (01A/01B) · **BUG-TIERNIGHT-03** 🟠 · **BUG-TRIVIA-01 ✅** (01A/01B/01B-bis/01C) · ARCH-07 ✅ · M-14b ✅ · ARCH-08 ✅ |
 | 8 | Reset / migration incomplète | Partiel | **BUG-TIERNIGHT-05** 🔴 · **OPS-LOBBY-04** · **BUG-LOBBY-XX-E** · **BUG-TRUTHMETER-02** 🟠 · **ARCH-23** · ARCH-10 · **BUG-LOBBY-XX ✅** · I-09/SYN-15/16 ✅ |
 | 9 | Sync monolithe / duplication | Dette | ARCH-11… |
 | 10 | Code mort | Dette | **FEATURE-VIBECHECK-01** ⚪ · hors Fil Rouge app ✅ |
@@ -272,11 +269,11 @@ Retour terrain multi-jeux. Priorités : 🔴 critique · 🟠 haute · 🟡 moye
 | ~~**BUG-TRIVIA-01B-bis**~~ | ~~Impossible de répondre (sélection flash)~~ | ✅ **Clôturé QA 2026-07-31** |
 | ~~**BUG-TRIVIA-01B**~~ | ~~Course read-modify-write reveal~~ | ✅ **Clôturé QA 2026-07-31** — RPC atomique + QA terrain. |
 | ~~**BUG-TRIVIA-01C**~~ | ~~UX réponse invité Trivia~~ | ✅ **Clôturé revue 2026-07-31** |
-| **BUG-TRUTHMETER-01** | Validations de vote instables (parent) | **01A** ✅ · **01B** ✅ code 2026-08-02 — `reveal_truth_meter_round` + `submit_truth_meter_vote` + `truth_meter_apply_reveal_scoring` (FOR UPDATE) · MP sans score client · auto-reveal Option A. **Parent ouvert** jusqu’à migration prod + QA terrain. |
-| ~~**BUG-TRUTHMETER-01A**~~ | ~~Faux succès UI / perte submit~~ | ✅ **Code 2026-08-02** |
-| ~~**BUG-TRUTHMETER-01B**~~ | ~~Course vote ↔ reveal~~ | ✅ **Code 2026-08-02** · fix QA 2026-08-02 (compteur `lastRenderedVotesJson` · `hydrateTruthMeterMatchScores` remplace Math.max post-reveal). Migration prod + **re-QA terrain** à confirmer. |
-| **BUG-TIERNIGHT-04** | Joueurs invisibles | Pendant certaines manches : certains joueurs ne voient plus un participant · listes différentes selon appareils. Vérifier sync listes joueurs pendant toute la manche. |
-| **BUG-TIERNIGHT-05** | Ancien vote repris dans nouvelle partie | Après nouvelle partie : sélection précédente réapparaît. Attendu : état entièrement vierge. Vérifier : reset local · reset Supabase · caches · état mémoire. |
+| ~~**BUG-TRUTHMETER-01**~~ | ~~Validations de vote instables (parent)~~ | ✅ **Clôturé QA 2026-08-02** — 01A · 01B. |
+| ~~**BUG-TRUTHMETER-01A**~~ | ~~Faux succès UI / perte submit~~ | ✅ **Clôturé QA 2026-08-02** |
+| ~~**BUG-TRUTHMETER-01B**~~ | ~~Course vote ↔ reveal~~ | ✅ **Clôturé QA 2026-08-02** — RPC atomique · hydrate scores serveur · compteur `lastRenderedVotesJson`. |
+| **BUG-TIERNIGHT-04** | Joueurs invisibles | **Corrigé code 2026-08-02** — roster/deck figés (`playerRoster` + `items`) · votes Live non droppés si mapping UID manquant · X/Y + `allVotesIn` sur UIDs attendus · hydratation votes-only. **Reste : QA terrain** (hôte + 2 invités). Voir livrable chat BUG-TIERNIGHT-04. |
+| **BUG-TIERNIGHT-05** | Ancien vote repris dans nouvelle partie | Après nouvelle partie : sélection précédente réapparaît. Attendu : état entièrement vierge. Vérifier : reset local · reset Supabase · caches · état mémoire. **Caractérisé** : merge Live local-first + pas de clear votes sur nouveau `runId`. |
 
 #### 🟠 Haute
 
@@ -410,7 +407,7 @@ Ne pas rouvrir sans régression. Détail historique dans git / tests cités.
 
 Hors file prioritaire — opportunité / régression :
 
-- Votes optimistic hors Hot Take / VibeCheck / Dilemma (speedVote / …) — **BUG-TRUTHMETER-01A/01B** ✅ code · parent **01** 🔴 jusqu’à QA+migration
+- Votes optimistic hors Hot Take / VibeCheck / Dilemma (speedVote / …) — **BUG-TRUTHMETER-01 ✅** (01A/01B QA 2026-08-02)
 - `results.js` mount · rename remote résiduel — **BUG-TRUTHMETER-02** 🟠
 - Lobby `playing` si upsert échoue après `setLobbyPlaying` (M-11)
 - `pushGameSession` : `err.message` brut (L-09)
@@ -429,4 +426,4 @@ Hors file prioritaire — opportunité / régression :
 
 ---
 
-*Suivi vivant · MAJ 2026-08-02 — **01B** fix QA compteur+hydrate · parent **01** 🔴 re-QA terrain · TierNight-04/05*
+*Suivi vivant · MAJ 2026-08-02 — **BUG-TRUTHMETER-01 ✅ QA** · prochain 🔴 = TierNight-04/05*

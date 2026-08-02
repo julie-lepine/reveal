@@ -1,5 +1,6 @@
 import { TIER_LEVELS } from "../../data/tierTopics.js";
 import { getActivePlayerNames } from "./players.js";
+import { getLobbyParticipants } from "./lobby.js";
 import { getLocalDisplayName, getState, saveStatePatch } from "./state.js";
 import {
   isGameSyncActive,
@@ -7,7 +8,8 @@ import {
   normalizePlayerVotesMap,
   tierNightLiveToRemote,
   tierNightToRemote,
-  patchGameState,
+  userIdForName,
+  nameForUserId,
 } from "./gameSync.js";
 import { patchGameStateWithFeedback } from "./patchGameStateFeedback.js";
 import { launchGameWithSync, commitHostGamePlay } from "./mpLaunch.js";
@@ -15,6 +17,17 @@ import { buildRecapsFromPlacements } from "./tierNightSession.js";
 import { medianTierFromRanks } from "./tierNightScoring.js";
 import { setLobbyPlaying } from "./lobby.js";
 import { createTierNightRunId } from "./tierNightConfig.js";
+import { getTierListById } from "./tierLists.js";
+import {
+  buildTierNightPlayerRoster,
+  getTierNightExpectedVoterIds,
+  votesByUidFromMixed,
+  countConfirmedTierNightVotes,
+  hasAllExpectedTierNightVotes,
+  mapVotesForTierNightLiveUi,
+  warnUnexpectedTierNightVoteKeys,
+  sessionHasTierNightPlayerRoster,
+} from "./tierNightRoster.js";
 
 const TIER_RANK = { S: 0, A: 1, B: 2, C: 3, D: 4 };
 
@@ -25,6 +38,7 @@ function defaultLive() {
     topicId: null,
     listName: "",
     deck: null,
+    playerRoster: null,
     roundIdx: 0,
     phase: null,
     votes: {},
@@ -78,6 +92,7 @@ function tierNightLiveResetRemote() {
     topicId: null,
     listName: "",
     deck: null,
+    playerRoster: null,
     placements: {},
   });
 }
@@ -92,6 +107,8 @@ function tierNightClassicResetRemote() {
     placements: {},
     finished: {},
     game: null,
+    items: null,
+    playerRoster: null,
   });
 }
 
@@ -99,6 +116,7 @@ function tierNightClassicResetRemote() {
 export async function markTierNightLiveLobbyStarted({ topicId, listName, items }) {
   const runId = createTierNightRunId();
   const deck = shuffle(items);
+  const playerRoster = buildTierNightPlayerRoster(getLobbyParticipants());
   const next = {
     ...defaultLive(),
     runId,
@@ -106,6 +124,7 @@ export async function markTierNightLiveLobbyStarted({ topicId, listName, items }
     topicId,
     listName,
     deck,
+    playerRoster,
     placements: {},
     finished: false,
     ...votingPayload(0),
@@ -143,16 +162,50 @@ export async function commitTierNightLiveVote(tier) {
   return tier;
 }
 
+/** Progression X/Y fondée sur le roster snapshoté (pas getActivePlayers). */
+export function getTierNightLiveVoteProgress(session = getTierNightLiveSession()) {
+  const expected = getTierNightExpectedVoterIds(session);
+  const byUid = votesByUidFromMixed(
+    session.votes || {},
+    session.playerRoster || [],
+    userIdForName
+  );
+  if (expected.length) {
+    warnUnexpectedTierNightVoteKeys(byUid, expected);
+    return {
+      confirmed: countConfirmedTierNightVotes(byUid, expected),
+      expected: expected.length,
+      votesByUid: byUid,
+    };
+  }
+  const names = getActivePlayerNames();
+  const votes = normalizePlayerVotesMap(session.votes || {}, names);
+  const confirmed = names.filter((n) => votes[n] != null && votes[n] !== "").length;
+  return { confirmed, expected: names.length, votesByUid: byUid };
+}
+
 export function allTierNightLiveVotesIn(session = getTierNightLiveSession()) {
+  const expected = getTierNightExpectedVoterIds(session);
+  const votesByUid = votesByUidFromMixed(
+    session.votes || {},
+    session.playerRoster || [],
+    userIdForName
+  );
+  if (expected.length) {
+    warnUnexpectedTierNightVoteKeys(votesByUid, expected);
+    return hasAllExpectedTierNightVotes(votesByUid, expected);
+  }
   const names = getActivePlayerNames();
   const votes = normalizePlayerVotesMap(session.votes || {}, names);
   return names.length > 0 && names.every((n) => votes[n] != null && votes[n] !== "");
 }
 
-/** Accumule les votes de la manche courante dans les placements (par pseudo). */
+/** Accumule les votes de la manche courante dans les placements (par displayName snapshoté). */
 export function accumulatePlacements(session = getTierNightLiveSession()) {
-  const names = getActivePlayerNames();
-  const votes = normalizePlayerVotesMap(session.votes || {}, names);
+  const roster = session.playerRoster;
+  const votes = sessionHasTierNightPlayerRoster(session)
+    ? mapVotesForTierNightLiveUi(session.votes || {}, roster, nameForUserId)
+    : normalizePlayerVotesMap(session.votes || {}, getActivePlayerNames());
   const item = session.deck?.[session.roundIdx];
   const placements = { ...(session.placements || {}) };
   if (item == null) return placements;
@@ -204,11 +257,25 @@ export function resetTierNightLive() {
 /** Lancement MP Rank it / Classe le groupe (hôte). */
 export async function markTierNightClassicStarted({ topicId, mode, modifier }) {
   const runId = createTierNightRunId();
+  const playerRoster = buildTierNightPlayerRoster(getLobbyParticipants());
+  const list = getTierListById(topicId);
+  const items = list?.roster
+    ? playerRoster.map((p) => p.displayName)
+    : [...(list?.items || [])];
+  const listName = list?.name || "";
   saveStatePatch({
     tierNightTopicId: topicId,
     tierNightMode: mode,
     tierNightModifier: modifier,
-    tierNightGame: { runId, recaps: [], topicId: null, listName: "", controversialItem: null },
+    tierNightGame: {
+      runId,
+      recaps: [],
+      topicId,
+      listName,
+      controversialItem: null,
+      items,
+      playerRoster,
+    },
     tierNightLiveGame: defaultLive(),
   });
   const remoteTierNight = tierNightToRemote({
@@ -220,6 +287,8 @@ export async function markTierNightClassicStarted({ topicId, mode, modifier }) {
     placements: {},
     finished: {},
     game: true,
+    items,
+    playerRoster,
   });
   return launchGameWithSync({
     screen: "tiernight",

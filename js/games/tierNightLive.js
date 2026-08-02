@@ -13,10 +13,16 @@ import {
   commitTierNightLivePlay,
   commitTierNightLiveVote,
   allTierNightLiveVotesIn,
+  getTierNightLiveVoteProgress,
   buildTierNightLiveRecaps,
   consensusTierForVotes,
   tierNightLiveVotingPayload,
 } from "../core/tierNightLiveSession.js";
+import {
+  displayNameForTierNightUid,
+  mapVotesForTierNightLiveUi,
+  sessionHasTierNightPlayerRoster,
+} from "../core/tierNightRoster.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
 import {
   isGameSyncActive,
@@ -26,6 +32,7 @@ import {
   getEffectiveSessionScreen,
   stopGameSessionListenerOnPostGame,
   finalizeTierNightLiveToResults,
+  nameForUserId,
 } from "../core/gameSync.js";
 import { setLobbyPlaying } from "../core/lobby.js";
 import { navigate } from "../core/router.js";
@@ -115,6 +122,31 @@ function consensusRevealHtml(item, votesByName, players, itemLabel) {
         )
         .join("")}
     </div>`;
+}
+
+/** Joueurs d'affichage : roster session prioritaire (BUG-TIERNIGHT-04). */
+function expectedPlayersForLive(session) {
+  if (sessionHasTierNightPlayerRoster(session)) {
+    return session.playerRoster.map((r) => {
+      const live = getActivePlayers().find((p) => p.name === r.displayName);
+      return {
+        name: displayNameForTierNightUid(r.userId, session.playerRoster, nameForUserId),
+        color: live?.color || "#64748B",
+        emoji: live?.emoji || "👤",
+        userId: r.userId,
+        isLocal: Boolean(live?.isLocal),
+        isHost: Boolean(live?.isHost),
+      };
+    });
+  }
+  return getActivePlayers();
+}
+
+function votesUiForLive(session) {
+  if (sessionHasTierNightPlayerRoster(session)) {
+    return mapVotesForTierNightLiveUi(session.votes || {}, session.playerRoster, nameForUserId);
+  }
+  return session.votes || {};
 }
 
 /* ============================== SOLO ============================== */
@@ -226,12 +258,15 @@ function mountMp(app, list) {
   /** ARCH-06 Vague B3 : effets UI / navigate après unmount. */
   const mount = createMountGuard();
 
-  const players = () => getActivePlayers();
+  const players = () => expectedPlayersForLive(session);
   const itemLabel = makeItemLabel(list, players());
   const deck = () => session.deck || list.items;
   const total = () => deck().length;
   const currentItem = () => deck()[session.roundIdx];
-  const myVote = () => session.votes?.[localName] || null;
+  const myVote = () => {
+    const ui = votesUiForLive(session);
+    return ui[localName] || session.votes?.[localName] || null;
+  };
 
   function reload() {
     session = getTierNightLiveSession();
@@ -284,11 +319,10 @@ function mountMp(app, list) {
 
   function votingPhaseHtml() {
     const host = canActAsHost();
-    const votedCount = Object.keys(session.votes || {}).length;
-    const totalPlayers = players().length;
+    const { confirmed: votedCount, expected: totalPlayers } = getTierNightLiveVoteProgress(session);
     const mine = myVote();
     const hint = mine
-      ? allTierNightLiveVotesIn()
+      ? allTierNightLiveVotesIn(session)
         ? "Tout le monde a voté !"
         : "En attente des autres joueurs…"
       : "Choisis un tier !";
@@ -306,7 +340,7 @@ function mountMp(app, list) {
   function revealPhaseHtml() {
     const host = canActAsHost();
     return `
-      ${consensusRevealHtml(currentItem(), session.votes || {}, players(), itemLabel)}
+      ${consensusRevealHtml(currentItem(), votesUiForLive(session), players(), itemLabel)}
       ${
         host
           ? `<button type="button" class="btn btn-primary btn--spaced" id="live-next">
@@ -381,7 +415,8 @@ function listFromSession(session) {
     id: session.topicId || "live",
     name: session.listName || "Tier list",
     items: session.deck,
-    roster: false,
+    roster: Boolean(session.topicId?.startsWith?.("roster:")),
+    playerRoster: session.playerRoster || null,
   };
 }
 
