@@ -4,17 +4,16 @@ import {
   mergeSpeedVotePatchState,
   isNewSpeedVoteVoteRound,
 } from "../js/core/sessionMerge.js";
+import { mergeTierNightLiveVotesForPatch } from "../js/core/tierNightLiveMerge.js";
 import {
   finishedTierNightLiveRemote,
   shouldPreferTierNightEndRoute,
   tierNightConfigPatchFromRemoteState,
 } from "../js/core/tierNightConfig.js";
 
-// Réplique exacte du merge des votes live (gameSync.mergeRemoteTierNightLiveVotesUid) :
-// additif pendant une manche, reset uniquement sur une nouvelle manche.
+// Merge votes Live = helper BUG-TIERNIGHT-05 (pas seulement isNewSpeedVoteVoteRound).
 function mergeLiveVotes(cur, inc) {
-  if (isNewSpeedVoteVoteRound(cur, inc)) return inc?.votes || {};
-  return { ...(cur?.votes || {}), ...(inc?.votes || {}) };
+  return mergeTierNightLiveVotesForPatch(cur, inc);
 }
 
 const mergeReadyUid = (a, b) => ({ ...(a?.ready || {}), ...(b?.ready || {}) });
@@ -41,6 +40,28 @@ describe("tierNightLive — merge des votes", () => {
     state = merge(state, { votes: { b: "C" } });
     state = merge(state, { votes: { c: "S" } });
     assert.deepEqual(state.votes, { a: "A", b: "C", c: "S" });
+  });
+
+  it("une nouvelle partie (runId change, votes vides) réinitialise les votes stale", () => {
+    const cur = {
+      runId: "old",
+      phase: "voting",
+      roundIdx: 0,
+      votes: { u1: "S" },
+    };
+    const inc = {
+      runId: "new",
+      phase: "voting",
+      roundIdx: 0,
+      votes: {},
+      lobbyStarted: true,
+      finished: false,
+      placements: {},
+    };
+    assert.equal(isNewSpeedVoteVoteRound(cur, inc), false);
+    const out = merge(cur, inc);
+    assert.deepEqual(out.votes, {});
+    assert.equal(out.runId, "new");
   });
 
   it("une nouvelle manche (roundIdx change, votes vides) réinitialise les votes", () => {

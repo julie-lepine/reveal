@@ -108,6 +108,10 @@ import {
   tierNightConfigPatchFromRemoteState,
   tierNightRecapBelongsToRun,
 } from "./tierNightConfig.js";
+import {
+  mergeTierNightLiveGameFields,
+  mergeTierNightLiveVotesForPatch,
+} from "./tierNightLiveMerge.js";
 
 export { withPatchTimeout };
 export { pickRemotePlayFields, PLAY_PATCH_EXCLUDE } from "./playPatch.js";
@@ -2778,10 +2782,9 @@ export function tierNightLiveFromRemote(remote) {
   };
 }
 
-/** Merge additif des votes (reset uniquement sur nouvelle manche). */
+/** Merge additif des votes (reset sur nouvelle manche / nouveau runId / remote reset). */
 function mergeRemoteTierNightLiveVotesUid(cur, inc) {
-  if (isNewSpeedVoteVoteRound(cur, inc)) return inc?.votes || {};
-  return { ...(cur?.votes || {}), ...(inc?.votes || {}) };
+  return mergeTierNightLiveVotesForPatch(cur, inc);
 }
 
 function mergeTierNightLiveVotesPreserve(votes, playerRoster) {
@@ -2804,35 +2807,10 @@ function mergeTierNightLiveVotesPreserve(votes, playerRoster) {
 function mergeTierNightLiveGameLocal(local, remote) {
   if (!remote) return local;
   if (!local) return remote;
-  const newRound = isNewSpeedVoteVoteRound(local, remote);
-  // BUG-TIERNIGHT-05 : local-first conservé volontairement (non corrigé dans 04).
-  const votes = newRound
-    ? remote.votes || {}
-    : { ...(remote.votes || {}), ...(local.votes || {}) };
-  const remotePlacements = remote.placements || {};
-  const remoteHasPlacements = Object.keys(remotePlacements).length > 0;
-  const isRemoteReset =
-    (!remote.lobbyStarted && remote.finished) ||
-    (remote.lobbyStarted &&
-      !remote.finished &&
-      remote.phase === "voting" &&
-      (remote.roundIdx ?? 0) === 0 &&
-      !remoteHasPlacements);
-  const playerRoster =
-    Array.isArray(remote.playerRoster) && remote.playerRoster.length
-      ? remote.playerRoster
-      : local.playerRoster || null;
+  const merged = mergeTierNightLiveGameFields(local, remote);
   return {
-    ...local,
-    ...remote,
-    playerRoster,
-    phase: mergeSpeedVotePhase(local, remote),
-    votes: mergeTierNightLiveVotesPreserve(votes, playerRoster),
-    placements: isRemoteReset
-      ? remotePlacements
-      : remoteHasPlacements
-        ? { ...(local.placements || {}), ...remotePlacements }
-        : local.placements || {},
+    ...merged,
+    votes: mergeTierNightLiveVotesPreserve(merged.votes, merged.playerRoster),
   };
 }
 

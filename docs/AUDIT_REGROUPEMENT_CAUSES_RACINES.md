@@ -16,7 +16,7 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 
 | | |
 |--|--|
-| **Maintenant** | 🔴 BUG-TIERNIGHT-05 · QA terrain **BUG-TIERNIGHT-04** |
+| **Maintenant** | QA terrain **BUG-TIERNIGHT-05** · QA terrain **BUG-TIERNIGHT-04** |
 | **Ensuite** | 🟠 BUG-WAO-02/03/04 · BUG-TIERNIGHT-03 · BUG-TRUTHMETER-02 · **OPS-LOBBY-04** · **ARCH-23** · ARCH-10 · **UX-HOST-01** |
 | **Dernière clôture** | **BUG-TRUTHMETER-01** ✅ (01A · 01B · QA 2026-08-02) |
 
@@ -29,7 +29,7 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 | ID | Cause | Problème | Priorité |
 |----|-------|----------|----------|
 | **BUG-TIERNIGHT-04** | 3/7 | Joueurs invisibles · listes désynchronisées | 🟡 code OK · **QA terrain** |
-| **BUG-TIERNIGHT-05** | 8 | Ancien vote repris après nouvelle partie | 🔴 |
+| **BUG-TIERNIGHT-05** | 8 | Ancien vote repris après nouvelle partie | 🟡 code OK · **QA terrain** |
 
 ### Autres
 
@@ -273,7 +273,7 @@ Retour terrain multi-jeux. Priorités : 🔴 critique · 🟠 haute · 🟡 moye
 | ~~**BUG-TRUTHMETER-01A**~~ | ~~Faux succès UI / perte submit~~ | ✅ **Clôturé QA 2026-08-02** |
 | ~~**BUG-TRUTHMETER-01B**~~ | ~~Course vote ↔ reveal~~ | ✅ **Clôturé QA 2026-08-02** — RPC atomique · hydrate scores serveur · compteur `lastRenderedVotesJson`. |
 | **BUG-TIERNIGHT-04** | Joueurs invisibles | **Corrigé code 2026-08-02** — roster/deck figés (`playerRoster` + `items`) · votes Live non droppés si mapping UID manquant · X/Y + `allVotesIn` sur UIDs attendus · hydratation votes-only. **Reste : QA terrain** (hôte + 2 invités). Voir livrable chat BUG-TIERNIGHT-04. |
-| **BUG-TIERNIGHT-05** | Ancien vote repris dans nouvelle partie | Après nouvelle partie : sélection précédente réapparaît. Attendu : état entièrement vierge. Vérifier : reset local · reset Supabase · caches · état mémoire. **Caractérisé** : merge Live local-first + pas de clear votes sur nouveau `runId`. |
+| **BUG-TIERNIGHT-05** | Ancien vote repris dans nouvelle partie | **Corrigé code 2026-08-02** — `isNewTierNightLiveVoteRound` (runId + `isRemoteReset` + helper SpeedVote inchangé) · hydrate + patch votes remote-only sur nouveau run. **Reste : QA terrain**. |
 
 #### 🟠 Haute
 

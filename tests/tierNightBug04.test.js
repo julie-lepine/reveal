@@ -224,8 +224,8 @@ describe("BUG-TIERNIGHT-04 — Live UID canonique", () => {
   });
 });
 
-describe("BUG-TIERNIGHT-05 — caractérisation (non corrigé dans 04)", () => {
-  it("nouveau runId + ancien vote local encore présent : merge local-first conserve le vote", () => {
+describe("BUG-TIERNIGHT-05 — résolu : nouveau runId abandonne les votes locaux", () => {
+  it("isNewSpeedVoteVoteRound seul ne détecte pas un nouveau run (contrat SpeedVote inchangé)", () => {
     const local = {
       runId: "old",
       phase: "voting",
@@ -241,15 +241,7 @@ describe("BUG-TIERNIGHT-05 — caractérisation (non corrigé dans 04)", () => {
       finished: false,
       placements: {},
     };
-    const newRound = isNewSpeedVoteVoteRound(local, remote);
-    const votes = newRound
-      ? remote.votes || {}
-      : { ...(remote.votes || {}), ...(local.votes || {}) };
-    if (!newRound) {
-      assert.equal(votes.Alice, "S");
-    } else {
-      assert.deepEqual(votes, {});
-    }
+    assert.equal(isNewSpeedVoteVoteRound(local, remote), false);
   });
 });
 
