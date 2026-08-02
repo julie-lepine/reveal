@@ -444,8 +444,8 @@ describe("lobbyMembershipVagueE2 — contrats source", () => {
     const src = readFileSync(join(root, "js/core/lobby.js"), "utf8");
 
     const dissolveGuest = src.slice(
-      src.indexOf("export async function handleLobbyDissolvedForGuest"),
-      src.indexOf("export async function handleKickedFromLobby")
+      src.indexOf("export async function resolveLobbyClosureAndExit"),
+      src.indexOf("export async function handleLobbyDissolvedForGuest")
     );
     const kick = src.slice(
       src.indexOf("export async function handleKickedFromLobby"),
@@ -758,14 +758,14 @@ describe("lobbyMembershipVagueE2 — contrats dissolution / kick", () => {
     assert.match(gone, /isLocalStillLobbyMember/);
     assert.match(gone, /stillMember === true/);
     assert.match(gone, /stillMember === null/);
-    assert.match(gone, /handleLobbyDissolvedForGuest/);
+    assert.match(gone, /resolveLobbyClosureAndExit/);
     // stillMember null / true → pas de dissolve (ordre : return avant import dissolve)
     const nullIdx = gone.indexOf("stillMember === null");
     const trueIdx = gone.indexOf("stillMember === true");
-    const dissolveIdx = gone.lastIndexOf("handleLobbyDissolvedForGuest");
+    const dissolveIdx = gone.lastIndexOf("resolveLobbyClosureAndExit");
     assert.ok(nullIdx >= 0 && trueIdx >= 0 && dissolveIdx > nullIdx && dissolveIdx > trueIdx);
 
-    assert.match(src, /event:\s*"DELETE"[\s\S]*table:\s*"lobbies"[\s\S]*handleLobbyDissolvedForGuest/);
+    assert.match(src, /event:\s*"DELETE"[\s\S]*table:\s*"lobbies"[\s\S]*resolveLobbyClosureAndExit/);
   });
 
   it("kick : Realtime seulement si removedUid === localUid ; roster vide n'expulse pas", async () => {
@@ -777,8 +777,9 @@ describe("lobbyMembershipVagueE2 — contrats dissolution / kick", () => {
     assert.match(src, /removedUid && localUid && removedUid === localUid/);
     const applyStart = src.indexOf("function applyLobbyToState");
     assert.ok(applyStart >= 0);
-    const apply = src.slice(applyStart, applyStart + 900);
+    const apply = src.slice(applyStart, applyStart + 1800);
     assert.match(apply, /bundle\.participants\.length > 0/);
+    assert.match(apply, /wasLobbyClosureHandled/);
     assert.match(apply, /handleKickedFromLobby/);
   });
 

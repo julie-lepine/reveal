@@ -16,9 +16,9 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 
 | | |
 |--|--|
-| **Maintenant** | Re-QA terrain **BUG-TRUTHMETER-02** (fix merge affirmation / split-brain) |
-| **Ensuite** | **OPS-LOBBY-04** · **ARCH-23** · ARCH-10 · **UX-HOST-01** |
-| **Dernière clôture** | **BUG-TIERNIGHT-03** ✅ (QA) · **BUG-WAO-04** ✅ · **BUG-WAO-02** ✅ · **BUG-WAO-03** ✅ · **BUG-TIERNIGHT-04** ✅ · **BUG-TIERNIGHT-05** ✅ |
+| **Maintenant** | **BUG-LOBBY-XX-E** — implémentation livrée · **SQL ⏳** à exécuter puis QA terrain |
+| **Ensuite** | **ARCH-23** · ARCH-10 · **UX-HOST-01** |
+| **Dernière clôture** | **OPS-LOBBY-04** ✅ QA · **BUG-TRUTHMETER-02** ✅ (QA) · **BUG-TIERNIGHT-03** ✅ · **BUG-WAO-04** ✅ · **BUG-WAO-02** ✅ · **BUG-WAO-03** ✅ · **BUG-TIERNIGHT-04** ✅ · **BUG-TIERNIGHT-05** ✅ |
 
 ---
 
@@ -28,7 +28,8 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 
 | ID | Cause | Problème | Priorité |
 |----|-------|----------|----------|
-| **BUG-TRUTHMETER-02** | 3/8 | Changement de pseudo casse la saisie suivante | 🔧 QA |
+| **OPS-LOBBY-04** | 8 | Activer pg_cron + job `reveal-purge-stale-lobbies` | ✅ QA terrain |
+| **BUG-LOBBY-XX-E** | 4/8 | Distinguer fermeture manuelle / expiration (tombstones) | 🟡 code prêt · SQL ⏳ |
 
 ### Autres
 
@@ -45,8 +46,6 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 | **FEATURE-TIERNIGHT-01** | — | Thèmes personnalisés (Classer le groupe) | 🟡 |
 | **FEATURE-TIERNIGHT-02** | — | Séries de tierlists par catégories | 🟡 |
 | **FEATURE-CHAT-03** | — | Bouton « Futur jeu aléatoire » dans le chat | 🟡 |
-| **OPS-LOBBY-04** | 8 | Activer pg_cron + job `reveal-purge-stale-lobbies` (suite BUG-LOBBY-XX) | 🟡 ops |
-| **BUG-LOBBY-XX-E** | 4/8 | Hôte non notifié quand lobby expiré / supprimé (suite BUG-LOBBY-XX) | 🟡 |
 | **FEATURE-VIBECHECK-01** | 10 | Suppression complète du jeu VibeCheck | ⚪ produit |
 | **ARCH-10** | 8 | Clear cache leave lobby trop tard | 🟡 partiel |
 | **ARCH-05** | 5 | Course lobby vs session (`row.screen`) | 🟡 mitigé SYN-28 |
@@ -61,12 +60,12 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 |---|-------|------|----------------|
 | 1 | Identité invité / JWT | ✅ | ARCH-01 partiel |
 | 2 | Race auth / profil | ✅ | — |
-| 3 | Sources de vérité multiples | Partiel | **BUG-TIERNIGHT-04 ✅** · **BUG-TRUTHMETER-02** 🔧 QA · **Membership A–E5 ✅** · M-14a ✅ · Guess Lie ✅ |
+| 3 | Sources de vérité multiples | Partiel | **BUG-TIERNIGHT-04 ✅** · **BUG-TRUTHMETER-02 ✅** · **Membership A–E5 ✅** · M-14a ✅ · Guess Lie ✅ |
 | 4 | Asymétrie hôte / invité | ✅ | — |
 | 5 | Routing + timing sync | ✅ | ARCH-05 mitigé · **UX-NAV-LOBBY ✅** |
 | 6 | Async écrans | ✅ | **BUG-WAO-02** ✅ · **BUG-WAO-03** ✅ · **BUG-WAO-04** ✅ |
 | 7 | Sync silencieuse / fire-and-forget | Partiel | **BUG-TRUTHMETER-01 ✅** (01A/01B) · **BUG-TIERNIGHT-03** ✅ · **BUG-TRIVIA-01 ✅** (01A/01B/01B-bis/01C) · ARCH-07 ✅ · M-14b ✅ · ARCH-08 ✅ |
-| 8 | Reset / migration incomplète | Partiel | **BUG-TIERNIGHT-05 ✅** · **OPS-LOBBY-04** · **BUG-LOBBY-XX-E** · **BUG-TRUTHMETER-02** 🔧 QA · **ARCH-23** · ARCH-10 · **BUG-LOBBY-XX ✅** · I-09/SYN-15/16 ✅ |
+| 8 | Reset / migration incomplète | Partiel | **BUG-TIERNIGHT-05 ✅** · **OPS-LOBBY-04** · **BUG-LOBBY-XX-E** · **BUG-TRUTHMETER-02 ✅** · **ARCH-23** · ARCH-10 · **BUG-LOBBY-XX ✅** · I-09/SYN-15/16 ✅ |
 | 9 | Sync monolithe / duplication | Dette | ARCH-11… |
 | 10 | Code mort | Dette | **FEATURE-VIBECHECK-01** ⚪ · hors Fil Rouge app ✅ |
 | 11 | Friction UX | Partiel | **UX-CHAT-01/02** 🟡 · **UX-DEVICE-01** 🟡 · **UX-HOST-01** 🟡 · **BUG-WAO-04** ✅ · **ARCH-23** · ARCH-22/Loader ✅ · **L-04 ✅** |
@@ -192,8 +191,8 @@ Symptôme terrain : lobby inactif jamais fermé automatiquement. **Aucun correct
 | **Hypothèse prod H1** | Job `reveal-purge-stale-lobbies` probablement absent ou inactif — **à confirmer** via runbook SQL (étapes lecture seule 0–6) |
 | **Gaps secondaires (hors scope diagnostic)** | Hôte ignoré par `handleLobbyDissolvedForGuest()` (`isLocalLobbyHost()` → return) → **BUG-LOBBY-XX-E** · `lobbyHeartbeat.js` importé jamais appelé · vieillissement artificiel `lobbies.last_activity_at` impossible (`set_lobbies_timestamps()` force `now()`) |
 | **Runbook prod** | Validé v3 — R0 prioritaire (0 membre) · R3 conditionnel (membres seulement) · Realtime principal = DELETE ciblé 8B-2 · exécution dashboard **reste à faire** |
-| **Chantiers ouverts** | **OPS-LOBBY-04** activer pg_cron + job · **BUG-LOBBY-XX-E** client hôte à l'expiration · **BUG-LOBBY-XX-F** si Realtime invité KO (test 8B-2) · **GAME-LOBBY-01** ↻ politique heartbeat vs « inactif » (produit, séparé) |
-| **Verdict** | **Ne pas rouvrir BUG-LOBBY-XX** — rouvrir **OPS-LOBBY-04** ou **BUG-LOBBY-XX-E** selon résultats runbook prod |
+| **Chantiers ouverts** | **BUG-LOBBY-XX-E** : [`lobby-closures-xx-e.sql`](../supabase/lobby-closures-xx-e.sql) + runbook · client `resolveLobbyClosureAndExit` · **BUG-LOBBY-XX-F** · **GAME-LOBBY-01** |
+| **Verdict** | **Ne pas rouvrir BUG-LOBBY-XX** — OPS-04 ✅ · suite message = **BUG-LOBBY-XX-E** (SQL à déployer) |
 
 #### BUG-TRIVIA-01A ✅ (clôture QA terrain · 2026-07-31)
 
@@ -277,7 +276,7 @@ Retour terrain multi-jeux. Priorités : 🔴 critique · 🟠 haute · 🟡 moye
 | **BUG-WAO-03** | Scroll réinitialisé pendant votes | ✅ QA validé — ne pas rouvrir. |
 | **BUG-WAO-04** | Réponses vides validables | ✅ **QA validé 2026-08-02** — `#wrong-submit` disabled si trim vide · sync input + refresh hôte · `cap:sync` + `?v=97`. Ne pas rouvrir. |
 | **BUG-TIERNIGHT-03** | Révélation non automatique | ✅ **QA validé 2026-08-02** — `commitTierNightLiveRevealSafely` · verrou auto/manuel · chrome pending · retry one-shot · recovery refresh. Item suivant reste manuel. Ne pas rouvrir. |
-| **BUG-TRUTHMETER-02** | Changement de pseudo casse le jeu | 🔧 **Implémenté — QA terrain obligatoire** (2026-08-02). `authorOrder` + `affirmation.authorUid` canoniques ; gate UI UID ; SQL `truth_meter_resolve_author_uid` ; pas de rewrite distant auto ; I-09 normalise legacy→UID. |
+| **BUG-TRUTHMETER-02** | Changement de pseudo casse le jeu | ✅ **Clôturé QA 2026-08-02** — UID canonique · merge clear `affirmation:null` · writing≠submitted author · skip présence. |
 
 #### 🟡 Moyenne
 
@@ -424,4 +423,4 @@ Hors file prioritaire — opportunité / régression :
 
 ---
 
-*Suivi vivant · MAJ 2026-08-02 — **BUG-TRUTHMETER-02** 🔧 implémenté (QA terrain) · prochain après clôture = **OPS-LOBBY-04***
+*Suivi vivant · MAJ 2026-08-02 — **BUG-LOBBY-XX-E** implémenté (attente déploiement SQL + QA) · **OPS-LOBBY-04** ✅ · ensuite **ARCH-23***

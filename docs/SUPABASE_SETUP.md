@@ -109,7 +109,9 @@ Après migration SQL, l’app envoie un **heartbeat** (`last_seen_at`) toutes le
 | Purge `waiting` sans personne en ligne | **45 min** |
 | Purge sans aucun membre | immédiat (cron) |
 
-**Purge automatique** : active l’extension **pg_cron** (Database → Extensions), puis décommente le bloc `cron.schedule` en bas de `supabase/lobby-lifecycle.sql` (toutes les 15 min).
+**Purge automatique** : active l’extension **pg_cron** (Database → Extensions), puis exécute [`ops-lobby-04-enable-purge-cron.sql`](../supabase/ops-lobby-04-enable-purge-cron.sql) (job `reveal-purge-stale-lobbies`, toutes les 15 min). Validation : [`ops-lobby-04-purge-cron-runbook.sql`](../supabase/tests/ops-lobby-04-purge-cron-runbook.sql). Voir aussi [`DEPLOYMENTS_SQL.md`](./DEPLOYMENTS_SQL.md) §7.
+
+**Raison de fermeture (BUG-LOBBY-XX-E)** : après OPS-04, appliquer [`lobby-closures-xx-e.sql`](../supabase/lobby-closures-xx-e.sql) pour les tombstones `lobby_closures` (`host_closed` / `inactive_expired`). Runbook : [`lobby-closures-xx-e-runbook.sql`](../supabase/tests/lobby-closures-xx-e-runbook.sql). Rétention tombstones : **14 jours**. Voir [`DEPLOYMENTS_SQL.md`](./DEPLOYMENTS_SQL.md) §8. **Ne pas** réexécuter E5-01 dissolve ni le corps historique de `lobby-lifecycle.sql` après XX-E.
 
 Purge manuelle (SQL Editor) :
 

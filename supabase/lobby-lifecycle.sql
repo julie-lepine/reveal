@@ -198,16 +198,10 @@ revoke all on function public.purge_stale_lobbies() from public;
 -- Appel manuel (SQL Editor) ou pg_cron uniquement — pas exposé aux clients.
 
 -- ── pg_cron (optionnel — Extensions → pg_cron) ─────────────────────────────
--- Décommente après activation de l'extension pg_cron sur ton projet Supabase :
-
--- select cron.unschedule('reveal-purge-stale-lobbies')
--- where exists (select 1 from cron.job where jobname = 'reveal-purge-stale-lobbies');
-
--- select cron.schedule(
---   'reveal-purge-stale-lobbies',
---   '*/15 * * * *',
---   $$ select public.purge_stale_lobbies(); $$
--- );
+-- Volontairement non activé ici : ops séparée OPS-LOBBY-04.
+-- Script idempotent : supabase/ops-lobby-04-enable-purge-cron.sql
+-- Runbook : supabase/tests/ops-lobby-04-purge-cron-runbook.sql
+-- Job attendu : reveal-purge-stale-lobbies · */15 * * * * · select public.purge_stale_lobbies();
 
 -- ── Monitoring (aperçu lobbies à risque) ───────────────────────────────────
 

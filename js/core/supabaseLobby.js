@@ -354,6 +354,11 @@ export function getRememberedLobbyCode() {
   }
 }
 
+/** Dernier lobby id connu (fermeture / remount BUG-LOBBY-XX-E). */
+export function getRememberedLobbyId() {
+  return readRememberedLobbyId();
+}
+
 /** T-01/T-02 : true pendant restore session au join (bloque route SUBSCRIBED). */
 export function isJoinSessionHydrating() {
   return joinSessionHydrating;
@@ -845,8 +850,21 @@ export async function recoverLobbyFromServer({ withMessages = false } = {}) {
       return { ok: false, captchaRequired: true };
     }
     if (hadGuestMembership && (await isGuestMembershipDefinitivelyStale())) {
+      const closedId =
+        loadGuestMembership()?.lobbyId || readRememberedLobbyId() || null;
       clearGuestMembership();
       console.debug("[Lobby Recovery] recovery failed");
+      if (closedId) {
+        try {
+          const { resolveLobbyClosureAndExit } = await import("./lobby.js");
+          await resolveLobbyClosureAndExit({
+            lobbyId: closedId,
+            source: "recover-stale-membership",
+          });
+        } catch (e) {
+          console.warn("REVEAL closure on stale recovery:", e?.message || e);
+        }
+      }
       return { ok: false, staleMembership: true };
     }
     console.debug("[Lobby Recovery] recovery failed");
@@ -856,8 +874,21 @@ export async function recoverLobbyFromServer({ withMessages = false } = {}) {
   const reclaimResult = await ensureGuestMembershipReclaimed(lobbyId);
   if (!reclaimResult.ok) {
     if (reclaimResult.stale) {
+      const closedId =
+        loadGuestMembership()?.lobbyId || lobbyId || readRememberedLobbyId();
       clearGuestMembership();
       console.debug("[Lobby Recovery] recovery failed");
+      if (closedId) {
+        try {
+          const { resolveLobbyClosureAndExit } = await import("./lobby.js");
+          await resolveLobbyClosureAndExit({
+            lobbyId: closedId,
+            source: "recover-reclaim-stale",
+          });
+        } catch (e) {
+          console.warn("REVEAL closure on reclaim stale:", e?.message || e);
+        }
+      }
       return { ok: false, staleMembership: true };
     }
     console.debug("[Lobby Recovery] recovery failed");
@@ -974,8 +1005,11 @@ async function handlePossibleLobbyGone(lobbyId, e) {
     }
     return false;
   }
-  const { handleLobbyDissolvedForGuest } = await import("./lobby.js");
-  await handleLobbyDissolvedForGuest();
+  const { resolveLobbyClosureAndExit } = await import("./lobby.js");
+  await resolveLobbyClosureAndExit({
+    lobbyId: lobbyId || readRememberedLobbyId(),
+    source: "possible-lobby-gone",
+  });
   return false;
 }
 
@@ -1318,7 +1352,15 @@ function applyLobbyToState(bundle, { persistGuestMembership = false } = {}) {
     // participants=[] ne suffit pas (bundle vide / partiel) — dissolve/gone gèrent autrement.
     setTimeout(() => {
       if (!getState().inLobby) return;
-      void import("./lobby.js").then(({ handleKickedFromLobby }) => handleKickedFromLobby());
+      void import("./lobbyClosureSession.js").then(
+        ({ wasLobbyClosureHandled }) => {
+          const lid = getState().lobby?.id;
+          if (lid && wasLobbyClosureHandled(lid)) return;
+          void import("./lobby.js").then(({ handleKickedFromLobby }) =>
+            handleKickedFromLobby()
+          );
+        }
+      );
     }, 0);
     return;
   }
@@ -2022,6 +2064,47 @@ async function reconcileDissolveAfterTransportError(lobbyId, transportFailure) {
 
 export { LOBBY_DISSOLVE_STATUS, mapDissolveLobbyRpcData };
 
+/**
+ * BUG-LOBBY-XX-E — lit le tombstone de fermeture (RPC get_lobby_closure).
+ * @param {string} lobbyId
+ */
+export async function fetchLobbyClosure(lobbyId) {
+  const {
+    mapGetLobbyClosureRpcData,
+    LOBBY_CLOSURE_FETCH,
+  } = await import("./lobbyClosureContract.js");
+
+  if (!lobbyId || !isSupabaseConfigured()) {
+    return mapGetLobbyClosureRpcData({ found: false, lobby_id: lobbyId || null }, lobbyId);
+  }
+
+  try {
+    const { data, error } = await supabase.rpc("get_lobby_closure", {
+      p_lobby_id: lobbyId,
+    });
+    if (error) {
+      return {
+        status: LOBBY_CLOSURE_FETCH.ERROR,
+        lobbyId: lobbyId != null ? String(lobbyId) : null,
+        reason: null,
+        closedAt: null,
+        closedByUid: null,
+        error: error.message || "get_lobby_closure failed",
+      };
+    }
+    return mapGetLobbyClosureRpcData(data, lobbyId);
+  } catch (e) {
+    return {
+      status: LOBBY_CLOSURE_FETCH.ERROR,
+      lobbyId: lobbyId != null ? String(lobbyId) : null,
+      reason: null,
+      closedAt: null,
+      closedByUid: null,
+      error: e?.message || String(e),
+    };
+  }
+}
+
 /** Hôte : supprime le lobby (membres et messages en cascade) — cache local. */
 export async function closeLobbySupabase() {
   const lobbyId = getState().lobby?.id;
@@ -2250,8 +2333,15 @@ export function subscribeLobbyRealtime(onUpdate) {
         if (removedUid && localUid && removedUid === localUid) {
           setTimeout(() => {
             if (!getState().inLobby) return;
-            void import("./lobby.js").then(({ handleKickedFromLobby }) =>
-              handleKickedFromLobby()
+            void import("./lobbyClosureSession.js").then(
+              ({ wasLobbyClosureHandled, isLocalHostManualDissolve }) => {
+                if (wasLobbyClosureHandled(lobbyId) || isLocalHostManualDissolve(lobbyId)) {
+                  return;
+                }
+                void import("./lobby.js").then(({ handleKickedFromLobby }) =>
+                  handleKickedFromLobby()
+                );
+              }
             );
           }, 180);
           return;
@@ -2279,9 +2369,14 @@ export function subscribeLobbyRealtime(onUpdate) {
     .on(
       "postgres_changes",
       { event: "DELETE", schema: "public", table: "lobbies", filter: `id=eq.${lobbyId}` },
-      async () => {
-        const { handleLobbyDissolvedForGuest } = await import("./lobby.js");
-        await handleLobbyDissolvedForGuest();
+      async (payload) => {
+        const closedId =
+          payload?.old?.id != null ? String(payload.old.id) : String(lobbyId);
+        const { resolveLobbyClosureAndExit } = await import("./lobby.js");
+        await resolveLobbyClosureAndExit({
+          lobbyId: closedId,
+          source: "realtime-lobbies-delete",
+        });
         onUpdate?.();
       }
     )

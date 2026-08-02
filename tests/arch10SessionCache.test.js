@@ -410,10 +410,11 @@ describe("ARCH-10 — contrat source pipelines", () => {
     assert.match(kick, /invalidateCurrentLobbySessionCache/);
 
     const dissolveGuest = lobbySrc.slice(
-      lobbySrc.indexOf("export async function handleLobbyDissolvedForGuest"),
-      lobbySrc.indexOf("export async function handleKickedFromLobby")
+      lobbySrc.indexOf("export async function resolveLobbyClosureAndExit"),
+      lobbySrc.indexOf("export async function handleLobbyDissolvedForGuest")
     );
     assert.match(dissolveGuest, /invalidateCurrentLobbySessionCache/);
+    assert.match(dissolveGuest, /getLobbyClosureCopy/);
 
     const leaveFn = lobbySrc.slice(
       lobbySrc.indexOf("export async function leaveLobby("),

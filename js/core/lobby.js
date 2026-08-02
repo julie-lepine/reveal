@@ -41,9 +41,19 @@ import {
   recoverAfterMembershipAlreadyExists,
   peekServerLobbyForUser,
   getRememberedLobbyCode,
+  getRememberedLobbyId,
+  fetchLobbyClosure,
   transferLobbyHostSupabase,
   kickLobbyMemberSupabase,
 } from "./supabaseLobby.js";
+import { getLobbyClosureCopy } from "./lobbyClosureCopy.js";
+import { LOBBY_CLOSURE_FETCH } from "./lobbyClosureContract.js";
+import {
+  markLobbyClosureHandled,
+  wasLobbyClosureHandled,
+  markLocalHostManualDissolve,
+  isLocalHostManualDissolve,
+} from "./lobbyClosureSession.js";
 import { queryActiveLobbyMembership } from "./lobbyMembershipFetch.js";
 import {
   alignMembershipSnapshotAfterLobbyHydration,
@@ -1098,33 +1108,111 @@ async function clearGuestSessionAfterFailedJoin() {
   sessionStorage.setItem("reveal-auth-tab", "guest");
 }
 
-/** Invité : l'hôte a fermé le lobby (realtime ou refresh). */
-export async function handleLobbyDissolvedForGuest() {
-  if (lobbyDissolveHandling || lobbyKickHandling) return;
-  if (!getState().inLobby) return;
-  if (isLocalLobbyHost()) return;
+/**
+ * BUG-LOBBY-XX-E — pipeline unique de disparition du lobby.
+ * Source de vérité de la raison = tombstone serveur (get_lobby_closure).
+ * Fallback générique : jamais d'attribution à l'hôte sans proof host_closed.
+ *
+ * @param {{
+ *   lobbyId?: string|null,
+ *   source?: string,
+ *   showModal?: boolean,
+ * }} [opts]
+ */
+export async function resolveLobbyClosureAndExit(opts = {}) {
+  const source = opts.source || "unknown";
+  const showModal = opts.showModal !== false;
 
+  const lobbyId =
+    (opts.lobbyId != null && String(opts.lobbyId)) ||
+    getLobby()?.id ||
+    getRememberedLobbyId() ||
+    null;
+
+  if (!lobbyId) return { ok: false, skipped: true, reason: "no-lobby-id" };
+
+  if (wasLobbyClosureHandled(lobbyId)) {
+    return { ok: true, skipped: true, reason: "already-handled" };
+  }
+
+  // Hôte : fermeture manuelle locale déjà finalisée → pas de 2e modale (Realtime DELETE).
+  if (isLocalHostManualDissolve(lobbyId)) {
+    markLobbyClosureHandled(lobbyId);
+    if (getState().inLobby && String(getLobby()?.id || "") === String(lobbyId)) {
+      // Sécurité : état déjà nettoyé en principe.
+      applyLeaveLobbyLocal({ wasGuest: isGuest(), navigateAway: true });
+    }
+    return { ok: true, skipped: true, reason: "local-host-manual" };
+  }
+
+  if (lobbyDissolveHandling || lobbyKickHandling) {
+    return { ok: false, skipped: true, reason: "in-flight" };
+  }
+
+  // Priorité dissolution : bloquer kick pendant le pipeline.
   lobbyDissolveHandling = true;
+  markLobbyClosureHandled(lobbyId);
+
   stopMultiplayerSync();
   stopLobbyPresenceSync();
 
-  // Preuve : DELETE lobby (Realtime) ou membership absente confirmée (refresh gone).
-  const dissolvedLobbyId = getLobby()?.id || null;
   const dissolvedUserId = getSupabaseUserId();
-  if (dissolvedUserId && dissolvedLobbyId) {
-    commitMembershipRemoved({ userId: dissolvedUserId, lobbyId: dissolvedLobbyId });
+  if (dissolvedUserId) {
+    commitMembershipRemoved({ userId: dissolvedUserId, lobbyId });
   }
-
   invalidateCurrentLobbySessionCache();
 
+  let closureReason = null;
+  if (isSupabaseConfigured()) {
+    try {
+      const closure = await fetchLobbyClosure(lobbyId);
+      if (closure.status === LOBBY_CLOSURE_FETCH.FOUND) {
+        closureReason = closure.reason;
+      }
+      // ABSENT / ERROR / UNAUTHENTICATED → générique (pas d'invention)
+    } catch (e) {
+      console.warn("REVEAL lobby closure fetch:", e?.message || e, { source });
+    }
+  }
+
+  const copy = getLobbyClosureCopy(closureReason);
   const wasGuest = isGuest();
   await signOutAnonGuestIfNeeded(wasGuest);
   applyLeaveLobbyLocal({ wasGuest, navigateAway: false });
 
-  await showAppAlert("L'hôte a quitté le lobby.", { title: "Lobby fermé", icon: "👋" });
+  if (showModal) {
+    await showAppAlert(copy.message, {
+      title: copy.title,
+      confirmLabel: copy.cta,
+      icon: copy.icon,
+    });
+  }
 
   lobbyDissolveHandling = false;
   navigate("home", { reset: true });
+  return {
+    ok: true,
+    lobbyId,
+    reason: closureReason,
+    source,
+  };
+}
+
+/**
+ * @deprecated alias — Realtime / gone → pipeline XX-E
+ * @param {{ lobbyId?: string|null, source?: string }} [opts]
+ */
+export async function handleLobbyDissolvedForGuest(opts = {}) {
+  const lobbyId =
+    opts.lobbyId ?? getLobby()?.id ?? getRememberedLobbyId() ?? null;
+  // Même si plus inLobby (course), on peut encore afficher via remembered id.
+  if (!getState().inLobby && wasLobbyClosureHandled(lobbyId)) return;
+  if (!getState().inLobby && !lobbyId) return;
+  return resolveLobbyClosureAndExit({
+    lobbyId,
+    source: opts.source || "dissolve-guest",
+    showModal: true,
+  });
 }
 
 /** Invité : retiré du lobby par l'hôte (kick) — membership locale absente côté serveur. */
@@ -1133,13 +1221,17 @@ export async function handleKickedFromLobby() {
   if (!getState().inLobby) return;
   if (isLocalLobbyHost()) return;
 
+  const kickedLobbyId = getLobby()?.id || getRememberedLobbyId() || null;
+  // Priorité dissolution : si fermeture déjà en cours / traitée → pas de modale kick.
+  if (kickedLobbyId && wasLobbyClosureHandled(kickedLobbyId)) return;
+  if (kickedLobbyId && isLocalHostManualDissolve(kickedLobbyId)) return;
+
   lobbyKickHandling = true;
   stopMultiplayerSync();
   stopLobbyPresenceSync();
 
   // Preuve : DELETE lobby_members user_id === local (Realtime) ou uid absent du bundle.
   // Ne s'applique jamais au kick d'un *autre* joueur (hôte reste dans le roster).
-  const kickedLobbyId = getLobby()?.id || null;
   const kickedUserId = getSupabaseUserId();
   if (kickedUserId && kickedLobbyId) {
     commitMembershipRemoved({ userId: kickedUserId, lobbyId: kickedLobbyId });
@@ -1315,6 +1407,11 @@ export async function dissolveLobbyAsHost({ navigateAway = true } = {}) {
       });
     }
     // E3 soft-hold — DISSOLVED et ALREADY_GONE (succès silencieux).
+    // XX-E : supprimer la modale Realtime DELETE pour cet hôte (fermeture manuelle locale).
+    if (lobbyId) {
+      markLocalHostManualDissolve(lobbyId);
+      markLobbyClosureHandled(lobbyId);
+    }
     beginPostLeaveHomeTransition();
     const hostUserId = getSupabaseUserId();
     if (hostUserId && lobbyId) {

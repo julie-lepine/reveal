@@ -58,7 +58,9 @@ Sources : audit SQL du dépôt (`AUDIT-SQL-01`) + docs ops ([`SUPABASE_SETUP.md`
 | Historique (date inconnue) | [`fix-lobbies-insert.sql`](../supabase/fix-lobbies-insert.sql) | Select hôte post-insert | 🟡 État à vérifier | 🟡 État à vérifier | — | Correctif ponctuel ; peut être redondant avec schema |
 | Historique (date inconnue) | [`lobby-host-close.sql`](../supabase/lobby-host-close.sql) | DELETE lobby hôte | 🟡 État à vérifier | 🟡 État à vérifier | — | Policy souvent déjà dans schema |
 | Historique (date inconnue) | [`game-sessions.sql`](../supabase/game-sessions.sql) | Sessions MP | ✅ probable | ✅ probable | — | **Ne pas réexécuter** après I-08 policy host-only (rouvre UPDATE membre) |
-| Historique (date inconnue) | [`lobby-lifecycle.sql`](../supabase/lobby-lifecycle.sql) | Expiration / purge | ✅ probable | ✅ probable | — | Colonnes + `purge_stale_lobbies` ; job `pg_cron` = ops séparée (OPS-LOBBY-04) |
+| Historique (date inconnue) | [`lobby-lifecycle.sql`](../supabase/lobby-lifecycle.sql) | Expiration / purge | ✅ probable | ✅ probable | — | Colonnes + purge historique ; **corps purge remplacé** par lobby-closures-xx-e (ne pas réexécuter lifecycle entier après XX-E) |
+| — (non déployé) | [`ops-lobby-04-enable-purge-cron.sql`](../supabase/ops-lobby-04-enable-purge-cron.sql) | OPS-LOBBY-04 | ⏳ | ⏳ | [`ops-lobby-04-purge-cron-runbook.sql`](../supabase/tests/ops-lobby-04-purge-cron-runbook.sql) | Activation scheduler uniquement — **pas une migration de schéma** ; voir §7 |
+| — (non déployé) | [`lobby-closures-xx-e.sql`](../supabase/lobby-closures-xx-e.sql) | BUG-LOBBY-XX-E | ⏳ | ⏳ | [`lobby-closures-xx-e-runbook.sql`](../supabase/tests/lobby-closures-xx-e-runbook.sql) | Tombstones `lobby_closures` + RPC + replace dissolve/purge ; voir §8 |
 | Historique (date inconnue) | [`transfer-lobby-host.sql`](../supabase/transfer-lobby-host.sql) | Transfert hôte | ✅ probable | ✅ probable | — | |
 | Historique (date inconnue) | [`kick-lobby-member.sql`](../supabase/kick-lobby-member.sql) | Kick membre | ✅ probable | ✅ probable | — | |
 | Historique (date inconnue) | [`lobby-members-unique-name.sql`](../supabase/lobby-members-unique-name.sql) | Pseudo unique / lobby | ✅ probable | ✅ probable | — | Échoue si doublons restants |
@@ -161,3 +163,83 @@ Résultat : SETUP OK · A1 PASS · A2 PASS · A3 PASS · A4 PASS · A5 PASS · B
 Auteur test : Joulaille la GOAT (`1c2146d8-…`) · 3 membres · `truth_meter_resolve_author_uid` présente
 
 Commentaires : Migration déjà appliquée manuellement auparavant ; runbook SQL validé. **Reste la QA applicative** (changement de pseudo en partie TruthMeter). Ne pas réexécuter `truthmeter-01b` après cette version.
+
+---
+
+## 7. OPS-LOBBY-04 — Purge automatique des lobbies (`pg_cron`)
+
+**Constat audit (repo)** : `public.purge_stale_lobbies()` est définie dans [`lobby-lifecycle.sql`](../supabase/lobby-lifecycle.sql) ; le `cron.schedule` y est **volontairement commenté**. Aucun autre scheduler dans le dépôt. Sans job actif en base, la purge auto ne tourne pas.
+
+| Élément | Fichier / valeur |
+| ------- | ---------------- |
+| Fonction | `select public.purge_stale_lobbies();` |
+| Jobname | `reveal-purge-stale-lobbies` |
+| Fréquence recommandée | `*/15 * * * *` (15 min) — plus court seuil métier = 45 min |
+| Activation (idempotente) | [`ops-lobby-04-enable-purge-cron.sql`](../supabase/ops-lobby-04-enable-purge-cron.sql) |
+| Runbook QA Ops | [`ops-lobby-04-purge-cron-runbook.sql`](../supabase/tests/ops-lobby-04-purge-cron-runbook.sql) |
+| Prérequis | Extension `pg_cron` (Dashboard → Extensions) ; `lobby-lifecycle.sql` déjà appliqué |
+
+**Procédure Ops (ne pas inventer de date ici)** :
+
+1. Staging : vérifier `pg_cron` + fonction (runbook A–D lecture seule).
+2. Staging : exécuter [`ops-lobby-04-enable-purge-cron.sql`](../supabase/ops-lobby-04-enable-purge-cron.sql).
+3. Staging : runbook E–F (lobby stale / lobby actif).
+4. Production : mêmes étapes A–D puis activation + E–F contrôlé.
+5. Ajouter une entrée journal ci-dessous avec **date réelle** d’activation et résultats.
+
+**Statut** : ⏳ activation **non tracée** dans ce registre (à faire après exécution Ops).
+
+### Modèle d’entrée journal (après activation)
+
+```markdown
+## YYYY-MM-DD
+
+Migration : ops-lobby-04-enable-purge-cron.sql (ops / pas de schéma)
+Ticket : OPS-LOBBY-04
+
+Staging :
+Production :
+
+Runbook : ops-lobby-04-purge-cron-runbook.sql (A–F)
+
+Résultat :
+
+Commentaires : job reveal-purge-stale-lobbies · schedule */15 * * * *
+```
+
+---
+
+## 8. BUG-LOBBY-XX-E — Tombstones de fermeture (`lobby_closures`)
+
+**Problème** : purge et dissolve produisent le même `DELETE lobbies` ; le client affichait une attribution fausse à l’hôte.
+
+| Élément | Fichier / valeur |
+| ------- | ---------------- |
+| Migration | [`lobby-closures-xx-e.sql`](../supabase/lobby-closures-xx-e.sql) — statut **⏳** tant que non appliquée |
+| Runbook | [`lobby-closures-xx-e-runbook.sql`](../supabase/tests/lobby-closures-xx-e-runbook.sql) |
+| Table | `public.lobby_closures` (PK `lobby_id`, **pas** de FK CASCADE vers `lobbies`) |
+| Reasons | `host_closed` \| `inactive_expired` |
+| RPC lecture | `get_lobby_closure(uuid)` — authenticated ; table non SELECT publique |
+| Remplace | `dissolve_lobby_atomically` (E5-01) · `purge_stale_lobbies` (lifecycle) |
+| Rétention | **14 jours** via `purge_old_lobby_closures()` en fin de `purge_stale_lobbies` |
+| Ne pas réexécuter après XX-E | `lobby-membership-e5-01-dissolve-lobby-atomically.sql` · `lobby-lifecycle.sql` (corps fonctions) |
+
+**Statut** : ⏳ migration **non appliquée** (pas de date inventée). Après exécution Ops : journal + runbook A–F.
+
+### Modèle d’entrée journal (après application)
+
+```markdown
+## YYYY-MM-DD
+
+Migration : lobby-closures-xx-e.sql
+Ticket : BUG-LOBBY-XX-E
+
+Staging :
+Production :
+
+Runbook : lobby-closures-xx-e-runbook.sql
+
+Résultat :
+
+Commentaires : remplace dissolve E5 + purge lifecycle ; rétention 14 j
+```
