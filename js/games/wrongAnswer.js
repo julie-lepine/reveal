@@ -37,6 +37,13 @@ import {
   getActingHostUiRefreshToken,
   needsActingHostUiRefresh,
 } from "../core/gameSync.js";
+import {
+  shouldFullRenderWrongAnswer,
+  wrongAnswerComposeStatusText,
+  wrongAnswerVoteStatusText,
+  wrongAnswerConfirmVoteState,
+  wrongAnswerAuthorNames,
+} from "../core/wrongAnswerUiRefresh.js";
 
 export function mountWrongAnswer(app) {
   if (!requireLobbyPlay()) return null;
@@ -221,13 +228,13 @@ export function mountWrongAnswer(app) {
     const total = getActivePlayerNames().length;
     const remaining = WRONG_ANSWER_MAX_LEN - (submitted ? myAnswerText().length : draftText.length);
 
-    const status = submitted
-      ? mp
-        ? allWrongAnswersIn()
-          ? "Tout le monde a répondu !"
-          : `Réponse envoyée - en attente des autres (${answeredCount}/${total})…`
-        : "Réponse envoyée !"
-      : "Donne la pire réponse possible, en secret 🤫";
+    const status = wrongAnswerComposeStatusText({
+      submitted,
+      mp,
+      allIn: allWrongAnswersIn(),
+      answeredCount,
+      total,
+    });
 
     return `
       <div class="card wrong-prompt">
@@ -236,11 +243,11 @@ export function mountWrongAnswer(app) {
       </div>
       ${
         submitted
-          ? `<div class="card card--feedback card--ok">
+          ? `<div class="card card--feedback card--ok" id="wrong-answer-feedback">
               <p class="feedback-title">Ta pire réponse</p>
               <p class="feedback-sub">« ${escapeHtml(myAnswerText())} »</p>
             </div>`
-          : `<div class="wrong-answer-form">
+          : `<div class="wrong-answer-form" id="wrong-answer-form">
               <textarea id="wrong-input" class="wrong-input" rows="2" maxlength="${WRONG_ANSWER_MAX_LEN}"
                 placeholder="Ex. « Girafe. »">${escapeHtml(draftText)}</textarea>
               <p class="hint wrong-input__count"><span id="wrong-count">${remaining}</span> caractères restants</p>
@@ -249,14 +256,16 @@ export function mountWrongAnswer(app) {
               <button type="button" class="btn btn-primary btn--spaced" id="wrong-submit">Valider ma réponse</button>
             </div>`
       }
-      <p class="hint" style="text-align:center">${escapeHtml(status)}</p>
+      <p class="hint" id="wrong-answer-status" style="text-align:center">${escapeHtml(status)}</p>
+      <div id="wrong-answer-host-slot">
       ${
         (!mp || canActAsHost()) && answeredCount > 0
           ? `<button type="button" class="btn btn-secondary btn--spaced" id="wrong-force-vote">
               Passer au vote (${answeredCount}/${total})
             </button>`
           : ""
-      }`;
+      }
+      </div>`;
   }
 
   function votingHtml() {
@@ -265,6 +274,11 @@ export function mountWrongAnswer(app) {
     const votedCount = getActivePlayerNames().filter((n) => votes[n] != null).length;
     const total = getActivePlayerNames().length;
     const displayPick = selectedTarget ?? myVote();
+    const { confirmDisabled, label: confirmLabel } = wrongAnswerConfirmVoteState({
+      displayPick,
+      localName,
+      voted,
+    });
 
     const cards = displayOrder
       .map((author, i) => {
@@ -286,31 +300,32 @@ export function mountWrongAnswer(app) {
       })
       .join("");
 
-    const hint = voted
-      ? allWrongAnswerVotesIn()
-        ? "Tout le monde a voté !"
-        : `Vote enregistré - en attente des autres (${votedCount}/${total})…`
-      : "Vote pour la PIRE réponse (tu ne peux pas voter pour la tienne).";
-
-    const confirmDisabled = displayPick == null || displayPick === localName || voted;
+    const hint = wrongAnswerVoteStatusText({
+      voted,
+      allIn: allWrongAnswerVotesIn(),
+      votedCount,
+      total,
+    });
 
     return `
       <div class="card wrong-prompt">
         <p class="label-upper label-upper--pink">↩️ Vote la pire</p>
         <p class="wrong-prompt__q">${escapeHtml(currentPrompt?.prompt || "…")}</p>
       </div>
-      <p class="hint">${escapeHtml(hint)}</p>
-      <div class="wrong-vote-list">${cards}</div>
+      <p class="hint" id="wrong-vote-status">${escapeHtml(hint)}</p>
+      <div class="wrong-vote-list" id="wrong-vote-list">${cards}</div>
       <button type="button" class="btn ${confirmDisabled ? "btn-secondary" : "btn-primary"} btn--spaced" id="wrong-confirm-vote" ${confirmDisabled ? "disabled" : ""}>
-        ${voted ? "Vote enregistré" : "Valider mon vote"}
+        ${confirmLabel}
       </button>
+      <div id="wrong-vote-host-slot">
       ${
         (!mp || canActAsHost()) && votedCount > 0
           ? `<button type="button" class="btn btn-secondary btn--spaced" id="wrong-force-reveal">
               Révéler maintenant (${votedCount}/${total})
             </button>`
           : ""
-      }`;
+      }
+      </div>`;
   }
 
   function revealHtml() {
@@ -361,6 +376,104 @@ export function mountWrongAnswer(app) {
             </button>`
           : `<p class="hint">En attente de l'hôte pour la suite…</p>`
       }`;
+  }
+
+  /** BUG-WAO-02 — chrome phase réponse sans toucher #wrong-input. */
+  function refreshWrongAnswerResponseProgress() {
+    if (!mount.isMounted() || !mount.isCurrentMount()) return;
+    if (phase !== "answer") return;
+    const answeredCount = getActivePlayerNames().filter((n) => answers[n]?.text).length;
+    const total = getActivePlayerNames().length;
+    const submitted = Boolean(myAnswerText());
+    const statusEl = app.querySelector("#wrong-answer-status");
+    if (statusEl) {
+      statusEl.textContent = wrongAnswerComposeStatusText({
+        submitted,
+        mp,
+        allIn: allWrongAnswersIn(),
+        answeredCount,
+        total,
+      });
+    }
+    const slot = app.querySelector("#wrong-answer-host-slot");
+    if (!slot) return;
+    const showHost = (!mp || canActAsHost()) && answeredCount > 0;
+    let btn = app.querySelector("#wrong-force-vote");
+    if (showHost) {
+      const label = `Passer au vote (${answeredCount}/${total})`;
+      if (!btn) {
+        slot.innerHTML = `<button type="button" class="btn btn-secondary btn--spaced" id="wrong-force-vote">${label}</button>`;
+        btn = app.querySelector("#wrong-force-vote");
+        btn?.addEventListener("click", () => void transitionToVoting());
+      } else {
+        btn.textContent = label;
+      }
+    } else if (btn) {
+      slot.innerHTML = "";
+    }
+  }
+
+  /** BUG-WAO-03 — chrome phase vote sans reconstruire #wrong-vote-list. */
+  function refreshWrongAnswerVoteProgress() {
+    if (!mount.isMounted() || !mount.isCurrentMount()) return;
+    if (phase !== "voting") return;
+    const voted = myVote() != null;
+    const votedCount = getActivePlayerNames().filter((n) => votes[n] != null).length;
+    const total = getActivePlayerNames().length;
+    const displayPick = selectedTarget ?? myVote();
+
+    const statusEl = app.querySelector("#wrong-vote-status");
+    if (statusEl) {
+      statusEl.textContent = wrongAnswerVoteStatusText({
+        voted,
+        allIn: allWrongAnswerVotesIn(),
+        votedCount,
+        total,
+      });
+    }
+
+    app.querySelectorAll("#wrong-vote-list [data-vote]").forEach((btn) => {
+      const author = btn.getAttribute("data-vote");
+      btn.classList.toggle("wrong-vote-card--picked", displayPick === author);
+    });
+
+    const confirm = app.querySelector("#wrong-confirm-vote");
+    if (confirm) {
+      const { confirmDisabled, label } = wrongAnswerConfirmVoteState({
+        displayPick,
+        localName,
+        voted,
+      });
+      confirm.disabled = confirmDisabled;
+      confirm.textContent = label;
+      confirm.classList.toggle("btn-primary", !confirmDisabled);
+      confirm.classList.toggle("btn-secondary", confirmDisabled);
+    }
+
+    const slot = app.querySelector("#wrong-vote-host-slot");
+    if (!slot) return;
+    const showHost = (!mp || canActAsHost()) && votedCount > 0;
+    let btn = app.querySelector("#wrong-force-reveal");
+    if (showHost) {
+      const label = `Révéler maintenant (${votedCount}/${total})`;
+      if (!btn) {
+        slot.innerHTML = `<button type="button" class="btn btn-secondary btn--spaced" id="wrong-force-reveal">${label}</button>`;
+        btn = app.querySelector("#wrong-force-reveal");
+        btn?.addEventListener("click", () => void transitionToReveal());
+      } else {
+        btn.textContent = label;
+      }
+    } else if (btn) {
+      slot.innerHTML = "";
+    }
+  }
+
+  function composeLayoutIsForm() {
+    return Boolean(app.querySelector("#wrong-input") || app.querySelector("#wrong-answer-form"));
+  }
+
+  function voteListAuthorsSig() {
+    return wrongAnswerAuthorNames(answers).join(",");
   }
 
   function render() {
@@ -445,7 +558,8 @@ export function mountWrongAnswer(app) {
         const target = btn.getAttribute("data-vote");
         if (target === localName) return;
         selectedTarget = target;
-        render();
+        // BUG-WAO-03 : pas de full render — conserve scroll + nœuds de liste.
+        refreshWrongAnswerVoteProgress();
       });
     });
 
@@ -462,7 +576,8 @@ export function mountWrongAnswer(app) {
         if (!mount.isMounted()) return;
         if (!mount.isCurrentMount()) return;
       }
-      render();
+      syncFromSession();
+      refreshWrongAnswerVoteProgress();
       if (!mp) {
         if (allWrongAnswerVotesIn()) await transitionToReveal();
       } else if (allWrongAnswerVotesIn() && canActAsHost()) {
@@ -528,8 +643,11 @@ export function mountWrongAnswer(app) {
     if (!mount.isCurrentMount()) return;
     if (stopGameSessionListenerOnPostGame(row)) return;
 
+    // Snapshot AVANT sync — vérité du dernier rendu local (pas le store déjà muté).
     const prevPhase = phase;
     const prevRound = roundIdx;
+    const prevAuthorsSig = voteListAuthorsSig();
+    const wasComposeForm = phase === "answer" && composeLayoutIsForm();
     const ahTokenNow = getActingHostUiRefreshToken();
     const actingHostUiRefresh = needsActingHostUiRefresh(
       lastAckedActingHostToken,
@@ -558,13 +676,52 @@ export function mountWrongAnswer(app) {
       }
     }
 
-    if (phase === "reveal" && prevPhase === "reveal" && !actingHostUiRefresh) {
+    const submitted = Boolean(myAnswerText());
+    const composeLayoutMismatch =
+      phase === "answer" &&
+      ((wasComposeForm && submitted) || (!wasComposeForm && !submitted && prevPhase === "answer"));
+
+    let voteListAuthorsChanged = false;
+    if (phase === "voting" && prevPhase === "voting") {
+      const nextSig = voteListAuthorsSig();
+      voteListAuthorsChanged = nextSig !== prevAuthorsSig;
+    }
+
+    const needFull = shouldFullRenderWrongAnswer({
+      prevPhase,
+      phase,
+      prevRound,
+      roundIdx,
+      actingHostUiRefresh,
+      composeLayoutMismatch,
+      voteListAuthorsChanged,
+    });
+
+    if (needFull) {
+      render();
+      lastAckedActingHostToken = ahTokenNow;
+      return;
+    }
+
+    if (phase === "reveal" && prevPhase === "reveal") {
       lastAckedActingHostToken = ahTokenNow;
       refreshGameScoresBox(app, {
         gameLabel: "Wrong Answer Only",
         title: "Cumul des scores",
         scores: sessionScores(),
       });
+      return;
+    }
+
+    if (phase === "answer") {
+      refreshWrongAnswerResponseProgress();
+      lastAckedActingHostToken = ahTokenNow;
+      return;
+    }
+
+    if (phase === "voting") {
+      refreshWrongAnswerVoteProgress();
+      lastAckedActingHostToken = ahTokenNow;
       return;
     }
 

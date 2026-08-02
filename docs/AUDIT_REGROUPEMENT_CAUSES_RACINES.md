@@ -16,9 +16,9 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 
 | | |
 |--|--|
-| **Maintenant** | QA terrain **BUG-TIERNIGHT-05** · QA terrain **BUG-TIERNIGHT-04** |
-| **Ensuite** | 🟠 BUG-WAO-02/03/04 · BUG-TIERNIGHT-03 · BUG-TRUTHMETER-02 · **OPS-LOBBY-04** · **ARCH-23** · ARCH-10 · **UX-HOST-01** |
-| **Dernière clôture** | **BUG-TRUTHMETER-01** ✅ (01A · 01B · QA 2026-08-02) |
+| **Maintenant** | QA terrain **BUG-WAO-02/03** · 🟠 BUG-WAO-04 |
+| **Ensuite** | 🟠 BUG-TIERNIGHT-03 · BUG-TRUTHMETER-02 · **OPS-LOBBY-04** · **ARCH-23** · ARCH-10 · **UX-HOST-01** |
+| **Dernière clôture** | **BUG-TIERNIGHT-04** ✅ · **BUG-TIERNIGHT-05** ✅ (QA 2026-08-02) |
 
 ---
 
@@ -28,8 +28,8 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 
 | ID | Cause | Problème | Priorité |
 |----|-------|----------|----------|
-| **BUG-TIERNIGHT-04** | 3/7 | Joueurs invisibles · listes désynchronisées | 🟡 code OK · **QA terrain** |
-| **BUG-TIERNIGHT-05** | 8 | Ancien vote repris après nouvelle partie | 🟡 code OK · **QA terrain** |
+| **BUG-WAO-02** | 6/11 | Clavier fermé pendant rédaction | 🟡 code OK · **QA terrain** |
+| **BUG-WAO-03** | 6/11 | Scroll réinitialisé pendant votes | 🟡 code OK · **QA terrain** |
 
 ### Autres
 
@@ -37,8 +37,6 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 |----|-------|----------|----------|
 | **ARCH-23** | 8/11 | Détection version cliente + refresh obligatoire post-déploiement | 🟡 ops/UX |
 | **UX-HOST-01** | 11 | CTA hôte « manche / question suivante » au-dessus du classement (fin de manche) | 🟡 |
-| **BUG-WAO-02** | 6/11 | Clavier fermé quand un autre joueur envoie sa réponse | 🟠 |
-| **BUG-WAO-03** | 6/11 | Scroll réinitialisé en haut pendant les votes | 🟠 |
 | **BUG-WAO-04** | 11 | Validation d'une réponse vide possible | 🟠 |
 | **BUG-TIERNIGHT-03** | 7 | Révélation non automatique en mode direct | 🟠 |
 | **BUG-TRUTHMETER-02** | 3/8 | Changement de pseudo casse la saisie suivante | 🟠 |
@@ -67,12 +65,12 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 |---|-------|------|----------------|
 | 1 | Identité invité / JWT | ✅ | ARCH-01 partiel |
 | 2 | Race auth / profil | ✅ | — |
-| 3 | Sources de vérité multiples | Partiel | **BUG-TIERNIGHT-04** 🔴 · **BUG-TRUTHMETER-02** 🟠 · **Membership A–E5 ✅** · M-14a ✅ · Guess Lie ✅ |
+| 3 | Sources de vérité multiples | Partiel | **BUG-TIERNIGHT-04 ✅** · **BUG-TRUTHMETER-02** 🟠 · **Membership A–E5 ✅** · M-14a ✅ · Guess Lie ✅ |
 | 4 | Asymétrie hôte / invité | ✅ | — |
 | 5 | Routing + timing sync | ✅ | ARCH-05 mitigé · **UX-NAV-LOBBY ✅** |
-| 6 | Async écrans | Partiel | **BUG-WAO-02/03** 🟠 |
+| 6 | Async écrans | Partiel | **BUG-WAO-02/03** 🟡 QA · **BUG-WAO-04** 🟠 |
 | 7 | Sync silencieuse / fire-and-forget | Partiel | **BUG-TRUTHMETER-01 ✅** (01A/01B) · **BUG-TIERNIGHT-03** 🟠 · **BUG-TRIVIA-01 ✅** (01A/01B/01B-bis/01C) · ARCH-07 ✅ · M-14b ✅ · ARCH-08 ✅ |
-| 8 | Reset / migration incomplète | Partiel | **BUG-TIERNIGHT-05** 🔴 · **OPS-LOBBY-04** · **BUG-LOBBY-XX-E** · **BUG-TRUTHMETER-02** 🟠 · **ARCH-23** · ARCH-10 · **BUG-LOBBY-XX ✅** · I-09/SYN-15/16 ✅ |
+| 8 | Reset / migration incomplète | Partiel | **BUG-TIERNIGHT-05 ✅** · **OPS-LOBBY-04** · **BUG-LOBBY-XX-E** · **BUG-TRUTHMETER-02** 🟠 · **ARCH-23** · ARCH-10 · **BUG-LOBBY-XX ✅** · I-09/SYN-15/16 ✅ |
 | 9 | Sync monolithe / duplication | Dette | ARCH-11… |
 | 10 | Code mort | Dette | **FEATURE-VIBECHECK-01** ⚪ · hors Fil Rouge app ✅ |
 | 11 | Friction UX | Partiel | **UX-CHAT-01/02** 🟡 · **UX-DEVICE-01** 🟡 · **UX-HOST-01** 🟡 · **BUG-WAO-04** 🟠 · **ARCH-23** · ARCH-22/Loader ✅ · **L-04 ✅** |
@@ -272,16 +270,16 @@ Retour terrain multi-jeux. Priorités : 🔴 critique · 🟠 haute · 🟡 moye
 | ~~**BUG-TRUTHMETER-01**~~ | ~~Validations de vote instables (parent)~~ | ✅ **Clôturé QA 2026-08-02** — 01A · 01B. |
 | ~~**BUG-TRUTHMETER-01A**~~ | ~~Faux succès UI / perte submit~~ | ✅ **Clôturé QA 2026-08-02** |
 | ~~**BUG-TRUTHMETER-01B**~~ | ~~Course vote ↔ reveal~~ | ✅ **Clôturé QA 2026-08-02** — RPC atomique · hydrate scores serveur · compteur `lastRenderedVotesJson`. |
-| **BUG-TIERNIGHT-04** | Joueurs invisibles | **Corrigé code 2026-08-02** — roster/deck figés (`playerRoster` + `items`) · votes Live non droppés si mapping UID manquant · X/Y + `allVotesIn` sur UIDs attendus · hydratation votes-only. **Reste : QA terrain** (hôte + 2 invités). Voir livrable chat BUG-TIERNIGHT-04. |
-| **BUG-TIERNIGHT-05** | Ancien vote repris dans nouvelle partie | **Corrigé code 2026-08-02** — `isNewTierNightLiveVoteRound` (runId + `isRemoteReset` + helper SpeedVote inchangé) · hydrate + patch votes remote-only sur nouveau run. **Reste : QA terrain**. |
+| ~~**BUG-TIERNIGHT-05**~~ | ~~Ancien vote repris dans nouvelle partie~~ | ✅ **Clôturé QA 2026-08-02** — `isNewTierNightLiveVoteRound` · hydrate + patch remote-only sur nouveau `runId` · SpeedVote inchangé. |
+| ~~**BUG-TIERNIGHT-04**~~ | ~~Joueurs invisibles~~ | ✅ **Clôturé QA 2026-08-02** — roster/deck figés · UID Live · X/Y sur snapshot · hydratation votes-only. |
 
 #### 🟠 Haute
 
 | ID | Problème | Analyse / attendu |
 |----|----------|-------------------|
-| **BUG-WAO-02** | Clavier fermé pendant rédaction | Quand un autre joueur envoie sa réponse, le clavier disparaît · le joueur doit recliquer. Attendu : les mises à jour réseau ne doivent jamais faire perdre le focus du champ. |
-| **BUG-WAO-03** | Scroll réinitialisé pendant votes | Phase vote : quand d'autres joueurs votent, la liste revient en haut. Attendu : conserver la position de scroll lors des mises à jour temps réel. |
-| **BUG-WAO-04** | Réponses vides validables | Validation possible avec chaîne vide / espaces seuls. Attendu : bouton désactivé si longueur utile = 0. |
+| **BUG-WAO-02** | Clavier fermé pendant rédaction | **Corrigé code 2026-08-02** — `refreshWrongAnswerResponseProgress` · answers-only sans remplacer `#wrong-input`. **Reste : QA terrain**. |
+| **BUG-WAO-03** | Scroll réinitialisé pendant votes | **Corrigé code 2026-08-02** — `refreshWrongAnswerVoteProgress` · votes-only / sélection locale sans reconstruire `#wrong-vote-list`. **Reste : QA terrain**. |
+| **BUG-WAO-04** | Réponses vides validables | Validation possible avec chaîne vide / espaces seuls. Attendu : bouton désactivé si longueur utile = 0. **Hors scope 02/03.** |
 | **BUG-TIERNIGHT-03** | Révélation non automatique | Mode direct : révélation ne passe parfois pas auto à l'étape suivante. Analyser sync de transition. |
 | **BUG-TRUTHMETER-02** | Changement de pseudo casse le jeu | Repro : lancer TruthMeter → changer pseudo → affirmation suivante : impossible d'écrire. L'UI garde l'ancien état (ex. « Joulaille » → « Joulaille la Goat »). Vérifier toutes les références utilisant `username` comme clé métier. |
 
