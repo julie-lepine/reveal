@@ -59,8 +59,9 @@ Sources : audit SQL du dépôt (`AUDIT-SQL-01`) + docs ops ([`SUPABASE_SETUP.md`
 | Historique (date inconnue) | [`lobby-host-close.sql`](../supabase/lobby-host-close.sql) | DELETE lobby hôte | 🟡 État à vérifier | 🟡 État à vérifier | — | Policy souvent déjà dans schema |
 | Historique (date inconnue) | [`game-sessions.sql`](../supabase/game-sessions.sql) | Sessions MP | ✅ probable | ✅ probable | — | **Ne pas réexécuter** après I-08 policy host-only (rouvre UPDATE membre) |
 | Historique (date inconnue) | [`lobby-lifecycle.sql`](../supabase/lobby-lifecycle.sql) | Expiration / purge | ✅ probable | ✅ probable | — | Colonnes + purge historique ; **corps purge remplacé** par lobby-closures-xx-e (ne pas réexécuter lifecycle entier après XX-E) |
-| — (non déployé) | [`ops-lobby-04-enable-purge-cron.sql`](../supabase/ops-lobby-04-enable-purge-cron.sql) | OPS-LOBBY-04 | ⏳ | ⏳ | [`ops-lobby-04-purge-cron-runbook.sql`](../supabase/tests/ops-lobby-04-purge-cron-runbook.sql) | Activation scheduler uniquement — **pas une migration de schéma** ; voir §7 |
-| — (non déployé) | [`lobby-closures-xx-e.sql`](../supabase/lobby-closures-xx-e.sql) | BUG-LOBBY-XX-E | ⏳ | ⏳ | [`lobby-closures-xx-e-runbook.sql`](../supabase/tests/lobby-closures-xx-e-runbook.sql) | Tombstones `lobby_closures` + RPC + replace dissolve/purge ; voir §8 |
+| 2026-08-02 | [`ops-lobby-04-enable-purge-cron.sql`](../supabase/ops-lobby-04-enable-purge-cron.sql) | OPS-LOBBY-04 | ✅ | ✅ | [`ops-lobby-04-purge-cron-runbook.sql`](../supabase/tests/ops-lobby-04-purge-cron-runbook.sql) | Job `reveal-purge-stale-lobbies` */15 — QA terrain ✅ · voir §7 |
+| 2026-08-02 | [`lobby-closures-xx-e.sql`](../supabase/lobby-closures-xx-e.sql) | BUG-LOBBY-XX-E | ✅ | ✅ | [`lobby-closures-xx-e-runbook.sql`](../supabase/tests/lobby-closures-xx-e-runbook.sql) | Tombstones + dissolve/purge ; QA terrain ✅ · voir §8 |
+| — (non déployé) | [`app-client-compatibility.sql`](../supabase/app-client-compatibility.sql) | ARCH-23 Vague 1 | ⏳ | ⏳ | — | Floor `min_client_compatibility_build=1` · **ne pas bumper** sans instruction · voir §9 |
 | Historique (date inconnue) | [`transfer-lobby-host.sql`](../supabase/transfer-lobby-host.sql) | Transfert hôte | ✅ probable | ✅ probable | — | |
 | Historique (date inconnue) | [`kick-lobby-member.sql`](../supabase/kick-lobby-member.sql) | Kick membre | ✅ probable | ✅ probable | — | |
 | Historique (date inconnue) | [`lobby-members-unique-name.sql`](../supabase/lobby-members-unique-name.sql) | Pseudo unique / lobby | ✅ probable | ✅ probable | — | Échoue si doublons restants |
@@ -162,84 +163,90 @@ Runbook : [`truthmeter-02-author-uid-runbook.sql`](../supabase/tests/truthmeter-
 Résultat : SETUP OK · A1 PASS · A2 PASS · A3 PASS · A4 PASS · A5 PASS · B1 PASS · B2 PASS  
 Auteur test : Joulaille la GOAT (`1c2146d8-…`) · 3 membres · `truth_meter_resolve_author_uid` présente
 
-Commentaires : Migration déjà appliquée manuellement auparavant ; runbook SQL validé. **Reste la QA applicative** (changement de pseudo en partie TruthMeter). Ne pas réexécuter `truthmeter-01b` après cette version.
+Commentaires : Migration déjà appliquée manuellement auparavant ; runbook SQL validé. QA applicative TruthMeter-02 clôturée. Ne pas réexécuter `truthmeter-01b` après cette version.
+
+## 2026-08-02 (suite)
+
+Migration : [`ops-lobby-04-enable-purge-cron.sql`](../supabase/ops-lobby-04-enable-purge-cron.sql) (ops / pas de schéma)  
+Ticket : OPS-LOBBY-04
+
+Staging : ✅  
+Production : ✅
+
+Runbook : [`ops-lobby-04-purge-cron-runbook.sql`](../supabase/tests/ops-lobby-04-purge-cron-runbook.sql)
+
+Résultat : job `reveal-purge-stale-lobbies` actif · `*/15 * * * *` · purge stale + Realtime OK (QA terrain)
+
+Commentaires : Ticket **clôturé**.
+
+## 2026-08-02 (suite)
+
+Migration : [`lobby-closures-xx-e.sql`](../supabase/lobby-closures-xx-e.sql)  
+Ticket : BUG-LOBBY-XX-E
+
+Staging : ✅  
+Production : ✅
+
+Runbook : [`lobby-closures-xx-e-runbook.sql`](../supabase/tests/lobby-closures-xx-e-runbook.sql)
+
+Résultat : tombstones `host_closed` / `inactive_expired` · modales distinctes · QA terrain OK
+
+Commentaires : Remplace dissolve E5 + corps purge lifecycle. Rétention 14 j. Ticket **clôturé**. Ne pas réexécuter E5-01 ni lifecycle entier après XX-E.
 
 ---
 
 ## 7. OPS-LOBBY-04 — Purge automatique des lobbies (`pg_cron`)
 
-**Constat audit (repo)** : `public.purge_stale_lobbies()` est définie dans [`lobby-lifecycle.sql`](../supabase/lobby-lifecycle.sql) ; le `cron.schedule` y est **volontairement commenté**. Aucun autre scheduler dans le dépôt. Sans job actif en base, la purge auto ne tourne pas.
-
 | Élément | Fichier / valeur |
 | ------- | ---------------- |
 | Fonction | `select public.purge_stale_lobbies();` |
 | Jobname | `reveal-purge-stale-lobbies` |
-| Fréquence recommandée | `*/15 * * * *` (15 min) — plus court seuil métier = 45 min |
-| Activation (idempotente) | [`ops-lobby-04-enable-purge-cron.sql`](../supabase/ops-lobby-04-enable-purge-cron.sql) |
-| Runbook QA Ops | [`ops-lobby-04-purge-cron-runbook.sql`](../supabase/tests/ops-lobby-04-purge-cron-runbook.sql) |
-| Prérequis | Extension `pg_cron` (Dashboard → Extensions) ; `lobby-lifecycle.sql` déjà appliqué |
+| Fréquence | `*/15 * * * *` |
+| Activation | [`ops-lobby-04-enable-purge-cron.sql`](../supabase/ops-lobby-04-enable-purge-cron.sql) |
+| Runbook | [`ops-lobby-04-purge-cron-runbook.sql`](../supabase/tests/ops-lobby-04-purge-cron-runbook.sql) |
 
-**Procédure Ops (ne pas inventer de date ici)** :
-
-1. Staging : vérifier `pg_cron` + fonction (runbook A–D lecture seule).
-2. Staging : exécuter [`ops-lobby-04-enable-purge-cron.sql`](../supabase/ops-lobby-04-enable-purge-cron.sql).
-3. Staging : runbook E–F (lobby stale / lobby actif).
-4. Production : mêmes étapes A–D puis activation + E–F contrôlé.
-5. Ajouter une entrée journal ci-dessous avec **date réelle** d’activation et résultats.
-
-**Statut** : ⏳ activation **non tracée** dans ce registre (à faire après exécution Ops).
-
-### Modèle d’entrée journal (après activation)
-
-```markdown
-## YYYY-MM-DD
-
-Migration : ops-lobby-04-enable-purge-cron.sql (ops / pas de schéma)
-Ticket : OPS-LOBBY-04
-
-Staging :
-Production :
-
-Runbook : ops-lobby-04-purge-cron-runbook.sql (A–F)
-
-Résultat :
-
-Commentaires : job reveal-purge-stale-lobbies · schedule */15 * * * *
-```
+**Statut** : ✅ appliqué + QA terrain 2026-08-02 (ticket clôturé).
 
 ---
 
 ## 8. BUG-LOBBY-XX-E — Tombstones de fermeture (`lobby_closures`)
 
-**Problème** : purge et dissolve produisent le même `DELETE lobbies` ; le client affichait une attribution fausse à l’hôte.
-
 | Élément | Fichier / valeur |
 | ------- | ---------------- |
-| Migration | [`lobby-closures-xx-e.sql`](../supabase/lobby-closures-xx-e.sql) — statut **⏳** tant que non appliquée |
+| Migration | [`lobby-closures-xx-e.sql`](../supabase/lobby-closures-xx-e.sql) |
 | Runbook | [`lobby-closures-xx-e-runbook.sql`](../supabase/tests/lobby-closures-xx-e-runbook.sql) |
-| Table | `public.lobby_closures` (PK `lobby_id`, **pas** de FK CASCADE vers `lobbies`) |
+| Table | `public.lobby_closures` (pas de FK CASCADE vers `lobbies`) |
 | Reasons | `host_closed` \| `inactive_expired` |
-| RPC lecture | `get_lobby_closure(uuid)` — authenticated ; table non SELECT publique |
-| Remplace | `dissolve_lobby_atomically` (E5-01) · `purge_stale_lobbies` (lifecycle) |
-| Rétention | **14 jours** via `purge_old_lobby_closures()` en fin de `purge_stale_lobbies` |
-| Ne pas réexécuter après XX-E | `lobby-membership-e5-01-dissolve-lobby-atomically.sql` · `lobby-lifecycle.sql` (corps fonctions) |
+| RPC | `get_lobby_closure(uuid)` |
+| Remplace | dissolve E5-01 · purge lifecycle |
+**Statut** : ✅ appliqué + QA terrain 2026-08-02 (ticket clôturé).
 
-**Statut** : ⏳ migration **non appliquée** (pas de date inventée). Après exécution Ops : journal + runbook A–F.
+---
 
-### Modèle d’entrée journal (après application)
+## 9. ARCH-23 Vague 1 — Compatibilité client (`app_client_compatibility`)
 
-```markdown
-## YYYY-MM-DD
+Canal principal = apps **iOS / Android**. Floor autoritaire = Supabase.
 
-Migration : lobby-closures-xx-e.sql
-Ticket : BUG-LOBBY-XX-E
+| Élément | Valeur |
+| ------- | ------ |
+| Migration | [`app-client-compatibility.sql`](../supabase/app-client-compatibility.sql) — **⏳** |
+| Table | `app_client_compatibility` (singleton id=1) |
+| Floor initial | `min_client_compatibility_build = **1**` (= `APP_COMPATIBILITY_BUILD` Vague 1) |
+| RPC | `get_client_compatibility_config()` — grant **anon + authenticated** |
+| Client | `js/config/appCompatibility.js` · `clientCompatibility.js` · gate UI |
+| Heuristiques (centralisées) | `CLIENT_COMPAT_FRESH_MS` = 5 min · `CLIENT_COMPAT_TIMEOUT_MS` = 8 s · foreground ≥ 10 min hidden |
 
-Staging :
-Production :
+**Périmètre Vague 1** : boot · create · join · resume · retour foreground.
 
-Runbook : lobby-closures-xx-e-runbook.sql
+**Hors périmètre** : writes in-game pendant une partie déjà active (votes, commits, scores, phases). Si le floor est relevé mid-soirée, un ancien client peut encore envoyer ces writes jusqu’au prochain gate. Ops : conserver une fenêtre de rétrocompatibilité backend pour les parties engagées ; ne pas bumper un floor cassant au milieu d’une soirée ; ne pas ajouter un guard à chaque helper de jeu dans cette vague (ticket distinct après audit transversal).
 
-Résultat :
+**Contrat cache** : une incompatibilité confirmée (`lastConfirmedIncompatible`) n’est **jamais** levée par un recheck `unknown` (timeout / réseau / payload). Le hard gate reste ; feedback réseau distinct ; retry possible. Seul un recheck `compatible` vide le cache et masque le gate.
 
-Commentaires : remplace dissolve E5 + purge lifecycle ; rétention 14 j
-```
+**Bump floor (ops ultérieure, PAS Vague 1)** :
+
+1. Publier clients compatibles iOS + Android  
+2. Vérifier dispo stores  
+3. Puis seulement `UPDATE … SET min_client_compatibility_build = N`  
+4. Contrôler logs `[ARCH-23]` refus
+
+**Statut** : ⏳ SQL non appliquée ; **ne pas bumper** le floor sans instruction.

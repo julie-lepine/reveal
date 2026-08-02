@@ -419,7 +419,8 @@ describe("lobbyCreateVagueC — Home chrome + source", () => {
   it("25 — offline createLobby path conserve branche sans query (source)", () => {
     const lobbySrc = readFileSync(join(ROOT, "js/core/lobby.js"), "utf8");
     const createIdx = lobbySrc.indexOf("export async function createLobby()");
-    const slice = lobbySrc.slice(createIdx, createIdx + 1500);
+    const slice = lobbySrc.slice(createIdx, createIdx + 2800);
+    assert.match(slice, /guardClientCompatibility\("create"\)/);
     assert.match(slice, /if \(isSupabaseConfigured\(\)\)/);
     assert.match(slice, /assertCanInsertLobby/);
     // Branche offline après garde

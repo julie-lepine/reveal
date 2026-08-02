@@ -54,6 +54,12 @@ import { initFeedbackFab } from "./core/feedbackUi.js";
 import { initLobbyPollSync } from "./core/lobbyPollStore.js";
 import { initHostNoticeListener } from "./core/hostNotice.js";
 import { initActingHostNoticeListener } from "./core/actingHostNotice.js";
+import { checkClientCompatibility } from "./core/clientCompatibility.js";
+import { COMPAT_STATUS } from "./core/clientCompatibilityContract.js";
+import {
+  presentCompatibilityGateIfNeeded,
+} from "./core/clientCompatibilityGateUi.js";
+import { initClientCompatibilityForeground } from "./core/clientCompatibilityForeground.js";
 
 const app = document.getElementById("app");
 
@@ -115,24 +121,47 @@ initAds();
 initMultiplayerSyncVisibility();
 initHostNoticeListener();
 initActingHostNoticeListener();
+initClientCompatibilityForeground();
+
+/** Empêche double initLobbyPollSync / reconcile / resume après retry gate boot. */
+let postCompatBootStarted = false;
+
 async function boot() {
   await initDeepLinks();
   await initSupabaseAuth();
   await authReady;
-  // Premier subscribe polls uniquement après session Supabase prête
-  void initLobbyPollSync();
-  await reconcileLobbyMembership();
-  resetNav();
-  if (isPasswordRecoveryPending()) {
-    navigate("reset-password", { reset: true });
-  } else if (hasActiveLobby()) {
-    const resumed = await resumeEveningSession({ force: true });
-    if (!resumed) navigate("home", { reset: true });
-  } else if (shouldShowWelcome()) {
-    navigate("welcome", { reset: true });
-  } else {
-    navigate("home", { reset: true });
+
+  async function continueBootAfterCompatibilityOk() {
+    if (postCompatBootStarted) return;
+    postCompatBootStarted = true;
+
+    // Premier subscribe polls uniquement après session Supabase prête
+    void initLobbyPollSync();
+    await reconcileLobbyMembership();
+    resetNav();
+    if (isPasswordRecoveryPending()) {
+      navigate("reset-password", { reset: true });
+    } else if (hasActiveLobby()) {
+      const resumed = await resumeEveningSession({ force: true });
+      if (!resumed) navigate("home", { reset: true });
+    } else if (shouldShowWelcome()) {
+      navigate("welcome", { reset: true });
+    } else {
+      navigate("home", { reset: true });
+    }
   }
+
+  // ARCH-23 : après session Supabase possible (RPC anon OK aussi), avant MP / Realtime polls.
+  const compat = await checkClientCompatibility({ source: "boot" });
+  if (compat.status === COMPAT_STATUS.INCOMPATIBLE) {
+    presentCompatibilityGateIfNeeded(compat, {
+      onCompatible: () => continueBootAfterCompatibilityOk(),
+    });
+    // Pas de reconcile / resume / navigate lobby — hard gate autoritaire.
+    return;
+  }
+  // unknown au boot : ne pas afficher « mise à jour » ; continuer (create/join re-check).
+  await continueBootAfterCompatibilityOk();
 }
 
 boot().catch((e) => {

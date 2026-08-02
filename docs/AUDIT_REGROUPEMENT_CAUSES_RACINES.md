@@ -16,9 +16,9 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 
 | | |
 |--|--|
-| **Maintenant** | **BUG-LOBBY-XX-E** — implémentation livrée · **SQL ⏳** à exécuter puis QA terrain |
-| **Ensuite** | **ARCH-23** · ARCH-10 · **UX-HOST-01** |
-| **Dernière clôture** | **OPS-LOBBY-04** ✅ QA · **BUG-TRUTHMETER-02** ✅ (QA) · **BUG-TIERNIGHT-03** ✅ · **BUG-WAO-04** ✅ · **BUG-WAO-02** ✅ · **BUG-WAO-03** ✅ · **BUG-TIERNIGHT-04** ✅ · **BUG-TIERNIGHT-05** ✅ |
+| **Maintenant** | **ARCH-23** Vague 1 livrée (socle) · **SQL ⏳** + QA terrain |
+| **Ensuite** | ARCH-10 · **UX-HOST-01** |
+| **Dernière clôture** | **BUG-LOBBY-XX-E** ✅ · **OPS-LOBBY-04** ✅ · **BUG-TRUTHMETER-02** ✅ (QA) · **BUG-TIERNIGHT-03** ✅ · **BUG-WAO-04** ✅ · **BUG-WAO-02** ✅ · **BUG-WAO-03** ✅ · **BUG-TIERNIGHT-04** ✅ · **BUG-TIERNIGHT-05** ✅ |
 
 ---
 
@@ -28,14 +28,12 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 
 | ID | Cause | Problème | Priorité |
 |----|-------|----------|----------|
-| **OPS-LOBBY-04** | 8 | Activer pg_cron + job `reveal-purge-stale-lobbies` | ✅ QA terrain |
-| **BUG-LOBBY-XX-E** | 4/8 | Distinguer fermeture manuelle / expiration (tombstones) | 🟡 code prêt · SQL ⏳ |
+| **ARCH-23** | 8/11 | Détection compatibilité client (natif) + hard gate | 🟡 Vague 1 code prêt · SQL ⏳ · QA |
 
 ### Autres
 
 | ID | Cause | Problème | Priorité |
 |----|-------|----------|----------|
-| **ARCH-23** | 8/11 | Détection version cliente + refresh obligatoire post-déploiement | 🟡 ops/UX |
 | **UX-HOST-01** | 11 | CTA hôte « manche / question suivante » au-dessus du classement (fin de manche) | 🟡 |
 | **UX-CHAT-01** | 11 | Pas de message système au lancement d'un jeu | 🟡 |
 | **UX-CHAT-02** | 11 | Clavier s'ouvre automatiquement à l'ouverture du chat | 🟡 |
@@ -65,7 +63,7 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 | 5 | Routing + timing sync | ✅ | ARCH-05 mitigé · **UX-NAV-LOBBY ✅** |
 | 6 | Async écrans | ✅ | **BUG-WAO-02** ✅ · **BUG-WAO-03** ✅ · **BUG-WAO-04** ✅ |
 | 7 | Sync silencieuse / fire-and-forget | Partiel | **BUG-TRUTHMETER-01 ✅** (01A/01B) · **BUG-TIERNIGHT-03** ✅ · **BUG-TRIVIA-01 ✅** (01A/01B/01B-bis/01C) · ARCH-07 ✅ · M-14b ✅ · ARCH-08 ✅ |
-| 8 | Reset / migration incomplète | Partiel | **BUG-TIERNIGHT-05 ✅** · **OPS-LOBBY-04** · **BUG-LOBBY-XX-E** · **BUG-TRUTHMETER-02 ✅** · **ARCH-23** · ARCH-10 · **BUG-LOBBY-XX ✅** · I-09/SYN-15/16 ✅ |
+| 8 | Reset / migration incomplète | Partiel | **BUG-TIERNIGHT-05 ✅** · **OPS-LOBBY-04 ✅** · **BUG-LOBBY-XX-E ✅** · **BUG-TRUTHMETER-02 ✅** · **ARCH-23** · ARCH-10 · **BUG-LOBBY-XX ✅** · I-09/SYN-15/16 ✅ |
 | 9 | Sync monolithe / duplication | Dette | ARCH-11… |
 | 10 | Code mort | Dette | **FEATURE-VIBECHECK-01** ⚪ · hors Fil Rouge app ✅ |
 | 11 | Friction UX | Partiel | **UX-CHAT-01/02** 🟡 · **UX-DEVICE-01** 🟡 · **UX-HOST-01** 🟡 · **BUG-WAO-04** ✅ · **ARCH-23** · ARCH-22/Loader ✅ · **L-04 ✅** |
@@ -145,18 +143,19 @@ Hors scope volontaire (autres causes) : rollback votes dilemma/speedVote/truthMe
 | **ARCH-10** | Cache session clear trop tard au leave | 🟡 |
 | **ARCH-01** | Démo locale sans avertissement MP | 🟡 |
 
-#### ARCH-23 — Version cliente + refresh obligatoire (ouvert)
+#### ARCH-23 — Compatibilité client native + hard gate (Vague 1 · ouvert)
 
-Contexte : soirées-test où un onglet / PWA / cache GH Pages tourne encore sur un ancien bundle alors que Supabase a déjà les nouvelles RPC (ex. `submit_trivia_answer` en 01B-bis) → KO silencieux ou trompeurs, très coûteux à diagnostiquer.
+Canal principal = **iOS / Android Capacitor**. Web = tests seulement. Autorité du floor = **Supabase** (`min_client_compatibility_build`), pas `version.json`.
 
 | | |
 |--|--|
-| **Objectif** | Au démarrage app et/ou à l’entrée / join lobby : comparer une version locale embarquée à une version distante attendue |
-| **Si décalage** | Bloquer le jeu · message du type « Une nouvelle version de REVEAL est disponible. Rechargez l'application pour continuer. » · CTA reload (`location.reload` / bypass cache si possible) |
-| **Sources possibles** | Fichier statique versionné (`version.json` / build id) · config lue au boot · en-tête / row légère côté Supabase — à trancher en design |
-| **Hors scope** | Hot-reload partiel · feature flags fins · migration SQL auto |
-| **Priorité** | 🟡 ops/UX — après file 🔴 soirée-test, avant ou avec **OPS-LOBBY-04** |
-| **Statut** | Ouvert · pas encore de code |
+| **Vague 1 livrée** | `APP_COMPATIBILITY_BUILD` (=1) · identité build · RPC/table floor · service `clientCompatibility` · gate UI · boot/create/join/resume/foreground · tests `arch23ClientCompatibility` |
+| **SQL** | [`app-client-compatibility.sql`](../supabase/app-client-compatibility.sql) — floor initial **1** (pas de bump prod dans cette vague) |
+| **Stores** | `IOS_APP_STORE_URL` / `ANDROID_PLAY_STORE_URL` vides tant que non configurés (bouton « Mettre à jour » masqué) |
+| **Périmètre** | boot · create · join · resume · foreground — **pas** chaque write in-game mid-partie |
+| **Contrat retry** | `unknown` après incompatibilité confirmée → gate conservé + feedback réseau ; seul `compatible` lève le gate |
+| **Hors Vague 1** | Bumper le floor · publier stores · SW · feature flags · guard global writes in-game |
+| **Statut** | Code prêt (corrections pré-QA) · SQL à appliquer · **pas clôturé** — QA terrain requise |
 
 #### L-04 ✅ (accepté — UI déjà livrée)
 
@@ -189,10 +188,32 @@ Symptôme terrain : lobby inactif jamais fermé automatiquement. **Aucun correct
 |--|--|
 | **Cause racine (architecture)** | Pas de timer client. Purge serveur = `purge_stale_lobbies()` (`supabase/lobby-lifecycle.sql`) **non exposée aux clients** ; planification = **pg_cron manuel** (bloc `cron.schedule` commenté dans le repo · voir `SUPABASE_SETUP.md` §7bis) |
 | **Hypothèse prod H1** | Job `reveal-purge-stale-lobbies` probablement absent ou inactif — **à confirmer** via runbook SQL (étapes lecture seule 0–6) |
-| **Gaps secondaires (hors scope diagnostic)** | Hôte ignoré par `handleLobbyDissolvedForGuest()` (`isLocalLobbyHost()` → return) → **BUG-LOBBY-XX-E** · `lobbyHeartbeat.js` importé jamais appelé · vieillissement artificiel `lobbies.last_activity_at` impossible (`set_lobbies_timestamps()` force `now()`) |
-| **Runbook prod** | Validé v3 — R0 prioritaire (0 membre) · R3 conditionnel (membres seulement) · Realtime principal = DELETE ciblé 8B-2 · exécution dashboard **reste à faire** |
-| **Chantiers ouverts** | **BUG-LOBBY-XX-E** : [`lobby-closures-xx-e.sql`](../supabase/lobby-closures-xx-e.sql) + runbook · client `resolveLobbyClosureAndExit` · **BUG-LOBBY-XX-F** · **GAME-LOBBY-01** |
-| **Verdict** | **Ne pas rouvrir BUG-LOBBY-XX** — OPS-04 ✅ · suite message = **BUG-LOBBY-XX-E** (SQL à déployer) |
+| **Gaps secondaires (hors scope diagnostic)** | Hôte ignoré par `handleLobbyDissolvedForGuest()` → **BUG-LOBBY-XX-E ✅** · heartbeat legacy · vieillissement `last_activity_at` via trigger |
+| **Runbook prod** | Validé v3 — exécution dashboard faite via **OPS-LOBBY-04 ✅** |
+| **Chantiers ouverts** | **BUG-LOBBY-XX-F** (si Realtime invité KO) · **GAME-LOBBY-01** (politique heartbeat / inactif) |
+| **Verdict** | **Ne pas rouvrir BUG-LOBBY-XX** — chaîne **OPS-LOBBY-04 ✅** + **BUG-LOBBY-XX-E ✅** |
+
+#### OPS-LOBBY-04 ✅ (clôture QA · 2026-08-02)
+
+Activation du job pg_cron `reveal-purge-stale-lobbies` (`*/15`) appelant `purge_stale_lobbies()`.
+
+| | |
+|--|--|
+| **Livré** | Script [`ops-lobby-04-enable-purge-cron.sql`](../supabase/ops-lobby-04-enable-purge-cron.sql) · runbook [`ops-lobby-04-purge-cron-runbook.sql`](../supabase/tests/ops-lobby-04-purge-cron-runbook.sql) · doc [`DEPLOYMENTS_SQL.md`](./DEPLOYMENTS_SQL.md) §7 |
+| **Preuve** | QA terrain : job actif · purge stale · Realtime DELETE reçu · sortie joueurs |
+| **Hors scope** | Messages de fermeture → **BUG-LOBBY-XX-E** · seuils / heartbeat |
+| **Verdict** | **Ne pas rouvrir** sauf job cron absent/inactif en prod |
+
+#### BUG-LOBBY-XX-E ✅ (clôture QA · 2026-08-02)
+
+Raison persistante de fermeture (`host_closed` / `inactive_expired`) via tombstones + modales distinctes.
+
+| | |
+|--|--|
+| **Livré** | [`lobby-closures-xx-e.sql`](../supabase/lobby-closures-xx-e.sql) · `resolveLobbyClosureAndExit` · copies `lobbyClosureCopy.js` · runbook [`lobby-closures-xx-e-runbook.sql`](../supabase/tests/lobby-closures-xx-e-runbook.sql) |
+| **Preuve** | `lobbyClosureXxE.test.js` · QA terrain (manuel vs purge / hôte+invités) |
+| **Hors scope** | Seuils purge · cron · soft-close lifecycle · **BUG-LOBBY-XX-F** |
+| **Verdict** | **Ne pas rouvrir** sauf attribution fausse sans tombstone ou double modale démontrée |
 
 #### BUG-TRIVIA-01A ✅ (clôture QA terrain · 2026-07-31)
 
@@ -256,7 +277,7 @@ Retour terrain multi-jeux. Priorités : 🔴 critique · 🟠 haute · 🟡 moye
 
 | ID | Problème | Analyse / attendu |
 |----|----------|-------------------|
-| ~~**BUG-LOBBY-XX**~~ | ~~Fermeture auto lobby inactif~~ | ✅ **Clôturé diagnostic 2026-07-31** — voir section BUG-LOBBY-XX ✅ · suite **OPS-LOBBY-04** |
+| ~~**BUG-LOBBY-XX**~~ | ~~Fermeture auto lobby inactif~~ | ✅ **Clôturé diagnostic 2026-07-31** — suites **OPS-LOBBY-04 ✅** · **BUG-LOBBY-XX-E ✅** |
 | ~~**BUG-TRIVIA-01**~~ | ~~Dernière question bloquée~~ | ✅ **Clôturé QA 2026-07-31** — 01A · 01B · 01B-bis · 01C. |
 | ~~**BUG-TRIVIA-01A**~~ | ~~Acting host Trivia transitions~~ | ✅ **Clôturé QA 2026-07-31** |
 | ~~**BUG-TRIVIA-01B-bis**~~ | ~~Impossible de répondre (sélection flash)~~ | ✅ **Clôturé QA 2026-07-31** |
@@ -350,6 +371,8 @@ Ne pas rouvrir sans régression. Détail historique dans git / tests cités.
 | **BUG-TRIVIA-01C** | 7 | Hint honnête · mapper answer · replay `startGameSession` sécurisé · persistDeck MP | `triviaAnswerUi` · `triviaAnswerErrors` · `triviaReplayRestart` · 2026-07-31 |
 | **BUG-TRIVIA-01B-bis** | 7 | Réponse Trivia atomique · pending UI · alerte RPC absente | `triviaAnswerUi` · `triviaAnswerCommit` · QA 2026-07-31 |
 | **BUG-TRIVIA-01A** | 7 | Acting host Trivia : reveal / next / final · patches explicites · derive `currentQuestion` | `triviaActingHostPlay.test.js` (18) · migration `game-sessions-trivia-01a-acting-host.sql` · QA terrain 2026-07-31 |
+| **BUG-LOBBY-XX-E** | 4/8 | Tombstones `lobby_closures` · modales host_closed / inactive_expired · pipeline unifié | QA 2026-08-02 · `lobbyClosureXxE` · SQL `lobby-closures-xx-e` |
+| **OPS-LOBBY-04** | 8 | pg_cron `reveal-purge-stale-lobbies` */15 · purge stale | QA 2026-08-02 · runbook ops-lobby-04 |
 | **BUG-LOBBY-XX** | 8 | Diagnostic + runbook prod validés · cause = purge pg_cron · gaps E/F documentés | Analyse 2026-07-31 · `lobby-lifecycle.sql` · `lobbyLifecycle.js` · runbook v3 |
 | **ARCH-07** | 7 | Clôture définitive P0+P1/P2 · observabilité sync complète | `mpRtCatchup` (20) · `arch07CatchupResidual` (10) · 2026-07-29 |
 | **M-14b / SYN-09b** | 7 | Contrat `onLocalApplied` · helper centralisé | `mpLaunchLaunch.test.js` (20) · 2026-07-29 |
@@ -419,8 +442,8 @@ Hors file prioritaire — opportunité / régression :
 - Fil Rouge SQL historique — ops Supabase séparée · fail docs `filRougeVague3Cleanup` hors Membership
 - **ARCH-23** : clients / PWA / cache Pages en retard sur migrations (leçon 01B-bis)
 
-**Surveiller** : Clutch taps sous latence (SYN-26) · ready prep après Recommencer · conflit pending join vs chrome Home membership · leave multi-onglets après dissolve (modale « connexion a empêché ») · **ARCH-23** (clients stale post-deploy) · **OPS-LOBBY-04** après runbook prod
+**Surveiller** : Clutch taps sous latence (SYN-26) · ready prep après Recommencer · conflit pending join vs chrome Home membership · leave multi-onglets après dissolve (modale « connexion a empêché ») · **ARCH-23** (clients stale post-deploy)
 
 ---
 
-*Suivi vivant · MAJ 2026-08-02 — **BUG-LOBBY-XX-E** implémenté (attente déploiement SQL + QA) · **OPS-LOBBY-04** ✅ · ensuite **ARCH-23***
+*Suivi vivant · MAJ 2026-08-02 — **ARCH-23 Vague 1** corrigée pré-QA (retry/unknown, codes, docs writes) · SQL ⏳ · **XX-E ✅** · **OPS-04 ✅***

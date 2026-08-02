@@ -133,11 +133,20 @@ describe("forceClearClientLobbyState — contrat source", () => {
     assert.equal(body.includes("navigate("), false);
     const main = src("js/main.js");
     const bootStart = main.indexOf("async function boot");
-    const boot = main.slice(bootStart, bootStart + 600);
+    const boot = main.slice(bootStart, bootStart + 2200);
+    assert.match(boot, /checkClientCompatibility/);
+    assert.match(boot, /continueBootAfterCompatibilityOk/);
     assert.match(boot, /await reconcileLobbyMembership\(\)/);
+    const compatIdx = boot.indexOf("checkClientCompatibility");
+    const continueIdx = boot.indexOf("continueBootAfterCompatibilityOk");
     const reconcileIdx = boot.indexOf("reconcileLobbyMembership");
     const resetIdx = boot.indexOf("resetNav");
-    assert.ok(reconcileIdx >= 0 && resetIdx > reconcileIdx);
+    assert.ok(
+      compatIdx >= 0 &&
+        continueIdx >= 0 &&
+        reconcileIdx > continueIdx &&
+        resetIdx > reconcileIdx
+    );
   });
 
   it("settings écoute onLobbyBundleUpdated pour rafraîchir la soirée", () => {

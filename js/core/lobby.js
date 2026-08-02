@@ -135,6 +135,9 @@ import {
   markLobbyJoinFinalized,
 } from "./lobbyJoinEffects.js";
 import { finalizeFailedJoinAttempt } from "./lobbyJoinFinalize.js";
+import { assertClientCompatibility } from "./clientCompatibility.js";
+import { COMPAT_STATUS } from "./clientCompatibilityContract.js";
+import { presentCompatibilityGateIfNeeded } from "./clientCompatibilityGateUi.js";
 
 const GUEST_RECOVERY_CAPTCHA_KEY = "reveal-guest-recovery-captcha-required";
 
@@ -163,6 +166,30 @@ function isLocalLobbyHost() {
   const hostId = getLobby()?.hostId;
   if (uid && hostId) return uid === hostId;
   return getLobbyParticipants().some((p) => p.isLocal && p.isHost);
+}
+
+/**
+ * ARCH-23 — gate attendu avant create / join / resume.
+ * @param {"create"|"join"|"resume"} source
+ */
+async function guardClientCompatibility(source) {
+  if (!isSupabaseConfigured()) return { ok: true, error: null };
+  const gate = await assertClientCompatibility({
+    source,
+    blockedAction: source,
+  });
+  if (gate.ok) return gate;
+  if (gate.status === COMPAT_STATUS.INCOMPATIBLE) {
+    presentCompatibilityGateIfNeeded(gate.result);
+    return gate;
+  }
+  // unknown pur (sans autorité incompatible) — alerte réseau, pas hard gate update.
+  await showAppAlert(
+    gate.message ||
+      "Impossible de vérifier la compatibilité de l'application. Vérifie ta connexion et réessaie.",
+    { title: "Connexion", icon: "📡", confirmLabel: "OK" }
+  );
+  return gate;
 }
 
 async function signOutAnonGuestIfNeeded(wasGuest) {
@@ -852,6 +879,9 @@ export async function routeToEveningHub({
  * @param {{ force?: boolean }} [options] - force=true au boot ; false si l’utilisateur est allé à l’accueil volontairement.
  */
 export async function resumeEveningSession({ force = false } = {}) {
+  const compat = await guardClientCompatibility("resume");
+  if (!compat.ok) return false;
+
   if (!hasActiveLobby()) {
     const recovered = await tryRecoverLobbyFromServer();
     if (!recovered.ok) return false;
@@ -877,6 +907,27 @@ export function getLobbyParticipants() {
  * `assertCanInsertLobby` reste un pré-check UX, pas l’autorité finale.
  */
 export async function createLobby() {
+  const compat = await guardClientCompatibility("create");
+  if (!compat.ok) {
+    // ARCH-23 : ne pas collapser vers LOBBY_MEMBERSHIP_CHECK_FAILED.
+    const code =
+      compat.status === COMPAT_STATUS.INCOMPATIBLE
+        ? LOBBY_CREATE_ERROR.CLIENT_INCOMPATIBLE
+        : LOBBY_CREATE_ERROR.CLIENT_COMPAT_UNKNOWN;
+    throw makeLobbyCreateError(
+      code,
+      compat.status === COMPAT_STATUS.INCOMPATIBLE
+        ? compat.message ||
+            "Mise à jour de l'application requise pour créer un lobby."
+        : compat.message ||
+            "Impossible de vérifier la compatibilité. Réessaie.",
+      {
+        clientCompatStatus: compat.status,
+        recheckUnknown: Boolean(compat.recheckUnknown),
+      }
+    );
+  }
+
   const activeLobby = hasActiveLobby() ? getLobby() : null;
   if (activeLobby?.code) {
     throw makeLobbyCreateError(
@@ -949,6 +1000,27 @@ export async function createLobby() {
 
 export async function joinLobby(code) {
   console.log("[DEBUG JOIN LOBBY START]", { code });
+
+  const compat = await guardClientCompatibility("join");
+  if (!compat.ok) {
+    return {
+      ok: false,
+      error:
+        compat.status === COMPAT_STATUS.INCOMPATIBLE
+          ? compat.message ||
+            "Mise à jour de l'application requise pour rejoindre un lobby."
+          : compat.message ||
+            "Impossible de vérifier la compatibilité. Réessaie.",
+      errorCode:
+        compat.error ||
+        (compat.status === COMPAT_STATUS.INCOMPATIBLE
+          ? "CLIENT_INCOMPATIBLE"
+          : "CLIENT_COMPAT_UNKNOWN"),
+      clientIncompatible: compat.status === COMPAT_STATUS.INCOMPATIBLE,
+      clientCompatUnknown: compat.status === COMPAT_STATUS.UNKNOWN,
+      recheckUnknown: Boolean(compat.recheckUnknown),
+    };
+  }
 
   const fromActiveLobby = hasActiveLobby();
   const rollbackSnapshot = fromActiveLobby ? captureLobbyRollbackSnapshot() : null;
