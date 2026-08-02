@@ -16,7 +16,7 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 
 | | |
 |--|--|
-| **Maintenant** | **UX-CHAT-01** — code livré · QA Pages · UX-DEVICE-01 |
+| **Maintenant** | **UX-CHAT-01** — corrigé (annonce prep) · **QA Pages** · UX-DEVICE-01 |
 | **Ensuite** | backlog produit (FEATURE-* / GAME-WAO-01) |
 | **Dernière clôture** | **UX-CHAT-02** ✅ · **FEATURE-VIBECHECK-01** ✅ · **UX-HOST-01** ✅ |
 | **En attente QA finale** | **ARCH-23** (SQL ✅) · **ARCH-10** mobile |
@@ -36,7 +36,7 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 
 | ID | Cause | Problème | Priorité |
 |----|-------|----------|----------|
-| **UX-CHAT-01** | 11 | Pas de message système au lancement d'un jeu | 🟡 code livré · **QA Pages** |
+| **UX-CHAT-01** | 11 | Message chat au choix / entrée prep | 🟡 corrigé · **QA Pages** |
 | **UX-DEVICE-01** | 11 | Écran verrouillé pendant une partie (Wake Lock API) | 🟡 |
 | **GAME-WAO-01** | — | Revoir le barème Wrong Answer Only (doc d'abord) | 🟡 |
 | **FEATURE-DILEMMA-01** | — | Plusieurs dilemmes par joueur | 🟡 |
@@ -313,7 +313,7 @@ Retour terrain multi-jeux. Priorités : 🔴 critique · 🟠 haute · 🟡 moye
 |----|----------|-------------------|
 | **ARCH-23** | Version cliente vs déploiement | Au boot et/ou au join lobby : comparer version locale à une version attendue (manifest / endpoint / config distante). Si décalage : bloquer le flux jeu et forcer reload, message du type « Une nouvelle version de REVEAL est disponible. Rechargez l'application pour continuer. ». Motive : soirées-test avec client GH Pages / PWA en retard sur migrations SQL → bugs indiagnosticables (ex. 01B-bis). |
 | **UX-HOST-01** | CTA hôte — hiérarchie reveal mid-round | ✅ QA validée · reveal → action → cumul · `uxHost01RevealHierarchy` |
-| **UX-CHAT-01** | Message système au lancement jeu | ✅ **Code 2026-08-02** — `announceGameStartedInChat` via `launchGameWithSync` uniquement · texte `🎮 Une partie de {title} commence !` · titres `gameCatalogTitle` / `GAMES` · v1.1 replays `startGameSession` play documentés · **QA Pages en attente**. |
+| **UX-CHAT-01** | Message système au choix / prep | ✅ **Corrigé 2026-08-02** — annonce à `commitPrepSessionLaunch` (pas `launchGameWithSync`) · `🎮 L'hôte lance la préparation de {title}.` · Recommencer = oui · sondage close ≠ annonce · **nouvelle QA Pages**. |
 | **UX-CHAT-02** | Clavier auto à l'ouverture chat | ✅ **QA validée 2026-08-02** — `openChatSheet` focus panel seul · re-focus post-send · `chatInGameVagueA`. Ne pas rouvrir. |
 | **UX-DEVICE-01** | Mise en veille pendant partie | Écran verrouillé si téléphone posé. À étudier : Screen Wake Lock API (ou équivalent) tant que lobby actif · relâcher au leave · fallback propre si API indisponible. |
 | ~~**GAME-SPEEDVOTE-01**~~ | ~~Récompense gagnant~~ | ❌ **Annulé 2026-08-02** — barème actuel **+10** (`EVENING_POINTS.WIN`) déjà harmonisé ; +15 / podium 15-10-5 non retenus. |

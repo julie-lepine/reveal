@@ -1,6 +1,5 @@
 /**
- * UX-CHAT-01 — annonce chat au lancement.
- * Helper + contrats source ici ; chemins launchGameWithSync couverts aussi dans mpLaunchLaunch.test.js.
+ * UX-CHAT-01 — annonce à l'entrée prep (commitPrepSessionLaunch), pas au play.
  */
 import { describe, it, mock } from "node:test";
 import assert from "node:assert/strict";
@@ -12,8 +11,8 @@ import {
   SESSION_GAME_ID_TO_TILE,
 } from "../js/core/gameCatalogTitle.js";
 import {
-  buildGameStartedChatMessage,
-  announceGameStartedInChat,
+  buildGamePreparationChatMessage,
+  announceGamePreparationInChat,
 } from "../js/core/announceGameStartedInChat.js";
 import { GAMES } from "../data/games.js";
 
@@ -24,47 +23,38 @@ const announceSrc = readFileSync(
   "utf8"
 );
 const restartSrc = readFileSync(join(__dirname, "../js/core/restartGame.js"), "utf8");
-const gameSyncSrc = readFileSync(join(__dirname, "../js/core/gameSync.js"), "utf8");
+const pollStoreSrc = readFileSync(join(__dirname, "../js/core/lobbyPollStore.js"), "utf8");
 
-describe("UX-CHAT-01 — titres catalogue (comportemental)", () => {
-  it("résout Trivia Quiz depuis GAMES via mapping session", () => {
+describe("UX-CHAT-01 — titres + message prep (comportemental)", () => {
+  it("résout Trivia Quiz depuis GAMES", () => {
     assert.equal(SESSION_GAME_ID_TO_TILE.trivia, "trivia-prep");
     assert.equal(catalogTitleForSessionGameId("trivia"), "Trivia Quiz");
-    const tile = GAMES.find((g) => g.id === "trivia-prep");
-    assert.equal(tile.title, "Trivia Quiz");
+    assert.equal(GAMES.find((g) => g.id === "trivia-prep").title, "Trivia Quiz");
   });
 
-  it("message exact avec titre catalogue", () => {
+  it("formulation préparation (pas « partie commence »)", () => {
     assert.equal(
-      buildGameStartedChatMessage("trivia"),
-      "🎮 Une partie de Trivia Quiz commence !"
+      buildGamePreparationChatMessage("trivia"),
+      "🎮 L'hôte lance la préparation de Trivia Quiz."
     );
     assert.equal(
-      buildGameStartedChatMessage("hottake"),
-      "🎮 Une partie de HotTake commence !"
+      buildGamePreparationChatMessage("hottake"),
+      "🎮 L'hôte lance la préparation de HotTake."
     );
-    assert.equal(
-      buildGameStartedChatMessage("dilemma"),
-      "🎮 Une partie de Dilemma commence !"
+    assert.doesNotMatch(
+      buildGamePreparationChatMessage("trivia"),
+      /Une partie de .+ commence/
     );
   });
 
-  it("fallback générique sans undefined pour jeu inconnu", () => {
-    assert.equal(catalogTitleForSessionGameId("nope"), null);
-    const msg = buildGameStartedChatMessage("nope");
-    assert.equal(msg, "🎮 Une nouvelle partie commence !");
+  it("fallback générique sans undefined", () => {
+    const msg = buildGamePreparationChatMessage("nope");
+    assert.equal(msg, "🎮 L'hôte lance la préparation d'un jeu.");
     assert.doesNotMatch(msg, /undefined|null|\[object/i);
-  });
-
-  it("aucune map de libellés dans announce ; titres via catalogTitle", () => {
-    assert.doesNotMatch(announceSrc, /trivia:\s*["']Trivia/);
-    assert.match(announceSrc, /catalogTitleForSessionGameId/);
-    assert.match(restartSrc, /catalogTitleForSessionGameId/);
-    assert.match(gameSyncSrc, /from "\.\/gameCatalogTitle\.js"/);
   });
 });
 
-describe("UX-CHAT-01 — announceGameStartedInChat (comportemental)", () => {
+describe("UX-CHAT-01 — announceGamePreparationInChat (comportemental)", () => {
   it("échec addMessage : warning, pas de throw", async () => {
     const addMessage = mock.fn(async () => {
       throw new Error("chat down");
@@ -73,65 +63,53 @@ describe("UX-CHAT-01 — announceGameStartedInChat (comportemental)", () => {
     const orig = console.warn;
     console.warn = (...a) => warnings.push(a);
     try {
-      await announceGameStartedInChat("trivia", { addMessage });
+      await announceGamePreparationInChat("trivia", { addMessage });
     } finally {
       console.warn = orig;
     }
     assert.equal(addMessage.mock.calls.length, 1);
     assert.equal(
       addMessage.mock.calls[0].arguments[0],
-      "🎮 Une partie de Trivia Quiz commence !"
+      "🎮 L'hôte lance la préparation de Trivia Quiz."
     );
     assert.ok(warnings.some((w) => w[0] === "[UX-CHAT-01] announce failed"));
   });
 
   it("succès : une écriture", async () => {
     const addMessage = mock.fn(async () => {});
-    await announceGameStartedInChat("clutch", { addMessage });
+    await announceGamePreparationInChat("dilemma", { addMessage });
     assert.equal(addMessage.mock.calls.length, 1);
-    assert.equal(
-      addMessage.mock.calls[0].arguments[0],
-      "🎮 Une partie de Clutch commence !"
-    );
   });
 });
 
-describe("UX-CHAT-01 — contrats source", () => {
-  it("émission uniquement dans launchGameWithSync (succès + fallback)", () => {
-    assert.match(mpLaunchSrc, /fireGameStartedChatAnnounce/);
-    assert.match(mpLaunchSrc, /import\("\.\/announceGameStartedInChat\.js"\)/);
-    const callSites = [
-      ...mpLaunchSrc.matchAll(/fireGameStartedChatAnnounce\(gameId\);/g),
-    ];
-    assert.equal(callSites.length, 2, "une fois succès, une fois fallback");
+describe("UX-CHAT-01 — contrats source (point d'émission)", () => {
+  it("annonce dans commitPrepSessionLaunch après startGameSession réussi", () => {
+    assert.match(restartSrc, /fireGamePreparationChatAnnounce/);
+    assert.match(restartSrc, /await startGameSession[\s\S]*?fireGamePreparationChatAnnounce\(gameId\)/);
+    const fires = [...restartSrc.matchAll(/fireGamePreparationChatAnnounce\(gameId\);/g)];
+    assert.equal(fires.length, 1);
   });
 
-  it("pas d'annonce sur offline early-return (contrat source)", () => {
-    const offlineBlock = mpLaunchSrc.slice(
-      mpLaunchSrc.indexOf("if (!isGameSyncActive())"),
-      mpLaunchSrc.indexOf("if (!isLobbyHost())")
-    );
-    assert.doesNotMatch(offlineBlock, /fireGameStartedChatAnnounce/);
+  it("aucune annonce dans launchGameWithSync (play)", () => {
+    assert.doesNotMatch(mpLaunchSrc, /fireGameStartedChatAnnounce/);
+    assert.doesNotMatch(mpLaunchSrc, /announceGamePreparationInChat/);
+    assert.doesNotMatch(mpLaunchSrc, /announceGameStartedInChat/);
   });
 
-  it("notHost return avant annonce", () => {
-    const hostBlock = mpLaunchSrc.slice(
-      mpLaunchSrc.indexOf("if (!isLobbyHost())"),
-      mpLaunchSrc.indexOf("if (localFirst)")
-    );
-    assert.match(hostBlock, /notHost/);
-    assert.doesNotMatch(hostBlock, /fireGameStartedChatAnnounce/);
+  it("Recommencer réutilise launch*Prep → commitPrepSessionLaunch", () => {
+    assert.match(restartSrc, /RESTART_HANDLERS/);
+    assert.match(restartSrc, /trivia:\s*launchTriviaPrep/);
+    assert.match(restartSrc, /commitPrepSessionLaunch/);
   });
 
-  it("documente v1.1 replays startGameSession", () => {
-    assert.match(mpLaunchSrc, /v1\.1/);
-    assert.match(announceSrc, /startGameSession/);
-    assert.match(announceSrc, /Trivia/);
+  it("fermeture sondage n'annonce pas (annonce = prep host)", () => {
+    assert.doesNotMatch(pollStoreSrc, /announceGamePreparationInChat/);
+    assert.doesNotMatch(pollStoreSrc, /fireGamePreparationChatAnnounce/);
+    assert.doesNotMatch(pollStoreSrc, /addLobbyMessage/);
   });
 
-  it("hors scope : restartGame / setLobbyPlaying n'appellent pas announce", () => {
-    assert.doesNotMatch(restartSrc, /announceGameStartedInChat/);
-    const lobbySrc = readFileSync(join(__dirname, "../js/core/lobby.js"), "utf8");
-    assert.doesNotMatch(lobbySrc, /announceGameStartedInChat/);
+  it("documente absence de jeu sans prep + pas de double play", () => {
+    assert.match(announceSrc, /sans écran prep/);
+    assert.match(announceSrc, /Pas d'annonce au clic/);
   });
 });

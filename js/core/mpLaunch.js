@@ -13,8 +13,8 @@
  *
  * En partie (hôte) : `commitHostGamePlay` + `pickRemotePlayFields` (playPatch.js)
  *
- * UX-CHAT-01 : annonce chat uniquement ici (début de partie play). Hors scope v1 —
- * replays Trivia/Consensus via startGameSession play direct (v1.1 → même helper).
+ * UX-CHAT-01 : annonce chat à l'entrée prep (`commitPrepSessionLaunch` dans restartGame.js),
+ * pas ici au clic « Lancer » / play.
  */
 import {
   DEFAULT_SYNC_PATCH_TIMEOUT_MS,
@@ -48,21 +48,6 @@ export { DEFAULT_SYNC_PATCH_TIMEOUT_MS as SYNC_PATCH_TIMEOUT_MS };
 
 export const SYNC_SLOW_LAUNCH_MESSAGE =
   "La sync est lente - la partie démarre chez toi. Les autres peuvent avoir un léger retard.";
-
-/**
- * UX-CHAT-01 : une seule tentative par décision de lancement (succès ou fallback).
- * Import dynamique pour éviter cycles / casser les mocks gameSync des tests ARCH-08.
- */
-function fireGameStartedChatAnnounce(gameId) {
-  void import("./announceGameStartedInChat.js")
-    .then(({ announceGameStartedInChat }) => announceGameStartedInChat(gameId))
-    .catch((err) => {
-      console.warn("[UX-CHAT-01] announce fire rejected", {
-        gameId: gameId || null,
-        message: err?.message || String(err),
-      });
-    });
-}
 
 function logLaunchCommitFailure(
   error,
@@ -191,16 +176,12 @@ export async function launchGameWithSync({
   } catch (err) {
     logLaunchCommitFailure(err, { ...launchLogContext, phase: "initial_commit", attempt: 1 });
     if (!localFirst) applyLocalWithSideEffects();
-    // Décision finale fallback : partie démarre chez l'hôte → une annonce.
-    fireGameStartedChatAnnounce(gameId);
     retryLaunchCommitInBackground({ commit, ...launchLogContext });
     await showAppAlert(fallbackMessage, { title: "Connexion", icon: "📡" });
     return { ok: false, usedFallback: true, error: err };
   }
 
   if (!localFirst) applyLocalWithSideEffects();
-  // Après commit OK (+ applyLocal) : une annonce. Pas d'annonce offline / notHost.
-  fireGameStartedChatAnnounce(gameId);
   return { ok: true };
 }
 

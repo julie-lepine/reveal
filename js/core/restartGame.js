@@ -59,8 +59,26 @@ async function requireHostToLaunch() {
 }
 
 /**
+ * UX-CHAT-01 : une seule tentative après engagement prep réussi (hôte).
+ * Import dynamique pour éviter cycles.
+ */
+function fireGamePreparationChatAnnounce(gameId) {
+  void import("./announceGameStartedInChat.js")
+    .then(({ announceGamePreparationInChat }) =>
+      announceGamePreparationInChat(gameId)
+    )
+    .catch((err) => {
+      console.warn("[UX-CHAT-01] announce fire rejected", {
+        gameId: gameId || null,
+        message: err?.message || String(err),
+      });
+    });
+}
+
+/**
  * MP : patch local puis startGameSession ; rollback du snapshot en cas d'échec.
  * Gardes hôte / joueurs doivent être passées avant l'appel.
+ * Annonce chat après succès uniquement (pas catch-up invité, pas play).
  */
 async function commitPrepSessionLaunch({
   statePatch,
@@ -78,6 +96,7 @@ async function commitPrepSessionLaunch({
 
   try {
     await startGameSession(gameId, screen, remoteState);
+    fireGamePreparationChatAnnounce(gameId);
     if (afterSuccess) await afterSuccess();
   } catch (e) {
     console.warn(`REVEAL launch ${logLabel}:`, e);
