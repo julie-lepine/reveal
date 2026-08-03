@@ -60,10 +60,11 @@ describe("SYN-VOTE-ROLLBACK-01 — contrats commit*", () => {
     assert.match(block, /runId:\s*session\.runId/);
   });
 
-  it("commitTraitreDealAck hors périmètre (pas de rollback vote helper)", () => {
+  it("commitTraitreDealAck : désormais couvert par SYN-TRAITRE-DEALACK-01 (rollback présent)", () => {
     const src = read("js/core/traitreSession.js");
     const block = fnBlock(src, "commitTraitreDealAck", "commitTraitreVote");
-    assert.equal(block.includes("rollbackOptimisticMapEntry"), false);
+    // Vague vote : hors scope. Vague deal-ack : rollback obligatoire.
+    assert.match(block, /rollbackOptimisticMapEntry/);
     assert.match(block, /dealAcks/);
   });
 });

@@ -16,11 +16,11 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 
 | | |
 |--|--|
-| **Maintenant** | **SYN-VOTE-ROLLBACK-01** (QA terrain) · **UX-DEVICE-01** |
+| **Maintenant** | **SYN-TRAITRE-DEALACK-01** (QA terrain) · **UX-DEVICE-01** |
 | **Ensuite** | Consensus reveal atomique · ARCH-23/10 QA natif · backlog produit |
-| **Dernière clôture** | **AUTH-LEAVE-*** ✅ · **UX-CHAT-01** ✅ · **UX-CHAT-02** ✅ · **FEATURE-VIBECHECK-01** ✅ · **UX-HOST-01** ✅ | **GAME-WAO-01**✅ | 
-| **En attente QA finale** | **SYN-VOTE-ROLLBACK-01** · **ARCH-23** (SQL ✅) · **ARCH-10** mobile |
-| **Audit** | Transversal 2026-08-02 — AUTH leave orphans ✅ QA 2026-08-03 · optimistic submissions rollback 🔧 2026-08-03 |
+| **Dernière clôture** | **SYN-VOTE-ROLLBACK-01** ✅ · **AUTH-LEAVE-*** ✅ · **UX-CHAT-01** ✅ · **UX-CHAT-02** ✅ · **FEATURE-VIBECHECK-01** ✅ · **UX-HOST-01** ✅ · **GAME-WAO-01** ✅ |
+| **En attente QA finale** | **SYN-TRAITRE-DEALACK-01** · **ARCH-23** (SQL ✅) · **ARCH-10** mobile |
+| **Audit** | Transversal 2026-08-02 — optimistic submissions ✅ QA 2026-08-03 · Deal ACK 🔧 |
 
 ---
 
@@ -37,16 +37,16 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 
 | ID | Cause | Problème | Priorité |
 |----|-------|----------|----------|
-| **SYN-VOTE-ROLLBACK-01** | 7 | Rollback ciblé soumissions optimistes (votes + réponse WAO) | 🟡 **🔧 code + tests** · **QA terrain requise** |
+| **SYN-TRAITRE-DEALACK-01** | 7 | Rollback ciblé Deal ACK Traître | 🟡 **🔧 code + tests** · **QA terrain requise** |
 | **UX-DEVICE-01** | 11 | Écran verrouillé pendant une partie (Wake Lock API) | 🟡 |
 | **FEATURE-DILEMMA-01** | — | Plusieurs dilemmes par joueur | 🟡 |
 | **FEATURE-TIERNIGHT-01** | — | Thèmes personnalisés (Classer le groupe) | 🟡 |
 | **FEATURE-TIERNIGHT-02** | — | Séries de tierlists par catégories | 🟡 |
-| **FEATURE-CHAT-03** | — | Bouton « Futur jeu aléatoire » dans le chat - Visible par tous les joueurs, cliquable par l'hôte. Petite animation de "roulette" pour montrer le côté aléatoire du pick | 🟡 |
+| **** | — | Bouton « Futur jeu aléatoire » dans le chat - Visible par tous les joueurs, cliquable par l'hôte. Petite animation de "roulette" pour montrer le côté aléatoire du pick | 🟡 |
 | **ARCH-05** | 5 | Route lobby vs session (`row.screen`) | 🟡 mitigé SYN-28 |
 | **ARCH-01 / F-01** | 1 | Démo offline sans avertissement MP | 🟡 partiel |
 | **ARCH-11–17, SYN-19–24, SYN-27** | 9–10 | Monolithe / dup / code mort | Dette |
-| **TRAITRES-VIBECHECK SUPPRESSION** | vérifier que tous les fichiers / codes inhérents aux deux jeux supprimés ont aussi été supprimés
+| **FIL ROUGE / VIBECHECK SUPPRESSION** | vérifier que tous les fichiers / codes inhérents aux deux jeux supprimés ont aussi été supprimés
 
 ## Carte des causes racines
 
@@ -93,34 +93,40 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 | **ARCH-07** | Catch-up Realtime · foreground · resume · claim · poll | voir clôture ci-dessous | ✅ 2026-07-29 |
 | **ARCH-08** | Retry launch silencieux | `mpLaunch.js` | ✅ 2026-07-29 |
 | **M-14b** | Contrat `onLocalApplied` | `mpLaunch.js` | ✅ 2026-07-29 |
-| **SYN-VOTE-ROLLBACK-01** | États optimistes votes/réponse non rollbackés | sessions + UI jeux | 🔧 QA terrain |
+| **SYN-VOTE-ROLLBACK-01** | États optimistes votes/réponse non rollbackés | sessions + UI jeux | ✅ QA 2026-08-03 |
+| **SYN-TRAITRE-DEALACK-01** | Deal ACK optimiste sans rollback | `commitTraitreDealAck` | 🔧 QA terrain |
 
-#### SYN-VOTE-ROLLBACK-01 🔧 (implémentation 2026-08-03 — QA terrain requise)
+#### SYN-VOTE-ROLLBACK-01 ✅ (clôture QA terrain · 2026-08-03)
 
-Optimistic submissions rollback — Cause 7 résidu. **Ne pas clôturer** avant QA terrain.
+Optimistic submissions rollback (votes + réponse WAO). **Ne pas rouvrir** sans régression.
 
-| ID | Commit / surface | QA |
-|----|------------------|-----|
-| **01A** | `commitSpeedVoteVote` + UI `handleSpeedVotePick` | 🔧 re-QA : rejet non consommé (orphan `withPatchTimeout` + catch terminal) |
-| **01B** | `commitDilemmaVote` + merge catch-up A→B | 🔧 re-QA : divergence changement de vote |
-| **01C** | `commitWrongAnswerVote` + refresh vote ciblé | 🔧 QA |
-| **01D** | `commitTraitreVote` | 🔧 QA |
-| **01E** | `commitTierNightLiveVote` (`runId`) | 🔧 QA |
-| **01F** | `commitWrongAnswerAnswer` + draft / WAO-02 | 🔧 QA |
+| ID | Livré |
+|----|--------|
+| **01A–01F** | SpeedVote · Dilemma · WAO vote/answer · Traitre vote · TierNight Live |
+| **QA fix** | rejet non consommé (`withPatchTimeout` orphan) · convergence Dilemma A→B |
 
 | | |
 |--|--|
-| **Contrat** | `optimisticMapEntry.js` — apply / rollback ciblé · `hadPreviousValue` · delete réel · `attemptId` · garde `runId`/`phase`/`roundIdx` · rethrow après rollback |
-| **QA fix 01A** | `withPatchTimeout` consomme rejet orphelin post-timeout · handlers UI catch terminal documenté · pas de double modale |
-| **QA fix 01B** | `mergePlayerVoteMapsForCatchUp` : remote gagne (A→B) · `mergeDilemmaGameLocal` · `myVote` dérivé session |
-| **Où** | `optimisticMapEntry.js` · `withPatchTimeout.js` · `sessionMerge.js` · `gameSync.js` · `*Session.js` · UI jeux |
-| **Preuve auto** | `optimisticMapEntry` · `synVoteRollback01*` · `dilemmaVoteChange` · `withPatchTimeout` 3c · WAO-02/03 · TierNight 04–05 |
-| **Hors scope** | orphan writes généraux hors race timeout · Consensus reveal · `commitTraitreDealAck` · SQL/RLS · migration name→UID globale |
-| **Statut** | **Correctifs QA 01A/01B implémentés — tests verts — re-QA SpeedVote + Dilemma requise** |
+| **Où** | `optimisticMapEntry.js` · `withPatchTimeout.js` · `sessionMerge.js` · commits + UI jeux |
+| **Preuve** | `synVoteRollback01*` · `dilemmaVoteChange` · QA terrain 2026-08-03 |
+| **Verdict** | **Ne pas rouvrir** sauf régression vote/rollback démontrée |
+
+#### SYN-TRAITRE-DEALACK-01 🔧 (implémentation 2026-08-03 — QA terrain requise)
+
+Seul flux Traître encore optimiste sans rollback après SYN-VOTE-ROLLBACK-01.
+
+| | |
+|--|--|
+| **Contrat** | Même helper `optimisticMapEntry` · `attemptId` · garde phase `deal` · rethrow · catch UI terminal |
+| **Où** | `traitreSession.js` (`commitTraitreDealAck`) · `traitre.js` (`handleDealAckClick`) |
+| **Serveur** | `contribute_game_session_player` / `jsonb_set` UID → `true` : **idempotent** · rejouable |
+| **Transition** | `allTraitreDealAcksIn` → `maybeAdvanceFromDeal` (deal → speak) |
+| **Preuve auto** | `synTraitreDealAck01.test.js` |
+| **Statut** | **Implémentation terminée — tests automatisés verts — QA terrain requise** |
 
 #### ARCH-07 ✅ (clôture définitive · 2026-07-29)
 
-P0 livré 2026-07-29 · P1/P2 livré 2026-07-29 — chantiers ARCH-07 clos ; résidu votes optimistes traité sous **SYN-VOTE-ROLLBACK-01** (QA ouverte).
+P0 livré 2026-07-29 · P1/P2 livré 2026-07-29 — chantiers ARCH-07 clos ; résidu votes → **SYN-VOTE-ROLLBACK-01** ✅ ; résidu Deal ACK → **SYN-TRAITRE-DEALACK-01** 🔧.
 
 | | |
 |--|--|
@@ -468,7 +474,7 @@ Ne pas rouvrir sans régression. Détail historique dans git / tests cités.
 | 4 | I-01/02/08, M-03b, M-06a/b, L-01, ARCH-03/03b, UX-VIBE-01, Guess Lie |
 | 5 | T-01/02, T-03↻, M-07/08, P-02, SYN-28, ARCH-04, UX-VIBE-02, pré-résolution entry, **UX-NAV-LOBBY** |
 | 6 | I-05, SYN-13b↻, SYN-25, SYN-05/ARCH-18, ARCH-06 |
-| 7 | I-07, M-09, L-09, M-11, M-10, T-05, SYN-26, M-04b/SYN-18, **ARCH-08**, **ARCH-07** (P0+P1/P2), **M-14b**, **BUG-TRIVIA-01** (01A/01B/01B-bis/01C) |
+| 7 | I-07, M-09, L-09, M-11, M-10, T-05, SYN-26, M-04b/SYN-18, **ARCH-08**, **ARCH-07** (P0+P1/P2), **M-14b**, **BUG-TRIVIA-01** (01A/01B/01B-bis/01C), **SYN-VOTE-ROLLBACK-01** |
 | 8 | I-06, P-02, ARCH-09, I-09/SYN-06, SYN-15/16, M-15, **BUG-LOBBY-XX ✅** |
 | 9 | SYN-12 / M-05b |
 | 10 | SYN-05 / ARCH-18 (Fil Rouge app) |
@@ -480,8 +486,8 @@ Ne pas rouvrir sans régression. Détail historique dans git / tests cités.
 
 Hors file prioritaire — opportunité / régression :
 
-- ~~Votes optimistic hors Hot Take / Guess Lie~~ → **SYN-VOTE-ROLLBACK-01** 🔧 (QA terrain)
-- `commitTraitreDealAck` : écriture optimiste `dealAcks` sans rollback (voir ticket proposé SYN-TRAITRE-DEALACK-01)
+- ~~Votes optimistic hors Hot Take / Guess Lie~~ → **SYN-VOTE-ROLLBACK-01** ✅
+- ~~`commitTraitreDealAck` sans rollback~~ → **SYN-TRAITRE-DEALACK-01** 🔧 (QA terrain)
 - `results.js` mount async — résidu bas (TruthMeter-02 ✅ clôturé)
 - Lobby `playing` si upsert échoue après `setLobbyPlaying` (M-11)
 - `pushGameSession` : `err.message` brut (L-09)
@@ -498,8 +504,8 @@ Hors file prioritaire — opportunité / régression :
 - Logout snapshot `found` sans cache hydraté (hors AUTH-LEAVE Vague 1)
 - Leave multi-onglets sans BroadcastChannel
 
-**Surveiller** : Clutch taps sous latence (SYN-26) · ready prep après Recommencer · conflit pending join vs chrome Home membership · leave multi-onglets après dissolve · **ARCH-23** (clients stale) · **ARCH-10** non-régression mobile (QA finale) · **SYN-VOTE-ROLLBACK-01** QA terrain
+**Surveiller** : Clutch taps sous latence (SYN-26) · ready prep après Recommencer · conflit pending join vs chrome Home membership · leave multi-onglets après dissolve · **ARCH-23** (clients stale) · **ARCH-10** non-régression mobile (QA finale) · **SYN-TRAITRE-DEALACK-01** QA terrain
 
 ---
 
-*Suivi vivant · MAJ 2026-08-03 — **SYN-VOTE-ROLLBACK-01** 🔧 QA · **AUTH-LEAVE-*** ✅ · prochain après QA = **UX-DEVICE-01** · **ARCH-10** Pages ✅ · **ARCH-23** QA différée*
+*Suivi vivant · MAJ 2026-08-03 — **SYN-VOTE-ROLLBACK-01** ✅ · **SYN-TRAITRE-DEALACK-01** 🔧 QA · prochain après QA = **UX-DEVICE-01** · **ARCH-10** Pages ✅ · **ARCH-23** QA différée*

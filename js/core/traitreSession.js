@@ -39,6 +39,7 @@ import {
 } from "./optimisticMapEntry.js";
 
 let traitreVoteAttemptId = 0;
+let traitreDealAckAttemptId = 0;
 
 function defaultSession() {
   return {
@@ -263,15 +264,59 @@ export async function commitTraitrePlay(patch, patchOpts = {}) {
   });
 }
 
+/**
+ * MP : ACK phase deal (mot mémorisé). Optimistic write + rollback conditionnel.
+ * Idempotent côté serveur (jsonb_set true→true). Utilisé pour allTraitreDealAcksIn → speak.
+ */
 export async function commitTraitreDealAck() {
   const localName = getLocalDisplayName();
   const session = getTraitreSession();
-  const dealAcks = { ...(session.dealAcks || {}), [localName]: true };
-  saveStatePatch({ traitreGame: { ...session, dealAcks } });
-  if (!isGameSyncActive()) return dealAcks;
-  const uid = requireLocalParticipantUid();
-  await patchGameStateWithFeedback({ traitre: { dealAcks: { [uid]: true } } });
-  return dealAcks;
+  if (session.phase != null && session.phase !== "deal") {
+    return session.dealAcks || {};
+  }
+  if (session.dealAcks?.[localName] === true) {
+    return session.dealAcks;
+  }
+
+  const attemptId = ++traitreDealAckAttemptId;
+  const captured = { phase: session.phase ?? "deal" };
+  const apply = computeOptimisticMapEntryApply({
+    map: session.dealAcks,
+    key: localName,
+    value: true,
+  });
+  saveStatePatch({ traitreGame: { ...session, dealAcks: apply.nextMap } });
+  if (!isGameSyncActive()) return apply.nextMap;
+
+  try {
+    const uid = requireLocalParticipantUid();
+    await patchGameStateWithFeedback({ traitre: { dealAcks: { [uid]: true } } });
+    return apply.nextMap;
+  } catch (err) {
+    const live = getTraitreSession();
+    if (
+      attemptId === traitreDealAckAttemptId &&
+      canRollbackOptimisticSubmission(captured, live)
+    ) {
+      const rolled = rollbackOptimisticMapEntry({
+        currentMap: live.dealAcks,
+        key: localName,
+        hadPreviousValue: apply.hadPreviousValue,
+        previousValue: apply.previousValue,
+        optimisticValue: apply.optimisticValue,
+        attemptId,
+        currentAttemptId: traitreDealAckAttemptId,
+      });
+      if (rolled.applied) {
+        saveStatePatch({ traitreGame: { ...live, dealAcks: rolled.map } });
+      }
+    }
+    throw err;
+  }
+}
+
+export function __resetTraitreDealAckAttemptIdForTests() {
+  traitreDealAckAttemptId = 0;
 }
 
 export async function commitTraitreVote(targetName) {

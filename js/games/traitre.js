@@ -71,6 +71,8 @@ export function mountTraitre(app) {
   let winner = null;
   let voteSurvivals = 0;
   let roleSyncInFlight = false;
+  /** Empêche double-clic pendant le patch Deal ACK. */
+  let dealAckInFlight = false;
   /** ARCH-06 : vivacité + instance courante (remplace le flag local de mount). */
   const mount = createMountGuard();
   /** ARCH-06 mode A : locks partagés entre re-binds. */
@@ -475,8 +477,12 @@ export function mountTraitre(app) {
           <p class="traitre-word">${escapeHtml(myWord)}</p>
           <p class="hint">Mémorise ce mot - tu devras donner un indice à voix haute sans le prononcer.</p>
           ${
-            session.dealAcks?.[localName]
-              ? `<p class="hint traitre-deal-wait">✓ Mot mémorisé - en attente des autres joueurs…</p>`
+            session.dealAcks?.[localName] || dealAckInFlight
+              ? `<p class="hint traitre-deal-wait">${
+                  dealAckInFlight && !session.dealAcks?.[localName]
+                    ? "Envoi…"
+                    : "✓ Mot mémorisé - en attente des autres joueurs…"
+                }</p>`
               : `<button type="button" class="btn btn-primary btn--spaced" id="btn-deal-ack">J'ai mémorisé mon mot</button>`
           }
         </div>`
@@ -584,8 +590,33 @@ export function mountTraitre(app) {
     bindExitGame(app);
     if (phase === "final") bindRestartGameButtons(app);
 
-    app.querySelector("#btn-deal-ack")?.addEventListener("click", async () => {
-      await commitTraitreDealAck();
+    app.querySelector("#btn-deal-ack")?.addEventListener("click", () => {
+      void handleDealAckClick();
+    });
+
+    async function handleDealAckClick() {
+      if (dealAckInFlight) return;
+      if (getTraitreSession().dealAcks?.[localName]) return;
+      dealAckInFlight = true;
+      render();
+      let ackFailed = false;
+      try {
+        await commitTraitreDealAck();
+      } catch (error) {
+        // Catch terminal UI (SYN-TRAITRE-DEALACK-01) :
+        // - feedback déjà présenté en aval du commit ;
+        // - rollback dealAcks déjà effectué ;
+        // - pas de seconde notification ; bouton de nouveau disponible.
+        void error;
+        ackFailed = true;
+      } finally {
+        dealAckInFlight = false;
+      }
+      if (ackFailed) {
+        if (!mount.isMounted() || !mount.isCurrentMount()) return;
+        render();
+        return;
+      }
       if (!mount.isMounted()) return;
       if (!mount.isCurrentMount()) return;
       if (!mp) {
@@ -602,7 +633,7 @@ export function mountTraitre(app) {
       if (!mount.isMounted()) return;
       if (!mount.isCurrentMount()) return;
       render();
-    });
+    }
 
     app.querySelector("#btn-finish-speak")?.addEventListener(
       "click",
