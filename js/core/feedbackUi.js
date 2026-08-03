@@ -21,6 +21,7 @@ import {
   markLobbyPollSeen,
   setLobbyPollSheetOpenGetter,
 } from "./lobbyPollStore.js";
+import { mountChatRandomGameInChatSheet } from "./chatRandomGame.js";
 
 export { CHAT_FAB_ALLOWED_SCREENS, isChatFabAllowedScreen } from "./chatFabScreens.js";
 
@@ -31,6 +32,7 @@ let sheetPanel = null;
 let chatInstance = null;
 let unsubMessages = null;
 let unsubPollUi = null;
+let unsubRandomUi = null;
 let unsubPollBadge = null;
 let sheetOpen = false;
 let bodyOverflowPrev = "";
@@ -126,6 +128,8 @@ function onSheetKeydown(e) {
 function cleanupSheetDom() {
   unsubPollUi?.();
   unsubPollUi = null;
+  unsubRandomUi?.();
+  unsubRandomUi = null;
   unsubMessages?.();
   unsubMessages = null;
   chatInstance?.cleanup();
@@ -182,6 +186,7 @@ function openChatSheet() {
         <button type="button" class="chat-sheet__close" data-chat-sheet-dismiss aria-label="Fermer">✕</button>
       </div>
       <div id="chat-sheet-poll" class="chat-sheet__poll" hidden></div>
+      <div id="chat-sheet-random" class="chat-sheet__random" hidden></div>
       <div class="chat-messages chat-sheet__messages" id="chat-sheet-messages"></div>
       <div class="chat-box chat-sheet__box">
         <input
@@ -205,6 +210,7 @@ function openChatSheet() {
   const sendEl = sheetRoot.querySelector("#chat-sheet-send");
 
   unsubPollUi = mountLobbyPollInChatSheet(sheetRoot);
+  unsubRandomUi = mountChatRandomGameInChatSheet(sheetRoot);
 
   chatInstance = mountChatPanel(sheetRoot, {
     messagesEl,

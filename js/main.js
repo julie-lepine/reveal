@@ -50,6 +50,7 @@ import { mountTierNightLive } from "./games/tierNightLive.js";
 import { initMultiplayerSyncVisibility } from "./core/gameSync.js";
 import { initFeedbackFab } from "./core/feedbackUi.js";
 import { initLobbyPollSync } from "./core/lobbyPollStore.js";
+import { initChatRandomGameSync } from "./core/chatRandomGame.js";
 import { initHostNoticeListener } from "./core/hostNotice.js";
 import { initActingHostNoticeListener } from "./core/actingHostNotice.js";
 import { checkClientCompatibility } from "./core/clientCompatibility.js";
@@ -133,6 +134,7 @@ async function boot() {
 
     // Premier subscribe polls uniquement après session Supabase prête
     void initLobbyPollSync();
+    initChatRandomGameSync();
     await reconcileLobbyMembership();
     resetNav();
     if (isPasswordRecoveryPending()) {

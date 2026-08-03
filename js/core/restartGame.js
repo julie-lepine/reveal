@@ -37,9 +37,104 @@ import { showAppAlert } from "./dialog.js";
 import { escapeHtml } from "./ui.js";
 import { createTierNightRunId, finishedTierNightLiveRemote } from "./tierNightConfig.js";
 import { createActionLock } from "./actionLock.js";
+import {
+  CHAT_ROULETTE_STATE_KEY,
+  isChatRouletteBlockingLaunch,
+  normalizeChatRouletteEvent,
+  observeChatRouletteActivity,
+  chatRouletteMonotonicNow,
+  parseSessionUpdatedAtMs,
+} from "./chatRandomGameLogic.js";
+import {
+  TILE_ID_TO_SESSION_GAME_ID,
+} from "./gameCatalogTitle.js";
 
 /** ARCH-06 : exclusivité logique (survit au re-bind des boutons Recommencer). */
 const restartLock = createActionLock();
+
+/**
+ * Permit ponctuel pour lancer LE jeu tiré par LA roulette active.
+ * Forme : `{ rouletteId, tileId }` — nettoyé dans `finally`.
+ * Impossible de réutiliser pour un autre jeu / une autre roulette.
+ * @type {{ rouletteId: string, tileId: string }|null}
+ */
+let chatRouletteLaunchPermit = null;
+
+/**
+ * @param {{ rouletteId: string, tileId: string }} permit
+ * @param {() => Promise<unknown>} fn
+ */
+export async function runWithChatRouletteLaunchPermit(permit, fn) {
+  if (!permit?.rouletteId || !permit?.tileId) {
+    throw new Error("Permit roulette invalide.");
+  }
+  chatRouletteLaunchPermit = {
+    rouletteId: String(permit.rouletteId),
+    tileId: String(permit.tileId),
+  };
+  try {
+    return await fn();
+  } finally {
+    chatRouletteLaunchPermit = null;
+  }
+}
+
+/** @deprecated — utiliser runWithChatRouletteLaunchPermit */
+export async function runWithChatRouletteLaunchBypass(fn) {
+  return fn();
+}
+
+/**
+ * Bloque uniquement une roulette **active** (TTL hybride centralisé).
+ * Autorise le lancement si un permit cible exactement cette roulette + tile
+ * et que `sessionGameId` correspond au tile permis.
+ * @param {{ sessionGameId?: string|null }} [opts]
+ */
+async function assertNoActiveChatRoulette({ sessionGameId = null } = {}) {
+  if (!isGameSyncActive()) return true;
+  const row = getCachedGameSession();
+  const raw = row?.state?.[CHAT_ROULETTE_STATE_KEY];
+  const sessionTs = parseSessionUpdatedAtMs(row?.updated_at);
+  const mono = chatRouletteMonotonicNow();
+  const obs = observeChatRouletteActivity(raw, {
+    nowMonotonic: mono,
+    sessionUpdatedAtMs: sessionTs,
+  });
+  const ev = normalizeChatRouletteEvent(raw);
+  if (
+    !isChatRouletteBlockingLaunch({
+      chatRoulette: raw,
+      localObservation: obs,
+      nowWallClock: Date.now(),
+      nowMonotonic: chatRouletteMonotonicNow(),
+      sessionUpdatedAtMs: sessionTs,
+    })
+  ) {
+    return true;
+  }
+
+  const permit = chatRouletteLaunchPermit;
+  if (
+    permit &&
+    ev &&
+    permit.rouletteId === ev.rouletteId &&
+    permit.tileId === ev.selectedTileId
+  ) {
+    const permittedSession = TILE_ID_TO_SESSION_GAME_ID[permit.tileId];
+    if (
+      permittedSession &&
+      (!sessionGameId || sessionGameId === permittedSession)
+    ) {
+      return true;
+    }
+  }
+
+  await showAppAlert(
+    "Une roulette « Jeu aléatoire » est en cours. Termine-la ou annule-la avant de lancer un autre jeu.",
+    { title: "Jeu aléatoire", icon: "🎲" }
+  );
+  return false;
+}
 
 export function getRestartableGameTitle(gameId, fallbackTitle) {
   return (
@@ -50,7 +145,8 @@ export function getRestartableGameTitle(gameId, fallbackTitle) {
   );
 }
 
-async function requireHostToLaunch() {
+async function requireHostToLaunch(sessionGameId = null) {
+  if (!(await assertNoActiveChatRoulette({ sessionGameId }))) return false;
   if (!isGameSyncActive()) return true;
   if (isLobbyHost()) return true;
   const { ensureLobbyHostOrOfferClaim } = await import("./hostClaimOffer.js");
@@ -109,6 +205,7 @@ async function commitPrepSessionLaunch({
 }
 
 export async function launchTraitrePrep() {
+  if (!(await assertNoActiveChatRoulette({ sessionGameId: "traitre" }))) return;
   const check = await requireMinLobbyPlayers(TRAITRE_MIN_PLAYERS, {
     gameTitle: "Spot the fake",
     icon: "🎭",
@@ -123,7 +220,7 @@ export async function launchTraitrePrep() {
     return;
   }
 
-  if (!(await requireHostToLaunch())) return;
+  if (!(await requireHostToLaunch("traitre"))) return;
 
   const lobbyId = getState().lobby?.id;
   await commitPrepSessionLaunch({
@@ -139,6 +236,7 @@ export async function launchTraitrePrep() {
 }
 
 export async function launchSpeedVotePrep() {
+  if (!(await assertNoActiveChatRoulette({ sessionGameId: "speedvote" }))) return;
   const sv = defaultSpeedVotePrepSession();
 
   if (!isGameSyncActive()) {
@@ -147,7 +245,7 @@ export async function launchSpeedVotePrep() {
     return;
   }
 
-  if (!(await requireHostToLaunch())) return;
+  if (!(await requireHostToLaunch("speedvote"))) return;
 
   await commitPrepSessionLaunch({
     statePatch: { speedVoteGame: sv },
@@ -161,6 +259,7 @@ export async function launchSpeedVotePrep() {
 }
 
 export async function launchClutchPrep() {
+  if (!(await assertNoActiveChatRoulette({ sessionGameId: "clutch" }))) return;
   const rz = defaultClutchPrepSession();
 
   if (!isGameSyncActive()) {
@@ -169,7 +268,7 @@ export async function launchClutchPrep() {
     return;
   }
 
-  if (!(await requireHostToLaunch())) return;
+  if (!(await requireHostToLaunch("clutch"))) return;
 
   await commitPrepSessionLaunch({
     statePatch: { clutchGame: rz },
@@ -183,6 +282,7 @@ export async function launchClutchPrep() {
 }
 
 export async function launchWrongAnswerPrep() {
+  if (!(await assertNoActiveChatRoulette({ sessionGameId: "wronganswer" }))) return;
   const wa = defaultWrongAnswerPrepSession();
 
   if (!isGameSyncActive()) {
@@ -191,7 +291,7 @@ export async function launchWrongAnswerPrep() {
     return;
   }
 
-  if (!(await requireHostToLaunch())) return;
+  if (!(await requireHostToLaunch("wronganswer"))) return;
 
   await commitPrepSessionLaunch({
     statePatch: { wrongAnswerGame: wa },
@@ -205,6 +305,7 @@ export async function launchWrongAnswerPrep() {
 }
 
 export async function launchDilemmaPrep() {
+  if (!(await assertNoActiveChatRoulette({ sessionGameId: "dilemma" }))) return;
   const dm = defaultDilemmaPrepSession();
 
   if (!isGameSyncActive()) {
@@ -213,7 +314,7 @@ export async function launchDilemmaPrep() {
     return;
   }
 
-  if (!(await requireHostToLaunch())) return;
+  if (!(await requireHostToLaunch("dilemma"))) return;
 
   await commitPrepSessionLaunch({
     statePatch: { dilemmaGame: dm },
@@ -227,6 +328,7 @@ export async function launchDilemmaPrep() {
 }
 
 export async function launchTriviaPrep() {
+  if (!(await assertNoActiveChatRoulette({ sessionGameId: "trivia" }))) return;
   const trivia = defaultTriviaPrepSession();
 
   if (!isGameSyncActive()) {
@@ -235,7 +337,7 @@ export async function launchTriviaPrep() {
     return;
   }
 
-  if (!(await requireHostToLaunch())) return;
+  if (!(await requireHostToLaunch("trivia"))) return;
 
   await commitPrepSessionLaunch({
     statePatch: { triviaGame: trivia },
@@ -249,6 +351,7 @@ export async function launchTriviaPrep() {
 }
 
 export async function launchTruthMeterPrep() {
+  if (!(await assertNoActiveChatRoulette({ sessionGameId: "truthmeter" }))) return;
   const check = await requireMinLobbyPlayers(TRUTH_METER_MIN_PLAYERS, {
     gameTitle: "TruthMeter",
     icon: "📊",
@@ -263,7 +366,7 @@ export async function launchTruthMeterPrep() {
     return;
   }
 
-  if (!(await requireHostToLaunch())) return;
+  if (!(await requireHostToLaunch("truthmeter"))) return;
 
   await commitPrepSessionLaunch({
     statePatch: { truthMeterGame: tm },
@@ -277,6 +380,7 @@ export async function launchTruthMeterPrep() {
 }
 
 export async function launchConsensusPrep() {
+  if (!(await assertNoActiveChatRoulette({ sessionGameId: "consensus" }))) return;
   const consensus = defaultConsensusPrepSession();
 
   if (!isGameSyncActive()) {
@@ -285,7 +389,7 @@ export async function launchConsensusPrep() {
     return;
   }
 
-  if (!(await requireHostToLaunch())) return;
+  if (!(await requireHostToLaunch("consensus"))) return;
 
   await commitPrepSessionLaunch({
     statePatch: { consensusGame: consensus },
@@ -299,6 +403,7 @@ export async function launchConsensusPrep() {
 }
 
 export async function launchHotTakePrep() {
+  if (!(await assertNoActiveChatRoulette({ sessionGameId: "hottake" }))) return;
   const ht = {
     customTakes: [],
     ready: {},
@@ -321,7 +426,7 @@ export async function launchHotTakePrep() {
     return;
   }
 
-  if (!(await requireHostToLaunch())) return;
+  if (!(await requireHostToLaunch("hottake"))) return;
 
   await commitPrepSessionLaunch({
     statePatch: { hotTakeGame: ht },
@@ -335,6 +440,7 @@ export async function launchHotTakePrep() {
 }
 
 export async function launchGuessLieMenu() {
+  if (!(await assertNoActiveChatRoulette({ sessionGameId: "guesslie" }))) return;
   const gl = {
     sessionId: getState().lobbyCode,
     submissions: {},
@@ -351,7 +457,7 @@ export async function launchGuessLieMenu() {
     return;
   }
 
-  if (!(await requireHostToLaunch())) return;
+  if (!(await requireHostToLaunch("guesslie"))) return;
 
   await commitPrepSessionLaunch({
     statePatch: { guessLie: gl },
@@ -365,6 +471,7 @@ export async function launchGuessLieMenu() {
 }
 
 export async function launchTierNightSelect() {
+  if (!(await assertNoActiveChatRoulette({ sessionGameId: "tiernight" }))) return;
   const runId = createTierNightRunId();
   const tierNightReset = { runId, recaps: [], topicId: null, listName: "", controversialItem: null };
   const tierNightLiveReset = {
@@ -393,7 +500,7 @@ export async function launchTierNightSelect() {
     return;
   }
 
-  if (!(await requireHostToLaunch())) return;
+  if (!(await requireHostToLaunch("tiernight"))) return;
 
   await commitPrepSessionLaunch({
     statePatch,
@@ -436,8 +543,23 @@ const RESTART_HANDLERS = {
 export async function restartGame(gameId) {
   const fn = RESTART_HANDLERS[gameId];
   if (!fn) return;
+  if (!(await assertNoActiveChatRoulette({ sessionGameId: gameId }))) return;
   const outcome = await restartLock.run(() => fn());
   return outcome.ok ? outcome.value : undefined;
+}
+
+/**
+ * FEATURE-CHAT-03 — lance un jeu depuis un id catalogue (tile),
+ * sans passer par game-select. Réutilise `restartGame` / launchers existants.
+ * @param {string} tileId
+ */
+export async function launchCatalogGame(tileId) {
+  const sessionId = TILE_ID_TO_SESSION_GAME_ID[tileId];
+  if (!sessionId) {
+    await showAppAlert("Jeu inconnu.", { title: "Jeu aléatoire", icon: "🎲" });
+    return;
+  }
+  return restartGame(sessionId);
 }
 
 /** lastGame local + filet session multijoueur (game_id sur écran résultats). */

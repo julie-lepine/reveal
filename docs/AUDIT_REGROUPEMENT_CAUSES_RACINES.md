@@ -16,11 +16,9 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 
 | | |
 |--|--|
-| **Maintenant** | **SYN-TRAITRE-DEALACK-01** (QA terrain) · **UX-DEVICE-01** |
+| **Maintenant** | **FEATURE-CHAT-03** |
 | **Ensuite** | Consensus reveal atomique · ARCH-23/10 QA natif · backlog produit |
-| **Dernière clôture** | **SYN-VOTE-ROLLBACK-01** ✅ · **AUTH-LEAVE-*** ✅ · **UX-CHAT-01** ✅ · **UX-CHAT-02** ✅ · **FEATURE-VIBECHECK-01** ✅ · **UX-HOST-01** ✅ · **GAME-WAO-01** ✅ |
-| **En attente QA finale** | **SYN-TRAITRE-DEALACK-01** · **ARCH-23** (SQL ✅) · **ARCH-10** mobile |
-| **Audit** | Transversal 2026-08-02 — optimistic submissions ✅ QA 2026-08-03 · Deal ACK 🔧 |
+| **Audit** | Transversal 2026-08-02 — optimistic submissions ✅ · Deal ACK ✅ QA 2026-08-03 |
 
 ---
 
@@ -37,12 +35,11 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 
 | ID | Cause | Problème | Priorité |
 |----|-------|----------|----------|
-| **SYN-TRAITRE-DEALACK-01** | 7 | Rollback ciblé Deal ACK Traître | 🟡 **🔧 code + tests** · **QA terrain requise** |
 | **UX-DEVICE-01** | 11 | Écran verrouillé pendant une partie (Wake Lock API) | 🟡 |
 | **FEATURE-DILEMMA-01** | — | Plusieurs dilemmes par joueur | 🟡 |
 | **FEATURE-TIERNIGHT-01** | — | Thèmes personnalisés (Classer le groupe) | 🟡 |
 | **FEATURE-TIERNIGHT-02** | — | Séries de tierlists par catégories | 🟡 |
-| **** | — | Bouton « Futur jeu aléatoire » dans le chat - Visible par tous les joueurs, cliquable par l'hôte. Petite animation de "roulette" pour montrer le côté aléatoire du pick | 🟡 |
+| **FEATURE-CHAT-03** | — | Roulette chat — TTL hybride (mono + `updated_at` serveur) | 🟡 **🔧 durci TTL** · **QA terrain** |
 | **ARCH-05** | 5 | Route lobby vs session (`row.screen`) | 🟡 mitigé SYN-28 |
 | **ARCH-01 / F-01** | 1 | Démo offline sans avertissement MP | 🟡 partiel |
 | **ARCH-11–17, SYN-19–24, SYN-27** | 9–10 | Monolithe / dup / code mort | Dette |
@@ -58,11 +55,11 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 | 4 | Asymétrie hôte / invité | ✅ | — |
 | 5 | Routing + timing sync | ✅ | ARCH-05 mitigé · **UX-NAV-LOBBY ✅** |
 | 6 | Async écrans | ✅ | **BUG-WAO-02** ✅ · **BUG-WAO-03** ✅ · **BUG-WAO-04** ✅ |
-| 7 | Sync silencieuse / fire-and-forget | Partiel | **BUG-TRUTHMETER-01 ✅** (01A/01B) · **BUG-TIERNIGHT-03** ✅ · **BUG-TRIVIA-01 ✅** (01A/01B/01B-bis/01C) · ARCH-07 ✅ · M-14b ✅ · ARCH-08 ✅ |
+| 7 | Sync silencieuse / fire-and-forget | Partiel | **BUG-TRUTHMETER-01 ✅** (01A/01B) · **BUG-TIERNIGHT-03** ✅ · **BUG-TRIVIA-01 ✅** (01A/01B/01B-bis/01C) · ARCH-07 ✅ · M-14b ✅ · ARCH-08 ✅ · **SYN-VOTE-ROLLBACK-01 ✅** · **SYN-TRAITRE-DEALACK-01 ✅** |
 | 8 | Reset / migration incomplète | Partiel | **BUG-TIERNIGHT-05 ✅** · **OPS-LOBBY-04 ✅** · **BUG-LOBBY-XX-E ✅** · **BUG-TRUTHMETER-02 ✅** · **ARCH-23** · ARCH-10 · **BUG-LOBBY-XX ✅** · I-09/SYN-15/16 ✅ |
 | 9 | Sync monolithe / duplication | Dette | ARCH-11… |
 | 10 | Code mort | Dette | **FEATURE-VIBECHECK-01 ✅** · hors Fil Rouge app ✅ |
-| 11 | Friction UX | Partiel | **UX-DEVICE-01** 🟡 · **UX-CHAT-01 ✅** · **UX-CHAT-02 ✅** · **UX-HOST-01 ✅** · **BUG-WAO-04** ✅ · **ARCH-23** · ARCH-22/Loader ✅ · **L-04 ✅** |
+| 11 | Friction UX | Partiel | **UX-DEVICE-01** 🟡 · **FEATURE-CHAT-03** 🔧 · **UX-CHAT-01 ✅** · **UX-CHAT-02 ✅** · **UX-HOST-01 ✅** · **BUG-WAO-04** ✅ · **ARCH-23** · ARCH-22/Loader ✅ · **L-04 ✅** |
 
 ---
 
@@ -94,7 +91,7 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 | **ARCH-08** | Retry launch silencieux | `mpLaunch.js` | ✅ 2026-07-29 |
 | **M-14b** | Contrat `onLocalApplied` | `mpLaunch.js` | ✅ 2026-07-29 |
 | **SYN-VOTE-ROLLBACK-01** | États optimistes votes/réponse non rollbackés | sessions + UI jeux | ✅ QA 2026-08-03 |
-| **SYN-TRAITRE-DEALACK-01** | Deal ACK optimiste sans rollback | `commitTraitreDealAck` | 🔧 QA terrain |
+| **SYN-TRAITRE-DEALACK-01** | Deal ACK optimiste sans rollback | `commitTraitreDealAck` | ✅ QA 2026-08-03 |
 
 #### SYN-VOTE-ROLLBACK-01 ✅ (clôture QA terrain · 2026-08-03)
 
@@ -111,9 +108,9 @@ Optimistic submissions rollback (votes + réponse WAO). **Ne pas rouvrir** sans 
 | **Preuve** | `synVoteRollback01*` · `dilemmaVoteChange` · QA terrain 2026-08-03 |
 | **Verdict** | **Ne pas rouvrir** sauf régression vote/rollback démontrée |
 
-#### SYN-TRAITRE-DEALACK-01 🔧 (implémentation 2026-08-03 — QA terrain requise)
+#### SYN-TRAITRE-DEALACK-01 ✅ (clôture QA terrain · 2026-08-03)
 
-Seul flux Traître encore optimiste sans rollback après SYN-VOTE-ROLLBACK-01.
+Rollback Deal ACK Traître. **Ne pas rouvrir** sans régression.
 
 | | |
 |--|--|
@@ -121,12 +118,12 @@ Seul flux Traître encore optimiste sans rollback après SYN-VOTE-ROLLBACK-01.
 | **Où** | `traitreSession.js` (`commitTraitreDealAck`) · `traitre.js` (`handleDealAckClick`) |
 | **Serveur** | `contribute_game_session_player` / `jsonb_set` UID → `true` : **idempotent** · rejouable |
 | **Transition** | `allTraitreDealAcksIn` → `maybeAdvanceFromDeal` (deal → speak) |
-| **Preuve auto** | `synTraitreDealAck01.test.js` |
-| **Statut** | **Implémentation terminée — tests automatisés verts — QA terrain requise** |
+| **Preuve** | `synTraitreDealAck01.test.js` · QA terrain 2026-08-03 |
+| **Verdict** | **Ne pas rouvrir** sauf régression Deal ACK / rollback démontrée |
 
 #### ARCH-07 ✅ (clôture définitive · 2026-07-29)
 
-P0 livré 2026-07-29 · P1/P2 livré 2026-07-29 — chantiers ARCH-07 clos ; résidu votes → **SYN-VOTE-ROLLBACK-01** ✅ ; résidu Deal ACK → **SYN-TRAITRE-DEALACK-01** 🔧.
+P0 livré 2026-07-29 · P1/P2 livré 2026-07-29 — chantiers ARCH-07 clos ; résidu votes → **SYN-VOTE-ROLLBACK-01** ✅ ; résidu Deal ACK → **SYN-TRAITRE-DEALACK-01** ✅.
 
 | | |
 |--|--|
@@ -372,7 +369,7 @@ Retour terrain multi-jeux. Priorités : 🔴 critique · 🟠 haute · 🟡 moye
 | **FEATURE-DILEMMA-01** | Plusieurs dilemmes par joueur | Actuellement 1 seul par joueur. Autoriser plusieurs propositions · le système doit rester cohérent avec plusieurs dilemmes d'un même auteur. |
 | **FEATURE-TIERNIGHT-01** | Thèmes personnalisés | Mode « Classer le groupe » : créer son propre thème (ex. « Qui survivrait le plus longtemps sur une île ? ») comme base de la tierlist. |
 | **FEATURE-TIERNIGHT-02** | Séries de tierlists | Plus de tierlists officielles · organisées par catégories · enchaînement de plusieurs tierlists dans une manche · révélation finale classement global. UX à définir. |
-| **FEATURE-CHAT-03** | Bouton « Futur jeu aléatoire » | Action rapide dans le chat : 🎲 Futur jeu aléatoire — proposer le prochain jeu aléatoire sans navigation classique. |
+| **FEATURE-CHAT-03** | Roulette « Jeu aléatoire » | 🔧 **Durci 2026-08-03** — `isChatRouletteActive` + TTL ~67s · `rouletteId`/`attemptId` · permit launch ciblé · revalidation min joueurs · resize/orientation · 30 tests. **QA terrain**. |
 
 ---
 
@@ -415,6 +412,8 @@ Ne pas rouvrir sans régression. Détail historique dans git / tests cités.
 
 | ID | Cause | Livré | Preuve / QA |
 |----|-------|-------|-------------|
+| **SYN-TRAITRE-DEALACK-01** | 7 | Rollback Deal ACK · `optimisticMapEntry` · catch UI terminal | QA terrain 2026-08-03 · `synTraitreDealAck01` |
+| **SYN-VOTE-ROLLBACK-01** | 7 | Rollback soumissions optimistes votes + réponse WAO | QA terrain 2026-08-03 · `synVoteRollback01*` |
 | **AUTH-LEAVE-*** | 1/3 | Preuve DELETE membership · logout membre strict · finalize guest Home · join switch abort | QA terrain 2026-08-03 · `authLeaveOrphans` |
 | **UX-CHAT-01** | 11 | Annonce chat à l'entrée prep (`commitPrepSessionLaunch`) · titre catalogue | QA Pages 2026-08-02 · `uxChat01GameLaunchAnnounce` · `announceGameStartedInChat` |
 | **FEATURE-VIBECHECK-01** | 10 | Retrait produit VibeCheck (`playlistguess`) · allowlists SQL · fallback sessions orphelines | QA GitHub Pages 2026-08-02 · `featureVibecheck01OrphanSession` · SQL `feature-vibecheck-01-remove-allowlist` |
@@ -474,7 +473,7 @@ Ne pas rouvrir sans régression. Détail historique dans git / tests cités.
 | 4 | I-01/02/08, M-03b, M-06a/b, L-01, ARCH-03/03b, UX-VIBE-01, Guess Lie |
 | 5 | T-01/02, T-03↻, M-07/08, P-02, SYN-28, ARCH-04, UX-VIBE-02, pré-résolution entry, **UX-NAV-LOBBY** |
 | 6 | I-05, SYN-13b↻, SYN-25, SYN-05/ARCH-18, ARCH-06 |
-| 7 | I-07, M-09, L-09, M-11, M-10, T-05, SYN-26, M-04b/SYN-18, **ARCH-08**, **ARCH-07** (P0+P1/P2), **M-14b**, **BUG-TRIVIA-01** (01A/01B/01B-bis/01C), **SYN-VOTE-ROLLBACK-01** |
+| 7 | I-07, M-09, L-09, M-11, M-10, T-05, SYN-26, M-04b/SYN-18, **ARCH-08**, **ARCH-07** (P0+P1/P2), **M-14b**, **BUG-TRIVIA-01** (01A/01B/01B-bis/01C), **SYN-VOTE-ROLLBACK-01**, **SYN-TRAITRE-DEALACK-01** |
 | 8 | I-06, P-02, ARCH-09, I-09/SYN-06, SYN-15/16, M-15, **BUG-LOBBY-XX ✅** |
 | 9 | SYN-12 / M-05b |
 | 10 | SYN-05 / ARCH-18 (Fil Rouge app) |
@@ -487,7 +486,7 @@ Ne pas rouvrir sans régression. Détail historique dans git / tests cités.
 Hors file prioritaire — opportunité / régression :
 
 - ~~Votes optimistic hors Hot Take / Guess Lie~~ → **SYN-VOTE-ROLLBACK-01** ✅
-- ~~`commitTraitreDealAck` sans rollback~~ → **SYN-TRAITRE-DEALACK-01** 🔧 (QA terrain)
+- ~~`commitTraitreDealAck` sans rollback~~ → **SYN-TRAITRE-DEALACK-01** ✅
 - `results.js` mount async — résidu bas (TruthMeter-02 ✅ clôturé)
 - Lobby `playing` si upsert échoue après `setLobbyPlaying` (M-11)
 - `pushGameSession` : `err.message` brut (L-09)
@@ -504,8 +503,8 @@ Hors file prioritaire — opportunité / régression :
 - Logout snapshot `found` sans cache hydraté (hors AUTH-LEAVE Vague 1)
 - Leave multi-onglets sans BroadcastChannel
 
-**Surveiller** : Clutch taps sous latence (SYN-26) · ready prep après Recommencer · conflit pending join vs chrome Home membership · leave multi-onglets après dissolve · **ARCH-23** (clients stale) · **ARCH-10** non-régression mobile (QA finale) · **SYN-TRAITRE-DEALACK-01** QA terrain
+**Surveiller** : Clutch taps sous latence (SYN-26) · ready prep après Recommencer · conflit pending join vs chrome Home membership · leave multi-onglets après dissolve · **ARCH-23** (clients stale) · **ARCH-10** non-régression mobile (QA finale)
 
 ---
 
-*Suivi vivant · MAJ 2026-08-03 — **SYN-VOTE-ROLLBACK-01** ✅ · **SYN-TRAITRE-DEALACK-01** 🔧 QA · prochain après QA = **UX-DEVICE-01** · **ARCH-10** Pages ✅ · **ARCH-23** QA différée*
+*Suivi vivant · MAJ 2026-08-03 — **SYN-TRAITRE-DEALACK-01** ✅ · **SYN-VOTE-ROLLBACK-01** ✅ · prochain = **UX-DEVICE-01** · **ARCH-10** Pages ✅ · **ARCH-23** QA différée*
