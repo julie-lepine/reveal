@@ -188,9 +188,7 @@ function renderSpinMarkup(games, winner, progress, cardH) {
   const viewportH = cardH * 3;
   const offset = Math.max(0, landingIndex * cardH - cardH);
   const y = -offset * progress;
-  const cards = reel
-    .map((g, i) => gameCardHtml(g, { winner: i === landingIndex }))
-    .join("");
+  const cards = reel.map((g) => gameCardHtml(g)).join("");
   return `
     <div class="chat-roulette__viewport" style="height:${viewportH}px">
       <div class="chat-roulette__reel" data-roulette-reel style="transform:translate3d(0,${y}px,0)">

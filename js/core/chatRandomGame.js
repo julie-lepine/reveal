@@ -436,10 +436,10 @@ export function initChatRandomGameSync() {
     applySessionRoulette();
   });
   unsubScreen = onScreenChange(() => {
-    if (
-      !localScreenAllowsChatRoulette(getCurrentScreen()) &&
-      !readActiveChatRoulette()
-    ) {
+    // Sortie du hub (entrée game-prep / gameplay) : fermer la modale chez
+    // tous les clients, même si un fantôme chatRoulette reste un instant en state.
+    // Les phases prompt/spinning/result sur hub ne changent pas d'écran → sheet OK.
+    if (!localScreenAllowsChatRoulette(getCurrentScreen())) {
       if (isChatRouletteModalOpen()) closeChatRouletteModal({ silent: true });
     }
   });

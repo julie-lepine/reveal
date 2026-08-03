@@ -5,7 +5,10 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   CHAT_FAB_ALLOWED_SCREENS,
+  CHAT_HUB_SCREENS,
   isChatFabAllowedScreen,
+  isChatHubScreen,
+  shouldAutoCloseChatSheetOnScreen,
 } from "../js/core/chatFabScreens.js";
 import {
   compareChatCursors,
@@ -39,6 +42,24 @@ const GAME_ROUTES = [
   "tiernight-live",
 ];
 
+const PREP_SETUP_SCREENS = [
+  "traitre-prep",
+  "hottake-prep",
+  "speedvote-prep",
+  "clutch-prep",
+  "wronganswer-prep",
+  "truthmeter-prep",
+  "dilemma-prep",
+  "trivia-prep",
+  "consensus-prep",
+  "guesslie-setup",
+  "guesslie-menu",
+  "guesslie-wait",
+  "tiernight-select",
+  "tiernight-create",
+  "tiernight-end",
+];
+
 describe("chat FAB whitelist Vague A", () => {
   it("autorise game-select, results, leaderboard", () => {
     assert.equal(isChatFabAllowedScreen("game-select"), true);
@@ -47,23 +68,7 @@ describe("chat FAB whitelist Vague A", () => {
   });
 
   it("autorise les prépas et setups listés", () => {
-    for (const id of [
-      "traitre-prep",
-      "hottake-prep",
-      "speedvote-prep",
-      "clutch-prep",
-      "wronganswer-prep",
-      "truthmeter-prep",
-      "dilemma-prep",
-      "trivia-prep",
-      "consensus-prep",
-      "guesslie-setup",
-      "guesslie-menu",
-      "guesslie-wait",
-      "tiernight-select",
-      "tiernight-create",
-      "tiernight-end",
-    ]) {
+    for (const id of PREP_SETUP_SCREENS) {
       assert.equal(isChatFabAllowedScreen(id), true, id);
       assert.ok(CHAT_FAB_ALLOWED_SCREENS.has(id), id);
     }
@@ -83,6 +88,83 @@ describe("chat FAB whitelist Vague A", () => {
     for (const id of GAME_ROUTES) {
       assert.equal(isChatFabAllowedScreen(id), false, id);
     }
+  });
+});
+
+describe("FEATURE-CHAT-03 / Vague A — auto-close sheet hors hub", () => {
+  it("hub : sheet peut rester ouvert", () => {
+    for (const id of ["game-select", "results", "leaderboard"]) {
+      assert.equal(isChatHubScreen(id), true, id);
+      assert.equal(shouldAutoCloseChatSheetOnScreen(id), false, id);
+      assert.ok(CHAT_HUB_SCREENS.has(id), id);
+    }
+  });
+
+  it("entrée game-prep / setup : fermer le sheet (FAB reste autorisé)", () => {
+    for (const id of PREP_SETUP_SCREENS) {
+      assert.equal(isChatFabAllowedScreen(id), true, id);
+      assert.equal(shouldAutoCloseChatSheetOnScreen(id), true, id);
+    }
+  });
+
+  it("gameplay : fermer le sheet", () => {
+    for (const id of GAME_ROUTES) {
+      assert.equal(shouldAutoCloseChatSheetOnScreen(id), true, id);
+    }
+  });
+
+  it("feedbackUi ferme le sheet via shouldAutoCloseChatSheetOnScreen (pas seulement FAB masqué)", () => {
+    const src = readFileSync(
+      join(__dirname, "../js/core/feedbackUi.js"),
+      "utf8"
+    );
+    assert.match(src, /shouldAutoCloseChatSheetOnScreen/);
+    assert.match(
+      src,
+      /sheetOpen && \(!show \|\| shouldAutoCloseChatSheetOnScreen\(screen\)\)/
+    );
+  });
+
+  it("closeChatSheet blur l'input avant cleanup (clavier mobile)", () => {
+    const src = readFileSync(
+      join(__dirname, "../js/core/feedbackUi.js"),
+      "utf8"
+    );
+    const closeIdx = src.indexOf("export function closeChatSheet");
+    assert.ok(closeIdx >= 0);
+    const block = src.slice(closeIdx, closeIdx + 700);
+    assert.match(block, /\.blur\(\)/);
+    assert.match(block, /cleanupSheetDom/);
+    assert.ok(block.indexOf(".blur()") < block.indexOf("cleanupSheetDom()"));
+  });
+
+  it("closeChatSheet ne re-focus le FAB que s'il est encore montré", () => {
+    const src = readFileSync(
+      join(__dirname, "../js/core/feedbackUi.js"),
+      "utf8"
+    );
+    const closeIdx = src.indexOf("export function closeChatSheet");
+    const block = src.slice(closeIdx, closeIdx + 900);
+    assert.match(block, /shouldShowChatFab\(\)/);
+    assert.match(block, /returnFocus/);
+  });
+
+  it("phases roulette hub ne forcent pas la fermeture sheet (pas de screen change)", () => {
+    // Contrat : auto-close est branché sur screen, pas sur phase chatRoulette.
+    assert.equal(shouldAutoCloseChatSheetOnScreen("game-select"), false);
+    const rouletteSrc = readFileSync(
+      join(__dirname, "../js/core/chatRandomGame.js"),
+      "utf8"
+    );
+    assert.match(
+      rouletteSrc,
+      /!localScreenAllowsChatRoulette\(getCurrentScreen\(\)\)/
+    );
+    // Ne plus garder la modale ouverte juste parce qu'un event est encore « actif ».
+    assert.doesNotMatch(
+      rouletteSrc,
+      /!localScreenAllowsChatRoulette\([\s\S]*?!readActiveChatRoulette\(\)/
+    );
   });
 });
 

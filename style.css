@@ -4270,7 +4270,15 @@ body.has-bottom-nav .feedback-fab{
   display:none !important;
 }
 
-/* CTA chat partagées : même layout / typo (sondage + jeu aléatoire) */
+/* CTA chat partagées : bouton nu, même layout (sondage + jeu aléatoire) */
+.lobby-poll-cta,
+.chat-random-cta{
+  margin:0;
+  padding:0;
+  border:0;
+  background:transparent;
+}
+
 .lobby-poll__cta,
 .chat-random-cta__btn{
   width:100%;

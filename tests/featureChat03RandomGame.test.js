@@ -558,3 +558,42 @@ describe("FEATURE-CHAT-03 — contrats source TTL", () => {
     assert.match(src, /export async function launchCatalogGame/);
   });
 });
+
+describe("FEATURE-CHAT-03 — fermeture chat à l'entrée prep (tous clients)", () => {
+  it("fermeture sheet n'est pas seulement dans le handler hôte Commencer", () => {
+    const orch = readFileSync(
+      join(__dirname, "../js/core/chatRandomGame.js"),
+      "utf8"
+    );
+    const fab = readFileSync(
+      join(__dirname, "../js/core/feedbackUi.js"),
+      "utf8"
+    );
+    // Hôte ferme encore le chat à l'ouverture roulette (local),
+    // mais l'entrée prep ferme via onScreenChange central pour tous.
+    assert.match(fab, /shouldAutoCloseChatSheetOnScreen/);
+    assert.match(fab, /onScreenChange\(\(\) => updateFeedbackFabVisibility\(\)\)/);
+    assert.match(
+      orch,
+      /!localScreenAllowsChatRoulette\(getCurrentScreen\(\)\)/
+    );
+    assert.match(orch, /closeChatRouletteModal\(\{ silent: true \}\)/);
+  });
+
+  it("prompt/spinning/result restent sur hub → pas d'auto-close sheet", () => {
+    assert.equal(localScreenAllowsChatRoulette("game-select"), true);
+    assert.equal(localScreenAllowsChatRoulette("traitre-prep"), false);
+  });
+
+  it("idempotence closeChatSheet (early return)", () => {
+    const fab = readFileSync(
+      join(__dirname, "../js/core/feedbackUi.js"),
+      "utf8"
+    );
+    assert.match(
+      fab,
+      /export function closeChatSheet\(\) \{\s*if \(!sheetOpen && !sheetRoot\) return;/
+    );
+  });
+});
+

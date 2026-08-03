@@ -1,5 +1,8 @@
 import { INSTAGRAM_HANDLE, INSTAGRAM_PROFILE_URL } from "../../data/appConfig.js";
-import { isChatFabAllowedScreen } from "./chatFabScreens.js";
+import {
+  isChatFabAllowedScreen,
+  shouldAutoCloseChatSheetOnScreen,
+} from "./chatFabScreens.js";
 import { mountChatPanel } from "./chatPanel.js";
 import {
   formatUnreadBadge,
@@ -23,7 +26,13 @@ import {
 } from "./lobbyPollStore.js";
 import { mountChatRandomGameInChatSheet } from "./chatRandomGame.js";
 
-export { CHAT_FAB_ALLOWED_SCREENS, isChatFabAllowedScreen } from "./chatFabScreens.js";
+export {
+  CHAT_FAB_ALLOWED_SCREENS,
+  CHAT_HUB_SCREENS,
+  isChatFabAllowedScreen,
+  isChatHubScreen,
+  shouldAutoCloseChatSheetOnScreen,
+} from "./chatFabScreens.js";
 
 let fabEl = null;
 let badgeEl = null;
@@ -50,10 +59,13 @@ function shouldShowChatFab() {
 
 function updateFeedbackFabVisibility() {
   if (!fabEl) return;
+  const screen = getCurrentScreen();
   const show = shouldShowChatFab();
   fabEl.classList.toggle("feedback-fab--hidden", !show);
   fabEl.hidden = !show;
-  if (!show && sheetOpen) {
+  // Fermer le sheet sur toute sortie du hub (gameplay OU entrée game-prep/setup),
+  // y compris quand le FAB reste visible en prépa — hôte et invités via onScreenChange.
+  if (sheetOpen && (!show || shouldAutoCloseChatSheetOnScreen(screen))) {
     closeChatSheet();
   }
 }
@@ -147,7 +159,21 @@ function cleanupSheetDom() {
 
 export function closeChatSheet() {
   if (!sheetOpen && !sheetRoot) return;
-  const returnFocus = fabEl && !fabEl.hidden ? fabEl : null;
+  // Blur input / clavier mobile avant retrait du DOM (fermeture distante inclusive).
+  try {
+    const active = typeof document !== "undefined" ? document.activeElement : null;
+    if (
+      active &&
+      sheetRoot?.contains?.(active) &&
+      typeof active.blur === "function"
+    ) {
+      active.blur();
+    }
+  } catch {
+    /* ignore */
+  }
+  // Ne re-focus le FAB que s'il est encore visible sur l'écran courant.
+  const returnFocus = fabEl && !fabEl.hidden && shouldShowChatFab() ? fabEl : null;
   cleanupSheetDom();
   void syncChatUnread();
   if (returnFocus) {
