@@ -4267,11 +4267,13 @@ body.has-bottom-nav .feedback-fab{
   display:none !important;
 }
 
-/* Liste / formulaire longs uniquement — pas sur le CTA compact */
+/* Liste / formulaire longs : borne vs viewport (pas % du parent actions,
+   sinon hauteur trop basse → options coupées + mini-scrollbar). */
 .chat-sheet__poll--scrollable{
-  max-height:42%;
+  max-height:min(38vh, 280px);
   overflow-y:auto;
   -webkit-overflow-scrolling:touch;
+  overscroll-behavior:contain;
 }
 
 .chat-sheet__random{
