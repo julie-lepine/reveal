@@ -4284,7 +4284,7 @@ body.has-bottom-nav .feedback-fab{
   display:none !important;
 }
 
-/* CTA chat partagées : bouton nu, même layout (sondage + jeu aléatoire) */
+/* CTA chat partagées : même layout, styles distincts (primary ≠ secondary) */
 .lobby-poll-cta,
 .chat-random-cta{
   margin:0;
@@ -4297,33 +4297,42 @@ body.has-bottom-nav .feedback-fab{
 .chat-random-cta__btn{
   width:100%;
   margin-top:0;
-  font-size:13px;
-  font-weight:800;
-  padding:10px 12px;
+  font-size:15px;
+  font-weight:700;
+  letter-spacing:0.01em;
+  padding:12px 14px;
   min-height:var(--touch-min);
   display:inline-flex;
   align-items:center;
   justify-content:center;
   gap:8px;
-  line-height:1.2;
+  line-height:1.25;
   box-sizing:border-box;
 }
 
-/* Contraste AA : texte sombre sur dégradé rose (blanc/#ff3cac ~2.5:1, insuffisant) */
-.chat-sheet__actions .btn-primary{
+/* Jeu aléatoire : rose adouci (moins vif que le gradient global) */
+.chat-sheet__actions .chat-random-cta__btn.btn-primary{
+  background:linear-gradient(
+    135deg,
+    rgba(255, 107, 107, 0.72),
+    rgba(255, 60, 172, 0.68)
+  );
+  box-shadow:0 6px 20px rgba(255, 60, 172, 0.18);
   color:#1a0a14;
   text-shadow:none;
 }
 
-.chat-sheet__actions .btn-secondary{
+/* Sondage : secondary neutre, clairement distinct du rose */
+.chat-sheet__actions .lobby-poll__cta.btn-secondary{
   margin-top:0;
-  color:rgba(255,255,255,.92);
-  border-color:rgba(255,255,255,.22);
-  background:rgba(255,255,255,.1);
+  background:rgba(255,255,255,.08);
+  border:1px solid rgba(255,255,255,.18);
+  color:rgba(255,255,255,.88);
+  box-shadow:none;
 }
 
 .chat-random-cta__icon{
-  font-size:1em;
+  font-size:1.05em;
   line-height:1;
 }
 
@@ -4332,13 +4341,15 @@ body.has-bottom-nav .feedback-fab{
   font-weight:inherit;
 }
 
-.chat-random-cta__btn:disabled{
-  opacity:.55;
+/* Invité : visible mais atténué, sans rose saturé */
+.chat-sheet__actions .chat-random-cta__btn.btn-primary:disabled{
+  opacity:1;
   cursor:not-allowed;
-  filter:grayscale(.35);
-  box-shadow:none;
+  filter:none;
   transform:none;
-  color:rgba(26,10,20,.75);
+  background:rgba(255, 90, 150, 0.28);
+  box-shadow:none;
+  color:rgba(255,255,255,.55);
 }
 
 /* ─── FEATURE-CHAT-03 roulette ─── */
