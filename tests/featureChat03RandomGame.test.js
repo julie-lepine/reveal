@@ -33,7 +33,7 @@ import {
   localScreenAllowsChatRoulette,
   normalizeChatRouletteEvent,
   observeChatRouletteActivity,
-  pickChatRouletteReroll,
+  pickChatRouletteNextGame,
   pickRandomEligibleGame,
   remotePhaseAllowsChatRoulette,
   resetChatRouletteObservationsForTests,
@@ -63,9 +63,7 @@ function baseEvent(over = {}) {
     phase: "prompt",
     selectedTileId: null,
     eligibleTileIds: ["hottake-prep", "consensus-prep", "traitre-prep"],
-    rejectedTileIds: [],
     drawCount: 0,
-    cycleCount: 0,
     createdAt: now,
     animationStartTimestamp: null,
     animationDurationMs: CHAT_ROULETTE_DURATION_MS,
@@ -538,7 +536,7 @@ describe("FEATURE-CHAT-03 — sync / reel / hub", () => {
   });
 });
 
-describe("FEATURE-CHAT-03 — soft voice / pioche / bridge", () => {
+describe("FEATURE-CHAT-03 — soft voice / tirage libre + anti-répétition", () => {
   it("seuils internes wink/bridge", () => {
     assert.equal(resolveChatRouletteResultAct(1), "plain");
     assert.equal(resolveChatRouletteResultAct(2), "plain");
@@ -554,48 +552,101 @@ describe("FEATURE-CHAT-03 — soft voice / pioche / bridge", () => {
     assert.match(b.subtitle, /groupe/i);
   });
 
-  it("pioche sans remise : jeu refusé absent du tirage suivant", () => {
-    const catalog = sampleGames.filter((g) =>
-      ["hottake-prep", "consensus-prep", "traitre-prep"].includes(g.id)
-    );
-    const prev = {
-      eligibleTileIds: catalog.map((g) => g.id),
-      rejectedTileIds: [],
-      selectedTileId: "hottake-prep",
-      cycleCount: 0,
-    };
-    const { pick, rejectedTileIds } = pickChatRouletteReroll(prev, catalog, () => 0);
+  it("premier tirage : pool entier (pas d'exclusion sans courant)", () => {
+    const ids = ["hottake-prep", "consensus-prep", "traitre-prep"];
+    const pick = pickChatRouletteNextGame({
+      eligibleTileIds: ids,
+      currentSelectedTileId: null,
+      random: () => 0,
+    });
+    assert.equal(pick.id, "hottake-prep");
+  });
+
+  it("relance : jeu courant exclu ; pas de doublon immédiat", () => {
+    const ids = ["hottake-prep", "consensus-prep", "traitre-prep"];
+    const pick = pickChatRouletteNextGame({
+      eligibleTileIds: ids,
+      currentSelectedTileId: "hottake-prep",
+      random: () => 0,
+    });
     assert.ok(pick);
     assert.notEqual(pick.id, "hottake-prep");
-    assert.ok(rejectedTileIds.includes("hottake-prep"));
+    assert.ok(ids.includes(pick.id));
   });
 
-  it("pioche sans remise épuise le pool puis reset sans doublon immédiat", () => {
-    const catalog = [
-      { id: "hottake-prep", title: "A", emoji: "🔥" },
-      { id: "consensus-prep", title: "B", emoji: "🤝" },
-    ];
-    let state = {
-      eligibleTileIds: catalog.map((g) => g.id),
-      rejectedTileIds: [],
-      selectedTileId: "hottake-prep",
-      cycleCount: 0,
-    };
-    const r1 = pickChatRouletteReroll(state, catalog, () => 0);
-    assert.equal(r1.pick.id, "consensus-prep");
-    state = {
-      ...state,
-      selectedTileId: r1.pick.id,
-      rejectedTileIds: r1.rejectedTileIds,
-      cycleCount: r1.cycleCount,
-    };
-    const r2 = pickChatRouletteReroll(state, catalog, () => 0);
-    assert.equal(r2.cycleReset, true);
-    assert.notEqual(r2.pick.id, "consensus-prep");
-    assert.equal(r2.pick.id, "hottake-prep");
+  it("un ancien jeu peut ressortir après un autre", () => {
+    const ids = ["a", "b", "c"];
+    const first = pickChatRouletteNextGame({
+      eligibleTileIds: ids,
+      currentSelectedTileId: "a",
+      random: () => 0,
+    });
+    assert.equal(first.id, "b");
+    const second = pickChatRouletteNextGame({
+      eligibleTileIds: ids,
+      currentSelectedTileId: first.id,
+      random: () => 0,
+    });
+    assert.equal(second.id, "a");
   });
 
-  it("spin payload transporte rejectedTileIds + drawCount", () => {
+  it("11 jeux : plus de 11 tirages possibles (pas de mémoire longue)", () => {
+    const ids = Array.from({ length: 11 }, (_, i) => `g${i}`);
+    let current = null;
+    const seen = [];
+    for (let i = 0; i < 15; i++) {
+      const pick = pickChatRouletteNextGame({
+        eligibleTileIds: ids,
+        currentSelectedTileId: current,
+        random: () => 0.99,
+      });
+      assert.ok(pick);
+      if (current) assert.notEqual(pick.id, current);
+      seen.push(pick.id);
+      current = pick.id;
+    }
+    assert.equal(seen.length, 15);
+  });
+
+  it("deux jeux : alternance stricte", () => {
+    let current = "a";
+    for (let i = 0; i < 6; i++) {
+      const pick = pickChatRouletteNextGame({
+        eligibleTileIds: ["a", "b"],
+        currentSelectedTileId: current,
+        random: () => 0,
+      });
+      assert.notEqual(pick.id, current);
+      current = pick.id;
+    }
+  });
+
+  it("un seul jeu : résultat stable (pas d'exclusion)", () => {
+    const pick = pickChatRouletteNextGame({
+      eligibleTileIds: ["only"],
+      currentSelectedTileId: "only",
+      random: () => 0,
+    });
+    assert.equal(pick.id, "only");
+  });
+
+  it("normalize n'exige plus rejectedTileIds / cycleCount", () => {
+    const n = normalizeChatRouletteEvent(
+      baseEvent({
+        phase: "result",
+        selectedTileId: "hottake-prep",
+        drawCount: 2,
+        animationStartTimestamp: 1,
+        rejectedTileIds: ["x"],
+        cycleCount: 9,
+      })
+    );
+    assert.equal(n.drawCount, 2);
+    assert.equal(n.rejectedTileIds, undefined);
+    assert.equal(n.cycleCount, undefined);
+  });
+
+  it("spin payload : drawCount sans rejected/cycle", () => {
     const prev = normalizeChatRouletteEvent(
       baseEvent({
         phase: "result",
@@ -608,46 +659,32 @@ describe("FEATURE-CHAT-03 — soft voice / pioche / bridge", () => {
       prev,
       { id: "consensus-prep" },
       sampleGames.slice(0, 3),
-      { reroll: true, rejectedTileIds: ["hottake-prep"], cycleCount: 0 }
+      { reroll: true }
     );
     assert.equal(payload.drawCount, 3);
-    assert.deepEqual(payload.rejectedTileIds, ["hottake-prep"]);
-    assert.equal(payload.selectedTileId, "consensus-prep");
+    assert.equal(payload.rejectedTileIds, undefined);
+    assert.equal(payload.cycleCount, undefined);
   });
 
-  it("UI : aucun compteur Relancer (n) ; bridge après seuil", () => {
+  it("UI / orch : bridge inchangé ; pas de pioche sans remise", () => {
     const ui = readFileSync(
       join(__dirname, "../js/core/chatRandomGameUi.js"),
       "utf8"
     );
-    assert.doesNotMatch(ui, /Relancer\$\{/);
-    assert.doesNotMatch(ui, /rerollsLeft/);
-    assert.doesNotMatch(ui, /Plus de relances/);
-    assert.match(ui, /data-roulette-bridge/);
-    assert.match(ui, /Faire voter le groupe/);
-    assert.match(ui, /Voir le vote du groupe/);
-    assert.match(ui, /On joue/);
-    assert.match(ui, /resolveChatRouletteResultAct/);
-  });
-
-  it("orch : bridge clear roulette + openChatSheet + pas d'auto-create", () => {
     const orch = readFileSync(
       join(__dirname, "../js/core/chatRandomGame.js"),
       "utf8"
     );
-    assert.match(orch, /hostBridgeToPoll/);
-    assert.match(orch, /clearRouletteRemote/);
-    assert.match(orch, /openChatSheet/);
-    assert.match(orch, /openLobbyPollCreateFormForBridge/);
-    assert.doesNotMatch(orch, /createLobbyPollFromCatalog/);
-    assert.doesNotMatch(orch, /Plus de relances disponibles/);
+    assert.match(ui, /data-roulette-bridge/);
+    assert.match(orch, /pickChatRouletteNextGame/);
+    assert.doesNotMatch(orch, /rejectedTileIds/);
+    assert.doesNotMatch(ui, /cycleCount/);
   });
 
-  it("prompt payload initialise rejected/draw/cycle", () => {
+  it("prompt payload simple", () => {
     const p = buildChatRoulettePromptPayload([{ id: "hottake-prep" }], 1000);
-    assert.deepEqual(p.rejectedTileIds, []);
     assert.equal(p.drawCount, 0);
-    assert.equal(p.cycleCount, 0);
+    assert.equal(p.rejectedTileIds, undefined);
   });
 });
 

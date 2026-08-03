@@ -23,7 +23,7 @@ import {
   chatRouletteMonotonicNow,
   parseSessionUpdatedAtMs,
   pickRandomEligibleGame,
-  pickChatRouletteReroll,
+  pickChatRouletteNextGame,
   remotePhaseAllowsChatRoulette,
   resolveEligibleCatalogGames,
   canRerollChatRoulette,
@@ -333,10 +333,11 @@ async function hostReroll() {
     const pool = poolFromEvent(prev);
     if (pool.length < 2) return;
 
-    const { pick, rejectedTileIds, cycleCount } = pickChatRouletteReroll(
-      prev,
-      pool
-    );
+    const pick = pickChatRouletteNextGame({
+      eligibleTileIds: prev.eligibleTileIds,
+      currentSelectedTileId: prev.selectedTileId,
+      catalogGames: pool,
+    });
     if (!pick) return;
 
     const still = readActiveChatRoulette();
@@ -346,11 +347,7 @@ async function hostReroll() {
       return;
     }
     await publishRoulette(
-      buildChatRouletteSpinPayload(prev, pick, pool, {
-        reroll: true,
-        rejectedTileIds,
-        cycleCount,
-      })
+      buildChatRouletteSpinPayload(prev, pick, pool, { reroll: true })
     );
   });
 }
@@ -456,7 +453,7 @@ function applySessionRoulette() {
   const active = n && isChatRouletteBlockingLaunch(ctx) ? n : null;
 
   const sig = active
-    ? `${active.rouletteId}|${active.attemptId}|${active.phase}|${active.selectedTileId}|${active.drawCount}|${(active.rejectedTileIds || []).join(",")}|${active.animationStartTimestamp}`
+    ? `${active.rouletteId}|${active.attemptId}|${active.phase}|${active.selectedTileId}|${active.drawCount}|${active.animationStartTimestamp}`
     : "";
 
   if (sig === appliedEventSig) {

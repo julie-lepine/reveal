@@ -172,7 +172,7 @@ function renderResult(winner, ev, canControl) {
   const act = resolveChatRouletteResultAct(ev.drawCount);
   const canReroll = canControl && canRerollChatRoulette(ev);
   const pollOpen = Boolean(handlers?.hasOpenLobbyPoll?.());
-  const wink = chatRouletteWinkLine(ev.drawCount + (ev.cycleCount || 0));
+  const wink = chatRouletteWinkLine(ev.drawCount);
   const bridge = chatRouletteBridgeCopy();
 
   let voiceHtml = "";
@@ -428,7 +428,7 @@ function presentEvent(rawEvent, { forceResult = false, blockingOpts = null, now 
     ev.phase === "result" ||
     (ev.phase === "spinning" && chatRouletteShouldShowResult(ev, now));
 
-  const phaseKey = `${ev.rouletteId}|${ev.attemptId}|${ev.phase}|${ev.selectedTileId || ""}|${ev.drawCount}|${ev.rejectedTileIds?.join(",") || ""}|${showResult ? "R" : "A"}`;
+  const phaseKey = `${ev.rouletteId}|${ev.attemptId}|${ev.phase}|${ev.selectedTileId || ""}|${ev.drawCount}|${showResult ? "R" : "A"}`;
   if (
     phaseKey === lastPhaseKey &&
     lastRouletteId === ev.rouletteId &&

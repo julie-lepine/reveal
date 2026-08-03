@@ -247,9 +247,7 @@ export function computeChatRouletteExpiresAt(
  *   phase: "prompt"|"spinning"|"result"|"cancelled",
  *   selectedTileId: string|null,
  *   eligibleTileIds: string[],
- *   rejectedTileIds: string[],
  *   drawCount: number,
- *   cycleCount: number,
  *   createdAt: number,
  *   animationStartTimestamp: number|null,
  *   animationDurationMs: number,
@@ -271,16 +269,6 @@ export function normalizeChatRouletteEvent(raw) {
 
   const eligibleTileIds = Array.isArray(raw.eligibleTileIds)
     ? raw.eligibleTileIds.map(String).filter((id) => TILE_ID_TO_SESSION_GAME_ID[id])
-    : [];
-
-  const rejectedTileIds = Array.isArray(raw.rejectedTileIds)
-    ? [
-        ...new Set(
-          raw.rejectedTileIds
-            .map(String)
-            .filter((id) => TILE_ID_TO_SESSION_GAME_ID[id])
-        ),
-      ]
     : [];
 
   let selectedTileId =
@@ -317,7 +305,7 @@ export function normalizeChatRouletteEvent(raw) {
       ? 0
       : Math.max(1, rerollCount + 1);
 
-  const cycleCount = Math.max(0, Number(raw.cycleCount) || 0);
+  // Legacy : maxRerolls / rejectedTileIds / cycleCount ignorés pour le tirage.
   const maxRerolls = Math.max(
     0,
     Number(raw.maxRerolls) || CHAT_ROULETTE_MAX_REROLLS
@@ -334,9 +322,7 @@ export function normalizeChatRouletteEvent(raw) {
     phase,
     selectedTileId,
     eligibleTileIds,
-    rejectedTileIds,
     drawCount,
-    cycleCount,
     createdAt,
     animationStartTimestamp: Number.isFinite(animationStartTimestamp)
       ? animationStartTimestamp
@@ -576,56 +562,53 @@ export function chatRouletteBridgeCopy() {
 }
 
 /**
- * Pioche sans remise pour une relance.
+ * Tirage suivant : hasard libre, anti-répétition immédiate uniquement.
+ * Pas de mémoire longue (pas de rejectedTileIds / cycle).
+ *
  * @param {{
- *   eligibleTileIds: string[],
- *   rejectedTileIds?: string[],
- *   selectedTileId?: string|null,
- *   cycleCount?: number,
- * }} prev
- * @param {Array<{id:string}>} catalogGames jeux résolus depuis eligibleTileIds
- * @param {() => number} [rng]
+ *   eligibleTileIds?: string[],
+ *   currentSelectedTileId?: string|null,
+ *   catalogGames?: Array<{id:string}>,
+ *   random?: () => number,
+ * }} args
+ * @returns {{ id: string }|null}
+ */
+export function pickChatRouletteNextGame({
+  eligibleTileIds = [],
+  currentSelectedTileId = null,
+  catalogGames = null,
+  random = Math.random,
+} = {}) {
+  const ids = [...(eligibleTileIds || [])].map(String).filter(Boolean);
+  let pool = ids;
+  if (catalogGames?.length) {
+    const allow = new Set(catalogGames.map((g) => g?.id).filter(Boolean));
+    pool = ids.filter((id) => allow.has(id));
+  }
+  if (!pool.length) return null;
+
+  const current = currentSelectedTileId ? String(currentSelectedTileId) : null;
+  if (current && pool.length >= 2) {
+    pool = pool.filter((id) => id !== current);
+  }
+  if (!pool.length) return null;
+
+  const idx = Math.floor(random() * pool.length);
+  const id = pool[Math.min(pool.length - 1, Math.max(0, idx))];
+  return id ? { id } : null;
+}
+
+/**
+ * @deprecated — utiliser pickChatRouletteNextGame (anti-répétition immédiate).
  */
 export function pickChatRouletteReroll(prev, catalogGames, rng = Math.random) {
-  const catalog = (catalogGames || []).filter((g) => g?.id);
-  const byId = new Map(catalog.map((g) => [g.id, g]));
-  const eligibleIds = (prev?.eligibleTileIds || [])
-    .map(String)
-    .filter((id) => byId.has(id));
-  const basePool = eligibleIds.map((id) => byId.get(id)).filter(Boolean);
-  if (!basePool.length) {
-    return {
-      pick: null,
-      rejectedTileIds: [],
-      cycleCount: prev?.cycleCount || 0,
-      cycleReset: false,
-    };
-  }
-
-  const refused = new Set(
-    (prev?.rejectedTileIds || []).map(String).filter(Boolean)
-  );
-  const current = prev?.selectedTileId ? String(prev.selectedTileId) : null;
-  if (current) refused.add(current);
-
-  let cycleReset = false;
-  let cycleCount = Math.max(0, Number(prev?.cycleCount) || 0);
-  let pool = basePool.filter((g) => !refused.has(g.id));
-
-  if (!pool.length) {
-    cycleReset = true;
-    cycleCount += 1;
-    refused.clear();
-    pool = basePool.filter((g) => g.id !== current);
-    if (!pool.length) pool = basePool.slice();
-  }
-
-  const pick = pickRandomEligibleGame(pool, rng);
   return {
-    pick,
-    rejectedTileIds: [...refused],
-    cycleCount,
-    cycleReset,
+    pick: pickChatRouletteNextGame({
+      eligibleTileIds: prev?.eligibleTileIds,
+      currentSelectedTileId: prev?.selectedTileId,
+      catalogGames,
+      random: rng,
+    }),
   };
 }
 
@@ -696,13 +679,12 @@ export function buildChatRoulettePromptPayload(eligible, now = Date.now()) {
     phase: "prompt",
     selectedTileId: null,
     eligibleTileIds: (eligible || []).map((g) => g.id),
-    rejectedTileIds: [],
     drawCount: 0,
-    cycleCount: 0,
     createdAt,
     animationStartTimestamp: null,
     animationDurationMs: CHAT_ROULETTE_DURATION_MS,
     expiresAt: computeChatRouletteExpiresAt(createdAt),
+    // Legacy compat listeners (non source de vérité UX)
     rerollCount: 0,
     maxRerolls: CHAT_ROULETTE_MAX_REROLLS,
   };
@@ -713,23 +695,13 @@ export function buildChatRoulettePromptPayload(eligible, now = Date.now()) {
  * @param {ReturnType<typeof normalizeChatRouletteEvent>|null} prev
  * @param {{ id: string }} pick
  * @param {Array<{id:string}>} eligible
- * @param {{
- *   reroll?: boolean,
- *   now?: number,
- *   rejectedTileIds?: string[],
- *   cycleCount?: number,
- * }} [opts]
+ * @param {{ reroll?: boolean, now?: number }} [opts]
  */
 export function buildChatRouletteSpinPayload(
   prev,
   pick,
   eligible,
-  {
-    reroll = false,
-    now = Date.now(),
-    rejectedTileIds = null,
-    cycleCount = null,
-  } = {}
+  { reroll = false, now = Date.now() } = {}
 ) {
   const single = (eligible || []).length <= 1;
   const createdAt = prev?.createdAt || now;
@@ -737,15 +709,6 @@ export function buildChatRouletteSpinPayload(
   const drawCount = reroll
     ? Math.max(1, prevDraw) + 1
     : Math.max(1, prevDraw || 1);
-  const nextRejected = Array.isArray(rejectedTileIds)
-    ? rejectedTileIds
-    : reroll
-      ? prev?.rejectedTileIds || []
-      : [];
-  const nextCycle =
-    cycleCount != null
-      ? Math.max(0, Number(cycleCount) || 0)
-      : Math.max(0, Number(prev?.cycleCount) || 0);
 
   return {
     rouletteId: prev?.rouletteId || newChatRouletteId(now),
@@ -753,14 +716,11 @@ export function buildChatRouletteSpinPayload(
     phase: single ? "result" : "spinning",
     selectedTileId: pick.id,
     eligibleTileIds: (eligible || []).map((g) => g.id),
-    rejectedTileIds: nextRejected,
     drawCount,
-    cycleCount: nextCycle,
     createdAt,
     animationStartTimestamp: now,
     animationDurationMs: CHAT_ROULETTE_DURATION_MS,
     expiresAt: computeChatRouletteExpiresAt(now),
-    // Compat listeners / sig : miroir de (drawCount - 1)
     rerollCount: Math.max(0, drawCount - 1),
     maxRerolls: CHAT_ROULETTE_MAX_REROLLS,
   };
