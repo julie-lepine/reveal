@@ -595,7 +595,17 @@ export function mountWrongAnswer(app) {
         }
         return;
       }
-      await commitWrongAnswerAnswer(text);
+      try {
+        await commitWrongAnswerAnswer(text);
+      } catch {
+        // Feedback déjà affiché. Session answers rollbackée ; draftText conservé
+        // pour retry sans fermer le clavier (WAO-02).
+        if (!mount.isMounted() || !mount.isCurrentMount()) return;
+        syncFromSession();
+        refreshWrongAnswerResponseProgress();
+        syncWrongAnswerSubmitEnabled();
+        return;
+      }
       if (!mount.isMounted()) return;
       if (!mount.isCurrentMount()) return;
       draftText = "";
@@ -631,7 +641,15 @@ export function mountWrongAnswer(app) {
       if (phase !== "voting") return;
       const target = selectedTarget;
       if (target == null || target === localName) return;
-      await commitWrongAnswerVote(target);
+      try {
+        await commitWrongAnswerVote(target);
+      } catch {
+        if (!mount.isMounted() || !mount.isCurrentMount()) return;
+        syncFromSession();
+        // WAO-03 : refresh chrome vote ciblé (pas de full render destructif).
+        refreshWrongAnswerVoteProgress();
+        return;
+      }
       if (!mount.isMounted()) return;
       if (!mount.isCurrentMount()) return;
       if (!mp) {

@@ -478,15 +478,23 @@ export function mountDilemma(app) {
       voteCommitInFlight = pick;
       const pendingToken = syncPending.start();
       render();
+      let voteFailed = false;
       try {
         await commitDilemmaVote(pick);
         if (unmounted) return;
         selected = null;
         myVote = pick;
+      } catch {
+        // Feedback déjà affiché ; session rollbackée via commitDilemmaVote.
+        voteFailed = true;
       } finally {
         voteCommitInFlight = null;
         syncPending.end(pendingToken);
         if (!unmounted) syncFromSession();
+      }
+      if (voteFailed) {
+        if (!unmounted) render();
+        return;
       }
       if (unmounted) return;
       if (allDilemmaVotesIn() && canActAsHost()) {

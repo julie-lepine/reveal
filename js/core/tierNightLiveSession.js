@@ -20,6 +20,13 @@ import {
 import { patchGameStateWithFeedback } from "./patchGameStateFeedback.js";
 import { launchGameWithSync, commitHostGamePlay } from "./mpLaunch.js";
 import { buildRecapsFromPlacements } from "./tierNightSession.js";
+import {
+  computeOptimisticMapEntryApply,
+  rollbackOptimisticMapEntry,
+  canRollbackOptimisticSubmission,
+} from "./optimisticMapEntry.js";
+
+let tierNightLiveVoteAttemptId = 0;
 import { medianTierFromRanks } from "./tierNightScoring.js";
 import { setLobbyPlaying } from "./lobby.js";
 import { createTierNightRunId } from "./tierNightConfig.js";
@@ -152,20 +159,58 @@ export async function markTierNightLiveLobbyStarted({ topicId, listName, items }
   });
 }
 
-/** MP : envoie uniquement le vote local (merge additif côté serveur). */
+/** MP : envoie uniquement le vote local (merge additif côté serveur).
+ * Rollback conditionnel lié au runId courant. */
 export async function commitTierNightLiveVote(tier) {
   const localName = getLocalDisplayName();
   const session = getTierNightLiveSession();
   if (session.phase !== "voting") return session.votes?.[localName] ?? null;
-  const votes = { ...(session.votes || {}), [localName]: tier };
-  saveStatePatch({ tierNightLiveGame: { ...session, votes } });
+
+  const attemptId = ++tierNightLiveVoteAttemptId;
+  const captured = {
+    runId: session.runId,
+    phase: session.phase,
+  };
+  const apply = computeOptimisticMapEntryApply({
+    map: session.votes,
+    key: localName,
+    value: tier,
+  });
+  saveStatePatch({ tierNightLiveGame: { ...session, votes: apply.nextMap } });
   if (!isGameSyncActive()) return tier;
-  const uid = requireLocalParticipantUid();
-  await patchGameStateWithFeedback(
-    { tierNightLive: { votes: { [uid]: tier } } },
-    { gameId: "tiernight", screen: "tiernight-live" }
-  );
-  return tier;
+
+  try {
+    const uid = requireLocalParticipantUid();
+    await patchGameStateWithFeedback(
+      { tierNightLive: { votes: { [uid]: tier } } },
+      { gameId: "tiernight", screen: "tiernight-live" }
+    );
+    return tier;
+  } catch (err) {
+    const live = getTierNightLiveSession();
+    if (
+      attemptId === tierNightLiveVoteAttemptId &&
+      canRollbackOptimisticSubmission(captured, live)
+    ) {
+      const rolled = rollbackOptimisticMapEntry({
+        currentMap: live.votes,
+        key: localName,
+        hadPreviousValue: apply.hadPreviousValue,
+        previousValue: apply.previousValue,
+        optimisticValue: apply.optimisticValue,
+        attemptId,
+        currentAttemptId: tierNightLiveVoteAttemptId,
+      });
+      if (rolled.applied) {
+        saveStatePatch({ tierNightLiveGame: { ...live, votes: rolled.map } });
+      }
+    }
+    throw err;
+  }
+}
+
+export function __resetTierNightLiveVoteAttemptIdForTests() {
+  tierNightLiveVoteAttemptId = 0;
 }
 
 /** Progression X/Y fondée sur le roster snapshoté (pas getActivePlayers). */

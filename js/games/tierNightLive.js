@@ -440,7 +440,14 @@ function mountMp(app, list) {
 
   async function pickTier(tier) {
     if (session.phase !== "voting" || myVote()) return;
-    await commitTierNightLiveVote(tier);
+    try {
+      await commitTierNightLiveVote(tier);
+    } catch {
+      if (!mount.isMounted() || !mount.isCurrentMount()) return;
+      reload();
+      render();
+      return;
+    }
     if (!mount.isMounted()) return;
     if (!mount.isCurrentMount()) return;
     reload();

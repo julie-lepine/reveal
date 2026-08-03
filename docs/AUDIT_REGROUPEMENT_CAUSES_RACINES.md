@@ -16,11 +16,11 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 
 | | |
 |--|--|
-| **Maintenant** | **AUTH leave orphans** 🔧 QA terrain · rollback votes optimistes · **UX-DEVICE-01** |
+| **Maintenant** | **SYN-VOTE-ROLLBACK-01** (QA terrain) · **UX-DEVICE-01** |
 | **Ensuite** | Consensus reveal atomique · ARCH-23/10 QA natif · backlog produit |
-| **Dernière clôture** | **UX-CHAT-01** ✅ · **UX-CHAT-02** ✅ · **FEATURE-VIBECHECK-01** ✅ · **UX-HOST-01** ✅ |
-| **En attente QA finale** | **ARCH-23** (SQL ✅) · **ARCH-10** mobile |
-| **Audit** | Transversal 2026-08-02 — AUTH leave orphans livré (tests verts · QA terrain) |
+| **Dernière clôture** | **AUTH-LEAVE-*** ✅ · **UX-CHAT-01** ✅ · **UX-CHAT-02** ✅ · **FEATURE-VIBECHECK-01** ✅ · **UX-HOST-01** ✅ |
+| **En attente QA finale** | **SYN-VOTE-ROLLBACK-01** · **ARCH-23** (SQL ✅) · **ARCH-10** mobile |
+| **Audit** | Transversal 2026-08-02 — AUTH leave orphans ✅ QA 2026-08-03 · optimistic submissions rollback 🔧 2026-08-03 |
 
 ---
 
@@ -37,24 +37,25 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 
 | ID | Cause | Problème | Priorité |
 |----|-------|----------|----------|
+| **SYN-VOTE-ROLLBACK-01** | 7 | Rollback ciblé soumissions optimistes (votes + réponse WAO) | 🟡 **🔧 code + tests** · **QA terrain requise** |
 | **UX-DEVICE-01** | 11 | Écran verrouillé pendant une partie (Wake Lock API) | 🟡 |
-| **GAME-WAO-01** | — | Revoir le barème Wrong Answer Only (doc d'abord) | 🟡 |
+| ~~**GAME-WAO-01**~~ | — | Barème WAO : podium + 5/vote | 🟢 **code** · **QA terrain** |
 | **FEATURE-DILEMMA-01** | — | Plusieurs dilemmes par joueur | 🟡 |
 | **FEATURE-TIERNIGHT-01** | — | Thèmes personnalisés (Classer le groupe) | 🟡 |
 | **FEATURE-TIERNIGHT-02** | — | Séries de tierlists par catégories | 🟡 |
 | **FEATURE-CHAT-03** | — | Bouton « Futur jeu aléatoire » dans le chat - Visible par tous les joueurs, cliquable par l'hôte. Petite animation de "roulette" pour montrer le côté aléatoire du pick | 🟡 |
 | **ARCH-05** | 5 | Route lobby vs session (`row.screen`) | 🟡 mitigé SYN-28 |
 | **ARCH-01 / F-01** | 1 | Démo offline sans avertissement MP | 🟡 partiel |
-| **AUTH-LEAVE-*** | 1/3 | Leave orphans (silent-ok · logout membre · guest Home · join switch) | 🟡 code ✅ · **QA terrain** |
 | **ARCH-11–17, SYN-19–24, SYN-27** | 9–10 | Monolithe / dup / code mort | Dette |
+| **TRAITRES-VIBECHECK SUPPRESSION** | vérifier que tous les fichiers / codes inhérents aux deux jeux supprimés ont aussi été supprimés
 
 ## Carte des causes racines
 
 | # | Cause | État | Ouvert notable |
 |---|-------|------|----------------|
-| 1 | Identité invité / JWT | Partiel | ARCH-01 partiel · **AUTH-LEAVE-*** 🔧 QA |
+| 1 | Identité invité / JWT | ✅ | ARCH-01 partiel · **AUTH-LEAVE-*** ✅ |
 | 2 | Race auth / profil | ✅ | — |
-| 3 | Sources de vérité multiples | Partiel | **BUG-TIERNIGHT-04 ✅** · **BUG-TRUTHMETER-02 ✅** · **Membership A–E5 ✅** · M-14a ✅ · Guess Lie ✅ · **AUTH-LEAVE-*** 🔧 |
+| 3 | Sources de vérité multiples | Partiel | **BUG-TIERNIGHT-04 ✅** · **BUG-TRUTHMETER-02 ✅** · **Membership A–E5 ✅** · M-14a ✅ · Guess Lie ✅ · **AUTH-LEAVE-*** ✅ |
 | 4 | Asymétrie hôte / invité | ✅ | — |
 | 5 | Routing + timing sync | ✅ | ARCH-05 mitigé · **UX-NAV-LOBBY ✅** |
 | 6 | Async écrans | ✅ | **BUG-WAO-02** ✅ · **BUG-WAO-03** ✅ · **BUG-WAO-04** ✅ |
@@ -93,10 +94,33 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 | **ARCH-07** | Catch-up Realtime · foreground · resume · claim · poll | voir clôture ci-dessous | ✅ 2026-07-29 |
 | **ARCH-08** | Retry launch silencieux | `mpLaunch.js` | ✅ 2026-07-29 |
 | **M-14b** | Contrat `onLocalApplied` | `mpLaunch.js` | ✅ 2026-07-29 |
+| **SYN-VOTE-ROLLBACK-01** | États optimistes votes/réponse non rollbackés | sessions + UI jeux | 🔧 QA terrain |
+
+#### SYN-VOTE-ROLLBACK-01 🔧 (implémentation 2026-08-03 — QA terrain requise)
+
+Optimistic submissions rollback — Cause 7 résidu. **Ne pas clôturer** avant QA terrain.
+
+| ID | Commit / surface |
+|----|------------------|
+| **01A** | `commitSpeedVoteVote` + UI `myVote` post-succès |
+| **01B** | `commitDilemmaVote` |
+| **01C** | `commitWrongAnswerVote` + refresh vote ciblé |
+| **01D** | `commitTraitreVote` |
+| **01E** | `commitTierNightLiveVote` (`runId`) |
+| **01F** | `commitWrongAnswerAnswer` + draft / WAO-02 |
+
+| | |
+|--|--|
+| **Contrat** | `optimisticMapEntry.js` — apply / rollback ciblé · `hadPreviousValue` · delete réel · `attemptId` · garde `runId`/`phase`/`roundIdx` · rethrow après rollback |
+| **Où** | `optimisticMapEntry.js` · `*Session.js` (6 commits) · `speedVote.js` · `dilemma.js` · `wrongAnswer.js` · `traitre.js` · `tierNightLive.js` |
+| **Preuve auto** | `optimisticMapEntry` · `synVoteRollback01` · `synVoteRollback01Behavior` · non-régressions HT/GL/TM/Clutch/WAO-02/03/TierNight 04–05 |
+| **Hors scope** | `withPatchTimeout` orphans · Consensus reveal · `commitTraitreDealAck` (audit seul → ticket séparé recommandé) · SQL/RLS |
+| **Timeout** | Échec local peut être incertain ; Realtime peut réappliquer ; rollback tardif no-op si valeur remplacée |
+| **Statut** | **Implémentation terminée — tests automatisés verts — QA terrain requise** |
 
 #### ARCH-07 ✅ (clôture définitive · 2026-07-29)
 
-P0 livré 2026-07-29 · P1/P2 livré 2026-07-29 — **aucun chantier Cause 7 restant** hors résidus acceptés ↻.
+P0 livré 2026-07-29 · P1/P2 livré 2026-07-29 — chantiers ARCH-07 clos ; résidu votes optimistes traité sous **SYN-VOTE-ROLLBACK-01** (QA ouverte).
 
 | | |
 |--|--|
@@ -166,9 +190,9 @@ Canal principal = **iOS / Android Capacitor**. Web = tests seulement. Autorité 
 | **Hors Vague 1** | Bumper le floor · publier stores · SW · feature flags · guard global writes in-game |
 | **Statut** | Code + SQL prêts · **QA différée** au prochain déploiement Android/iOS de test · **pas clôturé** |
 
-#### AUTH-LEAVE-* — Leave orphans (implémenté · QA terrain)
+#### AUTH-LEAVE-* ✅ (clôture QA terrain · 2026-08-03)
 
-Cluster audit transversal 2026-08-02 : asymétries leave sans preuve membership / cleanup guest incomplet.
+Cluster audit transversal : leave sans preuve membership / cleanup guest incomplet. Ne pas rouvrir sans régression.
 
 | ID | Livré |
 |----|--------|
@@ -180,9 +204,9 @@ Cluster audit transversal 2026-08-02 : asymétries leave sans preuve membership 
 | | |
 |--|--|
 | **Où** | `lobbyLeaveContract.js` · `lobbyMembershipDelete.js` · `finalizeGuestLeave.js` · `supabaseLobby.js` · `voluntaryMemberLeave.js` · `lobby.js` · `auth.js` |
-| **Preuve** | `authLeaveOrphans.test.js` · suites voluntary / E2 / E3 / ARCH-10 / Vague D |
-| **Statut** | Implémentation terminée — tests automatisés verts — **QA terrain requise** |
-| **Hors scope** | multitab · snapshot found logout sans cache · SQL/RLS |
+| **Preuve** | `authLeaveOrphans.test.js` · QA terrain 2026-08-03 |
+| **Résidus acceptés** | multitab · logout snapshot `found` sans cache · SQL/RLS inchangés |
+| **Verdict** | **Ne pas rouvrir** sauf régression leave / logout / join guest démontrée |
 
 ---
 
@@ -338,7 +362,7 @@ Retour terrain multi-jeux. Priorités : 🔴 critique · 🟠 haute · 🟡 moye
 | **UX-CHAT-02** | Clavier auto à l'ouverture chat | ✅ **QA validée 2026-08-02** — `openChatSheet` focus panel seul · re-focus post-send · `chatInGameVagueA`. Ne pas rouvrir. |
 | **UX-DEVICE-01** | Mise en veille pendant partie | Écran verrouillé si téléphone posé. À étudier : Screen Wake Lock API (ou équivalent) tant que lobby actif · relâcher au leave · fallback propre si API indisponible. |
 | ~~**GAME-SPEEDVOTE-01**~~ | ~~Récompense gagnant~~ | ❌ **Annulé 2026-08-02** — barème actuel **+10** (`EVENING_POINTS.WIN`) déjà harmonisé ; +15 / podium 15-10-5 non retenus. |
-| **GAME-WAO-01** | Barème Wrong Answer Only | Barème actuel non convaincant en test. **Ne pas modifier le code immédiatement** — documenter le fonctionnement actuel puis proposer plusieurs variantes avant implémentation. |
+| ~~**GAME-WAO-01**~~ | Barème Wrong Answer Only | ✅ **Décision 2026-08-03** — podium **15/10/5** conservé **+ 5 pts / vote reçu**. `WRONG_ANSWER_POINTS_PER_VOTE` · `wrongAnswerScoring` · `gameRules`. **QA terrain** avant clôture. |
 | **FEATURE-DILEMMA-01** | Plusieurs dilemmes par joueur | Actuellement 1 seul par joueur. Autoriser plusieurs propositions · le système doit rester cohérent avec plusieurs dilemmes d'un même auteur. |
 | **FEATURE-TIERNIGHT-01** | Thèmes personnalisés | Mode « Classer le groupe » : créer son propre thème (ex. « Qui survivrait le plus longtemps sur une île ? ») comme base de la tierlist. |
 | **FEATURE-TIERNIGHT-02** | Séries de tierlists | Plus de tierlists officielles · organisées par catégories · enchaînement de plusieurs tierlists dans une manche · révélation finale classement global. UX à définir. |
@@ -363,9 +387,9 @@ Retour terrain multi-jeux. Priorités : 🔴 critique · 🟠 haute · 🟡 moye
 - **Join partiel (Home)** : retry compensation avant query · garde anti-restauration silencieuse de B · bandeau conflit si DELETE échoue.
 - **≠ SYN-13b** (sortie *jeu* vs sortie *lobby*).
 
-### Wrong Answer — égalités (2026-07-25)
+### Wrong Answer — égalités (2026-07-25) · barème GAME-WAO-01 (2026-08-03)
 
-Départage temporel (`answers[name].at`) **abandonné**. Votes seuls → rang compétition (`1, 1, 3`) + paliers points. Doc : `data/gameRules.js`. Clutch conserve son départage temporel.
+Départage temporel (`answers[name].at`) **abandonné**. Votes seuls → rang compétition (`1, 1, 3`) + paliers podium. Score manche = **podium 15/10/5 + 5 × votes reçus**. Doc : `data/gameRules.js`. Clutch conserve son départage temporel.
 
 ### Chaînes utiles
 
@@ -385,10 +409,12 @@ Ne pas rouvrir sans régression. Détail historique dans git / tests cités.
 
 | ID | Cause | Livré | Preuve / QA |
 |----|-------|-------|-------------|
+| **AUTH-LEAVE-*** | 1/3 | Preuve DELETE membership · logout membre strict · finalize guest Home · join switch abort | QA terrain 2026-08-03 · `authLeaveOrphans` |
 | **UX-CHAT-01** | 11 | Annonce chat à l'entrée prep (`commitPrepSessionLaunch`) · titre catalogue | QA Pages 2026-08-02 · `uxChat01GameLaunchAnnounce` · `announceGameStartedInChat` |
 | **FEATURE-VIBECHECK-01** | 10 | Retrait produit VibeCheck (`playlistguess`) · allowlists SQL · fallback sessions orphelines | QA GitHub Pages 2026-08-02 · `featureVibecheck01OrphanSession` · SQL `feature-vibecheck-01-remove-allowlist` |
 | **UX-CHAT-02** | 11 | Sheet chat : pas de focus input à l'ouverture (clavier) | QA Pages 2026-08-02 · `chatInGameVagueA` |
 | **GAME-SPEEDVOTE-01** | — | Annulé — barème +10 conservé (harmonisé `EVENING_POINTS.WIN`) | Décision produit 2026-08-02 |
+| **GAME-WAO-01** | — | Podium 15/10/5 + 5/vote · code livré · QA terrain | Décision produit 2026-08-03 |
 | **BUG-TIERNIGHT-03** | 7 | Auto-reveal Rank live sécurisé · verrou · recovery timeout · retry one-shot | QA terrain 2026-08-02 |
 | **BUG-WAO-04** | 11 | CTA « Valider » disabled si trim vide · sync input + refresh hôte | QA terrain 2026-08-02 |
 | **BUG-WAO-02** | 6/11 | Hard-gate composition · host CTA pré-monté · `#wrong-input` réattaché | QA terrain 2026-08-02 |
@@ -436,9 +462,9 @@ Ne pas rouvrir sans régression. Détail historique dans git / tests cités.
 
 | Cause | Fermés (sélection) |
 |-------|-------------------|
-| 1 | C-01/02, R-01–05, M-05a |
+| 1 | C-01/02, R-01–05, M-05a, **AUTH-LEAVE-*** |
 | 2 | M-01, P-03, M-02a, S-02 |
-| 3 | I-03/04, SYN-03, M-13, M-02b, ARCH-02, SYN-29, I-PG-01, ready stale, UX-CLUTCH-01, M-15, L-05↻, **Membership A–E5**, M-14a, boundary, join partiel |
+| 3 | I-03/04, SYN-03, M-13, M-02b, ARCH-02, SYN-29, I-PG-01, ready stale, UX-CLUTCH-01, M-15, L-05↻, **Membership A–E5**, M-14a, boundary, join partiel, **AUTH-LEAVE-*** |
 | 4 | I-01/02/08, M-03b, M-06a/b, L-01, ARCH-03/03b, UX-VIBE-01, Guess Lie |
 | 5 | T-01/02, T-03↻, M-07/08, P-02, SYN-28, ARCH-04, UX-VIBE-02, pré-résolution entry, **UX-NAV-LOBBY** |
 | 6 | I-05, SYN-13b↻, SYN-25, SYN-05/ARCH-18, ARCH-06 |
@@ -454,7 +480,8 @@ Ne pas rouvrir sans régression. Détail historique dans git / tests cités.
 
 Hors file prioritaire — opportunité / régression :
 
-- Votes optimistic hors Hot Take / Guess Lie (SpeedVote · Dilemma · WAO · Traitre · TierNight Live) — rollback manquant
+- ~~Votes optimistic hors Hot Take / Guess Lie~~ → **SYN-VOTE-ROLLBACK-01** 🔧 (QA terrain)
+- `commitTraitreDealAck` : écriture optimiste `dealAcks` sans rollback (voir ticket proposé SYN-TRAITRE-DEALACK-01)
 - `results.js` mount async — résidu bas (TruthMeter-02 ✅ clôturé)
 - Lobby `playing` si upsert échoue après `setLobbyPlaying` (M-11)
 - `pushGameSession` : `err.message` brut (L-09)
@@ -471,8 +498,8 @@ Hors file prioritaire — opportunité / régression :
 - Logout snapshot `found` sans cache hydraté (hors AUTH-LEAVE Vague 1)
 - Leave multi-onglets sans BroadcastChannel
 
-**Surveiller** : Clutch taps sous latence (SYN-26) · ready prep après Recommencer · conflit pending join vs chrome Home membership · leave multi-onglets après dissolve · **ARCH-23** (clients stale) · **ARCH-10** non-régression mobile (QA finale) · **AUTH-LEAVE-*** QA terrain
+**Surveiller** : Clutch taps sous latence (SYN-26) · ready prep après Recommencer · conflit pending join vs chrome Home membership · leave multi-onglets après dissolve · **ARCH-23** (clients stale) · **ARCH-10** non-régression mobile (QA finale) · **SYN-VOTE-ROLLBACK-01** QA terrain
 
 ---
 
-*Suivi vivant · MAJ 2026-08-03 — **AUTH-LEAVE-*** 🔧 QA · **UX-CHAT-01** ✅ · **UX-CHAT-02** ✅ · **FEATURE-VIBECHECK-01** ✅ · **UX-HOST-01** ✅ · **ARCH-10** Pages ✅ · **ARCH-23** QA différée*
+*Suivi vivant · MAJ 2026-08-03 — **SYN-VOTE-ROLLBACK-01** 🔧 QA · **AUTH-LEAVE-*** ✅ · prochain après QA = **UX-DEVICE-01** · **ARCH-10** Pages ✅ · **ARCH-23** QA différée*

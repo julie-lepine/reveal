@@ -114,16 +114,19 @@ export function awardClutchRound(ranking = [], { podiumPoints = CLUTCH_PODIUM_PO
 export { rankWrongAnswerResults } from "./wrongAnswerScoring.js";
 
 /**
- * Wrong Answer Only : podium de la manche 15 / 10 / 5 (votes reçus).
- * Ex æquo : même palier ; l'index podium avance de la taille du groupe (1,1,3).
+ * Wrong Answer Only : podium 15 / 10 / 5 + 5 pts par vote reçu (GAME-WAO-01).
+ * Ex æquo : même palier podium ; rang compétition 1,1,3.
  * `answers` = { [name]: { text, at? } } ; `votes` = { [voter]: targetName }.
  */
 export function awardWrongAnswerRound(
   answers = {},
   votes = {},
-  { podiumPoints = WRONG_ANSWER_PODIUM_POINTS } = {}
+  { podiumPoints = WRONG_ANSWER_PODIUM_POINTS, pointsPerVote } = {}
 ) {
-  const award = computeWrongAnswerRoundAward(answers, votes, { podiumPoints });
+  const award = computeWrongAnswerRoundAward(answers, votes, {
+    podiumPoints,
+    pointsPerVote,
+  });
   Object.entries(award.deltas).forEach(([name, pts]) => {
     addScore(name, pts);
   });

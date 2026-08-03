@@ -26,6 +26,13 @@ import { patchGameStateWithFeedback } from "./patchGameStateFeedback.js";
 import { launchGameWithSync, commitHostGamePlay, commitPrepReadyToggle } from "./mpLaunch.js";
 import { checkHotTakeModeration, getModerationNotice } from "./hotTakeSession.js";
 import {
+  computeOptimisticMapEntryApply,
+  rollbackOptimisticMapEntry,
+  canRollbackOptimisticSubmission,
+} from "./optimisticMapEntry.js";
+
+let dilemmaVoteAttemptId = 0;
+import {
   isPlayerTextTooLong,
   playerTextMaxError,
   trimPlayerText,
@@ -415,16 +422,49 @@ export async function commitDilemmaPlay(patch, patchOpts = {}) {
   });
 }
 
-/** Invité MP : envoie uniquement son vote (évite d'écraser phase reveal de l'hôte). */
+/** Invité MP : envoie uniquement son vote. Rollback conditionnel si sync échoue. */
 export async function commitDilemmaVote(choice) {
   const localName = getLocalDisplayName();
   const session = getDilemmaSession();
-  const votes = { ...(session.votes || {}), [localName]: choice };
-  saveStatePatch({ dilemmaGame: { ...session, votes } });
-  if (!isGameSyncActive()) return { ...session, votes };
-  const uid = requireLocalParticipantUid();
-  await patchGameStateWithFeedback({ dilemma: { votes: { [uid]: choice } } });
-  return { ...session, votes };
+  const attemptId = ++dilemmaVoteAttemptId;
+  const captured = { phase: session.phase, roundIdx: session.roundIdx };
+  const apply = computeOptimisticMapEntryApply({
+    map: session.votes,
+    key: localName,
+    value: choice,
+  });
+  saveStatePatch({ dilemmaGame: { ...session, votes: apply.nextMap } });
+  if (!isGameSyncActive()) return { ...session, votes: apply.nextMap };
+
+  try {
+    const uid = requireLocalParticipantUid();
+    await patchGameStateWithFeedback({ dilemma: { votes: { [uid]: choice } } });
+    return { ...session, votes: apply.nextMap };
+  } catch (err) {
+    const live = getDilemmaSession();
+    if (
+      attemptId === dilemmaVoteAttemptId &&
+      canRollbackOptimisticSubmission(captured, live)
+    ) {
+      const rolled = rollbackOptimisticMapEntry({
+        currentMap: live.votes,
+        key: localName,
+        hadPreviousValue: apply.hadPreviousValue,
+        previousValue: apply.previousValue,
+        optimisticValue: apply.optimisticValue,
+        attemptId,
+        currentAttemptId: dilemmaVoteAttemptId,
+      });
+      if (rolled.applied) {
+        saveStatePatch({ dilemmaGame: { ...live, votes: rolled.map } });
+      }
+    }
+    throw err;
+  }
+}
+
+export function __resetDilemmaVoteAttemptIdForTests() {
+  dilemmaVoteAttemptId = 0;
 }
 
 export async function setDilemmaPausedBy(name) {

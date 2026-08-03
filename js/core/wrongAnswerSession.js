@@ -15,6 +15,14 @@ import {
 import { patchGameStateWithFeedback } from "./patchGameStateFeedback.js";
 import { launchGameWithSync, commitHostGamePlay, commitPrepReadyToggle } from "./mpLaunch.js";
 import { checkHotTakeModeration } from "./hotTakeSession.js";
+import {
+  computeOptimisticMapEntryApply,
+  rollbackOptimisticMapEntry,
+  canRollbackOptimisticSubmission,
+} from "./optimisticMapEntry.js";
+
+let wrongAnswerVoteAttemptId = 0;
+let wrongAnswerAnswerAttemptId = 0;
 
 function defaultSession() {
   return {
@@ -142,7 +150,8 @@ export function allWrongAnswerReady() {
   return getActivePlayerNames().every((n) => session.ready[n]);
 }
 
-/** MP : envoie uniquement la réponse locale ({ text, at }). Première réponse conservée. */
+/** MP : envoie uniquement la réponse locale ({ text, at }). Première réponse conservée.
+ * Rollback conditionnel si sync échoue (01F). */
 export async function commitWrongAnswerAnswer(text) {
   const localName = getLocalDisplayName();
   const session = getWrongAnswerSession();
@@ -152,31 +161,94 @@ export async function commitWrongAnswerAnswer(text) {
   const cleanText = sanitizeWrongAnswer(text);
   if (!cleanText || checkHotTakeModeration(cleanText).blocked) return null;
   const answer = { text: cleanText, at: Date.now() };
-  const answers = { ...(session.answers || {}), [localName]: answer };
-  saveStatePatch({ wrongAnswerGame: { ...session, answers } });
+  const attemptId = ++wrongAnswerAnswerAttemptId;
+  const captured = { phase: session.phase, roundIdx: session.roundIdx };
+  const apply = computeOptimisticMapEntryApply({
+    map: session.answers,
+    key: localName,
+    value: answer,
+  });
+  saveStatePatch({ wrongAnswerGame: { ...session, answers: apply.nextMap } });
   if (!isGameSyncActive()) return answer;
-  const uid = requireLocalParticipantUid();
-  await patchGameStateWithFeedback(
-    { wrongAnswer: { answers: { [uid]: answer } } },
-    { gameId: "wronganswer", screen: "wronganswer" }
-  );
-  return answer;
+
+  try {
+    const uid = requireLocalParticipantUid();
+    await patchGameStateWithFeedback(
+      { wrongAnswer: { answers: { [uid]: answer } } },
+      { gameId: "wronganswer", screen: "wronganswer" }
+    );
+    return answer;
+  } catch (err) {
+    const live = getWrongAnswerSession();
+    if (
+      attemptId === wrongAnswerAnswerAttemptId &&
+      canRollbackOptimisticSubmission(captured, live)
+    ) {
+      const rolled = rollbackOptimisticMapEntry({
+        currentMap: live.answers,
+        key: localName,
+        hadPreviousValue: apply.hadPreviousValue,
+        previousValue: apply.previousValue,
+        optimisticValue: apply.optimisticValue,
+        attemptId,
+        currentAttemptId: wrongAnswerAnswerAttemptId,
+      });
+      if (rolled.applied) {
+        saveStatePatch({ wrongAnswerGame: { ...live, answers: rolled.map } });
+      }
+    }
+    throw err;
+  }
 }
 
-/** MP : envoie uniquement le vote local (auteur de la pire réponse). */
+/** MP : envoie uniquement le vote local. Rollback conditionnel si sync échoue. */
 export async function commitWrongAnswerVote(targetName) {
   const localName = getLocalDisplayName();
   const session = getWrongAnswerSession();
-  const votes = { ...(session.votes || {}), [localName]: targetName };
-  saveStatePatch({ wrongAnswerGame: { ...session, votes } });
-  if (!isGameSyncActive()) return votes;
-  const uid = requireLocalParticipantUid();
-  const targetUid = requirePlayerUid(targetName);
-  await patchGameStateWithFeedback(
-    { wrongAnswer: { votes: { [uid]: targetUid } } },
-    { gameId: "wronganswer", screen: "wronganswer" }
-  );
-  return votes;
+  const attemptId = ++wrongAnswerVoteAttemptId;
+  const captured = { phase: session.phase, roundIdx: session.roundIdx };
+  const apply = computeOptimisticMapEntryApply({
+    map: session.votes,
+    key: localName,
+    value: targetName,
+  });
+  saveStatePatch({ wrongAnswerGame: { ...session, votes: apply.nextMap } });
+  if (!isGameSyncActive()) return apply.nextMap;
+
+  try {
+    const uid = requireLocalParticipantUid();
+    const targetUid = requirePlayerUid(targetName);
+    await patchGameStateWithFeedback(
+      { wrongAnswer: { votes: { [uid]: targetUid } } },
+      { gameId: "wronganswer", screen: "wronganswer" }
+    );
+    return apply.nextMap;
+  } catch (err) {
+    const live = getWrongAnswerSession();
+    if (
+      attemptId === wrongAnswerVoteAttemptId &&
+      canRollbackOptimisticSubmission(captured, live)
+    ) {
+      const rolled = rollbackOptimisticMapEntry({
+        currentMap: live.votes,
+        key: localName,
+        hadPreviousValue: apply.hadPreviousValue,
+        previousValue: apply.previousValue,
+        optimisticValue: apply.optimisticValue,
+        attemptId,
+        currentAttemptId: wrongAnswerVoteAttemptId,
+      });
+      if (rolled.applied) {
+        saveStatePatch({ wrongAnswerGame: { ...live, votes: rolled.map } });
+      }
+    }
+    throw err;
+  }
+}
+
+export function __resetWrongAnswerOptimisticAttemptsForTests() {
+  wrongAnswerVoteAttemptId = 0;
+  wrongAnswerAnswerAttemptId = 0;
 }
 
 export function hasLocalWrongAnswer(session = getWrongAnswerSession()) {

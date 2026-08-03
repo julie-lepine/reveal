@@ -1,12 +1,15 @@
 // WRONG ANSWER ONLY ↩️ - chaque manche affiche une question, chacun écrit SECRÈTEMENT
 // la pire réponse possible. Les réponses sont anonymisées, puis tout le monde vote pour
-// la pire. Podium de la manche : 1er +15, 2e +10, 3e +5 (par nb de votes ; ex æquo → même
-// palier, rang compétition 1,1,3 — comme SpeedVote / Hot Take).
+// la pire. Score manche = podium (1er +15, 2e +10, 3e +5 ; ex æquo rang 1,1,3) + 5 pts
+// par vote reçu (GAME-WAO-01).
 
 export const WRONG_ANSWER_ROUND_PRESETS = [3, 5, 8];
 
 /** Points attribués au podium de CHAQUE manche (top 1 / 2 / 3 par votes ; ex æquo partagent le palier). */
 export const WRONG_ANSWER_PODIUM_POINTS = [15, 10, 5];
+
+/** Points par vote reçu sur la réponse (cumulés au podium — GAME-WAO-01). */
+export const WRONG_ANSWER_POINTS_PER_VOTE = 5;
 
 /** Longueur maximale d'une réponse saisie. */
 export const WRONG_ANSWER_MAX_LEN = 80;

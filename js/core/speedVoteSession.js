@@ -26,6 +26,14 @@ import {
 } from "./gameSync.js";
 import { patchGameStateWithFeedback } from "./patchGameStateFeedback.js";
 import { launchGameWithSync, commitHostGamePlay, commitPrepReadyToggle } from "./mpLaunch.js";
+import {
+  computeOptimisticMapEntryApply,
+  rollbackOptimisticMapEntry,
+  canRollbackOptimisticSubmission,
+} from "./optimisticMapEntry.js";
+
+/** Sérialise les commits vote SpeedVote (double-clic / retry). */
+let speedVoteVoteAttemptId = 0;
 
 function defaultSession() {
   return {
@@ -233,19 +241,61 @@ export async function commitSpeedVotePlay(patch, patchOpts = {}) {
   });
 }
 
-/** MP : envoie uniquement le vote local. */
+/** MP : envoie uniquement le vote local. Rollback conditionnel si sync échoue. */
 export async function commitSpeedVoteVote(choice) {
   const localName = getLocalDisplayName();
   const session = getSpeedVoteSession();
   if (session.votes?.[localName] != null && session.votes[localName] !== "") {
     return session.votes[localName];
   }
-  const votes = { ...(session.votes || {}), [localName]: choice };
-  saveStatePatch({ speedVoteGame: { ...session, votes } });
+
+  const attemptId = ++speedVoteVoteAttemptId;
+  const captured = {
+    phase: session.phase,
+    roundIdx: session.roundIdx,
+  };
+  const apply = computeOptimisticMapEntryApply({
+    map: session.votes,
+    key: localName,
+    value: choice,
+  });
+  saveStatePatch({ speedVoteGame: { ...session, votes: apply.nextMap } });
   if (!isGameSyncActive()) return choice;
-  const uid = requireLocalParticipantUid();
-  await patchGameStateWithFeedback({ speedVote: { votes: { [uid]: choice } } });
-  return choice;
+
+  try {
+    const uid = requireLocalParticipantUid();
+    await patchGameStateWithFeedback({ speedVote: { votes: { [uid]: choice } } });
+    return choice;
+  } catch (err) {
+    const live = getSpeedVoteSession();
+    if (
+      attemptId === speedVoteVoteAttemptId &&
+      canRollbackOptimisticSubmission(captured, live)
+    ) {
+      const rolled = rollbackOptimisticMapEntry({
+        currentMap: live.votes,
+        key: localName,
+        hadPreviousValue: apply.hadPreviousValue,
+        previousValue: apply.previousValue,
+        optimisticValue: apply.optimisticValue,
+        attemptId,
+        currentAttemptId: speedVoteVoteAttemptId,
+      });
+      if (rolled.applied) {
+        saveStatePatch({ speedVoteGame: { ...live, votes: rolled.map } });
+      }
+    }
+    throw err;
+  }
+}
+
+/** Tests / UI : génération courante du commit vote (stale catch). */
+export function __getSpeedVoteVoteAttemptIdForTests() {
+  return speedVoteVoteAttemptId;
+}
+
+export function __resetSpeedVoteVoteAttemptIdForTests() {
+  speedVoteVoteAttemptId = 0;
 }
 
 export function allSpeedVoteVotesIn(session = getSpeedVoteSession()) {

@@ -32,6 +32,13 @@ import {
 } from "./traitrePrivate.js";
 import { launchGameWithSync, commitHostGamePlay, commitPrepReadyToggle } from "./mpLaunch.js";
 import { normalizeKeyedVotes } from "./sessionMerge.js";
+import {
+  computeOptimisticMapEntryApply,
+  rollbackOptimisticMapEntry,
+  canRollbackOptimisticSubmission,
+} from "./optimisticMapEntry.js";
+
+let traitreVoteAttemptId = 0;
 
 function defaultSession() {
   return {
@@ -273,13 +280,47 @@ export async function commitTraitreVote(targetName) {
   if (session.phase !== "vote") return null;
   const alive = session.alive || [];
   if (!alive.includes(localName) || !alive.includes(targetName)) return null;
-  const votes = { ...(session.votes || {}), [localName]: targetName };
-  saveStatePatch({ traitreGame: { ...session, votes } });
+
+  const attemptId = ++traitreVoteAttemptId;
+  const captured = { phase: session.phase };
+  const apply = computeOptimisticMapEntryApply({
+    map: session.votes,
+    key: localName,
+    value: targetName,
+  });
+  saveStatePatch({ traitreGame: { ...session, votes: apply.nextMap } });
   if (!isGameSyncActive()) return targetName;
-  const uid = requireLocalParticipantUid();
-  const targetUid = requirePlayerUid(targetName);
-  await patchGameStateWithFeedback({ traitre: { votes: { [uid]: targetUid } } });
-  return targetName;
+
+  try {
+    const uid = requireLocalParticipantUid();
+    const targetUid = requirePlayerUid(targetName);
+    await patchGameStateWithFeedback({ traitre: { votes: { [uid]: targetUid } } });
+    return targetName;
+  } catch (err) {
+    const live = getTraitreSession();
+    if (
+      attemptId === traitreVoteAttemptId &&
+      canRollbackOptimisticSubmission(captured, live)
+    ) {
+      const rolled = rollbackOptimisticMapEntry({
+        currentMap: live.votes,
+        key: localName,
+        hadPreviousValue: apply.hadPreviousValue,
+        previousValue: apply.previousValue,
+        optimisticValue: apply.optimisticValue,
+        attemptId,
+        currentAttemptId: traitreVoteAttemptId,
+      });
+      if (rolled.applied) {
+        saveStatePatch({ traitreGame: { ...live, votes: rolled.map } });
+      }
+    }
+    throw err;
+  }
+}
+
+export function __resetTraitreVoteAttemptIdForTests() {
+  traitreVoteAttemptId = 0;
 }
 
 export function allTraitreDealAcksIn(session = getTraitreSession()) {

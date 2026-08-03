@@ -3,14 +3,18 @@ import assert from "node:assert/strict";
 import { HOT_TAKE_POINTS_TIE } from "../data/hotTakes.js";
 import { DILEMMA_POINTS_MAJORITY_WIN } from "../data/dilemma.js";
 import { CLUTCH_PODIUM_POINTS } from "../data/clutch.js";
-import { WRONG_ANSWER_PODIUM_POINTS } from "../data/wrongAnswer.js";
+import {
+  WRONG_ANSWER_PODIUM_POINTS,
+  WRONG_ANSWER_POINTS_PER_VOTE,
+} from "../data/wrongAnswer.js";
 import { TRIVIA_POINTS_FASTEST, TRIVIA_LOBBY_PODIUM_POINTS } from "../data/trivia.js";
 import { EVENING_POINTS } from "../data/eveningScoring.js";
 
 describe("barèmes soirée (constantes)", () => {
-  it("podiums manche Clutch / Wrong Answer = 15/10/5", () => {
+  it("podiums manche Clutch / Wrong Answer = 15/10/5 ; WAO +5/vote", () => {
     assert.deepEqual(CLUTCH_PODIUM_POINTS, [15, 10, 5]);
     assert.deepEqual(WRONG_ANSWER_PODIUM_POINTS, [15, 10, 5]);
+    assert.equal(WRONG_ANSWER_POINTS_PER_VOTE, 5);
   });
 
   it("Trivia : rapide +5, bonus podium soirée 15/10/5 (en plus du cumul quiz)", () => {

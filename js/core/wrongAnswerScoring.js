@@ -1,4 +1,7 @@
-import { WRONG_ANSWER_PODIUM_POINTS } from "../../data/wrongAnswer.js";
+import {
+  WRONG_ANSWER_PODIUM_POINTS,
+  WRONG_ANSWER_POINTS_PER_VOTE,
+} from "../../data/wrongAnswer.js";
 import { podiumPointsForRank, withCompetitionRanks } from "./competitionRank.js";
 
 function countWrongAnswerVotes(answers = {}, votes = {}) {
@@ -34,18 +37,26 @@ export function rankWrongAnswerResults(answers = {}, votes = {}) {
 
 /**
  * Calcule counts, deltas et ranking sans écrire dans le state.
- * Ex æquo de votes : même rang compétition → même palier podium (1,1,3).
+ * Score = podium (ex æquo rang 1,1,3) + pointsPerVote × votes reçus (GAME-WAO-01).
  */
 export function computeWrongAnswerRoundAward(
   answers = {},
   votes = {},
-  { podiumPoints = WRONG_ANSWER_PODIUM_POINTS } = {}
+  {
+    podiumPoints = WRONG_ANSWER_PODIUM_POINTS,
+    pointsPerVote = WRONG_ANSWER_POINTS_PER_VOTE,
+  } = {}
 ) {
   const counts = countWrongAnswerVotes(answers, votes);
   const ranking = rankWrongAnswerResults(answers, votes);
   const deltas = {};
   ranking.forEach((entry) => {
-    const pts = podiumPointsForRank(entry.rank, podiumPoints);
+    const podium = podiumPointsForRank(entry.rank, podiumPoints);
+    const fromVotes =
+      typeof pointsPerVote === "number" && Number.isFinite(pointsPerVote)
+        ? pointsPerVote * entry.votes
+        : 0;
+    const pts = podium + fromVotes;
     if (pts > 0) deltas[entry.name] = pts;
   });
   return { counts, deltas, ranking };

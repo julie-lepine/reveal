@@ -175,7 +175,7 @@ describe("Score boxes / leaderboards soirée (contrat)", () => {
 });
 
 describe("Wrong Answer ex æquo", () => {
-  it("trois ex æquo en tête : +15 chacun, suivant rang 4 → 0 pts", () => {
+  it("trois ex æquo en tête : podium +15 + votes ; rang 4 → votes seuls", () => {
     const answers = {
       Alice: { text: "a", at: 300 },
       Bob: { text: "b", at: 100 },
@@ -201,10 +201,12 @@ describe("Wrong Answer ex æquo", () => {
         ["Dave", 1, 4],
       ]
     );
+    // GAME-WAO-01 : podium + 5/vote — Dave hors podium marque quand même ses votes.
     assert.deepEqual(deltas, {
-      Alice: WRONG_ANSWER_PODIUM_POINTS[0],
-      Bob: WRONG_ANSWER_PODIUM_POINTS[0],
-      Carol: WRONG_ANSWER_PODIUM_POINTS[0],
+      Alice: WRONG_ANSWER_PODIUM_POINTS[0] + 2 * 5,
+      Bob: WRONG_ANSWER_PODIUM_POINTS[0] + 2 * 5,
+      Carol: WRONG_ANSWER_PODIUM_POINTS[0] + 2 * 5,
+      Dave: 5,
     });
   });
 
@@ -223,8 +225,8 @@ describe("Wrong Answer ex æquo", () => {
       r1.ranking.map((x) => [x.name, x.rank]),
       r2.ranking.map((x) => [x.name, x.rank])
     );
-    assert.equal(r1.deltas.Alice, 15);
-    assert.equal(r1.deltas.Bob, 15);
+    assert.equal(r1.deltas.Alice, WRONG_ANSWER_PODIUM_POINTS[0] + 2 * 5);
+    assert.equal(r1.deltas.Bob, WRONG_ANSWER_PODIUM_POINTS[0] + 2 * 5);
   });
 });
 

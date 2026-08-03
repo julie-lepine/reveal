@@ -107,10 +107,11 @@ export const GAME_RULES = {
     ],
     points: [
       "Podium de chaque manche : 1re pire réponse +15, 2e +10, 3e +5.",
+      "En plus : +5 pts par vote reçu sur ta réponse.",
       "Sans vote sur ta réponse : 0 pt pour la manche.",
     ],
     exemple:
-      "« Quel est le meilleur animal de compagnie ? » Ta « Girafe » finit 1re aux votes → +15 pts. Le 2e et le 3e de la manche prennent +10 et +5.",
+      "« Quel est le meilleur animal de compagnie ? » Ta « Girafe » finit 1re avec 3 votes → +15 (podium) +15 (votes) = +30. Le 2e et le 3e cumulent aussi podium + votes.",
   },
 
   dilemma: {

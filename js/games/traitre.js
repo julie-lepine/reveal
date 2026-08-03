@@ -647,7 +647,13 @@ export function mountTraitre(app) {
       const normalizedVotes = normalizeTraitreVotes(votes, alive);
       const pick = pickForVoteConfirm(selectedVote, normalizedVotes[localName]);
       if (pick == null) return;
-      await commitTraitreVote(pick);
+      try {
+        await commitTraitreVote(pick);
+      } catch {
+        if (!mount.isMounted() || !mount.isCurrentMount()) return;
+        render();
+        return;
+      }
       if (!mount.isMounted()) return;
       if (!mount.isCurrentMount()) return;
       selectedVote = null;

@@ -324,17 +324,29 @@ export function mountSpeedVote(app) {
       btn.addEventListener("click", async () => {
         if (phase !== "voting" || myVote) return;
         const target = btn.getAttribute("data-vote-player");
-        myVote = target;
-        votes = { ...votes, [localName]: target };
+        if (!target) return;
         if (mp) {
-          await commitSpeedVoteVote(target);
+          try {
+            await commitSpeedVoteVote(target);
+          } catch {
+            // Feedback déjà affiché par patchGameStateWithFeedback.
+            // Session rollbackée → myVote reste null ; re-vote possible.
+            if (!mount.isMounted() || !mount.isCurrentMount()) return;
+            syncFromSession();
+            render();
+            return;
+          }
           if (!mount.isMounted()) return;
           if (!mount.isCurrentMount()) return;
+          syncFromSession();
+          myVote = getSpeedVoteSession().votes?.[localName] ?? target;
           if (allSpeedVoteVotesIn() && canActAsHost()) await goToReveal();
           if (!mount.isMounted()) return;
           if (!mount.isCurrentMount()) return;
           render();
         } else {
+          myVote = target;
+          votes = { ...votes, [localName]: target };
           votes = simulateSpeedVoteLobbyVotes(target);
           await goToReveal();
         }
