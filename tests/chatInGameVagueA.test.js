@@ -318,7 +318,7 @@ describe("UX-CHAT-02 — pas de focus input à l'ouverture du sheet", () => {
       join(__dirname, "../js/core/feedbackUi.js"),
       "utf8"
     );
-    const openIdx = src.indexOf("function openChatSheet");
+    const openIdx = src.indexOf("function openChatSheetInner");
     assert.ok(openIdx >= 0);
     const rAFIdx = src.indexOf("requestAnimationFrame", openIdx);
     assert.ok(rAFIdx > openIdx);

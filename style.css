@@ -4444,6 +4444,67 @@ body.has-bottom-nav .feedback-fab{
   margin-top:16px;
 }
 
+.chat-roulette__actions--bridge{
+  gap:8px;
+}
+
+.chat-roulette__voice{
+  margin:14px 0 0;
+  font-size:15px;
+  font-weight:600;
+  line-height:1.35;
+  color:rgba(255,255,255,.82);
+  text-align:center;
+}
+
+.chat-roulette__voice--bridge{
+  margin-top:14px;
+}
+
+.chat-roulette__voice-title{
+  margin:0;
+  font-size:16px;
+  font-weight:800;
+  color:rgba(255,255,255,.92);
+}
+
+.chat-roulette__voice-sub{
+  margin:4px 0 0;
+  font-size:14px;
+  font-weight:500;
+  color:rgba(255,255,255,.72);
+}
+
+.chat-roulette__reroll-link{
+  margin-top:2px;
+  padding:8px;
+  font-size:14px;
+  font-weight:600;
+  color:rgba(255,255,255,.55);
+  text-align:center;
+  background:none;
+  border:none;
+  cursor:pointer;
+  font-family:inherit;
+}
+
+.chat-roulette__reroll-link:hover{
+  color:rgba(255,255,255,.8);
+}
+
+.chat-roulette__actions--bridge .btn-accent{
+  /* Indigo adouci, lisible (même esprit que CTA chat) */
+  background:linear-gradient(135deg, #8b93f7, #6b6ff0);
+  color:#1a0a14;
+  box-shadow:0 6px 18px rgba(99, 102, 241, 0.22);
+}
+
+.chat-roulette__actions--bridge .btn-primary{
+  background:linear-gradient(135deg, #ff7a8a, #e84aad);
+  color:#1a0a14;
+  box-shadow:0 6px 18px rgba(255, 60, 172, 0.2);
+}
+
 .chat-roulette__result-label{
   margin:0 0 12px;
   font-size:13px;

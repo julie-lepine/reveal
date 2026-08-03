@@ -23,6 +23,7 @@ import {
   chatRouletteMonotonicNow,
   parseSessionUpdatedAtMs,
   pickRandomEligibleGame,
+  pickChatRouletteReroll,
   remotePhaseAllowsChatRoulette,
   resolveEligibleCatalogGames,
   canRerollChatRoulette,
@@ -326,17 +327,18 @@ async function hostReroll() {
     if (!(await requireHostControl())) return;
     const prev = readActiveChatRoulette();
     if (!prev || !canRerollChatRoulette({ ...prev, phase: "result" })) {
-      await showAppAlert("Plus de relances disponibles.", {
-        title: "Jeu aléatoire",
-        icon: "🎲",
-      });
       return;
     }
     const expectedId = prev.rouletteId;
     const pool = poolFromEvent(prev);
     if (pool.length < 2) return;
-    const pick = pickRandomEligibleGame(pool);
+
+    const { pick, rejectedTileIds, cycleCount } = pickChatRouletteReroll(
+      prev,
+      pool
+    );
     if (!pick) return;
+
     const still = readActiveChatRoulette();
     if (
       !isChatRouletteActionCurrent({ rouletteId: expectedId }, still)
@@ -344,8 +346,56 @@ async function hostReroll() {
       return;
     }
     await publishRoulette(
-      buildChatRouletteSpinPayload(prev, pick, pool, { reroll: true })
+      buildChatRouletteSpinPayload(prev, pick, pool, {
+        reroll: true,
+        rejectedTileIds,
+        cycleCount,
+      })
     );
+  });
+}
+
+/**
+ * Bridge roulette → sondage existant (FEATURE-CHAT-03 soft voice).
+ * Clear sync de la roulette puis ouverture du chat / formulaire create.
+ */
+async function hostBridgeToPoll() {
+  return hostActionLock.run(async () => {
+    if (!(await requireHostControl())) return;
+    const prev = readActiveChatRoulette();
+    const expectedId = prev?.rouletteId || null;
+    const prefillIds = [...(prev?.eligibleTileIds || [])];
+
+    // Clear sync d'abord : débloque catalogue + ferme la modale partout.
+    await clearRouletteRemote({ expectedRouletteId: expectedId });
+
+    try {
+      const { openChatSheet } = await import("./feedbackUi.js");
+      const { getLobbyPollSnapshot } = await import("./lobbyPollStore.js");
+      const { openLobbyPollCreateFormForBridge } = await import(
+        "./lobbyPollSheetUi.js"
+      );
+
+      const snap = getLobbyPollSnapshot();
+      const openPoll =
+        snap?.activePoll && snap.activePoll.status === "open"
+          ? snap.activePoll
+          : null;
+
+      openChatSheet();
+
+      if (!openPoll) {
+        // Préremplit le formulaire create (hôte peut ajuster) — pas d'auto-create.
+        openLobbyPollCreateFormForBridge(prefillIds);
+      }
+      // Sondage déjà ouvert : le sheet montre le vote existant (pas de 2e create).
+    } catch (e) {
+      console.warn("[FEATURE-CHAT-03] bridge poll failed", e);
+      await showAppAlert(
+        e?.message || "Impossible d'ouvrir le sondage. Réessaie depuis le chat.",
+        { title: "Sondage", icon: "📊" }
+      );
+    }
   });
 }
 
@@ -406,7 +456,7 @@ function applySessionRoulette() {
   const active = n && isChatRouletteBlockingLaunch(ctx) ? n : null;
 
   const sig = active
-    ? `${active.rouletteId}|${active.attemptId}|${active.phase}|${active.selectedTileId}|${active.rerollCount}|${active.animationStartTimestamp}`
+    ? `${active.rouletteId}|${active.attemptId}|${active.phase}|${active.selectedTileId}|${active.drawCount}|${(active.rejectedTileIds || []).join(",")}|${active.animationStartTimestamp}`
     : "";
 
   if (sig === appliedEventSig) {
@@ -443,9 +493,19 @@ export function initChatRandomGameSync() {
   if (syncStarted) return;
   syncStarted = true;
 
+  /** @type {(() => boolean)|null} */
+  let hasOpenLobbyPollFn = null;
+  void import("./lobbyPollStore.js").then(({ getLobbyPollSnapshot }) => {
+    hasOpenLobbyPollFn = () => {
+      const poll = getLobbyPollSnapshot()?.activePoll;
+      return Boolean(poll && poll.status === "open");
+    };
+  });
+
   setChatRouletteUiHandlers({
     canControl: () => canControlChatRoulette(),
     getCatalogById: catalogById,
+    hasOpenLobbyPoll: () => Boolean(hasOpenLobbyPollFn?.()),
     onStart: () => {
       void hostStartSpin();
     },
@@ -454,6 +514,9 @@ export function initChatRandomGameSync() {
     },
     onLaunch: () => {
       void hostLaunchSelected();
+    },
+    onBridgePoll: () => {
+      void hostBridgeToPoll();
     },
     onDismiss: () => {
       void hostDismiss();

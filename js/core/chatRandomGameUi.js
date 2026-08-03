@@ -10,9 +10,12 @@ import {
   chatRouletteShouldShowResult,
   chatRouletteSpinProgress,
   canRerollChatRoulette,
+  chatRouletteBridgeCopy,
+  chatRouletteWinkLine,
   isChatRouletteActionCurrent,
   isChatRouletteBlockingLaunch,
   normalizeChatRouletteEvent,
+  resolveChatRouletteResultAct,
 } from "./chatRandomGameLogic.js";
 
 const DEFAULT_CARD_H = 76;
@@ -40,8 +43,10 @@ let spinCtx = null;
  *   onStart: () => void,
  *   onReroll: () => void,
  *   onLaunch: () => void,
+ *   onBridgePoll?: () => void,
  *   onDismiss: () => void,
  *   canControl: () => boolean,
+ *   hasOpenLobbyPoll?: () => boolean,
  *   getCatalogById: (id: string) => { id: string, title: string, emoji: string }|null,
  * }} */
 let handlers = null;
@@ -164,23 +169,62 @@ function renderPrompt(canControl) {
 }
 
 function renderResult(winner, ev, canControl) {
+  const act = resolveChatRouletteResultAct(ev.drawCount);
   const canReroll = canControl && canRerollChatRoulette(ev);
-  const rerollsLeft = Math.max(0, (ev.maxRerolls || 0) - (ev.rerollCount || 0));
+  const pollOpen = Boolean(handlers?.hasOpenLobbyPoll?.());
+  const wink = chatRouletteWinkLine(ev.drawCount + (ev.cycleCount || 0));
+  const bridge = chatRouletteBridgeCopy();
+
+  let voiceHtml = "";
+  if (act === "wink") {
+    voiceHtml = `<p class="chat-roulette__voice">${escapeHtml(wink)}</p>`;
+  } else if (act === "bridge") {
+    voiceHtml = `
+      <div class="chat-roulette__voice chat-roulette__voice--bridge">
+        <p class="chat-roulette__voice-title">${escapeHtml(bridge.title)}</p>
+        <p class="chat-roulette__voice-sub">${escapeHtml(bridge.subtitle)}</p>
+      </div>`;
+  }
+
+  const rerollLabel = act === "plain" ? "Relancer" : "Encore une fois";
+  const bridgeLabel = pollOpen
+    ? "Voir le vote du groupe"
+    : "Faire voter le groupe";
+
+  let actionsHtml = "";
+  if (canControl) {
+    const bridgeBtn =
+      act === "bridge"
+        ? `<button type="button" class="btn btn-accent chat-roulette__btn" data-roulette-bridge>
+            ${escapeHtml(bridgeLabel)}
+          </button>`
+        : "";
+    const rerollBtn = canReroll
+      ? act === "bridge"
+        ? `<button type="button" class="btn-link chat-roulette__reroll-link" data-roulette-reroll>
+            ${escapeHtml(rerollLabel)}
+          </button>`
+        : `<button type="button" class="btn btn-secondary chat-roulette__btn" data-roulette-reroll>
+            ${escapeHtml(rerollLabel)}
+          </button>`
+      : "";
+    actionsHtml = `
+      <div class="chat-roulette__actions${act === "bridge" ? " chat-roulette__actions--bridge" : ""}">
+        <button type="button" class="btn btn-primary chat-roulette__btn" data-roulette-launch>On joue</button>
+        ${bridgeBtn}
+        ${rerollBtn}
+      </div>`;
+  } else {
+    actionsHtml = `<p class="hint chat-roulette__wait">L'hôte décide de la suite…</p>`;
+  }
+
   return `
     <p class="chat-roulette__result-label">Le prochain jeu est</p>
     <div class="chat-roulette__winner chat-roulette__winner--pop">
       ${gameCardHtml(winner, { winner: true })}
     </div>
-    ${
-      canControl
-        ? `<div class="chat-roulette__actions">
-            <button type="button" class="btn btn-primary chat-roulette__btn" data-roulette-launch>Commencer le jeu</button>
-            <button type="button" class="btn btn-secondary chat-roulette__btn" data-roulette-reroll ${canReroll ? "" : "disabled"}>
-              Relancer${canReroll ? ` (${rerollsLeft})` : ""}
-            </button>
-          </div>`
-        : `<p class="hint chat-roulette__wait">L'hôte confirme le lancement…</p>`
-    }`;
+    ${voiceHtml}
+    ${actionsHtml}`;
 }
 
 function renderSpinMarkup(games, winner, progress, cardH) {
@@ -308,6 +352,10 @@ function bindRootOnce(root) {
       handlers?.onReroll?.();
       return;
     }
+    if (t.closest("[data-roulette-bridge]")) {
+      handlers?.onBridgePoll?.();
+      return;
+    }
     if (t.closest("[data-roulette-launch]")) {
       handlers?.onLaunch?.();
     }
@@ -380,7 +428,7 @@ function presentEvent(rawEvent, { forceResult = false, blockingOpts = null, now 
     ev.phase === "result" ||
     (ev.phase === "spinning" && chatRouletteShouldShowResult(ev, now));
 
-  const phaseKey = `${ev.rouletteId}|${ev.attemptId}|${ev.phase}|${ev.selectedTileId || ""}|${ev.rerollCount}|${showResult ? "R" : "A"}`;
+  const phaseKey = `${ev.rouletteId}|${ev.attemptId}|${ev.phase}|${ev.selectedTileId || ""}|${ev.drawCount}|${ev.rejectedTileIds?.join(",") || ""}|${showResult ? "R" : "A"}`;
   if (
     phaseKey === lastPhaseKey &&
     lastRouletteId === ev.rouletteId &&

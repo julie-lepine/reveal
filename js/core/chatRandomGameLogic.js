@@ -21,8 +21,17 @@ import {
 /** Durée cible de l’animation slot (cosmétique). */
 export const CHAT_ROULETTE_DURATION_MS = 2300;
 
-/** Relances max après un résultat. */
+/**
+ * @deprecated Soft voice : plus de hard cap UX.
+ * Conservé pour compat lectures d’anciens events (`maxRerolls`).
+ */
 export const CHAT_ROULETTE_MAX_REROLLS = 3;
+
+/** Tirage n° où apparaît le premier clin d’œil (acte 2). */
+export const CHAT_ROULETTE_WINK_AT_DRAW = 3;
+
+/** Tirage n° où apparaît le bridge sondage (acte 3). */
+export const CHAT_ROULETTE_BRIDGE_AT_DRAW = 4;
 
 /**
  * Fenêtre laissée à l’hôte pour confirmer / relancer après un résultat
@@ -238,6 +247,9 @@ export function computeChatRouletteExpiresAt(
  *   phase: "prompt"|"spinning"|"result"|"cancelled",
  *   selectedTileId: string|null,
  *   eligibleTileIds: string[],
+ *   rejectedTileIds: string[],
+ *   drawCount: number,
+ *   cycleCount: number,
  *   createdAt: number,
  *   animationStartTimestamp: number|null,
  *   animationDurationMs: number,
@@ -259,6 +271,16 @@ export function normalizeChatRouletteEvent(raw) {
 
   const eligibleTileIds = Array.isArray(raw.eligibleTileIds)
     ? raw.eligibleTileIds.map(String).filter((id) => TILE_ID_TO_SESSION_GAME_ID[id])
+    : [];
+
+  const rejectedTileIds = Array.isArray(raw.rejectedTileIds)
+    ? [
+        ...new Set(
+          raw.rejectedTileIds
+            .map(String)
+            .filter((id) => TILE_ID_TO_SESSION_GAME_ID[id])
+        ),
+      ]
     : [];
 
   let selectedTileId =
@@ -286,7 +308,16 @@ export function normalizeChatRouletteEvent(raw) {
     0,
     Number(raw.animationDurationMs) || CHAT_ROULETTE_DURATION_MS
   );
+
   const rerollCount = Math.max(0, Number(raw.rerollCount) || 0);
+  const drawCountRaw = Number(raw.drawCount);
+  const drawCount = Number.isFinite(drawCountRaw)
+    ? Math.max(0, drawCountRaw)
+    : phase === "prompt"
+      ? 0
+      : Math.max(1, rerollCount + 1);
+
+  const cycleCount = Math.max(0, Number(raw.cycleCount) || 0);
   const maxRerolls = Math.max(
     0,
     Number(raw.maxRerolls) || CHAT_ROULETTE_MAX_REROLLS
@@ -303,6 +334,9 @@ export function normalizeChatRouletteEvent(raw) {
     phase,
     selectedTileId,
     eligibleTileIds,
+    rejectedTileIds,
+    drawCount,
+    cycleCount,
     createdAt,
     animationStartTimestamp: Number.isFinite(animationStartTimestamp)
       ? animationStartTimestamp
@@ -506,7 +540,93 @@ export function canRerollChatRoulette(ev, opts = {}) {
       : isChatRouletteBlockingLaunch({ chatRoulette: n, ...opts });
   if (!active) return false;
   if (n.phase !== "result" && n.phase !== "spinning") return false;
-  return n.rerollCount < n.maxRerolls;
+  // Soft voice : plus de hard cap. Relance utile seulement si ≥2 jeux au pool.
+  return (n.eligibleTileIds?.length || 0) > 1;
+}
+
+/**
+ * Acte émotionnel selon le nombre de tirages (seuil interne, jamais un quota UX).
+ * @param {number} drawCount
+ * @returns {"plain"|"wink"|"bridge"}
+ */
+export function resolveChatRouletteResultAct(drawCount) {
+  const n = Math.max(0, Number(drawCount) || 0);
+  if (n >= CHAT_ROULETTE_BRIDGE_AT_DRAW) return "bridge";
+  if (n >= CHAT_ROULETTE_WINK_AT_DRAW) return "wink";
+  return "plain";
+}
+
+const WINK_LINES = [
+  "Pas mal, non ?",
+  "Le hasard insiste.",
+  "Hmm… celui-là a de l’allure.",
+];
+
+/** @param {number|string} [seed] */
+export function chatRouletteWinkLine(seed = 0) {
+  const i = Math.abs(Number(seed) || 0) % WINK_LINES.length;
+  return WINK_LINES[i];
+}
+
+export function chatRouletteBridgeCopy() {
+  return {
+    title: "Vous hésitez ?",
+    subtitle: "Laissez le groupe trancher.",
+  };
+}
+
+/**
+ * Pioche sans remise pour une relance.
+ * @param {{
+ *   eligibleTileIds: string[],
+ *   rejectedTileIds?: string[],
+ *   selectedTileId?: string|null,
+ *   cycleCount?: number,
+ * }} prev
+ * @param {Array<{id:string}>} catalogGames jeux résolus depuis eligibleTileIds
+ * @param {() => number} [rng]
+ */
+export function pickChatRouletteReroll(prev, catalogGames, rng = Math.random) {
+  const catalog = (catalogGames || []).filter((g) => g?.id);
+  const byId = new Map(catalog.map((g) => [g.id, g]));
+  const eligibleIds = (prev?.eligibleTileIds || [])
+    .map(String)
+    .filter((id) => byId.has(id));
+  const basePool = eligibleIds.map((id) => byId.get(id)).filter(Boolean);
+  if (!basePool.length) {
+    return {
+      pick: null,
+      rejectedTileIds: [],
+      cycleCount: prev?.cycleCount || 0,
+      cycleReset: false,
+    };
+  }
+
+  const refused = new Set(
+    (prev?.rejectedTileIds || []).map(String).filter(Boolean)
+  );
+  const current = prev?.selectedTileId ? String(prev.selectedTileId) : null;
+  if (current) refused.add(current);
+
+  let cycleReset = false;
+  let cycleCount = Math.max(0, Number(prev?.cycleCount) || 0);
+  let pool = basePool.filter((g) => !refused.has(g.id));
+
+  if (!pool.length) {
+    cycleReset = true;
+    cycleCount += 1;
+    refused.clear();
+    pool = basePool.filter((g) => g.id !== current);
+    if (!pool.length) pool = basePool.slice();
+  }
+
+  const pick = pickRandomEligibleGame(pool, rng);
+  return {
+    pick,
+    rejectedTileIds: [...refused],
+    cycleCount,
+    cycleReset,
+  };
 }
 
 /**
@@ -576,6 +696,9 @@ export function buildChatRoulettePromptPayload(eligible, now = Date.now()) {
     phase: "prompt",
     selectedTileId: null,
     eligibleTileIds: (eligible || []).map((g) => g.id),
+    rejectedTileIds: [],
+    drawCount: 0,
+    cycleCount: 0,
     createdAt,
     animationStartTimestamp: null,
     animationDurationMs: CHAT_ROULETTE_DURATION_MS,
@@ -590,27 +713,55 @@ export function buildChatRoulettePromptPayload(eligible, now = Date.now()) {
  * @param {ReturnType<typeof normalizeChatRouletteEvent>|null} prev
  * @param {{ id: string }} pick
  * @param {Array<{id:string}>} eligible
- * @param {{ reroll?: boolean, now?: number }} [opts]
+ * @param {{
+ *   reroll?: boolean,
+ *   now?: number,
+ *   rejectedTileIds?: string[],
+ *   cycleCount?: number,
+ * }} [opts]
  */
 export function buildChatRouletteSpinPayload(
   prev,
   pick,
   eligible,
-  { reroll = false, now = Date.now() } = {}
+  {
+    reroll = false,
+    now = Date.now(),
+    rejectedTileIds = null,
+    cycleCount = null,
+  } = {}
 ) {
   const single = (eligible || []).length <= 1;
   const createdAt = prev?.createdAt || now;
+  const prevDraw = Math.max(0, Number(prev?.drawCount) || 0);
+  const drawCount = reroll
+    ? Math.max(1, prevDraw) + 1
+    : Math.max(1, prevDraw || 1);
+  const nextRejected = Array.isArray(rejectedTileIds)
+    ? rejectedTileIds
+    : reroll
+      ? prev?.rejectedTileIds || []
+      : [];
+  const nextCycle =
+    cycleCount != null
+      ? Math.max(0, Number(cycleCount) || 0)
+      : Math.max(0, Number(prev?.cycleCount) || 0);
+
   return {
     rouletteId: prev?.rouletteId || newChatRouletteId(now),
     attemptId: newChatRouletteAttemptId(now),
     phase: single ? "result" : "spinning",
     selectedTileId: pick.id,
     eligibleTileIds: (eligible || []).map((g) => g.id),
+    rejectedTileIds: nextRejected,
+    drawCount,
+    cycleCount: nextCycle,
     createdAt,
     animationStartTimestamp: now,
     animationDurationMs: CHAT_ROULETTE_DURATION_MS,
     expiresAt: computeChatRouletteExpiresAt(now),
-    rerollCount: reroll ? (prev?.rerollCount || 0) + 1 : prev?.rerollCount || 0,
+    // Compat listeners / sig : miroir de (drawCount - 1)
+    rerollCount: Math.max(0, drawCount - 1),
     maxRerolls: CHAT_ROULETTE_MAX_REROLLS,
   };
 }

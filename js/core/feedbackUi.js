@@ -55,6 +55,11 @@ export function isChatSheetOpen() {
   return sheetOpen;
 }
 
+/** Ouvre le sheet chat (bridge roulette → sondage, etc.). Idempotent. */
+export function openChatSheet() {
+  openChatSheetInner();
+}
+
 function shouldShowChatFab() {
   if (!hasActiveLobby()) return false;
   return isChatFabAllowedScreen(getCurrentScreen());
@@ -201,7 +206,7 @@ export function closeChatSheet() {
   }
 }
 
-function openChatSheet() {
+function openChatSheetInner() {
   if (sheetOpen) return;
   if (typeof document === "undefined") return;
 

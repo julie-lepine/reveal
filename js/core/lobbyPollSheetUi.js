@@ -31,6 +31,18 @@ export function isLobbyPollCreateFormOpen() {
   return createFormOpen;
 }
 
+/**
+ * Bridge roulette → sondage : ouvre le formulaire create avec préselection.
+ * Doit être appelé après `openChatSheet()` (slot poll monté).
+ * @param {string[]} [preselectedCatalogIds]
+ */
+export function openLobbyPollCreateFormForBridge(preselectedCatalogIds = []) {
+  const ids = (preselectedCatalogIds || []).map(String).filter(Boolean);
+  createDraftIds = new Set(ids);
+  createFormOpen = true;
+  if (hostEl) renderLobbyPollSheet(hostEl);
+}
+
 function leaderLabel(leader, options) {
   if (!leader || leader.kind === "none") return "";
   const titleOf = (id) =>
