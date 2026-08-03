@@ -4248,10 +4248,18 @@ body.has-bottom-nav .feedback-fab{
   margin:0 12px 8px;
 }
 
-/* ─── Sondage pin (Vague 2) ─── */
+/* ─── Actions chat (sondage + jeu aléatoire) ─── */
+.chat-sheet__actions{
+  flex-shrink:0;
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+  margin:0 12px 8px;
+}
+
 .chat-sheet__poll{
   flex-shrink:0;
-  margin:0 12px 8px;
+  margin:0;
   max-height:42%;
   overflow-y:auto;
   -webkit-overflow-scrolling:touch;
@@ -4263,7 +4271,7 @@ body.has-bottom-nav .feedback-fab{
 
 .chat-sheet__random{
   flex-shrink:0;
-  margin:0 12px 8px;
+  margin:0;
 }
 
 .chat-sheet__random[hidden]{

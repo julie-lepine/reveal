@@ -1,7 +1,7 @@
 import { INSTAGRAM_HANDLE, INSTAGRAM_PROFILE_URL } from "../../data/appConfig.js";
 import {
   isChatFabAllowedScreen,
-  shouldAutoCloseChatSheetOnScreen,
+  shouldDismissChatSheetOnScreenTransition,
 } from "./chatFabScreens.js";
 import { mountChatPanel } from "./chatPanel.js";
 import {
@@ -32,6 +32,7 @@ export {
   isChatFabAllowedScreen,
   isChatHubScreen,
   shouldAutoCloseChatSheetOnScreen,
+  shouldDismissChatSheetOnScreenTransition,
 } from "./chatFabScreens.js";
 
 let fabEl = null;
@@ -47,6 +48,8 @@ let sheetOpen = false;
 let bodyOverflowPrev = "";
 /** Compteur messages non lus (indépendant de unseenPoll). */
 let chatUnreadCount = 0;
+/** Dernier écran observé pour fermeture sheet en *edge* (pas en boucle). */
+let prevScreenForChatDismiss = null;
 
 export function isChatSheetOpen() {
   return sheetOpen;
@@ -63,9 +66,22 @@ function updateFeedbackFabVisibility() {
   const show = shouldShowChatFab();
   fabEl.classList.toggle("feedback-fab--hidden", !show);
   fabEl.hidden = !show;
-  // Fermer le sheet sur toute sortie du hub (gameplay OU entrée game-prep/setup),
-  // y compris quand le FAB reste visible en prépa — hôte et invités via onScreenChange.
-  if (sheetOpen && (!show || shouldAutoCloseChatSheetOnScreen(screen))) {
+
+  const prev = prevScreenForChatDismiss;
+  prevScreenForChatDismiss = screen;
+
+  if (!sheetOpen) return;
+
+  // Gameplay / hors FAB : toujours fermer (FAB masqué).
+  if (!show) {
+    closeChatSheet();
+    return;
+  }
+
+  // Prep/setup : fermer uniquement sur *transition* hub → hors-hub
+  // (pas à chaque heartbeat lobby, ni si le joueur a rouvert le chat en prépa).
+  // N'altère jamais le rendu des CTA tant que le sheet reste ouvert sur le hub.
+  if (shouldDismissChatSheetOnScreenTransition(prev, screen)) {
     closeChatSheet();
   }
 }
@@ -211,8 +227,10 @@ function openChatSheet() {
         <h2 class="chat-sheet__title">Chat</h2>
         <button type="button" class="chat-sheet__close" data-chat-sheet-dismiss aria-label="Fermer">✕</button>
       </div>
-      <div id="chat-sheet-poll" class="chat-sheet__poll" hidden></div>
-      <div id="chat-sheet-random" class="chat-sheet__random" hidden></div>
+      <div class="chat-sheet__actions" id="chat-sheet-actions">
+        <div id="chat-sheet-random" class="chat-sheet__random" hidden></div>
+        <div id="chat-sheet-poll" class="chat-sheet__poll" hidden></div>
+      </div>
       <div class="chat-messages chat-sheet__messages" id="chat-sheet-messages"></div>
       <div class="chat-box chat-sheet__box">
         <input

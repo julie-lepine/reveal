@@ -9,6 +9,7 @@ import {
   isChatFabAllowedScreen,
   isChatHubScreen,
   shouldAutoCloseChatSheetOnScreen,
+  shouldDismissChatSheetOnScreenTransition,
 } from "../js/core/chatFabScreens.js";
 import {
   compareChatCursors,
@@ -113,13 +114,13 @@ describe("FEATURE-CHAT-03 / Vague A — auto-close sheet hors hub", () => {
     }
   });
 
-  it("feedbackUi ferme le sheet via shouldAutoCloseChatSheetOnScreen (pas seulement FAB masqué)", () => {
+  it("feedbackUi ferme via transition edge (pas boucle shouldAutoClose courant)", () => {
     const src = readFileSync(
       join(__dirname, "../js/core/feedbackUi.js"),
       "utf8"
     );
-    assert.match(src, /shouldAutoCloseChatSheetOnScreen/);
-    assert.match(
+    assert.match(src, /shouldDismissChatSheetOnScreenTransition/);
+    assert.doesNotMatch(
       src,
       /sheetOpen && \(!show \|\| shouldAutoCloseChatSheetOnScreen\(screen\)\)/
     );
@@ -150,8 +151,11 @@ describe("FEATURE-CHAT-03 / Vague A — auto-close sheet hors hub", () => {
   });
 
   it("phases roulette hub ne forcent pas la fermeture sheet (pas de screen change)", () => {
-    // Contrat : auto-close est branché sur screen, pas sur phase chatRoulette.
     assert.equal(shouldAutoCloseChatSheetOnScreen("game-select"), false);
+    assert.equal(
+      shouldDismissChatSheetOnScreenTransition("game-select", "game-select"),
+      false
+    );
     const rouletteSrc = readFileSync(
       join(__dirname, "../js/core/chatRandomGame.js"),
       "utf8"
@@ -160,7 +164,6 @@ describe("FEATURE-CHAT-03 / Vague A — auto-close sheet hors hub", () => {
       rouletteSrc,
       /!localScreenAllowsChatRoulette\(getCurrentScreen\(\)\)/
     );
-    // Ne plus garder la modale ouverte juste parce qu'un event est encore « actif ».
     assert.doesNotMatch(
       rouletteSrc,
       /!localScreenAllowsChatRoulette\([\s\S]*?!readActiveChatRoulette\(\)/

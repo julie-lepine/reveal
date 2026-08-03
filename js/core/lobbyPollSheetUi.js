@@ -236,12 +236,20 @@ export function mountLobbyPollInChatSheet(sheetRoot) {
   const messages = sheetRoot.querySelector("#chat-sheet-messages");
   if (!panel || !messages) return () => {};
 
+  let actions = sheetRoot.querySelector("#chat-sheet-actions");
+  if (!actions) {
+    actions = document.createElement("div");
+    actions.id = "chat-sheet-actions";
+    actions.className = "chat-sheet__actions";
+    panel.insertBefore(actions, messages);
+  }
+
   let slot = sheetRoot.querySelector("#chat-sheet-poll");
   if (!slot) {
     slot = document.createElement("div");
     slot.id = "chat-sheet-poll";
     slot.className = "chat-sheet__poll";
-    panel.insertBefore(slot, messages);
+    actions.appendChild(slot);
   }
 
   hostEl = slot;
@@ -258,6 +266,11 @@ export function mountLobbyPollInChatSheet(sheetRoot) {
   return () => {
     unsub?.();
     unsub = null;
+    // Ne touche que son sous-conteneur — jamais #chat-sheet-random.
+    if (hostEl) {
+      hostEl.innerHTML = "";
+      hostEl.hidden = true;
+    }
     hostEl = null;
     createFormOpen = false;
   };

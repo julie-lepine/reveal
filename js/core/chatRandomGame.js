@@ -124,16 +124,22 @@ export function canControlChatRoulette() {
   return isLobbyHost();
 }
 
+/**
+ * Visibilité CTA roulette (tous les joueurs).
+ * Ne dépend PAS de `isChatRouletteBlockingLaunch` — une roulette active
+ * ne doit pas faire disparaître le bouton (ni le sondage voisin).
+ * Le blocking ne protège que les lancements catalogue concurrents.
+ */
 export function canOfferChatRouletteCta() {
   if (!hasActiveLobby()) return false;
   if (!isChatFabAllowedScreen(getCurrentScreen())) return false;
   if (!localScreenAllowsChatRoulette(getCurrentScreen())) return false;
   const sessionRow = getCachedGameSession();
   if (!remotePhaseAllowsChatRoulette(sessionRow, getLobbyGameId())) return false;
-  if (isChatRouletteBlocking()) return false;
   return true;
 }
 
+/** Activé : hôte réel (ou claim possible). Invités : visible mais disabled. */
 export function isChatRouletteCtaEnabled() {
   if (!canOfferChatRouletteCta()) return false;
   return isLobbyHost() || clientMayOfferHostClaim();
@@ -161,13 +167,32 @@ function poolFromEvent(prev) {
   return fromIds.length ? fromIds : currentEligibleGames();
 }
 
+function hubPatchOptionsForRoulette() {
+  const row = getCachedGameSession();
+  const gid = row?.game_id ?? row?.gameId ?? null;
+  // Ne jamais écraser une session de jeu active avec menu.
+  if (row && gid && gid !== "menu") return {};
+  const screen = getCurrentScreen();
+  const hubScreen = localScreenAllowsChatRoulette(screen)
+    ? screen
+    : localScreenAllowsChatRoulette(row?.screen)
+      ? row.screen
+      : "game-select";
+  return { gameId: "menu", screen: hubScreen };
+}
+
 async function publishRoulette(payload) {
   if (!isGameSyncActive()) {
     presentChatRouletteEvent(payload);
     return { ok: true, local: true };
   }
   try {
-    await patchGameState({ [CHAT_ROULETTE_STATE_KEY]: payload });
+    // Si session absente du cache : forcer menu (évite upsert fallback « consensus »).
+    // Si session déjà menu : renforcer screen hub. Si jeu actif : state-only.
+    await patchGameState(
+      { [CHAT_ROULETTE_STATE_KEY]: payload },
+      hubPatchOptionsForRoulette()
+    );
     presentChatRouletteEvent(payload);
     return { ok: true };
   } catch (e) {
@@ -204,7 +229,10 @@ async function clearRouletteRemote({
     return { ok: true, local: true };
   }
   try {
-    await patchGameState({ [CHAT_ROULETTE_STATE_KEY]: null });
+    await patchGameState(
+      { [CHAT_ROULETTE_STATE_KEY]: null },
+      hubPatchOptionsForRoulette()
+    );
   } catch (e) {
     console.warn("[FEATURE-CHAT-03] clear failed", e);
     if (!opportunistic) {
@@ -512,23 +540,34 @@ function bindChatRandomGameCta(rootEl) {
 }
 
 /**
- * Monte la CTA sous le sondage dans le sheet chat.
+ * Monte la CTA roulette dans son sous-conteneur (#chat-sheet-random).
+ * Ne remplace jamais le DOM sondage (#chat-sheet-poll).
  * @param {ParentNode} sheetRoot
  * @returns {() => void} cleanup
  */
 export function mountChatRandomGameInChatSheet(sheetRoot) {
   if (!sheetRoot) return () => {};
 
+  const panel = sheetRoot.querySelector(".chat-sheet__panel");
+  const messages = sheetRoot.querySelector("#chat-sheet-messages");
+  let actions = sheetRoot.querySelector("#chat-sheet-actions");
+  if (!actions && panel && messages) {
+    actions = document.createElement("div");
+    actions.id = "chat-sheet-actions";
+    actions.className = "chat-sheet__actions";
+    panel.insertBefore(actions, messages);
+  }
+
   let slot = sheetRoot.querySelector("#chat-sheet-random");
   if (!slot) {
     slot = document.createElement("div");
     slot.id = "chat-sheet-random";
     slot.className = "chat-sheet__random";
-    const poll = sheetRoot.querySelector("#chat-sheet-poll");
-    const messages = sheetRoot.querySelector("#chat-sheet-messages");
-    const panel = sheetRoot.querySelector(".chat-sheet__panel");
-    if (poll?.parentNode) {
-      poll.parentNode.insertBefore(slot, poll.nextSibling);
+    if (actions) {
+      const poll = actions.querySelector("#chat-sheet-poll");
+      // Ordre produit : roulette puis sondage.
+      if (poll) actions.insertBefore(slot, poll);
+      else actions.appendChild(slot);
     } else if (messages?.parentNode) {
       messages.parentNode.insertBefore(slot, messages);
     } else if (panel) {
@@ -554,6 +593,7 @@ export function mountChatRandomGameInChatSheet(sheetRoot) {
     ctaUnsubSession = null;
     ctaUnsubScreen?.();
     ctaUnsubScreen = null;
+    // Uniquement son slot — le sondage voisin reste intact.
     if (ctaHost) {
       ctaHost.innerHTML = "";
       ctaHost.hidden = true;

@@ -569,9 +569,7 @@ describe("FEATURE-CHAT-03 — fermeture chat à l'entrée prep (tous clients)", 
       join(__dirname, "../js/core/feedbackUi.js"),
       "utf8"
     );
-    // Hôte ferme encore le chat à l'ouverture roulette (local),
-    // mais l'entrée prep ferme via onScreenChange central pour tous.
-    assert.match(fab, /shouldAutoCloseChatSheetOnScreen/);
+    assert.match(fab, /shouldDismissChatSheetOnScreenTransition/);
     assert.match(fab, /onScreenChange\(\(\) => updateFeedbackFabVisibility\(\)\)/);
     assert.match(
       orch,
