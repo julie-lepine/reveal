@@ -4260,18 +4260,24 @@ body.has-bottom-nav .feedback-fab{
 .chat-sheet__poll{
   flex-shrink:0;
   margin:0;
-  max-height:42%;
-  overflow-y:auto;
-  -webkit-overflow-scrolling:touch;
+  overflow:visible;
 }
 
 .chat-sheet__poll[hidden]{
   display:none !important;
 }
 
+/* Liste / formulaire longs uniquement — pas sur le CTA compact */
+.chat-sheet__poll--scrollable{
+  max-height:42%;
+  overflow-y:auto;
+  -webkit-overflow-scrolling:touch;
+}
+
 .chat-sheet__random{
   flex-shrink:0;
   margin:0;
+  overflow:visible;
 }
 
 .chat-sheet__random[hidden]{
@@ -4303,6 +4309,19 @@ body.has-bottom-nav .feedback-fab{
   box-sizing:border-box;
 }
 
+/* Contraste AA : texte sombre sur dégradé rose (blanc/#ff3cac ~2.5:1, insuffisant) */
+.chat-sheet__actions .btn-primary{
+  color:#1a0a14;
+  text-shadow:none;
+}
+
+.chat-sheet__actions .btn-secondary{
+  margin-top:0;
+  color:rgba(255,255,255,.92);
+  border-color:rgba(255,255,255,.22);
+  background:rgba(255,255,255,.1);
+}
+
 .chat-random-cta__icon{
   font-size:1em;
   line-height:1;
@@ -4314,11 +4333,12 @@ body.has-bottom-nav .feedback-fab{
 }
 
 .chat-random-cta__btn:disabled{
-  opacity:.45;
+  opacity:.55;
   cursor:not-allowed;
   filter:grayscale(.35);
   box-shadow:none;
   transform:none;
+  color:rgba(26,10,20,.75);
 }
 
 /* ─── FEATURE-CHAT-03 roulette ─── */

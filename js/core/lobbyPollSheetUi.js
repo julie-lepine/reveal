@@ -45,7 +45,7 @@ function leaderLabel(leader, options) {
 function renderCreateCta() {
   return `
     <div class="lobby-poll-cta">
-      <button type="button" class="btn btn-primary lobby-poll__cta" data-poll-open-create>
+      <button type="button" class="btn btn-secondary lobby-poll__cta" data-poll-open-create>
         📊 Faire voter le groupe
       </button>
     </div>`;
@@ -132,6 +132,7 @@ export function renderLobbyPollSheet(rootEl) {
   if (snap.activePoll && snap.activePoll.status === "open") {
     createDraftIds = new Set();
     createFormOpen = false;
+    rootEl.classList.add("chat-sheet__poll--scrollable");
     rootEl.innerHTML = renderOpenPoll(snap);
     rootEl.hidden = false;
     return;
@@ -140,17 +141,21 @@ export function renderLobbyPollSheet(rootEl) {
   if (!d.showCreateCta) {
     createFormOpen = false;
     createDraftIds = new Set();
+    rootEl.classList.remove("chat-sheet__poll--scrollable");
     rootEl.innerHTML = "";
     rootEl.hidden = true;
     return;
   }
 
   if (createFormOpen) {
+    rootEl.classList.add("chat-sheet__poll--scrollable");
     rootEl.innerHTML = renderCreateForm(snap);
     rootEl.hidden = false;
     return;
   }
 
+  // CTA compact : pas de max-height / overflow (évite le mini-scrollbar).
+  rootEl.classList.remove("chat-sheet__poll--scrollable");
   rootEl.innerHTML = renderCreateCta();
   rootEl.hidden = false;
 }
