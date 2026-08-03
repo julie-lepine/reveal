@@ -38,6 +38,10 @@ import {
   mapDissolveLobbyRpcData,
   interpretDissolveMembershipRequery,
 } from "./lobbyDissolveContract.js";
+import {
+  validateLeaveLobbySupabaseIdentity,
+} from "./lobbyLeaveContract.js";
+import { deleteOwnLobbyMembershipByIdWithDeps } from "./lobbyMembershipDelete.js";
 import { captureLobbyRuntimeEpoch, isLobbyRuntimeEpochCurrent } from "./lobbyRuntime.js";
 import {
   createLobbyJoinEffects,
@@ -1988,23 +1992,35 @@ export async function fetchLobbyHostIdById(lobbyId) {
 }
 
 /**
- * Vague D — retire la membership de l'utilisateur courant pour un lobbyId explicite.
+ * Vague D / AUTH-LEAVE-SILENT-OK-01 — retire la membership courante pour un lobbyId.
  * Ne lit pas state.lobby. Ne supprime pas le lobby.
+ * Preuve : lignes renvoyées par `.select()` après DELETE, sinon requery ciblée
+ * (lobby_id + user_id). Zéro ligne sans preuve d'absence → !ok (pas de faux succès RLS).
  */
 export async function deleteOwnLobbyMembershipById(lobbyId) {
-  const userId = getSupabaseUserId();
-  if (!lobbyId || !userId) {
-    return { ok: false, error: "Authentification ou lobbyId manquant." };
-  }
-
-  const { error } = await supabase
-    .from("lobby_members")
-    .delete()
-    .eq("lobby_id", lobbyId)
-    .eq("user_id", userId);
-
-  if (error) return { ok: false, error: error.message };
-  return { ok: true };
+  return deleteOwnLobbyMembershipByIdWithDeps(lobbyId, {
+    getUserId: getSupabaseUserId,
+    deleteAndReturnRows: async (id, userId) => {
+      const { data, error } = await supabase
+        .from("lobby_members")
+        .delete()
+        .eq("lobby_id", id)
+        .eq("user_id", userId)
+        .select("id");
+      if (error) return { ok: false, error: error.message };
+      return { ok: true, rows: Array.isArray(data) ? data : [] };
+    },
+    verifyMembershipAbsent: async (id, userId) => {
+      const { data, error } = await supabase
+        .from("lobby_members")
+        .select("id")
+        .eq("lobby_id", id)
+        .eq("user_id", userId)
+        .maybeSingle();
+      if (error) return { status: "unknown", error: error.message };
+      return { status: data ? "present" : "absent" };
+    },
+  });
 }
 
 /**
@@ -2114,12 +2130,22 @@ export async function closeLobbySupabase() {
   return closeLobbyByIdAsHost(lobbyId);
 }
 
-/** Quitte le lobby côté serveur (retire le membre local) — cache local. */
+/**
+ * Quitte le lobby côté serveur (retire le membre local) — cache local.
+ * AUTH-LEAVE-SILENT-OK-01 : jamais `{ ok: true }` si lobbyId/userId manquent.
+ */
 export async function leaveLobbySupabase() {
   const lobbyId = getState().lobby?.id;
   const userId = getSupabaseUserId();
-  if (!lobbyId || !userId) return { ok: true };
-  return deleteOwnLobbyMembershipById(lobbyId);
+  const identity = validateLeaveLobbySupabaseIdentity(lobbyId, userId);
+  if (!identity.ok) {
+    return {
+      ok: false,
+      code: identity.code,
+      error: identity.error,
+    };
+  }
+  return deleteOwnLobbyMembershipById(identity.lobbyId);
 }
 
 export async function setLocalReadySupabase(ready) {

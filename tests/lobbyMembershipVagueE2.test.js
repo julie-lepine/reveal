@@ -522,6 +522,7 @@ describe("lobbyMembershipVagueE2 — leave / clear / canonique", () => {
         stopMultiplayerSync: () => order.push("stopMp"),
         stopLobbyPresenceSync: () => order.push("stopPres"),
         signOutAnonGuestIfNeeded: async () => {},
+        clearGuestMembership: () => {},
         clearLocalOpenLobbySlot: () => {},
         applyLeaveLobbyLocal: () => {
           order.push("clearLocal");
@@ -557,6 +558,7 @@ describe("lobbyMembershipVagueE2 — leave / clear / canonique", () => {
         stopMultiplayerSync: () => assert.fail("no stop"),
         stopLobbyPresenceSync: () => assert.fail("no stop"),
         signOutAnonGuestIfNeeded: async () => assert.fail("no signOut"),
+        clearGuestMembership: () => assert.fail("no clearGuest"),
         clearLocalOpenLobbySlot: () => assert.fail("no clear slot"),
         applyLeaveLobbyLocal: () => assert.fail("no local leave"),
         getUserId: () => UID_A,

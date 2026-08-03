@@ -187,6 +187,7 @@ describe("ARCH-10 — leave volontaire", () => {
           await signOutGate.promise;
           order.push("signOut:end");
         },
+        clearGuestMembership: () => order.push("clearGuestMembership"),
         clearLocalOpenLobbySlot: () => {},
         applyLeaveLobbyLocal: () => order.push("applyLeave"),
         getUserId: () => "u-1",
@@ -223,6 +224,7 @@ describe("ARCH-10 — leave volontaire", () => {
         stopMultiplayerSync: () => assert.fail("no stop"),
         stopLobbyPresenceSync: () => assert.fail("no stop"),
         signOutAnonGuestIfNeeded: async () => assert.fail("no signOut"),
+        clearGuestMembership: () => assert.fail("no clearGuest"),
         clearLocalOpenLobbySlot: () => assert.fail("no clear"),
         applyLeaveLobbyLocal: () => assert.fail("no local leave"),
         getUserId: () => "u-1",

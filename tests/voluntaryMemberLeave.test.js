@@ -67,6 +67,10 @@ function makeTrackingDeps(overrides = {}) {
     signOutAnonGuestIfNeeded: async (wasGuest) => {
       order.push(`signOut:${wasGuest ? "guest" : "account"}`);
     },
+    clearGuestMembership: () => {
+      order.push("clearGuestMembership");
+      guestMembership.current = null;
+    },
     clearLocalOpenLobbySlot: () => {
       order.push("clearLocalOpenLobbySlot");
     },
@@ -127,6 +131,7 @@ describe("runVoluntaryMemberLeave — contrat échec", () => {
       "stopMultiplayerSync",
       "stopLobbyPresenceSync",
       "signOut:guest",
+      "clearGuestMembership",
       "applyLeaveLobbyLocal",
       "navigate:home:reset",
     ]);

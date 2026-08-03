@@ -16,10 +16,11 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 
 | | |
 |--|--|
-| **Maintenant** | **UX-DEVICE-01** · backlog produit (FEATURE-* / GAME-WAO-01) |
-| **Ensuite** | ARCH-23 QA natif · ARCH-10 QA mobile finale |
+| **Maintenant** | **AUTH leave orphans** 🔧 QA terrain · rollback votes optimistes · **UX-DEVICE-01** |
+| **Ensuite** | Consensus reveal atomique · ARCH-23/10 QA natif · backlog produit |
 | **Dernière clôture** | **UX-CHAT-01** ✅ · **UX-CHAT-02** ✅ · **FEATURE-VIBECHECK-01** ✅ · **UX-HOST-01** ✅ |
 | **En attente QA finale** | **ARCH-23** (SQL ✅) · **ARCH-10** mobile |
+| **Audit** | Transversal 2026-08-02 — AUTH leave orphans livré (tests verts · QA terrain) |
 
 ---
 
@@ -44,15 +45,16 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 | **FEATURE-CHAT-03** | — | Bouton « Futur jeu aléatoire » dans le chat - Visible par tous les joueurs, cliquable par l'hôte. Petite animation de "roulette" pour montrer le côté aléatoire du pick | 🟡 |
 | **ARCH-05** | 5 | Route lobby vs session (`row.screen`) | 🟡 mitigé SYN-28 |
 | **ARCH-01 / F-01** | 1 | Démo offline sans avertissement MP | 🟡 partiel |
+| **AUTH-LEAVE-*** | 1/3 | Leave orphans (silent-ok · logout membre · guest Home · join switch) | 🟡 code ✅ · **QA terrain** |
 | **ARCH-11–17, SYN-19–24, SYN-27** | 9–10 | Monolithe / dup / code mort | Dette |
 
 ## Carte des causes racines
 
 | # | Cause | État | Ouvert notable |
 |---|-------|------|----------------|
-| 1 | Identité invité / JWT | ✅ | ARCH-01 partiel |
+| 1 | Identité invité / JWT | Partiel | ARCH-01 partiel · **AUTH-LEAVE-*** 🔧 QA |
 | 2 | Race auth / profil | ✅ | — |
-| 3 | Sources de vérité multiples | Partiel | **BUG-TIERNIGHT-04 ✅** · **BUG-TRUTHMETER-02 ✅** · **Membership A–E5 ✅** · M-14a ✅ · Guess Lie ✅ |
+| 3 | Sources de vérité multiples | Partiel | **BUG-TIERNIGHT-04 ✅** · **BUG-TRUTHMETER-02 ✅** · **Membership A–E5 ✅** · M-14a ✅ · Guess Lie ✅ · **AUTH-LEAVE-*** 🔧 |
 | 4 | Asymétrie hôte / invité | ✅ | — |
 | 5 | Routing + timing sync | ✅ | ARCH-05 mitigé · **UX-NAV-LOBBY ✅** |
 | 6 | Async écrans | ✅ | **BUG-WAO-02** ✅ · **BUG-WAO-03** ✅ · **BUG-WAO-04** ✅ |
@@ -163,6 +165,26 @@ Canal principal = **iOS / Android Capacitor**. Web = tests seulement. Autorité 
 | **Contrat retry** | `unknown` après incompatibilité confirmée → gate conservé + feedback réseau ; seul `compatible` lève le gate |
 | **Hors Vague 1** | Bumper le floor · publier stores · SW · feature flags · guard global writes in-game |
 | **Statut** | Code + SQL prêts · **QA différée** au prochain déploiement Android/iOS de test · **pas clôturé** |
+
+#### AUTH-LEAVE-* — Leave orphans (implémenté · QA terrain)
+
+Cluster audit transversal 2026-08-02 : asymétries leave sans preuve membership / cleanup guest incomplet.
+
+| ID | Livré |
+|----|--------|
+| **AUTH-LEAVE-SILENT-OK-01** | `leaveLobbySupabase` → `ok:false` si identité manquante · DELETE `.select` + requery ciblée |
+| **AUTH-LOGOUT-MEMBER-01** | Logout membre bloque `signOut` si leave `!ok` / cancelled / invalide |
+| **AUTH-SERVER-LEAVE-GUEST-01** | `finalizeGuestAfterAuthoritativeLeave` après leave Home server-only (sauf `CANONICAL_ELSEWHERE`) |
+| **AUTH-JOIN-GUEST-LEAVE-01** | `joinLobbyAsGuest` abort join si leave préalable `!ok` |
+
+| | |
+|--|--|
+| **Où** | `lobbyLeaveContract.js` · `lobbyMembershipDelete.js` · `finalizeGuestLeave.js` · `supabaseLobby.js` · `voluntaryMemberLeave.js` · `lobby.js` · `auth.js` |
+| **Preuve** | `authLeaveOrphans.test.js` · suites voluntary / E2 / E3 / ARCH-10 / Vague D |
+| **Statut** | Implémentation terminée — tests automatisés verts — **QA terrain requise** |
+| **Hors scope** | multitab · snapshot found logout sans cache · SQL/RLS |
+
+---
 
 #### L-04 ✅ (accepté — UI déjà livrée)
 
@@ -432,8 +454,8 @@ Ne pas rouvrir sans régression. Détail historique dans git / tests cités.
 
 Hors file prioritaire — opportunité / régression :
 
-- Votes optimistic hors Hot Take / VibeCheck / Dilemma (speedVote / …) — **BUG-TRUTHMETER-01 ✅** (01A/01B QA 2026-08-02)
-- `results.js` mount · rename remote résiduel — **BUG-TRUTHMETER-02** 🔧 QA
+- Votes optimistic hors Hot Take / Guess Lie (SpeedVote · Dilemma · WAO · Traitre · TierNight Live) — rollback manquant
+- `results.js` mount async — résidu bas (TruthMeter-02 ✅ clôturé)
 - Lobby `playing` si upsert échoue après `setLobbyPlaying` (M-11)
 - `pushGameSession` : `err.message` brut (L-09)
 - Logs debug join · policy debug lobby Supabase
@@ -446,9 +468,11 @@ Hors file prioritaire — opportunité / régression :
 - Loader join interstitiel — **non retenu**
 - Fil Rouge SQL historique — ops Supabase séparée · fail docs `filRougeVague3Cleanup` hors Membership
 - **ARCH-23** : clients / PWA / cache Pages en retard sur migrations (leçon 01B-bis)
+- Logout snapshot `found` sans cache hydraté (hors AUTH-LEAVE Vague 1)
+- Leave multi-onglets sans BroadcastChannel
 
-**Surveiller** : Clutch taps sous latence (SYN-26) · ready prep après Recommencer · conflit pending join vs chrome Home membership · leave multi-onglets après dissolve · **ARCH-23** (clients stale) · **ARCH-10** non-régression mobile (QA finale)
+**Surveiller** : Clutch taps sous latence (SYN-26) · ready prep après Recommencer · conflit pending join vs chrome Home membership · leave multi-onglets après dissolve · **ARCH-23** (clients stale) · **ARCH-10** non-régression mobile (QA finale) · **AUTH-LEAVE-*** QA terrain
 
 ---
 
-*Suivi vivant · MAJ 2026-08-02 — **UX-CHAT-01** ✅ · **UX-CHAT-02** ✅ · **FEATURE-VIBECHECK-01** ✅ · **UX-HOST-01** ✅ · **ARCH-10** Pages ✅ · **ARCH-23** QA différée · audit transversal relancé*
+*Suivi vivant · MAJ 2026-08-03 — **AUTH-LEAVE-*** 🔧 QA · **UX-CHAT-01** ✅ · **UX-CHAT-02** ✅ · **FEATURE-VIBECHECK-01** ✅ · **UX-HOST-01** ✅ · **ARCH-10** Pages ✅ · **ARCH-23** QA différée*

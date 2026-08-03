@@ -2,6 +2,7 @@
  * Sortie volontaire membre non-hôte — contrat d’échec distant strict.
  * Module pur (deps injectées) pour tests sans charger Supabase / DOM.
  */
+import { finalizeGuestAfterAuthoritativeLeave } from "./finalizeGuestLeave.js";
 
 let voluntaryLeaveInFlight = false;
 
@@ -50,6 +51,7 @@ export async function notifyVoluntaryLeaveFailure(res, deps) {
  *   stopMultiplayerSync: () => void,
  *   stopLobbyPresenceSync: () => void,
  *   signOutAnonGuestIfNeeded: (wasGuest: boolean) => Promise<void>|void,
+ *   clearGuestMembership: () => void,
  *   clearLocalOpenLobbySlot: (code: string) => void,
  *   applyLeaveLobbyLocal: (args: { wasGuest: boolean, navigateAway: boolean }) => void,
  *   getUserId?: () => string|null|undefined,
@@ -57,7 +59,7 @@ export async function notifyVoluntaryLeaveFailure(res, deps) {
  *   beginPostLeaveHomeTransition?: () => number,
  *   invalidateCurrentLobbySessionCache?: () => void,
  * }} deps
- * @returns {Promise<{ ok: boolean, error?: string, busy?: boolean }>}
+ * @returns {Promise<{ ok: boolean, error?: string, busy?: boolean, code?: string, cancelled?: boolean }>}
  */
 export async function runVoluntaryMemberLeave(options = {}, deps) {
   if (!deps) {
@@ -87,10 +89,11 @@ export async function runVoluntaryMemberLeave(options = {}, deps) {
         return { ok: false, error: e?.message || String(e) };
       }
       if (!res?.ok) {
-        console.warn("REVEAL leaveLobbySupabase:", res?.error);
+        console.warn("REVEAL leaveLobbySupabase:", res?.error || res?.code);
         return {
           ok: false,
           error: res?.error || "Impossible de quitter le lobby.",
+          code: res?.code,
         };
       }
 
@@ -107,15 +110,34 @@ export async function runVoluntaryMemberLeave(options = {}, deps) {
 
       deps.stopMultiplayerSync();
       deps.stopLobbyPresenceSync();
-      await deps.signOutAnonGuestIfNeeded(wasGuest);
+      // Guest finalize avant wipe lobby : wasGuest encore valide ; hint clear idempotent
+      // avec applyLeaveLobbyLocal.
+      await finalizeGuestAfterAuthoritativeLeave(
+        { wasGuest, canonicalElsewhere: false },
+        {
+          signOutAnonGuestIfNeeded: deps.signOutAnonGuestIfNeeded,
+          clearGuestMembership: deps.clearGuestMembership,
+        }
+      );
       deps.applyLeaveLobbyLocal({ wasGuest, navigateAway });
-      return { ok: true };
+      return {
+        ok: true,
+        deleted: Boolean(res.deleted),
+        membershipAbsent: Boolean(res.membershipAbsent),
+      };
     }
 
     // Offline / démo : aucune ligne lobby_members — cleanup local direct.
     deps.stopMultiplayerSync();
     deps.stopLobbyPresenceSync();
     if (code) deps.clearLocalOpenLobbySlot(code);
+    await finalizeGuestAfterAuthoritativeLeave(
+      { wasGuest, canonicalElsewhere: false },
+      {
+        signOutAnonGuestIfNeeded: deps.signOutAnonGuestIfNeeded,
+        clearGuestMembership: deps.clearGuestMembership,
+      }
+    );
     deps.applyLeaveLobbyLocal({ wasGuest, navigateAway });
     return { ok: true };
   } finally {

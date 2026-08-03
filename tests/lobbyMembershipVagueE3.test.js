@@ -155,6 +155,7 @@ describe("lobbyMembershipVagueE3 — soft-hold post-leave", () => {
         stopMultiplayerSync: () => assert.fail("no stop"),
         stopLobbyPresenceSync: () => assert.fail("no stop"),
         signOutAnonGuestIfNeeded: async () => {},
+        clearGuestMembership: () => assert.fail("no clearGuest"),
         clearLocalOpenLobbySlot: () => {},
         applyLeaveLobbyLocal: () => assert.fail("no clear"),
         getUserId: () => UID_A,
@@ -400,6 +401,7 @@ describe("lobbyMembershipVagueE3 — soft-hold post-leave", () => {
           assert.equal(mid.state, "post_leave_transition");
           assert.equal(mid.showReturnToLobby, false);
         },
+        clearGuestMembership: () => {},
         clearLocalOpenLobbySlot: () => {},
         applyLeaveLobbyLocal: () => {
           cacheCleared = true;

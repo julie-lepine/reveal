@@ -299,7 +299,29 @@ export async function logout() {
           return { ok: false, error: res.error || "Impossible de fermer le lobby." };
         }
       } else {
-        await leaveLobby({ navigateAway: false });
+        // AUTH-LOGOUT-MEMBER-01 — ne pas signOut si leave non prouvé.
+        // Feedback UX : propriétaire = caller (home #btn-logout) via res.error.
+        let res;
+        try {
+          res = await leaveLobby({ navigateAway: false });
+        } catch (e) {
+          return {
+            ok: false,
+            error:
+              "La connexion a empêché la sortie du lobby. Réessaie avant de te déconnecter.",
+          };
+        }
+        if (res?.cancelled) {
+          return { ok: false, cancelled: true };
+        }
+        if (!res || res.ok !== true) {
+          return {
+            ok: false,
+            error:
+              res?.error ||
+              "Impossible de quitter le lobby. Vérifie ta connexion puis réessaie — la déconnexion n'a pas été effectuée pour éviter de bloquer ta place.",
+          };
+        }
       }
     } else {
       stopMultiplayerSync();

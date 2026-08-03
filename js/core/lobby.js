@@ -88,6 +88,7 @@ import {
   isVoluntaryLeaveInFlight,
   resetVoluntaryLeaveLockForTests,
 } from "./voluntaryMemberLeave.js";
+import { finalizeGuestAfterAuthoritativeLeave } from "./finalizeGuestLeave.js";
 import {
   showAppAlert,
   showAppConfirm,
@@ -1138,7 +1139,23 @@ export async function joinLobbyAsGuest(code, guestName, captchaToken = null, emo
   const nextCode = joinCode;
   const currentCode = normalizeLobbyCode(getLobby()?.code);
   if (hasActiveLobby() && currentCode && nextCode && currentCode !== nextCode) {
-    await leaveLobby({ navigateAway: false });
+    const leaveRes = await leaveLobby({ navigateAway: false });
+    if (leaveRes?.cancelled) {
+      return {
+        ok: false,
+        cancelled: true,
+        error: leaveRes.error || "Sortie du lobby actuel annulée.",
+      };
+    }
+    if (!leaveRes || leaveRes.ok !== true) {
+      return {
+        ok: false,
+        error:
+          leaveRes?.error ||
+          "Impossible de quitter le lobby actuel avant d'en rejoindre un autre.",
+        code: leaveRes?.code,
+      };
+    }
   }
 
   const res = await joinLobby(joinCode);
@@ -1565,6 +1582,7 @@ export async function leaveLobby({ navigateAway = true } = {}) {
       stopMultiplayerSync,
       stopLobbyPresenceSync,
       signOutAnonGuestIfNeeded,
+      clearGuestMembership,
       clearLocalOpenLobbySlot,
       applyLeaveLobbyLocal,
       getUserId: getSupabaseUserId,
@@ -1614,6 +1632,8 @@ export async function leaveLobbyMembershipFromServer(membership) {
         canonicalLobbyId: result.canonicalLobbyId ?? null,
       });
     }
+    // Capturer avant teardown / éventuel signOut anon.
+    const wasGuest = isGuest();
     // E3 soft-hold puis preuve DELETE/dissolve OK (Vague D / E5).
     beginPostLeaveHomeTransition();
     const userId = getSupabaseUserId();
@@ -1625,6 +1645,14 @@ export async function leaveLobbyMembershipFromServer(membership) {
       clearTraitrePrivateLocalForLobby(membership.lobbyId);
     }
     performLobbyBoundaryTeardown();
+    // AUTH-SERVER-LEAVE-GUEST-01 — même contrat guest que leave volontaire.
+    await finalizeGuestAfterAuthoritativeLeave(
+      { wasGuest, canonicalElsewhere: false },
+      {
+        signOutAnonGuestIfNeeded,
+        clearGuestMembership,
+      }
+    );
     return result;
   });
 }
