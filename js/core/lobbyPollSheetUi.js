@@ -45,7 +45,7 @@ function leaderLabel(leader, options) {
 function renderCreateCta() {
   return `
     <div class="lobby-poll-cta">
-      <button type="button" class="btn btn-secondary lobby-poll__cta" data-poll-open-create>
+      <button type="button" class="btn btn-accent lobby-poll__cta" data-poll-open-create>
         📊 Faire voter le groupe
       </button>
     </div>`;

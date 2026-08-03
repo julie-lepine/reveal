@@ -4322,13 +4322,18 @@ body.has-bottom-nav .feedback-fab{
   text-shadow:none;
 }
 
-/* Sondage : secondary neutre, clairement distinct du rose */
-.chat-sheet__actions .lobby-poll__cta.btn-secondary{
+/* Sondage : indigo (color-secondary), même logique de contraste */
+.chat-sheet__actions .lobby-poll__cta.btn-accent{
   margin-top:0;
-  background:rgba(255,255,255,.08);
-  border:1px solid rgba(255,255,255,.18);
-  color:rgba(255,255,255,.88);
-  box-shadow:none;
+  background:linear-gradient(
+    135deg,
+    rgba(129, 140, 248, 0.72),
+    rgba(99, 102, 241, 0.68)
+  );
+  box-shadow:0 6px 20px rgba(99, 102, 241, 0.18);
+  color:#1a0a14;
+  text-shadow:none;
+  border:none;
 }
 
 .chat-random-cta__icon{
