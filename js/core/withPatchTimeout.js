@@ -17,8 +17,10 @@ export function withPatchTimeout(
 ) {
   if (!ms || ms <= 0) return promise;
   let timer;
+  // Normalise pour pouvoir attacher un catch orphelin après un timeout gagnant.
+  const tracked = Promise.resolve(promise);
   return Promise.race([
-    promise,
+    tracked,
     new Promise((_, reject) => {
       timer = setTimeout(
         () => reject(new Error(message || "Synchronisation trop longue.")),
@@ -27,5 +29,9 @@ export function withPatchTimeout(
     }),
   ]).finally(() => {
     clearTimeout(timer);
+    // Si le timeout gagne, le fetch sous-jacent peut encore rejeter plus tard
+    // (ex. NetworkError hors ligne). Sans observateur → Uncaught (in promise)
+    // attribué au await UI (speedVote.js:330). On consomme ce rejet tardif ici.
+    tracked.catch(() => {});
   });
 }

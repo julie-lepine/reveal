@@ -483,9 +483,14 @@ export function mountDilemma(app) {
         await commitDilemmaVote(pick);
         if (unmounted) return;
         selected = null;
-        myVote = pick;
-      } catch {
-        // Feedback déjà affiché ; session rollbackée via commitDilemmaVote.
+        // SoT = session après patch (pas un cache myVote qui masquerait A).
+        myVote = getDilemmaSession().votes?.[localName] ?? pick;
+      } catch (error) {
+        // Catch terminal UI :
+        // - feedback réseau déjà présenté en aval du commit ;
+        // - rollback déjà effectué par commitDilemmaVote ;
+        // - pas de seconde notification.
+        void error;
         voteFailed = true;
       } finally {
         voteCommitInFlight = null;
@@ -493,7 +498,10 @@ export function mountDilemma(app) {
         if (!unmounted) syncFromSession();
       }
       if (voteFailed) {
-        if (!unmounted) render();
+        if (!unmounted) {
+          myVote = getDilemmaSession().votes?.[localName] ?? null;
+          render();
+        }
         return;
       }
       if (unmounted) return;

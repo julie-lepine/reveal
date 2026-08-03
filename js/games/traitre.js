@@ -649,7 +649,9 @@ export function mountTraitre(app) {
       if (pick == null) return;
       try {
         await commitTraitreVote(pick);
-      } catch {
+      } catch (error) {
+        // Catch terminal UI : feedback + rollback déjà faits ; pas de 2e notif.
+        void error;
         if (!mount.isMounted() || !mount.isCurrentMount()) return;
         render();
         return;

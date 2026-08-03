@@ -597,9 +597,12 @@ export function mountWrongAnswer(app) {
       }
       try {
         await commitWrongAnswerAnswer(text);
-      } catch {
-        // Feedback déjà affiché. Session answers rollbackée ; draftText conservé
-        // pour retry sans fermer le clavier (WAO-02).
+      } catch (error) {
+        // Catch terminal UI :
+        // - feedback déjà présenté par patchGameStateWithFeedback ;
+        // - rollback answers déjà fait par commitWrongAnswerAnswer ;
+        // - draftText conservé pour retry ; pas de seconde notification (WAO-02).
+        void error;
         if (!mount.isMounted() || !mount.isCurrentMount()) return;
         syncFromSession();
         refreshWrongAnswerResponseProgress();
@@ -643,10 +646,13 @@ export function mountWrongAnswer(app) {
       if (target == null || target === localName) return;
       try {
         await commitWrongAnswerVote(target);
-      } catch {
+      } catch (error) {
+        // Catch terminal UI :
+        // - feedback déjà présenté ; rollback votes déjà fait ;
+        // - pas de seconde notification ; refresh chrome ciblé (WAO-03).
+        void error;
         if (!mount.isMounted() || !mount.isCurrentMount()) return;
         syncFromSession();
-        // WAO-03 : refresh chrome vote ciblé (pas de full render destructif).
         refreshWrongAnswerVoteProgress();
         return;
       }

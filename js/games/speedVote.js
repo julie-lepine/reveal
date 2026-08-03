@@ -321,37 +321,50 @@ export function mountSpeedVote(app) {
     bindExitGame(app);
 
     app.querySelectorAll("[data-vote-player]").forEach((btn) => {
-      btn.addEventListener("click", async () => {
-        if (phase !== "voting" || myVote) return;
+      btn.addEventListener("click", () => {
         const target = btn.getAttribute("data-vote-player");
-        if (!target) return;
-        if (mp) {
-          try {
-            await commitSpeedVoteVote(target);
-          } catch {
-            // Feedback déjà affiché par patchGameStateWithFeedback.
-            // Session rollbackée → myVote reste null ; re-vote possible.
-            if (!mount.isMounted() || !mount.isCurrentMount()) return;
-            syncFromSession();
-            render();
-            return;
-          }
-          if (!mount.isMounted()) return;
-          if (!mount.isCurrentMount()) return;
-          syncFromSession();
-          myVote = getSpeedVoteSession().votes?.[localName] ?? target;
-          if (allSpeedVoteVotesIn() && canActAsHost()) await goToReveal();
-          if (!mount.isMounted()) return;
-          if (!mount.isCurrentMount()) return;
-          render();
-        } else {
-          myVote = target;
-          votes = { ...votes, [localName]: target };
-          votes = simulateSpeedVoteLobbyVotes(target);
-          await goToReveal();
-        }
+        void handleSpeedVotePick(target);
       });
     });
+
+    async function handleSpeedVotePick(target) {
+      if (phase !== "voting" || myVote) return;
+      if (!target) return;
+      if (!mp) {
+        myVote = target;
+        votes = { ...votes, [localName]: target };
+        votes = simulateSpeedVoteLobbyVotes(target);
+        await goToReveal();
+        return;
+      }
+      try {
+        await commitSpeedVoteVote(target);
+      } catch (error) {
+        // Catch terminal UI (SYN-VOTE-ROLLBACK-01A) :
+        // - feedback déjà présenté par patchGameStateWithFeedback ;
+        // - rollback déjà effectué par commitSpeedVoteVote ;
+        // - pas de seconde notification ici ;
+        // - responsabilité : terminer le geste UI (grille re-votable).
+        void error;
+        if (!mount.isMounted() || !mount.isCurrentMount()) return;
+        syncFromSession();
+        myVote = getSpeedVoteSession().votes?.[localName] ?? null;
+        render();
+        return;
+      }
+      if (!mount.isMounted() || !mount.isCurrentMount()) return;
+      syncFromSession();
+      myVote = getSpeedVoteSession().votes?.[localName] ?? target;
+      if (allSpeedVoteVotesIn() && canActAsHost()) {
+        try {
+          await goToReveal();
+        } catch {
+          // Reveal : feedback éventuel ailleurs ; ne pas rollback le vote confirmé.
+        }
+      }
+      if (!mount.isMounted() || !mount.isCurrentMount()) return;
+      render();
+    }
 
     app.querySelector("#speedvote-force")?.addEventListener("click", () => {
       void forceReveal();

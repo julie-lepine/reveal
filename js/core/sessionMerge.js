@@ -4,6 +4,19 @@
 
 import { trimPlayerText } from "../../data/playerTextLimits.js";
 
+/**
+ * Catch-up Realtime des maps de votes (clés = display names après normalisation).
+ * Remote gagne sur les clés communes (changement A→B) ; clés purement locales
+ * (optimiste pas encore sur le serveur) sont conservées.
+ *
+ * @param {Record<string, unknown>|null|undefined} localVotes
+ * @param {Record<string, unknown>|null|undefined} remoteVotes
+ */
+export function mergePlayerVoteMapsForCatchUp(localVotes, remoteVotes) {
+  return { ...(localVotes || {}), ...(remoteVotes || {}) };
+}
+
+
 export function normalizeDilemmaEntry(entry) {
   if (!entry || typeof entry !== "object") return null;
   const optionA = trimPlayerText(entry.optionA);

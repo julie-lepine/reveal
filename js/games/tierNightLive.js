@@ -442,7 +442,9 @@ function mountMp(app, list) {
     if (session.phase !== "voting" || myVote()) return;
     try {
       await commitTierNightLiveVote(tier);
-    } catch {
+    } catch (error) {
+      // Catch terminal UI : feedback + rollback déjà faits ; pas de 2e notif.
+      void error;
       if (!mount.isMounted() || !mount.isCurrentMount()) return;
       reload();
       render();

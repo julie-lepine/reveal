@@ -136,6 +136,44 @@ describe("M-04b / SYN-18 — withPatchTimeout", () => {
     }
   });
 
+  it("3c — timeout puis NetworkError tardif : pas d'unhandledRejection", async () => {
+    const unhandled = [];
+    const onUnhandled = (reason) => {
+      unhandled.push(reason);
+    };
+    process.on("unhandledRejection", onUnhandled);
+
+    let rejectUnderlying;
+    const underlying = new Promise((_, reject) => {
+      rejectUnderlying = reject;
+    });
+
+    try {
+      const raced = withPatchTimeout(underlying, 1000);
+      const expectReject = assert.rejects(
+        raced,
+        (err) =>
+          err instanceof Error &&
+          err.message === "Synchronisation trop longue."
+      );
+      mock.timers.tick(1000);
+      await expectReject;
+
+      const lateNet = {
+        message: "TypeError: NetworkError when attempting to fetch resource.",
+        details: "",
+        hint: "",
+        code: "",
+      };
+      rejectUnderlying(lateNet);
+      await Promise.resolve();
+      await Promise.resolve();
+      assert.deepEqual(unhandled, [], "rejet orphelin du fetch doit être consommé");
+    } finally {
+      process.off("unhandledRejection", onUnhandled);
+    }
+  });
+
   it("3b — message custom conservé au timeout", async () => {
     const never = new Promise(() => {});
     const p = withPatchTimeout(never, 200, "Trop long custom.");

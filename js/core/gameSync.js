@@ -68,6 +68,7 @@ import {
   isNewSpeedVoteVoteRound,
   isNewTraitreVoteRound,
   isNewTraitreGame,
+  mergePlayerVoteMapsForCatchUp,
   isStaleTraitreVotePatch,
   isTraitreVoteResetAfterTie,
   isSubmissionsOnlyGamePatch,
@@ -1811,9 +1812,11 @@ function mergeDilemmaGameLocal(local, remote) {
   if (newVoteRound) {
     votes = remoteVotes;
   } else if (remote.phase === "voting") {
-    votes = { ...remoteVotes, ...localVotes };
+    // SYN-VOTE-ROLLBACK-01B : remote gagne (A→B). Ancien `{...remote,...local}`
+    // conservait A chez hôte/invités après un changement confirmé.
+    votes = mergePlayerVoteMapsForCatchUp(localVotes, remoteVotes);
   } else if (remote.phase === "reveal" || local.phase === "reveal") {
-    votes = { ...remoteVotes, ...localVotes };
+    votes = mergePlayerVoteMapsForCatchUp(localVotes, remoteVotes);
   }
   votes = normalizePlayerVotesMap(votes);
   return {

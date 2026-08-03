@@ -18,7 +18,7 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 |--|--|
 | **Maintenant** | **SYN-VOTE-ROLLBACK-01** (QA terrain) · **UX-DEVICE-01** |
 | **Ensuite** | Consensus reveal atomique · ARCH-23/10 QA natif · backlog produit |
-| **Dernière clôture** | **AUTH-LEAVE-*** ✅ · **UX-CHAT-01** ✅ · **UX-CHAT-02** ✅ · **FEATURE-VIBECHECK-01** ✅ · **UX-HOST-01** ✅ |
+| **Dernière clôture** | **AUTH-LEAVE-*** ✅ · **UX-CHAT-01** ✅ · **UX-CHAT-02** ✅ · **FEATURE-VIBECHECK-01** ✅ · **UX-HOST-01** ✅ | **GAME-WAO-01**✅ | 
 | **En attente QA finale** | **SYN-VOTE-ROLLBACK-01** · **ARCH-23** (SQL ✅) · **ARCH-10** mobile |
 | **Audit** | Transversal 2026-08-02 — AUTH leave orphans ✅ QA 2026-08-03 · optimistic submissions rollback 🔧 2026-08-03 |
 
@@ -39,7 +39,6 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 |----|-------|----------|----------|
 | **SYN-VOTE-ROLLBACK-01** | 7 | Rollback ciblé soumissions optimistes (votes + réponse WAO) | 🟡 **🔧 code + tests** · **QA terrain requise** |
 | **UX-DEVICE-01** | 11 | Écran verrouillé pendant une partie (Wake Lock API) | 🟡 |
-| ~~**GAME-WAO-01**~~ | — | Barème WAO : podium + 5/vote | 🟢 **code** · **QA terrain** |
 | **FEATURE-DILEMMA-01** | — | Plusieurs dilemmes par joueur | 🟡 |
 | **FEATURE-TIERNIGHT-01** | — | Thèmes personnalisés (Classer le groupe) | 🟡 |
 | **FEATURE-TIERNIGHT-02** | — | Séries de tierlists par catégories | 🟡 |
@@ -100,23 +99,24 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 
 Optimistic submissions rollback — Cause 7 résidu. **Ne pas clôturer** avant QA terrain.
 
-| ID | Commit / surface |
-|----|------------------|
-| **01A** | `commitSpeedVoteVote` + UI `myVote` post-succès |
-| **01B** | `commitDilemmaVote` |
-| **01C** | `commitWrongAnswerVote` + refresh vote ciblé |
-| **01D** | `commitTraitreVote` |
-| **01E** | `commitTierNightLiveVote` (`runId`) |
-| **01F** | `commitWrongAnswerAnswer` + draft / WAO-02 |
+| ID | Commit / surface | QA |
+|----|------------------|-----|
+| **01A** | `commitSpeedVoteVote` + UI `handleSpeedVotePick` | 🔧 re-QA : rejet non consommé (orphan `withPatchTimeout` + catch terminal) |
+| **01B** | `commitDilemmaVote` + merge catch-up A→B | 🔧 re-QA : divergence changement de vote |
+| **01C** | `commitWrongAnswerVote` + refresh vote ciblé | 🔧 QA |
+| **01D** | `commitTraitreVote` | 🔧 QA |
+| **01E** | `commitTierNightLiveVote` (`runId`) | 🔧 QA |
+| **01F** | `commitWrongAnswerAnswer` + draft / WAO-02 | 🔧 QA |
 
 | | |
 |--|--|
 | **Contrat** | `optimisticMapEntry.js` — apply / rollback ciblé · `hadPreviousValue` · delete réel · `attemptId` · garde `runId`/`phase`/`roundIdx` · rethrow après rollback |
-| **Où** | `optimisticMapEntry.js` · `*Session.js` (6 commits) · `speedVote.js` · `dilemma.js` · `wrongAnswer.js` · `traitre.js` · `tierNightLive.js` |
-| **Preuve auto** | `optimisticMapEntry` · `synVoteRollback01` · `synVoteRollback01Behavior` · non-régressions HT/GL/TM/Clutch/WAO-02/03/TierNight 04–05 |
-| **Hors scope** | `withPatchTimeout` orphans · Consensus reveal · `commitTraitreDealAck` (audit seul → ticket séparé recommandé) · SQL/RLS |
-| **Timeout** | Échec local peut être incertain ; Realtime peut réappliquer ; rollback tardif no-op si valeur remplacée |
-| **Statut** | **Implémentation terminée — tests automatisés verts — QA terrain requise** |
+| **QA fix 01A** | `withPatchTimeout` consomme rejet orphelin post-timeout · handlers UI catch terminal documenté · pas de double modale |
+| **QA fix 01B** | `mergePlayerVoteMapsForCatchUp` : remote gagne (A→B) · `mergeDilemmaGameLocal` · `myVote` dérivé session |
+| **Où** | `optimisticMapEntry.js` · `withPatchTimeout.js` · `sessionMerge.js` · `gameSync.js` · `*Session.js` · UI jeux |
+| **Preuve auto** | `optimisticMapEntry` · `synVoteRollback01*` · `dilemmaVoteChange` · `withPatchTimeout` 3c · WAO-02/03 · TierNight 04–05 |
+| **Hors scope** | orphan writes généraux hors race timeout · Consensus reveal · `commitTraitreDealAck` · SQL/RLS · migration name→UID globale |
+| **Statut** | **Correctifs QA 01A/01B implémentés — tests verts — re-QA SpeedVote + Dilemma requise** |
 
 #### ARCH-07 ✅ (clôture définitive · 2026-07-29)
 

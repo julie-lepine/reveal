@@ -143,7 +143,7 @@ export function mountWrongAnswerPrep(app) {
           <h2 class="screen-title">Préparation</h2>
           ${rulesButtonHtml("wronganswer")}
         </div>
-        <p class="game-intro">À chaque manche, une question s'affiche. Donne la <strong>pire réponse possible</strong> en secret. Les réponses sont anonymisées, puis tout le monde vote pour la pire. Tu marques 3 points par vote reçu.</p>
+        <p class="game-intro">À chaque manche, une question s'affiche. Donne la <strong>pire réponse possible</strong> en secret. Les réponses sont anonymisées, puis tout le monde vote pour la pire. Podium de manche : +15 / +10 / +5, plus +5 pts par vote reçu.</p>
 
         <div class="card">
           <p class="card-heading">Nombre de manches</p>
