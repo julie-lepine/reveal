@@ -4270,14 +4270,39 @@ body.has-bottom-nav .feedback-fab{
   display:none !important;
 }
 
+/* CTA chat partagées : même layout / typo (sondage + jeu aléatoire) */
+.lobby-poll__cta,
 .chat-random-cta__btn{
   width:100%;
+  margin-top:0;
+  font-size:13px;
   font-weight:800;
+  padding:10px 12px;
+  min-height:var(--touch-min);
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:8px;
+  line-height:1.2;
+  box-sizing:border-box;
+}
+
+.chat-random-cta__icon{
+  font-size:1em;
+  line-height:1;
+}
+
+.chat-random-cta__label{
+  font-size:inherit;
+  font-weight:inherit;
 }
 
 .chat-random-cta__btn:disabled{
-  opacity:.55;
+  opacity:.45;
   cursor:not-allowed;
+  filter:grayscale(.35);
+  box-shadow:none;
+  transform:none;
 }
 
 /* ─── FEATURE-CHAT-03 roulette ─── */
@@ -4386,10 +4411,28 @@ body.has-bottom-nav .feedback-fab{
 .chat-roulette__winner{
   display:flex;
   justify-content:center;
+  align-items:stretch;
+  width:100%;
+  margin:0 auto;
+  border-radius:16px;
+  border:1px solid rgba(255,255,255,.12);
+  overflow:hidden;
+  background:linear-gradient(90deg, rgba(255,60,172,.18), rgba(167,139,250,.2));
+  box-shadow:0 0 0 1px rgba(255,60,172,.12) inset;
+}
+
+.chat-roulette__winner .chat-roulette__card,
+.chat-roulette__winner .chat-roulette__card--winner{
+  width:100%;
+  background:transparent;
+}
+
+.chat-roulette__winner--pop{
+  animation:chat-roulette-pop .55s cubic-bezier(.2,.9,.2,1) both;
 }
 
 .chat-roulette__winner--pop .chat-roulette__card{
-  animation:chat-roulette-pop .55s cubic-bezier(.2,.9,.2,1) both;
+  animation:none;
 }
 
 @keyframes chat-roulette-pop{
@@ -4555,12 +4598,6 @@ body.has-bottom-nav .feedback-fab{
   flex-direction:column;
   gap:6px;
   align-items:stretch;
-}
-
-.lobby-poll__cta{
-  width:100%;
-  font-size:13px;
-  padding:10px 12px;
 }
 
 .lobby-poll__cancel{

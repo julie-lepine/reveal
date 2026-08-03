@@ -490,12 +490,13 @@ export function renderChatRandomGameCta(rootEl) {
     <div class="chat-random-cta">
       <button
         type="button"
-        class="btn btn-secondary chat-random-cta__btn"
+        class="btn btn-primary chat-random-cta__btn"
         data-chat-random-game
         ${enabled ? "" : "disabled"}
         title="${enabled ? "Lancer un jeu au hasard" : "Réservé à l'hôte"}"
       >
-        <span aria-hidden="true">🎲</span> Jeu aléatoire
+        <span class="chat-random-cta__icon" aria-hidden="true">🎲</span>
+        <span class="chat-random-cta__label">Jeu aléatoire</span>
       </button>
     </div>`;
 }
