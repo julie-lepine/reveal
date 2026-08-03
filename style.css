@@ -4310,27 +4310,20 @@ body.has-bottom-nav .feedback-fab{
   box-sizing:border-box;
 }
 
-/* Jeu aléatoire : rose adouci (moins vif que le gradient global) */
+/* Jeu aléatoire : rose adouci, opaque (lisible sur fond sombre) */
 .chat-sheet__actions .chat-random-cta__btn.btn-primary{
-  background:linear-gradient(
-    135deg,
-    rgba(255, 107, 107, 0.72),
-    rgba(255, 60, 172, 0.68)
-  );
-  box-shadow:0 6px 20px rgba(255, 60, 172, 0.18);
+  background:linear-gradient(135deg, #ff7a8a, #e84aad);
+  box-shadow:0 6px 20px rgba(255, 60, 172, 0.22);
   color:#1a0a14;
   text-shadow:none;
+  border:none;
 }
 
-/* Sondage : indigo (color-secondary), même logique de contraste */
+/* Sondage : indigo color-secondary, opaque — même contraste texte sombre */
 .chat-sheet__actions .lobby-poll__cta.btn-accent{
   margin-top:0;
-  background:linear-gradient(
-    135deg,
-    rgba(129, 140, 248, 0.72),
-    rgba(99, 102, 241, 0.68)
-  );
-  box-shadow:0 6px 20px rgba(99, 102, 241, 0.18);
+  background:linear-gradient(135deg, #8b93f7, #6b6ff0);
+  box-shadow:0 6px 20px rgba(99, 102, 241, 0.28);
   color:#1a0a14;
   text-shadow:none;
   border:none;
