@@ -40,7 +40,8 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 | ID | Cause | Problème | Priorité |
 |----|-------|----------|----------|
 | **FEATURE-TIERNIGHT-01** | — | Thèmes personnalisés (Classer le groupe) | 🟡 |
-| **UX-TIERNIGHT-END-01** | — | Alléger récap fin de manche (retirer « Points de la manche ») | 🟡 code · **QA terrain** |
+| **UX-TIERNIGHT-END-01** | — | Alléger récap (retirer « Points de la manche ») | 🟡 code · **QA terrain** |
+| **UX-TIERNIGHT-END-02** | — | Fusion détail scoring dans la carte récap locale | 🟡 code · **QA terrain** |
 | **TIERNIGHT** | — | navigation
 
 ### Dette / opportunité

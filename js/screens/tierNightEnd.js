@@ -76,45 +76,73 @@ function consensusBoardHtml(consensus, labelFn = (i) => i) {
     </div>`;
 }
 
-function tierScoreBreakdownHtml(playerName, session, labelFn = (i) => i) {
-  const breakdown = getTierNightScoreBreakdownForPlayer(playerName, session);
-  if (!breakdown?.rows?.length) return "";
+/**
+ * UX-TIERNIGHT-END-02 — détail scoring intégré à la carte récap locale uniquement.
+ * Autres joueurs : tierlist compacte inchangée.
+ */
+function recapCardHtml(r, { isLocal = false, breakdown = null, labelFn = (i) => i } = {}) {
+  const scoreByItem = new Map(
+    (breakdown?.rows || []).map((row) => [row.item, row])
+  );
+  const hasLocalScores = isLocal && scoreByItem.size > 0;
 
-  const rows = breakdown.rows
-    .map(
-      (row) => `
-        <div class="tier-score-breakdown__row">
-          <span class="tier-score-breakdown__item">${escapeHtml(labelFn(row.item))}</span>
-          <span class="tier-score-breakdown__tiers">toi ${row.localTier} · groupe ${row.consensusTier}</span>
-          <strong class="tier-score-breakdown__pts ${row.pts > 0 ? "tier-score-breakdown__pts--gain" : ""}">${row.pts > 0 ? `+${row.pts}` : "0"}</strong>
-        </div>`
-    )
-    .join("");
+  const tiersHtml = hasLocalScores
+    ? TIER_LEVELS.map((tier) => {
+        const items = r.placed?.[tier] || [];
+        if (!items.length) return "";
+        return items
+          .map((item) => {
+            const row = scoreByItem.get(item);
+            const pts = row?.pts ?? 0;
+            const consensusTier = row?.consensusTier || "?";
+            return `
+                <div class="recap-tier recap-tier--scored">
+                  <span class="recap-tier__label" style="color:${TIER_COLORS[tier]}">${tier}</span>
+                  <span class="recap-tier__items">${escapeHtml(labelFn(item))}</span>
+                  <span class="recap-tier__meta">groupe ${escapeHtml(consensusTier)} · <strong class="${pts > 0 ? "recap-tier__pts--gain" : ""}">${pts > 0 ? `+${pts}` : "0"}</strong></span>
+                </div>`;
+          })
+          .join("");
+      }).join("")
+    : TIER_LEVELS.map((tier) => {
+        const items = r.placed?.[tier] || [];
+        if (!items.length) return "";
+        return `
+                <div class="recap-tier">
+                  <span class="recap-tier__label" style="color:${TIER_COLORS[tier]}">${tier}</span>
+                  <span class="recap-tier__items">${items.map((i) => escapeHtml(labelFn(i))).join(" · ")}</span>
+                </div>`;
+      }).join("");
 
-  const outsiderLine =
-    breakdown.outsiderBonus > 0
-      ? `<div class="tier-score-breakdown__row tier-score-breakdown__row--bonus">
-          <span class="tier-score-breakdown__item">Bonus outsider</span>
-          <span class="tier-score-breakdown__tiers">item le plus clivant</span>
-          <strong class="tier-score-breakdown__pts tier-score-breakdown__pts--gain">+${breakdown.outsiderBonus}</strong>
-        </div>`
+  const outsiderHtml =
+    hasLocalScores && breakdown.outsiderBonus > 0
+      ? `
+              <div class="recap-tier recap-tier--bonus">
+                <span class="recap-tier__label">🎖️</span>
+                <span class="recap-tier__items">Bonus outsider</span>
+                <span class="recap-tier__meta"><strong class="recap-tier__pts--gain">+${breakdown.outsiderBonus}</strong></span>
+              </div>`
       : "";
 
+  const hintHtml = hasLocalScores
+    ? `<p class="recap-card__hint">${
+        breakdown.reverse
+          ? "Mode à contre-courant"
+          : "+15 même tier · +10 à 1 écart (moyenne)"
+      }</p>`
+    : "";
+
   return `
-    <div class="card tier-score-breakdown">
-      <p class="card-heading">📋 Détail de tes points</p>
-      <p class="hint">Moyenne sur ${breakdown.itemCount} item(s) · ${
-        breakdown.reverse ? "mode à contre-courant" : "+15 même tier, +10 à 1 écart"
-      }</p>
-      <div class="tier-score-breakdown__list">
-        ${rows}
-        ${outsiderLine}
-        <div class="tier-score-breakdown__total">
-          <span>Total manche</span>
-          <strong>+${breakdown.total}</strong>
-        </div>
-      </div>
-    </div>`;
+            <div class="card recap-card${isLocal ? " recap-card--local" : ""}">
+              <div class="recap-card__head">
+                <span class="recap-card__avatar" style="background:${r.color}">${r.emoji}</span>
+                <span class="recap-card__name">${escapeHtml(r.player)}</span>
+                <span class="recap-card__pts">+${r.consensusPoints ?? 0} pts</span>
+              </div>
+              ${hintHtml}
+              ${tiersHtml}
+              ${outsiderHtml}
+            </div>`;
 }
 
 /** Mise en scène de l'item le plus clivant (#1) + bonus outsider (#3). */
@@ -244,35 +272,23 @@ export function mountTierNightEnd(app) {
     if (!mount.isCurrentMount()) return;
     reloadSession();
     const labelFn = makeItemLabel(session, recaps);
+    const localBreakdown = getTierNightScoreBreakdownForPlayer(localName, session);
     const content = `
         <p class="label-upper label-upper--gold">🏆 Tier Night</p>
         <h2 class="screen-title">Récap des classements</h2>
         <p class="game-intro">« ${escapeHtml(session.listName || "Tier list")} » - +${session.localConsensusPoints ?? 0} pts consensus pour toi cette manche.</p>
         ${consensusBoardHtml(session.consensus, labelFn)}
         ${controversialHtml(session, recaps, labelFn)}
-        ${tierScoreBreakdownHtml(localName, session, labelFn)}
         ${gameCumulativeScoresHtml({ gameId: "tiernight", gameLabel: "Tier Night", title: "Cumul des scores" })}
         <div class="recap-list">
           ${recaps.length
             ? recaps
-                .map(
-                  (r) => `
-            <div class="card recap-card">
-              <div class="recap-card__head">
-                <span class="recap-card__avatar" style="background:${r.color}">${r.emoji}</span>
-                <span class="recap-card__name">${escapeHtml(r.player)}</span>
-                <span class="recap-card__pts">+${r.consensusPoints ?? 0} pts</span>
-              </div>
-              ${TIER_LEVELS.map((tier) => {
-                const items = r.placed[tier] || [];
-                if (!items.length) return "";
-                return `
-                <div class="recap-tier">
-                  <span class="recap-tier__label" style="color:${TIER_COLORS[tier]}">${tier}</span>
-                  <span class="recap-tier__items">${items.map((i) => escapeHtml(labelFn(i))).join(" · ")}</span>
-                </div>`;
-              }).join("")}
-            </div>`
+                .map((r) =>
+                  recapCardHtml(r, {
+                    isLocal: r.player === localName,
+                    breakdown: r.player === localName ? localBreakdown : null,
+                    labelFn,
+                  })
                 )
                 .join("")
             : `<p class="hint">Chargement des classements…</p>`}

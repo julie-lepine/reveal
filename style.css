@@ -1276,68 +1276,6 @@ button.game-card{
   font-size:.88rem;
 }
 
-.tier-score-breakdown{
-  margin-bottom:14px;
-}
-
-.tier-score-breakdown__list{
-  display:flex;
-  flex-direction:column;
-  gap:8px;
-  margin-top:10px;
-}
-
-.tier-score-breakdown__row{
-  display:grid;
-  grid-template-columns:1fr auto auto;
-  gap:8px;
-  align-items:center;
-  padding:8px 10px;
-  border-radius:10px;
-  background:rgba(255,255,255,.04);
-  font-size:.85rem;
-}
-
-.tier-score-breakdown__row--bonus{
-  background:rgba(251,191,36,.08);
-  border:1px solid rgba(251,191,36,.2);
-}
-
-.tier-score-breakdown__item{
-  font-weight:600;
-  color:rgba(255,255,255,.92);
-  min-width:0;
-  overflow:hidden;
-  text-overflow:ellipsis;
-  white-space:nowrap;
-}
-
-.tier-score-breakdown__tiers{
-  font-size:.78rem;
-  color:rgba(255,255,255,.5);
-  white-space:nowrap;
-}
-
-.tier-score-breakdown__pts{
-  font-weight:800;
-  color:rgba(255,255,255,.35);
-}
-
-.tier-score-breakdown__pts--gain{
-  color:#4ade80;
-}
-
-.tier-score-breakdown__total{
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
-  margin-top:4px;
-  padding:10px 12px;
-  border-radius:10px;
-  background:rgba(167,139,250,.15);
-  font-weight:700;
-}
-
 .podium__badge{
   display:block;
   font-size:.72rem;
@@ -2256,6 +2194,16 @@ select.field-input option{
   white-space:nowrap;
 }
 
+.recap-card--local{
+  border:1px solid rgba(167,139,250,.28);
+}
+
+.recap-card__hint{
+  margin:8px 0 0;
+  font-size:12px;
+  color:rgba(255,255,255,.45);
+}
+
 .recap-tier{
   display:flex;
   gap:10px;
@@ -2263,6 +2211,33 @@ select.field-input option{
   margin-top:8px;
   font-size:13px;
   line-height:1.4;
+}
+
+.recap-tier--scored,
+.recap-tier--bonus{
+  display:grid;
+  grid-template-columns:18px 1fr auto;
+  gap:8px;
+  align-items:center;
+}
+
+.recap-tier--bonus{
+  margin-top:10px;
+  padding:8px 10px;
+  border-radius:10px;
+  background:rgba(251,191,36,.08);
+  border:1px solid rgba(251,191,36,.2);
+}
+
+.recap-tier__meta{
+  font-size:12px;
+  color:rgba(255,255,255,.5);
+  white-space:nowrap;
+}
+
+.recap-tier__pts--gain{
+  color:#4ADE80;
+  font-weight:800;
 }
 
 .recap-tier__label{
