@@ -13,8 +13,9 @@ import {
   TIER_NIGHT_MODES,
   TIER_NIGHT_ROSTER_TOPICS,
   DEFAULT_TIER_NIGHT_MODE,
+  normalizeTierNightMode,
 } from "../../data/tierTopics.js";
-import { navigate } from "../core/router.js";
+import { navigate, getScreenParams } from "../core/router.js";
 import {
   isGameSyncActive,
   isLobbyHost,
@@ -105,8 +106,14 @@ function renderRosterCard(topic, { custom = false, canDelete = false } = {}) {
 }
 
 export function mountTierNightSelect(app) {
-  let step = "mode";
-  let selectedMode = DEFAULT_TIER_NIGHT_MODE;
+  const params = getScreenParams() || {};
+  let selectedMode = normalizeTierNightMode(params.mode || DEFAULT_TIER_NIGHT_MODE);
+  let step =
+    params.step === "topic" || params.step === "list" || params.step === "mode"
+      ? params.step
+      : "mode";
+  if (step === "topic") selectedMode = "roster";
+  if (step === "list") selectedMode = "live";
 
   async function ensureHost() {
     if (isGameSyncActive() && !isLobbyHost()) {
@@ -274,10 +281,14 @@ export function mountTierNightSelect(app) {
     else if (step === "topic") content = topicStepHtml();
     else content = listStepHtml();
 
+    // UX-TIERNIGHT-NAV-01 : un seul retour contextuel.
+    // Niveau mode → shell back (jeux). Niveau topic/list → inline « Modes » uniquement.
+    const onModeLevel = step === "mode";
     app.innerHTML = pageShell({
+      back: onModeLevel,
       backTarget: "back",
       content: `
-        ${step !== "mode" ? `<button type="button" class="btn-back-inline" data-tier-back>‹ Modes</button>` : ""}
+        ${!onModeLevel ? `<button type="button" class="btn-back-inline" data-tier-back>‹ Modes</button>` : ""}
         ${content}
       `,
     });

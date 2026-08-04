@@ -14,11 +14,16 @@ import { navigateAfterGameLaunch } from "../core/mpLaunch.js";
 import { pageShell } from "../core/ui.js";
 import { checkHotTakeModeration, getModerationNotice } from "../core/hotTakeSession.js";
 import { showAppAlert } from "../core/dialog.js";
+import { returnToTierNightSelectStep } from "../core/tierNightNav.js";
 import { bindNav } from "./nav.js";
+
+function returnToLiveListSelect() {
+  returnToTierNightSelectStep({ step: "list", mode: "live" });
+}
 
 export function mountTierNightCreate(app) {
   app.innerHTML = pageShell({
-    backTarget: "back",
+    backTarget: "tiernight-live-lists",
     content: `
       <p class="label-upper label-upper--gold">⚡ Rank live</p>
       <h2 class="screen-title">Créer ma tier list</h2>
@@ -119,7 +124,9 @@ export function mountTierNightCreate(app) {
     })();
   });
 
-  bindNav(app);
+  bindNav(app, {
+    "tiernight-live-lists": returnToLiveListSelect,
+  });
   validate();
   return null;
 }

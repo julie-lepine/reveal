@@ -1,4 +1,3 @@
-import { navigate } from "../core/router.js";
 import { pageShell } from "../core/ui.js";
 import { checkHotTakeModeration, getModerationNotice } from "../core/hotTakeSession.js";
 import {
@@ -6,11 +5,16 @@ import {
   ROSTER_TOPIC_NAME_MIN,
 } from "../core/customRosterTopics.js";
 import { addCustomRosterTopicAndSync } from "../core/customRosterTopicSession.js";
+import { returnToTierNightSelectStep } from "../core/tierNightNav.js";
 import { bindNav } from "./nav.js";
+
+function returnToRosterTopicSelect() {
+  returnToTierNightSelectStep({ step: "topic", mode: "roster" });
+}
 
 export function mountTierNightCreateRoster(app) {
   app.innerHTML = pageShell({
-    backTarget: "back",
+    backTarget: "tiernight-roster-topics",
     content: `
       <p class="label-upper label-upper--gold">👥 Classe le groupe</p>
       <h2 class="screen-title">Créer mon thème</h2>
@@ -78,7 +82,8 @@ export function mountTierNightCreateRoster(app) {
           validate();
           return;
         }
-        navigate("tiernight-select");
+        // UX-TIERNIGHT-NAV-01 : retour sélection thèmes roster (pas choix des modes).
+        returnToRosterTopicSelect();
       } catch (e) {
         const errEl = app.querySelector("#roster-topic-error");
         if (errEl) {
@@ -90,7 +95,9 @@ export function mountTierNightCreateRoster(app) {
     })();
   });
 
-  bindNav(app);
+  bindNav(app, {
+    "tiernight-roster-topics": returnToRosterTopicSelect,
+  });
   validate();
   return null;
 }
