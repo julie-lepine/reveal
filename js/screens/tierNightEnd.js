@@ -2,7 +2,6 @@ import { TIER_LEVELS, TIER_COLORS } from "../../data/tierTopics.js";
 import {
   getTierNightRecaps,
   getTierNightSession,
-  getTierNightRoundPointsSorted,
   getTierNightScoreBreakdownForPlayer,
 } from "../core/tierNightSession.js";
 import { getTierListById } from "../core/tierLists.js";
@@ -21,7 +20,6 @@ import {
 } from "../core/gameSync.js";
 import {
   gameCumulativeScoresHtml,
-  tierNightRoundScoresHtml,
   refreshGameScoresBox,
 } from "../core/gameScores.js";
 import { navigate } from "../core/router.js";
@@ -245,7 +243,6 @@ export function mountTierNightEnd(app) {
     if (!mount.isMounted()) return;
     if (!mount.isCurrentMount()) return;
     reloadSession();
-    const roundSorted = getTierNightRoundPointsSorted();
     const labelFn = makeItemLabel(session, recaps);
     const content = `
         <p class="label-upper label-upper--gold">🏆 Tier Night</p>
@@ -254,7 +251,6 @@ export function mountTierNightEnd(app) {
         ${consensusBoardHtml(session.consensus, labelFn)}
         ${controversialHtml(session, recaps, labelFn)}
         ${tierScoreBreakdownHtml(localName, session, labelFn)}
-        ${tierNightRoundScoresHtml(roundSorted)}
         ${gameCumulativeScoresHtml({ gameId: "tiernight", gameLabel: "Tier Night", title: "Cumul des scores" })}
         <div class="recap-list">
           ${recaps.length

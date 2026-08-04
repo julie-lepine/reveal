@@ -2256,10 +2256,6 @@ select.field-input option{
   white-space:nowrap;
 }
 
-.game-scores-box--round{
-  margin-bottom:16px;
-}
-
 .recap-tier{
   display:flex;
   gap:10px;

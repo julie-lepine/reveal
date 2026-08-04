@@ -16,10 +16,10 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 
 | | |
 |--|--|
-| **Maintenant** | Backlog produit : **FEATURE-TIERNIGHT-01** · **FEATURE-TIERNIGHT-02** · **UX-DEVICE-01** (dernier ticket produit convenu) |
+| **Maintenant** | Backlog produit : **FEATURE-TIERNIGHT-01** · **UX-DEVICE-01** (dernier ticket produit convenu) |
 | **En fin de vague** | **ARCH-23** / **ARCH-10** QA natif — **après** clôture des tickets produit ouverts (code + SQL déjà livrés · QA différée deploy Capacitor) |
 | **Dette** | ARCH-05 · ARCH-01 · ARCH-11–17 · SYN-19–24 · SYN-27 · Fil Rouge / VibeCheck cleanup |
-| **Audit** | Transversal 2026-08-02 — optimistic submissions ✅ · Deal ACK ✅ · **FEATURE-CHAT-03 ✅** · **FEATURE-DILEMMA-01 ✅** QA 2026-08-04 |
+| **Audit** | Transversal 2026-08-02 — optimistic submissions ✅ · Deal ACK ✅ · **FEATURE-CHAT-03 ✅** · **FEATURE-DILEMMA-01 ✅** · **FEATURE-TIERNIGHT-02 ✅** QA 2026-08-04 |
 
 > ~~« Consensus reveal atomique »~~ — **aucun ticket** à cet intitulé dans l’audit (reliquat probable d’une note type Trivia 01B, jamais formalisé). Ne pas traiter comme chantier ouvert.
 
@@ -40,9 +40,8 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 | ID | Cause | Problème | Priorité |
 |----|-------|----------|----------|
 | **FEATURE-TIERNIGHT-01** | — | Thèmes personnalisés (Classer le groupe) | 🟡 |
-| **FEATURE-TIERNIGHT-02** | — | Séries de tierlists par catégories | 🟡 |
-| **TIERNIGHT** | — | Trop dinfos en fn de manche, supprimer -points de la manche- qui est redondant avec la visu des tierlists des joueurs | 🟡 |
-| **TIERNIGHT** | — | une fois tier custom validée, retour sur modes et non tiernight
+| **UX-TIERNIGHT-END-01** | — | Alléger récap fin de manche (retirer « Points de la manche ») | 🟡 code · **QA terrain** |
+| **TIERNIGHT** | — | navigation
 
 ### Dette / opportunité
 
@@ -67,7 +66,7 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 | 8 | Reset / migration incomplète | Partiel | **BUG-TIERNIGHT-05 ✅** · **OPS-LOBBY-04 ✅** · **BUG-LOBBY-XX-E ✅** · **BUG-TRUTHMETER-02 ✅** · **ARCH-23** · ARCH-10 · **BUG-LOBBY-XX ✅** · I-09/SYN-15/16 ✅ |
 | 9 | Sync monolithe / duplication | Dette | ARCH-11… |
 | 10 | Code mort | Dette | **FEATURE-VIBECHECK-01 ✅** · hors Fil Rouge app ✅ |
-| 11 | Friction UX | Partiel | **UX-DEVICE-01** 🟡 · **FEATURE-DILEMMA-01 ✅** · **FEATURE-CHAT-03 ✅** · **UX-CHAT-01 ✅** · **UX-CHAT-02 ✅** · **UX-HOST-01 ✅** · **BUG-WAO-04** ✅ · **ARCH-23** · ARCH-22/Loader ✅ · **L-04 ✅** |
+| 11 | Friction UX | Partiel | **UX-DEVICE-01** 🟡 · **FEATURE-DILEMMA-01 ✅** · **FEATURE-TIERNIGHT-02 ✅** · **FEATURE-CHAT-03 ✅** · **UX-CHAT-01 ✅** · **UX-CHAT-02 ✅** · **UX-HOST-01 ✅** · **BUG-WAO-04** ✅ · **ARCH-23** · ARCH-22/Loader ✅ · **L-04 ✅** |
 
 ---
 
@@ -294,6 +293,22 @@ Multi-custom Dilemma : plusieurs propositions par joueur, deck cohérent, sync M
 | **Hors scope** | Hot Take deck (schéma inchangé) · votes · scoring · round count · contrat leave customs persistants |
 | **Verdict** | **Ne pas rouvrir** sauf régression multi-custom / deck / compteur / sync prep démontrée |
 
+#### FEATURE-TIERNIGHT-02 ✅ (clôture QA terrain · 2026-08-04)
+
+Thèmes roster « Classe le groupe » multi-joueurs : sync lobby-scoped, anti lost-update, hydratation hôte après changement de jeu. **Ne pas rouvrir** sans régression démontrée.
+
+| | |
+|--|--|
+| **Produit** | Tous les joueurs créent · tous voient tous les thèmes · delete auteur-only · seul l’hôte lance · cycle de vie lobby (pas bibliothèque permanente) |
+| **Écriture** | RPC unique hôte=invité (`upsert`/`delete_player_custom_entry`, `game: "tiernight"`) · jamais de republication tableau complet via `patchGameState` |
+| **Anti lost-update** | Strip collection des patches génériques · préservation SQL sur replace (`upsert_game_session_preserving_roster_topics`) · **même filet sur `pushGameSessionInner`** (launch mode push) |
+| **Hydratation** | `mergeCustomRosterTopics` remote-first · ownership `authorUid` · garde remote `[]` vs local multi-auteurs |
+| **Où** | `customRosterTopicSession.js` · `customRosterTopicsSyncGuard.js` · `sessionMerge.js` · `gameSync.js` · `tierNightSelect.js` · `supabaseGame.js` |
+| **SQL** | [`feature-tiernight-02-custom-roster-sync.sql`](../supabase/feature-tiernight-02-custom-roster-sync.sql) · [`feature-tiernight-02-lost-update-fix.sql`](../supabase/feature-tiernight-02-lost-update-fix.sql) |
+| **Preuve** | `featureTierNight02CustomRosterSync` · `featureTierNight01CustomRoster` · QA terrain 2026-08-04 (créations · transition jeu · refresh · deletes · nouveau lobby vide) |
+| **Hors scope** | Séries de tierlists / catégories (autre chantier produit si besoin) · Rank Live `customTierLists` |
+| **Verdict** | **Ne pas rouvrir** sauf régression sync thèmes / amputation hôte après changement de jeu démontrée |
+
 #### BUG-TRIVIA-01A ✅ (clôture QA terrain · 2026-07-31)
 
 Acting host Trivia : transitions `question → reveal → next → final` via patches explicites + validation SQL.
@@ -391,7 +406,7 @@ Retour terrain multi-jeux. Priorités : 🔴 critique · 🟠 haute · 🟡 moye
 | ~~**GAME-WAO-01**~~ | Barème Wrong Answer Only | ✅ **Décision 2026-08-03** — podium **15/10/5** conservé **+ 5 pts / vote reçu**. `WRONG_ANSWER_POINTS_PER_VOTE` · `wrongAnswerScoring` · `gameRules`. **QA terrain** avant clôture. |
 | ~~**FEATURE-DILEMMA-01**~~ | ~~Plusieurs dilemmes par joueur~~ | ✅ **Clôturé QA 2026-08-04** — multi-custom sans plafond · deck customs prioritaires + shuffle global · correctifs compteur / leave / sync. Ne pas rouvrir. |
 | **FEATURE-TIERNIGHT-01** | Thèmes personnalisés | Mode « Classer le groupe » : créer son propre thème (ex. « Qui survivrait le plus longtemps sur une île ? ») comme base de la tierlist. |
-| **FEATURE-TIERNIGHT-02** | Séries de tierlists | Plus de tierlists officielles · organisées par catégories · enchaînement de plusieurs tierlists dans une manche · révélation finale classement global. UX à définir. |
+| ~~**FEATURE-TIERNIGHT-02**~~ | ~~Thèmes roster multi-joueurs + sync~~ | ✅ **Clôturé QA terrain 2026-08-04** — tous créent · RPC atomique · strip patch · préservation `push`/`start`/`complete` · merge remote-first · delete auteur-only · lancement hôte-only. Ne pas rouvrir. |
 | ~~**FEATURE-CHAT-03**~~ | ~~Roulette « Jeu aléatoire »~~ | ✅ **Clôturé QA terrain 2026-08-03** — CTA chat · soft voice · bridge sondage · tirage libre + anti-répétition immédiate · TTL hybride · `rouletteId`/`attemptId` · permit launch · sync Realtime · fermeture chat→prep. Ne pas rouvrir. |
 
 ---

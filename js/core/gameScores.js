@@ -3,7 +3,6 @@ import { getCurrentSessionScoreMap, getState } from "./state.js";
 import { escapeHtml } from "./ui.js";
 import {
   sortAndRankByScore,
-  withCompetitionRanks,
 } from "./competitionRank.js";
 import { resolveEveningGameScoreOrder } from "./gameScoreOrder.js";
 
@@ -50,36 +49,6 @@ function gameScoresBoxRowsHtml(players, scores) {
         </div>`;
     })
     .join("");
-}
-
-/** Points consensus de la manche Tier Night (tous les joueurs). */
-export function tierNightRoundScoresHtml(recaps, { title = "Points de la manche" } = {}) {
-  if (!recaps?.length) return "";
-  const sorted = [...recaps].sort(
-    (a, b) =>
-      (b.consensusPoints ?? 0) - (a.consensusPoints ?? 0) ||
-      String(a.player || "").localeCompare(String(b.player || ""))
-  );
-  const ranked = withCompetitionRanks(sorted, (r) => r.consensusPoints ?? 0);
-  const rows = ranked
-    .map((r) => {
-      const pts = r.consensusPoints ?? 0;
-      return `
-        <div class="game-scores-box__row">
-          <span class="game-scores-box__rank">${r.rank}</span>
-          <div class="avatar avatar--sm" style="background:${r.color}">${r.emoji}</div>
-          <span class="player-name game-scores-box__name">${escapeHtml(r.player)}</span>
-          <span class="player-score ${r.rank === 1 && pts > 0 ? "player-score--gold" : ""}">+${pts}</span>
-        </div>`;
-    })
-    .join("");
-
-  return `
-    <div class="card game-scores-box game-scores-box--round" data-scores="round">
-      <p class="card-heading game-scores-box__title">${escapeHtml(title)}</p>
-      <p class="game-scores-box__game">Moyenne proximité consensus (+15 / +10) · bonus outsider inclus</p>
-      ${rows}
-    </div>`;
 }
 
 const GAME_LABELS = {

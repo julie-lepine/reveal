@@ -246,10 +246,3 @@ export function getTierNightRecaps() {
 export function getTierConsensus() {
   return getTierNightSession().consensus;
 }
-
-/** Points de la manche Tier Night, triés (pour l’écran récap). */
-export function getTierNightRoundPointsSorted() {
-  return [...getTierNightRecaps()].sort(
-    (a, b) => (b.consensusPoints ?? 0) - (a.consensusPoints ?? 0)
-  );
-}
