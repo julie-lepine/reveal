@@ -66,3 +66,26 @@ export function detectPlayerContribution(stateMerge, localUid) {
 export function stateKeyToGameId(stateKey) {
   return STATE_KEY_TO_GAME[stateKey] || null;
 }
+
+/**
+ * Contribution ciblée roulette : `{ chatRoulette: { reactionsByUid: { [uid]: value } } }`.
+ * @param {object} stateMerge
+ * @param {string|null} localUid
+ * @returns {{ reaction: string|null } | null}
+ */
+export function detectChatRouletteReactionContribution(stateMerge, localUid) {
+  if (!stateMerge || typeof stateMerge !== "object" || !localUid) return null;
+  const topKeys = Object.keys(stateMerge);
+  if (topKeys.length !== 1 || topKeys[0] !== "chatRoulette") return null;
+  const inc = stateMerge.chatRoulette;
+  if (!inc || typeof inc !== "object") return null;
+  const mapKeys = Object.keys(inc);
+  if (mapKeys.length !== 1 || mapKeys[0] !== "reactionsByUid") return null;
+  const map = inc.reactionsByUid;
+  if (!map || typeof map !== "object" || Array.isArray(map)) return null;
+  const uids = Object.keys(map);
+  if (uids.length !== 1 || uids[0] !== localUid) return null;
+  const value = map[localUid];
+  if (value != null && typeof value !== "string") return null;
+  return { reaction: value == null ? null : value };
+}

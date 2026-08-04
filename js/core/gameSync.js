@@ -124,6 +124,7 @@ export { withPatchTimeout };
 export { pickRemotePlayFields, PLAY_PATCH_EXCLUDE } from "./playPatch.js";
 import {
   detectPlayerContribution,
+  detectChatRouletteReactionContribution,
   stateKeyToGameId,
 } from "./playerContribution.js";
 import {
@@ -4141,6 +4142,16 @@ async function patchGameStateAsNonHost(
     throw new Error(eveningPolicy.error || EVENING_SCORES_RESERVED_MSG);
   }
 
+  const rouletteReaction = detectChatRouletteReactionContribution(stateMerge, uid);
+  if (rouletteReaction) {
+    const { persistChatRouletteReactionRemote } = await import(
+      "./chatRandomGameReaction.js"
+    );
+    return persistChatRouletteReactionRemote({
+      reaction: rouletteReaction.reaction,
+    });
+  }
+
   const contribution = detectPlayerContribution(stateMerge, uid);
   if (contribution) {
     arch03RevealLog("route contribute_game_session_player", contribution);
@@ -4241,6 +4252,23 @@ async function patchGameStateInner(
   // I-08 : seul l'hôte réel conserve updateGameSession
   if (!isLobbyHost()) {
     return patchGameStateAsNonHost(stateMerge, { screen, gameId, withEveningScores });
+  }
+
+  const hostUid = getSupabaseUserId();
+  const hostRouletteReaction =
+    hostUid && Object.keys(stateMerge || {}).length === 1
+      ? detectChatRouletteReactionContribution(stateMerge, hostUid)
+      : null;
+  if (hostRouletteReaction) {
+    arch03RevealLog("route host contribute_chat_roulette_reaction", {
+      reaction: hostRouletteReaction.reaction,
+    });
+    const { persistChatRouletteReactionRemote } = await import(
+      "./chatRandomGameReaction.js"
+    );
+    return persistChatRouletteReactionRemote({
+      reaction: hostRouletteReaction.reaction,
+    });
   }
 
   let mergePayload = stateMerge;
@@ -4556,6 +4584,9 @@ async function patchGameStateInner(
         }
       : incGl;
     }
+  }
+  if (mergePayload.chatRoulette) {
+    nextState.chatRoulette = mergePayload.chatRoulette;
   }
   const patch = { state: nextState };
   if (screen) patch.screen = screen;

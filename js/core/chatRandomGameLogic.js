@@ -71,6 +71,19 @@ export const CHAT_ROULETTE_SERVER_AGE_SKEW_MS = 15_000;
 
 export const CHAT_ROULETTE_STATE_KEY = "chatRoulette";
 
+/** Réactions éphémères par tirage (FEATURE-CHAT-03). */
+export const CHAT_ROULETTE_REACTION_IDS = ["in", "bof", "funny", "curious"];
+
+/** @type {ReadonlyArray<{ id: string, emoji: string, label: string }>} */
+export const CHAT_ROULETTE_REACTION_DEFS = [
+  { id: "in", emoji: "🔥", label: "J'en suis !" },
+  { id: "bof", emoji: "😅", label: "Bof..." },
+  { id: "funny", emoji: "😂", label: "Ça promet !" },
+  { id: "curious", emoji: "👀", label: "Pourquoi pas ?" },
+];
+
+const CHAT_ROULETTE_REACTION_ID_SET = new Set(CHAT_ROULETTE_REACTION_IDS);
+
 /** Écrans hub où la CTA / la roulette a du sens (aligné sondages). */
 export const CHAT_ROULETTE_LOCAL_SCREENS = new Set([
   "game-select",
@@ -241,6 +254,28 @@ export function computeChatRouletteExpiresAt(
 
 /**
  * @param {unknown} raw
+ * @returns {Record<string, "in"|"bof"|"funny"|"curious">}
+ */
+export function normalizeChatRouletteReactionsByUid(raw) {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+  /** @type {Record<string, "in"|"bof"|"funny"|"curious">} */
+  const out = {};
+  for (const [uid, value] of Object.entries(raw)) {
+    const id = String(value || "").trim();
+    const key = String(uid || "").trim();
+    if (!key || !CHAT_ROULETTE_REACTION_ID_SET.has(id)) continue;
+    out[key] = /** @type {"in"|"bof"|"funny"|"curious"} */ (id);
+  }
+  return out;
+}
+
+/** @param {unknown} value */
+export function isChatRouletteReactionId(value) {
+  return CHAT_ROULETTE_REACTION_ID_SET.has(String(value || "").trim());
+}
+
+/**
+ * @param {unknown} raw
  * @returns {null|{
  *   rouletteId: string,
  *   attemptId: string,
@@ -254,6 +289,7 @@ export function computeChatRouletteExpiresAt(
  *   expiresAt: number,
  *   rerollCount: number,
  *   maxRerolls: number,
+ *   reactionsByUid: Record<string, "in"|"bof"|"funny"|"curious">,
  * }}
  */
 export function normalizeChatRouletteEvent(raw) {
@@ -331,7 +367,176 @@ export function normalizeChatRouletteEvent(raw) {
     expiresAt,
     rerollCount,
     maxRerolls,
+    reactionsByUid: normalizeChatRouletteReactionsByUid(raw.reactionsByUid),
   };
+}
+
+/**
+ * Compteurs dérivés depuis `reactionsByUid`.
+ * Les UIDs absents du roster actif sont ignorés (pas de patch de nettoyage).
+ *
+ * @param {Record<string, string>|null|undefined} reactionsByUid
+ * @param {Iterable<string>|null} [activeUids]
+ */
+export function computeChatRouletteReactionCounts(reactionsByUid, activeUids = null) {
+  /** @type {Record<"in"|"bof"|"funny"|"curious", number>} */
+  const counts = { in: 0, bof: 0, funny: 0, curious: 0 };
+  const allow =
+    activeUids != null ? new Set([...activeUids].filter(Boolean).map(String)) : null;
+  for (const [uid, reaction] of Object.entries(reactionsByUid || {})) {
+    if (allow && !allow.has(String(uid))) continue;
+    const id = String(reaction || "").trim();
+    if (CHAT_ROULETTE_REACTION_ID_SET.has(id)) {
+      counts[/** @type {"in"|"bof"|"funny"|"curious"} */ (id)] += 1;
+    }
+  }
+  return counts;
+}
+
+/**
+ * Toggle recommandé : même réaction → retrait ; autre → remplacement.
+ * @param {string|null|undefined} currentReaction
+ * @param {string} clickedReaction
+ * @returns {string|null}
+ */
+export function resolveChatRouletteReactionToggle(currentReaction, clickedReaction) {
+  const next = String(clickedReaction || "").trim();
+  if (!CHAT_ROULETTE_REACTION_ID_SET.has(next)) return currentReaction ?? null;
+  const cur = currentReaction != null ? String(currentReaction).trim() : null;
+  return cur === next ? null : next;
+}
+
+/** Réactions actives uniquement en phase `result` stabilisée. */
+export function canAcceptChatRouletteReactions(ev) {
+  const n = normalizeChatRouletteEvent(ev);
+  if (!n) return false;
+  return n.phase === "result";
+}
+
+/**
+ * Patch ciblé : une seule entrée `reactionsByUid[uid]`.
+ * @param {unknown} inc
+ */
+export function isChatRouletteReactionOnlyPatch(inc) {
+  if (!inc || typeof inc !== "object" || Array.isArray(inc)) return false;
+  const keys = Object.keys(inc);
+  if (keys.length !== 1 || keys[0] !== "reactionsByUid") return false;
+  const map = /** @type {Record<string, unknown>} */ (inc).reactionsByUid;
+  if (!map || typeof map !== "object" || Array.isArray(map)) return false;
+  const uids = Object.keys(map);
+  if (uids.length !== 1) return false;
+  const value = map[uids[0]];
+  return value == null || isChatRouletteReactionId(value);
+}
+
+/**
+ * Merge atomique d'une entrée de réaction (host UPDATE).
+ * `value === null` supprime la clé.
+ *
+ * @param {unknown} curRaw
+ * @param {{ reactionsByUid?: Record<string, unknown> }} incRaw
+ */
+export function mergeChatRouletteReactionPatch(curRaw, incRaw) {
+  const cur = normalizeChatRouletteEvent(curRaw);
+  if (!cur) return curRaw;
+  const incMap = incRaw?.reactionsByUid;
+  if (!incMap || typeof incMap !== "object") return curRaw;
+  const uids = Object.keys(incMap);
+  if (uids.length !== 1) return curRaw;
+  const uid = uids[0];
+  const value = incMap[uid];
+  const nextReactions = { ...(cur.reactionsByUid || {}) };
+  if (value == null) {
+    delete nextReactions[uid];
+  } else {
+    nextReactions[uid] = /** @type {"in"|"bof"|"funny"|"curious"} */ (
+      String(value).trim()
+    );
+  }
+  return {
+    ...(typeof curRaw === "object" && curRaw ? curRaw : {}),
+    ...cur,
+    reactionsByUid: nextReactions,
+  };
+}
+
+/** Signature stable pour re-render UI / dédup sync. */
+export function chatRouletteReactionsSignature(reactionsByUid) {
+  const entries = Object.entries(reactionsByUid || {})
+    .map(([uid, reaction]) => `${uid}:${reaction}`)
+    .sort();
+  return entries.join("|");
+}
+
+/**
+ * Merge atomique d'une entrée UID (miroir SQL `contribute_chat_roulette_reaction`).
+ * Pur / testable — ne remplace jamais toute la map depuis un snapshot stale.
+ *
+ * @param {Record<string, string>|null|undefined} reactionsByUid
+ * @param {string} uid
+ * @param {string|null} reaction
+ */
+export function atomicMergeChatRouletteReactionEntry(reactionsByUid, uid, reaction) {
+  const next = { ...(reactionsByUid || {}) };
+  if (reaction == null) delete next[uid];
+  else next[uid] = reaction;
+  return next;
+}
+
+/**
+ * Simule la sérialisation FOR UPDATE : chaque opération voit l'état post-op précédent.
+ * @param {Record<string, string>} initial
+ * @param {Array<{ uid: string, reaction: string|null }>} ops
+ */
+export function simulateSerializedAtomicReactionWrites(initial, ops) {
+  let map = { ...(initial || {}) };
+  for (const { uid, reaction } of ops) {
+    map = atomicMergeChatRouletteReactionEntry(map, uid, reaction);
+  }
+  return map;
+}
+
+/**
+ * Simule le lost update du chemin hôte read-modify-write (patch global stale).
+ * Chaque op relit le même snapshot initial puis remplace toute la map — dernier gagnant.
+ *
+ * @param {Record<string, string>} snapshot
+ * @param {Array<{ uid: string, reaction: string|null }>} ops
+ */
+export function simulateStaleHostReactionPatchLostUpdate(snapshot, ops) {
+  let lastWrite = { ...(snapshot || {}) };
+  for (const { uid, reaction } of ops) {
+    const staleRead = { ...(snapshot || {}) };
+    const merged = { ...staleRead };
+    if (reaction == null) delete merged[uid];
+    else merged[uid] = reaction;
+    lastWrite = merged;
+  }
+  return lastWrite;
+}
+
+/**
+ * Applique un overlay optimiste local (pur / testable).
+ * @param {Record<string, string>|null|undefined} reactionsByUid
+ * @param {{ rouletteId: string, attemptId: string, uid: string, reactionId: string|null }|null} overlay
+ * @param {{ rouletteId?: string, attemptId?: string }|null} scope
+ */
+export function applyChatRouletteReactionOverlay(reactionsByUid, overlay, scope) {
+  const base =
+    reactionsByUid && typeof reactionsByUid === "object" ? { ...reactionsByUid } : {};
+  if (
+    !overlay ||
+    !scope?.rouletteId ||
+    !scope?.attemptId ||
+    overlay.rouletteId !== scope.rouletteId ||
+    overlay.attemptId !== scope.attemptId
+  ) {
+    return base;
+  }
+  const next = { ...base };
+  if (overlay.reactionId == null) delete next[overlay.uid];
+  else next[overlay.uid] = overlay.reactionId;
+  return next;
 }
 
 /**
@@ -687,6 +892,7 @@ export function buildChatRoulettePromptPayload(eligible, now = Date.now()) {
     // Legacy compat listeners (non source de vérité UX)
     rerollCount: 0,
     maxRerolls: CHAT_ROULETTE_MAX_REROLLS,
+    reactionsByUid: {},
   };
 }
 
@@ -723,5 +929,6 @@ export function buildChatRouletteSpinPayload(
     expiresAt: computeChatRouletteExpiresAt(now),
     rerollCount: Math.max(0, drawCount - 1),
     maxRerolls: CHAT_ROULETTE_MAX_REROLLS,
+    reactionsByUid: {},
   };
 }

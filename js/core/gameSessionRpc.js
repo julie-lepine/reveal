@@ -27,6 +27,23 @@ export async function rpcContributeGameSessionPlayer({ lobbyId, game, kind, valu
   return asSessionRow(data);
 }
 
+export async function rpcContributeChatRouletteReaction({
+  lobbyId,
+  rouletteId,
+  attemptId,
+  reaction = null,
+}) {
+  requireClient();
+  const { data, error } = await supabase.rpc("contribute_chat_roulette_reaction", {
+    p_lobby_id: lobbyId,
+    p_roulette_id: rouletteId,
+    p_attempt_id: attemptId,
+    p_reaction: reaction,
+  });
+  if (error) throw error;
+  return asSessionRow(data);
+}
+
 export async function rpcUpsertPlayerCustomEntry({ lobbyId, game, entry }) {
   requireClient();
   const { data, error } = await supabase.rpc("upsert_player_custom_entry", {

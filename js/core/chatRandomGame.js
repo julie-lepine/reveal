@@ -29,7 +29,14 @@ import {
   canRerollChatRoulette,
   catalogTileMinPlayers,
   resetChatRouletteObservationsForTests,
+  chatRouletteReactionsSignature,
 } from "./chatRandomGameLogic.js";
+import {
+  commitChatRouletteReaction,
+  onChatRouletteRemoteEvent,
+  resetChatRouletteReactionStateForTests,
+  withChatRouletteReactionOverlay,
+} from "./chatRandomGameReaction.js";
 import {
   closeChatRouletteModal,
   isChatRouletteModalOpen,
@@ -45,6 +52,7 @@ import {
   onGameSessionChange,
   patchGameState,
   POST_GAME_SCREENS,
+  requireLocalParticipantUid,
 } from "./gameSync.js";
 import {
   getLobbyGameId,
@@ -453,7 +461,7 @@ function applySessionRoulette() {
   const active = n && isChatRouletteBlockingLaunch(ctx) ? n : null;
 
   const sig = active
-    ? `${active.rouletteId}|${active.attemptId}|${active.phase}|${active.selectedTileId}|${active.drawCount}|${active.animationStartTimestamp}`
+    ? `${active.rouletteId}|${active.attemptId}|${active.phase}|${active.selectedTileId}|${active.drawCount}|${active.animationStartTimestamp}|${chatRouletteReactionsSignature(withChatRouletteReactionOverlay(active.reactionsByUid, active))}`
     : "";
 
   if (sig === appliedEventSig) {
@@ -476,6 +484,7 @@ function applySessionRoulette() {
     return;
   }
   opportunisticClearedIds.delete(active.rouletteId);
+  onChatRouletteRemoteEvent(active);
   presentChatRouletteEvent(active, {
     blockingOpts: {
       localObservation: ctx.localObservation,
@@ -518,6 +527,26 @@ export function initChatRandomGameSync() {
     onDismiss: () => {
       void hostDismiss();
     },
+    getLocalUid: () => {
+      try {
+        return requireLocalParticipantUid();
+      } catch {
+        return null;
+      }
+    },
+    getActiveUids: () =>
+      getLobbyParticipants()
+        .map((p) => p.userId)
+        .filter(Boolean),
+    onReaction: (reactionId) => {
+      const live = readActiveChatRoulette();
+      if (!live) return;
+      void commitChatRouletteReaction(reactionId, {
+        rouletteId: live.rouletteId,
+        attemptId: live.attemptId,
+        reactionsByUid: live.reactionsByUid,
+      });
+    },
   });
 
   unsubSession = onGameSessionChange(() => {
@@ -543,6 +572,7 @@ export function resetChatRandomGameSyncForTests() {
   appliedEventSig = null;
   opportunisticClearedIds.clear();
   resetChatRouletteObservationsForTests();
+  resetChatRouletteReactionStateForTests();
   closeChatRouletteModal({ silent: true });
 }
 

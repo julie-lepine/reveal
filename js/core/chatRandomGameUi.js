@@ -16,7 +16,12 @@ import {
   isChatRouletteBlockingLaunch,
   normalizeChatRouletteEvent,
   resolveChatRouletteResultAct,
+  CHAT_ROULETTE_REACTION_DEFS,
+  computeChatRouletteReactionCounts,
+  canAcceptChatRouletteReactions,
+  chatRouletteReactionsSignature,
 } from "./chatRandomGameLogic.js";
+import { withChatRouletteReactionOverlay } from "./chatRandomGameReaction.js";
 
 const DEFAULT_CARD_H = 76;
 
@@ -39,13 +44,18 @@ let resizeListening = false;
  * }} */
 let spinCtx = null;
 
+let lastReactionsSig = "";
+
 /** @type {null|{
  *   onStart: () => void,
  *   onReroll: () => void,
  *   onLaunch: () => void,
  *   onBridgePoll?: () => void,
  *   onDismiss: () => void,
+ *   onReaction?: (reactionId: string) => void,
  *   canControl: () => boolean,
+ *   getLocalUid?: () => string|null,
+ *   getActiveUids?: () => string[],
  *   hasOpenLobbyPoll?: () => boolean,
  *   getCatalogById: (id: string) => { id: string, title: string, emoji: string }|null,
  * }} */
@@ -120,6 +130,7 @@ export function closeChatRouletteModal({ silent = false } = {}) {
   lastRouletteId = null;
   lastAttemptId = null;
   lastPhaseKey = "";
+  lastReactionsSig = "";
   unbindResize();
   if (rootEl) {
     rootEl.classList.remove("chat-roulette--in");
@@ -166,6 +177,74 @@ function renderPrompt(canControl) {
         ? `<button type="button" class="btn btn-primary chat-roulette__btn" data-roulette-start>Commencer</button>`
         : `<p class="hint chat-roulette__wait">L'hôte lance la roulette…</p>`
     }`;
+}
+
+function prefersReducedMotion() {
+  if (typeof window === "undefined" || !window.matchMedia) return false;
+  return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+
+function renderReactions(ev, { localUid = null, activeUids = null } = {}) {
+  const canReact = canAcceptChatRouletteReactions(ev);
+  const effective = withChatRouletteReactionOverlay(ev.reactionsByUid, ev);
+  const localEffective = localUid ? effective[localUid] : null;
+  const counts = computeChatRouletteReactionCounts(effective, activeUids);
+  const disabled = !canReact;
+
+  const items = CHAT_ROULETTE_REACTION_DEFS.map((def) => {
+    const count = counts[def.id] ?? 0;
+    const pressed = localEffective === def.id;
+    const label = `${def.emoji} ${def.label}`;
+    const aria = `${label}, ${count} réaction${count === 1 ? "" : "s"}`;
+    return `
+      <button
+        type="button"
+        class="chat-roulette__reaction${pressed ? " chat-roulette__reaction--active" : ""}"
+        data-roulette-reaction="${escapeHtml(def.id)}"
+        aria-pressed="${pressed ? "true" : "false"}"
+        aria-label="${escapeHtml(aria)}"
+        ${disabled ? "disabled" : ""}
+      >
+        <span class="chat-roulette__reaction-label">${escapeHtml(def.emoji)} ${escapeHtml(def.label)}</span>
+        <span class="chat-roulette__reaction-count" data-roulette-count="${escapeHtml(def.id)}">${count}</span>
+      </button>`;
+  }).join("");
+
+  return `
+    <div class="chat-roulette__reactions${disabled ? " chat-roulette__reactions--disabled" : ""}" data-roulette-reactions>
+      ${items}
+    </div>`;
+}
+
+function updateReactionCounts(root, ev, { activeUids = null } = {}) {
+  const effective = withChatRouletteReactionOverlay(ev.reactionsByUid, ev);
+  const counts = computeChatRouletteReactionCounts(effective, activeUids);
+  const reduced = prefersReducedMotion();
+  for (const def of CHAT_ROULETTE_REACTION_DEFS) {
+    const el = root?.querySelector?.(`[data-roulette-count="${def.id}"]`);
+    if (!el) continue;
+    const next = String(counts[def.id] ?? 0);
+    if (el.textContent === next) continue;
+    el.textContent = next;
+    if (!reduced) {
+      el.classList.remove("chat-roulette__reaction-count--pop");
+      void el.offsetWidth;
+      el.classList.add("chat-roulette__reaction-count--pop");
+    }
+  }
+}
+
+function updateReactionPressedStates(root, ev, localUid) {
+  if (!root || !localUid) return;
+  const effective = withChatRouletteReactionOverlay(ev.reactionsByUid, ev);
+  const selected = effective[localUid] || null;
+  root.querySelectorAll("[data-roulette-reaction]").forEach((btn) => {
+    if (!(btn instanceof HTMLButtonElement)) return;
+    const id = btn.getAttribute("data-roulette-reaction");
+    const pressed = id === selected;
+    btn.classList.toggle("chat-roulette__reaction--active", pressed);
+    btn.setAttribute("aria-pressed", pressed ? "true" : "false");
+  });
 }
 
 function renderResult(winner, ev, canControl) {
@@ -218,11 +297,16 @@ function renderResult(winner, ev, canControl) {
     actionsHtml = `<p class="hint chat-roulette__wait">L'hôte décide de la suite…</p>`;
   }
 
+  const localUid = handlers?.getLocalUid?.() || null;
+  const activeUids = handlers?.getActiveUids?.() || null;
+  const reactionsHtml = renderReactions(ev, { localUid, activeUids });
+
   return `
     <p class="chat-roulette__result-label">Le prochain jeu est</p>
     <div class="chat-roulette__winner chat-roulette__winner--pop">
       ${gameCardHtml(winner, { winner: true })}
     </div>
+    ${reactionsHtml}
     ${voiceHtml}
     ${actionsHtml}`;
 }
@@ -358,6 +442,12 @@ function bindRootOnce(root) {
     }
     if (t.closest("[data-roulette-launch]")) {
       handlers?.onLaunch?.();
+      return;
+    }
+    const reactionBtn = t.closest("[data-roulette-reaction]");
+    if (reactionBtn instanceof HTMLButtonElement && !reactionBtn.disabled) {
+      const reactionId = reactionBtn.getAttribute("data-roulette-reaction");
+      if (reactionId) handlers?.onReaction?.(reactionId);
     }
   });
   root.addEventListener("keydown", (e) => {
@@ -428,11 +518,31 @@ function presentEvent(rawEvent, { forceResult = false, blockingOpts = null, now 
     ev.phase === "result" ||
     (ev.phase === "spinning" && chatRouletteShouldShowResult(ev, now));
 
+  const reactionsSig = chatRouletteReactionsSignature(
+    withChatRouletteReactionOverlay(ev.reactionsByUid, ev)
+  );
   const phaseKey = `${ev.rouletteId}|${ev.attemptId}|${ev.phase}|${ev.selectedTileId || ""}|${ev.drawCount}|${showResult ? "R" : "A"}`;
+  const reactionsOnlyUpdate =
+    showResult &&
+    phaseKey === lastPhaseKey &&
+    lastRouletteId === ev.rouletteId &&
+    lastAttemptId === ev.attemptId &&
+    reactionsSig !== lastReactionsSig;
+
+  if (reactionsOnlyUpdate && rootEl) {
+    lastReactionsSig = reactionsSig;
+    const localUid = handlers?.getLocalUid?.() || null;
+    const activeUids = handlers?.getActiveUids?.() || null;
+    updateReactionCounts(rootEl, ev, { activeUids });
+    updateReactionPressedStates(rootEl, ev, localUid);
+    return;
+  }
+
   if (
     phaseKey === lastPhaseKey &&
     lastRouletteId === ev.rouletteId &&
     lastAttemptId === ev.attemptId &&
+    reactionsSig === lastReactionsSig &&
     !forceResult
   ) {
     return;
@@ -451,6 +561,7 @@ function presentEvent(rawEvent, { forceResult = false, blockingOpts = null, now 
   lastRouletteId = ev.rouletteId;
   lastAttemptId = ev.attemptId;
   lastPhaseKey = phaseKey;
+  lastReactionsSig = reactionsSig;
 
   const stage = rootEl.querySelector("[data-roulette-stage]");
   if (!stage) return;
