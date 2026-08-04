@@ -24,7 +24,7 @@ import { onLobbyBundleUpdated } from "../core/supabaseLobby.js";
 import { getLocalDisplayName } from "../core/state.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
 import { rulesButtonHtml } from "../core/gameRulesUi.js";
-import { isLobbyHost, onGameSessionChange } from "../core/gameSync.js";
+import { isLobbyHost, onGameSessionChange, refreshGameSession, isGameSyncActive } from "../core/gameSync.js";
 import { prepGuestFollowOnSession } from "../core/mpLaunch.js";
 import { executePrepLaunch, prepLaunchSlotParams, DEFAULT_PREP_MIN_PLAYERS } from "../core/prepLaunch.js";
 import { createPrepLobbyController } from "../core/usePrepLobby.js";
@@ -45,6 +45,7 @@ import {
   bindCharCounter,
   updateCharCount,
   prepOthersCustomEntriesHintHtml,
+  runPrepRefreshOnLobbyChange,
 } from "../core/prepScreen.js";
 import { PLAYER_TEXT_MAX_LEN } from "../../data/playerTextLimits.js";
 import { bindNav } from "./nav.js";
@@ -399,7 +400,11 @@ export function mountHotTakePrep(app) {
 
   const unsubLobby = onLobbyBundleUpdated(() => {
     if (!mounted) return;
-    refreshFromSync();
+    void runPrepRefreshOnLobbyChange({
+      isActive: isGameSyncActive,
+      refresh: refreshGameSession,
+      refreshFromSync,
+    });
   });
 
   return () => {

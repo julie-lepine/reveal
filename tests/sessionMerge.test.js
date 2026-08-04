@@ -119,6 +119,34 @@ describe("mergeDilemmaCustomDilemmas", () => {
     assert.equal(out.length, 1);
     assert.equal(out[0].id, "d-new");
   });
+
+  it("FEATURE-DILEMMA-01 QA : suppression distante — pas de réinjection depuis cache local", () => {
+    const other = "Bob";
+    const staleLocal = [
+      { id: "b1", optionA: "A1", optionB: "B1", author: other },
+      { id: "b2", optionA: "A2", optionB: "B2", author: other },
+      { id: "b3", optionA: "A3", optionB: "B3", author: other },
+    ];
+    const remote = [
+      { id: "b1", optionA: "A1", optionB: "B1", author: other },
+      { id: "b2", optionA: "A2", optionB: "B2", author: other },
+    ];
+    const out = mergeDilemmaCustomDilemmas(staleLocal, remote, me);
+    assert.equal(out.length, 2);
+    assert.ok(!out.some((d) => d.id === "b3"));
+  });
+
+  it("leave prep : customs auteur absent restent via remote", () => {
+    const departed = "Charlie";
+    const local = [{ id: "c1", optionA: "X", optionB: "Y", author: me }];
+    const remote = [
+      { id: "c1", optionA: "X", optionB: "Y", author: me },
+      { id: "d1", optionA: "A", optionB: "B", author: departed },
+      { id: "d2", optionA: "C", optionB: "D", author: departed },
+    ];
+    const out = mergeDilemmaCustomDilemmas(local, remote, me);
+    assert.equal(out.filter((d) => d.author === departed).length, 2);
+  });
 });
 
 describe("mergeHotTakeCustomTakes", () => {

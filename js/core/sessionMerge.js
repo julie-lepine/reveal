@@ -74,7 +74,9 @@ export function mergeReadyMapsLocal(
 
 /**
  * Liste locale = source de vérité pour le joueur local ; remote = entrées des autres auteurs.
- * Les suppressions locales ne sont pas réinjectées depuis le serveur.
+ * Les suppressions locales (joueur local) ne sont pas réinjectées depuis le serveur.
+ * Les entrées des autres auteurs viennent uniquement du remote — jamais du cache local
+ * (évite les customs « fantômes » après suppression distante ou leave — FEATURE-DILEMMA-01 QA).
  */
 export function mergeAuthorOwnedCustomList(
   localList = [],
@@ -91,7 +93,11 @@ export function mergeAuthorOwnedCustomList(
   }
   for (const raw of localList) {
     const item = normalize(raw);
-    if (item) byId.set(item.id, item);
+    if (!item) continue;
+    const author = item.author;
+    if (!author || author === me) {
+      byId.set(item.id, item);
+    }
   }
   return [...byId.values()];
 }

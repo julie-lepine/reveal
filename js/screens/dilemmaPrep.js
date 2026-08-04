@@ -27,6 +27,7 @@ import {
   isGameSyncActive,
   isLobbyHost,
   onGameSessionChange,
+  refreshGameSession,
 } from "../core/gameSync.js";
 import { prepGuestFollowOnSession } from "../core/mpLaunch.js";
 import { executePrepLaunch, prepLaunchSlotParams, DEFAULT_PREP_MIN_PLAYERS } from "../core/prepLaunch.js";
@@ -47,6 +48,7 @@ import {
   updateCharCount,
   syncPrepOnMount,
   prepOthersCustomEntriesHintHtml,
+  runPrepRefreshOnLobbyChange,
 } from "../core/prepScreen.js";
 import { PLAYER_TEXT_MAX_LEN } from "../../data/playerTextLimits.js";
 import { navigate } from "../core/router.js";
@@ -436,7 +438,11 @@ export function mountDilemmaPrep(app) {
 
   const unsubLobby = onLobbyBundleUpdated(() => {
     if (!mounted) return;
-    refreshFromSync();
+    void runPrepRefreshOnLobbyChange({
+      isActive: isGameSyncActive,
+      refresh: refreshGameSession,
+      refreshFromSync,
+    });
   });
 
   return () => {

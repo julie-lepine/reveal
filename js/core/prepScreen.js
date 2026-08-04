@@ -72,6 +72,26 @@ export function syncPrepOnMount(refreshFromSync) {
 }
 
 /**
+ * Leave / join roster en prep : re-fetch session jeu puis rerender (évite état stale sans F5).
+ */
+export function runPrepRefreshOnLobbyChange({ isActive, refresh, refreshFromSync }) {
+  if (!isActive()) {
+    refreshFromSync?.();
+    return Promise.resolve({ skipped: true });
+  }
+  return refresh()
+    .then(() => {
+      refreshFromSync?.();
+      return { ok: true };
+    })
+    .catch(async (err) => {
+      await defaultMountSyncError(err);
+      refreshFromSync?.();
+      return { ok: false, error: err };
+    });
+}
+
+/**
  * Bouton de lancement / attente en bas de l'écran prep.
  */
 export function prepStartSlotHtml({

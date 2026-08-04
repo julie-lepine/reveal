@@ -180,10 +180,11 @@ describe("FEATURE-DILEMMA-01 — deck et consume (contrat)", () => {
     assert.ok(left.every((d) => d.id !== "play-1"));
   });
 
-  it("buildDilemmaDeck source : shuffle customs sans quota auteur", () => {
+  it("buildDilemmaDeck source : shuffle global pool combiné", () => {
     const src = read("js/core/dilemmaSession.js");
-    assert.match(src, /shuffleArray\(customs\)/);
-    assert.doesNotMatch(src, /author.*slice|maxCustom|quota/i);
+    assert.match(src, /buildCombinedShuffledDeck/);
+    assert.doesNotMatch(src, /customsKept/);
+    assert.doesNotMatch(src, /bankKept/);
   });
 });
 

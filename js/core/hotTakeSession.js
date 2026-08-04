@@ -35,6 +35,7 @@ import { patchGameStateWithFeedback } from "./patchGameStateFeedback.js";
 import { computeHotTakeVoteApply } from "./hotTakeVoteCommit.js";
 import { launchGameWithSync, commitHostGamePlay, commitPrepReadyToggle } from "./mpLaunch.js";
 import { mergeHotTakeCustomTakes } from "./sessionMerge.js";
+import { countOtherAuthorsCustomEntries } from "./combinedGameDeck.js";
 
 function defaultSession() {
   return {
@@ -202,11 +203,12 @@ export function getMyCustomTakes() {
 }
 
 /** Nombre de takes custom des autres (texte masqué jusqu’à la manche). */
-export function countOtherPlayersCustomTakes() {
-  const me = getLocalDisplayName();
-  return (getHotTakeSession().customTakes || [])
-    .map(normalizeTake)
-    .filter((t) => t.author && t.author !== me).length;
+export function countOtherPlayersCustomTakes(session = getHotTakeSession()) {
+  return countOtherAuthorsCustomEntries(
+    session.customTakes || [],
+    getLocalDisplayName(),
+    normalizeTake
+  );
 }
 
 export async function addCustomTake(text) {

@@ -9,6 +9,7 @@ import {
   estimateDilemmaDuration,
   resolveEffectiveRoundCount,
 } from "./dilemmaDuration.js";
+import { buildCombinedShuffledDeck, countOtherAuthorsCustomEntries } from "./combinedGameDeck.js";
 import { getActivePlayerNames } from "./players.js";
 import { getLobbyParticipants } from "./lobby.js";
 import { getLocalDisplayName, getState, saveStatePatch } from "./state.js";
@@ -58,15 +59,6 @@ function defaultSession() {
     matchScores: {},
     lastRound: null,
   };
-}
-
-function shuffleArray(arr) {
-  const a = [...arr];
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [a[i], a[j]] = [a[j], a[i]];
-  }
-  return a;
 }
 
 export function getDilemmaSession() {
@@ -133,7 +125,7 @@ export function getDilemmaPrepSummary() {
   };
 }
 
-export function buildDilemmaDeck() {
+export function buildDilemmaDeck({ random = Math.random } = {}) {
   const session = getDilemmaSession();
   const deckId = session.selectedDeckId || DILEMMA_CATALOG_ID;
   const bank = getDilemmaDeckItems(deckId);
@@ -141,12 +133,14 @@ export function buildDilemmaDeck() {
     .map(normalizeCustomDilemma)
     .filter(Boolean);
   const totalAvailable = bank.length + customs.length;
-  const effective = resolveEffectiveRoundCount(session.roundCount ?? 8, totalAvailable);
-  // Les dilemmes des joueurs en tête de partie (ordre aléatoire entre eux), puis la banque.
-  const customsKept = shuffleArray(customs).slice(0, effective);
-  const remaining = Math.max(0, effective - customsKept.length);
-  const bankKept = shuffleArray(bank).slice(0, remaining);
-  const deck = [...customsKept, ...bankKept];
+  const deck = buildCombinedShuffledDeck(
+    customs,
+    bank,
+    session.roundCount ?? 8,
+    totalAvailable,
+    resolveEffectiveRoundCount,
+    random
+  );
   const next = { ...session, deck };
   saveStatePatch({ dilemmaGame: next });
   return deck;
@@ -162,12 +156,12 @@ export function getMyCustomDilemmas() {
 }
 
 /** Nombre de dilemmes custom des autres (masqués jusqu'à la manche). */
-export function countOtherPlayersCustomDilemmas() {
-  const me = getLocalDisplayName();
-  return (getDilemmaSession().customDilemmas || [])
-    .map(normalizeCustomDilemma)
-    .filter(Boolean)
-    .filter((d) => d.author && d.author !== me).length;
+export function countOtherPlayersCustomDilemmas(session = getDilemmaSession()) {
+  return countOtherAuthorsCustomEntries(
+    session.customDilemmas || [],
+    getLocalDisplayName(),
+    normalizeCustomDilemma
+  );
 }
 
 /** Fusionne les listes custom (par id) - usage local uniquement. */
