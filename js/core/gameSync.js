@@ -115,6 +115,7 @@ import {
   tierNightConfigPatchFromRemoteState,
   tierNightRecapBelongsToRun,
 } from "./tierNightConfig.js";
+import { mergeTierNightTopicMeta } from "./rosterTopic.js";
 import {
   mergeTierNightLiveGameFields,
   mergeTierNightLiveVotesForPatch,
@@ -621,13 +622,18 @@ const GAME_SETUP_SCREENS = new Set([
   "guesslie-wait",
   "tiernight-select",
   "tiernight-create",
+  "tiernight-create-roster",
 ]);
 
 /** Guess The Lie : préparation par joueur - la session reste sur guesslie-menu. */
 const GUESS_LIE_PREP_SCREENS = new Set(["guesslie-menu", "guesslie-setup", "guesslie-wait"]);
 
 /** Tier Night : création locale possible depuis tiernight-select. */
-const TIER_NIGHT_PREP_SCREENS = new Set(["tiernight-select", "tiernight-create"]);
+const TIER_NIGHT_PREP_SCREENS = new Set([
+  "tiernight-select",
+  "tiernight-create",
+  "tiernight-create-roster",
+]);
 
 function hasLocalTierNightRecap() {
   const local = getState().tierNightGame;
@@ -2632,6 +2638,8 @@ export function tierNightToRemote({
   lobbyStarted,
   items,
   playerRoster,
+  listName,
+  topicEmoji,
 }) {
   // Rank it (`consensus`) normalisé vers roster — plateau partagé Classe le groupe.
   let normalizedMode = "roster";
@@ -2646,6 +2654,8 @@ export function tierNightToRemote({
     game: game ?? (lobbyStarted ? true : null),
     items: Array.isArray(items) ? items : null,
     playerRoster: Array.isArray(playerRoster) ? playerRoster : null,
+    listName: typeof listName === "string" ? listName : "",
+    topicEmoji: typeof topicEmoji === "string" ? topicEmoji : "",
     placements: mapPlacementsByUid(placements || {}),
     finished: finished || {},
     recap: null,
@@ -2664,6 +2674,7 @@ export function tierNightRecapToRemote(session) {
     runId: session.runId ?? null,
     topicId: session.topicId ?? null,
     listName: session.listName ?? "",
+    topicEmoji: session.topicEmoji ?? "",
     recaps: session.recaps.map((r) => ({
       player: r.player,
       emoji: r.emoji,
@@ -3177,11 +3188,19 @@ export function applyRemoteSession(row, { epoch = null } = {}) {
       // BUG-TIERNIGHT-04 : hydrater runId + items + playerRoster (tn.game peut être `true`).
       const local = getState().tierNightGame || {};
       const gameObj = typeof tn.game === "object" && tn.game ? tn.game : {};
+      const meta = mergeTierNightTopicMeta({
+        local,
+        remote: tn,
+        remoteRunId: tn.runId ?? null,
+        localRunId: local.runId ?? null,
+      });
       patch.tierNightGame = {
         ...local,
         ...gameObj,
         runId: tn.runId ?? local.runId ?? null,
         topicId: tn.topicId ?? local.topicId ?? null,
+        listName: meta.listName,
+        topicEmoji: meta.topicEmoji,
         items:
           Array.isArray(tn.items) && tn.items.length
             ? tn.items
@@ -3202,6 +3221,7 @@ export function applyRemoteSession(row, { epoch = null } = {}) {
           recaps: [],
           topicId: tn.topicId ?? null,
           listName: "",
+          topicEmoji: "",
           controversialItem: null,
           consensus: null,
           localConsensusPoints: 0,
@@ -3374,6 +3394,7 @@ function navStackFor(screen) {
     "guesslie",
     "tiernight-select",
     "tiernight-create",
+    "tiernight-create-roster",
     "tiernight",
     "tiernight-live",
     "tiernight-end",
@@ -5015,6 +5036,8 @@ export async function syncTierNightSession(payload) {
     items: payload.items ?? cached.items ?? localGame.items ?? null,
     playerRoster:
       payload.playerRoster ?? cached.playerRoster ?? localGame.playerRoster ?? null,
+    listName: payload.listName ?? localGame.listName ?? cached.listName ?? "",
+    topicEmoji: payload.topicEmoji ?? localGame.topicEmoji ?? cached.topicEmoji ?? "",
   });
   await patchGameState({ tierNight: remote }, { screen: payload.screen, gameId: "tiernight" });
 }

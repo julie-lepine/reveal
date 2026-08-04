@@ -473,7 +473,14 @@ export async function launchGuessLieMenu() {
 export async function launchTierNightSelect() {
   if (!(await assertNoActiveChatRoulette({ sessionGameId: "tiernight" }))) return;
   const runId = createTierNightRunId();
-  const tierNightReset = { runId, recaps: [], topicId: null, listName: "", controversialItem: null };
+  const tierNightReset = {
+    runId,
+    recaps: [],
+    topicId: null,
+    listName: "",
+    topicEmoji: "",
+    controversialItem: null,
+  };
   const tierNightLiveReset = {
     runId,
     lobbyStarted: false,
@@ -513,6 +520,8 @@ export async function launchTierNightSelect() {
         mode: "roster",
         modifier: "normal",
         lobbyStarted: false,
+        listName: "",
+        topicEmoji: "",
         placements: {},
         finished: {},
         game: null,

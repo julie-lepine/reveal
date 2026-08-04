@@ -32,6 +32,7 @@ const SETUP = new Set([
   "guesslie-wait",
   "tiernight-select",
   "tiernight-create",
+  "tiernight-create-roster",
 ]);
 
 /** Miroir des guards post FEATURE-VIBECHECK-01 (enregistrement d'écran requis). */

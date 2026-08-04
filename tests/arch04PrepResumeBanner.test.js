@@ -25,6 +25,7 @@ const GAME_SETUP = new Set([
   "guesslie-wait",
   "tiernight-select",
   "tiernight-create",
+  "tiernight-create-roster",
 ]);
 
 function isOnGameSetupScreen(screen) {

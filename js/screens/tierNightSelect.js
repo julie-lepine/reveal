@@ -1,4 +1,6 @@
-import { deleteCustomTierList, getAllTierLists, getTierListById, ROSTER_PREFIX } from "../core/tierLists.js";
+import { deleteCustomTierList, getAllTierLists, getTierListById } from "../core/tierLists.js";
+import { deleteCustomRosterTopic, getCustomRosterTopics } from "../core/state.js";
+import { resolveRosterTopicConfig, ROSTER_TOPIC_PREFIX } from "../core/rosterTopic.js";
 import {
   setTierNightTopicId,
   setTierNightMode,
@@ -79,12 +81,24 @@ function renderModeCard(mode) {
     </button>`;
 }
 
-function renderRosterCard(topic) {
+function renderRosterCard(topic, { custom = false } = {}) {
+  const cardEmoji = custom ? "✏️" : topic.emoji || "👥";
+  const deleteBtn = custom
+    ? `<button
+          type="button"
+          class="tier-roster-card__delete"
+          data-roster-delete="${escapeHtml(topic.id)}"
+          aria-label="Supprimer ${escapeHtml(topic.name)}"
+        >×</button>`
+    : "";
   return `
-    <button type="button" class="tier-roster-card" data-roster="${escapeHtml(topic.id)}">
-      <span class="tier-roster-card__emoji">${topic.emoji}</span>
-      <span class="tier-roster-card__name">${escapeHtml(topic.name)}</span>
-    </button>`;
+    <div class="tier-roster-card${custom ? " tier-roster-card--custom" : ""}" data-roster-id="${escapeHtml(topic.id)}">
+      ${deleteBtn}
+      <button type="button" class="tier-roster-card__body" data-roster="${escapeHtml(topic.id)}">
+        <span class="tier-roster-card__emoji">${cardEmoji}</span>
+        <span class="tier-roster-card__name">${escapeHtml(topic.name)}</span>
+      </button>
+    </div>`;
 }
 
 export function mountTierNightSelect(app) {
@@ -130,9 +144,25 @@ export function mountTierNightSelect(app) {
       return;
     }
 
+    const rosterConfig = resolveRosterTopicConfig(topicId);
+    if (!rosterConfig.found) {
+      await showAppAlert("Ce thème est introuvable ou invalide.", {
+        title: "Thème indisponible",
+        icon: "⚠️",
+      });
+      return;
+    }
+
     // roster → plateau partagé (state.tierNight / écran tiernight)
     if (isGameSyncActive()) {
       const result = await markTierNightClassicStarted({ topicId, mode, modifier });
+      if (result?.ok === false) {
+        await showAppAlert(result.error || "Impossible de lancer la partie.", {
+          title: "Lancement impossible",
+          icon: "⚠️",
+        });
+        return;
+      }
       navigateAfterGameLaunch({ gameScreen: "tiernight", result });
     } else {
       navigate("tiernight");
@@ -177,6 +207,16 @@ export function mountTierNightSelect(app) {
   }
 
   function topicStepHtml() {
+    const customs = getCustomRosterTopics();
+    const customSection =
+      customs.length > 0
+        ? `
+      <p class="label-upper label-upper--muted">Mes thèmes</p>
+      <div class="tier-roster-grid tier-roster-grid--custom">
+        ${customs.map((t) => renderRosterCard(t, { custom: true })).join("")}
+      </div>`
+        : "";
+
     return `
       <p class="label-upper label-upper--gold">👥 Classe le groupe</p>
       <div class="screen-title-row">
@@ -184,8 +224,23 @@ export function mountTierNightSelect(app) {
         ${rulesButtonHtml("tiernight")}
       </div>
       <p class="game-intro">Les items à classer seront les joueurs du lobby.</p>
-      <div class="tier-roster-grid">
-        ${TIER_NIGHT_ROSTER_TOPICS.map(renderRosterCard).join("")}
+
+      <button type="button" class="card card--clickable card--highlight card--create-tier" data-nav="tiernight-create-roster">
+        <div class="card-row">
+          <span class="card-row__icon">➕</span>
+          <div class="card-row__text">
+            <p class="card-row__title">Créer mon thème</p>
+            <p class="card-row__sub">Question personnalisée pour classer le groupe</p>
+          </div>
+          <span class="card-row__chevron">›</span>
+        </div>
+      </button>
+
+      ${customSection}
+
+      <p class="label-upper label-upper--muted">Thèmes proposés</p>
+      <div class="tier-roster-grid tier-roster-grid--catalog">
+        ${TIER_NIGHT_ROSTER_TOPICS.map((t) => renderRosterCard(t)).join("")}
       </div>`;
   }
 
@@ -230,7 +285,25 @@ export function mountTierNightSelect(app) {
       app.querySelectorAll("[data-roster]").forEach((btn) => {
         btn.addEventListener("click", () => {
           const id = btn.getAttribute("data-roster");
-          void startGame(`${ROSTER_PREFIX}${id}`, "roster");
+          void startGame(`${ROSTER_TOPIC_PREFIX}${id}`, "roster");
+        });
+      });
+      app.querySelectorAll("[data-roster-delete]").forEach((btn) => {
+        btn.addEventListener("click", async (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const id = btn.getAttribute("data-roster-delete");
+          const topic = getCustomRosterTopics().find((t) => t.id === id);
+          const name = topic?.name || "ce thème";
+          const ok = await showAppConfirm(`Supprimer « ${name} » ? Cette action est irréversible.`, {
+            title: "Supprimer le thème",
+            confirmLabel: "Supprimer",
+            cancelLabel: "Annuler",
+            icon: "🗑️",
+          });
+          if (!ok) return;
+          deleteCustomRosterTopic(id);
+          render();
         });
       });
       return;

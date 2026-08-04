@@ -1,9 +1,15 @@
-import { TIER_LISTS, TIER_NIGHT_ROSTER_TOPICS } from "../../data/tierTopics.js";
+import { TIER_LISTS } from "../../data/tierTopics.js";
 import { deleteCustomTierList as deleteCustomTierListState, getState } from "./state.js";
 import { getActivePlayers } from "./players.js";
 import { buildRosterListFromPlayerRoster } from "./tierNightRoster.js";
+import { CUSTOM_ROSTER_TOPIC_ID_PREFIX } from "./customRosterTopics.js";
+import {
+  ROSTER_TOPIC_PREFIX,
+  parseRosterTopicDescriptor,
+  resolveRosterTopicConfig,
+} from "./rosterTopic.js";
 
-export const ROSTER_PREFIX = "roster:";
+export { ROSTER_TOPIC_PREFIX as ROSTER_PREFIX };
 
 export function getAllTierLists() {
   const custom = getState().customTierLists || [];
@@ -15,25 +21,24 @@ export function getAllTierLists() {
  * Solo / sélection : lobby live. En MP Classique lancé, préférer
  * `resolveTierNightClassicList` (snapshot session).
  */
-export function buildRosterList(topicRef) {
-  const topicId = topicRef.startsWith(ROSTER_PREFIX)
-    ? topicRef.slice(ROSTER_PREFIX.length)
-    : topicRef;
-  const topic = TIER_NIGHT_ROSTER_TOPICS.find((t) => t.id === topicId);
+export function buildRosterList(topicRef, sessionSnapshot = null) {
+  const config = resolveRosterTopicConfig(topicRef, sessionSnapshot);
+  if (!config.found) return null;
   const players = getActivePlayers();
   if (!players.length) return null;
   return {
-    id: `${ROSTER_PREFIX}${topicId}`,
-    name: topic?.name || "Classe le groupe",
-    emoji: topic?.emoji || "👥",
+    id: config.topicId,
+    name: config.listName,
+    emoji: config.topicEmoji,
     logo: "",
     items: players.map((p) => p.name),
     roster: true,
+    custom: config.custom,
   };
 }
 
 export function getTierListById(id) {
-  if (typeof id === "string" && id.startsWith(ROSTER_PREFIX)) {
+  if (typeof id === "string" && id.startsWith(ROSTER_TOPIC_PREFIX)) {
     return buildRosterList(id);
   }
   return getAllTierLists().find((t) => t.id === id) || null;
@@ -46,29 +51,43 @@ export function getTierListById(id) {
 export function resolveTierNightClassicList(topicId, sessionLike = null) {
   const items = sessionLike?.items;
   const playerRoster = sessionLike?.playerRoster;
-  const isRosterTopic =
-    typeof topicId === "string" && topicId.startsWith(ROSTER_PREFIX);
+  const parsed = parseRosterTopicDescriptor(topicId);
+  const isRosterTopic = parsed.isRoster;
 
   if (Array.isArray(items) && items.length) {
     if (isRosterTopic || (Array.isArray(playerRoster) && playerRoster.length)) {
-      const topicKey = isRosterTopic ? topicId.slice(ROSTER_PREFIX.length) : topicId;
-      const topic = TIER_NIGHT_ROSTER_TOPICS.find((t) => t.id === topicKey);
+      const config = resolveRosterTopicConfig(topicId, sessionLike);
+      const isCustomRoster =
+        config.custom || parsed.rawId.startsWith(CUSTOM_ROSTER_TOPIC_ID_PREFIX);
+      const topicMeta = config.found
+        ? { name: config.listName, emoji: isCustomRoster ? "" : config.topicEmoji }
+        : {
+            name: sessionLike?.listName || "Classe le groupe",
+            emoji: isCustomRoster ? "" : sessionLike?.topicEmoji || "👥",
+          };
       const fromSnap = buildRosterListFromPlayerRoster(
         topicId,
         Array.isArray(playerRoster) && playerRoster.length
           ? playerRoster
           : items.map((name) => ({ userId: "", displayName: name })),
-        topic
+        topicMeta
       );
       if (fromSnap) {
-        return { ...fromSnap, items: [...items], id: topicId || fromSnap.id };
+        return {
+          ...fromSnap,
+          items: [...items],
+          id: topicId || fromSnap.id,
+          name: sessionLike?.listName || fromSnap.name,
+          emoji: isCustomRoster ? "" : sessionLike?.topicEmoji || fromSnap.emoji,
+          custom: config.custom,
+        };
       }
     }
     const base = isRosterTopic ? null : getAllTierLists().find((t) => t.id === topicId);
     return {
       id: topicId,
       name: sessionLike?.listName || base?.name || "Tier list",
-      emoji: base?.emoji || "📋",
+      emoji: base?.emoji || sessionLike?.topicEmoji || "📋",
       logo: base?.logo || "",
       items: [...items],
       roster: Boolean(base?.roster) || isRosterTopic,
@@ -77,9 +96,20 @@ export function resolveTierNightClassicList(topicId, sessionLike = null) {
   }
 
   if (Array.isArray(playerRoster) && playerRoster.length && isRosterTopic) {
-    const topicKey = topicId.slice(ROSTER_PREFIX.length);
-    const topic = TIER_NIGHT_ROSTER_TOPICS.find((t) => t.id === topicKey);
-    return buildRosterListFromPlayerRoster(topicId, playerRoster, topic);
+    const config = resolveRosterTopicConfig(topicId, sessionLike);
+    const isCustomRoster =
+      config.custom || parsed.rawId.startsWith(CUSTOM_ROSTER_TOPIC_ID_PREFIX);
+    const topicMeta = config.found
+      ? { name: config.listName, emoji: isCustomRoster ? "" : config.topicEmoji }
+      : {
+          name: sessionLike?.listName || "Classe le groupe",
+          emoji: isCustomRoster ? "" : sessionLike?.topicEmoji || "👥",
+        };
+    return buildRosterListFromPlayerRoster(topicId, playerRoster, topicMeta);
+  }
+
+  if (isRosterTopic) {
+    return buildRosterList(topicId, sessionLike);
   }
 
   return getTierListById(topicId);

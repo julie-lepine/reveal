@@ -19,7 +19,8 @@ import {
 } from "./gameSync.js";
 import { patchGameStateWithFeedback } from "./patchGameStateFeedback.js";
 import { launchGameWithSync, commitHostGamePlay } from "./mpLaunch.js";
-import { buildRecapsFromPlacements } from "./tierNightSession.js";
+import { buildRecapsFromPlacements, getTierNightSession } from "./tierNightSession.js";
+import { resolveRosterTopicConfig, ROSTER_TOPIC_PREFIX } from "./rosterTopic.js";
 import {
   computeOptimisticMapEntryApply,
   rollbackOptimisticMapEntry,
@@ -407,11 +408,36 @@ export function resetTierNightLive() {
 export async function markTierNightClassicStarted({ topicId, mode, modifier }) {
   const runId = createTierNightRunId();
   const playerRoster = buildTierNightPlayerRoster(getLobbyParticipants());
-  const list = getTierListById(topicId);
-  const items = list?.roster
+  const sessionSnap = getState().tierNightGame || null;
+
+  let list;
+  if (typeof topicId === "string" && topicId.startsWith(ROSTER_TOPIC_PREFIX)) {
+    const config = resolveRosterTopicConfig(topicId, sessionSnap);
+    if (!config.found) {
+      console.warn("[TierNight] unknown roster topic", topicId);
+      return { ok: false, error: "Thème introuvable." };
+    }
+    list = {
+      id: config.topicId,
+      name: config.listName,
+      emoji: config.topicEmoji,
+      roster: true,
+      custom: config.custom,
+      items: playerRoster.map((p) => p.displayName),
+    };
+  } else {
+    list = getTierListById(topicId);
+  }
+  if (!list) {
+    return { ok: false, error: "Liste introuvable." };
+  }
+
+  const listName = list.name || "";
+  const topicEmoji = list.custom ? "" : list.emoji || "👥";
+  const items = list.roster
     ? playerRoster.map((p) => p.displayName)
-    : [...(list?.items || [])];
-  const listName = list?.name || "";
+    : [...(list.items || [])];
+
   saveStatePatch({
     tierNightTopicId: topicId,
     tierNightMode: mode,
@@ -421,6 +447,7 @@ export async function markTierNightClassicStarted({ topicId, mode, modifier }) {
       recaps: [],
       topicId,
       listName,
+      topicEmoji,
       controversialItem: null,
       items,
       playerRoster,
@@ -438,6 +465,8 @@ export async function markTierNightClassicStarted({ topicId, mode, modifier }) {
     game: true,
     items,
     playerRoster,
+    listName,
+    topicEmoji,
   });
   return launchGameWithSync({
     screen: "tiernight",

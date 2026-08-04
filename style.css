@@ -2051,14 +2051,26 @@ select.field-input option{
 }
 
 .tier-roster-card{
+  position:relative;
   display:flex;
-  align-items:center;
-  gap:14px;
-  text-align:left;
-  padding:16px;
+  align-items:stretch;
+  gap:0;
+  padding:0;
   border-radius:18px;
   border:1px solid rgba(255,255,255,.1);
   background:rgba(255,255,255,.05);
+  overflow:hidden;
+}
+
+.tier-roster-card__body{
+  display:flex;
+  align-items:center;
+  gap:14px;
+  flex:1;
+  text-align:left;
+  padding:16px;
+  border:none;
+  background:transparent;
   color:#fff;
   font-size:15px;
   font-weight:700;
@@ -2067,14 +2079,32 @@ select.field-input option{
   transition:transform .2s,border-color .2s;
 }
 
+.tier-roster-card--custom .tier-roster-card__delete{
+  position:absolute;
+  top:8px;
+  right:8px;
+  z-index:2;
+  width:28px;
+  height:28px;
+  border-radius:50%;
+  border:1px solid rgba(255,255,255,.15);
+  background:rgba(0,0,0,.35);
+  color:#fff;
+  font-size:18px;
+  line-height:1;
+  cursor:pointer;
+}
+
 @media (hover:hover){
-  .tier-roster-card:hover{
+  .tier-roster-card:hover .tier-roster-card__body{
     transform:scale(1.01);
+  }
+  .tier-roster-card:hover{
     border-color:rgba(167,139,250,.45);
   }
 }
 
-.tier-roster-card:active{ transform:scale(.99); }
+.tier-roster-card:active .tier-roster-card__body{ transform:scale(.99); }
 
 .tier-roster-card__emoji{
   font-size:26px;

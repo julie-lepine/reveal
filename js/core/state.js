@@ -3,6 +3,11 @@ import { DEFAULT_PROFILE_EMOJI } from "../../data/profileEmojis.js";
 import { trimPlayerText } from "../../data/playerTextLimits.js";
 import { getLastGameScopeKey, isLastGameInCurrentScope } from "./lobbyBoundary.js";
 import { migrateTruthMeterIdentityOnRename } from "./truthMeterIdentity.js";
+import {
+  createCustomRosterTopicId,
+  sanitizeCustomRosterTopicsFromStorage,
+  validateRosterTopicName,
+} from "./customRosterTopics.js";
 
 const STORAGE_KEY = "reveal-app-state";
 
@@ -100,6 +105,7 @@ const defaultState = () => ({
   tierNightMode: "roster",
   tierNightModifier: "normal",
   customTierLists: [],
+  customRosterTopics: [],
   hotTakeGame: {
     customTakes: [],
     ready: {},
@@ -245,7 +251,7 @@ const defaultState = () => ({
     podiumApplied: false,
     results: null,
   },
-  tierNightGame: { recaps: [], topicId: null, listName: "", controversialItem: null },
+  tierNightGame: { recaps: [], topicId: null, listName: "", topicEmoji: "", controversialItem: null },
   tierNightLiveGame: {
     lobbyStarted: false,
     topicId: null,
@@ -327,6 +333,7 @@ function loadState() {
       stats: { ...base.stats, ...parsed.stats },
       guessLie: { ...emptyGuessLie(), ...parsed.guessLie },
       customTierLists: parsed.customTierLists || [],
+      customRosterTopics: sanitizeCustomRosterTopicsFromStorage(parsed.customRosterTopics),
       globalStats: { ...defaultGlobalStats(), ...parsed.globalStats },
       user: { ...defaultUser(), ...parsed.user },
       lobby: { ...defaultLobby(), ...parsed.lobby },
@@ -1385,6 +1392,36 @@ export function deleteCustomTierList(id) {
   if (state.tierNightTopicId === id) {
     state.tierNightTopicId = null;
   }
+  save();
+  return true;
+}
+
+export function getCustomRosterTopics() {
+  return [...(state.customRosterTopics || [])];
+}
+
+/**
+ * @returns {{ ok: true, id: string, topic: object }|{ ok: false, error: string }}
+ */
+export function addCustomRosterTopic({ name }) {
+  const nameCheck = validateRosterTopicName(name);
+  if (!nameCheck.ok) return nameCheck;
+  const id = createCustomRosterTopicId();
+  const topic = {
+    id,
+    name: nameCheck.name,
+    custom: true,
+  };
+  state.customRosterTopics = [...(state.customRosterTopics || []), topic];
+  save();
+  return { ok: true, id, topic };
+}
+
+export function deleteCustomRosterTopic(id) {
+  const topics = state.customRosterTopics || [];
+  const next = topics.filter((t) => t.id !== id);
+  if (next.length === topics.length) return false;
+  state.customRosterTopics = next;
   save();
   return true;
 }

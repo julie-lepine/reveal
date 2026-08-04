@@ -12,33 +12,40 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 
 ---
 
-## Focus — 2026-07-31 (soirée-test)
+## Focus — 2026-08-04
 
 | | |
 |--|--|
-| **Maintenant** | Consensus reveal atomique · **ARCH-23** / **ARCH-10** QA natif |
-| **Ensuite** | Backlog produit (Dilemma · TierNight) · dette ARCH |
-| **Audit** | Transversal 2026-08-02 — optimistic submissions ✅ · Deal ACK ✅ · **FEATURE-CHAT-03 ✅** QA 2026-08-03 |
+| **Maintenant** | Backlog produit : **FEATURE-TIERNIGHT-01** · **FEATURE-TIERNIGHT-02** · **UX-DEVICE-01** (dernier ticket produit convenu) |
+| **En fin de vague** | **ARCH-23** / **ARCH-10** QA natif — **après** clôture des tickets produit ouverts (code + SQL déjà livrés · QA différée deploy Capacitor) |
+| **Dette** | ARCH-05 · ARCH-01 · ARCH-11–17 · SYN-19–24 · SYN-27 · Fil Rouge / VibeCheck cleanup |
+| **Audit** | Transversal 2026-08-02 — optimistic submissions ✅ · Deal ACK ✅ · **FEATURE-CHAT-03 ✅** · **FEATURE-DILEMMA-01 ✅** QA 2026-08-04 |
+
+> ~~« Consensus reveal atomique »~~ — **aucun ticket** à cet intitulé dans l’audit (reliquat probable d’une note type Trivia 01B, jamais formalisé). Ne pas traiter comme chantier ouvert.
 
 ---
 
 ## File ouverte
 
-### Prioritaire (QA différée / finale)
+### Fin de vague — QA natif différée (pas prioritaire maintenant)
 
 | ID | Cause | Problème | Priorité |
 |----|-------|----------|----------|
-| **ARCH-23** | 8/11 | Détection compatibilité client (natif) + hard gate | 🟡 Vague 1 · SQL ✅ · **QA différée** (deploy natif de test) |
-| **ARCH-10** | 8 | Clear cache leave lobby trop tard | 🟢 fonctionnel ✅ GH Pages · **mobile → QA finale** |
+| **ARCH-23** | 8/11 | Détection compatibilité client (natif) + hard gate | 🟡 Vague 1 · SQL ✅ · **QA après tickets produit** |
+| **ARCH-10** | 8 | Clear cache leave lobby trop tard | 🟢 fonctionnel ✅ GH Pages · **mobile QA finale** (même vague qu’ARCH-23) |
+| **UX-DEVICE-01** | 11 | Écran verrouillé pendant une partie (Wake Lock API) | 🟡 · **dernier produit** |
 
-### Autres
+### Backlog produit (ordre actuel)
 
 | ID | Cause | Problème | Priorité |
 |----|-------|----------|----------|
-| **UX-DEVICE-01** | 11 | Écran verrouillé pendant une partie (Wake Lock API) | 🟡 |
-| **FEATURE-DILEMMA-01** | — | Plusieurs dilemmes par joueur | 🟡 |
 | **FEATURE-TIERNIGHT-01** | — | Thèmes personnalisés (Classer le groupe) | 🟡 |
 | **FEATURE-TIERNIGHT-02** | — | Séries de tierlists par catégories | 🟡 |
+
+### Dette / opportunité
+
+| ID | Cause | Problème | Priorité |
+|----|-------|----------|----------|
 | **ARCH-05** | 5 | Route lobby vs session (`row.screen`) | 🟡 mitigé SYN-28 |
 | **ARCH-01 / F-01** | 1 | Démo offline sans avertissement MP | 🟡 partiel |
 | **ARCH-11–17, SYN-19–24, SYN-27** | 9–10 | Monolithe / dup / code mort | Dette |
@@ -58,7 +65,7 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 | 8 | Reset / migration incomplète | Partiel | **BUG-TIERNIGHT-05 ✅** · **OPS-LOBBY-04 ✅** · **BUG-LOBBY-XX-E ✅** · **BUG-TRUTHMETER-02 ✅** · **ARCH-23** · ARCH-10 · **BUG-LOBBY-XX ✅** · I-09/SYN-15/16 ✅ |
 | 9 | Sync monolithe / duplication | Dette | ARCH-11… |
 | 10 | Code mort | Dette | **FEATURE-VIBECHECK-01 ✅** · hors Fil Rouge app ✅ |
-| 11 | Friction UX | Partiel | **UX-DEVICE-01** 🟡 · **FEATURE-CHAT-03 ✅** · **UX-CHAT-01 ✅** · **UX-CHAT-02 ✅** · **UX-HOST-01 ✅** · **BUG-WAO-04** ✅ · **ARCH-23** · ARCH-22/Loader ✅ · **L-04 ✅** |
+| 11 | Friction UX | Partiel | **UX-DEVICE-01** 🟡 · **FEATURE-DILEMMA-01 ✅** · **FEATURE-CHAT-03 ✅** · **UX-CHAT-01 ✅** · **UX-CHAT-02 ✅** · **UX-HOST-01 ✅** · **BUG-WAO-04** ✅ · **ARCH-23** · ARCH-22/Loader ✅ · **L-04 ✅** |
 
 ---
 
@@ -270,6 +277,21 @@ Raison persistante de fermeture (`host_closed` / `inactive_expired`) via tombsto
 | **Hors scope** | Seuils purge · cron · soft-close lifecycle · **BUG-LOBBY-XX-F** |
 | **Verdict** | **Ne pas rouvrir** sauf attribution fausse sans tombstone ou double modale démontrée |
 
+#### FEATURE-DILEMMA-01 ✅ (clôture QA terrain · 2026-08-04)
+
+Multi-custom Dilemma : plusieurs propositions par joueur, deck cohérent, sync MP. **Ne pas rouvrir** sans régression démontrée.
+
+| | |
+|--|--|
+| **Produit** | Formulaire prep toujours visible · suppression individuelle · aucun plafond par auteur · customs prioritaires dans le deck (pas noyés dans le catalogue) · shuffle global du sous-ensemble sélectionné |
+| **Politique deck** | `C ≥ R` → R customs aléatoires · `C < R` → tous les customs + `(R−C)` prédéfinis · `C = 0` → R prédéfinis · déduplication ID · collision custom/banque → custom gagne (`{ c }` codec) |
+| **Correctifs QA** | Compteur « dilemmes d'autres » (merge stale) · leave prep sans F5 (`runPrepRefreshOnLobbyChange`) · régression deck slice sur huge catalog |
+| **Où** | `combinedGameDeck.js` · `dilemmaSession.js` · `deckCodec.js` · `sessionMerge.js` · `dilemmaPrep.js` · `prepOthersCustomHint.js` · `prepScreen.js` |
+| **SQL** | [`feature-dilemma-01-multi-custom.sql`](../supabase/feature-dilemma-01-multi-custom.sql) — append RPC sans limite par auteur |
+| **Preuve** | `featureDilemma01MultiCustom` · `featureDilemma01QaFixes` · `featureDilemma01DeckRegression` (61 tests dilemma) · QA terrain 2026-08-04 |
+| **Hors scope** | Hot Take deck (schéma inchangé) · votes · scoring · round count · contrat leave customs persistants |
+| **Verdict** | **Ne pas rouvrir** sauf régression multi-custom / deck / compteur / sync prep démontrée |
+
 #### BUG-TRIVIA-01A ✅ (clôture QA terrain · 2026-07-31)
 
 Acting host Trivia : transitions `question → reveal → next → final` via patches explicites + validation SQL.
@@ -365,7 +387,7 @@ Retour terrain multi-jeux. Priorités : 🔴 critique · 🟠 haute · 🟡 moye
 | **UX-DEVICE-01** | Mise en veille pendant partie | Écran verrouillé si téléphone posé. À étudier : Screen Wake Lock API (ou équivalent) tant que lobby actif · relâcher au leave · fallback propre si API indisponible. |
 | ~~**GAME-SPEEDVOTE-01**~~ | ~~Récompense gagnant~~ | ❌ **Annulé 2026-08-02** — barème actuel **+10** (`EVENING_POINTS.WIN`) déjà harmonisé ; +15 / podium 15-10-5 non retenus. |
 | ~~**GAME-WAO-01**~~ | Barème Wrong Answer Only | ✅ **Décision 2026-08-03** — podium **15/10/5** conservé **+ 5 pts / vote reçu**. `WRONG_ANSWER_POINTS_PER_VOTE` · `wrongAnswerScoring` · `gameRules`. **QA terrain** avant clôture. |
-| **FEATURE-DILEMMA-01** | Plusieurs dilemmes par joueur | Actuellement 1 seul par joueur. Autoriser plusieurs propositions · le système doit rester cohérent avec plusieurs dilemmes d'un même auteur. |
+| ~~**FEATURE-DILEMMA-01**~~ | ~~Plusieurs dilemmes par joueur~~ | ✅ **Clôturé QA 2026-08-04** — multi-custom sans plafond · deck customs prioritaires + shuffle global · correctifs compteur / leave / sync. Ne pas rouvrir. |
 | **FEATURE-TIERNIGHT-01** | Thèmes personnalisés | Mode « Classer le groupe » : créer son propre thème (ex. « Qui survivrait le plus longtemps sur une île ? ») comme base de la tierlist. |
 | **FEATURE-TIERNIGHT-02** | Séries de tierlists | Plus de tierlists officielles · organisées par catégories · enchaînement de plusieurs tierlists dans une manche · révélation finale classement global. UX à définir. |
 | ~~**FEATURE-CHAT-03**~~ | ~~Roulette « Jeu aléatoire »~~ | ✅ **Clôturé QA terrain 2026-08-03** — CTA chat · soft voice · bridge sondage · tirage libre + anti-répétition immédiate · TTL hybride · `rouletteId`/`attemptId` · permit launch · sync Realtime · fermeture chat→prep. Ne pas rouvrir. |
@@ -393,6 +415,19 @@ Retour terrain multi-jeux. Priorités : 🔴 critique · 🟠 haute · 🟡 moye
 
 Départage temporel (`answers[name].at`) **abandonné**. Votes seuls → rang compétition (`1, 1, 3`) + paliers podium. Score manche = **podium 15/10/5 + 5 × votes reçus**. Doc : `data/gameRules.js`. Clutch conserve son départage temporel.
 
+### FEATURE-DILEMMA-01 — deck prep (référence · ✅ clôturé)
+
+Customs **prioritaires** sur les places disponibles ; ordre final = **shuffle Fisher-Yates** du sous-ensemble sélectionné (pas de concat déterministe customs→banque).
+
+| Cas | Règle |
+|-----|--------|
+| `C = 0` | `R` prédéfinis aléatoires |
+| `C < R` | tous les `C` customs + `(R−C)` prédéfinis → shuffle |
+| `C = R` | tous les customs → shuffle |
+| `C > R` | `R` customs tirés aléatoirement · aucun prédéfini |
+
+Déduplication par `id` · collision custom/banque → custom gagne · consume one-shot après manche · auteur quitte prep → custom reste éligible. Impl : `combinedGameDeck.js` · `buildDilemmaDeckEntries`.
+
 ### Chaînes utiles
 
 ```
@@ -411,6 +446,7 @@ Ne pas rouvrir sans régression. Détail historique dans git / tests cités.
 
 | ID | Cause | Livré | Preuve / QA |
 |----|-------|-------|-------------|
+| **FEATURE-DILEMMA-01** | 11 | Multi-custom prep · deck customs prioritaires · shuffle global · QA compteur/leave/sync | QA terrain 2026-08-04 · `featureDilemma01*` (61) · SQL `feature-dilemma-01-multi-custom` |
 | **SYN-TRAITRE-DEALACK-01** | 7 | Rollback Deal ACK · `optimisticMapEntry` · catch UI terminal | QA terrain 2026-08-03 · `synTraitreDealAck01` |
 | **SYN-VOTE-ROLLBACK-01** | 7 | Rollback soumissions optimistes votes + réponse WAO | QA terrain 2026-08-03 · `synVoteRollback01*` |
 | **AUTH-LEAVE-*** | 1/3 | Preuve DELETE membership · logout membre strict · finalize guest Home · join switch abort | QA terrain 2026-08-03 · `authLeaveOrphans` |
@@ -476,7 +512,7 @@ Ne pas rouvrir sans régression. Détail historique dans git / tests cités.
 | 8 | I-06, P-02, ARCH-09, I-09/SYN-06, SYN-15/16, M-15, **BUG-LOBBY-XX ✅** |
 | 9 | SYN-12 / M-05b |
 | 10 | SYN-05 / ARCH-18 (Fil Rouge app) |
-| 11 | L-02, ARCH-21↻, M-12, UX-HIST/RESUME/VIBE, POLL, **Membership A–E5**, ARCH-22, Loader join, **UX-NAV-LOBBY**, join partiel, **L-04**, **UX-CHAT-01**, **UX-CHAT-02**, **UX-HOST-01** |
+| 11 | L-02, ARCH-21↻, M-12, UX-HIST/RESUME/VIBE, POLL, **Membership A–E5**, ARCH-22, Loader join, **UX-NAV-LOBBY**, join partiel, **L-04**, **UX-CHAT-01**, **UX-CHAT-02**, **UX-HOST-01**, **FEATURE-DILEMMA-01** |
 
 ---
 
@@ -506,4 +542,4 @@ Hors file prioritaire — opportunité / régression :
 
 ---
 
-*Suivi vivant · MAJ 2026-08-03 — **SYN-TRAITRE-DEALACK-01** ✅ · **SYN-VOTE-ROLLBACK-01** ✅ · prochain = **UX-DEVICE-01** · **ARCH-10** Pages ✅ · **ARCH-23** QA différée*
+*Suivi vivant · MAJ 2026-08-04 — **FEATURE-DILEMMA-01** ✅ · prochain produit = **FEATURE-TIERNIGHT-01/02** puis **UX-DEVICE-01** · **ARCH-23** / **ARCH-10** QA natif en fin de vague*
