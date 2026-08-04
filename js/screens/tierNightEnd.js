@@ -279,7 +279,6 @@ export function mountTierNightEnd(app) {
         <p class="game-intro">« ${escapeHtml(session.listName || "Tier list")} » - +${session.localConsensusPoints ?? 0} pts consensus pour toi cette manche.</p>
         ${consensusBoardHtml(session.consensus, labelFn)}
         ${controversialHtml(session, recaps, labelFn)}
-        ${gameCumulativeScoresHtml({ gameId: "tiernight", gameLabel: "Tier Night", title: "Cumul des scores" })}
         <div class="recap-list">
           ${recaps.length
             ? recaps
@@ -293,6 +292,7 @@ export function mountTierNightEnd(app) {
                 .join("")
             : `<p class="hint">Chargement des classements…</p>`}
         </div>
+        ${gameCumulativeScoresHtml({ gameId: "tiernight", gameLabel: "Tier Night", title: "Cumul des scores" })}
         ${eveningRecapRestartButtonHtml({ gameId: "tiernight", title: "TierNight" })}
         <button type="button" class="btn btn-primary" data-nav="results">Voir les résultats →</button>`;
 

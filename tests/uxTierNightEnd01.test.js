@@ -37,14 +37,15 @@ describe("UX-TIERNIGHT-END-01 — structure récap tiernight-end", () => {
     assert.doesNotMatch(tpl, /tierNightRoundScoresHtml/);
   });
 
-  it("conserve l'ordre : intro → consensus → clivant → cumul → cartes", () => {
+  it("conserve l'ordre : intro → consensus → clivant → cartes → cumul → recommencer", () => {
     const tpl = renderTemplateFromEndScreen();
     const markers = [
       { name: "intro", re: /pts consensus pour toi cette manche/ },
       { name: "consensus", re: /consensusBoardHtml\(/ },
       { name: "clivant", re: /controversialHtml\(/ },
-      { name: "cumul", re: /gameCumulativeScoresHtml\(/ },
       { name: "cartes", re: /recap-list/ },
+      { name: "cumul", re: /gameCumulativeScoresHtml\(/ },
+      { name: "recommencer", re: /eveningRecapRestartButtonHtml\(/ },
     ];
     let cursor = -1;
     for (const m of markers) {
