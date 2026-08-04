@@ -1018,7 +1018,14 @@ export function hasEveningStatsActivity() {
 export function resetEveningState() {
   resetScores();
   resetGameSessionsOnly();
-  saveStatePatch({ stats: defaultEveningStats(), eveningGamesRecorded: {} });
+  // Thèmes roster « Classe le groupe » : cycle de vie lobby (comme customTakes /
+  // customDilemmas via hotTakeGame/dilemmaGame), pas une bibliothèque permanente.
+  // Ne pas placer dans resetGameSessionsOnly — doit survivre aux changements de jeu.
+  saveStatePatch({
+    stats: defaultEveningStats(),
+    eveningGamesRecorded: {},
+    customRosterTopics: [],
+  });
 }
 
 /** Remet à zéro les sessions de jeu sans effacer le classement de la soirée. */
