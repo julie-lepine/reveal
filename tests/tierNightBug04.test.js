@@ -37,7 +37,7 @@ function resolveClassicFromSnap(topicId, sessionLike) {
   return null;
 }
 
-describe("BUG-TIERNIGHT-04 — Classique roster figé", () => {
+describe("BUG-TIERNIGHT-04 - Classique roster figé", () => {
   it("1. roster construit au lancement (ordre lobby)", () => {
     const roster = buildTierNightPlayerRoster(lobby3);
     assert.deepEqual(
@@ -143,7 +143,7 @@ describe("BUG-TIERNIGHT-04 — Classique roster figé", () => {
   });
 });
 
-describe("BUG-TIERNIGHT-04 — Live UID canonique", () => {
+describe("BUG-TIERNIGHT-04 - Live UID canonique", () => {
   const roster = buildTierNightPlayerRoster(lobby3);
 
   it("1. votes indexés par UID → comptés", () => {
@@ -210,7 +210,7 @@ describe("BUG-TIERNIGHT-04 — Live UID canonique", () => {
     assert.equal(displayNameForTierNightUid("u-b", roster, () => null), "Bob");
   });
 
-  it("11. merge placements serveur — clés conservées (convergence)", () => {
+  it("11. merge placements serveur - clés conservées (convergence)", () => {
     const local = { Alice: { S: ["item1"] } };
     const remote = { Bob: { A: ["item1"] } };
     const merged = { ...local, ...remote };
@@ -224,7 +224,7 @@ describe("BUG-TIERNIGHT-04 — Live UID canonique", () => {
   });
 });
 
-describe("BUG-TIERNIGHT-05 — résolu : nouveau runId abandonne les votes locaux", () => {
+describe("BUG-TIERNIGHT-05 - résolu : nouveau runId abandonne les votes locaux", () => {
   it("isNewSpeedVoteVoteRound seul ne détecte pas un nouveau run (contrat SpeedVote inchangé)", () => {
     const local = {
       runId: "old",
@@ -245,7 +245,7 @@ describe("BUG-TIERNIGHT-05 — résolu : nouveau runId abandonne les votes locau
   });
 });
 
-describe("BUG-TIERNIGHT-04 — helpers SpeedVote partagés (non-régression contrat)", () => {
+describe("BUG-TIERNIGHT-04 - helpers SpeedVote partagés (non-régression contrat)", () => {
   it("isNewSpeedVoteVoteRound : nouvelle manche (roundIdx+) avec votes vides → reset", () => {
     assert.equal(
       isNewSpeedVoteVoteRound(

@@ -361,7 +361,7 @@ function homeMembershipActionsHtml(chrome) {
   }
 
   if (chrome.state === "post_leave_transition") {
-    // E3 — soft-hold : pas de panneau checking, pas de Resume.
+    // E3 - soft-hold : pas de panneau checking, pas de Resume.
     return "";
   }
 
@@ -400,7 +400,7 @@ function clearStuckDialogs() {
 export function mountHome(app) {
   const mount = createMountGuard();
   const shouldContinue = () => mount.isMounted() && mount.isCurrentMount();
-  /** Loader UI Join Vague A — soft « Connexion… » ; pas de lock métier. */
+  /** Loader UI Join Vague A - soft « Connexion… » ; pas de lock métier. */
   const syncPending = createSyncPending({
     softDelayMs: 500,
     onChange: () => {
@@ -1211,7 +1211,7 @@ export function mountHome(app) {
           const refreshed = await queryActiveLobbyMembership();
           if (shouldContinue()) applyMembershipQueryResult(refreshed);
         } catch {
-          /* ignore — found local snapshot suffit */
+          /* ignore - found local snapshot suffit */
         }
         if (!shouldContinue()) return;
         await resumeEveningSession({ force: true });
@@ -1339,7 +1339,7 @@ export function mountHome(app) {
         });
         if (!shouldContinue()) return;
 
-        // Retirer le found B avant confirmation — évite retain_found trompeur (Vague D).
+        // Retirer le found B avant confirmation - évite retain_found trompeur (Vague D).
         // beginPostLeave déjà fait dans leaveLobbyMembershipFromServer.
         const leaveGen = getPostLeaveHomeTransitionGeneration();
         commitMembershipRemoved({

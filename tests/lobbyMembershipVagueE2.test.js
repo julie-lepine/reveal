@@ -1,5 +1,5 @@
 /**
- * Membership Vague E2 — sync asymétrique cache runtime ↔ snapshot membership.
+ * Membership Vague E2 - sync asymétrique cache runtime ↔ snapshot membership.
  */
 import { describe, it, beforeEach } from "node:test";
 import assert from "node:assert/strict";
@@ -73,14 +73,14 @@ const MEMBERSHIP_B = {
   hostId: UID_A,
 };
 
-describe("lobbyMembershipVagueE2 — primitives", () => {
+describe("lobbyMembershipVagueE2 - primitives", () => {
   beforeEach(() => {
     __resetMembershipAuthForTests();
     clearPendingLobbyMembershipCompensationIfMatches(null);
     resetMembershipSnapshotTestState(UID_A);
   });
 
-  it("A — create confirmé : none → found B host", () => {
+  it("A - create confirmé : none → found B host", () => {
     setMembershipSnapshot({ status: "none" }, "create-lobby-guard", UID_A);
     const out = commitMembershipHydrated({
       userId: UID_A,
@@ -96,7 +96,7 @@ describe("lobbyMembershipVagueE2 — primitives", () => {
     assert.equal(snap?.authGeneration, 0);
   });
 
-  it("B — source non autorisée rejetée", () => {
+  it("B - source non autorisée rejetée", () => {
     const out = commitMembershipHydrated({
       userId: UID_A,
       membership: MEMBERSHIP_B,
@@ -106,7 +106,7 @@ describe("lobbyMembershipVagueE2 — primitives", () => {
     assert.equal(getMembershipSnapshot(), null);
   });
 
-  it("C — join confirmé remplace found A par found B", () => {
+  it("C - join confirmé remplace found A par found B", () => {
     setMembershipSnapshot(
       { status: "found", membership: MEMBERSHIP_A },
       "home-query",
@@ -122,7 +122,7 @@ describe("lobbyMembershipVagueE2 — primitives", () => {
     assert.equal(getMembershipSnapshot()?.membership?.lobbyId, "lobby-b-id");
   });
 
-  it("D — identity mismatch refusé (E1)", () => {
+  it("D - identity mismatch refusé (E1)", () => {
     const out = commitMembershipHydrated({
       userId: UID_B,
       membership: MEMBERSHIP_B,
@@ -132,7 +132,7 @@ describe("lobbyMembershipVagueE2 — primitives", () => {
     assert.equal(out.reason, "identity_mismatch");
   });
 
-  it("E — recovery : membershipFromHydratedBundle + promote", () => {
+  it("E - recovery : membershipFromHydratedBundle + promote", () => {
     const m = membershipFromHydratedBundle(BUNDLE_B, UID_A);
     assert.equal(m?.role, "host");
     assert.equal(m?.membershipId, "mem-b-1");
@@ -144,7 +144,7 @@ describe("lobbyMembershipVagueE2 — primitives", () => {
     assert.equal(getMembershipSnapshot()?.membership?.code, "BBBB");
   });
 
-  it("F — refresh conserve membershipId/joinedAt, met à jour runtime", () => {
+  it("F - refresh conserve membershipId/joinedAt, met à jour runtime", () => {
     setMembershipSnapshot(
       {
         status: "found",
@@ -170,7 +170,7 @@ describe("lobbyMembershipVagueE2 — primitives", () => {
     assert.equal(snap?.membership?.joinedAt, "2026-07-01T12:00:00.000Z");
   });
 
-  it("F2 — refresh identique skip rewrite", () => {
+  it("F2 - refresh identique skip rewrite", () => {
     setMembershipSnapshot(
       { status: "found", membership: MEMBERSHIP_B },
       "join_confirmed",
@@ -187,7 +187,7 @@ describe("lobbyMembershipVagueE2 — primitives", () => {
     assert.equal(getMembershipSnapshot()?.checkedAt, before);
   });
 
-  it("G — mismatch A→B silent realign (found A remplacé)", () => {
+  it("G - mismatch A→B silent realign (found A remplacé)", () => {
     setMembershipSnapshot(
       { status: "found", membership: MEMBERSHIP_A },
       "home",
@@ -201,7 +201,7 @@ describe("lobbyMembershipVagueE2 — primitives", () => {
     assert.equal(getMembershipSnapshot()?.membership?.lobbyId, "lobby-b-id");
   });
 
-  it("H — commitMembershipRemoved : cache clear simulé, found conservé jusqu'à leave confirmé", () => {
+  it("H - commitMembershipRemoved : cache clear simulé, found conservé jusqu'à leave confirmé", () => {
     setMembershipSnapshot(
       { status: "found", membership: MEMBERSHIP_B },
       "join_confirmed",
@@ -222,7 +222,7 @@ describe("lobbyMembershipVagueE2 — primitives", () => {
     );
   });
 
-  it("I — leave serveur confirmé retire found B", () => {
+  it("I - leave serveur confirmé retire found B", () => {
     setMembershipSnapshot(
       { status: "found", membership: MEMBERSHIP_B },
       "join_confirmed",
@@ -233,7 +233,7 @@ describe("lobbyMembershipVagueE2 — primitives", () => {
     assert.equal(getMembershipSnapshot(), null);
   });
 
-  it("J — leave échoué ne retire pas found", () => {
+  it("J - leave échoué ne retire pas found", () => {
     setMembershipSnapshot(
       { status: "found", membership: MEMBERSHIP_B },
       "join_confirmed",
@@ -244,7 +244,7 @@ describe("lobbyMembershipVagueE2 — primitives", () => {
     assert.equal(getMembershipSnapshot()?.status, "found");
   });
 
-  it("K — canCreateLobbyFromInputs : cache actif bloque même avec snapshot none", () => {
+  it("K - canCreateLobbyFromInputs : cache actif bloque même avec snapshot none", () => {
     setMembershipSnapshot({ status: "none" }, "guard", UID_A);
     assert.equal(
       canCreateLobbyFromInputs({
@@ -279,14 +279,14 @@ describe("lobbyMembershipVagueE2 — primitives", () => {
     );
   });
 
-  it("L — offline skip (isSupabaseConfigured false simulé via guard)", () => {
-    // commitMembershipHydrated vérifie isSupabaseConfigured — testé via import mock difficile ;
+  it("L - offline skip (isSupabaseConfigured false simulé via guard)", () => {
+    // commitMembershipHydrated vérifie isSupabaseConfigured - testé via import mock difficile ;
     // mergeMembershipFields reste pur hors Supabase.
     const merged = mergeMembershipFields(MEMBERSHIP_A, MEMBERSHIP_A);
     assert.equal(merged?.lobbyId, MEMBERSHIP_A.lobbyId);
   });
 
-  it("M — anonymous : promotion scoped userId", () => {
+  it("M - anonymous : promotion scoped userId", () => {
     commitMembershipHydrated({
       userId: UID_A,
       membership: MEMBERSHIP_B,
@@ -298,7 +298,7 @@ describe("lobbyMembershipVagueE2 — primitives", () => {
     assert.equal(getMembershipSnapshot(), null);
   });
 
-  it("N — stale auth generation refusé", () => {
+  it("N - stale auth generation refusé", () => {
     commitMembershipHydrated({
       userId: UID_A,
       membership: MEMBERSHIP_B,
@@ -319,7 +319,7 @@ describe("lobbyMembershipVagueE2 — primitives", () => {
     assert.equal(out.reason, "stale_auth_generation");
   });
 
-  it("O — pending compensation bloque promotion silencieuse", () => {
+  it("O - pending compensation bloque promotion silencieuse", () => {
     const pending = {
       lobbyId: "lobby-b-id",
       membershipId: "mem-b-1",
@@ -344,13 +344,13 @@ describe("lobbyMembershipVagueE2 — primitives", () => {
     );
   });
 
-  it("mergeMembershipFields — lobby différent remplace", () => {
+  it("mergeMembershipFields - lobby différent remplace", () => {
     const merged = mergeMembershipFields(MEMBERSHIP_A, MEMBERSHIP_B);
     assert.equal(merged?.lobbyId, "lobby-b-id");
     assert.equal(merged?.membershipId, "mem-b-1");
   });
 
-  it("shouldAlignSnapshotOnRefresh — détecte changement runtime", () => {
+  it("shouldAlignSnapshotOnRefresh - détecte changement runtime", () => {
     const existing = {
       status: "found",
       membership: MEMBERSHIP_B,
@@ -369,7 +369,7 @@ describe("lobbyMembershipVagueE2 — primitives", () => {
   });
 });
 
-describe("lobbyMembershipVagueE2 — contrats source", () => {
+describe("lobbyMembershipVagueE2 - contrats source", () => {
   it("supabaseLobby importe align après hydrate confirmé + canonicalRow create/join", async () => {
     const { readFileSync } = await import("node:fs");
     const { fileURLToPath } = await import("node:url");
@@ -489,14 +489,14 @@ describe("lobbyMembershipVagueE2 — contrats source", () => {
   });
 });
 
-describe("lobbyMembershipVagueE2 — leave / clear / canonique", () => {
+describe("lobbyMembershipVagueE2 - leave / clear / canonique", () => {
   beforeEach(() => {
     __resetMembershipAuthForTests();
     clearPendingLobbyMembershipCompensationIfMatches(null);
     resetMembershipSnapshotTestState(UID_A);
   });
 
-  it("1 — leave volontaire serveur réussi : found B retiré + cache nettoyé", async () => {
+  it("1 - leave volontaire serveur réussi : found B retiré + cache nettoyé", async () => {
     setMembershipSnapshot(
       { status: "found", membership: MEMBERSHIP_B },
       "join_confirmed",
@@ -542,7 +542,7 @@ describe("lobbyMembershipVagueE2 — leave / clear / canonique", () => {
     assert.equal(getState().lobby, null);
   });
 
-  it("2 — leave volontaire serveur échoué : found B conservé", async () => {
+  it("2 - leave volontaire serveur échoué : found B conservé", async () => {
     setMembershipSnapshot(
       { status: "found", membership: MEMBERSHIP_B },
       "join_confirmed",
@@ -570,7 +570,7 @@ describe("lobbyMembershipVagueE2 — leave / clear / canonique", () => {
     assert.equal(getMembershipSnapshot()?.membership?.lobbyId, "lobby-b-id");
   });
 
-  it("3 — dissolution hôte confirmée : snapshot hôte retiré", () => {
+  it("3 - dissolution hôte confirmée : snapshot hôte retiré", () => {
     setMembershipSnapshot(
       { status: "found", membership: { ...MEMBERSHIP_B, role: "host" } },
       "create_confirmed",
@@ -581,7 +581,7 @@ describe("lobbyMembershipVagueE2 — leave / clear / canonique", () => {
     assert.equal(getMembershipSnapshot(), null);
   });
 
-  it("4 — dissolution reçue invité : remove uniquement après preuve (même API)", () => {
+  it("4 - dissolution reçue invité : remove uniquement après preuve (même API)", () => {
     setMembershipSnapshot(
       { status: "found", membership: MEMBERSHIP_B },
       "join_confirmed",
@@ -592,7 +592,7 @@ describe("lobbyMembershipVagueE2 — leave / clear / canonique", () => {
     assert.equal(getMembershipSnapshot(), null);
   });
 
-  it("5 — kick d'un autre joueur : snapshot hôte inchangé", () => {
+  it("5 - kick d'un autre joueur : snapshot hôte inchangé", () => {
     setMembershipSnapshot(
       { status: "found", membership: { ...MEMBERSHIP_B, role: "host" } },
       "create_confirmed",
@@ -606,7 +606,7 @@ describe("lobbyMembershipVagueE2 — leave / clear / canonique", () => {
     assert.equal(getMembershipSnapshot()?.userId, UID_A);
   });
 
-  it("6 — utilisateur courant expulsé : snapshot retiré après preuve", () => {
+  it("6 - utilisateur courant expulsé : snapshot retiré après preuve", () => {
     setMembershipSnapshot(
       { status: "found", membership: MEMBERSHIP_B },
       "join_confirmed",
@@ -617,7 +617,7 @@ describe("lobbyMembershipVagueE2 — leave / clear / canonique", () => {
     assert.equal(getMembershipSnapshot(), null);
   });
 
-  it("7 — force clear client-only : found conservé", () => {
+  it("7 - force clear client-only : found conservé", () => {
     setMembershipSnapshot(
       { status: "found", membership: MEMBERSHIP_B },
       "join_confirmed",
@@ -638,7 +638,7 @@ describe("lobbyMembershipVagueE2 — leave / clear / canonique", () => {
     );
   });
 
-  it("8 — create avec row canonique : membershipId / joinedAt dès promote", () => {
+  it("8 - create avec row canonique : membershipId / joinedAt dès promote", () => {
     const membership = buildHydratedMembership({
       userId: UID_A,
       bundle: BUNDLE_B,
@@ -662,7 +662,7 @@ describe("lobbyMembershipVagueE2 — leave / clear / canonique", () => {
     assert.equal(snap?.membership?.code, "BBBB");
   });
 
-  it("9 — join avec row canonique : métadonnées utilisées", () => {
+  it("9 - join avec row canonique : métadonnées utilisées", () => {
     const membership = buildHydratedMembership({
       userId: UID_A,
       bundle: {
@@ -690,7 +690,7 @@ describe("lobbyMembershipVagueE2 — leave / clear / canonique", () => {
     assert.equal(membership?.code, "BBBB");
   });
 
-  it("10 — create/join sans row canonique : fallback bundle", () => {
+  it("10 - create/join sans row canonique : fallback bundle", () => {
     const membership = buildHydratedMembership({
       userId: UID_A,
       bundle: BUNDLE_B,
@@ -702,7 +702,7 @@ describe("lobbyMembershipVagueE2 — leave / clear / canonique", () => {
     assert.equal(normalizeCanonicalMembershipRow(null), null);
   });
 
-  it("11 — E1 : userId / gen mismatch toujours rejeté", () => {
+  it("11 - E1 : userId / gen mismatch toujours rejeté", () => {
     const idMismatch = commitMembershipHydrated({
       userId: UID_B,
       membership: MEMBERSHIP_B,
@@ -731,7 +731,7 @@ describe("lobbyMembershipVagueE2 — leave / clear / canonique", () => {
     assert.equal(stale.reason, "stale_auth_generation");
   });
 
-  it("12 — commitMembershipRemoved idempotent", () => {
+  it("12 - commitMembershipRemoved idempotent", () => {
     setMembershipSnapshot(
       { status: "found", membership: MEMBERSHIP_B },
       "join_confirmed",
@@ -744,7 +744,7 @@ describe("lobbyMembershipVagueE2 — leave / clear / canonique", () => {
   });
 });
 
-describe("lobbyMembershipVagueE2 — contrats dissolution / kick", () => {
+describe("lobbyMembershipVagueE2 - contrats dissolution / kick", () => {
   it("dissolve : call sites = Realtime DELETE lobbies OU stillMember===false", async () => {
     const { readFileSync } = await import("node:fs");
     const { fileURLToPath } = await import("node:url");

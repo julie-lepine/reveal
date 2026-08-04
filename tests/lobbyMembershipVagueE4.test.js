@@ -1,5 +1,5 @@
 /**
- * Membership Vague E4 — UNIQUE user + create_lobby_atomically + mapping 23505.
+ * Membership Vague E4 - UNIQUE user + create_lobby_atomically + mapping 23505.
  */
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
@@ -20,8 +20,8 @@ function read(rel) {
   return readFileSync(join(ROOT, rel), "utf8");
 }
 
-describe("lobbyMembershipVagueE4 — contrainte & mapping", () => {
-  it("13 — conflit précis lobby_members(user_id) détecté", () => {
+describe("lobbyMembershipVagueE4 - contrainte & mapping", () => {
+  it("13 - conflit précis lobby_members(user_id) détecté", () => {
     assert.equal(
       isLobbyMembersOneLivingPerUserConflict({
         code: "23505",
@@ -40,7 +40,7 @@ describe("lobbyMembershipVagueE4 — contrainte & mapping", () => {
     );
   });
 
-  it("13b — forme PostgREST réelle typique SANS champ constraint", () => {
+  it("13b - forme PostgREST réelle typique SANS champ constraint", () => {
     // Forme documentée PostgREST / supabase-js (constraint souvent absent).
     const postgrestShape = {
       code: "23505",
@@ -52,7 +52,7 @@ describe("lobbyMembershipVagueE4 — contrainte & mapping", () => {
     assert.equal(isLobbyMembersOneLivingPerUserConflict(postgrestShape), true);
   });
 
-  it("13c — reclaim métier avec nom d’index dans le message", () => {
+  it("13c - reclaim métier avec nom d’index dans le message", () => {
     assert.equal(
       isLobbyMembersOneLivingPerUserConflict({
         code: "P0001",
@@ -63,7 +63,7 @@ describe("lobbyMembershipVagueE4 — contrainte & mapping", () => {
     );
   });
 
-  it("14 — autre 23505 non confondu avec ALREADY_EXISTS membership", () => {
+  it("14 - autre 23505 non confondu avec ALREADY_EXISTS membership", () => {
     assert.equal(
       isLobbyMembersOneLivingPerUserConflict({
         code: "23505",
@@ -93,7 +93,7 @@ describe("lobbyMembershipVagueE4 — contrainte & mapping", () => {
     );
   });
 
-  it("15 — Vague C codes toujours présents ; createLobby n’est plus l’autorité INSERT", () => {
+  it("15 - Vague C codes toujours présents ; createLobby n’est plus l’autorité INSERT", () => {
     assert.equal(LOBBY_CREATE_ERROR.ALREADY_EXISTS, "LOBBY_MEMBERSHIP_ALREADY_EXISTS");
     assert.equal(LOBBY_CREATE_ERROR.CHECK_FAILED, "LOBBY_MEMBERSHIP_CHECK_FAILED");
     const lobby = read("js/core/lobby.js");
@@ -105,8 +105,8 @@ describe("lobbyMembershipVagueE4 — contrainte & mapping", () => {
   });
 });
 
-describe("lobbyMembershipVagueE4 — contrats source", () => {
-  it("10 — CREATED via create_lobby_atomically + promote E2 existant", () => {
+describe("lobbyMembershipVagueE4 - contrats source", () => {
+  it("10 - CREATED via create_lobby_atomically + promote E2 existant", () => {
     const src = read("js/core/supabaseLobby.js");
     assert.match(src, /create_lobby_atomically/);
     assert.equal(src.includes('rpc(\n    "create_lobby_member"'), false);
@@ -114,7 +114,7 @@ describe("lobbyMembershipVagueE4 — contrats source", () => {
     assert.match(src, /canonicalRow: memberData/);
   });
 
-  it("11 — ALREADY_EXISTS → invalidate + query + recover (pas faux found RPC)", () => {
+  it("11 - ALREADY_EXISTS → invalidate + query + recover (pas faux found RPC)", () => {
     const src = read("js/core/supabaseLobby.js");
     const fn = src.slice(
       src.indexOf("export async function recoverAfterMembershipAlreadyExists"),
@@ -128,7 +128,7 @@ describe("lobbyMembershipVagueE4 — contrats source", () => {
     assert.match(fn, /unknown/);
   });
 
-  it("12 — re-query unknown ne fabrique pas found (source)", () => {
+  it("12 - re-query unknown ne fabrique pas found (source)", () => {
     const src = read("js/core/supabaseLobby.js");
     const fn = src.slice(
       src.indexOf("export async function recoverAfterMembershipAlreadyExists"),

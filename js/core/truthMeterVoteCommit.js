@@ -1,5 +1,5 @@
 /**
- * BUG-TRUTHMETER-01A — apply / compensation vote local (sans écraser les votes distants).
+ * BUG-TRUTHMETER-01A - apply / compensation vote local (sans écraser les votes distants).
  */
 
 /**
@@ -89,7 +89,7 @@ function mergeMatchScoresMax(local = {}, remote = {}) {
   return merged;
 }
 
-/** Hydratation matchScores TruthMeter — remplacement si autorité serveur, sinon max. */
+/** Hydratation matchScores TruthMeter - remplacement si autorité serveur, sinon max. */
 export function hydrateTruthMeterMatchScores(local, remote) {
   if (isTruthMeterRemoteScoreAuthority(local, remote)) {
     return { ...(remote?.matchScores || {}) };

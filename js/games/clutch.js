@@ -127,7 +127,7 @@ export function mountClutch(app) {
   }
 
   /**
-   * Chips « X a tapé ! » — affichées UNIQUEMENT en phase aveugle. En phase visible
+   * Chips « X a tapé ! » - affichées UNIQUEMENT en phase aveugle. En phase visible
    * elles fuiteraient l'estimation (on verrait le chrono ET le moment du tap).
    */
   function tappedChipsHtml(showBlind) {

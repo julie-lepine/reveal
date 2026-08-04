@@ -1,5 +1,5 @@
 /**
- * SYN-TRAITRE-DEALACK-01 — rollback Deal ACK + contrats UI.
+ * SYN-TRAITRE-DEALACK-01 - rollback Deal ACK + contrats UI.
  */
 import { describe, it, beforeEach, afterEach, mock } from "node:test";
 import assert from "node:assert/strict";
@@ -18,7 +18,7 @@ function read(rel) {
   return readFileSync(join(ROOT, rel), "utf8");
 }
 
-describe("SYN-TRAITRE-DEALACK-01 — cycles apply/rollback", () => {
+describe("SYN-TRAITRE-DEALACK-01 - cycles apply/rollback", () => {
   it("succès : ACK true sans rollback", () => {
     const apply = computeOptimisticMapEntryApply({
       map: { Bob: true },
@@ -91,7 +91,7 @@ describe("SYN-TRAITRE-DEALACK-01 — cycles apply/rollback", () => {
   });
 });
 
-describe("commitTraitreDealAck — mocks comportementaux", () => {
+describe("commitTraitreDealAck - mocks comportementaux", () => {
   const UID = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
   let savedSession;
   let patchShouldFail;
@@ -269,7 +269,7 @@ describe("commitTraitreDealAck — mocks comportementaux", () => {
   });
 });
 
-describe("SYN-TRAITRE-DEALACK-01 — contrats source UI", () => {
+describe("SYN-TRAITRE-DEALACK-01 - contrats source UI", () => {
   it("commitTraitreDealAck : apply + rollback + rethrow", () => {
     const src = read("js/core/traitreSession.js");
     const start = src.indexOf("export async function commitTraitreDealAck");

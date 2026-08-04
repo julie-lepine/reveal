@@ -1,5 +1,5 @@
 /**
- * Compensation join partiel — DELETE membership orpheline + restauration guestMembership.
+ * Compensation join partiel - DELETE membership orpheline + restauration guestMembership.
  * Idempotent ; ne throw pas (rollback local toujours possible).
  */
 import { withPatchTimeout } from "./withPatchTimeout.js";

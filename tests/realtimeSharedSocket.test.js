@@ -1,5 +1,5 @@
 /**
- * Gate lobby Realtime — générations, waiters, coalesce, timeout abandon.
+ * Gate lobby Realtime - générations, waiters, coalesce, timeout abandon.
  */
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";

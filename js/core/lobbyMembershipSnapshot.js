@@ -1,7 +1,7 @@
 /**
  * Snapshot mémoire de résolution membership (Vague A + E1 scope identité).
  *
- * Cache uniquement — jamais SoT. Pas de sessionStorage / localStorage.
+ * Cache uniquement - jamais SoT. Pas de sessionStorage / localStorage.
  * Chaque snapshot serveur (`none` | `found` | `unknown`) est lié à un `userId`
  * et une génération auth monotone ; les lectures sont scoped à l'utilisateur courant.
  */
@@ -33,7 +33,7 @@ import { getState } from "./state.js";
 /** @type {MembershipSnapshot|null} */
 let snapshot = null;
 
-/** Génération auth monotone — bump uniquement sur changement d'identité userId. */
+/** Génération auth monotone - bump uniquement sur changement d'identité userId. */
 let membershipAuthGeneration = 0;
 
 function shallowMembership(m) {
@@ -125,7 +125,7 @@ export function invalidateMembershipSnapshot() {
 }
 
 /**
- * Lecture scoped — snapshot d'un autre userId ou legacy sans userId → null.
+ * Lecture scoped - snapshot d'un autre userId ou legacy sans userId → null.
  * @param {string|null|undefined} userId
  * @returns {MembershipSnapshot|null}
  */

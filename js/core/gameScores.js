@@ -30,7 +30,7 @@ export function mergeMatchScoresLocal(local = {}, remote = {}) {
   return merged;
 }
 
-/** @internal exporté pour tests — rangs compétition d’une score box. */
+/** @internal exporté pour tests - rangs compétition d’une score box. */
 export function rankPlayersByScoreMap(players, scores) {
   return sortAndRankByScore(players, (p) => scores[p.name] || 0);
 }

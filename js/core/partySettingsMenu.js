@@ -1,6 +1,6 @@
 /**
  * Actions de la section « Partie en cours » selon le rôle (écran settings).
- * Module pur — pas de DOM.
+ * Module pur - pas de DOM.
  */
 
 /**

@@ -1,5 +1,5 @@
 /**
- * Membership Vague E1 — snapshot scoped par identité auth.
+ * Membership Vague E1 - snapshot scoped par identité auth.
  */
 import { describe, it, beforeEach } from "node:test";
 import assert from "node:assert/strict";
@@ -75,7 +75,7 @@ function signedInCheckingChrome(snapshot = null) {
   });
 }
 
-describe("lobbyMembershipVagueE1 — A logout avec snapshot found A", () => {
+describe("lobbyMembershipVagueE1 - A logout avec snapshot found A", () => {
   beforeEach(() => {
     resetMembershipSnapshotTestState(UID_A);
     setMembershipSnapshot(FOUND_A, "home-query", UID_A);
@@ -114,7 +114,7 @@ describe("lobbyMembershipVagueE1 — A logout avec snapshot found A", () => {
   });
 });
 
-describe("lobbyMembershipVagueE1 — B login B après logout A", () => {
+describe("lobbyMembershipVagueE1 - B login B après logout A", () => {
   beforeEach(() => {
     resetMembershipSnapshotTestState(UID_A);
     setMembershipSnapshot(FOUND_A, "home-query", UID_A);
@@ -152,7 +152,7 @@ describe("lobbyMembershipVagueE1 — B login B après logout A", () => {
   });
 });
 
-describe("lobbyMembershipVagueE1 — C query unknown B avec ancien found A", () => {
+describe("lobbyMembershipVagueE1 - C query unknown B avec ancien found A", () => {
   it("reject_stale_identity, pas retain_found", () => {
     const decision = decideMembershipSnapshotWrite(
       foundSnap(UID_A),
@@ -164,7 +164,7 @@ describe("lobbyMembershipVagueE1 — C query unknown B avec ancien found A", () 
   });
 });
 
-describe("lobbyMembershipVagueE1 — D query unknown A avec ancien found A", () => {
+describe("lobbyMembershipVagueE1 - D query unknown A avec ancien found A", () => {
   beforeEach(() => resetMembershipSnapshotTestState(UID_A));
 
   it("retain_found_same_identity autorisé", () => {
@@ -179,10 +179,10 @@ describe("lobbyMembershipVagueE1 — D query unknown A avec ancien found A", () 
   });
 });
 
-describe("lobbyMembershipVagueE1 — E query A lente puis login B", () => {
+describe("lobbyMembershipVagueE1 - E query A lente puis login B", () => {
   beforeEach(() => resetMembershipSnapshotTestState(UID_A));
 
-  it("réponse A ignorée — snapshot B non écrasé", async () => {
+  it("réponse A ignorée - snapshot B non écrasé", async () => {
     let currentUserId = UID_A;
     saveStatePatch({ supabaseUserId: UID_A });
 
@@ -240,7 +240,7 @@ describe("lobbyMembershipVagueE1 — E query A lente puis login B", () => {
   });
 });
 
-describe("lobbyMembershipVagueE1 — F query A lente puis logout", () => {
+describe("lobbyMembershipVagueE1 - F query A lente puis logout", () => {
   beforeEach(() => resetMembershipSnapshotTestState(UID_A));
 
   it("réponse A ignorée après logout", async () => {
@@ -286,10 +286,10 @@ describe("lobbyMembershipVagueE1 — F query A lente puis logout", () => {
   });
 });
 
-describe("lobbyMembershipVagueE1 — G refresh auth même userId", () => {
+describe("lobbyMembershipVagueE1 - G refresh auth même userId", () => {
   beforeEach(() => resetMembershipSnapshotTestState(UID_A));
 
-  it("snapshot A conservé — pas d'invalidation", () => {
+  it("snapshot A conservé - pas d'invalidation", () => {
     setMembershipSnapshot(FOUND_A, "home", UID_A);
     const before = getMembershipSnapshot();
     handleMembershipAuthIdentityTransition(UID_A, UID_A);
@@ -300,7 +300,7 @@ describe("lobbyMembershipVagueE1 — G refresh auth même userId", () => {
   });
 });
 
-describe("lobbyMembershipVagueE1 — H snapshot legacy sans userId", () => {
+describe("lobbyMembershipVagueE1 - H snapshot legacy sans userId", () => {
   it("setMembershipSnapshot sans userId → null, jamais exposé", () => {
     resetMembershipSnapshotTestState(UID_A);
     const written = setMembershipSnapshot({ status: "found", membership: FOUND_A.membership });
@@ -317,14 +317,14 @@ describe("lobbyMembershipVagueE1 — H snapshot legacy sans userId", () => {
   });
 });
 
-describe("lobbyMembershipVagueE1 — I signed out", () => {
+describe("lobbyMembershipVagueE1 - I signed out", () => {
   beforeEach(() => clearMembershipSnapshotTestState());
 
   it("aucune membership serveur exposée", () => {
     assert.equal(getMembershipSnapshot(), null);
   });
 
-  it("pas de Vérification… infini — état none", () => {
+  it("pas de Vérification… infini - état none", () => {
     const chrome = signedOutChrome(null);
     assert.equal(chrome.state, "none");
     assert.notEqual(chrome.primaryMessage, "Vérification de ton lobby…");
@@ -339,7 +339,7 @@ describe("lobbyMembershipVagueE1 — I signed out", () => {
   });
 });
 
-describe("lobbyMembershipVagueE1 — J idempotence", () => {
+describe("lobbyMembershipVagueE1 - J idempotence", () => {
   beforeEach(() => resetMembershipSnapshotTestState(UID_A));
 
   it("invalidation multiple sans erreur", () => {
@@ -363,7 +363,7 @@ describe("lobbyMembershipVagueE1 — J idempotence", () => {
     );
   });
 
-  it("remount même identité — snapshot mémoire-only conservé", () => {
+  it("remount même identité - snapshot mémoire-only conservé", () => {
     setMembershipSnapshot(FOUND_A, "home", UID_A);
     const first = getMembershipSnapshot();
     __resetMembershipAuthForTests();

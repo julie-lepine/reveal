@@ -1,6 +1,6 @@
 /**
  * Finalisation guest après leave serveur autoritativement prouvé.
- * Ne wipe pas le cache lobby, ne navigue pas — responsabilité de l'orchestrateur.
+ * Ne wipe pas le cache lobby, ne navigue pas - responsabilité de l'orchestrateur.
  *
  * Invariant ordre :
  * 1) signOut anon si besoin (utilise wasGuest capturé + getUser is_anonymous)

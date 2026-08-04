@@ -15,7 +15,7 @@ import { CLUTCH_PODIUM_POINTS } from "../data/clutch.js";
 import { WRONG_ANSWER_PODIUM_POINTS } from "../data/wrongAnswer.js";
 import { computeWrongAnswerRoundAward } from "../js/core/wrongAnswerScoring.js";
 
-/** Miroir du tri Clutch (gap puis at) — sans importer clutchSession (Supabase). */
+/** Miroir du tri Clutch (gap puis at) - sans importer clutchSession (Supabase). */
 function rankClutchLike(taps, targetMs, names) {
   return names
     .map((name) => {
@@ -201,7 +201,7 @@ describe("Wrong Answer ex æquo", () => {
         ["Dave", 1, 4],
       ]
     );
-    // GAME-WAO-01 : podium + 5/vote — Dave hors podium marque quand même ses votes.
+    // GAME-WAO-01 : podium + 5/vote - Dave hors podium marque quand même ses votes.
     assert.deepEqual(deltas, {
       Alice: WRONG_ANSWER_PODIUM_POINTS[0] + 2 * 5,
       Bob: WRONG_ANSWER_PODIUM_POINTS[0] + 2 * 5,

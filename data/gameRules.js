@@ -164,7 +164,7 @@ export const GAME_RULES = {
       "Rank live : votes simultanés item par item, puis consensus médian du groupe.",
     ],
     exemple:
-      "Classe le groupe : « Qui survit à l'apocalypse ? » — tu places Bob en S. Le groupe aussi → points de proximité. Rank live : tout le monde vote « Alien » en A en même temps.",
+      "Classe le groupe : « Qui survit à l'apocalypse ? » - tu places Bob en S. Le groupe aussi → points de proximité. Rank live : tout le monde vote « Alien » en A en même temps.",
   },
 
   trivia: {
@@ -180,7 +180,7 @@ export const GAME_RULES = {
     points: [
       "Pendant la partie : bonne réponse +10, et le plus rapide à répondre juste +5.",
       "À la fin, le cumul quiz est crédité à la soirée, plus un bonus podium : +15 / +10 / +5 selon le rang.",
-      "Ex æquo au score quiz : même rang et même bonus (1, 1, 3) — deux 1ers reçoivent +15 chacun.",
+      "Ex æquo au score quiz : même rang et même bonus (1, 1, 3) - deux 1ers reçoivent +15 chacun.",
     ],
     exemple:
       "« Capitale de l'Australie ? » Tu réponds Canberra en premier et juste → +10 (bonne) +5 (rapide).",

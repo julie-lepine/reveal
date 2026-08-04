@@ -77,13 +77,13 @@ function makeDeps(overrides = {}) {
   return { deps, calls };
 }
 
-describe("lobbyServerLeaveVagueD — API", () => {
+describe("lobbyServerLeaveVagueD - API", () => {
   beforeEach(() => {
     invalidateMembershipSnapshot();
     resetMountGenerationForTests();
   });
 
-  it("1 — membre server-only → suppression membership uniquement", async () => {
+  it("1 - membre server-only → suppression membership uniquement", async () => {
     const { deps, calls } = makeDeps();
     const res = await leaveLobbyMembershipFromServer(
       { ...MEMBER, hasActiveLobby: false },
@@ -96,7 +96,7 @@ describe("lobbyServerLeaveVagueD — API", () => {
     assert.equal(calls.close, 0);
   });
 
-  it("2 — hôte server-only → primitive dissolution", async () => {
+  it("2 - hôte server-only → primitive dissolution", async () => {
     const { deps, calls } = makeDeps();
     const res = await leaveLobbyMembershipFromServer(
       { ...HOST, hasActiveLobby: false },
@@ -108,21 +108,21 @@ describe("lobbyServerLeaveVagueD — API", () => {
     assert.equal(calls.delete, 0);
   });
 
-  it("3 — membre ne déclenche pas dissolution", async () => {
+  it("3 - membre ne déclenche pas dissolution", async () => {
     const { deps, calls } = makeDeps();
     await leaveLobbyMembershipFromServer({ ...MEMBER, hasActiveLobby: false }, deps);
     assert.equal(calls.close, 0);
     assert.equal(calls.delete, 1);
   });
 
-  it("4 — hôte ne passe pas par leave membre", async () => {
+  it("4 - hôte ne passe pas par leave membre", async () => {
     const { deps, calls } = makeDeps();
     await leaveLobbyMembershipFromServer({ ...HOST, hasActiveLobby: false }, deps);
     assert.equal(calls.delete, 0);
     assert.equal(calls.close, 1);
   });
 
-  it("5 — rôle invalide → refus", async () => {
+  it("5 - rôle invalide → refus", async () => {
     const { deps, calls } = makeDeps();
     await assert.rejects(
       () =>
@@ -135,7 +135,7 @@ describe("lobbyServerLeaveVagueD — API", () => {
     assert.equal(calls.delete + calls.close, 0);
   });
 
-  it("6 — auth absente → refus", async () => {
+  it("6 - auth absente → refus", async () => {
     const { deps, calls } = makeDeps({
       deps: { getUserId: () => null },
     });
@@ -147,7 +147,7 @@ describe("lobbyServerLeaveVagueD — API", () => {
     assert.equal(calls.delete + calls.close, 0);
   });
 
-  it("7 — lobbyId absent → refus", async () => {
+  it("7 - lobbyId absent → refus", async () => {
     const { deps } = makeDeps();
     await assert.rejects(
       () =>
@@ -159,7 +159,7 @@ describe("lobbyServerLeaveVagueD — API", () => {
     );
   });
 
-  it("8 — cache actif → pipeline server-only refusé", async () => {
+  it("8 - cache actif → pipeline server-only refusé", async () => {
     const { deps, calls } = makeDeps();
     await assert.rejects(
       () =>
@@ -169,8 +169,8 @@ describe("lobbyServerLeaveVagueD — API", () => {
     assert.equal(calls.delete + calls.close, 0);
   });
 
-  it("9 — confirmation annulée → zéro mutation (contrat confirm)", () => {
-    // Home n'appelle leaveLobbyMembershipFromServer si confirm false —
+  it("9 - confirmation annulée → zéro mutation (contrat confirm)", () => {
+    // Home n'appelle leaveLobbyMembershipFromServer si confirm false -
     // documenté ici : API pure n'a pas de confirm ; zéro appel = zéro mutation.
     const { calls } = makeDeps();
     assert.equal(calls.delete + calls.close, 0);
@@ -178,7 +178,7 @@ describe("lobbyServerLeaveVagueD — API", () => {
     assert.ok(SERVER_LEAVE_CONFIRM.host.message);
   });
 
-  it("10 — double clic / une seule mutation (flag inFlight simulé)", async () => {
+  it("10 - double clic / une seule mutation (flag inFlight simulé)", async () => {
     let inFlight = false;
     const { deps, calls } = makeDeps();
     async function guardedLeave() {
@@ -199,7 +199,7 @@ describe("lobbyServerLeaveVagueD — API", () => {
     assert.equal(calls.delete, 1);
   });
 
-  it("11 — erreur réseau leave → pas de succès", async () => {
+  it("11 - erreur réseau leave → pas de succès", async () => {
     const { deps } = makeDeps({
       deleteResult: { ok: false, error: "network" },
     });
@@ -210,7 +210,7 @@ describe("lobbyServerLeaveVagueD — API", () => {
     );
   });
 
-  it("12 — erreur dissolution → pas de succès", async () => {
+  it("12 - erreur dissolution → pas de succès", async () => {
     const { deps } = makeDeps({
       closeResult: { ok: false, error: "rls" },
     });
@@ -221,7 +221,7 @@ describe("lobbyServerLeaveVagueD — API", () => {
     );
   });
 
-  it("13 — succès + query none → snapshot none / Créer possible", () => {
+  it("13 - succès + query none → snapshot none / Créer possible", () => {
     resetMembershipSnapshotTestState(UID);
     setMembershipSnapshot(
       {
@@ -252,7 +252,7 @@ describe("lobbyServerLeaveVagueD — API", () => {
     );
   });
 
-  it("14 — succès + query found → nouvelle membership affichée", () => {
+  it("14 - succès + query found → nouvelle membership affichée", () => {
     resetMembershipSnapshotTestState(UID);
     invalidateMembershipSnapshot();
     const next = {
@@ -279,7 +279,7 @@ describe("lobbyServerLeaveVagueD — API", () => {
     assert.equal(chrome.createEnabled, false);
   });
 
-  it("15 — succès + query unknown → Créer disabled + leave_confirmation_pending", () => {
+  it("15 - succès + query unknown → Créer disabled + leave_confirmation_pending", () => {
     const chrome = deriveHomeMembershipChrome({
       hasActiveLobby: false,
       snapshot: { status: "unknown" },
@@ -294,7 +294,7 @@ describe("lobbyServerLeaveVagueD — API", () => {
     assert.equal(chrome.showRetry, true);
   });
 
-  it("16 — rôle obsolète → ROLE_MISMATCH", async () => {
+  it("16 - rôle obsolète → ROLE_MISMATCH", async () => {
     const { deps, calls } = makeDeps({
       // Intention member mais serveur dit hôte
       serverHostId: "user-1",
@@ -307,7 +307,7 @@ describe("lobbyServerLeaveVagueD — API", () => {
     assert.equal(calls.delete + calls.close, 0);
   });
 
-  it("17 — aucun faux none après mutation non confirmée", () => {
+  it("17 - aucun faux none après mutation non confirmée", () => {
     const decision = decideMembershipSnapshotWrite(
       null,
       { status: "unknown" },
@@ -329,7 +329,7 @@ describe("lobbyServerLeaveVagueD — API", () => {
     assert.equal(chrome.createEnabled, false);
   });
 
-  it("18 — Reprendre n'appelle pas leave (source Home)", () => {
+  it("18 - Reprendre n'appelle pas leave (source Home)", () => {
     const home = readFileSync(join(ROOT, "js/screens/home.js"), "utf8");
     const resumeBlock = home.slice(
       home.indexOf('if (e.target.closest("#btn-resume-evening"))'),
@@ -339,7 +339,7 @@ describe("lobbyServerLeaveVagueD — API", () => {
     assert.equal(resumeBlock.includes("deleteOwnMembership"), false);
   });
 
-  it("19 — bouton membre libellé Quitter le lobby", () => {
+  it("19 - bouton membre libellé Quitter le lobby", () => {
     assert.equal(leaveServerActionLabel("member"), "Quitter le lobby");
     const chrome = deriveHomeMembershipChrome({
       hasActiveLobby: false,
@@ -361,7 +361,7 @@ describe("lobbyServerLeaveVagueD — API", () => {
     assert.equal(chrome.leaveServerLabel, "Quitter le lobby");
   });
 
-  it("20 — bouton hôte libellé Fermer le lobby", () => {
+  it("20 - bouton hôte libellé Fermer le lobby", () => {
     assert.equal(leaveServerActionLabel("host"), "Fermer le lobby");
     const chrome = deriveHomeMembershipChrome({
       hasActiveLobby: false,
@@ -383,13 +383,13 @@ describe("lobbyServerLeaveVagueD — API", () => {
     assert.equal(chrome.leaveServerLabel, "Fermer le lobby");
   });
 
-  it("21 — ancien bouton bientôt absent", () => {
+  it("21 - ancien bouton bientôt absent", () => {
     const home = readFileSync(join(ROOT, "js/screens/home.js"), "utf8");
     assert.equal(home.includes("Quitter / Fermer (bientôt)"), false);
     assert.equal(home.includes("arrive bientôt (Vague D)"), false);
   });
 
-  it("22 — handler inactif après unmount (mount guard)", async () => {
+  it("22 - handler inactif après unmount (mount guard)", async () => {
     advanceMountGeneration();
     const mount = createMountGuard();
     const shouldContinue = () => mount.isMounted() && mount.isCurrentMount();
@@ -399,7 +399,7 @@ describe("lobbyServerLeaveVagueD — API", () => {
     assert.equal(uiApplied, false);
   });
 
-  it("23 — retry possible après échec (flag libéré)", async () => {
+  it("23 - retry possible après échec (flag libéré)", async () => {
     let inFlight = false;
     const { deps, calls } = makeDeps({
       deleteResult: { ok: false, error: "fail" },
@@ -429,8 +429,8 @@ describe("lobbyServerLeaveVagueD — API", () => {
     assert.ok(calls.delete >= 1);
   });
 
-  it("24 — membership multiple → passage à la suivante (found post-leave)", () => {
-    // Après leave de L1, query peut renvoyer L2 (extraCount) — found, pas none.
+  it("24 - membership multiple → passage à la suivante (found post-leave)", () => {
+    // Après leave de L1, query peut renvoyer L2 (extraCount) - found, pas none.
     const chrome = deriveHomeMembershipChrome({
       hasActiveLobby: false,
       snapshot: {
@@ -453,7 +453,7 @@ describe("lobbyServerLeaveVagueD — API", () => {
     assert.equal(chrome.createEnabled, false);
   });
 
-  it("25 — flow cache-actif leaveLobby inchangé (source)", () => {
+  it("25 - flow cache-actif leaveLobby inchangé (source)", () => {
     const lobby = readFileSync(join(ROOT, "js/core/lobby.js"), "utf8");
     assert.match(lobby, /export async function leaveLobby\(/);
     assert.match(lobby, /export async function dissolveLobbyAsHost\(/);
@@ -470,13 +470,13 @@ describe("lobbyServerLeaveVagueD — API", () => {
     assert.ok(leaveIdx > 0 && serverIdx > leaveIdx);
   });
 
-  it("26 — createLobby C inchangé (assertCanInsertLobby toujours présent)", () => {
+  it("26 - createLobby C inchangé (assertCanInsertLobby toujours présent)", () => {
     const lobby = readFileSync(join(ROOT, "js/core/lobby.js"), "utf8");
     assert.match(lobby, /assertCanInsertLobby/);
     assert.match(lobby, /queryActiveLobbyMembership/);
   });
 
-  it("27 — offline inchangé (canCreateLobbyFromInputs sans supabase)", () => {
+  it("27 - offline inchangé (canCreateLobbyFromInputs sans supabase)", () => {
     assert.equal(
       canCreateLobbyFromInputs({
         loggedIn: true,
@@ -489,7 +489,7 @@ describe("lobbyServerLeaveVagueD — API", () => {
     );
   });
 
-  it("28 — aucune navigation automatique après leave server-only (source)", () => {
+  it("28 - aucune navigation automatique après leave server-only (source)", () => {
     const home = readFileSync(join(ROOT, "js/screens/home.js"), "utf8");
     const block = home.slice(
       home.indexOf('if (e.target.closest("#btn-leave-lobby-server"))'),
@@ -499,7 +499,7 @@ describe("lobbyServerLeaveVagueD — API", () => {
     assert.equal(block.includes("navigate("), false);
   });
 
-  it("29 — Créer actif uniquement après none confirmé", () => {
+  it("29 - Créer actif uniquement après none confirmé", () => {
     assert.equal(
       canCreateLobbyFromInputs({
         loggedIn: true,
@@ -533,7 +533,7 @@ describe("lobbyServerLeaveVagueD — API", () => {
     );
   });
 
-  it("30 — query de confirmation systématique après succès (source Home)", () => {
+  it("30 - query de confirmation systématique après succès (source Home)", () => {
     const home = readFileSync(join(ROOT, "js/screens/home.js"), "utf8");
     const block = home.slice(
       home.indexOf('if (e.target.closest("#btn-leave-lobby-server"))'),
@@ -545,7 +545,7 @@ describe("lobbyServerLeaveVagueD — API", () => {
   });
 });
 
-describe("lobbyServerLeaveVagueD — QA source", () => {
+describe("lobbyServerLeaveVagueD - QA source", () => {
   it("flow membre ne lit pas lobbyId depuis getState().lobby", () => {
     const mod = readFileSync(join(ROOT, "js/core/lobbyServerLeave.js"), "utf8");
     assert.equal(mod.includes("getState()"), false);
@@ -621,7 +621,7 @@ describe("lobbyServerLeaveVagueD — QA source", () => {
   });
 });
 
-describe("lobbyServerLeaveVagueD — concurrence documentée", () => {
+describe("lobbyServerLeaveVagueD - concurrence documentée", () => {
   it("DELETE OK puis autre membership avant confirm → found pas none", () => {
     resetMembershipSnapshotTestState(UID);
     invalidateMembershipSnapshot();

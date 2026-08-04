@@ -1,5 +1,5 @@
 /**
- * AUTH-LEAVE-SILENT-OK-01 — DELETE membership avec preuve (deps injectées).
+ * AUTH-LEAVE-SILENT-OK-01 - DELETE membership avec preuve (deps injectées).
  * Pur / testable sans charger le client Supabase.
  */
 import {

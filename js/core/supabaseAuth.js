@@ -299,7 +299,7 @@ export async function reprocessAuthLaunchUrl() {
 
 /**
  * Session anon minimale pour recovery invité (peek/reclaim membership).
- * Ne pas appeler au boot normal — uniquement dans un flux recovery.
+ * Ne pas appeler au boot normal - uniquement dans un flux recovery.
  * @returns {Promise<import("@supabase/supabase-js").Session|null>}
  */
 export async function ensureAnonymousSessionForRecovery(captchaToken = null) {

@@ -1,5 +1,5 @@
 /**
- * Loader UI Join Vague A — chrome soft « Connexion… » sur Home (contrats source).
+ * Loader UI Join Vague A - chrome soft « Connexion… » sur Home (contrats source).
  * Pas de joinInFlight / locks métier : UX only via createSyncPending + paint.
  */
 import { describe, it, beforeEach, afterEach, mock } from "node:test";
@@ -21,7 +21,7 @@ function extractHandler(body, marker) {
   return nextIf === -1 ? from : from.slice(0, nextIf);
 }
 
-describe("Loader UI Join Vague A — contrats source Home", () => {
+describe("Loader UI Join Vague A - contrats source Home", () => {
   it("importe createSyncPending", () => {
     assert.match(src, /import \{ createSyncPending \} from "\.\.\/core\/syncPending\.js"/);
   });
@@ -108,7 +108,7 @@ describe("Loader UI Join Vague A — contrats source Home", () => {
   });
 });
 
-describe("Loader UI Join Vague A — soft delay (primitive)", () => {
+describe("Loader UI Join Vague A - soft delay (primitive)", () => {
   beforeEach(() => {
     mock.timers.enable({ apis: ["setTimeout"], now: 0 });
   });

@@ -79,7 +79,7 @@ mock.module("../js/core/lobby.js", {
 
 const { commitTriviaRevealPlay } = await import("../js/core/triviaSession.js");
 
-describe("commitTriviaRevealPlay — recovery timeout", () => {
+describe("commitTriviaRevealPlay - recovery timeout", () => {
   beforeEach(() => {
     savedTriviaSession = {
       phase: "question",

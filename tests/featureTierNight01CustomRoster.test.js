@@ -1,5 +1,5 @@
 /**
- * FEATURE-TIERNIGHT-01 — thèmes roster personnalisés (« Classe le groupe »).
+ * FEATURE-TIERNIGHT-01 - thèmes roster personnalisés (« Classe le groupe »).
  */
 import { describe, it, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
@@ -72,7 +72,7 @@ function mirrorTierNightToRemote(payload) {
   };
 }
 
-describe("FEATURE-TIERNIGHT-01 — store local customRosterTopics", () => {
+describe("FEATURE-TIERNIGHT-01 - store local customRosterTopics", () => {
   let snapshot;
 
   beforeEach(() => {
@@ -84,7 +84,7 @@ describe("FEATURE-TIERNIGHT-01 — store local customRosterTopics", () => {
     saveStatePatch(snapshot);
   });
 
-  it("ajout thème valide avec trim — sans propriété emoji", () => {
+  it("ajout thème valide avec trim - sans propriété emoji", () => {
     const r = addCustomRosterTopic({ name: "  Qui survit ?  " });
     assert.equal(r.ok, true);
     assert.match(r.id, new RegExp(`^${CUSTOM_ROSTER_TOPIC_ID_PREFIX}`));
@@ -126,8 +126,8 @@ describe("FEATURE-TIERNIGHT-01 — store local customRosterTopics", () => {
   });
 });
 
-describe("FEATURE-TIERNIGHT-01 — validation et modération", () => {
-  it("formulaire création — texte seul, modération avant persistance", () => {
+describe("FEATURE-TIERNIGHT-01 - validation et modération", () => {
+  it("formulaire création - texte seul, modération avant persistance", () => {
     const src = read("js/screens/tierNightCreateRoster.js");
     assert.doesNotMatch(src, /roster-topic-emoji/);
     const handler = src.match(/createBtn\.addEventListener\("click"[\s\S]*?\}\)\(\);/)?.[0] || "";
@@ -137,7 +137,7 @@ describe("FEATURE-TIERNIGHT-01 — validation et modération", () => {
   });
 });
 
-describe("FEATURE-TIERNIGHT-01 — résolution roster", () => {
+describe("FEATURE-TIERNIGHT-01 - résolution roster", () => {
   let snapshot;
 
   beforeEach(() => {
@@ -168,7 +168,7 @@ describe("FEATURE-TIERNIGHT-01 — résolution roster", () => {
   });
 });
 
-describe("FEATURE-TIERNIGHT-01 — sérialisation distante", () => {
+describe("FEATURE-TIERNIGHT-01 - sérialisation distante", () => {
   it("custom roster : listName synchronisé, topicEmoji vide", () => {
     const remote = mirrorTierNightToRemote({
       runId: "run-1",
@@ -183,7 +183,7 @@ describe("FEATURE-TIERNIGHT-01 — sérialisation distante", () => {
   });
 });
 
-describe("FEATURE-TIERNIGHT-01 — Relancer une partie", () => {
+describe("FEATURE-TIERNIGHT-01 - Relancer une partie", () => {
   it("retourne toujours à la sélection TierNight", () => {
     const src = read("js/core/restartGame.js");
     assert.match(src, /tiernight: launchTierNightSelect/);
@@ -200,14 +200,14 @@ describe("FEATURE-TIERNIGHT-01 — Relancer une partie", () => {
   });
 });
 
-describe("FEATURE-TIERNIGHT-01 — UI wiring (statique)", () => {
+describe("FEATURE-TIERNIGHT-01 - UI wiring (statique)", () => {
   it("cartes custom : icône UI ✏️", () => {
     const src = read("js/screens/tierNightSelect.js");
     assert.match(src, /const cardEmoji = custom \? "✏️"/);
   });
 });
 
-describe("FEATURE-TIERNIGHT-01 — cycle de vie lobby (customRosterTopics)", () => {
+describe("FEATURE-TIERNIGHT-01 - cycle de vie lobby (customRosterTopics)", () => {
   let snapshot;
 
   beforeEach(() => {
@@ -219,14 +219,14 @@ describe("FEATURE-TIERNIGHT-01 — cycle de vie lobby (customRosterTopics)", () 
     saveStatePatch(snapshot);
   });
 
-  it("1 — création d'un thème", () => {
+  it("1 - création d'un thème", () => {
     const r = addCustomRosterTopic({ name: "Qui survit sur l'île ?" });
     assert.equal(r.ok, true);
     assert.equal(getCustomRosterTopics().length, 1);
     assert.equal(getCustomRosterTopics()[0].name, "Qui survit sur l'île ?");
   });
 
-  it("2 — plusieurs parties / changement de jeu dans le même lobby → thème conservé", () => {
+  it("2 - plusieurs parties / changement de jeu dans le même lobby → thème conservé", () => {
     addCustomRosterTopic({ name: "Thème lobby" });
     // Même chemin que returnToGameSelect / leaveGameSetup / exitGame.
     resetGameSessionsOnly();
@@ -235,7 +235,7 @@ describe("FEATURE-TIERNIGHT-01 — cycle de vie lobby (customRosterTopics)", () 
     assert.equal(getCustomRosterTopics()[0].name, "Thème lobby");
   });
 
-  it("3 — fermeture / destruction du lobby → thèmes vidés (resetEveningState)", () => {
+  it("3 - fermeture / destruction du lobby → thèmes vidés (resetEveningState)", () => {
     addCustomRosterTopic({ name: "Thème à purger" });
     assert.equal(getCustomRosterTopics().length, 1);
     // Helper central aussi utilisé par Hot Take / Dilemma (via reset des sessions jeu).
@@ -243,7 +243,7 @@ describe("FEATURE-TIERNIGHT-01 — cycle de vie lobby (customRosterTopics)", () 
     assert.deepEqual(getCustomRosterTopics(), []);
   });
 
-  it("4–5 — nouveau lobby après teardown → liste vide (pas de bibliothèque)", () => {
+  it("4–5 - nouveau lobby après teardown → liste vide (pas de bibliothèque)", () => {
     addCustomRosterTopic({ name: "Ancien lobby" });
     // createLobby / joinLobby (hors transition) / leave → performLobbyBoundaryTeardown
     // → resetEveningState.
@@ -290,7 +290,7 @@ describe("FEATURE-TIERNIGHT-01 — cycle de vie lobby (customRosterTopics)", () 
   });
 });
 
-describe("FEATURE-TIERNIGHT-01 — snapshot partie", () => {
+describe("FEATURE-TIERNIGHT-01 - snapshot partie", () => {
   let snapshot;
 
   beforeEach(() => {

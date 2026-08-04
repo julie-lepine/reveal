@@ -34,7 +34,7 @@ export function createActionLock() {
  * désactiver visuellement le bouton cliqué le temps de l'action.
  *
  * Si `lock` est fourni, la même instance doit être réutilisée à chaque re-bind
- * après `innerHTML` — sinon un bouton recréé aurait un verrou neuf et
+ * après `innerHTML` - sinon un bouton recréé aurait un verrou neuf et
  * réentrerait pendant l'`await`.
  *
  * Usage :

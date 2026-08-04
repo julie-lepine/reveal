@@ -1,5 +1,5 @@
 /**
- * BUG-TRIVIA-01A — patches explicites Trivia en partie (hôte réel + acting host).
+ * BUG-TRIVIA-01A - patches explicites Trivia en partie (hôte réel + acting host).
  * Ne jamais reconstruire un patch distant à partir d'un spread de session complète.
  */
 

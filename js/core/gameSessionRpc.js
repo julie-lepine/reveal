@@ -1,5 +1,5 @@
 /**
- * I-08 / ARCH-03 — appels RPC game_sessions (pas d'UPDATE libre pour invité / acting).
+ * I-08 / ARCH-03 - appels RPC game_sessions (pas d'UPDATE libre pour invité / acting).
  */
 import { supabase, isSupabaseConfigured } from "./supabaseClient.js";
 
@@ -108,7 +108,7 @@ export async function rpcCompleteGameSessionAsActor({ lobbyId, screen = "results
   return asSessionRow(data);
 }
 
-/** BUG-TRIVIA-01B — reveal atomique (hôte réel + acting host). */
+/** BUG-TRIVIA-01B - reveal atomique (hôte réel + acting host). */
 export async function rpcRevealTriviaRound({ lobbyId, runId, questionIdx }) {
   requireClient();
   const { data, error } = await supabase.rpc("reveal_trivia_round", {
@@ -120,7 +120,7 @@ export async function rpcRevealTriviaRound({ lobbyId, runId, questionIdx }) {
   return asSessionRow(data);
 }
 
-/** BUG-TRIVIA-01B-bis — réponse atomique + auto-reveal serveur (tous les joueurs MP). */
+/** BUG-TRIVIA-01B-bis - réponse atomique + auto-reveal serveur (tous les joueurs MP). */
 export async function rpcSubmitTriviaAnswer({
   lobbyId,
   runId,
@@ -140,7 +140,7 @@ export async function rpcSubmitTriviaAnswer({
   return asSessionRow(data);
 }
 
-/** BUG-TRUTHMETER-01B — reveal/scoring atomique (hôte réel + acting host). */
+/** BUG-TRUTHMETER-01B - reveal/scoring atomique (hôte réel + acting host). */
 export async function rpcRevealTruthMeterRound({ lobbyId, runId, roundIdx }) {
   requireClient();
   const { data, error } = await supabase.rpc("reveal_truth_meter_round", {
@@ -152,7 +152,7 @@ export async function rpcRevealTruthMeterRound({ lobbyId, runId, roundIdx }) {
   return asSessionRow(data);
 }
 
-/** BUG-TRUTHMETER-01B — vote atomique + auto-reveal serveur. */
+/** BUG-TRUTHMETER-01B - vote atomique + auto-reveal serveur. */
 export async function rpcSubmitTruthMeterVote({ lobbyId, runId, roundIdx, value }) {
   requireClient();
   const { data, error } = await supabase.rpc("submit_truth_meter_vote", {

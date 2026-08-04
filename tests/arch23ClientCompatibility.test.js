@@ -1,5 +1,5 @@
 /**
- * ARCH-23 Vague 1 — identité, parsing floor, service, gates, retry/cache.
+ * ARCH-23 Vague 1 - identité, parsing floor, service, gates, retry/cache.
  */
 import { describe, it, beforeEach } from "node:test";
 import assert from "node:assert/strict";
@@ -49,7 +49,7 @@ function read(rel) {
   return readFileSync(join(ROOT, rel), "utf8");
 }
 
-describe("ARCH-23 — identité client", () => {
+describe("ARCH-23 - identité client", () => {
   it("version commerciale + compatibility build entier ≥ 1", () => {
     assert.equal(typeof APP_VERSION, "string");
     assert.ok(APP_VERSION.length > 0);
@@ -93,7 +93,7 @@ describe("ARCH-23 — identité client", () => {
   });
 });
 
-describe("ARCH-23 — parseClientCompatibilityConfig", () => {
+describe("ARCH-23 - parseClientCompatibilityConfig", () => {
   it("floor valide", () => {
     const r = parseClientCompatibilityConfig({ min_compatibility_build: 3 });
     assert.equal(r.ok, true);
@@ -122,15 +122,15 @@ describe("ARCH-23 — parseClientCompatibilityConfig", () => {
   });
 });
 
-describe("ARCH-23 — comparaison", () => {
-  it("supérieur / égal / inférieur — numérique seulement", () => {
+describe("ARCH-23 - comparaison", () => {
+  it("supérieur / égal / inférieur - numérique seulement", () => {
     assert.equal(compareCompatibilityBuilds(5, 3), COMPAT_STATUS.COMPATIBLE);
     assert.equal(compareCompatibilityBuilds(3, 3), COMPAT_STATUS.COMPATIBLE);
     assert.equal(compareCompatibilityBuilds(2, 3), COMPAT_STATUS.INCOMPATIBLE);
   });
 });
 
-describe("ARCH-23 — checkClientCompatibility service", () => {
+describe("ARCH-23 - checkClientCompatibility service", () => {
   beforeEach(() => {
     __resetClientCompatibilityForTests();
   });
@@ -161,7 +161,7 @@ describe("ARCH-23 — checkClientCompatibility service", () => {
     assert.equal(r.status, COMPAT_STATUS.INCOMPATIBLE);
   });
 
-  it("unknown sur timeout / payload invalide — jamais compatible silencieux", async () => {
+  it("unknown sur timeout / payload invalide - jamais compatible silencieux", async () => {
     const bad = await checkClientCompatibility({
       source: "boot",
       client,
@@ -416,7 +416,7 @@ function installMinimalDom() {
   globalThis.__arch23Dom = true;
 }
 
-describe("ARCH-23 — gate UI retry", () => {
+describe("ARCH-23 - gate UI retry", () => {
   beforeEach(() => {
     installMinimalDom();
     __resetClientCompatibilityForTests();
@@ -532,7 +532,7 @@ describe("ARCH-23 — gate UI retry", () => {
   });
 });
 
-describe("ARCH-23 — codes d’erreur frontières", () => {
+describe("ARCH-23 - codes d’erreur frontières", () => {
   it("create distingue INCOMPATIBLE vs UNKNOWN (≠ CHECK_FAILED membership)", () => {
     assert.equal(LOBBY_CREATE_ERROR.CLIENT_INCOMPATIBLE, "CLIENT_INCOMPATIBLE");
     assert.equal(LOBBY_CREATE_ERROR.CLIENT_COMPAT_UNKNOWN, "CLIENT_COMPAT_UNKNOWN");
@@ -560,7 +560,7 @@ describe("ARCH-23 — codes d’erreur frontières", () => {
   });
 });
 
-describe("ARCH-23 — wiring / SQL (statique)", () => {
+describe("ARCH-23 - wiring / SQL (statique)", () => {
   it("SQL floor initial = 1, RLS select anon, pas de bump prod", () => {
     const sql = read("supabase/app-client-compatibility.sql");
     assert.match(sql, /min_client_compatibility_build/);
@@ -598,7 +598,7 @@ describe("ARCH-23 — wiring / SQL (statique)", () => {
     assert.doesNotMatch(ui, /play\.google\.com\/store\/apps\/details/);
   });
 
-  it("compatibility build commun — pas versionCode comme floor", () => {
+  it("compatibility build commun - pas versionCode comme floor", () => {
     const id = read("js/core/appBuildIdentity.js");
     assert.match(id, /APP_COMPATIBILITY_BUILD/);
     assert.doesNotMatch(id, /versionCode/);

@@ -1,5 +1,5 @@
 /**
- * SYN-12 / M-05b — contrat mount lobby : un seul startMultiplayerSync par chemin MP.
+ * SYN-12 / M-05b - contrat mount lobby : un seul startMultiplayerSync par chemin MP.
  * Pur / testable (sans DOM ni gameSync).
  */
 

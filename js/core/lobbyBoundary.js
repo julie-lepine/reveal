@@ -1,5 +1,5 @@
 /**
- * Contrats de frontière lobby — session cache, restore, lastGame scope.
+ * Contrats de frontière lobby - session cache, restore, lastGame scope.
  * Purs / testables sans Supabase.
  */
 

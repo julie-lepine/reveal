@@ -77,7 +77,7 @@ describe("SYN-26 clutch tap freeze / merge", () => {
       mergeClutchTapsFrozen({}, { Alice: alice }),
       { Bob: bob }
     );
-    // Reveal / scoring lit session.taps[name].ms — pas de Date.now() / performance.now()
+    // Reveal / scoring lit session.taps[name].ms - pas de Date.now() / performance.now()
     assert.equal(sessionTaps.Alice.ms, 4123);
     assert.equal(sessionTaps.Alice.at, 100);
     assert.equal(sessionTaps.Bob.ms, 4001);

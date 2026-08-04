@@ -1,5 +1,5 @@
 /**
- * ARCH-07 P1/P2 — observabilité résiduelle (gameResume, hostClaim, poll rebuild queue).
+ * ARCH-07 P1/P2 - observabilité résiduelle (gameResume, hostClaim, poll rebuild queue).
  */
 import { describe, it, beforeEach, afterEach, mock } from "node:test";
 import assert from "node:assert/strict";
@@ -151,7 +151,7 @@ describe("ARCH-07 P2b gameResume", () => {
     console.warn = origWarn;
   });
 
-  it("refresh rejeté — routage immédiat conservé, log structuré, pas de second routage", async () => {
+  it("refresh rejeté - routage immédiat conservé, log structuré, pas de second routage", async () => {
     refreshGameSessionMock.mock.mockImplementation(async () => {
       throw new Error("network down");
     });
@@ -184,7 +184,7 @@ describe("ARCH-07 P2b gameResume", () => {
     });
   });
 
-  it("refresh réussi — route vers session active sans warning", async () => {
+  it("refresh réussi - route vers session active sans warning", async () => {
     const row = { id: "s1", screen: "hottake-play" };
     refreshGameSessionMock.mock.mockImplementation(async () => row);
 
@@ -200,7 +200,7 @@ describe("ARCH-07 P2b gameResume", () => {
     assert.equal(findMpRtWarn(warnings).length, 0);
   });
 
-  it("logger robuste — erreur string", () => {
+  it("logger robuste - erreur string", () => {
     /** @type {unknown[][]} */
     const captured = [];
     const prev = console.warn;
@@ -215,7 +215,7 @@ describe("ARCH-07 P2b gameResume", () => {
     assert.equal(captured[0][1].phase, "game_resume");
   });
 
-  it("logger robuste — null", () => {
+  it("logger robuste - null", () => {
     /** @type {unknown[][]} */
     const captured = [];
     const prev = console.warn;
@@ -270,7 +270,7 @@ describe("ARCH-07 P2a hostClaimOffer", () => {
     console.warn = origWarn;
   });
 
-  it("claim refusé + refresh rejeté — log recovery, alerte claim inchangée", async () => {
+  it("claim refusé + refresh rejeté - log recovery, alerte claim inchangée", async () => {
     claimLobbyHostIfStaleSupabaseMock.mock.mockImplementation(async () => ({
       ok: false,
       error: "Transfert impossible côté serveur",
@@ -295,7 +295,7 @@ describe("ARCH-07 P2a hostClaimOffer", () => {
     assert.equal(logged[0][1].errorMessage, "refresh lobby failed");
   });
 
-  it("claim refusé + refresh OK — aucun warning recovery", async () => {
+  it("claim refusé + refresh OK - aucun warning recovery", async () => {
     claimLobbyHostIfStaleSupabaseMock.mock.mockImplementation(async () => ({
       ok: false,
       error: "Host encore actif",
@@ -309,7 +309,7 @@ describe("ARCH-07 P2a hostClaimOffer", () => {
     assert.match(String(showAppAlertMock.mock.calls[0].arguments[0]), /de nouveau actif/i);
   });
 
-  it("logger recovery robuste — null", () => {
+  it("logger recovery robuste - null", () => {
     /** @type {unknown[][]} */
     const captured = [];
     const prev = console.warn;

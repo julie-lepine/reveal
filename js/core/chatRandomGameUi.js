@@ -1,5 +1,5 @@
 /**
- * FEATURE-CHAT-03 — modale + animation slot machine (cosmétique).
+ * FEATURE-CHAT-03 - modale + animation slot machine (cosmétique).
  * Le résultat est déjà connu via l'événement sync ; l'UI suit le timestamp hôte.
  * Resize / orientation : recalcule le transform sans nouveau tirage ni patch.
  */
@@ -105,7 +105,7 @@ function bindResize() {
 
 function onViewportChange() {
   if (!spinCtx || !rootEl) return;
-  // Recalcule géométrie / transform à partir du même attempt — pas de nouveau tirage.
+  // Recalcule géométrie / transform à partir du même attempt - pas de nouveau tirage.
   const progress = chatRouletteSpinProgress(
     {
       ...spinCtx,

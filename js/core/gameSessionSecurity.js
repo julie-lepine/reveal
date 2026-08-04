@@ -1,5 +1,5 @@
 /**
- * Contrats purs I-08 / ARCH-03 (sans Supabase) — miroir des règles SQL.
+ * Contrats purs I-08 / ARCH-03 (sans Supabase) - miroir des règles SQL.
  * Les tests SQL d'intégration se font manuellement dans le SQL Editor après migration.
  */
 
@@ -50,7 +50,7 @@ export function isActingHostServerLike(
   return resolveActingHostServerLike(members, hostId, nowMs, staleMs) === uid;
 }
 
-/** Éligibilité claim transfert (seuil 5 min) — miroir serveur, UX only. */
+/** Éligibilité claim transfert (seuil 5 min) - miroir serveur, UX only. */
 export function isClaimHostCandidateServerLike(uid, members, hostId, nowMs = Date.now()) {
   return isActingHostServerLike(
     uid,

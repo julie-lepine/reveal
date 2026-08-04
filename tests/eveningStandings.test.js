@@ -16,7 +16,7 @@ function namesOf(players) {
   return players.map((p) => p.name).sort();
 }
 
-describe("UX-HIST-01 — contribution soirée", () => {
+describe("UX-HIST-01 - contribution soirée", () => {
   it("scores !== 0 (positif) compte comme contribution", () => {
     assert.equal(
       nameHasEveningContribution("Alice", { scores: { Alice: 12 }, gameScores: {} }),
@@ -85,7 +85,7 @@ describe("UX-HIST-01 — contribution soirée", () => {
   });
 });
 
-describe("UX-HIST-01 — buildEveningStandingPlayers", () => {
+describe("UX-HIST-01 - buildEveningStandingPlayers", () => {
   const bob = {
     name: "Bob",
     color: "#111",
@@ -156,7 +156,7 @@ describe("UX-HIST-01 — buildEveningStandingPlayers", () => {
   });
 
   it("6. rename Alice→Alicia→Alix puis parti : une seule ligne Alix", () => {
-    // Après SYN-15/16 les maps ne portent plus Alice/Alicia — seulement Alix.
+    // Après SYN-15/16 les maps ne portent plus Alice/Alicia - seulement Alix.
     const players = buildEveningStandingPlayers({
       activePlayers: [bob],
       scores: { Bob: 3, Alix: 40 },
@@ -243,7 +243,7 @@ describe("UX-HIST-01 — buildEveningStandingPlayers", () => {
   });
 });
 
-describe("UX-HIST-01 — getActivePlayers / getSortedActivePlayers inchangés", () => {
+describe("UX-HIST-01 - getActivePlayers / getSortedActivePlayers inchangés", () => {
   it("getActivePlayers / getSortedActivePlayers restent roster-only (corps inchangé)", () => {
     const src = readFileSync(join(root, "js/core/players.js"), "utf8");
     const active = src.slice(

@@ -41,7 +41,7 @@ function livingRow(overrides = {}) {
   };
 }
 
-describe("lobbyMembershipVagueA — constantes & helpers", () => {
+describe("lobbyMembershipVagueA - constantes & helpers", () => {
   it("ACTIVE_MEMBERSHIP_QUERY_LIMIT = 20", () => {
     assert.equal(ACTIVE_MEMBERSHIP_QUERY_LIMIT, 20);
   });
@@ -51,7 +51,7 @@ describe("lobbyMembershipVagueA — constantes & helpers", () => {
     assert.deepEqual(membershipQueryUnknown(), { status: "unknown" });
   });
 
-  it("membershipFromLivingRow — hôte vs non-hôte ; défaut member si hostId manquant", () => {
+  it("membershipFromLivingRow - hôte vs non-hôte ; défaut member si hostId manquant", () => {
     assert.equal(membershipFromLivingRow(livingRow({ hostId: HOST_UID }), UID).role, "host");
     assert.equal(
       membershipFromLivingRow(livingRow({ hostId: OTHER_UID }), UID).role,
@@ -64,7 +64,7 @@ describe("lobbyMembershipVagueA — constantes & helpers", () => {
     assert.equal(membershipFromLivingRow({ lobbyId: "x" }, UID), null);
   });
 
-  it("compareMembershipRowsDeterministic — joined_at DESC puis lobbyId ASC", () => {
+  it("compareMembershipRowsDeterministic - joined_at DESC puis lobbyId ASC", () => {
     const older = livingRow({
       lobbyId: "lobby-z",
       joinedAt: "2026-01-01T00:00:00.000Z",
@@ -88,7 +88,7 @@ describe("lobbyMembershipVagueA — constantes & helpers", () => {
   });
 });
 
-describe("lobbyMembershipVagueA — interpretLivingMembershipRows", () => {
+describe("lobbyMembershipVagueA - interpretLivingMembershipRows", () => {
   it("aucune membership → none", () => {
     assert.deepEqual(interpretLivingMembershipRows(UID, []), membershipQueryNone());
     assert.deepEqual(interpretLivingMembershipRows(UID, null), membershipQueryNone());
@@ -172,7 +172,7 @@ describe("lobbyMembershipVagueA — interpretLivingMembershipRows", () => {
   });
 });
 
-describe("lobbyMembershipVagueA — queryActiveLobbyMembership (injectable)", () => {
+describe("lobbyMembershipVagueA - queryActiveLobbyMembership (injectable)", () => {
   it("aucune membership → none", async () => {
     const result = await queryActiveLobbyMembership({
       userId: UID,
@@ -278,7 +278,7 @@ describe("lobbyMembershipVagueA — queryActiveLobbyMembership (injectable)", ()
   });
 });
 
-describe("lobbyMembershipVagueA — snapshot", () => {
+describe("lobbyMembershipVagueA - snapshot", () => {
   beforeEach(() => {
     resetMembershipSnapshotTestState(UID);
   });
@@ -405,13 +405,13 @@ describe("lobbyMembershipVagueA — snapshot", () => {
     assert.equal(again.extraCount, 0);
   });
 
-  it("E1 — snapshot autre userId non exposé", () => {
+  it("E1 - snapshot autre userId non exposé", () => {
     setMembershipSnapshot({ status: "found", membership: { lobbyId: "L1", code: "X", lobbyStatus: null, gameId: null, role: "member" } }, "t", UID);
     assert.equal(getMembershipSnapshotForUser("other-user"), null);
   });
 });
 
-describe("lobbyMembershipVagueA — normalize PostgREST", () => {
+describe("lobbyMembershipVagueA - normalize PostgREST", () => {
   it("objet lobbies → LivingRow", () => {
     const row = normalizePostgrestMembershipRow({
       lobby_id: "lobby-1",

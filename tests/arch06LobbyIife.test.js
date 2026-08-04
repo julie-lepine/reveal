@@ -124,7 +124,7 @@ function simulateLobbyMount() {
   };
 }
 
-describe("ARCH-06 Lobby IIFE / SYN-12 — lifecycle", () => {
+describe("ARCH-06 Lobby IIFE / SYN-12 - lifecycle", () => {
   it("ancien bootstrap terminé après remount → aucun render / bind / subscribe", async () => {
     resetMountGenerationForTests();
     advanceMountGeneration();
@@ -215,7 +215,7 @@ describe("ARCH-06 Lobby IIFE / SYN-12 — lifecycle", () => {
   });
 });
 
-describe("ARCH-06 Lobby IIFE — listeners / double subscribe", () => {
+describe("ARCH-06 Lobby IIFE - listeners / double subscribe", () => {
   it("un seul subscribe par mount ; unsubscribe au cleanup", async () => {
     resetMountGenerationForTests();
     advanceMountGeneration();
@@ -251,7 +251,7 @@ describe("ARCH-06 Lobby IIFE — listeners / double subscribe", () => {
   });
 });
 
-describe("ARCH-06 Lobby IIFE — helpers shouldContinue", () => {
+describe("ARCH-06 Lobby IIFE - helpers shouldContinue", () => {
   it("shouldContinue=false → aucun effet local post-await", async () => {
     const h = simulateLobbyMount();
     h.mount.dispose();
@@ -275,7 +275,7 @@ describe("ARCH-06 Lobby IIFE — helpers shouldContinue", () => {
   });
 });
 
-describe("ARCH-06 Lobby IIFE — contrats source", () => {
+describe("ARCH-06 Lobby IIFE - contrats source", () => {
   const lobbySrc = readSrc("../js/screens/lobby.js");
   const syncSrc = readSrc("../js/core/gameSync.js");
   const resumeSrc = readSrc("../js/core/gameResume.js");

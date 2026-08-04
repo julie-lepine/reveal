@@ -8,7 +8,7 @@ import { CUSTOM_ROSTER_TOPIC_ID_PREFIX } from "./customRosterTopics.js";
 export const ROSTER_TOPIC_PREFIX = "roster:";
 
 /**
- * @param {string|null|undefined} descriptor — `roster:<id>` ou `<id>` brut
+ * @param {string|null|undefined} descriptor - `roster:<id>` ou `<id>` brut
  */
 export function parseRosterTopicDescriptor(descriptor) {
   const raw = String(descriptor ?? "").trim();

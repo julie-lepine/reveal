@@ -1,5 +1,5 @@
 /**
- * ARCH-03 — notification ponctuelle quand le joueur devient acting host technique.
+ * ARCH-03 - notification ponctuelle quand le joueur devient acting host technique.
  * Ne confond pas avec le claim permanent ARCH-03b ni le toast « Tu es maintenant l'hôte ».
  * Aucune mutation serveur.
  */

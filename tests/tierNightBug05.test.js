@@ -31,7 +31,7 @@ const newLiveRemote = (extra = {}) => ({
   ...extra,
 });
 
-describe("BUG-TIERNIGHT-05 — isNewTierNightLiveVoteRound", () => {
+describe("BUG-TIERNIGHT-05 - isNewTierNightLiveVoteRound", () => {
   it("runIds différents + votes remote vides → nouveau round", () => {
     const local = {
       runId: "old",
@@ -98,7 +98,7 @@ describe("BUG-TIERNIGHT-05 — isNewTierNightLiveVoteRound", () => {
   });
 });
 
-describe("BUG-TIERNIGHT-05 — merge hydrate", () => {
+describe("BUG-TIERNIGHT-05 - merge hydrate", () => {
   it("nouveau run + remote vide → votes {}", () => {
     const local = {
       runId: "old",
@@ -186,7 +186,7 @@ describe("BUG-TIERNIGHT-05 — merge hydrate", () => {
   });
 });
 
-describe("BUG-TIERNIGHT-05 — merge patch (même contrat reset)", () => {
+describe("BUG-TIERNIGHT-05 - merge patch (même contrat reset)", () => {
   it("nouveau run → remote uniquement", () => {
     const cur = { runId: "old", phase: "voting", roundIdx: 0, votes: { u1: "S" } };
     const inc = {
@@ -230,7 +230,7 @@ describe("BUG-TIERNIGHT-05 — merge patch (même contrat reset)", () => {
   });
 });
 
-describe("BUG-TIERNIGHT-05 — UI / pickTier (dérivé de votes)", () => {
+describe("BUG-TIERNIGHT-05 - UI / pickTier (dérivé de votes)", () => {
   it("après nouveau run, myVote équivalent est null et X=0", () => {
     const local = {
       runId: "old",
@@ -247,7 +247,7 @@ describe("BUG-TIERNIGHT-05 — UI / pickTier (dérivé de votes)", () => {
   });
 });
 
-describe("BUG-TIERNIGHT-05 — non-régression SpeedVote", () => {
+describe("BUG-TIERNIGHT-05 - non-régression SpeedVote", () => {
   it("isNewSpeedVoteVoteRound n'est pas modifié (pas de runId dans le corps)", () => {
     const src = readFileSync(join(root, "js/core/sessionMerge.js"), "utf8");
     const fn = src.match(

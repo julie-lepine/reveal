@@ -7,7 +7,7 @@ import { sortAndRankByScore } from "../js/core/competitionRank.js";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 
-/** Miroir exact de resolveFallbackBadge (badges.js) — hors import pour éviter Supabase. */
+/** Miroir exact de resolveFallbackBadge (badges.js) - hors import pour éviter Supabase. */
 function resolveFallbackBadge(index, total, hasStatBadge) {
   if (hasStatBadge) return "";
   if (index === 0) return "MVP de la soirée";

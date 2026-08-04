@@ -1,5 +1,5 @@
 /**
- * Vague B/D/E3 — projection Home de la membership résolue (pure, testable).
+ * Vague B/D/E3 - projection Home de la membership résolue (pure, testable).
  *
  * SoT chrome server-only : snapshot mémoire (`status === "found"`), pas `pendingServerLobby`.
  * Politique `found` face à `unknown` : consommateur Home / create (lobbyCreateGuard),
@@ -8,7 +8,7 @@
  * Vague D : Quitter/Fermer server-only via snapshot.membership ; confirmation `none`
  * obligatoire avant Créer. `leaveConfirmationPending` si mutation OK + query unknown.
  *
- * Vague E3 : `postLeaveHomeTransition` — soft-hold UI après leave confirmé (snapshot null)
+ * Vague E3 : `postLeaveHomeTransition` - soft-hold UI après leave confirmé (snapshot null)
  * sans checking générique ni faux `none` snapshot.
  * Priorité chrome (extrait) :
  * reconciliation → leave_confirmation_pending → post_leave_transition → cached_active → …
@@ -66,8 +66,8 @@ const CREATE_DISABLED_CHECK_FAILED =
   "Impossible de vérifier si tu es déjà dans un lobby. Réessaie avant d'en créer un.";
 const CREATE_DISABLED_ACTIVE = "Quitte le lobby actuel avant d'en créer un nouveau.";
 const CREATE_DISABLED_LEAVE_PENDING =
-  "Sortie en cours de vérification — attends la confirmation serveur avant de créer.";
-/** E3 — indication discrète CTA pendant soft-hold post-leave. */
+  "Sortie en cours de vérification - attends la confirmation serveur avant de créer.";
+/** E3 - indication discrète CTA pendant soft-hold post-leave. */
 export const CREATE_DISABLED_POST_LEAVE = "Finalisation…";
 
 /**
@@ -171,7 +171,7 @@ export function deriveHomeMembershipChrome(input = {}) {
     };
   }
 
-  // E3 — soft-hold après leave confirmé : none-like, pas de checking générique, Créer off.
+  // E3 - soft-hold après leave confirmé : none-like, pas de checking générique, Créer off.
   // Avant cached_active : pendant await signOut / avant applyLeaveLobbyLocal le cache
   // runtime est encore vrai ; le soft-hold doit le neutraliser (leave serveur confirmé).
   // Hors E3 (!postLeave) : politique cached_active inchangée.
@@ -231,7 +231,7 @@ export function deriveHomeMembershipChrome(input = {}) {
         ? resumeErrorMessage ||
           "Impossible de retrouver ta soirée. Tu peux réessayer ou demander le code à l'hôte."
         : retainedFoundDespiteUnknown
-          ? "Vérification serveur impossible pour le moment — membership connue conservée."
+          ? "Vérification serveur impossible pour le moment - membership connue conservée."
           : null,
     };
   }

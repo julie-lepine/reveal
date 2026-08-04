@@ -1,5 +1,5 @@
 /**
- * FEATURE-TIERNIGHT-02 — correction lost-update (RPC atomique + strip + préservation).
+ * FEATURE-TIERNIGHT-02 - correction lost-update (RPC atomique + strip + préservation).
  */
 import { describe, it, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
@@ -46,7 +46,7 @@ function simulatePreservingReplace(existingTopics, incomingState, rpcAppendDurin
   }).customRosterTopics;
 }
 
-describe("FEATURE-TIERNIGHT-02 — A. même RPC hôte/invité", () => {
+describe("FEATURE-TIERNIGHT-02 - A. même RPC hôte/invité", () => {
   it("création/suppression : RPC only, pas patchGameState collection", () => {
     const session = read("js/core/customRosterTopicSession.js");
     assert.match(session, /rpcUpsertPlayerCustomEntry/);
@@ -67,7 +67,7 @@ describe("FEATURE-TIERNIGHT-02 — A. même RPC hôte/invité", () => {
   });
 });
 
-describe("FEATURE-TIERNIGHT-02 — B. absence republication générique", () => {
+describe("FEATURE-TIERNIGHT-02 - B. absence republication générique", () => {
   it("eveningStateToRemote n'embarque pas customRosterTopics", () => {
     const evening = read("js/core/gameSync.js").match(
       /function eveningStateToRemote\(\) \{[\s\S]*?\n\}/
@@ -99,7 +99,7 @@ describe("FEATURE-TIERNIGHT-02 — B. absence republication générique", () => 
   });
 });
 
-describe("FEATURE-TIERNIGHT-02 — C. protection patchGameStateInner (strip)", () => {
+describe("FEATURE-TIERNIGHT-02 - C. protection patchGameStateInner (strip)", () => {
   it("strip retire la clé ; shallow merge ne peut plus écraser", () => {
     const current = {
       scores: {},
@@ -134,7 +134,7 @@ describe("FEATURE-TIERNIGHT-02 — C. protection patchGameStateInner (strip)", (
   });
 });
 
-describe("FEATURE-TIERNIGHT-02 — D. course RPC contre replace hôte", () => {
+describe("FEATURE-TIERNIGHT-02 - D. course RPC contre replace hôte", () => {
   it("serveur [A] + patch hôte stale + RPC B pendant lock → [A,B]", () => {
     const existing = [topic("a", "A", "Bob", "uid-b")];
     const hostIncoming = {
@@ -149,7 +149,7 @@ describe("FEATURE-TIERNIGHT-02 — D. course RPC contre replace hôte", () => {
   });
 });
 
-describe("FEATURE-TIERNIGHT-02 — QA hydratation hôte vs invité", () => {
+describe("FEATURE-TIERNIGHT-02 - QA hydratation hôte vs invité", () => {
   const remoteFull = [
     topic("h1", "H1", "Host", "host-uid"),
     topic("a1", "A1", "Ann", "guest-uid"),
@@ -232,8 +232,8 @@ describe("FEATURE-TIERNIGHT-02 — QA hydratation hôte vs invité", () => {
   });
 });
 
-describe("FEATURE-TIERNIGHT-02 — E/F. multi créations / multi auteurs", () => {
-  it("E — A,B,C même auteur via merge hydratation", () => {
+describe("FEATURE-TIERNIGHT-02 - E/F. multi créations / multi auteurs", () => {
+  it("E - A,B,C même auteur via merge hydratation", () => {
     const remote = [
       topic("a", "A-theme", "Bob", "uid-b"),
       topic("b", "B-theme", "Bob", "uid-b"),
@@ -243,7 +243,7 @@ describe("FEATURE-TIERNIGHT-02 — E/F. multi créations / multi auteurs", () =>
     assert.equal(hostView.length, 3);
   });
 
-  it("F — H + A1 + B1 + A2 convergent", () => {
+  it("F - H + A1 + B1 + A2 convergent", () => {
     const remote = [
       topic("h", "HostTheme", "Alice", "uid-a"),
       topic("a1", "A1Theme", "Ann", "uid-ann"),
@@ -267,7 +267,7 @@ describe("FEATURE-TIERNIGHT-02 — E/F. multi créations / multi auteurs", () =>
   });
 });
 
-describe("FEATURE-TIERNIGHT-02 — G. suppression concurrente", () => {
+describe("FEATURE-TIERNIGHT-02 - G. suppression concurrente", () => {
   it("delete distant A1 reflété ; A2/B1/B2 conservés", () => {
     const remoteAfter = [
       topic("a2", "A2", "Ann", "uid-ann"),
@@ -282,7 +282,7 @@ describe("FEATURE-TIERNIGHT-02 — G. suppression concurrente", () => {
   });
 });
 
-describe("FEATURE-TIERNIGHT-02 — H/J. survie jeu + frontière lobby", () => {
+describe("FEATURE-TIERNIGHT-02 - H/J. survie jeu + frontière lobby", () => {
   let snapshot;
   beforeEach(() => {
     snapshot = structuredClone(getState());
@@ -290,13 +290,13 @@ describe("FEATURE-TIERNIGHT-02 — H/J. survie jeu + frontière lobby", () => {
   });
   afterEach(() => saveStatePatch(snapshot));
 
-  it("H — resetGameSessionsOnly conserve les thèmes (changement de jeu local)", () => {
+  it("H - resetGameSessionsOnly conserve les thèmes (changement de jeu local)", () => {
     addCustomRosterTopic({ name: "Survit au menu" });
     resetGameSessionsOnly();
     assert.equal(getCustomRosterTopics().length, 1);
   });
 
-  it("J — resetEveningState vide ; nouveau lobby liste vide", () => {
+  it("J - resetEveningState vide ; nouveau lobby liste vide", () => {
     addCustomRosterTopic({ name: "Lobby A" });
     resetEveningState();
     assert.deepEqual(getCustomRosterTopics(), []);
@@ -306,7 +306,7 @@ describe("FEATURE-TIERNIGHT-02 — H/J. survie jeu + frontière lobby", () => {
   });
 });
 
-describe("FEATURE-TIERNIGHT-02 — I. rollback réseau (contrat source)", () => {
+describe("FEATURE-TIERNIGHT-02 - I. rollback réseau (contrat source)", () => {
   it("add/delete ont try/catch + rollback ciblé par id", () => {
     const session = read("js/core/customRosterTopicSession.js");
     assert.match(session, /removeTopicById/);
@@ -316,7 +316,7 @@ describe("FEATURE-TIERNIGHT-02 — I. rollback réseau (contrat source)", () => 
   });
 });
 
-describe("FEATURE-TIERNIGHT-02 — SQL correctif", () => {
+describe("FEATURE-TIERNIGHT-02 - SQL correctif", () => {
   it("migration lost-update : authorUid + preserving RPC + hint si base vide", () => {
     const sql = read("supabase/feature-tiernight-02-lost-update-fix.sql");
     assert.match(sql, /authorUid/);
@@ -335,7 +335,7 @@ describe("FEATURE-TIERNIGHT-02 — SQL correctif", () => {
   });
 });
 
-describe("FEATURE-TIERNIGHT-02 — ownership authorUid vs rename", () => {
+describe("FEATURE-TIERNIGHT-02 - ownership authorUid vs rename", () => {
   it("propriété suit authorUid même si display name change", () => {
     const mine = topic("x", "Thème", "OldName", "uid-1");
     const afterRename = mergeCustomRosterTopics(

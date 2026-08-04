@@ -1,5 +1,5 @@
 /**
- * ARCH-23 — revalidation au retour foreground (Capacitor + visibility web).
+ * ARCH-23 - revalidation au retour foreground (Capacitor + visibility web).
  */
 
 import {
@@ -36,7 +36,7 @@ async function onBecameActive() {
   }
   presentCompatibilityGateIfNeeded(result);
   // Compromis Vague 1 : si incompatible pendant une partie, overlay bloquant ;
-  // on ne force pas leaveLobby / teardown — mais create/join/resume et UI gate
+  // on ne force pas leaveLobby / teardown - mais create/join/resume et UI gate
   // empêchent nouveaux writes d’entrée. Writes in-game existants : risque résiduel documenté.
   if (result.status === COMPAT_STATUS.INCOMPATIBLE) {
     console.info("[ARCH-23]", {
@@ -50,7 +50,7 @@ async function onBecameActive() {
 }
 
 /**
- * Une seule initialisation — Cap appStateChange + visibilitychange.
+ * Une seule initialisation - Cap appStateChange + visibilitychange.
  */
 export function initClientCompatibilityForeground() {
   if (foregroundInit || typeof document === "undefined") return;

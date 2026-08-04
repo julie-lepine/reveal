@@ -1,5 +1,5 @@
 /**
- * Contrats source — vague 1 suppression Fil Rouge (code mort / runtime facile).
+ * Contrats source - vague 1 suppression Fil Rouge (code mort / runtime facile).
  * Ne couvre pas gameSync.js / state.js (vague 2).
  */
 import { describe, it } from "node:test";
@@ -39,7 +39,7 @@ function walkJsFiles(dir, out = []) {
   return out;
 }
 
-describe("fil rouge vague 1 — contrats source", () => {
+describe("fil rouge vague 1 - contrats source", () => {
   it("modules Fil Rouge orphelins sont absents du disque", () => {
     for (const rel of DELETED_MODULES) {
       assert.equal(existsSync(join(root, rel)), false, `attendu absent: ${rel}`);

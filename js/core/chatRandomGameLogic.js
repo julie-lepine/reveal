@@ -1,11 +1,11 @@
 /**
- * FEATURE-CHAT-03 — logique pure roulette « Jeu aléatoire ».
+ * FEATURE-CHAT-03 - logique pure roulette « Jeu aléatoire ».
  * Pas de DOM / Supabase : testable unitairement.
  *
  * Séparation horloges :
  * - **Cosmétique** : `animationStartTimestamp` = `Date.now()` hôte ; seek invité
  *   borné 0…1 via `chatRouletteSpinProgress` (aucune décision métier).
- * - **Métier (blocage launch)** : `isChatRouletteBlockingLaunch` — observation
+ * - **Métier (blocage launch)** : `isChatRouletteBlockingLaunch` - observation
  *   locale monotone (`performance.now`) + âge vs `game_sessions.updated_at`
  *   (serveur). `expiresAt` hôte n’est qu’un indice clampé, jamais une vérité
  *   sans borne.
@@ -44,7 +44,7 @@ export const CHAT_ROULETTE_NETWORK_MARGIN_MS = 5_000;
 
 /**
  * Fenêtre hôte indicative (`expiresAt` = activityAt + TTL).
- * N’est plus la source de vérité pour bloquer `restartGame` — voir
+ * N’est plus la source de vérité pour bloquer `restartGame` - voir
  * `CHAT_ROULETTE_MAX_LOCAL_LIFETIME_MS` + `isChatRouletteBlockingLaunch`.
  */
 export const CHAT_ROULETTE_TTL_MS =
@@ -58,7 +58,7 @@ export const CHAT_ROULETTE_TTL_MS =
  * `game_sessions.updated_at` (horloge serveur Postgres).
  *
  * Impératif : une roulette distante ne peut jamais bloquer plus longtemps
- * que cette borne après première observation — même si `expiresAt` hôte
+ * que cette borne après première observation - même si `expiresAt` hôte
  * est dans un futur lointain (horloge hôte avancée).
  */
 export const CHAT_ROULETTE_MAX_LOCAL_LIFETIME_MS = CHAT_ROULETTE_TTL_MS;
@@ -112,7 +112,7 @@ export function parseSessionUpdatedAtMs(raw) {
   return Number.isFinite(ms) ? ms : null;
 }
 
-/** Min joueurs au lancement catalogue — miroir des gardes `restartGame`. */
+/** Min joueurs au lancement catalogue - miroir des gardes `restartGame`. */
 export function catalogTileMinPlayers(tileId) {
   if (tileId === "traitre-prep") return TRAITRE_MIN_PLAYERS;
   if (tileId === "truthmeter-prep") return TRUTH_METER_MIN_PLAYERS;
@@ -234,7 +234,7 @@ export function newChatRouletteAttemptId(now = Date.now()) {
   return `attempt-${now.toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
-/** @deprecated alias — préfère newChatRouletteId */
+/** @deprecated alias - préfère newChatRouletteId */
 export function newChatRouletteEventId(now = Date.now()) {
   return newChatRouletteId(now);
 }
@@ -521,7 +521,7 @@ export function chatRouletteReactionsSignature(reactionsByUid) {
 
 /**
  * Merge atomique d'une entrée UID (miroir SQL `contribute_chat_roulette_reaction`).
- * Pur / testable — ne remplace jamais toute la map depuis un snapshot stale.
+ * Pur / testable - ne remplace jamais toute la map depuis un snapshot stale.
  *
  * @param {Record<string, string>|null|undefined} reactionsByUid
  * @param {string} uid
@@ -549,7 +549,7 @@ export function simulateSerializedAtomicReactionWrites(initial, ops) {
 
 /**
  * Simule le lost update du chemin hôte read-modify-write (patch global stale).
- * Chaque op relit le même snapshot initial puis remplace toute la map — dernier gagnant.
+ * Chaque op relit le même snapshot initial puis remplace toute la map - dernier gagnant.
  *
  * @param {Record<string, string>} snapshot
  * @param {Array<{ uid: string, reaction: string|null }>} ops
@@ -601,7 +601,7 @@ export function chatRouletteActivityKey(ev) {
 }
 
 /**
- * Mémoire d’observation locale (process) — jamais synchronisée.
+ * Mémoire d’observation locale (process) - jamais synchronisée.
  * @type {Map<string, { activityKey: string, firstSeenMono: number, serverUpdatedAtMs: number|null }>}
  */
 const localObservations = new Map();
@@ -688,7 +688,7 @@ export function isChatRouletteBlockingLaunch({
         ? obs.serverUpdatedAtMs
         : null;
 
-  // (1) Âge serveur — indépendant de l’horloge applicative de l’hôte
+  // (1) Âge serveur - indépendant de l’horloge applicative de l’hôte
   if (serverTs != null) {
     const serverAge = Math.max(0, wall - serverTs);
     if (
@@ -713,7 +713,7 @@ export function isChatRouletteBlockingLaunch({
     return true;
   }
 
-  // (4) Dernier recours : clamp `expiresAt` hôte — jamais plus que now+MAX_LOCAL
+  // (4) Dernier recours : clamp `expiresAt` hôte - jamais plus que now+MAX_LOCAL
   const clampedExpires = Math.min(
     n.expiresAt,
     wall + CHAT_ROULETTE_MAX_LOCAL_LIFETIME_MS
@@ -743,7 +743,7 @@ export function isChatRouletteActive(chatRoulette, nowOrOpts = Date.now()) {
   });
 }
 
-/** @deprecated — utiliser isChatRouletteActive / isChatRouletteBlockingLaunch */
+/** @deprecated - utiliser isChatRouletteActive / isChatRouletteBlockingLaunch */
 export function isChatRouletteEventActive(ev, now = Date.now()) {
   return isChatRouletteActive(ev, now);
 }
@@ -855,7 +855,7 @@ export function pickChatRouletteNextGame({
 }
 
 /**
- * @deprecated — utiliser pickChatRouletteNextGame (anti-répétition immédiate).
+ * @deprecated - utiliser pickChatRouletteNextGame (anti-répétition immédiate).
  */
 export function pickChatRouletteReroll(prev, catalogGames, rng = Math.random) {
   return {

@@ -55,7 +55,7 @@ export function canPlay() {
 export function canCreateLobby() {
   if (!isLoggedIn() || hasActiveLobby()) return false;
 
-  // Offline / demo : pas de snapshot membership — inchangé.
+  // Offline / demo : pas de snapshot membership - inchangé.
   if (!isSupabaseConfigured()) return true;
 
   // Synchrone : snapshot none frais requis. L’INSERT re-query toujours (Vague C).
@@ -299,7 +299,7 @@ export async function logout() {
           return { ok: false, error: res.error || "Impossible de fermer le lobby." };
         }
       } else {
-        // AUTH-LOGOUT-MEMBER-01 — ne pas signOut si leave non prouvé.
+        // AUTH-LOGOUT-MEMBER-01 - ne pas signOut si leave non prouvé.
         // Feedback UX : propriétaire = caller (home #btn-logout) via res.error.
         let res;
         try {
@@ -319,7 +319,7 @@ export async function logout() {
             ok: false,
             error:
               res?.error ||
-              "Impossible de quitter le lobby. Vérifie ta connexion puis réessaie — la déconnexion n'a pas été effectuée pour éviter de bloquer ta place.",
+              "Impossible de quitter le lobby. Vérifie ta connexion puis réessaie - la déconnexion n'a pas été effectuée pour éviter de bloquer ta place.",
           };
         }
       }

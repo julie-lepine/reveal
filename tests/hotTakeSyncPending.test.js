@@ -1,5 +1,5 @@
 /**
- * ARCH-22 Vague B — Hot Take × createSyncPending (contrats source + lifecycle).
+ * ARCH-22 Vague B - Hot Take × createSyncPending (contrats source + lifecycle).
  */
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
@@ -25,12 +25,12 @@ function extractSubmitVote(body) {
   throw new Error("submitVote non fermée");
 }
 
-describe("ARCH-22 Hot Take sync pending — contrats source", () => {
+describe("ARCH-22 Hot Take sync pending - contrats source", () => {
   it("importe createSyncPending", () => {
     assert.match(src, /import \{ createSyncPending \} from "\.\.\/core\/syncPending\.js"/);
   });
 
-  it("15 — double clic : garde voteCommitInFlight avant start", () => {
+  it("15 - double clic : garde voteCommitInFlight avant start", () => {
     const fn = extractSubmitVote(src);
     assert.match(fn, /if \(pick == null \|\| voteCommitInFlight != null\) return/);
     const lockIdx = fn.indexOf("voteCommitInFlight = pick");
@@ -38,7 +38,7 @@ describe("ARCH-22 Hot Take sync pending — contrats source", () => {
     assert.ok(lockIdx >= 0 && startIdx > lockIdx);
   });
 
-  it("16 — avant soft delay : libellé via visible, disable via inFlight", () => {
+  it("16 - avant soft delay : libellé via visible, disable via inFlight", () => {
     assert.match(
       src,
       /const confirmBusy = voteCommitInFlight != null/
@@ -53,7 +53,7 @@ describe("ARCH-22 Hot Take sync pending — contrats source", () => {
     );
   });
 
-  it("17 — Envoi… uniquement si getState().visible", () => {
+  it("17 - Envoi… uniquement si getState().visible", () => {
     assert.match(src, /getState\(\)\.visible\s*\?\s*"Envoi…"/);
     assert.doesNotMatch(
       src,
@@ -61,7 +61,7 @@ describe("ARCH-22 Hot Take sync pending — contrats source", () => {
     );
   });
 
-  it("18–20 — finally : clear lock puis end(token) ; pas de change patch/rollback", () => {
+  it("18–20 - finally : clear lock puis end(token) ; pas de change patch/rollback", () => {
     const fn = extractSubmitVote(src);
     const finallyIdx = fn.indexOf("} finally {");
     assert.ok(finallyIdx > 0);
@@ -75,7 +75,7 @@ describe("ARCH-22 Hot Take sync pending — contrats source", () => {
     assert.doesNotMatch(fn, /previousVotes/);
   });
 
-  it("21 — unmount : dispose syncPending + mount guards onChange", () => {
+  it("21 - unmount : dispose syncPending + mount guards onChange", () => {
     assert.match(
       src,
       /onChange:\s*\(\)\s*=>\s*\{\s*\n\s*if \(!mount\.isMounted\(\) \|\| !mount\.isCurrentMount\(\)\) return/

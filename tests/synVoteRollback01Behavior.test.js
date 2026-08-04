@@ -1,5 +1,5 @@
 /**
- * SYN-VOTE-ROLLBACK-01 — cycles comportementaux (SpeedVote mock + algorithme partagé).
+ * SYN-VOTE-ROLLBACK-01 - cycles comportementaux (SpeedVote mock + algorithme partagé).
  */
 import { describe, it, beforeEach, afterEach, mock } from "node:test";
 import assert from "node:assert/strict";
@@ -62,7 +62,7 @@ function simulateOptimisticCommitCycle({
   return { live, rolled: true, applied };
 }
 
-describe("SYN-VOTE-ROLLBACK-01 — cycles simulés (tous jeux)", () => {
+describe("SYN-VOTE-ROLLBACK-01 - cycles simulés (tous jeux)", () => {
   const cases = [
     { name: "SpeedVote", mapKey: "votes", phase: "voting", value: "Bob" },
     { name: "Dilemma", mapKey: "votes", phase: "voting", value: "A" },
@@ -84,7 +84,7 @@ describe("SYN-VOTE-ROLLBACK-01 — cycles simulés (tous jeux)", () => {
   ];
 
   for (const c of cases) {
-    it(`${c.name} : succès — pas de rollback`, () => {
+    it(`${c.name} : succès - pas de rollback`, () => {
       const session = {
         phase: c.phase,
         roundIdx: 0,
@@ -103,7 +103,7 @@ describe("SYN-VOTE-ROLLBACK-01 — cycles simulés (tous jeux)", () => {
       assert.ok(out.live[c.mapKey].Bob != null);
     });
 
-    it(`${c.name} : échec — retire / restaure uniquement Alice`, () => {
+    it(`${c.name} : échec - retire / restaure uniquement Alice`, () => {
       const session = {
         phase: c.phase,
         roundIdx: 0,
@@ -122,7 +122,7 @@ describe("SYN-VOTE-ROLLBACK-01 — cycles simulés (tous jeux)", () => {
       assert.ok(out.live[c.mapKey].Bob != null);
     });
 
-    it(`${c.name} : autre joueur ajouté avant catch — préservé`, () => {
+    it(`${c.name} : autre joueur ajouté avant catch - préservé`, () => {
       const session = {
         phase: c.phase,
         roundIdx: 0,
@@ -147,7 +147,7 @@ describe("SYN-VOTE-ROLLBACK-01 — cycles simulés (tous jeux)", () => {
       assert.equal(Object.prototype.hasOwnProperty.call(out.live[c.mapKey], "Alice"), false);
     });
 
-    it(`${c.name} : valeur remplacée avant catch — no-op`, () => {
+    it(`${c.name} : valeur remplacée avant catch - no-op`, () => {
       const session = {
         phase: c.phase,
         roundIdx: 0,
@@ -171,7 +171,7 @@ describe("SYN-VOTE-ROLLBACK-01 — cycles simulés (tous jeux)", () => {
       assert.deepEqual(out.live[c.mapKey].Alice, newer);
     });
 
-    it(`${c.name} : runId / phase change — no-op`, () => {
+    it(`${c.name} : runId / phase change - no-op`, () => {
       const session = {
         phase: c.phase,
         roundIdx: 0,
@@ -194,7 +194,7 @@ describe("SYN-VOTE-ROLLBACK-01 — cycles simulés (tous jeux)", () => {
       assert.deepEqual(out.live[c.mapKey].Alice, c.value);
     });
 
-    it(`${c.name} : ancienne tentative (stale attemptId) — no-op`, () => {
+    it(`${c.name} : ancienne tentative (stale attemptId) - no-op`, () => {
       const session = {
         phase: c.phase,
         roundIdx: 0,
@@ -216,7 +216,7 @@ describe("SYN-VOTE-ROLLBACK-01 — cycles simulés (tous jeux)", () => {
   }
 });
 
-describe("commitSpeedVoteVote — mocks comportementaux", () => {
+describe("commitSpeedVoteVote - mocks comportementaux", () => {
   const UID = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
   let savedSession;
   let saveCalls;

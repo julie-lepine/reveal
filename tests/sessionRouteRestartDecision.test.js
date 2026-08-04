@@ -51,7 +51,7 @@ function resolveActivePlayScreen(st) {
 }
 
 /**
- * Miroir de getEffectiveSessionScreen (branche post-partie + prep) — état actuel du code.
+ * Miroir de getEffectiveSessionScreen (branche post-partie + prep) - état actuel du code.
  * Le short-circuit local post-partie ignore lobbyPrep (pas encore patché).
  */
 function getEffectiveSessionScreen(row, { local, suppressed = false, lobbyGameId = null }) {

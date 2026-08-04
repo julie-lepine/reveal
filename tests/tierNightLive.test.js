@@ -25,7 +25,7 @@ function merge(cur, inc) {
   });
 }
 
-describe("tierNightLive — merge des votes", () => {
+describe("tierNightLive - merge des votes", () => {
   it("un patch votes-only conserve les votes des autres joueurs", () => {
     const cur = { phase: "voting", roundIdx: 0, votes: { u1: "S" } };
     const inc = { votes: { u2: "B" } };

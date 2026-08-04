@@ -58,7 +58,7 @@ describe("renameLocalPlayer (I-09 / SYN-06)", () => {
 
   it("baseline collision preferOld preserves in-game delta (no sum)", () => {
     // getCurrentSessionScoreMap: total[name] − baseline[name]
-    // Alice session delta 10, Alicia orphan delta 2 — preferOld keeps Alice pair → delta 10.
+    // Alice session delta 10, Alicia orphan delta 2 - preferOld keeps Alice pair → delta 10.
     // sum would yield (20+5)−(10+3)=12 (fabricated). preferNew would yield 5−3=2 (lost progress).
     seedAlice({
       gameScoreSessionGameId: "clutch",

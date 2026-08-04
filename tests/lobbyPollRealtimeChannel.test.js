@@ -1,5 +1,5 @@
 /**
- * Cycle de vie canal Realtime sondages — coalesce, degraded keep vs join-reply replace.
+ * Cycle de vie canal Realtime sondages - coalesce, degraded keep vs join-reply replace.
  */
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";

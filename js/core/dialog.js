@@ -191,7 +191,7 @@ export function showAppConfirm(
 }
 
 /**
- * ARCH-03b — offre de reprise du rôle hôte (pas de transfert silencieux).
+ * ARCH-03b - offre de reprise du rôle hôte (pas de transfert silencieux).
  * @returns {Promise<boolean>} true = « Reprendre le rôle d'hôte »
  */
 export function showClaimHostDialog({ inactiveMinutes = 5 } = {}) {

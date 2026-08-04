@@ -1,5 +1,5 @@
 /**
- * FEATURE-TIERNIGHT-02 — création / sync thèmes roster (tous les joueurs).
+ * FEATURE-TIERNIGHT-02 - création / sync thèmes roster (tous les joueurs).
  *
  * Contrat écriture MP : uniquement RPC atomique (hôte = invité).
  * Aucun client ne republie la collection complète via patchGameState.
@@ -52,7 +52,7 @@ export async function addCustomRosterTopicAndSync({ name }) {
     ...(authorUid ? { authorUid } : {}),
   };
 
-  // Optimiste local (auteur) — rollback ciblé si RPC échoue.
+  // Optimiste local (auteur) - rollback ciblé si RPC échoue.
   saveStatePatch({
     customRosterTopics: mergedTopicsWithLocal([topic], authorUid),
   });

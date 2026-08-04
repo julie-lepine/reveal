@@ -1,5 +1,5 @@
 /**
- * Contrats vague 3 — CSS générique, message Traître, docs actives (hors SQL).
+ * Contrats vague 3 - CSS générique, message Traître, docs actives (hors SQL).
  */
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
@@ -40,7 +40,7 @@ const ACTIVE_DOCS = [
   "docs/IPHONE_TEST_CHECKLIST.md",
 ];
 
-describe("fil rouge vague 3 — CSS / message / docs", () => {
+describe("fil rouge vague 3 - CSS / message / docs", () => {
   it("aucune classe .fil-rouge-setup__req* dans app ou CSS", () => {
     const css = read("style.css");
     assert.equal(css.includes("fil-rouge-setup__req"), false);

@@ -13,7 +13,7 @@ import { tierNightConfigPatchFromRemoteState } from "../js/core/tierNightConfig.
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 
-describe("TierNight — suppression Rank it (consensus)", () => {
+describe("TierNight - suppression Rank it (consensus)", () => {
   it("TIER_NIGHT_MODES ne contient plus consensus / Rank it", () => {
     assert.equal(
       TIER_NIGHT_MODES.some((m) => m.id === "consensus"),

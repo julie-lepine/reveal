@@ -1,5 +1,5 @@
 /**
- * Vague 1 — contrats SQL sondages (statique, sans Postgres) :
+ * Vague 1 - contrats SQL sondages (statique, sans Postgres) :
  * - drift allowlist ↔ GAMES_AVAILABLE
  * - close_lobby_poll(p_poll_id, …) ciblé (pas de close aveugle par lobby)
  * - outcomes closed / already_closed / poll_not_found

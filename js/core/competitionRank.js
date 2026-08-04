@@ -5,7 +5,7 @@
  * Prérequis : `scores` est déjà trié du meilleur au moins bon
  * (score décroissant, ou métrique croissante type écart Clutch).
  * Les valeurs adjacentes égales partagent le rang ; l’ordre dans le tableau
- * (nom, etc.) n’influence pas le rang — seulement l’affichage.
+ * (nom, etc.) n’influence pas le rang - seulement l’affichage.
  */
 
 /** @param {readonly number[]} scoresSortedBestFirst */
@@ -51,7 +51,7 @@ export function medalForCompetitionRank(rank) {
 /** Libellé court de place (classement soirée). */
 export function competitionRankLabel(rank) {
   if (rank === 1) return "1er";
-  if (rank == null || !Number.isFinite(rank)) return "—";
+  if (rank == null || !Number.isFinite(rank)) return "-";
   return `${rank}e`;
 }
 

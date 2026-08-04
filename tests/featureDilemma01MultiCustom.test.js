@@ -1,5 +1,5 @@
 /**
- * FEATURE-DILEMMA-01 — plusieurs dilemmes custom par joueur (alignement Hot Take).
+ * FEATURE-DILEMMA-01 - plusieurs dilemmes custom par joueur (alignement Hot Take).
  */
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
@@ -31,12 +31,12 @@ function consumeCustomById(list, playedId) {
   return list.filter((d) => d.id !== playedId);
 }
 
-/** Miroir buildDilemmaDeck customs slice (shuffle ignoré — vérifie inclusion). */
+/** Miroir buildDilemmaDeck customs slice (shuffle ignoré - vérifie inclusion). */
 function customsIncludedInPool(customs, effective) {
   return customs.length >= effective;
 }
 
-describe("FEATURE-DILEMMA-01 — verrous supprimés (statique)", () => {
+describe("FEATURE-DILEMMA-01 - verrous supprimés (statique)", () => {
   it("dilemmaSession : pas de guard length >= 1", () => {
     const src = read("js/core/dilemmaSession.js");
     assert.doesNotMatch(src, /getMyCustomDilemmas\(\)\.length\s*>=\s*1/);
@@ -91,10 +91,10 @@ describe("FEATURE-DILEMMA-01 — verrous supprimés (statique)", () => {
   });
 });
 
-describe("FEATURE-DILEMMA-01 — merge sync (plusieurs par auteur)", () => {
+describe("FEATURE-DILEMMA-01 - merge sync (plusieurs par auteur)", () => {
   const me = "Alice";
 
-  it("plusieurs créations même auteur — merge local", () => {
+  it("plusieurs créations même auteur - merge local", () => {
     const local = [
       makeCustom("d1", "A1", "B1", me),
       makeCustom("d2", "A2", "B2", me),
@@ -104,7 +104,7 @@ describe("FEATURE-DILEMMA-01 — merge sync (plusieurs par auteur)", () => {
     assert.equal(out.length, 3);
   });
 
-  it("suppression d'un seul — mergeAuthorOwnedCustomList", () => {
+  it("suppression d'un seul - mergeAuthorOwnedCustomList", () => {
     const all = [
       makeCustom("d1", "A1", "B1", me),
       makeCustom("d2", "A2", "B2", me),
@@ -115,7 +115,7 @@ describe("FEATURE-DILEMMA-01 — merge sync (plusieurs par auteur)", () => {
     assert.equal(out[0].id, "d2");
   });
 
-  it("ajout puis suppression puis nouvel ajout — ids distincts", () => {
+  it("ajout puis suppression puis nouvel ajout - ids distincts", () => {
     let local = [makeCustom("d1", "X", "Y", me)];
     local = local.filter((d) => d.id !== "d1");
     local = [...local, makeCustom("d2", "A", "B", me)];
@@ -134,7 +134,7 @@ describe("FEATURE-DILEMMA-01 — merge sync (plusieurs par auteur)", () => {
     assert.equal(out.filter((d) => d.author === me).length, 2);
   });
 
-  it("reconnexion prep — mergeDilemmaPatchState conserve plusieurs customs", () => {
+  it("reconnexion prep - mergeDilemmaPatchState conserve plusieurs customs", () => {
     const cur = {
       lobbyStarted: false,
       customDilemmas: [makeCustom("d1", "A", "B", me)],
@@ -157,7 +157,7 @@ describe("FEATURE-DILEMMA-01 — merge sync (plusieurs par auteur)", () => {
     assert.equal(merged.customDilemmas.length, 2);
   });
 
-  it("QA : Alice 6 dilemmes, Bob 0 — merge pool size", () => {
+  it("QA : Alice 6 dilemmes, Bob 0 - merge pool size", () => {
     const aliceEntries = Array.from({ length: 6 }, (_, i) =>
       makeCustom(`a-${i}`, `OptA${i}`, `OptB${i}`, "Alice")
     );
@@ -168,7 +168,7 @@ describe("FEATURE-DILEMMA-01 — merge sync (plusieurs par auteur)", () => {
   });
 });
 
-describe("FEATURE-DILEMMA-01 — deck et consume (contrat)", () => {
+describe("FEATURE-DILEMMA-01 - deck et consume (contrat)", () => {
   it("consume retire un seul id", () => {
     const customs = [
       makeCustom("keep-1", "A1", "B1"),
@@ -188,7 +188,7 @@ describe("FEATURE-DILEMMA-01 — deck et consume (contrat)", () => {
   });
 });
 
-describe("FEATURE-DILEMMA-01 — vote et scoring inchangés", () => {
+describe("FEATURE-DILEMMA-01 - vote et scoring inchangés", () => {
   it("countDilemmaResults stable", () => {
     const fn = read("js/core/dilemmaSession.js");
     assert.match(fn, /export function countDilemmaResults/);
@@ -202,7 +202,7 @@ describe("FEATURE-DILEMMA-01 — vote et scoring inchangés", () => {
   });
 });
 
-describe("FEATURE-DILEMMA-01 — prepOthersCustomHint (partagé Hot Take)", () => {
+describe("FEATURE-DILEMMA-01 - prepOthersCustomHint (partagé Hot Take)", () => {
   it("hint dilemme et hot take", () => {
     assert.match(
       prepOthersCustomEntriesHintHtml({
@@ -225,7 +225,7 @@ describe("FEATURE-DILEMMA-01 — prepOthersCustomHint (partagé Hot Take)", () =
   });
 });
 
-describe("FEATURE-DILEMMA-01 — compatibilité client/SQL", () => {
+describe("FEATURE-DILEMMA-01 - compatibilité client/SQL", () => {
   it("nouveau client : pas de plafond client", () => {
     assert.doesNotMatch(read("js/core/dilemmaSession.js"), /length\s*>=\s*1/);
   });
@@ -244,7 +244,7 @@ describe("FEATURE-DILEMMA-01 — compatibilité client/SQL", () => {
   });
 });
 
-describe("FEATURE-DILEMMA-01 — mergeAuthorOwnedCustomList multi-entry", () => {
+describe("FEATURE-DILEMMA-01 - mergeAuthorOwnedCustomList multi-entry", () => {
   it("deux entrées même auteur local conservées", () => {
     const me = "Alice";
     const out = mergeAuthorOwnedCustomList(

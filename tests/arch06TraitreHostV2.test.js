@@ -138,7 +138,7 @@ function simulateTraitreHostMount() {
   };
 }
 
-describe("ARCH-06 Traître host V2 — Mode A locks", () => {
+describe("ARCH-06 Traître host V2 - Mode A locks", () => {
   it("double clic finish-speak → un seul commit", async () => {
     const h = simulateTraitreHostMount();
     const gate = deferred();
@@ -253,7 +253,7 @@ describe("ARCH-06 Traître host V2 — Mode A locks", () => {
   });
 });
 
-describe("ARCH-06 Traître host V2 — Modes B/C lifecycle", () => {
+describe("ARCH-06 Traître host V2 - Modes B/C lifecycle", () => {
   it("async ancien mount après navigation → aucun render", async () => {
     resetMountGenerationForTests();
     advanceMountGeneration();
@@ -349,7 +349,7 @@ describe("ARCH-06 Traître host V2 — Modes B/C lifecycle", () => {
   });
 });
 
-describe("ARCH-06 Traître host V2 — acting host + contrats source", () => {
+describe("ARCH-06 Traître host V2 - acting host + contrats source", () => {
   const src = readSrc("../js/games/traitre.js");
   const syncSrc = readSrc("../js/core/gameSync.js");
 
@@ -408,7 +408,7 @@ describe("ARCH-06 Traître host V2 — acting host + contrats source", () => {
   });
 });
 
-describe("ARCH-06 Traître host V2 — régression métier (contrats)", () => {
+describe("ARCH-06 Traître host V2 - régression métier (contrats)", () => {
   it("transitions / scoring / commits inchangés dans l'écran", () => {
     const src = readSrc("../js/games/traitre.js");
     assert.match(src, /phase: "speak"/);

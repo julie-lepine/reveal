@@ -1,5 +1,5 @@
 /**
- * FEATURE-TIERNIGHT-02 — garde anti lost-update pour customRosterTopics.
+ * FEATURE-TIERNIGHT-02 - garde anti lost-update pour customRosterTopics.
  *
  * La collection n'est jamais réécrite via patch générique client.
  * Remplacement complet de state → préserver la valeur serveur (miroir SQL).

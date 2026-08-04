@@ -1,5 +1,5 @@
 /**
- * Guess Lie UX — Vague A (vote in-flight) + Vague B1 (stats post-RPC).
+ * Guess Lie UX - Vague A (vote in-flight) + Vague B1 (stats post-RPC).
  */
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
@@ -28,7 +28,7 @@ function extractTransitionToReveal(src) {
   throw new Error("transitionToReveal non fermée");
 }
 
-describe("Guess Lie UX Vague A — contrats source vote", () => {
+describe("Guess Lie UX Vague A - contrats source vote", () => {
   const src = readSrc("../js/games/guessLie.js");
 
   it("import voteConfirmChrome / pickForVoteConfirm", () => {
@@ -89,7 +89,7 @@ describe("Guess Lie UX Vague A — contrats source vote", () => {
   });
 });
 
-describe("Guess Lie UX Vague B1 — stats après RPC réussie", () => {
+describe("Guess Lie UX Vague B1 - stats après RPC réussie", () => {
   const src = readSrc("../js/games/guessLie.js");
   const revealBody = extractTransitionToReveal(src);
 

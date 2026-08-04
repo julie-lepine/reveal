@@ -1,5 +1,5 @@
 /**
- * Régression FEATURE-CHAT-03 — visibilité actions chat (sondage + roulette).
+ * Régression FEATURE-CHAT-03 - visibilité actions chat (sondage + roulette).
  * Contrat : sous-conteneurs distincts ; blocking roulette ≠ masquage CTA ;
  * auto-close sheet = transition hub→prep, pas boucle sur écran courant.
  */
@@ -75,7 +75,7 @@ function canShowPollCreateCta({ localScreen, sessionRow, lobbyGameId = "menu", a
   });
 }
 
-describe("chat actions — hub visibility matrix", () => {
+describe("chat actions - hub visibility matrix", () => {
   it("1. hub game-select : les deux actions visibles (create + roulette)", () => {
     const row = menuRow("game-select");
     assert.equal(canShowPollCreateCta({ localScreen: "game-select", sessionRow: row }), true);
@@ -171,7 +171,7 @@ describe("chat actions — hub visibility matrix", () => {
   });
 });
 
-describe("chat actions — DOM isolation & cleanup contracts", () => {
+describe("chat actions - DOM isolation & cleanup contracts", () => {
   it("12. chaque renderer ne touche que son sous-conteneur", () => {
     const pollUi = readFileSync(
       join(__dirname, "../js/core/lobbyPollSheetUi.js"),

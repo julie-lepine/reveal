@@ -7,7 +7,7 @@ import {
 } from "../js/core/triviaRevealErrors.js";
 import { createTriviaRunId } from "../js/core/triviaRunId.js";
 
-describe("validateTriviaRevealRequest — anti-stale client", () => {
+describe("validateTriviaRevealRequest - anti-stale client", () => {
   it("refuse sans runId", () => {
     const out = validateTriviaRevealRequest({ phase: "question", questionIdx: 0 });
     assert.equal(out.ok, false);
@@ -69,7 +69,7 @@ describe("mapTriviaRevealRpcError", () => {
   });
 });
 
-describe("runId — nouvelle partie replay", () => {
+describe("runId - nouvelle partie replay", () => {
   it("createTriviaRunId produit des ids distincts", () => {
     const a = createTriviaRunId();
     const b = createTriviaRunId();

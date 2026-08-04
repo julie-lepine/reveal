@@ -1,5 +1,5 @@
 /**
- * Transitions présence → UI (ARCH-03 / ARCH-03b) — helpers purs.
+ * Transitions présence → UI (ARCH-03 / ARCH-03b) - helpers purs.
  * Logs LIVE : localStorage reveal-acting-host-debug=1
  * Filtrer console : ARCH03-LIVE / ARCH03B-LIVE
  */
@@ -71,7 +71,7 @@ export function shouldNudgeClaimHubUi(prevEligible, nextEligible) {
 
 /**
  * Décision notif acting host (sans DOM).
- * `fromElectionNudge` : appelé uniquement depuis nudge d'élection — ne pas laisser
+ * `fromElectionNudge` : appelé uniquement depuis nudge d'élection - ne pas laisser
  * un seed bundle (wasActing déjà true) avaler la transition.
  * ack uniquement après show (appelant).
  */

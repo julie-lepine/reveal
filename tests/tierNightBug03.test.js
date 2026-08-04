@@ -19,7 +19,7 @@ const gameSrc = () => readFileSync(join(root, "js/games/tierNightLive.js"), "utf
 const sessionSrc = () =>
   readFileSync(join(root, "js/core/tierNightLiveSession.js"), "utf8");
 
-describe("BUG-TIERNIGHT-03 — decideTierNightLiveRevealAction", () => {
+describe("BUG-TIERNIGHT-03 - decideTierNightLiveRevealAction", () => {
   it("1. auto + all-in + host → commit", () => {
     const d = decideTierNightLiveRevealAction({
       phase: "voting",
@@ -127,7 +127,7 @@ describe("BUG-TIERNIGHT-03 — decideTierNightLiveRevealAction", () => {
   });
 });
 
-describe("BUG-TIERNIGHT-03 — concurrence / verrou", () => {
+describe("BUG-TIERNIGHT-03 - concurrence / verrou", () => {
   it("6. plusieurs begin → une seule promesse active", async () => {
     const lock = createTierNightLiveRevealLock();
     lock.ensureSessionKey({ runId: "r1", roundIdx: 0 });
@@ -192,7 +192,7 @@ describe("BUG-TIERNIGHT-03 — concurrence / verrou", () => {
   });
 });
 
-describe("BUG-TIERNIGHT-03 — recovery réseau", () => {
+describe("BUG-TIERNIGHT-03 - recovery réseau", () => {
   it("12. erreur certaine n'est pas uncertainty", () => {
     assert.equal(
       isTierNightLiveRevealNetworkUncertainty(new Error("NOT_ALLOWED")),
@@ -237,7 +237,7 @@ describe("BUG-TIERNIGHT-03 — recovery réseau", () => {
   });
 });
 
-describe("BUG-TIERNIGHT-03 — chrome UI", () => {
+describe("BUG-TIERNIGHT-03 - chrome UI", () => {
   it("17. all-in → hint Tout le monde a voté", () => {
     const c = tierNightLiveRevealChromeState({
       allIn: true,
@@ -266,7 +266,7 @@ describe("BUG-TIERNIGHT-03 — chrome UI", () => {
   });
 });
 
-describe("BUG-TIERNIGHT-03 — wiring (04/05 préservés, SpeedVote inchangé)", () => {
+describe("BUG-TIERNIGHT-03 - wiring (04/05 préservés, SpeedVote inchangé)", () => {
   it("expose helper sécurisé + plus de void transitionToReveal silencieux", () => {
     const src = gameSrc();
     assert.match(src, /commitTierNightLiveRevealSafely/);
@@ -318,7 +318,7 @@ describe("BUG-TIERNIGHT-03 — wiring (04/05 préservés, SpeedVote inchangé)",
         { runId: "a", votes: { x: 1 } },
         { runId: "b", votes: {} }
       ),
-      // SpeedVote ne wipe pas sur runId seul — comportement historique préservé
+      // SpeedVote ne wipe pas sur runId seul - comportement historique préservé
       false
     );
   });

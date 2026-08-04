@@ -1,5 +1,5 @@
 /**
- * Membership Vague E3 — soft-hold UI post-leave (pas de checking générique).
+ * Membership Vague E3 - soft-hold UI post-leave (pas de checking générique).
  */
 import { describe, it, beforeEach } from "node:test";
 import assert from "node:assert/strict";
@@ -47,14 +47,14 @@ const baseChrome = {
   resolutionInProgress: false,
 };
 
-describe("lobbyMembershipVagueE3 — soft-hold post-leave", () => {
+describe("lobbyMembershipVagueE3 - soft-hold post-leave", () => {
   beforeEach(() => {
     __resetMembershipAuthForTests();
     __resetPostLeaveHomeTransitionForTests();
     resetMembershipSnapshotTestState(UID_A);
   });
 
-  it("1 — leave réussi + query lente : pas de Resume / checking / found ; Créer off", () => {
+  it("1 - leave réussi + query lente : pas de Resume / checking / found ; Créer off", () => {
     setMembershipSnapshot(
       { status: "found", membership: MEMBERSHIP_B },
       "join_confirmed",
@@ -79,7 +79,7 @@ describe("lobbyMembershipVagueE3 — soft-hold post-leave", () => {
     assert.equal(getMembershipSnapshot(), null);
   });
 
-  it("2 — résultat none : transition retirée, Créer selon règles", () => {
+  it("2 - résultat none : transition retirée, Créer selon règles", () => {
     beginPostLeaveHomeTransition();
     const gen = getPostLeaveHomeTransitionGeneration();
     setMembershipSnapshot({ status: "none" }, "home-query", UID_A);
@@ -95,7 +95,7 @@ describe("lobbyMembershipVagueE3 — soft-hold post-leave", () => {
     assert.equal(chrome.createEnabled, true);
   });
 
-  it("3 — unknown : pending avant fin soft-hold, pas de checking", () => {
+  it("3 - unknown : pending avant fin soft-hold, pas de checking", () => {
     beginPostLeaveHomeTransition();
     const gen = getPostLeaveHomeTransitionGeneration();
     commitMembershipRemoved({ userId: UID_A, lobbyId: "x" }); // no-op if no found
@@ -117,7 +117,7 @@ describe("lobbyMembershipVagueE3 — soft-hold post-leave", () => {
     assert.notEqual(chrome.state, "checking");
   });
 
-  it("4 — marqueur survit conceptuellement au remount (process-level)", () => {
+  it("4 - marqueur survit conceptuellement au remount (process-level)", () => {
     beginPostLeaveHomeTransition();
     // Simule remount : nouvelle dérivation lit le même module process.
     const chrome = deriveHomeMembershipChrome({
@@ -131,14 +131,14 @@ describe("lobbyMembershipVagueE3 — soft-hold post-leave", () => {
     assert.notEqual(chrome.state, "checking");
   });
 
-  it("5 — none après remount nettoie le marqueur", () => {
+  it("5 - none après remount nettoie le marqueur", () => {
     const gen = beginPostLeaveHomeTransition();
     setMembershipSnapshot({ status: "none" }, "home-query", UID_A);
     endPostLeaveHomeTransition(gen);
     assert.equal(isPostLeaveHomeTransitionActive(), false);
   });
 
-  it("6 — leave serveur échoué : pas de marqueur ; found conservé", async () => {
+  it("6 - leave serveur échoué : pas de marqueur ; found conservé", async () => {
     setMembershipSnapshot(
       { status: "found", membership: MEMBERSHIP_B },
       "join_confirmed",
@@ -178,7 +178,7 @@ describe("lobbyMembershipVagueE3 — soft-hold post-leave", () => {
     assert.equal(chrome.showResume, true);
   });
 
-  it("7 — force-clear local : pas de post_leave ; found E2 conservé", () => {
+  it("7 - force-clear local : pas de post_leave ; found E2 conservé", () => {
     setMembershipSnapshot(
       { status: "found", membership: MEMBERSHIP_B },
       "join_confirmed",
@@ -196,7 +196,7 @@ describe("lobbyMembershipVagueE3 — soft-hold post-leave", () => {
     assert.equal(chrome.state, "server_membership_recoverable");
   });
 
-  it("8 — résolution stale ne retire pas une transition plus récente", () => {
+  it("8 - résolution stale ne retire pas une transition plus récente", () => {
     const gen1 = beginPostLeaveHomeTransition();
     const gen2 = beginPostLeaveHomeTransition();
     assert.notEqual(gen1, gen2);
@@ -206,7 +206,7 @@ describe("lobbyMembershipVagueE3 — soft-hold post-leave", () => {
     assert.equal(isPostLeaveHomeTransitionActive(), false);
   });
 
-  it("9 — unknown → retry → none : pending puis nettoyage", () => {
+  it("9 - unknown → retry → none : pending puis nettoyage", () => {
     beginPostLeaveHomeTransition();
     const gen = getPostLeaveHomeTransitionGeneration();
     let leaveConfirmationPending = true;
@@ -235,7 +235,7 @@ describe("lobbyMembershipVagueE3 — soft-hold post-leave", () => {
     );
   });
 
-  it("10 — hors leave : null + resolutionInProgress reste checking", () => {
+  it("10 - hors leave : null + resolutionInProgress reste checking", () => {
     assert.equal(isPostLeaveHomeTransitionActive(), false);
     const chrome = deriveHomeMembershipChrome({
       ...baseChrome,
@@ -275,7 +275,7 @@ describe("lobbyMembershipVagueE3 — soft-hold post-leave", () => {
     assert.match(dissolve, /invalidateCurrentLobbySessionCache/);
   });
 
-  it("11 — postLeave + cached_active encore présent : soft-hold, pas de Resume / Retour", () => {
+  it("11 - postLeave + cached_active encore présent : soft-hold, pas de Resume / Retour", () => {
     beginPostLeaveHomeTransition();
     commitMembershipRemoved({ userId: UID_A, lobbyId: "lobby-b-id" });
 
@@ -299,7 +299,7 @@ describe("lobbyMembershipVagueE3 — soft-hold post-leave", () => {
     assert.notEqual(chrome.state, "checking");
   });
 
-  it("12 — hors E3 : cached_active inchangé quand postLeave inactif", () => {
+  it("12 - hors E3 : cached_active inchangé quand postLeave inactif", () => {
     const chrome = deriveHomeMembershipChrome({
       ...baseChrome,
       hasActiveLobby: true,
@@ -312,7 +312,7 @@ describe("lobbyMembershipVagueE3 — soft-hold post-leave", () => {
     assert.equal(chrome.showLeave, true);
   });
 
-  it("13 — atomicité unknown→pending : aucun checking entre end et pending", () => {
+  it("13 - atomicité unknown→pending : aucun checking entre end et pending", () => {
     // Contrat Home : pending = true AVANT end(gen).
     // Frame interdite : snapshot null + !transition + !pending → checking.
     beginPostLeaveHomeTransition();
@@ -330,7 +330,7 @@ describe("lobbyMembershipVagueE3 — soft-hold post-leave", () => {
     endPostLeaveHomeTransition(gen);
     assert.equal(forbiddenIfEndFirst(), "checking");
 
-    // Contrat réel : pending avant end — derive ne voit jamais checking.
+    // Contrat réel : pending avant end - derive ne voit jamais checking.
     __resetPostLeaveHomeTransitionForTests();
     beginPostLeaveHomeTransition();
     const gen2 = getPostLeaveHomeTransitionGeneration();
@@ -367,7 +367,7 @@ describe("lobbyMembershipVagueE3 — soft-hold post-leave", () => {
     );
   });
 
-  it("14 — leave invité cache actif : exactement un begin puis un end correspondant", async () => {
+  it("14 - leave invité cache actif : exactement un begin puis un end correspondant", async () => {
     setMembershipSnapshot(
       { status: "found", membership: MEMBERSHIP_B },
       "join_confirmed",
@@ -425,7 +425,7 @@ describe("lobbyMembershipVagueE3 — soft-hold post-leave", () => {
     assert.equal(isPostLeaveHomeTransitionActive(), false);
   });
 
-  it("15 — pipelines A/B : un seul begin par mutation (pas de begin imbriqué)", async () => {
+  it("15 - pipelines A/B : un seul begin par mutation (pas de begin imbriqué)", async () => {
     const { readFileSync } = await import("node:fs");
     const { fileURLToPath } = await import("node:url");
     const { dirname, join } = await import("node:path");

@@ -135,7 +135,7 @@ function partySectionHtml() {
     <div class="card settings-section settings-party" id="settings-party-section">
       <h2 class="settings-section__title">Partie en cours</h2>
       <p class="hint settings-section__hint">
-        Lobby <strong>${escapeHtml(code || "—")}</strong>
+        Lobby <strong>${escapeHtml(code || "-")}</strong>
         ${role === "host" ? " · tu es l'hôte" : " · tu es membre"}
       </p>
       ${

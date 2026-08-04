@@ -124,7 +124,7 @@ export function navigate(screenId, { reset = false, params = null, navStack: for
       requestAnimationFrame(() => schedulePageScrollReset(appEl));
       return true;
     }
-    // Destination navigate from inside another mount — settle normally.
+    // Destination navigate from inside another mount - settle normally.
     currentCleanup = cleanup || null;
     notifyScreenChange(screenId);
     nestedNavigateCompleted = true;

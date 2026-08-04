@@ -1,5 +1,5 @@
 /**
- * BUG-TRUTHMETER-01A — soumission fiable, compensation, confirmation distante.
+ * BUG-TRUTHMETER-01A - soumission fiable, compensation, confirmation distante.
  */
 import { describe, it, beforeEach, afterEach, mock } from "node:test";
 import assert from "node:assert/strict";
@@ -20,7 +20,7 @@ function readSrc(rel) {
   return readFileSync(join(ROOT, rel), "utf8");
 }
 
-describe("truthMeterVoteCommit — apply / compensation", () => {
+describe("truthMeterVoteCommit - apply / compensation", () => {
   it("applique le vote local sans écraser les votes distants", () => {
     const out = computeTruthMeterVoteApply(
       { votes: { Bob: 40 } },
@@ -69,7 +69,7 @@ describe("truthMeterVoteCommit — apply / compensation", () => {
   });
 });
 
-describe("truthMeterVoteCommit — incertitude réseau", () => {
+describe("truthMeterVoteCommit - incertitude réseau", () => {
   it("détecte timeout / fetch / AbortError", () => {
     assert.equal(
       isTruthMeterVoteNetworkUncertainty({ name: "AbortError", message: "aborted" }),
@@ -90,7 +90,7 @@ describe("truthMeterVoteCommit — incertitude réseau", () => {
   });
 });
 
-describe("commitTruthMeterVote — mocks comportementaux", () => {
+describe("commitTruthMeterVote - mocks comportementaux", () => {
   const LOBBY_ID = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb";
   const UID = "cccccccc-cccc-cccc-cccc-cccccccccccc";
 
@@ -364,7 +364,7 @@ describe("commitTruthMeterVote — mocks comportementaux", () => {
   });
 });
 
-describe("contrats source — UI + contribute + ensureLocal", () => {
+describe("contrats source - UI + contribute + ensureLocal", () => {
   const sessionSrc = readSrc("js/core/truthMeterSession.js");
   const gameSrc = readSrc("js/games/truthMeter.js");
   const sqlSrc = readSrc("supabase/game-sessions-i08-arch03.sql");
@@ -451,7 +451,7 @@ function truthMeterVoteButtonLabel({ confirmed, sending }) {
   return "Valider mon vote";
 }
 
-describe("libellés UI — pas de succès optimiste seul", () => {
+describe("libellés UI - pas de succès optimiste seul", () => {
   it("in-flight prioritaire sur présence locale", () => {
     assert.equal(
       truthMeterVoteButtonLabel({ confirmed: 50, sending: true }),

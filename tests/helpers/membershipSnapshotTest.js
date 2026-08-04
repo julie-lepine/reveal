@@ -1,4 +1,4 @@
-/** Helpers partagés — snapshot membership scoped (E1). */
+/** Helpers partagés - snapshot membership scoped (E1). */
 import { saveStatePatch } from "../../js/core/state.js";
 import {
   __resetMembershipAuthForTests,

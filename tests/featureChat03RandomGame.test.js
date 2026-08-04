@@ -1,5 +1,5 @@
 /**
- * FEATURE-CHAT-03 — TTL hybride, horloges, stale IDs, contrats.
+ * FEATURE-CHAT-03 - TTL hybride, horloges, stale IDs, contrats.
  */
 import { describe, it, beforeEach } from "node:test";
 import assert from "node:assert/strict";
@@ -78,7 +78,7 @@ beforeEach(() => {
   resetChatRouletteObservationsForTests();
 });
 
-describe("FEATURE-CHAT-03 — éligibilité", () => {
+describe("FEATURE-CHAT-03 - éligibilité", () => {
   it("catalogue tile min players (miroir launchers)", () => {
     assert.equal(catalogTileMinPlayers("traitre-prep"), 3);
     assert.equal(catalogTileMinPlayers("truthmeter-prep"), 2);
@@ -129,7 +129,7 @@ describe("FEATURE-CHAT-03 — éligibilité", () => {
   });
 });
 
-describe("FEATURE-CHAT-03 — TTL hybride / horloges", () => {
+describe("FEATURE-CHAT-03 - TTL hybride / horloges", () => {
   it("constantes : MAX_LOCAL = TTL indicatif hôte", () => {
     assert.equal(CHAT_ROULETTE_MAX_LOCAL_LIFETIME_MS, CHAT_ROULETTE_TTL_MS);
     assert.ok(CHAT_ROULETTE_SERVER_AGE_SKEW_MS > 0);
@@ -439,7 +439,7 @@ describe("FEATURE-CHAT-03 — TTL hybride / horloges", () => {
   });
 });
 
-describe("FEATURE-CHAT-03 — IDs stale / payloads", () => {
+describe("FEATURE-CHAT-03 - IDs stale / payloads", () => {
   it("annulation A ≠ B", () => {
     assert.equal(
       isChatRouletteActionCurrent({ rouletteId: "A" }, { rouletteId: "B" }),
@@ -474,7 +474,7 @@ describe("FEATURE-CHAT-03 — IDs stale / payloads", () => {
   });
 });
 
-describe("FEATURE-CHAT-03 — sync / reel / hub", () => {
+describe("FEATURE-CHAT-03 - sync / reel / hub", () => {
   it("normalise spinning", () => {
     const ev = normalizeChatRouletteEvent(
       baseEvent({
@@ -536,7 +536,7 @@ describe("FEATURE-CHAT-03 — sync / reel / hub", () => {
   });
 });
 
-describe("FEATURE-CHAT-03 — soft voice / tirage libre + anti-répétition", () => {
+describe("FEATURE-CHAT-03 - soft voice / tirage libre + anti-répétition", () => {
   it("seuils internes wink/bridge", () => {
     assert.equal(resolveChatRouletteResultAct(1), "plain");
     assert.equal(resolveChatRouletteResultAct(2), "plain");
@@ -688,7 +688,7 @@ describe("FEATURE-CHAT-03 — soft voice / tirage libre + anti-répétition", ()
   });
 });
 
-describe("FEATURE-CHAT-03 — contrats source TTL", () => {
+describe("FEATURE-CHAT-03 - contrats source TTL", () => {
   it("restartGame utilise isChatRouletteBlockingLaunch + observe", () => {
     const src = readFileSync(join(__dirname, "../js/core/restartGame.js"), "utf8");
     assert.match(src, /isChatRouletteBlockingLaunch/);
@@ -720,7 +720,7 @@ describe("FEATURE-CHAT-03 — contrats source TTL", () => {
   });
 });
 
-describe("FEATURE-CHAT-03 — fermeture chat à l'entrée prep (tous clients)", () => {
+describe("FEATURE-CHAT-03 - fermeture chat à l'entrée prep (tous clients)", () => {
   it("fermeture sheet n'est pas seulement dans le handler hôte Commencer", () => {
     const orch = readFileSync(
       join(__dirname, "../js/core/chatRandomGame.js"),

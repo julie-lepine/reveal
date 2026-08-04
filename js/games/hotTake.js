@@ -144,7 +144,7 @@ export function mountHotTake(app) {
   /** Vote en cours d’envoi - évite que la synchro efface l’UI avant la réponse serveur. */
   let voteCommitInFlight = null;
   const mount = createMountGuard();
-  /** ARCH-22 — soft « Envoi… » ; ne remplace pas voteCommitInFlight. */
+  /** ARCH-22 - soft « Envoi… » ; ne remplace pas voteCommitInFlight. */
   const syncPending = createSyncPending({
     softDelayMs: 500,
     onChange: () => {
@@ -234,7 +234,7 @@ export function mountHotTake(app) {
   /**
    * Auteur à exclure du verdict (majorité + points), comme TruthMeter exclut l'auteur.
    * Uniquement les takes custom (vraie paternité) : les takes du pool reçoivent un
-   * `author` pseudo-aléatoire (round-robin) qui n'est pas une vraie paternité — l'exclure
+   * `author` pseudo-aléatoire (round-robin) qui n'est pas une vraie paternité - l'exclure
    * supprimerait à tort le vote d'un joueur à presque chaque manche.
    */
   function currentTakeVerdictAuthor() {
@@ -556,7 +556,7 @@ export function mountHotTake(app) {
         takeScoredAfter: getHotTakeSession().takeScored,
       });
     } catch (err) {
-      arch03RevealLog("goToReveal aborted — stay on voting", {
+      arch03RevealLog("goToReveal aborted - stay on voting", {
         message: err?.message || String(err),
         phaseNow: getHotTakeSession().phase,
       });

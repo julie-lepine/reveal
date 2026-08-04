@@ -55,7 +55,7 @@ function seedWaitingLobby({ hostReady = false, guestReady = false } = {}) {
   });
 }
 
-describe("I-06 / P-01 — ready lobby non destructif au mount", () => {
+describe("I-06 / P-01 - ready lobby non destructif au mount", () => {
   let snapshot;
 
   beforeEach(() => {

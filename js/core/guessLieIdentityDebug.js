@@ -1,5 +1,5 @@
 /**
- * Diagnostic restart Guess Lie — identité fantôme (submissions / merge / rounds).
+ * Diagnostic restart Guess Lie - identité fantôme (submissions / merge / rounds).
  *
  * Activation (au choix) :
  *   localStorage.setItem('reveal-guesslie-identity-debug', '1')
@@ -73,13 +73,13 @@ function getRemoteGuessLieSubmissionsByName() {
 }
 
 /**
- * Diagnostic élargi — toutes les couches d'identité Guess Lie.
+ * Diagnostic élargi - toutes les couches d'identité Guess Lie.
  * @param {object} params
- * @param {object} [params.round] — manche courante
- * @param {string} params.localNameClosure — getLocalDisplayName() figé au mount
+ * @param {object} [params.round] - manche courante
+ * @param {string} params.localNameClosure - getLocalDisplayName() figé au mount
  * @param {boolean} params.isSubject
  * @param {number} params.roundIdx
- * @param {object} params.submissions — guessLie.submissions local
+ * @param {object} params.submissions - guessLie.submissions local
  * @param {string|null} params.sessionId
  * @param {string|null} params.phase
  */
@@ -139,7 +139,7 @@ export function maybeLogGuessLieGhostDiagnostic({
   if (sig === lastLogSig) return;
   lastLogSig = sig;
 
-  console.warn("[GUESSLIE-ID] ghost identity — multi-layer diagnostic", {
+  console.warn("[GUESSLIE-ID] ghost identity - multi-layer diagnostic", {
     triggers: analysis.triggers,
     firstGhostLayerHint: analysis.firstGhostLayer,
     caseType,
@@ -190,7 +190,7 @@ export function maybeLogGuessLieGhostDiagnostic({
   });
 }
 
-/** @deprecated Alias — appelle le diagnostic élargi. */
+/** @deprecated Alias - appelle le diagnostic élargi. */
 export function maybeLogGuessLieOwnRoundVoteBug(params) {
   maybeLogGuessLieGhostDiagnostic(params);
 }

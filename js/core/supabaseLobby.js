@@ -94,10 +94,10 @@ export {
 } from "./joinSessionHydrate.js";
 
 /**
- * Vague A — résolution membership serveur (ternaire).
+ * Vague A - résolution membership serveur (ternaire).
  * Home consomme Fetch/Snapshot ; createLobby utilise la query canonique (Vague C).
  * peekServerLobbyForUser / findLobbyIdByUserId restent pour d’anciens flows
- * (filtre 24 h + remember) — plus comme garde d’INSERT.
+ * (filtre 24 h + remember) - plus comme garde d’INSERT.
  */
 export {
   queryActiveLobbyMembership,
@@ -128,7 +128,7 @@ let lastClaimEligible = null;
 let claimHubUiToken = 0;
 /**
  * Dernier acting host appliqué (pas un re-resolve live).
- * Indispensable : lastSeenAt hôte est figé, seul `now` avance — comparer deux
+ * Indispensable : lastSeenAt hôte est figé, seul `now` avance - comparer deux
  * resolve(..., now) au même tick avale la transition 100s→120s.
  */
 let lastAppliedActingHostUserId = null;
@@ -145,7 +145,7 @@ let realtimeReconnectTimer = null;
 let realtimeReconnectAttempts = 0;
 const REALTIME_RECONNECT_MAX_MS = 10000;
 
-/** idle | subscribing | subscribed | error — canal lobby realtime partagé */
+/** idle | subscribing | subscribed | error - canal lobby realtime partagé */
 let lobbyRealtimeStatus = "idle";
 let lobbyChannelLobbyId = null;
 /** Génération du canal lobby (invalide les callbacks / waiters obsolètes). */
@@ -197,7 +197,7 @@ export function onLobbyRealtimeStatus(fn) {
 /**
  * Attend SUBSCRIBED du canal lobby pour un lobbyId donné (sérialisation défensive poll).
  *
- * Timeout : ok=false, reason=timeout — le caller NE DOIT PAS ouvrir le poll
+ * Timeout : ok=false, reason=timeout - le caller NE DOIT PAS ouvrir le poll
  * (évite de réintroduire la course socket). Un futur SUBSCRIBED matching
  * pourra réveiller via onLobbyRealtimeStatus.
  *
@@ -302,7 +302,7 @@ function lobbyBundleSignature(bundle, now = Date.now()) {
     ),
     m: (bundle.messages || []).length,
     lm: bundle.messages?.[bundle.messages.length - 1]?.at || 0,
-    // Bits dérivés (pas last_seen_at brut) — basculent aux seuils 120 s / 300 s.
+    // Bits dérivés (pas last_seen_at brut) - basculent aux seuils 120 s / 300 s.
     hp: isHostPresentInBundle(bundle, now, HOST_PRESENCE_STALE_MS) ? 1 : 0,
     hc: isHostPresentInBundle(bundle, now, HOST_TRANSFER_STALE_MS) ? 1 : 0,
   });
@@ -509,7 +509,7 @@ async function executeSubscribedSessionCatchUp({ lobbyId, channelGeneration }) {
 }
 
 /**
- * ARCH-07 — catch-up session après SUBSCRIBED (refresh + gate routing, retry fetch borné).
+ * ARCH-07 - catch-up session après SUBSCRIBED (refresh + gate routing, retry fetch borné).
  * @param {{ lobbyId: string, channelGeneration: number }} params
  */
 export async function runSubscribedSessionCatchUp({ lobbyId, channelGeneration }) {
@@ -529,17 +529,17 @@ export async function runSubscribedSessionCatchUp({ lobbyId, channelGeneration }
   return work;
 }
 
-/** Tests ARCH-07 — logger catch-up (robustesse erreurs). */
+/** Tests ARCH-07 - logger catch-up (robustesse erreurs). */
 export { logMpRtCatchUpFailure as __testLogMpRtCatchUpFailure };
 export { normalizeCatchUpErrorForLog as __testNormalizeCatchUpErrorForLog };
 
-/** Tests ARCH-07 — reset in-flight catch-up SUBSCRIBED. */
+/** Tests ARCH-07 - reset in-flight catch-up SUBSCRIBED. */
 export function __testResetSubscribedCatchUpInFlightForTests() {
   subscribedCatchUpInFlight.clear();
 }
 
 /**
- * Tests ARCH-07 — patch état lobby realtime minimal pour gardes post-async.
+ * Tests ARCH-07 - patch état lobby realtime minimal pour gardes post-async.
  * @param {Partial<{ presenceLobbyId: string|null, lobbyChannelGen: number, lobbyChannelLobbyId: string|null, lobbyRealtimeStatus: string, joinSessionHydrating: boolean, realtimeChannel: object|null }>} patch
  */
 export function __testPatchSubscribedCatchUpLobbyState(patch) {
@@ -1353,7 +1353,7 @@ function applyLobbyToState(bundle, { persistGuestMembership = false } = {}) {
     !bundle.participants.some((p) => p.userId === localUid)
   ) {
     // Kick prouvé : roster non vide sans le joueur local.
-    // participants=[] ne suffit pas (bundle vide / partiel) — dissolve/gone gèrent autrement.
+    // participants=[] ne suffit pas (bundle vide / partiel) - dissolve/gone gèrent autrement.
     setTimeout(() => {
       if (!getState().inLobby) return;
       void import("./lobbyClosureSession.js").then(
@@ -1374,7 +1374,7 @@ function applyLobbyToState(bundle, { persistGuestMembership = false } = {}) {
   const prevLobby = getState().lobby;
   const now = Date.now();
   // Capture BEFORE toute mutation state / saveStatePatch.
-  // BEFORE = dernier acting mémorisé — JAMAIS re-resolve(prev, now) qui avale
+  // BEFORE = dernier acting mémorisé - JAMAIS re-resolve(prev, now) qui avale
   // la transition dès que hostAge franchit 120s avec le même lastSeenAt figé.
   // AFTER = resolve pur depuis le bundle entrant (aucune mutation state).
   const transition = detectActingHostTransition(
@@ -1504,7 +1504,7 @@ function applyLobbyToState(bundle, { persistGuestMembership = false } = {}) {
   }
   lastClaimEligible = claimEligibleAfter;
 
-  // ARCH-03 : nudge acting AVANT notifyLobby — sinon le seed wasActing dans
+  // ARCH-03 : nudge acting AVANT notifyLobby - sinon le seed wasActing dans
   // onLobbyBundleUpdated voit déjà le nouvel acting host et avale false→true.
   if (actingHostChanged) {
     arch03AhLog("will call nudgeSessionListenersForActingHost", {
@@ -1682,7 +1682,7 @@ export async function createLobbySupabase() {
   const displayName = getLocalDisplayName();
   const emoji = getLocalEmoji();
 
-  // E4 — un seul round-trip atomique (plus INSERT lobbies + create_lobby_member).
+  // E4 - un seul round-trip atomique (plus INSERT lobbies + create_lobby_member).
   const { data, error } = await supabase.rpc("create_lobby_atomically", {
     p_display_name: displayName,
     p_emoji: emoji,
@@ -1739,7 +1739,7 @@ export async function createLobbySupabase() {
 }
 
 /**
- * E4 — ALREADY_EXISTS / conflit UNIQUE : re-query membership puis hydrate E2.
+ * E4 - ALREADY_EXISTS / conflit UNIQUE : re-query membership puis hydrate E2.
  * N’écrit pas un faux snapshot found depuis la RPC seule.
  * @returns {Promise<{ ok: true, code: string }|{ ok: false, error: string, unknown?: boolean }>}
  */
@@ -1977,7 +1977,7 @@ export async function refreshLobbyFromSupabase({ withMessages = false } = {}) {
 }
 
 /**
- * Vague D — host_id serveur pour un lobbyId (sans lire state.lobby).
+ * Vague D - host_id serveur pour un lobbyId (sans lire state.lobby).
  * @returns {Promise<string|null>} host_id ou null si lobby absent / erreur non levée
  */
 export async function fetchLobbyHostIdById(lobbyId) {
@@ -1992,7 +1992,7 @@ export async function fetchLobbyHostIdById(lobbyId) {
 }
 
 /**
- * Vague D / AUTH-LEAVE-SILENT-OK-01 — retire la membership courante pour un lobbyId.
+ * Vague D / AUTH-LEAVE-SILENT-OK-01 - retire la membership courante pour un lobbyId.
  * Ne lit pas state.lobby. Ne supprime pas le lobby.
  * Preuve : lignes renvoyées par `.select()` après DELETE, sinon requery ciblée
  * (lobby_id + user_id). Zéro ligne sans preuve d'absence → !ok (pas de faux succès RLS).
@@ -2024,7 +2024,7 @@ export async function deleteOwnLobbyMembershipById(lobbyId) {
 }
 
 /**
- * E5 — dissolution hôte via dissolve_lobby_atomically (un round-trip).
+ * E5 - dissolution hôte via dissolve_lobby_atomically (un round-trip).
  * DISSOLVED | ALREADY_GONE → ok. NOT_ALLOWED / UNAUTHENTICATED / malformé → !ok.
  * Erreur transport → invalidate + query membership (pas SELECT lobbies RLS).
  * Pas de deleteGameSession / clearTraitre SQL / DELETE direct / fetch host_id.
@@ -2081,7 +2081,7 @@ async function reconcileDissolveAfterTransportError(lobbyId, transportFailure) {
 export { LOBBY_DISSOLVE_STATUS, mapDissolveLobbyRpcData };
 
 /**
- * BUG-LOBBY-XX-E — lit le tombstone de fermeture (RPC get_lobby_closure).
+ * BUG-LOBBY-XX-E - lit le tombstone de fermeture (RPC get_lobby_closure).
  * @param {string} lobbyId
  */
 export async function fetchLobbyClosure(lobbyId) {
@@ -2121,7 +2121,7 @@ export async function fetchLobbyClosure(lobbyId) {
   }
 }
 
-/** Hôte : supprime le lobby (membres et messages en cascade) — cache local. */
+/** Hôte : supprime le lobby (membres et messages en cascade) - cache local. */
 export async function closeLobbySupabase() {
   const lobbyId = getState().lobby?.id;
   if (!lobbyId) {
@@ -2131,7 +2131,7 @@ export async function closeLobbySupabase() {
 }
 
 /**
- * Quitte le lobby côté serveur (retire le membre local) — cache local.
+ * Quitte le lobby côté serveur (retire le membre local) - cache local.
  * AUTH-LEAVE-SILENT-OK-01 : jamais `{ ok: true }` si lobbyId/userId manquent.
  */
 export async function leaveLobbySupabase() {

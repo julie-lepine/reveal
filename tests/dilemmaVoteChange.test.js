@@ -1,5 +1,5 @@
 /**
- * SYN-VOTE-ROLLBACK-01B — Dilemma changement de vote A→B + catch-up Realtime.
+ * SYN-VOTE-ROLLBACK-01B - Dilemma changement de vote A→B + catch-up Realtime.
  */
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
@@ -22,7 +22,7 @@ function read(rel) {
   return readFileSync(join(ROOT, rel), "utf8");
 }
 
-describe("mergePlayerVoteMapsForCatchUp — A→B", () => {
+describe("mergePlayerVoteMapsForCatchUp - A→B", () => {
   it("premier vote : remote Alice=A, local vide → A", () => {
     const out = mergePlayerVoteMapsForCatchUp({}, { Alice: "A" });
     assert.deepEqual(out, { Alice: "A" });
@@ -79,7 +79,7 @@ describe("mergePlayerVoteMapsForCatchUp — A→B", () => {
   });
 });
 
-describe("mergeDilemmaPatchState — wire votes replace", () => {
+describe("mergeDilemmaPatchState - wire votes replace", () => {
   const mergeReadyUid = (a, b) => ({ ...(a?.ready || {}), ...(b?.ready || {}) });
   const mergeVotes = (cur, inc) => ({
     ...(cur?.votes || {}),
@@ -98,7 +98,7 @@ describe("mergeDilemmaPatchState — wire votes replace", () => {
   });
 });
 
-describe("commitDilemmaVote — stale catch après B", () => {
+describe("commitDilemmaVote - stale catch après B", () => {
   it("tentative A tardive ne restaure pas après B", () => {
     let map = {};
     const applyA = computeOptimisticMapEntryApply({
@@ -138,7 +138,7 @@ describe("commitDilemmaVote — stale catch après B", () => {
   });
 });
 
-describe("SYN-VOTE-ROLLBACK-01B — contrats source Dilemma", () => {
+describe("SYN-VOTE-ROLLBACK-01B - contrats source Dilemma", () => {
   it("mergeDilemmaGameLocal utilise mergePlayerVoteMapsForCatchUp", () => {
     const src = read("js/core/gameSync.js");
     const start = src.indexOf("function mergeDilemmaGameLocal");

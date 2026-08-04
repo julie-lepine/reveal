@@ -21,8 +21,8 @@ export function renderTriviaResults({
   const eveningTotal = winners[0] ? triviaEveningPoints(winners[0]) : 0;
   const summary = winnerNames
     ? multi
-      ? `<p class="hint trivia-results__summary">👑 <strong>${escapeHtml(winnerNames)}</strong> remportent la partie — <strong>+${eveningTotal} pts</strong> soirée chacun (quiz + bonus podium).</p>`
-      : `<p class="hint trivia-results__summary">👑 <strong>${escapeHtml(winnerNames)}</strong> remporte la partie — <strong>+${eveningTotal} pts</strong> soirée (quiz + bonus podium).</p>`
+      ? `<p class="hint trivia-results__summary">👑 <strong>${escapeHtml(winnerNames)}</strong> remportent la partie - <strong>+${eveningTotal} pts</strong> soirée chacun (quiz + bonus podium).</p>`
+      : `<p class="hint trivia-results__summary">👑 <strong>${escapeHtml(winnerNames)}</strong> remporte la partie - <strong>+${eveningTotal} pts</strong> soirée (quiz + bonus podium).</p>`
     : "";
 
   return `

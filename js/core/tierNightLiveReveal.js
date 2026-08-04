@@ -1,5 +1,5 @@
 /**
- * BUG-TIERNIGHT-03 — décisions / verrou pour auto-reveal Rank live (pures, testables).
+ * BUG-TIERNIGHT-03 - décisions / verrou pour auto-reveal Rank live (pures, testables).
  * Ne gère pas le passage manuel à l'item suivant.
  */
 
@@ -88,7 +88,7 @@ export function decideTierNightLiveRevealAction({
     return { action: "noop", reason: "incomplete" };
   }
   // Après échec + retry one-shot consommé : plus d'auto sur les events suivants.
-  // `auto-retry` (en cours) n'est pas bloqué — le flag est posé juste avant ce commit.
+  // `auto-retry` (en cours) n'est pas bloqué - le flag est posé juste avant ce commit.
   if (source === "auto" && retryUsed) {
     return { action: "noop", reason: "auto-exhausted" };
   }

@@ -1,5 +1,5 @@
 /**
- * Mapping erreurs métier sondages (sans dépendance Supabase — testable Node).
+ * Mapping erreurs métier sondages (sans dépendance Supabase - testable Node).
  */
 
 /** Extrait le code métier depuis error.message / details PostgREST. */

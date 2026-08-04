@@ -1,5 +1,5 @@
 /**
- * BUG-TRUTHMETER-02 — identité auteur TruthMeter (UID canonique).
+ * BUG-TRUTHMETER-02 - identité auteur TruthMeter (UID canonique).
  *
  * Limite legacy : session pseudos seuls sans preuve → unresolved (jamais d'attribution arbitraire).
  *
@@ -20,7 +20,7 @@
 const hasOwn = (obj, key) =>
   obj != null && Object.prototype.hasOwnProperty.call(obj, key);
 
-/** UUID Supabase — fast-path ordre canonique (forme 8-4-4-4-12 hex). */
+/** UUID Supabase - fast-path ordre canonique (forme 8-4-4-4-12 hex). */
 const UID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -401,7 +401,7 @@ export function tm02Log(event, detail = {}) {
 }
 
 /**
- * Instrumentation re-QA — retirer après validation terrain (chercher TM-02-QA).
+ * Instrumentation re-QA - retirer après validation terrain (chercher TM-02-QA).
  */
 export function tm02QaLog(event, detail = {}) {
   if (typeof console === "undefined" || !console.info) return;

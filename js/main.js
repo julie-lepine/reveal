@@ -114,7 +114,7 @@ registerScreen("tiernight-live", mountTierNightLive);
 
 initBottomNav();
 initFeedbackFab();
-// initLobbyPollSync après authReady (voir boot) — évite subscribe Realtime sans JWT
+// initLobbyPollSync après authReady (voir boot) - évite subscribe Realtime sans JWT
 initExitGameDelegation(app);
 initAds();
 initMultiplayerSyncVisibility();
@@ -157,7 +157,7 @@ async function boot() {
     presentCompatibilityGateIfNeeded(compat, {
       onCompatible: () => continueBootAfterCompatibilityOk(),
     });
-    // Pas de reconcile / resume / navigate lobby — hard gate autoritaire.
+    // Pas de reconcile / resume / navigate lobby - hard gate autoritaire.
     return;
   }
   // unknown au boot : ne pas afficher « mise à jour » ; continuer (create/join re-check).

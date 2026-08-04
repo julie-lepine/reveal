@@ -120,7 +120,7 @@ describe("mergeDilemmaCustomDilemmas", () => {
     assert.equal(out[0].id, "d-new");
   });
 
-  it("FEATURE-DILEMMA-01 QA : suppression distante — pas de réinjection depuis cache local", () => {
+  it("FEATURE-DILEMMA-01 QA : suppression distante - pas de réinjection depuis cache local", () => {
     const other = "Bob";
     const staleLocal = [
       { id: "b1", optionA: "A1", optionB: "B1", author: other },

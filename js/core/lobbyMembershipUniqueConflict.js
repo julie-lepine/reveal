@@ -1,5 +1,5 @@
 /**
- * Vague E4 — détection du conflit UNIQUE lobby_members(user_id).
+ * Vague E4 - détection du conflit UNIQUE lobby_members(user_id).
  * Ne mappe PAS tout 23505 vers ALREADY_EXISTS.
  *
  * Forme PostgREST typique (souvent SANS champ `constraint`) :
@@ -17,7 +17,7 @@ export const LOBBY_MEMBERS_ONE_LIVING_PER_USER =
   "lobby_members_one_living_per_user";
 
 /**
- * @param {unknown} error — erreur PostgREST / Postgres / Error
+ * @param {unknown} error - erreur PostgREST / Postgres / Error
  * @returns {boolean}
  */
 export function isLobbyMembersOneLivingPerUserConflict(error) {

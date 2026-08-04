@@ -1,5 +1,5 @@
 /**
- * AUTH leave orphans — codes + interprétation preuve DELETE membership.
+ * AUTH leave orphans - codes + interprétation preuve DELETE membership.
  * Pur / testable (sans Supabase).
  */
 

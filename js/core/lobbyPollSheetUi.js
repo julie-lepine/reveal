@@ -1,5 +1,5 @@
 /**
- * Vague 2 — UI sondage dans le sheet chat (pas de 2e FAB / sheet / store).
+ * Vague 2 - UI sondage dans le sheet chat (pas de 2e FAB / sheet / store).
  * Formulaire de création replié : CTA compact → expand.
  */
 import { escapeHtml } from "./ui.js";
@@ -283,7 +283,7 @@ export function mountLobbyPollInChatSheet(sheetRoot) {
   return () => {
     unsub?.();
     unsub = null;
-    // Ne touche que son sous-conteneur — jamais #chat-sheet-random.
+    // Ne touche que son sous-conteneur - jamais #chat-sheet-random.
     if (hostEl) {
       hostEl.innerHTML = "";
       hostEl.hidden = true;

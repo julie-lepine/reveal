@@ -1,5 +1,5 @@
 /**
- * BUG-TRUTHMETER-01B QA — compteur hôte + convergence matchScores.
+ * BUG-TRUTHMETER-01B QA - compteur hôte + convergence matchScores.
  */
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
@@ -29,7 +29,7 @@ function mergeMatchScoresMax(local = {}, remote = {}) {
   return merged;
 }
 
-describe("compteur TruthMeter — votes confirmés uniquement", () => {
+describe("compteur TruthMeter - votes confirmés uniquement", () => {
   const voters = ["Alice", "Charlie"];
 
   it("hôte détective ayant voté, 2 votants → 1", () => {
@@ -66,7 +66,7 @@ describe("compteur TruthMeter — votes confirmés uniquement", () => {
   });
 });
 
-describe("hydratation matchScores — autorité serveur", () => {
+describe("hydratation matchScores - autorité serveur", () => {
   it("reveal scoré : remplace le local divergent (pas Math.max)", () => {
     const local = {
       runId: "r1",
@@ -162,7 +162,7 @@ describe("hydratation matchScores — autorité serveur", () => {
   });
 });
 
-describe("contrats source — compteur + hydratation", () => {
+describe("contrats source - compteur + hydratation", () => {
   const gameSrc = readSrc("js/games/truthMeter.js");
   const syncSrc = readSrc("js/core/gameSync.js");
   const sessionSrc = readSrc("js/core/truthMeterSession.js");

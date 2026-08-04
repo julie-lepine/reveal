@@ -9,7 +9,7 @@ import assert from "node:assert/strict";
  * Miroir du bug : routeLog renvoyait logSessionRouteDecision() (undefined).
  */
 function logSessionRouteDecision(_source, _row, _allowed, _reason) {
-  // side-effect only — no return
+  // side-effect only - no return
 }
 
 function routeLogBroken(allowed, reason) {
@@ -23,7 +23,7 @@ function routeLogFixed(allowed, reason) {
 }
 
 describe("shouldApply → handleSessionRoute contract", () => {
-  it("routeLog broken : guest_must_follow → undefined (falsy) — le bug observé", () => {
+  it("routeLog broken : guest_must_follow → undefined (falsy) - le bug observé", () => {
     const decision = routeLogBroken(true, "guest_must_follow");
     assert.equal(decision, undefined);
     assert.equal(typeof decision, "undefined");

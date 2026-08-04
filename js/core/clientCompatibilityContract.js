@@ -1,5 +1,5 @@
 /**
- * ARCH-23 — parsing du contrat serveur de compatibilité (pur).
+ * ARCH-23 - parsing du contrat serveur de compatibilité (pur).
  */
 
 export const COMPAT_STATUS = Object.freeze({

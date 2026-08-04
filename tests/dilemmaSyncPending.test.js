@@ -1,5 +1,5 @@
 /**
- * ARCH-22 Vague C — Dilemma × createSyncPending (contrats source + lifecycle).
+ * ARCH-22 Vague C - Dilemma × createSyncPending (contrats source + lifecycle).
  */
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
@@ -25,7 +25,7 @@ function extractSubmitVote(body) {
   throw new Error("submitVote non fermée");
 }
 
-describe("ARCH-22 Dilemma sync pending — contrats source", () => {
+describe("ARCH-22 Dilemma sync pending - contrats source", () => {
   it("importe createSyncPending", () => {
     assert.match(src, /import \{ createSyncPending \} from "\.\.\/core\/syncPending\.js"/);
   });

@@ -1,5 +1,5 @@
 /**
- * forceClearClientLobbyState — notification après wipe local.
+ * forceClearClientLobbyState - notification après wipe local.
  * (Pas d’import de lobby.js : supabaseClient charge un URL https: incompatible Node.)
  */
 import { describe, it } from "node:test";
@@ -79,7 +79,7 @@ function runForceClearContractSequence() {
   return { calls, seen, events, hasActiveLobby, forceClearClientLobbyState, state };
 }
 
-describe("forceClearClientLobbyState — contrat source", () => {
+describe("forceClearClientLobbyState - contrat source", () => {
   it("notifie après mutations, une seule fois dans la fonction", () => {
     const body = forceClearFnBody();
     assert.match(body, /performLobbyBoundaryTeardown\(\)/);
@@ -91,7 +91,7 @@ describe("forceClearClientLobbyState — contrat source", () => {
     assert.ok(teardownIdx >= 0 && patchIdx > teardownIdx);
     assert.ok(patchIdx >= 0 && notifyIdx > patchIdx);
     assert.equal((body.match(/notifyLobbyBundleUpdated\(\)/g) || []).length, 1);
-    // Sync/clear restent dans le teardown partagé — pas d’invalidate snapshot ici.
+    // Sync/clear restent dans le teardown partagé - pas d’invalidate snapshot ici.
     assert.equal(body.includes("invalidateMembershipSnapshot"), false);
     assert.equal(body.includes("commitMembershipRemoved"), false);
   });
@@ -128,7 +128,7 @@ describe("forceClearClientLobbyState — contrat source", () => {
     }
   });
 
-  it("boot : reconcile puis resetNav/navigate — pas de navigate dans forceClear", () => {
+  it("boot : reconcile puis resetNav/navigate - pas de navigate dans forceClear", () => {
     const body = forceClearFnBody();
     assert.equal(body.includes("navigate("), false);
     const main = src("js/main.js");
@@ -157,7 +157,7 @@ describe("forceClearClientLobbyState — contrat source", () => {
   });
 });
 
-describe("forceClearClientLobbyState — invariants d’ordre (miroir)", () => {
+describe("forceClearClientLobbyState - invariants d’ordre (miroir)", () => {
   it("listener voit lobby déjà effacé, hasActiveLobby faux, une seule notif", () => {
     const { calls, seen, events } = runForceClearContractSequence();
     assert.deepEqual(events, [
@@ -201,7 +201,7 @@ describe("forceClearClientLobbyState — invariants d’ordre (miroir)", () => {
   });
 });
 
-describe("cleanup migration — alias / CSS", () => {
+describe("cleanup migration - alias / CSS", () => {
   it("seul lobbySettingsActionsForRole est exporté", () => {
     const menu = src("js/core/partySettingsMenu.js");
     assert.match(menu, /export function lobbySettingsActionsForRole/);

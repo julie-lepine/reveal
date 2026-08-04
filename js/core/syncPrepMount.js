@@ -1,5 +1,5 @@
 /**
- * M-10 — montage prep : refresh session avec catch (testable sans Supabase).
+ * M-10 - montage prep : refresh session avec catch (testable sans Supabase).
  */
 export function runSyncPrepOnMount({
   isActive,

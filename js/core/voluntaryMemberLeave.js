@@ -1,5 +1,5 @@
 /**
- * Sortie volontaire membre non-hôte — contrat d’échec distant strict.
+ * Sortie volontaire membre non-hôte - contrat d’échec distant strict.
  * Module pur (deps injectées) pour tests sans charger Supabase / DOM.
  */
 import { finalizeGuestAfterAuthoritativeLeave } from "./finalizeGuestLeave.js";
@@ -97,10 +97,10 @@ export async function runVoluntaryMemberLeave(options = {}, deps) {
         };
       }
 
-      // E3 — soft-hold Home avant invalidate snapshot (survit navigate/remount).
+      // E3 - soft-hold Home avant invalidate snapshot (survit navigate/remount).
       deps.beginPostLeaveHomeTransition?.();
 
-      // Preuve : DELETE membership courant OK — retirer found(B) avant clear runtime.
+      // Preuve : DELETE membership courant OK - retirer found(B) avant clear runtime.
       const userId = deps.getUserId?.() || null;
       if (userId && lobbyId && deps.commitMembershipRemoved) {
         deps.commitMembershipRemoved({ userId, lobbyId });
@@ -127,7 +127,7 @@ export async function runVoluntaryMemberLeave(options = {}, deps) {
       };
     }
 
-    // Offline / démo : aucune ligne lobby_members — cleanup local direct.
+    // Offline / démo : aucune ligne lobby_members - cleanup local direct.
     deps.stopMultiplayerSync();
     deps.stopLobbyPresenceSync();
     if (code) deps.clearLocalOpenLobbySlot(code);

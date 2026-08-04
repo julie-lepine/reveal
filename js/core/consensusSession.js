@@ -611,7 +611,7 @@ export function getConsensusPodiumAwards(standings = buildConsensusStandings()) 
 
 /**
  * Crédite le cumul `matchScores` à la soirée (une fois).
- * Pas de bonus podium supplémentaire — les points de manches sont la seule source.
+ * Pas de bonus podium supplémentaire - les points de manches sont la seule source.
  */
 export function applyConsensusLobbyPodium(session = getConsensusSession()) {
   setActiveScoringGame("consensus");

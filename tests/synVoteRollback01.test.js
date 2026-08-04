@@ -1,5 +1,5 @@
 /**
- * SYN-VOTE-ROLLBACK-01 — contrats source des commits + SpeedVote UI.
+ * SYN-VOTE-ROLLBACK-01 - contrats source des commits + SpeedVote UI.
  */
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
@@ -32,7 +32,7 @@ const ROLLBACK_MARKERS = [
   "throw err",
 ];
 
-describe("SYN-VOTE-ROLLBACK-01 — contrats commit*", () => {
+describe("SYN-VOTE-ROLLBACK-01 - contrats commit*", () => {
   const cases = [
     ["js/core/speedVoteSession.js", "commitSpeedVoteVote"],
     ["js/core/dilemmaSession.js", "commitDilemmaVote"],
@@ -69,7 +69,7 @@ describe("SYN-VOTE-ROLLBACK-01 — contrats commit*", () => {
   });
 });
 
-describe("SYN-VOTE-ROLLBACK-01 — UI SpeedVote / WAO", () => {
+describe("SYN-VOTE-ROLLBACK-01 - UI SpeedVote / WAO", () => {
   it("SpeedVote : handleSpeedVotePick catch terminal + myVote post-succès", () => {
     const src = read("js/games/speedVote.js");
     assert.match(src, /async function handleSpeedVotePick/);

@@ -1,5 +1,5 @@
 /**
- * BUG-TRIVIA-01C — sécurisation replay / change-thème via startGameSession.
+ * BUG-TRIVIA-01C - sécurisation replay / change-thème via startGameSession.
  */
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
@@ -11,7 +11,7 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const triviaSrc = readFileSync(join(ROOT, "js/games/trivia.js"), "utf8");
 const sessionSrc = readFileSync(join(ROOT, "js/core/triviaSession.js"), "utf8");
 
-describe("trivia replay restart — contrats source 01C", () => {
+describe("trivia replay restart - contrats source 01C", () => {
   it("helper startTriviaRemoteRestart entoure startGameSession d'un try/catch", () => {
     assert.match(triviaSrc, /async function startTriviaRemoteRestart/);
     const start = triviaSrc.indexOf("async function startTriviaRemoteRestart");

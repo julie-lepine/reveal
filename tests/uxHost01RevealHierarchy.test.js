@@ -1,9 +1,9 @@
 /**
- * UX-HOST-01 — hiérarchie mid-round : reveal → action → cumul.
+ * UX-HOST-01 - hiérarchie mid-round : reveal → action → cumul.
  *
  * Preuve = contrats source sur les templates reveal (pas d’import des mounts
  * monolithes gameSync/lobby). Les listeners restent attachés par ID après
- * innerHTML — vérifié ici par présence inchangée des sélecteurs #id.
+ * innerHTML - vérifié ici par présence inchangée des sélecteurs #id.
  */
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
@@ -42,7 +42,7 @@ function assertRevealHierarchy(body, anchors, label) {
   }
 }
 
-describe("UX-HOST-01 — hiérarchie reveal mid-round", () => {
+describe("UX-HOST-01 - hiérarchie reveal mid-round", () => {
   it("Trivia reveal : bonne réponse → CTA → classement live", () => {
     const file = src("js/games/trivia.js");
     const start = file.indexOf('} else if (phase === "reveal")');

@@ -1,5 +1,5 @@
 /**
- * Membership Vague E5 — dissolve_lobby_atomically + mapping + chemins unifiés.
+ * Membership Vague E5 - dissolve_lobby_atomically + mapping + chemins unifiés.
  */
 import { describe, it, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
@@ -31,8 +31,8 @@ function read(rel) {
   return readFileSync(join(ROOT, rel), "utf8");
 }
 
-describe("lobbyMembershipVagueE5 — mapping RPC", () => {
-  it("1 — DISSOLVED → ok", () => {
+describe("lobbyMembershipVagueE5 - mapping RPC", () => {
+  it("1 - DISSOLVED → ok", () => {
     const r = mapDissolveLobbyRpcData(
       { status: "DISSOLVED", lobby_id: "L1" },
       "L1"
@@ -41,7 +41,7 @@ describe("lobbyMembershipVagueE5 — mapping RPC", () => {
     assert.equal(r.status, LOBBY_DISSOLVE_STATUS.DISSOLVED);
   });
 
-  it("2 — ALREADY_GONE → ok (succès silencieux)", () => {
+  it("2 - ALREADY_GONE → ok (succès silencieux)", () => {
     const r = mapDissolveLobbyRpcData(
       { status: "ALREADY_GONE", lobby_id: "L1" },
       "L1"
@@ -50,7 +50,7 @@ describe("lobbyMembershipVagueE5 — mapping RPC", () => {
     assert.equal(r.status, LOBBY_DISSOLVE_STATUS.ALREADY_GONE);
   });
 
-  it("3 — NOT_ALLOWED → !ok, pas ALREADY_GONE", () => {
+  it("3 - NOT_ALLOWED → !ok, pas ALREADY_GONE", () => {
     const r = mapDissolveLobbyRpcData(
       { status: "NOT_ALLOWED", lobby_id: "L1" },
       "L1"
@@ -60,7 +60,7 @@ describe("lobbyMembershipVagueE5 — mapping RPC", () => {
     assert.match(r.error, /hôte/i);
   });
 
-  it("4 — UNAUTHENTICATED → !ok", () => {
+  it("4 - UNAUTHENTICATED → !ok", () => {
     const r = mapDissolveLobbyRpcData(
       { status: "UNAUTHENTICATED", lobby_id: "L1" },
       "L1"
@@ -69,7 +69,7 @@ describe("lobbyMembershipVagueE5 — mapping RPC", () => {
     assert.equal(r.status, LOBBY_DISSOLVE_STATUS.UNAUTHENTICATED);
   });
 
-  it("5 — payload malformé → erreur identifiable, pas ALREADY_GONE", () => {
+  it("5 - payload malformé → erreur identifiable, pas ALREADY_GONE", () => {
     const r = mapDissolveLobbyRpcData({ status: "WEIRD" }, "L1");
     assert.equal(r.ok, false);
     assert.equal(r.malformed, true);
@@ -77,21 +77,21 @@ describe("lobbyMembershipVagueE5 — mapping RPC", () => {
     assert.match(r.error, /invalide/i);
   });
 
-  it("5b — null / undefined data → malformé", () => {
+  it("5b - null / undefined data → malformé", () => {
     assert.equal(mapDissolveLobbyRpcData(null, "L1").malformed, true);
     assert.equal(mapDissolveLobbyRpcData(undefined, "L1").malformed, true);
   });
 });
 
-describe("lobbyMembershipVagueE5 — re-query après transport", () => {
-  it("6 — membership none → ALREADY_GONE succès", () => {
+describe("lobbyMembershipVagueE5 - re-query après transport", () => {
+  it("6 - membership none → ALREADY_GONE succès", () => {
     const r = interpretDissolveMembershipRequery({ status: "none" }, "L1");
     assert.equal(r.ok, true);
     assert.equal(r.status, LOBBY_DISSOLVE_STATUS.ALREADY_GONE);
     assert.equal(r.viaRequery, true);
   });
 
-  it("7 — found host même lobby → erreur retryable", () => {
+  it("7 - found host même lobby → erreur retryable", () => {
     const r = interpretDissolveMembershipRequery(
       {
         status: "found",
@@ -105,7 +105,7 @@ describe("lobbyMembershipVagueE5 — re-query après transport", () => {
     assert.notEqual(r.status, LOBBY_DISSOLVE_STATUS.ALREADY_GONE);
   });
 
-  it("8 — found member même lobby → NOT_ALLOWED", () => {
+  it("8 - found member même lobby → NOT_ALLOWED", () => {
     const r = interpretDissolveMembershipRequery(
       {
         status: "found",
@@ -117,7 +117,7 @@ describe("lobbyMembershipVagueE5 — re-query après transport", () => {
     assert.equal(r.status, LOBBY_DISSOLVE_STATUS.NOT_ALLOWED);
   });
 
-  it("9 — found autre lobby Y → CANONICAL_ELSEWHERE (pas ALREADY_GONE)", () => {
+  it("9 - found autre lobby Y → CANONICAL_ELSEWHERE (pas ALREADY_GONE)", () => {
     const r = interpretDissolveMembershipRequery(
       {
         status: "found",
@@ -133,7 +133,7 @@ describe("lobbyMembershipVagueE5 — re-query après transport", () => {
     assert.notEqual(r.status, LOBBY_DISSOLVE_STATUS.ALREADY_GONE);
   });
 
-  it("10 — unknown → état protégé", () => {
+  it("10 - unknown → état protégé", () => {
     const r = interpretDissolveMembershipRequery({ status: "unknown" }, "L1");
     assert.equal(r.ok, false);
     assert.equal(r.unknown, true);
@@ -141,7 +141,7 @@ describe("lobbyMembershipVagueE5 — re-query après transport", () => {
     assert.notEqual(r.status, LOBBY_DISSOLVE_STATUS.ALREADY_GONE);
   });
 
-  it("10b — multi-onglets logique : A timeout X, B crée Y → A re-query Y", () => {
+  it("10b - multi-onglets logique : A timeout X, B crée Y → A re-query Y", () => {
     // A tentait X ; membership canonique = Y
     const r = interpretDissolveMembershipRequery(
       {
@@ -156,8 +156,8 @@ describe("lobbyMembershipVagueE5 — re-query après transport", () => {
   });
 });
 
-describe("lobbyMembershipVagueE5 — contrats source", () => {
-  it("11 — SQL RPC + grants + search_path durci", () => {
+describe("lobbyMembershipVagueE5 - contrats source", () => {
+  it("11 - SQL RPC + grants + search_path durci", () => {
     const sql = read(
       "supabase/lobby-membership-e5-01-dissolve-lobby-atomically.sql"
     );
@@ -182,7 +182,7 @@ describe("lobbyMembershipVagueE5 — contrats source", () => {
     assert.match(sql, /GRANT EXECUTE.*TO service_role/);
   });
 
-  it("12 — closeLobbyByIdAsHost = RPC unique, pas d’ancien pipeline", () => {
+  it("12 - closeLobbyByIdAsHost = RPC unique, pas d’ancien pipeline", () => {
     const sb = read("js/core/supabaseLobby.js");
     const start = sb.indexOf("export async function closeLobbyByIdAsHost");
     const end = sb.indexOf("export async function closeLobbySupabase", start);
@@ -196,7 +196,7 @@ describe("lobbyMembershipVagueE5 — contrats source", () => {
     assert.match(fn, /queryActiveLobbyMembership/);
   });
 
-  it("13 — dissolveLobbyAsHost : DISSOLVED/ALREADY_GONE → E3 + invalidate + local Traître", () => {
+  it("13 - dissolveLobbyAsHost : DISSOLVED/ALREADY_GONE → E3 + invalidate + local Traître", () => {
     const lobby = read("js/core/lobby.js");
     const dissolve = lobby.slice(
       lobby.indexOf("export async function dissolveLobbyAsHost"),
@@ -216,7 +216,7 @@ describe("lobbyMembershipVagueE5 — contrats source", () => {
     assert.equal(block.includes("commitMembershipRemoved"), false);
   });
 
-  it("13b — CANONICAL_ELSEWHERE : drop X, recover Y, pas Home soft-hold", () => {
+  it("13b - CANONICAL_ELSEWHERE : drop X, recover Y, pas Home soft-hold", () => {
     const lobby = read("js/core/lobby.js");
     const start = lobby.indexOf(
       "async function reconcileHostDissolveCanonicalElsewhere"
@@ -247,7 +247,7 @@ describe("lobbyMembershipVagueE5 — contrats source", () => {
     );
   });
 
-  it("14 — NOT_ALLOWED : pas de wipe succès aveugle, reconcile + message", () => {
+  it("14 - NOT_ALLOWED : pas de wipe succès aveugle, reconcile + message", () => {
     const lobby = read("js/core/lobby.js");
     assert.match(lobby, /reconcileHostDissolveNotAllowed/);
     const start = lobby.indexOf("async function reconcileHostDissolveNotAllowed");
@@ -260,7 +260,7 @@ describe("lobbyMembershipVagueE5 — contrats source", () => {
     assert.match(block, /reconcileHostDissolveCanonicalElsewhere/);
   });
 
-  it("15 — server-only Resume utilise closeLobbyByIdAsHost (même RPC)", () => {
+  it("15 - server-only Resume utilise closeLobbyByIdAsHost (même RPC)", () => {
     const lobby = read("js/core/lobby.js");
     const start = lobby.indexOf(
       "export async function leaveLobbyMembershipFromServer"
@@ -271,7 +271,7 @@ describe("lobbyMembershipVagueE5 — contrats source", () => {
     assert.match(block, /clearTraitrePrivateLocalForLobby/);
   });
 
-  it("16 — deleteGameSession reste hors dissolve (endGameSession)", () => {
+  it("16 - deleteGameSession reste hors dissolve (endGameSession)", () => {
     const sync = read("js/core/gameSync.js");
     assert.match(sync, /deleteGameSession/);
     const game = read("js/core/supabaseGame.js");
@@ -284,7 +284,7 @@ describe("lobbyMembershipVagueE5 — contrats source", () => {
     assert.equal(fn.includes("deleteGameSession"), false);
   });
 
-  it("17 — clearTraitrePrivateForLobby reste pour resets jeu", () => {
+  it("17 - clearTraitrePrivateForLobby reste pour resets jeu", () => {
     const restart = read("js/core/restartGame.js");
     assert.match(restart, /clearTraitrePrivateForLobby/);
     const traitre = read("js/core/traitreSession.js");
@@ -294,7 +294,7 @@ describe("lobbyMembershipVagueE5 — contrats source", () => {
     assert.match(priv, /export async function clearTraitrePrivateForLobby/);
   });
 
-  it("18 — notify NOT_ALLOWED n’utilise pas l’alerte connexion", async () => {
+  it("18 - notify NOT_ALLOWED n’utilise pas l’alerte connexion", async () => {
     const calls = [];
     await notifyVoluntaryLeaveFailure(
       {
@@ -313,7 +313,7 @@ describe("lobbyMembershipVagueE5 — contrats source", () => {
     assert.equal(calls[0].msg.includes("connexion a empêché"), false);
   });
 
-  it("19 — runbook + harness E5 présents", () => {
+  it("19 - runbook + harness E5 présents", () => {
     assert.match(
       read("supabase/lobby-membership-e5-RUNBOOK.sql"),
       /QA terrain/
@@ -328,7 +328,7 @@ describe("lobbyMembershipVagueE5 — contrats source", () => {
     );
   });
 
-  it("20 — multi-onglets : DISSOLVED puis ALREADY_GONE tous deux ok côté mapping", () => {
+  it("20 - multi-onglets : DISSOLVED puis ALREADY_GONE tous deux ok côté mapping", () => {
     const a = mapDissolveLobbyRpcData(
       { status: "DISSOLVED", lobby_id: "L" },
       "L"
@@ -340,7 +340,7 @@ describe("lobbyMembershipVagueE5 — contrats source", () => {
     assert.equal(a.ok && b.ok, true);
   });
 
-  it("21 — none et found-autre-lobby ne sont plus fusionnés", () => {
+  it("21 - none et found-autre-lobby ne sont plus fusionnés", () => {
     const none = interpretDissolveMembershipRequery({ status: "none" }, "X");
     const elsewhere = interpretDissolveMembershipRequery(
       { status: "found", membership: { lobbyId: "Y", role: "member" } },
@@ -352,7 +352,7 @@ describe("lobbyMembershipVagueE5 — contrats source", () => {
   });
 });
 
-describe("lobbyMembershipVagueE5 — CANONICAL_ELSEWHERE sûreté X≠Y", () => {
+describe("lobbyMembershipVagueE5 - CANONICAL_ELSEWHERE sûreté X≠Y", () => {
   /** @type {Map<string, string>} */
   let memoryStorage;
   let prevLocalStorage;
@@ -377,13 +377,13 @@ describe("lobbyMembershipVagueE5 — CANONICAL_ELSEWHERE sûreté X≠Y", () => 
     globalThis.localStorage = prevLocalStorage;
   });
 
-  it("22 — Traître local : clear X ne touche pas Y (contrat clé scoped)", () => {
+  it("22 - Traître local : clear X ne touche pas Y (contrat clé scoped)", () => {
     const LOCAL_KEY = "reveal-traitre-private";
     const keyX = `${LOCAL_KEY}:lobby-X`;
     const keyY = `${LOCAL_KEY}:lobby-Y`;
     localStorage.setItem(keyX, '{"role":"x"}');
     localStorage.setItem(keyY, '{"role":"y"}');
-    // Miroir de clearTraitrePrivateLocalForLobby(lobbyId) — une seule clé.
+    // Miroir de clearTraitrePrivateLocalForLobby(lobbyId) - une seule clé.
     localStorage.removeItem(`${LOCAL_KEY}:lobby-X`);
     assert.equal(localStorage.getItem(keyX), null);
     assert.equal(localStorage.getItem(keyY), '{"role":"y"}');
@@ -406,7 +406,7 @@ describe("lobbyMembershipVagueE5 — CANONICAL_ELSEWHERE sûreté X≠Y", () => 
     );
   });
 
-  it("23 — commitMembershipRemoved(X) préserve snapshot found Y", () => {
+  it("23 - commitMembershipRemoved(X) préserve snapshot found Y", () => {
     setMembershipSnapshot(
       {
         status: "found",
@@ -430,7 +430,7 @@ describe("lobbyMembershipVagueE5 — CANONICAL_ELSEWHERE sûreté X≠Y", () => 
     assert.equal(getMembershipSnapshot()?.membership?.lobbyId, "lobby-Y");
   });
 
-  it("24 — branche elsewhere : clear Traître / guest / commit ciblés sur X seulement", () => {
+  it("24 - branche elsewhere : clear Traître / guest / commit ciblés sur X seulement", () => {
     const lobby = read("js/core/lobby.js");
     const start = lobby.indexOf(
       "async function reconcileHostDissolveCanonicalElsewhere"
@@ -456,7 +456,7 @@ describe("lobbyMembershipVagueE5 — CANONICAL_ELSEWHERE sûreté X≠Y", () => 
     assert.equal(block.includes("patch.user"), false);
   });
 
-  it("25 — recover Y échoue : pas goToLobby, pas faux succès Home, Y reste cible", () => {
+  it("25 - recover Y échoue : pas goToLobby, pas faux succès Home, Y reste cible", () => {
     const lobby = read("js/core/lobby.js");
     const start = lobby.indexOf(
       "async function reconcileHostDissolveCanonicalElsewhere"

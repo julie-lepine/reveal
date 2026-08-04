@@ -624,7 +624,7 @@ body.has-top-ad .back{
 }
 
 .btn--spaced{ margin-top:20px; }
-/* UX-HOST-01 — conclusion du reveal mid-round (CTA/hint) avant infos complémentaires */
+/* UX-HOST-01 - conclusion du reveal mid-round (CTA/hint) avant infos complémentaires */
 .reveal-mid-action{
   margin-top:0.75rem;
   margin-bottom:0.35rem;
@@ -4322,7 +4322,7 @@ body.has-bottom-nav .feedback-fab{
   border:none;
 }
 
-/* Sondage : indigo color-secondary, opaque — même contraste texte sombre */
+/* Sondage : indigo color-secondary, opaque - même contraste texte sombre */
 .chat-sheet__actions .lobby-poll__cta.btn-accent{
   margin-top:0;
   background:linear-gradient(135deg, #8b93f7, #6b6ff0);
@@ -6966,7 +6966,7 @@ body{
   margin-top: 0.75rem;
 }
 
-/* Spot the fake — écran résultat */
+/* Spot the fake - écran résultat */
 .traitre-final {
   overflow: hidden;
   padding: 0;

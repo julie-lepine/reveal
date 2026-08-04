@@ -1,5 +1,5 @@
 /**
- * FEATURE-CHAT-03 — atomicité écriture réactions (lost update / RPC unique).
+ * FEATURE-CHAT-03 - atomicité écriture réactions (lost update / RPC unique).
  */
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
@@ -15,7 +15,7 @@ import {
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-describe("FEATURE-CHAT-03 — lost update / atomicité", () => {
+describe("FEATURE-CHAT-03 - lost update / atomicité", () => {
   it("ancien chemin hôte stale : deux writes concurrents depuis {} perdent une entrée", () => {
     const final = simulateStaleHostReactionPatchLostUpdate(
       {},
@@ -88,7 +88,7 @@ describe("FEATURE-CHAT-03 — lost update / atomicité", () => {
   });
 });
 
-describe("FEATURE-CHAT-03 — contrat chemin d'écriture réel", () => {
+describe("FEATURE-CHAT-03 - contrat chemin d'écriture réel", () => {
   it("commit utilise persistChatRouletteReactionRemote (RPC), pas patchGameState", () => {
     const src = readFileSync(
       join(__dirname, "../js/core/chatRandomGameReaction.js"),

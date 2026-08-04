@@ -19,7 +19,7 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 | **Maintenant** | Backlog produit : **FEATURE-TIERNIGHT-01** · **UX-DEVICE-01** (dernier ticket produit convenu) |
 | **En fin de vague** | **ARCH-23** / **ARCH-10** QA natif — **après** clôture des tickets produit ouverts (code + SQL déjà livrés · QA différée deploy Capacitor) |
 | **Dette** | ARCH-05 · ARCH-01 · ARCH-11–17 · SYN-19–24 · SYN-27 · Fil Rouge / VibeCheck cleanup |
-| **Audit** | Transversal 2026-08-02 — optimistic submissions ✅ · Deal ACK ✅ · **FEATURE-CHAT-03 ✅** · **FEATURE-DILEMMA-01 ✅** · **FEATURE-TIERNIGHT-02 ✅** · **UX-TIERNIGHT-END-01/02 ✅** QA 2026-08-04 |
+| **Audit** | Transversal 2026-08-02 — optimistic submissions ✅ · Deal ACK ✅ · **FEATURE-CHAT-03 ✅** · **FEATURE-DILEMMA-01 ✅** · **FEATURE-TIERNIGHT-02 ✅** · **UX-TIERNIGHT-END-01/02 ✅** · **UX-TIERNIGHT-NAV-01 ✅** QA 2026-08-04 |
 
 > ~~« Consensus reveal atomique »~~ — **aucun ticket** à cet intitulé dans l’audit (reliquat probable d’une note type Trivia 01B, jamais formalisé). Ne pas traiter comme chantier ouvert.
 
@@ -40,7 +40,6 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 | ID | Cause | Problème | Priorité |
 |----|-------|----------|----------|
 | **FEATURE-TIERNIGHT-01** | — | Thèmes personnalisés (Classer le groupe) | 🟡 |
-| **UX-TIERNIGHT-NAV-01** | — | Hiérarchie nav TierNight (retour création + un seul back) | 🟡 code · **QA terrain** |
 
 ### Dette / opportunité
 
@@ -65,7 +64,7 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 | 8 | Reset / migration incomplète | Partiel | **BUG-TIERNIGHT-05 ✅** · **OPS-LOBBY-04 ✅** · **BUG-LOBBY-XX-E ✅** · **BUG-TRUTHMETER-02 ✅** · **ARCH-23** · ARCH-10 · **BUG-LOBBY-XX ✅** · I-09/SYN-15/16 ✅ |
 | 9 | Sync monolithe / duplication | Dette | ARCH-11… |
 | 10 | Code mort | Dette | **FEATURE-VIBECHECK-01 ✅** · hors Fil Rouge app ✅ |
-| 11 | Friction UX | Partiel | **UX-DEVICE-01** 🟡 · **FEATURE-DILEMMA-01 ✅** · **FEATURE-TIERNIGHT-02 ✅** · **UX-TIERNIGHT-END-01/02 ✅** · **FEATURE-CHAT-03 ✅** · **UX-CHAT-01 ✅** · **UX-CHAT-02 ✅** · **UX-HOST-01 ✅** · **BUG-WAO-04** ✅ · **ARCH-23** · ARCH-22/Loader ✅ · **L-04 ✅** |
+| 11 | Friction UX | Partiel | **UX-DEVICE-01** 🟡 · **FEATURE-DILEMMA-01 ✅** · **FEATURE-TIERNIGHT-02 ✅** · **UX-TIERNIGHT-END-01/02 ✅** · **UX-TIERNIGHT-NAV-01 ✅** · **FEATURE-CHAT-03 ✅** · **UX-CHAT-01 ✅** · **UX-CHAT-02 ✅** · **UX-HOST-01 ✅** · **BUG-WAO-04** ✅ · **ARCH-23** · ARCH-22/Loader ✅ · **L-04 ✅** |
 
 ---
 
@@ -333,6 +332,19 @@ Fusion du détail scoring dans la carte récap **locale** uniquement ; cumul pla
 | **Hors scope** | Scoring / sync / barème |
 | **Verdict** | **Ne pas rouvrir** sauf régression détail local / cartes adverses |
 
+#### UX-TIERNIGHT-NAV-01 ✅ (clôture QA terrain · 2026-08-04)
+
+Hiérarchie de navigation TierNight : retour après création de thème + un seul chevron classique par niveau. **Ne pas rouvrir** sans régression démontrée.
+
+| | |
+|--|--|
+| **Produit** | Création thème → sélection thèmes roster (pas choix des modes) · un seul retour contextuel · chevron shell unifié · libellés `Classe le groupe · modes de jeu` / `Rank live · modes de jeu` |
+| **Causes** | `navigate("tiernight-select")` remontait `step=mode` · double contrôle shell + `btn-back-inline` |
+| **Où** | `tierNightNav.js` · `tierNightCreateRoster.js` · `tierNightCreate.js` · `tierNightSelect.js` |
+| **Preuve** | `uxTierNightNav01` · QA terrain 2026-08-04 |
+| **Hors scope** | Sync thèmes · permissions lancement · scoring |
+| **Verdict** | **Ne pas rouvrir** sauf mauvais retour après création ou double bouton retour |
+
 #### BUG-TRIVIA-01A ✅ (clôture QA terrain · 2026-07-31)
 
 Acting host Trivia : transitions `question → reveal → next → final` via patches explicites + validation SQL.
@@ -433,6 +445,7 @@ Retour terrain multi-jeux. Priorités : 🔴 critique · 🟠 haute · 🟡 moye
 | ~~**FEATURE-TIERNIGHT-02**~~ | ~~Thèmes roster multi-joueurs + sync~~ | ✅ **Clôturé QA terrain 2026-08-04** — tous créent · RPC atomique · strip patch · préservation `push`/`start`/`complete` · merge remote-first · delete auteur-only · lancement hôte-only. Ne pas rouvrir. |
 | ~~**UX-TIERNIGHT-END-01**~~ | ~~Points de la manche redondant~~ | ✅ **Clôturé QA terrain 2026-08-04** — leaderboard intermédiaire retiré · cartes + cumul conservés. Ne pas rouvrir. |
 | ~~**UX-TIERNIGHT-END-02**~~ | ~~Détail scoring vs carte récap~~ | ✅ **Clôturé QA terrain 2026-08-04** — détail fusionné dans la carte locale · cumul sous les cartes. Ne pas rouvrir. |
+| ~~**UX-TIERNIGHT-NAV-01**~~ | ~~Hiérarchie nav TierNight~~ | ✅ **Clôturé QA terrain 2026-08-04** — retour création → thèmes roster · chevron unique · libellés modes de jeu. Ne pas rouvrir. |
 | ~~**FEATURE-CHAT-03**~~ | ~~Roulette « Jeu aléatoire »~~ | ✅ **Clôturé QA terrain 2026-08-03** — CTA chat · soft voice · bridge sondage · tirage libre + anti-répétition immédiate · TTL hybride · `rouletteId`/`attemptId` · permit launch · sync Realtime · fermeture chat→prep. Ne pas rouvrir. |
 
 ---
@@ -585,4 +598,4 @@ Hors file prioritaire — opportunité / régression :
 
 ---
 
-*Suivi vivant · MAJ 2026-08-04 — **FEATURE-TIERNIGHT-02** ✅ · **UX-TIERNIGHT-END-01/02** ✅ · prochain produit = **FEATURE-TIERNIGHT-01** puis **UX-DEVICE-01** · **ARCH-23** / **ARCH-10** QA natif en fin de vague*
+*Suivi vivant · MAJ 2026-08-04 — **UX-TIERNIGHT-NAV-01** ✅ · **UX-TIERNIGHT-END-01/02** ✅ · **FEATURE-TIERNIGHT-02** ✅ · prochain produit = **FEATURE-TIERNIGHT-01** puis **UX-DEVICE-01** · **ARCH-23** / **ARCH-10** QA natif en fin de vague*

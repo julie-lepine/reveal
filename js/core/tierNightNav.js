@@ -1,5 +1,5 @@
 /**
- * UX-TIERNIGHT-NAV-01 — navigation explicite entre niveaux TierNight.
+ * UX-TIERNIGHT-NAV-01 - navigation explicite entre niveaux TierNight.
  */
 import { navigate, getNavStack } from "./router.js";
 import { normalizeTierNightMode } from "../../data/tierTopics.js";

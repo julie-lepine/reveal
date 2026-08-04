@@ -1,5 +1,5 @@
 /**
- * ARCH-04 — bandeau reprise prep (asymétrie UI) :
+ * ARCH-04 - bandeau reprise prep (asymétrie UI) :
  * - auto-route même prep reste bloquée (suppress volontaire) ;
  * - bandeau éligible pour destination getResumableSessionScreen (prep|play) ;
  * - rejoin intentionnel = clear suppress puis follow.
@@ -9,7 +9,7 @@ import assert from "node:assert/strict";
 
 const MENU_SCREENS = new Set(["home", "lobby", "game-select", "settings"]);
 const POST_GAME_SCREENS = new Set(["results", "leaderboard"]);
-/** Miroir GAME_SETUP_SCREENS (gameSync) — source de vérité prep. */
+/** Miroir GAME_SETUP_SCREENS (gameSync) - source de vérité prep. */
 const GAME_SETUP = new Set([
   "traitre-prep",
   "hottake-prep",
@@ -38,7 +38,7 @@ function isSessionInProgressPlay(screen) {
   return true;
 }
 
-/** Miroir isGameSelectResumeBannerScreen — gate final getResumableSessionScreen. */
+/** Miroir isGameSelectResumeBannerScreen - gate final getResumableSessionScreen. */
 function isGameSelectResumeBannerScreen(screen) {
   if (!screen) return false;
   return isOnGameSetupScreen(screen) || isSessionInProgressPlay(screen);

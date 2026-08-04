@@ -1,5 +1,5 @@
 /**
- * BUG-TRIVIA-01B-bis / 01C — sélection UI locale vs answers distantes (UID ou pseudo).
+ * BUG-TRIVIA-01B-bis / 01C - sélection UI locale vs answers distantes (UID ou pseudo).
  * Ne pas écrire de réponse optimiste dans state.trivia.answers.
  */
 
@@ -81,7 +81,7 @@ export function nextPendingAnswerAfterCommit({
 }
 
 /**
- * Hint sous les réponses — ne jamais traiter le pending seul comme « enregistré ».
+ * Hint sous les réponses - ne jamais traiter le pending seul comme « enregistré ».
  *
  * @param {{
  *   phase?: string|null,
@@ -106,15 +106,15 @@ export function buildTriviaAnswerWaitingMessage({
   if (Number.isInteger(confirmedIndex)) {
     return allAnswersIn
       ? "Tout le monde a répondu. Révélation en cours…"
-      : "Réponse enregistrée — tu peux encore la modifier · en attente des autres…";
+      : "Réponse enregistrée - tu peux encore la modifier · en attente des autres…";
   }
   if (answerCommitFailed && Number.isInteger(pendingAnswerIndex)) {
-    return "Envoi échoué — retente ou change de réponse.";
+    return "Envoi échoué - retente ou change de réponse.";
   }
   if (Number.isInteger(pendingAnswerIndex)) {
     // Uniquement post-succès RPC : pending gardé tant que answers distant n'a pas mappé
     // le joueur (inFlight déjà false, failed false). Pas un cas « recliquer pour envoyer ».
-    return "Réponse envoyée — vérification en cours…";
+    return "Réponse envoyée - vérification en cours…";
   }
   return "Choisis ta réponse (tu pourras la modifier avant la révélation).";
 }

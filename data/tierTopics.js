@@ -141,8 +141,8 @@ export const TIER_COLORS = {
 
 /**
  * Modes de jeu Tier Night (produit).
- * - roster : Rank vos amis — « Classe le groupe » (items = joueurs, plateau tiernight).
- * - live   : Rank live — item par item, vote temps réel.
+ * - roster : Rank vos amis - « Classe le groupe » (items = joueurs, plateau tiernight).
+ * - live   : Rank live - item par item, vote temps réel.
  *
  * Ancien mode `consensus` (Rank it) retiré de l'UX ; normalisé vers `roster`.
  */

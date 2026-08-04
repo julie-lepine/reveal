@@ -1,4 +1,4 @@
-/** Roster de lancement prep — joueurs prêts + hôte toujours inclus. */
+/** Roster de lancement prep - joueurs prêts + hôte toujours inclus. */
 export function buildLaunchRoster(participants, readyMap, { readyKey = (p) => p.name } = {}) {
   const host = participants.find((p) => p.isHost);
   const hostKey = host ? readyKey(host) : null;

@@ -1,5 +1,5 @@
 /**
- * BUG-LOBBY-XX-E — état de session pour dédup / suppression modale hôte manuelle.
+ * BUG-LOBBY-XX-E - état de session pour dédup / suppression modale hôte manuelle.
  */
 
 /** @type {Set<string>} */

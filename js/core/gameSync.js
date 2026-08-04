@@ -189,7 +189,7 @@ function __trackSessionWrite(label, info) {
   if (count >= 12 && !__loopTraced) {
     __loopTraced = true;
     console.warn(
-      `[REVEAL-LOOP] ${count} écritures game_sessions en 3 s — label=${label}`,
+      `[REVEAL-LOOP] ${count} écritures game_sessions en 3 s - label=${label}`,
       info
     );
     console.trace("[REVEAL-LOOP] pile d'appel de l'écriture");
@@ -338,7 +338,7 @@ function isSuppressedGameReturn(targetScreen) {
 
 /**
  * L'hôte a avancé la soirée : l'invité doit suivre malgré suppress.
- * Avancée = autre jeu / hors famille d'écran — pas une mutation de state
+ * Avancée = autre jeu / hors famille d'écran - pas une mutation de state
  * sur le même screen (ni une transition compatible type Guess Lie).
  * Prep → play du même jeu n'est pas « compatible » ici : branche
  * force_follow_from_other_active (suppress levé, invité suit).
@@ -842,7 +842,7 @@ export function nudgeSessionListenersForActingHost() {
     localUid: getSupabaseUserId() || null,
   });
   notify(cachedRow);
-  // Notification UX acting host (une fois / token) — hors chemin claim lobby
+  // Notification UX acting host (une fois / token) - hors chemin claim lobby
   void import("./actingHostNotice.js")
     .then((m) => {
       arch03AhLog("acting notice after nudge", {
@@ -899,7 +899,7 @@ function runNotify(row) {
 
 /**
  * Anti-réentrance : si un listener relance une notification synchrone (via navigate →
- * mount → refresh), on ne récurse pas — on mémorise la dernière `row` et on la traite
+ * mount → refresh), on ne récurse pas - on mémorise la dernière `row` et on la traite
  * après la passe courante. Coupe l'emballement synchrone à la racine.
  */
 function notify(row) {
@@ -1325,7 +1325,7 @@ function isNewClutchRoundUid(cur, inc) {
 
 /** Taps Clutch (clé uid ou pseudo, valeur { ms, at }) → clés = pseudos actifs. */
 function normalizeClutchTaps(taps = {}, allowedNames = null) {
-  // Snapshot participants when provided — never shrink to live lobby alone (leave mid-round).
+  // Snapshot participants when provided - never shrink to live lobby alone (leave mid-round).
   const names =
     Array.isArray(allowedNames) && allowedNames.length > 0
       ? allowedNames
@@ -1342,7 +1342,7 @@ function mergeRemoteClutchTapsUid(cur, inc) {
   const incTaps = inc?.taps || {};
   if (isNewClutchRound(cur, inc)) return incTaps;
   if (inc?.phase === "active" || inc?.phase === "reveal" || cur?.phase === "reveal") {
-    // First tap wins — never replace a frozen click with a late/recomputed patch.
+    // First tap wins - never replace a frozen click with a late/recomputed patch.
     return mergeClutchTapsFrozen(curTaps, incTaps);
   }
   return mergeClutchTapsFrozen(curTaps, incTaps);
@@ -1929,7 +1929,7 @@ function mergeTruthMeterGameLocal(local, remote) {
     ? remote.lastRound ?? null
     : remote.lastRound ?? local.lastRound ?? null;
 
-  // BUG-TRUTHMETER-02 — identité ciblée :
+  // BUG-TRUTHMETER-02 - identité ciblée :
   // remote snapshot : affirmation null = clear ; cross-run ignore identité locale.
   const roster = (getState().lobby?.participants || []).map((p) => ({
     userId: p.userId,
@@ -2647,7 +2647,7 @@ export function tierNightToRemote({
   listName,
   topicEmoji,
 }) {
-  // Rank it (`consensus`) normalisé vers roster — plateau partagé Classe le groupe.
+  // Rank it (`consensus`) normalisé vers roster - plateau partagé Classe le groupe.
   let normalizedMode = "roster";
   if (mode === "live") normalizedMode = "live";
   else if (mode === "roster") normalizedMode = "roster";
@@ -3017,7 +3017,7 @@ export function applyRemoteEveningState(st) {
 }
 
 /**
- * FEATURE-TIERNIGHT-02 — replace complet de state en préservant
+ * FEATURE-TIERNIGHT-02 - replace complet de state en préservant
  * customRosterTopics côté serveur (transaction FOR UPDATE, anti lost-update).
  */
 async function upsertSessionPreservingRosterTopics({
@@ -3594,7 +3594,7 @@ function isInProgressPlayScreen(screen) {
   return isSessionInProgressPlay(screen);
 }
 
-/** Prep ou play reprenable (gate unique — bandeau game-select + getResumableSessionScreen). */
+/** Prep ou play reprenable (gate unique - bandeau game-select + getResumableSessionScreen). */
 export function isResumableSessionDestination(screen) {
   if (!screen) return false;
   return isOnGameSetupScreen(screen) || isSessionInProgressPlay(screen);
@@ -3874,13 +3874,13 @@ export function initMultiplayerSyncVisibility() {
   });
 }
 
-/** Tests ARCH-07 — réinitialise le listener visibility (singleton). */
+/** Tests ARCH-07 - réinitialise le listener visibility (singleton). */
 export function __testResetSyncVisibilityForTests() {
   syncVisibilityInit = false;
   syncPausedByHidden = false;
 }
 
-/** Tests ARCH-07 — logger foreground (robustesse erreurs). */
+/** Tests ARCH-07 - logger foreground (robustesse erreurs). */
 export { logForegroundLobbyRefreshFailure as __testLogForegroundLobbyRefreshFailure };
 export { normalizeForegroundCatchUpErrorForLog as __testNormalizeForegroundCatchUpErrorForLog };
 
@@ -4127,7 +4127,7 @@ async function pushGameSessionInner({ screen, gameId, state }) {
   const hostId = getSupabaseUserId();
   if (!hostId) throw new Error("Session requise.");
 
-  // FEATURE-TIERNIGHT-02 — un push complet (launchGameWithSync mode "push")
+  // FEATURE-TIERNIGHT-02 - un push complet (launchGameWithSync mode "push")
   // réécrivait tout `state` via updateGameSession à partir du cache local.
   // Si le cache était en retard sur les RPC invitées, customRosterTopics
   // était amputé côté serveur (hôte ne voyait plus que ses thèmes ; invité
@@ -4261,7 +4261,7 @@ export async function patchGameState(
 }
 
 /**
- * I-08 : invité / acting host — jamais d'UPDATE direct game_sessions.
+ * I-08 : invité / acting host - jamais d'UPDATE direct game_sessions.
  * Contributions simples → RPC contribute ; acting play → RPC host-play.
  */
 async function patchGameStateAsNonHost(
@@ -4488,7 +4488,7 @@ async function patchGameStateInner(
   }
 
   const current = freshRow?.state || cachedRow?.state || {};
-  // FEATURE-TIERNIGHT-02 — option recommandée : strip, pas merge.
+  // FEATURE-TIERNIGHT-02 - option recommandée : strip, pas merge.
   // Un patch générique ne doit jamais réécrire la collection (anti lost-update).
   const { safePayload: safeMergePayload, stripped: strippedRoster } =
     stripCustomRosterTopicsFromGenericPatch(mergePayload);
@@ -4928,7 +4928,7 @@ export function clearCachedGameSession() {
 }
 
 /**
- * ARCH-10 — invalidation précoce du cache session MP du lobby courant.
+ * ARCH-10 - invalidation précoce du cache session MP du lobby courant.
  * Idempotent : ne stoppe pas sync, ne touche pas membership ni navigation.
  */
 export function invalidateCurrentLobbySessionCache() {
@@ -4942,12 +4942,12 @@ export function clearCachedGameSessionUnlessForLobby(lobbyId) {
   }
 }
 
-/** Tests uniquement — injecte une ligne cache sans passer par applyRemoteSession. */
+/** Tests uniquement - injecte une ligne cache sans passer par applyRemoteSession. */
 export function __setCachedGameSessionRowForTests(row) {
   cachedRow = row;
 }
 
-/** Tests uniquement — remet le cache session à zéro. */
+/** Tests uniquement - remet le cache session à zéro. */
 export function __resetCachedGameSessionForTests() {
   clearCachedGameSession();
 }
@@ -5136,7 +5136,7 @@ export async function commitGuessLiePlay(patch, { screen, withEveningScores = fa
     return getState().guessLie;
   }
 
-  // actingRpc — miroir commitHostGamePlay : pas de saveLocal avant confirmation
+  // actingRpc - miroir commitHostGamePlay : pas de saveLocal avant confirmation
   const session = { ...getState().guessLie, ...patch };
   const playPatch = buildGuessLieActingPlayFields(guessLieToRemote(session), patch);
   const keyCheck = validateActingHostPlayPatch(playPatch);
@@ -5155,7 +5155,7 @@ export async function commitGuessLiePlay(patch, { screen, withEveningScores = fa
       }
     );
   } catch (err) {
-    // prev intact — aucun saveStatePatch avant succès
+    // prev intact - aucun saveStatePatch avant succès
     throw err;
   }
 

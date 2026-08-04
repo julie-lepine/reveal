@@ -1,6 +1,6 @@
 /**
- * UX-HIST-01 — joueurs pour classements / récaps de soirée (actifs + contributeurs partis).
- * Helpers purs (sans state) — sélecteurs live dans players.js.
+ * UX-HIST-01 - joueurs pour classements / récaps de soirée (actifs + contributeurs partis).
+ * Helpers purs (sans state) - sélecteurs live dans players.js.
  */
 
 /** Fallback affichage si le joueur n’est plus dans le roster. */

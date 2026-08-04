@@ -1,5 +1,5 @@
 /**
- * BUG-LOBBY-XX-E — copies produit pour fermeture de lobby (raison serveur).
+ * BUG-LOBBY-XX-E - copies produit pour fermeture de lobby (raison serveur).
  * Ne jamais attribuer à l'hôte sans reason === host_closed.
  */
 

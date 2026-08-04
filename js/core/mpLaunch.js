@@ -187,7 +187,7 @@ export async function launchGameWithSync({
 
 /**
  * Désactive un bouton pendant une action async (lancement, sync).
- * ARCH-22 : libellé « Lancement… » seulement après soft delay — pas de flash réseau rapide.
+ * ARCH-22 : libellé « Lancement… » seulement après soft delay - pas de flash réseau rapide.
  */
 export async function runLaunchButton(
   btn,
@@ -376,7 +376,7 @@ export async function commitHostGamePlay({
     }
   } catch (err) {
     saveLocal(prev);
-    arch03RevealLog("commitHostGamePlay RPC FAILED — local rolled back", {
+    arch03RevealLog("commitHostGamePlay RPC FAILED - local rolled back", {
       message: err?.message || String(err),
       code: err?.code || null,
       details: err?.details || null,
@@ -386,7 +386,7 @@ export async function commitHostGamePlay({
     throw err;
   }
 
-  arch03RevealLog("commitHostGamePlay RPC OK — server authoritative", {
+  arch03RevealLog("commitHostGamePlay RPC OK - server authoritative", {
     phaseNow: getSession()?.phase ?? null,
     sessionUpdatedAt: getCachedGameSession()?.updated_at || null,
     navigationNote: "UI doit sync via applyRemoteSession / onGameSessionChange",

@@ -1,5 +1,5 @@
 /**
- * M-04b / SYN-18 — timeout de patch sync avec clear du timer.
+ * M-04b / SYN-18 - timeout de patch sync avec clear du timer.
  * Pur / testable (sans gameSync ni Supabase).
  */
 import { SYNC_PATCH_TIMEOUT_MS } from "../config/syncConfig.js";

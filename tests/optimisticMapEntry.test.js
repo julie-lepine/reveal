@@ -1,5 +1,5 @@
 /**
- * SYN-VOTE-ROLLBACK-01 — helper map entry + guards run/phase.
+ * SYN-VOTE-ROLLBACK-01 - helper map entry + guards run/phase.
  */
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
@@ -9,7 +9,7 @@ import {
   canRollbackOptimisticSubmission,
 } from "../js/core/optimisticMapEntry.js";
 
-describe("optimisticMapEntry — apply", () => {
+describe("optimisticMapEntry - apply", () => {
   it("clé absente : ajoute sans hadPrevious", () => {
     const out = computeOptimisticMapEntryApply({
       map: { Bob: "A" },
@@ -41,7 +41,7 @@ describe("optimisticMapEntry — apply", () => {
   });
 });
 
-describe("optimisticMapEntry — rollback", () => {
+describe("optimisticMapEntry - rollback", () => {
   it("clé absente avant : delete réel (pas undefined)", () => {
     const apply = computeOptimisticMapEntryApply({ map: {}, key: "A", value: "v" });
     const rolled = rollbackOptimisticMapEntry({

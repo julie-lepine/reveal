@@ -395,7 +395,7 @@ export function saveStatePatch(patch) {
 }
 
 /**
- * SYN-15/16 — remplace les maps soirée après migrate roster (évite le shallow merge
+ * SYN-15/16 - remplace les maps soirée après migrate roster (évite le shallow merge
  * de saveStatePatch qui ne peut pas supprimer d'anciennes clés).
  * @param {{
  *   scores: Record<string, number>,
@@ -470,7 +470,7 @@ export function setLocalEmoji(emoji) {
  * - or: boolean OR (ready / dealAcks).
  * - maxStats: per-numeric-field Math.max for playerStats (aligns with mergePlayerStatsRecord).
  *
- * Note: `sum` is intentionally unused — cumulative maps can hold concurrent full copies of the
+ * Note: `sum` is intentionally unused - cumulative maps can hold concurrent full copies of the
  * same identity after a partial rename/sync; summing would double-count. Session deltas use
  * total − baseline, so baseline must use the same preferOld pairing as gameScores.
  */
@@ -533,7 +533,7 @@ function rewriteNameValues(record, oldName, newName) {
 
 /**
  * Rename a map key then rewrite any values equal to the old pseudo.
- * Key move happens once; value rewrite once — no derived recount.
+ * Key move happens once; value rewrite once - no derived recount.
  * UUID keys are untouched because they never equal the display name string.
  */
 function migrateNameKeyedMap(record, oldName, newName, mode = "preferOld") {
@@ -560,7 +560,7 @@ function migrateNameScalar(value, oldName, newName) {
   return value === oldName ? newName : value;
 }
 
-/** gameScores: { [gameId]: { [playerName]: number } } — preferOld pairs with baseline. */
+/** gameScores: { [gameId]: { [playerName]: number } } - preferOld pairs with baseline. */
 function migrateNestedGameScores(gameScores, oldName, newName) {
   if (!gameScores || typeof gameScores !== "object") return gameScores;
   const next = { ...gameScores };
@@ -626,7 +626,7 @@ function pickBetterTriviaStanding(a, b) {
 function migrateLastRoundNameMaps(lastRound, oldName, newName, opts = {}) {
   if (!lastRound || typeof lastRound !== "object") return lastRound;
   const next = { ...lastRound };
-  // lastRound deltas/counts are concurrent snapshots of one round — not fragments to add.
+  // lastRound deltas/counts are concurrent snapshots of one round - not fragments to add.
   if (next.deltas) next.deltas = mergeKeyedRecord(next.deltas, oldName, newName, "preferOld");
   if (next.counts) next.counts = mergeKeyedRecord(next.counts, oldName, newName, "preferOld");
   if (next.answers) next.answers = mergeKeyedRecord(next.answers, oldName, newName, "preferOld");
@@ -676,7 +676,7 @@ export function renameLocalPlayer(newName) {
 
   if (state.guessLie) {
     if (state.guessLie.submissions) {
-      // Atomic { statements, lie } — never field-merge two submissions.
+      // Atomic { statements, lie } - never field-merge two submissions.
       state.guessLie.submissions = mergeKeyedRecord(
         state.guessLie.submissions,
         oldName,
@@ -1020,7 +1020,7 @@ export function resetEveningState() {
   resetGameSessionsOnly();
   // Thèmes roster « Classe le groupe » : cycle de vie lobby (comme customTakes /
   // customDilemmas via hotTakeGame/dilemmaGame), pas une bibliothèque permanente.
-  // Ne pas placer dans resetGameSessionsOnly — doit survivre aux changements de jeu.
+  // Ne pas placer dans resetGameSessionsOnly - doit survivre aux changements de jeu.
   saveStatePatch({
     stats: defaultEveningStats(),
     eveningGamesRecorded: {},

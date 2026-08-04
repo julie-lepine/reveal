@@ -1,5 +1,5 @@
 /**
- * ARCH/BUG — Résidu de partie après changement de lobby.
+ * ARCH/BUG - Résidu de partie après changement de lobby.
  * Contrats lobbyBoundary + gardes consommateurs (sans DOM).
  */
 import { describe, it, beforeEach, afterEach } from "node:test";
@@ -70,7 +70,7 @@ function resolveLastGameForRestartGuard({ lastGame, row, currentLobbyId, syncAct
   return scopedLast;
 }
 
-describe("lobbyBoundary — contrats purs", () => {
+describe("lobbyBoundary - contrats purs", () => {
   it("isSessionRowForLobby exige lobby_id identique", () => {
     assert.equal(isSessionRowForLobby(ROW_A_GUESSLIE, "lobby-a"), true);
     assert.equal(isSessionRowForLobby(ROW_A_GUESSLIE, "lobby-b"), false);
@@ -98,7 +98,7 @@ describe("lobbyBoundary — contrats purs", () => {
   });
 });
 
-describe("Cas 1 — cache lobby A, création lobby B sans session", () => {
+describe("Cas 1 - cache lobby A, création lobby B sans session", () => {
   it("aucune reprise / routage / lastGame hérité", () => {
     const currentLobbyId = "lobby-b";
     const cachedRow = ROW_A_GUESSLIE;
@@ -120,7 +120,7 @@ describe("Cas 1 — cache lobby A, création lobby B sans session", () => {
   });
 });
 
-describe("Cas 2 — cache lobby A, lobby B possède une session", () => {
+describe("Cas 2 - cache lobby A, lobby B possède une session", () => {
   it("seule la session de B est exploitable après activation", () => {
     const currentLobbyId = "lobby-b";
     const staleA = ROW_A_GUESSLIE;
@@ -135,7 +135,7 @@ describe("Cas 2 — cache lobby A, lobby B possède une session", () => {
   });
 });
 
-describe("Cas 3 — erreur réseau pendant hydratation de B", () => {
+describe("Cas 3 - erreur réseau pendant hydratation de B", () => {
   it("resolveSessionRestoreOutcome : erreurs seules ≠ absence confirmée", () => {
     const allErrors = resolveSessionRestoreOutcome([
       { status: "error" },
@@ -165,7 +165,7 @@ describe("Cas 3 — erreur réseau pendant hydratation de B", () => {
   });
 });
 
-describe("Cas 4 — même lobby, remount / reconnexion", () => {
+describe("Cas 4 - même lobby, remount / reconnexion", () => {
   it("session du lobby courant reste exploitable", () => {
     const currentLobbyId = "lobby-a";
     assert.equal(shouldExposeCachedSession(ROW_A_GUESSLIE, currentLobbyId), true);
@@ -180,7 +180,7 @@ describe("Cas 4 — même lobby, remount / reconnexion", () => {
   });
 });
 
-describe("Cas 5 — Résultats puis nouvelle soirée (lastGame scope)", () => {
+describe("Cas 5 - Résultats puis nouvelle soirée (lastGame scope)", () => {
   let snapshot;
 
   beforeEach(() => {
@@ -223,7 +223,7 @@ describe("Cas 5 — Résultats puis nouvelle soirée (lastGame scope)", () => {
   });
 });
 
-describe("Cas 6 — teardown canonique (composants)", () => {
+describe("Cas 6 - teardown canonique (composants)", () => {
   it("frontière vers B invalide cache A", () => {
     assert.equal(shouldClearCachedSessionForLobbyBoundary(ROW_A_GUESSLIE, "lobby-b"), true);
   });
@@ -234,7 +234,7 @@ describe("Cas 6 — teardown canonique (composants)", () => {
   });
 });
 
-describe("Cas 7 — gardes consommateurs refusent foreign lobby_id", () => {
+describe("Cas 7 - gardes consommateurs refusent foreign lobby_id", () => {
   const foreign = ROW_A_GUESSLIE;
   const currentLobbyId = "lobby-b";
 
@@ -272,7 +272,7 @@ describe("Hydratation confirmée sans session (none)", () => {
   });
 });
 
-describe("Génération runtime — callbacks tardives", () => {
+describe("Génération runtime - callbacks tardives", () => {
   beforeEach(() => __resetLobbyRuntimeGenerationForTests());
   afterEach(() => __resetLobbyRuntimeGenerationForTests());
 
@@ -312,7 +312,7 @@ describe("Génération runtime — callbacks tardives", () => {
   });
 });
 
-describe("Offline — code réutilisé, localInstanceId unique", () => {
+describe("Offline - code réutilisé, localInstanceId unique", () => {
   let snapshot;
 
   beforeEach(() => {
@@ -359,7 +359,7 @@ describe("Offline — code réutilisé, localInstanceId unique", () => {
   });
 });
 
-describe("Join échoue depuis A — contrat rollback (miroir)", () => {
+describe("Join échoue depuis A - contrat rollback (miroir)", () => {
   it("snapshot préserve lastGame scope de A", () => {
     const lastGame = {
       gameId: "guesslie",

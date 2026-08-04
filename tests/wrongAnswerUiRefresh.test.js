@@ -17,7 +17,7 @@ import {
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const gameSrc = () => readFileSync(join(root, "js/games/wrongAnswer.js"), "utf8");
 
-describe("BUG-WAO-02/03 — shouldFullRenderWrongAnswer", () => {
+describe("BUG-WAO-02/03 - shouldFullRenderWrongAnswer", () => {
   it("1. même phase answer + answers-only → pas de full render", () => {
     assert.equal(
       shouldFullRenderWrongAnswer({
@@ -105,7 +105,7 @@ describe("BUG-WAO-02/03 — shouldFullRenderWrongAnswer", () => {
   });
 });
 
-describe("BUG-WAO-02 — decideWrongAnswerRemoteUi hard gate composition", () => {
+describe("BUG-WAO-02 - decideWrongAnswerRemoteUi hard gate composition", () => {
   it("answers-only + formulaire vivant → refresh-answer (pas full)", () => {
     const d = decideWrongAnswerRemoteUi({
       prevPhase: "answer",
@@ -172,7 +172,7 @@ describe("BUG-WAO-02 — decideWrongAnswerRemoteUi hard gate composition", () =>
   });
 });
 
-describe("BUG-WAO-02 — identité DOM #wrong-input (before === after)", () => {
+describe("BUG-WAO-02 - identité DOM #wrong-input (before === after)", () => {
   /** Mini DOM suffisant pour querySelector / innerHTML / replaceWith. */
   function miniDom(initialInner) {
     function el(tag, attrs = {}, children = []) {
@@ -277,7 +277,7 @@ describe("BUG-WAO-02 — identité DOM #wrong-input (before === after)", () => {
   });
 });
 
-describe("BUG-WAO-02 — textes chrome composition", () => {
+describe("BUG-WAO-02 - textes chrome composition", () => {
   it("en rédaction : message secret", () => {
     assert.match(
       wrongAnswerComposeStatusText({
@@ -318,7 +318,7 @@ describe("BUG-WAO-02 — textes chrome composition", () => {
   });
 });
 
-describe("BUG-WAO-04 — submit désactivé si réponse vide", () => {
+describe("BUG-WAO-04 - submit désactivé si réponse vide", () => {
   it("vide / espaces / null → disabled", () => {
     assert.equal(wrongAnswerSubmitDisabled(""), true);
     assert.equal(wrongAnswerSubmitDisabled("   "), true);
@@ -333,7 +333,7 @@ describe("BUG-WAO-04 — submit désactivé si réponse vide", () => {
   });
 });
 
-describe("BUG-WAO-03 — textes chrome vote", () => {
+describe("BUG-WAO-03 - textes chrome vote", () => {
   it("compteur votes + confirm state", () => {
     assert.match(
       wrongAnswerVoteStatusText({
@@ -365,7 +365,7 @@ describe("BUG-WAO-03 — textes chrome vote", () => {
   });
 });
 
-describe("BUG-WAO-02/03 — wiring wrongAnswer.js", () => {
+describe("BUG-WAO-02/03 - wiring wrongAnswer.js", () => {
   it("expose refresh ciblés et hard-gate decideWrongAnswerRemoteUi", () => {
     const src = gameSrc();
     assert.match(src, /function refreshWrongAnswerResponseProgress/);
@@ -382,7 +382,7 @@ describe("BUG-WAO-02/03 — wiring wrongAnswer.js", () => {
     );
   });
 
-  it("BUG-WAO-04 — CTA submit gated + sync sur input", () => {
+  it("BUG-WAO-04 - CTA submit gated + sync sur input", () => {
     const src = gameSrc();
     assert.match(src, /wrongAnswerSubmitDisabled/);
     assert.match(src, /function syncWrongAnswerSubmitEnabled/);

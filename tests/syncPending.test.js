@@ -14,13 +14,13 @@ describe("ARCH-22 createSyncPending", () => {
     mock.timers.reset();
   });
 
-  it("1 — état initial : visible false, token null", () => {
+  it("1 - état initial : visible false, token null", () => {
     const p = createSyncPending();
     assert.deepEqual(p.getState(), { visible: false, token: null });
     assert.equal(DEFAULT_SYNC_PENDING_SOFT_MS, 500);
   });
 
-  it("2 — start() crée un token et reste invisible avant soft delay", () => {
+  it("2 - start() crée un token et reste invisible avant soft delay", () => {
     const p = createSyncPending({ softDelayMs: 500 });
     const token = p.start();
     assert.equal(typeof token, "number");
@@ -28,14 +28,14 @@ describe("ARCH-22 createSyncPending", () => {
     assert.equal(p.getState().visible, false);
   });
 
-  it("3 — pending à 499 ms : toujours invisible", () => {
+  it("3 - pending à 499 ms : toujours invisible", () => {
     const p = createSyncPending({ softDelayMs: 500 });
     p.start();
     mock.timers.tick(499);
     assert.equal(p.getState().visible, false);
   });
 
-  it("4 — pending à 500 ms : visible", () => {
+  it("4 - pending à 500 ms : visible", () => {
     const changes = [];
     const p = createSyncPending({
       softDelayMs: 500,
@@ -47,7 +47,7 @@ describe("ARCH-22 createSyncPending", () => {
     assert.ok(changes.some((c) => c.visible === true));
   });
 
-  it("5 — end(token) avant 500 ms : jamais de passage visible tardif", () => {
+  it("5 - end(token) avant 500 ms : jamais de passage visible tardif", () => {
     const changes = [];
     const p = createSyncPending({
       softDelayMs: 500,
@@ -66,7 +66,7 @@ describe("ARCH-22 createSyncPending", () => {
     );
   });
 
-  it("6 — end(token) après visibilité : retour idle", () => {
+  it("6 - end(token) après visibilité : retour idle", () => {
     const p = createSyncPending({ softDelayMs: 500 });
     const token = p.start();
     mock.timers.tick(500);
@@ -75,7 +75,7 @@ describe("ARCH-22 createSyncPending", () => {
     assert.deepEqual(p.getState(), { visible: false, token: null });
   });
 
-  it("7 — start(A), start(B), end(A) : B reste courant", () => {
+  it("7 - start(A), start(B), end(A) : B reste courant", () => {
     const p = createSyncPending({ softDelayMs: 500 });
     const a = p.start();
     const b = p.start();
@@ -85,7 +85,7 @@ describe("ARCH-22 createSyncPending", () => {
     assert.equal(p.getState().visible, false);
   });
 
-  it("8 — timer de A ne rend pas B visible prématurément", () => {
+  it("8 - timer de A ne rend pas B visible prématurément", () => {
     const p = createSyncPending({ softDelayMs: 500 });
     p.start(); // A
     mock.timers.tick(400);
@@ -96,7 +96,7 @@ describe("ARCH-22 createSyncPending", () => {
     assert.equal(p.getState().visible, true);
   });
 
-  it("9 — end(B) termine correctement B", () => {
+  it("9 - end(B) termine correctement B", () => {
     const p = createSyncPending({ softDelayMs: 500 });
     p.start();
     const b = p.start();
@@ -106,7 +106,7 @@ describe("ARCH-22 createSyncPending", () => {
     assert.deepEqual(p.getState(), { visible: false, token: null });
   });
 
-  it("10 — dispose() avant expiration : aucun callback tardif", () => {
+  it("10 - dispose() avant expiration : aucun callback tardif", () => {
     let calls = 0;
     const p = createSyncPending({
       softDelayMs: 500,
@@ -122,7 +122,7 @@ describe("ARCH-22 createSyncPending", () => {
     assert.deepEqual(p.getState(), { visible: false, token: null });
   });
 
-  it("11 — dispose() après visibilité : aucun callback / effet tardif", () => {
+  it("11 - dispose() après visibilité : aucun callback / effet tardif", () => {
     let calls = 0;
     const p = createSyncPending({
       softDelayMs: 500,
@@ -139,7 +139,7 @@ describe("ARCH-22 createSyncPending", () => {
     assert.equal(calls, afterVisible);
   });
 
-  it("12 — dispose() répété sans erreur", () => {
+  it("12 - dispose() répété sans erreur", () => {
     const p = createSyncPending();
     p.start();
     p.dispose();
@@ -148,7 +148,7 @@ describe("ARCH-22 createSyncPending", () => {
     assert.deepEqual(p.getState(), { visible: false, token: null });
   });
 
-  it("13 — end() token inconnu / obsolète : no-op", () => {
+  it("13 - end() token inconnu / obsolète : no-op", () => {
     const p = createSyncPending({ softDelayMs: 500 });
     const a = p.start();
     const b = p.start();
@@ -160,7 +160,7 @@ describe("ARCH-22 createSyncPending", () => {
     assert.equal(p.getState().visible, true);
   });
 
-  it("14 — getState() ne mute pas l’état interne", () => {
+  it("14 - getState() ne mute pas l’état interne", () => {
     const p = createSyncPending({ softDelayMs: 500 });
     p.start();
     const s = p.getState();

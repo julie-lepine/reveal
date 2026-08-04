@@ -1,5 +1,5 @@
 /**
- * UX-TIERNIGHT-NAV-01 — hiérarchie navigation TierNight (création + un seul retour).
+ * UX-TIERNIGHT-NAV-01 - hiérarchie navigation TierNight (création + un seul retour).
  */
 import { describe, it, beforeEach } from "node:test";
 import assert from "node:assert/strict";
@@ -36,7 +36,7 @@ function fakeApp() {
   };
 }
 
-describe("UX-TIERNIGHT-NAV-01 — source navigation", () => {
+describe("UX-TIERNIGHT-NAV-01 - source navigation", () => {
   it("création roster réussie → returnToTierNightSelectStep topic/roster", () => {
     const create = read("js/screens/tierNightCreateRoster.js");
     assert.match(create, /returnToTierNightSelectStep/);
@@ -81,7 +81,7 @@ describe("UX-TIERNIGHT-NAV-01 — source navigation", () => {
   });
 });
 
-describe("UX-TIERNIGHT-NAV-01 — returnToTierNightSelectStep comportement", () => {
+describe("UX-TIERNIGHT-NAV-01 - returnToTierNightSelectStep comportement", () => {
   beforeEach(() => {
     globalThis.requestAnimationFrame = (fn) => {
       fn();

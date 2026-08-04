@@ -82,7 +82,7 @@ export function mountDilemma(app) {
   let unmounted = false;
   const localName = getLocalDisplayName();
   const mp = isGameSyncActive();
-  /** ARCH-22 — soft « Envoi… » ; ne remplace pas voteCommitInFlight. */
+  /** ARCH-22 - soft « Envoi… » ; ne remplace pas voteCommitInFlight. */
   const syncPending = createSyncPending({
     softDelayMs: 500,
     onChange: () => {

@@ -1,12 +1,12 @@
 /**
- * T-01 / T-02 — hydrate session au join avant sync/Realtime route.
+ * T-01 / T-02 - hydrate session au join avant sync/Realtime route.
  * Purs / testables (sans Supabase).
  */
 
 /** Délais restore après join (pas de tentative à 0 ms). */
 export const JOIN_SESSION_RESTORE_DELAYS_MS = Object.freeze([100, 350, 800, 1500]);
 
-/** Catch-up SUBSCRIBED uniquement — pas les events INSERT/UPDATE normaux. */
+/** Catch-up SUBSCRIBED uniquement - pas les events INSERT/UPDATE normaux. */
 export const SUBSCRIBED_ROUTE_DEBOUNCE_MS = 300;
 
 /**

@@ -1,5 +1,5 @@
 /**
- * Guess Lie vote commit — reveal bloqué pendant RPC + rollback / defer local.
+ * Guess Lie vote commit - reveal bloqué pendant RPC + rollback / defer local.
  */
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
@@ -143,7 +143,7 @@ describe("progression reveal pendant vote RPC", () => {
   });
 });
 
-describe("contrats source — commitGuessLieVote + tryAdvanceToReveal", () => {
+describe("contrats source - commitGuessLieVote + tryAdvanceToReveal", () => {
   const sessionSrc = readSrc("../js/core/guessLieSession.js");
   const gameSrc = readSrc("../js/games/guessLie.js");
 

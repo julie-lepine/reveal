@@ -1,5 +1,5 @@
 /**
- * UX-TIERNIGHT-END-01 / 02 — récap allégé + détail fusionné dans la carte locale.
+ * UX-TIERNIGHT-END-01 / 02 - récap allégé + détail fusionné dans la carte locale.
  */
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
@@ -23,7 +23,7 @@ function renderTemplateFromEndScreen() {
   return src.slice(start, end);
 }
 
-describe("UX-TIERNIGHT-END-01 — structure récap tiernight-end", () => {
+describe("UX-TIERNIGHT-END-01 - structure récap tiernight-end", () => {
   it("ne rend plus Points de la manche ni le leaderboard round", () => {
     const end = read("js/screens/tierNightEnd.js");
     assert.doesNotMatch(end, /tierNightRoundScoresHtml/);
@@ -73,7 +73,7 @@ describe("UX-TIERNIGHT-END-01 — structure récap tiernight-end", () => {
   });
 });
 
-describe("UX-TIERNIGHT-END-02 — détail fusionné dans la carte locale", () => {
+describe("UX-TIERNIGHT-END-02 - détail fusionné dans la carte locale", () => {
   it("plus de bloc séparé Détail de tes points / Total manche", () => {
     const end = read("js/screens/tierNightEnd.js");
     const tpl = renderTemplateFromEndScreen();

@@ -170,7 +170,7 @@ function isLocalLobbyHost() {
 }
 
 /**
- * ARCH-23 — gate attendu avant create / join / resume.
+ * ARCH-23 - gate attendu avant create / join / resume.
  * @param {"create"|"join"|"resume"} source
  */
 async function guardClientCompatibility(source) {
@@ -184,7 +184,7 @@ async function guardClientCompatibility(source) {
     presentCompatibilityGateIfNeeded(gate.result);
     return gate;
   }
-  // unknown pur (sans autorité incompatible) — alerte réseau, pas hard gate update.
+  // unknown pur (sans autorité incompatible) - alerte réseau, pas hard gate update.
   await showAppAlert(
     gate.message ||
       "Impossible de vérifier la compatibilité de l'application. Vérifie ta connexion et réessaie.",
@@ -249,7 +249,7 @@ function applyLeaveLobbyLocal({ wasGuest, navigateAway }) {
 /**
  * Teardown local canonique à chaque frontière de lobby (commit).
  * Ordre : invalider génération → arrêt sync → cache → reset soirée.
- * lastGame : scope lobby (state.js) — non effacé ici.
+ * lastGame : scope lobby (state.js) - non effacé ici.
  */
 export function performLobbyBoundaryTeardown() {
   bumpLobbyRuntimeGeneration();
@@ -524,7 +524,7 @@ export function hasActiveLobby() {
   return true;
 }
 
-/** E2 — promote snapshot après join Supabase finalisé (pas rollback / compensation). */
+/** E2 - promote snapshot après join Supabase finalisé (pas rollback / compensation). */
 function promoteMembershipSnapshotAfterJoinConfirmed(canonicalRow = null) {
   const userId = getSupabaseUserId();
   const lobby = getLobby();
@@ -898,7 +898,7 @@ export function getLobbyParticipants() {
 /**
  * Crée un lobby.
  *
- * Garde serveur (Vague C) : uniquement `queryActiveLobbyMembership()` —
+ * Garde serveur (Vague C) : uniquement `queryActiveLobbyMembership()` -
  * `found` / `unknown` → refus ; `none` → INSERT. `peekServerLobbyForUser`
  * (filtre 24 h) n’est plus une garde de création.
  *
@@ -1043,7 +1043,7 @@ export async function joinLobby(code) {
       }
       if (!res.ok) {
         await runFinalizeFailedJoinAttempt({ joinEffects, rollbackSnapshot });
-        // E4 — déjà membre ailleurs : re-query + hydrate soirée canonique.
+        // E4 - déjà membre ailleurs : re-query + hydrate soirée canonique.
         if (res.code === "membership_already_elsewhere") {
           const recovered = await recoverAfterMembershipAlreadyExists();
           if (recovered.ok) {
@@ -1196,7 +1196,7 @@ async function clearGuestSessionAfterFailedJoin() {
 }
 
 /**
- * BUG-LOBBY-XX-E — pipeline unique de disparition du lobby.
+ * BUG-LOBBY-XX-E - pipeline unique de disparition du lobby.
  * Source de vérité de la raison = tombstone serveur (get_lobby_closure).
  * Fallback générique : jamais d'attribution à l'hôte sans proof host_closed.
  *
@@ -1286,7 +1286,7 @@ export async function resolveLobbyClosureAndExit(opts = {}) {
 }
 
 /**
- * @deprecated alias — Realtime / gone → pipeline XX-E
+ * @deprecated alias - Realtime / gone → pipeline XX-E
  * @param {{ lobbyId?: string|null, source?: string }} [opts]
  */
 export async function handleLobbyDissolvedForGuest(opts = {}) {
@@ -1302,7 +1302,7 @@ export async function handleLobbyDissolvedForGuest(opts = {}) {
   });
 }
 
-/** Invité : retiré du lobby par l'hôte (kick) — membership locale absente côté serveur. */
+/** Invité : retiré du lobby par l'hôte (kick) - membership locale absente côté serveur. */
 export async function handleKickedFromLobby() {
   if (lobbyKickHandling || lobbyDissolveHandling) return;
   if (!getState().inLobby) return;
@@ -1340,7 +1340,7 @@ export async function handleKickedFromLobby() {
 }
 
 /**
- * E5 — après DISSOLVED / ALREADY_GONE (succès silencieux pour ALREADY_GONE).
+ * E5 - après DISSOLVED / ALREADY_GONE (succès silencieux pour ALREADY_GONE).
  */
 function applyHostDissolveLocalSuccess({ lobbyId, wasGuest, navigateAway }) {
   clearTraitrePrivateLocalForLobby(lobbyId);
@@ -1348,7 +1348,7 @@ function applyHostDissolveLocalSuccess({ lobbyId, wasGuest, navigateAway }) {
 }
 
 /**
- * E5 — timeout dissolve X puis membership vivante Y (≠ X).
+ * E5 - timeout dissolve X puis membership vivante Y (≠ X).
  * Ordre : drop cache X (sans Home, sans soft-hold) → snapshot Y déjà appliqué
  * en re-query → recover Y → goToLobby. Soft-hold bloquerait le chrome found Y.
  *
@@ -1404,7 +1404,7 @@ async function reconcileHostDissolveCanonicalElsewhere({
 }
 
 /**
- * E5 — NOT_ALLOWED : pas de wipe succès ; relecture membership E2.
+ * E5 - NOT_ALLOWED : pas de wipe succès ; relecture membership E2.
  */
 async function reconcileHostDissolveNotAllowed(lobbyId) {
   invalidateMembershipSnapshot();
@@ -1493,7 +1493,7 @@ export async function dissolveLobbyAsHost({ navigateAway = true } = {}) {
         canonicalLobbyId: res.canonicalLobbyId ?? null,
       });
     }
-    // E3 soft-hold — DISSOLVED et ALREADY_GONE (succès silencieux).
+    // E3 soft-hold - DISSOLVED et ALREADY_GONE (succès silencieux).
     // XX-E : supprimer la modale Realtime DELETE pour cet hôte (fermeture manuelle locale).
     if (lobbyId) {
       markLocalHostManualDissolve(lobbyId);
@@ -1564,7 +1564,7 @@ export async function notifyVoluntaryLeaveFailure(res, testDeps = null) {
  * Invité / membre : runVoluntaryMemberLeave (contrat échec distant strict).
  * Hôte : redirige vers confirmAndLeaveLobby → dissolve.
  *
- * Branche locale (pas de lobby.id Supabase) : démo / offline — cleanup immédiat
+ * Branche locale (pas de lobby.id Supabase) : démo / offline - cleanup immédiat
  * sans DELETE distant (voir runVoluntaryMemberLeave).
  */
 export async function leaveLobby({ navigateAway = true } = {}) {
@@ -1594,8 +1594,8 @@ export async function leaveLobby({ navigateAway = true } = {}) {
 }
 
 /**
- * Vague D — quitter / fermer depuis une membership serveur sans cache hydraté.
- * Identité : { lobbyId, code, role } du snapshot — pas state.lobby.
+ * Vague D - quitter / fermer depuis une membership serveur sans cache hydraté.
+ * Identité : { lobbyId, code, role } du snapshot - pas state.lobby.
  * Ne remplace pas leaveLobby / dissolveLobbyAsHost (pipeline cache-actif).
  *
  * @param {{ lobbyId: string, code?: string|null, role: "host"|"member" }} membership
@@ -1640,12 +1640,12 @@ export async function leaveLobbyMembershipFromServer(membership) {
     if (userId && membership?.lobbyId) {
       commitMembershipRemoved({ userId, lobbyId: membership.lobbyId });
     }
-    // E5 — localStorage Traître uniquement (SQL CASCADE déjà fait côté dissolve).
+    // E5 - localStorage Traître uniquement (SQL CASCADE déjà fait côté dissolve).
     if (result?.action === "dissolved" && membership?.lobbyId) {
       clearTraitrePrivateLocalForLobby(membership.lobbyId);
     }
     performLobbyBoundaryTeardown();
-    // AUTH-SERVER-LEAVE-GUEST-01 — même contrat guest que leave volontaire.
+    // AUTH-SERVER-LEAVE-GUEST-01 - même contrat guest que leave volontaire.
     await finalizeGuestAfterAuthoritativeLeave(
       { wasGuest, canonicalElsewhere: false },
       {

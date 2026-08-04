@@ -1,5 +1,5 @@
 /**
- * FEATURE-CHAT-03 — orchestration sync + CTA chat.
+ * FEATURE-CHAT-03 - orchestration sync + CTA chat.
  * Couche UX au-dessus de `launchCatalogGame` / `restartGame` (aucun fork de launch).
  *
  * Concurrence sondage : vote / consultation / création / fermeture de sondage
@@ -145,7 +145,7 @@ export function canControlChatRoulette() {
 
 /**
  * Visibilité CTA roulette (tous les joueurs).
- * Ne dépend PAS de `isChatRouletteBlockingLaunch` — une roulette active
+ * Ne dépend PAS de `isChatRouletteBlockingLaunch` - une roulette active
  * ne doit pas faire disparaître le bouton (ni le sondage voisin).
  * Le blocking ne protège que les lancements catalogue concurrents.
  */
@@ -471,7 +471,7 @@ async function hostBridgeToPoll() {
       openChatSheet();
 
       if (!openPoll) {
-        // Préremplit le formulaire create (hôte peut ajuster) — pas d'auto-create.
+        // Préremplit le formulaire create (hôte peut ajuster) - pas d'auto-create.
         openLobbyPollCreateFormForBridge(prefillIds);
       }
       // Sondage déjà ouvert : le sheet montre le vote existant (pas de 2e create).
@@ -510,7 +510,7 @@ async function hostLaunchSelected() {
       runWithChatRouletteLaunchPermit,
     } = await import("./restartGame.js");
 
-    // Permit ciblé : uniquement ce rouletteId + ce tile — nettoyé en finally.
+    // Permit ciblé : uniquement ce rouletteId + ce tile - nettoyé en finally.
     await runWithChatRouletteLaunchPermit(
       { rouletteId, tileId },
       () => launchCatalogGame(tileId)
@@ -768,7 +768,7 @@ export function mountChatRandomGameInChatSheet(sheetRoot) {
     ctaUnsubSession = null;
     ctaUnsubScreen?.();
     ctaUnsubScreen = null;
-    // Uniquement son slot — le sondage voisin reste intact.
+    // Uniquement son slot - le sondage voisin reste intact.
     if (ctaHost) {
       ctaHost.innerHTML = "";
       ctaHost.hidden = true;

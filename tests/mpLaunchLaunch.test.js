@@ -1,5 +1,5 @@
 /**
- * ARCH-08 — launchGameWithSync : retry observable + isolation commit / applyLocal.
+ * ARCH-08 - launchGameWithSync : retry observable + isolation commit / applyLocal.
  */
 import { describe, it, beforeEach, afterEach, mock } from "node:test";
 import assert from "node:assert/strict";
@@ -274,7 +274,7 @@ describe("ARCH-08 launchGameWithSync", () => {
     );
   });
 
-  it("9. retry non bloquant — fallback avant fin du retry", async () => {
+  it("9. retry non bloquant - fallback avant fin du retry", async () => {
     const initialErr = new Error("fail initial");
     let rejectRetry;
     const retryControlled = new Promise((_resolve, reject) => {
@@ -388,7 +388,7 @@ describe("M-14b onLocalApplied contract", () => {
     };
   }
 
-  it("1. remote-first, commit réussi — applyLocal puis onLocalApplied une fois", async () => {
+  it("1. remote-first, commit réussi - applyLocal puis onLocalApplied une fois", async () => {
     const { events, applyLocal, onLocalApplied } = trackedSideEffects();
     const result = await launchGameWithSync(
       baseLaunchOpts({ localFirst: false, applyLocal, onLocalApplied })
@@ -404,7 +404,7 @@ describe("M-14b onLocalApplied contract", () => {
     assert.equal(findStructuredWarn(warnings, "background_retry"), undefined);
   });
 
-  it("2. remote-first, commit échoué — fallback avec hook une fois", async () => {
+  it("2. remote-first, commit échoué - fallback avec hook une fois", async () => {
     const networkErr = new Error("network down");
     pushSequence(networkErr, SESSION_ROW);
 
@@ -425,7 +425,7 @@ describe("M-14b onLocalApplied contract", () => {
     assert.ok(findStructuredWarn(warnings, "initial_commit"));
   });
 
-  it("3. local-first, commit réussi — hook une fois avant commit", async () => {
+  it("3. local-first, commit réussi - hook une fois avant commit", async () => {
     /** @type {string[]} */
     const events = [];
     const applyLocal = mock.fn(() => {
@@ -449,7 +449,7 @@ describe("M-14b onLocalApplied contract", () => {
     assert.deepEqual(result, { ok: true });
   });
 
-  it("4. local-first, commit échoué — hook une fois, pas de second appel fallback", async () => {
+  it("4. local-first, commit échoué - hook une fois, pas de second appel fallback", async () => {
     const initialErr = new Error("gl initial");
     pushSequence(initialErr, new Error("gl retry"));
 
@@ -467,7 +467,7 @@ describe("M-14b onLocalApplied contract", () => {
     assert.equal(pushGameSessionMock.mock.callCount(), 2);
   });
 
-  it("5. solo / sync désactivée — applyLocal puis onLocalApplied", async () => {
+  it("5. solo / sync désactivée - applyLocal puis onLocalApplied", async () => {
     isGameSyncActiveMock.mock.mockImplementation(() => false);
 
     const { events, applyLocal, onLocalApplied } = trackedSideEffects();
@@ -482,7 +482,7 @@ describe("M-14b onLocalApplied contract", () => {
     assert.deepEqual(result, { ok: true });
   });
 
-  it("6. callback absent — pas de throw", async () => {
+  it("6. callback absent - pas de throw", async () => {
     const applyLocal = mock.fn();
     const result = await launchGameWithSync(
       baseLaunchOpts({ localFirst: false, applyLocal, onLocalApplied: undefined })

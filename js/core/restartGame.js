@@ -54,7 +54,7 @@ const restartLock = createActionLock();
 
 /**
  * Permit ponctuel pour lancer LE jeu tiré par LA roulette active.
- * Forme : `{ rouletteId, tileId }` — nettoyé dans `finally`.
+ * Forme : `{ rouletteId, tileId }` - nettoyé dans `finally`.
  * Impossible de réutiliser pour un autre jeu / une autre roulette.
  * @type {{ rouletteId: string, tileId: string }|null}
  */
@@ -79,7 +79,7 @@ export async function runWithChatRouletteLaunchPermit(permit, fn) {
   }
 }
 
-/** @deprecated — utiliser runWithChatRouletteLaunchPermit */
+/** @deprecated - utiliser runWithChatRouletteLaunchPermit */
 export async function runWithChatRouletteLaunchBypass(fn) {
   return fn();
 }
@@ -558,7 +558,7 @@ export async function restartGame(gameId) {
 }
 
 /**
- * FEATURE-CHAT-03 — lance un jeu depuis un id catalogue (tile),
+ * FEATURE-CHAT-03 - lance un jeu depuis un id catalogue (tile),
  * sans passer par game-select. Réutilise `restartGame` / launchers existants.
  * @param {string} tileId
  */
@@ -607,7 +607,7 @@ export function eveningRecapRestartButtonHtml(lastGame = resolveLastGameForResta
 
 /**
  * Bind « Recommencer une partie de X ».
- * L'exclusivité est dans `restartGame` (verrou logique), pas sur le nœud —
+ * L'exclusivité est dans `restartGame` (verrou logique), pas sur le nœud -
  * un re-render peut re-créer le bouton pendant l'await.
  */
 export function bindRestartGameButtons(root) {

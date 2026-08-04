@@ -1,5 +1,5 @@
 /**
- * Staging helper — provoque UNIQUE et imprime la forme d’erreur Supabase/PostgREST.
+ * Staging helper - provoque UNIQUE et imprime la forme d’erreur Supabase/PostgREST.
  *
  * Usage (après e4-01 + e4-02 sur le projet pointé par js/config/supabase.js) :
  *   node scripts/e4ProbeUniqueConflict.mjs

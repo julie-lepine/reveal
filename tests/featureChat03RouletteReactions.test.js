@@ -1,5 +1,5 @@
 /**
- * FEATURE-CHAT-03 — réactions éphémères roulette.
+ * FEATURE-CHAT-03 - réactions éphémères roulette.
  */
 import { describe, it, beforeEach } from "node:test";
 import assert from "node:assert/strict";
@@ -49,7 +49,7 @@ function baseEvent(over = {}) {
 
 beforeEach(() => {});
 
-describe("FEATURE-CHAT-03 — réactions éphémères", () => {
+describe("FEATURE-CHAT-03 - réactions éphémères", () => {
   it("1. quatre réactions définies", () => {
     assert.equal(CHAT_ROULETTE_REACTION_DEFS.length, 4);
     assert.deepEqual(
@@ -162,7 +162,7 @@ describe("FEATURE-CHAT-03 — réactions éphémères", () => {
     assert.deepEqual(spin.reactionsByUid, {});
   });
 
-  it("15–17. clear / launch / bridge — réactions absentes après replace", () => {
+  it("15–17. clear / launch / bridge - réactions absentes après replace", () => {
     const spin = buildChatRouletteSpinPayload(
       baseEvent({ reactionsByUid: { u1: "in" } }),
       { id: "hottake-prep" },
@@ -173,7 +173,7 @@ describe("FEATURE-CHAT-03 — réactions éphémères", () => {
     assert.equal(n, null);
   });
 
-  it("18–19. invité peut réagir — contrat handlers", () => {
+  it("18–19. invité peut réagir - contrat handlers", () => {
     const syncSrc = readFileSync(join(__dirname, "../js/core/chatRandomGame.js"), "utf8");
     assert.match(syncSrc, /onReaction:/);
     assert.match(syncSrc, /getLocalUid:/);
@@ -190,7 +190,7 @@ describe("FEATURE-CHAT-03 — réactions éphémères", () => {
     assert.equal(counts.funny, 1);
   });
 
-  it("21. join mid-result — map vide par défaut", () => {
+  it("21. join mid-result - map vide par défaut", () => {
     const ev = normalizeChatRouletteEvent(baseEvent());
     assert.deepEqual(ev.reactionsByUid, {});
   });
@@ -203,7 +203,7 @@ describe("FEATURE-CHAT-03 — réactions éphémères", () => {
     assert.match(src, /reactionCommitLock\.run/);
   });
 
-  it("23–24. reconnexion — signature réactions / reset attempt", () => {
+  it("23–24. reconnexion - signature réactions / reset attempt", () => {
     const sig1 = chatRouletteReactionsSignature({ u1: "in" });
     const sig2 = chatRouletteReactionsSignature({});
     assert.notEqual(sig1, sig2);
@@ -239,7 +239,7 @@ describe("FEATURE-CHAT-03 — réactions éphémères", () => {
     assert.match(restartSrc, /assertNoActiveChatRoulette/);
   });
 
-  it("contribution invité détectée — une seule clé uid", () => {
+  it("contribution invité détectée - une seule clé uid", () => {
     const uid = "11111111-1111-1111-1111-111111111111";
     const ok = detectChatRouletteReactionContribution(
       { chatRoulette: { reactionsByUid: { [uid]: "in" } } },
@@ -273,7 +273,7 @@ describe("FEATURE-CHAT-03 — réactions éphémères", () => {
   });
 });
 
-describe("FEATURE-CHAT-03 — contrats SQL RPC réactions", () => {
+describe("FEATURE-CHAT-03 - contrats SQL RPC réactions", () => {
   it("RPC contribute_chat_roulette_reaction présente", () => {
     const sql = readFileSync(
       join(__dirname, "../supabase/feature-chat-03-roulette-reactions.sql"),

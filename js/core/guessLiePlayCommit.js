@@ -1,5 +1,5 @@
 /**
- * Plan + champs play Guess The Lie (I-08 / ARCH-03) — purs, testables hors gameSync.
+ * Plan + champs play Guess The Lie (I-08 / ARCH-03) - purs, testables hors gameSync.
  */
 import { pickRemotePlayFields } from "./playPatch.js";
 import { ACTING_HOST_PLAY_ALLOWED_KEYS } from "./gameSessionSecurity.js";
@@ -26,8 +26,8 @@ export function planGuessLiePlayWrite({
 }
 
 /**
- * @param {object} fullRemote — typiquement guessLieToRemote(session)
- * @param {object} patch — patch local (clés à propager)
+ * @param {object} fullRemote - typiquement guessLieToRemote(session)
+ * @param {object} patch - patch local (clés à propager)
  */
 export function buildGuessLieActingPlayFields(fullRemote, patch) {
   const playPatch = pickRemotePlayFields(fullRemote, patch);

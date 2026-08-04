@@ -213,7 +213,7 @@ export function mountTruthMeter(app) {
   let authorFocusRound = -1;
   let suppressAuthorAutoFocus = false;
   const mount = createMountGuard();
-  // Affichage cosmétique uniquement — identité métier = UID (isLocalTruthMeterAuthorNow).
+  // Affichage cosmétique uniquement - identité métier = UID (isLocalTruthMeterAuthorNow).
   const localName = getLocalDisplayName();
   const mp = isGameSyncActive();
 
@@ -252,7 +252,7 @@ export function mountTruthMeter(app) {
     affirmation = s.affirmation || null;
     authorEstimate = s.authorEstimate;
     votes = { ...(s.votes || {}) };
-    // myVote = confirmation distante uniquement (01A) — pas le pending in-flight.
+    // myVote = confirmation distante uniquement (01A) - pas le pending in-flight.
     myVote = resolveConfirmedTruthMeterVote(s, localName);
     roundScored = Boolean(s.roundScored);
   }
@@ -535,7 +535,7 @@ export function mountTruthMeter(app) {
       if (!mount.isCurrentMount()) return;
 
       if (mp) {
-        // BUG-TRUTHMETER-01B — scoring serveur uniquement (pas de snapshot client).
+        // BUG-TRUTHMETER-01B - scoring serveur uniquement (pas de snapshot client).
         if (getTruthMeterSession().phase === "reveal" && alreadyScoredThisRound()) {
           syncFromSession();
           phase = "reveal";

@@ -1,5 +1,5 @@
 /**
- * AUTH leave orphans — contrat leave serveur + finalize guest + source wiring.
+ * AUTH leave orphans - contrat leave serveur + finalize guest + source wiring.
  */
 import { describe, it, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
@@ -26,7 +26,7 @@ function read(rel) {
   return readFileSync(join(ROOT, rel), "utf8");
 }
 
-describe("AUTH-LEAVE-SILENT-OK-01 — identité leaveLobbySupabase", () => {
+describe("AUTH-LEAVE-SILENT-OK-01 - identité leaveLobbySupabase", () => {
   it("lobby ID absent → ok:false + code stable", () => {
     const r = validateLeaveLobbySupabaseIdentity(null, "u-1");
     assert.equal(r.ok, false);
@@ -64,7 +64,7 @@ describe("AUTH-LEAVE-SILENT-OK-01 — identité leaveLobbySupabase", () => {
   });
 });
 
-describe("AUTH-LEAVE-SILENT-OK-01 — preuve DELETE", () => {
+describe("AUTH-LEAVE-SILENT-OK-01 - preuve DELETE", () => {
   it("rows deleted → ok deleted", () => {
     const r = interpretMembershipDeleteProof({ deletedRows: [{ id: "m1" }] });
     assert.equal(r.ok, true);
@@ -198,7 +198,7 @@ describe("AUTH-LEAVE-SILENT-OK-01 — preuve DELETE", () => {
   });
 });
 
-describe("AUTH-SERVER-LEAVE-GUEST-01 — finalize guest", () => {
+describe("AUTH-SERVER-LEAVE-GUEST-01 - finalize guest", () => {
   it("guest succès : signOut puis clear hint", async () => {
     const order = [];
     const r = await finalizeGuestAfterAuthoritativeLeave(
@@ -293,7 +293,7 @@ describe("AUTH-SERVER-LEAVE-GUEST-01 — finalize guest", () => {
   });
 });
 
-describe("AUTH-LOGOUT-MEMBER-01 — source logout", () => {
+describe("AUTH-LOGOUT-MEMBER-01 - source logout", () => {
   it("membre : résultat leave contrôlé avant signOut", () => {
     const src = read("js/core/auth.js");
     const start = src.indexOf("export async function logout");
@@ -337,7 +337,7 @@ describe("AUTH-LOGOUT-MEMBER-01 — source logout", () => {
   });
 });
 
-describe("AUTH-JOIN-GUEST-LEAVE-01 — joinLobbyAsGuest", () => {
+describe("AUTH-JOIN-GUEST-LEAVE-01 - joinLobbyAsGuest", () => {
   it("source : leave précédent contrôlé avant joinLobby", () => {
     const src = read("js/core/lobby.js");
     const start = src.indexOf("export async function joinLobbyAsGuest");
@@ -367,7 +367,7 @@ describe("AUTH-JOIN-GUEST-LEAVE-01 — joinLobbyAsGuest", () => {
   });
 });
 
-describe("AUTH leave orphans — CANONICAL_ELSEWHERE non-régression source", () => {
+describe("AUTH leave orphans - CANONICAL_ELSEWHERE non-régression source", () => {
   it("reconcile CANONICAL_ELSEWHERE n'appelle pas finalize guest full wipe auth", () => {
     const src = read("js/core/lobby.js");
     const start = src.indexOf("async function reconcileHostDissolveCanonicalElsewhere");

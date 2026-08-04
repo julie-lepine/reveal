@@ -1,5 +1,5 @@
 /**
- * Micro-diagnostic Realtime polls — probes A/B/C (temporaire).
+ * Micro-diagnostic Realtime polls - probes A/B/C (temporaire).
  * Activation : localStorage.setItem('reveal-poll-rt-isolate','1') puis reload dans un lobby.
  * Ou : node scripts/pollRealtimeIsolate.mjs <lobbyUuid>
  */
@@ -38,7 +38,7 @@ export function inspectLobbyIdForRealtimeFilter(lobbyId) {
 
 /**
  * Attend le premier statut terminal (SUBSCRIBED / CHANNEL_ERROR / TIMED_OUT / CLOSED).
- * @param {object} channel — RealtimeChannel
+ * @param {object} channel - RealtimeChannel
  * @param {number} [timeoutMs]
  */
 export function awaitChannelStatus(channel, timeoutMs = 8000) {
@@ -150,7 +150,7 @@ export function pollRtIsolateEnabled() {
   // ET décommenter le return ci-dessous si besoin ponctuel.
   try {
     if (localStorage.getItem("reveal-poll-rt-isolate") === "1") {
-      // Isolates volontairement off — le flag ne relance plus les probes.
+      // Isolates volontairement off - le flag ne relance plus les probes.
       return false;
     }
   } catch {

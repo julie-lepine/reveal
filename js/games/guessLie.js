@@ -64,7 +64,7 @@ export function mountGuessLie(app) {
 
   const mount = createMountGuard();
   const mp = isGameSyncActive();
-  /** ARCH-22 — soft « Envoi… » ; ne remplace pas voteCommitInFlight. */
+  /** ARCH-22 - soft « Envoi… » ; ne remplace pas voteCommitInFlight. */
   const syncPending = createSyncPending({
     softDelayMs: 500,
     onChange: () => {

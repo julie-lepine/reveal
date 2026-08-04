@@ -17,7 +17,7 @@ function loadFixtures() {
     }));
 }
 
-describe("triviaScoreEngine — golden fixtures", () => {
+describe("triviaScoreEngine - golden fixtures", () => {
   for (const { name, data } of loadFixtures()) {
     it(name, () => {
       const result = scoreTriviaRoundFromAnswers({
@@ -32,7 +32,7 @@ describe("triviaScoreEngine — golden fixtures", () => {
   }
 });
 
-describe("pickFastestTriviaEntry — tie-break stable", () => {
+describe("pickFastestTriviaEntry - tie-break stable", () => {
   it("answeredAt ASC puis uid ASC", () => {
     const fastest = pickFastestTriviaEntry([
       ["uid-z", { answeredAt: 100 }],
@@ -51,7 +51,7 @@ describe("pickFastestTriviaEntry — tie-break stable", () => {
   });
 });
 
-describe("isValidTriviaAnswerIndex — alignement SQL", () => {
+describe("isValidTriviaAnswerIndex - alignement SQL", () => {
   const base = {
     correctIndex: 1,
     correctAnswer: "B",
@@ -93,7 +93,7 @@ describe("isValidTriviaAnswerIndex — alignement SQL", () => {
   });
 });
 
-describe("sortCorrectEntriesForReveal — ordre correctPlayers", () => {
+describe("sortCorrectEntriesForReveal - ordre correctPlayers", () => {
   it("answeredAt ASC puis uid ASC", () => {
     const sorted = sortCorrectEntriesForReveal([
       ["b", { answerIndex: 1, answeredAt: 200 }],

@@ -1,5 +1,5 @@
 /**
- * Finalisation join échoué — compensation serveur puis rollback local.
+ * Finalisation join échoué - compensation serveur puis rollback local.
  * Exporté pour tests comportementaux.
  */
 import { needsJoinCompensation, markLobbyJoinFinalized } from "./lobbyJoinEffects.js";

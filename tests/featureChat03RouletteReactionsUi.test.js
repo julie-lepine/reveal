@@ -1,5 +1,5 @@
 /**
- * FEATURE-CHAT-03 — wiring UI réactions (phase / disabled / handlers).
+ * FEATURE-CHAT-03 - wiring UI réactions (phase / disabled / handlers).
  */
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
@@ -31,7 +31,7 @@ function spinEvent(over = {}) {
   };
 }
 
-describe("FEATURE-CHAT-03 — interactabilité réactions / phase", () => {
+describe("FEATURE-CHAT-03 - interactabilité réactions / phase", () => {
   it("1. phase result → réactions acceptées", () => {
     assert.equal(
       canAcceptChatRouletteReactions({ ...spinEvent(), phase: "result" }),
@@ -60,7 +60,7 @@ describe("FEATURE-CHAT-03 — interactabilité réactions / phase", () => {
     assert.match(syncSrc, /hostPublishSpinPhaseResult/);
   });
 
-  it("6–7. invité et hôte — pas de garde isHost sur réactions", () => {
+  it("6–7. invité et hôte - pas de garde isHost sur réactions", () => {
     const syncSrc = readFileSync(join(__dirname, "../js/core/chatRandomGame.js"), "utf8");
     assert.doesNotMatch(syncSrc, /isLobbyHost\(\)[\s\S]{0,80}onReaction/);
   });
@@ -98,7 +98,7 @@ describe("FEATURE-CHAT-03 — interactabilité réactions / phase", () => {
   });
 });
 
-describe("FEATURE-CHAT-03 — bug QA repro corrigé via phase partagée", () => {
+describe("FEATURE-CHAT-03 - bug QA repro corrigé via phase partagée", () => {
   it("spinning affiché localement n'active pas les réactions sans phase result", () => {
     const ev = spinEvent();
     assert.equal(ev.phase, "spinning");

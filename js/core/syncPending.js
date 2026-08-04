@@ -1,5 +1,5 @@
 /**
- * ARCH-22 — pending sync visible après délai soft.
+ * ARCH-22 - pending sync visible après délai soft.
  *
  * Gère uniquement : soft delay, tokens, timers, cleanup.
  * Pas de libellés, DOM, locks métier, réseau ni alertes.
@@ -86,7 +86,7 @@ export function createSyncPending({
     return snapshot();
   }
 
-  /** Idempotent — gèle timers et callbacks. */
+  /** Idempotent - gèle timers et callbacks. */
   function dispose() {
     if (disposed) return;
     disposed = true;

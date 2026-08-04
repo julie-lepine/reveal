@@ -1,5 +1,5 @@
 /**
- * Journal d'effets d'une tentative de join MP — purs / testables.
+ * Journal d'effets d'une tentative de join MP - purs / testables.
  */
 
 /** @typedef {'none'|'inserted'|'reclaimed'|'preexisting'} LobbyJoinMembershipOrigin */
@@ -44,8 +44,8 @@ export function markLobbyJoinFinalized(effects) {
 }
 
 /**
- * INSERT confirmé pendant cette tentative — éligible au DELETE compensation.
- * Reclaim confirmé (UPDATE user_id) — même DELETE que « Quitter le lobby ».
+ * INSERT confirmé pendant cette tentative - éligible au DELETE compensation.
+ * Reclaim confirmé (UPDATE user_id) - même DELETE que « Quitter le lobby ».
  * @param {LobbyJoinEffects|null|undefined} effects
  */
 export function shouldCompensateInsertedMembershipDelete(effects) {
@@ -60,7 +60,7 @@ export function shouldCompensateInsertedMembershipDelete(effects) {
 }
 
 /**
- * Reclaim avec mutation confirmée — DELETE équivalent au leave volontaire.
+ * Reclaim avec mutation confirmée - DELETE équivalent au leave volontaire.
  * @param {LobbyJoinEffects|null|undefined} effects
  */
 export function shouldCompensateReclaimedMembershipDelete(effects) {

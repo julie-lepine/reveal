@@ -9,7 +9,7 @@ const TRUTHMETER_REVEAL_ERROR_MESSAGES = {
     "Action TruthMeter indisponible : migration SQL 01B non appliquée sur Supabase. Exécute game-sessions-truthmeter-01b-reveal-round.sql puis relance une partie.",
 };
 
-/** Messages joueur — soumission de vote (jamais de vocabulaire « révéler » / ops). */
+/** Messages joueur - soumission de vote (jamais de vocabulaire « révéler » / ops). */
 const TRUTHMETER_VOTE_ERROR_MESSAGES = {
   TRUTHMETER_STALE_RUN:
     "La partie n'est plus disponible. Reviens au lobby puis réessaie.",

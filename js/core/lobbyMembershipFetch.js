@@ -1,5 +1,5 @@
 /**
- * API production — résolution membership lobby (Vague A).
+ * API production - résolution membership lobby (Vague A).
  *
  * Convention d’import runtime (Vague B+) :
  *   import { queryActiveLobbyMembership } from "../core/lobbyMembershipFetch.js";

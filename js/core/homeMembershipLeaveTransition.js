@@ -1,14 +1,14 @@
 /**
- * Vague E3 — marqueur UI process-level post-leave (pas une SoT membership).
+ * Vague E3 - marqueur UI process-level post-leave (pas une SoT membership).
  *
  * Après DELETE/dissolve confirmé, le snapshot est null jusqu’à la query.
  * Ce marqueur empêche le chrome générique `checking` pendant cette fenêtre.
- * Mémoire process uniquement — pas de localStorage / sessionStorage.
+ * Mémoire process uniquement - pas de localStorage / sessionStorage.
  */
 
 let active = false;
 let generation = 0;
-/** Compteurs tests — une mutation volontaire réussie ⇒ 1 begin + 1 end correspondant. */
+/** Compteurs tests - une mutation volontaire réussie ⇒ 1 begin + 1 end correspondant. */
 let beginCallCount = 0;
 let endCallCount = 0;
 

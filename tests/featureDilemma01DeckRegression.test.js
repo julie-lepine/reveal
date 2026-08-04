@@ -1,6 +1,6 @@
 /**
 
- * FEATURE-DILEMMA-01 — politique d'inclusion customs dans le deck.
+ * FEATURE-DILEMMA-01 - politique d'inclusion customs dans le deck.
 
  */
 
@@ -116,7 +116,7 @@ function build(opts) {
 
 
 
-describe("FEATURE-DILEMMA-01 — politique inclusion customs (4 cas)", () => {
+describe("FEATURE-DILEMMA-01 - politique inclusion customs (4 cas)", () => {
 
   it("cas 1 : 0 custom + 8 manches → 8 prédéfinis", () => {
 
@@ -334,7 +334,7 @@ describe("FEATURE-DILEMMA-01 — politique inclusion customs (4 cas)", () => {
 
 
 
-describe("FEATURE-DILEMMA-01 — shuffle et ordre", () => {
+describe("FEATURE-DILEMMA-01 - shuffle et ordre", () => {
 
   it("prédéfini peut apparaître avant custom (cas mixte)", () => {
 
@@ -514,7 +514,7 @@ describe("FEATURE-DILEMMA-01 — shuffle et ordre", () => {
 
 
 
-describe("FEATURE-DILEMMA-01 — déduplication et collisions", () => {
+describe("FEATURE-DILEMMA-01 - déduplication et collisions", () => {
 
   it("IDs finaux uniques", () => {
 
@@ -670,7 +670,7 @@ describe("FEATURE-DILEMMA-01 — déduplication et collisions", () => {
 
 
 
-describe("FEATURE-DILEMMA-01 — chemin session et codec", () => {
+describe("FEATURE-DILEMMA-01 - chemin session et codec", () => {
 
   let snapshot;
 

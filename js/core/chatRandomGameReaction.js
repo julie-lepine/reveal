@@ -1,5 +1,5 @@
 /**
- * FEATURE-CHAT-03 — réactions éphémères roulette (commit + optimisme).
+ * FEATURE-CHAT-03 - réactions éphémères roulette (commit + optimisme).
  */
 import { createActionLock } from "./actionLock.js";
 import {
@@ -61,7 +61,7 @@ export function onChatRouletteRemoteEvent(ev) {
 }
 
 /**
- * Persistance atomique serveur — RPC unique hôte + invités.
+ * Persistance atomique serveur - RPC unique hôte + invités.
  * `contribute_chat_roulette_reaction` : SELECT … FOR UPDATE + jsonb_set sur une clé UID.
  *
  * @param {{ reaction: string|null }} input

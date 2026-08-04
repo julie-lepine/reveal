@@ -1,5 +1,5 @@
 /**
- * ARCH-07 — catch-up Realtime P0 (SUBSCRIBED + contrats source).
+ * ARCH-07 - catch-up Realtime P0 (SUBSCRIBED + contrats source).
  */
 import { describe, it, beforeEach, afterEach, mock } from "node:test";
 import assert from "node:assert/strict";
@@ -297,14 +297,14 @@ describe("ARCH-07 SUBSCRIBED catch-up", () => {
     console.warn = origWarn;
   });
 
-  it("1. refresh initial réussi — aucun warning, routing conservé", async () => {
+  it("1. refresh initial réussi - aucun warning, routing conservé", async () => {
     await runSubscribedSessionCatchUp({ lobbyId: LOBBY_ID, channelGeneration: CHANNEL_GEN });
     assert.equal(refreshGameSessionMock.mock.callCount(), 1);
     assert.equal(handleSessionRouteMock.mock.callCount(), 1);
     assert.equal(findMpRtWarn(warnings), undefined);
   });
 
-  it("2. refresh rejeté puis retry réussi — warning attempt 1, deux refresh, un routing", async () => {
+  it("2. refresh rejeté puis retry réussi - warning attempt 1, deux refresh, un routing", async () => {
     refreshSequence(new Error("network"), SESSION_ROW);
     await runSubscribedSessionCatchUp({ lobbyId: LOBBY_ID, channelGeneration: CHANNEL_GEN });
     assert.equal(refreshGameSessionMock.mock.callCount(), 2);
@@ -313,7 +313,7 @@ describe("ARCH-07 SUBSCRIBED catch-up", () => {
     assert.equal(findMpRtWarn(warnings, { attempt: 2 }), undefined);
   });
 
-  it("3. refresh initial et retry rejetés — deux refresh, deux warnings, pas de 3e", async () => {
+  it("3. refresh initial et retry rejetés - deux refresh, deux warnings, pas de 3e", async () => {
     refreshSequence(new Error("fail-1"), new Error("fail-2"), new Error("fail-3"));
     await runSubscribedSessionCatchUp({ lobbyId: LOBBY_ID, channelGeneration: CHANNEL_GEN });
     assert.equal(refreshGameSessionMock.mock.callCount(), 2);
@@ -324,7 +324,7 @@ describe("ARCH-07 SUBSCRIBED catch-up", () => {
     assert.deepEqual(attempts, [1, 2]);
   });
 
-  it("4. contexte stale après échec initial — warning 1, pas de retry ni routing", async () => {
+  it("4. contexte stale après échec initial - warning 1, pas de retry ni routing", async () => {
     refreshGameSessionMock.mock.mockImplementation(async () => {
       __testPatchSubscribedCatchUpLobbyState({ presenceLobbyId: null });
       throw new Error("network");
@@ -336,7 +336,7 @@ describe("ARCH-07 SUBSCRIBED catch-up", () => {
     assert.equal(findMpRtWarn(warnings, { attempt: 2 }), undefined);
   });
 
-  it("5. contexte stale après retry réussi — pas de schedule tardif", async () => {
+  it("5. contexte stale après retry réussi - pas de schedule tardif", async () => {
     refreshGameSessionMock.mock.mockImplementation(async () => {
       if (refreshGameSessionMock.mock.callCount() === 1) {
         throw new Error("network");
@@ -348,7 +348,7 @@ describe("ARCH-07 SUBSCRIBED catch-up", () => {
     assert.equal(handleSessionRouteMock.mock.callCount(), 0);
   });
 
-  it("6. deux SUBSCRIBED même gen — une chaîne in-flight, deux refresh max", async () => {
+  it("6. deux SUBSCRIBED même gen - une chaîne in-flight, deux refresh max", async () => {
     let inFlight = 0;
     refreshGameSessionMock.mock.mockImplementation(async () => {
       inFlight += 1;
@@ -364,7 +364,7 @@ describe("ARCH-07 SUBSCRIBED catch-up", () => {
     assert.equal(handleSessionRouteMock.mock.callCount(), 1);
   });
 
-  it("7. nouvelle génération — ancienne chaîne ne route pas, nouvelle exécute", async () => {
+  it("7. nouvelle génération - ancienne chaîne ne route pas, nouvelle exécute", async () => {
     let bumped = false;
     refreshGameSessionMock.mock.mockImplementation(async () => {
       if (!bumped) {
@@ -386,21 +386,21 @@ describe("ARCH-07 SUBSCRIBED catch-up", () => {
     assert.equal(handleSessionRouteMock.mock.callCount(), 1);
   });
 
-  it("8. row === null — aucun routing ni warning failure", async () => {
+  it("8. row === null - aucun routing ni warning failure", async () => {
     refreshGameSessionMock.mock.mockImplementation(async () => null);
     await runSubscribedSessionCatchUp({ lobbyId: LOBBY_ID, channelGeneration: CHANNEL_GEN });
     assert.equal(handleSessionRouteMock.mock.callCount(), 0);
     assert.equal(findMpRtWarn(warnings), undefined);
   });
 
-  it("9. gate joinSessionHydrating fermée — pas de routing, refresh autorisé", async () => {
+  it("9. gate joinSessionHydrating fermée - pas de routing, refresh autorisé", async () => {
     __testPatchSubscribedCatchUpLobbyState({ joinSessionHydrating: true });
     await runSubscribedSessionCatchUp({ lobbyId: LOBBY_ID, channelGeneration: CHANNEL_GEN });
     assert.equal(refreshGameSessionMock.mock.callCount(), 1);
     assert.equal(handleSessionRouteMock.mock.callCount(), 0);
   });
 
-  it("10. erreur schedule_route — warning stage schedule_route, pas de retry réseau", async () => {
+  it("10. erreur schedule_route - warning stage schedule_route, pas de retry réseau", async () => {
     scheduleThrows = true;
     await runSubscribedSessionCatchUp({ lobbyId: LOBBY_ID, channelGeneration: CHANNEL_GEN });
     assert.equal(refreshGameSessionMock.mock.callCount(), 1);
@@ -460,7 +460,7 @@ describe("ARCH-07 contrats log SUBSCRIBED", () => {
     assert.equal(Object.hasOwn(payload, "participants"), false);
   });
 
-  it("19. logger robuste — null, chaîne, objet non-Error", () => {
+  it("19. logger robuste - null, chaîne, objet non-Error", () => {
     assert.deepEqual(__testNormalizeCatchUpErrorForLog(null), {
       errorName: "Error",
       errorMessage: "null",
@@ -509,14 +509,14 @@ describe("ARCH-07 contrats source gameSync foreground", () => {
   const visibilityBlock =
     gameSyncSrc.match(/export function initMultiplayerSyncVisibility[\s\S]*?^}/m)?.[0] || "";
 
-  it("13. passage visible — refresh lobby toujours appelé", () => {
+  it("13. passage visible - refresh lobby toujours appelé", () => {
     assert.match(visibilityBlock, /m\.refreshLobbyFromSupabase\?\.\(\)\.catch\(/);
     assert.match(visibilityBlock, /logForegroundLobbyRefreshFailure/);
     assert.match(visibilityBlock, /resubscribeLobbyRealtime/);
     assert.match(visibilityBlock, /void syncTick\(\)/);
   });
 
-  it("14. refresh lobby rejeté — log foreground (contrat source)", () => {
+  it("14. refresh lobby rejeté - log foreground (contrat source)", () => {
     assert.match(foregroundLogBlock, /phase: "foreground_refresh"/);
     assert.match(foregroundLogBlock, /stage: "refresh_lobby"/);
     assert.match(foregroundLogBlock, /attempt: 1/);

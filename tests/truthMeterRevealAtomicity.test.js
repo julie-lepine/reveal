@@ -1,5 +1,5 @@
 /**
- * BUG-TRUTHMETER-01B — contrats chemins MP reveal (pas de score client live).
+ * BUG-TRUTHMETER-01B - contrats chemins MP reveal (pas de score client live).
  * Les verrous SQL réels sont prouvés par les scripts SQL rollback / runbook concurrence.
  */
 import { describe, it } from "node:test";
@@ -28,7 +28,7 @@ const sql01b = readFileSync(
   "utf8"
 );
 
-describe("BUG-TRUTHMETER-01B — chemins MP sans score client", () => {
+describe("BUG-TRUTHMETER-01B - chemins MP sans score client", () => {
   it("transitionToReveal MP appelle commitTruthMeterReveal, pas awardTruthMeterRound", () => {
     const start = truthJs.indexOf("async function transitionToReveal");
     const end = truthJs.indexOf("async function goToReveal", start);
@@ -92,7 +92,7 @@ describe("BUG-TRUTHMETER-01B — chemins MP sans score client", () => {
   });
 });
 
-describe("BUG-TRUTHMETER-01B — SQL contrats atomiques (source)", () => {
+describe("BUG-TRUTHMETER-01B - SQL contrats atomiques (source)", () => {
   it("reveal et submit partagent truth_meter_apply_reveal_scoring", () => {
     assert.match(sql01b, /create or replace function public\.truth_meter_apply_reveal_scoring/);
     assert.match(
@@ -128,7 +128,7 @@ describe("BUG-TRUTHMETER-01B — SQL contrats atomiques (source)", () => {
   });
 });
 
-describe("BUG-TRUTHMETER-01B — erreurs vote / recovery", () => {
+describe("BUG-TRUTHMETER-01B - erreurs vote / recovery", () => {
   it("vote tardif → message dédié sans Réessaie", () => {
     const mapped = mapTruthMeterVoteRpcError(new Error("TRUTHMETER_INVALID_PHASE"));
     assert.match(mapped.message, /révélation a déjà commencé/i);

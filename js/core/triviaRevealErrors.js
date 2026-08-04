@@ -9,7 +9,7 @@ const TRIVIA_REVEAL_ERROR_MESSAGES = {
     "Action Trivia indisponible : migrations SQL 01B / 01B-bis non appliquées sur Supabase. Exécute les scripts trivia puis relance une partie.",
 };
 
-/** Messages joueur — soumission de réponse (jamais de vocabulaire « révéler » / ops). */
+/** Messages joueur - soumission de réponse (jamais de vocabulaire « révéler » / ops). */
 const TRIVIA_ANSWER_ERROR_MESSAGES = {
   TRIVIA_STALE_RUN:
     "La partie n'est plus disponible. Reviens au lobby puis réessaie.",
@@ -80,7 +80,7 @@ export function mapTriviaRevealRpcError(err) {
 
 /**
  * Mapper dédié soumission de réponse (BUG-TRIVIA-01C).
- * Toujours un message joueur — jamais de détail migration / « révéler ».
+ * Toujours un message joueur - jamais de détail migration / « révéler ».
  */
 export function mapTriviaAnswerRpcError(err) {
   const coded = mapTriviaCodedError(err, TRIVIA_ANSWER_ERROR_MESSAGES);

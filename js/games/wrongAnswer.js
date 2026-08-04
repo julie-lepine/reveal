@@ -401,7 +401,7 @@ export function mountWrongAnswer(app) {
       })}`;
   }
 
-  /** BUG-WAO-02 — chrome phase réponse sans toucher #wrong-input ni slot.innerHTML. */
+  /** BUG-WAO-02 - chrome phase réponse sans toucher #wrong-input ni slot.innerHTML. */
   function refreshWrongAnswerResponseProgress() {
     if (!mount.isMounted() || !mount.isCurrentMount()) return;
     if (phase !== "answer") return;
@@ -437,7 +437,7 @@ export function mountWrongAnswer(app) {
     });
   }
 
-  /** BUG-WAO-03 — chrome phase vote sans reconstruire #wrong-vote-list. */
+  /** BUG-WAO-03 - chrome phase vote sans reconstruire #wrong-vote-list. */
   function refreshWrongAnswerVoteProgress() {
     if (!mount.isMounted() || !mount.isCurrentMount()) return;
     if (phase !== "voting") return;
@@ -555,7 +555,7 @@ export function mountWrongAnswer(app) {
     bindPhaseEvents();
   }
 
-  /** BUG-WAO-04 — sync disabled du CTA depuis la valeur live du textarea (pas draft stale). */
+  /** BUG-WAO-04 - sync disabled du CTA depuis la valeur live du textarea (pas draft stale). */
   function syncWrongAnswerSubmitEnabled() {
     const submit = app.querySelector("#wrong-submit");
     if (!submit) return;
@@ -635,7 +635,7 @@ export function mountWrongAnswer(app) {
         const target = btn.getAttribute("data-vote");
         if (target === localName) return;
         selectedTarget = target;
-        // BUG-WAO-03 : pas de full render — conserve scroll + nœuds de liste.
+        // BUG-WAO-03 : pas de full render - conserve scroll + nœuds de liste.
         refreshWrongAnswerVoteProgress();
       });
     });
@@ -731,7 +731,7 @@ export function mountWrongAnswer(app) {
     if (!mount.isCurrentMount()) return;
     if (stopGameSessionListenerOnPostGame(row)) return;
 
-    // Snapshot AVANT sync — vérité du dernier rendu local (pas le store déjà muté).
+    // Snapshot AVANT sync - vérité du dernier rendu local (pas le store déjà muté).
     const prevPhase = phase;
     const prevRound = roundIdx;
     const prevAuthorsSig = voteListAuthorsSig();

@@ -5,7 +5,7 @@ const TRIVIA_SOFT_ANSWER_CODES = new Set([
   "TRIVIA_ANSWER_UNKNOWN",
 ]);
 
-/** Erreur RPC métier Trivia — pas de recovery timeout. */
+/** Erreur RPC métier Trivia - pas de recovery timeout. */
 export function isTriviaRevealBusinessError(err) {
   const code = triviaRevealErrorCode(err);
   return Boolean(code) && !TRIVIA_SOFT_ANSWER_CODES.has(code);

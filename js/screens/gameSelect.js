@@ -418,7 +418,7 @@ export function mountGameSelect(app) {
   }
 
   const unsubLobby = onLobbyBundleUpdated(() => {
-    // Toujours re-évaluer le snapshot hub (mayClaim / claimHubTok) — le catchup
+    // Toujours re-évaluer le snapshot hub (mayClaim / claimHubTok) - le catchup
     // session seul ne suffit pas quand seul un bit de présence (hc/hp) bascule.
     const mayClaim = clientMayOfferHostClaim();
     arch03LiveLog("ARCH03B-LIVE", "hub UI nudge", {

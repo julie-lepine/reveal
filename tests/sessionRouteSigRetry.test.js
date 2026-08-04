@@ -1,6 +1,6 @@
 /**
  * Retry de navigation après un premier refus (suppress) alors que la sig session
- * n'a pas changé — miroir de la logique applyRemoteSession sig_unchanged + forceFollow.
+ * n'a pas changé - miroir de la logique applyRemoteSession sig_unchanged + forceFollow.
  */
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";

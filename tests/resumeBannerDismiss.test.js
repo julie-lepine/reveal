@@ -15,7 +15,7 @@ import {
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 
-describe("UX-RESUME-BANNER — dismiss game-select", () => {
+describe("UX-RESUME-BANNER - dismiss game-select", () => {
   beforeEach(() => {
     __resetResumeBannerDismissForTests();
   });

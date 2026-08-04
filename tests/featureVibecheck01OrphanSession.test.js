@@ -1,8 +1,8 @@
 /**
- * FEATURE-VIBECHECK-01 — session orpheline playlistguess / écran non enregistré.
+ * FEATURE-VIBECHECK-01 - session orpheline playlistguess / écran non enregistré.
  * - contrat source (guards gameSync + isScreenRegistered)
  * - comportement router (navigate refuse l'écran absent)
- * - miroir local des guards (sans importer gameSync — graphe ESM https)
+ * - miroir local des guards (sans importer gameSync - graphe ESM https)
  */
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
@@ -54,7 +54,7 @@ function mirrorRouteTarget(screen, registered) {
   return registered.has(screen) || screen === "lobby" ? screen : "game-select";
 }
 
-describe("FEATURE-VIBECHECK-01 orphan screens — source", () => {
+describe("FEATURE-VIBECHECK-01 orphan screens - source", () => {
   it("exporte isScreenRegistered", () => {
     assert.match(routerSrc, /export function isScreenRegistered/);
   });
@@ -87,7 +87,7 @@ describe("FEATURE-VIBECHECK-01 orphan screens — source", () => {
   });
 });
 
-describe("FEATURE-VIBECHECK-01 orphan screens — miroir", () => {
+describe("FEATURE-VIBECHECK-01 orphan screens - miroir", () => {
   const registered = new Set(["home", "lobby", "game-select", "hottake"]);
 
   it("playlistguess n'est pas play / actif / reprenable", () => {
@@ -107,7 +107,7 @@ describe("FEATURE-VIBECHECK-01 orphan screens — miroir", () => {
   });
 });
 
-describe("FEATURE-VIBECHECK-01 orphan screens — router (sans mount DOM)", () => {
+describe("FEATURE-VIBECHECK-01 orphan screens - router (sans mount DOM)", () => {
   it("isScreenRegistered refuse playlistguess sans initRouter", () => {
     // Pas d'enregistrement de ces ids dans main.js → false même après boot.
     assert.equal(isScreenRegistered("playlistguess"), false);

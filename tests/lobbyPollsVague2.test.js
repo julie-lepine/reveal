@@ -1,5 +1,5 @@
 /**
- * Vague 2 — sondages : logique store (votes actifs, droits, égalité).
+ * Vague 2 - sondages : logique store (votes actifs, droits, égalité).
  */
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";

@@ -77,7 +77,7 @@ function consensusBoardHtml(consensus, labelFn = (i) => i) {
 }
 
 /**
- * UX-TIERNIGHT-END-02 — détail scoring intégré à la carte récap locale uniquement.
+ * UX-TIERNIGHT-END-02 - détail scoring intégré à la carte récap locale uniquement.
  * Autres joueurs : tierlist compacte inchangée.
  */
 function recapCardHtml(r, { isLocal = false, breakdown = null, labelFn = (i) => i } = {}) {

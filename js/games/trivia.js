@@ -66,7 +66,7 @@ export function mountTrivia(app) {
   let eveningPodiumApplied = false;
   let answerCommitInFlight = false;
   let pendingAnswerIndex = null;
-  /** Dernier envoi a échoué — pending conservé, hint honnête (01C). */
+  /** Dernier envoi a échoué - pending conservé, hint honnête (01C). */
   let answerCommitFailed = false;
   let sessionRunId = trivia.getSession().runId || null;
   const replayLaunchLock = createActionLock();
@@ -295,7 +295,7 @@ export function mountTrivia(app) {
   }
 
   /**
-   * Relance MP via startGameSession — alerte hôte si échec, pas de patch local anticipé.
+   * Relance MP via startGameSession - alerte hôte si échec, pas de patch local anticipé.
    * @returns {Promise<boolean>} true si la session distante a démarré
    */
   async function startTriviaRemoteRestart(screen, triviaSession) {

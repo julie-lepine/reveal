@@ -1,5 +1,5 @@
 /**
- * Pré-résolution Vague A — gardes entry au mount prep (alignement Trivia/Consensus/Traître).
+ * Pré-résolution Vague A - gardes entry au mount prep (alignement Trivia/Consensus/Traître).
  * Les preps autrefois sans garde : Hot Take, SpeedVote, Clutch, Wrong Answer,
  * Dilemma, TruthMeter.
  */
@@ -128,7 +128,7 @@ function assertGuardBefore(body, prepId, entryExpr) {
   assert.doesNotMatch(guardBlock, /onGameSessionChange\(/);
 }
 
-describe("Pré-résolution Vague A — gardes prep manquantes", () => {
+describe("Pré-résolution Vague A - gardes prep manquantes", () => {
   for (const spec of PREP_GUARDS) {
     it(`${spec.file} : ${spec.entryFn} → navigate si ≠ ${spec.prepId}, avant side effects`, () => {
       const src = readFileSync(join(ROOT, spec.file), "utf8");
@@ -160,7 +160,7 @@ describe("Pré-résolution Vague A — gardes prep manquantes", () => {
     assert.doesNotMatch(router, /getHotTakeEntryScreen/);
     assert.doesNotMatch(router, /ENTRY_RESOLVERS/);
     const glMenu = readFileSync(join(ROOT, "js/screens/guessLieMenu.js"), "utf8");
-    // Guess Lie hors Vague A — pas d'exigence de changer
+    // Guess Lie hors Vague A - pas d'exigence de changer
     assert.ok(glMenu.length > 0);
   });
 });

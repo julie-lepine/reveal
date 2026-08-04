@@ -1,5 +1,5 @@
 /**
- * Diagnostic pur — identité fantôme Guess Lie (submissions / rounds / roster).
+ * Diagnostic pur - identité fantôme Guess Lie (submissions / rounds / roster).
  * Testable sans Supabase ; le logger vit dans guessLieIdentityDebug.js.
  */
 import { isValidGuessLieSubmission } from "./sessionMerge.js";
@@ -7,7 +7,7 @@ import { isValidGuessLieSubmission } from "./sessionMerge.js";
 /** @typedef {{ key: string, uid: string|null, valid: boolean, stmtHash: string|null, inRoster: boolean }} SubmissionKeyInfo */
 
 /**
- * Liste des manches comme getGuessLieRounds() — sans lire state global.
+ * Liste des manches comme getGuessLieRounds() - sans lire state global.
  */
 export function buildGuessLieRoundsFromSources(submissions = {}, lobbyMemberNames = []) {
   const subKeys = Object.keys(submissions || {});
@@ -33,9 +33,9 @@ function hashShort(text) {
 
 /**
  * @param {object} params
- * @param {string[]} params.lobbyMemberNames — getLobbyMemberNames()
- * @param {object} params.localSubmissions — getGuessLieSession().submissions
- * @param {object} [params.remoteSubmissionsByName] — guessLieFromRemote(cached).submissions
+ * @param {string[]} params.lobbyMemberNames - getLobbyMemberNames()
+ * @param {object} params.localSubmissions - getGuessLieSession().submissions
+ * @param {object} [params.remoteSubmissionsByName] - guessLieFromRemote(cached).submissions
  * @param {string|null} params.localUid
  * @param {string} params.localDisplayName
  * @param {string|null} params.localLobbyParticipantName
@@ -134,7 +134,7 @@ export function analyzeGuessLieGhostLayers({
   } else if (keysNotInLobbyRoster.length > 0) {
     firstGhostLayer = "merged submissions (local ∪ remote)";
   } else if (roundPlayersNotInRoster.length > 0) {
-    firstGhostLayer = "getGuessLieRounds() — clé submissions hors roster";
+    firstGhostLayer = "getGuessLieRounds() - clé submissions hors roster";
   }
 
   return {

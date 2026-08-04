@@ -46,7 +46,7 @@ function sampleRemote(overrides = {}) {
   };
 }
 
-describe("pickTriviaPlayFields — filtrage", () => {
+describe("pickTriviaPlayFields - filtrage", () => {
   it("reveal ne contient aucune clé interdite", () => {
     const remote = sampleRemote({
       phase: "reveal",
@@ -131,7 +131,7 @@ describe("pickTriviaPlayFields — filtrage", () => {
   });
 });
 
-describe("validateTriviaActingHostPlayPatch — transitions serveur (miroir)", () => {
+describe("validateTriviaActingHostPlayPatch - transitions serveur (miroir)", () => {
   const serverReveal = {
     phase: "question",
     questionIdx: 4,
@@ -246,7 +246,7 @@ describe("validateTriviaActingHostPlayPatch — transitions serveur (miroir)", (
   });
 });
 
-describe("hôte réel — merge profond answers (non atomicité complète)", () => {
+describe("hôte réel - merge profond answers (non atomicité complète)", () => {
   it("conserve une réponse serveur absente du patch reveal", () => {
     const curAnswers = {
       [UID_A]: { answerIndex: 1, answeredAt: 100 },
@@ -275,7 +275,7 @@ describe("hôte réel — merge profond answers (non atomicité complète)", () 
   });
 });
 
-describe("deriveTriviaCurrentQuestion — ignore stale remote", () => {
+describe("deriveTriviaCurrentQuestion - ignore stale remote", () => {
   it("prend deck[questionIdx] quand currentQuestion remote est obsolète", () => {
     const deck = [Q0, Q1];
     assert.equal(deriveTriviaCurrentQuestion(deck, 1, Q0)?.id, "q1");

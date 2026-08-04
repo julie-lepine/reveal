@@ -92,7 +92,7 @@ describe("chat FAB whitelist Vague A", () => {
   });
 });
 
-describe("FEATURE-CHAT-03 / Vague A — auto-close sheet hors hub", () => {
+describe("FEATURE-CHAT-03 / Vague A - auto-close sheet hors hub", () => {
   it("hub : sheet peut rester ouvert", () => {
     for (const id of ["game-select", "results", "leaderboard"]) {
       assert.equal(isChatHubScreen(id), true, id);
@@ -312,7 +312,7 @@ describe("validateChatText", () => {
   });
 });
 
-describe("UX-CHAT-02 — pas de focus input à l'ouverture du sheet", () => {
+describe("UX-CHAT-02 - pas de focus input à l'ouverture du sheet", () => {
   it("openChatSheet focus le panel, pas l'input", () => {
     const src = readFileSync(
       join(__dirname, "../js/core/feedbackUi.js"),

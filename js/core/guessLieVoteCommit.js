@@ -1,5 +1,5 @@
 /**
- * Contrats vote Guess Lie (commit MP) — purs, testables hors session.
+ * Contrats vote Guess Lie (commit MP) - purs, testables hors session.
  */
 
 /** MP : pas d'écriture locale avant confirmation RPC. */

@@ -25,5 +25,5 @@ export const ADMOB_USE_TEST_ADS = false;
 /** Hauteur par défaut (px CSS) avant que le SDK signale la taille réelle (bannière adaptive). */
 export const ADMOB_DEFAULT_BANNER_HEIGHT = 72;
 
-/** Marge de sécurité sous la bannière native (px CSS) — évite que le contenu soit rogné. */
+/** Marge de sécurité sous la bannière native (px CSS) - évite que le contenu soit rogné. */
 export const ADMOB_BANNER_BUFFER = 8;

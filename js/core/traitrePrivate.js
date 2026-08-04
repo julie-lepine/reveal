@@ -137,7 +137,7 @@ export async function hostDistributeTraitreRoles(pairId, impostorName, playerNam
   return { ok: true, written, skippedNames: [] };
 }
 
-/** E5 dissolve — localStorage seulement (SQL déjà CASCADE sur DELETE lobby). */
+/** E5 dissolve - localStorage seulement (SQL déjà CASCADE sur DELETE lobby). */
 export function clearTraitrePrivateLocalForLobby(lobbyId) {
   if (!lobbyId) return;
   localStorage.removeItem(`${LOCAL_KEY}:${lobbyId}`);

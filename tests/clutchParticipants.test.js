@@ -22,7 +22,7 @@ const lobby3 = [
   { name: "Charlie", userId: "u-c", isHost: false },
 ];
 
-describe("UX-CLUTCH-01 — snapshot participants", () => {
+describe("UX-CLUTCH-01 - snapshot participants", () => {
   it("1. force-start Alice+Bob : taps complets → allIn ; Charlie hors verdict", () => {
     const { roster, excluded } = buildLaunchRoster(lobby3, {
       Alice: true,

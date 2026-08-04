@@ -1,4 +1,4 @@
-# SECOURS UNIQUEMENT — écrase resources/icon.png et splash.png depuis reveal.png (sans tagline).
+# SECOURS UNIQUEMENT - écrase resources/icon.png et splash.png depuis reveal.png (sans tagline).
 # Si tu as déjà des PNG custom dans resources/, ne pas lancer (voir resources/README.md).
 # Génère icon 1024² et splash 2732² depuis reveal.png.
 $ErrorActionPreference = "Stop"

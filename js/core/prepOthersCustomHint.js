@@ -1,6 +1,6 @@
 /**
  * Hint prep : entrées custom d'autres joueurs (masquées jusqu'à la manche).
- * Module pur — partagé Hot Take / Dilemma (FEATURE-DILEMMA-01).
+ * Module pur - partagé Hot Take / Dilemma (FEATURE-DILEMMA-01).
  */
 export function prepOthersCustomEntriesHintHtml({
   count,

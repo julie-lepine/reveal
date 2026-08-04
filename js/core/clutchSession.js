@@ -104,7 +104,7 @@ function resolveLiveNameByUserId(uid) {
 }
 
 /**
- * UX-CLUTCH-01 — participants de la session (snapshot), pas le lobby live.
+ * UX-CLUTCH-01 - participants de la session (snapshot), pas le lobby live.
  * Legacy sans snapshot → actifs (compat uniquement).
  */
 export function getClutchParticipantNames(session = getClutchSession()) {
@@ -115,7 +115,7 @@ export function getClutchParticipantNames(session = getClutchSession()) {
 }
 
 /**
- * @param {{ rosterNames: string[] }} opts — obligatoire au lancement (force + normal).
+ * @param {{ rosterNames: string[] }} opts - obligatoire au lancement (force + normal).
  * Pas de fallback silencieux vers le lobby : l’appelant doit transmettre le roster.
  */
 export async function markClutchLobbyStarted({ rosterNames } = {}) {
@@ -241,7 +241,7 @@ export function getClutchEntryScreen() {
 /**
  * Classe les joueurs par écart absolu à la cible (croissant). Les non-tappeurs sont
  * derniers (écart infini). Égalité d'écart départagée par le tap le plus tôt commit.
- * `playerNames` doit être le snapshot (getClutchParticipantNames) — pas le lobby live.
+ * `playerNames` doit être le snapshot (getClutchParticipantNames) - pas le lobby live.
  */
 export function rankClutchResults(
   taps = {},

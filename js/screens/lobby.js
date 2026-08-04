@@ -120,7 +120,7 @@ export function mountLobby(app) {
   let cleanupSim = null;
   let unsubSession = () => {};
   let unsubBundle = () => {};
-  /** Capture chat entre re-renders — distinct du lifecycle mount. */
+  /** Capture chat entre re-renders - distinct du lifecycle mount. */
   let hasRenderedOnce = false;
   let chatPanel = null;
 
@@ -518,7 +518,7 @@ export function mountLobby(app) {
     }
     renderFull();
     if (isGameSyncActive()) {
-      // SYN-12 : pas de second startMultiplayerSync — déjà démarré pre-refresh
+      // SYN-12 : pas de second startMultiplayerSync - déjà démarré pre-refresh
       void routeToActiveGameIfNeeded(null, { shouldContinue });
       unsubSession = onGameSessionChange(async (row) => {
         if (!mount.isMounted()) return;

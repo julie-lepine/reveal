@@ -1,4 +1,4 @@
-/** Classification Cas A / B — pure, testable sans gameSync. */
+/** Classification Cas A / B - pure, testable sans gameSync. */
 export function classifyGuessLieIdentityCase(submissionKeys, localUid) {
   if (!localUid) return "unknown";
   const forLocal = submissionKeys.filter((e) => e.uid === localUid && e.valid);

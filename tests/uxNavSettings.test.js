@@ -1,5 +1,5 @@
 /**
- * UX-NAV-SETTINGS — écran Paramètres unique (profil + partie).
+ * UX-NAV-SETTINGS - écran Paramètres unique (profil + partie).
  */
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
@@ -22,7 +22,7 @@ function src(rel) {
   return readFileSync(join(ROOT, rel), "utf8");
 }
 
-describe("UX-NAV-SETTINGS — navigation", () => {
+describe("UX-NAV-SETTINGS - navigation", () => {
   it("lobby actif → Paramètres bottom nav → goToEveningSettings (pas openPartySettings)", () => {
     const nav = src("js/core/bottomNav.js");
     assert.match(nav, /goToEveningSettings/);
@@ -54,7 +54,7 @@ describe("UX-NAV-SETTINGS — navigation", () => {
   });
 });
 
-describe("UX-NAV-SETTINGS — game-select sans doublon", () => {
+describe("UX-NAV-SETTINGS - game-select sans doublon", () => {
   it("n’affiche plus Profil & paramètres ni Paramètres party ni card feedback", () => {
     const gs = src("js/screens/gameSelect.js");
     assert.equal(gs.includes("Profil & paramètres"), false);
@@ -67,7 +67,7 @@ describe("UX-NAV-SETTINGS — game-select sans doublon", () => {
   });
 });
 
-describe("UX-NAV-SETTINGS — contenu écran", () => {
+describe("UX-NAV-SETTINGS - contenu écran", () => {
   it("profil / soirée / support en onglets ; soirée grisée hors lobby", () => {
     const settings = src("js/screens/settings.js");
     assert.match(settings, /Profil/);
@@ -145,7 +145,7 @@ describe("UX-NAV-SETTINGS — contenu écran", () => {
   });
 });
 
-describe("UX-NAV-SETTINGS — modules morts retirés", () => {
+describe("UX-NAV-SETTINGS - modules morts retirés", () => {
   it("openPartySettings et showPartySettingsDialog absents", () => {
     const lobby = src("js/core/lobby.js");
     assert.equal(lobby.includes("export async function openPartySettings"), false);

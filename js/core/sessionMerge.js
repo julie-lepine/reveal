@@ -49,7 +49,7 @@ export function normalizeHotTakeEntry(entry) {
 }
 
 /**
- * Prêt prep : le remote fait foi (clé absente = pas prêt) — hôte et invités alignés.
+ * Prêt prep : le remote fait foi (clé absente = pas prêt) - hôte et invités alignés.
  * Optimism local uniquement si la clé existe déjà côté remote, ou si le local force « pas prêt »
  * (toggle en vol). Ne jamais réutiliser un ready local stale après « Recommencer » (remote {}).
  */
@@ -75,8 +75,8 @@ export function mergeReadyMapsLocal(
 /**
  * Liste locale = source de vérité pour le joueur local ; remote = entrées des autres auteurs.
  * Les suppressions locales (joueur local) ne sont pas réinjectées depuis le serveur.
- * Les entrées des autres auteurs viennent uniquement du remote — jamais du cache local
- * (évite les customs « fantômes » après suppression distante ou leave — FEATURE-DILEMMA-01 QA).
+ * Les entrées des autres auteurs viennent uniquement du remote - jamais du cache local
+ * (évite les customs « fantômes » après suppression distante ou leave - FEATURE-DILEMMA-01 QA).
  */
 export function mergeAuthorOwnedCustomList(
   localList = [],
@@ -117,7 +117,7 @@ export function mergeHotTakeCustomTakes(localList, remoteList, localAuthor) {
 }
 
 /**
- * Thèmes roster « Classe le groupe » — hydratation locale uniquement.
+ * Thèmes roster « Classe le groupe » - hydratation locale uniquement.
  *
  * Contrat (FEATURE-TIERNIGHT-02 QA) :
  * - remote = vérité confirmée (TOUS les auteurs) ;
@@ -154,7 +154,7 @@ export function isCustomRosterTopicOwnedBy(item, localAuthor, localAuthorUid = n
     return String(item.authorUid) === String(localAuthorUid);
   }
   // Legacy : sans authorUid, exiger un author explicite (ne jamais traiter
-  // « author absent » comme appartenant au joueur local — sinon toute entrée
+  // « author absent » comme appartenant au joueur local - sinon toute entrée
   // distante sans author serait filtrée / mal classée).
   if (!item.author) return false;
   return item.author === localAuthor;
@@ -266,7 +266,7 @@ export function isGuessLieLocalPlayProtected(local = {}) {
 
 /**
  * Restart légitime Guess Lie : prep distante vierge après fin de partie locale.
- * Repose sur phase `idle` (completeGameSession) avant la relance — pas un reveal inter-manche.
+ * Repose sur phase `idle` (completeGameSession) avant la relance - pas un reveal inter-manche.
  */
 export function isGuessLieLegitimateRestart(local = {}, remote = {}) {
   if (!local?.lobbyComplete) return false;

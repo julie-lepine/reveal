@@ -1,5 +1,5 @@
 /**
- * FEATURE-TIERNIGHT-01 — thèmes roster personnalisés (« Classe le groupe »).
+ * FEATURE-TIERNIGHT-01 - thèmes roster personnalisés (« Classe le groupe »).
  */
 
 export const ROSTER_TOPIC_NAME_MIN = 2;

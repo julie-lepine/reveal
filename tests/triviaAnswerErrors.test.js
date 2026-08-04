@@ -1,5 +1,5 @@
 /**
- * BUG-TRIVIA-01C — mapper erreurs soumission vs révélation.
+ * BUG-TRIVIA-01C - mapper erreurs soumission vs révélation.
  */
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
@@ -9,7 +9,7 @@ import {
   triviaRevealErrorCode,
 } from "../js/core/triviaRevealErrors.js";
 
-describe("mapTriviaAnswerRpcError — 01C", () => {
+describe("mapTriviaAnswerRpcError - 01C", () => {
   it("TRIVIA_INVALID_PHASE : révélation déjà commencée, pas de « réessaie »", () => {
     const err = mapTriviaAnswerRpcError(new Error("TRIVIA_INVALID_PHASE"));
     assert.equal(err.code, "TRIVIA_INVALID_PHASE");
@@ -73,7 +73,7 @@ describe("mapTriviaAnswerRpcError — 01C", () => {
   });
 });
 
-describe("mapTriviaRevealRpcError — inchangé pour reveal", () => {
+describe("mapTriviaRevealRpcError - inchangé pour reveal", () => {
   it("conserve le vocabulaire révélation pour INVALID_PHASE", () => {
     const err = mapTriviaRevealRpcError(new Error("TRIVIA_INVALID_PHASE"));
     assert.match(err.message, /r[eé]v[eé]l/i);

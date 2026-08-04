@@ -1,5 +1,5 @@
 /**
- * BUG-TIERNIGHT-05 — merge des votes Rank live (TierNight-only).
+ * BUG-TIERNIGHT-05 - merge des votes Rank live (TierNight-only).
  * Ne modifie pas isNewSpeedVoteVoteRound (contrat SpeedVote).
  */
 import { isNewSpeedVoteVoteRound, mergeSpeedVotePhase } from "./sessionMerge.js";
@@ -41,7 +41,7 @@ export function tierNightLiveRunIdsDiffer(cur = {}, inc = {}) {
  * 1. les deux runId présents et différents
  * 2. local sans runId + remote avec runId (hydratation / pré-migration)
  * 3. remote terminé (select / fin) → votes remote (souvent {})
- * 4. nouvelle manche SpeedVote (roundIdx / voteEndsAt) — helper partagé inchangé
+ * 4. nouvelle manche SpeedVote (roundIdx / voteEndsAt) - helper partagé inchangé
  *
  * Ne passe PAS par isTierNightLiveRemoteReset pour les votes : ce signal
  * reste vrai toute la 1re manche tant qu'il n'y a pas de placements, et
@@ -78,7 +78,7 @@ export function mergeTierNightLiveVotesForPatch(cur, inc) {
 }
 
 /**
- * Fusion des champs session Live (hors mapping pseudo — fait dans gameSync).
+ * Fusion des champs session Live (hors mapping pseudo - fait dans gameSync).
  */
 export function mergeTierNightLiveGameFields(local, remote) {
   if (!remote) return local;

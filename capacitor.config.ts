@@ -6,7 +6,7 @@ const config: CapacitorConfig = {
   webDir: 'www',
   server: {
     androidScheme: 'https',
-    // Même origine https://localhost que Android — Turnstile Cloudflare (hostnames localhost).
+    // Même origine https://localhost que Android - Turnstile Cloudflare (hostnames localhost).
     iosScheme: 'https',
   },
   plugins: {

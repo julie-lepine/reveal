@@ -1,5 +1,5 @@
 /**
- * UX-CLUTCH-01 — snapshot figé des participants Clutch (pur, testable).
+ * UX-CLUTCH-01 - snapshot figé des participants Clutch (pur, testable).
  * Distinct du roster lobby live et des joueurs ayant tapé.
  */
 

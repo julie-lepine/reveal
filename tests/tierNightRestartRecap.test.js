@@ -1,5 +1,5 @@
 /**
- * QA C2 — Recommencer TierNight ne doit pas ramener l'ancien récap.
+ * QA C2 - Recommencer TierNight ne doit pas ramener l'ancien récap.
  */
 import { describe, it, beforeEach } from "node:test";
 import assert from "node:assert/strict";
@@ -41,7 +41,7 @@ function placedRecap(runId = "run-old") {
   };
 }
 
-describe("TierNight Recommencer — pas de retour vers l'ancien récap", () => {
+describe("TierNight Recommencer - pas de retour vers l'ancien récap", () => {
   beforeEach(() => {
     resetMountGenerationForTests();
   });

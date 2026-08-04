@@ -1,5 +1,5 @@
 /**
- * Génération runtime lobby — invalide les callbacks async démarrés sous une génération antérieure.
+ * Génération runtime lobby - invalide les callbacks async démarrés sous une génération antérieure.
  * Purs / testables sans DOM.
  */
 

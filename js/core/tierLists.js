@@ -45,7 +45,7 @@ export function getTierListById(id) {
 }
 
 /**
- * BUG-TIERNIGHT-04 — liste Classique depuis le snapshot session (items + playerRoster).
+ * BUG-TIERNIGHT-04 - liste Classique depuis le snapshot session (items + playerRoster).
  * Ne reconstruit pas depuis getActivePlayers() une fois la partie lancée.
  */
 export function resolveTierNightClassicList(topicId, sessionLike = null) {

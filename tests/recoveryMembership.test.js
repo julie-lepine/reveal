@@ -43,13 +43,13 @@ describe("guestMembership storage", () => {
     memoryStorage.clear();
   });
 
-  it("T3.2 — persiste membershipId + lobby pour recovery hors session", () => {
+  it("T3.2 - persiste membershipId + lobby pour recovery hors session", () => {
     saveGuestMembership(SAMPLE_MEMBERSHIP);
     const loaded = loadGuestMembership();
     assert.deepEqual(loaded, SAMPLE_MEMBERSHIP);
   });
 
-  it("T3.4 — clearGuestMembership supprime la preuve locale", () => {
+  it("T3.4 - clearGuestMembership supprime la preuve locale", () => {
     saveGuestMembership(SAMPLE_MEMBERSHIP);
     clearGuestMembership();
     assert.equal(loadGuestMembership(), null);
@@ -74,7 +74,7 @@ describe("canUseGuestMembershipRecovery", () => {
     memoryStorage.clear();
   });
 
-  it("T3.5 — ignore guestMembership pour un compte email connecté", () => {
+  it("T3.5 - ignore guestMembership pour un compte email connecté", () => {
     saveGuestMembership(SAMPLE_MEMBERSHIP);
     saveStatePatch({
       user: {
@@ -127,7 +127,7 @@ describe("membershipFromBundle", () => {
     assert.deepEqual(membership, SAMPLE_MEMBERSHIP);
   });
 
-  it("T3.6 — deux invités même pseudo : membership distincte par id", () => {
+  it("T3.6 - deux invités même pseudo : membership distincte par id", () => {
     const otherMembershipId = "33333333-3333-3333-3333-333333333333";
     const bundle = {
       id: SAMPLE_MEMBERSHIP.lobbyId,

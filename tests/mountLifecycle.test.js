@@ -62,7 +62,7 @@ function simulateGameMount() {
     return { ok: true, uiApplied: true };
   }
 
-  /** void asyncFn() depuis un listener session — se protège après await. */
+  /** void asyncFn() depuis un listener session - se protège après await. */
   function onSessionChange(asyncFn) {
     if (!mount.isMounted()) return;
     void asyncFn().catch(() => {});
@@ -79,7 +79,7 @@ function simulateGameMount() {
   };
 }
 
-describe("ARCH-06 Vague B0 — createMountGuard", () => {
+describe("ARCH-06 Vague B0 - createMountGuard", () => {
   it("isMounted true jusqu'à dispose", () => {
     const g = createMountGuard();
     assert.equal(g.isMounted(), true);
@@ -220,7 +220,7 @@ describe("ARCH-06 Vague B0 — createMountGuard", () => {
   });
 });
 
-describe("ARCH-06 Vague B1 — contrats câblage", () => {
+describe("ARCH-06 Vague B1 - contrats câblage", () => {
   for (const file of [
     "../js/games/hotTake.js",
     "../js/games/wrongAnswer.js",
@@ -242,7 +242,7 @@ describe("ARCH-06 Vague B1 — contrats câblage", () => {
 
 });
 
-describe("ARCH-06 Vague B2 — timers / RAF + contrats", () => {
+describe("ARCH-06 Vague B2 - timers / RAF + contrats", () => {
   it("timeout déjà programmé puis dispose → aucun effet", async () => {
     const mount = createMountGuard();
     let ran = 0;
@@ -455,7 +455,7 @@ describe("ARCH-06 Vague B2 — timers / RAF + contrats", () => {
   });
 });
 
-describe("ARCH-06 Vague B3 — tierNightLive mountMp", () => {
+describe("ARCH-06 Vague B3 - tierNightLive mountMp", () => {
   function simulateTierLiveMpMount() {
     const mount = createMountGuard();
     const effects = {
@@ -642,7 +642,7 @@ describe("ARCH-06 Vague B3 — tierNightLive mountMp", () => {
   });
 });
 
-describe("ARCH-06 Vague C0 — génération + isCurrentMount (transparent)", () => {
+describe("ARCH-06 Vague C0 - génération + isCurrentMount (transparent)", () => {
   it("isCurrentMount true tant que génération stable et pas disposé", () => {
     resetMountGenerationForTests();
     advanceMountGeneration();
@@ -731,7 +731,7 @@ describe("ARCH-06 Vague C0 — génération + isCurrentMount (transparent)", () 
   });
 });
 
-describe("ARCH-06 Vague C1 — contrats double garde périmètre B", () => {
+describe("ARCH-06 Vague C1 - contrats double garde périmètre B", () => {
   for (const file of [
     "../js/games/hotTake.js",
     "../js/games/wrongAnswer.js",
@@ -758,7 +758,7 @@ describe("ARCH-06 Vague C1 — contrats double garde périmètre B", () => {
   });
 });
 
-describe("ARCH-06 Vague C2 — shouldContinue helpers", () => {
+describe("ARCH-06 Vague C2 - shouldContinue helpers", () => {
   it("shouldContinue false après await → pas de navigate ; défaut true sans callback", async () => {
     let navigates = 0;
     let commits = 0;

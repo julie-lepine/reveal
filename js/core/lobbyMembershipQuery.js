@@ -90,7 +90,7 @@ function isValidLivingRow(row) {
 
 /**
  * Interprète des LivingRows déjà normalisées (pas de filtre âge).
- * Multi-memberships : état serveur anormal — sélection déterministe défensive,
+ * Multi-memberships : état serveur anormal - sélection déterministe défensive,
  * extraCount, log borné ; aucune mutation / leave / delete.
  * Nettoyage serveur = ticket séparé.
  *

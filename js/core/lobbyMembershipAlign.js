@@ -1,5 +1,5 @@
 /**
- * Vague E2 — alignement asymétrique snapshot membership ↔ commits serveur confirmés.
+ * Vague E2 - alignement asymétrique snapshot membership ↔ commits serveur confirmés.
  *
  * Le snapshot = dernière connaissance membership serveur (pas une copie du cache runtime).
  * Promotion uniquement sur sources confirmées ; clear local ne retire pas un found récupérable.
@@ -187,7 +187,7 @@ export function membershipFromHydratedBundle(bundle, userId) {
 }
 
 /**
- * Fusionne métadonnées — même lobbyId uniquement.
+ * Fusionne métadonnées - même lobbyId uniquement.
  * @param {ActiveLobbyMembership|null|undefined} existing
  * @param {ActiveLobbyMembership|null|undefined} incoming
  * @returns {ActiveLobbyMembership|null}

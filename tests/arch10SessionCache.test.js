@@ -1,5 +1,5 @@
 /**
- * ARCH-10 — invalidation précoce du cache session MP après sortie confirmée.
+ * ARCH-10 - invalidation précoce du cache session MP après sortie confirmée.
  *
  * Pas d’import de gameSync.js / lobby.js réels (cycle Node + named exports).
  * Preuve = miroir minimal du contrat cache + contrats source + leave injecté.
@@ -103,7 +103,7 @@ function createSessionCacheMirror() {
   };
 }
 
-describe("ARCH-10 — helper canonique (miroir)", () => {
+describe("ARCH-10 - helper canonique (miroir)", () => {
   let cache;
   let stateSnapshot;
 
@@ -144,7 +144,7 @@ describe("ARCH-10 — helper canonique (miroir)", () => {
   });
 });
 
-describe("ARCH-10 — leave volontaire", () => {
+describe("ARCH-10 - leave volontaire", () => {
   let cache;
   let stateSnapshot;
 
@@ -166,7 +166,7 @@ describe("ARCH-10 — leave volontaire", () => {
     resetVoluntaryLeaveLockForTests();
   });
 
-  it("1 — cache invalidé avant sign-out (signOut en attente)", async () => {
+  it("1 - cache invalidé avant sign-out (signOut en attente)", async () => {
     const signOutGate = deferred();
     const order = [];
 
@@ -210,7 +210,7 @@ describe("ARCH-10 — leave volontaire", () => {
     await p;
   });
 
-  it("2 — échec serveur : cache conservé, pas d'invalidation", async () => {
+  it("2 - échec serveur : cache conservé, pas d'invalidation", async () => {
     const notes = [];
     cache.onGameSessionChange((row) => notes.push(row));
 
@@ -239,7 +239,7 @@ describe("ARCH-10 — leave volontaire", () => {
   });
 });
 
-describe("ARCH-10 — kick Realtime", () => {
+describe("ARCH-10 - kick Realtime", () => {
   let cache;
   let stateSnapshot;
 
@@ -261,7 +261,7 @@ describe("ARCH-10 — kick Realtime", () => {
     cache.__resetCachedGameSessionForTests();
   });
 
-  it("3 — kick confirmé : cache nul pendant signOut simulé (miroir pipeline)", async () => {
+  it("3 - kick confirmé : cache nul pendant signOut simulé (miroir pipeline)", async () => {
     const signOutGate = deferred();
     const order = [];
 
@@ -286,7 +286,7 @@ describe("ARCH-10 — kick Realtime", () => {
     await signOutP;
   });
 
-  it("3b — contrat source kick : invalidate après commit, avant signOut", () => {
+  it("3b - contrat source kick : invalidate après commit, avant signOut", () => {
     const lobbySrc = src("js/core/lobby.js");
     const kick = lobbySrc.slice(
       lobbySrc.indexOf("export async function handleKickedFromLobby"),
@@ -299,8 +299,8 @@ describe("ARCH-10 — kick Realtime", () => {
   });
 });
 
-describe("ARCH-10 — dissolution hôte", () => {
-  it("4a — contrat source : invalidate après closeLobby OK, avant signOut", () => {
+describe("ARCH-10 - dissolution hôte", () => {
+  it("4a - contrat source : invalidate après closeLobby OK, avant signOut", () => {
     const lobbySrc = src("js/core/lobby.js");
     const block = lobbySrc.slice(
       lobbySrc.indexOf("export async function dissolveLobbyAsHost"),
@@ -317,7 +317,7 @@ describe("ARCH-10 — dissolution hôte", () => {
     assert.match(block, /commitMembershipRemoved/);
   });
 
-  it("4b — échec dissolution : pas d'invalidate précoce dans branche !res.ok", () => {
+  it("4b - échec dissolution : pas d'invalidate précoce dans branche !res.ok", () => {
     const lobbySrc = src("js/core/lobby.js");
     const dissolve = lobbySrc.slice(
       lobbySrc.indexOf("export async function dissolveLobbyAsHost"),
@@ -335,7 +335,7 @@ describe("ARCH-10 — dissolution hôte", () => {
   });
 });
 
-describe("ARCH-10 — teardown canonique", () => {
+describe("ARCH-10 - teardown canonique", () => {
   let cache;
 
   beforeEach(() => {
@@ -346,7 +346,7 @@ describe("ARCH-10 — teardown canonique", () => {
     cache.__resetCachedGameSessionForTests();
   });
 
-  it("5 — performLobbyBoundaryTeardown utilise invalidate (source)", () => {
+  it("5 - performLobbyBoundaryTeardown utilise invalidate (source)", () => {
     const lobbySrc = src("js/core/lobby.js");
     const block = lobbySrc.slice(
       lobbySrc.indexOf("export function performLobbyBoundaryTeardown"),
@@ -359,7 +359,7 @@ describe("ARCH-10 — teardown canonique", () => {
     assert.match(block, /resetEveningState/);
   });
 
-  it("5b — early invalidate + teardown simulate reste idempotent côté notif", () => {
+  it("5b - early invalidate + teardown simulate reste idempotent côté notif", () => {
     cache.__setCachedGameSessionRowForTests(SESSION_ROW);
     saveStatePatch({
       inLobby: true,
@@ -377,7 +377,7 @@ describe("ARCH-10 — teardown canonique", () => {
   });
 });
 
-describe("ARCH-10 — notification consommateur", () => {
+describe("ARCH-10 - notification consommateur", () => {
   let cache;
 
   beforeEach(() => {
@@ -388,7 +388,7 @@ describe("ARCH-10 — notification consommateur", () => {
     cache.__resetCachedGameSessionForTests();
   });
 
-  it("6 — listener reçoit null dès invalidation précoce ; une seule notif utile", () => {
+  it("6 - listener reçoit null dès invalidation précoce ; une seule notif utile", () => {
     cache.__setCachedGameSessionRowForTests(SESSION_ROW);
     saveStatePatch({
       inLobby: true,
@@ -408,7 +408,7 @@ describe("ARCH-10 — notification consommateur", () => {
   });
 });
 
-describe("ARCH-10 — frontière lobby A → B", () => {
+describe("ARCH-10 - frontière lobby A → B", () => {
   let cache;
   let stateSnapshot;
 
@@ -422,7 +422,7 @@ describe("ARCH-10 — frontière lobby A → B", () => {
     cache.__resetCachedGameSessionForTests();
   });
 
-  it("7 — session A invalidée ; B acceptée ensuite", () => {
+  it("7 - session A invalidée ; B acceptée ensuite", () => {
     saveStatePatch({
       inLobby: true,
       lobby: { id: "lobby-a", code: "AAAA" },
@@ -454,8 +454,8 @@ describe("ARCH-10 — frontière lobby A → B", () => {
   });
 });
 
-describe("ARCH-10 — contrat source pipelines", () => {
-  it("8 — helper canonique, wiring leave/kick/dissolve/teardown/XX-E", () => {
+describe("ARCH-10 - contrat source pipelines", () => {
+  it("8 - helper canonique, wiring leave/kick/dissolve/teardown/XX-E", () => {
     const voluntary = src("js/core/voluntaryMemberLeave.js");
     assert.match(voluntary, /invalidateCurrentLobbySessionCache\?\.\(\)/);
     assert.equal((voluntary.match(/clearCachedGameSession/g) || []).length, 0);
@@ -494,7 +494,7 @@ describe("ARCH-10 — contrat source pipelines", () => {
     );
     assert.match(
       gameSyncSrc,
-      /ARCH-10 — invalidation précoce du cache session MP/
+      /ARCH-10 - invalidation précoce du cache session MP/
     );
   });
 });

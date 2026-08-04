@@ -1,5 +1,5 @@
 /**
- * Contrats vague 2 — suppression Fil Rouge dans gameSync / state / data/filRouge.
+ * Contrats vague 2 - suppression Fil Rouge dans gameSync / state / data/filRouge.
  */
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
@@ -62,7 +62,7 @@ const GAME_PLAY_STATE_KEYS_EXPECTED = [
   "tierNightLive",
 ];
 
-describe("fil rouge vague 2 — sync / state", () => {
+describe("fil rouge vague 2 - sync / state", () => {
   it("data/filRouge.js est supprimé", () => {
     assert.equal(existsSync(join(root, "data/filRouge.js")), false);
   });

@@ -1,5 +1,5 @@
 /**
- * BUG-LOBBY-XX-E — mapping RPC get_lobby_closure (pur).
+ * BUG-LOBBY-XX-E - mapping RPC get_lobby_closure (pur).
  */
 
 import { LOBBY_CLOSURE_REASON } from "./lobbyClosureCopy.js";
@@ -14,7 +14,7 @@ export const LOBBY_CLOSURE_FETCH = Object.freeze({
 });
 
 /**
- * @param {unknown} data — jsonb RPC
+ * @param {unknown} data - jsonb RPC
  * @param {string|null|undefined} lobbyId
  * @returns {{
  *   status: string,

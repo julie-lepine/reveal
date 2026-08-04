@@ -1,5 +1,5 @@
 /**
- * ARCH-03b — offre confirmée de reprise du rôle hôte (lobby).
+ * ARCH-03b - offre confirmée de reprise du rôle hôte (lobby).
  * Ne confond pas avec l'acting host technique (120 s, session de jeu).
  */
 import { HOST_TRANSFER_STALE_MS } from "../config/lobbyLifecycle.js";
@@ -55,7 +55,7 @@ function hostInactiveMinutes(participants, hostId, now = Date.now()) {
 }
 
 /**
- * Préfiltre UX uniquement — la RPC recalcule tout côté serveur.
+ * Préfiltre UX uniquement - la RPC recalcule tout côté serveur.
  * true si l'hôte est stale ≥ 5 min (lastSeenAt non null) et le local est le candidat déterministe.
  */
 export function clientMayOfferHostClaim(now = Date.now()) {

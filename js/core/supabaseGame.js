@@ -46,7 +46,7 @@ export async function upsertGameSession({ lobbyId, gameId, screen, hostId, state
 }
 
 /**
- * FEATURE-TIERNIGHT-02 — replace de state en préservant customRosterTopics
+ * FEATURE-TIERNIGHT-02 - replace de state en préservant customRosterTopics
  * atomiquement côté serveur (FOR UPDATE). Hôte uniquement.
  */
 export async function upsertGameSessionPreservingRosterTopics({

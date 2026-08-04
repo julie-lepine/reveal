@@ -1,6 +1,6 @@
 /**
  * Normalisation PostgREST lobby_members → LivingRow.
- * Pure, sans import Supabase — testable en Node.
+ * Pure, sans import Supabase - testable en Node.
  *
  * Forme brute many-to-one attendue :
  *   { lobby_id, joined_at, lobbies: { id, code, status, game_id, host_id } }

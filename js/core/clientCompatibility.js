@@ -1,5 +1,5 @@
 /**
- * ARCH-23 — service central de compatibilité client ↔ floor Supabase.
+ * ARCH-23 - service central de compatibilité client ↔ floor Supabase.
  *
  * État autoritaire `lastConfirmedIncompatible` (mémoire process) ≠ dernier recheck.
  * Un recheck `unknown` ne lève jamais une incompatibilité confirmée.
@@ -22,10 +22,10 @@ import {
 /** @type {null | object} */
 let lastSuccessfulCompatible = null;
 
-/** @type {null | object} — état autoritaire hard-gate */
+/** @type {null | object} - état autoritaire hard-gate */
 let lastConfirmedIncompatible = null;
 
-/** @type {null | object} — dernier résultat de recheck (peut être unknown) */
+/** @type {null | object} - dernier résultat de recheck (peut être unknown) */
 let lastRecheckResult = null;
 
 /** @type {Promise<any>|null} */
@@ -272,7 +272,7 @@ export async function checkClientCompatibility(opts = {}) {
 }
 
 /**
- * Gate métier — attendu, jamais fire-and-forget.
+ * Gate métier - attendu, jamais fire-and-forget.
  *
  * @param {{
  *   source: CompatibilityCheckSource,

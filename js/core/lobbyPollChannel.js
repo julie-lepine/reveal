@@ -1,5 +1,5 @@
 /**
- * Cycle de vie canal Realtime sondages — testable sans Supabase.
+ * Cycle de vie canal Realtime sondages - testable sans Supabase.
  *
  * Règles :
  * - topic unique par génération
@@ -81,7 +81,7 @@ export function logPollRebuildChainFailure(error, meta = {}) {
 
 /**
  * Famille join-reply (realtime-js 2.11.2) : CHANNEL_ERROR sans transition
- * vers `errored` / scheduleTimeout — state reste `joining`.
+ * vers `errored` / scheduleTimeout - state reste `joining`.
  * Discriminant structurel uniquement (pas err.message).
  *
  * @param {string} status
@@ -134,7 +134,7 @@ export function createPollChannelController(deps) {
     onVotesEvent,
     onStatusChange = () => {},
     onSubscribed = () => {},
-    /** Reconnect manuel — uniquement CLOSED involontaire */
+    /** Reconnect manuel - uniquement CLOSED involontaire */
     onInvoluntaryClosed = () => {},
     log = () => {},
     identity = {},
@@ -263,7 +263,7 @@ export function createPollChannelController(deps) {
     });
   }
 
-  /** Chronologie replace join-reply — debug only (reveal-poll-rt-debug). */
+  /** Chronologie replace join-reply - debug only (reveal-poll-rt-debug). */
   function replaceChronology(step, extra = {}) {
     if (!lifecycleDebugEnabled()) return;
     const topics = channelTopics();
@@ -705,7 +705,7 @@ export function createPollChannelController(deps) {
       if (!isCurrentBuilder) ignoredReason = "channel_!==_builder";
       else if (!isCurrentGeneration) ignoredReason = "myGen_!==_channelGen";
 
-      // Avant toute garde stale — visible même si callback ignoré ensuite.
+      // Avant toute garde stale - visible même si callback ignoré ensuite.
       instanceLog("subscribe_callback", {
         reason: lastBuildReason,
         lobbyId,

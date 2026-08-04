@@ -327,7 +327,7 @@ export async function commitTriviaPlay(patch, { screen } = {}) {
   });
 }
 
-/** BUG-TRIVIA-01B — reveal atomique via RPC (MP uniquement). */
+/** BUG-TRIVIA-01B - reveal atomique via RPC (MP uniquement). */
 export async function commitTriviaRevealPlay() {
   const session = getTriviaSession();
   if (!isGameSyncActive()) {

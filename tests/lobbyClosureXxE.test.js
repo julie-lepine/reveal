@@ -1,5 +1,5 @@
 /**
- * BUG-LOBBY-XX-E — copies, mapping RPC, session dédup, SQL migration.
+ * BUG-LOBBY-XX-E - copies, mapping RPC, session dédup, SQL migration.
  */
 import { describe, it, beforeEach } from "node:test";
 import assert from "node:assert/strict";
@@ -30,7 +30,7 @@ function read(rel) {
   return readFileSync(join(ROOT, rel), "utf8");
 }
 
-describe("BUG-LOBBY-XX-E — getLobbyClosureCopy", () => {
+describe("BUG-LOBBY-XX-E - getLobbyClosureCopy", () => {
   it("host_closed → copie manuelle", () => {
     const c = getLobbyClosureCopy(LOBBY_CLOSURE_REASON.HOST_CLOSED);
     assert.equal(c.title, "Lobby fermé");
@@ -54,7 +54,7 @@ describe("BUG-LOBBY-XX-E — getLobbyClosureCopy", () => {
   });
 });
 
-describe("BUG-LOBBY-XX-E — mapGetLobbyClosureRpcData", () => {
+describe("BUG-LOBBY-XX-E - mapGetLobbyClosureRpcData", () => {
   it("found + reason", () => {
     const r = mapGetLobbyClosureRpcData(
       {
@@ -99,12 +99,12 @@ describe("BUG-LOBBY-XX-E — mapGetLobbyClosureRpcData", () => {
   });
 });
 
-describe("BUG-LOBBY-XX-E — session dédup", () => {
+describe("BUG-LOBBY-XX-E - session dédup", () => {
   beforeEach(() => {
     __resetLobbyClosureSessionStateForTests();
   });
 
-  it("handled par lobbyId — pas de réutilisation autre lobby", () => {
+  it("handled par lobbyId - pas de réutilisation autre lobby", () => {
     markLobbyClosureHandled("A");
     assert.equal(wasLobbyClosureHandled("A"), true);
     assert.equal(wasLobbyClosureHandled("B"), false);
@@ -117,7 +117,7 @@ describe("BUG-LOBBY-XX-E — session dédup", () => {
   });
 });
 
-describe("BUG-LOBBY-XX-E — migration SQL", () => {
+describe("BUG-LOBBY-XX-E - migration SQL", () => {
   const sql = read("supabase/lobby-closures-xx-e.sql");
 
   it("table + check reason + pas de FK cascade lobbies", () => {
@@ -169,7 +169,7 @@ describe("BUG-LOBBY-XX-E — migration SQL", () => {
   });
 });
 
-describe("BUG-LOBBY-XX-E — client wiring (statique)", () => {
+describe("BUG-LOBBY-XX-E - client wiring (statique)", () => {
   it("lobby.js pipeline + copies centralisées", () => {
     const lobby = read("js/core/lobby.js");
     assert.match(lobby, /resolveLobbyClosureAndExit/);

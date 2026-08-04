@@ -1,5 +1,5 @@
 /**
- * Membership Vague E5 — contrat dissolve_lobby_atomically (mapping pur).
+ * Membership Vague E5 - contrat dissolve_lobby_atomically (mapping pur).
  * Ne mappe jamais erreur réseau / payload inconnu → ALREADY_GONE.
  */
 
@@ -13,7 +13,7 @@ export const LOBBY_DISSOLVE_STATUS = Object.freeze({
 });
 
 /**
- * @param {unknown} data — corps jsonb RPC (sans error transport)
+ * @param {unknown} data - corps jsonb RPC (sans error transport)
  * @param {string|null|undefined} lobbyId
  * @returns {{
  *   ok: boolean,
@@ -68,7 +68,7 @@ export function mapDissolveLobbyRpcData(data, lobbyId) {
  * `found` autre lobby ≠ ALREADY_GONE (ne pas Home-wipe sans hydrater Y).
  *
  * @param {{ status: string, membership?: { lobbyId?: string, role?: string, code?: string }|null }} queryResult
- * @param {string} lobbyId — lobby X qu’on tentait de dissoudre
+ * @param {string} lobbyId - lobby X qu’on tentait de dissoudre
  */
 export function interpretDissolveMembershipRequery(queryResult, lobbyId) {
   const status = queryResult?.status;

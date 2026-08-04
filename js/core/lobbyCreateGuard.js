@@ -1,6 +1,6 @@
 /**
- * Vague C — garde canonique de création de lobby (pure + décision injectable).
- * Vague E1 — décisions snapshot scoped par identité auth.
+ * Vague C - garde canonique de création de lobby (pure + décision injectable).
+ * Vague E1 - décisions snapshot scoped par identité auth.
  */
 import {
   getMembershipAuthGeneration,
@@ -13,9 +13,9 @@ export const LOBBY_CREATE_ERROR = Object.freeze({
   CACHE_ACTIVE: "LOBBY_CACHE_ACTIVE",
   ALREADY_EXISTS: "LOBBY_MEMBERSHIP_ALREADY_EXISTS",
   CHECK_FAILED: "LOBBY_MEMBERSHIP_CHECK_FAILED",
-  /** ARCH-23 — floor confirmé (≠ CHECK_FAILED membership). */
+  /** ARCH-23 - floor confirmé (≠ CHECK_FAILED membership). */
   CLIENT_INCOMPATIBLE: "CLIENT_INCOMPATIBLE",
-  /** ARCH-23 — timeout / réseau / payload sans décision. */
+  /** ARCH-23 - timeout / réseau / payload sans décision. */
   CLIENT_COMPAT_UNKNOWN: "CLIENT_COMPAT_UNKNOWN",
 });
 
@@ -108,7 +108,7 @@ export function isMembershipSnapshotFresh(
 }
 
 /**
- * Dérivé synchrone — chrome / fast-fail. Pas une autorisation d'INSERT.
+ * Dérivé synchrone - chrome / fast-fail. Pas une autorisation d'INSERT.
  */
 export function canCreateLobbyFromInputs(input = {}) {
   const loggedIn = Boolean(input.loggedIn);
@@ -166,7 +166,7 @@ export function applyMembershipQueryToSnapshot(
 }
 
 /**
- * Garde avant INSERT — injectable / testable sans client Supabase CDN.
+ * Garde avant INSERT - injectable / testable sans client Supabase CDN.
  */
 export async function assertCanInsertLobby(deps) {
   if (deps.hasActiveLobby) {

@@ -1,5 +1,5 @@
 /**
- * SYN-15 / SYN-16 — migrate evening name-keyed maps when roster proves a rename
+ * SYN-15 / SYN-16 - migrate evening name-keyed maps when roster proves a rename
  * (same userId, display name changed). Pur / testable (sans Supabase).
  */
 import { mergePlayerStatsRecord } from "./playerStatsSync.js";
@@ -113,7 +113,7 @@ export function migratePlayerStatsForRenames(playerStats, renames) {
 }
 
 /**
- * gameScores nested — Math.max par joueur dans chaque gameId.
+ * gameScores nested - Math.max par joueur dans chaque gameId.
  * @param {Record<string, Record<string, number>>} gameScores
  * @param {Array<{ oldName: string, newName: string }>} renames
  */

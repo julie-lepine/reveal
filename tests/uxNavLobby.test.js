@@ -1,5 +1,5 @@
 /**
- * UX-NAV-LOBBY — Accueil hors menu en lobby, Paramètres unifiés, sortie invité.
+ * UX-NAV-LOBBY - Accueil hors menu en lobby, Paramètres unifiés, sortie invité.
  */
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
@@ -23,27 +23,27 @@ function src(rel) {
   return readFileSync(join(ROOT, rel), "utf8");
 }
 
-describe("UX-NAV-LOBBY — catalogue menu", () => {
-  it("1 — hors lobby, Accueil est visible dans le menu", () => {
+describe("UX-NAV-LOBBY - catalogue menu", () => {
+  it("1 - hors lobby, Accueil est visible dans le menu", () => {
     const tabs = resolveBottomNavTabs(false);
     assert.ok(tabs.includes(BOTTOM_NAV_TAB.HOME));
     assert.equal(isBottomNavTabVisible(false, BOTTOM_NAV_TAB.HOME), true);
     assert.equal(isBottomNavTabVisible(false, BOTTOM_NAV_TAB.SETTINGS), false);
   });
 
-  it("2 — en lobby, Accueil est absent du menu", () => {
+  it("2 - en lobby, Accueil est absent du menu", () => {
     const tabs = resolveBottomNavTabs(true);
     assert.equal(tabs.includes(BOTTOM_NAV_TAB.HOME), false);
     assert.equal(isBottomNavTabVisible(true, BOTTOM_NAV_TAB.HOME), false);
   });
 
-  it("3 — en lobby, Paramètres est visible", () => {
+  it("3 - en lobby, Paramètres est visible", () => {
     const tabs = resolveBottomNavTabs(true);
     assert.ok(tabs.includes(BOTTOM_NAV_TAB.SETTINGS));
     assert.equal(isBottomNavTabVisible(true, BOTTOM_NAV_TAB.SETTINGS), true);
   });
 
-  it("15 — barre : 5 slots stables (pas de 6e entrée Home+Settings)", () => {
+  it("15 - barre : 5 slots stables (pas de 6e entrée Home+Settings)", () => {
     assert.equal(resolveBottomNavTabs(false).length, 5);
     assert.equal(resolveBottomNavTabs(true).length, 5);
     const css = src("style.css");
@@ -56,15 +56,15 @@ describe("UX-NAV-LOBBY — catalogue menu", () => {
   });
 });
 
-describe("UX-NAV-LOBBY — Paramètres (écran settings, pas modale)", () => {
-  it("4 — entrée Paramètres bottom nav → goToEveningSettings", () => {
+describe("UX-NAV-LOBBY - Paramètres (écran settings, pas modale)", () => {
+  it("4 - entrée Paramètres bottom nav → goToEveningSettings", () => {
     const nav = src("js/core/bottomNav.js");
     assert.match(nav, /goToEveningSettings/);
     assert.equal(nav.includes("openPartySettings"), false);
     assert.match(nav, /function goSettings/);
   });
 
-  it("5 — invité : action leave seule (helper rôle)", () => {
+  it("5 - invité : action leave seule (helper rôle)", () => {
     const actions = lobbySettingsActionsForRole("member");
     assert.deepEqual([...actions], ["leave"]);
     assert.equal(actions.includes("close"), false);
@@ -73,13 +73,13 @@ describe("UX-NAV-LOBBY — Paramètres (écran settings, pas modale)", () => {
     assert.match(settings, /Quitter le lobby/);
   });
 
-  it("6 — invité ne voit pas Fermer / transfert / joueurs (helper)", () => {
+  it("6 - invité ne voit pas Fermer / transfert / joueurs (helper)", () => {
     assert.equal(lobbySettingsActionsForRole("member").includes("close"), false);
     assert.equal(lobbySettingsActionsForRole("member").includes("transfer"), false);
     assert.equal(lobbySettingsActionsForRole("member").includes("players"), false);
   });
 
-  it("7 — hôte conserve fermeture / transfert / joueurs", () => {
+  it("7 - hôte conserve fermeture / transfert / joueurs", () => {
     assert.deepEqual([...lobbySettingsActionsForRole("host")], [
       "transfer",
       "players",
@@ -91,13 +91,13 @@ describe("UX-NAV-LOBBY — Paramètres (écran settings, pas modale)", () => {
     assert.match(settings, /data-settings-party="players"/);
   });
 
-  it("8 — hôte ne voit pas l’action leave réservée aux membres", () => {
+  it("8 - hôte ne voit pas l’action leave réservée aux membres", () => {
     assert.equal(lobbySettingsActionsForRole("host").includes("leave"), false);
   });
 });
 
-describe("UX-NAV-LOBBY — sortie volontaire invité", () => {
-  it("9–11 — confirm / leave / cleanup / Accueil via pipeline canonique", () => {
+describe("UX-NAV-LOBBY - sortie volontaire invité", () => {
+  it("9–11 - confirm / leave / cleanup / Accueil via pipeline canonique", () => {
     const lobby = src("js/core/lobby.js");
 
     // confirmAndLeaveLobby : confirm membre avant leaveFn
@@ -125,7 +125,7 @@ describe("UX-NAV-LOBBY — sortie volontaire invité", () => {
     assert.equal(SERVER_LEAVE_CONFIRM.member.confirmLabel, "Quitter le lobby");
   });
 
-  it("10 — leaveLobby membre délègue à runVoluntaryMemberLeave (pas closeLobby)", () => {
+  it("10 - leaveLobby membre délègue à runVoluntaryMemberLeave (pas closeLobby)", () => {
     const lobby = src("js/core/lobby.js");
     const leaveIdx = lobby.indexOf("export async function leaveLobby(");
     const end = lobby.indexOf("export async function leaveLobbyMembershipFromServer", leaveIdx);
@@ -138,7 +138,7 @@ describe("UX-NAV-LOBBY — sortie volontaire invité", () => {
     assert.match(core, /stopLobbyPresenceSync/);
   });
 
-  it("12 — après sortie, reset nav empêche retour game-select", () => {
+  it("12 - après sortie, reset nav empêche retour game-select", () => {
     const lobby = src("js/core/lobby.js");
     assert.match(lobby, /navigate\("home",\s*\{\s*reset:\s*true\s*\}\)/);
     const router = src("js/core/router.js");
@@ -149,7 +149,7 @@ describe("UX-NAV-LOBBY — sortie volontaire invité", () => {
     assert.equal(/backTarget:\s*"home"/.test(gs), false);
   });
 
-  it("13 — F5 en lobby : resume + catalogue sans Accueil", () => {
+  it("13 - F5 en lobby : resume + catalogue sans Accueil", () => {
     const main = src("js/main.js");
     assert.match(main, /resumeEveningSession/);
     assert.match(main, /hasActiveLobby/);
@@ -162,7 +162,7 @@ describe("UX-NAV-LOBBY — sortie volontaire invité", () => {
     ]);
   });
 
-  it("14 — F5 après sortie : hors lobby → Accueil au catalogue, pas Paramètres", () => {
+  it("14 - F5 après sortie : hors lobby → Accueil au catalogue, pas Paramètres", () => {
     assert.deepEqual([...resolveBottomNavTabs(false)], [
       "games",
       "results",
@@ -175,7 +175,7 @@ describe("UX-NAV-LOBBY — sortie volontaire invité", () => {
     assert.match(main, /if\s*\(!resumed\)\s*navigate\("home"/);
   });
 
-  it("16 — leave : DELETE distant avant stop sync / cleanup (contrat échec)", () => {
+  it("16 - leave : DELETE distant avant stop sync / cleanup (contrat échec)", () => {
     const core = src("js/core/voluntaryMemberLeave.js");
     const remote = core.indexOf("await deps.leaveLobbySupabase()");
     const stopMp = core.indexOf("deps.stopMultiplayerSync()");
@@ -188,7 +188,7 @@ describe("UX-NAV-LOBBY — sortie volontaire invité", () => {
   });
 });
 
-describe("UX-NAV-LOBBY — Accueil inaccessible en lobby (nav)", () => {
+describe("UX-NAV-LOBBY - Accueil inaccessible en lobby (nav)", () => {
   it("goToEveningHome en lobby redirige vers hub jeux (pas Accueil)", () => {
     const nav = src("js/screens/nav.js");
     const fn = nav.slice(
@@ -197,7 +197,7 @@ describe("UX-NAV-LOBBY — Accueil inaccessible en lobby (nav)", () => {
     );
     assert.match(fn, /returnToEveningGames\(\{\s*hubOnly:\s*true\s*\}\)/);
     assert.match(fn, /if\s*\(!hasActiveLobby\(\)\)/);
-    // Accueil uniquement hors lobby — pas de navigate home après le early-return.
+    // Accueil uniquement hors lobby - pas de navigate home après le early-return.
     const afterGuard = fn.slice(fn.indexOf("return;") + "return;".length);
     assert.equal(afterGuard.includes('navigate("home"'), false);
   });

@@ -33,7 +33,7 @@ function makeExclusiveAction(lock = createActionLock()) {
   };
 }
 
-describe("ARCH-06 — createActionLock / withClickLock", () => {
+describe("ARCH-06 - createActionLock / withClickLock", () => {
   it("1. double run concurrent → une seule exécution", async () => {
     const lock = createActionLock();
     let calls = 0;
@@ -209,7 +209,7 @@ describe("ARCH-06 — createActionLock / withClickLock", () => {
   });
 });
 
-describe("ARCH-06 — contrats source (câblage V1)", () => {
+describe("ARCH-06 - contrats source (câblage V1)", () => {
   it("executePrepLaunch : prepLaunchLock logique (pas seulement DOM)", () => {
     const src = readSrc("../js/core/prepLaunch.js");
     assert.match(src, /import \{ createActionLock \} from "\.\/actionLock\.js"/);

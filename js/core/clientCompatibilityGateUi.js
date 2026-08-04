@@ -1,11 +1,11 @@
 /**
- * ARCH-23 — écran bloquant incompatibilité (natif prioritaire).
+ * ARCH-23 - écran bloquant incompatibilité (natif prioritaire).
  *
  * Bouton « Réessayer » = `checkClientCompatibility({ force: true })`.
  * - Boot : onCompatible continue le boot une seule fois (pas de double init).
  * - Foreground : masque le gate si compatible ; sinon garde + feedback réseau.
  * - Create / join / resume : gate présenté avant l’op ; retry compatible masque
- *   le gate — l’utilisateur peut retenter l’action manuellement (pas d’auto-replay).
+ *   le gate - l’utilisateur peut retenter l’action manuellement (pas d’auto-replay).
  */
 
 import {

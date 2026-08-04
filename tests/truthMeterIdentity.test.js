@@ -1,5 +1,5 @@
 /**
- * BUG-TRUTHMETER-02 — identité / merge (clear null, cross-run, no hint index).
+ * BUG-TRUTHMETER-02 - identité / merge (clear null, cross-run, no hint index).
  */
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";

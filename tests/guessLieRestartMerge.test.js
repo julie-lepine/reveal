@@ -1,5 +1,5 @@
 /**
- * Guess Lie — merge restart légitime (fin de partie → Recommencer).
+ * Guess Lie - merge restart légitime (fin de partie → Recommencer).
  * Simule mergeGuessLieGameLocal (gameSync) via les helpers sessionMerge exportés.
  */
 import { describe, it } from "node:test";

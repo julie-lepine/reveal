@@ -1,5 +1,5 @@
 /**
- * UX-NAV-LOBBY — catalogue des onglets du menu principal.
+ * UX-NAV-LOBBY - catalogue des onglets du menu principal.
  * Visibilité fondée sur l’appartenance lobby (`hasActiveLobby`), pas sur l’écran courant.
  */
 

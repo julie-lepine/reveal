@@ -6,7 +6,7 @@ import { getState, getLieSuccessRate } from "./state.js";
 export function getEveningRecap() {
   const { stats, scores, tierNightGame } = getState();
   const participants = getLobbyParticipants();
-  // Classement historique soirée (actifs + contributeurs partis) — pas le roster seul.
+  // Classement historique soirée (actifs + contributeurs partis) - pas le roster seul.
   const ranked = sortAndRankByScore(getSortedEveningStandingPlayers(), (p) => scores[p.name] || 0);
   const top = ranked
     .filter((p) => (scores[p.name] || 0) > 0 && p.rank <= 3)

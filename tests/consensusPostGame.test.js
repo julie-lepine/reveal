@@ -1,7 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
-/** Miroir de completeGameSession (gameSync.js) — vérifie le contrat post-partie Consensus. */
+/** Miroir de completeGameSession (gameSync.js) - vérifie le contrat post-partie Consensus. */
 const POST_GAME_SCREENS = new Set(["results", "leaderboard"]);
 
 function completeGameSessionGameId(screen, gameId) {

@@ -17,7 +17,7 @@ function mountLobbySource() {
   return lobbyScreenSrc.slice(start);
 }
 
-describe("SYN-12 / M-05b — planLobbyMountMultiplayerSync", () => {
+describe("SYN-12 / M-05b - planLobbyMountMultiplayerSync", () => {
   it("salle d’attente MP : exactement 1 start pre-refresh, pas d’early return", () => {
     const plan = planLobbyMountMultiplayerSync({
       syncActive: true,
@@ -101,7 +101,7 @@ describe("SYN-12 / M-05b — planLobbyMountMultiplayerSync", () => {
   });
 });
 
-describe("SYN-12 — mountLobby source (un seul start + early returns)", () => {
+describe("SYN-12 - mountLobby source (un seul start + early returns)", () => {
   it("importe et utilise planLobbyMountMultiplayerSync", () => {
     assert.match(lobbyScreenSrc, /planLobbyMountMultiplayerSync/);
     assert.match(

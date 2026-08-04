@@ -1,7 +1,7 @@
 /**
  * Registre diagnostic multi-instances Realtime polls.
  * Vit sur globalThis pour survivre à plusieurs évaluations de module.
- * Aucun rôle fonctionnel — activé uniquement si reveal-poll-rt-debug=1.
+ * Aucun rôle fonctionnel - activé uniquement si reveal-poll-rt-debug=1.
  */
 
 export const POLL_RT_DEBUG_KEY = "reveal-poll-rt-debug";
@@ -63,7 +63,7 @@ export function countPollRtRegistryActive(lobbyId = null) {
 }
 
 /**
- * @param {string} entryKey — typiquement controllerId
+ * @param {string} entryKey - typiquement controllerId
  * @param {object} patch
  */
 export function upsertPollRtRegistryEntry(entryKey, patch = {}) {
@@ -135,7 +135,7 @@ export function collectPollRtModuleOrigin(importMetaUrl) {
 }
 
 /**
- * Log diagnostic instance — debug only.
+ * Log diagnostic instance - debug only.
  * @param {string} event
  * @param {object} payload
  */

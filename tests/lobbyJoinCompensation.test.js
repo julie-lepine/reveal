@@ -1,5 +1,5 @@
 /**
- * SYN/ARCH — Compensation join partiel (membership B orpheline).
+ * SYN/ARCH - Compensation join partiel (membership B orpheline).
  */
 import { describe, it, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
@@ -73,7 +73,7 @@ function resetGuestStorage() {
   memoryStorage.clear();
 }
 
-describe("lobbyJoinEffects — journal", () => {
+describe("lobbyJoinEffects - journal", () => {
   it("INSERT confirmé → eligible DELETE", () => {
     const effects = createLobbyJoinEffects(GUEST_A);
     recordMembershipInsertForJoin(effects, { id: "mem-b" }, "lobby-b");
@@ -88,7 +88,7 @@ describe("lobbyJoinEffects — journal", () => {
     assert.equal(needsJoinCompensation(effects), false);
   });
 
-  it("F — reclaim avec mutation → DELETE éligible", () => {
+  it("F - reclaim avec mutation → DELETE éligible", () => {
     const effects = createLobbyJoinEffects(GUEST_A);
     recordMembershipReclaimForJoin(effects, {
       membershipId: "mem-b-guest",
@@ -122,7 +122,7 @@ describe("restoreGuestMembershipFromJoinEffects", () => {
   beforeEach(() => resetGuestStorage());
   afterEach(() => resetGuestStorage());
 
-  it("G — restaure guestMembership A après écriture B", () => {
+  it("G - restaure guestMembership A après écriture B", () => {
     saveGuestMembership(GUEST_A);
     const effects = createLobbyJoinEffects(loadGuestMembership());
     recordGuestMembershipWriteForJoin(effects, GUEST_B, saveGuestMembership);
@@ -133,7 +133,7 @@ describe("restoreGuestMembershipFromJoinEffects", () => {
     assert.equal(loadGuestMembership()?.lobbyId, "lobby-a");
   });
 
-  it("H — supprime B si aucun guestMembership avant", () => {
+  it("H - supprime B si aucun guestMembership avant", () => {
     const effects = createLobbyJoinEffects(null);
     recordGuestMembershipWriteForJoin(effects, GUEST_B, saveGuestMembership);
     assert.equal(loadGuestMembership()?.lobbyId, "lobby-b");
@@ -163,7 +163,7 @@ describe("compensateFailedLobbyJoin", () => {
     savePendingLobbyMembershipCompensation(null);
   });
 
-  it("A — INSERT puis échec simulé : DELETE B + guest restauré", async () => {
+  it("A - INSERT puis échec simulé : DELETE B + guest restauré", async () => {
     saveGuestMembership(GUEST_A);
     const effects = createLobbyJoinEffects(loadGuestMembership());
     recordMembershipInsertForJoin(effects, { id: "mem-b" }, "lobby-b");
@@ -184,7 +184,7 @@ describe("compensateFailedLobbyJoin", () => {
     assert.equal(getPendingLobbyMembershipCompensation(), null);
   });
 
-  it("B — même contrat après hydrate échoué (journal identique INSERT)", async () => {
+  it("B - même contrat après hydrate échoué (journal identique INSERT)", async () => {
     const effects = createLobbyJoinEffects(null);
     recordMembershipInsertForJoin(effects, { id: "mem-b" }, "lobby-b");
     recordGuestMembershipWriteForJoin(effects, GUEST_B, saveGuestMembership);
@@ -196,7 +196,7 @@ describe("compensateFailedLobbyJoin", () => {
     assert.equal(loadGuestMembership(), null);
   });
 
-  it("D — join finalisé : aucune action", async () => {
+  it("D - join finalisé : aucune action", async () => {
     const effects = createLobbyJoinEffects(null);
     recordMembershipInsertForJoin(effects, { id: "mem-b" }, "lobby-b");
     markLobbyJoinFinalized(effects);
@@ -212,7 +212,7 @@ describe("compensateFailedLobbyJoin", () => {
     assert.equal(result.membershipDeleted, false);
   });
 
-  it("E — préexistant : pas de DELETE", async () => {
+  it("E - préexistant : pas de DELETE", async () => {
     const effects = createLobbyJoinEffects(GUEST_A);
     recordPreexistingMembershipForJoin(effects, { id: "mem-b" }, "lobby-b");
 
@@ -226,7 +226,7 @@ describe("compensateFailedLobbyJoin", () => {
     assert.equal(called, false);
   });
 
-  it("I — DELETE échoue : pending + guest restauré", async () => {
+  it("I - DELETE échoue : pending + guest restauré", async () => {
     saveGuestMembership(GUEST_A);
     const effects = createLobbyJoinEffects(loadGuestMembership());
     recordMembershipInsertForJoin(effects, { id: "mem-b" }, "lobby-b");
@@ -242,7 +242,7 @@ describe("compensateFailedLobbyJoin", () => {
     assert.equal(loadGuestMembership()?.lobbyId, "lobby-a");
   });
 
-  it("J — retry pending réussit et efface le journal", async () => {
+  it("J - retry pending réussit et efface le journal", async () => {
     savePendingLobbyMembershipCompensation({
       lobbyId: "lobby-b",
       membershipId: "mem-b",
@@ -257,7 +257,7 @@ describe("compensateFailedLobbyJoin", () => {
     assert.equal(getPendingLobbyMembershipCompensation(), null);
   });
 
-  it("J — retry pending reclaim réussit", async () => {
+  it("J - retry pending reclaim réussit", async () => {
     savePendingLobbyMembershipCompensation({
       lobbyId: "lobby-b",
       membershipId: "mem-b-guest",
@@ -272,7 +272,7 @@ describe("compensateFailedLobbyJoin", () => {
     assert.equal(getPendingLobbyMembershipCompensation(), null);
   });
 
-  it("J — membership déjà absente acceptée comme succès DELETE", async () => {
+  it("J - membership déjà absente acceptée comme succès DELETE", async () => {
     savePendingLobbyMembershipCompensation({
       lobbyId: "lobby-b",
       membershipId: "mem-b",
@@ -287,7 +287,7 @@ describe("compensateFailedLobbyJoin", () => {
     assert.equal(getPendingLobbyMembershipCompensation(), null);
   });
 
-  it("L — double compensation : guest A intact, pas d'erreur fatale", async () => {
+  it("L - double compensation : guest A intact, pas d'erreur fatale", async () => {
     saveGuestMembership(GUEST_A);
     const effects = createLobbyJoinEffects(loadGuestMembership());
     recordMembershipInsertForJoin(effects, { id: "mem-b" }, "lobby-b");
@@ -307,7 +307,7 @@ describe("compensateFailedLobbyJoin", () => {
     assert.equal(deleteCount, 2);
   });
 
-  it("reclaim réussi puis échec — DELETE B appelé, pas de pending", async () => {
+  it("reclaim réussi puis échec - DELETE B appelé, pas de pending", async () => {
     const effects = createLobbyJoinEffects(GUEST_B);
     recordMembershipReclaimForJoin(effects, {
       membershipId: "mem-b-guest",
@@ -328,7 +328,7 @@ describe("compensateFailedLobbyJoin", () => {
     assert.equal(getPendingLobbyMembershipCompensation(), null);
   });
 
-  it("reclaim DELETE échoue — pending retryable distinct", async () => {
+  it("reclaim DELETE échoue - pending retryable distinct", async () => {
     const effects = createLobbyJoinEffects(GUEST_B);
     recordMembershipReclaimForJoin(effects, {
       membershipId: "mem-b-guest",
@@ -347,7 +347,7 @@ describe("compensateFailedLobbyJoin", () => {
     );
   });
 
-  it("reclaim idempotent (reclaimed false) — pas de DELETE", async () => {
+  it("reclaim idempotent (reclaimed false) - pas de DELETE", async () => {
     const effects = createLobbyJoinEffects(GUEST_B);
     recordMembershipReclaimForJoin(effects, {
       membershipId: "mem-b",
@@ -437,7 +437,7 @@ describe("resolvePendingMembershipByLeave", () => {
   });
 });
 
-describe("finalizeFailedJoinAttempt — comportement", () => {
+describe("finalizeFailedJoinAttempt - comportement", () => {
   it("mutation confirmée + !ok : compensation avant rollback, pas de commit", async () => {
     const effects = createLobbyJoinEffects(GUEST_A);
     recordMembershipInsertForJoin(effects, { id: "mem-b" }, "lobby-b");
@@ -496,8 +496,8 @@ describe("pending storage", () => {
   });
 });
 
-describe("joinLobby — contrats source compensation", () => {
-  it("C — finalizeFailedJoinAttempt extrait et câblé dans joinLobby", () => {
+describe("joinLobby - contrats source compensation", () => {
+  it("C - finalizeFailedJoinAttempt extrait et câblé dans joinLobby", () => {
     const lobbySrc = readFileSync(join(ROOT, "js/core/lobby.js"), "utf8");
     const finalizeSrc = readFileSync(join(ROOT, "js/core/lobbyJoinFinalize.js"), "utf8");
     assert.match(lobbySrc, /runFinalizeFailedJoinAttempt/);
@@ -527,7 +527,7 @@ describe("joinLobby — contrats source compensation", () => {
   });
 });
 
-describe("joinLobbySupabase — contrats source journal", () => {
+describe("joinLobbySupabase - contrats source journal", () => {
   it("recordPreexistingMembershipForJoin sur membership existante", () => {
     const src = readFileSync(join(ROOT, "js/core/supabaseLobby.js"), "utf8");
     assert.match(src, /recordPreexistingMembershipForJoin\(joinEffects, existing/);

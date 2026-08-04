@@ -1,5 +1,5 @@
 /**
- * ARCH-22 Vague C — runLaunchButton soft delay « Lancement… ».
+ * ARCH-22 Vague C - runLaunchButton soft delay « Lancement… ».
  * Pas d’import de mpLaunch.js (dépendances ESM browser) : contrats source +
  * réplique minimale du chrome soft-delay (même branchement que la prod).
  */
@@ -30,12 +30,12 @@ function extractRunLaunchButton(body) {
   throw new Error("runLaunchButton non fermée");
 }
 
-describe("ARCH-22 runLaunchButton — contrats source", () => {
+describe("ARCH-22 runLaunchButton - contrats source", () => {
   it("importe createSyncPending ; soft delay sur le chrome seulement", () => {
     assert.match(src, /import \{ createSyncPending \} from "\.\/syncPending\.js"/);
     const fn = extractRunLaunchButton(src);
     assert.match(fn, /btn\.disabled = true/);
-    // Ancien pattern : label immédiat après disable — interdit
+    // Ancien pattern : label immédiat après disable - interdit
     assert.doesNotMatch(
       fn,
       /btn\.disabled = true;\r?\n\s*btn\.textContent = loadingLabel/
@@ -89,7 +89,7 @@ async function softLaunchChrome(btn, launchFn, { loadingLabel = "Lancement…", 
   }
 }
 
-describe("ARCH-22 launch chrome — comportement soft delay", () => {
+describe("ARCH-22 launch chrome - comportement soft delay", () => {
   beforeEach(() => {
     mock.timers.enable({ apis: ["setTimeout"], now: 0 });
   });

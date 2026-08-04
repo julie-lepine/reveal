@@ -91,7 +91,7 @@ export function installRealtimeSocketDiagnostics(supabase) {
   try {
     const sock = rt.conn || rt.socket || rt._socket || null;
     if (sock && typeof sock.onOpen === "function") {
-      /* phoenix socket callbacks vary by version — wrap connect path instead */
+      /* phoenix socket callbacks vary by version - wrap connect path instead */
     }
   } catch {
     /* ignore */
@@ -113,7 +113,7 @@ export function installRealtimeSocketDiagnostics(supabase) {
     };
   }
 
-  // Écoute via channel events insuffisant — poll connectionState périodique léger si debug
+  // Écoute via channel events insuffisant - poll connectionState périodique léger si debug
   if (typeof window !== "undefined" && rtSocketDebugEnabled()) {
     let lastState = null;
     const iv = setInterval(() => {
@@ -185,7 +185,7 @@ export async function runSharedSocketProbes(supabase, opts = {}) {
     topicsBefore: listRealtimeTopics(supabase),
   });
 
-  // Probe 1 — poll seul
+  // Probe 1 - poll seul
   {
     const topic = `probe-poll-only:${stamp}`;
     const ch = supabase.channel(topic).on(
@@ -203,7 +203,7 @@ export async function runSharedSocketProbes(supabase, opts = {}) {
     await remove(ch);
   }
 
-  // Probe 2 — lobby-like seul (même forme de topic que prod)
+  // Probe 2 - lobby-like seul (même forme de topic que prod)
   {
     const topic = `probe-lobby-only:${stamp}`;
     const ch = supabase.channel(topic).on(
@@ -221,7 +221,7 @@ export async function runSharedSocketProbes(supabase, opts = {}) {
     await remove(ch);
   }
 
-  // Probe 3 — lobby SUBSCRIBED puis poll
+  // Probe 3 - lobby SUBSCRIBED puis poll
   {
     const lobbyTopic = `probe-lobby-then-poll-L:${stamp}`;
     const pollTopic = `probe-lobby-then-poll-P:${stamp}`;
@@ -253,7 +253,7 @@ export async function runSharedSocketProbes(supabase, opts = {}) {
     await remove(lobbyCh);
   }
 
-  // Probe 4 — quasi simultané
+  // Probe 4 - quasi simultané
   {
     const lobbyTopic = `probe-simul-L:${stamp}`;
     const pollTopic = `probe-simul-P:${stamp}`;

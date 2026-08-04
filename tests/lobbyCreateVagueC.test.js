@@ -57,12 +57,12 @@ function guardDeps(overrides = {}) {
   };
 }
 
-describe("lobbyCreateVagueC — assertCanInsertLobby", () => {
+describe("lobbyCreateVagueC - assertCanInsertLobby", () => {
   beforeEach(() => {
     resetMembershipSnapshotTestState(UID);
   });
 
-  it("1 — cache actif → refus sans query/INSERT", async () => {
+  it("1 - cache actif → refus sans query/INSERT", async () => {
     let queries = 0;
     await assert.rejects(
       () =>
@@ -81,7 +81,7 @@ describe("lobbyCreateVagueC — assertCanInsertLobby", () => {
     assert.equal(queries, 0);
   });
 
-  it("2 — query found → refus + snapshot found", async () => {
+  it("2 - query found → refus + snapshot found", async () => {
     await assert.rejects(
       () =>
         assertCanInsertLobby(
@@ -97,7 +97,7 @@ describe("lobbyCreateVagueC — assertCanInsertLobby", () => {
     assert.equal(getMembershipSnapshot()?.membership?.code, "ABCD");
   });
 
-  it("3 — query unknown → refus sans « déjà dans un lobby »", async () => {
+  it("3 - query unknown → refus sans « déjà dans un lobby »", async () => {
     await assert.rejects(
       () =>
         assertCanInsertLobby(
@@ -112,7 +112,7 @@ describe("lobbyCreateVagueC — assertCanInsertLobby", () => {
     assert.equal(getMembershipSnapshot()?.status, "unknown");
   });
 
-  it("4 — query none → autorise (pas throw)", async () => {
+  it("4 - query none → autorise (pas throw)", async () => {
     const out = await assertCanInsertLobby(
       guardDeps({
         queryActiveLobbyMembership: async () => ({ status: "none" }),
@@ -122,7 +122,7 @@ describe("lobbyCreateVagueC — assertCanInsertLobby", () => {
     assert.equal(getMembershipSnapshot()?.status, "none");
   });
 
-  it("5 — snapshot none ancien, query found → refus", async () => {
+  it("5 - snapshot none ancien, query found → refus", async () => {
     setMembershipSnapshot({ status: "none" }, "old", UID);
     await assert.rejects(
       () =>
@@ -136,7 +136,7 @@ describe("lobbyCreateVagueC — assertCanInsertLobby", () => {
     assert.equal(getMembershipSnapshot()?.status, "found");
   });
 
-  it("6 — snapshot none, query unknown → refus", async () => {
+  it("6 - snapshot none, query unknown → refus", async () => {
     setMembershipSnapshot({ status: "none" }, "old", UID);
     await assert.rejects(
       () =>
@@ -149,7 +149,7 @@ describe("lobbyCreateVagueC — assertCanInsertLobby", () => {
     );
   });
 
-  it("7 — found met à jour le snapshot", async () => {
+  it("7 - found met à jour le snapshot", async () => {
     setMembershipSnapshot({ status: "none" }, "x", UID);
     try {
       await assertCanInsertLobby(
@@ -163,7 +163,7 @@ describe("lobbyCreateVagueC — assertCanInsertLobby", () => {
     assert.equal(getMembershipSnapshot()?.status, "found");
   });
 
-  it("8 — unknown sans ancien found → check_failed snapshot", async () => {
+  it("8 - unknown sans ancien found → check_failed snapshot", async () => {
     applyMembershipQueryToSnapshot(
       { status: "unknown" },
       {
@@ -176,7 +176,7 @@ describe("lobbyCreateVagueC — assertCanInsertLobby", () => {
     assert.equal(getMembershipSnapshot()?.status, "unknown");
   });
 
-  it("9 — unknown avec ancien found → retain", async () => {
+  it("9 - unknown avec ancien found → retain", async () => {
     setMembershipSnapshot(FOUND, "home", UID);
     const action = applyMembershipQueryToSnapshot(
       { status: "unknown" },
@@ -191,7 +191,7 @@ describe("lobbyCreateVagueC — assertCanInsertLobby", () => {
     assert.equal(getMembershipSnapshot()?.status, "found");
   });
 
-  it("11 — membership > 24 h (joinedAt vieux) → found bloque toujours", async () => {
+  it("11 - membership > 24 h (joinedAt vieux) → found bloque toujours", async () => {
     const oldFound = {
       ...FOUND,
       membership: { ...FOUND.membership, code: "OLD1" },
@@ -222,12 +222,12 @@ describe("lobbyCreateVagueC — assertCanInsertLobby", () => {
   });
 });
 
-describe("lobbyCreateVagueC — canCreateLobby / staleness", () => {
+describe("lobbyCreateVagueC - canCreateLobby / staleness", () => {
   beforeEach(() => {
     resetMembershipSnapshotTestState(UID);
   });
 
-  it("12 — snapshot null → faux", () => {
+  it("12 - snapshot null → faux", () => {
     assert.equal(
       canCreateLobbyFromInputs({
         loggedIn: true,
@@ -240,7 +240,7 @@ describe("lobbyCreateVagueC — canCreateLobby / staleness", () => {
     );
   });
 
-  it("13 — unknown → faux", () => {
+  it("13 - unknown → faux", () => {
     assert.equal(
       canCreateLobbyFromInputs({
         loggedIn: true,
@@ -251,7 +251,7 @@ describe("lobbyCreateVagueC — canCreateLobby / staleness", () => {
     );
   });
 
-  it("14 — found → faux", () => {
+  it("14 - found → faux", () => {
     assert.equal(
       canCreateLobbyFromInputs({
         loggedIn: true,
@@ -267,7 +267,7 @@ describe("lobbyCreateVagueC — canCreateLobby / staleness", () => {
     );
   });
 
-  it("15 — snapshot stale → faux", () => {
+  it("15 - snapshot stale → faux", () => {
     const now = 1_000_000;
     assert.equal(
       canCreateLobbyFromInputs({
@@ -291,7 +291,7 @@ describe("lobbyCreateVagueC — canCreateLobby / staleness", () => {
     );
   });
 
-  it("16 — none frais + login + cache absent → vrai", () => {
+  it("16 - none frais + login + cache absent → vrai", () => {
     const now = Date.now();
     assert.equal(
       canCreateLobbyFromInputs({
@@ -331,8 +331,8 @@ describe("lobbyCreateVagueC — canCreateLobby / staleness", () => {
   });
 });
 
-describe("lobbyCreateVagueC — Home chrome + source", () => {
-  it("17 — none + resolutionInProgress → Créer disabled", () => {
+describe("lobbyCreateVagueC - Home chrome + source", () => {
+  it("17 - none + resolutionInProgress → Créer disabled", () => {
     const chrome = deriveHomeMembershipChrome({
       hasActiveLobby: false,
       snapshot: { status: "none" },
@@ -346,7 +346,7 @@ describe("lobbyCreateVagueC — Home chrome + source", () => {
     assert.equal(chrome.createEnabled, false);
   });
 
-  it("18 — handler pattern : createEnabled false bloque", () => {
+  it("18 - handler pattern : createEnabled false bloque", () => {
     const chrome = deriveHomeMembershipChrome({
       hasActiveLobby: false,
       snapshot: { status: "none" },
@@ -360,7 +360,7 @@ describe("lobbyCreateVagueC — Home chrome + source", () => {
     assert.equal(wouldRun, false);
   });
 
-  it("10+QA — createLobby n’appelle plus peekServerLobbyForUser", () => {
+  it("10+QA - createLobby n’appelle plus peekServerLobbyForUser", () => {
     const lobbySrc = readFileSync(join(ROOT, "js/core/lobby.js"), "utf8");
     const createIdx = lobbySrc.indexOf("export async function createLobby()");
     const nextExport = lobbySrc.indexOf("\nexport ", createIdx + 10);
@@ -382,7 +382,7 @@ describe("lobbyCreateVagueC — Home chrome + source", () => {
     assert.match(lobbySrc, /lobbyMembershipFetch\.js/);
   });
 
-  it("21 — message unknown ≠ déjà dans un lobby", () => {
+  it("21 - message unknown ≠ déjà dans un lobby", () => {
     const err = makeLobbyCreateError(
       LOBBY_CREATE_ERROR.CHECK_FAILED,
       "Impossible de vérifier votre situation. Réessayez."
@@ -391,7 +391,7 @@ describe("lobbyCreateVagueC — Home chrome + source", () => {
     assert.equal(/déjà dans un lobby/i.test(err.message), false);
   });
 
-  it("23 — mount guard : late assert n’écrit pas si disposed", async () => {
+  it("23 - mount guard : late assert n’écrit pas si disposed", async () => {
     resetMountGenerationForTests();
     advanceMountGeneration();
     const mount = createMountGuard();
@@ -409,14 +409,14 @@ describe("lobbyCreateVagueC — Home chrome + source", () => {
     assert.equal(getMembershipSnapshot()?.status, "found");
   });
 
-  it("24 — ensureLobby appelle createLobby (source)", () => {
+  it("24 - ensureLobby appelle createLobby (source)", () => {
     const lobbyScreen = readFileSync(join(ROOT, "js/screens/lobby.js"), "utf8");
     assert.match(lobbyScreen, /async function ensureLobby/);
     assert.match(lobbyScreen, /await createLobby\(\)/);
     assert.match(lobbyScreen, /assertCanInsertLobby|Vague C|createLobby centralise/i);
   });
 
-  it("25 — offline createLobby path conserve branche sans query (source)", () => {
+  it("25 - offline createLobby path conserve branche sans query (source)", () => {
     const lobbySrc = readFileSync(join(ROOT, "js/core/lobby.js"), "utf8");
     const createIdx = lobbySrc.indexOf("export async function createLobby()");
     const slice = lobbySrc.slice(createIdx, createIdx + 2800);
@@ -444,7 +444,7 @@ describe("lobbyCreateVagueC — Home chrome + source", () => {
   });
 });
 
-describe("lobbyCreateVagueC — decideMembershipSnapshotWrite source", () => {
+describe("lobbyCreateVagueC - decideMembershipSnapshotWrite source", () => {
   it("écrit avec source custom", () => {
     const d = decideMembershipSnapshotWrite(
       null,

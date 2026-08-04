@@ -1,5 +1,5 @@
 /**
- * Ancien canal d’invitation `#join=CODE` (abandonné — saisie manuelle du code uniquement).
+ * Ancien canal d’invitation `#join=CODE` (abandonné - saisie manuelle du code uniquement).
  * Ne confond pas avec les hash auth Supabase (`#access_token=…`, `#type=recovery`, …).
  */
 

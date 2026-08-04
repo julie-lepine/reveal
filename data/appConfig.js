@@ -18,7 +18,7 @@ export const PRIVACY_POLICY_PUBLIC_URL =
 export const CONTACT_EMAIL = "contact@revealthepartygame.fr";
 
 /**
- * URL publique — demande de suppression de compte (Play Console / App Store).
+ * URL publique - demande de suppression de compte (Play Console / App Store).
  * Déployer suppression-compte.html sur le même domaine que privacy.html.
  */
 export const ACCOUNT_DELETION_PUBLIC_URL =

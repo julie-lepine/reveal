@@ -1,5 +1,5 @@
 /**
- * Instrumentation rejoin-watch — pas de changement de stratégie contrôleur.
+ * Instrumentation rejoin-watch - pas de changement de stratégie contrôleur.
  */
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";

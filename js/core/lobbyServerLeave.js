@@ -1,13 +1,13 @@
 /**
- * Vague D — quitter / fermer un lobby depuis une membership server-only.
+ * Vague D - quitter / fermer un lobby depuis une membership server-only.
  *
- * Identité canonique : snapshot.membership.{lobbyId,code,role} — pas state.lobby.
+ * Identité canonique : snapshot.membership.{lobbyId,code,role} - pas state.lobby.
  * Pipeline séparé du leave cache-actif (leaveLobby / dissolveLobbyAsHost).
  *
  * Après mutation réussie : re-query obligatoire ; Créer uniquement si `none` confirmé.
  *
  * Concurrence documentée : DELETE OK → autre membership créée avant confirmation
- * → query `found` (pas `none`) — correct.
+ * → query `found` (pas `none`) - correct.
  */
 
 import { LOBBY_DISSOLVE_STATUS } from "./lobbyDissolveContract.js";
@@ -59,7 +59,7 @@ export const SERVER_LEAVE_CONFIRM = Object.freeze({
 });
 
 /**
- * Validation d’entrée (pure) — avant toute mutation.
+ * Validation d’entrée (pure) - avant toute mutation.
  * @returns {{ ok: true } | { ok: false, error: Error }}
  */
 export function validateServerLeaveInput({
@@ -144,7 +144,7 @@ export function resolveServerLeaveAction({
         ok: false,
         error: makeLobbyServerLeaveError(
           LOBBY_SERVER_LEAVE_ERROR.ROLE_MISMATCH,
-          "Tu es hôte sur le serveur — utilise Fermer le lobby.",
+          "Tu es hôte sur le serveur - utilise Fermer le lobby.",
           { intendedRole, serverHostId }
         ),
       };

@@ -16,7 +16,7 @@ const OTHER = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
 const T0 = 1_700_000_000_000;
 const isoAgo = (ms) => new Date(T0 - ms).toISOString();
 
-describe("presence live — acting 120s", () => {
+describe("presence live - acting 120s", () => {
   it("119s → 121s : acting host change + notice demandée une fois", () => {
     const members = [
       { userId: HOST, lastSeenAt: isoAgo(119_000) },
@@ -102,7 +102,7 @@ describe("presence live — acting 120s", () => {
   });
 });
 
-describe("presence live — claim 300s hub", () => {
+describe("presence live - claim 300s hub", () => {
   it("299s → 301s : claimEligible false→true + nudge hub", () => {
     const members = [
       { userId: HOST, lastSeenAt: isoAgo(299_000) },

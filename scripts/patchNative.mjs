@@ -98,7 +98,7 @@ function patchAndroid() {
   const stringsPath = path.join(root, "android", "app", "src", "main", "res", "values", "strings.xml");
 
   if (!fs.existsSync(manifestPath)) {
-    console.log("Android: AndroidManifest.xml absent — skip");
+    console.log("Android: AndroidManifest.xml absent - skip");
     return;
   }
 
@@ -152,7 +152,7 @@ function plistInsertAfterDict(plist, insert) {
 function patchIos() {
   const plistPath = path.join(root, "ios", "App", "App", "Info.plist");
   if (!fs.existsSync(plistPath)) {
-    console.log("iOS: Info.plist absent — skip");
+    console.log("iOS: Info.plist absent - skip");
     return;
   }
 

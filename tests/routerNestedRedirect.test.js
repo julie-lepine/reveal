@@ -191,7 +191,7 @@ describe("M-08 / SYN-13 nested redirect in mount", () => {
   });
 });
 
-describe("ARCH-06 Vague C0 — génération routeur", () => {
+describe("ARCH-06 Vague C0 - génération routeur", () => {
   it("navigate same-screen avance la génération ; ancien mount non courant", () => {
     let guardA = null;
     let guardB = null;
@@ -224,7 +224,7 @@ describe("ARCH-06 Vague C0 — génération routeur", () => {
     registerScreen("screen-a", () => {
       guardA = createMountGuard();
       navigate("screen-b");
-      return null; // pas de dispose — trou mode B
+      return null; // pas de dispose - trou mode B
     });
     registerScreen("screen-b", () => {
       guardB = createMountGuard();

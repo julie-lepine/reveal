@@ -158,7 +158,7 @@ export function getCurrentAuthor(session = getTruthMeterSession()) {
 }
 
 export function isLocalTruthMeterAuthorNow(session = getTruthMeterSession()) {
-  // Solo / offline : authorOrder reste name-keyed (pas de wire MP) — gate par pseudo local.
+  // Solo / offline : authorOrder reste name-keyed (pas de wire MP) - gate par pseudo local.
   if (!isGameSyncActive()) {
     const localName = getLocalDisplayName();
     const entry = (session.authorOrder || [])[session.roundIdx ?? 0];
@@ -193,7 +193,7 @@ export function getTruthMeterAuthorStatusNow(session = getTruthMeterSession()) {
 export function getTruthMeterParticipantNames(session = getTruthMeterSession()) {
   const order = session.authorOrder || [];
   if (!order.length) return getActivePlayerNames();
-  // Order peut être UID ou legacy name — résoudre en labels d'affichage.
+  // Order peut être UID ou legacy name - résoudre en labels d'affichage.
   return order.map((entry) => {
     const asName = nameForUserId(entry);
     if (asName) return asName;
@@ -316,7 +316,7 @@ export async function markTruthMeterLobbyStarted({ rosterNames } = {}) {
     if (!built.ok) throw new Error(built.error);
     authorOrder = shuffleArray(built.uids);
   } else {
-    // Solo / offline : pas d'UID lobby — conserver noms locaux (pas de wire MP).
+    // Solo / offline : pas d'UID lobby - conserver noms locaux (pas de wire MP).
     const names = rosterNames?.length ? rosterNames : getActivePlayerNames();
     if (names.length < TRUTH_METER_MIN_PLAYERS) {
       throw new Error(`Il faut au moins ${TRUTH_METER_MIN_PLAYERS} joueurs pour TruthMeter.`);
@@ -452,7 +452,7 @@ export function applyTruthMeterEveningFromLastRound(session = getTruthMeterSessi
   return true;
 }
 
-/** BUG-TRUTHMETER-01B — reveal atomique via RPC (MP uniquement). */
+/** BUG-TRUTHMETER-01B - reveal atomique via RPC (MP uniquement). */
 export async function commitTruthMeterReveal() {
   const session = getTruthMeterSession();
   if (!isGameSyncActive()) {
@@ -473,7 +473,7 @@ export async function commitTruthMeterReveal() {
     if (row) applyRemoteSession(row);
     const synced = getTruthMeterSession();
     if (isLobbyHost() && synced.roundScored && synced.lastRound) {
-      // Soirée : cumul local idempotent. Pas de patchGameState evening ici —
+      // Soirée : cumul local idempotent. Pas de patchGameState evening ici -
       // un RMW hôte post-reveal peut réécrire un blob stale et diverger des invités.
       applyTruthMeterEveningFromLastRound(synced);
     }
@@ -665,7 +665,7 @@ export function allTruthMeterVotesIn(session = getTruthMeterSession()) {
 }
 
 /**
- * Compteur hôte « Révéler maintenant X/Y » — votes confirmés session uniquement
+ * Compteur hôte « Révéler maintenant X/Y » - votes confirmés session uniquement
  * (pas de draft / pending / in-flight).
  */
 export function countConfirmedTruthMeterVoterVotes(

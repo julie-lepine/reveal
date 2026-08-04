@@ -1,11 +1,11 @@
 /**
- * UX-CHAT-01 — annonce chat quand l'hôte engage la préparation d'un jeu
+ * UX-CHAT-01 - annonce chat quand l'hôte engage la préparation d'un jeu
  * (choix autoritaire catalogue / Recommencer → commitPrepSessionLaunch).
  *
  * Une seule annonce par entrée en prep. Pas d'annonce au clic « Lancer » (play).
  * Les invités en catch-up / Realtime ne doivent pas réémettre (émission hôte seule).
  *
- * Jeux sans écran prep dédié : aucun inventorié dans le catalogue actuel — tous
+ * Jeux sans écran prep dédié : aucun inventorié dans le catalogue actuel - tous
  * passent par un écran prep/menu/select avant launchGameWithSync.
  */
 import { catalogTitleForSessionGameId } from "./gameCatalogTitle.js";
@@ -45,7 +45,7 @@ export async function announceGamePreparationInChat(gameId, opts = {}) {
   }
 }
 
-/** @deprecated nom v1 play — redirige vers la formulation préparation */
+/** @deprecated nom v1 play - redirige vers la formulation préparation */
 export function buildGameStartedChatMessage(gameId) {
   return buildGamePreparationChatMessage(gameId);
 }

@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { decideActingHostNotice } from "../js/core/presenceUiLive.js";
 import { needsActingHostUiRefresh } from "../js/core/hostPresence.js";
 
-describe("acting host notice — election nudge vs bad seed", () => {
+describe("acting host notice - election nudge vs bad seed", () => {
   it("seed wasActing=true puis election nudge : notice demandée (pas avalée)", () => {
     const r = decideActingHostNotice({
       wasActing: true, // seed après patch state (bug historique)

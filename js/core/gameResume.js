@@ -105,7 +105,7 @@ function resumeBannerHint(screen) {
 function resumeBannerTitle(screen) {
   const label = gameLabelForScreen(screen);
   if (isOnGameSetupScreen(screen)) {
-    return `🎮 ${label} — préparation`;
+    return `🎮 ${label} - préparation`;
   }
   return `🎮 ${label} en cours`;
 }
@@ -194,7 +194,7 @@ export function stayOnGameResumeTarget(resumeScreen = null) {
  * Ecran plein page (lobby par erreur) : reprise auto vers prep / partie.
  * @returns {() => void} cleanup
  * NOTE (résidu) : « Rester ici » de l’interstitial (#game-resume-stay) ne masque
- * pas l’UI plein écran — hors scope du fix bandeau game-select.
+ * pas l’UI plein écran - hors scope du fix bandeau game-select.
  */
 export function mountGameResumeInterstitial(
   app,

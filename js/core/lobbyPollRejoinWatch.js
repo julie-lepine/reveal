@@ -1,5 +1,5 @@
 /**
- * Instrumentation seule — observe le rejoin Phoenix après CHANNEL_ERROR.
+ * Instrumentation seule - observe le rejoin Phoenix après CHANNEL_ERROR.
  * N'altère pas la stratégie degraded_keep_channel.
  *
  * Logs : [POLL-RT] rejoin-watch

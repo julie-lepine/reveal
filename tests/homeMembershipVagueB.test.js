@@ -42,8 +42,8 @@ const foundSnap = () => ({
   extraCount: 0,
 });
 
-describe("homeMembershipVagueB — machine d’états", () => {
-  it("1 — premier mount sans snapshot → checking", () => {
+describe("homeMembershipVagueB - machine d’états", () => {
+  it("1 - premier mount sans snapshot → checking", () => {
     const chrome = deriveHomeMembershipChrome({
       hasActiveLobby: false,
       snapshot: null,
@@ -58,7 +58,7 @@ describe("homeMembershipVagueB — machine d’états", () => {
     assert.equal(chrome.showResume, false);
   });
 
-  it("2 — résultat serveur none → none", () => {
+  it("2 - résultat serveur none → none", () => {
     const chrome = deriveHomeMembershipChrome({
       hasActiveLobby: false,
       snapshot: { status: "none" },
@@ -72,7 +72,7 @@ describe("homeMembershipVagueB — machine d’états", () => {
     assert.equal(chrome.createEnabled, true);
   });
 
-  it("3 — found, cache absent → server_membership_recoverable", () => {
+  it("3 - found, cache absent → server_membership_recoverable", () => {
     const chrome = deriveHomeMembershipChrome({
       hasActiveLobby: false,
       snapshot: foundSnap(),
@@ -91,7 +91,7 @@ describe("homeMembershipVagueB — machine d’états", () => {
     assert.equal(chrome.showLeaveServer, true);
   });
 
-  it("4 — cache actif → cached_active", () => {
+  it("4 - cache actif → cached_active", () => {
     const chrome = deriveHomeMembershipChrome({
       hasActiveLobby: true,
       snapshot: foundSnap(),
@@ -109,7 +109,7 @@ describe("homeMembershipVagueB — machine d’états", () => {
     assert.equal(chrome.createEnabled, false);
   });
 
-  it("5 — unknown sans ancien found → check_failed", () => {
+  it("5 - unknown sans ancien found → check_failed", () => {
     const chrome = deriveHomeMembershipChrome({
       hasActiveLobby: false,
       snapshot: { status: "unknown" },
@@ -125,7 +125,7 @@ describe("homeMembershipVagueB — machine d’états", () => {
     assert.equal(chrome.showResume, false);
   });
 
-  it("6 — ancien found puis unknown → rétention (decide + chrome)", () => {
+  it("6 - ancien found puis unknown → rétention (decide + chrome)", () => {
     const decision = decideMembershipSnapshotWrite(
       foundSnap(),
       { status: "unknown" },
@@ -150,7 +150,7 @@ describe("homeMembershipVagueB — machine d’états", () => {
     assert.equal(chrome.createEnabled, false);
   });
 
-  it("7 — ancien found puis none confirmé → disparition carte", () => {
+  it("7 - ancien found puis none confirmé → disparition carte", () => {
     const decision = decideMembershipSnapshotWrite(
       foundSnap(),
       { status: "none" },
@@ -174,7 +174,7 @@ describe("homeMembershipVagueB — machine d’états", () => {
     assert.equal(chrome.membershipCode, null);
   });
 
-  it("8 — échec Resume → found conservé + unrecoverable", () => {
+  it("8 - échec Resume → found conservé + unrecoverable", () => {
     const chrome = deriveHomeMembershipChrome({
       hasActiveLobby: false,
       snapshot: foundSnap(),
@@ -193,7 +193,7 @@ describe("homeMembershipVagueB — machine d’états", () => {
     assert.match(chrome.errorMessage || "", /Impossible/);
   });
 
-  it("9 — Resume réussi → cached_active après hydrate", () => {
+  it("9 - Resume réussi → cached_active après hydrate", () => {
     const chrome = deriveHomeMembershipChrome({
       hasActiveLobby: true,
       snapshot: foundSnap(),
@@ -208,7 +208,7 @@ describe("homeMembershipVagueB — machine d’états", () => {
     assert.equal(chrome.showReturnToLobby, true);
   });
 
-  it("13–16 — Créer désactivé checking/found/check_failed ; actif après none", () => {
+  it("13–16 - Créer désactivé checking/found/check_failed ; actif après none", () => {
     assert.equal(
       deriveHomeMembershipChrome({
         hasActiveLobby: false,
@@ -270,7 +270,7 @@ describe("homeMembershipVagueB — machine d’états", () => {
     );
   });
 
-  it("17 — server-only : leave/ferme actif (Vague D)", () => {
+  it("17 - server-only : leave/ferme actif (Vague D)", () => {
     const chrome = deriveHomeMembershipChrome({
       hasActiveLobby: false,
       snapshot: foundSnap(),
@@ -311,13 +311,13 @@ describe("homeMembershipVagueB — machine d’états", () => {
   });
 });
 
-describe("homeMembershipVagueB — snapshot + lifecycle", () => {
+describe("homeMembershipVagueB - snapshot + lifecycle", () => {
   beforeEach(() => {
     resetMembershipSnapshotTestState(UID_A);
     resetMountGenerationForTests();
   });
 
-  it("10 — remount Home → snapshot mémoire réutilisé", () => {
+  it("10 - remount Home → snapshot mémoire réutilisé", () => {
     setMembershipSnapshot(foundSnap(), "home-query", UID_A);
     const snap = getMembershipSnapshot();
     assert.equal(snap.status, "found");
@@ -336,7 +336,7 @@ describe("homeMembershipVagueB — snapshot + lifecycle", () => {
     assert.equal(chrome.membershipCode, "ABCD");
   });
 
-  it("6b — apply politique : unknown ne wipe pas found en mémoire", () => {
+  it("6b - apply politique : unknown ne wipe pas found en mémoire", () => {
     setMembershipSnapshot(foundSnap(), "home-query", UID_A);
     const decision = decideMembershipSnapshotWrite(
       getMembershipSnapshot(),
@@ -350,7 +350,7 @@ describe("homeMembershipVagueB — snapshot + lifecycle", () => {
     assert.equal(getMembershipSnapshot().membership.code, "ABCD");
   });
 
-  it("7b — none confirmé écrit et retire la carte", () => {
+  it("7b - none confirmé écrit et retire la carte", () => {
     setMembershipSnapshot(foundSnap(), "home-query", UID_A);
     const decision = decideMembershipSnapshotWrite(
       getMembershipSnapshot(),
@@ -364,7 +364,7 @@ describe("homeMembershipVagueB — snapshot + lifecycle", () => {
     assert.equal(getMembershipSnapshot().membership, undefined);
   });
 
-  it("11 — résultat async après unmount → pas de mutation snapshot", () => {
+  it("11 - résultat async après unmount → pas de mutation snapshot", () => {
     const mount = createMountGuard();
     mount.dispose();
     const shouldContinue = () => mount.isMounted() && mount.isCurrentMount();
@@ -381,7 +381,7 @@ describe("homeMembershipVagueB — snapshot + lifecycle", () => {
     assert.equal(getMembershipSnapshot(), null);
   });
 
-  it("12 — deux mounts : le premier résultat tardif ne remplace pas le second", () => {
+  it("12 - deux mounts : le premier résultat tardif ne remplace pas le second", () => {
     advanceMountGeneration();
     const mount1 = createMountGuard();
     advanceMountGeneration();
@@ -410,13 +410,13 @@ describe("homeMembershipVagueB — snapshot + lifecycle", () => {
     setMembershipSnapshot(foundSnap(), "home-query", UID_A);
     const mount = createMountGuard();
     mount.dispose();
-    // Home cleanup ne doit pas appeler invalidate — snapshot survit
+    // Home cleanup ne doit pas appeler invalidate - snapshot survit
     assert.equal(getMembershipSnapshot().status, "found");
   });
 });
 
-describe("homeMembershipVagueB — contrats Home / createLobby", () => {
-  it("18 — pendingServerLobby ne décide plus du chrome (absent de home.js)", () => {
+describe("homeMembershipVagueB - contrats Home / createLobby", () => {
+  it("18 - pendingServerLobby ne décide plus du chrome (absent de home.js)", () => {
     const homeSrc = readFileSync(join(ROOT, "js/screens/home.js"), "utf8");
     assert.equal(homeSrc.includes("pendingServerLobby"), false);
     assert.equal(homeSrc.includes("peekServerLobbyForUser"), false);
@@ -426,14 +426,14 @@ describe("homeMembershipVagueB — contrats Home / createLobby", () => {
     assert.match(homeSrc, /createMountGuard/);
   });
 
-  it("19 — Home volontaire : resumeEveningSession / suppress inchangés (lobby.js)", () => {
+  it("19 - Home volontaire : resumeEveningSession / suppress inchangés (lobby.js)", () => {
     const lobbySrc = readFileSync(join(ROOT, "js/core/lobby.js"), "utf8");
     assert.match(lobbySrc, /export async function resumeEveningSession/);
     assert.match(lobbySrc, /isSessionRouteSuppressed/);
     assert.match(lobbySrc, /force\s*=\s*false/);
   });
 
-  it("20 — createLobby n’utilise plus peek comme garde (Vague C)", () => {
+  it("20 - createLobby n’utilise plus peek comme garde (Vague C)", () => {
     const lobbySrc = readFileSync(join(ROOT, "js/core/lobby.js"), "utf8");
     const createIdx = lobbySrc.indexOf("export async function createLobby()");
     assert.ok(createIdx >= 0);

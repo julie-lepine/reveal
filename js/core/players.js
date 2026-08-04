@@ -52,7 +52,7 @@ export function getSortedActivePlayers() {
 }
 
 /**
- * UX-HIST-01 — standings soirée : roster actif ∪ contributeurs historiques.
+ * UX-HIST-01 - standings soirée : roster actif ∪ contributeurs historiques.
  * Ne pas utiliser pour lobby / ready / présence / HUD in-game.
  * @param {{ gameId?: string|null }} [opts]
  */

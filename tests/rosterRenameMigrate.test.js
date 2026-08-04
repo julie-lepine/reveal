@@ -20,7 +20,7 @@ import {
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-describe("SYN-15 / SYN-16 — detectParticipantRenames", () => {
+describe("SYN-15 / SYN-16 - detectParticipantRenames", () => {
   it("détecte rename prouvé par même userId", () => {
     const renames = detectParticipantRenames(
       [
@@ -76,8 +76,8 @@ describe("SYN-15 / SYN-16 — detectParticipantRenames", () => {
   });
 });
 
-describe("SYN-15 — scores migrateNumericNameMapMax", () => {
-  it("1 — rename distant : max conservé, ancienne clé absente", () => {
+describe("SYN-15 - scores migrateNumericNameMapMax", () => {
+  it("1 - rename distant : max conservé, ancienne clé absente", () => {
     const out = migrateNumericNameMapMax(
       { Alice: 50, Bob: 10 },
       [{ oldName: "Alice", newName: "Alicia" }]
@@ -85,7 +85,7 @@ describe("SYN-15 — scores migrateNumericNameMapMax", () => {
     assert.deepEqual(out, { Alicia: 50, Bob: 10 });
   });
 
-  it("2 — nouveau nom déjà présent : Math.max", () => {
+  it("2 - nouveau nom déjà présent : Math.max", () => {
     const out = migrateNumericNameMapMax(
       { Alice: 80, Alicia: 50 },
       [{ oldName: "Alice", newName: "Alicia" }]
@@ -120,8 +120,8 @@ describe("SYN-15 — scores migrateNumericNameMapMax", () => {
   });
 });
 
-describe("SYN-15 — playerStats", () => {
-  it("3 — fusion compteur par compteur + suppression ancienne clé", () => {
+describe("SYN-15 - playerStats", () => {
+  it("3 - fusion compteur par compteur + suppression ancienne clé", () => {
     const out = migratePlayerStatsForRenames(
       {
         Alice: { liesDetected: 3, hotTakeDissentWins: 1 },
@@ -140,8 +140,8 @@ describe("SYN-15 — playerStats", () => {
   });
 });
 
-describe("SYN-16 — gameScores + baseline", () => {
-  it("4 — migration multi-jeux ; autres joueurs/jeux intacts", () => {
+describe("SYN-16 - gameScores + baseline", () => {
+  it("4 - migration multi-jeux ; autres joueurs/jeux intacts", () => {
     const out = migrateGameScoresForRenames(
       {
         clutch: { Alice: 20, Bob: 5 },
@@ -157,7 +157,7 @@ describe("SYN-16 — gameScores + baseline", () => {
     });
   });
 
-  it("4b — collision dans un jeu : Math.max", () => {
+  it("4b - collision dans un jeu : Math.max", () => {
     const out = migrateGameScoresForRenames(
       { clutch: { Alice: 80, Alicia: 50 } },
       [{ oldName: "Alice", newName: "Alicia" }]
@@ -165,7 +165,7 @@ describe("SYN-16 — gameScores + baseline", () => {
     assert.deepEqual(out, { clutch: { Alicia: 80 } });
   });
 
-  it("5 — baseline preferOld (contrat I-09)", () => {
+  it("5 - baseline preferOld (contrat I-09)", () => {
     // preferOld : valeur sous Alice (identité qui rename) gagne
     assert.deepEqual(
       migrateNumericNameMapPreferOld(
@@ -177,8 +177,8 @@ describe("SYN-16 — gameScores + baseline", () => {
   });
 });
 
-describe("SYN-15/16 — scénarios composés", () => {
-  it("6 — renames successifs Alice → Alicia → Alix", () => {
+describe("SYN-15/16 - scénarios composés", () => {
+  it("6 - renames successifs Alice → Alicia → Alix", () => {
     let scores = { Alice: 50, Bob: 1 };
     scores = migrateNumericNameMapMax(scores, [
       { oldName: "Alice", newName: "Alicia" },
@@ -189,7 +189,7 @@ describe("SYN-15/16 — scénarios composés", () => {
     assert.deepEqual(scores, { Alix: 50, Bob: 1 });
   });
 
-  it("7 — joueur sorti : clé conservée (pas de rename uid)", () => {
+  it("7 - joueur sorti : clé conservée (pas de rename uid)", () => {
     const renames = detectParticipantRenames(
       [
         { userId: "u1", name: "Alice" },
@@ -202,7 +202,7 @@ describe("SYN-15/16 — scénarios composés", () => {
     assert.deepEqual(migrateNumericNameMapMax(scores, renames), scores);
   });
 
-  it("8 — Alice et Alicia uids différents : aucune fusion", () => {
+  it("8 - Alice et Alicia uids différents : aucune fusion", () => {
     const renames = detectParticipantRenames(
       [
         { userId: "u1", name: "Alice" },
@@ -221,7 +221,7 @@ describe("SYN-15/16 — scénarios composés", () => {
     );
   });
 
-  it("9 — roster absent : aucune purge via migrateEvening", () => {
+  it("9 - roster absent : aucune purge via migrateEvening", () => {
     const maps = {
       scores: { Alice: 50, Ghost: 99 },
       playerStats: { Alice: { liesDetected: 1 } },
@@ -233,7 +233,7 @@ describe("SYN-15/16 — scénarios composés", () => {
     assert.deepEqual(out.scores, maps.scores);
   });
 
-  it("10 — idempotence : 2× même rename", () => {
+  it("10 - idempotence : 2× même rename", () => {
     const renames = [{ oldName: "Alice", newName: "Alicia" }];
     const once = migrateEveningMapsForRosterRenames(
       {
@@ -256,7 +256,7 @@ describe("SYN-15/16 — scénarios composés", () => {
     assert.deepEqual(twice.gameScoreSessionBaseline, once.gameScoreSessionBaseline);
   });
 
-  it("11 — multi-renames parallèles sans contamination", () => {
+  it("11 - multi-renames parallèles sans contamination", () => {
     const out = migrateNumericNameMapMax(
       { Alice: 10, Bob: 20, Carol: 3 },
       [
@@ -267,7 +267,7 @@ describe("SYN-15/16 — scénarios composés", () => {
     assert.deepEqual(out, { Alicia: 10, Bobby: 20, Carol: 3 });
   });
 
-  it("11b — échange théorique Alice↔Bob : snapshot two-phase préserve les valeurs", () => {
+  it("11b - échange théorique Alice↔Bob : snapshot two-phase préserve les valeurs", () => {
     // Impossible sous contrainte SQL unique en un seul UPDATE, mais défendu.
     const out = migrateNumericNameMapMax(
       { Alice: 10, Bob: 20 },
@@ -280,7 +280,7 @@ describe("SYN-15/16 — scénarios composés", () => {
   });
 });
 
-describe("SYN-15/16 — replaceEveningScoreMaps + I-09", () => {
+describe("SYN-15/16 - replaceEveningScoreMaps + I-09", () => {
   let snapshot;
 
   beforeEach(() => {
@@ -311,7 +311,7 @@ describe("SYN-15/16 — replaceEveningScoreMaps + I-09", () => {
     assert.equal(s.scores.Alicia, 1);
   });
 
-  it("12 — non-régression I-09 : rename local conserve scores/stats", () => {
+  it("12 - non-régression I-09 : rename local conserve scores/stats", () => {
     saveStatePatch({
       user: { ...(getState().user || {}), name: "Alice", loggedIn: true, isGuest: true },
       lobby: {
@@ -340,7 +340,7 @@ describe("SYN-15/16 — replaceEveningScoreMaps + I-09", () => {
   });
 });
 
-describe("SYN-15/16 — branchement applyLobbyToState", () => {
+describe("SYN-15/16 - branchement applyLobbyToState", () => {
   it("supabaseLobby importe detect + migrate et replaceEveningScoreMaps", () => {
     const src = readFileSync(
       join(__dirname, "../js/core/supabaseLobby.js"),

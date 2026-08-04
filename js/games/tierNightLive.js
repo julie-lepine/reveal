@@ -258,7 +258,7 @@ function mountSolo(app, list) {
 function mountMp(app, list) {
   const localName = getLocalDisplayName();
   let session = getTierNightLiveSession();
-  /** BUG-TIERNIGHT-03 — verrou partagé auto + manuel (anti double patch). */
+  /** BUG-TIERNIGHT-03 - verrou partagé auto + manuel (anti double patch). */
   const revealLockState = createTierNightLiveRevealLock();
   revealLockState.ensureSessionKey(session);
   /** ARCH-06 : partagé entre re-binds après render. */
@@ -286,7 +286,7 @@ function mountMp(app, list) {
     }
   }
 
-  /** Chrome vote ciblé — pas de full render (préserve roster/chips 04/05). */
+  /** Chrome vote ciblé - pas de full render (préserve roster/chips 04/05). */
   function refreshVotingChrome() {
     if (!mount.isMounted() || !mount.isCurrentMount()) return;
     if (session.phase !== "voting") return;
@@ -307,7 +307,7 @@ function mountMp(app, list) {
       btn.textContent = chrome.buttonLabel;
       btn.disabled = chrome.buttonDisabled;
     } else if (host && !revealPendingUi) {
-      // Bouton absent (premier paint sans host slot) — full render minimal via caller.
+      // Bouton absent (premier paint sans host slot) - full render minimal via caller.
     }
   }
 

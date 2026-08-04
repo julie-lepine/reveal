@@ -1,8 +1,8 @@
 /**
- * ARCH-06 — lifecycle de mount (modes B + C).
+ * ARCH-06 - lifecycle de mount (modes B + C).
  *
- * Mode B : `isMounted()` / `dispose()` — vivacité locale après cleanup.
- * Mode C : génération module + `isCurrentMount()` — instance encore active
+ * Mode B : `isMounted()` / `dispose()` - vivacité locale après cleanup.
+ * Mode C : génération module + `isCurrentMount()` - instance encore active
  *          après remount / nested redirect (même screenId).
  *
  * Le compteur vit ICI. Le routeur signale via `advanceMountGeneration()`.
@@ -27,12 +27,12 @@ export function advanceMountGeneration() {
   return mountGeneration;
 }
 
-/** @internal tests / diagnostics uniquement — interdite dans js/games. */
+/** @internal tests / diagnostics uniquement - interdite dans js/games. */
 export function getMountGenerationForTests() {
   return mountGeneration;
 }
 
-/** @internal tests — réinitialise le compteur (ex. avec resetNav). */
+/** @internal tests - réinitialise le compteur (ex. avec resetNav). */
 export function resetMountGenerationForTests() {
   mountGeneration = 0;
 }

@@ -134,7 +134,7 @@ function revealRowFromAnswers(answers) {
   };
 }
 
-describe("commitTriviaAnswer — 01B-bis RPC", () => {
+describe("commitTriviaAnswer - 01B-bis RPC", () => {
   beforeEach(() => {
     savedTriviaSession = {
       phase: "question",

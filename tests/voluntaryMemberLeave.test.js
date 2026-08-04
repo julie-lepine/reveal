@@ -1,5 +1,5 @@
 /**
- * UX-NAV-LOBBY — contrat d’échec leave membre (comportemental).
+ * UX-NAV-LOBBY - contrat d’échec leave membre (comportemental).
  * Module pur : js/core/voluntaryMemberLeave.js (pas de chargement Supabase).
  */
 import { describe, it, beforeEach, afterEach } from "node:test";
@@ -106,7 +106,7 @@ function makeTrackingDeps(overrides = {}) {
   return { deps, order, lobbyRef, guestMembership, navigations, localState };
 }
 
-describe("runVoluntaryMemberLeave — contrat échec", () => {
+describe("runVoluntaryMemberLeave - contrat échec", () => {
   beforeEach(() => {
     resetVoluntaryLeaveLockForTests();
   });
@@ -115,7 +115,7 @@ describe("runVoluntaryMemberLeave — contrat échec", () => {
     resetVoluntaryLeaveLockForTests();
   });
 
-  it("A — succès distant : ordre DELETE → stop → signOut → cleanup → nav", async () => {
+  it("A - succès distant : ordre DELETE → stop → signOut → cleanup → nav", async () => {
     const { deps, order, localState, navigations, guestMembership } = makeTrackingDeps({
       wasGuest: true,
     });
@@ -142,7 +142,7 @@ describe("runVoluntaryMemberLeave — contrat échec", () => {
     assert.equal(isVoluntaryLeaveInFlight(), false);
   });
 
-  it("A — succès : un seul DELETE ; pas de stop avant résolution", async () => {
+  it("A - succès : un seul DELETE ; pas de stop avant résolution", async () => {
     const gate = deferred();
     let deleteCalls = 0;
     const { deps, order } = makeTrackingDeps({
@@ -165,7 +165,7 @@ describe("runVoluntaryMemberLeave — contrat échec", () => {
     assert.ok(order.indexOf("leaveLobbySupabase") < order.indexOf("stopMultiplayerSync"));
   });
 
-  it("B — échec soft : aucun cleanup / sync / nav ; état intact", async () => {
+  it("B - échec soft : aucun cleanup / sync / nav ; état intact", async () => {
     const { deps, order, localState, lobbyRef, guestMembership, navigations } = makeTrackingDeps({
       wasGuest: true,
       leaveLobbySupabase: async () => ({ ok: false, error: "network down" }),
@@ -184,7 +184,7 @@ describe("runVoluntaryMemberLeave — contrat échec", () => {
     assert.equal(isVoluntaryLeaveInFlight(), false);
   });
 
-  it("C — exception distante : même invariant que soft fail", async () => {
+  it("C - exception distante : même invariant que soft fail", async () => {
     const { deps, order, localState, navigations } = makeTrackingDeps({
       leaveLobbySupabase: async () => {
         throw new Error("boom");
@@ -201,7 +201,7 @@ describe("runVoluntaryMemberLeave — contrat échec", () => {
     assert.equal(isVoluntaryLeaveInFlight(), false);
   });
 
-  it("D — annulation confirm : leave jamais appelé + pas d’alerte échec", async () => {
+  it("D - annulation confirm : leave jamais appelé + pas d’alerte échec", async () => {
     // Miroir confirmAndLeaveLobby membre : confirm false → cancelled avant leave.
     let leaveCalls = 0;
     const confirmed = false;
@@ -224,7 +224,7 @@ describe("runVoluntaryMemberLeave — contrat échec", () => {
     assert.equal(alertCalls, 0);
   });
 
-  it("B+ — notifyVoluntaryLeaveFailure : alerte sur échec ; busy/cancel silencieux", async () => {
+  it("B+ - notifyVoluntaryLeaveFailure : alerte sur échec ; busy/cancel silencieux", async () => {
     const alerts = [];
     const alertDeps = {
       showAppAlert: async (msg, opts) => {
@@ -243,7 +243,7 @@ describe("runVoluntaryMemberLeave — contrat échec", () => {
     assert.equal(alerts.length, 1);
   });
 
-  it("E — deux appels concurrents : un seul DELETE, second busy, verrou libéré", async () => {
+  it("E - deux appels concurrents : un seul DELETE, second busy, verrou libéré", async () => {
     const gate = deferred();
     let deleteCalls = 0;
 
@@ -288,7 +288,7 @@ describe("runVoluntaryMemberLeave — contrat échec", () => {
     assert.equal(deleteCalls, 1);
   });
 
-  it("E — concurrent sur échec : verrou libéré pour retry", async () => {
+  it("E - concurrent sur échec : verrou libéré pour retry", async () => {
     const gate = deferred();
     let deleteCalls = 0;
     const { deps } = makeTrackingDeps({
@@ -321,7 +321,7 @@ describe("runVoluntaryMemberLeave — contrat échec", () => {
     assert.equal(deleteCalls, 1);
   });
 
-  it("F — cleanup kick/dissolve non bloqué par le verrou volontaire", async () => {
+  it("F - cleanup kick/dissolve non bloqué par le verrou volontaire", async () => {
     const gate = deferred();
     const { deps, localState } = makeTrackingDeps({
       leaveLobbySupabase: async () => {

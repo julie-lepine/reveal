@@ -1,5 +1,5 @@
 /**
- * BUG-WAO-02 / BUG-WAO-03 — décisions de rendu Wrong Answer Only (pures, testables).
+ * BUG-WAO-02 / BUG-WAO-03 - décisions de rendu Wrong Answer Only (pures, testables).
  * Full render uniquement sur changements structurels ; sinon refresh chrome ciblé.
  */
 
@@ -37,7 +37,7 @@ export function shouldFullRenderWrongAnswer(opts = {}) {
 /**
  * Décision UI après sync distante.
  * Contrat BUG-WAO-02 : pendant composition active (même phase/manche), jamais de full render
- * — même si actingHostUiRefresh ou un faux positif composeLayoutMismatch.
+ * - même si actingHostUiRefresh ou un faux positif composeLayoutMismatch.
  *
  * @returns {{ mode: "full"|"refresh-answer"|"refresh-vote"|"refresh-reveal-scores", reason: string }}
  */
@@ -162,7 +162,7 @@ export function wrongAnswerConfirmVoteState({
 }
 
 /**
- * BUG-WAO-04 — bouton « Valider ma réponse » : désactivé si longueur utile = 0
+ * BUG-WAO-04 - bouton « Valider ma réponse » : désactivé si longueur utile = 0
  * (vide ou espaces seuls). Aligné sur sanitizeWrongAnswer (trim).
  */
 export function wrongAnswerSubmitDisabled(draftText) {

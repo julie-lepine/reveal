@@ -288,7 +288,7 @@ export async function commitTierNightLivePlay(patch, patchOpts = {}) {
 }
 
 /**
- * BUG-TIERNIGHT-03 — commit reveal avec recovery si résultat réseau incertain.
+ * BUG-TIERNIGHT-03 - commit reveal avec recovery si résultat réseau incertain.
  * N'alerte pas ici (l'UI décide auto vs manuel). Pas d'optimistic phase locale.
  *
  * @param {{ requireAllVotes?: boolean, source?: string }} [opts]

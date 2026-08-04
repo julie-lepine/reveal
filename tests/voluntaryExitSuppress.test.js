@@ -58,7 +58,7 @@ function isCompatibleSessionScreen(sessionScreen, localScreen) {
  */
 function isSuppressedGameReturn(targetScreen, { suppressActive, suppressScreen, cachedRow }) {
   if (!suppressActive || !suppressScreen || !targetScreen) return false;
-  // Intentionnel : ne pas comparer sessionSignature(cachedRow) — les mutations
+  // Intentionnel : ne pas comparer sessionSignature(cachedRow) - les mutations
   // de state sur le même écran doivent conserver le suppress.
   void cachedRow;
   if (targetScreen === suppressScreen) return true;

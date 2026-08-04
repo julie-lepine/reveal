@@ -45,7 +45,7 @@ export function formatClutchSeconds(ms) {
   return `${(ms / 1000).toFixed(1).replace(".", ",")} s`;
 }
 
-/** Libellé précis au millième (« 8,342 s ») — chrono et taps des joueurs. */
+/** Libellé précis au millième (« 8,342 s ») - chrono et taps des joueurs. */
 export function formatClutchSecondsMs(ms) {
   if (ms == null || !Number.isFinite(ms)) return "-";
   return `${(ms / 1000).toFixed(3).replace(".", ",")} s`;

@@ -1,5 +1,5 @@
 /**
- * BUG-TRIVIA-01C — sélection UI, waitingMessage, pending après échec.
+ * BUG-TRIVIA-01C - sélection UI, waitingMessage, pending après échec.
  */
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
@@ -16,7 +16,7 @@ import {
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 
-describe("triviaAnswerUi — sélection vs remote", () => {
+describe("triviaAnswerUi - sélection vs remote", () => {
   it("pending local visible avant confirmation distante", () => {
     assert.equal(
       resolveLocalTriviaAnswerIndex({
@@ -130,7 +130,7 @@ describe("triviaAnswerUi — sélection vs remote", () => {
   });
 });
 
-describe("triviaAnswerUi — waitingMessage (01C)", () => {
+describe("triviaAnswerUi - waitingMessage (01C)", () => {
   it("phase hors question → chaîne vide", () => {
     assert.equal(
       buildTriviaAnswerWaitingMessage({
@@ -227,7 +227,7 @@ describe("triviaAnswerUi — waitingMessage (01C)", () => {
   });
 });
 
-describe("triviaAnswerUi — contrats source click handler", () => {
+describe("triviaAnswerUi - contrats source click handler", () => {
   it("catch n’efface plus pending ; alerte + mapper answer + nextPending", () => {
     const src = readFileSync(join(ROOT, "js/games/trivia.js"), "utf8");
     const start = src.indexOf('app.querySelectorAll("[data-trivia-answer]")');

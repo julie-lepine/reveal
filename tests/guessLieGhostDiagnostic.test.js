@@ -1,5 +1,5 @@
 /**
- * Guess Lie — diagnostic identité fantôme (couches submissions / rounds).
+ * Guess Lie - diagnostic identité fantôme (couches submissions / rounds).
  */
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";

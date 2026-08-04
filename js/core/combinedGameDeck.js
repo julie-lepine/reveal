@@ -67,7 +67,7 @@ export function prepareCombinedDeckPool(customEntries, predefinedEntries) {
  * Cas C > R → R customs aléatoires, aucun prédéfini.
  *
  * @template T
- * @param {T[]} customEntries — déjà normalisés
+ * @param {T[]} customEntries - déjà normalisés
  * @param {T[]} predefinedEntries
  * @param {number|null|undefined} requestedRoundCount
  * @param {(requested: number|null|undefined, poolSize: number) => number} resolveEffectiveRoundCount
@@ -143,7 +143,7 @@ export function buildDilemmaDeckEntries({
   );
 }
 
-/** Marqueur deck runtime — custom joueur vs banque catalogue. */
+/** Marqueur deck runtime - custom joueur vs banque catalogue. */
 export function isDilemmaCustomDeckEntry(entry) {
   if (!entry || typeof entry !== "object") return false;
   if (entry.tier === "custom" || entry.author) return true;

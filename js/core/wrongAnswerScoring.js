@@ -18,7 +18,7 @@ function countWrongAnswerVotes(answers = {}, votes = {}) {
 
 /**
  * Classe les auteurs par votes reçus (décroissant). Ex æquo : ordre de nom stable
- * (affichage uniquement — n'influence pas les points). Les réponses sans vote sont exclues.
+ * (affichage uniquement - n'influence pas les points). Les réponses sans vote sont exclues.
  */
 export function rankWrongAnswerResults(answers = {}, votes = {}) {
   const counts = countWrongAnswerVotes(answers, votes);

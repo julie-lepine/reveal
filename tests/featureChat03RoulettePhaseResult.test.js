@@ -1,5 +1,5 @@
 /**
- * FEATURE-CHAT-03 — transition partagée spinning → result (hôte).
+ * FEATURE-CHAT-03 - transition partagée spinning → result (hôte).
  */
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
@@ -34,7 +34,7 @@ function spinEvent(over = {}) {
   };
 }
 
-describe("FEATURE-CHAT-03 — phase result partagée", () => {
+describe("FEATURE-CHAT-03 - phase result partagée", () => {
   it("1. merge patch phase result depuis spinning", () => {
     const cur = spinEvent();
     const merged = mergeChatRoulettePhaseResultPatch(cur, { phase: "result" });

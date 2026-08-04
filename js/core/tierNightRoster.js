@@ -1,9 +1,9 @@
 /**
- * BUG-TIERNIGHT-04 — roster / votants figés pour TierNight (Classique + Live).
+ * BUG-TIERNIGHT-04 - roster / votants figés pour TierNight (Classique + Live).
  * Identité canonique = userId. displayName = label snapshoté au lancement.
  *
  * Ordre : ordre du lobby au moment du lancement (getLobbyParticipants),
- * figé une fois pour le runId — aucun reshuffle ni rebuild depuis getActivePlayers().
+ * figé une fois pour le runId - aucun reshuffle ni rebuild depuis getActivePlayers().
  */
 
 /**

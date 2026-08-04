@@ -299,7 +299,7 @@ describe("goToScores suppress vs host launch", () => {
       cachedRow: hotTakePrepRow,
     });
     // browsing = results + we treat suppress as inactive when suppressScreen null
-    // in routeDecisionUnderScoresSuppress — need to model inactive suppress explicitly.
+    // in routeDecisionUnderScoresSuppress - need to model inactive suppress explicitly.
     assert.equal(
       isSessionAdvancedFromSuppress("hottake-prep", {
         suppressScreen: null,

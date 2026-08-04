@@ -1,5 +1,5 @@
 /**
- * SYN-VOTE-ROLLBACK-01 — apply / rollback ciblé d'une entrée de map optimiste.
+ * SYN-VOTE-ROLLBACK-01 - apply / rollback ciblé d'une entrée de map optimiste.
  * Pur / testable. Ne restaure jamais une map entière.
  */
 

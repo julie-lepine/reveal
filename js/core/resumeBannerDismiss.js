@@ -1,6 +1,6 @@
 /**
  * Dismiss local du bandeau reprise game-select (mémoire process uniquement).
- * Ne gère pas le suppress de routing (gameSync) — complémentaire UI.
+ * Ne gère pas le suppress de routing (gameSync) - complémentaire UI.
  */
 
 /** @type {string|null} */

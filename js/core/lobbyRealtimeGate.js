@@ -1,5 +1,5 @@
 /**
- * Gate Realtime lobby (sérialisation défensive poll) — logique pure + contrôleur testable.
+ * Gate Realtime lobby (sérialisation défensive poll) - logique pure + contrôleur testable.
  *
  * Mitigation produit : attendre SUBSCRIBED lobby avant poll sur le socket partagé.
  * Cause immédiate prouvée : _onConnClose pendant join poll.

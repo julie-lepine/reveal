@@ -1,5 +1,5 @@
 /**
- * Vague 2 — logique pure sondages (testable, sans DOM / Supabase).
+ * Vague 2 - logique pure sondages (testable, sans DOM / Supabase).
  */
 
 export const POLL_CREATE_LOCAL_SCREENS = new Set([

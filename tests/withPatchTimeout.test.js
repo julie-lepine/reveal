@@ -8,7 +8,7 @@ import { withPatchTimeout } from "../js/core/withPatchTimeout.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-describe("M-04b / SYN-18 — withPatchTimeout", () => {
+describe("M-04b / SYN-18 - withPatchTimeout", () => {
   beforeEach(() => {
     mock.timers.enable({ apis: ["setTimeout"], now: 0 });
   });
@@ -30,7 +30,7 @@ describe("M-04b / SYN-18 — withPatchTimeout", () => {
     await expectReject;
   });
 
-  it("1 — résolution rapide : résultat, clearTimeout, callback timeout absent après tick", async () => {
+  it("1 - résolution rapide : résultat, clearTimeout, callback timeout absent après tick", async () => {
     const clearIds = [];
     const realClear = globalThis.clearTimeout;
     globalThis.clearTimeout = (id) => {
@@ -69,7 +69,7 @@ describe("M-04b / SYN-18 — withPatchTimeout", () => {
     }
   });
 
-  it("2 — rejet rapide du patch : erreur originale conservée, timer cleared", async () => {
+  it("2 - rejet rapide du patch : erreur originale conservée, timer cleared", async () => {
     const clearIds = [];
     const realClear = globalThis.clearTimeout;
     globalThis.clearTimeout = (id) => {
@@ -91,7 +91,7 @@ describe("M-04b / SYN-18 — withPatchTimeout", () => {
     }
   });
 
-  it("3 — timeout réel : message actuel, clear exécuté, promesse réseau non annulée", async () => {
+  it("3 - timeout réel : message actuel, clear exécuté, promesse réseau non annulée", async () => {
     const clearIds = [];
     const realClear = globalThis.clearTimeout;
     globalThis.clearTimeout = (id) => {
@@ -136,7 +136,7 @@ describe("M-04b / SYN-18 — withPatchTimeout", () => {
     }
   });
 
-  it("3c — timeout puis NetworkError tardif : pas d'unhandledRejection", async () => {
+  it("3c - timeout puis NetworkError tardif : pas d'unhandledRejection", async () => {
     const unhandled = [];
     const onUnhandled = (reason) => {
       unhandled.push(reason);
@@ -174,7 +174,7 @@ describe("M-04b / SYN-18 — withPatchTimeout", () => {
     }
   });
 
-  it("3b — message custom conservé au timeout", async () => {
+  it("3b - message custom conservé au timeout", async () => {
     const never = new Promise(() => {});
     const p = withPatchTimeout(never, 200, "Trop long custom.");
     const expectReject = assert.rejects(
@@ -185,7 +185,7 @@ describe("M-04b / SYN-18 — withPatchTimeout", () => {
     await expectReject;
   });
 
-  it("4 — ms <= 0 : passthrough, aucun timer créé", async () => {
+  it("4 - ms <= 0 : passthrough, aucun timer créé", async () => {
     let setCount = 0;
     const realSet = globalThis.setTimeout;
     globalThis.setTimeout = (...args) => {
@@ -204,7 +204,7 @@ describe("M-04b / SYN-18 — withPatchTimeout", () => {
     }
   });
 
-  it("5 — appels parallèles : chaque appel clear son timer, aucun résidu", async () => {
+  it("5 - appels parallèles : chaque appel clear son timer, aucun résidu", async () => {
     const clearIds = [];
     const realClear = globalThis.clearTimeout;
     globalThis.clearTimeout = (id) => {
@@ -245,7 +245,7 @@ describe("M-04b / SYN-18 — withPatchTimeout", () => {
   });
 });
 
-describe("M-04b — branchement gameSync", () => {
+describe("M-04b - branchement gameSync", () => {
   it("gameSync réexporte withPatchTimeout depuis le module pur", () => {
     const src = readFileSync(
       join(__dirname, "../js/core/gameSync.js"),

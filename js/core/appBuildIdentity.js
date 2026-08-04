@@ -1,5 +1,5 @@
 /**
- * ARCH-23 — identité du binaire installé (diagnostic + gate).
+ * ARCH-23 - identité du binaire installé (diagnostic + gate).
  */
 
 import {

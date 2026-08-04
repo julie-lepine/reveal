@@ -1,5 +1,5 @@
 /**
- * Vague 2 — wrappers RPC sondages.
+ * Vague 2 - wrappers RPC sondages.
  */
 import { supabase, isSupabaseConfigured } from "./supabaseClient.js";
 export {

@@ -8,7 +8,7 @@ export const WRONG_ANSWER_ROUND_PRESETS = [3, 5, 8];
 /** Points attribués au podium de CHAQUE manche (top 1 / 2 / 3 par votes ; ex æquo partagent le palier). */
 export const WRONG_ANSWER_PODIUM_POINTS = [15, 10, 5];
 
-/** Points par vote reçu sur la réponse (cumulés au podium — GAME-WAO-01). */
+/** Points par vote reçu sur la réponse (cumulés au podium - GAME-WAO-01). */
 export const WRONG_ANSWER_POINTS_PER_VOTE = 5;
 
 /** Longueur maximale d'une réponse saisie. */

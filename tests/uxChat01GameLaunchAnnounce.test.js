@@ -1,5 +1,5 @@
 /**
- * UX-CHAT-01 — annonce à l'entrée prep (commitPrepSessionLaunch), pas au play.
+ * UX-CHAT-01 - annonce à l'entrée prep (commitPrepSessionLaunch), pas au play.
  */
 import { describe, it, mock } from "node:test";
 import assert from "node:assert/strict";
@@ -25,7 +25,7 @@ const announceSrc = readFileSync(
 const restartSrc = readFileSync(join(__dirname, "../js/core/restartGame.js"), "utf8");
 const pollStoreSrc = readFileSync(join(__dirname, "../js/core/lobbyPollStore.js"), "utf8");
 
-describe("UX-CHAT-01 — titres + message prep (comportemental)", () => {
+describe("UX-CHAT-01 - titres + message prep (comportemental)", () => {
   it("résout Trivia Quiz depuis GAMES", () => {
     assert.equal(SESSION_GAME_ID_TO_TILE.trivia, "trivia-prep");
     assert.equal(catalogTitleForSessionGameId("trivia"), "Trivia Quiz");
@@ -54,7 +54,7 @@ describe("UX-CHAT-01 — titres + message prep (comportemental)", () => {
   });
 });
 
-describe("UX-CHAT-01 — announceGamePreparationInChat (comportemental)", () => {
+describe("UX-CHAT-01 - announceGamePreparationInChat (comportemental)", () => {
   it("échec addMessage : warning, pas de throw", async () => {
     const addMessage = mock.fn(async () => {
       throw new Error("chat down");
@@ -82,7 +82,7 @@ describe("UX-CHAT-01 — announceGamePreparationInChat (comportemental)", () => 
   });
 });
 
-describe("UX-CHAT-01 — contrats source (point d'émission)", () => {
+describe("UX-CHAT-01 - contrats source (point d'émission)", () => {
   it("annonce dans commitPrepSessionLaunch après startGameSession réussi", () => {
     assert.match(restartSrc, /fireGamePreparationChatAnnounce/);
     assert.match(restartSrc, /await startGameSession[\s\S]*?fireGamePreparationChatAnnounce\(gameId\)/);

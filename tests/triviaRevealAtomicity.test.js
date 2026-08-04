@@ -1,5 +1,5 @@
 /**
- * BUG-TRIVIA-01B — contrats chemins MP reveal (pas de score client live).
+ * BUG-TRIVIA-01B - contrats chemins MP reveal (pas de score client live).
  * Les verrous SQL réels sont prouvés par les scripts SQL rollback / runbook concurrence.
  */
 import { describe, it } from "node:test";
@@ -21,7 +21,7 @@ const revealSqlV1 = readFileSync(
   "utf8"
 );
 
-describe("BUG-TRIVIA-01B — chemins MP sans score client", () => {
+describe("BUG-TRIVIA-01B - chemins MP sans score client", () => {
   it("goToReveal MP appelle commitRevealPlay, pas scoreRound", () => {
     const start = triviaJs.indexOf("async function goToReveal");
     const end = triviaJs.indexOf("async function forceReveal", start);
@@ -68,7 +68,7 @@ describe("BUG-TRIVIA-01B — chemins MP sans score client", () => {
   });
 });
 
-describe("BUG-TRIVIA-01B — SQL contrats atomiques (source)", () => {
+describe("BUG-TRIVIA-01B - SQL contrats atomiques (source)", () => {
   it("01B-bis : reveal_trivia_round et submit partagent trivia_apply_reveal_scoring", () => {
     assert.match(answerSql, /create or replace function public\.trivia_apply_reveal_scoring/);
     assert.match(
@@ -126,7 +126,7 @@ describe("BUG-TRIVIA-01B — SQL contrats atomiques (source)", () => {
   });
 });
 
-describe("BUG-TRIVIA-01B — UX late answer / reset pending", () => {
+describe("BUG-TRIVIA-01B - UX late answer / reset pending", () => {
   it("changement de phase clearAnswerCommitUi (pending + failed)", () => {
     assert.match(triviaJs, /clearAnswerCommitUi\(\)/);
     assert.match(
@@ -145,7 +145,7 @@ describe("BUG-TRIVIA-01B — UX late answer / reset pending", () => {
   });
 });
 
-describe("BUG-TRIVIA-01B — buildTriviaRevealExplicitPatch hors live MP", () => {
+describe("BUG-TRIVIA-01B - buildTriviaRevealExplicitPatch hors live MP", () => {
   it("trivia.js live n'appelle pas buildTriviaRevealExplicitPatch", () => {
     assert.equal(triviaJs.includes("buildTriviaRevealExplicitPatch"), false);
   });

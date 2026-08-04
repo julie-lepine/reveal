@@ -1,5 +1,5 @@
 /**
- * Vague 2 — store unique sondages + fetch + Realtime.
+ * Vague 2 - store unique sondages + fetch + Realtime.
  *
  * Realtime (un seul canal / lobby, rebuild sérialisé) :
  * - topic unique par génération : lobby-polls:${lobbyId}:${gen}
@@ -161,7 +161,7 @@ let pollSubscribeInFlight = null;
 let pollSubscribeInFlightKey = null;
 /** Après premier hydrate d'un poll déjà open : pas de fausse alerte « nouveau ». */
 let hasHydratedPollOnce = false;
-/** poll id créé localement — pas de pastille. */
+/** poll id créé localement - pas de pastille. */
 let suppressUnseenForPollId = null;
 /** Dernier poll id « vu » (sheet ouvert / hydrate). */
 let lastSeenPollId = null;
@@ -175,13 +175,13 @@ let pollReconnectTimer = null;
 let pollReconnectAttempts = 0;
 /** Promise auth injectable (tests). */
 let authReadyForSync = authReady;
-/** True après await authReady dans init — autorise subscribe. */
+/** True après await authReady dans init - autorise subscribe. */
 let authGatePassed = false;
 /** Coalesce catch-up join-reply (même lobby). */
 let joinReplyCatchupInFlight = null;
 let joinReplyCatchupLobbyId = null;
 
-// Diagnostic : évaluation module (debug only) — après bindings locales.
+// Diagnostic : évaluation module (debug only) - après bindings locales.
 storeInstanceLog("module_evaluated", {
   reason: "lobbyPollStore_module",
   status: "idle",
@@ -1011,7 +1011,7 @@ function syncToCurrentLobby() {
 
 /**
  * Démarre le sync polls après authReady.
- * @param {{ authReadyPromise?: Promise<void> }} [opts] — injectable pour tests
+ * @param {{ authReadyPromise?: Promise<void> }} [opts] - injectable pour tests
  */
 export async function initLobbyPollSync(opts = {}) {
   storeInstanceLog("init_poll_sync_called", {
@@ -1135,13 +1135,13 @@ export function __testForceActivePoll(poll, votes = {}) {
   lastSeenPollId = null;
 }
 
-/** @internal tests — simule événement Realtime lobby_polls */
+/** @internal tests - simule événement Realtime lobby_polls */
 export function __testSimulateRealtimeClose(payload) {
   const lobbyId = store.lobbyId || "test-lobby";
   handleLobbyPollsRealtime(payload, lobbyId);
 }
 
-/** @internal tests — INSERT / UPDATE générique */
+/** @internal tests - INSERT / UPDATE générique */
 export function __testSimulateRealtimePollsEvent(payload) {
   const lobbyId = store.lobbyId || "test-lobby";
   handleLobbyPollsRealtime(payload, lobbyId);

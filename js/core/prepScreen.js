@@ -60,7 +60,7 @@ async function defaultMountSyncError(err) {
 
 /**
  * Rafraîchit la session distante au montage d'un écran prep (état prêt / lancement).
- * M-10 : catch les rejets (réseau / timeout) — pas de rejection non gérée ; feedback léger.
+ * M-10 : catch les rejets (réseau / timeout) - pas de rejection non gérée ; feedback léger.
  */
 export function syncPrepOnMount(refreshFromSync) {
   return runSyncPrepOnMount({
@@ -141,7 +141,7 @@ export function updatePrepStartSlot(
 /**
  * Bind hôte « Lancer » / « Lancer quand même ».
  * L'exclusivité anti double-lancement est dans `executePrepLaunch` (verrou logique),
- * pas sur le nœud bouton — `updatePrepStartSlot` peut re-créer le DOM pendant l'await.
+ * pas sur le nœud bouton - `updatePrepStartSlot` peut re-créer le DOM pendant l'await.
  */
 export function bindPrepLaunchButtons(
   root,

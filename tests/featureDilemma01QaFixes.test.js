@@ -1,5 +1,5 @@
 /**
- * FEATURE-DILEMMA-01 — correctifs QA (compteur, leave prep, deck mixte).
+ * FEATURE-DILEMMA-01 - correctifs QA (compteur, leave prep, deck mixte).
  */
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
@@ -21,7 +21,7 @@ function read(rel) {
   return readFileSync(join(ROOT, rel), "utf8");
 }
 
-describe("FEATURE-DILEMMA-01 QA — compteur others", () => {
+describe("FEATURE-DILEMMA-01 QA - compteur others", () => {
   const norm = (e) => normalizeDilemmaEntry(e);
 
   it("3 customs autre joueur → hint 3", () => {
@@ -71,7 +71,7 @@ describe("FEATURE-DILEMMA-01 QA — compteur others", () => {
   });
 });
 
-describe("FEATURE-DILEMMA-01 QA — deck mixte global", () => {
+describe("FEATURE-DILEMMA-01 QA - deck mixte global", () => {
   const customs = Array.from({ length: 6 }, (_, i) => ({
     id: `c-${i}`,
     tier: "custom",
@@ -152,7 +152,7 @@ describe("FEATURE-DILEMMA-01 QA — deck mixte global", () => {
     assert.ok(deck.some((d) => String(d.id).startsWith("c-")));
   });
 
-  it("slice après shuffle — longueur = roundCount effectif", () => {
+  it("slice après shuffle - longueur = roundCount effectif", () => {
     const deck = buildCombinedShuffledDeck(
       customs,
       bank,
@@ -182,7 +182,7 @@ describe("FEATURE-DILEMMA-01 QA — deck mixte global", () => {
   });
 });
 
-describe("FEATURE-DILEMMA-01 QA — leave prep wiring", () => {
+describe("FEATURE-DILEMMA-01 QA - leave prep wiring", () => {
   it("dilemmaPrep refresh session on lobby change", () => {
     const src = read("js/screens/dilemmaPrep.js");
     assert.match(src, /runPrepRefreshOnLobbyChange/);
@@ -196,7 +196,7 @@ describe("FEATURE-DILEMMA-01 QA — leave prep wiring", () => {
   });
 });
 
-describe("FEATURE-DILEMMA-01 QA — shuffleArray déterministe", () => {
+describe("FEATURE-DILEMMA-01 QA - shuffleArray déterministe", () => {
   it("conserve les éléments du pool", () => {
     const input = [1, 2, 3, 4];
     const out = shuffleArray(input, () => 0.33);
