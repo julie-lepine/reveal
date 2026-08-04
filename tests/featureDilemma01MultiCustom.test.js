@@ -182,7 +182,7 @@ describe("FEATURE-DILEMMA-01 — deck et consume (contrat)", () => {
 
   it("buildDilemmaDeck source : shuffle global pool combiné", () => {
     const src = read("js/core/dilemmaSession.js");
-    assert.match(src, /buildCombinedShuffledDeck/);
+    assert.match(src, /buildDilemmaDeckEntries/);
     assert.doesNotMatch(src, /customsKept/);
     assert.doesNotMatch(src, /bankKept/);
   });

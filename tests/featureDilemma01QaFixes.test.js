@@ -82,12 +82,49 @@ describe("FEATURE-DILEMMA-01 QA — deck mixte global", () => {
     tier: "catalog",
   }));
 
-  it("RNG fixe : deck ≠ concat customs puis bank", () => {
+  it("12 customs + catalog large + 8 manches → 8 customs uniquement", () => {
+    const customs = Array.from({ length: 12 }, (_, i) => ({
+      id: `c-${i}`,
+      tier: "custom",
+      author: "Alice",
+    }));
+    const bank = Array.from({ length: 100 }, (_, i) => ({ id: `bank-${i}` }));
+    const deck = buildCombinedShuffledDeck(
+      customs,
+      bank,
+      8,
+      resolveEffectiveRoundCount,
+      () => 0.33
+    );
+    assert.equal(deck.length, 8);
+    assert.equal(deck.filter((d) => d.tier === "custom").length, 8);
+  });
+
+  it("6 customs + bank : tous les customs inclus malgré catalog large", () => {
+    const customs = Array.from({ length: 6 }, (_, i) => ({
+      id: `c-${i}`,
+      tier: "custom",
+      author: "Alice",
+    }));
+    const bank = Array.from({ length: 100 }, (_, i) => ({
+      id: `bank-${i}`,
+    }));
+    const deck = buildCombinedShuffledDeck(
+      customs,
+      bank,
+      8,
+      resolveEffectiveRoundCount,
+      () => 0.33
+    );
+    assert.equal(deck.length, 8);
+    assert.equal(deck.filter((d) => d.tier === "custom").length, 6);
+  });
+
+  it("RNG fixe : deck ≠ concat customs puis bank (shuffle global)", () => {
     const deck = buildCombinedShuffledDeck(
       customs.slice(0, 6),
       bank.slice(0, 4),
       8,
-      10,
       resolveEffectiveRoundCount,
       () => 0.33
     );
@@ -108,7 +145,6 @@ describe("FEATURE-DILEMMA-01 QA — deck mixte global", () => {
       smallCustoms,
       smallBank,
       3,
-      3,
       resolveEffectiveRoundCount,
       random
     );
@@ -121,7 +157,6 @@ describe("FEATURE-DILEMMA-01 QA — deck mixte global", () => {
       customs,
       bank,
       5,
-      customs.length + bank.length,
       resolveEffectiveRoundCount,
       () => 0.5
     );
@@ -133,7 +168,6 @@ describe("FEATURE-DILEMMA-01 QA — deck mixte global", () => {
       customs,
       bank,
       8,
-      customs.length + bank.length,
       resolveEffectiveRoundCount,
       () => 0.42
     );
@@ -141,9 +175,9 @@ describe("FEATURE-DILEMMA-01 QA — deck mixte global", () => {
     assert.equal(new Set(ids).size, ids.length);
   });
 
-  it("buildDilemmaDeck source utilise buildCombinedShuffledDeck", () => {
+  it("buildDilemmaDeck source utilise buildDilemmaDeckEntries", () => {
     const src = read("js/core/dilemmaSession.js");
-    assert.match(src, /buildCombinedShuffledDeck/);
+    assert.match(src, /buildDilemmaDeckEntries/);
     assert.doesNotMatch(src, /customsKept.*bankKept/s);
   });
 });

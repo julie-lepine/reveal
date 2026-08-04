@@ -9,7 +9,7 @@ import {
   estimateDilemmaDuration,
   resolveEffectiveRoundCount,
 } from "./dilemmaDuration.js";
-import { buildCombinedShuffledDeck, countOtherAuthorsCustomEntries } from "./combinedGameDeck.js";
+import { countOtherAuthorsCustomEntries, buildDilemmaDeckEntries } from "./combinedGameDeck.js";
 import { getActivePlayerNames } from "./players.js";
 import { getLobbyParticipants } from "./lobby.js";
 import { getLocalDisplayName, getState, saveStatePatch } from "./state.js";
@@ -129,18 +129,14 @@ export function buildDilemmaDeck({ random = Math.random } = {}) {
   const session = getDilemmaSession();
   const deckId = session.selectedDeckId || DILEMMA_CATALOG_ID;
   const bank = getDilemmaDeckItems(deckId);
-  const customs = (session.customDilemmas || [])
-    .map(normalizeCustomDilemma)
-    .filter(Boolean);
-  const totalAvailable = bank.length + customs.length;
-  const deck = buildCombinedShuffledDeck(
-    customs,
-    bank,
-    session.roundCount ?? 8,
-    totalAvailable,
+  const deck = buildDilemmaDeckEntries({
+    customDilemmas: session.customDilemmas,
+    bankItems: bank,
+    roundCount: session.roundCount ?? 8,
+    normalizeCustom: normalizeCustomDilemma,
     resolveEffectiveRoundCount,
-    random
-  );
+    random,
+  });
   const next = { ...session, deck };
   saveStatePatch({ dilemmaGame: next });
   return deck;

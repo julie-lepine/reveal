@@ -51,10 +51,18 @@ function isRef(entry) {
 
 // --- Jeux à items "plats" (id au premier niveau) : consensus, dilemma --------
 
-function dehydrateById(deck, index) {
+function isDilemmaCustomInline(item) {
+  if (!item || typeof item !== "object") return false;
+  if (item.tier === "custom" || item.author) return true;
+  const id = String(item.id || "");
+  return id.startsWith("custom-");
+}
+
+function dehydrateById(deck, index, { isCustomEntry } = {}) {
   if (!Array.isArray(deck)) return deck;
   return deck.map((item) => {
     if (isRef(item)) return item;
+    if (isCustomEntry?.(item)) return { c: item };
     if (item && item.id != null && index[String(item.id)]) {
       return { r: String(item.id) };
     }
@@ -85,7 +93,7 @@ export function rehydrateConsensusDeck(deck) {
 }
 
 export function dehydrateDilemmaDeck(deck) {
-  return dehydrateById(deck, dilemmaIndex());
+  return dehydrateById(deck, dilemmaIndex(), { isCustomEntry: isDilemmaCustomInline });
 }
 export function rehydrateDilemmaDeck(deck) {
   return rehydrateById(deck, dilemmaIndex());
