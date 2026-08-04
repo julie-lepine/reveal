@@ -126,6 +126,12 @@ import {
   mergeTierNightLiveGameFields,
   mergeTierNightLiveVotesForPatch,
 } from "./tierNightLiveMerge.js";
+import {
+  withTierNightSeriesRemote,
+  resolveTierNightSeriesMerge,
+  mergeTierNightRemoteBlob,
+  applySeriesDecisionToTierNightGame,
+} from "./tierNightSeries.js";
 
 export { withPatchTimeout };
 export { pickRemotePlayFields, PLAY_PATCH_EXCLUDE } from "./playPatch.js";
@@ -2646,12 +2652,13 @@ export function tierNightToRemote({
   playerRoster,
   listName,
   topicEmoji,
+  series,
 }) {
   // Rank it (`consensus`) normalisé vers roster - plateau partagé Classe le groupe.
   let normalizedMode = "roster";
   if (mode === "live") normalizedMode = "live";
   else if (mode === "roster") normalizedMode = "roster";
-  return {
+  const remote = {
     runId: runId || null,
     topicId: topicId || null,
     mode: normalizedMode,
@@ -2666,6 +2673,20 @@ export function tierNightToRemote({
     finished: finished || {},
     recap: null,
   };
+  // SERIES-02 : n'embarque une série que si elle valide (jamais de copie brute invalide).
+  const withSeries = withTierNightSeriesRemote(remote, series, {
+    runId: remote.runId,
+  });
+  if (
+    series !== undefined &&
+    series != null &&
+    !Object.prototype.hasOwnProperty.call(withSeries, "series")
+  ) {
+    console.warn(
+      "REVEAL FEATURE-TIERNIGHT-SERIES-02: series omise à la sérialisation"
+    );
+  }
+  return withSeries;
 }
 
 export function tierNightFromRemote(remote) {
@@ -3266,13 +3287,37 @@ export function applyRemoteSession(row, { epoch = null } = {}) {
 
   if (st.tierNight) {
     const tn = tierNightFromRemote(st.tierNight);
-    const localRunId = getState().tierNightGame?.runId || null;
+    const localGame = getState().tierNightGame || {};
+    const localRunId = localGame.runId || null;
     const remoteRunId = tn.runId || null;
     const recapRunId = tn.recap?.runId || null;
     const recapMatchesRun =
       !remoteRunId || !recapRunId || remoteRunId === recapRunId;
     const recapMatchesLocal =
       !localRunId || !recapRunId || localRunId === recapRunId;
+
+    const remoteHasSeriesKey = Object.prototype.hasOwnProperty.call(tn, "series");
+    const seriesDecision = resolveTierNightSeriesMerge({
+      remoteSeries: remoteHasSeriesKey ? tn.series : undefined,
+      remoteHasSeriesKey,
+      remoteRunId,
+      localSeries: localGame.series ?? null,
+      localRunId,
+      remoteTopicId: tn.topicId ?? null,
+      remoteListName: typeof tn.listName === "string" ? tn.listName : null,
+      remoteTopicEmoji: typeof tn.topicEmoji === "string" ? tn.topicEmoji : null,
+      source: "full",
+    });
+    if (
+      seriesDecision.action === "keep_local_reject_remote" ||
+      seriesDecision.action === "reject_invalid"
+    ) {
+      console.warn(
+        "REVEAL FEATURE-TIERNIGHT-SERIES-02: hydrate series rejected",
+        seriesDecision.diagnostic || seriesDecision.action
+      );
+    }
+
     if (
       tn.recap?.recaps?.length &&
       !tn.lobbyStarted &&
@@ -3283,15 +3328,18 @@ export function applyRemoteSession(row, { epoch = null } = {}) {
       const localName = getLocalDisplayName();
       const localPts =
         tn.recap.recaps.find((r) => r.player === localName)?.consensusPoints ?? 0;
-      patch.tierNightGame = {
-        ...getState().tierNightGame,
-        ...tn.recap,
-        localConsensusPoints: localPts,
-        recapSynced: true,
-      };
+      patch.tierNightGame = applySeriesDecisionToTierNightGame(
+        {
+          ...localGame,
+          ...tn.recap,
+          localConsensusPoints: localPts,
+          recapSynced: true,
+        },
+        seriesDecision
+      );
     } else if (tn.lobbyStarted || tn.game) {
       // BUG-TIERNIGHT-04 : hydrater runId + items + playerRoster (tn.game peut être `true`).
-      const local = getState().tierNightGame || {};
+      const local = localGame;
       const gameObj = typeof tn.game === "object" && tn.game ? tn.game : {};
       const meta = mergeTierNightTopicMeta({
         local,
@@ -3299,28 +3347,32 @@ export function applyRemoteSession(row, { epoch = null } = {}) {
         remoteRunId: tn.runId ?? null,
         localRunId: local.runId ?? null,
       });
-      patch.tierNightGame = {
-        ...local,
-        ...gameObj,
-        runId: tn.runId ?? local.runId ?? null,
-        topicId: tn.topicId ?? local.topicId ?? null,
-        listName: meta.listName,
-        topicEmoji: meta.topicEmoji,
-        items:
-          Array.isArray(tn.items) && tn.items.length
-            ? tn.items
-            : local.items,
-        playerRoster:
-          Array.isArray(tn.playerRoster) && tn.playerRoster.length
-            ? tn.playerRoster
-            : local.playerRoster,
-      };
+      patch.tierNightGame = applySeriesDecisionToTierNightGame(
+        {
+          ...local,
+          ...gameObj,
+          runId: tn.runId ?? local.runId ?? null,
+          topicId: tn.topicId ?? local.topicId ?? null,
+          listName: meta.listName,
+          topicEmoji: meta.topicEmoji,
+          items:
+            Array.isArray(tn.items) && tn.items.length
+              ? tn.items
+              : local.items,
+          playerRoster:
+            Array.isArray(tn.playerRoster) && tn.playerRoster.length
+              ? tn.playerRoster
+              : local.playerRoster,
+        },
+        seriesDecision
+      );
     } else if (!tn.lobbyStarted && (tn.recap == null || tn.recap === undefined)) {
       // Recommencer / prep reset : effacer un récap local stale (run précédent).
-      const local = getState().tierNightGame || {};
+      const local = localGame;
       const localHasRecap = Array.isArray(local.recaps) && local.recaps.length > 0;
       const runChanged = remoteRunId && localRunId && remoteRunId !== localRunId;
       if (localHasRecap || runChanged || (remoteRunId && localRunId !== remoteRunId)) {
+        // Prep / nouveau run : clear série (legacy ou nouvelle série pas encore lancée).
         patch.tierNightGame = {
           runId: remoteRunId || null,
           recaps: [],
@@ -4724,7 +4776,28 @@ async function patchGameStateInner(
     }
   }
   if (mergePayload.tierNight) {
-    nextState.tierNight = { ...(current.tierNight || {}), ...mergePayload.tierNight };
+    const { tierNight: mergedTn, decision } = mergeTierNightRemoteBlob(
+      current.tierNight,
+      mergePayload.tierNight,
+      { source: "patch" }
+    );
+    if (mergedTn.__seriesMergeDiagnostic) {
+      console.warn(
+        "REVEAL FEATURE-TIERNIGHT-SERIES-02: series merge diagnostic",
+        mergedTn.__seriesMergeDiagnostic
+      );
+      delete mergedTn.__seriesMergeDiagnostic;
+    }
+    if (
+      decision?.action === "keep_local_reject_remote" ||
+      decision?.action === "reject_invalid"
+    ) {
+      console.warn(
+        "REVEAL FEATURE-TIERNIGHT-SERIES-02: remote series rejected",
+        decision.diagnostic || decision.action
+      );
+    }
+    nextState.tierNight = mergedTn;
   }
   if (mergePayload.guessLie) {
     const curGl = current.guessLie;
@@ -5193,6 +5266,11 @@ export async function syncTierNightSession(payload) {
       payload.playerRoster ?? cached.playerRoster ?? localGame.playerRoster ?? null,
     listName: payload.listName ?? localGame.listName ?? cached.listName ?? "",
     topicEmoji: payload.topicEmoji ?? localGame.topicEmoji ?? cached.topicEmoji ?? "",
+    // SERIES-02 : republier la série locale/cache si présente (clé absente → preserve patch).
+    series:
+      payload.series !== undefined
+        ? payload.series
+        : localGame.series ?? cached.series ?? undefined,
   });
   await patchGameState({ tierNight: remote }, { screen: payload.screen, gameId: "tiernight" });
 }

@@ -223,17 +223,105 @@ export function getTierNightModifierById(id) {
   return TIER_NIGHT_MODIFIERS.find((m) => m.id === id) || TIER_NIGHT_MODIFIERS[0];
 }
 
-/** Thèmes pour le mode « Classe le groupe » (items = joueurs). */
-export const TIER_NIGHT_ROSTER_TOPICS = [
-  { id: "apocalypse", emoji: "🧟", name: "Qui survit à l'apocalypse ?" },
-  { id: "soiree", emoji: "🎉", name: "Qui organise la meilleure soirée ?" },
-  { id: "secret", emoji: "🤐", name: "À qui tu confies ton plus gros secret ?" },
-  { id: "boss", emoji: "💼", name: "Qui ferait le meilleur boss ?" },
-  { id: "crime", emoji: "🕵️", name: "Qui s'en sortirait après un crime ?" },
-  { id: "loto", emoji: "🤑", name: "Qui claque tout son loto en une semaine ?" },
-  { id: "roadtrip", emoji: "🚗", name: "Qui tu veux en road-trip ?" },
-  { id: "celebrity", emoji: "⭐", name: "Qui devient célèbre en premier ?" },
-  { id: "panic", emoji: "🔥", name: "Qui garde son calme en cas de panique ?" },
-  { id: "ghost", emoji: "👻", name: "Qui ghoste le plus vite ?" },
+/**
+ * Catégories stables (FEATURE-TIERNIGHT-SERIES-01).
+ * Identifiants techniques — ne pas renommer sans migration de sessions.
+ */
+export const TIER_NIGHT_ROSTER_CATEGORIES = [
+  { id: "survival", label: "Survie", order: 10 },
+  { id: "social", label: "Social", order: 20 },
+  { id: "chaos", label: "Chaos", order: 30 },
 ];
+
+/**
+ * Thèmes pour le mode « Classe le groupe » (items = joueurs).
+ * FEATURE-TIERNIGHT-SERIES-01 : `categoryId` / `enabled` / `order` additifs.
+ * Les `id` existants et le wire `roster:<id>` sont immuables.
+ */
+export const TIER_NIGHT_ROSTER_TOPICS = [
+  {
+    id: "apocalypse",
+    emoji: "🧟",
+    name: "Qui survit à l'apocalypse ?",
+    categoryId: "survival",
+    enabled: true,
+    order: 10,
+  },
+  {
+    id: "soiree",
+    emoji: "🎉",
+    name: "Qui organise la meilleure soirée ?",
+    categoryId: "social",
+    enabled: true,
+    order: 10,
+  },
+  {
+    id: "secret",
+    emoji: "🤐",
+    name: "À qui tu confies ton plus gros secret ?",
+    categoryId: "social",
+    enabled: true,
+    order: 20,
+  },
+  {
+    id: "boss",
+    emoji: "💼",
+    name: "Qui ferait le meilleur boss ?",
+    categoryId: "social",
+    enabled: true,
+    order: 30,
+  },
+  {
+    id: "crime",
+    emoji: "🕵️",
+    name: "Qui s'en sortirait après un crime ?",
+    categoryId: "survival",
+    enabled: true,
+    order: 20,
+  },
+  {
+    id: "loto",
+    emoji: "🤑",
+    name: "Qui claque tout son loto en une semaine ?",
+    categoryId: "chaos",
+    enabled: true,
+    order: 10,
+  },
+  {
+    id: "roadtrip",
+    emoji: "🚗",
+    name: "Qui tu veux en road-trip ?",
+    categoryId: "chaos",
+    enabled: true,
+    order: 20,
+  },
+  {
+    id: "celebrity",
+    emoji: "⭐",
+    name: "Qui devient célèbre en premier ?",
+    categoryId: "social",
+    enabled: true,
+    order: 40,
+  },
+  {
+    id: "panic",
+    emoji: "🔥",
+    name: "Qui garde son calme en cas de panique ?",
+    categoryId: "survival",
+    enabled: true,
+    order: 30,
+  },
+  {
+    id: "ghost",
+    emoji: "👻",
+    name: "Qui ghoste le plus vite ?",
+    categoryId: "chaos",
+    enabled: true,
+    order: 30,
+  },
+];
+
+export function getTierNightRosterCategoryById(id) {
+  return TIER_NIGHT_ROSTER_CATEGORIES.find((c) => c.id === id) || null;
+}
 

@@ -1,0 +1,576 @@
+[
+  {
+    "id": "odd-median-exact",
+    "reverse": false,
+    "items": [
+      "alpha",
+      "beta",
+      "gamma"
+    ],
+    "participantUids": [
+      "11111111-1111-4111-8111-111111111111",
+      "22222222-2222-4222-8222-222222222222",
+      "33333333-3333-4333-8333-333333333333"
+    ],
+    "placementsByUid": {
+      "11111111-1111-4111-8111-111111111111": {
+        "S": [
+          "alpha"
+        ],
+        "A": [
+          "beta"
+        ],
+        "B": [
+          "gamma"
+        ],
+        "C": [],
+        "D": []
+      },
+      "22222222-2222-4222-8222-222222222222": {
+        "S": [
+          "alpha"
+        ],
+        "A": [],
+        "B": [
+          "beta",
+          "gamma"
+        ],
+        "C": [],
+        "D": []
+      },
+      "33333333-3333-4333-8333-333333333333": {
+        "S": [],
+        "A": [
+          "alpha"
+        ],
+        "B": [
+          "gamma"
+        ],
+        "C": [
+          "beta"
+        ],
+        "D": []
+      }
+    },
+    "expected": {
+      "ok": true,
+      "consensus": {
+        "S": [
+          "alpha"
+        ],
+        "A": [],
+        "B": [
+          "beta",
+          "gamma"
+        ],
+        "C": [],
+        "D": []
+      },
+      "controversialItem": "beta",
+      "controversialSpread": 2,
+      "scores": [
+        {
+          "uid": "11111111-1111-4111-8111-111111111111",
+          "proximityPoints": 13,
+          "outsiderBonus": 15,
+          "consensusPoints": 28
+        },
+        {
+          "uid": "22222222-2222-4222-8222-222222222222",
+          "proximityPoints": 15,
+          "outsiderBonus": 0,
+          "consensusPoints": 15
+        },
+        {
+          "uid": "33333333-3333-4333-8333-333333333333",
+          "proximityPoints": 12,
+          "outsiderBonus": 15,
+          "consensusPoints": 27
+        }
+      ]
+    }
+  },
+  {
+    "id": "even-median-floor",
+    "reverse": false,
+    "items": [
+      "alpha",
+      "beta",
+      "gamma"
+    ],
+    "participantUids": [
+      "11111111-1111-4111-8111-111111111111",
+      "22222222-2222-4222-8222-222222222222"
+    ],
+    "placementsByUid": {
+      "11111111-1111-4111-8111-111111111111": {
+        "S": [
+          "alpha",
+          "beta",
+          "gamma"
+        ],
+        "A": [],
+        "B": [],
+        "C": [],
+        "D": []
+      },
+      "22222222-2222-4222-8222-222222222222": {
+        "S": [],
+        "A": [],
+        "B": [],
+        "C": [],
+        "D": [
+          "alpha",
+          "beta",
+          "gamma"
+        ]
+      }
+    },
+    "expected": {
+      "ok": true,
+      "consensus": {
+        "S": [],
+        "A": [],
+        "B": [
+          "alpha",
+          "beta",
+          "gamma"
+        ],
+        "C": [],
+        "D": []
+      },
+      "controversialItem": "alpha",
+      "controversialSpread": 4,
+      "scores": [
+        {
+          "uid": "11111111-1111-4111-8111-111111111111",
+          "proximityPoints": 0,
+          "outsiderBonus": 15,
+          "consensusPoints": 15
+        },
+        {
+          "uid": "22222222-2222-4222-8222-222222222222",
+          "proximityPoints": 0,
+          "outsiderBonus": 15,
+          "consensusPoints": 15
+        }
+      ]
+    }
+  },
+  {
+    "id": "diff-buckets-normal",
+    "reverse": false,
+    "items": [
+      "x",
+      "y"
+    ],
+    "participantUids": [
+      "11111111-1111-4111-8111-111111111111",
+      "22222222-2222-4222-8222-222222222222",
+      "33333333-3333-4333-8333-333333333333"
+    ],
+    "placementsByUid": {
+      "11111111-1111-4111-8111-111111111111": {
+        "S": [
+          "x",
+          "y"
+        ],
+        "A": [],
+        "B": [],
+        "C": [],
+        "D": []
+      },
+      "22222222-2222-4222-8222-222222222222": {
+        "S": [
+          "x"
+        ],
+        "A": [
+          "y"
+        ],
+        "B": [],
+        "C": [],
+        "D": []
+      },
+      "33333333-3333-4333-8333-333333333333": {
+        "S": [
+          "x"
+        ],
+        "A": [],
+        "B": [],
+        "C": [
+          "y"
+        ],
+        "D": []
+      }
+    },
+    "expected": {
+      "ok": true,
+      "consensus": {
+        "S": [
+          "x"
+        ],
+        "A": [
+          "y"
+        ],
+        "B": [],
+        "C": [],
+        "D": []
+      },
+      "controversialItem": "y",
+      "controversialSpread": 3,
+      "scores": [
+        {
+          "uid": "11111111-1111-4111-8111-111111111111",
+          "proximityPoints": 13,
+          "outsiderBonus": 0,
+          "consensusPoints": 13
+        },
+        {
+          "uid": "22222222-2222-4222-8222-222222222222",
+          "proximityPoints": 15,
+          "outsiderBonus": 0,
+          "consensusPoints": 15
+        },
+        {
+          "uid": "33333333-3333-4333-8333-333333333333",
+          "proximityPoints": 8,
+          "outsiderBonus": 15,
+          "consensusPoints": 23
+        }
+      ]
+    }
+  },
+  {
+    "id": "reverse-modifier",
+    "reverse": true,
+    "items": [
+      "x",
+      "y"
+    ],
+    "participantUids": [
+      "11111111-1111-4111-8111-111111111111",
+      "22222222-2222-4222-8222-222222222222",
+      "33333333-3333-4333-8333-333333333333"
+    ],
+    "placementsByUid": {
+      "11111111-1111-4111-8111-111111111111": {
+        "S": [
+          "x",
+          "y"
+        ],
+        "A": [],
+        "B": [],
+        "C": [],
+        "D": []
+      },
+      "22222222-2222-4222-8222-222222222222": {
+        "S": [],
+        "A": [
+          "x"
+        ],
+        "B": [
+          "y"
+        ],
+        "C": [],
+        "D": []
+      },
+      "33333333-3333-4333-8333-333333333333": {
+        "S": [],
+        "A": [],
+        "B": [],
+        "C": [],
+        "D": [
+          "x",
+          "y"
+        ]
+      }
+    },
+    "expected": {
+      "ok": true,
+      "consensus": {
+        "S": [],
+        "A": [
+          "x"
+        ],
+        "B": [
+          "y"
+        ],
+        "C": [],
+        "D": []
+      },
+      "controversialItem": "x",
+      "controversialSpread": 4,
+      "scores": [
+        {
+          "uid": "11111111-1111-4111-8111-111111111111",
+          "proximityPoints": 5,
+          "outsiderBonus": 0,
+          "consensusPoints": 5
+        },
+        {
+          "uid": "22222222-2222-4222-8222-222222222222",
+          "proximityPoints": 0,
+          "outsiderBonus": 0,
+          "consensusPoints": 0
+        },
+        {
+          "uid": "33333333-3333-4333-8333-333333333333",
+          "proximityPoints": 13,
+          "outsiderBonus": 15,
+          "consensusPoints": 28
+        }
+      ]
+    }
+  },
+  {
+    "id": "outsider-tie",
+    "reverse": false,
+    "items": [
+      "hot",
+      "cold"
+    ],
+    "participantUids": [
+      "11111111-1111-4111-8111-111111111111",
+      "22222222-2222-4222-8222-222222222222",
+      "33333333-3333-4333-8333-333333333333",
+      "44444444-4444-4444-8444-444444444444"
+    ],
+    "placementsByUid": {
+      "11111111-1111-4111-8111-111111111111": {
+        "S": [
+          "hot"
+        ],
+        "A": [],
+        "B": [
+          "cold"
+        ],
+        "C": [],
+        "D": []
+      },
+      "22222222-2222-4222-8222-222222222222": {
+        "S": [
+          "hot"
+        ],
+        "A": [],
+        "B": [
+          "cold"
+        ],
+        "C": [],
+        "D": []
+      },
+      "33333333-3333-4333-8333-333333333333": {
+        "S": [],
+        "A": [],
+        "B": [
+          "cold"
+        ],
+        "C": [],
+        "D": [
+          "hot"
+        ]
+      },
+      "44444444-4444-4444-8444-444444444444": {
+        "S": [],
+        "A": [],
+        "B": [
+          "cold"
+        ],
+        "C": [],
+        "D": [
+          "hot"
+        ]
+      }
+    },
+    "expected": {
+      "ok": true,
+      "consensus": {
+        "S": [],
+        "A": [],
+        "B": [
+          "hot",
+          "cold"
+        ],
+        "C": [],
+        "D": []
+      },
+      "controversialItem": "hot",
+      "controversialSpread": 4,
+      "scores": [
+        {
+          "uid": "11111111-1111-4111-8111-111111111111",
+          "proximityPoints": 8,
+          "outsiderBonus": 15,
+          "consensusPoints": 23
+        },
+        {
+          "uid": "22222222-2222-4222-8222-222222222222",
+          "proximityPoints": 8,
+          "outsiderBonus": 15,
+          "consensusPoints": 23
+        },
+        {
+          "uid": "33333333-3333-4333-8333-333333333333",
+          "proximityPoints": 8,
+          "outsiderBonus": 15,
+          "consensusPoints": 23
+        },
+        {
+          "uid": "44444444-4444-4444-8444-444444444444",
+          "proximityPoints": 8,
+          "outsiderBonus": 15,
+          "consensusPoints": 23
+        }
+      ]
+    }
+  },
+  {
+    "id": "item-order-invariant",
+    "reverse": false,
+    "items": [
+      "gamma",
+      "alpha",
+      "beta"
+    ],
+    "participantUids": [
+      "11111111-1111-4111-8111-111111111111",
+      "22222222-2222-4222-8222-222222222222",
+      "33333333-3333-4333-8333-333333333333"
+    ],
+    "placementsByUid": {
+      "11111111-1111-4111-8111-111111111111": {
+        "S": [
+          "alpha"
+        ],
+        "A": [
+          "beta"
+        ],
+        "B": [
+          "gamma"
+        ],
+        "C": [],
+        "D": []
+      },
+      "22222222-2222-4222-8222-222222222222": {
+        "S": [
+          "alpha"
+        ],
+        "A": [],
+        "B": [
+          "beta",
+          "gamma"
+        ],
+        "C": [],
+        "D": []
+      },
+      "33333333-3333-4333-8333-333333333333": {
+        "S": [],
+        "A": [
+          "alpha"
+        ],
+        "B": [
+          "gamma"
+        ],
+        "C": [
+          "beta"
+        ],
+        "D": []
+      }
+    },
+    "expected": {
+      "ok": true,
+      "consensus": {
+        "S": [
+          "alpha"
+        ],
+        "A": [],
+        "B": [
+          "gamma",
+          "beta"
+        ],
+        "C": [],
+        "D": []
+      },
+      "controversialItem": "beta",
+      "controversialSpread": 2,
+      "scores": [
+        {
+          "uid": "11111111-1111-4111-8111-111111111111",
+          "proximityPoints": 13,
+          "outsiderBonus": 15,
+          "consensusPoints": 28
+        },
+        {
+          "uid": "22222222-2222-4222-8222-222222222222",
+          "proximityPoints": 15,
+          "outsiderBonus": 0,
+          "consensusPoints": 15
+        },
+        {
+          "uid": "33333333-3333-4333-8333-333333333333",
+          "proximityPoints": 12,
+          "outsiderBonus": 15,
+          "consensusPoints": 27
+        }
+      ]
+    }
+  },
+  {
+    "id": "empty-tiers-ok",
+    "reverse": false,
+    "items": [
+      "solo"
+    ],
+    "participantUids": [
+      "11111111-1111-4111-8111-111111111111",
+      "22222222-2222-4222-8222-222222222222"
+    ],
+    "placementsByUid": {
+      "11111111-1111-4111-8111-111111111111": {
+        "S": [
+          "solo"
+        ],
+        "A": [],
+        "B": [],
+        "C": [],
+        "D": []
+      },
+      "22222222-2222-4222-8222-222222222222": {
+        "S": [
+          "solo"
+        ],
+        "A": [],
+        "B": [],
+        "C": [],
+        "D": []
+      }
+    },
+    "expected": {
+      "ok": true,
+      "consensus": {
+        "S": [
+          "solo"
+        ],
+        "A": [],
+        "B": [],
+        "C": [],
+        "D": []
+      },
+      "controversialItem": "solo",
+      "controversialSpread": 0,
+      "scores": [
+        {
+          "uid": "11111111-1111-4111-8111-111111111111",
+          "proximityPoints": 15,
+          "outsiderBonus": 0,
+          "consensusPoints": 15
+        },
+        {
+          "uid": "22222222-2222-4222-8222-222222222222",
+          "proximityPoints": 15,
+          "outsiderBonus": 0,
+          "consensusPoints": 15
+        }
+      ]
+    }
+  }
+]
