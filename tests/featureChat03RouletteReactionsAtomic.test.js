@@ -119,7 +119,7 @@ describe("FEATURE-CHAT-03 — contrat chemin d'écriture réel", () => {
     assert.match(block, /persistChatRouletteReactionRemote/);
   });
 
-  it("SQL RPC : FOR UPDATE + jsonb_set clé UID", () => {
+  it("SQL RPC : FOR UPDATE + jsonb_set clé UID + phase result strict", () => {
     const sql = readFileSync(
       join(__dirname, "../supabase/feature-chat-03-roulette-reactions.sql"),
       "utf8"
@@ -129,6 +129,8 @@ describe("FEATURE-CHAT-03 — contrat chemin d'écriture réel", () => {
     assert.match(sql, /v_reactions := v_reactions - v_uid_text/);
     assert.match(sql, /attemptId/);
     assert.match(sql, /rouletteId/);
+    assert.match(sql, /v_phase is distinct from 'result'/);
+    assert.doesNotMatch(sql, /animationStartTimestamp/);
   });
 
   it("rollback local ne supprime pas entrée d'un autre joueur", () => {

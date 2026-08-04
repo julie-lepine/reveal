@@ -30,6 +30,8 @@ import {
   catalogTileMinPlayers,
   resetChatRouletteObservationsForTests,
   chatRouletteReactionsSignature,
+  mergeChatRoulettePhaseResultPatch,
+  shouldPublishChatRoulettePhaseResult,
 } from "./chatRandomGameLogic.js";
 import {
   commitChatRouletteReaction,
@@ -68,6 +70,14 @@ import {
 import { isChatFabAllowedScreen } from "./chatFabScreens.js";
 
 const hostActionLock = createActionLock();
+const resultPhasePublishLock = createActionLock();
+
+/** Évite double patch `phase: result` pour le même attempt (idempotence locale). */
+let lastResultPhasePublishKey = null;
+
+function resultPhasePublishKey(rouletteId, attemptId) {
+  return `${rouletteId}|${attemptId}`;
+}
 
 let syncStarted = false;
 let unsubSession = null;
@@ -212,6 +222,77 @@ async function publishRoulette(payload) {
     });
     return { ok: false, error: e };
   }
+}
+
+/**
+ * Hôte : publie `phase: result` à la fin de l'animation (vérité partagée).
+ * Idempotent, anti-stale, retry unique si réseau.
+ *
+ * @param {{ rouletteId: string, attemptId: string }} expected
+ */
+export async function hostPublishSpinPhaseResult({ rouletteId, attemptId }) {
+  if (!isLobbyHost()) return { ok: false, reason: "not_host" };
+
+  const key = resultPhasePublishKey(rouletteId, attemptId);
+  const cached = readRouletteFromCache();
+  if (
+    lastResultPhasePublishKey === key &&
+    cached?.phase === "result" &&
+    isChatRouletteActionCurrent({ rouletteId, attemptId }, cached, {
+      matchAttempt: true,
+    })
+  ) {
+    return { ok: true, noop: true };
+  }
+
+  return resultPhasePublishLock.run(async () => {
+    const live = readRouletteFromCache();
+    const gate = shouldPublishChatRoulettePhaseResult(live, {
+      rouletteId,
+      attemptId,
+    });
+    if (!gate.ok) {
+      if (gate.noop) return { ok: true, noop: true };
+      return { ok: false, reason: gate.reason };
+    }
+
+    const patch = { phase: "result" };
+
+    if (!isGameSyncActive()) {
+      const merged = mergeChatRoulettePhaseResultPatch(live, patch);
+      lastResultPhasePublishKey = key;
+      presentChatRouletteEvent(merged);
+      return { ok: true, local: true };
+    }
+
+    for (let tryIdx = 0; tryIdx < 2; tryIdx++) {
+      const still = readRouletteFromCache();
+      const gateRetry = shouldPublishChatRoulettePhaseResult(still, {
+        rouletteId,
+        attemptId,
+      });
+      if (!gateRetry.ok) {
+        if (gateRetry.noop) return { ok: true, noop: true };
+        return { ok: false, reason: gateRetry.reason };
+      }
+      try {
+        await patchGameState(
+          { [CHAT_ROULETTE_STATE_KEY]: patch },
+          hubPatchOptionsForRoulette()
+        );
+        lastResultPhasePublishKey = key;
+        return { ok: true };
+      } catch (e) {
+        console.warn("[FEATURE-CHAT-03] phase result publish failed", e);
+        if (tryIdx === 0) {
+          await new Promise((r) => setTimeout(r, 450));
+          continue;
+        }
+        return { ok: false, error: e };
+      }
+    }
+    return { ok: false, reason: "exhausted" };
+  });
 }
 
 /**
@@ -547,6 +628,9 @@ export function initChatRandomGameSync() {
         reactionsByUid: live.reactionsByUid,
       });
     },
+    onSpinAnimationComplete: ({ rouletteId, attemptId }) => {
+      void hostPublishSpinPhaseResult({ rouletteId, attemptId });
+    },
   });
 
   unsubSession = onGameSessionChange(() => {
@@ -571,6 +655,7 @@ export function resetChatRandomGameSyncForTests() {
   syncStarted = false;
   appliedEventSig = null;
   opportunisticClearedIds.clear();
+  lastResultPhasePublishKey = null;
   resetChatRouletteObservationsForTests();
   resetChatRouletteReactionStateForTests();
   closeChatRouletteModal({ silent: true });

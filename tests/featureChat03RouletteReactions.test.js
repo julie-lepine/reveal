@@ -8,6 +8,7 @@ import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   CHAT_ROULETTE_REACTION_DEFS,
+  CHAT_ROULETTE_DURATION_MS,
   buildChatRouletteSpinPayload,
   canAcceptChatRouletteReactions,
   computeChatRouletteReactionCounts,
@@ -57,8 +58,15 @@ describe("FEATURE-CHAT-03 — réactions éphémères", () => {
     );
   });
 
-  it("2. réactions refusées hors phase result", () => {
-    assert.equal(canAcceptChatRouletteReactions(baseEvent({ phase: "spinning" })), false);
+  it("2. réactions strictement en phase result", () => {
+    const spinning = baseEvent({
+      phase: "spinning",
+      animationStartTimestamp: 1_000_000,
+      animationDurationMs: CHAT_ROULETTE_DURATION_MS,
+    });
+    const after = 1_000_000 + CHAT_ROULETTE_DURATION_MS + 1;
+    assert.equal(canAcceptChatRouletteReactions(spinning, after), false);
+    assert.equal(canAcceptChatRouletteReactions(spinning), false);
     assert.equal(canAcceptChatRouletteReactions(baseEvent({ phase: "prompt" })), false);
     assert.equal(canAcceptChatRouletteReactions(baseEvent({ phase: "result" })), true);
   });

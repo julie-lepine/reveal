@@ -128,6 +128,10 @@ import {
   stateKeyToGameId,
 } from "./playerContribution.js";
 import {
+  isChatRoulettePhaseResultPatch,
+  mergeChatRoulettePhaseResultPatch,
+} from "./chatRandomGameLogic.js";
+import {
   resolveNonHostEveningScoresPolicy,
   EVENING_SCORES_RESERVED_MSG,
   validateActingHostPlayPatch,
@@ -4586,7 +4590,15 @@ async function patchGameStateInner(
     }
   }
   if (mergePayload.chatRoulette) {
-    nextState.chatRoulette = mergePayload.chatRoulette;
+    const incCr = mergePayload.chatRoulette;
+    if (isChatRoulettePhaseResultPatch(incCr)) {
+      nextState.chatRoulette = mergeChatRoulettePhaseResultPatch(
+        current.chatRoulette,
+        incCr
+      );
+    } else {
+      nextState.chatRoulette = incCr;
+    }
   }
   const patch = { state: nextState };
   if (screen) patch.screen = screen;

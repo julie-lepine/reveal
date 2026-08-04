@@ -53,6 +53,7 @@ let lastReactionsSig = "";
  *   onBridgePoll?: () => void,
  *   onDismiss: () => void,
  *   onReaction?: (reactionId: string) => void,
+ *   onSpinAnimationComplete?: (scope: { rouletteId: string, attemptId: string }) => void,
  *   canControl: () => boolean,
  *   getLocalUid?: () => string|null,
  *   getActiveUids?: () => string[],
@@ -249,7 +250,8 @@ function updateReactionPressedStates(root, ev, localUid) {
 
 function renderResult(winner, ev, canControl) {
   const act = resolveChatRouletteResultAct(ev.drawCount);
-  const canReroll = canControl && canRerollChatRoulette(ev);
+  const phaseResult = ev.phase === "result";
+  const canReroll = canControl && phaseResult && canRerollChatRoulette(ev);
   const pollOpen = Boolean(handlers?.hasOpenLobbyPoll?.());
   const wink = chatRouletteWinkLine(ev.drawCount);
   const bridge = chatRouletteBridgeCopy();
@@ -271,7 +273,7 @@ function renderResult(winner, ev, canControl) {
     : "Faire voter le groupe";
 
   let actionsHtml = "";
-  if (canControl) {
+  if (canControl && phaseResult) {
     const bridgeBtn =
       act === "bridge"
         ? `<button type="button" class="btn btn-accent chat-roulette__btn" data-roulette-bridge>
@@ -293,13 +295,17 @@ function renderResult(winner, ev, canControl) {
         ${bridgeBtn}
         ${rerollBtn}
       </div>`;
+  } else if (canControl && !phaseResult) {
+    actionsHtml = `<p class="hint chat-roulette__wait">Résultat en cours…</p>`;
   } else {
     actionsHtml = `<p class="hint chat-roulette__wait">L'hôte décide de la suite…</p>`;
   }
 
   const localUid = handlers?.getLocalUid?.() || null;
   const activeUids = handlers?.getActiveUids?.() || null;
-  const reactionsHtml = renderReactions(ev, { localUid, activeUids });
+  const reactionsHtml = phaseResult
+    ? renderReactions(ev, { localUid, activeUids })
+    : "";
 
   return `
     <p class="chat-roulette__result-label">Le prochain jeu est</p>
@@ -351,6 +357,12 @@ function finishSpinIfCurrent(ev) {
     return;
   }
   presentEvent(ev, { forceResult: true });
+  if (ev?.rouletteId && ev?.attemptId) {
+    handlers?.onSpinAnimationComplete?.({
+      rouletteId: ev.rouletteId,
+      attemptId: ev.attemptId,
+    });
+  }
 }
 
 function runSpinAnimation(ev, winner, games) {

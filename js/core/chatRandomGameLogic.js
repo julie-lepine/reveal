@@ -406,11 +406,62 @@ export function resolveChatRouletteReactionToggle(currentReaction, clickedReacti
   return cur === next ? null : next;
 }
 
-/** Réactions actives uniquement en phase `result` stabilisée. */
+/**
+ * Réactions actives uniquement en phase `result` partagée.
+ * @param {unknown} ev
+ */
 export function canAcceptChatRouletteReactions(ev) {
   const n = normalizeChatRouletteEvent(ev);
   if (!n) return false;
   return n.phase === "result";
+}
+
+/**
+ * Patch ciblé : transition `spinning` → `result` (seule clé `phase`).
+ * @param {unknown} inc
+ */
+export function isChatRoulettePhaseResultPatch(inc) {
+  if (!inc || typeof inc !== "object" || Array.isArray(inc)) return false;
+  const keys = Object.keys(inc);
+  return keys.length === 1 && keys[0] === "phase" && inc.phase === "result";
+}
+
+/**
+ * Garde pure : l'hôte peut-il publier `phase: result` ?
+ * @param {unknown} current
+ * @param {{ rouletteId?: string, attemptId?: string }|null} expected
+ */
+export function shouldPublishChatRoulettePhaseResult(current, expected) {
+  const n = normalizeChatRouletteEvent(current);
+  if (!n) return { ok: false, reason: "no_event" };
+  if (
+    !isChatRouletteActionCurrent(expected, n, { matchAttempt: true })
+  ) {
+    return { ok: false, reason: "stale_id" };
+  }
+  if (n.phase === "result") return { ok: false, reason: "already_result", noop: true };
+  if (n.phase !== "spinning") return { ok: false, reason: "wrong_phase" };
+  if (!n.selectedTileId) return { ok: false, reason: "no_selection" };
+  return { ok: true };
+}
+
+/**
+ * Merge idempotent `phase: result` sur l'état courant (host UPDATE).
+ * @param {unknown} curRaw
+ * @param {{ phase?: string }} incRaw
+ */
+export function mergeChatRoulettePhaseResultPatch(curRaw, incRaw) {
+  const cur = normalizeChatRouletteEvent(curRaw);
+  if (!cur || incRaw?.phase !== "result") return curRaw;
+  if (cur.phase === "result") {
+    return typeof curRaw === "object" && curRaw ? curRaw : cur;
+  }
+  if (cur.phase !== "spinning" || !cur.selectedTileId) return curRaw;
+  return {
+    ...(typeof curRaw === "object" && curRaw ? curRaw : {}),
+    ...cur,
+    phase: "result",
+  };
 }
 
 /**
