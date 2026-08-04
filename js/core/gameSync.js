@@ -44,6 +44,7 @@ import {
   mergeReadyMapsLocal,
   mergeDilemmaCustomDilemmas,
   mergeHotTakeCustomTakes,
+  mergeCustomRosterTopics,
   mergeDilemmaPatchState,
   mergeHotTakePatchState,
   mergeConsensusPatchState,
@@ -2884,7 +2885,10 @@ function eveningStateToRemote() {
     gameScoreSessionBaseline,
     gameScoreSessionGameId,
     eveningGamesRecorded,
+    customRosterTopics,
   } = getState();
+  const me = getLocalDisplayName();
+  const remoteCached = cachedRow?.state?.customRosterTopics || [];
   const remote = {
     scores: scoresToRemote(getState().scores),
     playerStats: playerStatsToRemote(getState().playerStats || {}, (name) => playerKeyToRemoteUid(name)),
@@ -2910,6 +2914,12 @@ function eveningStateToRemote() {
     },
     lastGame: lastGame ? { ...lastGame } : null,
     lastTierName: tierNightGame?.listName || null,
+    // FEATURE-TIERNIGHT-02 : thèmes roster = evening (survit aux startGameSession).
+    customRosterTopics: mergeCustomRosterTopics(
+      customRosterTopics || [],
+      remoteCached,
+      me
+    ),
   };
   return remote;
 }
@@ -2939,6 +2949,14 @@ export function applyRemoteEveningState(st) {
     patch.tierNightGame = { ...getState().tierNightGame, listName: st.lastTierName };
   } else if (st.lastTierName) {
     patch.tierNightGame = { listName: st.lastTierName };
+  }
+
+  if (Array.isArray(st.customRosterTopics)) {
+    patch.customRosterTopics = mergeCustomRosterTopics(
+      getState().customRosterTopics || [],
+      st.customRosterTopics,
+      getLocalDisplayName()
+    );
   }
 
   if (Object.keys(patch).length) saveStatePatch(patch);

@@ -41,6 +41,8 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 |----|-------|----------|----------|
 | **FEATURE-TIERNIGHT-01** | — | Thèmes personnalisés (Classer le groupe) | 🟡 |
 | **FEATURE-TIERNIGHT-02** | — | Séries de tierlists par catégories | 🟡 |
+| **TIERNIGHT** | — | Trop dinfos en fn de manche, supprimer -points de la manche- qui est redondant avec la visu des tierlists des joueurs | 🟡 |
+
 
 ### Dette / opportunité
 

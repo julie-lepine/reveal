@@ -131,8 +131,9 @@ describe("FEATURE-TIERNIGHT-01 — validation et modération", () => {
     const src = read("js/screens/tierNightCreateRoster.js");
     assert.doesNotMatch(src, /roster-topic-emoji/);
     const handler = src.match(/createBtn\.addEventListener\("click"[\s\S]*?\}\)\(\);/)?.[0] || "";
-    assert.ok(handler.indexOf("checkHotTakeModeration") < handler.indexOf("addCustomRosterTopic"));
-    assert.match(handler, /addCustomRosterTopic\(\{ name \}\)/);
+    assert.ok(handler.indexOf("checkHotTakeModeration") < handler.indexOf("addCustomRosterTopicAndSync"));
+    assert.match(handler, /addCustomRosterTopicAndSync\(\{ name \}\)/);
+    assert.doesNotMatch(handler, /isLobbyHost/);
   });
 });
 

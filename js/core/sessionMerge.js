@@ -117,6 +117,31 @@ export function mergeHotTakeCustomTakes(localList, remoteList, localAuthor) {
 }
 
 /**
+ * Thèmes roster « Classe le groupe » — même contrat auteur que Hot Take / Dilemma.
+ * Stockés au top-level de game_sessions.state (cycle de vie lobby / evening).
+ */
+export function mergeCustomRosterTopics(localList, remoteList, localAuthor) {
+  return mergeAuthorOwnedCustomList(localList, remoteList, {
+    normalize: normalizeCustomRosterTopicForMerge,
+    localAuthor,
+  });
+}
+
+function normalizeCustomRosterTopicForMerge(entry) {
+  if (!entry || typeof entry !== "object") return null;
+  const id = entry.id != null ? String(entry.id).trim() : "";
+  if (!id.startsWith("custom-roster-")) return null;
+  const name = trimPlayerText(entry.name).slice(0, 80);
+  if (name.length < 2) return null;
+  return {
+    id,
+    name,
+    custom: true,
+    author: entry.author || null,
+  };
+}
+
+/**
  * Deck Hot Take / Dilemma : null en prep (customs modifiables).
  * En partie lancée, deck figé - remote prioritaire.
  */

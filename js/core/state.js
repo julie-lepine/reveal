@@ -1418,6 +1418,7 @@ export function addCustomRosterTopic({ name }) {
     id,
     name: nameCheck.name,
     custom: true,
+    author: getLocalDisplayName(),
   };
   state.customRosterTopics = [...(state.customRosterTopics || []), topic];
   save();

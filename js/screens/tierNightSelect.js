@@ -1,5 +1,6 @@
 import { deleteCustomTierList, getAllTierLists, getTierListById } from "../core/tierLists.js";
-import { deleteCustomRosterTopic, getCustomRosterTopics } from "../core/state.js";
+import { getCustomRosterTopics, getLocalDisplayName } from "../core/state.js";
+import { deleteCustomRosterTopicAndSync } from "../core/customRosterTopicSession.js";
 import { resolveRosterTopicConfig, ROSTER_TOPIC_PREFIX } from "../core/rosterTopic.js";
 import {
   setTierNightTopicId,
@@ -81,9 +82,9 @@ function renderModeCard(mode) {
     </button>`;
 }
 
-function renderRosterCard(topic, { custom = false } = {}) {
+function renderRosterCard(topic, { custom = false, canDelete = false } = {}) {
   const cardEmoji = custom ? "✏️" : topic.emoji || "👥";
-  const deleteBtn = custom
+  const deleteBtn = custom && canDelete
     ? `<button
           type="button"
           class="tier-roster-card__delete"
@@ -207,13 +208,21 @@ export function mountTierNightSelect(app) {
   }
 
   function topicStepHtml() {
+    const me = getLocalDisplayName();
     const customs = getCustomRosterTopics();
     const customSection =
       customs.length > 0
         ? `
-      <p class="label-upper label-upper--muted">Mes thèmes</p>
+      <p class="label-upper label-upper--muted">Thèmes personnalisés</p>
       <div class="tier-roster-grid tier-roster-grid--custom">
-        ${customs.map((t) => renderRosterCard(t, { custom: true })).join("")}
+        ${customs
+          .map((t) =>
+            renderRosterCard(t, {
+              custom: true,
+              canDelete: !t.author || t.author === me,
+            })
+          )
+          .join("")}
       </div>`
         : "";
 
@@ -302,7 +311,7 @@ export function mountTierNightSelect(app) {
             icon: "🗑️",
           });
           if (!ok) return;
-          deleteCustomRosterTopic(id);
+          await deleteCustomRosterTopicAndSync(id);
           render();
         });
       });
@@ -313,12 +322,16 @@ export function mountTierNightSelect(app) {
     bindTierGrid(app, (id) => startGame(id, "live"));
   }
 
-  const unsubSession = onGameSessionChange(
-    prepGuestFollowOnSession({
-      prepScreen: "tiernight-select",
-      getEntryScreen: () => getEffectiveSessionScreen(getCachedGameSession()),
-    })
-  );
+  const guestFollow = prepGuestFollowOnSession({
+    prepScreen: "tiernight-select",
+    getEntryScreen: () => getEffectiveSessionScreen(getCachedGameSession()),
+  });
+
+  const unsubSession = onGameSessionChange(() => {
+    if (guestFollow()) return;
+    // FEATURE-TIERNIGHT-02 : rafraîchir la liste quand un invité publie un thème.
+    if (step === "topic") render();
+  });
 
   render();
 
