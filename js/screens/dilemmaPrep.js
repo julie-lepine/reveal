@@ -46,6 +46,7 @@ import {
   bindCharCounter,
   updateCharCount,
   syncPrepOnMount,
+  prepOthersCustomEntriesHintHtml,
 } from "../core/prepScreen.js";
 import { PLAYER_TEXT_MAX_LEN } from "../../data/playerTextLimits.js";
 import { navigate } from "../core/router.js";
@@ -101,9 +102,12 @@ export function mountDilemmaPrep(app) {
   }
 
   function othersDilemmasHintHtml() {
-    const n = countOtherPlayersCustomDilemmas();
-    if (!n) return "";
-    return `<p class="hint" id="dilemma-others-hint">${n} dilemme${n > 1 ? "s" : ""} d'autres joueurs - révélé${n > 1 ? "s" : ""} en manche.</p>`;
+    return prepOthersCustomEntriesHintHtml({
+      count: countOtherPlayersCustomDilemmas(),
+      hintId: "dilemma-others-hint",
+      itemLabel: "dilemme",
+      revealedPast: "révélé",
+    });
   }
 
   function renderCustomDilemmasList() {
@@ -150,6 +154,11 @@ export function mountDilemmaPrep(app) {
       dilemmaStartSlotHtml(allReady, prep),
       onLaunch
     );
+
+    const focused = document.activeElement?.id;
+    if (focused !== "dilemma-option-a" && focused !== "dilemma-option-b") {
+      renderCustomDilemmasList();
+    }
   }
 
   function refreshDeckAndRounds() {
@@ -192,8 +201,10 @@ export function mountDilemmaPrep(app) {
   }
 
   function refreshFromSync() {
+    const draft = captureDraft();
     refreshDeckAndRounds();
     refreshReadySection();
+    restoreDraft(draft);
   }
 
   async function onLaunch({ force = false } = {}) {
@@ -245,13 +256,14 @@ export function mountDilemmaPrep(app) {
         return;
       }
       err.classList.add("hidden");
-      render(captureDraft());
       const inputA = app.querySelector("#dilemma-option-a");
       const inputB = app.querySelector("#dilemma-option-b");
       if (inputA) inputA.value = "";
       if (inputB) inputB.value = "";
       updateCharCount(inputA, app.querySelector("#dilemma-option-a-count"));
       updateCharCount(inputB, app.querySelector("#dilemma-option-b-count"));
+      renderCustomDilemmasList();
+      refreshReadySection();
     });
 
     app.querySelector("#btn-ready")?.addEventListener("click", () => {
@@ -279,20 +291,11 @@ export function mountDilemmaPrep(app) {
     };
   }
 
-  function customDilemmaCardHtml() {
-    const myCustoms = getMyCustomDilemmas();
-    if (myCustoms.length > 0) {
-      return `
-        <div class="card">
-          <p class="card-heading">Ton dilemme</p>
-          <p class="hint">Ton dilemme sera joué en priorité. Tu pourras en proposer un autre à la prochaine partie.</p>
-          ${customDilemmasListHtml()}
-          ${othersDilemmasHintHtml()}
-        </div>`;
-    }
+  function customDilemmasCardHtml() {
     return `
         <div class="card">
-          <p class="card-heading">Ton dilemme</p>
+          <p class="card-heading">Tes dilemmes</p>
+          <p class="hint">Tes dilemmes seront joués en priorité. Ajoute-en autant que tu veux.</p>
           <label class="field-label" for="dilemma-option-a">Option A</label>
           <input type="text" class="field-input" id="dilemma-option-a" maxlength="${PLAYER_TEXT_MAX_LEN}" placeholder="Ex : Ne plus jamais dormir" />
           ${charCountHtml("dilemma-option-a-count")}
@@ -304,6 +307,7 @@ export function mountDilemmaPrep(app) {
           ${charCountHtml("dilemma-option-b-count")}
           <p class="moderation-notice">${escapeHtml(moderationNotice)}</p>
           <p class="auth-error hidden" id="dilemma-error"></p>
+          ${customDilemmasListHtml()}
           ${othersDilemmasHintHtml()}
         </div>`;
   }
@@ -379,7 +383,7 @@ export function mountDilemmaPrep(app) {
           ${!isHost ? `<p class="hint">Seul l'hôte peut modifier les réglages.</p>` : ""}
         </div>
 
-        ${customDilemmaCardHtml()}
+        ${customDilemmasCardHtml()}
 
         <div class="card" id="dilemma-players">${playersReadySectionHtml(members, session.ready)}</div>
 
@@ -411,7 +415,7 @@ export function mountDilemmaPrep(app) {
     attr: "data-remove-dilemma",
     onRemove: async (id) => {
       await removeCustomDilemma(id);
-      render(captureDraft());
+      refreshFromSync();
     },
   });
 

@@ -44,6 +44,7 @@ import {
   charCountHtml,
   bindCharCounter,
   updateCharCount,
+  prepOthersCustomEntriesHintHtml,
 } from "../core/prepScreen.js";
 import { PLAYER_TEXT_MAX_LEN } from "../../data/playerTextLimits.js";
 import { bindNav } from "./nav.js";
@@ -100,9 +101,12 @@ export function mountHotTakePrep(app) {
   }
 
   function othersTakesHintHtml() {
-    const n = countOtherPlayersCustomTakes();
-    if (!n) return "";
-    return `<p class="hint" id="hot-take-others-hint">${n} hot take${n > 1 ? "s" : ""} d'autres joueurs - révélée${n > 1 ? "s" : ""} en manche.</p>`;
+    return prepOthersCustomEntriesHintHtml({
+      count: countOtherPlayersCustomTakes(),
+      hintId: "hot-take-others-hint",
+      itemLabel: "hot take",
+      revealedPast: "révélée",
+    });
   }
 
   function renderCustomTakesList() {

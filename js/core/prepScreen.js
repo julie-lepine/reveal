@@ -152,6 +152,8 @@ export function refreshPrepReadyUi(
   updateReadyButton(root.querySelector(readyBtnSelector), localReady);
 }
 
+export { prepOthersCustomEntriesHintHtml } from "./prepOthersCustomHint.js";
+
 /**
  * Met à jour une liste dynamique dans une .card sans re-render complet.
  */

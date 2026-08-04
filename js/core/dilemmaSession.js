@@ -211,10 +211,6 @@ export async function addCustomDilemma(optionA, optionB) {
   const b = trimPlayerText(optionB);
   if (!a || !b) return { ok: false, error: "Les deux options sont requises." };
 
-  if (getMyCustomDilemmas().length >= 1) {
-    return { ok: false, error: "Tu as déjà soumis un dilemme pour cette partie." };
-  }
-
   const modA = checkHotTakeModeration(a);
   if (modA.blocked) return { ok: false, error: modA.message };
   const modB = checkHotTakeModeration(b);
