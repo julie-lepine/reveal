@@ -9,7 +9,7 @@ import {
   sanitizeCustomRosterTopicsFromStorage,
   validateRosterTopicName,
 } from "./customRosterTopics.js";
-import { mergeCustomRosterTopics } from "./sessionMerge.js";
+import { mergeCustomRosterTopics, isCustomRosterTopicOwnedBy } from "./sessionMerge.js";
 import { getLocalDisplayName, getState, saveStatePatch } from "./state.js";
 import { checkHotTakeModeration } from "./hotTakeSession.js";
 
@@ -92,9 +92,7 @@ export async function deleteCustomRosterTopicAndSync(id) {
   const target = topics.find((t) => t.id === id);
   if (!target) return { ok: false, error: "Thème introuvable." };
 
-  const owns =
-    (authorUid && target.authorUid && String(target.authorUid) === String(authorUid)) ||
-    ((!target.authorUid || !authorUid) && (!target.author || target.author === me));
+  const owns = isCustomRosterTopicOwnedBy(target, me, authorUid);
   if (!owns) return { ok: false, error: "Tu ne peux supprimer que tes propres thèmes." };
 
   saveStatePatch({ customRosterTopics: removeTopicById(topics, id) });

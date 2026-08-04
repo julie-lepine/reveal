@@ -1,22 +1,25 @@
 /**
  * FEATURE-TIERNIGHT-02 — correction lost-update (RPC atomique + strip + préservation).
  */
-import { describe, it, beforeEach, afterEach, mock } from "node:test";
+import { describe, it, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { mergeCustomRosterTopics } from "../js/core/sessionMerge.js";
+import {
+  mergeCustomRosterTopics,
+  isCustomRosterTopicOwnedBy,
+} from "../js/core/sessionMerge.js";
 import {
   stripCustomRosterTopicsFromGenericPatch,
   preserveCustomRosterTopicsInFullStateReplace,
+  pickRichestCustomRosterTopics,
 } from "../js/core/customRosterTopicsSyncGuard.js";
 import {
   getState,
   saveStatePatch,
   addCustomRosterTopic,
   getCustomRosterTopics,
-  getLocalDisplayName,
   resetEveningState,
   resetGameSessionsOnly,
 } from "../js/core/state.js";
@@ -60,6 +63,7 @@ describe("FEATURE-TIERNIGHT-02 — A. même RPC hôte/invité", () => {
     const select = read("js/screens/tierNightSelect.js");
     assert.match(select, /ensureHost/);
     assert.match(select, /Seul l'hôte choisit le mode et le thème/);
+    assert.match(select, /isCustomRosterTopicOwnedBy/);
   });
 });
 
@@ -72,18 +76,26 @@ describe("FEATURE-TIERNIGHT-02 — B. absence republication générique", () => 
     assert.doesNotMatch(evening, /customRosterTopics:/);
   });
 
-  it("start/complete utilisent préservation serveur, pas copie local stale seule", () => {
+  it("start/complete/push utilisent préservation serveur", () => {
     const sync = read("js/core/gameSync.js");
     assert.match(sync, /upsertSessionPreservingRosterTopics/);
-    assert.match(sync, /upsert_game_session_preserving_roster_topics|upsertGameSessionPreservingRosterTopics/);
     const start = sync.match(/export async function startGameSession\([\s\S]*?\n\}/)?.[0];
     assert.match(start, /upsertSessionPreservingRosterTopics/);
-    assert.doesNotMatch(start, /resolveCustomRosterTopicsForStateReplace/);
+    const pushIdx = sync.indexOf("async function pushGameSessionInner");
+    assert.ok(pushIdx >= 0, "pushGameSessionInner introuvable");
+    const pushSlice = sync.slice(pushIdx, pushIdx + 2200);
+    assert.match(pushSlice, /upsertSessionPreservingRosterTopics/);
+    assert.match(pushSlice, /stripCustomRosterTopicsFromGenericPatch/);
+    assert.match(pushSlice, /preserveCustomRosterTopicsInFullStateReplace/);
+    assert.doesNotMatch(pushSlice, /updateGameSession\(/);
   });
 
   it("syncLobbyScores = eveningStateToRemote sans collection", () => {
     const sync = read("js/core/gameSync.js");
-    assert.match(sync, /export async function syncLobbyScores[\s\S]*?patchGameState\(eveningStateToRemote\(\)\)/);
+    assert.match(
+      sync,
+      /export async function syncLobbyScores[\s\S]*?patchGameState\(eveningStateToRemote\(\)\)/
+    );
   });
 });
 
@@ -127,13 +139,96 @@ describe("FEATURE-TIERNIGHT-02 — D. course RPC contre replace hôte", () => {
     const existing = [topic("a", "A", "Bob", "uid-b")];
     const hostIncoming = {
       scores: {},
-      customRosterTopics: [topic("a", "A", "Bob", "uid-b")], // stale snapshot sans B
+      customRosterTopics: [topic("a", "A", "Bob", "uid-b")],
       hotTake: { lobbyStarted: false },
     };
     const rpcB = topic("b", "B", "Bob", "uid-b");
     const final = simulatePreservingReplace(existing, hostIncoming, rpcB);
     const names = final.map((t) => t.name).sort();
     assert.deepEqual(names, ["A", "B"]);
+  });
+});
+
+describe("FEATURE-TIERNIGHT-02 — QA hydratation hôte vs invité", () => {
+  const remoteFull = [
+    topic("h1", "H1", "Host", "host-uid"),
+    topic("a1", "A1", "Ann", "guest-uid"),
+    topic("a2", "A2", "Ann", "guest-uid"),
+    topic("a3", "A3", "Ann", "guest-uid"),
+  ];
+
+  it("remote complet → hôte et invité voient H1+A1+A2+A3", () => {
+    const hostView = mergeCustomRosterTopics(
+      [topic("h1", "H1", "Host", "host-uid")],
+      remoteFull,
+      "Host",
+      "host-uid"
+    );
+    const guestView = mergeCustomRosterTopics(
+      [
+        topic("a1", "A1", "Ann", "guest-uid"),
+        topic("a2", "A2", "Ann", "guest-uid"),
+        topic("a3", "A3", "Ann", "guest-uid"),
+      ],
+      remoteFull,
+      "Ann",
+      "guest-uid"
+    );
+    assert.equal(hostView.length, 4);
+    assert.equal(guestView.length, 4);
+  });
+
+  it("permissions delete : hôte H1 seulement ; invité A*", () => {
+    assert.equal(isCustomRosterTopicOwnedBy(remoteFull[0], "Host", "host-uid"), true);
+    assert.equal(isCustomRosterTopicOwnedBy(remoteFull[1], "Host", "host-uid"), false);
+    assert.equal(isCustomRosterTopicOwnedBy(remoteFull[1], "Ann", "guest-uid"), true);
+    assert.equal(isCustomRosterTopicOwnedBy(remoteFull[0], "Ann", "guest-uid"), false);
+  });
+
+  it("retour après jeu : local hôte amputé + remote sain → grille complète", () => {
+    const hostView = mergeCustomRosterTopics(
+      [topic("h1", "H1", "Host", "host-uid")],
+      remoteFull,
+      "Host",
+      "host-uid"
+    );
+    assert.equal(hostView.length, 4);
+    assert.ok(hostView.some((t) => t.name === "A2"));
+  });
+
+  it("push stale cache ne doit plus gagner sur la base (préserve le plus riche)", () => {
+    const serverTopics = remoteFull;
+    const staleHostCache = [topic("h1", "H1", "Host", "host-uid")];
+    const pushed = preserveCustomRosterTopicsInFullStateReplace(
+      { hotTake: { lobbyStarted: true }, customRosterTopics: staleHostCache },
+      { customRosterTopics: serverTopics },
+      staleHostCache
+    );
+    assert.equal(pushed.customRosterTopics.length, 4);
+  });
+
+  it("legacy author sans authorUid reste visible pour l'autre joueur", () => {
+    const remote = [
+      topic("h1", "H1", "Host", "host-uid"),
+      { id: "custom-roster-legacy", name: "LegacyGuest", custom: true, author: "Ann" },
+    ];
+    const hostView = mergeCustomRosterTopics([], remote, "Host", "host-uid");
+    assert.equal(hostView.length, 2);
+  });
+
+  it("delete distant confirmé : A1 disparaît chez hôte (pas d'union éternelle)", () => {
+    const remoteAfter = [
+      topic("h1", "H1", "Host", "host-uid"),
+      topic("a2", "A2", "Ann", "guest-uid"),
+    ];
+    const hostLocal = [
+      topic("h1", "H1", "Host", "host-uid"),
+      topic("a1", "A1", "Ann", "guest-uid"),
+      topic("a2", "A2", "Ann", "guest-uid"),
+    ];
+    const merged = mergeCustomRosterTopics(hostLocal, remoteAfter, "Host", "host-uid");
+    assert.equal(merged.some((t) => t.name === "A1"), false);
+    assert.equal(merged.length, 2);
   });
 });
 
@@ -179,11 +274,7 @@ describe("FEATURE-TIERNIGHT-02 — G. suppression concurrente", () => {
       topic("b1", "B1", "Ben", "uid-ben"),
       topic("b2", "B2", "Ben", "uid-ben"),
     ];
-    // Ann avait encore A1 en local optimiste non confirmé — remote sans A1 gagne pour les autres ;
-    // ses propres entrées viennent du local : si elle a déjà retiré A1 localement :
-    const annLocal = [
-      topic("a2", "A2", "Ann", "uid-ann"),
-    ];
+    const annLocal = [topic("a2", "A2", "Ann", "uid-ann")];
     const merged = mergeCustomRosterTopics(annLocal, remoteAfter, "Ann", "uid-ann");
     const names = merged.map((t) => t.name).sort();
     assert.deepEqual(names, ["A2", "B1", "B2"]);
@@ -226,12 +317,21 @@ describe("FEATURE-TIERNIGHT-02 — I. rollback réseau (contrat source)", () => 
 });
 
 describe("FEATURE-TIERNIGHT-02 — SQL correctif", () => {
-  it("migration lost-update : authorUid + preserving RPC", () => {
+  it("migration lost-update : authorUid + preserving RPC + hint si base vide", () => {
     const sql = read("supabase/feature-tiernight-02-lost-update-fix.sql");
     assert.match(sql, /authorUid/);
     assert.match(sql, /upsert_game_session_preserving_roster_topics/);
     assert.match(sql, /for update/i);
     assert.match(sql, /Hôte requis/);
+    assert.match(sql, /jsonb_array_length\(v_topics\) = 0/);
+    assert.match(sql, /p_state -> 'customRosterTopics'/);
+  });
+
+  it("pickRichest préfère la liste non vide", () => {
+    assert.deepEqual(
+      pickRichestCustomRosterTopics([], [topic("a", "A1", "Ann")], []),
+      [topic("a", "A1", "Ann")]
+    );
   });
 });
 

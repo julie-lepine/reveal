@@ -1,6 +1,8 @@
 import { deleteCustomTierList, getAllTierLists, getTierListById } from "../core/tierLists.js";
 import { getCustomRosterTopics, getLocalDisplayName } from "../core/state.js";
 import { deleteCustomRosterTopicAndSync } from "../core/customRosterTopicSession.js";
+import { isCustomRosterTopicOwnedBy } from "../core/sessionMerge.js";
+import { getSupabaseUserId } from "../core/supabaseAuth.js";
 import { resolveRosterTopicConfig, ROSTER_TOPIC_PREFIX } from "../core/rosterTopic.js";
 import {
   setTierNightTopicId,
@@ -209,7 +211,20 @@ export function mountTierNightSelect(app) {
 
   function topicStepHtml() {
     const me = getLocalDisplayName();
+    const localUid = getSupabaseUserId();
     const customs = getCustomRosterTopics();
+    if (typeof globalThis !== "undefined" && globalThis.__REVEAL_DEBUG_ROSTER__) {
+      console.debug("REVEAL roster render topicStep", {
+        topics: customs.map((t) => ({
+          id: t.id,
+          name: t.name,
+          authorUid: t.authorUid ?? null,
+          author: t.author ?? null,
+        })),
+        localUid,
+        me,
+      });
+    }
     const customSection =
       customs.length > 0
         ? `
@@ -219,7 +234,7 @@ export function mountTierNightSelect(app) {
           .map((t) =>
             renderRosterCard(t, {
               custom: true,
-              canDelete: !t.author || t.author === me,
+              canDelete: isCustomRosterTopicOwnedBy(t, me, localUid),
             })
           )
           .join("")}

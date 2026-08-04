@@ -320,6 +320,15 @@ begin
     v_topics := '[]'::jsonb;
   end if;
 
+  -- Si la base est vide mais le client envoie un hint non vide (réparation
+  -- après amputation), préférer le hint. Sinon la base gagne toujours.
+  if jsonb_array_length(v_topics) = 0
+     and p_state is not null
+     and jsonb_typeof(p_state -> 'customRosterTopics') = 'array'
+     and jsonb_array_length(p_state -> 'customRosterTopics') > 0 then
+    v_topics := p_state -> 'customRosterTopics';
+  end if;
+
   v_next := jsonb_set(
     coalesce(p_state, '{}'::jsonb),
     '{customRosterTopics}',

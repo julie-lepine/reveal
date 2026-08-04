@@ -109,7 +109,11 @@ import { scalePollIntervalMs, SYNC_PATCH_TIMEOUT_MS } from "../config/syncConfig
 import { withPatchTimeout } from "./withPatchTimeout.js";
 import { GUESS_LIE_SYNC_PATCH_TIMEOUT_MS } from "../../data/guessLies.js";
 import { pickRemotePlayFields } from "./playPatch.js";
-import { stripCustomRosterTopicsFromGenericPatch } from "./customRosterTopicsSyncGuard.js";
+import {
+  stripCustomRosterTopicsFromGenericPatch,
+  summarizeCustomRosterTopics,
+  preserveCustomRosterTopicsInFullStateReplace,
+} from "./customRosterTopicsSyncGuard.js";
 import { pickLatestConsensusAnswer } from "./consensusAnswerUtils.js";
 import {
   finishedTierNightLiveRemote,
@@ -2947,12 +2951,47 @@ export function applyRemoteEveningState(st) {
   }
 
   if (Array.isArray(st.customRosterTopics)) {
-    patch.customRosterTopics = mergeCustomRosterTopics(
-      getState().customRosterTopics || [],
-      st.customRosterTopics,
-      getLocalDisplayName(),
-      getSupabaseUserId()
-    );
+    const localBefore = getState().customRosterTopics || [];
+    const remoteList = st.customRosterTopics;
+    const localAuthor = getLocalDisplayName();
+    const localAuthorUid = getSupabaseUserId();
+
+    // Garde : un remote [] ne doit pas amputter des thèmes d'autres auteurs
+    // encore présents localement (symptôme QA hôte après transition de jeu).
+    const remoteEmpty = remoteList.length === 0;
+    const localHasOthers = localBefore.some((t) => {
+      if (localAuthorUid && t.authorUid) {
+        return String(t.authorUid) !== String(localAuthorUid);
+      }
+      return t.author && t.author !== localAuthor;
+    });
+    if (remoteEmpty && localHasOthers) {
+      console.warn(
+        "REVEAL FEATURE-TIERNIGHT-02: ignore empty customRosterTopics remote over multi-author local",
+        {
+          local: summarizeCustomRosterTopics(localBefore),
+          localAuthor,
+          localAuthorUid,
+        }
+      );
+    } else {
+      const merged = mergeCustomRosterTopics(
+        localBefore,
+        remoteList,
+        localAuthor,
+        localAuthorUid
+      );
+      if (typeof globalThis !== "undefined" && globalThis.__REVEAL_DEBUG_ROSTER__) {
+        console.debug("REVEAL roster hydrate", {
+          remote: summarizeCustomRosterTopics(remoteList),
+          localBefore: summarizeCustomRosterTopics(localBefore),
+          merged: summarizeCustomRosterTopics(merged),
+          localAuthor,
+          localAuthorUid,
+        });
+      }
+      patch.customRosterTopics = merged;
+    }
   }
 
   if (Object.keys(patch).length) saveStatePatch(patch);
@@ -3016,7 +3055,8 @@ async function upsertSessionPreservingRosterTopics({
     }
     const mergedState = preserveCustomRosterTopicsInFullStateReplace(
       state || {},
-      existing?.state || cachedRow?.state || {}
+      existing?.state || cachedRow?.state || {},
+      getState().customRosterTopics || []
     );
     return upsertGameSession({
       lobbyId,
@@ -4073,6 +4113,8 @@ export async function startGameSession(gameId, screen, state) {
     state: {
       ...eveningStateToRemote(),
       ...(state || {}),
+      // Hint client : si la base est vide (amputation), SQL peut réinjecter.
+      customRosterTopics: getState().customRosterTopics || [],
     },
   });
   applyRemoteSession(row);
@@ -4082,16 +4124,46 @@ export async function startGameSession(gameId, screen, state) {
 
 async function pushGameSessionInner({ screen, gameId, state }) {
   const lobbyId = getState().lobby.id;
-  const current = cachedRow?.state || {};
-  const nextState = state ? { ...current, ...state } : current;
-  const patch = { state: nextState };
-  if (screen) patch.screen = screen;
-  if (gameId) patch.game_id = gameId;
+  const hostId = getSupabaseUserId();
+  if (!hostId) throw new Error("Session requise.");
 
-  let row = await updateGameSession(lobbyId, patch);
-  // L'update ne renvoie plus `state` : on le rattache localement (on vient de l'écrire).
-  if (row) row = { ...row, state: nextState };
-  else row = await fetchGameSessionByLobby(lobbyId);
+  // FEATURE-TIERNIGHT-02 — un push complet (launchGameWithSync mode "push")
+  // réécrivait tout `state` via updateGameSession à partir du cache local.
+  // Si le cache était en retard sur les RPC invitées, customRosterTopics
+  // était amputé côté serveur (hôte ne voyait plus que ses thèmes ; invité
+  // masquait la perte via merge auteur-local). Même filet que start/complete :
+  // fetch frais + strip + RPC de préservation.
+  let existing = cachedRow;
+  try {
+    existing = (await fetchGameSessionByLobby(lobbyId)) || cachedRow;
+  } catch {
+    existing = cachedRow;
+  }
+  const current = existing?.state || cachedRow?.state || {};
+  const { safePayload, stripped } = stripCustomRosterTopicsFromGenericPatch(
+    state && typeof state === "object" ? state : {}
+  );
+  if (stripped) {
+    console.warn(
+      "REVEAL FEATURE-TIERNIGHT-02: customRosterTopics stripped from pushGameSession"
+    );
+  }
+  const merged = Object.keys(safePayload).length
+    ? { ...current, ...safePayload }
+    : { ...current };
+  const nextState = preserveCustomRosterTopicsInFullStateReplace(
+    merged,
+    existing?.state || cachedRow?.state || {},
+    getState().customRosterTopics || []
+  );
+
+  const row = await upsertSessionPreservingRosterTopics({
+    lobbyId,
+    gameId: gameId || existing?.game_id || cachedRow?.game_id || "menu",
+    screen: screen || existing?.screen || cachedRow?.screen || "game-select",
+    hostId,
+    state: nextState,
+  });
   if (!row) {
     throw new Error("Impossible de synchroniser la partie (session introuvable).");
   }
@@ -4823,6 +4895,7 @@ export async function completeGameSession({ gameId = "menu", screen = "results",
     ...priorState,
     ...eveningStateToRemote(),
     ...(state || {}),
+    customRosterTopics: getState().customRosterTopics || [],
   });
 
   const row = await upsertSessionPreservingRosterTopics({

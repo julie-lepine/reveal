@@ -118,8 +118,12 @@ export function mergeHotTakeCustomTakes(localList, remoteList, localAuthor) {
 
 /**
  * Thèmes roster « Classe le groupe » — hydratation locale uniquement.
- * Ownership : authorUid (canonique) puis author display name (legacy).
- * N'est PAS une stratégie d'écriture serveur.
+ *
+ * Contrat (FEATURE-TIERNIGHT-02 QA) :
+ * - remote = vérité confirmée (TOUS les auteurs) ;
+ * - local = optimismes en vol de l'auteur local absents du remote ;
+ * - les deletes distants se reflètent (absents du remote → absents du résultat,
+ *   sauf optimisme local encore non confirmé).
  */
 export function mergeCustomRosterTopics(
   localList = [],
@@ -128,23 +132,32 @@ export function mergeCustomRosterTopics(
   localAuthorUid = null
 ) {
   const byId = new Map();
-  const isMine = (item) => {
-    if (localAuthorUid && item.authorUid) {
-      return String(item.authorUid) === String(localAuthorUid);
-    }
-    return !item.author || item.author === localAuthor;
-  };
+  const isMine = (item) => isCustomRosterTopicOwnedBy(item, localAuthor, localAuthorUid);
+
   for (const raw of remoteList) {
     const item = normalizeCustomRosterTopicForMerge(raw);
     if (!item) continue;
-    if (!isMine(item)) byId.set(item.id, item);
+    byId.set(item.id, item);
   }
   for (const raw of localList) {
     const item = normalizeCustomRosterTopicForMerge(raw);
-    if (!item) continue;
+    if (!item || byId.has(item.id)) continue;
     if (isMine(item)) byId.set(item.id, item);
   }
   return [...byId.values()];
+}
+
+/** Ownership pour UI delete / merge optimismes. */
+export function isCustomRosterTopicOwnedBy(item, localAuthor, localAuthorUid = null) {
+  if (!item) return false;
+  if (localAuthorUid && item.authorUid) {
+    return String(item.authorUid) === String(localAuthorUid);
+  }
+  // Legacy : sans authorUid, exiger un author explicite (ne jamais traiter
+  // « author absent » comme appartenant au joueur local — sinon toute entrée
+  // distante sans author serait filtrée / mal classée).
+  if (!item.author) return false;
+  return item.author === localAuthor;
 }
 
 function normalizeCustomRosterTopicForMerge(entry) {
