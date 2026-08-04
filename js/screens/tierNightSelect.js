@@ -311,7 +311,13 @@ export function mountTierNightSelect(app) {
             icon: "🗑️",
           });
           if (!ok) return;
-          await deleteCustomRosterTopicAndSync(id);
+          const res = await deleteCustomRosterTopicAndSync(id);
+          if (!res?.ok) {
+            await showAppAlert(res?.error || "Impossible de supprimer le thème.", {
+              title: "Suppression impossible",
+              icon: "⚠️",
+            });
+          }
           render();
         });
       });

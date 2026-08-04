@@ -32,7 +32,7 @@ export function createCustomRosterTopicId() {
 
 /**
  * @param {unknown} entry
- * @returns {{ id: string, name: string, custom: true, author?: string }|null}
+ * @returns {{ id: string, name: string, custom: true, author?: string, authorUid?: string }|null}
  */
 export function sanitizeCustomRosterTopicEntry(entry) {
   if (!entry || typeof entry !== "object") return null;
@@ -45,12 +45,17 @@ export function sanitizeCustomRosterTopicEntry(entry) {
     entry.author != null && String(entry.author).trim()
       ? String(entry.author).trim()
       : null;
+  const authorUid =
+    entry.authorUid != null && String(entry.authorUid).trim()
+      ? String(entry.authorUid).trim()
+      : null;
   const out = {
     id,
     name,
     custom: true,
   };
   if (author) out.author = author;
+  if (authorUid) out.authorUid = authorUid;
   return out;
 }
 
@@ -61,6 +66,7 @@ export function normalizeCustomRosterTopicEntry(entry) {
   return {
     ...item,
     author: item.author || null,
+    authorUid: item.authorUid || null,
   };
 }
 

@@ -117,14 +117,34 @@ export function mergeHotTakeCustomTakes(localList, remoteList, localAuthor) {
 }
 
 /**
- * Thèmes roster « Classe le groupe » — même contrat auteur que Hot Take / Dilemma.
- * Stockés au top-level de game_sessions.state (cycle de vie lobby / evening).
+ * Thèmes roster « Classe le groupe » — hydratation locale uniquement.
+ * Ownership : authorUid (canonique) puis author display name (legacy).
+ * N'est PAS une stratégie d'écriture serveur.
  */
-export function mergeCustomRosterTopics(localList, remoteList, localAuthor) {
-  return mergeAuthorOwnedCustomList(localList, remoteList, {
-    normalize: normalizeCustomRosterTopicForMerge,
-    localAuthor,
-  });
+export function mergeCustomRosterTopics(
+  localList = [],
+  remoteList = [],
+  localAuthor = null,
+  localAuthorUid = null
+) {
+  const byId = new Map();
+  const isMine = (item) => {
+    if (localAuthorUid && item.authorUid) {
+      return String(item.authorUid) === String(localAuthorUid);
+    }
+    return !item.author || item.author === localAuthor;
+  };
+  for (const raw of remoteList) {
+    const item = normalizeCustomRosterTopicForMerge(raw);
+    if (!item) continue;
+    if (!isMine(item)) byId.set(item.id, item);
+  }
+  for (const raw of localList) {
+    const item = normalizeCustomRosterTopicForMerge(raw);
+    if (!item) continue;
+    if (isMine(item)) byId.set(item.id, item);
+  }
+  return [...byId.values()];
 }
 
 function normalizeCustomRosterTopicForMerge(entry) {
@@ -133,12 +153,18 @@ function normalizeCustomRosterTopicForMerge(entry) {
   if (!id.startsWith("custom-roster-")) return null;
   const name = trimPlayerText(entry.name).slice(0, 80);
   if (name.length < 2) return null;
-  return {
+  const authorUid =
+    entry.authorUid != null && String(entry.authorUid).trim()
+      ? String(entry.authorUid).trim()
+      : null;
+  const out = {
     id,
     name,
     custom: true,
     author: entry.author || null,
   };
+  if (authorUid) out.authorUid = authorUid;
+  return out;
 }
 
 /**

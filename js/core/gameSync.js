@@ -109,6 +109,7 @@ import { scalePollIntervalMs, SYNC_PATCH_TIMEOUT_MS } from "../config/syncConfig
 import { withPatchTimeout } from "./withPatchTimeout.js";
 import { GUESS_LIE_SYNC_PATCH_TIMEOUT_MS } from "../../data/guessLies.js";
 import { pickRemotePlayFields } from "./playPatch.js";
+import { stripCustomRosterTopicsFromGenericPatch } from "./customRosterTopicsSyncGuard.js";
 import { pickLatestConsensusAnswer } from "./consensusAnswerUtils.js";
 import {
   finishedTierNightLiveRemote,
@@ -2885,10 +2886,10 @@ function eveningStateToRemote() {
     gameScoreSessionBaseline,
     gameScoreSessionGameId,
     eveningGamesRecorded,
-    customRosterTopics,
   } = getState();
-  const me = getLocalDisplayName();
-  const remoteCached = cachedRow?.state?.customRosterTopics || [];
+  // customRosterTopics volontairement ABSENT : collection concurrente multi-auteurs.
+  // Toute republication de tableau complet depuis un snapshot client provoque des lost updates.
+  // Écritures = RPC atomique ; survie aux startGameSession = préservation explicite (voir helpers).
   const remote = {
     scores: scoresToRemote(getState().scores),
     playerStats: playerStatsToRemote(getState().playerStats || {}, (name) => playerKeyToRemoteUid(name)),
@@ -2914,12 +2915,6 @@ function eveningStateToRemote() {
     },
     lastGame: lastGame ? { ...lastGame } : null,
     lastTierName: tierNightGame?.listName || null,
-    // FEATURE-TIERNIGHT-02 : thèmes roster = evening (survit aux startGameSession).
-    customRosterTopics: mergeCustomRosterTopics(
-      customRosterTopics || [],
-      remoteCached,
-      me
-    ),
   };
   return remote;
 }
@@ -2955,7 +2950,8 @@ export function applyRemoteEveningState(st) {
     patch.customRosterTopics = mergeCustomRosterTopics(
       getState().customRosterTopics || [],
       st.customRosterTopics,
-      getLocalDisplayName()
+      getLocalDisplayName(),
+      getSupabaseUserId()
     );
   }
 
@@ -2978,6 +2974,57 @@ export function applyRemoteEveningState(st) {
       baselinePatch.gameScoreSessionBaseline = merged;
     }
     if (Object.keys(baselinePatch).length) saveStatePatch(baselinePatch);
+  }
+}
+
+/**
+ * FEATURE-TIERNIGHT-02 — replace complet de state en préservant
+ * customRosterTopics côté serveur (transaction FOR UPDATE, anti lost-update).
+ */
+async function upsertSessionPreservingRosterTopics({
+  lobbyId,
+  gameId,
+  screen,
+  hostId,
+  state,
+}) {
+  const { upsertGameSessionPreservingRosterTopics } = await import("./supabaseGame.js");
+  try {
+    return await upsertGameSessionPreservingRosterTopics({
+      lobbyId,
+      gameId,
+      screen,
+      state: state || {},
+    });
+  } catch (e) {
+    // Compat : SQL pas encore déployé → fallback client (moins sûr, logué).
+    console.warn(
+      "REVEAL upsert preserving roster topics fallback:",
+      e?.message || e
+    );
+    const { upsertGameSession, fetchGameSessionByLobby } = await import(
+      "./supabaseGame.js"
+    );
+    const { preserveCustomRosterTopicsInFullStateReplace } = await import(
+      "./customRosterTopicsSyncGuard.js"
+    );
+    let existing = null;
+    try {
+      existing = await fetchGameSessionByLobby(lobbyId);
+    } catch {
+      existing = cachedRow;
+    }
+    const mergedState = preserveCustomRosterTopicsInFullStateReplace(
+      state || {},
+      existing?.state || cachedRow?.state || {}
+    );
+    return upsertGameSession({
+      lobbyId,
+      gameId,
+      screen,
+      hostId,
+      state: mergedState,
+    });
   }
 }
 
@@ -4018,7 +4065,7 @@ export async function startGameSession(gameId, screen, state) {
 
   const { setLobbyPlaying } = await import("./lobby.js");
   await setLobbyPlaying(gameId);
-  const row = await upsertGameSession({
+  const row = await upsertSessionPreservingRosterTopics({
     lobbyId,
     gameId,
     screen,
@@ -4027,7 +4074,8 @@ export async function startGameSession(gameId, screen, state) {
       ...eveningStateToRemote(),
       ...(state || {}),
     },
-  });  applyRemoteSession(row);
+  });
+  applyRemoteSession(row);
   routeToSessionScreen(screen, { force: true });
   return row;
 }
@@ -4327,7 +4375,14 @@ async function patchGameStateInner(
     if (!hostId) throw new Error("Session requise.");
     if (isLobbyHost()) {
       const cachedSession = getCachedGameSession();
-      freshRow = await upsertGameSession({
+      const { safePayload, stripped } =
+        stripCustomRosterTopicsFromGenericPatch(stateMerge);
+      if (stripped) {
+        console.warn(
+          "REVEAL FEATURE-TIERNIGHT-02: customRosterTopics stripped from generic patch (upsert fallback)"
+        );
+      }
+      freshRow = await upsertSessionPreservingRosterTopics({
         lobbyId,
         gameId: gameId || cachedSession?.game_id || "consensus",
         screen: screen || cachedSession?.screen || "game-select",
@@ -4335,7 +4390,7 @@ async function patchGameStateInner(
         state: {
           ...(cachedRow?.state || cachedSession?.state || {}),
           ...eveningStateToRemote(),
-          ...stateMerge,
+          ...safePayload,
         },
       });
     } else {
@@ -4361,7 +4416,16 @@ async function patchGameStateInner(
   }
 
   const current = freshRow?.state || cachedRow?.state || {};
-  let nextState = { ...current, ...mergePayload };
+  // FEATURE-TIERNIGHT-02 — option recommandée : strip, pas merge.
+  // Un patch générique ne doit jamais réécrire la collection (anti lost-update).
+  const { safePayload: safeMergePayload, stripped: strippedRoster } =
+    stripCustomRosterTopicsFromGenericPatch(mergePayload);
+  if (strippedRoster) {
+    console.warn(
+      "REVEAL FEATURE-TIERNIGHT-02: customRosterTopics stripped from generic patchGameState"
+    );
+  }
+  let nextState = { ...current, ...safeMergePayload };
   if (mergePayload.hotTake) {
     const curHt = current.hotTake;
     const incHt = mergePayload.hotTake;
@@ -4761,7 +4825,7 @@ export async function completeGameSession({ gameId = "menu", screen = "results",
     ...(state || {}),
   });
 
-  const row = await upsertGameSession({
+  const row = await upsertSessionPreservingRosterTopics({
     lobbyId,
     gameId: sessionGameId,
     screen,

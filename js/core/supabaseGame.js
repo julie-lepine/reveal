@@ -45,6 +45,32 @@ export async function upsertGameSession({ lobbyId, gameId, screen, hostId, state
   return data;
 }
 
+/**
+ * FEATURE-TIERNIGHT-02 — replace de state en préservant customRosterTopics
+ * atomiquement côté serveur (FOR UPDATE). Hôte uniquement.
+ */
+export async function upsertGameSessionPreservingRosterTopics({
+  lobbyId,
+  gameId,
+  screen,
+  state,
+}) {
+  if (!isSupabaseConfigured() || !supabase) {
+    throw new Error("Supabase non configuré.");
+  }
+  const { data, error } = await supabase.rpc(
+    "upsert_game_session_preserving_roster_topics",
+    {
+      p_lobby_id: lobbyId,
+      p_game_id: gameId,
+      p_screen: screen,
+      p_state: state || {},
+    }
+  );
+  if (error) throw error;
+  return data;
+}
+
 export async function updateGameSession(lobbyId, patch) {
   // On ne re-télécharge PAS `state` ici : l'appelant connaît déjà l'état qu'il
   // vient d'écrire, et le Realtime diffuse la ligne complète aux autres clients.
