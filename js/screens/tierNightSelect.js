@@ -194,7 +194,7 @@ export function mountTierNightSelect(app) {
 
   function listStepHtml() {
     return `
-      <p class="label-upper label-upper--gold">⚡ Rank live</p>
+      <p class="label-upper label-upper--gold">Rank live · modes de jeu</p>
       <div class="screen-title-row">
         <h2 class="screen-title">Choisis une tier list</h2>
         ${rulesButtonHtml("tiernight")}
@@ -249,7 +249,7 @@ export function mountTierNightSelect(app) {
         : "";
 
     return `
-      <p class="label-upper label-upper--gold">👥 Classe le groupe</p>
+      <p class="label-upper label-upper--gold">Classe le groupe · modes de jeu</p>
       <div class="screen-title-row">
         <h2 class="screen-title">Choisis un thème</h2>
         ${rulesButtonHtml("tiernight")}
@@ -281,28 +281,25 @@ export function mountTierNightSelect(app) {
     else if (step === "topic") content = topicStepHtml();
     else content = listStepHtml();
 
-    // UX-TIERNIGHT-NAV-01 : un seul retour contextuel.
-    // Niveau mode → shell back (jeux). Niveau topic/list → inline « Modes » uniquement.
+    // UX-TIERNIGHT-NAV-01 : un seul chevron classique.
+    // Niveau mode → retour jeux. Niveau topic/list → retour choix des modes.
     const onModeLevel = step === "mode";
     app.innerHTML = pageShell({
-      back: onModeLevel,
-      backTarget: "back",
-      content: `
-        ${!onModeLevel ? `<button type="button" class="btn-back-inline" data-tier-back>‹ Modes</button>` : ""}
-        ${content}
-      `,
+      back: true,
+      backTarget: onModeLevel ? "back" : "tiernight-modes",
+      content,
     });
 
-    bindNav(app);
+    bindNav(app, {
+      "tiernight-modes": () => {
+        step = "mode";
+        render();
+      },
+    });
     bindStep();
   }
 
   function bindStep() {
-    app.querySelector("[data-tier-back]")?.addEventListener("click", () => {
-      step = "mode";
-      render();
-    });
-
     if (step === "mode") {
       app.querySelectorAll("[data-mode]").forEach((btn) => {
         btn.addEventListener("click", () => {

@@ -54,16 +54,15 @@ describe("UX-TIERNIGHT-NAV-01 — source navigation", () => {
     assert.doesNotMatch(failBlock[0], /navigate\(/);
   });
 
-  it("select : params step/mode + un seul back selon niveau", () => {
+  it("select : params step/mode + chevron classique unique selon niveau", () => {
     const select = read("js/screens/tierNightSelect.js");
     assert.match(select, /getScreenParams/);
     assert.match(select, /params\.step === "topic"/);
-    assert.match(select, /back:\s*onModeLevel/);
-    assert.match(select, /data-tier-back/);
-    assert.match(
-      select,
-      /const onModeLevel = step === "mode";[\s\S]*back:\s*onModeLevel[\s\S]*!onModeLevel \? `[\s\S]*data-tier-back/
-    );
+    assert.match(select, /backTarget:\s*onModeLevel \? "back" : "tiernight-modes"/);
+    assert.match(select, /Classe le groupe · modes de jeu/);
+    assert.match(select, /Rank live · modes de jeu/);
+    assert.doesNotMatch(select, /btn-back-inline/);
+    assert.doesNotMatch(select, /data-tier-back/);
   });
 
   it("création Rank Live : retour → list/live", () => {
@@ -74,15 +73,11 @@ describe("UX-TIERNIGHT-NAV-01 — source navigation", () => {
     assert.match(create, /tiernight-live-lists/);
   });
 
-  it("DOM select : pas deux contrôles retour actifs au même niveau", () => {
+  it("pas de double contrôle retour (inline Modes retiré)", () => {
     const select = read("js/screens/tierNightSelect.js");
-    // Niveau mode : shell back only (pas data-tier-back)
-    // Niveau topic/list : data-tier-back only (back: false)
-    assert.match(select, /back:\s*onModeLevel/);
-    assert.doesNotMatch(
-      select,
-      /back:\s*true[\s\S]*data-tier-back/
-    );
+    assert.doesNotMatch(select, /btn-back-inline/);
+    assert.match(select, /back:\s*true/);
+    assert.match(select, /"tiernight-modes"/);
   });
 });
 
