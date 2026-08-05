@@ -15,6 +15,7 @@ import {
   userIdForName,
   nameForUserId,
   canActAsHost,
+  isLobbyHost,
   refreshGameSession,
 } from "./gameSync.js";
 import { patchGameStateWithFeedback } from "./patchGameStateFeedback.js";
@@ -42,6 +43,9 @@ import {
   warnUnexpectedTierNightVoteKeys,
   sessionHasTierNightPlayerRoster,
 } from "./tierNightRoster.js";
+import { buildTierNightSeriesLaunchPayload } from "./tierNightSeriesLaunch.js";
+
+export { prepareTierNightSeriesLaunchAttempt } from "./tierNightSeriesLaunch.js";
 
 const TIER_RANK = { S: 0, A: 1, B: 2, C: 3, D: 4 };
 
@@ -479,6 +483,81 @@ export async function markTierNightClassicStarted({ topicId, mode, modifier }) {
       tierNightLive: tierNightLiveResetRemote(),
     }),
   });
+}
+
+/**
+ * FEATURE-TIERNIGHT-SERIES-04 — lancement MP/local d’une série (manche 1).
+ * Ne finalise pas la manche ; n’appelle pas la RPC SERIES-03.
+ *
+ * @param {object} opts
+ * @param {object} opts.attempt — sortie de prepareTierNightSeriesLaunchAttempt
+ */
+export async function markTierNightSeriesStarted({ attempt } = {}) {
+  if (isGameSyncActive() && !isLobbyHost()) {
+    return { ok: false, error: "Seul l'hôte peut lancer la série." };
+  }
+
+  const built = buildTierNightSeriesLaunchPayload(attempt);
+  if (!built.ok) {
+    return {
+      ok: false,
+      error: built.error || "Tentative de lancement série invalide.",
+      code: built.code,
+    };
+  }
+
+  const previousLocal = {
+    tierNightTopicId: getState().tierNightTopicId,
+    tierNightMode: getState().tierNightMode,
+    tierNightModifier: getState().tierNightModifier,
+    tierNightGame: getState().tierNightGame ? { ...getState().tierNightGame } : null,
+  };
+
+  saveStatePatch({
+    tierNightTopicId: built.topicId,
+    tierNightMode: built.mode,
+    tierNightModifier: built.modifier,
+    tierNightGame: built.localGame,
+    tierNightLiveGame: defaultLive(),
+  });
+
+  if (!isGameSyncActive()) {
+    return { ok: true, localOnly: true, attempt, previousLocal };
+  }
+
+  try {
+    const result = await launchGameWithSync({
+      screen: "tiernight",
+      gameId: "tiernight",
+      mode: "push",
+      beforeCommit: () => setLobbyPlaying("tiernight"),
+      applyLocal: () => {},
+      getRemoteState: () => ({
+        tierNight: built.remoteTierNight,
+        tierNightLive: tierNightLiveResetRemote(),
+      }),
+    });
+
+    if (result?.ok === false) {
+      saveStatePatch(previousLocal);
+      return {
+        ...result,
+        attempt,
+        rolledBack: true,
+      };
+    }
+
+    return { ...result, attempt, ok: result?.ok !== false };
+  } catch (error) {
+    saveStatePatch(previousLocal);
+    return {
+      ok: false,
+      error: error?.message || "Échec du lancement série.",
+      attempt,
+      rolledBack: true,
+      uncertain: true,
+    };
+  }
 }
 
 export { votingPayload as tierNightLiveVotingPayload };

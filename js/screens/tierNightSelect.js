@@ -23,15 +23,30 @@ import {
   getCachedGameSession,
   getEffectiveSessionScreen,
 } from "../core/gameSync.js";
+import { getLobbyParticipants } from "../core/lobby.js";
 import {
   markTierNightLiveLobbyStarted,
   markTierNightClassicStarted,
+  prepareTierNightSeriesLaunchAttempt,
+  markTierNightSeriesStarted,
 } from "../core/tierNightLiveSession.js";
-import { navigateAfterGameLaunch, prepGuestFollowOnSession } from "../core/mpLaunch.js";
+import { navigateAfterGameLaunch, prepGuestFollowOnSession, runLaunchButton } from "../core/mpLaunch.js";
 import { escapeHtml, pageShell, tierLogoHtml, bindTierLogos } from "../core/ui.js";
 import { rulesButtonHtml } from "../core/gameRulesUi.js";
 import { bindNav } from "./nav.js";
 import { showAppAlert, showAppConfirm } from "../core/dialog.js";
+import { isTierNightSeriesUiEnabled } from "../core/tierNightSeriesGate.js";
+import { TIER_NIGHT_SERIES_ALL_CATEGORIES } from "../core/tierNightSeries.js";
+import {
+  createEmptyTierNightSeriesSetup,
+  listTierNightSeriesCategoryOptions,
+  getTierNightSeriesRoundCountAvailability,
+  getTierNightSeriesPoolSize,
+  validateTierNightSeriesSetupForLaunch,
+  reconcileTierNightSeriesSetupAfterCategoryChange,
+  formatTierNightSeriesCategorySummary,
+  resolveTierNightSeriesSetupCategoryIds,
+} from "../core/tierNightSeriesSetup.js";
 
 /** Tous les modes sont jouables en solo comme en multijoueur. */
 function isModeLocked() {
@@ -105,15 +120,38 @@ function renderRosterCard(topic, { custom = false, canDelete = false } = {}) {
     </div>`;
 }
 
+const SERIES_STEPS = new Set([
+  "roster-path",
+  "series-category",
+  "series-count",
+  "series-review",
+]);
+
 export function mountTierNightSelect(app) {
   const params = getScreenParams() || {};
+  const seriesUi = isTierNightSeriesUiEnabled();
   let selectedMode = normalizeTierNightMode(params.mode || DEFAULT_TIER_NIGHT_MODE);
   let step =
-    params.step === "topic" || params.step === "list" || params.step === "mode"
+    params.step === "topic" ||
+    params.step === "list" ||
+    params.step === "mode" ||
+    (seriesUi && SERIES_STEPS.has(params.step))
       ? params.step
       : "mode";
   if (step === "topic") selectedMode = "roster";
   if (step === "list") selectedMode = "live";
+  if (!seriesUi && SERIES_STEPS.has(step)) step = "mode";
+
+  /** Setup temporaire — jamais sérialisé. */
+  let seriesSetup = createEmptyTierNightSeriesSetup();
+  /** Tentative de launch (runId+queue) réutilisée après échec ambigu. */
+  let seriesLaunchAttempt = null;
+  let seriesLaunching = false;
+
+  function resetSeriesSetup() {
+    seriesSetup = createEmptyTierNightSeriesSetup();
+    seriesLaunchAttempt = null;
+  }
 
   async function ensureHost() {
     if (isGameSyncActive() && !isLobbyHost()) {
@@ -163,7 +201,7 @@ export function mountTierNightSelect(app) {
       return;
     }
 
-    // roster → plateau partagé (state.tierNight / écran tiernight)
+    // roster → plateau partagé (state.tierNight / écran tiernight) — mono-thème, sans series
     if (isGameSyncActive()) {
       const result = await markTierNightClassicStarted({ topicId, mode, modifier });
       if (result?.ok === false) {
@@ -179,6 +217,72 @@ export function mountTierNightSelect(app) {
     }
   }
 
+  async function launchSeriesFromReview(btn) {
+    if (seriesLaunching) return;
+    if (!(await ensureHost())) return;
+
+    const check = validateTierNightSeriesSetupForLaunch(seriesSetup);
+    if (!check.ok) {
+      await showAppAlert(check.message, { title: "Setup incomplet", icon: "⚠️" });
+      return;
+    }
+
+    const run = async () => {
+      seriesLaunching = true;
+      try {
+        if (!seriesLaunchAttempt?.ok) {
+          seriesLaunchAttempt = prepareTierNightSeriesLaunchAttempt({
+            categoryIds: resolveTierNightSeriesSetupCategoryIds(seriesSetup.categoryIds),
+            roundCount: seriesSetup.roundCount,
+            modifier: "normal",
+            participants: getLobbyParticipants(),
+          });
+        }
+        if (!seriesLaunchAttempt?.ok) {
+          await showAppAlert(seriesLaunchAttempt?.error || "Impossible de préparer la série.", {
+            title: "Lancement impossible",
+            icon: "⚠️",
+          });
+          seriesLaunchAttempt = null;
+          return;
+        }
+
+        const result = await markTierNightSeriesStarted({
+          attempt: seriesLaunchAttempt.attempt,
+        });
+
+        if (result?.ok === false) {
+          // Échec clair + rollback : autoriser une nouvelle queue au prochain essai.
+          // Incertitude (timeout) : conserver attempt pour retry sans nouveau RNG.
+          if (!result.uncertain) {
+            seriesLaunchAttempt = null;
+          }
+          await showAppAlert(result.error || "Impossible de lancer la série.", {
+            title: "Lancement impossible",
+            icon: "⚠️",
+          });
+          return;
+        }
+
+        seriesLaunchAttempt = null;
+        resetSeriesSetup();
+        if (isGameSyncActive()) {
+          navigateAfterGameLaunch({ gameScreen: "tiernight", result });
+        } else {
+          navigate("tiernight");
+        }
+      } finally {
+        seriesLaunching = false;
+      }
+    };
+
+    if (btn) {
+      await runLaunchButton(btn, run, { loadingLabel: "Lancement…" });
+    } else {
+      await run();
+    }
+  }
+
   function modeStepHtml() {
     return `
       <p class="label-upper label-upper--gold">🏆 Tier Night</p>
@@ -190,6 +294,155 @@ export function mountTierNightSelect(app) {
       <div class="tier-mode-list">
         ${TIER_NIGHT_MODES.map(renderModeCard).join("")}
       </div>`;
+  }
+
+  function rosterPathStepHtml() {
+    return `
+      <p class="label-upper label-upper--gold">Classe le groupe</p>
+      <div class="screen-title-row">
+        <h2 class="screen-title">Comment voulez-vous jouer ?</h2>
+        ${rulesButtonHtml("tiernight")}
+      </div>
+      <p class="game-intro">Un thème unique, ou une série de classements enchaînés.</p>
+      <div class="tier-mode-list">
+        <button type="button" class="tier-mode-card" data-roster-path="single">
+          <span class="tier-mode-card__emoji">1️⃣</span>
+          <span class="tier-mode-card__body">
+            <span class="tier-mode-card__name">Un seul classement</span>
+            <span class="tier-mode-card__tagline">Parcours classique</span>
+            <span class="tier-mode-card__desc">Choisis un thème et classe le groupe une fois.</span>
+          </span>
+          <span class="card-row__chevron">›</span>
+        </button>
+        <button type="button" class="tier-mode-card" data-roster-path="series">
+          <span class="tier-mode-card__emoji">📚</span>
+          <span class="tier-mode-card__body">
+            <span class="tier-mode-card__name">Une série</span>
+            <span class="tier-mode-card__tagline">3, 5 ou 7 manches</span>
+            <span class="tier-mode-card__desc">Enchaîne plusieurs thèmes tirés dans une catégorie.</span>
+          </span>
+          <span class="card-row__chevron">›</span>
+        </button>
+      </div>`;
+  }
+
+  function seriesCategoryStepHtml() {
+    const options = listTierNightSeriesCategoryOptions();
+    const allCount = getTierNightSeriesPoolSize([TIER_NIGHT_SERIES_ALL_CATEGORIES]);
+    const selected = seriesSetup.categoryIds;
+    const isAll =
+      Array.isArray(selected) && selected.includes(TIER_NIGHT_SERIES_ALL_CATEGORIES);
+    const selectedId =
+      !isAll && Array.isArray(selected) && selected.length === 1 ? selected[0] : null;
+
+    const catCards = options
+      .map((c) => {
+        const active = selectedId === c.id;
+        const disabled = c.eligibleCount < 3;
+        return `
+        <button type="button" class="tier-mode-card${active ? " tier-mode-card--active" : ""}"
+          data-series-cat="${escapeHtml(c.id)}" ${disabled ? "disabled" : ""}>
+          <span class="tier-mode-card__emoji">🏷️</span>
+          <span class="tier-mode-card__body">
+            <span class="tier-mode-card__name">${escapeHtml(c.label)}</span>
+            <span class="tier-mode-card__tagline">${c.eligibleCount} thème${c.eligibleCount > 1 ? "s" : ""} éligible${c.eligibleCount > 1 ? "s" : ""}</span>
+            <span class="tier-mode-card__desc">${
+              disabled ? "Moins de 3 thèmes - indisponible pour une série." : "Sélectionner cette catégorie."
+            }</span>
+          </span>
+        </button>`;
+      })
+      .join("");
+
+    return `
+      <p class="label-upper label-upper--gold">Série · catégories</p>
+      <div class="screen-title-row">
+        <h2 class="screen-title">Choisis une catégorie</h2>
+        ${rulesButtonHtml("tiernight")}
+      </div>
+      <p class="game-intro">Les thèmes personnalisés ne sont pas inclus dans les packs.</p>
+      <div class="tier-mode-list">
+        <button type="button" class="tier-mode-card${isAll ? " tier-mode-card--active" : ""}"
+          data-series-cat="*">
+          <span class="tier-mode-card__emoji">✨</span>
+          <span class="tier-mode-card__body">
+            <span class="tier-mode-card__name">Toutes les catégories</span>
+            <span class="tier-mode-card__tagline">${allCount} thèmes éligibles</span>
+            <span class="tier-mode-card__desc">Tirage dans tout le catalogue activé.</span>
+          </span>
+        </button>
+        ${catCards}
+      </div>
+      ${
+        selected
+          ? `<button type="button" class="btn btn-primary btn--spaced" data-series-next="count">Continuer</button>`
+          : ""
+      }`;
+  }
+
+  function seriesCountStepHtml() {
+    const avail = getTierNightSeriesRoundCountAvailability(seriesSetup.categoryIds);
+    const pool = avail[0]?.poolSize ?? 0;
+    const catLabel = formatTierNightSeriesCategorySummary(seriesSetup.categoryIds);
+    const cards = avail
+      .map((r) => {
+        const active = Number(seriesSetup.roundCount) === r.roundCount;
+        return `
+        <button type="button" class="tier-mode-card${active ? " tier-mode-card--active" : ""}"
+          data-series-count="${r.roundCount}" ${r.available ? "" : "disabled"}>
+          <span class="tier-mode-card__emoji">${r.roundCount}</span>
+          <span class="tier-mode-card__body">
+            <span class="tier-mode-card__name">${r.roundCount} manches</span>
+            <span class="tier-mode-card__tagline">${
+              r.available ? "Disponible" : "Indisponible"
+            }</span>
+            <span class="tier-mode-card__desc">${
+              r.available
+                ? `Pool : ${r.poolSize} thèmes.`
+                : `Il faut au moins ${r.roundCount} thèmes (pool : ${r.poolSize}).`
+            }</span>
+          </span>
+        </button>`;
+      })
+      .join("");
+
+    return `
+      <p class="label-upper label-upper--gold">Série · manches</p>
+      <div class="screen-title-row">
+        <h2 class="screen-title">Combien de manches ?</h2>
+        ${rulesButtonHtml("tiernight")}
+      </div>
+      <p class="game-intro">${escapeHtml(catLabel)} - ${pool} thème${pool > 1 ? "s" : ""} disponible${pool > 1 ? "s" : ""}.</p>
+      <div class="tier-mode-list">${cards}</div>
+      ${
+        seriesSetup.roundCount
+          ? `<button type="button" class="btn btn-primary btn--spaced" data-series-next="review">Continuer</button>`
+          : ""
+      }`;
+  }
+
+  function seriesReviewStepHtml() {
+    const catLabel = formatTierNightSeriesCategorySummary(seriesSetup.categoryIds);
+    const pool = getTierNightSeriesPoolSize(seriesSetup.categoryIds);
+    const host = !isGameSyncActive() || isLobbyHost();
+    return `
+      <p class="label-upper label-upper--gold">Série · récap</p>
+      <div class="screen-title-row">
+        <h2 class="screen-title">Prêt à lancer</h2>
+        ${rulesButtonHtml("tiernight")}
+      </div>
+      <p class="game-intro">La queue sera tirée une seule fois au lancement.</p>
+      <div class="card card--static">
+        <p><strong>Catégorie</strong> — ${escapeHtml(catLabel)}</p>
+        <p><strong>Manches</strong> — ${escapeHtml(String(seriesSetup.roundCount))}</p>
+        <p><strong>Thèmes éligibles</strong> — ${pool}</p>
+        <p><strong>Modificateur</strong> — normal</p>
+      </div>
+      ${
+        host
+          ? `<button type="button" class="btn btn-primary btn--spaced" data-series-launch>Lancer la série</button>`
+          : `<p class="hint">En attente de l'hôte…</p>`
+      }`;
   }
 
   function listStepHtml() {
@@ -275,24 +528,57 @@ export function mountTierNightSelect(app) {
       </div>`;
   }
 
+  function backTargetForStep() {
+    if (step === "mode") return "back";
+    if (!seriesUi) return "tiernight-modes";
+    if (step === "roster-path") return "tiernight-modes";
+    if (step === "topic") return "tiernight-roster-path";
+    if (step === "list") return "tiernight-modes";
+    if (step === "series-category") return "tiernight-roster-path";
+    if (step === "series-count") return "tiernight-series-category";
+    if (step === "series-review") return "tiernight-series-count";
+    return "tiernight-modes";
+  }
+
   function render() {
     let content = "";
     if (step === "mode") content = modeStepHtml();
+    else if (step === "roster-path") content = rosterPathStepHtml();
+    else if (step === "series-category") content = seriesCategoryStepHtml();
+    else if (step === "series-count") content = seriesCountStepHtml();
+    else if (step === "series-review") content = seriesReviewStepHtml();
     else if (step === "topic") content = topicStepHtml();
     else content = listStepHtml();
 
     // UX-TIERNIGHT-NAV-01 : un seul chevron classique.
-    // Niveau mode → retour jeux. Niveau topic/list → retour choix des modes.
     const onModeLevel = step === "mode";
     app.innerHTML = pageShell({
       back: true,
-      backTarget: onModeLevel ? "back" : "tiernight-modes",
+      backTarget: onModeLevel ? "back" : backTargetForStep(),
       content,
     });
 
     bindNav(app, {
       "tiernight-modes": () => {
         step = "mode";
+        resetSeriesSetup();
+        render();
+      },
+      "tiernight-roster-path": () => {
+        step = "roster-path";
+        seriesSetup = { ...seriesSetup, path: null, categoryIds: null, roundCount: null };
+        seriesLaunchAttempt = null;
+        render();
+      },
+      "tiernight-series-category": () => {
+        step = "series-category";
+        seriesSetup = { ...seriesSetup, roundCount: null };
+        seriesLaunchAttempt = null;
+        render();
+      },
+      "tiernight-series-count": () => {
+        step = "series-count";
+        seriesLaunchAttempt = null;
         render();
       },
     });
@@ -306,9 +592,89 @@ export function mountTierNightSelect(app) {
           const id = btn.getAttribute("data-mode");
           if (isModeLocked(id)) return;
           selectedMode = id;
-          step = id === "roster" ? "topic" : "list";
+          resetSeriesSetup();
+          if (id === "roster") {
+            step = seriesUi ? "roster-path" : "topic";
+          } else {
+            step = "list";
+          }
           render();
         });
+      });
+      return;
+    }
+
+    if (step === "roster-path") {
+      app.querySelectorAll("[data-roster-path]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const path = btn.getAttribute("data-roster-path");
+          seriesLaunchAttempt = null;
+          if (path === "series") {
+            seriesSetup = {
+              path: "series",
+              categoryIds: null,
+              roundCount: null,
+            };
+            step = "series-category";
+          } else {
+            seriesSetup = { path: "single", categoryIds: null, roundCount: null };
+            step = "topic";
+          }
+          render();
+        });
+      });
+      return;
+    }
+
+    if (step === "series-category") {
+      app.querySelectorAll("[data-series-cat]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const id = btn.getAttribute("data-series-cat");
+          seriesLaunchAttempt = null;
+          const categoryIds =
+            id === "*" ? [TIER_NIGHT_SERIES_ALL_CATEGORIES] : [id];
+          seriesSetup = reconcileTierNightSeriesSetupAfterCategoryChange({
+            ...seriesSetup,
+            path: "series",
+            categoryIds,
+          });
+          render();
+        });
+      });
+      app.querySelector("[data-series-next='count']")?.addEventListener("click", () => {
+        if (!seriesSetup.categoryIds) return;
+        step = "series-count";
+        render();
+      });
+      return;
+    }
+
+    if (step === "series-count") {
+      app.querySelectorAll("[data-series-count]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          if (btn.disabled) return;
+          const n = Number(btn.getAttribute("data-series-count"));
+          seriesLaunchAttempt = null;
+          seriesSetup = { ...seriesSetup, path: "series", roundCount: n };
+          render();
+        });
+      });
+      app.querySelector("[data-series-next='review']")?.addEventListener("click", () => {
+        const check = validateTierNightSeriesSetupForLaunch(seriesSetup);
+        if (!check.ok) {
+          void showAppAlert(check.message, { title: "Choix invalide", icon: "⚠️" });
+          return;
+        }
+        step = "series-review";
+        render();
+      });
+      return;
+    }
+
+    if (step === "series-review") {
+      const launchBtn = app.querySelector("[data-series-launch]");
+      launchBtn?.addEventListener("click", () => {
+        void launchSeriesFromReview(launchBtn);
       });
       return;
     }

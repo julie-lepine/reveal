@@ -5,6 +5,9 @@ www/
 # Supabase CLI (local link state)
 supabase/.temp/
 
+# Smoke snapshots locaux (pas de secrets, mais fixtures)
+tmp/
+
 # Capacitor (futur)
 ios/
 android/

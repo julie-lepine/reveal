@@ -58,7 +58,7 @@ describe("UX-TIERNIGHT-NAV-01 - source navigation", () => {
     const select = read("js/screens/tierNightSelect.js");
     assert.match(select, /getScreenParams/);
     assert.match(select, /params\.step === "topic"/);
-    assert.match(select, /backTarget:\s*onModeLevel \? "back" : "tiernight-modes"/);
+    assert.match(select, /backTarget:\s*onModeLevel \? "back" : backTargetForStep\(\)/);
     assert.match(select, /Classe le groupe · modes de jeu/);
     assert.match(select, /Rank live · modes de jeu/);
     assert.doesNotMatch(select, /btn-back-inline/);
