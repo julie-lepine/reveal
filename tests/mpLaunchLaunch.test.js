@@ -17,7 +17,7 @@ const isGameSyncActiveMock = mock.fn(() => true);
 const isLobbyHostMock = mock.fn(() => true);
 
 mock.module("../js/core/gameSync.js", {
-  exports: {
+  namedExports: {
     DEFAULT_SYNC_PATCH_TIMEOUT_MS: 20000,
     isGameSyncActive: isGameSyncActiveMock,
     isLobbyHost: isLobbyHostMock,
@@ -32,14 +32,14 @@ mock.module("../js/core/gameSync.js", {
 });
 
 mock.module("../js/core/dialog.js", {
-  exports: {
+  namedExports: {
     showAppAlert: showAppAlertMock,
     showAppConfirm: mock.fn(async () => false),
   },
 });
 
 mock.module("../js/core/supabaseAuth.js", {
-  exports: {
+  namedExports: {
     getSupabaseUserId: () => "user-test",
   },
 });

@@ -34,7 +34,7 @@ const showClaimHostDialogMock = mock.fn(async () => true);
 const getSupabaseUserIdMock = mock.fn();
 
 mock.module("../js/core/gameSync.js", {
-  exports: {
+  namedExports: {
     clearSessionRouteSuppress: mock.fn(),
     applyRemoteSession: applyRemoteSessionMock,
     getCachedGameSession: getCachedGameSessionMock,
@@ -52,7 +52,7 @@ mock.module("../js/core/gameSync.js", {
 });
 
 mock.module("../js/core/resumeBannerDismiss.js", {
-  exports: {
+  namedExports: {
     clearResumeBannerDismiss: mock.fn(),
     dismissResumeBannerForSession: mock.fn(),
     shouldShowResumeBannerAfterDismiss: mock.fn(() => true),
@@ -63,40 +63,40 @@ mock.module("../js/core/resumeBannerDismiss.js", {
 });
 
 mock.module("../js/core/router.js", {
-  exports: {
+  namedExports: {
     getCurrentScreen: getCurrentScreenMock,
     navigate: mock.fn(),
   },
 });
 
 mock.module("../js/core/state.js", {
-  exports: {
+  namedExports: {
     getState: getStateMock,
   },
 });
 
 mock.module("../js/core/supabaseLobby.js", {
-  exports: {
+  namedExports: {
     claimLobbyHostIfStaleSupabase: claimLobbyHostIfStaleSupabaseMock,
     refreshLobbyFromSupabase: refreshLobbyFromSupabaseMock,
   },
 });
 
 mock.module("../js/core/dialog.js", {
-  exports: {
+  namedExports: {
     showAppAlert: showAppAlertMock,
     showClaimHostDialog: showClaimHostDialogMock,
   },
 });
 
 mock.module("../js/core/supabaseAuth.js", {
-  exports: {
+  namedExports: {
     getSupabaseUserId: getSupabaseUserIdMock,
   },
 });
 
 mock.module("../js/screens/nav.js", {
-  exports: {
+  namedExports: {
     bindNav: mock.fn(),
   },
 });

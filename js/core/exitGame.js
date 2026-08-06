@@ -1,4 +1,4 @@
-import { showAppConfirm } from "./dialog.js";
+import { showAppConfirm, showAppAlert } from "./dialog.js";
 import { escapeHtml } from "./ui.js";
 import {
   isGameSyncActive,
@@ -24,7 +24,7 @@ export function gameExitBarHtml() {
 export const exitGameToLobbyButtonHtml = gameExitBarHtml;
 
 /** Quitte la partie en cours → menu des jeux (hôte : termine la session pour tous). */
-export async function exitGameToGameSelect() {
+export async function exitGameToGameSelect({ shouldContinue = null } = {}) {
   const mp = isGameSyncActive();
   const host = mp && isLobbyHost();
   const ok = await showAppConfirm(
@@ -40,8 +40,16 @@ export async function exitGameToGameSelect() {
   if (!ok) return false;
 
   if (mp) {
-    await returnToGameSelect();
-    return true;
+    try {
+      await returnToGameSelect({ shouldContinue });
+      return true;
+    } catch (err) {
+      await showAppAlert(err?.message || "Impossible de quitter la partie.", {
+        title: "Sortie impossible",
+        icon: "⚠️",
+      });
+      return false;
+    }
   }
 
   resetGameSessionsOnly();

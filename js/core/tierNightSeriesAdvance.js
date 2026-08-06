@@ -1,8 +1,9 @@
 /**
  * FEATURE-TIERNIGHT-SERIES-05 — wrapper RPC advance_tiernight_series_round.
  *
- * Transition between_rounds → ranking. Aucun scoring. Aucune mutation
- * optimiste locale (placements / index / topic). Non branché à l’UI.
+ * Transition between_rounds → ranking. Aucun scoring.
+ * Branchement UX : hostAdvanceTierNightSeriesRound (tiernight-between).
+ * expectedPhase SQL = between_rounds uniquement (pas round_result).
  */
 
 import { supabase, isSupabaseConfigured } from "./supabaseClient.js";

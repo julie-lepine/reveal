@@ -1,0 +1,42 @@
+-- =============================================================================
+-- FEATURE-TIERNIGHT-03-A1 — Runbook (shape totale)
+-- =============================================================================
+-- 1. Prérequis : feature-tiernight-series-03a-finalize-round-hardening.sql
+-- 2. Optionnel si déjà joué : feature-tiernight-03-series-contract.sql (A)
+-- 3. Exécuter : feature-tiernight-03-a1-series-shape-total.sql
+--
+-- Preuves (SQL Editor, rôle postgres — le helper n'est PAS EXECUTE pour authenticated) :
+--
+-- P0) ACL
+--   select has_function_privilege('anon', 'public.tiernight_series_validate_series_shape(jsonb,text)', 'EXECUTE');
+--   select has_function_privilege('authenticated', 'public.tiernight_series_validate_series_shape(jsonb,text)', 'EXECUTE');
+--   -- Attendu : false, false
+--
+-- P1) Totalité — version non castable
+--   select public.tiernight_series_validate_series_shape(
+--     '{"version":"x","phase":"ranking","roundCount":3,"roundIndex":0,"categoryIds":[],"queue":[]}'::jsonb,
+--     'run'
+--   );
+--   -- Attendu : ok=false code=TNS_UNSUPPORTED_VERSION  (pas d'ERROR PG)
+--
+-- P2) categoryIds manquant
+--   select public.tiernight_series_validate_series_shape(
+--     '{"version":1,"phase":"ranking","roundCount":3,"roundIndex":0,"queue":[1,2,3]}'::jsonb,
+--     'run'
+--   );
+--   -- Attendu : TNS_INVALID_CATEGORY_IDS
+--
+-- P3) Custom cohérent (bool JSON true) — queue complète 3
+--   (construire 3 entrées valides dont une roster:custom-roster-… + custom:true)
+--   -- Attendu : ok=true
+--
+-- P4) Custom incohérent
+--   -- Attendu : TNS_CUSTOM_SNAPSHOT_INCONSISTENT
+--
+-- P5) Count 8 accepté structurellement (queue length mismatch si queue vide)
+--   select public.tiernight_series_validate_series_shape(
+--     '{"version":1,"phase":"ranking","roundCount":8,"roundIndex":0,"categoryIds":["*"],"queue":[]}'::jsonb,
+--     'run'
+--   );
+--   -- Attendu : TNS_QUEUE_LENGTH_MISMATCH (prouve 8 ∈ allowed counts)
+-- =============================================================================

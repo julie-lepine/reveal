@@ -176,16 +176,16 @@ describe("FEATURE-TIERNIGHT-SERIES-01 - catalogue additif", () => {
 });
 
 describe("FEATURE-TIERNIGHT-SERIES-01 - queue", () => {
-  it("construit 3 / 5 / 7 sans doublon avec snapshots et roundId stables", () => {
-    for (const roundCount of [3, 5, 7]) {
+  it("construit 3 / 5 / 8 sans doublon avec snapshots et roundId stables", () => {
+    for (const roundCount of [3, 5, 8]) {
       const built = buildTierNightSeriesQueue({
         runId: "run-abc",
         topics: FIXTURE_TOPICS,
-        categoryIds: ["survival"],
+        categoryIds: [TIER_NIGHT_SERIES_ALL_CATEGORIES],
         roundCount,
         rng: identityShuffleRng(),
       });
-      assert.equal(built.ok, true, built.code);
+      assert.equal(built.ok, true, `${roundCount}: ${built.code}`);
       assert.equal(built.queue.length, roundCount);
       const topicIds = built.queue.map((e) => e.topicId);
       assert.equal(new Set(topicIds).size, roundCount);
@@ -194,7 +194,7 @@ describe("FEATURE-TIERNIGHT-SERIES-01 - queue", () => {
         assert.equal(entry.roundId, buildTierNightSeriesRoundId("run-abc", i));
         assert.equal(entry.topicId, `${ROSTER_TOPIC_PREFIX}${entry.topicSnapshot.id}`);
         assert.ok(entry.topicSnapshot.name);
-        assert.equal(entry.topicSnapshot.categoryId, "survival");
+        assert.equal(entry.topicSnapshot.custom, false);
       });
     }
   });
@@ -293,7 +293,20 @@ describe("FEATURE-TIERNIGHT-SERIES-01 - queue", () => {
       name: "X",
       emoji: "X",
       categoryId: "survival",
+      custom: false,
     });
+  });
+
+  it("roundCount 7 refusé au build (legacy lecture seule)", () => {
+    const built = buildTierNightSeriesQueue({
+      runId: "run-legacy7",
+      topics: FIXTURE_TOPICS,
+      categoryIds: [TIER_NIGHT_SERIES_ALL_CATEGORIES],
+      roundCount: 7,
+      rng: identityShuffleRng(),
+    });
+    assert.equal(built.ok, false);
+    assert.equal(built.code, "INVALID_ROUND_COUNT");
   });
 });
 
@@ -379,16 +392,70 @@ describe("FEATURE-TIERNIGHT-SERIES-01 - validation / legacy", () => {
     assert.equal(validateTierNightSeries(s, { runId: "run-v" }).code, "INCOMPLETE_SNAPSHOT");
   });
 
-  it("custom présent dans queue", () => {
+  it("custom présent dans queue avec flag cohérent", () => {
     const s = validSeries();
     s.queue[0].topicId = `${ROSTER_TOPIC_PREFIX}custom-roster-x`;
     s.queue[0].topicSnapshot = {
       id: "custom-roster-x",
       name: "Custom",
       emoji: "",
-      categoryId: "survival",
+      categoryId: "",
+      custom: true,
     };
-    assert.equal(validateTierNightSeries(s, { runId: "run-v" }).code, "CUSTOM_IN_SERIES_QUEUE");
+    const v = validateTierNightSeries(s, { runId: "run-v" });
+    assert.equal(v.ok, true, v.code);
+  });
+
+  it("custom wire sans flag snapshot → inconsistent", () => {
+    const s = validSeries();
+    s.queue[0].topicId = `${ROSTER_TOPIC_PREFIX}custom-roster-x`;
+    s.queue[0].topicSnapshot = {
+      id: "custom-roster-x",
+      name: "Custom",
+      emoji: "",
+      categoryId: "",
+      custom: false,
+    };
+    assert.equal(
+      validateTierNightSeries(s, { runId: "run-v" }).code,
+      "CUSTOM_SNAPSHOT_INCONSISTENT"
+    );
+  });
+
+  it("roundCount 7 legacy encore validable (lecture)", () => {
+    const built = buildTierNightSeriesQueue({
+      runId: "run-v7",
+      topics: FIXTURE_TOPICS,
+      categoryIds: [TIER_NIGHT_SERIES_ALL_CATEGORIES],
+      roundCount: 8,
+      rng: identityShuffleRng(),
+    });
+    assert.equal(built.ok, true);
+    const queue7 = built.queue.slice(0, 7).map((e, i) => ({
+      ...e,
+      roundIndex: i,
+      roundId: buildTierNightSeriesRoundId("run-v7", i),
+    }));
+    const created = createTierNightSeriesState({
+      runId: "run-v7",
+      categoryIds: ["*"],
+      roundCount: 7,
+      queue: queue7,
+    });
+    // create may reject 7 — validate path is what matters for hydrate
+    const series = {
+      version: TIER_NIGHT_SERIES_VERSION,
+      categoryIds: ["*"],
+      roundCount: 7,
+      queue: queue7,
+      roundIndex: 0,
+      phase: "ranking",
+      scoredRoundIds: [],
+      completedRoundIds: [],
+    };
+    const v = validateTierNightSeries(series, { runId: "run-v7" });
+    assert.equal(v.ok, true, v.code);
+    void created;
   });
 
   it("createTierNightSeriesState ne mute pas la queue source", () => {

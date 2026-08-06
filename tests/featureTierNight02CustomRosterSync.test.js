@@ -57,13 +57,14 @@ describe("FEATURE-TIERNIGHT-02 - A. même RPC hôte/invité", () => {
     assert.match(session, /authorUid/);
   });
 
-  it("UI création sans garde hôte ; lancement reste ensureHost", () => {
+  it("UI création sans garde hôte ; lancement/modes restent ensureHost", () => {
     const create = read("js/screens/tierNightCreateRoster.js");
     assert.doesNotMatch(create, /isLobbyHost/);
     const select = read("js/screens/tierNightSelect.js");
     assert.match(select, /ensureHost/);
     assert.match(select, /Seul l'hôte choisit le mode et le thème/);
-    assert.match(select, /isCustomRosterTopicOwnedBy/);
+    const prep = read("js/screens/tierNightPrep.js");
+    assert.match(prep, /customEntryListHtml|getMyCustomRosterTopicsForPrep/);
   });
 });
 

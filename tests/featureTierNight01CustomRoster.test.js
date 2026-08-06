@@ -201,9 +201,11 @@ describe("FEATURE-TIERNIGHT-01 - Relancer une partie", () => {
 });
 
 describe("FEATURE-TIERNIGHT-01 - UI wiring (statique)", () => {
-  it("cartes custom : icône UI ✏️", () => {
-    const src = read("js/screens/tierNightSelect.js");
-    assert.match(src, /const cardEmoji = custom \? "✏️"/);
+  it("customs roster : UI dans prep série (plus de grille select)", () => {
+    const prep = read("js/screens/tierNightPrep.js");
+    assert.match(prep, /customEntryListHtml|getMyCustomRosterTopicsForPrep|customTopicsListHtml/);
+    const select = read("js/screens/tierNightSelect.js");
+    assert.doesNotMatch(select, /topicStepHtml/);
   });
 });
 

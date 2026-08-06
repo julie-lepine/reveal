@@ -54,15 +54,15 @@ describe("UX-TIERNIGHT-NAV-01 - source navigation", () => {
     assert.doesNotMatch(failBlock[0], /navigate\(/);
   });
 
-  it("select : params step/mode + chevron classique unique selon niveau", () => {
+  it("select : params step/mode + chevron (modes / Rank Live list)", () => {
     const select = read("js/screens/tierNightSelect.js");
     assert.match(select, /getScreenParams/);
-    assert.match(select, /params\.step === "topic"/);
+    assert.match(select, /LEGACY_SERIES_DEAD_STEPS|params\.step === "list"/);
     assert.match(select, /backTarget:\s*onModeLevel \? "back" : backTargetForStep\(\)/);
-    assert.match(select, /Classe le groupe · modes de jeu/);
     assert.match(select, /Rank live · modes de jeu/);
     assert.doesNotMatch(select, /btn-back-inline/);
     assert.doesNotMatch(select, /data-tier-back/);
+    assert.doesNotMatch(select, /topicStepHtml/);
   });
 
   it("création Rank Live : retour → list/live", () => {
@@ -91,8 +91,10 @@ describe("UX-TIERNIGHT-NAV-01 - returnToTierNightSelectStep comportement", () =>
     initRouter(fakeApp());
     for (const id of [
       "home",
+      "lobby",
       "game-select",
       "tiernight-select",
+      "tiernight-prep",
       "tiernight-create-roster",
       "tiernight-create",
     ]) {
@@ -100,7 +102,7 @@ describe("UX-TIERNIGHT-NAV-01 - returnToTierNightSelectStep comportement", () =>
     }
   });
 
-  it("après create-roster → select topic/roster sans create dans la pile", () => {
+  it("après create-roster → prep série (plus de grille topic)", () => {
     navigate("home", { reset: true });
     navigate("game-select");
     navigate("tiernight-select");
@@ -109,10 +111,9 @@ describe("UX-TIERNIGHT-NAV-01 - returnToTierNightSelectStep comportement", () =>
 
     returnToTierNightSelectStep({ step: "topic", mode: "roster" });
 
-    assert.equal(getCurrentScreen(), "tiernight-select");
-    assert.deepEqual(getScreenParams(), { step: "topic", mode: "roster" });
+    assert.equal(getCurrentScreen(), "tiernight-prep");
     assert.equal(getNavStack().includes("tiernight-create-roster"), false);
-    assert.equal(getNavStack().at(-1), "tiernight-select");
+    assert.equal(getNavStack().at(-1), "tiernight-prep");
   });
 
   it("après create live → select list/live", () => {
@@ -128,11 +129,10 @@ describe("UX-TIERNIGHT-NAV-01 - returnToTierNightSelectStep comportement", () =>
     assert.equal(getNavStack().includes("tiernight-create"), false);
   });
 
-  it("ne saute pas au choix des modes (step reste topic)", () => {
+  it("retour topic legacy normalisé vers prep (pas modes seuls)", () => {
     navigate("home", { reset: true });
     navigate("tiernight-create-roster");
     returnToTierNightSelectStep({ step: "topic", mode: "roster" });
-    assert.equal(getScreenParams().step, "topic");
-    assert.notEqual(getScreenParams().step, "mode");
+    assert.equal(getCurrentScreen(), "tiernight-prep");
   });
 });

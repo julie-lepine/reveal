@@ -17,6 +17,7 @@ import {
   canActAsHost,
   isLobbyHost,
   refreshGameSession,
+  tierNightPrepToRemote,
 } from "./gameSync.js";
 import { patchGameStateWithFeedback } from "./patchGameStateFeedback.js";
 import { launchGameWithSync, commitHostGamePlay } from "./mpLaunch.js";
@@ -408,8 +409,23 @@ export function resetTierNightLive() {
   saveStatePatch({ tierNightLiveGame: defaultLive() });
 }
 
-/** Lancement MP Classe le groupe / plateau (hôte). */
+/**
+ * Lancement MP Classe le groupe / plateau mono-thème (hôte).
+ * FEATURE-TIERNIGHT-03-F — toute *nouvelle* session roster classic est refusée.
+ * (Sessions legacy déjà actives se lisent hors de ce helper.)
+ */
 export async function markTierNightClassicStarted({ topicId, mode, modifier }) {
+  if (mode === "roster" || mode == null || mode === "") {
+    console.error(
+      "FEATURE-TIERNIGHT-03-F: markTierNightClassicStarted blocked — parcours série final"
+    );
+    return {
+      ok: false,
+      error: "Le parcours série est actif : lancez depuis la préparation.",
+      code: "SERIES_GATE_BLOCKS_CLASSIC",
+    };
+  }
+
   const runId = createTierNightRunId();
   const playerRoster = buildTierNightPlayerRoster(getLobbyParticipants());
   const sessionSnap = getState().tierNightGame || null;
@@ -486,13 +502,20 @@ export async function markTierNightClassicStarted({ topicId, mode, modifier }) {
 }
 
 /**
- * FEATURE-TIERNIGHT-SERIES-04 — lancement MP/local d’une série (manche 1).
+ * FEATURE-TIERNIGHT-SERIES-04 / 03-B1 — lancement MP/local d’une série (manche 1).
  * Ne finalise pas la manche ; n’appelle pas la RPC SERIES-03.
+ * Application locale immédiate ; consumed + reset prep dans la même mutation remote.
  *
  * @param {object} opts
  * @param {object} opts.attempt — sortie de prepareTierNightSeriesLaunchAttempt
+ * @param {string[]} [opts.consumedCustomRosterTopicIds] — ledger one-shot (même mutation)
+ * @param {object|null} [opts.resetPrepSession] — prep reset publié avec le launch
  */
-export async function markTierNightSeriesStarted({ attempt } = {}) {
+export async function markTierNightSeriesStarted({
+  attempt,
+  consumedCustomRosterTopicIds = null,
+  resetPrepSession = null,
+} = {}) {
   if (isGameSyncActive() && !isLobbyHost()) {
     return { ok: false, error: "Seul l'hôte peut lancer la série." };
   }
@@ -511,15 +534,35 @@ export async function markTierNightSeriesStarted({ attempt } = {}) {
     tierNightMode: getState().tierNightMode,
     tierNightModifier: getState().tierNightModifier,
     tierNightGame: getState().tierNightGame ? { ...getState().tierNightGame } : null,
+    consumedCustomRosterTopicIds: Array.isArray(getState().consumedCustomRosterTopicIds)
+      ? [...getState().consumedCustomRosterTopicIds]
+      : [],
+    tierNightSeriesPrep: getState().tierNightSeriesPrep
+      ? { ...getState().tierNightSeriesPrep }
+      : null,
   };
 
-  saveStatePatch({
+  const localGame = {
+    ...built.localGame,
+    lobbyStarted: true,
+  };
+
+  const localPatch = {
     tierNightTopicId: built.topicId,
     tierNightMode: built.mode,
     tierNightModifier: built.modifier,
-    tierNightGame: built.localGame,
+    tierNightGame: localGame,
     tierNightLiveGame: defaultLive(),
-  });
+  };
+  if (Array.isArray(consumedCustomRosterTopicIds)) {
+    localPatch.consumedCustomRosterTopicIds = consumedCustomRosterTopicIds.map(String);
+  }
+  if (resetPrepSession && typeof resetPrepSession === "object") {
+    localPatch.tierNightSeriesPrep = { ...resetPrepSession };
+  }
+
+  // Application locale immédiate (Realtime confirme / merge, ne déclenche pas seul)
+  saveStatePatch(localPatch);
 
   if (!isGameSyncActive()) {
     return { ok: true, localOnly: true, attempt, previousLocal };
@@ -531,11 +574,22 @@ export async function markTierNightSeriesStarted({ attempt } = {}) {
       gameId: "tiernight",
       mode: "push",
       beforeCommit: () => setLobbyPlaying("tiernight"),
-      applyLocal: () => {},
-      getRemoteState: () => ({
-        tierNight: built.remoteTierNight,
-        tierNightLive: tierNightLiveResetRemote(),
-      }),
+      applyLocal: () => {
+        saveStatePatch(localPatch);
+      },
+      getRemoteState: () => {
+        const remote = {
+          tierNight: built.remoteTierNight,
+          tierNightLive: tierNightLiveResetRemote(),
+        };
+        if (Array.isArray(consumedCustomRosterTopicIds)) {
+          remote.consumedCustomRosterTopicIds = consumedCustomRosterTopicIds.map(String);
+        }
+        if (resetPrepSession && typeof resetPrepSession === "object") {
+          remote.tierNightPrep = tierNightPrepToRemote(resetPrepSession);
+        }
+        return remote;
+      },
     });
 
     if (result?.ok === false) {

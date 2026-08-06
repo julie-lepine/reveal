@@ -196,23 +196,22 @@ describe("FEATURE-TIERNIGHT-SERIES-03 - commitTierNightSeriesRoundResult", () =>
   });
 });
 
-describe("FEATURE-TIERNIGHT-SERIES-03 - non-branchement + SQL contrat", () => {
-  it("wrapper non branché à advanceTierNight / select / end", () => {
-    const files = [
-      "js/core/gameSync.js",
-      "js/screens/tierNightSelect.js",
-      "js/screens/tierNightEnd.js",
-      "js/games/tierNight.js",
-    ];
-    for (const rel of files) {
-      const src = readFileSync(join(ROOT, rel), "utf8");
-      assert.equal(
-        src.includes("commitTierNightSeriesRoundResult"),
-        false,
-        rel
-      );
-      assert.equal(src.includes("finalize_tiernight_series_round"), false, rel);
-    }
+describe("FEATURE-TIERNIGHT-SERIES-03 - branchement D + SQL contrat", () => {
+  it("finalize branché sur board série ; pas sur select", () => {
+    const game = readFileSync(join(ROOT, "js/games/tierNight.js"), "utf8");
+    const play = readFileSync(join(ROOT, "js/core/tierNightSeriesPlaySession.js"), "utf8");
+    const select = readFileSync(join(ROOT, "js/screens/tierNightSelect.js"), "utf8");
+    assert.match(game, /hostFinalizeTierNightSeriesRound/);
+    assert.match(game, /hasActiveTierNightSeries/);
+    assert.match(play, /commitTierNightSeriesRoundResult/);
+    assert.equal(select.includes("commitTierNightSeriesRoundResult"), false);
+    assert.equal(select.includes("finalize_tiernight_series_round"), false);
+  });
+
+  it("classic end ne croise pas finalize série", () => {
+    const game = readFileSync(join(ROOT, "js/games/tierNight.js"), "utf8");
+    assert.match(game, /advanceTierNightToResultsWhenReady/);
+    assert.match(game, /hasActiveTierNightSeries\(\)/);
   });
 
   it("wrapper n’appelle pas addScore / applyTierNightRoundScores", () => {

@@ -207,16 +207,11 @@ describe("FEATURE-TIERNIGHT-SERIES-03A - contrats SQL / non-branchement", () => 
     assert.match(SQL_03A, /roundHistory/);
   });
 
-  it("RPC toujours non branchée au gameplay", () => {
-    for (const rel of [
-      "js/core/gameSync.js",
-      "js/games/tierNight.js",
-      "js/screens/tierNightSelect.js",
-      "js/screens/tierNightEnd.js",
-    ]) {
-      const src = readFileSync(join(ROOT, rel), "utf8");
-      assert.equal(src.includes("commitTierNightSeriesRoundResult"), false, rel);
-    }
+  it("RPC branchée via playSession (D), pas via select", () => {
+    const play = readFileSync(join(ROOT, "js/core/tierNightSeriesPlaySession.js"), "utf8");
+    assert.match(play, /commitTierNightSeriesRoundResult/);
+    const select = readFileSync(join(ROOT, "js/screens/tierNightSelect.js"), "utf8");
+    assert.equal(select.includes("commitTierNightSeriesRoundResult"), false);
   });
 
   it("eveningGamesRecorded documenté comme non-bloquant pour la RPC", () => {

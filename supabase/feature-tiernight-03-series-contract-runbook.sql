@@ -1,0 +1,22 @@
+-- =============================================================================
+-- FEATURE-TIERNIGHT-03-A — Runbook SQL (contrat série)
+-- =============================================================================
+-- Appliquer UNIQUEMENT après les prérequis SERIES-03A (et 05 si advance déjà posé).
+--
+-- 1. Ouvrir le SQL Editor Supabase (projet cible).
+-- 2. Coller / exécuter : supabase/feature-tiernight-03-series-contract.sql
+-- 3. Vérifications :
+--
+--    select public.tiernight_series_validate_series_shape(
+--      '{"version":1,"phase":"ranking","roundCount":8,"roundIndex":0,
+--        "categoryIds":["*"],"scoredRoundIds":[],"completedRoundIds":[],
+--        "queue":[]}'::jsonb,
+--      'run-x'
+--    );
+--    -- Attendu : TNS_QUEUE_LENGTH_MISMATCH (8 accepté comme count, queue vide)
+--
+--    -- Custom cohérent (ok=true si queue complète valide) : voir smoke helpers.
+--
+-- 4. Ne PAS ré-exécuter silencieusement feature-tiernight-series-03a-*.sql
+--    après ce fichier (écraserait le contrat 03-A).
+-- =============================================================================

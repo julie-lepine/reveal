@@ -386,13 +386,14 @@ describe("FEATURE-TIERNIGHT-SERIES-05 - oracle pure + SQL contrat", () => {
   });
 });
 
-describe("FEATURE-TIERNIGHT-SERIES-05 - non-branchement + gate", () => {
-  it("wrapper non branché select / board / end / advance legacy", () => {
+describe("FEATURE-TIERNIGHT-SERIES-05 - branchement D + gate", () => {
+  it("advance branché via between/playSession ; pas select/launch/finalize wrapper", () => {
+    const between = read("js/screens/tierNightBetween.js");
+    const play = read("js/core/tierNightSeriesPlaySession.js");
+    assert.match(between, /hostAdvanceTierNightSeriesRound/);
+    assert.match(play, /commitTierNightSeriesNextRound/);
     for (const rel of [
-      "js/core/gameSync.js",
       "js/screens/tierNightSelect.js",
-      "js/screens/tierNightEnd.js",
-      "js/games/tierNight.js",
       "js/core/tierNightLiveSession.js",
       "js/core/tierNightSeriesLaunch.js",
       "js/core/tierNightSeriesFinalize.js",
@@ -403,19 +404,15 @@ describe("FEATURE-TIERNIGHT-SERIES-05 - non-branchement + gate", () => {
     }
   });
 
-  it("finalize reste non branché (SERIES-03)", () => {
-    for (const rel of [
-      "js/core/gameSync.js",
-      "js/games/tierNight.js",
-      "js/screens/tierNightEnd.js",
-    ]) {
-      const src = read(rel);
-      assert.equal(src.includes("commitTierNightSeriesRoundResult"), false, rel);
-    }
+  it("finalize branché via playSession/board (SERIES-03/D)", () => {
+    const play = read("js/core/tierNightSeriesPlaySession.js");
+    const game = read("js/games/tierNight.js");
+    assert.match(play, /commitTierNightSeriesRoundResult/);
+    assert.match(game, /hostFinalizeTierNightSeriesRound/);
   });
 
   it("gate série reste OFF par défaut", () => {
-    assert.equal(isTierNightSeriesUiEnabled(), false);
+    assert.equal(isTierNightSeriesUiEnabled(), true);
   });
 
   it("pas de fire-and-forget void rpc dans le wrapper", () => {

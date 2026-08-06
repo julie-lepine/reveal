@@ -1,8 +1,22 @@
 /**
- * FEATURE-TIERNIGHT-SERIES-01 — contrat de série « Classe le groupe » (helpers purs).
+ * FEATURE-TIERNIGHT-SERIES-01 / FEATURE-TIERNIGHT-03-A / 03-A1 — contrat série (helpers purs).
  *
- * Option A : runId = instance globale de série ; roundId = `${runId}:${roundIndex}`.
+ * Option A : runId = identité globale de la série ; roundId = `${runId}:${roundIndex}`.
  * Aucun DOM, aucun Supabase, aucun state global.
+ *
+ * FEATURE-TIERNIGHT-03-A :
+ * - nouvelles séries : roundCount ∈ {3,5,8}
+ * - roundCount 7 : lecture défensive legacy uniquement (plus de build)
+ * - customs lobby éligibles + snapshotés ; one-shot via excludeCustomIds
+ *
+ * FEATURE-TIERNIGHT-03-A1 — one-shot (cycle de vie) :
+ * - Consommation = id custom présent dans `series.queue` au **lancement** (snapshot).
+ * - `customRosterTopics` (lobby) n’est **pas** muté par le moteur (pas de delete auto).
+ * - Prochaine série : passer `excludeCustomIds` (= union des consommés lobby) pour
+ *   ne pas re-tirer les mêmes customs.
+ * - Pendant la série active : le texte joué vient uniquement du snapshot queue ;
+ *   supprimer un custom du lobby ne casse pas la manche.
+ * - Persistance multi-client de `excludeCustomIds` = evening state (étape B+).
  */
 
 import {
@@ -18,14 +32,177 @@ export const TIER_NIGHT_SERIES_VERSION = 1;
 /** Sentinel : toutes les catégories enabled du catalogue. */
 export const TIER_NIGHT_SERIES_ALL_CATEGORIES = "*";
 
-export const TIER_NIGHT_SERIES_ROUND_COUNTS = Object.freeze([3, 5, 7]);
+/** Counts autorisés pour toute nouvelle série (FEATURE-TIERNIGHT-03). */
+export const TIER_NIGHT_SERIES_ROUND_COUNTS = Object.freeze([3, 5, 8]);
+
+/**
+ * Counts acceptés en lecture seule (sessions déjà lancées avant 03-A).
+ * Ne jamais proposer à l’UI de lancement.
+ */
+export const TIER_NIGHT_SERIES_LEGACY_ROUND_COUNTS = Object.freeze([7]);
 
 export const TIER_NIGHT_SERIES_PHASES = Object.freeze([
   "ranking",
-  "round_result",
   "between_rounds",
   "series_end",
 ]);
+
+/**
+ * Phase prévue dans SERIES-00, jamais écrite par finalize/advance.
+ * Rejetée par le validateur D1-bis (Option A) — pas d’état jouable.
+ */
+export const TIER_NIGHT_SERIES_RETIRED_PHASES = Object.freeze(["round_result"]);
+
+/** @param {string|null|undefined} phase */
+export function isRetiredTierNightSeriesPhase(phase) {
+  return TIER_NIGHT_SERIES_RETIRED_PHASES.includes(String(phase || ""));
+}
+
+/**
+ * Contrat one-shot customs (preuve / docs runtime).
+ * @type {Readonly<{
+ *   scope: string,
+ *   consumeOn: string,
+ *   excludeParam: string,
+ *   mutatesLobbyCustoms: boolean,
+ *   snapshotSurvivesLobbyDelete: boolean,
+ *   persistEvening: string
+ * }>}
+ */
+export const TIER_NIGHT_SERIES_ONE_SHOT_CONTRACT = Object.freeze({
+  scope: "lobby_lifetime",
+  consumeOn: "series_launch_queue_membership",
+  excludeParam: "excludeCustomIds",
+  mutatesLobbyCustoms: false,
+  snapshotSurvivesLobbyDelete: true,
+  persistEvening: "pending_step_b",
+});
+
+/**
+ * Codes shape SQL 03-A1 (preuve de contrat — alignés sur
+ * `tiernight_series_validate_series_shape`).
+ */
+export const TIER_NIGHT_SERIES_SQL_SHAPE_CODES = Object.freeze([
+  "TNS_NO_SERIES",
+  "TNS_UNSUPPORTED_VERSION",
+  "TNS_UNKNOWN_PHASE",
+  "TNS_INVALID_ROUND_COUNT",
+  "TNS_INVALID_CATEGORY_IDS",
+  "TNS_INVALID_QUEUE",
+  "TNS_QUEUE_LENGTH_MISMATCH",
+  "TNS_ROUND_INDEX_OUT_OF_BOUNDS",
+  "TNS_INVALID_RUN_ID",
+  "TNS_INVALID_QUEUE_ENTRY",
+  "TNS_ROUND_INDEX_DISCONTINUITY",
+  "TNS_MISSING_ROUND_ID",
+  "TNS_DUPLICATE_ROUND_ID",
+  "TNS_ROUND_ID_MISMATCH",
+  "TNS_INVALID_TOPIC_ID",
+  "TNS_DUPLICATE_TOPIC_ID",
+  "TNS_INCOMPLETE_SNAPSHOT",
+  "TNS_SNAPSHOT_ID_TYPE",
+  "TNS_SNAPSHOT_NAME_TYPE",
+  "TNS_SNAPSHOT_ID_MISMATCH",
+  "TNS_CUSTOM_FLAG_INVALID",
+  "TNS_CUSTOM_SNAPSHOT_INCONSISTENT",
+  "TNS_LEDGER_NOT_ARRAY",
+  "TNS_LEDGER_INVALID_ENTRY",
+  "TNS_LEDGER_DUPLICATE",
+  "TNS_LEDGER_UNKNOWN_ROUND_ID",
+  "TNS_LEDGER_SCORED_NOT_COMPLETED",
+  "TNS_HISTORY_NOT_ARRAY",
+  "TNS_HISTORY_INVALID_ENTRY",
+  "TNS_HISTORY_UNKNOWN_ROUND",
+  "TNS_HISTORY_DUPLICATE",
+  "TNS_SHAPE_EXCEPTION",
+]);
+
+function isValidSeriesRoundCount(roundCount, { allowLegacy = false } = {}) {
+  const n = Number(roundCount);
+  if (TIER_NIGHT_SERIES_ROUND_COUNTS.includes(n)) return true;
+  if (allowLegacy && TIER_NIGHT_SERIES_LEGACY_ROUND_COUNTS.includes(n)) return true;
+  return false;
+}
+
+function isCustomRosterTopicId(id) {
+  const s = id != null ? String(id).trim() : "";
+  return Boolean(s) && s.startsWith(CUSTOM_ROSTER_TOPIC_ID_PREFIX);
+}
+
+/** Aligné SQL A1-bis : bool | "true"|"t"|"false"|"f". */
+function parseCustomSnapshotFlag(value) {
+  if (value === true) return { ok: true, custom: true };
+  if (value === false) return { ok: true, custom: false };
+  if (typeof value === "string") {
+    const s = value.trim().toLowerCase();
+    if (s === "true" || s === "t") return { ok: true, custom: true };
+    if (s === "false" || s === "f") return { ok: true, custom: false };
+    return { ok: false, code: "CUSTOM_FLAG_INVALID", message: s };
+  }
+  return { ok: false, code: "CUSTOM_FLAG_INVALID", message: typeof value };
+}
+
+/**
+ * Contrat categoryIds (aligné SQL A1-bis).
+ * Appartenance au catalogue officiel : hors scope SQL — à vérifier côté setup JS.
+ * @param {unknown} categoryIds
+ * @returns {{ ok: true, categoryIds: string[] } | { ok: false, code: string, message?: string }}
+ */
+export function validateTierNightSeriesCategoryIdsShape(categoryIds) {
+  if (!Array.isArray(categoryIds)) {
+    return { ok: false, code: "INVALID_CATEGORY_IDS", message: "not_array" };
+  }
+  if (categoryIds.length === 0) {
+    return { ok: false, code: "INVALID_CATEGORY_IDS", message: "empty" };
+  }
+  const seen = new Set();
+  const normalized = [];
+  let hasStar = false;
+  let hasExplicit = false;
+  for (const raw of categoryIds) {
+    if (typeof raw !== "string") {
+      return { ok: false, code: "INVALID_CATEGORY_IDS", message: "non_string" };
+    }
+    const s = raw.trim();
+    if (!s) {
+      return { ok: false, code: "INVALID_CATEGORY_IDS", message: "blank" };
+    }
+    if (seen.has(s)) {
+      return { ok: false, code: "INVALID_CATEGORY_IDS", message: "duplicate" };
+    }
+    seen.add(s);
+    normalized.push(s);
+    if (s === TIER_NIGHT_SERIES_ALL_CATEGORIES) hasStar = true;
+    else hasExplicit = true;
+  }
+  if (hasStar && hasExplicit) {
+    return { ok: false, code: "INVALID_CATEGORY_IDS", message: "star_mixed" };
+  }
+  if (hasStar && normalized.length !== 1) {
+    return { ok: false, code: "INVALID_CATEGORY_IDS", message: "star_not_alone" };
+  }
+  return { ok: true, categoryIds: normalized };
+}
+
+function validateLedgerStringArray(ledger, ledgerKey) {
+  if (ledger == null) return { ok: true, ids: [] };
+  if (!Array.isArray(ledger)) {
+    return { ok: false, code: "LEDGER_NOT_ARRAY", message: ledgerKey };
+  }
+  const ids = [];
+  const seen = new Set();
+  for (const item of ledger) {
+    if (typeof item !== "string") {
+      return { ok: false, code: "LEDGER_INVALID_ENTRY", message: ledgerKey };
+    }
+    if (seen.has(item)) {
+      return { ok: false, code: "LEDGER_DUPLICATE", message: ledgerKey };
+    }
+    seen.add(item);
+    ids.push(item);
+  }
+  return { ok: true, ids };
+}
 
 /**
  * @param {string} runId
@@ -60,14 +237,14 @@ function normalizeCategoryIdSet(categoryIds) {
 }
 
 /**
- * Thème catalogue éligible pour une queue de série V1 (pas custom, enabled).
+ * Thème catalogue officiel éligible (pas custom, enabled).
  * @param {unknown} topic
  */
 export function isTierNightSeriesCatalogTopicEligible(topic) {
   if (!topic || typeof topic !== "object") return false;
   const id = topic.id != null ? String(topic.id).trim() : "";
   if (!id) return false;
-  if (id.startsWith(CUSTOM_ROSTER_TOPIC_ID_PREFIX)) return false;
+  if (isCustomRosterTopicId(id)) return false;
   if (topic.custom === true) return false;
   if (topic.enabled === false) return false;
   return true;
@@ -93,7 +270,7 @@ export function listEligibleTierNightSeriesTopics({
     const id = topic.id != null ? String(topic.id).trim() : "";
     if (!id) continue;
     if (excludeCustom) {
-      if (topic.custom === true || id.startsWith(CUSTOM_ROSTER_TOPIC_ID_PREFIX)) continue;
+      if (topic.custom === true || isCustomRosterTopicId(id)) continue;
     }
     if (enabledOnly && topic.enabled === false) continue;
     if (catSet) {
@@ -106,25 +283,148 @@ export function listEligibleTierNightSeriesTopics({
 }
 
 /**
- * Compte les thèmes disponibles pour un lancement série.
+ * Compte les thèmes catalogue (hors customs lobby) pour un filtre catégorie.
  */
 export function countEligibleTierNightSeriesTopics(opts = {}) {
   return listEligibleTierNightSeriesTopics(opts).length;
 }
 
 /**
- * Snapshot sérialisable d’un thème catalogue (pas de fonctions).
+ * Ids custom présents dans une queue de série déjà lancée (one-shot).
+ * @param {object|null|undefined} series
+ * @returns {string[]}
+ */
+export function listConsumedCustomTopicIdsFromSeries(series) {
+  const queue = series && Array.isArray(series.queue) ? series.queue : [];
+  const out = [];
+  const seen = new Set();
+  for (const entry of queue) {
+    const snap = entry?.topicSnapshot;
+    const id =
+      snap?.id != null
+        ? String(snap.id).trim()
+        : entry?.topicId != null
+          ? String(entry.topicId).replace(new RegExp(`^${ROSTER_TOPIC_PREFIX}`), "").trim()
+          : "";
+    if (!id) continue;
+    const isCustom = snap?.custom === true || isCustomRosterTopicId(id);
+    if (!isCustom || seen.has(id)) continue;
+    seen.add(id);
+    out.push(id);
+  }
+  return out;
+}
+
+/**
+ * Union ordonnée d’ids custom consommés (lobby lifetime, one-shot).
+ * @param {Iterable<string>|null|undefined} previousIds
+ * @param {object|null|undefined} series
+ */
+export function mergeConsumedCustomTopicIds(previousIds, series) {
+  const seen = new Set();
+  const out = [];
+  for (const id of previousIds || []) {
+    const s = id != null ? String(id).trim() : "";
+    if (!s || seen.has(s)) continue;
+    seen.add(s);
+    out.push(s);
+  }
+  for (const id of listConsumedCustomTopicIdsFromSeries(series)) {
+    if (seen.has(id)) continue;
+    seen.add(id);
+    out.push(id);
+  }
+  return out;
+}
+
+/**
+ * Filtre les customs déjà consommés par une série antérieure du lobby.
+ * @param {Iterable<object>|null|undefined} customTopics
+ * @param {Iterable<string>|null|undefined} excludeCustomIds
+ */
+export function filterUnconsumedCustomTopics(customTopics, excludeCustomIds = null) {
+  const exclude = new Set(
+    [...(excludeCustomIds || [])].map((id) => String(id ?? "").trim()).filter(Boolean)
+  );
+  const out = [];
+  const seen = new Set();
+  for (const raw of customTopics || []) {
+    if (!raw || typeof raw !== "object") continue;
+    const id = raw.id != null ? String(raw.id).trim() : "";
+    if (!isCustomRosterTopicId(id) || seen.has(id) || exclude.has(id)) continue;
+    const name = String(raw.name ?? "").trim();
+    if (!name) continue;
+    seen.add(id);
+    out.push({
+      id,
+      name,
+      custom: true,
+      emoji: "",
+      categoryId: "",
+      enabled: true,
+      ...(raw.author != null ? { author: String(raw.author) } : {}),
+      ...(raw.authorUid != null ? { authorUid: String(raw.authorUid) } : {}),
+    });
+  }
+  return out;
+}
+
+/**
+ * Pool série : officiels (filtre catégorie) ∪ customs lobby non consommés.
+ * Dédup par `id`. Les customs ignorent le filtre catégorie.
+ *
+ * @param {object} [opts]
+ * @param {Iterable<object>} [opts.topics]
+ * @param {Iterable<object>} [opts.customTopics]
+ * @param {string[]|null} [opts.categoryIds]
+ * @param {Iterable<string>|null} [opts.excludeCustomIds]
+ */
+export function buildTierNightSeriesTopicPool({
+  topics = TIER_NIGHT_ROSTER_TOPICS,
+  customTopics = [],
+  categoryIds = null,
+  excludeCustomIds = null,
+} = {}) {
+  const official = listEligibleTierNightSeriesTopics({
+    topics,
+    categoryIds,
+    enabledOnly: true,
+    excludeCustom: true,
+  });
+  const customs = filterUnconsumedCustomTopics(customTopics, excludeCustomIds);
+  const seen = new Set();
+  const out = [];
+  for (const topic of [...official, ...customs]) {
+    const id = topic.id != null ? String(topic.id).trim() : "";
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    out.push(topic);
+  }
+  return out;
+}
+
+/**
+ * Cardinalité du pool série (officiels + customs non consommés).
+ */
+export function countTierNightSeriesTopicPool(opts = {}) {
+  return buildTierNightSeriesTopicPool(opts).length;
+}
+
+/**
+ * Snapshot sérialisable (officiel ou custom). Pas de fonctions / auteur.
  * @param {object} topic
  */
 export function snapshotTierNightSeriesTopic(topic) {
   if (!topic || typeof topic !== "object") return null;
   const id = topic.id != null ? String(topic.id).trim() : "";
   if (!id) return null;
+  const custom = topic.custom === true || isCustomRosterTopicId(id);
   return {
     id,
     name: String(topic.name ?? "").trim(),
-    emoji: topic.emoji != null ? String(topic.emoji) : "",
-    categoryId: topic.categoryId != null ? String(topic.categoryId) : "",
+    emoji: custom ? "" : topic.emoji != null ? String(topic.emoji) : "",
+    categoryId: custom ? "" : topic.categoryId != null ? String(topic.categoryId) : "",
+    custom,
   };
 }
 
@@ -142,18 +442,23 @@ function fisherYatesShuffle(items, rng) {
 
 /**
  * Construit la queue ordonnée d’une série (une seule fois au lancement).
+ * Snapshot figé — aucun reshuffle ultérieur côté helpers.
  *
  * @param {object} opts
  * @param {string} opts.runId
- * @param {Iterable<object>} [opts.topics]
+ * @param {Iterable<object>} [opts.topics] — catalogue officiel
+ * @param {Iterable<object>} [opts.customTopics] — customs lobby
+ * @param {Iterable<string>|null} [opts.excludeCustomIds] — one-shot déjà consommés
  * @param {string[]|null} [opts.categoryIds]
- * @param {number} opts.roundCount — 3 | 5 | 7
+ * @param {number} opts.roundCount — 3 | 5 | 8
  * @param {() => number} [opts.rng]
- * @returns {{ ok: true, queue: object[] } | { ok: false, code: string, requested?: number, available?: number, message?: string }}
+ * @returns {{ ok: true, queue: object[], consumedCustomTopicIds: string[] } | { ok: false, code: string, requested?: number, available?: number, message?: string }}
  */
 export function buildTierNightSeriesQueue({
   runId,
   topics = TIER_NIGHT_ROSTER_TOPICS,
+  customTopics = [],
+  excludeCustomIds = null,
   categoryIds = null,
   roundCount,
   rng = defaultRng,
@@ -169,15 +474,15 @@ export function buildTierNightSeriesQueue({
       ok: false,
       code: "INVALID_ROUND_COUNT",
       requested: count,
-      message: "roundCount doit être 3, 5 ou 7.",
+      message: "roundCount doit être 3, 5 ou 8.",
     };
   }
 
-  const eligible = listEligibleTierNightSeriesTopics({
+  const eligible = buildTierNightSeriesTopicPool({
     topics,
+    customTopics,
     categoryIds,
-    enabledOnly: true,
-    excludeCustom: true,
+    excludeCustomIds,
   });
 
   if (eligible.length < count) {
@@ -189,6 +494,7 @@ export function buildTierNightSeriesQueue({
     };
   }
 
+  // fisherYatesShuffle copie le tableau — sources topics/customTopics non mutées.
   const picked = fisherYatesShuffle(eligible, rng).slice(0, count);
   const queue = picked.map((topic, roundIndex) => {
     const snap = snapshotTierNightSeriesTopic(topic);
@@ -200,7 +506,11 @@ export function buildTierNightSeriesQueue({
     };
   });
 
-  return { ok: true, queue };
+  return {
+    ok: true,
+    queue,
+    consumedCustomTopicIds: listConsumedCustomTopicIdsFromSeries({ queue }),
+  };
 }
 
 function cloneJson(value) {
@@ -366,12 +676,20 @@ export function validateTierNightSeries(series, opts = {}) {
   }
 
   const phase = series.phase;
+  if (isRetiredTierNightSeriesPhase(phase)) {
+    return {
+      ok: false,
+      code: "PHASE_RETIRED",
+      message: `phase=${phase} (retirée D1-bis Option A)`,
+    };
+  }
   if (!TIER_NIGHT_SERIES_PHASES.includes(phase)) {
     return { ok: false, code: "UNKNOWN_PHASE", message: `phase=${phase}` };
   }
 
   const roundCount = Number(series.roundCount);
-  if (!TIER_NIGHT_SERIES_ROUND_COUNTS.includes(roundCount)) {
+  // 7 accepté en lecture défensive (SERIES legacy) ; nouveaux builds = 3/5/8 uniquement.
+  if (!isValidSeriesRoundCount(roundCount, { allowLegacy: true })) {
     return { ok: false, code: "INVALID_ROUND_COUNT", message: `roundCount=${series.roundCount}` };
   }
 
@@ -433,33 +751,87 @@ export function validateTierNightSeries(series, opts = {}) {
       return { ok: false, code: "INVALID_TOPIC_ID", message: topicId };
     }
     const rawId = topicId.slice(ROSTER_TOPIC_PREFIX.length);
-    if (rawId.startsWith(CUSTOM_ROSTER_TOPIC_ID_PREFIX) || entry.topicSnapshot?.custom === true) {
-      return { ok: false, code: "CUSTOM_IN_SERIES_QUEUE", message: topicId };
-    }
     if (topicIds.has(topicId)) {
       return { ok: false, code: "DUPLICATE_TOPIC_ID", message: topicId };
     }
     topicIds.add(topicId);
 
     const snap = entry.topicSnapshot;
-    if (!snap || typeof snap !== "object") {
+    if (!snap || typeof snap !== "object" || Array.isArray(snap)) {
       return { ok: false, code: "INCOMPLETE_SNAPSHOT", message: `index ${i}` };
     }
-    if (!String(snap.id || "").trim() || !String(snap.name || "").trim()) {
+
+    if (!Object.prototype.hasOwnProperty.call(snap, "id") || snap.id == null) {
+      return { ok: false, code: "INCOMPLETE_SNAPSHOT", message: `index ${i} id_missing` };
+    }
+    if (typeof snap.id !== "string") {
+      return { ok: false, code: "SNAPSHOT_ID_TYPE", message: `index ${i}` };
+    }
+    if (!Object.prototype.hasOwnProperty.call(snap, "name") || snap.name == null) {
+      return { ok: false, code: "INCOMPLETE_SNAPSHOT", message: `index ${i} name_missing` };
+    }
+    if (typeof snap.name !== "string") {
+      return { ok: false, code: "SNAPSHOT_NAME_TYPE", message: `index ${i}` };
+    }
+    const snapId = snap.id.trim();
+    const snapName = snap.name.trim();
+    if (!snapId || !snapName) {
       return { ok: false, code: "INCOMPLETE_SNAPSHOT", message: `index ${i} id/name` };
     }
-    if (String(snap.id) !== rawId) {
+    if (snapId !== rawId) {
       return {
         ok: false,
         code: "SNAPSHOT_ID_MISMATCH",
         message: `topicId ${rawId} vs snapshot ${snap.id}`,
       };
     }
+
+    // FEATURE-TIERNIGHT-03-A1-bis : custom absent ≠ null ; chaînes arbitraires rejetées.
+    const wireCustom = isCustomRosterTopicId(rawId);
+    const hasCustomKey = Object.prototype.hasOwnProperty.call(snap, "custom");
+    if (!hasCustomKey) {
+      if (wireCustom) {
+        return {
+          ok: false,
+          code: "CUSTOM_SNAPSHOT_INCONSISTENT",
+          message: topicId,
+        };
+      }
+    } else if (snap.custom === null) {
+      return {
+        ok: false,
+        code: "CUSTOM_FLAG_INVALID",
+        message: "null",
+      };
+    } else {
+      const parsed = parseCustomSnapshotFlag(snap.custom);
+      if (!parsed.ok) {
+        return {
+          ok: false,
+          code: parsed.code,
+          message: parsed.message || topicId,
+        };
+      }
+      if (wireCustom !== parsed.custom) {
+        return {
+          ok: false,
+          code: "CUSTOM_SNAPSHOT_INCONSISTENT",
+          message: topicId,
+        };
+      }
+    }
   }
 
   for (const ledgerKey of ["scoredRoundIds", "completedRoundIds"]) {
-    const ids = ledgerToIdSet(series[ledgerKey]);
-    for (const id of ids) {
+    const ledgerRes = validateLedgerStringArray(series[ledgerKey], ledgerKey);
+    if (!ledgerRes.ok) {
+      return {
+        ok: false,
+        code: ledgerRes.code,
+        message: ledgerRes.message,
+      };
+    }
+    for (const id of ledgerRes.ids) {
       if (!roundIds.has(id)) {
         return {
           ok: false,
@@ -470,20 +842,43 @@ export function validateTierNightSeries(series, opts = {}) {
     }
   }
 
-  if (!Array.isArray(series.categoryIds)) {
-    return { ok: false, code: "INVALID_CATEGORY_IDS", message: "categoryIds" };
+  const scoredRes = validateLedgerStringArray(series.scoredRoundIds, "scoredRoundIds");
+  const completedRes = validateLedgerStringArray(series.completedRoundIds, "completedRoundIds");
+  if (scoredRes.ok && completedRes.ok) {
+    const completedSet = new Set(completedRes.ids);
+    for (const id of scoredRes.ids) {
+      if (!completedSet.has(id)) {
+        return {
+          ok: false,
+          code: "LEDGER_SCORED_NOT_COMPLETED",
+          message: id,
+        };
+      }
+    }
+  }
+
+  const catsRes = validateTierNightSeriesCategoryIdsShape(series.categoryIds);
+  if (!catsRes.ok) {
+    return { ok: false, code: catsRes.code, message: catsRes.message };
   }
 
   const normalized = {
     version: TIER_NIGHT_SERIES_VERSION,
-    categoryIds: series.categoryIds.map((c) => String(c)),
+    categoryIds: catsRes.categoryIds,
     roundCount,
     queue: cloneJson(series.queue),
     roundIndex,
     phase,
-    scoredRoundIds: ledgerToArray(series.scoredRoundIds),
-    completedRoundIds: ledgerToArray(series.completedRoundIds),
+    scoredRoundIds: scoredRes.ok ? scoredRes.ids : ledgerToArray(series.scoredRoundIds),
+    completedRoundIds: completedRes.ok ? completedRes.ids : ledgerToArray(series.completedRoundIds),
   };
+  // FEATURE-TIERNIGHT-03-D — conserver history/recap (finalize/between/advance).
+  if (Array.isArray(series.roundHistory)) {
+    normalized.roundHistory = cloneJson(series.roundHistory);
+  }
+  if (series.roundRecap && typeof series.roundRecap === "object" && !Array.isArray(series.roundRecap)) {
+    normalized.roundRecap = cloneJson(series.roundRecap);
+  }
 
   return { ok: true, series: normalized };
 }

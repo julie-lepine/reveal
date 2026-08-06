@@ -48,18 +48,23 @@ function place(map) {
 function minimalSeries({ topicId, snapCustom = false, snapId = null } = {}) {
   const runId = "run-03b";
   const rawId = snapId ?? topicId.replace(/^roster:/, "");
-  const queue = [0, 1, 2].map((i) => ({
-    roundId: `${runId}:${i}`,
-    roundIndex: i,
-    topicId: i === 0 ? topicId : `roster:catalog-${i}`,
-    topicSnapshot: {
-      id: i === 0 ? rawId : `catalog-${i}`,
-      name: `Theme ${i}`,
-      emoji: "x",
-      categoryId: "survival",
-      ...(snapCustom ? { custom: true } : { custom: false }),
-    },
-  }));
+  const queue = [0, 1, 2].map((i) => {
+    const isFirst = i === 0;
+    const id = isFirst ? rawId : `catalog-${i}`;
+    const custom = isFirst ? snapCustom === true : false;
+    return {
+      roundId: `${runId}:${i}`,
+      roundIndex: i,
+      topicId: isFirst ? topicId : `roster:catalog-${i}`,
+      topicSnapshot: {
+        id,
+        name: `Theme ${i}`,
+        emoji: custom ? "" : "x",
+        categoryId: custom ? "" : "survival",
+        custom,
+      },
+    };
+  });
   return {
     version: 1,
     categoryIds: ["survival"],
@@ -84,30 +89,46 @@ describe("FEATURE-TIERNIGHT-SERIES-03B - préfixe custom réel", () => {
     assert.equal(wire.startsWith("roster:custom:"), false);
   });
 
-  it("SQL rejette roster:custom-roster- (pas roster:custom:)", () => {
+  it("SQL contrat 03-A : customs cohérents OK, counts 3/5/7/8", () => {
+    const contract = readFileSync(
+      join(ROOT, "supabase/feature-tiernight-03-series-contract.sql"),
+      "utf8"
+    );
+    assert.match(contract, /array\[3, 5, 7, 8\]/);
+    assert.match(contract, /TNS_CUSTOM_SNAPSHOT_INCONSISTENT/);
+    // Corps de fonction : plus de rejet TNS_CUSTOM_IN_SERIES_QUEUE (hors commentaires d’en-tête)
+    const bodyStart = contract.indexOf("as $$");
+    const body = contract.slice(bodyStart);
+    assert.equal(/TNS_CUSTOM_IN_SERIES_QUEUE/.test(body), false);
+  });
+
+  it("SQL 03A historique cite encore le rejet custom (pré-03-A)", () => {
     assert.match(SQL, /custom-roster-/);
+    assert.match(SQL, /TNS_CUSTOM_IN_SERIES_QUEUE/);
+    assert.match(SQL, /array\[3, 5, 7\]/);
+  });
+
+  it("SQL rejette roster:custom-roster- dans 03A (préfixe réel)", () => {
     assert.match(SQL, /position\('custom-roster-' in v_raw_id\) = 1/);
-    // l'ancien préfixe théorique ne doit plus être le critère actif
     assert.equal(/position\('roster:custom:' in v_topic_id\)/.test(SQL), false);
   });
 
-  it("vrai wire custom rejeté par validateTierNightSeries JS", () => {
+  it("vrai wire custom accepté si snapshot.custom=true", () => {
     const raw = createCustomRosterTopicId();
     const wire = `${ROSTER_TOPIC_PREFIX}${raw}`;
-    const series = minimalSeries({ topicId: wire, snapId: raw, snapCustom: false });
+    const series = minimalSeries({ topicId: wire, snapId: raw, snapCustom: true });
     const res = validateTierNightSeries(series, { runId: "run-03b" });
-    assert.equal(res.ok, false);
-    assert.equal(res.code, "CUSTOM_IN_SERIES_QUEUE");
+    assert.equal(res.ok, true, res.code);
   });
 
-  it("custom avec snapshot.custom=false toujours rejeté (wire)", () => {
+  it("custom avec snapshot.custom=false → CUSTOM_SNAPSHOT_INCONSISTENT", () => {
     const raw = createCustomRosterTopicId();
     const wire = `${ROSTER_TOPIC_PREFIX}${raw}`;
     const series = minimalSeries({ topicId: wire, snapId: raw, snapCustom: false });
     assert.equal(series.queue[0].topicSnapshot.custom, false);
     const res = validateTierNightSeries(series, { runId: "run-03b" });
     assert.equal(res.ok, false);
-    assert.equal(res.code, "CUSTOM_IN_SERIES_QUEUE");
+    assert.equal(res.code, "CUSTOM_SNAPSHOT_INCONSISTENT");
   });
 
   it("thème catalogue accepté", () => {
@@ -218,13 +239,13 @@ describe("FEATURE-TIERNIGHT-SERIES-03B - finished strict", () => {
   });
 });
 
-describe("FEATURE-TIERNIGHT-SERIES-03B - non-branchement", () => {
-  it("RPC non branchée gameplay", () => {
+describe("FEATURE-TIERNIGHT-SERIES-03B - branchement D (périmètre)", () => {
+  it("finalize via playSession/board ; pas via select/launch", () => {
+    const play = readFileSync(join(ROOT, "js/core/tierNightSeriesPlaySession.js"), "utf8");
+    assert.match(play, /commitTierNightSeriesRoundResult/);
     for (const rel of [
-      "js/core/gameSync.js",
-      "js/games/tierNight.js",
       "js/screens/tierNightSelect.js",
-      "js/screens/tierNightEnd.js",
+      "js/core/tierNightSeriesLaunch.js",
     ]) {
       const src = readFileSync(join(ROOT, rel), "utf8");
       assert.equal(src.includes("commitTierNightSeriesRoundResult"), false, rel);

@@ -5,18 +5,19 @@ import {
   getTierNightScoreBreakdownForPlayer,
 } from "../core/tierNightSession.js";
 import { getTierListById } from "../core/tierLists.js";
-import { getTierNightTopicId } from "../core/state.js";
-import { getLocalDisplayName, setLastGame } from "../core/state.js";
+import { getTierNightTopicId, getLocalDisplayName, setLastGame, getState } from "../core/state.js";
 import { setLobbyWaiting } from "../core/lobby.js";
 import {
   completeGameSession,
   isGameSyncActive,
   isLobbyHost,
+  canActAsHost,
   onGameSessionChange,
   suppressSessionRoute,
   refreshEveningScoresFromSession,
   refreshGameSession,
   ensureTierNightRecapsFromRemote,
+  getCachedGameSession,
 } from "../core/gameSync.js";
 import {
   gameCumulativeScoresHtml,
@@ -30,6 +31,11 @@ import {
   bindRestartGameButtons,
 } from "../core/restartGame.js";
 import { createMountGuard } from "../core/mountLifecycle.js";
+import { createActionLock, withClickLock } from "../core/actionLock.js";
+import {
+  changeTierNightModeFromSeriesPlay,
+  quitTierNightSeriesToGameSelect,
+} from "../core/tierNightSeriesExitNav.js";
 
 function tierOfItemIn(placed, item) {
   for (const tier of TIER_LEVELS) {
@@ -184,6 +190,7 @@ function controversialHtml(session, recaps, labelFn = (i) => i) {
 
 export function mountTierNightEnd(app) {
   const mount = createMountGuard();
+  const exitLock = createActionLock();
   let session = getTierNightSession();
   let recaps = getTierNightRecaps();
   const localName = getLocalDisplayName();
@@ -192,6 +199,20 @@ export function mountTierNightEnd(app) {
   function reloadSession() {
     session = getTierNightSession();
     recaps = getTierNightRecaps();
+  }
+
+  async function onChangeMode() {
+    if (isGameSyncActive() && !(isLobbyHost() || canActAsHost())) return;
+    await changeTierNightModeFromSeriesPlay({
+      shouldContinue: () => mount.isMounted() && mount.isCurrentMount(),
+    });
+  }
+
+  async function onQuit() {
+    if (isGameSyncActive() && !isLobbyHost()) return;
+    await quitTierNightSeriesToGameSelect({
+      shouldContinue: () => mount.isMounted() && mount.isCurrentMount(),
+    });
   }
 
   async function bootstrapRecaps() {
@@ -273,10 +294,31 @@ export function mountTierNightEnd(app) {
     reloadSession();
     const labelFn = makeItemLabel(session, recaps);
     const localBreakdown = getTierNightScoreBreakdownForPlayer(localName, session);
+    const series = getState().tierNightGame?.series || getCachedGameSession()?.state?.tierNight?.series;
+    const isSeriesEnd = series?.phase === "series_end";
+    const hostOrAh = !isGameSyncActive() || isLobbyHost() || canActAsHost();
+    const realHost = !isGameSyncActive() || isLobbyHost();
+    const history = Array.isArray(series?.roundHistory) ? series.roundHistory : [];
+    const seriesHistoryHtml =
+      isSeriesEnd && history.length
+        ? `<div class="card">
+            <p class="card-heading">Thèmes de la série</p>
+            <ol class="tier-series-history">
+              ${history
+                .map((h, i) => {
+                  const name = h?.topicSnapshot?.name || h?.topicId || `Manche ${i + 1}`;
+                  const emoji = h?.topicSnapshot?.emoji || "🏷️";
+                  return `<li>${escapeHtml(emoji)} ${escapeHtml(name)}</li>`;
+                })
+                .join("")}
+            </ol>
+          </div>`
+        : "";
     const content = `
-        <p class="label-upper label-upper--gold">🏆 Tier Night</p>
-        <h2 class="screen-title">Récap des classements</h2>
+        <p class="label-upper label-upper--gold">🏆 Tier Night${isSeriesEnd ? " · Fin de série" : ""}</p>
+        <h2 class="screen-title">${isSeriesEnd ? "Classement de la série" : "Récap des classements"}</h2>
         <p class="game-intro">« ${escapeHtml(session.listName || "Tier list")} » - +${session.localConsensusPoints ?? 0} pts consensus pour toi cette manche.</p>
+        ${seriesHistoryHtml}
         ${consensusBoardHtml(session.consensus, labelFn)}
         ${controversialHtml(session, recaps, labelFn)}
         <div class="recap-list">
@@ -293,7 +335,17 @@ export function mountTierNightEnd(app) {
             : `<p class="hint">Chargement des classements…</p>`}
         </div>
         ${gameCumulativeScoresHtml({ gameId: "tiernight", gameLabel: "Tier Night", title: "Cumul des scores" })}
-        ${eveningRecapRestartButtonHtml({ gameId: "tiernight", title: "TierNight" })}
+        ${
+          hostOrAh
+            ? `${eveningRecapRestartButtonHtml({ gameId: "tiernight", title: "TierNight" })}
+        <button type="button" class="btn btn-secondary btn--spaced" id="btn-tiernight-end-change-mode">⇄ Changer de mode</button>`
+            : `<p class="hint">En attente de l’hôte…</p>`
+        }
+        ${
+          realHost
+            ? `<button type="button" class="btn btn-secondary btn--spaced" id="btn-tiernight-end-quit">✕ Quitter TierNight</button>`
+            : ""
+        }
         <button type="button" class="btn btn-primary" data-nav="results">Voir les résultats →</button>`;
 
     app.innerHTML = pageShell({
@@ -302,7 +354,25 @@ export function mountTierNightEnd(app) {
     });
 
     bindNav(app, { results: goToResults });
-    bindRestartGameButtons(app);
+    if (hostOrAh) {
+      bindRestartGameButtons(app);
+      const changeBtn = app.querySelector("#btn-tiernight-end-change-mode");
+      if (changeBtn) {
+        changeBtn.addEventListener(
+          "click",
+          withClickLock(() => onChangeMode(), { lock: exitLock })
+        );
+      }
+    }
+    if (realHost) {
+      const quitBtn = app.querySelector("#btn-tiernight-end-quit");
+      if (quitBtn) {
+        quitBtn.addEventListener(
+          "click",
+          withClickLock(() => onQuit(), { lock: exitLock })
+        );
+      }
+    }
 
     if (isGameSyncActive()) {
       refreshGameScoresBox(app, {

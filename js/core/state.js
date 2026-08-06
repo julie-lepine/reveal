@@ -106,6 +106,15 @@ const defaultState = () => ({
   tierNightModifier: "normal",
   customTierLists: [],
   customRosterTopics: [],
+  /** FEATURE-TIERNIGHT-03-B — ids custom déjà tirés en série (lobby lifetime). */
+  consumedCustomRosterTopicIds: [],
+  /** Prep série multi-thèmes (settings + ready) — pas de queue ici. */
+  tierNightSeriesPrep: {
+    categoryIds: ["*"],
+    roundCount: 5,
+    ready: {},
+    setupEpoch: 0,
+  },
   hotTakeGame: {
     customTakes: [],
     ready: {},
@@ -334,6 +343,15 @@ function loadState() {
       guessLie: { ...emptyGuessLie(), ...parsed.guessLie },
       customTierLists: parsed.customTierLists || [],
       customRosterTopics: sanitizeCustomRosterTopicsFromStorage(parsed.customRosterTopics),
+      consumedCustomRosterTopicIds: Array.isArray(parsed.consumedCustomRosterTopicIds)
+        ? parsed.consumedCustomRosterTopicIds.map(String)
+        : [],
+      tierNightSeriesPrep: {
+        ...base.tierNightSeriesPrep,
+        ...(parsed.tierNightSeriesPrep && typeof parsed.tierNightSeriesPrep === "object"
+          ? parsed.tierNightSeriesPrep
+          : {}),
+      },
       globalStats: { ...defaultGlobalStats(), ...parsed.globalStats },
       user: { ...defaultUser(), ...parsed.user },
       lobby: { ...defaultLobby(), ...parsed.lobby },
@@ -1025,6 +1043,8 @@ export function resetEveningState() {
     stats: defaultEveningStats(),
     eveningGamesRecorded: {},
     customRosterTopics: [],
+    consumedCustomRosterTopicIds: [],
+    tierNightSeriesPrep: { ...defaultState().tierNightSeriesPrep },
   });
 }
 
@@ -1047,6 +1067,7 @@ export function resetGameSessionsOnly() {
     tierNightModifier: "normal",
     tierNightGame: { ...base.tierNightGame },
     tierNightLiveGame: { ...base.tierNightLiveGame },
+    tierNightSeriesPrep: { ...base.tierNightSeriesPrep },
   });
 }
 

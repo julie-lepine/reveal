@@ -1091,10 +1091,12 @@ begin
   v_tn_scores := coalesce(v_game_scores -> 'tiernight', '{}'::jsonb);
   v_stats := coalesce(v_state -> 'stats', '{}'::jsonb);
 
-  for v_rec in select value as elem from jsonb_array_elements(v_recaps)
+  -- v_rec est jsonb (scalaire) : la boucle assigne `value`, pas un RECORD.
+  -- v_rec.elem serait interprété comme table.colonne → 42P01.
+  for v_rec in select value from jsonb_array_elements(v_recaps)
   loop
-    v_uid_text := v_rec.elem ->> 'uid';
-    v_points := greatest(0, coalesce((v_rec.elem ->> 'consensusPoints')::int, 0));
+    v_uid_text := v_rec ->> 'uid';
+    v_points := greatest(0, coalesce((v_rec ->> 'consensusPoints')::int, 0));
     if v_points > 0 then
       v_scores := jsonb_set(
         v_scores, array[v_uid_text],

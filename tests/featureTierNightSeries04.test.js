@@ -47,8 +47,10 @@ describe("FEATURE-TIERNIGHT-SERIES-04 - gate interne", () => {
     delete globalThis[TIER_NIGHT_SERIES_UI_GATE_KEY];
   });
 
-  it("désactivé par défaut", () => {
+  it("désactivé uniquement via kill switch explicite", () => {
     delete globalThis[TIER_NIGHT_SERIES_UI_GATE_KEY];
+    assert.equal(isTierNightSeriesUiEnabled(), true);
+    setTierNightSeriesUiEnabledForTests(false);
     assert.equal(isTierNightSeriesUiEnabled(), false);
   });
 
@@ -57,11 +59,19 @@ describe("FEATURE-TIERNIGHT-SERIES-04 - gate interne", () => {
     assert.equal(isTierNightSeriesUiEnabled(), true);
   });
 
-  it("select n’expose la série que derrière le gate", () => {
+  it("select : roster → prep direct (plus de roster-path / wizard / classic)", () => {
     const select = read("js/screens/tierNightSelect.js");
     assert.match(select, /isTierNightSeriesUiEnabled/);
-    assert.match(select, /data-roster-path="series"/);
-    assert.match(select, /seriesUi \? "roster-path" : "topic"/);
+    assert.match(select, /enterTierNightSeriesPrep/);
+    assert.match(select, /openSeriesPrepFromRoster|id === "roster"/);
+    assert.doesNotMatch(select, /data-roster-path/);
+    assert.doesNotMatch(select, /function rosterPathStepHtml/);
+    assert.doesNotMatch(select, /function seriesCategoryStepHtml/);
+    assert.doesNotMatch(select, /function seriesReviewStepHtml/);
+    assert.doesNotMatch(select, /launchSeriesFromReview/);
+    assert.doesNotMatch(select, /seriesUi \? "roster-path"/);
+    assert.doesNotMatch(select, /markTierNightClassicStarted/);
+    assert.doesNotMatch(select, /topicStepHtml/);
   });
 });
 
@@ -79,14 +89,14 @@ describe("FEATURE-TIERNIGHT-SERIES-04 - setup temporaire", () => {
     assert.equal(getTierNightSeriesPoolSize(["survival"]), 3);
   });
 
-  it("3 disponible / 5 et 7 indisponibles sur survie", () => {
+  it("3 disponible / 5 et 8 indisponibles sur survie", () => {
     const avail = getTierNightSeriesRoundCountAvailability(["survival"]);
     assert.deepEqual(
       avail.map((a) => [a.roundCount, a.available]),
       [
         [3, true],
         [5, false],
-        [7, false],
+        [8, false],
       ]
     );
   });
@@ -104,19 +114,33 @@ describe("FEATURE-TIERNIGHT-SERIES-04 - setup temporaire", () => {
     const bad = validateTierNightSeriesSetupForLaunch({
       path: "series",
       categoryIds: ["survival"],
-      roundCount: 7,
+      roundCount: 8,
     });
     assert.equal(bad.ok, false);
     assert.equal(bad.code, "INSUFFICIENT_TOPICS");
   });
 
-  it("validate OK toutes catégories × 7", () => {
+  it("validate OK toutes catégories × 8", () => {
     const ok = validateTierNightSeriesSetupForLaunch({
       path: "series",
       categoryIds: [TIER_NIGHT_SERIES_ALL_CATEGORIES],
-      roundCount: 7,
+      roundCount: 8,
     });
     assert.equal(ok.ok, true);
+  });
+
+  it("customs lobby augmentent le pool setup", () => {
+    const customs = [
+      { id: `${CUSTOM_ROSTER_TOPIC_ID_PREFIX}a`, name: "Custom A", custom: true },
+      { id: `${CUSTOM_ROSTER_TOPIC_ID_PREFIX}b`, name: "Custom B", custom: true },
+    ];
+    const base = getTierNightSeriesPoolSize(["survival"]);
+    const withCustoms = getTierNightSeriesPoolSize(["survival"], { customTopics: customs });
+    assert.equal(withCustoms, base + 2);
+    const avail = getTierNightSeriesRoundCountAvailability(["survival"], {
+      customTopics: customs,
+    });
+    assert.equal(avail.find((a) => a.roundCount === 5)?.available, true);
   });
 });
 
@@ -195,13 +219,12 @@ describe("FEATURE-TIERNIGHT-SERIES-04 - prepare + payload launch", () => {
   });
 });
 
-describe("FEATURE-TIERNIGHT-SERIES-04 - non-branchement finalize + mono", () => {
-  it("aucune RPC finalize dans select / game / advance / launch", () => {
+describe("FEATURE-TIERNIGHT-SERIES-04 - branchement finalize + mono", () => {
+  it("finalize branché via playSession ; absent de select/launch", () => {
+    const play = read("js/core/tierNightSeriesPlaySession.js");
+    assert.match(play, /commitTierNightSeriesRoundResult/);
     for (const rel of [
       "js/screens/tierNightSelect.js",
-      "js/games/tierNight.js",
-      "js/core/gameSync.js",
-      "js/screens/tierNightEnd.js",
       "js/core/tierNightSeriesLaunch.js",
       "js/core/tierNightLiveSession.js",
     ]) {
@@ -211,12 +234,13 @@ describe("FEATURE-TIERNIGHT-SERIES-04 - non-branchement finalize + mono", () => 
     }
   });
 
-  it("mono startGame reste séparé de launchSeries", () => {
+  it("Rank Live startLiveGame reste séparé du launch série (prep)", () => {
     const select = read("js/screens/tierNightSelect.js");
-    assert.match(select, /markTierNightClassicStarted/);
-    assert.match(select, /markTierNightSeriesStarted/);
-    assert.match(select, /async function startGame/);
-    assert.match(select, /async function launchSeriesFromReview/);
+    const prepSession = read("js/core/tierNightSeriesPrepSession.js");
+    assert.match(select, /startLiveGame|markTierNightLiveLobbyStarted/);
+    assert.doesNotMatch(select, /markTierNightClassicStarted/);
+    assert.doesNotMatch(select, /markTierNightSeriesStarted/);
+    assert.match(prepSession, /markTierNightSeriesStarted/);
   });
 
   it("create-roster retourne toujours topic/roster", () => {

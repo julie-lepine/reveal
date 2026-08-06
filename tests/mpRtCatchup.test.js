@@ -32,7 +32,7 @@ const getStateMock = mock.fn(() => ({ inLobby: true, lobby: { id: LOBBY_ID } }))
 let scheduleThrows = false;
 
 mock.module("../js/core/joinSessionHydrate.js", {
-  exports: {
+  namedExports: {
     JOIN_SESSION_RESTORE_DELAYS_MS: [100, 350, 800, 1500],
     SUBSCRIBED_ROUTE_DEBOUNCE_MS: 300,
     shouldRouteAfterRealtimeSubscribed: ({ joinSessionHydrating }) => !joinSessionHydrating,
@@ -48,7 +48,7 @@ mock.module("../js/core/joinSessionHydrate.js", {
 });
 
 mock.module("../js/core/gameSync.js", {
-  exports: {
+  namedExports: {
     applyRemoteSession: mock.fn(),
     handleSessionRoute: handleSessionRouteMock,
     refreshGameSession: refreshGameSessionMock,
@@ -61,7 +61,7 @@ mock.module("../js/core/gameSync.js", {
 });
 
 mock.module("../js/core/state.js", {
-  exports: {
+  namedExports: {
     getState: getStateMock,
     saveStatePatch: mock.fn(),
     ensurePlayerScore: mock.fn(),
@@ -72,14 +72,14 @@ mock.module("../js/core/state.js", {
 });
 
 mock.module("../js/core/router.js", {
-  exports: {
+  namedExports: {
     getCurrentScreen: () => "game-select",
     navigate: mock.fn(),
   },
 });
 
 mock.module("../js/core/supabaseClient.js", {
-  exports: {
+  namedExports: {
     supabase: {
       channel: () => ({
         on() {
@@ -96,14 +96,14 @@ mock.module("../js/core/supabaseClient.js", {
 });
 
 mock.module("../js/core/supabaseAuth.js", {
-  exports: {
+  namedExports: {
     getSupabaseUserId: () => "user-test",
     ensureAnonymousSessionForRecovery: async () => {},
   },
 });
 
 mock.module("../js/core/guestMembership.js", {
-  exports: {
+  namedExports: {
     saveGuestMembership: mock.fn(),
     membershipFromBundle: mock.fn(),
     loadGuestMembership: () => null,
@@ -113,30 +113,30 @@ mock.module("../js/core/guestMembership.js", {
 });
 
 mock.module("../js/core/supabaseGame.js", {
-  exports: {
+  namedExports: {
     fetchGameSessionByLobby: async () => null,
   },
 });
 
 mock.module("../js/core/lobbyBoundary.js", {
-  exports: {
+  namedExports: {
     resolveSessionRestoreOutcome: () => ({ status: "none" }),
   },
 });
 
 mock.module("../js/core/lobbyMembershipAlign.js", {
-  exports: {
+  namedExports: {
     alignMembershipSnapshotAfterLobbyHydration: mock.fn(),
     MEMBERSHIP_HYDRATION_SOURCE: { REFRESH_CONFIRMED: "refresh" },
   },
 });
 
 mock.module("../js/core/lobbyMembershipUniqueConflict.js", {
-  exports: { isLobbyMembersOneLivingPerUserConflict: () => false },
+  namedExports: { isLobbyMembersOneLivingPerUserConflict: () => false },
 });
 
 mock.module("../js/core/lobbyMembershipFetch.js", {
-  exports: {
+  namedExports: {
     queryActiveLobbyMembership: async () => ({ status: "none" }),
     fetchLivingMembershipRowsForUser: async () => ({ ok: true, rows: [] }),
     normalizePostgrestMembershipData: mock.fn(),
@@ -146,7 +146,7 @@ mock.module("../js/core/lobbyMembershipFetch.js", {
 });
 
 mock.module("../js/core/lobbyMembershipSnapshot.js", {
-  exports: {
+  namedExports: {
     invalidateMembershipSnapshot: mock.fn(),
     getMembershipSnapshot: () => null,
     setMembershipSnapshot: mock.fn(),
@@ -155,11 +155,11 @@ mock.module("../js/core/lobbyMembershipSnapshot.js", {
 });
 
 mock.module("../js/core/lobbyCreateGuard.js", {
-  exports: { applyMembershipQueryToSnapshot: mock.fn() },
+  namedExports: { applyMembershipQueryToSnapshot: mock.fn() },
 });
 
 mock.module("../js/core/lobbyDissolveContract.js", {
-  exports: {
+  namedExports: {
     LOBBY_DISSOLVE_STATUS: {},
     mapDissolveLobbyRpcData: mock.fn(),
     interpretDissolveMembershipRequery: mock.fn(),
@@ -167,7 +167,7 @@ mock.module("../js/core/lobbyDissolveContract.js", {
 });
 
 mock.module("../js/core/lobbyJoinEffects.js", {
-  exports: {
+  namedExports: {
     createLobbyJoinEffects: () => ({}),
     recordGuestMembershipWriteForJoin: mock.fn(),
     recordMembershipInsertForJoin: mock.fn(),
@@ -177,29 +177,29 @@ mock.module("../js/core/lobbyJoinEffects.js", {
 });
 
 mock.module("../js/core/hostPresence.js", {
-  exports: {
+  namedExports: {
     detectActingHostTransition: () => false,
     resolveActingHostUserId: () => null,
   },
 });
 
 mock.module("../js/core/rosterRenameMigrate.js", {
-  exports: {
+  namedExports: {
     detectParticipantRenames: () => [],
     migrateEveningMapsForRosterRenames: mock.fn(),
   },
 });
 
 mock.module("../js/core/arch03ActingHostDebug.js", {
-  exports: { arch03AhLog: mock.fn(), arch03AhHostAgeMs: () => 0 },
+  namedExports: { arch03AhLog: mock.fn(), arch03AhHostAgeMs: () => 0 },
 });
 
 mock.module("../js/config/syncConfig.js", {
-  exports: { scalePollIntervalMs: (ms) => ms },
+  namedExports: { scalePollIntervalMs: (ms) => ms },
 });
 
 mock.module("../js/config/lobbyLifecycle.js", {
-  exports: {
+  namedExports: {
     LOBBY_EXPIRED_JOIN_MSG: "",
     LOBBY_FULL_MSG: "",
     LOBBY_HEARTBEAT_MIN_MS: 5000,
@@ -211,11 +211,11 @@ mock.module("../js/config/lobbyLifecycle.js", {
 });
 
 mock.module("../js/core/lobbyHeartbeat.js", {
-  exports: { startLobbyHeartbeat: mock.fn() },
+  namedExports: { startLobbyHeartbeat: mock.fn() },
 });
 
 mock.module("../js/core/presenceUiLive.js", {
-  exports: {
+  namedExports: {
     arch03LiveLog: mock.fn(),
     computeClaimEligible: () => false,
     hostAgeMs: () => 0,

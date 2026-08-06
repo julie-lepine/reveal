@@ -63,7 +63,40 @@ select public.tiernight_series_validate_finished(
 );
 -- Attendu : ok=false code=TNS_FINISHED_INVALID_VALUE
 
--- I) Custom wire réel rejeté (custom-roster-, pas custom:)
+-- I) Custom wire cohérent (03-A / 03-A1) — custom:true accepté
+select public.tiernight_series_validate_series_shape(
+  jsonb_build_object(
+    'version', 1,
+    'phase', 'ranking',
+    'roundCount', 3,
+    'roundIndex', 0,
+    'scoredRoundIds', '[]'::jsonb,
+    'completedRoundIds', '[]'::jsonb,
+    'roundHistory', '[]'::jsonb,
+    'categoryIds', '["survival"]'::jsonb,
+    'queue', jsonb_build_array(
+      jsonb_build_object(
+        'roundId', 'runx:0', 'roundIndex', 0,
+        'topicId', 'roster:custom-roster-abc',
+        'topicSnapshot', jsonb_build_object('id','custom-roster-abc','name','X','custom', true)
+      ),
+      jsonb_build_object(
+        'roundId', 'runx:1', 'roundIndex', 1,
+        'topicId', 'roster:t1',
+        'topicSnapshot', jsonb_build_object('id','t1','name','Y','custom', false)
+      ),
+      jsonb_build_object(
+        'roundId', 'runx:2', 'roundIndex', 2,
+        'topicId', 'roster:t2',
+        'topicSnapshot', jsonb_build_object('id','t2','name','Z','custom', false)
+      )
+    )
+  ),
+  'runx'
+);
+-- Attendu (après 03-A1) : ok=true
+
+-- I2) Custom incohérent → TNS_CUSTOM_SNAPSHOT_INCONSISTENT
 select public.tiernight_series_validate_series_shape(
   jsonb_build_object(
     'version', 1,
@@ -83,15 +116,15 @@ select public.tiernight_series_validate_series_shape(
       jsonb_build_object(
         'roundId', 'runx:1', 'roundIndex', 1,
         'topicId', 'roster:t1',
-        'topicSnapshot', jsonb_build_object('id','t1','name','Y')
+        'topicSnapshot', jsonb_build_object('id','t1','name','Y','custom', false)
       ),
       jsonb_build_object(
         'roundId', 'runx:2', 'roundIndex', 2,
         'topicId', 'roster:t2',
-        'topicSnapshot', jsonb_build_object('id','t2','name','Z')
+        'topicSnapshot', jsonb_build_object('id','t2','name','Z','custom', false)
       )
     )
   ),
   'runx'
 );
--- Attendu : ok=false code=TNS_CUSTOM_IN_SERIES_QUEUE
+-- Attendu : ok=false code=TNS_CUSTOM_SNAPSHOT_INCONSISTENT

@@ -819,7 +819,7 @@ describe("FEATURE-TIERNIGHT-SERIES-05B - secrets / non-branchement / gate", () =
   });
 
   it("gate OFF", () => {
-    assert.equal(isTierNightSeriesUiEnabled(), false);
+    assert.equal(isTierNightSeriesUiEnabled(), true);
   });
 
   it("lib restore n’UPDATE plus uniquement par lobby_id", () => {

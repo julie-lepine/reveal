@@ -182,13 +182,12 @@ describe("TierNight Recommencer - pas de retour vers l'ancien récap", () => {
     assert.match(s, /if \(row\?\.screen && row\.screen !== "tiernight-end"\) return;/);
   });
 
-  it("gameSync canRouteToTierNightEnd délègue à tierNightRecapBelongsToRun", () => {
+  it("gameSync canRouteToTierNightEnd : recap legacy + series_end (D)", () => {
     const s = readSrc("../js/core/gameSync.js");
     assert.match(s, /tierNightRecapBelongsToRun/);
-    assert.match(
-      s,
-      /export function canRouteToTierNightEnd\(row\) \{\s*\n\s*return tierNightRecapBelongsToRun\(row\?\.state\?\.tierNight\);/s
-    );
+    assert.match(s, /export function canRouteToTierNightEnd\(row\)/);
+    assert.match(s, /tn\?\.series\?\.phase === "series_end"/);
+    assert.match(s, /roundHistory/);
   });
 
   it("createTierNightRunId produit des ids distincts", () => {

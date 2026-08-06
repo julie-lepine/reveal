@@ -12,14 +12,14 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 
 ---
 
-## Focus — 2026-08-04
+## Focus — 2026-08-05
 
 | | |
 |--|--|
-| **Maintenant** | Backlog produit : **FEATURE-TIERNIGHT-01** · **UX-DEVICE-01** (dernier ticket produit convenu) |
-| **En fin de vague** | **ARCH-23** / **ARCH-10** QA natif — **après** clôture des tickets produit ouverts (code + SQL déjà livrés · QA différée deploy Capacitor) |
-| **Dette** | ARCH-05 · ARCH-01 · ARCH-11–17 · SYN-19–24 · SYN-27 · Fil Rouge / VibeCheck cleanup |
-| **Audit** | Transversal 2026-08-02 — optimistic submissions ✅ · Deal ACK ✅ · **FEATURE-CHAT-03 ✅** · **FEATURE-DILEMMA-01 ✅** · **FEATURE-TIERNIGHT-02 ✅** · **UX-TIERNIGHT-END-01/02 ✅** · **UX-TIERNIGHT-NAV-01 ✅** QA 2026-08-04 |
+| **Maintenant** | **UX-DEVICE-01** (dernier ticket produit convenu) |
+| **En fin de vague** | **ARCH-23** / **ARCH-10** QA natif — **après** clôture produit (code + SQL déjà livrés · QA différée deploy Capacitor) |
+| **Dette** | ARCH-05 · ARCH-01/F-01 · ARCH-11–17 / SYN-19–24 / SYN-27 · Fil Rouge / VibeCheck cleanup |
+| **Audit** | Transversal 2026-08-02 — optimistic submissions ✅ · Deal ACK ✅ · **FEATURE-CHAT-03 ✅** · **FEATURE-DILEMMA-01 ✅** · **FEATURE-TIERNIGHT-01 ✅** · **FEATURE-TIERNIGHT-02 ✅** · **UX-TIERNIGHT-END-01/02 ✅** · **UX-TIERNIGHT-NAV-01 ✅** QA 2026-08-04/05 |
 
 > ~~« Consensus reveal atomique »~~ — **aucun ticket** à cet intitulé dans l’audit (reliquat probable d’une note type Trivia 01B, jamais formalisé). Ne pas traiter comme chantier ouvert.
 
@@ -35,12 +35,6 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 | **ARCH-10** | 8 | Clear cache leave lobby trop tard | 🟢 fonctionnel ✅ GH Pages · **mobile QA finale** (même vague qu’ARCH-23) |
 | **UX-DEVICE-01** | 11 | Écran verrouillé pendant une partie (Wake Lock API) | 🟡 · **dernier produit** |
 
-### Backlog produit (ordre actuel)
-
-| ID | Cause | Problème | Priorité |
-|----|-------|----------|----------|
-| **FEATURE-TIERNIGHT-01** | — | Thèmes personnalisés (Classer le groupe) | 🟡 |
-
 ### Dette / opportunité
 
 | ID | Cause | Problème | Priorité |
@@ -48,7 +42,8 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 | **ARCH-05** | 5 | Route lobby vs session (`row.screen`) | 🟡 mitigé SYN-28 |
 | **ARCH-01 / F-01** | 1 | Démo offline sans avertissement MP | 🟡 partiel |
 | **ARCH-11–17, SYN-19–24, SYN-27** | 9–10 | Monolithe / dup / code mort | Dette |
-| **FIL ROUGE / VIBECHECK SUPPRESSION** | vérifier que tous les fichiers / codes inhérents aux deux jeux supprimés ont aussi été supprimés
+| **FIL ROUGE / VIBECHECK SUPPRESSION** | 10 | Vérifier suppression complète des fichiers/codes des deux jeux retirés | Dette |
+
 
 ## Carte des causes racines
 
@@ -64,7 +59,7 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 | 8 | Reset / migration incomplète | Partiel | **BUG-TIERNIGHT-05 ✅** · **OPS-LOBBY-04 ✅** · **BUG-LOBBY-XX-E ✅** · **BUG-TRUTHMETER-02 ✅** · **ARCH-23** · ARCH-10 · **BUG-LOBBY-XX ✅** · I-09/SYN-15/16 ✅ |
 | 9 | Sync monolithe / duplication | Dette | ARCH-11… |
 | 10 | Code mort | Dette | **FEATURE-VIBECHECK-01 ✅** · hors Fil Rouge app ✅ |
-| 11 | Friction UX | Partiel | **UX-DEVICE-01** 🟡 · **FEATURE-DILEMMA-01 ✅** · **FEATURE-TIERNIGHT-02 ✅** · **UX-TIERNIGHT-END-01/02 ✅** · **UX-TIERNIGHT-NAV-01 ✅** · **FEATURE-CHAT-03 ✅** · **UX-CHAT-01 ✅** · **UX-CHAT-02 ✅** · **UX-HOST-01 ✅** · **BUG-WAO-04** ✅ · **ARCH-23** · ARCH-22/Loader ✅ · **L-04 ✅** |
+| 11 | Friction UX | Partiel | **UX-DEVICE-01** 🟡 · **FEATURE-TIERNIGHT-01 ✅** · **FEATURE-DILEMMA-01 ✅** · **FEATURE-TIERNIGHT-02 ✅** · **UX-TIERNIGHT-END-01/02 ✅** · **UX-TIERNIGHT-NAV-01 ✅** · **FEATURE-CHAT-03 ✅** · **UX-CHAT-01 ✅** · **UX-CHAT-02 ✅** · **UX-HOST-01 ✅** · **BUG-WAO-04** ✅ · **ARCH-23** · ARCH-22/Loader ✅ · **L-04 ✅** |
 
 ---
 
@@ -441,7 +436,7 @@ Retour terrain multi-jeux. Priorités : 🔴 critique · 🟠 haute · 🟡 moye
 | ~~**GAME-SPEEDVOTE-01**~~ | ~~Récompense gagnant~~ | ❌ **Annulé 2026-08-02** — barème actuel **+10** (`EVENING_POINTS.WIN`) déjà harmonisé ; +15 / podium 15-10-5 non retenus. |
 | ~~**GAME-WAO-01**~~ | Barème Wrong Answer Only | ✅ **Décision 2026-08-03** — podium **15/10/5** conservé **+ 5 pts / vote reçu**. `WRONG_ANSWER_POINTS_PER_VOTE` · `wrongAnswerScoring` · `gameRules`. **QA terrain** avant clôture. |
 | ~~**FEATURE-DILEMMA-01**~~ | ~~Plusieurs dilemmes par joueur~~ | ✅ **Clôturé QA 2026-08-04** — multi-custom sans plafond · deck customs prioritaires + shuffle global · correctifs compteur / leave / sync. Ne pas rouvrir. |
-| **FEATURE-TIERNIGHT-01** | Thèmes personnalisés | Mode « Classer le groupe » : créer son propre thème (ex. « Qui survivrait le plus longtemps sur une île ? ») comme base de la tierlist. |
+| ~~**FEATURE-TIERNIGHT-01**~~ | ~~Thèmes personnalisés~~ | ✅ **Clôturé / validé 2026-08-05** — thèmes custom « Classer le groupe » · create-roster · sync FEATURE-02. Ne pas rouvrir. |
 | ~~**FEATURE-TIERNIGHT-02**~~ | ~~Thèmes roster multi-joueurs + sync~~ | ✅ **Clôturé QA terrain 2026-08-04** — tous créent · RPC atomique · strip patch · préservation `push`/`start`/`complete` · merge remote-first · delete auteur-only · lancement hôte-only. Ne pas rouvrir. |
 | ~~**UX-TIERNIGHT-END-01**~~ | ~~Points de la manche redondant~~ | ✅ **Clôturé QA terrain 2026-08-04** — leaderboard intermédiaire retiré · cartes + cumul conservés. Ne pas rouvrir. |
 | ~~**UX-TIERNIGHT-END-02**~~ | ~~Détail scoring vs carte récap~~ | ✅ **Clôturé QA terrain 2026-08-04** — détail fusionné dans la carte locale · cumul sous les cartes. Ne pas rouvrir. |
@@ -598,4 +593,4 @@ Hors file prioritaire — opportunité / régression :
 
 ---
 
-*Suivi vivant · MAJ 2026-08-04 — **UX-TIERNIGHT-NAV-01** ✅ · **UX-TIERNIGHT-END-01/02** ✅ · **FEATURE-TIERNIGHT-02** ✅ · prochain produit = **FEATURE-TIERNIGHT-01** puis **UX-DEVICE-01** · **ARCH-23** / **ARCH-10** QA natif en fin de vague*
+*Suivi vivant · MAJ 2026-08-05 — **FEATURE-TIERNIGHT-01** ✅ · **UX-TIERNIGHT-NAV-01** ✅ · **UX-TIERNIGHT-END-01/02** ✅ · **FEATURE-TIERNIGHT-02** ✅ · prochain produit = **UX-DEVICE-01** · **ARCH-23** / **ARCH-10** QA natif en fin de vague*

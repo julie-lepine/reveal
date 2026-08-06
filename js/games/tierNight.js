@@ -28,6 +28,12 @@ import {
   canForceTierNightResults,
   canRouteToTierNightEnd,
 } from "../core/gameSync.js";
+import {
+  hasActiveTierNightSeries,
+  hostFinalizeTierNightSeriesRound,
+  navigateForTierNightSeriesPhase,
+  resolveTierNightSeriesScreenFromPhase,
+} from "../core/tierNightSeriesPlaySession.js";
 import { getSupabaseUserId } from "../core/supabaseAuth.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
 import { navigate } from "../core/router.js";
@@ -37,6 +43,16 @@ import { bindNav } from "../screens/nav.js";
 
 export function mountTierNight(app) {
   if (!requireLobbyPlay()) return null;
+
+  // Série en intermanches / fin : ne pas rester sur le board.
+  const seriesPhaseEarly =
+    getState().tierNightGame?.series?.phase ||
+    getCachedGameSession()?.state?.tierNight?.series?.phase;
+  const seriesScreenEarly = resolveTierNightSeriesScreenFromPhase(seriesPhaseEarly);
+  if (seriesScreenEarly && seriesScreenEarly !== "tiernight") {
+    navigateForTierNightSeriesPhase(seriesPhaseEarly);
+    return null;
+  }
 
   const topicId = getTierNightTopicId();
   if (!topicId) {
@@ -153,10 +169,20 @@ export function mountTierNight(app) {
       if (!alive) return;
 
       render();
+      // FEATURE-TIERNIGHT-03-D — série : finalize RPC ; legacy : classic end.
+      if (hasActiveTierNightSeries()) {
+        if (isLobbyHost()) {
+          await hostFinalizeTierNightSeriesRound({
+            shouldContinue: () => alive,
+          });
+        }
+        return;
+      }
       await advanceTierNightToResultsWhenReady(list, { isMounted: () => alive });
       return;
     }
 
+    // Solo local : série non supportée sans sync (prep local rare) → classic.
     buildRecapsWithSimulation(list.id, list.name, list.items, placed);
     recordTierNightPlayed();
     if (!alive) return;
@@ -204,6 +230,13 @@ export function mountTierNight(app) {
 
   async function forceResults() {
     if (!isLobbyHost()) return;
+    if (hasActiveTierNightSeries()) {
+      await hostFinalizeTierNightSeriesRound({
+        force: true,
+        shouldContinue: () => alive,
+      });
+      return;
+    }
     await advanceTierNightToResultsWhenReady(list, {
       force: true,
       isMounted: () => alive,
@@ -393,6 +426,12 @@ export function mountTierNight(app) {
 
   const unsub = onGameSessionChange(async (row) => {
     if (!alive) return;
+    const seriesPhase = row?.state?.tierNight?.series?.phase;
+    const seriesScreen = resolveTierNightSeriesScreenFromPhase(seriesPhase);
+    if (seriesScreen && seriesScreen !== "tiernight") {
+      navigateForTierNightSeriesPhase(seriesPhase);
+      return;
+    }
     if (getEffectiveSessionScreen(row) === "tiernight-end") {
       if (!canRouteToTierNightEnd(row)) return;
       await refreshGameSession();
@@ -405,6 +444,12 @@ export function mountTierNight(app) {
     if (finished && isGameSyncActive()) {
       if (!alive) return;
       render();
+      if (hasActiveTierNightSeries()) {
+        if (isLobbyHost()) {
+          await hostFinalizeTierNightSeriesRound({ shouldContinue: () => alive });
+        }
+        return;
+      }
       await advanceTierNightToResultsWhenReady(list, { isMounted: () => alive });
     }
   });

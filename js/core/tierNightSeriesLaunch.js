@@ -24,6 +24,8 @@ import { resolveTierNightSeriesSetupCategoryIds } from "./tierNightSeriesSetup.j
  * @param {string} [opts.modifier="normal"]
  * @param {() => number} [opts.rng]
  * @param {Array<{ userId?: string, name?: string }>} opts.participants — requis (fige le roster)
+ * @param {Iterable<object>} [opts.customTopics] — customs lobby (FEATURE-TIERNIGHT-03-A)
+ * @param {Iterable<string>|null} [opts.excludeCustomIds] — customs one-shot déjà consommés
  */
 export function prepareTierNightSeriesLaunchAttempt({
   categoryIds,
@@ -31,6 +33,8 @@ export function prepareTierNightSeriesLaunchAttempt({
   modifier = "normal",
   rng,
   participants,
+  customTopics = [],
+  excludeCustomIds = null,
 } = {}) {
   if (!Array.isArray(participants)) {
     return {
@@ -55,6 +59,8 @@ export function prepareTierNightSeriesLaunchAttempt({
     runId,
     categoryIds: cats,
     roundCount,
+    customTopics,
+    excludeCustomIds,
   };
   if (typeof rng === "function") queueOpts.rng = rng;
 
@@ -106,6 +112,7 @@ export function prepareTierNightSeriesLaunchAttempt({
       modifier: modifier || "normal",
       categoryIds: seriesRes.series.categoryIds,
       roundCount: seriesRes.series.roundCount,
+      consumedCustomTopicIds: queueRes.consumedCustomTopicIds || [],
     },
   };
 }

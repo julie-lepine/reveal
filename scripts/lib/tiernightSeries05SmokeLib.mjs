@@ -422,7 +422,8 @@ export function analyzeSeriesFixture(sessionRow) {
     base.blockers.push("UNSUPPORTED_VERSION");
     return base;
   }
-  if (![3, 5, 7].includes(Number(roundCount))) {
+  // 7 = legacy lecture ; 3/5/8 = contrat FEATURE-TIERNIGHT-03-A
+  if (![3, 5, 7, 8].includes(Number(roundCount))) {
     base.blockers.push("INVALID_ROUND_COUNT");
     return base;
   }

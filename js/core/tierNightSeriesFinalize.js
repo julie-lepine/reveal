@@ -2,7 +2,8 @@
  * FEATURE-TIERNIGHT-SERIES-03 — wrapper RPC finalize_tiernight_series_round.
  *
  * Ne fait AUCUN scoring local (pas d’addScore).
- * Non branché à advanceTierNightToResultsWhenReady / UX série.
+ * Branchement UX : hostFinalizeTierNightSeriesRound (playSession / board série).
+ * Ne pas appeler depuis classic advanceTierNightToResultsWhenReady.
  */
 
 import { supabase, isSupabaseConfigured } from "./supabaseClient.js";

@@ -36,6 +36,7 @@ import { defaultDilemmaPrepSession } from "./dilemmaSession.js";
 import { showAppAlert } from "./dialog.js";
 import { escapeHtml } from "./ui.js";
 import { createTierNightRunId, finishedTierNightLiveRemote } from "./tierNightConfig.js";
+import { buildAuthoritativeTierNightPrepReset } from "./tierNightSeriesPrepContracts.js";
 import { createActionLock } from "./actionLock.js";
 import {
   CHAT_ROULETTE_STATE_KEY,
@@ -470,6 +471,18 @@ export async function launchGuessLieMenu() {
   });
 }
 
+/**
+ * Entrée hub TierNight (game-select / recommencer Rank Live / gate OFF).
+ * FEATURE-TIERNIGHT-03-C / C1 / E — ouvre le choix de mode (select).
+ * Sous gate série, « Classe le groupe » mène ensuite à tiernight-prep.
+ * Fin de série / legacy roster sous gate : `restartGame` → `replayTierNightAfterSeriesEnd` (prep).
+ * Reset prep remote : intention autoritative hôte uniquement, epoch bumpée,
+ * même mutation que le changement d’écran (commitPrepSessionLaunch).
+ * consumed + customs non touchés.
+ *
+ * Note E : le `runId` minté ici sert au shell hub / Rank Live ; le runId de série
+ * est reminté uniquement dans `prepareTierNightSeriesLaunchAttempt` au launch.
+ */
 export async function launchTierNightSelect() {
   if (!(await assertNoActiveChatRoulette({ sessionGameId: "tiernight" }))) return;
   const runId = createTierNightRunId();
@@ -493,12 +506,20 @@ export async function launchTierNightSelect() {
     placements: {},
     finished: false,
   };
+  const prevEpoch = Number(getState().tierNightSeriesPrep?.setupEpoch) || 0;
+  const prepReset = buildAuthoritativeTierNightPrepReset({
+    previousSetupEpoch: prevEpoch,
+    categoryIds: ["*"],
+    roundCount: 5,
+  });
   const statePatch = {
     tierNightTopicId: null,
     tierNightMode: "roster",
     tierNightModifier: "normal",
     tierNightGame: tierNightReset,
     tierNightLiveGame: tierNightLiveReset,
+    // Prep reset settings/ready (B1/C1) — consumed ledger préservé (non touché ici).
+    tierNightSeriesPrep: prepReset,
   };
 
   if (!isGameSyncActive()) {
@@ -528,6 +549,12 @@ export async function launchTierNightSelect() {
         recap: null,
       },
       tierNightLive: finishedTierNightLiveRemote({ runId }),
+      tierNightPrep: {
+        categoryIds: prepReset.categoryIds,
+        roundCount: prepReset.roundCount,
+        ready: {},
+        setupEpoch: prepReset.setupEpoch,
+      },
     },
     alertTitle: "TierNight",
     alertFallback: "Impossible de lancer TierNight.",
@@ -553,6 +580,21 @@ export async function restartGame(gameId) {
   const fn = RESTART_HANDLERS[gameId];
   if (!fn) return;
   if (!(await assertNoActiveChatRoulette({ sessionGameId: gameId }))) return;
+
+  // FEATURE-TIERNIGHT-03-E — sous gate, fin série / legacy roster → prep (pas classic / pas select).
+  if (gameId === "tiernight") {
+    const {
+      shouldReplayTierNightSeriesToPrep,
+      replayTierNightAfterSeriesEnd,
+    } = await import("./tierNightSeriesExitNav.js");
+    if (shouldReplayTierNightSeriesToPrep()) {
+      const outcome = await restartLock.run(() =>
+        replayTierNightAfterSeriesEnd()
+      );
+      return outcome.ok ? outcome.value : undefined;
+    }
+  }
+
   const outcome = await restartLock.run(() => fn());
   return outcome.ok ? outcome.value : undefined;
 }

@@ -132,6 +132,13 @@ import {
   mergeTierNightRemoteBlob,
   applySeriesDecisionToTierNightGame,
 } from "./tierNightSeries.js";
+import {
+  mergeConsumedCustomRosterTopicIdsForHydrate,
+  reconcileConsumedCustomRosterTopicIds,
+  mergeTierNightPrepRemoteState,
+  resolveTierNightRosterDestinationFromSharedState,
+} from "./tierNightSeriesPrepContracts.js";
+import { isTierNightSeriesUiEnabled } from "./tierNightSeriesGate.js";
 
 export { withPatchTimeout };
 export { pickRemotePlayFields, PLAY_PATCH_EXCLUDE } from "./playPatch.js";
@@ -633,6 +640,7 @@ const GAME_SETUP_SCREENS = new Set([
   "guesslie-setup",
   "guesslie-wait",
   "tiernight-select",
+  "tiernight-prep",
   "tiernight-create",
   "tiernight-create-roster",
 ]);
@@ -640,9 +648,10 @@ const GAME_SETUP_SCREENS = new Set([
 /** Guess The Lie : préparation par joueur - la session reste sur guesslie-menu. */
 const GUESS_LIE_PREP_SCREENS = new Set(["guesslie-menu", "guesslie-setup", "guesslie-wait"]);
 
-/** Tier Night : création locale possible depuis tiernight-select. */
+/** Tier Night : création locale / prep série depuis tiernight-select. */
 const TIER_NIGHT_PREP_SCREENS = new Set([
   "tiernight-select",
+  "tiernight-prep",
   "tiernight-create",
   "tiernight-create-roster",
 ]);
@@ -659,7 +668,14 @@ function hasLocalTierNightRecap() {
 }
 
 export function canRouteToTierNightEnd(row) {
-  return tierNightRecapBelongsToRun(row?.state?.tierNight);
+  const tn = row?.state?.tierNight;
+  if (tn?.series?.phase === "series_end") {
+    // Bridge legacy recap posé par finalize dernière manche, ou history non vide.
+    if (tierNightRecapBelongsToRun(tn)) return true;
+    const history = tn.series.roundHistory;
+    return Array.isArray(history) && history.length > 0;
+  }
+  return tierNightRecapBelongsToRun(tn);
 }
 
 function warnBlockedTierNightEndRoute(row, source) {
@@ -680,7 +696,12 @@ export function isCompatibleSessionScreen(sessionScreen, localScreen) {
   if (GUESS_LIE_PREP_SCREENS.has(sessionScreen) && GUESS_LIE_PREP_SCREENS.has(localScreen)) {
     return true;
   }
-  if (sessionScreen === "tiernight-select" && TIER_NIGHT_PREP_SCREENS.has(localScreen)) return true;
+  if (
+    (sessionScreen === "tiernight-select" || sessionScreen === "tiernight-prep") &&
+    TIER_NIGHT_PREP_SCREENS.has(localScreen)
+  ) {
+    return true;
+  }
   /** Résultats ↔ classement : navigation locale sans forcer le retour via la session. */
   if (
     (sessionScreen === "results" && localScreen === "leaderboard") ||
@@ -1185,6 +1206,50 @@ export function hotTakeToRemote(session) {
           ...session.lastRound,
           deltas: scoresToRemote(session.lastRound.deltas || {}),
         }
+      : null,
+  };
+}
+
+/** FEATURE-TIERNIGHT-03-B / B1 / B1-bis — prep série (settings + ready + setupEpoch). */
+export function tierNightPrepToRemote(session = {}) {
+  const roundRaw = session.roundCount;
+  const remote = {
+    categoryIds: Array.isArray(session.categoryIds)
+      ? session.categoryIds.map(String)
+      : ["*"],
+    roundCount: roundRaw == null || roundRaw === "" ? null : Number(roundRaw),
+    ready: mapReadyByUid(session.ready || {}),
+    setupEpoch: Number(session.setupEpoch) || 0,
+  };
+  if (session.poolInvalidateRequestId) {
+    remote.poolInvalidateRequestId = String(session.poolInvalidateRequestId);
+  } else if (session.poolInvalidateRequestId === null) {
+    remote.poolInvalidateRequestId = null;
+  }
+  return remote;
+}
+
+export function tierNightPrepFromRemote(remote) {
+  if (!remote || typeof remote !== "object") {
+    return {
+      categoryIds: ["*"],
+      roundCount: 5,
+      ready: {},
+      setupEpoch: 0,
+      poolInvalidateRequestId: null,
+    };
+  }
+  // FEATURE-TIERNIGHT-03-C — ignorer path/wizard legacy (ne pas créer un prep parallèle).
+  const roundRaw = remote.roundCount;
+  return {
+    categoryIds: Array.isArray(remote.categoryIds)
+      ? remote.categoryIds.map(String)
+      : ["*"],
+    roundCount: roundRaw == null || roundRaw === "" ? null : Number(roundRaw),
+    ready: mapReadyByName(remote.ready || {}),
+    setupEpoch: Number(remote.setupEpoch) || 0,
+    poolInvalidateRequestId: remote.poolInvalidateRequestId
+      ? String(remote.poolInvalidateRequestId)
       : null,
   };
 }
@@ -3015,6 +3080,13 @@ export function applyRemoteEveningState(st) {
     }
   }
 
+  if (Array.isArray(st.consumedCustomRosterTopicIds) || st.consumedCustomRosterTopicIds === null) {
+    patch.consumedCustomRosterTopicIds = mergeConsumedCustomRosterTopicIdsForHydrate(
+      getState().consumedCustomRosterTopicIds,
+      st.consumedCustomRosterTopicIds
+    );
+  }
+
   if (Object.keys(patch).length) saveStatePatch(patch);
   if (st.scores) applyRemoteLobbyScores(st.scores);
   if (st.playerStats) applyRemotePlayerStats(st.playerStats, (uid) => playerKeyToDisplayName(uid));
@@ -3283,6 +3355,9 @@ export function applyRemoteSession(row, { epoch = null } = {}) {
     const local = getState().guessLie;
     patch.guessLie = local ? mergeGuessLieGameLocal(local, remote) : remote;
   }
+  if (st.tierNightPrep) {
+    patch.tierNightSeriesPrep = tierNightPrepFromRemote(st.tierNightPrep);
+  }
   Object.assign(patch, tierNightConfigPatchFromRemoteState(st));
 
   if (st.tierNight) {
@@ -3389,6 +3464,22 @@ export function applyRemoteSession(row, { epoch = null } = {}) {
       }
     }
   }
+
+  // FEATURE-TIERNIGHT-03-B1 — réconciliation ledger depuis queue série (crash-safe)
+  {
+    const seriesForLedger = patch.tierNightGame?.series || null;
+    if (seriesForLedger && typeof seriesForLedger === "object") {
+      const base =
+        patch.consumedCustomRosterTopicIds !== undefined
+          ? patch.consumedCustomRosterTopicIds
+          : getState().consumedCustomRosterTopicIds;
+      patch.consumedCustomRosterTopicIds = reconcileConsumedCustomRosterTopicIds(
+        base,
+        seriesForLedger
+      );
+    }
+  }
+
   if (st.tierNightLive) {
     const remote = tierNightLiveFromRemote(st.tierNightLive);
     const local = getState().tierNightLiveGame;
@@ -3466,6 +3557,17 @@ export function applyRemoteSession(row, { epoch = null } = {}) {
 
   applyRemoteEveningState(st);
   syncLastGameFromSessionRow(row);
+
+  // FEATURE-TIERNIGHT-03-B1-bis — hôte honore invalidation pool (requête invité / customs)
+  void import("./tierNightSeriesPrepSession.js")
+    .then((m) => {
+      const prepRemote = st.tierNightPrep || getState().tierNightSeriesPrep;
+      return Promise.all([
+        m.honorTierNightPrepPoolInvalidateRequest(prepRemote),
+        m.honorTierNightPrepCustomsPoolChange(getState().customRosterTopics),
+      ]);
+    })
+    .catch(() => {});
 
   if (sigUnchanged && !playChanged) {
     // Session déjà observée ≠ navigation déjà réussie : retenter si mustFollow.
@@ -3550,6 +3652,7 @@ function navStackFor(screen) {
     "guesslie-wait",
     "guesslie",
     "tiernight-select",
+    "tiernight-prep",
     "tiernight-create",
     "tiernight-create-roster",
     "tiernight",
@@ -3689,6 +3792,16 @@ function resolveActivePlayScreen(st, gid, declared) {
   const glPhase = st.guessLie?.phase;
   if (glPhase && glPhase !== "idle" && glPhase !== "lobby") return "guesslie";
   if (st.tierNightLive?.lobbyStarted && !st.tierNightLive?.finished) return "tiernight-live";
+  // FEATURE-TIERNIGHT-03-C/D/E — phase série prioritaire (between / end / ranking).
+  // round_result / phase invalide : null (pas d’écran jouable incorrect).
+  const tnSeries = st.tierNight?.series;
+  if (tnSeries && typeof tnSeries === "object") {
+    const phase = tnSeries.phase;
+    if (phase === "between_rounds") return "tiernight-between";
+    if (phase === "series_end") return "tiernight-end";
+    if (phase === "ranking") return "tiernight";
+    return null;
+  }
   if (st.tierNight?.lobbyStarted) return "tiernight";
   return null;
 }
@@ -3733,6 +3846,25 @@ export function getEffectiveSessionScreen(row) {
   const activePlay = resolveActivePlayScreen(st, gid, declared);
   if (activePlay) return activePlay;
 
+  // FEATURE-TIERNIGHT-03-E1 — série présente mais phase non jouable (ex. round_result) :
+  // ne pas conserver un declared play (between/tiernight) qui laisserait le board actif.
+  const tnSeries = st.tierNight?.series;
+  if (tnSeries && typeof tnSeries === "object" && tnSeries.phase) {
+    const phase = tnSeries.phase;
+    if (
+      phase !== "ranking" &&
+      phase !== "between_rounds" &&
+      phase !== "series_end"
+    ) {
+      const safe = resolveTierNightRosterDestinationFromSharedState({
+        tierNight: st.tierNight,
+        seriesUiEnabled: isTierNightSeriesUiEnabled(),
+        declaredScreen: declared,
+      });
+      return safe.screen;
+    }
+  }
+
   if (declared && GAME_SETUP_SCREENS.has(declared)) return declared;
 
   if (declared && !MENU_SCREENS.has(declared) && !POST_GAME_SCREENS.has(declared)) {
@@ -3776,6 +3908,9 @@ export function getEffectiveSessionScreen(row) {
   }
 
   if (gid === "guesslie" || declared === "guesslie-menu") return "guesslie-menu";
+  if (st.tierNightPrep && (gid === "tiernight" || declared === "tiernight-prep")) {
+    return "tiernight-prep";
+  }
   return declared;
 }
 
@@ -4799,6 +4934,23 @@ async function patchGameStateInner(
     }
     nextState.tierNight = mergedTn;
   }
+  if (mergePayload.tierNightPrep) {
+    const curPrep = current.tierNightPrep || {};
+    const incPrep = mergePayload.tierNightPrep;
+    nextState.tierNightPrep = mergeTierNightPrepRemoteState(curPrep, incPrep);
+  }
+  if (
+    Array.isArray(mergePayload.consumedCustomRosterTopicIds) ||
+    mergePayload.consumedCustomRosterTopicIds === null
+  ) {
+    // null n’est pas un clear autorisé ici — union monotone seulement si array
+    if (Array.isArray(mergePayload.consumedCustomRosterTopicIds)) {
+      nextState.consumedCustomRosterTopicIds = mergeConsumedCustomRosterTopicIdsForHydrate(
+        current.consumedCustomRosterTopicIds,
+        mergePayload.consumedCustomRosterTopicIds
+      );
+    }
+  }
   if (mergePayload.guessLie) {
     const curGl = current.guessLie;
     const incGl = mergePayload.guessLie;
@@ -4890,7 +5042,17 @@ async function patchGameStateInner(
 export async function endGameSession() {
   if (!isGameSyncActive()) return;
   const lobbyId = getState().lobby.id;
-  await deleteGameSession(lobbyId);
+  try {
+    await withPatchTimeout(
+      deleteGameSession(lobbyId),
+      DEFAULT_SYNC_PATCH_TIMEOUT_MS,
+      "Fermeture de partie trop longue."
+    );
+  } catch (err) {
+    // Timeout / réseau : succès serveur possible (DELETE 0-row = OK).
+    const row = await fetchGameSessionByLobby(lobbyId);
+    if (row) throw err;
+  }
   cachedRow = null;
   lastSessionSig = "";
   lastSessionUpdatedAt = "";
@@ -5048,8 +5210,9 @@ export async function returnToGameSelect({ shouldContinue = null } = {}) {
 
   if (isLobbyHost()) {
     await endGameSession();
-    if (!canContinue()) return false;
+    // Delete déjà commit : reset local même si le mount est stale (évite série fantôme).
     resetLocalGamePrepState();
+    if (!canContinue()) return true;
     routeToSessionScreen("game-select", { force: true });
     return true;
   }

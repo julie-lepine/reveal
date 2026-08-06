@@ -1,5 +1,5 @@
 /**
- * FEATURE-TIERNIGHT-SERIES-04 — état UI temporaire du setup série (pur).
+ * FEATURE-TIERNIGHT-SERIES-04 / FEATURE-TIERNIGHT-03-A — état UI temporaire du setup série (pur).
  * Ne crée ni runId ni queue ; non sérialisé dans game_sessions.
  */
 
@@ -8,7 +8,9 @@ import {
   TIER_NIGHT_SERIES_ALL_CATEGORIES,
   TIER_NIGHT_SERIES_ROUND_COUNTS,
   countEligibleTierNightSeriesTopics,
+  countTierNightSeriesTopicPool,
   listEligibleTierNightSeriesTopics,
+  buildTierNightSeriesTopicPool,
 } from "./tierNightSeries.js";
 
 export const TIER_NIGHT_SERIES_SETUP_PATHS = Object.freeze(["single", "series"]);
@@ -25,7 +27,7 @@ export function createEmptyTierNightSeriesSetup() {
 }
 
 /**
- * Options catégories pour l’UI (customs / disabled exclus du count).
+ * Options catégories pour l’UI (counts catalogue seuls — les customs sont globaux au pool).
  * @returns {Array<{ id: string, label: string, order: number, eligibleCount: number }>}
  */
 export function listTierNightSeriesCategoryOptions() {
@@ -53,20 +55,25 @@ export function resolveTierNightSeriesSetupCategoryIds(categoryIds) {
 }
 
 /**
+ * Taille du pool série (officiels filtrés + customs non consommés).
  * @param {string[]|null} categoryIds
+ * @param {{ customTopics?: Iterable<object>, excludeCustomIds?: Iterable<string>|null }} [opts]
  */
-export function getTierNightSeriesPoolSize(categoryIds) {
-  return countEligibleTierNightSeriesTopics({
+export function getTierNightSeriesPoolSize(categoryIds, opts = {}) {
+  return countTierNightSeriesTopicPool({
     categoryIds: resolveTierNightSeriesSetupCategoryIds(categoryIds),
+    customTopics: opts.customTopics || [],
+    excludeCustomIds: opts.excludeCustomIds ?? null,
   });
 }
 
 /**
- * Disponibilité 3/5/7 pour le pool courant (pas de clamp silencieux).
+ * Disponibilité 3/5/8 pour le pool courant (pas de clamp silencieux).
  * @param {string[]|null} categoryIds
+ * @param {{ customTopics?: Iterable<object>, excludeCustomIds?: Iterable<string>|null }} [opts]
  */
-export function getTierNightSeriesRoundCountAvailability(categoryIds) {
-  const poolSize = getTierNightSeriesPoolSize(categoryIds);
+export function getTierNightSeriesRoundCountAvailability(categoryIds, opts = {}) {
+  const poolSize = getTierNightSeriesPoolSize(categoryIds, opts);
   return TIER_NIGHT_SERIES_ROUND_COUNTS.map((roundCount) => ({
     roundCount,
     poolSize,
@@ -76,9 +83,10 @@ export function getTierNightSeriesRoundCountAvailability(categoryIds) {
 
 /**
  * @param {object} setup
+ * @param {{ customTopics?: Iterable<object>, excludeCustomIds?: Iterable<string>|null }} [opts]
  * @returns {{ ok: true } | { ok: false, code: string, message: string }}
  */
-export function validateTierNightSeriesSetupForLaunch(setup) {
+export function validateTierNightSeriesSetupForLaunch(setup, opts = {}) {
   if (!setup || setup.path !== "series") {
     return { ok: false, code: "NOT_SERIES_PATH", message: "Parcours série requis." };
   }
@@ -90,11 +98,11 @@ export function validateTierNightSeriesSetupForLaunch(setup) {
     return {
       ok: false,
       code: "NO_ROUND_COUNT",
-      message: "Choisis 3, 5 ou 7 manches.",
+      message: "Choisis 3, 5 ou 8 manches.",
     };
   }
   const cats = resolveTierNightSeriesSetupCategoryIds(setup.categoryIds);
-  const poolSize = getTierNightSeriesPoolSize(cats);
+  const poolSize = getTierNightSeriesPoolSize(cats, opts);
   if (poolSize < roundCount) {
     return {
       ok: false,
@@ -110,15 +118,16 @@ export function validateTierNightSeriesSetupForLaunch(setup) {
 /**
  * Invalide roundCount si le pool ne le permet plus.
  * @param {object} setup
+ * @param {{ customTopics?: Iterable<object>, excludeCustomIds?: Iterable<string>|null }} [opts]
  */
-export function reconcileTierNightSeriesSetupAfterCategoryChange(setup) {
+export function reconcileTierNightSeriesSetupAfterCategoryChange(setup, opts = {}) {
   const next = {
     path: setup?.path ?? null,
     categoryIds: setup?.categoryIds ?? null,
     roundCount: setup?.roundCount ?? null,
   };
   if (next.roundCount == null || next.categoryIds == null) return next;
-  const avail = getTierNightSeriesRoundCountAvailability(next.categoryIds).find(
+  const avail = getTierNightSeriesRoundCountAvailability(next.categoryIds, opts).find(
     (r) => r.roundCount === Number(next.roundCount)
   );
   if (!avail?.available) {
@@ -142,8 +151,25 @@ export function formatTierNightSeriesCategorySummary(categoryIds) {
   return labels.join(", ") || "Catégories";
 }
 
+/**
+ * Aperçu catalogue (sans customs) — rétrocompat UI gate.
+ * @param {string[]|null} categoryIds
+ */
 export function peekEligibleTopicsForSetup(categoryIds) {
   return listEligibleTierNightSeriesTopics({
     categoryIds: resolveTierNightSeriesSetupCategoryIds(categoryIds),
+  });
+}
+
+/**
+ * Aperçu pool série complet (officiels + customs non consommés).
+ * @param {string[]|null} categoryIds
+ * @param {{ customTopics?: Iterable<object>, excludeCustomIds?: Iterable<string>|null }} [opts]
+ */
+export function peekSeriesTopicPoolForSetup(categoryIds, opts = {}) {
+  return buildTierNightSeriesTopicPool({
+    categoryIds: resolveTierNightSeriesSetupCategoryIds(categoryIds),
+    customTopics: opts.customTopics || [],
+    excludeCustomIds: opts.excludeCustomIds ?? null,
   });
 }
