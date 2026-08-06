@@ -223,7 +223,7 @@ export function mountTierNightPrep(app) {
     const poolHint = app.querySelector("#tier-night-pool-hint");
     if (poolHint) {
       const catLabel = formatTierNightSeriesCategorySummary(cats);
-      poolHint.textContent = `${catLabel} — ${prep.poolSize} thème${
+      poolHint.textContent = `${catLabel} - ${prep.poolSize} thème${
         prep.poolSize > 1 ? "s" : ""
       } disponible${prep.poolSize > 1 ? "s" : ""} (catalogue + customs).`;
     }
@@ -397,7 +397,7 @@ export function mountTierNightPrep(app) {
               .join("")}
           </div>
           <p class="hint" id="tier-night-pool-hint">${escapeHtml(
-            `${formatTierNightSeriesCategorySummary(cats)} — ${prep.poolSize} thème${
+            `${formatTierNightSeriesCategorySummary(cats)} - ${prep.poolSize} thème${
               prep.poolSize > 1 ? "s" : ""
             } disponible${prep.poolSize > 1 ? "s" : ""} (catalogue + customs).`
           )}</p>
