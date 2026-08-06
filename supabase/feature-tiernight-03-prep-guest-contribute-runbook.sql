@@ -1,0 +1,19 @@
+-- =============================================================================
+-- BUG-TIERNIGHT-PREP-GUEST-01 — Runbook (pointeur)
+-- =============================================================================
+-- Ce fichier était descriptif / commenté : NON PROBANT pour R1–R10.
+--
+-- Harness réellement exécutable (assertions + fixtures + cleanup) :
+--   supabase/feature-tiernight-03-prep-guest-contribute-smoke-harness.sql
+--
+-- R0 ACL a été validé manuellement sur staging (SECURITY DEFINER, search_path,
+-- authenticated EXECUTE, anon/public sans EXECUTE).
+--
+-- Migration produit (ne pas modifier sauf défaut smoke) :
+--   supabase/feature-tiernight-03-prep-guest-contribute.sql
+--
+-- Ordre staging :
+--   1. Migration contribute déjà appliquée
+--   2. Exécuter le smoke-harness (helpers → R0 → spawn → R1–R9 → R10)
+--   3. Notices « Rn OK » ; sinon exception + cleanup de secours en bas du harness
+-- =============================================================================

@@ -96,4 +96,62 @@ describe("detectPlayerContribution (I-08)", () => {
     assert.equal(stateKeyToGameId("tierNightLive"), "tiernightlive");
     assert.equal(stateKeyToGameId("unknown"), null);
   });
+
+  it("BUG-TIERNIGHT-PREP-GUEST-01 : tierNightPrep ready + expectedSetupEpoch + poolInvalidate", () => {
+    assert.deepEqual(
+      detectPlayerContribution(
+        {
+          tierNightPrep: {
+            ready: { [UID]: true },
+            expectedSetupEpoch: 2,
+          },
+        },
+        UID
+      ),
+      {
+        game: "tiernight",
+        kind: "ready",
+        value: { ready: true, expectedSetupEpoch: 2 },
+      }
+    );
+    assert.equal(
+      detectPlayerContribution(
+        { tierNightPrep: { ready: { [UID]: true } } },
+        UID
+      ),
+      null
+    );
+    assert.deepEqual(
+      detectPlayerContribution(
+        {
+          tierNightPrep: {
+            poolInvalidateRequest: {
+              requestId: "inv-1",
+              customEntryId: "roster:c1",
+            },
+          },
+        },
+        UID
+      ),
+      {
+        game: "tiernight",
+        kind: "pool_invalidate_request",
+        value: { requestId: "inv-1", customEntryId: "roster:c1" },
+      }
+    );
+    assert.equal(
+      detectPlayerContribution(
+        { tierNightPrep: { poolInvalidateRequestId: "inv-1" } },
+        UID
+      ),
+      null
+    );
+    assert.equal(
+      detectPlayerContribution(
+        { tierNightPrep: { ready: { [UID]: true }, categoryIds: ["*"] } },
+        UID
+      ),
+      null
+    );
+  });
 });

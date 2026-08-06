@@ -175,9 +175,9 @@ describe("FEATURE-TIERNIGHT-03-B1-bis - invalidation ready globale", () => {
       },
     });
 
-    // Prime signature
+    // Amorce signature vide → skip si topics []
     let r = await prepSession.honorTierNightPrepCustomsPoolChange([]);
-    assert.equal(r.primed || r.skipped, true);
+    assert.equal(r.skipped, true);
 
     r = await prepSession.honorTierNightPrepCustomsPoolChange([
       { id: `${CUSTOM_ROSTER_TOPIC_ID_PREFIX}x`, name: "X" },
@@ -309,17 +309,19 @@ describe("FEATURE-TIERNIGHT-03-B1-bis - atomicité launch", () => {
 });
 
 describe("FEATURE-TIERNIGHT-03-B1-bis - wiring host honor", () => {
-  it("gameSync planifie honor invalidate + customs", () => {
+  it("gameSync planifie honor via scheduleTierNightPrepHostHonors", () => {
     const src = read("js/core/gameSync.js");
-    assert.match(src, /honorTierNightPrepPoolInvalidateRequest/);
-    assert.match(src, /honorTierNightPrepCustomsPoolChange/);
+    assert.match(src, /scheduleTierNightPrepHostHonors/);
+    assert.doesNotMatch(src, /void import\("\.\/tierNightSeriesPrepSession/);
   });
 
-  it("invité invalidate publie poolInvalidateRequestId (source)", () => {
+  it("invité invalidate publie poolInvalidateRequest + customEntryId", () => {
     const src = read("js/core/tierNightSeriesPrepSession.js");
-    assert.match(src, /poolInvalidateRequestId/);
+    assert.match(src, /poolInvalidateRequest/);
+    assert.match(src, /customEntryId/);
     assert.match(src, /requested:\s*true/);
     assert.match(src, /canActAsHost/);
     assert.match(src, /AUTHORITATIVE_INVALIDATE_COALESCE_MS|coalesced/);
+    assert.match(src, /scheduleTierNightPrepHostHonors/);
   });
 });

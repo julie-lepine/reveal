@@ -3558,16 +3558,18 @@ export function applyRemoteSession(row, { epoch = null } = {}) {
   applyRemoteEveningState(st);
   syncLastGameFromSessionRow(row);
 
-  // FEATURE-TIERNIGHT-03-B1-bis — hôte honore invalidation pool (requête invité / customs)
-  void import("./tierNightSeriesPrepSession.js")
-    .then((m) => {
-      const prepRemote = st.tierNightPrep || getState().tierNightSeriesPrep;
-      return Promise.all([
-        m.honorTierNightPrepPoolInvalidateRequest(prepRemote),
-        m.honorTierNightPrepCustomsPoolChange(getState().customRosterTopics),
-      ]);
-    })
-    .catch(() => {});
+  // FEATURE-TIERNIGHT-03-B1-bis / BUG-TIERNIGHT-PREP-GUEST-01 —
+  // hôte honore invalidation pool (empreinte customs + request) — catch terminal.
+  import("./tierNightSeriesPrepSession.js")
+    .then((m) =>
+      m.scheduleTierNightPrepHostHonors(
+        st.tierNightPrep || getState().tierNightSeriesPrep,
+        getState().customRosterTopics
+      )
+    )
+    .catch((err) => {
+      console.warn("REVEAL tierNight prep host honor schedule:", err);
+    });
 
   if (sigUnchanged && !playChanged) {
     // Session déjà observée ≠ navigation déjà réussie : retenter si mustFollow.

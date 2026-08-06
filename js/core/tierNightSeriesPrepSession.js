@@ -37,6 +37,7 @@ import {
   tierNightPrepFromRemote,
   requireLocalParticipantUid,
 } from "./gameSync.js";
+import { commitPrepReadyToggle } from "./mpLaunch.js";
 import { prepareTierNightSeriesLaunchAttempt } from "./tierNightSeriesLaunch.js";
 import { markTierNightSeriesStarted } from "./tierNightLiveSession.js";
 import { getLobbyParticipants } from "./lobby.js";
@@ -58,12 +59,17 @@ let lastHostSeenCustomsSignature = null;
 /** Coalesce bumps hôte (customs + request proches). */
 let lastAuthoritativeInvalidateAt = 0;
 const AUTHORITATIVE_INVALIDATE_COALESCE_MS = 750;
+/** File d’honneur hôte (une mutation autoritative à la fois). */
+let honorChain = Promise.resolve();
+let honorGeneration = 0;
 
 /** Tests uniquement. */
 export function resetTierNightSeriesPrepInvalidateGuardsForTests() {
   lastHonoredPoolInvalidateRequestId = null;
   lastHostSeenCustomsSignature = null;
   lastAuthoritativeInvalidateAt = 0;
+  honorChain = Promise.resolve();
+  honorGeneration = 0;
 }
 
 function defaultPrepSession() {
@@ -125,9 +131,13 @@ async function syncTierNightSeriesPrepSession(extra = {}, patchOpts = {}) {
 /**
  * Invalide readiness après changement de setup / pool.
  * Autorité : hôte (ou acting host) bump setupEpoch + clear ready global.
- * Invité : publie poolInvalidateRequestId (contribute) ; ne bump pas l’epoch.
+ * Invité : contribute `{ poolInvalidateRequest: { requestId, customEntryId } }`
+ *          (custom doit exister + appartenir à auth.uid côté SQL).
+ * @param {{ customEntryId?: string|null }} [opts]
  */
-export async function invalidateTierNightSeriesPrepReadiness() {
+export async function invalidateTierNightSeriesPrepReadiness({
+  customEntryId = null,
+} = {}) {
   if (!isGameSyncActive()) {
     const session = getTierNightSeriesPrepSession();
     const setupEpoch = (Number(session.setupEpoch) || 0) + 1;
@@ -146,7 +156,16 @@ export async function invalidateTierNightSeriesPrepReadiness() {
     return publishAuthoritativePrepReadyInvalidation();
   }
 
-  // Invité : clear local (UX) + demande autoritative
+  const entryId = customEntryId != null ? String(customEntryId).trim() : "";
+  if (!entryId) {
+    return {
+      ok: false,
+      code: "CUSTOM_ENTRY_REQUIRED",
+      error: "Invalidation pool : customEntryId requis.",
+    };
+  }
+
+  // Invité : clear local (UX) + demande autoritative liée au custom
   const session = getTierNightSeriesPrepSession();
   saveStatePatch({
     tierNightSeriesPrep: { ...session, ready: {} },
@@ -156,12 +175,19 @@ export async function invalidateTierNightSeriesPrepReadiness() {
     const uid = requireLocalParticipantUid();
     requestId = `inv-${uid}-${Date.now()}`;
   } catch {
-    requestId = `inv-anon-${Date.now()}`;
+    return {
+      ok: false,
+      error: "Synchronisation du joueur en cours. Réessaie.",
+    };
   }
   try {
     const { patchGameStateWithFeedback } = await import("./patchGameStateFeedback.js");
     await patchGameStateWithFeedback(
-      { tierNightPrep: { poolInvalidateRequestId: requestId } },
+      {
+        tierNightPrep: {
+          poolInvalidateRequest: { requestId, customEntryId: entryId },
+        },
+      },
       {}
     );
     return { ok: true, requested: true, poolInvalidateRequestId: requestId };
@@ -173,6 +199,10 @@ export async function invalidateTierNightSeriesPrepReadiness() {
   }
 }
 
+/**
+ * Mutation autoritative unique : setupEpoch++ + ready:{} + clear request.
+ * Coalesce ≤750 ms ; échec → refresh/reconcile ; pas de mark « honoré » ici.
+ */
 async function publishAuthoritativePrepReadyInvalidation() {
   const now = Date.now();
   if (now - lastAuthoritativeInvalidateAt < AUTHORITATIVE_INVALIDATE_COALESCE_MS) {
@@ -184,10 +214,12 @@ async function publishAuthoritativePrepReadyInvalidation() {
       authoritative: true,
     };
   }
-  lastAuthoritativeInvalidateAt = now;
 
+  const generation = honorGeneration;
   const session = getTierNightSeriesPrepSession();
-  const setupEpoch = (Number(session.setupEpoch) || 0) + 1;
+  const prevEpoch = Number(session.setupEpoch) || 0;
+  const setupEpoch = prevEpoch + 1;
+  const snapshot = { ...session };
   const next = {
     ...session,
     ready: {},
@@ -195,16 +227,56 @@ async function publishAuthoritativePrepReadyInvalidation() {
     poolInvalidateRequestId: null,
   };
   saveStatePatch({ tierNightSeriesPrep: next });
-  await patchGameState(
-    { tierNightPrep: tierNightPrepToRemote(next) },
-    { gameId: "tiernight", screen: "tiernight-prep" }
-  );
-  return { ok: true, setupEpoch, authoritative: true };
+  lastAuthoritativeInvalidateAt = now;
+
+  try {
+    await patchGameState(
+      { tierNightPrep: tierNightPrepToRemote(next) },
+      { gameId: "tiernight", screen: "tiernight-prep" }
+    );
+    return { ok: true, setupEpoch, authoritative: true };
+  } catch (err) {
+    if (generation !== honorGeneration) {
+      return { ok: false, staleCallback: true };
+    }
+    try {
+      const { refreshGameSession } = await import("./gameSync.js");
+      const row = await refreshGameSession();
+      const remote = row?.state?.tierNightPrep || {};
+      const remoteEpoch = Number(remote.setupEpoch) || 0;
+      const remoteReady =
+        remote.ready && typeof remote.ready === "object" ? remote.ready : {};
+      const readyEmpty = Object.keys(remoteReady).length === 0;
+      if (remoteEpoch > prevEpoch && readyEmpty) {
+        return { ok: true, reconciled: true, setupEpoch: remoteEpoch };
+      }
+      if (remoteEpoch > setupEpoch) {
+        return { ok: true, superseded: true, setupEpoch: remoteEpoch };
+      }
+    } catch {
+      /* refresh best-effort */
+    }
+    const cur = getTierNightSeriesPrepSession();
+    if (
+      generation === honorGeneration &&
+      Number(cur.setupEpoch) === setupEpoch
+    ) {
+      saveStatePatch({ tierNightSeriesPrep: snapshot });
+    }
+    lastAuthoritativeInvalidateAt = 0;
+    return {
+      ok: false,
+      error: err?.message || "Impossible d'invalider la préparation.",
+      retryable: true,
+    };
+  }
 }
 
 /**
- * Hôte : honore une requête d’invalidation (contribute invité) une seule fois.
- * @param {object|null|undefined} remotePrep — shape remote ou locale
+ * Hôte : honore une requête d’invalidation.
+ * - Bump epoch seulement si l’empreinte customs a changé (anti-spam request).
+ * - Sinon ack : clear request id sans bump.
+ * - lastHonored marqué uniquement après succès.
  */
 export async function honorTierNightPrepPoolInvalidateRequest(remotePrep) {
   if (!isGameSyncActive()) return { ok: true, skipped: true };
@@ -217,13 +289,55 @@ export async function honorTierNightPrepPoolInvalidateRequest(remotePrep) {
   if (!shouldHonorPoolInvalidateRequest(lastHonoredPoolInvalidateRequestId, requestId)) {
     return { ok: true, skipped: true };
   }
-  lastHonoredPoolInvalidateRequestId = String(requestId);
-  return publishAuthoritativePrepReadyInvalidation();
+
+  const sig = customRosterTopicsPoolSignature(getCustomRosterTopics());
+  const poolChanged =
+    lastHostSeenCustomsSignature != null && sig !== lastHostSeenCustomsSignature;
+
+  if (!poolChanged) {
+    // Request sans mutation pool réelle → ack seul (pas de bump epoch)
+    const ack = await ackPoolInvalidateRequestOnly(String(requestId));
+    if (ack.ok) lastHonoredPoolInvalidateRequestId = String(requestId);
+    return { ...ack, bumped: false, reason: "no_pool_change" };
+  }
+
+  const result = await publishAuthoritativePrepReadyInvalidation();
+  if (result.ok && !result.retryable) {
+    lastHonoredPoolInvalidateRequestId = String(requestId);
+    lastHostSeenCustomsSignature = sig;
+  }
+  return { ...result, bumped: Boolean(result.ok && !result.coalesced) };
+}
+
+/** Clear distant du request id sans changer setupEpoch / ready. */
+async function ackPoolInvalidateRequestOnly(requestId) {
+  const session = getTierNightSeriesPrepSession();
+  if (!session.poolInvalidateRequestId) {
+    return { ok: true, acked: true, alreadyClear: true };
+  }
+  const next = { ...session, poolInvalidateRequestId: null };
+  const snapshot = session;
+  saveStatePatch({ tierNightSeriesPrep: next });
+  try {
+    await patchGameState(
+      { tierNightPrep: { poolInvalidateRequestId: null } },
+      { gameId: "tiernight", screen: "tiernight-prep" }
+    );
+    return { ok: true, acked: true, requestId };
+  } catch (err) {
+    saveStatePatch({ tierNightSeriesPrep: snapshot });
+    return {
+      ok: false,
+      retryable: true,
+      error: err?.message || "Ack invalidate échoué.",
+    };
+  }
 }
 
 /**
  * Hôte : si l’empreinte customs a changé, invalide la readiness globale.
- * @param {Iterable<object>|null|undefined} topics
+ * Source primaire d’invalidation (request id = hint secondaire).
+ * Première observation : amorce à "" pour ne pas avaler le 1er custom sans bump.
  */
 export async function honorTierNightPrepCustomsPoolChange(topics) {
   if (!isGameSyncActive()) return { ok: true, skipped: true };
@@ -232,16 +346,45 @@ export async function honorTierNightPrepCustomsPoolChange(topics) {
   }
   const sig = customRosterTopicsPoolSignature(topics);
   if (lastHostSeenCustomsSignature == null) {
-    lastHostSeenCustomsSignature = sig;
-    return { ok: true, skipped: true, primed: true };
+    lastHostSeenCustomsSignature = "";
   }
   if (sig === lastHostSeenCustomsSignature) {
     return { ok: true, skipped: true };
   }
-  lastHostSeenCustomsSignature = sig;
-  const pending = getTierNightSeriesPrepSession().poolInvalidateRequestId;
-  if (pending) lastHonoredPoolInvalidateRequestId = String(pending);
-  return publishAuthoritativePrepReadyInvalidation();
+  const result = await publishAuthoritativePrepReadyInvalidation();
+  if (result.ok && !result.retryable) {
+    lastHostSeenCustomsSignature = sig;
+    const pending = getTierNightSeriesPrepSession().poolInvalidateRequestId;
+    if (pending) lastHonoredPoolInvalidateRequestId = String(pending);
+  }
+  return result;
+}
+
+/**
+ * Point d’entrée hydrate/Realtime : chaîne sérialisée + catch terminal.
+ * Pas de `void` silencieux — rejet toujours journalisé, jamais non géré.
+ * @param {object|null|undefined} remotePrep
+ * @param {Iterable<object>|null|undefined} topics
+ */
+export function scheduleTierNightPrepHostHonors(remotePrep, topics) {
+  if (!isGameSyncActive()) return Promise.resolve({ ok: true, skipped: true });
+  if (!isLobbyHost() && !canActAsHost()) {
+    return Promise.resolve({ ok: true, skipped: true, notHost: true });
+  }
+  honorGeneration += 1;
+  const gen = honorGeneration;
+  const job = async () => {
+    if (gen !== honorGeneration) return { ok: false, staleCallback: true };
+    const customs = await honorTierNightPrepCustomsPoolChange(topics);
+    if (gen !== honorGeneration) return { ok: false, staleCallback: true };
+    const request = await honorTierNightPrepPoolInvalidateRequest(remotePrep);
+    return { ok: true, customs, request };
+  };
+  honorChain = honorChain.then(job, job).catch((err) => {
+    console.warn("REVEAL tierNight prep host honor:", err);
+    return { ok: false, error: err?.message || String(err) };
+  });
+  return honorChain;
 }
 
 export function getConsumedCustomRosterTopicIds() {
@@ -350,41 +493,30 @@ export async function setTierNightSeriesPrepRoundCount(roundCount) {
   return { ok: true };
 }
 
+/**
+ * Ready joueur : contribution UID + expectedSetupEpoch (anti-stale B1).
+ * Payload contribute :
+ * `{ tierNightPrep: { ready: { [uid]: bool }, expectedSetupEpoch } }`
+ * → RPC value `{ ready, expectedSetupEpoch }`.
+ */
 export async function setTierNightSeriesPrepReady(playerName, ready) {
-  const session = getTierNightSeriesPrepSession();
-  const setupEpoch = Number(session.setupEpoch) || 0;
-  const previousReady = { ...(session.ready || {}) };
-  const nextReady = { ...previousReady, [playerName]: Boolean(ready) };
-  saveStatePatch({
-    tierNightSeriesPrep: { ...session, ready: nextReady },
+  await commitPrepReadyToggle({
+    readyKey: playerName,
+    ready,
+    getSession: getTierNightSeriesPrepSession,
+    saveLocal: (session) => saveStatePatch({ tierNightSeriesPrep: session }),
+    stateKey: "tierNightPrep",
+    gameId: "tiernight",
+    screen: "tiernight-prep",
+    buildRemoteReadyPatch: (uid, readyVal, session) => ({
+      ready: { [uid]: Boolean(readyVal) },
+      expectedSetupEpoch: Number(session.setupEpoch) || 0,
+    }),
+    isBenignRemoteFailure: (err) =>
+      /Ready obsolète|expectedSetupEpoch|setupEpoch diverg/i.test(
+        String(err?.message || err || "")
+      ),
   });
-
-  if (!isGameSyncActive()) return nextReady;
-
-  // Inclure setupEpoch pour que les ready stale (epoch plus ancien) soient ignorés au merge
-  try {
-    const { patchGameStateWithFeedback } = await import("./patchGameStateFeedback.js");
-    const { requireLocalParticipantUid, isLobbyHost: hostFn } = await import("./gameSync.js");
-    const uid = requireLocalParticipantUid();
-    const patchOpts = hostFn()
-      ? { gameId: "tiernight", screen: "tiernight-prep" }
-      : {};
-    await patchGameStateWithFeedback(
-      {
-        tierNightPrep: {
-          ready: { [uid]: Boolean(ready) },
-          setupEpoch,
-        },
-      },
-      patchOpts
-    );
-    return nextReady;
-  } catch {
-    saveStatePatch({
-      tierNightSeriesPrep: { ...session, ready: previousReady },
-    });
-    return previousReady;
-  }
 }
 
 export function allTierNightSeriesPrepReady() {
@@ -448,15 +580,21 @@ export function countOtherPlayersCustomRosterTopics() {
 export async function addCustomRosterTopicFromPrep(name) {
   const res = await addCustomRosterTopicAndSync({ name });
   if (res?.ok) {
-    await invalidateTierNightSeriesPrepReadiness();
+    await invalidateTierNightSeriesPrepReadiness({ customEntryId: res.id });
   }
   return res;
 }
 
 export async function removeCustomRosterTopicFromPrep(id) {
   const res = await deleteCustomRosterTopicAndSync(id);
-  if (res?.ok) {
+  if (!res?.ok) return res;
+  if (isLobbyHost() || canActAsHost()) {
     await invalidateTierNightSeriesPrepReadiness();
+  } else {
+    // Invité : le delete RPC change déjà l’empreinte customs ;
+    // l’hôte bump via honorTierNightPrepCustomsPoolChange (pas de request sans custom vivant).
+    const session = getTierNightSeriesPrepSession();
+    saveStatePatch({ tierNightSeriesPrep: { ...session, ready: {} } });
   }
   return res;
 }

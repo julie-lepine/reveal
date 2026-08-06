@@ -396,6 +396,11 @@ export async function commitHostGamePlay({
 
 /**
  * Toggle prêt en prep : patch local + patch remote narrow (ready uniquement).
+ * @param {object} opts
+ * @param {(uid: string, ready: boolean, session: object) => object} [opts.buildRemoteReadyPatch]
+ *        blob sous stateKey (défaut `{ ready: { [uid]: ready } }`).
+ * @param {(err: Error) => boolean} [opts.isBenignRemoteFailure]
+ *        si true : rollback local sans modale (ex. ready epoch stale).
  */
 export async function commitPrepReadyToggle({
   readyKey,
@@ -406,6 +411,8 @@ export async function commitPrepReadyToggle({
   gameId,
   screen,
   readyField = "ready",
+  buildRemoteReadyPatch = null,
+  isBenignRemoteFailure = null,
 }) {
   const session = getSession();
   const { previousReady, nextReady } = computePrepReadyToggle(
@@ -430,14 +437,35 @@ export async function commitPrepReadyToggle({
     return previousReady;
   }
 
+  const remoteBlob =
+    typeof buildRemoteReadyPatch === "function"
+      ? buildRemoteReadyPatch(uid, ready, session)
+      : { ready: { [uid]: ready } };
+
   try {
     // I-08 : ready invité sans screen/gameId (RPC contribute via patchGameState)
     const { patchGameStateWithFeedback } = await import("./patchGameStateFeedback.js");
+    const { patchGameState } = await import("./gameSync.js");
     const patchOpts = isLobbyHost() ? { gameId, screen } : {};
-    await patchGameStateWithFeedback(
-      { [stateKey]: { ready: { [uid]: ready } } },
-      patchOpts
-    );
+    if (typeof isBenignRemoteFailure === "function") {
+      try {
+        await patchGameState({ [stateKey]: remoteBlob }, patchOpts);
+      } catch (err) {
+        if (isBenignRemoteFailure(err)) {
+          saveLocal({ ...session, [readyField]: previousReady });
+          return previousReady;
+        }
+        const { showAppAlert: alert } = await import("./dialog.js");
+        const { formatSyncErrorMessage } = await import("./authErrors.js");
+        await alert(formatSyncErrorMessage(err?.message), {
+          title: "Connexion",
+          icon: "📡",
+        });
+        throw err;
+      }
+    } else {
+      await patchGameStateWithFeedback({ [stateKey]: remoteBlob }, patchOpts);
+    }
     return nextReady;
   } catch {
     saveLocal({ ...session, [readyField]: previousReady });
