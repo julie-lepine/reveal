@@ -81,3 +81,14 @@ export function tierNightPointsHintText({ reverse = false } = {}) {
   }
   return "Points : +15 même tier que le groupe, +10 à 1 tier d'écart · bonus +15 sur l'item le plus clivant.";
 }
+
+/**
+ * Explication métier intermanche (barème réel : proximité consensus + outsider).
+ * Pas pour Rank Live (scoring distinct).
+ */
+export function tierNightBetweenScoringExplainText({ reverse = false } = {}) {
+  if (reverse) {
+    return "Plus ton classement s’éloigne du consensus du groupe, plus tu marques de points.";
+  }
+  return "Plus ton classement se rapproche du classement du groupe, plus tu marques de points.";
+}

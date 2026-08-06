@@ -40,6 +40,8 @@ import {
   changeTierNightModeFromSeriesPlay,
   quitTierNightSeriesToGameSelect,
 } from "../core/tierNightSeriesExitNav.js";
+import { EXIT_GAME_LABEL } from "../core/exitGame.js";
+import { tierNightBetweenScoringExplainText } from "../core/tierNightScoring.js";
 
 export { TIER_NIGHT_SERIES_ADVANCE_FIELD_POLICY };
 
@@ -86,9 +88,22 @@ export function mountTierNightBetween(app) {
   function syncPhaseOrLeave() {
     const tn = getSeriesTn();
     const phase = tn?.series?.phase;
+    const series = tn?.series;
     if (phase === "round_result") {
       // Option A D1-bis : phase retirée — pas d’écran between / pas d’impasse sync.
       navigate("tiernight-prep");
+      return false;
+    }
+    // Récupération : history complète sur dernier index mais phase between (incohérent).
+    if (
+      series &&
+      phase === "between_rounds" &&
+      isTierNightSeriesLastRound(series) &&
+      Array.isArray(series.roundHistory) &&
+      Number(series.roundCount) > 0 &&
+      series.roundHistory.length >= Number(series.roundCount)
+    ) {
+      navigateForTierNightSeriesPhase("series_end");
       return false;
     }
     const target = resolveTierNightSeriesScreenFromPhase(phase);
@@ -194,6 +209,9 @@ export function mountTierNightBetween(app) {
           Array.isArray(recap?.recaps) && recap.recaps.length
             ? `<div class="card">
                 <p class="card-heading">Scores de la manche</p>
+                <p class="hint tier-between-scoring-explain">${escapeHtml(
+                  tierNightBetweenScoringExplainText({ reverse: false })
+                )}</p>
                 <ul class="score-list">
                   ${recap.recaps
                     .slice()
@@ -234,7 +252,7 @@ export function mountTierNightBetween(app) {
           }
           ${
             realHost
-              ? `<button type="button" class="btn btn-secondary btn--spaced" id="btn-tiernight-quit-series">✕ Quitter TierNight</button>`
+              ? `<button type="button" class="btn btn-secondary btn--spaced" id="btn-tiernight-quit-series">${escapeHtml(EXIT_GAME_LABEL)}</button>`
               : ""
           }
         </div>

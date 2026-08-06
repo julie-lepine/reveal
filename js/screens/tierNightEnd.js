@@ -36,6 +36,8 @@ import {
   changeTierNightModeFromSeriesPlay,
   quitTierNightSeriesToGameSelect,
 } from "../core/tierNightSeriesExitNav.js";
+import { EXIT_GAME_LABEL } from "../core/exitGame.js";
+import { resolveControversialItemForDisplay } from "../core/tierNightControversialDisplay.js";
 
 function tierOfItemIn(placed, item) {
   for (const tier of TIER_LEVELS) {
@@ -152,9 +154,12 @@ function recapCardHtml(r, { isLocal = false, breakdown = null, labelFn = (i) => 
 }
 
 /** Mise en scène de l'item le plus clivant (#1) + bonus outsider (#3). */
-function controversialHtml(session, recaps, labelFn = (i) => i) {
-  const item = session.controversialItem;
-  if (!item || (session.controversialSpread ?? 0) <= 0) return "";
+function controversialHtml(session, recaps, labelFn = (i) => i, series = null) {
+  const resolved = resolveControversialItemForDisplay({ session, series });
+  const item = resolved.item;
+  if (!item) return "";
+  const label = normalizeLabel(labelFn(item));
+  if (!label) return "";
   const votes = recaps
     .map((r) => ({ ...r, tier: tierOfItemIn(r.placed, item) }))
     .filter((r) => r.tier);
@@ -171,7 +176,7 @@ function controversialHtml(session, recaps, labelFn = (i) => i) {
   return `
     <div class="card tier-controversial-card">
       <p class="card-heading">🔥 L'item le plus clivant</p>
-      <p class="tier-controversial__item">« ${escapeHtml(labelFn(item))} »</p>
+      <p class="tier-controversial__item">« ${escapeHtml(label)} »</p>
       <p class="hint tier-controversial__sub">Personne n'était d'accord sur celui-là.</p>
       <div class="tier-controversial__votes">
         ${votes
@@ -186,6 +191,13 @@ function controversialHtml(session, recaps, labelFn = (i) => i) {
       </div>
       ${outsiderLine}
     </div>`;
+}
+
+function normalizeLabel(raw) {
+  if (raw == null) return "";
+  const t = String(raw).trim();
+  if (!t || t === "undefined" || t === "null") return "";
+  return t;
 }
 
 export function mountTierNightEnd(app) {
@@ -317,10 +329,14 @@ export function mountTierNightEnd(app) {
     const content = `
         <p class="label-upper label-upper--gold">🏆 Tier Night${isSeriesEnd ? " · Fin de série" : ""}</p>
         <h2 class="screen-title">${isSeriesEnd ? "Classement de la série" : "Récap des classements"}</h2>
-        <p class="game-intro">« ${escapeHtml(session.listName || "Tier list")} » - +${session.localConsensusPoints ?? 0} pts consensus pour toi cette manche.</p>
+        <p class="game-intro">${
+          isSeriesEnd
+            ? `Série terminée${history.length ? ` · ${history.length} thème${history.length > 1 ? "s" : ""}` : ""}.`
+            : `« ${escapeHtml(session.listName || "Tier list")} » - +${session.localConsensusPoints ?? 0} pts consensus pour toi cette manche.`
+        }</p>
         ${seriesHistoryHtml}
         ${consensusBoardHtml(session.consensus, labelFn)}
-        ${controversialHtml(session, recaps, labelFn)}
+        ${controversialHtml(session, recaps, labelFn, series)}
         <div class="recap-list">
           ${recaps.length
             ? recaps
@@ -343,7 +359,7 @@ export function mountTierNightEnd(app) {
         }
         ${
           realHost
-            ? `<button type="button" class="btn btn-secondary btn--spaced" id="btn-tiernight-end-quit">✕ Quitter TierNight</button>`
+            ? `<button type="button" class="btn btn-secondary btn--spaced" id="btn-tiernight-end-quit">${escapeHtml(EXIT_GAME_LABEL)}</button>`
             : ""
         }
         <button type="button" class="btn btn-primary" data-nav="results">Voir les résultats →</button>`;

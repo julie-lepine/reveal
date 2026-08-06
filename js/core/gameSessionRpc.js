@@ -66,6 +66,25 @@ export async function rpcDeletePlayerCustomEntry({ lobbyId, game, entryId }) {
   return asSessionRow(data);
 }
 
+/**
+ * FEATURE-TIERNIGHT-03 — hôte réel : vide tous les customRosterTopics (CAS session).
+ * @param {{ lobbyId: string, expectedSessionId?: string|null, reopen?: boolean }} opts
+ */
+export async function rpcClearTierNightCustomRosterTopics({
+  lobbyId,
+  expectedSessionId = null,
+  reopen = false,
+}) {
+  requireClient();
+  const { data, error } = await supabase.rpc("clear_tiernight_custom_roster_topics", {
+    p_lobby_id: lobbyId,
+    p_expected_session_id: expectedSessionId || null,
+    p_reopen: Boolean(reopen),
+  });
+  if (error) throw error;
+  return data && typeof data === "object" ? data : null;
+}
+
 export async function rpcSubmitTruthMeterAffirmation({ lobbyId, text, authorEstimate }) {
   requireClient();
   const { data, error } = await supabase.rpc("submit_truth_meter_affirmation", {

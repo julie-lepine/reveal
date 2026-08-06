@@ -8,12 +8,12 @@ import {
 import { resetGameSessionsOnly } from "./state.js";
 import { goToGameSelect, setLobbyWaiting } from "./lobby.js";
 
-export const EXIT_GAME_LABEL = "Arrêter la partie - menu des jeux";
+export const EXIT_GAME_LABEL = "Arrêter la partie · Menu des jeux";
 
 export function gameExitBarHtml() {
   const label =
     isGameSyncActive() && !isLobbyHost()
-      ? "Quitter la partie - menu des jeux"
+      ? "Quitter la partie · Menu des jeux"
       : EXIT_GAME_LABEL;
   return `<div class="game-exit-bar">
     <button type="button" class="btn btn-secondary btn--compact game-exit-bar__btn" data-exit-game>${escapeHtml(label)}</button>
@@ -53,6 +53,15 @@ export async function exitGameToGameSelect({ shouldContinue = null } = {}) {
   }
 
   resetGameSessionsOnly();
+  try {
+    const { clearTierNightCustomRosterTopicsAtExitBoundary } = await import(
+      "./tierNightCustomRosterClear.js"
+    );
+    await clearTierNightCustomRosterTopicsAtExitBoundary({ reopen: false });
+  } catch {
+    const { clearCustomRosterTopicsLocal } = await import("./customRosterTopicSession.js");
+    clearCustomRosterTopicsLocal();
+  }
   await setLobbyWaiting();
   await goToGameSelect();
   return true;

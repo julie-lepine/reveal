@@ -92,9 +92,11 @@ describe("FEATURE-TIERNIGHT-03-E - between / end CTA (source)", () => {
   it("4. between → quitter (exitGame contrat)", () => {
     const src = read("js/screens/tierNightBetween.js");
     assert.match(src, /quitTierNightSeriesToGameSelect/);
-    assert.match(src, /✕ Quitter TierNight/);
+    assert.match(src, /EXIT_GAME_LABEL/);
+    assert.doesNotMatch(src, /Quitter TierNight/);
     const exit = read("js/core/tierNightSeriesExitNav.js");
     assert.match(exit, /exitGameToGameSelect/);
+    assert.match(read("js/core/exitGame.js"), /Arrêter la partie · Menu des jeux/);
   });
 
   it("5. end sans CTA next", () => {
@@ -163,10 +165,10 @@ describe("FEATURE-TIERNIGHT-03-E - replay / queue / runId / consumed", () => {
     );
   });
 
-  it("9–11. consumed ledger préservé ; exclus ; non consommé éligible", () => {
+  it("9–11. consumed ledger préservé ; customs vidés à la sortie série ; Rank Live intact", () => {
     const exit = read("js/core/tierNightSeriesExitNav.js");
     assert.doesNotMatch(exit, /consumedCustomRosterTopicIds/);
-    assert.doesNotMatch(exit, /customRosterTopics/);
+    assert.match(exit, /customRosterTopics:\s*\[\]/);
     assert.doesNotMatch(exit, /customTierLists/);
 
     const customId = "roster:custom-abc";
@@ -412,11 +414,11 @@ describe("FEATURE-TIERNIGHT-03-E - phases / anti-double / rollback / preserve", 
     assert.match(exit, /rolledBack:\s*true/);
   });
 
-  it("25. absence de reset customs/consumed hors frontière soirée", () => {
+  it("25. sortie série : clear customs session ; consumed/Rank Live hors patch", () => {
     delete globalThis[TIER_NIGHT_SERIES_UI_GATE_KEY];
     const exit = read("js/core/tierNightSeriesExitNav.js");
     assert.doesNotMatch(exit, /consumedCustomRosterTopicIds\s*:/);
-    assert.doesNotMatch(exit, /customRosterTopics\s*:/);
+    assert.match(exit, /customRosterTopics:\s*\[\]/);
     assert.doesNotMatch(exit, /customTierLists\s*:/);
     const prep = buildSeriesExitPrepReset(3);
     assert.equal(prep.setupEpoch, 4);

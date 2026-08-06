@@ -142,6 +142,7 @@ describe("FEATURE-TIERNIGHT-03-E1 - payloads atomiques", () => {
     assert.equal(remote.patchOpts.gameId, "tiernight");
     assert.equal("tierNightLive" in remote.stateMerge, false);
     assert.equal("consumedCustomRosterTopicIds" in remote.stateMerge, false);
+    // Remote patch générique strippe toujours customs ; clear local via statePatch.
     assert.equal("customRosterTopics" in remote.stateMerge, false);
 
     const exit = read("js/core/tierNightSeriesExitNav.js");
@@ -149,7 +150,7 @@ describe("FEATURE-TIERNIGHT-03-E1 - payloads atomiques", () => {
     assert.equal((exit.match(/patchGameState\(/g) || []).length, 1);
   });
 
-  it("2. rollback change mode restaure série, prep ; customs/consumed hors patch", () => {
+  it("2. rollback change mode restaure série, prep ; customs clear local puis restore snap", () => {
     seedSeriesEndState();
     const before = getState();
     const { statePatch } = buildSeriesExitLocalStatePatch({
@@ -161,6 +162,7 @@ describe("FEATURE-TIERNIGHT-03-E1 - payloads atomiques", () => {
     assert.equal(getState().tierNightGame.series, undefined);
     assert.equal(getState().tierNightGame.runId, null);
     assert.deepEqual(getState().tierNightSeriesPrep.ready, {});
+    assert.deepEqual(getState().customRosterTopics, []);
 
     saveStatePatch(snap);
     assert.equal(getState().tierNightGame.series.phase, "series_end");
@@ -254,7 +256,7 @@ describe("FEATURE-TIERNIGHT-03-E1 - replay", () => {
 });
 
 describe("FEATURE-TIERNIGHT-03-E1 - quit", () => {
-  it("7. quit clear série sessions sans clear customs/consumed (resetGameSessionsOnly)", () => {
+  it("7. quit : resetGameSessionsOnly ne touche pas customs ; clear via frontière dédiée", () => {
     const stateSrc = read("js/core/state.js");
     const fn = stateSrc.match(
       /export function resetGameSessionsOnly\([\s\S]*?^\}/m
@@ -269,8 +271,10 @@ describe("FEATURE-TIERNIGHT-03-E1 - quit", () => {
     const exit = read("js/core/exitGame.js");
     assert.match(exit, /returnToGameSelect/);
     assert.match(exit, /resetGameSessionsOnly/);
+    assert.match(exit, /clearTierNightCustomRosterTopicsAtExitBoundary/);
     const sync = read("js/core/gameSync.js");
     assert.match(sync, /export async function returnToGameSelect/);
+    assert.match(sync, /clearTierNightCustomRosterTopicsAtExitBoundary/);
     assert.match(sync, /endGameSession/);
     assert.match(sync, /deleteGameSession/);
   });

@@ -1,0 +1,21 @@
+-- =============================================================================
+-- RUNBOOK — clear_tiernight_custom_roster_topics
+-- =============================================================================
+-- ORDRE STAGING DÉFINITIF :
+--   1) Exécuter préflight lecture seule et conserver les résultats :
+--        feature-tiernight-03-clear-custom-roster-topics-preflight.sql
+--   2) Comparer upsert staging vs base canonique
+--        (feature-tiernight-02-lost-update-fix.sql).
+--      Si divergence non comprise → ARRÊT, ne pas appliquer.
+--   3) Appliquer la migration complète (BEGIN…COMMIT) en une exécution :
+--        feature-tiernight-03-clear-custom-roster-topics.sql
+--   4) Exécuter le harness R0–R12 :
+--        feature-tiernight-03-clear-custom-roster-topics-smoke-harness.sql
+--   5) Cleanup harness = 0 (R12)
+--   6) Seulement ensuite : re-QA terrain
+--
+-- Prérequis : ≥ 3 auth.users libres (pas de membership vivant).
+-- Living = lobby_members ⋈ lobbies (index lobby_members_one_living_per_user).
+-- Spawn : host + guest + other_host distincts ; 2 lobbies / 3 membres / 2 sessions.
+-- Cleanup secours : select public.tnclr03_cleanup_fixtures();
+-- =============================================================================

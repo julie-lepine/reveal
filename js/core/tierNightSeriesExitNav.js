@@ -25,6 +25,7 @@ import {
 } from "./gameSync.js";
 import { showAppAlert } from "./dialog.js";
 import { exitGameToGameSelect } from "./exitGame.js";
+import { clearTierNightCustomRosterTopicsAtExitBoundary } from "./tierNightCustomRosterClear.js";
 
 const exitNavLock = createActionLock();
 
@@ -106,7 +107,9 @@ export function buildSeriesExitLocalStatePatch({ previousSetupEpoch = 0 } = {}) 
       tierNightModifier: "normal",
       tierNightGame: buildClearedTierNightSeriesLocalGame(),
       tierNightSeriesPrep: prepReset,
-      // intentional omit: live game local, listes live, customs roster, ledger consumed
+      // Fin de partie / change mode : customs de session vidés (idempotent).
+      customRosterTopics: [],
+      // intentional omit: live game local, listes live, ledger consumed
     },
     prepReset,
   };
@@ -244,6 +247,10 @@ async function applySeriesClearAndPrepReset({ screen, shouldContinue }) {
   saveStatePatch(statePatch);
 
   if (!isGameSyncActive()) {
+    await clearTierNightCustomRosterTopicsAtExitBoundary({
+      reopen: true,
+      shouldContinue,
+    });
     return { ok: true, previousPatch, prepReset, localOnly: true, networkCalls: 0 };
   }
 
@@ -255,6 +262,32 @@ async function applySeriesClearAndPrepReset({ screen, shouldContinue }) {
       error: "Seul l'hôte peut changer de mode ou rejouer la série.",
       previousPatch,
       networkCalls: 0,
+    };
+  }
+
+  // Clear distant autoritatif avant patch série (reopen pour nouveaux customs prep).
+  const cleared = await clearTierNightCustomRosterTopicsAtExitBoundary({
+    reopen: true,
+    shouldContinue,
+  });
+  if (!cleared?.ok && !cleared?.stale) {
+    saveStatePatch(previousPatch);
+    return {
+      ok: false,
+      code: cleared?.code || "CUSTOM_CLEAR_FAILED",
+      error: cleared?.error || "Impossible de vider les thèmes personnalisés.",
+      previousPatch,
+      rolledBack: true,
+      networkCalls: 1,
+    };
+  }
+  if (cleared?.stale || !canContinue()) {
+    return {
+      ok: false,
+      code: "STALE",
+      stale: true,
+      previousPatch,
+      networkCalls: 1,
     };
   }
 
@@ -396,6 +429,18 @@ export async function replayTierNightAfterSeriesEnd({
  */
 export async function quitTierNightSeriesToGameSelect({ shouldContinue } = {}) {
   if (isGameSyncActive() && !canAuthorSeriesQuit()) {
+    return false;
+  }
+  // Hôte : clear distant avant delete session ; invité : clear local.
+  const cleared = await clearTierNightCustomRosterTopicsAtExitBoundary({
+    reopen: false,
+    shouldContinue,
+  });
+  if (isGameSyncActive() && isLobbyHost() && cleared && cleared.ok === false && !cleared.stale) {
+    await showAppAlert(cleared.error || "Impossible de vider les thèmes personnalisés.", {
+      title: "Sortie impossible",
+      icon: "⚠️",
+    });
     return false;
   }
   return exitGameToGameSelect({ shouldContinue });

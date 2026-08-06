@@ -114,6 +114,7 @@ import {
   summarizeCustomRosterTopics,
   preserveCustomRosterTopicsInFullStateReplace,
 } from "./customRosterTopicsSyncGuard.js";
+import { shouldAcceptRemoteCustomRosterTopicsEmpty } from "./tierNightCustomRosterClear.js";
 import { pickLatestConsensusAnswer } from "./consensusAnswerUtils.js";
 import {
   finishedTierNightLiveRemote,
@@ -3041,9 +3042,16 @@ export function applyRemoteEveningState(st) {
     const remoteList = st.customRosterTopics;
     const localAuthor = getLocalDisplayName();
     const localAuthorUid = getSupabaseUserId();
+    const localEpoch = Number(getState().customRosterTopicsEpoch) || 0;
+    const remoteEpoch = Number(st.customRosterTopicsEpoch) || 0;
 
-    // Garde : un remote [] ne doit pas amputter des thèmes d'autres auteurs
-    // encore présents localement (symptôme QA hôte après transition de jeu).
+    // Clear host-only : epoch remote plus récent → accepter [] (anti revive).
+    const acceptEmpty = shouldAcceptRemoteCustomRosterTopicsEmpty(
+      st,
+      localBefore,
+      localEpoch
+    );
+
     const remoteEmpty = remoteList.length === 0;
     const localHasOthers = localBefore.some((t) => {
       if (localAuthorUid && t.authorUid) {
@@ -3051,7 +3059,8 @@ export function applyRemoteEveningState(st) {
       }
       return t.author && t.author !== localAuthor;
     });
-    if (remoteEmpty && localHasOthers) {
+
+    if (remoteEmpty && localHasOthers && !acceptEmpty) {
       console.warn(
         "REVEAL FEATURE-TIERNIGHT-02: ignore empty customRosterTopics remote over multi-author local",
         {
@@ -3060,6 +3069,12 @@ export function applyRemoteEveningState(st) {
           localAuthorUid,
         }
       );
+    } else if (acceptEmpty || remoteEpoch > localEpoch) {
+      patch.customRosterTopics = Array.isArray(remoteList) ? remoteList : [];
+      if (remoteEpoch > 0) patch.customRosterTopicsEpoch = remoteEpoch;
+      if (st.customRosterTopicsWritable === true || st.customRosterTopicsWritable === false) {
+        patch.customRosterTopicsWritable = Boolean(st.customRosterTopicsWritable);
+      }
     } else {
       const merged = mergeCustomRosterTopics(
         localBefore,
@@ -3077,6 +3092,21 @@ export function applyRemoteEveningState(st) {
         });
       }
       patch.customRosterTopics = merged;
+      if (remoteEpoch > localEpoch) patch.customRosterTopicsEpoch = remoteEpoch;
+      if (st.customRosterTopicsWritable === true || st.customRosterTopicsWritable === false) {
+        patch.customRosterTopicsWritable = Boolean(st.customRosterTopicsWritable);
+      }
+    }
+  } else if (
+    st.customRosterTopicsEpoch != null ||
+    st.customRosterTopicsWritable === true ||
+    st.customRosterTopicsWritable === false
+  ) {
+    if (st.customRosterTopicsEpoch != null) {
+      patch.customRosterTopicsEpoch = Number(st.customRosterTopicsEpoch) || 0;
+    }
+    if (st.customRosterTopicsWritable === true || st.customRosterTopicsWritable === false) {
+      patch.customRosterTopicsWritable = Boolean(st.customRosterTopicsWritable);
     }
   }
 
@@ -5209,6 +5239,32 @@ export function stopGameSessionListenerOnPostGame(
 export async function returnToGameSelect({ shouldContinue = null } = {}) {
   const canContinue = () => typeof shouldContinue !== "function" || shouldContinue();
   if (!isGameSyncActive()) return false;
+
+  // Clear distant host-only avant delete (évite revive post-session fantôme).
+  if (isLobbyHost()) {
+    const { clearTierNightCustomRosterTopicsAtExitBoundary } = await import(
+      "./tierNightCustomRosterClear.js"
+    );
+    const cleared = await clearTierNightCustomRosterTopicsAtExitBoundary({
+      reopen: false,
+      shouldContinue,
+    });
+    if (
+      cleared &&
+      cleared.ok === false &&
+      !cleared.stale &&
+      cleared.code !== "SESSION_ABSENT" &&
+      cleared.code !== "SESSION_ABSENT_CANNOT_REOPEN"
+    ) {
+      // Ne bloque pas la sortie menu si session déjà absente ; sinon surface l’échec.
+      if (cleared.code !== "NO_LOBBY") {
+        console.warn("REVEAL clear customRosterTopics failed before returnToGameSelect", cleared);
+      }
+    }
+  } else {
+    const { clearCustomRosterTopicsLocal } = await import("./customRosterTopicSession.js");
+    clearCustomRosterTopicsLocal();
+  }
 
   if (isLobbyHost()) {
     await endGameSession();

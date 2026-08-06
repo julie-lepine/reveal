@@ -124,6 +124,50 @@ export async function deleteCustomRosterTopicAndSync(id) {
   }
 }
 
+/**
+ * Frontière fin de partie TierNight — clear local idempotent.
+ * Ne touche pas le catalogue officiel ni customTierLists (Rank Live).
+ * @returns {{ cleared: boolean, alreadyEmpty: boolean }}
+ */
+export function clearCustomRosterTopicsLocal() {
+  const cur = getState().customRosterTopics || [];
+  if (!Array.isArray(cur) || cur.length === 0) {
+    return { cleared: false, alreadyEmpty: true };
+  }
+  saveStatePatch({ customRosterTopics: [] });
+  return { cleared: true, alreadyEmpty: false };
+}
+
+/**
+ * Fin de série / retour menu : vide la collection session.
+ * MP : chaque client supprime ses propres entrées (ownership) puis force local [].
+ * Idempotent. Ne touche pas consumedCustomRosterTopicIds (ledger soirée).
+ * @returns {Promise<{ ok: true, localCleared: boolean, deletedIds: string[] }>}
+ */
+export async function clearCustomRosterTopicsAtTierNightGameBoundary() {
+  const before = [...(getState().customRosterTopics || [])];
+  const { isGameSyncActive } = await import("./gameSync.js");
+  const deletedIds = [];
+
+  if (isGameSyncActive() && before.length) {
+    const me = getLocalDisplayName();
+    const { getSupabaseUserId } = await import("./supabaseAuth.js");
+    const authorUid = getSupabaseUserId() || null;
+    for (const topic of before) {
+      if (!isCustomRosterTopicOwnedBy(topic, me, authorUid)) continue;
+      const res = await deleteCustomRosterTopicAndSync(topic.id);
+      if (res?.ok) deletedIds.push(String(topic.id));
+    }
+  }
+
+  const local = clearCustomRosterTopicsLocal();
+  return {
+    ok: true,
+    localCleared: local.cleared || local.alreadyEmpty,
+    deletedIds,
+  };
+}
+
 /** Helpers tests / lecture. */
 export function listCustomRosterTopics() {
   return sanitizeCustomRosterTopicsFromStorage(getState().customRosterTopics);

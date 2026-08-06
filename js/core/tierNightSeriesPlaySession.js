@@ -406,6 +406,7 @@ function canHostSeriesCommit() {
 export function navigateForTierNightSeriesPhase(phase, { navStack } = {}) {
   const screen = resolveTierNightSeriesScreenFromPhase(phase);
   if (!screen) return false;
+  // Pas de clear customs ici : frontière = sortie menu / change mode / replay.
   const stack =
     navStack ||
     (screen === "tiernight-end"
@@ -534,17 +535,86 @@ async function reconcileSeriesFromServer({
   return { ok: match.ok, code: match.code, phase: series.phase, series, row };
 }
 
+/** Rang de phase pour anti-régression soft-refresh (plus haut = plus avancé). */
+function seriesPhaseRank(phase) {
+  if (phase === "ranking") return 1;
+  if (phase === "between_rounds") return 2;
+  if (phase === "series_end") return 3;
+  return 0;
+}
+
+/**
+ * Un refresh stale ne doit jamais écraser un apply RPC plus avancé (cas F terrain).
+ * @param {object|null|undefined} localTn — tierNightGame local
+ * @param {object|null|undefined} remoteTn — row.state.tierNight
+ */
+export function shouldPreferLocalSeriesOverSoftRefresh(localTn, remoteTn) {
+  if (!localTn?.series || !remoteTn?.series) return false;
+  if (String(localTn.runId || "") !== String(remoteTn.runId || "")) return false;
+  const localPhase = localTn.series.phase;
+  const remotePhase = remoteTn.series.phase;
+  if (seriesPhaseRank(localPhase) > seriesPhaseRank(remotePhase)) return true;
+  const localScored = Array.isArray(localTn.series.scoredRoundIds)
+    ? localTn.series.scoredRoundIds.length
+    : 0;
+  const remoteScored = Array.isArray(remoteTn.series.scoredRoundIds)
+    ? remoteTn.series.scoredRoundIds.length
+    : 0;
+  if (localScored > remoteScored) return true;
+  const localHist = Array.isArray(localTn.series.roundHistory)
+    ? localTn.series.roundHistory.length
+    : 0;
+  const remoteHist = Array.isArray(remoteTn.series.roundHistory)
+    ? remoteTn.series.roundHistory.length
+    : 0;
+  if (localHist > remoteHist) return true;
+  return false;
+}
+
+/**
+ * Soft-refresh : applique le row serveur sauf s’il régresse l’apply local du même run.
+ * Exporté pour tests de symétrie anti-régression.
+ * @param {object|null|undefined} row — game_sessions row
+ * @returns {{ ok: true, applied: boolean, skippedStale?: boolean }}
+ */
+export function applySoftRefreshSeriesRowIfNotRegression(row) {
+  const remoteTn = row?.state?.tierNight;
+  if (!remoteTn) return { ok: true, applied: false };
+  const localTn = getState().tierNightGame;
+  if (shouldPreferLocalSeriesOverSoftRefresh(localTn, remoteTn)) {
+    return { ok: true, applied: false, skippedStale: true };
+  }
+  applySeriesRowToLocal(row);
+  return { ok: true, applied: true };
+}
+
 /**
  * Best-effort refresh après apply local. Échec ≠ rollback.
+ * N’applique pas un row qui régresserait phase / ledgers locaux.
  */
 async function softRefreshAfterLocalApply() {
   try {
     const row = await refreshGameSession();
-    if (row?.state?.tierNight) applySeriesRowToLocal(row);
-    return { ok: true, row };
+    return { ...applySoftRefreshSeriesRowIfNotRegression(row), row };
   } catch {
     return { ok: false, refreshFailed: true };
   }
+}
+
+/**
+ * Phase de navigation post-finalize (après soft refresh anti-régression).
+ */
+export function resolvePostFinalizeNavigationPhase({
+  localApply = null,
+  resPhase = null,
+  isLast = false,
+  series = null,
+} = {}) {
+  const fromState = series?.phase;
+  if (fromState === "series_end" || fromState === "between_rounds") return fromState;
+  if (localApply?.ok && localApply.phase) return localApply.phase;
+  if (resPhase === "series_end" || resPhase === "between_rounds") return resPhase;
+  return isLast ? "series_end" : "between_rounds";
 }
 
 /**
@@ -639,13 +709,16 @@ export async function hostFinalizeTierNightSeriesRound({
       runId,
       expectScoredRoundId: guard.roundId,
     });
-    const phase =
-      (localApply.ok && localApply.phase) ||
-      res.phase ||
-      (guard.isLast ? "series_end" : "between_rounds");
 
-    // 2) Soft refresh confirme ; échec ne rollback pas.
+    // 2) Soft refresh confirme ; échec / stale ne rollback pas l’apply RPC.
     await softRefreshAfterLocalApply();
+
+    const phase = resolvePostFinalizeNavigationPhase({
+      localApply,
+      resPhase: res.phase,
+      isLast: guard.isLast,
+      series: getState().tierNightGame?.series,
+    });
 
     if (canContinue()) navigateForTierNightSeriesPhase(phase);
     return {
@@ -775,10 +848,34 @@ function applySeriesRowToLocal(row) {
       finished: tn.finished && typeof tn.finished === "object" ? tn.finished : local.finished,
     },
   };
+  // Bridge legacy dernière manche OU projection roundRecap (between / end).
+  const roundRecap =
+    series?.roundRecap && typeof series.roundRecap === "object" ? series.roundRecap : null;
   if (tn.recap && typeof tn.recap === "object") {
     patch.tierNightGame = {
       ...patch.tierNightGame,
       ...tn.recap,
+      recapSynced: true,
+    };
+  } else if (roundRecap) {
+    const snap = roundRecap.topicSnapshot && typeof roundRecap.topicSnapshot === "object"
+      ? roundRecap.topicSnapshot
+      : null;
+    patch.tierNightGame = {
+      ...patch.tierNightGame,
+      topicId: roundRecap.topicId ?? patch.tierNightGame.topicId,
+      listName: snap?.name || patch.tierNightGame.listName || "",
+      topicEmoji: snap?.emoji || patch.tierNightGame.topicEmoji || "",
+      consensus: roundRecap.consensus ?? patch.tierNightGame.consensus ?? null,
+      controversialItem:
+        roundRecap.controversialItem !== undefined
+          ? roundRecap.controversialItem
+          : patch.tierNightGame.controversialItem ?? null,
+      controversialSpread:
+        roundRecap.controversialSpread !== undefined
+          ? roundRecap.controversialSpread
+          : patch.tierNightGame.controversialSpread ?? 0,
+      recaps: Array.isArray(roundRecap.recaps) ? roundRecap.recaps : patch.tierNightGame.recaps,
       recapSynced: true,
     };
   }

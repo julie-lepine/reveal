@@ -106,6 +106,10 @@ const defaultState = () => ({
   tierNightModifier: "normal",
   customTierLists: [],
   customRosterTopics: [],
+  /** Epoch monotone après clear host-only (anti revive hydrate). */
+  customRosterTopicsEpoch: 0,
+  /** false après clear quit ; true par défaut / après reopen change-mode. */
+  customRosterTopicsWritable: true,
   /** FEATURE-TIERNIGHT-03-B — ids custom déjà tirés en série (lobby lifetime). */
   consumedCustomRosterTopicIds: [],
   /** Prep série multi-thèmes (settings + ready) — pas de queue ici. */
@@ -343,6 +347,8 @@ function loadState() {
       guessLie: { ...emptyGuessLie(), ...parsed.guessLie },
       customTierLists: parsed.customTierLists || [],
       customRosterTopics: sanitizeCustomRosterTopicsFromStorage(parsed.customRosterTopics),
+      customRosterTopicsEpoch: Number(parsed.customRosterTopicsEpoch) || 0,
+      customRosterTopicsWritable: parsed.customRosterTopicsWritable !== false,
       consumedCustomRosterTopicIds: Array.isArray(parsed.consumedCustomRosterTopicIds)
         ? parsed.consumedCustomRosterTopicIds.map(String)
         : [],
@@ -1043,6 +1049,8 @@ export function resetEveningState() {
     stats: defaultEveningStats(),
     eveningGamesRecorded: {},
     customRosterTopics: [],
+    customRosterTopicsEpoch: 0,
+    customRosterTopicsWritable: true,
     consumedCustomRosterTopicIds: [],
     tierNightSeriesPrep: { ...defaultState().tierNightSeriesPrep },
   });
