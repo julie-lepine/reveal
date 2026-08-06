@@ -212,7 +212,7 @@ describe("BUG-TIERNIGHT-PREP-GUEST-01 - wiring source", () => {
     assert.match(sql, /tierNightPrep,setupEpoch/);
   });
 
-  it("10–11. custom via RPC atomique ; invalidate après succès seulement", () => {
+  it("10–11. custom via RPC atomique ; pas d’invalidate prêts (READY-CUSTOM-01)", () => {
     const custom = read("js/core/customRosterTopicSession.js");
     assert.match(custom, /rpcUpsertPlayerCustomEntry/);
     assert.doesNotMatch(custom, /patchGameState\s*\(/);
@@ -221,20 +221,31 @@ describe("BUG-TIERNIGHT-PREP-GUEST-01 - wiring source", () => {
       prep.indexOf("export async function addCustomRosterTopicFromPrep"),
       prep.indexOf("export async function removeCustomRosterTopicFromPrep")
     );
-    assert.match(add, /if \(res\?\.ok\)/);
-    assert.match(add, /invalidateTierNightSeriesPrepReadiness/);
+    assert.match(add, /addCustomRosterTopicAndSync/);
+    assert.doesNotMatch(add, /invalidateTierNightSeriesPrepReadiness/);
+    const remove = prep.slice(
+      prep.indexOf("export async function removeCustomRosterTopicFromPrep"),
+      prep.indexOf("export function getTierNightSeriesPrepEntryScreen")
+    );
+    assert.match(remove, /deleteCustomRosterTopicAndSync/);
+    assert.doesNotMatch(remove, /invalidateTierNightSeriesPrepReadiness/);
+    assert.doesNotMatch(remove, /ready:\s*\{\}/);
   });
 
-  it("15–16. invité invalidate = request + customEntryId only", () => {
+  it("15–16. invité invalidate = request catalogue only (sans clear ready local)", () => {
     const src = read("js/core/tierNightSeriesPrepSession.js");
-    const fn = src.slice(
-      src.indexOf("export async function invalidateTierNightSeriesPrepReadiness"),
-      src.indexOf("async function publishAuthoritativePrepReadyInvalidation")
+    const start = src.indexOf("export async function invalidateTierNightSeriesPrepReadiness");
+    const end = src.indexOf(
+      "/**\n * Mutation autoritative : setupEpoch++",
+      start
     );
+    const fn = src.slice(start, end > start ? end : src.indexOf("async function publishAuthoritativePrepReadyInvalidation", start));
     assert.match(fn, /poolInvalidateRequest/);
     assert.match(fn, /customEntryId/);
-    assert.doesNotMatch(fn, /setupEpoch:\s*\(/);
+    assert.match(fn, /ne pas toucher ready local/);
     assert.match(fn, /patchGameStateWithFeedback/);
+    const guest = fn.slice(fn.indexOf("CUSTOM_ENTRY_REQUIRED"));
+    assert.doesNotMatch(guest, /ready:\s*\{\s*\}/);
   });
 
   it("honor hôte : schedule sans void silencieux", () => {
@@ -417,7 +428,8 @@ describe("BUG-TIERNIGHT-PREP-GUEST-01 - contrôleur + session locale", () => {
     assert.equal(ctrl2.localReadyState(), false);
   });
 
-  it("9 / 22–24. custom local + invalidate locale ; consumed / queue / Rank Live intacts", async () => {
+  it("9 / 22–24. custom local sans bump epoch ; consumed / queue / Rank Live intacts", async () => {
+    const beforeEpoch = prepSession.getTierNightSeriesPrepSession().setupEpoch;
     const res = await prepSession.addCustomRosterTopicFromPrep("Thème invité QA");
     assert.equal(res.ok, true);
     assert.ok(getState().customRosterTopics.some((t) => t.name === "Thème invité QA"));
@@ -425,8 +437,7 @@ describe("BUG-TIERNIGHT-PREP-GUEST-01 - contrôleur + session locale", () => {
     assert.equal(getState().customTierLists[0].id, "live-keep");
     assert.equal(getState().tierNightGame?.series ?? null, null);
     assert.equal(getState().tierNightGame?.runId ?? null, null);
-    // solo : invalidate bump epoch local
-    assert.ok(prepSession.getTierNightSeriesPrepSession().setupEpoch >= 2);
+    assert.equal(prepSession.getTierNightSeriesPrepSession().setupEpoch, beforeEpoch);
   });
 
   it("13. custom rejeté → pas d'invalidate (source + comportement)", async () => {
@@ -442,10 +453,11 @@ describe("BUG-TIERNIGHT-PREP-GUEST-01 - contrôleur + session locale", () => {
     assert.match(custom, /Tu ne peux supprimer que tes propres thèmes/);
   });
 
-  it("honor : request sans changement pool → pas de bump (contrat source)", () => {
+  it("honor : request catalogue → ack sans bump (READY-CUSTOM-01)", () => {
     const src = read("js/core/tierNightSeriesPrepSession.js");
-    assert.match(src, /no_pool_change/);
+    assert.match(src, /catalog_ack_only/);
     assert.match(src, /ackPoolInvalidateRequestOnly/);
+    assert.match(src, /catalog_signature_only/);
     assert.match(src, /lastHonoredPoolInvalidateRequestId = String\(requestId\)/);
   });
 

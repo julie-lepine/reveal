@@ -66,16 +66,24 @@
 
 ## 4. Readiness
 
-**Politique TierNight** : toute modification substantielle du setup (catégorie, count, custom add/remove) invalide la readiness.
+**Politique TierNight (BUG-TIERNIGHT-PREP-READY-CUSTOM-01)** :
 
-**Hot Take** : thème/count **ne** clear **pas** ready (audité). TierNight est volontairement plus strict car le setup définit la série entière.
+| Événement | Invalide les prêts ? |
+|---|---:|
+| Catégories / nombre de manches | **Oui** (`setupEpoch++`, `ready:{}`) |
+| Mode / nouveau prep / replay | **Oui** |
+| Ajout ou suppression d’un thème custom | **Non** — catalogue seulement |
+| Reconnexion / hydrate identique | **Non** |
+
+**Hot Take** : thème/count **ne** clear **pas** ready (audité). TierNight clear uniquement sur **réglages structurants**.
 
 **Mécanisme** :
 
-- Hôte : `ready: {}` + `setupEpoch++` synchronisé.
-- Invité custom : clear self (ou hôte invalide s’il est hôte).
-- Ready patch inclut `setupEpoch` courant.
+- Hôte change catégories/count : `ready: {}` + `setupEpoch++` synchronisé.
+- Custom add/remove : sync catalogue (`customRosterTopics`) ; **pas** de bump `setupEpoch`.
+- Ready patch inclut `expectedSetupEpoch` courant.
 - Merge : epoch↑ remplace ready ; epoch↓ ignore ; même epoch merge UID.
+- Signal legacy `poolInvalidateRequest` : hôte **ack** uniquement (pas de clear ready).
 
 ---
 

@@ -129,10 +129,13 @@ async function syncTierNightSeriesPrepSession(extra = {}, patchOpts = {}) {
 }
 
 /**
- * Invalide readiness après changement de setup / pool.
+ * Invalide readiness après changement de **réglages structurants** (catégorie / roundCount).
+ * Ne pas appeler pour un simple ajout/suppression de thème custom
+ * (BUG-TIERNIGHT-PREP-READY-CUSTOM-01 — le catalogue n’invalide plus les prêts).
+ *
  * Autorité : hôte (ou acting host) bump setupEpoch + clear ready global.
- * Invité : contribute `{ poolInvalidateRequest: { requestId, customEntryId } }`
- *          (custom doit exister + appartenir à auth.uid côté SQL).
+ * Invité : contribute `{ poolInvalidateRequest }` (signal catalogue / legacy) —
+ *          l’hôte **ack sans** bump setupEpoch ni clear ready.
  * @param {{ customEntryId?: string|null }} [opts]
  */
 export async function invalidateTierNightSeriesPrepReadiness({
@@ -165,11 +168,7 @@ export async function invalidateTierNightSeriesPrepReadiness({
     };
   }
 
-  // Invité : clear local (UX) + demande autoritative liée au custom
-  const session = getTierNightSeriesPrepSession();
-  saveStatePatch({
-    tierNightSeriesPrep: { ...session, ready: {} },
-  });
+  // Invité : signal catalogue uniquement — ne pas toucher ready local.
   let requestId;
   try {
     const uid = requireLocalParticipantUid();
@@ -200,7 +199,9 @@ export async function invalidateTierNightSeriesPrepReadiness({
 }
 
 /**
- * Mutation autoritative unique : setupEpoch++ + ready:{} + clear request.
+ * Mutation autoritative : setupEpoch++ + ready:{} + clear request.
+ * Réservée aux réglages structurants (catégorie / roundCount / reset prep),
+ * pas au catalogue custom (BUG-TIERNIGHT-PREP-READY-CUSTOM-01).
  * Coalesce ≤750 ms ; échec → refresh/reconcile ; pas de mark « honoré » ici.
  */
 async function publishAuthoritativePrepReadyInvalidation() {
@@ -273,10 +274,9 @@ async function publishAuthoritativePrepReadyInvalidation() {
 }
 
 /**
- * Hôte : honore une requête d’invalidation.
- * - Bump epoch seulement si l’empreinte customs a changé (anti-spam request).
- * - Sinon ack : clear request id sans bump.
- * - lastHonored marqué uniquement après succès.
+ * Hôte : honore une requête d’invalidation catalogue.
+ * BUG-TIERNIGHT-PREP-READY-CUSTOM-01 — ack uniquement (clear request id).
+ * Ne bump jamais setupEpoch et ne vide jamais ready pour un signal pool.
  */
 export async function honorTierNightPrepPoolInvalidateRequest(remotePrep) {
   if (!isGameSyncActive()) return { ok: true, skipped: true };
@@ -291,22 +291,12 @@ export async function honorTierNightPrepPoolInvalidateRequest(remotePrep) {
   }
 
   const sig = customRosterTopicsPoolSignature(getCustomRosterTopics());
-  const poolChanged =
-    lastHostSeenCustomsSignature != null && sig !== lastHostSeenCustomsSignature;
-
-  if (!poolChanged) {
-    // Request sans mutation pool réelle → ack seul (pas de bump epoch)
-    const ack = await ackPoolInvalidateRequestOnly(String(requestId));
-    if (ack.ok) lastHonoredPoolInvalidateRequestId = String(requestId);
-    return { ...ack, bumped: false, reason: "no_pool_change" };
-  }
-
-  const result = await publishAuthoritativePrepReadyInvalidation();
-  if (result.ok && !result.retryable) {
+  const ack = await ackPoolInvalidateRequestOnly(String(requestId));
+  if (ack.ok) {
     lastHonoredPoolInvalidateRequestId = String(requestId);
     lastHostSeenCustomsSignature = sig;
   }
-  return { ...result, bumped: Boolean(result.ok && !result.coalesced) };
+  return { ...ack, bumped: false, reason: "catalog_ack_only" };
 }
 
 /** Clear distant du request id sans changer setupEpoch / ready. */
@@ -335,9 +325,9 @@ async function ackPoolInvalidateRequestOnly(requestId) {
 }
 
 /**
- * Hôte : si l’empreinte customs a changé, invalide la readiness globale.
- * Source primaire d’invalidation (request id = hint secondaire).
- * Première observation : amorce à "" pour ne pas avaler le 1er custom sans bump.
+ * Hôte : suit l’empreinte customs pour coalescence / anti-spam.
+ * BUG-TIERNIGHT-PREP-READY-CUSTOM-01 — ne vide plus ready et ne bump plus setupEpoch.
+ * Le catalogue se synchronise via customRosterTopics ; le launch lit le pool à jour.
  */
 export async function honorTierNightPrepCustomsPoolChange(topics) {
   if (!isGameSyncActive()) return { ok: true, skipped: true };
@@ -351,13 +341,13 @@ export async function honorTierNightPrepCustomsPoolChange(topics) {
   if (sig === lastHostSeenCustomsSignature) {
     return { ok: true, skipped: true };
   }
-  const result = await publishAuthoritativePrepReadyInvalidation();
-  if (result.ok && !result.retryable) {
-    lastHostSeenCustomsSignature = sig;
-    const pending = getTierNightSeriesPrepSession().poolInvalidateRequestId;
-    if (pending) lastHonoredPoolInvalidateRequestId = String(pending);
-  }
-  return result;
+  lastHostSeenCustomsSignature = sig;
+  return {
+    ok: true,
+    bumped: false,
+    signatureUpdated: true,
+    reason: "catalog_signature_only",
+  };
 }
 
 /**
@@ -577,26 +567,20 @@ export function countOtherPlayersCustomRosterTopics() {
   }).length;
 }
 
+/**
+ * Ajoute un thème custom depuis le prep.
+ * BUG-TIERNIGHT-PREP-READY-CUSTOM-01 — synchronise le catalogue sans invalider les prêts.
+ */
 export async function addCustomRosterTopicFromPrep(name) {
-  const res = await addCustomRosterTopicAndSync({ name });
-  if (res?.ok) {
-    await invalidateTierNightSeriesPrepReadiness({ customEntryId: res.id });
-  }
-  return res;
+  return addCustomRosterTopicAndSync({ name });
 }
 
+/**
+ * Supprime un thème custom depuis le prep.
+ * BUG-TIERNIGHT-PREP-READY-CUSTOM-01 — synchronise le catalogue sans invalider les prêts.
+ */
 export async function removeCustomRosterTopicFromPrep(id) {
-  const res = await deleteCustomRosterTopicAndSync(id);
-  if (!res?.ok) return res;
-  if (isLobbyHost() || canActAsHost()) {
-    await invalidateTierNightSeriesPrepReadiness();
-  } else {
-    // Invité : le delete RPC change déjà l’empreinte customs ;
-    // l’hôte bump via honorTierNightPrepCustomsPoolChange (pas de request sans custom vivant).
-    const session = getTierNightSeriesPrepSession();
-    saveStatePatch({ tierNightSeriesPrep: { ...session, ready: {} } });
-  }
-  return res;
+  return deleteCustomRosterTopicAndSync(id);
 }
 
 /**

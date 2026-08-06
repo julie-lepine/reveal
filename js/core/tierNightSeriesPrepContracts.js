@@ -211,7 +211,7 @@ export function resolveTierNightRosterDestinationFromSharedState({
  * setupEpoch plus grand → settings + ready autoritatifs (clear possible).
  * setupEpoch plus petit → ignore (stale).
  * même epoch → merge ready ; settings seulement si présents dans inc.
- * poolInvalidateRequestId : propagé (hôte honore → bump epoch).
+ * poolInvalidateRequestId : propagé (hôte ack catalogue — sans bump epoch / ready).
  * Champs wizard legacy ignorés (FEATURE-TIERNIGHT-03-C).
  *
  * @param {object} cur — remote shape (ready by uid)

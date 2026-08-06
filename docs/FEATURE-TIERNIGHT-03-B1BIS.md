@@ -40,32 +40,32 @@ node --experimental-test-module-mocks --test tests/mpLaunchLaunch.test.js
 
 ---
 
-## 2. Customs → readiness globale
+## 2. Customs → catalogue (pas readiness)
 
-### Ancien comportement (B1)
+### Historique B1 / B1-bis (obsolète)
 
-Invité custom → clear **self** seulement. Contredisait la politique « toute mutation de pool invalide tous les ready ».
+Une mutation de pool (add/remove custom) déclenchait `setupEpoch++` + `ready:{}` (hôte) ou clear ready local + `poolInvalidateRequest` (invité).
 
-### Nouveau comportement (B1-bis)
+### Contrat actuel (BUG-TIERNIGHT-PREP-READY-CUSTOM-01)
 
 | Acteur | Action |
 |--------|--------|
-| Hôte / acting host | `setupEpoch++`, `ready: {}`, clear `poolInvalidateRequestId`, sync autoritatif |
-| Invité | Clear ready **local** (UX) + contribute `poolInvalidateRequestId` (pas de bump epoch) |
-| Hydrate hôte | Honore la requête **ou** détecte changement d’empreinte customs → invalidation autoritative |
-| Coalesce | ≤750 ms → un seul bump (customs + request proches) |
+| Tout joueur | Add/remove custom via RPC catalogue uniquement |
+| Hôte hydrate | Met à jour l’empreinte customs ; **ack** `poolInvalidateRequest` si présent |
+| Ready / `setupEpoch` | **Inchangés** sur simple évolution du catalogue |
+| Catégories / roundCount | Seuls réglages structurants qui clear ready + bump epoch |
 
 ### Autorité
 
-- Seul hôte / `canActAsHost()` publie un nouvel epoch.
+- Seul hôte / `canActAsHost()` publie un nouvel epoch **structurant**.
 - Invité ne peut pas modifier `categoryIds` / `roundCount` (`HOST_ONLY`).
-- Ready stale : patch avec `setupEpoch` inférieur → ignoré (`mergeTierNightPrepRemoteState`).
-- Mutation rejetée / rollback RPC → pas d’appel `invalidate` (add/remove échouent avant).
+- Ready stale : patch avec `expectedSetupEpoch` inférieur → ignoré (`mergeTierNightPrepRemoteState`).
+- Queue de série : construite au **clic launch** depuis `getCustomRosterTopics()` à jour.
 
-### Stale / rollback
+### Stale / ack catalogue
 
 - `shouldHonorPoolInvalidateRequest` : même `requestId` → skip.
-- Empreinte customs : première vue = prime (pas d’invalidate).
+- Empreinte customs : signature suivie pour anti-spam ; **pas** d’invalidation ready.
 - Epoch ne régresse jamais.
 
 ---

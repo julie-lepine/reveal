@@ -87,19 +87,15 @@ Mismatch → `Ready obsolète` · state inchangé · rollback client silencieux 
 
 ---
 
-## 6. Honor hôte (risque 2)
+## 6. Honor hôte (catalogue)
 
-### Avant
-`void import(...).then(Promise.all(honor…)).catch(() => {})` — rejets avalés ; `lastHonored` **avant** succès patch.
+### Contrat BUG-TIERNIGHT-PREP-READY-CUSTOM-01
 
-### Après
-- `scheduleTierNightPrepHostHonors` : chaîne sérialisée (`honorChain`) + **catch terminal** journalisé
-- `gameSync` : plus de `void` ; `.catch(console.warn)`
-- bump = mutation unique `setupEpoch++` + `ready:{}` + clear request
-- timeout/échec → `refreshGameSession` ; si epoch déjà ↑ et ready vide → **reconciled**
+- `scheduleTierNightPrepHostHonors` : chaîne sérialisée (`honorChain`) + catch terminal journalisé
+- Empreinte customs : met à jour la signature **sans** `setupEpoch++` ni `ready:{}`
+- `poolInvalidateRequest` : **ack** (clear request id) uniquement
+- `setupEpoch++` + `ready:{}` restent réservés aux réglages structurants / reset prep
 - callback stale (`honorGeneration`) → pas de rollback régressif
-- `lastHonored*` / signature **après** succès uniquement
-- coalesce 750 ms ; échec réel → `lastAuthoritativeInvalidateAt = 0` (réessayable)
 
 ---
 
@@ -108,12 +104,12 @@ Mismatch → `Ready obsolète` · state inchangé · rollback client silencieux 
 | Couche | Contrat |
 |--------|---------|
 | SQL | value **objet** `{ requestId, customEntryId }` ; custom doit exister dans `state.customRosterTopics` avec `authorUid = auth.uid()` |
-| Client | publié seulement après **add custom réussi** ; remove invité → empreinte customs seule (pas de request sur custom mort) |
-| Honor | **bump seulement si empreinte customs a changé** ; sinon **ack** clear request sans bump |
-| Coalesce | ≤750 ms anti double-bump |
+| Client | **plus publié** après add custom (catalogue RPC suffit) ; signal legacy encore ackable |
+| Honor | **toujours ack** — jamais de bump ready pour un signal pool |
+| Coalesce | N/A pour clear ready (plus de bump catalogue) |
 
 Spam de request ids sans custom réel → **rejet SQL**.  
-Spam de request ids avec même custom → ack sans bump si signature inchangée.
+Spam de request ids avec même custom → ack sans effet ready.
 
 ---
 
@@ -130,7 +126,9 @@ Spam de request ids avec même custom → ack sans bump si signature inchangée.
 }
 ```
 
-**Invalidate (après add custom)**
+**Catalogue** : RPC `upsert_player_custom_entry` / delete — **pas** d’invalidation prêts.
+
+**Invalidate legacy (optionnel, ack hôte)**
 
 ```json
 {

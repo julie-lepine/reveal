@@ -156,7 +156,7 @@ describe("FEATURE-TIERNIGHT-03-B1-bis - invalidation ready globale", () => {
     assert.equal(s.setupEpoch, 3);
   });
 
-  it("hôte customs change : une invalidation autoritative", async () => {
+  it("hôte customs change : signature only, prêts conservés (READY-CUSTOM-01)", async () => {
     stateApi.resetEveningState();
     prepSession.resetTierNightSeriesPrepInvalidateGuardsForTests();
     stateApi.saveStatePatch({
@@ -175,19 +175,25 @@ describe("FEATURE-TIERNIGHT-03-B1-bis - invalidation ready globale", () => {
       },
     });
 
-    // Amorce signature vide → skip si topics []
     let r = await prepSession.honorTierNightPrepCustomsPoolChange([]);
     assert.equal(r.skipped, true);
 
     r = await prepSession.honorTierNightPrepCustomsPoolChange([
       { id: `${CUSTOM_ROSTER_TOPIC_ID_PREFIX}x`, name: "X" },
     ]);
-    // Sans game sync active → skipped (pas hôte MP). Solo path via invalidate.
-    // Forcer invalidate solo pour prouver clear global
-    await prepSession.invalidateTierNightSeriesPrepReadiness();
+    // Sans game sync : skipped ; avec sync hôte : signature only (pas de clear).
+    // Prouver le contrat source : pas de publishAuthoritative sur fingerprint.
+    const src = read("js/core/tierNightSeriesPrepSession.js");
+    const honorFn = src.slice(
+      src.indexOf("export async function honorTierNightPrepCustomsPoolChange"),
+      src.indexOf("export function scheduleTierNightPrepHostHonors")
+    );
+    assert.match(honorFn, /catalog_signature_only/);
+    assert.doesNotMatch(honorFn, /publishAuthoritativePrepReadyInvalidation/);
     const s = prepSession.getTierNightSeriesPrepSession();
-    assert.deepEqual(s.ready, {});
-    assert.ok(s.setupEpoch >= 2);
+    assert.equal(s.ready.Alice, true);
+    assert.equal(s.ready.Bob, true);
+    assert.equal(s.setupEpoch, 1);
   });
 
   it("série activée par défaut (F)", () => {
