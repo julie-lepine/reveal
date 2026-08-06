@@ -266,6 +266,7 @@ const EVENING_ROLLBACK_KEYS = [
   "gameScoreOrder",
   "gameScoreSessionBaseline",
   "gameScoreSessionGameId",
+  "gameScoreSessionKey",
   "eveningGamesRecorded",
   "lastGame",
   "guessLie",

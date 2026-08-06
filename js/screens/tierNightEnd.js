@@ -354,7 +354,7 @@ export function mountTierNightEnd(app) {
         ${
           hostOrAh
             ? `${eveningRecapRestartButtonHtml({ gameId: "tiernight", title: "TierNight" })}
-        <button type="button" class="btn btn-secondary btn--spaced" id="btn-tiernight-end-change-mode">⇄ Changer de mode</button>`
+        <button type="button" class="btn btn-secondary btn--spaced" id="btn-tiernight-end-change-mode">Changer de mode</button>`
             : `<p class="hint">En attente de l’hôte…</p>`
         }
         ${

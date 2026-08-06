@@ -65,7 +65,8 @@ describe("FEATURE-TIERNIGHT-03-E - between / end CTA (source)", () => {
   it("1. between → next round hôte (CTA + advance)", () => {
     const src = read("js/screens/tierNightBetween.js");
     assert.match(src, /btn-tiernight-next-theme/);
-    assert.match(src, /▶ Thème suivant/);
+    assert.match(src, /Thème suivant/);
+    assert.doesNotMatch(src, /▶ Thème suivant/);
     assert.match(src, /hostAdvanceTierNightSeriesRound/);
     assert.match(src, /canAdvanceTierNightSeriesFromPhase/);
   });

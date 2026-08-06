@@ -101,7 +101,8 @@ describe("FEATURE-TIERNIGHT-03-D - mapping phases / écrans", () => {
     assert.match(main, /registerScreen\("tiernight-between"/);
     assert.match(main, /mountTierNightBetween/);
     const between = read("js/screens/tierNightBetween.js");
-    assert.match(between, /▶ Thème suivant/);
+    assert.match(between, /Thème suivant/);
+    assert.doesNotMatch(between, /▶ Thème suivant/);
     assert.match(between, /En attente de l’hôte/);
     assert.doesNotMatch(between, /Créer un thème|Créer mon thème/);
   });

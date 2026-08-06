@@ -74,6 +74,18 @@ const defaultState = () => ({
   /** Snapshot gameScores au démarrage de la partie en cours (affichage in-game). */
   gameScoreSessionBaseline: {},
   gameScoreSessionGameId: null,
+  /**
+   * Identité de la session de score affichée (BUG-TIERNIGHT-SCORE-BASELINE-01).
+   * Legacy jeux sans run : égal à gameId.
+   * TierNight : `tiernight:<mode>:<runId>` (series|live|classic).
+   */
+  gameScoreSessionKey: null,
+  /**
+   * Snapshot evening score-session reçu avant le run TierNight correspondant.
+   * Adopté dès que le run actif matche (BUG-TIERNIGHT-SCORE-BASELINE-01).
+   * @type {{ key: string|null, gameId: string|null, baseline: Record<string, number> }|null}
+   */
+  pendingRemoteGameScoreSession: null,
   /** Ordre de passage des jeux pour l'affichage des classements. */
   gameScoreOrder: [],
   playerStats: {},
@@ -341,6 +353,8 @@ function loadState() {
         ...parsed.gameScoreSessionBaseline,
       },
       gameScoreSessionGameId: parsed.gameScoreSessionGameId ?? null,
+      gameScoreSessionKey: parsed.gameScoreSessionKey ?? null,
+      pendingRemoteGameScoreSession: parsed.pendingRemoteGameScoreSession ?? null,
       gameScoreOrder: Array.isArray(parsed.gameScoreOrder) ? parsed.gameScoreOrder : [],
       playerStats: { ...base.playerStats, ...parsed.playerStats },
       stats: { ...base.stats, ...parsed.stats },
@@ -980,6 +994,8 @@ export function resetScores() {
   state.gameScoreOrder = [];
   state.gameScoreSessionBaseline = {};
   state.gameScoreSessionGameId = null;
+  state.gameScoreSessionKey = null;
+  state.pendingRemoteGameScoreSession = null;
   save();
 }
 
@@ -1091,12 +1107,371 @@ export function setActiveScoringGame(gameId) {
   activeScoringGameId = gameId || null;
 }
 
+/**
+ * Clé de session de score.
+ * @param {{ gameId?: string|null, mode?: string|null, runId?: string|null }} [opts]
+ * @returns {string|null}
+ */
+export function buildGameScoreSessionKey({ gameId = null, mode = null, runId = null } = {}) {
+  const gid = String(gameId || "").trim();
+  if (!gid) return null;
+  const run = runId != null ? String(runId).trim() : "";
+  if (!run) return gid;
+  const m = String(mode || "run").trim() || "run";
+  return `${gid}:${m}:${run}`;
+}
+
+/** @param {string|null|undefined} key */
+export function parseGameScoreSessionKey(key) {
+  const raw = key != null ? String(key).trim() : "";
+  if (!raw) return null;
+  const parts = raw.split(":");
+  if (parts.length === 1) {
+    return { gameId: parts[0], mode: null, runId: null, legacy: true };
+  }
+  if (parts.length >= 3) {
+    return {
+      gameId: parts[0],
+      mode: parts[1],
+      runId: parts.slice(2).join(":"),
+      legacy: false,
+    };
+  }
+  return null;
+}
+
+function snapshotGameScoreBaseline(gameId) {
+  const src = state.gameScores[gameId] || {};
+  const out = {};
+  Object.entries(src).forEach(([name, pts]) => {
+    const n = Number(pts);
+    out[name] = Number.isFinite(n) ? n : 0;
+  });
+  return out;
+}
+
+/**
+ * Run TierNight de *jeu* courant (pas le shell hub select/prep).
+ * @returns {{ mode: string, runId: string }|null}
+ */
+export function resolveActiveTierNightScoreRunIdentity() {
+  const live = state.tierNightLiveGame;
+  if (live?.lobbyStarted && live.phase !== "done" && live.runId) {
+    return { mode: "live", runId: String(live.runId) };
+  }
+  const tn = state.tierNightGame;
+  if (tn?.series && tn.runId) {
+    return { mode: "series", runId: String(tn.runId) };
+  }
+  if (tn?.runId && tn.topicId && !tn.series) {
+    return { mode: "classic", runId: String(tn.runId) };
+  }
+  return null;
+}
+
+/**
+ * Une clé TierNight n’est adoptée que si elle matche le run de jeu courant.
+ * @param {string|null|undefined} key
+ * @param {{ mode: string, runId: string }|null} [active]
+ */
+export function isGameScoreSessionKeyCompatibleWithActiveRun(
+  key,
+  active = resolveActiveTierNightScoreRunIdentity()
+) {
+  const parsed = parseGameScoreSessionKey(key);
+  if (!parsed) return { ok: false, reason: "NO_KEY" };
+  if (parsed.gameId !== "tiernight") {
+    return { ok: false, reason: "NOT_TIERNIGHT", parsed };
+  }
+  if (parsed.legacy || !parsed.runId || !parsed.mode) {
+    return { ok: false, reason: "LEGACY_OR_INCOMPLETE", parsed };
+  }
+  if (!active?.runId) {
+    return { ok: false, reason: "NO_ACTIVE_RUN", parsed };
+  }
+  if (String(active.runId) !== String(parsed.runId)) {
+    return { ok: false, reason: "RUN_MISMATCH", parsed, active };
+  }
+  if (String(active.mode) !== String(parsed.mode)) {
+    return { ok: false, reason: "MODE_MISMATCH", parsed, active };
+  }
+  return { ok: true, parsed, active };
+}
+
+/**
+ * Décision d’adoption d’un snapshot score-session distant.
+ * Pas d’ordre lexical sur runId : la fraîcheur = compatibilité avec le run actif.
+ *
+ * @param {{
+ *   remoteKey?: string|null,
+ *   remoteGameId?: string|null,
+ *   remoteBaseline?: Record<string, number>|null,
+ *   localKey?: string|null,
+ *   activeRun?: { mode: string, runId: string }|null,
+ * }} opts
+ */
+export function evaluateRemoteGameScoreSessionAdoption({
+  remoteKey = null,
+  remoteGameId = null,
+  remoteBaseline = null,
+  localKey = state.gameScoreSessionKey,
+  activeRun = resolveActiveTierNightScoreRunIdentity(),
+} = {}) {
+  const gid = remoteGameId != null ? String(remoteGameId) : null;
+  const key = remoteKey != null ? String(remoteKey) : null;
+
+  // Autre jeu (Hot Take, etc.) : chemin legacy gameId.
+  if (gid && gid !== "tiernight") {
+    if (localKey === (key || gid)) {
+      return { action: "merge_same_key", reason: "LEGACY_OTHER_GAME" };
+    }
+    return { action: "replace", reason: "LEGACY_OTHER_GAME" };
+  }
+
+  if (key && key.startsWith("tiernight:")) {
+    const compat = isGameScoreSessionKeyCompatibleWithActiveRun(key, activeRun);
+    if (!compat.ok) {
+      if (compat.reason === "NO_ACTIVE_RUN") {
+        return {
+          action: "buffer",
+          reason: compat.reason,
+          remoteKey: key,
+          remoteGameId: gid || "tiernight",
+          remoteBaseline: remoteBaseline || {},
+        };
+      }
+      // RUN/MODE mismatch ou legacy incomplete = stale / orphelin vs run courant
+      return { action: "reject", reason: compat.reason, compat };
+    }
+    if (localKey === key) {
+      return { action: "merge_same_key", reason: "SAME_KEY" };
+    }
+    return { action: "replace", reason: "MATCHES_ACTIVE_RUN" };
+  }
+
+  // Remote TierNight sans clé (legacy) pendant un run actif : ne pas écraser.
+  if (activeRun && (gid === "tiernight" || remoteBaseline)) {
+    return { action: "reject", reason: "LEGACY_WITHOUT_KEY" };
+  }
+
+  if (!key && !gid) {
+    return { action: "ignore", reason: "EMPTY" };
+  }
+
+  return { action: "replace", reason: "LEGACY_FALLBACK" };
+}
+
+function applyGameScoreSessionSnapshot({ key, gameId, baseline, merge }) {
+  const gid = gameId || "tiernight";
+  const nextBaseline = baseline && typeof baseline === "object" ? { ...baseline } : {};
+  if (merge && state.gameScoreSessionKey === key) {
+    state.gameScoreSessionBaseline = {
+      ...state.gameScoreSessionBaseline,
+      ...nextBaseline,
+    };
+  } else {
+    state.gameScoreSessionBaseline = nextBaseline;
+  }
+  state.gameScoreSessionKey = key;
+  state.gameScoreSessionGameId = gid;
+  activeScoringGameId = gid;
+  save();
+}
+
+/** Applique (ou buffer / refuse) un snapshot distant. */
+export function applyRemoteGameScoreSessionFields({
+  remoteKey = undefined,
+  remoteGameId = undefined,
+  remoteBaseline = undefined,
+} = {}) {
+  const decision = evaluateRemoteGameScoreSessionAdoption({
+    remoteKey: remoteKey !== undefined ? remoteKey : null,
+    remoteGameId: remoteGameId !== undefined ? remoteGameId : null,
+    remoteBaseline:
+      remoteBaseline && typeof remoteBaseline === "object" ? remoteBaseline : {},
+  });
+
+  if (decision.action === "ignore") {
+    return { ...decision, applied: false };
+  }
+  if (decision.action === "reject") {
+    return { ...decision, applied: false };
+  }
+  if (decision.action === "buffer") {
+    state.pendingRemoteGameScoreSession = {
+      key: decision.remoteKey,
+      gameId: decision.remoteGameId,
+      baseline: { ...(decision.remoteBaseline || {}) },
+    };
+    save();
+    return { ...decision, applied: false, buffered: true };
+  }
+
+  const key =
+    remoteKey !== undefined && remoteKey != null
+      ? String(remoteKey)
+      : remoteGameId != null
+        ? String(remoteGameId)
+        : state.gameScoreSessionKey;
+  const gameId =
+    remoteGameId !== undefined && remoteGameId != null
+      ? String(remoteGameId)
+      : "tiernight";
+  const baseline =
+    remoteBaseline && typeof remoteBaseline === "object" ? remoteBaseline : {};
+
+  applyGameScoreSessionSnapshot({
+    key,
+    gameId,
+    baseline,
+    merge: decision.action === "merge_same_key",
+  });
+  if (state.pendingRemoteGameScoreSession?.key === key) {
+    state.pendingRemoteGameScoreSession = null;
+    save();
+  }
+  return { ...decision, applied: true };
+}
+
+/** Après adoption d’un run TierNight : tenter d’appliquer un evening bufferisé. */
+export function flushPendingRemoteGameScoreSession() {
+  const pending = state.pendingRemoteGameScoreSession;
+  if (!pending?.key) return { ok: false, reason: "NO_PENDING" };
+  const result = applyRemoteGameScoreSessionFields({
+    remoteKey: pending.key,
+    remoteGameId: pending.gameId,
+    remoteBaseline: pending.baseline,
+  });
+  if (result.applied) {
+    state.pendingRemoteGameScoreSession = null;
+    save();
+  }
+  return result;
+}
+
+/**
+ * Vue d’affichage du cumul interne TierNight.
+ * Si run actif sans baseline/clé alignés → pending (pas de fallback soirée).
+ */
+export function resolveGameScoreSessionDisplay(gameId = getActiveScoringGame()) {
+  if (!gameId) {
+    return { ready: true, scores: {}, pending: null };
+  }
+  if (gameId !== "tiernight") {
+    return {
+      ready: true,
+      scores: getCurrentSessionScoreMap(gameId),
+      pending: null,
+    };
+  }
+  const active = resolveActiveTierNightScoreRunIdentity();
+  if (!active) {
+    return {
+      ready: true,
+      scores: getCurrentSessionScoreMap(gameId),
+      pending: null,
+    };
+  }
+  const expectedKey = buildGameScoreSessionKey({
+    gameId: "tiernight",
+    mode: active.mode,
+    runId: active.runId,
+  });
+  if (
+    state.gameScoreSessionKey !== expectedKey ||
+    state.gameScoreSessionGameId !== "tiernight" ||
+    !state.gameScoreSessionBaseline ||
+    typeof state.gameScoreSessionBaseline !== "object"
+  ) {
+    return {
+      ready: false,
+      scores: {},
+      pending: "WAITING_BASELINE",
+      expectedKey,
+      localKey: state.gameScoreSessionKey,
+    };
+  }
+  return {
+    ready: true,
+    scores: getCurrentSessionScoreMap(gameId),
+    pending: null,
+  };
+}
+
+/**
+ * BUG-TIERNIGHT-SCORE-BASELINE-01 — ouvre une session de score liée au run.
+ * No-op si même clé ; refuse runId absent ; refuse si run ≠ actif.
+ * @param {{ gameId: string, mode?: string|null, runId?: string|null }} opts
+ */
+export function ensureGameScoreSessionForRun({ gameId, mode = null, runId = null } = {}) {
+  const gid = String(gameId || "").trim();
+  const run = runId != null ? String(runId).trim() : "";
+  if (!gid || !run) {
+    return { ok: false, changed: false, reason: "NO_RUN" };
+  }
+  const key = buildGameScoreSessionKey({ gameId: gid, mode, runId: run });
+  if (!key) return { ok: false, changed: false, reason: "NO_KEY" };
+
+  if (gid === "tiernight") {
+    const active = resolveActiveTierNightScoreRunIdentity();
+    if (!active?.runId) {
+      return { ok: false, changed: false, reason: "NO_ACTIVE_RUN", key };
+    }
+    if (String(active.runId) !== run) {
+      return { ok: false, changed: false, reason: "STALE_RUN", key, active };
+    }
+    if (mode && String(active.mode) !== String(mode)) {
+      return { ok: false, changed: false, reason: "STALE_MODE", key, active };
+    }
+  }
+
+  if (state.gameScoreSessionKey === key) {
+    activeScoringGameId = gid;
+    if (state.gameScoreSessionGameId !== gid) {
+      state.gameScoreSessionGameId = gid;
+      save();
+    }
+    return { ok: true, changed: false, key };
+  }
+
+  activeScoringGameId = gid;
+  state.gameScoreSessionGameId = gid;
+  state.gameScoreSessionKey = key;
+  state.gameScoreSessionBaseline = snapshotGameScoreBaseline(gid);
+  save();
+  return { ok: true, changed: true, key };
+}
+
+/** Snapshot cohérent clé+baseline+gameId (rollback launch). */
+export function captureGameScoreSessionRollbackSnapshot() {
+  return {
+    gameScoreSessionKey: state.gameScoreSessionKey,
+    gameScoreSessionGameId: state.gameScoreSessionGameId,
+    gameScoreSessionBaseline: { ...(state.gameScoreSessionBaseline || {}) },
+    pendingRemoteGameScoreSession: state.pendingRemoteGameScoreSession
+      ? { ...state.pendingRemoteGameScoreSession }
+      : null,
+  };
+}
+
+export function restoreGameScoreSessionRollbackSnapshot(snap) {
+  if (!snap || typeof snap !== "object") return;
+  state.gameScoreSessionKey = snap.gameScoreSessionKey ?? null;
+  state.gameScoreSessionGameId = snap.gameScoreSessionGameId ?? null;
+  state.gameScoreSessionBaseline = {
+    ...(snap.gameScoreSessionBaseline || {}),
+  };
+  state.pendingRemoteGameScoreSession = snap.pendingRemoteGameScoreSession ?? null;
+  save();
+}
+
 /** Marque le début d'une partie : affichage in-game = points depuis ce snapshot. */
 export function beginGameScoreSession(gameId) {
   if (!gameId) return;
   activeScoringGameId = gameId;
   state.gameScoreSessionGameId = gameId;
-  state.gameScoreSessionBaseline = { ...(state.gameScores[gameId] || {}) };
+  state.gameScoreSessionKey = buildGameScoreSessionKey({ gameId }) || gameId;
+  state.gameScoreSessionBaseline = snapshotGameScoreBaseline(gameId);
   save();
 }
 
@@ -1113,7 +1488,12 @@ export function getCurrentSessionScoreMap(gameId = getActiveScoringGame()) {
   ]);
   const out = {};
   names.forEach((name) => {
-    out[name] = (total[name] || 0) - (base[name] || 0);
+    const t = Number(total[name]);
+    const b = Number(base[name]);
+    const totalN = Number.isFinite(t) ? t : 0;
+    const baseN = Number.isFinite(b) ? b : 0;
+    const delta = totalN - baseN;
+    out[name] = Number.isFinite(delta) ? delta : 0;
   });
   return out;
 }

@@ -42,8 +42,32 @@ import {
 } from "../core/tierNightSeriesExitNav.js";
 import { EXIT_GAME_LABEL } from "../core/exitGame.js";
 import { tierNightBetweenScoringExplainText } from "../core/tierNightScoring.js";
+import { sortAndRankByScore } from "../core/competitionRank.js";
 
 export { TIER_NIGHT_SERIES_ADVANCE_FIELD_POLICY };
+
+function roundRecapScoreRowsHtml(recaps) {
+  const ranked = sortAndRankByScore(
+    Array.isArray(recaps) ? recaps.slice() : [],
+    (r) => (Number(r.consensusPoints) || 0) + (Number(r.outsiderBonus) || 0)
+  );
+  return ranked
+    .map((r) => {
+      const pts =
+        (Number(r.consensusPoints) || 0) + (Number(r.outsiderBonus) || 0);
+      const gold = r.rank === 1 && pts > 0 ? "player-score--gold" : "";
+      const color = r.color || "rgba(255,255,255,.2)";
+      const emoji = r.emoji || "🙂";
+      return `
+        <div class="game-scores-box__row">
+          <span class="game-scores-box__rank">${r.rank}</span>
+          <div class="avatar avatar--sm" style="background:${escapeHtml(color)}">${escapeHtml(emoji)}</div>
+          <span class="player-name game-scores-box__name">${escapeHtml(r.player || "?")}</span>
+          <span class="player-score ${gold}">+${pts}</span>
+        </div>`;
+    })
+    .join("");
+}
 
 function getSeriesTn() {
   return (
@@ -207,29 +231,25 @@ export function mountTierNightBetween(app) {
 
         ${
           Array.isArray(recap?.recaps) && recap.recaps.length
-            ? `<div class="card">
-                <p class="card-heading">Scores de la manche</p>
+            ? `<div class="card game-scores-box">
+                <p class="card-heading game-scores-box__title">Scores de la manche</p>
                 <p class="hint tier-between-scoring-explain">${escapeHtml(
                   tierNightBetweenScoringExplainText({ reverse: false })
                 )}</p>
-                <ul class="score-list">
-                  ${recap.recaps
-                    .slice()
-                    .sort(
-                      (a, b) =>
-                        (Number(b.consensusPoints) || 0) + (Number(b.outsiderBonus) || 0) -
-                        ((Number(a.consensusPoints) || 0) + (Number(a.outsiderBonus) || 0))
-                    )
-                    .map((r) => {
-                      const pts =
-                        (Number(r.consensusPoints) || 0) + (Number(r.outsiderBonus) || 0);
-                      return `<li><strong>${escapeHtml(r.player || "?")}</strong> · +${pts}</li>`;
-                    })
-                    .join("")}
-                </ul>
+                ${roundRecapScoreRowsHtml(recap.recaps)}
               </div>`
             : ""
         }
+
+        <div class="reveal-mid-action">
+          ${
+            showNext
+              ? `<button type="button" class="btn btn-primary btn--spaced" id="btn-tiernight-next-theme">Thème suivant</button>`
+              : hostOrAh && isLast
+                ? `<p class="hint">Fin de série…</p>`
+                : `<p class="hint">En attente de l’hôte…</p>`
+          }
+        </div>
 
         ${gameCumulativeScoresHtml({
           gameId: "tiernight",
@@ -239,15 +259,8 @@ export function mountTierNightBetween(app) {
 
         <div class="tier-between-actions">
           ${
-            showNext
-              ? `<button type="button" class="btn btn-primary btn--spaced" id="btn-tiernight-next-theme">▶ Thème suivant</button>`
-              : hostOrAh && isLast
-                ? `<p class="hint">Fin de série…</p>`
-                : `<p class="hint">En attente de l’hôte…</p>`
-          }
-          ${
             hostOrAh
-              ? `<button type="button" class="btn btn-secondary btn--spaced" id="btn-tiernight-change-mode">⇄ Changer de mode</button>`
+              ? `<button type="button" class="btn btn-secondary btn--spaced" id="btn-tiernight-change-mode">Changer de mode</button>`
               : ""
           }
           ${

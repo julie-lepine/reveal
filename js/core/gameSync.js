@@ -14,6 +14,8 @@ import {
   recordTierNightPlayed,
   resetGameSessionsOnly,
   defaultEveningStats,
+  applyRemoteGameScoreSessionFields,
+  flushPendingRemoteGameScoreSession,
 } from "./state.js";
 import {
   SESSION_GAME_ID_TO_TILE,
@@ -2976,6 +2978,7 @@ function eveningStateToRemote() {
     tierNightGame,
     gameScoreSessionBaseline,
     gameScoreSessionGameId,
+    gameScoreSessionKey,
     eveningGamesRecorded,
   } = getState();
   // customRosterTopics volontairement ABSENT : collection concurrente multi-auteurs.
@@ -2988,6 +2991,7 @@ function eveningStateToRemote() {
     gameScoreOrder: [...(getState().gameScoreOrder || [])],
     gameScoreSessionBaseline: scoresToRemote(gameScoreSessionBaseline || {}),
     gameScoreSessionGameId: gameScoreSessionGameId || null,
+    gameScoreSessionKey: gameScoreSessionKey || null,
     eveningGamesRecorded: normalizeEveningGamesRecorded(eveningGamesRecorded || {}),
     stats: {
       hotTakesPlayed: stats.hotTakesPlayed || 0,
@@ -3121,22 +3125,22 @@ export function applyRemoteEveningState(st) {
   if (st.scores) applyRemoteLobbyScores(st.scores);
   if (st.playerStats) applyRemotePlayerStats(st.playerStats, (uid) => playerKeyToDisplayName(uid));
   if (st.gameScores) applyRemoteGameScores(st.gameScores, st.gameScoreOrder);
-  if (st.gameScoreSessionGameId !== undefined || st.gameScoreSessionBaseline) {
-    const baselinePatch = {};
-    if (st.gameScoreSessionGameId !== undefined) {
-      baselinePatch.gameScoreSessionGameId = st.gameScoreSessionGameId;
-    }
-    if (st.gameScoreSessionBaseline) {
-      const byName = scoresFromRemote(st.gameScoreSessionBaseline);
-      const merged = { ...getState().gameScoreSessionBaseline };
-      getLobbyParticipants().forEach((p) => {
-        if (byName[p.name] != null) merged[p.name] = byName[p.name];
-      });
-      Object.assign(merged, byName);
-      baselinePatch.gameScoreSessionBaseline = merged;
-    }
-    if (Object.keys(baselinePatch).length) saveStatePatch(baselinePatch);
+  if (
+    st.gameScoreSessionGameId !== undefined ||
+    st.gameScoreSessionBaseline ||
+    st.gameScoreSessionKey !== undefined
+  ) {
+    const byName = st.gameScoreSessionBaseline
+      ? scoresFromRemote(st.gameScoreSessionBaseline)
+      : undefined;
+    applyRemoteGameScoreSessionFields({
+      remoteKey: st.gameScoreSessionKey !== undefined ? st.gameScoreSessionKey : undefined,
+      remoteGameId:
+        st.gameScoreSessionGameId !== undefined ? st.gameScoreSessionGameId : undefined,
+      remoteBaseline: byName,
+    });
   }
+  flushPendingRemoteGameScoreSession();
 }
 
 /**
@@ -3584,6 +3588,10 @@ export function applyRemoteSession(row, { epoch = null } = {}) {
   // distant. On évite alors la réécriture localStorage (JSON.stringify de tout le state)
   // qui, multipliée par chaque push/poll, était un coût CPU inutile.
   if (Object.keys(patch).length && (!sigUnchanged || playChanged)) saveStatePatch(patch);
+
+  if (tierNightPlayChanged || tierNightLivePlayChanged) {
+    flushPendingRemoteGameScoreSession();
+  }
 
   applyRemoteEveningState(st);
   syncLastGameFromSessionRow(row);
@@ -4114,6 +4122,7 @@ const EVENING_STATE_KEYS = new Set([
   "gameScoreOrder",
   "gameScoreSessionBaseline",
   "gameScoreSessionGameId",
+  "gameScoreSessionKey",
   "eveningGamesRecorded",
   "stats",
   "lastGame",

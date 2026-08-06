@@ -1,5 +1,5 @@
 import { getSortedActivePlayers, getEveningStandingPlayers } from "./players.js";
-import { getCurrentSessionScoreMap, getState } from "./state.js";
+import { getCurrentSessionScoreMap, getState, resolveGameScoreSessionDisplay } from "./state.js";
 import { escapeHtml } from "./ui.js";
 import {
   sortAndRankByScore,
@@ -128,12 +128,25 @@ export function gameCumulativeScoresHtml({
   title = "Cumul des scores",
   scores: scoresOverride = null,
 } = {}) {
+  const players = getSortedActivePlayers();
+  if (!players.length) return "";
+
+  if (scoresOverride == null && gameId === "tiernight") {
+    const view = resolveGameScoreSessionDisplay("tiernight");
+    if (!view.ready) {
+      return `
+    <div class="card game-scores-box" data-scores="session" data-scores-pending="1">
+      <p class="card-heading game-scores-box__title">${escapeHtml(title)}</p>
+      ${gameLabel ? `<p class="game-scores-box__game">${escapeHtml(gameLabel)}</p>` : ""}
+      <p class="hint">Synchronisation des scores…</p>
+    </div>`;
+    }
+  }
+
   const scores =
     scoresOverride && typeof scoresOverride === "object"
       ? scoresOverride
       : getCurrentSessionScoreMap(gameId);
-  const players = getSortedActivePlayers();
-  if (!players.length) return "";
 
   return `
     <div class="card game-scores-box" data-scores="session">
@@ -151,15 +164,39 @@ export function refreshGameScoresBox(app, {
   scores: scoresOverride = null,
 } = {}) {
   if (!app) return;
-  const scores =
-    scoresOverride && typeof scoresOverride === "object"
-      ? scoresOverride
-      : getCurrentSessionScoreMap(gameId);
   const players = getSortedActivePlayers();
   if (!players.length) return;
 
   const box = app.querySelector('[data-scores="session"]');
   if (!box) return;
+
+  if (scoresOverride == null && gameId === "tiernight") {
+    const view = resolveGameScoreSessionDisplay("tiernight");
+    if (!view.ready) {
+      box.setAttribute("data-scores-pending", "1");
+      const titleEl = box.querySelector(".game-scores-box__title");
+      if (titleEl) titleEl.textContent = title;
+      const gameEl = box.querySelector(".game-scores-box__game");
+      if (gameEl && gameLabel) gameEl.textContent = gameLabel;
+      const rows = box.querySelectorAll(".game-scores-box__row");
+      rows.forEach((el) => el.remove());
+      let hint = box.querySelector(".hint");
+      if (!hint) {
+        hint = document.createElement("p");
+        hint.className = "hint";
+        box.appendChild(hint);
+      }
+      hint.textContent = "Synchronisation des scores…";
+      return;
+    }
+    box.removeAttribute("data-scores-pending");
+    box.querySelector(".hint")?.remove();
+  }
+
+  const scores =
+    scoresOverride && typeof scoresOverride === "object"
+      ? scoresOverride
+      : getCurrentSessionScoreMap(gameId);
 
   const titleEl = box.querySelector(".game-scores-box__title");
   const gameEl = box.querySelector(".game-scores-box__game");

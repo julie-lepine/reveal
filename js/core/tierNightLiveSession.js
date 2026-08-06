@@ -1,7 +1,7 @@
 import { TIER_LEVELS } from "../../data/tierTopics.js";
 import { getActivePlayerNames } from "./players.js";
 import { getLobbyParticipants } from "./lobby.js";
-import { getLocalDisplayName, getState, saveStatePatch } from "./state.js";
+import { getLocalDisplayName, getState, saveStatePatch, ensureGameScoreSessionForRun, captureGameScoreSessionRollbackSnapshot, restoreGameScoreSessionRollbackSnapshot } from "./state.js";
 import {
   isTierNightLiveRevealNetworkUncertainty,
   evaluateTierNightLiveRevealRecovery,
@@ -28,8 +28,6 @@ import {
   rollbackOptimisticMapEntry,
   canRollbackOptimisticSubmission,
 } from "./optimisticMapEntry.js";
-
-let tierNightLiveVoteAttemptId = 0;
 import { medianTierFromRanks } from "./tierNightScoring.js";
 import { setLobbyPlaying } from "./lobby.js";
 import { createTierNightRunId } from "./tierNightConfig.js";
@@ -47,6 +45,17 @@ import {
 import { buildTierNightSeriesLaunchPayload } from "./tierNightSeriesLaunch.js";
 
 export { prepareTierNightSeriesLaunchAttempt } from "./tierNightSeriesLaunch.js";
+
+let tierNightLiveVoteAttemptId = 0;
+
+/** Capture baseline cumul interne avant le 1er scoring du run (BUG-TIERNIGHT-SCORE-BASELINE-01). */
+function captureTierNightScoreBaselineForRun({ mode, runId }) {
+  return ensureGameScoreSessionForRun({
+    gameId: "tiernight",
+    mode,
+    runId,
+  });
+}
 
 const TIER_RANK = { S: 0, A: 1, B: 2, C: 3, D: 4 };
 
@@ -148,21 +157,48 @@ export async function markTierNightLiveLobbyStarted({ topicId, listName, items }
     finished: false,
     ...votingPayload(0),
   };
-  return launchGameWithSync({
-    screen: "tiernight-live",
-    gameId: "tiernight",
-    mode: "push",
-    beforeCommit: () => setLobbyPlaying("tiernight"),
-    applyLocal: () =>
-      saveStatePatch({
-        tierNightLiveGame: next,
-        tierNightGame: { runId, recaps: [], topicId: null, listName: "", controversialItem: null },
-      }),
-    getRemoteState: () => ({
-      tierNightLive: tierNightLiveToRemote(next),
-      tierNight: tierNightClassicResetRemote(),
-    }),
+  // Run adopté localement avant baseline + sync (ordre : run → baseline → scoring).
+  const previousLiveLocal = {
+    tierNightLiveGame: getState().tierNightLiveGame
+      ? { ...getState().tierNightLiveGame }
+      : null,
+    tierNightGame: getState().tierNightGame ? { ...getState().tierNightGame } : null,
+  };
+  const previousScoreSession = captureGameScoreSessionRollbackSnapshot();
+  saveStatePatch({
+    tierNightLiveGame: next,
+    tierNightGame: { runId, recaps: [], topicId: null, listName: "", controversialItem: null },
   });
+  captureTierNightScoreBaselineForRun({ mode: "live", runId });
+  try {
+    const result = await launchGameWithSync({
+      screen: "tiernight-live",
+      gameId: "tiernight",
+      mode: "push",
+      beforeCommit: () => {
+        captureTierNightScoreBaselineForRun({ mode: "live", runId });
+        return setLobbyPlaying("tiernight");
+      },
+      applyLocal: () =>
+        saveStatePatch({
+          tierNightLiveGame: next,
+          tierNightGame: { runId, recaps: [], topicId: null, listName: "", controversialItem: null },
+        }),
+      getRemoteState: () => ({
+        tierNightLive: tierNightLiveToRemote(next),
+        tierNight: tierNightClassicResetRemote(),
+      }),
+    });
+    if (result?.ok === false) {
+      saveStatePatch(previousLiveLocal);
+      restoreGameScoreSessionRollbackSnapshot(previousScoreSession);
+    }
+    return result;
+  } catch (error) {
+    saveStatePatch(previousLiveLocal);
+    restoreGameScoreSessionRollbackSnapshot(previousScoreSession);
+    throw error;
+  }
 }
 
 /** MP : envoie uniquement le vote local (merge additif côté serveur).
@@ -474,6 +510,7 @@ export async function markTierNightClassicStarted({ topicId, mode, modifier }) {
     },
     tierNightLiveGame: defaultLive(),
   });
+  captureTierNightScoreBaselineForRun({ mode: "classic", runId });
   const remoteTierNight = tierNightToRemote({
     runId,
     topicId,
@@ -492,7 +529,10 @@ export async function markTierNightClassicStarted({ topicId, mode, modifier }) {
     screen: "tiernight",
     gameId: "tiernight",
     mode: "push",
-    beforeCommit: () => setLobbyPlaying("tiernight"),
+    beforeCommit: () => {
+      captureTierNightScoreBaselineForRun({ mode: "classic", runId });
+      return setLobbyPlaying("tiernight");
+    },
     applyLocal: () => {},
     getRemoteState: () => ({
       tierNight: remoteTierNight,
@@ -541,6 +581,7 @@ export async function markTierNightSeriesStarted({
       ? { ...getState().tierNightSeriesPrep }
       : null,
   };
+  const previousScoreSession = captureGameScoreSessionRollbackSnapshot();
 
   const localGame = {
     ...built.localGame,
@@ -563,6 +604,10 @@ export async function markTierNightSeriesStarted({
 
   // Application locale immédiate (Realtime confirme / merge, ne déclenche pas seul)
   saveStatePatch(localPatch);
+  captureTierNightScoreBaselineForRun({
+    mode: "series",
+    runId: attempt.runId,
+  });
 
   if (!isGameSyncActive()) {
     return { ok: true, localOnly: true, attempt, previousLocal };
@@ -573,7 +618,13 @@ export async function markTierNightSeriesStarted({
       screen: "tiernight",
       gameId: "tiernight",
       mode: "push",
-      beforeCommit: () => setLobbyPlaying("tiernight"),
+      beforeCommit: () => {
+        captureTierNightScoreBaselineForRun({
+          mode: "series",
+          runId: attempt.runId,
+        });
+        return setLobbyPlaying("tiernight");
+      },
       applyLocal: () => {
         saveStatePatch(localPatch);
       },
@@ -594,6 +645,7 @@ export async function markTierNightSeriesStarted({
 
     if (result?.ok === false) {
       saveStatePatch(previousLocal);
+      restoreGameScoreSessionRollbackSnapshot(previousScoreSession);
       return {
         ...result,
         attempt,
@@ -604,6 +656,7 @@ export async function markTierNightSeriesStarted({
     return { ...result, attempt, ok: result?.ok !== false };
   } catch (error) {
     saveStatePatch(previousLocal);
+    restoreGameScoreSessionRollbackSnapshot(previousScoreSession);
     return {
       ok: false,
       error: error?.message || "Échec du lancement série.",
