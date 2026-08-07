@@ -18,7 +18,7 @@
 8. Exécute **`supabase/lobby-polls.sql`** (sondages « prochain jeu » — tables + RPC ; dépend de `is_lobby_host` / `is_acting_host` I-08/ARCH-03)
 9. Exécute **`supabase/traitre-private.sql`** si tu joues à Spot the fake (dépend de `is_lobby_host`, fourni par `game-sessions-i08-arch03.sql`)
 
-> **Fil Rouge / Mot interdit** — suppression applicative terminée (plus de feature ni de flag dans l’app). Le script historique `supabase/fil-rouge-private.sql` peut encore exister en dépôt / sur un projet Supabase déjà provisionné ; ne pas l’exécuter pour une install neuve. Une éventuelle purge SQL (table / clés RPC) est une opération ops séparée, hors setup courant.
+> **Fil Rouge / Mot interdit** — suppression applicative terminée (et serveur via **CLEANUP-FILROUGE-02 ✅** 2026-08-07). Ne pas exécuter `supabase/fil-rouge-private.sql` sur une install neuve. Sur le projet cible : table `fil_rouge_private` absente ; RPC actives sans Fil Rouge / sans `playlistGuess` regressé. Helper client `stripLegacyFilRougeKeys` conservé (anciens localStorage).
 ## 2. Clés API
 
 1. **Project Settings → API** : copie l’URL et la clé `anon` (publique).

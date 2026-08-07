@@ -85,7 +85,7 @@ Sources : audit SQL du dépôt (`AUDIT-SQL-01`) + docs ops ([`SUPABASE_SETUP.md`
 | Historique (date inconnue) | [`lobby-membership-e4-03b-revoke-create-lobby-member.sql`](../supabase/lobby-membership-e4-03b-revoke-create-lobby-member.sql) | Membership E4 Option B | 🟡 État à vérifier | 🟡 État à vérifier | [`lobby-membership-e4-RUNBOOK.sql`](../supabase/lobby-membership-e4-RUNBOOK.sql) | REVOKE conditionnel |
 | Historique (date inconnue) | [`lobby-membership-e5-01-dissolve-lobby-atomically.sql`](../supabase/lobby-membership-e5-01-dissolve-lobby-atomically.sql) | Membership E5 | ✅ probable | ✅ probable | [`lobby-membership-e5-RUNBOOK.sql`](../supabase/lobby-membership-e5-RUNBOOK.sql) · [`lobby-membership-e5-staging-harness.sql`](../supabase/lobby-membership-e5-staging-harness.sql) | QA staging + terrain 2026-07-28 (doc audit) |
 | Historique (date inconnue) | [`create-lobby-member.sql`](../supabase/create-lobby-member.sql) | Snapshot prod | ❌ | ❌ | — | Legacy / snapshot — **ne pas réappliquer** (réactive create legacy) |
-| Historique (date inconnue) | [`fil-rouge-private.sql`](../supabase/fil-rouge-private.sql) | Fil Rouge abandonné | ❌ (ne plus déployer) | 🟡 État à vérifier (legacy éventuel) | — | Jeu retiré de l’app ; ne pas exécuter sur install neuve |
+| Historique (date inconnue) | [`fil-rouge-private.sql`](../supabase/fil-rouge-private.sql) | Fil Rouge abandonné | ❌ (ne plus déployer) | ❌ table live retirée | — | Historique uniquement · **DROP** via [`cleanup-filrouge-02-remove-server-legacy.sql`](../supabase/cleanup-filrouge-02-remove-server-legacy.sql) ✅ 2026-08-07 |
 
 **Hors migrations (tracés ailleurs si besoin)** : préflight [`lobby-membership-e4-00-preflight-duplicates.sql`](../supabase/lobby-membership-e4-00-preflight-duplicates.sql) (lecture seule) ; runbooks / harness sous [`supabase/tests/`](../supabase/tests/) et [`lobby-membership-e4-RUNBOOK.sql`](../supabase/lobby-membership-e4-RUNBOOK.sql) / [`lobby-membership-e5-RUNBOOK.sql`](../supabase/lobby-membership-e5-RUNBOOK.sql) — ce ne sont pas des migrations. Voir aussi [`lobby-membership-e4-tests-manual.sql`](../supabase/lobby-membership-e4-tests-manual.sql).
 
@@ -268,5 +268,22 @@ Suppression produit du jeu VibeCheck (`game_id` client `playlistguess`, écran `
 | Hors scope | Table `lobby_polls` / `game_sessions` (schéma inchangé) · aucun DELETE de lignes existantes |
 
 **Statut** : Client + SQL + QA GitHub Pages ✅ · ticket **clôturé** (2026-08-02).
+
+---
+
+## 11. CLEANUP-FILROUGE-02 — Retrait legacy serveur Fil Rouge
+
+Nettoyage serveur après retrait produit Fil Rouge (app déjà propre via CLEANUP-FILROUGE-01). Base = définitions LIVE D2 + garde MD5 ; deltas minimaux uniquement.
+
+| Élément | Valeur |
+| ------- | ------ |
+| Migration | [`cleanup-filrouge-02-remove-server-legacy.sql`](../supabase/cleanup-filrouge-02-remove-server-legacy.sql) — **✅ appliquée** (projet cible, 2026-08-07) |
+| Post-deploy | [`tests/cleanup-filrouge-02-postdeploy-check.sql`](../supabase/tests/cleanup-filrouge-02-postdeploy-check.sql) — **PASS** |
+| Fonctions | `apply_acting_host_play` (− `filRougeScores` deny) · `complete_game_session_as_actor` (− `filRouge` / `playlistGuess` ; **`tiernight-end` conservé**) · `remap_lobby_user_id` (− branche `fil_rouge_private`) |
+| Table | `DROP TABLE IF EXISTS public.fil_rouge_private` (sans CASCADE) — absente live |
+| Client | `stripLegacyFilRougeKeys` **conservé** (localStorage) · `gameScoreSessionKey` inchangé |
+| Hors scope | Migrations historiques non réécrites · aucun REVOKE/GRANT (ACL live préservées) |
+
+**Statut** : SQL + post-deploy ✅ · ticket **CLEANUP-FILROUGE-02** clôturable (2026-08-07).
 
 ---

@@ -113,9 +113,8 @@ describe("fil rouge vague 3 - CSS / message / docs", () => {
     assert.ok(setup.includes("traitre-private.sql"));
     const audit = read("docs/AUDIT_REGROUPEMENT_CAUSES_RACINES.md");
     assert.ok(/SYN-05 \/ ARCH-18/.test(audit));
-    // Contrat produit : l’audit ne décrit plus Fil Rouge comme disponible / dormant.
-    // Ne pas exiger une phrase magique (« suppression applicative ») : SUPABASE_SETUP porte déjà ce wording.
-    assert.ok(/Fil Rouge app supprimé/i.test(audit));
+    // Contrat produit : l’audit décrit Fil Rouge comme retiré (app + serveur).
+    assert.ok(/Fil Rouge app(\s*\+\s*serveur)?\s+(supprimé|nettoyés)/i.test(audit));
     assert.equal(/Fil Rouge dormant/.test(audit), false);
   });
 });

@@ -90,7 +90,8 @@ describe("BUG-TIERNIGHT-SERIES-QA-02 - outsider +5", () => {
       between,
       /consensusPoints\) \|\| 0\) \+ \(Number\(r\.outsiderBonus\)/
     );
-    assert.match(between, /dont \+\$\{outsider\} outsider/);
+    assert.match(between, /dont \+\$\{outsider\} pts outsider/);
+    assert.match(between, /game-scores-box__identity/);
   });
 
   it("sources JS utilisent TIER_NIGHT_OUTSIDER_BONUS", () => {

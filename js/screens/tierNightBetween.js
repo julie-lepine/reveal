@@ -65,13 +65,16 @@ function roundRecapScoreRowsHtml(recaps) {
       const emoji = r.emoji || "🙂";
       const outsiderHint =
         outsider > 0
-          ? `<span class="hint game-scores-box__meta">dont +${outsider} outsider</span>`
+          ? `<span class="hint game-scores-box__meta">dont +${outsider} pts outsider</span>`
           : "";
       return `
         <div class="game-scores-box__row">
           <span class="game-scores-box__rank">${r.rank}</span>
           <div class="avatar avatar--sm" style="background:${escapeHtml(color)}">${escapeHtml(emoji)}</div>
-          <span class="player-name game-scores-box__name">${escapeHtml(r.player || "?")}${outsiderHint}</span>
+          <div class="game-scores-box__identity">
+            <span class="player-name game-scores-box__name">${escapeHtml(r.player || "?")}</span>
+            ${outsiderHint}
+          </div>
           <span class="player-score ${gold}">+${pts}</span>
         </div>`;
     })
