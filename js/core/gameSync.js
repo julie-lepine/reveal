@@ -283,7 +283,7 @@ function guestMustFollowSession(targetScreen, currentScreen = getCurrentScreen()
 }
 
 const MENU_SCREENS = new Set(["home", "lobby", "game-select", "settings"]);
-export const POST_GAME_SCREENS = new Set(["results", "leaderboard"]);
+export const POST_GAME_SCREENS = new Set(["results", "leaderboard", "tiernight-end"]);
 export const DEFAULT_SYNC_PATCH_TIMEOUT_MS = SYNC_PATCH_TIMEOUT_MS;
 
 const RESTARTABLE_SESSION_GAME_IDS = new Set([
@@ -5146,13 +5146,32 @@ export async function completeGameSession({ gameId = "menu", screen = "results",
   if (!isLobbyHost()) {
     if (!canActAsHost()) return null;
     const { rpcCompleteGameSessionAsActor } = await import("./gameSessionRpc.js");
-    const row = await rpcCompleteGameSessionAsActor({ lobbyId, screen });
+    // Allowlist SQL historique : results|leaderboard|game-select.
+    // tiernight-end (BUG-TIERNIGHT-SERIES-QA-01) : tenter d’abord ; fallback results + route force.
+    const actorScreens = new Set(["results", "leaderboard", "game-select", "tiernight-end"]);
+    let rpcScreen = actorScreens.has(screen) ? screen : "results";
+    let row;
+    try {
+      row = await rpcCompleteGameSessionAsActor({ lobbyId, screen: rpcScreen });
+    } catch (err) {
+      if (rpcScreen === "tiernight-end") {
+        row = await rpcCompleteGameSessionAsActor({ lobbyId, screen: "results" });
+        rpcScreen = "results";
+      } else {
+        throw err;
+      }
+    }
     let full = row;
     if (!row?.state) {
       full = (await fetchGameSessionByLobby(lobbyId)) || row;
     }
     applyRemoteSession(full);
-    routeToSessionScreen(screen, { force: true });
+    const routeScreen =
+      screen === "tiernight-end" ||
+      full?.state?.tierNight?.series?.phase === "series_end"
+        ? "tiernight-end"
+        : rpcScreen;
+    routeToSessionScreen(routeScreen, { force: true });
     return full;
   }
 

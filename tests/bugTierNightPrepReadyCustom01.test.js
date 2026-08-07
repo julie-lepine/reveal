@@ -167,7 +167,7 @@ describe("bugTierNightPrepReadyCustom01 - customs ≠ ready clear", () => {
   });
 
   it("struct-15/16 catégories / roundCount invalident prêts + bump epoch", async () => {
-    const cat = await prepSession.setTierNightSeriesPrepCategories(["survie"]);
+    const cat = await prepSession.setTierNightSeriesPrepCategories(["survival"]);
     assert.equal(cat.ok, true);
     let s = prepSession.getTierNightSeriesPrepSession();
     assert.deepEqual(s.ready, {});

@@ -22,6 +22,7 @@ import {
   allTierNightMembersFinished,
   applyRemoteLobbyScores,
   canActAsHost,
+  completeGameSession,
   isGameSyncActive,
   isLobbyHost,
   refreshGameSession,
@@ -31,6 +32,7 @@ import { navigate } from "./router.js";
 
 const finalizeLock = createActionLock();
 const advanceLock = createActionLock();
+const seriesCompleteLock = createActionLock();
 
 /** Identité de transition en cours (tests + garde stale). */
 let finalizeTransitionId = null;
@@ -618,6 +620,65 @@ export function resolvePostFinalizeNavigationPhase({
 }
 
 /**
+ * BUG-TIERNIGHT-SERIES-QA-01 — clôture session au classement de série.
+ * Idempotent : si game_id=menu + screen terminal + series_end, no-op.
+ * Préserve state.tierNight (history / recap) via completeGameSession (deactivate flags only).
+ */
+export async function ensureTierNightSeriesSessionCompleted({
+  shouldContinue = null,
+} = {}) {
+  const canContinue = () => typeof shouldContinue !== "function" || shouldContinue();
+  if (!isGameSyncActive()) return { ok: true, local: true };
+  if (!canHostSeriesCommit()) {
+    return { ok: false, unauthorized: true, code: "TNS_UNAUTHORIZED" };
+  }
+
+  const outcome = await seriesCompleteLock.run(async () => {
+    const row = getCachedGameSession();
+    const tn = row?.state?.tierNight;
+    const phase = tn?.series?.phase;
+    if (
+      row?.game_id === "menu" &&
+      (row.screen === "tiernight-end" || phase === "series_end") &&
+      tn?.finished
+    ) {
+      return { ok: true, alreadyComplete: true, phase: "series_end" };
+    }
+
+    try {
+      await completeGameSession({
+        gameId: "menu",
+        screen: "tiernight-end",
+        state: {},
+      });
+      return { ok: true, completed: true, phase: "series_end" };
+    } catch (err) {
+      console.warn("[TierNight] series complete failed, soft refresh:", err);
+      try {
+        await refreshGameSession({ soft: true });
+      } catch (_) {
+        /* ignore */
+      }
+      const after = getCachedGameSession();
+      if (
+        after?.game_id === "menu" &&
+        (after.screen === "tiernight-end" ||
+          after.state?.tierNight?.series?.phase === "series_end")
+      ) {
+        return { ok: true, reconciled: true, phase: "series_end" };
+      }
+      return { ok: false, code: "TNS_SERIES_COMPLETE_FAILED", error: err };
+    }
+  });
+
+  if (outcome.skipped) return { ok: false, skipped: true, code: "TNS_IN_FLIGHT" };
+  if (outcome.value?.ok && canContinue()) {
+    navigateForTierNightSeriesPhase("series_end");
+  }
+  return outcome.value;
+}
+
+/**
  * Hôte : finalize manche série (RPC) + application locale immédiate + navigation.
  *
  * force=true : CTA hôte explicite « Voir les résultats » — SQL score
@@ -640,8 +701,13 @@ export async function hostFinalizeTierNightSeriesRound({
     const guard = assertCanFinalizeTierNightSeriesRound({ runId, series, force });
     if (!guard.ok) return guard;
     if (guard.alreadyApplied) {
-      if (canContinue()) navigateForTierNightSeriesPhase(guard.phase || series.phase);
-      return { ok: true, applied: false, code: "ALREADY_APPLIED", phase: guard.phase };
+      const phase = guard.phase || series.phase;
+      if (phase === "series_end") {
+        await ensureTierNightSeriesSessionCompleted({ shouldContinue });
+      } else if (canContinue()) {
+        navigateForTierNightSeriesPhase(phase);
+      }
+      return { ok: true, applied: false, code: "ALREADY_APPLIED", phase };
     }
 
     if (!force && isGameSyncActive() && !allTierNightMembersFinished()) {
@@ -688,7 +754,11 @@ export async function hostFinalizeTierNightSeriesRound({
       if (rec.ok) {
         applySeriesRowToLocal(rec.row);
         if (rec.row?.state?.scores) applyRemoteLobbyScores(rec.row.state.scores);
-        if (canContinue()) navigateForTierNightSeriesPhase(rec.phase);
+        if (rec.phase === "series_end") {
+          await ensureTierNightSeriesSessionCompleted({ shouldContinue });
+        } else if (canContinue()) {
+          navigateForTierNightSeriesPhase(rec.phase);
+        }
         return {
           ok: true,
           applied: false,
@@ -720,12 +790,18 @@ export async function hostFinalizeTierNightSeriesRound({
       series: getState().tierNightGame?.series,
     });
 
-    if (canContinue()) navigateForTierNightSeriesPhase(phase);
+    // Dernière manche : clôturer la game session avant / avec le classement.
+    if (phase === "series_end") {
+      await ensureTierNightSeriesSessionCompleted({ shouldContinue });
+    } else if (canContinue()) {
+      navigateForTierNightSeriesPhase(phase);
+    }
     return {
       ...res,
       phase,
       appliedLocal: localApply.ok === true,
       transitionId,
+      sessionCompleted: phase === "series_end",
     };
   });
 

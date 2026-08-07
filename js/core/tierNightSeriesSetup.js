@@ -11,6 +11,7 @@ import {
   countTierNightSeriesTopicPool,
   listEligibleTierNightSeriesTopics,
   buildTierNightSeriesTopicPool,
+  validateTierNightSeriesCategoryIds,
 } from "./tierNightSeries.js";
 
 export const TIER_NIGHT_SERIES_SETUP_PATHS = Object.freeze(["single", "series"]);
@@ -102,6 +103,17 @@ export function validateTierNightSeriesSetupForLaunch(setup, opts = {}) {
     };
   }
   const cats = resolveTierNightSeriesSetupCategoryIds(setup.categoryIds);
+  const catsOk = validateTierNightSeriesCategoryIds(cats);
+  if (!catsOk.ok) {
+    return {
+      ok: false,
+      code: catsOk.code,
+      message:
+        catsOk.code === "UNKNOWN_CATEGORY_ID"
+          ? "Catégorie inconnue."
+          : "Catégories invalides.",
+    };
+  }
   const poolSize = getTierNightSeriesPoolSize(cats, opts);
   if (poolSize < roundCount) {
     return {

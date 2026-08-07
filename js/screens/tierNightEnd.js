@@ -18,6 +18,7 @@ import {
   refreshGameSession,
   ensureTierNightRecapsFromRemote,
   getCachedGameSession,
+  returnToGameSelect,
 } from "../core/gameSync.js";
 import {
   gameCumulativeScoresHtml,
@@ -300,6 +301,39 @@ export function mountTierNightEnd(app) {
     navigate("results", resultsNav);
   }
 
+  /** Série déjà clôturée : sortie soirée / menu jeux (pas de 2ᵉ complete). */
+  async function continueEvening() {
+    if (!mount.isMounted()) return;
+    if (!mount.isCurrentMount()) return;
+    setLastGame({
+      gameId: "tiernight",
+      title: "Tier Night",
+      summary: `Série terminée · +${session.localConsensusPoints || 0} pts dernière manche`,
+    });
+    const stack = { navStack: ["home", "lobby", "game-select"] };
+    if (isGameSyncActive()) {
+      if (isLobbyHost() || canActAsHost()) {
+        try {
+          await returnToGameSelect({
+            shouldContinue: () => mount.isMounted() && mount.isCurrentMount(),
+          });
+        } catch (e) {
+          console.warn("REVEAL returnToGameSelect:", e);
+          if (!mount.isMounted()) return;
+          suppressSessionRoute(120000);
+          navigate("game-select", stack);
+        }
+      } else {
+        suppressSessionRoute(120000);
+        navigate("game-select", stack);
+      }
+      return;
+    }
+    await setLobbyWaiting();
+    if (!mount.isMounted()) return;
+    navigate("game-select", stack);
+  }
+
   function render() {
     if (!mount.isMounted()) return;
     if (!mount.isCurrentMount()) return;
@@ -331,6 +365,9 @@ export function mountTierNightEnd(app) {
             </div>
           </div>`
         : "";
+    const primaryCta = isSeriesEnd
+      ? `<button type="button" class="btn btn-primary" id="btn-tiernight-end-continue">Autre jeu</button>`
+      : `<button type="button" class="btn btn-primary" data-nav="results">Voir les résultats →</button>`;
     const content = `
         <p class="label-upper label-upper--gold">🏆 Tier Night${isSeriesEnd ? " · Fin de série" : ""}</p>
         <h2 class="screen-title">${isSeriesEnd ? "Classement de la série" : "Récap des classements"}</h2>
@@ -360,21 +397,33 @@ export function mountTierNightEnd(app) {
           hostOrAh
             ? `${eveningRecapRestartButtonHtml({ gameId: "tiernight", title: "TierNight" })}
         <button type="button" class="btn btn-secondary btn--spaced" id="btn-tiernight-end-change-mode">Changer de mode</button>`
-            : `<p class="hint">En attente de l’hôte…</p>`
+            : isSeriesEnd
+              ? ""
+              : `<p class="hint">En attente de l’hôte…</p>`
         }
         ${
-          realHost
+          realHost && !isSeriesEnd
             ? `<button type="button" class="btn btn-secondary btn--spaced" id="btn-tiernight-end-quit">${escapeHtml(EXIT_GAME_LABEL)}</button>`
             : ""
         }
-        <button type="button" class="btn btn-primary" data-nav="results">Voir les résultats →</button>`;
+        ${primaryCta}`;
 
     app.innerHTML = pageShell({
       backTarget: "back",
       content,
     });
 
-    bindNav(app, { results: goToResults });
+    if (isSeriesEnd) {
+      const cont = app.querySelector("#btn-tiernight-end-continue");
+      if (cont) {
+        cont.addEventListener(
+          "click",
+          withClickLock(() => continueEvening(), { lock: exitLock })
+        );
+      }
+    } else {
+      bindNav(app, { results: goToResults });
+    }
     if (hostOrAh) {
       bindRestartGameButtons(app);
       const changeBtn = app.querySelector("#btn-tiernight-end-change-mode");
@@ -385,7 +434,7 @@ export function mountTierNightEnd(app) {
         );
       }
     }
-    if (realHost) {
+    if (realHost && !isSeriesEnd) {
       const quitBtn = app.querySelector("#btn-tiernight-end-quit");
       if (quitBtn) {
         quitBtn.addEventListener(
@@ -407,13 +456,21 @@ export function mountTierNightEnd(app) {
   const unsubSession = onGameSessionChange((row) => {
     if (!mount.isMounted()) return;
     if (!mount.isCurrentMount()) return;
-    if (row?.screen === "results") {
+    const seriesPhase = row?.state?.tierNight?.series?.phase;
+    // Série terminale : ne pas basculer vers results génériques.
+    if (row?.screen === "results" && seriesPhase !== "series_end") {
       navigate("results", { navStack: ["home", "lobby", "game-select", "results"] });
       return;
     }
     // Restart / prep : ne pas recharger un ancien récap hors écran end.
-    if (row?.screen && row.screen !== "tiernight-end") return;
-    if (row?.state?.scores || row?.state?.tierNight?.recap) {
+    if (
+      row?.screen &&
+      row.screen !== "tiernight-end" &&
+      seriesPhase !== "series_end"
+    ) {
+      return;
+    }
+    if (row?.state?.scores || row?.state?.tierNight?.recap || seriesPhase === "series_end") {
       void bootstrapRecaps();
     }
   });

@@ -179,7 +179,10 @@ describe("TierNight Recommencer - pas de retour vers l'ancien récap", () => {
     assert.match(s, /mount\.dispose\(\)/);
     assert.match(s, /if \(!mount\.isMounted\(\)\) return;/);
     assert.match(s, /if \(!mount\.isCurrentMount\(\)\) return;/);
-    assert.match(s, /if \(row\?\.screen && row\.screen !== "tiernight-end"\) return;/);
+    assert.match(
+      s,
+      /if \(\s*row\?\.screen &&\s*row\.screen !== "tiernight-end" &&\s*seriesPhase !== "series_end"\s*\)/
+    );
   });
 
   it("gameSync canRouteToTierNightEnd : recap legacy + series_end (D)", () => {

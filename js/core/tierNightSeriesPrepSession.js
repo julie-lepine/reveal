@@ -11,7 +11,7 @@ import {
   TIER_NIGHT_SERIES_ALL_CATEGORIES,
   TIER_NIGHT_SERIES_ROUND_COUNTS,
   mergeConsumedCustomTopicIds,
-  validateTierNightSeriesCategoryIdsShape,
+  validateTierNightSeriesCategoryIds,
 } from "./tierNightSeries.js";
 import {
   getTierNightSeriesPoolSize,
@@ -426,7 +426,7 @@ export async function setTierNightSeriesPrepCategories(categoryIds) {
   if (isGameSyncActive() && !isLobbyHost()) {
     return { ok: false, code: "HOST_ONLY", message: "Seul l'hôte modifie les catégories." };
   }
-  const shape = validateTierNightSeriesCategoryIdsShape(categoryIds);
+  const shape = validateTierNightSeriesCategoryIds(categoryIds);
   if (!shape.ok) {
     return { ok: false, code: shape.code, message: shape.message };
   }

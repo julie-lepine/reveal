@@ -4,10 +4,11 @@
  * Option A : runId = identité globale de la série ; roundId = `${runId}:${roundIndex}`.
  * Aucun DOM, aucun Supabase, aucun state global.
  *
- * FEATURE-TIERNIGHT-03-A :
+ * FEATURE-TIERNIGHT-03-A / BUG-TIERNIGHT-SERIES-QA-01 :
  * - nouvelles séries : roundCount ∈ {3,5,8}
  * - roundCount 7 : lecture défensive legacy uniquement (plus de build)
  * - customs lobby éligibles + snapshotés ; one-shot via excludeCustomIds
+ * - queue : priorité custom (même logique REVEAL combinedGameDeck), puis shuffle du sous-ensemble
  *
  * FEATURE-TIERNIGHT-03-A1 — one-shot (cycle de vie) :
  * - Consommation = id custom présent dans `series.queue` au **lancement** (snapshot).
@@ -26,6 +27,7 @@ import {
 import { CUSTOM_ROSTER_TOPIC_ID_PREFIX } from "./customRosterTopics.js";
 import { ROSTER_TOPIC_PREFIX } from "./rosterTopic.js";
 import { sessionHasTierNightPlayerRoster } from "./tierNightRoster.js";
+import { buildCombinedShuffledDeck } from "./combinedGameDeck.js";
 
 export const TIER_NIGHT_SERIES_VERSION = 1;
 
@@ -143,8 +145,7 @@ function parseCustomSnapshotFlag(value) {
 }
 
 /**
- * Contrat categoryIds (aligné SQL A1-bis).
- * Appartenance au catalogue officiel : hors scope SQL — à vérifier côté setup JS.
+ * Contrat categoryIds (aligné SQL A1-bis) — forme seule.
  * @param {unknown} categoryIds
  * @returns {{ ok: true, categoryIds: string[] } | { ok: false, code: string, message?: string }}
  */
@@ -182,6 +183,41 @@ export function validateTierNightSeriesCategoryIdsShape(categoryIds) {
     return { ok: false, code: "INVALID_CATEGORY_IDS", message: "star_not_alone" };
   }
   return { ok: true, categoryIds: normalized };
+}
+
+/** Ids catégorie catalogue canonique (hors sentinel `*`). */
+export function listKnownTierNightSeriesCategoryIds() {
+  return TIER_NIGHT_ROSTER_CATEGORIES.map((c) => String(c.id));
+}
+
+/**
+ * BUG-TIERNIGHT-SERIES-QA-01 — forme + appartenance catalogue JS.
+ * `["*"]` reste le wildcard. Une catégorie inconnue est rejetée (pas de pool officiel vide silencieux).
+ * Validation côté JS uniquement : le SQL série ne possède pas le registry catalogue.
+ *
+ * @param {unknown} categoryIds
+ * @returns {{ ok: true, categoryIds: string[] } | { ok: false, code: string, message?: string }}
+ */
+export function validateTierNightSeriesCategoryIds(categoryIds) {
+  const shape = validateTierNightSeriesCategoryIdsShape(categoryIds);
+  if (!shape.ok) return shape;
+  if (
+    shape.categoryIds.length === 1 &&
+    shape.categoryIds[0] === TIER_NIGHT_SERIES_ALL_CATEGORIES
+  ) {
+    return shape;
+  }
+  const known = new Set(listKnownTierNightSeriesCategoryIds());
+  for (const id of shape.categoryIds) {
+    if (!known.has(id)) {
+      return {
+        ok: false,
+        code: "UNKNOWN_CATEGORY_ID",
+        message: id,
+      };
+    }
+  }
+  return shape;
 }
 
 function validateLedgerStringArray(ledger, ledgerKey) {
@@ -444,6 +480,12 @@ function fisherYatesShuffle(items, rng) {
  * Construit la queue ordonnée d’une série (une seule fois au lancement).
  * Snapshot figé — aucun reshuffle ultérieur côté helpers.
  *
+ * BUG-TIERNIGHT-SERIES-QA-01 — priorité custom (pas de shuffle global pool→slice) :
+ * - C = 0 → N officiels
+ * - 0 < C < N → tous les customs + (N−C) officiels → shuffle du sous-ensemble
+ * - C = N → N customs
+ * - C > N → N customs tirés ; non tirés non consommés
+ *
  * @param {object} opts
  * @param {string} opts.runId
  * @param {Iterable<object>} [opts.topics] — catalogue officiel
@@ -478,24 +520,57 @@ export function buildTierNightSeriesQueue({
     };
   }
 
-  const eligible = buildTierNightSeriesTopicPool({
-    topics,
-    customTopics,
-    categoryIds,
-    excludeCustomIds,
-  });
+  if (categoryIds != null) {
+    const cats = validateTierNightSeriesCategoryIds(
+      Array.isArray(categoryIds) && categoryIds.length === 0
+        ? [TIER_NIGHT_SERIES_ALL_CATEGORIES]
+        : categoryIds
+    );
+    if (!cats.ok) {
+      return {
+        ok: false,
+        code: cats.code,
+        message: cats.message,
+      };
+    }
+  }
 
-  if (eligible.length < count) {
+  const officials = listEligibleTierNightSeriesTopics({
+    topics,
+    categoryIds,
+    enabledOnly: true,
+    excludeCustom: true,
+  });
+  const customs = filterUnconsumedCustomTopics(customTopics, excludeCustomIds);
+  const available = officials.length + customs.length;
+
+  if (available < count) {
     return {
       ok: false,
       code: "INSUFFICIENT_TOPICS",
       requested: count,
-      available: eligible.length,
+      available,
     };
   }
 
-  // fisherYatesShuffle copie le tableau — sources topics/customTopics non mutées.
-  const picked = fisherYatesShuffle(eligible, rng).slice(0, count);
+  // Même politique REVEAL que Dilemma / HotTake (combinedGameDeck).
+  const picked = buildCombinedShuffledDeck(
+    customs,
+    officials,
+    count,
+    (requested) => Number(requested) || 0,
+    typeof rng === "function" ? rng : defaultRng
+  );
+
+  if (!Array.isArray(picked) || picked.length !== count) {
+    return {
+      ok: false,
+      code: "INSUFFICIENT_TOPICS",
+      requested: count,
+      available: Array.isArray(picked) ? picked.length : 0,
+    };
+  }
+
   const queue = picked.map((topic, roundIndex) => {
     const snap = snapshotTierNightSeriesTopic(topic);
     return {
