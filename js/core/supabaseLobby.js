@@ -1806,7 +1806,7 @@ export async function joinLobbySupabase(codeInput, { joinEffects: externalEffect
     return {
       ok: false,
       error:
-        "Code introuvable. Vérifie le code auprès de l'hôte ou ouvre le lien d'invitation qu'il t'a envoyé.",
+        "Code introuvable. Vérifie le code auprès de l'hôte.",
       joinEffects,
     };
   }

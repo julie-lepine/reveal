@@ -224,7 +224,7 @@ function guestJoinPanelHtml({
       ${
         leaveHint
           ? `<p class="hint auth-form__guest-intro auth-form__guest-intro--warn">Tu es encore lié à un lobby (${escapeHtml(getLobby()?.code || "?")}). Utilise « Quitter le lobby » ou rejoins avec le code ci-dessous.</p>`
-          : `<p class="hint auth-form__guest-intro">Rejoins avec un code ou un lien d'invitation de l'hôte. Pas de compte requis - les invités ne peuvent pas créer de lobby.</p>`
+          : `<p class="hint auth-form__guest-intro">Rejoins avec un code de l'hôte. Pas de compte requis - les invités ne peuvent pas créer de lobby.</p>`
       }
       ${guestJoinFieldsHtml({
         nameId: "guest-rejoin-name",
@@ -967,7 +967,7 @@ export function mountHome(app) {
                 joinUi.active
                   ? homeJoinPendingStatusHtml(joinUi.statusMessage)
                   : `
-              <p class="hint auth-form__guest-intro">Rejoins avec un code ou un lien d'invitation de l'hôte. Pas de compte requis - les invités ne peuvent pas créer de lobby.</p>
+              <p class="hint auth-form__guest-intro">Rejoins avec un code de l'hôte. Pas de compte requis - les invités ne peuvent pas créer de lobby.</p>
               ${guestJoinFieldsHtml({
                 nameId: "guest-name",
                 codeId: "guest-code",
