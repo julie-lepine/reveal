@@ -19,7 +19,7 @@ import {
   canManageLobbyRoster,
 } from "../core/lobby.js";
 import { mountChatPanel, CHAT_MAX_LENGTH } from "../core/chatPanel.js";
-import { canCreateLobby, updateProfileEmoji, isLoggedIn } from "../core/auth.js";
+import { updateProfileEmoji, isLoggedIn } from "../core/auth.js";
 import { getLocalEmoji } from "../core/state.js";
 import { isSupabaseConfigured } from "../core/supabaseClient.js";
 import { onLobbyBundleUpdated } from "../core/supabaseLobby.js";
@@ -129,13 +129,10 @@ export function mountLobby(app) {
     if (lobby?.code && lobby.participants?.length) return;
     if (hasActiveLobby()) return;
     if (!isLoggedIn()) return;
+    if (!isSupabaseConfigured()) return;
 
-    // Offline : chrome synchrone historique. Online : createLobby centralise la garde C
-    // (ne pas se limiter à canCreateLobby() qui exige un snapshot none déjà frais).
-    if (!isSupabaseConfigured()) {
-      if (canCreateLobby()) await createLobby();
-      return;
-    }
+    // createLobby centralise la garde C (ne pas se limiter à canCreateLobby()
+    // qui exige un snapshot none déjà frais).
     try {
       await createLobby();
     } catch (e) {
@@ -407,7 +404,7 @@ export function mountLobby(app) {
             <span class="invite-code">${escapeHtml(lobby.code)}</span>
             <button type="button" class="btn-icon" id="copy-code" aria-label="Copier le code">⧉</button>
           </div>
-          <p class="hint">${online ? "Partage le code - les invités rejoignent sans compte." : "Démo locale : partage le code avec les autres joueurs."}</p>
+          <p class="hint">Partage le code - les invités rejoignent sans compte.</p>
           ${isHost && online ? `<p class="hint lobby-lifecycle-hint">${escapeHtml(getLobbyAutoCloseHint(getLobbyStatus()))}</p>` : ""}
         </div>
 

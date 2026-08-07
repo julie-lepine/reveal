@@ -1,32 +1,31 @@
-import { DEMO_NPC_PLAYERS } from "./demoPlayers.js";
 import { getLobbyParticipants, hasActiveLobby } from "./lobby.js";
 import { buildEveningStandingPlayers } from "./eveningStandings.js";
 import { getLocalDisplayName, getLocalEmoji, getState, ensurePlayerScore } from "./state.js";
 
-/** Joueurs actifs : lobby si présent, sinon NPC + local */
+/**
+ * ARCH-01B — roster produit = participants du lobby actif uniquement.
+ * Hors lobby : [] (pas de PNJ, pas de faux multijoueur).
+ * getLocalPlayer() conserve un fallback display local pour l’UI hors lobby.
+ */
 export function getActivePlayers() {
-  if (hasActiveLobby()) {
-    const ps = getLobbyParticipants();
-    if (ps.length) return ps.map((p) => ({
-      name: p.name,
-      userId: p.userId || null,
-      color: p.color,
-      emoji: p.emoji,
-      isLocal: Boolean(p.isLocal),
-      isHost: Boolean(p.isHost),
-    }));
-  }
-  const localName = getLocalDisplayName();
-  return [
-    ...DEMO_NPC_PLAYERS.map((p) => ({ ...p, isLocal: false, isHost: false })),
-    { name: localName, color: "#60A5FA", emoji: getLocalEmoji(), isLocal: true, isHost: true },
-  ];
+  if (!hasActiveLobby()) return [];
+  const ps = getLobbyParticipants();
+  if (!ps.length) return [];
+  return ps.map((p) => ({
+    name: p.name,
+    userId: p.userId || null,
+    color: p.color,
+    emoji: p.emoji,
+    isLocal: Boolean(p.isLocal),
+    isHost: Boolean(p.isHost),
+  }));
 }
 
 export function getActivePlayerNames() {
   return getActivePlayers().map((p) => p.name);
 }
 
+/** Joueurs non locaux du roster actif (vide hors lobby). */
 export function getNpcPlayers() {
   return getActivePlayers().filter((p) => !p.isLocal);
 }

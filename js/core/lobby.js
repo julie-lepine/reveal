@@ -1,11 +1,7 @@
-import { DEMO_NPC_PLAYERS } from "./demoPlayers.js";
 import {
   getState,
   saveStatePatch,
-  newLobby as genLobbyCode,
   getLocalDisplayName,
-  getLocalEmoji,
-  ensurePlayerScore,
   resetEveningState,
   beginGameScoreSession,
   setActiveScoringGame,
@@ -14,7 +10,6 @@ import {
 import { loginAsGuest, isGuest } from "./auth.js";
 import { clearGuestMembership, loadGuestMembership } from "./guestMembership.js";
 import { signOutSupabase, getSupabaseUserId, getLiveSupabaseUserId } from "./supabaseAuth.js";
-import { syncAllPlayerScores } from "./players.js";
 import { navigate, getCurrentScreen } from "./router.js";
 import { resetWelcomeSeen } from "./welcomeGate.js";
 import { isSupabaseConfigured, supabase } from "./supabaseClient.js";
@@ -129,7 +124,6 @@ import {
   shouldReconcileLobbyReadyFromServer,
 } from "./lobbyReadyMount.js";
 import { MAX_PLAYERS } from "../config/lobbyLifecycle.js";
-import { newOfflineLobbyInstanceId } from "./lobbyBoundary.js";
 import { bumpLobbyRuntimeGeneration } from "./lobbyRuntime.js";
 import {
   createLobbyJoinEffects,
@@ -208,19 +202,8 @@ async function signOutAnonGuestIfNeeded(wasGuest) {
   }
 }
 
-function clearLocalOpenLobbySlot(code) {
-  if (!code) return;
-  const open = { ...(getState().openLobbies || {}) };
-  const published = open[code];
-  if (!published) return;
-  const localName = getLocalDisplayName();
-  open[code] = {
-    ...published,
-    participants: (published.participants || []).filter((p) => p.name !== localName),
-    updatedAt: Date.now(),
-  };
-  saveStatePatch({ openLobbies: open });
-}
+/** ARCH-01B : no-op (openLobbies local retiré). Conservé pour deps leave/tests. */
+function clearLocalOpenLobbySlot(_code) {}
 
 function applyLeaveLobbyLocal({ wasGuest, navigateAway }) {
   const patch = { inLobby: false, lobby: null, lobbyCode: null };
@@ -307,7 +290,6 @@ function captureLobbyRollbackSnapshot() {
   }
   return {
     lobbyId: s.lobby?.id || null,
-    localInstanceId: s.lobby?.localInstanceId || null,
     patch,
   };
 }
@@ -351,40 +333,6 @@ async function runFinalizeFailedJoinAttempt(ctx) {
     deleteOwnLobbyMembershipById,
     rollbackLobbyJoinTransition,
   });
-}
-
-function localParticipant(ready = false, { asHost = false } = {}) {
-  const name = getLocalDisplayName();
-  return {
-    name,
-    emoji: getLocalEmoji(),
-    color: asHost ? "#A78BFA" : "#60A5FA",
-    ready,
-    isHost: asHost,
-    isLocal: true,
-  };
-}
-
-function publishOpenLobby(code, lobby) {
-  const open = { ...(getState().openLobbies || {}) };
-  open[code] = {
-    code,
-    localInstanceId: lobby.localInstanceId || null,
-    hostName: lobby.participants.find((p) => p.isHost)?.name || "Hôte",
-    participants: lobby.participants
-      .filter((p) => !p.isLocal)
-      .map((p) => ({ ...p, isLocal: false })),
-    messages: [...(lobby.messages || [])],
-    status: lobby.status || "waiting",
-    gameId: lobby.gameId || null,
-    updatedAt: Date.now(),
-  };
-  saveStatePatch({ openLobbies: open });
-}
-
-export function getOpenLobby(code) {
-  const trimmed = code?.trim().toUpperCase().replace(/\s/g, "");
-  return getState().openLobbies?.[trimmed] || null;
 }
 
 export function getLobby() {
@@ -443,7 +391,6 @@ export async function setLobbyPlaying(gameId) {
   }
   const lobby = { ...getLobby(), status: "playing", gameId };
   saveStatePatch({ lobby });
-  if (lobby.code) publishOpenLobby(lobby.code, lobby);
 }
 
 /** Entre deux jeux (MP) : reste en soirée, retour au hub menu. */
@@ -454,7 +401,6 @@ export async function setLobbyBetweenGames() {
   }
   const lobby = { ...getLobby(), status: "playing", gameId: "menu" };
   saveStatePatch({ lobby });
-  if (lobby.code) publishOpenLobby(lobby.code, lobby);
 }
 
 export async function setLobbyWaiting() {
@@ -466,7 +412,6 @@ export async function setLobbyWaiting() {
   const participants = mapParticipantsReadyFalse(lobby.participants);
   const next = { ...lobby, participants };
   saveStatePatch({ lobby: next });
-  if (next.code) publishOpenLobby(next.code, next);
 }
 
 export async function resetAllParticipantsReady() {
@@ -481,7 +426,6 @@ export async function resetAllParticipantsReady() {
   const participants = mapParticipantsReadyFalse(lobby.participants);
   const next = { ...lobby, participants };
   saveStatePatch({ lobby: next });
-  if (next.code) publishOpenLobby(next.code, next);
 }
 
 /**
@@ -722,7 +666,6 @@ export async function resetAppToCleanHome() {
   resetWelcomeSeen();
   try {
     localStorage.removeItem("reveal-app-state");
-    localStorage.removeItem("reveal-auth-credentials");
     clearGuestMembership();
   } catch {
     /* ignore */
@@ -937,65 +880,46 @@ export async function createLobby() {
     );
   }
 
-  if (isSupabaseConfigured()) {
-    await assertCanInsertLobby({
-      hasActiveLobby: false,
-      queryActiveLobbyMembership,
-      getSupabaseUserId,
-      getMembershipSnapshot,
-      setMembershipSnapshot,
-    });
+  if (!isSupabaseConfigured()) {
+    throw makeLobbyCreateError(
+      LOBBY_CREATE_ERROR.CHECK_FAILED,
+      "Configuration backend requise pour créer un lobby."
+    );
   }
+
+  await assertCanInsertLobby({
+    hasActiveLobby: false,
+    queryActiveLobbyMembership,
+    getSupabaseUserId,
+    getMembershipSnapshot,
+    setMembershipSnapshot,
+  });
 
   performLobbyBoundaryTeardown();
 
-  if (isSupabaseConfigured()) {
-    const res = await createLobbySupabase();
-    if (!res.ok) throw new Error(res.error);
-    if (res.alreadyExists) {
-      await showAppAlert("Une soirée est déjà active. Reconnexion…", {
-        title: "Lobby existant",
-        icon: "ℹ️",
-      });
-      const recovered = await recoverAfterMembershipAlreadyExists();
-      if (!recovered.ok) {
-        if (recovered.unknown) {
-          throw makeLobbyCreateError(
-            LOBBY_CREATE_ERROR.CHECK_FAILED,
-            recovered.error || "Impossible de vérifier votre situation. Réessayez."
-          );
-        }
+  const res = await createLobbySupabase();
+  if (!res.ok) throw new Error(res.error);
+  if (res.alreadyExists) {
+    await showAppAlert("Une soirée est déjà active. Reconnexion…", {
+      title: "Lobby existant",
+      icon: "ℹ️",
+    });
+    const recovered = await recoverAfterMembershipAlreadyExists();
+    if (!recovered.ok) {
+      if (recovered.unknown) {
         throw makeLobbyCreateError(
-          LOBBY_CREATE_ERROR.ALREADY_EXISTS,
-          recovered.error || "Une soirée est déjà active."
+          LOBBY_CREATE_ERROR.CHECK_FAILED,
+          recovered.error || "Impossible de vérifier votre situation. Réessayez."
         );
       }
-      return recovered.code;
+      throw makeLobbyCreateError(
+        LOBBY_CREATE_ERROR.ALREADY_EXISTS,
+        recovered.error || "Une soirée est déjà active."
+      );
     }
-    return res.code;
+    return recovered.code;
   }
-
-  const code = genLobbyCode();
-  const participants = [localParticipant(false, { asHost: true })];
-  ensurePlayerScore(getLocalDisplayName());
-  syncAllPlayerScores();
-  const localInstanceId = newOfflineLobbyInstanceId();
-  const lobby = {
-    code,
-    localInstanceId,
-    participants,
-    messages: [],
-    status: "waiting",
-    gameId: null,
-  };
-  saveStatePatch({
-    lobby,
-    lobbyCode: code,
-    inLobby: true,
-  });
-  publishOpenLobby(code, lobby);
-  incrementGlobalStat("lobbiesCreated");
-  return code;
+  return res.code;
 }
 
 export async function joinLobby(code) {
@@ -1032,91 +956,46 @@ export async function joinLobby(code) {
   }
 
   try {
-    if (isSupabaseConfigured()) {
-      console.log("[DEBUG CALL JOIN SUPABASE]");
-      const joinEffects = createLobbyJoinEffects(loadGuestMembership());
-      let res;
-      try {
-        res = await joinLobbySupabase(code, { joinEffects });
-      } catch (joinErr) {
-        await runFinalizeFailedJoinAttempt({ joinEffects, rollbackSnapshot });
-        throw joinErr;
-      }
-      if (!res.ok) {
-        await runFinalizeFailedJoinAttempt({ joinEffects, rollbackSnapshot });
-        // E4 - déjà membre ailleurs : re-query + hydrate soirée canonique.
-        if (res.code === "membership_already_elsewhere") {
-          const recovered = await recoverAfterMembershipAlreadyExists();
-          if (recovered.ok) {
-            return { ok: true, code: recovered.code, recoveredExisting: true };
-          }
-          return {
-            ok: false,
-            error: recovered.error || res.error,
-            code: recovered.unknown ? "membership_check_failed" : res.code,
-          };
-        }
-        return res;
-      }
-      markLobbyJoinFinalized(joinEffects);
-      if (fromActiveLobby) {
-        commitLobbyJoinTransition();
-      }
-      promoteMembershipSnapshotAfterJoinConfirmed(res.membershipRow || null);
-      return res;
-    }
-
-    const trimmed = code.trim().toUpperCase().replace(/\s/g, "");
-    if (trimmed.length < 4) {
-      if (rollbackSnapshot) await rollbackLobbyJoinTransition(rollbackSnapshot);
-      return { ok: false, error: "Code invalide." };
-    }
-
-    const published = getOpenLobby(trimmed);
-    if (!published) {
+    if (!isSupabaseConfigured()) {
       if (rollbackSnapshot) await rollbackLobbyJoinTransition(rollbackSnapshot);
       return {
         ok: false,
-        error:
-          "Code introuvable. Vérifie le code auprès de l'hôte ou ouvre le lien d'invitation qu'il t'a envoyé.",
+        error: "Configuration backend requise pour rejoindre un lobby.",
+        errorCode: "BACKEND_MISSING",
       };
     }
 
-    const me = localParticipant(false, { asHost: false });
-    ensurePlayerScore(me.name);
-
-    const others = published.participants
-      .filter((p) => p.name !== me.name)
-      .map((p) => ({ ...p, ready: false, isLocal: false }));
-    const participants = [...others, { ...me, ready: false }];
-
-    const lobby = {
-      code: trimmed,
-      localInstanceId: published.localInstanceId || newOfflineLobbyInstanceId(),
-      participants,
-      messages: published.messages || [],
-      status: published.status || "waiting",
-      gameId: published.gameId || null,
-    };
-
-    saveStatePatch({
-      lobbyCode: trimmed,
-      lobby,
-      inLobby: true,
-      guessLie: { sessionId: trimmed, submissions: {}, lobbyComplete: false, currentRound: 0 },
-    });
-
-    syncAllPlayerScores();
-
-    const gs = { ...getState().globalStats };
-    gs.playersJoined = (gs.playersJoined || 0) + 1;
-    saveStatePatch({ globalStats: gs });
-
+    console.log("[DEBUG CALL JOIN SUPABASE]");
+    const joinEffects = createLobbyJoinEffects(loadGuestMembership());
+    let res;
+    try {
+      res = await joinLobbySupabase(code, { joinEffects });
+    } catch (joinErr) {
+      await runFinalizeFailedJoinAttempt({ joinEffects, rollbackSnapshot });
+      throw joinErr;
+    }
+    if (!res.ok) {
+      await runFinalizeFailedJoinAttempt({ joinEffects, rollbackSnapshot });
+      // E4 - déjà membre ailleurs : re-query + hydrate soirée canonique.
+      if (res.code === "membership_already_elsewhere") {
+        const recovered = await recoverAfterMembershipAlreadyExists();
+        if (recovered.ok) {
+          return { ok: true, code: recovered.code, recoveredExisting: true };
+        }
+        return {
+          ok: false,
+          error: recovered.error || res.error,
+          code: recovered.unknown ? "membership_check_failed" : res.code,
+        };
+      }
+      return res;
+    }
+    markLobbyJoinFinalized(joinEffects);
     if (fromActiveLobby) {
       commitLobbyJoinTransition();
     }
-
-    return { ok: true, code: trimmed };
+    promoteMembershipSnapshotAfterJoinConfirmed(res.membershipRow || null);
+    return res;
   } catch (err) {
     throw err;
   }
@@ -1509,8 +1388,6 @@ export async function dissolveLobbyAsHost({ navigateAway = true } = {}) {
     await signOutAnonGuestIfNeeded(wasGuest);
     applyHostDissolveLocalSuccess({ lobbyId, wasGuest, navigateAway });
     return { ok: true, status: res.status };
-  } else if (code) {
-    clearLocalOpenLobbySlot(code);
   }
 
   applyLeaveLobbyLocal({ wasGuest, navigateAway });
@@ -1565,8 +1442,7 @@ export async function notifyVoluntaryLeaveFailure(res, testDeps = null) {
  * Invité / membre : runVoluntaryMemberLeave (contrat échec distant strict).
  * Hôte : redirige vers confirmAndLeaveLobby → dissolve.
  *
- * Branche locale (pas de lobby.id Supabase) : démo / offline - cleanup immédiat
- * sans DELETE distant (voir runVoluntaryMemberLeave).
+ * Branche sans lobby.id Supabase : cleanup local (legacy / edge) sans DELETE distant.
  */
 export async function leaveLobby({ navigateAway = true } = {}) {
   if (isSupabaseConfigured() && getLobby()?.id && isLocalLobbyHost()) {
@@ -1785,7 +1661,6 @@ export async function setLocalReady(ready) {
   );
   const lobby = { ...getLobby(), participants };
   saveStatePatch({ lobby });
-  if (lobby.code) publishOpenLobby(lobby.code, lobby);
 }
 
 export async function toggleLocalReady() {
@@ -1810,39 +1685,18 @@ export function getNotReadyParticipants() {
   return getLobbyParticipants().filter((p) => !p.ready);
 }
 
+/**
+ * Abonnement présence / bundle lobby (Realtime).
+ * ARCH-01B : plus d’injection PNJ — uniquement le chemin Supabase.
+ */
 export function simulateLobbyJoins(onUpdate) {
-  if (isSupabaseConfigured()) {
-    startLobbyPresenceSync();
-    if (!onUpdate) return () => {};
-    const unsub = onLobbyBundleUpdated(onUpdate);
-    return () => unsub();
+  if (!isSupabaseConfigured()) {
+    return () => {};
   }
-
-  const pool = DEMO_NPC_PLAYERS.filter(
-    (p) => !getLobbyParticipants().some((x) => x.name === p.name)
-  );
-  let i = 0;
-  const id = setInterval(() => {
-    const current = getLobbyParticipants();
-    if (i >= pool.length || current.length >= MAX_PLAYERS) {
-      clearInterval(id);
-      return;
-    }
-    const p = pool[i++];
-    const participants = [
-      ...current,
-      { name: p.name, emoji: p.emoji, color: p.color, ready: false, isHost: false, isLocal: false },
-    ];
-    const lobby = { ...getLobby(), participants };
-    saveStatePatch({ lobby });
-    ensurePlayerScore(p.name);
-    if (lobby.code) publishOpenLobby(lobby.code, lobby);
-    const gs = { ...getState().globalStats };
-    gs.playersJoined = (gs.playersJoined || 0) + 1;
-    saveStatePatch({ globalStats: gs });
-    onUpdate?.();
-  }, 2200);
-  return () => clearInterval(id);
+  startLobbyPresenceSync();
+  if (!onUpdate) return () => {};
+  const unsub = onLobbyBundleUpdated(onUpdate);
+  return () => unsub();
 }
 
 export function getLobbyMessages() {
@@ -1869,7 +1723,6 @@ export async function addLobbyMessage(text) {
   ];
   const lobby = { ...getLobby(), messages };
   saveStatePatch({ lobby });
-  if (lobby.code) publishOpenLobby(lobby.code, lobby);
   try {
     const { notifyLocalChatMessagesChanged } = await import("./chatUnread.js");
     notifyLocalChatMessagesChanged();

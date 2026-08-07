@@ -437,7 +437,8 @@ describe("homeMembershipVagueB - contrats Home / createLobby", () => {
     const lobbySrc = readFileSync(join(ROOT, "js/core/lobby.js"), "utf8");
     const createIdx = lobbySrc.indexOf("export async function createLobby()");
     assert.ok(createIdx >= 0);
-    const slice = lobbySrc.slice(createIdx, createIdx + 1200);
+    const nextExport = lobbySrc.indexOf("\nexport ", createIdx + 10);
+    const slice = lobbySrc.slice(createIdx, nextExport > 0 ? nextExport : createIdx + 2500);
     assert.equal(slice.includes("peekServerLobbyForUser"), false);
     assert.match(slice, /assertCanInsertLobby|queryActiveLobbyMembership/);
   });

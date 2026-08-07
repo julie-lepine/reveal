@@ -288,7 +288,6 @@ const defaultState = () => ({
     placements: {},
     finished: false,
   },
-  openLobbies: {},
 });
 
 function generateLobbyCode() {
@@ -387,7 +386,6 @@ function loadState() {
       triviaGame: { ...defaultState().triviaGame, ...parsed.triviaGame },
       tierNightGame: { ...defaultState().tierNightGame, ...parsed.tierNightGame },
       tierNightLiveGame: { ...defaultState().tierNightLiveGame, ...parsed.tierNightLiveGame },
-      openLobbies: parsed.openLobbies || {},
       lastGame: parsed.lastGame || null,
       settings: { ...defaultSettings(), ...parsed.settings },
     };

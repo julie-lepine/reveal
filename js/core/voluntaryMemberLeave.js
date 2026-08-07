@@ -127,7 +127,7 @@ export async function runVoluntaryMemberLeave(options = {}, deps) {
       };
     }
 
-    // Offline / démo : aucune ligne lobby_members - cleanup local direct.
+    // Offline / sans membership serveur : cleanup local direct.
     deps.stopMultiplayerSync();
     deps.stopLobbyPresenceSync();
     if (code) deps.clearLocalOpenLobbySlot(code);

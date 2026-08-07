@@ -306,7 +306,7 @@ describe("lobbyCreateVagueC - canCreateLobby / staleness", () => {
     );
   });
 
-  it("offline supabaseConfigured false → vrai si login", () => {
+  it("supabaseConfigured false → création refusée (ARCH-01B)", () => {
     assert.equal(
       canCreateLobbyFromInputs({
         loggedIn: true,
@@ -314,7 +314,7 @@ describe("lobbyCreateVagueC - canCreateLobby / staleness", () => {
         supabaseConfigured: false,
         snapshot: null,
       }),
-      true
+      false
     );
   });
 
@@ -416,15 +416,14 @@ describe("lobbyCreateVagueC - Home chrome + source", () => {
     assert.match(lobbyScreen, /assertCanInsertLobby|Vague C|createLobby centralise/i);
   });
 
-  it("25 - offline createLobby path conserve branche sans query (source)", () => {
+  it("25 - createLobby est un chemin Supabase unique (plus de branche offline)", () => {
     const lobbySrc = readFileSync(join(ROOT, "js/core/lobby.js"), "utf8");
     const createIdx = lobbySrc.indexOf("export async function createLobby()");
     const slice = lobbySrc.slice(createIdx, createIdx + 2800);
     assert.match(slice, /guardClientCompatibility\("create"\)/);
-    assert.match(slice, /if \(isSupabaseConfigured\(\)\)/);
     assert.match(slice, /assertCanInsertLobby/);
-    // Branche offline après garde
-    assert.match(slice, /genLobbyCode|newLobby/);
+    assert.match(slice, /createLobbySupabase/);
+    assert.doesNotMatch(slice, /genLobbyCode|newLobby\(|publishOpenLobby|localInstanceId/);
   });
 
   it("double pipeline : second appel bloqué par flag simulé", () => {

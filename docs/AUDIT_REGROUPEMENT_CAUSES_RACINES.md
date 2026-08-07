@@ -40,7 +40,7 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 | ID | Cause | Problème | Priorité | 
 |----|-------|----------|----------|
 | **ARCH-05** | 5 | Route lobby vs session (`row.screen`) | 🟡 mitigé SYN-28 |
-| **ARCH-01 / F-01** | 1 | Démo offline sans avertissement MP | 🟡 **01A** gate livré · ouvert (QA + 01B) |
+| **ARCH-01 / F-01** | 1 | Démo offline sans avertissement MP | 🟡 **01A** QA ✅ · **01B** livré · ouvert (QA finale) |
 | **ARCH-11–17, SYN-19–24, SYN-27** | 9–10 | Monolithe / dup / code mort | Dette |
 
 
@@ -163,7 +163,7 @@ Hors scope volontaire (autres causes) : rollback votes dilemma/speedVote/truthMe
 | **ARCH-23** | Version cliente vs attendue · refresh forcé | 🟡 ouvert — post-mortem 01B-bis |
 | **ARCH-05** | `row.screen` en retard vs lobby | 🟡 mitigé ; hors scope routing |
 | **ARCH-10** | Cache session clear trop tard au leave | 🟢 QA Pages ✅ · mobile → QA finale |
-| **ARCH-01** | Démo locale sans avertissement MP | 🟡 **ARCH-01A** livré (gate `BACKEND_MISSING`) · **ouvert** jusqu’à QA + **ARCH-01B** |
+| **ARCH-01** | Démo locale sans avertissement MP | 🟡 **01A** QA ✅ · **01B** cleanup livré · **ouvert** (QA finale) |
 
 #### BUG-MP-NAV-01 ✅ (clôture QA terrain · 2026-08-07)
 

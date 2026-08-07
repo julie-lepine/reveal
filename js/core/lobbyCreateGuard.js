@@ -121,7 +121,8 @@ export function canCreateLobbyFromInputs(input = {}) {
 
   if (!loggedIn || hasActiveLobby) return false;
 
-  if (!supabaseConfigured) return true;
+  // ARCH-01B : pas de création lobby sans backend (gate BACKEND_MISSING).
+  if (!supabaseConfigured) return false;
 
   if (!authReady) return false;
   if (!snapshot?.userId) return false;

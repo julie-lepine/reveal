@@ -476,7 +476,7 @@ describe("lobbyServerLeaveVagueD - API", () => {
     assert.match(lobby, /queryActiveLobbyMembership/);
   });
 
-  it("27 - offline inchangé (canCreateLobbyFromInputs sans supabase)", () => {
+  it("27 - ARCH-01B : canCreateLobbyFromInputs refuse sans supabase", () => {
     assert.equal(
       canCreateLobbyFromInputs({
         loggedIn: true,
@@ -485,7 +485,7 @@ describe("lobbyServerLeaveVagueD - API", () => {
         supabaseConfigured: false,
         snapshot: null,
       }),
-      true
+      false
     );
   });
 

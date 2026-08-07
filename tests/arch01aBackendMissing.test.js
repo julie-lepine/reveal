@@ -6,7 +6,7 @@
  */
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readFileSync, existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
@@ -111,7 +111,8 @@ describe("ARCH-01A — TEST B : auth locale inatteignable (parcours runtime)", (
     );
   });
 
-  it("authCredentials reste hors chemin boot (pas d’import main)", () => {
+  it("authCredentials absent du runtime (fichier + imports)", () => {
+    assert.equal(existsSync(join(ROOT, "js/core/authCredentials.js")), false);
     const main = read("js/main.js");
     assert.doesNotMatch(main, /authCredentials/);
   });
@@ -136,10 +137,10 @@ describe("ARCH-01A — TEST C : faux lobby inatteignable via parcours utilisateu
 });
 
 describe("ARCH-01A — TEST D : PNJ démo non atteints depuis ce parcours", () => {
-  it("boot / BACKEND_MISSING n’importent ni demoPlayers ni simulateLobbyJoins", () => {
+  it("boot / BACKEND_MISSING n’importent ni demoPlayers ni branche PNJ", () => {
     const main = read("js/main.js");
     const screen = read("js/screens/backendMissing.js");
-    assert.doesNotMatch(main, /demoPlayers|DEMO_NPC|simulateLobbyJoins/);
+    assert.doesNotMatch(main, /demoPlayers|DEMO_NPC/);
     assert.doesNotMatch(screen, /demoPlayers|DEMO_NPC|simulateLobbyJoins/);
   });
 });
@@ -209,10 +210,12 @@ describe("ARCH-01A — TEST F : configured sans lobby ≠ backend missing", () =
 });
 
 describe("ARCH-01A — non-régression présence MP (source)", () => {
-  it("simulateLobbyJoins conserve la branche Realtime configured", () => {
+  it("simulateLobbyJoins = présence Realtime (plus de PNJ)", () => {
     const lobby = read("js/core/lobby.js");
     assert.match(lobby, /simulateLobbyJoins/);
     assert.match(lobby, /startLobbyPresenceSync/);
-    assert.match(lobby, /isSupabaseConfigured\(\)/);
+    const idx = lobby.indexOf("export function simulateLobbyJoins");
+    const slice = lobby.slice(idx, idx + 500);
+    assert.doesNotMatch(slice, /DEMO_NPC|setInterval/);
   });
 });

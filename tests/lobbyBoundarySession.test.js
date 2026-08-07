@@ -9,7 +9,6 @@ import {
   getLastGameScopeKey,
   isLastGameInCurrentScope,
   isSessionRowForLobby,
-  newOfflineLobbyInstanceId,
   resolveSessionRestoreOutcome,
   shouldClearCachedSessionForLobbyBoundary,
   shouldExposeCachedSession,
@@ -312,7 +311,7 @@ describe("Génération runtime - callbacks tardives", () => {
   });
 });
 
-describe("Offline - code réutilisé, localInstanceId unique", () => {
+describe("ARCH-01B - getLastGameScopeKey sans localInstanceId", () => {
   let snapshot;
 
   beforeEach(() => {
@@ -323,39 +322,31 @@ describe("Offline - code réutilisé, localInstanceId unique", () => {
     saveStatePatch(snapshot);
   });
 
-  it("lastGame soirée 1 invisible après nouvelle soirée offline même code", () => {
-    const code = "DEMO01";
-    const instanceA = "offline-aaa";
+  it("id Supabase prioritaire ; sinon code ; localInstanceId ignoré", () => {
+    assert.equal(getLastGameScopeKey({ id: "uuid-1", code: "ABCD" }), "uuid-1");
+    assert.equal(getLastGameScopeKey({ code: "ABCD" }, "ABCD"), "ABCD");
+    assert.equal(
+      getLastGameScopeKey({ code: "DEMO", localInstanceId: "offline-x" }),
+      "DEMO"
+    );
+  });
+
+  it("changement de lobby.id invalide lastGame même si code inchangé", () => {
+    const code = "SAME01";
     saveStatePatch({
-      lobby: { code, localInstanceId: instanceA },
+      lobby: { id: "lobby-a", code },
       lobbyCode: code,
       inLobby: true,
     });
     setLastGame({ gameId: "guesslie", title: "Guess The Lie" });
     assert.equal(getLastGame()?.gameId, "guesslie");
 
-    const instanceB = "offline-bbb";
     saveStatePatch({
-      lobby: { code, localInstanceId: instanceB },
+      lobby: { id: "lobby-b", code },
       lobbyCode: code,
       inLobby: true,
     });
     assert.equal(getLastGame(), null);
-    assert.notEqual(instanceA, instanceB);
-  });
-
-  it("newOfflineLobbyInstanceId produit des ids distincts", () => {
-    const a = newOfflineLobbyInstanceId();
-    const b = newOfflineLobbyInstanceId();
-    assert.notEqual(a, b);
-    assert.ok(a.startsWith("offline-"));
-  });
-
-  it("getLastGameScopeKey préfère localInstanceId au code", () => {
-    assert.equal(
-      getLastGameScopeKey({ code: "DEMO", localInstanceId: "offline-x" }),
-      "offline-x"
-    );
   });
 });
 

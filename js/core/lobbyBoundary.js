@@ -7,19 +7,14 @@
 /** @typedef {{ status: "found", row: object } | { status: "none" } | { status: "error" }} SessionRestoreAttempt */
 
 /**
- * Clé de scope pour lastGame (id Supabase, instance offline unique, ou code legacy).
- * @param {{ id?: string|null, localInstanceId?: string|null, code?: string|null }|null|undefined} lobby
+ * Clé de scope pour lastGame (id Supabase, ou code legacy).
+ * ARCH-01B : plus de localInstanceId (faux lobby offline).
+ * @param {{ id?: string|null, code?: string|null }|null|undefined} lobby
  * @param {string|null|undefined} lobbyCode
  */
 export function getLastGameScopeKey(lobby, lobbyCode = null) {
   if (lobby?.id) return lobby.id;
-  if (lobby?.localInstanceId) return lobby.localInstanceId;
   return lobby?.code || lobbyCode || null;
-}
-
-/** Identifiant unique pour une soirée offline (réutilisation de code possible). */
-export function newOfflineLobbyInstanceId() {
-  return `offline-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
 /**
