@@ -7,6 +7,12 @@ export const EVENING_POINTS = {
   BONUS: 15,
 };
 
+/**
+ * BUG-TIERNIGHT-SERIES-QA-02 — bonus outsider TierNight uniquement.
+ * Ne pas réutiliser EVENING_POINTS.BONUS (+15) : partagé HotTake / Dilemma / etc.
+ */
+export const TIER_NIGHT_OUTSIDER_BONUS = 5;
+
 /** Tier Night : écart de rang vs consensus → points */
 export function tierNightPointsForRankDiff(diff) {
   if (diff <= 0) return EVENING_POINTS.BONUS;

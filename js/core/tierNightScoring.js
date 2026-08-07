@@ -79,7 +79,7 @@ export function tierNightPointsHintText({ reverse = false } = {}) {
   if (reverse) {
     return "Points : +15 si tu t'éloignes fort du groupe, +10 si modérément (à contre-courant).";
   }
-  return "Points : +15 même tier que le groupe, +10 à 1 tier d'écart · bonus +15 sur l'item le plus clivant.";
+  return "Points : +15 même tier que le groupe, +10 à 1 tier d'écart · bonus +5 sur l'item le plus clivant.";
 }
 
 /**

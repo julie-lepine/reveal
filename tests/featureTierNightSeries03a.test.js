@@ -173,7 +173,7 @@ describe("FEATURE-TIERNIGHT-SERIES-03A - golden scoring JS", () => {
 
   it("outsider tie attribue le bonus aux deux", () => {
     const f = buildTierNightSeriesGoldenFixtures().find((x) => x.id === "outsider-tie");
-    const withBonus = f.expected.scores.filter((s) => s.outsiderBonus === 15);
+    const withBonus = f.expected.scores.filter((s) => s.outsiderBonus === 5);
     assert.ok(withBonus.length >= 2);
   });
 

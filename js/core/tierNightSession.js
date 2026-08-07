@@ -1,5 +1,5 @@
 import { TIER_LEVELS, getTierNightModifierById } from "../../data/tierTopics.js";
-import { EVENING_POINTS } from "../../data/eveningScoring.js";
+import { TIER_NIGHT_OUTSIDER_BONUS } from "../../data/eveningScoring.js";
 import {
   buildTierNightScoreBreakdown,
   tierNightPointsForItem,
@@ -128,8 +128,8 @@ function attachOutsiderBonus(recaps, consensus, controversialItem) {
 
   recaps.forEach((r, i) => {
     if (diffs[i] === maxDiff) {
-      r.outsiderBonus = EVENING_POINTS.BONUS;
-      r.consensusPoints = (r.consensusPoints || 0) + EVENING_POINTS.BONUS;
+      r.outsiderBonus = TIER_NIGHT_OUTSIDER_BONUS;
+      r.consensusPoints = (r.consensusPoints || 0) + TIER_NIGHT_OUTSIDER_BONUS;
     }
   });
 }

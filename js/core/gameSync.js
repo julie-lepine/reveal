@@ -2902,6 +2902,24 @@ function scoresFromRemote(remote = {}) {
   return out;
 }
 
+/**
+ * BUG-TIERNIGHT-SERIES-QA-02 — retire les alias UID d’une map name-keyed.
+ * Si la clé se résout vers un autre pseudo, merge max puis purge la clé technique.
+ */
+export function pruneUidAliasKeysFromScoreMap(mapByName = {}) {
+  const next = { ...(mapByName || {}) };
+  for (const key of Object.keys(next)) {
+    const display = playerKeyToDisplayName(key);
+    if (!display || display === key) continue;
+    const pts = next[key];
+    if (typeof pts === "number" && Number.isFinite(pts)) {
+      next[display] = Math.max(next[display] || 0, pts);
+    }
+    delete next[key];
+  }
+  return next;
+}
+
 export { playerStatsToRemote, applyRemotePlayerStats } from "./playerStatsSync.js";
 
 /** Fusion des matchScores côté blob session (clés uid). */
@@ -2922,26 +2940,44 @@ function gameScoresToRemote(byGame = {}) {
   return out;
 }
 
-function gameScoresFromRemote(remote = {}) {
+export function gameScoresFromRemote(remote = {}) {
   const out = {};
-  Object.entries(remote).forEach(([gid, scoresByUid]) => {
+  Object.entries(remote || {}).forEach(([gid, scoresByUid]) => {
     out[gid] = scoresFromRemote(scoresByUid || {});
   });
   return out;
 }
 
-function applyRemoteGameScores(remote, order) {
-  if (!remote || typeof remote !== "object") return;
+/**
+ * Merge remote UID-keyed gameScores → local name-keyed, sans laisser d’alias UID.
+ */
+export function mergeRemoteGameScoresIntoLocal(current = {}, remote = {}) {
   const byGame = gameScoresFromRemote(remote);
-  const current = getState().gameScores || {};
   const merged = { ...current };
   Object.entries(byGame).forEach(([gid, scoresByName]) => {
-    const prev = { ...(merged[gid] || {}) };
+    let prev = pruneUidAliasKeysFromScoreMap({ ...(merged[gid] || {}) });
+    // Purge aussi les UID présents dans le payload remote (même si déjà absents du prev).
+    for (const uid of Object.keys(remote?.[gid] || {})) {
+      const display = playerKeyToDisplayName(uid);
+      if (display && display !== uid && Object.prototype.hasOwnProperty.call(prev, uid)) {
+        const pts = prev[uid];
+        if (typeof pts === "number" && Number.isFinite(pts)) {
+          prev[display] = Math.max(prev[display] || 0, pts);
+        }
+        delete prev[uid];
+      }
+    }
     Object.entries(scoresByName).forEach(([name, pts]) => {
       prev[name] = Math.max(prev[name] || 0, pts);
     });
-    merged[gid] = prev;
+    merged[gid] = pruneUidAliasKeysFromScoreMap(prev);
   });
+  return merged;
+}
+
+function applyRemoteGameScores(remote, order) {
+  if (!remote || typeof remote !== "object") return;
+  const merged = mergeRemoteGameScoresIntoLocal(getState().gameScores || {}, remote);
   const patch = {
     gameScores: merged,
     gameScoreOrder: mergeGameScoreOrder(

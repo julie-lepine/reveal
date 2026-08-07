@@ -58,7 +58,7 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 | 7 | Sync silencieuse / fire-and-forget | Partiel | **BUG-TRUTHMETER-01 ✅** (01A/01B) · **BUG-TIERNIGHT-03** ✅ · **BUG-TRIVIA-01 ✅** (01A/01B/01B-bis/01C) · ARCH-07 ✅ · M-14b ✅ · ARCH-08 ✅ · **SYN-VOTE-ROLLBACK-01 ✅** · **SYN-TRAITRE-DEALACK-01 ✅** |
 | 8 | Reset / migration incomplète | Partiel | **BUG-TIERNIGHT-05 ✅** · **OPS-LOBBY-04 ✅** · **BUG-LOBBY-XX-E ✅** · **BUG-TRUTHMETER-02 ✅** · **ARCH-23** · ARCH-10 · **BUG-LOBBY-XX ✅** · I-09/SYN-15/16 ✅ |
 | 9 | Sync monolithe / duplication | Dette | ARCH-11… |
-| 10 | Code mort | Dette | **FEATURE-VIBECHECK-01 ✅** · hors Fil Rouge app ✅ |
+| 10 | Code mort | Dette | **FEATURE-VIBECHECK-01 ✅** · **CLEANUP-FILROUGE-01** (app) · SQL ops Fil Rouge hors scope |
 | 11 | Friction UX | Partiel | **UX-DEVICE-01** 🟡 · **FEATURE-TIERNIGHT-01 ✅** · **FEATURE-DILEMMA-01 ✅** · **FEATURE-TIERNIGHT-02 ✅** · **UX-TIERNIGHT-END-01/02 ✅** · **UX-TIERNIGHT-NAV-01 ✅** · **FEATURE-CHAT-03 ✅** · **UX-CHAT-01 ✅** · **UX-CHAT-02 ✅** · **UX-HOST-01 ✅** · **BUG-WAO-04** ✅ · **ARCH-23** · ARCH-22/Loader ✅ · **L-04 ✅** |
 
 ---
@@ -539,7 +539,7 @@ Ne pas rouvrir sans régression. Détail historique dans git / tests cités.
 | **FEATURE-LOBBY-POLL** | — | Sondages in-chat | `lobbyPolls*` |
 | **UX-VIBE-01/02** | 4/5/11 | Vote chrome · exit play | 2026-07-26 |
 | **ARCH-06** | 6 | Mount guard A/B/C · Traître V2 · Lobby IIFE | `mountLifecycle` · `arch06*` |
-| **SYN-05 / ARCH-18** | 6/10 | Fil Rouge app supprimé (SQL ops hors scope) | `filRougeVague*` |
+| **SYN-05 / ARCH-18** | 6/10 | Fil Rouge app supprimé (SQL ops hors scope) · CLEANUP-FILROUGE-01 | `filRougeVague*` |
 | **SYN-15/16 · I-09** | 8 | Rename migrate maps evening | `rosterRenameMigrate` |
 | **UX-CLUTCH-01** | 3 | Roster figé au launch | 2026-07-26 |
 | **UX-HIST-01** | 11 | Standings actifs ∪ contributeurs | 2026-07-26 |
@@ -584,7 +584,7 @@ Hors file prioritaire — opportunité / régression :
 - Join partiel : revert RPC reclaim anonymous · orphelin **création** · E2E Supabase
 - Pré-résolution B1 (getter post-mark launch) — étudiée, **non retenue**
 - Loader join interstitiel — **non retenu**
-- Fil Rouge SQL historique — ops Supabase séparée · fail docs `filRougeVague3Cleanup` hors Membership
+- Fil Rouge SQL historique — ops Supabase séparée (table `fil_rouge_private` / clés allowlist éventuelles) ; garde-fous app verts via `filRougeVague*`
 - **ARCH-23** : clients / PWA / cache Pages en retard sur migrations (leçon 01B-bis)
 - Logout snapshot `found` sans cache hydraté (hors AUTH-LEAVE Vague 1)
 - Leave multi-onglets sans BroadcastChannel

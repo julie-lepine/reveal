@@ -54,20 +54,24 @@ function roundRecapScoreRowsHtml(recaps) {
       Array.isArray(recaps) ? recaps.slice() : [],
       getActivePlayers()
     ),
-    (r) => (Number(r.consensusPoints) || 0) + (Number(r.outsiderBonus) || 0)
+    (r) => Number(r.consensusPoints) || 0
   );
   return ranked
     .map((r) => {
-      const pts =
-        (Number(r.consensusPoints) || 0) + (Number(r.outsiderBonus) || 0);
+      const pts = Number(r.consensusPoints) || 0;
+      const outsider = Number(r.outsiderBonus) || 0;
       const gold = r.rank === 1 && pts > 0 ? "player-score--gold" : "";
       const color = r.color || "rgba(255,255,255,.2)";
       const emoji = r.emoji || "🙂";
+      const outsiderHint =
+        outsider > 0
+          ? `<span class="hint game-scores-box__meta">dont +${outsider} outsider</span>`
+          : "";
       return `
         <div class="game-scores-box__row">
           <span class="game-scores-box__rank">${r.rank}</span>
           <div class="avatar avatar--sm" style="background:${escapeHtml(color)}">${escapeHtml(emoji)}</div>
-          <span class="player-name game-scores-box__name">${escapeHtml(r.player || "?")}</span>
+          <span class="player-name game-scores-box__name">${escapeHtml(r.player || "?")}${outsiderHint}</span>
           <span class="player-score ${gold}">+${pts}</span>
         </div>`;
     })

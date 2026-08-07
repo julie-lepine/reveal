@@ -1,6 +1,8 @@
 -- REVEAL — Fil Rouge / Mot interdit (missions privées par joueur)
--- JEU ABANDONNÉ dans l'app (FIL_ROUGE_ENABLED = false) — conserver ce script pour réactivation future.
--- Run after schema.sql + game-sessions.sql
+-- HISTORIQUE UNIQUEMENT — jeu retiré du produit. Ne pas exécuter sur une install neuve.
+-- Ne pas utiliser pour une « réactivation ». Une purge table/RPC est une ops séparée.
+-- Conservé pour reproductibilité des projets déjà provisionnés.
+-- (is_lobby_host est désormais fourni par game-sessions-i08-arch03.sql / chaîne I-08.)
 
 create or replace function public.is_lobby_host(p_lobby_id uuid)
 returns boolean

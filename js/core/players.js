@@ -53,6 +53,21 @@ export function getSortedActivePlayers() {
 }
 
 /**
+ * Résout une clé score (uid ou pseudo) → pseudo lobby si connue.
+ * Pur lobby (évite import gameSync).
+ */
+function resolveLobbyDisplayName(key) {
+  if (key == null || key === "") return null;
+  const raw = String(key);
+  const ps = getLobbyParticipants() || [];
+  const byUid = ps.find((p) => p.userId && String(p.userId) === raw);
+  if (byUid?.name) return byUid.name;
+  const byName = ps.find((p) => p.name === raw);
+  if (byName) return raw;
+  return null;
+}
+
+/**
  * UX-HIST-01 - standings soirée : roster actif ∪ contributeurs historiques.
  * Ne pas utiliser pour lobby / ready / présence / HUD in-game.
  * @param {{ gameId?: string|null }} [opts]
@@ -64,6 +79,7 @@ export function getEveningStandingPlayers({ gameId = null } = {}) {
     scores,
     gameScores,
     gameId,
+    resolveDisplayName: resolveLobbyDisplayName,
   });
 }
 

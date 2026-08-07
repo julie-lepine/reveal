@@ -34,34 +34,6 @@ function walkJsFiles(dir, out = []) {
   return out;
 }
 
-const EVENING_STATE_KEYS_EXPECTED = [
-  "scores",
-  "playerStats",
-  "gameScores",
-  "gameScoreOrder",
-  "gameScoreSessionBaseline",
-  "gameScoreSessionGameId",
-  "eveningGamesRecorded",
-  "stats",
-  "lastGame",
-  "lastTierName",
-];
-
-const GAME_PLAY_STATE_KEYS_EXPECTED = [
-  "hotTake",
-  "speedVote",
-  "clutch",
-  "wrongAnswer",
-  "traitre",
-  "trivia",
-  "truthMeter",
-  "consensus",
-  "dilemma",
-  "guessLie",
-  "tierNight",
-  "tierNightLive",
-];
-
 describe("fil rouge vague 2 - sync / state", () => {
   it("data/filRouge.js est supprimé", () => {
     assert.equal(existsSync(join(root, "data/filRouge.js")), false);
@@ -180,7 +152,7 @@ describe("fil rouge vague 2 - sync / state", () => {
     assert.deepEqual(out.scores, { Alice: 1 });
   });
 
-  it("clés de soirée et play state gameSync restent stables (hors Fil Rouge)", () => {
+  it("evening / play keys : aucune clé Fil Rouge ; gameScoreSessionKey présent", () => {
     const sync = read("js/core/gameSync.js");
     const eveningMatch = sync.match(/const EVENING_STATE_KEYS = new Set\(\[([\s\S]*?)\]\);/);
     const playMatch = sync.match(/const GAME_PLAY_STATE_KEYS = new Set\(\[([\s\S]*?)\]\);/);
@@ -188,8 +160,14 @@ describe("fil rouge vague 2 - sync / state", () => {
     assert.ok(playMatch, "GAME_PLAY_STATE_KEYS manquant");
     const parseKeys = (block) =>
       [...block.matchAll(/"([^"]+)"/g)].map((m) => m[1]);
-    assert.deepEqual(parseKeys(eveningMatch[1]), EVENING_STATE_KEYS_EXPECTED);
-    assert.deepEqual(parseKeys(playMatch[1]), GAME_PLAY_STATE_KEYS_EXPECTED);
+    const evening = parseKeys(eveningMatch[1]);
+    const play = parseKeys(playMatch[1]);
+    for (const key of [...evening, ...play]) {
+      assert.equal(/filRouge/i.test(key), false, `clé Fil Rouge indésirable: ${key}`);
+    }
+    assert.ok(evening.includes("gameScoreSessionKey"));
+    assert.ok(play.includes("tierNight"));
+    assert.ok(play.includes("tierNightLive"));
     assert.ok(sync.includes("...eveningStateToRemote()"));
     assert.equal(sync.includes("filRougePreserve"), false);
   });

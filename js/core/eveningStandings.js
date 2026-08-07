@@ -10,6 +10,20 @@ export const EVENING_STANDING_FALLBACK = Object.freeze({
 });
 
 /**
+ * BUG-TIERNIGHT-SERIES-QA-02 — clé score map affichable ssi ce n’est pas un alias
+ * technique d’une identité déjà résolue (UID → autre pseudo).
+ * @param {string} key
+ * @param {(key: string) => string|null|undefined} [resolveDisplayName]
+ */
+export function isDisplayableEveningContributorKey(key, resolveDisplayName = null) {
+  if (!key) return false;
+  if (typeof resolveDisplayName !== "function") return true;
+  const display = resolveDisplayName(key);
+  if (display != null && String(display) !== String(key)) return false;
+  return true;
+}
+
+/**
  * Contribution soirée démontrable avec les maps actuelles.
  *
  * - `scores[name] !== 0` (fini) : points soirée non nuls (positifs ou négatifs si un jour utilisés).
@@ -53,24 +67,29 @@ export function collectEveningContributorNames({
   scores = {},
   gameScores = {},
   gameId = null,
+  resolveDisplayName = null,
 } = {}) {
   const names = new Set();
+  const maybeAdd = (name) => {
+    if (!isDisplayableEveningContributorKey(name, resolveDisplayName)) return;
+    names.add(name);
+  };
 
   if (gameId) {
     const byName = gameScores?.[gameId] || {};
     for (const [name, v] of Object.entries(byName)) {
-      if (typeof v === "number" && Number.isFinite(v)) names.add(name);
+      if (typeof v === "number" && Number.isFinite(v)) maybeAdd(name);
     }
     return names;
   }
 
   for (const [name, s] of Object.entries(scores || {})) {
-    if (typeof s === "number" && Number.isFinite(s) && s !== 0) names.add(name);
+    if (typeof s === "number" && Number.isFinite(s) && s !== 0) maybeAdd(name);
   }
   for (const byName of Object.values(gameScores || {})) {
     if (!byName || typeof byName !== "object") continue;
     for (const [name, v] of Object.entries(byName)) {
-      if (typeof v === "number" && Number.isFinite(v)) names.add(name);
+      if (typeof v === "number" && Number.isFinite(v)) maybeAdd(name);
     }
   }
   return names;
@@ -83,6 +102,7 @@ export function collectEveningContributorNames({
  *   scores?: Record<string, number>,
  *   gameScores?: Record<string, Record<string, number>>,
  *   gameId?: string|null,
+ *   resolveDisplayName?: ((key: string) => string|null|undefined)|null,
  * }} opts
  */
 export function buildEveningStandingPlayers({
@@ -90,6 +110,7 @@ export function buildEveningStandingPlayers({
   scores = {},
   gameScores = {},
   gameId = null,
+  resolveDisplayName = null,
 } = {}) {
   const byName = new Map();
 
@@ -105,7 +126,12 @@ export function buildEveningStandingPlayers({
     });
   }
 
-  const contributors = collectEveningContributorNames({ scores, gameScores, gameId });
+  const contributors = collectEveningContributorNames({
+    scores,
+    gameScores,
+    gameId,
+    resolveDisplayName,
+  });
   for (const name of contributors) {
     if (byName.has(name)) continue;
     byName.set(name, {

@@ -6,7 +6,7 @@
  */
 
 import { TIER_LEVELS } from "../../data/tierTopics.js";
-import { EVENING_POINTS } from "../../data/eveningScoring.js";
+import { TIER_NIGHT_OUTSIDER_BONUS } from "../../data/eveningScoring.js";
 import { computeConsensusPlaced } from "./tierNightConsensus.js";
 import {
   buildTierNightScoreBreakdown,
@@ -136,8 +136,8 @@ export function computeTierNightSeriesRoundScores({
     if (maxDiff >= 1) {
       recaps.forEach((r, i) => {
         if (diffs[i] === maxDiff) {
-          r.outsiderBonus = EVENING_POINTS.BONUS;
-          r.consensusPoints = (r.proximityPoints || 0) + EVENING_POINTS.BONUS;
+          r.outsiderBonus = TIER_NIGHT_OUTSIDER_BONUS;
+          r.consensusPoints = (r.proximityPoints || 0) + TIER_NIGHT_OUTSIDER_BONUS;
         }
       });
     }

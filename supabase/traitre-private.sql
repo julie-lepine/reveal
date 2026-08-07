@@ -1,5 +1,5 @@
 -- REVEAL — Spot the fake (Traitre) : rôle imposteur privé par joueur
--- Run after schema.sql + game-sessions.sql (+ fil-rouge-private.sql for is_lobby_host)
+-- Run after schema.sql + game-sessions.sql (is_lobby_host via game-sessions-i08-arch03.sql)
 
 create table if not exists public.traitre_private (
   id uuid primary key default gen_random_uuid(),

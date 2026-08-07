@@ -25,6 +25,7 @@ import {
   completeGameSession,
   isGameSyncActive,
   isLobbyHost,
+  mergeRemoteGameScoresIntoLocal,
   refreshGameSession,
   getCachedGameSession,
 } from "./gameSync.js";
@@ -484,7 +485,11 @@ export function applyAuthoritativeSeriesRpcState(rpcState, guards = {}) {
     patch.playerStats = rpcState.playerStats;
   }
   if (rpcState.gameScores && typeof rpcState.gameScores === "object") {
-    patch.gameScores = rpcState.gameScores;
+    // BUG-TIERNIGHT-SERIES-QA-02 : UID serveur → pseudos (même contrat qu’hydratation).
+    patch.gameScores = mergeRemoteGameScoresIntoLocal(
+      getState().gameScores || {},
+      rpcState.gameScores
+    );
   }
   if (rpcState.stats && typeof rpcState.stats === "object") {
     patch.stats = rpcState.stats;
