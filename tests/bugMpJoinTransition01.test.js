@@ -3,13 +3,17 @@
  *
  * Pendant syncPending.token (JOINING) : pas de chrome membership interactif
  * (Retour / Quitter) ni contrôles create/join, même si hasActiveLobby est déjà vrai.
+ * FEATURE-MP-JOIN-UX-01 : copy HERO / statusMessage évolués — contrats ci-dessous.
  */
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { deriveHomeJoinTransitionUi } from "../js/core/homeJoinTransition.js";
+import {
+  deriveHomeJoinTransitionUi,
+  HOME_JOIN_PENDING_TITLE,
+} from "../js/core/homeJoinTransition.js";
 import { deriveHomeMembershipChrome } from "../js/core/homeMembershipChrome.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -24,13 +28,17 @@ describe("BUG-MP-JOIN-TRANSITION-01 — deriveHomeJoinTransitionUi", () => {
     assert.equal(ui.active, true);
     assert.equal(ui.suppressMembershipActions, true);
     assert.equal(ui.suppressLobbyControls, true);
+    assert.equal(ui.title, HOME_JOIN_PENDING_TITLE);
+    assert.equal(ui.heroCode, "H5VQAN");
     assert.match(ui.statusMessage, /Connexion au lobby H5VQAN/);
 
-    // Chrome membership resterait cached_active sans override paint :
     const chrome = deriveHomeMembershipChrome({
       hasActiveLobby: true,
       activeLobbyCode: "H5VQAN",
-      snapshot: { status: "found", membership: { code: "H5VQAN", lobbyId: "L1", role: "member" } },
+      snapshot: {
+        status: "found",
+        membership: { code: "H5VQAN", lobbyId: "L1", role: "member" },
+      },
       authReady: true,
       supabaseConfigured: true,
       loggedIn: true,
@@ -38,7 +46,6 @@ describe("BUG-MP-JOIN-TRANSITION-01 — deriveHomeJoinTransitionUi", () => {
     });
     assert.equal(chrome.state, "cached_active");
     assert.equal(chrome.showReturnToLobby, true);
-    // …mais le paint Home doit supprimer ce chrome via join transition.
     assert.equal(ui.suppressMembershipActions, true);
   });
 
@@ -55,30 +62,28 @@ describe("BUG-MP-JOIN-TRANSITION-01 — deriveHomeJoinTransitionUi", () => {
 
   it("sans code : message générique", () => {
     const ui = deriveHomeJoinTransitionUi({ joinPendingActive: true });
-    assert.equal(ui.statusMessage, "Connexion au lobby…");
+    assert.equal(ui.statusMessage, "Connexion au lobby en cours");
+    assert.equal(ui.heroCode, null);
   });
 });
 
 describe("BUG-MP-JOIN-TRANSITION-01 — contrats source Home", () => {
   it("importe deriveHomeJoinTransitionUi", () => {
-    assert.match(
-      homeSrc,
-      /import \{ deriveHomeJoinTransitionUi \} from "\.\.\/core\/homeJoinTransition\.js"/
-    );
+    assert.match(homeSrc, /from "\.\.\/core\/homeJoinTransition\.js"/);
+    assert.match(homeSrc, /deriveHomeJoinTransitionUi/);
   });
 
   it("TEST 1/2 — paint : suppress membership + contrôles si joinUi actif", () => {
     assert.match(homeSrc, /deriveHomeJoinTransitionUi\(\{/);
     assert.match(
       homeSrc,
-      /const membershipActionsHtml = joinUi\.suppressMembershipActions\s*\?\s*homeJoinPendingStatusHtml\(joinUi\.statusMessage\)\s*:\s*homeMembershipActionsHtml\(chrome\)/
+      /const membershipActionsHtml = joinUi\.suppressMembershipActions\s*\?\s*homeJoinPendingStatusHtml\(joinUi\)\s*:\s*homeMembershipActionsHtml\(chrome\)/
     );
     assert.match(
       homeSrc,
       /showLoggedInLobbyControls = loggedIn && !joinUi\.suppressLobbyControls/
     );
     assert.match(homeSrc, /home-join-pending/);
-    assert.match(homeSrc, /joinUi\.active\s*\?\s*homeJoinPendingStatusHtml/);
   });
 
   it("TEST 3 — navigateAfterLobbyJoin await avant end syncPending (handlers join)", () => {
@@ -99,10 +104,16 @@ describe("BUG-MP-JOIN-TRANSITION-01 — contrats source Home", () => {
     }
   });
 
-  it("TEST 4 — échec : end dans finally (clear JOINING)", () => {
+  it("TEST 4 — échec : end dans finally + restoreHomeAfterFailedJoin", () => {
     const join = homeSrc.slice(homeSrc.indexOf('if (e.target.closest("#btn-join-lobby"))'));
     assert.match(join, /if \(!res\.ok\)/);
     assert.match(join, /syncPending\.end\(pendingToken\)/);
+    assert.match(join, /if \(!joinSucceeded\) await restoreHomeAfterFailedJoin\(\)/);
+    assert.match(homeSrc, /async function restoreHomeAfterFailedJoin\(/);
+    assert.match(
+      homeSrc,
+      /async function restoreHomeAfterFailedJoin\([\s\S]*?await resolveHomeMembership\(\{ force: true \}\)/
+    );
   });
 
   it("TEST 6 — double clic : garde token + start syncPending", () => {
@@ -127,12 +138,23 @@ describe("BUG-MP-JOIN-TRANSITION-01 — contrats source Home", () => {
     assert.match(slice, /await joinLobbyAsGuest\(/);
   });
 
-  it("pending-join-remote aussi sous syncPending (même transaction UX)", () => {
+  it("pending-join-remote aussi sous syncPending + restore après échec", () => {
     const fn = homeSrc.slice(
       homeSrc.indexOf('if (e.target.closest("#btn-pending-join-remote"))'),
       homeSrc.indexOf('if (e.target.closest("#btn-membership-retry"))')
     );
     assert.match(fn, /syncPending\.start\(\)/);
     assert.match(fn, /syncPending\.end\(pendingToken\)/);
+    assert.match(fn, /if \(!joinSucceeded\) await restoreHomeAfterFailedJoin\(\)/);
+  });
+
+  it("échec join sans rollback : forceClearClientLobbyState si hasActiveLobby orphelin", () => {
+    const lobbySrc = readFileSync(join(__dirname, "../js/core/lobby.js"), "utf8");
+    const start = lobbySrc.indexOf("export async function joinLobby(");
+    const slice = lobbySrc.slice(start, start + 4500);
+    assert.match(
+      slice,
+      /if \(!rollbackSnapshot && hasActiveLobby\(\)\) \{\s*\r?\n\s*forceClearClientLobbyState\(\);/
+    );
   });
 });

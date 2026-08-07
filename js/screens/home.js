@@ -99,7 +99,10 @@ import {
 } from "../core/turnstile.js";
 import { createMountGuard } from "../core/mountLifecycle.js";
 import { createSyncPending } from "../core/syncPending.js";
-import { deriveHomeJoinTransitionUi } from "../core/homeJoinTransition.js";
+import {
+  deriveHomeJoinTransitionUi,
+  normalizeJoinAttemptCode,
+} from "../core/homeJoinTransition.js";
 
 function syncForgotPasswordButton(root) {
   const btn = root.querySelector("#btn-forgot-password");
@@ -303,11 +306,40 @@ function homeRenderSnapshot(
   });
 }
 
-/** Statut unique pendant JOINING (pas de Retour/Quitter + formulaire simultanés). */
-function homeJoinPendingStatusHtml(message) {
-  return `<p class="hint home-join-pending" role="status">${escapeHtml(
-    message || "Connexion au lobby…"
-  )}</p>`;
+/**
+ * FEATURE-MP-JOIN-UX-01 — bloc JOINING stable (code HERO + indicateur CSS).
+ * @param {{
+ *   title?: string|null,
+ *   heroCode?: string|null,
+ *   statusMessage?: string|null,
+ * }|string|null|undefined} joinUiOrMessage
+ */
+function homeJoinPendingStatusHtml(joinUiOrMessage) {
+  const ui =
+    joinUiOrMessage && typeof joinUiOrMessage === "object"
+      ? joinUiOrMessage
+      : {
+          title: "Entrée dans le lobby",
+          heroCode: null,
+          statusMessage:
+            typeof joinUiOrMessage === "string" && joinUiOrMessage
+              ? joinUiOrMessage
+              : "Connexion au lobby en cours",
+        };
+  const title = ui.title || "Entrée dans le lobby";
+  const code = normalizeJoinAttemptCode(ui.heroCode);
+  const aria = ui.statusMessage ||
+    (code
+      ? `Connexion au lobby ${code} en cours`
+      : "Connexion au lobby en cours");
+
+  return `<div class="home-join-pending" role="status" aria-label="${escapeHtml(aria)}">
+            <p class="label-upper home-join-pending__title">${escapeHtml(title)}</p>
+            <p class="home-join-pending__code${code ? "" : " home-join-pending__code--empty"}" aria-hidden="true">${
+              code ? escapeHtml(code) : "······"
+            }</p>
+            <span class="home-join-pending__indicator" aria-hidden="true"></span>
+          </div>`;
 }
 
 function homeMembershipActionsHtml(chrome) {
@@ -440,6 +472,11 @@ export function mountHome(app) {
   );
   /** Code saisi conservé pendant JOINING (input retiré du paint). */
   let stickyJoinCode = "";
+  /**
+   * FEATURE-MP-JOIN-UX-01 — snapshot code de la tentative JOIN active uniquement.
+   * Jamais membership / getLobby (évite CODEA pendant tentative CODEB).
+   */
+  let joinAttemptCode = "";
   let stickyGuestName = "";
 
   /** Résolution membership serveur en cours (chrome `checking` si pas de found). */
@@ -616,6 +653,20 @@ export function mountHome(app) {
         resolutionInProgress = false;
       }
     }
+  }
+
+  /**
+   * Après échec join : quitter JOINING puis rafraîchir membership none
+   * pour réactiver « Créer un lobby » (snapshot frais / pas de cache fantôme).
+   */
+  async function restoreHomeAfterFailedJoin() {
+    if (!shouldContinue()) return;
+    if (getCurrentScreen() !== "home") return;
+    if (hasActiveLobby()) {
+      scheduleRender(true);
+      return;
+    }
+    await resolveHomeMembership({ force: true });
   }
 
   function syncGuestEmojiPreview() {
@@ -853,16 +904,11 @@ export function mountHome(app) {
     const joinPendingActive = syncPending.getState().token != null;
     const joinUi = deriveHomeJoinTransitionUi({
       joinPendingActive,
-      lobbyCode:
-        getLobby()?.code ||
-        chrome?.membershipCode ||
-        app.querySelector("#join-code")?.value ||
-        app.querySelector("#guest-code")?.value ||
-        app.querySelector("#guest-rejoin-code")?.value ||
-        null,
+      // Tentative active uniquement — pas de membership / lobby résiduel.
+      lobbyCode: joinPendingActive ? joinAttemptCode || null : null,
     });
     const membershipActionsHtml = joinUi.suppressMembershipActions
-      ? homeJoinPendingStatusHtml(joinUi.statusMessage)
+      ? homeJoinPendingStatusHtml(joinUi)
       : homeMembershipActionsHtml(chrome);
     const activeLobby = chrome.state === "cached_active";
     const canStartNewLobby =
@@ -914,7 +960,7 @@ export function mountHome(app) {
           ${
             joinUi.active
               ? `<div class="card auth-form auth-form--guest">${homeJoinPendingStatusHtml(
-                  joinUi.statusMessage
+                  joinUi
                 )}</div>`
               : guestJoinPanelHtml({
                   leaveHint: activeLobby,
@@ -965,7 +1011,7 @@ export function mountHome(app) {
             <div id="auth-panel-guest" class="${authTab === "guest" ? "" : "hidden"}">
               ${
                 joinUi.active
-                  ? homeJoinPendingStatusHtml(joinUi.statusMessage)
+                  ? homeJoinPendingStatusHtml(joinUi)
                   : `
               <p class="hint auth-form__guest-intro">Rejoins avec un code de l'hôte. Pas de compte requis - les invités ne peuvent pas créer de lobby.</p>
               ${guestJoinFieldsHtml({
@@ -1311,20 +1357,23 @@ export function mountHome(app) {
       if (syncPending.getState().token != null) return;
       const btn = e.target.closest("#btn-pending-join-remote");
       btn.disabled = true;
+      const code =
+        membershipReconciliationConflict?.remoteCode ||
+        currentMembershipChrome().membershipCode ||
+        "";
+      joinAttemptCode = normalizeJoinAttemptCode(code);
+      if (joinAttemptCode) stickyJoinCode = joinAttemptCode;
       const pendingToken = syncPending.start();
+      let joinSucceeded = false;
       try {
-        const code =
-          membershipReconciliationConflict?.remoteCode ||
-          currentMembershipChrome().membershipCode ||
-          "";
-        if (!code) {
+        if (!joinAttemptCode) {
           await showAppAlert("Code lobby introuvable.", {
             title: "Connexion inachevée",
             icon: "⚠️",
           });
           return;
         }
-        const joinRes = await joinLobby(code);
+        const joinRes = await joinLobby(joinAttemptCode);
         if (!shouldContinue()) return;
         if (!joinRes?.ok) {
           await showAppAlert(joinRes.error || "Impossible de rejoindre ce lobby.", {
@@ -1332,18 +1381,20 @@ export function mountHome(app) {
             icon: "⚠️",
           });
           if (!shouldContinue()) return;
-          scheduleRender(true);
           return;
         }
         clearPendingLobbyMembershipCompensationIfMatches(
           membershipReconciliationConflict?.remoteLobbyId
         );
         membershipReconciliationConflict = null;
+        joinSucceeded = true;
         await navigateAfterLobbyJoin(joinRes.code);
       } finally {
+        joinAttemptCode = "";
         syncPending.end(pendingToken);
         if (btn?.isConnected) btn.disabled = false;
       }
+      if (!joinSucceeded) await restoreHomeAfterFailedJoin();
       return;
     }
 
@@ -1542,8 +1593,10 @@ export function mountHome(app) {
       if (syncPending.getState().token != null) return;
       const btn = e.target.closest("#btn-join-lobby");
       stickyJoinCode = String(app.querySelector("#join-code")?.value || "").trim();
+      joinAttemptCode = normalizeJoinAttemptCode(stickyJoinCode);
       btn.disabled = true;
       const pendingToken = syncPending.start();
+      let joinSucceeded = false;
       try {
         const res = await joinLobby(stickyJoinCode || app.querySelector("#join-code")?.value);
         if (!res.ok) {
@@ -1554,6 +1607,7 @@ export function mountHome(app) {
           await showAppAlert(joinErrorMessage, { title: "Rejoindre le lobby", icon: "⚠️" });
           return;
         }
+        joinSucceeded = true;
         await navigateAfterLobbyJoin();
       } catch (err) {
         await showAppAlert(err?.message || "Impossible de rejoindre le lobby.", {
@@ -1561,9 +1615,11 @@ export function mountHome(app) {
           icon: "⚠️",
         });
       } finally {
+        joinAttemptCode = "";
         syncPending.end(pendingToken);
-        btn.disabled = false;
+        if (btn?.isConnected) btn.disabled = false;
       }
+      if (!joinSucceeded) await restoreHomeAfterFailedJoin();
       return;
     }
 
@@ -1573,10 +1629,12 @@ export function mountHome(app) {
       const btn = e.target.closest("#btn-guest-join, #btn-guest-rejoin");
       stickyGuestName = String(nameEl?.value || "").trim();
       stickyJoinCode = String(codeEl?.value || "").trim();
+      joinAttemptCode = normalizeJoinAttemptCode(stickyJoinCode);
 
       const liveUserId = await getLiveSupabaseUserId();
       if (isTurnstileRequired() && !liveUserId && !isTurnstileSolved("guest")) {
         guestJoinError = "Valide la vérification anti-robot.";
+        joinAttemptCode = "";
         if (errEl) {
           errEl.textContent = guestJoinError;
           errEl.classList.remove("hidden");
@@ -1588,6 +1646,7 @@ export function mountHome(app) {
       guestJoinError = "";
       errEl?.classList.add("hidden");
       const pendingToken = syncPending.start();
+      let joinSucceeded = false;
 
       try {
         const captchaToken =
@@ -1611,7 +1670,7 @@ export function mountHome(app) {
             resetTurnstile("guest");
             if (btn) btn.disabled = true;
           } else {
-            btn.disabled = false;
+            if (btn?.isConnected) btn.disabled = false;
           }
 
           if (errEl) {
@@ -1634,9 +1693,10 @@ export function mountHome(app) {
           return;
         }
         guestJoinError = "";
+        joinSucceeded = true;
         await navigateAfterLobbyJoin();
       } catch (err) {
-        btn.disabled = false;
+        if (btn?.isConnected) btn.disabled = false;
         const msg = err?.message || "Impossible de rejoindre le lobby.";
         guestJoinError = msg;
         if (errEl) {
@@ -1646,8 +1706,10 @@ export function mountHome(app) {
           await showAppAlert(msg, { title: "Rejoindre", icon: "⚠️" });
         }
       } finally {
+        joinAttemptCode = "";
         syncPending.end(pendingToken);
       }
+      if (!joinSucceeded) await restoreHomeAfterFailedJoin();
       return;
     }
 

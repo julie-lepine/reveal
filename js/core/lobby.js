@@ -972,10 +972,18 @@ export async function joinLobby(code) {
       res = await joinLobbySupabase(code, { joinEffects });
     } catch (joinErr) {
       await runFinalizeFailedJoinAttempt({ joinEffects, rollbackSnapshot });
+      if (!rollbackSnapshot && hasActiveLobby()) {
+        forceClearClientLobbyState();
+      }
       throw joinErr;
     }
     if (!res.ok) {
       await runFinalizeFailedJoinAttempt({ joinEffects, rollbackSnapshot });
+      // Join sans lobby préalable : ne pas laisser un cache lobby orphelin
+      // (ex. applyLobbyToState puis échec hydrate) bloquer « Créer un lobby ».
+      if (!rollbackSnapshot && hasActiveLobby()) {
+        forceClearClientLobbyState();
+      }
       // E4 - déjà membre ailleurs : re-query + hydrate soirée canonique.
       if (res.code === "membership_already_elsewhere") {
         const recovered = await recoverAfterMembershipAlreadyExists();

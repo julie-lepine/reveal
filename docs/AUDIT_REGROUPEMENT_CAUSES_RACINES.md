@@ -19,7 +19,7 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 | **Maintenant** | **UX-DEVICE-01** (dernier ticket produit convenu) |
 | **En fin de vague** | **ARCH-23** / **ARCH-10** QA natif — **après** clôture produit (code + SQL déjà livrés · QA différée deploy Capacitor) |
 | **Dette** | ARCH-05 · ARCH-11–17 / SYN-19–24 / SYN-27 · VibeCheck ✅ · **CLEANUP-FILROUGE-01/02 ✅** · **ARCH-01/F-01 ✅** |
-| **Audit** | Transversal 2026-08-02 — optimistic submissions ✅ · Deal ACK ✅ · **FEATURE-CHAT-03 ✅** · **FEATURE-DILEMMA-01 ✅** · **FEATURE-TIERNIGHT-01 ✅** · **FEATURE-TIERNIGHT-02 ✅** · **UX-TIERNIGHT-END-01/02 ✅** · **UX-TIERNIGHT-NAV-01 ✅** · **BUG-MP-NAV-01 ✅** QA 2026-08-07 · **ARCH-01/F-01 ✅** QA 2026-08-08 |
+| **Audit** | Transversal 2026-08-02 — optimistic submissions ✅ · Deal ACK ✅ · **FEATURE-CHAT-03 ✅** · **FEATURE-DILEMMA-01 ✅** · **FEATURE-TIERNIGHT-01 ✅** · **FEATURE-TIERNIGHT-02 ✅** · **UX-TIERNIGHT-END-01/02 ✅** · **UX-TIERNIGHT-NAV-01 ✅** · **BUG-MP-NAV-01 ✅** QA 2026-08-07 · **ARCH-01/F-01 ✅** QA 2026-08-08 · **BUG-MP-JOIN-TRANSITION-01 ✅** QA 2026-08-08 |
 
 > ~~« Consensus reveal atomique »~~ — **aucun ticket** à cet intitulé dans l’audit (reliquat probable d’une note type Trivia 01B, jamais formalisé). Ne pas traiter comme chantier ouvert.
 
@@ -51,13 +51,13 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 | 2 | Race auth / profil | ✅ | — |
 | 3 | Sources de vérité multiples | Partiel | **BUG-TIERNIGHT-04 ✅** · **BUG-TRUTHMETER-02 ✅** · **Membership A–E5 ✅** · M-14a ✅ · Guess Lie ✅ · **AUTH-LEAVE-*** ✅ |
 | 4 | Asymétrie hôte / invité | ✅ | — |
-| 5 | Routing + timing sync | ✅ | ARCH-05 mitigé · **UX-NAV-LOBBY ✅** · **BUG-MP-NAV-01 ✅** |
-| 6 | Async écrans | ✅ | **BUG-WAO-02** ✅ · **BUG-WAO-03** ✅ · **BUG-WAO-04** ✅ |
+| 5 | Routing + timing sync | ✅ | ARCH-05 mitigé · **UX-NAV-LOBBY ✅** · **BUG-MP-NAV-01 ✅** · **BUG-MP-JOIN-TRANSITION-01 ✅** |
+| 6 | Async écrans | ✅ | **BUG-WAO-02** ✅ · **BUG-WAO-03** ✅ · **BUG-WAO-04** ✅ · **BUG-MP-JOIN-TRANSITION-01 ✅** |
 | 7 | Sync silencieuse / fire-and-forget | Partiel | **BUG-TRUTHMETER-01 ✅** (01A/01B) · **BUG-TIERNIGHT-03** ✅ · **BUG-TRIVIA-01 ✅** (01A/01B/01B-bis/01C) · ARCH-07 ✅ · M-14b ✅ · ARCH-08 ✅ · **SYN-VOTE-ROLLBACK-01 ✅** · **SYN-TRAITRE-DEALACK-01 ✅** · **BUG-MP-NAV-01 ✅** |
 | 8 | Reset / migration incomplète | Partiel | **BUG-TIERNIGHT-05 ✅** · **OPS-LOBBY-04 ✅** · **BUG-LOBBY-XX-E ✅** · **BUG-TRUTHMETER-02 ✅** · **ARCH-23** · ARCH-10 · **BUG-LOBBY-XX ✅** · I-09/SYN-15/16 ✅ |
 | 9 | Sync monolithe / duplication | Dette | ARCH-11… |
 | 10 | Code mort | ✅ | **FEATURE-VIBECHECK-01 ✅** · **CLEANUP-FILROUGE-01 ✅** (app) · **CLEANUP-FILROUGE-02 ✅** (SQL · post-deploy 2026-08-07) |
-| 11 | Friction UX | Partiel | **UX-DEVICE-01** 🟡 · **FEATURE-TIERNIGHT-01 ✅** · **FEATURE-DILEMMA-01 ✅** · **FEATURE-TIERNIGHT-02 ✅** · **UX-TIERNIGHT-END-01/02 ✅** · **UX-TIERNIGHT-NAV-01 ✅** · **FEATURE-CHAT-03 ✅** · **UX-CHAT-01 ✅** · **UX-CHAT-02 ✅** · **UX-HOST-01 ✅** · **BUG-WAO-04** ✅ · **ARCH-23** · ARCH-22/Loader ✅ · **L-04 ✅** |
+| 11 | Friction UX | Partiel | **UX-DEVICE-01** 🟡 · **FEATURE-TIERNIGHT-01 ✅** · **FEATURE-DILEMMA-01 ✅** · **FEATURE-TIERNIGHT-02 ✅** · **UX-TIERNIGHT-END-01/02 ✅** · **UX-TIERNIGHT-NAV-01 ✅** · **FEATURE-CHAT-03 ✅** · **UX-CHAT-01 ✅** · **UX-CHAT-02 ✅** · **UX-HOST-01 ✅** · **BUG-WAO-04** ✅ · **BUG-MP-JOIN-TRANSITION-01 ✅** · **ARCH-23** · ARCH-22/Loader ✅ · **L-04 ✅** |
 
 ---
 
@@ -184,6 +184,16 @@ Invité ne suivait pas l’hôte sur « Recommencer » / « Changer de mode » (
 | **Livré** | `shouldBlockLateGamePatchAfterPostGame` · `isAdmittedPostGameExitScreen` · `applySeriesClearAndPrepReset` · UI between/end realHost |
 | **Preuve** | `bugMpNav01RestartChangeMode` · suite E/E1 · **QA terrain 2026-08-07** |
 | **Hors scope** | SQL acting-host multi-blob (CAS A) · CLEANUP-FILROUGE-02 innocent |
+
+#### BUG-MP-JOIN-TRANSITION-01 ✅ (clôture QA terrain · 2026-08-08)
+
+Flash Home contradictoire après join invité (membership déjà appliquée pendant `await navigateAfterLobbyJoin`). Fix : état JOINING via `syncPending.token` · paint Home verrouillé (« Connexion au lobby… ») · pas de nav anticipée · hydratation / presence / roster / session inchangés · « Retour au lobby » hors JOINING conservé. **Ne pas rouvrir** sans régression.
+
+| | |
+|--|--|
+| **Livré** | `homeJoinTransition.js` · paint Home JOINING · gardes anti-double action · sticky code |
+| **Preuve** | `bugMpJoinTransition01` · `homeJoinSyncPending` · suite **2570** · **QA terrain CAS A/B/C/D 2026-08-08** |
+| **Hors scope** | `navigateAfterLobbyJoin` / `routeToEveningHub` · SQL · ARCH-01 · SYN-NET-01 |
 
 #### ARCH-10 — Invalidation précoce cache session MP (ouvert · résidu mobile)
 
@@ -462,6 +472,7 @@ Retour terrain multi-jeux. Priorités : 🔴 critique · 🟠 haute · 🟡 moye
 | ~~**UX-TIERNIGHT-NAV-01**~~ | ~~Hiérarchie nav TierNight~~ | ✅ **Clôturé QA terrain 2026-08-04** — retour création → thèmes roster · chevron unique · libellés modes de jeu. Ne pas rouvrir. |
 | ~~**FEATURE-CHAT-03**~~ | ~~Roulette « Jeu aléatoire »~~ | ✅ **Clôturé QA terrain 2026-08-03** — CTA chat · soft voice · bridge sondage · tirage libre + anti-répétition immédiate · TTL hybride · `rouletteId`/`attemptId` · permit launch · sync Realtime · fermeture chat→prep. Ne pas rouvrir. |
 | ~~**BUG-MP-NAV-01**~~ | ~~Invité ne suit pas Recommencer / Changer de mode~~ | ✅ **Clôturé QA terrain 2026-08-07** — garde post-game + destinations admises · CAS A AH · `SCREEN_MISMATCH`. Ne pas rouvrir. |
+| ~~**BUG-MP-JOIN-TRANSITION-01**~~ | ~~Flash Home après join invité~~ | ✅ **Clôturé QA terrain 2026-08-08** — JOINING via `syncPending.token` · pas de Retour/Quitter/formulaire intermédiaires · hydratation conservée · CAS A–D. Ne pas rouvrir. |
 
 ---
 
@@ -479,6 +490,7 @@ Retour terrain multi-jeux. Priorités : 🔴 critique · 🟠 haute · 🟡 moye
 - Ordre actuel : hors lobby `[games, results, logo, final, home]` · en lobby `[games, results, logo, final, settings]`.
 - **Fin membership** (Quitter / Fermer) : `navigate("home", { reset: true })`.
 - **Home monté en lobby** (edge) : chrome `cached_active` (Retour au lobby).
+- **Join en cours (Home)** : JOINING (`syncPending.token`) → statut « Connexion au lobby… » uniquement · pas de Retour/Quitter/formulaire tant que `navigateAfterLobbyJoin` n’a pas terminé (**BUG-MP-JOIN-TRANSITION-01 ✅**).
 - **Join partiel (Home)** : retry compensation avant query · garde anti-restauration silencieuse de B · bandeau conflit si DELETE échoue.
 - **≠ SYN-13b** (sortie *jeu* vs sortie *lobby*).
 
@@ -517,6 +529,7 @@ Ne pas rouvrir sans régression. Détail historique dans git / tests cités.
 
 | ID | Cause | Livré | Preuve / QA |
 |----|-------|-------|-------------|
+| **BUG-MP-JOIN-TRANSITION-01** | 5/6/11 | JOINING Home via `syncPending.token` · pas de flash Retour/Quitter · hydratation join conservée | QA terrain CAS A/B/C/D 2026-08-08 · `bugMpJoinTransition01` · suite 2570 |
 | **ARCH-01 / F-01** | 1 | Fin démo locale · BACKEND_MISSING si config absente · MP Supabase inchangé · aucun PNJ runtime | QA terrain CAS A/B/C 2026-08-08 · `arch01a*` · `arch01b*` · suite 2560 |
 | **BUG-MP-NAV-01** | 5/7 | Sortie post-game TierNight écrite remote · garde late-patch bornée · AH = hôte réel (CAS A) | QA terrain 2026-08-07 · `bugMpNav01RestartChangeMode` |
 | **FEATURE-DILEMMA-01** | 11 | Multi-custom prep · deck customs prioritaires · shuffle global · QA compteur/leave/sync | QA terrain 2026-08-04 · `featureDilemma01*` (61) · SQL `feature-dilemma-01-multi-custom` |
@@ -554,7 +567,7 @@ Ne pas rouvrir sans régression. Détail historique dans git / tests cités.
 | **Join partiel B** | 3/5/8 | Compensation membership orpheline | `lobbyJoinCompensation` · 1097 |
 | **Membership A–D** | 3/11 | Query · chrome · create guard · server leave | VagueA–D tests · 2026-07-27 |
 | **ARCH-22** | 11 | Soft pending sync (API figée) | `syncPending` · HT/Dilemma/GL/Vibe/launch |
-| **Loader UI join** | 5/11 | Soft « Connexion… » Home | `homeJoinSyncPending` · Vague B non retenue |
+| **Loader UI join** | 5/11 | Soft « Connexion… » Home · étendu JOINING (**BUG-MP-JOIN-TRANSITION-01 ✅**) | `homeJoinSyncPending` · `bugMpJoinTransition01` · Vague B interstitiel non retenue |
 | **Pré-résolution entry** | 5 | Garde `get*EntryScreen` avant paint | `prepEntryGuardVagueA` · B1 non retenue |
 | **M-14a / SYN-14** | 3 | TierNight récap `runId` | `tierNightRestartRecap` |
 | **Guess Lie** | 3/4/7/8 | UX vote A/B1 · M-15 non repro · L-05 invalidée | `guessLieVote*` |
@@ -579,13 +592,13 @@ Ne pas rouvrir sans régression. Détail historique dans git / tests cités.
 | 2 | M-01, P-03, M-02a, S-02 |
 | 3 | I-03/04, SYN-03, M-13, M-02b, ARCH-02, SYN-29, I-PG-01, ready stale, UX-CLUTCH-01, M-15, L-05↻, **Membership A–E5**, M-14a, boundary, join partiel, **AUTH-LEAVE-*** |
 | 4 | I-01/02/08, M-03b, M-06a/b, L-01, ARCH-03/03b, UX-VIBE-01, Guess Lie |
-| 5 | T-01/02, T-03↻, M-07/08, P-02, SYN-28, ARCH-04, UX-VIBE-02, pré-résolution entry, **UX-NAV-LOBBY**, **BUG-MP-NAV-01** |
-| 6 | I-05, SYN-13b↻, SYN-25, SYN-05/ARCH-18, ARCH-06 |
+| 5 | T-01/02, T-03↻, M-07/08, P-02, SYN-28, ARCH-04, UX-VIBE-02, pré-résolution entry, **UX-NAV-LOBBY**, **BUG-MP-NAV-01**, **BUG-MP-JOIN-TRANSITION-01** |
+| 6 | I-05, SYN-13b↻, SYN-25, SYN-05/ARCH-18, ARCH-06, **BUG-MP-JOIN-TRANSITION-01** |
 | 7 | I-07, M-09, L-09, M-11, M-10, T-05, SYN-26, M-04b/SYN-18, **ARCH-08**, **ARCH-07** (P0+P1/P2), **M-14b**, **BUG-TRIVIA-01** (01A/01B/01B-bis/01C), **SYN-VOTE-ROLLBACK-01**, **SYN-TRAITRE-DEALACK-01**, **BUG-MP-NAV-01** |
 | 8 | I-06, P-02, ARCH-09, I-09/SYN-06, SYN-15/16, M-15, **BUG-LOBBY-XX ✅** |
 | 9 | SYN-12 / M-05b |
 | 10 | SYN-05 / ARCH-18 · **CLEANUP-FILROUGE-01/02 ✅** |
-| 11 | L-02, ARCH-21↻, M-12, UX-HIST/RESUME/VIBE, POLL, **Membership A–E5**, ARCH-22, Loader join, **UX-NAV-LOBBY**, join partiel, **L-04**, **UX-CHAT-01**, **UX-CHAT-02**, **UX-HOST-01**, **FEATURE-DILEMMA-01** |
+| 11 | L-02, ARCH-21↻, M-12, UX-HIST/RESUME/VIBE, POLL, **Membership A–E5**, ARCH-22, Loader join, **BUG-MP-JOIN-TRANSITION-01**, **UX-NAV-LOBBY**, join partiel, **L-04**, **UX-CHAT-01**, **UX-CHAT-02**, **UX-HOST-01**, **FEATURE-DILEMMA-01** |
 
 ---
 
@@ -605,7 +618,7 @@ Hors file prioritaire — opportunité / régression :
 - Membership **E4** (reporté) : course RPC pure ALREADY_EXISTS · join↔join concurrent · reclaim X/Y · JSON 23505 · e4-03/03b
 - Join partiel : revert RPC reclaim anonymous · orphelin **création** · E2E Supabase
 - Pré-résolution B1 (getter post-mark launch) — étudiée, **non retenue**
-- Loader join interstitiel — **non retenu**
+- Loader join interstitiel dédié — **non retenu** (OPTION A Home JOINING via `syncPending` · **BUG-MP-JOIN-TRANSITION-01 ✅**)
 - ~~Fil Rouge SQL historique~~ → **CLEANUP-FILROUGE-02 ✅** (`fil_rouge_private` DROP · RPC apply/complete/remap nettoyées · post-deploy PASS 2026-08-07) · `stripLegacyFilRougeKeys` conservé (localStorage) · migrations historiques inchangées
 - **ARCH-23** : clients / PWA / cache Pages en retard sur migrations (leçon 01B-bis)
 - Logout snapshot `found` sans cache hydraté (hors AUTH-LEAVE Vague 1)
@@ -615,4 +628,4 @@ Hors file prioritaire — opportunité / régression :
 
 ---
 
-*Suivi vivant · MAJ 2026-08-07 — **CLEANUP-FILROUGE-02 ✅** (QA Supabase) · **FEATURE-TIERNIGHT-01** ✅ · **UX-TIERNIGHT-NAV-01** ✅ · **UX-TIERNIGHT-END-01/02** ✅ · **FEATURE-TIERNIGHT-02** ✅ · prochain produit = **UX-DEVICE-01** · **ARCH-23** / **ARCH-10** QA natif en fin de vague*
+*Suivi vivant · MAJ 2026-08-08 — **BUG-MP-JOIN-TRANSITION-01 ✅** (QA terrain CAS A–D) · **ARCH-01/F-01 ✅** · prochain produit = **UX-DEVICE-01** · **ARCH-23** / **ARCH-10** QA natif en fin de vague*
