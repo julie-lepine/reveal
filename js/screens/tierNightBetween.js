@@ -187,7 +187,8 @@ export function mountTierNightBetween(app) {
   }
 
   async function onChangeMode() {
-    if (!(isLobbyHost() || canActAsHost())) return;
+    // BUG-MP-NAV-01B CAS A : frontière soirée = hôte réel (pas AH).
+    if (isGameSyncActive() && !isLobbyHost()) return;
     await changeTierNightModeFromSeriesPlay({
       shouldContinue: () => mount.isMounted() && mount.isCurrentMount(),
     });
@@ -271,7 +272,7 @@ export function mountTierNightBetween(app) {
 
         <div class="tier-between-actions">
           ${
-            hostOrAh
+            realHost
               ? `<button type="button" class="btn btn-secondary btn--spaced" id="btn-tiernight-change-mode">Changer de mode</button>`
               : ""
           }

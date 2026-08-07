@@ -4187,10 +4187,55 @@ function isEveningScoresOnlyMerge(stateMerge) {
   return keys.every((k) => EVENING_STATE_KEYS.has(k));
 }
 
-/** Patch concurrent (votes / réponses) : toujours relire le blob serveur avant merge. */
-function isLateGamePatchAfterPostGame(row, stateMerge = {}) {
+/**
+ * Destinations admises pour quitter un écran post-partie via patch play.
+ * Ne PAS élargir à tout `!POST_GAME` : une string arbitraire ne doit pas
+ * désarmer la garde late-play (BUG-MP-NAV-01B).
+ */
+export function isAdmittedPostGameExitScreen(screen) {
+  if (!screen || typeof screen !== "string") return false;
+  if (POST_GAME_SCREENS.has(screen)) return false;
+  if (GAME_SETUP_SCREENS.has(screen)) return true;
+  if (screen === "game-select") return true;
+  return false;
+}
+
+/**
+ * Patch concurrent (votes / réponses) après post-partie : refuse de réouvrir le blob play.
+ *
+ * BUG-MP-NAV-01 / 01B :
+ * block = post-game courant
+ *   ET patch contient du play
+ *   ET aucune transition vers une destination ADMISE hors post-game
+ *
+ * Autoriser seulement GAME_SETUP_SCREENS | game-select (pas « n’importe quelle string »).
+ *
+ * @param {{ screen?: string|null }|null} row
+ * @param {object} [stateMerge]
+ * @param {string|null} [screen] cible demandée par le patch
+ */
+export function shouldBlockLateGamePatchAfterPostGame(
+  row,
+  stateMerge = {},
+  screen = null
+) {
   if (!row || !POST_GAME_SCREENS.has(row.screen)) return false;
-  return Object.keys(stateMerge || {}).some((key) => GAME_PLAY_STATE_KEYS.has(key));
+  const hasLatePlay = Object.keys(stateMerge || {}).some((key) =>
+    GAME_PLAY_STATE_KEYS.has(key)
+  );
+  if (!hasLatePlay) return false;
+  if (
+    isAdmittedPostGameExitScreen(screen) &&
+    screen !== row.screen
+  ) {
+    return false;
+  }
+  return true;
+}
+
+/** @deprecated alias interne — préférer shouldBlockLateGamePatchAfterPostGame */
+function isLateGamePatchAfterPostGame(row, stateMerge = {}, screen = null) {
+  return shouldBlockLateGamePatchAfterPostGame(row, stateMerge, screen);
 }
 
 function isStaleTierNightEndPatch(row, stateMerge = {}, screen = null) {
@@ -4741,7 +4786,7 @@ async function patchGameStateInner(
     lastSessionSig = sessionSignature(freshRow);
   }
 
-  if (isLateGamePatchAfterPostGame(freshRow, mergePayload)) {
+  if (isLateGamePatchAfterPostGame(freshRow, mergePayload, screen)) {
     applyRemoteSession(freshRow);
     return freshRow;
   }

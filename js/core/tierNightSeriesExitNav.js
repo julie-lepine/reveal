@@ -17,7 +17,6 @@ import { navigate, getNavStack } from "./router.js";
 import { buildAuthoritativeTierNightPrepReset } from "./tierNightSeriesPrepContracts.js";
 import { isTierNightSeriesUiEnabled } from "./tierNightSeriesGate.js";
 import {
-  canActAsHost,
   isGameSyncActive,
   isLobbyHost,
   patchGameState,
@@ -76,6 +75,8 @@ export function buildClearedTierNightSeriesRemote({ mode = "roster" } = {}) {
     placements: {},
     finished: {},
     game: null,
+    // BUG-MP-NAV-01 : nullifier le récap distant (sinon canRouteToTierNightEnd
+    // peut encore préférer l’écran end après clear série / change mode).
     recap: null,
     items: null,
     playerRoster: null,
@@ -208,10 +209,18 @@ export function shouldReplayTierNightSeriesToPrep({
   return false;
 }
 
-/** Change mode / replay : hôte ou acting host. */
+/**
+ * Change mode / replay série : hôte réel uniquement (BUG-MP-NAV-01B CAS A).
+ *
+ * Pourquoi pas acting host :
+ * - clear customs distant = RPC hôte réel ;
+ * - mutation = `tierNight` + `tierNightPrep` (update hôte ; AH = 1 jeu / screens play) ;
+ * - même famille que quit / `eveningRecapRestartButtonHtml` (frontière soirée).
+ * AH conserve « Thème suivant » (`canHostSeriesCommit`).
+ */
 export function canAuthorSeriesExit() {
   if (!isGameSyncActive()) return true;
-  return isLobbyHost() || canActAsHost();
+  return isLobbyHost();
 }
 
 /**
@@ -292,7 +301,7 @@ async function applySeriesClearAndPrepReset({ screen, shouldContinue }) {
   }
 
   try {
-    await patchGameState(remote.stateMerge, remote.patchOpts);
+    const row = await patchGameState(remote.stateMerge, remote.patchOpts);
     if (!canContinue()) {
       // Succès serveur déjà appliqué localement — pas de rollback d’un état plus récent.
       return {
@@ -303,7 +312,23 @@ async function applySeriesClearAndPrepReset({ screen, shouldContinue }) {
         networkCalls: 1,
       };
     }
-    return { ok: true, previousPatch, prepReset, networkCalls: 1 };
+    // BUG-MP-NAV-01 / 01B : confirmation screen serveur (update sélectionne `screen`).
+    // Pas de nav locale si row absente, screen manquant, ou screen ≠ cible.
+    const remoteScreen = row?.screen ?? null;
+    if (!row || remoteScreen !== screen) {
+      saveStatePatch(previousPatch);
+      return {
+        ok: false,
+        code: "SCREEN_MISMATCH",
+        error:
+          "La session distante n’a pas basculé. Réessaie ou demande à l’hôte de relancer.",
+        previousPatch,
+        rolledBack: true,
+        networkCalls: 1,
+        remoteScreen,
+      };
+    }
+    return { ok: true, previousPatch, prepReset, networkCalls: 1, row };
   } catch (err) {
     // Timeout / réseau : le serveur a pu réussir — reconcile avant rollback.
     try {

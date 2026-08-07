@@ -297,17 +297,20 @@ describe("FEATURE-TIERNIGHT-03-E1 - autorité / stale / consumed / ready", () =>
   it("9. invité : handlers protégés + mutation NOT_HOST", () => {
     const between = read("js/screens/tierNightBetween.js");
     assert.match(between, /onNextTheme[\s\S]*isLobbyHost\(\) \|\| canActAsHost\(\)/);
-    assert.match(between, /onChangeMode[\s\S]*isLobbyHost\(\) \|\| canActAsHost\(\)/);
+    assert.match(between, /onChangeMode[\s\S]*!isLobbyHost\(\)\) return/);
     assert.match(between, /onQuit[\s\S]*!isLobbyHost\(\)\) return/);
     const end = read("js/screens/tierNightEnd.js");
     assert.match(end, /onQuit[\s\S]*!isLobbyHost\(\)\) return/);
+    assert.match(end, /onChangeMode[\s\S]*!isLobbyHost\(\)\) return/);
     assert.equal(typeof canAuthorSeriesExit, "function");
     assert.equal(typeof canAuthorSeriesQuit, "function");
   });
 
-  it("10. acting host : change/replay/next oui ; quit non", () => {
+  it("10. acting host : next oui ; change/replay/quit non (CAS A soirée)", () => {
     const exit = read("js/core/tierNightSeriesExitNav.js");
-    assert.match(exit, /canAuthorSeriesExit[\s\S]*canActAsHost/);
+    const exitAuthor = exit.match(/export function canAuthorSeriesExit[\s\S]*?^\}/m)?.[0] || "";
+    assert.match(exitAuthor, /isLobbyHost\(\)/);
+    assert.doesNotMatch(exitAuthor, /canActAsHost/);
     assert.match(exit, /canAuthorSeriesQuit[\s\S]*isLobbyHost\(\)/);
     assert.doesNotMatch(
       exit.match(/export function canAuthorSeriesQuit[\s\S]*?^\}/m)?.[0] || "",
@@ -315,6 +318,13 @@ describe("FEATURE-TIERNIGHT-03-E1 - autorité / stale / consumed / ready", () =>
     );
     const play = read("js/core/tierNightSeriesPlaySession.js");
     assert.match(play, /canHostSeriesCommit[\s\S]*canActAsHost/);
+    const between = read("js/screens/tierNightBetween.js");
+    assert.match(between, /onNextTheme[\s\S]*isLobbyHost\(\) \|\| canActAsHost\(\)/);
+    assert.match(between, /onChangeMode[\s\S]*!isLobbyHost\(\)\) return/);
+    assert.match(between, /realHost[\s\S]*btn-tiernight-change-mode/);
+    const end = read("js/screens/tierNightEnd.js");
+    assert.match(end, /onChangeMode[\s\S]*!isLobbyHost\(\)\) return/);
+    assert.match(end, /realHost[\s\S]*btn-tiernight-end-change-mode/);
   });
 
   it("11. callback stale n’écrase pas un état plus récent (pas de rollback après succès)", () => {

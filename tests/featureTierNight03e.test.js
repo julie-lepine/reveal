@@ -76,8 +76,8 @@ describe("FEATURE-TIERNIGHT-03-E - between / end CTA (source)", () => {
     assert.match(src, /En attente de l’hôte/);
     assert.match(src, /hostOrAh/);
     assert.match(src, /realHost/);
-    // Change mode derrière hostOrAh ; quit derrière realHost uniquement
-    assert.match(src, /hostOrAh\s*\?\s*`[\s\S]*?btn-tiernight-change-mode/);
+    // Change mode + quit : hôte réel (CAS A) ; next : hostOrAh
+    assert.match(src, /realHost\s*\?\s*`[\s\S]*?btn-tiernight-change-mode/);
     assert.match(src, /realHost\s*\?\s*`[\s\S]*?btn-tiernight-quit-series/);
   });
 

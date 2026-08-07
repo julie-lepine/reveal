@@ -215,7 +215,8 @@ export function mountTierNightEnd(app) {
   }
 
   async function onChangeMode() {
-    if (isGameSyncActive() && !(isLobbyHost() || canActAsHost())) return;
+    // BUG-MP-NAV-01B CAS A : frontière soirée = hôte réel (pas AH).
+    if (isGameSyncActive() && !isLobbyHost()) return;
     await changeTierNightModeFromSeriesPlay({
       shouldContinue: () => mount.isMounted() && mount.isCurrentMount(),
     });
@@ -342,7 +343,6 @@ export function mountTierNightEnd(app) {
     const localBreakdown = getTierNightScoreBreakdownForPlayer(localName, session);
     const series = getState().tierNightGame?.series || getCachedGameSession()?.state?.tierNight?.series;
     const isSeriesEnd = series?.phase === "series_end";
-    const hostOrAh = !isGameSyncActive() || isLobbyHost() || canActAsHost();
     const realHost = !isGameSyncActive() || isLobbyHost();
     const history = Array.isArray(series?.roundHistory) ? series.roundHistory : [];
     const seriesHistoryHtml =
@@ -394,7 +394,7 @@ export function mountTierNightEnd(app) {
         </div>
         ${gameCumulativeScoresHtml({ gameId: "tiernight", gameLabel: "Tier Night", title: "Cumul des scores" })}
         ${
-          hostOrAh
+          realHost
             ? `${eveningRecapRestartButtonHtml({ gameId: "tiernight", title: "TierNight" })}
         <button type="button" class="btn btn-secondary btn--spaced" id="btn-tiernight-end-change-mode">Changer de mode</button>`
             : isSeriesEnd
@@ -424,7 +424,7 @@ export function mountTierNightEnd(app) {
     } else {
       bindNav(app, { results: goToResults });
     }
-    if (hostOrAh) {
+    if (realHost) {
       bindRestartGameButtons(app);
       const changeBtn = app.querySelector("#btn-tiernight-end-change-mode");
       if (changeBtn) {
