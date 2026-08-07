@@ -37,7 +37,7 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 
 ### Dette / opportunité
 
-| ID | Cause | Problème | Priorité |
+| ID | Cause | Problème | Priorité | 
 |----|-------|----------|----------|
 | **ARCH-05** | 5 | Route lobby vs session (`row.screen`) | 🟡 mitigé SYN-28 |
 | **ARCH-01 / F-01** | 1 | Démo offline sans avertissement MP | 🟡 partiel |
