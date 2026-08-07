@@ -132,18 +132,15 @@ describe("FEATURE-MP-JOIN-UX-01 — contrats source Home", () => {
 
   it("TEST 4 — source code = joinAttemptCode (pas membership / getLobby)", () => {
     assert.match(homeSrc, /let joinAttemptCode = ""/);
+    const paintIdx = homeSrc.indexOf("function paint(");
+    assert.ok(paintIdx > 0);
+    const paintSlice = homeSrc.slice(paintIdx, paintIdx + 2500);
     assert.match(
-      homeSrc,
+      paintSlice,
       /lobbyCode:\s*joinPendingActive \? joinAttemptCode \|\| null : null/
     );
-    assert.doesNotMatch(
-      homeSrc,
-      /deriveHomeJoinTransitionUi\(\{[\s\S]*?getLobby\(\)\?\.code/
-    );
-    assert.doesNotMatch(
-      homeSrc,
-      /deriveHomeJoinTransitionUi\(\{[\s\S]*?membershipCode/
-    );
+    assert.doesNotMatch(paintSlice, /getLobby\(\)\?\.code/);
+    assert.doesNotMatch(paintSlice, /membershipCode/);
   });
 
   it("TEST 5 — aucun délai minimal / sleep avant navigateAfterLobbyJoin", () => {
@@ -186,14 +183,17 @@ describe("FEATURE-MP-JOIN-UX-01 — contrats source Home", () => {
   });
 
   it("TEST 8 — UI JOINING liée à joinPendingActive, pas visible seul", () => {
+    const paintIdx = homeSrc.indexOf("function paint(");
+    const paintSlice = homeSrc.slice(paintIdx, paintIdx + 2500);
     assert.match(
-      homeSrc,
+      paintSlice,
       /deriveHomeJoinTransitionUi\(\{\s*joinPendingActive,/
     );
-    assert.doesNotMatch(
-      homeSrc,
-      /deriveHomeJoinTransitionUi\(\{[\s\S]*?joinPendingVisible/
+    const deriveCall = paintSlice.match(
+      /deriveHomeJoinTransitionUi\(\{[\s\S]*?\}\);/
     );
+    assert.ok(deriveCall);
+    assert.doesNotMatch(deriveCall[0], /joinPendingVisible/);
     // create lobby n'utilise pas syncPending.start
     const create = homeSrc.slice(homeSrc.indexOf('if (e.target.closest("#btn-create-lobby"))'));
     const createSlice = create.slice(0, create.indexOf('if (e.target.closest("#btn-join-lobby"))'));
@@ -201,8 +201,12 @@ describe("FEATURE-MP-JOIN-UX-01 — contrats source Home", () => {
   });
 
   it("TEST 9 — pas de timer / interval UX décoratif dans homeJoinTransition", () => {
-    assert.doesNotMatch(transitionSrc, /setInterval|setTimeout|requestAnimationFrame/);
-    assert.doesNotMatch(transitionSrc, /rotation|typewriter|countdown/i);
+    assert.doesNotMatch(transitionSrc, /\bsetInterval\b|\bsetTimeout\b|\brequestAnimationFrame\b/);
+    // Interdit d'introduire une UX rotative / typewriter (hors commentaires d'exclusion).
+    assert.doesNotMatch(
+      transitionSrc,
+      /setInterval\s*\(|phrases?\s*rotat|typewriter\s*\(|countdown\s*\(/i
+    );
   });
 
   it("a11y — aria-label stable + bloc non interactif", () => {

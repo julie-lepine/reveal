@@ -959,9 +959,7 @@ export function mountHome(app) {
           </div>
           ${
             joinUi.active
-              ? `<div class="card auth-form auth-form--guest">${homeJoinPendingStatusHtml(
-                  joinUi
-                )}</div>`
+              ? homeJoinPendingStatusHtml(joinUi)
               : guestJoinPanelHtml({
                   leaveHint: activeLobby,
                   error: guestJoinError,
