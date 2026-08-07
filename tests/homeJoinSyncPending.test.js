@@ -33,7 +33,7 @@ describe("Loader UI Join Vague A - contrats source Home", () => {
     );
   });
 
-  it("paint : libellé « Connexion… » seulement si getState().visible", () => {
+  it("paint : libellé « Connexion… » si visible OU active (JOINING)", () => {
     assert.match(
       src,
       /const joinPendingVisible = syncPending\.getState\(\)\.visible/
@@ -44,15 +44,12 @@ describe("Loader UI Join Vague A - contrats source Home", () => {
     );
     assert.match(
       src,
-      /const joinLobbyLabel = joinPendingVisible \? "Connexion…" : "Rejoindre"/
+      /const joinLobbyLabel = joinPendingVisible \|\| joinPendingActive \? "Connexion…" : "Rejoindre"/
     );
     assert.match(
       src,
-      /const guestJoinLabel = joinPendingVisible\s*\?\s*"Connexion…"\s*:\s*"Rejoindre la partie →"/
+      /const guestJoinLabel =\s*joinPendingVisible \|\| joinPendingActive\s*\?\s*"Connexion…"\s*:\s*"Rejoindre la partie →"/
     );
-    assert.match(src, /id="btn-join-lobby"\$\{joinDisabledAttr\}>\$\{escapeHtml\(joinLobbyLabel\)\}/);
-    assert.match(src, /id="btn-guest-join"\$\{joinDisabledAttr\}>\$\{escapeHtml\(guestJoinLabel\)\}/);
-    assert.match(src, /joinLabel: guestJoinLabel/);
     assert.match(src, /joinDisabled: joinPendingActive/);
   });
 

@@ -18,8 +18,8 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 |--|--|
 | **Maintenant** | **UX-DEVICE-01** (dernier ticket produit convenu) |
 | **En fin de vague** | **ARCH-23** / **ARCH-10** QA natif — **après** clôture produit (code + SQL déjà livrés · QA différée deploy Capacitor) |
-| **Dette** | ARCH-05 · ARCH-01/F-01 · ARCH-11–17 / SYN-19–24 / SYN-27 · VibeCheck ✅ · **CLEANUP-FILROUGE-01/02 ✅** |
-| **Audit** | Transversal 2026-08-02 — optimistic submissions ✅ · Deal ACK ✅ · **FEATURE-CHAT-03 ✅** · **FEATURE-DILEMMA-01 ✅** · **FEATURE-TIERNIGHT-01 ✅** · **FEATURE-TIERNIGHT-02 ✅** · **UX-TIERNIGHT-END-01/02 ✅** · **UX-TIERNIGHT-NAV-01 ✅** · **BUG-MP-NAV-01 ✅** QA 2026-08-07 |
+| **Dette** | ARCH-05 · ARCH-11–17 / SYN-19–24 / SYN-27 · VibeCheck ✅ · **CLEANUP-FILROUGE-01/02 ✅** · **ARCH-01/F-01 ✅** |
+| **Audit** | Transversal 2026-08-02 — optimistic submissions ✅ · Deal ACK ✅ · **FEATURE-CHAT-03 ✅** · **FEATURE-DILEMMA-01 ✅** · **FEATURE-TIERNIGHT-01 ✅** · **FEATURE-TIERNIGHT-02 ✅** · **UX-TIERNIGHT-END-01/02 ✅** · **UX-TIERNIGHT-NAV-01 ✅** · **BUG-MP-NAV-01 ✅** QA 2026-08-07 · **ARCH-01/F-01 ✅** QA 2026-08-08 |
 
 > ~~« Consensus reveal atomique »~~ — **aucun ticket** à cet intitulé dans l’audit (reliquat probable d’une note type Trivia 01B, jamais formalisé). Ne pas traiter comme chantier ouvert.
 
@@ -40,7 +40,6 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 | ID | Cause | Problème | Priorité | 
 |----|-------|----------|----------|
 | **ARCH-05** | 5 | Route lobby vs session (`row.screen`) | 🟡 mitigé SYN-28 |
-| **ARCH-01 / F-01** | 1 | Démo offline sans avertissement MP | 🟡 **01A** QA ✅ · **01B** livré · ouvert (QA finale) |
 | **ARCH-11–17, SYN-19–24, SYN-27** | 9–10 | Monolithe / dup / code mort | Dette |
 
 
@@ -48,7 +47,7 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 
 | # | Cause | État | Ouvert notable |
 |---|-------|------|----------------|
-| 1 | Identité invité / JWT | ✅ | ARCH-01 partiel · **AUTH-LEAVE-*** ✅ |
+| 1 | Identité invité / JWT | ✅ | **ARCH-01/F-01 ✅** · **AUTH-LEAVE-*** ✅ |
 | 2 | Race auth / profil | ✅ | — |
 | 3 | Sources de vérité multiples | Partiel | **BUG-TIERNIGHT-04 ✅** · **BUG-TRUTHMETER-02 ✅** · **Membership A–E5 ✅** · M-14a ✅ · Guess Lie ✅ · **AUTH-LEAVE-*** ✅ |
 | 4 | Asymétrie hôte / invité | ✅ | — |
@@ -163,7 +162,18 @@ Hors scope volontaire (autres causes) : rollback votes dilemma/speedVote/truthMe
 | **ARCH-23** | Version cliente vs attendue · refresh forcé | 🟡 ouvert — post-mortem 01B-bis |
 | **ARCH-05** | `row.screen` en retard vs lobby | 🟡 mitigé ; hors scope routing |
 | **ARCH-10** | Cache session clear trop tard au leave | 🟢 QA Pages ✅ · mobile → QA finale |
-| **ARCH-01** | Démo locale sans avertissement MP | 🟡 **01A** QA ✅ · **01B** cleanup livré · **ouvert** (QA finale) |
+| ~~**ARCH-01**~~ | ~~Démo locale sans avertissement MP~~ | ✅ **Clôturé QA 2026-08-08** — 01A gate + 01B cleanup |
+
+#### ARCH-01 / F-01 ✅ (clôture QA terrain · 2026-08-08)
+
+Ancien mode produit « Démo locale » (auth locale, faux lobby, PNJ, `openLobbies`) retiré. Contrat : `!isSupabaseConfigured()` → `BACKEND_MISSING` uniquement ; vrai multijoueur Supabase inchangé. **Ne pas rouvrir** sans régression.
+
+| | |
+|--|--|
+| **Livré** | Gate boot `BACKEND_MISSING` (01A) · suppression authCredentials / demoPlayers / openLobbies / create-join local / PNJ (01B) · `getActivePlayers()` hors lobby → `[]` |
+| **Preuve** | `arch01aBackendMissing` · `arch01bDemoCleanup` · suite 2560 · **QA terrain CAS A/B/C 2026-08-08** |
+| **Hors scope** | SYN-NET-01 · campagne `!isGameSyncActive` · SQL |
+| **Dette mineure** | `clearLocalOpenLobbySlot` no-op conservé pour deps leave/tests |
 
 #### BUG-MP-NAV-01 ✅ (clôture QA terrain · 2026-08-07)
 
@@ -507,6 +517,7 @@ Ne pas rouvrir sans régression. Détail historique dans git / tests cités.
 
 | ID | Cause | Livré | Preuve / QA |
 |----|-------|-------|-------------|
+| **ARCH-01 / F-01** | 1 | Fin démo locale · BACKEND_MISSING si config absente · MP Supabase inchangé · aucun PNJ runtime | QA terrain CAS A/B/C 2026-08-08 · `arch01a*` · `arch01b*` · suite 2560 |
 | **BUG-MP-NAV-01** | 5/7 | Sortie post-game TierNight écrite remote · garde late-patch bornée · AH = hôte réel (CAS A) | QA terrain 2026-08-07 · `bugMpNav01RestartChangeMode` |
 | **FEATURE-DILEMMA-01** | 11 | Multi-custom prep · deck customs prioritaires · shuffle global · QA compteur/leave/sync | QA terrain 2026-08-04 · `featureDilemma01*` (61) · SQL `feature-dilemma-01-multi-custom` |
 | **SYN-TRAITRE-DEALACK-01** | 7 | Rollback Deal ACK · `optimisticMapEntry` · catch UI terminal | QA terrain 2026-08-03 · `synTraitreDealAck01` |

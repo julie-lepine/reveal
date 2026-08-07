@@ -99,6 +99,7 @@ import {
 } from "../core/turnstile.js";
 import { createMountGuard } from "../core/mountLifecycle.js";
 import { createSyncPending } from "../core/syncPending.js";
+import { deriveHomeJoinTransitionUi } from "../core/homeJoinTransition.js";
 
 function syncForgotPasswordButton(root) {
   const btn = root.querySelector("#btn-forgot-password");
@@ -213,8 +214,10 @@ function guestJoinPanelHtml({
   emoji = DEFAULT_GUEST_EMOJI,
   joinLabel = "Rejoindre la partie →",
   joinDisabled = false,
+  nameValue = "",
+  codeValue = "",
 } = {}) {
-  const defaultCode = guestRejoinDefaultCode();
+  const defaultCode = codeValue || guestRejoinDefaultCode();
   const disabledAttr = joinDisabled ? " disabled" : "";
   return `
     <div class="card auth-form auth-form--guest auth-form--guest-rejoin">
@@ -228,7 +231,7 @@ function guestJoinPanelHtml({
         codeId: "guest-rejoin-code",
         emojiBtnId: "guest-rejoin-emoji-btn",
         emoji,
-        nameValue: getUser()?.name || "",
+        nameValue: nameValue || getUser()?.name || "",
         codeValue: defaultCode,
       })}
       <div id="guest-rejoin-turnstile" class="auth-turnstile-wrap"></div>
@@ -298,6 +301,13 @@ function homeRenderSnapshot(
     joinPendingActive: Boolean(joinPendingActive),
     recap: hasActiveLobby() ? getEveningRecap().participantCount : 0,
   });
+}
+
+/** Statut unique pendant JOINING (pas de Retour/Quitter + formulaire simultanés). */
+function homeJoinPendingStatusHtml(message) {
+  return `<p class="hint home-join-pending" role="status">${escapeHtml(
+    message || "Connexion au lobby…"
+  )}</p>`;
 }
 
 function homeMembershipActionsHtml(chrome) {
@@ -428,6 +438,9 @@ export function mountHome(app) {
   let selectedGuestEmoji = normalizeGuestEmoji(
     isGuest() ? getLocalEmoji() : DEFAULT_GUEST_EMOJI
   );
+  /** Code saisi conservé pendant JOINING (input retiré du paint). */
+  let stickyJoinCode = "";
+  let stickyGuestName = "";
 
   /** Résolution membership serveur en cours (chrome `checking` si pas de found). */
   let resolutionInProgress =
@@ -836,21 +849,40 @@ export function mountHome(app) {
     const user = getUser();
     const loggedIn = isLoggedIn();
     const guest = isGuest();
-    const membershipActionsHtml = homeMembershipActionsHtml(chrome);
-    const activeLobby = chrome.state === "cached_active";
-    const canStartNewLobby = Boolean(chrome.createEnabled) && canCreateLobby();
-    const createLobbyDisabledReason =
-      chrome.createDisabledReason ||
-      "Quitte le lobby actuel avant d'en créer un nouveau.";
-    const createLobbyLabel =
-      chrome.state === "post_leave_transition" ? "Finalisation…" : "Créer un lobby";
     const joinPendingVisible = syncPending.getState().visible;
     const joinPendingActive = syncPending.getState().token != null;
-    const joinLobbyLabel = joinPendingVisible ? "Connexion…" : "Rejoindre";
-    const guestJoinLabel = joinPendingVisible
-      ? "Connexion…"
-      : "Rejoindre la partie →";
+    const joinUi = deriveHomeJoinTransitionUi({
+      joinPendingActive,
+      lobbyCode:
+        getLobby()?.code ||
+        chrome?.membershipCode ||
+        app.querySelector("#join-code")?.value ||
+        app.querySelector("#guest-code")?.value ||
+        app.querySelector("#guest-rejoin-code")?.value ||
+        null,
+    });
+    const membershipActionsHtml = joinUi.suppressMembershipActions
+      ? homeJoinPendingStatusHtml(joinUi.statusMessage)
+      : homeMembershipActionsHtml(chrome);
+    const activeLobby = chrome.state === "cached_active";
+    const canStartNewLobby =
+      !joinUi.suppressLobbyControls &&
+      Boolean(chrome.createEnabled) &&
+      canCreateLobby();
+    const createLobbyDisabledReason = joinUi.active
+      ? "Connexion au lobby en cours…"
+      : chrome.createDisabledReason ||
+        "Quitte le lobby actuel avant d'en créer un nouveau.";
+    const createLobbyLabel =
+      chrome.state === "post_leave_transition" ? "Finalisation…" : "Créer un lobby";
+    // Soft delay : libellé « Connexion… » ; lock UI via joinPendingActive dès start().
+    const joinLobbyLabel = joinPendingVisible || joinPendingActive ? "Connexion…" : "Rejoindre";
+    const guestJoinLabel =
+      joinPendingVisible || joinPendingActive
+        ? "Connexion…"
+        : "Rejoindre la partie →";
     const joinDisabledAttr = joinPendingActive ? " disabled" : "";
+    const showLoggedInLobbyControls = loggedIn && !joinUi.suppressLobbyControls;
 
     app.innerHTML = pageShell({
       back: false,
@@ -879,13 +911,21 @@ export function mountHome(app) {
               <button type="button" class="btn-link" id="btn-logout">Quitter la session</button>
             </div>
           </div>
-          ${guestJoinPanelHtml({
-            leaveHint: activeLobby,
-            error: guestJoinError,
-            emoji: selectedGuestEmoji,
-            joinLabel: guestJoinLabel,
-            joinDisabled: joinPendingActive,
-          })}`
+          ${
+            joinUi.active
+              ? `<div class="card auth-form auth-form--guest">${homeJoinPendingStatusHtml(
+                  joinUi.statusMessage
+                )}</div>`
+              : guestJoinPanelHtml({
+                  leaveHint: activeLobby,
+                  error: guestJoinError,
+                  emoji: selectedGuestEmoji,
+                  joinLabel: guestJoinLabel,
+                  joinDisabled: joinPendingActive,
+                  nameValue: stickyGuestName,
+                  codeValue: stickyJoinCode,
+                })
+          }`
               : `
           <div class="auth-tabs">
             <button type="button" class="auth-tab ${authTab === "login" ? "auth-tab--active" : ""}" data-tab="login">Connexion</button>
@@ -923,23 +963,31 @@ export function mountHome(app) {
               <button type="button" class="btn btn-primary btn--spaced" id="btn-signup"${isTurnstileRequired() ? " disabled" : ""}>Créer mon compte</button>
             </div>
             <div id="auth-panel-guest" class="${authTab === "guest" ? "" : "hidden"}">
+              ${
+                joinUi.active
+                  ? homeJoinPendingStatusHtml(joinUi.statusMessage)
+                  : `
               <p class="hint auth-form__guest-intro">Rejoins avec un code ou un lien d'invitation de l'hôte. Pas de compte requis - les invités ne peuvent pas créer de lobby.</p>
               ${guestJoinFieldsHtml({
                 nameId: "guest-name",
                 codeId: "guest-code",
                 emojiBtnId: "guest-emoji-btn",
                 emoji: selectedGuestEmoji,
+                nameValue: stickyGuestName || getUser()?.name || "",
+                codeValue: stickyJoinCode,
               })}
               <div id="guest-turnstile" class="auth-turnstile-wrap"></div>
               ${guestJoinErrorHtml("guest-error", guestJoinError)}
               <button type="button" class="btn btn-primary btn--spaced" id="btn-guest-join"${joinDisabledAttr}>${escapeHtml(guestJoinLabel)}</button>
+              `
+              }
             </div>
           </div>
           `
         }
 
         ${
-          loggedIn && !membershipActionsHtml
+          loggedIn && !membershipActionsHtml && !joinUi.active
             ? `<p class="hint auth-form__guest-intro lobby-actions__intro">Prêt·e pour la soirée ? Crée un lobby pour inviter tes amis, ou entre un code pour rejoindre une partie.</p>`
             : ""
         }
@@ -947,17 +995,17 @@ export function mountHome(app) {
         <div class="lobby-actions">
           ${membershipActionsHtml}
           ${
-            loggedIn
+            showLoggedInLobbyControls
               ? canStartNewLobby
                 ? `<button type="button" class="btn btn-primary" id="btn-create-lobby">${escapeHtml(createLobbyLabel)}</button>`
                 : `<button type="button" class="btn btn-primary" id="btn-create-lobby" disabled aria-disabled="true" title="${escapeHtml(createLobbyDisabledReason)}">${escapeHtml(createLobbyLabel)}</button>`
               : ""
           }
           ${
-            loggedIn
+            showLoggedInLobbyControls
               ? `
           <div class="join-row">
-            <input type="text" class="field-input join-input" id="join-code" placeholder="Code d'invitation" maxlength="8" />
+            <input type="text" class="field-input join-input" id="join-code" placeholder="Code d'invitation" maxlength="8" value="${escapeHtml(stickyJoinCode)}" />
             <button type="button" class="btn btn-secondary join-btn" id="btn-join-lobby"${joinDisabledAttr}>${escapeHtml(joinLobbyLabel)}</button>
           </div>`
               : ""
@@ -1154,6 +1202,7 @@ export function mountHome(app) {
     }
 
     if (e.target.closest("#btn-return-lobby")) {
+      if (syncPending.getState().token != null) return;
       const btn = e.target.closest("#btn-return-lobby");
       btn.disabled = true;
       try {
@@ -1259,8 +1308,10 @@ export function mountHome(app) {
     }
 
     if (e.target.closest("#btn-pending-join-remote")) {
+      if (syncPending.getState().token != null) return;
       const btn = e.target.closest("#btn-pending-join-remote");
       btn.disabled = true;
+      const pendingToken = syncPending.start();
       try {
         const code =
           membershipReconciliationConflict?.remoteCode ||
@@ -1290,6 +1341,7 @@ export function mountHome(app) {
         membershipReconciliationConflict = null;
         await navigateAfterLobbyJoin(joinRes.code);
       } finally {
+        syncPending.end(pendingToken);
         if (btn?.isConnected) btn.disabled = false;
       }
       return;
@@ -1416,6 +1468,7 @@ export function mountHome(app) {
     }
 
     if (e.target.closest("#btn-leave-lobby")) {
+      if (syncPending.getState().token != null) return;
       const btn = e.target.closest("#btn-leave-lobby");
       btn.disabled = true;
       const res = await confirmAndLeaveLobby();
@@ -1436,6 +1489,7 @@ export function mountHome(app) {
       const btn = e.target.closest("#btn-create-lobby");
       // DOM disabled / chrome / canCreateLobby : triple garde synchrone.
       if (btn?.disabled || btn?.getAttribute("aria-disabled") === "true") return;
+      if (syncPending.getState().token != null) return;
       if (!currentMembershipChrome().createEnabled || !canCreateLobby()) return;
       if (createLobbyInFlight) return;
       createLobbyInFlight = true;
@@ -1485,11 +1539,13 @@ export function mountHome(app) {
 
     if (e.target.closest("#btn-join-lobby")) {
       if (!isLoggedIn()) return;
+      if (syncPending.getState().token != null) return;
       const btn = e.target.closest("#btn-join-lobby");
+      stickyJoinCode = String(app.querySelector("#join-code")?.value || "").trim();
       btn.disabled = true;
       const pendingToken = syncPending.start();
       try {
-        const res = await joinLobby(app.querySelector("#join-code")?.value);
+        const res = await joinLobby(stickyJoinCode || app.querySelector("#join-code")?.value);
         if (!res.ok) {
           const joinErrorMessage =
             res.code === "display_name_taken"
@@ -1512,8 +1568,11 @@ export function mountHome(app) {
     }
 
     if (e.target.closest("#btn-guest-join") || e.target.closest("#btn-guest-rejoin")) {
+      if (syncPending.getState().token != null) return;
       const { nameEl, codeEl, errEl } = readGuestJoinFields();
       const btn = e.target.closest("#btn-guest-join, #btn-guest-rejoin");
+      stickyGuestName = String(nameEl?.value || "").trim();
+      stickyJoinCode = String(codeEl?.value || "").trim();
 
       const liveUserId = await getLiveSupabaseUserId();
       if (isTurnstileRequired() && !liveUserId && !isTurnstileSolved("guest")) {
@@ -1534,8 +1593,8 @@ export function mountHome(app) {
         const captchaToken =
           isTurnstileRequired() && isTurnstileSolved("guest") ? getTurnstileToken("guest") : null;
         const res = await joinLobbyAsGuest(
-          codeEl?.value,
-          nameEl?.value,
+          stickyJoinCode || codeEl?.value,
+          stickyGuestName || nameEl?.value,
           captchaToken,
           selectedGuestEmoji
         );
