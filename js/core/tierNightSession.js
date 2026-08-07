@@ -25,6 +25,7 @@ import {
 } from "./state.js";
 import { isLobbyHost } from "./gameSync.js";
 import { computeConsensusPlaced, recapHasPlacements } from "./tierNightConsensus.js";
+import { enrichTierNightRecapsWithPlayerMeta as enrichRecapsWithPlayers } from "./tierNightRecapMeta.js";
 
 const TIER_RANK = { S: 0, A: 1, B: 2, C: 3, D: 4 };
 
@@ -239,8 +240,12 @@ export function buildRecapsWithSimulation(topicId, listName, items, localPlaced)
   return recaps;
 }
 
+export function enrichTierNightRecapsWithPlayerMeta(recaps = [], players = getActivePlayers()) {
+  return enrichRecapsWithPlayers(recaps, players);
+}
+
 export function getTierNightRecaps() {
-  return getTierNightSession().recaps || [];
+  return enrichTierNightRecapsWithPlayerMeta(getTierNightSession().recaps || []);
 }
 
 export function getTierConsensus() {

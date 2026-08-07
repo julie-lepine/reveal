@@ -9,6 +9,7 @@ export function getActivePlayers() {
     const ps = getLobbyParticipants();
     if (ps.length) return ps.map((p) => ({
       name: p.name,
+      userId: p.userId || null,
       color: p.color,
       emoji: p.emoji,
       isLocal: Boolean(p.isLocal),

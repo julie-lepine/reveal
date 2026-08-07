@@ -2080,6 +2080,59 @@ select.field-input option{
   margin:16px 0 24px;
 }
 
+.tier-series-history{
+  margin:12px 0 20px;
+}
+
+.tier-series-history__list{
+  display:flex;
+  flex-direction:column;
+  gap:0;
+}
+
+.tier-series-history__row{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  padding:12px 0;
+  border-bottom:1px solid rgba(255,255,255,.06);
+}
+
+.tier-series-history__row:last-child{
+  border-bottom:none;
+  padding-bottom:0;
+}
+
+.tier-series-history__row:first-child{
+  padding-top:2px;
+}
+
+.tier-series-history__rank{
+  width:1.5rem;
+  flex-shrink:0;
+  font-size:13px;
+  font-weight:700;
+  color:rgba(255,255,255,.4);
+  text-align:center;
+}
+
+.tier-series-history__emoji{
+  flex-shrink:0;
+  width:1.75rem;
+  text-align:center;
+  font-size:1.15rem;
+  line-height:1;
+}
+
+.tier-series-history__name{
+  flex:1;
+  min-width:0;
+  font-size:15px;
+  font-weight:600;
+  line-height:1.35;
+  color:rgba(255,255,255,.92);
+}
+
 .recap-card{
   padding:16px 18px;
 }
@@ -2808,6 +2861,7 @@ select.field-input option{
 
 .game-exit-bar{
   margin-top:20px;
+  margin-bottom:24px;
   padding-top:16px;
   border-top:1px solid rgba(255,255,255,.08);
   display:flex;
@@ -2816,6 +2870,11 @@ select.field-input option{
 
 .game-exit-bar__btn{
   max-width:100%;
+}
+
+#btn-tiernight-quit-series,
+#btn-tiernight-end-quit{
+  margin-bottom:24px;
 }
 
 .app-reset-bar{

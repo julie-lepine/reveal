@@ -43,12 +43,17 @@ import {
 import { EXIT_GAME_LABEL } from "../core/exitGame.js";
 import { tierNightBetweenScoringExplainText } from "../core/tierNightScoring.js";
 import { sortAndRankByScore } from "../core/competitionRank.js";
+import { getActivePlayers } from "../core/players.js";
+import { enrichTierNightRecapsWithPlayerMeta } from "../core/tierNightRecapMeta.js";
 
 export { TIER_NIGHT_SERIES_ADVANCE_FIELD_POLICY };
 
 function roundRecapScoreRowsHtml(recaps) {
   const ranked = sortAndRankByScore(
-    Array.isArray(recaps) ? recaps.slice() : [],
+    enrichTierNightRecapsWithPlayerMeta(
+      Array.isArray(recaps) ? recaps.slice() : [],
+      getActivePlayers()
+    ),
     (r) => (Number(r.consensusPoints) || 0) + (Number(r.outsiderBonus) || 0)
   );
   return ranked

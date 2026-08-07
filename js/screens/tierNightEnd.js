@@ -143,7 +143,7 @@ function recapCardHtml(r, { isLocal = false, breakdown = null, labelFn = (i) => 
   return `
             <div class="card recap-card${isLocal ? " recap-card--local" : ""}">
               <div class="recap-card__head">
-                <span class="recap-card__avatar" style="background:${r.color}">${r.emoji}</span>
+                <span class="recap-card__avatar" style="background:${escapeHtml(r.color || "rgba(255,255,255,.2)")}">${escapeHtml(r.emoji || "🙂")}</span>
                 <span class="recap-card__name">${escapeHtml(r.player)}</span>
                 <span class="recap-card__pts">+${r.consensusPoints ?? 0} pts</span>
               </div>
@@ -183,7 +183,7 @@ function controversialHtml(session, recaps, labelFn = (i) => i, series = null) {
           .map(
             (r) => `
           <span class="tier-controversial__vote ${(r.outsiderBonus ?? 0) > 0 ? "tier-controversial__vote--outsider" : ""}" style="--tier-color:${TIER_COLORS[r.tier]}" title="${escapeHtml(r.player)}">
-            <span class="recap-card__avatar" style="background:${r.color}">${r.emoji}</span>
+            <span class="recap-card__avatar" style="background:${escapeHtml(r.color || "rgba(255,255,255,.2)")}">${escapeHtml(r.emoji || "🙂")}</span>
             <span class="tier-controversial__badge">${r.tier}</span>
           </span>`
           )
@@ -313,17 +313,22 @@ export function mountTierNightEnd(app) {
     const history = Array.isArray(series?.roundHistory) ? series.roundHistory : [];
     const seriesHistoryHtml =
       isSeriesEnd && history.length
-        ? `<div class="card">
+        ? `<div class="card tier-series-history">
             <p class="card-heading">Thèmes de la série</p>
-            <ol class="tier-series-history">
+            <div class="tier-series-history__list" role="list">
               ${history
                 .map((h, i) => {
                   const name = h?.topicSnapshot?.name || h?.topicId || `Manche ${i + 1}`;
                   const emoji = h?.topicSnapshot?.emoji || "🏷️";
-                  return `<li>${escapeHtml(emoji)} ${escapeHtml(name)}</li>`;
+                  return `
+                <div class="tier-series-history__row" role="listitem">
+                  <span class="tier-series-history__rank">${i + 1}</span>
+                  <span class="tier-series-history__emoji" aria-hidden="true">${escapeHtml(emoji)}</span>
+                  <span class="tier-series-history__name">${escapeHtml(name)}</span>
+                </div>`;
                 })
                 .join("")}
-            </ol>
+            </div>
           </div>`
         : "";
     const content = `
