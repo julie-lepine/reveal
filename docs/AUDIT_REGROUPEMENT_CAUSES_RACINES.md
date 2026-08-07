@@ -35,7 +35,7 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 | **ARCH-10** | 8 | Clear cache leave lobby trop tard | 🟢 fonctionnel ✅ GH Pages · **mobile QA finale** (même vague qu’ARCH-23) |
 | **UX-DEVICE-01** | 11 | Écran verrouillé pendant une partie (Wake Lock API) | 🟡 · **dernier produit** |
 
-### Dette / opportunité
+### Dette / opportunité 
 
 | ID | Cause | Problème | Priorité | 
 |----|-------|----------|----------|
