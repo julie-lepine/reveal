@@ -11,6 +11,12 @@ import {
 import { stripLegacyJoinHashFromLocation } from "./core/legacyJoinHash.js";
 import { initSupabaseAuth, isPasswordRecoveryPending, authReady } from "./core/supabaseAuth.js";
 import { shouldShowWelcome } from "./core/welcomeGate.js";
+import { isSupabaseConfigured } from "./core/supabaseClient.js";
+import {
+  BACKEND_MISSING_SCREEN_ID,
+  shouldEnterBackendMissingGate,
+} from "./core/backendConfigGate.js";
+import { mountBackendMissing } from "./screens/backendMissing.js";
 import { mountResetPassword } from "./screens/resetPassword.js";
 import { mountWelcome } from "./screens/welcome.js";
 import { mountHome } from "./screens/home.js";
@@ -76,6 +82,7 @@ initRouter(app);
 
 document.querySelectorAll(".app-dialog").forEach((el) => el.remove());
 
+registerScreen(BACKEND_MISSING_SCREEN_ID, mountBackendMissing);
 registerScreen("welcome", mountWelcome);
 registerScreen("home", mountHome);
 registerScreen("reset-password", mountResetPassword);
@@ -129,7 +136,37 @@ initClientCompatibilityForeground();
 /** Empêche double initLobbyPollSync / reconcile / resume après retry gate boot. */
 let postCompatBootStarted = false;
 
+function hideChromeForBackendMissing() {
+  const nav = document.getElementById("bottom-nav");
+  if (nav) {
+    nav.hidden = true;
+    nav.classList.add("bottom-nav--hidden");
+    nav.setAttribute("aria-hidden", "true");
+  }
+}
+
+/**
+ * ARCH-01A — point de gate le plus haut du boot produit.
+ * Avant auth / compat / reconcile / welcome / home / lobby.
+ * Empêche toute descente vers auth locale, faux lobby, PNJ.
+ */
+function enterBackendMissingGate() {
+  hideChromeForBackendMissing();
+  resetNav();
+  navigate(BACKEND_MISSING_SCREEN_ID, { reset: true });
+}
+
 async function boot() {
+  // ARCH-01A : config absente = terminal, pas de démo locale silencieuse.
+  if (
+    shouldEnterBackendMissingGate({
+      isSupabaseConfigured,
+    })
+  ) {
+    enterBackendMissingGate();
+    return;
+  }
+
   await initDeepLinks();
   await initSupabaseAuth();
   await authReady;

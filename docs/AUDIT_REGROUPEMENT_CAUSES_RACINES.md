@@ -19,7 +19,7 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 | **Maintenant** | **UX-DEVICE-01** (dernier ticket produit convenu) |
 | **En fin de vague** | **ARCH-23** / **ARCH-10** QA natif — **après** clôture produit (code + SQL déjà livrés · QA différée deploy Capacitor) |
 | **Dette** | ARCH-05 · ARCH-01/F-01 · ARCH-11–17 / SYN-19–24 / SYN-27 · VibeCheck ✅ · **CLEANUP-FILROUGE-01/02 ✅** |
-| **Audit** | Transversal 2026-08-02 — optimistic submissions ✅ · Deal ACK ✅ · **FEATURE-CHAT-03 ✅** · **FEATURE-DILEMMA-01 ✅** · **FEATURE-TIERNIGHT-01 ✅** · **FEATURE-TIERNIGHT-02 ✅** · **UX-TIERNIGHT-END-01/02 ✅** · **UX-TIERNIGHT-NAV-01 ✅** QA 2026-08-04/05 |
+| **Audit** | Transversal 2026-08-02 — optimistic submissions ✅ · Deal ACK ✅ · **FEATURE-CHAT-03 ✅** · **FEATURE-DILEMMA-01 ✅** · **FEATURE-TIERNIGHT-01 ✅** · **FEATURE-TIERNIGHT-02 ✅** · **UX-TIERNIGHT-END-01/02 ✅** · **UX-TIERNIGHT-NAV-01 ✅** · **BUG-MP-NAV-01 ✅** QA 2026-08-07 |
 
 > ~~« Consensus reveal atomique »~~ — **aucun ticket** à cet intitulé dans l’audit (reliquat probable d’une note type Trivia 01B, jamais formalisé). Ne pas traiter comme chantier ouvert.
 
@@ -40,7 +40,7 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 | ID | Cause | Problème | Priorité | 
 |----|-------|----------|----------|
 | **ARCH-05** | 5 | Route lobby vs session (`row.screen`) | 🟡 mitigé SYN-28 |
-| **ARCH-01 / F-01** | 1 | Démo offline sans avertissement MP | 🟡 partiel |
+| **ARCH-01 / F-01** | 1 | Démo offline sans avertissement MP | 🟡 **01A** gate livré · ouvert (QA + 01B) |
 | **ARCH-11–17, SYN-19–24, SYN-27** | 9–10 | Monolithe / dup / code mort | Dette |
 
 
@@ -52,9 +52,9 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 | 2 | Race auth / profil | ✅ | — |
 | 3 | Sources de vérité multiples | Partiel | **BUG-TIERNIGHT-04 ✅** · **BUG-TRUTHMETER-02 ✅** · **Membership A–E5 ✅** · M-14a ✅ · Guess Lie ✅ · **AUTH-LEAVE-*** ✅ |
 | 4 | Asymétrie hôte / invité | ✅ | — |
-| 5 | Routing + timing sync | ✅ | ARCH-05 mitigé · **UX-NAV-LOBBY ✅** |
+| 5 | Routing + timing sync | ✅ | ARCH-05 mitigé · **UX-NAV-LOBBY ✅** · **BUG-MP-NAV-01 ✅** |
 | 6 | Async écrans | ✅ | **BUG-WAO-02** ✅ · **BUG-WAO-03** ✅ · **BUG-WAO-04** ✅ |
-| 7 | Sync silencieuse / fire-and-forget | Partiel | **BUG-TRUTHMETER-01 ✅** (01A/01B) · **BUG-TIERNIGHT-03** ✅ · **BUG-TRIVIA-01 ✅** (01A/01B/01B-bis/01C) · ARCH-07 ✅ · M-14b ✅ · ARCH-08 ✅ · **SYN-VOTE-ROLLBACK-01 ✅** · **SYN-TRAITRE-DEALACK-01 ✅** |
+| 7 | Sync silencieuse / fire-and-forget | Partiel | **BUG-TRUTHMETER-01 ✅** (01A/01B) · **BUG-TIERNIGHT-03** ✅ · **BUG-TRIVIA-01 ✅** (01A/01B/01B-bis/01C) · ARCH-07 ✅ · M-14b ✅ · ARCH-08 ✅ · **SYN-VOTE-ROLLBACK-01 ✅** · **SYN-TRAITRE-DEALACK-01 ✅** · **BUG-MP-NAV-01 ✅** |
 | 8 | Reset / migration incomplète | Partiel | **BUG-TIERNIGHT-05 ✅** · **OPS-LOBBY-04 ✅** · **BUG-LOBBY-XX-E ✅** · **BUG-TRUTHMETER-02 ✅** · **ARCH-23** · ARCH-10 · **BUG-LOBBY-XX ✅** · I-09/SYN-15/16 ✅ |
 | 9 | Sync monolithe / duplication | Dette | ARCH-11… |
 | 10 | Code mort | ✅ | **FEATURE-VIBECHECK-01 ✅** · **CLEANUP-FILROUGE-01 ✅** (app) · **CLEANUP-FILROUGE-02 ✅** (SQL · post-deploy 2026-08-07) |
@@ -163,7 +163,17 @@ Hors scope volontaire (autres causes) : rollback votes dilemma/speedVote/truthMe
 | **ARCH-23** | Version cliente vs attendue · refresh forcé | 🟡 ouvert — post-mortem 01B-bis |
 | **ARCH-05** | `row.screen` en retard vs lobby | 🟡 mitigé ; hors scope routing |
 | **ARCH-10** | Cache session clear trop tard au leave | 🟢 QA Pages ✅ · mobile → QA finale |
-| **ARCH-01** | Démo locale sans avertissement MP | 🟡 |
+| **ARCH-01** | Démo locale sans avertissement MP | 🟡 **ARCH-01A** livré (gate `BACKEND_MISSING`) · **ouvert** jusqu’à QA + **ARCH-01B** |
+
+#### BUG-MP-NAV-01 ✅ (clôture QA terrain · 2026-08-07)
+
+Invité ne suivait pas l’hôte sur « Recommencer » / « Changer de mode » (TierNight end). Cause : `patchGameState` no-op silencieux via garde late/post-game alors que la cible quittait le post-game. **01B** : destinations admises (`GAME_SETUP` ∪ `game-select`) · CAS A acting host (sortie soirée = hôte réel) · `SCREEN_MISMATCH` strict. **Ne pas rouvrir** sans régression.
+
+| | |
+|--|--|
+| **Livré** | `shouldBlockLateGamePatchAfterPostGame` · `isAdmittedPostGameExitScreen` · `applySeriesClearAndPrepReset` · UI between/end realHost |
+| **Preuve** | `bugMpNav01RestartChangeMode` · suite E/E1 · **QA terrain 2026-08-07** |
+| **Hors scope** | SQL acting-host multi-blob (CAS A) · CLEANUP-FILROUGE-02 innocent |
 
 #### ARCH-10 — Invalidation précoce cache session MP (ouvert · résidu mobile)
 
@@ -441,6 +451,7 @@ Retour terrain multi-jeux. Priorités : 🔴 critique · 🟠 haute · 🟡 moye
 | ~~**UX-TIERNIGHT-END-02**~~ | ~~Détail scoring vs carte récap~~ | ✅ **Clôturé QA terrain 2026-08-04** — détail fusionné dans la carte locale · cumul sous les cartes. Ne pas rouvrir. |
 | ~~**UX-TIERNIGHT-NAV-01**~~ | ~~Hiérarchie nav TierNight~~ | ✅ **Clôturé QA terrain 2026-08-04** — retour création → thèmes roster · chevron unique · libellés modes de jeu. Ne pas rouvrir. |
 | ~~**FEATURE-CHAT-03**~~ | ~~Roulette « Jeu aléatoire »~~ | ✅ **Clôturé QA terrain 2026-08-03** — CTA chat · soft voice · bridge sondage · tirage libre + anti-répétition immédiate · TTL hybride · `rouletteId`/`attemptId` · permit launch · sync Realtime · fermeture chat→prep. Ne pas rouvrir. |
+| ~~**BUG-MP-NAV-01**~~ | ~~Invité ne suit pas Recommencer / Changer de mode~~ | ✅ **Clôturé QA terrain 2026-08-07** — garde post-game + destinations admises · CAS A AH · `SCREEN_MISMATCH`. Ne pas rouvrir. |
 
 ---
 
@@ -496,6 +507,7 @@ Ne pas rouvrir sans régression. Détail historique dans git / tests cités.
 
 | ID | Cause | Livré | Preuve / QA |
 |----|-------|-------|-------------|
+| **BUG-MP-NAV-01** | 5/7 | Sortie post-game TierNight écrite remote · garde late-patch bornée · AH = hôte réel (CAS A) | QA terrain 2026-08-07 · `bugMpNav01RestartChangeMode` |
 | **FEATURE-DILEMMA-01** | 11 | Multi-custom prep · deck customs prioritaires · shuffle global · QA compteur/leave/sync | QA terrain 2026-08-04 · `featureDilemma01*` (61) · SQL `feature-dilemma-01-multi-custom` |
 | **SYN-TRAITRE-DEALACK-01** | 7 | Rollback Deal ACK · `optimisticMapEntry` · catch UI terminal | QA terrain 2026-08-03 · `synTraitreDealAck01` |
 | **SYN-VOTE-ROLLBACK-01** | 7 | Rollback soumissions optimistes votes + réponse WAO | QA terrain 2026-08-03 · `synVoteRollback01*` |
@@ -556,9 +568,9 @@ Ne pas rouvrir sans régression. Détail historique dans git / tests cités.
 | 2 | M-01, P-03, M-02a, S-02 |
 | 3 | I-03/04, SYN-03, M-13, M-02b, ARCH-02, SYN-29, I-PG-01, ready stale, UX-CLUTCH-01, M-15, L-05↻, **Membership A–E5**, M-14a, boundary, join partiel, **AUTH-LEAVE-*** |
 | 4 | I-01/02/08, M-03b, M-06a/b, L-01, ARCH-03/03b, UX-VIBE-01, Guess Lie |
-| 5 | T-01/02, T-03↻, M-07/08, P-02, SYN-28, ARCH-04, UX-VIBE-02, pré-résolution entry, **UX-NAV-LOBBY** |
+| 5 | T-01/02, T-03↻, M-07/08, P-02, SYN-28, ARCH-04, UX-VIBE-02, pré-résolution entry, **UX-NAV-LOBBY**, **BUG-MP-NAV-01** |
 | 6 | I-05, SYN-13b↻, SYN-25, SYN-05/ARCH-18, ARCH-06 |
-| 7 | I-07, M-09, L-09, M-11, M-10, T-05, SYN-26, M-04b/SYN-18, **ARCH-08**, **ARCH-07** (P0+P1/P2), **M-14b**, **BUG-TRIVIA-01** (01A/01B/01B-bis/01C), **SYN-VOTE-ROLLBACK-01**, **SYN-TRAITRE-DEALACK-01** |
+| 7 | I-07, M-09, L-09, M-11, M-10, T-05, SYN-26, M-04b/SYN-18, **ARCH-08**, **ARCH-07** (P0+P1/P2), **M-14b**, **BUG-TRIVIA-01** (01A/01B/01B-bis/01C), **SYN-VOTE-ROLLBACK-01**, **SYN-TRAITRE-DEALACK-01**, **BUG-MP-NAV-01** |
 | 8 | I-06, P-02, ARCH-09, I-09/SYN-06, SYN-15/16, M-15, **BUG-LOBBY-XX ✅** |
 | 9 | SYN-12 / M-05b |
 | 10 | SYN-05 / ARCH-18 · **CLEANUP-FILROUGE-01/02 ✅** |

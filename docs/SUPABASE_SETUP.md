@@ -66,7 +66,7 @@ Dans l’app Meta (Facebook Login), ajoute les mêmes URLs dans **Valid OAuth Re
 - **Partage** : le lobby affiche le code + bouton pour **copier le code** (pas de lien d’invitation, pas de QR dans l’app).
 - Les anciens liens `#join=CODE` ne sont plus supportés : l’app les ignore (hash retiré, aucun préremplissage / auto-join).
 
-Sans `supabase.js` configuré, l’app reste en **mode démo locale** (localStorage + simulation de joueurs).
+Sans `supabase.js` configuré (URL/clé absentes ou placeholders), l’application produit **ne démarre pas** en multijoueur : écran terminal **Configuration requise** (`BACKEND_MISSING`). Il n’y a plus de « démo locale » runtime (auth locale, faux lobby, PNJ). La configuration Supabase est **nécessaire** pour exécuter REVEAL.
 
 ## 5. Dépendances
 
