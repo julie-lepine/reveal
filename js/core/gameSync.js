@@ -3996,7 +3996,10 @@ export function getEffectiveSessionScreen(row) {
   }
 
   if (declared && POST_GAME_SCREENS.has(declared)) {
-    const skippedActivePlay = resolveActivePlayScreen(st, gid, declared);
+    // AUDIT-010 — volontairement PAS de resolveActivePlayScreen ici.
+    // Contrat : screen post-game + (local Results|suppress) → rester sur declared
+    // (browsing scores / ARCH-05). Convergence Guest = Event B (row.screen prep/play),
+    // pas un blob state play arrivé avant le screen. Voir tests/audit010*.
     const lobbyGid = getLobbyGameId();
     const lobbyPrep =
       isLobbyEveningStarted() && lobbyGid && lobbyGid !== "menu"

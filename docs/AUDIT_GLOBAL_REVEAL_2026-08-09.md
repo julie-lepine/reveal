@@ -156,7 +156,7 @@ Les candidats les plus proches sont classés **P1** (scores restart, channel orp
 
 ---
 
-### AUDIT-009 — Merge votes HotTake pendant `voting` : local gagne toutes les clés - Implementation ✅ / Tests ✅ / QA terrain ⏳
+### AUDIT-009 — Merge votes HotTake pendant `voting` : local gagne toutes les clés - Implementation ✅ / Tests ✅ / QA terrain ✅
 
 * **Sévérité :** P2
 * **Confiance :** BUG CONFIRMÉ (revote HotTake autorisé en `voting` ; même anti-pattern SpeedVote)
@@ -170,12 +170,14 @@ Les candidats les plus proches sont classés **P1** (scores restart, channel orp
 
 ## 5. P3 — Faible / dette technique
 
-### AUDIT-010 — `skippedActivePlay` mort
+### AUDIT-010 — `skippedActivePlay` mort / post-game vs active play - DETTE ✅ (pas un bug)
 
-* Variable inutilisée (~4032)
-* **Type :** DETTE
+* **Classification :** DETTE / CODE SMELL (FALSE POSITIVE comme bug de routing)
 * **Confiance :** haute
-* **Risque suppression :** faible
+* **Contrat confirmé :** tant que `row.screen` est post-game, local Results ou `isSessionRouteSuppressed()` → `return declared` ; `resolveActivePlayScreen` est **intentionnellement ignoré** (browsing scores / ARCH-05 / split Event A→B).
+* **Convergence Guest :** Event B (`screen` → prep/play) — pas de blocage durable documenté.
+* **Correctif :** suppression du calcul mort `skippedActivePlay` + commentaire de contrat (aucun changement de comportement).
+* **Tests :** `tests/audit010ActivePlayRouting.test.js` (+ `sessionRouteRestartDecision.test.js`)
 
 ### AUDIT-011 — `setLobbyPlaying(...).catch(() => {})` silencieux
 
