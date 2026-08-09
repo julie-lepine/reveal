@@ -8,6 +8,7 @@ import {
   isTierNightLiveRemoteReset,
   tierNightLiveRunIdsDiffer,
   isNewTierNightLiveVoteRound,
+  isNewTierNightLiveSeriesList,
   mergeTierNightLiveVotesForHydrate,
   mergeTierNightLiveVotesForPatch,
   mergeTierNightLiveGameFields,
@@ -279,5 +280,170 @@ describe("BUG-TIERNIGHT-05 - non-régression SpeedVote", () => {
     assert.match(merge, /isNewTierNightLiveVoteRound/);
     assert.match(merge, /mergeTierNightLiveVotesForHydrate/);
     assert.match(merge, /mergeTierNightLiveVotesForPatch/);
+  });
+});
+
+/**
+ * Stale votes après advance série (même runId, roundIdx item = 0).
+ * Signal : series.roundIndex (+ topicId si série live des deux côtés).
+ */
+describe("BUG-TIERNIGHT-LIVE-SERIES-VOTE — nouvelle liste wipe", () => {
+  const seriesList = (roundIndex, topicId, extra = {}) => ({
+    runId: "run-series",
+    lobbyStarted: true,
+    finished: false,
+    roundIdx: 0,
+    topicId,
+    series: {
+      kind: "live",
+      phase: extra.seriesPhase || "between_lists",
+      roundIndex,
+      roundCount: 3,
+      queue: [{}, {}, {}],
+    },
+    ...extra,
+  });
+
+  it("1 — nouvelle liste : même runId, roundIdx 0, series.roundIndex 0→1 → votes {}", () => {
+    const cur = seriesList(0, "list-a", {
+      phase: "between",
+      seriesPhase: "between_lists",
+      votes: { Alice: "S", Bob: "A" },
+    });
+    const inc = seriesList(1, "list-b", {
+      phase: "voting",
+      seriesPhase: "playing_list",
+      votes: {},
+    });
+    assert.equal(isNewTierNightLiveSeriesList(cur, inc), true);
+    assert.equal(isNewTierNightLiveVoteRound(cur, inc), true);
+    assert.deepEqual(mergeTierNightLiveVotesForPatch(cur, inc), {});
+    assert.deepEqual(mergeTierNightLiveVotesForHydrate(cur, inc), {});
+  });
+
+  it("2 — même liste / 1re take : remote vide → pas de wipe (BUG-05)", () => {
+    const local = seriesList(0, "list-a", {
+      phase: "voting",
+      seriesPhase: "playing_list",
+      votes: { Alice: "S" },
+      placements: {},
+    });
+    const remote = seriesList(0, "list-a", {
+      phase: "voting",
+      seriesPhase: "playing_list",
+      votes: {},
+      placements: {},
+    });
+    assert.equal(isTierNightLiveRemoteReset(remote), true);
+    assert.equal(isNewTierNightLiveSeriesList(local, remote), false);
+    assert.equal(isNewTierNightLiveVoteRound(local, remote), false);
+    assert.deepEqual(mergeTierNightLiveVotesForHydrate(local, remote), {
+      Alice: "S",
+    });
+  });
+
+  it("3 — item suivant même liste : roundIdx 0→1 → wipe", () => {
+    const cur = seriesList(1, "list-b", {
+      phase: "reveal",
+      seriesPhase: "playing_list",
+      roundIdx: 0,
+      votes: { Alice: "S", Bob: "B" },
+    });
+    const inc = seriesList(1, "list-b", {
+      phase: "voting",
+      seriesPhase: "playing_list",
+      roundIdx: 1,
+      votes: {},
+    });
+    assert.equal(isNewTierNightLiveSeriesList(cur, inc), false);
+    assert.equal(isNewSpeedVoteVoteRound(cur, inc), true);
+    assert.equal(isNewTierNightLiveVoteRound(cur, inc), true);
+    assert.deepEqual(mergeTierNightLiveVotesForPatch(cur, inc), {});
+  });
+
+  it("4 — nouveau run → wipe (existant)", () => {
+    const cur = seriesList(0, "list-a", {
+      phase: "voting",
+      votes: { Alice: "S" },
+    });
+    const inc = {
+      ...seriesList(0, "list-z", { phase: "voting", seriesPhase: "playing_list", votes: {} }),
+      runId: "run-other",
+    };
+    assert.equal(isNewTierNightLiveVoteRound(cur, inc), true);
+    assert.deepEqual(mergeTierNightLiveVotesForPatch(cur, inc), {});
+  });
+
+  it("5 — série 3 listes : votes A puis B ne survivent pas à l’advance", () => {
+    // After list A reveal / between — stale votes still on blob (bug pré-fix merge).
+    let blob = seriesList(0, "list-a", {
+      phase: "between",
+      seriesPhase: "between_lists",
+      votes: { Alice: "S", Bob: "A" },
+    });
+
+    // Advance → list B
+    const advB = seriesList(1, "list-b", {
+      phase: "voting",
+      seriesPhase: "playing_list",
+      votes: {},
+      placements: {},
+    });
+    const votesB = mergeTierNightLiveVotesForPatch(blob, advB);
+    assert.deepEqual(votesB, {});
+    blob = { ...advB, votes: votesB };
+    assert.equal(Object.keys(blob.votes).length, 0);
+
+    // Simulate players voting on B then between
+    blob = {
+      ...blob,
+      phase: "between",
+      series: { ...blob.series, phase: "between_lists" },
+      votes: { Alice: "C", Bob: "D" },
+    };
+
+    // Advance → list C
+    const advC = seriesList(2, "list-c", {
+      phase: "voting",
+      seriesPhase: "playing_list",
+      votes: {},
+      placements: {},
+    });
+    const votesC = mergeTierNightLiveVotesForPatch(blob, advC);
+    assert.deepEqual(votesC, {});
+    assert.equal(Object.keys(votesC).length, 0);
+    // Pas de votes de A ni B → allVotesIn ne peut pas être vrai sur votes seuls.
+    assert.equal("Alice" in votesC, false);
+    assert.equal("Bob" in votesC, false);
+  });
+
+  it("votes-only patch (sans series) ne wipe pas", () => {
+    const cur = seriesList(0, "list-a", {
+      phase: "voting",
+      seriesPhase: "playing_list",
+      votes: { Alice: "S" },
+    });
+    const inc = { votes: { Bob: "A" } };
+    assert.equal(isNewTierNightLiveSeriesList(cur, inc), false);
+    assert.equal(isNewTierNightLiveVoteRound(cur, inc), false);
+    assert.deepEqual(mergeTierNightLiveVotesForPatch(cur, inc), {
+      Alice: "S",
+      Bob: "A",
+    });
+  });
+
+  it("topicId change avec même series.roundIndex : both live → wipe (secours)", () => {
+    // roundIndex both 0 but topic changed (défense secondaire)
+    const cur = seriesList(0, "list-a", {
+      phase: "between",
+      votes: { Alice: "S" },
+    });
+    const inc = seriesList(0, "list-b", {
+      phase: "voting",
+      seriesPhase: "playing_list",
+      votes: {},
+    });
+    assert.equal(isNewTierNightLiveSeriesList(cur, inc), true);
+    assert.deepEqual(mergeTierNightLiveVotesForPatch(cur, inc), {});
   });
 });

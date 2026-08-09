@@ -35,13 +35,50 @@ export function tierNightLiveRunIdsDiffer(cur = {}, inc = {}) {
   return Boolean(a && b && a !== b);
 }
 
+function liveSeriesRoundIndex(session) {
+  const series = session?.series;
+  if (!series || typeof series !== "object" || series.kind !== "live") return null;
+  const idx = Number(series.roundIndex);
+  return Number.isInteger(idx) && idx >= 0 ? idx : null;
+}
+
+function liveSeriesTopicId(session) {
+  const id = session?.topicId;
+  if (id == null || id === "") return null;
+  return String(id);
+}
+
+/**
+ * Nouvelle liste dans une série Rank Live (même runId, roundIdx item souvent 0).
+ *
+ * Signaux (les deux côtés doivent exposer le contexte — pas de wipe sur patch votes-only) :
+ * 1. `series.roundIndex` différent (contrat 04E/04F, propagé par finalize/advance)
+ * 2. `topicId` différent si les deux blobs ont `series.kind === "live"`
+ *
+ * Ne remplace pas isNewSpeedVoteVoteRound (item suivant dans la même liste).
+ */
+export function isNewTierNightLiveSeriesList(cur, inc) {
+  if (!cur || !inc) return false;
+  const curRi = liveSeriesRoundIndex(cur);
+  const incRi = liveSeriesRoundIndex(inc);
+  if (curRi != null && incRi != null && curRi !== incRi) return true;
+
+  if (cur?.series?.kind === "live" && inc?.series?.kind === "live") {
+    const a = liveSeriesTopicId(cur);
+    const b = liveSeriesTopicId(inc);
+    if (a && b && a !== b) return true;
+  }
+  return false;
+}
+
 /**
  * Faut-il abandonner les votes de `cur` au profit de ceux de `inc` ?
  *
  * 1. les deux runId présents et différents
  * 2. local sans runId + remote avec runId (hydratation / pré-migration)
  * 3. remote terminé (select / fin) → votes remote (souvent {})
- * 4. nouvelle manche SpeedVote (roundIdx / voteEndsAt) - helper partagé inchangé
+ * 4. nouvelle liste de série (series.roundIndex / topicId) — même runId, roundIdx item 0
+ * 5. nouvelle manche SpeedVote (roundIdx / voteEndsAt) - helper partagé inchangé
  *
  * Ne passe PAS par isTierNightLiveRemoteReset pour les votes : ce signal
  * reste vrai toute la 1re manche tant qu'il n'y a pas de placements, et
@@ -52,6 +89,7 @@ export function isNewTierNightLiveVoteRound(cur, inc) {
   if (tierNightLiveRunIdsDiffer(cur, inc)) return true;
   if (!(cur?.runId) && inc?.runId) return true;
   if (!inc.lobbyStarted && inc.finished) return true;
+  if (isNewTierNightLiveSeriesList(cur, inc)) return true;
   return isNewSpeedVoteVoteRound(cur, inc);
 }
 
