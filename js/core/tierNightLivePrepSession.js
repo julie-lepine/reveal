@@ -126,8 +126,10 @@ async function syncTierNightLivePrepSession(extra = {}, patchOpts = {}) {
 }
 
 /**
- * Host change roundCount : une seule mutation locale+remote
- * (roundCount + ready:{} + setupEpoch++) — miroir roster.
+ * Host change roundCount : mutation roundCount UNIQUEMENT.
+ * Ready et setupEpoch restent inchangés (contrat Rank Live QA-02).
+ * Race launch : RPC 04E rejette proposal.roundCount ≠ prep.roundCount
+ * même sans bump epoch ; attempt in-flight invalidée si longueur change.
  */
 export async function setTierNightLivePrepRoundCount(roundCount) {
   if (isGameSyncActive() && !isLobbyHost()) {
@@ -139,10 +141,13 @@ export async function setTierNightLivePrepRoundCount(roundCount) {
   }
   const prev = getTierNightLivePrepSession();
   const changed = Number(prev.roundCount) !== n;
+  if (changed) {
+    clearInFlightTierNightLiveLaunchAttempt();
+  }
   await syncTierNightLivePrepSession({
     roundCount: n,
-    ready: changed ? {} : prev.ready,
-    setupEpoch: changed ? (Number(prev.setupEpoch) || 0) + 1 : prev.setupEpoch,
+    ready: prev.ready,
+    setupEpoch: prev.setupEpoch,
   });
   return { ok: true };
 }

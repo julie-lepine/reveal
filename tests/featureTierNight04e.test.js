@@ -428,6 +428,26 @@ describe("FEATURE-TIERNIGHT-04E — attempt / double-click / idempotence client"
     });
     assert.notEqual(a.runId, b.runId);
   });
+
+  it("roundCount change même setupEpoch → nouvelle tentative (pas stale N)", () => {
+    const a = obtainTierNightLiveLaunchAttempt({
+      prep: { roundCount: 5, setupEpoch: 1 },
+      officialLists: getTierNightLiveOfficialPool(),
+      customLists: [],
+      random: () => 0.4,
+    });
+    assert.equal(a.ok, true);
+    assert.equal(a.roundCount, 5);
+    const b = obtainTierNightLiveLaunchAttempt({
+      prep: { roundCount: 3, setupEpoch: 1 },
+      officialLists: getTierNightLiveOfficialPool(),
+      customLists: [],
+      random: () => 0.4,
+    });
+    assert.equal(b.ok, true);
+    assert.equal(b.roundCount, 3);
+    assert.notEqual(a.runId, b.runId);
+  });
 });
 
 describe("FEATURE-TIERNIGHT-04E — projection + writable + solo", () => {

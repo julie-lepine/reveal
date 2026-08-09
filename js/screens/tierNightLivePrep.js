@@ -264,9 +264,11 @@ export function mountTierNightLivePrep(app) {
       backTarget: "tiernight-select",
       content: `
         <p class="label-upper label-upper--gold">⚡ Rank Live</p>
-        <h2 class="screen-title">Préparation série</h2>
+        <div class="screen-title-row">
+          <h2 class="screen-title">Préparation</h2>
+          ${rulesButtonHtml("tiernight")}
+        </div>
         <p class="game-intro">Choisis la longueur, ajoute des listes custom, puis lance quand tout le monde est prêt.</p>
-        ${rulesButtonHtml("tiernight")}
 
         <div class="card">
           <p class="label-upper">Longueur de série</p>
@@ -338,14 +340,14 @@ export function mountTierNightLivePrep(app) {
 
   const unsubLobby = onLobbyBundleUpdated(() => {
     if (!mounted) return;
-    runPrepRefreshOnLobbyChange(refreshFromSync);
+    void runPrepRefreshOnLobbyChange({
+      isActive: isGameSyncActive,
+      refresh: refreshGameSession,
+      refreshFromSync,
+    });
   });
 
-  void syncPrepOnMount({
-    refreshGameSession,
-    isGameSyncActive,
-    onSynced: refreshFromSync,
-  });
+  syncPrepOnMount(refreshFromSync);
 
   return () => {
     mounted = false;

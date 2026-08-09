@@ -253,8 +253,8 @@ describe("FEATURE-TIERNIGHT-04D — prep state local/remote", () => {
   });
 });
 
-describe("FEATURE-TIERNIGHT-04D — roundCount + setupEpoch atomicité", () => {
-  it("une mutation : roundCount + ready clear + epoch bump", async () => {
+describe("FEATURE-TIERNIGHT-04D — roundCount mutation (Ready conservés)", () => {
+  it("une mutation : roundCount seul ; ready + setupEpoch inchangés", async () => {
     syncActive = true;
     lobbyHost = true;
     saveStatePatch({
@@ -269,17 +269,17 @@ describe("FEATURE-TIERNIGHT-04D — roundCount + setupEpoch atomicité", () => {
     await setTierNightLivePrepRoundCount(7);
     const s = getTierNightLivePrepSession();
     assert.equal(s.roundCount, 7);
-    assert.deepEqual(s.ready, {});
-    assert.equal(s.setupEpoch, 2);
+    assert.deepEqual(s.ready, { Host: true, Guest: true });
+    assert.equal(s.setupEpoch, 1);
     assert.equal(patched.length, 1);
     const remote = patched[0].payload.tierNightLivePrep;
     assert.equal(remote.roundCount, 7);
-    assert.deepEqual(remote.ready, {});
-    assert.equal(remote.setupEpoch, 2);
+    assert.deepEqual(remote.ready, { Host: true, Guest: true });
+    assert.equal(remote.setupEpoch, 1);
     assert.equal(patched[0].opts.screen, "tiernight-live-prep");
   });
 
-  it("même roundCount : pas de bump", async () => {
+  it("même roundCount : pas de bump ; ready intact", async () => {
     saveStatePatch({
       tierNightLiveSeriesPrep: {
         categoryIds: ["*"],
@@ -532,7 +532,7 @@ describe("FEATURE-TIERNIGHT-04D — Ready contrats A–G", () => {
     assert.equal(getTierNightLivePrepSession().setupEpoch, epoch);
   });
 
-  it("F/G : roundCount change → epoch↑ + ready invalidés (une mutation)", async () => {
+  it("F/G : roundCount change → epoch + ready inchangés (une mutation)", async () => {
     syncActive = true;
     saveStatePatch({
       tierNightLiveSeriesPrep: {
@@ -544,8 +544,8 @@ describe("FEATURE-TIERNIGHT-04D — Ready contrats A–G", () => {
     });
     patched.length = 0;
     await setTierNightLivePrepRoundCount(3);
-    assert.equal(getTierNightLivePrepSession().setupEpoch, 6);
-    assert.deepEqual(getTierNightLivePrepSession().ready, {});
+    assert.equal(getTierNightLivePrepSession().setupEpoch, 5);
+    assert.deepEqual(getTierNightLivePrepSession().ready, { Host: true, Guest: true });
     assert.equal(patched.length, 1);
   });
 });
@@ -616,10 +616,18 @@ describe("FEATURE-TIERNIGHT-04D — contrats mappés (≥40 assertions groupées
     ok("package wired", read("package.json").includes("featureTierNight04d.test.js"));
     ok("doc exists", read("docs/FEATURE-TIERNIGHT-04D.md").includes("stub"));
 
+    saveStatePatch({
+      tierNightLiveSeriesPrep: {
+        categoryIds: ["*"],
+        roundCount: 5,
+        ready: { Host: true },
+        setupEpoch: 4,
+      },
+    });
     await setTierNightLivePrepRoundCount(3);
     ok("round 3", getTierNightLivePrepSession().roundCount === 3);
-    ok("epoch bumped", getTierNightLivePrepSession().setupEpoch >= 1);
-    ok("ready cleared", Object.keys(getTierNightLivePrepSession().ready).length === 0);
+    ok("epoch stable", getTierNightLivePrepSession().setupEpoch === 4);
+    ok("ready preserved", getTierNightLivePrepSession().ready.Host === true);
 
     const v = validateTierNightLivePrepForLaunch();
     ok("launch validate", v.ok === true);

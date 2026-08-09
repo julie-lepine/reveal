@@ -476,7 +476,9 @@ export function clearInFlightTierNightLiveLaunchAttempt() {
 }
 
 /**
- * Réutilise la tentative courante si même setupEpoch ; sinon rebuild.
+ * Réutilise la tentative courante si même setupEpoch + roundCount ; sinon rebuild.
+ * roundCount fait partie de la clé : un changement 3↔5↔7 sans bump epoch
+ * ne doit pas renvoyer une proposal stale (contrat Rank Live QA-02).
  */
 export function obtainTierNightLiveLaunchAttempt({
   prep,
@@ -485,9 +487,11 @@ export function obtainTierNightLiveLaunchAttempt({
   random = Math.random,
 } = {}) {
   const setupEpoch = Number(prep?.setupEpoch) || 0;
+  const roundCount = Number(prep?.roundCount);
   if (
     inFlightLaunchAttempt?.ok &&
     inFlightLaunchAttempt.setupEpoch === setupEpoch &&
+    Number(inFlightLaunchAttempt.roundCount) === roundCount &&
     inFlightLaunchAttempt.series?.runId
   ) {
     return inFlightLaunchAttempt;

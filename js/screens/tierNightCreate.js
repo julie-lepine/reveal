@@ -59,7 +59,7 @@ export function mountTierNightCreate(app) {
       }</h2>
       <p class="game-intro">${
         contribute
-          ? `Nom + items (${LIVE_TIER_LIST_ITEMS_MIN}–${LIVE_TIER_LIST_ITEMS_MAX}), un par ligne. La liste rejoint le prep partagé — pas de lancement.`
+          ? `Nom + items (${LIVE_TIER_LIST_ITEMS_MIN}–${LIVE_TIER_LIST_ITEMS_MAX}), un par ligne. La liste rejoint le prep partagé - pas de lancement.`
           : "Donne un nom et liste les items (un par ligne, 4 minimum). Tu joueras ensuite en Rank live."
       }</p>
 
