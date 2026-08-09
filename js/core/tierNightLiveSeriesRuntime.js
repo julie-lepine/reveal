@@ -47,15 +47,23 @@ export function getActiveTierNightLiveSeriesRound(series) {
 }
 
 /**
+ * Dernière liste = plus de suivante. Vérité : `queue.length` (pas un roundCount stale).
  * @param {unknown} series
  */
 export function isTierNightLiveSeriesLastRound(series) {
   if (!series || typeof series !== "object") return false;
+  const queueLen = Array.isArray(series.queue) ? series.queue.length : 0;
   const roundCount = Number(series.roundCount);
+  const total =
+    queueLen > 0
+      ? queueLen
+      : Number.isInteger(roundCount) && roundCount >= 1
+        ? roundCount
+        : 0;
+  if (total < 1) return false;
   const roundIndex = Number(series.roundIndex);
-  if (!Number.isInteger(roundCount) || roundCount < 1) return false;
   if (!Number.isInteger(roundIndex) || roundIndex < 0) return false;
-  return roundIndex >= roundCount - 1;
+  return roundIndex >= total - 1;
 }
 
 /**

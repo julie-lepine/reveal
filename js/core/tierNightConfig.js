@@ -99,7 +99,20 @@ export function shouldPreferTierNightEndRoute({
   if (declared === "tiernight-end") {
     return !hasActiveTierNightRun(state);
   }
-  if (declared === "tiernight-live" && remoteHasRecap) return true;
+  // Single-list live : screen encore "tiernight-live" + recap → préférer end.
+  // BUG-TIERNIGHT-04F-QA-01 : en série Rank Live active, le récap de la liste
+  // précédente ne doit PAS détourner l'advance (playing_list) vers tiernight-end.
+  if (declared === "tiernight-live" && remoteHasRecap) {
+    const liveSeriesPhase =
+      state?.tierNightLive?.series?.kind === "live" &&
+      typeof state.tierNightLive.series.phase === "string"
+        ? state.tierNightLive.series.phase
+        : null;
+    if (liveSeriesPhase === "playing_list" || liveSeriesPhase === "between_lists") {
+      return false;
+    }
+    return true;
+  }
   return (
     local === "tiernight-end" &&
     declared == null &&

@@ -138,7 +138,8 @@ function placeAll(items, tier = "A") {
 }
 
 function seedLiveSeriesPlaying(series, livePartial = {}) {
-  const projected = projectTierNightLiveSeriesRound0(series, [], () => 0.2);
+  const idx = Number.isInteger(Number(series?.roundIndex)) ? Number(series.roundIndex) : 0;
+  const projected = projectTierNightLiveSeriesRound(series, idx, [], () => 0.2);
   assert.equal(projected.ok, true);
   const live = {
     ...projected.live,
@@ -416,6 +417,302 @@ describe("FEATURE-TIERNIGHT-04F — config / finish blob", () => {
     });
     // Run actif → ne pas préférer end.
     assert.equal(prefer, false);
+  });
+});
+
+/**
+ * BUG-TIERNIGHT-04F-QA-01 — advance ne doit pas être détourné vers series_end / classement.
+ */
+describe("BUG-TIERNIGHT-04F-QA-01 — advance vs series_end", () => {
+  const midSeriesRecap = {
+    recaps: [{ player: "Host", placed: { A: ["x"] } }],
+  };
+
+  function buildPlayingSeries(roundCount, roundIndex, extras = {}) {
+    const built = buildTierNightLiveSeriesLaunchState({
+      roundCount,
+      customLists: [],
+      random: seqRng([0.11, 0.22, 0.33, 0.44, 0.55, 0.66, 0.77, 0.88]),
+      deckRandom: () => 0.2,
+      runId: `run-qa01-${roundCount}`,
+    });
+    assert.equal(built.ok, true);
+    const scored = [];
+    const completed = [];
+    // Between après finalisation de la manche `roundIndex` → ledgers 0..roundIndex inclus.
+    for (let i = 0; i <= roundIndex; i += 1) {
+      scored.push(`${built.series.runId}:${i}`);
+      completed.push(`${built.series.runId}:${i}`);
+    }
+    return {
+      ...built.series,
+      roundIndex,
+      phase: TIER_NIGHT_LIVE_SERIES_PHASE_BETWEEN,
+      scoredRoundIds: scored,
+      completedRoundIds: completed,
+      ...extras,
+    };
+  }
+
+  it("A — série 3 : roundIndex 0 → advance → roundIndex 1 playing_list", async () => {
+    const series = buildPlayingSeries(3, 0);
+    // Finalize path marks round 0 scored; seed as between after list 0.
+    const between = {
+      ...series,
+      scoredRoundIds: [`${series.runId}:0`],
+      completedRoundIds: [`${series.runId}:0`],
+      phase: TIER_NIGHT_LIVE_SERIES_PHASE_BETWEEN,
+    };
+    seedLiveSeriesPlaying(between);
+    saveStatePatch({
+      tierNightLiveGame: {
+        ...getState().tierNightLiveGame,
+        series: between,
+        phase: "between",
+      },
+    });
+    const adv = await hostAdvanceTierNightLiveSeriesList();
+    assert.equal(adv.ok, true);
+    assert.equal(adv.phase, TIER_NIGHT_LIVE_SERIES_PHASE_PLAYING);
+    assert.equal(getState().tierNightLiveGame.series.roundIndex, 1);
+    assert.equal(getState().tierNightLiveGame.series.phase, "playing_list");
+    assert.notEqual(adv.phase, TIER_NIGHT_LIVE_SERIES_PHASE_END);
+  });
+
+  it("B — série 3 : roundIndex 1 → advance → roundIndex 2 playing_list", async () => {
+    const series = buildPlayingSeries(3, 1);
+    seedLiveSeriesPlaying(series);
+    saveStatePatch({
+      tierNightLiveGame: {
+        ...getState().tierNightLiveGame,
+        series,
+        phase: "between",
+      },
+    });
+    const adv = await hostAdvanceTierNightLiveSeriesList();
+    assert.equal(adv.ok, true);
+    assert.equal(getState().tierNightLiveGame.series.roundIndex, 2);
+    assert.equal(getState().tierNightLiveGame.series.phase, "playing_list");
+  });
+
+  it("C — série 3 : roundIndex 2 finalize → series_end", async () => {
+    const series = {
+      ...buildPlayingSeries(3, 2),
+      phase: TIER_NIGHT_LIVE_SERIES_PHASE_PLAYING,
+      scoredRoundIds: ["run-qa01-3:0", "run-qa01-3:1"],
+      completedRoundIds: ["run-qa01-3:0", "run-qa01-3:1"],
+    };
+    seedLiveSeriesPlaying(series);
+    const f = await hostFinalizeTierNightLiveSeriesList();
+    assert.equal(f.ok, true);
+    assert.equal(f.phase, TIER_NIGHT_LIVE_SERIES_PHASE_END);
+    assert.equal(getState().tierNightLiveGame.series.phase, "series_end");
+  });
+
+  it("D — guard : roundIndex 0 ne produit jamais series_end", async () => {
+    const series = {
+      ...buildPlayingSeries(3, 0),
+      phase: TIER_NIGHT_LIVE_SERIES_PHASE_PLAYING,
+      scoredRoundIds: [],
+      completedRoundIds: [],
+    };
+    seedLiveSeriesPlaying(series);
+    const f = await hostFinalizeTierNightLiveSeriesList();
+    assert.equal(f.ok, true);
+    assert.equal(f.phase, TIER_NIGHT_LIVE_SERIES_PHASE_BETWEEN);
+    assert.notEqual(f.phase, TIER_NIGHT_LIVE_SERIES_PHASE_END);
+    assert.equal(isTierNightLiveSeriesLastRound(getState().tierNightLiveGame.series), false);
+
+    const adv = await hostAdvanceTierNightLiveSeriesList();
+    assert.equal(adv.ok, true);
+    assert.notEqual(adv.phase, TIER_NIGHT_LIVE_SERIES_PHASE_END);
+    assert.equal(getState().tierNightLiveGame.series.roundIndex, 1);
+  });
+
+  it("E — projection après advance 0→1 = queue[1]", async () => {
+    const series = {
+      ...buildPlayingSeries(3, 0),
+      scoredRoundIds: ["run-qa01-3:0"],
+      completedRoundIds: ["run-qa01-3:0"],
+    };
+    const q1 = series.queue[1];
+    seedLiveSeriesPlaying(series);
+    saveStatePatch({
+      tierNightLiveGame: {
+        ...getState().tierNightLiveGame,
+        series,
+        phase: "between",
+      },
+    });
+    const adv = await hostAdvanceTierNightLiveSeriesList();
+    assert.equal(adv.ok, true);
+    const live = getState().tierNightLiveGame;
+    assert.equal(live.topicId, q1.listId);
+    assert.equal(live.listName, q1.listSnapshot.name);
+    assert.deepEqual([...live.deck].sort(), [...q1.listSnapshot.items].map(String).sort());
+    assert.equal(live.roundIdx, 0);
+  });
+
+  it("F — ledgers conservés après advance", async () => {
+    const series = {
+      ...buildPlayingSeries(3, 0),
+      scoredRoundIds: ["run-qa01-3:0"],
+      completedRoundIds: ["run-qa01-3:0"],
+    };
+    seedLiveSeriesPlaying(series);
+    saveStatePatch({
+      tierNightLiveGame: {
+        ...getState().tierNightLiveGame,
+        series,
+        phase: "between",
+      },
+    });
+    const adv = await hostAdvanceTierNightLiveSeriesList();
+    assert.equal(adv.ok, true);
+    const s = getState().tierNightLiveGame.series;
+    assert.deepEqual(s.scoredRoundIds, ["run-qa01-3:0"]);
+    assert.deepEqual(s.completedRoundIds, ["run-qa01-3:0"]);
+    assert.equal(s.queue.length, 3);
+    assert.equal(s.runId, "run-qa01-3");
+  });
+
+  it("G — guest suit playing_list + roundIndex=1 (follow between)", async () => {
+    const { followTierNightLiveSeriesBetweenScreen } = await import(
+      "../js/core/tierNightLiveSeriesPlaySession.js"
+    );
+    navigations.length = 0;
+    const followed = followTierNightLiveSeriesBetweenScreen({
+      state: {
+        tierNightLive: {
+          series: { kind: "live", phase: "playing_list", roundIndex: 1, queue: [{}, {}, {}] },
+        },
+      },
+    });
+    assert.equal(followed, true);
+    assert.equal(navigations.at(-1)?.screen, "tiernight-live");
+  });
+
+  it("H — série 5 : 0→1→2→3→4 puis series_end", async () => {
+    const built = buildTierNightLiveSeriesLaunchState({
+      roundCount: 5,
+      customLists: [],
+      random: seqRng([0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8]),
+      deckRandom: () => 0.25,
+      runId: "run-qa01-5",
+    });
+    assert.equal(built.ok, true);
+    seedLiveSeriesPlaying(built.series);
+
+    for (let i = 0; i < 5; i += 1) {
+      const live = getState().tierNightLiveGame;
+      saveStatePatch({
+        tierNightLiveGame: { ...live, placements: placeAll(live.deck) },
+      });
+      const f = await hostFinalizeTierNightLiveSeriesList();
+      assert.equal(f.ok, true);
+      if (i < 4) {
+        assert.equal(f.phase, TIER_NIGHT_LIVE_SERIES_PHASE_BETWEEN);
+        const adv = await hostAdvanceTierNightLiveSeriesList();
+        assert.equal(adv.ok, true);
+        assert.equal(getState().tierNightLiveGame.series.roundIndex, i + 1);
+        assert.equal(getState().tierNightLiveGame.series.phase, "playing_list");
+      } else {
+        assert.equal(f.phase, TIER_NIGHT_LIVE_SERIES_PHASE_END);
+      }
+    }
+  });
+
+  it("I — série 7 : 0→…→6 puis series_end", async () => {
+    const built = buildTierNightLiveSeriesLaunchState({
+      roundCount: 7,
+      customLists: [],
+      random: seqRng([0.12, 0.23, 0.34, 0.45, 0.56, 0.67, 0.78, 0.89]),
+      deckRandom: () => 0.3,
+      runId: "run-qa01-7",
+    });
+    assert.equal(built.ok, true);
+    seedLiveSeriesPlaying(built.series);
+
+    for (let i = 0; i < 7; i += 1) {
+      const live = getState().tierNightLiveGame;
+      saveStatePatch({
+        tierNightLiveGame: { ...live, placements: placeAll(live.deck) },
+      });
+      const f = await hostFinalizeTierNightLiveSeriesList();
+      assert.equal(f.ok, true);
+      if (i < 6) {
+        assert.equal(f.phase, TIER_NIGHT_LIVE_SERIES_PHASE_BETWEEN);
+        const adv = await hostAdvanceTierNightLiveSeriesList();
+        assert.equal(adv.ok, true);
+        assert.equal(getState().tierNightLiveGame.series.roundIndex, i + 1);
+      } else {
+        assert.equal(f.phase, TIER_NIGHT_LIVE_SERIES_PHASE_END);
+      }
+    }
+  });
+
+  it("routing : declared tiernight-live + récap mid-série ≠ end", () => {
+    assert.equal(
+      shouldPreferTierNightEndRoute({
+        declared: "tiernight-live",
+        local: "tiernight-between",
+        state: {
+          tierNight: { lobbyStarted: false, recap: midSeriesRecap },
+          tierNightLive: {
+            lobbyStarted: true,
+            finished: false,
+            series: {
+              kind: "live",
+              phase: "playing_list",
+              roundIndex: 1,
+              roundCount: 3,
+              queue: [{}, {}, {}],
+            },
+          },
+        },
+      }),
+      false
+    );
+    assert.equal(
+      shouldPreferTierNightEndRoute({
+        declared: "tiernight-live",
+        local: "tiernight-between",
+        state: {
+          tierNight: { lobbyStarted: false, recap: midSeriesRecap },
+          tierNightLive: {
+            lobbyStarted: true,
+            finished: false,
+            series: {
+              kind: "live",
+              phase: "between_lists",
+              roundIndex: 0,
+              roundCount: 3,
+              queue: [{}, {}, {}],
+            },
+          },
+        },
+      }),
+      false
+    );
+  });
+
+  it("last-round helper : queue.length prime sur roundCount stale", () => {
+    assert.equal(
+      isTierNightLiveSeriesLastRound({
+        roundIndex: 0,
+        roundCount: 1,
+        queue: [{}, {}, {}],
+      }),
+      false
+    );
+    assert.equal(
+      isTierNightLiveSeriesLastRound({
+        roundIndex: 2,
+        roundCount: 99,
+        queue: [{}, {}, {}],
+      }),
+      true
+    );
   });
 });
 
