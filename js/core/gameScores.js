@@ -19,16 +19,12 @@ export function applyMatchScoreDeltas(scores = {}, deltas = {}) {
   return next;
 }
 
-/** Fusion locale des matchScores (sync multijoueur, max par joueur). */
-export function mergeMatchScoresLocal(local = {}, remote = {}) {
-  const merged = { ...local };
-  Object.entries(remote).forEach(([name, pts]) => {
-    if (typeof pts === "number" && Number.isFinite(pts)) {
-      merged[name] = Math.max(merged[name] || 0, pts);
-    }
-  });
-  return merged;
-}
+export {
+  mergeMatchScoresLocal,
+  shouldReplaceMatchScoresOnFullHydrate,
+  mergeMatchScoresForFullHydrate,
+  mergeMatchScoresPatchUid,
+} from "./matchScoresMerge.js";
 
 /** @internal exporté pour tests - rangs compétition d’une score box. */
 export function rankPlayersByScoreMap(players, scores) {

@@ -24,7 +24,10 @@ import {
 import { navigate, getCurrentScreen, isScreenRegistered } from "./router.js";
 import { getLobbyParticipants, getLobbyStatus, getLobbyGameId, isLobbyEveningStarted } from "./lobby.js";
 import { getActivePlayerNames, getActivePlayers } from "./players.js";
-import { mergeMatchScoresLocal } from "./gameScores.js";
+import {
+  mergeMatchScoresForFullHydrate,
+  mergeMatchScoresPatchUid,
+} from "./matchScoresMerge.js";
 import { hydrateTruthMeterMatchScores, isTruthMeterRemoteScoreAuthority } from "./truthMeterVoteCommit.js";
 import {
   mergeTruthMeterIdentityFields,
@@ -1351,7 +1354,8 @@ function mergeHotTakeGameLocal(local, remote) {
     customTakes,
     deck: mergeCustomGameDeck(local, remote),
     takeScored: mergeRoundFlag(local.takeScored, remote.takeScored, newVoteRound),
-    matchScores: mergeMatchScoresLocal(local.matchScores || {}, remote.matchScores || {}),
+    // AUDIT-001 — clear autoritatif prep/launch vs merge max intra-partie.
+    matchScores: mergeMatchScoresForFullHydrate(local, remote),
     lastRound: remote.lastRound ?? local.lastRound ?? null,
   };
 }
@@ -1400,7 +1404,8 @@ function mergeSpeedVoteGameLocal(local, remote) {
     votes,
     ready,
     roundScored: mergeRoundFlag(local.roundScored, remote.roundScored, newVoteRound),
-    matchScores: mergeMatchScoresLocal(local.matchScores || {}, remote.matchScores || {}),
+    // AUDIT-001
+    matchScores: mergeMatchScoresForFullHydrate(local, remote),
   };
 }
 
@@ -1477,7 +1482,8 @@ function mergeClutchGameLocal(local, remote) {
     ready,
     participants,
     roundScored: mergeRoundFlag(local.roundScored, remote.roundScored, newRound),
-    matchScores: mergeMatchScoresLocal(local.matchScores || {}, remote.matchScores || {}),
+    // AUDIT-001
+    matchScores: mergeMatchScoresForFullHydrate(local, remote),
     lastRound: remote.lastRound ?? local.lastRound ?? null,
   };
 }
@@ -1541,7 +1547,8 @@ function mergeWrongAnswerGameLocal(local, remote) {
     votes,
     ready,
     roundScored: mergeRoundFlag(local.roundScored, remote.roundScored, newRound),
-    matchScores: mergeMatchScoresLocal(local.matchScores || {}, remote.matchScores || {}),
+    // AUDIT-001
+    matchScores: mergeMatchScoresForFullHydrate(local, remote),
     lastRound: newRound ? remote.lastRound ?? null : remote.lastRound ?? local.lastRound ?? null,
   };
 }
@@ -1930,7 +1937,8 @@ function mergeDilemmaGameLocal(local, remote) {
     customDilemmas,
     deck: mergeCustomGameDeck(local, remote),
     roundScored: mergeRoundFlag(local.roundScored, remote.roundScored, newVoteRound),
-    matchScores: mergeMatchScoresLocal(local.matchScores || {}, remote.matchScores || {}),
+    // AUDIT-001
+    matchScores: mergeMatchScoresForFullHydrate(local, remote),
     lastRound: remote.lastRound ?? local.lastRound ?? null,
   };
 }
@@ -4979,9 +4987,11 @@ async function patchGameStateInner(
         incHt.takeScored,
         newHtVote
       );
-      nextState.hotTake.matchScores = mergeRemoteMatchScoresUid(
+      // AUDIT-001 — omit ≠ clear ; `{}` explicite = clear autoritatif.
+      nextState.hotTake.matchScores = mergeMatchScoresPatchUid(
         curHt.matchScores || {},
-        incHt.matchScores || {}
+        incHt.matchScores,
+        { keyPresent: Object.prototype.hasOwnProperty.call(incHt, "matchScores") }
       );
       if (incHt.lastRound != null) {
         nextState.hotTake.lastRound = incHt.lastRound;
@@ -5002,9 +5012,10 @@ async function patchGameStateInner(
         }
       : incSv;
     if (curSv && incSv && nextState.speedVote) {
-      nextState.speedVote.matchScores = mergeRemoteMatchScoresUid(
+      nextState.speedVote.matchScores = mergeMatchScoresPatchUid(
         curSv.matchScores || {},
-        incSv.matchScores || {}
+        incSv.matchScores,
+        { keyPresent: Object.prototype.hasOwnProperty.call(incSv, "matchScores") }
       );
     }
   }
@@ -5032,9 +5043,10 @@ async function patchGameStateInner(
         }
       : incRz;
     if (curRz && incRz && nextState.clutch) {
-      nextState.clutch.matchScores = mergeRemoteMatchScoresUid(
+      nextState.clutch.matchScores = mergeMatchScoresPatchUid(
         curRz.matchScores || {},
-        incRz.matchScores || {}
+        incRz.matchScores,
+        { keyPresent: Object.prototype.hasOwnProperty.call(incRz, "matchScores") }
       );
       if (incRz.lastRound != null) {
         nextState.clutch.lastRound = incRz.lastRound;
@@ -5057,9 +5069,10 @@ async function patchGameStateInner(
         }
       : incWa;
     if (curWa && incWa && nextState.wrongAnswer) {
-      nextState.wrongAnswer.matchScores = mergeRemoteMatchScoresUid(
+      nextState.wrongAnswer.matchScores = mergeMatchScoresPatchUid(
         curWa.matchScores || {},
-        incWa.matchScores || {}
+        incWa.matchScores,
+        { keyPresent: Object.prototype.hasOwnProperty.call(incWa, "matchScores") }
       );
       if (newWaRound) {
         nextState.wrongAnswer.lastRound = incWa.lastRound ?? null;
@@ -5178,9 +5191,10 @@ async function patchGameStateInner(
         incDm.roundScored,
         newDmVote
       );
-      nextState.dilemma.matchScores = mergeRemoteMatchScoresUid(
+      nextState.dilemma.matchScores = mergeMatchScoresPatchUid(
         curDm.matchScores || {},
-        incDm.matchScores || {}
+        incDm.matchScores,
+        { keyPresent: Object.prototype.hasOwnProperty.call(incDm, "matchScores") }
       );
       if (incDm.lastRound != null) {
         nextState.dilemma.lastRound = incDm.lastRound;

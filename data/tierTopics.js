@@ -420,7 +420,7 @@ export const TIER_LISTS = [
     items: [
       "Le motivé",
       "Le down pour tout",
-      "Le drama queen soft",
+      "Le drama queen",
       "Le fact-checker",
       "Le ghoster affectionné",
       "Le photographe officiel",
