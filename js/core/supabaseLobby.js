@@ -281,13 +281,20 @@ function scheduleRealtimeReconnect() {
     1000 * Math.pow(2, realtimeReconnectAttempts)
   );
   realtimeReconnectAttempts += 1;
+  const scheduledPresenceLobbyId = presenceLobbyId;
   realtimeReconnectTimer = setTimeout(() => {
     realtimeReconnectTimer = null;
+    if (!presenceLobbyId || presenceLobbyId !== scheduledPresenceLobbyId) return;
+    // Race : foreground / resubscribe manuel a déjà reconstruit un canal vivant
+    if (
+      realtimeChannel &&
+      (lobbyRealtimeStatus === "subscribed" || lobbyRealtimeStatus === "subscribing")
+    ) {
+      return;
+    }
+    // AUDIT-002 : removeChannel via unsubscribe AVANT de perdre la ref (pas de null orphelin)
+    unsubscribeLobbyRealtime({ reason: "reconnect" });
     if (!presenceLobbyId) return;
-    realtimeChannel = null;
-    lobbyChannelLobbyId = null;
-    // autorise reconstruction (status error/idle, pas coalesce)
-    emitLobbyRealtimeStatus("idle", { reason: "reconnect_prepare" });
     subscribeLobbyRealtime(realtimeOnUpdate || (() => notifyLobbyBundleUpdated()));
   }, delay);
 }
@@ -539,8 +546,8 @@ export function __testResetSubscribedCatchUpInFlightForTests() {
 }
 
 /**
- * Tests ARCH-07 - patch état lobby realtime minimal pour gardes post-async.
- * @param {Partial<{ presenceLobbyId: string|null, lobbyChannelGen: number, lobbyChannelLobbyId: string|null, lobbyRealtimeStatus: string, joinSessionHydrating: boolean, realtimeChannel: object|null }>} patch
+ * Tests ARCH-07 / AUDIT-002 - patch état lobby realtime minimal pour gardes post-async.
+ * @param {Partial<{ presenceLobbyId: string|null, lobbyChannelGen: number, lobbyChannelLobbyId: string|null, lobbyRealtimeStatus: string, joinSessionHydrating: boolean, realtimeChannel: object|null, realtimeReconnectAttempts: number }>} patch
  */
 export function __testPatchSubscribedCatchUpLobbyState(patch) {
   if ("presenceLobbyId" in patch) presenceLobbyId = patch.presenceLobbyId;
@@ -549,6 +556,9 @@ export function __testPatchSubscribedCatchUpLobbyState(patch) {
   if ("lobbyRealtimeStatus" in patch) lobbyRealtimeStatus = patch.lobbyRealtimeStatus;
   if ("joinSessionHydrating" in patch) joinSessionHydrating = patch.joinSessionHydrating;
   if ("realtimeChannel" in patch) realtimeChannel = patch.realtimeChannel;
+  if ("realtimeReconnectAttempts" in patch) {
+    realtimeReconnectAttempts = patch.realtimeReconnectAttempts;
+  }
 }
 
 /** Charge la session de jeu en cours après join / create (sans router - voir navigateAfterLobbyJoin). */
@@ -2344,21 +2354,32 @@ export function subscribeLobbyRealtime(onUpdate) {
   emitLobbyRealtimeStatus("subscribing", { gen: myGen });
 
   const topic = `lobby:${lobbyId}`;
-  let builder = supabase.channel(topic);
-  builder.__lobbySubscribeCallCount = 0;
-  builder.__lobbyChannelId = `lobby-ch-${lobbyId}`;
-  builder.__lobbyGen = myGen;
+  const channel = supabase.channel(topic);
+  channel.__lobbySubscribeCallCount = 0;
+  channel.__lobbyChannelId = `lobby-ch-${lobbyId}`;
+  channel.__lobbyGen = myGen;
 
-  builder = builder
+  /** AUDIT-002 : ignorer postgres_changes / effets d'un channel remplacé. */
+  const isLiveLobbyChannelEvent = () =>
+    shouldApplyLobbySubscribeStatus({
+      eventGen: myGen,
+      currentGen: lobbyChannelGen,
+      channelRef: channel,
+      activeChannelRef: realtimeChannel,
+    });
+
+  channel
     .on(
       "postgres_changes",
       { event: "*", schema: "public", table: "lobby_members", filter: `lobby_id=eq.${lobbyId}` },
       (payload) => {
+        if (!isLiveLobbyChannelEvent()) return;
         const removedUid = payload?.eventType === "DELETE" ? payload.old?.user_id : null;
         const localUid = getSupabaseUserId();
         if (removedUid && localUid && removedUid === localUid) {
           setTimeout(() => {
             if (!getState().inLobby) return;
+            if (!isLiveLobbyChannelEvent()) return;
             void import("./lobbyClosureSession.js").then(
               ({ wasLobbyClosureHandled, isLocalHostManualDissolve }) => {
                 if (wasLobbyClosureHandled(lobbyId) || isLocalHostManualDissolve(lobbyId)) {
@@ -2380,6 +2401,7 @@ export function subscribeLobbyRealtime(onUpdate) {
       "postgres_changes",
       { event: "*", schema: "public", table: "lobby_messages", filter: `lobby_id=eq.${lobbyId}` },
       () => {
+        if (!isLiveLobbyChannelEvent()) return;
         scheduleLobbyRefresh({ withMessages: true });
       }
     )
@@ -2387,6 +2409,7 @@ export function subscribeLobbyRealtime(onUpdate) {
       "postgres_changes",
       { event: "UPDATE", schema: "public", table: "lobbies", filter: `id=eq.${lobbyId}` },
       (payload) => {
+        if (!isLiveLobbyChannelEvent()) return;
         const meaningful = isMeaningfulLobbyUpdate(payload.new);
         if (!meaningful) return;
         scheduleLobbyRefresh();
@@ -2396,6 +2419,7 @@ export function subscribeLobbyRealtime(onUpdate) {
       "postgres_changes",
       { event: "DELETE", schema: "public", table: "lobbies", filter: `id=eq.${lobbyId}` },
       async (payload) => {
+        if (!isLiveLobbyChannelEvent()) return;
         const closedId =
           payload?.old?.id != null ? String(payload.old.id) : String(lobbyId);
         const { resolveLobbyClosureAndExit } = await import("./lobby.js");
@@ -2410,6 +2434,7 @@ export function subscribeLobbyRealtime(onUpdate) {
       "postgres_changes",
       { event: "*", schema: "public", table: "game_sessions", filter: `lobby_id=eq.${lobbyId}` },
       async (payload) => {
+        if (!isLiveLobbyChannelEvent()) return;
         const epoch = captureLobbyRuntimeEpoch(lobbyId);
         if (payload.eventType === "DELETE") {
           applyRemoteSession(null, { epoch });
@@ -2431,6 +2456,7 @@ export function subscribeLobbyRealtime(onUpdate) {
             await refreshGameSession(epoch);
           }
           if (!isLobbyRuntimeEpochCurrent(epoch)) return;
+          if (!isLiveLobbyChannelEvent()) return;
           const row = getCachedGameSession();
           if (row) handleSessionRoute(row, { debugSource: "supabaseLobby/realtime/handle" });
         } catch (e) {
@@ -2440,15 +2466,15 @@ export function subscribeLobbyRealtime(onUpdate) {
       }
     );
 
-  realtimeChannel = builder;
-  builder.__lobbySubscribeCallCount = 1;
+  realtimeChannel = channel;
+  channel.__lobbySubscribeCallCount = 1;
 
-  builder.subscribe((status, err) => {
+  channel.subscribe((status, err) => {
     if (
       !shouldApplyLobbySubscribeStatus({
         eventGen: myGen,
         currentGen: lobbyChannelGen,
-        channelRef: builder,
+        channelRef: channel,
         activeChannelRef: realtimeChannel,
       })
     ) {
@@ -2472,7 +2498,7 @@ export function subscribeLobbyRealtime(onUpdate) {
         lobbyId,
         topic,
         gen: myGen,
-        subscribeCallCount: builder.__lobbySubscribeCallCount,
+        subscribeCallCount: channel.__lobbySubscribeCallCount,
         connectionState: supabase.realtime?.connectionState?.() ?? null,
       });
     }
@@ -2488,6 +2514,8 @@ export function subscribeLobbyRealtime(onUpdate) {
       return;
     }
     if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
+      // removeChannel intentionnel → CLOSED ne doit pas relancer un reconnect
+      if (channel.__intentionalClose && status === "CLOSED") return;
       emitLobbyRealtimeStatus("error", { gen: myGen });
       scheduleRealtimeReconnect();
     }

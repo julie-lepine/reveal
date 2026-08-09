@@ -35,7 +35,7 @@ Les candidats les plus proches sont classés **P1** (scores restart, channel orp
 
 ## 3. P1 — Important
 
-### AUDIT-001 — `matchScores` survivent au restart (merge max)
+### AUDIT-001 — `matchScores` survivent au restart (merge max) - Implementation ✅ / Tests ✅ / QA terrain ✅
 
 * **Sévérité :** P1
 * **Confiance :** BUG CONFIRMÉ (chemin code)
@@ -55,19 +55,18 @@ Les candidats les plus proches sont classés **P1** (scores restart, channel orp
 
 ---
 
-### AUDIT-002 — Reconnect Realtime orpheline le channel
+### AUDIT-002 — Reconnect Realtime orpheline le channel - Implementation ✅ / Tests ✅ / QA terrain ⏳
 
 * **Sévérité :** P1
 * **Confiance :** BUG PROBABLE
 * **Fichier :** `js/core/supabaseLobby.js`
-* **Fonction :** `scheduleRealtimeReconnect` (~277–292)
+* **Fonction :** `scheduleRealtimeReconnect` · `subscribeLobbyRealtime`
 * **Cause :** `realtimeChannel = null` **sans** `removeChannel` ; `subscribeLobbyRealtime` appelle `unsubscribe` sur une ref déjà nulle
 * **Scénario :** CHANNEL_ERROR/TIMEOUT → timer → null ref → nouveau subscribe → ancien Phoenix channel peut rester vivant
 * **Impact :** doubles events → double `applyRemoteSession` / `handleSessionRoute` / auto-actions (reveal, advance)
 * **Preuve :** reconnect nullifie avant resubscribe ; `unsubscribeLobbyRealtime` ne peut plus retirer l’ancien ; les handlers `postgres_changes` **ne filtrent pas** `lobbyChannelGen` (seul le status `subscribe` le fait)
-* **Tests existants :** ARCH-07 teste catch-up, pas ce path reconnect
-* **Tests manquants :** AUDIT-TEST-02
-* **Recommandation :** `removeChannel(old)` avant null ; garde `gen` dans les callbacks `postgres_changes`
+* **Tests :** `tests/audit002RealtimeReconnect.test.js` (AUDIT-TEST-02)
+* **Fix :** reconnect via `unsubscribeLobbyRealtime` (removeChannel) ; garde gen/ref sur `postgres_changes` ; ignore CLOSED intentionnel
 
 ---
 
