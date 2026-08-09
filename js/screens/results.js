@@ -10,6 +10,7 @@ import {
   resolveLastGameForRestart,
 } from "../core/restartGame.js";
 import { eveningGameLeaderboardsHtml } from "../core/gameScores.js";
+import { lastGamePodiumHtml } from "../core/lastGamePodium.js";
 import { formatPlayerWithBadge } from "../core/badges.js";
 import {
   isGameSyncActive,
@@ -29,13 +30,14 @@ export function mountResults(app) {
     const last = resolveLastGameForRestart();
     const status = getLobbyStatus();
     const gameId = getLobbyGameId();
+    const podiumHtml = lastGamePodiumHtml(last);
 
     const lastBlock = last
       ? `
     <div class="card card--highlight">
       <p class="card-heading">Dernière partie</p>
       <p class="evening-recap__title">${escapeHtml(last.title || last.gameId)}</p>
-      <p class="hint">${escapeHtml(last.summary || "")}</p>
+      ${podiumHtml || `<p class="hint">${escapeHtml(last.summary || "")}</p>`}
       ${eveningRecapRestartButtonHtml(last)}
     </div>`
       : `<p class="hint">Aucune partie récente.</p>`;

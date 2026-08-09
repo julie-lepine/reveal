@@ -1,6 +1,6 @@
 /**
- * Contrat Hot Take B2 : podium in-game (phase final) puis clôture explicite.
- * Miroir de finishHotTakeGame / showEveningResults (hotTake.js).
+ * Contrat Hot Take fin de partie :
+ * dernière révélation → « Voir les résultats » (podium dans results, pas de phase final).
  */
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
@@ -12,154 +12,96 @@ function completeGameSessionGameId(screen, gameId) {
 }
 
 function finishHotTakeDecision({ mp, canActAsHost, phase }) {
-  if (phase === "final") {
+  if (mp && !canActAsHost) {
     return {
       callCompleteGameSession: false,
       resetBeforeClose: false,
       recordPlayed: false,
-      commitScreen: null,
-      renderPodium: true,
-      phase: "final",
-    };
-  }
-  if (mp && canActAsHost) {
-    return {
-      callCompleteGameSession: false,
-      resetBeforeClose: false,
-      recordPlayed: true,
-      commitScreen: "hottake",
-      renderPodium: true,
-      phase: "final",
-    };
-  }
-  if (!mp) {
-    return {
-      callCompleteGameSession: false,
-      resetBeforeClose: false,
-      recordPlayed: true,
-      commitScreen: null,
-      renderPodium: true,
-      phase: "final",
-      soloSave: true,
-    };
-  }
-  return {
-    callCompleteGameSession: false,
-    resetBeforeClose: false,
-    recordPlayed: false,
-    renderPodium: false,
-  };
-}
-
-function showEveningResultsDecision({ mp, canActAsHost }) {
-  if (mp) {
-    if (!canActAsHost) {
-      return {
-        callCompleteGameSession: false,
-        resetBeforeClose: false,
-        navigateResults: false,
-      };
-    }
-    return {
-      callCompleteGameSession: true,
-      resetBeforeClose: true,
-      screen: "results",
-      gameIdWritten: completeGameSessionGameId("results", "hottake"),
+      setLastGameStandings: false,
       navigateResults: false,
+      commitPhaseFinal: false,
+    };
+  }
+  if (phase === "final") {
+    return {
+      callCompleteGameSession: Boolean(mp),
+      resetBeforeClose: true,
+      recordPlayed: false,
+      setLastGameStandings: false,
+      navigateResults: !mp,
+      commitPhaseFinal: false,
     };
   }
   return {
-    callCompleteGameSession: false,
+    callCompleteGameSession: Boolean(mp),
     resetBeforeClose: true,
-    navigateResults: true,
+    recordPlayed: true,
+    setLastGameStandings: true,
+    navigateResults: !mp,
+    commitPhaseFinal: false,
+    screen: mp ? "results" : null,
+    gameIdWritten: mp ? completeGameSessionGameId("results", "hottake") : null,
   };
 }
 
-function podiumChrome({ mp, canActAsHost }) {
-  return {
-    showContinueAction: !mp || canActAsHost,
-  };
+function lastRevealCtaLabel({ takeIdx, total }) {
+  return takeIdx < total - 1 ? "Prochain Hot Take →" : "Voir les résultats →";
 }
 
-describe("Hot Take MP podium stay-on-game (I-PG-01 B2)", () => {
-  it("MP host : finishHotTakeGame n’appelle pas completeGameSession", () => {
+describe("Hot Take fin de partie → résultats avec podium (I-PG-01)", () => {
+  it("MP host : dernière manche saute le podium in-game et clôture vers results", () => {
     const d = finishHotTakeDecision({
       mp: true,
       canActAsHost: true,
       phase: "reveal",
     });
-    assert.equal(d.callCompleteGameSession, false);
-    assert.equal(d.resetBeforeClose, false);
-  });
-
-  it("MP host : session écrite screen hottake + phase final + render podium", () => {
-    const d = finishHotTakeDecision({
-      mp: true,
-      canActAsHost: true,
-      phase: "reveal",
-    });
-    assert.equal(d.commitScreen, "hottake");
-    assert.equal(d.phase, "final");
-    assert.equal(d.renderPodium, true);
+    assert.equal(d.commitPhaseFinal, false);
     assert.equal(d.recordPlayed, true);
+    assert.equal(d.setLastGameStandings, true);
+    assert.equal(d.resetBeforeClose, true);
+    assert.equal(d.callCompleteGameSession, true);
+    assert.equal(d.screen, "results");
+    assert.equal(d.gameIdWritten, "menu");
   });
 
-  it("phase déjà final : render only, pas de record / reset / clôture", () => {
-    const d = finishHotTakeDecision({
-      mp: true,
-      canActAsHost: true,
-      phase: "final",
-    });
-    assert.equal(d.renderPodium, true);
-    assert.equal(d.recordPlayed, false);
-    assert.equal(d.callCompleteGameSession, false);
-    assert.equal(d.resetBeforeClose, false);
-  });
-
-  it("solo : podium rendu, pas de completeGameSession, pas de reset anticipé", () => {
+  it("solo : record + standings puis navigate results, pas de phase final", () => {
     const d = finishHotTakeDecision({
       mp: false,
       canActAsHost: true,
       phase: "reveal",
     });
-    assert.equal(d.renderPodium, true);
+    assert.equal(d.commitPhaseFinal, false);
+    assert.equal(d.recordPlayed, true);
+    assert.equal(d.setLastGameStandings, true);
+    assert.equal(d.navigateResults, true);
     assert.equal(d.callCompleteGameSession, false);
-    assert.equal(d.resetBeforeClose, false);
-    assert.equal(d.soloSave, true);
   });
 
-  it("CTA Voir les résultats (MP host) → reset puis completeGameSession results + game_id menu", () => {
-    const d = showEveningResultsDecision({ mp: true, canActAsHost: true });
-    assert.equal(d.resetBeforeClose, true);
-    assert.equal(d.callCompleteGameSession, true);
-    assert.equal(d.screen, "results");
-    assert.equal(d.gameIdWritten, "menu");
-    assert.equal(d.navigateResults, false);
-  });
-
-  it("invité : pas de CTA clôture, pas de completeGameSession", () => {
-    const evening = showEveningResultsDecision({ mp: true, canActAsHost: false });
-    assert.equal(evening.callCompleteGameSession, false);
-    assert.equal(evening.resetBeforeClose, false);
-    const chrome = podiumChrome({ mp: true, canActAsHost: false });
-    assert.equal(chrome.showContinueAction, false);
-  });
-
-  it("acting host : CTA résultats + clôture autorisée", () => {
-    const chrome = podiumChrome({ mp: true, canActAsHost: true });
-    assert.equal(chrome.showContinueAction, true);
-    const evening = showEveningResultsDecision({ mp: true, canActAsHost: true });
-    assert.equal(evening.callCompleteGameSession, true);
-  });
-
-  it("finish ne reset pas ; seul showEveningResults reset avant clôture", () => {
-    const finish = finishHotTakeDecision({
+  it("phase legacy final : clôture sans re-record", () => {
+    const d = finishHotTakeDecision({
       mp: true,
       canActAsHost: true,
+      phase: "final",
+    });
+    assert.equal(d.recordPlayed, false);
+    assert.equal(d.setLastGameStandings, false);
+    assert.equal(d.callCompleteGameSession, true);
+    assert.equal(d.resetBeforeClose, true);
+  });
+
+  it("invité : pas de clôture depuis finish", () => {
+    const d = finishHotTakeDecision({
+      mp: true,
+      canActAsHost: false,
       phase: "reveal",
     });
-    const evening = showEveningResultsDecision({ mp: true, canActAsHost: true });
-    assert.equal(finish.resetBeforeClose, false);
-    assert.equal(evening.resetBeforeClose, true);
+    assert.equal(d.callCompleteGameSession, false);
+    assert.equal(d.recordPlayed, false);
+    assert.equal(d.setLastGameStandings, false);
+  });
+
+  it("CTA dernière manche : Voir les résultats (plus Voir le podium)", () => {
+    assert.equal(lastRevealCtaLabel({ takeIdx: 0, total: 3 }), "Prochain Hot Take →");
+    assert.equal(lastRevealCtaLabel({ takeIdx: 2, total: 3 }), "Voir les résultats →");
   });
 });

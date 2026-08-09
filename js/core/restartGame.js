@@ -80,11 +80,6 @@ export async function runWithChatRouletteLaunchPermit(permit, fn) {
   }
 }
 
-/** @deprecated - utiliser runWithChatRouletteLaunchPermit */
-export async function runWithChatRouletteLaunchBypass(fn) {
-  return fn();
-}
-
 /**
  * Bloque uniquement une roulette **active** (TTL hybride centralisé).
  * Autorise le lancement si un permit cible exactement cette roulette + tile

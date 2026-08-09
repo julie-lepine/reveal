@@ -368,26 +368,6 @@ export async function resumeHotTakeVote() {
   });
 }
 
-/** @deprecated Utiliser pauseHotTakeVote */
-export async function setHotTakePausedBy(name) {
-  const s = getHotTakeSession();
-  let rem = HOT_TAKE_TIMER_SEC;
-  if (s.voteEndsAt) {
-    rem = Math.max(
-      0,
-      Math.ceil((new Date(s.voteEndsAt).getTime() - Date.now()) / 1000)
-    );
-  } else if (s.voteTimerRemaining != null) {
-    rem = s.voteTimerRemaining;
-  }
-  return pauseHotTakeVote(name, rem);
-}
-
-/** @deprecated Utiliser resumeHotTakeVote */
-export async function clearHotTakePause() {
-  return resumeHotTakeVote();
-}
-
 export async function resetHotTakeSession() {
   await syncHotTakeSession(defaultSession());
 }

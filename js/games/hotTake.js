@@ -25,14 +25,9 @@ import {
 } from "../core/gameScores.js";
 import { getActivePlayers, getActivePlayerNames } from "../core/players.js";
 import { createSyncPending } from "../core/syncPending.js";
-import {
-  formatNameList,
-  formatWinnersLabel,
-  medalForCompetitionRank,
-  winnersAtRank,
-  withCompetitionRanks,
-} from "../core/competitionRank.js";
+import { formatWinnersLabel, withCompetitionRanks } from "../core/competitionRank.js";
 import { getLocalDisplayName, recordHotTakePlayed, setLastGame } from "../core/state.js";
+import { serializeLastGameStandings } from "../core/lastGamePodium.js";
 import { setLobbyPlaying, setLobbyWaiting } from "../core/lobby.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
 import { withClickLock } from "../core/actionLock.js";
@@ -67,48 +62,6 @@ function buildHotTakeStandings(matchScores = {}) {
     }))
     .sort((a, b) => b.score - a.score || a.name.localeCompare(b.name));
   return withCompetitionRanks(sorted, (p) => p.score);
-}
-
-function finalHotTakeResultsHtml({
-  standings = [],
-  showContinueAction = true,
-  continueAction = "show-results",
-  continueLabel = "Voir les résultats",
-  waitingText = "En attente de l'hôte pour afficher les résultats…",
-} = {}) {
-  const winners = winnersAtRank(standings, 1);
-  const winnerNames = formatNameList(winners.map((w) => w.name));
-  const multi = winners.length > 1;
-  const score = winners[0]?.score ?? 0;
-  const summary = winnerNames
-    ? multi
-      ? `<p class="hint hottake-final__summary">👑 <strong>${escapeHtml(winnerNames)}</strong> remportent la partie avec <strong>${score} pts</strong>.</p>`
-      : `<p class="hint hottake-final__summary">👑 <strong>${escapeHtml(winnerNames)}</strong> remporte la partie avec <strong>${score} pts</strong>.</p>`
-    : "";
-  return `
-    <div class="card card--highlight hottake-final">
-      <p class="label-upper label-upper--hot">🔥 Hot Take</p>
-      <h3 class="section-title">Podium final</h3>
-      ${summary}
-      <div class="trivia-results__podium">
-        ${standings
-          .map(
-            (player) => `
-          <div class="trivia-results__row ${player.rank <= 3 ? "trivia-results__row--winner" : ""} ${player.rank === 1 ? "trivia-results__row--champion" : ""}">
-            <span class="trivia-results__medal">${medalForCompetitionRank(player.rank)}</span>
-            <div class="avatar avatar--sm" style="background:${player.color}">${player.emoji}</div>
-            <span class="player-name trivia-results__name">${escapeHtml(player.name)}</span>
-            <span class="trivia-results__score">${player.score} pts</span>
-          </div>`
-          )
-          .join("")}
-      </div>
-      ${
-        showContinueAction
-          ? `<button type="button" class="btn btn-primary btn--spaced" data-hottake-action="${escapeHtml(continueAction)}">${escapeHtml(continueLabel)}</button>`
-          : `<p class="hint">${escapeHtml(waitingText)}</p>`
-      }
-    </div>`;
 }
 
 export function mountHotTake(app) {
@@ -366,43 +319,22 @@ export function mountHotTake(app) {
   }
 
   async function finishHotTakeGame() {
-    const live = getHotTakeSession();
-    if (live.phase === "final") {
-      if (!mount.isMounted()) return;
-      if (!mount.isCurrentMount()) return;
-      render();
-      return;
-    }
+    if (mp && !canActAsHost()) return;
 
-    const standings = buildHotTakeStandings(live.matchScores || {});
-    if (!mp || canActAsHost()) {
+    const live = getHotTakeSession();
+    // Podium affiché sur l'écran résultats (plus de phase intermédiaire).
+    if (live.phase !== "final") {
+      const standings = buildHotTakeStandings(live.matchScores || {});
       recordHotTakePlayed();
       setLastGame({
         gameId: "hottake",
         title: "Hot Take",
         summary: `${TAKES.length} prises · ${formatWinnersLabel(standings)}`,
+        standings: serializeLastGameStandings(standings),
       });
     }
 
-    const finalSession = {
-      ...live,
-      phase: "final",
-    };
-
-    if (mp && canActAsHost()) {
-      await commitHotTakePlay(finalSession, { screen: "hottake" });
-      if (!mount.isMounted()) return;
-      if (!mount.isCurrentMount()) return;
-      render();
-      return;
-    }
-
-    if (!mp) {
-      await commitHotTakePlay(finalSession);
-      if (!mount.isMounted()) return;
-      if (!mount.isCurrentMount()) return;
-      render();
-    }
+    await showEveningResults();
   }
 
   async function showEveningResults() {
@@ -787,7 +719,7 @@ export function mountHotTake(app) {
         ${
           host
             ? `<button type="button" class="btn btn-primary btn--spaced" id="next-take">
-          ${takeIdx < total - 1 ? "Prochain Hot Take →" : "Voir le podium →"}
+          ${takeIdx < total - 1 ? "Prochain Hot Take →" : "Voir les résultats →"}
         </button>`
             : `<p class="hint">En attente de l'hôte pour la suite…</p>`
         }
@@ -799,14 +731,19 @@ export function mountHotTake(app) {
         })}`;
     }
 
+    // Legacy : ancienne session encore en phase final → bascule vers résultats.
     if (phase === "final") {
-      phaseHtml = finalHotTakeResultsHtml({
-        standings: buildHotTakeStandings(hotTakeSessionScores()),
-        showContinueAction: !mp || canActAsHost(),
-        continueAction: "show-results",
-        continueLabel: "Voir les résultats",
-        waitingText: "En attente de l'hôte pour afficher les résultats…",
-      });
+      phaseHtml = `
+        <div class="card card--highlight hottake-final">
+          <p class="label-upper label-upper--hot">🔥 Hot Take</p>
+          <h3 class="section-title">Partie terminée</h3>
+          <p class="hint">Le podium s'affiche dans les résultats de la soirée.</p>
+          ${
+            !mp || canActAsHost()
+              ? `<button type="button" class="btn btn-primary btn--spaced" data-hottake-action="show-results">Voir les résultats</button>`
+              : `<p class="hint">En attente de l'hôte pour afficher les résultats…</p>`
+          }
+        </div>`;
     }
 
     const mainContent =

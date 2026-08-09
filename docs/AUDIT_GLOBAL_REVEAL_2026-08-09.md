@@ -179,19 +179,23 @@ Les candidats les plus proches sont classés **P1** (scores restart, channel orp
 * **Correctif :** suppression du calcul mort `skippedActivePlay` + commentaire de contrat (aucun changement de comportement).
 * **Tests :** `tests/audit010ActivePlayRouting.test.js` (+ `sessionRouteRestartDecision.test.js`)
 
-### AUDIT-011 — `setLobbyPlaying(...).catch(() => {})` silencieux
+### AUDIT-011 — `setLobbyPlaying(...).catch(() => {})` silencieux - DETTE ACCEPTÉE ✅
 
 * `js/games/*`
 * Accepté M-11 / ARCH-07
 * **Type :** DETTE observabilité
 * **Sévérité :** P3
+* **Clôture :** conservation volontaire — pas de correctif dans ce cycle d’audit
 
-### AUDIT-012 — Helpers deprecated encore exportés
+### AUDIT-012 — Helpers deprecated encore exportés - DEAD CODE CONFIRMÉ ✅ (supprimés)
 
-* `runWithChatRouletteLaunchBypass` · `setHotTakePausedBy`
-* **Type :** DEAD CODE candidat
+* **`runWithChatRouletteLaunchBypass`** (`restartGame.js`) : export-only ; runtime = `runWithChatRouletteLaunchPermit` (`chatRandomGame.js`). **Supprimé.**
+* **`setHotTakePausedBy`** (`hotTakeSession.js`) : export-only ; remplacé conceptuellement par `pauseHotTakeVote`. **Supprimé.**
+* **Companion :** `clearHotTakePause` (wrapper deprecated de `resumeHotTakeVote`) également export-only → **supprimé** avec le même ticket (même paire deprecated).
+* **Conservé :** `runWithChatRouletteLaunchPermit`, `pauseHotTakeVote`, `resumeHotTakeVote`
+* **Tests :** `tests/audit012DeprecatedHelpers.test.js`
 
-### AUDIT-013 — `clearLocalOpenLobbySlot` no-op
+### AUDIT-013 — `clearLocalOpenLobbySlot` no-op - DEAD CODE CONTRÔLÉ / dette acceptée — aucun correctif requis. ✅
 
 * Documenté ARCH-01
 * Conservé pour deps
@@ -203,10 +207,8 @@ Les candidats les plus proches sont classés **P1** (scores restart, channel orp
 
 | Élément | Fichier | Preuve d'inutilisation | Confiance | Risque suppression |
 | ------- | ------- | ---------------------- | --------- | ------------------ |
-| `runWithChatRouletteLaunchBypass` | `restartGame.js` | `@deprecated`, wrap `fn()` | Haute | Faible |
-| `setHotTakePausedBy` / resume deprecated | `hotTakeSession.js` | Marqués deprecated | Moyenne | Moyen (call sites legacy?) |
 | `clearLocalOpenLobbySlot` | `lobby.js` | Corps vide, deps leave | Haute | Moyen (tests/deps) |
-| `skippedActivePlay` | `gameSync.js` | Assigné jamais lu | Haute | Faible |
+| `skippedActivePlay` | `gameSync.js` | Assigné jamais lu → retiré AUDIT-010 | Haute | Faible |
 | Mode Consensus `extremes` UI | data/UI | Scoring encore branché, UX commentée | Moyenne | Moyen |
 | VibeCheck runtime | — | FEATURE-VIBECHECK-01 retiré | Haute | Déjà nettoyé |
 

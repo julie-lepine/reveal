@@ -1,16 +1,11 @@
 import { CONSENSUS_DEFAULT_SLIDER_VALUE, CONSENSUS_REVEAL_PENDING_MS } from "../../data/consensus.js";
-import { formatConsensusScore } from "../core/consensusSession.js";
 import { useConsensusGame } from "../core/useConsensusGame.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
 import { withClickLock } from "../core/actionLock.js";
 import { createMountGuard } from "../core/mountLifecycle.js";
 import { getActivePlayers } from "../core/players.js";
-import {
-  formatNameList,
-  formatWinnersLabel,
-  medalForCompetitionRank,
-  winnersAtRank,
-} from "../core/competitionRank.js";
+import { formatWinnersLabel } from "../core/competitionRank.js";
+import { serializeLastGameStandings } from "../core/lastGamePodium.js";
 import { goToGameSelect, setLobbyPlaying, setLobbyWaiting } from "../core/lobby.js";
 import {
   getLocalDisplayName,
@@ -20,7 +15,7 @@ import {
 } from "../core/state.js";
 import { showAppAlert, showAppConfirm } from "../core/dialog.js";
 import { navigate } from "../core/router.js";
-import { escapeHtml, pageShell } from "../core/ui.js";
+import { pageShell } from "../core/ui.js";
 import { bindNav } from "../screens/nav.js";
 import { gameExitBarHtml, bindExitGame } from "../core/exitGame.js";
 import {
@@ -142,58 +137,6 @@ function bindConsensusSlider(app, { onInput, disabled = false } = {}) {
   }
 
   update();
-}
-
-function finalConsensusResultsHtml({
-  standings = [],
-  showHostActions = true,
-  showContinueAction = true,
-  continueAction = "show-results",
-  continueLabel = "Voir les résultats",
-  waitingText = "En attente de l'hôte pour afficher les résultats…",
-} = {}) {
-  const winners = winnersAtRank(standings, 1);
-  const winnerNames = formatNameList(winners.map((w) => w.name));
-  const multi = winners.length > 1;
-  const score = winners[0] != null ? formatConsensusScore(winners[0].score) : "0";
-  const summary = winnerNames
-    ? multi
-      ? `<p class="hint consensus-final__summary">👑 <strong>${escapeHtml(winnerNames)}</strong> remportent la partie avec <strong>${score} pts</strong>.</p>`
-      : `<p class="hint consensus-final__summary">👑 <strong>${escapeHtml(winnerNames)}</strong> remporte la partie avec <strong>${score} pts</strong>.</p>`
-    : "";
-  return `
-    <div class="card card--highlight consensus-final">
-      <p class="label-upper label-upper--gold">🤝 Consensus</p>
-      <h3 class="section-title">Podium final</h3>
-      ${summary}
-      <div class="trivia-results__podium">
-        ${standings
-          .map(
-            (player) => `
-          <div class="trivia-results__row ${player.rank <= 3 ? "trivia-results__row--winner" : ""} ${player.rank === 1 ? "trivia-results__row--champion" : ""}">
-            <span class="trivia-results__medal">${medalForCompetitionRank(player.rank)}</span>
-            <div class="avatar avatar--sm" style="background:${player.color}">${player.emoji}</div>
-            <span class="player-name trivia-results__name">${escapeHtml(player.name)}</span>
-            <span class="trivia-results__score">${formatConsensusScore(player.score)} pts</span>
-          </div>`
-          )
-          .join("")}
-      </div>
-      ${
-        showHostActions
-          ? `<div class="btn-row consensus-final__actions">
-        <button type="button" class="btn btn-primary" data-consensus-action="replay">Rejouer</button>
-        <button type="button" class="btn btn-accent" data-consensus-action="change-settings">Changer réglages</button>
-      </div>
-      <button type="button" class="btn btn-secondary btn--spaced" data-consensus-action="back-select">Retour au menu des jeux</button>`
-          : `<p class="hint">${escapeHtml(waitingText)}</p>`
-      }
-      ${
-        showContinueAction
-          ? `<button type="button" class="btn btn-primary btn--spaced" data-consensus-action="${escapeHtml(continueAction)}">${escapeHtml(continueLabel)}</button>`
-          : ""
-      }
-    </div>`;
 }
 
 export function mountConsensus(app) {
@@ -687,17 +630,14 @@ export function mountConsensus(app) {
   }
 
   async function finishConsensusGame() {
+    if (mp && !canActAsHost()) return;
+
+    clearNpcTimers();
+    clearRevealPending();
+
     const live = consensus.getSession();
-    if (live.podiumApplied) {
-      if (!mount.isMounted()) return;
-      if (!mount.isCurrentMount()) return;
-      render();
-      return;
-    }
-
-    let standings = consensus.getPodiumAwards(consensus.buildStandings(live.matchScores || {}));
-
-    if (!mp || canActAsHost()) {
+    // Podium affiché sur l'écran résultats (plus de phase intermédiaire).
+    if (!live.podiumApplied) {
       const claimed = {
         ...live,
         phase: "final",
@@ -709,39 +649,17 @@ export function mountConsensus(app) {
         saveStatePatch({ consensusGame: claimed });
       }
 
-      standings = consensus.applyLobbyPodium(consensus.getSession());
+      const standings = consensus.applyLobbyPodium(consensus.getSession());
       recordConsensusPlayed();
       setLastGame({
         gameId: "consensus",
         title: "Consensus",
         summary: `${standings.length} joueur(s) · ${formatWinnersLabel(standings)}`,
+        standings: serializeLastGameStandings(standings),
       });
     }
 
-    const finalSession = {
-      ...consensus.getSession(),
-      phase: "final",
-      podiumApplied: true,
-    };
-
-    clearNpcTimers();
-    clearRevealPending();
-
-    if (mp && canActAsHost()) {
-      await consensus.commitPlay(finalSession, { screen: "consensus" });
-      if (!mount.isMounted()) return;
-      if (!mount.isCurrentMount()) return;
-      render();
-      return;
-    }
-
-    if (!mp) {
-      await setLobbyWaiting();
-      if (!mount.isMounted()) return;
-      if (!mount.isCurrentMount()) return;
-      saveStatePatch({ consensusGame: finalSession });
-      render();
-    }
+    await showEveningResults();
   }
 
   async function showEveningResults() {
@@ -846,7 +764,7 @@ export function mountConsensus(app) {
         ${
           !mp || canActAsHost()
             ? `<button type="button" class="btn btn-primary btn--spaced" id="btn-consensus-next">
-                ${questionIdx < totalQuestions - 1 ? "Question suivante →" : "Voir le podium →"}
+                ${questionIdx < totalQuestions - 1 ? "Question suivante →" : "Voir les résultats →"}
               </button>`
             : `<p class="hint">En attente de l'hôte pour la suite…</p>`
         }
@@ -857,15 +775,26 @@ export function mountConsensus(app) {
           deltaMap: lastRound?.deltas || {},
         })}`;
     } else {
+      // Legacy : session encore en phase final → bascule vers résultats.
       phaseHtml = `
-        ${finalConsensusResultsHtml({
-          standings,
-          showHostActions: !mp || isLobbyHost(),
-          showContinueAction: !mp || canActAsHost(),
-          continueAction: "show-results",
-          continueLabel: "Voir les résultats",
-          waitingText: "En attente de l'hôte pour afficher les résultats…",
-        })}
+        <div class="card card--highlight consensus-final">
+          <p class="label-upper label-upper--gold">🤝 Consensus</p>
+          <h3 class="section-title">Partie terminée</h3>
+          <p class="hint">Le podium s'affiche dans les résultats de la soirée.</p>
+          ${
+            !mp || canActAsHost()
+              ? `<button type="button" class="btn btn-primary btn--spaced" data-consensus-action="show-results">Voir les résultats</button>`
+              : `<p class="hint">En attente de l'hôte pour afficher les résultats…</p>`
+          }
+          ${
+            !mp || isLobbyHost()
+              ? `<div class="btn-row consensus-final__actions">
+                  <button type="button" class="btn btn-secondary" data-consensus-action="replay">Rejouer</button>
+                  <button type="button" class="btn btn-accent" data-consensus-action="change-settings">Changer réglages</button>
+                </div>`
+              : ""
+          }
+        </div>
         ${renderConsensusScoreboard({
           standings,
           title: "Classement final Consensus",

@@ -1,6 +1,6 @@
 /**
- * Contrat I-PG-01 étape A : fin Consensus MP = podium in-game, puis clôture explicite.
- * Miroir de finishConsensusGame / showEveningResults (consensus.js), sans monter le DOM.
+ * Contrat Consensus fin de partie :
+ * dernière révélation → « Voir les résultats » (podium dans results, pas d’écran podium).
  */
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
@@ -11,138 +11,83 @@ function completeGameSessionGameId(screen, gameId) {
   return POST_GAME_SCREENS.has(screen) ? "menu" : gameId;
 }
 
-/** Décision finishConsensusGame (branche MP host / solo / podium déjà appliqué). */
 function finishConsensusDecision({ mp, canActAsHost, podiumApplied }) {
-  if (podiumApplied) {
+  if (mp && !canActAsHost) {
     return {
       callCompleteGameSession: false,
-      commitScreen: null,
-      renderPodium: true,
-      phase: "final",
-    };
-  }
-  if (mp && canActAsHost) {
-    return {
-      callCompleteGameSession: false,
-      commitScreen: "consensus",
-      renderPodium: true,
-      phase: "final",
-    };
-  }
-  if (!mp) {
-    return {
-      callCompleteGameSession: false,
-      commitScreen: null,
-      renderPodium: true,
-      phase: "final",
-      soloSave: true,
-    };
-  }
-  return {
-    callCompleteGameSession: false,
-    commitScreen: null,
-    renderPodium: false,
-  };
-}
-
-/** Décision showEveningResults. */
-function showEveningResultsDecision({ mp, canActAsHost }) {
-  if (mp) {
-    if (!canActAsHost) {
-      return { callCompleteGameSession: false, navigateResults: false };
-    }
-    return {
-      callCompleteGameSession: true,
-      screen: "results",
-      gameIdWritten: completeGameSessionGameId("results", "consensus"),
+      applyLobbyPodium: false,
+      setLastGameStandings: false,
+      commitPhaseFinal: false,
       navigateResults: false,
     };
   }
   return {
-    callCompleteGameSession: false,
-    navigateResults: true,
+    callCompleteGameSession: Boolean(mp),
+    applyLobbyPodium: !podiumApplied,
+    setLastGameStandings: !podiumApplied,
+    commitPhaseFinal: !podiumApplied,
+    navigateResults: !mp,
+    screen: mp ? "results" : null,
+    gameIdWritten: mp ? completeGameSessionGameId("results", "consensus") : null,
+    stayOnPodiumScreen: false,
   };
 }
 
-/** Qui voit le CTA podium (miroir render). */
-function podiumChrome({ mp, isLobbyHost, canActAsHost }) {
-  return {
-    showHostActions: !mp || isLobbyHost,
-    showContinueAction: !mp || canActAsHost,
-  };
+function lastRevealCtaLabel({ questionIdx, totalQuestions }) {
+  return questionIdx < totalQuestions - 1 ? "Question suivante →" : "Voir les résultats →";
 }
 
-describe("Consensus MP podium stay-on-game (I-PG-01 A)", () => {
-  it("MP host : finishConsensusGame n’appelle pas completeGameSession", () => {
+describe("Consensus fin de partie → résultats avec podium (I-PG-01)", () => {
+  it("MP host : scoring puis clôture results, pas d’écran podium", () => {
     const d = finishConsensusDecision({
       mp: true,
       canActAsHost: true,
       podiumApplied: false,
     });
-    assert.equal(d.callCompleteGameSession, false);
+    assert.equal(d.stayOnPodiumScreen, false);
+    assert.equal(d.applyLobbyPodium, true);
+    assert.equal(d.setLastGameStandings, true);
+    assert.equal(d.commitPhaseFinal, true);
+    assert.equal(d.callCompleteGameSession, true);
+    assert.equal(d.screen, "results");
+    assert.equal(d.gameIdWritten, "menu");
   });
 
-  it("MP host : session écrite reste screen consensus + phase final + render podium", () => {
-    const d = finishConsensusDecision({
-      mp: true,
-      canActAsHost: true,
-      podiumApplied: false,
-    });
-    assert.equal(d.commitScreen, "consensus");
-    assert.equal(d.phase, "final");
-    assert.equal(d.renderPodium, true);
-  });
-
-  it("podium déjà appliqué : render podium, pas de clôture silencieuse", () => {
-    const d = finishConsensusDecision({
-      mp: true,
-      canActAsHost: true,
-      podiumApplied: true,
-    });
-    assert.equal(d.callCompleteGameSession, false);
-    assert.equal(d.renderPodium, true);
-  });
-
-  it("solo : podium rendu, pas de completeGameSession", () => {
+  it("solo : scoring + navigate results", () => {
     const d = finishConsensusDecision({
       mp: false,
       canActAsHost: true,
       podiumApplied: false,
     });
-    assert.equal(d.renderPodium, true);
+    assert.equal(d.stayOnPodiumScreen, false);
+    assert.equal(d.applyLobbyPodium, true);
+    assert.equal(d.navigateResults, true);
     assert.equal(d.callCompleteGameSession, false);
-    assert.equal(d.soloSave, true);
   });
 
-  it("CTA Voir les résultats (MP host) → completeGameSession screen results + game_id menu", () => {
-    const d = showEveningResultsDecision({ mp: true, canActAsHost: true });
-    assert.equal(d.callCompleteGameSession, true);
-    assert.equal(d.screen, "results");
-    assert.equal(d.gameIdWritten, "menu");
-    assert.equal(d.navigateResults, false);
-  });
-
-  it("invité : pas de CTA clôture, pas de completeGameSession", () => {
-    const evening = showEveningResultsDecision({ mp: true, canActAsHost: false });
-    assert.equal(evening.callCompleteGameSession, false);
-    const chrome = podiumChrome({
+  it("podium déjà appliqué : clôture sans re-score", () => {
+    const d = finishConsensusDecision({
       mp: true,
-      isLobbyHost: false,
-      canActAsHost: false,
-    });
-    assert.equal(chrome.showContinueAction, false);
-    assert.equal(chrome.showHostActions, false);
-  });
-
-  it("acting host non-lobby-host : CTA résultats, pas les actions replay hôte", () => {
-    const chrome = podiumChrome({
-      mp: true,
-      isLobbyHost: false,
       canActAsHost: true,
+      podiumApplied: true,
     });
-    assert.equal(chrome.showContinueAction, true);
-    assert.equal(chrome.showHostActions, false);
-    const evening = showEveningResultsDecision({ mp: true, canActAsHost: true });
-    assert.equal(evening.callCompleteGameSession, true);
+    assert.equal(d.applyLobbyPodium, false);
+    assert.equal(d.setLastGameStandings, false);
+    assert.equal(d.callCompleteGameSession, true);
+  });
+
+  it("invité : pas de clôture", () => {
+    const d = finishConsensusDecision({
+      mp: true,
+      canActAsHost: false,
+      podiumApplied: false,
+    });
+    assert.equal(d.callCompleteGameSession, false);
+    assert.equal(d.applyLobbyPodium, false);
+  });
+
+  it("CTA dernière question : Voir les résultats", () => {
+    assert.equal(lastRevealCtaLabel({ questionIdx: 0, totalQuestions: 5 }), "Question suivante →");
+    assert.equal(lastRevealCtaLabel({ questionIdx: 4, totalQuestions: 5 }), "Voir les résultats →");
   });
 });

@@ -6,6 +6,8 @@ import { createActionLock, withClickLock } from "../core/actionLock.js";
 import { createMountGuard } from "../core/mountLifecycle.js";
 import { getActivePlayers } from "../core/players.js";
 import { formatWinnersLabel } from "../core/competitionRank.js";
+import { serializeLastGameStandings } from "../core/lastGamePodium.js";
+import { triviaEveningPoints } from "../core/triviaScoring.js";
 import { goToGameSelect, setLobbyPlaying, setLobbyWaiting } from "../core/lobby.js";
 import { getLocalDisplayName, recordTriviaPlayed, saveStatePatch, setLastGame } from "../core/state.js";
 import { showAppAlert } from "../core/dialog.js";
@@ -27,7 +29,6 @@ import {
   triviaToRemote,
 } from "../core/gameSync.js";
 import { renderTriviaQuestion } from "../trivia/TriviaQuestion.js";
-import { renderTriviaResults } from "../trivia/TriviaResults.js";
 import { renderTriviaScoreboard } from "../trivia/TriviaScoreboard.js";
 import { arch03AhLogSkipDecision } from "../core/arch03ActingHostDebug.js";
 import {
@@ -392,18 +393,14 @@ export function mountTrivia(app) {
 
   async function finishTriviaGame() {
     if (finishInFlight) return;
-    const live = trivia.getSession();
-    if (live.phase === "final" && eveningPodiumApplied) {
-      if (!mount.isMounted()) return;
-      if (!mount.isCurrentMount()) return;
-      render();
-      return;
-    }
+    if (mp && !canActAsHost()) return;
 
     finishInFlight = true;
     clearNpcTimers();
     try {
-      if (mp && canActAsHost()) {
+      // Scoring podium conservé ; affichage podium déplacé vers l'écran résultats.
+      if (mp) {
+        const live = trivia.getSession();
         if (!live.podiumApplied) {
           await trivia.commitFinalPlay();
         }
@@ -417,10 +414,17 @@ export function mountTrivia(app) {
             gameId: "trivia",
             title: "Trivia Quiz",
             summary: `${standings.length} joueur(s) · ${formatWinnersLabel(standings)}`,
+            standings: serializeLastGameStandings(
+              standings.map((p) => ({
+                ...p,
+                score: triviaEveningPoints(p),
+              }))
+            ),
           });
           eveningPodiumApplied = true;
         }
-      } else if (!mp) {
+      } else if (!eveningPodiumApplied) {
+        const live = trivia.getSession();
         const scoredSession = {
           ...live,
           phase: "final",
@@ -433,14 +437,19 @@ export function mountTrivia(app) {
           gameId: "trivia",
           title: "Trivia Quiz",
           summary: `${standings.length} joueur(s) · ${formatWinnersLabel(standings)}`,
+          standings: serializeLastGameStandings(
+            standings.map((p) => ({
+              ...p,
+              score: triviaEveningPoints(p),
+            }))
+          ),
         });
         eveningPodiumApplied = true;
       }
 
       if (!mount.isMounted()) return;
       if (!mount.isCurrentMount()) return;
-      syncFromSession();
-      render();
+      await showEveningResults();
     } catch (err) {
       console.warn("REVEAL trivia finishTriviaGame:", err);
       syncFromSession();
@@ -547,7 +556,7 @@ export function mountTrivia(app) {
         ${
           !mp || canActAsHost()
             ? `<button type="button" class="btn btn-primary btn--spaced" id="btn-trivia-next">
-                ${questionIdx < totalQuestions - 1 ? "Question suivante →" : "Voir le podium →"}
+                ${questionIdx < totalQuestions - 1 ? "Question suivante →" : "Voir les résultats →"}
               </button>`
             : `<p class="hint">En attente de l'hote pour la suite…</p>`
         }
@@ -558,15 +567,26 @@ export function mountTrivia(app) {
           deltaMap: lastRound?.deltas || {},
         })}`;
     } else {
-      phaseHtml = renderTriviaResults({
-        standings,
-        themeLabel: getTriviaThemeLabel(session.selectedThemeId),
-        showHostActions: !mp || isLobbyHost(),
-        showContinueAction: !mp || canActAsHost(),
-        continueAction: "show-results",
-        continueLabel: "Voir les resultats",
-        waitingText: "En attente de l'hote pour afficher les resultats...",
-      });
+      // Legacy : session encore en phase final → bascule vers résultats.
+      phaseHtml = `
+        <div class="card card--highlight trivia-results">
+          <p class="label-upper label-upper--gold">🧠 Trivia Quiz</p>
+          <h3 class="section-title">Partie terminée</h3>
+          <p class="hint">Le podium s'affiche dans les résultats de la soirée.</p>
+          ${
+            !mp || canActAsHost()
+              ? `<button type="button" class="btn btn-primary btn--spaced" data-trivia-action="show-results">Voir les résultats</button>`
+              : `<p class="hint">En attente de l'hote pour afficher les resultats...</p>`
+          }
+          ${
+            !mp || isLobbyHost()
+              ? `<div class="btn-row trivia-results__actions">
+                  <button type="button" class="btn btn-secondary" data-trivia-action="replay">Rejouer</button>
+                  <button type="button" class="btn btn-accent" data-trivia-action="change-theme">Changer theme</button>
+                </div>`
+              : ""
+          }
+        </div>`;
     }
 
     app.innerHTML = pageShell({
