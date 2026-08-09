@@ -1,5 +1,5 @@
 /**
- * FEATURE-TIERNIGHT-SERIES-04 — préparation / payload de lancement série (pur, testable).
+ * FEATURE-TIERNIGHT-SERIES-04 - préparation / payload de lancement série (pur, testable).
  *
  * Pas d’import gameSync / lobby / Supabase : les callers injectent le roster.
  * Ordre : runId final → queue → series → payload.
@@ -23,9 +23,9 @@ import { resolveTierNightSeriesSetupCategoryIds } from "./tierNightSeriesSetup.j
  * @param {number} opts.roundCount
  * @param {string} [opts.modifier="normal"]
  * @param {() => number} [opts.rng]
- * @param {Array<{ userId?: string, name?: string }>} opts.participants — requis (fige le roster)
- * @param {Iterable<object>} [opts.customTopics] — customs lobby (FEATURE-TIERNIGHT-03-A)
- * @param {Iterable<string>|null} [opts.excludeCustomIds] — customs one-shot déjà consommés
+ * @param {Array<{ userId?: string, name?: string }>} opts.participants - requis (fige le roster)
+ * @param {Iterable<object>} [opts.customTopics] - customs lobby (FEATURE-TIERNIGHT-03-A)
+ * @param {Iterable<string>|null} [opts.excludeCustomIds] - customs one-shot déjà consommés
  */
 export function prepareTierNightSeriesLaunchAttempt({
   categoryIds,
@@ -119,7 +119,7 @@ export function prepareTierNightSeriesLaunchAttempt({
 
 /**
  * Construit local game + blob remote à partir d’une tentative validée.
- * Sérialisation série via SERIES-02 (`withTierNightSeriesRemote`) — sans gameSync.
+ * Sérialisation série via SERIES-02 (`withTierNightSeriesRemote`) - sans gameSync.
  * @param {object} attempt
  */
 export function buildTierNightSeriesLaunchPayload(attempt) {

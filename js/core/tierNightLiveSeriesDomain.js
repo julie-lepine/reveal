@@ -1,5 +1,5 @@
 /**
- * FEATURE-TIERNIGHT-04B — domaine pur Rank Live série (counts, pool officiel, builder).
+ * FEATURE-TIERNIGHT-04B - domaine pur Rank Live série (counts, pool officiel, builder).
  *
  * Sélectionne un SOUS-ENSEMBLE de listes pour une future queue (04E).
  * Ne crée pas runId / roundId / series wire / state / Supabase.
@@ -17,7 +17,7 @@ export const TIER_NIGHT_LIVE_SERIES_ROUND_COUNTS = Object.freeze([3, 5, 7]);
 
 export const DEFAULT_TIER_NIGHT_LIVE_SERIES_ROUND_COUNT = 5;
 
-/** Sentinelle forward-compat — V1 : seule valeur valide. */
+/** Sentinelle forward-compat - V1 : seule valeur valide. */
 export const TIER_NIGHT_LIVE_SERIES_ALL_CATEGORIES = "*";
 
 /**
@@ -31,7 +31,7 @@ export function isValidTierNightLiveRoundCount(value) {
 /**
  * Pool officiel V1 = tout `TIER_LISTS`.
  * Ne fusionne PAS `customTierLists` local.
- * Copie défensive (listes + items) — ne mute jamais le catalogue source.
+ * Copie défensive (listes + items) - ne mute jamais le catalogue source.
  *
  * @returns {Array<{ id: string, name: string, emoji?: string, items: string[], custom: false }>}
  */
@@ -66,10 +66,10 @@ export function validateTierNightLiveSeriesCategoryIdsV1(categoryIds) {
  * Construit le sous-ensemble de listes pour une série Rank Live.
  *
  * @param {object} [opts]
- * @param {unknown[]} [opts.officialLists] — défaut : pool officiel global
- * @param {unknown[]} [opts.customLists] — `customLiveTierLists` (pas la lib locale)
+ * @param {unknown[]} [opts.officialLists] - défaut : pool officiel global
+ * @param {unknown[]} [opts.customLists] - `customLiveTierLists` (pas la lib locale)
  * @param {unknown} opts.roundCount
- * @param {unknown} [opts.categoryIds] — V1 défaut `["*"]`
+ * @param {unknown} [opts.categoryIds] - V1 défaut `["*"]`
  * @param {() => number} [opts.random]
  * @returns {{
  *   ok: true,
@@ -157,7 +157,7 @@ export function buildTierNightLiveSeriesListSubset({
   }
 
   // Même politique REVEAL que roster/Dilemma : customs prioritaires, pas de giant-shuffle+slice.
-  // resolveEffectiveRoundCount : ne pas clamper — R strict ; assert longueur ensuite.
+  // resolveEffectiveRoundCount : ne pas clamper - R strict ; assert longueur ensuite.
   const picked = buildCombinedShuffledDeck(
     customs,
     officials,

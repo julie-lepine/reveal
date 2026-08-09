@@ -169,7 +169,7 @@ export function mountTierNight(app) {
       if (!alive) return;
 
       render();
-      // FEATURE-TIERNIGHT-03-D — série : finalize RPC ; legacy : classic end.
+      // FEATURE-TIERNIGHT-03-D - série : finalize RPC ; legacy : classic end.
       if (hasActiveTierNightSeries()) {
         if (isLobbyHost()) {
           await hostFinalizeTierNightSeriesRound({

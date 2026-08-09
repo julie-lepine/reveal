@@ -1,5 +1,5 @@
 /**
- * FEATURE-TIERNIGHT-SERIES-03 — wrapper RPC finalize_tiernight_series_round.
+ * FEATURE-TIERNIGHT-SERIES-03 - wrapper RPC finalize_tiernight_series_round.
  *
  * Ne fait AUCUN scoring local (pas d’addScore).
  * Branchement UX : hostFinalizeTierNightSeriesRound (playSession / board série).

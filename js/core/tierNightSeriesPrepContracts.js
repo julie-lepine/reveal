@@ -1,5 +1,5 @@
 /**
- * FEATURE-TIERNIGHT-03-B1 — helpers purs ledger one-shot / roster launch / prep epoch.
+ * FEATURE-TIERNIGHT-03-B1 - helpers purs ledger one-shot / roster launch / prep epoch.
  * Testables sans Supabase.
  */
 
@@ -59,7 +59,7 @@ export function mergeConsumedCustomRosterTopicIdsForHydrate(localIds, remoteIds)
  *
  * @param {object} opts
  * @param {Array<{ userId?: string, name?: string, isHost?: boolean }>} opts.participants
- * @param {string[]|null|undefined} opts.rosterNames — si fourni, filtre (force-start / ready)
+ * @param {string[]|null|undefined} opts.rosterNames - si fourni, filtre (force-start / ready)
  * @returns {{ participants: typeof opts.participants, excludedNames: string[] }}
  */
 export function resolveTierNightSeriesLaunchParticipants({
@@ -94,7 +94,7 @@ export function didTierNightSeriesPrepSetupChange(prev, next) {
   return rA !== rB;
 }
 
-/** Anciens champs wizard SERIES-04 — jamais source de vérité du prep. */
+/** Anciens champs wizard SERIES-04 - jamais source de vérité du prep. */
 export const LEGACY_SERIES_WIZARD_PREP_KEYS = [
   "path",
   "seriesPath",
@@ -140,7 +140,7 @@ export function buildAuthoritativeTierNightPrepReset({
 
 /**
  * Résolution destination roster à partir de l’état partagé (gate ignorée si session active).
- * FEATURE-TIERNIGHT-03-C1 — la gate ne choisit que le parcours de *création*.
+ * FEATURE-TIERNIGHT-03-C1 - la gate ne choisit que le parcours de *création*.
  *
  * @param {{
  *   tierNight?: object|null,
@@ -159,7 +159,7 @@ export function resolveTierNightRosterDestinationFromSharedState({
   const series = tierNight?.series;
   if (series && typeof series === "object") {
     const phase = series.phase;
-    // FEATURE-TIERNIGHT-03-E — mapping phase → écran (état partagé > gate / screen stale).
+    // FEATURE-TIERNIGHT-03-E - mapping phase → écran (état partagé > gate / screen stale).
     if (phase === "ranking") {
       return { screen: "tiernight", reason: "series_ranking", gateIgnored: true };
     }
@@ -186,7 +186,7 @@ export function resolveTierNightRosterDestinationFromSharedState({
     tierNight?.lobbyStarted &&
     !(series && typeof series === "object" && series.phase && series.phase !== "series_end")
   ) {
-    // Legacy mono actif (sans series jouable) — gate ignorée
+    // Legacy mono actif (sans series jouable) - gate ignorée
     return { screen: "tiernight", reason: "legacy_active", gateIgnored: true };
   }
 
@@ -198,7 +198,7 @@ export function resolveTierNightRosterDestinationFromSharedState({
       gateIgnored: false,
     };
   }
-  // Kill switch OFF (F) : jamais classic — select modes sûr uniquement
+  // Kill switch OFF (F) : jamais classic - select modes sûr uniquement
   return {
     screen: "tiernight-select",
     reason: "series_entry_blocked",
@@ -211,10 +211,10 @@ export function resolveTierNightRosterDestinationFromSharedState({
  * setupEpoch plus grand → settings + ready autoritatifs (clear possible).
  * setupEpoch plus petit → ignore (stale).
  * même epoch → merge ready ; settings seulement si présents dans inc.
- * poolInvalidateRequestId : propagé (hôte ack catalogue — sans bump epoch / ready).
+ * poolInvalidateRequestId : propagé (hôte ack catalogue - sans bump epoch / ready).
  * Champs wizard legacy ignorés (FEATURE-TIERNIGHT-03-C).
  *
- * @param {object} cur — remote shape (ready by uid)
+ * @param {object} cur - remote shape (ready by uid)
  * @param {object} inc
  */
 export function mergeTierNightPrepRemoteState(cur = {}, inc = {}) {

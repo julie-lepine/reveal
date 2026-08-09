@@ -1,5 +1,5 @@
 /**
- * FEATURE-TIERNIGHT-04C — création / sync customs Rank Live partagés.
+ * FEATURE-TIERNIGHT-04C - création / sync customs Rank Live partagés.
  *
  * Contrat écriture MP : uniquement RPC atomiques dédiées.
  * Aucun client ne republie la collection via patchGameState.
@@ -29,7 +29,7 @@ export {
 };
 
 /**
- * Modère name + tous les items (1 appel local pur par string — coût négligeable).
+ * Modère name + tous les items (1 appel local pur par string - coût négligeable).
  * Arrêt au premier refus.
  * @param {{ name?: string, items?: string[] }} content
  * @returns {{ blocked: false }|{ blocked: true, message: string, field: string, index?: number }}

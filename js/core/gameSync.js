@@ -3515,12 +3515,21 @@ export function applyRemoteSession(row, { epoch = null } = {}) {
   }
   if (st.tierNightLivePrep) {
     // Codec ready partagé (tierNightPrepFromRemote) ; domaine local distinct.
+    // mergeReadyMapsLocal = même primitive Hot Take (évite flicker Ready pendant echo patch).
     const base = tierNightPrepFromRemote(st.tierNightLivePrep);
+    const local = getState().tierNightLiveSeriesPrep || {};
     const roundN = Number(base.roundCount);
+    const me = getLocalDisplayName();
     patch.tierNightLiveSeriesPrep = {
       ...base,
       categoryIds: ["*"],
       roundCount: [3, 5, 7].includes(roundN) ? roundN : 5,
+      ready: mergeReadyMapsLocal(
+        local.ready || {},
+        base.ready || {},
+        getActivePlayerNames(),
+        me
+      ),
     };
   }
   Object.assign(patch, tierNightConfigPatchFromRemoteState(st));

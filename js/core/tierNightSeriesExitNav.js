@@ -1,5 +1,5 @@
 /**
- * FEATURE-TIERNIGHT-03-E / E1 — sorties autoritaires série (change mode / replay / clear).
+ * FEATURE-TIERNIGHT-03-E / E1 - sorties autoritaires série (change mode / replay / clear).
  *
  * Contrats :
  * - customs roster + ledger consumed préservés (soirée) ;
@@ -38,7 +38,7 @@ const SERIES_PREP_STACK = [
 ];
 
 /**
- * Shell local après clear série (pas de runId — mint au launch série).
+ * Shell local après clear série (pas de runId - mint au launch série).
  * Remplace l’objet `tierNightGame` entier (pas de shallow merge nested).
  * @param {object} [prev]
  */
@@ -96,7 +96,7 @@ export function buildSeriesExitPrepReset(previousSetupEpoch = 0) {
 }
 
 /**
- * Patch local atomique (change mode / replay) — n’inclut ni live ni customs ni consumed.
+ * Patch local atomique (change mode / replay) - n’inclut ni live ni customs ni consumed.
  * @param {{ previousSetupEpoch?: number }} [opts]
  */
 export function buildSeriesExitLocalStatePatch({ previousSetupEpoch = 0 } = {}) {
@@ -303,7 +303,7 @@ async function applySeriesClearAndPrepReset({ screen, shouldContinue }) {
   try {
     const row = await patchGameState(remote.stateMerge, remote.patchOpts);
     if (!canContinue()) {
-      // Succès serveur déjà appliqué localement — pas de rollback d’un état plus récent.
+      // Succès serveur déjà appliqué localement - pas de rollback d’un état plus récent.
       return {
         ok: false,
         code: "STALE",
@@ -330,7 +330,7 @@ async function applySeriesClearAndPrepReset({ screen, shouldContinue }) {
     }
     return { ok: true, previousPatch, prepReset, networkCalls: 1, row };
   } catch (err) {
-    // Timeout / réseau : le serveur a pu réussir — reconcile avant rollback.
+    // Timeout / réseau : le serveur a pu réussir - reconcile avant rollback.
     try {
       const row = await refreshGameSession();
       const remoteTn = row?.state?.tierNight;

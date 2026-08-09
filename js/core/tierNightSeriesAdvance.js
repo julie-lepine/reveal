@@ -1,5 +1,5 @@
 /**
- * FEATURE-TIERNIGHT-SERIES-05 — wrapper RPC advance_tiernight_series_round.
+ * FEATURE-TIERNIGHT-SERIES-05 - wrapper RPC advance_tiernight_series_round.
  *
  * Transition between_rounds → ranking. Aucun scoring.
  * Branchement UX : hostAdvanceTierNightSeriesRound (tiernight-between).
@@ -79,7 +79,7 @@ export function buildAdvanceTierNightSeriesRoundRpcArgs({
  * @param {object} opts
  * @param {string} opts.lobbyId
  * @param {string} opts.runId
- * @param {string} opts.currentRoundId — roundId de la manche between_rounds courante
+ * @param {string} opts.currentRoundId - roundId de la manche between_rounds courante
  * @param {number} opts.currentRoundIndex
  * @param {string} [opts.expectedPhase="between_rounds"]
  * @param {number} [opts.timeoutMs]

@@ -1,6 +1,7 @@
 /**
- * FEATURE-TIERNIGHT-04D — prep Rank Live (shell REVEAL + customs partagés).
- * Launch série = stub 04E (validateBeforeLaunch, copy UX propre).
+ * FEATURE-TIERNIGHT-04D/04E — prep Rank Live = adapter mince du shell game-prep partagé.
+ * Domaine local : roundCount 3/5/7, customLiveTierLists, launch Rank Live.
+ * Ready / CTA / sync / launch slot = primitives Hot Take / roster (prepScreen + usePrepLobby).
  */
 import {
   allTierNightLivePrepReady,
@@ -198,6 +199,7 @@ export function mountTierNightLivePrep(app) {
       btn.addEventListener("click", async () => {
         if (!isLobbyHost() || btn.disabled) return;
         await setTierNightLivePrepRoundCount(Number(btn.getAttribute("data-live-round")));
+        // Même cycle Hot Take/roster : re-render shell (Ready préservé côté session).
         render();
       });
     });
@@ -219,7 +221,8 @@ export function mountTierNightLivePrep(app) {
     app.querySelector("#btn-ready")?.addEventListener("click", () => {
       void prepLobby.toggleReady({
         setReady: setTierNightLivePrepReady,
-        onAfter: refreshReadySection,
+        simulateReady: simulateTierNightLivePrepReady,
+        render: refreshReadySection,
       });
     });
 
@@ -241,13 +244,14 @@ export function mountTierNightLivePrep(app) {
       })();
     });
 
-    bindPrepLaunchButtons(app, onLaunch);
+    bindPrepLaunchButtons(app, { onLaunch });
   }
 
   function render() {
     const session = getTierNightLivePrepSession();
     const members = getLobbyParticipants();
     const allReady = allTierNightLivePrepReady();
+    const localReady = prepLobby.localReadyState();
     const isHost = isLobbyHost();
     const prep = getTierNightLivePrepSummary();
 
@@ -285,7 +289,7 @@ export function mountTierNightLivePrep(app) {
 
         <div class="card">
           <p class="label-upper">Listes custom partagées</p>
-          <p class="hint muted">Nom, emoji, auteur et nombre d'items — visibles par tous.</p>
+          <p class="hint muted">Nom, emoji, auteur et nombre d'items - visibles par tous.</p>
           <div id="live-customs-host">${customListsHtml()}</div>
           <p class="auth-error hidden" id="live-custom-error"></p>
           <button type="button" class="btn btn-secondary btn--spaced" id="btn-add-live-custom">
@@ -298,8 +302,8 @@ export function mountTierNightLivePrep(app) {
           ${playersReadySectionHtml(members, session.ready)}
         </div>
 
-        <button type="button" class="btn btn-secondary btn--spaced" id="btn-ready">
-          ${prepLobby.localReadyState() ? "Je ne suis plus prêt" : "Je suis prêt"}
+        <button type="button" class="btn btn-ready ${localReady ? "btn-ready--active" : ""}" id="btn-ready">
+          ${localReady ? "Prêt ✓" : "Je suis prêt !"}
         </button>
 
         <div id="tier-night-live-start-slot">
@@ -351,6 +355,7 @@ export function mountTierNightLivePrep(app) {
 
   return () => {
     mounted = false;
+    prepLobby.dispose();
     unsubSession?.();
     unsubLobby?.();
     // Pas de reset ici : navigation vers create conserve settings/ready.

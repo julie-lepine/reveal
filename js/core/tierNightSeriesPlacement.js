@@ -1,5 +1,5 @@
 /**
- * FEATURE-TIERNIGHT-SERIES-03A/B — validation canonique placement / finished.
+ * FEATURE-TIERNIGHT-SERIES-03A/B - validation canonique placement / finished.
  * Miroir SQL `tiernight_series_validate_*`. Pur : pas de DOM / Supabase / state.
  */
 

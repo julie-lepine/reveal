@@ -1,5 +1,5 @@
 /**
- * FEATURE-TIERNIGHT-SERIES-03A — calcul de scores série (pur), aligné mono-thème + SQL.
+ * FEATURE-TIERNIGHT-SERIES-03A - calcul de scores série (pur), aligné mono-thème + SQL.
  *
  * Utilise les helpers canoniques JS (consensus / proximité / outsider).
  * Les golden tests comparent ces sorties aux helpers SQL `tiernight_series_*`.
@@ -56,7 +56,7 @@ export function tierNightSeriesMedianRank(ranks) {
  * @param {object} opts
  * @param {string[]} opts.items
  * @param {Record<string, object>} opts.placementsByUid
- * @param {string[]} opts.participantUids — ordre stable
+ * @param {string[]} opts.participantUids - ordre stable
  * @param {Record<string, string>} [opts.displayNames]
  * @param {boolean} [opts.reverse]
  * @returns {{
@@ -182,7 +182,7 @@ export function buildTierNightSeriesGoldenFixtures() {
   /** @type {Array<object>} */
   const cases = [];
 
-  // Impair (3) — consensus médian
+  // Impair (3) - consensus médian
   cases.push({
     id: "odd-median-exact",
     reverse: false,
@@ -247,7 +247,7 @@ export function buildTierNightSeriesGoldenFixtures() {
     },
   });
 
-  // Ordre items différent — même score
+  // Ordre items différent - même score
   cases.push({
     id: "item-order-invariant",
     reverse: false,

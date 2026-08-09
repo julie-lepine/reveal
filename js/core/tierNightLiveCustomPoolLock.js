@@ -1,5 +1,5 @@
 /**
- * FEATURE-TIERNIGHT-04C — predicate pool customs Rank Live writable.
+ * FEATURE-TIERNIGHT-04C - predicate pool customs Rank Live writable.
  *
  * Writable pendant prep.
  * Verrouillé dès launch canonique (série live) ou Rank Live mono actif.

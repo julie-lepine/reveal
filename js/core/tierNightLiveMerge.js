@@ -94,7 +94,7 @@ export function mergeTierNightLiveGameFields(local, remote) {
     ...local,
     ...remote,
     playerRoster,
-    // FEATURE-TIERNIGHT-04E — remote series gagne si présente (vérité serveur).
+    // FEATURE-TIERNIGHT-04E - remote series gagne si présente (vérité serveur).
     series:
       remote.series && typeof remote.series === "object"
         ? remote.series

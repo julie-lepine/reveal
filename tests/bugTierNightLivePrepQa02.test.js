@@ -356,6 +356,96 @@ describe("BUG-TIERNIGHT-LIVE-PREP-QA-02 — UI header game-prep", () => {
   });
 });
 
+describe("BUG-TIERNIGHT-LIVE-PREP-QA-02 — Ready CTA + controller parité Hot Take", () => {
+  it("CTA = asset partagé btn-ready (pas btn-secondary Rank Live)", () => {
+    const live = read("js/screens/tierNightLivePrep.js");
+    const hot = read("js/screens/hotTakePrep.js");
+    assert.match(live, /class="btn btn-ready \$\{localReady \? "btn-ready--active" : ""\}"/);
+    assert.match(live, /localReady \? "Prêt ✓" : "Je suis prêt !"/);
+    assert.doesNotMatch(live, /Je ne suis plus prêt/);
+    assert.doesNotMatch(live, /btn btn-secondary btn--spaced" id="btn-ready"/);
+    assert.match(hot, /class="btn btn-ready \$\{localReady \? "btn-ready--active" : ""\}"/);
+  });
+
+  it("toggleReady passe render + simulateReady (pas onAfter)", () => {
+    const live = read("js/screens/tierNightLivePrep.js");
+    const hot = read("js/screens/hotTakePrep.js");
+    assert.match(
+      live,
+      /prepLobby\.toggleReady\(\s*\{[\s\S]*setReady:\s*setTierNightLivePrepReady[\s\S]*simulateReady:\s*simulateTierNightLivePrepReady[\s\S]*render:\s*refreshReadySection[\s\S]*\}\s*\)/
+    );
+    assert.doesNotMatch(live, /onAfter:\s*refreshReadySection/);
+    assert.match(
+      hot,
+      /prepLobby\.toggleReady\(\s*\{[\s\S]*render:\s*refreshReadySection[\s\S]*\}\s*\)/
+    );
+  });
+
+  it("bindPrepLaunchButtons reçoit { onLaunch } (pas la fn nue)", () => {
+    const live = read("js/screens/tierNightLivePrep.js");
+    const hot = read("js/screens/hotTakePrep.js");
+    assert.match(live, /bindPrepLaunchButtons\(\s*app,\s*\{\s*onLaunch\s*\}\s*\)/);
+    assert.match(hot, /bindPrepLaunchButtons\(\s*app,\s*\{\s*onLaunch\s*\}\s*\)/);
+  });
+
+  it("dispose prepLobby au unmount (comme Hot Take/roster)", () => {
+    const live = read("js/screens/tierNightLivePrep.js");
+    assert.match(live, /prepLobby\.dispose\(\)/);
+  });
+});
+
+describe("BUG-TIERNIGHT-LIVE-PREP-QA-02 — Ready comportemental (commit + roundCount)", () => {
+  it("setReady host → map Ready true ; unready → false", async () => {
+    const { setTierNightLivePrepReady } = await import(
+      "../js/core/tierNightLivePrepSession.js"
+    );
+    seedLiveReady(5, {}, 4);
+    await setTierNightLivePrepReady("Host", true);
+    assert.equal(getTierNightLivePrepSession().ready.Host, true);
+    await setTierNightLivePrepReady("Host", false);
+    assert.equal(getTierNightLivePrepSession().ready.Host, false);
+  });
+
+  it("guest Ready + host Ready → allReady ; roundCount 5→3 conserve allReady", async () => {
+    const { setTierNightLivePrepReady } = await import(
+      "../js/core/tierNightLivePrepSession.js"
+    );
+    seedLiveReady(5, {}, 4);
+    await setTierNightLivePrepReady("Host", true);
+    await setTierNightLivePrepReady("Guest", true);
+    assert.equal(allTierNightLivePrepReady(), true);
+    await setTierNightLivePrepRoundCount(3);
+    assert.equal(allTierNightLivePrepReady(), true);
+    assert.deepEqual(getTierNightLivePrepSession().ready, { Host: true, Guest: true });
+  });
+
+  it("createPrepLobbyController : localReadyState suit map + inFlight", async () => {
+    const { createPrepLobbyController } = await import("../js/core/usePrepLobby.js");
+    seedLiveReady(5, { Host: false }, 1);
+    let map = { Host: false };
+    const ctrl = createPrepLobbyController({
+      localKey: "Host",
+      getReadyMap: () => map,
+    });
+    assert.equal(ctrl.localReadyState(), false);
+    let renders = 0;
+    const pending = ctrl.toggleReady({
+      setReady: async (_k, ready) => {
+        await new Promise((r) => setTimeout(r, 5));
+        map = { ...map, Host: ready };
+      },
+      render: () => {
+        renders += 1;
+      },
+    });
+    assert.equal(ctrl.localReadyState(), true);
+    await pending;
+    assert.equal(ctrl.localReadyState(), true);
+    assert.ok(renders >= 2);
+    ctrl.dispose();
+  });
+});
+
 describe("BUG-TIERNIGHT-LIVE-PREP-QA-02 — SQL race-safe sans bump epoch", () => {
   it("RPC valide roundCount proposal vs prep indépendamment de setupEpoch", () => {
     const sql = read("supabase/feature-tiernight-04e-start-live-series.sql");

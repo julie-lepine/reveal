@@ -32,7 +32,7 @@ import { createActionLock } from "../core/actionLock.js";
 import { bindNav } from "./nav.js";
 
 function returnToLiveListSelect() {
-  // FEATURE-TIERNIGHT-04D — step=list mort ; retour modes (live).
+  // FEATURE-TIERNIGHT-04D - step=list mort ; retour modes (live).
   returnToTierNightSelectStep({ step: "mode", mode: "live" });
 }
 

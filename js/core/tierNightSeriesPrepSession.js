@@ -1,5 +1,5 @@
 /**
- * FEATURE-TIERNIGHT-03-B / B1 — session prep série (settings + ready), sans queue.
+ * FEATURE-TIERNIGHT-03-B / B1 - session prep série (settings + ready), sans queue.
  *
  * Queue / series créées uniquement au launch (prepare + markTierNightSeriesStarted).
  * One-shot : consumed inclus dans la mutation de launch + réconciliation hydrate.
@@ -105,7 +105,7 @@ export function getTierNightSeriesPrepSession() {
   };
 }
 
-/** Codec local (ready par nom) — mapping uid dans gameSync.tierNightPrepToRemote. */
+/** Codec local (ready par nom) - mapping uid dans gameSync.tierNightPrepToRemote. */
 export function tierNightSeriesPrepToRemote(session = getTierNightSeriesPrepSession()) {
   return tierNightPrepToRemote(session);
 }
@@ -131,10 +131,10 @@ async function syncTierNightSeriesPrepSession(extra = {}, patchOpts = {}) {
 /**
  * Invalide readiness après changement de **réglages structurants** (catégorie / roundCount).
  * Ne pas appeler pour un simple ajout/suppression de thème custom
- * (BUG-TIERNIGHT-PREP-READY-CUSTOM-01 — le catalogue n’invalide plus les prêts).
+ * (BUG-TIERNIGHT-PREP-READY-CUSTOM-01 - le catalogue n’invalide plus les prêts).
  *
  * Autorité : hôte (ou acting host) bump setupEpoch + clear ready global.
- * Invité : contribute `{ poolInvalidateRequest }` (signal catalogue / legacy) —
+ * Invité : contribute `{ poolInvalidateRequest }` (signal catalogue / legacy) -
  *          l’hôte **ack sans** bump setupEpoch ni clear ready.
  * @param {{ customEntryId?: string|null }} [opts]
  */
@@ -168,7 +168,7 @@ export async function invalidateTierNightSeriesPrepReadiness({
     };
   }
 
-  // Invité : signal catalogue uniquement — ne pas toucher ready local.
+  // Invité : signal catalogue uniquement - ne pas toucher ready local.
   let requestId;
   try {
     const uid = requireLocalParticipantUid();
@@ -275,7 +275,7 @@ async function publishAuthoritativePrepReadyInvalidation() {
 
 /**
  * Hôte : honore une requête d’invalidation catalogue.
- * BUG-TIERNIGHT-PREP-READY-CUSTOM-01 — ack uniquement (clear request id).
+ * BUG-TIERNIGHT-PREP-READY-CUSTOM-01 - ack uniquement (clear request id).
  * Ne bump jamais setupEpoch et ne vide jamais ready pour un signal pool.
  */
 export async function honorTierNightPrepPoolInvalidateRequest(remotePrep) {
@@ -326,7 +326,7 @@ async function ackPoolInvalidateRequestOnly(requestId) {
 
 /**
  * Hôte : suit l’empreinte customs pour coalescence / anti-spam.
- * BUG-TIERNIGHT-PREP-READY-CUSTOM-01 — ne vide plus ready et ne bump plus setupEpoch.
+ * BUG-TIERNIGHT-PREP-READY-CUSTOM-01 - ne vide plus ready et ne bump plus setupEpoch.
  * Le catalogue se synchronise via customRosterTopics ; le launch lit le pool à jour.
  */
 export async function honorTierNightPrepCustomsPoolChange(topics) {
@@ -352,7 +352,7 @@ export async function honorTierNightPrepCustomsPoolChange(topics) {
 
 /**
  * Point d’entrée hydrate/Realtime : chaîne sérialisée + catch terminal.
- * Pas de `void` silencieux — rejet toujours journalisé, jamais non géré.
+ * Pas de `void` silencieux - rejet toujours journalisé, jamais non géré.
  * @param {object|null|undefined} remotePrep
  * @param {Iterable<object>|null|undefined} topics
  */
@@ -534,8 +534,8 @@ export function simulateTierNightSeriesPrepReady(onUpdate) {
 }
 
 /**
- * Reset settings+ready autoritatif — **ne touche pas** consumedCustomRosterTopicIds.
- * FEATURE-TIERNIGHT-03-C1 — bump setupEpoch (monotone) pour qu’un reset ne soit
+ * Reset settings+ready autoritatif - **ne touche pas** consumedCustomRosterTopicIds.
+ * FEATURE-TIERNIGHT-03-C1 - bump setupEpoch (monotone) pour qu’un reset ne soit
  * pas ignoré par merge face à un prep distant plus récent.
  */
 export function resetTierNightSeriesPrepSession() {
@@ -569,7 +569,7 @@ export function countOtherPlayersCustomRosterTopics() {
 
 /**
  * Ajoute un thème custom depuis le prep.
- * BUG-TIERNIGHT-PREP-READY-CUSTOM-01 — synchronise le catalogue sans invalider les prêts.
+ * BUG-TIERNIGHT-PREP-READY-CUSTOM-01 - synchronise le catalogue sans invalider les prêts.
  */
 export async function addCustomRosterTopicFromPrep(name) {
   return addCustomRosterTopicAndSync({ name });
@@ -577,7 +577,7 @@ export async function addCustomRosterTopicFromPrep(name) {
 
 /**
  * Supprime un thème custom depuis le prep.
- * BUG-TIERNIGHT-PREP-READY-CUSTOM-01 — synchronise le catalogue sans invalider les prêts.
+ * BUG-TIERNIGHT-PREP-READY-CUSTOM-01 - synchronise le catalogue sans invalider les prêts.
  */
 export async function removeCustomRosterTopicFromPrep(id) {
   return deleteCustomRosterTopicAndSync(id);
@@ -606,8 +606,8 @@ export function getTierNightSeriesPrepEntryScreen() {
 /**
  * Entrée prep depuis le select (chemin série volontaire).
  * @param {{ resetSettings?: boolean }} [opts]
- *   resetSettings=true (défaut) : nouveau prep — clear settings/ready, preserve consumed.
- *   resetSettings=false : reprise / follow — hydrate remote, ne wipe pas.
+ *   resetSettings=true (défaut) : nouveau prep - clear settings/ready, preserve consumed.
+ *   resetSettings=false : reprise / follow - hydrate remote, ne wipe pas.
  */
 export async function enterTierNightSeriesPrep({ resetSettings = true } = {}) {
   if (resetSettings) {
@@ -701,7 +701,7 @@ export async function markTierNightSeriesPrepStarted({ rosterNames } = {}) {
     };
   }
 
-  // Ledger prévu avant mark — appliqué localement + dans la même mutation remote
+  // Ledger prévu avant mark - appliqué localement + dans la même mutation remote
   const mergedConsumed = mergeConsumedCustomTopicIds(
     getConsumedCustomRosterTopicIds(),
     prepared.attempt.series

@@ -1,5 +1,5 @@
 /**
- * FEATURE-TIERNIGHT-03-D — intermanches série (between_rounds).
+ * FEATURE-TIERNIGHT-03-D - intermanches série (between_rounds).
  *
  * Données dérivées de l’état partagé (roundRecap / roundHistory / queue).
  * Hôte : CTA « Thème suivant » → commitTierNightSeriesNextRound.
@@ -126,7 +126,7 @@ export function mountTierNightBetween(app) {
     const phase = tn?.series?.phase;
     const series = tn?.series;
     if (phase === "round_result") {
-      // Option A D1-bis : phase retirée — pas d’écran between / pas d’impasse sync.
+      // Option A D1-bis : phase retirée - pas d’écran between / pas d’impasse sync.
       navigate("tiernight-prep");
       return false;
     }

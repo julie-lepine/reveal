@@ -1,5 +1,5 @@
 /**
- * FEATURE-TIERNIGHT-04B — domaine pur : customs Rank Live (`customLiveTierLists`).
+ * FEATURE-TIERNIGHT-04B - domaine pur : customs Rank Live (`customLiveTierLists`).
  *
  * Structure / normalisation uniquement. Pas de state, Supabase, ni modération.
  * Modération (`checkHotTakeModeration`) : brancher en 04C/04D à la contribution UI/session.
@@ -14,7 +14,7 @@ export const LIVE_TIER_LIST_EMOJI_MAX = 4;
 export const LIVE_TIER_LIST_ITEMS_MIN = 4;
 export const LIVE_TIER_LIST_ITEMS_MAX = 16;
 export const LIVE_TIER_LIST_ITEM_MAX = 40;
-/** Borne serveur prévue 04C — mesurée en code units UTF-16 de `JSON.stringify(entry)`. */
+/** Borne serveur prévue 04C - mesurée en code units UTF-16 de `JSON.stringify(entry)`. */
 export const LIVE_TIER_LIST_ENTRY_JSON_MAX_BYTES = 4096;
 
 /**
@@ -103,7 +103,7 @@ export function normalizeCustomLiveTierListInput(input) {
 
 /**
  * Validation structurelle stricte (domaine).
- * Longueurs mesurées en code units UTF-16 (`String.length`) — convention REVEAL.
+ * Longueurs mesurées en code units UTF-16 (`String.length`) - convention REVEAL.
  *
  * @param {unknown} input
  * @returns {{

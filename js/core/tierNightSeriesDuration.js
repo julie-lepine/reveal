@@ -1,6 +1,6 @@
 /**
- * FEATURE-TIERNIGHT-03-B — estimation durée série « Classe le groupe ».
- * Basé sur ~2 min / manche (produit) — pas les timers Hot Take.
+ * FEATURE-TIERNIGHT-03-B - estimation durée série « Classe le groupe ».
+ * Basé sur ~2 min / manche (produit) - pas les timers Hot Take.
  */
 
 import { formatDurationRange } from "./hotTakeDuration.js";

@@ -1,5 +1,5 @@
 /**
- * FEATURE-TIERNIGHT-03-B — game-prep série « Classe le groupe » (UX Hot Take).
+ * FEATURE-TIERNIGHT-03-B - game-prep série « Classe le groupe » (UX Hot Take).
  * Queue uniquement au launch ; customs one-shot après succès.
  */
 import {

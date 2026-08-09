@@ -1,5 +1,5 @@
 /**
- * FEATURE-TIERNIGHT-SERIES-01 / FEATURE-TIERNIGHT-03-A / 03-A1 — contrat série (helpers purs).
+ * FEATURE-TIERNIGHT-SERIES-01 / FEATURE-TIERNIGHT-03-A / 03-A1 - contrat série (helpers purs).
  *
  * Option A : runId = identité globale de la série ; roundId = `${runId}:${roundIndex}`.
  * Aucun DOM, aucun Supabase, aucun state global.
@@ -10,7 +10,7 @@
  * - customs lobby éligibles + snapshotés ; one-shot via excludeCustomIds
  * - queue : priorité custom (même logique REVEAL combinedGameDeck), puis shuffle du sous-ensemble
  *
- * FEATURE-TIERNIGHT-03-A1 — one-shot (cycle de vie) :
+ * FEATURE-TIERNIGHT-03-A1 - one-shot (cycle de vie) :
  * - Consommation = id custom présent dans `series.queue` au **lancement** (snapshot).
  * - `customRosterTopics` (lobby) n’est **pas** muté par le moteur (pas de delete auto).
  * - Prochaine série : passer `excludeCustomIds` (= union des consommés lobby) pour
@@ -51,7 +51,7 @@ export const TIER_NIGHT_SERIES_PHASES = Object.freeze([
 
 /**
  * Phase prévue dans SERIES-00, jamais écrite par finalize/advance.
- * Rejetée par le validateur D1-bis (Option A) — pas d’état jouable.
+ * Rejetée par le validateur D1-bis (Option A) - pas d’état jouable.
  */
 export const TIER_NIGHT_SERIES_RETIRED_PHASES = Object.freeze(["round_result"]);
 
@@ -81,7 +81,7 @@ export const TIER_NIGHT_SERIES_ONE_SHOT_CONTRACT = Object.freeze({
 });
 
 /**
- * Codes shape SQL 03-A1 (preuve de contrat — alignés sur
+ * Codes shape SQL 03-A1 (preuve de contrat - alignés sur
  * `tiernight_series_validate_series_shape`).
  */
 export const TIER_NIGHT_SERIES_SQL_SHAPE_CODES = Object.freeze([
@@ -145,7 +145,7 @@ function parseCustomSnapshotFlag(value) {
 }
 
 /**
- * Contrat categoryIds (aligné SQL A1-bis) — forme seule.
+ * Contrat categoryIds (aligné SQL A1-bis) - forme seule.
  * @param {unknown} categoryIds
  * @returns {{ ok: true, categoryIds: string[] } | { ok: false, code: string, message?: string }}
  */
@@ -191,7 +191,7 @@ export function listKnownTierNightSeriesCategoryIds() {
 }
 
 /**
- * BUG-TIERNIGHT-SERIES-QA-01 — forme + appartenance catalogue JS.
+ * BUG-TIERNIGHT-SERIES-QA-01 - forme + appartenance catalogue JS.
  * `["*"]` reste le wildcard. Une catégorie inconnue est rejetée (pas de pool officiel vide silencieux).
  * Validation côté JS uniquement : le SQL série ne possède pas le registry catalogue.
  *
@@ -289,7 +289,7 @@ export function isTierNightSeriesCatalogTopicEligible(topic) {
 /**
  * @param {object} [opts]
  * @param {Iterable<object>} [opts.topics]
- * @param {string[]|null} [opts.categoryIds] — `null` / `["*"]` / `[]` = toutes
+ * @param {string[]|null} [opts.categoryIds] - `null` / `["*"]` / `[]` = toutes
  * @param {boolean} [opts.enabledOnly=true]
  * @param {boolean} [opts.excludeCustom=true]
  */
@@ -478,9 +478,9 @@ function fisherYatesShuffle(items, rng) {
 
 /**
  * Construit la queue ordonnée d’une série (une seule fois au lancement).
- * Snapshot figé — aucun reshuffle ultérieur côté helpers.
+ * Snapshot figé - aucun reshuffle ultérieur côté helpers.
  *
- * BUG-TIERNIGHT-SERIES-QA-01 — priorité custom (pas de shuffle global pool→slice) :
+ * BUG-TIERNIGHT-SERIES-QA-01 - priorité custom (pas de shuffle global pool→slice) :
  * - C = 0 → N officiels
  * - 0 < C < N → tous les customs + (N−C) officiels → shuffle du sous-ensemble
  * - C = N → N customs
@@ -488,11 +488,11 @@ function fisherYatesShuffle(items, rng) {
  *
  * @param {object} opts
  * @param {string} opts.runId
- * @param {Iterable<object>} [opts.topics] — catalogue officiel
- * @param {Iterable<object>} [opts.customTopics] — customs lobby
- * @param {Iterable<string>|null} [opts.excludeCustomIds] — one-shot déjà consommés
+ * @param {Iterable<object>} [opts.topics] - catalogue officiel
+ * @param {Iterable<object>} [opts.customTopics] - customs lobby
+ * @param {Iterable<string>|null} [opts.excludeCustomIds] - one-shot déjà consommés
  * @param {string[]|null} [opts.categoryIds]
- * @param {number} opts.roundCount — 3 | 5 | 8
+ * @param {number} opts.roundCount - 3 | 5 | 8
  * @param {() => number} [opts.rng]
  * @returns {{ ok: true, queue: object[], consumedCustomTopicIds: string[] } | { ok: false, code: string, requested?: number, available?: number, message?: string }}
  */
@@ -947,7 +947,7 @@ export function validateTierNightSeries(series, opts = {}) {
     scoredRoundIds: scoredRes.ok ? scoredRes.ids : ledgerToArray(series.scoredRoundIds),
     completedRoundIds: completedRes.ok ? completedRes.ids : ledgerToArray(series.completedRoundIds),
   };
-  // FEATURE-TIERNIGHT-03-D — conserver history/recap (finalize/between/advance).
+  // FEATURE-TIERNIGHT-03-D - conserver history/recap (finalize/between/advance).
   if (Array.isArray(series.roundHistory)) {
     normalized.roundHistory = cloneJson(series.roundHistory);
   }
@@ -1019,7 +1019,7 @@ export function doesTierNightSeriesEventMatch({
   if (incomingPhase != null) {
     const phase = String(incomingPhase);
     // Phase d’une manche future non commitée : entre rounds alors qu’on est encore ranking
-    // sur un index inférieur — déjà couvert par roundIndex. Ici : phase series_end alors
+    // sur un index inférieur - déjà couvert par roundIndex. Ici : phase series_end alors
     // qu’on n’est pas sur la dernière manche active côté courant.
     if (phase === "series_end" && !isTierNightSeriesLastRound(series) && series.phase !== "series_end") {
       return { ok: false, code: "PREMATURE_SERIES_END" };
@@ -1090,7 +1090,7 @@ export function computeNextTierNightRoundState({
 
 /**
  * Invariant : roster figé pour toute la série (lecture pure).
- * @param {object|null|undefined} session — tierNightGame / remote tierNight
+ * @param {object|null|undefined} session - tierNightGame / remote tierNight
  */
 export function isTierNightSeriesRosterFrozen(session) {
   return sessionHasTierNightPlayerRoster(session);
@@ -1125,7 +1125,7 @@ export function listTierNightRosterCategories() {
 }
 
 /* -------------------------------------------------------------------------- */
-/* SERIES-02 — sérialisation / hydratation / merge (purs)                     */
+/* SERIES-02 - sérialisation / hydratation / merge (purs)                     */
 /* -------------------------------------------------------------------------- */
 
 /**

@@ -225,7 +225,7 @@ export function getTierNightModifierById(id) {
 
 /**
  * Catégories stables (FEATURE-TIERNIGHT-SERIES-01).
- * Identifiants techniques — ne pas renommer sans migration de sessions.
+ * Identifiants techniques - ne pas renommer sans migration de sessions.
  */
 export const TIER_NIGHT_ROSTER_CATEGORIES = [
   { id: "survival", label: "Survie", order: 10 },

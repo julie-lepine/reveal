@@ -1,5 +1,5 @@
 /**
- * FEATURE-TIERNIGHT-04C — garde anti lost-update pour customLiveTierLists.
+ * FEATURE-TIERNIGHT-04C - garde anti lost-update pour customLiveTierLists.
  */
 
 /**

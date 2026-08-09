@@ -1,5 +1,5 @@
 /**
- * FEATURE-TIERNIGHT-04D / 04E — session prep Rank Live (`tierNightLiveSeriesPrep` /
+ * FEATURE-TIERNIGHT-04D / 04E - session prep Rank Live (`tierNightLiveSeriesPrep` /
  * remote `tierNightLivePrep`).
  *
  * Shell prep partagé ; domaine live distinct du roster.
@@ -54,7 +54,7 @@ export const getModerationNotice = getHotTakeModerationNotice;
 export const TIER_NIGHT_LIVE_PREP_DEFAULT_ROUND_COUNT =
   DEFAULT_TIER_NIGHT_LIVE_SERIES_ROUND_COUNT;
 
-/** @deprecated 04E — plus de stub ; conservé pour tests source anti-régression legacy. */
+/** @deprecated 04E - plus de stub ; conservé pour tests source anti-régression legacy. */
 export const TNS_LIVE_LAUNCH_PENDING_04E = "TNS_LIVE_LAUNCH_PENDING_04E";
 
 function defaultLivePrepSession() {
@@ -281,7 +281,7 @@ export async function enterTierNightLivePrep({ resetSettings = true } = {}) {
 }
 
 /**
- * FEATURE-TIERNIGHT-04E — launch canonique série Rank Live.
+ * FEATURE-TIERNIGHT-04E - launch canonique série Rank Live.
  * Client prépare la queue (TIER_LISTS + customs) ; MP commit via RPC.
  * @param {{ rosterNames?: string[] }} [_opts]
  */
@@ -451,7 +451,7 @@ export function validateTierNightLivePrepForLaunch() {
     officialLists: getTierNightLiveOfficialPool(),
     roundCount: prep.roundCount,
     playerRoster: [],
-    // Déterministe : on ne consomme pas le RNG réel ici — juste capacité.
+    // Déterministe : on ne consomme pas le RNG réel ici - juste capacité.
     random: () => 0.5,
     deckRandom: () => 0.5,
   });
@@ -466,7 +466,7 @@ export function validateTierNightLivePrepForLaunch() {
   return { ok: true };
 }
 
-/** @deprecated alias — anciennes imports stub */
+/** @deprecated alias - anciennes imports stub */
 export function validateTierNightLivePrepLaunchPending() {
   return validateTierNightLivePrepForLaunch();
 }

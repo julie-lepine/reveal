@@ -447,13 +447,13 @@ export function resetTierNightLive() {
 
 /**
  * Lancement MP Classe le groupe / plateau mono-thème (hôte).
- * FEATURE-TIERNIGHT-03-F — toute *nouvelle* session roster classic est refusée.
+ * FEATURE-TIERNIGHT-03-F - toute *nouvelle* session roster classic est refusée.
  * (Sessions legacy déjà actives se lisent hors de ce helper.)
  */
 export async function markTierNightClassicStarted({ topicId, mode, modifier }) {
   if (mode === "roster" || mode == null || mode === "") {
     console.error(
-      "FEATURE-TIERNIGHT-03-F: markTierNightClassicStarted blocked — parcours série final"
+      "FEATURE-TIERNIGHT-03-F: markTierNightClassicStarted blocked - parcours série final"
     );
     return {
       ok: false,
@@ -542,14 +542,14 @@ export async function markTierNightClassicStarted({ topicId, mode, modifier }) {
 }
 
 /**
- * FEATURE-TIERNIGHT-SERIES-04 / 03-B1 — lancement MP/local d’une série (manche 1).
+ * FEATURE-TIERNIGHT-SERIES-04 / 03-B1 - lancement MP/local d’une série (manche 1).
  * Ne finalise pas la manche ; n’appelle pas la RPC SERIES-03.
  * Application locale immédiate ; consumed + reset prep dans la même mutation remote.
  *
  * @param {object} opts
- * @param {object} opts.attempt — sortie de prepareTierNightSeriesLaunchAttempt
- * @param {string[]} [opts.consumedCustomRosterTopicIds] — ledger one-shot (même mutation)
- * @param {object|null} [opts.resetPrepSession] — prep reset publié avec le launch
+ * @param {object} opts.attempt - sortie de prepareTierNightSeriesLaunchAttempt
+ * @param {string[]} [opts.consumedCustomRosterTopicIds] - ledger one-shot (même mutation)
+ * @param {object|null} [opts.resetPrepSession] - prep reset publié avec le launch
  */
 export async function markTierNightSeriesStarted({
   attempt,

@@ -1,8 +1,8 @@
 /**
- * FEATURE-TIERNIGHT-03-F — parcours série = produit final « Classe le groupe ».
+ * FEATURE-TIERNIGHT-03-F - parcours série = produit final « Classe le groupe ».
  *
  * Clé : `__REVEAL_TIERNIGHT_SERIES_UI__` (`TIER_NIGHT_SERIES_UI_GATE_KEY`)
- * Lu via : `isTierNightSeriesUiEnabled()` (local only — pas de flag distant).
+ * Lu via : `isTierNightSeriesUiEnabled()` (local only - pas de flag distant).
  *
  * ## Comportement final (F)
  * - **Défaut ON** : clé absente ou `true` → parcours série canonique.

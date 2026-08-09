@@ -1,9 +1,9 @@
 /**
- * FEATURE-TIERNIGHT-03 — clear distant autoritatif customRosterTopics (frontière sortie).
+ * FEATURE-TIERNIGHT-03 - clear distant autoritatif customRosterTopics (frontière sortie).
  *
  * Source de vérité : game_sessions.state.customRosterTopics
  * RPC : clear_tiernight_custom_roster_topics (hôte réel + CAS session).
- * Ne pas appeler à series_end (snapshots encore utiles) — seulement à la sortie produit.
+ * Ne pas appeler à series_end (snapshots encore utiles) - seulement à la sortie produit.
  *
  * Isolation (décision B) : collection top-level ; pas d’exigence game_id.
  * Protection stale : p_expected_session_id obligatoire si session existante (serveur).
@@ -23,7 +23,7 @@ export function readLocalCustomRosterWritable(state = getState()) {
 }
 
 /**
- * @param {object|null|undefined} result — payload RPC
+ * @param {object|null|undefined} result - payload RPC
  */
 export function applyClearedCustomRosterTopicsFromRpc(result) {
   const epoch = Number(result?.epoch);
@@ -44,7 +44,7 @@ export function applyClearedCustomRosterTopicsFromRpc(result) {
 
 /**
  * Hydrate : un epoch remote plus récent autorise [] même avec customs locaux multi-auteurs.
- * @param {object} st — row.state
+ * @param {object} st - row.state
  * @param {unknown[]} localBefore
  * @param {number} localEpoch
  */
@@ -231,9 +231,9 @@ export async function clearTierNightCustomRosterTopicsAtExitBoundary({
               : code === "SESSION_ABSENT_CANNOT_REOPEN"
                 ? "Aucune session à rouvrir pour les thèmes personnalisés."
                 : code === "STALE_SESSION"
-                  ? "Session de jeu obsolète — thèmes non modifiés."
+                  ? "Session de jeu obsolète - thèmes non modifiés."
                   : code === "CUSTOM_ROSTER_EPOCH_EXHAUSTED"
-                    ? "Compteur de thèmes personnalisés saturé — clear impossible."
+                    ? "Compteur de thèmes personnalisés saturé - clear impossible."
                   : code === "EXPECTED_SESSION_REQUIRED"
                     ? "Identité de session requise pour vider les thèmes."
                     : "Impossible de vider les thèmes personnalisés.",

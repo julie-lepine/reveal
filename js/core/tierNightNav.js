@@ -1,5 +1,5 @@
 /**
- * UX-TIERNIGHT-NAV-01 / FEATURE-TIERNIGHT-03-F — navigation explicite entre niveaux TierNight.
+ * UX-TIERNIGHT-NAV-01 / FEATURE-TIERNIGHT-03-F - navigation explicite entre niveaux TierNight.
  */
 import { navigate, getNavStack } from "./router.js";
 import { normalizeTierNightMode } from "../../data/tierTopics.js";
@@ -23,8 +23,8 @@ const LEGACY_ROSTER_STEPS = new Set(["topic", "roster-path"]);
  * Remonte / ouvre `tiernight-select` sur un step donné, sans laisser
  * les écrans de création / prep dans la pile (évite retour fantôme).
  *
- * FEATURE-TIERNIGHT-03-F — topic / roster-path / wizard → prep (jamais grille classic).
- * FEATURE-TIERNIGHT-04D — retour depuis live-prep → select mode (pas step=list).
+ * FEATURE-TIERNIGHT-03-F - topic / roster-path / wizard → prep (jamais grille classic).
+ * FEATURE-TIERNIGHT-04D - retour depuis live-prep → select mode (pas step=list).
  *
  * @param {{ step?: "mode"|"topic"|"list"|"roster-path", mode?: string|null }} [opts]
  */
@@ -33,7 +33,7 @@ export function returnToTierNightSelectStep({ step = "mode", mode = null } = {})
   let resolvedStep = allowed.has(step) ? step : "mode";
   let resolvedMode = mode != null ? normalizeTierNightMode(mode) : null;
   if (LEGACY_ROSTER_STEPS.has(resolvedStep)) resolvedMode = "roster";
-  // 04D : step=list n'est plus une destination — mode live → select modes.
+  // 04D : step=list n'est plus une destination - mode live → select modes.
   if (resolvedStep === "list") {
     resolvedStep = "mode";
     resolvedMode = "live";

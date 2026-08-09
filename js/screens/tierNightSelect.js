@@ -29,7 +29,7 @@ import { enterTierNightLivePrep } from "../core/tierNightLivePrepSession.js";
 import { navigate } from "../core/router.js";
 
 /**
- * FEATURE-TIERNIGHT-03-F / 04D — select modes TierNight.
+ * FEATURE-TIERNIGHT-03-F / 04D - select modes TierNight.
  *
  * Classe le groupe → tiernight-prep (série) uniquement.
  * Anciens steps wizard / grille mono → normalisation vers prep (ou mode si kill switch).
@@ -37,7 +37,7 @@ import { navigate } from "../core/router.js";
  * Aucune nouvelle session classic.
  */
 
-/** Anciens steps wizard SERIES-04 / grille — normalisés, jamais rendus. */
+/** Anciens steps wizard SERIES-04 / grille - normalisés, jamais rendus. */
 const LEGACY_SERIES_DEAD_STEPS = new Set([
   "topic",
   "roster-path",
@@ -118,7 +118,7 @@ export function mountTierNightSelect(app) {
     step = "mode";
   }
 
-  // FEATURE-TIERNIGHT-04D — step=list mort : redirige vers live prep (pas de pick mono).
+  // FEATURE-TIERNIGHT-04D - step=list mort : redirige vers live prep (pas de pick mono).
   if (step === "list") {
     void enterTierNightLivePrep({ resetSettings: false });
     return () => {};
@@ -154,7 +154,7 @@ export function mountTierNightSelect(app) {
   }
 
   /**
-   * FEATURE-TIERNIGHT-04D — Rank Live → prep série (pas de pick list / mono launch).
+   * FEATURE-TIERNIGHT-04D - Rank Live → prep série (pas de pick list / mono launch).
    */
   async function openLivePrepFromSelect() {
     if (!(await ensureHost())) return;

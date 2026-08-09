@@ -1,9 +1,9 @@
 /**
- * FEATURE-TIERNIGHT-03-D / D1 / D1-bis — orchestration finalize / advance / résolution d’écran série.
+ * FEATURE-TIERNIGHT-03-D / D1 / D1-bis - orchestration finalize / advance / résolution d’écran série.
  *
  * Scoring autoritatif = SQL (RPC). Le client ne recalcule pas les points en MP.
  * Machine d’état canonique : ranking → between_rounds | series_end → ranking…
- * round_result : phase SERIES-00 jamais produite — retirée (Option A D1-bis).
+ * round_result : phase SERIES-00 jamais produite - retirée (Option A D1-bis).
  */
 
 import { getState, saveStatePatch } from "./state.js";
@@ -68,7 +68,7 @@ export function buildTierNightSeriesTransitionId(action, { runId, roundId, phase
 }
 
 /**
- * @param {object|null|undefined} session — tierNightGame / remote tierNight
+ * @param {object|null|undefined} session - tierNightGame / remote tierNight
  */
 export function hasActiveTierNightSeries(session = getState().tierNightGame) {
   const series = session?.series;
@@ -433,7 +433,7 @@ export function navigateForTierNightSeriesPhase(phase, { navStack } = {}) {
  * Applique l’état session renvoyé par la RPC (sans attendre Realtime).
  * Ne recalcule aucun score : copie l’état autoritatif.
  *
- * @param {object|null|undefined} rpcState — result.state
+ * @param {object|null|undefined} rpcState - result.state
  * @param {{
  *   runId: string,
  *   expectScoredRoundId?: string|null,
@@ -552,8 +552,8 @@ function seriesPhaseRank(phase) {
 
 /**
  * Un refresh stale ne doit jamais écraser un apply RPC plus avancé (cas F terrain).
- * @param {object|null|undefined} localTn — tierNightGame local
- * @param {object|null|undefined} remoteTn — row.state.tierNight
+ * @param {object|null|undefined} localTn - tierNightGame local
+ * @param {object|null|undefined} remoteTn - row.state.tierNight
  */
 export function shouldPreferLocalSeriesOverSoftRefresh(localTn, remoteTn) {
   if (!localTn?.series || !remoteTn?.series) return false;
@@ -581,7 +581,7 @@ export function shouldPreferLocalSeriesOverSoftRefresh(localTn, remoteTn) {
 /**
  * Soft-refresh : applique le row serveur sauf s’il régresse l’apply local du même run.
  * Exporté pour tests de symétrie anti-régression.
- * @param {object|null|undefined} row — game_sessions row
+ * @param {object|null|undefined} row - game_sessions row
  * @returns {{ ok: true, applied: boolean, skippedStale?: boolean }}
  */
 export function applySoftRefreshSeriesRowIfNotRegression(row) {
@@ -625,7 +625,7 @@ export function resolvePostFinalizeNavigationPhase({
 }
 
 /**
- * BUG-TIERNIGHT-SERIES-QA-01 — clôture session au classement de série.
+ * BUG-TIERNIGHT-SERIES-QA-01 - clôture session au classement de série.
  * Idempotent : si game_id=menu + screen terminal + series_end, no-op.
  * Préserve state.tierNight (history / recap) via completeGameSession (deactivate flags only).
  */
@@ -686,7 +686,7 @@ export async function ensureTierNightSeriesSessionCompleted({
 /**
  * Hôte : finalize manche série (RPC) + application locale immédiate + navigation.
  *
- * force=true : CTA hôte explicite « Voir les résultats » — SQL score
+ * force=true : CTA hôte explicite « Voir les résultats » - SQL score
  * roster ∩ finished=true ∩ placement valide uniquement (déterministe).
  * Sans force : finalize seulement si tous les membres roster sont finished
  * (barrière client) ; SQL refuse sinon TNS_PLACEMENTS_INCOMPLETE.

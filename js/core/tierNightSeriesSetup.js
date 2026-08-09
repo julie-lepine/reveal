@@ -1,5 +1,5 @@
 /**
- * FEATURE-TIERNIGHT-SERIES-04 / FEATURE-TIERNIGHT-03-A — état UI temporaire du setup série (pur).
+ * FEATURE-TIERNIGHT-SERIES-04 / FEATURE-TIERNIGHT-03-A - état UI temporaire du setup série (pur).
  * Ne crée ni runId ni queue ; non sérialisé dans game_sessions.
  */
 
@@ -28,7 +28,7 @@ export function createEmptyTierNightSeriesSetup() {
 }
 
 /**
- * Options catégories pour l’UI (counts catalogue seuls — les customs sont globaux au pool).
+ * Options catégories pour l’UI (counts catalogue seuls - les customs sont globaux au pool).
  * @returns {Array<{ id: string, label: string, order: number, eligibleCount: number }>}
  */
 export function listTierNightSeriesCategoryOptions() {
@@ -164,7 +164,7 @@ export function formatTierNightSeriesCategorySummary(categoryIds) {
 }
 
 /**
- * Aperçu catalogue (sans customs) — rétrocompat UI gate.
+ * Aperçu catalogue (sans customs) - rétrocompat UI gate.
  * @param {string[]|null} categoryIds
  */
 export function peekEligibleTopicsForSetup(categoryIds) {

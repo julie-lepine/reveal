@@ -8,7 +8,7 @@ import { addCustomRosterTopicAndSync } from "../core/customRosterTopicSession.js
 import { returnToTierNightSelectStep } from "../core/tierNightNav.js";
 import { bindNav } from "./nav.js";
 
-/** FEATURE-TIERNIGHT-03-C — écran legacy/transitoire (gate OFF grille). Gate ON : prep inline + nav → prep. */
+/** FEATURE-TIERNIGHT-03-C - écran legacy/transitoire (gate OFF grille). Gate ON : prep inline + nav → prep. */
 function returnToRosterTopicSelect() {
   returnToTierNightSelectStep({ step: "topic", mode: "roster" });
 }

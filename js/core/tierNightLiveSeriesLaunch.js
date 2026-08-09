@@ -1,5 +1,5 @@
 /**
- * FEATURE-TIERNIGHT-04E — préparation tentative + wire série Rank Live.
+ * FEATURE-TIERNIGHT-04E - préparation tentative + wire série Rank Live.
  *
  * Catalogue officiel = `TIER_LISTS` (via officialLists / getTierNightLiveOfficialPool).
  * Builder sélection = `buildTierNightLiveSeriesListSubset` (04B) UNIQUEMENT.
@@ -73,7 +73,7 @@ function mapSubsetFailCode(code) {
   return code || "TNS_LIVE_LAUNCH_FAILED";
 }
 
-/** Snapshot défensif (copie items — aucune ref mutable). */
+/** Snapshot défensif (copie items - aucune ref mutable). */
 export function snapshotLiveTierListForSeries(list) {
   const snap = {
     id: String(list.id),
@@ -195,7 +195,7 @@ export function validateTierNightLiveCustomQueuePolicy({
 }
 
 /**
- * Cast défensif miroir SQL tiernight_live_jsonb_int — number entier seulement.
+ * Cast défensif miroir SQL tiernight_live_jsonb_int - number entier seulement.
  */
 export function parseTierNightLiveJsonInt(value) {
   if (typeof value !== "number" || !Number.isInteger(value)) return null;
@@ -385,9 +385,9 @@ export function projectTierNightLiveSeriesRound0(
 }
 
 /**
- * PURE PREPARE — tentative de launch (runId client + series snapshot).
+ * PURE PREPARE - tentative de launch (runId client + series snapshot).
  * @param {object} opts
- * @param {object} opts.prep — { roundCount, setupEpoch }
+ * @param {object} opts.prep - { roundCount, setupEpoch }
  * @param {unknown[]} [opts.officialLists]
  * @param {unknown[]} [opts.customLists]
  * @param {string} [opts.runId]
