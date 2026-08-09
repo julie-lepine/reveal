@@ -7,8 +7,6 @@ import {
   HOT_TAKE_THEMES,
   HOT_TAKE_CATALOG_ID,
   HOT_TAKE_MIX_ID,
-  HOT_TAKE_FORBIDDEN_WORDS,
-  HOT_TAKE_MODERATION_NOTICE,
   HOT_TAKE_ROUND_PRESETS,
   HOT_TAKE_TIMER_SEC,
   getThemeBankTexts,
@@ -36,6 +34,10 @@ import { computeHotTakeVoteApply } from "./hotTakeVoteCommit.js";
 import { launchGameWithSync, commitHostGamePlay, commitPrepReadyToggle } from "./mpLaunch.js";
 import { mergeHotTakeCustomTakes } from "./sessionMerge.js";
 import { countOtherAuthorsCustomEntries } from "./combinedGameDeck.js";
+export {
+  checkHotTakeModeration,
+  getHotTakeModerationNotice as getModerationNotice,
+} from "./hotTakeModeration.js";
 
 function defaultSession() {
   return {
@@ -69,32 +71,6 @@ function shuffleArray(arr) {
 
 export function getHotTakeSession() {
   return getState().hotTakeGame || defaultSession();
-}
-
-export function getModerationNotice() {
-  return HOT_TAKE_MODERATION_NOTICE;
-}
-
-function normalizeForModeration(text) {
-  return String(text)
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "");
-}
-
-export function checkHotTakeModeration(text) {
-  const normalized = normalizeForModeration(text);
-  const hit = HOT_TAKE_FORBIDDEN_WORDS.find((word) => {
-    const w = normalizeForModeration(word);
-    return w && normalized.includes(w);
-  });
-  if (hit) {
-    return {
-      blocked: true,
-      message: `${HOT_TAKE_MODERATION_NOTICE} (terme interdit détecté.)`,
-    };
-  }
-  return { blocked: false };
 }
 
 function normalizeTake(entry) {

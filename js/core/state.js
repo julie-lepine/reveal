@@ -8,6 +8,7 @@ import {
   sanitizeCustomRosterTopicsFromStorage,
   validateRosterTopicName,
 } from "./customRosterTopics.js";
+import { sanitizeCustomLiveTierListsCollection } from "./customLiveTierLists.js";
 
 const STORAGE_KEY = "reveal-app-state";
 
@@ -122,10 +123,21 @@ const defaultState = () => ({
   customRosterTopicsEpoch: 0,
   /** false après clear quit ; true par défaut / après reopen change-mode. */
   customRosterTopicsWritable: true,
+  /** FEATURE-TIERNIGHT-04C — customs Rank Live partagés (manche). */
+  customLiveTierLists: [],
+  customLiveTierListsEpoch: 0,
+  customLiveTierListsWritable: true,
   /** FEATURE-TIERNIGHT-03-B — ids custom déjà tirés en série (lobby lifetime). */
   consumedCustomRosterTopicIds: [],
   /** Prep série multi-thèmes (settings + ready) — pas de queue ici. */
   tierNightSeriesPrep: {
+    categoryIds: ["*"],
+    roundCount: 5,
+    ready: {},
+    setupEpoch: 0,
+  },
+  /** FEATURE-TIERNIGHT-04D — prep Rank Live série (settings + ready). */
+  tierNightLiveSeriesPrep: {
     categoryIds: ["*"],
     roundCount: 5,
     ready: {},
@@ -362,6 +374,9 @@ function loadState() {
       customRosterTopics: sanitizeCustomRosterTopicsFromStorage(parsed.customRosterTopics),
       customRosterTopicsEpoch: Number(parsed.customRosterTopicsEpoch) || 0,
       customRosterTopicsWritable: parsed.customRosterTopicsWritable !== false,
+      customLiveTierLists: sanitizeCustomLiveTierListsCollection(parsed.customLiveTierLists),
+      customLiveTierListsEpoch: Number(parsed.customLiveTierListsEpoch) || 0,
+      customLiveTierListsWritable: parsed.customLiveTierListsWritable !== false,
       consumedCustomRosterTopicIds: Array.isArray(parsed.consumedCustomRosterTopicIds)
         ? parsed.consumedCustomRosterTopicIds.map(String)
         : [],
@@ -369,6 +384,12 @@ function loadState() {
         ...base.tierNightSeriesPrep,
         ...(parsed.tierNightSeriesPrep && typeof parsed.tierNightSeriesPrep === "object"
           ? parsed.tierNightSeriesPrep
+          : {}),
+      },
+      tierNightLiveSeriesPrep: {
+        ...base.tierNightLiveSeriesPrep,
+        ...(parsed.tierNightLiveSeriesPrep && typeof parsed.tierNightLiveSeriesPrep === "object"
+          ? parsed.tierNightLiveSeriesPrep
           : {}),
       },
       globalStats: { ...defaultGlobalStats(), ...parsed.globalStats },
@@ -1066,7 +1087,11 @@ export function resetEveningState() {
     customRosterTopicsEpoch: 0,
     customRosterTopicsWritable: true,
     consumedCustomRosterTopicIds: [],
+    customLiveTierLists: [],
+    customLiveTierListsEpoch: 0,
+    customLiveTierListsWritable: true,
     tierNightSeriesPrep: { ...defaultState().tierNightSeriesPrep },
+    tierNightLiveSeriesPrep: { ...defaultState().tierNightLiveSeriesPrep },
   });
 }
 
@@ -1090,6 +1115,11 @@ export function resetGameSessionsOnly() {
     tierNightGame: { ...base.tierNightGame },
     tierNightLiveGame: { ...base.tierNightLiveGame },
     tierNightSeriesPrep: { ...base.tierNightSeriesPrep },
+    tierNightLiveSeriesPrep: { ...base.tierNightLiveSeriesPrep },
+    // FEATURE-TIERNIGHT-04C — customs live = manche ; clear au changement de jeu.
+    customLiveTierLists: [],
+    customLiveTierListsEpoch: 0,
+    customLiveTierListsWritable: true,
   });
 }
 

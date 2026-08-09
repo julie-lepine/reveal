@@ -47,6 +47,7 @@ import {
   mergeDilemmaCustomDilemmas,
   mergeHotTakeCustomTakes,
   mergeCustomRosterTopics,
+  mergeCustomLiveTierLists,
   mergeDilemmaPatchState,
   mergeHotTakePatchState,
   mergeConsensusPatchState,
@@ -116,6 +117,12 @@ import {
   summarizeCustomRosterTopics,
   preserveCustomRosterTopicsInFullStateReplace,
 } from "./customRosterTopicsSyncGuard.js";
+import {
+  stripCustomLiveTierListsFromGenericPatch,
+  summarizeCustomLiveTierLists,
+  preserveCustomLiveTierListsInFullStateReplace,
+  shouldAcceptRemoteCustomLiveTierListsEmpty,
+} from "./customLiveTierListsSyncGuard.js";
 import { shouldAcceptRemoteCustomRosterTopicsEmpty } from "./tierNightCustomRosterClear.js";
 import { pickLatestConsensusAnswer } from "./consensusAnswerUtils.js";
 import {
@@ -644,6 +651,7 @@ const GAME_SETUP_SCREENS = new Set([
   "guesslie-wait",
   "tiernight-select",
   "tiernight-prep",
+  "tiernight-live-prep",
   "tiernight-create",
   "tiernight-create-roster",
 ]);
@@ -651,10 +659,11 @@ const GAME_SETUP_SCREENS = new Set([
 /** Guess The Lie : préparation par joueur - la session reste sur guesslie-menu. */
 const GUESS_LIE_PREP_SCREENS = new Set(["guesslie-menu", "guesslie-setup", "guesslie-wait"]);
 
-/** Tier Night : création locale / prep série depuis tiernight-select. */
+/** Tier Night : création locale / prep série / prep live depuis tiernight-select. */
 const TIER_NIGHT_PREP_SCREENS = new Set([
   "tiernight-select",
   "tiernight-prep",
+  "tiernight-live-prep",
   "tiernight-create",
   "tiernight-create-roster",
 ]);
@@ -700,7 +709,9 @@ export function isCompatibleSessionScreen(sessionScreen, localScreen) {
     return true;
   }
   if (
-    (sessionScreen === "tiernight-select" || sessionScreen === "tiernight-prep") &&
+    (sessionScreen === "tiernight-select" ||
+      sessionScreen === "tiernight-prep" ||
+      sessionScreen === "tiernight-live-prep") &&
     TIER_NIGHT_PREP_SCREENS.has(localScreen)
   ) {
     return true;
@@ -2810,7 +2821,7 @@ export function applyTierNightRecapFromRemote(recap) {
 /* ----- Tier Night « En direct » (mode live temps réel) ----- */
 
 export function tierNightLiveToRemote(session) {
-  return {
+  const remote = {
     runId: session.runId || null,
     lobbyStarted: Boolean(session.lobbyStarted),
     topicId: session.topicId || null,
@@ -2823,6 +2834,11 @@ export function tierNightLiveToRemote(session) {
     placements: mapPlacementsByUid(session.placements || {}),
     finished: Boolean(session.finished),
   };
+  // FEATURE-TIERNIGHT-04E — série canonique (vérité runtime).
+  if (session.series && typeof session.series === "object") {
+    remote.series = session.series;
+  }
+  return remote;
 }
 
 export function tierNightLiveFromRemote(remote) {
@@ -2834,7 +2850,7 @@ export function tierNightLiveFromRemote(remote) {
     const snap = playerRoster?.find((r) => r.userId === uid);
     votes[snap?.displayName || nameForUserId(uid) || uid] = tier;
   });
-  return {
+  const out = {
     runId: remote.runId || null,
     lobbyStarted: Boolean(remote.lobbyStarted),
     topicId: remote.topicId || null,
@@ -2847,6 +2863,10 @@ export function tierNightLiveFromRemote(remote) {
     placements: mapPlacementsByName(remote.placements || {}),
     finished: Boolean(remote.finished),
   };
+  if (remote.series && typeof remote.series === "object") {
+    out.series = remote.series;
+  }
+  return out;
 }
 
 /** Merge additif des votes (reset sur nouvelle manche / nouveau runId / remote reset). */
@@ -3017,7 +3037,8 @@ function eveningStateToRemote() {
     gameScoreSessionKey,
     eveningGamesRecorded,
   } = getState();
-  // customRosterTopics volontairement ABSENT : collection concurrente multi-auteurs.
+  // customRosterTopics / customLiveTierLists volontairement ABSENTS :
+  // collections concurrentes multi-auteurs (RPC dédiées uniquement).
   // Toute republication de tableau complet depuis un snapshot client provoque des lost updates.
   // Écritures = RPC atomique ; survie aux startGameSession = préservation explicite (voir helpers).
   const remote = {
@@ -3150,6 +3171,62 @@ export function applyRemoteEveningState(st) {
     }
   }
 
+  // FEATURE-TIERNIGHT-04C — customLiveTierLists (multi-auteur).
+  if (Array.isArray(st.customLiveTierLists)) {
+    const localBeforeLive = getState().customLiveTierLists || [];
+    const remoteLiveList = st.customLiveTierLists;
+    const liveAuthor = getLocalDisplayName();
+    const liveAuthorUid = getSupabaseUserId();
+    const localLiveEpoch = Number(getState().customLiveTierListsEpoch) || 0;
+    const remoteLiveEpoch = Number(st.customLiveTierListsEpoch) || 0;
+    const acceptLiveEmpty = shouldAcceptRemoteCustomLiveTierListsEmpty(
+      st,
+      localBeforeLive,
+      localLiveEpoch
+    );
+    const remoteLiveEmpty = remoteLiveList.length === 0;
+    const localLiveHasOthers = localBeforeLive.some((t) => {
+      if (liveAuthorUid && t.authorUid) {
+        return String(t.authorUid) !== String(liveAuthorUid);
+      }
+      return false;
+    });
+    if (remoteLiveEmpty && localLiveHasOthers && !acceptLiveEmpty) {
+      console.warn(
+        "REVEAL FEATURE-TIERNIGHT-04C: ignore empty customLiveTierLists remote over multi-author local",
+        { local: summarizeCustomLiveTierLists(localBeforeLive), liveAuthorUid }
+      );
+    } else if (acceptLiveEmpty || remoteLiveEpoch > localLiveEpoch) {
+      patch.customLiveTierLists = Array.isArray(remoteLiveList) ? remoteLiveList : [];
+      if (remoteLiveEpoch > 0) patch.customLiveTierListsEpoch = remoteLiveEpoch;
+      if (st.customLiveTierListsWritable === true || st.customLiveTierListsWritable === false) {
+        patch.customLiveTierListsWritable = Boolean(st.customLiveTierListsWritable);
+      }
+    } else {
+      patch.customLiveTierLists = mergeCustomLiveTierLists(
+        localBeforeLive,
+        remoteLiveList,
+        liveAuthor,
+        liveAuthorUid
+      );
+      if (remoteLiveEpoch > localLiveEpoch) patch.customLiveTierListsEpoch = remoteLiveEpoch;
+      if (st.customLiveTierListsWritable === true || st.customLiveTierListsWritable === false) {
+        patch.customLiveTierListsWritable = Boolean(st.customLiveTierListsWritable);
+      }
+    }
+  } else if (
+    st.customLiveTierListsEpoch != null ||
+    st.customLiveTierListsWritable === true ||
+    st.customLiveTierListsWritable === false
+  ) {
+    if (st.customLiveTierListsEpoch != null) {
+      patch.customLiveTierListsEpoch = Number(st.customLiveTierListsEpoch) || 0;
+    }
+    if (st.customLiveTierListsWritable === true || st.customLiveTierListsWritable === false) {
+      patch.customLiveTierListsWritable = Boolean(st.customLiveTierListsWritable);
+    }
+  }
+
   if (Array.isArray(st.consumedCustomRosterTopicIds) || st.consumedCustomRosterTopicIds === null) {
     patch.consumedCustomRosterTopicIds = mergeConsumedCustomRosterTopicIdsForHydrate(
       getState().consumedCustomRosterTopicIds,
@@ -3210,16 +3287,24 @@ async function upsertSessionPreservingRosterTopics({
     const { preserveCustomRosterTopicsInFullStateReplace } = await import(
       "./customRosterTopicsSyncGuard.js"
     );
+    const { preserveCustomLiveTierListsInFullStateReplace } = await import(
+      "./customLiveTierListsSyncGuard.js"
+    );
     let existing = null;
     try {
       existing = await fetchGameSessionByLobby(lobbyId);
     } catch {
       existing = cachedRow;
     }
-    const mergedState = preserveCustomRosterTopicsInFullStateReplace(
+    let mergedState = preserveCustomRosterTopicsInFullStateReplace(
       state || {},
       existing?.state || cachedRow?.state || {},
       getState().customRosterTopics || []
+    );
+    mergedState = preserveCustomLiveTierListsInFullStateReplace(
+      mergedState,
+      existing?.state || cachedRow?.state || {},
+      getState().customLiveTierLists || []
     );
     return upsertGameSession({
       lobbyId,
@@ -3427,6 +3512,16 @@ export function applyRemoteSession(row, { epoch = null } = {}) {
   }
   if (st.tierNightPrep) {
     patch.tierNightSeriesPrep = tierNightPrepFromRemote(st.tierNightPrep);
+  }
+  if (st.tierNightLivePrep) {
+    // Codec ready partagé (tierNightPrepFromRemote) ; domaine local distinct.
+    const base = tierNightPrepFromRemote(st.tierNightLivePrep);
+    const roundN = Number(base.roundCount);
+    patch.tierNightLiveSeriesPrep = {
+      ...base,
+      categoryIds: ["*"],
+      roundCount: [3, 5, 7].includes(roundN) ? roundN : 5,
+    };
   }
   Object.assign(patch, tierNightConfigPatchFromRemoteState(st));
 
@@ -3987,6 +4082,12 @@ export function getEffectiveSessionScreen(row) {
   if (st.tierNightPrep && (gid === "tiernight" || declared === "tiernight-prep")) {
     return "tiernight-prep";
   }
+  if (
+    st.tierNightLivePrep &&
+    (gid === "tiernight" || declared === "tiernight-live-prep")
+  ) {
+    return "tiernight-live-prep";
+  }
   return declared;
 }
 
@@ -4424,6 +4525,7 @@ export async function startGameSession(gameId, screen, state) {
       ...(state || {}),
       // Hint client : si la base est vide (amputation), SQL peut réinjecter.
       customRosterTopics: getState().customRosterTopics || [],
+      customLiveTierLists: getState().customLiveTierLists || [],
     },
   });
   applyRemoteSession(row);
@@ -4449,7 +4551,7 @@ async function pushGameSessionInner({ screen, gameId, state }) {
     existing = cachedRow;
   }
   const current = existing?.state || cachedRow?.state || {};
-  const { safePayload, stripped } = stripCustomRosterTopicsFromGenericPatch(
+  let { safePayload, stripped } = stripCustomRosterTopicsFromGenericPatch(
     state && typeof state === "object" ? state : {}
   );
   if (stripped) {
@@ -4457,13 +4559,25 @@ async function pushGameSessionInner({ screen, gameId, state }) {
       "REVEAL FEATURE-TIERNIGHT-02: customRosterTopics stripped from pushGameSession"
     );
   }
+  const liveStrip = stripCustomLiveTierListsFromGenericPatch(safePayload);
+  safePayload = liveStrip.safePayload;
+  if (liveStrip.stripped) {
+    console.warn(
+      "REVEAL FEATURE-TIERNIGHT-04C: customLiveTierLists stripped from pushGameSession"
+    );
+  }
   const merged = Object.keys(safePayload).length
     ? { ...current, ...safePayload }
     : { ...current };
-  const nextState = preserveCustomRosterTopicsInFullStateReplace(
+  let nextState = preserveCustomRosterTopicsInFullStateReplace(
     merged,
     existing?.state || cachedRow?.state || {},
     getState().customRosterTopics || []
+  );
+  nextState = preserveCustomLiveTierListsInFullStateReplace(
+    nextState,
+    existing?.state || cachedRow?.state || {},
+    getState().customLiveTierLists || []
   );
 
   const row = await upsertSessionPreservingRosterTopics({
@@ -4756,11 +4870,18 @@ async function patchGameStateInner(
     if (!hostId) throw new Error("Session requise.");
     if (isLobbyHost()) {
       const cachedSession = getCachedGameSession();
-      const { safePayload, stripped } =
+      let { safePayload, stripped } =
         stripCustomRosterTopicsFromGenericPatch(stateMerge);
       if (stripped) {
         console.warn(
           "REVEAL FEATURE-TIERNIGHT-02: customRosterTopics stripped from generic patch (upsert fallback)"
+        );
+      }
+      const liveStripFb = stripCustomLiveTierListsFromGenericPatch(safePayload);
+      safePayload = liveStripFb.safePayload;
+      if (liveStripFb.stripped) {
+        console.warn(
+          "REVEAL FEATURE-TIERNIGHT-04C: customLiveTierLists stripped from generic patch (upsert fallback)"
         );
       }
       freshRow = await upsertSessionPreservingRosterTopics({
@@ -4797,13 +4918,19 @@ async function patchGameStateInner(
   }
 
   const current = freshRow?.state || cachedRow?.state || {};
-  // FEATURE-TIERNIGHT-02 - option recommandée : strip, pas merge.
-  // Un patch générique ne doit jamais réécrire la collection (anti lost-update).
-  const { safePayload: safeMergePayload, stripped: strippedRoster } =
+  // FEATURE-TIERNIGHT-02 / 04C - strip collections multi-auteur, pas merge.
+  let { safePayload: safeMergePayload, stripped: strippedRoster } =
     stripCustomRosterTopicsFromGenericPatch(mergePayload);
   if (strippedRoster) {
     console.warn(
       "REVEAL FEATURE-TIERNIGHT-02: customRosterTopics stripped from generic patchGameState"
+    );
+  }
+  const liveStripPatch = stripCustomLiveTierListsFromGenericPatch(safeMergePayload);
+  safeMergePayload = liveStripPatch.safePayload;
+  if (liveStripPatch.stripped) {
+    console.warn(
+      "REVEAL FEATURE-TIERNIGHT-04C: customLiveTierLists stripped from generic patchGameState"
     );
   }
   let nextState = { ...current, ...safeMergePayload };
@@ -5061,6 +5188,11 @@ async function patchGameStateInner(
     const incPrep = mergePayload.tierNightPrep;
     nextState.tierNightPrep = mergeTierNightPrepRemoteState(curPrep, incPrep);
   }
+  if (mergePayload.tierNightLivePrep) {
+    const curPrep = current.tierNightLivePrep || {};
+    const incPrep = mergePayload.tierNightLivePrep;
+    nextState.tierNightLivePrep = mergeTierNightPrepRemoteState(curPrep, incPrep);
+  }
   if (
     Array.isArray(mergePayload.consumedCustomRosterTopicIds) ||
     mergePayload.consumedCustomRosterTopicIds === null
@@ -5272,6 +5404,7 @@ export async function completeGameSession({ gameId = "menu", screen = "results",
     ...eveningStateToRemote(),
     ...(state || {}),
     customRosterTopics: getState().customRosterTopics || [],
+    customLiveTierLists: getState().customLiveTierLists || [],
   });
 
   const row = await upsertSessionPreservingRosterTopics({

@@ -66,6 +66,66 @@ export async function rpcDeletePlayerCustomEntry({ lobbyId, game, entryId }) {
   return asSessionRow(data);
 }
 
+/** FEATURE-TIERNIGHT-04C — upsert atomique customLiveTierLists. */
+export async function rpcUpsertPlayerCustomLiveTierList({ lobbyId, entry }) {
+  requireClient();
+  const { data, error } = await supabase.rpc("upsert_player_custom_live_tier_list", {
+    p_lobby_id: lobbyId,
+    p_entry: entry,
+  });
+  if (error) throw error;
+  return asSessionRow(data);
+}
+
+/** FEATURE-TIERNIGHT-04C — delete own customLiveTierLists. */
+export async function rpcDeletePlayerCustomLiveTierList({ lobbyId, entryId }) {
+  requireClient();
+  const { data, error } = await supabase.rpc("delete_player_custom_live_tier_list", {
+    p_lobby_id: lobbyId,
+    p_entry_id: entryId,
+  });
+  if (error) throw error;
+  return asSessionRow(data);
+}
+
+/**
+ * FEATURE-TIERNIGHT-04C — clear ALL autoritatif (déclenchement 04F/04G).
+ * @param {{ lobbyId: string, expectedSessionId?: string|null, reopen?: boolean }} opts
+ */
+export async function rpcClearTierNightCustomLiveTierLists({
+  lobbyId,
+  expectedSessionId = null,
+  reopen = false,
+}) {
+  requireClient();
+  const { data, error } = await supabase.rpc("clear_tiernight_custom_live_tier_lists", {
+    p_lobby_id: lobbyId,
+    p_expected_session_id: expectedSessionId || null,
+    p_reopen: Boolean(reopen),
+  });
+  if (error) throw error;
+  return data && typeof data === "object" ? data : null;
+}
+
+/**
+ * FEATURE-TIERNIGHT-04E — commit atomique série Rank Live (proposition client).
+ * @param {{ lobbyId: string, expectedSetupEpoch: number, series: object }} opts
+ */
+export async function rpcStartTierNightLiveSeries({
+  lobbyId,
+  expectedSetupEpoch,
+  series,
+}) {
+  requireClient();
+  const { data, error } = await supabase.rpc("start_tiernight_live_series", {
+    p_lobby_id: lobbyId,
+    p_expected_setup_epoch: Number(expectedSetupEpoch),
+    p_series: series,
+  });
+  if (error) throw error;
+  return asSessionRow(data);
+}
+
 /**
  * FEATURE-TIERNIGHT-03 — hôte réel : vide tous les customRosterTopics (CAS session).
  * @param {{ lobbyId: string, expectedSessionId?: string|null, reopen?: boolean }} opts

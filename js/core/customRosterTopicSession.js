@@ -11,7 +11,7 @@ import {
 } from "./customRosterTopics.js";
 import { mergeCustomRosterTopics, isCustomRosterTopicOwnedBy } from "./sessionMerge.js";
 import { getLocalDisplayName, getState, saveStatePatch } from "./state.js";
-import { checkHotTakeModeration } from "./hotTakeSession.js";
+import { checkHotTakeModeration } from "./hotTakeModeration.js";
 
 function mergedTopicsWithLocal(extraLocal = [], localAuthorUid = null) {
   const me = getLocalDisplayName();

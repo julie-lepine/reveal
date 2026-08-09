@@ -6,6 +6,7 @@
  *
  * BUG-TIERNIGHT-PREP-GUEST-01 : `tierNightPrep` (ready + poolInvalidateRequestId)
  * est un blob distinct de `tierNight` — détection dédiée.
+ * FEATURE-TIERNIGHT-04E : même forme pour `tierNightLivePrep` (ready live).
  */
 
 const STATE_KEY_TO_GAME = {
@@ -131,7 +132,7 @@ export function detectPlayerContribution(stateMerge, localUid) {
   const blob = stateMerge[stateKey];
   if (!blob || typeof blob !== "object") return null;
 
-  if (stateKey === "tierNightPrep") {
+  if (stateKey === "tierNightPrep" || stateKey === "tierNightLivePrep") {
     return detectTierNightPrepContribution(blob, localUid);
   }
 

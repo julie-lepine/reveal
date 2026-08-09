@@ -25,14 +25,15 @@ import { bindNav } from "./nav.js";
 import { showAppAlert, showAppConfirm } from "../core/dialog.js";
 import { isTierNightSeriesUiEnabled } from "../core/tierNightSeriesGate.js";
 import { enterTierNightSeriesPrep } from "../core/tierNightSeriesPrepSession.js";
+import { enterTierNightLivePrep } from "../core/tierNightLivePrepSession.js";
 import { navigate } from "../core/router.js";
 
 /**
- * FEATURE-TIERNIGHT-03-F — select modes TierNight.
+ * FEATURE-TIERNIGHT-03-F / 04D — select modes TierNight.
  *
  * Classe le groupe → tiernight-prep (série) uniquement.
  * Anciens steps wizard / grille mono → normalisation vers prep (ou mode si kill switch).
- * Rank Live : list → create / pick → live (inchangé).
+ * Rank Live → tiernight-live-prep (plus de step=list / mono launch depuis ce parcours).
  * Aucune nouvelle session classic.
  */
 
@@ -117,6 +118,12 @@ export function mountTierNightSelect(app) {
     step = "mode";
   }
 
+  // FEATURE-TIERNIGHT-04D — step=list mort : redirige vers live prep (pas de pick mono).
+  if (step === "list") {
+    void enterTierNightLivePrep({ resetSettings: false });
+    return () => {};
+  }
+
   async function ensureHost() {
     if (isGameSyncActive() && !isLobbyHost()) {
       await showAppAlert("Seul l'hôte choisit le mode et le thème pour le lobby.", {
@@ -147,7 +154,24 @@ export function mountTierNightSelect(app) {
   }
 
   /**
-   * Rank Live uniquement. Roster classic retiré (FEATURE-TIERNIGHT-03-F).
+   * FEATURE-TIERNIGHT-04D — Rank Live → prep série (pas de pick list / mono launch).
+   */
+  async function openLivePrepFromSelect() {
+    if (!(await ensureHost())) return;
+    setTierNightMode("live");
+    setTierNightModifier("normal");
+    const res = await enterTierNightLivePrep({ resetSettings: true });
+    if (res?.ok === false) {
+      await showAppAlert(res.error || "Impossible d'ouvrir la préparation Rank Live.", {
+        title: "Préparation",
+        icon: "⚠️",
+      });
+    }
+  }
+
+  /**
+   * Compat legacy : mono launch depuis une URL step=list encore en pile.
+   * Le nouveau parcours mode→live n'appelle plus cette fonction.
    */
   async function startLiveGame(topicId) {
     if (!(await ensureHost())) return;
@@ -245,6 +269,10 @@ export function mountTierNightSelect(app) {
             void openSeriesPrepFromRoster();
             return;
           }
+          if (id === "live") {
+            void openLivePrepFromSelect();
+            return;
+          }
           step = "list";
           render();
         });
@@ -252,9 +280,11 @@ export function mountTierNightSelect(app) {
       return;
     }
 
-    // step === "list" (Rank live uniquement)
-    bindTierGrid(app, (id) => startLiveGame(id));
+    // step === "list" ne doit plus être rendu (redirigé au mount).
   }
+
+  // Conservé pour audit : aucun bind CTA mono depuis le nouveau parcours.
+  void startLiveGame;
 
   const guestFollow = prepGuestFollowOnSession({
     prepScreen: "tiernight-select",
@@ -262,7 +292,9 @@ export function mountTierNightSelect(app) {
       const effective = getEffectiveSessionScreen(getCachedGameSession());
       if (
         effective === "tiernight-prep" ||
+        effective === "tiernight-live-prep" ||
         effective === "tiernight" ||
+        effective === "tiernight-live" ||
         effective === "tiernight-between" ||
         effective === "tiernight-end"
       ) {
@@ -273,6 +305,19 @@ export function mountTierNightSelect(app) {
     buildNavStack: (entry) => {
       if (entry === "tiernight-prep") {
         return ["home", "lobby", "game-select", "tiernight-select", "tiernight-prep"];
+      }
+      if (entry === "tiernight-live-prep") {
+        return ["home", "lobby", "game-select", "tiernight-select", "tiernight-live-prep"];
+      }
+      if (entry === "tiernight-live") {
+        return [
+          "home",
+          "lobby",
+          "game-select",
+          "tiernight-select",
+          "tiernight-live-prep",
+          "tiernight-live",
+        ];
       }
       if (entry === "tiernight" || entry === "tiernight-between" || entry === "tiernight-end") {
         return [

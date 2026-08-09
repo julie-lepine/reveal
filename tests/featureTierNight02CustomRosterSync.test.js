@@ -126,8 +126,10 @@ describe("FEATURE-TIERNIGHT-02 - C. protection patchGameStateInner (strip)", () 
     const sync = read("js/core/gameSync.js");
     const idx = sync.indexOf("let nextState = { ...current, ...safeMergePayload };");
     assert.ok(idx > 0, "safeMergePayload attendu après strip");
-    const before = sync.slice(idx - 400, idx);
+    // Fenêtre élargie : 04C ajoute strip customLiveTierLists juste avant nextState.
+    const before = sync.slice(idx - 700, idx);
     assert.match(before, /stripCustomRosterTopicsFromGenericPatch/);
+    assert.match(before, /stripCustomLiveTierListsFromGenericPatch/);
     assert.doesNotMatch(
       sync.slice(idx, idx + 200),
       /mergeCustomRosterTopics\(\s*mergePayload\.customRosterTopics/

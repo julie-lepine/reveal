@@ -1,0 +1,29 @@
+-- =============================================================================
+-- RUNBOOK — FEATURE-TIERNIGHT-04C customLiveTierLists (terrain)
+-- =============================================================================
+--
+-- SÉPARATION CLAIRE :
+--
+--   A) MIGRATION PRODUIT — DÉJÀ VALIDÉE / SUCCESS
+--        supabase/feature-tiernight-04c-custom-live-tier-lists.sql
+--      → NE PAS RÉEXÉCUTER sauf nouvelle correction produit.
+--
+--   B1) BOOTSTRAP HARNESS (exécuter en premier, attendre SUCCESS) :
+--        supabase/feature-tiernight-04c-custom-live-tier-lists-smoke-bootstrap.sql
+--      → notice attendue : TN04C B1 READY
+--      → SELECT final : ctx_table, ctx_rows=1, lobby_id, session_id, code
+--
+--   B2) TESTS C1–C25 (seulement après B1 SUCCESS) :
+--        supabase/feature-tiernight-04c-custom-live-tier-lists-smoke-tests.sql
+--      → notice finale : CLEANUP OK
+--
+--   Cleanup d'urgence (si B2 mid-fail laisse des fixtures) :
+--        supabase/feature-tiernight-04c-custom-live-tier-lists-smoke-cleanup.sql
+--
+--   Ancien monolith (DEPRECATED stub) :
+--        supabase/feature-tiernight-04c-custom-live-tier-lists-smoke-harness.sql
+--      → NE PAS utiliser pour le smoke.
+--
+-- Prérequis B1 : ≥ 2 auth.users libres (pas de membership vivant).
+-- Fixtures uniquement lobbies.code LIKE 'TN04C%'.
+-- =============================================================================

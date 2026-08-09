@@ -181,6 +181,66 @@ function normalizeCustomRosterTopicForMerge(entry) {
 }
 
 /**
+ * FEATURE-TIERNIGHT-04C — merge customs Rank Live.
+ * remote = vérité confirmée ; local = optimismes own absents du remote.
+ * Ownership : authorUid uniquement (pas de fallback name).
+ */
+export function mergeCustomLiveTierLists(
+  localList = [],
+  remoteList = [],
+  localAuthor = null,
+  localAuthorUid = null
+) {
+  void localAuthor;
+  const byId = new Map();
+  const isMine = (item) => isCustomLiveTierListOwnedBy(item, null, localAuthorUid);
+
+  for (const raw of remoteList) {
+    const item = normalizeCustomLiveTierListForMerge(raw);
+    if (!item) continue;
+    byId.set(item.id, item);
+  }
+  for (const raw of localList) {
+    const item = normalizeCustomLiveTierListForMerge(raw);
+    if (!item || byId.has(item.id)) continue;
+    if (isMine(item)) byId.set(item.id, item);
+  }
+  return [...byId.values()];
+}
+
+/** Ownership live : UID only (collection neuve). */
+export function isCustomLiveTierListOwnedBy(item, _localAuthor = null, localAuthorUid = null) {
+  if (!item || !localAuthorUid || !item.authorUid) return false;
+  return String(item.authorUid) === String(localAuthorUid);
+}
+
+function normalizeCustomLiveTierListForMerge(entry) {
+  if (!entry || typeof entry !== "object") return null;
+  const id = entry.id != null ? String(entry.id).trim() : "";
+  if (!id.startsWith("custom-live-")) return null;
+  const name = String(entry.name ?? "").trim().slice(0, 40);
+  if (name.length < 2) return null;
+  const authorUid =
+    entry.authorUid != null && String(entry.authorUid).trim()
+      ? String(entry.authorUid).trim()
+      : null;
+  if (!authorUid) return null;
+  const items = Array.isArray(entry.items)
+    ? entry.items.map((x) => String(x ?? "").trim()).filter(Boolean)
+    : [];
+  if (items.length < 4) return null;
+  return {
+    id,
+    name,
+    emoji: entry.emoji != null ? String(entry.emoji).trim().slice(0, 4) || "✨" : "✨",
+    items,
+    author: entry.author != null ? String(entry.author) : "",
+    authorUid,
+    custom: true,
+  };
+}
+
+/**
  * Deck Hot Take / Dilemma : null en prep (customs modifiables).
  * En partie lancée, deck figé - remote prioritaire.
  */

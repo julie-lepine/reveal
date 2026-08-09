@@ -65,10 +65,10 @@ describe("UX-TIERNIGHT-NAV-01 - source navigation", () => {
     assert.doesNotMatch(select, /topicStepHtml/);
   });
 
-  it("création Rank Live : retour → list/live", () => {
+  it("création Rank Live : retour → mode/live (plus de step=list)", () => {
     const create = read("js/screens/tierNightCreate.js");
     assert.match(create, /returnToTierNightSelectStep/);
-    assert.match(create, /step:\s*"list"/);
+    assert.match(create, /step:\s*"mode"/);
     assert.match(create, /mode:\s*"live"/);
     assert.match(create, /tiernight-live-lists/);
   });
@@ -116,7 +116,7 @@ describe("UX-TIERNIGHT-NAV-01 - returnToTierNightSelectStep comportement", () =>
     assert.equal(getNavStack().at(-1), "tiernight-prep");
   });
 
-  it("après create live → select list/live", () => {
+  it("après create live → select mode/live (04D : plus de step=list)", () => {
     navigate("home", { reset: true });
     navigate("game-select");
     navigate("tiernight-select");
@@ -125,7 +125,7 @@ describe("UX-TIERNIGHT-NAV-01 - returnToTierNightSelectStep comportement", () =>
     returnToTierNightSelectStep({ step: "list", mode: "live" });
 
     assert.equal(getCurrentScreen(), "tiernight-select");
-    assert.deepEqual(getScreenParams(), { step: "list", mode: "live" });
+    assert.deepEqual(getScreenParams(), { step: "mode", mode: "live" });
     assert.equal(getNavStack().includes("tiernight-create"), false);
   });
 

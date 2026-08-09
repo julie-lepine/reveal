@@ -154,4 +154,23 @@ describe("detectPlayerContribution (I-08)", () => {
       null
     );
   });
+
+  it("FEATURE-TIERNIGHT-04E : tierNightLivePrep ready + expectedSetupEpoch", () => {
+    assert.deepEqual(
+      detectPlayerContribution(
+        {
+          tierNightLivePrep: {
+            ready: { [UID]: false },
+            expectedSetupEpoch: 4,
+          },
+        },
+        UID
+      ),
+      {
+        game: "tiernight",
+        kind: "ready",
+        value: { ready: false, expectedSetupEpoch: 4 },
+      }
+    );
+  });
 });

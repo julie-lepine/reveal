@@ -131,21 +131,21 @@ const FIXTURE_TOPICS = [
 describe("FEATURE-TIERNIGHT-SERIES-01 - catalogue additif", () => {
   it("préserve les ids historiques et wire roster:", () => {
     const ids = TIER_NIGHT_ROSTER_TOPICS.map((t) => t.id);
-    assert.deepEqual(
-      ids,
-      [
-        "apocalypse",
-        "soiree",
-        "secret",
-        "boss",
-        "crime",
-        "loto",
-        "roadtrip",
-        "celebrity",
-        "panic",
-        "ghost",
-      ]
-    );
+    const historicalIds = [
+      "apocalypse",
+      "soiree",
+      "secret",
+      "boss",
+      "crime",
+      "loto",
+      "roadtrip",
+      "celebrity",
+      "panic",
+      "ghost",
+    ];
+    // Préfixe immuable (wire roster:<id>) ; ajouts autorisés en fin de catalogue.
+    assert.deepEqual(ids.slice(0, historicalIds.length), historicalIds);
+    assert.equal(new Set(ids).size, ids.length);
     for (const t of TIER_NIGHT_ROSTER_TOPICS) {
       assert.equal(typeof t.categoryId, "string");
       assert.equal(t.enabled, true);

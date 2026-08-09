@@ -281,12 +281,12 @@ describe("FEATURE-TIERNIGHT-03-C - navigation gate ON", () => {
     assert.equal(getNavStack().at(-1), "tiernight-prep");
   });
 
-  it("Rank Live returnTo list inchangé sous gate", () => {
+  it("Rank Live returnTo list → mode (04D step=list mort)", () => {
     navigate("home", { reset: true });
     navigate("tiernight-create");
     returnToTierNightSelectStep({ step: "list", mode: "live" });
     assert.equal(getCurrentScreen(), "tiernight-select");
-    assert.deepEqual(getScreenParams(), { step: "list", mode: "live" });
+    assert.deepEqual(getScreenParams(), { step: "mode", mode: "live" });
   });
 
   it("enterTierNightSeriesPrep pile canonique", async () => {

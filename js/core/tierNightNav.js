@@ -24,6 +24,7 @@ const LEGACY_ROSTER_STEPS = new Set(["topic", "roster-path"]);
  * les écrans de création / prep dans la pile (évite retour fantôme).
  *
  * FEATURE-TIERNIGHT-03-F — topic / roster-path / wizard → prep (jamais grille classic).
+ * FEATURE-TIERNIGHT-04D — retour depuis live-prep → select mode (pas step=list).
  *
  * @param {{ step?: "mode"|"topic"|"list"|"roster-path", mode?: string|null }} [opts]
  */
@@ -32,7 +33,11 @@ export function returnToTierNightSelectStep({ step = "mode", mode = null } = {})
   let resolvedStep = allowed.has(step) ? step : "mode";
   let resolvedMode = mode != null ? normalizeTierNightMode(mode) : null;
   if (LEGACY_ROSTER_STEPS.has(resolvedStep)) resolvedMode = "roster";
-  if (resolvedStep === "list") resolvedMode = "live";
+  // 04D : step=list n'est plus une destination — mode live → select modes.
+  if (resolvedStep === "list") {
+    resolvedStep = "mode";
+    resolvedMode = "live";
+  }
 
   // Create-roster / ancien step grille → prep série canonique.
   if (LEGACY_ROSTER_STEPS.has(resolvedStep)) {
@@ -45,13 +50,24 @@ export function returnToTierNightSelectStep({ step = "mode", mode = null } = {})
     return;
   }
 
+  const leavingLivePrep = getNavStack().includes("tiernight-live-prep");
   const stack = getNavStack().filter(
-    (id) => !TIER_NIGHT_CREATE_SCREENS.has(id) && id !== "tiernight-prep"
+    (id) =>
+      !TIER_NIGHT_CREATE_SCREENS.has(id) &&
+      id !== "tiernight-prep" &&
+      id !== "tiernight-live-prep"
   );
   while (stack.length && stack[stack.length - 1] === "tiernight-select") {
     stack.pop();
   }
   stack.push("tiernight-select");
+
+  // Quitter un prep live vers select : reset local settings (pas clear customs remote).
+  if (leavingLivePrep && resolvedStep === "mode") {
+    void import("./tierNightLivePrepSession.js")
+      .then(({ resetTierNightLivePrepSession }) => resetTierNightLivePrepSession())
+      .catch(() => {});
+  }
 
   navigate("tiernight-select", {
     params: {

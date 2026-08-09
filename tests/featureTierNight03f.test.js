@@ -251,14 +251,16 @@ describe("FEATURE-TIERNIGHT-03-F - shapes / Rank Live / consumed", () => {
     assert.equal(stale.screen, "tiernight");
   });
 
-  it("23–27. Rank Live isolé + customTierLists", () => {
+  it("23–27. Rank Live isolé + customTierLists (04D : prep, pas step=list)", () => {
     const select = read("js/screens/tierNightSelect.js");
-    assert.match(select, /listStepHtml/);
-    assert.match(select, /markTierNightLiveLobbyStarted/);
-    assert.match(select, /tiernight-create/);
+    assert.match(select, /enterTierNightLivePrep/);
+    assert.match(select, /id === "live"/);
+    // Legacy mono peut rester en source (startLiveGame) mais n'est plus bindé depuis le parcours.
+    assert.doesNotMatch(select, /bindTierGrid\(app,\s*\(id\)\s*=>\s*startLiveGame/);
     assert.doesNotMatch(select, /topicStepHtml/);
     const create = read("js/screens/tierNightCreate.js");
-    assert.match(create, /step:\s*"list"/);
+    assert.match(create, /from === "live-prep"|from:\s*"live-prep"/);
+    assert.match(create, /step:\s*"mode"/);
     saveStatePatch({
       customTierLists: [{ id: "keep", name: "K", items: ["a"] }],
     });

@@ -330,18 +330,21 @@ describe("FEATURE-TIERNIGHT-03-E - legacy / gate / stale / resume", () => {
 });
 
 describe("FEATURE-TIERNIGHT-03-E - Rank Live isolation", () => {
-  it("18–19. Rank Live list / create / restart / reprise inchangés", () => {
+  it("18–19. Rank Live isolé (04D prep ; mono legacy hors nouveau parcours)", () => {
     const nav = read("js/core/tierNightNav.js");
     assert.match(nav, /resolvedStep === "list"/);
+    assert.match(nav, /resolvedStep = "mode"/);
     assert.match(nav, /resolvedMode = "live"/);
 
     const select = read("js/screens/tierNightSelect.js");
+    assert.match(select, /enterTierNightLivePrep/);
     assert.match(select, /step === "list"/);
-    assert.match(select, /markTierNightLiveLobbyStarted/);
 
     const create = read("js/screens/tierNightCreate.js");
-    assert.match(create, /step:\s*"list"/);
+    assert.match(create, /step:\s*"mode"/);
     assert.match(create, /mode:\s*"live"/);
+    // Legacy mono conservé hors from=live-prep
+    assert.match(create, /markTierNightLiveLobbyStarted/);
 
     const exit = read("js/core/tierNightSeriesExitNav.js");
     assert.doesNotMatch(exit, /customTierLists/);
