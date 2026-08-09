@@ -1328,9 +1328,11 @@ function mergeHotTakeGameLocal(local, remote) {
   if (newVoteRound) {
     votes = remoteVotes;
   } else if (remote.phase === "voting") {
-    votes = { ...remoteVotes, ...localVotes };
+    // AUDIT-009 / SYN-VOTE-ROLLBACK-01B : remote gagne (A→B). Ancien
+    // `{...remote,...local}` conservait A chez hôte/invités après un revote.
+    votes = mergePlayerVoteMapsForCatchUp(localVotes, remoteVotes);
   } else if (remote.phase === "reveal" || local.phase === "reveal") {
-    votes = { ...remoteVotes, ...localVotes };
+    votes = mergePlayerVoteMapsForCatchUp(localVotes, remoteVotes);
   }
   votes = normalizePlayerVotesMap(votes);
   const ready =
@@ -1385,9 +1387,10 @@ function mergeSpeedVoteGameLocal(local, remote) {
   if (newVoteRound) {
     votes = remoteVotes;
   } else if (remote.phase === "voting") {
-    votes = { ...remoteVotes, ...localVotes };
+    // AUDIT-009 : même contrat catch-up que Dilemma / HotTake.
+    votes = mergePlayerVoteMapsForCatchUp(localVotes, remoteVotes);
   } else if (remote.phase === "reveal" || local.phase === "reveal") {
-    votes = { ...remoteVotes, ...localVotes };
+    votes = mergePlayerVoteMapsForCatchUp(localVotes, remoteVotes);
   }
   votes = normalizePlayerVotesMap(votes);
   const ready =

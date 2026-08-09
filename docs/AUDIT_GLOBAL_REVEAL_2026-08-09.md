@@ -85,7 +85,7 @@ Les candidats les plus proches sont classés **P1** (scores restart, channel orp
 
 ---
 
-### AUDIT-004 — Customs ressuscités (`mergeAuthorOwned` + `pickRichest*`) - Implementation ✅ / Tests ✅ / QA terrain ⏳
+### AUDIT-004 — Customs ressuscités (`mergeAuthorOwned` + `pickRichest*`) - Implementation ✅ / Tests ✅ / QA terrain ✅
 
 * **Sévérité :** P1
 * **Confiance :** BUG CONFIRMÉ (QA terrain : dernière custom)
@@ -99,7 +99,7 @@ Les candidats les plus proches sont classés **P1** (scores restart, channel orp
 
 ## 4. P2 — Moyen
 
-### AUDIT-005 — Scores soirée perdus si joueur parti
+### AUDIT-005 — Scores soirée perdus si joueur parti - QA terrain ✅
 
 * **Sévérité :** P2
 * **Confiance :** BUG CONFIRMÉ
@@ -113,7 +113,7 @@ Les candidats les plus proches sont classés **P1** (scores restart, channel orp
 
 ---
 
-### AUDIT-006 — Post-game declared ignore `resolveActivePlayScreen`
+### AUDIT-006 — Post-game declared ignore `resolveActivePlayScreen` - 🟡 Risque théorique, pas de QA nécessaire
 
 * **Sévérité :** P2
 * **Confiance :** RISQUE / HYPOTHÈSE À CONFIRMER
@@ -127,7 +127,7 @@ Les candidats les plus proches sont classés **P1** (scores restart, channel orp
 
 ---
 
-### AUDIT-007 — Roster `series_end` sans garde setup-reentry (asymétrie Live)
+### AUDIT-007 — Roster `series_end` sans garde setup-reentry (asymétrie Live) - 🟡 Risque théorique, pas de QA nécessaire
 
 * **Sévérité :** P2
 * **Confiance :** RISQUE
@@ -142,7 +142,7 @@ Les candidats les plus proches sont classés **P1** (scores restart, channel orp
 
 ---
 
-### AUDIT-008 — Replay Live avale l’erreur du 1er patch
+### AUDIT-008 — Replay Live avale l’erreur du 1er patch - ✅ QA validée
 
 * **Sévérité :** P2
 * **Confiance :** BUG PROBABLE
@@ -156,17 +156,15 @@ Les candidats les plus proches sont classés **P1** (scores restart, channel orp
 
 ---
 
-### AUDIT-009 — Merge votes HotTake pendant `voting` : local gagne toutes les clés
+### AUDIT-009 — Merge votes HotTake pendant `voting` : local gagne toutes les clés - Implementation ✅ / Tests ✅ / QA terrain ⏳
 
 * **Sévérité :** P2
-* **Confiance :** RISQUE
-* **Fichier :** `gameSync.js` — `mergeHotTakeGameLocal` (~1330)
+* **Confiance :** BUG CONFIRMÉ (revote HotTake autorisé en `voting` ; même anti-pattern SpeedVote)
+* **Fichier :** `gameSync.js` — `mergeHotTakeGameLocal` / `mergeSpeedVoteGameLocal`
 * **Cause :** `votes = { ...remoteVotes, ...localVotes }`
-* **Scénario :** si revote autorisé / ordre Realtime bizarre → vote distant d’un autre joueur écrasé par cache local
-* **Impact :** faible si write-once ; plus haut si changement de vote
-* **Tests existants :** merges HotTake phase/round ; pas revote concurrent multi-joueur
-* **Tests manquants :** remote vote B plus récent vs local stale B
-* **Recommandation :** ne merger que la clé locale optimiste (comme Dilemma post-fix)
+* **Scénario :** revote A→B / ordre Realtime → cache local stale écrase le remote
+* **Correctif :** `mergePlayerVoteMapsForCatchUp(localVotes, remoteVotes)` (contrat Dilemma)
+* **Tests :** `tests/audit009VoteCatchUpMerge.test.js`
 
 ---
 
