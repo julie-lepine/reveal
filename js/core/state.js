@@ -1187,6 +1187,15 @@ export function resolveActiveTierNightScoreRunIdentity() {
   if (live?.lobbyStarted && live.phase !== "done" && live.runId) {
     return { mode: "live", runId: String(live.runId) };
   }
+  // Rank Live series_end : le blob est finished/lobbyStarted=false mais le cumul
+  // doit rester branché sur le run live (sinon baseline orpheline / pending).
+  if (
+    live?.series?.kind === "live" &&
+    live.series.phase === "series_end" &&
+    (live.series.runId || live.runId)
+  ) {
+    return { mode: "live", runId: String(live.series.runId || live.runId) };
+  }
   const tn = state.tierNightGame;
   if (tn?.series && tn.runId) {
     return { mode: "series", runId: String(tn.runId) };

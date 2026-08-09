@@ -46,7 +46,7 @@ mock.module("../js/core/gameSessionRpc.js", {
   namedExports: {
     rpcClearTierNightCustomLiveTierLists: async (args) => {
       clearRpcCalls.push(args);
-      return { ok: true };
+      return { ok: true, code: "CLEARED", epoch: 1, writable: true };
     },
     rpcStartTierNightLiveSeries: async () => null,
   },
@@ -60,8 +60,8 @@ const gameSyncExports = {
     patchCalls.push({ stateMerge, opts });
     return { screen: opts?.screen || null, state: stateMerge, game_id: "tiernight" };
   },
-  getCachedGameSession: () => null,
-  refreshGameSession: async () => null,
+  getCachedGameSession: () => ({ id: "session-04f", lobby_id: "lobby-04f" }),
+  refreshGameSession: async () => ({ id: "session-04f", lobby_id: "lobby-04f" }),
   tierNightLiveToRemote: (session) => ({ ...(session || {}) }),
   tierNightRecapToRemote: (session) => {
     if (!session?.recaps?.length) return null;
@@ -314,7 +314,17 @@ describe("FEATURE-TIERNIGHT-04F — série 3 listes", () => {
     assert.equal(navigations.at(-1)?.screen, "tiernight-end");
     assert.ok(clearRpcCalls.length >= 1);
     assert.equal(clearRpcCalls[0].lobbyId, "lobby-04f");
+    assert.equal(clearRpcCalls[0].expectedSessionId, "session-04f");
+    assert.equal(clearRpcCalls[0].reopen, true);
     assert.deepEqual(getState().customLiveTierLists, []);
+    assert.equal(getState().customLiveTierListsWritable, true);
+  });
+
+  it("clear customs refuse STALE sans expectedSessionId (contrat SQL)", async () => {
+    const src = read("js/core/tierNightLiveSeriesPlaySession.js");
+    assert.match(src, /expectedSessionId:\s*sessionId/);
+    assert.match(src, /result\?\.ok !== true/);
+    assert.match(src, /NO_SESSION_ID/);
   });
 
   it("anti-double finalize (scoredRoundIds)", async () => {

@@ -207,19 +207,93 @@ function applyLiveSeriesLocalState({ liveNext, tierNightPatch = null }) {
 }
 
 async function clearCustomsBestEffortOnSeriesEnd() {
+  const previousLists = [...(getState().customLiveTierLists || [])];
+  const previousEpoch = Number(getState().customLiveTierListsEpoch) || 0;
+  const previousWritable = getState().customLiveTierListsWritable !== false;
+
   try {
     clearCustomLiveTierListsLocal();
+    // Epoch + reopen locaux anticipés (comme clear roster) — confirmés par RPC.
+    saveStatePatch({
+      customLiveTierListsEpoch: previousEpoch + 1,
+      customLiveTierListsWritable: true,
+    });
   } catch (err) {
     console.warn("[TierNightLive] clear customs local failed:", err);
   }
-  if (!isGameSyncActive()) return { ok: true, localOnly: true };
+
+  if (!isGameSyncActive()) {
+    return { ok: true, localOnly: true };
+  }
+
+  // Clear lifecycle = hôte réel (SQL is_lobby_host), pas acting-host.
+  if (!isLobbyHost()) {
+    return { ok: true, skipped: true, guestLocalOnly: true };
+  }
+
   const lobbyId = getLobbyId();
-  if (!lobbyId || !isLobbyHost()) return { ok: true, skipped: true };
+  if (!lobbyId) {
+    return { ok: false, code: "NO_LOBBY" };
+  }
+
+  let sessionId = getCachedGameSession()?.id || null;
+  if (!sessionId) {
+    try {
+      const { refreshGameSession } = await import("./gameSync.js");
+      const row = await refreshGameSession();
+      sessionId = row?.id || null;
+    } catch {
+      sessionId = null;
+    }
+  }
+  // SQL : p_expected_session_id null → STALE_SESSION (aucune mutation).
+  if (!sessionId) {
+    console.warn("[TierNightLive] clear customs skipped: missing session id");
+    saveStatePatch({
+      customLiveTierLists: previousLists,
+      customLiveTierListsEpoch: previousEpoch,
+      customLiveTierListsWritable: previousWritable,
+    });
+    return { ok: false, code: "NO_SESSION_ID" };
+  }
+
   try {
-    await rpcClearTierNightCustomLiveTierLists({ lobbyId, reopen: true });
-    return { ok: true, cleared: true };
+    const result = await rpcClearTierNightCustomLiveTierLists({
+      lobbyId,
+      expectedSessionId: sessionId,
+      reopen: true,
+    });
+    if (result?.ok !== true) {
+      console.warn(
+        "[TierNightLive] clear customs RPC rejected:",
+        result?.code || result
+      );
+      saveStatePatch({
+        customLiveTierLists: previousLists,
+        customLiveTierListsEpoch: previousEpoch,
+        customLiveTierListsWritable: previousWritable,
+      });
+      return {
+        ok: false,
+        code: result?.code || "CLEAR_REJECTED",
+        result,
+      };
+    }
+    const epoch = Number(result?.epoch);
+    saveStatePatch({
+      customLiveTierLists: [],
+      customLiveTierListsEpoch:
+        Number.isFinite(epoch) && epoch >= 0 ? epoch : previousEpoch + 1,
+      customLiveTierListsWritable: true,
+    });
+    return { ok: true, cleared: true, code: result?.code || "CLEARED", epoch };
   } catch (err) {
     console.warn("[TierNightLive] clear customs RPC failed (scoring preserved):", err);
+    saveStatePatch({
+      customLiveTierLists: previousLists,
+      customLiveTierListsEpoch: previousEpoch,
+      customLiveTierListsWritable: previousWritable,
+    });
     return { ok: false, error: err };
   }
 }
@@ -267,6 +341,13 @@ export async function hostFinalizeTierNightLiveSeriesList({
           : isTierNightLiveSeriesLastRound(series)
             ? TIER_NIGHT_LIVE_SERIES_PHASE_END
             : TIER_NIGHT_LIVE_SERIES_PHASE_BETWEEN;
+      // Retry clear si on retombe sur series_end sans customs déjà vides.
+      if (
+        phase === TIER_NIGHT_LIVE_SERIES_PHASE_END &&
+        (getState().customLiveTierLists || []).length > 0
+      ) {
+        await clearCustomsBestEffortOnSeriesEnd();
+      }
       if (canContinue()) navigateForTierNightLiveSeriesPhase(phase);
       return { ok: true, applied: false, code: "ALREADY_APPLIED", phase, roundId };
     }
