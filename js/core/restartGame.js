@@ -582,11 +582,20 @@ export async function restartGame(gameId) {
   if (!(await assertNoActiveChatRoulette({ sessionGameId: gameId }))) return;
 
   // FEATURE-TIERNIGHT-03-E — sous gate, fin série / legacy roster → prep (pas classic / pas select).
+  // FEATURE-TIERNIGHT-04F — fin série Rank Live → live prep.
   if (gameId === "tiernight") {
     const {
       shouldReplayTierNightSeriesToPrep,
+      shouldReplayTierNightLiveSeriesToPrep,
       replayTierNightAfterSeriesEnd,
+      replayTierNightLiveAfterSeriesEnd,
     } = await import("./tierNightSeriesExitNav.js");
+    if (shouldReplayTierNightLiveSeriesToPrep()) {
+      const outcome = await restartLock.run(() =>
+        replayTierNightLiveAfterSeriesEnd()
+      );
+      return outcome.ok ? outcome.value : undefined;
+    }
     if (shouldReplayTierNightSeriesToPrep()) {
       const outcome = await restartLock.run(() =>
         replayTierNightAfterSeriesEnd()

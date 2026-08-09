@@ -29,7 +29,7 @@ export function tierNightConfigPatchFromRemoteState(st = {}) {
 
 export function finishedTierNightLiveRemote(session = null) {
   const preserve = session && typeof session === "object";
-  return {
+  const out = {
     runId: preserve ? session.runId ?? null : null,
     lobbyStarted: false,
     topicId: preserve ? session.topicId ?? null : null,
@@ -42,6 +42,11 @@ export function finishedTierNightLiveRemote(session = null) {
     placements: preserve ? session.placements || {} : {},
     finished: true,
   };
+  // FEATURE-TIERNIGHT-04F — conserver la série (history / series_end) sur le blob fini.
+  if (preserve && session.series && typeof session.series === "object") {
+    out.series = session.series;
+  }
+  return out;
 }
 
 export function createTierNightRunId() {
@@ -58,7 +63,16 @@ function hasRemoteTierNightRecap(st = {}) {
 }
 
 function hasActiveTierNightRun(st = {}) {
-  const liveActive = Boolean(st?.tierNightLive?.lobbyStarted && !st?.tierNightLive?.finished);
+  const live = st?.tierNightLive;
+  const liveSeriesPhase =
+    live?.series?.kind === "live" && typeof live.series.phase === "string"
+      ? live.series.phase
+      : null;
+  // between_lists : lobbyStarted peut rester true — traité comme run actif.
+  const liveSeriesActive =
+    liveSeriesPhase === "playing_list" || liveSeriesPhase === "between_lists";
+  const liveActive =
+    Boolean(live?.lobbyStarted && !live?.finished) || liveSeriesActive;
   const classicActive = Boolean(st?.tierNight?.lobbyStarted);
   const seriesPhase = st?.tierNight?.series?.phase;
   const seriesPlayActive =
@@ -72,6 +86,12 @@ export function shouldPreferTierNightEndRoute({
   local = null,
   localHasRecap = false,
 } = {}) {
+  if (
+    state?.tierNightLive?.series?.kind === "live" &&
+    state.tierNightLive.series.phase === "series_end"
+  ) {
+    return !hasActiveTierNightRun(state);
+  }
   if (state?.tierNight?.series?.phase === "series_end") {
     return !hasActiveTierNightRun(state);
   }

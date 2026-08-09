@@ -169,8 +169,18 @@ export function resolveReplayDestination({ seriesUiEnabled = false } = {}) {
 }
 
 /**
+ * FEATURE-TIERNIGHT-04F — fin série Rank Live → prep live (pas roster prep).
+ */
+export function shouldReplayTierNightLiveSeriesToPrep({
+  tierNightLive = getState().tierNightLiveGame,
+} = {}) {
+  const series = tierNightLive?.series;
+  return series?.kind === "live" && series?.phase === "series_end";
+}
+
+/**
  * Sous gate ON, recommencer depuis fin série / legacy roster → prep (pas classic).
- * Rank Live (mode live) → false → hub select via launchTierNightSelect.
+ * Rank Live series_end → false (chemin `shouldReplayTierNightLiveSeriesToPrep`).
  *
  * @param {{
  *   seriesUiEnabled?: boolean,
@@ -187,6 +197,8 @@ export function shouldReplayTierNightSeriesToPrep({
 } = {}) {
   if (!seriesUiEnabled) return false;
   if (tierNightLive?.lobbyStarted && !tierNightLive?.finished) return false;
+  // Live series_end : chemin dédié (enter live prep), pas roster prep.
+  if (shouldReplayTierNightLiveSeriesToPrep({ tierNightLive })) return false;
 
   const mode = tierNight?.mode || tierNightMode || "roster";
   const phase = tierNight?.series?.phase;
@@ -443,6 +455,76 @@ export async function replayTierNightAfterSeriesEnd({
       networkCalls: res.networkCalls,
     };
   });
+  return outcome.ok ? outcome.value : { ok: false, skipped: true };
+}
+
+/**
+ * FEATURE-TIERNIGHT-04F — Recommencer après series_end Rank Live → live prep.
+ * Customs déjà clear à series_end ; on reset le blob live + ouvre prep.
+ */
+export async function replayTierNightLiveAfterSeriesEnd({
+  shouldContinue = null,
+} = {}) {
+  const canContinue = () =>
+    typeof shouldContinue !== "function" || shouldContinue();
+
+  const outcome = await exitNavLock.run(async () => {
+    if (isGameSyncActive() && !canAuthorSeriesExit()) {
+      return {
+        ok: false,
+        code: "NOT_HOST",
+        error: "Seul l'hôte peut relancer Rank Live.",
+      };
+    }
+
+    const runId = null;
+    const liveReset = {
+      runId,
+      lobbyStarted: false,
+      topicId: null,
+      listName: "",
+      deck: null,
+      playerRoster: null,
+      roundIdx: 0,
+      phase: null,
+      votes: {},
+      placements: {},
+      finished: false,
+      series: null,
+    };
+    saveStatePatch({
+      tierNightLiveGame: liveReset,
+      tierNightMode: "live",
+    });
+
+    if (!canContinue()) {
+      return { ok: false, code: "STALE", stale: true };
+    }
+
+    const { enterTierNightLivePrep } = await import("./tierNightLivePrepSession.js");
+    const { finishedTierNightLiveRemote } = await import("./tierNightConfig.js");
+
+    if (isGameSyncActive()) {
+      try {
+        await patchGameState(
+          {
+            tierNightLive: finishedTierNightLiveRemote(liveReset),
+          },
+          { gameId: "tiernight", screen: "tiernight-live-prep" }
+        );
+      } catch (err) {
+        console.warn("[TierNightLive] replay patch failed:", err);
+      }
+    }
+
+    if (!canContinue()) {
+      return { ok: false, code: "STALE", stale: true };
+    }
+
+    const entered = await enterTierNightLivePrep({ resetSettings: true });
+    return { ok: entered?.ok !== false, destination: { screen: "tiernight-live-prep" }, entered };
+  });
+
   return outcome.ok ? outcome.value : { ok: false, skipped: true };
 }
 

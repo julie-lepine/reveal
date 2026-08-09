@@ -163,7 +163,13 @@ function finalizeTierNightRecapSave(recaps, meta) {
   });
 }
 
-export function buildRecapsFromPlacements(topicId, listName, items, placementsByName) {
+export function buildRecapsFromPlacements(
+  topicId,
+  listName,
+  items,
+  placementsByName,
+  { applyScores = true } = {}
+) {
   const recaps = getActivePlayers().map((p) => ({
     player: p.name,
     emoji: p.emoji,
@@ -185,11 +191,57 @@ export function buildRecapsFromPlacements(topicId, listName, items, placementsBy
   });
 
   const mp = isMultiplayerLobby();
-  if (!mp || isLocalLobbyHost()) {
+  if (applyScores && (!mp || isLocalLobbyHost())) {
     applyTierNightRoundScores(recaps);
   }
 
   return recaps;
+}
+
+/**
+ * FEATURE-TIERNIGHT-04F — scoring d’une liste de série Rank Live.
+ * Ledger `scoredRoundIds` (pas le singleton `scoresApplied`).
+ * `tierNightsPlayed` uniquement à `isSeriesEnd`.
+ *
+ * @param {{
+ *   roundId?: string|null,
+ *   recaps?: object[],
+ *   isSeriesEnd?: boolean,
+ *   series?: object|null,
+ * }} [opts]
+ */
+export function applyTierNightLiveSeriesListScores({
+  roundId = null,
+  recaps = [],
+  isSeriesEnd = false,
+  series = null,
+} = {}) {
+  const rid = roundId != null ? String(roundId) : "";
+  const scored = Array.isArray(series?.scoredRoundIds)
+    ? series.scoredRoundIds.map(String)
+    : [];
+  if (rid && scored.includes(rid)) {
+    return { applied: false, alreadyScored: true };
+  }
+
+  const mp = isMultiplayerLobby();
+  const toScore = mp
+    ? recaps
+    : recaps.filter((r) => r.player === getLocalDisplayName());
+
+  toScore.forEach((r) => {
+    if (!recapHasPlacements(r)) return;
+    const pts = Math.max(0, r.consensusPoints ?? 0);
+    addScore(r.player, pts);
+    bumpPlayerStat(r.player, "tierConsensusPoints", pts);
+    if (isSeriesEnd === true) {
+      bumpPlayerStat(r.player, "tierNightsPlayed", 1);
+    }
+  });
+
+  // Ne pas poser scoresApplied=true : bloquerait la liste suivante (mono-path).
+  saveTierNightRecaps(recaps, { scoresApplied: false });
+  return { applied: true, alreadyScored: false };
 }
 
 export function buildRecapsWithSimulation(topicId, listName, items, localPlaced) {

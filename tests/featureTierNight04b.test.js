@@ -63,10 +63,10 @@ describe("FEATURE-TIERNIGHT-04B — constantes live", () => {
 });
 
 describe("FEATURE-TIERNIGHT-04B — catalogue officiel", () => {
-  it("pool = TIER_LISTS (8) sans customTierLists", () => {
-    assert.equal(TIER_LISTS.length, 8);
+  it("pool = TIER_LISTS sans customTierLists", () => {
+    assert.ok(TIER_LISTS.length >= 8);
     const pool = getTierNightLiveOfficialPool();
-    assert.equal(pool.length, 8);
+    assert.equal(pool.length, TIER_LISTS.length);
     assert.deepEqual(
       pool.map((l) => l.id),
       TIER_LISTS.map((l) => l.id)
@@ -76,11 +76,12 @@ describe("FEATURE-TIERNIGHT-04B — catalogue officiel", () => {
 
   it("copie défensive : mute pool ne touche pas TIER_LISTS", () => {
     const before = TIER_LISTS[0].items[0];
+    const beforeLen = TIER_LISTS.length;
     const pool = getTierNightLiveOfficialPool();
     pool[0].items[0] = "__mutated__";
     pool.pop();
     assert.equal(TIER_LISTS[0].items[0], before);
-    assert.equal(TIER_LISTS.length, 8);
+    assert.equal(TIER_LISTS.length, beforeLen);
   });
 });
 

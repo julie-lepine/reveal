@@ -3971,6 +3971,12 @@ function resolveActivePlayScreen(st, gid, declared) {
   if (st.guessLie?.lobbyComplete) return "guesslie";
   const glPhase = st.guessLie?.phase;
   if (glPhase && glPhase !== "idle" && glPhase !== "lobby") return "guesslie";
+  // FEATURE-TIERNIGHT-04F — phase série Rank Live avant lobbyStarted générique.
+  const liveSeries = st.tierNightLive?.series;
+  if (liveSeries?.kind === "live") {
+    if (liveSeries.phase === "between_lists") return "tiernight-between";
+    if (liveSeries.phase === "series_end") return "tiernight-end";
+  }
   if (st.tierNightLive?.lobbyStarted && !st.tierNightLive?.finished) return "tiernight-live";
   // FEATURE-TIERNIGHT-03-C/D/E — phase série prioritaire (between / end / ranking).
   // round_result / phase invalide : null (pas d’écran jouable incorrect).

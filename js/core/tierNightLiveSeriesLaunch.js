@@ -6,15 +6,24 @@
  * Serveur = validation structurelle + match customs + commit atomique (pas de catalogue SQL).
  */
 import { createTierNightRunId } from "./tierNightConfig.js";
-import { shuffleArray } from "./combinedGameDeck.js";
 import {
   buildTierNightLiveSeriesListSubset,
   TIER_NIGHT_LIVE_SERIES_ALL_CATEGORIES,
   isValidTierNightLiveRoundCount,
 } from "./tierNightLiveSeriesDomain.js";
+import {
+  TIER_NIGHT_LIVE_SERIES_PHASE_BETWEEN,
+  TIER_NIGHT_LIVE_SERIES_PHASE_END,
+  TIER_NIGHT_LIVE_SERIES_PHASE_PLAYING,
+  projectTierNightLiveSeriesRound0 as projectRound0FromRuntime,
+} from "./tierNightLiveSeriesRuntime.js";
 
 export const TIER_NIGHT_LIVE_SERIES_KIND = "live";
-export const TIER_NIGHT_LIVE_SERIES_PHASE_PLAYING = "playing_list";
+export { TIER_NIGHT_LIVE_SERIES_PHASE_PLAYING };
+export {
+  TIER_NIGHT_LIVE_SERIES_PHASE_BETWEEN,
+  TIER_NIGHT_LIVE_SERIES_PHASE_END,
+};
 
 export const TIER_NIGHT_LIVE_LAUNCH_ERROR_MESSAGES = Object.freeze({
   TNS_LIVE_INVALID_ROUND_COUNT: "Longueur de série invalide. Choisis 3, 5 ou 7 listes.",
@@ -293,8 +302,8 @@ export function validateTierNightLiveSeriesShape(series) {
   }
   if (
     series.phase !== TIER_NIGHT_LIVE_SERIES_PHASE_PLAYING &&
-    series.phase !== "between_lists" &&
-    series.phase !== "series_end"
+    series.phase !== TIER_NIGHT_LIVE_SERIES_PHASE_BETWEEN &&
+    series.phase !== TIER_NIGHT_LIVE_SERIES_PHASE_END
   ) {
     return { ok: false, code: "TNS_LIVE_CORRUPT_STATE", message: "phase" };
   }
@@ -362,26 +371,7 @@ export function projectTierNightLiveSeriesRound0(
 ) {
   const shape = validateTierNightLiveSeriesShape(series);
   if (!shape.ok) return shape;
-  const entry = series.queue[0];
-  const snap = entry.listSnapshot;
-  const deck = shuffleArray([...(snap.items || [])], random);
-  return {
-    ok: true,
-    live: {
-      runId: series.runId,
-      lobbyStarted: true,
-      finished: false,
-      series,
-      topicId: snap.id,
-      listName: snap.name || "",
-      deck,
-      playerRoster: Array.isArray(playerRoster) ? playerRoster : [],
-      placements: {},
-      roundIdx: 0,
-      phase: "voting",
-      votes: {},
-    },
-  };
+  return projectRound0FromRuntime(series, playerRoster, random);
 }
 
 /**

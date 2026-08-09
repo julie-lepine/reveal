@@ -1,8 +1,10 @@
 /**
- * FEATURE-TIERNIGHT-03-D - intermanches série (between_rounds).
+ * FEATURE-TIERNIGHT-03-D - intermanches série roster (between_rounds).
+ * FEATURE-TIERNIGHT-04F - intermanches série Rank Live (between_lists).
  *
  * Données dérivées de l’état partagé (roundRecap / roundHistory / queue).
- * Hôte : CTA « Thème suivant » → commitTierNightSeriesNextRound.
+ * Hôte roster : CTA « Thème suivant » → hostAdvanceTierNightSeriesRound.
+ * Hôte live : CTA « Thème suivant » → hostAdvanceTierNightLiveSeriesList.
  * Invités : attente.
  */
 import { getState, setLastGame } from "../core/state.js";
@@ -28,6 +30,18 @@ import {
   resolveTierNightSeriesScreenFromPhase,
   TIER_NIGHT_SERIES_ADVANCE_FIELD_POLICY,
 } from "../core/tierNightSeriesPlaySession.js";
+import {
+  getActiveTierNightLiveSeriesRound,
+  getTierNightLiveSeriesProgress,
+  isTierNightLiveSeriesLastRound,
+  TIER_NIGHT_LIVE_SERIES_PHASE_BETWEEN,
+} from "../core/tierNightLiveSeriesRuntime.js";
+import {
+  followTierNightLiveSeriesBetweenScreen,
+  hostAdvanceTierNightLiveSeriesList,
+  navigateForTierNightLiveSeriesPhase,
+  resolveTierNightLiveSeriesScreenFromPhase,
+} from "../core/tierNightLiveSeriesPlaySession.js";
 import { createActionLock, withClickLock } from "../core/actionLock.js";
 import { gameCumulativeScoresHtml, refreshGameScoresBox } from "../core/gameScores.js";
 import { navigate } from "../core/router.js";
@@ -89,6 +103,21 @@ function getSeriesTn() {
   );
 }
 
+function getLiveSeriesBlob() {
+  return (
+    getCachedGameSession()?.state?.tierNightLive ||
+    getState().tierNightLiveGame ||
+    null
+  );
+}
+
+function isLiveBetweenSeries(live = getLiveSeriesBlob()) {
+  return (
+    live?.series?.kind === "live" &&
+    live.series.phase === TIER_NIGHT_LIVE_SERIES_PHASE_BETWEEN
+  );
+}
+
 function consensusBoardHtml(consensus) {
   if (!consensus) return "";
   const hasItems = TIER_LEVELS.some((t) => (consensus[t] || []).length > 0);
@@ -122,6 +151,20 @@ export function mountTierNightBetween(app) {
   let advancing = false;
 
   function syncPhaseOrLeave() {
+    // FEATURE-TIERNIGHT-04F — branche Rank Live (ne pas casser le path roster).
+    const live = getLiveSeriesBlob();
+    if (live?.series?.kind === "live") {
+      const livePhase = live.series.phase;
+      if (livePhase === TIER_NIGHT_LIVE_SERIES_PHASE_BETWEEN) return true;
+      const liveTarget = resolveTierNightLiveSeriesScreenFromPhase(livePhase);
+      if (liveTarget && liveTarget !== "tiernight-between") {
+        navigateForTierNightLiveSeriesPhase(livePhase);
+        return false;
+      }
+      navigate("tiernight-live-prep");
+      return false;
+    }
+
     const tn = getSeriesTn();
     const phase = tn?.series?.phase;
     const series = tn?.series;
@@ -156,7 +199,37 @@ export function mountTierNightBetween(app) {
     return true;
   }
 
+  async function onNextThemeLive() {
+    if (advancing) return;
+    if (!(isLobbyHost() || canActAsHost())) return;
+    const live = getLiveSeriesBlob();
+    if (isTierNightLiveSeriesLastRound(live?.series)) return;
+    if (live?.series?.phase !== TIER_NIGHT_LIVE_SERIES_PHASE_BETWEEN) return;
+
+    advancing = true;
+    try {
+      const res = await hostAdvanceTierNightLiveSeriesList({
+        shouldContinue: () => mount.isMounted() && mount.isCurrentMount(),
+      });
+      if (!mount.isMounted()) return;
+      if (res?.skipped) return;
+      if (res?.ok === false && !res?.stale) {
+        await showAppAlert(res.message || "Impossible de passer au thème suivant.", {
+          title: "Liste suivante",
+          icon: "⚠️",
+        });
+        if (mount.isMounted()) render();
+      }
+    } finally {
+      advancing = false;
+    }
+  }
+
   async function onNextTheme() {
+    if (isLiveBetweenSeries()) {
+      await onNextThemeLive();
+      return;
+    }
     if (advancing) return;
     if (!(isLobbyHost() || canActAsHost())) return;
     const tn = getSeriesTn();
@@ -202,10 +275,121 @@ export function mountTierNightBetween(app) {
     });
   }
 
-  function render() {
-    if (!mount.isMounted()) return;
-    if (!syncPhaseOrLeave()) return;
+  function renderLiveBetween() {
+    const live = getLiveSeriesBlob();
+    const series = live?.series;
+    const progress = getTierNightLiveSeriesProgress(series);
+    const active = getActiveTierNightLiveSeriesRound(series);
+    const recap = series?.roundRecap || null;
+    const snap =
+      recap?.topicSnapshot ||
+      recap?.listSnapshot ||
+      (active.ok ? active.round?.listSnapshot : null);
+    const topicName =
+      recap?.listName ||
+      snap?.name ||
+      live?.listName ||
+      "Liste";
+    const topicEmoji = snap?.emoji || "⚡";
+    const roundLabel =
+      progress.ok && progress.roundIndex != null && progress.roundCount != null
+        ? `Liste ${progress.roundIndex + 1} sur ${progress.roundCount}`
+        : "";
+    const hostOrAh = !isGameSyncActive() || isLobbyHost() || canActAsHost();
+    const realHost = !isGameSyncActive() || isLobbyHost();
+    const isLast = isTierNightLiveSeriesLastRound(series);
+    const phaseOk = series?.phase === TIER_NIGHT_LIVE_SERIES_PHASE_BETWEEN;
+    const showNext = hostOrAh && !isLast && !advancing && phaseOk;
 
+    setLastGame("tiernight");
+
+    app.innerHTML = pageShell({
+      backTarget: "back",
+      scroll: true,
+      content: `
+        <p class="label-upper label-upper--gold">⚡ Rank Live</p>
+        <h2 class="screen-title">Résultat de liste</h2>
+        <p class="game-intro">${escapeHtml(topicEmoji)} ${escapeHtml(topicName)}${
+        roundLabel ? ` · ${escapeHtml(roundLabel)}` : ""
+      }</p>
+
+        ${consensusBoardHtml(recap?.consensus)}
+
+        ${
+          Array.isArray(recap?.recaps) && recap.recaps.length
+            ? `<div class="card game-scores-box">
+                <p class="card-heading game-scores-box__title">Scores de la liste</p>
+                <p class="hint tier-between-scoring-explain">${escapeHtml(
+                  tierNightBetweenScoringExplainText({ reverse: false })
+                )}</p>
+                ${roundRecapScoreRowsHtml(recap.recaps)}
+              </div>`
+            : ""
+        }
+
+        <div class="reveal-mid-action">
+          ${
+            showNext
+              ? `<button type="button" class="btn btn-primary btn--spaced" id="btn-tiernight-next-theme">Thème suivant</button>`
+              : hostOrAh && isLast
+                ? `<p class="hint">Fin de série…</p>`
+                : `<p class="hint">En attente de l’hôte…</p>`
+          }
+        </div>
+
+        ${gameCumulativeScoresHtml({
+          gameId: "tiernight",
+          gameLabel: "Rank Live",
+          title: "Cumul des scores",
+        })}
+
+        <div class="tier-between-actions">
+          ${
+            realHost
+              ? `<button type="button" class="btn btn-secondary btn--spaced" id="btn-tiernight-change-mode">Changer de mode</button>`
+              : ""
+          }
+          ${
+            realHost
+              ? `<button type="button" class="btn btn-secondary btn--spaced" id="btn-tiernight-quit-series">${escapeHtml(EXIT_GAME_LABEL)}</button>`
+              : ""
+          }
+        </div>
+      `,
+    });
+
+    bindNav(app);
+    const nextBtn = app.querySelector("#btn-tiernight-next-theme");
+    if (nextBtn) {
+      nextBtn.addEventListener(
+        "click",
+        withClickLock(() => onNextTheme(), { lock: advanceLock })
+      );
+    }
+    const changeBtn = app.querySelector("#btn-tiernight-change-mode");
+    if (changeBtn) {
+      changeBtn.addEventListener(
+        "click",
+        withClickLock(() => onChangeMode(), { lock: exitLock })
+      );
+    }
+    const quitBtn = app.querySelector("#btn-tiernight-quit-series");
+    if (quitBtn) {
+      quitBtn.addEventListener(
+        "click",
+        withClickLock(() => onQuit(), { lock: exitLock })
+      );
+    }
+    if (isGameSyncActive()) {
+      refreshGameScoresBox(app, {
+        gameId: "tiernight",
+        gameLabel: "Rank Live",
+        title: "Cumul des scores",
+      });
+    }
+  }
+
+  function renderRosterBetween() {
     const tn = getSeriesTn();
     const series = tn?.series;
     const progress = getTierNightSeriesProgress(series);
@@ -316,8 +500,29 @@ export function mountTierNightBetween(app) {
     }
   }
 
+  function render() {
+    if (!mount.isMounted()) return;
+    if (!syncPhaseOrLeave()) return;
+    if (isLiveBetweenSeries()) {
+      renderLiveBetween();
+      return;
+    }
+    renderRosterBetween();
+  }
+
   const unsub = onGameSessionChange((row) => {
     if (!mount.isMounted() || !mount.isCurrentMount()) return;
+    if (row?.state?.tierNightLive?.series?.kind === "live") {
+      if (
+        followTierNightLiveSeriesBetweenScreen(row, {
+          shouldContinue: () => mount.isMounted() && mount.isCurrentMount(),
+        })
+      ) {
+        return;
+      }
+      render();
+      return;
+    }
     const effective = getEffectiveSessionScreen(row);
     if (effective && effective !== "tiernight-between") {
       const phase = row?.state?.tierNight?.series?.phase;

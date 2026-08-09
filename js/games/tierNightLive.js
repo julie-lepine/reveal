@@ -40,6 +40,7 @@ import {
   finalizeTierNightLiveToResults,
   nameForUserId,
 } from "../core/gameSync.js";
+import { hostFinalizeTierNightLiveSeriesList } from "../core/tierNightLiveSeriesPlaySession.js";
 import { showAppAlert } from "../core/dialog.js";
 import { setLobbyPlaying } from "../core/lobby.js";
 import { navigate } from "../core/router.js";
@@ -430,11 +431,20 @@ function mountMp(app, list) {
       revealPendingUi = false;
       render();
     } else {
-      buildTierNightLiveRecaps(session);
-      recordTierNightPlayed();
-      await finalizeTierNightLiveToResults({
-        shouldContinue: () => mount.isMounted() && mount.isCurrentMount(),
-      });
+      // FEATURE-TIERNIGHT-04F — série Rank Live (toute queue live, y compris length===1).
+      const series = session.series;
+      if (series?.kind === "live" && Array.isArray(series.queue) && series.queue.length) {
+        await hostFinalizeTierNightLiveSeriesList({
+          shouldContinue: () => mount.isMounted() && mount.isCurrentMount(),
+        });
+      } else {
+        // Legacy mono (sans series wire).
+        buildTierNightLiveRecaps(session);
+        recordTierNightPlayed();
+        await finalizeTierNightLiveToResults({
+          shouldContinue: () => mount.isMounted() && mount.isCurrentMount(),
+        });
+      }
     }
   }
 
