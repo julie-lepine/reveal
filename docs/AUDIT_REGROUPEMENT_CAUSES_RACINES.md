@@ -26,7 +26,7 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 ---
 
 ## File ouverte
-| **TIERNIGHT** | Agrandir la banque de themes prédéfinis
+| **TIERNIGHT LIVE** | Listes custom à supprimer en fin de chaque série
 
 ### Fin de vague — QA natif différée (pas prioritaire maintenant)
 

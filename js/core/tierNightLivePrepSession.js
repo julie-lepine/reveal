@@ -258,24 +258,29 @@ export async function enterTierNightLivePrep({ resetSettings = true } = {}) {
     navStack: ["home", "lobby", "game-select", "tiernight-select", "tiernight-live-prep"],
   };
 
+  // Idle clear (pas finishedTierNightLiveRemote) : prep ouverte, série absente,
+  // pool customs réouvert — restart game-select / re-entrée select→prep.
+  const liveIdleClear = {
+    runId: null,
+    lobbyStarted: false,
+    finished: false,
+    series: null,
+    topicId: null,
+    listName: "",
+    deck: null,
+    playerRoster: null,
+    roundIdx: 0,
+    phase: null,
+    votes: {},
+    placements: {},
+  };
+
   if (!isGameSyncActive()) {
-    // Solo : neutralise un blob live stale (series_end) pour ne pas polluer un retry.
     if (resetSettings) {
+      clearInFlightTierNightLiveLaunchAttempt();
       saveStatePatch({
-        tierNightLiveGame: {
-          runId: null,
-          lobbyStarted: false,
-          finished: false,
-          series: null,
-          topicId: null,
-          listName: "",
-          deck: null,
-          playerRoster: null,
-          roundIdx: 0,
-          phase: null,
-          votes: {},
-          placements: {},
-        },
+        tierNightLiveGame: liveIdleClear,
+        customLiveTierListsWritable: true,
       });
     }
     navigate("tiernight-live-prep", navOpts);
@@ -284,28 +289,18 @@ export async function enterTierNightLivePrep({ resetSettings = true } = {}) {
 
   if (isLobbyHost() && resetSettings) {
     try {
-      // Comme replay post series_end : clear le blob live distant pour que
-      // getEffectiveSessionScreen ne préfère plus tiernight-end au live-prep.
-      const { finishedTierNightLiveRemote } = await import("./tierNightConfig.js");
-      const liveCleared = finishedTierNightLiveRemote({
-        runId: null,
-        lobbyStarted: false,
-        finished: false,
-        series: null,
-        topicId: null,
-        listName: "",
-        deck: null,
-        playerRoster: null,
-        roundIdx: 0,
-        phase: null,
-        votes: {},
-        placements: {},
+      clearInFlightTierNightLiveLaunchAttempt();
+      // Clear blob live + réouvre le pool (writable reste false après un launch 04E
+      // et startGameSession le préserve — sans ce patch, delete custom → LOCKED).
+      saveStatePatch({
+        tierNightLiveGame: liveIdleClear,
+        customLiveTierListsWritable: true,
       });
-      saveStatePatch({ tierNightLiveGame: { ...liveCleared, series: null, finished: false } });
       await patchGameState(
         {
           tierNightLivePrep: tierNightLivePrepToRemote(session),
-          tierNightLive: { ...liveCleared, series: null, finished: false },
+          tierNightLive: liveIdleClear,
+          customLiveTierListsWritable: true,
         },
         { gameId: "tiernight", screen: "tiernight-live-prep" }
       );

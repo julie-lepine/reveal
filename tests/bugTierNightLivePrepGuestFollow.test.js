@@ -114,11 +114,13 @@ describe("BUG — guest follow Rank Live prep vs Classe le groupe", () => {
     assert.equal(getEffectiveSessionScreen(row), "tiernight-live-prep");
   });
 
-  it("5 — enterTierNightLivePrep clear live stale (source)", () => {
+  it("5 — enterTierNightLivePrep clear live stale + réouvre writable (source)", () => {
     const src = read("js/core/tierNightLivePrepSession.js");
     assert.match(src, /tierNightLive/);
     assert.match(src, /series:\s*null/);
+    assert.match(src, /customLiveTierListsWritable:\s*true/);
     assert.match(src, /screen:\s*["']tiernight-live-prep["']/);
+    assert.match(src, /clearInFlightTierNightLiveLaunchAttempt/);
   });
 
   it("6 — select wiring guestFollow inclut live-prep", () => {
@@ -126,5 +128,58 @@ describe("BUG — guest follow Rank Live prep vs Classe le groupe", () => {
     assert.match(select, /tiernight-live-prep/);
     assert.match(select, /prepGuestFollowOnSession/);
     assert.match(select, /enterTierNightLivePrep/);
+  });
+
+  it("7 — launchTierNightSelect republie tierNightLivePrep + series null (source)", () => {
+    const src = read("js/core/restartGame.js");
+    assert.match(src, /tierNightLivePrep:/);
+    assert.match(src, /series:\s*null/);
+    assert.match(src, /tierNightLiveSeriesPrep:/);
+  });
+
+  it("8 — tierNightLiveToRemote émet series:null (clear explicite)", async () => {
+    const { tierNightLiveToRemote } = await import("../js/core/gameSync.js");
+    const remote = tierNightLiveToRemote({
+      runId: null,
+      lobbyStarted: false,
+      finished: false,
+      phase: null,
+      votes: {},
+      placements: {},
+      series: null,
+    });
+    assert.equal(Object.prototype.hasOwnProperty.call(remote, "series"), true);
+    assert.equal(remote.series, null);
+  });
+
+  it("9 — writable false OU série live → pool locked ; clear + writable true → open", async () => {
+    const { isLocalTierNightLiveCustomPoolWritable } = await import(
+      "../js/core/tierNightLiveCustomPoolLock.js"
+    );
+    assert.equal(
+      isLocalTierNightLiveCustomPoolWritable({
+        customLiveTierListsWritable: false,
+        tierNightLiveGame: { lobbyStarted: false, finished: false, series: null },
+      }),
+      false
+    );
+    assert.equal(
+      isLocalTierNightLiveCustomPoolWritable({
+        customLiveTierListsWritable: true,
+        tierNightLiveGame: {
+          lobbyStarted: false,
+          finished: false,
+          series: { kind: "live", phase: "series_end" },
+        },
+      }),
+      false
+    );
+    assert.equal(
+      isLocalTierNightLiveCustomPoolWritable({
+        customLiveTierListsWritable: true,
+        tierNightLiveGame: { lobbyStarted: false, finished: false, series: null },
+      }),
+      true
+    );
   });
 });

@@ -124,21 +124,33 @@ export function mergeTierNightLiveGameFields(local, remote) {
   const remotePlacements = remote.placements || {};
   const remoteHasPlacements = Object.keys(remotePlacements).length > 0;
   const remoteReset = isTierNightLiveRemoteReset(remote);
+  const remoteHasSeriesKey = Object.prototype.hasOwnProperty.call(remote, "series");
   const playerRoster =
     Array.isArray(remote.playerRoster) && remote.playerRoster.length
       ? remote.playerRoster
       : local.playerRoster || null;
+
+  // Série : null explicite = clear ; reset select/fin sans clé = clear ;
+  // sinon remote object gagne ; sinon conserver local (patch votes-only).
+  let series;
+  if (remoteHasSeriesKey) {
+    series =
+      remote.series && typeof remote.series === "object" ? remote.series : null;
+  } else if (remoteReset) {
+    series = null;
+  } else if (remote.series && typeof remote.series === "object") {
+    series = remote.series;
+  } else if (local.series && typeof local.series === "object") {
+    series = local.series;
+  } else {
+    series = remote.series ?? local.series ?? null;
+  }
+
   return {
     ...local,
     ...remote,
     playerRoster,
-    // FEATURE-TIERNIGHT-04E - remote series gagne si présente (vérité serveur).
-    series:
-      remote.series && typeof remote.series === "object"
-        ? remote.series
-        : local.series && typeof local.series === "object"
-          ? local.series
-          : remote.series ?? local.series,
+    series,
     phase: mergeSpeedVotePhase(local, remote),
     votes: mergeTierNightLiveVotesForHydrate(local, remote),
     placements: remoteReset

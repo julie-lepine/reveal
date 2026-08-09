@@ -447,3 +447,73 @@ describe("BUG-TIERNIGHT-LIVE-SERIES-VOTE — nouvelle liste wipe", () => {
     assert.deepEqual(mergeTierNightLiveVotesForPatch(cur, inc), {});
   });
 });
+
+describe("BUG-TIERNIGHT-LIVE-PREP-REOPEN — clear série + lock pool", () => {
+  it("select/fin sans clé series → clear série locale stale (pas de conserve)", () => {
+    const local = {
+      runId: "old",
+      lobbyStarted: true,
+      finished: false,
+      series: { kind: "live", phase: "playing_list", roundIndex: 0, queue: [{}] },
+      votes: { Alice: "S" },
+      placements: {},
+    };
+    const remote = {
+      runId: "hub",
+      lobbyStarted: false,
+      finished: true,
+      phase: "done",
+      votes: {},
+      placements: {},
+    };
+    assert.equal(isTierNightLiveRemoteReset(remote), true);
+    const out = mergeTierNightLiveGameFields(local, remote);
+    assert.equal(out.series, null);
+  });
+
+  it("series:null explicite → clear même si pas remoteReset", () => {
+    const local = {
+      runId: "x",
+      lobbyStarted: false,
+      finished: false,
+      series: { kind: "live", phase: "series_end", roundIndex: 2, queue: [{}, {}, {}] },
+      votes: {},
+      placements: {},
+    };
+    const remote = {
+      runId: null,
+      lobbyStarted: false,
+      finished: false,
+      phase: null,
+      series: null,
+      votes: {},
+      placements: {},
+    };
+    assert.equal(isTierNightLiveRemoteReset(remote), false);
+    const out = mergeTierNightLiveGameFields(local, remote);
+    assert.equal(out.series, null);
+  });
+
+  it("series_end avec série présente sur reset finished → conserve history", () => {
+    const series = { kind: "live", phase: "series_end", roundIndex: 2, queue: [{}, {}, {}] };
+    const local = {
+      runId: "r1",
+      lobbyStarted: true,
+      finished: false,
+      series,
+      votes: {},
+      placements: {},
+    };
+    const remote = {
+      runId: "r1",
+      lobbyStarted: false,
+      finished: true,
+      phase: "done",
+      series,
+      votes: {},
+      placements: {},
+    };
+    const out = mergeTierNightLiveGameFields(local, remote);
+    assert.equal(out.series?.phase, "series_end");
+  });
+});

@@ -494,6 +494,7 @@ export async function launchTierNightSelect() {
     topicEmoji: "",
     controversialItem: null,
   };
+  // series:null explicite — évite de conserver une série live stale en local.
   const tierNightLiveReset = {
     runId,
     lobbyStarted: false,
@@ -505,6 +506,7 @@ export async function launchTierNightSelect() {
     votes: {},
     placements: {},
     finished: false,
+    series: null,
   };
   const prevEpoch = Number(getState().tierNightSeriesPrep?.setupEpoch) || 0;
   const prepReset = buildAuthoritativeTierNightPrepReset({
@@ -512,6 +514,14 @@ export async function launchTierNightSelect() {
     categoryIds: ["*"],
     roundCount: 5,
   });
+  const prevLiveEpoch = Number(getState().tierNightLiveSeriesPrep?.setupEpoch) || 0;
+  const livePrepReset = {
+    categoryIds: ["*"],
+    roundCount: 5,
+    ready: {},
+    setupEpoch: prevLiveEpoch + 1,
+    poolInvalidateRequestId: null,
+  };
   const statePatch = {
     tierNightTopicId: null,
     tierNightMode: "roster",
@@ -520,6 +530,10 @@ export async function launchTierNightSelect() {
     tierNightLiveGame: tierNightLiveReset,
     // Prep reset settings/ready (B1/C1) — consumed ledger préservé (non touché ici).
     tierNightSeriesPrep: prepReset,
+    // Rank Live prep : republier dans startGameSession (sinon wipe → TNS_LIVE_CORRUPT_STATE).
+    tierNightLiveSeriesPrep: livePrepReset,
+    // Réouvre localement ; le serveur est réouvert à l’entrée live-prep (preserve start).
+    customLiveTierListsWritable: true,
   };
 
   if (!isGameSyncActive()) {
@@ -529,6 +543,15 @@ export async function launchTierNightSelect() {
   }
 
   if (!(await requireHostToLaunch("tiernight"))) return;
+
+  try {
+    const { clearInFlightTierNightLiveLaunchAttempt } = await import(
+      "./tierNightLiveSeriesLaunch.js"
+    );
+    clearInFlightTierNightLiveLaunchAttempt();
+  } catch {
+    /* ignore */
+  }
 
   await commitPrepSessionLaunch({
     statePatch,
@@ -547,13 +570,25 @@ export async function launchTierNightSelect() {
         finished: {},
         game: null,
         recap: null,
+        series: null,
       },
-      tierNightLive: finishedTierNightLiveRemote({ runId }),
+      // series:null explicite via hasOwn → clear distant (codec live).
+      tierNightLive: {
+        ...finishedTierNightLiveRemote({ runId }),
+        series: null,
+      },
       tierNightPrep: {
         categoryIds: prepReset.categoryIds,
         roundCount: prepReset.roundCount,
         ready: {},
         setupEpoch: prepReset.setupEpoch,
+      },
+      // Évite un state sans tierNightLivePrep après full replace startGameSession.
+      tierNightLivePrep: {
+        categoryIds: livePrepReset.categoryIds,
+        roundCount: livePrepReset.roundCount,
+        ready: {},
+        setupEpoch: livePrepReset.setupEpoch,
       },
     },
     alertTitle: "TierNight",

@@ -2835,7 +2835,11 @@ export function tierNightLiveToRemote(session) {
     finished: Boolean(session.finished),
   };
   // FEATURE-TIERNIGHT-04E — série canonique (vérité runtime).
-  if (session.series && typeof session.series === "object") {
+  // `series: null` explicite = clear (sinon omit → merge conserve l'ancienne série).
+  if (Object.prototype.hasOwnProperty.call(session || {}, "series")) {
+    remote.series =
+      session.series && typeof session.series === "object" ? session.series : null;
+  } else if (session.series && typeof session.series === "object") {
     remote.series = session.series;
   }
   return remote;
@@ -2863,7 +2867,10 @@ export function tierNightLiveFromRemote(remote) {
     placements: mapPlacementsByName(remote.placements || {}),
     finished: Boolean(remote.finished),
   };
-  if (remote.series && typeof remote.series === "object") {
+  if (Object.prototype.hasOwnProperty.call(remote, "series")) {
+    out.series =
+      remote.series && typeof remote.series === "object" ? remote.series : null;
+  } else if (remote.series && typeof remote.series === "object") {
     out.series = remote.series;
   }
   return out;
