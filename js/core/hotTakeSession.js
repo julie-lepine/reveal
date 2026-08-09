@@ -30,7 +30,11 @@ import {
   normalizePlayerVotesMap,
 } from "./gameSync.js";
 import { patchGameStateWithFeedback } from "./patchGameStateFeedback.js";
-import { computeHotTakeVoteApply } from "./hotTakeVoteCommit.js";
+import {
+  computeOptimisticMapEntryApply,
+  rollbackOptimisticMapEntry,
+  canRollbackOptimisticSubmission,
+} from "./optimisticMapEntry.js";
 import { launchGameWithSync, commitHostGamePlay, commitPrepReadyToggle } from "./mpLaunch.js";
 import { mergeHotTakeCustomTakes } from "./sessionMerge.js";
 import { countOtherAuthorsCustomEntries } from "./combinedGameDeck.js";
@@ -38,6 +42,9 @@ export {
   checkHotTakeModeration,
   getHotTakeModerationNotice as getModerationNotice,
 } from "./hotTakeModeration.js";
+
+/** Génération commit vote (stale catch / AUDIT-003). */
+let hotTakeVoteAttemptId = 0;
 
 function defaultSession() {
   return {
@@ -417,23 +424,53 @@ export async function commitHotTakePlay(patch, patchOpts = {}) {
   });
 }
 
-/** Invité MP : envoie uniquement son vote (évite d'écraser phase reveal de l'hôte). Rollback si sync échoue. */
+/** Invité MP : envoie uniquement son vote (évite d'écraser phase reveal de l'hôte). Rollback ciblé si sync échoue. */
 export async function commitHotTakeVote(choice) {
   const localName = getLocalDisplayName();
   const session = getHotTakeSession();
-  const { previousVotes, nextVotes } = computeHotTakeVoteApply(session, localName, choice);
-  saveStatePatch({ hotTakeGame: { ...session, votes: nextVotes } });
-  if (!isGameSyncActive()) return { ...session, votes: nextVotes };
+  const attemptId = ++hotTakeVoteAttemptId;
+  // takeIdx = round HotTake (helper générique lit roundIdx)
+  const captured = { phase: session.phase, roundIdx: session.takeIdx };
+  const apply = computeOptimisticMapEntryApply({
+    map: session.votes,
+    key: localName,
+    value: choice,
+  });
+  saveStatePatch({ hotTakeGame: { ...session, votes: apply.nextMap } });
+  if (!isGameSyncActive()) return { ...session, votes: apply.nextMap };
 
   try {
     const uid = requireLocalParticipantUid();
     await patchGameStateWithFeedback({ hotTake: { votes: { [uid]: choice } } });
-    return { ...session, votes: nextVotes };
+    return { ...session, votes: apply.nextMap };
   } catch (err) {
-    const current = getHotTakeSession();
-    saveStatePatch({ hotTakeGame: { ...current, votes: previousVotes } });
+    const live = getHotTakeSession();
+    if (
+      attemptId === hotTakeVoteAttemptId &&
+      canRollbackOptimisticSubmission(captured, {
+        ...live,
+        roundIdx: live.takeIdx,
+      })
+    ) {
+      const rolled = rollbackOptimisticMapEntry({
+        currentMap: live.votes,
+        key: localName,
+        hadPreviousValue: apply.hadPreviousValue,
+        previousValue: apply.previousValue,
+        optimisticValue: apply.optimisticValue,
+        attemptId,
+        currentAttemptId: hotTakeVoteAttemptId,
+      });
+      if (rolled.applied) {
+        saveStatePatch({ hotTakeGame: { ...live, votes: rolled.map } });
+      }
+    }
     throw err;
   }
+}
+
+export function __resetHotTakeVoteAttemptIdForTests() {
+  hotTakeVoteAttemptId = 0;
 }
 
 export function getHotTakeVotesForUi() {

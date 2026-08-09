@@ -16,7 +16,12 @@ import {
 } from "./gameSync.js";
 import { formatSyncErrorMessage } from "./authErrors.js";
 import { launchGameWithSync, commitHostGamePlay, commitPrepReadyToggle } from "./mpLaunch.js";
-import { computeClutchTapApply } from "./clutchTapCommit.js";
+import { freezeClutchTap } from "./clutchTapCommit.js";
+import {
+  computeOptimisticMapEntryApply,
+  rollbackOptimisticMapEntry,
+  canRollbackOptimisticSubmission,
+} from "./optimisticMapEntry.js";
 import {
   buildClutchParticipantsSnapshot,
   resolveClutchParticipantNames,
@@ -24,6 +29,9 @@ import {
   rankClutchEntries,
   sessionHasClutchParticipantSnapshot,
 } from "./clutchParticipants.js";
+
+/** Génération commit tap (stale catch / AUDIT-003). */
+let clutchTapAttemptId = 0;
 
 export {
   buildClutchParticipantsSnapshot,
@@ -186,26 +194,46 @@ export function allClutchReady() {
   return getActivePlayerNames().every((n) => session.ready[n]);
 }
 
-/** MP : envoie le tap figé au clic ({ ms, at }). Aucun recalcul. Rollback avant feedback. */
+/** MP : envoie le tap figé au clic ({ ms, at }). Aucun recalcul. Rollback ciblé si sync échoue. */
 export async function commitClutchTap(tapInput) {
   const localName = getLocalDisplayName();
   const session = getClutchSession();
-  const { alreadyTapped, previousTaps, nextTaps, tap: resolved } = computeClutchTapApply(
-    session,
-    localName,
-    tapInput
-  );
-  if (alreadyTapped) return resolved;
+  const existing = session.taps?.[localName];
+  if (existing?.ms != null) return existing;
 
-  saveStatePatch({ clutchGame: { ...session, taps: nextTaps } });
+  const resolved = freezeClutchTap(tapInput);
+  const attemptId = ++clutchTapAttemptId;
+  const captured = { phase: session.phase, roundIdx: session.roundIdx };
+  const apply = computeOptimisticMapEntryApply({
+    map: session.taps,
+    key: localName,
+    value: resolved,
+  });
+  saveStatePatch({ clutchGame: { ...session, taps: apply.nextMap } });
   if (!isGameSyncActive()) return resolved;
   const uid = requireLocalParticipantUid();
   try {
     await patchGameState({ clutch: { taps: { [uid]: resolved } } });
     return resolved;
   } catch (err) {
-    const current = getClutchSession();
-    saveStatePatch({ clutchGame: { ...current, taps: previousTaps } });
+    const live = getClutchSession();
+    if (
+      attemptId === clutchTapAttemptId &&
+      canRollbackOptimisticSubmission(captured, live)
+    ) {
+      const rolled = rollbackOptimisticMapEntry({
+        currentMap: live.taps,
+        key: localName,
+        hadPreviousValue: apply.hadPreviousValue,
+        previousValue: apply.previousValue,
+        optimisticValue: apply.optimisticValue,
+        attemptId,
+        currentAttemptId: clutchTapAttemptId,
+      });
+      if (rolled.applied) {
+        saveStatePatch({ clutchGame: { ...live, taps: rolled.map } });
+      }
+    }
     console.warn("REVEAL clutch tap:", err);
     try {
       const { showAppAlert } = await import("./dialog.js");
@@ -218,6 +246,10 @@ export async function commitClutchTap(tapInput) {
     }
     throw err;
   }
+}
+
+export function __resetClutchTapAttemptIdForTests() {
+  clutchTapAttemptId = 0;
 }
 
 export function hasLocalClutchTap(session = getClutchSession()) {

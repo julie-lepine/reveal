@@ -55,7 +55,7 @@ Les candidats les plus proches sont classés **P1** (scores restart, channel orp
 
 ---
 
-### AUDIT-002 — Reconnect Realtime orpheline le channel - Implementation ✅ / Tests ✅ / QA terrain ⏳
+### AUDIT-002 — Reconnect Realtime orpheline le channel - Implementation ✅ / Tests ✅ / QA terrain ✅
 
 * **Sévérité :** P1
 * **Confiance :** BUG PROBABLE
@@ -70,7 +70,7 @@ Les candidats les plus proches sont classés **P1** (scores restart, channel orp
 
 ---
 
-### AUDIT-003 — Rollback HotTake/Clutch écrase la map votes/taps
+### AUDIT-003 — Rollback HotTake/Clutch écrase la map votes/taps - Implementation ✅ / Tests ✅ / QA terrain ⏳
 
 * **Sévérité :** P1
 * **Confiance :** BUG CONFIRMÉ
@@ -79,10 +79,9 @@ Les candidats les plus proches sont classés **P1** (scores restart, channel orp
 * **Cause :** restore de **toute** la map snapshotée au début ; pas `rollbackOptimisticMapEntry`
 * **Scénario :** A vote → B vote arrive pendant le await → échec réseau A → rollback restaure map sans B → `all*In` faux jusqu’au catch-up
 * **Impact :** retard reveal / auto-advance ; UI « en attente » incorrecte
-* **Preuve :** HotTake ~421–435 ; Clutch ~200–208 ; Dilemma/SV/WAO/Traitre utilisent le helper ciblé
-* **Tests existants :** `synVoteRollback01` vérifie encore `previousVotes` HotTake (contrat incomplet accepté)
-* **Tests manquants :** rollback concurrent multi-joueurs HotTake/Clutch
-* **Recommandation :** aligner sur `rollbackOptimisticMapEntry` (clé locale seule)
+* **Preuve :** HotTake / Clutch restauraient `previousVotes` / `previousTaps` entiers ; Dilemma/SV/WAO/Traitre utilisent le helper ciblé
+* **Tests :** `tests/audit003VoteRollback.test.js` + contrats `synVoteRollback01`
+* **Fix :** `computeOptimisticMapEntryApply` + `rollbackOptimisticMapEntry` (clé locale) + gardes attempt/phase
 
 ---
 

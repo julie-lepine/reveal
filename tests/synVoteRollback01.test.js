@@ -40,6 +40,8 @@ describe("SYN-VOTE-ROLLBACK-01 - contrats commit*", () => {
     ["js/core/wrongAnswerSession.js", "commitWrongAnswerAnswer"],
     ["js/core/traitreSession.js", "commitTraitreVote"],
     ["js/core/tierNightLiveSession.js", "commitTierNightLiveVote"],
+    ["js/core/hotTakeSession.js", "commitHotTakeVote"],
+    ["js/core/clutchSession.js", "commitClutchTap"],
   ];
 
   for (const [file, name] of cases) {
@@ -128,10 +130,18 @@ describe("SYN-VOTE-ROLLBACK-01 - UI SpeedVote / WAO", () => {
     assert.equal(catchBlock.includes("render()"), false);
   });
 
-  it("références saines Hot Take / Guess Lie intactes", () => {
+  it("Hot Take / Clutch : rollback ciblé (AUDIT-003) ; Guess Lie intact", () => {
     const ht = read("js/core/hotTakeSession.js");
-    assert.match(ht, /computeHotTakeVoteApply/);
-    assert.match(ht, /previousVotes/);
+    const htBlock = fnBlock(ht, "commitHotTakeVote");
+    assert.match(htBlock, /rollbackOptimisticMapEntry/);
+    assert.match(htBlock, /computeOptimisticMapEntryApply/);
+    assert.equal(htBlock.includes("votes: previousVotes"), false);
+
+    const clutch = read("js/core/clutchSession.js");
+    const clutchBlock = fnBlock(clutch, "commitClutchTap");
+    assert.match(clutchBlock, /rollbackOptimisticMapEntry/);
+    assert.equal(clutchBlock.includes("taps: previousTaps"), false);
+
     const gl = read("js/core/guessLieVoteCommit.js");
     assert.match(gl, /rollbackGuessLieOptimisticVote/);
   });

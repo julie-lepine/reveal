@@ -70,6 +70,24 @@ describe("SYN-26 clutch tap freeze / merge", () => {
     assert.equal(out.taps.Bob.ms, 900);
   });
 
+  it("5b. AUDIT-003 : Bob injecté pendant await survit au rollback Alice", () => {
+    const out = simulateClutchTapCommitCycle({
+      session: { taps: {} },
+      localName: "Alice",
+      firstTap: { ms: 1100, at: 2 },
+      secondTap: { ms: 1300, at: 3 },
+      commitFails: true,
+      mutateBeforeFail: (taps) => ({
+        ...taps,
+        Bob: { ms: 800, at: 9 },
+      }),
+    });
+    assert.equal(out.ok, true);
+    assert.equal(Object.prototype.hasOwnProperty.call(out.taps, "Alice"), true);
+    assert.equal(out.taps.Alice.ms, 1300);
+    assert.equal(out.taps.Bob.ms, 800);
+  });
+
   it("6. clôture après tous les commits → aucun recalcul au reveal", () => {
     const alice = { ms: 4123, at: 100 };
     const bob = { ms: 4001, at: 101 };

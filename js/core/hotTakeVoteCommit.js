@@ -1,6 +1,18 @@
-/** Snapshot votes Hot Take avant/après apply local (rollback si sync échoue). */
+/** Apply vote Hot Take (tests purs). Le rollback runtime utilise rollbackOptimisticMapEntry. */
+import { computeOptimisticMapEntryApply } from "./optimisticMapEntry.js";
+
 export function computeHotTakeVoteApply(session, localName, choice) {
-  const previousVotes = { ...(session.votes || {}) };
-  const nextVotes = { ...previousVotes, [localName]: choice };
-  return { previousVotes, nextVotes };
+  const apply = computeOptimisticMapEntryApply({
+    map: session?.votes,
+    key: localName,
+    value: choice,
+  });
+  const previousVotes = { ...(session?.votes || {}) };
+  return {
+    previousVotes,
+    nextVotes: apply.nextMap,
+    hadPreviousValue: apply.hadPreviousValue,
+    previousValue: apply.previousValue,
+    optimisticValue: apply.optimisticValue,
+  };
 }

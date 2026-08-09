@@ -1,4 +1,9 @@
 /** Fige le tap capturé au clic (aucun recalcul de ms/at). */
+import {
+  computeOptimisticMapEntryApply,
+  rollbackOptimisticMapEntry,
+} from "./optimisticMapEntry.js";
+
 export function freezeClutchTap(tap) {
   return {
     ms: tap.ms,
@@ -24,7 +29,7 @@ export function mergeClutchTapsFrozen(base = {}, incoming = {}) {
   return out;
 }
 
-/** Snapshot taps avant/après apply local (rollback si sync échoue). */
+/** Snapshot taps avant/après apply local (tests purs / UI helpers). */
 export function computeClutchTapApply(session, localName, tap) {
   const frozen = freezeClutchTap(tap);
   const previousTaps = { ...(session.taps || {}) };
@@ -35,10 +40,25 @@ export function computeClutchTapApply(session, localName, tap) {
       previousTaps,
       nextTaps: previousTaps,
       tap: existing,
+      hadPreviousValue: true,
+      previousValue: existing,
+      optimisticValue: existing,
     };
   }
-  const nextTaps = { ...previousTaps, [localName]: frozen };
-  return { alreadyTapped: false, previousTaps, nextTaps, tap: frozen };
+  const apply = computeOptimisticMapEntryApply({
+    map: previousTaps,
+    key: localName,
+    value: frozen,
+  });
+  return {
+    alreadyTapped: false,
+    previousTaps,
+    nextTaps: apply.nextMap,
+    tap: frozen,
+    hadPreviousValue: apply.hadPreviousValue,
+    previousValue: apply.previousValue,
+    optimisticValue: apply.optimisticValue,
+  };
 }
 
 /**
@@ -77,8 +97,8 @@ export function preferInFlightClutchTap(sessionTaps, localTaps, localName, tapCo
 }
 
 /**
- * Machine de commit tap : échec → rollback taps + UI retentable → second tap OK.
- * Testable sans DOM / Supabase.
+ * Machine de commit tap : échec → rollback entrée locale seulement → second tap OK.
+ * Testable sans DOM / Supabase. AUDIT-003 : ne restaure jamais previousTaps entier.
  */
 export function simulateClutchTapCommitCycle({
   session,
@@ -86,6 +106,8 @@ export function simulateClutchTapCommitCycle({
   firstTap,
   secondTap,
   commitFails = true,
+  /** Injecte un concurrent (ex. Bob) pendant l’await avant rollback. */
+  mutateBeforeFail = null,
 }) {
   let taps = { ...(session.taps || {}) };
   let tapCommitInFlight = false;
@@ -105,7 +127,17 @@ export function simulateClutchTapCommitCycle({
   localWindowClosed = true;
 
   if (commitFails) {
-    taps = first.previousTaps;
+    if (typeof mutateBeforeFail === "function") {
+      taps = mutateBeforeFail(taps);
+    }
+    const rolled = rollbackOptimisticMapEntry({
+      currentMap: taps,
+      key: localName,
+      hadPreviousValue: first.hadPreviousValue,
+      previousValue: first.previousValue,
+      optimisticValue: first.optimisticValue,
+    });
+    if (rolled.applied) taps = rolled.map;
     const ui = resolveClutchTapCommitFailureUi();
     tapCommitInFlight = ui.tapCommitInFlight;
     localWindowClosed = ui.localWindowClosed;

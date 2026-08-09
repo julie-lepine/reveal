@@ -81,15 +81,33 @@ describe("SYN-VOTE-ROLLBACK-01 - cycles simulés (tous jeux)", () => {
       phase: "answer",
       value: { text: "girafe", at: 1 },
     },
+    {
+      name: "HotTake",
+      mapKey: "votes",
+      phase: "question",
+      value: "B",
+    },
+    {
+      name: "Clutch",
+      mapKey: "taps",
+      phase: "active",
+      value: { ms: 1100, at: 2 },
+    },
   ];
 
   for (const c of cases) {
     it(`${c.name} : succès - pas de rollback`, () => {
+      const bobSeed =
+        c.mapKey === "answers"
+          ? { text: "x", at: 0 }
+          : c.mapKey === "taps"
+            ? { ms: 1, at: 0 }
+            : "keep";
       const session = {
         phase: c.phase,
         roundIdx: 0,
         runId: c.runId ?? null,
-        [c.mapKey]: { Bob: c.mapKey === "answers" ? { text: "x", at: 0 } : "keep" },
+        [c.mapKey]: { Bob: bobSeed },
       };
       const out = simulateOptimisticCommitCycle({
         session,
@@ -104,11 +122,17 @@ describe("SYN-VOTE-ROLLBACK-01 - cycles simulés (tous jeux)", () => {
     });
 
     it(`${c.name} : échec - retire / restaure uniquement Alice`, () => {
+      const bobSeed =
+        c.mapKey === "answers"
+          ? { text: "x", at: 0 }
+          : c.mapKey === "taps"
+            ? { ms: 1, at: 0 }
+            : "keep";
       const session = {
         phase: c.phase,
         roundIdx: 0,
         runId: c.runId ?? null,
-        [c.mapKey]: { Bob: c.mapKey === "answers" ? { text: "x", at: 0 } : "keep" },
+        [c.mapKey]: { Bob: bobSeed },
       };
       const out = simulateOptimisticCommitCycle({
         session,
@@ -130,7 +154,11 @@ describe("SYN-VOTE-ROLLBACK-01 - cycles simulés (tous jeux)", () => {
         [c.mapKey]: {},
       };
       const otherVal =
-        c.mapKey === "answers" ? { text: "npc", at: 2 } : "Charlie";
+        c.mapKey === "answers"
+          ? { text: "npc", at: 2 }
+          : c.mapKey === "taps"
+            ? { ms: 800, at: 2 }
+            : "Charlie";
       const out = simulateOptimisticCommitCycle({
         session,
         mapKey: c.mapKey,
@@ -155,7 +183,11 @@ describe("SYN-VOTE-ROLLBACK-01 - cycles simulés (tous jeux)", () => {
         [c.mapKey]: {},
       };
       const newer =
-        c.mapKey === "answers" ? { text: "retry", at: 9 } : "newer";
+        c.mapKey === "answers"
+          ? { text: "retry", at: 9 }
+          : c.mapKey === "taps"
+            ? { ms: 999, at: 9 }
+            : "newer";
       const out = simulateOptimisticCommitCycle({
         session,
         mapKey: c.mapKey,
