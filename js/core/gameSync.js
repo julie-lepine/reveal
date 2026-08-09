@@ -49,8 +49,6 @@ import {
   mergeReadyMapsLocal,
   mergeDilemmaCustomDilemmas,
   mergeHotTakeCustomTakes,
-  mergeCustomRosterTopics,
-  mergeCustomLiveTierLists,
   mergeDilemmaPatchState,
   mergeHotTakePatchState,
   mergeConsensusPatchState,
@@ -122,11 +120,10 @@ import {
 } from "./customRosterTopicsSyncGuard.js";
 import {
   stripCustomLiveTierListsFromGenericPatch,
-  summarizeCustomLiveTierLists,
   preserveCustomLiveTierListsInFullStateReplace,
-  shouldAcceptRemoteCustomLiveTierListsEmpty,
+  resolveCustomLiveTierListsFromRemote,
 } from "./customLiveTierListsSyncGuard.js";
-import { shouldAcceptRemoteCustomRosterTopicsEmpty } from "./tierNightCustomRosterClear.js";
+import { resolveCustomRosterTopicsFromRemote } from "./tierNightCustomRosterClear.js";
 import { pickLatestConsensusAnswer } from "./consensusAnswerUtils.js";
 import {
   finishedTierNightLiveRemote,
@@ -3121,57 +3118,35 @@ export function applyRemoteEveningState(st) {
     const localEpoch = Number(getState().customRosterTopicsEpoch) || 0;
     const remoteEpoch = Number(st.customRosterTopicsEpoch) || 0;
 
-    // Clear host-only : epoch remote plus récent → accepter [] (anti revive).
-    const acceptEmpty = shouldAcceptRemoteCustomRosterTopicsEmpty(
-      st,
+    const resolved = resolveCustomRosterTopicsFromRemote({
+      remoteList,
       localBefore,
-      localEpoch
-    );
-
-    const remoteEmpty = remoteList.length === 0;
-    const localHasOthers = localBefore.some((t) => {
-      if (localAuthorUid && t.authorUid) {
-        return String(t.authorUid) !== String(localAuthorUid);
-      }
-      return t.author && t.author !== localAuthor;
+      localAuthor,
+      localAuthorUid,
+      localEpoch,
+      remoteState: st,
     });
 
-    if (remoteEmpty && localHasOthers && !acceptEmpty) {
-      console.warn(
-        "REVEAL FEATURE-TIERNIGHT-02: ignore empty customRosterTopics remote over multi-author local",
-        {
-          local: summarizeCustomRosterTopics(localBefore),
-          localAuthor,
-          localAuthorUid,
-        }
-      );
-    } else if (acceptEmpty || remoteEpoch > localEpoch) {
-      patch.customRosterTopics = Array.isArray(remoteList) ? remoteList : [];
-      if (remoteEpoch > 0) patch.customRosterTopicsEpoch = remoteEpoch;
-      if (st.customRosterTopicsWritable === true || st.customRosterTopicsWritable === false) {
-        patch.customRosterTopicsWritable = Boolean(st.customRosterTopicsWritable);
-      }
-    } else {
-      const merged = mergeCustomRosterTopics(
-        localBefore,
-        remoteList,
+    if (typeof globalThis !== "undefined" && globalThis.__REVEAL_DEBUG_ROSTER__) {
+      console.debug("REVEAL roster hydrate", {
+        remote: summarizeCustomRosterTopics(remoteList),
+        localBefore: summarizeCustomRosterTopics(localBefore),
+        merged: summarizeCustomRosterTopics(resolved.topics),
+        mode: resolved.mode,
         localAuthor,
-        localAuthorUid
-      );
-      if (typeof globalThis !== "undefined" && globalThis.__REVEAL_DEBUG_ROSTER__) {
-        console.debug("REVEAL roster hydrate", {
-          remote: summarizeCustomRosterTopics(remoteList),
-          localBefore: summarizeCustomRosterTopics(localBefore),
-          merged: summarizeCustomRosterTopics(merged),
-          localAuthor,
-          localAuthorUid,
-        });
-      }
-      patch.customRosterTopics = merged;
-      if (remoteEpoch > localEpoch) patch.customRosterTopicsEpoch = remoteEpoch;
-      if (st.customRosterTopicsWritable === true || st.customRosterTopicsWritable === false) {
-        patch.customRosterTopicsWritable = Boolean(st.customRosterTopicsWritable);
-      }
+        localAuthorUid,
+      });
+    }
+
+    patch.customRosterTopics = resolved.topics;
+    if (
+      (resolved.mode === "authoritative" || remoteEpoch > localEpoch) &&
+      remoteEpoch > 0
+    ) {
+      patch.customRosterTopicsEpoch = remoteEpoch;
+    }
+    if (st.customRosterTopicsWritable === true || st.customRosterTopicsWritable === false) {
+      patch.customRosterTopicsWritable = Boolean(st.customRosterTopicsWritable);
     }
   } else if (
     st.customRosterTopicsEpoch != null ||
@@ -3194,40 +3169,21 @@ export function applyRemoteEveningState(st) {
     const liveAuthorUid = getSupabaseUserId();
     const localLiveEpoch = Number(getState().customLiveTierListsEpoch) || 0;
     const remoteLiveEpoch = Number(st.customLiveTierListsEpoch) || 0;
-    const acceptLiveEmpty = shouldAcceptRemoteCustomLiveTierListsEmpty(
-      st,
-      localBeforeLive,
-      localLiveEpoch
-    );
-    const remoteLiveEmpty = remoteLiveList.length === 0;
-    const localLiveHasOthers = localBeforeLive.some((t) => {
-      if (liveAuthorUid && t.authorUid) {
-        return String(t.authorUid) !== String(liveAuthorUid);
-      }
-      return false;
+    const resolvedLive = resolveCustomLiveTierListsFromRemote({
+      remoteList: remoteLiveList,
+      localBefore: localBeforeLive,
+      localAuthor: liveAuthor,
+      localAuthorUid: liveAuthorUid,
+      localEpoch: localLiveEpoch,
+      remoteState: st,
     });
-    if (remoteLiveEmpty && localLiveHasOthers && !acceptLiveEmpty) {
-      console.warn(
-        "REVEAL FEATURE-TIERNIGHT-04C: ignore empty customLiveTierLists remote over multi-author local",
-        { local: summarizeCustomLiveTierLists(localBeforeLive), liveAuthorUid }
-      );
-    } else if (acceptLiveEmpty || remoteLiveEpoch > localLiveEpoch) {
-      patch.customLiveTierLists = Array.isArray(remoteLiveList) ? remoteLiveList : [];
+
+    patch.customLiveTierLists = resolvedLive.lists;
+    if (remoteLiveEpoch > localLiveEpoch || resolvedLive.mode === "authoritative") {
       if (remoteLiveEpoch > 0) patch.customLiveTierListsEpoch = remoteLiveEpoch;
-      if (st.customLiveTierListsWritable === true || st.customLiveTierListsWritable === false) {
-        patch.customLiveTierListsWritable = Boolean(st.customLiveTierListsWritable);
-      }
-    } else {
-      patch.customLiveTierLists = mergeCustomLiveTierLists(
-        localBeforeLive,
-        remoteLiveList,
-        liveAuthor,
-        liveAuthorUid
-      );
-      if (remoteLiveEpoch > localLiveEpoch) patch.customLiveTierListsEpoch = remoteLiveEpoch;
-      if (st.customLiveTierListsWritable === true || st.customLiveTierListsWritable === false) {
-        patch.customLiveTierListsWritable = Boolean(st.customLiveTierListsWritable);
-      }
+    }
+    if (st.customLiveTierListsWritable === true || st.customLiveTierListsWritable === false) {
+      patch.customLiveTierListsWritable = Boolean(st.customLiveTierListsWritable);
     }
   } else if (
     st.customLiveTierListsEpoch != null ||

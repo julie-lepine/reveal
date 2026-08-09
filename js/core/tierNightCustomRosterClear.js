@@ -12,6 +12,7 @@
 import { createActionLock } from "./actionLock.js";
 import { getState, saveStatePatch } from "./state.js";
 import { clearCustomRosterTopicsLocal } from "./customRosterTopicSession.js";
+import { mergeCustomRosterTopics } from "./sessionMerge.js";
 
 export const TIERNIGHT_CLEAR_CUSTOM_ROSTER_RPC = "clear_tiernight_custom_roster_topics";
 
@@ -55,6 +56,70 @@ export function shouldAcceptRemoteCustomRosterTopicsEmpty(st, localBefore, local
     return st.customRosterTopics.length === 0;
   }
   return false;
+}
+
+/**
+ * AUDIT-004 — décision d'hydrate customRosterTopics (pur / testable).
+ *
+ * Contrat :
+ * - acceptEmpty (epoch↑ / writable:false+[]) → remote autoritaire (y compris []) ;
+ * - remote epoch < local + [] → conserver local (stale empty) ;
+ * - sinon merge : remote gagne pour les autres ; own absents du remote = optimisme.
+ *
+ * Ne jamais « ignorer » un [] remote à epoch égale à cause de customs d'autrui :
+ * delete_player_custom_entry ne bump pas l'epoch → [B]→[] doit passer par merge.
+ *
+ * @param {{
+ *   remoteList?: unknown[],
+ *   localBefore?: unknown[],
+ *   localAuthor?: string|null,
+ *   localAuthorUid?: string|null,
+ *   localEpoch?: number,
+ *   remoteState?: object|null,
+ * }} input
+ */
+export function resolveCustomRosterTopicsFromRemote(input = {}) {
+  const remoteList = Array.isArray(input.remoteList) ? input.remoteList : [];
+  const localBefore = Array.isArray(input.localBefore) ? input.localBefore : [];
+  const localEpoch = Number(input.localEpoch) || 0;
+  const remoteState = input.remoteState || {};
+  const remoteEpoch = Number(remoteState.customRosterTopicsEpoch) || 0;
+  const acceptEmpty = shouldAcceptRemoteCustomRosterTopicsEmpty(
+    { ...remoteState, customRosterTopics: remoteList },
+    localBefore,
+    localEpoch
+  );
+
+  if (acceptEmpty || remoteEpoch > localEpoch) {
+    return {
+      topics: remoteList,
+      mode: "authoritative",
+      acceptEmpty,
+      remoteEpoch,
+    };
+  }
+
+  // Stale empty : epoch remote strictement plus ancienne → ne pas amputer le local.
+  if (remoteList.length === 0 && remoteEpoch < localEpoch) {
+    return {
+      topics: localBefore,
+      mode: "keep_local_stale_empty",
+      acceptEmpty,
+      remoteEpoch,
+    };
+  }
+
+  return {
+    topics: mergeCustomRosterTopics(
+      localBefore,
+      remoteList,
+      input.localAuthor ?? null,
+      input.localAuthorUid ?? null
+    ),
+    mode: "merge",
+    acceptEmpty,
+    remoteEpoch,
+  };
 }
 
 /**

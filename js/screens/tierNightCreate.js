@@ -23,6 +23,7 @@ import { checkHotTakeModeration, getModerationNotice } from "../core/hotTakeSess
 import { showAppAlert } from "../core/dialog.js";
 import { returnToTierNightSelectStep } from "../core/tierNightNav.js";
 import {
+  LIVE_TIER_LIST_NAME_MIN,
   LIVE_TIER_LIST_ITEMS_MIN,
   LIVE_TIER_LIST_ITEMS_MAX,
   validateCustomLiveTierList,
@@ -108,11 +109,13 @@ export function mountTierNightCreate(app) {
   function validate() {
     const name = nameEl.value.trim();
     const items = parseItems();
-    let ok = name.length >= 2 && items.length >= LIVE_TIER_LIST_ITEMS_MIN;
+    let ok = name.length >= LIVE_TIER_LIST_NAME_MIN && items.length >= LIVE_TIER_LIST_ITEMS_MIN;
     if (contribute && items.length > LIVE_TIER_LIST_ITEMS_MAX) ok = false;
     createBtn.disabled = !ok || createBtn.dataset.busy === "1";
     if (!name) hint.textContent = "Donne un nom à ta tier list.";
-    else if (items.length < LIVE_TIER_LIST_ITEMS_MIN) {
+    else if (name.length < LIVE_TIER_LIST_NAME_MIN) {
+      hint.textContent = `Nom trop court — ${LIVE_TIER_LIST_NAME_MIN} caractères minimum.`;
+    } else if (items.length < LIVE_TIER_LIST_ITEMS_MIN) {
       hint.textContent = `${items.length}/${LIVE_TIER_LIST_ITEMS_MIN} items - ajoute-en encore.`;
     } else if (contribute && items.length > LIVE_TIER_LIST_ITEMS_MAX) {
       hint.textContent = `Maximum ${LIVE_TIER_LIST_ITEMS_MAX} items.`;

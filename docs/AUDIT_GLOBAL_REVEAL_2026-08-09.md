@@ -70,7 +70,7 @@ Les candidats les plus proches sont classés **P1** (scores restart, channel orp
 
 ---
 
-### AUDIT-003 — Rollback HotTake/Clutch écrase la map votes/taps - Implementation ✅ / Tests ✅ / QA terrain ⏳
+### AUDIT-003 — Rollback HotTake/Clutch écrase la map votes/taps - Implementation ✅ / Tests ✅ / QA terrain ✅
 
 * **Sévérité :** P1
 * **Confiance :** BUG CONFIRMÉ
@@ -85,19 +85,15 @@ Les candidats les plus proches sont classés **P1** (scores restart, channel orp
 
 ---
 
-### AUDIT-004 — Customs ressuscités (`mergeAuthorOwned` + `pickRichest*`)
+### AUDIT-004 — Customs ressuscités (`mergeAuthorOwned` + `pickRichest*`) - Implementation ✅ / Tests ✅ / QA terrain ⏳
 
 * **Sévérité :** P1
-* **Confiance :** BUG PROBABLE
-* **Fichier :** `sessionMerge.js` · `customLiveTierListsSyncGuard.js` · `customRosterTopicsSyncGuard.js` · `gameSync.applyRemoteEveningState`
-* **Fonction :** `mergeAuthorOwnedCustomList` / `mergeCustom*` / `pickRichestCustom*`
-* **Cause :** local own absent du remote = « optimisme » ; `pickRichest` choisit le tableau **le plus long**
-* **Scénario :** delete distant (autre device / host clear partiel) → client garde entrée own → hydrate réinjecte → full push / preserve republie
-* **Impact :** customs fantômes en prep · deck / listes incorrects
-* **Preuve :** merge réinjecte own manquants ; `pickRichest` = max length (pas epoch) ; SQL epoch protège surtout les clears **vides**
-* **Tests existants :** Feature TierNight-02/04C epoch empty ; pas « shorter non-empty wins »
-* **Tests manquants :** delete multi-device + hydrate + push settings
-* **Recommandation :** tombstone/epoch par entrée ; ne pas préférer « plus long » sans epoch
+* **Confiance :** BUG CONFIRMÉ (QA terrain : dernière custom)
+* **Fichier :** `tierNightCustomRosterClear.js` · `customLiveTierListsSyncGuard.js` · `gameSync.applyRemoteEveningState`
+* **Cause terrain :** hydrate ignorait `remote []` si local contenait des customs d’autrui et epoch non bumpée (RPC delete ne bump pas)
+* **Scénario :** `[B] → delete B → []` refusé chez Guest ; `[A,B] → [B]` OK ; rejoin OK (local déjà vide)
+* **Fix :** `resolveCustom*FromRemote` — `[]` epoch égale → merge (drop others) ; epoch↑ / writable:false → authoritative ; epoch remote < local → keep local (stale)
+* **Tests :** `tests/audit004CustomEmptyClear.test.js`
 
 ---
 

@@ -2,6 +2,8 @@
  * FEATURE-TIERNIGHT-04C - garde anti lost-update pour customLiveTierLists.
  */
 
+import { mergeCustomLiveTierLists } from "./sessionMerge.js";
+
 /**
  * Clear local accepté si epoch remote plus récent, ou writable=false + empty.
  * Distingue clé absente (preserve) d'un clear autoritatif (epoch/writable).
@@ -22,6 +24,62 @@ export function shouldAcceptRemoteCustomLiveTierListsEmpty(
   }
   void localList;
   return false;
+}
+
+/**
+ * AUDIT-004 — décision d'hydrate customLiveTierLists (pur / testable).
+ * Même contrat que resolveCustomRosterTopicsFromRemote.
+ *
+ * @param {{
+ *   remoteList?: unknown[],
+ *   localBefore?: unknown[],
+ *   localAuthor?: string|null,
+ *   localAuthorUid?: string|null,
+ *   localEpoch?: number,
+ *   remoteState?: object|null,
+ * }} input
+ */
+export function resolveCustomLiveTierListsFromRemote(input = {}) {
+  const remoteList = Array.isArray(input.remoteList) ? input.remoteList : [];
+  const localBefore = Array.isArray(input.localBefore) ? input.localBefore : [];
+  const localEpoch = Number(input.localEpoch) || 0;
+  const remoteState = input.remoteState || {};
+  const remoteEpoch = Number(remoteState.customLiveTierListsEpoch) || 0;
+  const acceptEmpty = shouldAcceptRemoteCustomLiveTierListsEmpty(
+    { ...remoteState, customLiveTierLists: remoteList },
+    localBefore,
+    localEpoch
+  );
+
+  if (acceptEmpty || remoteEpoch > localEpoch) {
+    return {
+      lists: remoteList,
+      mode: "authoritative",
+      acceptEmpty,
+      remoteEpoch,
+    };
+  }
+
+  if (remoteList.length === 0 && remoteEpoch < localEpoch) {
+    return {
+      lists: localBefore,
+      mode: "keep_local_stale_empty",
+      acceptEmpty,
+      remoteEpoch,
+    };
+  }
+
+  return {
+    lists: mergeCustomLiveTierLists(
+      localBefore,
+      remoteList,
+      input.localAuthor ?? null,
+      input.localAuthorUid ?? null
+    ),
+    mode: "merge",
+    acceptEmpty,
+    remoteEpoch,
+  };
 }
 
 /**

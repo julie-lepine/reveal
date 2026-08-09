@@ -519,6 +519,14 @@ describe("FEATURE-TIERNIGHT-04C — optimistic create/delete", () => {
     assert.equal(getState().customLiveTierLists.length, 0);
   });
 
+  it("delete déjà absente est idempotent (pas d'erreur introuvable)", async () => {
+    saveStatePatch({ customLiveTierLists: [] });
+    const res = await deleteCustomLiveTierListAndSync("missing-id");
+    assert.equal(res.ok, true);
+    assert.equal(res.code, "ALREADY_GONE");
+    assert.equal(getState().customLiveTierLists.length, 0);
+  });
+
   it("delete refuse cross-author", async () => {
     saveStatePatch({
       customLiveTierLists: [makeList(1, { authorUid: "uid-other" })],
@@ -562,7 +570,7 @@ describe("FEATURE-TIERNIGHT-04C — session API contract", () => {
     const sync = readFileSync(join(root, "js/core/gameSync.js"), "utf8");
     assert.match(sync, /stripCustomLiveTierListsFromGenericPatch/);
     assert.match(sync, /preserveCustomLiveTierListsInFullStateReplace/);
-    assert.match(sync, /mergeCustomLiveTierLists/);
+    assert.match(sync, /resolveCustomLiveTierListsFromRemote/);
     assert.match(sync, /customLiveTierLists/);
     assert.match(sync, /customRosterTopics \/ customLiveTierLists volontairement ABSENTS/);
   });

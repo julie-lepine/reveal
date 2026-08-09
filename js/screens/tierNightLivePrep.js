@@ -228,17 +228,24 @@ export function mountTierNightLivePrep(app) {
 
     app.addEventListener("click", (e) => {
       const btn = e.target?.closest?.("[data-remove-live-custom]");
-      if (!btn || !app.contains(btn)) return;
+      if (!btn || !app.contains(btn) || btn.disabled) return;
       const id = btn.getAttribute("data-remove-live-custom");
+      if (!id) return;
+      btn.disabled = true;
       void (async () => {
+        const err = app.querySelector("#live-custom-error");
         const res = await removeCustomLiveTierListFromPrep(id);
         if (!res?.ok) {
-          const err = app.querySelector("#live-custom-error");
           if (err) {
             err.textContent = res?.error || "Suppression impossible.";
             err.classList.remove("hidden");
           }
+          btn.disabled = false;
           return;
+        }
+        if (err) {
+          err.textContent = "";
+          err.classList.add("hidden");
         }
         refreshReadySection();
       })();

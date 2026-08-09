@@ -176,7 +176,8 @@ export async function deleteCustomLiveTierListAndSync(id) {
   const authorUid = getSupabaseUserId() || null;
   const lists = getState().customLiveTierLists || [];
   const target = lists.find((t) => t.id === id);
-  if (!target) return { ok: false, error: "Tier list introuvable.", code: "NOT_FOUND" };
+  // Idempotent : déjà absente (double-clic, sync concurrente) = objectif atteint.
+  if (!target) return { ok: true, code: "ALREADY_GONE" };
 
   if (!isCustomLiveTierListOwnedBy(target, me, authorUid)) {
     return {
