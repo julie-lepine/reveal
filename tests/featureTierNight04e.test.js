@@ -391,6 +391,56 @@ describe("FEATURE-TIERNIGHT-04E — custom snapshot ↔ canon", () => {
     snap.authorUid = "other";
     assert.equal(customLiveSnapshotMatchesCanon(snap, c), false);
   });
+
+  it("BUG launch CORRUPT : snapshot clamp name/item ≤40 (officiel long)", () => {
+    const longName =
+      "Du plaisir coupable le plus validé au plus cringe et encore trop long";
+    assert.ok(longName.length > 40);
+    const longItem =
+      "Fait 6 séries de plus pour la « dernière série » vraiment trop longue";
+    assert.ok(longItem.length > 40);
+    const snap = snapshotLiveTierListForSeries({
+      id: "guilty_pleasures",
+      name: longName,
+      emoji: "🍫",
+      items: ["Court", longItem, "Ok", "Fine"],
+      custom: false,
+    });
+    assert.ok(snap.name.length <= 40);
+    assert.ok(snap.name.length >= 1);
+    assert.equal(snap.items.every((it) => it.length <= 40 && it.length >= 1), true);
+    assert.equal(snap.items.length, 4);
+  });
+
+  it("BUG launch CORRUPT : N=3 + 1 custom + pool réel → shape OK (noms officielles longues)", () => {
+    const c = makeCustom(1);
+    let shapedOk = 0;
+    for (let s = 0; s < 40; s += 1) {
+      let i = 0;
+      const rng = () => {
+        const v = ((s * 17 + i * 31) % 100) / 100;
+        i += 1;
+        return v;
+      };
+      const built = buildTierNightLiveSeriesLaunchState({
+        customLists: [c],
+        officialLists: getTierNightLiveOfficialPool(),
+        roundCount: 3,
+        playerRoster: [],
+        runId: `run-clamp-${s}`,
+        random: rng,
+        deckRandom: () => 0.2,
+      });
+      assert.equal(built.ok, true, built.code);
+      const shape = validateTierNightLiveSeriesShape(built.series);
+      assert.equal(shape.ok, true, JSON.stringify(shape));
+      for (const entry of built.series.queue) {
+        assert.ok(String(entry.listSnapshot.name).trim().length <= 40);
+      }
+      shapedOk += 1;
+    }
+    assert.equal(shapedOk, 40);
+  });
 });
 
 describe("FEATURE-TIERNIGHT-04E — attempt / double-click / idempotence client", () => {

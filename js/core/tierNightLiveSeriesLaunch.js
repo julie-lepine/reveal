@@ -17,6 +17,12 @@ import {
   TIER_NIGHT_LIVE_SERIES_PHASE_PLAYING,
   projectTierNightLiveSeriesRound0 as projectRound0FromRuntime,
 } from "./tierNightLiveSeriesRuntime.js";
+import {
+  LIVE_TIER_LIST_ITEM_MAX,
+  LIVE_TIER_LIST_NAME_MAX,
+  normalizeLiveTierListEmoji,
+  normalizeLiveTierListName,
+} from "./customLiveTierLists.js";
 
 export const TIER_NIGHT_LIVE_SERIES_KIND = "live";
 export { TIER_NIGHT_LIVE_SERIES_PHASE_PLAYING };
@@ -122,13 +128,29 @@ function mapSubsetFailCode(code) {
   return code || "TNS_LIVE_LAUNCH_FAILED";
 }
 
-/** Snapshot défensif (copie items - aucune ref mutable). */
+/** Snapshot défensif (copie items - aucune ref mutable).
+ * Bornes wire SQL 04E : name/item trim 1–40 (catalogue officiel peut être plus long).
+ */
 export function snapshotLiveTierListForSeries(list) {
+  const rawItems = Array.isArray(list.items) ? list.items : [];
+  const items = [];
+  for (const raw of rawItems) {
+    const item = String(raw ?? "")
+      .trim()
+      .slice(0, LIVE_TIER_LIST_ITEM_MAX);
+    if (item) items.push(item);
+  }
+  const name =
+    normalizeLiveTierListName(list.name) ||
+    String(list.id || "Liste")
+      .trim()
+      .slice(0, LIVE_TIER_LIST_NAME_MAX) ||
+    "Liste";
   const snap = {
     id: String(list.id),
-    name: String(list.name ?? ""),
-    emoji: list.emoji != null ? String(list.emoji) : "📋",
-    items: Array.isArray(list.items) ? list.items.map((item) => String(item)) : [],
+    name,
+    emoji: normalizeLiveTierListEmoji(list.emoji != null ? list.emoji : "📋"),
+    items,
     custom: list.custom === true,
   };
   if (snap.custom) {
@@ -384,8 +406,21 @@ export function validateTierNightLiveSeriesShape(series) {
     if (!String(snap.id || "").trim()) {
       return { ok: false, code: "TNS_LIVE_CORRUPT_STATE", message: "snapshot_id" };
     }
-    if (!Array.isArray(snap.items) || snap.items.length < 1) {
+    const snapName = String(snap.name || "").trim();
+    if (!snapName || snapName.length > LIVE_TIER_LIST_NAME_MAX) {
+      return { ok: false, code: "TNS_LIVE_CORRUPT_STATE", message: "name" };
+    }
+    if (typeof snap.custom !== "boolean") {
+      return { ok: false, code: "TNS_LIVE_CORRUPT_STATE", message: "custom" };
+    }
+    if (!Array.isArray(snap.items) || snap.items.length < 1 || snap.items.length > 16) {
       return { ok: false, code: "TNS_LIVE_CORRUPT_STATE", message: "snapshot_items" };
+    }
+    for (const rawItem of snap.items) {
+      const item = String(rawItem ?? "").trim();
+      if (!item || item.length > LIVE_TIER_LIST_ITEM_MAX) {
+        return { ok: false, code: "TNS_LIVE_CORRUPT_STATE", message: "item" };
+      }
     }
     if (String(entry.listId || "") !== String(snap.id)) {
       return { ok: false, code: "TNS_LIVE_CORRUPT_STATE", message: "listId" };
