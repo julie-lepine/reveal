@@ -20,6 +20,7 @@ import {
 import {
   buildTierNightLiveSeriesLaunchState,
   mapTierNightLiveLaunchError,
+  extractTierNightLiveLaunchCode,
   obtainTierNightLiveLaunchAttempt,
   clearInFlightTierNightLiveLaunchAttempt,
 } from "./tierNightLiveSeriesLaunch.js";
@@ -258,14 +259,54 @@ export async function enterTierNightLivePrep({ resetSettings = true } = {}) {
   };
 
   if (!isGameSyncActive()) {
+    // Solo : neutralise un blob live stale (series_end) pour ne pas polluer un retry.
+    if (resetSettings) {
+      saveStatePatch({
+        tierNightLiveGame: {
+          runId: null,
+          lobbyStarted: false,
+          finished: false,
+          series: null,
+          topicId: null,
+          listName: "",
+          deck: null,
+          playerRoster: null,
+          roundIdx: 0,
+          phase: null,
+          votes: {},
+          placements: {},
+        },
+      });
+    }
     navigate("tiernight-live-prep", navOpts);
     return { ok: true, localOnly: true };
   }
 
   if (isLobbyHost() && resetSettings) {
     try {
+      // Comme replay post series_end : clear le blob live distant pour que
+      // getEffectiveSessionScreen ne préfère plus tiernight-end au live-prep.
+      const { finishedTierNightLiveRemote } = await import("./tierNightConfig.js");
+      const liveCleared = finishedTierNightLiveRemote({
+        runId: null,
+        lobbyStarted: false,
+        finished: false,
+        series: null,
+        topicId: null,
+        listName: "",
+        deck: null,
+        playerRoster: null,
+        roundIdx: 0,
+        phase: null,
+        votes: {},
+        placements: {},
+      });
+      saveStatePatch({ tierNightLiveGame: { ...liveCleared, series: null, finished: false } });
       await patchGameState(
-        { tierNightLivePrep: tierNightLivePrepToRemote(session) },
+        {
+          tierNightLivePrep: tierNightLivePrepToRemote(session),
+          tierNightLive: { ...liveCleared, series: null, finished: false },
+        },
         { gameId: "tiernight", screen: "tiernight-live-prep" }
       );
     } catch (err) {
@@ -401,10 +442,7 @@ export async function markTierNightLiveSeriesPrepStarted(_opts = {}) {
     } catch {
       /* ignore */
     }
-    const code =
-      err?.code ||
-      String(err?.message || "").match(/TNS_LIVE_[A-Z0-9_]+/)?.[0] ||
-      "TNS_LIVE_LAUNCH_FAILED";
+    const code = extractTierNightLiveLaunchCode(err);
     if (
       code === "TNS_LIVE_PREP_STALE" ||
       code === "TNS_LIVE_ALREADY_STARTED" ||

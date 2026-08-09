@@ -3972,8 +3972,14 @@ function resolveActivePlayScreen(st, gid, declared) {
   const glPhase = st.guessLie?.phase;
   if (glPhase && glPhase !== "idle" && glPhase !== "lobby") return "guesslie";
   // FEATURE-TIERNIGHT-04F — phase série Rank Live avant lobbyStarted générique.
+  // Ne pas laisser series_end / between écraser une re-entrée prep/select
+  // (hôte a republie tiernight-live-prep ; l’invité doit suivre le declared).
   const liveSeries = st.tierNightLive?.series;
-  if (liveSeries?.kind === "live") {
+  const liveSetupReentry =
+    declared === "tiernight-live-prep" ||
+    declared === "tiernight-prep" ||
+    declared === "tiernight-select";
+  if (liveSeries?.kind === "live" && !liveSetupReentry) {
     if (liveSeries.phase === "between_lists") return "tiernight-between";
     if (liveSeries.phase === "series_end") return "tiernight-end";
   }

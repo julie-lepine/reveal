@@ -46,22 +46,62 @@ export const TIER_NIGHT_LIVE_LAUNCH_ERROR_MESSAGES = Object.freeze({
     "Pas assez de tier lists pour cette longueur. Ajoute des customs ou réduis le nombre.",
 });
 
+const TNS_LIVE_CODE_RE = /TNS_LIVE_[A-Z0-9_]+/;
+/** Codes PostgREST/Postgres génériques — jamais affichés tels quels (ex. P0001). */
+const GENERIC_RPC_ERRCODES = new Set(["P0001", "57014", "40001", "40P01"]);
+
+/**
+ * Extrait le code métier TNS_LIVE_* depuis une erreur Supabase/PostgREST.
+ * `error.code` est souvent P0001 (RAISE) — le motif utile est dans message/details.
+ */
+export function extractTierNightLiveLaunchCode(errOrCode, fallbackMessage = "") {
+  if (typeof errOrCode === "string") {
+    if (TNS_LIVE_CODE_RE.test(errOrCode) && !GENERIC_RPC_ERRCODES.has(errOrCode)) {
+      return errOrCode.match(TNS_LIVE_CODE_RE)[0];
+    }
+    if (GENERIC_RPC_ERRCODES.has(errOrCode) || errOrCode === "P0001") {
+      const fromFallback = String(fallbackMessage || "").match(TNS_LIVE_CODE_RE)?.[0];
+      return fromFallback || "TNS_LIVE_LAUNCH_FAILED";
+    }
+    if (TIER_NIGHT_LIVE_LAUNCH_ERROR_MESSAGES[errOrCode]) return errOrCode;
+    const fromSelf = errOrCode.match(TNS_LIVE_CODE_RE)?.[0];
+    return fromSelf || errOrCode || "TNS_LIVE_LAUNCH_FAILED";
+  }
+  const blob = [
+    errOrCode?.message,
+    errOrCode?.details,
+    errOrCode?.hint,
+    fallbackMessage,
+  ]
+    .filter(Boolean)
+    .join("\n");
+  const fromMsg = blob.match(TNS_LIVE_CODE_RE)?.[0];
+  if (fromMsg) return fromMsg;
+  const rawCode = errOrCode?.code != null ? String(errOrCode.code) : "";
+  if (rawCode && !GENERIC_RPC_ERRCODES.has(rawCode) && TIER_NIGHT_LIVE_LAUNCH_ERROR_MESSAGES[rawCode]) {
+    return rawCode;
+  }
+  if (rawCode && !GENERIC_RPC_ERRCODES.has(rawCode) && TNS_LIVE_CODE_RE.test(rawCode)) {
+    return rawCode.match(TNS_LIVE_CODE_RE)[0];
+  }
+  return "TNS_LIVE_LAUNCH_FAILED";
+}
+
 export function mapTierNightLiveLaunchError(codeOrErr, fallback) {
-  const code =
-    typeof codeOrErr === "string"
-      ? codeOrErr
-      : codeOrErr?.code ||
-        String(codeOrErr?.message || codeOrErr || "").match(/TNS_LIVE_[A-Z0-9_]+/)?.[0] ||
-        "";
+  const code = extractTierNightLiveLaunchCode(codeOrErr, fallback);
   const mapped = TIER_NIGHT_LIVE_LAUNCH_ERROR_MESSAGES[code];
   if (mapped) return mapped;
   const raw = String(
-    typeof codeOrErr === "string"
+    typeof codeOrErr === "string" && !GENERIC_RPC_ERRCODES.has(codeOrErr)
       ? codeOrErr
-      : codeOrErr?.message ||
+      : (typeof codeOrErr === "object" && codeOrErr?.message) ||
           fallback ||
           TIER_NIGHT_LIVE_LAUNCH_ERROR_MESSAGES.TNS_LIVE_LAUNCH_FAILED
   );
+  // Message SQL métier non mappé (ex. « Session de jeu introuvable. »)
+  if (GENERIC_RPC_ERRCODES.has(raw) || raw === "P0001") {
+    return TIER_NIGHT_LIVE_LAUNCH_ERROR_MESSAGES.TNS_LIVE_LAUNCH_FAILED;
+  }
   if (/TNS_LIVE_/.test(raw)) {
     return TIER_NIGHT_LIVE_LAUNCH_ERROR_MESSAGES.TNS_LIVE_LAUNCH_FAILED;
   }

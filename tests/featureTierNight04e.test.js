@@ -91,6 +91,7 @@ const {
   obtainTierNightLiveLaunchAttempt,
   clearInFlightTierNightLiveLaunchAttempt,
   getInFlightTierNightLiveLaunchAttempt,
+  extractTierNightLiveLaunchCode,
 } = await import("../js/core/tierNightLiveSeriesLaunch.js");
 const { CUSTOM_LIVE_TIER_LIST_ID_PREFIX } = await import("../js/core/customLiveTierLists.js");
 const { getState, saveStatePatch } = await import("../js/core/state.js");
@@ -735,6 +736,18 @@ describe("FEATURE-TIERNIGHT-04E — validateurs / erreurs UX", () => {
     const msg = mapTierNightLiveLaunchError("TNS_LIVE_PREP_STALE");
     assert.doesNotMatch(msg, /TNS_LIVE_/);
     assert.ok(msg.length > 10);
+  });
+
+  it("P0001 + message TNS_LIVE_* → message produit (pas P0001)", () => {
+    const err = {
+      code: "P0001",
+      message: "TNS_LIVE_PREP_STALE",
+    };
+    assert.equal(extractTierNightLiveLaunchCode(err), "TNS_LIVE_PREP_STALE");
+    const msg = mapTierNightLiveLaunchError(err);
+    assert.equal(msg, "La préparation a changé. Mets à jour et relance quand tu es prêt.");
+    assert.equal(mapTierNightLiveLaunchError("P0001", "TNS_LIVE_ALREADY_STARTED").includes("déjà"), true);
+    assert.notEqual(mapTierNightLiveLaunchError("P0001"), "P0001");
   });
 });
 

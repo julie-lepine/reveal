@@ -418,6 +418,28 @@ describe("FEATURE-TIERNIGHT-04F — config / finish blob", () => {
     // Run actif → ne pas préférer end.
     assert.equal(prefer, false);
   });
+
+  it("series_end + declared live-prep → ne préfère PAS end (guest follow prep)", () => {
+    assert.equal(
+      shouldPreferTierNightEndRoute({
+        state: {
+          tierNightLive: {
+            lobbyStarted: false,
+            finished: true,
+            series: { kind: "live", phase: "series_end", queue: [{}] },
+          },
+          tierNight: {
+            lobbyStarted: false,
+            recap: {
+              recaps: [{ player: "Host", placed: { A: ["x"] } }],
+            },
+          },
+        },
+        declared: "tiernight-live-prep",
+      }),
+      false
+    );
+  });
 });
 
 /**

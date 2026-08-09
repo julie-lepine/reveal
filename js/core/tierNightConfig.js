@@ -86,13 +86,22 @@ export function shouldPreferTierNightEndRoute({
   local = null,
   localHasRecap = false,
 } = {}) {
+  // Re-entrée prep/select après series_end : le declared setup gagne
+  // (sinon l’invité reste collé à tiernight-end alors que l’hôte ouvre Rank Live).
+  const setupReentry =
+    declared === "tiernight-live-prep" ||
+    declared === "tiernight-prep" ||
+    declared === "tiernight-select";
+
   if (
     state?.tierNightLive?.series?.kind === "live" &&
     state.tierNightLive.series.phase === "series_end"
   ) {
+    if (setupReentry) return false;
     return !hasActiveTierNightRun(state);
   }
   if (state?.tierNight?.series?.phase === "series_end") {
+    if (setupReentry) return false;
     return !hasActiveTierNightRun(state);
   }
   const remoteHasRecap = hasRemoteTierNightRecap(state);
