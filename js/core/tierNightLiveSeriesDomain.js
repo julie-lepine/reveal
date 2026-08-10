@@ -12,8 +12,14 @@ import { TIER_LISTS } from "../../data/tierTopics.js";
 import { buildCombinedShuffledDeck } from "./combinedGameDeck.js";
 import { validateCustomLiveTierListsForBuild } from "./customLiveTierLists.js";
 
-/** Counts autorisés pour une NOUVELLE série Rank Live (distinct du roster 3/5/8). */
-export const TIER_NIGHT_LIVE_SERIES_ROUND_COUNTS = Object.freeze([3, 5, 7]);
+/** Counts autorisés pour une NOUVELLE série Rank Live (aligné roster 3/5/8). */
+export const TIER_NIGHT_LIVE_SERIES_ROUND_COUNTS = Object.freeze([3, 5, 8]);
+
+/**
+ * Counts acceptés en lecture seule (séries déjà lancées avant le contrat 3/5/8).
+ * Ne jamais proposer à l’UI de lancement ni au builder.
+ */
+export const TIER_NIGHT_LIVE_SERIES_LEGACY_ROUND_COUNTS = Object.freeze([7]);
 
 export const DEFAULT_TIER_NIGHT_LIVE_SERIES_ROUND_COUNT = 5;
 
@@ -26,6 +32,18 @@ export const TIER_NIGHT_LIVE_SERIES_ALL_CATEGORIES = "*";
  */
 export function isValidTierNightLiveRoundCount(value) {
   return TIER_NIGHT_LIVE_SERIES_ROUND_COUNTS.includes(value);
+}
+
+/**
+ * Nouveau launch + séries legacy encore jouables.
+ * @param {unknown} value
+ * @returns {boolean}
+ */
+export function isReadableTierNightLiveRoundCount(value) {
+  const n = Number(value);
+  if (TIER_NIGHT_LIVE_SERIES_ROUND_COUNTS.includes(n)) return true;
+  if (TIER_NIGHT_LIVE_SERIES_LEGACY_ROUND_COUNTS.includes(n)) return true;
+  return false;
 }
 
 /**

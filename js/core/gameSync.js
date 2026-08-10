@@ -3497,7 +3497,8 @@ export function applyRemoteSession(row, { epoch = null } = {}) {
     patch.tierNightLiveSeriesPrep = {
       ...base,
       categoryIds: ["*"],
-      roundCount: [3, 5, 7].includes(roundN) ? roundN : 5,
+      // Prep Live : nouveaux counts 3/5/8 uniquement (7 = legacy série en cours, pas prep).
+      roundCount: [3, 5, 8].includes(roundN) ? roundN : 5,
       ready: mergeReadyMapsLocal(
         local.ready || {},
         base.ready || {},

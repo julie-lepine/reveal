@@ -1,119 +1,18 @@
 -- =============================================================================
--- FEATURE-TIERNIGHT-04E — start_tiernight_live_series (commit atomique)
+-- TierNight Rank Live — round counts 3 / 5 / 8 (ex 3 / 5 / 7)
 -- =============================================================================
--- Architecture :
---   CLIENT construit la queue (TIER_LISTS + customLiveTierLists + builder 04B).
---   SERVEUR valide structure + politique C/N + compare customs au canon sous
---   FOR UPDATE, puis commit.
+-- Prérequis : feature-tiernight-04e-start-live-series.sql déjà appliqué.
+-- Idempotent : CREATE OR REPLACE des 3 fonctions qui valident roundCount.
 --
--- AUCUN catalogue officiel SQL (pas de miroir TIER_LISTS).
--- Non déployé encore — fichier corrigé avant première exécution terrain.
+-- Contrat :
+--   • Nouveaux lancements : roundCount ∈ {3, 5, 8}
+--   • 7 n'est plus accepté au start (séries déjà en cours restent côté client
+--     via isReadableTierNightLiveRoundCount / queue.length — pas de re-gate SQL)
 --
--- Prérequis : FEATURE-TIERNIGHT-04C.
+-- Greenfield : le fichier 04E source est déjà aligné 3/5/8 ; ce fichier sert
+-- aux environnements où 04E a été déployé avec (3, 5, 7).
 -- =============================================================================
 
--- Dead helpers éventuels (jamais déployés terrain) — nettoyage défensif.
--- Recherche repo : aucune autre définition historique de
---   start_tiernight_live_series(uuid, integer)
--- hors brouillon 04E expérimental (jamais exécuté terrain). Aucune RPC
--- pré-04E ne porte cette signature. DROP défensif = harmless / ciblé 04E.
-drop function if exists public.tiernight_live_official_catalog();
-drop function if exists public.tiernight_live_build_list_subset(jsonb, int);
-drop function if exists public.start_tiernight_live_series(uuid, integer);
-
--- ---------------------------------------------------------------------------
--- Shuffle items (projection round 0) — PAS pour sélectionner des listes.
--- ---------------------------------------------------------------------------
-create or replace function public.tiernight_live_jsonb_shuffle(p_arr jsonb)
-returns jsonb
-language plpgsql
-volatile
-as $$
-declare
-  v_len int;
-  v_i int;
-  v_j int;
-  v_tmp jsonb;
-  v_items jsonb[];
-begin
-  if p_arr is null or jsonb_typeof(p_arr) <> 'array' then
-    return '[]'::jsonb;
-  end if;
-  v_len := jsonb_array_length(p_arr);
-  if v_len <= 1 then
-    return coalesce(p_arr, '[]'::jsonb);
-  end if;
-  v_items := array(select elem from jsonb_array_elements(p_arr) as t(elem));
-  for v_i in reverse v_len .. 2 loop
-    v_j := 1 + floor(random() * v_i)::int;
-    v_tmp := v_items[v_i];
-    v_items[v_i] := v_items[v_j];
-    v_items[v_j] := v_tmp;
-  end loop;
-  return to_jsonb(v_items);
-end;
-$$;
-
-revoke all on function public.tiernight_live_jsonb_shuffle(jsonb) from public;
-revoke all on function public.tiernight_live_jsonb_shuffle(jsonb) from anon;
-revoke all on function public.tiernight_live_jsonb_shuffle(jsonb) from authenticated;
-
--- ---------------------------------------------------------------------------
--- Normalize emoji for comparison (empty → ✨)
--- ---------------------------------------------------------------------------
-create or replace function public.tiernight_live_norm_emoji(p_emoji text)
-returns text
-language sql
-immutable
-as $$
-  select coalesce(nullif(trim(coalesce(p_emoji, '')), ''), '✨');
-$$;
-
-revoke all on function public.tiernight_live_norm_emoji(text) from public;
-revoke all on function public.tiernight_live_norm_emoji(text) from anon;
-revoke all on function public.tiernight_live_norm_emoji(text) from authenticated;
-
--- ---------------------------------------------------------------------------
--- Defensive JSON integer extract — NULL si type/valeur invalide (pas 22P02).
--- ---------------------------------------------------------------------------
-create or replace function public.tiernight_live_jsonb_int(p_obj jsonb, p_key text)
-returns integer
-language plpgsql
-immutable
-as $$
-declare
-  v_node jsonb;
-  v_txt text;
-  v_out integer;
-begin
-  if p_obj is null or p_key is null or p_key = '' then
-    return null;
-  end if;
-  v_node := p_obj -> p_key;
-  if v_node is null or jsonb_typeof(v_node) <> 'number' then
-    return null;
-  end if;
-  v_txt := v_node #>> '{}';
-  if v_txt is null or v_txt !~ '^-?(0|[1-9][0-9]*)$' then
-    return null;
-  end if;
-  begin
-    v_out := v_txt::integer;
-  exception
-    when invalid_text_representation or numeric_value_out_of_range then
-      return null;
-  end;
-  return v_out;
-end;
-$$;
-
-revoke all on function public.tiernight_live_jsonb_int(jsonb, text) from public;
-revoke all on function public.tiernight_live_jsonb_int(jsonb, text) from anon;
-revoke all on function public.tiernight_live_jsonb_int(jsonb, text) from authenticated;
-
--- ---------------------------------------------------------------------------
--- Validate proposed series shape (structure only — no official catalogue)
--- ---------------------------------------------------------------------------
 create or replace function public.tiernight_live_validate_series_shape(p_series jsonb)
 returns jsonb
 language plpgsql
@@ -230,7 +129,6 @@ begin
 
     v_is_custom := (v_snap -> 'custom') = 'true'::jsonb;
     v_has_prefix := left(v_list_id, 12) = 'custom-live-';
-    -- Invariant strict : custom-live-* ⇔ custom:true
     if v_has_prefix <> v_is_custom then
       return jsonb_build_object('ok', false, 'code', 'TNS_LIVE_CORRUPT_CUSTOM', 'message', 'custom_flag_prefix');
     end if;
@@ -266,57 +164,6 @@ revoke all on function public.tiernight_live_validate_series_shape(jsonb) from p
 revoke all on function public.tiernight_live_validate_series_shape(jsonb) from anon;
 revoke all on function public.tiernight_live_validate_series_shape(jsonb) from authenticated;
 
--- ---------------------------------------------------------------------------
--- Compare custom snapshot to remote canon entry (gameplay fields)
--- author display = hors comparaison (affichage non autoritatif).
--- ---------------------------------------------------------------------------
-create or replace function public.tiernight_live_custom_snapshot_matches_canon(
-  p_snap jsonb,
-  p_canon jsonb
-)
-returns boolean
-language plpgsql
-immutable
-as $$
-begin
-  if p_snap is null or p_canon is null then
-    return false;
-  end if;
-  if coalesce(p_snap ->> 'id', '') is distinct from coalesce(p_canon ->> 'id', '') then
-    return false;
-  end if;
-  if coalesce(p_snap ->> 'name', '') is distinct from coalesce(p_canon ->> 'name', '') then
-    return false;
-  end if;
-  if public.tiernight_live_norm_emoji(p_snap ->> 'emoji')
-     is distinct from public.tiernight_live_norm_emoji(p_canon ->> 'emoji') then
-    return false;
-  end if;
-  if coalesce(p_snap ->> 'authorUid', '') is distinct from coalesce(p_canon ->> 'authorUid', '') then
-    return false;
-  end if;
-  if (p_snap -> 'custom') is distinct from 'true'::jsonb
-     or (p_canon -> 'custom') is distinct from 'true'::jsonb then
-    return false;
-  end if;
-  if (p_snap -> 'items') is distinct from (p_canon -> 'items') then
-    return false;
-  end if;
-  return true;
-end;
-$$;
-
-revoke all on function public.tiernight_live_custom_snapshot_matches_canon(jsonb, jsonb) from public;
-revoke all on function public.tiernight_live_custom_snapshot_matches_canon(jsonb, jsonb) from anon;
-revoke all on function public.tiernight_live_custom_snapshot_matches_canon(jsonb, jsonb) from authenticated;
-
--- ---------------------------------------------------------------------------
--- Politique C/N sous lock (sans catalogue officiel).
--- C = customs canoniques ; N = roundCount.
---   C=0     → 0 custom dans queue
---   0<C<N   → exactement les C customs (toutes) + N-C officiels
---   C>=N    → exactement N customs (sous-ensemble)
--- ---------------------------------------------------------------------------
 create or replace function public.tiernight_live_validate_custom_queue_policy(
   p_series jsonb,
   p_customs jsonb,
@@ -384,7 +231,6 @@ begin
   end if;
 
   if v_c < p_round then
-    -- Exactement toutes les customs canoniques.
     if v_q <> v_c then
       return jsonb_build_object('ok', false, 'code', 'TNS_LIVE_CUSTOM_POOL_STALE', 'message', 'c_lt_n_count');
     end if;
@@ -404,7 +250,6 @@ begin
     return jsonb_build_object('ok', true, 'C', v_c, 'Q', v_q);
   end if;
 
-  -- C >= N : exactement N customs (sous-ensemble arbitraire).
   if v_q <> p_round then
     return jsonb_build_object('ok', false, 'code', 'TNS_LIVE_CUSTOM_POOL_STALE', 'message', 'c_ge_n_count');
   end if;
@@ -416,11 +261,6 @@ revoke all on function public.tiernight_live_validate_custom_queue_policy(jsonb,
 revoke all on function public.tiernight_live_validate_custom_queue_policy(jsonb, jsonb, int) from anon;
 revoke all on function public.tiernight_live_validate_custom_queue_policy(jsonb, jsonb, int) from authenticated;
 
--- ---------------------------------------------------------------------------
--- RPC : commit proposition client
--- Authority : is_lobby_host / is_acting_host lisent lobbies + lobby_members
--- (pas game_sessions.state). Check avant FOR UPDATE = sûr (pas de race state).
--- ---------------------------------------------------------------------------
 create or replace function public.start_tiernight_live_series(
   p_lobby_id uuid,
   p_expected_setup_epoch integer,
@@ -459,8 +299,6 @@ declare
 begin
   v_uid := public.assert_lobby_member(p_lobby_id);
 
-  -- Host / acting-host : source = lobbies.host_id + lobby_members.last_seen_at
-  -- (is_acting_host). Indépendant de game_sessions → ordre avant lock OK.
   if not (public.is_lobby_host(p_lobby_id) or public.is_acting_host(p_lobby_id)) then
     raise exception 'TNS_LIVE_HOST_REQUIRED';
   end if;
@@ -478,7 +316,6 @@ begin
   v_existing := v_state -> 'tierNightLive';
   v_prop_run := trim(coalesce(v_series ->> 'runId', ''));
 
-  -- Idempotence / already started — booléens via jsonb (pas ::boolean → 22P02).
   if v_existing is not null and jsonb_typeof(v_existing) = 'object' then
     if (v_existing ? 'lobbyStarted')
        and jsonb_typeof(v_existing -> 'lobbyStarted') is distinct from 'boolean' then
@@ -531,13 +368,11 @@ begin
     v_customs := '[]'::jsonb;
   end if;
 
-  -- Politique C/N au moment du lock (pas de rebuild serveur).
   v_check := public.tiernight_live_validate_custom_queue_policy(v_series, v_customs, v_round);
   if coalesce((v_check ->> 'ok')::boolean, false) is not true then
     raise exception '%', coalesce(v_check ->> 'code', 'TNS_LIVE_CUSTOM_POOL_STALE');
   end if;
 
-  -- Customs : snapshot ↔ canon remote (pas ID-only)
   v_n := jsonb_array_length(v_series -> 'queue');
   for v_i in 0 .. v_n - 1 loop
     v_entry := v_series -> 'queue' -> v_i;
@@ -614,7 +449,7 @@ end;
 $$;
 
 comment on function public.start_tiernight_live_series(uuid, integer, jsonb) is
-  'FEATURE-TIERNIGHT-04E — commit atomique série Rank Live (C/N + customs canon, pas de catalogue SQL).';
+  'FEATURE-TIERNIGHT-04E — commit atomique série Rank Live ; roundCount ∈ {3,5,8}.';
 
 revoke all on function public.start_tiernight_live_series(uuid, integer, jsonb) from public;
 revoke all on function public.start_tiernight_live_series(uuid, integer, jsonb) from anon;

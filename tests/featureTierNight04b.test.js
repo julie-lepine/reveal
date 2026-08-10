@@ -16,9 +16,11 @@ import {
 import {
   DEFAULT_TIER_NIGHT_LIVE_SERIES_ROUND_COUNT,
   TIER_NIGHT_LIVE_SERIES_ROUND_COUNTS,
+  TIER_NIGHT_LIVE_SERIES_LEGACY_ROUND_COUNTS,
   buildTierNightLiveSeriesListSubset,
   getTierNightLiveOfficialPool,
   isValidTierNightLiveRoundCount,
+  isReadableTierNightLiveRoundCount,
   validateTierNightLiveSeriesCategoryIdsV1,
 } from "../js/core/tierNightLiveSeriesDomain.js";
 import { buildCombinedShuffledDeck, shuffleArray } from "../js/core/combinedGameDeck.js";
@@ -50,13 +52,17 @@ function seqRng(values) {
 }
 
 describe("FEATURE-TIERNIGHT-04B — constantes live", () => {
-  it("counts 3/5/7 séparés du roster ; défaut 5", () => {
-    assert.deepEqual([...TIER_NIGHT_LIVE_SERIES_ROUND_COUNTS], [3, 5, 7]);
+  it("counts 3/5/8 séparés du legacy 7 ; défaut 5", () => {
+    assert.deepEqual([...TIER_NIGHT_LIVE_SERIES_ROUND_COUNTS], [3, 5, 8]);
+    assert.deepEqual([...TIER_NIGHT_LIVE_SERIES_LEGACY_ROUND_COUNTS], [7]);
     assert.equal(DEFAULT_TIER_NIGHT_LIVE_SERIES_ROUND_COUNT, 5);
     assert.equal(isValidTierNightLiveRoundCount(3), true);
     assert.equal(isValidTierNightLiveRoundCount(5), true);
-    assert.equal(isValidTierNightLiveRoundCount(7), true);
-    assert.equal(isValidTierNightLiveRoundCount(8), false);
+    assert.equal(isValidTierNightLiveRoundCount(8), true);
+    assert.equal(isValidTierNightLiveRoundCount(7), false);
+    assert.equal(isReadableTierNightLiveRoundCount(7), true);
+    assert.equal(isReadableTierNightLiveRoundCount(8), true);
+    assert.equal(isReadableTierNightLiveRoundCount(4), false);
     assert.equal(isValidTierNightLiveRoundCount("5"), false);
     assert.equal(isValidTierNightLiveRoundCount(4), false);
   });
@@ -199,8 +205,8 @@ describe("FEATURE-TIERNIGHT-04B — catégories V1", () => {
 describe("FEATURE-TIERNIGHT-04B — builder", () => {
   const rng = seqRng([0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]);
 
-  it("1–3. 0 custom + R=3/5/7 → R officielles distinctes", () => {
-    for (const R of [3, 5, 7]) {
+  it("1–3. 0 custom + R=3/5/8 → R officielles distinctes", () => {
+    for (const R of [3, 5, 8]) {
       const res = buildTierNightLiveSeriesListSubset({
         roundCount: R,
         customLists: [],
@@ -290,8 +296,8 @@ describe("FEATURE-TIERNIGHT-04B — builder", () => {
     assert.equal(res.available, 2);
   });
 
-  it("R=8 invalide live", () => {
-    const res = buildTierNightLiveSeriesListSubset({ roundCount: 8, customLists: [] });
+  it("R=7 invalide live (legacy lecture seule)", () => {
+    const res = buildTierNightLiveSeriesListSubset({ roundCount: 7, customLists: [] });
     assert.equal(res.ok, false);
     assert.equal(res.code, "INVALID_ROUND_COUNT");
   });

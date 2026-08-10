@@ -654,25 +654,25 @@ describe("BUG-TIERNIGHT-04F-QA-01 — advance vs series_end", () => {
     }
   });
 
-  it("I — série 7 : 0→…→6 puis series_end", async () => {
+  it("I — série 8 : 0→…→7 puis series_end", async () => {
     const built = buildTierNightLiveSeriesLaunchState({
-      roundCount: 7,
+      roundCount: 8,
       customLists: [],
       random: seqRng([0.12, 0.23, 0.34, 0.45, 0.56, 0.67, 0.78, 0.89]),
       deckRandom: () => 0.3,
-      runId: "run-qa01-7",
+      runId: "run-qa01-8",
     });
     assert.equal(built.ok, true);
     seedLiveSeriesPlaying(built.series);
 
-    for (let i = 0; i < 7; i += 1) {
+    for (let i = 0; i < 8; i += 1) {
       const live = getState().tierNightLiveGame;
       saveStatePatch({
         tierNightLiveGame: { ...live, placements: placeAll(live.deck) },
       });
       const f = await hostFinalizeTierNightLiveSeriesList();
       assert.equal(f.ok, true);
-      if (i < 6) {
+      if (i < 7) {
         assert.equal(f.phase, TIER_NIGHT_LIVE_SERIES_PHASE_BETWEEN);
         const adv = await hostAdvanceTierNightLiveSeriesList();
         assert.equal(adv.ok, true);

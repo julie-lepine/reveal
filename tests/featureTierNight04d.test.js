@@ -214,26 +214,27 @@ describe("FEATURE-TIERNIGHT-04D — fichiers & wiring", () => {
 });
 
 describe("FEATURE-TIERNIGHT-04D — prep state local/remote", () => {
-  it("défaut roundCount 5 ; counts 3/5/7", async () => {
+  it("défaut roundCount 5 ; counts 3/5/8", async () => {
     const s = getTierNightLivePrepSession();
     assert.equal(s.roundCount, 5);
     assert.deepEqual(s.categoryIds, ["*"]);
     const r = await setTierNightLivePrepRoundCount(3);
     assert.equal(r.ok, true);
     assert.equal(getTierNightLivePrepSession().roundCount, 3);
-    assert.equal((await setTierNightLivePrepRoundCount(8)).ok, false);
+    assert.equal((await setTierNightLivePrepRoundCount(7)).ok, false);
+    assert.equal((await setTierNightLivePrepRoundCount(8)).ok, true);
   });
 
   it("hydrate remote tierNightLivePrep → local sans toucher roster prep", () => {
     const remote = {
       categoryIds: ["*"],
-      roundCount: 7,
+      roundCount: 8,
       ready: { Guest: true },
       setupEpoch: 2,
     };
     const local = tierNightLivePrepFromRemote(remote);
     saveStatePatch({ tierNightLiveSeriesPrep: local });
-    assert.equal(getTierNightLivePrepSession().roundCount, 7);
+    assert.equal(getTierNightLivePrepSession().roundCount, 8);
     assert.equal(getState().tierNightSeriesPrep.setupEpoch, 9);
     assert.equal(getState().tierNightSeriesPrep.ready.Alice, true);
   });
@@ -266,14 +267,14 @@ describe("FEATURE-TIERNIGHT-04D — roundCount mutation (Ready conservés)", () 
       },
     });
     patched.length = 0;
-    await setTierNightLivePrepRoundCount(7);
+    await setTierNightLivePrepRoundCount(8);
     const s = getTierNightLivePrepSession();
-    assert.equal(s.roundCount, 7);
+    assert.equal(s.roundCount, 8);
     assert.deepEqual(s.ready, { Host: true, Guest: true });
     assert.equal(s.setupEpoch, 1);
     assert.equal(patched.length, 1);
     const remote = patched[0].payload.tierNightLivePrep;
-    assert.equal(remote.roundCount, 7);
+    assert.equal(remote.roundCount, 8);
     assert.deepEqual(remote.ready, { Host: true, Guest: true });
     assert.equal(remote.setupEpoch, 1);
     assert.equal(patched[0].opts.screen, "tiernight-live-prep");
@@ -435,7 +436,7 @@ describe("FEATURE-TIERNIGHT-04D — lifecycle reset", () => {
     saveStatePatch({
       tierNightLiveSeriesPrep: {
         categoryIds: ["*"],
-        roundCount: 7,
+        roundCount: 8,
         ready: { Host: true },
         setupEpoch: 4,
       },
@@ -464,7 +465,7 @@ describe("FEATURE-TIERNIGHT-04D — lifecycle reset", () => {
       customLiveTierLists: [makeLiveCustom(1)],
       tierNightLiveSeriesPrep: {
         categoryIds: ["*"],
-        roundCount: 7,
+        roundCount: 8,
         ready: { Host: true },
         setupEpoch: 2,
       },
@@ -568,7 +569,7 @@ describe("FEATURE-TIERNIGHT-04D — coexistence prep roster/live", () => {
   it("remote roster only n’écrase pas live local ; live only n’écrase pas roster", () => {
     saveStatePatch({
       tierNightSeriesPrep: { categoryIds: ["*"], roundCount: 8, ready: { A: true }, setupEpoch: 11 },
-      tierNightLiveSeriesPrep: { categoryIds: ["*"], roundCount: 7, ready: { B: true }, setupEpoch: 22 },
+      tierNightLiveSeriesPrep: { categoryIds: ["*"], roundCount: 8, ready: { B: true }, setupEpoch: 22 },
     });
     const liveOnly = tierNightLivePrepFromRemote({
       categoryIds: ["*"],
@@ -600,7 +601,7 @@ describe("FEATURE-TIERNIGHT-04D — contrats mappés (≥40 assertions groupées
       assert.ok(cond, label);
     };
 
-    ok("counts 3/5/7", true);
+    ok("counts 3/5/8", true);
     ok("default 5", getTierNightLivePrepSession().roundCount === 5);
     ok("no categories UI", !read("js/screens/tierNightLivePrep.js").includes("data-series-cat"));
     ok("local key", "tierNightLiveSeriesPrep" in getState());

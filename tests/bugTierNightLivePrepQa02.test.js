@@ -179,16 +179,16 @@ describe("BUG-TIERNIGHT-LIVE-PREP-QA-02 — Ready conservé (A–E, H–I)", () 
     assert.deepEqual(s.ready, { Host: true, Guest: true });
   });
 
-  it("B. 3→7 : Ready inchangés", async () => {
+  it("B. 3→8 : Ready inchangés", async () => {
     seedLiveReady(3, { Host: true, Guest: true }, 2);
-    await setTierNightLivePrepRoundCount(7);
+    await setTierNightLivePrepRoundCount(8);
     const s = getTierNightLivePrepSession();
-    assert.equal(s.roundCount, 7);
+    assert.equal(s.roundCount, 8);
     assert.deepEqual(s.ready, { Host: true, Guest: true });
   });
 
-  it("C. 7→5 : Ready inchangés", async () => {
-    seedLiveReady(7, { Host: true, Guest: true }, 9);
+  it("C. 8→5 : Ready inchangés", async () => {
+    seedLiveReady(8, { Host: true, Guest: true }, 9);
     await setTierNightLivePrepRoundCount(5);
     const s = getTierNightLivePrepSession();
     assert.equal(s.roundCount, 5);

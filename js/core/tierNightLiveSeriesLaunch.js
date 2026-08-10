@@ -10,6 +10,7 @@ import {
   buildTierNightLiveSeriesListSubset,
   TIER_NIGHT_LIVE_SERIES_ALL_CATEGORIES,
   isValidTierNightLiveRoundCount,
+  isReadableTierNightLiveRoundCount,
 } from "./tierNightLiveSeriesDomain.js";
 import {
   TIER_NIGHT_LIVE_SERIES_PHASE_BETWEEN,
@@ -32,7 +33,7 @@ export {
 };
 
 export const TIER_NIGHT_LIVE_LAUNCH_ERROR_MESSAGES = Object.freeze({
-  TNS_LIVE_INVALID_ROUND_COUNT: "Longueur de série invalide. Choisis 3, 5 ou 7 listes.",
+  TNS_LIVE_INVALID_ROUND_COUNT: "Longueur de série invalide. Choisis 3, 5 ou 8 listes.",
   TNS_LIVE_INSUFFICIENT_TIER_LISTS:
     "Pas assez de tier lists pour cette longueur. Ajoute des customs ou réduis le nombre.",
   TNS_LIVE_PREP_STALE:
@@ -47,7 +48,7 @@ export const TIER_NIGHT_LIVE_LAUNCH_ERROR_MESSAGES = Object.freeze({
   TNS_LIVE_HOST_REQUIRED: "Seul l'hôte peut lancer la série Rank Live.",
   TNS_LIVE_LAUNCH_FAILED: "Impossible de lancer la série. Réessaie dans un instant.",
   TNS_LIVE_CUSTOM_LOCKED: "Les listes custom sont verrouillées pour cette série.",
-  INVALID_ROUND_COUNT: "Longueur de série invalide. Choisis 3, 5 ou 7 listes.",
+  INVALID_ROUND_COUNT: "Longueur de série invalide. Choisis 3, 5 ou 8 listes.",
   INSUFFICIENT_POOL:
     "Pas assez de tier lists pour cette longueur. Ajoute des customs ou réduis le nombre.",
 });
@@ -355,7 +356,8 @@ export function validateTierNightLiveSeriesShape(series) {
   if (!runId) {
     return { ok: false, code: "TNS_LIVE_CORRUPT_STATE", message: "runId" };
   }
-  if (!isValidTierNightLiveRoundCount(series.roundCount)) {
+  // Lecture : 3/5/8 + legacy 7 (séries déjà lancées). Nouveau build refuse 7 via isValid*.
+  if (!isReadableTierNightLiveRoundCount(series.roundCount)) {
     return { ok: false, code: "TNS_LIVE_INVALID_ROUND_COUNT" };
   }
   const idx = Number(series.roundIndex);
@@ -542,7 +544,7 @@ export function clearInFlightTierNightLiveLaunchAttempt() {
 
 /**
  * Réutilise la tentative courante si même setupEpoch + roundCount ; sinon rebuild.
- * roundCount fait partie de la clé : un changement 3↔5↔7 sans bump epoch
+ * roundCount fait partie de la clé : un changement 3↔5↔8 sans bump epoch
  * ne doit pas renvoyer une proposal stale (contrat Rank Live QA-02).
  */
 export function obtainTierNightLiveLaunchAttempt({
