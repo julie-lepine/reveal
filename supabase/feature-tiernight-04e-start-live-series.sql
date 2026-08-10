@@ -136,6 +136,11 @@ declare
   v_bytes int;
   v_is_custom boolean;
   v_has_prefix boolean;
+  v_cat_len int;
+  v_cat text;
+  v_seen_cat text[] := array[]::text[];
+  v_has_star boolean := false;
+  v_has_explicit boolean := false;
 begin
   if p_series is null or jsonb_typeof(p_series) <> 'object' then
     return jsonb_build_object('ok', false, 'code', 'TNS_LIVE_CORRUPT_STATE');
@@ -152,9 +157,35 @@ begin
   if coalesce(p_series ->> 'kind', '') <> 'live' then
     return jsonb_build_object('ok', false, 'code', 'TNS_LIVE_CORRUPT_STATE', 'message', 'kind');
   end if;
+
+  -- Shape only (JS owns taxonomy). Accept ["*"] or explicit non-empty strings.
   if jsonb_typeof(p_series -> 'categoryIds') <> 'array'
-     or jsonb_array_length(p_series -> 'categoryIds') <> 1
-     or coalesce(p_series -> 'categoryIds' ->> 0, '') <> '*' then
+     or jsonb_array_length(p_series -> 'categoryIds') < 1 then
+    return jsonb_build_object('ok', false, 'code', 'TNS_LIVE_CORRUPT_STATE', 'message', 'categoryIds');
+  end if;
+  v_cat_len := jsonb_array_length(p_series -> 'categoryIds');
+  for v_i in 0 .. v_cat_len - 1 loop
+    if jsonb_typeof(p_series -> 'categoryIds' -> v_i) <> 'string' then
+      return jsonb_build_object('ok', false, 'code', 'TNS_LIVE_CORRUPT_STATE', 'message', 'categoryIds');
+    end if;
+    v_cat := trim(coalesce(p_series -> 'categoryIds' ->> v_i, ''));
+    if v_cat = '' or char_length(v_cat) > 64 then
+      return jsonb_build_object('ok', false, 'code', 'TNS_LIVE_CORRUPT_STATE', 'message', 'categoryIds');
+    end if;
+    if v_cat = any (v_seen_cat) then
+      return jsonb_build_object('ok', false, 'code', 'TNS_LIVE_CORRUPT_STATE', 'message', 'categoryIds');
+    end if;
+    v_seen_cat := array_append(v_seen_cat, v_cat);
+    if v_cat = '*' then
+      v_has_star := true;
+    else
+      v_has_explicit := true;
+    end if;
+  end loop;
+  if v_has_star and v_has_explicit then
+    return jsonb_build_object('ok', false, 'code', 'TNS_LIVE_CORRUPT_STATE', 'message', 'categoryIds');
+  end if;
+  if v_has_star and v_cat_len <> 1 then
     return jsonb_build_object('ok', false, 'code', 'TNS_LIVE_CORRUPT_STATE', 'message', 'categoryIds');
   end if;
 
@@ -518,6 +549,11 @@ begin
     raise exception 'TNS_LIVE_INVALID_ROUND_COUNT';
   end if;
   if public.tiernight_live_jsonb_int(v_series, 'roundCount') is distinct from v_round then
+    raise exception 'TNS_LIVE_PREP_STALE';
+  end if;
+
+  -- Cohérence catégories prep ↔ series (JS owns taxonomy ; SQL compare shape only).
+  if (v_prep -> 'categoryIds') is distinct from (v_series -> 'categoryIds') then
     raise exception 'TNS_LIVE_PREP_STALE';
   end if;
 

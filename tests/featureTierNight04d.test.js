@@ -127,6 +127,7 @@ let navStack = ["home", "lobby", "game-select", "tiernight-select"];
 const {
   getTierNightLivePrepSession,
   setTierNightLivePrepRoundCount,
+  setTierNightLivePrepCategories,
   setTierNightLivePrepReady,
   resetTierNightLivePrepSession,
   tierNightLivePrepFromRemote,
@@ -278,6 +279,31 @@ describe("FEATURE-TIERNIGHT-04D — roundCount mutation (Ready conservés)", () 
     assert.deepEqual(remote.ready, { Host: true, Guest: true });
     assert.equal(remote.setupEpoch, 1);
     assert.equal(patched[0].opts.screen, "tiernight-live-prep");
+  });
+
+  it("catégorie : ready + setupEpoch inchangés ; codec conserve l'id", async () => {
+    syncActive = true;
+    lobbyHost = true;
+    saveStatePatch({
+      tierNightLiveSeriesPrep: {
+        categoryIds: ["*"],
+        roundCount: 5,
+        ready: { Host: true, Guest: true },
+        setupEpoch: 2,
+      },
+    });
+    patched.length = 0;
+    const r = await setTierNightLivePrepCategories(["food"]);
+    assert.equal(r.ok, true);
+    const s = getTierNightLivePrepSession();
+    assert.deepEqual(s.categoryIds, ["food"]);
+    assert.deepEqual(s.ready, { Host: true, Guest: true });
+    assert.equal(s.setupEpoch, 2);
+    assert.equal(s.roundCount, 5);
+    const remote = patched[0].payload.tierNightLivePrep;
+    assert.deepEqual(remote.categoryIds, ["food"]);
+    const roundTrip = tierNightLivePrepFromRemote(remote);
+    assert.deepEqual(roundTrip.categoryIds, ["food"]);
   });
 
   it("même roundCount : pas de bump ; ready intact", async () => {
@@ -603,7 +629,7 @@ describe("FEATURE-TIERNIGHT-04D — contrats mappés (≥40 assertions groupées
 
     ok("counts 3/5/8", true);
     ok("default 5", getTierNightLivePrepSession().roundCount === 5);
-    ok("no categories UI", !read("js/screens/tierNightLivePrep.js").includes("data-series-cat"));
+    ok("categories UI", read("js/screens/tierNightLivePrep.js").includes("data-live-cat"));
     ok("local key", "tierNightLiveSeriesPrep" in getState());
     ok("remote key codec", Boolean(tierNightLivePrepToRemote().categoryIds));
     ok("ready key remote", read("js/core/tierNightLivePrepSession.js").includes('stateKey: "tierNightLivePrep"'));

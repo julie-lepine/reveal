@@ -19,9 +19,11 @@ import {
   TIER_NIGHT_LIVE_SERIES_LEGACY_ROUND_COUNTS,
   buildTierNightLiveSeriesListSubset,
   getTierNightLiveOfficialPool,
+  getTierNightLivePoolSize,
+  getTierNightLiveRoundCountAvailability,
   isValidTierNightLiveRoundCount,
   isReadableTierNightLiveRoundCount,
-  validateTierNightLiveSeriesCategoryIdsV1,
+  validateTierNightLiveSeriesCategoryIds,
 } from "../js/core/tierNightLiveSeriesDomain.js";
 import { buildCombinedShuffledDeck, shuffleArray } from "../js/core/combinedGameDeck.js";
 
@@ -193,12 +195,32 @@ describe("FEATURE-TIERNIGHT-04B — validation custom", () => {
   });
 });
 
-describe("FEATURE-TIERNIGHT-04B — catégories V1", () => {
-  it("seul [\"*\"] accepté", () => {
-    assert.equal(validateTierNightLiveSeriesCategoryIdsV1(["*"]).ok, true);
-    assert.equal(validateTierNightLiveSeriesCategoryIdsV1(["life"]).ok, false);
-    assert.equal(validateTierNightLiveSeriesCategoryIdsV1(["*", "food"]).ok, false);
-    assert.equal(validateTierNightLiveSeriesCategoryIdsV1([]).ok, false);
+describe("FEATURE-TIERNIGHT-04B — catégories Rank Live", () => {
+  it("accepte [\"*\"] et catégories registry ; refuse invalides", () => {
+    assert.equal(validateTierNightLiveSeriesCategoryIds(["*"]).ok, true);
+    assert.equal(validateTierNightLiveSeriesCategoryIds(["food"]).ok, true);
+    assert.equal(validateTierNightLiveSeriesCategoryIds(["nope"]).ok, false);
+    assert.equal(validateTierNightLiveSeriesCategoryIds(["nope"]).code, "UNKNOWN_CATEGORY_ID");
+    assert.equal(validateTierNightLiveSeriesCategoryIds(["*", "food"]).ok, false);
+    assert.equal(validateTierNightLiveSeriesCategoryIds([]).ok, false);
+    assert.equal(validateTierNightLiveSeriesCategoryIds(["food", "food"]).ok, false);
+  });
+
+  it("filtre pool officiel ; customs toujours comptés", () => {
+    const food = getTierNightLiveOfficialPool(["food"]);
+    assert.ok(food.length >= 8);
+    assert.ok(food.every((l) => l.categoryId === "food"));
+    const all = getTierNightLiveOfficialPool(["*"]);
+    assert.equal(all.length, TIER_LISTS.length);
+    const withCustoms = getTierNightLivePoolSize(["food"], {
+      customLists: [makeCustom({ _n: 1 }), makeCustom({ _n: 2 })],
+    });
+    assert.equal(withCustoms, food.length + 2);
+  });
+
+  it("availability 3/5/8 selon pool", () => {
+    const avail = getTierNightLiveRoundCountAvailability(["food"], { customLists: [] });
+    assert.ok(avail.every((a) => a.available));
   });
 });
 
@@ -302,14 +324,28 @@ describe("FEATURE-TIERNIGHT-04B — builder", () => {
     assert.equal(res.code, "INVALID_ROUND_COUNT");
   });
 
-  it("categoryIds non-star reject", () => {
+  it("categoryIds explicite filtre le pool officiel", () => {
     const res = buildTierNightLiveSeriesListSubset({
       roundCount: 3,
       categoryIds: ["food"],
       customLists: [],
+      random: () => 0.2,
+    });
+    assert.equal(res.ok, true);
+    assert.deepEqual(res.categoryIds, ["food"]);
+    assert.equal(res.lists.length, 3);
+    const foodIds = new Set(getTierNightLiveOfficialPool(["food"]).map((l) => l.id));
+    assert.ok(res.lists.every((l) => foodIds.has(l.id)));
+  });
+
+  it("categoryIds inconnu reject", () => {
+    const res = buildTierNightLiveSeriesListSubset({
+      roundCount: 3,
+      categoryIds: ["nope"],
+      customLists: [],
     });
     assert.equal(res.ok, false);
-    assert.equal(res.code, "INVALID_CATEGORY_IDS");
+    assert.equal(res.code, "UNKNOWN_CATEGORY_ID");
   });
 
   it("11. customTierLists local n'entre pas dans le builder", () => {

@@ -15,10 +15,16 @@ import {
   removeCustomLiveTierListFromPrep,
   setTierNightLivePrepReady,
   setTierNightLivePrepRoundCount,
+  setTierNightLivePrepCategories,
   simulateTierNightLivePrepReady,
   validateTierNightLivePrepForLaunch,
 } from "../core/tierNightLivePrepSession.js";
-import { TIER_NIGHT_LIVE_SERIES_ROUND_COUNTS } from "../core/tierNightLiveSeriesDomain.js";
+import {
+  TIER_NIGHT_LIVE_SERIES_ROUND_COUNTS,
+  TIER_NIGHT_LIVE_SERIES_ALL_CATEGORIES,
+  listTierNightLiveCategoryOptions,
+  getTierNightLivePoolSize,
+} from "../core/tierNightLiveSeriesDomain.js";
 import { getLobbyParticipants } from "../core/lobby.js";
 import { onLobbyBundleUpdated } from "../core/supabaseLobby.js";
 import { getLocalDisplayName } from "../core/state.js";
@@ -114,13 +120,15 @@ export function mountTierNightLivePrep(app) {
 
   function seriesStartSlotHtml(allReady) {
     const session = getTierNightLivePrepSession();
+    const prep = getTierNightLivePrepSummary();
     return prepStartSlotHtml(
       prepLaunchSlotParams({
         readyMap: session.ready || {},
         allReady,
         isHost: isLobbyHost(),
         minPlayers: DEFAULT_PREP_MIN_PLAYERS,
-        poolEmpty: false,
+        poolEmpty: !prep.available,
+        poolEmptyLabel: "Choisis une longueur disponible",
         launchLabel: "Lancer la série Rank Live →",
       })
     );
@@ -148,28 +156,50 @@ export function mountTierNightLivePrep(app) {
     if (customsHost) customsHost.innerHTML = customListsHtml();
   }
 
-  function refreshRoundCounts() {
+  function refreshCategoriesAndRounds() {
     const session = getTierNightLivePrepSession();
     const isHost = isLobbyHost();
     const prep = getTierNightLivePrepSummary();
+    const cats = session.categoryIds || [TIER_NIGHT_LIVE_SERIES_ALL_CATEGORIES];
+    const isAll = cats.includes(TIER_NIGHT_LIVE_SERIES_ALL_CATEGORIES);
+    const selectedId = !isAll && cats.length === 1 ? cats[0] : null;
+
+    app.querySelectorAll("[data-live-cat]").forEach((btn) => {
+      const id = btn.getAttribute("data-live-cat");
+      const active =
+        id === TIER_NIGHT_LIVE_SERIES_ALL_CATEGORIES ? isAll : selectedId === id;
+      btn.classList.toggle("theme-chip--active", active);
+      const minPool = Number(btn.getAttribute("data-cat-min-pool")) || 3;
+      const disabledByPool = Number(btn.getAttribute("data-cat-pool")) < minPool;
+      btn.disabled = disabledByPool || !isHost;
+    });
 
     app.querySelectorAll("[data-live-round]").forEach((btn) => {
       const value = Number(btn.getAttribute("data-live-round"));
+      const avail = prep.roundCountAvailability?.find((a) => a.roundCount === value);
       btn.classList.toggle("theme-chip--active", session.roundCount === value);
-      btn.disabled = !isHost;
+      btn.disabled = !avail?.available || !isHost;
     });
+
+    const poolHint = app.querySelector("#tier-night-live-pool-hint");
+    if (poolHint) {
+      poolHint.textContent = `${prep.categorySummary} - ${prep.poolSize} liste${
+        prep.poolSize > 1 ? "s" : ""
+      } disponible${prep.poolSize > 1 ? "s" : ""} (catalogue + customs).`;
+    }
 
     const dur = app.querySelector("#tier-night-live-duration");
     if (dur) {
-      dur.innerHTML = `
-        <strong>${prep.roundCount}</strong> liste${prep.roundCount > 1 ? "s" : ""}
-        · ${escapeHtml(prep.durationLabel)}
-        <span class="muted"> (estimation)</span>`;
+      dur.innerHTML = prep.available
+        ? `<strong>${prep.effective}</strong> liste${prep.effective > 1 ? "s" : ""}
+            · ${escapeHtml(prep.durationLabel)}
+            <span class="muted"> (estimation)</span>`
+        : `<span class="muted">Choisis une longueur disponible</span>`;
     }
   }
 
   function refreshFromSync() {
-    refreshRoundCounts();
+    refreshCategoriesAndRounds();
     refreshReadySection();
   }
 
@@ -215,6 +245,16 @@ export function mountTierNightLivePrep(app) {
           }
         })();
       },
+    });
+
+    app.querySelectorAll("[data-live-cat]").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        if (!isLobbyHost() || btn.disabled) return;
+        const id = btn.getAttribute("data-live-cat");
+        if (!id) return;
+        await setTierNightLivePrepCategories([id]);
+        render();
+      });
     });
 
     app.querySelectorAll("[data-live-round]").forEach((btn) => {
@@ -283,15 +323,54 @@ export function mountTierNightLivePrep(app) {
     const localReady = prepLobby.localReadyState();
     const isHost = isLobbyHost();
     const prep = getTierNightLivePrepSummary();
+    const cats = session.categoryIds || [TIER_NIGHT_LIVE_SERIES_ALL_CATEGORIES];
+    const isAll = cats.includes(TIER_NIGHT_LIVE_SERIES_ALL_CATEGORIES);
+    const selectedId = !isAll && cats.length === 1 ? cats[0] : null;
+    const catOptions = listTierNightLiveCategoryOptions();
+    const customs = listSharedCustomLiveTierListsForPrep();
+    const poolOpts = { customLists: customs };
 
-    const roundChips = TIER_NIGHT_LIVE_SERIES_ROUND_COUNTS.map(
-      (n) => `
+    const categoryChips = [
+      {
+        id: TIER_NIGHT_LIVE_SERIES_ALL_CATEGORIES,
+        label: "Tout",
+        pool: getTierNightLivePoolSize([TIER_NIGHT_LIVE_SERIES_ALL_CATEGORIES], poolOpts),
+      },
+      ...catOptions.map((c) => ({
+        id: c.id,
+        label: c.label,
+        pool: getTierNightLivePoolSize([c.id], poolOpts),
+      })),
+    ];
+
+    const roundChipsHtml = TIER_NIGHT_LIVE_SERIES_ROUND_COUNTS.map((n) => {
+      const avail = prep.roundCountAvailability.find((a) => a.roundCount === n);
+      const disabled = !avail?.available || !isHost;
+      return `
         <button type="button" class="theme-chip${
           session.roundCount === n ? " theme-chip--active" : ""
-        }" data-live-round="${n}" ${isHost ? "" : "disabled"}>
+        }" data-live-round="${n}" ${disabled ? "disabled" : ""}>
           ${n}
-        </button>`
-    ).join("");
+        </button>`;
+    }).join("");
+
+    const categoryChipsHtml = categoryChips
+      .map((c) => {
+        const active =
+          c.id === TIER_NIGHT_LIVE_SERIES_ALL_CATEGORIES
+            ? isAll
+            : selectedId === c.id;
+        const disabled = c.pool < 3 || !isHost;
+        return `
+              <button type="button" class="theme-chip ${active ? "theme-chip--active" : ""}"
+                data-live-cat="${escapeHtml(c.id)}"
+                data-cat-pool="${c.pool}"
+                data-cat-min-pool="3"
+                ${disabled ? "disabled" : ""}>
+                ${escapeHtml(c.label)}
+              </button>`;
+      })
+      .join("");
 
     app.innerHTML = pageShell({
       backTarget: TIER_NIGHT_PREP_MODES_EXIT_NAV,
@@ -301,15 +380,29 @@ export function mountTierNightLivePrep(app) {
           <h2 class="screen-title">Préparation</h2>
           ${rulesButtonHtml("tiernight")}
         </div>
-        <p class="game-intro">Choisis la longueur, ajoute des listes custom, puis lance quand tout le monde est prêt.</p>
+        <p class="game-intro">Choisis les catégories et la longueur, ajoute des listes custom, puis lance quand tout le monde est prêt.</p>
+
+        <div class="card">
+          <p class="card-heading">Catégories</p>
+          <div class="theme-chips">${categoryChipsHtml}</div>
+          <p class="hint" id="tier-night-live-pool-hint">${escapeHtml(
+            `${prep.categorySummary} - ${prep.poolSize} liste${
+              prep.poolSize > 1 ? "s" : ""
+            } disponible${prep.poolSize > 1 ? "s" : ""} (catalogue + customs).`
+          )}</p>
+        </div>
 
         <div class="card">
           <p class="card-heading">Longueur de série</p>
-          <div class="theme-chips theme-chips--rounds">${roundChips}</div>
+          <div class="theme-chips theme-chips--rounds">${roundChipsHtml}</div>
           <p class="hot-take-duration" id="tier-night-live-duration" aria-live="polite">
-            <strong>${prep.roundCount}</strong> liste${prep.roundCount > 1 ? "s" : ""}
+            ${
+              prep.available
+                ? `<strong>${prep.effective}</strong> liste${prep.effective > 1 ? "s" : ""}
             · ${escapeHtml(prep.durationLabel)}
-            <span class="muted"> (estimation)</span>
+            <span class="muted"> (estimation)</span>`
+                : `<span class="muted">Choisis une longueur disponible</span>`
+            }
           </p>
           ${
             isHost

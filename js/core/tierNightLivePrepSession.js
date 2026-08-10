@@ -16,6 +16,11 @@ import {
   TIER_NIGHT_LIVE_SERIES_ALL_CATEGORIES,
   isValidTierNightLiveRoundCount,
   getTierNightLiveOfficialPool,
+  normalizeTierNightLivePrepCategoryIds,
+  validateTierNightLiveSeriesCategoryIds,
+  getTierNightLivePoolSize,
+  getTierNightLiveRoundCountAvailability,
+  formatTierNightLiveCategorySummary,
 } from "./tierNightLiveSeriesDomain.js";
 import { estimateTierNightSeriesDuration } from "./tierNightSeriesDuration.js";
 import {
@@ -69,6 +74,17 @@ function defaultLivePrepSession() {
   };
 }
 
+function livePrepPoolOpts() {
+  return { customLists: listCustomLiveTierLists() };
+}
+
+function categoryIdsEqual(a, b) {
+  const aa = Array.isArray(a) ? a.map(String) : [];
+  const bb = Array.isArray(b) ? b.map(String) : [];
+  if (aa.length !== bb.length) return false;
+  return aa.every((v, i) => v === bb[i]);
+}
+
 export function getTierNightLivePrepSession() {
   const raw = getState().tierNightLiveSeriesPrep;
   if (!raw || typeof raw !== "object") return defaultLivePrepSession();
@@ -80,7 +96,7 @@ export function getTierNightLivePrepSession() {
         ? Number(roundRaw)
         : TIER_NIGHT_LIVE_PREP_DEFAULT_ROUND_COUNT;
   return {
-    categoryIds: [TIER_NIGHT_LIVE_SERIES_ALL_CATEGORIES],
+    categoryIds: normalizeTierNightLivePrepCategoryIds(raw.categoryIds),
     roundCount,
     ready: raw.ready && typeof raw.ready === "object" ? { ...raw.ready } : {},
     setupEpoch: Number(raw.setupEpoch) || 0,
@@ -93,7 +109,7 @@ export function getTierNightLivePrepSession() {
 export function tierNightLivePrepToRemote(session = getTierNightLivePrepSession()) {
   return tierNightPrepToRemote({
     ...session,
-    categoryIds: [TIER_NIGHT_LIVE_SERIES_ALL_CATEGORIES],
+    categoryIds: normalizeTierNightLivePrepCategoryIds(session.categoryIds),
   });
 }
 
@@ -102,7 +118,7 @@ export function tierNightLivePrepFromRemote(remote) {
   const roundRaw = base.roundCount;
   return {
     ...base,
-    categoryIds: [TIER_NIGHT_LIVE_SERIES_ALL_CATEGORIES],
+    categoryIds: normalizeTierNightLivePrepCategoryIds(base.categoryIds),
     roundCount:
       roundRaw == null || roundRaw === ""
         ? TIER_NIGHT_LIVE_PREP_DEFAULT_ROUND_COUNT
@@ -113,10 +129,15 @@ export function tierNightLivePrepFromRemote(remote) {
 }
 
 async function syncTierNightLivePrepSession(extra = {}, patchOpts = {}) {
-  const session = {
+  const merged = {
     ...getTierNightLivePrepSession(),
     ...extra,
-    categoryIds: [TIER_NIGHT_LIVE_SERIES_ALL_CATEGORIES],
+  };
+  const session = {
+    ...merged,
+    categoryIds: normalizeTierNightLivePrepCategoryIds(
+      extra.categoryIds !== undefined ? extra.categoryIds : merged.categoryIds
+    ),
   };
   saveStatePatch({ tierNightLiveSeriesPrep: session });
   if (!isGameSyncActive()) return session;
@@ -142,12 +163,44 @@ export async function setTierNightLivePrepRoundCount(roundCount) {
     return { ok: false, code: "INVALID_ROUND_COUNT" };
   }
   const prev = getTierNightLivePrepSession();
+  const avail = getTierNightLiveRoundCountAvailability(
+    prev.categoryIds,
+    livePrepPoolOpts()
+  ).find((a) => a.roundCount === n);
+  if (!avail?.available) {
+    return { ok: false, code: "INSUFFICIENT_POOL" };
+  }
   const changed = Number(prev.roundCount) !== n;
   if (changed) {
     clearInFlightTierNightLiveLaunchAttempt();
   }
   await syncTierNightLivePrepSession({
     roundCount: n,
+    ready: prev.ready,
+    setupEpoch: prev.setupEpoch,
+  });
+  return { ok: true };
+}
+
+/**
+ * Host change categoryIds : ready + setupEpoch inchangés (contrat Rank Live).
+ * Pas de clamp silencieux de roundCount ; l'UI/launch refusent une longueur trop grande.
+ */
+export async function setTierNightLivePrepCategories(categoryIds) {
+  if (isGameSyncActive() && !isLobbyHost()) {
+    return { ok: false, code: "HOST_ONLY", message: "Seul l'hôte modifie les catégories." };
+  }
+  const shape = validateTierNightLiveSeriesCategoryIds(categoryIds);
+  if (!shape.ok) {
+    return { ok: false, code: shape.code, message: shape.message };
+  }
+  const prev = getTierNightLivePrepSession();
+  const changed = !categoryIdsEqual(prev.categoryIds, shape.categoryIds);
+  if (changed) {
+    clearInFlightTierNightLiveLaunchAttempt();
+  }
+  await syncTierNightLivePrepSession({
+    categoryIds: shape.categoryIds,
     ready: prev.ready,
     setupEpoch: prev.setupEpoch,
   });
@@ -211,15 +264,30 @@ export function resetTierNightLivePrepSession() {
 
 export function getTierNightLivePrepSummary() {
   const session = getTierNightLivePrepSession();
-  const duration = estimateTierNightSeriesDuration(session.roundCount);
+  const opts = livePrepPoolOpts();
+  const poolSize = getTierNightLivePoolSize(session.categoryIds, opts);
+  const roundCountAvailability = getTierNightLiveRoundCountAvailability(
+    session.categoryIds,
+    opts
+  );
+  const requested = session.roundCount;
+  const available =
+    isValidTierNightLiveRoundCount(requested) &&
+    poolSize >= Number(requested);
+  const duration = estimateTierNightSeriesDuration(available ? Number(requested) : 0);
   return {
-    requested: session.roundCount,
+    categoryIds: session.categoryIds,
+    categorySummary: formatTierNightLiveCategorySummary(session.categoryIds),
+    poolSize,
+    roundCountAvailability,
+    requested,
     roundCount: session.roundCount,
-    available: true,
-    effective: session.roundCount,
-    durationLabel: duration.label,
+    available,
+    effective: available ? Number(requested) : 0,
+    durationLabel: available ? duration.label : "-",
   };
 }
+
 
 export function listSharedCustomLiveTierListsForPrep() {
   return listCustomLiveTierLists();
@@ -338,7 +406,7 @@ export async function markTierNightLiveSeriesPrepStarted(_opts = {}) {
 
   const attempt = obtainTierNightLiveLaunchAttempt({
     prep,
-    officialLists: getTierNightLiveOfficialPool(),
+    officialLists: getTierNightLiveOfficialPool(prep.categoryIds),
     customLists: listCustomLiveTierLists(),
   });
   if (!attempt?.ok) {
@@ -353,8 +421,9 @@ export async function markTierNightLiveSeriesPrepStarted(_opts = {}) {
   if (!isGameSyncActive()) {
     const built = buildTierNightLiveSeriesLaunchState({
       customLists: listCustomLiveTierLists(),
-      officialLists: getTierNightLiveOfficialPool(),
+      officialLists: getTierNightLiveOfficialPool(prep.categoryIds),
       roundCount: prep.roundCount,
+      categoryIds: prep.categoryIds,
       playerRoster: buildTierNightPlayerRoster(getLobbyParticipants()),
       runId: attempt.runId,
       setupEpoch: expectedSetupEpoch,
@@ -484,8 +553,9 @@ export function validateTierNightLivePrepForLaunch() {
   }
   const probe = buildTierNightLiveSeriesLaunchState({
     customLists: listCustomLiveTierLists(),
-    officialLists: getTierNightLiveOfficialPool(),
+    officialLists: getTierNightLiveOfficialPool(prep.categoryIds),
     roundCount: prep.roundCount,
+    categoryIds: prep.categoryIds,
     playerRoster: [],
     // Déterministe : on ne consomme pas le RNG réel ici - juste capacité.
     random: () => 0.5,

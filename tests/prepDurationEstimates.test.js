@@ -69,8 +69,11 @@ describe("prep duration estimates - Rank Live / TruthMeter / Spot the fake", () 
     assert.match(live, /prep\.durationLabel/);
     assert.match(live, /hot-take-duration/);
     assert.match(live, /card-heading">Longueur de série/);
+    assert.match(live, /card-heading">Catégories/);
+    assert.match(live, /data-live-cat/);
     assert.match(live, /theme-chips theme-chips--rounds/);
     assert.doesNotMatch(live, /listes dans la série/);
+    assert.doesNotMatch(live, /thèmes disponibles/);
     assert.match(live, /\(estimation\)/);
   });
 

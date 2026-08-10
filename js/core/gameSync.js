@@ -3496,7 +3496,7 @@ export function applyRemoteSession(row, { epoch = null } = {}) {
     const me = getLocalDisplayName();
     patch.tierNightLiveSeriesPrep = {
       ...base,
-      categoryIds: ["*"],
+      categoryIds: Array.isArray(base.categoryIds) ? base.categoryIds.map(String) : ["*"],
       // Prep Live : nouveaux counts 3/5/8 uniquement (7 = legacy série en cours, pas prep).
       roundCount: [3, 5, 8].includes(roundN) ? roundN : 5,
       ready: mergeReadyMapsLocal(

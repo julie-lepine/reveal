@@ -149,6 +149,10 @@ describe("FEATURE-TIERNIGHT-04E — wiring", () => {
     const sql = read("supabase/feature-tiernight-04e-start-live-series.sql");
     assert.ok(sql.includes("start_tiernight_live_series"));
     assert.match(sql, /p_series\s+jsonb/);
+    assert.match(sql, /v_has_star/);
+    assert.match(sql, /v_prep -> 'categoryIds'\) is distinct from \(v_series -> 'categoryIds'\)/);
+    assert.doesNotMatch(sql, /TIER_NIGHT_LIVE_CATEGORIES/);
+    assert.doesNotMatch(sql, /categoryIds'\) <> 1\s*\n\s*or coalesce\(p_series -> 'categoryIds' ->> 0, ''\) <> '\*'/);
     assert.ok(read("package.json").includes("featureTierNight04e.test.js"));
     assert.ok(read("docs/FEATURE-TIERNIGHT-04E.md").includes("TIER_LISTS"));
     assert.match(read("js/core/gameSessionRpc.js"), /p_series:\s*series/);

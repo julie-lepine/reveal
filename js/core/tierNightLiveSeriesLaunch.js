@@ -11,6 +11,7 @@ import {
   TIER_NIGHT_LIVE_SERIES_ALL_CATEGORIES,
   isValidTierNightLiveRoundCount,
   isReadableTierNightLiveRoundCount,
+  validateTierNightLiveSeriesCategoryIdsShape,
 } from "./tierNightLiveSeriesDomain.js";
 import {
   TIER_NIGHT_LIVE_SERIES_PHASE_BETWEEN,
@@ -352,6 +353,10 @@ export function validateTierNightLiveSeriesShape(series) {
   if (series.kind !== TIER_NIGHT_LIVE_SERIES_KIND) {
     return { ok: false, code: "TNS_LIVE_CORRUPT_STATE", message: "kind" };
   }
+  const cats = validateTierNightLiveSeriesCategoryIdsShape(series.categoryIds);
+  if (!cats.ok) {
+    return { ok: false, code: "TNS_LIVE_CORRUPT_STATE", message: "categoryIds" };
+  }
   const runId = series.runId != null ? String(series.runId).trim() : "";
   if (!runId) {
     return { ok: false, code: "TNS_LIVE_CORRUPT_STATE", message: "runId" };
@@ -469,10 +474,14 @@ export function prepareTierNightLiveSeriesLaunch({
 } = {}) {
   const roundCount = prep?.roundCount;
   const setupEpoch = Number(prep?.setupEpoch) || 0;
+  const categoryIds = Array.isArray(prep?.categoryIds)
+    ? prep.categoryIds
+    : [TIER_NIGHT_LIVE_SERIES_ALL_CATEGORIES];
   const subset = buildTierNightLiveSeriesListSubset({
     customLists,
     officialLists,
     roundCount,
+    categoryIds,
     random,
   });
   if (!subset.ok) {
@@ -490,6 +499,7 @@ export function prepareTierNightLiveSeriesLaunch({
     setupEpoch,
     runId: wire.series.runId,
     roundCount: wire.series.roundCount,
+    categoryIds: wire.series.categoryIds,
     series: wire.series,
   };
 }
@@ -501,6 +511,7 @@ export function buildTierNightLiveSeriesLaunchState({
   customLists = [],
   officialLists,
   roundCount,
+  categoryIds = [TIER_NIGHT_LIVE_SERIES_ALL_CATEGORIES],
   playerRoster = [],
   runId,
   random = Math.random,
@@ -508,7 +519,7 @@ export function buildTierNightLiveSeriesLaunchState({
   setupEpoch = 0,
 } = {}) {
   const prepared = prepareTierNightLiveSeriesLaunch({
-    prep: { roundCount, setupEpoch },
+    prep: { roundCount, setupEpoch, categoryIds },
     officialLists,
     customLists,
     runId,
@@ -543,9 +554,9 @@ export function clearInFlightTierNightLiveLaunchAttempt() {
 }
 
 /**
- * Réutilise la tentative courante si même setupEpoch + roundCount ; sinon rebuild.
- * roundCount fait partie de la clé : un changement 3↔5↔8 sans bump epoch
- * ne doit pas renvoyer une proposal stale (contrat Rank Live QA-02).
+ * Réutilise la tentative courante si même setupEpoch + roundCount + categoryIds ;
+ * sinon rebuild. roundCount / categoryIds font partie de la clé : un changement
+ * sans bump epoch ne doit pas renvoyer une proposal stale (contrat Rank Live QA-02).
  */
 export function obtainTierNightLiveLaunchAttempt({
   prep,
@@ -555,10 +566,17 @@ export function obtainTierNightLiveLaunchAttempt({
 } = {}) {
   const setupEpoch = Number(prep?.setupEpoch) || 0;
   const roundCount = Number(prep?.roundCount);
+  const categoryKey = Array.isArray(prep?.categoryIds)
+    ? prep.categoryIds.map(String).join("\0")
+    : "*";
+  const attemptKey = Array.isArray(inFlightLaunchAttempt?.categoryIds)
+    ? inFlightLaunchAttempt.categoryIds.map(String).join("\0")
+    : "*";
   if (
     inFlightLaunchAttempt?.ok &&
     inFlightLaunchAttempt.setupEpoch === setupEpoch &&
     Number(inFlightLaunchAttempt.roundCount) === roundCount &&
+    attemptKey === categoryKey &&
     inFlightLaunchAttempt.series?.runId
   ) {
     return inFlightLaunchAttempt;

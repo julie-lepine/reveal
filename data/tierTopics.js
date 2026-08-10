@@ -4,6 +4,7 @@
 export const TIER_LISTS = [
   {
     id: "life",
+    categoryId: "social",
     name: "Du plus humiliant au plus digérable",
     emoji: "💥",
     items: [
@@ -20,6 +21,7 @@ export const TIER_LISTS = [
   },
   {
     id: "food",
+    categoryId: "food",
     name: "Du meilleur plat au pire",
     emoji: "🍕",
     items: [
@@ -36,6 +38,7 @@ export const TIER_LISTS = [
   },
   {
     id: "excuses_late",
+    categoryId: "social",
     name: "De la meilleure excuse de retard à la pire",
     emoji: "⏰",
     items: [
@@ -52,6 +55,7 @@ export const TIER_LISTS = [
   },
   {
     id: "roommate_crimes",
+    categoryId: "social",
     name: "Du pire crime de coloc au plus pardonné",
     emoji: "🏠",
     items: [
@@ -68,6 +72,7 @@ export const TIER_LISTS = [
   },
   {
     id: "party_vibes",
+    categoryId: "party",
     name: "De la meilleure énergie de soirée au flop",
     emoji: "🪩",
     items: [
@@ -84,6 +89,7 @@ export const TIER_LISTS = [
   },
   {
     id: "useless_powers",
+    categoryId: "party",
     name: "Du superpouvoir inutile le plus utile au plus nul",
     emoji: "🦸",
     items: [
@@ -99,6 +105,7 @@ export const TIER_LISTS = [
   },
   {
     id: "texting_styles",
+    categoryId: "social",
     name: "Du style de texto le plus insupportable au plus ok",
     emoji: "💬",
     items: [
@@ -115,6 +122,7 @@ export const TIER_LISTS = [
   },
   {
     id: "apero",
+    categoryId: "food",
     name: "Du meilleur snack d'apéro au pire",
     emoji: "🧀",
     items: [
@@ -131,6 +139,7 @@ export const TIER_LISTS = [
   },
   {
     id: "first_dates",
+    categoryId: "social",
     name: "Du meilleur 1er date au pire plan",
     emoji: "💘",
     items: [
@@ -147,6 +156,7 @@ export const TIER_LISTS = [
   },
   {
     id: "guilty_pleasures",
+    categoryId: "party",
     name: "Du plaisir coupable le plus validé au plus cringe",
     emoji: "🤫",
     items: [
@@ -163,6 +173,7 @@ export const TIER_LISTS = [
   },
   {
     id: "pets_rank",
+    categoryId: "daily",
     name: "Du meilleur animal de compagnie au pire",
     emoji: "🐾",
     items: [
@@ -179,6 +190,7 @@ export const TIER_LISTS = [
   },
   {
     id: "weekend_plans",
+    categoryId: "party",
     name: "Du meilleur plan de week-end au pire",
     emoji: "📆",
     items: [
@@ -195,6 +207,7 @@ export const TIER_LISTS = [
   },
   {
     id: "kitchen_crimes",
+    categoryId: "food",
     name: "Du pire crime culinaire au plus acceptable",
     emoji: "🍳",
     items: [
@@ -211,6 +224,7 @@ export const TIER_LISTS = [
   },
   {
     id: "hangover_cures",
+    categoryId: "food",
     name: "Du meilleur remède de lendemain au pire",
     emoji: "🥴",
     items: [
@@ -226,6 +240,7 @@ export const TIER_LISTS = [
   },
   {
     id: "group_chat_roles",
+    categoryId: "social",
     name: "Du rôle de groupe le plus S tier au plus chaotique",
     emoji: "📱",
     items: [
@@ -242,6 +257,7 @@ export const TIER_LISTS = [
   },
   {
     id: "shower_thoughts",
+    categoryId: "daily",
     name: "Du meilleur moment sous la douche au plus random",
     emoji: "🚿",
     items: [
@@ -258,6 +274,7 @@ export const TIER_LISTS = [
   },
   {
     id: "airport_chaos",
+    categoryId: "party",
     name: "Du pire moment à l'aéroport au plus chill",
     emoji: "✈️",
     items: [
@@ -274,6 +291,7 @@ export const TIER_LISTS = [
   },
   {
     id: "comfort_foods",
+    categoryId: "food",
     name: "Du meilleur comfort food au pire",
     emoji: "🍜",
     items: [
@@ -291,6 +309,7 @@ export const TIER_LISTS = [
   },
   {
     id: "bad_habits",
+    categoryId: "daily",
     name: "De la pire mauvaise habitude à la plus soft",
     emoji: "🙃",
     items: [
@@ -306,6 +325,7 @@ export const TIER_LISTS = [
   },
   {
     id: "road_trip_vibes",
+    categoryId: "party",
     name: "Du must-have road trip au plus inutile",
     emoji: "🚗",
     items: [
@@ -322,6 +342,7 @@ export const TIER_LISTS = [
   },
   {
     id: "office_sins",
+    categoryId: "social",
     name: "Du pire péché bureau/école au plus acceptable",
     emoji: "📎",
     items: [
@@ -338,6 +359,7 @@ export const TIER_LISTS = [
   },
   {
     id: "ice_cream_wars",
+    categoryId: "food",
     name: "Du meilleur parfum de glace au pire",
     emoji: "🍦",
     items: [
@@ -354,6 +376,7 @@ export const TIER_LISTS = [
   },
   {
     id: "sleep_styles",
+    categoryId: "daily",
     name: "Du meilleur style de dodo au pire",
     emoji: "😴",
     items: [
@@ -370,6 +393,7 @@ export const TIER_LISTS = [
   },
   {
     id: "pizza_toppings",
+    categoryId: "food",
     name: "Du meilleur topping pizza au pire",
     emoji: "🍕",
     items: [
@@ -385,6 +409,7 @@ export const TIER_LISTS = [
   },
   {
     id: "spotify_crimes",
+    categoryId: "party",
     name: "Du pire crime Spotify au plus ok",
     emoji: "🎧",
     items: [
@@ -399,6 +424,7 @@ export const TIER_LISTS = [
   },
   {
     id: "supermarket_chaos",
+    categoryId: "daily",
     name: "Du pire crime au supermarché au plus acceptable",
     emoji: "🛒",
     items: [
@@ -414,6 +440,7 @@ export const TIER_LISTS = [
   },
   {
     id: "friend_group_tropes",
+    categoryId: "social",
     name: "Du meilleur archétype de pote au plus lourd",
     emoji: "🫶",
     items: [
@@ -430,6 +457,7 @@ export const TIER_LISTS = [
   },
   {
     id: "weather_moods",
+    categoryId: "daily",
     name: "De la meilleure météo à la pire",
     emoji: "🌦️",
     items: [
@@ -446,6 +474,7 @@ export const TIER_LISTS = [
   },
   {
     id: "breakfast_wars",
+    categoryId: "food",
     name: "Du meilleur petit-déj au pire",
     emoji: "🥐",
     items: [
@@ -462,6 +491,7 @@ export const TIER_LISTS = [
   },
   {
     id: "phone_battery",
+    categoryId: "daily",
     name: "Du meilleur rapport à la batterie au pire",
     emoji: "🔋",
     items: [
@@ -478,6 +508,7 @@ export const TIER_LISTS = [
   },
   {
     id: "board_game_vibes",
+    categoryId: "party",
     name: "Du joueur de société idéal au plus cauchemardesque",
     emoji: "🎲",
     items: [
@@ -494,6 +525,7 @@ export const TIER_LISTS = [
   },
   {
     id: "vacation_styles",
+    categoryId: "party",
     name: "Du meilleur style de vacances au pire",
     emoji: "🧳",
     items: [
@@ -510,6 +542,7 @@ export const TIER_LISTS = [
   },
   {
     id: "cinema_etiquette",
+    categoryId: "social",
     name: "Du pire crime au ciné au plus pardonné",
     emoji: "🎬",
     items: [
@@ -526,6 +559,7 @@ export const TIER_LISTS = [
   },
   {
     id: "coffee_order",
+    categoryId: "food",
     name: "De la meilleure commande café à la pire",
     emoji: "☕",
     items: [
@@ -541,6 +575,7 @@ export const TIER_LISTS = [
   },
   {
     id: "gym_personas",
+    categoryId: "daily",
     name: "De la meilleure vibe à la salle au flop",
     emoji: "💪",
     items: [
@@ -556,6 +591,7 @@ export const TIER_LISTS = [
   },
   {
     id: "delivery_apps",
+    categoryId: "food",
     name: "De la meilleure habitude de commande en ligne à la pire",
     emoji: "🛵",
     items: [
@@ -572,6 +608,7 @@ export const TIER_LISTS = [
   },
   {
     id: "wedding_guest",
+    categoryId: "social",
     name: "Du meilleur invité de mariage au pire",
     emoji: "💒",
     items: [
@@ -588,6 +625,7 @@ export const TIER_LISTS = [
   },
   {
     id: "hot_take_snacks",
+    categoryId: "food",
     name: "Du snack le plus clivant au plus consensuel",
     emoji: "🍿",
     items: [
@@ -604,6 +642,7 @@ export const TIER_LISTS = [
   },
   {
     id: "morning_routine",
+    categoryId: "daily",
     name: "De la meilleure routine du matin à la pire",
     emoji: "🌅",
     items: [
@@ -621,6 +660,7 @@ export const TIER_LISTS = [
   },
   {
     id: "concert_chaos",
+    categoryId: "party",
     name: "Du meilleur moment concert au plus chaotique",
     emoji: "🎤",
     items: [
@@ -637,6 +677,7 @@ export const TIER_LISTS = [
   },
   {
     id: "plant_parent",
+    categoryId: "daily",
     name: "Du meilleur parent de plantes au pire",
     emoji: "🪴",
     items: [
@@ -653,6 +694,7 @@ export const TIER_LISTS = [
   },
   {
     id: "subway_etiquette",
+    categoryId: "social",
     name: "Du pire crime dans le métro au plus ok",
     emoji: "🚇",
     items: [
@@ -767,6 +809,19 @@ export function getTierNightModifierById(id) {
  * Catégories stables (FEATURE-TIERNIGHT-SERIES-01).
  * Identifiants techniques - ne pas renommer sans migration de sessions.
  */
+
+/**
+ * Catégories Rank Live (FEATURE-TIERNIGHT-LIVE-CATEGORIES).
+ * Source de vérité unique — labels / ordre / ids modifiables ici sans migration SQL.
+ * Indépendant de TIER_NIGHT_ROSTER_CATEGORIES.
+ */
+export const TIER_NIGHT_LIVE_CATEGORIES = [
+  { id: "food", label: "Bouffe", order: 10 },
+  { id: "social", label: "Social", order: 20 },
+  { id: "party", label: "Soirée", order: 30 },
+  { id: "daily", label: "Quotidien", order: 40 },
+];
+
 export const TIER_NIGHT_ROSTER_CATEGORIES = [
   { id: "survival", label: "Survie", order: 10 },
   { id: "social", label: "Social", order: 20 },

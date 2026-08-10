@@ -6,9 +6,15 @@
  *
  * Réutilise `buildCombinedShuffledDeck` TEL QUEL (décision A/B : wrapper live, pas de
  * modification de `combinedGameDeck.js`).
+ *
+ * Catégories Rank Live : registry JS `TIER_NIGHT_LIVE_CATEGORIES` + `categoryId` sur
+ * `TIER_LISTS` — pas de catalogue SQL.
  */
 
-import { TIER_LISTS } from "../../data/tierTopics.js";
+import {
+  TIER_LISTS,
+  TIER_NIGHT_LIVE_CATEGORIES,
+} from "../../data/tierTopics.js";
 import { buildCombinedShuffledDeck } from "./combinedGameDeck.js";
 import { validateCustomLiveTierListsForBuild } from "./customLiveTierLists.js";
 
@@ -23,7 +29,7 @@ export const TIER_NIGHT_LIVE_SERIES_LEGACY_ROUND_COUNTS = Object.freeze([7]);
 
 export const DEFAULT_TIER_NIGHT_LIVE_SERIES_ROUND_COUNT = 5;
 
-/** Sentinelle forward-compat - V1 : seule valeur valide. */
+/** Sentinelle wildcard catalogue officiel complet (+ customs au pool). */
 export const TIER_NIGHT_LIVE_SERIES_ALL_CATEGORIES = "*";
 
 /**
@@ -46,61 +52,192 @@ export function isReadableTierNightLiveRoundCount(value) {
   return false;
 }
 
+/** @returns {string[]} */
+export function listKnownTierNightLiveCategoryIds() {
+  return (TIER_NIGHT_LIVE_CATEGORIES || []).map((c) => String(c.id));
+}
+
 /**
- * Pool officiel V1 = tout `TIER_LISTS`.
- * Ne fusionne PAS `customTierLists` local.
- * Copie défensive (listes + items) - ne mute jamais le catalogue source.
- *
- * @returns {Array<{ id: string, name: string, emoji?: string, items: string[], custom: false }>}
+ * Options UI (ordre registry).
+ * @returns {Array<{ id: string, label: string, order: number }>}
  */
-export function getTierNightLiveOfficialPool() {
-  return (TIER_LISTS || []).map((list) => ({
+export function listTierNightLiveCategoryOptions() {
+  return (TIER_NIGHT_LIVE_CATEGORIES || [])
+    .map((c) => ({
+      id: String(c.id),
+      label: String(c.label ?? c.id),
+      order: Number(c.order) || 0,
+    }))
+    .sort((a, b) => (a.order || 0) - (b.order || 0));
+}
+
+/**
+ * Forme seule (alignée conventions roster / SQL structurel).
+ * @param {unknown} categoryIds
+ */
+export function validateTierNightLiveSeriesCategoryIdsShape(categoryIds) {
+  if (!Array.isArray(categoryIds)) {
+    return { ok: false, code: "INVALID_CATEGORY_IDS", message: "not_array" };
+  }
+  if (categoryIds.length === 0) {
+    return { ok: false, code: "INVALID_CATEGORY_IDS", message: "empty" };
+  }
+  const seen = new Set();
+  const normalized = [];
+  let hasStar = false;
+  let hasExplicit = false;
+  for (const raw of categoryIds) {
+    if (typeof raw !== "string") {
+      return { ok: false, code: "INVALID_CATEGORY_IDS", message: "non_string" };
+    }
+    const s = raw.trim();
+    if (!s) {
+      return { ok: false, code: "INVALID_CATEGORY_IDS", message: "blank" };
+    }
+    if (seen.has(s)) {
+      return { ok: false, code: "INVALID_CATEGORY_IDS", message: "duplicate" };
+    }
+    seen.add(s);
+    normalized.push(s);
+    if (s === TIER_NIGHT_LIVE_SERIES_ALL_CATEGORIES) hasStar = true;
+    else hasExplicit = true;
+  }
+  if (hasStar && hasExplicit) {
+    return { ok: false, code: "INVALID_CATEGORY_IDS", message: "star_mixed" };
+  }
+  if (hasStar && normalized.length !== 1) {
+    return { ok: false, code: "INVALID_CATEGORY_IDS", message: "star_not_alone" };
+  }
+  return { ok: true, categoryIds: normalized };
+}
+
+/**
+ * Forme + appartenance registry JS Rank Live.
+ * @param {unknown} categoryIds
+ */
+export function validateTierNightLiveSeriesCategoryIds(categoryIds) {
+  const shape = validateTierNightLiveSeriesCategoryIdsShape(categoryIds);
+  if (!shape.ok) return shape;
+  if (
+    shape.categoryIds.length === 1 &&
+    shape.categoryIds[0] === TIER_NIGHT_LIVE_SERIES_ALL_CATEGORIES
+  ) {
+    return shape;
+  }
+  const known = new Set(listKnownTierNightLiveCategoryIds());
+  for (const id of shape.categoryIds) {
+    if (!known.has(id)) {
+      return { ok: false, code: "UNKNOWN_CATEGORY_ID", message: id };
+    }
+  }
+  return shape;
+}
+
+/** @deprecated alias — utiliser validateTierNightLiveSeriesCategoryIds */
+export function validateTierNightLiveSeriesCategoryIdsV1(categoryIds) {
+  return validateTierNightLiveSeriesCategoryIds(categoryIds);
+}
+
+/**
+ * @param {unknown} categoryIds
+ * @returns {string[]}
+ */
+export function resolveTierNightLiveSetupCategoryIds(categoryIds) {
+  if (
+    categoryIds == null ||
+    !Array.isArray(categoryIds) ||
+    categoryIds.length === 0 ||
+    categoryIds.some((id) => String(id) === TIER_NIGHT_LIVE_SERIES_ALL_CATEGORIES)
+  ) {
+    return [TIER_NIGHT_LIVE_SERIES_ALL_CATEGORIES];
+  }
+  return categoryIds.map((c) => String(c));
+}
+
+/**
+ * Normalise une valeur remote/legacy vers un tableau utilisable.
+ * Invalide / vide → `["*"]` (compat).
+ * @param {unknown} categoryIds
+ * @returns {string[]}
+ */
+export function normalizeTierNightLivePrepCategoryIds(categoryIds) {
+  const resolved = resolveTierNightLiveSetupCategoryIds(categoryIds);
+  const validated = validateTierNightLiveSeriesCategoryIds(resolved);
+  if (!validated.ok) return [TIER_NIGHT_LIVE_SERIES_ALL_CATEGORIES];
+  return validated.categoryIds;
+}
+
+function mapOfficialList(list) {
+  return {
     id: String(list.id),
     name: String(list.name ?? ""),
     emoji: list.emoji != null ? String(list.emoji) : "📋",
     items: Array.isArray(list.items) ? list.items.map((item) => String(item)) : [],
     custom: false,
+    categoryId: list.categoryId != null ? String(list.categoryId) : null,
+  };
+}
+
+/**
+ * Pool officiel filtré. Ne fusionne PAS `customTierLists` / `customLiveTierLists`.
+ * @param {unknown} [categoryIds] - défaut `["*"]`
+ */
+export function getTierNightLiveOfficialPool(
+  categoryIds = [TIER_NIGHT_LIVE_SERIES_ALL_CATEGORIES]
+) {
+  const cats = resolveTierNightLiveSetupCategoryIds(categoryIds);
+  const isAll = cats.includes(TIER_NIGHT_LIVE_SERIES_ALL_CATEGORIES);
+  const allow = isAll ? null : new Set(cats);
+  return (TIER_LISTS || [])
+    .filter((list) => {
+      if (isAll) return true;
+      const cid = list?.categoryId != null ? String(list.categoryId) : "";
+      return cid && allow.has(cid);
+    })
+    .map(mapOfficialList);
+}
+
+/**
+ * @param {unknown} categoryIds
+ * @param {{ customLists?: Iterable<object> }} [opts]
+ */
+export function getTierNightLivePoolSize(categoryIds, opts = {}) {
+  const officials = getTierNightLiveOfficialPool(categoryIds);
+  const customsResult = validateCustomLiveTierListsForBuild(opts.customLists || []);
+  const customsLen = customsResult.ok ? customsResult.lists.length : 0;
+  return officials.length + customsLen;
+}
+
+/**
+ * @param {unknown} categoryIds
+ * @param {{ customLists?: Iterable<object> }} [opts]
+ */
+export function getTierNightLiveRoundCountAvailability(categoryIds, opts = {}) {
+  const poolSize = getTierNightLivePoolSize(categoryIds, opts);
+  return TIER_NIGHT_LIVE_SERIES_ROUND_COUNTS.map((roundCount) => ({
+    roundCount,
+    poolSize,
+    available: poolSize >= roundCount,
   }));
 }
 
 /**
- * V1 : uniquement `["*"]` (catalogue global). Toute autre valeur = erreur.
  * @param {unknown} categoryIds
  */
-export function validateTierNightLiveSeriesCategoryIdsV1(categoryIds) {
-  if (!Array.isArray(categoryIds)) {
-    return { ok: false, code: "INVALID_CATEGORY_IDS", message: "not_array" };
+export function formatTierNightLiveCategorySummary(categoryIds) {
+  const cats = resolveTierNightLiveSetupCategoryIds(categoryIds);
+  if (cats.includes(TIER_NIGHT_LIVE_SERIES_ALL_CATEGORIES)) {
+    return "Toutes les catégories";
   }
-  if (
-    categoryIds.length !== 1 ||
-    categoryIds[0] !== TIER_NIGHT_LIVE_SERIES_ALL_CATEGORIES
-  ) {
-    return { ok: false, code: "INVALID_CATEGORY_IDS", message: "v1_star_only" };
-  }
-  return { ok: true, categoryIds: [TIER_NIGHT_LIVE_SERIES_ALL_CATEGORIES] };
+  const labels = cats
+    .map((id) => TIER_NIGHT_LIVE_CATEGORIES.find((c) => c.id === id)?.label || id)
+    .filter(Boolean);
+  return labels.join(", ") || "Catégories";
 }
 
 /**
  * Construit le sous-ensemble de listes pour une série Rank Live.
- *
- * @param {object} [opts]
- * @param {unknown[]} [opts.officialLists] - défaut : pool officiel global
- * @param {unknown[]} [opts.customLists] - `customLiveTierLists` (pas la lib locale)
- * @param {unknown} opts.roundCount
- * @param {unknown} [opts.categoryIds] - V1 défaut `["*"]`
- * @param {() => number} [opts.random]
- * @returns {{
- *   ok: true,
- *   lists: object[],
- *   roundCount: number,
- *   categoryIds: string[]
- * } | {
- *   ok: false,
- *   code: string,
- *   message?: string,
- *   requested?: number,
- *   available?: number
- * }}
+ * Customs toujours éligibles quel que soit le filtre.
  */
 export function buildTierNightLiveSeriesListSubset({
   officialLists,
@@ -119,7 +256,7 @@ export function buildTierNightLiveSeriesListSubset({
   }
   const R = roundCount;
 
-  const cats = validateTierNightLiveSeriesCategoryIdsV1(categoryIds);
+  const cats = validateTierNightLiveSeriesCategoryIds(categoryIds);
   if (!cats.ok) return cats;
 
   const customsResult = validateCustomLiveTierListsForBuild(customLists);
@@ -128,7 +265,7 @@ export function buildTierNightLiveSeriesListSubset({
 
   const officialsRaw = Array.isArray(officialLists)
     ? officialLists
-    : getTierNightLiveOfficialPool();
+    : getTierNightLiveOfficialPool(cats.categoryIds);
 
   const officialSeen = new Set();
   const officials = [];
@@ -156,7 +293,6 @@ export function buildTierNightLiveSeriesListSubset({
     });
   }
 
-  // Namespace : un custom ne doit pas collisonner un id officiel (préfixe custom-live-).
   for (const custom of customs) {
     if (officialSeen.has(custom.id)) {
       return { ok: false, code: "DUPLICATE_CUSTOM_ID", message: custom.id };
@@ -174,8 +310,6 @@ export function buildTierNightLiveSeriesListSubset({
     };
   }
 
-  // Même politique REVEAL que roster/Dilemma : customs prioritaires, pas de giant-shuffle+slice.
-  // resolveEffectiveRoundCount : ne pas clamper - R strict ; assert longueur ensuite.
   const picked = buildCombinedShuffledDeck(
     customs,
     officials,
@@ -203,7 +337,6 @@ export function buildTierNightLiveSeriesListSubset({
     pickedIds.add(id);
   }
 
-  // Copie défensive du résultat (items inclus).
   const lists = picked.map((entry) => ({
     id: String(entry.id),
     name: String(entry.name ?? ""),
