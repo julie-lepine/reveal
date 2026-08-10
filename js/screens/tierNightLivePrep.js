@@ -154,7 +154,10 @@ export function mountTierNightLivePrep(app) {
 
     const dur = app.querySelector("#tier-night-live-duration");
     if (dur) {
-      dur.innerHTML = `<strong>${prep.roundCount}</strong> listes dans la série`;
+      dur.innerHTML = `
+        <strong>${prep.roundCount}</strong> liste${prep.roundCount > 1 ? "s" : ""} dans la série
+        · ${escapeHtml(prep.durationLabel)}
+        <span class="muted"> (estimation)</span>`;
     }
   }
 
@@ -285,7 +288,9 @@ export function mountTierNightLivePrep(app) {
           <p class="label-upper">Longueur de série</p>
           <div class="theme-chip-row">${roundChips}</div>
           <p class="hint" id="tier-night-live-duration">
-            <strong>${prep.roundCount}</strong> listes dans la série
+            <strong>${prep.roundCount}</strong> liste${prep.roundCount > 1 ? "s" : ""} dans la série
+            · ${escapeHtml(prep.durationLabel)}
+            <span class="muted"> (estimation)</span>
           </p>
           ${
             isHost

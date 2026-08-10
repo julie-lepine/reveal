@@ -20,6 +20,7 @@ import {
   rollbackOptimisticMapEntry,
   canRollbackOptimisticSubmission,
 } from "./optimisticMapEntry.js";
+import { estimateWrongAnswerDuration } from "./wrongAnswerDuration.js";
 
 let wrongAnswerVoteAttemptId = 0;
 let wrongAnswerAnswerAttemptId = 0;
@@ -61,10 +62,11 @@ export async function setWrongAnswerRoundCount(count) {
 
 export function getWrongAnswerPrepSummary() {
   const requested = getWrongAnswerRoundCount();
+  const duration = estimateWrongAnswerDuration(requested);
   return {
     requested,
     effective: requested,
-    durationLabel: `${requested} manche${requested > 1 ? "s" : ""}`,
+    durationLabel: duration.label,
   };
 }
 

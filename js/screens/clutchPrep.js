@@ -23,7 +23,7 @@ import {
   updatePrepStartSlot,
   bindPrepLaunchButtons,
 } from "../core/prepScreen.js";
-import { pageShell } from "../core/ui.js";
+import { pageShell, escapeHtml } from "../core/ui.js";
 import { navigate } from "../core/router.js";
 import { bindNav } from "./nav.js";
 
@@ -79,11 +79,20 @@ export function mountClutchPrep(app) {
     const session = getClutchSession();
     const roundCount = session.roundCount ?? 5;
     const isHost = isLobbyHost();
+    const prep = getClutchPrepSummary();
     app.querySelectorAll("[data-round]").forEach((btn) => {
       const value = Number(btn.getAttribute("data-round"));
       btn.classList.toggle("theme-chip--active", roundCount === value);
       btn.disabled = !isHost;
     });
+
+    const dur = app.querySelector("#clutch-duration");
+    if (dur) {
+      dur.innerHTML = `
+        <strong>${prep.effective}</strong> manche${prep.effective > 1 ? "s" : ""}
+        · ${escapeHtml(prep.durationLabel)}
+        <span class="muted"> (estimation)</span>`;
+    }
   }
 
   function refreshFromSync() {
@@ -112,7 +121,7 @@ export function mountClutchPrep(app) {
       btn.addEventListener("click", async () => {
         if (!isLobbyHost() || btn.disabled) return;
         await setClutchRoundCount(Number(btn.getAttribute("data-round")));
-        render();
+        refreshFromSync();
       });
     });
 
@@ -156,8 +165,10 @@ export function mountClutchPrep(app) {
               </button>`
             ).join("")}
           </div>
-          <p class="hot-take-duration">
+          <p class="hot-take-duration" id="clutch-duration" aria-live="polite">
             <strong>${prep.effective}</strong> manche${prep.effective > 1 ? "s" : ""}
+            · ${escapeHtml(prep.durationLabel)}
+            <span class="muted"> (estimation)</span>
           </p>
           ${!isHost ? `<p class="hint">Seul l'hôte peut modifier les réglages.</p>` : ""}
         </div>

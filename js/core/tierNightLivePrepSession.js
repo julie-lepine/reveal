@@ -17,6 +17,7 @@ import {
   isValidTierNightLiveRoundCount,
   getTierNightLiveOfficialPool,
 } from "./tierNightLiveSeriesDomain.js";
+import { estimateTierNightSeriesDuration } from "./tierNightSeriesDuration.js";
 import {
   buildTierNightLiveSeriesLaunchState,
   mapTierNightLiveLaunchError,
@@ -210,11 +211,13 @@ export function resetTierNightLivePrepSession() {
 
 export function getTierNightLivePrepSummary() {
   const session = getTierNightLivePrepSession();
+  const duration = estimateTierNightSeriesDuration(session.roundCount);
   return {
     requested: session.roundCount,
     roundCount: session.roundCount,
     available: true,
     effective: session.roundCount,
+    durationLabel: duration.label,
   };
 }
 

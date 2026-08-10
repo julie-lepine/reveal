@@ -29,6 +29,7 @@ import {
   rankClutchEntries,
   sessionHasClutchParticipantSnapshot,
 } from "./clutchParticipants.js";
+import { estimateClutchDuration } from "./clutchDuration.js";
 
 /** Génération commit tap (stale catch / AUDIT-003). */
 let clutchTapAttemptId = 0;
@@ -80,10 +81,11 @@ export async function setClutchRoundCount(count) {
 
 export function getClutchPrepSummary() {
   const requested = getClutchRoundCount();
+  const duration = estimateClutchDuration(requested);
   return {
     requested,
     effective: requested,
-    durationLabel: `${requested} manche${requested > 1 ? "s" : ""}`,
+    durationLabel: duration.label,
   };
 }
 

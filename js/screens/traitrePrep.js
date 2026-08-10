@@ -27,8 +27,9 @@ import {
   syncPrepOnMount,
 } from "../core/prepScreen.js";
 import { navigate } from "../core/router.js";
-import { pageShell } from "../core/ui.js";
+import { pageShell, escapeHtml } from "../core/ui.js";
 import { bindNav } from "./nav.js";
+import { estimateTraitreDuration } from "../core/traitreDuration.js";
 
 function traitreMinPlayersCardHtml(playerCount) {
   const minPlayersMet = playerCount >= TRAITRE_MIN_PLAYERS;
@@ -46,6 +47,18 @@ function traitreMinPlayersCardHtml(playerCount) {
         </p>
       </div>
     </div>`;
+}
+
+function traitreDurationHtml(playerCount) {
+  const duration = estimateTraitreDuration(playerCount);
+  if (duration.label === "-") {
+    return `<p class="hot-take-duration" id="traitre-duration" aria-live="polite">Durée estimée : -</p>`;
+  }
+  return `
+    <p class="hot-take-duration" id="traitre-duration" aria-live="polite">
+      Durée estimée : ${escapeHtml(duration.label)}
+      <span class="muted"> (selon le nombre de joueurs)</span>
+    </p>`;
 }
 
 export function mountTraitrePrep(app) {
@@ -121,6 +134,7 @@ export function mountTraitrePrep(app) {
         </p>
 
         <div id="traitre-min-players">${traitreMinPlayersCardHtml(members.length)}</div>
+        ${traitreDurationHtml(members.length)}
 
         <div class="card" id="traitre-players">
           ${playersReadySectionHtml(members, session.ready || {})}
@@ -156,6 +170,18 @@ export function mountTraitrePrep(app) {
     const minCard = app.querySelector("#traitre-min-players");
     if (minCard) {
       minCard.innerHTML = traitreMinPlayersCardHtml(members.length);
+    }
+
+    const dur = app.querySelector("#traitre-duration");
+    if (dur) {
+      const duration = estimateTraitreDuration(members.length);
+      if (duration.label === "-") {
+        dur.innerHTML = `Durée estimée : -`;
+      } else {
+        dur.innerHTML = `
+          Durée estimée : ${escapeHtml(duration.label)}
+          <span class="muted"> (selon le nombre de joueurs)</span>`;
+      }
     }
 
     const allReady = allTraitreReady();

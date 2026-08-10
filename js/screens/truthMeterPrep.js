@@ -24,10 +24,11 @@ import {
 } from "../core/prepScreen.js";
 import { prepLaunchSlotParams } from "../core/prepLaunch.js";
 import { navigate } from "../core/router.js";
-import { pageShell } from "../core/ui.js";
+import { pageShell, escapeHtml } from "../core/ui.js";
 import { bindNav } from "./nav.js";
 import { TRUTH_METER_MIN_PLAYERS } from "../../data/truthMeter.js";
 import { showAppAlert } from "../core/dialog.js";
+import { estimateTruthMeterDuration } from "../core/truthMeterDuration.js";
 
 const TRUTH_METER_NAV = ["home", "lobby", "game-select", "truthmeter-prep", "truthmeter"];
 
@@ -55,6 +56,8 @@ export function mountTruthMeterPrep(app) {
     const members = getLobbyParticipants();
     const allReady = allTruthMeterReady();
     const ok = minPlayersOk();
+    const roundCount = getActivePlayerNames().length;
+    const duration = estimateTruthMeterDuration(roundCount);
 
     refreshPrepReadyUi(app, {
       playersSelector: "#truth-meter-players",
@@ -63,6 +66,14 @@ export function mountTruthMeterPrep(app) {
       readyMap: session.ready || {},
       localReady: prepLobby.localReadyState(),
     });
+
+    const dur = app.querySelector("#truth-meter-duration");
+    if (dur) {
+      dur.innerHTML = `
+        <strong>${roundCount}</strong> manche${roundCount > 1 ? "s" : ""} - un auteur
+        · ${escapeHtml(duration.label)}
+        <span class="muted"> (estimation)</span>`;
+    }
 
     updatePrepStartSlot(
       app.querySelector("#truth-meter-start-slot"),
@@ -117,6 +128,7 @@ export function mountTruthMeterPrep(app) {
     const localReady = prepLobby.localReadyState();
     const roundCount = getActivePlayerNames().length;
     const ok = minPlayersOk();
+    const duration = estimateTruthMeterDuration(roundCount);
 
     app.innerHTML = pageShell({
       backTarget: "back",
@@ -130,7 +142,11 @@ export function mountTruthMeterPrep(app) {
 
         <div class="card">
           <p class="card-heading">Déroulé</p>
-          <p class="hint"><strong>${roundCount}</strong> manche${roundCount > 1 ? "s" : ""} - un auteur.</p>
+          <p class="hint" id="truth-meter-duration">
+            <strong>${roundCount}</strong> manche${roundCount > 1 ? "s" : ""} - un auteur
+            · ${escapeHtml(duration.label)}
+            <span class="muted"> (estimation)</span>
+          </p>
           <p class="hint">0 = Faux · 100 = Vrai · Gros écart auteur/groupe = bonus bluff.</p>
         </div>
 
