@@ -237,8 +237,14 @@ export function navigateAfterGameLaunch({
 
 /**
  * Handler `onGameSessionChange` pour écrans prep : invités suivent l'hôte quand la partie démarre.
+ * `buildNavigateOpts(entry)` optionnel : params + navStack (ex. prep → tiernight-select step=mode).
  */
-export function prepGuestFollowOnSession({ prepScreen, getEntryScreen, buildNavStack }) {
+export function prepGuestFollowOnSession({
+  prepScreen,
+  getEntryScreen,
+  buildNavStack,
+  buildNavigateOpts = null,
+}) {
   return () => {
     if (isGameSyncActive() && !isLobbyHost()) {
       // On se base sur l'écran *effectif* (qui applique l'inférence lobby) et non sur
@@ -262,7 +268,10 @@ export function prepGuestFollowOnSession({ prepScreen, getEntryScreen, buildNavS
         navStack: ["home", "lobby", "game-select", "guesslie-menu", "guesslie-wait", "guesslie"],
       });
     }
-    return navigate(entry, buildNavStack ? { navStack: buildNavStack(entry) } : { reset: true });
+    const opts =
+      (typeof buildNavigateOpts === "function" && buildNavigateOpts(entry)) ||
+      (buildNavStack ? { navStack: buildNavStack(entry) } : { reset: true });
+    return navigate(entry, opts);
   };
 }
 

@@ -38,6 +38,8 @@ import {
   onGameSessionChange,
   refreshGameSession,
   isGameSyncActive,
+  getEffectiveSessionScreen,
+  getCachedGameSession,
 } from "../core/gameSync.js";
 import { prepGuestFollowOnSession } from "../core/mpLaunch.js";
 import {
@@ -66,7 +68,12 @@ import {
   runPrepRefreshOnLobbyChange,
 } from "../core/prepScreen.js";
 import { PLAYER_TEXT_MAX_LEN } from "../../data/playerTextLimits.js";
+import {
+  leaveTierNightSeriesPrepToModes,
+  TIER_NIGHT_PREP_MODES_EXIT_NAV,
+} from "../core/tierNightNav.js";
 import { bindNav } from "./nav.js";
+import { showAppAlert } from "../core/dialog.js";
 
 function poolSizeForCategories(categoryIds) {
   return getTierNightSeriesPoolSize(categoryIds, getTierNightSeriesPrepPoolOpts());
@@ -272,7 +279,19 @@ export function mountTierNightPrep(app) {
   }
 
   function bindEvents() {
-    bindNav(app);
+    bindNav(app, {
+      [TIER_NIGHT_PREP_MODES_EXIT_NAV]: () => {
+        void (async () => {
+          const res = await leaveTierNightSeriesPrepToModes();
+          if (res?.ok === false && res.error) {
+            await showAppAlert(res.error, {
+              title: "Retour",
+              icon: "⚠️",
+            });
+          }
+        })();
+      },
+    });
 
     app.querySelectorAll("[data-round]").forEach((btn) => {
       btn.addEventListener("click", async () => {
@@ -368,7 +387,7 @@ export function mountTierNightPrep(app) {
     });
 
     app.innerHTML = pageShell({
-      backTarget: "back",
+      backTarget: TIER_NIGHT_PREP_MODES_EXIT_NAV,
       content: `
         <p class="label-upper label-upper--gold">🏅 Classe le groupe</p>
         <div class="screen-title-row">
@@ -479,7 +498,11 @@ export function mountTierNightPrep(app) {
 
   const guestFollow = prepGuestFollowOnSession({
     prepScreen: "tiernight-prep",
-    getEntryScreen: getTierNightSeriesPrepEntryScreen,
+    getEntryScreen: () => {
+      const effective = getEffectiveSessionScreen(getCachedGameSession());
+      if (effective === "tiernight-select") return "tiernight-select";
+      return getTierNightSeriesPrepEntryScreen();
+    },
     buildNavStack: (entry) => [
       "home",
       "lobby",
@@ -488,6 +511,24 @@ export function mountTierNightPrep(app) {
       "tiernight-prep",
       entry,
     ],
+    buildNavigateOpts: (entry) => {
+      if (entry === "tiernight-select") {
+        return {
+          params: { step: "mode", mode: "roster" },
+          navStack: ["home", "lobby", "game-select", "tiernight-select"],
+        };
+      }
+      return {
+        navStack: [
+          "home",
+          "lobby",
+          "game-select",
+          "tiernight-select",
+          "tiernight-prep",
+          entry,
+        ],
+      };
+    },
   });
 
   const unsub = onGameSessionChange(() => {

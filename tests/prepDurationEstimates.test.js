@@ -67,6 +67,10 @@ describe("prep duration estimates - Rank Live / TruthMeter / Spot the fake", () 
     assert.equal(estimateTierNightSeriesDuration(5).label, "~8-12 min");
     const live = read("js/screens/tierNightLivePrep.js");
     assert.match(live, /prep\.durationLabel/);
+    assert.match(live, /hot-take-duration/);
+    assert.match(live, /card-heading">Longueur de série/);
+    assert.match(live, /theme-chips theme-chips--rounds/);
+    assert.doesNotMatch(live, /listes dans la série/);
     assert.match(live, /\(estimation\)/);
   });
 

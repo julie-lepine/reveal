@@ -17,7 +17,6 @@ import {
   setTierNightLivePrepRoundCount,
   simulateTierNightLivePrepReady,
   validateTierNightLivePrepForLaunch,
-  resetTierNightLivePrepSession,
 } from "../core/tierNightLivePrepSession.js";
 import { TIER_NIGHT_LIVE_SERIES_ROUND_COUNTS } from "../core/tierNightLiveSeriesDomain.js";
 import { getLobbyParticipants } from "../core/lobby.js";
@@ -30,6 +29,8 @@ import {
   onGameSessionChange,
   refreshGameSession,
   isGameSyncActive,
+  getEffectiveSessionScreen,
+  getCachedGameSession,
 } from "../core/gameSync.js";
 import { prepGuestFollowOnSession } from "../core/mpLaunch.js";
 import {
@@ -50,9 +51,15 @@ import {
   syncPrepOnMount,
   runPrepRefreshOnLobbyChange,
 } from "../core/prepScreen.js";
-import { returnToTierNightSelectStep } from "../core/tierNightNav.js";
+import {
+  leaveTierNightLivePrepToModes,
+  TIER_NIGHT_PREP_MODES_EXIT_NAV,
+  leaveLivePrepToSelect,
+} from "../core/tierNightNav.js";
 import { showAppAlert } from "../core/dialog.js";
 import { bindNav } from "./nav.js";
+
+export { leaveLivePrepToSelect };
 
 function customListsHtml() {
   const lists = listSharedCustomLiveTierListsForPrep();
@@ -155,7 +162,7 @@ export function mountTierNightLivePrep(app) {
     const dur = app.querySelector("#tier-night-live-duration");
     if (dur) {
       dur.innerHTML = `
-        <strong>${prep.roundCount}</strong> liste${prep.roundCount > 1 ? "s" : ""} dans la série
+        <strong>${prep.roundCount}</strong> liste${prep.roundCount > 1 ? "s" : ""}
         · ${escapeHtml(prep.durationLabel)}
         <span class="muted"> (estimation)</span>`;
     }
@@ -196,7 +203,19 @@ export function mountTierNightLivePrep(app) {
   }
 
   function bindEvents() {
-    bindNav(app);
+    bindNav(app, {
+      [TIER_NIGHT_PREP_MODES_EXIT_NAV]: () => {
+        void (async () => {
+          const res = await leaveTierNightLivePrepToModes();
+          if (res?.ok === false && res.error) {
+            await showAppAlert(res.error, {
+              title: "Retour",
+              icon: "⚠️",
+            });
+          }
+        })();
+      },
+    });
 
     app.querySelectorAll("[data-live-round]").forEach((btn) => {
       btn.addEventListener("click", async () => {
@@ -275,7 +294,7 @@ export function mountTierNightLivePrep(app) {
     ).join("");
 
     app.innerHTML = pageShell({
-      backTarget: "tiernight-select",
+      backTarget: TIER_NIGHT_PREP_MODES_EXIT_NAV,
       content: `
         <p class="label-upper label-upper--gold">⚡ Rank Live</p>
         <div class="screen-title-row">
@@ -285,22 +304,22 @@ export function mountTierNightLivePrep(app) {
         <p class="game-intro">Choisis la longueur, ajoute des listes custom, puis lance quand tout le monde est prêt.</p>
 
         <div class="card">
-          <p class="label-upper">Longueur de série</p>
-          <div class="theme-chip-row">${roundChips}</div>
-          <p class="hint" id="tier-night-live-duration">
-            <strong>${prep.roundCount}</strong> liste${prep.roundCount > 1 ? "s" : ""} dans la série
+          <p class="card-heading">Longueur de série</p>
+          <div class="theme-chips theme-chips--rounds">${roundChips}</div>
+          <p class="hot-take-duration" id="tier-night-live-duration" aria-live="polite">
+            <strong>${prep.roundCount}</strong> liste${prep.roundCount > 1 ? "s" : ""}
             · ${escapeHtml(prep.durationLabel)}
             <span class="muted"> (estimation)</span>
           </p>
           ${
             isHost
               ? ""
-              : `<p class="hint muted">Seul l'hôte peut changer la longueur.</p>`
+              : `<p class="hint">Seul l'hôte peut modifier les réglages.</p>`
           }
         </div>
 
         <div class="card">
-          <p class="label-upper">Listes custom partagées</p>
+          <p class="card-heading">Listes custom partagées</p>
           <p class="hint muted">Nom, emoji, auteur et nombre d'items - visibles par tous.</p>
           <div id="live-customs-host">${customListsHtml()}</div>
           <p class="auth-error hidden" id="live-custom-error"></p>
@@ -332,7 +351,11 @@ export function mountTierNightLivePrep(app) {
 
   const guestFollow = prepGuestFollowOnSession({
     prepScreen: "tiernight-live-prep",
-    getEntryScreen: getTierNightLivePrepEntryScreen,
+    getEntryScreen: () => {
+      const effective = getEffectiveSessionScreen(getCachedGameSession());
+      if (effective === "tiernight-select") return "tiernight-select";
+      return getTierNightLivePrepEntryScreen();
+    },
     buildNavStack: (entry) => {
       if (entry === "tiernight-live") {
         return [
@@ -345,6 +368,29 @@ export function mountTierNightLivePrep(app) {
         ];
       }
       return ["home", "lobby", "game-select", "tiernight-select", "tiernight-live-prep"];
+    },
+    buildNavigateOpts: (entry) => {
+      if (entry === "tiernight-select") {
+        return {
+          params: { step: "mode", mode: "live" },
+          navStack: ["home", "lobby", "game-select", "tiernight-select"],
+        };
+      }
+      if (entry === "tiernight-live") {
+        return {
+          navStack: [
+            "home",
+            "lobby",
+            "game-select",
+            "tiernight-select",
+            "tiernight-live-prep",
+            "tiernight-live",
+          ],
+        };
+      }
+      return {
+        navStack: ["home", "lobby", "game-select", "tiernight-select", "tiernight-live-prep"],
+      };
     },
   });
 
@@ -371,12 +417,6 @@ export function mountTierNightLivePrep(app) {
     unsubSession?.();
     unsubLobby?.();
     // Pas de reset ici : navigation vers create conserve settings/ready.
-    // Reset = enter(resetSettings) / retour select / reset evening|game.
+    // Reset = enter(resetSettings) / leaveTierNightLivePrepToModes / reset evening|game.
   };
-}
-
-/** Utilitaire tests / nav : retour select mode live sans step=list. */
-export function leaveLivePrepToSelect() {
-  resetTierNightLivePrepSession();
-  returnToTierNightSelectStep({ step: "mode", mode: "live" });
 }
