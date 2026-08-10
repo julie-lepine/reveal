@@ -907,8 +907,12 @@ export function mountHome(app) {
       // Tentative active uniquement — pas de membership / lobby résiduel.
       lobbyCode: joinPendingActive ? joinAttemptCode || null : null,
     });
+    // JOINING : HERO dans membershipActions pour logged-in ; guests le peignent
+    // déjà dans le panneau Invité / rejoin (évite double box).
     const membershipActionsHtml = joinUi.suppressMembershipActions
-      ? homeJoinPendingStatusHtml(joinUi)
+      ? loggedIn
+        ? homeJoinPendingStatusHtml(joinUi)
+        : ""
       : homeMembershipActionsHtml(chrome);
     const activeLobby = chrome.state === "cached_active";
     const canStartNewLobby =

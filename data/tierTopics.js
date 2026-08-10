@@ -816,7 +816,7 @@ export function getTierNightModifierById(id) {
  * Indépendant de TIER_NIGHT_ROSTER_CATEGORIES.
  */
 export const TIER_NIGHT_LIVE_CATEGORIES = [
-  { id: "food", label: "Bouffe", order: 10 },
+  { id: "food", label: "Miam", order: 10 },
   { id: "social", label: "Social", order: 20 },
   { id: "party", label: "Soirée", order: 30 },
   { id: "daily", label: "Quotidien", order: 40 },

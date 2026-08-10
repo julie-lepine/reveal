@@ -77,7 +77,7 @@ describe("BUG-MP-JOIN-TRANSITION-01 — contrats source Home", () => {
     assert.match(homeSrc, /deriveHomeJoinTransitionUi\(\{/);
     assert.match(
       homeSrc,
-      /const membershipActionsHtml = joinUi\.suppressMembershipActions\s*\?\s*homeJoinPendingStatusHtml\(joinUi\)\s*:\s*homeMembershipActionsHtml\(chrome\)/
+      /const membershipActionsHtml = joinUi\.suppressMembershipActions\s*\?\s*loggedIn\s*\?\s*homeJoinPendingStatusHtml\(joinUi\)\s*:\s*""\s*:\s*homeMembershipActionsHtml\(chrome\)/
     );
     assert.match(
       homeSrc,

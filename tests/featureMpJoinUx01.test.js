@@ -122,12 +122,26 @@ describe("FEATURE-MP-JOIN-UX-01 — contrats source Home", () => {
   it("TEST 3 — suppress membership + contrôles si joinUi actif", () => {
     assert.match(
       homeSrc,
-      /const membershipActionsHtml = joinUi\.suppressMembershipActions\s*\?\s*homeJoinPendingStatusHtml\(joinUi\)\s*:\s*homeMembershipActionsHtml\(chrome\)/
+      /const membershipActionsHtml = joinUi\.suppressMembershipActions\s*\?\s*loggedIn\s*\?\s*homeJoinPendingStatusHtml\(joinUi\)\s*:\s*""\s*:\s*homeMembershipActionsHtml\(chrome\)/
     );
     assert.match(
       homeSrc,
       /showLoggedInLobbyControls = loggedIn && !joinUi\.suppressLobbyControls/
     );
+  });
+
+  it("TEST 3b — guest JOINING : HERO panneau invité seulement (pas double box)", () => {
+    assert.match(
+      homeSrc,
+      /joinUi\.suppressMembershipActions\s*\?\s*loggedIn\s*\?\s*homeJoinPendingStatusHtml\(joinUi\)\s*:\s*""/
+    );
+    // Session guest déjà active : HERO à la place du panneau rejoin.
+    assert.match(
+      homeSrc,
+      /joinUi\.active\s*\?\s*homeJoinPendingStatusHtml\(joinUi\)\s*:\s*guestJoinPanelHtml/
+    );
+    // Onglet Invité (anonyme) : HERO dans #auth-panel-guest.
+    assert.match(homeSrc, /id="auth-panel-guest"[\s\S]*?joinUi\.active\s*\?\s*homeJoinPendingStatusHtml\(joinUi\)/);
   });
 
   it("TEST 4 — source code = joinAttemptCode (pas membership / getLobby)", () => {
@@ -178,7 +192,7 @@ describe("FEATURE-MP-JOIN-UX-01 — contrats source Home", () => {
     assert.match(homeSrc, /btn-return-lobby/);
     assert.match(
       homeSrc,
-      /joinUi\.suppressMembershipActions\s*\?\s*homeJoinPendingStatusHtml\(joinUi\)\s*:\s*homeMembershipActionsHtml\(chrome\)/
+      /joinUi\.suppressMembershipActions\s*\?\s*loggedIn\s*\?\s*homeJoinPendingStatusHtml\(joinUi\)\s*:\s*""\s*:\s*homeMembershipActionsHtml\(chrome\)/
     );
   });
 
