@@ -82,6 +82,12 @@ function eveningRecapHtml(recap) {
     recap.speedVotes > 0
       ? `<span class="evening-recap__chip">⚡ ${recap.speedVotes} SpeedVote${recap.speedVotes > 1 ? "s" : ""}</span>`
       : "",
+    recap.clutches > 0
+      ? `<span class="evening-recap__chip">💥 ${recap.clutches} Clutch</span>`
+      : "",
+    recap.wrongAnswers > 0
+      ? `<span class="evening-recap__chip">↩️ ${recap.wrongAnswers} Wrong Answer Only</span>`
+      : "",
     recap.traitreGames > 0
       ? `<span class="evening-recap__chip">🎭 ${recap.traitreGames} Spot the fake</span>`
       : "",
@@ -211,11 +217,17 @@ function gameSelectRenderSnapshot() {
     code: getLobby()?.code || "",
     recap: recap.hasActivity,
     ht: recap.hotTakes,
+    gl: recap.guessLieGamesPlayed,
+    lies: recap.liesTotal,
     sv: recap.speedVotes,
+    cl: recap.clutches,
+    wao: recap.wrongAnswers,
+    tr: recap.traitreGames,
     tq: recap.triviaGames,
     tm: recap.truthMeters,
     cs: recap.consensusGames,
     dl: recap.dilemmas,
+    tn: recap.tierNights,
     lastGame: getLastGame()?.gameId ?? null,
     resume,
   });
