@@ -3,6 +3,9 @@
  */
 import { describe, it, beforeEach, mock } from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import {
   DRAW_IT_CATALOG_ID,
   DRAW_IT_CATEGORIES,
@@ -211,6 +214,15 @@ describe("Draw it ! T3 — confidentialité + estimation", () => {
     assert.ok(prep.durationLabel);
     assert.equal(prep.capped, false);
     assert.equal("deck" in getDrawItSession(), false);
+  });
+
+  it("render prépa passe prep à drawItStartSlotHtml (évite crash .valid)", () => {
+    const src = readFileSync(
+      join(dirname(fileURLToPath(import.meta.url)), "../js/screens/drawItPrep.js"),
+      "utf8"
+    );
+    assert.match(src, /drawItStartSlotHtml\(allReady,\s*prep\)/);
+    assert.doesNotMatch(src, /drawItStartSlotHtml\(allReady\s*\)/);
   });
 
   it("lancement bloqué si pool insuffisant", async () => {

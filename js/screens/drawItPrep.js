@@ -56,8 +56,8 @@ export function mountDrawItPrep(app) {
         allReady,
         isHost: isLobbyHost(),
         minPlayers: DEFAULT_PREP_MIN_PLAYERS,
-        poolEmpty: !prep.valid,
-        poolEmptyLabel: prep.blockLabel || "Configuration invalide",
+        poolEmpty: !prep?.valid,
+        poolEmptyLabel: prep?.blockLabel || "Configuration invalide",
         launchLabel: "Lancer Draw it ! →",
       })
     );
@@ -263,7 +263,7 @@ export function mountDrawItPrep(app) {
         </button>
 
         <div id="draw-it-start-slot">
-          ${drawItStartSlotHtml(allReady)}
+          ${drawItStartSlotHtml(allReady, prep)}
         </div>
       `,
     });
