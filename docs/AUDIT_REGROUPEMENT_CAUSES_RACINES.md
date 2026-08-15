@@ -33,6 +33,7 @@ Vanilla JS + Supabase. Invité = `state.user.isGuest` + `state.supabaseUserId` (
 |----|-------|----------|----------|
 | **ARCH-23** | 8/11 | Détection compatibilité client (natif) + hard gate | 🟡 Vague 1 · SQL ✅ · **QA après tickets produit** |
 | **ARCH-10** | 8 | Clear cache leave lobby trop tard | 🟢 fonctionnel ✅ GH Pages · **mobile QA finale** (même vague qu’ARCH-23) |
+| **LANCEMENT APP** | Splash maj | code ok · **QA après prochain launch** |
 | **UX-DEVICE-01** | 11 | Écran verrouillé pendant une partie (Wake Lock API) | 🟡 · **dernier produit** |
 
 ### Dette / opportunité 

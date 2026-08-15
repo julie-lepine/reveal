@@ -17,6 +17,8 @@ Sources graphiques **versionnées dans le repo** pour l’app native et les stor
 
 Les exports portrait (`splash_*`) incluent le slogan **« l'app de soirée entre amis »** — c’est la version la plus aboutie visuellement.
 
+Sur **Android 12+**, le cold start système ne peut afficher qu’une **icône centrée + fond** (contrainte Google). Le logo R brandé (`resources/icon.png` → `splash_icon`) + fond `#0A0F1C` est appliqué via `scripts/patchNative.mjs`. Les PNG portrait (logo + tagline) restent utilisés en `drawable-port-*` (Android &lt;12 / fond de fenêtre).
+
 `../reveal.png` reste le logo source web (barre nav, etc.) ; **ne pas** l’utiliser directement comme icône store.
 
 ---
@@ -86,7 +88,7 @@ Ce script **écrase** `icon.png` et `splash.png` à partir de `reveal.png` (logo
 |----------|--------|--------|
 | `Capacitor CLI requires NodeJS >=22` | Node 20 | Installer [Node 22 LTS](https://nodejs.org) |
 | `@capacitor/assets` / `sharp` échoue | TLS ou EPERM | Autre réseau, Mac, ou upload manuel de `icon.png` sur App Store Connect |
-| Splash sans tagline au lancement | `splash.png` carré utilisé par Capacitor | Exporter un 2732² avec tagline depuis tes maquettes portrait, remplacer `splash.png`, relancer `assets:native` |
+| Splash sans tagline / icône blanche au lancement | Android 12+ = splash système (icône) ; fond launcher blanc | `node scripts/patchNative.mjs` puis rebuild ; vérifier `Theme.SplashScreen` + `ic_launcher_background` `#0A0F1C` |
 
 `resources/icon.png` reste valide pour l’**upload direct** icône 1024 sur App Store Connect même si `assets:native` échoue.
 

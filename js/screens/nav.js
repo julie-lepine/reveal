@@ -30,7 +30,7 @@ export async function goToEveningHome() {
   await returnToEveningGames({ hubOnly: true });
 }
 
-/** Paramètres : écran unique (profil + partie si lobby). */
+/** Menu : écran unique (profil + partie si lobby). */
 export function goToEveningSettings() {
   if (!canPlay()) {
     navigate("home", { reset: true });

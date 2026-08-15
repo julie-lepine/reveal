@@ -197,7 +197,9 @@ npm run cap:open:android   # ou cap:open:ios sur Mac
   # ou npm run cap:sync seul après modif js/data uniquement
   ```
   - [x] `cap:sync` + run Android Studio → app lancée sur téléphone (02 juin 2026)
-  - [x] `assets:native` régénéré (splash plein écran Android 12+, `logoSplashScale 0.62`) — 🧪 logo au démarrage OK sur device (juin 2026)
+  - [x] Splash Android 12+ brandé (`Theme.SplashScreen` + logo R + fond `#0A0F1C`, `patchNative`) — août 2026
+  - [x] `assets:native` / portrait tagline injectés en `drawable-port-*` via `patchNative`
+
   - [x] Icône **1024×1024** validée dans `resources/icon.png`
   - ⚠️ **Node ≥ 22** obligatoire pour `cap sync`
   - ⚠️ `@capacitor/assets` peut échouer sur Windows (TLS / `sharp`) — autre réseau ou Mac

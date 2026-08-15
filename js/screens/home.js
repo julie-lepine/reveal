@@ -948,7 +948,7 @@ export function mountHome(app) {
           <div class="auth-welcome card">
             <p class="auth-welcome__hi">Salut, <strong>${escapeHtml(user.name)}</strong> 👋</p>
             <div class="auth-welcome__actions">
-              <button type="button" class="btn btn-secondary btn--compact" data-nav="settings">Paramètres</button>
+              <button type="button" class="btn btn-secondary btn--compact" data-nav="settings">Menu</button>
               <button type="button" class="btn-link" id="btn-logout">Se déconnecter</button>
             </div>
           </div>`
@@ -957,7 +957,7 @@ export function mountHome(app) {
           <div class="auth-welcome card auth-welcome--guest">
             <p class="auth-welcome__hi">Invité : <strong>${escapeHtml(user.name)}</strong> ${escapeHtml(getLocalEmoji())}</p>
             <div class="auth-welcome__actions">
-              <button type="button" class="btn btn-secondary btn--compact" data-nav="settings">Paramètres</button>
+              <button type="button" class="btn btn-secondary btn--compact" data-nav="settings">Menu</button>
               <button type="button" class="btn-link" id="btn-logout">Quitter la session</button>
             </div>
           </div>

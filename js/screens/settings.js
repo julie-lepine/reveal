@@ -5,6 +5,7 @@ import {
   updateProfileName,
   updateProfileEmoji,
   changeEmailPassword,
+  logout,
 } from "../core/auth.js";
 import { getLocalDisplayName, getLocalEmoji } from "../core/state.js";
 import { PROFILE_EMOJI_CHOICES } from "../../data/profileEmojis.js";
@@ -23,7 +24,7 @@ import {
 import { isLobbyHost } from "../core/gameSync.js";
 import { isSupabaseConfigured } from "../core/supabaseClient.js";
 import { onLobbyBundleUpdated } from "../core/supabaseLobby.js";
-import { showAppConfirm, showLobbyPlayersManageDialog } from "../core/dialog.js";
+import { showAppAlert, showAppConfirm, showLobbyPlayersManageDialog } from "../core/dialog.js";
 import { MAX_PLAYERS } from "../config/lobbyLifecycle.js";
 import { lobbySettingsActionsForRole } from "../core/partySettingsMenu.js";
 import { navigate, getCurrentScreen } from "../core/router.js";
@@ -66,7 +67,7 @@ function settingsTabsHtml(activeTab, inLobby) {
   const soireeDisabled = !inLobby;
   const tabIndex = settingsTabIndex(activeTab);
   return `
-    <div class="settings-tabs" role="tablist" aria-label="Sections des paramètres" style="--settings-tab-index:${tabIndex}">
+    <div class="settings-tabs" role="tablist" aria-label="Sections du menu" style="--settings-tab-index:${tabIndex}">
       <span class="settings-tabs__cursor" aria-hidden="true"></span>
       <button type="button" class="settings-tabs__btn${
         activeTab === TAB_SOIREE ? " settings-tabs__btn--active" : ""
@@ -176,6 +177,18 @@ function soireePanelHtml(inLobby) {
     </div>`;
 }
 
+function profileLogoutSectionHtml(user) {
+  const label = user.isGuest ? "Quitter la session" : "Se déconnecter";
+  return `
+      <div class="card settings-section settings-profile__session">
+        <div class="settings-party__danger">
+          <button type="button" class="btn btn-secondary btn--spaced settings-party__btn settings-party__btn--danger" id="btn-settings-logout">
+            ${escapeHtml(label)}
+          </button>
+        </div>
+      </div>`;
+}
+
 function personnalisationPanelHtml({ emailAccount, user, selectedEmoji }) {
   return `
     <div class="settings-panel" id="settings-panel-personnalisation">
@@ -226,6 +239,7 @@ function personnalisationPanelHtml({ emailAccount, user, selectedEmoji }) {
             ? `<p class="hint settings-social-hint">Compte ${escapeHtml(user.provider || "social")} - le mot de passe se gère chez le fournisseur.</p>`
             : ""
       }
+      ${profileLogoutSectionHtml(user)}
     </div>`;
 }
 
@@ -361,6 +375,18 @@ export function mountSettings(app) {
       app.querySelector("#pwd-new").value = "";
       app.querySelector("#pwd-confirm").value = "";
       ok?.classList.remove("hidden");
+    });
+
+    app.querySelector("#btn-settings-logout")?.addEventListener("click", async () => {
+      if (!mount.isMounted()) return;
+      const res = await logout();
+      if (!mount.isMounted()) return;
+      if (res?.cancelled) return;
+      if (res?.ok === false && res.error) {
+        await showAppAlert(res.error, { title: "Déconnexion", icon: "⚠️" });
+        return;
+      }
+      navigate("home", { reset: true });
     });
   }
 
@@ -546,8 +572,8 @@ export function mountSettings(app) {
       back: true,
       backTarget: inLobby ? "back" : "home",
       content: `
-        <p class="label-upper label-upper--gold">⚙️ Paramètres</p>
-        <h1 class="page-title">Paramètres</h1>
+        <p class="label-upper label-upper--gold">☰ Menu</p>
+        <h1 class="page-title">Menu</h1>
         ${settingsTabsHtml(activeTab, inLobby)}
         ${
           activeTab === TAB_PERSONNALISATION

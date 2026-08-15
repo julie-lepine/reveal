@@ -22,13 +22,40 @@ const SPLASH_SCREEN_XML = `<?xml version="1.0" encoding="utf-8"?>
 </layer-list>
 `;
 
-const ANDROID_LAUNCH_STYLES = `    <!-- Plein écran : évite l'icône minuscule Android 12 (Theme.SplashScreen + animatedIcon). -->
-    <style name="AppTheme.NoActionBarLaunch" parent="AppTheme.NoActionBar">
+const SPLASH_ICON_XML = `<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 12+ animatedIcon : logo R sur fond brand (évite l'icône launcher / plaque claire). -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:drawable="@color/splash_background" />
+    <item>
+        <bitmap
+            android:gravity="center"
+            android:src="@drawable/splash_logo" />
+    </item>
+</layer-list>
+`;
+
+const ANDROID_LAUNCH_STYLE_BLOCK = `    <style name="AppTheme.NoActionBarLaunch" parent="Theme.SplashScreen">
         <item name="android:background">@drawable/splash_screen</item>
-        <item name="android:windowFullscreen">true</item>
-        <item name="android:windowDrawsSystemBarBackgrounds">true</item>
+        <item name="windowSplashScreenBackground">@color/splash_background</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/splash_icon</item>
+        <item name="windowSplashScreenIconBackgroundColor">@color/splash_background</item>
+        <item name="postSplashScreenTheme">@style/AppTheme.NoActionBar</item>
         <item name="android:statusBarColor">@color/splash_background</item>
         <item name="android:navigationBarColor">@color/splash_background</item>
+    </style>`;
+
+const ANDROID_BASE_STYLES = `    <!-- Base application theme. -->
+    <style name="AppTheme" parent="Theme.AppCompat.Light.DarkActionBar">
+        <!-- Customize your theme here. -->
+        <item name="colorPrimary">@color/colorPrimary</item>
+        <item name="colorPrimaryDark">@color/colorPrimaryDark</item>
+        <item name="colorAccent">@color/colorAccent</item>
+    </style>
+
+    <style name="AppTheme.NoActionBar" parent="Theme.AppCompat.DayNight.NoActionBar">
+        <item name="windowActionBar">false</item>
+        <item name="windowNoTitle">true</item>
+        <item name="android:background">@null</item>
     </style>
 `;
 
@@ -54,45 +81,79 @@ function patchAndroidProguardGradle() {
 
 function patchAndroidSplash() {
   const resDir = path.join(root, "android", "app", "src", "main", "res");
-  const splashScreenPath = path.join(resDir, "drawable", "splash_screen.xml");
+  const drawableDir = path.join(resDir, "drawable");
+  const splashScreenPath = path.join(drawableDir, "splash_screen.xml");
+  const splashIconPath = path.join(drawableDir, "splash_icon.xml");
+  const splashLogoPath = path.join(drawableDir, "splash_logo.png");
   const stylesPath = path.join(resDir, "values", "styles.xml");
   const colorsPath = path.join(resDir, "values", "colors.xml");
+  const iconBgPath = path.join(resDir, "values", "ic_launcher_background.xml");
+  const iconSrc = path.join(root, "resources", "icon.png");
+  const portraitSplash = path.join(root, "resources", "splash_android_1080x1920.png");
 
-  if (!fs.existsSync(splashScreenPath)) {
-    fs.mkdirSync(path.dirname(splashScreenPath), { recursive: true });
-    fs.writeFileSync(splashScreenPath, SPLASH_SCREEN_XML);
-    console.log("Android: splash_screen.xml créé");
+  fs.mkdirSync(drawableDir, { recursive: true });
+  fs.writeFileSync(splashScreenPath, SPLASH_SCREEN_XML);
+  fs.writeFileSync(splashIconPath, SPLASH_ICON_XML);
+  console.log("Android: splash_screen.xml + splash_icon.xml");
+
+  if (fs.existsSync(iconSrc)) {
+    fs.copyFileSync(iconSrc, splashLogoPath);
+    console.log("Android: splash_logo.png (resources/icon.png)");
+  }
+
+  if (fs.existsSync(portraitSplash)) {
+    let portCount = 0;
+    for (const entry of fs.readdirSync(resDir, { withFileTypes: true })) {
+      if (!entry.isDirectory() || !entry.name.startsWith("drawable-port")) continue;
+      fs.copyFileSync(portraitSplash, path.join(resDir, entry.name, "splash.png"));
+      portCount += 1;
+    }
+    if (portCount > 0) {
+      console.log(`Android: splash portrait + tagline → ${portCount} drawable-port*`);
+    }
   }
 
   if (fs.existsSync(stylesPath)) {
     let styles = fs.readFileSync(stylesPath, "utf8");
-    if (styles.includes("Theme.SplashScreen") || styles.includes("windowSplashScreenAnimatedIcon")) {
-      styles = styles.replace(
-        /<!-- Android 12\+[\s\S]*?<\/style>\s*\n\s*<\/resources>/,
-        `${ANDROID_LAUNCH_STYLES}\n</resources>`
-      );
-      if (styles.includes("Theme.SplashScreen")) {
-        styles = styles.replace(
-          /<style name="AppTheme\.NoActionBarLaunch" parent="Theme\.SplashScreen">[\s\S]*?<\/style>/,
-          ANDROID_LAUNCH_STYLES.trim()
-        );
-      }
-      fs.writeFileSync(stylesPath, styles);
-      console.log("Android: thème splash plein écran appliqué");
+
+    // Ne matcher que le bloc <style> (pas les commentaires précédents — évite d'avaler AppTheme).
+    const launchRe = /<style name="AppTheme\.NoActionBarLaunch"[\s\S]*?<\/style>/;
+    if (launchRe.test(styles)) {
+      styles = styles.replace(launchRe, ANDROID_LAUNCH_STYLE_BLOCK.trim());
+    } else {
+      styles = styles.replace("</resources>", `\n${ANDROID_LAUNCH_STYLE_BLOCK}\n</resources>`);
     }
+
+    if (!styles.includes('name="AppTheme"') || !styles.includes('name="AppTheme.NoActionBar"')) {
+      styles = styles.replace("<resources>", `<resources>\n\n${ANDROID_BASE_STYLES}`);
+    }
+
+    fs.writeFileSync(stylesPath, styles);
+    console.log("Android: Theme.SplashScreen brandé (logo R + fond #0A0F1C)");
   }
 
   if (fs.existsSync(colorsPath) && !fs.readFileSync(colorsPath, "utf8").includes("splash_background")) {
     let colors = fs.readFileSync(colorsPath, "utf8");
     colors = colors.replace(
       "</resources>",
-      `    <color name="splash_background">#0A0F1C</color>\n</resources>`
+      `    <!-- Fond splash REVEAL -->\n    <color name="splash_background">#0A0F1C</color>\n</resources>`
     );
     fs.writeFileSync(colorsPath, colors);
     console.log("Android: splash_background ajouté");
   }
-}
 
+  if (fs.existsSync(iconBgPath)) {
+    const next = `<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="ic_launcher_background">#0A0F1C</color>
+</resources>
+`;
+    if (fs.readFileSync(iconBgPath, "utf8") !== next) {
+      fs.writeFileSync(iconBgPath, next);
+      console.log("Android: ic_launcher_background → #0A0F1C");
+    }
+  }
+}
 function patchAndroid() {
   const manifestPath = path.join(root, "android", "app", "src", "main", "AndroidManifest.xml");
   const stringsPath = path.join(root, "android", "app", "src", "main", "res", "values", "strings.xml");

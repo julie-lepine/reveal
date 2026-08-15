@@ -22,7 +22,7 @@ const TAB_LOGO = BOTTOM_NAV_TAB.LOGO;
 const TAB_RESULTS = BOTTOM_NAV_TAB.RESULTS;
 const TAB_FINAL = BOTTOM_NAV_TAB.FINAL;
 
-/** Écran courant → onglet actif (settings = onglet Paramètres en lobby). */
+/** Écran courant → onglet actif (settings = onglet Menu en lobby). */
 const SCREEN_TO_TAB = {
   home: TAB_HOME,
   lobby: TAB_LOGO,
@@ -81,7 +81,7 @@ function goFinal() {
   goToScores("leaderboard");
 }
 
-/** Onglet Paramètres → écran settings (plus de modale party). */
+/** Onglet Menu → écran settings (plus de modale party). */
 function goSettings() {
   if (!hasActiveLobby()) return;
   goToEveningSettings();
@@ -97,9 +97,9 @@ const TAB_ACTIONS = {
 function tabButtonHtml(tabId) {
   if (tabId === TAB_SETTINGS) {
     return `
-    <button type="button" class="bottom-nav__item" data-tab="${TAB_SETTINGS}" data-tab-nav="${TAB_SETTINGS}" aria-label="Paramètres">
-      <span class="bottom-nav__icon-wrap"><span class="bottom-nav__icon" aria-hidden="true">⚙️</span></span>
-      <span class="bottom-nav__label">Paramètres</span>
+    <button type="button" class="bottom-nav__item" data-tab="${TAB_SETTINGS}" data-tab-nav="${TAB_SETTINGS}" aria-label="Menu">
+      <span class="bottom-nav__icon-wrap"><span class="bottom-nav__icon bottom-nav__icon--menu" aria-hidden="true"></span></span>
+      <span class="bottom-nav__label">Menu</span>
     </button>`;
   }
   if (tabId === TAB_HOME) {
@@ -200,7 +200,7 @@ function updateNavVisibility(screenId) {
   nav.hidden = !show;
   document.body.classList.toggle("has-bottom-nav", show);
 
-  // Catalogue selon membership réelle (Accueil hors lobby / Paramètres en lobby).
+  // Catalogue selon membership réelle (Accueil hors lobby / Menu en lobby).
   const want = resolveBottomNavTabs(inLobby).join("|");
   const have = [...nav.querySelectorAll("[data-tab]")]
     .map((el) => el.getAttribute("data-tab"))

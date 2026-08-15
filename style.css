@@ -4116,6 +4116,15 @@ button.emoji-picker-preview__avatar:active{
   line-height:1;
 }
 
+.bottom-nav__icon--menu{
+  display:block;
+  width:18px;
+  height:2px;
+  border-radius:1px;
+  background:currentColor;
+  box-shadow:0 -6px 0 currentColor, 0 6px 0 currentColor;
+}
+
 .bottom-nav__label{
   font-size:10px;
   font-weight:600;

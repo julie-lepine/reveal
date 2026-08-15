@@ -1,5 +1,5 @@
 /**
- * UX-NAV-SETTINGS - écran Paramètres unique (profil + partie).
+ * UX-NAV-SETTINGS - écran Menu unique (profil + soirée + support).
  */
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
@@ -23,16 +23,20 @@ function src(rel) {
 }
 
 describe("UX-NAV-SETTINGS - navigation", () => {
-  it("lobby actif → Paramètres bottom nav → goToEveningSettings (pas openPartySettings)", () => {
+  it("lobby actif → Menu bottom nav → goToEveningSettings (pas openPartySettings)", () => {
     const nav = src("js/core/bottomNav.js");
     assert.match(nav, /goToEveningSettings/);
     assert.equal(nav.includes("openPartySettings"), false);
     assert.match(nav, /settings:\s*TAB_SETTINGS/);
+    assert.match(nav, /bottom-nav__icon--menu/);
+    assert.match(nav, /aria-label="Menu"/);
+    assert.match(nav, /bottom-nav__label">Menu/);
+    assert.equal(nav.includes("Paramètres"), false);
     assert.equal(isBottomNavTabVisible(true, BOTTOM_NAV_TAB.SETTINGS), true);
     assert.equal(isBottomNavTabVisible(true, BOTTOM_NAV_TAB.HOME), false);
   });
 
-  it("hors lobby → Accueil dans le catalogue, pas Paramètres", () => {
+  it("hors lobby → Accueil dans le catalogue, pas Menu", () => {
     assert.deepEqual([...resolveBottomNavTabs(false)], [
       "games",
       "results",
@@ -97,7 +101,13 @@ describe("UX-NAV-SETTINGS - contenu écran", () => {
     assert.match(settings, /changeEmailPassword/);
     assert.match(settings, /Partie en cours/);
     assert.match(settings, /Retour aux jeux/);
-    assert.match(settings, /hasActiveLobby\(\)/);
+    assert.match(settings, /page-title">Menu/);
+    assert.match(settings, /btn-settings-logout/);
+    assert.match(settings, /profileLogoutSectionHtml/);
+    assert.match(settings, /logout\(\)/);
+    assert.match(settings, /Quitter la session/);
+    assert.match(settings, /Se déconnecter/);
+    assert.match(settings, /navigate\("home",\s*\{\s*reset:\s*true\s*\}\)/);
     assert.match(settings, /data-settings-party="leave"/);
     assert.match(settings, /data-settings-party="close"/);
     assert.match(settings, /data-settings-party="transfer"/);
@@ -111,6 +121,11 @@ describe("UX-NAV-SETTINGS - contenu écran", () => {
     assert.match(settings, /onLobbyBundleUpdated/);
     assert.match(settings, /createMountGuard/);
     assert.match(settings, /mount\.dispose/);
+  });
+
+  it("CSS hamburger menu bottom nav présent", () => {
+    const css = src("style.css");
+    assert.match(css, /\.bottom-nav__icon--menu/);
   });
 
   it("CSS onglets settings présents", () => {
