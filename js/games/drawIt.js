@@ -13,6 +13,7 @@ import {
   formatDrawItCountdown,
   remainingMsUntil,
   canCommitDrawItReveal,
+  drawItSyncedNowMs,
 } from "../core/drawItRound.js";
 import {
   drawItGuessesToChatMessages,
@@ -104,29 +105,31 @@ export function mountDrawIt(app) {
       },
       getSession: getDrawItSession,
       getLocalUid: localUid,
+      nowMs: () => drawItSyncedNowMs(getDrawItSession()),
     });
   }
 
-  function guessLockReason(session) {
+  function guessLockReason(session, nowMs = drawItSyncedNowMs(session)) {
     if (session.phase !== DRAW_IT_PHASE_DRAWING) return "Les propositions sont fermées.";
     if (isLocalDrawer(session)) return "Le dessinateur ne propose pas.";
     if (isUidInDrawItFoundOrder(session.foundOrder, localUid())) {
       return "Tu as trouvé ! Tu peux encore lire les propositions.";
     }
-    if (isDrawItGuessInputLocked(session, localUid())) {
+    if (isDrawItGuessInputLocked(session, localUid(), nowMs)) {
       return "Les propositions sont fermées.";
     }
     return "";
   }
 
   function applyGuessInputLock(session) {
-    const locked = isDrawItGuessInputLocked(session, localUid());
+    const nowMs = drawItSyncedNowMs(session);
+    const locked = isDrawItGuessInputLocked(session, localUid(), nowMs);
     const inputEl = app.querySelector("#draw-it-guess-input");
     const sendEl = app.querySelector("#draw-it-guess-send");
     if (inputEl) {
       inputEl.disabled = locked;
       inputEl.placeholder = locked
-        ? guessLockReason(session) || "Propositions fermées"
+        ? guessLockReason(session, nowMs) || "Propositions fermées"
         : "Propose un mot…";
     }
     if (sendEl) sendEl.disabled = locked;
@@ -148,7 +151,9 @@ export function mountDrawIt(app) {
           return nameForUserId(uid) || "Joueur";
         }),
       sendMessage: async (text) => {
-        const result = await submitDrawItGuess(text);
+        const result = await submitDrawItGuess(text, {
+          nowMs: drawItSyncedNowMs(getDrawItSession()),
+        });
         if (!result?.ok) {
           throw new Error(result?.reason || "guess_failed");
         }
@@ -230,8 +235,9 @@ export function mountDrawIt(app) {
   }
 
   function guessChatHtml(session) {
-    const locked = isDrawItGuessInputLocked(session, localUid());
-    const hint = guessLockReason(session);
+    const nowMs = drawItSyncedNowMs(session);
+    const locked = isDrawItGuessInputLocked(session, localUid(), nowMs);
+    const hint = guessLockReason(session, nowMs);
     return `
       <div class="card draw-it-guess">
         <p class="label-upper">Propositions</p>
@@ -258,7 +264,10 @@ export function mountDrawIt(app) {
     const total = Number(session.roundCount) || 0;
     const roundIdx = session.roundIdx ?? 0;
     const phase = session.phase;
-    const remaining = remainingMsUntil(session.roundEndsAt);
+    const remaining = remainingMsUntil(
+      session.roundEndsAt,
+      drawItSyncedNowMs(session)
+    );
     const clock = formatDrawItCountdown(remaining);
     const host = !mp || canActAsHost();
     const drawer = isLocalDrawer(session);
@@ -370,12 +379,17 @@ export function mountDrawIt(app) {
       }
       const session = getDrawItSession();
       if (session.phase !== DRAW_IT_PHASE_DRAWING) return;
+      const nowMs = drawItSyncedNowMs(session);
       const clock = app.querySelector("#draw-it-clock");
-      if (clock) clock.textContent = formatDrawItCountdown(remainingMsUntil(session.roundEndsAt));
+      if (clock) {
+        clock.textContent = formatDrawItCountdown(
+          remainingMsUntil(session.roundEndsAt, nowMs)
+        );
+      }
       applyGuessInputLock(session);
       canvasCtl?.syncInteractive();
-      if ((!mp || canActAsHost()) && canCommitDrawItReveal(session).ok) {
-        void commitDrawItReveal().then(() => {
+      if ((!mp || canActAsHost()) && canCommitDrawItReveal(session, nowMs).ok) {
+        void commitDrawItReveal({ nowMs }).then(() => {
           if (!mount.isMounted() || !mount.isCurrentMount()) return;
           render();
         });
@@ -388,6 +402,9 @@ export function mountDrawIt(app) {
     if (stopGameSessionListenerOnPostGame(row)) return;
     const session = getDrawItSession();
     board = maybeResetDrawItBoard(board, session);
+    // Le nouveau roundIdx/timer est rendu immédiatement ; le mot privé du
+    // nouveau drawer peut arriver ensuite sans retarder le countdown.
+    render();
     void refreshPrivateWord(session).then(() => {
       if (!mount.isMounted() || !mount.isCurrentMount()) return;
       render();

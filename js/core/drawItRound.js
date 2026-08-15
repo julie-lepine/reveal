@@ -78,6 +78,49 @@ export function remainingMsUntil(roundEndsAt, nowMs = Date.now()) {
   return Math.max(0, end - Number(nowMs));
 }
 
+/**
+ * Estimation de l'heure serveur à partir du dernier game_sessions.updated_at reçu.
+ * Annule le décalage absolu de l'horloge de l'appareil sans persister de compteur.
+ */
+export function drawItSyncedNowMs(session, clientNowMs = Date.now()) {
+  const serverAt = Date.parse(session?.serverTimeAtSync);
+  const clientAt = Number(session?.clientTimeAtSyncMs);
+  const clientNow = Number(clientNowMs);
+  if (
+    Number.isFinite(serverAt) &&
+    Number.isFinite(clientAt) &&
+    Number.isFinite(clientNow)
+  ) {
+    return serverAt + Math.max(0, clientNow - clientAt);
+  }
+  return clientNow;
+}
+
+export function isNewDrawItRound(current, incoming) {
+  if (!incoming?.runId) return false;
+  if (!current?.runId) return true;
+  if (String(incoming.runId) !== String(current.runId)) return true;
+  const currentIdx = Number(current.roundIdx);
+  const incomingIdx = Number(incoming.roundIdx);
+  return (
+    Number.isInteger(currentIdx) &&
+    Number.isInteger(incomingIdx) &&
+    incomingIdx > currentIdx
+  );
+}
+
+export function isStaleDrawItRound(current, incoming) {
+  if (!current?.runId || !incoming?.runId) return false;
+  if (String(incoming.runId) !== String(current.runId)) return false;
+  const currentIdx = Number(current.roundIdx);
+  const incomingIdx = Number(incoming.roundIdx);
+  return (
+    Number.isInteger(currentIdx) &&
+    Number.isInteger(incomingIdx) &&
+    incomingIdx < currentIdx
+  );
+}
+
 export function isDrawItRoundExpired(roundEndsAt, nowMs = Date.now()) {
   const end = Date.parse(roundEndsAt);
   if (!Number.isFinite(end)) return false;

@@ -359,7 +359,7 @@ declare
   v_order jsonb;
   v_len int;
   v_drawer text;
-  v_start timestamptz := clock_timestamp();
+  v_start timestamptz;
   v_end timestamptz;
   v_next_di jsonb;
 begin
@@ -412,6 +412,8 @@ begin
   if v_drawer is null or length(trim(v_drawer)) = 0 then
     raise exception 'drawerUid suivant invalide.';
   end if;
+  -- Un seul instant serveur, pris sous verrou, définit toute la nouvelle manche.
+  v_start := clock_timestamp();
   v_end := v_start + interval '60 seconds';
 
   v_next_di := v_di

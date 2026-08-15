@@ -119,6 +119,10 @@ import {
   sanitizeDrawItGuesses,
 } from "./drawItGuesses.js";
 import {
+  isNewDrawItRound,
+  isStaleDrawItRound,
+} from "./drawItRound.js";
+import {
   stripCustomRosterTopicsFromGenericPatch,
   summarizeCustomRosterTopics,
   preserveCustomRosterTopicsInFullStateReplace,
@@ -1387,6 +1391,7 @@ function mergeRemoteSpeedVoteVotesUid(cur, inc) {
 function mergeDrawItGameLocal(local, remote) {
   if (!remote) return local;
   if (!local) return remote;
+  if (isStaleDrawItRound(local, remote)) return local;
   const ready =
     !remote.lobbyStarted && !local.lobbyStarted
       ? mergeReadyMapsLocal(local.ready || {}, remote.ready || {}, getActivePlayerNames(), getLocalDisplayName())
@@ -1395,7 +1400,7 @@ function mergeDrawItGameLocal(local, remote) {
     Array.isArray(remote.drawerOrder) && remote.drawerOrder.length
       ? remote.drawerOrder
       : local.drawerOrder || [];
-  return {
+  const merged = {
     ...local,
     ...remote,
     ready,
@@ -1406,6 +1411,13 @@ function mergeDrawItGameLocal(local, remote) {
         ? remote.participants
         : local.participants || [],
   };
+  if (isNewDrawItRound(local, remote)) {
+    // Nouvelle identité runId+roundIdx : aucun timestamp de l'ancienne manche
+    // ne doit survivre, même face à un payload distant incomplet.
+    merged.roundStartAt = remote.roundStartAt ?? null;
+    merged.roundEndsAt = remote.roundEndsAt ?? null;
+  }
+  return merged;
 }
 
 function mergeDrawItPatchState(cur, inc, { mergeReadyUid }) {
@@ -3569,7 +3581,11 @@ export function applyRemoteSession(row, { epoch = null } = {}) {
     patch.speedVoteGame = local ? mergeSpeedVoteGameLocal(local, remote) : remote;
   }
   if (st.drawIt) {
-    const remote = drawItFromRemote(st.drawIt);
+    const remote = {
+      ...drawItFromRemote(st.drawIt),
+      serverTimeAtSync: row.updated_at || null,
+      clientTimeAtSyncMs: Date.now(),
+    };
     const local = getState().drawItGame;
     patch.drawItGame = local ? mergeDrawItGameLocal(local, remote) : remote;
   }
