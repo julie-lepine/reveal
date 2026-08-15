@@ -158,6 +158,23 @@ describe("Draw it ! — barème et cumul de trois manches", () => {
       ]
     );
   });
+
+  it("le podium final reprend emoji et couleur du roster", () => {
+    const { afterThree } = playThreeRounds();
+    const standings = buildDrawItStandings(afterThree, [
+      { userId: EMMA, name: "Emma renommée", emoji: "🦊", color: "#f97316" },
+      { userId: LUCAS, name: "Lucas", emoji: "🐼", color: "#111827" },
+      { userId: JULIE, name: "Julie", emoji: "🐸", color: "#22c55e" },
+    ]);
+    assert.deepEqual(
+      standings.map(({ name, emoji, color }) => ({ name, emoji, color })),
+      [
+        { name: "Emma", emoji: "🦊", color: "#f97316" },
+        { name: "Lucas", emoji: "🐼", color: "#111827" },
+        { name: "Julie", emoji: "🐸", color: "#22c55e" },
+      ]
+    );
+  });
 });
 
 describe("Draw it ! — intégration scores REVEAL", () => {

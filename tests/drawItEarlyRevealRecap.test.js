@@ -155,7 +155,7 @@ describe("Draw it ! — clôture anticipée", () => {
 });
 
 describe("Draw it ! — contrat récapitulatif", () => {
-  it("classe trouvés, absents et drawer sans inventer de points", () => {
+  it("classe trouvés, absents et drawer avec le delta de manche", () => {
     const revealed = applyDrawItReveal(
       {
         ...session(),
@@ -170,9 +170,9 @@ describe("Draw it ! — contrat récapitulatif", () => {
     assert.deepEqual(
       recap.rows.map((row) => [row.name, row.role, row.found, row.rank, row.pointsDelta]),
       [
-        ["Bob", "guesser", true, 1, null],
-        ["Chloé", "guesser", false, null, null],
-        ["Alice", "drawer", false, null, null],
+        ["Bob", "guesser", true, 1, 20],
+        ["Chloé", "guesser", false, null, 0],
+        ["Alice", "drawer", false, null, 5],
       ]
     );
   });
@@ -189,7 +189,8 @@ describe("Draw it ! — contrat récapitulatif", () => {
     assert.doesNotMatch(revealBranch, /id="draw-it-clock"/);
     assert.match(revealBranch, /Dessin de la manche/);
     assert.match(revealBranch, /Résultat de la manche/);
-    assert.match(src, /Points : —/);
+    assert.match(src, /pointsLabel/);
+    assert.doesNotMatch(src, /Points : —/);
     assert.match(src, /Dessin indisponible sur cet appareil/);
     assert.match(revealBranch, /Manche suivante →/);
     assert.match(revealBranch, /Voir les résultats →/);

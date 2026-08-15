@@ -1,6 +1,5 @@
 /**
  * Contrat de données du récap Draw it !.
- * Les points restent null jusqu'au ticket de scoring dédié.
  */
 import { expectedDrawItGuessers } from "./drawItRound.js";
 
@@ -28,6 +27,16 @@ export function buildDrawItRoundRecap(session = {}) {
   const foundOrder = Array.isArray(session.lastRound?.foundOrder)
     ? session.lastRound.foundOrder
     : session.foundOrder;
+  const deltas =
+    session.lastRound?.deltas && typeof session.lastRound.deltas === "object"
+      ? session.lastRound.deltas
+      : {};
+  const pointsFor = (uid) => {
+    const name = players.get(uid)?.name;
+    const value = deltas[name] ?? deltas[uid] ?? 0;
+    const points = Number(value);
+    return Number.isFinite(points) ? points : 0;
+  };
   for (const entry of Array.isArray(foundOrder)
     ? foundOrder
     : []) {
@@ -46,7 +55,7 @@ export function buildDrawItRoundRecap(session = {}) {
     found: true,
     rank: index + 1,
     foundAt: entry.at,
-    pointsDelta: null,
+    pointsDelta: pointsFor(entry.uid),
   }));
   const notFound = expected
     .filter((uid) => !foundByUid.has(uid))
@@ -57,7 +66,7 @@ export function buildDrawItRoundRecap(session = {}) {
       found: false,
       rank: null,
       foundAt: null,
-      pointsDelta: null,
+      pointsDelta: pointsFor(uid),
     }));
   const drawer = drawerUid
     ? {
@@ -67,7 +76,7 @@ export function buildDrawItRoundRecap(session = {}) {
         found: false,
         rank: null,
         foundAt: null,
-        pointsDelta: null,
+        pointsDelta: pointsFor(drawerUid),
       }
     : null;
 

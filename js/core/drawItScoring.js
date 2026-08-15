@@ -87,14 +87,25 @@ export function awardDrawItRound(session = {}) {
   };
 }
 
-export function buildDrawItStandings(session = {}) {
+export function buildDrawItStandings(session = {}, roster = []) {
   const players = participantIndex(session);
   const scores = session.matchScores || {};
+  const visualsByName = new Map();
+  const visualsByUid = new Map();
+  for (const player of Array.isArray(roster) ? roster : []) {
+    if (player?.name) visualsByName.set(String(player.name), player);
+    if (player?.userId) visualsByUid.set(String(player.userId), player);
+  }
   return sortAndRankByScore(
-    [...players.values()].map((name) => ({
-      name,
-      score: Number(scores[name]) || 0,
-    })),
+    [...players.entries()].map(([uid, name]) => {
+      const visual = visualsByUid.get(uid) || visualsByName.get(name);
+      return {
+        name,
+        score: Number(scores[name]) || 0,
+        emoji: visual?.emoji || "🙂",
+        color: visual?.color || "#888",
+      };
+    }),
     (player) => player.score
   );
 }

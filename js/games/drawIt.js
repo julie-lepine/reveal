@@ -46,6 +46,7 @@ import {
 import { buildDrawItRoundRecap } from "../core/drawItRoundRecap.js";
 import { buildDrawItStandings } from "../core/drawItScoring.js";
 import { serializeLastGameStandings } from "../core/lastGamePodium.js";
+import { getSortedActivePlayers } from "../core/players.js";
 
 export function mountDrawIt(app) {
   if (!requireLobbyPlay()) return null;
@@ -210,12 +211,14 @@ export function mountDrawIt(app) {
             : row.found
               ? "A trouvé"
               : "N’a pas trouvé";
+        const points = Number(row.pointsDelta) || 0;
+        const pointsLabel = `${points > 0 ? "+" : ""}${points} pt${Math.abs(points) > 1 ? "s" : ""}`;
         return `
           <li class="draw-it-recap__row" data-role="${row.role}" data-found="${row.found}">
             <span class="draw-it-recap__rank">${marker}</span>
             <span class="draw-it-recap__player">${escapeHtml(row.name)}</span>
             <span class="draw-it-recap__result">${result}</span>
-            <span class="draw-it-recap__points" title="Scoring Draw it ! à venir">Points : —</span>
+            <span class="draw-it-recap__points">${pointsLabel}</span>
           </li>`;
       })
       .join("");
@@ -354,7 +357,9 @@ export function mountDrawIt(app) {
             gameId: "drawit",
             title: "Draw it !",
             summary: `${live.roundCount} manches`,
-            standings: serializeLastGameStandings(buildDrawItStandings(live)),
+            standings: serializeLastGameStandings(
+              buildDrawItStandings(live, getSortedActivePlayers())
+            ),
           });
           const done = await commitDrawItComplete();
           if (done?.ok === false) return;
