@@ -188,6 +188,7 @@ describe("Draw it ! T5 — mauvaises / bonnes réponses", () => {
     assert.equal(applied.session.foundOrder[0].uid, GUEST_UID);
     assert.equal(applied.session.foundOrder[0].at, SERVER_AT);
     assert.equal(applied.session.guesses[0].correct, true);
+    assert.equal(applied.session.guesses[0].value, "");
   });
 
   it("variante acceptedAnswers acceptée", () => {
@@ -338,6 +339,7 @@ describe("Draw it ! T5 — secret + feed + hydrate", () => {
     assert.equal("acceptedAnswers" in remote, false);
     assert.equal("deck" in remote, false);
     assert.equal(JSON.stringify(remote).includes("Éléphant"), false);
+    assert.equal(JSON.stringify(remote).includes("elephant"), false);
     assert.equal(JSON.stringify(remote).includes("pachyderme"), false);
   });
 
@@ -410,7 +412,7 @@ describe("Draw it ! T5 — session + UI wiring", () => {
     __resetCachedGameSessionForTests();
   });
 
-  it("submit hors-ligne ajoute Bob sans terminer la manche", async () => {
+  it("dernier devineur hors-ligne : guess puis reveal sans second appel", async () => {
     const launched = getDrawItSession();
     const priv = peekLocalDrawItPrivate(LOBBY_ID, launched.runId, 0);
     assert.ok(priv?.wordLabel);
@@ -421,9 +423,10 @@ describe("Draw it ! T5 — session + UI wiring", () => {
     });
     assert.equal(result.ok, true);
     const session = getDrawItSession();
-    assert.equal(session.phase, DRAW_IT_PHASE_DRAWING);
+    assert.equal(session.phase, DRAW_IT_PHASE_REVEAL);
     assert.equal(session.foundOrder[0].uid, GUEST_UID);
     assert.equal(session.roundEndsAt, launched.roundEndsAt);
+    assert.equal(session.lastRound.wordLabel, priv.wordLabel);
   });
 
   it("écran jeu monte mountChatPanel, pas lobby_messages", () => {
@@ -469,25 +472,30 @@ describe("Draw it ! T5 — session + UI wiring", () => {
       launched,
       guessOpts(GUEST_UID, "elephant")
     ).session;
+    const revealed = applyDrawItReveal(withGuess, {
+      wordLabel: "Éléphant",
+      nowMs: NOW + 5_000,
+    }).session;
     __resetCachedGameSessionForTests();
     applyRemoteSession({
       lobby_id: LOBBY_ID,
       game_id: "drawit",
       screen: "drawit",
       updated_at: "2026-08-15T21:00:31.000Z",
-      state: { drawIt: drawItToRemote(withGuess) },
+      state: { drawIt: drawItToRemote(revealed) },
     });
     const session = getDrawItSession();
     assert.equal(session.guesses[0].correct, true);
     assert.equal(session.foundOrder[0].uid, GUEST_UID);
-    assert.equal(session.phase, DRAW_IT_PHASE_DRAWING);
+    assert.equal(session.phase, DRAW_IT_PHASE_REVEAL);
+    assert.equal(session.lastRound.wordLabel, "Éléphant");
     const feed = drawItGuessesToChatMessages(session.guesses, () => "Bob");
-    assert.equal(feed[0].text, "✓ elephant");
+    assert.equal(feed[0].text, "✓ Mot trouvé !");
   });
 });
 
 describe("Draw it ! T5 — SQL RPC", () => {
-  it("submit_drawit_guess : FOR UPDATE, clock_timestamp, pas de phase", () => {
+  it("submit_drawit_guess : FOR UPDATE + reveal atomique du dernier devineur", () => {
     const sql = read("supabase/feature-drawit-03-guesses.sql");
     assert.match(sql, /create or replace function public\.normalize_drawit_guess/);
     assert.match(sql, /create or replace function public\.submit_drawit_guess/);
@@ -500,10 +508,12 @@ describe("Draw it ! T5 — SQL RPC", () => {
     assert.match(fn, /DRAWIT_EXPIRED/);
     assert.match(fn, /DRAWIT_NOT_DRAWING/);
     assert.match(fn, /drawit_private/);
-    assert.doesNotMatch(fn, /p_word_label|p_accepted|wordLabel/);
-    assert.doesNotMatch(fn, /'reveal'/);
-    assert.match(fn, /jsonb_set\([\s\S]*foundOrder[\s\S]*guesses/);
-    assert.doesNotMatch(fn, /\{drawIt,phase\}/);
+    assert.doesNotMatch(fn, /p_word_label|p_accepted/);
+    assert.match(fn, /drawit_all_guessers_found/);
+    assert.match(fn, /drawit_revealed_state\(v_di, v_priv\.word_label\)/);
+    assert.match(fn, /case when v_correct then '' else v_trimmed end/);
+    assert.match(fn, /'foundOrder', v_found/);
+    assert.match(fn, /'guesses', v_guesses/);
     assert.doesNotMatch(fn, /\{drawIt,roundEndsAt\}/);
     assert.match(read("js/core/gameSessionRpc.js"), /rpcSubmitDrawItGuess/);
     assert.match(read("js/core/gameSessionRpc.js"), /submit_drawit_guess/);

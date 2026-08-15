@@ -273,7 +273,13 @@ export async function commitDrawItReveal({ nowMs = Date.now() } = {}) {
     if (isGameSyncActive() && isSupabaseConfigured() && canActAsHost()) {
       const { rpcRevealDrawItRound } = await import("./gameSessionRpc.js");
       const row = await rpcRevealDrawItRound({ lobbyId: getState().lobby.id });
-      if (row) applyRemoteSession(row);
+      let full = row;
+      if (row && !row.state) full = await refreshGameSession();
+      if (!full?.state) return { ok: false, reason: "not_applied" };
+      applyRemoteSession(full);
+      if (getDrawItSession().phase !== "reveal") {
+        return { ok: false, reason: "not_applied" };
+      }
       return { ok: true, reason: null };
     }
 
@@ -302,7 +308,17 @@ export async function commitDrawItNextRound({ nowMs = Date.now() } = {}) {
     if (isGameSyncActive() && isSupabaseConfigured() && canActAsHost()) {
       const { rpcAdvanceDrawItRound } = await import("./gameSessionRpc.js");
       const row = await rpcAdvanceDrawItRound({ lobbyId: getState().lobby.id });
-      if (row) applyRemoteSession(row);
+      let full = row;
+      if (row && !row.state) full = await refreshGameSession();
+      if (!full?.state) return { ok: false, reason: "not_applied" };
+      applyRemoteSession(full);
+      const synced = getDrawItSession();
+      if (
+        synced.phase !== "drawing" ||
+        Number(synced.roundIdx) !== Number(check.nextIdx)
+      ) {
+        return { ok: false, reason: "not_applied" };
+      }
       return { ok: true, reason: null };
     }
 
@@ -377,7 +393,11 @@ export async function submitDrawItGuess(rawValue, { nowMs = Date.now(), uid } = 
         const last = Array.isArray(synced.guesses)
           ? synced.guesses[synced.guesses.length - 1]
           : null;
-        if (!last || String(last.uid) !== String(author) || last.value !== trimmed) {
+        if (
+          !last ||
+          String(last.uid) !== String(author) ||
+          (!last.correct && last.value !== trimmed)
+        ) {
           return { ok: false, reason: "not_applied" };
         }
         return { ok: true, correct: Boolean(last.correct), reason: null };
@@ -409,7 +429,15 @@ export async function submitDrawItGuess(rawValue, { nowMs = Date.now(), uid } = 
       acceptedAnswers: priv?.acceptedAnswers || [],
     });
     if (!applied.ok) return applied;
-    saveStatePatch({ drawItGame: applied.session });
+    let nextSession = applied.session;
+    if (applied.correct) {
+      const revealed = applyDrawItReveal(nextSession, {
+        wordLabel: priv?.wordLabel || "",
+        nowMs,
+      });
+      if (revealed.ok) nextSession = revealed.session;
+    }
+    saveStatePatch({ drawItGame: nextSession });
     return { ok: true, correct: applied.correct, reason: null };
   });
   if (!outcome.ok && outcome.skipped) return { ok: false, reason: "in_flight" };

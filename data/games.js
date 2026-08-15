@@ -75,6 +75,7 @@ export const GAMES = [
     desc: "Un joueur dessine - les autres devinent en 60 secondes",
     emoji: "✏️",
     cssClass: "drawit",
+    logo: "assets/games/drawit.png",
     borderGradient:
       "linear-gradient(145deg, #38BDF8 0%, #A78BFA 48%, #2B2D66 100%)",
     enabled: true,

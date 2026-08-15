@@ -57,9 +57,12 @@ const {
   drawItToRemote,
   __resetCachedGameSessionForTests,
 } = await import("../js/core/gameSync.js");
-const { buildDrawItLaunchState, DRAW_IT_PHASE_DRAWING } = await import(
-  "../js/core/drawItRound.js"
-);
+const {
+  applyDrawItReveal,
+  buildDrawItLaunchState,
+  DRAW_IT_PHASE_DRAWING,
+  DRAW_IT_PHASE_REVEAL,
+} = await import("../js/core/drawItRound.js");
 const {
   applyDrawItGuess,
   drawItGuessesToChatMessages,
@@ -215,7 +218,48 @@ describe("Draw it ! T5 — RPC → état local → feed", () => {
     assert.equal(session.phase, DRAW_IT_PHASE_DRAWING);
     assert.equal(session.roundEndsAt, launched.roundEndsAt);
     const feed = drawItGuessesToChatMessages(session.guesses, () => "Bob");
-    assert.equal(feed[0].text, "✓ éléphant");
+    assert.equal(session.guesses[0].value, "");
+    assert.equal(feed[0].text, "✓ Mot trouvé !");
+  });
+
+  it("dernier devineur : la même RPC retourne reveal, sans second appel", async () => {
+    const launched = getDrawItSession();
+    const first = applyDrawItGuess(
+      launched,
+      guessOpts(GUEST_UID, "éléphant")
+    ).session;
+    seedPlay(first);
+    saveStatePatch({ supabaseUserId: THIRD_UID });
+    const withLastGuess = applyDrawItGuess(
+      first,
+      guessOpts(THIRD_UID, "éléphant", {
+        serverAt: "2026-08-15T21:00:13.000Z",
+      })
+    ).session;
+    const revealed = applyDrawItReveal(withLastGuess, {
+      wordLabel: "Éléphant",
+      nowMs: NOW + 6_000,
+    }).session;
+    rpcSubmitDrawItGuessMock.mock.mockImplementation(async () =>
+      sessionRow(revealed, "2026-08-15T21:00:23.000Z")
+    );
+
+    const result = await submitDrawItGuess("éléphant", {
+      uid: THIRD_UID,
+      nowMs: NOW + 6_000,
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(result.correct, true);
+    assert.equal(rpcSubmitDrawItGuessMock.mock.calls.length, 1);
+    const session = getDrawItSession();
+    assert.equal(session.phase, DRAW_IT_PHASE_REVEAL);
+    assert.deepEqual(
+      session.foundOrder.map((entry) => entry.uid),
+      [GUEST_UID, THIRD_UID]
+    );
+    assert.equal(session.lastRound.wordLabel, "Éléphant");
+    assert.equal(session.roundEndsAt, launched.roundEndsAt);
   });
 
   it("RPC absente (01b seul) : pas de succès fantôme, feed vide", async () => {

@@ -4985,6 +4985,79 @@ body.has-bottom-nav .feedback-fab{
   cursor:default;
 }
 
+.draw-it-recap__canvas{
+  max-height:min(42vh, 340px);
+}
+
+.draw-it-recap__drawing-placeholder{
+  display:grid;
+  place-items:center;
+  min-height:150px;
+  margin:10px 0 8px;
+  padding:20px;
+  text-align:center;
+  background:#0e1524;
+  border:1px dashed rgba(255,255,255,.16);
+  border-radius:14px;
+  color:rgba(255,255,255,.7);
+}
+
+.draw-it-recap__drawing-placeholder span{
+  font-size:32px;
+}
+
+.draw-it-recap__drawing-placeholder p{
+  margin:8px 0 4px;
+  font-weight:800;
+}
+
+.draw-it-recap__drawing-placeholder small{
+  color:rgba(255,255,255,.45);
+}
+
+.draw-it-recap__ranking-title{
+  margin-top:18px;
+}
+
+.draw-it-recap__ranking{
+  display:grid;
+  gap:8px;
+  margin:8px 0 0;
+  padding:0;
+  list-style:none;
+}
+
+.draw-it-recap__row{
+  display:grid;
+  grid-template-columns:28px minmax(0, 1fr) auto;
+  gap:8px;
+  align-items:center;
+  padding:10px 12px;
+  border:1px solid rgba(255,255,255,.08);
+  border-radius:10px;
+  background:rgba(255,255,255,.04);
+}
+
+.draw-it-recap__rank,
+.draw-it-recap__player{
+  font-weight:800;
+}
+
+.draw-it-recap__result{
+  font-size:12px;
+  color:rgba(255,255,255,.62);
+}
+
+.draw-it-recap__points{
+  grid-column:2 / -1;
+  font-size:11px;
+  color:rgba(255,255,255,.38);
+}
+
+.draw-it-recap__row[data-found="true"] .draw-it-recap__result{
+  color:#4ADE80;
+}
+
 .theme-chip--active{
   background:rgba(255,107,107,.2);
   border-color:rgba(255,107,107,.4);

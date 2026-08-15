@@ -1,7 +1,7 @@
 /**
  * Domaine Draw it ! T4 — boucle de manche (pur, testable).
  * phase === "drawing" | "reveal" est la seule source de vérité.
- * foundOrder ne termine jamais la manche.
+ * foundOrder décrit qui a trouvé ; la transition reste matérialisée par phase.
  */
 import { DRAW_IT_ROUND_DURATION_MS } from "../../data/drawIt.js";
 
@@ -84,6 +84,62 @@ export function isDrawItRoundExpired(roundEndsAt, nowMs = Date.now()) {
   return Number(nowMs) >= end;
 }
 
+function drawItUid(value) {
+  if (value == null) return "";
+  if (typeof value === "object") {
+    return String(value.userId ?? value.uid ?? "").trim();
+  }
+  return String(value).trim();
+}
+
+/** Devineurs du snapshot figé ; drawerOrder sert uniquement de repli legacy. */
+export function expectedDrawItGuessers({
+  participants = [],
+  drawerOrder = [],
+  drawerUid = null,
+} = {}) {
+  const frozenParticipants = Array.isArray(participants)
+    ? participants.map(drawItUid).filter(Boolean)
+    : [];
+  const source = frozenParticipants.length
+    ? frozenParticipants
+    : Array.isArray(drawerOrder)
+      ? drawerOrder.map(drawItUid).filter(Boolean)
+      : [];
+  const drawer = drawItUid(drawerUid);
+  return [...new Set(source)].filter((uid) => uid !== drawer);
+}
+
+export function areAllDrawItGuessersFound(expectedGuessers = [], foundOrder = []) {
+  const expected = [...new Set(
+    (Array.isArray(expectedGuessers) ? expectedGuessers : [])
+      .map(drawItUid)
+      .filter(Boolean)
+  )];
+  if (!expected.length) return false;
+  const found = new Set(
+    (Array.isArray(foundOrder) ? foundOrder : [])
+      .map(drawItUid)
+      .filter(Boolean)
+  );
+  return expected.every((uid) => found.has(uid));
+}
+
+/** Décision pure : limite absolue du timer OU tous les devineurs figés ont trouvé. */
+export function shouldEndDrawItRound({
+  now = Date.now(),
+  nowMs,
+  roundEndsAt,
+  expectedGuessers = [],
+  foundOrder = [],
+} = {}) {
+  const effectiveNow = nowMs ?? now;
+  return (
+    isDrawItRoundExpired(roundEndsAt, effectiveNow) ||
+    areAllDrawItGuessersFound(expectedGuessers, foundOrder)
+  );
+}
+
 export function formatDrawItCountdown(remainingMs) {
   const ms = Math.max(0, Number(remainingMs) || 0);
   const totalSec = Math.ceil(ms / 1000);
@@ -134,7 +190,13 @@ export function canCommitDrawItReveal(session, nowMs = Date.now()) {
   if (session.phase !== DRAW_IT_PHASE_DRAWING) {
     return { ok: false, reason: "not_drawing" };
   }
-  if (!isDrawItRoundExpired(session.roundEndsAt, nowMs)) {
+  const expectedGuessers = expectedDrawItGuessers(session);
+  if (!shouldEndDrawItRound({
+    nowMs,
+    roundEndsAt: session.roundEndsAt,
+    expectedGuessers,
+    foundOrder: session.foundOrder,
+  })) {
     return { ok: false, reason: "too_early" };
   }
   return { ok: true };

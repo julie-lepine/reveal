@@ -7,7 +7,7 @@
 --   - SELECT client : uniquement le drawer de la manche PUBLIQUE courante
 --   - le mot n'est jamais dans game_sessions pendant phase = drawing
 --   - reveal_drawit_round (SECURITY DEFINER) publie wordLabel dans lastRound
---     uniquement si now >= roundEndsAt
+--     si now >= roundEndsAt OU si tous les devineurs figés ont trouvé
 --
 -- Ce fichier NE doit PAS être appliqué automatiquement par le client.
 
@@ -130,7 +130,119 @@ revoke all on function public.write_drawit_private_rounds(uuid, text, jsonb) fro
 grant execute on function public.write_drawit_private_rounds(uuid, text, jsonb) to authenticated;
 
 -- ---------------------------------------------------------------------------
--- reveal_drawit_round — drawing → reveal uniquement si now >= roundEndsAt
+-- drawit_all_guessers_found — participants figés moins drawerUid.
+-- Repli drawerOrder uniquement pour les anciennes sessions sans participants.
+-- ---------------------------------------------------------------------------
+
+create or replace function public.drawit_all_guessers_found(p_drawit jsonb)
+returns boolean
+language plpgsql
+immutable
+set search_path = pg_catalog, public
+as $$
+declare
+  v_drawer text := coalesce(p_drawit->>'drawerUid', '');
+  v_participants jsonb := coalesce(p_drawit->'participants', '[]'::jsonb);
+  v_order jsonb := coalesce(p_drawit->'drawerOrder', '[]'::jsonb);
+  v_found jsonb := coalesce(p_drawit->'foundOrder', '[]'::jsonb);
+  v_expected_count int := 0;
+  v_all_found boolean := false;
+begin
+  if jsonb_typeof(v_found) <> 'array' then
+    v_found := '[]'::jsonb;
+  end if;
+
+  if jsonb_typeof(v_participants) = 'array' then
+    select count(distinct p->>'userId')
+      into v_expected_count
+    from jsonb_array_elements(v_participants) p
+    where length(trim(coalesce(p->>'userId', ''))) > 0
+      and p->>'userId' is distinct from v_drawer;
+
+    if v_expected_count > 0 then
+      select not exists (
+        select 1
+        from (
+          select distinct p->>'userId' as uid
+          from jsonb_array_elements(v_participants) p
+          where length(trim(coalesce(p->>'userId', ''))) > 0
+            and p->>'userId' is distinct from v_drawer
+        ) expected
+        where not exists (
+          select 1
+          from jsonb_array_elements(v_found) f
+          where f->>'uid' = expected.uid
+        )
+      ) into v_all_found;
+      return v_all_found;
+    end if;
+  end if;
+
+  if jsonb_typeof(v_order) <> 'array' then
+    return false;
+  end if;
+
+  select count(distinct uid)
+    into v_expected_count
+  from jsonb_array_elements_text(v_order) as t(uid)
+  where length(trim(uid)) > 0
+    and uid is distinct from v_drawer;
+
+  if v_expected_count < 1 then
+    return false;
+  end if;
+
+  select not exists (
+    select 1
+    from (
+      select distinct uid
+      from jsonb_array_elements_text(v_order) as t(uid)
+      where length(trim(uid)) > 0
+        and uid is distinct from v_drawer
+    ) expected
+    where not exists (
+      select 1
+      from jsonb_array_elements(v_found) f
+      where f->>'uid' = expected.uid
+    )
+  ) into v_all_found;
+
+  return v_all_found;
+end;
+$$;
+
+revoke all on function public.drawit_all_guessers_found(jsonb) from public;
+
+-- ---------------------------------------------------------------------------
+-- drawit_revealed_state — unique construction de l'état public de reveal.
+-- Utilisée par le timeout acting-host ET par le dernier guess correct.
+-- ---------------------------------------------------------------------------
+
+create or replace function public.drawit_revealed_state(
+  p_drawit jsonb,
+  p_word_label text
+)
+returns jsonb
+language sql
+immutable
+set search_path = pg_catalog, public
+as $$
+  select coalesce(p_drawit, '{}'::jsonb) || jsonb_build_object(
+    'phase', 'reveal',
+    'roundScored', true,
+    'lastRound', jsonb_build_object(
+      'roundIdx', coalesce((p_drawit->>'roundIdx')::int, 0),
+      'drawerUid', p_drawit->>'drawerUid',
+      'wordLabel', coalesce(p_word_label, ''),
+      'foundOrder', coalesce(p_drawit->'foundOrder', '[]'::jsonb)
+    )
+  );
+$$;
+
+revoke all on function public.drawit_revealed_state(jsonb, text) from public;
+
+-- ---------------------------------------------------------------------------
+-- reveal_drawit_round — drawing → reveal sur timeout OU tous trouvés.
 -- Publie lastRound.wordLabel. Idempotent si déjà reveal.
 -- ---------------------------------------------------------------------------
 
@@ -149,7 +261,6 @@ declare
   v_run text;
   v_idx int;
   v_word text;
-  v_last jsonb;
 begin
   if v_uid is null then
     raise exception 'Authentification requise.';
@@ -167,7 +278,16 @@ begin
     raise exception 'Session de jeu introuvable.';
   end if;
 
+  if v_row.game_id is distinct from 'drawit' then
+    raise exception 'DRAWIT_WRONG_GAME';
+  end if;
+
   v_di := coalesce(v_row.state->'drawIt', '{}'::jsonb);
+  if jsonb_typeof(v_di) <> 'object'
+     or coalesce((v_di->>'lobbyStarted')::boolean, false) is not true
+  then
+    raise exception 'DRAWIT_NO_SESSION';
+  end if;
   v_phase := coalesce(v_di->>'phase', '');
 
   if v_phase = 'reveal' then
@@ -179,7 +299,10 @@ begin
   end if;
 
   v_ends := (v_di->>'roundEndsAt')::timestamptz;
-  if v_ends is null or clock_timestamp() < v_ends then
+  if
+    (v_ends is null or clock_timestamp() < v_ends)
+    and not public.drawit_all_guessers_found(v_di)
+  then
     raise exception 'Reveal Draw it ! trop tôt.';
   end if;
 
@@ -190,25 +313,20 @@ begin
   from public.drawit_private
   where lobby_id = p_lobby_id
     and run_id = v_run
-    and round_idx = v_idx;
+    and round_idx = v_idx
+    and drawer_uid::text = coalesce(v_di->>'drawerUid', '');
 
-  v_last := jsonb_build_object(
-    'roundIdx', v_idx,
-    'drawerUid', v_di->>'drawerUid',
-    'wordLabel', coalesce(v_word, ''),
-    'foundOrder', coalesce(v_di->'foundOrder', '[]'::jsonb)
-  );
+  if not found then
+    raise exception 'DRAWIT_NO_WORD';
+  end if;
+
+  v_di := public.drawit_revealed_state(v_di, v_word);
 
   update public.game_sessions
   set state = jsonb_set(
-        jsonb_set(
-          jsonb_set(coalesce(state, '{}'::jsonb), '{drawIt,phase}', '"reveal"'::jsonb, true),
-          '{drawIt,roundScored}',
-          'true'::jsonb,
-          true
-        ),
-        '{drawIt,lastRound}',
-        v_last,
+        coalesce(state, '{}'::jsonb),
+        '{drawIt}',
+        v_di,
         true
       )
   where lobby_id = p_lobby_id
@@ -261,7 +379,16 @@ begin
     raise exception 'Session de jeu introuvable.';
   end if;
 
+  if v_row.game_id is distinct from 'drawit' then
+    raise exception 'DRAWIT_WRONG_GAME';
+  end if;
+
   v_di := coalesce(v_row.state->'drawIt', '{}'::jsonb);
+  if jsonb_typeof(v_di) <> 'object'
+     or coalesce((v_di->>'lobbyStarted')::boolean, false) is not true
+  then
+    raise exception 'DRAWIT_NO_SESSION';
+  end if;
   if coalesce(v_di->>'phase', '') <> 'reveal' then
     raise exception 'Manche suivante Draw it ! uniquement depuis reveal.';
   end if;
@@ -274,11 +401,17 @@ begin
   end if;
 
   v_order := coalesce(v_di->'drawerOrder', '[]'::jsonb);
+  if jsonb_typeof(v_order) <> 'array' then
+    raise exception 'drawerOrder invalide.';
+  end if;
   v_len := jsonb_array_length(v_order);
   if v_len < 1 then
     raise exception 'drawerOrder manquant.';
   end if;
   v_drawer := v_order ->> (v_next % v_len);
+  if v_drawer is null or length(trim(v_drawer)) = 0 then
+    raise exception 'drawerUid suivant invalide.';
+  end if;
   v_end := v_start + interval '60 seconds';
 
   v_next_di := v_di

@@ -37,7 +37,9 @@ const {
   canCommitDrawItNextRound,
   canCompleteDrawItGame,
   drawerUidForRound,
+  expectedDrawItGuessers,
   remainingMsUntil,
+  shouldEndDrawItRound,
   DRAW_IT_PHASE_DRAWING,
   DRAW_IT_PHASE_REVEAL,
 } = await import("../js/core/drawItRound.js");
@@ -134,6 +136,87 @@ describe("Draw it ! T4 — timer", () => {
   });
 });
 
+describe("Draw it ! — décision pure de clôture", () => {
+  const roundEndsAt = "2026-08-15T21:01:00.000Z";
+  const before = Date.parse("2026-08-15T21:00:30.000Z");
+  const expectedGuessers = [GUEST_UID, THIRD_UID];
+
+  it("avant expiration + personne trouvé → false", () => {
+    assert.equal(
+      shouldEndDrawItRound({ now: before, roundEndsAt, expectedGuessers, foundOrder: [] }),
+      false
+    );
+  });
+
+  it("avant expiration + certains trouvés → false", () => {
+    assert.equal(
+      shouldEndDrawItRound({
+        now: before,
+        roundEndsAt,
+        expectedGuessers,
+        foundOrder: [{ uid: GUEST_UID }],
+      }),
+      false
+    );
+  });
+
+  it("avant expiration + tous trouvés → true", () => {
+    assert.equal(
+      shouldEndDrawItRound({
+        now: before,
+        roundEndsAt,
+        expectedGuessers,
+        foundOrder: [{ uid: THIRD_UID }, { uid: GUEST_UID }],
+      }),
+      true
+    );
+  });
+
+  it("exactement à roundEndsAt puis après → true", () => {
+    assert.equal(
+      shouldEndDrawItRound({
+        now: Date.parse(roundEndsAt),
+        roundEndsAt,
+        expectedGuessers,
+        foundOrder: [],
+      }),
+      true
+    );
+    assert.equal(
+      shouldEndDrawItRound({
+        now: Date.parse(roundEndsAt) + 1,
+        roundEndsAt,
+        expectedGuessers,
+        foundOrder: [],
+      }),
+      true
+    );
+  });
+
+  it("le drawer dans foundOrder ne compte jamais comme devineur attendu", () => {
+    const session = buildDrawItLaunchState({
+      session: { selectedCategoryId: "demo", roundCount: 3, ready: {} },
+      participants: threePlayers(),
+      nowMs: before,
+      runId: "run-expected",
+    });
+    const expected = expectedDrawItGuessers(session);
+    assert.deepEqual(expected, [GUEST_UID, THIRD_UID]);
+    assert.equal(
+      shouldEndDrawItRound({
+        now: before,
+        roundEndsAt: session.roundEndsAt,
+        expectedGuessers: expected,
+        foundOrder: [
+          { uid: session.drawerUid },
+          { uid: GUEST_UID },
+        ],
+      }),
+      false
+    );
+  });
+});
+
 describe("Draw it ! T4 — guards de phase", () => {
   function drawingSession(extra = {}) {
     const now = 1_000_000;
@@ -165,14 +248,41 @@ describe("Draw it ! T4 — guards de phase", () => {
     assert.equal(applied.session.lastRound.wordLabel, "Pizza");
   });
 
-  it("foundOrder non vide ne termine pas la manche", () => {
-    const session = { ...drawingSession(), foundOrder: [GUEST_UID] };
+  it("foundOrder partiel ne termine pas la manche", () => {
+    const session = {
+      ...buildDrawItLaunchState({
+        session: { selectedCategoryId: "demo", roundCount: 3, ready: {} },
+        participants: threePlayers(),
+        nowMs: 1_000_000,
+        runId: "run-partial",
+      }),
+      foundOrder: [{ uid: GUEST_UID }],
+    };
     const now = Date.parse(session.roundStartAt) + 5_000;
     assert.equal(canCommitDrawItReveal(session, now).ok, false);
     assert.equal(session.phase, DRAW_IT_PHASE_DRAWING);
     const applied = applyDrawItReveal(session, { wordLabel: "fuite", nowMs: now });
     assert.equal(applied.ok, false);
     assert.equal(applied.session.phase, DRAW_IT_PHASE_DRAWING);
+  });
+
+  it("tous les devineurs trouvés → reveal avant le timeout", () => {
+    const session = {
+      ...buildDrawItLaunchState({
+        session: { selectedCategoryId: "demo", roundCount: 3, ready: {} },
+        participants: threePlayers(),
+        nowMs: 1_000_000,
+        runId: "run-all-found",
+      }),
+      foundOrder: [{ uid: GUEST_UID }, { uid: THIRD_UID }],
+    };
+    const now = Date.parse(session.roundStartAt) + 5_000;
+    const applied = applyDrawItReveal(session, { wordLabel: "Pizza", nowMs: now });
+    assert.equal(applied.ok, true);
+    assert.equal(applied.session.phase, DRAW_IT_PHASE_REVEAL);
+    assert.deepEqual(applied.session.foundOrder, session.foundOrder);
+    assert.deepEqual(applied.session.lastRound.foundOrder, session.foundOrder);
+    assert.equal(applied.session.roundEndsAt, session.roundEndsAt);
   });
 
   it("reveal idempotent", () => {

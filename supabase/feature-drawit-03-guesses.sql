@@ -4,7 +4,8 @@
 --   - SELECT game_sessions … FOR UPDATE (anti lost-update)
 --   - valide contre drawit_private (jamais le mot dans le payload client)
 --   - foundOrder = ordre d'acceptation serveur (clock_timestamp)
---   - ne mute JAMAIS phase / roundEndsAt
+--   - le dernier devineur correct passe atomiquement phase à reveal
+--   - ne modifie jamais roundEndsAt
 --
 -- Normalisation : miroir de js/core/drawItNormalize.js
 --   trim, lowercase, accents FR/EN, apostrophes, ponctuation, espaces.
@@ -86,13 +87,14 @@ declare
   v_norm text;
   v_trimmed text;
   v_correct boolean := false;
-  v_at timestamptz := clock_timestamp();
+  v_at timestamptz;
   v_found jsonb;
   v_guesses jsonb;
   v_priv record;
   v_answer text;
   v_order jsonb;
   v_in_party boolean := false;
+  v_all_found boolean := false;
 begin
   if v_uid is null then
     raise exception 'Authentification requise.';
@@ -157,8 +159,10 @@ begin
     raise exception 'DRAWIT_NOT_DRAWING';
   end if;
 
+  -- Instant d'acceptation pris sous FOR UPDATE : deadline et ordre cohérents.
+  v_at := clock_timestamp();
   v_ends := (v_di->>'roundEndsAt')::timestamptz;
-  if v_ends is null or clock_timestamp() >= v_ends then
+  if v_ends is null or v_at >= v_ends then
     raise exception 'DRAWIT_EXPIRED';
   end if;
 
@@ -223,7 +227,8 @@ begin
   v_guesses := v_guesses || jsonb_build_array(
     jsonb_build_object(
       'uid', v_uid_text,
-      'value', v_trimmed,
+      -- Ne jamais publier le mot correct tant que la phase était drawing.
+      'value', case when v_correct then '' else v_trimmed end,
       'at', to_jsonb(v_at),
       'correct', v_correct
     )
@@ -248,16 +253,24 @@ begin
     );
   end if;
 
+  v_di := v_di || jsonb_build_object(
+    'foundOrder', v_found,
+    'guesses', v_guesses
+  );
+
+  if v_correct then
+    v_all_found := public.drawit_all_guessers_found(v_di);
+  end if;
+
+  if v_all_found then
+    v_di := public.drawit_revealed_state(v_di, v_priv.word_label);
+  end if;
+
   update public.game_sessions
   set state = jsonb_set(
-        jsonb_set(
-          coalesce(state, '{}'::jsonb),
-          '{drawIt,foundOrder}',
-          v_found,
-          true
-        ),
-        '{drawIt,guesses}',
-        v_guesses,
+        coalesce(state, '{}'::jsonb),
+        '{drawIt}',
+        v_di,
         true
       )
   where lobby_id = p_lobby_id

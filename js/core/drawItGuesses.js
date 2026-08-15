@@ -118,7 +118,8 @@ export function applyDrawItGuess(
 
   const guess = {
     uid: author,
-    value: trimmed,
+    // Une bonne réponse ne doit pas publier le mot avant phase=reveal.
+    value: correct ? "" : trimmed,
     at,
     correct,
   };
@@ -156,6 +157,6 @@ export function drawItGuessesToChatMessages(guesses, nameOf) {
     typeof nameOf === "function" ? nameOf : (uid) => uid;
   return sanitizeDrawItGuesses(guesses).map((guess) => ({
     from: resolve(guess.uid) || "Joueur",
-    text: guess.correct ? `✓ ${guess.value}` : guess.value,
+    text: guess.correct ? "✓ Mot trouvé !" : guess.value,
   }));
 }

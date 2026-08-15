@@ -42,6 +42,7 @@ import {
   createEmptyDrawItBoard,
   maybeResetDrawItBoard,
 } from "../core/drawItStrokes.js";
+import { buildDrawItRoundRecap } from "../core/drawItRoundRecap.js";
 
 export function mountDrawIt(app) {
   if (!requireLobbyPlay()) return null;
@@ -186,6 +187,48 @@ export function mountDrawIt(app) {
     return `<p class="hint">Trouvé : ${names.join(", ")}</p>`;
   }
 
+  function roundRecapRowsHtml(session) {
+    const recap = buildDrawItRoundRecap(session);
+    return recap.rows
+      .map((row) => {
+        const marker =
+          row.role === "drawer"
+            ? "✏️"
+            : row.found
+              ? `${row.rank}.`
+              : "—";
+        const result =
+          row.role === "drawer"
+            ? "Dessinateur"
+            : row.found
+              ? "A trouvé"
+              : "N’a pas trouvé";
+        return `
+          <li class="draw-it-recap__row" data-role="${row.role}" data-found="${row.found}">
+            <span class="draw-it-recap__rank">${marker}</span>
+            <span class="draw-it-recap__player">${escapeHtml(row.name)}</span>
+            <span class="draw-it-recap__result">${result}</span>
+            <span class="draw-it-recap__points" title="Scoring Draw it ! à venir">Points : —</span>
+          </li>`;
+      })
+      .join("");
+  }
+
+  function roundRecapDrawingHtml(session) {
+    if (isLocalDrawer(session)) {
+      return `
+        <div class="draw-it-canvas-host draw-it-recap__canvas" id="draw-it-canvas-host"></div>
+        <p class="hint">Dessin disponible localement sur l’appareil du dessinateur.</p>`;
+    }
+    return `
+      <div class="draw-it-recap__drawing-placeholder" role="img"
+        aria-label="Dessin indisponible sur cet appareil">
+        <span aria-hidden="true">🖼️</span>
+        <p>Dessin indisponible sur cet appareil.</p>
+        <small>Il sera partagé ici lorsque la synchronisation du dessin sera disponible.</small>
+      </div>`;
+  }
+
   function guessChatHtml(session) {
     const locked = isDrawItGuessInputLocked(session, localUid());
     const hint = guessLockReason(session);
@@ -237,14 +280,22 @@ export function mountDrawIt(app) {
           ${foundLine(session)}
         </div>`;
     } else if (phase === DRAW_IT_PHASE_REVEAL) {
-      const word = session.lastRound?.wordLabel || "";
+      const recap = buildDrawItRoundRecap(session);
+      const word = recap.wordLabel;
       const last = roundIdx >= total - 1;
       phaseHtml = `
-        <div class="card">
-          <p class="label-upper label-upper--gold">Révélation</p>
+        <div class="card draw-it-recap">
+          <p class="label-upper label-upper--gold">Récapitulatif de la manche</p>
           <p class="hot-take-text">${escapeHtml(word || "—")}</p>
-          <p class="hint">Le mot est maintenant public.</p>
-          ${foundLine(session.lastRound || session)}
+          <p class="hint">${
+            recap.allGuessersFound ? "Tout le monde a trouvé !" : "Temps écoulé."
+          } Le mot est maintenant public.</p>
+          <p class="label-upper">Dessin de la manche</p>
+          ${roundRecapDrawingHtml(session)}
+          <p class="label-upper draw-it-recap__ranking-title">Résultat de la manche</p>
+          <ol class="draw-it-recap__ranking" id="draw-it-round-ranking">
+            ${roundRecapRowsHtml(session)}
+          </ol>
         </div>
         ${
           host
@@ -275,7 +326,12 @@ export function mountDrawIt(app) {
 
     bindNav(app);
     bindExitGame(app, { shouldContinue: () => mount.isMounted() });
-    if (phase === DRAW_IT_PHASE_DRAWING) bindCanvas(session);
+    if (
+      phase === DRAW_IT_PHASE_DRAWING ||
+      (phase === DRAW_IT_PHASE_REVEAL && drawer)
+    ) {
+      bindCanvas(session);
+    }
     bindGuessChat(session);
 
     app.querySelector("#draw-it-advance")?.addEventListener(
