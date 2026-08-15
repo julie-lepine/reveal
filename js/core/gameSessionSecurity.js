@@ -75,6 +75,7 @@ export function isContributePairAllowed(game, kind) {
     "trivia",
     "consensus",
     "truthmeter",
+    "drawit",
   ]);
   const voteGames = new Set([
     "hottake",
@@ -144,6 +145,14 @@ export const ACTING_HOST_PLAY_ALLOWED_KEYS = new Set([
   "voteTimerRemaining",
   "questionScored",
   "podiumApplied",
+  "drawerUid",
+  "roundStartAt",
+  "roundEndsAt",
+  "foundOrder",
+  "guesses",
+  "canvasEpoch",
+  "strokeSeq",
+  "strokes",
 ]);
 
 /**

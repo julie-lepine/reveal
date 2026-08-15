@@ -42,6 +42,8 @@ const SCREEN_TO_TAB = {
   dilemma: TAB_GAMES,
   "clutch-prep": TAB_GAMES,
   clutch: TAB_GAMES,
+  "drawit-prep": TAB_GAMES,
+  drawit: TAB_GAMES,
   "wronganswer-prep": TAB_GAMES,
   wronganswer: TAB_GAMES,
   "trivia-prep": TAB_GAMES,

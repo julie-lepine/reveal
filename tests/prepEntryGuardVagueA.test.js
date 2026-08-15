@@ -33,6 +33,12 @@ const PREP_GUARDS = [
     entryFn: "getClutchEntryScreen",
   },
   {
+    file: "js/screens/drawItPrep.js",
+    mount: "mountDrawItPrep",
+    prepId: "drawit-prep",
+    entryFn: "getDrawItEntryScreen",
+  },
+  {
     file: "js/screens/wrongAnswerPrep.js",
     mount: "mountWrongAnswerPrep",
     prepId: "wronganswer-prep",

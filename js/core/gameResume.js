@@ -40,6 +40,8 @@ const SCREEN_LABELS = {
   dilemma: "Dilemma",
   "clutch-prep": "Clutch",
   clutch: "Clutch",
+  "drawit-prep": "Draw it !",
+  drawit: "Draw it !",
   "truthmeter-prep": "TruthMeter",
   truthmeter: "TruthMeter",
   "tiernight-select": "TierNight",

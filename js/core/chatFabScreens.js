@@ -7,6 +7,7 @@ export const CHAT_FAB_ALLOWED_SCREENS = new Set([
   "hottake-prep",
   "speedvote-prep",
   "clutch-prep",
+  "drawit-prep",
   "wronganswer-prep",
   "truthmeter-prep",
   "dilemma-prep",

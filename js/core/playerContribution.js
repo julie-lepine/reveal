@@ -19,6 +19,7 @@ const STATE_KEY_TO_GAME = {
   trivia: "trivia",
   consensus: "consensus",
   truthMeter: "truthmeter",
+  drawIt: "drawit",
   guessLie: "guesslie",
   tierNight: "tiernight",
   tierNightLive: "tiernightlive",

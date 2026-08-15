@@ -79,6 +79,7 @@ import {
   isSubmissionsOnlyGamePatch,
   isVotesOnlyGamePatch,
   isAnswersOnlyGamePatch,
+  isReadyOnlyGamePatch,
   mergeGuessLieSubmissions,
   isGuessLieLobbyReset,
   shouldApplyGuessLieLobbyReset,
@@ -113,6 +114,10 @@ import { scalePollIntervalMs, SYNC_PATCH_TIMEOUT_MS } from "../config/syncConfig
 import { withPatchTimeout } from "./withPatchTimeout.js";
 import { GUESS_LIE_SYNC_PATCH_TIMEOUT_MS } from "../../data/guessLies.js";
 import { pickRemotePlayFields } from "./playPatch.js";
+import {
+  sanitizeDrawItFoundOrder,
+  sanitizeDrawItGuesses,
+} from "./drawItGuesses.js";
 import {
   stripCustomRosterTopicsFromGenericPatch,
   summarizeCustomRosterTopics,
@@ -305,6 +310,7 @@ const RESTARTABLE_SESSION_GAME_IDS = new Set([
   "tiernight",
   "clutch",
   "wronganswer",
+  "drawit",
 ]);
 
 function titleForSessionGameId(gameId) {
@@ -645,6 +651,7 @@ const GAME_SETUP_SCREENS = new Set([
   "consensus-prep",
   "dilemma-prep",
   "clutch-prep",
+  "drawit-prep",
   "wronganswer-prep",
   "guesslie-menu",
   "guesslie-setup",
@@ -1375,6 +1382,43 @@ function mergeRemoteSpeedVoteVotesUid(cur, inc) {
     return { ...curVotes, ...incVotes };
   }
   return incVotes;
+}
+
+function mergeDrawItGameLocal(local, remote) {
+  if (!remote) return local;
+  if (!local) return remote;
+  const ready =
+    !remote.lobbyStarted && !local.lobbyStarted
+      ? mergeReadyMapsLocal(local.ready || {}, remote.ready || {}, getActivePlayerNames(), getLocalDisplayName())
+      : remote.ready || {};
+  const drawerOrder =
+    Array.isArray(remote.drawerOrder) && remote.drawerOrder.length
+      ? remote.drawerOrder
+      : local.drawerOrder || [];
+  return {
+    ...local,
+    ...remote,
+    ready,
+    runId: remote.runId || local.runId || null,
+    drawerOrder,
+    participants:
+      Array.isArray(remote.participants) && remote.participants.length
+        ? remote.participants
+        : local.participants || [],
+  };
+}
+
+function mergeDrawItPatchState(cur, inc, { mergeReadyUid }) {
+  if (!cur) return inc;
+  if (!inc) return cur;
+  if (isReadyOnlyGamePatch(inc)) {
+    return { ...cur, ready: mergeReadyUid(cur, inc) };
+  }
+  return {
+    ...cur,
+    ...inc,
+    ready: mergeReadyUid(cur, inc),
+  };
 }
 
 function mergeSpeedVoteGameLocal(local, remote) {
@@ -2401,6 +2445,91 @@ export function dilemmaFromRemote(remote) {
   };
 }
 
+function drawItLastRoundToRemote(lastRound) {
+  if (!lastRound || typeof lastRound !== "object") return null;
+  return {
+    roundIdx: lastRound.roundIdx ?? 0,
+    drawerUid: lastRound.drawerUid || null,
+    wordLabel: lastRound.wordLabel != null ? String(lastRound.wordLabel) : "",
+    foundOrder: sanitizeDrawItFoundOrder(lastRound.foundOrder),
+  };
+}
+
+function drawItParticipantsToRemote(participants = []) {
+  if (!Array.isArray(participants)) return [];
+  return participants
+    .map((p) => {
+      if (!p || typeof p !== "object") return null;
+      const userId = p.userId != null ? String(p.userId) : null;
+      if (!userId) return null;
+      return { userId, name: p.name != null ? String(p.name) : "" };
+    })
+    .filter(Boolean);
+}
+
+export function drawItToRemote(session) {
+  const base = {
+    ready: mapReadyByUid(session.ready || {}),
+    lobbyStarted: Boolean(session.lobbyStarted),
+    selectedCategoryId: session.selectedCategoryId || "catalog",
+    roundCount: session.roundCount ?? 5,
+  };
+  if (!session.lobbyStarted && !session.runId) return base;
+  return {
+    ...base,
+    runId: session.runId || null,
+    participants: drawItParticipantsToRemote(session.participants),
+    drawerOrder: Array.isArray(session.drawerOrder)
+      ? session.drawerOrder.map(String)
+      : [],
+    roundIdx: session.roundIdx ?? 0,
+    phase: session.phase || null,
+    drawerUid: session.drawerUid || null,
+    roundStartAt: session.roundStartAt || null,
+    roundEndsAt: session.roundEndsAt || null,
+    roundScored: Boolean(session.roundScored),
+    lastRound: drawItLastRoundToRemote(session.lastRound),
+    matchScores: scoresToRemote(session.matchScores || {}),
+    foundOrder: sanitizeDrawItFoundOrder(session.foundOrder),
+    guesses: sanitizeDrawItGuesses(session.guesses),
+    canvasEpoch: session.canvasEpoch ?? 0,
+    strokeSeq: session.strokeSeq ?? 0,
+    strokes: Array.isArray(session.strokes) ? session.strokes : [],
+  };
+}
+
+export function drawItFromRemote(remote) {
+  if (!remote) return null;
+  const base = {
+    ready: mapReadyByName(remote.ready || {}),
+    lobbyStarted: Boolean(remote.lobbyStarted),
+    selectedCategoryId: remote.selectedCategoryId || "catalog",
+    roundCount: remote.roundCount ?? 5,
+  };
+  if (!remote.lobbyStarted && !remote.runId) return base;
+  return {
+    ...base,
+    runId: remote.runId || null,
+    participants: drawItParticipantsToRemote(remote.participants),
+    drawerOrder: Array.isArray(remote.drawerOrder)
+      ? remote.drawerOrder.map(String)
+      : [],
+    roundIdx: remote.roundIdx ?? 0,
+    phase: remote.phase || null,
+    drawerUid: remote.drawerUid || null,
+    roundStartAt: remote.roundStartAt || null,
+    roundEndsAt: remote.roundEndsAt || null,
+    roundScored: Boolean(remote.roundScored),
+    lastRound: drawItLastRoundToRemote(remote.lastRound),
+    matchScores: scoresFromRemote(remote.matchScores || {}),
+    foundOrder: sanitizeDrawItFoundOrder(remote.foundOrder),
+    guesses: sanitizeDrawItGuesses(remote.guesses),
+    canvasEpoch: remote.canvasEpoch ?? 0,
+    strokeSeq: remote.strokeSeq ?? 0,
+    strokes: Array.isArray(remote.strokes) ? remote.strokes : [],
+  };
+}
+
 export function speedVoteFromRemote(remote) {
   if (!remote) return null;
   const votes = {};
@@ -3416,6 +3545,8 @@ export function applyRemoteSession(row, { epoch = null } = {}) {
   const prevHtTakeIdx = getState().hotTakeGame?.takeIdx ?? null;
   const prevHtVotes = JSON.stringify(getState().hotTakeGame?.votes || {});
   const prevSvVotes = JSON.stringify(getState().speedVoteGame?.votes || {});
+  const prevDiPhase = getState().drawItGame?.phase ?? null;
+  const prevDiRoundIdx = getState().drawItGame?.roundIdx ?? null;
   const prevTmVotes = JSON.stringify(getState().truthMeterGame?.votes || {});
   const prevTierNightRunId = getState().tierNightGame?.runId ?? null;
   const prevTierNightRecaps = JSON.stringify(getState().tierNightGame?.recaps || []);
@@ -3434,6 +3565,11 @@ export function applyRemoteSession(row, { epoch = null } = {}) {
     const remote = speedVoteFromRemote(st.speedVote);
     const local = getState().speedVoteGame;
     patch.speedVoteGame = local ? mergeSpeedVoteGameLocal(local, remote) : remote;
+  }
+  if (st.drawIt) {
+    const remote = drawItFromRemote(st.drawIt);
+    const local = getState().drawItGame;
+    patch.drawItGame = local ? mergeDrawItGameLocal(local, remote) : remote;
   }
   if (st.clutch) {
     const remote = clutchFromRemote(st.clutch);
@@ -3662,6 +3798,11 @@ export function applyRemoteSession(row, { epoch = null } = {}) {
       (patch.speedVoteGame.roundIdx ?? null) !== (getState().speedVoteGame?.roundIdx ?? null) ||
       JSON.stringify(patch.speedVoteGame.votes || {}) !== prevSvVotes);
 
+  const drawItPlayChanged =
+    patch.drawItGame &&
+    ((patch.drawItGame.phase ?? null) !== prevDiPhase ||
+      (patch.drawItGame.roundIdx ?? null) !== prevDiRoundIdx);
+
   const truthMeterPlayChanged =
     patch.truthMeterGame &&
     ((patch.truthMeterGame.phase ?? null) !== (getState().truthMeterGame?.phase ?? null) ||
@@ -3692,6 +3833,7 @@ export function applyRemoteSession(row, { epoch = null } = {}) {
       dilemmaPlayChanged ||
       hotTakePlayChanged ||
       speedVotePlayChanged ||
+      drawItPlayChanged ||
       truthMeterPlayChanged ||
       wrongAnswerPlayChanged ||
       tierNightPlayChanged ||
@@ -3932,6 +4074,7 @@ export function isActiveGameSessionScreen(screen) {
 function resolveActivePlayScreen(st, gid, declared) {
   if (st.hotTake?.lobbyStarted) return "hottake";
   if (st.speedVote?.lobbyStarted) return "speedvote";
+  if (st.drawIt?.lobbyStarted) return "drawit";
   if (st.clutch?.lobbyStarted) return "clutch";
   if (st.wrongAnswer?.lobbyStarted) return "wronganswer";
   if (st.traitre?.lobbyStarted) {
@@ -4054,6 +4197,9 @@ export function getEffectiveSessionScreen(row) {
   }
   if (st.speedVote) {
     if (gid === "speedvote" || declared === "speedvote-prep") return "speedvote-prep";
+  }
+  if (st.drawIt) {
+    if (gid === "drawit" || declared === "drawit-prep") return "drawit-prep";
   }
   if (st.clutch) {
     if (gid === "clutch" || declared === "clutch-prep") return "clutch-prep";
@@ -4278,6 +4424,7 @@ const GAME_PLAY_STATE_KEYS = new Set([
   "guessLie",
   "tierNight",
   "tierNightLive",
+  "drawIt",
 ]);
 
 function isEveningScoresOnlyMerge(stateMerge) {
@@ -4982,6 +5129,15 @@ async function patchGameStateInner(
       );
     }
   }
+  if (mergePayload.drawIt) {
+    const curDi = current.drawIt;
+    const incDi = mergePayload.drawIt;
+    nextState.drawIt = curDi
+      ? mergeDrawItPatchState(curDi, incDi, {
+          mergeReadyUid: mergeRemoteReadyUid,
+        })
+      : incDi;
+  }
   if (mergePayload.tierNightLive) {
     const curTl = current.tierNightLive;
     const incTl = mergePayload.tierNightLive;
@@ -5338,6 +5494,7 @@ function deactivatePlayFlagsInSessionState(state = {}) {
     "dilemma",
     "tierNight",
     "tierNightLive",
+    "drawIt",
   ];
   lobbyStartedGames.forEach((key) => {
     if (st[key] && typeof st[key] === "object") {
@@ -5551,6 +5708,14 @@ export async function syncSpeedVoteSession(extra = {}, patchOpts = {}) {
   saveStatePatch({ speedVoteGame: session });
   if (!isGameSyncActive()) return session;
   await patchGameState({ speedVote: speedVoteToRemote(session) }, patchOpts);
+  return session;
+}
+
+export async function syncDrawItSession(extra = {}, patchOpts = {}) {
+  const session = { ...getState().drawItGame, ...extra };
+  saveStatePatch({ drawItGame: session });
+  if (!isGameSyncActive()) return session;
+  await patchGameState({ drawIt: drawItToRemote(session) }, patchOpts);
   return session;
 }
 

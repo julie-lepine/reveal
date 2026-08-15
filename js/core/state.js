@@ -173,6 +173,12 @@ const defaultState = () => ({
     currentQuestion: null,
     matchScores: {},
   },
+  drawItGame: {
+    ready: {},
+    lobbyStarted: false,
+    selectedCategoryId: "catalog",
+    roundCount: 5,
+  },
   clutchGame: {
     ready: {},
     lobbyStarted: false,
@@ -398,6 +404,7 @@ function loadState() {
       inLobby: parsed.inLobby || false,
       hotTakeGame: { ...defaultState().hotTakeGame, ...parsed.hotTakeGame },
       speedVoteGame: { ...defaultState().speedVoteGame, ...parsed.speedVoteGame },
+      drawItGame: { ...defaultState().drawItGame, ...parsed.drawItGame },
       clutchGame: { ...defaultState().clutchGame, ...parsed.clutchGame },
       wrongAnswerGame: { ...defaultState().wrongAnswerGame, ...parsed.wrongAnswerGame },
       traitreGame: { ...defaultState().traitreGame, ...parsed.traitreGame },
@@ -1101,6 +1108,7 @@ export function resetGameSessionsOnly() {
   saveStatePatch({
     hotTakeGame: { ...base.hotTakeGame },
     speedVoteGame: { ...base.speedVoteGame },
+    drawItGame: { ...base.drawItGame },
     clutchGame: { ...base.clutchGame },
     wrongAnswerGame: { ...base.wrongAnswerGame },
     traitreGame: { ...base.traitreGame },

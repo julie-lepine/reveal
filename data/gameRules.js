@@ -74,6 +74,24 @@ export const GAME_RULES = {
       "« Qui rirait à un enterrement ? » La majorité vote Sarah → Sarah gagne +10.",
   },
 
+  drawit: {
+    title: "Draw it !",
+    emoji: "✏️",
+    but: "Un joueur dessine un mot secret, les autres le devinent en 60 secondes.",
+    etapes: [
+      "Un dessinateur est désigné et reçoit un mot.",
+      "Il dessine pendant 60 secondes ; les autres proposent des réponses.",
+      "À la fin du chrono, le mot est révélé et les points sont attribués.",
+    ],
+    points: [
+      "Les joueurs qui trouvent marquent selon l'ordre de découverte.",
+      "Le dessinateur marque aussi si au moins une personne a trouvé.",
+      "Personne ne trouve : 0 point pour tout le monde.",
+    ],
+    exemple:
+      "Emma trouve à 0:52, Lucas à 0:41. Les deux marquent ; le dessinateur aussi. Le barème exact arrive bientôt.",
+  },
+
   clutch: {
     title: "Clutch",
     emoji: "💥",
@@ -219,6 +237,7 @@ export const RULES_KEY_BY_NAV = {
   guesslie: "guesslie",
   "speedvote-prep": "speedvote",
   "clutch-prep": "clutch",
+  "drawit-prep": "drawit",
   "wronganswer-prep": "wronganswer",
   "dilemma-prep": "dilemma",
   "truthmeter-prep": "truthmeter",

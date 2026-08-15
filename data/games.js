@@ -70,6 +70,16 @@ export const GAMES = [
    /* badgeLabel: "Prochainement",*/
   },
   {
+    id: "drawit-prep",
+    title: "Draw it !",
+    desc: "Un joueur dessine - les autres devinent en 60 secondes",
+    emoji: "✏️",
+    cssClass: "drawit",
+    borderGradient:
+      "linear-gradient(145deg, #38BDF8 0%, #A78BFA 48%, #2B2D66 100%)",
+    enabled: true,
+  },
+  {
     id: "wronganswer-prep",
     title: "Wrong Answer Only",
     desc: "Donne la pire réponse possible - les autres votent la pire",

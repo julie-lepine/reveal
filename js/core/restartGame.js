@@ -27,6 +27,7 @@ import { TRAITRE_MIN_PLAYERS } from "../../data/traitre.js";
 import { requireMinLobbyPlayers } from "./gameLaunchGuard.js";
 import { defaultSpeedVotePrepSession } from "./speedVoteSession.js";
 import { defaultClutchPrepSession } from "./clutchSession.js";
+import { defaultDrawItPrepSession, drawItToRemote } from "./drawItSession.js";
 import { defaultWrongAnswerPrepSession } from "./wrongAnswerSession.js";
 import { defaultTriviaPrepSession } from "./triviaSession.js";
 import { TRUTH_METER_MIN_PLAYERS } from "../../data/truthMeter.js";
@@ -274,6 +275,29 @@ export async function launchClutchPrep() {
     alertTitle: "Clutch",
     alertFallback: "Impossible de lancer Clutch.",
     logLabel: "Clutch",
+  });
+}
+
+export async function launchDrawItPrep() {
+  if (!(await assertNoActiveChatRoulette({ sessionGameId: "drawit" }))) return;
+  const di = defaultDrawItPrepSession();
+
+  if (!isGameSyncActive()) {
+    saveStatePatch({ drawItGame: di });
+    navigate("drawit-prep");
+    return;
+  }
+
+  if (!(await requireHostToLaunch("drawit"))) return;
+
+  await commitPrepSessionLaunch({
+    statePatch: { drawItGame: di },
+    gameId: "drawit",
+    screen: "drawit-prep",
+    remoteState: { drawIt: drawItToRemote(di) },
+    alertTitle: "Draw it !",
+    alertFallback: "Impossible de lancer Draw it !.",
+    logLabel: "DrawIt",
   });
 }
 
@@ -597,6 +621,7 @@ const RESTART_HANDLERS = {
   hottake: launchHotTakePrep,
   speedvote: launchSpeedVotePrep,
   clutch: launchClutchPrep,
+  drawit: launchDrawItPrep,
   wronganswer: launchWrongAnswerPrep,
   trivia: launchTriviaPrep,
   truthmeter: launchTruthMeterPrep,

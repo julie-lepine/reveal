@@ -243,3 +243,33 @@ export async function rpcSubmitTruthMeterVote({ lobbyId, runId, roundIdx, value 
   if (error) throw error;
   return asSessionRow(data);
 }
+
+export async function rpcRevealDrawItRound({ lobbyId }) {
+  requireClient();
+  const { data, error } = await supabase.rpc("reveal_drawit_round", {
+    p_lobby_id: lobbyId,
+  });
+  if (error) throw error;
+  return asSessionRow(data);
+}
+
+export async function rpcAdvanceDrawItRound({ lobbyId }) {
+  requireClient();
+  const { data, error } = await supabase.rpc("advance_drawit_round", {
+    p_lobby_id: lobbyId,
+  });
+  if (error) throw error;
+  return asSessionRow(data);
+}
+
+export async function rpcSubmitDrawItGuess({ lobbyId, runId, roundIdx, value }) {
+  requireClient();
+  const { data, error } = await supabase.rpc("submit_drawit_guess", {
+    p_lobby_id: lobbyId,
+    p_run_id: runId,
+    p_round_idx: roundIdx,
+    p_value: value,
+  });
+  if (error) throw error;
+  return asSessionRow(data);
+}

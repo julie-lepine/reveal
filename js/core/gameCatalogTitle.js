@@ -16,6 +16,7 @@ export const SESSION_GAME_ID_TO_TILE = {
   guesslie: "guesslie",
   tiernight: "tiernight-select",
   clutch: "clutch-prep",
+  drawit: "drawit-prep",
   wronganswer: "wronganswer-prep",
 };
 
