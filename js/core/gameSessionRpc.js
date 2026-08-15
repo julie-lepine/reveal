@@ -262,6 +262,15 @@ export async function rpcAdvanceDrawItRound({ lobbyId }) {
   return asSessionRow(data);
 }
 
+export async function rpcFinalizeDrawItScores({ lobbyId }) {
+  requireClient();
+  const { data, error } = await supabase.rpc("finalize_drawit_scores", {
+    p_lobby_id: lobbyId,
+  });
+  if (error) throw error;
+  return asSessionRow(data);
+}
+
 export async function rpcSubmitDrawItGuess({ lobbyId, runId, roundIdx, value }) {
   requireClient();
   const { data, error } = await supabase.rpc("submit_drawit_guess", {

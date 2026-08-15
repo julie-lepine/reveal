@@ -59,6 +59,7 @@ const GAME_LABELS = {
   truthmeter: { title: "TruthMeter", emoji: "📏", statKey: "truthMetersPlayed" },
   tiernight: { title: "TierNight", emoji: "🏆", statKey: "tierNightsPlayed" },
   trivia: { title: "Trivia Quiz", emoji: "🧠", statKey: "triviaGamesPlayed" },
+  drawit: { title: "Draw it !", emoji: "✏️", statKey: null },
 };
 
 function gameLeaderboardRowsHtml(players, scoreMap) {

@@ -317,6 +317,124 @@ $$;
 revoke all on function public.drawit_all_guessers_found(jsonb) from public;
 
 -- ---------------------------------------------------------------------------
+-- Scoring de manche — UID-keyed, pur et partagé par timeout / dernier guess.
+-- Trouveurs : 20, 15, 10 puis 5. Drawer : 5 par trouveur valide.
+-- ---------------------------------------------------------------------------
+
+create or replace function public.drawit_round_score_deltas(p_drawit jsonb)
+returns jsonb
+language plpgsql
+immutable
+set search_path = pg_catalog, public
+as $$
+declare
+  v_deltas jsonb := '{}'::jsonb;
+  v_participants jsonb := coalesce(p_drawit->'participants', '[]'::jsonb);
+  v_order jsonb := coalesce(p_drawit->'drawerOrder', '[]'::jsonb);
+  v_found jsonb := coalesce(p_drawit->'foundOrder', '[]'::jsonb);
+  v_drawer text := coalesce(p_drawit->>'drawerUid', '');
+  v_item jsonb;
+  v_uid text;
+  v_seen text[] := array[]::text[];
+  v_rank int := 0;
+  v_points int;
+  v_valid boolean;
+begin
+  if jsonb_typeof(v_participants) = 'array' and jsonb_array_length(v_participants) > 0 then
+    for v_item in select value from jsonb_array_elements(v_participants)
+    loop
+      v_uid := trim(coalesce(v_item->>'userId', ''));
+      if v_uid <> '' then
+        v_deltas := jsonb_set(v_deltas, array[v_uid], '0'::jsonb, true);
+      end if;
+    end loop;
+  elsif jsonb_typeof(v_order) = 'array' then
+    for v_uid in select value from jsonb_array_elements_text(v_order)
+    loop
+      if trim(v_uid) <> '' then
+        v_deltas := jsonb_set(v_deltas, array[trim(v_uid)], '0'::jsonb, true);
+      end if;
+    end loop;
+  end if;
+
+  if jsonb_typeof(v_found) = 'array' then
+    for v_item in select value from jsonb_array_elements(v_found)
+    loop
+      v_uid := trim(coalesce(v_item->>'uid', ''));
+      if v_uid = '' or v_uid = v_drawer or v_uid = any(v_seen) then
+        continue;
+      end if;
+      if jsonb_typeof(v_participants) = 'array' and jsonb_array_length(v_participants) > 0 then
+        select exists (
+          select 1 from jsonb_array_elements(v_participants) p
+          where p->>'userId' = v_uid
+        ) into v_valid;
+      else
+        select exists (
+          select 1 from jsonb_array_elements_text(v_order) o(uid)
+          where o.uid = v_uid
+        ) into v_valid;
+      end if;
+      if not v_valid then
+        continue;
+      end if;
+
+      v_seen := array_append(v_seen, v_uid);
+      v_rank := v_rank + 1;
+      v_points := case v_rank
+        when 1 then 20
+        when 2 then 15
+        when 3 then 10
+        else 5
+      end;
+      v_deltas := jsonb_set(v_deltas, array[v_uid], to_jsonb(v_points), true);
+    end loop;
+  end if;
+
+  if v_drawer <> '' and v_deltas ? v_drawer then
+    v_deltas := jsonb_set(v_deltas, array[v_drawer], to_jsonb(v_rank * 5), true);
+  end if;
+  return v_deltas;
+end;
+$$;
+
+create or replace function public.drawit_add_score_deltas(
+  p_scores jsonb,
+  p_deltas jsonb
+)
+returns jsonb
+language plpgsql
+immutable
+set search_path = pg_catalog, public
+as $$
+declare
+  v_scores jsonb := coalesce(p_scores, '{}'::jsonb);
+  v_entry record;
+  v_current int;
+  v_delta int;
+begin
+  if jsonb_typeof(v_scores) <> 'object' then
+    v_scores := '{}'::jsonb;
+  end if;
+  for v_entry in select key, value from jsonb_each(coalesce(p_deltas, '{}'::jsonb))
+  loop
+    v_current := coalesce((v_scores->>v_entry.key)::int, 0);
+    v_delta := coalesce((v_entry.value #>> '{}')::int, 0);
+    v_scores := jsonb_set(
+      v_scores,
+      array[v_entry.key],
+      to_jsonb(v_current + greatest(v_delta, 0)),
+      true
+    );
+  end loop;
+  return v_scores;
+end;
+$$;
+
+revoke all on function public.drawit_round_score_deltas(jsonb) from public;
+revoke all on function public.drawit_add_score_deltas(jsonb, jsonb) from public;
+
+-- ---------------------------------------------------------------------------
 -- drawit_revealed_state — unique construction de l'état public de reveal.
 -- Utilisée par le timeout acting-host ET par le dernier guess correct.
 -- ---------------------------------------------------------------------------
@@ -326,20 +444,38 @@ create or replace function public.drawit_revealed_state(
   p_word_label text
 )
 returns jsonb
-language sql
+language plpgsql
 immutable
 set search_path = pg_catalog, public
 as $$
-  select coalesce(p_drawit, '{}'::jsonb) || jsonb_build_object(
+declare
+  v_di jsonb := coalesce(p_drawit, '{}'::jsonb);
+  v_deltas jsonb;
+  v_match_scores jsonb;
+  v_score_key text;
+begin
+  if coalesce((v_di->>'roundScored')::boolean, false) then
+    return v_di;
+  end if;
+  v_deltas := public.drawit_round_score_deltas(v_di);
+  v_match_scores := public.drawit_add_score_deltas(v_di->'matchScores', v_deltas);
+  v_score_key := coalesce(v_di->>'runId', '') || ':' ||
+    coalesce((v_di->>'roundIdx')::int, 0)::text;
+
+  return v_di || jsonb_build_object(
     'phase', 'reveal',
     'roundScored', true,
+    'matchScores', v_match_scores,
     'lastRound', jsonb_build_object(
-      'roundIdx', coalesce((p_drawit->>'roundIdx')::int, 0),
-      'drawerUid', p_drawit->>'drawerUid',
+      'roundIdx', coalesce((v_di->>'roundIdx')::int, 0),
+      'drawerUid', v_di->>'drawerUid',
       'wordLabel', coalesce(p_word_label, ''),
-      'foundOrder', coalesce(p_drawit->'foundOrder', '[]'::jsonb)
+      'foundOrder', coalesce(v_di->'foundOrder', '[]'::jsonb),
+      'deltas', v_deltas,
+      'scoreKey', v_score_key
     )
   );
+end;
 $$;
 
 revoke all on function public.drawit_revealed_state(jsonb, text) from public;
@@ -545,3 +681,108 @@ $$;
 
 revoke all on function public.advance_drawit_round(uuid) from public;
 grant execute on function public.advance_drawit_round(uuid) to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- finalize_drawit_scores — transfère une fois le cumul du run vers la soirée.
+-- Doit précéder completeGameSession ; ne change ni phase ni routing.
+-- ---------------------------------------------------------------------------
+
+create or replace function public.finalize_drawit_scores(p_lobby_id uuid)
+returns public.game_sessions
+language plpgsql
+security definer
+set search_path = pg_catalog, public
+as $$
+declare
+  v_uid uuid := auth.uid();
+  v_row public.game_sessions;
+  v_state jsonb;
+  v_di jsonb;
+  v_run text;
+  v_match jsonb;
+  v_scores jsonb;
+  v_game_scores jsonb;
+  v_drawit_scores jsonb;
+  v_recorded jsonb;
+  v_order jsonb;
+begin
+  if v_uid is null then
+    raise exception 'Authentification requise.';
+  end if;
+  if not (public.is_lobby_host(p_lobby_id) or public.is_acting_host(p_lobby_id)) then
+    raise exception 'Action réservée à l''hôte ou à l''acting host.';
+  end if;
+
+  select * into v_row
+  from public.game_sessions
+  where lobby_id = p_lobby_id
+  for update;
+
+  if not found or v_row.game_id is distinct from 'drawit' then
+    raise exception 'DRAWIT_WRONG_GAME';
+  end if;
+  v_state := coalesce(v_row.state, '{}'::jsonb);
+  v_di := coalesce(v_state->'drawIt', '{}'::jsonb);
+  v_run := coalesce(v_di->>'runId', '');
+  if v_run = ''
+     or coalesce(v_di->>'phase', '') <> 'reveal'
+     or coalesce((v_di->>'roundIdx')::int, -1) <>
+        coalesce((v_di->>'roundCount')::int, 0) - 1
+     or coalesce((v_di->>'roundScored')::boolean, false) is not true
+  then
+    raise exception 'DRAWIT_NOT_COMPLETE';
+  end if;
+
+  if coalesce(v_di->>'scoresCommittedRunId', '') = v_run then
+    return v_row;
+  end if;
+
+  v_match := coalesce(v_di->'matchScores', '{}'::jsonb);
+  v_scores := public.drawit_add_score_deltas(v_state->'scores', v_match);
+  v_game_scores := coalesce(v_state->'gameScores', '{}'::jsonb);
+  if jsonb_typeof(v_game_scores) <> 'object' then
+    v_game_scores := '{}'::jsonb;
+  end if;
+  v_drawit_scores := public.drawit_add_score_deltas(
+    v_game_scores->'drawit',
+    v_match
+  );
+  v_game_scores := jsonb_set(
+    v_game_scores,
+    '{drawit}',
+    v_drawit_scores,
+    true
+  );
+  v_recorded := coalesce(v_state->'eveningGamesRecorded', '{}'::jsonb)
+    || jsonb_build_object('drawit', true);
+  v_order := coalesce(v_state->'gameScoreOrder', '[]'::jsonb);
+  if jsonb_typeof(v_order) <> 'array' then
+    v_order := '[]'::jsonb;
+  end if;
+  if not v_order @> '["drawit"]'::jsonb then
+    v_order := v_order || '["drawit"]'::jsonb;
+  end if;
+
+  v_di := v_di || jsonb_build_object('scoresCommittedRunId', v_run);
+  v_state := jsonb_set(v_state, '{drawIt}', v_di, true)
+    || jsonb_build_object(
+      'scores', v_scores,
+      'gameScores', v_game_scores,
+      'eveningGamesRecorded', v_recorded,
+      'gameScoreOrder', v_order
+    );
+
+  update public.game_sessions
+  set state = v_state
+  where lobby_id = p_lobby_id
+  returning * into v_row;
+
+  return v_row;
+end;
+$$;
+
+revoke all on function public.finalize_drawit_scores(uuid) from public;
+grant execute on function public.finalize_drawit_scores(uuid) to authenticated;
+
+-- Force PostgREST à découvrir immédiatement les RPC créées/remplacées ci-dessus.
+notify pgrst, 'reload schema';

@@ -4,6 +4,7 @@
  * foundOrder décrit qui a trouvé ; la transition reste matérialisée par phase.
  */
 import { DRAW_IT_ROUND_DURATION_MS } from "../../data/drawIt.js";
+import { awardDrawItRound } from "./drawItScoring.js";
 
 export const DRAW_IT_PHASE_DRAWING = "drawing";
 export const DRAW_IT_PHASE_REVEAL = "reveal";
@@ -218,9 +219,8 @@ export function buildDrawItLaunchState({
     ...timing,
     roundScored: false,
     lastRound: null,
-    matchScores: session.matchScores && typeof session.matchScores === "object"
-      ? session.matchScores
-      : {},
+    matchScores: {},
+    scoresCommittedRunId: null,
     ...emptyDrawItPlayBuffers(),
   };
 }
@@ -248,17 +248,21 @@ export function canCommitDrawItReveal(session, nowMs = Date.now()) {
 export function applyDrawItReveal(session, { wordLabel = "", nowMs = Date.now() } = {}) {
   const check = canCommitDrawItReveal(session, nowMs);
   if (!check.ok) return { ok: false, reason: check.reason, session };
+  const award = awardDrawItRound(session);
   return {
     ok: true,
     session: {
       ...session,
       phase: DRAW_IT_PHASE_REVEAL,
       roundScored: true,
+      matchScores: award.matchScores,
       lastRound: {
         roundIdx: session.roundIdx ?? 0,
         drawerUid: session.drawerUid || null,
         wordLabel: String(wordLabel || ""),
         foundOrder: Array.isArray(session.foundOrder) ? [...session.foundOrder] : [],
+        deltas: award.deltas,
+        scoreKey: award.scoreKey,
       },
     },
   };

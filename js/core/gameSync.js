@@ -2464,6 +2464,20 @@ function drawItLastRoundToRemote(lastRound) {
     drawerUid: lastRound.drawerUid || null,
     wordLabel: lastRound.wordLabel != null ? String(lastRound.wordLabel) : "",
     foundOrder: sanitizeDrawItFoundOrder(lastRound.foundOrder),
+    deltas: scoresToRemote(lastRound.deltas || {}),
+    scoreKey: lastRound.scoreKey || null,
+  };
+}
+
+function drawItLastRoundFromRemote(lastRound) {
+  if (!lastRound || typeof lastRound !== "object") return null;
+  return {
+    roundIdx: lastRound.roundIdx ?? 0,
+    drawerUid: lastRound.drawerUid || null,
+    wordLabel: lastRound.wordLabel != null ? String(lastRound.wordLabel) : "",
+    foundOrder: sanitizeDrawItFoundOrder(lastRound.foundOrder),
+    deltas: scoresFromRemote(lastRound.deltas || {}),
+    scoreKey: lastRound.scoreKey || null,
   };
 }
 
@@ -2502,6 +2516,7 @@ export function drawItToRemote(session) {
     roundScored: Boolean(session.roundScored),
     lastRound: drawItLastRoundToRemote(session.lastRound),
     matchScores: scoresToRemote(session.matchScores || {}),
+    scoresCommittedRunId: session.scoresCommittedRunId || null,
     foundOrder: sanitizeDrawItFoundOrder(session.foundOrder),
     guesses: sanitizeDrawItGuesses(session.guesses),
     canvasEpoch: session.canvasEpoch ?? 0,
@@ -2532,8 +2547,9 @@ export function drawItFromRemote(remote) {
     roundStartAt: remote.roundStartAt || null,
     roundEndsAt: remote.roundEndsAt || null,
     roundScored: Boolean(remote.roundScored),
-    lastRound: drawItLastRoundToRemote(remote.lastRound),
+    lastRound: drawItLastRoundFromRemote(remote.lastRound),
     matchScores: scoresFromRemote(remote.matchScores || {}),
+    scoresCommittedRunId: remote.scoresCommittedRunId || null,
     foundOrder: sanitizeDrawItFoundOrder(remote.foundOrder),
     guesses: sanitizeDrawItGuesses(remote.guesses),
     canvasEpoch: remote.canvasEpoch ?? 0,

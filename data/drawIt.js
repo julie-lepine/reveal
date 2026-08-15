@@ -3,6 +3,9 @@ export const DRAW_IT_CATALOG_ID = "catalog";
 
 /** Durée fixe d'une manche — pas un paramètre de prépa. */
 export const DRAW_IT_ROUND_DURATION_MS = 60_000;
+export const DRAW_IT_FINDER_POINTS = Object.freeze([20, 15, 10]);
+export const DRAW_IT_LATER_FINDER_POINTS = 5;
+export const DRAW_IT_DRAWER_POINTS_PER_FIND = 5;
 
 export const DRAW_IT_ROUND_PRESETS = [3, 5, 8];
 export const DRAW_IT_ROUND_ALL = -1;

@@ -11,7 +11,15 @@ import {
 } from "../../data/drawIt.js";
 import { getActivePlayerNames } from "./players.js";
 import { getLobbyParticipants } from "./lobby.js";
-import { getLocalDisplayName, getState, saveStatePatch } from "./state.js";
+import {
+  addScore,
+  getCurrentSessionScoreMap,
+  getLocalDisplayName,
+  getState,
+  recordEveningGameOnce,
+  saveStatePatch,
+  setActiveScoringGame,
+} from "./state.js";
 import {
   isLobbyHost,
   isGameSyncActive,
@@ -366,21 +374,66 @@ export async function commitDrawItNextRound({ nowMs = Date.now() } = {}) {
 
 export async function commitDrawItComplete() {
   const outcome = await completeLock.run(async () => {
-    const session = getDrawItSession();
+    let session = getDrawItSession();
     const check = canCompleteDrawItGame(session);
     if (!check.ok) return { ok: false, reason: check.reason };
 
+    if (isGameSyncActive() && isSupabaseConfigured()) {
+      const { rpcFinalizeDrawItScores } = await import("./gameSessionRpc.js");
+      const scoredRow = await rpcFinalizeDrawItScores({
+        lobbyId: getState().lobby.id,
+      });
+      if (!scoredRow?.state) return { ok: false, reason: "scores_not_committed" };
+      applyRemoteSession(scoredRow);
+      session = getDrawItSession();
+      if (session.scoresCommittedRunId !== session.runId) {
+        return { ok: false, reason: "scores_not_committed" };
+      }
+      await completeGameSession({ gameId: "drawit", screen: "results", state: {} });
+      return { ok: true, reason: null };
+    }
+
+    commitDrawItMatchScoresLocal(session);
     if (isGameSyncActive()) {
       await completeGameSession({ gameId: "drawit", screen: "results", state: {} });
       return { ok: true, reason: null };
     }
     saveStatePatch({
-      drawItGame: { ...session, lobbyStarted: false },
+      drawItGame: {
+        ...session,
+        lobbyStarted: false,
+        scoresCommittedRunId: session.runId,
+      },
     });
     return { ok: true, reason: null };
   });
   if (!outcome.ok && outcome.skipped) return { ok: false, reason: "in_flight" };
   return outcome.value;
+}
+
+/** Offline/fallback : converge le cumul du match vers les scores REVEAL sans double crédit. */
+export function commitDrawItMatchScoresLocal(session = getDrawItSession()) {
+  const current = getDrawItSession();
+  if (
+    session.runId &&
+    current.runId === session.runId &&
+    current.scoresCommittedRunId === session.runId
+  ) {
+    return getCurrentSessionScoreMap("drawit");
+  }
+  setActiveScoringGame("drawit");
+  for (const [name, totalValue] of Object.entries(session.matchScores || {})) {
+    const total = Number(totalValue) || 0;
+    if (total > 0) addScore(name, total);
+  }
+  recordEveningGameOnce("drawit", () => {});
+  saveStatePatch({
+    drawItGame: {
+      ...session,
+      scoresCommittedRunId: session.runId || null,
+    },
+  });
+  return getCurrentSessionScoreMap("drawit");
 }
 
 /**

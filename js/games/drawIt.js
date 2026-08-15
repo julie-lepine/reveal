@@ -44,6 +44,8 @@ import {
   maybeResetDrawItBoard,
 } from "../core/drawItStrokes.js";
 import { buildDrawItRoundRecap } from "../core/drawItRoundRecap.js";
+import { buildDrawItStandings } from "../core/drawItScoring.js";
+import { serializeLastGameStandings } from "../core/lastGamePodium.js";
 
 export function mountDrawIt(app) {
   if (!requireLobbyPlay()) return null;
@@ -352,6 +354,7 @@ export function mountDrawIt(app) {
             gameId: "drawit",
             title: "Draw it !",
             summary: `${live.roundCount} manches`,
+            standings: serializeLastGameStandings(buildDrawItStandings(live)),
           });
           const done = await commitDrawItComplete();
           if (done?.ok === false) return;
