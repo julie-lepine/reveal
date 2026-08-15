@@ -42,6 +42,7 @@ import {
 } from "./drawItRound.js";
 import {
   fetchMyDrawItPrivate,
+  hostLaunchDrawItGame,
   hostWriteDrawItPrivateRounds,
   peekLocalDrawItPrivate,
 } from "./drawItPrivate.js";
@@ -224,18 +225,38 @@ export async function markDrawItLobbyStarted({ rosterNames } = {}) {
     nowMs: Date.now(),
     runId,
   });
+  const rounds = series.map((word, i) => ({
+    roundIdx: i,
+    drawerUid: drawerUidForRound(drawerOrder, i),
+    wordLabel: word.label,
+    acceptedAnswers: Array.isArray(word.acceptedAnswers)
+      ? word.acceptedAnswers
+      : [word.label],
+  }));
 
-  await hostWriteDrawItPrivateRounds({
-    runId,
-    rounds: series.map((word, i) => ({
-      roundIdx: i,
-      drawerUid: drawerUidForRound(drawerOrder, i),
-      wordLabel: word.label,
-      acceptedAnswers: Array.isArray(word.acceptedAnswers)
-        ? word.acceptedAnswers
-        : [word.label],
-    })),
-  });
+  if (isGameSyncActive() && isSupabaseConfigured()) {
+    const launched = await hostLaunchDrawItGame({
+      publicSession: drawItToRemote(next),
+      runId,
+      rounds,
+    });
+    if (!launched.ok || !launched.row?.state) {
+      try {
+        const { showAppAlert } = await import("./dialog.js");
+        await showAppAlert(
+          launched.error || "Impossible de lancer Draw it !",
+          { title: "Connexion", icon: "📡" }
+        );
+      } catch {
+        /* alerte optionnelle */
+      }
+      return { ok: false, error: launched.error || "launch_failed" };
+    }
+    applyRemoteSession(launched.row);
+    return { ok: true };
+  }
+
+  await hostWriteDrawItPrivateRounds({ runId, rounds });
 
   return launchGameWithSync({
     screen: "drawit",

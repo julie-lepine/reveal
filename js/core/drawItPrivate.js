@@ -82,6 +82,61 @@ export async function hostWriteDrawItPrivateRounds({ runId, rounds = [] } = {}) 
 }
 
 /**
+ * MP : publie atomiquement les mots privés et la manche 1 horodatée serveur.
+ * Le payload public peut contenir des timestamps préparatoires : la RPC les remplace.
+ */
+export async function hostLaunchDrawItGame({
+  publicSession,
+  runId,
+  rounds = [],
+} = {}) {
+  const lobbyId = getState().lobby?.id;
+  if (!lobbyId || !runId || !publicSession) {
+    return { ok: false, row: null, error: "Lobby ou lancement invalide." };
+  }
+
+  const map = {};
+  for (const round of rounds) {
+    if (round == null || round.roundIdx == null) continue;
+    map[String(round.roundIdx)] = {
+      runId,
+      roundIdx: Number(round.roundIdx),
+      drawerUid: String(round.drawerUid || ""),
+      wordLabel: String(round.wordLabel || ""),
+      acceptedAnswers: Array.isArray(round.acceptedAnswers)
+        ? round.acceptedAnswers
+        : [],
+    };
+  }
+  writeLocalBundle(lobbyId, { runId, rounds: map });
+
+  if (!isSupabaseConfigured()) {
+    return { ok: true, row: null, written: Object.keys(map).length };
+  }
+
+  const payload = rounds.map((round) => ({
+    roundIdx: round.roundIdx,
+    drawerUid: round.drawerUid,
+    wordLabel: round.wordLabel,
+    acceptedAnswers: round.acceptedAnswers || [],
+  }));
+  const { data, error } = await supabase.rpc("launch_drawit_game", {
+    p_lobby_id: lobbyId,
+    p_drawit: publicSession,
+    p_rounds: payload,
+  });
+  if (error) {
+    console.warn("[drawit_private] launch:", error.message);
+    return { ok: false, row: null, written: 0, error: error.message };
+  }
+  return {
+    ok: true,
+    row: Array.isArray(data) ? data[0] || null : data || null,
+    written: Object.keys(map).length,
+  };
+}
+
+/**
  * Drawer uniquement : relit son mot pour runId + roundIdx courants.
  * Un non-drawer reçoit null (RLS + filtre local).
  */

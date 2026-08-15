@@ -130,6 +130,109 @@ revoke all on function public.write_drawit_private_rounds(uuid, text, jsonb) fro
 grant execute on function public.write_drawit_private_rounds(uuid, text, jsonb) to authenticated;
 
 -- ---------------------------------------------------------------------------
+-- launch_drawit_game — mots privés + manche 1 publique dans une transaction.
+-- Le timer ne démarre qu'après l'écriture des mots, à l'instant serveur du commit.
+-- ---------------------------------------------------------------------------
+
+create or replace function public.launch_drawit_game(
+  p_lobby_id uuid,
+  p_drawit jsonb,
+  p_rounds jsonb
+)
+returns public.game_sessions
+language plpgsql
+security definer
+set search_path = pg_catalog, public
+as $$
+declare
+  v_uid uuid := auth.uid();
+  v_row public.game_sessions;
+  v_run text;
+  v_round_count int;
+  v_drawer text;
+  v_start timestamptz;
+  v_end timestamptz;
+  v_di jsonb;
+begin
+  if v_uid is null then
+    raise exception 'Authentification requise.';
+  end if;
+  if not (public.is_lobby_host(p_lobby_id) or public.is_acting_host(p_lobby_id)) then
+    raise exception 'Action réservée à l''hôte ou à l''acting host.';
+  end if;
+
+  select * into v_row
+  from public.game_sessions
+  where lobby_id = p_lobby_id
+  for update;
+
+  if not found then
+    raise exception 'Session de jeu introuvable.';
+  end if;
+  if v_row.game_id is distinct from 'drawit' then
+    raise exception 'DRAWIT_WRONG_GAME';
+  end if;
+  if p_drawit is null or jsonb_typeof(p_drawit) <> 'object' then
+    raise exception 'DRAWIT_INVALID_LAUNCH';
+  end if;
+
+  v_run := trim(coalesce(p_drawit->>'runId', ''));
+  v_round_count := coalesce((p_drawit->>'roundCount')::int, 0);
+  v_drawer := coalesce(p_drawit->>'drawerUid', '');
+  if v_run = ''
+     or coalesce((p_drawit->>'lobbyStarted')::boolean, false) is not true
+     or coalesce(p_drawit->>'phase', '') <> 'drawing'
+     or coalesce((p_drawit->>'roundIdx')::int, -1) <> 0
+     or v_round_count < 1
+     or p_rounds is null
+     or jsonb_typeof(p_rounds) <> 'array'
+     or jsonb_array_length(p_rounds) <> v_round_count
+     or jsonb_typeof(coalesce(p_drawit->'drawerOrder', 'null'::jsonb)) <> 'array'
+     or jsonb_array_length(p_drawit->'drawerOrder') < 1
+     or (p_drawit->'drawerOrder'->>0) is distinct from v_drawer
+  then
+    raise exception 'DRAWIT_INVALID_LAUNCH';
+  end if;
+  if p_drawit ?| array['wordId','wordLabel','deck','words','acceptedAnswers'] then
+    raise exception 'DRAWIT_PUBLIC_SECRET';
+  end if;
+
+  -- Même transaction : aucun état drawing n'est visible avant que les mots existent.
+  perform public.write_drawit_private_rounds(p_lobby_id, v_run, p_rounds);
+
+  v_start := clock_timestamp();
+  v_end := v_start + interval '60 seconds';
+  v_di := (p_drawit - 'roundStartAt' - 'roundEndsAt')
+    || jsonb_build_object(
+      'roundIdx', 0,
+      'phase', 'drawing',
+      'roundStartAt', to_jsonb(v_start),
+      'roundEndsAt', to_jsonb(v_end),
+      'roundScored', false,
+      'lastRound', null,
+      'matchScores', '{}'::jsonb,
+      'foundOrder', '[]'::jsonb,
+      'guesses', '[]'::jsonb,
+      'strokes', '[]'::jsonb,
+      'canvasEpoch', 0,
+      'strokeSeq', 0
+    );
+
+  update public.game_sessions
+  set game_id = 'drawit',
+      screen = 'drawit',
+      state = jsonb_set(coalesce(state, '{}'::jsonb), '{drawIt}', v_di, true)
+  where lobby_id = p_lobby_id
+  returning * into v_row;
+
+  return v_row;
+end;
+$$;
+
+revoke all on function public.launch_drawit_game(uuid, jsonb, jsonb) from public;
+grant execute on function public.launch_drawit_game(uuid, jsonb, jsonb) to authenticated;
+
+-- ---------------------------------------------------------------------------
 -- drawit_all_guessers_found — participants figés moins drawerUid.
 -- Repli drawerOrder uniquement pour les anciennes sessions sans participants.
 -- ---------------------------------------------------------------------------

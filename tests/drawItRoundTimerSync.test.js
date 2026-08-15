@@ -142,6 +142,30 @@ describe("Draw it ! — identité et timestamps de nouvelle manche", () => {
       50_000
     );
   });
+
+  it("hôte et invité avec le même roundEndsAt ont le même remaining", () => {
+    const first = roundOne();
+    const host = {
+      ...first,
+      serverTimeAtSync: first.roundStartAt,
+      clientTimeAtSyncMs: T0,
+    };
+    const guest = {
+      ...first,
+      serverTimeAtSync: first.roundStartAt,
+      clientTimeAtSyncMs: T0 - 15_000,
+    };
+    const hostRemaining = remainingMsUntil(
+      host.roundEndsAt,
+      drawItSyncedNowMs(host, T0 + 12_345)
+    );
+    const guestRemaining = remainingMsUntil(
+      guest.roundEndsAt,
+      drawItSyncedNowMs(guest, T0 - 15_000 + 12_345)
+    );
+    assert.equal(hostRemaining, 47_655);
+    assert.equal(guestRemaining, hostRemaining);
+  });
 });
 
 describe("Draw it ! — hydratation invitée", () => {
@@ -183,6 +207,15 @@ describe("Draw it ! — hydratation invitée", () => {
     assert.equal(Number.isFinite(guest.clientTimeAtSyncMs), true);
   });
 
+  it("manche 1 distante conserve les timestamps canoniques sans les recréer", () => {
+    const first = roundOne();
+    applyRemoteSession(row(first, new Date(T0).toISOString()));
+    const guest = getDrawItSession();
+    assert.equal(guest.roundIdx, 0);
+    assert.equal(guest.roundStartAt, first.roundStartAt);
+    assert.equal(guest.roundEndsAt, first.roundEndsAt);
+  });
+
   it("patch tardif manche 1 ne restaure jamais son timer", () => {
     const second = roundTwo();
     applyRemoteSession(row(second, "2026-08-15T21:00:15.000Z"));
@@ -217,6 +250,25 @@ describe("Draw it ! — serveur et intervalle UI", () => {
     assert.match(fn, /'guesses', '\[\]'::jsonb/);
   });
 
+  it("launch écrit les mots avant de créer le timer canonique de manche 1", () => {
+    const sql = read("supabase/feature-drawit-02-private-word.sql");
+    const start = sql.indexOf("create or replace function public.launch_drawit_game");
+    const end = sql.indexOf(
+      "revoke all on function public.launch_drawit_game",
+      start
+    );
+    const fn = sql.slice(start, end);
+    assert.ok(start >= 0);
+    assert.ok(
+      fn.indexOf("write_drawit_private_rounds") <
+        fn.indexOf("v_start := clock_timestamp()")
+    );
+    assert.match(fn, /v_end := v_start \+ interval '60 seconds'/);
+    assert.match(fn, /p_drawit - 'roundStartAt' - 'roundEndsAt'/);
+    assert.match(fn, /'roundStartAt', to_jsonb\(v_start\)/);
+    assert.match(fn, /'roundEndsAt', to_jsonb\(v_end\)/);
+  });
+
   it("un seul intervalle, nettoyé au remount, lit toujours la session courante", () => {
     const src = read("js/games/drawIt.js");
     assert.equal((src.match(/setInterval\(/g) || []).length, 1);
@@ -224,5 +276,12 @@ describe("Draw it ! — serveur et intervalle UI", () => {
     assert.match(src, /const session = getDrawItSession\(\)/);
     assert.match(src, /drawItSyncedNowMs\(session\)/);
     assert.match(src, /return \(\) => \{\s*stopTick\(\)/);
+  });
+
+  it("le rendu ne crée ni ne modifie roundStartAt / roundEndsAt", () => {
+    const src = read("js/games/drawIt.js");
+    assert.doesNotMatch(src, /roundEndsAt\s*=/);
+    assert.doesNotMatch(src, /roundStartAt\s*=/);
+    assert.doesNotMatch(src, /buildDrawItRoundTiming|buildDrawItLaunchState/);
   });
 });
