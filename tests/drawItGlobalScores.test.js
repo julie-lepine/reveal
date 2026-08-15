@@ -213,6 +213,28 @@ describe("Draw it ! — intégration scores REVEAL", () => {
     assert.equal(awardDrawItRound(hydrated).applied, false);
   });
 
+  it("invité avec compte hydrate les deltas via le snapshot même sans roster local", () => {
+    const { afterThree } = playThreeRounds();
+    const remote = drawItToRemote(afterThree);
+    saveStatePatch({
+      lobby: {
+        id: "11111111-1111-1111-1111-111111111111",
+        participants: [],
+      },
+    });
+    const hydrated = drawItFromRemote(remote);
+    assert.deepEqual(hydrated.lastRound.deltas, {
+      Emma: 20,
+      Lucas: 15,
+      Julie: 10,
+    });
+    assert.deepEqual(hydrated.matchScores, {
+      Emma: 50,
+      Lucas: 40,
+      Julie: 25,
+    });
+  });
+
   it("results/leaderboard possèdent le mapping Draw it existant", () => {
     const scores = read("js/core/gameScores.js");
     const results = read("js/screens/results.js");

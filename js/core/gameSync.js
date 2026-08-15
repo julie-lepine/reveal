@@ -2469,14 +2469,36 @@ function drawItLastRoundToRemote(lastRound) {
   };
 }
 
-function drawItLastRoundFromRemote(lastRound) {
+function drawItScoresFromRemote(remoteScores = {}, participants = []) {
+  const namesByUid = new Map(
+    (Array.isArray(participants) ? participants : [])
+      .map((participant) => [
+        String(participant?.userId || ""),
+        String(participant?.name || ""),
+      ])
+      .filter(([uid, name]) => uid && name)
+  );
+  const out = {};
+  for (const [uid, value] of Object.entries(remoteScores || {})) {
+    const score = Number(value);
+    if (!Number.isFinite(score)) continue;
+    const name =
+      namesByUid.get(String(uid)) ||
+      playerKeyToDisplayName(uid) ||
+      String(uid);
+    out[name] = out[name] == null ? score : Math.max(out[name], score);
+  }
+  return out;
+}
+
+function drawItLastRoundFromRemote(lastRound, participants = []) {
   if (!lastRound || typeof lastRound !== "object") return null;
   return {
     roundIdx: lastRound.roundIdx ?? 0,
     drawerUid: lastRound.drawerUid || null,
     wordLabel: lastRound.wordLabel != null ? String(lastRound.wordLabel) : "",
     foundOrder: sanitizeDrawItFoundOrder(lastRound.foundOrder),
-    deltas: scoresFromRemote(lastRound.deltas || {}),
+    deltas: drawItScoresFromRemote(lastRound.deltas || {}, participants),
     scoreKey: lastRound.scoreKey || null,
   };
 }
@@ -2547,8 +2569,11 @@ export function drawItFromRemote(remote) {
     roundStartAt: remote.roundStartAt || null,
     roundEndsAt: remote.roundEndsAt || null,
     roundScored: Boolean(remote.roundScored),
-    lastRound: drawItLastRoundFromRemote(remote.lastRound),
-    matchScores: scoresFromRemote(remote.matchScores || {}),
+    lastRound: drawItLastRoundFromRemote(remote.lastRound, remote.participants),
+    matchScores: drawItScoresFromRemote(
+      remote.matchScores || {},
+      remote.participants
+    ),
     scoresCommittedRunId: remote.scoresCommittedRunId || null,
     foundOrder: sanitizeDrawItFoundOrder(remote.foundOrder),
     guesses: sanitizeDrawItGuesses(remote.guesses),
