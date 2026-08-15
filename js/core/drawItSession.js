@@ -20,6 +20,7 @@ import {
   allMembersReady,
   drawItToRemote,
   applyRemoteSession,
+  refreshGameSession,
   completeGameSession,
 } from "./gameSync.js";
 import { launchGameWithSync, commitHostGamePlay, commitPrepReadyToggle } from "./mpLaunch.js";
@@ -365,11 +366,34 @@ export async function submitDrawItGuess(rawValue, { nowMs = Date.now(), uid } = 
           roundIdx: session.roundIdx,
           value: rawValue,
         });
-        if (row) applyRemoteSession(row);
-        return { ok: true, reason: null };
+        if (!row) throw new Error("Proposition refusée.");
+        let full = row;
+        if (!row.state) {
+          full = (await refreshGameSession()) || row;
+        }
+        if (full) applyRemoteSession(full);
+        const synced = getDrawItSession();
+        const trimmed = String(rawValue ?? "").trim();
+        const last = Array.isArray(synced.guesses)
+          ? synced.guesses[synced.guesses.length - 1]
+          : null;
+        if (!last || String(last.uid) !== String(author) || last.value !== trimmed) {
+          return { ok: false, reason: "not_applied" };
+        }
+        return { ok: true, correct: Boolean(last.correct), reason: null };
       } catch (error) {
         const message = String(error?.message || error || "");
         const code = message.match(/DRAWIT_[A-Z_]+/)?.[0] || "rpc_failed";
+        try {
+          const { showAppAlert } = await import("./dialog.js");
+          const { formatSyncErrorMessage } = await import("./authErrors.js");
+          await showAppAlert(
+            formatSyncErrorMessage(message) || "Proposition non enregistrée.",
+            { title: "Draw it !", icon: "✏️" }
+          );
+        } catch {
+          /* alerte optionnelle */
+        }
         return { ok: false, reason: code.toLowerCase() };
       }
     }

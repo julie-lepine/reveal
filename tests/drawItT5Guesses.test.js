@@ -1,7 +1,7 @@
 /**
  * Draw it ! T5 — guesses + foundOrder atomique + feed.
  */
-import { describe, it, beforeEach, mock } from "node:test";
+import { describe, it, beforeEach, afterEach, mock } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -32,6 +32,7 @@ const {
   applyDrawItGuess,
   applyDrawItGuessesSerialized,
   canSubmitDrawItGuess,
+  drawItGuessesToChatMessages,
   isDrawItGuessInputLocked,
   isUidInDrawItFoundOrder,
   sanitizeDrawItGuesses,
@@ -42,7 +43,12 @@ const {
   DRAW_IT_PHASE_DRAWING,
   DRAW_IT_PHASE_REVEAL,
 } = await import("../js/core/drawItRound.js");
-const { drawItFromRemote, drawItToRemote } = await import("../js/core/gameSync.js");
+const {
+  applyRemoteSession,
+  drawItFromRemote,
+  drawItToRemote,
+  __resetCachedGameSessionForTests,
+} = await import("../js/core/gameSync.js");
 const {
   defaultDrawItPrepSession,
   getDrawItSession,
@@ -53,6 +59,29 @@ const {
 } = await import("../js/core/drawItSession.js");
 const { peekLocalDrawItPrivate } = await import("../js/core/drawItPrivate.js");
 const { saveStatePatch } = await import("../js/core/state.js");
+const { initRouter, registerScreen, resetNav } = await import("../js/core/router.js");
+
+function ensureScreens() {
+  initRouter({
+    innerHTML: "",
+    querySelector() {
+      return null;
+    },
+    querySelectorAll() {
+      return [];
+    },
+  });
+  for (const id of [
+    "home",
+    "results",
+    "leaderboard",
+    "game-select",
+    "drawit-prep",
+    "drawit",
+  ]) {
+    registerScreen(id, () => {});
+  }
+}
 
 function twoPlayers() {
   return [
@@ -240,6 +269,34 @@ describe("Draw it ! T5 — concurrence + timestamps", () => {
     assert.equal(session.foundOrder[1].at, "2026-08-15T21:00:10.010Z");
   });
 
+  it("deux joueurs : les deux guesses sont conservées", () => {
+    const { session } = applyDrawItGuessesSerialized(
+      drawingSession({ participants: threePlayers() }),
+      [
+        guessOpts(GUEST_UID, "girafe"),
+        guessOpts(THIRD_UID, "lion"),
+      ]
+    );
+    assert.equal(session.guesses.length, 2);
+    assert.equal(session.guesses[0].uid, GUEST_UID);
+    assert.equal(session.guesses[1].uid, THIRD_UID);
+    assert.deepEqual(session.foundOrder, []);
+  });
+
+  it("mauvaise puis bonne du même joueur : feed 2, foundOrder 1", () => {
+    const { session, results } = applyDrawItGuessesSerialized(drawingSession(), [
+      guessOpts(GUEST_UID, "girafe"),
+      guessOpts(GUEST_UID, "elephant"),
+    ]);
+    assert.equal(results[0].ok, true);
+    assert.equal(results[0].correct, false);
+    assert.equal(results[1].ok, true);
+    assert.equal(results[1].correct, true);
+    assert.equal(session.guesses.length, 2);
+    assert.equal(session.foundOrder.length, 1);
+    assert.equal(session.foundOrder[0].uid, GUEST_UID);
+  });
+
   it("A correct deux fois : une seule entrée", () => {
     const { session, results } = applyDrawItGuessesSerialized(drawingSession(), [
       guessOpts(GUEST_UID, "elephant"),
@@ -339,7 +396,18 @@ describe("Draw it ! T5 — secret + feed + hydrate", () => {
 
 describe("Draw it ! T5 — session + UI wiring", () => {
   beforeEach(async () => {
+    globalThis.requestAnimationFrame = (fn) => {
+      fn(0);
+      return 0;
+    };
+    ensureScreens();
+    resetNav();
+    __resetCachedGameSessionForTests();
     await launchTwoPlayerGame();
+  });
+
+  afterEach(() => {
+    __resetCachedGameSessionForTests();
   });
 
   it("submit hors-ligne ajoute Bob sans terminer la manche", async () => {
@@ -362,9 +430,59 @@ describe("Draw it ! T5 — session + UI wiring", () => {
     const src = read("js/games/drawIt.js");
     assert.match(src, /mountChatPanel/);
     assert.match(src, /submitDrawItGuess/);
+    assert.match(src, /drawItGuessesToChatMessages\(getDrawItSession\(\)\.guesses/);
+    assert.match(src, /if \(!result\?\.ok\)/);
+    assert.match(src, /throw new Error/);
     assert.doesNotMatch(src, /lobby_messages/);
     assert.doesNotMatch(src, /addLobbyMessage/);
     assert.doesNotMatch(src, /pointerdown|Broadcast|awardDrawItRound/);
+  });
+
+  it("RPC appliquée : guesses locales + feed lisible tout de suite", () => {
+    const launched = getDrawItSession();
+    const withGuess = applyDrawItGuess(
+      launched,
+      guessOpts(GUEST_UID, "girafe")
+    ).session;
+    __resetCachedGameSessionForTests();
+    applyRemoteSession({
+      lobby_id: LOBBY_ID,
+      game_id: "drawit",
+      screen: "drawit",
+      updated_at: "2026-08-15T21:00:30.000Z",
+      state: { drawIt: drawItToRemote(withGuess) },
+    });
+    const session = getDrawItSession();
+    assert.equal(session.guesses.length, 1);
+    assert.equal(session.guesses[0].value, "girafe");
+    assert.equal(session.guesses[0].uid, GUEST_UID);
+    const feed = drawItGuessesToChatMessages(session.guesses, () => "Bob");
+    assert.equal(feed.length, 1);
+    assert.equal(feed[0].from, "Bob");
+    assert.equal(feed[0].text, "girafe");
+    assert.equal(JSON.stringify(feed).includes("lobby_messages"), false);
+  });
+
+  it("bonne réponse distante : guesses + foundOrder hydratés", () => {
+    const launched = getDrawItSession();
+    const withGuess = applyDrawItGuess(
+      launched,
+      guessOpts(GUEST_UID, "elephant")
+    ).session;
+    __resetCachedGameSessionForTests();
+    applyRemoteSession({
+      lobby_id: LOBBY_ID,
+      game_id: "drawit",
+      screen: "drawit",
+      updated_at: "2026-08-15T21:00:31.000Z",
+      state: { drawIt: drawItToRemote(withGuess) },
+    });
+    const session = getDrawItSession();
+    assert.equal(session.guesses[0].correct, true);
+    assert.equal(session.foundOrder[0].uid, GUEST_UID);
+    assert.equal(session.phase, DRAW_IT_PHASE_DRAWING);
+    const feed = drawItGuessesToChatMessages(session.guesses, () => "Bob");
+    assert.equal(feed[0].text, "✓ elephant");
   });
 });
 
@@ -389,5 +507,13 @@ describe("Draw it ! T5 — SQL RPC", () => {
     assert.doesNotMatch(fn, /\{drawIt,roundEndsAt\}/);
     assert.match(read("js/core/gameSessionRpc.js"), /rpcSubmitDrawItGuess/);
     assert.match(read("js/core/gameSessionRpc.js"), /submit_drawit_guess/);
+    assert.doesNotMatch(
+      read("supabase/feature-drawit-01b-remote-ready.sql"),
+      /create or replace function public\.submit_drawit_guess/
+    );
+    assert.doesNotMatch(
+      read("supabase/feature-drawit-01-prep-guest-ready.sql"),
+      /create or replace function public\.submit_drawit_guess/
+    );
   });
 });

@@ -147,7 +147,10 @@ export function mountDrawIt(app) {
           return nameForUserId(uid) || "Joueur";
         }),
       sendMessage: async (text) => {
-        await submitDrawItGuess(text);
+        const result = await submitDrawItGuess(text);
+        if (!result?.ok) {
+          throw new Error(result?.reason || "guess_failed");
+        }
       },
       onAfterSend: () => {
         if (!mount.isMounted() || !mount.isCurrentMount()) return;

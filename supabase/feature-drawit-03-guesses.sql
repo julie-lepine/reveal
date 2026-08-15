@@ -10,6 +10,11 @@
 --   trim, lowercase, accents FR/EN, apostrophes, ponctuation, espaces.
 --   Pas de fuzzy / Levenshtein.
 --
+-- QA MP : 01b (ready) ne suffit PAS. Appliquer aussi :
+--   feature-drawit-02-private-word.sql
+--   ce fichier (submit_drawit_guess).
+-- Sans 03, le client appelle une RPC inexistante → feed vide.
+--
 -- Ce fichier NE doit PAS être appliqué automatiquement par le client.
 
 create or replace function public.normalize_drawit_guess(p_raw text)

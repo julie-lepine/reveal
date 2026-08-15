@@ -254,6 +254,20 @@ describe("Draw it ! T2 — setup / ready / sync prépa", () => {
     assert.equal(/'drawit'/.test(voteBlock[1]), false);
   });
 
+  it("SQL 01B prod : mapping drawit + ready sans casser TierNight 04E", () => {
+    const sql = read("supabase/feature-drawit-01b-remote-ready.sql");
+    assert.match(sql, /when 'drawit' then 'drawIt'/);
+    assert.match(sql, /when 'drawit' then 'drawit'/);
+    assert.match(sql, /'trivia','consensus','truthmeter','tiernight','drawit'/);
+    assert.match(sql, /tierNightLivePrep/);
+    assert.match(sql, /pool_invalidate_request/);
+    const voteBlock = sql.match(
+      /v_kind = 'vote' and v_game not in \(\s*([\s\S]*?)\)/
+    );
+    assert.ok(voteBlock);
+    assert.equal(/'drawit'/.test(voteBlock[1]), false);
+  });
+
   it("catégorie hôte se propage via session distante", async () => {
     await setDrawItCategory("demo");
     assert.equal(getDrawItSession().selectedCategoryId, "demo");
