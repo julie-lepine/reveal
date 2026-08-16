@@ -29,6 +29,30 @@ describe("formatSyncErrorMessage", () => {
     assert.equal(formatSyncErrorMessage(""), "Impossible de synchroniser.");
     assert.equal(formatSyncErrorMessage(null), "Impossible de synchroniser.");
   });
+
+  it("traduit DRAWIT_EMPTY_GUESS en message joueur", () => {
+    assert.equal(
+      formatSyncErrorMessage("DRAWIT_EMPTY_GUESS"),
+      "Entre un mot avec des lettres ou des chiffres."
+    );
+    assert.equal(
+      formatSyncErrorMessage("new row violates DRAWIT_EMPTY_GUESS"),
+      "Entre un mot avec des lettres ou des chiffres."
+    );
+  });
+
+  it("ne laisse pas un code DRAWIT_* brut à l'écran", () => {
+    assert.equal(
+      formatSyncErrorMessage("DRAWIT_GUESS_TOO_LONG"),
+      "Ce mot est trop long."
+    );
+    assert.equal(
+      formatSyncErrorMessage("DRAWIT_STALE_ROUND"),
+      "Proposition non enregistrée. Réessaie."
+    );
+    assert.match(formatSyncErrorMessage("DRAWIT_EMPTY_GUESS"), /[a-zàéèê]/i);
+    assert.doesNotMatch(formatSyncErrorMessage("DRAWIT_EMPTY_GUESS"), /DRAWIT_/);
+  });
 });
 
 describe("isSyncNetworkError", () => {

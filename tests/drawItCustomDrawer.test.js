@@ -226,17 +226,18 @@ describe("FEATURE-DRAWIT-14 — custom drawer = author", () => {
     });
   });
 
-  it("deux customs consécutifs du même auteur autorisés", () => {
+  it("deux customs du même auteur sur positions compatibles", () => {
     const drawerOrder = [HOST_UID, GUEST_UID];
     const series = [
       { id: "a", label: "Un", custom: true, authorUid: HOST_UID },
-      { id: "b", label: "Deux", custom: true, authorUid: HOST_UID },
       { id: "cat", label: "Facile-1", categoryId: TEST_CATEGORY },
+      { id: "b", label: "Deux", custom: true, authorUid: HOST_UID },
     ];
     const rounds = buildDrawItPrivateRounds(series, drawerOrder);
+    assert.equal(rounds.length, 3);
     assert.equal(rounds[0].drawerUid, HOST_UID);
-    assert.equal(rounds[1].drawerUid, HOST_UID);
-    assert.equal(rounds[2].drawerUid, drawerUidForRound(drawerOrder, 2));
+    assert.equal(rounds[1].drawerUid, GUEST_UID);
+    assert.equal(rounds[2].drawerUid, HOST_UID);
   });
 
   it("drawer conservé après hydrate / fromRemote", () => {
@@ -362,14 +363,17 @@ describe("FEATURE-DRAWIT-14 — custom drawer = author", () => {
 
   it("structure privée des rounds customs", () => {
     const rounds = buildDrawItPrivateRounds(
-      [{ id: "c1", label: SECRET, custom: true, authorUid: GUEST_UID }],
+      [
+        { id: "cat", label: "Facile-1", categoryId: TEST_CATEGORY },
+        { id: "c1", label: SECRET, custom: true, authorUid: GUEST_UID },
+      ],
       [HOST_UID, GUEST_UID]
     );
-    assert.equal(rounds[0].wordSource, "custom");
-    assert.equal(rounds[0].customId, "c1");
-    assert.equal(rounds[0].customAuthorUid, GUEST_UID);
-    assert.equal(rounds[0].drawerUid, GUEST_UID);
-    assert.equal(rounds[0].wordLabel, SECRET);
+    assert.equal(rounds[1].wordSource, "custom");
+    assert.equal(rounds[1].customId, "c1");
+    assert.equal(rounds[1].customAuthorUid, GUEST_UID);
+    assert.equal(rounds[1].drawerUid, GUEST_UID);
+    assert.equal(rounds[1].wordLabel, SECRET);
   });
 
   it("next round custom utilise le drawer privé, pas la rotation", () => {

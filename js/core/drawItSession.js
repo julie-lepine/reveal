@@ -178,12 +178,13 @@ export function validateDrawItPrep(
  * @returns {object[]}
  */
 export function buildDrawItSeries(
-  { selectedCategoryId, roundCount, customWords = [], presentUids = null } = {},
+  { selectedCategoryId, roundCount, customWords = [], presentUids = null, drawerOrder = null } = {},
   words = DRAW_IT_WORDS,
   random = Math.random
 ) {
-  const playable = presentUids
-    ? filterPlayableDrawItCustomWords(customWords, presentUids)
+  const order = drawerOrder || presentUids;
+  const playable = order
+    ? filterPlayableDrawItCustomWords(customWords, order)
     : customWords;
   const check = validateDrawItPrep(
     { selectedCategoryId, roundCount, customWords: playable },
@@ -200,7 +201,8 @@ export function buildDrawItSeries(
     customWords: playable,
     catalogWords: words,
     random,
-    presentUids,
+    presentUids: order,
+    drawerOrder: order,
   });
 }
 
@@ -343,6 +345,7 @@ export async function markDrawItLobbyStarted({ rosterNames } = {}) {
     roundCount: session.roundCount,
     customWords: playableCustoms,
     presentUids: drawerOrder,
+    drawerOrder,
   });
   if (series.length < Number(session.roundCount)) {
     await showDrawItLaunchError("Impossible de construire la série avec les mots disponibles.");
@@ -424,16 +427,29 @@ export async function commitDrawItReveal({ nowMs = Date.now() } = {}) {
     if (!check.ok) return { ok: false, reason: check.reason };
 
     if (isGameSyncActive() && isSupabaseConfigured() && canActAsHost()) {
-      const { rpcRevealDrawItRound } = await import("./gameSessionRpc.js");
-      const row = await rpcRevealDrawItRound({ lobbyId: getState().lobby.id });
-      let full = row;
-      if (row && !row.state) full = await refreshGameSession();
-      if (!full?.state) return { ok: false, reason: "not_applied" };
-      applyRemoteSession(full);
-      if (getDrawItSession().phase !== "reveal") {
-        return { ok: false, reason: "not_applied" };
+      try {
+        const { rpcRevealDrawItRound } = await import("./gameSessionRpc.js");
+        const row = await rpcRevealDrawItRound({ lobbyId: getState().lobby.id });
+        let full = row;
+        if (row && !row.state) full = await refreshGameSession();
+        if (!full?.state) return { ok: false, reason: "not_applied" };
+        applyRemoteSession(full);
+        if (getDrawItSession().phase !== "reveal") {
+          return { ok: false, reason: "not_applied" };
+        }
+        return { ok: true, reason: null };
+      } catch {
+        try {
+          const full = await refreshGameSession();
+          if (full) applyRemoteSession(full);
+        } catch {
+          /* refresh optionnel */
+        }
+        if (getDrawItSession().phase === "reveal") {
+          return { ok: true, reason: null };
+        }
+        return { ok: false, reason: "rpc_failed" };
       }
-      return { ok: true, reason: null };
     }
 
     const applied = applyDrawItReveal(session, {

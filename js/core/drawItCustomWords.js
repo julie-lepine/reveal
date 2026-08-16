@@ -16,7 +16,7 @@ import {
   isDrawItRoundCount,
 } from "../../data/drawIt.js";
 import { checkHotTakeModeration } from "./hotTakeModeration.js";
-import { buildCombinedShuffledDeck, dedupeEntriesById } from "./combinedGameDeck.js";
+import { buildCombinedShuffledDeck, shuffleArray, dedupeEntriesById } from "./combinedGameDeck.js";
 import { normalizeDrawItGuess } from "./drawItNormalize.js";
 import {
   isDrawItCustomWordOwnedBy,
@@ -28,7 +28,7 @@ import {
 } from "./sessionMerge.js";
 import { getLocalDisplayName, getState, saveStatePatch } from "./state.js";
 import { getSupabaseUserId } from "./supabaseAuth.js";
-import { isDrawItAuthorUid, isDrawerUidInOrder } from "./drawItRound.js";
+import { isDrawItAuthorUid, isDrawerUidInOrder, drawerUidForRound } from "./drawItRound.js";
 
 export {
   isDrawItCustomWordOwnedBy,
@@ -109,6 +109,47 @@ function catalogWithoutCustomLabels(catalog, customEntries) {
   });
 }
 
+function takeUnusedWord(queue, usedKeys) {
+  while (queue.length) {
+    const next = queue.shift();
+    const key = normalizeDrawItGuess(next?.label);
+    if (!key || usedKeys.has(key)) continue;
+    usedKeys.add(key);
+    return next;
+  }
+  return null;
+}
+
+/**
+ * Un custom n'occupe que la position dont le drawer attendu est son auteur.
+ * Sinon catalogue + rotation. Aucun fallback vers un autre drawer.
+ */
+export function buildDrawItSlottedDeck(customs, catalog, roundCount, drawerOrder, random = Math.random) {
+  const byAuthor = new Map();
+  for (const item of shuffleArray(customs, random)) {
+    const uid = String(item.authorUid || "");
+    if (!uid) continue;
+    if (!byAuthor.has(uid)) byAuthor.set(uid, []);
+    byAuthor.get(uid).push(item);
+  }
+  const catalogQueue = shuffleArray(catalog, random);
+  const usedKeys = new Set();
+  const out = [];
+  for (let i = 0; i < roundCount; i += 1) {
+    const expected = drawerUidForRound(drawerOrder, i);
+    const bucket = expected ? byAuthor.get(String(expected)) || [] : [];
+    const custom = takeUnusedWord(bucket, usedKeys);
+    if (custom) {
+      out.push(custom);
+      continue;
+    }
+    const catalogWord = takeUnusedWord(catalogQueue, usedKeys);
+    if (!catalogWord) return [];
+    out.push(catalogWord);
+  }
+  return out;
+}
+
 export function resolveDrawItDeckRoundCount(requested, poolSize) {
   const n = Number(requested);
   if (!isDrawItRoundCount(n)) return 0;
@@ -117,8 +158,9 @@ export function resolveDrawItDeckRoundCount(requested, poolSize) {
 }
 
 /**
- * Construit le deck Draw it : customs d'abord, catalogue uniquement pour compléter.
- * Ne mélange jamais customs+catalogue avant la sélection.
+ * Construit le deck Draw it.
+ * Avec drawerOrder : custom uniquement si authorUid === drawer attendu.
+ * Sans drawerOrder : contrat historique (tests / preview pool).
  */
 export function buildDrawItDeck({
   categoryId,
@@ -127,11 +169,22 @@ export function buildDrawItDeck({
   catalogWords = DRAW_IT_WORDS,
   random = Math.random,
   presentUids = null,
+  drawerOrder = null,
 } = {}) {
   if (!isDrawItCategoryId(categoryId) || !isDrawItRoundCount(roundCount)) return [];
-  const customs = uniqueCustomWordEntries(customWords, presentUids);
+  const order = Array.isArray(drawerOrder) && drawerOrder.length
+    ? drawerOrder
+    : Array.isArray(presentUids) && presentUids.length
+      ? presentUids
+      : null;
+  const customs = uniqueCustomWordEntries(customWords, order);
   const catalog = distinctCatalogPool(categoryId, catalogWords);
   const bank = catalogWithoutCustomLabels(catalog, customs);
+  if (order && order.length) {
+    const n = resolveDrawItDeckRoundCount(roundCount, customs.length + bank.length);
+    if (n <= 0) return [];
+    return buildDrawItSlottedDeck(customs, bank, n, order, random);
+  }
   return buildCombinedShuffledDeck(
     customs,
     bank,

@@ -929,10 +929,16 @@ export function mountDrawIt(app) {
       applyGuessInputLock(session);
       canvasCtl?.syncInteractive();
       if ((!mp || canActAsHost()) && canCommitDrawItReveal(session, nowMs).ok) {
-        void commitDrawItReveal({ nowMs }).then(() => {
-          if (!mount.isMounted() || !mount.isCurrentMount()) return;
-          render();
-        });
+        void commitDrawItReveal({ nowMs })
+          .then((result) => {
+            if (!mount.isMounted() || !mount.isCurrentMount()) return;
+            if (result?.ok || getDrawItSession().phase === DRAW_IT_PHASE_REVEAL) {
+              render();
+            }
+          })
+          .catch(() => {
+            /* retry au tick suivant */
+          });
       }
     }, 250);
   }

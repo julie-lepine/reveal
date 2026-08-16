@@ -45,6 +45,15 @@ export function isSyncNetworkError(message) {
   return SYNC_NETWORK_ERROR_RE.test(String(message || "").toLowerCase());
 }
 
+const DRAWIT_PLAYER_MESSAGES = {
+  DRAWIT_EMPTY_GUESS: "Entre un mot avec des lettres ou des chiffres.",
+  DRAWIT_GUESS_TOO_LONG: "Ce mot est trop long.",
+  DRAWIT_DRAWER: "Le dessinateur ne peut pas proposer.",
+  DRAWIT_ALREADY_FOUND: "Tu as déjà trouvé ce mot.",
+  DRAWIT_EXPIRED: "Trop tard, le temps est écoulé.",
+  DRAWIT_NOT_DRAWING: "Ce n'est plus le moment de proposer.",
+};
+
 /** Messages réseau / sync patch en français pour l’UI. */
 export function formatSyncErrorMessage(message) {
   const raw = String(message || "").trim();
@@ -52,6 +61,14 @@ export function formatSyncErrorMessage(message) {
 
   if (isSyncNetworkError(raw)) {
     return "Connexion impossible. Vérifie ton réseau et réessaie.";
+  }
+
+  const drawItCode = raw.match(/DRAWIT_[A-Z_]+/)?.[0];
+  if (drawItCode) {
+    return (
+      DRAWIT_PLAYER_MESSAGES[drawItCode] ||
+      "Proposition non enregistrée. Réessaie."
+    );
   }
 
   return raw;

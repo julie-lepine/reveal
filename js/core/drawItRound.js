@@ -92,8 +92,11 @@ export function buildDrawItPrivateRounds(series = [], drawerOrder = []) {
   for (let i = 0; i < series.length; i += 1) {
     const word = series[i] || {};
     const custom = isDrawItCustomDeckEntry(word);
+    const expected = drawerUidForRound(drawerOrder, i);
     const drawerUid = resolveDrawItRoundDrawerUid(word, drawerOrder, i);
-    if (!drawerUid) return [];
+    if (!drawerUid || !expected) return [];
+    if (custom && drawerUid !== expected) return [];
+    if (!custom && drawerUid !== expected) return [];
     const label = String(word.label || "");
     const round = {
       roundIdx: i,
@@ -107,6 +110,7 @@ export function buildDrawItPrivateRounds(series = [], drawerOrder = []) {
     if (custom) {
       round.customId = String(word.id || "");
       round.customAuthorUid = String(word.authorUid || "");
+      if (round.customAuthorUid !== round.drawerUid) return [];
     }
     rounds.push(round);
   }
