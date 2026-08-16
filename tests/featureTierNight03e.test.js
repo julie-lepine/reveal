@@ -348,8 +348,10 @@ describe("FEATURE-TIERNIGHT-03-E - Rank Live isolation", () => {
 
     const exit = read("js/core/tierNightSeriesExitNav.js");
     assert.doesNotMatch(exit, /customTierLists/);
-    assert.doesNotMatch(exit, /tiernight-live/);
     assert.doesNotMatch(exit, /markTierNightLive/);
+    // Replay Rank Live reste sur la prep, pas un jump play `tiernight-live`.
+    assert.match(exit, /screen: "tiernight-live-prep"/);
+    assert.doesNotMatch(exit, /navigate\("tiernight-live"\)/);
 
     assert.equal(
       shouldReplayTierNightSeriesToPrep({

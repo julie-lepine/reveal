@@ -191,8 +191,7 @@ beforeEach(() => {
 });
 
 describe("FEATURE-TIERNIGHT-04F — wiring", () => {
-  it("doc + package + nextRound series path", () => {
-    assert.ok(read("docs/FEATURE-TIERNIGHT-04F.md").includes("between_lists"));
+  it("package + nextRound series path", () => {
     assert.ok(read("package.json").includes("featureTierNight04f.test.js"));
     const game = read("js/games/tierNightLive.js");
     assert.match(game, /hostFinalizeTierNightLiveSeriesList/);

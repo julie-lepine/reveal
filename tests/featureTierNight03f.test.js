@@ -308,10 +308,12 @@ describe("FEATURE-TIERNIGHT-03-F - DOM mort / void / double push / hydrate", () 
     assert.match(css, /FEATURE-TIERNIGHT-03-F/);
   });
 
-  it("36–37. aucun void critique change/replay ; un seul patchGameState exit", () => {
+  it("36–37. aucun void critique change/replay ; patch série + replay live", () => {
     const exit = read("js/core/tierNightSeriesExitNav.js");
     assert.doesNotMatch(exit, /void\s+patchGameState/);
-    assert.equal((exit.match(/await patchGameState\(/g) || []).length, 1);
+    assert.equal((exit.match(/await patchGameState\(/g) || []).length, 2);
+    assert.match(exit, /await patchGameState\(remote\.stateMerge/);
+    assert.match(exit, /screen: "tiernight-live-prep"/);
   });
 
   it("38–40. hydrate ne reshuffle ; fin soirée seule clear consumed", () => {

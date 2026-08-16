@@ -124,7 +124,6 @@ as $$
     'speedvote-prep',
     'clutch-prep',
     'drawit-prep',
-    'wronganswer-prep',
     'dilemma-prep',
     'truthmeter-prep',
     'tiernight-select',

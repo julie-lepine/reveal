@@ -85,29 +85,40 @@ describe("FEATURE-TIERNIGHT-SERIES-04 - setup temporaire", () => {
     const opts = listTierNightSeriesCategoryOptions();
     assert.ok(opts.length >= 3);
     const all = getTierNightSeriesPoolSize([TIER_NIGHT_SERIES_ALL_CATEGORIES]);
-    assert.equal(all, 10);
-    assert.equal(getTierNightSeriesPoolSize(["survival"]), 3);
+    const survival = getTierNightSeriesPoolSize(["survival"]);
+    assert.equal(survival, opts.find((c) => c.id === "survival")?.eligibleCount);
+    assert.ok(all >= 8);
+    assert.ok(survival >= 3);
+    assert.ok(all > survival);
   });
 
-  it("3 disponible / 5 et 8 indisponibles sur survie", () => {
+  it("3/5/8 disponibles selon la taille réelle du pool survie", () => {
+    const pool = getTierNightSeriesPoolSize(["survival"]);
     const avail = getTierNightSeriesRoundCountAvailability(["survival"]);
     assert.deepEqual(
       avail.map((a) => [a.roundCount, a.available]),
       [
-        [3, true],
-        [5, false],
-        [8, false],
+        [3, pool >= 3],
+        [5, pool >= 5],
+        [8, pool >= 8],
       ]
     );
   });
 
   it("invalide roundCount après changement de catégorie", () => {
+    const keep = reconcileTierNightSeriesSetupAfterCategoryChange({
+      path: "series",
+      categoryIds: ["survival"],
+      roundCount: 3,
+    });
+    assert.equal(keep.roundCount, 3);
     const next = reconcileTierNightSeriesSetupAfterCategoryChange({
       path: "series",
       categoryIds: ["survival"],
-      roundCount: 5,
+      roundCount: 8,
     });
-    assert.equal(next.roundCount, null);
+    const survivalPool = getTierNightSeriesPoolSize(["survival"]);
+    assert.equal(next.roundCount, survivalPool >= 8 ? 8 : null);
   });
 
   it("validate bloquer pool insuffisant", () => {

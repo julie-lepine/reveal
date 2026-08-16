@@ -145,7 +145,7 @@ beforeEach(() => {
 });
 
 describe("FEATURE-TIERNIGHT-04E — wiring", () => {
-  it("SQL migration + package + doc + RPC client p_series", () => {
+  it("SQL migration + package + RPC client p_series", () => {
     const sql = read("supabase/feature-tiernight-04e-start-live-series.sql");
     assert.ok(sql.includes("start_tiernight_live_series"));
     assert.match(sql, /p_series\s+jsonb/);
@@ -154,7 +154,6 @@ describe("FEATURE-TIERNIGHT-04E — wiring", () => {
     assert.doesNotMatch(sql, /TIER_NIGHT_LIVE_CATEGORIES/);
     assert.doesNotMatch(sql, /categoryIds'\) <> 1\s*\n\s*or coalesce\(p_series -> 'categoryIds' ->> 0, ''\) <> '\*'/);
     assert.ok(read("package.json").includes("featureTierNight04e.test.js"));
-    assert.ok(read("docs/FEATURE-TIERNIGHT-04E.md").includes("TIER_LISTS"));
     assert.match(read("js/core/gameSessionRpc.js"), /p_series:\s*series/);
   });
 
@@ -817,13 +816,13 @@ describe("FEATURE-TIERNIGHT-04E — codecs / legacy / hors scope", () => {
     assert.match(screen, /markStarted:\s*markTierNightLiveSeriesPrepStarted/);
   });
 
-  it("doc : trust boundary sans miroir SQL", () => {
-    const doc = read("docs/FEATURE-TIERNIGHT-04E.md");
-    assert.match(doc, /TIER_LISTS/);
-    assert.doesNotMatch(doc, /catalogue SQL miroir/i);
-    assert.doesNotMatch(doc, /drift SQL/i);
-    assert.doesNotMatch(doc, /regen catalogue SQL/i);
-    assert.match(doc, /SQL terrain validation pending/);
+  it("trust boundary : catalogue JS, pas de miroir SQL", () => {
+    const sql = read("supabase/feature-tiernight-04e-start-live-series.sql");
+    assert.doesNotMatch(sql, /TIER_NIGHT_LIVE_CATEGORIES/);
+    assert.doesNotMatch(sql, /catalogue SQL miroir/i);
+    assert.doesNotMatch(sql, /regen catalogue SQL/i);
+    const session = read("js/core/tierNightLivePrepSession.js");
+    assert.match(session, /buildTierNightLiveSeriesLaunchState|rpcStartTierNightLiveSeries/);
   });
 });
 

@@ -181,7 +181,7 @@ describe("TierNight Recommencer - pas de retour vers l'ancien récap", () => {
     assert.match(s, /if \(!mount\.isCurrentMount\(\)\) return;/);
     assert.match(
       s,
-      /if \(\s*row\?\.screen &&\s*row\.screen !== "tiernight-end" &&\s*seriesPhase !== "series_end"\s*\)/
+      /if \(\s*row\?\.screen &&\s*row\.screen !== "tiernight-end" &&\s*!terminalSeries\s*\)/
     );
   });
 

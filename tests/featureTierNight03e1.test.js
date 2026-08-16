@@ -147,7 +147,9 @@ describe("FEATURE-TIERNIGHT-03-E1 - payloads atomiques", () => {
 
     const exit = read("js/core/tierNightSeriesExitNav.js");
     assert.match(exit, /await patchGameState\(remote\.stateMerge/);
-    assert.equal((exit.match(/patchGameState\(/g) || []).length, 1);
+    // 1 patch sortie série + 1 patch replay Rank Live (prep), pas de void.
+    assert.equal((exit.match(/patchGameState\(/g) || []).length, 2);
+    assert.doesNotMatch(exit, /void\s+patchGameState/);
   });
 
   it("2. rollback change mode restaure série, prep ; customs clear local puis restore snap", () => {

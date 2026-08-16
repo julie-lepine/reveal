@@ -62,6 +62,7 @@ mock.module("../js/core/gameSync.js", {
       return refreshImpl();
     },
     getCachedGameSession: () => null,
+    getEffectiveSessionScreen: (row) => row?.screen || null,
     onGameSessionChange: (fn) => {
       sessionListeners.push(fn);
       return () => {
