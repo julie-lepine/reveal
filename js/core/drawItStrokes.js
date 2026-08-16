@@ -79,13 +79,18 @@ export function createDrawItBrush(overrides = {}) {
   };
 }
 
-/** Clear remet le crayon. Couleur et épaisseur restent des préférences UI. */
-export function resetDrawItBrushToDraw(brush = {}) {
+/** Sélection explicite crayon / gomme. Couleur et épaisseur inchangées. */
+export function selectDrawItBrushTool(brush = {}, tool) {
   return createDrawItBrush({
     color: brush.color,
     width: brush.width,
-    tool: DRAW_IT_TOOL_DRAW,
+    tool: tool === DRAW_IT_TOOL_ERASE ? DRAW_IT_TOOL_ERASE : DRAW_IT_TOOL_DRAW,
   });
+}
+
+/** Clear remet le crayon. Couleur et épaisseur restent des préférences UI. */
+export function resetDrawItBrushToDraw(brush = {}) {
+  return selectDrawItBrushTool(brush, DRAW_IT_TOOL_DRAW);
 }
 
 export function isDrawItEraseTool(tool) {

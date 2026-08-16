@@ -41,6 +41,7 @@ const {
   drawItEraserRadius,
   endDrawItStroke,
   mergeDrawItDurableSnapshot,
+  selectDrawItBrushTool,
   maybeResetDrawItBoard,
   resolveDrawItToolColor,
   undoLastCompletedDrawItStroke,
@@ -165,6 +166,8 @@ describe("Draw it ! outils — gomme UI / tailles", () => {
     const ui = read("js/games/drawIt.js");
     assert.match(ui, /id="draw-it-erase"/);
     assert.match(ui, /Gomme/);
+    assert.match(ui, /id="draw-it-draw"/);
+    assert.match(ui, /Crayon/);
   });
 
   it("F. gomme conserve la couleur ; retour dessin sans reset", () => {
@@ -185,13 +188,74 @@ describe("Draw it ! outils — gomme UI / tailles", () => {
     assert.equal(draw.color, "#38bdf8");
     const ui = read("js/games/drawIt.js");
     assert.match(ui, /id="draw-it-erase"/);
+    assert.match(ui, /id="draw-it-draw"/);
     assert.match(ui, /DRAW_IT_TOOL_DRAW/);
+    assert.match(ui, /selectDrawItBrushTool/);
   });
 
   it("G. gomme utilise Fin / Moyen / Épais", () => {
     assert.ok(drawItEraserRadius(4) < drawItEraserRadius(7));
     assert.ok(drawItEraserRadius(7) < drawItEraserRadius(12));
     assert.equal(createDrawItBrush({ tool: DRAW_IT_TOOL_ERASE, width: 12 }).width, 12);
+  });
+});
+
+describe("Draw it ! outils — bouton Crayon", () => {
+  it("Crayon et Gomme sont des sélections explicites", () => {
+    const ui = read("js/games/drawIt.js");
+    const htmlAt = ui.indexOf("id=\"draw-it-tools\"");
+    const html = ui.slice(htmlAt, htmlAt + 1200);
+    assert.ok(html.indexOf("draw-it-draw") < html.indexOf("draw-it-erase"));
+    assert.ok(html.indexOf("draw-it-erase") < html.indexOf("draw-it-color"));
+    assert.match(html, /✏️ Crayon/);
+    assert.match(html, /🧽 Gomme/);
+    let brush = createDrawItBrush({ color: "#ec4899", width: 12, tool: DRAW_IT_TOOL_DRAW });
+    brush = selectDrawItBrushTool(brush, DRAW_IT_TOOL_ERASE);
+    brush = selectDrawItBrushTool(brush, DRAW_IT_TOOL_ERASE);
+    assert.equal(brush.tool, DRAW_IT_TOOL_ERASE);
+    brush = selectDrawItBrushTool(brush, DRAW_IT_TOOL_DRAW);
+    assert.equal(brush.tool, DRAW_IT_TOOL_DRAW);
+    assert.equal(brush.color, "#ec4899");
+    assert.equal(brush.width, 12);
+  });
+
+  it("couleur et épaisseur ne changent pas l'outil", () => {
+    const erase = createDrawItBrush({ color: "#12abef", width: 7, tool: DRAW_IT_TOOL_ERASE });
+    const recolored = createDrawItBrush({
+      color: "#f97316",
+      width: erase.width,
+      tool: erase.tool,
+    });
+    const resized = createDrawItBrush({
+      color: recolored.color,
+      width: 12,
+      tool: recolored.tool,
+    });
+    assert.equal(resized.tool, DRAW_IT_TOOL_ERASE);
+    assert.equal(resized.color, "#f97316");
+    assert.equal(resized.width, 12);
+  });
+
+  it("après gomme, Crayon permet de dessiner immédiatement", () => {
+    let board = {
+      ...createEmptyDrawItBoard({ runId: "run-tools" }),
+      strokes: [stroke("s1", { points: [[0.1, 0.5], [0.9, 0.5]] })],
+    };
+    board = applyDrawItPointer(board, "down", [0.5, 0.5], true, {
+      ...createDrawItBrush({ tool: DRAW_IT_TOOL_ERASE, width: 7 }),
+    });
+    board = applyDrawItPointer(board, "up", [0.52, 0.5], true);
+    const afterErase = board.strokes.length;
+    const brush = selectDrawItBrushTool(
+      createDrawItBrush({ tool: DRAW_IT_TOOL_ERASE, color: "#38bdf8", width: 7 }),
+      DRAW_IT_TOOL_DRAW
+    );
+    board = applyDrawItPointer(board, "down", [0.2, 0.8], true, brush);
+    board = applyDrawItPointer(board, "up", [0.3, 0.8], true);
+    assert.equal(brush.tool, DRAW_IT_TOOL_DRAW);
+    assert.ok(board.strokes.length > afterErase);
+    assert.equal(board.strokes.at(-1).color, "#38bdf8");
+    assert.equal(board.strokes.at(-1).tool, DRAW_IT_TOOL_DRAW);
   });
 });
 

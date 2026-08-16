@@ -43,6 +43,7 @@ const {
   drawItEraserRadius,
   endDrawItStroke,
   mergeDrawItDurableSnapshot,
+  selectDrawItBrushTool,
   splitStrokeByErasePath,
   undoLastCompletedDrawItStroke,
 } = strokes;
@@ -624,6 +625,7 @@ describe("Draw it ! régression T06 — toolbar + canvas actifs", () => {
     assert.ok(bindStart >= 0);
     assert.match(bind, /#draw-it-color-input/);
     assert.match(bind, /data-width/);
+    assert.match(bind, /draw-it-draw/);
     assert.match(bind, /draw-it-erase/);
     assert.match(bind, /draw-it-undo/);
     assert.match(bind, /draw-it-clear/);
@@ -655,21 +657,26 @@ describe("Draw it ! régression T06 — toolbar + canvas actifs", () => {
     assert.match(game, /tool: brush\.tool/);
   });
 
-  it("4. eraser toggle : draw → erase → draw", () => {
-    let brush = createDrawItBrush({ tool: DRAW_IT_TOOL_DRAW });
+  it("4. crayon / gomme : sélection explicite, pas un toggle", () => {
+    let brush = createDrawItBrush({ tool: DRAW_IT_TOOL_DRAW, color: "#ff69b4", width: 12 });
     assert.equal(brush.tool, DRAW_IT_TOOL_DRAW);
-    brush = createDrawItBrush({
-      color: brush.color,
-      width: brush.width,
-      tool: brush.tool === DRAW_IT_TOOL_ERASE ? DRAW_IT_TOOL_DRAW : DRAW_IT_TOOL_ERASE,
-    });
+    brush = selectDrawItBrushTool(brush, DRAW_IT_TOOL_ERASE);
     assert.equal(brush.tool, DRAW_IT_TOOL_ERASE);
-    brush = createDrawItBrush({
-      color: brush.color,
-      width: brush.width,
-      tool: brush.tool === DRAW_IT_TOOL_ERASE ? DRAW_IT_TOOL_DRAW : DRAW_IT_TOOL_ERASE,
-    });
+    assert.equal(brush.color, "#ff69b4");
+    assert.equal(brush.width, 12);
+    brush = selectDrawItBrushTool(brush, DRAW_IT_TOOL_ERASE);
+    assert.equal(brush.tool, DRAW_IT_TOOL_ERASE);
+    brush = selectDrawItBrushTool(brush, DRAW_IT_TOOL_DRAW);
     assert.equal(brush.tool, DRAW_IT_TOOL_DRAW);
+    assert.equal(brush.color, "#ff69b4");
+    assert.equal(brush.width, 12);
+    const game = read("js/games/drawIt.js");
+    assert.match(game, /id="draw-it-draw"/);
+    assert.match(game, /selectDrawItBrushTool/);
+    assert.doesNotMatch(
+      game.slice(game.indexOf("function bindTools()"), game.indexOf("function guessChatHtml")),
+      /DRAW_IT_TOOL_ERASE\s*\?\s*DRAW_IT_TOOL_DRAW/
+    );
   });
 
   it("5. draw gesture : pointerdown/move/up produit un stroke", () => {

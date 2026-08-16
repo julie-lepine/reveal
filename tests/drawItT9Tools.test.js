@@ -426,7 +426,7 @@ describe("Draw it ! T9 — Clear remet le crayon", () => {
   it("8. Clear pendant currentStroke : guard toolsBusy inchangé", () => {
     const game = read("js/games/drawIt.js");
     const clearAt = game.indexOf('if (target.id === "draw-it-clear")');
-    const clearFn = game.slice(clearAt, game.indexOf('if (target.id === "draw-it-erase")'));
+    const clearFn = game.slice(clearAt, game.indexOf('if (target.id === "draw-it-draw"'));
     assert.match(clearFn, /if \(toolsBusy\(\)\) return;/);
     assert.match(clearFn, /resetDrawItBrushToDraw/);
     assert.match(game, /return Boolean\(canvasCtl\?\.isDrawing\(\) \|\| board\?\.currentStroke\);/);

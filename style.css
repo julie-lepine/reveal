@@ -5054,6 +5054,7 @@ body.has-bottom-nav .feedback-fab{
 }
 
 .draw-it-tools__btn.is-active,
+.draw-it-pencil.is-active,
 .draw-it-eraser.is-active{
   border-color:rgba(255,255,255,.55);
   background:rgba(255,255,255,.16);

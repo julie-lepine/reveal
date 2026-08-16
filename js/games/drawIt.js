@@ -33,7 +33,7 @@ import { requireLobbyPlay } from "../core/gameGuard.js";
 import { withClickLock } from "../core/actionLock.js";
 import { createMountGuard } from "../core/mountLifecycle.js";
 import { navigate } from "../core/router.js";
-import { escapeHtml, pageShell } from "../core/ui.js";
+import { escapeHtml, pageShell, schedulePageScrollReset } from "../core/ui.js";
 import { bindNav } from "../screens/nav.js";
 import { gameExitBarHtml, bindExitGame } from "../core/exitGame.js";
 import {
@@ -56,6 +56,7 @@ import {
   DRAW_IT_TOOL_DRAW,
   DRAW_IT_TOOL_ERASE,
   resetDrawItBrushToDraw,
+  selectDrawItBrushTool,
   DRAW_IT_TOOL_WIDTHS,
   maybeResetDrawItBoard,
   resolveDrawItToolColor,
@@ -364,6 +365,16 @@ export function mountDrawIt(app) {
     };
   }
 
+  function shouldResetPageScroll(session) {
+    if (!lastPlayIdentity) return true;
+    if ((lastPlayIdentity.runId || null) !== (session.runId || null)) return true;
+    if (Number(lastPlayIdentity.roundIdx) !== Number(session.roundIdx ?? 0)) {
+      return true;
+    }
+    if ((lastPlayIdentity.phase || null) !== (session.phase || null)) return true;
+    return false;
+  }
+
   function hasStableGuessComposer() {
     return Boolean(chatPanel && app.querySelector("#draw-it-guess-input"));
   }
@@ -562,9 +573,16 @@ export function mountDrawIt(app) {
       btn.classList.toggle("is-active", Number(btn.getAttribute("data-width")) === brush.width);
       btn.disabled = busy;
     });
+    const drawEl = root.querySelector("#draw-it-draw");
     const eraseEl = root.querySelector("#draw-it-erase");
+    if (drawEl) {
+      drawEl.classList.toggle("is-active", brush.tool === DRAW_IT_TOOL_DRAW);
+      drawEl.setAttribute("aria-pressed", brush.tool === DRAW_IT_TOOL_DRAW ? "true" : "false");
+      drawEl.disabled = busy;
+    }
     if (eraseEl) {
       eraseEl.classList.toggle("is-active", brush.tool === DRAW_IT_TOOL_ERASE);
+      eraseEl.setAttribute("aria-pressed", brush.tool === DRAW_IT_TOOL_ERASE ? "true" : "false");
       eraseEl.disabled = busy;
     }
     const undoEl = root.querySelector("#draw-it-undo");
@@ -586,7 +604,15 @@ export function mountDrawIt(app) {
     ).join("");
     return `
       <div class="draw-it-tools" id="draw-it-tools">
-        <div class="draw-it-tools__row" role="group" aria-label="Épaisseur">
+        <div class="draw-it-tools__row" role="group" aria-label="Outils">
+          <button type="button" class="btn btn-ghost draw-it-tools__btn draw-it-pencil${
+            brush.tool === DRAW_IT_TOOL_DRAW ? " is-active" : ""
+          }" id="draw-it-draw" aria-label="Crayon" title="Crayon"
+            aria-pressed="${brush.tool === DRAW_IT_TOOL_DRAW ? "true" : "false"}">✏️ Crayon</button>
+          <button type="button" class="btn btn-ghost draw-it-tools__btn draw-it-eraser${
+            brush.tool === DRAW_IT_TOOL_ERASE ? " is-active" : ""
+          }" id="draw-it-erase" aria-label="Gomme" title="Gomme"
+            aria-pressed="${brush.tool === DRAW_IT_TOOL_ERASE ? "true" : "false"}">🧽 Gomme</button>
           <div class="draw-it-color" id="draw-it-color">
             <span class="draw-it-color__swatch" id="draw-it-color-swatch"
               style="background:${color}" aria-hidden="true"></span>
@@ -594,13 +620,10 @@ export function mountDrawIt(app) {
               aria-label="Choisir une couleur" />
           </div>
           ${widths}
-        </div>
-        <div class="draw-it-tools__row draw-it-tools__actions">
-          <button type="button" class="btn btn-ghost draw-it-tools__btn draw-it-eraser${
-            brush.tool === DRAW_IT_TOOL_ERASE ? " is-active" : ""
-          }" id="draw-it-erase" aria-label="Gomme" title="Gomme">🧽 Gomme</button>
-          <button type="button" class="btn btn-ghost draw-it-tools__btn" id="draw-it-undo">Undo</button>
-          <button type="button" class="btn btn-ghost draw-it-tools__btn" id="draw-it-clear">Clear</button>
+          <button type="button" class="btn btn-ghost draw-it-tools__btn" id="draw-it-undo"
+            aria-label="Annuler" title="Annuler">↩️ Annuler</button>
+          <button type="button" class="btn btn-ghost draw-it-tools__btn" id="draw-it-clear"
+            aria-label="Tout effacer" title="Tout effacer">🗑️ Tout effacer</button>
         </div>
       </div>`;
   }
@@ -656,16 +679,12 @@ export function mountDrawIt(app) {
         void commitDrawItClearCanvas();
         return;
       }
-      if (target.id === "draw-it-erase") {
+      if (target.id === "draw-it-draw" || target.id === "draw-it-erase") {
         if (toolsBusy()) return;
-        brush = createDrawItBrush({
-          color: brush.color,
-          width: brush.width,
-          tool:
-            brush.tool === DRAW_IT_TOOL_ERASE
-              ? DRAW_IT_TOOL_DRAW
-              : DRAW_IT_TOOL_ERASE,
-        });
+        brush = selectDrawItBrushTool(
+          brush,
+          target.id === "draw-it-erase" ? DRAW_IT_TOOL_ERASE : DRAW_IT_TOOL_DRAW
+        );
         canvasCtl?.syncInteractive();
         syncToolButtons();
         return;
@@ -717,6 +736,7 @@ export function mountDrawIt(app) {
     const total = Number(session.roundCount) || 0;
     const roundIdx = session.roundIdx ?? 0;
     const phase = session.phase;
+    const resetScroll = shouldResetPageScroll(session);
     if (
       lastPlayIdentity &&
       (lastPlayIdentity.runId !== (session.runId || null) ||
@@ -804,6 +824,7 @@ export function mountDrawIt(app) {
     bindGuessChat(session);
     bindTools();
     rememberPlayIdentity(session);
+    if (resetScroll) schedulePageScrollReset(app);
 
     app.querySelector("#draw-it-advance")?.addEventListener(
       "click",
