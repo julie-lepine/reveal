@@ -79,6 +79,15 @@ export function createDrawItBrush(overrides = {}) {
   };
 }
 
+/** Clear remet le crayon. Couleur et épaisseur restent des préférences UI. */
+export function resetDrawItBrushToDraw(brush = {}) {
+  return createDrawItBrush({
+    color: brush.color,
+    width: brush.width,
+    tool: DRAW_IT_TOOL_DRAW,
+  });
+}
+
 export function isDrawItEraseTool(tool) {
   return tool === DRAW_IT_TOOL_ERASE;
 }

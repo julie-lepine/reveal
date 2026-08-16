@@ -292,6 +292,155 @@ describe("Draw it ! T9 — Clear / epoch", () => {
   });
 });
 
+describe("Draw it ! T9 — Clear remet le crayon", () => {
+  it("1. erase → clear → draw : tool=draw et un nouveau stroke peut être créé", () => {
+    let brush = strokes.createDrawItBrush({
+      color: "#ec4899",
+      width: 12,
+      tool: strokes.DRAW_IT_TOOL_ERASE,
+    });
+    let board = boardWith(["s1"]);
+    board = strokes.applyDrawItBoardClear(board, 1);
+    brush = strokes.resetDrawItBrushToDraw(brush);
+    assert.equal(brush.tool, strokes.DRAW_IT_TOOL_DRAW);
+    board = strokes.applyDrawItPointer(board, "down", [0.1, 0.2], true, brush);
+    board = strokes.applyDrawItPointer(board, "up", [0.3, 0.2], true);
+    assert.equal(board.currentStroke, null);
+    assert.equal(board.strokes.length, 1);
+    assert.equal(board.strokes[0].tool, strokes.DRAW_IT_TOOL_DRAW);
+    assert.equal(board.strokes[0].canvasEpoch, 1);
+  });
+
+  it("2. erase → clear : canvas vide, epoch bump inchangé", () => {
+    const cleared = strokes.applyDrawItBoardClear(boardWith(["s1", "s2"]), 1);
+    const durable = strokes.applyDrawItDurableClear(
+      session({ strokes: [stroke("s1"), stroke("s2", { seq: 2 })] }),
+      { uid: DRAWER, canvasEpoch: 0 }
+    );
+    assert.deepEqual(cleared.strokes, []);
+    assert.equal(cleared.canvasEpoch, 1);
+    assert.equal(durable.ok, true);
+    assert.deepEqual(durable.session.strokes, []);
+    assert.equal(durable.session.canvasEpoch, 1);
+    assert.equal(durable.session.tool, undefined);
+  });
+
+  it("3. erase → clear : couleur conservée", () => {
+    const brush = strokes.resetDrawItBrushToDraw(
+      strokes.createDrawItBrush({
+        color: "#ff69b4",
+        width: 12,
+        tool: strokes.DRAW_IT_TOOL_ERASE,
+      })
+    );
+    assert.equal(brush.color, "#ff69b4");
+    assert.notEqual(brush.color, strokes.DRAW_IT_DEFAULT_COLOR);
+  });
+
+  it("4. erase → clear : width conservée", () => {
+    const brush = strokes.resetDrawItBrushToDraw(
+      strokes.createDrawItBrush({
+        color: "#ff69b4",
+        width: 12,
+        tool: strokes.DRAW_IT_TOOL_ERASE,
+      })
+    );
+    assert.equal(brush.width, 12);
+  });
+
+  it("5. erase → clear → draw : stroke valide, live T7 et persistence T8", () => {
+    let brush = strokes.resetDrawItBrushToDraw(
+      strokes.createDrawItBrush({
+        color: "#38bdf8",
+        width: 7,
+        tool: strokes.DRAW_IT_TOOL_ERASE,
+      })
+    );
+    let board = strokes.applyDrawItBoardClear(boardWith(["s1"]), 1);
+    board = strokes.applyDrawItPointer(board, "down", [0.2, 0.3], true, brush);
+    board = strokes.applyDrawItPointer(board, "up", [0.4, 0.3], true);
+    const painted = board.strokes[0];
+    assert.equal(painted.color, "#38bdf8");
+    assert.equal(painted.width, 7);
+    const s1 = { ...session(), canvasEpoch: 1 };
+    const liveStart = live.applyDrawItLiveEvent(
+      live.createDrawItLiveState(s1),
+      payload("start", {
+        canvasEpoch: 1,
+        strokeId: painted.strokeId,
+        seq: painted.seq,
+        color: painted.color,
+        width: painted.width,
+        points: painted.points,
+      }),
+      s1
+    );
+    assert.equal(liveStart.applied, true);
+    const durable = strokes.applyDrawItDurableAppend(s1, painted, { uid: DRAWER });
+    assert.equal(durable.ok, true);
+    assert.equal(durable.session.strokes[0].strokeId, painted.strokeId);
+    const game = read("js/games/drawIt.js");
+    assert.match(game, /resetDrawItBrushToDraw/);
+    assert.match(game, /commitDrawItClearCanvas/);
+    assert.match(read("js/core/drawItSession.js"), /broadcastDrawItLiveClear/);
+    assert.match(read("js/core/drawItSession.js"), /rpcClearDrawItCanvas/);
+  });
+
+  it("6. draw → clear : reste draw, couleur et width inchangées", () => {
+    const before = strokes.createDrawItBrush({
+      color: "#f97316",
+      width: 7,
+      tool: strokes.DRAW_IT_TOOL_DRAW,
+    });
+    const after = strokes.resetDrawItBrushToDraw(before);
+    assert.equal(after.tool, strokes.DRAW_IT_TOOL_DRAW);
+    assert.equal(after.color, "#f97316");
+    assert.equal(after.width, 7);
+  });
+
+  it("7. clear → incoming session patch : le patch ne remet pas erase", () => {
+    let brush = strokes.resetDrawItBrushToDraw(
+      strokes.createDrawItBrush({
+        color: "#12abef",
+        width: 12,
+        tool: strokes.DRAW_IT_TOOL_ERASE,
+      })
+    );
+    const local = strokes.applyDrawItBoardClear(boardWith(["s1"]), 1);
+    const remote = strokes.applyDrawItDurableClear(
+      session({ strokes: [stroke("s1")] }),
+      { uid: DRAWER, canvasEpoch: 0 }
+    ).session;
+    const merged = strokes.maybeResetDrawItBoard(local, remote);
+    assert.deepEqual(merged.strokes, []);
+    assert.equal(merged.canvasEpoch, 1);
+    assert.equal(brush.tool, strokes.DRAW_IT_TOOL_DRAW);
+    assert.equal(brush.color, "#12abef");
+    assert.equal(remote.tool, undefined);
+    assert.equal(
+      JSON.stringify(remote.strokes || []).includes("erase"),
+      false
+    );
+  });
+
+  it("8. Clear pendant currentStroke : guard toolsBusy inchangé", () => {
+    const game = read("js/games/drawIt.js");
+    const clearAt = game.indexOf('if (target.id === "draw-it-clear")');
+    const clearFn = game.slice(clearAt, game.indexOf('if (target.id === "draw-it-erase")'));
+    assert.match(clearFn, /if \(toolsBusy\(\)\) return;/);
+    assert.match(clearFn, /resetDrawItBrushToDraw/);
+    assert.match(game, /return Boolean\(canvasCtl\?\.isDrawing\(\) \|\| board\?\.currentStroke\);/);
+    let board = strokes.beginDrawItStroke(
+      strokes.createEmptyDrawItBoard({ runId: "run-t9" }),
+      [0.1, 0.1],
+      { color: "#ef4444", width: 4 }
+    );
+    assert.ok(board.currentStroke);
+    const busy = Boolean(board.currentStroke);
+    assert.equal(busy, true);
+  });
+});
+
 describe("Draw it ! T9 — guards / isolation / régressions", () => {
   it("L. non-drawer : Undo et Clear refusés", () => {
     const current = session({ strokes: [stroke("s1")] });

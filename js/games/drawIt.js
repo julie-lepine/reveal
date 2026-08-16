@@ -55,6 +55,7 @@ import {
   createDrawItRecapBoardFromSession,
   DRAW_IT_TOOL_DRAW,
   DRAW_IT_TOOL_ERASE,
+  resetDrawItBrushToDraw,
   DRAW_IT_TOOL_WIDTHS,
   maybeResetDrawItBoard,
   resolveDrawItToolColor,
@@ -123,7 +124,9 @@ export function mountDrawIt(app) {
       rememberSuppressedStrokes(board);
     } else if (delta?.action === "clear") {
       board = applyDrawItBoardClear(board, delta.canvasEpoch);
+      brush = resetDrawItBrushToDraw(brush);
       rememberSuppressedStrokes(board);
+      canvasCtl?.syncInteractive();
     }
     canvasCtl?.applyLiveDelta(delta);
   };
@@ -645,7 +648,9 @@ export function mountDrawIt(app) {
         if (toolsBusy()) return;
         const nextEpoch = (Number(board.canvasEpoch) || 0) + 1;
         board = applyDrawItBoardClear(board, nextEpoch);
+        brush = resetDrawItBrushToDraw(brush);
         rememberSuppressedStrokes(board);
+        canvasCtl?.syncInteractive();
         canvasCtl?.paint();
         syncToolButtons();
         void commitDrawItClearCanvas();
