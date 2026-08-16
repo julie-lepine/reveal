@@ -49,6 +49,13 @@ export function buildDrawItDrawerOrder(participants = []) {
   return out;
 }
 
+const AUTHOR_UID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export function isDrawItAuthorUid(value) {
+  return AUTHOR_UID_RE.test(String(value || "").trim());
+}
+
 export function drawerUidForRound(drawerOrder, roundIdx) {
   if (!Array.isArray(drawerOrder) || drawerOrder.length === 0) return null;
   const idx = Number(roundIdx);
@@ -59,6 +66,51 @@ export function drawerUidForRound(drawerOrder, roundIdx) {
 export function isDrawerUidInOrder(drawerUid, drawerOrder) {
   if (!drawerUid || !Array.isArray(drawerOrder)) return false;
   return drawerOrder.includes(String(drawerUid));
+}
+
+export function isDrawItCustomDeckEntry(word) {
+  if (!word || typeof word !== "object") return false;
+  return word.custom === true || word.source === "custom" || word.categoryId === "custom";
+}
+
+/**
+ * Custom → auteur uniquement (aucun tirage). Catalogue → rotation actuelle.
+ * @returns {string|null}
+ */
+export function resolveDrawItRoundDrawerUid(word, drawerOrder, roundIdx) {
+  if (isDrawItCustomDeckEntry(word)) {
+    const authorUid = String(word.authorUid || "").trim();
+    if (!isDrawItAuthorUid(authorUid)) return null;
+    if (!isDrawerUidInOrder(authorUid, drawerOrder)) return null;
+    return authorUid;
+  }
+  return drawerUidForRound(drawerOrder, roundIdx);
+}
+
+export function buildDrawItPrivateRounds(series = [], drawerOrder = []) {
+  const rounds = [];
+  for (let i = 0; i < series.length; i += 1) {
+    const word = series[i] || {};
+    const custom = isDrawItCustomDeckEntry(word);
+    const drawerUid = resolveDrawItRoundDrawerUid(word, drawerOrder, i);
+    if (!drawerUid) return [];
+    const label = String(word.label || "");
+    const round = {
+      roundIdx: i,
+      drawerUid,
+      wordLabel: label,
+      acceptedAnswers: Array.isArray(word.acceptedAnswers)
+        ? word.acceptedAnswers
+        : [label],
+      wordSource: custom ? "custom" : "catalog",
+    };
+    if (custom) {
+      round.customId = String(word.id || "");
+      round.customAuthorUid = String(word.authorUid || "");
+    }
+    rounds.push(round);
+  }
+  return rounds;
 }
 
 export function buildDrawItRoundTiming(
@@ -203,10 +255,14 @@ export function buildDrawItLaunchState({
   nowMs = Date.now(),
   runId,
   durationMs = DRAW_IT_ROUND_DURATION_MS,
+  drawerUid: launchDrawerUid,
 } = {}) {
   const drawerOrder = buildDrawItDrawerOrder(participants);
   const roundIdx = 0;
   const timing = buildDrawItRoundTiming(nowMs, durationMs);
+  const drawerUid = launchDrawerUid
+    ? String(launchDrawerUid)
+    : drawerUidForRound(drawerOrder, roundIdx);
   return {
     ...session,
     lobbyStarted: true,
@@ -215,7 +271,7 @@ export function buildDrawItLaunchState({
     drawerOrder,
     roundIdx,
     phase: DRAW_IT_PHASE_DRAWING,
-    drawerUid: drawerUidForRound(drawerOrder, roundIdx),
+    drawerUid,
     ...timing,
     roundScored: false,
     lastRound: null,
@@ -292,12 +348,14 @@ export function canCommitDrawItNextRound(session) {
 
 export function applyDrawItNextRound(
   session,
-  { nowMs = Date.now(), durationMs = DRAW_IT_ROUND_DURATION_MS } = {}
+  { nowMs = Date.now(), durationMs = DRAW_IT_ROUND_DURATION_MS, drawerUid: nextDrawerUid } = {}
 ) {
   const check = canCommitDrawItNextRound(session);
   if (!check.ok) return { ok: false, reason: check.reason, session };
   const drawerOrder = freezeDrawItDrawerOrder(session.drawerOrder, []);
-  const drawerUid = drawerUidForRound(drawerOrder, check.nextIdx);
+  const drawerUid = nextDrawerUid
+    ? String(nextDrawerUid)
+    : drawerUidForRound(drawerOrder, check.nextIdx);
   if (!isDrawerUidInOrder(drawerUid, drawerOrder)) {
     return { ok: false, reason: "invalid_drawer", session };
   }

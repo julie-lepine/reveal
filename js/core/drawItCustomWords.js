@@ -28,6 +28,7 @@ import {
 } from "./sessionMerge.js";
 import { getLocalDisplayName, getState, saveStatePatch } from "./state.js";
 import { getSupabaseUserId } from "./supabaseAuth.js";
+import { isDrawItAuthorUid, isDrawerUidInOrder } from "./drawItRound.js";
 
 export {
   isDrawItCustomWordOwnedBy,
@@ -54,11 +55,17 @@ function distinctCatalogPool(categoryId, words = DRAW_IT_WORDS) {
   return dedupeEntriesById(getDrawItCategoryWords(categoryId, words));
 }
 
-function uniqueCustomWordEntries(customWords = []) {
+function uniqueCustomWordEntries(customWords = [], presentUids = null) {
   const seen = new Set();
   const out = [];
+  const allowed =
+    presentUids == null
+      ? null
+      : new Set((presentUids || []).map((uid) => String(uid || "").trim()).filter(Boolean));
   for (const item of sanitizeDrawItCustomWords(customWords)) {
     if (!item.text) continue;
+    if (!isDrawItAuthorUid(item.authorUid)) continue;
+    if (allowed && !allowed.has(String(item.authorUid))) continue;
     const key = normalizeDrawItGuess(item.text);
     if (!key || seen.has(key)) continue;
     seen.add(key);
@@ -69,10 +76,27 @@ function uniqueCustomWordEntries(customWords = []) {
       enabled: true,
       acceptedAnswers: [item.text],
       author: item.author || null,
+      authorUid: item.authorUid,
+      source: "custom",
       custom: true,
     });
   }
   return out;
+}
+
+export function filterPlayableDrawItCustomWords(customWords = [], presentUids = []) {
+  return sanitizeDrawItCustomWords(customWords).filter((item) => {
+    if (!item.text) return false;
+    if (!isDrawItAuthorUid(item.authorUid)) return false;
+    if (
+      Array.isArray(presentUids) &&
+      presentUids.length &&
+      !isDrawerUidInOrder(item.authorUid, presentUids)
+    ) {
+      return false;
+    }
+    return true;
+  });
 }
 
 function catalogWithoutCustomLabels(catalog, customEntries) {
@@ -102,9 +126,10 @@ export function buildDrawItDeck({
   customWords = [],
   catalogWords = DRAW_IT_WORDS,
   random = Math.random,
+  presentUids = null,
 } = {}) {
   if (!isDrawItCategoryId(categoryId) || !isDrawItRoundCount(roundCount)) return [];
-  const customs = uniqueCustomWordEntries(customWords);
+  const customs = uniqueCustomWordEntries(customWords, presentUids);
   const catalog = distinctCatalogPool(categoryId, catalogWords);
   const bank = catalogWithoutCustomLabels(catalog, customs);
   return buildCombinedShuffledDeck(

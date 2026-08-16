@@ -43,6 +43,7 @@ import {
   drawItCatalogPoolSize,
   getDrawItCustomWords,
   getMyDrawItCustomWords,
+  filterPlayableDrawItCustomWords,
   loadDrawItCustomWordsForLaunch,
   removeDrawItCustomWord as removeDrawItCustomWordEntry,
   summarizeOthersDrawItCustomAdds,
@@ -59,10 +60,13 @@ import {
   applyDrawItReveal,
   buildDrawItDrawerOrder,
   buildDrawItLaunchState,
+  buildDrawItPrivateRounds,
   canCommitDrawItNextRound,
   canCommitDrawItReveal,
   canCompleteDrawItGame,
   drawerUidForRound,
+  resolveDrawItRoundDrawerUid,
+  isDrawItCustomDeckEntry,
 } from "./drawItRound.js";
 import {
   fetchMyDrawItPrivate,
@@ -174,22 +178,29 @@ export function validateDrawItPrep(
  * @returns {object[]}
  */
 export function buildDrawItSeries(
-  { selectedCategoryId, roundCount, customWords = [] } = {},
+  { selectedCategoryId, roundCount, customWords = [], presentUids = null } = {},
   words = DRAW_IT_WORDS,
   random = Math.random
 ) {
-  const check = validateDrawItPrep({ selectedCategoryId, roundCount, customWords }, words);
+  const playable = presentUids
+    ? filterPlayableDrawItCustomWords(customWords, presentUids)
+    : customWords;
+  const check = validateDrawItPrep(
+    { selectedCategoryId, roundCount, customWords: playable },
+    words
+  );
   if (!check.valid) return [];
-  if (!customWords?.length) {
+  if (!playable?.length) {
     const pool = distinctDrawItPool(selectedCategoryId, words);
     return shuffleArray(pool, random).slice(0, check.required);
   }
   return buildDrawItDeck({
     categoryId: selectedCategoryId,
     roundCount,
-    customWords,
+    customWords: playable,
     catalogWords: words,
     random,
+    presentUids,
   });
 }
 
@@ -309,16 +320,6 @@ export async function markDrawItLobbyStarted({ rosterNames } = {}) {
     return { ok: false, error: loaded.error || "customs_unavailable" };
   }
   const customWords = loaded.customWords;
-  const check = validateDrawItPrep({
-    selectedCategoryId: session.selectedCategoryId,
-    roundCount: session.roundCount,
-    customWords,
-  });
-  if (!check.valid) {
-    await showDrawItLaunchError(drawItPrepBlockLabel(check) || "Configuration invalide");
-    return { ok: false, error: check.reason || "invalid_prep" };
-  }
-
   const participants = freezeDrawItParticipants(rosterNames);
   const drawerOrder = buildDrawItDrawerOrder(participants);
   if (!drawerOrder.length) {
@@ -326,14 +327,32 @@ export async function markDrawItLobbyStarted({ rosterNames } = {}) {
     return { ok: false, error: "no_drawers" };
   }
 
+  const playableCustoms = filterPlayableDrawItCustomWords(customWords, drawerOrder);
+  const check = validateDrawItPrep({
+    selectedCategoryId: session.selectedCategoryId,
+    roundCount: session.roundCount,
+    customWords: playableCustoms,
+  });
+  if (!check.valid) {
+    await showDrawItLaunchError(drawItPrepBlockLabel(check) || "Configuration invalide");
+    return { ok: false, error: check.reason || "invalid_prep" };
+  }
+
   const series = buildDrawItSeries({
     selectedCategoryId: session.selectedCategoryId,
     roundCount: session.roundCount,
-    customWords,
+    customWords: playableCustoms,
+    presentUids: drawerOrder,
   });
   if (series.length < Number(session.roundCount)) {
     await showDrawItLaunchError("Impossible de construire la série avec les mots disponibles.");
     return { ok: false, error: "insufficient_series" };
+  }
+
+  const rounds = buildDrawItPrivateRounds(series, drawerOrder);
+  if (rounds.length !== series.length) {
+    await showDrawItLaunchError("Impossible d'attribuer les dessinateurs.");
+    return { ok: false, error: "invalid_drawer" };
   }
 
   const runId = createDrawItRunId();
@@ -343,16 +362,9 @@ export async function markDrawItLobbyStarted({ rosterNames } = {}) {
       participants,
       nowMs: Date.now(),
       runId,
+      drawerUid: rounds[0].drawerUid,
     })
   );
-  const rounds = series.map((word, i) => ({
-    roundIdx: i,
-    drawerUid: drawerUidForRound(drawerOrder, i),
-    wordLabel: word.label,
-    acceptedAnswers: Array.isArray(word.acceptedAnswers)
-      ? word.acceptedAnswers
-      : [word.label],
-  }));
 
   if (isGameSyncActive() && isSupabaseConfigured()) {
     const launched = await hostLaunchDrawItGame({
@@ -464,7 +476,14 @@ export async function commitDrawItNextRound({ nowMs = Date.now() } = {}) {
       return { ok: true, reason: null };
     }
 
-    const applied = applyDrawItNextRound(session, { nowMs });
+    const applied = applyDrawItNextRound(session, {
+      nowMs,
+      drawerUid: peekLocalDrawItPrivate(
+        getState().lobby?.id,
+        session.runId,
+        check.nextIdx
+      )?.drawerUid,
+    });
     if (!applied.ok) return applied;
     await commitDrawItPlay({
       roundIdx: applied.session.roundIdx,
@@ -982,6 +1001,9 @@ export {
   buildDrawItDrawerOrder,
   drawerUidForRound,
   buildDrawItLaunchState,
+  buildDrawItPrivateRounds,
+  resolveDrawItRoundDrawerUid,
+  isDrawItCustomDeckEntry,
   canSubmitDrawItGuess,
   isDrawItGuessInputLocked,
   applyDrawItGuess,

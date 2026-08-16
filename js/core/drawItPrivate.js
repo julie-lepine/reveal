@@ -56,6 +56,9 @@ export async function hostWriteDrawItPrivateRounds({ runId, rounds = [] } = {}) 
       drawerUid: String(row.drawerUid || ""),
       wordLabel: String(row.wordLabel || ""),
       acceptedAnswers: Array.isArray(row.acceptedAnswers) ? row.acceptedAnswers : [],
+      wordSource: row.wordSource === "custom" ? "custom" : "catalog",
+      customId: row.customId ? String(row.customId) : "",
+      customAuthorUid: row.customAuthorUid ? String(row.customAuthorUid) : "",
     };
   }
   writeLocalBundle(lobbyId, { runId, rounds: map });
@@ -72,6 +75,8 @@ export async function hostWriteDrawItPrivateRounds({ runId, rounds = [] } = {}) 
       drawerUid: r.drawerUid,
       wordLabel: r.wordLabel,
       acceptedAnswers: r.acceptedAnswers || [],
+      customId: r.customId || "",
+      wordSource: r.wordSource || "",
     })),
   });
   if (error) {
@@ -106,6 +111,9 @@ export async function hostLaunchDrawItGame({
       acceptedAnswers: Array.isArray(round.acceptedAnswers)
         ? round.acceptedAnswers
         : [],
+      wordSource: round.wordSource === "custom" ? "custom" : "catalog",
+      customId: round.customId ? String(round.customId) : "",
+      customAuthorUid: round.customAuthorUid ? String(round.customAuthorUid) : "",
     };
   }
   writeLocalBundle(lobbyId, { runId, rounds: map });
@@ -119,6 +127,8 @@ export async function hostLaunchDrawItGame({
     drawerUid: round.drawerUid,
     wordLabel: round.wordLabel,
     acceptedAnswers: round.acceptedAnswers || [],
+    customId: round.customId || "",
+    wordSource: round.wordSource || "",
   }));
   const { data, error } = await supabase.rpc("launch_drawit_game", {
     p_lobby_id: lobbyId,
