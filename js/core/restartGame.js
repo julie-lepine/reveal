@@ -298,6 +298,14 @@ export async function launchDrawItPrep() {
     alertTitle: "Draw it !",
     alertFallback: "Impossible de lancer Draw it !.",
     logLabel: "DrawIt",
+    afterSuccess: async () => {
+      try {
+        const { clearRemoteDrawItCustomWords } = await import("./drawItCustomWords.js");
+        await clearRemoteDrawItCustomWords();
+      } catch {
+        /* SQL 10 optionnelle */
+      }
+    },
   });
 }
 

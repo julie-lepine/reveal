@@ -233,7 +233,7 @@ describe("Draw it ! T3 — confidentialité + estimation", () => {
   it("lancement bloqué si pool insuffisant", async () => {
     await setDrawItRoundCount(8);
     const result = await markDrawItLobbyStarted();
-    assert.equal(result, null);
+    assert.equal(result?.ok, false);
     assert.equal(getDrawItSession().lobbyStarted, false);
   });
 });

@@ -342,7 +342,7 @@ describe("BUG-DRAWIT-CUSTOM-10 — sync notification", () => {
         custom("theirs", SECRET_GUEST, "Bob", GUEST_UID),
       ],
     });
-    assert.equal(asHost.customWords.find((item) => item.id === "mine").text, "neige");
+    assert.equal(asHost.customWords.find((item) => item.id === "mine").text, undefined);
     assert.equal(asHost.customWords.find((item) => item.id === "theirs").text, undefined);
 
     resetViewer({ name: "Bob", uid: GUEST_UID });
@@ -356,7 +356,7 @@ describe("BUG-DRAWIT-CUSTOM-10 — sync notification", () => {
       ],
     });
     assert.equal(asGuest.customWords.find((item) => item.id === "mine").text, undefined);
-    assert.equal(asGuest.customWords.find((item) => item.id === "theirs").text, SECRET_GUEST);
+    assert.equal(asGuest.customWords.find((item) => item.id === "theirs").text, undefined);
     assert.deepEqual(
       summarizeOthersDrawItCustomAdds(asGuest.customWords, "Bob", GUEST_UID),
       [{ author: "Alice", count: 1 }]

@@ -175,11 +175,12 @@ describe("DRAWIT CUSTOM WORDS — QA fix", () => {
     const alice = remote.customWords.find((w) => w.id === "c1");
     const bob = remote.customWords.find((w) => w.id === "c2");
     assert.equal(alice.text, undefined);
-    assert.equal(bob.text, "MotBob");
+    assert.equal(bob.text, undefined);
     assert.equal(JSON.stringify(remote).includes(SECRET), false);
+    assert.equal(JSON.stringify(remote).includes("MotBob"), false);
   });
 
-  it("K. reconnect owner : son texte reste", () => {
+  it("K. reconnect owner : payload public sans texte (textes via merge local / RPC privée)", () => {
     const remote = drawItFromRemote({
       lobbyStarted: false,
       selectedCategoryId: TEST_CATEGORY,
@@ -187,7 +188,8 @@ describe("DRAWIT CUSTOM WORDS — QA fix", () => {
       ready: {},
       customWords: [{ id: "c1", text: SECRET, author: "Alice", authorUid: HOST_UID }],
     });
-    assert.equal(remote.customWords[0].text, SECRET);
+    assert.equal(remote.customWords[0].text, undefined);
+    assert.equal(JSON.stringify(remote).includes(SECRET), false);
   });
 
   it("L. reconnect other : texte d'autrui inaccessible", () => {

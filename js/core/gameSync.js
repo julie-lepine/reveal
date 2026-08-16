@@ -51,7 +51,8 @@ import {
   mergeHotTakeCustomTakes,
   mergeDrawItCustomWords,
   sanitizeDrawItCustomWords,
-  redactDrawItCustomWordsForViewer,
+  stripDrawItCustomWordTexts,
+  nextDrawItCustomWordsFromPrepPatch,
   mergeDilemmaPatchState,
   mergeHotTakePatchState,
   mergeConsensusPatchState,
@@ -1427,11 +1428,7 @@ function mergeDrawItGameLocal(local, remote) {
   } else if (Array.isArray(remote.customWords)) {
     merged.customWords = mergeDrawItCustomWords(
       local.customWords || [],
-      redactDrawItCustomWordsForViewer(
-        remote.customWords,
-        getLocalDisplayName(),
-        getSupabaseUserId() || getLocalParticipantUid()
-      ),
+      stripDrawItCustomWordTexts(remote.customWords),
       getLocalDisplayName(),
       getSupabaseUserId() || getLocalParticipantUid()
     );
@@ -1474,10 +1471,12 @@ function mergeDrawItPatchState(cur, inc, { mergeReadyUid }) {
   };
   if (merged.lobbyStarted) {
     merged.customWords = [];
-  } else if (Object.prototype.hasOwnProperty.call(inc, "customWords")) {
-    merged.customWords = sanitizeDrawItCustomWords(inc.customWords);
   } else {
-    merged.customWords = sanitizeDrawItCustomWords(cur.customWords);
+    merged.customWords = nextDrawItCustomWordsFromPrepPatch(
+      cur.customWords,
+      inc,
+      false
+    );
   }
   if (!merged.lobbyStarted && Object.prototype.hasOwnProperty.call(inc, "runId")) {
     merged.runId = inc.runId || null;
@@ -2613,11 +2612,7 @@ export function drawItFromRemote(remote) {
   };
   if (!remote.lobbyStarted) {
     if (Array.isArray(remote.customWords)) {
-      base.customWords = redactDrawItCustomWordsForViewer(
-        remote.customWords,
-        getLocalDisplayName(),
-        getSupabaseUserId()
-      );
+      base.customWords = stripDrawItCustomWordTexts(remote.customWords);
     }
     return base;
   }
@@ -4030,6 +4025,12 @@ export function applyRemoteSession(row, { epoch = null } = {}) {
   }
 
   notify(row);
+  if (patch.drawItGame && !patch.drawItGame.lobbyStarted) {
+    void import("./drawItCustomWords.js").then(async (m) => {
+      const changed = await m.hydrateOwnDrawItCustomWordsIfNeeded();
+      if (changed) notify(row);
+    });
+  }
   const routeAllowed = shouldApplySessionRoute(row, {
     fromScreen: prevScreen,
     debugSource: "applyRemoteSession/shouldApply",
@@ -5675,6 +5676,12 @@ export async function completeGameSession({ gameId = "menu", screen = "results",
       full = (await fetchGameSessionByLobby(lobbyId)) || row;
     }
     applyRemoteSession(full);
+    try {
+      const { clearRemoteDrawItCustomWords } = await import("./drawItCustomWords.js");
+      await clearRemoteDrawItCustomWords();
+    } catch {
+      /* SQL 10 optionnelle */
+    }
     const routeScreen =
       screen === "tiernight-end" ||
       full?.state?.tierNight?.series?.phase === "series_end"
@@ -5695,6 +5702,12 @@ export async function completeGameSession({ gameId = "menu", screen = "results",
   // lobby/session, contrairement à une inférence basée sur le gameId du lobby.
   const sessionGameId = POST_GAME_SCREENS.has(screen) ? "menu" : gameId;
   const priorState = cachedRow?.state || {};
+  try {
+    const { clearRemoteDrawItCustomWords } = await import("./drawItCustomWords.js");
+    await clearRemoteDrawItCustomWords();
+  } catch {
+    /* SQL 10 optionnelle */
+  }
   const sessionState = deactivatePlayFlagsInSessionState({
     ...priorState,
     ...eveningStateToRemote(),

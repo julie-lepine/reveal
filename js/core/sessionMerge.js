@@ -149,18 +149,18 @@ export function sanitizeDrawItCustomWords(list = []) {
   return out;
 }
 
-/** Autres joueurs : id + auteur uniquement. Owner : conserve le texte. */
-export function redactDrawItCustomWordsForViewer(
-  list = [],
-  localAuthor,
-  localAuthorUid = null
-) {
+/** Autres joueurs : jamais de texte, même si le blob serveur en contient encore. */
+export function stripDrawItCustomWordTexts(list = []) {
   return sanitizeDrawItCustomWords(list).map((item) => {
-    if (isDrawItCustomWordOwnedBy(item, localAuthor, localAuthorUid)) return item;
     const out = { id: item.id, author: item.author };
     if (item.authorUid) out.authorUid = item.authorUid;
     return out;
   });
+}
+
+/** Compat : la redaction viewer = strip total (textes owner via table privée / local). */
+export function redactDrawItCustomWordsForViewer(list = []) {
+  return stripDrawItCustomWordTexts(list);
 }
 
 export function isDrawItCustomWordOwnedBy(item, localAuthor, localAuthorUid = null) {
@@ -173,10 +173,25 @@ export function isDrawItCustomWordOwnedBy(item, localAuthor, localAuthorUid = nu
 }
 
 /**
- * Merge anti-résurrection Draw it (prépa) :
- * - les customs des autres viennent du remote (leurs deletes gagnent) ;
- * - les customs locaux viennent du local (delete/add en vol gagnent contre un snapshot stale).
+ * Patch prep serveur : un snapshot stale non vide ne doit jamais remplacer
+ * customWords. Tableau vide = clear intentionnel (restart / fin de partie).
  */
+export function nextDrawItCustomWordsFromPrepPatch(
+  curList = [],
+  inc = {},
+  lobbyStarted = false
+) {
+  if (lobbyStarted) return [];
+  if (
+    Object.prototype.hasOwnProperty.call(inc, "customWords") &&
+    Array.isArray(inc.customWords) &&
+    inc.customWords.length === 0
+  ) {
+    return [];
+  }
+  return sanitizeDrawItCustomWords(curList);
+}
+
 export function mergeDrawItCustomWords(
   localList = [],
   remoteList = [],

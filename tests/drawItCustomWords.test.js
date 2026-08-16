@@ -349,7 +349,8 @@ describe("FEATURE-DRAWIT-CUSTOM-WORDS-01", () => {
       customWords: [custom("c1", "Hydrate")],
     });
     assert.equal(remote.customWords.length, 1);
-    assert.equal(remote.customWords[0].text, "Hydrate");
+    assert.equal(remote.customWords[0].id, "c1");
+    assert.equal(remote.customWords[0].text, undefined);
   });
 
   it("W. reconnect après suppression (remote sans l'id)", () => {

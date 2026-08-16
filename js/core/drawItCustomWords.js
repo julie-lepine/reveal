@@ -24,8 +24,10 @@ import {
   normalizeDrawItCustomWord,
   redactDrawItCustomWordsForViewer,
   sanitizeDrawItCustomWords,
+  stripDrawItCustomWordTexts,
 } from "./sessionMerge.js";
 import { getLocalDisplayName, getState, saveStatePatch } from "./state.js";
+import { getSupabaseUserId } from "./supabaseAuth.js";
 
 export {
   isDrawItCustomWordOwnedBy,
@@ -33,6 +35,7 @@ export {
   normalizeDrawItCustomWord,
   redactDrawItCustomWordsForViewer,
   sanitizeDrawItCustomWords,
+  stripDrawItCustomWordTexts,
 };
 
 export const DRAW_IT_CUSTOM_LOCKED = "DRAWIT_CUSTOM_LOCKED";
@@ -113,6 +116,10 @@ export function buildDrawItDeck({
   );
 }
 
+export function countUniqueDrawItCustomWords(customWords = []) {
+  return uniqueCustomWordEntries(customWords).length;
+}
+
 export function drawItAvailablePoolSize({
   categoryId,
   customWords = [],
@@ -141,9 +148,113 @@ export function summarizeOthersDrawItCustomAdds(
 }
 
 function persistCustomWords(session, customWords) {
+  const latest = getState().drawItGame || session;
   saveStatePatch({
-    drawItGame: { ...session, customWords: sanitizeDrawItCustomWords(customWords) },
+    drawItGame: { ...latest, customWords: sanitizeDrawItCustomWords(customWords) },
   });
+}
+
+const LAUNCH_CUSTOMS_ERROR =
+  "Impossible de récupérer tous les mots personnalisés. Réessaie de lancer la partie.";
+
+/**
+ * Host launch : textes complets via RPC privée. Échec / incomplet → pas de fallback textless.
+ * @returns {Promise<{ ok: true, customWords: object[] }|{ ok: false, error: string, customWords: object[] }>}
+ */
+export async function loadDrawItCustomWordsForLaunch(session) {
+  const local = getDrawItCustomWords(session);
+  const { isGameSyncActive } = await import("./gameSync.js");
+  const { isSupabaseConfigured } = await import("./supabaseClient.js");
+  if (!isGameSyncActive() || !isSupabaseConfigured()) {
+    const incomplete = local.filter((item) => !item.text);
+    if (incomplete.length) {
+      return { ok: false, error: LAUNCH_CUSTOMS_ERROR, customWords: local };
+    }
+    return { ok: true, customWords: local };
+  }
+
+  const lobbyId = getState().lobby?.id;
+  if (!lobbyId) {
+    return { ok: false, error: LAUNCH_CUSTOMS_ERROR, customWords: [] };
+  }
+
+  try {
+    const { rpcFetchDrawItCustomWordsForLaunch } = await import("./gameSessionRpc.js");
+    const rows = await rpcFetchDrawItCustomWordsForLaunch({ lobbyId });
+    const fetched = sanitizeDrawItCustomWords(rows);
+    const byId = new Map(fetched.map((item) => [item.id, item]));
+    const missing = local.filter((item) => !byId.get(item.id)?.text);
+    const incompleteFetched = fetched.filter((item) => !item.text);
+    if (missing.length || incompleteFetched.length) {
+      return { ok: false, error: LAUNCH_CUSTOMS_ERROR, customWords: [] };
+    }
+    const publicIds = new Set(local.map((item) => item.id));
+    const extras = fetched.filter((item) => item.text && !publicIds.has(item.id));
+    const merged = [
+      ...local.map((item) => ({
+        ...item,
+        text: byId.get(item.id).text,
+        author: byId.get(item.id).author || item.author,
+        authorUid: byId.get(item.id).authorUid || item.authorUid,
+      })),
+      ...extras,
+    ];
+    return { ok: true, customWords: sanitizeDrawItCustomWords(merged) };
+  } catch (e) {
+    return {
+      ok: false,
+      error: e?.message || LAUNCH_CUSTOMS_ERROR,
+      customWords: [],
+    };
+  }
+}
+
+/**
+ * Reconnexion owner : rattacher les textes privés aux métadonnées publiques.
+ * Ne lit jamais les textes d'autrui.
+ * @returns {Promise<boolean>} true si le state local a changé
+ */
+export async function hydrateOwnDrawItCustomWordsIfNeeded() {
+  const { isGameSyncActive, getLocalParticipantUid } = await import("./gameSync.js");
+  if (!isGameSyncActive()) return false;
+  const { isSupabaseConfigured } = await import("./supabaseClient.js");
+  if (!isSupabaseConfigured()) return false;
+  const session = getState().drawItGame;
+  if (!session || session.lobbyStarted) return false;
+  const uid = getLocalParticipantUid() || getSupabaseUserId() || null;
+  const me = getLocalDisplayName();
+  const current = getDrawItCustomWords(session);
+  const needFetch = current.some(
+    (item) => isDrawItCustomWordOwnedBy(item, me, uid) && !item.text
+  );
+  if (!needFetch) return false;
+  const lobbyId = getState().lobby?.id;
+  if (!lobbyId) return false;
+  try {
+    const { rpcFetchMyDrawItCustomWords } = await import("./gameSessionRpc.js");
+    const rows = await rpcFetchMyDrawItCustomWords({ lobbyId });
+    const mine = sanitizeDrawItCustomWords(rows);
+    if (!mine.length) return false;
+    const byId = new Map(mine.map((item) => [item.id, item]));
+    let changed = false;
+    const next = current.map((item) => {
+      if (!isDrawItCustomWordOwnedBy(item, me, uid)) return item;
+      const priv = byId.get(item.id);
+      if (!priv?.text || priv.text === item.text) return item;
+      changed = true;
+      return {
+        ...item,
+        text: priv.text,
+        author: priv.author || item.author,
+        authorUid: priv.authorUid || item.authorUid,
+      };
+    });
+    if (!changed) return false;
+    persistCustomWords(getState().drawItGame || session, next);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function createCustomWordId() {
@@ -276,4 +387,18 @@ export async function removeDrawItCustomWord(wordId, session, { localAuthor, loc
 
 export function drawItCatalogPoolSize(categoryId = DRAW_IT_CATALOG_ID, words = DRAW_IT_WORDS) {
   return distinctCatalogPool(categoryId, words).length;
+}
+
+/** Purge table privée. No-op si SQL 10 n'est pas encore appliquée. */
+export async function clearRemoteDrawItCustomWords() {
+  const lobbyId = getState().lobby?.id;
+  if (!lobbyId) return;
+  try {
+    const { isSupabaseConfigured } = await import("./supabaseClient.js");
+    if (!isSupabaseConfigured()) return;
+    const { rpcClearDrawItCustomWords } = await import("./gameSessionRpc.js");
+    await rpcClearDrawItCustomWords({ lobbyId });
+  } catch {
+    /* migration 10 optionnelle */
+  }
 }

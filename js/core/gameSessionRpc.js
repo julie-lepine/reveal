@@ -66,6 +66,48 @@ export async function rpcDeletePlayerCustomEntry({ lobbyId, game, entryId }) {
   return asSessionRow(data);
 }
 
+function asJsonArray(data) {
+  if (Array.isArray(data)) return data;
+  if (typeof data === "string") {
+    try {
+      const parsed = JSON.parse(data);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+}
+
+/** FEATURE-DRAWIT-10 — textes customs du joueur connecté (table privée). */
+export async function rpcFetchMyDrawItCustomWords({ lobbyId }) {
+  requireClient();
+  const { data, error } = await supabase.rpc("fetch_my_drawit_custom_words", {
+    p_lobby_id: lobbyId,
+  });
+  if (error) throw error;
+  return asJsonArray(data);
+}
+
+/** FEATURE-DRAWIT-10 — tous les textes customs, hôte / acting, prépa uniquement. */
+export async function rpcFetchDrawItCustomWordsForLaunch({ lobbyId }) {
+  requireClient();
+  const { data, error } = await supabase.rpc("fetch_drawit_custom_words_for_launch", {
+    p_lobby_id: lobbyId,
+  });
+  if (error) throw error;
+  return asJsonArray(data);
+}
+
+/** FEATURE-DRAWIT-10 — purge table privée (restart / nouvelle prépa). */
+export async function rpcClearDrawItCustomWords({ lobbyId }) {
+  requireClient();
+  const { error } = await supabase.rpc("clear_drawit_custom_words", {
+    p_lobby_id: lobbyId,
+  });
+  if (error) throw error;
+}
+
 /** FEATURE-TIERNIGHT-04C — upsert atomique customLiveTierLists. */
 export async function rpcUpsertPlayerCustomLiveTierList({ lobbyId, entry }) {
   requireClient();

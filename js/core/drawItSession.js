@@ -43,10 +43,11 @@ import {
   drawItCatalogPoolSize,
   getDrawItCustomWords,
   getMyDrawItCustomWords,
+  loadDrawItCustomWordsForLaunch,
   removeDrawItCustomWord as removeDrawItCustomWordEntry,
   summarizeOthersDrawItCustomAdds,
+  countUniqueDrawItCustomWords,
 } from "./drawItCustomWords.js";
-import { sanitizeDrawItCustomWords } from "./sessionMerge.js";
 import { getHotTakeModerationNotice as getModerationNotice } from "./hotTakeModeration.js";
 import { estimateDrawItDuration } from "./drawItDuration.js";
 import { createDrawItRunId } from "./drawItRunId.js";
@@ -139,7 +140,7 @@ export function validateDrawItPrep(
     };
   }
   const catalogSize = distinctDrawItPool(selectedCategoryId, words).length;
-  const customCount = getDrawItCustomWords({ customWords }).length;
+  const customCount = countUniqueDrawItCustomWords(customWords);
   const poolSize = drawItAvailablePoolSize({
     categoryId: selectedCategoryId,
     customWords,
@@ -288,42 +289,52 @@ function freezeDrawItParticipants(rosterNames) {
   return buildClutchParticipantsSnapshot(names, lobby).filter((p) => p.userId);
 }
 
-async function loadDrawItCustomWordsForLaunch(session) {
-  if (isGameSyncActive() && isSupabaseConfigured()) {
-    try {
-      const { fetchGameSessionByLobby } = await import("./supabaseGame.js");
-      const row = await fetchGameSessionByLobby(getState().lobby?.id);
-      const remote = row?.state?.drawIt?.customWords;
-      if (Array.isArray(remote) && remote.length) {
-        return sanitizeDrawItCustomWords(remote);
-      }
-    } catch {
-      /* repli local */
-    }
+async function showDrawItLaunchError(message) {
+  try {
+    const { showAppAlert } = await import("./dialog.js");
+    await showAppAlert(message || "Impossible de lancer Draw it !", {
+      title: "Draw it !",
+      icon: "⚠️",
+    });
+  } catch {
+    /* alerte optionnelle */
   }
-  return getDrawItCustomWords(session);
 }
 
 export async function markDrawItLobbyStarted({ rosterNames } = {}) {
   const session = getDrawItSession();
-  const customWords = await loadDrawItCustomWordsForLaunch(session);
+  const loaded = await loadDrawItCustomWordsForLaunch(session);
+  if (!loaded.ok) {
+    await showDrawItLaunchError(loaded.error);
+    return { ok: false, error: loaded.error || "customs_unavailable" };
+  }
+  const customWords = loaded.customWords;
   const check = validateDrawItPrep({
     selectedCategoryId: session.selectedCategoryId,
     roundCount: session.roundCount,
     customWords,
   });
-  if (!check.valid) return null;
+  if (!check.valid) {
+    await showDrawItLaunchError(drawItPrepBlockLabel(check) || "Configuration invalide");
+    return { ok: false, error: check.reason || "invalid_prep" };
+  }
 
   const participants = freezeDrawItParticipants(rosterNames);
   const drawerOrder = buildDrawItDrawerOrder(participants);
-  if (!drawerOrder.length) return null;
+  if (!drawerOrder.length) {
+    await showDrawItLaunchError("Il faut au moins un joueur pour lancer.");
+    return { ok: false, error: "no_drawers" };
+  }
 
   const series = buildDrawItSeries({
     selectedCategoryId: session.selectedCategoryId,
     roundCount: session.roundCount,
     customWords,
   });
-  if (series.length < Number(session.roundCount)) return null;
+  if (series.length < Number(session.roundCount)) {
+    await showDrawItLaunchError("Impossible de construire la série avec les mots disponibles.");
+    return { ok: false, error: "insufficient_series" };
+  }
 
   const runId = createDrawItRunId();
   const next = clearDrawItCustomWords(
