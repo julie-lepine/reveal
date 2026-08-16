@@ -335,6 +335,16 @@ export function restoredIdsFromUndoneErases(editLog, canvasEpoch) {
   return ids;
 }
 
+/** Strokes définitivement retirés par Undo crayon — prioritaire sur un Undo gomme. */
+export function undoneDrawStrokeIds(editLog, canvasEpoch) {
+  const ids = [];
+  for (const entry of sanitizeDrawItEditLog(editLog, canvasEpoch)) {
+    if (entry.kind !== DRAW_IT_EDIT_DRAW || !entry.undone) continue;
+    if (entry.strokeId) ids.push(entry.strokeId);
+  }
+  return ids;
+}
+
 export function mergeDrawItEditLog(localLog, remoteLog, canvasEpoch) {
   const epoch = Number(canvasEpoch) || 0;
   const local = sanitizeDrawItEditLog(localLog, epoch);
@@ -723,6 +733,7 @@ export function applyDrawItDurableUndo(session = {}, strokeId, { uid } = {}) {
     session: {
       ...session,
       strokes,
+      suppressedStrokeIds: [...new Set([...(session.suppressedStrokeIds || []), id])],
       editLog: markDrawItEditUndone(
         session.editLog,
         (entry) => entry.kind === DRAW_IT_EDIT_DRAW && entry.strokeId === id,
@@ -880,6 +891,7 @@ export function applyDrawItDurableClear(session = {}, { uid, canvasEpoch } = {})
       strokeSeq: 0,
       editLog: [],
       eraseOpIds: [],
+      suppressedStrokeIds: [],
     },
   };
 }
@@ -906,7 +918,11 @@ function suppressedStrokeIdSet(session = {}) {
 }
 
 function strokesForCanvasEpoch(session = {}, epoch = Number(session.canvasEpoch) || 0) {
-  const suppressed = suppressedStrokeIdSet(session);
+  const suppressed = applyEditLogSuppression(
+    suppressedStrokeIdSet(session),
+    session.editLog,
+    epoch
+  );
   return completedDrawItStrokesFromSession(session).filter(
     (stroke) => Number(stroke.canvasEpoch) === epoch && !suppressed.has(stroke.strokeId)
   );
@@ -928,6 +944,9 @@ function suppressedIdsFromEditLog(editLog, canvasEpoch) {
 function applyEditLogSuppression(suppressed, editLog, canvasEpoch) {
   for (const id of suppressedIdsFromEditLog(editLog, canvasEpoch)) suppressed.add(id);
   for (const id of restoredIdsFromUndoneErases(editLog, canvasEpoch)) suppressed.delete(id);
+  // Undo crayon gagne : un stroke ensuite annulé ne doit pas être réinjecté
+  // parce qu'un Undo de gomme plus ancien l'avait "restauré".
+  for (const id of undoneDrawStrokeIds(editLog, canvasEpoch)) suppressed.add(id);
   return suppressed;
 }
 
