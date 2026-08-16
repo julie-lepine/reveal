@@ -4,6 +4,7 @@ export const PLAY_PATCH_EXCLUDE = new Set([
   "ready",
   "customTakes",
   "customDilemmas",
+  "customWords",
   "submissions",
   "selectedThemeId",
   "selectedCategoryId",

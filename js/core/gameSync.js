@@ -49,6 +49,8 @@ import {
   mergeReadyMapsLocal,
   mergeDilemmaCustomDilemmas,
   mergeHotTakeCustomTakes,
+  mergeDrawItCustomWords,
+  sanitizeDrawItCustomWords,
   mergeDilemmaPatchState,
   mergeHotTakePatchState,
   mergeConsensusPatchState,
@@ -1416,6 +1418,18 @@ function mergeDrawItGameLocal(local, remote) {
         ? remote.participants
         : local.participants || [],
   };
+  if (remote.lobbyStarted || local.lobbyStarted || remote.runId || local.runId) {
+    merged.customWords = [];
+  } else if (Array.isArray(remote.customWords)) {
+    merged.customWords = mergeDrawItCustomWords(
+      local.customWords || [],
+      remote.customWords,
+      getLocalDisplayName(),
+      getSupabaseUserId() || getLocalParticipantUid()
+    );
+  } else {
+    merged.customWords = sanitizeDrawItCustomWords(local.customWords);
+  }
   if (isNewDrawItRound(local, remote)) {
     // Nouvelle identité runId+roundIdx : aucun timestamp de l'ancienne manche
     // ne doit survivre, même face à un payload distant incomplet.
@@ -1445,11 +1459,19 @@ function mergeDrawItPatchState(cur, inc, { mergeReadyUid }) {
   if (isReadyOnlyGamePatch(inc)) {
     return { ...cur, ready: mergeReadyUid(cur, inc) };
   }
-  return {
+  const merged = {
     ...cur,
     ...inc,
     ready: mergeReadyUid(cur, inc),
   };
+  if (merged.lobbyStarted || merged.runId) {
+    merged.customWords = [];
+  } else if (Object.prototype.hasOwnProperty.call(inc, "customWords")) {
+    merged.customWords = sanitizeDrawItCustomWords(inc.customWords);
+  } else {
+    merged.customWords = sanitizeDrawItCustomWords(cur.customWords);
+  }
+  return merged;
 }
 
 function mergeSpeedVoteGameLocal(local, remote) {
@@ -2578,6 +2600,13 @@ export function drawItFromRemote(remote) {
     selectedCategoryId: remote.selectedCategoryId || "catalog",
     roundCount: remote.roundCount ?? 5,
   };
+  if (
+    !remote.lobbyStarted &&
+    !remote.runId &&
+    Array.isArray(remote.customWords)
+  ) {
+    base.customWords = sanitizeDrawItCustomWords(remote.customWords);
+  }
   if (!remote.lobbyStarted && !remote.runId) return base;
   return {
     ...base,
@@ -5587,7 +5616,9 @@ function deactivatePlayFlagsInSessionState(state = {}) {
   lobbyStartedGames.forEach((key) => {
     if (st[key] && typeof st[key] === "object") {
       // Invalide les prêts prep de la partie terminée (évite stale local / F5 après Recommencer).
-      st[key] = { ...st[key], lobbyStarted: false, ready: {} };
+      const next = { ...st[key], lobbyStarted: false, ready: {} };
+      if (key === "drawIt") next.customWords = [];
+      st[key] = next;
     }
   });
   if (st.guessLie && typeof st.guessLie === "object") {

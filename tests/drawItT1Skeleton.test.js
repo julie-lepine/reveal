@@ -96,12 +96,14 @@ describe("Draw it ! T1 — session prépa", () => {
   it("default a la shape prépa uniquement", () => {
     const session = defaultDrawItPrepSession();
     assert.deepEqual(Object.keys(session).sort(), [
+      "customWords",
       "lobbyStarted",
       "ready",
       "roundCount",
       "selectedCategoryId",
     ]);
     assert.deepEqual(session.ready, {});
+    assert.deepEqual(session.customWords, []);
     assert.equal(session.lobbyStarted, false);
     assert.equal(session.selectedCategoryId, DRAW_IT_CATALOG_ID);
     assert.equal(session.roundCount, 5);

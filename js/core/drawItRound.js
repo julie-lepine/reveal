@@ -221,6 +221,7 @@ export function buildDrawItLaunchState({
     lastRound: null,
     matchScores: {},
     scoresCommittedRunId: null,
+    customWords: [],
     ...emptyDrawItPlayBuffers(),
     editLog: [],
     eraseOpIds: [],
@@ -347,6 +348,13 @@ export function publicDrawItHasForbiddenSecrets(remote, { allowLastRoundWord = f
     const currentLabel = remote.currentWordLabel || remote.word || null;
     if (currentLabel) return true;
   }
+  if (
+    (remote.lobbyStarted || remote.runId) &&
+    Array.isArray(remote.customWords) &&
+    remote.customWords.length
+  ) {
+    return true;
+  }
   return false;
 }
 
@@ -355,5 +363,6 @@ export function stripDrawItPublicSecrets(session = {}) {
   for (const key of PUBLIC_SECRET_KEYS) {
     delete out[key];
   }
+  if (out.lobbyStarted || out.runId) delete out.customWords;
   return out;
 }

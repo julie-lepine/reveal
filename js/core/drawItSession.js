@@ -30,9 +30,22 @@ import {
   applyRemoteSession,
   refreshGameSession,
   completeGameSession,
+  getLocalParticipantUid,
 } from "./gameSync.js";
 import { launchGameWithSync, commitHostGamePlay, commitPrepReadyToggle } from "./mpLaunch.js";
 import { shuffleArray, dedupeEntriesById } from "./combinedGameDeck.js";
+import {
+  addDrawItCustomWord as addDrawItCustomWordEntry,
+  buildDrawItDeck,
+  canMutateDrawItCustomWords,
+  clearDrawItCustomWords,
+  drawItAvailablePoolSize,
+  drawItCatalogPoolSize,
+  getDrawItCustomWords,
+  getMyDrawItCustomWords,
+  removeDrawItCustomWord as removeDrawItCustomWordEntry,
+} from "./drawItCustomWords.js";
+import { getHotTakeModerationNotice as getModerationNotice } from "./hotTakeModeration.js";
 import { estimateDrawItDuration } from "./drawItDuration.js";
 import { createDrawItRunId } from "./drawItRunId.js";
 import { buildClutchParticipantsSnapshot } from "./clutchParticipants.js";
@@ -80,6 +93,7 @@ function defaultSession() {
     lobbyStarted: false,
     selectedCategoryId: DRAW_IT_CATALOG_ID,
     roundCount: 5,
+    customWords: [],
   };
 }
 
@@ -104,11 +118,11 @@ function distinctDrawItPool(categoryId, words = DRAW_IT_WORDS) {
 }
 
 /**
- * Validation prépa (catégorie + presets 3/5/8 + pool).
+ * Validation prépa (catégorie + presets 3/5/8 + pool catalogue+customs).
  * Ne mute pas le catalogue. Ne construit pas de série publique.
  */
 export function validateDrawItPrep(
-  { selectedCategoryId, roundCount } = {},
+  { selectedCategoryId, roundCount, customWords = [] } = {},
   words = DRAW_IT_WORDS
 ) {
   const required = Number(roundCount);
@@ -117,15 +131,25 @@ export function validateDrawItPrep(
       valid: false,
       reason: "invalid_category",
       poolSize: 0,
+      catalogSize: 0,
+      customCount: 0,
       required: Number.isFinite(required) ? required : 0,
     };
   }
-  const poolSize = distinctDrawItPool(selectedCategoryId, words).length;
+  const catalogSize = distinctDrawItPool(selectedCategoryId, words).length;
+  const customCount = getDrawItCustomWords({ customWords }).length;
+  const poolSize = drawItAvailablePoolSize({
+    categoryId: selectedCategoryId,
+    customWords,
+    catalogWords: words,
+  });
   if (!isDrawItRoundCount(roundCount)) {
     return {
       valid: false,
       reason: "invalid_round_count",
       poolSize,
+      catalogSize,
+      customCount,
       required: Number.isFinite(required) ? required : 0,
     };
   }
@@ -134,10 +158,12 @@ export function validateDrawItPrep(
       valid: false,
       reason: "insufficient_pool",
       poolSize,
+      catalogSize,
+      customCount,
       required,
     };
   }
-  return { valid: true, poolSize, required };
+  return { valid: true, poolSize, catalogSize, customCount, required };
 }
 
 /**
@@ -145,14 +171,23 @@ export function validateDrawItPrep(
  * @returns {object[]}
  */
 export function buildDrawItSeries(
-  { selectedCategoryId, roundCount } = {},
+  { selectedCategoryId, roundCount, customWords = [] } = {},
   words = DRAW_IT_WORDS,
   random = Math.random
 ) {
-  const check = validateDrawItPrep({ selectedCategoryId, roundCount }, words);
+  const check = validateDrawItPrep({ selectedCategoryId, roundCount, customWords }, words);
   if (!check.valid) return [];
-  const pool = distinctDrawItPool(selectedCategoryId, words);
-  return shuffleArray(pool, random).slice(0, check.required);
+  if (!customWords?.length) {
+    const pool = distinctDrawItPool(selectedCategoryId, words);
+    return shuffleArray(pool, random).slice(0, check.required);
+  }
+  return buildDrawItDeck({
+    categoryId: selectedCategoryId,
+    roundCount,
+    customWords,
+    catalogWords: words,
+    random,
+  });
 }
 
 export function drawItPrepBlockLabel(check) {
@@ -189,12 +224,18 @@ export function getDrawItPrepSummary() {
   const session = getDrawItSession();
   const selectedCategoryId = session.selectedCategoryId || DRAW_IT_CATALOG_ID;
   const requested = getDrawItRoundCount();
-  const check = validateDrawItPrep({ selectedCategoryId, roundCount: requested });
+  const check = validateDrawItPrep({
+    selectedCategoryId,
+    roundCount: requested,
+    customWords: session.customWords,
+  });
   const duration = isDrawItRoundCount(requested)
     ? estimateDrawItDuration(requested)
     : estimateDrawItDuration(0);
   return {
     poolSize: check.poolSize,
+    catalogSize: check.catalogSize ?? drawItCatalogPoolSize(selectedCategoryId),
+    customCount: check.customCount ?? 0,
     requested,
     required: check.required,
     effective: check.valid ? requested : 0,
@@ -205,6 +246,29 @@ export function getDrawItPrepSummary() {
     blockLabel: drawItPrepBlockLabel(check),
     capped: false,
   };
+}
+
+export async function addDrawItCustomWord(text) {
+  return addDrawItCustomWordEntry(text, getDrawItSession());
+}
+
+export async function removeDrawItCustomWord(wordId) {
+  return removeDrawItCustomWordEntry(wordId, getDrawItSession(), {
+    localAuthor: getLocalDisplayName(),
+    localAuthorUid: getLocalParticipantUid() || null,
+  });
+}
+
+export function listDrawItCustomWords() {
+  return getDrawItCustomWords(getDrawItSession());
+}
+
+export function listMyDrawItCustomWords() {
+  return getMyDrawItCustomWords(
+    getDrawItSession(),
+    getLocalDisplayName(),
+    getLocalParticipantUid() || null
+  );
 }
 
 const revealLock = createActionLock();
@@ -227,6 +291,7 @@ export async function markDrawItLobbyStarted({ rosterNames } = {}) {
   const check = validateDrawItPrep({
     selectedCategoryId: session.selectedCategoryId,
     roundCount: session.roundCount,
+    customWords: session.customWords,
   });
   if (!check.valid) return null;
 
@@ -237,16 +302,19 @@ export async function markDrawItLobbyStarted({ rosterNames } = {}) {
   const series = buildDrawItSeries({
     selectedCategoryId: session.selectedCategoryId,
     roundCount: session.roundCount,
+    customWords: session.customWords,
   });
   if (series.length < Number(session.roundCount)) return null;
 
   const runId = createDrawItRunId();
-  const next = buildDrawItLaunchState({
-    session,
-    participants,
-    nowMs: Date.now(),
-    runId,
-  });
+  const next = clearDrawItCustomWords(
+    buildDrawItLaunchState({
+      session,
+      participants,
+      nowMs: Date.now(),
+      runId,
+    })
+  );
   const rounds = series.map((word, i) => ({
     roundIdx: i,
     drawerUid: drawerUidForRound(drawerOrder, i),
@@ -405,20 +473,26 @@ export async function commitDrawItComplete() {
         return { ok: false, reason: "scores_not_committed" };
       }
       await completeGameSession({ gameId: "drawit", screen: "results", state: {} });
+      saveStatePatch({
+        drawItGame: clearDrawItCustomWords(getDrawItSession()),
+      });
       return { ok: true, reason: null };
     }
 
     commitDrawItMatchScoresLocal(session);
     if (isGameSyncActive()) {
       await completeGameSession({ gameId: "drawit", screen: "results", state: {} });
+      saveStatePatch({
+        drawItGame: clearDrawItCustomWords(getDrawItSession()),
+      });
       return { ok: true, reason: null };
     }
     saveStatePatch({
-      drawItGame: {
+      drawItGame: clearDrawItCustomWords({
         ...session,
         lobbyStarted: false,
         scoresCommittedRunId: session.runId,
-      },
+      }),
     });
     return { ok: true, reason: null };
   });
@@ -866,6 +940,9 @@ export {
   isDrawItCategoryId,
   isDrawItRoundCount,
   drawItToRemote,
+  canMutateDrawItCustomWords,
+  getModerationNotice,
+  buildDrawItDeck,
   canCommitDrawItReveal,
   canCommitDrawItNextRound,
   canCompleteDrawItGame,

@@ -178,6 +178,7 @@ const defaultState = () => ({
     lobbyStarted: false,
     selectedCategoryId: "catalog",
     roundCount: 5,
+    customWords: [],
   },
   clutchGame: {
     ready: {},
@@ -771,6 +772,13 @@ export function renameLocalPlayer(newName) {
         nameArrays: ["dissenters", "majorityWinners", "tieWinners"],
       });
     }
+  }
+
+  const di = state.drawItGame;
+  if (di && Array.isArray(di.customWords)) {
+    di.customWords = di.customWords.map((w) =>
+      w?.author === oldName ? { ...w, author: trimmed } : w
+    );
   }
 
   const dm = state.dilemmaGame;

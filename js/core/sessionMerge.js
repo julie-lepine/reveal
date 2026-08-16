@@ -116,6 +116,81 @@ export function mergeHotTakeCustomTakes(localList, remoteList, localAuthor) {
   });
 }
 
+/** Mot custom Draw it ! — id + texte + ownership UID (fallback nom). */
+export function normalizeDrawItCustomWord(entry) {
+  if (!entry || typeof entry !== "object") return null;
+  const text = trimPlayerText(entry.text);
+  if (!text) return null;
+  const id = entry.id != null ? String(entry.id).trim() : "";
+  if (!id) return null;
+  const authorUid =
+    entry.authorUid != null && String(entry.authorUid).trim()
+      ? String(entry.authorUid).trim()
+      : null;
+  const out = {
+    id,
+    text,
+    author: entry.author ? String(entry.author) : null,
+  };
+  if (authorUid) out.authorUid = authorUid;
+  return out;
+}
+
+export function sanitizeDrawItCustomWords(list = []) {
+  if (!Array.isArray(list)) return [];
+  const seen = new Set();
+  const out = [];
+  for (const raw of list) {
+    const item = normalizeDrawItCustomWord(raw);
+    if (!item || seen.has(item.id)) continue;
+    seen.add(item.id);
+    out.push(item);
+  }
+  return out;
+}
+
+export function isDrawItCustomWordOwnedBy(item, localAuthor, localAuthorUid = null) {
+  if (!item) return false;
+  if (localAuthorUid && item.authorUid) {
+    return String(item.authorUid) === String(localAuthorUid);
+  }
+  if (!item.author) return false;
+  return item.author === localAuthor;
+}
+
+/**
+ * Merge anti-résurrection Draw it (prépa) :
+ * - les customs des autres viennent du remote (leurs deletes gagnent) ;
+ * - les customs locaux viennent du local (delete/add en vol gagnent contre un snapshot stale).
+ */
+export function mergeDrawItCustomWords(
+  localList = [],
+  remoteList = [],
+  localAuthor = null,
+  localAuthorUid = null
+) {
+  const byId = new Map();
+  for (const raw of remoteList) {
+    const item = normalizeDrawItCustomWord(raw);
+    if (!item) continue;
+    if (!isDrawItCustomWordOwnedBy(item, localAuthor, localAuthorUid)) {
+      byId.set(item.id, item);
+    }
+  }
+  for (const raw of localList) {
+    const item = normalizeDrawItCustomWord(raw);
+    if (!item) continue;
+    if (!item.author && !item.authorUid) {
+      byId.set(item.id, item);
+      continue;
+    }
+    if (isDrawItCustomWordOwnedBy(item, localAuthor, localAuthorUid)) {
+      byId.set(item.id, item);
+    }
+  }
+  return [...byId.values()];
+}
+
 /**
  * Thèmes roster « Classe le groupe » - hydratation locale uniquement.
  *

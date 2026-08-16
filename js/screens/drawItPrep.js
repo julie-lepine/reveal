@@ -10,19 +10,29 @@ import {
   simulateDrawItReady,
   validateDrawItPrep,
   drawItPrepBlockLabel,
+  addDrawItCustomWord,
+  removeDrawItCustomWord,
+  listDrawItCustomWords,
+  getModerationNotice,
   DRAW_IT_CATEGORIES,
   DRAW_IT_ROUND_PRESETS,
   DRAW_IT_CATALOG_ID,
 } from "../core/drawItSession.js";
+import { isDrawItCustomWordOwnedBy } from "../core/sessionMerge.js";
 import { getLobbyParticipants } from "../core/lobby.js";
 import { getLocalDisplayName } from "../core/state.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
 import { rulesButtonHtml } from "../core/gameRulesUi.js";
-import { isLobbyHost, onGameSessionChange } from "../core/gameSync.js";
+import { getLocalParticipantUid, isLobbyHost, onGameSessionChange } from "../core/gameSync.js";
 import { prepGuestFollowOnSession } from "../core/mpLaunch.js";
 import { executePrepLaunch, prepLaunchSlotParams, DEFAULT_PREP_MIN_PLAYERS } from "../core/prepLaunch.js";
 import { createPrepLobbyController } from "../core/usePrepLobby.js";
 import {
+  bindPrepRemoveDelegation,
+  charCountHtml,
+  bindCharCounter,
+  updateCharCount,
+  patchDynamicListInCard,
   playersReadySectionHtml,
   prepStartSlotHtml,
   refreshPrepReadyUi,
@@ -32,6 +42,7 @@ import {
 import { navigate } from "../core/router.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
 import { bindNav } from "./nav.js";
+import { PLAYER_TEXT_MAX_LEN } from "../../data/playerTextLimits.js";
 
 export function mountDrawItPrep(app) {
   if (!requireLobbyPlay()) return null;
@@ -47,6 +58,66 @@ export function mountDrawItPrep(app) {
     localKey: localName,
     getReadyMap: () => getDrawItSession().ready || {},
   });
+
+  const moderationNotice = getModerationNotice();
+
+  function customWordsListHtml() {
+    const items = listDrawItCustomWords();
+    if (!items.length) return "";
+    const me = getLocalDisplayName();
+    const uid = getLocalParticipantUid() || null;
+    return `<ul class="take-list" id="draw-it-custom-list">${items
+      .map((item) => {
+        const mine = isDrawItCustomWordOwnedBy(item, me, uid);
+        const author = item.author ? escapeHtml(item.author) : "Joueur";
+        return `<li class="take-list__item">
+          <span class="take-list__text">${escapeHtml(item.text)}</span>
+          <span class="muted"> — ${author}</span>
+          ${
+            mine
+              ? `<button type="button" class="btn-link take-list__remove" data-remove-drawit-word="${escapeHtml(item.id)}" aria-label="Supprimer">Supprimer</button>`
+              : ""
+          }
+        </li>`;
+      })
+      .join("")}</ul>`;
+  }
+
+  function renderCustomWordsList() {
+    const card = app.querySelector("#new-drawit-word")?.closest(".card");
+    patchDynamicListInCard(card, {
+      listSelector: ".take-list",
+      listHtml: customWordsListHtml(),
+      insertAfterSelectors: ["#drawit-word-error", ".moderation-notice"],
+    });
+  }
+
+  function showWordError(message) {
+    const el = app.querySelector("#drawit-word-error");
+    if (!el) return;
+    if (!message) {
+      el.textContent = "";
+      el.classList.add("hidden");
+      return;
+    }
+    el.textContent = message;
+    el.classList.remove("hidden");
+  }
+
+  async function onAddCustomWord() {
+    const input = app.querySelector("#new-drawit-word");
+    const res = await addDrawItCustomWord(input?.value || "");
+    if (!res.ok) {
+      showWordError(res.error);
+      return;
+    }
+    if (input) input.value = "";
+    updateCharCount(input, app.querySelector("#new-drawit-word-count"));
+    showWordError("");
+    renderCustomWordsList();
+    refreshCategoryAndRounds();
+    refreshReadySection();
+  }
 
   function drawItStartSlotHtml(allReady, prep) {
     const session = getDrawItSession();
@@ -117,6 +188,9 @@ export function mountDrawItPrep(app) {
   function refreshFromSync() {
     refreshCategoryAndRounds();
     refreshReadySection();
+    if (document.activeElement?.id !== "new-drawit-word") {
+      renderCustomWordsList();
+    }
   }
 
   async function onLaunch({ force = false } = {}) {
@@ -124,6 +198,7 @@ export function mountDrawItPrep(app) {
     const check = validateDrawItPrep({
       selectedCategoryId: session.selectedCategoryId,
       roundCount: session.roundCount,
+      customWords: session.customWords,
     });
     await executePrepLaunch({
       force,
@@ -137,9 +212,11 @@ export function mountDrawItPrep(app) {
       allReadyFn: allDrawItReady,
       poolEmpty: !check.valid,
       validateBeforeLaunch: async () => {
+        const latestSession = getDrawItSession();
         const latest = validateDrawItPrep({
-          selectedCategoryId: getDrawItSession().selectedCategoryId,
-          roundCount: getDrawItSession().roundCount,
+          selectedCategoryId: latestSession.selectedCategoryId,
+          roundCount: latestSession.roundCount,
+          customWords: latestSession.customWords,
         });
         if (!latest.valid) {
           return {
@@ -180,6 +257,20 @@ export function mountDrawItPrep(app) {
     });
 
     bindPrepLaunchButtons(app, { onLaunch });
+
+    app.querySelector("#add-drawit-word")?.addEventListener("click", () => {
+      void onAddCustomWord();
+    });
+    app.querySelector("#new-drawit-word")?.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        void onAddCustomWord();
+      }
+    });
+    bindCharCounter(
+      app.querySelector("#new-drawit-word"),
+      app.querySelector("#new-drawit-word-count")
+    );
   }
 
   function render() {
@@ -223,8 +314,8 @@ export function mountDrawItPrep(app) {
             prep.reason === "invalid_category"
               ? `<p class="hint">Catégorie inconnue - l'hôte doit en choisir une valide.</p>`
               : categoryId === DRAW_IT_CATALOG_ID
-                ? `<p class="hint">${prep.poolSize} mot(s) - tout le catalogue.</p>`
-                : `<p class="hint">${prep.poolSize} mot(s) dans cette catégorie.</p>`
+                ? `<p class="hint">${prep.catalogSize ?? prep.poolSize} mot(s) - tout le catalogue.</p>`
+                : `<p class="hint">${prep.catalogSize ?? prep.poolSize} mot(s) dans cette catégorie.</p>`
           }
         </div>
 
@@ -254,6 +345,19 @@ export function mountDrawItPrep(app) {
           ${!isHost ? `<p class="hint">Seul l'hôte peut modifier les réglages.</p>` : ""}
         </div>
 
+        <div class="card">
+          <label class="field-label" for="new-drawit-word">Mots personnalisés</label>
+          <p class="hint">Tous les joueurs peuvent en ajouter. Ils sont joués en priorité.</p>
+          <div class="join-row">
+            <input type="text" class="field-input join-input" id="new-drawit-word" maxlength="${PLAYER_TEXT_MAX_LEN}" placeholder="Un mot à faire deviner…" />
+            <button type="button" class="btn btn-secondary join-btn" id="add-drawit-word">+</button>
+          </div>
+          ${charCountHtml("new-drawit-word-count")}
+          <p class="moderation-notice">${escapeHtml(moderationNotice)}</p>
+          <p class="auth-error hidden" id="drawit-word-error"></p>
+          ${customWordsListHtml()}
+        </div>
+
         <div class="card" id="draw-it-players">
           ${playersReadySectionHtml(members, session.ready || {})}
         </div>
@@ -269,7 +373,24 @@ export function mountDrawItPrep(app) {
     });
 
     bindEvents();
+    updateCharCount(
+      app.querySelector("#new-drawit-word"),
+      app.querySelector("#new-drawit-word-count")
+    );
   }
+
+  const unbindRemove = bindPrepRemoveDelegation(app, {
+    screenId: "drawit-prep",
+    attr: "data-remove-drawit-word",
+    onRemove: async (id) => {
+      const res = await removeDrawItCustomWord(id);
+      if (!res.ok) showWordError(res.error);
+      else showWordError("");
+      renderCustomWordsList();
+      refreshCategoryAndRounds();
+      refreshReadySection();
+    },
+  });
 
   render();
 
@@ -286,6 +407,7 @@ export function mountDrawItPrep(app) {
 
   return () => {
     prepLobby.dispose();
+    unbindRemove();
     unsub();
   };
 }
