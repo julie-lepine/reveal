@@ -65,6 +65,7 @@ import {
   applyDrawItDurableErase,
   applyDrawItDurableEraseSegments,
   applyDrawItDurableUndo,
+  applyDrawItDurableUndoErase,
   canPersistDrawItStroke,
   sanitizeEraseOperationId,
   sanitizeEraseReplacements,
@@ -612,6 +613,63 @@ export async function commitDrawItUndoStroke(strokeId) {
     }
 
     const applied = applyDrawItDurableUndo(session, strokeId, { uid });
+    if (!applied.ok) return applied;
+    if (!applied.skipped) saveStatePatch({ drawItGame: applied.session });
+    return { ok: true, skipped: Boolean(applied.skipped) };
+  });
+  if (!outcome.ok && outcome.skipped) return { ok: false, reason: "in_flight" };
+  return outcome.value;
+}
+
+export async function commitDrawItUndoErase(eraseOperationId, snapshot = {}) {
+  const outcome = await completedStrokeLock.run(async () => {
+    const session = getDrawItSession();
+    const uid = getSupabaseUserId();
+    const gate = canPersistDrawItStroke(session, uid);
+    if (!gate.ok) return { ok: false, reason: gate.reason };
+    const operationId = sanitizeEraseOperationId(eraseOperationId);
+    if (!operationId) return { ok: true, skipped: true };
+
+    if (isGameSyncActive() && isSupabaseConfigured()) {
+      try {
+        const { broadcastDrawItLiveEraseUndo } = await import("./drawItLive.js");
+        const entry = (Array.isArray(session.editLog) ? session.editLog : []).find(
+          (item) => item?.kind === "erase" && item?.operationId === operationId
+        );
+        broadcastDrawItLiveEraseUndo(session, uid, {
+          operationId,
+          sourceStrokes: snapshot.sourceStrokes || entry?.sourceStrokes,
+          replacementStrokeIds:
+            snapshot.replacementStrokeIds || entry?.replacementStrokeIds,
+        });
+        const { rpcUndoDrawItErase } = await import("./gameSessionRpc.js");
+        const row = await rpcUndoDrawItErase({
+          lobbyId: getState().lobby.id,
+          runId: session.runId,
+          roundIdx: session.roundIdx,
+          canvasEpoch: Number(session.canvasEpoch) || 0,
+          eraseOperationId: operationId,
+        });
+        if (!row) return { ok: false, reason: "not_applied" };
+        await applyDrawItStrokeRow(row);
+        return { ok: true, skipped: false };
+      } catch (error) {
+        try {
+          await refreshGameSession();
+        } catch {
+          /* resync best-effort */
+        }
+        const code = String(error?.message || error).match(/DRAWIT_[A-Z_]+/)?.[0];
+        return { ok: false, reason: (code || "rpc_failed").toLowerCase() };
+      }
+    }
+
+    const applied = applyDrawItDurableUndoErase(session, operationId, {
+      uid,
+      canvasEpoch: Number(session.canvasEpoch) || 0,
+      runId: session.runId,
+      roundIdx: session.roundIdx,
+    });
     if (!applied.ok) return applied;
     if (!applied.skipped) saveStatePatch({ drawItGame: applied.session });
     return { ok: true, skipped: Boolean(applied.skipped) };

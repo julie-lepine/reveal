@@ -8,12 +8,18 @@ import {
   whenLobbyRealtimeReady,
 } from "./supabaseLobby.js";
 import { onScreenChange } from "./router.js";
-import { canDrawOnDrawItCanvas, sanitizeEraseStrokeIds, sanitizeEraseReplacements, sanitizeEraseOperationId } from "./drawItStrokes.js";
+import {
+  canDrawOnDrawItCanvas,
+  completedDrawItStrokesFromSession,
+  sanitizeEraseStrokeIds,
+  sanitizeEraseReplacements,
+  sanitizeEraseOperationId,
+} from "./drawItStrokes.js";
 
 export const DRAW_IT_LIVE_EVENT = "drawit";
 export const DRAW_IT_LIVE_CHUNK_MS = 100;
 export const DRAW_IT_LIVE_SEND_RELEASE_MS = 250;
-const ALLOWED_TYPES = new Set(["start", "chunk", "end", "clear", "undo", "erase", "erase_segments"]);
+const ALLOWED_TYPES = new Set(["start", "chunk", "end", "clear", "undo", "erase", "erase_segments", "erase_undo"]);
 const FORBIDDEN_KEYS = [
   "lobbyId",
   "game",
@@ -34,6 +40,7 @@ const TYPE_KEYS = {
   undo: [...COMMON_KEYS, "strokeId"],
   erase: [...COMMON_KEYS, "strokeIds"],
   erase_segments: [...COMMON_KEYS, "operationId", "replacements"],
+  erase_undo: [...COMMON_KEYS, "operationId", "restoredStrokes", "removedFragmentIds"],
 };
 
 let activeChannel = null;
@@ -96,6 +103,7 @@ export function createDrawItLiveState(session = {}) {
     identity: identityFrom(session),
     remoteInProgress: {},
     remoteCompleted: {},
+    appliedEraseUndoOpIds: [],
   };
 }
 
@@ -132,6 +140,17 @@ function validEraseSegmentReplacements(replacements, operationId) {
   return clean.length === replacements.length;
 }
 
+function validEraseUndoPayload(payload) {
+  if (!sanitizeEraseOperationId(payload?.operationId)) return false;
+  const restored = completedDrawItStrokesFromSession({
+    strokes: payload?.restoredStrokes,
+  });
+  if (!restored.length || restored.length > 25) return false;
+  if (!Array.isArray(payload?.removedFragmentIds)) return false;
+  const removed = sanitizeEraseStrokeIds(payload.removedFragmentIds);
+  return removed.length === payload.removedFragmentIds.length;
+}
+
 function validCommonPayload(payload, session, liveIdentity = null) {
   if (!payload || typeof payload !== "object") return false;
   if (String(payload.runId || "") !== String(session?.runId || "")) return false;
@@ -154,6 +173,9 @@ function validCommonPayload(payload, session, liveIdentity = null) {
   if (payload.type === "erase") return validEraseStrokeIds(payload.strokeIds);
   if (payload.type === "erase_segments") {
     return validEraseSegmentReplacements(payload.replacements, payload.operationId);
+  }
+  if (payload.type === "erase_undo") {
+    return validEraseUndoPayload(payload);
   }
   if (typeof payload.strokeId !== "string" || !payload.strokeId.trim()) return false;
   if (payload.strokeId.length > 128) return false;
@@ -234,6 +256,54 @@ export function applyDrawItLiveEvent(state, payload, session = {}) {
         action: "erase_segments",
         operationId: sanitizeEraseOperationId(payload.operationId),
         replacements,
+      },
+    };
+  }
+
+  if (payload.type === "erase_undo") {
+    const operationId = sanitizeEraseOperationId(payload.operationId);
+    const appliedOps = Array.isArray(next.appliedEraseUndoOpIds)
+      ? next.appliedEraseUndoOpIds
+      : [];
+    if (appliedOps.includes(operationId)) {
+      return { applied: true, reason: "duplicate", state: next, delta: null };
+    }
+    const restoredStrokes = completedDrawItStrokesFromSession({
+      strokes: payload.restoredStrokes,
+    });
+    const removedFragmentIds = sanitizeEraseStrokeIds(payload.removedFragmentIds);
+    const inProgress = { ...next.remoteInProgress };
+    const completed = { ...next.remoteCompleted };
+    for (const id of removedFragmentIds) {
+      delete inProgress[id];
+      delete completed[id];
+    }
+    for (const stroke of restoredStrokes) {
+      delete inProgress[stroke.strokeId];
+      completed[stroke.strokeId] = {
+        strokeId: stroke.strokeId,
+        points: stroke.points,
+        color: stroke.color,
+        width: stroke.width,
+        lastSeq: stroke.seq,
+      };
+    }
+    next = {
+      ...next,
+      remoteInProgress: inProgress,
+      remoteCompleted: completed,
+      appliedEraseUndoOpIds: [...appliedOps, operationId].slice(-32),
+    };
+    return {
+      applied: true,
+      reason: null,
+      state: next,
+      delta: {
+        type: "replay",
+        action: "erase_undo",
+        operationId,
+        restoredStrokes,
+        removedFragmentIds,
       },
     };
   }
@@ -344,6 +414,8 @@ export function buildDrawItLivePayload(type, {
   points,
   operationId,
   replacements,
+  restoredStrokes,
+  removedFragmentIds,
 } = {}) {
   const base = payloadBase(type, session, uid);
   if (type === "clear") return base;
@@ -355,6 +427,14 @@ export function buildDrawItLivePayload(type, {
       ...base,
       operationId: sanitizeEraseOperationId(operationId),
       replacements: sanitizeEraseReplacements(replacements),
+    };
+  }
+  if (type === "erase_undo") {
+    return {
+      ...base,
+      operationId: sanitizeEraseOperationId(operationId),
+      restoredStrokes: completedDrawItStrokesFromSession({ strokes: restoredStrokes }),
+      removedFragmentIds: sanitizeEraseStrokeIds(removedFragmentIds),
     };
   }
   const id = String(strokeId || stroke?.strokeId || "");
@@ -724,6 +804,28 @@ export function broadcastDrawItLiveEraseSegments(session, uid, mutation) {
       uid,
       operationId,
       replacements,
+    })
+  );
+  return true;
+}
+
+export function broadcastDrawItLiveEraseUndo(session, uid, mutation) {
+  if (!canEmitDrawItLive(session, uid)) return false;
+  const operationId = sanitizeEraseOperationId(mutation?.operationId);
+  const restoredStrokes = completedDrawItStrokesFromSession({
+    strokes: mutation?.restoredStrokes || mutation?.sourceStrokes,
+  });
+  const removedFragmentIds = sanitizeEraseStrokeIds(
+    mutation?.removedFragmentIds || mutation?.replacementStrokeIds
+  );
+  if (!operationId || !restoredStrokes.length) return false;
+  void sendPayload(
+    buildDrawItLivePayload("erase_undo", {
+      session,
+      uid,
+      operationId,
+      restoredStrokes,
+      removedFragmentIds,
     })
   );
   return true;

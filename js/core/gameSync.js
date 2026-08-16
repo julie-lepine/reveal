@@ -125,6 +125,7 @@ import {
 import {
   completedDrawItStrokesFromSession,
   mergeDrawItDurableSnapshot,
+  sanitizeDrawItEditLog,
 } from "./drawItStrokes.js";
 import {
   stripCustomRosterTopicsFromGenericPatch,
@@ -1424,12 +1425,16 @@ function mergeDrawItGameLocal(local, remote) {
     merged.strokeSeq = remote.strokeSeq ?? 0;
     merged.canvasEpoch = remote.canvasEpoch ?? 0;
     merged.suppressedStrokeIds = [];
+    merged.editLog = [];
+    merged.eraseOpIds = [];
   } else {
     const snapshot = mergeDrawItDurableSnapshot(local, remote);
     merged.strokes = snapshot.strokes;
     merged.strokeSeq = snapshot.strokeSeq;
     merged.canvasEpoch = snapshot.canvasEpoch;
     merged.suppressedStrokeIds = snapshot.suppressedStrokeIds;
+    merged.editLog = snapshot.editLog || [];
+    merged.eraseOpIds = snapshot.eraseOpIds || [];
   }
   return merged;
 }
@@ -2558,6 +2563,10 @@ export function drawItToRemote(session) {
     canvasEpoch: session.canvasEpoch ?? 0,
     strokeSeq: session.strokeSeq ?? 0,
     strokes: completedDrawItStrokesFromSession(session),
+    editLog: sanitizeDrawItEditLog(session.editLog, session.canvasEpoch),
+    eraseOpIds: Array.isArray(session.eraseOpIds)
+      ? session.eraseOpIds.map(String).filter(Boolean).slice(-32)
+      : [],
   };
 }
 
@@ -2594,6 +2603,10 @@ export function drawItFromRemote(remote) {
     canvasEpoch: remote.canvasEpoch ?? 0,
     strokeSeq: remote.strokeSeq ?? 0,
     strokes: completedDrawItStrokesFromSession(remote),
+    editLog: sanitizeDrawItEditLog(remote.editLog, remote.canvasEpoch),
+    eraseOpIds: Array.isArray(remote.eraseOpIds)
+      ? remote.eraseOpIds.map(String).filter(Boolean).slice(-32)
+      : [],
   };
 }
 

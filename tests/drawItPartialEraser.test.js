@@ -48,6 +48,7 @@ const {
   selectDrawItBrushTool,
   splitStrokeByErasePath,
   undoLastCompletedDrawItStroke,
+  undoLastDrawItEdit,
 } = strokes;
 
 function session(extra = {}) {
@@ -410,22 +411,19 @@ describe("Draw it ! gomme partielle — live / durable / recap", () => {
     assert.ok(merged.strokes.length >= 1);
   });
 
-  it("S. Undo après gomme partielle retire le dernier fragment, sans restaurer le milieu", () => {
+  it("S. Undo après gomme partielle restaure le stroke original", () => {
     const line = stroke("s1");
+    const mutation = eraseMiddle(line);
     const board = applyDrawItBoardEraseSegments(
       { ...createEmptyDrawItBoard(), strokes: [line] },
-      eraseMiddle(line).replacements
+      mutation.replacements,
+      { operationId: mutation.operationId }
     );
     assert.ok(board.strokes.length >= 2);
-    const undone = undoLastCompletedDrawItStroke(board);
-    assert.equal(undone.strokes.length, board.strokes.length - 1);
-    assert.equal(undone.strokes.some((entry) => entry.strokeId === "s1"), false);
-    for (const entry of undone.strokes) {
-      assert.equal(
-        entry.points.some((point) => Math.abs(point[0] - 0.5) < 0.02),
-        false
-      );
-    }
+    const undone = undoLastDrawItEdit(board);
+    assert.equal(undone.strokes.length, 1);
+    assert.equal(undone.strokes[0].strokeId, "s1");
+    assert.deepEqual(undone.strokes[0].points, line.points);
   });
 });
 

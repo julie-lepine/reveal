@@ -486,7 +486,7 @@ describe("Draw it ! T9 — guards / isolation / régressions", () => {
     const source = read("js/core/drawItLive.js");
     assert.match(source, /DRAW_IT_LIVE_CHUNK_MS = 100/);
     assert.match(source, /drawit:\$\{intent\.lobbyId\}/);
-    assert.match(source, /ALLOWED_TYPES = new Set\(\["start", "chunk", "end", "clear", "undo", "erase", "erase_segments"\]\)/);
+    assert.match(source, /ALLOWED_TYPES = new Set\(\["start", "chunk", "end", "clear", "undo", "erase", "erase_segments", "erase_undo"\]\)/);
     assert.doesNotMatch(read("js/games/drawIt.js"), /input\.focus\(/);
   });
 
@@ -681,7 +681,7 @@ describe("Draw it ! T9 — anti-résurrection hydrate", () => {
     const source = read("js/core/drawItLive.js");
     assert.match(source, /DRAW_IT_LIVE_CHUNK_MS = 100/);
     assert.match(source, /broadcast: \{ self: false/);
-    assert.match(source, /ALLOWED_TYPES = new Set\(\["start", "chunk", "end", "clear", "undo", "erase", "erase_segments"\]\)/);
+    assert.match(source, /ALLOWED_TYPES = new Set\(\["start", "chunk", "end", "clear", "undo", "erase", "erase_segments", "erase_undo"\]\)/);
     const s = session();
     let state = live.createDrawItLiveState(s);
     state = live.applyDrawItLiveEvent(

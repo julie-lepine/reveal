@@ -6,6 +6,7 @@ import {
   commitDrawItComplete,
   commitDrawItCompletedStroke,
   commitDrawItUndoStroke,
+  commitDrawItUndoErase,
   commitDrawItClearCanvas,
   commitDrawItEraseSegments,
   loadLocalDrawItPrivateWord,
@@ -49,6 +50,7 @@ import {
   applyDrawItBoardUndo,
   applyDrawItBoardErase,
   applyDrawItBoardEraseSegments,
+  applyDrawItBoardUndoErase,
   absorbDrawItLiveCompletedStroke,
   createDrawItBoardFromSession,
   createDrawItBrush,
@@ -61,8 +63,10 @@ import {
   selectDrawItBrushTool,
   DRAW_IT_TOOL_WIDTHS,
   maybeResetDrawItBoard,
+  peekLastUndoableDrawItEdit,
   resolveDrawItToolColor,
-  undoLastCompletedDrawItStroke,
+  undoLastDrawItEdit,
+  DRAW_IT_EDIT_ERASE,
 } from "../core/drawItStrokes.js";
 import {
   buildDrawItRoundRecap,
@@ -123,7 +127,16 @@ export function mountDrawIt(app) {
       board = applyDrawItBoardErase(board, delta.strokeIds);
       rememberSuppressedStrokes(board);
     } else if (delta?.action === "erase_segments" && Array.isArray(delta.replacements)) {
-      board = applyDrawItBoardEraseSegments(board, delta.replacements);
+      board = applyDrawItBoardEraseSegments(board, delta.replacements, {
+        operationId: delta.operationId,
+      });
+      rememberSuppressedStrokes(board);
+    } else if (delta?.action === "erase_undo") {
+      board = applyDrawItBoardUndoErase(board, {
+        operationId: delta.operationId,
+        sourceStrokes: delta.restoredStrokes,
+        replacementStrokeIds: delta.removedFragmentIds,
+      });
       rememberSuppressedStrokes(board);
     } else if (delta?.action === "clear") {
       board = applyDrawItBoardClear(board, delta.canvasEpoch);
@@ -674,17 +687,31 @@ export function mountDrawIt(app) {
       if (!isLocalDrawer(getDrawItSession())) return;
       if (target.id === "draw-it-undo") {
         if (toolsBusy()) return;
-        if (!(board.strokes || []).length) {
-          canvasCtl?.forceIdle?.();
+        if (board.currentStroke) return;
+        const last = peekLastUndoableDrawItEdit(board.editLog, board.canvasEpoch);
+        if (!last) {
+          if (!(board.strokes || []).length) {
+            canvasCtl?.forceIdle?.();
+            syncToolButtons();
+            return;
+          }
+          const lastStroke = board.strokes[board.strokes.length - 1];
+          board = undoLastDrawItEdit(board);
+          rememberSuppressedStrokes(board);
+          canvasCtl?.paint();
           syncToolButtons();
+          if (lastStroke?.strokeId) void commitDrawItUndoStroke(lastStroke.strokeId);
           return;
         }
-        const last = board.strokes[board.strokes.length - 1];
-        board = undoLastCompletedDrawItStroke(board);
+        board = undoLastDrawItEdit(board);
         rememberSuppressedStrokes(board);
         canvasCtl?.paint();
         syncToolButtons();
-        if (last?.strokeId) void commitDrawItUndoStroke(last.strokeId);
+        if (last.kind === DRAW_IT_EDIT_ERASE) {
+          void commitDrawItUndoErase(last.operationId, last);
+        } else if (last.strokeId) {
+          void commitDrawItUndoStroke(last.strokeId);
+        }
         return;
       }
       if (target.id === "draw-it-clear") {

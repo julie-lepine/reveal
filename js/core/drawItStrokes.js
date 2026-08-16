@@ -12,6 +12,9 @@ export const DRAW_IT_STROKE_MAX_POINTS = 4096;
 export const DRAW_IT_DURABLE_STROKE_MAX_POINTS = 80;
 export const DRAW_IT_STROKE_MAX_COUNT = 25;
 export const DRAW_IT_STROKE_MIN_DIST = 0.012;
+export const DRAW_IT_EDIT_LOG_MAX = 32;
+export const DRAW_IT_EDIT_DRAW = "draw";
+export const DRAW_IT_EDIT_ERASE = "erase";
 export const DRAW_IT_DEFAULT_COLOR = "#f4f4f5";
 export const DRAW_IT_DEFAULT_WIDTH = 4;
 export const DRAW_IT_TOOL_DRAW = "draw";
@@ -224,6 +227,161 @@ export function createDrawItEraseOperationId() {
   return `e:${random}`.slice(0, 64);
 }
 
+function editLogKey(entry) {
+  if (!entry) return "";
+  if (entry.kind === DRAW_IT_EDIT_ERASE) {
+    return `erase:${entry.operationId || ""}`;
+  }
+  return `draw:${entry.strokeId || ""}`;
+}
+
+export function sanitizeDrawItEditLog(editLog, canvasEpoch = null) {
+  const epoch =
+    canvasEpoch == null ? null : Number.isInteger(Number(canvasEpoch)) ? Number(canvasEpoch) : null;
+  const out = [];
+  const seen = new Set();
+  for (const raw of Array.isArray(editLog) ? editLog : []) {
+    if (!raw || typeof raw !== "object") continue;
+    const entryEpoch = Number(raw.canvasEpoch);
+    const resolvedEpoch = Number.isInteger(entryEpoch) && entryEpoch >= 0 ? entryEpoch : 0;
+    if (epoch != null && resolvedEpoch !== epoch) continue;
+    if (raw.kind === DRAW_IT_EDIT_ERASE) {
+      const operationId = sanitizeEraseOperationId(raw.operationId);
+      if (!operationId) continue;
+      const key = `erase:${operationId}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const sourceStrokes = completedDrawItStrokesFromSession({
+        strokes: raw.sourceStrokes,
+      });
+      const replacementStrokeIds = sanitizeEraseStrokeIds(
+        raw.replacementStrokeIds,
+        DRAW_IT_STROKE_MAX_COUNT
+      );
+      out.push({
+        kind: DRAW_IT_EDIT_ERASE,
+        operationId,
+        canvasEpoch: resolvedEpoch,
+        sourceStrokes,
+        replacementStrokeIds,
+        undone: Boolean(raw.undone),
+      });
+    } else if (raw.kind === DRAW_IT_EDIT_DRAW) {
+      const strokeId = String(raw.strokeId || "").trim();
+      if (!strokeId || strokeId.length > 128) continue;
+      const key = `draw:${strokeId}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push({
+        kind: DRAW_IT_EDIT_DRAW,
+        strokeId,
+        canvasEpoch: resolvedEpoch,
+        undone: Boolean(raw.undone),
+      });
+    }
+    if (out.length >= DRAW_IT_EDIT_LOG_MAX) break;
+  }
+  return out.slice(-DRAW_IT_EDIT_LOG_MAX);
+}
+
+export function appendDrawItEditLog(editLog, entry, canvasEpoch) {
+  const epoch = Number(canvasEpoch);
+  const resolvedEpoch = Number.isInteger(epoch) && epoch >= 0 ? epoch : 0;
+  const next = sanitizeDrawItEditLog(editLog, resolvedEpoch);
+  const sanitized = sanitizeDrawItEditLog([{ ...entry, canvasEpoch: resolvedEpoch }], resolvedEpoch)[0];
+  if (!sanitized) return next;
+  const key = editLogKey(sanitized);
+  const existing = next.find((item) => editLogKey(item) === key);
+  if (existing) {
+    if (sanitized.undone && !existing.undone) {
+      return next.map((item) => (editLogKey(item) === key ? { ...item, undone: true } : item));
+    }
+    return next;
+  }
+  return [...next, sanitized].slice(-DRAW_IT_EDIT_LOG_MAX);
+}
+
+export function markDrawItEditUndone(editLog, predicate, canvasEpoch) {
+  const epoch = Number(canvasEpoch);
+  const resolvedEpoch = Number.isInteger(epoch) && epoch >= 0 ? epoch : 0;
+  return sanitizeDrawItEditLog(editLog, resolvedEpoch).map((entry) =>
+    predicate(entry) ? { ...entry, undone: true } : entry
+  );
+}
+
+export function peekLastUndoableDrawItEdit(editLog, canvasEpoch) {
+  const list = sanitizeDrawItEditLog(editLog, canvasEpoch);
+  for (let i = list.length - 1; i >= 0; i -= 1) {
+    if (!list[i].undone) return list[i];
+  }
+  return null;
+}
+
+export function replacementIdsFromUndoneErases(editLog, canvasEpoch) {
+  const ids = [];
+  for (const entry of sanitizeDrawItEditLog(editLog, canvasEpoch)) {
+    if (entry.kind !== DRAW_IT_EDIT_ERASE || !entry.undone) continue;
+    ids.push(...entry.replacementStrokeIds);
+  }
+  return ids;
+}
+
+export function restoredIdsFromUndoneErases(editLog, canvasEpoch) {
+  const ids = [];
+  for (const entry of sanitizeDrawItEditLog(editLog, canvasEpoch)) {
+    if (entry.kind !== DRAW_IT_EDIT_ERASE || !entry.undone) continue;
+    ids.push(...entry.sourceStrokes.map((stroke) => stroke.strokeId));
+  }
+  return ids;
+}
+
+export function mergeDrawItEditLog(localLog, remoteLog, canvasEpoch) {
+  const epoch = Number(canvasEpoch) || 0;
+  const local = sanitizeDrawItEditLog(localLog, epoch);
+  const remote = sanitizeDrawItEditLog(remoteLog, epoch);
+  const byKey = new Map();
+  function absorb(entry) {
+    const key = editLogKey(entry);
+    if (!key.endsWith(":") && key !== "draw:" && key !== "erase:") {
+      const prev = byKey.get(key);
+      if (!prev) {
+        byKey.set(key, entry);
+        return;
+      }
+      const sourceStrokes =
+        entry.sourceStrokes?.length && !prev.sourceStrokes?.length
+          ? entry.sourceStrokes
+          : prev.sourceStrokes;
+      const replacementStrokeIds =
+        entry.replacementStrokeIds?.length && !prev.replacementStrokeIds?.length
+          ? entry.replacementStrokeIds
+          : prev.replacementStrokeIds;
+      byKey.set(key, {
+        ...prev,
+        ...entry,
+        undone: Boolean(prev.undone || entry.undone),
+        sourceStrokes: sourceStrokes || prev.sourceStrokes || [],
+        replacementStrokeIds: replacementStrokeIds || prev.replacementStrokeIds || [],
+      });
+    }
+  }
+  const preferLocalOrder = local.length >= remote.length;
+  for (const entry of preferLocalOrder ? remote : local) absorb(entry);
+  for (const entry of preferLocalOrder ? local : remote) absorb(entry);
+  const orderSource = preferLocalOrder ? local : remote;
+  const other = preferLocalOrder ? remote : local;
+  const ordered = [];
+  const seen = new Set();
+  for (const entry of [...orderSource, ...other]) {
+    const key = editLogKey(entry);
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    const merged = byKey.get(key);
+    if (merged) ordered.push(merged);
+  }
+  return ordered.slice(-DRAW_IT_EDIT_LOG_MAX);
+}
+
 function densifyPolyline(points, step) {
   const list = Array.isArray(points) ? points.filter(Boolean) : [];
   if (!list.length) return [];
@@ -424,6 +582,7 @@ export function createEmptyDrawItBoard({
     strokes: [],
     currentStroke: null,
     suppressedStrokeIds: [],
+    editLog: [],
   };
 }
 
@@ -530,6 +689,7 @@ export function applyDrawItDurableAppend(session = {}, stroke, { uid } = {}) {
   if (existing.length >= DRAW_IT_STROKE_MAX_COUNT) {
     return { ok: false, reason: "stroke_cap", session };
   }
+  const epoch = Number(session.canvasEpoch) || 0;
   return {
     ok: true,
     skipped: false,
@@ -537,6 +697,11 @@ export function applyDrawItDurableAppend(session = {}, stroke, { uid } = {}) {
       ...session,
       strokes: [...existing, durable],
       strokeSeq: Math.max(Number(session.strokeSeq) || 0, durable.seq),
+      editLog: appendDrawItEditLog(
+        session.editLog,
+        { kind: DRAW_IT_EDIT_DRAW, strokeId: durable.strokeId, canvasEpoch: epoch },
+        epoch
+      ),
     },
   };
 }
@@ -551,10 +716,19 @@ export function applyDrawItDurableUndo(session = {}, strokeId, { uid } = {}) {
   if (strokes.length === existing.length) {
     return { ok: true, skipped: true, session };
   }
+  const epoch = Number(session.canvasEpoch) || 0;
   return {
     ok: true,
     skipped: false,
-    session: { ...session, strokes },
+    session: {
+      ...session,
+      strokes,
+      editLog: markDrawItEditUndone(
+        session.editLog,
+        (entry) => entry.kind === DRAW_IT_EDIT_DRAW && entry.strokeId === id,
+        epoch
+      ),
+    },
   };
 }
 
@@ -607,8 +781,15 @@ export function applyDrawItDurableEraseSegments(
   if (!list.length) return { ok: true, skipped: true, session };
   const existing = completedDrawItStrokesFromSession(session);
   const board = applyDrawItBoardEraseSegments(
-    { strokes: existing, suppressedStrokeIds: session.suppressedStrokeIds || [], strokeSeq: session.strokeSeq },
-    list
+    {
+      strokes: existing,
+      suppressedStrokeIds: session.suppressedStrokeIds || [],
+      strokeSeq: session.strokeSeq,
+      canvasEpoch: epoch,
+      editLog: session.editLog,
+    },
+    list,
+    { operationId: op }
   );
   const same =
     board.strokes.length === existing.length &&
@@ -622,7 +803,62 @@ export function applyDrawItDurableEraseSegments(
       strokes: board.strokes,
       strokeSeq: board.strokeSeq,
       suppressedStrokeIds: board.suppressedStrokeIds,
-      eraseOpIds: op ? [...appliedOps, op].slice(-32) : appliedOps,
+      eraseOpIds: op ? [...appliedOps, op].slice(-DRAW_IT_EDIT_LOG_MAX) : appliedOps,
+      editLog: board.editLog,
+    },
+  };
+}
+
+export function applyDrawItDurableUndoErase(
+  session = {},
+  eraseOperationId,
+  { uid, canvasEpoch, runId, roundIdx } = {}
+) {
+  const gate = canPersistDrawItStroke(session, uid);
+  if (!gate.ok) return { ok: false, reason: gate.reason, session };
+  if (runId != null && String(runId) !== String(session.runId || "")) {
+    return { ok: false, reason: "stale_run", session };
+  }
+  if (roundIdx != null && Number(roundIdx) !== Number(session.roundIdx)) {
+    return { ok: false, reason: "stale_round", session };
+  }
+  const epoch = Number(session.canvasEpoch) || 0;
+  if (canvasEpoch != null && Number(canvasEpoch) !== epoch) {
+    return { ok: false, reason: "stale_epoch", session };
+  }
+  const op = sanitizeEraseOperationId(eraseOperationId);
+  if (!op) return { ok: false, reason: "invalid_stroke", session };
+  const editLog = sanitizeDrawItEditLog(session.editLog, epoch);
+  const entry = editLog.find(
+    (item) => item.kind === DRAW_IT_EDIT_ERASE && item.operationId === op
+  );
+  if (!entry) return { ok: false, reason: "stale_epoch", session };
+  if (entry.undone) {
+    return { ok: true, skipped: true, session };
+  }
+  const last = peekLastUndoableDrawItEdit(editLog, epoch);
+  if (!last || last.kind !== DRAW_IT_EDIT_ERASE || last.operationId !== op) {
+    return { ok: false, reason: "not_last_edit", session };
+  }
+  const board = applyDrawItBoardUndoErase(
+    {
+      strokes: completedDrawItStrokesFromSession(session),
+      suppressedStrokeIds: session.suppressedStrokeIds || [],
+      strokeSeq: session.strokeSeq,
+      canvasEpoch: epoch,
+      editLog,
+    },
+    entry
+  );
+  return {
+    ok: true,
+    skipped: false,
+    session: {
+      ...session,
+      strokes: board.strokes,
+      strokeSeq: board.strokeSeq,
+      suppressedStrokeIds: board.suppressedStrokeIds,
+      editLog: board.editLog,
     },
   };
 }
@@ -642,6 +878,8 @@ export function applyDrawItDurableClear(session = {}, { uid, canvasEpoch } = {})
       canvasEpoch: epoch + 1,
       strokes: [],
       strokeSeq: 0,
+      editLog: [],
+      eraseOpIds: [],
     },
   };
 }
@@ -674,15 +912,43 @@ function strokesForCanvasEpoch(session = {}, epoch = Number(session.canvasEpoch)
   );
 }
 
+function suppressedIdsFromEditLog(editLog, canvasEpoch) {
+  const ids = [];
+  for (const entry of sanitizeDrawItEditLog(editLog, canvasEpoch)) {
+    if (entry.kind !== DRAW_IT_EDIT_ERASE) continue;
+    if (entry.undone) {
+      ids.push(...entry.replacementStrokeIds);
+    } else {
+      ids.push(...entry.sourceStrokes.map((stroke) => stroke.strokeId));
+    }
+  }
+  return ids;
+}
+
+function applyEditLogSuppression(suppressed, editLog, canvasEpoch) {
+  for (const id of suppressedIdsFromEditLog(editLog, canvasEpoch)) suppressed.add(id);
+  for (const id of restoredIdsFromUndoneErases(editLog, canvasEpoch)) suppressed.delete(id);
+  return suppressed;
+}
+
 export function createDrawItBoardFromSession(session = {}) {
   const board = createEmptyDrawItBoard(session);
-  const suppressed = [...suppressedStrokeIdSet(session)];
+  const editLog = sanitizeDrawItEditLog(session.editLog, board.canvasEpoch);
+  const suppressed = applyEditLogSuppression(
+    suppressedStrokeIdSet(session),
+    editLog,
+    board.canvasEpoch
+  );
   return {
     ...board,
     strokeSeq: Math.max(0, Number(session.strokeSeq) || 0),
-    strokes: strokesForCanvasEpoch(session, board.canvasEpoch),
+    strokes: strokesForCanvasEpoch(
+      { ...session, suppressedStrokeIds: [...suppressed] },
+      board.canvasEpoch
+    ),
     currentStroke: null,
-    suppressedStrokeIds: suppressed,
+    suppressedStrokeIds: [...suppressed],
+    editLog,
   };
 }
 
@@ -719,6 +985,7 @@ export function mergeDrawItDurableSnapshot(local = {}, remote = {}) {
   ]);
 
   if (remoteEpoch > localEpoch) {
+    const editLog = sanitizeDrawItEditLog(remote.editLog, remoteEpoch);
     const strokes = strokesForCanvasEpoch(
       { ...remote, suppressedStrokeIds: [] },
       remoteEpoch
@@ -728,10 +995,16 @@ export function mergeDrawItDurableSnapshot(local = {}, remote = {}) {
       strokes,
       strokeSeq: Math.max(Number(remote.strokeSeq) || 0, strokes.length),
       suppressedStrokeIds: [],
+      editLog,
+      eraseOpIds: Array.isArray(remote.eraseOpIds)
+        ? remote.eraseOpIds.slice(-DRAW_IT_EDIT_LOG_MAX)
+        : [],
     };
   }
 
   if (remoteEpoch < localEpoch) {
+    const editLog = sanitizeDrawItEditLog(local.editLog, localEpoch);
+    applyEditLogSuppression(suppressed, editLog, localEpoch);
     const strokes = strokesForCanvasEpoch(
       { ...local, suppressedStrokeIds: [...suppressed] },
       localEpoch
@@ -745,8 +1018,15 @@ export function mergeDrawItDurableSnapshot(local = {}, remote = {}) {
         strokes.length
       ),
       suppressedStrokeIds: [...suppressed],
+      editLog,
+      eraseOpIds: Array.isArray(local.eraseOpIds)
+        ? local.eraseOpIds.slice(-DRAW_IT_EDIT_LOG_MAX)
+        : [],
     };
   }
+
+  const editLog = mergeDrawItEditLog(local.editLog, remote.editLog, localEpoch);
+  applyEditLogSuppression(suppressed, editLog, localEpoch);
 
   const byId = new Map();
   for (const stroke of [
@@ -758,10 +1038,20 @@ export function mergeDrawItDurableSnapshot(local = {}, remote = {}) {
     if (!byId.has(stroke.strokeId)) byId.set(stroke.strokeId, stroke);
   }
   const strokes = [...byId.values()].slice(-DRAW_IT_STROKE_MAX_COUNT);
-  const stillSuppressed = [...suppressed].filter((id) =>
-    [...completedDrawItStrokesFromSession(local), ...completedDrawItStrokesFromSession(remote)]
-      .some((stroke) => stroke.strokeId === id)
+  const allStrokes = [
+    ...completedDrawItStrokesFromSession(local),
+    ...completedDrawItStrokesFromSession(remote),
+  ];
+  const stillSuppressed = [...suppressed].filter(
+    (id) =>
+      allStrokes.some((stroke) => stroke.strokeId === id) || suppressed.has(id)
   );
+  const eraseOpIds = [
+    ...new Set([
+      ...(Array.isArray(local.eraseOpIds) ? local.eraseOpIds : []),
+      ...(Array.isArray(remote.eraseOpIds) ? remote.eraseOpIds : []),
+    ]),
+  ].slice(-DRAW_IT_EDIT_LOG_MAX);
   return {
     canvasEpoch: localEpoch,
     strokes,
@@ -771,6 +1061,8 @@ export function mergeDrawItDurableSnapshot(local = {}, remote = {}) {
       strokes.length
     ),
     suppressedStrokeIds: stillSuppressed,
+    editLog,
+    eraseOpIds,
   };
 }
 
@@ -825,6 +1117,7 @@ export function applyDrawItBoardUndo(board, strokeId) {
   if (!board) return createEmptyDrawItBoard();
   const id = String(strokeId || "").trim();
   if (!id) return board;
+  const epoch = Number(board.canvasEpoch) || 0;
   const suppressed = [...new Set([...(board.suppressedStrokeIds || []), id])];
   return {
     ...board,
@@ -832,6 +1125,11 @@ export function applyDrawItBoardUndo(board, strokeId) {
     currentStroke:
       board.currentStroke?.strokeId === id ? null : board.currentStroke,
     suppressedStrokeIds: suppressed,
+    editLog: markDrawItEditUndone(
+      board.editLog,
+      (entry) => entry.kind === DRAW_IT_EDIT_DRAW && entry.strokeId === id,
+      epoch
+    ),
   };
 }
 
@@ -847,18 +1145,36 @@ export function applyDrawItBoardErase(board, strokeIds) {
   return { ...next, currentStroke: null };
 }
 
-export function applyDrawItBoardEraseSegments(board, replacements) {
+export function applyDrawItBoardEraseSegments(board, replacements, { operationId } = {}) {
   if (!board) return createEmptyDrawItBoard();
   const list = sanitizeEraseReplacements(replacements);
   if (!list.length) {
     return { ...board, currentStroke: null };
   }
+  const epoch = Number(board.canvasEpoch) || 0;
+  const op = sanitizeEraseOperationId(operationId);
+  if (op) {
+    const existingOp = sanitizeDrawItEditLog(board.editLog, epoch).find(
+      (entry) => entry.kind === DRAW_IT_EDIT_ERASE && entry.operationId === op
+    );
+    if (existingOp) {
+      return existingOp.undone ? board : { ...board, currentStroke: null };
+    }
+  }
   let strokes = Array.isArray(board.strokes) ? [...board.strokes] : [];
   const suppressed = new Set(board.suppressedStrokeIds || []);
+  const sourceStrokes = [];
+  const replacementStrokeIds = [];
   for (const entry of list) {
     const idx = strokes.findIndex((stroke) => stroke.strokeId === entry.sourceStrokeId);
     if (idx < 0) continue;
+    const source = sanitizeCompletedStroke(strokes[idx]) || strokes[idx];
+    if (source) sourceStrokes.push(source);
     suppressed.add(entry.sourceStrokeId);
+    for (const fragment of entry.fragments) {
+      const id = String(fragment?.strokeId || "").trim();
+      if (id) replacementStrokeIds.push(id);
+    }
     strokes = [
       ...strokes.slice(0, idx),
       ...entry.fragments,
@@ -869,12 +1185,94 @@ export function applyDrawItBoardEraseSegments(board, replacements) {
     strokes = strokes.slice(0, DRAW_IT_STROKE_MAX_COUNT);
   }
   const seqs = strokes.map((stroke) => Number(stroke.seq) || 0);
-  return {
+  const next = {
     ...board,
     strokes,
     currentStroke: null,
     suppressedStrokeIds: [...new Set([...(board.suppressedStrokeIds || []), ...suppressed])],
     strokeSeq: Math.max(Number(board.strokeSeq) || 0, ...seqs, 0),
+  };
+  if (!op || !sourceStrokes.length) return next;
+  return {
+    ...next,
+    editLog: appendDrawItEditLog(
+      board.editLog,
+      {
+        kind: DRAW_IT_EDIT_ERASE,
+        operationId: op,
+        canvasEpoch: epoch,
+        sourceStrokes,
+        replacementStrokeIds,
+        undone: false,
+      },
+      epoch
+    ),
+  };
+}
+
+export function applyDrawItBoardUndoErase(board, entry = {}) {
+  if (!board) return createEmptyDrawItBoard();
+  if (board.currentStroke) return board;
+  const epoch = Number(board.canvasEpoch) || 0;
+  const op = sanitizeEraseOperationId(entry.operationId);
+  const log = sanitizeDrawItEditLog(board.editLog, epoch);
+  const recorded =
+    Array.isArray(entry.sourceStrokes) && entry.sourceStrokes.length
+      ? {
+          kind: DRAW_IT_EDIT_ERASE,
+          operationId: op,
+          canvasEpoch: epoch,
+          sourceStrokes: completedDrawItStrokesFromSession({
+            strokes: entry.sourceStrokes,
+          }),
+          replacementStrokeIds: sanitizeEraseStrokeIds(
+            entry.replacementStrokeIds || entry.removedFragmentIds
+          ),
+          undone: Boolean(entry.undone),
+        }
+      : log.find((item) => item.kind === DRAW_IT_EDIT_ERASE && item.operationId === op);
+  if (!recorded || !op) return board;
+  if (recorded.undone) return board;
+  const already = log.find(
+    (item) => item.kind === DRAW_IT_EDIT_ERASE && item.operationId === op
+  );
+  if (already?.undone) return board;
+  const removeIds = new Set(recorded.replacementStrokeIds);
+  const restored = recorded.sourceStrokes.filter(Boolean);
+  const restoredIds = new Set(restored.map((stroke) => stroke.strokeId));
+  let strokes = (board.strokes || []).filter((stroke) => !removeIds.has(stroke.strokeId));
+  for (const source of restored) {
+    if (strokes.some((stroke) => stroke.strokeId === source.strokeId)) continue;
+    const idx = strokes.findIndex(
+      (stroke) =>
+        Number(stroke.seq) > Number(source.seq) ||
+        (Number(stroke.seq) === Number(source.seq) &&
+          String(stroke.strokeId) > String(source.strokeId))
+    );
+    if (idx < 0) strokes.push(source);
+    else strokes.splice(idx, 0, source);
+  }
+  if (strokes.length > DRAW_IT_STROKE_MAX_COUNT) {
+    strokes = strokes.slice(0, DRAW_IT_STROKE_MAX_COUNT);
+  }
+  const suppressed = [
+    ...new Set([
+      ...(board.suppressedStrokeIds || []).filter((id) => !restoredIds.has(id)),
+      ...recorded.replacementStrokeIds,
+    ]),
+  ];
+  const seqs = strokes.map((stroke) => Number(stroke.seq) || 0);
+  return {
+    ...board,
+    strokes,
+    currentStroke: null,
+    suppressedStrokeIds: suppressed,
+    strokeSeq: Math.max(Number(board.strokeSeq) || 0, ...seqs, 0),
+    editLog: markDrawItEditUndone(
+      appendDrawItEditLog(board.editLog, { ...recorded, undone: false }, epoch),
+      (item) => item.kind === DRAW_IT_EDIT_ERASE && item.operationId === op,
+      epoch
+    ),
   };
 }
 
@@ -883,6 +1281,16 @@ export function undoLastCompletedDrawItStroke(board) {
   const strokes = board.strokes || [];
   if (!strokes.length) return board;
   return applyDrawItBoardUndo(board, strokes[strokes.length - 1].strokeId);
+}
+
+export function undoLastDrawItEdit(board) {
+  if (!board || board.currentStroke) return board;
+  const last = peekLastUndoableDrawItEdit(board.editLog, board.canvasEpoch);
+  if (!last) return undoLastCompletedDrawItStroke(board);
+  if (last.kind === DRAW_IT_EDIT_ERASE) {
+    return applyDrawItBoardUndoErase(board, last);
+  }
+  return applyDrawItBoardUndo(board, last.strokeId);
 }
 
 export function applyDrawItBoardClear(board, canvasEpoch) {
@@ -909,21 +1317,25 @@ export function maybeResetDrawItBoard(board, session = {}) {
   if (localEpoch !== nextEpoch) {
     return createDrawItBoardFromSession(session);
   }
-  const suppressed = new Set(board.suppressedStrokeIds || []);
+  const editLog = mergeDrawItEditLog(board.editLog, session.editLog, nextEpoch);
+  const suppressed = applyEditLogSuppression(
+    new Set(board.suppressedStrokeIds || []),
+    editLog,
+    nextEpoch
+  );
   const durable = completedDrawItStrokesFromSession(session).filter(
     (stroke) =>
       Number(stroke.canvasEpoch) === nextEpoch && !suppressed.has(stroke.strokeId)
   );
-  const stillSuppressed = [...suppressed].filter((id) =>
-    (Array.isArray(session.strokes) ? session.strokes : []).some(
-      (stroke) => String(stroke?.strokeId || "") === id
-    )
-  );
+  const stillSuppressed = [...suppressed];
   if (!durable.length) {
-    if (stillSuppressed.length === (board.suppressedStrokeIds || []).length) {
+    if (
+      stillSuppressed.length === (board.suppressedStrokeIds || []).length &&
+      editLog.length === (board.editLog || []).length
+    ) {
       return board;
     }
-    return { ...board, suppressedStrokeIds: stillSuppressed };
+    return { ...board, suppressedStrokeIds: stillSuppressed, editLog };
   }
   const byId = new Map(
     [...durable, ...(board.strokes || [])]
@@ -942,7 +1354,8 @@ export function maybeResetDrawItBoard(board, session = {}) {
   if (
     unchanged &&
     Number(board.strokeSeq) >= (Number(session.strokeSeq) || 0) &&
-    stillSuppressed.length === (board.suppressedStrokeIds || []).length
+    stillSuppressed.length === (board.suppressedStrokeIds || []).length &&
+    editLog.length === (board.editLog || []).length
   ) {
     return board;
   }
@@ -951,6 +1364,7 @@ export function maybeResetDrawItBoard(board, session = {}) {
     strokeSeq: Math.max(Number(board.strokeSeq) || 0, Number(session.strokeSeq) || 0),
     strokes,
     suppressedStrokeIds: stillSuppressed,
+    editLog,
   };
 }
 
@@ -1045,25 +1459,30 @@ export function endDrawItStroke(board, finalPoint) {
     }
     const next = applyDrawItBoardEraseSegments(
       { ...board, currentStroke: null },
-      mutation.replacements
+      mutation.replacements,
+      { operationId: mutation.operationId }
     );
     return { ...next, eraseMutation: mutation };
   }
   if (!stroke.points.length || board.strokes.length >= DRAW_IT_STROKE_MAX_COUNT) {
     return { ...board, currentStroke: null };
   }
+  const epoch = Number(stroke.canvasEpoch) || Number(board.canvasEpoch) || 0;
+  const completed = {
+    ...stroke,
+    tool: DRAW_IT_TOOL_DRAW,
+    seq: Number(stroke.seq) || Number(board.strokeSeq) || 0,
+    canvasEpoch: epoch,
+  };
   return {
     ...board,
-    strokes: [
-      ...board.strokes,
-      {
-        ...stroke,
-        tool: DRAW_IT_TOOL_DRAW,
-        seq: Number(stroke.seq) || Number(board.strokeSeq) || 0,
-        canvasEpoch: Number(stroke.canvasEpoch) || Number(board.canvasEpoch) || 0,
-      },
-    ],
+    strokes: [...board.strokes, completed],
     currentStroke: null,
+    editLog: appendDrawItEditLog(
+      board.editLog,
+      { kind: DRAW_IT_EDIT_DRAW, strokeId: completed.strokeId, canvasEpoch: epoch },
+      epoch
+    ),
   };
 }
 

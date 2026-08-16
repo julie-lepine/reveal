@@ -222,6 +222,8 @@ export function buildDrawItLaunchState({
     matchScores: {},
     scoresCommittedRunId: null,
     ...emptyDrawItPlayBuffers(),
+    editLog: [],
+    eraseOpIds: [],
   };
 }
 
@@ -312,6 +314,8 @@ export function applyDrawItNextRound(
       ...timing,
       roundScored: false,
       ...emptyDrawItPlayBuffers(),
+      editLog: [],
+      eraseOpIds: [],
     },
   };
 }

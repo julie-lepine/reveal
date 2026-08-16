@@ -291,7 +291,7 @@ describe("Draw it ! color picker — UI / régressions", () => {
   it("R. T7/T8 inchangés", () => {
     const live = read("js/core/drawItLive.js");
     assert.match(live, /drawit:\$\{intent\.lobbyId\}/);
-    assert.match(live, /ALLOWED_TYPES = new Set\(\["start", "chunk", "end", "clear", "undo", "erase", "erase_segments"\]\)/);
+    assert.match(live, /ALLOWED_TYPES = new Set\(\["start", "chunk", "end", "clear", "undo", "erase", "erase_segments", "erase_undo"\]\)/);
     const rpc = read("js/core/gameSessionRpc.js");
     assert.match(rpc, /append_drawit_stroke/);
     assert.match(rpc, /undo_drawit_stroke/);
