@@ -21,7 +21,7 @@ import {
   isUidInDrawItFoundOrder,
 } from "../core/drawItGuesses.js";
 import { mountChatPanel, CHAT_MAX_LENGTH } from "../core/chatPanel.js";
-import { getLocalDisplayName, setLastGame } from "../core/state.js";
+import { getLocalDisplayName, getState, setLastGame } from "../core/state.js";
 import { getSupabaseUserId } from "../core/supabaseAuth.js";
 import { setLobbyPlaying, setLobbyWaiting } from "../core/lobby.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
@@ -47,6 +47,17 @@ import { buildDrawItRoundRecap } from "../core/drawItRoundRecap.js";
 import { buildDrawItStandings } from "../core/drawItScoring.js";
 import { serializeLastGameStandings } from "../core/lastGamePodium.js";
 import { getSortedActivePlayers } from "../core/players.js";
+import {
+  activateDrawItLive,
+  bufferDrawItLivePoints,
+  createDrawItLiveStrokeId,
+  detachDrawItLiveRenderer,
+  endDrawItLiveStroke,
+  getDrawItLiveState,
+  startDrawItLiveStroke,
+  syncActiveDrawItLiveSession,
+  teardownDrawItLive,
+} from "../core/drawItLive.js";
 
 export function mountDrawIt(app) {
   if (!requireLobbyPlay()) return null;
@@ -66,6 +77,11 @@ export function mountDrawIt(app) {
   let chatPanel = null;
   let canvasCtl = null;
   let board = createEmptyDrawItBoard();
+  let deferredDrawingRender = false;
+  const liveRender = ({ delta }) => {
+    if (!mount.isMounted() || !mount.isCurrentMount()) return;
+    canvasCtl?.applyLiveDelta(delta);
+  };
 
   function localUid() {
     return getSupabaseUserId() || null;
@@ -109,6 +125,26 @@ export function mountDrawIt(app) {
       getSession: getDrawItSession,
       getLocalUid: localUid,
       nowMs: () => drawItSyncedNowMs(getDrawItSession()),
+      getLiveState: getDrawItLiveState,
+      createStrokeId: () => createDrawItLiveStrokeId(localUid()),
+      onStrokeStart: (stroke) => {
+        startDrawItLiveStroke(stroke);
+      },
+      onStrokePoints: (strokeId, points) => {
+        bufferDrawItLivePoints(strokeId, points);
+      },
+      onStrokeEnd: (stroke, finalPoints) => {
+        void endDrawItLiveStroke(stroke, finalPoints).finally(() => {
+          if (
+            deferredDrawingRender &&
+            mount.isMounted() &&
+            mount.isCurrentMount()
+          ) {
+            deferredDrawingRender = false;
+            render();
+          }
+        });
+      },
     });
   }
 
@@ -261,6 +297,7 @@ export function mountDrawIt(app) {
   function render() {
     if (!mount.isMounted() || !mount.isCurrentMount()) return;
     const session = getDrawItSession();
+    syncActiveDrawItLiveSession(session);
     if (!session.lobbyStarted) {
       navigate(getDrawItEntryScreen());
       return;
@@ -407,16 +444,46 @@ export function mountDrawIt(app) {
 
   const unsub = onGameSessionChange((row) => {
     if (!mount.isMounted() || !mount.isCurrentMount()) return;
-    if (stopGameSessionListenerOnPostGame(row)) return;
+    if (stopGameSessionListenerOnPostGame(row)) {
+      teardownDrawItLive();
+      return;
+    }
     const session = getDrawItSession();
+    syncActiveDrawItLiveSession(session);
+    const previousBoard = board;
     board = maybeResetDrawItBoard(board, session);
+    if (
+      board === previousBoard &&
+      session.phase === DRAW_IT_PHASE_DRAWING &&
+      canvasCtl?.isDrawing()
+    ) {
+      deferredDrawingRender = true;
+      chatPanel?.refresh();
+      applyGuessInputLock(session);
+      canvasCtl.syncInteractive();
+      return;
+    }
     // Le nouveau roundIdx/timer est rendu immédiatement ; le mot privé du
     // nouveau drawer peut arriver ensuite sans retarder le countdown.
     render();
     void refreshPrivateWord(session).then(() => {
       if (!mount.isMounted() || !mount.isCurrentMount()) return;
+      if (
+        getDrawItSession().phase === DRAW_IT_PHASE_DRAWING &&
+        canvasCtl?.isDrawing()
+      ) {
+        deferredDrawingRender = true;
+        return;
+      }
       render();
     });
+  });
+
+  activateDrawItLive({
+    lobbyId: getState().lobby?.id,
+    getSession: getDrawItSession,
+    getLocalUid: localUid,
+    onRender: liveRender,
   });
 
   void refreshPrivateWord(getDrawItSession()).then(() => {
@@ -430,6 +497,7 @@ export function mountDrawIt(app) {
     teardownChat();
     teardownCanvas();
     unsub();
+    detachDrawItLiveRenderer(liveRender);
     mount.dispose();
   };
 }

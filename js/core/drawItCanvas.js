@@ -1,6 +1,6 @@
 /**
- * Canvas local Draw it ! T6 — Pointer Events + resize.
- * Aucun Broadcast, RPC, contribute, ni écriture de session distante.
+ * Canvas Draw it ! — T6 local + rendu live incrémental T7.
+ * Aucun RPC, contribute, ni écriture de session distante.
  */
 import {
   applyDrawItPointer,
@@ -30,6 +30,33 @@ function drawStroke(ctx, stroke, canvasWidth, canvasHeight, dpr) {
   ctx.restore();
 }
 
+export function drawDrawItLiveSegment(
+  ctx,
+  { previousPoint = null, points = [], color, width: strokeWidth } = {},
+  { width, height, dpr = 1 } = {}
+) {
+  const fresh = Array.isArray(points) ? points : [];
+  if (!ctx || !fresh.length) return;
+  const start = previousPoint || fresh[0];
+  ctx.save();
+  ctx.strokeStyle = color || "#f4f4f5";
+  ctx.lineWidth = Math.max(1, (Number(strokeWidth) || 4) * dpr);
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  ctx.beginPath();
+  ctx.moveTo(start[0] * width, start[1] * height);
+  const from = previousPoint ? 0 : 1;
+  if (!previousPoint && fresh.length === 1) {
+    ctx.lineTo(start[0] * width + dpr, start[1] * height);
+  } else {
+    for (let i = from; i < fresh.length; i += 1) {
+      ctx.lineTo(fresh[i][0] * width, fresh[i][1] * height);
+    }
+  }
+  ctx.stroke();
+  ctx.restore();
+}
+
 export function paintDrawItBoard(ctx, board, { width, height, dpr = 1 } = {}) {
   if (!ctx) return;
   ctx.clearRect(0, 0, width, height);
@@ -47,6 +74,11 @@ export function mountDrawItCanvas(hostEl, {
   getSession,
   getLocalUid,
   nowMs = () => Date.now(),
+  getLiveState = () => null,
+  onStrokeStart,
+  onStrokePoints,
+  onStrokeEnd,
+  createStrokeId,
 } = {}) {
   if (!hostEl) return null;
 
@@ -76,6 +108,13 @@ export function mountDrawItCanvas(hostEl, {
       height: canvas.height,
       dpr,
     });
+    const remote = getLiveState?.();
+    for (const stroke of Object.values(remote?.remoteCompleted || {})) {
+      drawStroke(ctx, stroke, canvas.width, canvas.height, dpr);
+    }
+    for (const stroke of Object.values(remote?.remoteInProgress || {})) {
+      drawStroke(ctx, stroke, canvas.width, canvas.height, dpr);
+    }
   }
 
   function sizeCanvas() {
@@ -114,7 +153,15 @@ export function mountDrawItCanvas(hostEl, {
     } catch {
       /* capture optionnelle */
     }
-    setBoard(applyDrawItPointer(getBoard(), "down", pointFromEvent(event), true));
+    const next = applyDrawItPointer(
+      getBoard(),
+      "down",
+      pointFromEvent(event),
+      true,
+      { strokeId: createStrokeId?.() || null }
+    );
+    setBoard(next);
+    if (next?.currentStroke) onStrokeStart?.(next.currentStroke);
     paint();
   }
 
@@ -122,10 +169,30 @@ export function mountDrawItCanvas(hostEl, {
     if (cleaned || !drawing || event.pointerId !== pointerId) return;
     event.preventDefault();
     const ok = allowed();
-    setBoard(applyDrawItPointer(getBoard(), "move", pointFromEvent(event), ok));
+    const before = getBoard();
+    const strokeId = before?.currentStroke?.strokeId;
+    const beforeLength = before?.currentStroke?.points?.length || 0;
+    const events =
+      typeof event.getCoalescedEvents === "function"
+        ? event.getCoalescedEvents()
+        : [event];
+    let next = before;
+    for (const sample of events?.length ? events : [event]) {
+      next = applyDrawItPointer(next, "move", pointFromEvent(sample), ok);
+    }
+    setBoard(next);
+    const active = next?.currentStroke;
+    if (ok && active && active.strokeId === strokeId) {
+      const added = active.points.slice(beforeLength);
+      if (added.length) onStrokePoints?.(strokeId, added);
+    }
     if (!ok) {
       drawing = false;
       pointerId = null;
+      const completed = next?.strokes?.[next.strokes.length - 1];
+      if (completed?.strokeId === strokeId) {
+        onStrokeEnd?.(completed, completed.points.slice(beforeLength));
+      }
     }
     paint();
   }
@@ -141,7 +208,20 @@ export function mountDrawItCanvas(hostEl, {
     } catch {
       /* déjà relâché */
     }
-    setBoard(applyDrawItPointer(getBoard(), event.type === "pointercancel" ? "cancel" : "up", pointFromEvent(event), true));
+    const before = getBoard();
+    const strokeId = before?.currentStroke?.strokeId;
+    const beforeLength = before?.currentStroke?.points?.length || 0;
+    const next = applyDrawItPointer(
+      before,
+      event.type === "pointercancel" ? "cancel" : "up",
+      pointFromEvent(event),
+      true
+    );
+    setBoard(next);
+    const completed = next?.strokes?.[next.strokes.length - 1];
+    if (completed?.strokeId === strokeId) {
+      onStrokeEnd?.(completed, completed.points.slice(beforeLength));
+    }
     paint();
   }
 
@@ -174,14 +254,44 @@ export function mountDrawItCanvas(hostEl, {
     canvas,
     paint,
     syncInteractive,
+    isDrawing() {
+      return !cleaned && drawing;
+    },
     applySession(session) {
       if (cleaned) return;
       setBoard(maybeResetDrawItBoard(getBoard(), session || getSession?.() || {}));
       syncInteractive();
       paint();
     },
+    applyLiveDelta(delta) {
+      if (cleaned || !delta) return;
+      if (delta.type === "segment") {
+        drawDrawItLiveSegment(
+          canvas.getContext("2d"),
+          {
+            previousPoint: delta.previousPoint,
+            points: delta.points,
+            color: delta.stroke?.color,
+            width: delta.stroke?.width,
+          },
+          { width: canvas.width, height: canvas.height, dpr }
+        );
+        return;
+      }
+      if (delta.type === "replay") paint();
+    },
     cleanup() {
       if (cleaned) return;
+      if (drawing) {
+        const before = getBoard();
+        const strokeId = before?.currentStroke?.strokeId;
+        const next = applyDrawItPointer(before, "cancel", null, true);
+        setBoard(next);
+        const completed = next?.strokes?.[next.strokes.length - 1];
+        if (completed?.strokeId === strokeId) onStrokeEnd?.(completed, []);
+        drawing = false;
+        pointerId = null;
+      }
       cleaned = true;
       resizeObserver?.disconnect();
       resizeObserver = null;

@@ -131,7 +131,11 @@ export function canDrawOnDrawItCanvas(
 export function beginDrawItStroke(
   board,
   point,
-  { color = DRAW_IT_DEFAULT_COLOR, width = DRAW_IT_DEFAULT_WIDTH } = {}
+  {
+    color = DRAW_IT_DEFAULT_COLOR,
+    width = DRAW_IT_DEFAULT_WIDTH,
+    strokeId = null,
+  } = {}
 ) {
   if (!board) return createEmptyDrawItBoard();
   let next = board.currentStroke ? endDrawItStroke(board) : board;
@@ -144,7 +148,7 @@ export function beginDrawItStroke(
     ...next,
     strokeSeq,
     currentStroke: {
-      strokeId: makeDrawItStrokeId(strokeSeq),
+      strokeId: strokeId || makeDrawItStrokeId(strokeSeq),
       points: [point],
       color,
       width,
@@ -182,10 +186,10 @@ export function endDrawItStroke(board, finalPoint) {
   };
 }
 
-export function applyDrawItPointer(board, type, point, allowed) {
+export function applyDrawItPointer(board, type, point, allowed, opts = {}) {
   if (type === "down") {
     if (!allowed) return board;
-    return beginDrawItStroke(board, point);
+    return beginDrawItStroke(board, point, opts);
   }
   if (type === "move") {
     if (!allowed) {
