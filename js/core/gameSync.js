@@ -4027,7 +4027,9 @@ export function applyRemoteSession(row, { epoch = null } = {}) {
   notify(row);
   if (patch.drawItGame && !patch.drawItGame.lobbyStarted) {
     void import("./drawItCustomWords.js").then(async (m) => {
-      const changed = await m.hydrateOwnDrawItCustomWordsIfNeeded();
+      const changed = await m.hydrateOwnDrawItCustomWordsIfNeeded({
+        sessionUpdatedAt: row?.updated_at,
+      });
       if (changed) notify(row);
     });
   }

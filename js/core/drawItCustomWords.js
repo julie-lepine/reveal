@@ -126,11 +126,9 @@ export function drawItAvailablePoolSize({
   catalogWords = DRAW_IT_WORDS,
 } = {}) {
   if (!isDrawItCategoryId(categoryId)) return 0;
-  const all = sanitizeDrawItCustomWords(customWords);
-  const customs = uniqueCustomWordEntries(all);
-  const textless = all.filter((item) => !item.text).length;
+  const customs = uniqueCustomWordEntries(customWords);
   const catalog = distinctCatalogPool(categoryId, catalogWords);
-  return customs.length + textless + catalogWithoutCustomLabels(catalog, customs).length;
+  return customs.length + catalogWithoutCustomLabels(catalog, customs).length;
 }
 
 export function summarizeOthersDrawItCustomAdds(
@@ -158,6 +156,30 @@ const LAUNCH_CUSTOMS_ERROR =
   "Impossible de récupérer tous les mots personnalisés. Réessaie de lancer la partie.";
 
 /**
+ * Launch : intersection méta publique ∩ texte privé.
+ * Privé sans public = orphelin, jamais joué. Public sans privé = fail-closed.
+ */
+export function mergePlayableDrawItCustomWordsForLaunch(publicList = [], privateList = []) {
+  const pub = sanitizeDrawItCustomWords(publicList);
+  const priv = sanitizeDrawItCustomWords(privateList);
+  const byId = new Map(priv.map((item) => [item.id, item]));
+  const missing = pub.filter((item) => !byId.get(item.id)?.text);
+  if (missing.length) {
+    return { ok: false, error: LAUNCH_CUSTOMS_ERROR, customWords: [] };
+  }
+  const merged = pub.map((item) => {
+    const row = byId.get(item.id);
+    return {
+      ...item,
+      text: row.text,
+      author: row.author || item.author,
+      authorUid: row.authorUid || item.authorUid,
+    };
+  });
+  return { ok: true, customWords: sanitizeDrawItCustomWords(merged) };
+}
+
+/**
  * Host launch : textes complets via RPC privée. Échec / incomplet → pas de fallback textless.
  * @returns {Promise<{ ok: true, customWords: object[] }|{ ok: false, error: string, customWords: object[] }>}
  */
@@ -181,25 +203,7 @@ export async function loadDrawItCustomWordsForLaunch(session) {
   try {
     const { rpcFetchDrawItCustomWordsForLaunch } = await import("./gameSessionRpc.js");
     const rows = await rpcFetchDrawItCustomWordsForLaunch({ lobbyId });
-    const fetched = sanitizeDrawItCustomWords(rows);
-    const byId = new Map(fetched.map((item) => [item.id, item]));
-    const missing = local.filter((item) => !byId.get(item.id)?.text);
-    const incompleteFetched = fetched.filter((item) => !item.text);
-    if (missing.length || incompleteFetched.length) {
-      return { ok: false, error: LAUNCH_CUSTOMS_ERROR, customWords: [] };
-    }
-    const publicIds = new Set(local.map((item) => item.id));
-    const extras = fetched.filter((item) => item.text && !publicIds.has(item.id));
-    const merged = [
-      ...local.map((item) => ({
-        ...item,
-        text: byId.get(item.id).text,
-        author: byId.get(item.id).author || item.author,
-        authorUid: byId.get(item.id).authorUid || item.authorUid,
-      })),
-      ...extras,
-    ];
-    return { ok: true, customWords: sanitizeDrawItCustomWords(merged) };
+    return mergePlayableDrawItCustomWordsForLaunch(local, rows);
   } catch (e) {
     return {
       ok: false,
@@ -209,51 +213,125 @@ export async function loadDrawItCustomWordsForLaunch(session) {
   }
 }
 
+const ownHydrateMemo = {
+  inFlight: false,
+  fetchedLobby: "",
+  lastKey: "",
+  lastStamp: "",
+};
+
+/** Tests uniquement. */
+export function resetDrawItCustomHydrateCacheForTests() {
+  ownHydrateMemo.inFlight = false;
+  ownHydrateMemo.fetchedLobby = "";
+  ownHydrateMemo.lastKey = "";
+  ownHydrateMemo.lastStamp = "";
+}
+
+function ownCustomHydrateKey(lobbyId, uid, current, me) {
+  const ownedIds = current
+    .filter((item) => isDrawItCustomWordOwnedBy(item, me, uid))
+    .map((item) => item.id)
+    .sort()
+    .join(",");
+  return `${lobbyId}|${uid || "nouid"}|${ownedIds}`;
+}
+
+/** Applique les lignes privées owner sur le snapshot public local. */
+export function applyOwnPrivateCustomWords(current = [], privateRows = [], localAuthor, localUid) {
+  const mine = sanitizeDrawItCustomWords(privateRows);
+  const cur = sanitizeDrawItCustomWords(current);
+  const byId = new Map(mine.map((item) => [item.id, item]));
+  let changed = false;
+  const next = cur.map((item) => {
+    const priv = byId.get(item.id);
+    if (!priv?.text) return item;
+    if (priv.text === item.text) {
+      if (priv.authorUid && !item.authorUid) {
+        changed = true;
+        return { ...item, authorUid: priv.authorUid, author: priv.author || item.author };
+      }
+      return item;
+    }
+    changed = true;
+    return {
+      ...item,
+      text: priv.text,
+      author: priv.author || item.author,
+      authorUid: priv.authorUid || item.authorUid,
+    };
+  });
+  const seen = new Set(next.map((item) => item.id));
+  for (const priv of mine) {
+    if (!priv.text || seen.has(priv.id)) continue;
+    changed = true;
+    next.push({
+      id: priv.id,
+      text: priv.text,
+      author: priv.author || localAuthor,
+      authorUid: priv.authorUid || localUid,
+    });
+  }
+  return { changed, customWords: next };
+}
+
 /**
- * Reconnexion owner : rattacher les textes privés aux métadonnées publiques.
- * Ne lit jamais les textes d'autrui.
+ * Reconnexion owner : textes privés, même sans méta publique locale.
+ * Ne lit jamais les textes d'autrui. Un fetch par signature (pas à chaque render).
  * @returns {Promise<boolean>} true si le state local a changé
  */
-export async function hydrateOwnDrawItCustomWordsIfNeeded() {
+export async function hydrateOwnDrawItCustomWordsIfNeeded(opts = {}) {
   const { isGameSyncActive, getLocalParticipantUid } = await import("./gameSync.js");
   if (!isGameSyncActive()) return false;
   const { isSupabaseConfigured } = await import("./supabaseClient.js");
   if (!isSupabaseConfigured()) return false;
   const session = getState().drawItGame;
   if (!session || session.lobbyStarted) return false;
+  const lobbyId = getState().lobby?.id;
+  if (!lobbyId) return false;
   const uid = getLocalParticipantUid() || getSupabaseUserId() || null;
   const me = getLocalDisplayName();
   const current = getDrawItCustomWords(session);
-  const needFetch = current.some(
+  const ownedMissingText = current.some(
     (item) => isDrawItCustomWordOwnedBy(item, me, uid) && !item.text
   );
-  if (!needFetch) return false;
-  const lobbyId = getState().lobby?.id;
-  if (!lobbyId) return false;
+  const key = ownCustomHydrateKey(lobbyId, uid, current, me);
+  const stamp = String(opts.sessionUpdatedAt || "");
+  const lobbyChanged = ownHydrateMemo.fetchedLobby !== lobbyId;
+  const stampChanged = Boolean(stamp) && stamp !== ownHydrateMemo.lastStamp;
+  if (ownHydrateMemo.inFlight) return false;
+  if (
+    !ownedMissingText &&
+    !lobbyChanged &&
+    !stampChanged &&
+    ownHydrateMemo.lastKey === key
+  ) {
+    return false;
+  }
+
+  ownHydrateMemo.inFlight = true;
   try {
     const { rpcFetchMyDrawItCustomWords } = await import("./gameSessionRpc.js");
     const rows = await rpcFetchMyDrawItCustomWords({ lobbyId });
     const mine = sanitizeDrawItCustomWords(rows);
-    if (!mine.length) return false;
-    const byId = new Map(mine.map((item) => [item.id, item]));
-    let changed = false;
-    const next = current.map((item) => {
-      if (!isDrawItCustomWordOwnedBy(item, me, uid)) return item;
-      const priv = byId.get(item.id);
-      if (!priv?.text || priv.text === item.text) return item;
-      changed = true;
-      return {
-        ...item,
-        text: priv.text,
-        author: priv.author || item.author,
-        authorUid: priv.authorUid || item.authorUid,
-      };
-    });
-    if (!changed) return false;
-    persistCustomWords(getState().drawItGame || session, next);
+    ownHydrateMemo.fetchedLobby = lobbyId;
+    ownHydrateMemo.lastKey = key;
+    ownHydrateMemo.lastStamp = stamp;
+    if (!mine.length && !ownedMissingText) return false;
+    const applied = applyOwnPrivateCustomWords(current, mine, me, uid);
+    if (!applied.changed) return false;
+    persistCustomWords(getState().drawItGame || session, applied.customWords);
+    ownHydrateMemo.lastKey = ownCustomHydrateKey(
+      lobbyId,
+      uid,
+      applied.customWords,
+      me
+    );
     return true;
   } catch {
     return false;
+  } finally {
+    ownHydrateMemo.inFlight = false;
   }
 }
 
