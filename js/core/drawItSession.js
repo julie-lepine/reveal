@@ -328,6 +328,7 @@ export async function commitDrawItReveal({ nowMs = Date.now() } = {}) {
     await commitDrawItPlay({
       phase: applied.session.phase,
       roundScored: applied.session.roundScored,
+      matchScores: applied.session.matchScores,
       lastRound: applied.session.lastRound,
     });
     return { ok: true, reason: null };
