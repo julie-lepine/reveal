@@ -63,8 +63,11 @@ import {
   applyDrawItDurableAppend,
   applyDrawItDurableClear,
   applyDrawItDurableErase,
+  applyDrawItDurableEraseSegments,
   applyDrawItDurableUndo,
   canPersistDrawItStroke,
+  sanitizeEraseOperationId,
+  sanitizeEraseReplacements,
   sanitizeEraseStrokeIds,
   toDurableDrawItStroke,
 } from "./drawItStrokes.js";
@@ -648,6 +651,53 @@ export async function commitDrawItEraseStrokes(strokeIds) {
     }
 
     const applied = applyDrawItDurableErase(session, ids, { uid });
+    if (!applied.ok) return applied;
+    if (!applied.skipped) saveStatePatch({ drawItGame: applied.session });
+    return { ok: true, skipped: Boolean(applied.skipped) };
+  });
+  if (!outcome.ok && outcome.skipped) return { ok: false, reason: "in_flight" };
+  return outcome.value;
+}
+
+export async function commitDrawItEraseSegments(mutation) {
+  const outcome = await completedStrokeLock.run(async () => {
+    const session = getDrawItSession();
+    const uid = getSupabaseUserId();
+    const gate = canPersistDrawItStroke(session, uid);
+    if (!gate.ok) return { ok: false, reason: gate.reason };
+    const operationId = sanitizeEraseOperationId(mutation?.operationId);
+    const replacements = sanitizeEraseReplacements(mutation?.replacements);
+    if (!operationId || !replacements.length) return { ok: true, skipped: true };
+
+    if (isGameSyncActive() && isSupabaseConfigured()) {
+      try {
+        const { broadcastDrawItLiveEraseSegments } = await import("./drawItLive.js");
+        broadcastDrawItLiveEraseSegments(session, uid, { operationId, replacements });
+        const { rpcEraseDrawItSegments } = await import("./gameSessionRpc.js");
+        const row = await rpcEraseDrawItSegments({
+          lobbyId: getState().lobby.id,
+          runId: session.runId,
+          roundIdx: session.roundIdx,
+          canvasEpoch: Number(session.canvasEpoch) || 0,
+          operationId,
+          replacements,
+        });
+        if (!row) return { ok: false, reason: "not_applied" };
+        await applyDrawItStrokeRow(row);
+        return { ok: true, skipped: false };
+      } catch (error) {
+        const code = String(error?.message || error).match(/DRAWIT_[A-Z_]+/)?.[0];
+        return { ok: false, reason: (code || "rpc_failed").toLowerCase() };
+      }
+    }
+
+    const applied = applyDrawItDurableEraseSegments(session, replacements, {
+      uid,
+      operationId,
+      canvasEpoch: Number(session.canvasEpoch) || 0,
+      runId: session.runId,
+      roundIdx: session.roundIdx,
+    });
     if (!applied.ok) return applied;
     if (!applied.skipped) saveStatePatch({ drawItGame: applied.session });
     return { ok: true, skipped: Boolean(applied.skipped) };

@@ -8,12 +8,12 @@ import {
   whenLobbyRealtimeReady,
 } from "./supabaseLobby.js";
 import { onScreenChange } from "./router.js";
-import { canDrawOnDrawItCanvas, sanitizeEraseStrokeIds } from "./drawItStrokes.js";
+import { canDrawOnDrawItCanvas, sanitizeEraseStrokeIds, sanitizeEraseReplacements, sanitizeEraseOperationId } from "./drawItStrokes.js";
 
 export const DRAW_IT_LIVE_EVENT = "drawit";
 export const DRAW_IT_LIVE_CHUNK_MS = 100;
 export const DRAW_IT_LIVE_SEND_RELEASE_MS = 250;
-const ALLOWED_TYPES = new Set(["start", "chunk", "end", "clear", "undo", "erase"]);
+const ALLOWED_TYPES = new Set(["start", "chunk", "end", "clear", "undo", "erase", "erase_segments"]);
 const FORBIDDEN_KEYS = [
   "lobbyId",
   "game",
@@ -33,6 +33,7 @@ const TYPE_KEYS = {
   clear: COMMON_KEYS,
   undo: [...COMMON_KEYS, "strokeId"],
   erase: [...COMMON_KEYS, "strokeIds"],
+  erase_segments: [...COMMON_KEYS, "operationId", "replacements"],
 };
 
 let activeChannel = null;
@@ -122,6 +123,15 @@ function validEraseStrokeIds(ids) {
   return clean.length === ids.length;
 }
 
+function validEraseSegmentReplacements(replacements, operationId) {
+  if (!sanitizeEraseOperationId(operationId)) return false;
+  if (!Array.isArray(replacements) || !replacements.length || replacements.length > 25) {
+    return false;
+  }
+  const clean = sanitizeEraseReplacements(replacements);
+  return clean.length === replacements.length;
+}
+
 function validCommonPayload(payload, session, liveIdentity = null) {
   if (!payload || typeof payload !== "object") return false;
   if (String(payload.runId || "") !== String(session?.runId || "")) return false;
@@ -142,6 +152,9 @@ function validCommonPayload(payload, session, liveIdentity = null) {
   if (Object.keys(payload).some((key) => !allowedKeys.includes(key))) return false;
   if (payload.type === "clear") return true;
   if (payload.type === "erase") return validEraseStrokeIds(payload.strokeIds);
+  if (payload.type === "erase_segments") {
+    return validEraseSegmentReplacements(payload.replacements, payload.operationId);
+  }
   if (typeof payload.strokeId !== "string" || !payload.strokeId.trim()) return false;
   if (payload.strokeId.length > 128) return false;
   if (payload.type === "undo") return true;
@@ -191,6 +204,37 @@ export function applyDrawItLiveEvent(state, payload, session = {}) {
       reason: null,
       state: next,
       delta: { type: "replay", action: "erase", strokeIds: ids },
+    };
+  }
+
+  if (payload.type === "erase_segments") {
+    const replacements = sanitizeEraseReplacements(payload.replacements);
+    const inProgress = { ...next.remoteInProgress };
+    const completed = { ...next.remoteCompleted };
+    for (const entry of replacements) {
+      delete inProgress[entry.sourceStrokeId];
+      delete completed[entry.sourceStrokeId];
+      for (const fragment of entry.fragments) {
+        completed[fragment.strokeId] = {
+          strokeId: fragment.strokeId,
+          points: fragment.points,
+          color: fragment.color,
+          width: fragment.width,
+          lastSeq: fragment.seq,
+        };
+      }
+    }
+    next = { ...next, remoteInProgress: inProgress, remoteCompleted: completed };
+    return {
+      applied: true,
+      reason: null,
+      state: next,
+      delta: {
+        type: "replay",
+        action: "erase_segments",
+        operationId: sanitizeEraseOperationId(payload.operationId),
+        replacements,
+      },
     };
   }
 
@@ -298,11 +342,20 @@ export function buildDrawItLivePayload(type, {
   strokeIds,
   seq,
   points,
+  operationId,
+  replacements,
 } = {}) {
   const base = payloadBase(type, session, uid);
   if (type === "clear") return base;
   if (type === "erase") {
     return { ...base, strokeIds: sanitizeEraseStrokeIds(strokeIds) };
+  }
+  if (type === "erase_segments") {
+    return {
+      ...base,
+      operationId: sanitizeEraseOperationId(operationId),
+      replacements: sanitizeEraseReplacements(replacements),
+    };
   }
   const id = String(strokeId || stroke?.strokeId || "");
   if (type === "undo") return { ...base, strokeId: id };
@@ -656,6 +709,22 @@ export function broadcastDrawItLiveErase(session, uid, strokeIds) {
   if (!ids.length) return false;
   void sendPayload(
     buildDrawItLivePayload("erase", { session, uid, strokeIds: ids })
+  );
+  return true;
+}
+
+export function broadcastDrawItLiveEraseSegments(session, uid, mutation) {
+  if (!canEmitDrawItLive(session, uid)) return false;
+  const operationId = sanitizeEraseOperationId(mutation?.operationId);
+  const replacements = sanitizeEraseReplacements(mutation?.replacements);
+  if (!operationId || !replacements.length) return false;
+  void sendPayload(
+    buildDrawItLivePayload("erase_segments", {
+      session,
+      uid,
+      operationId,
+      replacements,
+    })
   );
   return true;
 }

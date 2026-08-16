@@ -7,7 +7,7 @@ import {
   commitDrawItCompletedStroke,
   commitDrawItUndoStroke,
   commitDrawItClearCanvas,
-  commitDrawItEraseStrokes,
+  commitDrawItEraseSegments,
   loadLocalDrawItPrivateWord,
   submitDrawItGuess,
 } from "../core/drawItSession.js";
@@ -48,6 +48,7 @@ import {
   applyDrawItBoardClear,
   applyDrawItBoardUndo,
   applyDrawItBoardErase,
+  applyDrawItBoardEraseSegments,
   absorbDrawItLiveCompletedStroke,
   createDrawItBoardFromSession,
   createDrawItBrush,
@@ -116,6 +117,9 @@ export function mountDrawIt(app) {
       rememberSuppressedStrokes(board);
     } else if (delta?.action === "erase" && Array.isArray(delta.strokeIds)) {
       board = applyDrawItBoardErase(board, delta.strokeIds);
+      rememberSuppressedStrokes(board);
+    } else if (delta?.action === "erase_segments" && Array.isArray(delta.replacements)) {
+      board = applyDrawItBoardEraseSegments(board, delta.replacements);
       rememberSuppressedStrokes(board);
     } else if (delta?.action === "clear") {
       board = applyDrawItBoardClear(board, delta.canvasEpoch);
@@ -202,11 +206,11 @@ export function mountDrawIt(app) {
         void commitDrawItCompletedStroke(stroke);
         syncToolButtons();
       },
-      onEraseEnd: (strokeIds) => {
+      onEraseEnd: (mutation) => {
         rememberSuppressedStrokes(board);
         canvasCtl?.paint();
         syncToolButtons();
-        void commitDrawItEraseStrokes(strokeIds);
+        void commitDrawItEraseSegments(mutation);
       },
       getBrush: () => brush,
       onDrawingChange: () => {

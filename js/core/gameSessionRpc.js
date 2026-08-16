@@ -356,3 +356,24 @@ export async function rpcEraseDrawItStrokes({
   if (error) throw error;
   return asSessionRow(data);
 }
+
+export async function rpcEraseDrawItSegments({
+  lobbyId,
+  runId,
+  roundIdx,
+  canvasEpoch,
+  operationId,
+  replacements,
+}) {
+  requireClient();
+  const { data, error } = await supabase.rpc("erase_drawit_segments", {
+    p_lobby_id: lobbyId,
+    p_run_id: runId,
+    p_round_idx: roundIdx,
+    p_canvas_epoch: canvasEpoch,
+    p_operation_id: operationId,
+    p_replacements: replacements,
+  });
+  if (error) throw error;
+  return asSessionRow(data);
+}

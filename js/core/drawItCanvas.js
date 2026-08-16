@@ -181,7 +181,10 @@ export function mountDrawItCanvas(hostEl, {
   canvas.setAttribute("aria-label", "Zone de dessin");
   hostEl.appendChild(canvas);
 
-  let drawing = false;
+  function emitEraseEnd(next) {
+    const mutation = next?.eraseMutation;
+    if (mutation?.replacements?.length) onEraseEnd?.(mutation);
+  }
   let pointerId = null;
   let cssW = 0;
   let cssH = 0;
@@ -307,11 +310,7 @@ export function mountDrawItCanvas(hostEl, {
       pointerId = null;
       onDrawingChange?.(false);
       if (erasing) {
-        const remaining = new Set((next.strokes || []).map((entry) => entry.strokeId));
-        const erased = (before.strokes || [])
-          .map((entry) => entry.strokeId)
-          .filter((id) => !remaining.has(id));
-        if (erased.length) onEraseEnd?.(erased);
+        emitEraseEnd(next);
       } else {
         const completed = next?.strokes?.[next.strokes.length - 1];
         if (completed?.strokeId === strokeId) {
@@ -346,11 +345,7 @@ export function mountDrawItCanvas(hostEl, {
     );
     setBoard(next);
     if (erasing) {
-      const remaining = new Set((next.strokes || []).map((entry) => entry.strokeId));
-      const erased = (before.strokes || [])
-        .map((entry) => entry.strokeId)
-        .filter((id) => !remaining.has(id));
-      if (erased.length) onEraseEnd?.(erased);
+      emitEraseEnd(next);
     } else {
       const completed = next?.strokes?.[next.strokes.length - 1];
       if (completed?.strokeId === strokeId) {
@@ -425,11 +420,7 @@ export function mountDrawItCanvas(hostEl, {
         const next = applyDrawItPointer(before, "cancel", null, true);
         setBoard(next);
         if (erasing) {
-          const remaining = new Set((next.strokes || []).map((entry) => entry.strokeId));
-          const erased = (before.strokes || [])
-            .map((entry) => entry.strokeId)
-            .filter((id) => !remaining.has(id));
-          if (erased.length) onEraseEnd?.(erased);
+          emitEraseEnd(next);
         } else {
           const completed = next?.strokes?.[next.strokes.length - 1];
           if (completed?.strokeId === strokeId) onStrokeEnd?.(completed, []);

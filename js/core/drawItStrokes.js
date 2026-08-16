@@ -189,6 +189,171 @@ export function collectErasedStrokeIds(strokes, erasePoints, radius) {
   return sanitizeEraseStrokeIds(ids);
 }
 
+export function sanitizeEraseOperationId(id) {
+  const value = String(id || "").trim();
+  if (!value || value.length > 64) return "";
+  return value;
+}
+
+export function makePartialEraseFragmentId(sourceId, operationId, index) {
+  const src = String(sourceId || "s").replace(/~/g, "-").slice(0, 80);
+  const op = String(operationId || "e").replace(/~/g, "-").slice(0, 36);
+  return `${src}~${op}~${Math.max(0, Number(index) || 0)}`.slice(0, 128);
+}
+
+let eraseOperationNonce = 0;
+export function createDrawItEraseOperationId() {
+  eraseOperationNonce += 1;
+  const random =
+    globalThis.crypto?.randomUUID?.() ||
+    `${Date.now().toString(36)}-${eraseOperationNonce.toString(36)}`;
+  return `e:${random}`.slice(0, 64);
+}
+
+function densifyPolyline(points, step) {
+  const list = Array.isArray(points) ? points.filter(Boolean) : [];
+  if (!list.length) return [];
+  if (list.length === 1) return [list[0]];
+  const gap = Number(step);
+  const size = Number.isFinite(gap) && gap > 0 ? gap : 0.01;
+  const out = [list[0]];
+  for (let i = 1; i < list.length; i += 1) {
+    const start = list[i - 1];
+    const end = list[i];
+    const dist = pointDistance(start, end);
+    const n = Math.max(1, Math.ceil(dist / size));
+    for (let k = 1; k <= n; k += 1) {
+      const t = k / n;
+      out.push([
+        round3(Number(start[0]) + (Number(end[0]) - Number(start[0])) * t),
+        round3(Number(start[1]) + (Number(end[1]) - Number(start[1])) * t),
+      ]);
+    }
+  }
+  return out;
+}
+
+function pointNearErasePath(point, erasePoints, threshold) {
+  const segs = polylineSegments(erasePoints);
+  for (const [start, end] of segs) {
+    if (pointToSegmentDistance(point, start, end) <= threshold) return true;
+  }
+  return false;
+}
+
+export function splitStrokeByErasePath(stroke, erasePoints, radius) {
+  const pts = Array.isArray(stroke?.points) ? stroke.points.filter(Boolean) : [];
+  if (!pts.length) return { unchanged: true, fragments: [] };
+  const hit = Number(radius);
+  if (!Number.isFinite(hit) || hit <= 0) return { unchanged: true, fragments: [pts] };
+  const strokeWidthNorm = (Number(stroke.width) || DRAW_IT_DEFAULT_WIDTH) / 800;
+  const threshold = hit + strokeWidthNorm;
+  const step = Math.min(Math.max(threshold * 0.4, 0.006), 0.012);
+  const samples = densifyPolyline(pts, step);
+  const keep = samples.map((point) => !pointNearErasePath(point, erasePoints, threshold));
+  if (keep.every(Boolean)) return { unchanged: true, fragments: [pts] };
+  if (!keep.some(Boolean)) return { unchanged: false, fragments: [] };
+  const groups = [];
+  let current = [];
+  for (let i = 0; i < samples.length; i += 1) {
+    if (keep[i]) current.push(samples[i]);
+    else if (current.length) {
+      groups.push(current);
+      current = [];
+    }
+  }
+  if (current.length) groups.push(current);
+  const fragments = groups
+    .map((group) => {
+      if (group.length === 1) return [group[0], group[0]];
+      return downsampleDrawItStrokePoints(group);
+    })
+    .filter((group) => group.length);
+  return { unchanged: false, fragments };
+}
+
+function fitEraseReplacementsToCap(strokes, replacements) {
+  const sources = new Set(
+    (Array.isArray(replacements) ? replacements : []).map((entry) =>
+      String(entry?.sourceStrokeId || "")
+    )
+  );
+  const untouched = (Array.isArray(strokes) ? strokes : []).filter(
+    (stroke) => !sources.has(String(stroke?.strokeId || ""))
+  ).length;
+  let budget = DRAW_IT_STROKE_MAX_COUNT - untouched;
+  const out = [];
+  for (const entry of Array.isArray(replacements) ? replacements : []) {
+    const fragments = Array.isArray(entry?.fragments) ? entry.fragments : [];
+    if (!fragments.length) {
+      out.push(entry);
+      continue;
+    }
+    if (budget <= 0) continue;
+    const kept = fragments.slice(0, budget);
+    out.push({ ...entry, fragments: kept });
+    budget -= kept.length;
+  }
+  return out;
+}
+
+export function computeDrawItPartialErase(
+  strokes,
+  erasePoints,
+  radius,
+  { operationId } = {}
+) {
+  const op = sanitizeEraseOperationId(operationId) || createDrawItEraseOperationId();
+  const replacements = [];
+  for (const stroke of Array.isArray(strokes) ? strokes : []) {
+    const sourceId = String(stroke?.strokeId || "").trim();
+    if (!sourceId) continue;
+    const split = splitStrokeByErasePath(stroke, erasePoints, radius);
+    if (split.unchanged) continue;
+    const fragments = split.fragments
+      .map((points, index) =>
+        sanitizeCompletedStroke({
+          strokeId: makePartialEraseFragmentId(sourceId, op, index),
+          seq: Number(stroke.seq) || 1,
+          canvasEpoch: Number(stroke.canvasEpoch) || 0,
+          points,
+          color: stroke.color,
+          width: stroke.width,
+        })
+      )
+      .filter(Boolean);
+    replacements.push({ sourceStrokeId: sourceId, fragments });
+  }
+  return {
+    operationId: op,
+    replacements: fitEraseReplacementsToCap(strokes, replacements),
+  };
+}
+
+export function sanitizeEraseReplacements(replacements, max = DRAW_IT_STROKE_MAX_COUNT) {
+  const out = [];
+  const seenSource = new Set();
+  for (const raw of Array.isArray(replacements) ? replacements : []) {
+    const sourceStrokeId = String(raw?.sourceStrokeId || "").trim();
+    if (!sourceStrokeId || sourceStrokeId.length > 128 || seenSource.has(sourceStrokeId)) {
+      continue;
+    }
+    seenSource.add(sourceStrokeId);
+    const fragments = [];
+    const seenFrag = new Set();
+    for (const frag of Array.isArray(raw?.fragments) ? raw.fragments : []) {
+      const stroke = sanitizeCompletedStroke(frag);
+      if (!stroke || seenFrag.has(stroke.strokeId)) continue;
+      seenFrag.add(stroke.strokeId);
+      fragments.push(stroke);
+      if (fragments.length >= max) break;
+    }
+    out.push({ sourceStrokeId, fragments });
+    if (out.length >= max) break;
+  }
+  return out;
+}
+
 export function shouldKeepSimplifiedPoint(
   prev,
   next,
@@ -388,6 +553,52 @@ export function applyDrawItDurableErase(session = {}, strokeIds, { uid } = {}) {
       suppressedStrokeIds: [
         ...new Set([...(session.suppressedStrokeIds || []), ...ids]),
       ],
+    },
+  };
+}
+
+export function applyDrawItDurableEraseSegments(
+  session = {},
+  replacements,
+  { uid, operationId, canvasEpoch, runId, roundIdx } = {}
+) {
+  const gate = canPersistDrawItStroke(session, uid);
+  if (!gate.ok) return { ok: false, reason: gate.reason, session };
+  if (runId != null && String(runId) !== String(session.runId || "")) {
+    return { ok: false, reason: "stale_run", session };
+  }
+  if (roundIdx != null && Number(roundIdx) !== Number(session.roundIdx)) {
+    return { ok: false, reason: "stale_round", session };
+  }
+  const epoch = Number(session.canvasEpoch) || 0;
+  if (canvasEpoch != null && Number(canvasEpoch) !== epoch) {
+    return { ok: false, reason: "stale_epoch", session };
+  }
+  const op = sanitizeEraseOperationId(operationId);
+  const appliedOps = Array.isArray(session.eraseOpIds) ? session.eraseOpIds : [];
+  if (op && appliedOps.includes(op)) {
+    return { ok: true, skipped: true, session };
+  }
+  const list = sanitizeEraseReplacements(replacements);
+  if (!list.length) return { ok: true, skipped: true, session };
+  const existing = completedDrawItStrokesFromSession(session);
+  const board = applyDrawItBoardEraseSegments(
+    { strokes: existing, suppressedStrokeIds: session.suppressedStrokeIds || [], strokeSeq: session.strokeSeq },
+    list
+  );
+  const same =
+    board.strokes.length === existing.length &&
+    board.strokes.every((stroke, index) => stroke.strokeId === existing[index]?.strokeId);
+  if (same) return { ok: true, skipped: true, session };
+  return {
+    ok: true,
+    skipped: false,
+    session: {
+      ...session,
+      strokes: board.strokes,
+      strokeSeq: board.strokeSeq,
+      suppressedStrokeIds: board.suppressedStrokeIds,
+      eraseOpIds: op ? [...appliedOps, op].slice(-32) : appliedOps,
     },
   };
 }
@@ -612,6 +823,37 @@ export function applyDrawItBoardErase(board, strokeIds) {
   return { ...next, currentStroke: null };
 }
 
+export function applyDrawItBoardEraseSegments(board, replacements) {
+  if (!board) return createEmptyDrawItBoard();
+  const list = sanitizeEraseReplacements(replacements);
+  if (!list.length) {
+    return { ...board, currentStroke: null };
+  }
+  let strokes = Array.isArray(board.strokes) ? [...board.strokes] : [];
+  const suppressed = new Set(board.suppressedStrokeIds || []);
+  for (const entry of list) {
+    const idx = strokes.findIndex((stroke) => stroke.strokeId === entry.sourceStrokeId);
+    if (idx < 0) continue;
+    suppressed.add(entry.sourceStrokeId);
+    strokes = [
+      ...strokes.slice(0, idx),
+      ...entry.fragments,
+      ...strokes.slice(idx + 1),
+    ];
+  }
+  if (strokes.length > DRAW_IT_STROKE_MAX_COUNT) {
+    strokes = strokes.slice(0, DRAW_IT_STROKE_MAX_COUNT);
+  }
+  const seqs = strokes.map((stroke) => Number(stroke.seq) || 0);
+  return {
+    ...board,
+    strokes,
+    currentStroke: null,
+    suppressedStrokeIds: [...new Set([...(board.suppressedStrokeIds || []), ...suppressed])],
+    strokeSeq: Math.max(Number(board.strokeSeq) || 0, ...seqs, 0),
+  };
+}
+
 export function undoLastCompletedDrawItStroke(board) {
   if (!board || board.currentStroke) return board;
   const strokes = board.strokes || [];
@@ -768,12 +1010,20 @@ export function endDrawItStroke(board, finalPoint) {
   }
   if (isDrawItEraseTool(stroke.tool)) {
     const points = downsampleDrawItStrokePoints(stroke.points);
-    const ids = collectErasedStrokeIds(
+    const mutation = computeDrawItPartialErase(
       board.strokes,
       points,
-      drawItEraserRadius(stroke.width)
+      drawItEraserRadius(stroke.width),
+      { operationId: createDrawItEraseOperationId() }
     );
-    return applyDrawItBoardErase({ ...board, currentStroke: null }, ids);
+    if (!mutation.replacements.length) {
+      return { ...board, currentStroke: null, eraseMutation: null };
+    }
+    const next = applyDrawItBoardEraseSegments(
+      { ...board, currentStroke: null },
+      mutation.replacements
+    );
+    return { ...next, eraseMutation: mutation };
   }
   if (!stroke.points.length || board.strokes.length >= DRAW_IT_STROKE_MAX_COUNT) {
     return { ...board, currentStroke: null };

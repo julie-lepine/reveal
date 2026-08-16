@@ -282,7 +282,7 @@ describe("Draw it ! color picker — UI / régressions", () => {
     assert.equal(erase.color, "#12abef");
     const ui = read("js/games/drawIt.js");
     assert.match(ui, /id="draw-it-erase"/);
-    assert.match(ui, /commitDrawItEraseStrokes/);
+    assert.match(ui, /commitDrawItEraseSegments/);
     assert.doesNotMatch(ui, /#ffffff/);
     const sql = read("supabase/feature-drawit-05-erase.sql");
     assert.match(sql, /erase_drawit_strokes/);
@@ -291,7 +291,7 @@ describe("Draw it ! color picker — UI / régressions", () => {
   it("R. T7/T8 inchangés", () => {
     const live = read("js/core/drawItLive.js");
     assert.match(live, /drawit:\$\{intent\.lobbyId\}/);
-    assert.match(live, /ALLOWED_TYPES = new Set\(\["start", "chunk", "end", "clear", "undo", "erase"\]\)/);
+    assert.match(live, /ALLOWED_TYPES = new Set\(\["start", "chunk", "end", "clear", "undo", "erase", "erase_segments"\]\)/);
     const rpc = read("js/core/gameSessionRpc.js");
     assert.match(rpc, /append_drawit_stroke/);
     assert.match(rpc, /undo_drawit_stroke/);
