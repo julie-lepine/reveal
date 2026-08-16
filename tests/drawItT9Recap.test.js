@@ -405,7 +405,7 @@ describe("Draw it ! T9 recap — reconstruction durable", () => {
       strokeSeq: 2,
       strokes: [
         stroke("s1", { seq: 1, color: "#facc15", width: 4 }),
-        stroke("s2", { seq: 2, color: "#111111", width: 12 }),
+        stroke("s2", { seq: 2, color: "#818cf8", width: 12 }),
       ],
     });
     const first = strokes.createDrawItRecapBoardFromSession(session);

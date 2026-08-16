@@ -20,7 +20,7 @@ export const DRAW_IT_TOOL_COLORS = [
   { id: "blue", value: "#38bdf8", label: "Bleu" },
   { id: "green", value: "#4ade80", label: "Vert" },
   { id: "yellow", value: "#facc15", label: "Jaune" },
-  { id: "black", value: "#111111", label: "Noir" },
+  { id: "violet", value: "#818cf8", label: "Violet" },
 ];
 export const DRAW_IT_TOOL_WIDTHS = [
   { id: "thin", value: 4, label: "Fin" },
@@ -288,13 +288,30 @@ export function completedDrawItStrokesFromSession(session = {}) {
     .slice(0, DRAW_IT_STROKE_MAX_COUNT);
 }
 
+function suppressedStrokeIdSet(session = {}) {
+  return new Set(
+    (Array.isArray(session.suppressedStrokeIds) ? session.suppressedStrokeIds : [])
+      .map((id) => String(id || "").trim())
+      .filter(Boolean)
+  );
+}
+
+function strokesForCanvasEpoch(session = {}, epoch = Number(session.canvasEpoch) || 0) {
+  const suppressed = suppressedStrokeIdSet(session);
+  return completedDrawItStrokesFromSession(session).filter(
+    (stroke) => Number(stroke.canvasEpoch) === epoch && !suppressed.has(stroke.strokeId)
+  );
+}
+
 export function createDrawItBoardFromSession(session = {}) {
   const board = createEmptyDrawItBoard(session);
+  const suppressed = [...suppressedStrokeIdSet(session)];
   return {
     ...board,
     strokeSeq: Math.max(0, Number(session.strokeSeq) || 0),
-    strokes: completedDrawItStrokesFromSession(session),
+    strokes: strokesForCanvasEpoch(session, board.canvasEpoch),
     currentStroke: null,
+    suppressedStrokeIds: suppressed,
   };
 }
 
@@ -303,9 +320,7 @@ export function createDrawItBoardFromSession(session = {}) {
  * Source du recap : jamais currentStroke / Broadcast / board local.
  */
 export function recapDrawItStrokesFromSession(session = {}) {
-  const epoch = Number(session.canvasEpoch) || 0;
-  return completedDrawItStrokesFromSession(session)
-    .filter((stroke) => Number(stroke.canvasEpoch) === epoch)
+  return strokesForCanvasEpoch(session)
     .slice()
     .sort((a, b) => (Number(a.seq) || 0) - (Number(b.seq) || 0));
 }
@@ -316,6 +331,100 @@ export function createDrawItRecapBoardFromSession(session = {}) {
     strokeSeq: Math.max(0, Number(session.strokeSeq) || 0),
     strokes: recapDrawItStrokesFromSession(session),
     currentStroke: null,
+  };
+}
+
+/**
+ * Fusion epoch-aware des snapshots durables.
+ * Un epoch plus petit, ou un tableau de strokes plus ancien, ne doit pas
+ * faire régresser un board/session déjà confirmé.
+ */
+export function mergeDrawItDurableSnapshot(local = {}, remote = {}) {
+  const localEpoch = Number(local.canvasEpoch) || 0;
+  const remoteEpoch = Number(remote.canvasEpoch) || 0;
+  const suppressed = new Set([
+    ...suppressedStrokeIdSet(local),
+    ...suppressedStrokeIdSet(remote),
+  ]);
+
+  if (remoteEpoch > localEpoch) {
+    const strokes = strokesForCanvasEpoch(
+      { ...remote, suppressedStrokeIds: [] },
+      remoteEpoch
+    );
+    return {
+      canvasEpoch: remoteEpoch,
+      strokes,
+      strokeSeq: Math.max(Number(remote.strokeSeq) || 0, strokes.length),
+      suppressedStrokeIds: [],
+    };
+  }
+
+  if (remoteEpoch < localEpoch) {
+    const strokes = strokesForCanvasEpoch(
+      { ...local, suppressedStrokeIds: [...suppressed] },
+      localEpoch
+    );
+    return {
+      canvasEpoch: localEpoch,
+      strokes,
+      strokeSeq: Math.max(
+        Number(local.strokeSeq) || 0,
+        Number(remote.strokeSeq) || 0,
+        strokes.length
+      ),
+      suppressedStrokeIds: [...suppressed],
+    };
+  }
+
+  const byId = new Map();
+  for (const stroke of [
+    ...completedDrawItStrokesFromSession(local),
+    ...completedDrawItStrokesFromSession(remote),
+  ]) {
+    if (Number(stroke.canvasEpoch) !== localEpoch) continue;
+    if (suppressed.has(stroke.strokeId)) continue;
+    if (!byId.has(stroke.strokeId)) byId.set(stroke.strokeId, stroke);
+  }
+  const strokes = [...byId.values()].slice(-DRAW_IT_STROKE_MAX_COUNT);
+  const stillSuppressed = [...suppressed].filter((id) =>
+    [...completedDrawItStrokesFromSession(local), ...completedDrawItStrokesFromSession(remote)]
+      .some((stroke) => stroke.strokeId === id)
+  );
+  return {
+    canvasEpoch: localEpoch,
+    strokes,
+    strokeSeq: Math.max(
+      Number(local.strokeSeq) || 0,
+      Number(remote.strokeSeq) || 0,
+      strokes.length
+    ),
+    suppressedStrokeIds: stillSuppressed,
+  };
+}
+
+export function absorbDrawItLiveCompletedStroke(board, stroke, session = {}) {
+  if (!board) return createEmptyDrawItBoard(session);
+  const epoch = Number(board.canvasEpoch) || 0;
+  const sessionEpoch = Number(session.canvasEpoch);
+  if (Number.isInteger(sessionEpoch) && sessionEpoch < epoch) return board;
+  const suppressed = new Set(board.suppressedStrokeIds || []);
+  const strokeId = String(stroke?.strokeId || "").trim();
+  if (!strokeId || suppressed.has(strokeId)) return board;
+  if ((board.strokes || []).some((entry) => entry.strokeId === strokeId)) return board;
+  const durable = toDurableDrawItStroke(
+    {
+      ...stroke,
+      seq: Number(stroke?.seq) || Number(stroke?.lastSeq) || (Number(board.strokeSeq) || 0) + 1,
+      canvasEpoch: epoch,
+    },
+    { ...session, canvasEpoch: epoch, strokeSeq: board.strokeSeq }
+  );
+  if (!durable || Number(durable.canvasEpoch) !== epoch) return board;
+  return {
+    ...board,
+    strokeSeq: Math.max(Number(board.strokeSeq) || 0, durable.seq),
+    strokes: [...(board.strokes || []), durable].slice(-DRAW_IT_STROKE_MAX_COUNT),
   };
 }
 
@@ -388,7 +497,8 @@ export function maybeResetDrawItBoard(board, session = {}) {
   }
   const suppressed = new Set(board.suppressedStrokeIds || []);
   const durable = completedDrawItStrokesFromSession(session).filter(
-    (stroke) => !suppressed.has(stroke.strokeId)
+    (stroke) =>
+      Number(stroke.canvasEpoch) === nextEpoch && !suppressed.has(stroke.strokeId)
   );
   const stillSuppressed = [...suppressed].filter((id) =>
     (Array.isArray(session.strokes) ? session.strokes : []).some(
@@ -403,7 +513,12 @@ export function maybeResetDrawItBoard(board, session = {}) {
   }
   const byId = new Map(
     [...durable, ...(board.strokes || [])]
-      .filter((stroke) => !suppressed.has(stroke.strokeId))
+      .filter((stroke) => {
+        if (suppressed.has(stroke.strokeId)) return false;
+        const strokeEpoch = Number(stroke.canvasEpoch);
+        const epoch = Number.isInteger(strokeEpoch) ? strokeEpoch : nextEpoch;
+        return epoch === nextEpoch;
+      })
       .map((stroke) => [stroke.strokeId, stroke])
   );
   const strokes = [...byId.values()].slice(-DRAW_IT_STROKE_MAX_COUNT);
@@ -467,6 +582,8 @@ export function beginDrawItStroke(
     strokeSeq,
     currentStroke: {
       strokeId: strokeId || makeDrawItStrokeId(strokeSeq),
+      seq: strokeSeq,
+      canvasEpoch: Number(next.canvasEpoch) || 0,
       points: [point],
       color:
         typeof color === "string" && color
@@ -504,7 +621,14 @@ export function endDrawItStroke(board, finalPoint) {
   }
   return {
     ...board,
-    strokes: [...board.strokes, stroke],
+    strokes: [
+      ...board.strokes,
+      {
+        ...stroke,
+        seq: Number(stroke.seq) || Number(board.strokeSeq) || 0,
+        canvasEpoch: Number(stroke.canvasEpoch) || Number(board.canvasEpoch) || 0,
+      },
+    ],
     currentStroke: null,
   };
 }

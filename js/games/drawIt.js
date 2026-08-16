@@ -25,7 +25,7 @@ import {
   isUidInDrawItFoundOrder,
 } from "../core/drawItGuesses.js";
 import { mountChatPanel, CHAT_MAX_LENGTH } from "../core/chatPanel.js";
-import { getLocalDisplayName, getState, setLastGame } from "../core/state.js";
+import { getLocalDisplayName, getState, saveStatePatch, setLastGame } from "../core/state.js";
 import { getSupabaseUserId } from "../core/supabaseAuth.js";
 import { setLobbyPlaying, setLobbyWaiting } from "../core/lobby.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
@@ -46,6 +46,7 @@ import { mountDrawItCanvas, mountDrawItReplayCanvas } from "../core/drawItCanvas
 import {
   applyDrawItBoardClear,
   applyDrawItBoardUndo,
+  absorbDrawItLiveCompletedStroke,
   createDrawItBoardFromSession,
   createDrawItBrush,
   createDrawItRecapBoardFromSession,
@@ -104,10 +105,14 @@ export function mountDrawIt(app) {
     ) {
       return;
     }
-    if (delta?.action === "undo" && delta.strokeId) {
+    if (delta?.type === "end" && delta.stroke) {
+      board = absorbDrawItLiveCompletedStroke(board, delta.stroke, getDrawItSession());
+    } else if (delta?.action === "undo" && delta.strokeId) {
       board = applyDrawItBoardUndo(board, delta.strokeId);
+      rememberSuppressedStrokes(board);
     } else if (delta?.action === "clear") {
       board = applyDrawItBoardClear(board, delta.canvasEpoch);
+      rememberSuppressedStrokes(board);
     }
     canvasCtl?.applyLiveDelta(delta);
   };
@@ -135,6 +140,18 @@ export function mountDrawIt(app) {
     debugGuessFocus("teardownChat");
     chatPanel?.cleanup();
     chatPanel = null;
+  }
+
+  function rememberSuppressedStrokes(nextBoard) {
+    const session = getDrawItSession();
+    const ids = [...new Set(nextBoard?.suppressedStrokeIds || [])];
+    const prev = session.suppressedStrokeIds || [];
+    if (ids.length === prev.length && ids.every((id, index) => id === prev[index])) {
+      return;
+    }
+    saveStatePatch({
+      drawItGame: { ...session, suppressedStrokeIds: ids },
+    });
   }
 
   function teardownCanvas() {
@@ -387,9 +404,9 @@ export function mountDrawIt(app) {
       render();
       return;
     }
-    syncActiveDrawItLiveSession(session);
     const previousBoard = board;
     board = maybeResetDrawItBoard(board, session);
+    syncActiveDrawItLiveSession(session);
     syncGuessFeedDom(session);
     applyGuessInputLock(session);
     patchFoundLine(session);
@@ -565,6 +582,7 @@ export function mountDrawIt(app) {
         if (toolsBusy() || !(board.strokes || []).length) return;
         const last = board.strokes[board.strokes.length - 1];
         board = undoLastCompletedDrawItStroke(board);
+        rememberSuppressedStrokes(board);
         canvasCtl?.paint();
         syncToolButtons();
         if (last?.strokeId) void commitDrawItUndoStroke(last.strokeId);
@@ -574,6 +592,7 @@ export function mountDrawIt(app) {
         if (toolsBusy()) return;
         const nextEpoch = (Number(board.canvasEpoch) || 0) + 1;
         board = applyDrawItBoardClear(board, nextEpoch);
+        rememberSuppressedStrokes(board);
         canvasCtl?.paint();
         syncToolButtons();
         void commitDrawItClearCanvas();
@@ -785,7 +804,6 @@ export function mountDrawIt(app) {
       return;
     }
     const session = getDrawItSession();
-    syncActiveDrawItLiveSession(session);
     if (session.phase === DRAW_IT_PHASE_REVEAL) {
       if (
         canKeepDrawItRecapCanvas(lastPlayIdentity, session) &&
@@ -799,6 +817,7 @@ export function mountDrawIt(app) {
     }
     const previousBoard = board;
     board = maybeResetDrawItBoard(board, session);
+    syncActiveDrawItLiveSession(session);
     const sameRound =
       previousBoard.runId === board.runId &&
       Number(previousBoard.roundIdx) === Number(board.roundIdx) &&

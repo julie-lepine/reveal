@@ -452,6 +452,11 @@ export function detachDrawItLiveRenderer(onRender) {
 export function syncActiveDrawItLiveSession(session = {}) {
   const previous = liveState;
   liveState = syncDrawItLiveIdentity(liveState, session);
+  const identityChanged =
+    String(previous.identity?.runId || "") !== String(liveState.identity?.runId || "") ||
+    Number(previous.identity?.roundIdx) !== Number(liveState.identity?.roundIdx) ||
+    Number(previous.identity?.canvasEpoch) !== Number(liveState.identity?.canvasEpoch) ||
+    String(previous.identity?.drawerUid || "") !== String(liveState.identity?.drawerUid || "");
   const durableIds = new Set(
     (Array.isArray(session.strokes) ? session.strokes : [])
       .map((stroke) => String(stroke?.strokeId || "").trim())
@@ -479,7 +484,7 @@ export function syncActiveDrawItLiveSession(session = {}) {
       };
     }
   }
-  if (liveState !== previous) {
+  if (identityChanged) {
     localSender = null;
     notifyRender({ type: "replay" });
   }

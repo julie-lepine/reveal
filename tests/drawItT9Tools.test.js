@@ -103,13 +103,17 @@ describe("Draw it ! T9 — couleur / épaisseur", () => {
   it("A. couleur par défaut et changement pour le prochain stroke seulement", () => {
     assert.equal(strokes.DRAW_IT_DEFAULT_COLOR, "#f4f4f5");
     assert.ok(strokes.DRAW_IT_TOOL_COLORS.some((entry) => entry.value === "#ef4444"));
-    assert.ok(strokes.DRAW_IT_TOOL_COLORS.some((entry) => entry.value === "#111111"));
+    assert.ok(strokes.DRAW_IT_TOOL_COLORS.some((entry) => entry.value === "#818cf8"));
+    assert.equal(
+      strokes.DRAW_IT_TOOL_COLORS.some((entry) => entry.value === "#111111"),
+      false
+    );
     let board = strokes.createEmptyDrawItBoard({ runId: "run-t9" });
-    board = strokes.beginDrawItStroke(board, [0.1, 0.1], { color: "#111111", width: 4 });
+    board = strokes.beginDrawItStroke(board, [0.1, 0.1], { color: "#818cf8", width: 4 });
     board = strokes.endDrawItStroke(board, [0.2, 0.2]);
     board = strokes.beginDrawItStroke(board, [0.3, 0.3], { color: "#ef4444", width: 4 });
     board = strokes.endDrawItStroke(board, [0.4, 0.4]);
-    assert.equal(board.strokes[0].color, "#111111");
+    assert.equal(board.strokes[0].color, "#818cf8");
     assert.equal(board.strokes[1].color, "#ef4444");
     assert.equal(strokes.resolveDrawItToolColor("#ef4444"), "#ef4444");
     assert.equal(strokes.resolveDrawItToolColor("#not-a-color"), "#f4f4f5");
@@ -134,12 +138,12 @@ describe("Draw it ! T9 — couleur / épaisseur", () => {
 
   it("N. changer d'outil pendant currentStroke ne corrompt pas le trait", () => {
     let board = strokes.createEmptyDrawItBoard({ runId: "run-t9" });
-    const brush = strokes.createDrawItBrush({ color: "#111111", width: 4 });
+    const brush = strokes.createDrawItBrush({ color: "#818cf8", width: 4 });
     board = strokes.beginDrawItStroke(board, [0.1, 0.1], brush);
     const nextBrush = strokes.createDrawItBrush({ color: "#ef4444", width: 12 });
     board = strokes.extendDrawItStroke(board, [0.3, 0.3]);
     board = strokes.endDrawItStroke(board, [0.4, 0.4]);
-    assert.equal(board.strokes[0].color, "#111111");
+    assert.equal(board.strokes[0].color, "#818cf8");
     assert.equal(board.strokes[0].width, 4);
     assert.notEqual(board.strokes[0].color, nextBrush.color);
     const src = read("js/games/drawIt.js");
@@ -365,5 +369,236 @@ describe("Draw it ! T9 — guards / isolation / régressions", () => {
       })),
     }).length;
     assert.ok(payloadSize < 48_000, payloadSize);
+  });
+});
+
+describe("Draw it ! T9 — anti-résurrection hydrate", () => {
+  it("A. append live + snapshot intermédiaire [s1] conserve s2", () => {
+    const base = session({ strokes: [stroke("s1")], strokeSeq: 1 });
+    let board = strokes.createDrawItBoardFromSession(base);
+    board = strokes.absorbDrawItLiveCompletedStroke(board, stroke("s2", { seq: 2 }));
+    assert.deepEqual(
+      board.strokes.map((entry) => entry.strokeId),
+      ["s1", "s2"]
+    );
+    board = strokes.maybeResetDrawItBoard(board, base);
+    assert.deepEqual(
+      board.strokes.map((entry) => entry.strokeId),
+      ["s1", "s2"]
+    );
+    const stale = strokes.mergeDrawItDurableSnapshot(
+      { ...base, strokes: [stroke("s1"), stroke("s2", { seq: 2 })], strokeSeq: 2 },
+      base
+    );
+    assert.deepEqual(
+      stale.strokes.map((entry) => entry.strokeId),
+      ["s1", "s2"]
+    );
+    const finalSnap = session({
+      strokes: [stroke("s1"), stroke("s2", { seq: 2 })],
+      strokeSeq: 2,
+    });
+    board = strokes.maybeResetDrawItBoard(board, finalSnap);
+    assert.deepEqual(
+      board.strokes.map((entry) => entry.strokeId),
+      ["s1", "s2"]
+    );
+  });
+
+  it("B. plusieurs strokes successifs ne disparaissent pas", () => {
+    let board = strokes.createEmptyDrawItBoard(session());
+    const ids = ["s1", "s2", "s3", "s4"];
+    const committed = [];
+    for (const id of ids) {
+      board = strokes.absorbDrawItLiveCompletedStroke(
+        board,
+        stroke(id, { seq: committed.length + 1 })
+      );
+      committed.push(stroke(id, { seq: committed.length }));
+      const partial = session({
+        strokes: committed.slice(0, -1),
+        strokeSeq: Math.max(0, committed.length - 1),
+      });
+      board = strokes.maybeResetDrawItBoard(board, partial);
+      assert.deepEqual(
+        board.strokes.map((entry) => entry.strokeId),
+        ids.slice(0, committed.length)
+      );
+    }
+  });
+
+  it("C. Clear + ancien snapshot epoch 0 ne ressuscite rien", () => {
+    const before = session({
+      strokes: [stroke("s1"), stroke("s2", { seq: 2 })],
+      strokeSeq: 2,
+      canvasEpoch: 0,
+    });
+    let board = strokes.createDrawItBoardFromSession(before);
+    board = strokes.applyDrawItBoardClear(board, 1);
+    const mergedRpc = strokes.mergeDrawItDurableSnapshot(before, {
+      ...before,
+      canvasEpoch: 1,
+      strokes: [],
+      strokeSeq: 0,
+    });
+    assert.equal(mergedRpc.canvasEpoch, 1);
+    assert.deepEqual(mergedRpc.strokes, []);
+    const mergedStale = strokes.mergeDrawItDurableSnapshot(mergedRpc, before);
+    assert.equal(mergedStale.canvasEpoch, 1);
+    assert.deepEqual(mergedStale.strokes, []);
+    board = strokes.maybeResetDrawItBoard(board, before);
+    assert.equal(board.canvasEpoch, 1);
+    assert.deepEqual(board.strokes, []);
+    board = strokes.maybeResetDrawItBoard(board, {
+      ...mergedRpc,
+      strokes: [stroke("s1"), stroke("s2", { seq: 2 })],
+    });
+    assert.deepEqual(board.strokes, []);
+  });
+
+  it("D. Clear + nouveau stroke = uniquement s3", () => {
+    let board = strokes.createDrawItBoardFromSession(
+      session({ strokes: [stroke("s1"), stroke("s2", { seq: 2 })], strokeSeq: 2 })
+    );
+    board = strokes.applyDrawItBoardClear(board, 1);
+    board = strokes.absorbDrawItLiveCompletedStroke(
+      board,
+      stroke("s3", { seq: 1, canvasEpoch: 1 })
+    );
+    board = strokes.maybeResetDrawItBoard(
+      board,
+      session({
+        canvasEpoch: 0,
+        strokes: [stroke("s1"), stroke("s2", { seq: 2 })],
+        strokeSeq: 2,
+      })
+    );
+    assert.deepEqual(
+      board.strokes.map((entry) => entry.strokeId),
+      ["s3"]
+    );
+    const recap = strokes.createDrawItRecapBoardFromSession({
+      ...session(),
+      canvasEpoch: 1,
+      strokes: [stroke("s3", { seq: 1, canvasEpoch: 1 })],
+    });
+    assert.deepEqual(
+      recap.strokes.map((entry) => entry.strokeId),
+      ["s3"]
+    );
+  });
+
+  it("E. Undo + ancien snapshot ne réintroduit pas s3", () => {
+    const full = session({
+      strokes: [stroke("s1"), stroke("s2", { seq: 2 }), stroke("s3", { seq: 3 })],
+      strokeSeq: 3,
+    });
+    let board = strokes.undoLastCompletedDrawItStroke(
+      strokes.createDrawItBoardFromSession(full)
+    );
+    board = strokes.maybeResetDrawItBoard(board, full);
+    assert.deepEqual(
+      board.strokes.map((entry) => entry.strokeId),
+      ["s1", "s2"]
+    );
+    const merged = strokes.mergeDrawItDurableSnapshot(
+      { ...full, suppressedStrokeIds: ["s3"], strokes: [stroke("s1"), stroke("s2", { seq: 2 })] },
+      full
+    );
+    assert.deepEqual(
+      merged.strokes.map((entry) => entry.strokeId),
+      ["s1", "s2"]
+    );
+  });
+
+  it("F. violet accepté, persisté, hydraté et rejoué", () => {
+    assert.equal(strokes.resolveDrawItToolColor("#818cf8"), "#818cf8");
+    const violet = stroke("s1", { color: "#818cf8", width: 7 });
+    const drawing = strokes.applyDrawItDurableAppend(session(), violet, { uid: DRAWER });
+    assert.equal(drawing.ok, true);
+    assert.equal(drawing.session.strokes[0].color, "#818cf8");
+    const board = strokes.createDrawItBoardFromSession(drawing.session);
+    assert.equal(board.strokes[0].color, "#818cf8");
+    const recap = strokes.createDrawItRecapBoardFromSession({
+      ...drawing.session,
+      phase: "reveal",
+    });
+    assert.equal(recap.strokes[0].color, "#818cf8");
+  });
+
+  it("G. non-régression T7 : live Broadcast inchangé", () => {
+    const source = read("js/core/drawItLive.js");
+    assert.match(source, /DRAW_IT_LIVE_CHUNK_MS = 100/);
+    assert.match(source, /broadcast: \{ self: false/);
+    assert.match(source, /ALLOWED_TYPES = new Set\(\["start", "chunk", "end", "clear", "undo"\]\)/);
+    const s = session();
+    let state = live.createDrawItLiveState(s);
+    state = live.applyDrawItLiveEvent(
+      state,
+      payload("start", { strokeId: "s2", seq: 1, points: [[0.2, 0.2]] }),
+      s
+    ).state;
+    state = live.applyDrawItLiveEvent(
+      state,
+      payload("end", { strokeId: "s2", seq: 2 }),
+      s
+    ).state;
+    assert.ok(state.remoteCompleted.s2);
+  });
+
+  it("H. non-régression T8 : persist reconnect conserve le snapshot", () => {
+    const sessionSrc = read("js/core/drawItSession.js");
+    assert.match(sessionSrc, /rpcAppendDrawItStroke/);
+    assert.match(sessionSrc, /rpcUndoDrawItStroke/);
+    assert.match(sessionSrc, /rpcClearDrawItCanvas/);
+    const hydrated = strokes.createDrawItBoardFromSession(
+      session({
+        strokes: [stroke("s1"), stroke("s2", { seq: 2 })],
+        strokeSeq: 2,
+      })
+    );
+    const remount = strokes.createDrawItBoardFromSession({
+      ...session({
+        strokes: [stroke("s1"), stroke("s2", { seq: 2 })],
+        strokeSeq: 2,
+      }),
+    });
+    assert.deepEqual(
+      remount.strokes.map((entry) => entry.strokeId),
+      hydrated.strokes.map((entry) => entry.strokeId)
+    );
+  });
+
+  it("I. recap affiche l'état durable final après Clear / Undo", () => {
+    const cleared = strokes.createDrawItRecapBoardFromSession({
+      ...session(),
+      canvasEpoch: 1,
+      strokes: [
+        stroke("s1", { canvasEpoch: 0 }),
+        stroke("s4", { seq: 1, canvasEpoch: 1 }),
+      ],
+    });
+    assert.deepEqual(
+      cleared.strokes.map((entry) => entry.strokeId),
+      ["s4"]
+    );
+    const undone = strokes.createDrawItRecapBoardFromSession({
+      ...session(),
+      suppressedStrokeIds: ["s3"],
+      strokes: [stroke("s1"), stroke("s2", { seq: 2 }), stroke("s3", { seq: 3 })],
+      strokeSeq: 3,
+    });
+    assert.deepEqual(
+      undone.strokes.map((entry) => entry.strokeId),
+      ["s1", "s2"]
+    );
+    const liveSrc = read("js/core/drawItLive.js");
+    const syncFn = liveSrc.slice(liveSrc.indexOf("export function syncActiveDrawItLiveSession"));
+    assert.match(syncFn, /identityChanged/);
+    const game = read("js/games/drawIt.js");
+    const patch = game.slice(game.indexOf("function patchDrawingLive"));
+    assert.ok(
+      patch.indexOf("maybeResetDrawItBoard") < patch.indexOf("syncActiveDrawItLiveSession")
+    );
   });
 });

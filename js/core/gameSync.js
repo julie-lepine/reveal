@@ -124,7 +124,7 @@ import {
 } from "./drawItRound.js";
 import {
   completedDrawItStrokesFromSession,
-  mergeCompletedDrawItStrokes,
+  mergeDrawItDurableSnapshot,
 } from "./drawItStrokes.js";
 import {
   stripCustomRosterTopicsFromGenericPatch,
@@ -1423,13 +1423,13 @@ function mergeDrawItGameLocal(local, remote) {
     merged.strokes = Array.isArray(remote.strokes) ? remote.strokes : [];
     merged.strokeSeq = remote.strokeSeq ?? 0;
     merged.canvasEpoch = remote.canvasEpoch ?? 0;
+    merged.suppressedStrokeIds = [];
   } else {
-    const mergedStrokes = mergeCompletedDrawItStrokes(local, remote.strokes || []);
-    merged.strokes = mergedStrokes.strokes || local.strokes || [];
-    merged.strokeSeq = Math.max(
-      Number(local.strokeSeq) || 0,
-      Number(remote.strokeSeq) || 0
-    );
+    const snapshot = mergeDrawItDurableSnapshot(local, remote);
+    merged.strokes = snapshot.strokes;
+    merged.strokeSeq = snapshot.strokeSeq;
+    merged.canvasEpoch = snapshot.canvasEpoch;
+    merged.suppressedStrokeIds = snapshot.suppressedStrokeIds;
   }
   return merged;
 }

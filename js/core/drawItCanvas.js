@@ -390,7 +390,7 @@ export function mountDrawItCanvas(hostEl, {
         );
         return;
       }
-      if (delta.type === "replay") paint();
+      if (delta.type === "end" || delta.type === "replay") paint();
     },
     cleanup() {
       if (cleaned) return;
