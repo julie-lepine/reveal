@@ -60,7 +60,11 @@ import {
   isDrawItGuessInputLocked,
 } from "./drawItGuesses.js";
 import {
-  mergeCompletedDrawItStrokes,
+  applyDrawItDurableAppend,
+  applyDrawItDurableClear,
+  applyDrawItDurableUndo,
+  canPersistDrawItStroke,
+  toDurableDrawItStroke,
 } from "./drawItStrokes.js";
 import { getSupabaseUserId } from "./supabaseAuth.js";
 
@@ -523,29 +527,124 @@ export async function submitDrawItGuess(rawValue, { nowMs = Date.now(), uid } = 
 }
 
 /**
- * Snapshot durable des strokes terminés uniquement.
- * currentStroke n'est jamais écrit. Pas de RPC stroke dédiée (hors T8).
+ * Snapshot durable des strokes terminés. currentStroke n'est jamais écrit.
+ * MP : RPC drawer-only. Pas d'optimistic write dans game_sessions.
  */
+async function applyDrawItStrokeRow(row) {
+  let full = row;
+  if (row && !row.state) full = (await refreshGameSession()) || row;
+  if (full) applyRemoteSession(full);
+  return getDrawItSession();
+}
+
 export async function commitDrawItCompletedStroke(stroke) {
   if (!stroke?.strokeId || !Array.isArray(stroke.points) || !stroke.points.length) {
     return { ok: false, reason: "invalid_stroke" };
   }
   const outcome = await completedStrokeLock.run(async () => {
     const session = getDrawItSession();
-    if (!session?.lobbyStarted) return { ok: false, reason: "not_started" };
-    const next = mergeCompletedDrawItStrokes(session, [stroke]);
-    if (next === session) return { ok: true, skipped: true };
-    saveStatePatch({ drawItGame: next });
-    if (isGameSyncActive() && isSupabaseConfigured() && canActAsHost()) {
+    const uid = getSupabaseUserId();
+    const gate = canPersistDrawItStroke(session, uid);
+    if (!gate.ok) return { ok: false, reason: gate.reason };
+    const durable = toDurableDrawItStroke(stroke, session);
+    if (!durable) return { ok: false, reason: "invalid_stroke" };
+
+    if (isGameSyncActive() && isSupabaseConfigured()) {
       try {
-        await commitDrawItPlay({
-          strokes: next.strokes,
-          strokeSeq: next.strokeSeq,
+        const { rpcAppendDrawItStroke } = await import("./gameSessionRpc.js");
+        const row = await rpcAppendDrawItStroke({
+          lobbyId: getState().lobby.id,
+          runId: session.runId,
+          roundIdx: session.roundIdx,
+          canvasEpoch: Number(session.canvasEpoch) || 0,
+          stroke: durable,
         });
+        if (!row) return { ok: false, reason: "not_applied" };
+        await applyDrawItStrokeRow(row);
+        return { ok: true, skipped: false };
       } catch (error) {
-        console.warn("[drawit] snapshot strokes:", error?.message || error);
+        const code = String(error?.message || error).match(/DRAWIT_[A-Z_]+/)?.[0];
+        return { ok: false, reason: (code || "rpc_failed").toLowerCase() };
       }
     }
+
+    const applied = applyDrawItDurableAppend(session, durable, { uid });
+    if (!applied.ok) return applied;
+    if (!applied.skipped) saveStatePatch({ drawItGame: applied.session });
+    return { ok: true, skipped: Boolean(applied.skipped) };
+  });
+  if (!outcome.ok && outcome.skipped) return { ok: false, reason: "in_flight" };
+  return outcome.value;
+}
+
+export async function commitDrawItUndoStroke(strokeId) {
+  const outcome = await completedStrokeLock.run(async () => {
+    const session = getDrawItSession();
+    const uid = getSupabaseUserId();
+    const gate = canPersistDrawItStroke(session, uid);
+    if (!gate.ok) return { ok: false, reason: gate.reason };
+
+    if (isGameSyncActive() && isSupabaseConfigured()) {
+      try {
+        const { rpcUndoDrawItStroke } = await import("./gameSessionRpc.js");
+        const row = await rpcUndoDrawItStroke({
+          lobbyId: getState().lobby.id,
+          runId: session.runId,
+          roundIdx: session.roundIdx,
+          canvasEpoch: Number(session.canvasEpoch) || 0,
+          strokeId,
+        });
+        if (!row) return { ok: false, reason: "not_applied" };
+        const next = await applyDrawItStrokeRow(row);
+        const { broadcastDrawItLiveUndo } = await import("./drawItLive.js");
+        broadcastDrawItLiveUndo(next, uid, strokeId);
+        return { ok: true, skipped: false };
+      } catch (error) {
+        const code = String(error?.message || error).match(/DRAWIT_[A-Z_]+/)?.[0];
+        return { ok: false, reason: (code || "rpc_failed").toLowerCase() };
+      }
+    }
+
+    const applied = applyDrawItDurableUndo(session, strokeId, { uid });
+    if (!applied.ok) return applied;
+    if (!applied.skipped) saveStatePatch({ drawItGame: applied.session });
+    return { ok: true, skipped: Boolean(applied.skipped) };
+  });
+  if (!outcome.ok && outcome.skipped) return { ok: false, reason: "in_flight" };
+  return outcome.value;
+}
+
+export async function commitDrawItClearCanvas() {
+  const outcome = await completedStrokeLock.run(async () => {
+    const session = getDrawItSession();
+    const uid = getSupabaseUserId();
+    const gate = canPersistDrawItStroke(session, uid);
+    if (!gate.ok) return { ok: false, reason: gate.reason };
+    const epoch = Number(session.canvasEpoch) || 0;
+
+    if (isGameSyncActive() && isSupabaseConfigured()) {
+      try {
+        const { rpcClearDrawItCanvas } = await import("./gameSessionRpc.js");
+        const row = await rpcClearDrawItCanvas({
+          lobbyId: getState().lobby.id,
+          runId: session.runId,
+          roundIdx: session.roundIdx,
+          canvasEpoch: epoch,
+        });
+        if (!row) return { ok: false, reason: "not_applied" };
+        const next = await applyDrawItStrokeRow(row);
+        const { broadcastDrawItLiveClear } = await import("./drawItLive.js");
+        broadcastDrawItLiveClear(next, uid);
+        return { ok: true, skipped: false };
+      } catch (error) {
+        const code = String(error?.message || error).match(/DRAWIT_[A-Z_]+/)?.[0];
+        return { ok: false, reason: (code || "rpc_failed").toLowerCase() };
+      }
+    }
+
+    const applied = applyDrawItDurableClear(session, { uid, canvasEpoch: epoch });
+    if (!applied.ok) return applied;
+    saveStatePatch({ drawItGame: applied.session });
     return { ok: true, skipped: false };
   });
   if (!outcome.ok && outcome.skipped) return { ok: false, reason: "in_flight" };

@@ -82,9 +82,6 @@ export function mountDrawIt(app) {
   const liveRender = ({ delta }) => {
     if (!mount.isMounted() || !mount.isCurrentMount()) return;
     canvasCtl?.applyLiveDelta(delta);
-    if (delta?.type === "end" && delta.stroke) {
-      void commitDrawItCompletedStroke(delta.stroke);
-    }
   };
 
   function localUid() {
@@ -138,7 +135,6 @@ export function mountDrawIt(app) {
         bufferDrawItLivePoints(strokeId, points);
       },
       onStrokeEnd: (stroke, finalPoints) => {
-        void commitDrawItCompletedStroke(stroke);
         void endDrawItLiveStroke(stroke, finalPoints).finally(() => {
           if (
             deferredDrawingRender &&
@@ -149,6 +145,7 @@ export function mountDrawIt(app) {
             render();
           }
         });
+        void commitDrawItCompletedStroke(stroke);
       },
     });
   }

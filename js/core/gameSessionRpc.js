@@ -282,3 +282,58 @@ export async function rpcSubmitDrawItGuess({ lobbyId, runId, roundIdx, value }) 
   if (error) throw error;
   return asSessionRow(data);
 }
+
+export async function rpcAppendDrawItStroke({
+  lobbyId,
+  runId,
+  roundIdx,
+  canvasEpoch,
+  stroke,
+}) {
+  requireClient();
+  const { data, error } = await supabase.rpc("append_drawit_stroke", {
+    p_lobby_id: lobbyId,
+    p_run_id: runId,
+    p_round_idx: roundIdx,
+    p_canvas_epoch: canvasEpoch,
+    p_stroke: stroke,
+  });
+  if (error) throw error;
+  return asSessionRow(data);
+}
+
+export async function rpcUndoDrawItStroke({
+  lobbyId,
+  runId,
+  roundIdx,
+  canvasEpoch,
+  strokeId,
+}) {
+  requireClient();
+  const { data, error } = await supabase.rpc("undo_drawit_stroke", {
+    p_lobby_id: lobbyId,
+    p_run_id: runId,
+    p_round_idx: roundIdx,
+    p_canvas_epoch: canvasEpoch,
+    p_stroke_id: strokeId,
+  });
+  if (error) throw error;
+  return asSessionRow(data);
+}
+
+export async function rpcClearDrawItCanvas({
+  lobbyId,
+  runId,
+  roundIdx,
+  canvasEpoch,
+}) {
+  requireClient();
+  const { data, error } = await supabase.rpc("clear_drawit_canvas", {
+    p_lobby_id: lobbyId,
+    p_run_id: runId,
+    p_round_idx: roundIdx,
+    p_canvas_epoch: canvasEpoch,
+  });
+  if (error) throw error;
+  return asSessionRow(data);
+}

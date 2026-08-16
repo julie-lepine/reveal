@@ -7,9 +7,9 @@ import {
   isDrawItRoundExpired,
 } from "./drawItRound.js";
 
-// 80 points coupaient un geste continu après ~2 s sur les écrans à forte fréquence.
-// Le cap reste borné, mais couvre désormais largement un trait continu de 5–10 s.
+// Live T7 : buffer local long. Durable T8 : 80 points / stroke après downsample.
 export const DRAW_IT_STROKE_MAX_POINTS = 4096;
+export const DRAW_IT_DURABLE_STROKE_MAX_POINTS = 80;
 export const DRAW_IT_STROKE_MAX_COUNT = 25;
 export const DRAW_IT_STROKE_MIN_DIST = 0.012;
 export const DRAW_IT_DEFAULT_COLOR = "#f4f4f5";
@@ -90,29 +90,153 @@ export function createEmptyDrawItBoard({
   };
 }
 
-function sanitizeCompletedStroke(stroke) {
+export function downsampleDrawItStrokePoints(
+  points,
+  max = DRAW_IT_DURABLE_STROKE_MAX_POINTS
+) {
+  const list = (Array.isArray(points) ? points : []).filter(Boolean);
+  if (list.length <= max) return list;
+  if (max <= 1) return list.slice(0, 1);
+  const lastIndex = list.length - 1;
+  const out = [];
+  for (let i = 0; i < max; i += 1) {
+    const index = Math.round((i * lastIndex) / (max - 1));
+    const point = list[index];
+    const prev = out[out.length - 1];
+    if (!prev || prev[0] !== point[0] || prev[1] !== point[1]) out.push(point);
+  }
+  if (out[out.length - 1] !== list[lastIndex]) {
+    out[out.length - 1] = list[lastIndex];
+  }
+  return out.slice(0, max);
+}
+
+function sanitizeCompletedStroke(stroke, { maxPoints = DRAW_IT_DURABLE_STROKE_MAX_POINTS } = {}) {
   if (!stroke || typeof stroke !== "object") return null;
   const strokeId = String(stroke.strokeId || "").trim();
-  if (!strokeId) return null;
-  const points = (Array.isArray(stroke.points) ? stroke.points : [])
-    .map((point) => {
-      if (!Array.isArray(point) || point.length !== 2) return null;
-      const x = Number(point[0]);
-      const y = Number(point[1]);
-      if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
-      return [round3(clamp01(x)), round3(clamp01(y))];
-    })
-    .filter(Boolean)
-    .slice(0, DRAW_IT_STROKE_MAX_POINTS);
+  if (!strokeId || strokeId.length > 128) return null;
+  if (
+    ["lobbyId", "game", "wordLabel", "wordId", "acceptedAnswers", "currentStroke"].some(
+      (key) => Object.hasOwn(stroke, key)
+    )
+  ) {
+    return null;
+  }
+  const seq = Number(stroke.seq);
+  const canvasEpoch = Number(stroke.canvasEpoch);
+  const points = downsampleDrawItStrokePoints(
+    (Array.isArray(stroke.points) ? stroke.points : [])
+      .map((point) => {
+        if (!Array.isArray(point) || point.length !== 2) return null;
+        const x = Number(point[0]);
+        const y = Number(point[1]);
+        if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+        if (x < 0 || x > 1 || y < 0 || y > 1) return null;
+        return [round3(x), round3(y)];
+      })
+      .filter(Boolean),
+    maxPoints
+  );
   if (!points.length) return null;
+  const width = Number(stroke.width);
   return {
-    strokeId: strokeId.slice(0, 128),
+    strokeId,
+    seq: Number.isInteger(seq) && seq >= 1 ? seq : 1,
+    canvasEpoch: Number.isInteger(canvasEpoch) && canvasEpoch >= 0 ? canvasEpoch : 0,
     points,
     color:
       typeof stroke.color === "string" && stroke.color
         ? stroke.color.slice(0, 32)
         : DRAW_IT_DEFAULT_COLOR,
-    width: Math.min(64, Math.max(1, Number(stroke.width) || DRAW_IT_DEFAULT_WIDTH)),
+    width: Number.isFinite(width)
+      ? Math.min(64, Math.max(1, width))
+      : DRAW_IT_DEFAULT_WIDTH,
+  };
+}
+
+export function toDurableDrawItStroke(stroke, session = {}) {
+  return sanitizeCompletedStroke({
+    ...stroke,
+    seq: Number(stroke?.seq) || Math.max(1, Number(session.strokeSeq) || 1),
+    canvasEpoch: Number(session.canvasEpoch) || 0,
+    points: downsampleDrawItStrokePoints(stroke?.points),
+  });
+}
+
+export function canPersistDrawItStroke(session, uid) {
+  if (!session?.lobbyStarted) return { ok: false, reason: "not_started" };
+  if (session.phase !== DRAW_IT_PHASE_DRAWING) {
+    return { ok: false, reason: "not_drawing" };
+  }
+  if (!uid || !session.drawerUid || String(uid) !== String(session.drawerUid)) {
+    return { ok: false, reason: "not_drawer" };
+  }
+  return { ok: true };
+}
+
+export function applyDrawItDurableAppend(session = {}, stroke, { uid } = {}) {
+  const gate = canPersistDrawItStroke(session, uid);
+  if (!gate.ok) return { ok: false, reason: gate.reason, session };
+  const rawPoints = Array.isArray(stroke?.points) ? stroke.points : [];
+  if (rawPoints.length > DRAW_IT_DURABLE_STROKE_MAX_POINTS && stroke?.downsample === false) {
+    return { ok: false, reason: "too_long", session };
+  }
+  const durable = toDurableDrawItStroke(stroke, session);
+  if (!durable) return { ok: false, reason: "invalid_stroke", session };
+  if (Number(durable.canvasEpoch) !== (Number(session.canvasEpoch) || 0)) {
+    return { ok: false, reason: "stale_epoch", session };
+  }
+  const existing = completedDrawItStrokesFromSession(session);
+  if (existing.some((entry) => entry.strokeId === durable.strokeId)) {
+    return { ok: true, skipped: true, session };
+  }
+  if (existing.length >= DRAW_IT_STROKE_MAX_COUNT) {
+    return { ok: false, reason: "stroke_cap", session };
+  }
+  return {
+    ok: true,
+    skipped: false,
+    session: {
+      ...session,
+      strokes: [...existing, durable],
+      strokeSeq: Math.max(Number(session.strokeSeq) || 0, durable.seq),
+    },
+  };
+}
+
+export function applyDrawItDurableUndo(session = {}, strokeId, { uid } = {}) {
+  const gate = canPersistDrawItStroke(session, uid);
+  if (!gate.ok) return { ok: false, reason: gate.reason, session };
+  const id = String(strokeId || "").trim();
+  if (!id) return { ok: false, reason: "invalid_stroke", session };
+  const existing = completedDrawItStrokesFromSession(session);
+  const strokes = existing.filter((stroke) => stroke.strokeId !== id);
+  if (strokes.length === existing.length) {
+    return { ok: true, skipped: true, session };
+  }
+  return {
+    ok: true,
+    skipped: false,
+    session: { ...session, strokes },
+  };
+}
+
+export function applyDrawItDurableClear(session = {}, { uid, canvasEpoch } = {}) {
+  const gate = canPersistDrawItStroke(session, uid);
+  if (!gate.ok) return { ok: false, reason: gate.reason, session };
+  const epoch = Number(session.canvasEpoch) || 0;
+  if (canvasEpoch != null && Number(canvasEpoch) !== epoch) {
+    return { ok: false, reason: "stale_epoch", session };
+  }
+  return {
+    ok: true,
+    skipped: false,
+    session: {
+      ...session,
+      canvasEpoch: epoch + 1,
+      strokes: [],
+      strokeSeq: 0,
+    },
   };
 }
 
