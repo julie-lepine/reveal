@@ -5032,6 +5032,10 @@ body.has-bottom-nav .feedback-fab{
   min-height:36px;
   padding:6px 12px;
   font-size:13px;
+  border:2px solid rgba(255,255,255,.12);
+  background:rgba(255,255,255,.06);
+  color:#fff;
+  box-shadow:none;
 }
 
 .draw-it-canvas-host{
@@ -5056,8 +5060,9 @@ body.has-bottom-nav .feedback-fab{
 .draw-it-tools__btn.is-active,
 .draw-it-pencil.is-active,
 .draw-it-eraser.is-active{
-  border-color:rgba(255,255,255,.55);
-  background:rgba(255,255,255,.16);
+  border-color:var(--color-primary);
+  background:color-mix(in srgb,var(--color-primary) 20%,transparent);
+  box-shadow:0 0 0 2px color-mix(in srgb,var(--color-primary) 35%,transparent);
 }
 
 .draw-it-canvas--active{

@@ -429,7 +429,9 @@ describe("Draw it ! T9 — Clear remet le crayon", () => {
     const clearFn = game.slice(clearAt, game.indexOf('if (target.id === "draw-it-draw"'));
     assert.match(clearFn, /if \(toolsBusy\(\)\) return;/);
     assert.match(clearFn, /resetDrawItBrushToDraw/);
-    assert.match(game, /return Boolean\(canvasCtl\?\.isDrawing\(\) \|\| board\?\.currentStroke\);/);
+    assert.match(clearFn, /if \(!\(board\.strokes \|\| \[\]\)\.length\)/);
+    assert.match(game, /isDrawItToolsBusy/);
+    assert.match(game, /forceIdle/);
     let board = strokes.beginDrawItStroke(
       strokes.createEmptyDrawItBoard({ runId: "run-t9" }),
       [0.1, 0.1],

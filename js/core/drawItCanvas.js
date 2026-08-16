@@ -6,6 +6,7 @@ import {
   applyDrawItPointer,
   canDrawOnDrawItCanvas,
   clientPointToNormalized,
+  ensureDrawItBoardIdle,
   maybeResetDrawItBoard,
 } from "./drawItStrokes.js";
 
@@ -199,6 +200,78 @@ export function mountDrawItCanvas(hostEl, {
     }).ok;
   }
 
+  function releaseCapture(id) {
+    if (id == null) return;
+    try {
+      canvas.releasePointerCapture?.(id);
+    } catch {
+      /* déjà relâché */
+    }
+  }
+
+  function forceIdle() {
+    if (cleaned) return getBoard();
+    const captured = pointerId;
+    drawing = false;
+    pointerId = null;
+    releaseCapture(captured);
+    const idle = ensureDrawItBoardIdle(getBoard());
+    setBoard(idle);
+    try {
+      onDrawingChange?.(false);
+    } catch {
+      /* toolbar best-effort */
+    }
+    return idle;
+  }
+
+  function completeGesture(event, type) {
+    if (cleaned) return;
+    if (!drawing && !getBoard()?.currentStroke) return;
+    const before = getBoard();
+    const strokeId = before?.currentStroke?.strokeId;
+    const beforeLength = before?.currentStroke?.points?.length || 0;
+    const erasing = before?.currentStroke?.tool === "erase";
+    const captured = pointerId;
+    drawing = false;
+    pointerId = null;
+    releaseCapture(event?.pointerId ?? captured);
+    let next = before;
+    try {
+      next = applyDrawItPointer(
+        before,
+        type === "cancel" || event?.type === "pointercancel" ? "cancel" : "up",
+        event ? pointFromEvent(event) : null,
+        true
+      );
+      setBoard(next);
+    } catch {
+      next = ensureDrawItBoardIdle(before);
+      setBoard(next);
+    }
+    try {
+      if (erasing) emitEraseEnd(next);
+      else {
+        const completed = next?.strokes?.[next.strokes.length - 1];
+        if (completed?.strokeId === strokeId) {
+          onStrokeEnd?.(completed, completed.points.slice(beforeLength));
+        }
+      }
+    } catch {
+      /* RPC / live best-effort */
+    }
+    try {
+      onDrawingChange?.(false);
+    } catch {
+      /* toolbar best-effort */
+    }
+    try {
+      paint();
+    } catch {
+      /* paint best-effort */
+    }
+  }
+
   function paint() {
     const ctx = canvas.getContext("2d");
     paintDrawItBoard(ctx, getBoard(), {
@@ -242,8 +315,28 @@ export function mountDrawItCanvas(hostEl, {
 
   function onPointerDown(event) {
     if (cleaned || !allowed()) return;
-    if (drawing) return;
+    if (event.isPrimary === false) return;
+    if (event.pointerType === "mouse" && event.button !== 0) return;
+    if (drawing || getBoard()?.currentStroke) completeGesture(event, "cancel");
     event.preventDefault();
+    let next = getBoard();
+    try {
+      next = applyDrawItPointer(next, "down", pointFromEvent(event), true, {
+        strokeId: createStrokeId?.() || null,
+        color: getBrush?.()?.color,
+        width: getBrush?.()?.width,
+        tool: getBrush?.()?.tool,
+      });
+      setBoard(next);
+    } catch {
+      forceIdle();
+      return;
+    }
+    if (!next?.currentStroke) {
+      forceIdle();
+      paint();
+      return;
+    }
     drawing = true;
     pointerId = event.pointerId;
     try {
@@ -251,23 +344,12 @@ export function mountDrawItCanvas(hostEl, {
     } catch {
       /* capture optionnelle */
     }
-    const next = applyDrawItPointer(
-      getBoard(),
-      "down",
-      pointFromEvent(event),
-      true,
-      {
-        strokeId: createStrokeId?.() || null,
-        color: getBrush?.()?.color,
-        width: getBrush?.()?.width,
-        tool: getBrush?.()?.tool,
-      }
-    );
-    setBoard(next);
-    if (next?.currentStroke && next.currentStroke.tool !== "erase") {
-      onStrokeStart?.(next.currentStroke);
+    try {
+      if (next.currentStroke.tool !== "erase") onStrokeStart?.(next.currentStroke);
+      onDrawingChange?.(true);
+    } catch {
+      /* live / toolbar best-effort */
     }
-    onDrawingChange?.(true);
     paint();
     canvas.classList.toggle("draw-it-canvas--erase", getBrush?.()?.tool === "erase");
   }
@@ -284,16 +366,25 @@ export function mountDrawItCanvas(hostEl, {
         ? event.getCoalescedEvents()
         : [event];
     let next = before;
-    for (const sample of events?.length ? events : [event]) {
-      next = applyDrawItPointer(next, "move", pointFromEvent(sample), ok);
+    try {
+      for (const sample of events?.length ? events : [event]) {
+        next = applyDrawItPointer(next, "move", pointFromEvent(sample), ok);
+      }
+      setBoard(next);
+    } catch {
+      completeGesture(event, "cancel");
+      return;
     }
-    setBoard(next);
     const active = next?.currentStroke;
     const erasing = before?.currentStroke?.tool === "erase";
     if (ok && active && active.strokeId === strokeId) {
       const added = active.points.slice(beforeLength);
       if (added.length) {
-        if (!erasing) onStrokePoints?.(strokeId, added);
+        try {
+          if (!erasing) onStrokePoints?.(strokeId, added);
+        } catch {
+          /* live best-effort */
+        }
         drawDrawItLiveSegment(
           canvas.getContext("2d"),
           {
@@ -306,54 +397,34 @@ export function mountDrawItCanvas(hostEl, {
         );
       }
     }
-    if (!ok) {
-      drawing = false;
-      pointerId = null;
-      onDrawingChange?.(false);
-      if (erasing) {
-        emitEraseEnd(next);
-      } else {
-        const completed = next?.strokes?.[next.strokes.length - 1];
-        if (completed?.strokeId === strokeId) {
-          onStrokeEnd?.(completed, completed.points.slice(beforeLength));
-        }
-      }
-      paint();
-    }
+    if (!ok) completeGesture(event, "up");
   }
 
   function finishPointer(event) {
-    if (cleaned || !drawing) return;
-    if (event.pointerId != null && event.pointerId !== pointerId) return;
+    if (cleaned) return;
+    if (event.pointerId != null && pointerId != null && event.pointerId !== pointerId) {
+      return;
+    }
     event.preventDefault?.();
-    drawing = false;
-    pointerId = null;
-    onDrawingChange?.(false);
-    try {
-      canvas.releasePointerCapture?.(event.pointerId);
-    } catch {
-      /* déjà relâché */
-    }
-    const before = getBoard();
-    const strokeId = before?.currentStroke?.strokeId;
-    const beforeLength = before?.currentStroke?.points?.length || 0;
-    const erasing = before?.currentStroke?.tool === "erase";
-    const next = applyDrawItPointer(
-      before,
-      event.type === "pointercancel" ? "cancel" : "up",
-      pointFromEvent(event),
-      true
+    completeGesture(
+      event,
+      event.type === "pointercancel" || event.type === "lostpointercapture"
+        ? "cancel"
+        : "up"
     );
-    setBoard(next);
-    if (erasing) {
-      emitEraseEnd(next);
-    } else {
-      const completed = next?.strokes?.[next.strokes.length - 1];
-      if (completed?.strokeId === strokeId) {
-        onStrokeEnd?.(completed, completed.points.slice(beforeLength));
-      }
+  }
+
+  function onLostPointerCapture(event) {
+    if (!drawing || event.pointerId !== pointerId) return;
+    completeGesture(event, "cancel");
+  }
+
+  function onGlobalPointerUp(event) {
+    if (!drawing) return;
+    if (pointerId != null && event.pointerId != null && event.pointerId !== pointerId) {
+      return;
     }
-    paint();
+    finishPointer(event);
   }
 
   function syncInteractive() {
@@ -371,6 +442,10 @@ export function mountDrawItCanvas(hostEl, {
   canvas.addEventListener("pointermove", onPointerMove);
   canvas.addEventListener("pointerup", finishPointer);
   canvas.addEventListener("pointercancel", finishPointer);
+  canvas.addEventListener("lostpointercapture", onLostPointerCapture);
+  const globalTarget = typeof window !== "undefined" ? window : null;
+  globalTarget?.addEventListener?.("pointerup", onGlobalPointerUp, true);
+  globalTarget?.addEventListener?.("pointercancel", onGlobalPointerUp, true);
 
   let resizeObserver = null;
   if (typeof ResizeObserver === "function") {
@@ -389,6 +464,7 @@ export function mountDrawItCanvas(hostEl, {
     isDrawing() {
       return !cleaned && drawing;
     },
+    forceIdle,
     applySession(session) {
       if (cleaned) return;
       setBoard(maybeResetDrawItBoard(getBoard(), session || getSession?.() || {}));
@@ -414,20 +490,12 @@ export function mountDrawItCanvas(hostEl, {
     },
     cleanup() {
       if (cleaned) return;
-      if (drawing) {
-        const before = getBoard();
-        const strokeId = before?.currentStroke?.strokeId;
-        const erasing = before?.currentStroke?.tool === "erase";
-        const next = applyDrawItPointer(before, "cancel", null, true);
-        setBoard(next);
-        if (erasing) {
-          emitEraseEnd(next);
-        } else {
-          const completed = next?.strokes?.[next.strokes.length - 1];
-          if (completed?.strokeId === strokeId) onStrokeEnd?.(completed, []);
+      if (drawing || getBoard()?.currentStroke) {
+        try {
+          completeGesture({ type: "pointercancel", pointerId }, "cancel");
+        } catch {
+          forceIdle();
         }
-        drawing = false;
-        pointerId = null;
       }
       cleaned = true;
       resizeObserver?.disconnect();
@@ -436,6 +504,9 @@ export function mountDrawItCanvas(hostEl, {
       canvas.removeEventListener("pointermove", onPointerMove);
       canvas.removeEventListener("pointerup", finishPointer);
       canvas.removeEventListener("pointercancel", finishPointer);
+      canvas.removeEventListener("lostpointercapture", onLostPointerCapture);
+      globalTarget?.removeEventListener?.("pointerup", onGlobalPointerUp, true);
+      globalTarget?.removeEventListener?.("pointercancel", onGlobalPointerUp, true);
       canvas.remove();
     },
   };

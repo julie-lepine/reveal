@@ -42,6 +42,8 @@ const {
   createEmptyDrawItBoard,
   drawItEraserRadius,
   endDrawItStroke,
+  ensureDrawItBoardIdle,
+  isDrawItToolsBusy,
   mergeDrawItDurableSnapshot,
   selectDrawItBrushTool,
   splitStrokeByErasePath,
@@ -576,8 +578,18 @@ function installFakeCanvasHost() {
   };
   const prevDoc = globalThis.document;
   const prevWin = globalThis.window;
+  const globalListeners = {};
   globalThis.document = { createElement: () => canvas };
-  globalThis.window = { ...(prevWin || {}), devicePixelRatio: 1 };
+  globalThis.window = {
+    ...(prevWin || {}),
+    devicePixelRatio: 1,
+    addEventListener(type, fn) {
+      globalListeners[type] = fn;
+    },
+    removeEventListener(type) {
+      delete globalListeners[type];
+    },
+  };
   const host = {
     appendChild() {},
     getBoundingClientRect: () => ({ width: 100, height: 100, left: 0, top: 0 }),
@@ -763,5 +775,91 @@ describe("Draw it ! régression T06 — toolbar + canvas actifs", () => {
     } finally {
       fake.restore();
     }
+  });
+
+  it("9. gesture idle : pointerup / cancel / lostcapture / erase vide", async () => {
+    const { mountDrawItCanvas } = await import("../js/core/drawItCanvas.js");
+    const drawingSession = session({ roundEndsAt: "2099-01-01T00:00:00.000Z" });
+    assert.equal(isDrawItToolsBusy({ drawing: true, currentStroke: null }), false);
+    assert.equal(isDrawItToolsBusy({ drawing: false, currentStroke: { strokeId: "s1" } }), false);
+    assert.equal(isDrawItToolsBusy({ drawing: true, currentStroke: { strokeId: "s1" } }), true);
+    const leftover = ensureDrawItBoardIdle({
+      ...createEmptyDrawItBoard({ runId: "run-partial" }),
+      currentStroke: stroke("s1"),
+      eraseMutation: { operationId: "e1", replacements: [] },
+    });
+    assert.equal(leftover.currentStroke, null);
+    assert.equal(leftover.eraseMutation, null);
+
+    async function withCanvas(run) {
+      const fake = installFakeCanvasHost();
+      let board = createEmptyDrawItBoard({ runId: "run-partial" });
+      try {
+        const ctl = mountDrawItCanvas(fake.host, {
+          getBoard: () => board,
+          setBoard: (next) => {
+            board = next;
+          },
+          getSession: () => drawingSession,
+          getLocalUid: () => DRAWER,
+          getBrush: () => createDrawItBrush({ tool: DRAW_IT_TOOL_ERASE, width: 7 }),
+          createStrokeId: () => "live-erase",
+        });
+        await run({ fake, ctl, getBoard: () => board });
+        ctl.cleanup();
+      } finally {
+        fake.restore();
+      }
+    }
+
+    await withCanvas(({ fake, ctl, getBoard }) => {
+      fake.listeners.pointerdown(pointerEvent("pointerdown", 50, 50));
+      assert.equal(ctl.isDrawing(), true);
+      fake.listeners.pointerup(pointerEvent("pointerup", 52, 50));
+      assert.equal(ctl.isDrawing(), false);
+      assert.equal(getBoard().currentStroke, null);
+    });
+
+    await withCanvas(({ fake, ctl, getBoard }) => {
+      fake.listeners.pointerdown(pointerEvent("pointerdown", 50, 50));
+      fake.listeners.pointercancel(pointerEvent("pointercancel", 52, 50));
+      assert.equal(ctl.isDrawing(), false);
+      assert.equal(getBoard().currentStroke, null);
+    });
+
+    await withCanvas(({ fake, ctl, getBoard }) => {
+      fake.listeners.pointerdown(pointerEvent("pointerdown", 50, 50));
+      fake.listeners.lostpointercapture(
+        pointerEvent("lostpointercapture", 52, 50)
+      );
+      assert.equal(ctl.isDrawing(), false);
+      assert.equal(getBoard().currentStroke, null);
+    });
+
+    await withCanvas(({ fake, ctl }) => {
+      fake.listeners.pointerdown(pointerEvent("pointerdown", 50, 50));
+      ctl.forceIdle();
+      assert.equal(ctl.isDrawing(), false);
+    });
+  });
+
+  it("10. Clear / Undo à vide : no-op idle, pas de RPC", () => {
+    const game = read("js/games/drawIt.js");
+    const undoAt = game.indexOf('if (target.id === "draw-it-undo")');
+    const undoFn = game.slice(undoAt, game.indexOf('if (target.id === "draw-it-clear")'));
+    const clearAt = game.indexOf('if (target.id === "draw-it-clear")');
+    const clearFn = game.slice(clearAt, game.indexOf('if (target.id === "draw-it-draw"'));
+    assert.match(undoFn, /if \(!\(board\.strokes \|\| \[\]\)\.length\)/);
+    assert.match(undoFn, /forceIdle/);
+    assert.doesNotMatch(
+      undoFn.slice(undoFn.indexOf("length"), undoFn.indexOf("const last")),
+      /commitDrawItUndoStroke/
+    );
+    assert.match(clearFn, /if \(!\(board\.strokes \|\| \[\]\)\.length\)/);
+    assert.match(clearFn, /forceIdle/);
+    assert.doesNotMatch(
+      clearFn.slice(clearFn.indexOf("length"), clearFn.indexOf("const nextEpoch")),
+      /commitDrawItClearCanvas/
+    );
   });
 });

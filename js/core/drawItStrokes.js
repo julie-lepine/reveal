@@ -401,6 +401,16 @@ export function makeDrawItStrokeId(strokeSeq) {
   return `s${Number(strokeSeq) || 0}`;
 }
 
+export function ensureDrawItBoardIdle(board) {
+  if (!board) return createEmptyDrawItBoard();
+  if (!board.currentStroke && board.eraseMutation == null) return board;
+  return { ...board, currentStroke: null, eraseMutation: null };
+}
+
+export function isDrawItToolsBusy({ drawing = false, currentStroke = null } = {}) {
+  return Boolean(drawing) && Boolean(currentStroke);
+}
+
 export function createEmptyDrawItBoard({
   runId = null,
   roundIdx = 0,

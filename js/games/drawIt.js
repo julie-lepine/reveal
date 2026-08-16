@@ -53,6 +53,8 @@ import {
   createDrawItBoardFromSession,
   createDrawItBrush,
   createDrawItRecapBoardFromSession,
+  ensureDrawItBoardIdle,
+  isDrawItToolsBusy,
   DRAW_IT_TOOL_DRAW,
   DRAW_IT_TOOL_ERASE,
   resetDrawItBrushToDraw,
@@ -197,24 +199,30 @@ export function mountDrawIt(app) {
         bufferDrawItLivePoints(strokeId, points);
       },
       onStrokeEnd: (stroke, finalPoints) => {
-        void endDrawItLiveStroke(stroke, finalPoints).finally(() => {
-          if (
-            deferredDrawingRender &&
-            mount.isMounted() &&
-            mount.isCurrentMount()
-          ) {
-            deferredDrawingRender = false;
-            render();
-          }
-        });
-        void commitDrawItCompletedStroke(stroke);
-        syncToolButtons();
+        try {
+          void endDrawItLiveStroke(stroke, finalPoints).finally(() => {
+            if (
+              deferredDrawingRender &&
+              mount.isMounted() &&
+              mount.isCurrentMount()
+            ) {
+              deferredDrawingRender = false;
+              render();
+            }
+          });
+          void commitDrawItCompletedStroke(stroke);
+        } finally {
+          syncToolButtons();
+        }
       },
       onEraseEnd: (mutation) => {
-        rememberSuppressedStrokes(board);
-        canvasCtl?.paint();
-        syncToolButtons();
-        void commitDrawItEraseSegments(mutation);
+        try {
+          rememberSuppressedStrokes(board);
+          canvasCtl?.paint();
+          void commitDrawItEraseSegments(mutation);
+        } finally {
+          syncToolButtons();
+        }
       },
       getBrush: () => brush,
       onDrawingChange: () => {
@@ -552,7 +560,14 @@ export function mountDrawIt(app) {
   }
 
   function toolsBusy() {
-    return Boolean(canvasCtl?.isDrawing() || board?.currentStroke);
+    const drawing = Boolean(canvasCtl?.isDrawing());
+    const active = board?.currentStroke || null;
+    if (isDrawItToolsBusy({ drawing, currentStroke: active })) return true;
+    if (drawing || active) {
+      canvasCtl?.forceIdle?.();
+      if (board?.currentStroke) board = ensureDrawItBoardIdle(board);
+    }
+    return false;
   }
 
   function syncToolButtons() {
@@ -658,7 +673,12 @@ export function mountDrawIt(app) {
       event.preventDefault();
       if (!isLocalDrawer(getDrawItSession())) return;
       if (target.id === "draw-it-undo") {
-        if (toolsBusy() || !(board.strokes || []).length) return;
+        if (toolsBusy()) return;
+        if (!(board.strokes || []).length) {
+          canvasCtl?.forceIdle?.();
+          syncToolButtons();
+          return;
+        }
         const last = board.strokes[board.strokes.length - 1];
         board = undoLastCompletedDrawItStroke(board);
         rememberSuppressedStrokes(board);
@@ -669,6 +689,13 @@ export function mountDrawIt(app) {
       }
       if (target.id === "draw-it-clear") {
         if (toolsBusy()) return;
+        if (!(board.strokes || []).length) {
+          brush = resetDrawItBrushToDraw(brush);
+          canvasCtl?.forceIdle?.();
+          canvasCtl?.syncInteractive();
+          syncToolButtons();
+          return;
+        }
         const nextEpoch = (Number(board.canvasEpoch) || 0) + 1;
         board = applyDrawItBoardClear(board, nextEpoch);
         brush = resetDrawItBrushToDraw(brush);
