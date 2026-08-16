@@ -3671,6 +3671,7 @@ export function applyRemoteSession(row, { epoch = null } = {}) {
   const prevDiRoundIdx = getState().drawItGame?.roundIdx ?? null;
   const prevDiGuesses = JSON.stringify(getState().drawItGame?.guesses || []);
   const prevDiFound = JSON.stringify(getState().drawItGame?.foundOrder || []);
+  const prevDiCustomWords = JSON.stringify(getState().drawItGame?.customWords || []);
   const prevTmVotes = JSON.stringify(getState().truthMeterGame?.votes || {});
   const prevTierNightRunId = getState().tierNightGame?.runId ?? null;
   const prevTierNightRecaps = JSON.stringify(getState().tierNightGame?.recaps || []);
@@ -3931,7 +3932,8 @@ export function applyRemoteSession(row, { epoch = null } = {}) {
     ((patch.drawItGame.phase ?? null) !== prevDiPhase ||
       (patch.drawItGame.roundIdx ?? null) !== prevDiRoundIdx ||
       JSON.stringify(patch.drawItGame.guesses || []) !== prevDiGuesses ||
-      JSON.stringify(patch.drawItGame.foundOrder || []) !== prevDiFound);
+      JSON.stringify(patch.drawItGame.foundOrder || []) !== prevDiFound ||
+      JSON.stringify(patch.drawItGame.customWords || []) !== prevDiCustomWords);
 
   const truthMeterPlayChanged =
     patch.truthMeterGame &&

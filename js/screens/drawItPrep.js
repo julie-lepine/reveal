@@ -38,6 +38,7 @@ import {
   refreshPrepReadyUi,
   updatePrepStartSlot,
   bindPrepLaunchButtons,
+  syncPrepOnMount,
 } from "../core/prepScreen.js";
 import { navigate } from "../core/router.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
@@ -60,6 +61,31 @@ export function mountDrawItPrep(app) {
   });
 
   const moderationNotice = getModerationNotice();
+  let unbindCharCounter = () => {};
+
+  function captureDraft() {
+    const input = app.querySelector("#new-drawit-word");
+    return {
+      value: input?.value ?? "",
+      focused: document.activeElement === input,
+      selStart: input?.selectionStart ?? 0,
+      selEnd: input?.selectionEnd ?? 0,
+    };
+  }
+
+  function restoreDraft(state) {
+    const input = app.querySelector("#new-drawit-word");
+    if (!input || !state) return;
+    input.value = state.value;
+    if (state.focused) {
+      input.focus();
+      try {
+        input.setSelectionRange(state.selStart, state.selEnd);
+      } catch {
+        /* ignore */
+      }
+    }
+  }
 
   function customWordsListHtml() {
     const items = listMyDrawItCustomWords();
@@ -193,11 +219,15 @@ export function mountDrawItPrep(app) {
   }
 
   function refreshFromSync() {
+    const draft = captureDraft();
     refreshCategoryAndRounds();
     refreshReadySection();
-    if (document.activeElement?.id !== "new-drawit-word") {
-      renderCustomWordsList();
-    }
+    renderCustomWordsList();
+    restoreDraft(draft);
+    updateCharCount(
+      app.querySelector("#new-drawit-word"),
+      app.querySelector("#new-drawit-word-count")
+    );
   }
 
   async function onLaunch({ force = false } = {}) {
@@ -274,7 +304,8 @@ export function mountDrawItPrep(app) {
         void onAddCustomWord();
       }
     });
-    bindCharCounter(
+    unbindCharCounter();
+    unbindCharCounter = bindCharCounter(
       app.querySelector("#new-drawit-word"),
       app.querySelector("#new-drawit-word-count")
     );
@@ -401,6 +432,7 @@ export function mountDrawItPrep(app) {
   });
 
   render();
+  syncPrepOnMount(refreshFromSync);
 
   const guestFollow = prepGuestFollowOnSession({
     prepScreen: "drawit-prep",
@@ -414,6 +446,7 @@ export function mountDrawItPrep(app) {
   });
 
   return () => {
+    unbindCharCounter();
     prepLobby.dispose();
     unbindRemove();
     unsub();

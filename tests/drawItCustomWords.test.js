@@ -568,6 +568,8 @@ describe("FEATURE-DRAWIT-CUSTOM-WORDS-01", () => {
     assert.match(src, /listMyDrawItCustomWords/);
     assert.match(src, /summarizeOthersDrawItCustomAdds/);
     assert.match(src, /a ajouté/);
+    assert.match(src, /syncPrepOnMount\(refreshFromSync\)/);
+    assert.doesNotMatch(src, /activeElement\?\.id !== "new-drawit-word"/);
     assert.doesNotMatch(src, /listDrawItCustomWords\(\)/);
   });
 
