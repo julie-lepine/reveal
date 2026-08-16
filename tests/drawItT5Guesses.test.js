@@ -31,6 +31,7 @@ const {
   DRAW_IT_GUESS_FEED_LIMIT,
   applyDrawItGuess,
   applyDrawItGuessesSerialized,
+  canKeepDrawItGuessComposer,
   canSubmitDrawItGuess,
   drawItGuessesToChatMessages,
   isDrawItGuessInputLocked,
@@ -491,6 +492,71 @@ describe("Draw it ! T5 — session + UI wiring", () => {
     assert.equal(session.lastRound.wordLabel, "Éléphant");
     const feed = drawItGuessesToChatMessages(session.guesses, () => "Bob");
     assert.equal(feed[0].text, "✓ Mot trouvé !");
+  });
+});
+
+describe("Draw it ! — composer guesses stable (clavier)", () => {
+  function identity(extra = {}) {
+    return {
+      phase: DRAW_IT_PHASE_DRAWING,
+      runId: "run-focus",
+      roundIdx: 0,
+      canvasEpoch: 0,
+      drawerUid: HOST_UID,
+      ...extra,
+    };
+  }
+
+  it("un feed distant (guesses / foundOrder) conserve l'identité du composer", () => {
+    const prev = identity({ guesses: [], foundOrder: [] });
+    const nextGuess = applyDrawItGuess(drawingSession({
+      runId: "run-focus",
+    }), guessOpts(GUEST_UID, "girafe")).session;
+    assert.equal(canKeepDrawItGuessComposer(prev, nextGuess), true);
+    const nextFound = applyDrawItGuess(drawingSession({
+      runId: "run-focus",
+    }), guessOpts(GUEST_UID, "elephant")).session;
+    assert.equal(canKeepDrawItGuessComposer(prev, nextFound), true);
+    assert.equal(nextFound.foundOrder.length, 1);
+  });
+
+  it("phase / round / epoch / run / drawer : remount du composer", () => {
+    const prev = identity();
+    assert.equal(
+      canKeepDrawItGuessComposer(prev, identity({ phase: DRAW_IT_PHASE_REVEAL })),
+      false
+    );
+    assert.equal(canKeepDrawItGuessComposer(prev, identity({ roundIdx: 1 })), false);
+    assert.equal(canKeepDrawItGuessComposer(prev, identity({ canvasEpoch: 1 })), false);
+    assert.equal(canKeepDrawItGuessComposer(prev, identity({ runId: "run-b" })), false);
+    assert.equal(
+      canKeepDrawItGuessComposer(prev, identity({ drawerUid: GUEST_UID })),
+      false
+    );
+  });
+
+  it("écran jeu : patch live du feed, pas de remount innerHTML du composer", () => {
+    const src = read("js/games/drawIt.js");
+    const guesses = read("js/core/drawItGuesses.js");
+    assert.match(guesses, /export function canKeepDrawItGuessComposer/);
+    assert.match(src, /canKeepDrawItGuessComposer\(lastPlayIdentity/);
+    assert.match(src, /function patchDrawingLive/);
+    assert.match(src, /chatPanel\.refresh\(\)/);
+    const patchStart = src.indexOf("function patchDrawingLive");
+    const patch = src.slice(patchStart, src.indexOf("function bindGuessChat"));
+    assert.doesNotMatch(patch, /innerHTML\s*=/);
+    assert.doesNotMatch(patch, /teardownChat\(\)/);
+    assert.doesNotMatch(patch, /bindGuessChat\(/);
+    assert.doesNotMatch(patch, /\.focus\(/);
+    const handlerStart = src.indexOf("const unsub = onGameSessionChange");
+    const handler = src.slice(
+      handlerStart,
+      src.indexOf("activateDrawItLive({", handlerStart)
+    );
+    assert.match(handler, /canKeepDrawItGuessComposer\(lastPlayIdentity, session\)/);
+    assert.match(handler, /patchDrawingLive\(session\)/);
+    assert.match(src, /teardownChat\(\);\s*\n\s*teardownCanvas\(\);\s*\n\s*app\.innerHTML/);
+    assert.match(src, /bindGuessChat\(session\)/);
   });
 });
 

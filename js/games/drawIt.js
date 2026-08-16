@@ -17,6 +17,7 @@ import {
   drawItSyncedNowMs,
 } from "../core/drawItRound.js";
 import {
+  canKeepDrawItGuessComposer,
   drawItGuessesToChatMessages,
   isDrawItGuessInputLocked,
   isUidInDrawItFoundOrder,
@@ -78,6 +79,7 @@ export function mountDrawIt(app) {
   let chatPanel = null;
   let canvasCtl = null;
   let board = createDrawItBoardFromSession(getDrawItSession());
+  let lastPlayIdentity = null;
   let deferredDrawingRender = false;
   const liveRender = ({ delta }) => {
     if (!mount.isMounted() || !mount.isCurrentMount()) return;
@@ -162,18 +164,86 @@ export function mountDrawIt(app) {
     return "";
   }
 
+  function rememberPlayIdentity(session) {
+    lastPlayIdentity = {
+      runId: session?.runId || null,
+      roundIdx: Number(session?.roundIdx) || 0,
+      canvasEpoch: Number(session?.canvasEpoch) || 0,
+      drawerUid: session?.drawerUid || null,
+      phase: session?.phase || null,
+    };
+  }
+
+  function hasStableGuessComposer() {
+    return Boolean(chatPanel && app.querySelector("#draw-it-guess-input"));
+  }
+
   function applyGuessInputLock(session) {
     const nowMs = drawItSyncedNowMs(session);
     const locked = isDrawItGuessInputLocked(session, localUid(), nowMs);
+    const reason = guessLockReason(session, nowMs);
     const inputEl = app.querySelector("#draw-it-guess-input");
     const sendEl = app.querySelector("#draw-it-guess-send");
+    const hintEl = app.querySelector("#draw-it-guess-hint");
     if (inputEl) {
       inputEl.disabled = locked;
       inputEl.placeholder = locked
-        ? guessLockReason(session, nowMs) || "Propositions fermées"
+        ? reason || "Propositions fermées"
         : "Propose un mot…";
     }
     if (sendEl) sendEl.disabled = locked;
+    if (hintEl) {
+      if (reason) {
+        hintEl.hidden = false;
+        hintEl.textContent = reason;
+      } else {
+        hintEl.hidden = true;
+        hintEl.textContent = "";
+      }
+    }
+  }
+
+  function patchFoundLine(session) {
+    const el = app.querySelector("#draw-it-found");
+    if (!el) return;
+    const found = Array.isArray(session.foundOrder) ? session.foundOrder : [];
+    if (!found.length) {
+      el.hidden = true;
+      el.textContent = "";
+      return;
+    }
+    el.hidden = false;
+    el.textContent = `Trouvé : ${found
+      .map((entry) => nameForUserId(entry.uid) || "Joueur")
+      .join(", ")}`;
+  }
+
+  function patchDrawerWord(session) {
+    if (!isLocalDrawer(session) || !privateWord) return;
+    const el = app.querySelector("#draw-it-word");
+    if (el) el.textContent = privateWord;
+  }
+
+  function patchDrawingLive(session) {
+    if (!mount.isMounted() || !mount.isCurrentMount()) return;
+    if (!hasStableGuessComposer()) {
+      render();
+      return;
+    }
+    syncActiveDrawItLiveSession(session);
+    board = maybeResetDrawItBoard(board, session);
+    chatPanel.refresh();
+    applyGuessInputLock(session);
+    patchFoundLine(session);
+    const clock = app.querySelector("#draw-it-clock");
+    if (clock) {
+      clock.textContent = formatDrawItCountdown(
+        remainingMsUntil(session.roundEndsAt, drawItSyncedNowMs(session))
+      );
+    }
+    canvasCtl?.syncInteractive();
+    canvasCtl?.paint();
+    rememberPlayIdentity(session);
   }
 
   function bindGuessChat(session) {
@@ -226,11 +296,13 @@ export function mountDrawIt(app) {
 
   function foundLine(session) {
     const found = Array.isArray(session.foundOrder) ? session.foundOrder : [];
-    if (!found.length) return "";
+    if (!found.length) {
+      return `<p class="hint" id="draw-it-found" hidden></p>`;
+    }
     const names = found
       .map((entry) => nameForUserId(entry.uid) || "Joueur")
       .map((name) => escapeHtml(name));
-    return `<p class="hint">Trouvé : ${names.join(", ")}</p>`;
+    return `<p class="hint" id="draw-it-found">Trouvé : ${names.join(", ")}</p>`;
   }
 
   function roundRecapRowsHtml(session) {
@@ -292,7 +364,9 @@ export function mountDrawIt(app) {
           <button type="button" class="chat-box__send" id="draw-it-guess-send"
             aria-label="Envoyer" ${locked ? "disabled" : ""}>➤</button>
         </div>
-        ${hint ? `<p class="hint">${escapeHtml(hint)}</p>` : ""}
+        <p class="hint" id="draw-it-guess-hint"${hint ? "" : " hidden"}>${
+          hint ? escapeHtml(hint) : ""
+        }</p>
       </div>`;
   }
 
@@ -320,9 +394,9 @@ export function mountDrawIt(app) {
     let phaseHtml = "";
     if (phase === DRAW_IT_PHASE_DRAWING) {
       const wordBlock = drawer
-        ? `<p class="hot-take-text">${escapeHtml(privateWord || "…")}</p>
+        ? `<p class="hot-take-text" id="draw-it-word">${escapeHtml(privateWord || "…")}</p>
            <p class="hint">Toi seul vois ce mot. Dessine-le.</p>`
-        : `<p class="hot-take-text">✏️ ${escapeHtml(drawerName)} dessine…</p>
+        : `<p class="hot-take-text" id="draw-it-word">✏️ ${escapeHtml(drawerName)} dessine…</p>
            <p class="hint">Le mot est secret jusqu'à la fin des 60 secondes.</p>`;
       phaseHtml = `
         <div class="card">
@@ -386,6 +460,7 @@ export function mountDrawIt(app) {
       bindCanvas(session);
     }
     bindGuessChat(session);
+    rememberPlayIdentity(session);
 
     app.querySelector("#draw-it-advance")?.addEventListener(
       "click",
@@ -464,10 +539,21 @@ export function mountDrawIt(app) {
       canvasCtl?.isDrawing()
     ) {
       deferredDrawingRender = true;
-      chatPanel?.refresh();
-      applyGuessInputLock(session);
-      canvasCtl.syncInteractive();
-      canvasCtl.paint();
+      patchDrawingLive(session);
+      return;
+    }
+    if (canKeepDrawItGuessComposer(lastPlayIdentity, session) && hasStableGuessComposer()) {
+      patchDrawingLive(session);
+      void refreshPrivateWord(session).then(() => {
+        if (!mount.isMounted() || !mount.isCurrentMount()) return;
+        const live = getDrawItSession();
+        if (!canKeepDrawItGuessComposer(lastPlayIdentity, live) || !hasStableGuessComposer()) {
+          render();
+          return;
+        }
+        patchDrawerWord(live);
+        patchDrawingLive(live);
+      });
       return;
     }
     // Le nouveau roundIdx/timer est rendu immédiatement ; le mot privé du
@@ -480,6 +566,12 @@ export function mountDrawIt(app) {
         canvasCtl?.isDrawing()
       ) {
         deferredDrawingRender = true;
+        return;
+      }
+      const live = getDrawItSession();
+      if (canKeepDrawItGuessComposer(lastPlayIdentity, live) && hasStableGuessComposer()) {
+        patchDrawerWord(live);
+        patchDrawingLive(live);
         return;
       }
       render();

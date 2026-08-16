@@ -85,6 +85,21 @@ export function isDrawItGuessInputLocked(session, uid, nowMs = Date.now()) {
 }
 
 /**
+ * Même manche drawing : le composer/input peut rester le même nœud DOM.
+ * Un changement de phase / run / round / epoch / drawer exige un rerender.
+ */
+export function canKeepDrawItGuessComposer(prev = {}, next = {}) {
+  if (!prev || !next) return false;
+  if (next.phase !== DRAW_IT_PHASE_DRAWING) return false;
+  if (prev.phase !== DRAW_IT_PHASE_DRAWING) return false;
+  if ((prev.runId || null) !== (next.runId || null)) return false;
+  if (Number(prev.roundIdx) !== Number(next.roundIdx)) return false;
+  if (Number(prev.canvasEpoch || 0) !== Number(next.canvasEpoch || 0)) return false;
+  if (String(prev.drawerUid || "") !== String(next.drawerUid || "")) return false;
+  return true;
+}
+
+/**
  * Applique une proposition comme la RPC (après FOR UPDATE).
  * `serverAt` est obligatoire pour l'horodatage — le `at` / `clientAt` client est ignoré.
  */
