@@ -7,6 +7,7 @@ import {
   commitDrawItCompletedStroke,
   commitDrawItUndoStroke,
   commitDrawItClearCanvas,
+  commitDrawItEraseStrokes,
   loadLocalDrawItPrivateWord,
   submitDrawItGuess,
 } from "../core/drawItSession.js";
@@ -46,13 +47,16 @@ import { mountDrawItCanvas, mountDrawItReplayCanvas } from "../core/drawItCanvas
 import {
   applyDrawItBoardClear,
   applyDrawItBoardUndo,
+  applyDrawItBoardErase,
   absorbDrawItLiveCompletedStroke,
   createDrawItBoardFromSession,
   createDrawItBrush,
   createDrawItRecapBoardFromSession,
-  DRAW_IT_TOOL_COLORS,
+  DRAW_IT_TOOL_DRAW,
+  DRAW_IT_TOOL_ERASE,
   DRAW_IT_TOOL_WIDTHS,
   maybeResetDrawItBoard,
+  resolveDrawItToolColor,
   undoLastCompletedDrawItStroke,
 } from "../core/drawItStrokes.js";
 import {
@@ -109,6 +113,9 @@ export function mountDrawIt(app) {
       board = absorbDrawItLiveCompletedStroke(board, delta.stroke, getDrawItSession());
     } else if (delta?.action === "undo" && delta.strokeId) {
       board = applyDrawItBoardUndo(board, delta.strokeId);
+      rememberSuppressedStrokes(board);
+    } else if (delta?.action === "erase" && Array.isArray(delta.strokeIds)) {
+      board = applyDrawItBoardErase(board, delta.strokeIds);
       rememberSuppressedStrokes(board);
     } else if (delta?.action === "clear") {
       board = applyDrawItBoardClear(board, delta.canvasEpoch);
@@ -194,6 +201,12 @@ export function mountDrawIt(app) {
         });
         void commitDrawItCompletedStroke(stroke);
         syncToolButtons();
+      },
+      onEraseEnd: (strokeIds) => {
+        rememberSuppressedStrokes(board);
+        canvasCtl?.paint();
+        syncToolButtons();
+        void commitDrawItEraseStrokes(strokeIds);
       },
       getBrush: () => brush,
       onDrawingChange: () => {
@@ -494,7 +507,7 @@ export function mountDrawIt(app) {
             ? "✏️"
             : row.found
               ? `${row.rank}.`
-              : "—";
+              : "-";
         const result =
           row.role === "drawer"
             ? "Dessinateur"
@@ -528,14 +541,25 @@ export function mountDrawIt(app) {
     const root = app.querySelector("#draw-it-tools");
     if (!root) return;
     const busy = toolsBusy();
-    root.querySelectorAll("[data-color]").forEach((btn) => {
-      btn.classList.toggle("is-active", btn.getAttribute("data-color") === brush.color);
-      btn.disabled = busy;
-    });
+    const color = resolveDrawItToolColor(brush.color);
+    const colorInput = root.querySelector("#draw-it-color-input");
+    const swatch = root.querySelector("#draw-it-color-swatch");
+    const colorWrap = root.querySelector("#draw-it-color");
+    if (colorInput) {
+      if (colorInput.value !== color) colorInput.value = color;
+      colorInput.disabled = busy;
+    }
+    if (swatch) swatch.style.background = color;
+    if (colorWrap) colorWrap.classList.toggle("is-disabled", busy);
     root.querySelectorAll("[data-width]").forEach((btn) => {
       btn.classList.toggle("is-active", Number(btn.getAttribute("data-width")) === brush.width);
       btn.disabled = busy;
     });
+    const eraseEl = root.querySelector("#draw-it-erase");
+    if (eraseEl) {
+      eraseEl.classList.toggle("is-active", brush.tool === DRAW_IT_TOOL_ERASE);
+      eraseEl.disabled = busy;
+    }
     const undoEl = root.querySelector("#draw-it-undo");
     const clearEl = root.querySelector("#draw-it-clear");
     if (undoEl) undoEl.disabled = busy || !(board.strokes || []).length;
@@ -546,13 +570,7 @@ export function mountDrawIt(app) {
     if (session.phase !== DRAW_IT_PHASE_DRAWING || !isLocalDrawer(session)) {
       return "";
     }
-    const colors = DRAW_IT_TOOL_COLORS.map(
-      (entry) => `
-        <button type="button" class="draw-it-swatch${
-          entry.value === brush.color ? " is-active" : ""
-        }" data-color="${escapeHtml(entry.value)}" style="background:${escapeHtml(entry.value)}"
-          aria-label="${escapeHtml(entry.label)}" title="${escapeHtml(entry.label)}"></button>`
-    ).join("");
+    const color = escapeHtml(resolveDrawItToolColor(brush.color));
     const widths = DRAW_IT_TOOL_WIDTHS.map(
       (entry) => `
         <button type="button" class="draw-it-width${
@@ -561,9 +579,19 @@ export function mountDrawIt(app) {
     ).join("");
     return `
       <div class="draw-it-tools" id="draw-it-tools">
-        <div class="draw-it-tools__row" role="group" aria-label="Couleur">${colors}</div>
-        <div class="draw-it-tools__row" role="group" aria-label="Épaisseur">${widths}</div>
+        <div class="draw-it-tools__row" role="group" aria-label="Épaisseur">
+          <div class="draw-it-color" id="draw-it-color">
+            <span class="draw-it-color__swatch" id="draw-it-color-swatch"
+              style="background:${color}" aria-hidden="true"></span>
+            <input type="color" id="draw-it-color-input" value="${color}"
+              aria-label="Choisir une couleur" />
+          </div>
+          ${widths}
+        </div>
         <div class="draw-it-tools__row draw-it-tools__actions">
+          <button type="button" class="btn btn-ghost draw-it-tools__btn draw-it-eraser${
+            brush.tool === DRAW_IT_TOOL_ERASE ? " is-active" : ""
+          }" id="draw-it-erase" aria-label="Gomme" title="Gomme">🧽 Gomme</button>
           <button type="button" class="btn btn-ghost draw-it-tools__btn" id="draw-it-undo">Undo</button>
           <button type="button" class="btn btn-ghost draw-it-tools__btn" id="draw-it-clear">Clear</button>
         </div>
@@ -573,7 +601,28 @@ export function mountDrawIt(app) {
   function bindTools() {
     const root = app.querySelector("#draw-it-tools");
     if (!root) return;
+    const colorInput = root.querySelector("#draw-it-color-input");
+    if (colorInput) {
+      const applyPickerColor = () => {
+        if (toolsBusy()) {
+          colorInput.value = resolveDrawItToolColor(brush.color);
+          return;
+        }
+        brush = createDrawItBrush({
+          color: colorInput.value,
+          width: brush.width,
+          tool: brush.tool,
+        });
+        syncToolButtons();
+      };
+      colorInput.addEventListener("input", applyPickerColor);
+      colorInput.addEventListener("change", applyPickerColor);
+    }
+    root.querySelector("#draw-it-color")?.addEventListener("pointerdown", (event) => {
+      event.stopPropagation();
+    });
     root.addEventListener("click", (event) => {
+      if (event.target?.closest?.("#draw-it-color-input")) return;
       const target = event.target?.closest?.("button");
       if (!target || !root.contains(target)) return;
       event.preventDefault();
@@ -598,19 +647,26 @@ export function mountDrawIt(app) {
         void commitDrawItClearCanvas();
         return;
       }
-      if (toolsBusy()) return;
-      if (target.hasAttribute("data-color")) {
+      if (target.id === "draw-it-erase") {
+        if (toolsBusy()) return;
         brush = createDrawItBrush({
-          color: target.getAttribute("data-color"),
+          color: brush.color,
           width: brush.width,
+          tool:
+            brush.tool === DRAW_IT_TOOL_ERASE
+              ? DRAW_IT_TOOL_DRAW
+              : DRAW_IT_TOOL_ERASE,
         });
+        canvasCtl?.syncInteractive();
         syncToolButtons();
         return;
       }
+      if (toolsBusy()) return;
       if (target.hasAttribute("data-width")) {
         brush = createDrawItBrush({
           color: brush.color,
           width: Number(target.getAttribute("data-width")),
+          tool: brush.tool,
         });
         syncToolButtons();
       }
@@ -691,7 +747,7 @@ export function mountDrawIt(app) {
       phaseHtml = `
         <div class="card draw-it-recap">
           <p class="label-upper label-upper--gold">Récapitulatif de la manche</p>
-          <p class="hot-take-text">${escapeHtml(word || "—")}</p>
+          <p class="hot-take-text">${escapeHtml(word || "-")}</p>
           <p class="hint">${
             recap.allGuessersFound ? "Tout le monde a trouvé !" : "Temps écoulé."
           } Le mot est maintenant public.</p>
@@ -722,7 +778,7 @@ export function mountDrawIt(app) {
           ).join("")}</div>
           <span class="muted">${roundIdx + 1}/${total}</span>
         </div>
-        <p class="label-upper label-upper--gold">✏️ Draw it !</p>
+        <div class="logo logo--sm"><h1>DRAW IT !</h1></div>
         ${phaseHtml}
         ${guessChatHtml(session)}
         ${gameExitBarHtml()}

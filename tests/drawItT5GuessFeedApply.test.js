@@ -114,7 +114,7 @@ function participants() {
 function launchedSession(extra = {}) {
   return {
     ...buildDrawItLaunchState({
-      session: { selectedCategoryId: "demo", roundCount: 3, ready: {} },
+      session: { selectedCategoryId: "Facile", roundCount: 3, ready: {} },
       participants: participants(),
       nowMs: NOW,
       runId: extra.runId || "run-t5-rpc",

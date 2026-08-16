@@ -14,25 +14,52 @@ export const DRAW_IT_STROKE_MAX_COUNT = 25;
 export const DRAW_IT_STROKE_MIN_DIST = 0.012;
 export const DRAW_IT_DEFAULT_COLOR = "#f4f4f5";
 export const DRAW_IT_DEFAULT_WIDTH = 4;
+export const DRAW_IT_TOOL_DRAW = "draw";
+export const DRAW_IT_TOOL_ERASE = "erase";
+export const DRAW_IT_ERASE_PREVIEW_COLOR = "rgba(156,163,175,0.55)";
 export const DRAW_IT_TOOL_COLORS = [
   { id: "ink", value: "#f4f4f5", label: "Clair" },
   { id: "red", value: "#ef4444", label: "Rouge" },
-  { id: "blue", value: "#38bdf8", label: "Bleu" },
-  { id: "green", value: "#4ade80", label: "Vert" },
+  { id: "orange", value: "#f97316", label: "Orange" },
   { id: "yellow", value: "#facc15", label: "Jaune" },
+  { id: "green", value: "#4ade80", label: "Vert" },
+  { id: "blue", value: "#38bdf8", label: "Bleu" },
   { id: "violet", value: "#818cf8", label: "Violet" },
+  { id: "pink", value: "#ec4899", label: "Rose" },
+  { id: "gray", value: "#9ca3af", label: "Gris" },
 ];
 export const DRAW_IT_TOOL_WIDTHS = [
   { id: "thin", value: 4, label: "Fin" },
   { id: "medium", value: 7, label: "Moyen" },
   { id: "thick", value: 12, label: "Épais" },
 ];
+const DRAW_IT_ERASER_RADIUS_BY_WIDTH = {
+  4: 0.024,
+  7: 0.038,
+  12: 0.055,
+};
+
+const DRAW_IT_HEX6 = /^#([0-9a-f]{6})$/i;
+const DRAW_IT_HEX3 = /^#([0-9a-f]{3})$/i;
 
 export function resolveDrawItToolColor(color) {
-  const value = String(color || "").trim().slice(0, 32);
-  return DRAW_IT_TOOL_COLORS.some((entry) => entry.value === value)
-    ? value
-    : DRAW_IT_DEFAULT_COLOR;
+  const value = String(color || "").trim();
+  const short = DRAW_IT_HEX3.exec(value);
+  if (short) {
+    const [r, g, b] = short[1];
+    return `#${r}${r}${g}${g}${b}${b}`.toLowerCase();
+  }
+  const full = DRAW_IT_HEX6.exec(value);
+  if (full) return `#${full[1]}`.toLowerCase();
+  return DRAW_IT_DEFAULT_COLOR;
+}
+
+export function applyDrawItBrushColor(brush = {}, color) {
+  return createDrawItBrush({
+    color,
+    width: brush.width,
+    tool: brush.tool,
+  });
 }
 
 export function resolveDrawItToolWidth(width) {
@@ -43,10 +70,35 @@ export function resolveDrawItToolWidth(width) {
 }
 
 export function createDrawItBrush(overrides = {}) {
+  const tool =
+    overrides.tool === DRAW_IT_TOOL_ERASE ? DRAW_IT_TOOL_ERASE : DRAW_IT_TOOL_DRAW;
   return {
     color: resolveDrawItToolColor(overrides.color),
     width: resolveDrawItToolWidth(overrides.width),
+    tool,
   };
+}
+
+export function isDrawItEraseTool(tool) {
+  return tool === DRAW_IT_TOOL_ERASE;
+}
+
+export function drawItEraserRadius(width) {
+  const resolved = resolveDrawItToolWidth(width);
+  return DRAW_IT_ERASER_RADIUS_BY_WIDTH[resolved] || DRAW_IT_ERASER_RADIUS_BY_WIDTH[4];
+}
+
+export function sanitizeEraseStrokeIds(ids, max = DRAW_IT_STROKE_MAX_COUNT) {
+  const seen = new Set();
+  const out = [];
+  for (const raw of Array.isArray(ids) ? ids : []) {
+    const id = String(raw || "").trim();
+    if (!id || id.length > 128 || seen.has(id)) continue;
+    seen.add(id);
+    out.push(id);
+    if (out.length >= max) break;
+  }
+  return out;
 }
 
 export function clamp01(value) {
@@ -74,6 +126,67 @@ export function clientPointToNormalized(clientX, clientY, rect) {
 export function pointDistance(a, b) {
   if (!a || !b) return Infinity;
   return Math.hypot(Number(a[0]) - Number(b[0]), Number(a[1]) - Number(b[1]));
+}
+
+function pointToSegmentDistance(point, start, end) {
+  if (!point || !start) return Infinity;
+  if (!end) return pointDistance(point, start);
+  const dx = Number(end[0]) - Number(start[0]);
+  const dy = Number(end[1]) - Number(start[1]);
+  const len2 = dx * dx + dy * dy;
+  if (len2 <= 0) return pointDistance(point, start);
+  let t =
+    ((Number(point[0]) - Number(start[0])) * dx +
+      (Number(point[1]) - Number(start[1])) * dy) /
+    len2;
+  if (t < 0) t = 0;
+  else if (t > 1) t = 1;
+  return Math.hypot(
+    Number(point[0]) - (Number(start[0]) + t * dx),
+    Number(point[1]) - (Number(start[1]) + t * dy)
+  );
+}
+
+function polylineSegments(points) {
+  const list = Array.isArray(points) ? points.filter(Boolean) : [];
+  if (!list.length) return [];
+  if (list.length === 1) return [[list[0], list[0]]];
+  const out = [];
+  for (let i = 1; i < list.length; i += 1) {
+    out.push([list[i - 1], list[i]]);
+  }
+  return out;
+}
+
+export function strokeIntersectsErasePath(stroke, erasePoints, radius) {
+  const hit = Number(radius);
+  if (!Number.isFinite(hit) || hit <= 0) return false;
+  const strokePts = Array.isArray(stroke?.points) ? stroke.points : [];
+  const erasePts = Array.isArray(erasePoints) ? erasePoints : [];
+  if (!strokePts.length || !erasePts.length) return false;
+  const strokeWidthNorm = (Number(stroke.width) || DRAW_IT_DEFAULT_WIDTH) / 800;
+  const threshold = hit + strokeWidthNorm;
+  const strokeSegs = polylineSegments(strokePts);
+  const eraseSegs = polylineSegments(erasePts);
+  for (const [a, b] of eraseSegs) {
+    for (const [c, d] of strokeSegs) {
+      if (pointToSegmentDistance(a, c, d) <= threshold) return true;
+      if (pointToSegmentDistance(b, c, d) <= threshold) return true;
+      if (pointToSegmentDistance(c, a, b) <= threshold) return true;
+      if (pointToSegmentDistance(d, a, b) <= threshold) return true;
+    }
+  }
+  return false;
+}
+
+export function collectErasedStrokeIds(strokes, erasePoints, radius) {
+  const ids = [];
+  for (const stroke of Array.isArray(strokes) ? strokes : []) {
+    const id = String(stroke?.strokeId || "").trim();
+    if (!id) continue;
+    if (strokeIntersectsErasePath(stroke, erasePoints, radius)) ids.push(id);
+  }
+  return sanitizeEraseStrokeIds(ids);
 }
 
 export function shouldKeepSimplifiedPoint(
@@ -253,6 +366,29 @@ export function applyDrawItDurableUndo(session = {}, strokeId, { uid } = {}) {
     ok: true,
     skipped: false,
     session: { ...session, strokes },
+  };
+}
+
+export function applyDrawItDurableErase(session = {}, strokeIds, { uid } = {}) {
+  const gate = canPersistDrawItStroke(session, uid);
+  if (!gate.ok) return { ok: false, reason: gate.reason, session };
+  const ids = new Set(sanitizeEraseStrokeIds(strokeIds));
+  if (!ids.size) return { ok: true, skipped: true, session };
+  const existing = completedDrawItStrokesFromSession(session);
+  const strokes = existing.filter((stroke) => !ids.has(stroke.strokeId));
+  if (strokes.length === existing.length) {
+    return { ok: true, skipped: true, session };
+  }
+  return {
+    ok: true,
+    skipped: false,
+    session: {
+      ...session,
+      strokes,
+      suppressedStrokeIds: [
+        ...new Set([...(session.suppressedStrokeIds || []), ...ids]),
+      ],
+    },
   };
 }
 
@@ -464,6 +600,18 @@ export function applyDrawItBoardUndo(board, strokeId) {
   };
 }
 
+export function applyDrawItBoardErase(board, strokeIds) {
+  const ids = sanitizeEraseStrokeIds(strokeIds);
+  if (!board || !ids.length) {
+    return board ? { ...board, currentStroke: null } : createEmptyDrawItBoard();
+  }
+  let next = board;
+  for (const id of ids) {
+    next = applyDrawItBoardUndo(next, id);
+  }
+  return { ...next, currentStroke: null };
+}
+
 export function undoLastCompletedDrawItStroke(board) {
   if (!board || board.currentStroke) return board;
   const strokes = board.strokes || [];
@@ -568,27 +716,29 @@ export function beginDrawItStroke(
     color = DRAW_IT_DEFAULT_COLOR,
     width = DRAW_IT_DEFAULT_WIDTH,
     strokeId = null,
+    tool = DRAW_IT_TOOL_DRAW,
   } = {}
 ) {
   if (!board) return createEmptyDrawItBoard();
   let next = board.currentStroke ? endDrawItStroke(board) : board;
-  if (next.strokes.length >= DRAW_IT_STROKE_MAX_COUNT) {
+  const erase = isDrawItEraseTool(tool);
+  if (!erase && next.strokes.length >= DRAW_IT_STROKE_MAX_COUNT) {
     return { ...next, currentStroke: null };
   }
   if (!point) return next;
-  const strokeSeq = Number(next.strokeSeq) + 1;
+  const strokeSeq = Number(next.strokeSeq) + (erase ? 0 : 1);
   return {
     ...next,
     strokeSeq,
     currentStroke: {
-      strokeId: strokeId || makeDrawItStrokeId(strokeSeq),
-      seq: strokeSeq,
+      strokeId: strokeId || makeDrawItStrokeId(strokeSeq || next.strokeSeq || 1),
+      seq: strokeSeq || Number(next.strokeSeq) || 1,
       canvasEpoch: Number(next.canvasEpoch) || 0,
       points: [point],
-      color:
-        typeof color === "string" && color
-          ? color.slice(0, 32)
-          : DRAW_IT_DEFAULT_COLOR,
+      tool: erase ? DRAW_IT_TOOL_ERASE : DRAW_IT_TOOL_DRAW,
+      color: erase
+        ? DRAW_IT_ERASE_PREVIEW_COLOR
+        : resolveDrawItToolColor(color),
       width: Number.isFinite(Number(width))
         ? Math.min(64, Math.max(1, Number(width)))
         : DRAW_IT_DEFAULT_WIDTH,
@@ -616,6 +766,15 @@ export function endDrawItStroke(board, finalPoint) {
       points: appendSimplifiedPoint(stroke.points, finalPoint, { force: true }),
     };
   }
+  if (isDrawItEraseTool(stroke.tool)) {
+    const points = downsampleDrawItStrokePoints(stroke.points);
+    const ids = collectErasedStrokeIds(
+      board.strokes,
+      points,
+      drawItEraserRadius(stroke.width)
+    );
+    return applyDrawItBoardErase({ ...board, currentStroke: null }, ids);
+  }
   if (!stroke.points.length || board.strokes.length >= DRAW_IT_STROKE_MAX_COUNT) {
     return { ...board, currentStroke: null };
   }
@@ -625,6 +784,7 @@ export function endDrawItStroke(board, finalPoint) {
       ...board.strokes,
       {
         ...stroke,
+        tool: DRAW_IT_TOOL_DRAW,
         seq: Number(stroke.seq) || Number(board.strokeSeq) || 0,
         canvasEpoch: Number(stroke.canvasEpoch) || Number(board.canvasEpoch) || 0,
       },

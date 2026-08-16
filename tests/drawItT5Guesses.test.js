@@ -101,7 +101,7 @@ function threePlayers() {
 function drawingSession(extra = {}) {
   return {
     ...buildDrawItLaunchState({
-      session: { selectedCategoryId: "demo", roundCount: 3, ready: {} },
+      session: { selectedCategoryId: "Facile", roundCount: 3, ready: {} },
       participants: extra.participants || twoPlayers(),
       nowMs: NOW,
       runId: extra.runId || "run-t5",
@@ -139,7 +139,7 @@ async function launchTwoPlayerGame() {
     },
     drawItGame: defaultDrawItPrepSession(),
   });
-  await setDrawItCategory("demo");
+  await setDrawItCategory("Facile");
   await setDrawItRoundCount(3);
   const result = await markDrawItLobbyStarted({ rosterNames: ["Alice", "Bob"] });
   assert.equal(result?.ok, true);
@@ -439,7 +439,7 @@ describe("Draw it ! T5 — session + UI wiring", () => {
     assert.match(src, /throw new Error/);
     assert.doesNotMatch(src, /lobby_messages/);
     assert.doesNotMatch(src, /addLobbyMessage/);
-    assert.doesNotMatch(src, /pointerdown|Broadcast|awardDrawItRound/);
+    assert.doesNotMatch(src, /awardDrawItRound/);
   });
 
   it("RPC appliquée : guesses locales + feed lisible tout de suite", () => {

@@ -41,7 +41,7 @@ const { drawItFromRemote, drawItToRemote } = await import(
 
 function session() {
   return buildDrawItLaunchState({
-    session: { selectedCategoryId: "demo", roundCount: 3, ready: {} },
+      session: { selectedCategoryId: "Facile", roundCount: 3, ready: {} },
     participants: [
       { userId: DRAWER, name: "Alice" },
       { userId: BOB, name: "Bob" },

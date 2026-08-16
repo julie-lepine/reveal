@@ -169,6 +169,7 @@ export function mountDrawItCanvas(hostEl, {
   onStrokeStart,
   onStrokePoints,
   onStrokeEnd,
+  onEraseEnd,
   createStrokeId,
   getBrush,
   onDrawingChange,
@@ -255,12 +256,16 @@ export function mountDrawItCanvas(hostEl, {
         strokeId: createStrokeId?.() || null,
         color: getBrush?.()?.color,
         width: getBrush?.()?.width,
+        tool: getBrush?.()?.tool,
       }
     );
     setBoard(next);
-    if (next?.currentStroke) onStrokeStart?.(next.currentStroke);
+    if (next?.currentStroke && next.currentStroke.tool !== "erase") {
+      onStrokeStart?.(next.currentStroke);
+    }
     onDrawingChange?.(true);
     paint();
+    canvas.classList.toggle("draw-it-canvas--erase", getBrush?.()?.tool === "erase");
   }
 
   function onPointerMove(event) {
@@ -280,10 +285,11 @@ export function mountDrawItCanvas(hostEl, {
     }
     setBoard(next);
     const active = next?.currentStroke;
+    const erasing = before?.currentStroke?.tool === "erase";
     if (ok && active && active.strokeId === strokeId) {
       const added = active.points.slice(beforeLength);
       if (added.length) {
-        onStrokePoints?.(strokeId, added);
+        if (!erasing) onStrokePoints?.(strokeId, added);
         drawDrawItLiveSegment(
           canvas.getContext("2d"),
           {
@@ -300,9 +306,17 @@ export function mountDrawItCanvas(hostEl, {
       drawing = false;
       pointerId = null;
       onDrawingChange?.(false);
-      const completed = next?.strokes?.[next.strokes.length - 1];
-      if (completed?.strokeId === strokeId) {
-        onStrokeEnd?.(completed, completed.points.slice(beforeLength));
+      if (erasing) {
+        const remaining = new Set((next.strokes || []).map((entry) => entry.strokeId));
+        const erased = (before.strokes || [])
+          .map((entry) => entry.strokeId)
+          .filter((id) => !remaining.has(id));
+        if (erased.length) onEraseEnd?.(erased);
+      } else {
+        const completed = next?.strokes?.[next.strokes.length - 1];
+        if (completed?.strokeId === strokeId) {
+          onStrokeEnd?.(completed, completed.points.slice(beforeLength));
+        }
       }
       paint();
     }
@@ -323,6 +337,7 @@ export function mountDrawItCanvas(hostEl, {
     const before = getBoard();
     const strokeId = before?.currentStroke?.strokeId;
     const beforeLength = before?.currentStroke?.points?.length || 0;
+    const erasing = before?.currentStroke?.tool === "erase";
     const next = applyDrawItPointer(
       before,
       event.type === "pointercancel" ? "cancel" : "up",
@@ -330,9 +345,17 @@ export function mountDrawItCanvas(hostEl, {
       true
     );
     setBoard(next);
-    const completed = next?.strokes?.[next.strokes.length - 1];
-    if (completed?.strokeId === strokeId) {
-      onStrokeEnd?.(completed, completed.points.slice(beforeLength));
+    if (erasing) {
+      const remaining = new Set((next.strokes || []).map((entry) => entry.strokeId));
+      const erased = (before.strokes || [])
+        .map((entry) => entry.strokeId)
+        .filter((id) => !remaining.has(id));
+      if (erased.length) onEraseEnd?.(erased);
+    } else {
+      const completed = next?.strokes?.[next.strokes.length - 1];
+      if (completed?.strokeId === strokeId) {
+        onStrokeEnd?.(completed, completed.points.slice(beforeLength));
+      }
     }
     paint();
   }
@@ -341,6 +364,7 @@ export function mountDrawItCanvas(hostEl, {
     if (cleaned) return;
     const ok = allowed();
     canvas.classList.toggle("draw-it-canvas--active", ok);
+    canvas.classList.toggle("draw-it-canvas--erase", ok && getBrush?.()?.tool === "erase");
     canvas.style.pointerEvents = ok ? "auto" : "none";
     canvas.style.setProperty("touch-action", "none");
     hostEl.style.setProperty("touch-action", "none");
@@ -397,10 +421,19 @@ export function mountDrawItCanvas(hostEl, {
       if (drawing) {
         const before = getBoard();
         const strokeId = before?.currentStroke?.strokeId;
+        const erasing = before?.currentStroke?.tool === "erase";
         const next = applyDrawItPointer(before, "cancel", null, true);
         setBoard(next);
-        const completed = next?.strokes?.[next.strokes.length - 1];
-        if (completed?.strokeId === strokeId) onStrokeEnd?.(completed, []);
+        if (erasing) {
+          const remaining = new Set((next.strokes || []).map((entry) => entry.strokeId));
+          const erased = (before.strokes || [])
+            .map((entry) => entry.strokeId)
+            .filter((id) => !remaining.has(id));
+          if (erased.length) onEraseEnd?.(erased);
+        } else {
+          const completed = next?.strokes?.[next.strokes.length - 1];
+          if (completed?.strokeId === strokeId) onStrokeEnd?.(completed, []);
+        }
         drawing = false;
         pointerId = null;
       }

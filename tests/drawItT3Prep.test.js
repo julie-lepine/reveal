@@ -46,6 +46,9 @@ function makeWords(count, categoryId, prefix = categoryId) {
   }));
 }
 
+/** Catégorie réelle du catalogue actuel — `demo` n'existe plus. */
+const TEST_CATEGORY = "Facile";
+
 const PUBLIC_FORBIDDEN = ["deck", "words", "wordId", "wordLabel", "acceptedAnswers"];
 
 describe("Draw it ! T3 — catégorie", () => {
@@ -55,11 +58,11 @@ describe("Draw it ! T3 — catégorie", () => {
 
   it("catégorie valide acceptée", async () => {
     assert.equal(isDrawItCategoryId(DRAW_IT_CATALOG_ID), true);
-    assert.equal(isDrawItCategoryId("demo"), true);
-    await setDrawItCategory("demo");
-    assert.equal(getDrawItSession().selectedCategoryId, "demo");
+    assert.equal(isDrawItCategoryId(TEST_CATEGORY), true);
+    await setDrawItCategory(TEST_CATEGORY);
+    assert.equal(getDrawItSession().selectedCategoryId, TEST_CATEGORY);
     assert.equal(
-      validateDrawItPrep({ selectedCategoryId: "demo", roundCount: 3 }).valid,
+      validateDrawItPrep({ selectedCategoryId: TEST_CATEGORY, roundCount: 3 }).valid,
       true
     );
   });
@@ -77,7 +80,7 @@ describe("Draw it ! T3 — catégorie", () => {
   it("sélection catégorie ne mute pas le catalogue", async () => {
     const before = JSON.stringify(DRAW_IT_WORDS);
     const beforeCats = JSON.stringify(DRAW_IT_CATEGORIES);
-    await setDrawItCategory("demo");
+    await setDrawItCategory(TEST_CATEGORY);
     await setDrawItCategory(DRAW_IT_CATALOG_ID);
     assert.equal(JSON.stringify(DRAW_IT_WORDS), before);
     assert.equal(JSON.stringify(DRAW_IT_CATEGORIES), beforeCats);
@@ -89,26 +92,26 @@ describe("Draw it ! T3 — nombre de manches", () => {
     for (const n of DRAW_IT_ROUND_PRESETS) {
       assert.equal(isDrawItRoundCount(n), true);
     }
-    const words = makeWords(8, "demo");
+    const words = makeWords(8, TEST_CATEGORY);
     assert.equal(
-      validateDrawItPrep({ selectedCategoryId: "demo", roundCount: 3 }, words).valid,
+      validateDrawItPrep({ selectedCategoryId: TEST_CATEGORY, roundCount: 3 }, words).valid,
       true
     );
     assert.equal(
-      validateDrawItPrep({ selectedCategoryId: "demo", roundCount: 5 }, words).valid,
+      validateDrawItPrep({ selectedCategoryId: TEST_CATEGORY, roundCount: 5 }, words).valid,
       true
     );
     assert.equal(
-      validateDrawItPrep({ selectedCategoryId: "demo", roundCount: 8 }, words).valid,
+      validateDrawItPrep({ selectedCategoryId: TEST_CATEGORY, roundCount: 8 }, words).valid,
       true
     );
   });
 
   it("valeur invalide refusée sans coercion", () => {
-    const words = makeWords(8, "demo");
+    const words = makeWords(8, TEST_CATEGORY);
     for (const n of [0, 1, 4, 7, 9, -1, 2.5]) {
       const check = validateDrawItPrep(
-        { selectedCategoryId: "demo", roundCount: n },
+        { selectedCategoryId: TEST_CATEGORY, roundCount: n },
         words
       );
       assert.equal(check.valid, false, String(n));
@@ -119,20 +122,22 @@ describe("Draw it ! T3 — nombre de manches", () => {
 
 describe("Draw it ! T3 — pool et série", () => {
   it("pool suffisant → configuration valide", () => {
-    const check = validateDrawItPrep({
-      selectedCategoryId: "demo",
-      roundCount: 3,
-    });
+    const words = makeWords(3, TEST_CATEGORY);
+    const check = validateDrawItPrep(
+      { selectedCategoryId: TEST_CATEGORY, roundCount: 3 },
+      words
+    );
     assert.equal(check.valid, true);
     assert.equal(check.poolSize, 3);
     assert.equal(check.required, 3);
   });
 
   it("pool insuffisant → configuration invalide", () => {
-    const check = validateDrawItPrep({
-      selectedCategoryId: "demo",
-      roundCount: 5,
-    });
+    const words = makeWords(3, TEST_CATEGORY);
+    const check = validateDrawItPrep(
+      { selectedCategoryId: TEST_CATEGORY, roundCount: 5 },
+      words
+    );
     assert.equal(check.valid, false);
     assert.equal(check.reason, "insufficient_pool");
     assert.equal(check.poolSize, 3);
@@ -140,32 +145,32 @@ describe("Draw it ! T3 — pool et série", () => {
   });
 
   it("série sans doublons, limitée à roundCount, dans la catégorie", () => {
-    const words = [...makeWords(6, "demo"), ...makeWords(6, "other")];
+    const words = [...makeWords(6, TEST_CATEGORY), ...makeWords(6, "other")];
     const series = buildDrawItSeries(
-      { selectedCategoryId: "demo", roundCount: 5 },
+      { selectedCategoryId: TEST_CATEGORY, roundCount: 5 },
       words
     );
     assert.equal(series.length, 5);
     assert.equal(new Set(series.map((w) => w.id)).size, 5);
-    assert.ok(series.every((w) => w.categoryId === "demo"));
+    assert.ok(series.every((w) => w.categoryId === TEST_CATEGORY));
   });
 
   it("catalogue source inchangé après construction (copie)", () => {
-    const words = makeWords(8, "demo");
+    const words = makeWords(8, TEST_CATEGORY);
     const snapshot = JSON.stringify(words);
     const catalog = JSON.stringify(DRAW_IT_WORDS);
-    buildDrawItSeries({ selectedCategoryId: "demo", roundCount: 5 }, words);
-    getDrawItCategoryWords("demo", words);
+    buildDrawItSeries({ selectedCategoryId: TEST_CATEGORY, roundCount: 5 }, words);
+    getDrawItCategoryWords(TEST_CATEGORY, words);
     assert.equal(JSON.stringify(words), snapshot);
     assert.equal(JSON.stringify(DRAW_IT_WORDS), catalog);
   });
 
   it("série invalide → tableau vide, pas d'écriture session", () => {
     saveStatePatch({ drawItGame: defaultDrawItPrepSession() });
-    const series = buildDrawItSeries({
-      selectedCategoryId: "demo",
-      roundCount: 8,
-    });
+    const series = buildDrawItSeries(
+      { selectedCategoryId: TEST_CATEGORY, roundCount: 8 },
+      makeWords(3, TEST_CATEGORY)
+    );
     assert.deepEqual(series, []);
     const session = getDrawItSession();
     for (const key of PUBLIC_FORBIDDEN) {
@@ -180,7 +185,7 @@ describe("Draw it ! T3 — confidentialité + estimation", () => {
   });
 
   it("codec / état sync sans deck ni mots", async () => {
-    await setDrawItCategory("demo");
+    await setDrawItCategory(TEST_CATEGORY);
     await setDrawItRoundCount(3);
     buildDrawItSeries({
       selectedCategoryId: getDrawItSession().selectedCategoryId,

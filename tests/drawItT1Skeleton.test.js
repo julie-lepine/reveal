@@ -49,8 +49,8 @@ describe("Draw it ! T1 — data", () => {
       assert.ok(word.categoryId);
       assert.equal(word.enabled, true);
     }
-    assert.ok(getDrawItCategoryWords("demo").length > 0);
-    assert.ok(getDrawItCategoryWords(DRAW_IT_CATALOG_ID).length >= getDrawItCategoryWords("demo").length);
+    assert.ok(getDrawItCategoryWords("Facile").length > 0);
+    assert.ok(getDrawItCategoryWords(DRAW_IT_CATALOG_ID).length >= getDrawItCategoryWords("Facile").length);
   });
 });
 
@@ -112,10 +112,10 @@ describe("Draw it ! T1 — session prépa", () => {
   });
 
   it("conserve selectedCategoryId et roundCount", async () => {
-    await setDrawItCategory("demo");
+    await setDrawItCategory("Facile");
     await setDrawItRoundCount(8);
     const session = getDrawItSession();
-    assert.equal(session.selectedCategoryId, "demo");
+    assert.equal(session.selectedCategoryId, "Facile");
     assert.equal(session.roundCount, 8);
   });
 
@@ -131,7 +131,7 @@ describe("Draw it ! T1 — session prépa", () => {
     const remote = drawItToRemote({
       ready: {},
       lobbyStarted: false,
-      selectedCategoryId: "demo",
+      selectedCategoryId: "Facile",
       roundCount: 3,
     });
     assert.deepEqual(Object.keys(remote).sort(), [
@@ -140,7 +140,7 @@ describe("Draw it ! T1 — session prépa", () => {
       "roundCount",
       "selectedCategoryId",
     ]);
-    assert.equal(remote.selectedCategoryId, "demo");
+    assert.equal(remote.selectedCategoryId, "Facile");
     assert.equal(remote.roundCount, 3);
     assert.equal(remote.lobbyStarted, false);
     assert.deepEqual(remote.ready, {});

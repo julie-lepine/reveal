@@ -79,7 +79,7 @@ async function launchTwoPlayerGame() {
     ...lobbyPatch(twoPlayers()),
     drawItGame: defaultDrawItPrepSession(),
   });
-  await setDrawItCategory("demo");
+  await setDrawItCategory("Facile");
   await setDrawItRoundCount(3);
   const result = await markDrawItLobbyStarted({ rosterNames: ["Alice", "Bob"] });
   assert.equal(result?.ok, true);
@@ -195,7 +195,7 @@ describe("Draw it ! — décision pure de clôture", () => {
 
   it("le drawer dans foundOrder ne compte jamais comme devineur attendu", () => {
     const session = buildDrawItLaunchState({
-      session: { selectedCategoryId: "demo", roundCount: 3, ready: {} },
+      session: { selectedCategoryId: "Facile", roundCount: 3, ready: {} },
       participants: threePlayers(),
       nowMs: before,
       runId: "run-expected",
@@ -221,7 +221,7 @@ describe("Draw it ! T4 — guards de phase", () => {
   function drawingSession(extra = {}) {
     const now = 1_000_000;
     return buildDrawItLaunchState({
-      session: { selectedCategoryId: "demo", roundCount: 3, ready: {} },
+      session: { selectedCategoryId: "Facile", roundCount: 3, ready: {} },
       participants: twoPlayers(),
       nowMs: now,
       runId: "run-1",
@@ -251,7 +251,7 @@ describe("Draw it ! T4 — guards de phase", () => {
   it("foundOrder partiel ne termine pas la manche", () => {
     const session = {
       ...buildDrawItLaunchState({
-        session: { selectedCategoryId: "demo", roundCount: 3, ready: {} },
+        session: { selectedCategoryId: "Facile", roundCount: 3, ready: {} },
         participants: threePlayers(),
         nowMs: 1_000_000,
         runId: "run-partial",
@@ -269,7 +269,7 @@ describe("Draw it ! T4 — guards de phase", () => {
   it("tous les devineurs trouvés → reveal avant le timeout", () => {
     const session = {
       ...buildDrawItLaunchState({
-        session: { selectedCategoryId: "demo", roundCount: 3, ready: {} },
+        session: { selectedCategoryId: "Facile", roundCount: 3, ready: {} },
         participants: threePlayers(),
         nowMs: 1_000_000,
         runId: "run-all-found",
@@ -392,7 +392,7 @@ describe("Draw it ! T4 — reconnect + remote guest", () => {
   it("invité suit phase / drawer / timer sans mot avant reveal", () => {
     const now = Date.parse("2026-08-15T21:00:00.000Z");
     const launched = buildDrawItLaunchState({
-      session: { selectedCategoryId: "demo", roundCount: 3, ready: {} },
+      session: { selectedCategoryId: "Facile", roundCount: 3, ready: {} },
       participants: twoPlayers(),
       nowMs: now,
       runId: "run-guest",

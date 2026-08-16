@@ -221,9 +221,9 @@ export function mountDrawItPrep(app) {
           </div>
           ${
             prep.reason === "invalid_category"
-              ? `<p class="hint">Catégorie inconnue — l'hôte doit en choisir une valide.</p>`
+              ? `<p class="hint">Catégorie inconnue - l'hôte doit en choisir une valide.</p>`
               : categoryId === DRAW_IT_CATALOG_ID
-                ? `<p class="hint">${prep.poolSize} mot(s) — tout le catalogue.</p>`
+                ? `<p class="hint">${prep.poolSize} mot(s) - tout le catalogue.</p>`
                 : `<p class="hint">${prep.poolSize} mot(s) dans cette catégorie.</p>`
           }
         </div>

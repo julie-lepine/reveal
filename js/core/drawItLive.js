@@ -8,12 +8,12 @@ import {
   whenLobbyRealtimeReady,
 } from "./supabaseLobby.js";
 import { onScreenChange } from "./router.js";
-import { canDrawOnDrawItCanvas } from "./drawItStrokes.js";
+import { canDrawOnDrawItCanvas, sanitizeEraseStrokeIds } from "./drawItStrokes.js";
 
 export const DRAW_IT_LIVE_EVENT = "drawit";
 export const DRAW_IT_LIVE_CHUNK_MS = 100;
 export const DRAW_IT_LIVE_SEND_RELEASE_MS = 250;
-const ALLOWED_TYPES = new Set(["start", "chunk", "end", "clear", "undo"]);
+const ALLOWED_TYPES = new Set(["start", "chunk", "end", "clear", "undo", "erase"]);
 const FORBIDDEN_KEYS = [
   "lobbyId",
   "game",
@@ -32,6 +32,7 @@ const TYPE_KEYS = {
   end: [...COMMON_KEYS, "strokeId", "seq", "color", "width"],
   clear: COMMON_KEYS,
   undo: [...COMMON_KEYS, "strokeId"],
+  erase: [...COMMON_KEYS, "strokeIds"],
 };
 
 let activeChannel = null;
@@ -115,6 +116,12 @@ export function syncDrawItLiveIdentity(state, session = {}) {
   return createDrawItLiveState(session);
 }
 
+function validEraseStrokeIds(ids) {
+  if (!Array.isArray(ids) || !ids.length || ids.length > 25) return false;
+  const clean = sanitizeEraseStrokeIds(ids);
+  return clean.length === ids.length;
+}
+
 function validCommonPayload(payload, session, liveIdentity = null) {
   if (!payload || typeof payload !== "object") return false;
   if (String(payload.runId || "") !== String(session?.runId || "")) return false;
@@ -134,6 +141,7 @@ function validCommonPayload(payload, session, liveIdentity = null) {
   const allowedKeys = TYPE_KEYS[payload.type];
   if (Object.keys(payload).some((key) => !allowedKeys.includes(key))) return false;
   if (payload.type === "clear") return true;
+  if (payload.type === "erase") return validEraseStrokeIds(payload.strokeIds);
   if (typeof payload.strokeId !== "string" || !payload.strokeId.trim()) return false;
   if (payload.strokeId.length > 128) return false;
   if (payload.type === "undo") return true;
@@ -166,6 +174,23 @@ export function applyDrawItLiveEvent(state, payload, session = {}) {
       reason: null,
       state: next,
       delta: { type: "replay", action: "clear", canvasEpoch: epoch },
+    };
+  }
+
+  if (payload.type === "erase") {
+    const ids = sanitizeEraseStrokeIds(payload.strokeIds);
+    const inProgress = { ...next.remoteInProgress };
+    const completed = { ...next.remoteCompleted };
+    for (const strokeId of ids) {
+      delete inProgress[strokeId];
+      delete completed[strokeId];
+    }
+    next = { ...next, remoteInProgress: inProgress, remoteCompleted: completed };
+    return {
+      applied: true,
+      reason: null,
+      state: next,
+      delta: { type: "replay", action: "erase", strokeIds: ids },
     };
   }
 
@@ -270,11 +295,15 @@ export function buildDrawItLivePayload(type, {
   uid,
   stroke,
   strokeId,
+  strokeIds,
   seq,
   points,
 } = {}) {
   const base = payloadBase(type, session, uid);
   if (type === "clear") return base;
+  if (type === "erase") {
+    return { ...base, strokeIds: sanitizeEraseStrokeIds(strokeIds) };
+  }
   const id = String(strokeId || stroke?.strokeId || "");
   if (type === "undo") return { ...base, strokeId: id };
   const payload = {
@@ -617,6 +646,16 @@ export function broadcastDrawItLiveUndo(session, uid, strokeId) {
   if (!canEmitDrawItLive(session, uid)) return false;
   void sendPayload(
     buildDrawItLivePayload("undo", { session, uid, strokeId })
+  );
+  return true;
+}
+
+export function broadcastDrawItLiveErase(session, uid, strokeIds) {
+  if (!canEmitDrawItLive(session, uid)) return false;
+  const ids = sanitizeEraseStrokeIds(strokeIds);
+  if (!ids.length) return false;
+  void sendPayload(
+    buildDrawItLivePayload("erase", { session, uid, strokeIds: ids })
   );
   return true;
 }

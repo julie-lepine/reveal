@@ -50,7 +50,7 @@ function participants() {
 
 function roundOne() {
   return buildDrawItLaunchState({
-    session: { selectedCategoryId: "demo", roundCount: 3, ready: {} },
+      session: { selectedCategoryId: "Facile", roundCount: 3, ready: {} },
     participants: participants(),
     nowMs: T0,
     runId: "run-timer-sync",

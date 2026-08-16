@@ -4975,20 +4975,40 @@ body.has-bottom-nav .feedback-fab{
   align-items:center;
   gap:8px;
 }
-.draw-it-swatch{
-  width:28px;
-  height:28px;
-  border-radius:50%;
-  border:2px solid rgba(255,255,255,.25);
-  padding:0;
-  cursor:pointer;
+.draw-it-color{
+  position:relative;
+  width:36px;
+  height:36px;
   flex-shrink:0;
+  border-radius:50%;
+  border:2px solid rgba(255,255,255,.55);
+  box-shadow:0 0 0 2px rgba(255,255,255,.2);
+  overflow:hidden;
+  background:transparent;
 }
-.draw-it-swatch.is-active{
-  border-color:#fff;
-  box-shadow:0 0 0 2px rgba(255,255,255,.35);
+.draw-it-color.is-disabled{
+  opacity:.45;
 }
-.draw-it-swatch:disabled,
+.draw-it-color__swatch{
+  position:absolute;
+  inset:0;
+  border-radius:50%;
+  pointer-events:none;
+}
+.draw-it-color input[type="color"]{
+  position:absolute;
+  inset:0;
+  width:100%;
+  height:100%;
+  margin:0;
+  padding:0;
+  border:0;
+  opacity:0;
+  cursor:pointer;
+}
+.draw-it-color input[type="color"]:disabled{
+  cursor:default;
+}
 .draw-it-width:disabled,
 .draw-it-tools__btn:disabled{
   opacity:.45;
@@ -5033,8 +5053,18 @@ body.has-bottom-nav .feedback-fab{
   touch-action:none;
 }
 
+.draw-it-tools__btn.is-active,
+.draw-it-eraser.is-active{
+  border-color:rgba(255,255,255,.55);
+  background:rgba(255,255,255,.16);
+}
+
 .draw-it-canvas--active{
   cursor:crosshair;
+}
+
+.draw-it-canvas--erase{
+  cursor:cell;
 }
 
 .draw-it-canvas-host--locked{

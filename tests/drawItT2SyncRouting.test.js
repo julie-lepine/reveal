@@ -103,7 +103,7 @@ function lobbyPatch() {
 function drawItRow({
   screen = "drawit-prep",
   lobbyStarted = false,
-  selectedCategoryId = "demo",
+  selectedCategoryId = "Facile",
   roundCount = 3,
   ready = {},
   updatedAt = "2026-08-15T21:00:00.000Z",
@@ -147,7 +147,7 @@ describe("Draw it ! T2 — codecs / hydratation", () => {
     const remote = drawItFromRemote({
       ready: { [GUEST_UID]: true },
       lobbyStarted: true,
-      selectedCategoryId: "demo",
+      selectedCategoryId: "Facile",
       roundCount: 8,
       strokes: [{ x: 1 }],
       guesses: { Bob: "chat" },
@@ -155,7 +155,7 @@ describe("Draw it ! T2 — codecs / hydratation", () => {
       drawerOrder: ["Alice"],
       phase: "drawing",
     });
-    assert.equal(remote.selectedCategoryId, "demo");
+    assert.equal(remote.selectedCategoryId, "Facile");
     assert.equal(remote.roundCount, 8);
     assert.equal(remote.lobbyStarted, true);
     assert.equal(remote.ready.Bob, true);
@@ -178,7 +178,7 @@ describe("Draw it ! T2 — codecs / hydratation", () => {
     const remote = drawItToRemote({
       ready: { Alice: true, Bob: false },
       lobbyStarted: false,
-      selectedCategoryId: "demo",
+      selectedCategoryId: "Facile",
       roundCount: 8,
     });
     assert.equal(remote.ready[HOST_UID], true);
@@ -189,17 +189,17 @@ describe("Draw it ! T2 — codecs / hydratation", () => {
   it("applyRemoteSession injecte drawItGame depuis game_sessions", () => {
     applyRemoteSession(
       drawItRow({
-        selectedCategoryId: "demo",
+        selectedCategoryId: "Facile",
         roundCount: 8,
         ready: { [GUEST_UID]: true },
       })
     );
     const session = getDrawItSession();
-    assert.equal(session.selectedCategoryId, "demo");
+    assert.equal(session.selectedCategoryId, "Facile");
     assert.equal(session.roundCount, 8);
     assert.equal(session.lobbyStarted, false);
     assert.equal(session.ready.Bob, true);
-    assert.equal(getState().drawItGame.selectedCategoryId, "demo");
+    assert.equal(getState().drawItGame.selectedCategoryId, "Facile");
   });
 });
 
@@ -269,8 +269,8 @@ describe("Draw it ! T2 — setup / ready / sync prépa", () => {
   });
 
   it("catégorie hôte se propage via session distante", async () => {
-    await setDrawItCategory("demo");
-    assert.equal(getDrawItSession().selectedCategoryId, "demo");
+    await setDrawItCategory("Facile");
+    assert.equal(getDrawItSession().selectedCategoryId, "Facile");
     applyRemoteSession(
       drawItRow({
         selectedCategoryId: "catalog",
@@ -286,7 +286,7 @@ describe("Draw it ! T2 — setup / ready / sync prépa", () => {
     assert.equal(getDrawItSession().roundCount, 8);
     applyRemoteSession(
       drawItRow({
-        selectedCategoryId: "demo",
+        selectedCategoryId: "Facile",
         roundCount: 3,
         updatedAt: "2026-08-15T21:02:00.000Z",
       })
@@ -363,7 +363,7 @@ describe("Draw it ! T2 — routing host / guest / post-game", () => {
       state: {
         drawIt: {
           lobbyStarted: false,
-          selectedCategoryId: "demo",
+          selectedCategoryId: "Facile",
           roundCount: 3,
           ready: {},
         },
@@ -382,7 +382,7 @@ describe("Draw it ! T2 — routing host / guest / post-game", () => {
       state: {
         drawIt: {
           lobbyStarted: true,
-          selectedCategoryId: "demo",
+          selectedCategoryId: "Facile",
           roundCount: 3,
           ready: {},
         },
