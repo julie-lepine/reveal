@@ -586,6 +586,8 @@ export async function commitDrawItUndoStroke(strokeId) {
 
     if (isGameSyncActive() && isSupabaseConfigured()) {
       try {
+        const { broadcastDrawItLiveUndo } = await import("./drawItLive.js");
+        broadcastDrawItLiveUndo(session, uid, strokeId);
         const { rpcUndoDrawItStroke } = await import("./gameSessionRpc.js");
         const row = await rpcUndoDrawItStroke({
           lobbyId: getState().lobby.id,
@@ -595,9 +597,7 @@ export async function commitDrawItUndoStroke(strokeId) {
           strokeId,
         });
         if (!row) return { ok: false, reason: "not_applied" };
-        const next = await applyDrawItStrokeRow(row);
-        const { broadcastDrawItLiveUndo } = await import("./drawItLive.js");
-        broadcastDrawItLiveUndo(next, uid, strokeId);
+        await applyDrawItStrokeRow(row);
         return { ok: true, skipped: false };
       } catch (error) {
         const code = String(error?.message || error).match(/DRAWIT_[A-Z_]+/)?.[0];
@@ -624,6 +624,11 @@ export async function commitDrawItClearCanvas() {
 
     if (isGameSyncActive() && isSupabaseConfigured()) {
       try {
+        const { broadcastDrawItLiveClear } = await import("./drawItLive.js");
+        broadcastDrawItLiveClear(
+          { ...session, canvasEpoch: epoch + 1 },
+          uid
+        );
         const { rpcClearDrawItCanvas } = await import("./gameSessionRpc.js");
         const row = await rpcClearDrawItCanvas({
           lobbyId: getState().lobby.id,
@@ -632,9 +637,7 @@ export async function commitDrawItClearCanvas() {
           canvasEpoch: epoch,
         });
         if (!row) return { ok: false, reason: "not_applied" };
-        const next = await applyDrawItStrokeRow(row);
-        const { broadcastDrawItLiveClear } = await import("./drawItLive.js");
-        broadcastDrawItLiveClear(next, uid);
+        await applyDrawItStrokeRow(row);
         return { ok: true, skipped: false };
       } catch (error) {
         const code = String(error?.message || error).match(/DRAWIT_[A-Z_]+/)?.[0];

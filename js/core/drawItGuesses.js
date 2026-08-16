@@ -86,7 +86,8 @@ export function isDrawItGuessInputLocked(session, uid, nowMs = Date.now()) {
 
 /**
  * Même manche drawing : le composer/input peut rester le même nœud DOM.
- * Un changement de phase / run / round / epoch / drawer exige un rerender.
+ * Un changement de phase / run / round / drawer exige un rerender.
+ * canvasEpoch (Clear) ne remonte pas le composer : le board se patch en place.
  */
 export function canKeepDrawItGuessComposer(prev = {}, next = {}) {
   if (!prev || !next) return false;
@@ -94,7 +95,6 @@ export function canKeepDrawItGuessComposer(prev = {}, next = {}) {
   if (prev.phase !== DRAW_IT_PHASE_DRAWING) return false;
   if ((prev.runId || null) !== (next.runId || null)) return false;
   if (Number(prev.roundIdx) !== Number(next.roundIdx)) return false;
-  if (Number(prev.canvasEpoch || 0) !== Number(next.canvasEpoch || 0)) return false;
   if (String(prev.drawerUid || "") !== String(next.drawerUid || "")) return false;
   return true;
 }

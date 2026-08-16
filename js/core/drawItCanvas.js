@@ -68,6 +68,97 @@ export function paintDrawItBoard(ctx, board, { width, height, dpr = 1 } = {}) {
   }
 }
 
+/**
+ * Replay read-only du snapshot durable (recap de manche).
+ * Pas de pointer events, pas de Broadcast, pas de currentStroke.
+ */
+export function mountDrawItReplayCanvas(hostEl, { getBoard } = {}) {
+  if (!hostEl) return null;
+
+  const canvas = document.createElement("canvas");
+  canvas.className = "draw-it-canvas draw-it-canvas--recap";
+  canvas.setAttribute("aria-label", "Dessin final de la manche");
+  canvas.style.pointerEvents = "none";
+  canvas.setAttribute("aria-hidden", "false");
+  hostEl.classList.add("draw-it-canvas-host--locked");
+  hostEl.style.pointerEvents = "none";
+  hostEl.appendChild(canvas);
+
+  let cssW = 0;
+  let cssH = 0;
+  let dpr = 1;
+  let cleaned = false;
+
+  function recapBoard() {
+    const board = getBoard?.() || {};
+    return { ...board, currentStroke: null };
+  }
+
+  function paint() {
+    if (cleaned) return;
+    const ctx = canvas.getContext("2d");
+    paintDrawItBoard(ctx, recapBoard(), {
+      width: canvas.width,
+      height: canvas.height,
+      dpr,
+    });
+  }
+
+  function sizeCanvas() {
+    if (cleaned) return;
+    const rect = hostEl.getBoundingClientRect();
+    const nextDpr = window.devicePixelRatio || 1;
+    const w = Math.max(1, Math.round(rect.width));
+    const h = Math.max(1, Math.round(rect.height));
+    if (w === cssW && h === cssH && nextDpr === dpr) return;
+    cssW = w;
+    cssH = h;
+    dpr = nextDpr;
+    canvas.width = Math.max(1, Math.round(w * dpr));
+    canvas.height = Math.max(1, Math.round(h * dpr));
+    canvas.style.width = `${w}px`;
+    canvas.style.height = `${h}px`;
+    paint();
+  }
+
+  let resizeObserver = null;
+  if (typeof ResizeObserver === "function") {
+    resizeObserver = new ResizeObserver(() => {
+      sizeCanvas();
+    });
+    resizeObserver.observe(hostEl);
+  }
+  sizeCanvas();
+
+  return {
+    canvas,
+    paint,
+    isDrawing() {
+      return false;
+    },
+    isReadOnly() {
+      return true;
+    },
+    syncInteractive() {},
+    applyLiveDelta() {},
+    applyBoard() {
+      if (cleaned) return;
+      paint();
+    },
+    applySession() {
+      if (cleaned) return;
+      paint();
+    },
+    cleanup() {
+      if (cleaned) return;
+      cleaned = true;
+      resizeObserver?.disconnect();
+      resizeObserver = null;
+      canvas.remove();
+    },
+  };
+}
+
 export function mountDrawItCanvas(hostEl, {
   getBoard,
   setBoard,
@@ -79,6 +170,8 @@ export function mountDrawItCanvas(hostEl, {
   onStrokePoints,
   onStrokeEnd,
   createStrokeId,
+  getBrush,
+  onDrawingChange,
 } = {}) {
   if (!hostEl) return null;
 
@@ -158,10 +251,15 @@ export function mountDrawItCanvas(hostEl, {
       "down",
       pointFromEvent(event),
       true,
-      { strokeId: createStrokeId?.() || null }
+      {
+        strokeId: createStrokeId?.() || null,
+        color: getBrush?.()?.color,
+        width: getBrush?.()?.width,
+      }
     );
     setBoard(next);
     if (next?.currentStroke) onStrokeStart?.(next.currentStroke);
+    onDrawingChange?.(true);
     paint();
   }
 
@@ -201,6 +299,7 @@ export function mountDrawItCanvas(hostEl, {
     if (!ok) {
       drawing = false;
       pointerId = null;
+      onDrawingChange?.(false);
       const completed = next?.strokes?.[next.strokes.length - 1];
       if (completed?.strokeId === strokeId) {
         onStrokeEnd?.(completed, completed.points.slice(beforeLength));
@@ -215,6 +314,7 @@ export function mountDrawItCanvas(hostEl, {
     event.preventDefault?.();
     drawing = false;
     pointerId = null;
+    onDrawingChange?.(false);
     try {
       canvas.releasePointerCapture?.(event.pointerId);
     } catch {

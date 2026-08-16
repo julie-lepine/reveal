@@ -1,7 +1,20 @@
 /**
  * Contrat de données du récap Draw it !.
  */
-import { expectedDrawItGuessers } from "./drawItRound.js";
+import { DRAW_IT_PHASE_REVEAL, expectedDrawItGuessers } from "./drawItRound.js";
+
+/**
+ * Même manche reveal : le canvas recap peut rester monté et se repeindre.
+ * Un changement de phase / run / round exige un rerender.
+ */
+export function canKeepDrawItRecapCanvas(prev = {}, next = {}) {
+  if (!prev || !next) return false;
+  if (next.phase !== DRAW_IT_PHASE_REVEAL) return false;
+  if (prev.phase !== DRAW_IT_PHASE_REVEAL) return false;
+  if ((prev.runId || null) !== (next.runId || null)) return false;
+  if (Number(prev.roundIdx) !== Number(next.roundIdx)) return false;
+  return true;
+}
 
 function participantMap(session = {}) {
   const out = new Map();

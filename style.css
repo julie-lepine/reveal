@@ -4963,6 +4963,57 @@ body.has-bottom-nav .feedback-fab{
   min-height:1.4em;
 }
 
+.draw-it-tools{
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+  margin:8px 0 4px;
+}
+.draw-it-tools__row{
+  display:flex;
+  flex-wrap:wrap;
+  align-items:center;
+  gap:8px;
+}
+.draw-it-swatch{
+  width:28px;
+  height:28px;
+  border-radius:50%;
+  border:2px solid rgba(255,255,255,.25);
+  padding:0;
+  cursor:pointer;
+  flex-shrink:0;
+}
+.draw-it-swatch.is-active{
+  border-color:#fff;
+  box-shadow:0 0 0 2px rgba(255,255,255,.35);
+}
+.draw-it-swatch:disabled,
+.draw-it-width:disabled,
+.draw-it-tools__btn:disabled{
+  opacity:.45;
+  cursor:default;
+}
+.draw-it-width{
+  min-height:32px;
+  padding:6px 10px;
+  border-radius:999px;
+  border:1px solid rgba(255,255,255,.12);
+  background:rgba(255,255,255,.06);
+  color:#fff;
+  font-size:12px;
+  font-weight:700;
+}
+.draw-it-width.is-active{
+  border-color:rgba(255,255,255,.55);
+  background:rgba(255,255,255,.16);
+}
+.draw-it-tools__btn{
+  min-height:36px;
+  padding:6px 12px;
+  font-size:13px;
+}
+
 .draw-it-canvas-host{
   width:100%;
   aspect-ratio:1;
@@ -4992,6 +5043,14 @@ body.has-bottom-nav .feedback-fab{
 
 .draw-it-recap__canvas{
   max-height:min(42vh, 340px);
+  touch-action:auto;
+  pointer-events:none;
+}
+
+.draw-it-canvas--recap{
+  pointer-events:none;
+  cursor:default;
+  touch-action:auto;
 }
 
 .draw-it-recap__drawing-placeholder{

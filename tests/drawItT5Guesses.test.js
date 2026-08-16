@@ -527,7 +527,7 @@ describe("Draw it ! — composer guesses stable (clavier)", () => {
       false
     );
     assert.equal(canKeepDrawItGuessComposer(prev, identity({ roundIdx: 1 })), false);
-    assert.equal(canKeepDrawItGuessComposer(prev, identity({ canvasEpoch: 1 })), false);
+    assert.equal(canKeepDrawItGuessComposer(prev, identity({ canvasEpoch: 1 })), true);
     assert.equal(canKeepDrawItGuessComposer(prev, identity({ runId: "run-b" })), false);
     assert.equal(
       canKeepDrawItGuessComposer(prev, identity({ drawerUid: GUEST_UID })),

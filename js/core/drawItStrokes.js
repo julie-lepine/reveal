@@ -14,6 +14,40 @@ export const DRAW_IT_STROKE_MAX_COUNT = 25;
 export const DRAW_IT_STROKE_MIN_DIST = 0.012;
 export const DRAW_IT_DEFAULT_COLOR = "#f4f4f5";
 export const DRAW_IT_DEFAULT_WIDTH = 4;
+export const DRAW_IT_TOOL_COLORS = [
+  { id: "ink", value: "#f4f4f5", label: "Clair" },
+  { id: "red", value: "#ef4444", label: "Rouge" },
+  { id: "blue", value: "#38bdf8", label: "Bleu" },
+  { id: "green", value: "#4ade80", label: "Vert" },
+  { id: "yellow", value: "#facc15", label: "Jaune" },
+  { id: "black", value: "#111111", label: "Noir" },
+];
+export const DRAW_IT_TOOL_WIDTHS = [
+  { id: "thin", value: 4, label: "Fin" },
+  { id: "medium", value: 7, label: "Moyen" },
+  { id: "thick", value: 12, label: "Épais" },
+];
+
+export function resolveDrawItToolColor(color) {
+  const value = String(color || "").trim().slice(0, 32);
+  return DRAW_IT_TOOL_COLORS.some((entry) => entry.value === value)
+    ? value
+    : DRAW_IT_DEFAULT_COLOR;
+}
+
+export function resolveDrawItToolWidth(width) {
+  const n = Number(width);
+  return DRAW_IT_TOOL_WIDTHS.some((entry) => entry.value === n)
+    ? n
+    : DRAW_IT_DEFAULT_WIDTH;
+}
+
+export function createDrawItBrush(overrides = {}) {
+  return {
+    color: resolveDrawItToolColor(overrides.color),
+    width: resolveDrawItToolWidth(overrides.width),
+  };
+}
 
 export function clamp01(value) {
   const n = Number(value);
@@ -87,6 +121,7 @@ export function createEmptyDrawItBoard({
     strokeSeq: 0,
     strokes: [],
     currentStroke: null,
+    suppressedStrokeIds: [],
   };
 }
 
@@ -263,6 +298,27 @@ export function createDrawItBoardFromSession(session = {}) {
   };
 }
 
+/**
+ * Strokes terminés du snapshot durable, filtrés sur l'epoch courant.
+ * Source du recap : jamais currentStroke / Broadcast / board local.
+ */
+export function recapDrawItStrokesFromSession(session = {}) {
+  const epoch = Number(session.canvasEpoch) || 0;
+  return completedDrawItStrokesFromSession(session)
+    .filter((stroke) => Number(stroke.canvasEpoch) === epoch)
+    .slice()
+    .sort((a, b) => (Number(a.seq) || 0) - (Number(b.seq) || 0));
+}
+
+export function createDrawItRecapBoardFromSession(session = {}) {
+  return {
+    ...createEmptyDrawItBoard(session),
+    strokeSeq: Math.max(0, Number(session.strokeSeq) || 0),
+    strokes: recapDrawItStrokesFromSession(session),
+    currentStroke: null,
+  };
+}
+
 export function mergeCompletedDrawItStrokes(session = {}, incoming = []) {
   const extra = completedDrawItStrokesFromSession({ strokes: incoming });
   const durable = completedDrawItStrokesFromSession(session);
@@ -285,34 +341,87 @@ export function mergeCompletedDrawItStrokes(session = {}, incoming = []) {
   };
 }
 
+export function applyDrawItBoardUndo(board, strokeId) {
+  if (!board) return createEmptyDrawItBoard();
+  const id = String(strokeId || "").trim();
+  if (!id) return board;
+  const suppressed = [...new Set([...(board.suppressedStrokeIds || []), id])];
+  return {
+    ...board,
+    strokes: (board.strokes || []).filter((stroke) => stroke.strokeId !== id),
+    currentStroke:
+      board.currentStroke?.strokeId === id ? null : board.currentStroke,
+    suppressedStrokeIds: suppressed,
+  };
+}
+
+export function undoLastCompletedDrawItStroke(board) {
+  if (!board || board.currentStroke) return board;
+  const strokes = board.strokes || [];
+  if (!strokes.length) return board;
+  return applyDrawItBoardUndo(board, strokes[strokes.length - 1].strokeId);
+}
+
+export function applyDrawItBoardClear(board, canvasEpoch) {
+  const nextEpoch =
+    Number.isInteger(Number(canvasEpoch)) && Number(canvasEpoch) >= 0
+      ? Number(canvasEpoch)
+      : (Number(board?.canvasEpoch) || 0) + 1;
+  return createEmptyDrawItBoard({
+    runId: board?.runId,
+    roundIdx: board?.roundIdx,
+    canvasEpoch: nextEpoch,
+  });
+}
+
 export function maybeResetDrawItBoard(board, session = {}) {
   const nextEpoch = Number(session.canvasEpoch) || 0;
   const nextIdx = Number(session.roundIdx) || 0;
   const nextRun = session.runId || null;
-  if (
-    !board ||
-    board.runId !== nextRun ||
-    Number(board.roundIdx) !== nextIdx ||
-    Number(board.canvasEpoch) !== nextEpoch
-  ) {
+  const localEpoch = Number(board?.canvasEpoch) || 0;
+  if (!board || board.runId !== nextRun || Number(board.roundIdx) !== nextIdx) {
     return createDrawItBoardFromSession(session);
   }
-  const durable = completedDrawItStrokesFromSession(session);
-  if (!durable.length) return board;
+  if (localEpoch > nextEpoch) return board;
+  if (localEpoch !== nextEpoch) {
+    return createDrawItBoardFromSession(session);
+  }
+  const suppressed = new Set(board.suppressedStrokeIds || []);
+  const durable = completedDrawItStrokesFromSession(session).filter(
+    (stroke) => !suppressed.has(stroke.strokeId)
+  );
+  const stillSuppressed = [...suppressed].filter((id) =>
+    (Array.isArray(session.strokes) ? session.strokes : []).some(
+      (stroke) => String(stroke?.strokeId || "") === id
+    )
+  );
+  if (!durable.length) {
+    if (stillSuppressed.length === (board.suppressedStrokeIds || []).length) {
+      return board;
+    }
+    return { ...board, suppressedStrokeIds: stillSuppressed };
+  }
   const byId = new Map(
-    [...durable, ...(board.strokes || [])].map((stroke) => [stroke.strokeId, stroke])
+    [...durable, ...(board.strokes || [])]
+      .filter((stroke) => !suppressed.has(stroke.strokeId))
+      .map((stroke) => [stroke.strokeId, stroke])
   );
   const strokes = [...byId.values()].slice(-DRAW_IT_STROKE_MAX_COUNT);
   const unchanged =
     strokes.length === (board.strokes?.length || 0) &&
     strokes.every((stroke, index) => stroke.strokeId === board.strokes[index]?.strokeId);
-  if (unchanged && Number(board.strokeSeq) >= (Number(session.strokeSeq) || 0)) {
+  if (
+    unchanged &&
+    Number(board.strokeSeq) >= (Number(session.strokeSeq) || 0) &&
+    stillSuppressed.length === (board.suppressedStrokeIds || []).length
+  ) {
     return board;
   }
   return {
     ...board,
     strokeSeq: Math.max(Number(board.strokeSeq) || 0, Number(session.strokeSeq) || 0),
     strokes,
+    suppressedStrokeIds: stillSuppressed,
   };
 }
 
@@ -359,8 +468,13 @@ export function beginDrawItStroke(
     currentStroke: {
       strokeId: strokeId || makeDrawItStrokeId(strokeSeq),
       points: [point],
-      color,
-      width,
+      color:
+        typeof color === "string" && color
+          ? color.slice(0, 32)
+          : DRAW_IT_DEFAULT_COLOR,
+      width: Number.isFinite(Number(width))
+        ? Math.min(64, Math.max(1, Number(width)))
+        : DRAW_IT_DEFAULT_WIDTH,
     },
   };
 }

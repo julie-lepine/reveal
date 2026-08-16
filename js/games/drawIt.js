@@ -5,6 +5,8 @@ import {
   commitDrawItNextRound,
   commitDrawItComplete,
   commitDrawItCompletedStroke,
+  commitDrawItUndoStroke,
+  commitDrawItClearCanvas,
   loadLocalDrawItPrivateWord,
   submitDrawItGuess,
 } from "../core/drawItSession.js";
@@ -40,12 +42,22 @@ import {
   nameForUserId,
   stopGameSessionListenerOnPostGame,
 } from "../core/gameSync.js";
-import { mountDrawItCanvas } from "../core/drawItCanvas.js";
+import { mountDrawItCanvas, mountDrawItReplayCanvas } from "../core/drawItCanvas.js";
 import {
+  applyDrawItBoardClear,
+  applyDrawItBoardUndo,
   createDrawItBoardFromSession,
+  createDrawItBrush,
+  createDrawItRecapBoardFromSession,
+  DRAW_IT_TOOL_COLORS,
+  DRAW_IT_TOOL_WIDTHS,
   maybeResetDrawItBoard,
+  undoLastCompletedDrawItStroke,
 } from "../core/drawItStrokes.js";
-import { buildDrawItRoundRecap } from "../core/drawItRoundRecap.js";
+import {
+  buildDrawItRoundRecap,
+  canKeepDrawItRecapCanvas,
+} from "../core/drawItRoundRecap.js";
 import { buildDrawItStandings } from "../core/drawItScoring.js";
 import { serializeLastGameStandings } from "../core/lastGamePodium.js";
 import { getSortedActivePlayers } from "../core/players.js";
@@ -83,8 +95,20 @@ export function mountDrawIt(app) {
   let deferredDrawingRender = false;
   let lastDebugInput = null;
   let debugPatchSeq = 0;
+  let brush = createDrawItBrush();
   const liveRender = ({ delta }) => {
     if (!mount.isMounted() || !mount.isCurrentMount()) return;
+    if (
+      canvasCtl?.isReadOnly?.() ||
+      getDrawItSession().phase === DRAW_IT_PHASE_REVEAL
+    ) {
+      return;
+    }
+    if (delta?.action === "undo" && delta.strokeId) {
+      board = applyDrawItBoardUndo(board, delta.strokeId);
+    } else if (delta?.action === "clear") {
+      board = applyDrawItBoardClear(board, delta.canvasEpoch);
+    }
     canvasCtl?.applyLiveDelta(delta);
   };
 
@@ -135,6 +159,7 @@ export function mountDrawIt(app) {
       createStrokeId: () => createDrawItLiveStrokeId(localUid()),
       onStrokeStart: (stroke) => {
         startDrawItLiveStroke(stroke);
+        syncToolButtons();
       },
       onStrokePoints: (strokeId, points) => {
         bufferDrawItLivePoints(strokeId, points);
@@ -151,8 +176,43 @@ export function mountDrawIt(app) {
           }
         });
         void commitDrawItCompletedStroke(stroke);
+        syncToolButtons();
+      },
+      getBrush: () => brush,
+      onDrawingChange: () => {
+        syncToolButtons();
       },
     });
+  }
+
+  function bindRecapCanvas(session) {
+    teardownCanvas();
+    board = createDrawItRecapBoardFromSession(session);
+    const host = app.querySelector("#draw-it-canvas-host");
+    if (!host) return;
+    canvasCtl = mountDrawItReplayCanvas(host, {
+      getBoard: () => board,
+    });
+  }
+
+  function hasStableRecapCanvas() {
+    return Boolean(
+      app.querySelector("#draw-it-canvas-host") && canvasCtl?.isReadOnly?.()
+    );
+  }
+
+  function patchRecapView(session) {
+    if (!mount.isMounted() || !mount.isCurrentMount()) return;
+    if (!hasStableRecapCanvas()) {
+      render();
+      return;
+    }
+    board = createDrawItRecapBoardFromSession(session);
+    if (typeof canvasCtl?.applyBoard === "function") canvasCtl.applyBoard();
+    else canvasCtl?.paint?.();
+    const ranking = app.querySelector("#draw-it-round-ranking");
+    if (ranking) ranking.innerHTML = roundRecapRowsHtml(session);
+    rememberPlayIdentity(session);
   }
 
   function guessLockReason(session, nowMs = drawItSyncedNowMs(session)) {
@@ -341,8 +401,9 @@ export function mountDrawIt(app) {
       if (clock.textContent !== nextClock) clock.textContent = nextClock;
     }
     canvasCtl?.syncInteractive();
-    if (board !== previousBoard) canvasCtl?.paint();
+    if (board !== previousBoard)     canvasCtl?.paint();
     rememberPlayIdentity(session);
+    syncToolButtons();
     const inputAfter = app.querySelector("#draw-it-guess-input");
     debugGuessFocus("patch:after", {
       inputSameNode: Boolean(inputBefore && inputBefore === inputAfter),
@@ -436,19 +497,106 @@ export function mountDrawIt(app) {
       .join("");
   }
 
-  function roundRecapDrawingHtml(session) {
-    if (isLocalDrawer(session)) {
-      return `
-        <div class="draw-it-canvas-host draw-it-recap__canvas" id="draw-it-canvas-host"></div>
-        <p class="hint">Dessin disponible localement sur l’appareil du dessinateur.</p>`;
-    }
+  function roundRecapDrawingHtml() {
     return `
-      <div class="draw-it-recap__drawing-placeholder" role="img"
-        aria-label="Dessin indisponible sur cet appareil">
-        <span aria-hidden="true">🖼️</span>
-        <p>Dessin indisponible sur cet appareil.</p>
-        <small>Il sera partagé ici lorsque la synchronisation du dessin sera disponible.</small>
+      <div class="draw-it-canvas-host draw-it-recap__canvas" id="draw-it-canvas-host"
+        data-readonly="true"></div>`;
+  }
+
+  function toolsBusy() {
+    return Boolean(canvasCtl?.isDrawing() || board?.currentStroke);
+  }
+
+  function syncToolButtons() {
+    const root = app.querySelector("#draw-it-tools");
+    if (!root) return;
+    const busy = toolsBusy();
+    root.querySelectorAll("[data-color]").forEach((btn) => {
+      btn.classList.toggle("is-active", btn.getAttribute("data-color") === brush.color);
+      btn.disabled = busy;
+    });
+    root.querySelectorAll("[data-width]").forEach((btn) => {
+      btn.classList.toggle("is-active", Number(btn.getAttribute("data-width")) === brush.width);
+      btn.disabled = busy;
+    });
+    const undoEl = root.querySelector("#draw-it-undo");
+    const clearEl = root.querySelector("#draw-it-clear");
+    if (undoEl) undoEl.disabled = busy || !(board.strokes || []).length;
+    if (clearEl) clearEl.disabled = busy || !(board.strokes || []).length;
+  }
+
+  function toolsHtml(session) {
+    if (session.phase !== DRAW_IT_PHASE_DRAWING || !isLocalDrawer(session)) {
+      return "";
+    }
+    const colors = DRAW_IT_TOOL_COLORS.map(
+      (entry) => `
+        <button type="button" class="draw-it-swatch${
+          entry.value === brush.color ? " is-active" : ""
+        }" data-color="${escapeHtml(entry.value)}" style="background:${escapeHtml(entry.value)}"
+          aria-label="${escapeHtml(entry.label)}" title="${escapeHtml(entry.label)}"></button>`
+    ).join("");
+    const widths = DRAW_IT_TOOL_WIDTHS.map(
+      (entry) => `
+        <button type="button" class="draw-it-width${
+          entry.value === brush.width ? " is-active" : ""
+        }" data-width="${entry.value}">${escapeHtml(entry.label)}</button>`
+    ).join("");
+    return `
+      <div class="draw-it-tools" id="draw-it-tools">
+        <div class="draw-it-tools__row" role="group" aria-label="Couleur">${colors}</div>
+        <div class="draw-it-tools__row" role="group" aria-label="Épaisseur">${widths}</div>
+        <div class="draw-it-tools__row draw-it-tools__actions">
+          <button type="button" class="btn btn-ghost draw-it-tools__btn" id="draw-it-undo">Undo</button>
+          <button type="button" class="btn btn-ghost draw-it-tools__btn" id="draw-it-clear">Clear</button>
+        </div>
       </div>`;
+  }
+
+  function bindTools() {
+    const root = app.querySelector("#draw-it-tools");
+    if (!root) return;
+    root.addEventListener("click", (event) => {
+      const target = event.target?.closest?.("button");
+      if (!target || !root.contains(target)) return;
+      event.preventDefault();
+      if (!isLocalDrawer(getDrawItSession())) return;
+      if (target.id === "draw-it-undo") {
+        if (toolsBusy() || !(board.strokes || []).length) return;
+        const last = board.strokes[board.strokes.length - 1];
+        board = undoLastCompletedDrawItStroke(board);
+        canvasCtl?.paint();
+        syncToolButtons();
+        if (last?.strokeId) void commitDrawItUndoStroke(last.strokeId);
+        return;
+      }
+      if (target.id === "draw-it-clear") {
+        if (toolsBusy()) return;
+        const nextEpoch = (Number(board.canvasEpoch) || 0) + 1;
+        board = applyDrawItBoardClear(board, nextEpoch);
+        canvasCtl?.paint();
+        syncToolButtons();
+        void commitDrawItClearCanvas();
+        return;
+      }
+      if (toolsBusy()) return;
+      if (target.hasAttribute("data-color")) {
+        brush = createDrawItBrush({
+          color: target.getAttribute("data-color"),
+          width: brush.width,
+        });
+        syncToolButtons();
+        return;
+      }
+      if (target.hasAttribute("data-width")) {
+        brush = createDrawItBrush({
+          color: brush.color,
+          width: Number(target.getAttribute("data-width")),
+        });
+        syncToolButtons();
+      }
+    });
+    syncToolButtons();
   }
 
   function guessChatHtml(session) {
@@ -485,6 +633,13 @@ export function mountDrawIt(app) {
     const total = Number(session.roundCount) || 0;
     const roundIdx = session.roundIdx ?? 0;
     const phase = session.phase;
+    if (
+      lastPlayIdentity &&
+      (lastPlayIdentity.runId !== (session.runId || null) ||
+        Number(lastPlayIdentity.roundIdx) !== Number(roundIdx))
+    ) {
+      brush = createDrawItBrush();
+    }
     const remaining = remainingMsUntil(
       session.roundEndsAt,
       drawItSyncedNowMs(session)
@@ -507,6 +662,7 @@ export function mountDrawIt(app) {
           ${wordBlock}
           <p class="hot-take-duration" id="draw-it-clock" aria-live="polite">${clock}</p>
           <div class="draw-it-canvas-host" id="draw-it-canvas-host"></div>
+          ${toolsHtml(session)}
           ${foundLine(session)}
         </div>`;
     } else if (phase === DRAW_IT_PHASE_REVEAL) {
@@ -521,7 +677,7 @@ export function mountDrawIt(app) {
             recap.allGuessersFound ? "Tout le monde a trouvé !" : "Temps écoulé."
           } Le mot est maintenant public.</p>
           <p class="label-upper">Dessin de la manche</p>
-          ${roundRecapDrawingHtml(session)}
+          ${roundRecapDrawingHtml()}
           <p class="label-upper draw-it-recap__ranking-title">Résultat de la manche</p>
           <ol class="draw-it-recap__ranking" id="draw-it-round-ranking">
             ${roundRecapRowsHtml(session)}
@@ -556,13 +712,13 @@ export function mountDrawIt(app) {
 
     bindNav(app);
     bindExitGame(app, { shouldContinue: () => mount.isMounted() });
-    if (
-      phase === DRAW_IT_PHASE_DRAWING ||
-      (phase === DRAW_IT_PHASE_REVEAL && drawer)
-    ) {
+    if (phase === DRAW_IT_PHASE_DRAWING) {
       bindCanvas(session);
+    } else if (phase === DRAW_IT_PHASE_REVEAL) {
+      bindRecapCanvas(session);
     }
     bindGuessChat(session);
+    bindTools();
     rememberPlayIdentity(session);
 
     app.querySelector("#draw-it-advance")?.addEventListener(
@@ -630,6 +786,17 @@ export function mountDrawIt(app) {
     }
     const session = getDrawItSession();
     syncActiveDrawItLiveSession(session);
+    if (session.phase === DRAW_IT_PHASE_REVEAL) {
+      if (
+        canKeepDrawItRecapCanvas(lastPlayIdentity, session) &&
+        hasStableRecapCanvas()
+      ) {
+        patchRecapView(session);
+        return;
+      }
+      render();
+      return;
+    }
     const previousBoard = board;
     board = maybeResetDrawItBoard(board, session);
     const sameRound =

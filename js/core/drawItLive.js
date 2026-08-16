@@ -102,15 +102,33 @@ export function syncDrawItLiveIdentity(state, session = {}) {
   if (!session?.runId && !session?.lobbyStarted) return current;
   const nextIdentity = identityFrom(session);
   if (sameIdentity(current.identity, nextIdentity)) return current;
+  const sameRound =
+    String(current.identity.runId || "") === String(nextIdentity.runId || "") &&
+    Number(current.identity.roundIdx) === Number(nextIdentity.roundIdx) &&
+    String(current.identity.drawerUid || "") === String(nextIdentity.drawerUid || "");
+  if (
+    sameRound &&
+    Number(current.identity.canvasEpoch) > Number(nextIdentity.canvasEpoch)
+  ) {
+    return current;
+  }
   return createDrawItLiveState(session);
 }
 
-function validCommonPayload(payload, session) {
+function validCommonPayload(payload, session, liveIdentity = null) {
   if (!payload || typeof payload !== "object") return false;
   if (String(payload.runId || "") !== String(session?.runId || "")) return false;
   if (finiteInt(payload.roundIdx) !== finiteInt(session?.roundIdx)) return false;
-  if (finiteInt(payload.canvasEpoch) !== finiteInt(session?.canvasEpoch)) return false;
   if (String(payload.drawerUid || "") !== String(session?.drawerUid || "")) return false;
+  const sessionEpoch = finiteInt(session?.canvasEpoch) ?? 0;
+  const liveEpoch = finiteInt(liveIdentity?.canvasEpoch) ?? sessionEpoch;
+  const payloadEpoch = finiteInt(payload.canvasEpoch);
+  if (payloadEpoch == null) return false;
+  if (payload.type === "clear") {
+    if (payloadEpoch !== sessionEpoch && payloadEpoch !== sessionEpoch + 1) return false;
+  } else if (payloadEpoch !== Math.max(sessionEpoch, liveEpoch)) {
+    return false;
+  }
   if (!ALLOWED_TYPES.has(payload.type)) return false;
   if (FORBIDDEN_KEYS.some((key) => Object.hasOwn(payload, key))) return false;
   const allowedKeys = TYPE_KEYS[payload.type];
@@ -136,13 +154,19 @@ function validCommonPayload(payload, session) {
 
 export function applyDrawItLiveEvent(state, payload, session = {}) {
   let next = syncDrawItLiveIdentity(state, session);
-  if (!validCommonPayload(payload, session)) {
+  if (!validCommonPayload(payload, session, next.identity)) {
     return { applied: false, reason: "identity_or_format", state: next, delta: null };
   }
 
   if (payload.type === "clear") {
-    next = createDrawItLiveState(session);
-    return { applied: true, reason: null, state: next, delta: { type: "replay" } };
+    const epoch = finiteInt(payload.canvasEpoch) ?? 0;
+    next = createDrawItLiveState({ ...session, canvasEpoch: epoch });
+    return {
+      applied: true,
+      reason: null,
+      state: next,
+      delta: { type: "replay", action: "clear", canvasEpoch: epoch },
+    };
   }
 
   const strokeId = String(payload.strokeId || "").trim();
@@ -156,7 +180,12 @@ export function applyDrawItLiveEvent(state, payload, session = {}) {
     delete inProgress[strokeId];
     delete completed[strokeId];
     next = { ...next, remoteInProgress: inProgress, remoteCompleted: completed };
-    return { applied: true, reason: null, state: next, delta: { type: "replay" } };
+    return {
+      applied: true,
+      reason: null,
+      state: next,
+      delta: { type: "replay", action: "undo", strokeId },
+    };
   }
 
   const seq = finiteInt(payload.seq, 1);

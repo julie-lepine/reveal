@@ -191,7 +191,11 @@ describe("Draw it ! — contrat récapitulatif", () => {
     assert.match(revealBranch, /Résultat de la manche/);
     assert.match(src, /pointsLabel/);
     assert.doesNotMatch(src, /Points : —/);
-    assert.match(src, /Dessin indisponible sur cet appareil/);
+    assert.match(src, /mountDrawItReplayCanvas/);
+    assert.match(src, /createDrawItRecapBoardFromSession/);
+    assert.match(src, /bindRecapCanvas/);
+    assert.doesNotMatch(src, /Dessin indisponible sur cet appareil/);
+    assert.doesNotMatch(src, /Dessin disponible localement/);
     assert.match(revealBranch, /Manche suivante →/);
     assert.match(revealBranch, /Voir les résultats →/);
     assert.match(src, /canActAsHost/);
