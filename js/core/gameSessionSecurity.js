@@ -102,7 +102,9 @@ export const EVENING_SCORES_RESERVED_MSG = "Scores de soirée réservés à l'h�
 
 /**
  * Miroir de la whitelist `apply_acting_host_play` (merge_play).
- * Garder aligné avec supabase/game-sessions-i08-arch03.sql (+ hotfix takeScored).
+ * Aligné sur la dernière définition SQL repo de cette RPC (clés merge_play).
+ * Draw it ! n'y figure pas : strokes / drawer / epoch passent par des RPC
+ * drawer-only (`append_drawit_stroke`, etc.).
  */
 export const ACTING_HOST_PLAY_ALLOWED_KEYS = new Set([
   "phase",
@@ -145,14 +147,6 @@ export const ACTING_HOST_PLAY_ALLOWED_KEYS = new Set([
   "voteTimerRemaining",
   "questionScored",
   "podiumApplied",
-  "drawerUid",
-  "roundStartAt",
-  "roundEndsAt",
-  "foundOrder",
-  "guesses",
-  "canvasEpoch",
-  "strokeSeq",
-  "strokes",
 ]);
 
 /**
