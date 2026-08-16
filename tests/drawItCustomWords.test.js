@@ -561,13 +561,14 @@ describe("FEATURE-DRAWIT-CUSTOM-WORDS-01", () => {
     assert.match(src, /checkHotTakeModeration/);
   });
 
-  it("UI prep : liste tous les mots, delete seulement les siens", () => {
+  it("UI prep : liste owner + hint générique, pas le texte des autres", () => {
     const src = read("js/screens/drawItPrep.js");
     assert.match(src, /id="new-drawit-word"/);
     assert.match(src, /id="add-drawit-word"/);
-    assert.match(src, /data-remove-drawit-word/);
-    assert.match(src, /isDrawItCustomWordOwnedBy/);
-    assert.match(src, /listDrawItCustomWords/);
+    assert.match(src, /listMyDrawItCustomWords/);
+    assert.match(src, /summarizeOthersDrawItCustomAdds/);
+    assert.match(src, /a ajouté/);
+    assert.doesNotMatch(src, /listDrawItCustomWords\(\)/);
   });
 
   it("available pool 0 customs = catalogue", () => {

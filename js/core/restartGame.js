@@ -294,7 +294,7 @@ export async function launchDrawItPrep() {
     statePatch: { drawItGame: di },
     gameId: "drawit",
     screen: "drawit-prep",
-    remoteState: { drawIt: { ...drawItToRemote(di), customWords: [] } },
+    remoteState: { drawIt: { ...drawItToRemote(di), customWords: [], runId: null } },
     alertTitle: "Draw it !",
     alertFallback: "Impossible de lancer Draw it !.",
     logLabel: "DrawIt",

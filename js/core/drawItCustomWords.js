@@ -22,6 +22,7 @@ import {
   isDrawItCustomWordOwnedBy,
   mergeDrawItCustomWords,
   normalizeDrawItCustomWord,
+  redactDrawItCustomWordsForViewer,
   sanitizeDrawItCustomWords,
 } from "./sessionMerge.js";
 import { getLocalDisplayName, getState, saveStatePatch } from "./state.js";
@@ -30,13 +31,16 @@ export {
   isDrawItCustomWordOwnedBy,
   mergeDrawItCustomWords,
   normalizeDrawItCustomWord,
+  redactDrawItCustomWordsForViewer,
   sanitizeDrawItCustomWords,
 };
 
 export const DRAW_IT_CUSTOM_LOCKED = "DRAWIT_CUSTOM_LOCKED";
 
 export function canMutateDrawItCustomWords(session = {}) {
-  return !session?.lobbyStarted && !session?.runId;
+  // Verrou = partie effectivement lancée. Un runId stale (localStorage /
+  // merge guest) ne doit pas bloquer la prépa.
+  return !session?.lobbyStarted;
 }
 
 export function clearDrawItCustomWords(session = {}) {
@@ -51,6 +55,7 @@ function uniqueCustomWordEntries(customWords = []) {
   const seen = new Set();
   const out = [];
   for (const item of sanitizeDrawItCustomWords(customWords)) {
+    if (!item.text) continue;
     const key = normalizeDrawItGuess(item.text);
     if (!key || seen.has(key)) continue;
     seen.add(key);
@@ -114,9 +119,25 @@ export function drawItAvailablePoolSize({
   catalogWords = DRAW_IT_WORDS,
 } = {}) {
   if (!isDrawItCategoryId(categoryId)) return 0;
-  const customs = uniqueCustomWordEntries(customWords);
+  const all = sanitizeDrawItCustomWords(customWords);
+  const customs = uniqueCustomWordEntries(all);
+  const textless = all.filter((item) => !item.text).length;
   const catalog = distinctCatalogPool(categoryId, catalogWords);
-  return customs.length + catalogWithoutCustomLabels(catalog, customs).length;
+  return customs.length + textless + catalogWithoutCustomLabels(catalog, customs).length;
+}
+
+export function summarizeOthersDrawItCustomAdds(
+  entries = [],
+  localAuthor,
+  localAuthorUid = null
+) {
+  const byAuthor = new Map();
+  for (const item of sanitizeDrawItCustomWords(entries)) {
+    if (isDrawItCustomWordOwnedBy(item, localAuthor, localAuthorUid)) continue;
+    const name = item.author || "Un joueur";
+    byAuthor.set(name, (byAuthor.get(name) || 0) + 1);
+  }
+  return [...byAuthor.entries()].map(([author, count]) => ({ author, count }));
 }
 
 function persistCustomWords(session, customWords) {
@@ -135,8 +156,9 @@ export function getDrawItCustomWords(session) {
 
 export function getMyDrawItCustomWords(session, localAuthor, localAuthorUid) {
   const me = localAuthor ?? getLocalDisplayName();
-  return getDrawItCustomWords(session).filter((item) =>
-    isDrawItCustomWordOwnedBy(item, me, localAuthorUid)
+  return getDrawItCustomWords(session).filter(
+    (item) =>
+      Boolean(item.text) && isDrawItCustomWordOwnedBy(item, me, localAuthorUid)
   );
 }
 
@@ -194,7 +216,7 @@ export async function addDrawItCustomWord(text, session) {
       cur,
       getDrawItCustomWords(cur).filter((item) => item.id !== entry.id)
     );
-    if (code.includes(DRAW_IT_CUSTOM_LOCKED) || code.includes("DRAWIT_WRONG_GAME")) {
+    if (code.includes(DRAW_IT_CUSTOM_LOCKED)) {
       return { ok: false, error: "La partie a déjà commencé." };
     }
     return { ok: false, error: e?.message || "Impossible d'ajouter le mot." };
@@ -245,7 +267,7 @@ export async function removeDrawItCustomWord(wordId, session, { localAuthor, loc
     const code = String(e?.message || "");
     const cur = getState().drawItGame || session;
     persistCustomWords(cur, [...getDrawItCustomWords(cur), target]);
-    if (code.includes(DRAW_IT_CUSTOM_LOCKED) || code.includes("DRAWIT_WRONG_GAME")) {
+    if (code.includes(DRAW_IT_CUSTOM_LOCKED)) {
       return { ok: false, error: "La partie a déjà commencé." };
     }
     return { ok: false, error: e?.message || "Impossible de supprimer le mot." };

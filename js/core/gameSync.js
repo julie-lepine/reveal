@@ -51,6 +51,7 @@ import {
   mergeHotTakeCustomTakes,
   mergeDrawItCustomWords,
   sanitizeDrawItCustomWords,
+  redactDrawItCustomWordsForViewer,
   mergeDilemmaPatchState,
   mergeHotTakePatchState,
   mergeConsensusPatchState,
@@ -1411,19 +1412,26 @@ function mergeDrawItGameLocal(local, remote) {
     ...local,
     ...remote,
     ready,
-    runId: remote.runId || local.runId || null,
+    runId:
+      !remote.lobbyStarted && !remote.runId
+        ? null
+        : remote.runId || local.runId || null,
     drawerOrder,
     participants:
       Array.isArray(remote.participants) && remote.participants.length
         ? remote.participants
         : local.participants || [],
   };
-  if (remote.lobbyStarted || local.lobbyStarted || remote.runId || local.runId) {
+  if (remote.lobbyStarted || local.lobbyStarted) {
     merged.customWords = [];
   } else if (Array.isArray(remote.customWords)) {
     merged.customWords = mergeDrawItCustomWords(
       local.customWords || [],
-      remote.customWords,
+      redactDrawItCustomWordsForViewer(
+        remote.customWords,
+        getLocalDisplayName(),
+        getSupabaseUserId() || getLocalParticipantUid()
+      ),
       getLocalDisplayName(),
       getSupabaseUserId() || getLocalParticipantUid()
     );
@@ -1464,12 +1472,15 @@ function mergeDrawItPatchState(cur, inc, { mergeReadyUid }) {
     ...inc,
     ready: mergeReadyUid(cur, inc),
   };
-  if (merged.lobbyStarted || merged.runId) {
+  if (merged.lobbyStarted) {
     merged.customWords = [];
   } else if (Object.prototype.hasOwnProperty.call(inc, "customWords")) {
     merged.customWords = sanitizeDrawItCustomWords(inc.customWords);
   } else {
     merged.customWords = sanitizeDrawItCustomWords(cur.customWords);
+  }
+  if (!merged.lobbyStarted && Object.prototype.hasOwnProperty.call(inc, "runId")) {
+    merged.runId = inc.runId || null;
   }
   return merged;
 }
@@ -2600,14 +2611,16 @@ export function drawItFromRemote(remote) {
     selectedCategoryId: remote.selectedCategoryId || "catalog",
     roundCount: remote.roundCount ?? 5,
   };
-  if (
-    !remote.lobbyStarted &&
-    !remote.runId &&
-    Array.isArray(remote.customWords)
-  ) {
-    base.customWords = sanitizeDrawItCustomWords(remote.customWords);
+  if (!remote.lobbyStarted) {
+    if (Array.isArray(remote.customWords)) {
+      base.customWords = redactDrawItCustomWordsForViewer(
+        remote.customWords,
+        getLocalDisplayName(),
+        getSupabaseUserId()
+      );
+    }
+    return base;
   }
-  if (!remote.lobbyStarted && !remote.runId) return base;
   return {
     ...base,
     runId: remote.runId || null,

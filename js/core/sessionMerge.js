@@ -116,23 +116,23 @@ export function mergeHotTakeCustomTakes(localList, remoteList, localAuthor) {
   });
 }
 
-/** Mot custom Draw it ! — id + texte + ownership UID (fallback nom). */
+/** Mot custom Draw it ! — id + ownership ; le texte est optionnel (méta publique). */
 export function normalizeDrawItCustomWord(entry) {
   if (!entry || typeof entry !== "object") return null;
-  const text = trimPlayerText(entry.text);
-  if (!text) return null;
   const id = entry.id != null ? String(entry.id).trim() : "";
   if (!id) return null;
+  const text = trimPlayerText(entry.text);
   const authorUid =
     entry.authorUid != null && String(entry.authorUid).trim()
       ? String(entry.authorUid).trim()
       : null;
   const out = {
     id,
-    text,
     author: entry.author ? String(entry.author) : null,
   };
+  if (text) out.text = text;
   if (authorUid) out.authorUid = authorUid;
+  if (!out.text && !out.author && !out.authorUid) return null;
   return out;
 }
 
@@ -147,6 +147,20 @@ export function sanitizeDrawItCustomWords(list = []) {
     out.push(item);
   }
   return out;
+}
+
+/** Autres joueurs : id + auteur uniquement. Owner : conserve le texte. */
+export function redactDrawItCustomWordsForViewer(
+  list = [],
+  localAuthor,
+  localAuthorUid = null
+) {
+  return sanitizeDrawItCustomWords(list).map((item) => {
+    if (isDrawItCustomWordOwnedBy(item, localAuthor, localAuthorUid)) return item;
+    const out = { id: item.id, author: item.author };
+    if (item.authorUid) out.authorUid = item.authorUid;
+    return out;
+  });
 }
 
 export function isDrawItCustomWordOwnedBy(item, localAuthor, localAuthorUid = null) {

@@ -44,7 +44,9 @@ import {
   getDrawItCustomWords,
   getMyDrawItCustomWords,
   removeDrawItCustomWord as removeDrawItCustomWordEntry,
+  summarizeOthersDrawItCustomAdds,
 } from "./drawItCustomWords.js";
+import { sanitizeDrawItCustomWords } from "./sessionMerge.js";
 import { getHotTakeModerationNotice as getModerationNotice } from "./hotTakeModeration.js";
 import { estimateDrawItDuration } from "./drawItDuration.js";
 import { createDrawItRunId } from "./drawItRunId.js";
@@ -286,12 +288,29 @@ function freezeDrawItParticipants(rosterNames) {
   return buildClutchParticipantsSnapshot(names, lobby).filter((p) => p.userId);
 }
 
+async function loadDrawItCustomWordsForLaunch(session) {
+  if (isGameSyncActive() && isSupabaseConfigured()) {
+    try {
+      const { fetchGameSessionByLobby } = await import("./supabaseGame.js");
+      const row = await fetchGameSessionByLobby(getState().lobby?.id);
+      const remote = row?.state?.drawIt?.customWords;
+      if (Array.isArray(remote) && remote.length) {
+        return sanitizeDrawItCustomWords(remote);
+      }
+    } catch {
+      /* repli local */
+    }
+  }
+  return getDrawItCustomWords(session);
+}
+
 export async function markDrawItLobbyStarted({ rosterNames } = {}) {
   const session = getDrawItSession();
+  const customWords = await loadDrawItCustomWordsForLaunch(session);
   const check = validateDrawItPrep({
     selectedCategoryId: session.selectedCategoryId,
     roundCount: session.roundCount,
-    customWords: session.customWords,
+    customWords,
   });
   if (!check.valid) return null;
 
@@ -302,7 +321,7 @@ export async function markDrawItLobbyStarted({ rosterNames } = {}) {
   const series = buildDrawItSeries({
     selectedCategoryId: session.selectedCategoryId,
     roundCount: session.roundCount,
-    customWords: session.customWords,
+    customWords,
   });
   if (series.length < Number(session.roundCount)) return null;
 
@@ -943,6 +962,7 @@ export {
   canMutateDrawItCustomWords,
   getModerationNotice,
   buildDrawItDeck,
+  summarizeOthersDrawItCustomAdds,
   canCommitDrawItReveal,
   canCommitDrawItNextRound,
   canCompleteDrawItGame,

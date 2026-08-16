@@ -12,13 +12,13 @@ import {
   drawItPrepBlockLabel,
   addDrawItCustomWord,
   removeDrawItCustomWord,
-  listDrawItCustomWords,
+  listMyDrawItCustomWords,
+  summarizeOthersDrawItCustomAdds,
   getModerationNotice,
   DRAW_IT_CATEGORIES,
   DRAW_IT_ROUND_PRESETS,
   DRAW_IT_CATALOG_ID,
 } from "../core/drawItSession.js";
-import { isDrawItCustomWordOwnedBy } from "../core/sessionMerge.js";
 import { getLobbyParticipants } from "../core/lobby.js";
 import { getLocalDisplayName } from "../core/state.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
@@ -62,25 +62,30 @@ export function mountDrawItPrep(app) {
   const moderationNotice = getModerationNotice();
 
   function customWordsListHtml() {
-    const items = listDrawItCustomWords();
+    const items = listMyDrawItCustomWords();
     if (!items.length) return "";
-    const me = getLocalDisplayName();
-    const uid = getLocalParticipantUid() || null;
     return `<ul class="take-list" id="draw-it-custom-list">${items
-      .map((item) => {
-        const mine = isDrawItCustomWordOwnedBy(item, me, uid);
-        const author = item.author ? escapeHtml(item.author) : "Joueur";
-        return `<li class="take-list__item">
+      .map(
+        (item) => `<li class="take-list__item">
           <span class="take-list__text">${escapeHtml(item.text)}</span>
-          <span class="muted"> — ${author}</span>
-          ${
-            mine
-              ? `<button type="button" class="btn-link take-list__remove" data-remove-drawit-word="${escapeHtml(item.id)}" aria-label="Supprimer">Supprimer</button>`
-              : ""
-          }
-        </li>`;
-      })
+          <button type="button" class="btn-link take-list__remove" data-remove-drawit-word="${escapeHtml(item.id)}" aria-label="Supprimer">Supprimer</button>
+        </li>`
+      )
       .join("")}</ul>`;
+  }
+
+  function othersCustomHintHtml() {
+    const summary = summarizeOthersDrawItCustomAdds(
+      getDrawItSession().customWords || [],
+      getLocalDisplayName(),
+      getLocalParticipantUid() || null
+    );
+    if (!summary.length) return "";
+    const lines = summary.map(({ author, count }) => {
+      const label = count > 1 ? "mots" : "mot";
+      return `${escapeHtml(author)} a ajouté ${count} ${label} au jeu`;
+    });
+    return `<p class="hint" id="draw-it-others-hint" aria-live="polite">${lines.join("<br>")}</p>`;
   }
 
   function renderCustomWordsList() {
@@ -88,6 +93,8 @@ export function mountDrawItPrep(app) {
     patchDynamicListInCard(card, {
       listSelector: ".take-list",
       listHtml: customWordsListHtml(),
+      hintSelector: "#draw-it-others-hint",
+      hintHtml: othersCustomHintHtml(),
       insertAfterSelectors: ["#drawit-word-error", ".moderation-notice"],
     });
   }
@@ -356,6 +363,7 @@ export function mountDrawItPrep(app) {
           <p class="moderation-notice">${escapeHtml(moderationNotice)}</p>
           <p class="auth-error hidden" id="drawit-word-error"></p>
           ${customWordsListHtml()}
+          ${othersCustomHintHtml()}
         </div>
 
         <div class="card" id="draw-it-players">
