@@ -4954,8 +4954,13 @@ body.has-bottom-nav .feedback-fab{
 }
 
 .draw-it-guess .chat-messages{
+  height:180px;
   max-height:180px;
   margin-bottom:10px;
+}
+
+.draw-it-found-line{
+  min-height:1.4em;
 }
 
 .draw-it-canvas-host{

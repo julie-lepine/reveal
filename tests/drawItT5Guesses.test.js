@@ -541,13 +541,16 @@ describe("Draw it ! — composer guesses stable (clavier)", () => {
     assert.match(guesses, /export function canKeepDrawItGuessComposer/);
     assert.match(src, /canKeepDrawItGuessComposer\(lastPlayIdentity/);
     assert.match(src, /function patchDrawingLive/);
-    assert.match(src, /chatPanel\.refresh\(\)/);
+    assert.match(src, /function syncGuessFeedDom/);
+    assert.match(src, /appendChild\(buildGuessMsgNode/);
     const patchStart = src.indexOf("function patchDrawingLive");
     const patch = src.slice(patchStart, src.indexOf("function bindGuessChat"));
     assert.doesNotMatch(patch, /innerHTML\s*=/);
+    assert.doesNotMatch(patch, /chatPanel\.refresh\(/);
     assert.doesNotMatch(patch, /teardownChat\(\)/);
     assert.doesNotMatch(patch, /bindGuessChat\(/);
     assert.doesNotMatch(patch, /\.focus\(/);
+    assert.match(read("style.css"), /\.draw-it-guess \.chat-messages\{[\s\S]*?height:180px;/);
     const handlerStart = src.indexOf("const unsub = onGameSessionChange");
     const handler = src.slice(
       handlerStart,

@@ -81,6 +81,8 @@ export function mountDrawIt(app) {
   let board = createDrawItBoardFromSession(getDrawItSession());
   let lastPlayIdentity = null;
   let deferredDrawingRender = false;
+  let lastDebugInput = null;
+  let debugPatchSeq = 0;
   const liveRender = ({ delta }) => {
     if (!mount.isMounted() || !mount.isCurrentMount()) return;
     canvasCtl?.applyLiveDelta(delta);
@@ -106,6 +108,7 @@ export function mountDrawIt(app) {
   }
 
   function teardownChat() {
+    debugGuessFocus("teardownChat");
     chatPanel?.cleanup();
     chatPanel = null;
   }
@@ -164,6 +167,96 @@ export function mountDrawIt(app) {
     return "";
   }
 
+  function isGuessFocusDebug() {
+    try {
+      return sessionStorage.getItem("drawit-focus-debug") === "1";
+    } catch {
+      return false;
+    }
+  }
+
+  function debugGuessFocus(label, extra = {}) {
+    if (!isGuessFocusDebug()) return;
+    const input = app.querySelector("#draw-it-guess-input");
+    debugPatchSeq += 1;
+    console.info("[drawit-focus]", debugPatchSeq, label, {
+      activeId: document.activeElement?.id || document.activeElement?.tagName || null,
+      activeIsInput: document.activeElement === input,
+      inputIsConnected: input?.isConnected ?? null,
+      inputSameNode: lastDebugInput ? lastDebugInput === input : null,
+      inputDisabled: input?.disabled ?? null,
+      canKeep: extra.canKeep,
+      ...extra,
+    });
+    lastDebugInput = input || lastDebugInput;
+  }
+
+  function buildGuessMsgNode(message) {
+    const row = document.createElement("div");
+    row.className = "chat-msg";
+    const from = document.createElement("span");
+    from.className = "chat-msg__from";
+    from.textContent = message?.from || "Joueur";
+    const text = document.createElement("span");
+    text.className = "chat-msg__text";
+    text.textContent = message?.text || "";
+    row.appendChild(from);
+    row.appendChild(text);
+    return row;
+  }
+
+  function syncGuessFeedDom(session) {
+    const messagesEl = app.querySelector("#draw-it-guess-messages");
+    if (!messagesEl) return false;
+    const messages = drawItGuessesToChatMessages(session.guesses, (uid) => {
+      return nameForUserId(uid) || "Joueur";
+    });
+    const nodes = messagesEl.querySelectorAll(":scope > .chat-msg");
+    let prefixOk =
+      nodes.length > 0 &&
+      messages.length >= nodes.length &&
+      !messagesEl.querySelector(":scope > .chat-empty");
+    if (prefixOk) {
+      for (let i = 0; i < nodes.length; i += 1) {
+        const from = nodes[i].querySelector(".chat-msg__from")?.textContent;
+        const text = nodes[i].querySelector(".chat-msg__text")?.textContent;
+        if (from !== messages[i].from || text !== messages[i].text) {
+          prefixOk = false;
+          break;
+        }
+      }
+    }
+    if (prefixOk && messages.length === nodes.length) return false;
+    if (prefixOk) {
+      for (let i = nodes.length; i < messages.length; i += 1) {
+        messagesEl.appendChild(buildGuessMsgNode(messages[i]));
+      }
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+      return true;
+    }
+    const empty = messagesEl.querySelector(":scope > .chat-empty");
+    if (empty && messages.length && !nodes.length) {
+      empty.remove();
+      for (const message of messages) {
+        messagesEl.appendChild(buildGuessMsgNode(message));
+      }
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+      return true;
+    }
+    const frag = document.createDocumentFragment();
+    if (!messages.length) {
+      const empty = document.createElement("p");
+      empty.className = "chat-empty";
+      empty.textContent = "Aucun message pour l'instant.";
+      frag.appendChild(empty);
+    } else {
+      for (const message of messages) frag.appendChild(buildGuessMsgNode(message));
+    }
+    messagesEl.replaceChildren(frag);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+    return true;
+  }
+
   function rememberPlayIdentity(session) {
     lastPlayIdentity = {
       runId: session?.runId || null,
@@ -186,20 +279,20 @@ export function mountDrawIt(app) {
     const sendEl = app.querySelector("#draw-it-guess-send");
     const hintEl = app.querySelector("#draw-it-guess-hint");
     if (inputEl) {
-      inputEl.disabled = locked;
-      inputEl.placeholder = locked
+      if (inputEl.disabled !== locked) inputEl.disabled = locked;
+      const nextPlaceholder = locked
         ? reason || "Propositions fermées"
         : "Propose un mot…";
-    }
-    if (sendEl) sendEl.disabled = locked;
-    if (hintEl) {
-      if (reason) {
-        hintEl.hidden = false;
-        hintEl.textContent = reason;
-      } else {
-        hintEl.hidden = true;
-        hintEl.textContent = "";
+      if (inputEl.placeholder !== nextPlaceholder) {
+        inputEl.placeholder = nextPlaceholder;
       }
+    }
+    if (sendEl && sendEl.disabled !== locked) sendEl.disabled = locked;
+    if (hintEl) {
+      const hide = !reason;
+      if (hintEl.hidden !== hide) hintEl.hidden = hide;
+      const nextHint = reason || "";
+      if (hintEl.textContent !== nextHint) hintEl.textContent = nextHint;
     }
   }
 
@@ -207,15 +300,12 @@ export function mountDrawIt(app) {
     const el = app.querySelector("#draw-it-found");
     if (!el) return;
     const found = Array.isArray(session.foundOrder) ? session.foundOrder : [];
-    if (!found.length) {
-      el.hidden = true;
-      el.textContent = "";
-      return;
-    }
-    el.hidden = false;
-    el.textContent = `Trouvé : ${found
-      .map((entry) => nameForUserId(entry.uid) || "Joueur")
-      .join(", ")}`;
+    const next = found.length
+      ? `Trouvé : ${found
+          .map((entry) => nameForUserId(entry.uid) || "Joueur")
+          .join(", ")}`
+      : "";
+    if (el.textContent !== next) el.textContent = next;
   }
 
   function patchDrawerWord(session) {
@@ -226,24 +316,38 @@ export function mountDrawIt(app) {
 
   function patchDrawingLive(session) {
     if (!mount.isMounted() || !mount.isCurrentMount()) return;
+    const inputBefore = app.querySelector("#draw-it-guess-input");
+    debugGuessFocus("patch:before", {
+      canKeep: canKeepDrawItGuessComposer(lastPlayIdentity, session),
+      guesses: (session.guesses || []).length,
+      found: (session.foundOrder || []).length,
+    });
     if (!hasStableGuessComposer()) {
+      debugGuessFocus("patch:fallback-render", { reason: "no-composer" });
       render();
       return;
     }
     syncActiveDrawItLiveSession(session);
+    const previousBoard = board;
     board = maybeResetDrawItBoard(board, session);
-    chatPanel.refresh();
+    syncGuessFeedDom(session);
     applyGuessInputLock(session);
     patchFoundLine(session);
     const clock = app.querySelector("#draw-it-clock");
     if (clock) {
-      clock.textContent = formatDrawItCountdown(
+      const nextClock = formatDrawItCountdown(
         remainingMsUntil(session.roundEndsAt, drawItSyncedNowMs(session))
       );
+      if (clock.textContent !== nextClock) clock.textContent = nextClock;
     }
     canvasCtl?.syncInteractive();
-    canvasCtl?.paint();
+    if (board !== previousBoard) canvasCtl?.paint();
     rememberPlayIdentity(session);
+    const inputAfter = app.querySelector("#draw-it-guess-input");
+    debugGuessFocus("patch:after", {
+      inputSameNode: Boolean(inputBefore && inputBefore === inputAfter),
+      stillFocused: document.activeElement === inputAfter,
+    });
   }
 
   function bindGuessChat(session) {
@@ -296,13 +400,11 @@ export function mountDrawIt(app) {
 
   function foundLine(session) {
     const found = Array.isArray(session.foundOrder) ? session.foundOrder : [];
-    if (!found.length) {
-      return `<p class="hint" id="draw-it-found" hidden></p>`;
-    }
     const names = found
       .map((entry) => nameForUserId(entry.uid) || "Joueur")
       .map((name) => escapeHtml(name));
-    return `<p class="hint" id="draw-it-found">Trouvé : ${names.join(", ")}</p>`;
+    const text = names.length ? `Trouvé : ${names.join(", ")}` : "";
+    return `<p class="hint draw-it-found-line" id="draw-it-found">${text}</p>`;
   }
 
   function roundRecapRowsHtml(session) {
@@ -372,6 +474,7 @@ export function mountDrawIt(app) {
 
   function render() {
     if (!mount.isMounted() || !mount.isCurrentMount()) return;
+    debugGuessFocus("render:start");
     const session = getDrawItSession();
     syncActiveDrawItLiveSession(session);
     if (!session.lobbyStarted) {
@@ -542,20 +645,38 @@ export function mountDrawIt(app) {
       patchDrawingLive(session);
       return;
     }
-    if (canKeepDrawItGuessComposer(lastPlayIdentity, session) && hasStableGuessComposer()) {
+    const keepComposer =
+      canKeepDrawItGuessComposer(lastPlayIdentity, session) && hasStableGuessComposer();
+    debugGuessFocus("session-change", {
+      canKeep: canKeepDrawItGuessComposer(lastPlayIdentity, session),
+      keepComposer,
+      lastPhase: lastPlayIdentity?.phase || null,
+      phase: session.phase,
+      lastRun: lastPlayIdentity?.runId || null,
+      run: session.runId || null,
+      lastRound: lastPlayIdentity?.roundIdx,
+      round: session.roundIdx,
+      lastEpoch: lastPlayIdentity?.canvasEpoch,
+      epoch: session.canvasEpoch,
+      lastDrawer: lastPlayIdentity?.drawerUid || null,
+      drawer: session.drawerUid || null,
+    });
+    if (keepComposer) {
       patchDrawingLive(session);
+      if (!isLocalDrawer(session)) return;
       void refreshPrivateWord(session).then(() => {
         if (!mount.isMounted() || !mount.isCurrentMount()) return;
         const live = getDrawItSession();
         if (!canKeepDrawItGuessComposer(lastPlayIdentity, live) || !hasStableGuessComposer()) {
+          debugGuessFocus("private-word:full-render");
           render();
           return;
         }
         patchDrawerWord(live);
-        patchDrawingLive(live);
       });
       return;
     }
+    debugGuessFocus("session-change:full-render");
     // Le nouveau roundIdx/timer est rendu immédiatement ; le mot privé du
     // nouveau drawer peut arriver ensuite sans retarder le countdown.
     render();
