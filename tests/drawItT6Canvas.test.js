@@ -240,6 +240,7 @@ describe("Draw it ! T6 — aucun réseau", () => {
     assert.match(canvas, /pointermove/);
     assert.match(canvas, /pointerup/);
     assert.match(canvas, /pointercancel/);
+    assert.match(canvas, /let drawing = false/);
     assert.match(canvas, /touch-action/);
     assert.match(canvas, /ResizeObserver/);
     const game = read("js/games/drawIt.js");

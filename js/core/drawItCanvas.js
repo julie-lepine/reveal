@@ -185,6 +185,7 @@ export function mountDrawItCanvas(hostEl, {
     const mutation = next?.eraseMutation;
     if (mutation?.replacements?.length) onEraseEnd?.(mutation);
   }
+  let drawing = false;
   let pointerId = null;
   let cssW = 0;
   let cssH = 0;

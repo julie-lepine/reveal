@@ -27,6 +27,7 @@ const live = await import("../js/core/drawItLive.js");
 const {
   DRAW_IT_DURABLE_STROKE_MAX_POINTS,
   DRAW_IT_STROKE_MAX_COUNT,
+  DRAW_IT_TOOL_DRAW,
   DRAW_IT_TOOL_ERASE,
   applyDrawItBoardClear,
   applyDrawItBoardEraseSegments,
@@ -527,5 +528,233 @@ describe("Draw it ! gomme partielle — caps / sécurité", () => {
     const liveSrc = read("js/core/drawItLive.js");
     assert.match(liveSrc, /erase_segments/);
     assert.match(liveSrc, /drawit:\$\{intent\.lobbyId\}/);
+  });
+});
+
+function fakeCanvasCtx() {
+  return {
+    save() {},
+    restore() {},
+    beginPath() {},
+    moveTo() {},
+    lineTo() {},
+    stroke() {},
+    clearRect() {},
+    strokeStyle: "",
+    lineWidth: 1,
+    lineCap: "",
+    lineJoin: "",
+  };
+}
+
+function installFakeCanvasHost() {
+  const listeners = {};
+  const canvas = {
+    className: "",
+    style: {
+      pointerEvents: "auto",
+      width: "",
+      height: "",
+      setProperty() {},
+    },
+    classList: { add() {}, toggle() {}, remove() {} },
+    width: 100,
+    height: 100,
+    getContext: () => fakeCanvasCtx(),
+    getBoundingClientRect: () => ({ left: 0, top: 0, width: 100, height: 100 }),
+    addEventListener(type, fn) {
+      listeners[type] = fn;
+    },
+    removeEventListener(type) {
+      delete listeners[type];
+    },
+    setPointerCapture() {},
+    releasePointerCapture() {},
+    setAttribute() {},
+    remove() {},
+  };
+  const prevDoc = globalThis.document;
+  const prevWin = globalThis.window;
+  globalThis.document = { createElement: () => canvas };
+  globalThis.window = { ...(prevWin || {}), devicePixelRatio: 1 };
+  const host = {
+    appendChild() {},
+    getBoundingClientRect: () => ({ width: 100, height: 100, left: 0, top: 0 }),
+    classList: { add() {}, toggle() {}, remove() {} },
+    style: { setProperty() {}, pointerEvents: "" },
+  };
+  return {
+    host,
+    listeners,
+    restore() {
+      if (prevDoc === undefined) delete globalThis.document;
+      else globalThis.document = prevDoc;
+      if (prevWin === undefined) delete globalThis.window;
+      else globalThis.window = prevWin;
+    },
+  };
+}
+
+function pointerEvent(type, x, y, pointerId = 1) {
+  return {
+    type,
+    pointerId,
+    clientX: x,
+    clientY: y,
+    preventDefault() {},
+    getCoalescedEvents() {
+      return [
+        {
+          type: "pointermove",
+          pointerId,
+          clientX: x,
+          clientY: y,
+          preventDefault() {},
+        },
+      ];
+    },
+  };
+}
+
+describe("Draw it ! régression T06 — toolbar + canvas actifs", () => {
+  it("1. toolbar mount : color picker + widths + eraser sont bindés", () => {
+    const game = read("js/games/drawIt.js");
+    const bindStart = game.indexOf("function bindTools()");
+    const bind = game.slice(bindStart, game.indexOf("function guessChatHtml"));
+    assert.ok(bindStart >= 0);
+    assert.match(bind, /#draw-it-color-input/);
+    assert.match(bind, /data-width/);
+    assert.match(bind, /draw-it-erase/);
+    assert.match(bind, /draw-it-undo/);
+    assert.match(bind, /draw-it-clear/);
+    assert.match(game, /id="draw-it-color-input"/);
+    assert.match(game, /data-width="\$\{entry\.value\}"/);
+  });
+
+  it("2. width click : Fin 4 / Moyen 7 / Épais 12, sans forcer erase", () => {
+    assert.equal(createDrawItBrush({ width: 4, tool: DRAW_IT_TOOL_DRAW }).width, 4);
+    assert.equal(createDrawItBrush({ width: 7, tool: DRAW_IT_TOOL_DRAW }).width, 7);
+    assert.equal(createDrawItBrush({ width: 12, tool: DRAW_IT_TOOL_DRAW }).width, 12);
+    const game = read("js/games/drawIt.js");
+    assert.match(
+      game,
+      /width: Number\(target\.getAttribute\("data-width"\)\),\s*tool: brush\.tool/
+    );
+  });
+
+  it("3. color picker : changement de couleur met à jour brush.color", () => {
+    const next = createDrawItBrush({
+      color: "#12abef",
+      width: 7,
+      tool: DRAW_IT_TOOL_DRAW,
+    });
+    assert.equal(next.color, "#12abef");
+    assert.equal(next.tool, DRAW_IT_TOOL_DRAW);
+    const game = read("js/games/drawIt.js");
+    assert.match(game, /color: colorInput\.value/);
+    assert.match(game, /tool: brush\.tool/);
+  });
+
+  it("4. eraser toggle : draw → erase → draw", () => {
+    let brush = createDrawItBrush({ tool: DRAW_IT_TOOL_DRAW });
+    assert.equal(brush.tool, DRAW_IT_TOOL_DRAW);
+    brush = createDrawItBrush({
+      color: brush.color,
+      width: brush.width,
+      tool: brush.tool === DRAW_IT_TOOL_ERASE ? DRAW_IT_TOOL_DRAW : DRAW_IT_TOOL_ERASE,
+    });
+    assert.equal(brush.tool, DRAW_IT_TOOL_ERASE);
+    brush = createDrawItBrush({
+      color: brush.color,
+      width: brush.width,
+      tool: brush.tool === DRAW_IT_TOOL_ERASE ? DRAW_IT_TOOL_DRAW : DRAW_IT_TOOL_ERASE,
+    });
+    assert.equal(brush.tool, DRAW_IT_TOOL_DRAW);
+  });
+
+  it("5. draw gesture : pointerdown/move/up produit un stroke", () => {
+    let board = createEmptyDrawItBoard({ runId: "run-partial" });
+    const brush = createDrawItBrush({ tool: DRAW_IT_TOOL_DRAW, color: "#ef4444", width: 4 });
+    board = applyDrawItPointer(board, "down", [0.1, 0.2], true, brush);
+    assert.equal(board.currentStroke?.tool, DRAW_IT_TOOL_DRAW);
+    board = applyDrawItPointer(board, "move", [0.3, 0.4], true);
+    board = applyDrawItPointer(board, "up", [0.31, 0.41], true);
+    assert.equal(board.currentStroke, null);
+    assert.equal(board.strokes.length, 1);
+    assert.equal(board.strokes[0].color, "#ef4444");
+    assert.equal(board.strokes[0].tool, DRAW_IT_TOOL_DRAW);
+  });
+
+  it("6. erase gesture : ne produit pas de stroke de dessin", () => {
+    let board = {
+      ...createEmptyDrawItBoard({ runId: "run-partial" }),
+      strokes: [stroke("s1")],
+    };
+    board = applyDrawItPointer(board, "down", [0.5, 0.5], true, {
+      ...createDrawItBrush({ tool: DRAW_IT_TOOL_ERASE, width: 7 }),
+    });
+    assert.equal(board.currentStroke?.tool, DRAW_IT_TOOL_ERASE);
+    board = applyDrawItPointer(board, "up", [0.52, 0.5], true);
+    assert.equal(board.currentStroke, null);
+    assert.equal(board.strokes.some((entry) => entry.tool === DRAW_IT_TOOL_ERASE), false);
+    assert.equal(board.strokes.some((entry) => entry.strokeId === "s1"), false);
+  });
+
+  it("7. eraser → draw : après une gomme, le mode draw dessine immédiatement", () => {
+    let board = {
+      ...createEmptyDrawItBoard({ runId: "run-partial" }),
+      strokes: [stroke("s1")],
+    };
+    board = applyDrawItPointer(board, "down", [0.5, 0.5], true, {
+      ...createDrawItBrush({ tool: DRAW_IT_TOOL_ERASE, width: 7 }),
+    });
+    board = applyDrawItPointer(board, "up", [0.52, 0.5], true);
+    const afterErase = board.strokes.length;
+    board = applyDrawItPointer(
+      board,
+      "down",
+      [0.1, 0.8],
+      true,
+      createDrawItBrush({ tool: DRAW_IT_TOOL_DRAW, color: "#38bdf8", width: 4 })
+    );
+    board = applyDrawItPointer(board, "up", [0.2, 0.8], true);
+    assert.equal(board.currentStroke, null);
+    assert.ok(board.strokes.length > afterErase);
+    assert.equal(board.strokes.at(-1).color, "#38bdf8");
+    assert.equal(board.strokes.at(-1).tool, DRAW_IT_TOOL_DRAW);
+  });
+
+  it("8. toolbar independence : isDrawing() ne bloque pas color/width/draw", async () => {
+    const canvasSrc = read("js/core/drawItCanvas.js");
+    assert.match(canvasSrc, /let drawing = false;/);
+    const game = read("js/games/drawIt.js");
+    assert.match(game, /canvasCtl\?\.isDrawing\(\)/);
+    const { mountDrawItCanvas } = await import("../js/core/drawItCanvas.js");
+    const fake = installFakeCanvasHost();
+    let board = createEmptyDrawItBoard({ runId: "run-partial" });
+    const drawingSession = session({ roundEndsAt: "2099-01-01T00:00:00.000Z" });
+    try {
+      const ctl = mountDrawItCanvas(fake.host, {
+        getBoard: () => board,
+        setBoard: (next) => {
+          board = next;
+        },
+        getSession: () => drawingSession,
+        getLocalUid: () => DRAWER,
+        getBrush: () => createDrawItBrush({ tool: DRAW_IT_TOOL_DRAW }),
+        createStrokeId: () => "live-1",
+      });
+      assert.equal(ctl.isDrawing(), false);
+      fake.listeners.pointerdown(pointerEvent("pointerdown", 20, 20));
+      assert.equal(ctl.isDrawing(), true);
+      assert.equal(board.currentStroke?.tool, DRAW_IT_TOOL_DRAW);
+      fake.listeners.pointermove(pointerEvent("pointermove", 40, 40));
+      fake.listeners.pointerup(pointerEvent("pointerup", 41, 41));
+      assert.equal(ctl.isDrawing(), false);
+      assert.equal(board.strokes.length, 1);
+      ctl.cleanup();
+    } finally {
+      fake.restore();
+    }
   });
 });
