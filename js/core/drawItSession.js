@@ -59,6 +59,9 @@ import {
   canSubmitDrawItGuess,
   isDrawItGuessInputLocked,
 } from "./drawItGuesses.js";
+import {
+  mergeCompletedDrawItStrokes,
+} from "./drawItStrokes.js";
 import { getSupabaseUserId } from "./supabaseAuth.js";
 
 function defaultSession() {
@@ -198,6 +201,7 @@ const revealLock = createActionLock();
 const nextRoundLock = createActionLock();
 const completeLock = createActionLock();
 const guessLock = createActionLock();
+const completedStrokeLock = createActionLock();
 
 function freezeDrawItParticipants(rosterNames) {
   const lobby = getLobbyParticipants();
@@ -513,6 +517,36 @@ export async function submitDrawItGuess(rawValue, { nowMs = Date.now(), uid } = 
     }
     saveStatePatch({ drawItGame: nextSession });
     return { ok: true, correct: applied.correct, reason: null };
+  });
+  if (!outcome.ok && outcome.skipped) return { ok: false, reason: "in_flight" };
+  return outcome.value;
+}
+
+/**
+ * Snapshot durable des strokes terminés uniquement.
+ * currentStroke n'est jamais écrit. Pas de RPC stroke dédiée (hors T8).
+ */
+export async function commitDrawItCompletedStroke(stroke) {
+  if (!stroke?.strokeId || !Array.isArray(stroke.points) || !stroke.points.length) {
+    return { ok: false, reason: "invalid_stroke" };
+  }
+  const outcome = await completedStrokeLock.run(async () => {
+    const session = getDrawItSession();
+    if (!session?.lobbyStarted) return { ok: false, reason: "not_started" };
+    const next = mergeCompletedDrawItStrokes(session, [stroke]);
+    if (next === session) return { ok: true, skipped: true };
+    saveStatePatch({ drawItGame: next });
+    if (isGameSyncActive() && isSupabaseConfigured() && canActAsHost()) {
+      try {
+        await commitDrawItPlay({
+          strokes: next.strokes,
+          strokeSeq: next.strokeSeq,
+        });
+      } catch (error) {
+        console.warn("[drawit] snapshot strokes:", error?.message || error);
+      }
+    }
+    return { ok: true, skipped: false };
   });
   if (!outcome.ok && outcome.skipped) return { ok: false, reason: "in_flight" };
   return outcome.value;

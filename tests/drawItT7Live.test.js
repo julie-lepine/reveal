@@ -80,6 +80,7 @@ mock.module("../js/core/router.js", {
 });
 
 const live = await import("../js/core/drawItLive.js");
+const strokes = await import("../js/core/drawItStrokes.js");
 
 function session(overrides = {}) {
   return {
@@ -381,6 +382,78 @@ describe("Draw it ! T7 — réception best-effort", () => {
     state = live.syncDrawItLiveIdentity(state, session({ roundIdx: 1, canvasEpoch: 2 }));
     assert.deepEqual(state.remoteCompleted, {});
   });
+
+  it("un session incomplet ne purge pas le live déjà reçu", () => {
+    const s = session();
+    let state = live.applyDrawItLiveEvent(
+      live.createDrawItLiveState(s),
+      payload("start"),
+      s
+    ).state;
+    state = live.syncDrawItLiveIdentity(state, {});
+    assert.ok(state.remoteInProgress.s1);
+  });
+});
+
+describe("Draw it ! T7 — replay du snapshot disponible", () => {
+  const durable = [
+    {
+      strokeId: "durable-1",
+      color: "#fff",
+      width: 4,
+      points: [[0.1, 0.1], [0.2, 0.2]],
+    },
+    {
+      strokeId: "durable-2",
+      color: "#abc",
+      width: 3,
+      points: [[0.3, 0.3], [0.4, 0.4]],
+    },
+  ];
+
+  it("reconstruit plusieurs strokes terminés sans currentStroke", () => {
+    const hydrated = strokes.createDrawItBoardFromSession(
+      session({ strokes: durable, strokeSeq: 2 })
+    );
+    assert.equal(hydrated.strokes.length, 2);
+    assert.deepEqual(
+      hydrated.strokes.map((stroke) => stroke.strokeId),
+      ["durable-1", "durable-2"]
+    );
+    assert.equal(hydrated.currentStroke, null);
+    assert.equal(hydrated.strokeSeq, 2);
+  });
+
+  it("hydrate un snapshot arrivé après la création du board", () => {
+    let board = strokes.createEmptyDrawItBoard(session());
+    board = strokes.maybeResetDrawItBoard(
+      board,
+      session({ strokes: durable, strokeSeq: 2 })
+    );
+    assert.equal(board.strokes.length, 2);
+    assert.equal(board.currentStroke, null);
+  });
+
+  it("un snapshot distant vide ne supprime pas les strokes terminés locaux", () => {
+    const local = session({ strokes: durable, strokeSeq: 2 });
+    const merged = strokes.mergeCompletedDrawItStrokes(local, []);
+    assert.equal(merged, local);
+    assert.equal(merged.strokes.length, 2);
+    assert.equal(Object.hasOwn(merged, "currentStroke"), false);
+  });
+
+  it("un hydrate conserve currentStroke du trait en cours", () => {
+    let board = strokes.createEmptyDrawItBoard(session());
+    board = strokes.applyDrawItPointer(board, "down", [0.1, 0.1], true);
+    board = strokes.applyDrawItPointer(board, "move", [0.2, 0.2], true);
+    const after = strokes.maybeResetDrawItBoard(
+      board,
+      session({ strokes: durable, strokeSeq: 2 })
+    );
+    assert.ok(after.currentStroke);
+    assert.equal(after.currentStroke.strokeId, board.currentStroke.strokeId);
+    assert.equal(after.strokes.length, 2);
+  });
 });
 
 describe("Draw it ! T7 — émission 10 Hz / un en vol", () => {
@@ -446,12 +519,90 @@ describe("Draw it ! T7 — émission 10 Hz / un en vol", () => {
     assert.deepEqual(messages.map((entry) => entry.type), ["start", "chunk", "end"]);
     assert.deepEqual(messages[1].points, [[0.2, 0.2], [0.3, 0.3]]);
   });
+
+  it("continue à émettre pendant un trait simulé de 10 secondes", async () => {
+    live.startDrawItLiveStroke({
+      strokeId: "long-stroke",
+      color: "#fff",
+      width: 4,
+      points: [[0, 0]],
+    });
+    await tick();
+    for (let chunk = 1; chunk <= 100; chunk += 1) {
+      const x = (chunk % 50) / 50;
+      live.bufferDrawItLivePoints("long-stroke", [[x, (chunk % 2) * 0.5]]);
+      await live.flushDrawItLiveChunk();
+    }
+    assert.equal(channels[0].sent.filter((entry) => entry.payload.type === "chunk").length, 100);
+    assert.equal(channels[0].sent.some((entry) => entry.payload.type === "end"), false);
+    await live.endDrawItLiveStroke({
+      strokeId: "long-stroke",
+      color: "#fff",
+      width: 4,
+    });
+    assert.equal(channels[0].sent.at(-1).payload.type, "end");
+  });
+
+  it("libère un send Broadcast bloqué sans ACK et reprend les chunks", async () => {
+    sendImpl = () => new Promise(() => {});
+    live.startDrawItLiveStroke({
+      strokeId: "stalled-send",
+      color: "#fff",
+      width: 4,
+      points: [[0, 0]],
+    });
+    live.bufferDrawItLivePoints("stalled-send", [[0.2, 0.2]]);
+    await new Promise((resolve) =>
+      setTimeout(resolve, live.DRAW_IT_LIVE_SEND_RELEASE_MS + 20)
+    );
+    const flushing = live.flushDrawItLiveChunk();
+    await new Promise((resolve) =>
+      setTimeout(resolve, live.DRAW_IT_LIVE_SEND_RELEASE_MS + 20)
+    );
+    assert.equal(await flushing, true);
+    assert.equal(channels[0].sent.at(-1).payload.type, "chunk");
+  });
+});
+
+describe("Draw it ! T7 — trait local long", () => {
+  it("600 pointermove ne terminent pas automatiquement currentStroke", () => {
+    let board = strokes.createEmptyDrawItBoard(session());
+    board = strokes.applyDrawItPointer(board, "down", [0, 0], true);
+    for (let i = 1; i <= 600; i += 1) {
+      board = strokes.applyDrawItPointer(
+        board,
+        "move",
+        [(i % 40) / 40, (i % 2) * 0.5],
+        true
+      );
+      assert.ok(board.currentStroke);
+    }
+    assert.ok(board.currentStroke.points.length > 80);
+    board = strokes.applyDrawItPointer(board, "up", [1, 1], true);
+    assert.equal(board.currentStroke, null);
+    assert.equal(board.strokes.length, 1);
+  });
+
+  it("un hydrate/rerender normal de même manche conserve le currentStroke", () => {
+    const currentSession = session({ guesses: [] });
+    let board = strokes.createEmptyDrawItBoard(currentSession);
+    board = strokes.applyDrawItPointer(board, "down", [0.1, 0.1], true);
+    board = strokes.applyDrawItPointer(board, "move", [0.3, 0.3], true);
+    const afterChatPatch = strokes.maybeResetDrawItBoard(
+      board,
+      session({ guesses: [{ uid: GUEST, value: "test" }] })
+    );
+    assert.equal(afterChatPatch, board);
+    assert.ok(afterChatPatch.currentStroke);
+    assert.equal(afterChatPatch.currentStroke.strokeId, board.currentStroke.strokeId);
+  });
 });
 
 describe("Draw it ! T7 — frontières de scope", () => {
   it("n'écrit ni game_sessions ni RPC stroke et canvas utilise les coalesced events", () => {
     const source = read("js/core/drawItLive.js");
     const canvas = read("js/core/drawItCanvas.js");
+    const game = read("js/games/drawIt.js");
     assert.doesNotMatch(
       source,
       /\.from\(["']game_sessions["']\)|patchGameState|contribute_game_session|rpc\([^)]*stroke/i
@@ -460,5 +611,10 @@ describe("Draw it ! T7 — frontières de scope", () => {
     assert.match(canvas, /getCoalescedEvents/);
     assert.match(canvas, /drawDrawItLiveSegment/);
     assert.match(canvas, /isDrawing\(\)/);
+    assert.match(game, /deferredDrawingRender/);
+    assert.match(game, /commitDrawItCompletedStroke/);
+    const sessionSrc = read("js/core/drawItSession.js");
+    assert.match(sessionSrc, /commitDrawItCompletedStroke/);
+    assert.doesNotMatch(sessionSrc, /strokes:\s*session\.currentStroke|currentStroke:/);
   });
 });

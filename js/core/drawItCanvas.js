@@ -184,7 +184,19 @@ export function mountDrawItCanvas(hostEl, {
     const active = next?.currentStroke;
     if (ok && active && active.strokeId === strokeId) {
       const added = active.points.slice(beforeLength);
-      if (added.length) onStrokePoints?.(strokeId, added);
+      if (added.length) {
+        onStrokePoints?.(strokeId, added);
+        drawDrawItLiveSegment(
+          canvas.getContext("2d"),
+          {
+            previousPoint: before?.currentStroke?.points?.[beforeLength - 1] || null,
+            points: added,
+            color: active.color,
+            width: active.width,
+          },
+          { width: canvas.width, height: canvas.height, dpr }
+        );
+      }
     }
     if (!ok) {
       drawing = false;
@@ -193,8 +205,8 @@ export function mountDrawItCanvas(hostEl, {
       if (completed?.strokeId === strokeId) {
         onStrokeEnd?.(completed, completed.points.slice(beforeLength));
       }
+      paint();
     }
-    paint();
   }
 
   function finishPointer(event) {

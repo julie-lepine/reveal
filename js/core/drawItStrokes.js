@@ -7,7 +7,9 @@ import {
   isDrawItRoundExpired,
 } from "./drawItRound.js";
 
-export const DRAW_IT_STROKE_MAX_POINTS = 80;
+// 80 points coupaient un geste continu après ~2 s sur les écrans à forte fréquence.
+// Le cap reste borné, mais couvre désormais largement un trait continu de 5–10 s.
+export const DRAW_IT_STROKE_MAX_POINTS = 4096;
 export const DRAW_IT_STROKE_MAX_COUNT = 25;
 export const DRAW_IT_STROKE_MIN_DIST = 0.012;
 export const DRAW_IT_DEFAULT_COLOR = "#f4f4f5";
@@ -88,6 +90,77 @@ export function createEmptyDrawItBoard({
   };
 }
 
+function sanitizeCompletedStroke(stroke) {
+  if (!stroke || typeof stroke !== "object") return null;
+  const strokeId = String(stroke.strokeId || "").trim();
+  if (!strokeId) return null;
+  const points = (Array.isArray(stroke.points) ? stroke.points : [])
+    .map((point) => {
+      if (!Array.isArray(point) || point.length !== 2) return null;
+      const x = Number(point[0]);
+      const y = Number(point[1]);
+      if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+      return [round3(clamp01(x)), round3(clamp01(y))];
+    })
+    .filter(Boolean)
+    .slice(0, DRAW_IT_STROKE_MAX_POINTS);
+  if (!points.length) return null;
+  return {
+    strokeId: strokeId.slice(0, 128),
+    points,
+    color:
+      typeof stroke.color === "string" && stroke.color
+        ? stroke.color.slice(0, 32)
+        : DRAW_IT_DEFAULT_COLOR,
+    width: Math.min(64, Math.max(1, Number(stroke.width) || DRAW_IT_DEFAULT_WIDTH)),
+  };
+}
+
+export function completedDrawItStrokesFromSession(session = {}) {
+  if (!Array.isArray(session.strokes)) return [];
+  const seen = new Set();
+  return session.strokes
+    .map(sanitizeCompletedStroke)
+    .filter((stroke) => {
+      if (!stroke || seen.has(stroke.strokeId)) return false;
+      seen.add(stroke.strokeId);
+      return true;
+    })
+    .slice(0, DRAW_IT_STROKE_MAX_COUNT);
+}
+
+export function createDrawItBoardFromSession(session = {}) {
+  const board = createEmptyDrawItBoard(session);
+  return {
+    ...board,
+    strokeSeq: Math.max(0, Number(session.strokeSeq) || 0),
+    strokes: completedDrawItStrokesFromSession(session),
+    currentStroke: null,
+  };
+}
+
+export function mergeCompletedDrawItStrokes(session = {}, incoming = []) {
+  const extra = completedDrawItStrokesFromSession({ strokes: incoming });
+  const durable = completedDrawItStrokesFromSession(session);
+  if (!extra.length) return session;
+  const byId = new Map(durable.map((stroke) => [stroke.strokeId, stroke]));
+  let added = 0;
+  for (const stroke of extra) {
+    if (byId.has(stroke.strokeId)) continue;
+    byId.set(stroke.strokeId, stroke);
+    added += 1;
+  }
+  if (!added && durable.length === (Array.isArray(session.strokes) ? session.strokes.length : 0)) {
+    return session;
+  }
+  const strokes = [...byId.values()].slice(-DRAW_IT_STROKE_MAX_COUNT);
+  return {
+    ...session,
+    strokes,
+    strokeSeq: Math.max(Number(session.strokeSeq) || 0, strokes.length),
+  };
+}
+
 export function maybeResetDrawItBoard(board, session = {}) {
   const nextEpoch = Number(session.canvasEpoch) || 0;
   const nextIdx = Number(session.roundIdx) || 0;
@@ -98,13 +171,25 @@ export function maybeResetDrawItBoard(board, session = {}) {
     Number(board.roundIdx) !== nextIdx ||
     Number(board.canvasEpoch) !== nextEpoch
   ) {
-    return createEmptyDrawItBoard({
-      runId: nextRun,
-      roundIdx: nextIdx,
-      canvasEpoch: nextEpoch,
-    });
+    return createDrawItBoardFromSession(session);
   }
-  return board;
+  const durable = completedDrawItStrokesFromSession(session);
+  if (!durable.length) return board;
+  const byId = new Map(
+    [...durable, ...(board.strokes || [])].map((stroke) => [stroke.strokeId, stroke])
+  );
+  const strokes = [...byId.values()].slice(-DRAW_IT_STROKE_MAX_COUNT);
+  const unchanged =
+    strokes.length === (board.strokes?.length || 0) &&
+    strokes.every((stroke, index) => stroke.strokeId === board.strokes[index]?.strokeId);
+  if (unchanged && Number(board.strokeSeq) >= (Number(session.strokeSeq) || 0)) {
+    return board;
+  }
+  return {
+    ...board,
+    strokeSeq: Math.max(Number(board.strokeSeq) || 0, Number(session.strokeSeq) || 0),
+    strokes,
+  };
 }
 
 /**

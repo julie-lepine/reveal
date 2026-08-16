@@ -4,6 +4,7 @@ import {
   commitDrawItReveal,
   commitDrawItNextRound,
   commitDrawItComplete,
+  commitDrawItCompletedStroke,
   loadLocalDrawItPrivateWord,
   submitDrawItGuess,
 } from "../core/drawItSession.js";
@@ -40,7 +41,7 @@ import {
 } from "../core/gameSync.js";
 import { mountDrawItCanvas } from "../core/drawItCanvas.js";
 import {
-  createEmptyDrawItBoard,
+  createDrawItBoardFromSession,
   maybeResetDrawItBoard,
 } from "../core/drawItStrokes.js";
 import { buildDrawItRoundRecap } from "../core/drawItRoundRecap.js";
@@ -76,11 +77,14 @@ export function mountDrawIt(app) {
   let tickId = 0;
   let chatPanel = null;
   let canvasCtl = null;
-  let board = createEmptyDrawItBoard();
+  let board = createDrawItBoardFromSession(getDrawItSession());
   let deferredDrawingRender = false;
   const liveRender = ({ delta }) => {
     if (!mount.isMounted() || !mount.isCurrentMount()) return;
     canvasCtl?.applyLiveDelta(delta);
+    if (delta?.type === "end" && delta.stroke) {
+      void commitDrawItCompletedStroke(delta.stroke);
+    }
   };
 
   function localUid() {
@@ -134,6 +138,7 @@ export function mountDrawIt(app) {
         bufferDrawItLivePoints(strokeId, points);
       },
       onStrokeEnd: (stroke, finalPoints) => {
+        void commitDrawItCompletedStroke(stroke);
         void endDrawItLiveStroke(stroke, finalPoints).finally(() => {
           if (
             deferredDrawingRender &&
@@ -452,8 +457,12 @@ export function mountDrawIt(app) {
     syncActiveDrawItLiveSession(session);
     const previousBoard = board;
     board = maybeResetDrawItBoard(board, session);
+    const sameRound =
+      previousBoard.runId === board.runId &&
+      Number(previousBoard.roundIdx) === Number(board.roundIdx) &&
+      Number(previousBoard.canvasEpoch) === Number(board.canvasEpoch);
     if (
-      board === previousBoard &&
+      sameRound &&
       session.phase === DRAW_IT_PHASE_DRAWING &&
       canvasCtl?.isDrawing()
     ) {
@@ -461,6 +470,7 @@ export function mountDrawIt(app) {
       chatPanel?.refresh();
       applyGuessInputLock(session);
       canvasCtl.syncInteractive();
+      canvasCtl.paint();
       return;
     }
     // Le nouveau roundIdx/timer est rendu immédiatement ; le mot privé du

@@ -123,6 +123,10 @@ import {
   isStaleDrawItRound,
 } from "./drawItRound.js";
 import {
+  completedDrawItStrokesFromSession,
+  mergeCompletedDrawItStrokes,
+} from "./drawItStrokes.js";
+import {
   stripCustomRosterTopicsFromGenericPatch,
   summarizeCustomRosterTopics,
   preserveCustomRosterTopicsInFullStateReplace,
@@ -1416,6 +1420,16 @@ function mergeDrawItGameLocal(local, remote) {
     // ne doit survivre, même face à un payload distant incomplet.
     merged.roundStartAt = remote.roundStartAt ?? null;
     merged.roundEndsAt = remote.roundEndsAt ?? null;
+    merged.strokes = Array.isArray(remote.strokes) ? remote.strokes : [];
+    merged.strokeSeq = remote.strokeSeq ?? 0;
+    merged.canvasEpoch = remote.canvasEpoch ?? 0;
+  } else {
+    const mergedStrokes = mergeCompletedDrawItStrokes(local, remote.strokes || []);
+    merged.strokes = mergedStrokes.strokes || local.strokes || [];
+    merged.strokeSeq = Math.max(
+      Number(local.strokeSeq) || 0,
+      Number(remote.strokeSeq) || 0
+    );
   }
   return merged;
 }
@@ -2543,7 +2557,7 @@ export function drawItToRemote(session) {
     guesses: sanitizeDrawItGuesses(session.guesses),
     canvasEpoch: session.canvasEpoch ?? 0,
     strokeSeq: session.strokeSeq ?? 0,
-    strokes: Array.isArray(session.strokes) ? session.strokes : [],
+    strokes: completedDrawItStrokesFromSession(session),
   };
 }
 
@@ -2579,7 +2593,7 @@ export function drawItFromRemote(remote) {
     guesses: sanitizeDrawItGuesses(remote.guesses),
     canvasEpoch: remote.canvasEpoch ?? 0,
     strokeSeq: remote.strokeSeq ?? 0,
-    strokes: Array.isArray(remote.strokes) ? remote.strokes : [],
+    strokes: completedDrawItStrokesFromSession(remote),
   };
 }
 

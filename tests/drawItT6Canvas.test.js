@@ -84,10 +84,10 @@ describe("Draw it ! T6 — simplification + cap", () => {
     ]);
   });
 
-  it("plafond 80 points par stroke", () => {
+  it("conserve un trait long puis applique le plafond de sécurité", () => {
     let points = [];
-    for (let i = 0; i < 120; i += 1) {
-      points = appendSimplifiedPoint(points, [i / 200, 0], {
+    for (let i = 0; i < DRAW_IT_STROKE_MAX_POINTS + 20; i += 1) {
+      points = appendSimplifiedPoint(points, [i / DRAW_IT_STROKE_MAX_POINTS, 0], {
         minDist: 0,
       });
     }

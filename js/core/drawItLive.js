@@ -12,6 +12,7 @@ import { canDrawOnDrawItCanvas } from "./drawItStrokes.js";
 
 export const DRAW_IT_LIVE_EVENT = "drawit";
 export const DRAW_IT_LIVE_CHUNK_MS = 100;
+export const DRAW_IT_LIVE_SEND_RELEASE_MS = 250;
 const ALLOWED_TYPES = new Set(["start", "chunk", "end", "clear", "undo"]);
 const FORBIDDEN_KEYS = [
   "lobbyId",
@@ -61,9 +62,9 @@ function cleanPoint(point) {
   return [x, y];
 }
 
-function cleanPoints(points) {
+function cleanPoints(points, max = 64) {
   if (!Array.isArray(points)) return [];
-  return points.map(cleanPoint).filter(Boolean).slice(-80);
+  return points.map(cleanPoint).filter(Boolean).slice(-max);
 }
 
 function samePoint(a, b) {
@@ -98,6 +99,7 @@ export function createDrawItLiveState(session = {}) {
 
 export function syncDrawItLiveIdentity(state, session = {}) {
   const current = state || createDrawItLiveState();
+  if (!session?.runId && !session?.lobbyStarted) return current;
   const nextIdentity = identityFrom(session);
   if (sameIdentity(current.identity, nextIdentity)) return current;
   return createDrawItLiveState(session);
@@ -421,6 +423,33 @@ export function detachDrawItLiveRenderer(onRender) {
 export function syncActiveDrawItLiveSession(session = {}) {
   const previous = liveState;
   liveState = syncDrawItLiveIdentity(liveState, session);
+  const durableIds = new Set(
+    (Array.isArray(session.strokes) ? session.strokes : [])
+      .map((stroke) => String(stroke?.strokeId || "").trim())
+      .filter(Boolean)
+  );
+  if (durableIds.size) {
+    const inProgress = { ...liveState.remoteInProgress };
+    const completed = { ...liveState.remoteCompleted };
+    let removed = false;
+    for (const strokeId of durableIds) {
+      if (Object.hasOwn(inProgress, strokeId)) {
+        delete inProgress[strokeId];
+        removed = true;
+      }
+      if (Object.hasOwn(completed, strokeId)) {
+        delete completed[strokeId];
+        removed = true;
+      }
+    }
+    if (removed) {
+      liveState = {
+        ...liveState,
+        remoteInProgress: inProgress,
+        remoteCompleted: completed,
+      };
+    }
+  }
   if (liveState !== previous) {
     localSender = null;
     notifyRender({ type: "replay" });
@@ -431,13 +460,27 @@ export function syncActiveDrawItLiveSession(session = {}) {
 function sendPayload(payload) {
   if (!activeChannel || activeStatus !== "subscribed") return Promise.resolve(false);
   try {
-    return Promise.resolve(
+    const send = Promise.resolve(
       activeChannel.send({
         type: "broadcast",
         event: DRAW_IT_LIVE_EVENT,
         payload,
       })
     ).then(() => true, () => false);
+    return new Promise((resolve) => {
+      let settled = false;
+      const finish = (value) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        resolve(value);
+      };
+      const timer = setTimeout(
+        () => finish(false),
+        DRAW_IT_LIVE_SEND_RELEASE_MS
+      );
+      send.then(finish);
+    });
   } catch {
     return Promise.resolve(false);
   }
@@ -479,6 +522,7 @@ export function bufferDrawItLivePoints(strokeId, points = []) {
 
 export async function flushDrawItLiveChunk(sender = localSender) {
   if (!sender || sender.inFlight || !sender.pending.length) return false;
+  // Un envoi bloqué ne doit pas figer le trait : sendPayload libère inFlight.
   const session = desired?.getSession?.() || {};
   const uid = desired?.getLocalUid?.() || null;
   if (!canEmitDrawItLive(session, uid)) {
