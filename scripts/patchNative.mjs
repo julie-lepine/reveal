@@ -22,16 +22,36 @@ const SPLASH_SCREEN_XML = `<?xml version="1.0" encoding="utf-8"?>
 </layer-list>
 `;
 
-const SPLASH_ICON_XML = `<?xml version="1.0" encoding="utf-8"?>
-<!-- Android 12+ animatedIcon : logo R sur fond brand (évite l'icône launcher / plaque claire). -->
-<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:drawable="@color/splash_background" />
-    <item>
-        <bitmap
-            android:gravity="center"
-            android:src="@drawable/splash_logo" />
-    </item>
-</layer-list>
+const SPLASH_ICON_LEGACY_XML = `<?xml version="1.0" encoding="utf-8"?>
+<!-- API < 26 : pas d'adaptive-icon. -->
+<inset xmlns:android="http://schemas.android.com/apk/res/android"
+    android:drawable="@mipmap/ic_launcher_foreground"
+    android:inset="18%" />
+`;
+
+const SPLASH_ICON_V26_XML = `<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 8+ / splash 12+ : AdaptiveIconDrawable (un PNG 1024 en layer-list est recadré → « D »). -->
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@color/splash_background" />
+    <foreground>
+        <inset android:drawable="@mipmap/ic_launcher_foreground" android:inset="18%" />
+    </foreground>
+</adaptive-icon>
+`;
+
+const MAIN_ACTIVITY_JAVA = `package com.reveal.partygames;
+
+import android.os.Bundle;
+import androidx.core.splashscreen.SplashScreen;
+import com.getcapacitor.BridgeActivity;
+
+public class MainActivity extends BridgeActivity {
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        SplashScreen.installSplashScreen(this);
+        super.onCreate(savedInstanceState);
+    }
+}
 `;
 
 const ANDROID_LAUNCH_STYLE_BLOCK = `    <style name="AppTheme.NoActionBarLaunch" parent="Theme.SplashScreen">
@@ -84,21 +104,23 @@ function patchAndroidSplash() {
   const drawableDir = path.join(resDir, "drawable");
   const splashScreenPath = path.join(drawableDir, "splash_screen.xml");
   const splashIconPath = path.join(drawableDir, "splash_icon.xml");
-  const splashLogoPath = path.join(drawableDir, "splash_logo.png");
   const stylesPath = path.join(resDir, "values", "styles.xml");
   const colorsPath = path.join(resDir, "values", "colors.xml");
   const iconBgPath = path.join(resDir, "values", "ic_launcher_background.xml");
-  const iconSrc = path.join(root, "resources", "icon.png");
   const portraitSplash = path.join(root, "resources", "splash_android_1080x1920.png");
 
   fs.mkdirSync(drawableDir, { recursive: true });
+  const drawableV26Dir = path.join(resDir, "drawable-v26");
+  fs.mkdirSync(drawableV26Dir, { recursive: true });
   fs.writeFileSync(splashScreenPath, SPLASH_SCREEN_XML);
-  fs.writeFileSync(splashIconPath, SPLASH_ICON_XML);
-  console.log("Android: splash_screen.xml + splash_icon.xml");
+  fs.writeFileSync(splashIconPath, SPLASH_ICON_LEGACY_XML);
+  fs.writeFileSync(path.join(drawableV26Dir, "splash_icon.xml"), SPLASH_ICON_V26_XML);
+  console.log("Android: splash_icon.xml (legacy + drawable-v26 adaptive)");
 
-  if (fs.existsSync(iconSrc)) {
-    fs.copyFileSync(iconSrc, splashLogoPath);
-    console.log("Android: splash_logo.png (resources/icon.png)");
+  const robotFg = path.join(resDir, "drawable-v24", "ic_launcher_foreground.xml");
+  if (fs.existsSync(robotFg)) {
+    fs.unlinkSync(robotFg);
+    console.log("Android: suppression icône launcher template (robot)");
   }
 
   if (fs.existsSync(portraitSplash)) {
@@ -154,6 +176,29 @@ function patchAndroidSplash() {
     }
   }
 }
+function patchAndroidMainActivity() {
+  const javaPath = path.join(
+    root,
+    "android",
+    "app",
+    "src",
+    "main",
+    "java",
+    "com",
+    "reveal",
+    "partygames",
+    "MainActivity.java"
+  );
+  if (!fs.existsSync(javaPath)) {
+    console.log("Android: MainActivity.java absent - skip");
+    return;
+  }
+  const current = fs.readFileSync(javaPath, "utf8");
+  if (current.includes("SplashScreen.installSplashScreen")) return;
+  fs.writeFileSync(javaPath, MAIN_ACTIVITY_JAVA);
+  console.log("Android: MainActivity installe SplashScreen avant super.onCreate");
+}
+
 function patchAndroid() {
   const manifestPath = path.join(root, "android", "app", "src", "main", "AndroidManifest.xml");
   const stringsPath = path.join(root, "android", "app", "src", "main", "res", "values", "strings.xml");
@@ -203,6 +248,7 @@ function patchAndroid() {
 
   patchAndroidProguardGradle();
   patchAndroidSplash();
+  patchAndroidMainActivity();
 }
 
 function plistInsertAfterDict(plist, insert) {

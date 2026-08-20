@@ -5,7 +5,16 @@ export function getCapacitor() {
 }
 
 export function isNativeApp() {
-  return getCapacitor()?.isNativePlatform?.() === true;
+  const capacitor = getCapacitor();
+  const native = capacitor?.isNativePlatform?.() === true;
+
+  console.log("[REVEAL PLATFORM]", {
+    hasCapacitor: Boolean(capacitor),
+    native,
+    platform: capacitor?.getPlatform?.() || "web",
+  });
+
+  return native;
 }
 
 export function getNativePlatform() {
