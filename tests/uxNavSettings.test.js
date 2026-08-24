@@ -104,6 +104,11 @@ describe("UX-NAV-SETTINGS - contenu écran", () => {
     assert.match(settings, /page-title">Menu/);
     assert.match(settings, /btn-settings-logout/);
     assert.match(settings, /profileLogoutSectionHtml/);
+    const logoutHtml = settings.slice(
+      settings.indexOf("function profileLogoutSectionHtml"),
+      settings.indexOf("function personnalisationPanelHtml")
+    );
+    assert.equal(logoutHtml.includes("settings-party__danger"), false);
     assert.match(settings, /logout\(\)/);
     assert.match(settings, /Quitter la session/);
     assert.match(settings, /Se déconnecter/);

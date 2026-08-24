@@ -42,13 +42,15 @@ export function adFreeSettingsCardHtml() {
       </div>`;
 }
 
-/** Carte compacte hub jeux, sous le récap. Vide si déjà Sans pub. */
+/** Carte compacte hub jeux, sous le récap. Vide si déjà Sans pub. Le bloc entier est le CTA. */
 export function adFreeHubCardHtml() {
   if (!shouldShowAdFreePromo()) return "";
   return `
-      <div class="card adfree-hub-card">
-        <p class="adfree-hub-card__title">Sans pub à vie - 2,99&nbsp;€</p>
-        <p class="hint adfree-hub-card__hint">Enlève la bannière sur tes appareils liés à ce compte.</p>
-        <button type="button" class="btn btn-primary btn--compact" id="btn-adfree-hub">Voir l’offre</button>
-      </div>`;
+      <button type="button" class="adfree-hub-card" id="btn-adfree-hub">
+        <span class="adfree-hub-card__body">
+          <span class="adfree-hub-card__title">Sans pub à vie - 2,99&nbsp;€</span>
+          <span class="adfree-hub-card__hint">Enlève la bannière sur tes appareils liés à ce compte.</span>
+        </span>
+        <span class="adfree-hub-card__chevron" aria-hidden="true">›</span>
+      </button>`;
 }

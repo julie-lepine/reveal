@@ -3056,6 +3056,10 @@ select.field-input option{
   margin:0 0 14px;
 }
 
+.settings-profile__session .btn{
+  margin-top:0;
+}
+
 .settings-premium__ok{
   margin:0 0 10px;
   font-weight:700;
@@ -3722,25 +3726,63 @@ button.emoji-picker-preview__avatar:active{
 }
 
 .adfree-hub-card{
-  margin-top:0;
-  margin-bottom:18px;
-  padding:16px;
-  border-color:rgba(255, 60, 172, 0.35);
+  display:flex;
+  align-items:center;
+  gap:12px;
+  width:100%;
+  margin:0 0 18px;
+  padding:14px 16px;
+  border-radius:24px;
+  border:1px solid color-mix(in srgb, var(--color-primary) 35%, transparent);
+  background:color-mix(in srgb, var(--color-primary) 22%, #0d0f1e);
+  color:#fff;
+  font-family:inherit;
+  text-align:left;
+  cursor:pointer;
+  -webkit-appearance:none;
+  appearance:none;
+  -webkit-tap-highlight-color:transparent;
+  transition:background .15s ease, transform .1s ease;
+}
+
+.adfree-hub-card:active{
+  transform:scale(.98);
+}
+
+@media (hover:hover){
+  .adfree-hub-card:hover{
+    background:color-mix(in srgb, var(--color-primary) 28%, #0d0f1e);
+  }
+}
+
+.adfree-hub-card__body{
+  flex:1;
+  min-width:0;
 }
 
 .adfree-hub-card__title{
-  margin:0 0 6px;
+  display:block;
+  margin:0 0 4px;
   font-size:16px;
   font-weight:800;
   letter-spacing:-.02em;
+  color:#fff;
 }
 
 .adfree-hub-card__hint{
-  margin:0 0 12px;
+  display:block;
+  margin:0;
+  font-size:13px;
+  font-weight:500;
+  line-height:1.4;
+  color:rgba(255,255,255,.7);
 }
 
-.adfree-hub-card .btn{
-  margin:0;
+.adfree-hub-card__chevron{
+  flex-shrink:0;
+  color:rgba(255,255,255,.45);
+  font-size:22px;
+  line-height:1;
 }
 
 .evening-recap--empty{

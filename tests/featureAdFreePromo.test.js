@@ -23,13 +23,16 @@ describe("FEATURE-ADFREE promo hub + Profil", () => {
     assert.match(src("style.css"), /\.adfree-hub-card\{/);
   });
 
-  it("hub : carte masquée si Sans pub déjà actif", () => {
+  it("hub : le bloc entier est le bouton, masqué si Sans pub", () => {
     const ui = src("js/core/adFreeUi.js");
+    const hub = ui.slice(ui.indexOf("export function adFreeHubCardHtml"));
     assert.match(ui, /export function shouldShowAdFreePromo/);
     assert.match(ui, /return !isAdFree\(\)/);
-    assert.match(ui, /if \(!shouldShowAdFreePromo\(\)\) return ""/);
-    assert.match(ui, /id="btn-adfree-hub"/);
-    assert.match(ui, /2,99/);
+    assert.match(hub, /if \(!shouldShowAdFreePromo\(\)\) return ""/);
+    assert.match(hub, /<button type="button" class="adfree-hub-card" id="btn-adfree-hub">/);
+    assert.equal(hub.includes("btn-primary"), false);
+    assert.equal(hub.includes("Voir l"), false);
+    assert.match(src("style.css"), /color-mix\(in srgb, var\(--color-primary\) 22%/);
   });
 
   it("settings lit params.tab personnalisation au mount", () => {
