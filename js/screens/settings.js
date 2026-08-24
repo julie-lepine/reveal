@@ -191,11 +191,9 @@ function soireePanelHtml(inLobby) {
 function profileLogoutSectionHtml(user) {
   const label = user.isGuest ? "Quitter la session" : "Se déconnecter";
   return `
-      <div class="card settings-section settings-profile__session">
-        <button type="button" class="btn btn-secondary settings-party__btn settings-party__btn--danger" id="btn-settings-logout">
-          ${escapeHtml(label)}
-        </button>
-      </div>`;
+      <button type="button" class="btn btn-secondary settings-party__btn settings-party__btn--danger" id="btn-settings-logout">
+        ${escapeHtml(label)}
+      </button>`;
 }
 
 function personnalisationPanelHtml({ emailAccount, user, selectedEmoji }) {

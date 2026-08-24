@@ -109,6 +109,7 @@ describe("UX-NAV-SETTINGS - contenu écran", () => {
       settings.indexOf("function personnalisationPanelHtml")
     );
     assert.equal(logoutHtml.includes("settings-party__danger"), false);
+    assert.equal(logoutHtml.includes("class=\"card"), false);
     assert.match(settings, /logout\(\)/);
     assert.match(settings, /Quitter la session/);
     assert.match(settings, /Se déconnecter/);

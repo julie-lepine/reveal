@@ -3056,8 +3056,9 @@ select.field-input option{
   margin:0 0 14px;
 }
 
-.settings-profile__session .btn{
+#btn-settings-logout{
   margin-top:0;
+  margin-bottom:14px;
 }
 
 .settings-premium__ok{
