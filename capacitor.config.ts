@@ -6,8 +6,9 @@ const config: CapacitorConfig = {
   webDir: 'www',
   server: {
     androidScheme: 'https',
-    // Même origine https://localhost que Android - Turnstile Cloudflare (hostnames localhost).
     iosScheme: 'https',
+    // Origine WebView = même hostname que le site (déjà dans Turnstile), pas https://localhost.
+    hostname: 'julie-lepine.github.io',
   },
   plugins: {
     SplashScreen: {

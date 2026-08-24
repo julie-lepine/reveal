@@ -31,20 +31,25 @@ export async function goToEveningHome() {
 }
 
 /** Menu : écran unique (profil + partie si lobby). */
-export function goToEveningSettings() {
+export function goToEveningSettings({ tab } = {}) {
   if (!canPlay()) {
     navigate("home", { reset: true });
     return;
   }
   if (getCurrentScreen() === "settings") return;
 
+  const params = tab ? { tab } : null;
   if (hasActiveLobby()) {
     suppressSessionRoute(120000, getCachedGameSession()?.screen ?? null);
     // Push sur la pile courante (game-select / results / leaderboard / …).
-    navigate("settings");
+    if (params) navigate("settings", { params });
+    else navigate("settings");
     return;
   }
-  navigate("settings", { navStack: ["home", "settings"] });
+  navigate("settings", {
+    navStack: ["home", "settings"],
+    ...(params ? { params } : {}),
+  });
 }
 
 /** Retour au menu jeux (ou partie en cours) après profil / paramètres. */

@@ -79,14 +79,46 @@ const ANDROID_BASE_STYLES = `    <!-- Base application theme. -->
     </style>
 `;
 
+const ANDROID_APPLICATION_ID = "com.reveal.partygames";
 const PROGUARD_LEGACY = "getDefaultProguardFile('proguard-android.txt')";
 const PROGUARD_OPTIMIZE = "getDefaultProguardFile('proguard-android-optimize.txt')";
+
+function assertAndroidApplicationId() {
+  const gradlePath = path.join(root, "android", "app", "build.gradle");
+  if (!fs.existsSync(gradlePath)) return;
+  const gradle = fs.readFileSync(gradlePath, "utf8");
+  const match = gradle.match(/applicationId\s+"([^"]+)"/);
+  const applicationId = match?.[1];
+  if (applicationId !== ANDROID_APPLICATION_ID) {
+    throw new Error(
+      `Android applicationId doit rester ${ANDROID_APPLICATION_ID} (trouvé: ${applicationId || "absent"})`
+    );
+  }
+}
+
+/**
+ * Le plugin RevenueCat pin AGP 8.13.2 (absent du cache local). 8.13.0 est déjà
+ * résolu (AdMob). Évite un fetch Maven cassé par l’inspection HTTPS (PKIX).
+ */
+function patchRevenueCatAgpClasspath() {
+  const filePath = path.join(root, "node_modules", "@revenuecat", "purchases-capacitor", "android", "build.gradle");
+  if (!fs.existsSync(filePath)) return;
+  let gradle = fs.readFileSync(filePath, "utf8");
+  if (!gradle.includes("com.android.tools.build:gradle:8.13.2")) return;
+  gradle = gradle.replaceAll(
+    "com.android.tools.build:gradle:8.13.2",
+    "com.android.tools.build:gradle:8.13.0"
+  );
+  fs.writeFileSync(filePath, gradle);
+  console.log("Android: RevenueCat AGP classpath 8.13.2 → 8.13.0");
+}
 
 /** AGP 9+ : proguard-android.txt n'est plus accepté (plugins Capacitor pas encore tous à jour). */
 function patchAndroidProguardGradle() {
   const candidates = [
     path.join(root, "android", "app", "build.gradle"),
     path.join(root, "node_modules", "@capacitor-community", "admob", "android", "build.gradle"),
+    path.join(root, "node_modules", "@revenuecat", "purchases-capacitor", "android", "build.gradle"),
   ];
 
   for (const filePath of candidates) {
@@ -232,7 +264,17 @@ function patchAndroid() {
     console.log("Android: deep link auth ajouté");
   }
 
+  if (!manifest.includes("com.android.vending.BILLING")) {
+    manifest = manifest.replace(
+      "</manifest>",
+      `    <uses-permission android:name="com.android.vending.BILLING" />\n</manifest>`
+    );
+    console.log("Android: permission BILLING ajoutée");
+  }
+
   fs.writeFileSync(manifestPath, manifest);
+
+  assertAndroidApplicationId();
 
   if (fs.existsSync(stringsPath)) {
     let strings = fs.readFileSync(stringsPath, "utf8");
@@ -246,6 +288,7 @@ function patchAndroid() {
     }
   }
 
+  patchRevenueCatAgpClasspath();
   patchAndroidProguardGradle();
   patchAndroidSplash();
   patchAndroidMainActivity();

@@ -287,3 +287,19 @@ Nettoyage serveur après retrait produit Fil Rouge (app déjà propre via CLEANU
 **Statut** : SQL + post-deploy ✅ · ticket **CLEANUP-FILROUGE-02** clôturable (2026-08-07).
 
 ---
+
+## 12. FEATURE-ADFREE-01 — Flag Sans pub (`profiles.ad_free`)
+
+Premier palier Premium (2,99 €) : entitlement serveur, **sans IAP** pour l’instant. Le client lit le flag et masque la bannière AdMob. L’écriture `ad_free = true` est bloquée pour `authenticated` / `anon` (trigger).
+
+| Élément | Valeur |
+| ------- | ------ |
+| Migration | [`feature-adfree-01-profile-flag.sql`](../supabase/feature-adfree-01-profile-flag.sql) — **⏳ à appliquer** (SQL Editor staging puis prod) |
+| Colonne | `public.profiles.ad_free boolean not null default false` |
+| Client | `js/core/entitlements.js` · `js/core/ads.js` · Menu → Profil |
+| Test manuel | `update public.profiles set ad_free = true where id = '<uuid>';` puis Actualiser le statut |
+| Hors scope | Play Billing · App Store · RevenueCat · palier 6,99 / 12,99 |
+
+**Statut** : code client dans le repo · SQL **non appliquée** tant que cette ligne n’est pas passée à ✅.
+
+---

@@ -9,7 +9,7 @@ import {
   gameTileVisualHtml,
   bindGameTileLogos,
 } from "../core/ui.js";
-import { handleNavTarget } from "./nav.js";
+import { handleNavTarget, goToEveningSettings } from "./nav.js";
 import {
   isGameSyncActive,
   isLobbyHost,
@@ -25,6 +25,8 @@ import { startLobbyPresenceSync, onLobbyBundleUpdated, getClaimHubUiToken } from
 import { getLobby, hasActiveLobby } from "../core/lobby.js";
 import { clientMayOfferHostClaim } from "../core/hostClaimOffer.js";
 import { getLastGame, getState } from "../core/state.js";
+import { isAdFree } from "../core/entitlements.js";
+import { adFreeHubCardHtml } from "../core/adFreeUi.js";
 import { arch03LiveLog } from "../core/presenceUiLive.js";
 import {
   bindGameResumeBanner,
@@ -232,6 +234,7 @@ function gameSelectRenderSnapshot() {
     tn: recap.tierNights,
     lastGame: getLastGame()?.gameId ?? null,
     resume,
+    adFree: isAdFree(),
   });
 }
 
@@ -344,6 +347,12 @@ export function mountGameSelect(app) {
       return;
     }
 
+    if (e.target.closest("#btn-adfree-hub")) {
+      e.preventDefault();
+      goToEveningSettings({ tab: "personnalisation" });
+      return;
+    }
+
     const navEl = e.target.closest("[data-nav]");
     if (navEl) {
       void handleNavTarget(navEl.getAttribute("data-nav"), navHandlers);
@@ -411,6 +420,7 @@ export function mountGameSelect(app) {
       ${gameSelectActionsHtml()}
 
       ${eveningRecapHtml(recap)}
+      ${adFreeHubCardHtml()}
 
       ${gameGridSection("🎮 Jeux disponibles", GAMES_AVAILABLE)}
       ${gameGridSection("🔜 Prochainement", GAMES_COMING_SOON)}

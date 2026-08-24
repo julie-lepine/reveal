@@ -3056,6 +3056,12 @@ select.field-input option{
   margin:0 0 14px;
 }
 
+.settings-premium__ok{
+  margin:0 0 10px;
+  font-weight:700;
+  color:#4ADE80;
+}
+
 #btn-delete-account{
   margin-bottom:14px;
 }
@@ -3713,6 +3719,28 @@ button.emoji-picker-preview__avatar:active{
 .evening-recap{
   margin-bottom:18px;
   padding:14px 16px;
+}
+
+.adfree-hub-card{
+  margin-top:0;
+  margin-bottom:18px;
+  padding:16px;
+  border-color:rgba(255, 60, 172, 0.35);
+}
+
+.adfree-hub-card__title{
+  margin:0 0 6px;
+  font-size:16px;
+  font-weight:800;
+  letter-spacing:-.02em;
+}
+
+.adfree-hub-card__hint{
+  margin:0 0 12px;
+}
+
+.adfree-hub-card .btn{
+  margin:0;
 }
 
 .evening-recap--empty{

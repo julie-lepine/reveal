@@ -1,6 +1,7 @@
 import { supabase, isSupabaseConfigured } from "./supabaseClient.js";
 import { getState, saveStatePatch } from "./state.js";
 import { fetchProfile, upsertProfile } from "./supabaseProfile.js";
+import { adFreeFromProfile } from "./entitlements.js";
 import { formatAuthErrorMessage, isAuthRateLimitError, isAuthCaptchaError } from "./authErrors.js";
 import {
   getPasswordResetCooldownRemainingMs,
@@ -162,13 +163,27 @@ export async function syncSessionToState(session) {
 
   if (!session?.user) {
     saveStatePatch({
-      user: { email: null, name: null, emoji: null, loggedIn: false, isGuest: false, provider: null },
+      user: {
+        email: null,
+        name: null,
+        emoji: null,
+        loggedIn: false,
+        isGuest: false,
+        provider: null,
+        adFree: false,
+      },
       supabaseUserId: null,
     });
     const { handleMembershipAuthIdentityTransition } = await import(
       "./lobbyMembershipSnapshot.js"
     );
     handleMembershipAuthIdentityTransition(prevUserId, null);
+    try {
+      const { refreshAdsForEntitlement } = await import("./ads.js");
+      refreshAdsForEntitlement();
+    } catch {
+      /* web / ads indisponible */
+    }
     return;
   }
 
@@ -201,8 +216,16 @@ export async function syncSessionToState(session) {
       loggedIn: !isAnonymous,
       isGuest: isAnonymous,
       provider: providerFromUser(user),
+      adFree: isAnonymous ? false : adFreeFromProfile(profile),
     },
   });
+
+  try {
+    const { refreshAdsForEntitlement } = await import("./ads.js");
+    refreshAdsForEntitlement();
+  } catch {
+    /* web / ads indisponible */
+  }
 
   const { handleMembershipAuthIdentityTransition } = await import(
     "./lobbyMembershipSnapshot.js"
@@ -592,6 +615,7 @@ export async function signInAsGuest(displayName, captchaToken = null, emoji = nu
       loggedIn: false,
       isGuest: true,
       provider: "guest",
+      adFree: false,
     },
   });
 

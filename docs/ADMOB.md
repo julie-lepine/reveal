@@ -6,6 +6,8 @@ Capacitor est **initialisé** avec les plateformes `android/` et `ios/`, le plug
 
 La bannière s’affiche en **haut** à partir du **lobby** (prep, jeux, résultats…). Elle est **masquée** sur l’intro (`welcome`), la page connexion / accueil (`home`) et le reset mot de passe.
 
+Si `profiles.ad_free` est vrai pour le compte connecté, **aucune bannière** (voir [`feature-adfree-01-profile-flag.sql`](../supabase/feature-adfree-01-profile-flag.sql) et Menu → Profil).
+
 ---
 
 ## Configuration AdMob
@@ -59,9 +61,9 @@ npm run cap:open:ios
 
 | Affichée | Masquée |
 |----------|---------|
-| home, game-select, lobby, prep, résultats, classement | hottake, speedvote, playlistguess, truthmeter, dilemma, trivia, consensus, guesslie, tiernight |
+| lobby, game-select, prep, **jeux**, résultats, classement, Menu | welcome, home, reset-password |
 
-Logique : `js/core/ads.js` → `GAMEPLAY_SCREENS`.
+Logique : `js/core/ads.js` → `NO_AD_SCREENS` (`welcome`, `home`, `reset-password`). La bannière reste visible **pendant le play**.
 
 ---
 

@@ -6,6 +6,7 @@ create table if not exists public.profiles (
   id uuid primary key references auth.users(id) on delete cascade,
   display_name text not null check (char_length(display_name) >= 2),
   emoji text default '👤',
+  ad_free boolean not null default false,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -157,6 +158,31 @@ create policy "profiles_insert_own" on public.profiles for insert with check (au
 
 drop policy if exists "profiles_update_own" on public.profiles;
 create policy "profiles_update_own" on public.profiles for update using (auth.uid() = id);
+
+-- Sans pub : le client ne peut pas s’auto-attribuer ad_free (voir aussi feature-adfree-01).
+create or replace function public.profiles_protect_ad_free()
+returns trigger
+language plpgsql
+as $$
+begin
+  if tg_op = 'INSERT' then
+    if coalesce(auth.role(), '') in ('authenticated', 'anon') then
+      new.ad_free := false;
+    end if;
+    return new;
+  end if;
+
+  if coalesce(auth.role(), '') in ('authenticated', 'anon') then
+    new.ad_free := old.ad_free;
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists profiles_protect_ad_free on public.profiles;
+create trigger profiles_protect_ad_free
+before insert or update on public.profiles
+for each row execute function public.profiles_protect_ad_free();
 
 drop policy if exists "lobbies_insert_host" on public.lobbies;
 create policy "lobbies_insert_host" on public.lobbies for insert

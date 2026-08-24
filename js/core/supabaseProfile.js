@@ -1,5 +1,37 @@
 import { supabase, isSupabaseConfigured } from "./supabaseClient.js";
 
+function isMissingAdFreeColumn(error) {
+  const msg = String(error?.message || "").toLowerCase();
+  const code = String(error?.code || "");
+  return (
+    code === "42703" ||
+    (msg.includes("ad_free") && (msg.includes("column") || msg.includes("schema cache")))
+  );
+}
+
+async function fetchProfileRow(userId) {
+  const withFlag = await supabase
+    .from("profiles")
+    .select("id, display_name, emoji, ad_free")
+    .eq("id", userId)
+    .maybeSingle();
+
+  if (!withFlag.error) return withFlag;
+
+  if (!isMissingAdFreeColumn(withFlag.error)) return withFlag;
+
+  const fallback = await supabase
+    .from("profiles")
+    .select("id, display_name, emoji")
+    .eq("id", userId)
+    .maybeSingle();
+  if (fallback.error) return fallback;
+  return {
+    data: fallback.data ? { ...fallback.data, ad_free: false } : fallback.data,
+    error: null,
+  };
+}
+
 export async function fetchProfile(userId) {
   console.log("[DEBUG FETCH PROFILE INPUT]", {
     userId,
@@ -14,11 +46,7 @@ export async function fetchProfile(userId) {
 
   if (!isSupabaseConfigured() || !userId) return null;
 
-  const { data, error } = await supabase
-    .from("profiles")
-    .select("id, display_name, emoji")
-    .eq("id", userId)
-    .maybeSingle();
+  const { data, error } = await fetchProfileRow(userId);
 
   console.log("[DEBUG FETCH PROFILE RESULT]", {
     data,

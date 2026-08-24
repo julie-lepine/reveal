@@ -7,6 +7,9 @@ import {
   changeEmailPassword,
   logout,
 } from "../core/auth.js";
+import { refreshAdFreeFromServer } from "../core/entitlements.js";
+import { refreshAdsForEntitlement } from "../core/ads.js";
+import { adFreeSettingsCardHtml } from "../core/adFreeUi.js";
 import { getLocalDisplayName, getLocalEmoji } from "../core/state.js";
 import { PROFILE_EMOJI_CHOICES } from "../../data/profileEmojis.js";
 import {
@@ -27,7 +30,7 @@ import { onLobbyBundleUpdated } from "../core/supabaseLobby.js";
 import { showAppAlert, showAppConfirm, showLobbyPlayersManageDialog } from "../core/dialog.js";
 import { MAX_PLAYERS } from "../config/lobbyLifecycle.js";
 import { lobbySettingsActionsForRole } from "../core/partySettingsMenu.js";
-import { navigate, getCurrentScreen } from "../core/router.js";
+import { navigate, getCurrentScreen, getScreenParams } from "../core/router.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
 import { INSTAGRAM_HANDLE, INSTAGRAM_PROFILE_URL, ACCOUNT_DELETION_PUBLIC_URL } from "../../data/appConfig.js";
 import { openExternalUrl } from "../core/openExternal.js";
@@ -61,6 +64,14 @@ function settingsTabIndex(activeTab) {
   if (activeTab === TAB_SOIREE) return 0;
   if (activeTab === TAB_PERSONNALISATION) return 1;
   return 2;
+}
+
+function initialSettingsTab() {
+  const requested = getScreenParams()?.tab;
+  if (requested === TAB_PERSONNALISATION) return TAB_PERSONNALISATION;
+  if (requested === TAB_SUPPORT) return TAB_SUPPORT;
+  if (requested === TAB_SOIREE && hasActiveLobby()) return TAB_SOIREE;
+  return hasActiveLobby() ? TAB_SOIREE : TAB_PERSONNALISATION;
 }
 
 function settingsTabsHtml(activeTab, inLobby) {
@@ -192,6 +203,7 @@ function profileLogoutSectionHtml(user) {
 function personnalisationPanelHtml({ emailAccount, user, selectedEmoji }) {
   return `
     <div class="settings-panel" id="settings-panel-personnalisation">
+      ${adFreeSettingsCardHtml()}
       <div class="card settings-section">
         <h2 class="settings-section__title">Pseudo</h2>
         <p class="hint settings-section__hint">Visible dans le lobby et les scores.</p>
@@ -296,7 +308,7 @@ export function mountSettings(app) {
   const emailAccount = isEmailAccount();
 
   let selectedEmoji = getLocalEmoji();
-  let activeTab = hasActiveLobby() ? TAB_SOIREE : TAB_PERSONNALISATION;
+  let activeTab = initialSettingsTab();
   let lastPartySnap = "";
   let lastLobbyActive = hasActiveLobby();
   let partyActionInFlight = false;
@@ -387,6 +399,29 @@ export function mountSettings(app) {
         return;
       }
       navigate("home", { reset: true });
+    });
+
+    bindAdFreeEvents();
+  }
+
+  function bindAdFreeEvents() {
+    app.querySelector("#btn-adfree-refresh")?.addEventListener("click", async () => {
+      try {
+        const on = await refreshAdFreeFromServer();
+        refreshAdsForEntitlement();
+        if (!mount.isMounted()) return;
+        swapActivePanel();
+        await showAppAlert(
+          on ? "Sans pub est actif sur ce compte." : "Sans pub n’est pas actif sur ce compte.",
+          { title: "Sans pub", icon: on ? "✨" : "📢" }
+        );
+      } catch (e) {
+        if (!mount.isMounted()) return;
+        await showAppAlert(e?.message || "Impossible de vérifier le statut.", {
+          title: "Sans pub",
+          icon: "⚠️",
+        });
+      }
     });
   }
 

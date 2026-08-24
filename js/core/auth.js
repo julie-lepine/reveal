@@ -200,7 +200,14 @@ export async function changeEmailPassword(_currentPassword, newPassword) {
 export async function logout() {
   if (!isSupabaseConfigured()) {
     saveStatePatch({
-      user: { email: null, name: null, loggedIn: false, isGuest: false, provider: null },
+      user: {
+        email: null,
+        name: null,
+        loggedIn: false,
+        isGuest: false,
+        provider: null,
+        adFree: false,
+      },
       inLobby: false,
       lobby: null,
       lobbyCode: null,

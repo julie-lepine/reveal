@@ -1,6 +1,7 @@
 import { isNativeApp, getNativePlatform } from "./platform.js";
 import { loadCapacitorAdMob } from "./capacitorImports.js";
 import { onScreenChange, getCurrentScreen } from "./router.js";
+import { isAdFree } from "./entitlements.js";
 import {
   ADMOB_BANNER_IDS,
   ADMOB_TEST_BANNER_IDS,
@@ -20,8 +21,8 @@ let lastBannerHeightPx = ADMOB_DEFAULT_BANNER_HEIGHT;
 /** Écrans sans bannière (accueil, connexion, reset MDP). Layout via body.has-top-ad ailleurs. */
 const NO_AD_SCREENS = new Set(["welcome", "home", "reset-password"]);
 
-function shouldShowAdForScreen(screenId) {
-  return Boolean(screenId && !NO_AD_SCREENS.has(screenId));
+export function shouldShowAdForScreen(screenId) {
+  return Boolean(screenId && !NO_AD_SCREENS.has(screenId) && !isAdFree());
 }
 
 /** Estimation hauteur bannière adaptive (formule Google ~16,4 % de la largeur, plafond 90). */
@@ -245,6 +246,12 @@ function enqueueAdSync(screenId) {
   adSyncChain = adSyncChain
     .then(() => syncAdForScreen(screenId))
     .catch((err) => console.warn("AdMob sync:", err));
+}
+
+/** Rejouer le sync bannière après un changement d’entitlement (login, SQL, plus tard IAP). */
+export function refreshAdsForEntitlement() {
+  if (!isNativeApp()) return;
+  enqueueAdSync(getCurrentScreen());
 }
 
 export function initAds() {

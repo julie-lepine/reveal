@@ -40,6 +40,7 @@ const defaultUser = () => ({
   loggedIn: false,
   isGuest: false,
   provider: null,
+  adFree: false,
 });
 
 const defaultLobby = () => ({

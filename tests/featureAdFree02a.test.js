@@ -1,0 +1,77 @@
+import { describe, it } from "node:test";
+import assert from "node:assert/strict";
+import { existsSync, readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const ROOT = join(__dirname, "..");
+
+function src(rel) {
+  return readFileSync(join(ROOT, rel), "utf8");
+}
+
+function optionalSrc(rel) {
+  const path = join(ROOT, rel);
+  return existsSync(path) ? readFileSync(path, "utf8") : null;
+}
+
+describe("FEATURE-ADFREE-02A — préparation Billing / RevenueCat", () => {
+  it("installe @revenuecat/purchases-capacitor", () => {
+    const pkg = JSON.parse(src("package.json"));
+    assert.ok(pkg.dependencies["@revenuecat/purchases-capacitor"]);
+  });
+
+  it("applicationId reste com.reveal.partygames", () => {
+    const cap = src("capacitor.config.ts");
+    assert.match(cap, /appId:\s*'com\.reveal\.partygames'/);
+
+    const gradle = optionalSrc("android/app/build.gradle");
+    if (gradle) {
+      assert.match(gradle, /applicationId "com\.reveal\.partygames"/);
+      assert.match(gradle, /namespace = "com\.reveal\.partygames"/);
+    }
+
+    const patch = src("scripts/patchNative.mjs");
+    assert.match(patch, /ANDROID_APPLICATION_ID = "com\.reveal\.partygames"/);
+  });
+
+  it("déclare BILLING dans le manifeste app et le persiste via patchNative", () => {
+    const patch = src("scripts/patchNative.mjs");
+    assert.match(patch, /com\.android\.vending\.BILLING/);
+
+    const manifest = optionalSrc("android/app/src/main/AndroidManifest.xml");
+    if (manifest) {
+      assert.match(manifest, /android:name="com\.android\.vending\.BILLING"/);
+    }
+  });
+
+  it("n’expose aucun secret RevenueCat / Supabase", () => {
+    const config = src("data/revenueCatConfig.js");
+    assert.match(config, /appl_REPLACE_ME/);
+    assert.equal(/\bsk_[A-Za-z0-9]/.test(config), false);
+    assert.equal(/service_role\s*[:=]/.test(config), false);
+    assert.equal(/whsec_/.test(config), false);
+  });
+
+  it("le socle purchases ne configure pas, n’achète pas et n’écrit pas ad_free", () => {
+    const purchases = src("js/core/purchases.js");
+    assert.equal(/Purchases\.configure\s*\(/.test(purchases), false);
+    assert.equal(/purchasePackage|purchaseStoreProduct|restorePurchases/.test(purchases), false);
+    assert.equal(/ad_free/.test(purchases), false);
+    assert.equal(/\.from\(["']profiles["']\)/.test(purchases), false);
+
+    const main = src("js/main.js");
+    assert.equal(/purchases\.js/.test(main), false);
+    assert.equal(/revenueCatConfig/.test(main), false);
+  });
+
+  it("ne change pas le bouton Profil (achat toujours désactivé)", () => {
+    const ui = src("js/core/adFreeUi.js");
+    const settings = src("js/screens/settings.js");
+    assert.match(ui, /id="btn-adfree-buy" disabled/);
+    assert.match(ui, /2,99/);
+    assert.equal(/from ["'].*purchases\.js["']/.test(settings), false);
+    assert.equal(/from ["'].*purchases\.js["']/.test(ui), false);
+  });
+});
