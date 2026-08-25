@@ -24,3 +24,15 @@ export async function refreshAdFreeFromServer() {
   saveStatePatch({ user: { ...getState().user, adFree } });
   return adFree;
 }
+
+export async function refreshAdFreeFromServerUntil(expected, opts = {}) {
+  const tries = Number(opts.tries) > 0 ? Number(opts.tries) : 6;
+  const delayMs = Number(opts.delayMs) > 0 ? Number(opts.delayMs) : 1000;
+  let last = false;
+  for (let i = 0; i < tries; i++) {
+    last = await refreshAdFreeFromServer();
+    if (last === expected) return last;
+    await new Promise((r) => setTimeout(r, delayMs));
+  }
+  return last;
+}

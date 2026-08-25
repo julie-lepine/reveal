@@ -8,7 +8,7 @@ import {
 
 export const PRIVACY_POLICY = {
   title: "Politique de confidentialité",
-  updated: "15 juin 2026",
+  updated: "25 août 2026",
   sections: [
     {
       heading: "Qui sommes-nous ?",
@@ -24,11 +24,15 @@ export const PRIVACY_POLICY = {
     },
     {
       heading: "Hébergement et sous-traitants",
-      body: "Les données sont hébergées via Supabase (base de données, authentification, temps réel). Cloudflare Turnstile protège les formulaires sensibles. Google AdMob affiche des publicités sur l'app mobile native. Les polices Inter sont chargées depuis Google Fonts.",
+      body: "Les données sont hébergées via Supabase (base de données, authentification, temps réel). Cloudflare Turnstile protège les formulaires sensibles. Google AdMob affiche des publicités sur l'app mobile native. RevenueCat relaie l'état des achats in-app (Sans pub) depuis les stores. Les polices Inter sont chargées depuis Google Fonts.",
     },
     {
       heading: "Publicité (AdMob)",
       body: "Sur l'application mobile, des bannières publicitaires peuvent s'afficher en dehors des manches de jeu. Google peut utiliser un identifiant publicitaire selon votre consentement (formulaire UMP en UE). Vous pouvez refuser la personnalisation via le bandeau de consentement.",
+    },
+    {
+      heading: "Achat Sans pub",
+      body: "L'option Sans pub à vie (2,99 € TTC) est un achat in-app. Le paiement est encaissé par Google Play ou Apple. RevenueCat nous transmet l'état de l'achat pour l'associer à votre compte REVEAL (pas à l'appareil). Les invités ne peuvent pas acheter. Vous pouvez restaurer l'achat après réinstallation ou changement de téléphone, en vous connectant au même compte.",
     },
     {
       heading: "Conservation",

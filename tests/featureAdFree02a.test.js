@@ -48,30 +48,35 @@ describe("FEATURE-ADFREE-02A — préparation Billing / RevenueCat", () => {
 
   it("n’expose aucun secret RevenueCat / Supabase", () => {
     const config = src("data/revenueCatConfig.js");
+    assert.match(config, /goog_/);
+    assert.match(config, /REVENUECAT_IOS_PUBLIC_SDK_KEY/);
     assert.match(config, /appl_REPLACE_ME/);
     assert.equal(/\bsk_[A-Za-z0-9]/.test(config), false);
     assert.equal(/service_role\s*[:=]/.test(config), false);
     assert.equal(/whsec_/.test(config), false);
   });
 
-  it("le socle purchases ne configure pas, n’achète pas et n’écrit pas ad_free", () => {
+  it("le socle purchases n’écrit pas ad_free en base", () => {
     const purchases = src("js/core/purchases.js");
-    assert.equal(/Purchases\.configure\s*\(/.test(purchases), false);
-    assert.equal(/purchasePackage|purchaseStoreProduct|restorePurchases/.test(purchases), false);
-    assert.equal(/ad_free/.test(purchases), false);
     assert.equal(/\.from\(["']profiles["']\)/.test(purchases), false);
+    assert.match(purchases, /Purchases\.configure/);
+    assert.match(purchases, /logIn/);
+    assert.match(purchases, /purchasePackage/);
+    assert.match(purchases, /restorePurchases/);
 
     const main = src("js/main.js");
     assert.equal(/purchases\.js/.test(main), false);
-    assert.equal(/revenueCatConfig/.test(main), false);
   });
 
-  it("ne change pas le bouton Profil (achat toujours désactivé)", () => {
+  it("Profil : Acheter / Restaurer, pas Actualiser", () => {
     const ui = src("js/core/adFreeUi.js");
     const settings = src("js/screens/settings.js");
-    assert.match(ui, /id="btn-adfree-buy" disabled/);
+    assert.match(ui, /id="btn-adfree-buy"/);
+    assert.equal(/id="btn-adfree-buy" disabled/.test(ui), false);
+    assert.match(ui, /id="btn-adfree-restore"/);
+    assert.equal(/btn-adfree-refresh/.test(ui), false);
     assert.match(ui, /2,99/);
-    assert.equal(/from ["'].*purchases\.js["']/.test(settings), false);
-    assert.equal(/from ["'].*purchases\.js["']/.test(ui), false);
+    assert.match(settings, /purchaseAdFree/);
+    assert.match(settings, /restoreAdFree/);
   });
 });

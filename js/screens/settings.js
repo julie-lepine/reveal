@@ -7,9 +7,9 @@ import {
   changeEmailPassword,
   logout,
 } from "../core/auth.js";
-import { refreshAdFreeFromServer } from "../core/entitlements.js";
 import { refreshAdsForEntitlement } from "../core/ads.js";
 import { adFreeSettingsCardHtml } from "../core/adFreeUi.js";
+import { purchaseAdFree, restoreAdFree } from "../core/purchases.js";
 import { getLocalDisplayName, getLocalEmoji } from "../core/state.js";
 import { PROFILE_EMOJI_CHOICES } from "../../data/profileEmojis.js";
 import {
@@ -400,24 +400,32 @@ export function mountSettings(app) {
     bindAdFreeEvents();
   }
 
+  async function runAdFreeAction(action) {
+    try {
+      const res = await action();
+      refreshAdsForEntitlement();
+      if (!mount.isMounted()) return;
+      swapActivePanel();
+      if (res?.cancelled) return;
+      await showAppAlert(res?.message || "Action terminée.", {
+        title: "Sans pub",
+        icon: res?.ok && res?.adFree ? "✨" : "📢",
+      });
+    } catch (e) {
+      if (!mount.isMounted()) return;
+      await showAppAlert(e?.message || "Impossible de finaliser l’achat.", {
+        title: "Sans pub",
+        icon: "⚠️",
+      });
+    }
+  }
+
   function bindAdFreeEvents() {
-    app.querySelector("#btn-adfree-refresh")?.addEventListener("click", async () => {
-      try {
-        const on = await refreshAdFreeFromServer();
-        refreshAdsForEntitlement();
-        if (!mount.isMounted()) return;
-        swapActivePanel();
-        await showAppAlert(
-          on ? "Sans pub est actif sur ce compte." : "Sans pub n’est pas actif sur ce compte.",
-          { title: "Sans pub", icon: on ? "✨" : "📢" }
-        );
-      } catch (e) {
-        if (!mount.isMounted()) return;
-        await showAppAlert(e?.message || "Impossible de vérifier le statut.", {
-          title: "Sans pub",
-          icon: "⚠️",
-        });
-      }
+    app.querySelector("#btn-adfree-buy")?.addEventListener("click", () => {
+      void runAdFreeAction(purchaseAdFree);
+    });
+    app.querySelector("#btn-adfree-restore")?.addEventListener("click", () => {
+      void runAdFreeAction(restoreAdFree);
     });
   }
 

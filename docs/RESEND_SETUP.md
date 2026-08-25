@@ -3,7 +3,7 @@
 Supabase envoie les mails d’auth (inscription, **reset mot de passe**, confirmations).  
 Par défaut, les quotas Supabase sont limités → **Resend** sert de relais SMTP professionnel.
 
-Checklist rapide : voir sections **Emails** dans [LAUNCH_CHECKLIST.md](./LAUNCH_CHECKLIST.md) et [STORE_CHECKLIST.md](./STORE_CHECKLIST.md).
+Checklist deploy web : [LAUNCH_CHECKLIST.md](./LAUNCH_CHECKLIST.md) (avant une soirée). DNS / SMTP : ce fichier.
 
 ---
 

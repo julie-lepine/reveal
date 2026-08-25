@@ -1,15 +1,18 @@
 import { isLoggedIn, isGuest } from "./auth.js";
 import { isAdFree } from "./entitlements.js";
+import { isNativeApp } from "./platform.js";
+import { isPurchasesNativeReady } from "./purchases.js";
 
 export function shouldShowAdFreePromo() {
   return !isAdFree();
 }
 
-/** Carte complète Menu → Profil (achat IAP pas encore branché). */
+/** Carte Menu → Profil. */
 export function adFreeSettingsCardHtml() {
   const loggedIn = isLoggedIn();
   const guest = isGuest();
   const unlocked = isAdFree();
+  const storeReady = isPurchasesNativeReady();
 
   let body;
   if (guest || !loggedIn) {
@@ -21,18 +24,21 @@ export function adFreeSettingsCardHtml() {
   } else if (unlocked) {
     body = `
         <p class="settings-premium__ok" role="status">Sans pub est actif sur ce compte.</p>
-        <p class="hint settings-section__hint">Plus de bannière dans l’app native. L’achat in-app sera branché ensuite.</p>
-        <button type="button" class="btn btn-secondary btn--spaced" id="btn-adfree-refresh">Actualiser le statut</button>`;
+        <p class="hint settings-section__hint">Plus de bannière dans l’app native, sur tous tes appareils liés à ce compte.</p>
+        <button type="button" class="btn btn-secondary btn--spaced" id="btn-adfree-restore">Restaurer l’achat</button>`;
   } else {
+    const storeHint = isNativeApp()
+      ? storeReady
+        ? "Paiement via Google Play (ou App Store). Licence testeur = 0&nbsp;€."
+        : "Achats pas encore disponibles sur cette plateforme."
+      : "L’achat se fait dans l’app Android (Play Store), pas sur le navigateur.";
     body = `
         <p class="hint settings-section__hint">
           2,99&nbsp;€ à vie - enlève la bannière sur tes appareils liés à ce compte.
         </p>
-        <p class="hint settings-section__hint">
-          L’achat Play / App Store n’est pas encore branché. En test : un flag serveur coupe déjà les pubs.
-        </p>
-        <button type="button" class="btn btn-primary btn--spaced" id="btn-adfree-buy" disabled>2,99&nbsp;€ - bientôt</button>
-        <button type="button" class="btn btn-secondary btn--spaced" id="btn-adfree-refresh">Actualiser le statut</button>`;
+        <p class="hint settings-section__hint">${storeHint}</p>
+        <button type="button" class="btn btn-primary btn--spaced" id="btn-adfree-buy">2,99&nbsp;€ - Sans pub</button>
+        <button type="button" class="btn btn-secondary btn--spaced" id="btn-adfree-restore">Restaurer l’achat</button>`;
   }
 
   return `

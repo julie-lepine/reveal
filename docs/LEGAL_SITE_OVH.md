@@ -2,7 +2,7 @@
 
 Repo **séparé** du projet Party Games (pages statiques : `index.html`, `privacy.html`, `suppression-compte.html`, `mentions-legales.html`, `legal.css`, `reveal.png`).
 
-Checklist associée : section **G bis** dans [STORE_CHECKLIST.md](./STORE_CHECKLIST.md).
+Checklist associée : [STORE_CHECKLIST.md](./STORE_CHECKLIST.md) (bloc site & AdMob).
 
 ---
 
@@ -88,7 +88,7 @@ Attendre 15 min à 2 h (parfois 24 h) pour la propagation.
 - [ ] `…/privacy.html` et `…/mentions-legales.html` OK
 - [ ] Logo `reveal.png` s’affiche
 - [ ] Liens footer entre les pages
-- [ ] **Liens téléchargement app** (Play Store / App Store) présents quand les apps sont publiées — voir checklist G bis
+- [ ] **Liens téléchargement app** (Play Store / App Store) présents quand les apps sont publiées — [STORE_CHECKLIST.md](./STORE_CHECKLIST.md)
 
 ---
 
@@ -98,7 +98,7 @@ Dans ce repo :
 
 - [ ] `data/appConfig.js` → `PRIVACY_POLICY_PUBLIC_URL` =  
   `https://www.revealthepartygame.fr/privacy.html` (ou sans `www` selon ton choix DNS)
-- [ ] Fiches **Play Console** / **App Store Connect** : même URL confidentialité
+- [x] Fiches **Play Console** / **App Store Connect** : même URL confidentialité (`https://revealthepartygame.fr/privacy.html`) — ASC 24 août 2026
 - [ ] Optionnel : Cloudflare Turnstile → hostname `revealthepartygame.fr` / `www` si un jour l’app web y est hébergée
 
 ---
@@ -110,7 +110,7 @@ Quand les fiches store sont en ligne, ajoute sur **`index.html`** (pilule ou bou
 | Store | URL type |
 |-------|----------|
 | Google Play | `https://play.google.com/store/apps/details?id=com.reveal.partygames` (à confirmer après publication) |
-| App Store | `https://apps.apple.com/app/idXXXXXXXXX` (ID numérique après création de la fiche) |
+| App Store | `https://apps.apple.com/app/id6785256450` (fiche créée ; lien public après acceptation Apple) |
 
 Tant que l’app n’est pas publiée : texte du type « Bientôt sur Google Play et l’App Store » ou masquer les boutons.
 

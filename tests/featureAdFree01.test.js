@@ -81,7 +81,9 @@ describe("FEATURE-ADFREE-01 — entitlement Sans pub", () => {
     const settings = src("js/screens/settings.js");
     const ui = src("js/core/adFreeUi.js");
     assert.match(settings, /adFreeSettingsCardHtml/);
-    assert.match(settings, /btn-adfree-refresh/);
+    assert.match(settings, /btn-adfree-buy/);
+    assert.match(settings, /btn-adfree-restore/);
+    assert.equal(/btn-adfree-refresh/.test(settings), false);
     assert.match(ui, /Sans pub/);
     assert.match(ui, /2,99/);
     const persoStart = settings.indexOf("function personnalisationPanelHtml");

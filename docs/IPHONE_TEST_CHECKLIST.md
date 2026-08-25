@@ -1,7 +1,7 @@
 # REVEAL — Checklist test iPhone (Mac + Xcode)
 
 À utiliser **le jour où tu as le Mac** (équivalent Android Studio pour iOS).  
-Complète la section **E** de [STORE_CHECKLIST.md](./STORE_CHECKLIST.md) quand tout est coché ici.
+Coche le parcours iPhone dans [STORE_CHECKLIST.md](./STORE_CHECKLIST.md) quand tout est vert ici.
 
 Légende : ☐ à faire · 🧪 test sur device · ✅ OK · ❌ bug (noter en bas)
 
@@ -156,7 +156,7 @@ Utilise l’**org / projet de test** actuel (egress : 1 onglet, fermer le lobby 
 
 ## K. Quand tout est vert
 
-- [ ] Cocher **🧪 iPhone** et les lignes associées dans [STORE_CHECKLIST.md](./STORE_CHECKLIST.md) § E
+- [ ] Cocher le parcours iPhone dans [STORE_CHECKLIST.md](./STORE_CHECKLIST.md)
 - [ ] Corriger les bugs sur Windows → `npm run cap:sync` → retest rapide au Mac
 - [ ] **Ne pas** soumettre au store depuis l’org Supabase en dépassement : nouvelle org REVEAL avant launch (cf. [SUPABASE_EGRESS.md](./SUPABASE_EGRESS.md))
 

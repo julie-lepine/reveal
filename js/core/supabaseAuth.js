@@ -179,6 +179,12 @@ export async function syncSessionToState(session) {
     );
     handleMembershipAuthIdentityTransition(prevUserId, null);
     try {
+      const { syncPurchasesIdentity } = await import("./purchases.js");
+      await syncPurchasesIdentity();
+    } catch {
+      /* RC indisponible */
+    }
+    try {
       const { refreshAdsForEntitlement } = await import("./ads.js");
       refreshAdsForEntitlement();
     } catch {
@@ -219,6 +225,13 @@ export async function syncSessionToState(session) {
       adFree: isAnonymous ? false : adFreeFromProfile(profile),
     },
   });
+
+  try {
+    const { syncPurchasesIdentity } = await import("./purchases.js");
+    await syncPurchasesIdentity();
+  } catch {
+    /* RC indisponible */
+  }
 
   try {
     const { refreshAdsForEntitlement } = await import("./ads.js");
