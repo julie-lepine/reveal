@@ -1,4 +1,8 @@
-# Configuration Supabase — REVEAL
+# Supabase — REVEAL (setup, egress, emails)
+
+Lancement : [LAUNCH.md](./LAUNCH.md) · Native : [NATIVE.md](./NATIVE.md) · SQL prod : [DEPLOYMENTS_SQL.md](./DEPLOYMENTS_SQL.md)
+
+---
 
 ## 1. Projet Supabase
 
@@ -12,7 +16,7 @@
    - `lobby_polls` *(Vague 1 sondages — après `lobby-polls.sql`)*
    - `lobby_poll_votes` *(idem)*
 4. Exécute aussi **`supabase/game-sessions.sql`** (multijoueur des jeux). Si les invités ne peuvent pas synchroniser les mini-jeux (erreur `PGRST116` ou `406` sur `PATCH game_sessions`), réexécute au minimum la politique `game_sessions_update` (section `with check`) de ce fichier.
-5. Exécute **`supabase/lobby-lifecycle.sql`** (expiration, heartbeat `last_seen_at`, purge auto — voir ci-dessous)
+5. Exécute **`supabase/lobby-lifecycle.sql`** (expiration, heartbeat `last_seen_at`, purge auto — voir § 7bis)
 6. Exécute **`supabase/transfer-lobby-host.sql`** (transfert volontaire du rôle d'hôte depuis le menu jeux)
 7. Exécute **`supabase/kick-lobby-member.sql`** (l'hôte peut retirer un joueur au lobby / entre deux jeux)
 8. Exécute **`supabase/lobby-polls.sql`** (sondages « prochain jeu » — tables + RPC ; dépend de `is_lobby_host` / `is_acting_host` I-08/ARCH-03)
@@ -20,6 +24,7 @@
 10. Exécute **`supabase/feature-adfree-01-profile-flag.sql`** (colonne `profiles.ad_free` + trigger anti auto-attribution — palier Sans pub)
 
 > **Fil Rouge / Mot interdit** — suppression applicative terminée (et serveur via **CLEANUP-FILROUGE-02 ✅** 2026-08-07). Ne pas exécuter `supabase/fil-rouge-private.sql` sur une install neuve. Sur le projet cible : table `fil_rouge_private` absente ; RPC actives sans Fil Rouge / sans `playlistGuess` regressé. Helper client `stripLegacyFilRougeKeys` conservé (anciens localStorage).
+
 ## 2. Clés API
 
 1. **Project Settings → API** : copie l’URL et la clé `anon` (publique).
@@ -75,9 +80,7 @@ Sans `supabase.js` configuré (URL/clé absentes ou placeholders), l’applicati
 npm install
 ```
 
-Le client charge `@supabase/supabase-js` via `esm.sh` dans le navigateur ; `npm install` sert aux tests et à Capacitor (voir [CAPACITOR.md](./CAPACITOR.md)).
-
-**Lancement web** : [LAUNCH_CHECKLIST.md](./LAUNCH_CHECKLIST.md)
+Le client charge `@supabase/supabase-js` via `esm.sh` dans le navigateur ; `npm install` sert aux tests et à Capacitor (voir [NATIVE.md](./NATIVE.md)).
 
 ## 6. Vérification rapide
 
@@ -90,13 +93,49 @@ Le client charge `@supabase/supabase-js` via `esm.sh` dans le navigateur ; `npm 
 
 Les mails d’auth (reset mot de passe, etc.) passent par **Resend** en SMTP custom Supabase.
 
-→ Guide complet : **[RESEND_SETUP.md](./RESEND_SETUP.md)**
+**Statut** : domaine vérifié, SMTP actif, reset MDP testé — 25 août 2026.
 
-Résumé :
+### Pourquoi Resend ?
 
-1. Domaine vérifié dans Resend (DNS OVH : TXT, DKIM…)
-2. Supabase → **Authentication → SMTP Settings** → `smtp.resend.com`
-3. Tester « Mot de passe oublié » depuis l’app
+| Sans Resend | Avec Resend |
+|-------------|-------------|
+| Quota email Supabase limité | Volume adapté à une vraie app |
+| Expéditeur `@supabase.io` | Expéditeur `@ton-domaine.com` (plus pro) |
+| Risque de spam / rate limit en soirée | Meilleure délivrabilité (SPF/DKIM) |
+
+### Setup Resend
+
+1. [resend.com](https://resend.com) → **Domains** → ajouter le domaine (sous-domaine `mail.…` recommandé)
+2. **DNS OVH** : TXT vérification, DKIM (`resend._domainkey`), SPF si proposé
+3. Attendre **Verified** dans Resend (propagation 5 min – 48 h)
+4. **API Keys** → clé `re_…` (Sending access)
+5. Supabase → **Authentication → SMTP Settings** :
+
+| Champ | Valeur |
+|-------|--------|
+| Host | `smtp.resend.com` |
+| Port | `465` (SSL) ou `587` (TLS) |
+| Username | `resend` |
+| Password | clé API `re_…` |
+| Sender email | `noreply@mail.ton-domaine.fr` |
+| Sender name | `REVEAL` |
+
+6. (Optionnel) **Email Templates** : personnaliser reset MDP — modèle dans `supabase/email-reset-password.html`
+
+### Tests emails
+
+- [x] App REVEAL → **Mot de passe oublié** → mail reçu — 25 août 2026
+- [x] Lien reset → ouvre l’app web (deep link iOS : [NATIVE.md](./NATIVE.md) § Test iPhone § E)
+- [x] Expéditeur affiché (`REVEAL <noreply@…>`)
+
+### Dépannage emails
+
+| Symptôme | Piste |
+|----------|--------|
+| Resend « Checking DNS » longtemps | Attendre propagation ; revérifier TXT/CNAME dans OVH |
+| Supabase « SMTP error » | Clé API invalide ; port 465 vs 587 ; sender pas sur domaine vérifié |
+| Mail en spam | DKIM OK ? ; ajouter DMARC |
+| Reset reçu mais lien cassé | Redirect URLs Supabase (web + `com.reveal.partygames://auth/callback`) |
 
 ## 7bis. Cycle de vie des lobbies (`lobby-lifecycle.sql`)
 
@@ -128,6 +167,69 @@ select * from public.lobby_lifecycle_audit limit 30;
 
 Constantes alignées app ↔ SQL : `js/config/lobbyLifecycle.js`.
 
-## 8. Egress (quota « sortant »)
+## 8. Egress (trafic sortant)
 
-Si le dashboard affiche **Egress > 100 %** avec une petite base : c’est surtout les **lectures répétées** de `game_sessions.state`, pas Realtime. Voir **[SUPABASE_EGRESS.md](./SUPABASE_EGRESS.md)** (réglages app, SQL de nettoyage, bonnes pratiques dev).
+**Statut** : optimisations app + migration / org prod bouclées — 25 août 2026.
+
+L’**egress** compte les octets renvoyés par l’API Postgres (REST), pas la taille de la base. Une DB de ~30 Mo peut générer plusieurs Go d’egress si le même `game_sessions.state` est retéléchargé en boucle.
+
+### Optimisations dans l’app
+
+| Mécanisme | Fichier |
+|-----------|---------|
+| Polling `game_sessions` : méta sans `state`, fetch complet seulement si `updated_at` change | `js/core/gameSync.js` |
+| Hôte : plus de refetch systématique du `state` avant chaque patch (méta + cache comme l’invité) | `loadSessionRowForPatch` |
+| Decks déshydratés dans `state` | `js/core/deckCodec.js` |
+| Lobby : pas de 100 messages par défaut | `js/core/supabaseLobby.js` |
+| Heartbeat présence + expiration lobbies | `js/config/lobbyLifecycle.js`, `supabase/lobby-lifecycle.sql` |
+| Localhost : polling espacé (×3) | `js/config/syncConfig.js` |
+
+Réglages dev : `js/config/syncConfig.js` (`EGRESS_RELAX_POLL_ON_LOCALHOST`, `LOCALHOST_POLL_MULTIPLIER`).
+
+**Recommandation** : projet Supabase **séparé** pour le développement.
+
+### SQL utile (Dashboard → SQL Editor)
+
+Sessions les plus lourdes :
+
+```sql
+select
+  gs.id,
+  gs.lobby_id,
+  gs.game_id,
+  gs.screen,
+  gs.updated_at,
+  pg_column_size(gs.state) as state_bytes,
+  l.code as lobby_code
+from public.game_sessions gs
+left join public.lobbies l on l.id = gs.lobby_id
+order by state_bytes desc nulls last
+limit 20;
+```
+
+Lobbies / sessions de test orphelins (à adapter avant `DELETE`) :
+
+```sql
+-- Vue monitoring (lobby-lifecycle.sql)
+select * from public.lobby_lifecycle_audit limit 30;
+
+-- Purge automatique des lobbies expirés
+select public.purge_stale_lobbies();
+
+-- Lobbies sans membre (aperçu)
+select l.id, l.code, l.last_activity_at
+from public.lobbies l
+where not exists (
+  select 1 from public.lobby_members m where m.lobby_id = l.id
+);
+
+-- Supprimer les game_sessions d’un lobby précis (cascade si tu supprimes le lobby)
+-- delete from public.game_sessions where lobby_id = 'UUID_ICI';
+```
+
+### Habitudes dev
+
+- Un onglet client en test solo ; fermer le lobby (hôte) en fin de session.
+- Les lobbies abandonnés sont purgés côté serveur (voir `lobby-lifecycle.sql`) — activer pg_cron en prod.
+- Éviter les F5 en boucle pendant un lobby actif (chaque boot refetch lobby + session).
+- Vérifier **Usage → Egress** (Database), pas seulement Realtime Messages.

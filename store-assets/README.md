@@ -30,4 +30,4 @@ Les icône / splash **in-app** : [`resources/`](../resources/README.md) → `npm
 
 ## Checklist
 
-Checklist stores : [STORE_CHECKLIST.md](../docs/STORE_CHECKLIST.md).
+Checklist stores : [LAUNCH.md](../docs/LAUNCH.md).

@@ -611,7 +611,5 @@ describe("ARCH-23 - wiring / SQL (statique)", () => {
     const dep = read("docs/DEPLOYMENTS_SQL.md");
     assert.match(dep, /writes in-game|partie déjà active/i);
     assert.match(dep, /rétrocompatibilité|rétrocompat/i);
-    const audit = read("docs/AUDIT_REGROUPEMENT_CAUSES_RACINES.md");
-    assert.match(audit, /pas.*write in-game|pas.*chaque write/i);
   });
 });

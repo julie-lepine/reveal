@@ -49,7 +49,7 @@ Ne jamais écrire « confirmé » sans preuve (entrée de ce registre après ex�
 
 ## 3. Déploiements historiques
 
-Sources : audit SQL du dépôt (`AUDIT-SQL-01`) + docs ops ([`SUPABASE_SETUP.md`](./SUPABASE_SETUP.md), [`LAUNCH_CHECKLIST.md`](./LAUNCH_CHECKLIST.md), [`MIGRATION_I08_ARCH03.md`](./MIGRATION_I08_ARCH03.md), [`AUDIT_REGROUPEMENT_CAUSES_RACINES.md`](./AUDIT_REGROUPEMENT_CAUSES_RACINES.md)). Aucune date inventée.
+Sources : audit SQL du dépôt (`AUDIT-SQL-01`) + docs ops ([`SUPABASE.md`](./SUPABASE.md), [`LAUNCH.md`](./LAUNCH.md)). Aucune date inventée.
 
 | Date | Migration | Ticket | Staging | Production | Runbook | Commentaires |
 | ---- | --------- | ------ | ------- | ---------- | ------- | ------------ |

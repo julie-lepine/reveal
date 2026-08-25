@@ -2,7 +2,7 @@
 
 Repo **séparé** du projet Party Games (pages statiques : `index.html`, `privacy.html`, `suppression-compte.html`, `mentions-legales.html`, `legal.css`, `reveal.png`).
 
-Checklist associée : [STORE_CHECKLIST.md](./STORE_CHECKLIST.md) (bloc site & AdMob).
+Checklist associée : [LAUNCH.md](./LAUNCH.md) (bloc site & AdMob).
 
 ---
 
@@ -88,7 +88,7 @@ Attendre 15 min à 2 h (parfois 24 h) pour la propagation.
 - [ ] `…/privacy.html` et `…/mentions-legales.html` OK
 - [ ] Logo `reveal.png` s’affiche
 - [ ] Liens footer entre les pages
-- [ ] **Liens téléchargement app** (Play Store / App Store) présents quand les apps sont publiées — [STORE_CHECKLIST.md](./STORE_CHECKLIST.md)
+- [ ] **Liens téléchargement app** (Play Store / App Store) présents quand les apps sont publiées — [LAUNCH.md](./LAUNCH.md)
 
 ---
 

@@ -98,4 +98,4 @@ Ce script **écrase** `icon.png` et `splash.png` à partir de `reveal.png` (logo
 
 Les screenshots Play / App Store → dossier [`store-assets/`](../store-assets/README.md) (archivage optionnel) + upload manuel dans les consoles.
 
-Checklist stores : [STORE_CHECKLIST.md](../docs/STORE_CHECKLIST.md). Captures : [store-assets/README.md](../store-assets/README.md).
+Checklist stores : [LAUNCH.md](../docs/LAUNCH.md). Captures : [store-assets/README.md](../store-assets/README.md).

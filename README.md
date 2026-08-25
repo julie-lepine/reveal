@@ -13,7 +13,7 @@ npm install
 npm test
 ```
 
-Copier `js/config/supabase.example.js` → `js/config/supabase.js` et renseigner URL + clé anon Supabase. Voir [docs/SUPABASE_SETUP.md](./docs/SUPABASE_SETUP.md).
+Copier `js/config/supabase.example.js` → `js/config/supabase.js` et renseigner URL + clé anon Supabase. Voir [docs/SUPABASE.md](./docs/SUPABASE.md).
 
 ---
 
@@ -21,12 +21,11 @@ Copier `js/config/supabase.example.js` → `js/config/supabase.js` et renseigner
 
 | Sujet | Fichier |
 |-------|---------|
-| Lancement web (soirée pilote, prod) | [docs/LAUNCH_CHECKLIST.md](./docs/LAUNCH_CHECKLIST.md) |
-| Supabase (schéma, auth, Realtime) | [docs/SUPABASE_SETUP.md](./docs/SUPABASE_SETUP.md) |
-| Emails (Resend + OVH) | [docs/RESEND_SETUP.md](./docs/RESEND_SETUP.md) |
-| Capacitor (sync, build native) | [docs/CAPACITOR.md](./docs/CAPACITOR.md) |
-| Publication Play Store / App Store | [docs/STORE_CHECKLIST.md](./docs/STORE_CHECKLIST.md) |
-| AdMob (pub native) | [docs/ADMOB.md](./docs/ADMOB.md) |
+| Lancement (web, stores, sans pub) | [docs/LAUNCH.md](./docs/LAUNCH.md) |
+| Supabase (schéma, auth, egress, emails) | [docs/SUPABASE.md](./docs/SUPABASE.md) |
+| App native (Capacitor, AdMob, test iPhone) | [docs/NATIVE.md](./docs/NATIVE.md) |
+| Site légal OVH | [docs/LEGAL_SITE_OVH.md](./docs/LEGAL_SITE_OVH.md) |
+| Déploiements SQL prod | [docs/DEPLOYMENTS_SQL.md](./docs/DEPLOYMENTS_SQL.md) |
 | Icône / splash Capacitor | [resources/README.md](./resources/README.md) |
 | Captures fiche store (archivage) | [store-assets/README.md](./store-assets/README.md) |
 

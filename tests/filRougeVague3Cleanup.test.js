@@ -34,10 +34,9 @@ function walkJsFiles(dir, out = []) {
 }
 
 const ACTIVE_DOCS = [
-  "docs/SUPABASE_SETUP.md",
-  "docs/LAUNCH_CHECKLIST.md",
-  "docs/ADMOB.md",
-  "docs/IPHONE_TEST_CHECKLIST.md",
+  "docs/SUPABASE.md",
+  "docs/LAUNCH.md",
+  "docs/NATIVE.md",
 ];
 
 describe("fil rouge vague 3 - CSS / message / docs", () => {
@@ -108,13 +107,8 @@ describe("fil rouge vague 3 - CSS / message / docs", () => {
       assert.equal(/Fil Rouge\*\* \(optionnel\)/i.test(src), false, rel);
       assert.equal(/fil rouge mission\s*:/i.test(src), false, rel);
     }
-    const setup = read("docs/SUPABASE_SETUP.md");
+    const setup = read("docs/SUPABASE.md");
     assert.ok(/suppression applicative terminée/i.test(setup));
     assert.ok(setup.includes("traitre-private.sql"));
-    const audit = read("docs/AUDIT_REGROUPEMENT_CAUSES_RACINES.md");
-    assert.ok(/SYN-05 \/ ARCH-18/.test(audit));
-    // Contrat produit : l’audit décrit Fil Rouge comme retiré (app + serveur).
-    assert.ok(/Fil Rouge app(\s*\+\s*serveur)?\s+(supprimé|nettoyés)/i.test(audit));
-    assert.equal(/Fil Rouge dormant/.test(audit), false);
   });
 });
