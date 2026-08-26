@@ -37,6 +37,9 @@ describe("BUG-TRUTHMETER-02 truthMeterIdentity", () => {
     ]);
     assert.equal(ok.ok, true);
     assert.deepEqual(ok.uids, [UID_A, UID_B]);
+    const solo = buildTruthMeterAuthorOrderUids([{ userId: UID_A, name: "Alice" }]);
+    assert.equal(solo.ok, true);
+    assert.deepEqual(solo.uids, [UID_A]);
   });
 
   it("ordre entièrement UID : identité (roster incomplet OK)", () => {

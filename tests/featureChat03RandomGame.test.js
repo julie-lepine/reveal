@@ -24,6 +24,7 @@ import {
   chatRouletteBridgeCopy,
   chatRouletteShouldShowResult,
   chatRouletteSpinProgress,
+  chatRouletteLocalSpinProgress,
   chatRouletteWinkLine,
   computeChatRouletteExpiresAt,
   isCatalogTileEligibleForCount,
@@ -81,7 +82,7 @@ beforeEach(() => {
 describe("FEATURE-CHAT-03 - éligibilité", () => {
   it("catalogue tile min players (miroir launchers)", () => {
     assert.equal(catalogTileMinPlayers("traitre-prep"), 3);
-    assert.equal(catalogTileMinPlayers("truthmeter-prep"), 2);
+    assert.equal(catalogTileMinPlayers("truthmeter-prep"), 1);
     assert.equal(catalogTileMinPlayers("hottake-prep"), 1);
   });
 
@@ -427,7 +428,7 @@ describe("FEATURE-CHAT-03 - TTL hybride / horloges", () => {
     assert.equal(chatRouletteSpinProgress(ev, 2000), 0.5);
     assert.equal(chatRouletteSpinProgress(ev, 3000), 1);
     assert.equal(chatRouletteShouldShowResult(ev, 3000), true);
-    // Métier peut être inactif sans casser le seek
+    // Métier peut être inactif sans casser le seek (hors UI rouleau)
     assert.equal(
       isChatRouletteBlockingLaunch({
         chatRoulette: ev,
@@ -435,6 +436,33 @@ describe("FEATURE-CHAT-03 - TTL hybride / horloges", () => {
         sessionUpdatedAtMs: 1_000_000,
       }),
       false
+    );
+  });
+
+  it("15b. rouleau local : ancre réception, pas timestamp hôte", () => {
+    assert.equal(
+      chatRouletteLocalSpinProgress({
+        startMs: 5_000,
+        durationMs: 2_000,
+        nowMs: 5_000,
+      }),
+      0
+    );
+    assert.equal(
+      chatRouletteLocalSpinProgress({
+        startMs: 5_000,
+        durationMs: 2_000,
+        nowMs: 6_000,
+      }),
+      0.5
+    );
+    assert.equal(
+      chatRouletteLocalSpinProgress({
+        startMs: 5_000,
+        durationMs: 2_000,
+        nowMs: 8_000,
+      }),
+      1
     );
   });
 });

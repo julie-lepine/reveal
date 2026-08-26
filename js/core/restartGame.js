@@ -30,7 +30,6 @@ import { defaultClutchPrepSession } from "./clutchSession.js";
 import { defaultDrawItPrepSession, drawItToRemote } from "./drawItSession.js";
 import { defaultWrongAnswerPrepSession } from "./wrongAnswerSession.js";
 import { defaultTriviaPrepSession } from "./triviaSession.js";
-import { TRUTH_METER_MIN_PLAYERS } from "../../data/truthMeter.js";
 import { defaultTruthMeterPrepSession } from "./truthMeterSession.js";
 import { defaultConsensusPrepSession } from "./consensusSession.js";
 import { defaultDilemmaPrepSession } from "./dilemmaSession.js";
@@ -380,12 +379,6 @@ export async function launchTriviaPrep() {
 
 export async function launchTruthMeterPrep() {
   if (!(await assertNoActiveChatRoulette({ sessionGameId: "truthmeter" }))) return;
-  const check = await requireMinLobbyPlayers(TRUTH_METER_MIN_PLAYERS, {
-    gameTitle: "TruthMeter",
-    icon: "📊",
-  });
-  if (!check.ok) return;
-
   const tm = defaultTruthMeterPrepSession();
 
   if (!isGameSyncActive()) {

@@ -4,6 +4,7 @@
  */
 import {
   DRAW_IT_PHASE_DRAWING,
+  drawItSyncedNowMs,
   isDrawItRoundExpired,
 } from "./drawItRound.js";
 
@@ -669,13 +670,16 @@ export function toDurableDrawItStroke(stroke, session = {}) {
   });
 }
 
-export function canPersistDrawItStroke(session, uid) {
+export function canPersistDrawItStroke(session, uid, nowMs = drawItSyncedNowMs(session)) {
   if (!session?.lobbyStarted) return { ok: false, reason: "not_started" };
   if (session.phase !== DRAW_IT_PHASE_DRAWING) {
     return { ok: false, reason: "not_drawing" };
   }
   if (!uid || !session.drawerUid || String(uid) !== String(session.drawerUid)) {
     return { ok: false, reason: "not_drawer" };
+  }
+  if (isDrawItRoundExpired(session.roundEndsAt, nowMs)) {
+    return { ok: false, reason: "expired" };
   }
   return { ok: true };
 }

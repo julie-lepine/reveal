@@ -3,8 +3,10 @@
  * Pas de DOM / Supabase : testable unitairement.
  *
  * Séparation horloges :
- * - **Cosmétique** : `animationStartTimestamp` = `Date.now()` hôte ; seek invité
- *   borné 0…1 via `chatRouletteSpinProgress` (aucune décision métier).
+ * - **Cosmétique (rouleau)** : chaque client ancre le spin sur sa réception
+ *   locale de `spinning` (`chatRouletteLocalSpinProgress`). Ne pas seeker
+ *   `Date.now()` invité sur `animationStartTimestamp` hôte (skew → résultat
+ *   immédiat pendant que l'hôte tourne encore).
  * - **Métier (blocage launch)** : `isChatRouletteBlockingLaunch` - observation
  *   locale monotone (`performance.now`) + âge vs `game_sessions.updated_at`
  *   (serveur). `expiresAt` hôte n’est qu’un indice clampé, jamais une vérité
@@ -12,7 +14,6 @@
  */
 import { GAMES_AVAILABLE } from "../../data/games.js";
 import { TRAITRE_MIN_PLAYERS } from "../../data/traitre.js";
-import { TRUTH_METER_MIN_PLAYERS } from "../../data/truthMeter.js";
 import {
   SESSION_GAME_ID_TO_TILE,
   TILE_ID_TO_SESSION_GAME_ID,
@@ -115,7 +116,6 @@ export function parseSessionUpdatedAtMs(raw) {
 /** Min joueurs au lancement catalogue - miroir des gardes `restartGame`. */
 export function catalogTileMinPlayers(tileId) {
   if (tileId === "traitre-prep") return TRAITRE_MIN_PLAYERS;
-  if (tileId === "truthmeter-prep") return TRUTH_METER_MIN_PLAYERS;
   return 1;
 }
 
@@ -749,20 +749,36 @@ export function isChatRouletteEventActive(ev, now = Date.now()) {
 }
 
 /**
- * Progression 0→1 de l'animation (cosmétique uniquement).
- * Indépendant du TTL métier. Borne : horloge aberrante → clamp.
+ * Progression 0→1 d'un spin **local** (ancre = réception client).
+ * Ne pas utiliser `animationStartTimestamp` hôte pour l'UI.
+ */
+export function chatRouletteLocalSpinProgress({
+  startMs,
+  durationMs,
+  nowMs = Date.now(),
+} = {}) {
+  const duration = Number(durationMs);
+  if (!Number.isFinite(duration) || duration <= 0) return 1;
+  const start = Number(startMs);
+  const now = Number(nowMs);
+  if (!Number.isFinite(start) || !Number.isFinite(now)) return 1;
+  return Math.min(1, Math.max(0, (now - start) / duration));
+}
+
+/**
+ * Progression 0→1 vs timestamp hôte (tests / debug). L'UI du rouleau n'en
+ * dépend plus : skew d'horloge → résultat invité immédiat.
  */
 export function chatRouletteSpinProgress(ev, now = Date.now()) {
   const n = normalizeChatRouletteEvent(ev);
   if (!n) return 0;
   if (n.phase === "result" || n.phase === "cancelled") return 1;
   if (n.phase !== "spinning" || n.animationStartTimestamp == null) return 0;
-  if (n.animationDurationMs <= 0) return 1;
-  const t = Number(now);
-  if (!Number.isFinite(t)) return 1;
-  const elapsed = t - n.animationStartTimestamp;
-  if (!Number.isFinite(elapsed)) return 1;
-  return Math.min(1, Math.max(0, elapsed / n.animationDurationMs));
+  return chatRouletteLocalSpinProgress({
+    startMs: n.animationStartTimestamp,
+    durationMs: n.animationDurationMs,
+    nowMs: now,
+  });
 }
 
 export function chatRouletteShouldShowResult(ev, now = Date.now()) {
@@ -771,6 +787,24 @@ export function chatRouletteShouldShowResult(ev, now = Date.now()) {
   if (n.phase === "result") return true;
   if (n.phase === "spinning") return chatRouletteSpinProgress(n, now) >= 1;
   return false;
+}
+
+/**
+ * `phase: result` distant ne doit pas couper un rouleau déjà lancé pour
+ * le même attempt (l'hôte publie result à la fin de *son* spin).
+ */
+export function shouldDeferChatRouletteResultForLocalSpin(
+  ev,
+  spinIdentity,
+  { forceResult = false } = {}
+) {
+  if (forceResult) return false;
+  if (!ev || ev.phase !== "result") return false;
+  if (!spinIdentity?.rouletteId || !spinIdentity?.attemptId) return false;
+  return (
+    String(spinIdentity.rouletteId) === String(ev.rouletteId) &&
+    String(spinIdentity.attemptId) === String(ev.attemptId)
+  );
 }
 
 export function canRerollChatRoulette(ev, opts = {}) {

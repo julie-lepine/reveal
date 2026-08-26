@@ -152,7 +152,7 @@ export const GAME_RULES = {
   truthmeter: {
     title: "TruthMeter",
     emoji: "📏",
-    but: "Une affirmation chiffrée et un curseur Faux → Vrai : le groupe estime, l'auteur bluffe ou non. Minimum 2 joueurs.",
+    but: "Une affirmation chiffrée et un curseur Faux → Vrai : le groupe estime, l'auteur bluffe ou non.",
     etapes: [
       "Un joueur écrit une affirmation et garde son estimation secrète.",
       "Chacun place son curseur entre Faux (0%) et Vrai (100%).",

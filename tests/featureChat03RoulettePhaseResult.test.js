@@ -12,6 +12,7 @@ import {
   isChatRoulettePhaseResultPatch,
   mergeChatRoulettePhaseResultPatch,
   shouldPublishChatRoulettePhaseResult,
+  shouldDeferChatRouletteResultForLocalSpin,
 } from "../js/core/chatRandomGameLogic.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -153,5 +154,60 @@ describe("FEATURE-CHAT-03 - phase result partagée", () => {
     assert.match(uiSrc, /phaseResult/);
     assert.match(uiSrc, /phaseResult\s*\?\s*renderReactions/);
     assert.match(restartSrc, /assertNoActiveChatRoulette/);
+  });
+
+  it("rouleau local : pas de seek timestamp hôte / result distant ne coupe pas", () => {
+    const uiSrc = readFileSync(
+      join(__dirname, "../js/core/chatRandomGameUi.js"),
+      "utf8"
+    );
+    assert.match(uiSrc, /chatRouletteLocalSpinProgress/);
+    assert.match(uiSrc, /shouldDeferChatRouletteResultForLocalSpin/);
+    assert.match(uiSrc, /const start = Date\.now\(\)/);
+    assert.doesNotMatch(uiSrc, /chatRouletteShouldShowResult/);
+    assert.doesNotMatch(
+      uiSrc,
+      /const start = ev\.animationStartTimestamp/
+    );
+  });
+
+  it("result distant même attempt : on laisse finir le spin local", () => {
+    const spin = { rouletteId: "r1", attemptId: "a1" };
+    assert.equal(
+      shouldDeferChatRouletteResultForLocalSpin(
+        { phase: "result", rouletteId: "r1", attemptId: "a1" },
+        spin
+      ),
+      true
+    );
+    assert.equal(
+      shouldDeferChatRouletteResultForLocalSpin(
+        { phase: "result", rouletteId: "r1", attemptId: "a1" },
+        spin,
+        { forceResult: true }
+      ),
+      false
+    );
+    assert.equal(
+      shouldDeferChatRouletteResultForLocalSpin(
+        { phase: "result", rouletteId: "r1", attemptId: "a2" },
+        spin
+      ),
+      false
+    );
+    assert.equal(
+      shouldDeferChatRouletteResultForLocalSpin(
+        { phase: "spinning", rouletteId: "r1", attemptId: "a1" },
+        spin
+      ),
+      false
+    );
+    assert.equal(
+      shouldDeferChatRouletteResultForLocalSpin(
+        { phase: "result", rouletteId: "r1", attemptId: "a1" },
+        null
+      ),
+      false
+    );
   });
 });

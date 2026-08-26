@@ -1,7 +1,6 @@
 import {
   TRUTH_METER_AFFIRMATION_MIN,
   TRUTH_METER_AFFIRMATION_MAX,
-  TRUTH_METER_MIN_PLAYERS,
 } from "../../data/truthMeter.js";
 import { checkHotTakeModeration } from "./hotTakeSession.js";
 import { getActivePlayerNames, getActivePlayers } from "./players.js";
@@ -318,13 +317,13 @@ export async function markTruthMeterLobbyStarted({ rosterNames } = {}) {
   } else {
     // Solo / offline : pas d'UID lobby - conserver noms locaux (pas de wire MP).
     const names = rosterNames?.length ? rosterNames : getActivePlayerNames();
-    if (names.length < TRUTH_METER_MIN_PLAYERS) {
-      throw new Error(`Il faut au moins ${TRUTH_METER_MIN_PLAYERS} joueurs pour TruthMeter.`);
+    if (!names.length) {
+      throw new Error("Impossible de lancer TruthMeter : aucun joueur.");
     }
     authorOrder = shuffleArray(names);
   }
-  if (authorOrder.length < TRUTH_METER_MIN_PLAYERS) {
-    throw new Error(`Il faut au moins ${TRUTH_METER_MIN_PLAYERS} joueurs pour TruthMeter.`);
+  if (!authorOrder.length) {
+    throw new Error("Impossible de lancer TruthMeter : aucun joueur.");
   }
   const next = {
     ...getTruthMeterSession(),

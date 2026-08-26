@@ -17,6 +17,7 @@ const {
   applyDrawItPointer,
   beginDrawItStroke,
   canDrawOnDrawItCanvas,
+  canPersistDrawItStroke,
   clientPointToNormalized,
   clamp01,
   createEmptyDrawItBoard,
@@ -178,6 +179,14 @@ describe("Draw it ! T6 — permissions", () => {
     );
     assert.equal(
       canDrawOnDrawItCanvas(drawingSession(), { uid: DRAWER, nowMs: NOW + 60_000 }).reason,
+      "expired"
+    );
+    assert.equal(
+      canPersistDrawItStroke(drawingSession(), DRAWER, NOW + 60_000).ok,
+      false
+    );
+    assert.equal(
+      canPersistDrawItStroke(drawingSession(), DRAWER, NOW + 60_000).reason,
       "expired"
     );
   });

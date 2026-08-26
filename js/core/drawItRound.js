@@ -136,8 +136,55 @@ export function remainingMsUntil(roundEndsAt, nowMs = Date.now()) {
 }
 
 /**
- * Estimation de l'heure serveur à partir du dernier game_sessions.updated_at reçu.
- * Annule le décalage absolu de l'horloge de l'appareil sans persister de compteur.
+ * Au-delà, `game_sessions.updated_at` n'est plus « maintenant serveur »
+ * (reco / fetch d'une ligne inchangée). ~2,5 s = marge réseau sans recoller
+ * un timer à 60 s.
+ */
+export const DRAW_IT_CLOCK_STALE_MS = 2500;
+
+/**
+ * Ancre d'horloge pour remaining / reveal.
+ * `updated_at` n'est « maintenant » que s'il est plus récent que l'ancre
+ * locale, ou assez proche de l'horloge client (écriture fraîche).
+ */
+export function nextDrawItClockSync(
+  local,
+  incomingUpdatedAt,
+  clientNowMs = Date.now()
+) {
+  const incomingServer = Date.parse(incomingUpdatedAt);
+  const prevServer = Date.parse(local?.serverTimeAtSync);
+  const prevClient = Number(local?.clientTimeAtSyncMs);
+  const clientNow = Number(clientNowMs);
+  const hasPrev = Number.isFinite(prevServer) && Number.isFinite(prevClient);
+
+  if (hasPrev && Number.isFinite(incomingServer) && incomingServer <= prevServer) {
+    return {
+      serverTimeAtSync: local.serverTimeAtSync,
+      clientTimeAtSyncMs: prevClient,
+    };
+  }
+
+  if (
+    Number.isFinite(incomingServer) &&
+    Number.isFinite(clientNow) &&
+    clientNow - incomingServer > DRAW_IT_CLOCK_STALE_MS
+  ) {
+    return {
+      serverTimeAtSync: new Date(clientNow).toISOString(),
+      clientTimeAtSyncMs: clientNow,
+    };
+  }
+
+  return {
+    serverTimeAtSync: incomingUpdatedAt || null,
+    clientTimeAtSyncMs: Number.isFinite(clientNow) ? clientNow : Date.now(),
+  };
+}
+
+/**
+ * Estimation de l'heure serveur depuis l'ancre (pas updated_at à chaque fetch).
+ * Annule le décalage d'horloge appareil sans recoller un snapshot périmé.
  */
 export function drawItSyncedNowMs(session, clientNowMs = Date.now()) {
   const serverAt = Date.parse(session?.serverTimeAtSync);

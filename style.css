@@ -5024,21 +5024,48 @@ body.has-bottom-nav .feedback-fab{
   font-size:12px;
 }
 
+.draw-it-guess .chat-box{
+  margin-bottom:10px;
+}
 .draw-it-guess .chat-messages{
   height:180px;
   max-height:180px;
-  margin-bottom:10px;
+  margin-bottom:0;
 }
 
 .draw-it-found-line{
   min-height:1.4em;
+}
+.draw-it-found-line:empty{
+  min-height:0;
+  margin:0;
+}
+
+.draw-it-board{
+  padding-bottom:8px;
+  scroll-margin-top:calc(8px + env(safe-area-inset-top, 0px));
+}
+.draw-it-recap{
+  scroll-margin-top:calc(8px + env(safe-area-inset-top, 0px));
+}
+body.has-top-ad .draw-it-board,
+body.has-top-ad .draw-it-recap{
+  scroll-margin-top:calc(
+    8px
+    + var(--ad-banner-height, 72px)
+    + var(--ad-banner-buffer, 8px)
+    + env(safe-area-inset-top, 0px)
+  );
+}
+.draw-it-board + .draw-it-guess{
+  margin-top:10px;
 }
 
 .draw-it-tools{
   display:flex;
   flex-direction:column;
   gap:8px;
-  margin:8px 0 4px;
+  margin:8px 0 0;
 }
 .draw-it-tools__row{
   display:flex;
@@ -5447,6 +5474,10 @@ body.has-bottom-nav .feedback-fab{
   .card{
     padding:16px;
     border-radius:20px;
+  }
+
+  .card.draw-it-board{
+    padding-bottom:8px;
   }
 
   .participants-grid{

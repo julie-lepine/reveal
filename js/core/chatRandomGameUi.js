@@ -1,14 +1,14 @@
 /**
  * FEATURE-CHAT-03 - modale + animation slot machine (cosmétique).
- * Le résultat est déjà connu via l'événement sync ; l'UI suit le timestamp hôte.
+ * Le gagnant est déjà dans l'événement sync ; chaque client joue le rouleau
+ * depuis sa réception locale de `spinning` (pas le Date.now() hôte).
  * Resize / orientation : recalcule le transform sans nouveau tirage ni patch.
  */
 import { escapeHtml } from "./ui.js";
 import {
   CHAT_ROULETTE_DURATION_MS,
   buildSlotReel,
-  chatRouletteShouldShowResult,
-  chatRouletteSpinProgress,
+  chatRouletteLocalSpinProgress,
   canRerollChatRoulette,
   chatRouletteBridgeCopy,
   chatRouletteWinkLine,
@@ -16,6 +16,7 @@ import {
   isChatRouletteBlockingLaunch,
   normalizeChatRouletteEvent,
   resolveChatRouletteResultAct,
+  shouldDeferChatRouletteResultForLocalSpin,
   CHAT_ROULETTE_REACTION_DEFS,
   computeChatRouletteReactionCounts,
   canAcceptChatRouletteReactions,
@@ -106,21 +107,11 @@ function bindResize() {
 function onViewportChange() {
   if (!spinCtx || !rootEl) return;
   // Recalcule géométrie / transform à partir du même attempt - pas de nouveau tirage.
-  const progress = chatRouletteSpinProgress(
-    {
-      ...spinCtx,
-      phase: "spinning",
-      selectedTileId: spinCtx.winner.id,
-      eligibleTileIds: spinCtx.games.map((g) => g.id),
-      animationStartTimestamp: spinCtx.start,
-      animationDurationMs: spinCtx.duration,
-      createdAt: spinCtx.start,
-      expiresAt: spinCtx.start + 120_000,
-      rerollCount: 0,
-      maxRerolls: 3,
-    },
-    Date.now()
-  );
+  const progress = chatRouletteLocalSpinProgress({
+    startMs: spinCtx.start,
+    durationMs: spinCtx.duration,
+    nowMs: Date.now(),
+  });
   if (progress >= 1) return;
   applySpinFrame(spinCtx, progress);
 }
@@ -369,7 +360,7 @@ function runSpinAnimation(ev, winner, games) {
   const stage = rootEl?.querySelector("[data-roulette-stage]");
   if (!stage || !winner) return;
 
-  const start = ev.animationStartTimestamp || Date.now();
+  const start = Date.now();
   const duration = ev.animationDurationMs || CHAT_ROULETTE_DURATION_MS;
 
   spinCtx = {
@@ -383,14 +374,8 @@ function runSpinAnimation(ev, winner, games) {
   };
   bindResize();
 
-  const already = chatRouletteSpinProgress(ev, Date.now());
-  if (already >= 1) {
-    finishSpinIfCurrent(ev);
-    return;
-  }
-
   clearTimers();
-  applySpinFrame(spinCtx, already);
+  applySpinFrame(spinCtx, 0);
 
   const tick = () => {
     if (!rootEl || !spinCtx) return;
@@ -402,14 +387,11 @@ function runSpinAnimation(ev, winner, games) {
     ) {
       return;
     }
-    const linear = chatRouletteSpinProgress(
-      {
-        ...ev,
-        animationStartTimestamp: spinCtx.start,
-        animationDurationMs: spinCtx.duration,
-      },
-      Date.now()
-    );
+    const linear = chatRouletteLocalSpinProgress({
+      startMs: spinCtx.start,
+      durationMs: spinCtx.duration,
+      nowMs: Date.now(),
+    });
     applySpinFrame(spinCtx, linear);
     if (linear < 1) {
       rafId = requestAnimationFrame(tick);
@@ -420,13 +402,9 @@ function runSpinAnimation(ev, winner, games) {
   };
 
   rafId = requestAnimationFrame(tick);
-  const remaining = Math.max(
-    0,
-    duration * (1 - already)
-  );
   spinTimer = setTimeout(() => {
     finishSpinIfCurrent(ev);
-  }, remaining + 40);
+  }, duration + 40);
 }
 
 function bindRootOnce(root) {
@@ -525,10 +503,11 @@ function presentEvent(rawEvent, { forceResult = false, blockingOpts = null, now 
       null
     : null;
 
-  const showResult =
-    forceResult ||
-    ev.phase === "result" ||
-    (ev.phase === "spinning" && chatRouletteShouldShowResult(ev, now));
+  if (shouldDeferChatRouletteResultForLocalSpin(ev, spinCtx, { forceResult })) {
+    return;
+  }
+
+  const showResult = forceResult || ev.phase === "result";
 
   const reactionsSig = chatRouletteReactionsSignature(
     withChatRouletteReactionOverlay(ev.reactionsByUid, ev)
@@ -600,7 +579,11 @@ function presentEvent(rawEvent, { forceResult = false, blockingOpts = null, now 
   }
 
   if (ev.phase === "spinning") {
-    runSpinAnimation(ev, winner, games);
+    const sameAttempt =
+      spinCtx &&
+      String(spinCtx.rouletteId) === String(ev.rouletteId) &&
+      String(spinCtx.attemptId) === String(ev.attemptId);
+    if (!sameAttempt) runSpinAnimation(ev, winner, games);
   }
 }
 

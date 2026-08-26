@@ -125,6 +125,7 @@ import {
 import {
   isNewDrawItRound,
   isStaleDrawItRound,
+  nextDrawItClockSync,
 } from "./drawItRound.js";
 import {
   completedDrawItStrokesFromSession,
@@ -3687,12 +3688,11 @@ export function applyRemoteSession(row, { epoch = null } = {}) {
     patch.speedVoteGame = local ? mergeSpeedVoteGameLocal(local, remote) : remote;
   }
   if (st.drawIt) {
+    const local = getState().drawItGame;
     const remote = {
       ...drawItFromRemote(st.drawIt),
-      serverTimeAtSync: row.updated_at || null,
-      clientTimeAtSyncMs: Date.now(),
+      ...nextDrawItClockSync(local, row.updated_at),
     };
-    const local = getState().drawItGame;
     patch.drawItGame = local ? mergeDrawItGameLocal(local, remote) : remote;
   }
   if (st.clutch) {

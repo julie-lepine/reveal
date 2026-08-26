@@ -50,10 +50,10 @@ export function buildTruthMeterAuthorOrderUids(participants = []) {
     seen.add(uid);
     uids.push(uid);
   }
-  if (uids.length < 2) {
+  if (!uids.length) {
     return {
       ok: false,
-      error: "Impossible de lancer TruthMeter : pas assez de joueurs avec UID.",
+      error: "Impossible de lancer TruthMeter : aucun joueur avec UID.",
     };
   }
   return { ok: true, uids };

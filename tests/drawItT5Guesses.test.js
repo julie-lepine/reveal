@@ -159,6 +159,25 @@ describe("Draw it ! T5 — normalisation", () => {
     assert.equal(normalizeDrawItGuess("  pizza   royale  "), "pizza royale");
     assert.equal(normalizeDrawItGuess("PIZZA"), "pizza");
   });
+
+  it("articles FR en tête : un poireau == poireau", () => {
+    assert.equal(normalizeDrawItGuess("un poireau"), "poireau");
+    assert.equal(normalizeDrawItGuess("poireau"), "poireau");
+    assert.equal(normalizeDrawItGuess("Le Poireau"), "poireau");
+    assert.equal(normalizeDrawItGuess("une pizza royale"), "pizza royale");
+    assert.equal(drawItGuessMatches("poireau", ["un poireau"]), true);
+    assert.equal(drawItGuessMatches("un poireau", ["poireau"]), true);
+    assert.equal(drawItGuessMatches("un éléphant", ["Éléphant"]), true);
+  });
+
+  it("articles : tokens entiers seulement, pas des préfixes", () => {
+    assert.equal(normalizeDrawItGuess("descendre"), "descendre");
+    assert.equal(normalizeDrawItGuess("landes"), "landes");
+    assert.equal(normalizeDrawItGuess("lampe"), "lampe");
+    assert.equal(normalizeDrawItGuess("un"), "un");
+    assert.equal(drawItGuessMatches("chateau", ["chateau fort"]), false);
+    assert.equal(drawItGuessMatches("descendre", ["cendre"]), false);
+  });
 });
 
 describe("Draw it ! T5 — mauvaises / bonnes réponses", () => {
@@ -196,6 +215,19 @@ describe("Draw it ! T5 — mauvaises / bonnes réponses", () => {
     const applied = applyDrawItGuess(
       drawingSession(),
       guessOpts(GUEST_UID, "Pachyderme")
+    );
+    assert.equal(applied.ok, true);
+    assert.equal(applied.correct, true);
+    assert.equal(applied.session.foundOrder[0].uid, GUEST_UID);
+  });
+
+  it("mot custom avec article : poireau valide un poireau", () => {
+    const applied = applyDrawItGuess(
+      drawingSession(),
+      guessOpts(GUEST_UID, "poireau", {
+        wordLabel: "un poireau",
+        acceptedAnswers: ["un poireau"],
+      })
     );
     assert.equal(applied.ok, true);
     assert.equal(applied.correct, true);
@@ -593,6 +625,12 @@ describe("Draw it ! T5 — SQL RPC", () => {
     assert.doesNotMatch(
       read("supabase/feature-drawit-01-prep-guest-ready.sql"),
       /create or replace function public\.submit_drawit_guess/
+    );
+    const articlesSql = read("supabase/feature-drawit-16-guess-articles.sql");
+    assert.match(articlesSql, /create or replace function public\.normalize_drawit_guess/);
+    assert.match(
+      articlesSql,
+      /\^\(les\|le\|la\|une\|un\|des\|du\|l\)\( \(les\|le\|la\|une\|un\|des\|du\|l\)\)\*/
     );
   });
 });

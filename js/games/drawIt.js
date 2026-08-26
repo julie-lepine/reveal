@@ -34,7 +34,7 @@ import { requireLobbyPlay } from "../core/gameGuard.js";
 import { withClickLock } from "../core/actionLock.js";
 import { createMountGuard } from "../core/mountLifecycle.js";
 import { navigate } from "../core/router.js";
-import { escapeHtml, pageShell, schedulePageScrollReset } from "../core/ui.js";
+import { escapeHtml, pageShell, schedulePageScrollToElement } from "../core/ui.js";
 import { bindNav } from "../screens/nav.js";
 import { gameExitBarHtml, bindExitGame } from "../core/exitGame.js";
 import {
@@ -394,6 +394,14 @@ export function mountDrawIt(app) {
     }
     if ((lastPlayIdentity.phase || null) !== (session.phase || null)) return true;
     return false;
+  }
+
+  function drawingBoxEl() {
+    return (
+      app.querySelector(".draw-it-board") ||
+      app.querySelector(".draw-it-recap") ||
+      app.querySelector("#draw-it-canvas-host")
+    );
   }
 
   function hasStableGuessComposer() {
@@ -762,8 +770,6 @@ export function mountDrawIt(app) {
     const hint = guessLockReason(session, nowMs);
     return `
       <div class="card draw-it-guess">
-        <p class="label-upper">Propositions</p>
-        <div class="chat-messages" id="draw-it-guess-messages"></div>
         <div class="chat-box">
           <input type="text" class="chat-box__input" id="draw-it-guess-input"
             placeholder="${escapeHtml(locked ? hint || "Propositions fermées" : "Propose un mot…")}"
@@ -774,6 +780,8 @@ export function mountDrawIt(app) {
         <p class="hint" id="draw-it-guess-hint"${hint ? "" : " hidden"}>${
           hint ? escapeHtml(hint) : ""
         }</p>
+        <p class="label-upper">Propositions</p>
+        <div class="chat-messages" id="draw-it-guess-messages"></div>
       </div>`;
   }
 
@@ -815,7 +823,7 @@ export function mountDrawIt(app) {
         : `<p class="hot-take-text" id="draw-it-word">✏️ ${escapeHtml(drawerName)} dessine…</p>
            <p class="hint">Le mot est secret jusqu'à la fin des 60 secondes.</p>`;
       phaseHtml = `
-        <div class="card">
+        <div class="card draw-it-board">
           <p class="label-upper label-upper--gold">Manche ${roundIdx + 1}</p>
           ${wordBlock}
           <p class="hot-take-duration" id="draw-it-clock" aria-live="polite">${clock}</p>
@@ -878,7 +886,7 @@ export function mountDrawIt(app) {
     bindGuessChat(session);
     bindTools();
     rememberPlayIdentity(session);
-    if (resetScroll) schedulePageScrollReset(app);
+    if (resetScroll) schedulePageScrollToElement(drawingBoxEl, app);
 
     app.querySelector("#draw-it-advance")?.addEventListener(
       "click",
@@ -1035,6 +1043,7 @@ export function mountDrawIt(app) {
     lobbyId: getState().lobby?.id,
     getSession: getDrawItSession,
     getLocalUid: localUid,
+    getNowMs: () => drawItSyncedNowMs(getDrawItSession()),
     onRender: liveRender,
   });
 

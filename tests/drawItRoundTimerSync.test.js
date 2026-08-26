@@ -28,6 +28,7 @@ const {
   drawItSyncedNowMs,
   isNewDrawItRound,
   isStaleDrawItRound,
+  nextDrawItClockSync,
   remainingMsUntil,
 } = await import("../js/core/drawItRound.js");
 const {
@@ -168,8 +169,56 @@ describe("Draw it ! — identité et timestamps de nouvelle manche", () => {
   });
 });
 
+describe("Draw it ! — ancre d'horloge (reco / updated_at périmé)", () => {
+  it("écriture fraîche : updated_at = maintenant serveur", () => {
+    const clock = nextDrawItClockSync(null, new Date(T0).toISOString(), T0);
+    assert.equal(clock.serverTimeAtSync, new Date(T0).toISOString());
+    assert.equal(clock.clientTimeAtSyncMs, T0);
+  });
+
+  it("même updated_at au reconnect : conserve l'ancre (pas de reset à 60 s)", () => {
+    const local = {
+      serverTimeAtSync: new Date(T0).toISOString(),
+      clientTimeAtSyncMs: T0,
+    };
+    const clock = nextDrawItClockSync(local, new Date(T0).toISOString(), T0 + 13_000);
+    assert.equal(clock.serverTimeAtSync, local.serverTimeAtSync);
+    assert.equal(clock.clientTimeAtSyncMs, T0);
+    const remaining = remainingMsUntil(
+      new Date(T0 + 60_000).toISOString(),
+      drawItSyncedNowMs({ ...local, ...clock }, T0 + 13_000)
+    );
+    assert.equal(remaining, 47_000);
+  });
+
+  it("fetch froid d'une ligne vieille de 13 s : remaining = 47 s, pas 60 s", () => {
+    const ends = new Date(T0 + 60_000).toISOString();
+    const clock = nextDrawItClockSync(null, new Date(T0).toISOString(), T0 + 13_000);
+    assert.equal(clock.clientTimeAtSyncMs, T0 + 13_000);
+    assert.equal(remainingMsUntil(ends, drawItSyncedNowMs(clock, T0 + 13_000)), 47_000);
+  });
+
+  it("updated_at plus récent (stroke / guess) : ré-ancre", () => {
+    const local = {
+      serverTimeAtSync: new Date(T0).toISOString(),
+      clientTimeAtSyncMs: T0,
+    };
+    const later = T0 + 20_000;
+    const clock = nextDrawItClockSync(local, new Date(later).toISOString(), later);
+    assert.equal(clock.serverTimeAtSync, new Date(later).toISOString());
+    assert.equal(clock.clientTimeAtSyncMs, later);
+    const remaining = remainingMsUntil(
+      new Date(T0 + 60_000).toISOString(),
+      drawItSyncedNowMs(clock, later)
+    );
+    assert.equal(remaining, 40_000);
+  });
+});
+
 describe("Draw it ! — hydratation invitée", () => {
+  const realNow = Date.now;
   beforeEach(() => {
+    Date.now = () => T1;
     globalThis.requestAnimationFrame = (fn) => {
       fn(0);
       return 0;
@@ -190,6 +239,7 @@ describe("Draw it ! — hydratation invitée", () => {
   });
 
   afterEach(() => {
+    Date.now = realNow;
     __resetCachedGameSessionForTests();
   });
 
@@ -232,6 +282,26 @@ describe("Draw it ! — hydratation invitée", () => {
     const guest = getDrawItSession();
     assert.equal(remainingMsUntil(guest.roundEndsAt, T1 + 59_999), 1);
     assert.equal(remainingMsUntil(guest.roundEndsAt, T1 + 60_000), 0);
+  });
+
+  it("reconnect 13 s plus tard sans nouveau write : remaining ~47 s", () => {
+    Date.now = () => T0;
+    const first = roundOne();
+    saveStatePatch({
+      drawItGame: {
+        ...first,
+        serverTimeAtSync: new Date(T0).toISOString(),
+        clientTimeAtSyncMs: T0,
+      },
+    });
+    Date.now = () => T0 + 13_000;
+    applyRemoteSession(row(first, new Date(T0).toISOString()));
+    const guest = getDrawItSession();
+    assert.equal(guest.roundEndsAt, first.roundEndsAt);
+    assert.equal(
+      remainingMsUntil(guest.roundEndsAt, drawItSyncedNowMs(guest, T0 + 13_000)),
+      47_000
+    );
   });
 });
 
@@ -283,5 +353,10 @@ describe("Draw it ! — serveur et intervalle UI", () => {
     assert.doesNotMatch(src, /roundEndsAt\s*=/);
     assert.doesNotMatch(src, /roundStartAt\s*=/);
     assert.doesNotMatch(src, /buildDrawItRoundTiming|buildDrawItLaunchState/);
+  });
+
+  it("applyRemoteSession ancre l'horloge via nextDrawItClockSync", () => {
+    const src = read("js/core/gameSync.js");
+    assert.match(src, /nextDrawItClockSync\(local, row\.updated_at\)/);
   });
 });

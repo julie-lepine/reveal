@@ -31,6 +31,7 @@ Builds natifs : `npm run cap:sync` (Node ≥ 22) → AAB / Archive.
 
 ### App Store
 - [ ] Review **1.0.0** (build **4**, soumise 24 août 2026) — **ne pas retirer** de la file, pas de nouveau build
+- [ ] **Guideline 2.1 — Information Needed** : répondre + vidéo iPhone — voir § [App Review 2.1](#app-review-21--information-needed-août-2026) ci-dessous
 - [ ] Vérif **infos app + compte développeur** (modifs soumises) — en attente Apple — 25 août 2026
 - [x] DSA : **commerçant** + coordonnées fiche UE — 25 août 2026
 - [ ] Paid Apps : W-8BEN envoyé + RIB CA Atlantique Vendée — recocher **Actif** quand validé
@@ -129,3 +130,144 @@ Test fermé Play : codes générés, bêta device OK (Z Flip), critères prod re
 | Invité impossible | Anonymous sign-ins Supabase |
 | Sync cassée | Realtime + RLS — [SUPABASE.md](./SUPABASE.md) |
 | Pas de mail reset | [SUPABASE.md](./SUPABASE.md) § Emails Resend |
+
+---
+
+## App Review 2.1 — Information Needed (août 2026)
+
+**Ce n’est pas un rejet technique.** Apple demande des **informations complémentaires** (Guideline 2.1). Répondre dans **App Store Connect → Messages / Resolution Center** (réponse au fil du build 1.0.0).
+
+Apple **a déjà le binaire** (build 4 uploadé le 24 août). Tu n’envoies **pas** l’app à nouveau : tu envoies une **vidéo** + un **texte** + un **compte démo**.
+
+### Checklist réponse
+
+- [ ] Créer compte démo review (e-mail + mot de passe stables)
+- [ ] Renseigner **App Review Information → Sign-in required** + identifiants
+- [ ] Installer l’**app native** sur iPhone (TestFlight ou Xcode — voir ci-dessous)
+- [ ] Enregistrer la **vidéo** (iPhone physique, iOS récent, 3–5 min)
+- [ ] Répondre dans App Store Connect (texte EN ci-dessous + pièce jointe / lien)
+- [ ] Coller le même texte dans **Notes** (App Review Information) pour les prochaines soumissions
+
+### Compte démo (à créer dans l’app)
+
+| Champ | Valeur |
+|-------|--------|
+| E-mail | `review@revealthepartygame.fr` (ou Gmail dédié) |
+| Mot de passe | `[CHOISIR — ex. RevealReview2026!]` |
+
+Compte **enregistré** (pas invité) : permet hôte lobby, Paramètres, suppression compte. Préciser à Apple que le mode **Invité** fonctionne sans compte.
+
+### Comment avoir l’app sur iPhone **sans** publication App Store
+
+**GitHub Pages ne suffit pas** pour la vidéo demandée.
+
+| Méthode | C’est quoi | OK pour la vidéo Apple ? |
+|---------|------------|-------------------------|
+| [julie-lepine.github.io/reveal](https://julie-lepine.github.io/reveal/) (Safari) | Version **web** | ❌ Pas l’app native : pas d’icône REVEAL, pas d’ATT, pas d’AdMob natif, pas de deep link |
+| **TestFlight** | Build 4 déjà uploadé → install via app TestFlight | ✅ **Recommandé** si tu n’as pas de Mac |
+| **Xcode + câble USB** | `npm run cap:sync` → Run sur iPhone | ✅ Idéal si tu as un Mac ([NATIVE.md](./NATIVE.md)) |
+
+#### Option A — TestFlight (sans Mac, si le build est traité)
+
+1. App Store Connect → **TestFlight** → onglet **iOS** → build **1.0.0 (4)**
+2. Si le build est **Processing** : attendre 15–30 min (parfois quelques heures)
+3. **Internal Testing** → créer un groupe → ajouter ton Apple ID → activer le build
+4. Sur l’iPhone : installer **TestFlight** (App Store) → accepter l’invitation → installer **REVEAL**
+5. Enregistrer l’écran (Réglages → Centre de contrôle → Enregistrement d’écran)
+
+> Le build en review est en général **aussi** disponible en TestFlight interne pour ton compte développeur. Si le build n’apparaît pas : vérifier qu’il n’est pas en erreur de traitement (e-mail Apple / ASC).
+
+#### Option B — Xcode (Mac + câble)
+
+1. Cloner le repo sur le Mac, `npm install`, `npm run cap:sync`
+2. `npm run cap:open:ios` → signing → Run sur iPhone branché
+3. Réglages iPhone → Général → Gestion de l’appareil → faire confiance au dev
+4. Lancer depuis l’**icône** REVEAL (pas seulement Xcode)
+
+#### Multijoueur pour la démo (1 seul iPhone)
+
+- Hôte sur iPhone (app native)
+- 2ᵉ joueur : navigateur sur [julie-lepine.github.io/reveal](https://julie-lepine.github.io/reveal/) avec le **code lobby** (même Supabase prod)
+
+### Script vidéo (3–5 min, cold start)
+
+1. Lancement depuis l’icône REVEAL  
+2. Connexion compte démo (e-mail / mot de passe)  
+3. Créer un lobby → code visible  
+4. (Optionnel) 2ᵉ client web rejoint avec le code  
+5. Lancer une soirée → **1 jeu court** (ex. SpeedVote, Hot Take)  
+6. Popup **UMP** (consentement pub RGPD) si affichée  
+7. Popup **ATT** (« Autoriser le suivi ») — accepter **ou** refuser  
+8. Paramètres → Politique de confidentialité  
+9. Paramètres → **Supprimer mon compte** (montrer l’écran ; annuler si tu veux garder le compte démo)  
+10. (Optionnel) Mode Invité : pseudo + code lobby  
+
+**Important v1.0.0 iOS** : **pas d’achat in-app** (Sans pub = Android uniquement pour l’instant). Jeux + pub bannière AdMob seulement.
+
+### Où répondre dans App Store Connect
+
+1. **Messages** / **Resolution Center** lié au build → **Reply** + vidéo  
+2. **App → App Review Information** → identifiants démo + Notes (texte ci-dessous)  
+
+### Texte à coller (anglais — App Review)
+
+```
+Hello App Review Team,
+
+Thank you for your message. Please find below the information requested for REVEAL - Party Games (com.reveal.partygames), version 1.0.0 (build 4).
+
+1. SCREEN RECORDING
+A screen recording captured on a physical iPhone running the latest iOS is attached / available at: [LINK OR ATTACHMENT].
+It shows: app launch → email login with demo account → create lobby → start an evening → play one party game (multiplayer sync) → AdMob GDPR consent (UMP) → App Tracking Transparency prompt → Settings → Privacy Policy → account deletion entry point.
+Note: Version 1.0.0 on iOS does NOT include in-app purchases. The “Remove ads” purchase is Android-only in this build; iOS shows free gameplay with banner ads only.
+
+2. DEVICES TESTED
+- iPhone [model], iOS [version] — primary App Store review device
+- Samsung Galaxy Z Flip, Android 14 — Android closed testing (same Capacitor codebase)
+
+3. APP PURPOSE & AUDIENCE
+REVEAL is a multiplayer party games app for groups of friends (16+). Users create or join a private lobby via a short code, then play synchronized mini-games together in real time. Target audience: adults and older teens at casual social gatherings.
+
+4. SETUP & ACCESS INSTRUCTIONS
+- Open the app → Log in / Sign up.
+- Demo account (registered user, can host a lobby):
+  Email: [review@…]
+  Password: […]
+- Guest mode (no account): Guest → nickname → enter lobby code from host.
+- Multiplayer demo: host on iPhone; second player can join via https://julie-lepine.github.io/reveal/ with the same lobby code.
+
+5. EXTERNAL SERVICES
+- Supabase (auth, database, Realtime sync)
+- Google AdMob (banner ads; GDPR via Google UMP)
+- Resend (password-reset email via Supabase SMTP)
+- Google Fonts (Inter)
+Cloudflare Turnstile is web-only; disabled in the native iOS app.
+RevenueCat / IAP is NOT active on iOS in v1.0.0.
+
+6. REGIONAL DIFFERENCES
+No regional differences. French UI and content; consistent behavior worldwide.
+
+7. REGULATED INDUSTRY / THIRD-PARTY MATERIAL
+Not applicable. Casual party game; no licensed third-party media in v1.0.0.
+
+USER-GENERATED CONTENT:
+Nicknames, lobby chat, custom game text in private lobbies (code required). Mitigations: client-side word filter, host can remove players, contact@revealthepartygame.fr for abuse reports. No public social feed.
+
+ACCOUNT DELETION:
+In-app: Settings → Legal → “Supprimer mon compte”, or https://revealthepartygame.fr/suppression-compte.html
+
+PRIVACY POLICY: https://revealthepartygame.fr/privacy.html
+
+Best regards,
+Julie [Last name]
+contact@revealthepartygame.fr
+```
+
+### Points sensibles REVEAL
+
+| Sujet | Réponse |
+|-------|---------|
+| IAP iOS | **Aucun** en 1.0.0 — le dire explicitement |
+| UGC | Lobbies **privées** ; filtre mots ; kick hôte ; pas de bouton « Signaler » in-app |
+| ATT / UMP | **Obligatoire dans la vidéo** |
+| GitHub | Version web seulement — **ne remplace pas** la démo native |

@@ -45,6 +45,32 @@ export function resetPageScroll(root = document.getElementById("app")) {
   });
 }
 
+function readScrollMarginTop(el) {
+  if (typeof getComputedStyle !== "function") return 0;
+  const n = parseFloat(getComputedStyle(el).scrollMarginTop);
+  return Number.isFinite(n) ? n : 0;
+}
+
+/** Aligne la vue sur un élément (ex. carte dessin) plutôt que le haut de page. */
+export function resetPageScrollToElement(el, root = document.getElementById("app")) {
+  if (!el) {
+    resetPageScroll(root);
+    return;
+  }
+  if (typeof el.scrollIntoView === "function") {
+    el.scrollIntoView({ block: "start", inline: "nearest" });
+  }
+  const delta = el.getBoundingClientRect().top - readScrollMarginTop(el);
+  if (!delta) return;
+  if (typeof window !== "undefined" && typeof window.scrollBy === "function") {
+    window.scrollBy(0, delta);
+  }
+  if (root) root.scrollTop = (root.scrollTop || 0) + delta;
+  root?.querySelectorAll(".page, .container").forEach((node) => {
+    node.scrollTop = (node.scrollTop || 0) + delta;
+  });
+}
+
 /** Double rAF : le layout WebView est prêt avant le reset (iOS / Android). */
 export function schedulePageScrollReset(root = document.getElementById("app")) {
   if (!root || typeof requestAnimationFrame !== "function") {
@@ -54,6 +80,19 @@ export function schedulePageScrollReset(root = document.getElementById("app")) {
   requestAnimationFrame(() => {
     resetPageScroll(root);
     requestAnimationFrame(() => resetPageScroll(root));
+  });
+}
+
+export function schedulePageScrollToElement(el, root = document.getElementById("app")) {
+  const resolve = () => (typeof el === "function" ? el() : el);
+  const run = () => resetPageScrollToElement(resolve(), root);
+  if (!root || typeof requestAnimationFrame !== "function") {
+    run();
+    return;
+  }
+  requestAnimationFrame(() => {
+    run();
+    requestAnimationFrame(run);
   });
 }
 

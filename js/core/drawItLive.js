@@ -8,6 +8,7 @@ import {
   whenLobbyRealtimeReady,
 } from "./supabaseLobby.js";
 import { onScreenChange } from "./router.js";
+import { drawItSyncedNowMs } from "./drawItRound.js";
 import {
   canDrawOnDrawItCanvas,
   completedDrawItStrokesFromSession,
@@ -454,6 +455,11 @@ export function canEmitDrawItLive(session, uid, nowMs = Date.now()) {
   return canDrawOnDrawItCanvas(session, { uid, nowMs }).ok;
 }
 
+function liveNowMs() {
+  if (typeof desired?.getNowMs === "function") return desired.getNowMs();
+  return drawItSyncedNowMs(desired?.getSession?.() || {});
+}
+
 export function createDrawItLiveStrokeId(uid = "drawer") {
   localStrokeNonce += 1;
   const random =
@@ -591,6 +597,7 @@ export function activateDrawItLive({
   lobbyId,
   getSession,
   getLocalUid,
+  getNowMs,
   onRender,
 } = {}) {
   installLifecycleHooks();
@@ -599,7 +606,7 @@ export function activateDrawItLive({
     removeActiveChannel({ intentional: true, preserveIntent: false });
     liveState = createDrawItLiveState();
   }
-  desired = { lobbyId: String(lobbyId), getSession, getLocalUid };
+  desired = { lobbyId: String(lobbyId), getSession, getLocalUid, getNowMs };
   renderCallback = typeof onRender === "function" ? onRender : null;
   liveState = syncDrawItLiveIdentity(liveState, getSession?.() || {});
   startChunkTimer();
@@ -685,7 +692,7 @@ function sendPayload(payload) {
 export function startDrawItLiveStroke(stroke) {
   const session = desired?.getSession?.() || {};
   const uid = desired?.getLocalUid?.() || null;
-  if (!stroke?.strokeId || !canEmitDrawItLive(session, uid)) return false;
+  if (!stroke?.strokeId || !canEmitDrawItLive(session, uid, liveNowMs())) return false;
   const sender = {
     strokeId: stroke.strokeId,
     stroke,
@@ -721,7 +728,7 @@ export async function flushDrawItLiveChunk(sender = localSender) {
   // Un envoi bloqué ne doit pas figer le trait : sendPayload libère inFlight.
   const session = desired?.getSession?.() || {};
   const uid = desired?.getLocalUid?.() || null;
-  if (!canEmitDrawItLive(session, uid)) {
+  if (!canEmitDrawItLive(session, uid, liveNowMs())) {
     sender.pending = [];
     return false;
   }
@@ -752,7 +759,7 @@ export async function endDrawItLiveStroke(stroke, finalPoints = []) {
   if (sender.inFlight) await sender.inFlight;
   const session = desired?.getSession?.() || {};
   const uid = desired?.getLocalUid?.() || null;
-  if (!canEmitDrawItLive(session, uid)) {
+  if (!canEmitDrawItLive(session, uid, liveNowMs())) {
     if (localSender === sender) localSender = null;
     return false;
   }
@@ -770,13 +777,13 @@ export async function endDrawItLiveStroke(stroke, finalPoints = []) {
 }
 
 export function broadcastDrawItLiveClear(session, uid) {
-  if (!canEmitDrawItLive(session, uid)) return false;
+  if (!canEmitDrawItLive(session, uid, liveNowMs())) return false;
   void sendPayload(buildDrawItLivePayload("clear", { session, uid }));
   return true;
 }
 
 export function broadcastDrawItLiveUndo(session, uid, strokeId) {
-  if (!canEmitDrawItLive(session, uid)) return false;
+  if (!canEmitDrawItLive(session, uid, liveNowMs())) return false;
   void sendPayload(
     buildDrawItLivePayload("undo", { session, uid, strokeId })
   );
@@ -784,7 +791,7 @@ export function broadcastDrawItLiveUndo(session, uid, strokeId) {
 }
 
 export function broadcastDrawItLiveErase(session, uid, strokeIds) {
-  if (!canEmitDrawItLive(session, uid)) return false;
+  if (!canEmitDrawItLive(session, uid, liveNowMs())) return false;
   const ids = sanitizeEraseStrokeIds(strokeIds);
   if (!ids.length) return false;
   void sendPayload(
@@ -794,7 +801,7 @@ export function broadcastDrawItLiveErase(session, uid, strokeIds) {
 }
 
 export function broadcastDrawItLiveEraseSegments(session, uid, mutation) {
-  if (!canEmitDrawItLive(session, uid)) return false;
+  if (!canEmitDrawItLive(session, uid, liveNowMs())) return false;
   const operationId = sanitizeEraseOperationId(mutation?.operationId);
   const replacements = sanitizeEraseReplacements(mutation?.replacements);
   if (!operationId || !replacements.length) return false;
@@ -810,7 +817,7 @@ export function broadcastDrawItLiveEraseSegments(session, uid, mutation) {
 }
 
 export function broadcastDrawItLiveEraseUndo(session, uid, mutation) {
-  if (!canEmitDrawItLive(session, uid)) return false;
+  if (!canEmitDrawItLive(session, uid, liveNowMs())) return false;
   const operationId = sanitizeEraseOperationId(mutation?.operationId);
   const restoredStrokes = completedDrawItStrokesFromSession({
     strokes: mutation?.restoredStrokes || mutation?.sourceStrokes,

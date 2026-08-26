@@ -1,15 +1,28 @@
 /**
  * Normalisation Draw it ! — identique côté client et miroir SQL
- * `public.normalize_drawit_guess` (feature-drawit-03-guesses.sql).
+ * `public.normalize_drawit_guess` (feature-drawit-03-guesses.sql,
+ * articles : feature-drawit-16-guess-articles.sql).
  *
  * Pas de fuzzy / Levenshtein / synonymes.
+ * Articles FR en tête (tokens entiers) : le la les l un une des du.
  */
 const APOSTROPHES = /[''`´‘’]/g;
 const COMBINING_MARKS = /[\u0300-\u036f]/g;
 const NON_ALNUM = /[^a-z0-9]+/g;
+const LEADING_ARTICLES = new Set(["le", "la", "les", "l", "un", "une", "des", "du"]);
+
+function stripLeadingArticles(normalized) {
+  const tokens = String(normalized || "")
+    .split(" ")
+    .filter(Boolean);
+  while (tokens.length > 1 && LEADING_ARTICLES.has(tokens[0])) {
+    tokens.shift();
+  }
+  return tokens.join(" ");
+}
 
 export function normalizeDrawItGuess(raw) {
-  return String(raw ?? "")
+  const base = String(raw ?? "")
     .replace(/œ/gi, "oe")
     .replace(/æ/gi, "ae")
     .normalize("NFD")
@@ -19,6 +32,7 @@ export function normalizeDrawItGuess(raw) {
     .replace(NON_ALNUM, " ")
     .trim()
     .replace(/\s+/g, " ");
+  return stripLeadingArticles(base);
 }
 
 export function collectDrawItAcceptedAnswers(wordLabel, acceptedAnswers = []) {
