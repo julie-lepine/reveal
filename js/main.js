@@ -65,6 +65,7 @@ import { initLobbyPollSync } from "./core/lobbyPollStore.js";
 import { initChatRandomGameSync } from "./core/chatRandomGame.js";
 import { initHostNoticeListener } from "./core/hostNotice.js";
 import { initActingHostNoticeListener } from "./core/actingHostNotice.js";
+import { syncFriendsRealtimeForSession } from "./core/friendsRealtime.js";
 import { checkClientCompatibility } from "./core/clientCompatibility.js";
 import { COMPAT_STATUS } from "./core/clientCompatibilityContract.js";
 import {
@@ -184,6 +185,7 @@ async function boot() {
     // Premier subscribe polls uniquement après session Supabase prête
     void initLobbyPollSync();
     initChatRandomGameSync();
+    syncFriendsRealtimeForSession();
     await reconcileLobbyMembership();
     resetNav();
     if (isPasswordRecoveryPending()) {

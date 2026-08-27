@@ -84,11 +84,11 @@ Attendre 15 min à 2 h (parfois 24 h) pour la propagation.
 
 ## Étape 5 — Vérifications
 
-- [ ] `https://www.revealthepartygame.fr/` → accueil légal (pas « Site en construction »)
-- [ ] `…/privacy.html` et `…/mentions-legales.html` OK
-- [ ] Logo `reveal.png` s’affiche
-- [ ] Liens footer entre les pages
-- [ ] **Liens téléchargement app** (Play Store / App Store) présents quand les apps sont publiées — [LAUNCH.md](./LAUNCH.md)
+- [x] `https://www.revealthepartygame.fr/` → accueil légal (pas « Site en construction ») — 25 août 2026
+- [x] `…/privacy.html` et `…/mentions-legales.html` OK — 25 août 2026 (2,99 € TTC, Google = paiement)
+- [x] Logo `reveal.png` s’affiche
+- [x] Liens footer entre les pages
+- [x] **Liens téléchargement app** (Play Store / App Store) sur `index.html` — 25 août 2026
 
 ---
 
@@ -96,8 +96,8 @@ Attendre 15 min à 2 h (parfois 24 h) pour la propagation.
 
 Dans ce repo :
 
-- [ ] `data/appConfig.js` → `PRIVACY_POLICY_PUBLIC_URL` =  
-  `https://www.revealthepartygame.fr/privacy.html` (ou sans `www` selon ton choix DNS)
+- [x] `data/appConfig.js` → `PRIVACY_POLICY_PUBLIC_URL` =  
+  `https://revealthepartygame.fr/privacy.html`
 - [x] Fiches **Play Console** / **App Store Connect** : même URL confidentialité (`https://revealthepartygame.fr/privacy.html`) — ASC 24 août 2026
 - [ ] Optionnel : Cloudflare Turnstile → hostname `revealthepartygame.fr` / `www` si un jour l’app web y est hébergée
 

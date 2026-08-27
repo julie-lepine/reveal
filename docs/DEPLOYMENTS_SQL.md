@@ -303,3 +303,17 @@ Premier palier Premium (2,99 €) : entitlement serveur, **sans IAP** pour l’i
 **Statut** : code client dans le repo · SQL **non appliquée** tant que cette ligne n’est pas passée à ✅.
 
 ---
+
+## 13. FEATURE-FRIENDS-01 — Graphe d’amis (Palier 1 SQL)
+
+Tables `friend_requests` / `friendships` / `friend_request_cooldowns` + RPC. Découverte lobby only. Pas de fil public.
+
+| Élément | Valeur |
+| ------- | ------ |
+| Migration | [`feature-friends-01.sql`](../supabase/feature-friends-01.sql) — **✅ staging** (27 août 2026, dont hotfix `friends_lock_pair` 1-arg) · **prod : ne pas appliquer** avant Palier 9–10 |
+| Runbook | [`tests/feature-friends-01-runbook.sql`](../supabase/tests/feature-friends-01-runbook.sql) — **`FRIENDS01_RUNBOOK_OK`** |
+| Realtime | `friend_requests` + `friendships` on (Publications). Pas les cooldowns |
+| Client | Paliers 2+ dans [`FRIENDS.md`](./FRIENDS.md) — pas encore branché |
+| Hors scope | Invites lobby (FEATURE-FRIENDS-02) · push · DM |
+
+**Statut** : SQL + runbook **staging ✅** · palier 2 débloqué · prod ⏳.

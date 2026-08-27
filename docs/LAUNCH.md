@@ -41,9 +41,9 @@ Builds natifs : `npm run cap:sync` (Node ≥ 22) → AAB / Archive.
 Hors scope : DUNS, diffusion INSEE, nom de société sur la fiche. IAP iOS : après contrat **Actif** + prochaine version (pas la 1.0.0 en review).
 
 ### Site & AdMob (après pubs live)
-- [ ] `suppression-compte.html` en HTTPS
-- [ ] `https://revealthepartygame.fr/app-ads.txt` (`pub-6332424645114129`)
-- [ ] Boutons Play / App Store sur le site légal (ou « Bientôt » tant que pas live)
+- [x] `suppression-compte.html` en HTTPS — 25 août 2026
+- [x] `https://revealthepartygame.fr/app-ads.txt` (`pub-6332424645114129`) — 25 août 2026
+- [x] Boutons Play / App Store sur le site légal — 25 août 2026
 - [ ] Lier AdMob ↔ Play et ↔ App Store ; logo message UMP
 
 ---
@@ -74,7 +74,7 @@ Hors scope : DUNS, diffusion INSEE, nom de société sur la fiche. IAP iOS : apr
 - [ ] RC : Pub/Sub (optionnel)
 - [ ] Clé publique iOS `appl_…` (placeholder)
 - [ ] QA testeur Play : achat → pubs off (AAB **18+**, pas le 17)
-- [ ] Légal OVH : `privacy.html` + `mentions-legales.html` (2,99 € TTC, Google = paiement)
+- [x] Légal OVH : `privacy.html` + `mentions-legales.html` (2,99 € TTC, Google = paiement) — 25 août 2026
 
 ### Plus tard
 - [ ] Prod Play (critères test fermé OK — lancement au choix ; version peut être 1.0.20+)

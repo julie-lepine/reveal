@@ -48,8 +48,52 @@ import {
 import { planLobbyMountMultiplayerSync } from "../core/lobbyMountSyncPlan.js";
 import { createMountGuard } from "../core/mountLifecycle.js";
 import { createActionLock, withClickLock } from "../core/actionLock.js";
+import { FRIEND_LABEL, FRIEND_OVERLAY, FRIEND_ROSTER_ACTION } from "../config/friends.js";
+import { isSilentFriendRpcCode, overlayStatusAfterSilentFailure, peerFriendRosterKind, rosterLabelFromAction } from "../core/friendsLogic.js";
+import {
+  getLobbyFriendOverlayStatus,
+  markOverlayPendingOut,
+  onFriendsCacheUpdated,
+  patchLobbyFriendOverlayStatus,
+} from "../core/friendsState.js";
+import {
+  acceptFriendRequest,
+  fetchLobbyFriendOverlay,
+  sendFriendRequest,
+} from "../core/supabaseFriends.js";
 
-function participantsHtml(participants, { canKick = false, hostId = null } = {}) {
+function friendActionHtml(p, { localIsRegistered, lobbyId }) {
+  const status = lobbyId && p.userId ? getLobbyFriendOverlayStatus(lobbyId, p.userId) : null;
+  const kind = peerFriendRosterKind(status, {
+    isLocal: p.isLocal,
+    userId: p.userId,
+    localIsRegistered,
+  });
+  if (kind === "omit") return "";
+  const label = rosterLabelFromAction(kind);
+  if (kind === FRIEND_ROSTER_ACTION.hintGuest) {
+    return `<p class="participant__friend-hint">${escapeHtml(FRIEND_LABEL.guestHint)}</p>`;
+  }
+  if (kind === FRIEND_ROSTER_ACTION.sent || kind === FRIEND_ROSTER_ACTION.friend) {
+    return `<span class="participant__friend-badge participant__friend-badge--${escapeHtml(kind)}">${escapeHtml(label)}</span>`;
+  }
+  if (kind === FRIEND_ROSTER_ACTION.add) {
+    return `<button type="button" class="participant__friend-btn" data-friend-add="${escapeHtml(p.userId)}" aria-label="${escapeHtml(label)} ${escapeHtml(p.name)}">${escapeHtml(label)}</button>`;
+  }
+  if (kind === FRIEND_ROSTER_ACTION.accept) {
+    return `<button type="button" class="participant__friend-btn participant__friend-btn--accept" data-friend-accept="${escapeHtml(p.userId)}" aria-label="${escapeHtml(label)} ${escapeHtml(p.name)}">${escapeHtml(label)}</button>`;
+  }
+  return "";
+}
+
+function lobbyFriendsHintHtml(localIsRegistered, participants) {
+  if (localIsRegistered) return "";
+  const hasOthers = participants.some((p) => !p.isLocal && p.userId);
+  if (!hasOthers) return "";
+  return `<p class="hint lobby-friends-hint" data-lobby-friends-hint>${escapeHtml(FRIEND_LABEL.guestHint)}</p>`;
+}
+
+function participantsHtml(participants, { canKick = false, hostId = null, localIsRegistered = false, lobbyId = null } = {}) {
   return participants
     .map((p) => {
       const isHost = Boolean(
@@ -70,10 +114,12 @@ function participantsHtml(participants, { canKick = false, hostId = null } = {})
       const kickBtn = kickable
         ? `<button type="button" class="participant__kick" data-kick-user="${escapeHtml(p.userId)}" data-kick-name="${escapeHtml(p.name)}" aria-label="Retirer ${escapeHtml(p.name)}">Retirer</button>`
         : "";
+      const friendBit = friendActionHtml(p, { localIsRegistered, lobbyId });
       return `
     <div class="participant ${p.ready ? "participant--ready" : ""}">
       ${avatar}
       <span class="participant__name">${escapeHtml(p.name)}</span>
+      ${friendBit}
       ${kickBtn}
     </div>`;
     })
@@ -120,6 +166,9 @@ export function mountLobby(app) {
   let cleanupSim = null;
   let unsubSession = () => {};
   let unsubBundle = () => {};
+  let unsubFriendsCache = () => {};
+  let overlayFetchKey = "";
+  const friendLock = createActionLock();
   /** Capture chat entre re-renders - distinct du lifecycle mount. */
   let hasRenderedOnce = false;
   let chatPanel = null;
@@ -231,12 +280,32 @@ export function mountLobby(app) {
     const canKick =
       isSupabaseConfigured() && isLobbyHost() && canManageLobbyRoster();
     const hostId = getLobby()?.hostId || null;
+    const lobbyId = getLobby()?.id || null;
+    const localIsRegistered = isLoggedIn();
+
+    const overlayKey = `${lobbyId || ""}:${participants.map((p) => p.userId || "").join(",")}`;
+    if (localIsRegistered && lobbyId && overlayKey !== overlayFetchKey) {
+      overlayFetchKey = overlayKey;
+      void fetchLobbyFriendOverlay(lobbyId).catch(() => {
+        overlayFetchKey = "";
+      });
+    }
 
     const countEl = app.querySelector(".lobby-count");
     if (countEl) countEl.textContent = `${total} / ${MAX_PLAYERS} participants connectés`;
 
     const grid = app.querySelector(".participants-grid");
-    if (grid) grid.innerHTML = participantsHtml(participants, { canKick, hostId });
+    if (grid) {
+      grid.innerHTML = participantsHtml(participants, {
+        canKick,
+        hostId,
+        localIsRegistered,
+        lobbyId,
+      });
+    }
+
+    const hintHost = app.querySelector("[data-lobby-friends-hint-slot]");
+    if (hintHost) hintHost.innerHTML = lobbyFriendsHintHtml(localIsRegistered, participants);
 
     const footer = app.querySelector(".lobby-footer");
     if (footer) {
@@ -252,6 +321,67 @@ export function mountLobby(app) {
     }
 
     updateStartButton();
+  }
+
+  async function handleFriendAdd(userId) {
+    const lobbyId = getLobby()?.id;
+    if (!userId || !lobbyId || !isLoggedIn()) return;
+    const prev = markOverlayPendingOut(lobbyId, userId);
+    refreshParticipants();
+    const run = await friendLock.run(async () => {
+      try {
+        return await sendFriendRequest(userId);
+      } catch (err) {
+        return { ok: false, error: err };
+      }
+    });
+    if (!mount.isMounted() || !mount.isCurrentMount()) return;
+    if (run.skipped) return;
+    const res = run.value;
+    if (res?.ok && res.result === "friends") {
+      patchLobbyFriendOverlayStatus(lobbyId, userId, FRIEND_OVERLAY.friends);
+      refreshParticipants();
+      return;
+    }
+    if (res?.ok) {
+      refreshParticipants();
+      return;
+    }
+    const code = res?.code || res?.error?.code;
+    patchLobbyFriendOverlayStatus(
+      lobbyId,
+      userId,
+      overlayStatusAfterSilentFailure(prev)
+    );
+    refreshParticipants();
+    if (isSilentFriendRpcCode(code) || res?.skipped) return;
+    const msg = res?.error?.message || "Impossible d'envoyer la demande.";
+    await showAppAlert(msg, { title: "Amis", icon: "⚠️" });
+  }
+
+  async function handleFriendAccept(userId) {
+    if (!userId || !isLoggedIn()) return;
+    const lobbyId = getLobby()?.id;
+    const run = await friendLock.run(async () => {
+      try {
+        return await acceptFriendRequest(userId);
+      } catch (err) {
+        return { ok: false, error: err };
+      }
+    });
+    if (!mount.isMounted() || !mount.isCurrentMount()) return;
+    if (run.skipped) return;
+    const res = run.value;
+    if (res?.ok && lobbyId) {
+      patchLobbyFriendOverlayStatus(lobbyId, userId, FRIEND_OVERLAY.friends);
+      refreshParticipants();
+      return;
+    }
+    if (res?.skipped) return;
+    await showAppAlert(res?.error?.message || "Impossible d'accepter.", {
+      title: "Amis",
+      icon: "⚠️",
+    });
   }
 
   function onLobbyUpdate() {
@@ -300,6 +430,18 @@ export function mountLobby(app) {
           if (!mount.isCurrentMount()) return;
           if (res?.ok) refreshParticipants();
         });
+        return;
+      }
+      const addBtn = e.target.closest("[data-friend-add]");
+      if (addBtn) {
+        const userId = addBtn.getAttribute("data-friend-add");
+        void handleFriendAdd(userId);
+        return;
+      }
+      const acceptBtn = e.target.closest("[data-friend-accept]");
+      if (acceptBtn) {
+        const userId = acceptBtn.getAttribute("data-friend-accept");
+        void handleFriendAccept(userId);
       }
     });
 
@@ -388,6 +530,8 @@ export function mountLobby(app) {
     const online = isSupabaseConfigured();
     const canKick = online && isLobbyHost() && canManageLobbyRoster();
     const hostId = lobby?.hostId || null;
+    const lobbyId = lobby?.id || null;
+    const localIsRegistered = isLoggedIn();
 
     app.innerHTML = pageShell({
       backTarget: "home",
@@ -395,7 +539,8 @@ export function mountLobby(app) {
         <p class="lobby-count">${total} / ${MAX_PLAYERS} participants connectés</p>
 
         <div class="participants-wrap">
-          <div class="participants-grid">${participantsHtml(participants, { canKick, hostId })}</div>
+          <div class="participants-grid">${participantsHtml(participants, { canKick, hostId, localIsRegistered, lobbyId })}</div>
+          <div data-lobby-friends-hint-slot>${lobbyFriendsHintHtml(localIsRegistered, participants)}</div>
         </div>
 
         <div class="invite-card">
@@ -514,6 +659,12 @@ export function mountLobby(app) {
       if (!mount.isCurrentMount()) return;
     }
     renderFull();
+    unsubFriendsCache = onFriendsCacheUpdated(() => {
+      if (!mount.isMounted()) return;
+      if (!mount.isCurrentMount()) return;
+      refreshParticipants();
+    });
+    refreshParticipants();
     if (isGameSyncActive()) {
       // SYN-12 : pas de second startMultiplayerSync - déjà démarré pre-refresh
       void routeToActiveGameIfNeeded(null, { shouldContinue });
@@ -554,6 +705,7 @@ export function mountLobby(app) {
     cleanupResume();
     unsubSession();
     unsubBundle();
+    unsubFriendsCache();
     if (cleanupSim) cleanupSim();
   };
 }

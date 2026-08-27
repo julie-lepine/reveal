@@ -190,6 +190,12 @@ export async function syncSessionToState(session) {
     } catch {
       /* web / ads indisponible */
     }
+    try {
+      const { syncFriendsRealtimeForSession } = await import("./friendsRealtime.js");
+      syncFriendsRealtimeForSession();
+    } catch {
+      /* friends RT */
+    }
     return;
   }
 
@@ -238,6 +244,13 @@ export async function syncSessionToState(session) {
     refreshAdsForEntitlement();
   } catch {
     /* web / ads indisponible */
+  }
+
+  try {
+    const { syncFriendsRealtimeForSession } = await import("./friendsRealtime.js");
+    syncFriendsRealtimeForSession();
+  } catch {
+    /* friends RT */
   }
 
   const { handleMembershipAuthIdentityTransition } = await import(
