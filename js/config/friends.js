@@ -3,9 +3,12 @@
  * Aligné sur docs/FRIENDS.md. Le SQL / l’UI des paliers suivants importent d’ici.
  * Ne pas y mettre de fetch, de Realtime, ni de DOM.
  * Invitations de lobby : FEATURE-FRIENDS-02 (`js/config/lobbyInvites.js`).
+ * Annuler une demande envoyée : FEATURE-FRIENDS-03 (mêmes tables, RPC cancel / listOutgoing).
  */
 
 export const FRIENDS_FEATURE_ID = "FEATURE-FRIENDS-01";
+
+export const FRIENDS_03_FEATURE_ID = "FEATURE-FRIENDS-03";
 
 /** Écran dédié page Amis (pas un 4e onglet Settings). */
 export const FRIENDS_SCREEN_ID = "friends";
@@ -46,7 +49,7 @@ export const FRIEND_OVERLAY_STATUSES = Object.freeze([
 ]);
 
 /** Noms RPC Postgres (SECURITY DEFINER, authenticated, refuse is_anonymous). */
-export const FRIEND_RPC = {
+export const FRIEND_RPC_F01 = {
   send: "send_friend_request",
   decline: "decline_friend_request",
   accept: "accept_friend_request",
@@ -54,6 +57,17 @@ export const FRIEND_RPC = {
   overlay: "get_lobby_friend_overlay",
   listFriends: "list_my_friends",
   listIncoming: "list_incoming_friend_requests",
+};
+
+/** FEATURE-FRIENDS-03 — SQL palier 1 (`feature-friends-03.sql`). */
+export const FRIEND_RPC_F03 = {
+  cancel: "cancel_friend_request",
+  listOutgoing: "list_outgoing_friend_requests",
+};
+
+export const FRIEND_RPC = {
+  ...FRIEND_RPC_F01,
+  ...FRIEND_RPC_F03,
 };
 
 /**
@@ -91,6 +105,10 @@ export const FRIEND_LABEL = {
   entrySettings: "Mes amis",
   entryHome: "Amis",
   unfriendCancel: "Annuler",
+  /** FEATURE-FRIENDS-03 : rétracter sa demande (pas unfriend). */
+  cancelRequest: "Annuler",
+  outgoingSection: "Demandes envoyées",
+  outgoingEmpty: "Aucune demande envoyée.",
 };
 
 /** Action roster ( Palier 4 ). `hint_guest` = pas de bouton + Ami. */
@@ -100,6 +118,8 @@ export const FRIEND_ROSTER_ACTION = {
   sent: "sent",
   accept: "accept",
   friend: "friend",
+  /** F03 palier 3 UI : pending_out → bouton Annuler. */
+  cancel: "cancel",
 };
 
 /**
@@ -112,7 +132,7 @@ export function rosterActionFromOverlay(overlayStatus, { localIsRegistered } = {
     return FRIEND_ROSTER_ACTION.hintGuest;
   }
   if (overlayStatus === FRIEND_OVERLAY.none) return FRIEND_ROSTER_ACTION.add;
-  if (overlayStatus === FRIEND_OVERLAY.pendingOut) return FRIEND_ROSTER_ACTION.sent;
+  if (overlayStatus === FRIEND_OVERLAY.pendingOut) return FRIEND_ROSTER_ACTION.cancel;
   if (overlayStatus === FRIEND_OVERLAY.pendingIn) return FRIEND_ROSTER_ACTION.accept;
   if (overlayStatus === FRIEND_OVERLAY.friends) return FRIEND_ROSTER_ACTION.friend;
   return FRIEND_ROSTER_ACTION.hintGuest;
@@ -135,6 +155,21 @@ export const FRIEND_NOTICE_CALM_SCREENS = new Set([
 export function isFriendNoticeCalmScreen(screenId) {
   return FRIEND_NOTICE_CALM_SCREENS.has(screenId);
 }
+
+/**
+ * Annuler ≠ refus : pas de ligne cooldown.
+ * No-op (aucune demande from→to) : succès, pas d’erreur métier.
+ */
+export function cancelFriendRequestAppliesCooldown() {
+  return false;
+}
+
+/** Erreurs que `cancel_friend_request` peut lever (réutilise F01). Pas de code dédié no-op. */
+export const FRIEND_CANCEL_RPC_ERROR = {
+  guest: FRIEND_RPC_ERROR.guest,
+  self: FRIEND_RPC_ERROR.self,
+  notFound: FRIEND_RPC_ERROR.notFound,
+};
 
 /** Entrées UI vers l’écran friends (Palier 6). */
 export const FRIENDS_ENTRY = {

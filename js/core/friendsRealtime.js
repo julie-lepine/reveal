@@ -20,6 +20,7 @@ import {
   fetchIncomingFriendRequests,
   fetchLobbyFriendOverlay,
   fetchMyFriends,
+  fetchOutgoingFriendRequests,
 } from "./supabaseFriends.js";
 import {
   fetchIncomingLobbyInvites,
@@ -75,6 +76,7 @@ async function runFriendsCatchup(gen) {
   try {
     if (plan.overlay && lobbyId) await fetchLobbyFriendOverlay(lobbyId);
     if (plan.incoming) await fetchIncomingFriendRequests();
+    if (plan.outgoing) await fetchOutgoingFriendRequests();
     if (plan.friends) await fetchMyFriends();
     const invites = lobbyInvitesCatchupPlan();
     if (invites.incoming) await fetchIncomingLobbyInvites();

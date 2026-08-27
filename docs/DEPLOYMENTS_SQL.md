@@ -88,6 +88,7 @@ Sources : audit SQL du dépôt (`AUDIT-SQL-01`) + docs ops ([`SUPABASE.md`](./SU
 | Historique (date inconnue) | [`fil-rouge-private.sql`](../supabase/fil-rouge-private.sql) | Fil Rouge abandonné | ❌ (ne plus déployer) | ❌ table live retirée | — | Historique uniquement · **DROP** via [`cleanup-filrouge-02-remove-server-legacy.sql`](../supabase/cleanup-filrouge-02-remove-server-legacy.sql) ✅ 2026-08-07 |
 | 2026-08-27 | [`feature-friends-01.sql`](../supabase/feature-friends-01.sql) | FEATURE-FRIENDS-01 | ✅ | ✅ | [`feature-friends-01-runbook.sql`](../supabase/tests/feature-friends-01-runbook.sql) | Un seul projet live · runbook **staging only** · voir §13 |
 | 2026-08-27 | [`feature-friends-02.sql`](../supabase/feature-friends-02.sql) | FEATURE-FRIENDS-02 | ✅ | ✅ | [`feature-friends-02-runbook.sql`](../supabase/tests/feature-friends-02-runbook.sql) | Invitations lobby · voir §14 |
+| 2026-08-27 | [`feature-friends-03.sql`](../supabase/feature-friends-03.sql) | FEATURE-FRIENDS-03 | ✅ | ✅ | [`feature-friends-03-runbook.sql`](../supabase/tests/feature-friends-03-runbook.sql) | Annuler demande envoyée · voir §15 |
 
 **Hors migrations (tracés ailleurs si besoin)** : préflight [`lobby-membership-e4-00-preflight-duplicates.sql`](../supabase/lobby-membership-e4-00-preflight-duplicates.sql) (lecture seule) ; runbooks / harness sous [`supabase/tests/`](../supabase/tests/) et [`lobby-membership-e4-RUNBOOK.sql`](../supabase/lobby-membership-e4-RUNBOOK.sql) / [`lobby-membership-e5-RUNBOOK.sql`](../supabase/lobby-membership-e5-RUNBOOK.sql) — ce ne sont pas des migrations. Voir aussi [`lobby-membership-e4-tests-manual.sql`](../supabase/lobby-membership-e4-tests-manual.sql).
 
@@ -333,7 +334,23 @@ Table `lobby_invites` + RPC send/decline/accept/list. Join **sans** le code. CAS
 | Migration | [`feature-friends-02.sql`](../supabase/feature-friends-02.sql) — **✅** 27 août 2026 |
 | Runbook | [`tests/feature-friends-02-runbook.sql`](../supabase/tests/feature-friends-02-runbook.sql) — **`FRIENDS02_RUNBOOK_OK`** (staging, **ne pas relancer**) |
 | Realtime | `lobby_invites` on (Publications). Même topic client `friends:${userId}` |
-| Client | [`FRIENDS.md`](./FRIENDS.md) Phase 2 palier 2 — wrappers, pas d’UI |
+| Client | [`FRIENDS.md`](./FRIENDS.md) Palier 9 — web Pages ; pas le build App Store 1.0.0 en review |
 | Hors scope | Push · QR · deep link · présence hors lobby |
 
-**Statut** : SQL + Realtime **✅** (même projet) · Palier 1 **27 août 2026**.
+**Statut** : SQL + Realtime **✅ prod** (même projet) · Palier 9 **27 août 2026**.
+
+---
+
+## 15. FEATURE-FRIENDS-03 — Annuler une demande envoyée
+
+RPC `cancel_friend_request` / `list_outgoing_friend_requests`. Pas de nouvelle table. Realtime inchangé (`friend_requests`). Pas de cooldown à l’annulation.
+
+| Élément | Valeur |
+| ------- | ------ |
+| Migration | [`feature-friends-03.sql`](../supabase/feature-friends-03.sql) — **✅** 27 août 2026 |
+| Runbook | [`tests/feature-friends-03-runbook.sql`](../supabase/tests/feature-friends-03-runbook.sql) — **`FRIENDS03_RUNBOOK_OK`** (staging, **ne pas relancer**) |
+| Realtime | inchangé (`friend_requests` déjà on) |
+| Client | [`FRIENDS.md`](./FRIENDS.md) Phase 3 palier 2 — wrappers, pas d’UI |
+| Hors scope | Annuler une invitation de soirée · toast destinataire · cooldown |
+
+**Statut** : SQL **✅** (même projet) · Palier 1 **27 août 2026**.

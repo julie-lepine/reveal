@@ -25,6 +25,7 @@ Lancement : [LAUNCH.md](./LAUNCH.md) · Native : [NATIVE.md](./NATIVE.md) · SQL
 8. Exécute **`supabase/lobby-polls.sql`** (sondages « prochain jeu » — tables + RPC ; dépend de `is_lobby_host` / `is_acting_host` I-08/ARCH-03)
 9. Exécute **`supabase/traitre-private.sql`** si tu joues à Spot the fake (dépend de `is_lobby_host`, fourni par `game-sessions-i08-arch03.sql`)
 10. Exécute **`supabase/feature-adfree-01-profile-flag.sql`** (colonne `profiles.ad_free` + trigger anti auto-attribution — palier Sans pub)
+11. Exécute **`supabase/feature-friends-01.sql`** puis **`supabase/feature-friends-02.sql`** (amis + invitations de salon). Realtime : `friend_requests`, `friendships`, `lobby_invites` (pas `friend_request_cooldowns`)
 
 > **Fil Rouge / Mot interdit** — suppression applicative terminée (et serveur via **CLEANUP-FILROUGE-02 ✅** 2026-08-07). Ne pas exécuter `supabase/fil-rouge-private.sql` sur une install neuve. Sur le projet cible : table `fil_rouge_private` absente ; RPC actives sans Fil Rouge / sans `playlistGuess` regressé. Helper client `stripLegacyFilRougeKeys` conservé (anciens localStorage).
 
@@ -69,10 +70,10 @@ Dans l’app Meta (Facebook Login), ajoute les mêmes URLs dans **Valid OAuth Re
 
 | Profil | Créer lobby | Rejoindre |
 |--------|-------------|-----------|
-| Email / Facebook | Oui | Saisie manuelle du code |
+| Email / Facebook | Oui | Code salon **ou** invitation d’ami (FEATURE-FRIENDS-02) |
 | Invité anonyme | Non | Saisie manuelle du code (pseudo requis) |
 
-- **Partage** : le lobby affiche le code + bouton pour **copier le code** (pas de lien d’invitation, pas de QR dans l’app).
+- **Partage** : le lobby affiche le code + bouton pour **copier le code**. Invitations d’amis (FEATURE-FRIENDS-02) : **Rejoindre** sans code, inscrits seulement. Pas de QR, pas de lien `#join=`.
 - Les anciens liens `#join=CODE` ne sont plus supportés : l’app les ignore (hash retiré, aucun préremplissage / auto-join).
 
 Sans `supabase.js` configuré (URL/clé absentes ou placeholders), l’application produit **ne démarre pas** en multijoueur : écran terminal **Configuration requise** (`BACKEND_MISSING`). Il n’y a plus de « démo locale » runtime (auth locale, faux lobby, PNJ). La configuration Supabase est **nécessaire** pour exécuter REVEAL.

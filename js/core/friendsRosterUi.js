@@ -18,11 +18,14 @@ export function friendRosterActionHtml(p, { localIsRegistered, lobbyId } = {}) {
   if (kind === FRIEND_ROSTER_ACTION.hintGuest) {
     return `<p class="participant__friend-hint">${escapeHtml(FRIEND_LABEL.guestCard)}</p>`;
   }
-  if (kind === FRIEND_ROSTER_ACTION.sent || kind === FRIEND_ROSTER_ACTION.friend) {
+  if (kind === FRIEND_ROSTER_ACTION.friend) {
     return `<span class="participant__friend-badge participant__friend-badge--${escapeHtml(kind)}">${escapeHtml(label)}</span>`;
   }
   if (kind === FRIEND_ROSTER_ACTION.add) {
     return `<button type="button" class="participant__friend-btn" data-friend-add="${escapeHtml(p.userId)}" aria-label="${escapeHtml(label)} ${escapeHtml(p.name)}">${escapeHtml(label)}</button>`;
+  }
+  if (kind === FRIEND_ROSTER_ACTION.cancel) {
+    return `<button type="button" class="participant__friend-btn participant__friend-btn--cancel" data-friend-cancel="${escapeHtml(p.userId)}" aria-label="${escapeHtml(label)} ${escapeHtml(p.name)}">${escapeHtml(label)}</button>`;
   }
   if (kind === FRIEND_ROSTER_ACTION.accept) {
     return `<button type="button" class="participant__friend-btn participant__friend-btn--accept" data-friend-accept="${escapeHtml(p.userId)}" aria-label="${escapeHtml(label)} ${escapeHtml(p.name)}">${escapeHtml(label)}</button>`;

@@ -51,6 +51,7 @@ import { createActionLock, withClickLock } from "../core/actionLock.js";
 import { friendRosterActionHtml, lobbyFriendsHintHtml } from "../core/friendsRosterUi.js";
 import {
   acceptLobbyFriendRequest,
+  cancelLobbyFriendRequest,
   sendLobbyFriendRequest,
 } from "../core/lobbyFriendActions.js";
 import { getMyFriends, onFriendsCacheUpdated } from "../core/friendsState.js";
@@ -325,6 +326,20 @@ export function mountLobby(app) {
     });
   }
 
+  async function handleFriendCancel(userId) {
+    const lobbyId = getLobby()?.id;
+    if (!userId || !lobbyId || !isLoggedIn()) return;
+    const run = await friendLock.run(() => cancelLobbyFriendRequest(userId, lobbyId));
+    if (!mount.isMounted() || !mount.isCurrentMount()) return;
+    if (run.skipped) return;
+    const res = run.value;
+    if (res?.ok || res?.skipped) return;
+    await showAppAlert(res?.error?.message || "Impossible d'annuler.", {
+      title: "Amis",
+      icon: "⚠️",
+    });
+  }
+
   function onLobbyUpdate() {
     if (!mount.isMounted()) return;
     if (!mount.isCurrentMount()) return;
@@ -383,6 +398,12 @@ export function mountLobby(app) {
       if (acceptBtn) {
         const userId = acceptBtn.getAttribute("data-friend-accept");
         void handleFriendAccept(userId);
+        return;
+      }
+      const cancelBtn = e.target.closest("[data-friend-cancel]");
+      if (cancelBtn) {
+        const userId = cancelBtn.getAttribute("data-friend-cancel");
+        void handleFriendCancel(userId);
       }
     });
 

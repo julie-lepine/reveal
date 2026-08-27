@@ -108,7 +108,8 @@ Test fermé Play : codes générés, bêta device OK (Z Flip), critères prod re
 **Reset MDP** (Resend) validé et testé — 25 août 2026.  
 **Egress Supabase** : optimisations + migration faite — 25 août 2026.  
 **App Store** : 1.0.0 (build 4) en review + vérif infos dev en attente — 25 août 2026.  
-**Play** : test fermé OK, **prod disponible** ; QA 11 jeux + app validés — 25 août 2026.
+**Play** : test fermé OK, **prod disponible** ; QA 11 jeux + app validés — 25 août 2026.  
+**Amis / invitations de soirée** : live web [Pages](https://julie-lepine.github.io/reveal/) (`main`) — 27 août 2026. Stores : **prochain** build — **pas** le 1.0.0 App Store en review.
 
 ---
 

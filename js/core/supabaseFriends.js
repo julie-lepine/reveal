@@ -1,10 +1,10 @@
 /**
- * FEATURE-FRIENDS-01 Palier 2 — wrappers RPC. Pas d’UI.
+ * FEATURE-FRIENDS-01 / 03 — wrappers RPC. Pas d’UI.
  * Invité / hors backend : no-op (skipped). Cooldown : ok:false sans throw.
  */
 import { supabase, isSupabaseConfigured } from "./supabaseClient.js";
 import { getState } from "./state.js";
-import { FRIEND_RPC, FRIEND_RPC_ERROR } from "../config/friends.js";
+import { FRIEND_OVERLAY, FRIEND_RPC, FRIEND_RPC_ERROR } from "../config/friends.js";
 import {
   isRegisteredUser,
   isSilentFriendRpcCode,
@@ -12,9 +12,14 @@ import {
   parseFriendRpcError,
 } from "./friendsLogic.js";
 import {
+  getLobbyFriendOverlayStatus,
+  markOutgoingFriendPending,
+  patchLobbyFriendOverlayStatus,
+  removeOutgoingFriendRequest,
   setIncomingFriendRequests,
   setLobbyFriendOverlay,
   setMyFriends,
+  setOutgoingFriendRequests,
 } from "./friendsState.js";
 
 function canCallFriendsRpc() {
@@ -41,7 +46,9 @@ export async function sendFriendRequest(toUserId) {
   if (!canCallFriendsRpc() || !toUserId) return { ok: false, skipped: true };
   try {
     const data = await callRpc(FRIEND_RPC.send, { p_to: toUserId });
-    return { ok: true, result: data?.result || "pending" };
+    const result = data?.result || "pending";
+    if (result === "pending") markOutgoingFriendPending(toUserId);
+    return { ok: true, result };
   } catch (err) {
     if (isSilentFriendRpcCode(err.code)) {
       return { ok: false, code: FRIEND_RPC_ERROR.cooldown };
@@ -66,6 +73,17 @@ export async function unfriendUser(otherUserId) {
   if (!canCallFriendsRpc() || !otherUserId) return { ok: false, skipped: true };
   const data = await callRpc(FRIEND_RPC.unfriend, { p_other: otherUserId });
   return { ok: true, result: data?.result || "ok" };
+}
+
+export async function cancelFriendRequest(toUserId) {
+  if (!canCallFriendsRpc() || !toUserId) return { ok: false, skipped: true };
+  const data = await callRpc(FRIEND_RPC.cancel, { p_to: toUserId });
+  removeOutgoingFriendRequest(toUserId);
+  const lobbyId = getState().lobby?.id || null;
+  if (lobbyId && getLobbyFriendOverlayStatus(lobbyId, toUserId) === FRIEND_OVERLAY.pendingOut) {
+    patchLobbyFriendOverlayStatus(lobbyId, toUserId, FRIEND_OVERLAY.none);
+  }
+  return { ok: true, result: data?.result || "cancelled" };
 }
 
 export async function fetchLobbyFriendOverlay(lobbyId) {
@@ -97,4 +115,14 @@ export async function fetchIncomingFriendRequests() {
   const data = await callRpc(FRIEND_RPC.listIncoming, {});
   setIncomingFriendRequests(data);
   return { ok: true, incoming: data };
+}
+
+export async function fetchOutgoingFriendRequests() {
+  if (!canCallFriendsRpc()) {
+    setOutgoingFriendRequests([]);
+    return { ok: false, skipped: true, outgoing: [] };
+  }
+  const data = await callRpc(FRIEND_RPC.listOutgoing, {});
+  setOutgoingFriendRequests(data);
+  return { ok: true, outgoing: data };
 }

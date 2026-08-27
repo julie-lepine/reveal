@@ -5,10 +5,11 @@ import { FRIEND_OVERLAY } from "../config/friends.js";
 import { getState } from "./state.js";
 import { isRegisteredUser, isSilentFriendRpcCode, overlayStatusAfterSilentFailure } from "./friendsLogic.js";
 import {
+  getLobbyFriendOverlayStatus,
   markOverlayPendingOut,
   patchLobbyFriendOverlayStatus,
 } from "./friendsState.js";
-import { acceptFriendRequest, sendFriendRequest } from "./supabaseFriends.js";
+import { acceptFriendRequest, cancelFriendRequest, sendFriendRequest } from "./supabaseFriends.js";
 
 export async function sendLobbyFriendRequest(userId, lobbyId) {
   if (!userId || !lobbyId || !isRegisteredUser(getState().user)) {
@@ -45,6 +46,24 @@ export async function acceptLobbyFriendRequest(userId, lobbyId) {
     }
     return res;
   } catch (err) {
+    return { ok: false, error: err };
+  }
+}
+
+export async function cancelLobbyFriendRequest(userId, lobbyId) {
+  if (!userId || !isRegisteredUser(getState().user)) return { ok: false, skipped: true };
+  const prev = lobbyId ? getLobbyFriendOverlayStatus(lobbyId, userId) : null;
+  if (lobbyId) patchLobbyFriendOverlayStatus(lobbyId, userId, FRIEND_OVERLAY.none);
+  try {
+    const res = await cancelFriendRequest(userId);
+    if (!res?.ok && lobbyId && prev != null) {
+      patchLobbyFriendOverlayStatus(lobbyId, userId, prev);
+    }
+    return res;
+  } catch (err) {
+    if (lobbyId && prev != null) {
+      patchLobbyFriendOverlayStatus(lobbyId, userId, prev);
+    }
     return { ok: false, error: err };
   }
 }

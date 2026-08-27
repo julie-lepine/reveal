@@ -28,15 +28,15 @@ describe("FEATURE-FRIENDS-01 Palier 4 — roster lobby", () => {
     assert.equal(peerFriendRosterKind(null, peer), "omit");
   });
 
-  it("inscrit + overlay : + Ami / Envoyée / Accepter / Ami / Pas de compte", () => {
+  it("inscrit + overlay : + Ami / Annuler / Accepter / Ami / Pas de compte", () => {
     const peer = { isLocal: false, userId: "u2", localIsRegistered: true };
     assert.equal(peerFriendRosterKind(FRIEND_OVERLAY.none, peer), FRIEND_ROSTER_ACTION.add);
-    assert.equal(peerFriendRosterKind(FRIEND_OVERLAY.pendingOut, peer), FRIEND_ROSTER_ACTION.sent);
+    assert.equal(peerFriendRosterKind(FRIEND_OVERLAY.pendingOut, peer), FRIEND_ROSTER_ACTION.cancel);
     assert.equal(peerFriendRosterKind(FRIEND_OVERLAY.pendingIn, peer), FRIEND_ROSTER_ACTION.accept);
     assert.equal(peerFriendRosterKind(FRIEND_OVERLAY.friends, peer), FRIEND_ROSTER_ACTION.friend);
     assert.equal(peerFriendRosterKind(FRIEND_OVERLAY.guest, peer), FRIEND_ROSTER_ACTION.hintGuest);
     assert.equal(FRIEND_LABEL.add, "+ Ami");
-    assert.equal(FRIEND_LABEL.sent, "Envoyée");
+    assert.equal(FRIEND_LABEL.cancelRequest, "Annuler");
     assert.equal(FRIEND_LABEL.accept, "Accepter");
     assert.equal(FRIEND_LABEL.friend, "Ami");
     assert.equal(FRIEND_LABEL.guestCard, "Pas de compte");
@@ -47,9 +47,11 @@ describe("FEATURE-FRIENDS-01 Palier 4 — roster lobby", () => {
     const lobby = read("js/screens/lobby.js");
     assert.match(lobby, /data-friend-add/);
     assert.match(lobby, /data-friend-accept/);
+    assert.match(lobby, /data-friend-cancel/);
     assert.match(lobby, /data-lobby-friends-hint/);
     assert.match(lobby, /sendLobbyFriendRequest/);
     assert.match(lobby, /acceptLobbyFriendRequest/);
+    assert.match(lobby, /cancelLobbyFriendRequest/);
     assert.match(lobby, /fetchLobbyFriendOverlay/);
     assert.match(lobby, /onFriendsCacheUpdated/);
     assert.match(lobby, /friendRosterActionHtml/);
@@ -72,5 +74,6 @@ describe("FEATURE-FRIENDS-01 Palier 4 — roster lobby", () => {
     assert.match(rosterUi, /FRIEND_LABEL\.guestHint/);
     assert.match(rosterUi, /data-friend-add/);
     assert.match(rosterUi, /data-friend-accept/);
+    assert.match(rosterUi, /data-friend-cancel/);
   });
 });

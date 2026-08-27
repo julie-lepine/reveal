@@ -35,6 +35,7 @@ describe("FEATURE-FRIENDS-01 Palier 7bis — + Ami soirée", () => {
     assert.match(settings, /friendRosterActionHtml/);
     assert.match(settings, /sendLobbyFriendRequest/);
     assert.match(settings, /acceptLobbyFriendRequest/);
+    assert.match(settings, /cancelLobbyFriendRequest/);
     assert.match(settings, /flushFriendRequestNotice/);
     assert.match(settings, /lobbyFriendsHintHtml/);
     assert.doesNotMatch(settings, /lobby_messages/);
@@ -42,6 +43,8 @@ describe("FEATURE-FRIENDS-01 Palier 7bis — + Ami soirée", () => {
     assert.match(dialog, /data-friend-add/);
     assert.match(dialog, /onFriendAdd/);
     assert.match(dialog, /onFriendAccept/);
+    assert.match(dialog, /onFriendCancel/);
+    assert.match(dialog, /data-friend-cancel/);
     assert.match(dialog, /canKick && p\.userId/);
   });
 

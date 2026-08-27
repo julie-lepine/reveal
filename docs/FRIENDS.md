@@ -2,7 +2,7 @@
 
 Cadrage produit validé. On avance **un palier à la fois**. On ne commence pas le palier N+1 tant que les cases du palier N ne sont pas cochées (sauf mention « peut chevaucher »).
 
-Légal store : *No public social feed*. Découverte **uniquement** via le roster du lobby. Pas de recherche de joueurs.
+Légal store : *No public social feed*. Découverte = roster du lobby vivant, plus (Phase 4) joueurs **déjà croisés** dans un lobby il y a moins de 24 h. Pas de recherche de joueurs.
 
 ---
 
@@ -12,7 +12,9 @@ Légal store : *No public social feed*. Découverte **uniquement** via le roster
 - Canal = **notification privée**. Jamais le chat lobby (`lobby_messages`).
 - Refus = **suppression** de la ligne `friend_requests`. Côté émetteur, le bouton redevient **+ Ami**, **sans explication**.
 - Identité = `auth.users.id` (UUID). Pseudo / emoji **toujours relus** depuis `profiles`.
-- Invitations de lobby = **FEATURE-FRIENDS-02** (section Phase 2). Hors v1.
+- Invitations de lobby = **FEATURE-FRIENDS-02** (Phase 2). Hors v1.
+- Annuler une demande envoyée = **FEATURE-FRIENDS-03** (Phase 3).
+- Croisés récents (24 h) = **FEATURE-FRIENDS-04** (Phase 4). Pas une recherche.
 
 ---
 
@@ -278,10 +280,10 @@ On avance **un palier à la fois**, comme la v1. Source runtime : [`js/config/lo
 - [x] **5** Popup + badge — 27 août 2026
 - [x] **6** Rejoindre sans code (+ modale déjà ailleurs) — 27 août 2026
 - [x] **7** Légal in-app + OVH — 27 août 2026
-- [ ] **8** QA terrain *(toi, 2 comptes)*
-- [ ] **9** Pages / docs prod
+- [x] **8** QA terrain — 27 août 2026
+- [x] **9** Pages / docs prod — 27 août 2026
 
-**En cours : palier 8** (QA terrain). Dire les cas OK / KO au fil de l’eau.
+**FEATURE-FRIENDS-02 close** (sauf builds stores). Stores : prochain native — **pas** le 1.0.0 App Store en review.
 
 ### Règles figées (ne pas rediscuter)
 
@@ -410,28 +412,214 @@ Tests : [`tests/featureFriends02-07.test.js`](../tests/featureFriends02-07.test.
 
 À faire **toi** (2 téléphones ou 2 navigateurs, comptes inscrits). On ne commence pas avant que 4–7 soient cochés.
 
-- [ ] Invité : pas d’Inviter / pas de popup invite
-- [ ] A en lobby invite **plusieurs** amis inscrits (ex. 2 ou 7) : chacun a Envoyée ; ils peuvent tous rejoindre jusqu’au plafond 8
-- [ ] A en lobby, B ami hors lobby : Inviter → popup B → Rejoindre sans code → B dans la salle
-- [ ] Refus : A revoit **Inviter**, pas de texte
-- [ ] B déjà dans un **autre** lobby : modale *déjà dans une soirée* → **Quitter et rejoindre** OK ; **Rester et refuser** = B reste, A revoit **Inviter**
-- [ ] Clic hors de cette modale : B reste, l’invite **reste** (A voit encore Envoyée)
-- [ ] Lobby plein / fermé / hôte a dissous : échec clair
-- [ ] Fermeture de lobby : invitations **disparaissent** (CASCADE)
-- [ ] Pendant une manche : pas de modal invite ; badge puis popup au hub
-- [ ] Chat : aucune ligne
-- [ ] `npm test` vert
+- [x] Invité : pas d’Inviter / pas de popup invite
+- [x] A en lobby invite **plusieurs** amis inscrits (ex. 2 ou 7) : chacun a Envoyée ; ils peuvent tous rejoindre jusqu’au plafond 8
+- [x] A en lobby, B ami hors lobby : Inviter → popup B → Rejoindre sans code → B dans la salle
+- [x] Refus : A revoit **Inviter**, pas de texte
+- [x] B déjà dans un **autre** lobby : modale *déjà dans une soirée* → **Quitter et rejoindre** OK ; **Rester et refuser** = B reste, A revoit **Inviter**
+- [x] Clic hors de cette modale : B reste, l’invite **reste** (A voit encore Envoyée)
+- [x] Lobby plein / fermé / hôte a dissous : échec clair
+- [x] Fermeture de lobby : invitations **disparaissent** (CASCADE)
+- [x] Pendant une manche : pas de modal invite ; badge puis popup au hub
+- [x] Chat : aucune ligne
+- [x] `npm test` vert
 
-**Palier 8 validé quand** : toutes les cases ci-dessus cochées (date).
+**Palier 8 validé** (27 août 2026). Recette : toast hôte au switch, kick plus réactif, statut *Dans la soirée* sous le pseudo.
 
 ### Palier 9 — Production (même projet)
 
 SQL déjà sur le projet live au palier 1. Ici : client web + docs, **pas** le 1.0.0 App Store en review.
 
-- [ ] Apply `feature-friends-02.sql` (idempotent) + Realtime `lobby_invites` — déjà fait palier 1 si un seul projet
-- [ ] **Ne pas** relancer le runbook mutatif
-- [ ] Docs SQL + SUPABASE.md
-- [ ] Client web Pages ; **pas** le build App Store 1.0.0 en review
+- [x] [`feature-friends-02.sql`](../supabase/feature-friends-02.sql) + Realtime `lobby_invites` — palier 1 (27 août 2026). **Ne pas** relancer le runbook (blocs mutatifs ; marqué *INTERDIT EN PRODUCTION*). Catalogue lecture seule OK si besoin.
+- [x] Ligne ✅ dans [`docs/DEPLOYMENTS_SQL.md`](./DEPLOYMENTS_SQL.md) §14
+- [x] Mention Realtime dans [`docs/SUPABASE.md`](./SUPABASE.md) §1
+- [x] Client **web** : [Pages](https://julie-lepine.github.io/reveal/) (`main`). Stores : **prochain** build — **pas** le 1.0.0 App Store déjà en review
+
+**Palier 9 validé** (27 août 2026). FEATURE-FRIENDS-02 Phase 2 close (sauf builds stores).
+
+---
+
+## Phase 3 — Annuler une demande envoyée (FEATURE-FRIENDS-03)
+
+Aujourd’hui **Envoyée** est un cul-de-sac : pas de rétractation, et plus rien une fois hors du lobby. On ajoute **Annuler** (émetteur seulement).
+
+On avance **un palier à la fois**. Pas de code avant le palier 0 coché. QA téléphone = dernier palier UI.
+
+### Avancement
+
+- [x] **0** Contrats — 27 août 2026
+- [x] **1** SQL + `FRIENDS03_RUNBOOK_OK` — 27 août 2026
+- [x] **2** Client sans UI — 27 août 2026
+- [x] **3** UI (roster + page Amis) — 27 août 2026
+- [ ] **4** QA terrain
+- [ ] **5** Docs / Pages — **pas** le 1.0.0 App Store
+
+**Palier 3 terminé.** **Prochain : palier 4** (QA téléphone, 2 comptes). Dire *« on fait le palier 4 »* quand tu as testé.
+
+### Règles figées (ne pas rediscuter)
+
+- **Émetteur seulement.** RPC `cancel_friend_request(p_to)` : DELETE sa propre ligne `friend_requests` (`from_user_id = caller`, `to_user_id = p_to`). Pas le destinataire (ça reste `decline_friend_request`).
+- Inscrits seulement (mêmes garde-fous `friends_guest` / `friends_self` / `friends_not_found`).
+- **Pas de cooldown.** Le cooldown 60 s reste **uniquement** après un **refus** du destinataire. Annuler ≠ refusé : l’émetteur peut renvoyer **+ Ami** tout de suite.
+- **Silencieux pour le destinataire.** Pas de toast « a annulé ». Sa popup / badge disparaît via le DELETE Realtime déjà sur `friend_requests` (`friends:${userId}`).
+- Copy : **Annuler** (pas **Retirer**, réservé au unfriend). Roster : **Envoyée** devient action **Annuler**. Page Amis : section **Demandes envoyées** (pour annuler **hors** lobby).
+- Pas de nouvelle table. Pas de colonnes sur `lobby_members`. Jamais `lobby_messages`.
+- **Pas** l’annulation d’une invitation de soirée (reste hors scope FEATURE-FRIENDS-02).
+
+### Hors scope
+
+- Annuler une invitation de lobby
+- Toast / copy « a retiré sa demande » côté destinataire
+- Cooldown après annulation
+- Invités
+
+### Palier 0 — Contrats avant code
+
+- [x] Ticket : **FEATURE-FRIENDS-03**
+- [x] [`js/config/friends.js`](../js/config/friends.js) : RPC `cancel` / `listOutgoing`, label **Annuler**, section **Demandes envoyées**
+- [x] Erreurs : réutiliser `friends_guest` `friends_self` `friends_not_found` ; no-op si rien à annuler (pas d’erreur métier obligatoire)
+- [x] Tests source palier 0 [`tests/featureFriends03-00.test.js`](../tests/featureFriends03-00.test.js)
+
+**Palier 0 terminé.** Pas de SQL tant que ce palier n’était pas coché. **Ensuite palier 1.**
+
+### Palier 1 — SQL
+
+- [x] [`supabase/feature-friends-03.sql`](../supabase/feature-friends-03.sql) : `cancel_friend_request(p_to uuid)` SECURITY DEFINER
+- [x] `list_outgoing_friend_requests()` : id, to_user_id, display_name, emoji, created_at (profils live)
+- [x] Runbook source [`supabase/tests/feature-friends-03-runbook.sql`](../supabase/tests/feature-friends-03-runbook.sql) (`FRIENDS03_RUNBOOK_OK`) — **ne pas** lancer en prod sur des comptes réels
+- [x] Tests [`tests/featureFriends03Sql.test.js`](../tests/featureFriends03Sql.test.js)
+
+### 1.5 Ops — **à faire par toi**
+
+Même projet live (`ojzxbvpdfnwagrvbhfll`). Pas de nouvelle publication Realtime.
+
+- [x] Appliquer [`supabase/feature-friends-03.sql`](../supabase/feature-friends-03.sql) dans le SQL Editor
+- [x] Runbook : `FRIENDS03_RUNBOOK_OK` — 27 août 2026
+- [x] Consigner dans [`docs/DEPLOYMENTS_SQL.md`](./DEPLOYMENTS_SQL.md) §15
+
+**Palier 1 terminé.** Palier 2 = client sans UI. **Ne pas** relancer le runbook.
+
+### Palier 2 — Client sans UI
+
+- [x] Wrappers RPC + cache outgoing (comme incoming)
+- [x] Catch-up Realtime DELETE déjà là : rafraîchir overlay / outgoing
+- [x] Invité : zéro RPC
+- [x] Tests Node [`tests/featureFriends03-02.test.js`](../tests/featureFriends03-02.test.js)
+
+**Palier 2 terminé.** Pas d’écran modifié. Pas de QA. Ensuite palier 3.
+
+### Palier 3 — UI
+
+- [x] Roster waiting room : **Annuler** à la place d’**Envoyée** figé
+- [x] Page Amis : section **Demandes envoyées** au-dessus de **Tes amis** (sous les demandes reçues)
+- [x] Après Annuler : **+ Ami** (roster) / ligne disparaît (page Amis)
+- [x] Tests source (markup / actions) [`tests/featureFriends03-03.test.js`](../tests/featureFriends03-03.test.js)
+
+**Palier 3 terminé.** **QA téléphone = palier 4.**
+
+### Palier 4 — QA terrain
+
+À faire **toi** (2 comptes inscrits).
+
+- [ ] A envoie, annule dans le lobby : B ne voit plus la popup ; A revoit **+ Ami**
+- [ ] A envoie, sort du lobby, annule depuis Amis : même effet
+- [ ] B refuse toujours silencieux pour A ; cooldown 60 s **inchangé** (seulement après refus)
+- [ ] Invité : pas d’Annuler
+- [ ] Chat : aucune ligne
+
+### Palier 5 — Docs / Pages
+
+- [ ] [`docs/DEPLOYMENTS_SQL.md`](./DEPLOYMENTS_SQL.md) + Realtime inchangé (`friend_requests` déjà on)
+- [ ] Client web Pages (`main`) ; **pas** le 1.0.0 App Store
+
+---
+
+## Phase 4 — Vous venez de jouer avec (FEATURE-FRIENDS-04)
+
+Le roster **disparaît** à la dissolution (`lobby_members` CASCADE). Sans table dédiée, on ne peut plus ajouter après la soirée.
+
+Liste courte sur la page Amis : joueurs **inscrits** avec qui on a **partagé un lobby**, fenêtre **24 h après la fin du chevauchement**. Ce n’est **pas** une recherche, **pas** des suggestions de inconnus.
+
+On ne commence **pas** tant que FEATURE-FRIENDS-03 n’est pas close (sauf mention contraire). QA téléphone après l’UI. Légal in-app **avant** la recette (nouvelle donnée).
+
+### Avancement
+
+- [ ] **0** Contrats
+- [ ] **1** SQL
+- [ ] **2** Client sans UI
+- [ ] **3** UI page Amis
+- [ ] **4** Légal in-app + OVH
+- [ ] **5** QA terrain
+- [ ] **6** Docs / Pages — **pas** le 1.0.0 App Store
+
+**Prochain après F03 : palier 0** FEATURE-FRIENDS-04. Dire *« on fait le palier 0 (croisés récents) »*.
+
+### Règles figées (ne pas rediscuter)
+
+- **Déjà croisés seulement.** Une paire n’existe que si les deux ont été `lobby_members` du **même** lobby vivant, **tous les deux inscrits**. Jamais un invité. Jamais quelqu’un jamais vu en salon.
+- **Pas de recherche**, pas de suggestions, pas d’amis d’amis, pas de fil.
+- Fenêtre : **24 h après** qu’ils aient cessé d’être co-membres (leave / dissolve). Tant qu’ils sont **encore** dans le même lobby : **pas** dans cette liste (le **+ Ami** reste le roster).
+- `lobby_members` CASCADE à la mort du lobby → table dédiée `lobby_encounters` (paire ordonnée `user_a < user_b`, `last_shared_at`). Écriture **serveur** (trigger membership), **pas** d’INSERT client. Purge opportuniste `last_shared_at < now() - 24h`. CASCADE compte.
+- RPC `list_recent_lobby_peers()` : profils live (pseudo / emoji), **sans** code lobby, **sans** `lobby_id`. Client : SELECT via RPC seulement.
+- Déjà **amis** → omis (ils sont dans **Tes amis**). Pending in/out → **Accepter** / **Envoyée** (ou **Annuler** si F03 live). Sinon **+ Ami** = `send_friend_request` existant (cooldown refus inchangé).
+- Copy : section **Vous venez de jouer avec** · vide *« Personne récemment. »*
+- Canal inchangé. Jamais `lobby_messages`. Pas de présence, push, QR, `#join=`.
+- Stores : **ne pas** toucher App Privacy / Play Data safety tant que ce n’est pas le build qui embarque la feature (comme F01 palier 8 / F02 palier 7).
+
+### Hors scope
+
+- Recherche / suggestions / invités
+- Historique > 24 h, nom du salon, code
+- Présence online
+- Bouton *« Ajouter tout le lobby »* (idée écartée pour l’instant)
+
+### Palier 0 — Contrats avant code
+
+- [ ] Ticket : **FEATURE-FRIENDS-04**
+- [ ] Config dédiée [`js/config/recentPeers.js`](../js/config/recentPeers.js) (fenêtre 24 h, RPC, copy, qui apparaît)
+- [ ] Tests source palier 0
+
+**Fait quand** : contrats + tests verts. Pas de SQL avant.
+
+### Palier 1 — SQL
+
+- [ ] [`supabase/feature-friends-04.sql`](../supabase/feature-friends-04.sql) : table + trigger `lobby_members` INSERT/DELETE + RPC list + purge
+- [ ] Pas dans Realtime (liste au catch-up / ouverture page Amis ; optionnel plus tard)
+- [ ] Runbook staging (`FRIENDS04_RUNBOOK_OK`) — **ne pas** lancer en prod sur des comptes réels
+- [ ] Tests SQL source
+
+### Palier 2 — Client sans UI
+
+- [ ] Wrapper `list_recent_lobby_peers` + cache mémoire (pas `localStorage`)
+- [ ] Invité : zéro RPC
+- [ ] Tests Node
+
+### Palier 3 — UI
+
+- [ ] Page Amis : section **Vous venez de jouer avec** (après demandes, avant **Tes amis**)
+- [ ] Actions **+ Ami** / **Envoyée** / **Annuler** (F03) / **Accepter** — pas **Inviter** ici (pas un graphe d’invites)
+- [ ] Tests source
+
+### Palier 4 — Légal
+
+Nouvelle donnée : identifiants de joueurs croisés, **éphémères 24 h**, cascade compte.
+
+- [ ] [`data/legalContent.js`](../data/legalContent.js) + recopie OVH `privacy.html`
+- [ ] Stores : prochain build qui embarque la feature — **ne pas** modifier les fiches maintenant
+- [ ] Tests source légal
+
+### Palier 5 — QA terrain
+
+- [ ] Deux inscrits quittent / dissolvent : chacun voit l’autre 24 h, **+ Ami** marche
+- [ ] Encore dans le même lobby : absent de la section (roster seulement)
+- [ ] Invité jamais listé ; déjà ami jamais listé
+- [ ] Après 24 h : disparu
+- [ ] Chat : aucune ligne
+
+### Palier 6 — Docs / Pages
+
+- [ ] [`docs/DEPLOYMENTS_SQL.md`](./DEPLOYMENTS_SQL.md) · [`docs/SUPABASE.md`](./SUPABASE.md)
+- [ ] Client web Pages ; **pas** le 1.0.0 App Store
 
 ---
 
@@ -458,6 +646,12 @@ SQL déjà sur le projet live au palier 1. Ici : client web + docs, **pas** le 1
 | 17 | F02-5 | Popup + badge *(fait)* |
 | 18 | F02-6 | Join sans code *(fait)* |
 | 19 | F02-7 | Légal in-app + OVH *(validé)* |
-| 20 | F02-8–9 | QA, prod |
+| 20 | F02-8 | QA terrain *(validé)* |
+| 21 | F02-9 | Docs / Pages *(validé — même projet, SQL palier 1)* |
+| 22 | F03-0 | Contrats **Annuler** demande *(fait)* |
+| 23 | F03-1 | SQL `cancel_friend_request` *(validé runbook)* |
+| 24 | F03-2 | Module client *(fait)* |
+| 25 | F03-3 | UI **Annuler** *(fait)* |
+| 26 | F04-0 | Contrats croisés 24 h *(après F03)* |
 
-Pour implémenter : dire **« on fait le palier 8 »** (QA terrain, 2 comptes).
+**Prochain : FEATURE-FRIENDS-03 palier 4** (QA terrain, 2 comptes). Stores : **pas** le 1.0.0 App Store.

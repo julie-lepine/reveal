@@ -3,7 +3,11 @@
  * Le graphe n’est pas écrit dans le persist app : source de vérité = serveur.
  */
 import { FRIEND_OVERLAY } from "../config/friends.js";
-import { normalizeFriendRow, normalizeIncomingRequestRow } from "./friendsLogic.js";
+import {
+  normalizeFriendRow,
+  normalizeIncomingRequestRow,
+  normalizeOutgoingRequestRow,
+} from "./friendsLogic.js";
 
 let overlayLobbyId = null;
 /** @type {Record<string, string>} */
@@ -12,6 +16,8 @@ let overlayByUserId = Object.create(null);
 let friends = [];
 /** @type {Array<{ id: string, fromUserId: string, name: string, emoji: string, createdAt: string|null }>} */
 let incoming = [];
+/** @type {Array<{ id: string, toUserId: string, name: string, emoji: string, createdAt: string|null }>} */
+let outgoing = [];
 const cacheListeners = new Set();
 
 function emitFriendsCacheUpdated() {
@@ -35,6 +41,7 @@ export function clearFriendsCache() {
   overlayByUserId = Object.create(null);
   friends = [];
   incoming = [];
+  outgoing = [];
   emitFriendsCacheUpdated();
 }
 
@@ -91,4 +98,41 @@ export function getIncomingFriendRequests() {
 
 export function getIncomingFriendRequestCount() {
   return incoming.length;
+}
+
+export function setOutgoingFriendRequests(rows) {
+  outgoing = (Array.isArray(rows) ? rows : [])
+    .map(normalizeOutgoingRequestRow)
+    .filter(Boolean);
+  emitFriendsCacheUpdated();
+}
+
+export function getOutgoingFriendRequests() {
+  return outgoing.slice();
+}
+
+export function getOutgoingFriendRequestCount() {
+  return outgoing.length;
+}
+
+export function isOutgoingFriendRequestPending(toUserId) {
+  if (!toUserId) return false;
+  return outgoing.some((row) => row.toUserId === toUserId);
+}
+
+/** Optimistic send (page Amis palier 3). */
+export function markOutgoingFriendPending(toUserId) {
+  if (!toUserId) return;
+  if (isOutgoingFriendRequestPending(toUserId)) return;
+  outgoing = [
+    ...outgoing,
+    { id: `opt:${toUserId}`, toUserId, name: "Joueur", emoji: "👤", createdAt: null },
+  ];
+  emitFriendsCacheUpdated();
+}
+
+export function removeOutgoingFriendRequest(toUserId) {
+  if (!toUserId) return;
+  outgoing = outgoing.filter((row) => row.toUserId !== toUserId);
+  emitFriendsCacheUpdated();
 }

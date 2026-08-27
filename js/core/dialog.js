@@ -454,6 +454,7 @@ export async function showLobbyPlayersManageDialog({
   guestHintHtml = "",
   onFriendAdd,
   onFriendAccept,
+  onFriendCancel,
   subscribeUpdates,
 } = {}) {
   for (;;) {
@@ -524,6 +525,13 @@ export async function showLobbyPlayersManageDialog({
         const acceptBtn = e.target.closest("[data-friend-accept]");
         if (acceptBtn && typeof onFriendAccept === "function") {
           void Promise.resolve(onFriendAccept(acceptBtn.getAttribute("data-friend-accept"))).then(
+            paintList
+          );
+          return;
+        }
+        const cancelBtn = e.target.closest("[data-friend-cancel]");
+        if (cancelBtn && typeof onFriendCancel === "function") {
+          void Promise.resolve(onFriendCancel(cancelBtn.getAttribute("data-friend-cancel"))).then(
             paintList
           );
         }

@@ -10,7 +10,7 @@ import {
   FRIEND_LABEL,
   FRIEND_OVERLAY,
   FRIEND_ROSTER_ACTION,
-  FRIEND_RPC,
+  FRIEND_RPC_F01,
   FRIEND_RPC_ERROR,
   rosterActionFromOverlay,
 } from "../js/config/friends.js";
@@ -48,7 +48,7 @@ describe("FEATURE-FRIENDS-01 Palier 2 — client", () => {
 
   it("supabaseFriends : RPC du contrat, pas de chat lobby, pas d’écran", () => {
     const src = read("js/core/supabaseFriends.js");
-    for (const name of Object.values(FRIEND_RPC)) {
+    for (const name of Object.values(FRIEND_RPC_F01)) {
       assert.match(src, new RegExp(`FRIEND_RPC\\.\\w+|${name}`));
     }
     assert.match(src, /p_to/);
@@ -97,8 +97,9 @@ describe("FEATURE-FRIENDS-01 Palier 2 — client", () => {
     assert.equal(rosterLabelFromAction(FRIEND_ROSTER_ACTION.hintGuest), FRIEND_LABEL.guestCard);
     assert.equal(
       rosterActionFromOverlay(FRIEND_OVERLAY.pendingOut, { localIsRegistered: true }),
-      FRIEND_ROSTER_ACTION.sent
+      FRIEND_ROSTER_ACTION.cancel
     );
+    assert.equal(rosterLabelFromAction(FRIEND_ROSTER_ACTION.cancel), FRIEND_LABEL.cancelRequest);
     assert.equal(rosterLabelFromAction(FRIEND_ROSTER_ACTION.sent), FRIEND_LABEL.sent);
     assert.equal(
       rosterActionForPeer(FRIEND_OVERLAY.pendingIn, true),

@@ -3630,6 +3630,11 @@ button.emoji-picker-preview__avatar:active{
   color:#bbf7d0;
 }
 
+.participant__friend-btn--cancel{
+  background:rgba(255,255,255,.08);
+  color:rgba(255,255,255,.72);
+}
+
 .participant__friend-btn:active{
   transform:scale(.97);
 }

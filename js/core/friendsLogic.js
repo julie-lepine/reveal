@@ -63,6 +63,8 @@ export function rosterLabelFromAction(action) {
       return FRIEND_LABEL.add;
     case FRIEND_ROSTER_ACTION.sent:
       return FRIEND_LABEL.sent;
+    case FRIEND_ROSTER_ACTION.cancel:
+      return FRIEND_LABEL.cancelRequest;
     case FRIEND_ROSTER_ACTION.accept:
       return FRIEND_LABEL.accept;
     case FRIEND_ROSTER_ACTION.friend:
@@ -103,6 +105,25 @@ export function normalizeIncomingRequestRow(row) {
   };
 }
 
+export function normalizeOutgoingRequestRow(row) {
+  if (!row) return null;
+  const toUserId = row.to_user_id || row.toUserId;
+  const id = row.id;
+  if (!toUserId || !id) return null;
+  return {
+    id,
+    toUserId,
+    name: row.display_name || row.name || "Joueur",
+    emoji: row.emoji || "👤",
+    createdAt: row.created_at || row.createdAt || null,
+  };
+}
+
+export function isOutgoingFriendPending(outgoing, toUserId) {
+  if (!toUserId) return false;
+  return (outgoing || []).some((row) => row.toUserId === toUserId);
+}
+
 /** Quatre écoutes : incoming + outgoing requests, friendships des deux côtés. */
 export function friendsRealtimeChangeSpecs(userId) {
   if (!userId) return [];
@@ -116,19 +137,20 @@ export function friendsRealtimeChangeSpecs(userId) {
 
 /**
  * Catch-up HTTP après event Realtime.
- * Overlay seulement en lobby. Incoming + liste amis toujours (popup palier 5).
+ * Overlay seulement en lobby. Incoming + outgoing + liste amis toujours.
  */
 export function friendsCatchupPlan({ inLobby, lobbyId } = {}) {
   return {
     overlay: Boolean(inLobby && lobbyId),
     incoming: true,
+    outgoing: true,
     friends: true,
   };
 }
 
 /**
  * Action roster waiting room. `omit` = rien sur la carte (soi, loading, local invité).
- * @returns {"omit"|"hint_guest"|"add"|"sent"|"accept"|"friend"}
+ * @returns {"omit"|"hint_guest"|"add"|"sent"|"accept"|"friend"|"cancel"}
  */
 export function peerFriendRosterKind(overlayStatus, { isLocal, userId, localIsRegistered } = {}) {
   if (isLocal || !userId) return "omit";

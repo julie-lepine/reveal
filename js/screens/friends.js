@@ -1,7 +1,7 @@
 /**
  * FEATURE-FRIENDS-01 Palier 6–7 — page Amis (demandes + liste + unfriend).
  * FEATURE-FRIENDS-02 Palier 4 — Inviter / invitations de soirée.
- * Découverte toujours via le lobby, pas de recherche.
+ * FEATURE-FRIENDS-03 Palier 3 — Demandes envoyées / Annuler.
  */
 import {
   FRIEND_LABEL,
@@ -27,6 +27,7 @@ import {
 import {
   getIncomingFriendRequests,
   getMyFriends,
+  getOutgoingFriendRequests,
   onFriendsCacheUpdated,
   patchLobbyFriendOverlayStatus,
 } from "../core/friendsState.js";
@@ -47,9 +48,11 @@ import {
 import { unfriendConfirmCopy } from "../core/friendsLogic.js";
 import {
   acceptFriendRequest,
+  cancelFriendRequest,
   declineFriendRequest,
   fetchIncomingFriendRequests,
   fetchMyFriends,
+  fetchOutgoingFriendRequests,
   unfriendUser,
 } from "../core/supabaseFriends.js";
 import {
@@ -59,6 +62,17 @@ import {
 } from "../core/supabaseLobbyInvites.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
 import { bindNav } from "./nav.js";
+
+function outgoingRowHtml(row) {
+  return `
+    <div class="friends-row" data-friend-to="${escapeHtml(row.toUserId)}">
+      <span class="friends-row__avatar" aria-hidden="true">${escapeHtml(row.emoji || "👤")}</span>
+      <span class="friends-row__name">${escapeHtml(row.name || "Joueur")}</span>
+      <div class="friends-row__actions">
+        <button type="button" class="btn btn-secondary btn--compact" data-friend-cancel="${escapeHtml(row.toUserId)}">${escapeHtml(FRIEND_LABEL.cancelRequest)}</button>
+      </div>
+    </div>`;
+}
 
 function incomingRowHtml(row) {
   return `
@@ -136,6 +150,7 @@ function guestPanelHtml() {
 function listsHtml() {
   const lobbyInvites = getIncomingLobbyInvites();
   const incoming = getIncomingFriendRequests();
+  const outgoing = getOutgoingFriendRequests();
   const friends = getMyFriends();
   const localInLobby = hasActiveLobby();
   const lobbyId = getLobby()?.id || null;
@@ -158,6 +173,9 @@ function listsHtml() {
   const incomingBody = incoming.length
     ? incoming.map(incomingRowHtml).join("")
     : `<p class="hint friends-empty__hint" data-friends-incoming-empty>${escapeHtml(FRIEND_LABEL.incomingEmpty)}</p>`;
+  const outgoingBody = outgoing.length
+    ? outgoing.map(outgoingRowHtml).join("")
+    : `<p class="hint friends-empty__hint" data-friends-outgoing-empty>${escapeHtml(FRIEND_LABEL.outgoingEmpty)}</p>`;
   const friendsBody = friends.length
     ? friends.map((row) => friendRowHtml(row, inviteCtx)).join("")
     : `<p class="hint friends-empty__hint" data-friends-list-empty>${escapeHtml(FRIEND_LABEL.friendsEmpty)}</p>`;
@@ -172,6 +190,10 @@ function listsHtml() {
     <section class="card settings-section" data-friends-incoming>
       <h2 class="settings-section__title">${escapeHtml(FRIEND_LABEL.incomingSection)}</h2>
       ${incomingBody}
+    </section>
+    <section class="card settings-section" data-friends-outgoing>
+      <h2 class="settings-section__title">${escapeHtml(FRIEND_LABEL.outgoingSection)}</h2>
+      ${outgoingBody}
     </section>
     <section class="card settings-section" data-friends-list>
       <h2 class="settings-section__title">${escapeHtml(FRIEND_LABEL.friendsSection)}</h2>
@@ -223,6 +245,12 @@ export function mountFriends(app) {
       const refuseBtn = e.target.closest("[data-friend-refuse]");
       if (refuseBtn) {
         void onRefuse(refuseBtn.getAttribute("data-friend-refuse"));
+      }
+    });
+    app.querySelector("[data-friends-outgoing]")?.addEventListener("click", (e) => {
+      const cancelBtn = e.target.closest("[data-friend-cancel]");
+      if (cancelBtn) {
+        void onCancelOutgoing(cancelBtn.getAttribute("data-friend-cancel"));
       }
     });
     app.querySelector("[data-friends-list]")?.addEventListener("click", (e) => {
@@ -290,6 +318,30 @@ export function mountFriends(app) {
       return;
     }
     await showAppAlert(res?.error?.message || "Impossible de refuser.", {
+      title: FRIEND_LABEL.pageTitle,
+      icon: "⚠️",
+    });
+  }
+
+  async function onCancelOutgoing(toUserId) {
+    if (!toUserId || !isLoggedIn()) return;
+    const run = await actionLock.run(async () => {
+      try {
+        return await cancelFriendRequest(toUserId);
+      } catch (err) {
+        return { ok: false, error: err };
+      }
+    });
+    if (!mount.isMounted()) return;
+    if (run.skipped) return;
+    const res = run.value;
+    if (res?.ok || res?.skipped) {
+      await fetchOutgoingFriendRequests();
+      if (!mount.isMounted()) return;
+      paint();
+      return;
+    }
+    await showAppAlert(res?.error?.message || "Impossible d'annuler.", {
       title: FRIEND_LABEL.pageTitle,
       icon: "⚠️",
     });
@@ -450,6 +502,7 @@ export function mountFriends(app) {
   if (isLoggedIn()) {
     void Promise.all([
       fetchIncomingFriendRequests(),
+      fetchOutgoingFriendRequests(),
       fetchMyFriends(),
       fetchIncomingLobbyInvites(),
       fetchOutgoingLobbyInvites(),

@@ -7,7 +7,7 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
-  FRIEND_RPC,
+  FRIEND_RPC_F01,
   FRIEND_RPC_ERROR,
   FRIENDS_TABLE,
   FRIEND_OVERLAY_STATUSES,
@@ -25,7 +25,7 @@ describe("FEATURE-FRIENDS-01 Palier 1 — SQL source", () => {
     for (const table of Object.values(FRIENDS_TABLE)) {
       assert.match(sql, new RegExp(`create table if not exists public\\.${table}`));
     }
-    for (const name of Object.values(FRIEND_RPC)) {
+    for (const name of Object.values(FRIEND_RPC_F01)) {
       assert.match(sql, new RegExp(`create or replace function public\\.${name}`));
       assert.match(sql, new RegExp(`grant execute on function public\\.${name}`));
     }

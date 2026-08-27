@@ -13,7 +13,7 @@ import {
   FRIENDS_TABLE,
   FRIEND_OVERLAY,
   FRIEND_OVERLAY_STATUSES,
-  FRIEND_RPC,
+  FRIEND_RPC_F01,
   FRIEND_RPC_ERROR,
   FRIEND_REQUEST_COOLDOWN_MS,
   FRIEND_LABEL,
@@ -54,7 +54,7 @@ describe("FEATURE-FRIENDS-01 Palier 0 — contrats", () => {
   });
 
   it("RPC + erreurs métier figées (cooldown silencieux)", () => {
-    assert.deepEqual(FRIEND_RPC, {
+    assert.deepEqual(FRIEND_RPC_F01, {
       send: "send_friend_request",
       decline: "decline_friend_request",
       accept: "accept_friend_request",
@@ -77,7 +77,7 @@ describe("FEATURE-FRIENDS-01 Palier 0 — contrats", () => {
     );
     assert.equal(
       rosterActionFromOverlay(FRIEND_OVERLAY.pendingOut, { localIsRegistered: true }),
-      FRIEND_ROSTER_ACTION.sent
+      FRIEND_ROSTER_ACTION.cancel
     );
     assert.equal(
       rosterActionFromOverlay(FRIEND_OVERLAY.pendingIn, { localIsRegistered: true }),
@@ -122,7 +122,7 @@ describe("FEATURE-FRIENDS-01 Palier 0 — contrats", () => {
   });
 
   it("docs/FRIENDS.md nomme les mêmes RPC et l’écran friends", () => {
-    for (const name of Object.values(FRIEND_RPC)) {
+    for (const name of Object.values(FRIEND_RPC_F01)) {
       assert.match(friendsDoc, new RegExp(name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
     }
     assert.match(friendsDoc, /js\/screens\/friends\.js/);

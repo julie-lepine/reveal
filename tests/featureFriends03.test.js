@@ -51,11 +51,13 @@ describe("FEATURE-FRIENDS-01 Palier 3 — realtime", () => {
     assert.deepEqual(friendsCatchupPlan({ inLobby: true, lobbyId: "L" }), {
       overlay: true,
       incoming: true,
+      outgoing: true,
       friends: true,
     });
     assert.deepEqual(friendsCatchupPlan({ inLobby: false, lobbyId: null }), {
       overlay: false,
       incoming: true,
+      outgoing: true,
       friends: true,
     });
   });
@@ -67,6 +69,7 @@ describe("FEATURE-FRIENDS-01 Palier 3 — realtime", () => {
     assert.match(rt, /removeChannel/);
     assert.match(rt, /fetchLobbyFriendOverlay/);
     assert.match(rt, /fetchIncomingFriendRequests/);
+    assert.match(rt, /fetchOutgoingFriendRequests/);
     assert.doesNotMatch(rt, /lobby_messages/);
     assert.doesNotMatch(rt, /lobby:\$\{/);
   });

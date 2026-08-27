@@ -43,6 +43,7 @@ import { syncFriendsEntryBadges, flushFriendRequestNotice } from "../core/friend
 import { friendRosterActionHtml, lobbyFriendsHintHtml } from "../core/friendsRosterUi.js";
 import {
   acceptLobbyFriendRequest,
+  cancelLobbyFriendRequest,
   sendLobbyFriendRequest,
 } from "../core/lobbyFriendActions.js";
 import { onFriendsCacheUpdated } from "../core/friendsState.js";
@@ -529,6 +530,14 @@ export function mountSettings(app) {
           onFriendAccept: async (userId) => {
             const run = await friendLock.run(() =>
               acceptLobbyFriendRequest(userId, getLobby()?.id)
+            );
+            if (run.skipped) return;
+            const res = run.value;
+            if (res?.ok || res?.skipped) return;
+          },
+          onFriendCancel: async (userId) => {
+            const run = await friendLock.run(() =>
+              cancelLobbyFriendRequest(userId, getLobby()?.id)
             );
             if (run.skipped) return;
             const res = run.value;
