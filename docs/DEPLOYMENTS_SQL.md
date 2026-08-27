@@ -86,6 +86,7 @@ Sources : audit SQL du dépôt (`AUDIT-SQL-01`) + docs ops ([`SUPABASE.md`](./SU
 | Historique (date inconnue) | [`lobby-membership-e5-01-dissolve-lobby-atomically.sql`](../supabase/lobby-membership-e5-01-dissolve-lobby-atomically.sql) | Membership E5 | ✅ probable | ✅ probable | [`lobby-membership-e5-RUNBOOK.sql`](../supabase/lobby-membership-e5-RUNBOOK.sql) · [`lobby-membership-e5-staging-harness.sql`](../supabase/lobby-membership-e5-staging-harness.sql) | QA staging + terrain 2026-07-28 (doc audit) |
 | Historique (date inconnue) | [`create-lobby-member.sql`](../supabase/create-lobby-member.sql) | Snapshot prod | ❌ | ❌ | — | Legacy / snapshot — **ne pas réappliquer** (réactive create legacy) |
 | Historique (date inconnue) | [`fil-rouge-private.sql`](../supabase/fil-rouge-private.sql) | Fil Rouge abandonné | ❌ (ne plus déployer) | ❌ table live retirée | — | Historique uniquement · **DROP** via [`cleanup-filrouge-02-remove-server-legacy.sql`](../supabase/cleanup-filrouge-02-remove-server-legacy.sql) ✅ 2026-08-07 |
+| 2026-08-27 | [`feature-friends-01.sql`](../supabase/feature-friends-01.sql) | FEATURE-FRIENDS-01 | ✅ | ✅ | [`feature-friends-01-runbook.sql`](../supabase/tests/feature-friends-01-runbook.sql) | Un seul projet live · runbook **staging only** · voir §13 |
 
 **Hors migrations (tracés ailleurs si besoin)** : préflight [`lobby-membership-e4-00-preflight-duplicates.sql`](../supabase/lobby-membership-e4-00-preflight-duplicates.sql) (lecture seule) ; runbooks / harness sous [`supabase/tests/`](../supabase/tests/) et [`lobby-membership-e4-RUNBOOK.sql`](../supabase/lobby-membership-e4-RUNBOOK.sql) / [`lobby-membership-e5-RUNBOOK.sql`](../supabase/lobby-membership-e5-RUNBOOK.sql) — ce ne sont pas des migrations. Voir aussi [`lobby-membership-e4-tests-manual.sql`](../supabase/lobby-membership-e4-tests-manual.sql).
 
@@ -308,12 +309,14 @@ Premier palier Premium (2,99 €) : entitlement serveur, **sans IAP** pour l’i
 
 Tables `friend_requests` / `friendships` / `friend_request_cooldowns` + RPC. Découverte lobby only. Pas de fil public.
 
+Un seul projet Supabase (`ojzxbvpdfnwagrvbhfll`) : staging QA = prod app.
+
 | Élément | Valeur |
 | ------- | ------ |
-| Migration | [`feature-friends-01.sql`](../supabase/feature-friends-01.sql) — **✅ staging** (27 août 2026, dont hotfix `friends_lock_pair` 1-arg) · **prod : ne pas appliquer** avant Palier 9–10 |
-| Runbook | [`tests/feature-friends-01-runbook.sql`](../supabase/tests/feature-friends-01-runbook.sql) — **`FRIENDS01_RUNBOOK_OK`** |
+| Migration | [`feature-friends-01.sql`](../supabase/feature-friends-01.sql) — **✅** 27 août 2026 (dont hotfix `friends_lock_pair` 1-arg) |
+| Runbook | [`tests/feature-friends-01-runbook.sql`](../supabase/tests/feature-friends-01-runbook.sql) — **`FRIENDS01_RUNBOOK_OK`** (staging, **ne pas relancer**) |
 | Realtime | `friend_requests` + `friendships` on (Publications). Pas les cooldowns |
-| Client | Paliers 2+ dans [`FRIENDS.md`](./FRIENDS.md) — pas encore branché |
+| Client | [`FRIENDS.md`](./FRIENDS.md) Palier 10 — web Pages ; pas le build App Store 1.0.0 en review |
 | Hors scope | Invites lobby (FEATURE-FRIENDS-02) · push · DM |
 
-**Statut** : SQL + runbook **staging ✅** · palier 2 débloqué · prod ⏳.
+**Statut** : SQL + Realtime **✅ prod** (même projet) · Palier 10 **27 août 2026**.

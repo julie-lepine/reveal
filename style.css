@@ -3035,6 +3035,25 @@ select.field-input option{
   margin-top:4px;
 }
 
+.auth-welcome__nav{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+  width:100%;
+}
+
+.auth-welcome__nav .btn{
+  margin:0;
+  width:100%;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+
+.auth-welcome__actions .btn-link{
+  margin-top:2px;
+}
+
 .page-title{
   font-size:26px;
   font-weight:800;

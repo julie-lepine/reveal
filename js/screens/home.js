@@ -950,8 +950,10 @@ export function mountHome(app) {
           <div class="auth-welcome card">
             <p class="auth-welcome__hi">Salut, <strong>${escapeHtml(user.name)}</strong> 👋</p>
             <div class="auth-welcome__actions">
-              <button type="button" class="btn btn-secondary btn--compact" data-nav="settings">Menu</button>
-              <button type="button" class="btn btn-secondary btn--compact friends-entry" data-nav="${FRIENDS_SCREEN_ID}" data-friends-entry="${FRIENDS_ENTRY.homeLoggedIn}">${FRIEND_LABEL.entryHome}<span class="friends-badge" data-friends-badge hidden aria-hidden="true"></span></button>
+              <div class="auth-welcome__nav">
+                <button type="button" class="btn btn-secondary btn--compact" data-nav="settings">Menu</button>
+                <button type="button" class="btn btn-secondary btn--compact friends-entry" data-nav="${FRIENDS_SCREEN_ID}" data-friends-entry="${FRIENDS_ENTRY.homeLoggedIn}">${FRIEND_LABEL.entryHome}<span class="friends-badge" data-friends-badge hidden aria-hidden="true"></span></button>
+              </div>
               <button type="button" class="btn-link" id="btn-logout">Se déconnecter</button>
             </div>
           </div>`

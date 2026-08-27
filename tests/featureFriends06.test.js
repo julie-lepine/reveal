@@ -53,6 +53,7 @@ describe("FEATURE-FRIENDS-01 Palier 6 — page Amis", () => {
     const home = read("js/screens/home.js");
     assert.match(home, /FRIENDS_SCREEN_ID/);
     assert.match(home, /FRIENDS_ENTRY\.homeLoggedIn/);
+    assert.match(home, /auth-welcome__nav/);
     assert.match(home, /syncFriendsEntryBadges/);
     const nav = read("js/screens/nav.js");
     assert.match(nav, /target === "friends"/);

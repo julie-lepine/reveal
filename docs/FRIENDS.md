@@ -80,7 +80,7 @@ Fichiers à créer :
 - [x] Publications : `friend_requests` + `friendships` on ; `friend_request_cooldowns` off
 - [x] Runbook : `FRIENDS01_RUNBOOK_OK` — 27 août 2026
 - [x] Consigné dans [`docs/DEPLOYMENTS_SQL.md`](./DEPLOYMENTS_SQL.md) §13 (✅ staging)
-- [ ] Prod : **ne pas appliquer** avant Palier 9
+- [x] Prod : **même projet** que l’app live — Palier 10 (27 août 2026)
 
 **Palier 1 staging terminé.** Le palier 2 peut démarrer.
 
@@ -206,7 +206,7 @@ Après les paliers 6–7. Pas de SQL.
 - [x] Invité : pas de **+ Ami** (hint compte, comme palier 4)
 - [x] Tests source + recette : A hôte ou membre envoie depuis Menu pendant Trivia → B : point seulement, puis popup au hub
 
-**Palier 7bis code terminé.** Pas de SQL. Recette : soirée lancée, Menu → Soirée → **Joueurs** (membre inscrit) ou **Gestion des joueurs** (hôte). Envoyer + Ami pendant Trivia → B : badge seulement, popup au retour hub. Kick inchangé (hôte).
+**Palier 7bis validé** (27 août 2026). Menu → Soirée → Joueurs pour tout inscrit ; kick hôte ; pas de popup en manche.
 
 ---
 
@@ -214,15 +214,15 @@ Après les paliers 6–7. Pas de SQL.
 
 Le graphe est une **nouvelle donnée personnelle**. Pas un fil public.
 
-- [ ] [`data/legalContent.js`](../data/legalContent.js)
+- [x] [`data/legalContent.js`](../data/legalContent.js)
   - Données collectées : + *liste d’amis et demandes d’amitié (comptes inscrits)*
   - Suppression de compte : + *demandes et amitiés effacées en cascade*
-  - Date `updated`
-- [ ] Recopie sur le site OVH `privacy.html` (repo séparé, [`docs/LEGAL_SITE_OVH.md`](./LEGAL_SITE_OVH.md))
-- [ ] [`docs/LAUNCH.md`](./LAUNCH.md) UGC : rester sur *No public social feed* ; préciser *private friend list, lobby-only discovery* si on touche la section store
-- [ ] App Privacy Apple / Play Data safety : **uniquement si** on republie un build après cette feature (relations sociales / user IDs) — ne pas modifier les fiches tant que ce n’est pas dans un store build
+  - Date `updated` : 27 août 2026
+- [x] Recopie sur le site OVH `privacy.html` (27 août 2026) — [privacy.html](https://revealthepartygame.fr/privacy.html)
+- [x] [`docs/LAUNCH.md`](./LAUNCH.md) UGC : *No public social feed* + *private friend list, lobby-only discovery*
+- [ ] App Privacy Apple / Play Data safety : **uniquement** au prochain store build qui embarque la feature (relations sociales / user IDs) — ne pas modifier les fiches maintenant
 
-**Fait quand** : politique in-app et page web disent la même chose.
+**Palier 8 validé** (in-app + [site](https://revealthepartygame.fr/privacy.html)). Stores : avec le prochain build.
 
 ---
 
@@ -230,31 +230,35 @@ Le graphe est une **nouvelle donnée personnelle**. Pas un fil public.
 
 Deux téléphones ou deux navigateurs. Lobby code réel.
 
-- [ ] Invité ne peut pas envoyer / recevoir
-- [ ] Inscrit → inscrit : send, popup, accept → page Amis
-- [ ] Refus : A revoit **+ Ami**, aucun texte de refus
-- [ ] A peut renvoyer après cooldown 60 s
-- [ ] Demandes croisées → amis sans double popup bizarre
-- [ ] Rename / change emoji : page Amis affiche la **nouvelle** identité
-- [ ] Kick du lobby : l’amitié **reste**
-- [ ] Fermeture de lobby : demandes pending **restent** (page Amis)
-- [ ] Pendant Draw It / Trivia : pas de modal ami ; **+ Ami** possible via Menu (Palier 7bis)
-- [ ] Logout : plus de channel friends ; autre session ne voit pas les demandes d’un autre user
-- [ ] Suppression de compte (staging) : plus de lignes `friend_requests` / `friendships` pour cet id
-- [ ] Chat lobby : **aucune** ligne générée par ces actions
-- [ ] `npm test` vert
+- [x] Invité ne peut pas envoyer / recevoir
+- [x] Inscrit → inscrit : send, popup, accept → page Amis
+- [x] Refus : A revoit **+ Ami**, aucun texte de refus
+- [x] A peut renvoyer après cooldown 60 s
+- [x] Demandes croisées → amis sans double popup bizarre
+- [x] Rename / change emoji : page Amis affiche la **nouvelle** identité
+- [x] Kick du lobby : l’amitié **reste**
+- [x] Fermeture de lobby : demandes pending **restent** (page Amis)
+- [x] Pendant Draw It / Trivia : pas de modal ami ; **+ Ami** possible via Menu (Palier 7bis)
+- [x] Logout : plus de channel friends ; autre session ne voit pas les demandes d’un autre user
+- [x] Suppression de compte (staging) : plus de lignes `friend_requests` / `friendships` pour cet id
+- [x] Chat lobby : **aucune** ligne générée par ces actions
+- [x] `npm test` vert
 
-**Fait quand** : liste ci-dessus cochée. Alors seulement Palier 10 prod.
+**Palier 9 validé** (27 août 2026). Alors seulement Palier 10 prod.
 
 ---
 
 ## Palier 10 — Production
 
-- [ ] Appliquer `feature-friends-01.sql` sur le projet Supabase **prod**
-- [ ] Activer Replication Realtime `friend_requests` + `friendships`
-- [ ] Ligne ✅ dans [`docs/DEPLOYMENTS_SQL.md`](./DEPLOYMENTS_SQL.md)
-- [ ] Mention Realtime dans [`docs/SUPABASE.md`](./SUPABASE.md) §1
-- [ ] Déployer le client (web / store selon le train de release en cours — **ne pas** coller ça dans le build App Store 1.0.0 déjà en review)
+Un seul projet Supabase (`ojzxbvpdfnwagrvbhfll`) : Live Server, GitHub Pages et apps natives. Les deux SQL du palier 1 **sont** déjà sur ce projet. Rien d’autre à coller.
+
+- [x] [`feature-friends-01.sql`](../supabase/feature-friends-01.sql) — appliqué (27 août 2026). **Ne pas** relancer le runbook (blocs 1–3 mutent des comptes de test ; marqué *INTERDIT EN PRODUCTION*). Catalogue lecture seule (bloc 0) OK si besoin.
+- [x] Realtime `friend_requests` + `friendships` (pas `friend_request_cooldowns`) — Palier 1.5
+- [x] Ligne ✅ dans [`docs/DEPLOYMENTS_SQL.md`](./DEPLOYMENTS_SQL.md) §13
+- [x] Mention Realtime dans [`docs/SUPABASE.md`](./SUPABASE.md) §1
+- [x] Client **web** : [Pages](https://julie-lepine.github.io/reveal/) (`main`). Stores : **prochain** build — **pas** le 1.0.0 App Store déjà en review
+
+**Palier 10 validé** (27 août 2026). FEATURE-FRIENDS-01 v1 close. Phase 2 = invitations de lobby, plus tard.
 
 ---
 
@@ -285,8 +289,9 @@ Vague prévue : **FEATURE-FRIENDS-02**.
 | 5 | 5 | Popup + badge *(validé waiting room)* |
 | 6 | 6 | Page Amis *(validé)* |
 | 7 | 7 | Unfriend *(validé)* |
-| 8 | 7bis | + Ami pendant la soirée (Menu → joueurs) |
-| 9 | 8–9 | Légal + QA |
-| 10 | 10 | Prod (quand on choisit le train de release) |
+| 8 | 7bis | + Ami pendant la soirée *(validé)* |
+| 9 | 8 | Légal in-app + OVH *(validé)* ; stores au build |
+| 10 | 9 | QA terrain *(validé)* |
+| 11 | 10 | Prod *(validé — même projet, SQL palier 1)* |
 
 Pour implémenter : ouvrir ce fichier et dire **« on fait le palier N »**.

@@ -86,6 +86,7 @@ Attendre 15 min à 2 h (parfois 24 h) pour la propagation.
 
 - [x] `https://www.revealthepartygame.fr/` → accueil légal (pas « Site en construction ») — 25 août 2026
 - [x] `…/privacy.html` et `…/mentions-legales.html` OK — 25 août 2026 (2,99 € TTC, Google = paiement)
+- [x] `privacy.html` : liste d’amis privée + cascade suppression — 27 août 2026
 - [x] Logo `reveal.png` s’affiche
 - [x] Liens footer entre les pages
 - [x] **Liens téléchargement app** (Play Store / App Store) sur `index.html` — 25 août 2026
@@ -141,3 +142,62 @@ Tu n’uploades plus à la main : chaque push sur le repo met le site à jour (p
 ## Fichiers de ce repo (référence)
 
 L’app principale reste sur GitHub Pages. Le site légal est **un autre dépôt** ; seule l’URL publique dans `data/appConfig.js` doit pointer vers le domaine une fois en ligne.
+
+---
+
+## MAJ `privacy.html` — FEATURE-FRIENDS-01 (27 août 2026)
+
+Source de vérité in-app : [`data/legalContent.js`](../data/legalContent.js) (`updated` : **27 août 2026**).
+
+**Ne pas** modifier les fiches App Privacy Apple / Play Data safety tant qu’un **nouveau store build** n’embarque pas la feature. Ensuite seulement : relations sociales / user IDs, toujours *No public social feed*, *private friend list*, *lobby-only discovery*.
+
+### Prompt à coller dans le repo du site OVH
+
+```
+Tu mets à jour privacy.html du site légal REVEAL (revealthepartygame.fr) pour coller à la politique in-app du 27 août 2026.
+
+Contexte produit (ne pas inventer d’autre graphe social) :
+- REVEAL a une liste d’amis PRIVÉE, comptes inscrits seulement (pas les invités anonymes).
+- Découverte uniquement via le roster d’un lobby privé (code). Pas de recherche de joueurs, pas de fil public, pas de suggestions, pas de DM.
+- Demandes d’amitié + liste d’amis (pseudo / emoji lus depuis le profil). Refus = suppression de la demande.
+- Suppression de compte : les lignes friend_requests, friendships et cooldowns partent en cascade avec auth.users (ON DELETE CASCADE).
+- Ne pas présenter ça comme un réseau social public.
+
+Fichier : privacy.html (et seulement ce fichier, sauf si la date apparaît aussi en footer commun).
+
+1) Date « Dernière mise à jour » → 27 août 2026.
+
+2) Section « Données collectées » — remplacer le paragraphe par :
+
+Selon votre mode d'utilisation, nous pouvons traiter : pseudo et emoji de profil, adresse e-mail (compte enregistré), identifiant de session anonyme (mode invité), liste d’amis et demandes d’amitié (comptes inscrits uniquement ; découverte uniquement dans un lobby privé, sans recherche publique ni fil social), données de jeu (scores, votes, messages de lobby), et données techniques (appareil, logs d'erreur).
+
+3) Section « Finalités » — garder le texte existant (auth, sync, classements, Turnstile, AdMob) et y ajouter, sans retirer IAP/AdMob :
+
+gestion d’une liste d’amis privée (comptes inscrits)
+
+Formulation cible (si le paragraphe actuel est encore celui d’août sans amis) :
+
+Authentification, synchronisation multijoueur en temps réel, affichage des classements, gestion d’une liste d’amis privée (comptes inscrits), prévention des abus (captcha Cloudflare Turnstile), et monétisation par publicités (Google AdMob) sur l'application mobile.
+
+Si la page a déjà RevenueCat / Sans pub dans Finalités, insère seulement la mention liste d’amis privée, ne supprime rien.
+
+4) Section « Suppression de compte » — après « le profil (pseudo, emoji) », ajouter que les demandes d’amitié et amitiés associées sont effacées en cascade. Phrase cible :
+
+Nous effaçons le compte Supabase Auth, le profil (pseudo, emoji), les demandes d’amitié et amitiés associées (suppression en cascade), et les données de jeu associées, sous 30 jours ouvrés.
+
+5) Interdits :
+- Ne pas ajouter de recherche d’utilisateurs, de fil, de messagerie privée, de push marketing.
+- Ne pas changer les prix IAP, AdMob, UMP, contact e-mail, Instagram, liens Play/App Store.
+- Ne pas toucher mentions-legales.html ni suppression-compte.html sauf si un titre de date globale le force (alors 27 août 2026).
+- Conserver HTTPS, footer, CSS, logo.
+
+6) Vérif après MAJ :
+- https://www.revealthepartygame.fr/privacy.html affiche 27 août 2026
+- Ctrl+F « amis » et « cascade » OK
+- Ctrl+F : pas de « recherche de joueurs » / « fil d’actualité » / « réseau social public »
+
+Aligne-toi mot pour mot sur les paragraphes ci-dessus (mêmes apostrophes typographiques si le fichier les utilise déjà).
+```
+
+En ligne (27 août 2026) : [privacy.html](https://revealthepartygame.fr/privacy.html) — liste d’amis, finalités, cascade. Recocher LAUNCH fait.
+

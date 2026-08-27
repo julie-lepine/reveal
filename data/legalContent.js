@@ -8,7 +8,7 @@ import {
 
 export const PRIVACY_POLICY = {
   title: "Politique de confidentialité",
-  updated: "25 août 2026",
+  updated: "27 août 2026",
   sections: [
     {
       heading: "Qui sommes-nous ?",
@@ -16,11 +16,11 @@ export const PRIVACY_POLICY = {
     },
     {
       heading: "Données collectées",
-      body: "Selon votre mode d'utilisation, nous pouvons traiter : pseudo et emoji de profil, adresse e-mail (compte enregistré), identifiant de session anonyme (mode invité), données de jeu (scores, votes, messages de lobby), et données techniques (appareil, logs d'erreur).",
+      body: "Selon votre mode d'utilisation, nous pouvons traiter : pseudo et emoji de profil, adresse e-mail (compte enregistré), identifiant de session anonyme (mode invité), liste d’amis et demandes d’amitié (comptes inscrits uniquement ; découverte uniquement dans un lobby privé, sans recherche publique ni fil social), données de jeu (scores, votes, messages de lobby), et données techniques (appareil, logs d'erreur).",
     },
     {
       heading: "Finalités",
-      body: "Authentification, synchronisation multijoueur en temps réel, affichage des classements, prévention des abus (captcha Cloudflare Turnstile), et monétisation par publicités (Google AdMob) sur l'application mobile.",
+      body: "Authentification, synchronisation multijoueur en temps réel, affichage des classements, gestion d’une liste d’amis privée (comptes inscrits), prévention des abus (captcha Cloudflare Turnstile), et monétisation par publicités (Google AdMob) sur l'application mobile.",
     },
     {
       heading: "Hébergement et sous-traitants",
@@ -40,7 +40,7 @@ export const PRIVACY_POLICY = {
     },
     {
       heading: "Suppression de compte",
-      body: `Les comptes enregistrés (e-mail) peuvent être supprimés à tout moment. Envoyez une demande depuis l'application (Paramètres) ou depuis la page publique de suppression de compte. Nous effaçons le compte Supabase Auth, le profil (pseudo, emoji) et les données de jeu associées, sous 30 jours ouvrés. Le mode invité ne crée pas de compte permanent : les données de session expirent automatiquement.`,
+      body: `Les comptes enregistrés (e-mail) peuvent être supprimés à tout moment. Envoyez une demande depuis l'application (Paramètres) ou depuis la page publique de suppression de compte. Nous effaçons le compte Supabase Auth, le profil (pseudo, emoji), les demandes d’amitié et amitiés associées (suppression en cascade), et les données de jeu associées, sous 30 jours ouvrés. Le mode invité ne crée pas de compte permanent : les données de session expirent automatiquement.`,
     },
     {
       heading: "Vos droits (RGPD)",

@@ -15,7 +15,7 @@ Lancement : [LAUNCH.md](./LAUNCH.md) · Native : [NATIVE.md](./NATIVE.md) · SQL
    - `game_sessions`
    - `lobby_polls` *(Vague 1 sondages — après `lobby-polls.sql`)*
    - `lobby_poll_votes` *(idem)*
-   - `friend_requests` *(FEATURE-FRIENDS-01 — après `feature-friends-01.sql`, staging)*
+   - `friend_requests` *(FEATURE-FRIENDS-01 — après `feature-friends-01.sql`)*
    - `friendships` *(idem — pas `friend_request_cooldowns`)*
 4. Exécute aussi **`supabase/game-sessions.sql`** (multijoueur des jeux). Si les invités ne peuvent pas synchroniser les mini-jeux (erreur `PGRST116` ou `406` sur `PATCH game_sessions`), réexécute au minimum la politique `game_sessions_update` (section `with check`) de ce fichier.
 5. Exécute **`supabase/lobby-lifecycle.sql`** (expiration, heartbeat `last_seen_at`, purge auto — voir § 7bis)
