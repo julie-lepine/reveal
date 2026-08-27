@@ -1,12 +1,14 @@
 /**
- * Canal Realtime `friends:${userId}` (FEATURE-FRIENDS-01 + 02).
- * Pas de topic lobby. Catch-up HTTP coalescé (amis + invitations).
+ * Canal Realtime `friends:${userId}` (FEATURE-FRIENDS-01 + 02 + 03).
+ * Catch-up HTTP coalescé (amis + invitations + croisés F04). Pas de topic lobby.
+ * F04 : liste au catch-up HTTP seulement (pas de postgres_changes dédié).
  */
 import { supabase, isSupabaseConfigured } from "./supabaseClient.js";
 import { getState } from "./state.js";
 import { friendsRealtimeTopic } from "../config/friends.js";
 import { clearFriendsCache } from "./friendsState.js";
 import { clearLobbyInvitesCache } from "./lobbyInvitesState.js";
+import { clearRecentPeersCache } from "./recentPeersState.js";
 import {
   friendsCatchupPlan,
   friendsRealtimeChangeSpecs,
@@ -16,6 +18,7 @@ import {
   lobbyInviteRealtimeChangeSpecs,
   lobbyInvitesCatchupPlan,
 } from "./lobbyInvitesLogic.js";
+import { recentPeersCatchupPlan } from "./recentPeersLogic.js";
 import {
   fetchIncomingFriendRequests,
   fetchLobbyFriendOverlay,
@@ -26,6 +29,7 @@ import {
   fetchIncomingLobbyInvites,
   fetchOutgoingLobbyInvites,
 } from "./supabaseLobbyInvites.js";
+import { fetchRecentLobbyPeers } from "./supabaseRecentPeers.js";
 
 const CATCHUP_MS = 120;
 
@@ -55,6 +59,7 @@ export function stopFriendsRealtime() {
   channelUserId = null;
   clearFriendsCache();
   clearLobbyInvitesCache();
+  clearRecentPeersCache();
 }
 
 function scheduleFriendsCatchup(gen) {
@@ -81,6 +86,7 @@ async function runFriendsCatchup(gen) {
     const invites = lobbyInvitesCatchupPlan();
     if (invites.incoming) await fetchIncomingLobbyInvites();
     if (invites.outgoing) await fetchOutgoingLobbyInvites();
+    if (recentPeersCatchupPlan().list) await fetchRecentLobbyPeers();
   } catch (e) {
     console.warn("[FRIENDS-RT] catch-up", e?.message || e);
   }

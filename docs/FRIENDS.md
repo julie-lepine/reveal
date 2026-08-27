@@ -555,14 +555,14 @@ On ne commence **pas** le palier 1 SQL tant que le palier 0 n’est pas coché. 
 ### Avancement
 
 - [x] **0** Contrats — 27 août 2026
-- [ ] **1** SQL
-- [ ] **2** Client sans UI
-- [ ] **3** UI page Amis
+- [x] **1** SQL — 27 août 2026 (appliqué, même projet)
+- [x] **2** Client sans UI — 27 août 2026
+- [x] **3** UI page Amis — 27 août 2026
 - [ ] **4** Légal in-app + OVH
 - [ ] **5** QA terrain
 - [ ] **6** Docs / Pages — **pas** le 1.0.0 App Store
 
-**Palier 0 terminé.** Pas de SQL tant que ce palier n’était pas coché. **Ensuite palier 1** (`lobby_encounters`). Dire *« on fait le palier 1 (croisés SQL) »*.
+**Palier 3 terminé.** Recette téléphone après palier 4 légal. Stores : **pas** le 1.0.0.
 
 ### Règles figées (ne pas rediscuter)
 
@@ -589,26 +589,41 @@ On ne commence **pas** le palier 1 SQL tant que le palier 0 n’est pas coché. 
 - [x] Config dédiée [`js/config/recentPeers.js`](../js/config/recentPeers.js) (fenêtre 24 h, RPC, copy, qui apparaît)
 - [x] Tests source palier 0 [`tests/featureFriends04-00.test.js`](../tests/featureFriends04-00.test.js)
 
-**Palier 0 terminé.** Pas de SQL tant que ce palier n’était pas coché. **Ensuite palier 1.**
+**Palier 0 terminé.** Palier 1 SQL appliqué.
 
 ### Palier 1 — SQL
 
-- [ ] [`supabase/feature-friends-04.sql`](../supabase/feature-friends-04.sql) : table + trigger `lobby_members` INSERT/DELETE + RPC list + purge
-- [ ] Pas dans Realtime (liste au catch-up / ouverture page Amis ; optionnel plus tard)
-- [ ] Runbook staging (`FRIENDS04_RUNBOOK_OK`) — **ne pas** lancer en prod sur des comptes réels
-- [ ] Tests SQL source
+- [x] [`supabase/feature-friends-04.sql`](../supabase/feature-friends-04.sql) : table + trigger `lobby_members` INSERT/DELETE + RPC list + purge
+- [x] Pas dans Realtime (liste au catch-up / ouverture page Amis ; optionnel plus tard)
+- [x] Runbook staging (`FRIENDS04_RUNBOOK_OK`) — **ne pas** lancer en prod sur des comptes réels
+- [x] Tests SQL source [`tests/featureFriends04Sql.test.js`](../tests/featureFriends04Sql.test.js)
+
+### 1.5 Ops — **fait**
+
+Même projet live (`ojzxbvpdfnwagrvbhfll`). **Ne pas** ajouter `lobby_encounters` à Realtime.
+
+- [x] Appliquer [`supabase/feature-friends-04.sql`](../supabase/feature-friends-04.sql) dans le SQL Editor — 27 août 2026
+- [ ] Runbook : `FRIENDS04_RUNBOOK_OK` — **staging / INTERDIT EN PRODUCTION** (lobby jetable) — **ne pas** lancer
+- [x] Consigner dans [`docs/DEPLOYMENTS_SQL.md`](./DEPLOYMENTS_SQL.md) §17
+
+**Ne pas** lancer le runbook en prod.
 
 ### Palier 2 — Client sans UI
 
-- [ ] Wrapper `list_recent_lobby_peers` + cache mémoire (pas `localStorage`)
-- [ ] Invité : zéro RPC
-- [ ] Tests Node
+- [x] Wrapper [`list_recent_lobby_peers`](../js/core/supabaseRecentPeers.js) + cache mémoire [`recentPeersState.js`](../js/core/recentPeersState.js) (pas `localStorage`)
+- [x] Invité : zéro RPC
+- [x] Catch-up HTTP sur le canal friends (pas de `postgres_changes` `lobby_encounters`)
+- [x] Tests Node [`tests/featureFriends04-02.test.js`](../tests/featureFriends04-02.test.js)
+
+**Palier 2 terminé.** Pas d’écran modifié. Pas de QA. Ensuite palier 3.
 
 ### Palier 3 — UI
 
-- [ ] Page Amis : section **Vous venez de jouer avec** (après demandes, avant **Tes amis**)
-- [ ] Actions **+ Ami** / **Envoyée** / **Annuler** (F03) / **Accepter** — pas **Inviter** ici (pas un graphe d’invites)
-- [ ] Tests source
+- [x] Page Amis : section **Vous venez de jouer avec** (après demandes, avant **Tes amis**)
+- [x] Actions **+ Ami** / **Annuler** (F03) / **Accepter** — pas **Inviter** ici (pas un graphe d’invites)
+- [x] Tests source [`tests/featureFriends04-03.test.js`](../tests/featureFriends04-03.test.js)
+
+**Palier 3 terminé.** Pas de QA tant que le palier 4 légal n’est pas collé. Ensuite palier 4.
 
 ### Palier 4 — Légal
 
@@ -664,6 +679,9 @@ Nouvelle donnée : identifiants de joueurs croisés, **éphémères 24 h**, casc
 | 25 | F03-3 | UI **Annuler** *(fait)* |
 | 26 | F03-4 | QA **Annuler** *(validé 27 août 2026)* · identité Tes amis *(SQL ✅)* |
 | 27 | F03-5 | Docs / Pages *(validé — Annuler + identité, pas le 1.0.0)* |
-| 28 | F04-0 | Contrats croisés 24 h |
+| 28 | F04-0 | Contrats croisés 24 h *(fait)* |
+| 29 | F04-1 | SQL `lobby_encounters` *(validé — même projet, SQL palier 1)* |
+| 30 | F04-2 | Module client sans UI *(fait)* |
+| 31 | F04-3 | UI page Amis croisés *(fait)* |
 
-**Prochain : FEATURE-FRIENDS-04 palier 1** (SQL `lobby_encounters`) **après** le palier 0. Stores : **pas** le 1.0.0 App Store.
+**Prochain : palier 4 légal in-app + OVH. Stores : **pas** le 1.0.0 App Store.

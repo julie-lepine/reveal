@@ -3685,6 +3685,11 @@ button.emoji-picker-preview__avatar:active{
   position:relative;
 }
 
+.settings-section > .friends-entry{
+  margin-top:0;
+  border-color:var(--color-secondary);
+}
+
 .friends-row{
   display:flex;
   align-items:center;

@@ -223,7 +223,7 @@ function personnalisationPanelHtml({ emailAccount, user, selectedEmoji }) {
     <div class="settings-panel" id="settings-panel-personnalisation">
       ${adFreeSettingsCardHtml()}
       <div class="card settings-section">
-        <button type="button" class="btn btn-secondary btn--spaced friends-entry" data-nav="${FRIENDS_SCREEN_ID}" data-friends-entry="${FRIENDS_ENTRY.settingsProfile}">
+        <button type="button" class="btn btn-secondary friends-entry" data-nav="${FRIENDS_SCREEN_ID}" data-friends-entry="${FRIENDS_ENTRY.settingsProfile}">
           ${escapeHtml(FRIEND_LABEL.entrySettings)}
           <span class="friends-badge" data-friends-badge hidden aria-hidden="true"></span>
         </button>

@@ -2,6 +2,7 @@
  * FEATURE-FRIENDS-01 Palier 6–7 — page Amis (demandes + liste + unfriend).
  * FEATURE-FRIENDS-02 Palier 4 — Inviter / invitations de soirée.
  * FEATURE-FRIENDS-03 Palier 3 — Demandes envoyées / Annuler.
+ * FEATURE-FRIENDS-04 Palier 3 — Vous venez de jouer avec.
  */
 import {
   FRIEND_LABEL,
@@ -15,6 +16,10 @@ import {
   lobbyInviteBusyCopy,
   lobbyInviteBusyDecision,
 } from "../config/lobbyInvites.js";
+import {
+  RECENT_PEER_ACTION,
+  RECENT_PEERS_LABEL,
+} from "../config/recentPeers.js";
 import { isLoggedIn } from "../core/auth.js";
 import { createActionLock } from "../core/actionLock.js";
 import { showAppAlert, showAppConfirm } from "../core/dialog.js";
@@ -45,7 +50,14 @@ import {
   leaveAndJoinFromLobbyInvite,
   refuseLobbyInvite,
 } from "../core/lobbyInviteJoin.js";
-import { unfriendConfirmCopy } from "../core/friendsLogic.js";
+import { isSilentFriendRpcCode, unfriendConfirmCopy } from "../core/friendsLogic.js";
+import {
+  recentPeerRowAction,
+} from "../core/recentPeersLogic.js";
+import {
+  getRecentLobbyPeers,
+  onRecentPeersCacheUpdated,
+} from "../core/recentPeersState.js";
 import {
   acceptFriendRequest,
   cancelFriendRequest,
@@ -53,6 +65,7 @@ import {
   fetchIncomingFriendRequests,
   fetchMyFriends,
   fetchOutgoingFriendRequests,
+  sendFriendRequest,
   unfriendUser,
 } from "../core/supabaseFriends.js";
 import {
@@ -60,6 +73,7 @@ import {
   fetchOutgoingLobbyInvites,
   sendLobbyInvite,
 } from "../core/supabaseLobbyInvites.js";
+import { fetchRecentLobbyPeers } from "../core/supabaseRecentPeers.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
 import { bindNav } from "./nav.js";
 
@@ -117,6 +131,35 @@ function friendInviteControlHtml(row, inviteCtx) {
   return `<button type="button" class="btn btn-primary btn--compact" data-lobby-invite-send="${escapeHtml(row.userId)}">${escapeHtml(LOBBY_INVITE_LABEL.invite)}</button>`;
 }
 
+function recentPeerControlHtml(userId, action) {
+  if (action === RECENT_PEER_ACTION.add) {
+    return `<button type="button" class="btn btn-primary btn--compact" data-recent-peer-add="${escapeHtml(userId)}">${escapeHtml(FRIEND_LABEL.add)}</button>`;
+  }
+  if (action === RECENT_PEER_ACTION.cancel) {
+    return `<button type="button" class="btn btn-secondary btn--compact" data-recent-peer-cancel="${escapeHtml(userId)}">${escapeHtml(FRIEND_LABEL.cancelRequest)}</button>`;
+  }
+  if (action === RECENT_PEER_ACTION.accept) {
+    return `<button type="button" class="btn btn-primary btn--compact" data-recent-peer-accept="${escapeHtml(userId)}">${escapeHtml(FRIEND_LABEL.accept)}</button>`;
+  }
+  return "";
+}
+
+function recentPeerRowHtml(row, graph, { peerIds }) {
+  const action = recentPeerRowAction(row.userId, graph, {
+    localIsRegistered: true,
+    currentlyInSameLobby: peerIds.has(row.userId),
+  });
+  if (action === RECENT_PEER_ACTION.omit) return "";
+  return `
+    <div class="friends-row" data-recent-peer="${escapeHtml(row.userId)}">
+      <span class="friends-row__avatar" aria-hidden="true">${escapeHtml(row.emoji || "👤")}</span>
+      <span class="friends-row__name">${escapeHtml(row.name || "Joueur")}</span>
+      <div class="friends-row__actions">
+        ${recentPeerControlHtml(row.userId, action)}
+      </div>
+    </div>`;
+}
+
 function friendRowHtml(row, inviteCtx) {
   const inEvening = friendInviteKind(row, inviteCtx) === LOBBY_INVITE_ACTION.alreadyIn;
   const status = inEvening
@@ -152,6 +195,7 @@ function listsHtml() {
   const incoming = getIncomingFriendRequests();
   const outgoing = getOutgoingFriendRequests();
   const friends = getMyFriends();
+  const recentPeers = getRecentLobbyPeers();
   const localInLobby = hasActiveLobby();
   const lobbyId = getLobby()?.id || null;
   const peerIds = new Set(
@@ -176,6 +220,13 @@ function listsHtml() {
   const outgoingBody = outgoing.length
     ? outgoing.map(outgoingRowHtml).join("")
     : `<p class="hint friends-empty__hint" data-friends-outgoing-empty>${escapeHtml(FRIEND_LABEL.outgoingEmpty)}</p>`;
+  const recentGraph = { friends, incoming, outgoing };
+  const recentRows = recentPeers
+    .map((row) => recentPeerRowHtml(row, recentGraph, { peerIds }))
+    .filter(Boolean);
+  const recentBody = recentRows.length
+    ? recentRows.join("")
+    : `<p class="hint friends-empty__hint" data-recent-peers-empty>${escapeHtml(RECENT_PEERS_LABEL.empty)}</p>`;
   const friendsBody = friends.length
     ? friends.map((row) => friendRowHtml(row, inviteCtx)).join("")
     : `<p class="hint friends-empty__hint" data-friends-list-empty>${escapeHtml(FRIEND_LABEL.friendsEmpty)}</p>`;
@@ -195,6 +246,10 @@ function listsHtml() {
       <h2 class="settings-section__title">${escapeHtml(FRIEND_LABEL.outgoingSection)}</h2>
       ${outgoingBody}
     </section>
+    <section class="card settings-section" data-recent-peers>
+      <h2 class="settings-section__title">${escapeHtml(RECENT_PEERS_LABEL.section)}</h2>
+      ${recentBody}
+    </section>
     <section class="card settings-section" data-friends-list>
       <h2 class="settings-section__title">${escapeHtml(FRIEND_LABEL.friendsSection)}</h2>
       ${noLobbyHint}
@@ -207,6 +262,7 @@ export function mountFriends(app) {
   const actionLock = createActionLock();
   let unsubFriendsCache = () => {};
   let unsubInvitesCache = () => {};
+  let unsubRecentPeersCache = () => {};
   let joiningLobby = false;
 
   function paint() {
@@ -253,6 +309,22 @@ export function mountFriends(app) {
         void onCancelOutgoing(cancelBtn.getAttribute("data-friend-cancel"));
       }
     });
+    app.querySelector("[data-recent-peers]")?.addEventListener("click", (e) => {
+      const addBtn = e.target.closest("[data-recent-peer-add]");
+      if (addBtn) {
+        void onAddRecentPeer(addBtn.getAttribute("data-recent-peer-add"));
+        return;
+      }
+      const acceptBtn = e.target.closest("[data-recent-peer-accept]");
+      if (acceptBtn) {
+        void onAccept(acceptBtn.getAttribute("data-recent-peer-accept"));
+        return;
+      }
+      const cancelBtn = e.target.closest("[data-recent-peer-cancel]");
+      if (cancelBtn) {
+        void onCancelOutgoing(cancelBtn.getAttribute("data-recent-peer-cancel"));
+      }
+    });
     app.querySelector("[data-friends-list]")?.addEventListener("click", (e) => {
       const inviteBtn = e.target.closest("[data-lobby-invite-send]");
       if (inviteBtn) {
@@ -284,7 +356,11 @@ export function mountFriends(app) {
       if (lobbyId) {
         patchLobbyFriendOverlayStatus(lobbyId, fromUserId, FRIEND_OVERLAY.friends);
       }
-      await Promise.all([fetchIncomingFriendRequests(), fetchMyFriends()]);
+      await Promise.all([
+        fetchIncomingFriendRequests(),
+        fetchMyFriends(),
+        fetchRecentLobbyPeers(),
+      ]);
       if (!mount.isMounted()) return;
       paint();
       return;
@@ -336,7 +412,7 @@ export function mountFriends(app) {
     if (run.skipped) return;
     const res = run.value;
     if (res?.ok || res?.skipped) {
-      await fetchOutgoingFriendRequests();
+      await Promise.all([fetchOutgoingFriendRequests(), fetchRecentLobbyPeers()]);
       if (!mount.isMounted()) return;
       paint();
       return;
@@ -372,12 +448,41 @@ export function mountFriends(app) {
       if (lobbyId) {
         patchLobbyFriendOverlayStatus(lobbyId, otherUserId, FRIEND_OVERLAY.none);
       }
-      await fetchMyFriends();
+      await Promise.all([fetchMyFriends(), fetchRecentLobbyPeers()]);
       if (!mount.isMounted()) return;
       paint();
       return;
     }
     await showAppAlert(res?.error?.message || "Impossible de retirer cet ami.", {
+      title: FRIEND_LABEL.pageTitle,
+      icon: "⚠️",
+    });
+  }
+
+  async function onAddRecentPeer(toUserId) {
+    if (!toUserId || !isLoggedIn()) return;
+    const run = await actionLock.run(async () => {
+      try {
+        return await sendFriendRequest(toUserId);
+      } catch (err) {
+        return { ok: false, error: err };
+      }
+    });
+    if (!mount.isMounted()) return;
+    if (run.skipped) return;
+    const res = run.value;
+    if (res?.ok) {
+      await Promise.all([
+        fetchOutgoingFriendRequests(),
+        fetchMyFriends(),
+        fetchRecentLobbyPeers(),
+      ]);
+      if (!mount.isMounted()) return;
+      paint();
+      return;
+    }
+    if (res?.skipped || isSilentFriendRpcCode(res?.code)) return;
+    await showAppAlert(res?.error?.message || "Impossible d'ajouter.", {
       title: FRIEND_LABEL.pageTitle,
       icon: "⚠️",
     });
@@ -499,6 +604,7 @@ export function mountFriends(app) {
   paint();
   unsubFriendsCache = onFriendsCacheUpdated(onCacheUpdated);
   unsubInvitesCache = onLobbyInvitesCacheUpdated(onCacheUpdated);
+  unsubRecentPeersCache = onRecentPeersCacheUpdated(onCacheUpdated);
   if (isLoggedIn()) {
     void Promise.all([
       fetchIncomingFriendRequests(),
@@ -506,6 +612,7 @@ export function mountFriends(app) {
       fetchMyFriends(),
       fetchIncomingLobbyInvites(),
       fetchOutgoingLobbyInvites(),
+      fetchRecentLobbyPeers(),
     ]);
   }
 
@@ -513,6 +620,7 @@ export function mountFriends(app) {
     mount.dispose();
     unsubFriendsCache();
     unsubInvitesCache();
+    unsubRecentPeersCache();
   };
 }
 

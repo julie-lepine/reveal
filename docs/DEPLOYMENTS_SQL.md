@@ -90,6 +90,7 @@ Sources : audit SQL du dépôt (`AUDIT-SQL-01`) + docs ops ([`SUPABASE.md`](./SU
 | 2026-08-27 | [`feature-friends-02.sql`](../supabase/feature-friends-02.sql) | FEATURE-FRIENDS-02 | ✅ | ✅ | [`feature-friends-02-runbook.sql`](../supabase/tests/feature-friends-02-runbook.sql) | Invitations lobby · voir §14 |
 | 2026-08-27 | [`feature-friends-03.sql`](../supabase/feature-friends-03.sql) | FEATURE-FRIENDS-03 | ✅ | ✅ | [`feature-friends-03-runbook.sql`](../supabase/tests/feature-friends-03-runbook.sql) | Annuler demande envoyée · voir §15 |
 | 2026-08-27 | [`feature-friends-03-live-identity.sql`](../supabase/feature-friends-03-live-identity.sql) | FEATURE-FRIENDS-03 identité | ✅ | ✅ | — | Tes amis « Joueur » / 👤 · voir §16 |
+| 2026-08-27 | [`feature-friends-04.sql`](../supabase/feature-friends-04.sql) | FEATURE-FRIENDS-04 | ✅ | ✅ | [`feature-friends-04-runbook.sql`](../supabase/tests/feature-friends-04-runbook.sql) | Croisés 24 h · runbook **staging only** · voir §17 |
 
 **Hors migrations (tracés ailleurs si besoin)** : préflight [`lobby-membership-e4-00-preflight-duplicates.sql`](../supabase/lobby-membership-e4-00-preflight-duplicates.sql) (lecture seule) ; runbooks / harness sous [`supabase/tests/`](../supabase/tests/) et [`lobby-membership-e4-RUNBOOK.sql`](../supabase/lobby-membership-e4-RUNBOOK.sql) / [`lobby-membership-e5-RUNBOOK.sql`](../supabase/lobby-membership-e5-RUNBOOK.sql) — ce ne sont pas des migrations. Voir aussi [`lobby-membership-e4-tests-manual.sql`](../supabase/lobby-membership-e4-tests-manual.sql).
 
@@ -373,3 +374,19 @@ Helpers `friends_live_display_name` / `friends_live_emoji` + relit `list_my_frie
 | Hors scope | FEATURE-FRIENDS-04 · stores 1.0.0 |
 
 **Statut** : SQL **✅** (même projet) · QA Tes amis **27 août 2026**.
+
+---
+
+## 17. FEATURE-FRIENDS-04 — Croisés récents 24 h
+
+Table `lobby_encounters` + trigger `lobby_members` INSERT/DELETE + RPC `list_recent_lobby_peers`. Inscrits déjà co-membres seulement. Pas de Realtime. Pas d’INSERT client.
+
+| Élément | Valeur |
+| ------- | ------ |
+| Migration | [`feature-friends-04.sql`](../supabase/feature-friends-04.sql) — **✅** 27 août 2026 |
+| Runbook | [`tests/feature-friends-04-runbook.sql`](../supabase/tests/feature-friends-04-runbook.sql) — **`FRIENDS04_RUNBOOK_OK`** (staging, **INTERDIT EN PRODUCTION** — **ne pas lancer**) |
+| Realtime | **non** (`lobby_encounters` hors publication) |
+| Client | [`FRIENDS.md`](./FRIENDS.md) Phase 4 palier 2 — wrapper + cache, pas d’UI |
+| Hors scope | Recherche · invités · historique > 24 h · stores 1.0.0 |
+
+**Statut** : SQL **✅** (même projet) · runbook **non** exécuté (prod) · palier 2 client **27 août 2026**.
