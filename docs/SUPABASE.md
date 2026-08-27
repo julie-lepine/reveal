@@ -25,7 +25,7 @@ Lancement : [LAUNCH.md](./LAUNCH.md) · Native : [NATIVE.md](./NATIVE.md) · SQL
 8. Exécute **`supabase/lobby-polls.sql`** (sondages « prochain jeu » — tables + RPC ; dépend de `is_lobby_host` / `is_acting_host` I-08/ARCH-03)
 9. Exécute **`supabase/traitre-private.sql`** si tu joues à Spot the fake (dépend de `is_lobby_host`, fourni par `game-sessions-i08-arch03.sql`)
 10. Exécute **`supabase/feature-adfree-01-profile-flag.sql`** (colonne `profiles.ad_free` + trigger anti auto-attribution — palier Sans pub)
-11. Exécute **`supabase/feature-friends-01.sql`** puis **`supabase/feature-friends-02.sql`** (amis + invitations de salon). Realtime : `friend_requests`, `friendships`, `lobby_invites` (pas `friend_request_cooldowns`)
+11. Exécute **`supabase/feature-friends-01.sql`**, **`supabase/feature-friends-02.sql`**, **`supabase/feature-friends-03.sql`** puis **`supabase/feature-friends-03-live-identity.sql`** (amis, invitations de salon, Annuler, identité live). Realtime : `friend_requests`, `friendships`, `lobby_invites` (pas `friend_request_cooldowns`). F03 n’ajoute **pas** de table Realtime.
 
 > **Fil Rouge / Mot interdit** — suppression applicative terminée (et serveur via **CLEANUP-FILROUGE-02 ✅** 2026-08-07). Ne pas exécuter `supabase/fil-rouge-private.sql` sur une install neuve. Sur le projet cible : table `fil_rouge_private` absente ; RPC actives sans Fil Rouge / sans `playlistGuess` regressé. Helper client `stripLegacyFilRougeKeys` conservé (anciens localStorage).
 

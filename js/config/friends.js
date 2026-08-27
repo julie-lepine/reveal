@@ -4,6 +4,7 @@
  * Ne pas y mettre de fetch, de Realtime, ni de DOM.
  * Invitations de lobby : FEATURE-FRIENDS-02 (`js/config/lobbyInvites.js`).
  * Annuler une demande envoyée : FEATURE-FRIENDS-03 (mêmes tables, RPC cancel / listOutgoing).
+ * Croisés récents 24 h : FEATURE-FRIENDS-04 (`js/config/recentPeers.js`).
  */
 
 export const FRIENDS_FEATURE_ID = "FEATURE-FRIENDS-01";

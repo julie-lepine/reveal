@@ -13,6 +13,7 @@ import {
   isAuthReadyResolved,
 } from "./supabaseAuth.js";
 import { upsertProfile } from "./supabaseProfile.js";
+import { isPlaceholderDisplayName } from "./profileIdentity.js";
 import {
   stopLobbyPresenceSync,
   updateLobbyMemberProfileSupabase,
@@ -165,9 +166,10 @@ export async function updateProfileEmoji(emoji) {
   const userId = getSupabaseUserId();
   if (userId) {
     try {
+      const currentName = getState().user?.name;
       await upsertProfile({
         userId,
-        displayName: getState().user?.name || "Joueur",
+        displayName: isPlaceholderDisplayName(currentName) ? undefined : currentName,
         emoji: res.emoji,
       });
       if (getState().lobby?.id) {

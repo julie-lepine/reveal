@@ -89,6 +89,7 @@ Sources : audit SQL du dépôt (`AUDIT-SQL-01`) + docs ops ([`SUPABASE.md`](./SU
 | 2026-08-27 | [`feature-friends-01.sql`](../supabase/feature-friends-01.sql) | FEATURE-FRIENDS-01 | ✅ | ✅ | [`feature-friends-01-runbook.sql`](../supabase/tests/feature-friends-01-runbook.sql) | Un seul projet live · runbook **staging only** · voir §13 |
 | 2026-08-27 | [`feature-friends-02.sql`](../supabase/feature-friends-02.sql) | FEATURE-FRIENDS-02 | ✅ | ✅ | [`feature-friends-02-runbook.sql`](../supabase/tests/feature-friends-02-runbook.sql) | Invitations lobby · voir §14 |
 | 2026-08-27 | [`feature-friends-03.sql`](../supabase/feature-friends-03.sql) | FEATURE-FRIENDS-03 | ✅ | ✅ | [`feature-friends-03-runbook.sql`](../supabase/tests/feature-friends-03-runbook.sql) | Annuler demande envoyée · voir §15 |
+| 2026-08-27 | [`feature-friends-03-live-identity.sql`](../supabase/feature-friends-03-live-identity.sql) | FEATURE-FRIENDS-03 identité | ✅ | ✅ | — | Tes amis « Joueur » / 👤 · voir §16 |
 
 **Hors migrations (tracés ailleurs si besoin)** : préflight [`lobby-membership-e4-00-preflight-duplicates.sql`](../supabase/lobby-membership-e4-00-preflight-duplicates.sql) (lecture seule) ; runbooks / harness sous [`supabase/tests/`](../supabase/tests/) et [`lobby-membership-e4-RUNBOOK.sql`](../supabase/lobby-membership-e4-RUNBOOK.sql) / [`lobby-membership-e5-RUNBOOK.sql`](../supabase/lobby-membership-e5-RUNBOOK.sql) — ce ne sont pas des migrations. Voir aussi [`lobby-membership-e4-tests-manual.sql`](../supabase/lobby-membership-e4-tests-manual.sql).
 
@@ -350,7 +351,25 @@ RPC `cancel_friend_request` / `list_outgoing_friend_requests`. Pas de nouvelle t
 | Migration | [`feature-friends-03.sql`](../supabase/feature-friends-03.sql) — **✅** 27 août 2026 |
 | Runbook | [`tests/feature-friends-03-runbook.sql`](../supabase/tests/feature-friends-03-runbook.sql) — **`FRIENDS03_RUNBOOK_OK`** (staging, **ne pas relancer**) |
 | Realtime | inchangé (`friend_requests` déjà on) |
-| Client | [`FRIENDS.md`](./FRIENDS.md) Phase 3 palier 2 — wrappers, pas d’UI |
+| Client | [`FRIENDS.md`](./FRIENDS.md) Phase 3 palier 5 — web Pages ; pas le build App Store 1.0.0 en review |
 | Hors scope | Annuler une invitation de soirée · toast destinataire · cooldown |
 
-**Statut** : SQL **✅** (même projet) · Palier 1 **27 août 2026**.
+**Statut** : SQL **✅** (même projet) · Palier 5 Pages **27 août 2026**.
+
+---
+
+## 16. FEATURE-FRIENDS-03 — Identité live (Tes amis)
+
+Les listes d’amis relisaient uniquement `profiles`. Un compte dont la ligne était absente ou restée sur le fallback « Joueur » / 👤 s’affichait en placeholder, alors que le pseudo d’inscription (`raw_user_meta_data.display_name`) et/ou `lobby_members` étaient bons.
+
+Helpers `friends_live_display_name` / `friends_live_emoji` + relit `list_my_friends`, `list_incoming_friend_requests`, `list_outgoing_friend_requests`, `list_incoming_lobby_invites`. UPDATE des profils placeholder. Pas de nouvelle table. Realtime inchangé.
+
+| Élément | Valeur |
+| ------- | ------ |
+| Migration | [`feature-friends-03-live-identity.sql`](../supabase/feature-friends-03-live-identity.sql) — **✅** 27 août 2026 |
+| Runbook | aucun (idempotent, pas de comptes de test) |
+| Realtime | inchangé |
+| Client | login soigne `profiles` si encore placeholder ; inscription n’échoue plus si upsert sans session |
+| Hors scope | FEATURE-FRIENDS-04 · stores 1.0.0 |
+
+**Statut** : SQL **✅** (même projet) · QA Tes amis **27 août 2026**.

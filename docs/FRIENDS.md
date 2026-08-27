@@ -451,10 +451,10 @@ On avance **un palier à la fois**. Pas de code avant le palier 0 coché. QA té
 - [x] **1** SQL + `FRIENDS03_RUNBOOK_OK` — 27 août 2026
 - [x] **2** Client sans UI — 27 août 2026
 - [x] **3** UI (roster + page Amis) — 27 août 2026
-- [ ] **4** QA terrain
-- [ ] **5** Docs / Pages — **pas** le 1.0.0 App Store
+- [x] **4** QA terrain — 27 août 2026 (Annuler validé)
+- [x] **5** Docs / Pages — 27 août 2026 — **pas** le 1.0.0 App Store
 
-**Palier 3 terminé.** **Prochain : palier 4** (QA téléphone, 2 comptes). Dire *« on fait le palier 4 »* quand tu as testé.
+**FEATURE-FRIENDS-03 close** (sauf builds stores). Identité Tes amis : SQL live-identity ✅. Stores : prochain native — **pas** le 1.0.0 App Store en review.
 
 ### Règles figées (ne pas rediscuter)
 
@@ -521,16 +521,26 @@ Même projet live (`ojzxbvpdfnwagrvbhfll`). Pas de nouvelle publication Realtime
 
 À faire **toi** (2 comptes inscrits).
 
-- [ ] A envoie, annule dans le lobby : B ne voit plus la popup ; A revoit **+ Ami**
-- [ ] A envoie, sort du lobby, annule depuis Amis : même effet
-- [ ] B refuse toujours silencieux pour A ; cooldown 60 s **inchangé** (seulement après refus)
-- [ ] Invité : pas d’Annuler
-- [ ] Chat : aucune ligne
+- [x] A envoie, annule dans le lobby : B ne voit plus la popup ; A revoit **+ Ami**
+- [x] A envoie, sort du lobby, annule depuis Amis : même effet
+- [x] B refuse toujours silencieux pour A ; cooldown 60 s **inchangé** (seulement après refus)
+- [x] Invité : pas d’Annuler
+- [x] Chat : aucune ligne
+
+**Validé 27 août 2026.** Un ami pouvait rester « Joueur » / 👤 sur Tes amis (table `profiles` encore au fallback, alors que le pseudo d’inscription / le lobby étaient bons).
+
+### Palier 4 bis — Identité Tes amis
+
+- [x] SQL Editor : [`feature-friends-03-live-identity.sql`](../supabase/feature-friends-03-live-identity.sql) — 27 août 2026
+- [x] Recharger Tes amis : le pseudo / emoji du compte concerné (plus le placeholder)
+- [x] Consigner dans [`DEPLOYMENTS_SQL.md`](./DEPLOYMENTS_SQL.md) §16 après apply
 
 ### Palier 5 — Docs / Pages
 
-- [ ] [`docs/DEPLOYMENTS_SQL.md`](./DEPLOYMENTS_SQL.md) + Realtime inchangé (`friend_requests` déjà on)
-- [ ] Client web Pages (`main`) ; **pas** le 1.0.0 App Store
+- [x] [`docs/DEPLOYMENTS_SQL.md`](./DEPLOYMENTS_SQL.md) §15–16 + Realtime inchangé (`friend_requests` déjà on)
+- [x] Client **web** : [Pages](https://julie-lepine.github.io/reveal/) (`main`). Stores : **prochain** build — **pas** le 1.0.0 App Store déjà en review
+
+**Palier 5 validé** (27 août 2026). FEATURE-FRIENDS-03 Phase 3 close (sauf builds stores).
 
 ---
 
@@ -540,11 +550,11 @@ Le roster **disparaît** à la dissolution (`lobby_members` CASCADE). Sans table
 
 Liste courte sur la page Amis : joueurs **inscrits** avec qui on a **partagé un lobby**, fenêtre **24 h après la fin du chevauchement**. Ce n’est **pas** une recherche, **pas** des suggestions de inconnus.
 
-On ne commence **pas** tant que FEATURE-FRIENDS-03 n’est pas close (sauf mention contraire). QA téléphone après l’UI. Légal in-app **avant** la recette (nouvelle donnée).
+On ne commence **pas** le palier 1 SQL tant que le palier 0 n’est pas coché. QA téléphone après l’UI. Légal in-app **avant** la recette (nouvelle donnée).
 
 ### Avancement
 
-- [ ] **0** Contrats
+- [x] **0** Contrats — 27 août 2026
 - [ ] **1** SQL
 - [ ] **2** Client sans UI
 - [ ] **3** UI page Amis
@@ -552,7 +562,7 @@ On ne commence **pas** tant que FEATURE-FRIENDS-03 n’est pas close (sauf menti
 - [ ] **5** QA terrain
 - [ ] **6** Docs / Pages — **pas** le 1.0.0 App Store
 
-**Prochain après F03 : palier 0** FEATURE-FRIENDS-04. Dire *« on fait le palier 0 (croisés récents) »*.
+**Palier 0 terminé.** Pas de SQL tant que ce palier n’était pas coché. **Ensuite palier 1** (`lobby_encounters`). Dire *« on fait le palier 1 (croisés SQL) »*.
 
 ### Règles figées (ne pas rediscuter)
 
@@ -575,11 +585,11 @@ On ne commence **pas** tant que FEATURE-FRIENDS-03 n’est pas close (sauf menti
 
 ### Palier 0 — Contrats avant code
 
-- [ ] Ticket : **FEATURE-FRIENDS-04**
-- [ ] Config dédiée [`js/config/recentPeers.js`](../js/config/recentPeers.js) (fenêtre 24 h, RPC, copy, qui apparaît)
-- [ ] Tests source palier 0
+- [x] Ticket : **FEATURE-FRIENDS-04**
+- [x] Config dédiée [`js/config/recentPeers.js`](../js/config/recentPeers.js) (fenêtre 24 h, RPC, copy, qui apparaît)
+- [x] Tests source palier 0 [`tests/featureFriends04-00.test.js`](../tests/featureFriends04-00.test.js)
 
-**Fait quand** : contrats + tests verts. Pas de SQL avant.
+**Palier 0 terminé.** Pas de SQL tant que ce palier n’était pas coché. **Ensuite palier 1.**
 
 ### Palier 1 — SQL
 
@@ -652,6 +662,8 @@ Nouvelle donnée : identifiants de joueurs croisés, **éphémères 24 h**, casc
 | 23 | F03-1 | SQL `cancel_friend_request` *(validé runbook)* |
 | 24 | F03-2 | Module client *(fait)* |
 | 25 | F03-3 | UI **Annuler** *(fait)* |
-| 26 | F04-0 | Contrats croisés 24 h *(après F03)* |
+| 26 | F03-4 | QA **Annuler** *(validé 27 août 2026)* · identité Tes amis *(SQL ✅)* |
+| 27 | F03-5 | Docs / Pages *(validé — Annuler + identité, pas le 1.0.0)* |
+| 28 | F04-0 | Contrats croisés 24 h |
 
-**Prochain : FEATURE-FRIENDS-03 palier 4** (QA terrain, 2 comptes). Stores : **pas** le 1.0.0 App Store.
+**Prochain : FEATURE-FRIENDS-04 palier 1** (SQL `lobby_encounters`) **après** le palier 0. Stores : **pas** le 1.0.0 App Store.

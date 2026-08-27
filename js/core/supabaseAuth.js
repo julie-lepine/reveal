@@ -1,6 +1,11 @@
 import { supabase, isSupabaseConfigured } from "./supabaseClient.js";
 import { getState, saveStatePatch } from "./state.js";
 import { fetchProfile, upsertProfile } from "./supabaseProfile.js";
+import {
+  registeredProfileNeedsHeal,
+  resolveLiveDisplayName,
+  resolveLiveEmoji,
+} from "./profileIdentity.js";
 import { adFreeFromProfile } from "./entitlements.js";
 import { formatAuthErrorMessage, isAuthRateLimitError, isAuthCaptchaError } from "./authErrors.js";
 import {
@@ -210,27 +215,40 @@ export async function syncSessionToState(session) {
     profile = null;
   }
 
-  const name =
-    lockedGuestName ||
-    profile?.display_name ||
-    user.user_metadata?.display_name ||
-    user.email?.split("@")[0] ||
-    "Joueur";
+  const name = resolveLiveDisplayName({
+    lockedGuestName,
+    profileName: profile?.display_name,
+    metadataName: user.user_metadata?.display_name,
+    email: user.email,
+    localName: getState().user?.name,
+  });
+  const emoji = resolveLiveEmoji({
+    lockedGuestEmoji: lockedGuestName ? getState().user?.emoji : null,
+    profileEmoji: profile?.emoji,
+    metadataEmoji: user.user_metadata?.emoji,
+    localEmoji: lockedGuestName ? "🎭" : getState().user?.emoji,
+  });
 
   saveStatePatch({
     supabaseUserId: user.id,
     user: {
       email: user.email || null,
       name,
-      emoji: lockedGuestName
-        ? getState().user?.emoji || profile?.emoji || user.user_metadata?.emoji || "🎭"
-        : profile?.emoji || user.user_metadata?.emoji || null,
+      emoji: lockedGuestName ? emoji : emoji || null,
       loggedIn: !isAnonymous,
       isGuest: isAnonymous,
       provider: providerFromUser(user),
       adFree: isAnonymous ? false : adFreeFromProfile(profile),
     },
   });
+
+  if (!isAnonymous && registeredProfileNeedsHeal(profile, name, emoji)) {
+    try {
+      await upsertProfile({ userId: user.id, displayName: name, emoji });
+    } catch {
+      /* confirmation email / hors-ligne : le SQL de liste soigne à la lecture */
+    }
+  }
 
   try {
     const { syncPurchasesIdentity } = await import("./purchases.js");
@@ -520,8 +538,13 @@ export async function getLiveSupabaseUserId() {
 
 
 export async function signUpWithEmail(email, password, displayName, captchaToken = null) {
+  const trimmedName = String(displayName || "").trim().slice(0, 24);
+  if (trimmedName.length < 2) {
+    return { ok: false, error: "Le pseudo doit faire au moins 2 caractères." };
+  }
+
   const options = {
-    data: { display_name: displayName.trim().slice(0, 24) },
+    data: { display_name: trimmedName },
   };
   if (captchaToken) options.captchaToken = captchaToken;
 
@@ -535,11 +558,15 @@ export async function signUpWithEmail(email, password, displayName, captchaToken
     return { ok: false, error: msg, captcha: isAuthCaptchaError(error.message) };
   }
   if (data.user) {
-    await upsertProfile({
-      userId: data.user.id,
-      displayName,
-      emoji: "👤",
-    });
+    try {
+      await upsertProfile({
+        userId: data.user.id,
+        displayName: trimmedName,
+        emoji: "👤",
+      });
+    } catch {
+      /* Pas de session (confirmation email) : handle_new_user + prochain login. */
+    }
   }
   if (data.session) await syncSessionToState(data.session);
   return { ok: true, loggedIn: Boolean(data.session) };
