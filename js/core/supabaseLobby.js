@@ -1980,6 +1980,15 @@ export async function refreshLobbyFromSupabase({ withMessages = false } = {}) {
       userId: getSupabaseUserId(),
       source: MEMBERSHIP_HYDRATION_SOURCE.REFRESH_CONFIRMED,
     });
+    const uid = getSupabaseUserId();
+    const stillOnRoster = (bundle.participants || []).some((p) => p.userId === uid);
+    if (uid && getState().inLobby && !stillOnRoster) {
+      const stillMember = await isLocalStillLobbyMember(lobbyId);
+      if (stillMember === false) {
+        const { handleKickedFromLobby } = await import("./lobby.js");
+        await handleKickedFromLobby();
+      }
+    }
     return true;
   } catch (e) {
     return handlePossibleLobbyGone(lobbyId, e);
@@ -2379,7 +2388,6 @@ export function subscribeLobbyRealtime(onUpdate) {
         if (removedUid && localUid && removedUid === localUid) {
           setTimeout(() => {
             if (!getState().inLobby) return;
-            if (!isLiveLobbyChannelEvent()) return;
             void import("./lobbyClosureSession.js").then(
               ({ wasLobbyClosureHandled, isLocalHostManualDissolve }) => {
                 if (wasLobbyClosureHandled(lobbyId) || isLocalHostManualDissolve(lobbyId)) {
@@ -2392,6 +2400,26 @@ export function subscribeLobbyRealtime(onUpdate) {
             );
           }, 180);
           return;
+        }
+        if (payload?.eventType === "DELETE") {
+          const capturedLobbyId = lobbyId;
+          void isLocalStillLobbyMember(capturedLobbyId).then((still) => {
+            if (still !== false) return;
+            if (!getState().inLobby) return;
+            void import("./lobbyClosureSession.js").then(
+              ({ wasLobbyClosureHandled, isLocalHostManualDissolve }) => {
+                if (
+                  wasLobbyClosureHandled(capturedLobbyId) ||
+                  isLocalHostManualDissolve(capturedLobbyId)
+                ) {
+                  return;
+                }
+                void import("./lobby.js").then(({ handleKickedFromLobby }) =>
+                  handleKickedFromLobby()
+                );
+              }
+            );
+          });
         }
         if (!isMeaningfulMemberChange(payload)) return;
         scheduleLobbyRefresh();
