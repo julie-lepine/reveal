@@ -77,6 +77,26 @@ export function shouldShowLobbyInviteFriendsEntry({
   return Boolean(localIsRegistered && friendCount > 0);
 }
 
+/**
+ * Plan d’acceptation côté client (avant RPC).
+ * busy = déjà dans un *autre* lobby → modale, pas d’auto-leave.
+ * already_in = déjà dans *ce* lobby → RPC no-op `already_in`.
+ * join = appeler accept (le serveur reste le filet busy / full / closed).
+ */
+export function lobbyInviteAcceptPlan({
+  localInLobby = false,
+  localLobbyId = null,
+  inviteLobbyId = null,
+} = {}) {
+  if (localInLobby && localLobbyId && inviteLobbyId && localLobbyId === inviteLobbyId) {
+    return "already_in";
+  }
+  if (localInLobby && localLobbyId && inviteLobbyId && localLobbyId !== inviteLobbyId) {
+    return "busy";
+  }
+  return "join";
+}
+
 export function lobbyInviteFailMessage(code) {
   if (code === LOBBY_INVITE_RPC_ERROR.busy) {
     return "Tu es déjà dans une soirée. Tu ne peux en rejoindre qu’une à la fois.";

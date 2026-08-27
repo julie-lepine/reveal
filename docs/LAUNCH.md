@@ -68,7 +68,7 @@ Hors scope : DUNS, diffusion INSEE, nom de société sur la fiche. IAP iOS : apr
 - [x] 02B code : Acheter / Restaurer ; plus d’**Actualiser**
 - [x] 02B code : Edge Function `revenuecat-webhook` déployée + webhook RC — 25 août 2026
 - [x] RC Send test → 200 `ad_free: true` (Authorization **sans** `Bearer`)
-- [x] Légal in-app : `data/legalContent.js` (IAP + RevenueCat + liste d’amis privée, 27 août 2026)
+- [x] Légal in-app : `data/legalContent.js` (IAP + RevenueCat + liste d’amis privée + invitations de soirée éphémères, 27 août 2026)
 
 ### En cours / à revoir
 - [ ] RC : Pub/Sub (optionnel)
@@ -76,6 +76,7 @@ Hors scope : DUNS, diffusion INSEE, nom de société sur la fiche. IAP iOS : apr
 - [ ] QA testeur Play : achat → pubs off (AAB **18+**, pas le 17)
 - [x] Légal OVH : `privacy.html` + `mentions-legales.html` (2,99 € TTC, Google = paiement) — 25 août 2026
 - [x] Légal OVH : recopie **liste d’amis / demandes** sur `privacy.html` — 27 août 2026
+- [x] Légal OVH : recopie **invitations de soirée** sur `privacy.html` — 27 août 2026
 
 ### Plus tard
 - [ ] Prod Play (critères test fermé OK — lancement au choix ; version peut être 1.0.20+)
@@ -252,7 +253,7 @@ No regional differences. French UI and content; consistent behavior worldwide.
 Not applicable. Casual party game; no licensed third-party media in v1.0.0.
 
 USER-GENERATED CONTENT:
-Nicknames, lobby chat, custom game text in private lobbies (code required). Private friend list with lobby-only discovery (registered accounts only; no player search). Mitigations: client-side word filter, host can remove players, contact@revealthepartygame.fr for abuse reports. No public social feed.
+Nicknames, lobby chat, custom game text in private lobbies (code required). Private friend list with lobby-only discovery (registered accounts only; no player search). Private ephemeral party invites between registered friends (tied to a living lobby; no public invite link). Mitigations: client-side word filter, host can remove players, contact@revealthepartygame.fr for abuse reports. No public social feed.
 
 ACCOUNT DELETION:
 In-app: Settings → Legal → “Supprimer mon compte”, or https://revealthepartygame.fr/suppression-compte.html
@@ -269,6 +270,6 @@ contact@revealthepartygame.fr
 | Sujet | Réponse |
 |-------|---------|
 | IAP iOS | **Aucun** en 1.0.0 — le dire explicitement |
-| UGC | Lobbies **privées** ; liste d’amis **privée** (découverte roster lobby, pas de recherche) ; filtre mots ; kick hôte ; **pas de fil public** ; pas de bouton « Signaler » in-app |
+| UGC | Lobbies **privées** ; liste d’amis **privée** (découverte roster lobby, pas de recherche) ; invitations de soirée **privées** (éphémères, amis inscrits) ; filtre mots ; kick hôte ; **pas de fil public** ; pas de bouton « Signaler » in-app |
 | ATT / UMP | **Obligatoire dans la vidéo** |
 | GitHub | Version web seulement — **ne remplace pas** la démo native |

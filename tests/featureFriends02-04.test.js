@@ -104,6 +104,7 @@ describe("FEATURE-FRIENDS-02 Palier 4 — page Amis invitations", () => {
     assert.match(lobbyInviteFailMessage(LOBBY_INVITE_RPC_ERROR.full), /complète/);
     const css = read("style.css");
     assert.match(css, /\.friends-row__badge\{/);
+    assert.match(css, /\.friends-row__actions\{[\s\S]*?align-items:\s*center/);
     assert.match(css, /\.lobby-invite-friends-entry\{/);
   });
 });

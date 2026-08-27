@@ -2,11 +2,13 @@
 import { getState } from "./state.js";
 import { getSupabaseUserId } from "./supabaseAuth.js";
 import { onLobbyBundleUpdated } from "./supabaseLobby.js";
+import { decideHostNotice } from "./hostNoticeLogic.js";
 
 const TOAST_ID = "host-notice-toast";
 
 // null = pas (encore) dans un lobby ; true/false = état hôte connu dans le lobby courant.
 let wasHost = null;
+let lastLobbyId = null;
 
 function isInLobby() {
   return Boolean(getState().inLobby && getState().lobby?.id);
@@ -22,6 +24,13 @@ function isLocalHostNow() {
 
 function hideToast() {
   document.getElementById(TOAST_ID)?.remove();
+}
+
+function applyHostNoticeDecision(decision) {
+  wasHost = decision.wasHost;
+  lastLobbyId = decision.lastLobbyId;
+  if (decision.hide) hideToast();
+  if (decision.show) showHostToast();
 }
 
 function showHostToast() {
@@ -49,20 +58,33 @@ function showHostToast() {
 }
 
 function onLobbyUpdate() {
-  // Hors lobby : on oublie l'état (la création d'un lobby ne doit pas déclencher la toast).
-  if (!isInLobby()) {
-    wasHost = null;
-    hideToast();
-    return;
-  }
+  applyHostNoticeDecision(
+    decideHostNotice({
+      inLobby: isInLobby(),
+      lobbyId: getState().lobby?.id || null,
+      lastLobbyId,
+      wasHost,
+      isHost: isLocalHostNow(),
+    })
+  );
+}
 
-  const isHost = isLocalHostNow();
-  // Transition « invité → hôte » au sein d'un même lobby : désignation réelle.
-  if (wasHost === false && isHost) showHostToast();
-  wasHost = isHost;
+/** Appelé au switch de salon (invite) pour ne pas reporter le toast. */
+export function resetHostNoticeOnLobbySwitch() {
+  applyHostNoticeDecision(
+    decideHostNotice({
+      inLobby: false,
+      lobbyId: null,
+      lastLobbyId,
+      wasHost,
+      isHost: false,
+    })
+  );
 }
 
 export function initHostNoticeListener() {
-  wasHost = isInLobby() ? isLocalHostNow() : null;
+  const inLobby = isInLobby();
+  lastLobbyId = inLobby ? getState().lobby?.id || null : null;
+  wasHost = inLobby ? isLocalHostNow() : null;
   onLobbyBundleUpdated(onLobbyUpdate);
 }

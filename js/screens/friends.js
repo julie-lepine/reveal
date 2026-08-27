@@ -35,7 +35,10 @@ import {
   isLobbyInvitePendingOut,
   onLobbyInvitesCacheUpdated,
 } from "../core/lobbyInvitesState.js";
-import { lobbyInviteFailMessage } from "../core/lobbyInvitesLogic.js";
+import {
+  lobbyInviteAcceptPlan,
+  lobbyInviteFailMessage,
+} from "../core/lobbyInvitesLogic.js";
 import {
   joinFromLobbyInvite,
   leaveAndJoinFromLobbyInvite,
@@ -363,13 +366,12 @@ export function mountFriends(app) {
   async function onJoinInvite(inviteId) {
     if (!inviteId || !isLoggedIn()) return;
     const invite = getIncomingLobbyInvites().find((row) => row.id === inviteId);
-    const currentLobbyId = getLobby()?.id || null;
-    if (
-      hasActiveLobby() &&
-      currentLobbyId &&
-      invite?.lobbyId &&
-      invite.lobbyId !== currentLobbyId
-    ) {
+    const plan = lobbyInviteAcceptPlan({
+      localInLobby: hasActiveLobby(),
+      localLobbyId: getLobby()?.id || null,
+      inviteLobbyId: invite?.lobbyId || null,
+    });
+    if (plan === "busy") {
       const copy = lobbyInviteBusyCopy(invite);
       const accepted = await showAppConfirm(copy.message, {
         title: copy.title,

@@ -276,12 +276,12 @@ On avance **un palier à la fois**, comme la v1. Source runtime : [`js/config/lo
 - [x] **3** Realtime `friends:${userId}` — 27 août 2026
 - [x] **4** Page Amis : **Inviter** / incoming — 27 août 2026
 - [x] **5** Popup + badge — 27 août 2026
-- [ ] **6** Rejoindre sans code (+ modale déjà ailleurs)
-- [ ] **7** Légal
-- [ ] **8** QA terrain *(toi, 2 comptes — pas avant 5–7)*
+- [x] **6** Rejoindre sans code (+ modale déjà ailleurs) — 27 août 2026
+- [x] **7** Légal in-app + OVH — 27 août 2026
+- [ ] **8** QA terrain *(toi, 2 comptes)*
 - [ ] **9** Pages / docs prod
 
-**En cours : rien.** **Prochain : palier 6.** Dire *« on fait le palier 6 »*.
+**En cours : palier 8** (QA terrain). Dire les cas OK / KO au fil de l’eau.
 
 ### Règles figées (ne pas rediscuter)
 
@@ -387,22 +387,24 @@ Fichiers :
 
 ### Palier 6 — Rejoindre sans code
 
-- [ ] Tap Rejoindre (pas déjà ailleurs) → `accept_lobby_invite` puis hydrate lobby existant (même pipeline que join code **après** membership)
-- [ ] **Rester et refuser** → `decline_lobby_invite` ; on ne quitte pas
-- [ ] **Quitter et rejoindre** → `leaveLobby` puis `accept_lobby_invite` (filet `lobby_invite_busy` si le client n’a pas vu le lobby local)
-- [ ] Plein / fermé / gone : alerte claire, pas de join partiel
-- [ ] Un seul lobby vivant, max 8 au join — pas de contournement
-- [ ] Tests source (busy / full / closed)
+- [x] Tap Rejoindre (pas déjà ailleurs) → `accept_lobby_invite` puis hydrate lobby existant (même pipeline que join code **après** membership)
+- [x] **Rester et refuser** → `decline_lobby_invite` ; on ne quitte pas
+- [x] **Quitter et rejoindre** → `leaveLobby` puis `accept_lobby_invite` (filet `lobby_invite_busy` si le client n’a pas vu le lobby local)
+- [x] Plein / fermé / gone : alerte claire, pas de join partiel
+- [x] Un seul lobby vivant, max 8 au join — pas de contournement
+- [x] Tests source (busy / full / closed) [`tests/featureFriends02-06.test.js`](../tests/featureFriends02-06.test.js)
 
-**Fait quand** : tests verts. **Ensuite légal (7), puis QA (8).**
+**Palier 6 terminé.** Légal in-app (7) fait ; site OVH puis QA (8).
 
 ### Palier 7 — Légal
 
-- [ ] `data/legalContent.js` : + invitations de soirée (éphémères, liées au lobby / cascade compte)
-- [ ] Recopie OVH `privacy.html`
-- [ ] Stores : avec le prochain build qui embarque la feature (comme palier 8 v1)
+- [x] [`data/legalContent.js`](../data/legalContent.js) : + invitations de soirée (éphémères, liées au lobby / cascade compte) — 27 août 2026
+- [x] Recopie OVH `privacy.html` — 27 août 2026 — [privacy.html](https://revealthepartygame.fr/privacy.html)
+- [x] Stores : avec le prochain build qui embarque la feature (comme palier 8 v1) — **ne pas** toucher App Privacy Apple / Play Data safety maintenant
 
-**Fait quand** : in-app + site. **Puis palier 8 = ta recette.**
+**Palier 7 validé** (in-app + [site](https://revealthepartygame.fr/privacy.html)). **Puis QA (8).**
+
+Tests : [`tests/featureFriends02-07.test.js`](../tests/featureFriends02-07.test.js)
 
 ### Palier 8 — QA terrain
 
@@ -454,7 +456,8 @@ SQL déjà sur le projet live au palier 1. Ici : client web + docs, **pas** le 1
 | 15 | F02-3 | Realtime *(fait)* |
 | 16 | F02-4 | UI Inviter page Amis *(fait)* |
 | 17 | F02-5 | Popup + badge *(fait)* |
-| 18 | F02-6 | Join sans code |
-| 19 | F02-7–9 | Légal, QA, prod |
+| 18 | F02-6 | Join sans code *(fait)* |
+| 19 | F02-7 | Légal in-app + OVH *(validé)* |
+| 20 | F02-8–9 | QA, prod |
 
-Pour implémenter : ouvrir ce fichier et dire **« on fait le palier 6 »** (Rejoindre sans code).
+Pour implémenter : dire **« on fait le palier 8 »** (QA terrain, 2 comptes).

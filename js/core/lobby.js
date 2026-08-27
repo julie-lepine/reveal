@@ -1458,10 +1458,15 @@ export async function notifyVoluntaryLeaveFailure(res, testDeps = null) {
  * Invité / membre : runVoluntaryMemberLeave (contrat échec distant strict).
  * Hôte : redirige vers confirmAndLeaveLobby → dissolve.
  *
+ * `skipConfirm` : hôte, pas de 2ᵉ modale (Quitter et rejoindre après la modale busy).
+ *
  * Branche sans lobby.id Supabase : cleanup local (legacy / edge) sans DELETE distant.
  */
-export async function leaveLobby({ navigateAway = true } = {}) {
+export async function leaveLobby({ navigateAway = true, skipConfirm = false } = {}) {
   if (isSupabaseConfigured() && getLobby()?.id && isLocalLobbyHost()) {
+    if (skipConfirm) {
+      return dissolveLobbyAsHost({ navigateAway });
+    }
     return confirmAndLeaveLobby({ navigateAway });
   }
 

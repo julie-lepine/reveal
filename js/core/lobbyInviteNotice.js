@@ -17,7 +17,11 @@ import {
   getIncomingLobbyInvites,
   onLobbyInvitesCacheUpdated,
 } from "./lobbyInvitesState.js";
-import { lobbyInviteFailMessage, nextUnseenLobbyInvite } from "./lobbyInvitesLogic.js";
+import {
+  lobbyInviteAcceptPlan,
+  lobbyInviteFailMessage,
+  nextUnseenLobbyInvite,
+} from "./lobbyInvitesLogic.js";
 import {
   joinFromLobbyInvite,
   leaveAndJoinFromLobbyInvite,
@@ -58,9 +62,12 @@ function canPopupNow() {
 async function presentIncoming(row) {
   poppedIds.add(row.id);
   busy = true;
-  const currentLobbyId = getLobby()?.id || null;
   const alreadyElsewhere =
-    hasActiveLobby() && currentLobbyId && row.lobbyId && row.lobbyId !== currentLobbyId;
+    lobbyInviteAcceptPlan({
+      localInLobby: hasActiveLobby(),
+      localLobbyId: getLobby()?.id || null,
+      inviteLobbyId: row.lobbyId || null,
+    }) === "busy";
   const copy = alreadyElsewhere ? lobbyInviteBusyCopy(row) : lobbyInviteNoticeCopy(row);
   try {
     const accepted = await showAppConfirm(copy.message, {

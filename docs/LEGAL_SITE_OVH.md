@@ -87,6 +87,7 @@ Attendre 15 min à 2 h (parfois 24 h) pour la propagation.
 - [x] `https://www.revealthepartygame.fr/` → accueil légal (pas « Site en construction ») — 25 août 2026
 - [x] `…/privacy.html` et `…/mentions-legales.html` OK — 25 août 2026 (2,99 € TTC, Google = paiement)
 - [x] `privacy.html` : liste d’amis privée + cascade suppression — 27 août 2026
+- [x] `privacy.html` : invitations de soirée éphémères + cascade compte — FEATURE-FRIENDS-02 — 27 août 2026
 - [x] Logo `reveal.png` s’affiche
 - [x] Liens footer entre les pages
 - [x] **Liens téléchargement app** (Play Store / App Store) sur `index.html` — 25 août 2026
@@ -200,4 +201,91 @@ Aligne-toi mot pour mot sur les paragraphes ci-dessus (mêmes apostrophes typogr
 ```
 
 En ligne (27 août 2026) : [privacy.html](https://revealthepartygame.fr/privacy.html) — liste d’amis, finalités, cascade. Recocher LAUNCH fait.
+
+---
+
+## MAJ `privacy.html` — FEATURE-FRIENDS-02 (27 août 2026)
+
+Source de vérité in-app : [`data/legalContent.js`](../data/legalContent.js) (`updated` : **27 août 2026**).
+
+La page live a **déjà** la liste d’amis (FEATURE-FRIENDS-01). Ici on **ajoute** les invitations de soirée, sans retirer les amis ni IAP/AdMob/RevenueCat.
+
+**Ne pas** modifier les fiches App Privacy Apple / Play Data safety tant qu’un **nouveau store build** n’embarque pas la feature.
+
+### Prompt à coller dans le repo du site OVH
+
+```
+Tu mets à jour privacy.html du site légal REVEAL (https://revealthepartygame.fr/privacy.html) pour coller à la politique in-app du 27 août 2026 (FEATURE-FRIENDS-02).
+
+Contexte produit (ne pas inventer d’autre graphe social ni de canal public) :
+- REVEAL a déjà une liste d’amis PRIVÉE (comptes inscrits seulement, découverte roster lobby, pas de recherche, pas de fil).
+- NOUVEAU : invitations de soirée PRIVÉES, éphémères, uniquement entre amis inscrits.
+- L’émetteur doit déjà être membre d’un lobby vivant. Les invités anonymes ne peuvent ni envoyer ni recevoir une invitation.
+- L’invitation est liée à CE lobby : elle disparaît si le lobby est fermé / dissous (cascade), si on refuse, ou si on accepte (on rejoint).
+- Rejoindre se fait sans taper le code 6 lettres. La ligne d’invitation ne contient PAS le code salon. Ce n’est PAS un lien public, PAS un QR, PAS un deep link, PAS un e-mail d’invitation, PAS une notification push.
+- Ce n’est PAS un message dans le chat du lobby. Canal privé.
+- Suppression de compte : les invitations de soirée partent aussi en cascade (comme les demandes d’amitié / amitiés).
+- Ne pas présenter ça comme un réseau social public, ni comme des invitations e-mail / SMS.
+
+Fichier : privacy.html seulement (sauf si une date globale est aussi dans un footer commun).
+
+Garde tout le texte déjà en ligne (amis, AdMob, UMP, Sans pub 2,99 € TTC, RevenueCat, HAVEFUNCORP si présent, contact, Instagram, liens stores). N’écrase pas ces paragraphes : tu INSERTES les mentions ci-dessous.
+
+1) Date « Dernière mise à jour »
+Garder 27 août 2026. Si une autre date est affichée, mets 27 août 2026.
+
+2) Section « Données collectées »
+Après la clause sur la liste d’amis / demandes d’amitié (celle qui dit « sans recherche publique ni fil social »), AVANT « données de jeu », insère exactement :
+
+, invitations de soirée éphémères (entre amis inscrits, liées à un lobby vivant, sans le code salon)
+
+Paragraphe cible (si tu réécris tout le bloc, mot pour mot, apostrophes comme le fichier actuel) :
+
+Selon votre mode d'utilisation, nous pouvons traiter : pseudo et emoji de profil, adresse e-mail (compte enregistré), identifiant de session anonyme (mode invité), liste d’amis et demandes d’amitié (comptes inscrits uniquement ; découverte uniquement dans un lobby privé, sans recherche publique ni fil social), invitations de soirée éphémères (entre amis inscrits, liées à un lobby vivant, sans le code salon), données de jeu (scores, votes, messages de lobby), et données techniques (appareil, logs d'erreur).
+
+3) Section « Finalités »
+Après « gestion d’une liste d’amis privée (comptes inscrits) », insère :
+
+, envoi d’invitations de soirée privées (amis inscrits, depuis un lobby)
+
+Ne retire rien d’autre (Turnstile, AdMob, classements, auth). Formulation cible si le paragraphe n’a pas encore RevenueCat dans Finalités :
+
+Authentification, synchronisation multijoueur en temps réel, affichage des classements, gestion d’une liste d’amis privée (comptes inscrits), envoi d’invitations de soirée privées (amis inscrits, depuis un lobby), prévention des abus (captcha Cloudflare Turnstile), et monétisation par publicités (Google AdMob) sur l'application mobile.
+
+4) Section « Conservation »
+Après la phrase sur les données de session / lobby (temps de la soirée), ajoute cette phrase (sans supprimer le reste du paragraphe, e-mail, 30 jours, lien suppression) :
+
+Les invitations de soirée sont éphémères : elles disparaissent à la fermeture du lobby, au refus ou à l’acceptation.
+
+5) Section « Suppression de compte »
+Après « les demandes d’amitié et amitiés associées (suppression en cascade) », insère :
+
+, les invitations de soirée associées (suppression en cascade)
+
+Phrase cible :
+
+Nous effaçons le compte Supabase Auth, le profil (pseudo, emoji), les demandes d’amitié et amitiés associées (suppression en cascade), les invitations de soirée associées (suppression en cascade), et les données de jeu associées, sous 30 jours ouvrés.
+
+6) Interdits (très important) :
+- Ne pas ajouter de recherche d’utilisateurs, fil d’actualité, messagerie privée (DM), push marketing, QR, lien #join=, invitation par e-mail/SMS.
+- Ne pas citer de noms de tables SQL (lobby_invites, friend_requests, etc.) ni de RPC.
+- Ne pas changer les prix IAP, AdMob, UMP, RevenueCat, HAVEFUNCORP, contact e-mail, Instagram, boutons Play/App Store.
+- Ne pas toucher index.html, mentions-legales.html, suppression-compte.html, legal.css, logo — sauf date globale forcée (alors 27 août 2026).
+- Ne pas présenter REVEAL comme un réseau social public.
+- Ne pas modifier les questionnaires App Privacy Apple / Play Data safety (autre repo / consoles stores).
+
+7) Vérif après mise en ligne :
+- https://www.revealthepartygame.fr/privacy.html et https://revealthepartygame.fr/privacy.html
+- Date : 27 août 2026
+- Ctrl+F « invitations de soirée éphémères » → 1 occurrence (Données collectées)
+- Ctrl+F « invitations de soirée privées » → 1 (Finalités)
+- Ctrl+F « disparaissent à la fermeture du lobby » → 1 (Conservation)
+- Ctrl+F « invitations de soirée associées » → 1 (Suppression)
+- Ctrl+F « amis » toujours présent (ne pas avoir écrasé FEATURE-FRIENDS-01)
+- Ctrl+F : pas de « recherche de joueurs », « fil d’actualité », « réseau social public », « lobby_invites », « push »
+
+Aligne-toi mot pour mot sur les inserts ci-dessus (mêmes apostrophes typographiques que le fichier déjà en ligne : si la page utilise ' ASCII, garde-les ; si elle utilise ’, garde-les).
+```
+
+En ligne (27 août 2026) : [privacy.html](https://revealthepartygame.fr/privacy.html) — invitations éphémères, finalités, conservation, cascade compte.
 

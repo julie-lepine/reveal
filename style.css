@@ -3714,15 +3714,19 @@ button.emoji-picker-preview__avatar:active{
 .friends-row__actions{
   display:flex;
   flex-wrap:wrap;
+  align-items:center;
   gap:6px;
   flex-shrink:0;
 }
 
 .friends-row__badge{
+  display:inline-flex;
+  align-items:center;
   font-size:12px;
   font-weight:700;
   color:rgba(255,255,255,.5);
   white-space:nowrap;
+  line-height:1.2;
 }
 
 .lobby-invite-friends-entry{
