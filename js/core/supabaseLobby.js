@@ -86,6 +86,10 @@ import {
   shouldSkipLobbyRealtimeResubscribe,
   shouldApplyLobbySubscribeStatus,
 } from "./lobbyRealtimeGate.js";
+import {
+  wasLobbyClosureHandled,
+  isLocalHostManualDissolve,
+} from "./lobbyClosureSession.js";
 
 export {
   JOIN_SESSION_RESTORE_DELAYS_MS,
@@ -935,67 +939,45 @@ export async function recoverLobbyFromServer({ withMessages = false } = {}) {
 
 /**
  * Vérifie côté serveur si le joueur local est encore dans lobby_members.
+ * Pas de getUser() (round-trip Auth) : l’uid local suffit.
  * @returns {boolean|null} true/false, ou null si la requête a échoué (ne pas expulser).
  */
 export async function isLocalStillLobbyMember(lobbyId = getState().lobby?.id) {
   const userId = getSupabaseUserId();
-
-  console.log("[DEBUG membership check start]", {
-    lobbyId,
-    userId,
-    stateUser: getState().user,
-  });
-
-  if (!lobbyId) {
-    console.log("[DEBUG membership check skipped: no lobby]");
-    return null;
-  }
-  const { data: sessionData } = await supabase.auth.getSession();
-
-  const { data: authData } = await supabase.auth.getUser();
-
-console.log("[DEBUG SESSION IN MEMBERSHIP]", {
-  sessionUserId: sessionData?.session?.user?.id,
-  hasToken: !!sessionData?.session?.access_token
-});
-
-  console.log("[DEBUG AUTH COMPARE]", {
-    stateUserId: userId,
-    authUserId: authData?.user?.id,
-    isAnonymous: authData?.user?.is_anonymous,
-  });
-
-  const authUserId = authData?.user?.id;
-
-  // Auth absente : on ne peut pas conclure que le membre est parti
-  if (!authUserId) {
-    console.warn("membership check skipped: no auth");
-    return null;
-  }
+  if (!lobbyId || !userId) return null;
 
   const { data, error } = await supabase
     .from("lobby_members")
-    .select("id,user_id,lobby_id")
+    .select("id")
     .eq("lobby_id", lobbyId)
-    .eq("user_id", authUserId)
+    .eq("user_id", userId)
     .maybeSingle();
 
-  console.log("[DEBUG membership result]", {
-    lobbyId,
-    userId: authUserId,
-    data,
-    error,
-  });
-
   if (error) {
-    console.warn(
-      "REVEAL lobby membership check:",
-      error.message || error
-    );
+    console.warn("REVEAL lobby membership check:", error.message || error);
     return null;
   }
-
   return Boolean(data);
+}
+
+async function kickLocalPlayerIfStillInOpenLobby(lobbyId) {
+  if (!lobbyId || !getState().inLobby) return;
+  if (wasLobbyClosureHandled(lobbyId) || isLocalHostManualDissolve(lobbyId)) return;
+  const { handleKickedFromLobby } = await import("./lobby.js");
+  await handleKickedFromLobby();
+}
+
+/** DELETE membership : kick immédiat si le lobby existe encore (pas un dissolve CASCADE). */
+async function kickLocalIfMemberDeleteIsNotDissolve(lobbyId) {
+  if (!lobbyId || !getState().inLobby) return;
+  if (wasLobbyClosureHandled(lobbyId) || isLocalHostManualDissolve(lobbyId)) return;
+  const { data, error } = await supabase
+    .from("lobbies")
+    .select("id")
+    .eq("id", lobbyId)
+    .maybeSingle();
+  if (error || !data) return;
+  await kickLocalPlayerIfStillInOpenLobby(lobbyId);
 }
 
 /** N'expulse que si le membre local n'existe plus (évite faux « lobby fermé » après sync profil). */
@@ -1364,18 +1346,8 @@ function applyLobbyToState(bundle, { persistGuestMembership = false } = {}) {
   ) {
     // Kick prouvé : roster non vide sans le joueur local.
     // participants=[] ne suffit pas (bundle vide / partiel) - dissolve/gone gèrent autrement.
-    setTimeout(() => {
-      if (!getState().inLobby) return;
-      void import("./lobbyClosureSession.js").then(
-        ({ wasLobbyClosureHandled }) => {
-          const lid = getState().lobby?.id;
-          if (lid && wasLobbyClosureHandled(lid)) return;
-          void import("./lobby.js").then(({ handleKickedFromLobby }) =>
-            handleKickedFromLobby()
-          );
-        }
-      );
-    }, 0);
+    const lid = getState().lobby?.id || bundle.id;
+    void kickLocalPlayerIfStillInOpenLobby(lid);
     return;
   }
 
@@ -2386,39 +2358,14 @@ export function subscribeLobbyRealtime(onUpdate) {
         const removedUid = payload?.eventType === "DELETE" ? payload.old?.user_id : null;
         const localUid = getSupabaseUserId();
         if (removedUid && localUid && removedUid === localUid) {
-          setTimeout(() => {
-            if (!getState().inLobby) return;
-            void import("./lobbyClosureSession.js").then(
-              ({ wasLobbyClosureHandled, isLocalHostManualDissolve }) => {
-                if (wasLobbyClosureHandled(lobbyId) || isLocalHostManualDissolve(lobbyId)) {
-                  return;
-                }
-                void import("./lobby.js").then(({ handleKickedFromLobby }) =>
-                  handleKickedFromLobby()
-                );
-              }
-            );
-          }, 180);
+          void kickLocalIfMemberDeleteIsNotDissolve(lobbyId);
           return;
         }
-        if (payload?.eventType === "DELETE") {
+        if (payload?.eventType === "DELETE" && !removedUid && localUid) {
           const capturedLobbyId = lobbyId;
           void isLocalStillLobbyMember(capturedLobbyId).then((still) => {
             if (still !== false) return;
-            if (!getState().inLobby) return;
-            void import("./lobbyClosureSession.js").then(
-              ({ wasLobbyClosureHandled, isLocalHostManualDissolve }) => {
-                if (
-                  wasLobbyClosureHandled(capturedLobbyId) ||
-                  isLocalHostManualDissolve(capturedLobbyId)
-                ) {
-                  return;
-                }
-                void import("./lobby.js").then(({ handleKickedFromLobby }) =>
-                  handleKickedFromLobby()
-                );
-              }
-            );
+            void kickLocalPlayerIfStillInOpenLobby(capturedLobbyId);
           });
         }
         if (!isMeaningfulMemberChange(payload)) return;

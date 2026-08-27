@@ -3704,11 +3704,26 @@ button.emoji-picker-preview__avatar:active{
   background:rgba(255,255,255,.06);
 }
 
-.friends-row__name{
+.friends-row__meta{
   flex:1;
+  min-width:0;
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+  gap:2px;
+}
+
+.friends-row__name{
   min-width:0;
   font-weight:600;
   font-size:15px;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+
+.friends-row > .friends-row__name{
+  flex:1;
 }
 
 .friends-row__actions{
@@ -3719,14 +3734,27 @@ button.emoji-picker-preview__avatar:active{
   flex-shrink:0;
 }
 
-.friends-row__badge{
+.friends-row__actions .btn--compact{
+  margin:0;
+}
+
+.friends-row__status{
   display:inline-flex;
   align-items:center;
+  gap:6px;
   font-size:12px;
-  font-weight:700;
-  color:rgba(255,255,255,.5);
-  white-space:nowrap;
-  line-height:1.2;
+  font-weight:600;
+  color:rgba(187,247,208,.85);
+  line-height:1.25;
+}
+
+.friends-row__status::before{
+  content:"";
+  width:6px;
+  height:6px;
+  border-radius:50%;
+  background:#4ade80;
+  flex-shrink:0;
 }
 
 .lobby-invite-friends-entry{

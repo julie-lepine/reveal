@@ -69,6 +69,7 @@ describe("FEATURE-FRIENDS-02 Palier 4 — page Amis invitations", () => {
     assert.match(src, /joinFromLobbyInvite/);
     assert.match(src, /refuseLobbyInvite/);
     assert.match(src, /friendInviteAction/);
+    assert.match(src, /friends-row__status/);
     assert.match(src, /LOBBY_INVITE_LABEL/);
     assert.match(src, /fetchIncomingLobbyInvites/);
     assert.match(src, /fetchOutgoingLobbyInvites/);
@@ -103,7 +104,10 @@ describe("FEATURE-FRIENDS-02 Palier 4 — page Amis invitations", () => {
     assert.match(lobbyInviteFailMessage(LOBBY_INVITE_RPC_ERROR.busy), /une à la fois/);
     assert.match(lobbyInviteFailMessage(LOBBY_INVITE_RPC_ERROR.full), /complète/);
     const css = read("style.css");
-    assert.match(css, /\.friends-row__badge\{/);
+    assert.match(css, /\.friends-row__status\{/);
+    assert.match(css, /\.friends-row__status::before/);
+    assert.match(css, /\.friends-row__meta\{/);
+    assert.match(css, /\.friends-row__actions .btn--compact\{/);
     assert.match(css, /\.friends-row__actions\{[\s\S]*?align-items:\s*center/);
     assert.match(css, /\.lobby-invite-friends-entry\{/);
   });

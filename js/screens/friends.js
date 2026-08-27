@@ -84,17 +84,19 @@ function incomingLobbyInviteRowHtml(row) {
     </div>`;
 }
 
-function friendInviteControlHtml(row, { localIsRegistered, localInLobby, lobbyId, peerIds }) {
-  const kind = friendInviteAction({
+function friendInviteKind(row, { localIsRegistered, localInLobby, lobbyId, peerIds }) {
+  return friendInviteAction({
     localIsRegistered,
     localInLobby,
     peerInSameLobby: peerIds.has(row.userId),
     pendingOut: isLobbyInvitePendingOut(lobbyId, row.userId),
   });
+}
+
+function friendInviteControlHtml(row, inviteCtx) {
+  const kind = friendInviteKind(row, inviteCtx);
   if (kind === LOBBY_INVITE_ACTION.omit) return "";
-  if (kind === LOBBY_INVITE_ACTION.alreadyIn) {
-    return `<span class="friends-row__badge">${escapeHtml(LOBBY_INVITE_LABEL.alreadyIn)}</span>`;
-  }
+  if (kind === LOBBY_INVITE_ACTION.alreadyIn) return "";
   if (kind === LOBBY_INVITE_ACTION.sent) {
     return `<button type="button" class="btn btn-secondary btn--compact" data-lobby-invite-sent="${escapeHtml(row.userId)}" disabled>${escapeHtml(LOBBY_INVITE_LABEL.sent)}</button>`;
   }
@@ -102,10 +104,17 @@ function friendInviteControlHtml(row, { localIsRegistered, localInLobby, lobbyId
 }
 
 function friendRowHtml(row, inviteCtx) {
+  const inEvening = friendInviteKind(row, inviteCtx) === LOBBY_INVITE_ACTION.alreadyIn;
+  const status = inEvening
+    ? `<span class="friends-row__status">${escapeHtml(LOBBY_INVITE_LABEL.alreadyIn)}</span>`
+    : "";
   return `
     <div class="friends-row" data-friend-user="${escapeHtml(row.userId)}">
       <span class="friends-row__avatar" aria-hidden="true">${escapeHtml(row.emoji || "👤")}</span>
-      <span class="friends-row__name">${escapeHtml(row.name || "Joueur")}</span>
+      <div class="friends-row__meta">
+        <span class="friends-row__name">${escapeHtml(row.name || "Joueur")}</span>
+        ${status}
+      </div>
       <div class="friends-row__actions">
         ${friendInviteControlHtml(row, inviteCtx)}
         <button type="button" class="btn btn-secondary btn--compact" data-friend-unfriend="${escapeHtml(row.userId)}">${escapeHtml(FRIEND_LABEL.unfriend)}</button>

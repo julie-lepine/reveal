@@ -781,8 +781,11 @@ describe("lobbyMembershipVagueE2 - contrats dissolution / kick", () => {
     assert.ok(applyStart >= 0);
     const apply = src.slice(applyStart, applyStart + 1800);
     assert.match(apply, /bundle\.participants\.length > 0/);
-    assert.match(apply, /wasLobbyClosureHandled/);
-    assert.match(apply, /handleKickedFromLobby/);
+    assert.match(apply, /kickLocalPlayerIfStillInOpenLobby/);
+    assert.match(src, /wasLobbyClosureHandled/);
+    assert.match(src, /handleKickedFromLobby/);
+    assert.match(src, /kickLocalIfMemberDeleteIsNotDissolve/);
+    assert.doesNotMatch(src, /handleKickedFromLobby\(\)[\s\S]{0,40},\s*180\)/);
   });
 
   it("erreur réseau refresh : pas de dissolve si !isLobbyGoneError", async () => {
