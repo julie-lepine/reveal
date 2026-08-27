@@ -158,6 +158,16 @@ export function nextUnseenFriendRequest(incoming, poppedIds) {
   return null;
 }
 
+/**
+ * Résultat de la popup demande d’ami.
+ * true = Accepter, false = Refuser, autre (clic hors / Escape) = reporter.
+ */
+export function friendRequestPopupDecision(confirmResult) {
+  if (confirmResult === true) return "accept";
+  if (confirmResult === false) return "refuse";
+  return "dismiss";
+}
+
 export function friendRequestNoticeCopy(row) {
   const name = row?.name || "Quelqu’un";
   const emoji = row?.emoji || "👤";

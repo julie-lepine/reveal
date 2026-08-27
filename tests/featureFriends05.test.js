@@ -10,6 +10,7 @@ import { FRIEND_LABEL, isFriendNoticeCalmScreen } from "../js/config/friends.js"
 import {
   canShowFriendRequestPopup,
   friendRequestNoticeCopy,
+  friendRequestPopupDecision,
   friendsBadgeShouldShow,
   nextUnseenFriendRequest,
 } from "../js/core/friendsLogic.js";
@@ -43,18 +44,28 @@ describe("FEATURE-FRIENDS-01 Palier 5 — notice", () => {
     assert.equal(copy.icon, "🦊");
     assert.equal(friendsBadgeShouldShow(0), false);
     assert.equal(friendsBadgeShouldShow(1), true);
+    assert.equal(friendRequestPopupDecision(true), "accept");
+    assert.equal(friendRequestPopupDecision(false), "refuse");
+    assert.equal(friendRequestPopupDecision(null), "dismiss");
+    assert.equal(friendRequestPopupDecision(undefined), "dismiss");
   });
 
   it("friendRequestNotice : confirm + decline/accept, pas de chat", () => {
     const src = read("js/core/friendRequestNotice.js");
     assert.match(src, /showAppConfirm/);
+    assert.match(src, /dismissResult:\s*null/);
+    assert.match(src, /friendRequestPopupDecision/);
     assert.match(src, /isAppDialogOpen/);
     assert.match(src, /acceptFriendRequest/);
     assert.match(src, /declineFriendRequest/);
+    assert.match(src, /decision === "refuse"/);
     assert.match(src, /onScreenChange/);
     assert.match(src, /syncFriendsEntryBadges/);
     assert.doesNotMatch(src, /lobby_messages/);
     assert.doesNotMatch(src, /addLobbyMessage/);
+    const dialog = read("js/core/dialog.js");
+    assert.match(dialog, /dismissResult = false/);
+    assert.match(dialog, /close\(dismissResult\)/);
   });
 
   it("boot + badge Menu / Profil, écran friends branché au palier 6", () => {

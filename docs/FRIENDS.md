@@ -154,6 +154,7 @@ S’inspirer de [`js/core/hostNotice.js`](../js/core/hostNotice.js) (toast) et [
 - [x] Refuser → RPC decline ; A revoit **+ Ami** ; **pas** de toast chez A
 - [x] Accepter → friendship ; pastille Ami chez les deux si encore dans le même lobby
 - [x] Dédup : une popup par request id ; ne pas re-pop la même si déjà refusée
+- [x] Clic hors popup / Escape = **reporter** (pas `decline`) ; la demande reste dans **Mes amis**
 - [x] Branchement init dans [`js/main.js`](../js/main.js) (comme host notice)
 
 **Palier 5 validé** (27 août 2026). Recette waiting room : popup Accepter / Refuser. Recette « envoie pendant Trivia » **impossible** tant que **+ Ami** n’existe que dans la salle d’attente. Voir Palier 7bis.
@@ -177,7 +178,7 @@ Objectif : file durable + liste emoji/pseudo live.
 - [x] Écran `friends` = chrome soirée (`MENU_SCREENS` + `goToFriends` / `suppressSessionRoute`), comme Menu : pas une manche, pas de suivi auto vers le lobby
 - [x] Tests : [`tests/uxNavSettings.test.js`](../tests/uxNavSettings.test.js) mis à jour si le markup Profil change ; nouveau test écran friends (contrats HTML)
 
-**Palier 6 code à re-tester.** Pas de SQL. Recette : depuis un lobby encore ouvert, B ouvre **Mes amis**, reste sur la page, voit **Demandes reçues** (Accepter / Refuser). Retour hôte = pile nav / Menu, **pas** la modale « Arrêter la partie ». Unfriend = palier 7.
+**Palier 6 code à re-tester.** Pas de SQL. Recette : A envoie + Ami ; B clique **hors** de la popup → **Demandes reçues** dans Mes amis (pas vide). **Refuser** seulement via le bouton. Unfriend = palier 7.
 
 ---
 

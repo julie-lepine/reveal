@@ -9,6 +9,7 @@ import { getState } from "./state.js";
 import {
   canShowFriendRequestPopup,
   friendRequestNoticeCopy,
+  friendRequestPopupDecision,
   friendsBadgeShouldShow,
   isRegisteredUser,
   nextUnseenFriendRequest,
@@ -57,15 +58,17 @@ async function presentIncoming(row) {
       confirmLabel: copy.confirmLabel,
       cancelLabel: copy.cancelLabel,
       icon: copy.icon,
+      dismissResult: null,
     });
     const fromUserId = row.fromUserId;
     const lobbyId = getState().lobby?.id || null;
-    if (accepted) {
+    const decision = friendRequestPopupDecision(accepted);
+    if (decision === "accept") {
       const res = await acceptFriendRequest(fromUserId);
       if (res?.ok && lobbyId) {
         patchLobbyFriendOverlayStatus(lobbyId, fromUserId, FRIEND_OVERLAY.friends);
       }
-    } else {
+    } else if (decision === "refuse") {
       const res = await declineFriendRequest(fromUserId);
       if (res?.ok && lobbyId) {
         patchLobbyFriendOverlayStatus(lobbyId, fromUserId, FRIEND_OVERLAY.none);
