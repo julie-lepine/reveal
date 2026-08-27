@@ -1664,6 +1664,17 @@ export async function kickLobbyMember(targetUserId, { confirmName = "" } = {}) {
     return res;
   }
 
+  const lobby = getLobby();
+  if (lobby?.participants?.length) {
+    saveStatePatch({
+      lobby: {
+        ...lobby,
+        participants: lobby.participants.filter((p) => p.userId !== targetUserId),
+      },
+    });
+    notifyLobbyBundleUpdated();
+  }
+
   return { ok: true };
 }
 

@@ -173,9 +173,11 @@ export function mountFriends(app) {
   const actionLock = createActionLock();
   let unsubFriendsCache = () => {};
   let unsubInvitesCache = () => {};
+  let joiningLobby = false;
 
   function paint() {
     if (!mount.isMounted()) return;
+    if (joiningLobby) return;
     const registered = isLoggedIn();
     app.innerHTML = pageShell({
       back: true,
@@ -383,22 +385,34 @@ export function mountFriends(app) {
         return;
       }
       if (decision !== "leave_and_join") return;
+      joiningLobby = true;
       const runLeave = await actionLock.run(() => leaveAndJoinFromLobbyInvite(inviteId));
-      if (!mount.isMounted()) return;
-      if (runLeave.skipped) return;
+      if (runLeave.skipped) {
+        joiningLobby = false;
+        return;
+      }
       const left = runLeave.value;
-      if (left?.ok || left?.cancelled) return;
+      if (left?.ok) return;
+      joiningLobby = false;
+      if (!mount.isMounted()) return;
+      if (left?.cancelled) return;
       await showAppAlert(lobbyInviteFailMessage(left?.code), {
         title: LOBBY_INVITE_LABEL.busyTitle,
         icon: "⚠️",
       });
       return;
     }
+    joiningLobby = true;
     const run = await actionLock.run(() => joinFromLobbyInvite(inviteId));
-    if (!mount.isMounted()) return;
-    if (run.skipped) return;
+    if (run.skipped) {
+      joiningLobby = false;
+      return;
+    }
     const res = run.value;
-    if (res?.ok || res?.skipped) return;
+    if (res?.ok) return;
+    joiningLobby = false;
+    if (!mount.isMounted()) return;
+    if (res?.skipped) return;
     if (res?.joinedUnhydrated) {
       await showAppAlert("Invitation acceptée. Retourne à l’accueil pour ouvrir la soirée.", {
         title: LOBBY_INVITE_LABEL.noticeTitle,
@@ -414,6 +428,7 @@ export function mountFriends(app) {
 
   function onCacheUpdated() {
     if (!mount.isMounted()) return;
+    if (joiningLobby) return;
     if (!isLoggedIn()) return;
     paint();
   }

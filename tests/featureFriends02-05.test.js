@@ -66,10 +66,9 @@ describe("FEATURE-FRIENDS-02 Palier 5 — popup + badge", () => {
     const main = read("js/main.js");
     assert.match(main, /initLobbyInviteNotice/);
     const join = read("js/core/lobbyInviteJoin.js");
-    assert.match(join, /acceptLobbyInvite/);
-    assert.match(join, /tryRecoverLobbyFromServer/);
-    assert.match(join, /navigateAfterLobbyJoin/);
+    assert.match(join, /refreshLobbyFromSupabase/);
     assert.match(join, /goToLobby/);
+    assert.match(join, /acceptLobbyInvite/);
     assert.doesNotMatch(join, /find_lobby_by_code/);
     assert.doesNotMatch(join, /lobby_messages/);
     const notice = read("js/core/friendRequestNotice.js");

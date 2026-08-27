@@ -638,6 +638,7 @@ export function mountLobby(app) {
       unsubBundle = onLobbyBundleUpdated(() => {
         if (!mount.isMounted()) return;
         if (!mount.isCurrentMount()) return;
+        onLobbyUpdate();
         if (isLobbyEveningStarted()) {
           void routeToActiveGameIfNeeded(null, { shouldContinue });
         }

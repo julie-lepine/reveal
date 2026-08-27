@@ -1,15 +1,17 @@
 /**
  * FEATURE-FRIENDS-02 — accepter une invitation puis hydrater le lobby (sans code).
  */
-import { getCurrentScreen } from "./router.js";
+import { saveStatePatch } from "./state.js";
 import {
   getLobby,
   goToLobby,
   hasActiveLobby,
+  isLobbyEveningStarted,
   leaveLobby,
   navigateAfterLobbyJoin,
   tryRecoverLobbyFromServer,
 } from "./lobby.js";
+import { refreshLobbyFromSupabase } from "./supabaseLobby.js";
 import { LOBBY_INVITE_RPC_ERROR } from "../config/lobbyInvites.js";
 import { getIncomingLobbyInvites } from "./lobbyInvitesState.js";
 import {
@@ -18,19 +20,30 @@ import {
   fetchIncomingLobbyInvites,
 } from "./supabaseLobbyInvites.js";
 
-async function hydrateAfterLobbyInviteAccept() {
-  let recovered = await tryRecoverLobbyFromServer();
-  if (!recovered?.ok) {
-    recovered = await tryRecoverLobbyFromServer();
+async function hydrateAfterLobbyInviteAccept(lobbyId) {
+  if (lobbyId) {
+    const prev = getLobby() || {};
+    saveStatePatch({
+      inLobby: true,
+      lobby: {
+        ...prev,
+        id: lobbyId,
+        code: prev.code || "",
+        participants: prev.participants || [],
+      },
+    });
+    await refreshLobbyFromSupabase({ withMessages: true });
   }
-  if (!recovered?.ok && !hasActiveLobby() && !getLobby()?.code) {
-    return { ok: false };
+  if (!getLobby()?.code) {
+    const recovered = await tryRecoverLobbyFromServer();
+    if (!recovered?.ok && !getLobby()?.code) return { ok: false };
   }
-  await navigateAfterLobbyJoin();
-  const screen = getCurrentScreen();
-  if ((screen === "friends" || screen === "home") && (hasActiveLobby() || getLobby()?.code)) {
-    goToLobby();
-  }
+  saveStatePatch({ inLobby: true });
+  goToLobby();
+  void tryRecoverLobbyFromServer().then((recovered) => {
+    if (!recovered?.ok) return;
+    if (isLobbyEveningStarted()) void navigateAfterLobbyJoin();
+  });
   return { ok: true };
 }
 
@@ -52,7 +65,7 @@ export async function joinFromLobbyInvite(inviteId) {
     if (!res?.ok || (res.result !== "joined" && res.result !== "already_in")) {
       return { ok: false, code: null };
     }
-    const hydrated = await hydrateAfterLobbyInviteAccept();
+    const hydrated = await hydrateAfterLobbyInviteAccept(res.lobbyId || invite?.lobbyId);
     void fetchIncomingLobbyInvites();
     if (!hydrated.ok) return { ok: false, joinedUnhydrated: true };
     return { ok: true, result: res.result };
