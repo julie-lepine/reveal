@@ -137,8 +137,9 @@ export function showAppRichDialog({
 }
 
 /**
- * Confirmation (ex. suppression). Retourne true si confirmé.
- * @returns {Promise<boolean>}
+ * Confirmation (ex. suppression). Retourne true si confirmé, false si bouton Annuler.
+ * Backdrop / Escape : `dismissResult` (false par défaut, pour ne pas changer les autres confirms).
+ * @returns {Promise<boolean|null|undefined>}
  */
 export function showAppConfirm(
   message,
@@ -147,6 +148,7 @@ export function showAppConfirm(
     confirmLabel = "Confirmer",
     cancelLabel = "Annuler",
     icon = "⚠️",
+    dismissResult = false,
   } = {}
 ) {
   return new Promise((resolve) => {
@@ -178,9 +180,9 @@ export function showAppConfirm(
 
     root.querySelector("[data-dialog-ok]")?.addEventListener("click", () => close(true));
     root.querySelector("[data-dialog-cancel]")?.addEventListener("click", () => close(false));
-    root.querySelector("[data-dialog-dismiss]")?.addEventListener("click", () => close(false));
+    root.querySelector("[data-dialog-dismiss]")?.addEventListener("click", () => close(dismissResult));
     root.addEventListener("keydown", (e) => {
-      if (e.key === "Escape") close(false);
+      if (e.key === "Escape") close(dismissResult);
     });
 
     document.body.appendChild(root);
