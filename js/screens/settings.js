@@ -37,6 +37,7 @@ import { openExternalUrl } from "../core/openExternal.js";
 import { openInstagramProfile } from "../core/feedbackUi.js";
 import { createMountGuard } from "../core/mountLifecycle.js";
 import { bindNav, returnFromEveningProfile } from "./nav.js";
+import { syncFriendsEntryBadges } from "../core/friendRequestNotice.js";
 
 const TAB_PERSONNALISATION = "personnalisation";
 const TAB_SOIREE = "soiree";
@@ -95,6 +96,7 @@ function settingsTabsHtml(activeTab, inLobby) {
       }">
         <span class="settings-tabs__icon" aria-hidden="true">✨</span>
         <span class="settings-tabs__label">Profil</span>
+        <span class="friends-badge" data-friends-badge hidden aria-hidden="true"></span>
       </button>
       <button type="button" class="settings-tabs__btn${
         activeTab === TAB_SUPPORT ? " settings-tabs__btn--active" : ""
@@ -628,6 +630,7 @@ export function mountSettings(app) {
     bindNav(app, {
       "evening-return": () => returnFromEveningProfile(),
     });
+    syncFriendsEntryBadges(app);
 
     if (activeTab === TAB_PERSONNALISATION) bindPersonnalisationEvents();
     if (activeTab === TAB_SOIREE) bindSoireeEvents();

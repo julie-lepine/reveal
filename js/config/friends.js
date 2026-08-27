@@ -76,6 +76,8 @@ export const FRIEND_LABEL = {
   accept: "Accepter",
   friend: "Ami",
   unfriend: "Retirer",
+  refuse: "Refuser",
+  noticeTitle: "Demande d’ami",
   /** Carte d’un invité, vue par un inscrit. */
   guestCard: "Pas de compte",
   /** Sous la grille, seulement si le joueur local est invité. */

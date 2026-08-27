@@ -14,6 +14,7 @@ import {
 } from "./gameSync.js";
 import { exitGameToGameSelect } from "./exitGame.js";
 import { goToEveningSettings } from "../screens/nav.js";
+import { syncFriendsEntryBadges } from "./friendRequestNotice.js";
 
 const TAB_HOME = BOTTOM_NAV_TAB.HOME;
 const TAB_SETTINGS = BOTTOM_NAV_TAB.SETTINGS;
@@ -100,7 +101,7 @@ function tabButtonHtml(tabId) {
   if (tabId === TAB_SETTINGS) {
     return `
     <button type="button" class="bottom-nav__item" data-tab="${TAB_SETTINGS}" data-tab-nav="${TAB_SETTINGS}" aria-label="Menu">
-      <span class="bottom-nav__icon-wrap"><span class="bottom-nav__icon bottom-nav__icon--menu" aria-hidden="true"></span></span>
+      <span class="bottom-nav__icon-wrap"><span class="bottom-nav__icon bottom-nav__icon--menu" aria-hidden="true"></span><span class="friends-badge" data-friends-badge hidden aria-hidden="true"></span></span>
       <span class="bottom-nav__label">Menu</span>
     </button>`;
   }
@@ -158,6 +159,7 @@ function renderNavItems(nav) {
   const tabs = resolveBottomNavTabs(inLobby);
   nav.innerHTML = tabs.map((id) => tabButtonHtml(id)).join("");
   bindNavClicks(nav);
+  syncFriendsEntryBadges(nav);
 }
 
 function setActiveTab(tabId) {

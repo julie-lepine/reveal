@@ -3631,6 +3631,22 @@ button.emoji-picker-preview__avatar:active{
   margin:10px 0 0;
 }
 
+.friends-badge{
+  position:absolute;
+  top:-2px;
+  right:-2px;
+  width:8px;
+  height:8px;
+  border-radius:50%;
+  background:#f472b6;
+  box-shadow:0 0 0 2px #0d0f1e;
+  pointer-events:none;
+}
+
+.friends-badge[hidden]{
+  display:none !important;
+}
+
 .invite-card{
   background:rgba(255,255,255,.04);
   border:1px solid rgba(255,255,255,.08);
@@ -4225,6 +4241,7 @@ button.emoji-picker-preview__avatar:active{
   background:rgba(255,255,255,.05);
   border:1px solid rgba(255,255,255,.06);
   transition:background .2s, border-color .2s, transform .15s;
+  position:relative;
 }
 
 .bottom-nav__item:active .bottom-nav__icon-wrap{

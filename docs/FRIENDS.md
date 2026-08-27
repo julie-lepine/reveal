@@ -144,19 +144,19 @@ Fichiers : [`js/screens/lobby.js`](../js/screens/lobby.js) (`participantsHtml`),
 
 Objectif : B est prévenu sans polluer le chat, sans couper une partie.
 
-S’inspirer de [`js/core/hostNotice.js`](../js/core/hostNotice.js) (toast) et [`js/core/dialog.js`](../js/core/dialog.js) (confirm).
+S’inspirer de [`js/core/hostNotice.js`](../js/core/hostNotice.js) (toast) et [`js/core/dialog.js`](../js/core/dialog.js) (confirm). Tests : [`tests/featureFriends05.test.js`](../tests/featureFriends05.test.js).
 
-- [ ] Module [`js/core/friendRequestNotice.js`](../js/core/friendRequestNotice.js)
+- [x] Module [`js/core/friendRequestNotice.js`](../js/core/friendRequestNotice.js)
   - file des demandes incoming non vues (ids)
   - si écran calme (liste Palier 0) **et** pas de dialog déjà ouvert : popup *« {emoji} {name} veut t’ajouter »* → Accepter / Refuser
-  - sinon : badge (point) sur l’entrée Amis (Settings Profil + nav vers `friends`)
-- [ ] Pendant une partie : **aucune** `showAppConfirm` / modal
-- [ ] Refuser → RPC decline ; A revoit **+ Ami** ; **pas** de toast chez A
-- [ ] Accepter → friendship ; pastille Ami chez les deux si encore dans le même lobby
-- [ ] Dédup : une popup par request id ; ne pas re-pop la même si déjà refusée
-- [ ] Branchement init dans [`js/main.js`](../js/main.js) (comme host notice)
+  - sinon : badge (point) sur Menu (bottom nav) + onglet **Profil** (Settings) — entrée *Mes amis* au palier 6
+- [x] Pendant une partie : **aucune** `showAppConfirm` / modal
+- [x] Refuser → RPC decline ; A revoit **+ Ami** ; **pas** de toast chez A
+- [x] Accepter → friendship ; pastille Ami chez les deux si encore dans le même lobby
+- [x] Dédup : une popup par request id ; ne pas re-pop la même si déjà refusée
+- [x] Branchement init dans [`js/main.js`](../js/main.js) (comme host notice)
 
-**Fait quand** : recette A. waiting room popup ; B. en manche Trivia → badge seulement, popup au retour hub.
+**Palier 5 code terminé.** Pas de SQL. Recette : A. waiting room → popup chez B. B. en manche Trivia → point sur Menu seulement, popup au retour hub (game-select / results).
 
 ---
 

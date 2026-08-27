@@ -65,6 +65,7 @@ import { initLobbyPollSync } from "./core/lobbyPollStore.js";
 import { initChatRandomGameSync } from "./core/chatRandomGame.js";
 import { initHostNoticeListener } from "./core/hostNotice.js";
 import { initActingHostNoticeListener } from "./core/actingHostNotice.js";
+import { initFriendRequestNotice } from "./core/friendRequestNotice.js";
 import { syncFriendsRealtimeForSession } from "./core/friendsRealtime.js";
 import { checkClientCompatibility } from "./core/clientCompatibility.js";
 import { COMPAT_STATUS } from "./core/clientCompatibilityContract.js";
@@ -138,6 +139,7 @@ initAds();
 initMultiplayerSyncVisibility();
 initHostNoticeListener();
 initActingHostNoticeListener();
+initFriendRequestNotice();
 initClientCompatibilityForeground();
 
 /** Empêche double initLobbyPollSync / reconcile / resume après retry gate boot. */

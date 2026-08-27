@@ -10,6 +10,7 @@ import {
   FRIEND_ROSTER_ACTION,
   FRIEND_RPC_ERROR,
   FRIENDS_TABLE,
+  isFriendNoticeCalmScreen,
   rosterActionFromOverlay,
 } from "../config/friends.js";
 
@@ -133,4 +134,40 @@ export function peerFriendRosterKind(overlayStatus, { isLocal, userId, localIsRe
   if (!localIsRegistered) return "omit";
   if (overlayStatus == null) return "omit";
   return rosterActionFromOverlay(overlayStatus, { localIsRegistered: true });
+}
+
+/** Popup Accepter / Refuser seulement écran calme, inscrit, pas d’autre dialog. */
+export function canShowFriendRequestPopup({
+  screenId,
+  dialogOpen,
+  localIsRegistered,
+} = {}) {
+  if (!localIsRegistered) return false;
+  if (dialogOpen) return false;
+  return isFriendNoticeCalmScreen(screenId);
+}
+
+/** Première demande incoming dont l’id n’a pas déjà eu une popup. */
+export function nextUnseenFriendRequest(incoming, poppedIds) {
+  const seen = poppedIds instanceof Set ? poppedIds : new Set(poppedIds || []);
+  for (const row of incoming || []) {
+    if (row?.id && !seen.has(row.id)) return row;
+  }
+  return null;
+}
+
+export function friendRequestNoticeCopy(row) {
+  const name = row?.name || "Quelqu’un";
+  const emoji = row?.emoji || "👤";
+  return {
+    title: FRIEND_LABEL.noticeTitle,
+    message: `${name} veut t’ajouter`,
+    icon: emoji,
+    confirmLabel: FRIEND_LABEL.accept,
+    cancelLabel: FRIEND_LABEL.refuse,
+  };
+}
+
+export function friendsBadgeShouldShow(incomingCount) {
+  return Number(incomingCount) > 0;
 }
