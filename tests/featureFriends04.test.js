@@ -28,17 +28,18 @@ describe("FEATURE-FRIENDS-01 Palier 4 — roster lobby", () => {
     assert.equal(peerFriendRosterKind(null, peer), "omit");
   });
 
-  it("inscrit + overlay : Ajouter / Envoyée / Accepter / Ami / hint invité", () => {
+  it("inscrit + overlay : + Ami / Envoyée / Accepter / Ami / Pas de compte", () => {
     const peer = { isLocal: false, userId: "u2", localIsRegistered: true };
     assert.equal(peerFriendRosterKind(FRIEND_OVERLAY.none, peer), FRIEND_ROSTER_ACTION.add);
     assert.equal(peerFriendRosterKind(FRIEND_OVERLAY.pendingOut, peer), FRIEND_ROSTER_ACTION.sent);
     assert.equal(peerFriendRosterKind(FRIEND_OVERLAY.pendingIn, peer), FRIEND_ROSTER_ACTION.accept);
     assert.equal(peerFriendRosterKind(FRIEND_OVERLAY.friends, peer), FRIEND_ROSTER_ACTION.friend);
     assert.equal(peerFriendRosterKind(FRIEND_OVERLAY.guest, peer), FRIEND_ROSTER_ACTION.hintGuest);
-    assert.equal(FRIEND_LABEL.add, "Ajouter");
+    assert.equal(FRIEND_LABEL.add, "+ Ami");
     assert.equal(FRIEND_LABEL.sent, "Envoyée");
     assert.equal(FRIEND_LABEL.accept, "Accepter");
     assert.equal(FRIEND_LABEL.friend, "Ami");
+    assert.equal(FRIEND_LABEL.guestCard, "Pas de compte");
     assert.equal(FRIEND_LABEL.guestHint, "Crée un compte pour ajouter des amis");
   });
 
@@ -52,7 +53,8 @@ describe("FEATURE-FRIENDS-01 Palier 4 — roster lobby", () => {
     assert.match(lobby, /fetchLobbyFriendOverlay/);
     assert.match(lobby, /markOverlayPendingOut/);
     assert.match(lobby, /onFriendsCacheUpdated/);
-    assert.match(lobby, /FRIEND_LABEL/);
+    assert.match(lobby, /FRIEND_LABEL\.guestCard/);
+    assert.match(lobby, /FRIEND_LABEL\.guestHint/);
     assert.match(lobby, /sendMessage: addLobbyMessage/);
     assert.equal((lobby.match(/addLobbyMessage/g) || []).length, 2);
     assert.match(lobby, /data-kick-user/);

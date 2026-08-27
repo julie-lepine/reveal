@@ -57,7 +57,7 @@ export const FRIEND_RPC = {
 
 /**
  * `error.message` renvoyé par les RPC (raise exception).
- * `friends_cooldown` : le bouton reste « Ajouter », aucun toast « refusé ».
+ * `friends_cooldown` : le bouton reste « + Ami », aucun toast « refusé ».
  */
 export const FRIEND_RPC_ERROR = {
   cooldown: "friends_cooldown",
@@ -71,15 +71,18 @@ export const FRIEND_RPC_ERROR = {
 export const FRIEND_REQUEST_COOLDOWN_MS = 60 * 1000;
 
 export const FRIEND_LABEL = {
-  add: "Ajouter",
+  add: "+ Ami",
   sent: "Envoyée",
   accept: "Accepter",
   friend: "Ami",
   unfriend: "Retirer",
+  /** Carte d’un invité, vue par un inscrit. */
+  guestCard: "Pas de compte",
+  /** Sous la grille, seulement si le joueur local est invité. */
   guestHint: "Crée un compte pour ajouter des amis",
 };
 
-/** Action roster ( Palier 4 ). `hint_guest` = pas de bouton Ajouter. */
+/** Action roster ( Palier 4 ). `hint_guest` = pas de bouton + Ami. */
 export const FRIEND_ROSTER_ACTION = {
   hintGuest: "hint_guest",
   add: "add",

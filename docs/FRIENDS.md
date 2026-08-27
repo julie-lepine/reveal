@@ -10,7 +10,7 @@ Légal store : *No public social feed*. Découverte **uniquement** via le roster
 
 - Comptes **inscrits seulement** (`isLoggedIn()` = email / Facebook, pas invité anonyme).
 - Canal = **notification privée**. Jamais le chat lobby (`lobby_messages`).
-- Refus = **suppression** de la ligne `friend_requests`. Côté émetteur, le bouton redevient **Ajouter**, **sans explication**.
+- Refus = **suppression** de la ligne `friend_requests`. Côté émetteur, le bouton redevient **+ Ami**, **sans explication**.
 - Identité = `auth.users.id` (UUID). Pseudo / emoji **toujours relus** depuis `profiles`.
 - Invitations de lobby = **phase 2** (section dédiée en bas). Hors v1.
 
@@ -40,7 +40,7 @@ Source unique runtime : [`js/config/friends.js`](../js/config/friends.js). Tests
 - [x] Page Amis : écran dédié `friends` ([`js/screens/friends.js`](../js/screens/friends.js) au palier 6), pas un 4ᵉ onglet Settings
   - Entrées : Settings → Profil, et accueil si inscrit
 - [x] Popup vs badge : popup seulement sur `lobby`, `game-select`, `results`, `leaderboard`, `friends`, `settings`, `home` ([`FRIEND_NOTICE_CALM_SCREENS`](../js/config/friends.js)) ; badge partout ailleurs
-- [x] Cooldown **serveur** 60 s après refus A→B via table `friend_request_cooldowns` (écrite au decline, **aucune lecture client**, pas un statut `declined`). RPC `send_friend_request` lève `friends_cooldown` : le bouton reste **Ajouter**, **aucun toast**
+- [x] Cooldown **serveur** 60 s après refus A→B via table `friend_request_cooldowns` (écrite au decline, **aucune lecture client**, pas un statut `declined`). RPC `send_friend_request` lève `friends_cooldown` : le bouton reste **+ Ami**, **aucun toast**
 
 **Fait quand** : contrats dans `js/config/friends.js` + tests Palier 0 verts. Pas de SQL tant que ce palier n’est pas coché. **Palier 0 terminé.**
 
@@ -124,19 +124,19 @@ Objectif : envoyer / accepter depuis le lobby waiting room.
 Fichiers : [`js/screens/lobby.js`](../js/screens/lobby.js) (`participantsHtml`), styles dans `style.css`, overlay fetch au mount lobby + sur `onLobbyBundleUpdated`. Tests : [`tests/featureFriends04.test.js`](../tests/featureFriends04.test.js).
 
 - [x] Ne pas afficher d’action ami sur **soi**
-- [x] Membre **invité** : pas de bouton Ajouter ; hint court *« Crée un compte pour ajouter des amis »* (local = invité qui regarde un inscrit : même règle, CTA inscription plutôt qu’Ajouter)
-- [x] Local **invité** : aucun bouton Ajouter sur les cartes ; le hint suffit
+- [x] Membre **invité** (vue d’un inscrit) : pas de bouton ; hint carte *« Pas de compte »*
+- [x] Local **invité** : aucun bouton sur les cartes ; hint sous la grille *« Crée un compte pour ajouter des amis »*
 - [x] Local **inscrit** + cible inscrite :
-  - `none` → **Ajouter**
+  - `none` → **+ Ami**
   - `pending_out` → **Envoyée** (disabled)
   - `pending_in` → **Accepter** (raccourci)
   - `friends` → pastille **Ami** (pas de re-demande)
-- [x] Tap Ajouter → RPC ; optimistic `pending_out` + rollback si erreur
+- [x] Tap **+ Ami** → RPC ; optimistic `pending_out` + rollback si erreur
 - [x] Tap Accepter → RPC accept
 - [x] Kick / ready / emoji local **inchangés**
 - [x] Aucun message posté dans le chat
 
-**Palier 4 code terminé.** Pas de SQL. Recette : 2 inscrits + 1 invité dans un lobby **staging** ; les 4 états de bouton sont visibles et justes. Kick / prêt / emoji inchangés. Refus (via SQL ou palier 5) → Ajouter, sans toast.
+**Palier 4 code terminé.** Pas de SQL. Recette : 2 inscrits + 1 invité dans un lobby **staging** ; les 4 états de bouton sont visibles et justes. Kick / prêt / emoji inchangés. Refus (via SQL ou palier 5) → **+ Ami**, sans toast.
 
 ---
 
@@ -151,7 +151,7 @@ S’inspirer de [`js/core/hostNotice.js`](../js/core/hostNotice.js) (toast) et [
   - si écran calme (liste Palier 0) **et** pas de dialog déjà ouvert : popup *« {emoji} {name} veut t’ajouter »* → Accepter / Refuser
   - sinon : badge (point) sur l’entrée Amis (Settings Profil + nav vers `friends`)
 - [ ] Pendant une partie : **aucune** `showAppConfirm` / modal
-- [ ] Refuser → RPC decline ; A revoit Ajouter ; **pas** de toast chez A
+- [ ] Refuser → RPC decline ; A revoit **+ Ami** ; **pas** de toast chez A
 - [ ] Accepter → friendship ; pastille Ami chez les deux si encore dans le même lobby
 - [ ] Dédup : une popup par request id ; ne pas re-pop la même si déjà refusée
 - [ ] Branchement init dans [`js/main.js`](../js/main.js) (comme host notice)
@@ -183,10 +183,10 @@ Objectif : file durable + liste emoji/pseudo live.
 ## Palier 7 — Unfriend
 
 - [ ] Sur chaque fiche ami : action **Retirer** + `showAppConfirm` (confirmation locale seulement)
-- [ ] RPC `unfriend` ; silencieux pour l’autre (la pastille Ami redevient Ajouter s’ils sont encore dans le même lobby via realtime DELETE `friendships`)
+- [ ] RPC `unfriend` ; silencieux pour l’autre (la pastille Ami redevient **+ Ami** s’ils sont encore dans le même lobby via realtime DELETE `friendships`)
 - [ ] Pas de notif « X t’a retiré »
 
-**Fait quand** : A unfriend B → liste A à jour ; B voit Ajouter (ou absence de pastille Ami) sans toast.
+**Fait quand** : A unfriend B → liste A à jour ; B voit **+ Ami** (ou absence de pastille Ami) sans toast.
 
 ---
 
@@ -212,7 +212,7 @@ Deux téléphones ou deux navigateurs. Lobby code réel.
 
 - [ ] Invité ne peut pas envoyer / recevoir
 - [ ] Inscrit → inscrit : send, popup, accept → page Amis
-- [ ] Refus : A revoit **Ajouter**, aucun texte de refus
+- [ ] Refus : A revoit **+ Ami**, aucun texte de refus
 - [ ] A peut renvoyer après cooldown 60 s
 - [ ] Demandes croisées → amis sans double popup bizarre
 - [ ] Rename / change emoji : page Amis affiche la **nouvelle** identité

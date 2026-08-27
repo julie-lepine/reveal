@@ -72,7 +72,7 @@ function friendActionHtml(p, { localIsRegistered, lobbyId }) {
   if (kind === "omit") return "";
   const label = rosterLabelFromAction(kind);
   if (kind === FRIEND_ROSTER_ACTION.hintGuest) {
-    return `<p class="participant__friend-hint">${escapeHtml(FRIEND_LABEL.guestHint)}</p>`;
+    return `<p class="participant__friend-hint">${escapeHtml(FRIEND_LABEL.guestCard)}</p>`;
   }
   if (kind === FRIEND_ROSTER_ACTION.sent || kind === FRIEND_ROSTER_ACTION.friend) {
     return `<span class="participant__friend-badge participant__friend-badge--${escapeHtml(kind)}">${escapeHtml(label)}</span>`;

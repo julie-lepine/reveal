@@ -66,9 +66,9 @@ export function rosterLabelFromAction(action) {
     case FRIEND_ROSTER_ACTION.friend:
       return FRIEND_LABEL.friend;
     case FRIEND_ROSTER_ACTION.hintGuest:
-      return FRIEND_LABEL.guestHint;
+      return FRIEND_LABEL.guestCard;
     default:
-      return FRIEND_LABEL.guestHint;
+      return FRIEND_LABEL.guestCard;
   }
 }
 

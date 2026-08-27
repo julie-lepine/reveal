@@ -94,6 +94,7 @@ describe("FEATURE-FRIENDS-01 Palier 2 — client", () => {
       FRIEND_ROSTER_ACTION.add
     );
     assert.equal(rosterLabelFromAction(FRIEND_ROSTER_ACTION.add), FRIEND_LABEL.add);
+    assert.equal(rosterLabelFromAction(FRIEND_ROSTER_ACTION.hintGuest), FRIEND_LABEL.guestCard);
     assert.equal(
       rosterActionFromOverlay(FRIEND_OVERLAY.pendingOut, { localIsRegistered: true }),
       FRIEND_ROSTER_ACTION.sent

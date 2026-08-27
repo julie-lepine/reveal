@@ -65,11 +65,12 @@ describe("FEATURE-FRIENDS-01 Palier 0 — contrats", () => {
     });
     assert.equal(FRIEND_RPC_ERROR.cooldown, "friends_cooldown");
     assert.equal(FRIEND_REQUEST_COOLDOWN_MS, 60_000);
-    assert.equal(FRIEND_LABEL.add, "Ajouter");
+    assert.equal(FRIEND_LABEL.add, "+ Ami");
+    assert.equal(FRIEND_LABEL.guestCard, "Pas de compte");
     assert.equal(FRIEND_LABEL.sent, "Envoyée");
   });
 
-  it("roster : inscrit+none = Ajouter ; refus/cooldown restent add ; invité = hint", () => {
+  it("roster : inscrit+none = + Ami ; refus/cooldown restent add ; invité = hint carte", () => {
     assert.equal(
       rosterActionFromOverlay(FRIEND_OVERLAY.none, { localIsRegistered: true }),
       FRIEND_ROSTER_ACTION.add
