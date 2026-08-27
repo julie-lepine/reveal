@@ -48,50 +48,13 @@ import {
 import { planLobbyMountMultiplayerSync } from "../core/lobbyMountSyncPlan.js";
 import { createMountGuard } from "../core/mountLifecycle.js";
 import { createActionLock, withClickLock } from "../core/actionLock.js";
-import { FRIEND_LABEL, FRIEND_OVERLAY, FRIEND_ROSTER_ACTION } from "../config/friends.js";
-import { isSilentFriendRpcCode, overlayStatusAfterSilentFailure, peerFriendRosterKind, rosterLabelFromAction } from "../core/friendsLogic.js";
+import { friendRosterActionHtml, lobbyFriendsHintHtml } from "../core/friendsRosterUi.js";
 import {
-  getLobbyFriendOverlayStatus,
-  markOverlayPendingOut,
-  onFriendsCacheUpdated,
-  patchLobbyFriendOverlayStatus,
-} from "../core/friendsState.js";
-import {
-  acceptFriendRequest,
-  fetchLobbyFriendOverlay,
-  sendFriendRequest,
-} from "../core/supabaseFriends.js";
-
-function friendActionHtml(p, { localIsRegistered, lobbyId }) {
-  const status = lobbyId && p.userId ? getLobbyFriendOverlayStatus(lobbyId, p.userId) : null;
-  const kind = peerFriendRosterKind(status, {
-    isLocal: p.isLocal,
-    userId: p.userId,
-    localIsRegistered,
-  });
-  if (kind === "omit") return "";
-  const label = rosterLabelFromAction(kind);
-  if (kind === FRIEND_ROSTER_ACTION.hintGuest) {
-    return `<p class="participant__friend-hint">${escapeHtml(FRIEND_LABEL.guestCard)}</p>`;
-  }
-  if (kind === FRIEND_ROSTER_ACTION.sent || kind === FRIEND_ROSTER_ACTION.friend) {
-    return `<span class="participant__friend-badge participant__friend-badge--${escapeHtml(kind)}">${escapeHtml(label)}</span>`;
-  }
-  if (kind === FRIEND_ROSTER_ACTION.add) {
-    return `<button type="button" class="participant__friend-btn" data-friend-add="${escapeHtml(p.userId)}" aria-label="${escapeHtml(label)} ${escapeHtml(p.name)}">${escapeHtml(label)}</button>`;
-  }
-  if (kind === FRIEND_ROSTER_ACTION.accept) {
-    return `<button type="button" class="participant__friend-btn participant__friend-btn--accept" data-friend-accept="${escapeHtml(p.userId)}" aria-label="${escapeHtml(label)} ${escapeHtml(p.name)}">${escapeHtml(label)}</button>`;
-  }
-  return "";
-}
-
-function lobbyFriendsHintHtml(localIsRegistered, participants) {
-  if (localIsRegistered) return "";
-  const hasOthers = participants.some((p) => !p.isLocal && p.userId);
-  if (!hasOthers) return "";
-  return `<p class="hint lobby-friends-hint" data-lobby-friends-hint>${escapeHtml(FRIEND_LABEL.guestHint)}</p>`;
-}
+  acceptLobbyFriendRequest,
+  sendLobbyFriendRequest,
+} from "../core/lobbyFriendActions.js";
+import { onFriendsCacheUpdated } from "../core/friendsState.js";
+import { fetchLobbyFriendOverlay } from "../core/supabaseFriends.js";
 
 function participantsHtml(participants, { canKick = false, hostId = null, localIsRegistered = false, lobbyId = null } = {}) {
   return participants
@@ -114,7 +77,7 @@ function participantsHtml(participants, { canKick = false, hostId = null, localI
       const kickBtn = kickable
         ? `<button type="button" class="participant__kick" data-kick-user="${escapeHtml(p.userId)}" data-kick-name="${escapeHtml(p.name)}" aria-label="Retirer ${escapeHtml(p.name)}">Retirer</button>`
         : "";
-      const friendBit = friendActionHtml(p, { localIsRegistered, lobbyId });
+      const friendBit = friendRosterActionHtml(p, { localIsRegistered, lobbyId });
       return `
     <div class="participant ${p.ready ? "participant--ready" : ""}">
       ${avatar}
@@ -326,58 +289,25 @@ export function mountLobby(app) {
   async function handleFriendAdd(userId) {
     const lobbyId = getLobby()?.id;
     if (!userId || !lobbyId || !isLoggedIn()) return;
-    const prev = markOverlayPendingOut(lobbyId, userId);
-    refreshParticipants();
-    const run = await friendLock.run(async () => {
-      try {
-        return await sendFriendRequest(userId);
-      } catch (err) {
-        return { ok: false, error: err };
-      }
-    });
+    const run = await friendLock.run(() => sendLobbyFriendRequest(userId, lobbyId));
     if (!mount.isMounted() || !mount.isCurrentMount()) return;
     if (run.skipped) return;
     const res = run.value;
-    if (res?.ok && res.result === "friends") {
-      patchLobbyFriendOverlayStatus(lobbyId, userId, FRIEND_OVERLAY.friends);
-      refreshParticipants();
-      return;
-    }
-    if (res?.ok) {
-      refreshParticipants();
-      return;
-    }
-    const code = res?.code || res?.error?.code;
-    patchLobbyFriendOverlayStatus(
-      lobbyId,
-      userId,
-      overlayStatusAfterSilentFailure(prev)
-    );
-    refreshParticipants();
-    if (isSilentFriendRpcCode(code) || res?.skipped) return;
-    const msg = res?.error?.message || "Impossible d'envoyer la demande.";
-    await showAppAlert(msg, { title: "Amis", icon: "⚠️" });
+    if (res?.ok || res?.silent || res?.skipped) return;
+    await showAppAlert(res?.error?.message || "Impossible d'envoyer la demande.", {
+      title: "Amis",
+      icon: "⚠️",
+    });
   }
 
   async function handleFriendAccept(userId) {
     if (!userId || !isLoggedIn()) return;
     const lobbyId = getLobby()?.id;
-    const run = await friendLock.run(async () => {
-      try {
-        return await acceptFriendRequest(userId);
-      } catch (err) {
-        return { ok: false, error: err };
-      }
-    });
+    const run = await friendLock.run(() => acceptLobbyFriendRequest(userId, lobbyId));
     if (!mount.isMounted() || !mount.isCurrentMount()) return;
     if (run.skipped) return;
     const res = run.value;
-    if (res?.ok && lobbyId) {
-      patchLobbyFriendOverlayStatus(lobbyId, userId, FRIEND_OVERLAY.friends);
-      refreshParticipants();
-      return;
-    }
-    if (res?.skipped) return;
+    if (res?.ok || res?.skipped) return;
     await showAppAlert(res?.error?.message || "Impossible d'accepter.", {
       title: "Amis",
       icon: "⚠️",

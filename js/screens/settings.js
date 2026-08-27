@@ -1,6 +1,7 @@
 import {
   canPlay,
   isEmailAccount,
+  isLoggedIn,
   getUser,
   updateProfileName,
   updateProfileEmoji,
@@ -38,7 +39,15 @@ import { openInstagramProfile } from "../core/feedbackUi.js";
 import { createMountGuard } from "../core/mountLifecycle.js";
 import { bindNav, returnFromEveningProfile } from "./nav.js";
 import { FRIEND_LABEL, FRIENDS_ENTRY, FRIENDS_SCREEN_ID } from "../config/friends.js";
-import { syncFriendsEntryBadges } from "../core/friendRequestNotice.js";
+import { syncFriendsEntryBadges, flushFriendRequestNotice } from "../core/friendRequestNotice.js";
+import { friendRosterActionHtml, lobbyFriendsHintHtml } from "../core/friendsRosterUi.js";
+import {
+  acceptLobbyFriendRequest,
+  sendLobbyFriendRequest,
+} from "../core/lobbyFriendActions.js";
+import { onFriendsCacheUpdated } from "../core/friendsState.js";
+import { fetchLobbyFriendOverlay } from "../core/supabaseFriends.js";
+import { createActionLock } from "../core/actionLock.js";
 
 const TAB_PERSONNALISATION = "personnalisation";
 const TAB_SOIREE = "soiree";
@@ -113,38 +122,45 @@ function settingsTabsHtml(activeTab, inLobby) {
 function partySectionHtml() {
   const code = getLobby()?.code || "";
   const role = localLobbyRole();
-  const actions = lobbySettingsActionsForRole(role || "member");
+  const registered = isLoggedIn();
+  const actions = lobbySettingsActionsForRole(role || "member", {
+    localIsRegistered: registered,
+  });
   const others = getLobbyParticipants().filter((p) => !p.isLocal && p.userId);
   const canTransfer = others.length > 0;
   const mpReady = isSupabaseConfigured() && Boolean(getLobby()?.id);
 
-  const hostActions = actions.includes("transfer")
-    ? `
-        <button type="button" class="btn btn-secondary btn--spaced settings-party__btn" data-settings-party="transfer"${
-          !mpReady || !canTransfer ? " disabled" : ""
-        } title="${canTransfer ? "" : "Ajoute un autre joueur"}">
+  const playersBtn = actions.includes("players")
+    ? `<button type="button" class="btn btn-secondary btn--spaced settings-party__btn" data-settings-party="players"${
+        !mpReady ? " disabled" : ""
+      }>
+          👥 ${role === "host" ? "Gestion des joueurs" : "Joueurs"}
+        </button>`
+    : "";
+  const transferBtn = actions.includes("transfer")
+    ? `<button type="button" class="btn btn-secondary btn--spaced settings-party__btn" data-settings-party="transfer"${
+        !mpReady || !canTransfer ? " disabled" : ""
+      } title="${canTransfer ? "" : "Ajoute un autre joueur"}">
           👑 Transférer l'hôte
-        </button>
-        <button type="button" class="btn btn-secondary btn--spaced settings-party__btn" data-settings-party="players"${
-          !mpReady ? " disabled" : ""
-        }>
-          👥 Gestion des joueurs
-        </button>
-        <div class="settings-party__danger">
-          <button type="button" class="btn btn-secondary btn--spaced settings-party__btn settings-party__btn--danger" data-settings-party="close"${
-            !mpReady ? " disabled" : ""
-          }>
+        </button>`
+    : "";
+  const closeBtn = actions.includes("close")
+    ? `<button type="button" class="btn btn-secondary btn--spaced settings-party__btn settings-party__btn--danger" data-settings-party="close"${
+        !mpReady ? " disabled" : ""
+      }>
             🚪 Fermer le lobby
-          </button>
-        </div>`
-    : `
-        <div class="settings-party__danger">
-          <button type="button" class="btn btn-secondary btn--spaced settings-party__btn settings-party__btn--danger" data-settings-party="leave"${
-            !mpReady || isVoluntaryLeaveInFlight() ? " disabled" : ""
-          }>
+          </button>`
+    : "";
+  const leaveBtn = actions.includes("leave")
+    ? `<button type="button" class="btn btn-secondary btn--spaced settings-party__btn settings-party__btn--danger" data-settings-party="leave"${
+        !mpReady || isVoluntaryLeaveInFlight() ? " disabled" : ""
+      }>
             🚪 Quitter le lobby
-          </button>
-        </div>`;
+          </button>`
+    : "";
+  const danger = closeBtn || leaveBtn
+    ? `<div class="settings-party__danger">${closeBtn}${leaveBtn}</div>`
+    : "";
 
   return `
     <div class="card settings-section settings-party" id="settings-party-section">
@@ -159,7 +175,9 @@ function partySectionHtml() {
           : ""
       }
       <div class="settings-party__actions">
-        ${hostActions}
+        ${transferBtn}
+        ${playersBtn}
+        ${danger}
       </div>
     </div>`;
 }
@@ -317,6 +335,7 @@ export function mountSettings(app) {
   let lastPartySnap = "";
   let lastLobbyActive = hasActiveLobby();
   let partyActionInFlight = false;
+  const friendLock = createActionLock();
 
   function bindPersonnalisationEvents() {
     app.querySelectorAll(".emoji-picker__btn").forEach((btn) => {
@@ -483,12 +502,40 @@ export function mountSettings(app) {
         return;
       }
       if (action === "players") {
+        const lobbyId = getLobby()?.id || null;
+        if (lobbyId && isLoggedIn()) {
+          void fetchLobbyFriendOverlay(lobbyId).catch(() => {});
+        }
         await showLobbyPlayersManageDialog({
           getParticipants: () => getLobbyParticipants(),
           maxPlayers: MAX_PLAYERS,
-          canKick: canManageLobbyRoster(),
+          canKick: Boolean(isLobbyHost() && canManageLobbyRoster()),
           onKick: (userId, name) => kickLobbyMember(userId, { confirmName: name }),
+          friendActionHtml: (p) =>
+            friendRosterActionHtml(p, {
+              localIsRegistered: isLoggedIn(),
+              lobbyId: getLobby()?.id || null,
+            }),
+          guestHintHtml: lobbyFriendsHintHtml(isLoggedIn(), getLobbyParticipants()),
+          subscribeUpdates: (cb) => onFriendsCacheUpdated(cb),
+          onFriendAdd: async (userId) => {
+            const run = await friendLock.run(() =>
+              sendLobbyFriendRequest(userId, getLobby()?.id)
+            );
+            if (run.skipped) return;
+            const res = run.value;
+            if (res?.ok || res?.silent || res?.skipped) return;
+          },
+          onFriendAccept: async (userId) => {
+            const run = await friendLock.run(() =>
+              acceptLobbyFriendRequest(userId, getLobby()?.id)
+            );
+            if (run.skipped) return;
+            const res = run.value;
+            if (res?.ok || res?.skipped) return;
+          },
         });
+        void flushFriendRequestNotice();
         if (mount.isMounted()) refreshSoireePanel(true);
         return;
       }

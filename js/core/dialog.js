@@ -414,8 +414,10 @@ export function showTransferHostDialog(
   });
 }
 
-function lobbyPlayersListHtml(participants, { canKick }) {
+function lobbyPlayersListHtml(participants, { canKick, friendActionHtml }) {
   const hostId = getState().lobby?.hostId || null;
+  const renderFriend =
+    typeof friendActionHtml === "function" ? friendActionHtml : () => "";
   const rows = (participants || [])
     .map((p) => {
       const isHost = Boolean(
@@ -426,11 +428,12 @@ function lobbyPlayersListHtml(participants, { canKick }) {
       const kickBtn = kickable
         ? `<button type="button" class="btn btn-secondary btn--compact lobby-manage__kick" data-kick-user="${escapeHtml(p.userId)}" data-kick-name="${escapeHtml(p.name)}">Retirer</button>`
         : "";
+      const friendBit = renderFriend(p);
       return `
         <div class="lobby-manage__row">
           <span class="lobby-manage__avatar" style="background:${escapeHtml(p.color || "#60A5FA")}">${p.emoji || "👤"}</span>
           <span class="lobby-manage__name">${escapeHtml(p.name || "Joueur")}${badge}</span>
-          ${kickBtn}
+          <span class="lobby-manage__actions">${friendBit}${kickBtn}</span>
         </div>`;
     })
     .join("");
@@ -440,12 +443,18 @@ function lobbyPlayersListHtml(participants, { canKick }) {
 /**
  * Liste des joueurs du lobby ; l'hôte peut en retirer.
  * Rouvre la liste après un kick tant que le panneau n'est pas fermé.
+ * Actions ami : restent dans le panneau (pas un kick).
  */
 export async function showLobbyPlayersManageDialog({
   getParticipants,
   maxPlayers = 8,
   canKick = false,
   onKick,
+  friendActionHtml,
+  guestHintHtml = "",
+  onFriendAdd,
+  onFriendAccept,
+  subscribeUpdates,
 } = {}) {
   for (;;) {
     const participants = typeof getParticipants === "function" ? getParticipants() : [];
@@ -464,33 +473,65 @@ export async function showLobbyPlayersManageDialog({
 
       const close = (result) => removeDialog(root, () => resolve(result));
 
+      const paintList = () => {
+        const list = root.querySelector(".lobby-manage__list");
+        const count = root.querySelector(".lobby-manage__count");
+        const hint = root.querySelector("[data-lobby-manage-hint]");
+        const next = typeof getParticipants === "function" ? getParticipants() : [];
+        if (count) count.textContent = `${next.length} / ${maxPlayers} participants`;
+        if (list) list.innerHTML = lobbyPlayersListHtml(next, { canKick, friendActionHtml });
+        if (hint) hint.innerHTML = guestHintHtml || "";
+      };
+
       root.innerHTML = `
         <div class="app-dialog__backdrop" data-dialog-dismiss aria-hidden="true"></div>
         <div class="app-dialog__panel app-dialog__panel--rich">
           <div class="app-dialog__glow" aria-hidden="true"></div>
           <p class="app-dialog__icon" aria-hidden="true">👥</p>
-          <p class="app-dialog__title" id="app-dialog-title">Gestion des joueurs</p>
+          <p class="app-dialog__title" id="app-dialog-title">Joueurs</p>
           <p class="app-dialog__message lobby-manage__count">${total} / ${maxPlayers} participants</p>
           <div class="app-dialog__rich lobby-manage__list">
-            ${lobbyPlayersListHtml(participants, { canKick })}
+            ${lobbyPlayersListHtml(participants, { canKick, friendActionHtml })}
           </div>
+          <div data-lobby-manage-hint>${guestHintHtml || ""}</div>
           <button type="button" class="btn btn-primary app-dialog__btn" data-dialog-cancel>Fermer</button>
         </div>
       `;
 
-      root.querySelectorAll("[data-kick-user]").forEach((btn) => {
-        btn.addEventListener("click", () => {
-          close({
+      const unsubUpdates =
+        typeof subscribeUpdates === "function" ? subscribeUpdates(paintList) : () => {};
+
+      const finish = (result) => {
+        if (typeof unsubUpdates === "function") unsubUpdates();
+        close(result);
+      };
+
+      root.querySelector(".lobby-manage__list")?.addEventListener("click", (e) => {
+        const kickBtn = e.target.closest("[data-kick-user]");
+        if (kickBtn) {
+          finish({
             ok: true,
-            kickUserId: btn.getAttribute("data-kick-user"),
-            kickName: btn.getAttribute("data-kick-name") || "",
+            kickUserId: kickBtn.getAttribute("data-kick-user"),
+            kickName: kickBtn.getAttribute("data-kick-name") || "",
           });
-        });
+          return;
+        }
+        const addBtn = e.target.closest("[data-friend-add]");
+        if (addBtn && typeof onFriendAdd === "function") {
+          void Promise.resolve(onFriendAdd(addBtn.getAttribute("data-friend-add"))).then(paintList);
+          return;
+        }
+        const acceptBtn = e.target.closest("[data-friend-accept]");
+        if (acceptBtn && typeof onFriendAccept === "function") {
+          void Promise.resolve(onFriendAccept(acceptBtn.getAttribute("data-friend-accept"))).then(
+            paintList
+          );
+        }
       });
-      root.querySelector("[data-dialog-cancel]")?.addEventListener("click", () => close({ ok: false }));
-      root.querySelector("[data-dialog-dismiss]")?.addEventListener("click", () => close({ ok: false }));
+      root.querySelector("[data-dialog-cancel]")?.addEventListener("click", () => finish({ ok: false }));
+      root.querySelector("[data-dialog-dismiss]")?.addEventListener("click", () => finish({ ok: false }));
       root.addEventListener("keydown", (e) => {
-        if (e.key === "Escape") close({ ok: false });
+        if (e.key === "Escape") finish({ ok: false });
       });
 
       document.body.appendChild(root);

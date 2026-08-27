@@ -137,14 +137,18 @@ export function peerFriendRosterKind(overlayStatus, { isLocal, userId, localIsRe
   return rosterActionFromOverlay(overlayStatus, { localIsRegistered: true });
 }
 
-/** Popup Accepter / Refuser seulement écran calme, inscrit, pas d’autre dialog. */
+/** Popup Accepter / Refuser seulement écran calme, inscrit, pas d’autre dialog.
+ * `sessionInPlay` : manche ou prépa en cours (y compris si l’écran local est Menu).
+ */
 export function canShowFriendRequestPopup({
   screenId,
   dialogOpen,
   localIsRegistered,
+  sessionInPlay = false,
 } = {}) {
   if (!localIsRegistered) return false;
   if (dialogOpen) return false;
+  if (sessionInPlay) return false;
   if (screenId === FRIENDS_SCREEN_ID) return false;
   return isFriendNoticeCalmScreen(screenId);
 }

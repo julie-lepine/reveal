@@ -48,13 +48,12 @@ describe("FEATURE-FRIENDS-01 Palier 4 — roster lobby", () => {
     assert.match(lobby, /data-friend-add/);
     assert.match(lobby, /data-friend-accept/);
     assert.match(lobby, /data-lobby-friends-hint/);
-    assert.match(lobby, /sendFriendRequest/);
-    assert.match(lobby, /acceptFriendRequest/);
+    assert.match(lobby, /sendLobbyFriendRequest/);
+    assert.match(lobby, /acceptLobbyFriendRequest/);
     assert.match(lobby, /fetchLobbyFriendOverlay/);
-    assert.match(lobby, /markOverlayPendingOut/);
     assert.match(lobby, /onFriendsCacheUpdated/);
-    assert.match(lobby, /FRIEND_LABEL\.guestCard/);
-    assert.match(lobby, /FRIEND_LABEL\.guestHint/);
+    assert.match(lobby, /friendRosterActionHtml/);
+    assert.match(lobby, /lobbyFriendsHintHtml/);
     assert.match(lobby, /sendMessage: addLobbyMessage/);
     assert.equal((lobby.match(/addLobbyMessage/g) || []).length, 2);
     assert.match(lobby, /data-kick-user/);
@@ -68,5 +67,10 @@ describe("FEATURE-FRIENDS-01 Palier 4 — roster lobby", () => {
     assert.match(css, /\.participant__friend-btn\{/);
     assert.match(css, /\.participant__friend-badge\{/);
     assert.match(css, /\.lobby-friends-hint\{/);
+    const rosterUi = read("js/core/friendsRosterUi.js");
+    assert.match(rosterUi, /FRIEND_LABEL\.guestCard/);
+    assert.match(rosterUi, /FRIEND_LABEL\.guestHint/);
+    assert.match(rosterUi, /data-friend-add/);
+    assert.match(rosterUi, /data-friend-accept/);
   });
 });

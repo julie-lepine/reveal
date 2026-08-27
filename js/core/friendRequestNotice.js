@@ -21,6 +21,12 @@ import {
   patchLobbyFriendOverlayStatus,
 } from "./friendsState.js";
 import { acceptFriendRequest, declineFriendRequest } from "./supabaseFriends.js";
+import {
+  getCachedGameSession,
+  getEffectiveSessionScreen,
+  isOnGameSetupScreen,
+  isSessionInProgressPlay,
+} from "./gameSync.js";
 
 const poppedIds = new Set();
 let busy = false;
@@ -40,11 +46,18 @@ export function syncFriendsEntryBadges(root = typeof document !== "undefined" ? 
   });
 }
 
+function sessionBlocksFriendPopup() {
+  const screen = getEffectiveSessionScreen(getCachedGameSession());
+  if (!screen) return false;
+  return isOnGameSetupScreen(screen) || isSessionInProgressPlay(screen);
+}
+
 function canPopupNow() {
   return canShowFriendRequestPopup({
     screenId: getCurrentScreen(),
     dialogOpen: isAppDialogOpen() || busy,
     localIsRegistered: isRegisteredUser(getState().user),
+    sessionInPlay: sessionBlocksFriendPopup(),
   });
 }
 

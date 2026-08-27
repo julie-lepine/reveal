@@ -77,6 +77,10 @@ describe("UX-NAV-LOBBY - Paramètres (écran settings, pas modale)", () => {
     assert.equal(lobbySettingsActionsForRole("member").includes("close"), false);
     assert.equal(lobbySettingsActionsForRole("member").includes("transfer"), false);
     assert.equal(lobbySettingsActionsForRole("member").includes("players"), false);
+    assert.deepEqual(
+      [...lobbySettingsActionsForRole("member", { localIsRegistered: true })],
+      ["players", "leave"]
+    );
   });
 
   it("7 - hôte conserve fermeture / transfert / joueurs", () => {
@@ -193,7 +197,7 @@ describe("UX-NAV-LOBBY - Accueil inaccessible en lobby (nav)", () => {
     const nav = src("js/screens/nav.js");
     const fn = nav.slice(
       nav.indexOf("export async function goToEveningHome"),
-      nav.indexOf("export function goToEveningSettings")
+      nav.indexOf("export function goToFriends")
     );
     assert.match(fn, /returnToEveningGames\(\{\s*hubOnly:\s*true\s*\}\)/);
     assert.match(fn, /if\s*\(!hasActiveLobby\(\)\)/);

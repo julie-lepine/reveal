@@ -26,6 +26,8 @@ describe("FEATURE-FRIENDS-01 Palier 5 — notice", () => {
     assert.equal(canShowFriendRequestPopup({ ...base, screenId: "trivia" }), false);
     assert.equal(canShowFriendRequestPopup({ ...base, screenId: "trivia-prep" }), false);
     assert.equal(canShowFriendRequestPopup({ ...base, screenId: "friends" }), false);
+    assert.equal(canShowFriendRequestPopup({ ...base, screenId: "settings", sessionInPlay: true }), false);
+    assert.equal(canShowFriendRequestPopup({ ...base, screenId: "lobby", sessionInPlay: true }), false);
     assert.equal(canShowFriendRequestPopup({ ...base, dialogOpen: true }), false);
     assert.equal(canShowFriendRequestPopup({ ...base, localIsRegistered: false }), false);
     assert.equal(isFriendNoticeCalmScreen("trivia"), false);
@@ -60,6 +62,7 @@ describe("FEATURE-FRIENDS-01 Palier 5 — notice", () => {
     assert.match(src, /declineFriendRequest/);
     assert.match(src, /decision === "refuse"/);
     assert.match(src, /onScreenChange/);
+    assert.match(src, /sessionBlocksFriendPopup|sessionInPlay/);
     assert.match(src, /syncFriendsEntryBadges/);
     assert.doesNotMatch(src, /lobby_messages/);
     assert.doesNotMatch(src, /addLobbyMessage/);

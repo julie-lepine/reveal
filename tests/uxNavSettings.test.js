@@ -151,6 +151,10 @@ describe("UX-NAV-SETTINGS - contenu écran", () => {
       "close",
     ]);
     assert.deepEqual([...lobbySettingsActionsForRole("member")], ["leave"]);
+    assert.deepEqual(
+      [...lobbySettingsActionsForRole("member", { localIsRegistered: true })],
+      ["players", "leave"]
+    );
     assert.equal(lobbySettingsActionsForRole("host").includes("leave"), false);
     assert.equal(lobbySettingsActionsForRole("member").includes("close"), false);
     const menu = src("js/core/partySettingsMenu.js");

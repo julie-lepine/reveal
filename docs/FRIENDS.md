@@ -189,7 +189,7 @@ Objectif : file durable + liste emoji/pseudo live.
 - [x] Pas de notif « X t’a retiré »
 - [x] Tests : [`tests/featureFriends07.test.js`](../tests/featureFriends07.test.js)
 
-**Palier 7 code terminé.** Pas de SQL (RPC déjà en staging). Recette : A **Retirer** B → confirm → liste A à jour ; B voit disparaître A **sans toast** ; si même lobby, pastille **+ Ami** chez B.
+**Palier 7 validé** (27 août 2026). Retirer + confirm ; l’autre n’a pas de toast ; même lobby → **+ Ami**.
 
 ---
 
@@ -199,14 +199,14 @@ Objectif : demander en ami **après** « Commencer la soirée », pas seulement 
 
 Après les paliers 6–7. Pas de SQL.
 
-- [ ] Liste des joueurs du lobby ouverte à **tous** les inscrits (pas seulement l’hôte) : Menu → Soirée, même famille que [`showLobbyPlayersManageDialog`](../js/core/dialog.js)
-- [ ] Mêmes actions que le roster waiting room : **+ Ami** / **Envoyée** / **Accepter** / **Ami** / **Pas de compte**
-- [ ] **Retirer** (kick) reste **hôte seulement**
-- [ ] Pendant une manche : toujours **pas** de popup (Palier 5) ; le destinataire voit le badge Menu / Profil, popup au retour hub
-- [ ] Invité : pas de **+ Ami** (hint compte, comme palier 4)
-- [ ] Tests source + recette : A hôte ou membre envoie depuis Menu pendant Trivia → B : point seulement, puis popup au hub
+- [x] Liste des joueurs du lobby ouverte à **tous** les inscrits (pas seulement l’hôte) : Menu → Soirée, même famille que [`showLobbyPlayersManageDialog`](../js/core/dialog.js)
+- [x] Mêmes actions que le roster waiting room : **+ Ami** / **Envoyée** / **Accepter** / **Ami** / **Pas de compte**
+- [x] **Retirer** (kick) reste **hôte seulement**
+- [x] Pendant une manche : toujours **pas** de popup (Palier 5) ; le destinataire voit le badge Menu / Profil, popup au retour hub
+- [x] Invité : pas de **+ Ami** (hint compte, comme palier 4)
+- [x] Tests source + recette : A hôte ou membre envoie depuis Menu pendant Trivia → B : point seulement, puis popup au hub
 
-**Fait quand** : on peut s’ajouter en ami au hub jeux **et** depuis Menu en cours de manche.
+**Palier 7bis code terminé.** Pas de SQL. Recette : soirée lancée, Menu → Soirée → **Joueurs** (membre inscrit) ou **Gestion des joueurs** (hôte). Envoyer + Ami pendant Trivia → B : badge seulement, popup au retour hub. Kick inchangé (hôte).
 
 ---
 
@@ -284,7 +284,7 @@ Vague prévue : **FEATURE-FRIENDS-02**.
 | 4 | 4 | Boutons roster |
 | 5 | 5 | Popup + badge *(validé waiting room)* |
 | 6 | 6 | Page Amis *(validé)* |
-| 7 | 7 | Unfriend |
+| 7 | 7 | Unfriend *(validé)* |
 | 8 | 7bis | + Ami pendant la soirée (Menu → joueurs) |
 | 9 | 8–9 | Légal + QA |
 | 10 | 10 | Prod (quand on choisit le train de release) |
