@@ -9,6 +9,7 @@ import {
   FRIEND_OVERLAY_STATUSES,
   FRIEND_ROSTER_ACTION,
   FRIEND_RPC_ERROR,
+  FRIENDS_SCREEN_ID,
   FRIENDS_TABLE,
   isFriendNoticeCalmScreen,
   rosterActionFromOverlay,
@@ -144,6 +145,7 @@ export function canShowFriendRequestPopup({
 } = {}) {
   if (!localIsRegistered) return false;
   if (dialogOpen) return false;
+  if (screenId === FRIENDS_SCREEN_ID) return false;
   return isFriendNoticeCalmScreen(screenId);
 }
 

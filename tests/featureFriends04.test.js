@@ -69,11 +69,4 @@ describe("FEATURE-FRIENDS-01 Palier 4 — roster lobby", () => {
     assert.match(css, /\.participant__friend-badge\{/);
     assert.match(css, /\.lobby-friends-hint\{/);
   });
-
-  it("page Amis pas encore branchée", () => {
-    const main = read("js/main.js");
-    const settings = read("js/screens/settings.js");
-    assert.doesNotMatch(main, /registerScreen\("friends"/);
-    assert.doesNotMatch(settings, /FRIENDS_SCREEN_ID|fetchMyFriends/);
-  });
 });

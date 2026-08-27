@@ -156,7 +156,7 @@ S’inspirer de [`js/core/hostNotice.js`](../js/core/hostNotice.js) (toast) et [
 - [x] Dédup : une popup par request id ; ne pas re-pop la même si déjà refusée
 - [x] Branchement init dans [`js/main.js`](../js/main.js) (comme host notice)
 
-**Palier 5 code terminé.** Pas de SQL. Recette : A. waiting room → popup chez B. B. en manche Trivia → point sur Menu seulement, popup au retour hub (game-select / results).
+**Palier 5 validé** (27 août 2026). Recette waiting room : popup Accepter / Refuser. Recette « envoie pendant Trivia » **impossible** tant que **+ Ami** n’existe que dans la salle d’attente. Voir Palier 7bis.
 
 ---
 
@@ -164,19 +164,19 @@ S’inspirer de [`js/core/hostNotice.js`](../js/core/hostNotice.js) (toast) et [
 
 Objectif : file durable + liste emoji/pseudo live.
 
-- [ ] [`js/screens/friends.js`](../js/screens/friends.js) + `registerScreen("friends", …)` dans [`js/main.js`](../js/main.js)
-- [ ] Invité / déconnecté : empty state inscription, pas de liste fantôme
-- [ ] Inscrit :
+- [x] [`js/screens/friends.js`](../js/screens/friends.js) + `registerScreen("friends", …)` dans [`js/main.js`](../js/main.js)
+- [x] Invité / déconnecté : empty state inscription, pas de liste fantôme
+- [x] Inscrit :
   - section **Demandes reçues** (Accepter / Refuser)
   - section **Amis** : emoji + pseudo `profiles` (pas de snapshot figé)
   - empty states distincts (0 demande / 0 ami)
-- [ ] Entrée Settings → Profil : bouton / ligne **Mes amis** ([`js/screens/settings.js`](../js/screens/settings.js))
-- [ ] Entrée accueil si `isLoggedIn()` ([`js/screens/home.js`](../js/screens/home.js)) — discret, pas un 6ᵉ onglet bottom-nav
-- [ ] Badge incoming sur ces entrées ( Palier 5 )
-- [ ] Retour navigation cohérent avec `bindNav` / stack router
-- [ ] Tests : [`tests/uxNavSettings.test.js`](../tests/uxNavSettings.test.js) mis à jour si le markup Profil change ; nouveau test écran friends (contrats HTML)
+- [x] Entrée Settings → Profil : bouton / ligne **Mes amis** ([`js/screens/settings.js`](../js/screens/settings.js))
+- [x] Entrée accueil si `isLoggedIn()` ([`js/screens/home.js`](../js/screens/home.js)) — discret, pas un 6ᵉ onglet bottom-nav
+- [x] Badge incoming sur ces entrées ( Palier 5 )
+- [x] Retour navigation cohérent avec `bindNav` / stack router
+- [x] Tests : [`tests/uxNavSettings.test.js`](../tests/uxNavSettings.test.js) mis à jour si le markup Profil change ; nouveau test écran friends (contrats HTML)
 
-**Fait quand** : on peut accepter une demande **après** avoir quitté le lobby, depuis la page Amis.
+**Palier 6 code terminé.** Pas de SQL. Recette : accepter / refuser une demande **après** avoir quitté le lobby, depuis **Mes amis**. Unfriend = palier 7.
 
 ---
 
@@ -187,6 +187,23 @@ Objectif : file durable + liste emoji/pseudo live.
 - [ ] Pas de notif « X t’a retiré »
 
 **Fait quand** : A unfriend B → liste A à jour ; B voit **+ Ami** (ou absence de pastille Ami) sans toast.
+
+---
+
+## Palier 7bis — + Ami pendant la soirée
+
+Objectif : demander en ami **après** « Commencer la soirée », pas seulement dans la salle d’attente. Découverte toujours = roster du lobby (pas de recherche).
+
+Après les paliers 6–7. Pas de SQL.
+
+- [ ] Liste des joueurs du lobby ouverte à **tous** les inscrits (pas seulement l’hôte) : Menu → Soirée, même famille que [`showLobbyPlayersManageDialog`](../js/core/dialog.js)
+- [ ] Mêmes actions que le roster waiting room : **+ Ami** / **Envoyée** / **Accepter** / **Ami** / **Pas de compte**
+- [ ] **Retirer** (kick) reste **hôte seulement**
+- [ ] Pendant une manche : toujours **pas** de popup (Palier 5) ; le destinataire voit le badge Menu / Profil, popup au retour hub
+- [ ] Invité : pas de **+ Ami** (hint compte, comme palier 4)
+- [ ] Tests source + recette : A hôte ou membre envoie depuis Menu pendant Trivia → B : point seulement, puis popup au hub
+
+**Fait quand** : on peut s’ajouter en ami au hub jeux **et** depuis Menu en cours de manche.
 
 ---
 
@@ -218,7 +235,7 @@ Deux téléphones ou deux navigateurs. Lobby code réel.
 - [ ] Rename / change emoji : page Amis affiche la **nouvelle** identité
 - [ ] Kick du lobby : l’amitié **reste**
 - [ ] Fermeture de lobby : demandes pending **restent** (page Amis)
-- [ ] Pendant Draw It / Trivia : pas de modal ami
+- [ ] Pendant Draw It / Trivia : pas de modal ami ; **+ Ami** possible via Menu (Palier 7bis)
 - [ ] Logout : plus de channel friends ; autre session ne voit pas les demandes d’un autre user
 - [ ] Suppression de compte (staging) : plus de lignes `friend_requests` / `friendships` pour cet id
 - [ ] Chat lobby : **aucune** ligne générée par ces actions
@@ -262,9 +279,10 @@ Vague prévue : **FEATURE-FRIENDS-02**.
 | 2 | 1 | SQL staging + runbook |
 | 3 | 2–3 | Module + realtime (console) |
 | 4 | 4 | Boutons roster |
-| 5 | 5 | Popup + badge |
+| 5 | 5 | Popup + badge *(validé waiting room)* |
 | 6 | 6–7 | Page Amis + unfriend |
-| 7 | 8–9 | Légal + QA |
-| 8 | 10 | Prod (quand on choisit le train de release) |
+| 7 | 7bis | + Ami pendant la soirée (Menu → joueurs) |
+| 8 | 8–9 | Légal + QA |
+| 9 | 10 | Prod (quand on choisit le train de release) |
 
 Pour implémenter : ouvrir ce fichier et dire **« on fait le palier N »**.

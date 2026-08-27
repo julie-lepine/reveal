@@ -88,6 +88,8 @@ describe("UX-NAV-SETTINGS - contenu écran", () => {
     assert.match(settings, /TAB_SOIREE\s*=\s*"soiree"/);
     assert.match(settings, /TAB_SUPPORT\s*=\s*"support"/);
     assert.match(settings, /settings-tabs__btn--disabled/);
+    assert.match(settings, /FRIEND_LABEL\.entrySettings/);
+    assert.match(settings, /FRIENDS_SCREEN_ID/);
     assert.match(settings, /Emoji/);
     assert.match(settings, /Pseudo/);
     assert.match(settings, /Mot de passe/);

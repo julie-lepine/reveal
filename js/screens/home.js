@@ -79,6 +79,8 @@ import {
 import { navigate, getCurrentScreen, getScreenParams } from "../core/router.js";
 import { escapeHtml, logoHtml, pageShell } from "../core/ui.js";
 import { handleNavTarget, goToEveningSettings } from "./nav.js";
+import { FRIEND_LABEL, FRIENDS_ENTRY, FRIENDS_SCREEN_ID } from "../config/friends.js";
+import { syncFriendsEntryBadges } from "../core/friendRequestNotice.js";
 import { showAppAlert, showAppConfirm, showAppEmailPrompt, showEmojiPickerDialog } from "../core/dialog.js";
 import { getLocalEmoji } from "../core/state.js";
 import { DEFAULT_GUEST_EMOJI, normalizeGuestEmoji } from "../../data/profileEmojis.js";
@@ -949,6 +951,7 @@ export function mountHome(app) {
             <p class="auth-welcome__hi">Salut, <strong>${escapeHtml(user.name)}</strong> 👋</p>
             <div class="auth-welcome__actions">
               <button type="button" class="btn btn-secondary btn--compact" data-nav="settings">Menu</button>
+              <button type="button" class="btn btn-secondary btn--compact friends-entry" data-nav="${FRIENDS_SCREEN_ID}" data-friends-entry="${FRIENDS_ENTRY.homeLoggedIn}">${FRIEND_LABEL.entryHome}<span class="friends-badge" data-friends-badge hidden aria-hidden="true"></span></button>
               <button type="button" class="btn-link" id="btn-logout">Se déconnecter</button>
             </div>
           </div>`
@@ -1067,6 +1070,7 @@ export function mountHome(app) {
         </div>
       `,
     });
+    syncFriendsEntryBadges(app);
   }
 
   async function onHomeClick(e) {

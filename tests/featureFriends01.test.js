@@ -152,12 +152,10 @@ describe("FEATURE-FRIENDS-01 Palier 2 — client", () => {
     assert.equal(normalizeIncomingRequestRow({ id: "1" }), null);
   });
 
-  it("page Amis et Settings encore hors palier 2", () => {
-    const settings = read("js/screens/settings.js");
+  it("page Amis hors modules palier 2", () => {
+    const supabaseFriends = read("js/core/supabaseFriends.js");
     const home = read("js/screens/home.js");
-    const main = read("js/main.js");
-    assert.doesNotMatch(settings, /FRIENDS_SCREEN_ID|fetchMyFriends/);
+    assert.doesNotMatch(supabaseFriends, /registerScreen/);
     assert.doesNotMatch(home, /fetchMyFriends/);
-    assert.doesNotMatch(main, /registerScreen\("friends"/);
   });
 });

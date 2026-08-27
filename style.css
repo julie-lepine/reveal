@@ -3647,6 +3647,56 @@ button.emoji-picker-preview__avatar:active{
   display:none !important;
 }
 
+.friends-entry{
+  position:relative;
+}
+
+.friends-row{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  padding:10px 0;
+  border-bottom:1px solid rgba(255,255,255,.06);
+}
+
+.friends-row:last-child{
+  border-bottom:0;
+}
+
+.friends-row__avatar{
+  width:40px;
+  height:40px;
+  border-radius:50%;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  flex-shrink:0;
+  font-size:22px;
+  background:rgba(255,255,255,.06);
+}
+
+.friends-row__name{
+  flex:1;
+  min-width:0;
+  font-weight:600;
+  font-size:15px;
+}
+
+.friends-row__actions{
+  display:flex;
+  flex-wrap:wrap;
+  gap:6px;
+  flex-shrink:0;
+}
+
+.friends-empty{
+  padding:18px 16px;
+}
+
+.friends-empty__hint{
+  margin:8px 0 0;
+}
+
 .invite-card{
   background:rgba(255,255,255,.04);
   border:1px solid rgba(255,255,255,.08);

@@ -148,6 +148,10 @@ export async function handleNavTarget(target, handlers) {
     else navigate("settings", { navStack: ["home", "settings"] });
     return;
   }
+  if (target === "friends") {
+    navigate("friends");
+    return;
+  }
   navigate(target);
 }
 

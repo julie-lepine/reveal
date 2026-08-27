@@ -82,6 +82,13 @@ export const FRIEND_LABEL = {
   guestCard: "Pas de compte",
   /** Sous la grille, seulement si le joueur local est invité. */
   guestHint: "Crée un compte pour ajouter des amis",
+  pageTitle: "Amis",
+  incomingSection: "Demandes reçues",
+  friendsSection: "Tes amis",
+  incomingEmpty: "Aucune demande pour le moment.",
+  friendsEmpty: "Pas encore d’amis. Ajoute des joueurs depuis un lobby.",
+  entrySettings: "Mes amis",
+  entryHome: "Amis",
 };
 
 /** Action roster ( Palier 4 ). `hint_guest` = pas de bouton + Ami. */

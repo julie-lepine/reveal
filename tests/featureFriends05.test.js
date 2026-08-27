@@ -24,6 +24,7 @@ describe("FEATURE-FRIENDS-01 Palier 5 — notice", () => {
     assert.equal(canShowFriendRequestPopup({ ...base, screenId: "game-select" }), true);
     assert.equal(canShowFriendRequestPopup({ ...base, screenId: "trivia" }), false);
     assert.equal(canShowFriendRequestPopup({ ...base, screenId: "trivia-prep" }), false);
+    assert.equal(canShowFriendRequestPopup({ ...base, screenId: "friends" }), false);
     assert.equal(canShowFriendRequestPopup({ ...base, dialogOpen: true }), false);
     assert.equal(canShowFriendRequestPopup({ ...base, localIsRegistered: false }), false);
     assert.equal(isFriendNoticeCalmScreen("trivia"), false);
@@ -56,15 +57,14 @@ describe("FEATURE-FRIENDS-01 Palier 5 — notice", () => {
     assert.doesNotMatch(src, /addLobbyMessage/);
   });
 
-  it("boot + badge Menu / Profil, pas d’écran friends", () => {
+  it("boot + badge Menu / Profil, écran friends branché au palier 6", () => {
     const main = read("js/main.js");
     assert.match(main, /initFriendRequestNotice/);
-    assert.doesNotMatch(main, /registerScreen\("friends"/);
+    assert.match(main, /FRIENDS_SCREEN_ID/);
     const nav = read("js/core/bottomNav.js");
     assert.match(nav, /data-friends-badge/);
     const settings = read("js/screens/settings.js");
     assert.match(settings, /data-friends-badge/);
-    assert.doesNotMatch(settings, /FRIENDS_SCREEN_ID|fetchMyFriends/);
     const css = read("style.css");
     assert.match(css, /\.friends-badge\{/);
   });

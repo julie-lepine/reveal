@@ -76,6 +76,6 @@ describe("FEATURE-FRIENDS-01 Palier 3 — realtime", () => {
     assert.match(auth, /syncFriendsRealtimeForSession/);
     const main = read("js/main.js");
     assert.match(main, /syncFriendsRealtimeForSession/);
-    assert.doesNotMatch(main, /registerScreen\("friends"/);
+    assert.match(main, /FRIENDS_SCREEN_ID/);
   });
 });
