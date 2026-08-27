@@ -183,3 +183,15 @@ export function friendRequestNoticeCopy(row) {
 export function friendsBadgeShouldShow(incomingCount) {
   return Number(incomingCount) > 0;
 }
+
+/** Confirmation locale seulement — l’autre n’est pas notifié. */
+export function unfriendConfirmCopy(name) {
+  const who = String(name || "").trim() || "ce joueur";
+  return {
+    title: FRIEND_LABEL.pageTitle,
+    message: `Retirer ${who} de tes amis ?`,
+    confirmLabel: FRIEND_LABEL.unfriend,
+    cancelLabel: FRIEND_LABEL.unfriendCancel,
+    icon: "⚠️",
+  };
+}

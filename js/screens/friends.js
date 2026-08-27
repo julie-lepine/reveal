@@ -1,6 +1,6 @@
 /**
- * FEATURE-FRIENDS-01 Palier 6 — page Amis (demandes + liste).
- * Unfriend = palier 7. Découverte toujours via le lobby, pas de recherche.
+ * FEATURE-FRIENDS-01 Palier 6–7 — page Amis (demandes + liste + unfriend).
+ * Découverte toujours via le lobby, pas de recherche.
  */
 import {
   FRIEND_LABEL,
@@ -9,7 +9,7 @@ import {
 } from "../config/friends.js";
 import { isLoggedIn } from "../core/auth.js";
 import { createActionLock } from "../core/actionLock.js";
-import { showAppAlert } from "../core/dialog.js";
+import { showAppAlert, showAppConfirm } from "../core/dialog.js";
 import { createMountGuard } from "../core/mountLifecycle.js";
 import { getLobby, hasActiveLobby } from "../core/lobby.js";
 import {
@@ -18,11 +18,13 @@ import {
   onFriendsCacheUpdated,
   patchLobbyFriendOverlayStatus,
 } from "../core/friendsState.js";
+import { unfriendConfirmCopy } from "../core/friendsLogic.js";
 import {
   acceptFriendRequest,
   declineFriendRequest,
   fetchIncomingFriendRequests,
   fetchMyFriends,
+  unfriendUser,
 } from "../core/supabaseFriends.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
 import { bindNav } from "./nav.js";
@@ -41,9 +43,12 @@ function incomingRowHtml(row) {
 
 function friendRowHtml(row) {
   return `
-    <div class="friends-row">
+    <div class="friends-row" data-friend-user="${escapeHtml(row.userId)}">
       <span class="friends-row__avatar" aria-hidden="true">${escapeHtml(row.emoji || "👤")}</span>
       <span class="friends-row__name">${escapeHtml(row.name || "Joueur")}</span>
+      <div class="friends-row__actions">
+        <button type="button" class="btn btn-secondary btn--compact" data-friend-unfriend="${escapeHtml(row.userId)}">${escapeHtml(FRIEND_LABEL.unfriend)}</button>
+      </div>
     </div>`;
 }
 
@@ -109,6 +114,13 @@ export function mountFriends(app) {
         void onRefuse(refuseBtn.getAttribute("data-friend-refuse"));
       }
     });
+    app.querySelector("[data-friends-list]")?.addEventListener("click", (e) => {
+      const unfriendBtn = e.target.closest("[data-friend-unfriend]");
+      if (!unfriendBtn) return;
+      const userId = unfriendBtn.getAttribute("data-friend-unfriend");
+      const friend = getMyFriends().find((row) => row.userId === userId);
+      void onUnfriend(userId, friend?.name);
+    });
   }
 
   async function onAccept(fromUserId) {
@@ -162,6 +174,42 @@ export function mountFriends(app) {
       return;
     }
     await showAppAlert(res?.error?.message || "Impossible de refuser.", {
+      title: FRIEND_LABEL.pageTitle,
+      icon: "⚠️",
+    });
+  }
+
+  async function onUnfriend(otherUserId, name) {
+    if (!otherUserId || !isLoggedIn()) return;
+    const copy = unfriendConfirmCopy(name);
+    const ok = await showAppConfirm(copy.message, {
+      title: copy.title,
+      confirmLabel: copy.confirmLabel,
+      cancelLabel: copy.cancelLabel,
+      icon: copy.icon,
+    });
+    if (!ok || !mount.isMounted()) return;
+    const run = await actionLock.run(async () => {
+      try {
+        return await unfriendUser(otherUserId);
+      } catch (err) {
+        return { ok: false, error: err };
+      }
+    });
+    if (!mount.isMounted()) return;
+    if (run.skipped) return;
+    const res = run.value;
+    if (res?.ok) {
+      const lobbyId = getLobby()?.id;
+      if (lobbyId) {
+        patchLobbyFriendOverlayStatus(lobbyId, otherUserId, FRIEND_OVERLAY.none);
+      }
+      await fetchMyFriends();
+      if (!mount.isMounted()) return;
+      paint();
+      return;
+    }
+    await showAppAlert(res?.error?.message || "Impossible de retirer cet ami.", {
       title: FRIEND_LABEL.pageTitle,
       icon: "⚠️",
     });

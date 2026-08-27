@@ -178,17 +178,18 @@ Objectif : file durable + liste emoji/pseudo live.
 - [x] Écran `friends` = chrome soirée (`MENU_SCREENS` + `goToFriends` / `suppressSessionRoute`), comme Menu : pas une manche, pas de suivi auto vers le lobby
 - [x] Tests : [`tests/uxNavSettings.test.js`](../tests/uxNavSettings.test.js) mis à jour si le markup Profil change ; nouveau test écran friends (contrats HTML)
 
-**Palier 6 code à re-tester.** Pas de SQL. Recette : A envoie + Ami ; B clique **hors** de la popup → **Demandes reçues** dans Mes amis (pas vide). **Refuser** seulement via le bouton. Unfriend = palier 7.
+**Palier 6 validé** (27 août 2026). Badge Menu → Mes amis ; accepter depuis la page ; les deux listes **Tes amis** se mettent à jour. Clic hors popup = reporter, pas refuser. Unfriend = palier 7.
 
 ---
 
 ## Palier 7 — Unfriend
 
-- [ ] Sur chaque fiche ami : action **Retirer** + `showAppConfirm` (confirmation locale seulement)
-- [ ] RPC `unfriend` ; silencieux pour l’autre (la pastille Ami redevient **+ Ami** s’ils sont encore dans le même lobby via realtime DELETE `friendships`)
-- [ ] Pas de notif « X t’a retiré »
+- [x] Sur chaque fiche ami : action **Retirer** + `showAppConfirm` (confirmation locale seulement)
+- [x] RPC `unfriend` ; silencieux pour l’autre (la pastille Ami redevient **+ Ami** s’ils sont encore dans le même lobby via realtime DELETE `friendships`)
+- [x] Pas de notif « X t’a retiré »
+- [x] Tests : [`tests/featureFriends07.test.js`](../tests/featureFriends07.test.js)
 
-**Fait quand** : A unfriend B → liste A à jour ; B voit **+ Ami** (ou absence de pastille Ami) sans toast.
+**Palier 7 code terminé.** Pas de SQL (RPC déjà en staging). Recette : A **Retirer** B → confirm → liste A à jour ; B voit disparaître A **sans toast** ; si même lobby, pastille **+ Ami** chez B.
 
 ---
 
@@ -282,9 +283,10 @@ Vague prévue : **FEATURE-FRIENDS-02**.
 | 3 | 2–3 | Module + realtime (console) |
 | 4 | 4 | Boutons roster |
 | 5 | 5 | Popup + badge *(validé waiting room)* |
-| 6 | 6–7 | Page Amis + unfriend |
-| 7 | 7bis | + Ami pendant la soirée (Menu → joueurs) |
-| 8 | 8–9 | Légal + QA |
-| 9 | 10 | Prod (quand on choisit le train de release) |
+| 6 | 6 | Page Amis *(validé)* |
+| 7 | 7 | Unfriend |
+| 8 | 7bis | + Ami pendant la soirée (Menu → joueurs) |
+| 9 | 8–9 | Légal + QA |
+| 10 | 10 | Prod (quand on choisit le train de release) |
 
 Pour implémenter : ouvrir ce fichier et dire **« on fait le palier N »**.

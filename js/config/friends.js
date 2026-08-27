@@ -89,6 +89,7 @@ export const FRIEND_LABEL = {
   friendsEmpty: "Pas encore d’amis. Ajoute des joueurs depuis un lobby.",
   entrySettings: "Mes amis",
   entryHome: "Amis",
+  unfriendCancel: "Annuler",
 };
 
 /** Action roster ( Palier 4 ). `hint_guest` = pas de bouton + Ami. */

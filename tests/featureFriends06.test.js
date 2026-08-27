@@ -38,7 +38,7 @@ describe("FEATURE-FRIENDS-01 Palier 6 — page Amis", () => {
     assert.match(src, /fetchMyFriends/);
     assert.match(src, /data-friends-incoming-empty/);
     assert.match(src, /data-friends-list-empty/);
-    assert.doesNotMatch(src, /unfriendUser/);
+    assert.match(src, /data-friend-unfriend/);
     assert.doesNotMatch(src, /lobby_messages/);
     assert.equal(FRIEND_LABEL.incomingSection, "Demandes reçues");
     assert.equal(FRIEND_LABEL.friendsSection, "Tes amis");
