@@ -57,4 +57,25 @@ describe("FEATURE-FRIENDS-01 Palier 6 — page Amis", () => {
     const nav = read("js/screens/nav.js");
     assert.match(nav, /target === "friends"/);
   });
+
+  it("friends est du chrome soirée, pas une manche", () => {
+    const sync = read("js/core/gameSync.js");
+    const menuBlock = sync.slice(
+      sync.indexOf("const MENU_SCREENS"),
+      sync.indexOf("export function isPassiveChromeScreen")
+    );
+    assert.match(menuBlock, /"friends"/);
+    assert.match(menuBlock, /"settings"/);
+    assert.match(sync, /screen === "friends"/);
+    const nav = read("js/screens/nav.js");
+    const fn = nav.slice(
+      nav.indexOf("export function goToFriends"),
+      nav.indexOf("export function goToEveningSettings")
+    );
+    assert.match(fn, /suppressSessionRoute/);
+    assert.match(fn, /navigate\("friends"\)/);
+    assert.match(nav, /target === "friends"/);
+    assert.match(nav, /goToFriends\(\)/);
+    assert.doesNotMatch(fn, /exitGameToGameSelect/);
+  });
 });

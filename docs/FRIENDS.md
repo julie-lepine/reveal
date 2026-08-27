@@ -174,9 +174,10 @@ Objectif : file durable + liste emoji/pseudo live.
 - [x] Entrée accueil si `isLoggedIn()` ([`js/screens/home.js`](../js/screens/home.js)) — discret, pas un 6ᵉ onglet bottom-nav
 - [x] Badge incoming sur ces entrées ( Palier 5 )
 - [x] Retour navigation cohérent avec `bindNav` / stack router
+- [x] Écran `friends` = chrome soirée (`MENU_SCREENS` + `goToFriends` / `suppressSessionRoute`), comme Menu : pas une manche, pas de suivi auto vers le lobby
 - [x] Tests : [`tests/uxNavSettings.test.js`](../tests/uxNavSettings.test.js) mis à jour si le markup Profil change ; nouveau test écran friends (contrats HTML)
 
-**Palier 6 code terminé.** Pas de SQL. Recette : accepter / refuser une demande **après** avoir quitté le lobby, depuis **Mes amis**. Unfriend = palier 7.
+**Palier 6 code à re-tester.** Pas de SQL. Recette : depuis un lobby encore ouvert, B ouvre **Mes amis**, reste sur la page, voit **Demandes reçues** (Accepter / Refuser). Retour hôte = pile nav / Menu, **pas** la modale « Arrêter la partie ». Unfriend = palier 7.
 
 ---
 

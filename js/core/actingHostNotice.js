@@ -53,6 +53,9 @@ function isInActivePlaySession() {
     local === "game-select" ||
     local === "lobby" ||
     local === "home" ||
+    local === "settings" ||
+    local === "friends" ||
+    local === "privacy" ||
     local === "results" ||
     local === "leaderboard"
   ) {

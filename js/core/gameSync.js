@@ -308,7 +308,24 @@ function guestMustFollowSession(targetScreen, currentScreen = getCurrentScreen()
   return true;
 }
 
-const MENU_SCREENS = new Set(["home", "lobby", "game-select", "settings"]);
+const MENU_SCREENS = new Set([
+  "home",
+  "lobby",
+  "game-select",
+  "settings",
+  "friends",
+  "privacy",
+]);
+
+/** Accueil / Menu / Amis / légal : chrome soirée, pas une manche. */
+export function isPassiveChromeScreen(screen) {
+  return (
+    screen === "home" ||
+    screen === "settings" ||
+    screen === "friends" ||
+    screen === "privacy"
+  );
+}
 export const POST_GAME_SCREENS = new Set(["results", "leaderboard", "tiernight-end"]);
 export const DEFAULT_SYNC_PATCH_TIMEOUT_MS = SYNC_PATCH_TIMEOUT_MS;
 
@@ -439,7 +456,7 @@ function isSessionAdvancedFromSuppress(targetScreen) {
 /** L'invité sur le menu jeux / lobby / post-partie suit l'hôte qui lance prep ou partie. */
 function shouldFollowHostGameLaunch(current, targetScreen) {
   if (!targetScreen) return false;
-  if (current === "home" || current === "settings") return false;
+  if (isPassiveChromeScreen(current)) return false;
   if (isSuppressedGameReturn(targetScreen)) return false;
 
   if (POST_GAME_SCREENS.has(current) && isSessionRouteSuppressed()) {
@@ -487,7 +504,7 @@ function shouldApplySessionRoute(row, { fromScreen = null, debugSource = null } 
     current === "game-select" ||
     current === "home" ||
     current === "lobby" ||
-    current === "settings";
+    isPassiveChromeScreen(current);
   if (onVoluntaryExitHub && isSuppressedGameReturn(screen)) {
     return routeLog(false, "voluntary_exit_suppress_hub");
   }
@@ -533,7 +550,7 @@ function shouldApplySessionRoute(row, { fromScreen = null, debugSource = null } 
     if (
       screen === "game-select" &&
       isLobbyEveningStarted() &&
-      (current === "home" || current === "lobby" || current === "settings")
+      (current === "lobby" || isPassiveChromeScreen(current))
     ) {
       return routeLog(true, "hub_game_select_from_passive");
     }
@@ -571,7 +588,7 @@ function shouldApplySessionRoute(row, { fromScreen = null, debugSource = null } 
   const sessionAdvanced = isSessionAdvancedFromSuppress(screen);
 
   if (routingSuppressed) {
-    if (current === "home" || current === "settings") {
+    if (isPassiveChromeScreen(current)) {
       return routeLog(false, "routing_suppressed_passive_menu");
     }
     if (sessionAdvanced || hostLaunchedFromMenu || shouldFollowHostGameLaunch(current, screen)) {
@@ -780,7 +797,7 @@ export function isCompatibleSessionScreen(sessionScreen, localScreen) {
   }
   /** Accueil / paramètres : libre si pas de partie en cours ; sinon rattrapage vers le jeu. */
   if (getState().inLobby && getState().lobby?.id) {
-    if (localScreen === "settings" || localScreen === "home") {
+    if (isPassiveChromeScreen(localScreen)) {
       if (isActiveGameSessionScreen(sessionScreen)) return false;
       return true;
     }

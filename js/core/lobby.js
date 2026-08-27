@@ -110,6 +110,7 @@ import {
   getCachedGameSession,
   getEffectiveSessionScreen,
   isActiveGameSessionScreen,
+  isPassiveChromeScreen,
   isOnGameSetupScreen,
   isOnPostGameScreen,
   isLobbyHost,
@@ -780,7 +781,7 @@ export async function routeToEveningHub({
     if (rejoinActiveGame && (await routeToActiveGameIfNeeded(row, { force: true }))) {
       resumeLocalGuessLiePlay();
       const passive = getCurrentScreen();
-      if (passive === "home" || passive === "settings") {
+      if (isPassiveChromeScreen(passive)) {
         if (!isLobbyEveningStarted()) goToLobby();
         else navigate("game-select", { navStack: ["home", "lobby", "game-select"] });
       }

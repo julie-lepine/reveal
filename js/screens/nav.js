@@ -30,7 +30,21 @@ export async function goToEveningHome() {
   await returnToEveningGames({ hubOnly: true });
 }
 
-/** Menu : écran unique (profil + partie si lobby). */
+/** Page Amis : même contrat que Menu (pas une manche). */
+export function goToFriends() {
+  if (!canPlay()) {
+    navigate("home", { reset: true });
+    return;
+  }
+  if (getCurrentScreen() === "friends") return;
+  if (hasActiveLobby()) {
+    suppressSessionRoute(120000, getCachedGameSession()?.screen ?? null);
+    navigate("friends");
+    return;
+  }
+  navigate("friends");
+}
+
 export function goToEveningSettings({ tab } = {}) {
   if (!canPlay()) {
     navigate("home", { reset: true });
@@ -149,7 +163,7 @@ export async function handleNavTarget(target, handlers) {
     return;
   }
   if (target === "friends") {
-    navigate("friends");
+    goToFriends();
     return;
   }
   navigate(target);
