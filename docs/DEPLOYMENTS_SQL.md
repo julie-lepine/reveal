@@ -87,6 +87,7 @@ Sources : audit SQL du dépôt (`AUDIT-SQL-01`) + docs ops ([`SUPABASE.md`](./SU
 | Historique (date inconnue) | [`create-lobby-member.sql`](../supabase/create-lobby-member.sql) | Snapshot prod | ❌ | ❌ | — | Legacy / snapshot — **ne pas réappliquer** (réactive create legacy) |
 | Historique (date inconnue) | [`fil-rouge-private.sql`](../supabase/fil-rouge-private.sql) | Fil Rouge abandonné | ❌ (ne plus déployer) | ❌ table live retirée | — | Historique uniquement · **DROP** via [`cleanup-filrouge-02-remove-server-legacy.sql`](../supabase/cleanup-filrouge-02-remove-server-legacy.sql) ✅ 2026-08-07 |
 | 2026-08-27 | [`feature-friends-01.sql`](../supabase/feature-friends-01.sql) | FEATURE-FRIENDS-01 | ✅ | ✅ | [`feature-friends-01-runbook.sql`](../supabase/tests/feature-friends-01-runbook.sql) | Un seul projet live · runbook **staging only** · voir §13 |
+| 2026-08-27 | [`feature-friends-02.sql`](../supabase/feature-friends-02.sql) | FEATURE-FRIENDS-02 | ✅ | ✅ | [`feature-friends-02-runbook.sql`](../supabase/tests/feature-friends-02-runbook.sql) | Invitations lobby · voir §14 |
 
 **Hors migrations (tracés ailleurs si besoin)** : préflight [`lobby-membership-e4-00-preflight-duplicates.sql`](../supabase/lobby-membership-e4-00-preflight-duplicates.sql) (lecture seule) ; runbooks / harness sous [`supabase/tests/`](../supabase/tests/) et [`lobby-membership-e4-RUNBOOK.sql`](../supabase/lobby-membership-e4-RUNBOOK.sql) / [`lobby-membership-e5-RUNBOOK.sql`](../supabase/lobby-membership-e5-RUNBOOK.sql) — ce ne sont pas des migrations. Voir aussi [`lobby-membership-e4-tests-manual.sql`](../supabase/lobby-membership-e4-tests-manual.sql).
 
@@ -320,3 +321,19 @@ Un seul projet Supabase (`ojzxbvpdfnwagrvbhfll`) : staging QA = prod app.
 | Hors scope | Invites lobby (FEATURE-FRIENDS-02) · push · DM |
 
 **Statut** : SQL + Realtime **✅ prod** (même projet) · Palier 10 **27 août 2026**.
+
+---
+
+## 14. FEATURE-FRIENDS-02 — Invitations de lobby
+
+Table `lobby_invites` + RPC send/decline/accept/list. Join **sans** le code. CASCADE à la mort du lobby. Pas de colonnes d’invite sur `lobby_members`.
+
+| Élément | Valeur |
+| ------- | ------ |
+| Migration | [`feature-friends-02.sql`](../supabase/feature-friends-02.sql) — **✅** 27 août 2026 |
+| Runbook | [`tests/feature-friends-02-runbook.sql`](../supabase/tests/feature-friends-02-runbook.sql) — **`FRIENDS02_RUNBOOK_OK`** (staging, **ne pas relancer**) |
+| Realtime | `lobby_invites` on (Publications). Même topic client `friends:${userId}` |
+| Client | [`FRIENDS.md`](./FRIENDS.md) Phase 2 palier 2 — wrappers, pas d’UI |
+| Hors scope | Push · QR · deep link · présence hors lobby |
+
+**Statut** : SQL + Realtime **✅** (même projet) · Palier 1 **27 août 2026**.

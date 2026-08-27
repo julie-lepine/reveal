@@ -2,6 +2,7 @@
  * FEATURE-FRIENDS-01 — contrats figés (Palier 0).
  * Aligné sur docs/FRIENDS.md. Le SQL / l’UI des paliers suivants importent d’ici.
  * Ne pas y mettre de fetch, de Realtime, ni de DOM.
+ * Invitations de lobby : FEATURE-FRIENDS-02 (`js/config/lobbyInvites.js`).
  */
 
 export const FRIENDS_FEATURE_ID = "FEATURE-FRIENDS-01";

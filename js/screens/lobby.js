@@ -53,8 +53,11 @@ import {
   acceptLobbyFriendRequest,
   sendLobbyFriendRequest,
 } from "../core/lobbyFriendActions.js";
-import { onFriendsCacheUpdated } from "../core/friendsState.js";
+import { getMyFriends, onFriendsCacheUpdated } from "../core/friendsState.js";
 import { fetchLobbyFriendOverlay } from "../core/supabaseFriends.js";
+import { FRIENDS_SCREEN_ID } from "../config/friends.js";
+import { LOBBY_INVITE_LABEL } from "../config/lobbyInvites.js";
+import { shouldShowLobbyInviteFriendsEntry } from "../core/lobbyInvitesLogic.js";
 
 function participantsHtml(participants, { canKick = false, hostId = null, localIsRegistered = false, lobbyId = null } = {}) {
   return participants
@@ -270,6 +273,14 @@ export function mountLobby(app) {
     const hintHost = app.querySelector("[data-lobby-friends-hint-slot]");
     if (hintHost) hintHost.innerHTML = lobbyFriendsHintHtml(localIsRegistered, participants);
 
+    const friendsEntry = app.querySelector("[data-lobby-invite-friends]");
+    if (friendsEntry) {
+      friendsEntry.hidden = !shouldShowLobbyInviteFriendsEntry({
+        localIsRegistered,
+        friendCount: getMyFriends().length,
+      });
+    }
+
     const footer = app.querySelector(".lobby-footer");
     if (footer) {
       footer.textContent = `${ready} / ${total} prêts · ${lobbyFooterHint(ready, total)}`;
@@ -472,6 +483,17 @@ export function mountLobby(app) {
           <div class="participants-grid">${participantsHtml(participants, { canKick, hostId, localIsRegistered, lobbyId })}</div>
           <div data-lobby-friends-hint-slot>${lobbyFriendsHintHtml(localIsRegistered, participants)}</div>
         </div>
+
+        <p class="hint lobby-invite-friends-entry" data-lobby-invite-friends ${
+          shouldShowLobbyInviteFriendsEntry({
+            localIsRegistered,
+            friendCount: getMyFriends().length,
+          })
+            ? ""
+            : "hidden"
+        }>
+          <button type="button" class="btn-link" data-nav="${FRIENDS_SCREEN_ID}">${escapeHtml(LOBBY_INVITE_LABEL.entryLobby)}</button>
+        </p>
 
         <div class="invite-card">
           <p class="invite-card__label">Code · ${getLobbyStatus() === "playing" ? "partie en cours" : "en attente"}</p>

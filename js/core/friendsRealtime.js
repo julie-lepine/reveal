@@ -1,21 +1,30 @@
 /**
- * FEATURE-FRIENDS-01 Palier 3 — canal Realtime `friends:${userId}`.
- * Pas de topic lobby. Catch-up HTTP coalescé (overlay si lobby, listes toujours).
+ * Canal Realtime `friends:${userId}` (FEATURE-FRIENDS-01 + 02).
+ * Pas de topic lobby. Catch-up HTTP coalescé (amis + invitations).
  */
 import { supabase, isSupabaseConfigured } from "./supabaseClient.js";
 import { getState } from "./state.js";
 import { friendsRealtimeTopic } from "../config/friends.js";
+import { clearFriendsCache } from "./friendsState.js";
+import { clearLobbyInvitesCache } from "./lobbyInvitesState.js";
 import {
   friendsCatchupPlan,
   friendsRealtimeChangeSpecs,
   isRegisteredUser,
 } from "./friendsLogic.js";
-import { clearFriendsCache } from "./friendsState.js";
+import {
+  lobbyInviteRealtimeChangeSpecs,
+  lobbyInvitesCatchupPlan,
+} from "./lobbyInvitesLogic.js";
 import {
   fetchIncomingFriendRequests,
   fetchLobbyFriendOverlay,
   fetchMyFriends,
 } from "./supabaseFriends.js";
+import {
+  fetchIncomingLobbyInvites,
+  fetchOutgoingLobbyInvites,
+} from "./supabaseLobbyInvites.js";
 
 const CATCHUP_MS = 120;
 
@@ -44,6 +53,7 @@ export function stopFriendsRealtime() {
   channel = null;
   channelUserId = null;
   clearFriendsCache();
+  clearLobbyInvitesCache();
 }
 
 function scheduleFriendsCatchup(gen) {
@@ -66,6 +76,9 @@ async function runFriendsCatchup(gen) {
     if (plan.overlay && lobbyId) await fetchLobbyFriendOverlay(lobbyId);
     if (plan.incoming) await fetchIncomingFriendRequests();
     if (plan.friends) await fetchMyFriends();
+    const invites = lobbyInvitesCatchupPlan();
+    if (invites.incoming) await fetchIncomingLobbyInvites();
+    if (invites.outgoing) await fetchOutgoingLobbyInvites();
   } catch (e) {
     console.warn("[FRIENDS-RT] catch-up", e?.message || e);
   }
@@ -91,7 +104,11 @@ export function startFriendsRealtime(userId) {
   };
 
   let builder = ch;
-  for (const spec of friendsRealtimeChangeSpecs(userId)) {
+  const specs = [
+    ...friendsRealtimeChangeSpecs(userId),
+    ...lobbyInviteRealtimeChangeSpecs(userId),
+  ];
+  for (const spec of specs) {
     builder = builder.on(
       "postgres_changes",
       {

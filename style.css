@@ -3050,6 +3050,14 @@ select.field-input option{
   justify-content:center;
 }
 
+.auth-welcome__btn--primary{
+  border-color:var(--color-primary);
+}
+
+.auth-welcome__btn--secondary{
+  border-color:var(--color-secondary);
+}
+
 .auth-welcome__actions .btn-link{
   margin-top:2px;
 }
@@ -3706,6 +3714,18 @@ button.emoji-picker-preview__avatar:active{
   flex-wrap:wrap;
   gap:6px;
   flex-shrink:0;
+}
+
+.friends-row__badge{
+  font-size:12px;
+  font-weight:700;
+  color:rgba(255,255,255,.5);
+  white-space:nowrap;
+}
+
+.lobby-invite-friends-entry{
+  text-align:center;
+  margin:8px 0 12px;
 }
 
 .friends-empty{

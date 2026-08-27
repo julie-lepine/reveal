@@ -1,5 +1,6 @@
 /**
  * FEATURE-FRIENDS-01 Palier 6–7 — page Amis (demandes + liste + unfriend).
+ * FEATURE-FRIENDS-02 Palier 4 — Inviter / invitations de soirée.
  * Découverte toujours via le lobby, pas de recherche.
  */
 import {
@@ -7,17 +8,35 @@ import {
   FRIEND_OVERLAY,
   FRIENDS_SCREEN_ID,
 } from "../config/friends.js";
+import {
+  LOBBY_INVITE_ACTION,
+  LOBBY_INVITE_LABEL,
+  LOBBY_INVITE_RPC_ERROR,
+  friendInviteAction,
+} from "../config/lobbyInvites.js";
 import { isLoggedIn } from "../core/auth.js";
 import { createActionLock } from "../core/actionLock.js";
 import { showAppAlert, showAppConfirm } from "../core/dialog.js";
 import { createMountGuard } from "../core/mountLifecycle.js";
-import { getLobby, hasActiveLobby } from "../core/lobby.js";
+import {
+  getLobby,
+  getLobbyParticipants,
+  hasActiveLobby,
+  navigateAfterLobbyJoin,
+  tryRecoverLobbyFromServer,
+} from "../core/lobby.js";
 import {
   getIncomingFriendRequests,
   getMyFriends,
   onFriendsCacheUpdated,
   patchLobbyFriendOverlayStatus,
 } from "../core/friendsState.js";
+import {
+  getIncomingLobbyInvites,
+  isLobbyInvitePendingOut,
+  onLobbyInvitesCacheUpdated,
+} from "../core/lobbyInvitesState.js";
+import { lobbyInviteFailMessage } from "../core/lobbyInvitesLogic.js";
 import { unfriendConfirmCopy } from "../core/friendsLogic.js";
 import {
   acceptFriendRequest,
@@ -26,6 +45,13 @@ import {
   fetchMyFriends,
   unfriendUser,
 } from "../core/supabaseFriends.js";
+import {
+  acceptLobbyInvite,
+  declineLobbyInvite,
+  fetchIncomingLobbyInvites,
+  fetchOutgoingLobbyInvites,
+  sendLobbyInvite,
+} from "../core/supabaseLobbyInvites.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
 import { bindNav } from "./nav.js";
 
@@ -41,12 +67,42 @@ function incomingRowHtml(row) {
     </div>`;
 }
 
-function friendRowHtml(row) {
+function incomingLobbyInviteRowHtml(row) {
+  return `
+    <div class="friends-row" data-lobby-invite="${escapeHtml(row.id)}">
+      <span class="friends-row__avatar" aria-hidden="true">${escapeHtml(row.emoji || "👤")}</span>
+      <span class="friends-row__name">${escapeHtml(row.name || "Joueur")}</span>
+      <div class="friends-row__actions">
+        <button type="button" class="btn btn-primary btn--compact" data-lobby-invite-join="${escapeHtml(row.id)}">${escapeHtml(LOBBY_INVITE_LABEL.join)}</button>
+        <button type="button" class="btn btn-secondary btn--compact" data-lobby-invite-refuse="${escapeHtml(row.id)}">${escapeHtml(LOBBY_INVITE_LABEL.refuse)}</button>
+      </div>
+    </div>`;
+}
+
+function friendInviteControlHtml(row, { localIsRegistered, localInLobby, lobbyId, peerIds }) {
+  const kind = friendInviteAction({
+    localIsRegistered,
+    localInLobby,
+    peerInSameLobby: peerIds.has(row.userId),
+    pendingOut: isLobbyInvitePendingOut(lobbyId, row.userId),
+  });
+  if (kind === LOBBY_INVITE_ACTION.omit) return "";
+  if (kind === LOBBY_INVITE_ACTION.alreadyIn) {
+    return `<span class="friends-row__badge">${escapeHtml(LOBBY_INVITE_LABEL.alreadyIn)}</span>`;
+  }
+  if (kind === LOBBY_INVITE_ACTION.sent) {
+    return `<button type="button" class="btn btn-secondary btn--compact" data-lobby-invite-sent="${escapeHtml(row.userId)}" disabled>${escapeHtml(LOBBY_INVITE_LABEL.sent)}</button>`;
+  }
+  return `<button type="button" class="btn btn-primary btn--compact" data-lobby-invite-send="${escapeHtml(row.userId)}">${escapeHtml(LOBBY_INVITE_LABEL.invite)}</button>`;
+}
+
+function friendRowHtml(row, inviteCtx) {
   return `
     <div class="friends-row" data-friend-user="${escapeHtml(row.userId)}">
       <span class="friends-row__avatar" aria-hidden="true">${escapeHtml(row.emoji || "👤")}</span>
       <span class="friends-row__name">${escapeHtml(row.name || "Joueur")}</span>
       <div class="friends-row__actions">
+        ${friendInviteControlHtml(row, inviteCtx)}
         <button type="button" class="btn btn-secondary btn--compact" data-friend-unfriend="${escapeHtml(row.userId)}">${escapeHtml(FRIEND_LABEL.unfriend)}</button>
       </div>
     </div>`;
@@ -64,21 +120,48 @@ function guestPanelHtml() {
 }
 
 function listsHtml() {
+  const lobbyInvites = getIncomingLobbyInvites();
   const incoming = getIncomingFriendRequests();
   const friends = getMyFriends();
+  const localInLobby = hasActiveLobby();
+  const lobbyId = getLobby()?.id || null;
+  const peerIds = new Set(
+    localInLobby
+      ? getLobbyParticipants()
+          .map((p) => p.userId)
+          .filter(Boolean)
+      : []
+  );
+  const inviteCtx = {
+    localIsRegistered: true,
+    localInLobby,
+    lobbyId,
+    peerIds,
+  };
+  const lobbyInvitesBody = lobbyInvites.length
+    ? lobbyInvites.map(incomingLobbyInviteRowHtml).join("")
+    : `<p class="hint friends-empty__hint" data-lobby-invites-empty>${escapeHtml(LOBBY_INVITE_LABEL.incomingEmpty)}</p>`;
   const incomingBody = incoming.length
     ? incoming.map(incomingRowHtml).join("")
     : `<p class="hint friends-empty__hint" data-friends-incoming-empty>${escapeHtml(FRIEND_LABEL.incomingEmpty)}</p>`;
   const friendsBody = friends.length
-    ? friends.map(friendRowHtml).join("")
+    ? friends.map((row) => friendRowHtml(row, inviteCtx)).join("")
     : `<p class="hint friends-empty__hint" data-friends-list-empty>${escapeHtml(FRIEND_LABEL.friendsEmpty)}</p>`;
+  const noLobbyHint = localInLobby
+    ? ""
+    : `<p class="hint friends-empty__hint" data-lobby-invite-no-lobby>${escapeHtml(LOBBY_INVITE_LABEL.noLobbyHint)}</p>`;
   return `
+    <section class="card settings-section" data-lobby-invites-incoming>
+      <h2 class="settings-section__title">${escapeHtml(LOBBY_INVITE_LABEL.incomingSection)}</h2>
+      ${lobbyInvitesBody}
+    </section>
     <section class="card settings-section" data-friends-incoming>
       <h2 class="settings-section__title">${escapeHtml(FRIEND_LABEL.incomingSection)}</h2>
       ${incomingBody}
     </section>
     <section class="card settings-section" data-friends-list>
       <h2 class="settings-section__title">${escapeHtml(FRIEND_LABEL.friendsSection)}</h2>
+      ${noLobbyHint}
       ${friendsBody}
     </section>`;
 }
@@ -86,7 +169,8 @@ function listsHtml() {
 export function mountFriends(app) {
   const mount = createMountGuard();
   const actionLock = createActionLock();
-  let unsubCache = () => {};
+  let unsubFriendsCache = () => {};
+  let unsubInvitesCache = () => {};
 
   function paint() {
     if (!mount.isMounted()) return;
@@ -103,6 +187,17 @@ export function mountFriends(app) {
     });
     bindNav(app);
     if (!registered) return;
+    app.querySelector("[data-lobby-invites-incoming]")?.addEventListener("click", (e) => {
+      const joinBtn = e.target.closest("[data-lobby-invite-join]");
+      if (joinBtn) {
+        void onJoinInvite(joinBtn.getAttribute("data-lobby-invite-join"));
+        return;
+      }
+      const refuseBtn = e.target.closest("[data-lobby-invite-refuse]");
+      if (refuseBtn) {
+        void onRefuseInvite(refuseBtn.getAttribute("data-lobby-invite-refuse"));
+      }
+    });
     app.querySelector("[data-friends-incoming]")?.addEventListener("click", (e) => {
       const acceptBtn = e.target.closest("[data-friend-accept]");
       if (acceptBtn) {
@@ -115,6 +210,11 @@ export function mountFriends(app) {
       }
     });
     app.querySelector("[data-friends-list]")?.addEventListener("click", (e) => {
+      const inviteBtn = e.target.closest("[data-lobby-invite-send]");
+      if (inviteBtn) {
+        void onInvite(inviteBtn.getAttribute("data-lobby-invite-send"));
+        return;
+      }
       const unfriendBtn = e.target.closest("[data-friend-unfriend]");
       if (!unfriendBtn) return;
       const userId = unfriendBtn.getAttribute("data-friend-unfriend");
@@ -215,19 +315,123 @@ export function mountFriends(app) {
     });
   }
 
-  paint();
-  unsubCache = onFriendsCacheUpdated(() => {
+  async function onInvite(toUserId) {
+    if (!toUserId || !isLoggedIn() || !hasActiveLobby()) return;
+    const run = await actionLock.run(async () => {
+      try {
+        return await sendLobbyInvite(toUserId);
+      } catch (err) {
+        return { ok: false, error: err };
+      }
+    });
+    if (!mount.isMounted()) return;
+    if (run.skipped) return;
+    const res = run.value;
+    if (res?.ok) {
+      await fetchOutgoingLobbyInvites();
+      if (!mount.isMounted()) return;
+      paint();
+      return;
+    }
+    await showAppAlert(lobbyInviteFailMessage(res?.error?.code), {
+      title: LOBBY_INVITE_LABEL.noticeTitle,
+      icon: "⚠️",
+    });
+  }
+
+  async function onRefuseInvite(inviteId) {
+    if (!inviteId || !isLoggedIn()) return;
+    const run = await actionLock.run(async () => {
+      try {
+        return await declineLobbyInvite(inviteId);
+      } catch (err) {
+        return { ok: false, error: err };
+      }
+    });
+    if (!mount.isMounted()) return;
+    if (run.skipped) return;
+    const res = run.value;
+    if (res?.ok) {
+      await fetchIncomingLobbyInvites();
+      if (!mount.isMounted()) return;
+      paint();
+      return;
+    }
+    await showAppAlert(lobbyInviteFailMessage(res?.error?.code), {
+      title: LOBBY_INVITE_LABEL.noticeTitle,
+      icon: "⚠️",
+    });
+  }
+
+  async function onJoinInvite(inviteId) {
+    if (!inviteId || !isLoggedIn()) return;
+    const invite = getIncomingLobbyInvites().find((row) => row.id === inviteId);
+    const currentLobbyId = getLobby()?.id || null;
+    if (
+      hasActiveLobby() &&
+      currentLobbyId &&
+      invite?.lobbyId &&
+      invite.lobbyId !== currentLobbyId
+    ) {
+      await showAppAlert(lobbyInviteFailMessage(LOBBY_INVITE_RPC_ERROR.busy), {
+        title: LOBBY_INVITE_LABEL.busyTitle,
+        icon: "🎉",
+      });
+      return;
+    }
+    const run = await actionLock.run(async () => {
+      try {
+        return await acceptLobbyInvite(inviteId);
+      } catch (err) {
+        return { ok: false, error: err };
+      }
+    });
+    if (!mount.isMounted()) return;
+    if (run.skipped) return;
+    const res = run.value;
+    if (res?.ok && (res.result === "joined" || res.result === "already_in")) {
+      await fetchIncomingLobbyInvites();
+      if (!mount.isMounted()) return;
+      const recovered = await tryRecoverLobbyFromServer();
+      if (!mount.isMounted()) return;
+      if (recovered?.ok) {
+        await navigateAfterLobbyJoin();
+        return;
+      }
+      paint();
+      return;
+    }
+    await fetchIncomingLobbyInvites();
+    if (!mount.isMounted()) return;
+    paint();
+    await showAppAlert(lobbyInviteFailMessage(res?.error?.code), {
+      title: LOBBY_INVITE_LABEL.noticeTitle,
+      icon: "⚠️",
+    });
+  }
+
+  function onCacheUpdated() {
     if (!mount.isMounted()) return;
     if (!isLoggedIn()) return;
     paint();
-  });
+  }
+
+  paint();
+  unsubFriendsCache = onFriendsCacheUpdated(onCacheUpdated);
+  unsubInvitesCache = onLobbyInvitesCacheUpdated(onCacheUpdated);
   if (isLoggedIn()) {
-    void Promise.all([fetchIncomingFriendRequests(), fetchMyFriends()]);
+    void Promise.all([
+      fetchIncomingFriendRequests(),
+      fetchMyFriends(),
+      fetchIncomingLobbyInvites(),
+      fetchOutgoingLobbyInvites(),
+    ]);
   }
 
   return () => {
     mount.dispose();
-    unsubCache();
+    unsubFriendsCache();
+    unsubInvitesCache();
   };
 }
 
