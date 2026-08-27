@@ -40,6 +40,12 @@ Builds natifs : `npm run cap:sync` (Node ≥ 22) → AAB / Archive.
 
 Hors scope : DUNS, diffusion INSEE, nom de société sur la fiche. IAP iOS : après contrat **Actif** + prochaine version (pas la 1.0.0 en review).
 
+### Prochain native (amis)
+
+Le 1.0.0 en review **n’embarque pas** amis / invitations / croisés 24 h. **Ne pas** toucher les fiches maintenant.
+
+- [ ] App Privacy Apple / Play Data safety : **uniquement** au prochain store build qui embarque la feature (relations sociales / user IDs) — *No public social feed*, *private friend list*, *lobby-only discovery* (pas de recherche, pas de fil)
+
 ### Site & AdMob (après pubs live)
 - [x] `suppression-compte.html` en HTTPS — 25 août 2026
 - [x] `https://revealthepartygame.fr/app-ads.txt` (`pub-6332424645114129`) — 25 août 2026
@@ -77,6 +83,7 @@ Hors scope : DUNS, diffusion INSEE, nom de société sur la fiche. IAP iOS : apr
 - [x] Légal OVH : `privacy.html` + `mentions-legales.html` (2,99 € TTC, Google = paiement) — 25 août 2026
 - [x] Légal OVH : recopie **liste d’amis / demandes** sur `privacy.html` — 27 août 2026
 - [x] Légal OVH : recopie **invitations de soirée** sur `privacy.html` — 27 août 2026
+- [x] Légal OVH : recopie **joueurs récemment croisés 24 h** sur `privacy.html` — FEATURE-FRIENDS-04 — 27 août 2026
 
 ### Plus tard
 - [ ] Prod Play (critères test fermé OK — lancement au choix ; version peut être 1.0.20+)
@@ -109,7 +116,7 @@ Test fermé Play : codes générés, bêta device OK (Z Flip), critères prod re
 **Egress Supabase** : optimisations + migration faite — 25 août 2026.  
 **App Store** : 1.0.0 (build 4) en review + vérif infos dev en attente — 25 août 2026.  
 **Play** : test fermé OK, **prod disponible** ; QA 11 jeux + app validés — 25 août 2026.  
-**Amis / invitations de soirée / Annuler une demande** : live web [Pages](https://julie-lepine.github.io/reveal/) (`main`) — 27 août 2026. Stores : **prochain** build — **pas** le 1.0.0 App Store en review.
+**Amis / invitations de soirée / Annuler / croisés 24 h** : code FEATURE-FRIENDS-04 prêt ; web [Pages](https://julie-lepine.github.io/reveal/) (`main`) après ton push. Stores : **prochain** build — **pas** le 1.0.0 App Store en review.
 
 ---
 
@@ -119,7 +126,7 @@ Test fermé Play : codes générés, bêta device OK (Z Flip), critères prod re
 2. Lier les stores dans AdMob.
 3. Coller les URLs store sur `revealthepartygame.fr`.
 
-**Update store :** code → `cap:sync` → test → bump `versionCode` / `versionName` (Play : +1 obligatoire) → AAB ou Archive → upload.
+**Update store :** code → `cap:sync` → test → bump `versionCode` / `versionName` (Play : +1 obligatoire) → AAB ou Archive → upload. Si ce build embarque les amis : mettre à jour App Privacy Apple / Play Data safety **au même moment** (pas avant, pas sur le 1.0.0).
 
 ---
 
@@ -254,7 +261,7 @@ No regional differences. French UI and content; consistent behavior worldwide.
 Not applicable. Casual party game; no licensed third-party media in v1.0.0.
 
 USER-GENERATED CONTENT:
-Nicknames, lobby chat, custom game text in private lobbies (code required). Private friend list with lobby-only discovery (registered accounts only; no player search). Private ephemeral party invites between registered friends (tied to a living lobby; no public invite link). Mitigations: client-side word filter, host can remove players, contact@revealthepartygame.fr for abuse reports. No public social feed.
+Nicknames, lobby chat, custom game text in private lobbies (code required). Private friend list with lobby-only discovery (registered accounts only; no player search). Private ephemeral party invites between registered friends (tied to a living lobby; no public invite link). Recently-crossed registered players from a shared lobby, shown for 24 hours after the lobby ends (not a search, not suggestions of strangers). Mitigations: client-side word filter, host can remove players, contact@revealthepartygame.fr for abuse reports. No public social feed.
 
 ACCOUNT DELETION:
 In-app: Settings → Legal → “Supprimer mon compte”, or https://revealthepartygame.fr/suppression-compte.html
@@ -271,6 +278,6 @@ contact@revealthepartygame.fr
 | Sujet | Réponse |
 |-------|---------|
 | IAP iOS | **Aucun** en 1.0.0 — le dire explicitement |
-| UGC | Lobbies **privées** ; liste d’amis **privée** (découverte roster lobby, pas de recherche) ; invitations de soirée **privées** (éphémères, amis inscrits) ; filtre mots ; kick hôte ; **pas de fil public** ; pas de bouton « Signaler » in-app |
+| UGC | Lobbies **privées** ; liste d’amis **privée** (découverte roster lobby, pas de recherche) ; invitations de soirée **privées** (éphémères, amis inscrits) ; croisés récents **24 h** (inscrits déjà vus en salon, pas une recherche) ; filtre mots ; kick hôte ; **pas de fil public** ; pas de bouton « Signaler » in-app |
 | ATT / UMP | **Obligatoire dans la vidéo** |
 | GitHub | Version web seulement — **ne remplace pas** la démo native |

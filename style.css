@@ -3771,6 +3771,7 @@ button.emoji-picker-preview__avatar:active{
   display:block;
   width:100%;
   margin:8px 0 14px;
+  border-color:var(--color-secondary);
 }
 
 .lobby-invite-friends-entry[hidden]{

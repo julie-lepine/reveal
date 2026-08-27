@@ -18,6 +18,7 @@ Lancement : [LAUNCH.md](./LAUNCH.md) · Native : [NATIVE.md](./NATIVE.md) · SQL
    - `friend_requests` *(FEATURE-FRIENDS-01 — après `feature-friends-01.sql`)*
    - `friendships` *(idem — pas `friend_request_cooldowns`)*
    - `lobby_invites` *(FEATURE-FRIENDS-02 — après `feature-friends-02.sql`)*
+   - **Pas** `lobby_encounters` *(FEATURE-FRIENDS-04 — catch-up HTTP / page Amis, pas de `postgres_changes`)*
 4. Exécute aussi **`supabase/game-sessions.sql`** (multijoueur des jeux). Si les invités ne peuvent pas synchroniser les mini-jeux (erreur `PGRST116` ou `406` sur `PATCH game_sessions`), réexécute au minimum la politique `game_sessions_update` (section `with check`) de ce fichier.
 5. Exécute **`supabase/lobby-lifecycle.sql`** (expiration, heartbeat `last_seen_at`, purge auto — voir § 7bis)
 6. Exécute **`supabase/transfer-lobby-host.sql`** (transfert volontaire du rôle d'hôte depuis le menu jeux)
@@ -26,6 +27,7 @@ Lancement : [LAUNCH.md](./LAUNCH.md) · Native : [NATIVE.md](./NATIVE.md) · SQL
 9. Exécute **`supabase/traitre-private.sql`** si tu joues à Spot the fake (dépend de `is_lobby_host`, fourni par `game-sessions-i08-arch03.sql`)
 10. Exécute **`supabase/feature-adfree-01-profile-flag.sql`** (colonne `profiles.ad_free` + trigger anti auto-attribution — palier Sans pub)
 11. Exécute **`supabase/feature-friends-01.sql`**, **`supabase/feature-friends-02.sql`**, **`supabase/feature-friends-03.sql`** puis **`supabase/feature-friends-03-live-identity.sql`** (amis, invitations de salon, Annuler, identité live). Realtime : `friend_requests`, `friendships`, `lobby_invites` (pas `friend_request_cooldowns`). F03 n’ajoute **pas** de table Realtime.
+12. Exécute **`supabase/feature-friends-04.sql`** puis **`supabase/feature-friends-04-dissolve-trigger.sql`** (croisés 24 h : table `lobby_encounters`, RPC `list_recent_lobby_peers`, trigger membership **BEFORE DELETE** à la dissolve). **Ne pas** ajouter `lobby_encounters` à la publication Realtime. Runbook `FRIENDS04_RUNBOOK_OK` : **staging only**, interdit en production.
 
 > **Fil Rouge / Mot interdit** — suppression applicative terminée (et serveur via **CLEANUP-FILROUGE-02 ✅** 2026-08-07). Ne pas exécuter `supabase/fil-rouge-private.sql` sur une install neuve. Sur le projet cible : table `fil_rouge_private` absente ; RPC actives sans Fil Rouge / sans `playlistGuess` regressé. Helper client `stripLegacyFilRougeKeys` conservé (anciens localStorage).
 

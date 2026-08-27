@@ -25,8 +25,10 @@ function recentPeersError(error) {
 }
 
 function sameLobbyUserIds() {
+  const st = getState();
+  if (!st.inLobby) return new Set();
   const ids = new Set();
-  const participants = getState().lobby?.participants || [];
+  const participants = st.lobby?.participants || [];
   for (const p of participants) {
     if (p?.userId) ids.add(p.userId);
   }
@@ -38,22 +40,28 @@ export async function fetchRecentLobbyPeers() {
     setRecentLobbyPeers([]);
     return { ok: false, skipped: true, peers: [] };
   }
-  const { data, error } = await supabase.rpc(RECENT_PEERS_RPC.list, {});
-  if (error) throw recentPeersError(error);
+  try {
+    const { data, error } = await supabase.rpc(RECENT_PEERS_RPC.list, {});
+    if (error) throw recentPeersError(error);
 
-  const friendIds = new Set(getMyFriends().map((row) => row.userId));
-  const sameLobby = sameLobbyUserIds();
-  const localIsRegistered = isRegisteredUser(getState().user);
-  const peers = (Array.isArray(data) ? data : [])
-    .map(normalizeRecentPeerRow)
-    .filter(Boolean)
-    .filter((row) =>
-      recentPeerKeepListed(row, {
-        localIsRegistered,
-        alreadyFriends: friendIds.has(row.userId),
-        currentlyInSameLobby: sameLobby.has(row.userId),
-      })
-    );
-  setRecentLobbyPeers(peers);
-  return { ok: true, peers };
+    const friendIds = new Set(getMyFriends().map((row) => row.userId));
+    const sameLobby = sameLobbyUserIds();
+    const localIsRegistered = isRegisteredUser(getState().user);
+    const peers = (Array.isArray(data) ? data : [])
+      .map(normalizeRecentPeerRow)
+      .filter(Boolean)
+      .filter((row) =>
+        recentPeerKeepListed(row, {
+          localIsRegistered,
+          alreadyFriends: friendIds.has(row.userId),
+          currentlyInSameLobby: sameLobby.has(row.userId),
+        })
+      );
+    setRecentLobbyPeers(peers);
+    return { ok: true, peers };
+  } catch (err) {
+    console.warn("[FRIENDS-04] list_recent_lobby_peers", err?.message || err);
+    setRecentLobbyPeers([]);
+    return { ok: false, error: err, peers: [] };
+  }
 }

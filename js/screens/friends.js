@@ -613,7 +613,9 @@ export function mountFriends(app) {
       fetchIncomingLobbyInvites(),
       fetchOutgoingLobbyInvites(),
       fetchRecentLobbyPeers(),
-    ]);
+    ]).catch((e) => {
+      console.warn("[FRIENDS] refresh", e?.message || e);
+    });
   }
 
   return () => {

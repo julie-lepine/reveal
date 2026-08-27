@@ -40,6 +40,8 @@ describe("FEATURE-FRIENDS-04 Palier 2 — client", () => {
     assert.match(src, /canCallRecentPeersRpc/);
     assert.match(src, /isRegisteredUser/);
     assert.match(src, /skipped: true/);
+    assert.match(src, /inLobby/);
+    assert.match(src, /console\.warn/);
     assert.doesNotMatch(src, /\.from\(/);
     assert.doesNotMatch(src, /insert\(/);
     assert.doesNotMatch(src, /lobby_messages/);

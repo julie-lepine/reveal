@@ -36,7 +36,7 @@ describe("FEATURE-FRIENDS-04 Palier 1 — SQL source", () => {
     assert.match(sql, /create trigger lobby_encounters_on_member_ins/);
     assert.match(sql, /create trigger lobby_encounters_on_member_del/);
     assert.match(sql, /after insert on public\.lobby_members/);
-    assert.match(sql, /after delete on public\.lobby_members/);
+    assert.match(sql, /before delete on public\.lobby_members/);
     assert.match(sql, /friends_auth_kind\(v_uid\) is distinct from 'registered'/);
     assert.match(
       sql,
@@ -64,6 +64,7 @@ describe("FEATURE-FRIENDS-04 Palier 1 — SQL source", () => {
     assert.doesNotMatch(listFn, /lobby_id uuid/);
     assert.doesNotMatch(listFn, /lobby_code|p_code|l\.code/);
     assert.doesNotMatch(sql, /alter publication supabase_realtime add table public\.lobby_encounters/);
+    assert.match(sql, /notify pgrst/);
   });
 
   it("runbook staging interdit en prod ; lobby jetable ; pas d’unfriend", () => {

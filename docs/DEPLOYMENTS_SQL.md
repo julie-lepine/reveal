@@ -91,6 +91,7 @@ Sources : audit SQL du dépôt (`AUDIT-SQL-01`) + docs ops ([`SUPABASE.md`](./SU
 | 2026-08-27 | [`feature-friends-03.sql`](../supabase/feature-friends-03.sql) | FEATURE-FRIENDS-03 | ✅ | ✅ | [`feature-friends-03-runbook.sql`](../supabase/tests/feature-friends-03-runbook.sql) | Annuler demande envoyée · voir §15 |
 | 2026-08-27 | [`feature-friends-03-live-identity.sql`](../supabase/feature-friends-03-live-identity.sql) | FEATURE-FRIENDS-03 identité | ✅ | ✅ | — | Tes amis « Joueur » / 👤 · voir §16 |
 | 2026-08-27 | [`feature-friends-04.sql`](../supabase/feature-friends-04.sql) | FEATURE-FRIENDS-04 | ✅ | ✅ | [`feature-friends-04-runbook.sql`](../supabase/tests/feature-friends-04-runbook.sql) | Croisés 24 h · runbook **staging only** · voir §17 |
+| 2026-08-27 | [`feature-friends-04-dissolve-trigger.sql`](../supabase/feature-friends-04-dissolve-trigger.sql) | FEATURE-FRIENDS-04 hotfix | ✅ | ✅ | — | BEFORE DELETE dissolve + `NOTIFY pgrst` · voir §17 |
 
 **Hors migrations (tracés ailleurs si besoin)** : préflight [`lobby-membership-e4-00-preflight-duplicates.sql`](../supabase/lobby-membership-e4-00-preflight-duplicates.sql) (lecture seule) ; runbooks / harness sous [`supabase/tests/`](../supabase/tests/) et [`lobby-membership-e4-RUNBOOK.sql`](../supabase/lobby-membership-e4-RUNBOOK.sql) / [`lobby-membership-e5-RUNBOOK.sql`](../supabase/lobby-membership-e5-RUNBOOK.sql) — ce ne sont pas des migrations. Voir aussi [`lobby-membership-e4-tests-manual.sql`](../supabase/lobby-membership-e4-tests-manual.sql).
 
@@ -384,9 +385,10 @@ Table `lobby_encounters` + trigger `lobby_members` INSERT/DELETE + RPC `list_rec
 | Élément | Valeur |
 | ------- | ------ |
 | Migration | [`feature-friends-04.sql`](../supabase/feature-friends-04.sql) — **✅** 27 août 2026 |
+| Hotfix | [`feature-friends-04-dissolve-trigger.sql`](../supabase/feature-friends-04-dissolve-trigger.sql) — **✅** 27 août 2026 (BEFORE DELETE + schema) |
 | Runbook | [`tests/feature-friends-04-runbook.sql`](../supabase/tests/feature-friends-04-runbook.sql) — **`FRIENDS04_RUNBOOK_OK`** (staging, **INTERDIT EN PRODUCTION** — **ne pas lancer**) |
 | Realtime | **non** (`lobby_encounters` hors publication) |
-| Client | [`FRIENDS.md`](./FRIENDS.md) Phase 4 palier 2 — wrapper + cache, pas d’UI |
+| Client | [`FRIENDS.md`](./FRIENDS.md) Phase 4 palier 6 — docs ✅ ; web Pages après push `main` ; **pas** le 1.0.0 App Store en review |
 | Hors scope | Recherche · invités · historique > 24 h · stores 1.0.0 |
 
-**Statut** : SQL **✅** (même projet) · runbook **non** exécuté (prod) · palier 2 client **27 août 2026**.
+**Statut** : SQL + hotfix + QA **✅** (même projet) · runbook **non** exécuté (prod) · palier 6 docs **27 août 2026** · Pages = push `main`.

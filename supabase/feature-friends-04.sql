@@ -6,7 +6,7 @@
 --
 -- Contrats : js/config/recentPeers.js
 --   table lobby_encounters (user_a < user_b, last_shared_at)
---   trigger lobby_members INSERT/DELETE (inscrits seulement)
+--   trigger lobby_members INSERT / BEFORE DELETE (inscrits seulement)
 --   RPC list_recent_lobby_peers() — pas le code salon, pas lobby_id
 -- Écriture serveur seulement. Pas de Realtime.
 --
@@ -144,7 +144,7 @@ for each row execute function public.lobby_encounters_on_member();
 
 drop trigger if exists lobby_encounters_on_member_del on public.lobby_members;
 create trigger lobby_encounters_on_member_del
-after delete on public.lobby_members
+before delete on public.lobby_members
 for each row execute function public.lobby_encounters_on_member();
 
 -- ---------------------------------------------------------------------------
@@ -209,3 +209,5 @@ grant execute on function public.list_recent_lobby_peers() to authenticated;
 
 comment on function public.list_recent_lobby_peers() is
   'FEATURE-FRIENDS-04 : inscrits déjà croisés, 24 h, hors lobby commun, hors amis. Pas le code salon.';
+
+notify pgrst, 'reload schema';

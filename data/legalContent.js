@@ -16,11 +16,11 @@ export const PRIVACY_POLICY = {
     },
     {
       heading: "Données collectées",
-      body: "Selon votre mode d'utilisation, nous pouvons traiter : pseudo et emoji de profil, adresse e-mail (compte enregistré), identifiant de session anonyme (mode invité), liste d’amis et demandes d’amitié (comptes inscrits uniquement ; découverte uniquement dans un lobby privé, sans recherche publique ni fil social), invitations de soirée éphémères (entre amis inscrits, liées à un lobby vivant, sans le code salon), données de jeu (scores, votes, messages de lobby), et données techniques (appareil, logs d'erreur).",
+      body: "Selon votre mode d'utilisation, nous pouvons traiter : pseudo et emoji de profil, adresse e-mail (compte enregistré), identifiant de session anonyme (mode invité), liste d’amis et demandes d’amitié (comptes inscrits uniquement ; découverte uniquement dans un lobby privé, sans recherche publique ni fil social), invitations de soirée éphémères (entre amis inscrits, liées à un lobby vivant, sans le code salon), joueurs récemment croisés en salon (inscrits seulement, 24 h après la fin du lobby commun, sans le code salon), données de jeu (scores, votes, messages de lobby), et données techniques (appareil, logs d'erreur).",
     },
     {
       heading: "Finalités",
-      body: "Authentification, synchronisation multijoueur en temps réel, affichage des classements, gestion d’une liste d’amis privée (comptes inscrits), envoi d’invitations de soirée privées (amis inscrits, depuis un lobby), prévention des abus (captcha Cloudflare Turnstile), et monétisation par publicités (Google AdMob) sur l'application mobile.",
+      body: "Authentification, synchronisation multijoueur en temps réel, affichage des classements, gestion d’une liste d’amis privée (comptes inscrits), envoi d’invitations de soirée privées (amis inscrits, depuis un lobby), affichage des joueurs récemment croisés pour proposer de les ajouter en ami (24 h), prévention des abus (captcha Cloudflare Turnstile), et monétisation par publicités (Google AdMob) sur l'application mobile.",
     },
     {
       heading: "Hébergement et sous-traitants",
@@ -36,11 +36,11 @@ export const PRIVACY_POLICY = {
     },
     {
       heading: "Conservation",
-      body: `Les données de session et de lobby sont conservées le temps de la soirée et liées à votre compte Supabase. Les invitations de soirée sont éphémères : elles disparaissent à la fermeture du lobby, au refus ou à l’acceptation. Vous pouvez demander la suppression de votre compte via la page dédiée (voir ci-dessous) ou par e-mail à ${CONTACT_EMAIL}.`,
+      body: `Les données de session et de lobby sont conservées le temps de la soirée et liées à votre compte Supabase. Les invitations de soirée sont éphémères : elles disparaissent à la fermeture du lobby, au refus ou à l’acceptation. Les joueurs récemment croisés en salon sont oubliés 24 h après la fin du lobby commun. Vous pouvez demander la suppression de votre compte via la page dédiée (voir ci-dessous) ou par e-mail à ${CONTACT_EMAIL}.`,
     },
     {
       heading: "Suppression de compte",
-      body: `Les comptes enregistrés (e-mail) peuvent être supprimés à tout moment. Envoyez une demande depuis l'application (Paramètres) ou depuis la page publique de suppression de compte. Nous effaçons le compte Supabase Auth, le profil (pseudo, emoji), les demandes d’amitié et amitiés associées (suppression en cascade), les invitations de soirée associées (suppression en cascade), et les données de jeu associées, sous 30 jours ouvrés. Le mode invité ne crée pas de compte permanent : les données de session expirent automatiquement.`,
+      body: `Les comptes enregistrés (e-mail) peuvent être supprimés à tout moment. Envoyez une demande depuis l'application (Paramètres) ou depuis la page publique de suppression de compte. Nous effaçons le compte Supabase Auth, le profil (pseudo, emoji), les demandes d’amitié et amitiés associées (suppression en cascade), les invitations de soirée associées (suppression en cascade), les joueurs récemment croisés associés (suppression en cascade), et les données de jeu associées, sous 30 jours ouvrés. Le mode invité ne crée pas de compte permanent : les données de session expirent automatiquement.`,
     },
     {
       heading: "Vos droits (RGPD)",

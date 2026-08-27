@@ -109,6 +109,6 @@ describe("FEATURE-FRIENDS-02 Palier 4 — page Amis invitations", () => {
     assert.match(css, /\.friends-row__meta\{/);
     assert.match(css, /\.friends-row__actions .btn--compact\{/);
     assert.match(css, /\.friends-row__actions\{[\s\S]*?align-items:\s*center/);
-    assert.match(css, /\.lobby-invite-friends-entry\{/);
+    assert.match(css, /\.lobby-invite-friends-entry\{[\s\S]*?border-color:var\(--color-secondary\)/);
   });
 });

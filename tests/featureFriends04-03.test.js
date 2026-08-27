@@ -54,6 +54,9 @@ describe("FEATURE-FRIENDS-04 Palier 3 — UI croisés", () => {
     assert.match(src, /sendFriendRequest/);
     assert.match(src, /fetchRecentLobbyPeers/);
     assert.match(src, /onRecentPeersCacheUpdated/);
+    const lobby = read("js/core/lobby.js");
+    assert.match(lobby, /supabaseRecentPeers/);
+    assert.match(lobby, /fetchRecentLobbyPeers/);
     assert.doesNotMatch(src, /data-recent-peer-invite/);
     const controlFn = src.slice(
       src.indexOf("function recentPeerControlHtml"),

@@ -225,6 +225,13 @@ function applyLeaveLobbyLocal({ wasGuest, navigateAway }) {
   performLobbyBoundaryTeardown();
   clearGuestMembership();
   saveStatePatch(patch);
+  if (!wasGuest) {
+    void import("./supabaseRecentPeers.js")
+      .then((mod) => mod.fetchRecentLobbyPeers())
+      .catch((e) => {
+        console.warn("[FRIENDS-04] refresh after leave", e?.message || e);
+      });
+  }
   if (navigateAway) {
     navigate("home", { reset: true });
   }
