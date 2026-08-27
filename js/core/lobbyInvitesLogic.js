@@ -93,3 +93,11 @@ export function lobbyInviteFailMessage(code) {
   if (code === LOBBY_INVITE_RPC_ERROR.notFriends) return "Vous n’êtes plus amis.";
   return "Impossible de continuer.";
 }
+
+export function nextUnseenLobbyInvite(incoming, poppedIds) {
+  const seen = poppedIds instanceof Set ? poppedIds : new Set(poppedIds || []);
+  for (const row of incoming || []) {
+    if (row?.id && !seen.has(row.id)) return row;
+  }
+  return null;
+}

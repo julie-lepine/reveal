@@ -275,13 +275,13 @@ On avance **un palier à la fois**, comme la v1. Source runtime : [`js/config/lo
 - [x] **2** Client sans UI — 27 août 2026
 - [x] **3** Realtime `friends:${userId}` — 27 août 2026
 - [x] **4** Page Amis : **Inviter** / incoming — 27 août 2026
-- [ ] **5** Popup + badge
+- [x] **5** Popup + badge — 27 août 2026
 - [ ] **6** Rejoindre sans code (+ modale déjà ailleurs)
 - [ ] **7** Légal
-- [ ] **8** QA terrain *(toi, 2 comptes — pas avant 4–7)*
+- [ ] **8** QA terrain *(toi, 2 comptes — pas avant 5–7)*
 - [ ] **9** Pages / docs prod
 
-**En cours : rien.** **Prochain : palier 5.** Dire *« on fait le palier 5 »*.
+**En cours : rien.** **Prochain : palier 6.** Dire *« on fait le palier 6 »*.
 
 ### Règles figées (ne pas rediscuter)
 
@@ -376,14 +376,14 @@ Fichiers :
 
 ### Palier 5 — Popup destinataire + badge
 
-- [ ] Hors lobby : *« {name} t’invite à une soirée »* → **Rejoindre** / **Refuser**
-- [ ] Déjà dans une **autre** soirée : modale *« Tu es déjà dans une soirée »* (explique l’une-à-la-fois) → **Rester et refuser** ou **Quitter et rejoindre** — pas un 3ᵉ bouton Annuler
-- [ ] En manche : badge seulement (Menu / Amis) ; la modale busy attend le hub comme la popup simple
-- [ ] Badge = demandes d’ami **ou** invitations
-- [ ] Clic hors / Escape = reporter (simple : invite reste ; busy : reste ici **et** invite reste)
-- [ ] Tests source (copy + décisions)
+- [x] Hors lobby : *« {name} t’invite à une soirée »* → **Rejoindre** / **Refuser**
+- [x] Déjà dans une **autre** soirée : modale *« Tu es déjà dans une soirée »* (explique l’une-à-la-fois) → **Rester et refuser** ou **Quitter et rejoindre** — pas un 3ᵉ bouton Annuler
+- [x] En manche : badge seulement (Menu / Amis) ; la modale busy attend le hub comme la popup simple
+- [x] Badge = demandes d’ami **ou** invitations
+- [x] Clic hors / Escape = reporter (simple : invite reste ; busy : reste ici **et** invite reste)
+- [x] Tests source (copy + décisions)
 
-**Fait quand** : tests verts. **QA téléphone = palier 8.**
+**Palier 5 terminé.** **QA téléphone = palier 8.**
 
 ### Palier 6 — Rejoindre sans code
 
@@ -453,7 +453,8 @@ SQL déjà sur le projet live au palier 1. Ici : client web + docs, **pas** le 1
 | 14 | F02-2 | Module client *(fait)* |
 | 15 | F02-3 | Realtime *(fait)* |
 | 16 | F02-4 | UI Inviter page Amis *(fait)* |
-| 17 | F02-5–6 | Popup / join sans code |
-| 18 | F02-7–9 | Légal, QA, prod |
+| 17 | F02-5 | Popup + badge *(fait)* |
+| 18 | F02-6 | Join sans code |
+| 19 | F02-7–9 | Légal, QA, prod |
 
-Pour implémenter : ouvrir ce fichier et dire **« on fait le palier 5 »** (popup + badge).
+Pour implémenter : ouvrir ce fichier et dire **« on fait le palier 6 »** (Rejoindre sans code).

@@ -682,7 +682,14 @@ export async function resetAppToCleanHome() {
 
 export function goToLobby() {
   const lobby = getLobby();
-  if (!lobby?.code || !lobby.participants?.length) {
+  if (!lobby?.code) {
+    navigate("home", { reset: true });
+    return;
+  }
+  const hasRoster = Boolean(lobby.participants?.length);
+  const canHydrate =
+    isSupabaseConfigured() && lobby.id && getSupabaseUserId();
+  if (!hasRoster && !canHydrate) {
     navigate("home", { reset: true });
     return;
   }

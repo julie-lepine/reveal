@@ -184,8 +184,8 @@ export function friendRequestNoticeCopy(row) {
   };
 }
 
-export function friendsBadgeShouldShow(incomingCount) {
-  return Number(incomingCount) > 0;
+export function friendsBadgeShouldShow(incomingCount, lobbyInviteCount = 0) {
+  return Number(incomingCount) > 0 || Number(lobbyInviteCount) > 0;
 }
 
 /** Confirmation locale seulement — l’autre n’est pas notifié. */

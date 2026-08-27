@@ -20,6 +20,7 @@ import {
   onFriendsCacheUpdated,
   patchLobbyFriendOverlayStatus,
 } from "./friendsState.js";
+import { getIncomingLobbyInviteCount } from "./lobbyInvitesState.js";
 import { acceptFriendRequest, declineFriendRequest } from "./supabaseFriends.js";
 import {
   getCachedGameSession,
@@ -39,7 +40,10 @@ export function resetFriendRequestNoticeForTests() {
 
 export function syncFriendsEntryBadges(root = typeof document !== "undefined" ? document : null) {
   if (!root?.querySelectorAll) return;
-  const show = friendsBadgeShouldShow(getIncomingFriendRequestCount());
+  const show = friendsBadgeShouldShow(
+    getIncomingFriendRequestCount(),
+    getIncomingLobbyInviteCount()
+  );
   root.querySelectorAll("[data-friends-badge]").forEach((el) => {
     el.hidden = !show;
     el.setAttribute("aria-hidden", show ? "false" : "true");

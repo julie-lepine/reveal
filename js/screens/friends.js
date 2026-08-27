@@ -11,8 +11,9 @@ import {
 import {
   LOBBY_INVITE_ACTION,
   LOBBY_INVITE_LABEL,
-  LOBBY_INVITE_RPC_ERROR,
   friendInviteAction,
+  lobbyInviteBusyCopy,
+  lobbyInviteBusyDecision,
 } from "../config/lobbyInvites.js";
 import { isLoggedIn } from "../core/auth.js";
 import { createActionLock } from "../core/actionLock.js";
@@ -22,8 +23,6 @@ import {
   getLobby,
   getLobbyParticipants,
   hasActiveLobby,
-  navigateAfterLobbyJoin,
-  tryRecoverLobbyFromServer,
 } from "../core/lobby.js";
 import {
   getIncomingFriendRequests,
@@ -37,6 +36,11 @@ import {
   onLobbyInvitesCacheUpdated,
 } from "../core/lobbyInvitesState.js";
 import { lobbyInviteFailMessage } from "../core/lobbyInvitesLogic.js";
+import {
+  joinFromLobbyInvite,
+  leaveAndJoinFromLobbyInvite,
+  refuseLobbyInvite,
+} from "../core/lobbyInviteJoin.js";
 import { unfriendConfirmCopy } from "../core/friendsLogic.js";
 import {
   acceptFriendRequest,
@@ -46,8 +50,6 @@ import {
   unfriendUser,
 } from "../core/supabaseFriends.js";
 import {
-  acceptLobbyInvite,
-  declineLobbyInvite,
   fetchIncomingLobbyInvites,
   fetchOutgoingLobbyInvites,
   sendLobbyInvite,
@@ -341,23 +343,16 @@ export function mountFriends(app) {
 
   async function onRefuseInvite(inviteId) {
     if (!inviteId || !isLoggedIn()) return;
-    const run = await actionLock.run(async () => {
-      try {
-        return await declineLobbyInvite(inviteId);
-      } catch (err) {
-        return { ok: false, error: err };
-      }
-    });
+    const run = await actionLock.run(() => refuseLobbyInvite(inviteId));
     if (!mount.isMounted()) return;
     if (run.skipped) return;
     const res = run.value;
     if (res?.ok) {
-      await fetchIncomingLobbyInvites();
       if (!mount.isMounted()) return;
       paint();
       return;
     }
-    await showAppAlert(lobbyInviteFailMessage(res?.error?.code), {
+    await showAppAlert(lobbyInviteFailMessage(res?.code), {
       title: LOBBY_INVITE_LABEL.noticeTitle,
       icon: "⚠️",
     });
@@ -373,38 +368,45 @@ export function mountFriends(app) {
       invite?.lobbyId &&
       invite.lobbyId !== currentLobbyId
     ) {
-      await showAppAlert(lobbyInviteFailMessage(LOBBY_INVITE_RPC_ERROR.busy), {
+      const copy = lobbyInviteBusyCopy(invite);
+      const accepted = await showAppConfirm(copy.message, {
+        title: copy.title,
+        confirmLabel: copy.confirmLabel,
+        cancelLabel: copy.cancelLabel,
+        icon: copy.icon,
+        dismissResult: null,
+      });
+      if (!mount.isMounted()) return;
+      const decision = lobbyInviteBusyDecision(accepted);
+      if (decision === "stay_and_refuse") {
+        await onRefuseInvite(inviteId);
+        return;
+      }
+      if (decision !== "leave_and_join") return;
+      const runLeave = await actionLock.run(() => leaveAndJoinFromLobbyInvite(inviteId));
+      if (!mount.isMounted()) return;
+      if (runLeave.skipped) return;
+      const left = runLeave.value;
+      if (left?.ok || left?.cancelled) return;
+      await showAppAlert(lobbyInviteFailMessage(left?.code), {
         title: LOBBY_INVITE_LABEL.busyTitle,
+        icon: "⚠️",
+      });
+      return;
+    }
+    const run = await actionLock.run(() => joinFromLobbyInvite(inviteId));
+    if (!mount.isMounted()) return;
+    if (run.skipped) return;
+    const res = run.value;
+    if (res?.ok || res?.skipped) return;
+    if (res?.joinedUnhydrated) {
+      await showAppAlert("Invitation acceptée. Retourne à l’accueil pour ouvrir la soirée.", {
+        title: LOBBY_INVITE_LABEL.noticeTitle,
         icon: "🎉",
       });
       return;
     }
-    const run = await actionLock.run(async () => {
-      try {
-        return await acceptLobbyInvite(inviteId);
-      } catch (err) {
-        return { ok: false, error: err };
-      }
-    });
-    if (!mount.isMounted()) return;
-    if (run.skipped) return;
-    const res = run.value;
-    if (res?.ok && (res.result === "joined" || res.result === "already_in")) {
-      await fetchIncomingLobbyInvites();
-      if (!mount.isMounted()) return;
-      const recovered = await tryRecoverLobbyFromServer();
-      if (!mount.isMounted()) return;
-      if (recovered?.ok) {
-        await navigateAfterLobbyJoin();
-        return;
-      }
-      paint();
-      return;
-    }
-    await fetchIncomingLobbyInvites();
-    if (!mount.isMounted()) return;
-    paint();
-    await showAppAlert(lobbyInviteFailMessage(res?.error?.code), {
+    await showAppAlert(lobbyInviteFailMessage(res?.code), {
       title: LOBBY_INVITE_LABEL.noticeTitle,
       icon: "⚠️",
     });

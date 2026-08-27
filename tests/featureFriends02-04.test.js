@@ -66,8 +66,8 @@ describe("FEATURE-FRIENDS-02 Palier 4 — page Amis invitations", () => {
     assert.match(src, /data-lobby-invite-no-lobby/);
     assert.match(src, /data-lobby-invites-empty/);
     assert.match(src, /sendLobbyInvite/);
-    assert.match(src, /declineLobbyInvite/);
-    assert.match(src, /acceptLobbyInvite/);
+    assert.match(src, /joinFromLobbyInvite/);
+    assert.match(src, /refuseLobbyInvite/);
     assert.match(src, /friendInviteAction/);
     assert.match(src, /LOBBY_INVITE_LABEL/);
     assert.match(src, /fetchIncomingLobbyInvites/);

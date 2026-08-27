@@ -484,16 +484,14 @@ export function mountLobby(app) {
           <div data-lobby-friends-hint-slot>${lobbyFriendsHintHtml(localIsRegistered, participants)}</div>
         </div>
 
-        <p class="hint lobby-invite-friends-entry" data-lobby-invite-friends ${
+        <button type="button" class="btn btn-secondary lobby-invite-friends-entry" data-lobby-invite-friends data-nav="${FRIENDS_SCREEN_ID}" ${
           shouldShowLobbyInviteFriendsEntry({
             localIsRegistered,
             friendCount: getMyFriends().length,
           })
             ? ""
             : "hidden"
-        }>
-          <button type="button" class="btn-link" data-nav="${FRIENDS_SCREEN_ID}">${escapeHtml(LOBBY_INVITE_LABEL.entryLobby)}</button>
-        </p>
+        }>${escapeHtml(LOBBY_INVITE_LABEL.entryLobby)}</button>
 
         <div class="invite-card">
           <p class="invite-card__label">Code · ${getLobbyStatus() === "playing" ? "partie en cours" : "en attente"}</p>
