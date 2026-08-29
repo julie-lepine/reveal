@@ -1,5 +1,6 @@
 import { TURNSTILE_SITE_KEY } from "../config/turnstile.js";
 import { isSupabaseConfigured } from "./supabaseClient.js";
+import { isNativeApp } from "./platform.js";
 
 const SCRIPT_SRC = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
 
@@ -17,9 +18,10 @@ const slotState = {
 
 let loadPromise = null;
 
-/** Requis dès qu’une site key est configurée (web et natif) : Supabase Attack Protection exige le token. */
+/** Web seulement. WKWebView iOS casse Turnstile et peut bloquer le clavier des champs. */
 export function isTurnstileRequired() {
   if (!isSupabaseConfigured()) return false;
+  if (isNativeApp()) return false;
   const key = String(TURNSTILE_SITE_KEY || "").trim();
   return key.length > 0 && !/YOUR_TURNSTILE/i.test(key);
 }

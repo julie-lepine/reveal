@@ -1817,6 +1817,8 @@ button.game-card{
   background:rgba(255,255,255,.06);
   color:#fff;
   font-size:16px;
+  -webkit-user-select:text;
+  user-select:text;
 }
 
 .password-field{

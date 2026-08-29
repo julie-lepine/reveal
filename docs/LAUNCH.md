@@ -55,8 +55,8 @@ Builds natifs : `npm run cap:sync` (Node ≥ 22) → AAB / Archive.
 - [x] Privacy URL = `https://revealthepartygame.fr/privacy.html`
 
 #### Ancien binaire
-- [x] Review **1.0.0** (build **4**, soumise 24 août 2026) — **abandonnée** 29 août 2026 (app qui n’existe plus ; 2.1 non répondu)
-- [ ] App Store Connect → **Remove from Review** (ou équivalent) le 1.0.0 / build 4
+- [x] Review **1.0.0** (build **4**, soumise 24 août 2026) — **refusée** 30 août 2026 (app obsolète ; 2.1 abandonné)
+- [x] Pas de *Remove from Review* : version déjà **Refusée** — on resoumet un **nouveau build** sur 1.0.0 (ou version suivante)
 
 #### Build prod (tout brancher **avant** Archive)
 - [x] Paid Apps : W-8BEN + RIB CA Atlantique Vendée → **Actif** — 29 août 2026
