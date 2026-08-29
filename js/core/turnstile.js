@@ -1,6 +1,5 @@
 import { TURNSTILE_SITE_KEY } from "../config/turnstile.js";
 import { isSupabaseConfigured } from "./supabaseClient.js";
-import { isNativeApp } from "./platform.js";
 
 const SCRIPT_SRC = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
 
@@ -18,10 +17,9 @@ const slotState = {
 
 let loadPromise = null;
 
-/** Web seulement. WKWebView iOS casse Turnstile et peut bloquer le clavier des champs. */
+/** Captcha requis sur le web et dans l’app native (iOS / Android). */
 export function isTurnstileRequired() {
   if (!isSupabaseConfigured()) return false;
-  if (isNativeApp()) return false;
   const key = String(TURNSTILE_SITE_KEY || "").trim();
   return key.length > 0 && !/YOUR_TURNSTILE/i.test(key);
 }
@@ -95,6 +93,10 @@ export async function mountTurnstile(slot, container, { onChange } = {}) {
   state.widgetId = window.turnstile.render(container, {
     sitekey: TURNSTILE_SITE_KEY,
     theme: "dark",
+    size: "flexible",
+    appearance: "always",
+    retry: "auto",
+    language: "fr",
     callback: () => {
       state.solved = true;
       notifySlot(slot);

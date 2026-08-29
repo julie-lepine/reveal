@@ -107,13 +107,13 @@ Le code utilise `getAuthRedirectUrl()` : redirect web en navigateur, deep link e
 | Plateforme | Turnstile |
 |------------|-----------|
 | **Web** (GitHub Pages, navigateur) | ✅ widget + token envoyé à Supabase |
-| **App native** (Capacitor) | ❌ désactivé (`isNativeApp()` → `isTurnstileRequired()` false) |
+| **App native** (Capacitor) | ✅ même widget + token (`isTurnstileRequired()` true) |
 
-Turnstile n’est **pas fiable** en WKWebView iOS (même avec `iosScheme: 'https'`). L’app native n’affiche pas le widget et n’envoie pas de `captchaToken`.
+L’origine WebView est `https://julie-lepine.github.io` (`capacitor.config.ts`), déjà autorisée côté Cloudflare.
 
-**Supabase → Authentication → Attack Protection** : le captcha Turnstile ne doit **pas** être obligatoire pour les requêtes sans token, sinon login / invité échouent en app native. En pratique : captcha **désactivé** dans Supabase, protection web assurée côté client (widget) + rate limiting Supabase ; ou accepter captcha OFF partout si tu privilégies l’app store.
+**Supabase → Authentication → Attack Protection** : captcha Turnstile **activé** (même règle web et app).
 
-Hostnames Cloudflare (version web) : `julie-lepine.github.io`, `localhost` (dev local).
+Hostnames Cloudflare : `julie-lepine.github.io`, `localhost` (dev local).
 
 ---
 
@@ -226,14 +226,14 @@ npm run cap:open:ios
 
 Après chaque changement de code web : `npm run cap:sync` puis ▶ Run (ou *Product → Clean Build Folder*).
 
-### D. Auth (app native — sans Turnstile)
+### D. Auth (app native — avec Turnstile)
 
-- [ ] 🧪 **Connexion email** + mot de passe (pas de widget Turnstile)
-- [ ] 🧪 **Inscription** email
-- [ ] 🧪 **Invité** + pseudo + code lobby
+- [ ] 🧪 **Connexion email** + mot de passe (widget Turnstile, puis Connexion)
+- [ ] 🧪 **Inscription** email (idem captcha)
+- [ ] 🧪 **Invité** + pseudo + code lobby (idem captcha)
 - [ ] 🧪 **Mot de passe oublié** : saisie email → mail reçu (Resend — web OK le 25 août 2026 ; à retester sur iPhone)
 
-> **Supabase** : si **Attack Protection → Captcha** est activé, l’auth native échoue (pas de token). Désactiver le captcha Supabase ou le garder OFF — voir § Turnstile ci-dessus.
+> **Supabase** : Attack Protection → Captcha **On**, comme sur le web.
 
 ### E. Deep link — reset mot de passe (priorité store)
 
