@@ -107,13 +107,13 @@ Le code utilise `getAuthRedirectUrl()` : redirect web en navigateur, deep link e
 | Plateforme | Turnstile |
 |------------|-----------|
 | **Web** (GitHub Pages, navigateur) | ✅ widget + token envoyé à Supabase |
-| **App native** (Capacitor) | ✅ même widget + token (`isTurnstileRequired()` true) |
+| **App native** (Capacitor) | ❌ pas de widget (`isNativeApp()` → `isTurnstileRequired()` false) — **comme l’AAB Play en review** |
 
-L’origine WebView est `https://julie-lepine.github.io` (`capacitor.config.ts`), déjà autorisée côté Cloudflare.
+Turnstile casse dans WKWebView iOS. On ne change **pas** de provider (hCaptcha) tant que Play n’est pas live.
 
-**Supabase → Authentication → Attack Protection** : captcha Turnstile **activé** (même règle web et app).
+**Supabase → Authentication → Attack Protection** : ne **pas** changer de provider. Ne pas exiger un token sur les requêtes sans widget (sinon login natif échoue). Laisser comme quand le Z Flip se connectait.
 
-Hostnames Cloudflare : `julie-lepine.github.io`, `localhost` (dev local).
+Hostnames Cloudflare (web) : `julie-lepine.github.io`, `localhost` (dev local).
 
 ---
 
@@ -226,14 +226,14 @@ npm run cap:open:ios
 
 Après chaque changement de code web : `npm run cap:sync` puis ▶ Run (ou *Product → Clean Build Folder*).
 
-### D. Auth (app native — avec Turnstile)
+### D. Auth (app native — sans widget Turnstile)
 
-- [ ] 🧪 **Connexion email** + mot de passe (widget Turnstile, puis Connexion)
-- [ ] 🧪 **Inscription** email (idem captcha)
-- [ ] 🧪 **Invité** + pseudo + code lobby (idem captcha)
+- [ ] 🧪 **Connexion email** + mot de passe (pas de case Cloudflare)
+- [ ] 🧪 **Inscription** email
+- [ ] 🧪 **Invité** + pseudo + code lobby
 - [ ] 🧪 **Mot de passe oublié** : saisie email → mail reçu (Resend — web OK le 25 août 2026 ; à retester sur iPhone)
 
-> **Supabase** : Attack Protection → Captcha **On**, comme sur le web.
+> **Supabase** : ne pas basculer vers hCaptcha. Si login affiche « vérifie la case anti-robot », Attack Protection exige un token : remettre comme pour le test Play (Z Flip).
 
 ### E. Deep link — reset mot de passe (priorité store)
 

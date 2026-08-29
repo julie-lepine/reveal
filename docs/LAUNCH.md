@@ -141,7 +141,7 @@ Le webhook existant suffit pour iOS (même entitlement `ad_free`). Pas de nouvel
 
 ## Déjà en place
 
-Auth e-mail + invité, Turnstile (web et app native), Resend + SMTP, Realtime, schema lobby / game_sessions. Détail : [SUPABASE.md](./SUPABASE.md).
+Auth e-mail + invité, Turnstile (web ; pas de widget dans l’app native — comme Play), Resend + SMTP, Realtime, schema lobby / game_sessions. Détail : [SUPABASE.md](./SUPABASE.md).
 
 Comptes Play + Apple, fiches, UMP publié, AdMob IDs, assets (`resources/`, `store-assets/`), AAB test fermé. Âge Apple **16+** (IARC Play **3** : grilles différentes, normal). App Privacy Apple (e-mail, IDs, AdMob, UGC, gameplay) publiée le 24 août 2026 — **à compléter amis** sur le build prod.
 
@@ -172,7 +172,7 @@ Play : **demandée** 29 août 2026 — à faire **quand la fiche est live**. App
 | Symptôme | Piste |
 |----------|--------|
 | Modifs invisibles | Save → push → `?v=` dans `index.html` |
-| `no captcha_token` | Turnstile pas validé |
+| `no captcha_token` | Turnstile pas validé (web), ou captcha Supabase exigé alors que l’app native n’envoie pas de token |
 | Turnstile 600010 | Hostname Cloudflare, bloqueur, onglet caché |
 | Invité impossible | Anonymous sign-ins Supabase |
 | Sync cassée | Realtime + RLS — [SUPABASE.md](./SUPABASE.md) |
@@ -269,7 +269,7 @@ One-time “Remove ads” purchase, 2.99 EUR, product ID reveal_adfree (non-cons
 - RevenueCat (IAP entitlement sync)
 - Resend (password-reset email via Supabase SMTP)
 - Google Fonts (Inter)
-Cloudflare Turnstile on login, signup, guest, and password reset (web and native app).
+Cloudflare Turnstile on the website login/signup; not shown in the native iOS/Android apps (same as the Play build in review).
 
 6. REGIONAL DIFFERENCES
 No regional differences. French UI and content; consistent behavior worldwide.

@@ -239,7 +239,7 @@ function guestJoinPanelHtml({
         nameValue: nameValue || getUser()?.name || "",
         codeValue: defaultCode,
       })}
-      <div id="guest-rejoin-turnstile" class="auth-turnstile-wrap"></div>
+      ${isTurnstileRequired() ? `<div id="guest-rejoin-turnstile" class="auth-turnstile-wrap"></div>` : ""}
       ${guestJoinErrorHtml("guest-rejoin-error", error)}
       <button type="button" class="btn btn-primary btn--spaced" id="btn-guest-rejoin"${disabledAttr}>${escapeHtml(joinLabel)}</button>
     </div>`;
@@ -996,7 +996,7 @@ export function mountHome(app) {
                 <input type="password" class="field-input password-field__input" id="login-password" placeholder="••••••••" />
                 <button type="button" class="password-field__toggle" data-toggle-password="login-password" aria-label="Afficher le mot de passe" aria-pressed="false">👁️</button>
               </div>
-              <div id="login-turnstile" class="auth-turnstile-wrap"></div>
+              ${isTurnstileRequired() ? `<div id="login-turnstile" class="auth-turnstile-wrap"></div>` : ""}
               <p class="auth-error hidden" id="login-error"></p>
               <button type="button" class="btn btn-primary btn--spaced" id="btn-login"${isTurnstileRequired() ? " disabled" : ""}>Se connecter</button>
               <button type="button" class="btn-link auth-forgot" id="btn-forgot-password">Mot de passe oublié ?</button>
@@ -1011,7 +1011,7 @@ export function mountHome(app) {
                 <input type="password" class="field-input password-field__input" id="signup-password" placeholder="4 caractères min." />
                 <button type="button" class="password-field__toggle" data-toggle-password="signup-password" aria-label="Afficher le mot de passe" aria-pressed="false">👁️</button>
               </div>
-              <div id="signup-turnstile" class="auth-turnstile-wrap"></div>
+              ${isTurnstileRequired() ? `<div id="signup-turnstile" class="auth-turnstile-wrap"></div>` : ""}
               <p class="auth-error hidden" id="signup-error"></p>
               <button type="button" class="btn btn-primary btn--spaced" id="btn-signup"${isTurnstileRequired() ? " disabled" : ""}>Créer mon compte</button>
             </div>
@@ -1029,7 +1029,7 @@ export function mountHome(app) {
                 nameValue: stickyGuestName || getUser()?.name || "",
                 codeValue: stickyJoinCode,
               })}
-              <div id="guest-turnstile" class="auth-turnstile-wrap"></div>
+              ${isTurnstileRequired() ? `<div id="guest-turnstile" class="auth-turnstile-wrap"></div>` : ""}
               ${guestJoinErrorHtml("guest-error", guestJoinError)}
               <button type="button" class="btn btn-primary btn--spaced" id="btn-guest-join"${joinDisabledAttr}>${escapeHtml(guestJoinLabel)}</button>
               `
