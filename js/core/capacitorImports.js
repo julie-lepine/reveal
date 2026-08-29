@@ -1,34 +1,87 @@
 /**
- * Imports dynamiques Capacitor (native uniquement).
- * Évite les imports statiques qui casseraient la version web.
+ * Plugins Capacitor via le pont natif (`window.Capacitor`).
+ * Les imports CDN bloqués figent l’écran de démarrage sur Android.
  */
-import { isNativeApp } from "./platform.js";
+import { getCapacitor, isNativeApp } from "./platform.js";
 
-const CAPACITOR_APP =
-  "https://esm.sh/@capacitor/app@8.0.0?deps=@capacitor/core@8.3.4";
-const CAPACITOR_BROWSER =
-  "https://esm.sh/@capacitor/browser@8.0.0?deps=@capacitor/core@8.3.4";
-const CAPACITOR_ADMOB =
-  "https://esm.sh/@capacitor-community/admob@8.0.0?deps=@capacitor/core@8.3.4";
-const CAPACITOR_PURCHASES =
-  "https://esm.sh/@revenuecat/purchases-capacitor@13.4.1?deps=@capacitor/core@8.3.4";
+export const BannerAdSize = Object.freeze({
+  BANNER: "BANNER",
+  FULL_BANNER: "FULL_BANNER",
+  LARGE_BANNER: "LARGE_BANNER",
+  MEDIUM_RECTANGLE: "MEDIUM_RECTANGLE",
+  LEADERBOARD: "LEADERBOARD",
+  ADAPTIVE_BANNER: "ADAPTIVE_BANNER",
+  SMART_BANNER: "SMART_BANNER",
+});
+
+export const BannerAdPosition = Object.freeze({
+  TOP_CENTER: "TOP_CENTER",
+  CENTER: "CENTER",
+  BOTTOM_CENTER: "BOTTOM_CENTER",
+});
+
+export const BannerAdPluginEvents = Object.freeze({
+  SizeChanged: "bannerAdSizeChanged",
+  Loaded: "bannerAdLoaded",
+  FailedToLoad: "bannerAdFailedToLoad",
+  Opened: "bannerAdOpened",
+  Closed: "bannerAdClosed",
+  AdImpression: "bannerAdImpression",
+});
+
+export const AdmobConsentStatus = Object.freeze({
+  NOT_REQUIRED: "NOT_REQUIRED",
+  OBTAINED: "OBTAINED",
+  REQUIRED: "REQUIRED",
+  UNKNOWN: "UNKNOWN",
+});
+
+function nativePlugin(name) {
+  const cap = getCapacitor();
+  if (!cap) return null;
+  try {
+    if (typeof cap.registerPlugin === "function") {
+      return cap.registerPlugin(name);
+    }
+  } catch {
+    /* déjà enregistré */
+  }
+  return cap.Plugins?.[name] || null;
+}
 
 export async function loadCapacitorApp() {
   if (!isNativeApp()) return null;
-  return import(/* @vite-ignore */ CAPACITOR_APP);
+  const App = nativePlugin("App");
+  return App ? { App } : null;
 }
 
 export async function loadCapacitorBrowser() {
   if (!isNativeApp()) return null;
-  return import(/* @vite-ignore */ CAPACITOR_BROWSER);
+  const Browser = nativePlugin("Browser");
+  return Browser ? { Browser } : null;
 }
 
 export async function loadCapacitorAdMob() {
   if (!isNativeApp()) return null;
-  return import(/* @vite-ignore */ CAPACITOR_ADMOB);
+  const AdMob = nativePlugin("AdMob");
+  if (!AdMob) return null;
+  return {
+    AdMob,
+    BannerAdSize,
+    BannerAdPosition,
+    BannerAdPluginEvents,
+    AdmobConsentStatus,
+  };
 }
 
 export async function loadRevenueCatPurchases() {
   if (!isNativeApp()) return null;
-  return import(/* @vite-ignore */ CAPACITOR_PURCHASES);
+  const Purchases = nativePlugin("Purchases");
+  return Purchases ? { Purchases } : null;
+}
+
+export async function loadCapacitorSplashScreen() {
+  if (!isNativeApp()) return null;
+  const SplashScreen = nativePlugin("SplashScreen");
+  return SplashScreen ? { SplashScreen } : null;
 }

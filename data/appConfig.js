@@ -29,6 +29,6 @@ export const ACCOUNT_DELETION_MAILTO = `mailto:${CONTACT_EMAIL}?subject=${encode
 
 /** Profil Instagram (retours informels, communauté). */
 export const INSTAGRAM_PROFILE_URL =
-  "https://www.instagram.com/reveal.the.party.game/";
+  "https://www.instagram.com/revealthepartygame/";
 
-export const INSTAGRAM_HANDLE = "reveal.the.party.game";
+export const INSTAGRAM_HANDLE = "revealthepartygame";

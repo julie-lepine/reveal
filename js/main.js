@@ -76,6 +76,7 @@ import {
   presentCompatibilityGateIfNeeded,
 } from "./core/clientCompatibilityGateUi.js";
 import { initClientCompatibilityForeground } from "./core/clientCompatibilityForeground.js";
+import { armNativeSplashSafetyHide, hideNativeSplash } from "./core/nativeSplash.js";
 
 const app = document.getElementById("app");
 
@@ -135,17 +136,28 @@ registerScreen("guesslie", mountGuessLie);
 registerScreen("tiernight", mountTierNight);
 registerScreen("tiernight-live", mountTierNightLive);
 
-initBottomNav();
-initFeedbackFab();
-// initLobbyPollSync après authReady (voir boot) - évite subscribe Realtime sans JWT
-initExitGameDelegation(app);
-initAds();
-initMultiplayerSyncVisibility();
-initHostNoticeListener();
-initActingHostNoticeListener();
-initFriendRequestNotice();
-initLobbyInviteNotice();
-initClientCompatibilityForeground();
+try {
+  initBottomNav();
+  initFeedbackFab();
+  // initLobbyPollSync après authReady (voir boot) - évite subscribe Realtime sans JWT
+  initExitGameDelegation(app);
+  initAds();
+  initMultiplayerSyncVisibility();
+  initHostNoticeListener();
+  initActingHostNoticeListener();
+  initFriendRequestNotice();
+  initLobbyInviteNotice();
+  initClientCompatibilityForeground();
+  armNativeSplashSafetyHide();
+} catch (e) {
+  console.error("REVEAL init:", e);
+  void hideNativeSplash();
+  app.innerHTML = `<div class="card" style="margin:1.5rem;padding:1.25rem">
+    <p><strong>Erreur au démarrage</strong></p>
+    <p class="hint">${e?.message || e}</p>
+    <button type="button" class="btn btn-primary btn--spaced" onclick="location.reload()">Recharger</button>
+  </div>`;
+}
 
 /** Empêche double initLobbyPollSync / reconcile / resume après retry gate boot. */
 let postCompatBootStarted = false;
@@ -168,6 +180,7 @@ function enterBackendMissingGate() {
   hideChromeForBackendMissing();
   resetNav();
   navigate(BACKEND_MISSING_SCREEN_ID, { reset: true });
+  void hideNativeSplash();
 }
 
 async function boot() {
@@ -205,6 +218,7 @@ async function boot() {
     } else {
       navigate("home", { reset: true });
     }
+    void hideNativeSplash();
   }
 
   // ARCH-23 : après session Supabase possible (RPC anon OK aussi), avant MP / Realtime polls.
@@ -213,6 +227,7 @@ async function boot() {
     presentCompatibilityGateIfNeeded(compat, {
       onCompatible: () => continueBootAfterCompatibilityOk(),
     });
+    void hideNativeSplash();
     // Pas de reconcile / resume / navigate lobby - hard gate autoritaire.
     return;
   }
@@ -222,6 +237,7 @@ async function boot() {
 
 boot().catch((e) => {
   console.error("REVEAL boot:", e);
+  void hideNativeSplash();
   app.innerHTML = `<div class="card" style="margin:1.5rem;padding:1.25rem">
     <p><strong>Erreur au démarrage</strong></p>
     <p class="hint">${e?.message || e}</p>

@@ -25,7 +25,11 @@ let authReadyResolve = null;
 let authInitFinished = false;
 let authInitialSessionSeen = false;
 let authReadyResolved = false;
+let authListenerBound = false;
 let pendingGuestDisplayName = null;
+
+/** Filet anti-écran bleu : getSession / profile / RC ne doivent pas bloquer le boot. */
+const AUTH_READY_TIMEOUT_MS = 8_000;
 
 const GUEST_DISPLAY_NAME_LOCK_MS = 15000;
 
@@ -185,7 +189,7 @@ export async function syncSessionToState(session) {
     handleMembershipAuthIdentityTransition(prevUserId, null);
     try {
       const { syncPurchasesIdentity } = await import("./purchases.js");
-      await syncPurchasesIdentity();
+      void syncPurchasesIdentity();
     } catch {
       /* RC indisponible */
     }
@@ -252,7 +256,7 @@ export async function syncSessionToState(session) {
 
   try {
     const { syncPurchasesIdentity } = await import("./purchases.js");
-    await syncPurchasesIdentity();
+    void syncPurchasesIdentity();
   } catch {
     /* RC indisponible */
   }
@@ -471,52 +475,82 @@ export async function ensureAnonymousSessionForRecovery(captchaToken = null) {
   }
 }
 
+function markAuthReadyUnblocked(reason) {
+  authInitFinished = true;
+  authInitialSessionSeen = true;
+  resolveAuthReadyIfComplete(reason);
+}
+
 export async function initSupabaseAuth() {
   if (!isSupabaseConfigured()) {
-    authInitFinished = true;
-    authInitialSessionSeen = true;
-    resolveAuthReadyIfComplete("disabled");
+    markAuthReadyUnblocked("disabled");
     return;
   }
 
-  const windowUrl =
-    window.location.href ||
-    `${window.location.origin}${window.location.pathname}${window.location.search}${window.location.hash}`;
-  await handleAuthRedirectUrl(windowUrl);
-
-  supabase.auth.onAuthStateChange((event, session) => {
-    console.debug("[DEBUG AUTH CHANGE]", {
-      event,
-      userId: session?.user?.id,
-      hasToken: !!session?.access_token
-    });
-    void (async () => {
-      await syncSessionToState(session);
-      if (event === "PASSWORD_RECOVERY") {
-        setPasswordRecoveryPending();
-      }
-      if (event === "INITIAL_SESSION") {
-        authInitialSessionSeen = true;
-        resolveAuthReadyIfComplete("INITIAL_SESSION");
-      }
-    })();
-  });
-
-  const session = await recoverAuthSession();
-
-  console.debug("[DEBUG RECOVER AUTH SESSION RESULT]", {
-    userId: session?.user?.id,
-    hasToken: !!session?.access_token
-  });
-  
-  if (session) {
-    await syncSessionToState(session);
-  } else {
-    console.debug("[DEBUG WAITING FOR AUTH SIGNED_IN]");
+  if (authListenerBound) {
+    await authReady;
+    return;
   }
-  
-  authInitFinished = true;
-  resolveAuthReadyIfComplete("init");
+  authListenerBound = true;
+
+  const timeout = new Promise((resolve) => {
+    setTimeout(() => {
+      if (!authReadyResolved) {
+        console.warn("[Auth] init timeout — continue boot");
+        markAuthReadyUnblocked("timeout");
+      }
+      resolve();
+    }, AUTH_READY_TIMEOUT_MS);
+  });
+
+  const work = (async () => {
+    try {
+      const windowUrl =
+        window.location.href ||
+        `${window.location.origin}${window.location.pathname}${window.location.search}${window.location.hash}`;
+      await handleAuthRedirectUrl(windowUrl);
+
+      supabase.auth.onAuthStateChange((event, session) => {
+        console.debug("[DEBUG AUTH CHANGE]", {
+          event,
+          userId: session?.user?.id,
+          hasToken: !!session?.access_token
+        });
+        if (event === "INITIAL_SESSION") {
+          authInitialSessionSeen = true;
+        }
+        if (event === "PASSWORD_RECOVERY") {
+          setPasswordRecoveryPending();
+        }
+        void (async () => {
+          await syncSessionToState(session);
+          resolveAuthReadyIfComplete(
+            event === "INITIAL_SESSION" ? "INITIAL_SESSION" : "auth_change"
+          );
+        })();
+      });
+
+      const session = await recoverAuthSession();
+
+      console.debug("[DEBUG RECOVER AUTH SESSION RESULT]", {
+        userId: session?.user?.id,
+        hasToken: !!session?.access_token
+      });
+
+      if (session) {
+        await syncSessionToState(session);
+      } else {
+        console.debug("[DEBUG WAITING FOR AUTH SIGNED_IN]");
+      }
+
+      markAuthReadyUnblocked("init");
+    } catch (e) {
+      console.warn("[Auth] init:", e?.message || e);
+      markAuthReadyUnblocked("init_error");
+    }
+  })();
+
+  await Promise.race([work, timeout]);
 }
 
 export function getSupabaseUserId() {

@@ -79,17 +79,17 @@ export const GAME_RULES = {
     emoji: "✏️",
     but: "Un joueur dessine un mot secret, les autres le devinent en 60 secondes.",
     etapes: [
-      "Un dessinateur est désigné et reçoit un mot.",
+      "Un dessinateur est désigné à tour de rôle et reçoit un mot secret.",
       "Il dessine pendant 60 secondes ; les autres proposent des réponses.",
-      "À la fin du chrono, le mot est révélé et les points sont attribués.",
+      "Dès que tout le monde a trouvé, ou à la fin du chrono, le mot est révélé.",
     ],
     points: [
-      "Les joueurs qui trouvent marquent selon l'ordre de découverte.",
-      "Le dessinateur marque aussi si au moins une personne a trouvé.",
+      "Les 3 premiers à trouver : +20, +15, +10. Les suivants : +5.",
+      "Le dessinateur : +5 pts par personne qui a trouvé.",
       "Personne ne trouve : 0 point pour tout le monde.",
     ],
     exemple:
-      "Emma trouve à 0:52, Lucas à 0:41. Les deux marquent ; le dessinateur aussi. Le barème exact arrive bientôt.",
+      "Emma trouve en première (+20), Lucas ensuite (+15). Le dessinateur gagne +10 (2 trouvailles). Les autres n'ont pas trouvé : 0 pt.",
   },
 
   clutch: {

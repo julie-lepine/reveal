@@ -92,6 +92,7 @@ Attendre 15 min à 2 h (parfois 24 h) pour la propagation.
 - [x] Logo `reveal.png` s’affiche
 - [x] Liens footer entre les pages
 - [x] **Liens téléchargement app** (Play Store / App Store) sur `index.html` — 25 août 2026
+- [ ] `privacy.html` + `mentions-legales.html` / accueil : Instagram **@revealthepartygame** (`https://www.instagram.com/revealthepartygame/`) — plus `reveal.the.party.game` — 29 août 2026 *(à recoller sur OVH)*
 
 ---
 

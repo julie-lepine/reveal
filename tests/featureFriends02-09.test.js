@@ -39,10 +39,10 @@ describe("FEATURE-FRIENDS-02 Palier 9 — docs / Pages", () => {
     assert.match(supabase, /pas `friend_request_cooldowns`/);
   });
 
-  it("LAUNCH.md : invitations live web, pas le 1.0.0 en review", () => {
+  it("LAUNCH.md : invitations live web ; build prod iOS embarque amis", () => {
     const launch = read("docs/LAUNCH.md");
     assert.match(launch, /Amis \/ invitations de soirée/);
     assert.match(launch, /julie-lepine\.github\.io\/reveal/);
-    assert.match(launch, /pas.*le 1\.0\.0 App Store en review/);
+    assert.match(launch, /build prod iOS embarque/);
   });
 });

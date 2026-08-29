@@ -1,5 +1,5 @@
 /**
- * FEATURE-ADFREE-02B — RevenueCat natif (Play maintenant, App Store quand la clé iOS est collée).
+ * FEATURE-ADFREE-02B — RevenueCat natif (Play live ; iOS dès que `appl_…` est collée).
  *
  * Le client n’écrit jamais `profiles.ad_free`. Après achat / restore, on relit le profil
  * (webhook service_role).
@@ -123,14 +123,31 @@ export async function syncPurchasesIdentity() {
   }
 }
 
+/**
+ * Plugin Capacitor v13 : `{ current, all }` à la racine.
+ * Certaines versions / wrappers : `{ offerings: { current, all } }`.
+ */
+export function unwrapOfferings(result) {
+  if (!result || typeof result !== "object") return null;
+  if (result.current != null || (result.all && typeof result.all === "object")) {
+    return result;
+  }
+  const nested = result.offerings;
+  if (nested && typeof nested === "object") return nested;
+  return result;
+}
+
 function packageForAdFree(offerings) {
   const current = offerings?.current;
-  const packages = current?.availablePackages || [];
+  const packages =
+    current?.availablePackages ||
+    offerings?.all?.default?.availablePackages ||
+    [];
   const match = packages.find((pkg) => {
     const id = pkg?.product?.identifier || pkg?.product?.productIdentifier || "";
     return id === PLAY_PRODUCT_ID_AD_FREE || id?.endsWith(PLAY_PRODUCT_ID_AD_FREE);
   });
-  return match || packages[0] || null;
+  return match || packages[0] || current?.lifetime || offerings?.all?.default?.lifetime || null;
 }
 
 async function refreshAdFreeAfterStore() {
@@ -157,7 +174,7 @@ export async function purchaseAdFree() {
   try {
     const Purchases = await ensurePurchasesConfigured();
     await Purchases.logIn({ appUserID: getState().supabaseUserId });
-    const { offerings } = await Purchases.getOfferings();
+    const offerings = unwrapOfferings(await Purchases.getOfferings());
     const pkg = packageForAdFree(offerings);
     if (!pkg) {
       return {

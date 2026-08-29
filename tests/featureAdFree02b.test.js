@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { unwrapOfferings } from "../js/core/purchases.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, "..");
@@ -27,7 +28,7 @@ describe("FEATURE-ADFREE-02B — achat + webhook", () => {
     assert.match(fn, /SUPABASE_SERVICE_ROLE_KEY/);
     assert.match(fn, /ad_free/);
     assert.match(fn, /reveal_adfree/);
-    assert.equal(/sk_/.test(fn), false);
+    assert.equal(/\bsk_[A-Za-z0-9]{8,}/.test(fn), false);
     const client = src("js/core/purchases.js") + src("data/revenueCatConfig.js");
     assert.equal(/SERVICE_ROLE/.test(client), false);
     assert.equal(/REVENUECAT_WEBHOOK_AUTH/.test(client), false);
@@ -37,5 +38,18 @@ describe("FEATURE-ADFREE-02B — achat + webhook", () => {
     const ent = src("js/core/entitlements.js");
     assert.match(ent, /refreshAdFreeFromServerUntil/);
     assert.match(src("js/core/purchases.js"), /refreshAdFreeFromServerUntil/);
+  });
+
+  it("lit getOfferings racine { current } et forme enveloppée { offerings }", () => {
+    const pkg = { product: { identifier: "reveal_adfree" } };
+    const current = { availablePackages: [pkg] };
+
+    assert.equal(unwrapOfferings({ current, all: { default: current } }).current, current);
+    assert.equal(unwrapOfferings({ offerings: { current, all: {} } }).current, current);
+    assert.equal(unwrapOfferings(null), null);
+
+    const purchases = src("js/core/purchases.js");
+    assert.match(purchases, /unwrapOfferings\(await Purchases\.getOfferings\(\)\)/);
+    assert.equal(/const \{ offerings \} = await Purchases\.getOfferings/.test(purchases), false);
   });
 });

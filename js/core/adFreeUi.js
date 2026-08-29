@@ -29,15 +29,15 @@ export function adFreeSettingsCardHtml() {
   } else {
     const storeHint = isNativeApp()
       ? storeReady
-        ? "Paiement via Google Play (ou App Store). Licence testeur = 0&nbsp;€."
+        ? "Paiement unique."
         : "Achats pas encore disponibles sur cette plateforme."
       : "L’achat se fait dans l’app Android (Play Store), pas sur le navigateur.";
     body = `
         <p class="hint settings-section__hint">
-          2,99&nbsp;€ à vie - enlève la bannière sur tes appareils liés à ce compte.
+          2,99&nbsp;€ à vie - supprime la pub sur tes appareils liés à ce compte.
         </p>
         <p class="hint settings-section__hint">${storeHint}</p>
-        <button type="button" class="btn btn-primary btn--spaced" id="btn-adfree-buy">2,99&nbsp;€ - Sans pub</button>
+        <button type="button" class="btn btn-primary btn--spaced" id="btn-adfree-buy">Payer 2,99&nbsp;€</button>
         <button type="button" class="btn btn-secondary btn--spaced" id="btn-adfree-restore">Restaurer l’achat</button>`;
   }
 

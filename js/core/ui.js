@@ -51,24 +51,72 @@ function readScrollMarginTop(el) {
   return Number.isFinite(n) ? n : 0;
 }
 
+function canScrollY(node) {
+  if (!node || node.scrollHeight == null || node.clientHeight == null) return false;
+  return node.scrollHeight > node.clientHeight + 1;
+}
+
+/** Ancêtres qui débordent, puis html / body — OxygenOS scrolle souvent body, pas window. */
+function collectScrollTargets(el, root) {
+  const seen = new Set();
+  const list = [];
+  const add = (node) => {
+    if (!node || seen.has(node)) return;
+    seen.add(node);
+    list.push(node);
+  };
+  let node = el.parentElement;
+  while (node && node !== document.documentElement) {
+    if (canScrollY(node)) add(node);
+    node = node.parentElement;
+  }
+  if (typeof document !== "undefined") {
+    add(document.scrollingElement);
+    add(document.documentElement);
+    add(document.body);
+  }
+  add(root);
+  return list;
+}
+
+function readElementTop(el) {
+  return el.getBoundingClientRect?.().top ?? 0;
+}
+
+/** Applique le delta sur le premier nœud qui déplace vraiment l'élément, puis s'arrête. */
+function shiftScrollUntilAligned(el, margin, candidates) {
+  const aligned = () => Math.abs(readElementTop(el) - margin) < 1;
+  if (aligned()) return;
+
+  for (const node of candidates) {
+    if (aligned()) return;
+    const remaining = readElementTop(el) - margin;
+    const prev = Number(node.scrollTop) || 0;
+    const before = readElementTop(el);
+    node.scrollTop = prev + remaining;
+    if (Math.abs(readElementTop(el) - before) < 0.5) {
+      if ((Number(node.scrollTop) || 0) !== prev) node.scrollTop = prev;
+      continue;
+    }
+    if (!aligned()) {
+      node.scrollTop = (Number(node.scrollTop) || 0) + (readElementTop(el) - margin);
+    }
+    return;
+  }
+
+  if (aligned()) return;
+  if (typeof window === "undefined" || typeof window.scrollBy !== "function") return;
+  window.scrollBy(0, readElementTop(el) - margin);
+}
+
 /** Aligne la vue sur un élément (ex. carte dessin) plutôt que le haut de page. */
 export function resetPageScrollToElement(el, root = document.getElementById("app")) {
   if (!el) {
     resetPageScroll(root);
     return;
   }
-  if (typeof el.scrollIntoView === "function") {
-    el.scrollIntoView({ block: "start", inline: "nearest" });
-  }
-  const delta = el.getBoundingClientRect().top - readScrollMarginTop(el);
-  if (!delta) return;
-  if (typeof window !== "undefined" && typeof window.scrollBy === "function") {
-    window.scrollBy(0, delta);
-  }
-  if (root) root.scrollTop = (root.scrollTop || 0) + delta;
-  root?.querySelectorAll(".page, .container").forEach((node) => {
-    node.scrollTop = (node.scrollTop || 0) + delta;
-  });
+  const margin = readScrollMarginTop(el);
+  shiftScrollUntilAligned(el, margin, collectScrollTargets(el, root));
 }
 
 /** Double rAF : le layout WebView est prêt avant le reset (iOS / Android). */
@@ -85,14 +133,27 @@ export function schedulePageScrollReset(root = document.getElementById("app")) {
 
 export function schedulePageScrollToElement(el, root = document.getElementById("app")) {
   const resolve = () => (typeof el === "function" ? el() : el);
-  const run = () => resetPageScrollToElement(resolve(), root);
+  let pass = 0;
+  const run = () => {
+    const target = resolve();
+    if (!target) {
+      if (pass === 0) resetPageScroll(root);
+      return;
+    }
+    pass += 1;
+    resetPageScrollToElement(target, root);
+  };
   if (!root || typeof requestAnimationFrame !== "function") {
     run();
     return;
   }
   requestAnimationFrame(() => {
     run();
-    requestAnimationFrame(run);
+    requestAnimationFrame(() => {
+      run();
+      // OxygenOS / pub adaptive : layout souvent prêt seulement après paint.
+      if (typeof setTimeout === "function") setTimeout(run, 0);
+    });
   });
 }
 

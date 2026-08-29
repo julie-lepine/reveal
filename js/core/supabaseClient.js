@@ -1,4 +1,4 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
+import { createClient } from "../vendor/supabase-js.js";
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from "../config/supabase.js";
 import { installRealtimeSocketDiagnostics } from "./realtimeSocketDiagnose.js";
 

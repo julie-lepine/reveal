@@ -25,7 +25,12 @@ export async function initDeepLinks() {
   bound = true;
 
   try {
-    const mod = await loadCapacitorApp();
+    const mod = await Promise.race([
+      loadCapacitorApp(),
+      new Promise((_, reject) => {
+        setTimeout(() => reject(new Error("deeplink_timeout")), 3000);
+      }),
+    ]);
     if (!mod?.App) return;
 
     const { App } = mod;

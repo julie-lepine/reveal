@@ -2543,6 +2543,28 @@ select.field-input option{
   color:var(--muted, #64748b);
 }
 
+.boot-loading{
+  min-height:100dvh;
+  min-height:100vh;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:12px;
+  padding:var(--page-pad);
+  text-align:center;
+}
+
+.boot-loading__hint,
+.boot-loading__retry{
+  opacity:0;
+  animation:boot-loading-late 0.35s ease 8s forwards;
+}
+
+@keyframes boot-loading-late{
+  to{ opacity:1; }
+}
+
 /* ─── Welcome (landing) ─── */
 .welcome{
   --pink: var(--color-primary);
@@ -5230,6 +5252,12 @@ body.has-bottom-nav .feedback-fab{
 
 .draw-it-guess .chat-box{
   margin-bottom:10px;
+}
+.draw-it-guess #draw-it-guess-hint:not([hidden]){
+  margin-bottom:12px;
+}
+.draw-it-guess .label-upper{
+  margin-top:18px;
 }
 .draw-it-guess .chat-messages{
   height:180px;

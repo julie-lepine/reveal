@@ -66,6 +66,21 @@ describe("Draw it ! T1 — enregistrement catalogue", () => {
   it("a des règles et un mapping nav", () => {
     assert.ok(GAME_RULES.drawit);
     assert.equal(RULES_KEY_BY_NAV["drawit-prep"], "drawit");
+    const points = GAME_RULES.drawit.points.join(" ");
+    assert.match(points, /\+20, \+15, \+10/);
+    assert.match(points, /\+5 pts par personne/);
+    assert.doesNotMatch(GAME_RULES.drawit.exemple, /arrive bientôt/);
+  });
+
+  it("aligne la carte dessin via html/body, pas seulement window.scrollBy", () => {
+    const ui = read("js/core/ui.js");
+    const fn = ui.slice(
+      ui.indexOf("function collectScrollTargets"),
+      ui.indexOf("export function schedulePageScrollReset")
+    );
+    assert.match(fn, /document\.documentElement/);
+    assert.match(fn, /document\.body/);
+    assert.doesNotMatch(fn, /scrollIntoView/);
   });
 
   it("mappe session drawit → tuile drawit-prep", () => {

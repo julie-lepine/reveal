@@ -11,16 +11,58 @@
   <title>REVEAL - Party Games</title>
   <link rel="icon" href="./resources/icon.png" type="image/png" />
 
-  <link rel="stylesheet" href="style.css?v=23"/>
+  <link rel="stylesheet" href="style.css?v=25"/>
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" media="print" onload="this.media='all'"/>
+  <noscript>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet"/>
+  </noscript>
 </head>
 <body>
 
-  <div id="app"></div>
+  <div id="app">
+    <div class="page boot-loading" data-boot-loading>
+      <div class="logo logo--with-img logo--landing">
+        <img src="reveal.png" alt="REVEAL" class="app-logo app-logo--landing" />
+        <p class="subtitle">Chargement…</p>
+      </div>
+      <p class="hint boot-loading__hint">Si ça reste bloqué, vérifie ta connexion.</p>
+      <button type="button" class="btn btn-primary boot-loading__retry" onclick="location.reload()">Réessayer</button>
+    </div>
+  </div>
 
   <nav id="bottom-nav" class="bottom-nav bottom-nav--hidden" aria-label="Navigation principale" hidden></nav>
 
-  <script type="module" src="js/main.js?v=98"></script>
+  <script type="module">
+    function escapeHtml(value) {
+      return String(value || "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+    }
+    function showBootError(err) {
+      const app = document.getElementById("app");
+      if (!app || !app.querySelector("[data-boot-loading]")) return;
+      const msg = escapeHtml(err && (err.message || String(err)) || "import failed");
+      const stack = escapeHtml(err && err.stack);
+      console.error("REVEAL module:", err);
+      app.innerHTML = `<div class="card" style="margin:1.5rem;padding:1.25rem">
+        <p><strong>Impossible de démarrer</strong></p>
+        <p class="hint">${msg}</p>
+        ${stack ? `<pre class="hint" style="white-space:pre-wrap;overflow:auto;max-height:40vh;font-size:11px">${stack}</pre>` : ""}
+        <button type="button" class="btn btn-primary btn--spaced" onclick="location.reload()">Réessayer</button>
+      </div>`;
+    }
+    let moduleLoaded = false;
+    const load = import("./js/main.js?v=103");
+    load.then(() => {
+      moduleLoaded = true;
+    }).catch(showBootError);
+    setTimeout(() => {
+      if (!moduleLoaded) {
+        showBootError(new Error("Démarrage bloqué (chargement des modules)"));
+      }
+    }, 12000);
+  </script>
 </body>
 </html>

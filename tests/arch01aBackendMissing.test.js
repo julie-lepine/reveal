@@ -160,6 +160,16 @@ describe("ARCH-01A — TEST E : Supabase configuré → boot produit inchangé",
     assert.match(bootBody, /continueBootAfterCompatibilityOk/);
     assert.match(bootBody, /shouldShowWelcome/);
     assert.match(bootBody, /hasActiveLobby/);
+    assert.match(bootBody, /hideNativeSplash/);
+    const auth = read("js/core/supabaseAuth.js");
+    assert.match(auth, /AUTH_READY_TIMEOUT_MS/);
+    assert.match(auth, /markAuthReadyUnblocked\("timeout"\)/);
+    assert.match(auth, /void syncPurchasesIdentity\(\)/);
+    const supabaseClient = read("js/core/supabaseClient.js");
+    assert.match(supabaseClient, /from ["']\.\.\/vendor\/supabase-js\.js["']/);
+    assert.doesNotMatch(supabaseClient, /esm\.sh/);
+    const capImports = read("js/core/capacitorImports.js");
+    assert.doesNotMatch(capImports, /https:\/\/esm\.sh/);
   });
 
   it("isSupabaseConfigured reste un test de credentials purs (pas de réseau)", () => {
