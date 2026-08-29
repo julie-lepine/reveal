@@ -61,11 +61,11 @@ Builds natifs : `npm run cap:sync` (Node ≥ 22) → AAB / Archive.
 #### Build prod (tout brancher **avant** Archive)
 - [x] Paid Apps : W-8BEN + RIB CA Atlantique Vendée → **Actif** — 29 août 2026
 - [x] Produit IAP App Store `reveal_adfree` (achat unique, 2,99 €) — créé 29 août 2026 — à soumettre **avec** le build prod (ne pas « Ajouter pour vérification » tout seul)
-- [ ] RevenueCat iOS : app Apple dans RC, credentials App Store Connect, produit dans l’offering Current (`reveal_adfree` Play **et** iOS)
-- [ ] Clé publique iOS `appl_…` collée dans `data/revenueCatConfig.js` (remplace `appl_REPLACE_ME`) **puis** `npm run cap:sync`
-- [ ] App Privacy Apple : relations sociales / user IDs — *No public social feed*, *private friend list*, *lobby-only discovery* (pas de recherche, pas de fil) — **sur ce build**
-- [ ] AdMob : app iOS déjà créée (IDs dans `data/admobConfig.js`) — **lier** au bundle `com.reveal.partygames` / App Store ; `ADMOB_USE_TEST_ADS = false` (déjà)
-- [ ] Fiche textes : nouveautés alignées Play (amis, Sans pub 2,99 €) si pas déjà
+- [x] RevenueCat iOS : app Apple dans RC, credentials App Store Connect, produit dans l’offering Current (`reveal_adfree` Play **et** iOS) — 30 août 2026
+- [x] Clé publique iOS `appl_…` collée dans `data/revenueCatConfig.js` — 30 août 2026 — `npm run cap:sync` **avant** l’Archive Mac
+- [x] App Privacy Apple : User ID (amis, liste privée, pas de recherche) + Achats (Sans pub) + contenu de jeu — publié 30 août 2026
+- [ ] AdMob : app iOS déjà créée (IDs dans `data/admobConfig.js`) — **lier l’App Store après la fiche live** (recherche AdMob vide tant que l’app n’est pas publique) ; `ADMOB_USE_TEST_ADS = false` (déjà)
+- [x] Fiche textes : description alignée Play (amis, Sans pub 2,99 €) — 30 août 2026
 - [ ] 🧪 Parcours iPhone — [NATIVE.md](./NATIVE.md) § Test iPhone + Sans pub sandbox (compte Sandbox Apple)
 - [ ] Compte démo review + Notes App Review — § [Soumission prod iOS](#soumission-prod-ios--build-final) ci-dessous
 - [ ] `cap:sync` → Archive Xcode → upload → soumettre review → **demander la prod** (release auto ou manuel dès acceptation)
@@ -77,7 +77,7 @@ Hors scope : DUNS, diffusion INSEE, nom de société sur la fiche. Palier Profil
 Le build prod iOS **embarque** amis / invitations / croisés 24 h (plus le 1.0.0 obsolète).
 
 - [x] Play Data safety : relations sociales / user IDs — *No public social feed*, *private friend list*, *lobby-only discovery* (pas de recherche, pas de fil) — 29 août 2026
-- [ ] App Privacy Apple : **sur ce build prod** — mêmes libellés *No public social feed*, *private friend list*, *lobby-only discovery*
+- [x] App Privacy Apple : **ce build prod** — User ID (amis privés, lobby only) + Achats + contenu de jeu — 30 août 2026
 
 ### Site & AdMob (après pubs live)
 - [x] `suppression-compte.html` en HTTPS — 25 août 2026
@@ -118,8 +118,8 @@ Le build prod iOS **embarque** amis / invitations / croisés 24 h (plus le 1.0.0
 ### En cours — iOS (ce build)
 - [x] Prod Play — **demandée** 29 août 2026 (QA Sans pub OK ; critères test fermé déjà remplis) — **attente review Google**
 - [x] Paid Apps **Actif** — 29 août 2026
-- [ ] Produit IAP Apple `reveal_adfree` **dans l’offering RC** (Play **et** iOS)
-- [ ] Clé publique iOS `appl_…` (aujourd’hui `appl_REPLACE_ME`)
+- [x] Produit IAP Apple `reveal_adfree` **dans l’offering RC** (Play **et** iOS) — 30 août 2026
+- [x] Clé publique iOS `appl_…` dans `data/revenueCatConfig.js` — 30 août 2026
 - [ ] Légal OVH : préciser paiement Apple (App Store) en plus de Google, si pas déjà
 - [ ] Archive + soumettre + demander prod App Store
 

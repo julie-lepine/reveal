@@ -50,7 +50,7 @@ describe("FEATURE-ADFREE-02A — préparation Billing / RevenueCat", () => {
     const config = src("data/revenueCatConfig.js");
     assert.match(config, /goog_/);
     assert.match(config, /REVENUECAT_IOS_PUBLIC_SDK_KEY/);
-    assert.match(config, /appl_REPLACE_ME/);
+    assert.match(config, /appl_bpgdhybGDtsIWmmFNqlRlnJxLgV/);
     assert.equal(/\bsk_[A-Za-z0-9]/.test(config), false);
     assert.equal(/service_role\s*[:=]/.test(config), false);
     assert.equal(/whsec_/.test(config), false);
