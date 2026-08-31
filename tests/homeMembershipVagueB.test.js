@@ -298,6 +298,22 @@ describe("homeMembershipVagueB - machine d’états", () => {
     assert.equal(chrome.state, "checking");
   });
 
+  it("connecté sans snapshot après échec silencieux → check_failed + retry", () => {
+    const chrome = deriveHomeMembershipChrome({
+      hasActiveLobby: false,
+      snapshot: null,
+      resolutionInProgress: false,
+      authReady: true,
+      supabaseConfigured: true,
+      loggedIn: true,
+      shouldCheckMembership: true,
+    });
+    assert.equal(chrome.state, "check_failed");
+    assert.equal(chrome.showRetry, true);
+    assert.equal(chrome.createEnabled, false);
+    assert.notEqual(chrome.primaryMessage, "Vérification de ton lobby…");
+  });
+
   it("visiteur sans identité → none (pas check_failed)", () => {
     const chrome = deriveHomeMembershipChrome({
       hasActiveLobby: false,

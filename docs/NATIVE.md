@@ -177,6 +177,8 @@ La version web peut coexister ; le code détecte la plateforme via `js/core/plat
 
 ## Test iPhone (Mac + Xcode)
 
+**QA validée** 31 août 2026 (iPhone XR, iOS 15) — parcours [LAUNCH.md](./LAUNCH.md) coché. **v1.1 soumise en review App Store** — 31 août 2026.
+
 À utiliser **le jour où tu as le Mac**. Coche le parcours iPhone dans [LAUNCH.md](./LAUNCH.md) quand tout est vert ici.
 
 Légende : ☐ à faire · 🧪 test sur device · ✅ OK · ❌ bug (noter en bas)
@@ -293,7 +295,7 @@ Utilise l’**org Supabase prod** (migration egress bouclée — 25 août 2026).
 
 ### K. Quand tout est vert
 
-- [ ] Cocher le parcours iPhone dans [LAUNCH.md](./LAUNCH.md)
+- [x] Cocher le parcours iPhone dans [LAUNCH.md](./LAUNCH.md) — 31 août 2026
 - [ ] Corriger les bugs sur Windows → `npm run cap:sync` → retest rapide au Mac
 - [x] Org Supabase prod prête (egress / migration — 25 août 2026)
 

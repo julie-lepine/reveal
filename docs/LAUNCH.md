@@ -7,7 +7,7 @@ Backend : [SUPABASE.md](./SUPABASE.md) · Native : [NATIVE.md](./NATIVE.md) · S
 |--|--|
 | Package | `com.reveal.partygames` |
 | Play | compte **individuel** `contact@revealthepartygame.fr` — test fermé OK, **prod demandée** (29 août 2026) — attente review Google |
-| App Store | **REVEAL - Party Games** — Apple ID [`6785256450`](https://apps.apple.com/app/id6785256450) — compte **Particulier** (EI) |
+| App Store | **REVEAL - Party Games** — Apple ID [`6785256450`](https://apps.apple.com/app/id6785256450) — **v1.1 soumise en review** — 31 août 2026 — attente Apple |
 | Privacy | `https://revealthepartygame.fr/privacy.html` |
 | Suppression | `https://revealthepartygame.fr/suppression-compte.html` |
 | Contact | `contact@revealthepartygame.fr` |
@@ -20,13 +20,11 @@ Builds natifs : `npm run cap:sync` (Node ≥ 22) → AAB / Archive.
 
 ---
 
-## Reste (ordre — 29 août 2026)
+## Reste (ordre — 31 août 2026)
 
-1. **iOS (priorité)** — **abandonner** le 1.0.0 (build 4) / App Review 2.1 (binaire obsolète). Envoyer le **build final** (même codebase Play actuelle : amis + Sans pub + AdMob) et **demander la prod**.
-   - Retirer le 1.0.0 de la review dans App Store Connect, puis **nouvelle version** + Archive Xcode (`cap:sync`, pas l’AAB).
-   - **Avant** l’Archive : Paid Apps **Actif**, IAP `reveal_adfree`, RevenueCat iOS (`appl_…` + offering), App Privacy (amis), AdMob iOS lié.
-   - AdMob iOS : IDs / UMP / ATT **déjà** dans le projet. À **tester** sur iPhone + lier l’app dans la console AdMob.
-   - QA : **soirée test iPhone XR** (jeux + pubs + Sans pub sandbox). Si OK → soumettre + release prod.
+1. **iOS** — **v1.1 soumise en review** — 31 août 2026 (build du soir, IAP `reveal_adfree` joint). **Attente Apple** — ne pas répondre au fil 1.0.0 (build 4) / Guideline 2.1.
+   - **Après acceptation :** release prod (manuel ou auto) → lier AdMob ↔ App Store → vérifier bannières prod.
+   - AdMob iOS : test device OK — 31 août 2026. **Lier** l’app dans la console AdMob **après** publication.
 2. **Play** — **prod demandée** (29 août 2026). Attente review / rollout Google. QA Sans pub déjà OK (achat 0 €, restore, pubs off, 2ᵉ téléphone).
 
 ---
@@ -45,7 +43,7 @@ Builds natifs : `npm run cap:sync` (Node ≥ 22) → AAB / Archive.
   *(Paramètres de la fiche Play Store, pas la fiche textes)*
 
 ### App Store
-**Priorité actuelle.** Le 1.0.0 (build 4) est **abandonné** (29 août 2026) — ne pas répondre au 2.1, ne pas le garder en file. Soumettre le **build final** + demander la prod.
+**v1.1 en review** — soumise 31 août 2026. Le 1.0.0 (build 4) est **abandonné** — ne pas répondre au 2.1.
 
 #### Fiche (déjà fait)
 - [x] Fiche **REVEAL - Party Games** + Apple ID `6785256450`
@@ -60,15 +58,16 @@ Builds natifs : `npm run cap:sync` (Node ≥ 22) → AAB / Archive.
 
 #### Build prod (tout brancher **avant** Archive)
 - [x] Paid Apps : W-8BEN + RIB CA Atlantique Vendée → **Actif** — 29 août 2026
-- [x] Produit IAP App Store `reveal_adfree` (achat unique, 2,99 €) — créé 29 août 2026 — à soumettre **avec** le build prod (ne pas « Ajouter pour vérification » tout seul)
+- [x] Produit IAP App Store `reveal_adfree` (achat unique, 2,99 €) — créé 29 août 2026 — soumis **avec** v1.1 — 31 août 2026
 - [x] RevenueCat iOS : app Apple dans RC, credentials App Store Connect, produit dans l’offering Current (`reveal_adfree` Play **et** iOS) — 30 août 2026
 - [x] Clé publique iOS `appl_…` collée dans `data/revenueCatConfig.js` — 30 août 2026 — `npm run cap:sync` **avant** l’Archive Mac
 - [x] App Privacy Apple : User ID (amis, liste privée, pas de recherche) + Achats (Sans pub) + contenu de jeu — publié 30 août 2026
-- [ ] AdMob : app iOS déjà créée (IDs dans `data/admobConfig.js`) — **lier l’App Store après la fiche live** (recherche AdMob vide tant que l’app n’est pas publique) ; `ADMOB_USE_TEST_ADS = false` (déjà)
+- [ ] AdMob : app iOS déjà créée (IDs dans `data/admobConfig.js`) — test device OK — 31 août 2026 — **lier l’App Store après la fiche live** ; `ADMOB_USE_TEST_ADS = false` — 31 août 2026
 - [x] Fiche textes : description alignée Play (amis, Sans pub 2,99 €) — 30 août 2026
-- [ ] 🧪 Parcours iPhone — [NATIVE.md](./NATIVE.md) § Test iPhone + Sans pub sandbox (compte Sandbox Apple)
-- [ ] Compte démo review + Notes App Review — § [Soumission prod iOS](#soumission-prod-ios--build-final) ci-dessous
-- [ ] `cap:sync` → Archive Xcode → upload → soumettre review → **demander la prod** (release auto ou manuel dès acceptation)
+- [x] 🧪 Parcours iPhone — [NATIVE.md](./NATIVE.md) § Test iPhone + Sans pub sandbox (compte Sandbox Apple) — **validé** 31 août 2026 (iPhone XR, iOS 15)
+- [x] Compte démo review + Notes App Review — App Store Connect — 31 août 2026
+- [x] `cap:sync` → Archive Xcode → upload → **soumis en review** (v1.1, build du soir) — 31 août 2026
+- [ ] **Après acceptation Apple :** release prod (manuel ou auto) + lier AdMob iOS
 
 Hors scope : DUNS, diffusion INSEE, nom de société sur la fiche. Palier Profil 6,99 / Hôte 12,99.
 
@@ -120,8 +119,10 @@ Le build prod iOS **embarque** amis / invitations / croisés 24 h (plus le 1.0.0
 - [x] Paid Apps **Actif** — 29 août 2026
 - [x] Produit IAP Apple `reveal_adfree` **dans l’offering RC** (Play **et** iOS) — 30 août 2026
 - [x] Clé publique iOS `appl_…` dans `data/revenueCatConfig.js` — 30 août 2026
+- [x] 🧪 QA iPhone XR : parcours app + pubs (test puis prod) + Sans pub sandbox — 31 août 2026
+- [x] Archive + upload + **soumission review v1.1** — 31 août 2026 — **attente Apple**
 - [ ] Légal OVH : préciser paiement Apple (App Store) en plus de Google, si pas déjà
-- [ ] Archive + soumettre + demander prod App Store
+- [ ] **Après acceptation :** mettre en prod + lier AdMob iOS
 
 ### Plus tard
 - [ ] Palier Profil 6,99 / Hôte 12,99
@@ -149,15 +150,15 @@ Test fermé Play : codes générés, bêta device OK (Z Flip), critères prod re
 
 **Reset MDP** (Resend) validé et testé — 25 août 2026.  
 **Egress Supabase** : optimisations + migration faite — 25 août 2026.  
-**App Store** : 1.0.0 (build 4) **abandonné** 29 août 2026. **Priorité : build final + prod** (IAP, RC, AdMob, App Privacy amis, parcours iPhone).  
+**App Store** : v1.1 **soumise en review** 31 août 2026 (remplace 1.0.0 build 4 abandonné). QA iPhone validée 31 août 2026. **Attente Apple** — release + AdMob iOS après acceptation.  
 **Play** : test fermé OK ; QA 11 jeux + app validés — 25 août 2026. Fiche + Data safety + catégorie Jeu/Décontracté — 29 août 2026. QA Sans pub (0 € + 2ᵉ téléphone) OK. **Prod demandée** 29 août 2026 — attente review Google.  
-**Amis / invitations de soirée / Annuler / croisés 24 h** : code FEATURE-FRIENDS-04 prêt ; web [Pages](https://julie-lepine.github.io/reveal/) (`main`) après ton push. Play : fiche à jour (29 août 2026). App Store : **build prod iOS embarque** amis (plus le 1.0.0 obsolète).
+**Amis / invitations de soirée / Annuler / croisés 24 h** : code FEATURE-FRIENDS-04 prêt ; web [Pages](https://julie-lepine.github.io/reveal/) (`main`) après ton push. Play : fiche à jour (29 août 2026). App Store : **v1.1 en review** (31 août 2026).
 
 ---
 
 ## Après acceptation / prod
 
-Play : **demandée** 29 août 2026 — à faire **quand la fiche est live**. App Store : idem après acceptation Apple.
+Play : **demandée** 29 août 2026 — à faire **quand la fiche est live**. App Store : **v1.1 en review** 31 août 2026 — idem **après acceptation Apple**.
 
 1. Vérifier fiche live + pubs AdMob (`ADMOB_USE_TEST_ADS = false` — voir [NATIVE.md](./NATIVE.md)).
 2. Lier les stores dans AdMob (Play **et** App Store).
@@ -183,9 +184,9 @@ Play : **demandée** 29 août 2026 — à faire **quand la fiche est live**. App
 
 ## Soumission prod iOS — build final
 
-Le fil **Guideline 2.1** du 1.0.0 (build 4) est **abandonné** (29 août 2026) : ce binaire ne correspond plus à l’app. **Ne pas** répondre dans Resolution Center. Retirer de la review, uploader le build actuel, soumettre une **nouvelle** version.
+**Fait** — v1.1 soumise en review App Store — 31 août 2026 (build uploadé ce soir, IAP `reveal_adfree` joint). Référence ci-dessous si Apple redemande des infos (2.1, vidéo, etc.).
 
-Apple peut redemander une vidéo (2.1) sur le nouveau binaire — compte démo + notes ci-dessous restent utiles.
+Le fil **Guideline 2.1** du 1.0.0 (build 4) est **abandonné** (29 août 2026) : **ne pas** répondre dans Resolution Center sur ce fil.
 
 ### Compte démo (à créer dans l’app)
 

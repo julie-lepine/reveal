@@ -82,6 +82,15 @@ const ANDROID_BASE_STYLES = `    <!-- Base application theme. -->
 const ANDROID_APPLICATION_ID = "com.reveal.partygames";
 const PROGUARD_LEGACY = "getDefaultProguardFile('proguard-android.txt')";
 const PROGUARD_OPTIMIZE = "getDefaultProguardFile('proguard-android-optimize.txt')";
+const SPLASH_BACKGROUND = { r: 10, g: 15, b: 28, alpha: 1 };
+const IOS_SPLASH_IMAGE_SET = [
+  "Default@1x~universal~anyany.png",
+  "Default@2x~universal~anyany.png",
+  "Default@3x~universal~anyany.png",
+  "Default@1x~universal~anyany-dark.png",
+  "Default@2x~universal~anyany-dark.png",
+  "Default@3x~universal~anyany-dark.png",
+];
 
 function assertAndroidApplicationId() {
   const gradlePath = path.join(root, "android", "app", "build.gradle");
@@ -299,7 +308,83 @@ function plistInsertAfterDict(plist, insert) {
   return plist.replace("<dict>", `<dict>\n${insert}`);
 }
 
-function patchIos() {
+function resolveIosPortraitSplashSource() {
+  const candidates = [
+    "splash_ios_1242x2688.png",
+    "splash_ios_1125x2436.png",
+    "splash_ios_828x1792.png",
+    "splash_android_1080x1920.png",
+    "splash.png",
+  ];
+  for (const name of candidates) {
+    const candidate = path.join(root, "resources", name);
+    if (fs.existsSync(candidate)) return candidate;
+  }
+  return null;
+}
+
+async function patchIosSplash() {
+  const splashDir = path.join(root, "ios", "App", "App", "Assets.xcassets", "Splash.imageset");
+  const launchScreenPath = path.join(root, "ios", "App", "App", "Base.lproj", "LaunchScreen.storyboard");
+  if (!fs.existsSync(splashDir)) {
+    console.log("iOS: Splash.imageset absent - skip");
+    return;
+  }
+
+  const portraitSplash = resolveIosPortraitSplashSource();
+  if (portraitSplash) {
+    const sharp = (await import("sharp")).default;
+    // Portrait natif (pas carré 2732²) : scaleAspectFill remplit l’écran en hauteur.
+    const buffer = await sharp(portraitSplash).resize({ height: 2732 }).png().toBuffer();
+    for (const name of IOS_SPLASH_IMAGE_SET) {
+      fs.writeFileSync(path.join(splashDir, name), buffer);
+    }
+    const { width, height } = await sharp(buffer).metadata();
+    console.log(
+      `iOS: splash portrait ${width}x${height} → Splash.imageset (${path.basename(portraitSplash)})`
+    );
+  } else {
+    console.log("iOS: aucune source splash portrait dans resources/ - skip images");
+  }
+
+  if (!fs.existsSync(launchScreenPath)) {
+    console.log("iOS: LaunchScreen.storyboard absent - skip");
+    return;
+  }
+
+  let storyboard = fs.readFileSync(launchScreenPath, "utf8");
+  const brandedBackground =
+    '<color key="backgroundColor" red="0.0392156862745098" green="0.058823529411764705" blue="0.10980392156862745" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>';
+  let storyboardChanged = false;
+
+  if (storyboard.includes('contentMode="scaleAspectFit"')) {
+    storyboard = storyboard.replace(
+      'contentMode="scaleAspectFit"',
+      'contentMode="scaleAspectFill"'
+    );
+    storyboardChanged = true;
+    console.log("iOS: LaunchScreen scaleAspectFill (plein écran)");
+  }
+
+  if (storyboard.includes("systemBackgroundColor")) {
+    storyboard = storyboard.replace(
+      '<color key="backgroundColor" systemColor="systemBackgroundColor"/>',
+      brandedBackground
+    );
+    storyboard = storyboard.replace(
+      /\s*<systemColor name="systemBackgroundColor">[\s\S]*?<\/systemColor>\n?/,
+      "\n"
+    );
+    storyboardChanged = true;
+    console.log("iOS: LaunchScreen fond #0A0F1C (plus de blanc système)");
+  }
+
+  if (storyboardChanged) {
+    fs.writeFileSync(launchScreenPath, storyboard);
+  }
+}
+
+async function patchIos() {
   const plistPath = path.join(root, "ios", "App", "App", "Info.plist");
   if (!fs.existsSync(plistPath)) {
     console.log("iOS: Info.plist absent - skip");
@@ -342,7 +427,8 @@ function patchIos() {
   }
 
   fs.writeFileSync(plistPath, plist);
+  await patchIosSplash();
 }
 
 patchAndroid();
-patchIos();
+await patchIos();

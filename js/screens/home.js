@@ -70,6 +70,8 @@ import {
   isAuthReadyResolved,
 } from "../core/supabaseAuth.js";
 import { getEveningRecap } from "../core/eveningRecap.js";
+import { withPatchTimeout } from "../core/withPatchTimeout.js";
+import { SYNC_PATCH_TIMEOUT_MS } from "../config/syncConfig.js";
 import {
   isGameSyncActive,
   onGameSessionChange,
@@ -568,7 +570,7 @@ export function mountHome(app) {
     }
   }
 
-  async function resolveHomeMembership({ force = false } = {}) {
+  async function resolveHomeMembership({ force = false, identityRetry = 0 } = {}) {
     if (!isSupabaseConfigured()) {
       resolutionInProgress = false;
       return;
@@ -578,12 +580,6 @@ export function mountHome(app) {
       return;
     }
 
-    const queryUserId = getSupabaseUserId();
-    if (!queryUserId) {
-      resolutionInProgress = false;
-      return;
-    }
-    const queryAuthGeneration = getMembershipAuthGeneration();
     const leaveGen = isPostLeaveHomeTransitionActive()
       ? getPostLeaveHomeTransitionGeneration()
       : null;
@@ -591,13 +587,29 @@ export function mountHome(app) {
     resolutionInProgress = true;
     if (force && shouldContinue()) scheduleRender(true);
 
-    let settledResult = null;
+    let queryUserId = null;
+    let queryAuthGeneration = null;
+
+    const identityStillValid = () =>
+      getSupabaseUserId() === queryUserId &&
+      getMembershipAuthGeneration() === queryAuthGeneration;
+
+    const retryIfIdentityShifted = async () => {
+      if (identityRetry >= 1 || !shouldContinue()) return;
+      await resolveHomeMembership({ force: true, identityRetry: identityRetry + 1 });
+    };
+
     try {
       if (!isAuthReadyResolved()) {
         await authReady;
         if (!shouldContinue()) return;
       }
-      if (getSupabaseUserId() !== queryUserId) return;
+      if (!isLoggedIn() && !isGuest()) return;
+
+      queryUserId = getSupabaseUserId();
+      if (!queryUserId) return;
+      queryAuthGeneration = getMembershipAuthGeneration();
+
       if (isSupabaseConfigured()) {
         await retryPendingLobbyMembershipCompensation({
           deleteOwnLobbyMembershipById,
@@ -607,12 +619,20 @@ export function mountHome(app) {
           membershipReconciliationConflict = null;
         }
       }
-      if (getSupabaseUserId() !== queryUserId) return;
-      const result = await queryActiveLobbyMembership();
+      if (!identityStillValid()) {
+        await retryIfIdentityShifted();
+        return;
+      }
+      const result = await withPatchTimeout(
+        queryActiveLobbyMembership(),
+        SYNC_PATCH_TIMEOUT_MS,
+        "Vérification lobby trop longue."
+      );
       if (!shouldContinue()) return;
       const currentUserId = getSupabaseUserId();
       const currentAuthGeneration = getMembershipAuthGeneration();
       if (queryUserId !== currentUserId || queryAuthGeneration !== currentAuthGeneration) {
+        await retryIfIdentityShifted();
         return;
       }
       if (leaveGen != null && result?.status === "unknown") {
@@ -626,11 +646,12 @@ export function mountHome(app) {
       });
     } catch {
       if (!shouldContinue()) return;
-      const currentUserId = getSupabaseUserId();
-      const currentAuthGeneration = getMembershipAuthGeneration();
-      if (queryUserId !== currentUserId || queryAuthGeneration !== currentAuthGeneration) {
+      if (!queryUserId || !identityStillValid()) {
+        await retryIfIdentityShifted();
         return;
       }
+      const currentUserId = getSupabaseUserId();
+      const currentAuthGeneration = getMembershipAuthGeneration();
       if (leaveGen != null) {
         leaveConfirmationPending = true;
       }

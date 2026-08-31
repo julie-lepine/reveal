@@ -287,6 +287,23 @@ export function deriveHomeMembershipChrome(input = {}) {
 
   // Pas encore de snapshot, ou résolution initiale en cours.
   if (snapshot == null || resolutionInProgress) {
+    if (
+      snapshot == null &&
+      !resolutionInProgress &&
+      authReady &&
+      loggedIn &&
+      shouldCheckMembership
+    ) {
+      return {
+        ...base,
+        state: "check_failed",
+        createEnabled: false,
+        createDisabledReason: CREATE_DISABLED_CHECK_FAILED,
+        showRetry: true,
+        primaryMessage: "Impossible de vérifier si tu es déjà dans un lobby.",
+        errorMessage: "Réessaie dans un instant.",
+      };
+    }
     return {
       ...base,
       state: "checking",

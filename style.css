@@ -3961,6 +3961,9 @@ button.emoji-picker-preview__avatar:active{
   margin:0 0 18px;
   padding:14px 16px;
   border-radius:24px;
+  /* iOS 15 WebView : pas de color-mix() → fond violet explicite avant la règle moderne */
+  border:1px solid rgba(255, 60, 172, 0.35);
+  background-color:#42193d;
   border:1px solid color-mix(in srgb, var(--color-primary) 35%, transparent);
   background:color-mix(in srgb, var(--color-primary) 22%, #0d0f1e);
   color:#fff;
@@ -3979,6 +3982,7 @@ button.emoji-picker-preview__avatar:active{
 
 @media (hover:hover){
   .adfree-hub-card:hover{
+    background-color:#511c46;
     background:color-mix(in srgb, var(--color-primary) 28%, #0d0f1e);
   }
 }
