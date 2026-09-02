@@ -143,6 +143,19 @@ Les mails d’auth (reset mot de passe, etc.) passent par **Resend** en SMTP cus
 | Mail en spam | DKIM OK ? ; ajouter DMARC |
 | Reset reçu mais lien cassé | Redirect URLs Supabase (web + `com.reveal.partygames://auth/callback`) |
 
+## 7ter. Edge Function `delete-account` (App Store 5.1.1)
+
+Suppression **in-app** : le client appelle `supabase.functions.invoke("delete-account")` avec le JWT de la session. La function (service role) exécute `auth.admin.deleteUser` sur **cet** utilisateur seulement.
+
+```bash
+npx supabase functions deploy delete-account
+```
+
+- Projet **prod** (le même que l’app live).
+- **Ne pas** passer `--no-verify-jwt` (contrairement à `revenuecat-webhook`).
+- Secrets : `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` (injectés par la plateforme).
+- QA : compte e-mail jetable → Paramètres → Support → Supprimer mon compte → reconnexion impossible.
+
 ## 7bis. Cycle de vie des lobbies (`lobby-lifecycle.sql`)
 
 Après migration SQL, l’app envoie un **heartbeat** (`last_seen_at`) toutes les ~60–120 s.

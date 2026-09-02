@@ -296,30 +296,40 @@ describe("AUTH-SERVER-LEAVE-GUEST-01 - finalize guest", () => {
 describe("AUTH-LOGOUT-MEMBER-01 - source logout", () => {
   it("membre : résultat leave contrôlé avant signOut", () => {
     const src = read("js/core/auth.js");
-    const start = src.indexOf("export async function logout");
-    const fn = src.slice(start, start + 2200);
-    assert.match(fn, /leaveLobby\(\{\s*navigateAway:\s*false\s*\}\)/);
-    assert.match(fn, /res\?\.ok\s*!==\s*true|res\.ok\s*!==\s*true/);
-    assert.match(fn, /cancelled/);
-    // Sur !ok / cancelled / throw : return avant signOut (pas de fire-and-forget leave).
-    const failReturns = fn.match(/return\s*\{\s*ok:\s*false/g) || [];
+    const helperStart = src.indexOf("async function leaveActiveLobbyForAuthChange");
+    const logoutStart = src.indexOf("export async function logout");
+    assert.ok(helperStart >= 0 && logoutStart > helperStart);
+    const helper = src.slice(helperStart, logoutStart);
+    assert.match(helper, /leaveLobby\(\{\s*navigateAway:\s*false\s*\}\)/);
+    assert.match(helper, /res\?\.ok\s*!==\s*true|res\.ok\s*!==\s*true/);
+    assert.match(helper, /cancelled/);
+    const failReturns = helper.match(/return\s*\{\s*ok:\s*false/g) || [];
     assert.ok(failReturns.length >= 2, "au moins cancelled + !ok member/host");
-    const memberElse = fn.indexOf("} else {");
-    const memberLeave = fn.indexOf("leaveLobby({ navigateAway: false })", memberElse);
-    const memberFailReturn = fn.indexOf(
+    const memberElse = helper.indexOf("} else {");
+    const memberLeave = helper.indexOf("leaveLobby({ navigateAway: false })", memberElse);
+    const memberFailReturn = helper.indexOf(
       "la déconnexion n'a pas été effectuée",
       memberLeave
     );
     assert.ok(memberLeave > 0 && memberFailReturn > memberLeave);
-    const between = fn.slice(memberLeave, memberFailReturn + 80);
+    const between = helper.slice(memberLeave, memberFailReturn + 80);
     assert.equal(between.includes("await signOutSupabase"), false);
+
+    const logout = src.slice(logoutStart, src.indexOf("export async function deleteRegisteredAccount"));
+    assert.match(logout, /leaveActiveLobbyForAuthChange/);
+    assert.ok(
+      logout.indexOf("leaveActiveLobbyForAuthChange") < logout.indexOf("await signOutSupabase")
+    );
   });
 
   it("hôte : garde confirmAndLeaveLobby intacte", () => {
     const src = read("js/core/auth.js");
-    const fn = src.slice(src.indexOf("export async function logout"));
-    assert.match(fn, /confirmAndLeaveLobby/);
-    assert.match(fn, /isLobbyHost\(\)/);
+    const helper = src.slice(
+      src.indexOf("async function leaveActiveLobbyForAuthChange"),
+      src.indexOf("export async function logout")
+    );
+    assert.match(helper, /confirmAndLeaveLobby/);
+    assert.match(helper, /isLobbyHost\(\)/);
   });
 
   it("home possède le feedback (pas de double notify dans logout)", () => {

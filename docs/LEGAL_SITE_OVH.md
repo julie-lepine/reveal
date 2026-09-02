@@ -381,3 +381,45 @@ Aligne-toi mot pour mot sur les inserts ci-dessus. Apostrophes : celles déjà e
 
 En ligne (27 août 2026) : [privacy.html](https://revealthepartygame.fr/privacy.html) — croisés 24 h, finalités, conservation, cascade compte. Stores inchangés.
 
+---
+
+## Suppression in-app (App Store 5.1.1) — 2 septembre 2026
+
+Apple a refusé v1.1 parce que l’app **redirigeait** vers cette page pour un e-mail. Le bouton iOS supprime désormais **dans l’app**. La page web reste obligatoire pour **Play** (URL Data safety) et pour qui n’a plus l’app.
+
+**Ne pas retirer le parcours e-mail** tant que l’AAB Play en review ouvre encore cette page.
+
+### `suppression-compte.html`
+
+1. Date : **2 septembre 2026**.
+2. Remplace le bloc « Comment demander la suppression » par :
+
+**Dans l’application REVEAL (Android, iOS ou web)**
+
+1. Ouvrez **Menu** (Paramètres) → onglet **Support**.
+2. Appuyez sur **Supprimer mon compte**.
+3. Confirmez. La suppression est **immédiate et définitive** : compte, profil, amis, invitations et données de jeu associées.
+
+Aucun e-mail n’est nécessaire si vous avez encore l’application.
+
+**Si vous n’avez plus l’application**
+
+1. Envoyez un e-mail à **contact@revealthepartygame.fr** depuis l’adresse liée à votre compte REVEAL.
+2. Objet : **Demande de suppression de compte REVEAL** (le bouton mailto peut rester).
+3. Nous traitons cette demande sous 30 jours ouvrés après vérification de l’identité.
+
+3. **Supprime** la phrase : *« Vous serez redirigé vers cette page pour finaliser la demande par e-mail. »*
+4. Section délais : précise que **dans l’app c’est immédiat** ; le délai 30 jours ne concerne que la demande **par e-mail**.
+5. Mode invité : inchangé (pas de compte permanent).
+
+### `privacy.html`
+
+Date **2 septembre 2026**. Dans Conservation / Suppression : le chemin principal est **Paramètres → Support → Supprimer mon compte** (immédiat). E-mail / cette page = uniquement sans l’app. Ne pas écraser amis / invitations / croisés 24 h.
+
+### Vérif
+
+- https://revealthepartygame.fr/suppression-compte.html — plus de « redirigé vers cette page »
+- Ctrl+F « immédiat » (in-app) et « 30 jours » (e-mail seulement)
+- Bouton mailto toujours là (Play / sans app)
+
+

@@ -6,6 +6,8 @@ import {
   signInAsGuest as sbGuest,
   signInWithOAuth as sbOAuth,
   signOutSupabase,
+  signOutSupabaseAfterAccountDeleted,
+  deleteRegisteredAccountOnServer,
   sendPasswordResetEmail as sbSendPasswordResetEmail,
   updatePassword,
   getSupabaseUserId,
@@ -199,24 +201,11 @@ export async function changeEmailPassword(_currentPassword, newPassword) {
   return updatePassword(newPassword);
 }
 
-export async function logout() {
-  if (!isSupabaseConfigured()) {
-    saveStatePatch({
-      user: {
-        email: null,
-        name: null,
-        loggedIn: false,
-        isGuest: false,
-        provider: null,
-        adFree: false,
-      },
-      inLobby: false,
-      lobby: null,
-      lobbyCode: null,
-    });
-    return { ok: true };
-  }
-
+/**
+ * Sortie lobby avant déconnexion / suppression (AUTH-LOGOUT-MEMBER-01).
+ * Pas de signOut ici : l'appelant garde la session (JWT) si besoin.
+ */
+async function leaveActiveLobbyForAuthChange() {
   const { hasActiveLobby, leaveLobby, confirmAndLeaveLobby } = await import("./lobby.js");
   const { isLobbyHost } = await import("./gameSync.js");
   if (hasActiveLobby()) {
@@ -256,7 +245,50 @@ export async function logout() {
     stopMultiplayerSync();
     stopLobbyPresenceSync();
   }
+  return { ok: true };
+}
+
+export async function logout() {
+  if (!isSupabaseConfigured()) {
+    saveStatePatch({
+      user: {
+        email: null,
+        name: null,
+        loggedIn: false,
+        isGuest: false,
+        provider: null,
+        adFree: false,
+      },
+      inLobby: false,
+      lobby: null,
+      lobbyCode: null,
+    });
+    return { ok: true };
+  }
+
+  const leave = await leaveActiveLobbyForAuthChange();
+  if (!leave.ok) return leave;
   await signOutSupabase();
+  saveStatePatch({ inLobby: false, lobby: null, lobbyCode: null });
+  return { ok: true };
+}
+
+/** Compte inscrit uniquement. Confirm UI à la charge de l'écran Paramètres. */
+export async function deleteRegisteredAccount() {
+  if (!isLoggedIn()) {
+    return { ok: false, error: "Aucun compte enregistré à supprimer." };
+  }
+  if (!isSupabaseConfigured()) {
+    return { ok: false, error: BACKEND_REQUIRED };
+  }
+
+  const leave = await leaveActiveLobbyForAuthChange();
+  if (!leave.ok) return leave;
+
+  const server = await deleteRegisteredAccountOnServer();
+  if (!server.ok) return server;
+
+  await signOutSupabaseAfterAccountDeleted();
   saveStatePatch({ inLobby: false, lobby: null, lobbyCode: null });
   return { ok: true };
 }

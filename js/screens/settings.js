@@ -7,6 +7,7 @@ import {
   updateProfileEmoji,
   changeEmailPassword,
   logout,
+  deleteRegisteredAccount,
 } from "../core/auth.js";
 import { refreshAdsForEntitlement } from "../core/ads.js";
 import { adFreeSettingsCardHtml } from "../core/adFreeUi.js";
@@ -33,8 +34,7 @@ import { MAX_PLAYERS } from "../config/lobbyLifecycle.js";
 import { lobbySettingsActionsForRole } from "../core/partySettingsMenu.js";
 import { navigate, getCurrentScreen, getScreenParams } from "../core/router.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
-import { INSTAGRAM_HANDLE, INSTAGRAM_PROFILE_URL, ACCOUNT_DELETION_PUBLIC_URL } from "../../data/appConfig.js";
-import { openExternalUrl } from "../core/openExternal.js";
+import { INSTAGRAM_HANDLE, INSTAGRAM_PROFILE_URL } from "../../data/appConfig.js";
 import { openInstagramProfile } from "../core/feedbackUi.js";
 import { createMountGuard } from "../core/mountLifecycle.js";
 import { bindNav, returnFromEveningProfile } from "./nav.js";
@@ -279,7 +279,18 @@ function personnalisationPanelHtml({ emailAccount, user, selectedEmoji }) {
     </div>`;
 }
 
-function supportPanelHtml() {
+function supportPanelHtml(registeredAccount) {
+  const deletionBlock = registeredAccount
+    ? `
+        <button type="button" class="btn btn-secondary btn--spaced" id="btn-delete-account">Supprimer mon compte</button>
+        <p class="hint settings-section__hint">
+          Suppression définitive, immédiate, dans l'application. Irréversible.
+        </p>`
+    : `
+        <p class="hint settings-section__hint">
+          Le mode invité ne crée pas de compte. Tes données de session expirent toutes seules.
+        </p>`;
+
   return `
     <div class="settings-panel" id="settings-panel-support">
       <div class="card settings-section feedback-prompt">
@@ -313,10 +324,7 @@ function supportPanelHtml() {
         >@${escapeHtml(INSTAGRAM_HANDLE)}</a>
         </p>
         <button type="button" class="btn btn-secondary btn--spaced" data-nav="privacy">Politique de confidentialité</button>
-        <button type="button" class="btn btn-secondary btn--spaced" id="btn-delete-account">Supprimer mon compte</button>
-        <p class="hint settings-section__hint">
-          Suppression définitive du compte e-mail et des données associées.
-        </p>
+        ${deletionBlock}
       </div>
     </div>`;
 }
@@ -478,11 +486,43 @@ export function mountSettings(app) {
       await resetAppToCleanHome();
     });
 
-    const openDeletionPage = (e) => {
-      e?.preventDefault();
-      openExternalUrl(ACCOUNT_DELETION_PUBLIC_URL);
-    };
-    app.querySelector("#btn-delete-account")?.addEventListener("click", openDeletionPage);
+    app.querySelector("#btn-delete-account")?.addEventListener("click", async () => {
+      if (!mount.isMounted()) return;
+      const btn = app.querySelector("#btn-delete-account");
+      if (btn?.disabled) return;
+
+      const ok = await showAppConfirm(
+        "Ton compte et tes données personnelles (profil, amis, invitations) seront définitivement supprimés. Cette action est irréversible. L'achat Sans pub reste lié à ton compte Apple ou Google : tu pourras le restaurer plus tard.",
+        {
+          title: "Supprimer mon compte",
+          confirmLabel: "Supprimer définitivement",
+          cancelLabel: "Annuler",
+          icon: "⚠️",
+        }
+      );
+      if (!mount.isMounted() || !ok) return;
+
+      if (btn) btn.disabled = true;
+      const res = await deleteRegisteredAccount();
+      if (!mount.isMounted()) return;
+      if (res?.cancelled) {
+        if (btn) btn.disabled = false;
+        return;
+      }
+      if (res?.ok === false) {
+        if (btn) btn.disabled = false;
+        await showAppAlert(res.error || "Impossible de supprimer le compte.", {
+          title: "Suppression",
+          icon: "⚠️",
+        });
+        return;
+      }
+      await showAppAlert("Ton compte a été supprimé.", {
+        title: "Compte supprimé",
+        icon: "✅",
+      });
+      navigate("home", { reset: true });
+    });
 
     app.querySelector("[data-open-instagram]")?.addEventListener("click", (e) => {
       e.preventDefault();
@@ -612,7 +652,7 @@ export function mountSettings(app) {
         ? personnalisationPanelHtml({ emailAccount, user, selectedEmoji })
         : activeTab === TAB_SOIREE
           ? soireePanelHtml(inLobby)
-          : supportPanelHtml();
+          : supportPanelHtml(isLoggedIn());
     panel.outerHTML = html;
     bindNav(app, {
       "evening-return": () => returnFromEveningProfile(),
@@ -684,7 +724,7 @@ export function mountSettings(app) {
             ? personnalisationPanelHtml({ emailAccount, user, selectedEmoji })
             : activeTab === TAB_SOIREE
               ? soireePanelHtml(inLobby)
-              : supportPanelHtml()
+              : supportPanelHtml(isLoggedIn())
         }
       `,
     });

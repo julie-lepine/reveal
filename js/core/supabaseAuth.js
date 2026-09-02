@@ -727,6 +727,60 @@ export async function signOutSupabase() {
   await syncSessionToState(null);
 }
 
+/** Après deleteUser : le JWT n'est plus valide, signOut global peut échouer. */
+export async function signOutSupabaseAfterAccountDeleted() {
+  if (!isSupabaseConfigured() || !supabase) {
+    await syncSessionToState(null);
+    return;
+  }
+  try {
+    await supabase.auth.signOut({ scope: "local" });
+  } catch (e) {
+    console.warn("REVEAL signOut after delete:", e?.message || e);
+  }
+  await syncSessionToState(null);
+}
+
+/**
+ * Efface le compte Auth de la session courante (Edge Function delete-account).
+ * Ne pas envoyer d'id : le serveur ne supprime que le JWT présenté.
+ */
+export async function deleteRegisteredAccountOnServer() {
+  if (!isSupabaseConfigured() || !supabase) {
+    return { ok: false, error: "Configuration backend requise." };
+  }
+
+  const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+  if (sessionError || !sessionData?.session?.access_token) {
+    return { ok: false, error: "Session expirée. Reconnecte-toi puis réessaie." };
+  }
+
+  const { data, error } = await supabase.functions.invoke("delete-account", {
+    method: "POST",
+    body: {},
+    headers: {
+      Authorization: `Bearer ${sessionData.session.access_token}`,
+    },
+  });
+
+  if (error) {
+    return {
+      ok: false,
+      error: "Impossible de supprimer le compte. Vérifie ta connexion puis réessaie.",
+    };
+  }
+  if (!data?.ok) {
+    if (data?.error === "guest") {
+      return { ok: false, error: "Le mode invité n'a pas de compte à supprimer." };
+    }
+    return {
+      ok: false,
+      error: "Impossible de supprimer le compte. Réessaie dans un instant.",
+    };
+  }
+  return { ok: true };
+}
+
 export async function sendPasswordResetEmail(email, captchaToken = null) {
   const trimmed = String(email || "").trim().toLowerCase();
   if (!trimmed) return { ok: false, error: "Email requis." };

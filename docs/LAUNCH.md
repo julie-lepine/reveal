@@ -7,7 +7,7 @@ Backend : [SUPABASE.md](./SUPABASE.md) · Native : [NATIVE.md](./NATIVE.md) · S
 |--|--|
 | Package | `com.reveal.partygames` |
 | Play | compte **individuel** `contact@revealthepartygame.fr` — test fermé OK, **prod demandée** (29 août 2026) — attente review Google |
-| App Store | **REVEAL - Party Games** — Apple ID [`6785256450`](https://apps.apple.com/app/id6785256450) — **v1.1 soumise en review** — 31 août 2026 — attente Apple |
+| App Store | **REVEAL - Party Games** — Apple ID [`6785256450`](https://apps.apple.com/app/id6785256450) — **v1.1 refusée** 2 sept 2026 (5.1.1 + 2.1 : suppression par e-mail) — **resoumettre après suppression in-app** |
 | Privacy | `https://revealthepartygame.fr/privacy.html` |
 | Suppression | `https://revealthepartygame.fr/suppression-compte.html` |
 | Contact | `contact@revealthepartygame.fr` |
@@ -20,12 +20,38 @@ Builds natifs : `npm run cap:sync` (Node ≥ 22) → AAB / Archive.
 
 ---
 
-## Reste (ordre — 31 août 2026)
+## Reste (ordre — 2 septembre 2026)
 
-1. **iOS** — **v1.1 soumise en review** — 31 août 2026 (build du soir, IAP `reveal_adfree` joint). **Attente Apple** — ne pas répondre au fil 1.0.0 (build 4) / Guideline 2.1.
-   - **Après acceptation :** release prod (manuel ou auto) → lier AdMob ↔ App Store → vérifier bannières prod.
-   - AdMob iOS : test device OK — 31 août 2026. **Lier** l’app dans la console AdMob **après** publication.
-2. **Play** — **prod demandée** (29 août 2026). Attente review / rollout Google. QA Sans pub déjà OK (achat 0 €, restore, pubs off, 2ᵉ téléphone).
+1. **iOS** — **v1.1 refusée** 2 sept 2026 (Guideline **5.1.1** + **2.1** : « Supprimer mon compte » ouvrait le site / e-mail). Checklist ci-dessous. **Ne pas** répondre au fil 1.0.0 (build 4). **Ne pas** renvoyer d’AAB Android tant que Play est en review.
+2. **Play** — **prod demandée** (29 août 2026). Attente review / rollout Google. QA Sans pub déjà OK (achat 0 €, restore, pubs off, 2ᵉ téléphone). Garder l’URL `suppression-compte.html` + parcours e-mail de secours.
+
+---
+
+## iOS — suppression de compte in-app (refus 5.1.1 / 2.1)
+
+Apple : le compte doit être **supprimé dans l’app** (confirm → effacement → retour connexion). Pas de Safari, pas d’e-mail.
+
+### Code & backend
+- [x] Bouton Paramètres → Support → **Supprimer mon compte** : confirm in-app, plus d’ouverture du site
+- [x] Edge Function `delete-account` (JWT + `auth.admin.deleteUser`) — **à déployer en prod**
+- [x] **Déployer** `delete-account` (Dashboard, JWT **on**) — 2 sept 2026
+- [x] Textes in-app (`data/legalContent.js`) : suppression immédiate depuis Paramètres
+- [x] Site OVH `suppression-compte.html` + `privacy.html` : in-app en premier, e-mail de secours — 2 sept 2026
+
+### QA (compte **jetable**, pas le compte démo Review si tu veux le garder)
+- [ ] iPhone : inscris un compte test → Menu → Support → Supprimer mon compte → confirmer → message OK → écran connexion
+- [ ] Reconnexion avec le même e-mail / MDP : **échec** (compte inexistant)
+- [ ] Invité : pas de suppression de compte (texte d’explication seulement)
+- [ ] Annuler la confirm : compte toujours là
+
+### Resoumission App Store
+- [ ] Recréer un compte démo Review **après** QA (si le reviewer le supprime, c’est OK — le recréer)
+- [ ] Notes App Review : paragraphe ACCOUNT DELETION ci-dessous (in-app, pas d’e-mail)
+- [ ] `cap:sync` → Archive Xcode → upload → **nouvelle version** (ex. 1.1.1), IAP `reveal_adfree` joint
+- [ ] Répondre dans Resolution Center **après** le nouveau build : deletion completed in-app, Settings → Support → Supprimer mon compte
+- [ ] **Après acceptation :** release prod → lier AdMob ↔ App Store → bannières prod
+
+Ne pas uploader d’AAB Play pour ce correctif tant que la prod Google est en review.
 
 ---
 
@@ -43,7 +69,7 @@ Builds natifs : `npm run cap:sync` (Node ≥ 22) → AAB / Archive.
   *(Paramètres de la fiche Play Store, pas la fiche textes)*
 
 ### App Store
-**v1.1 en review** — soumise 31 août 2026. Le 1.0.0 (build 4) est **abandonné** — ne pas répondre au 2.1.
+**v1.1 refusée** 2 sept 2026 (5.1.1 + 2.1). Le 1.0.0 (build 4) est **abandonné** — ne pas répondre à ce fil. Resoumettre **après** suppression in-app (checklist en tête).
 
 #### Fiche (déjà fait)
 - [x] Fiche **REVEAL - Party Games** + Apple ID `6785256450`
@@ -121,7 +147,7 @@ Le build prod iOS **embarque** amis / invitations / croisés 24 h (plus le 1.0.0
 - [x] Clé publique iOS `appl_…` dans `data/revenueCatConfig.js` — 30 août 2026
 - [x] 🧪 QA iPhone XR : parcours app + pubs (test puis prod) + Sans pub sandbox — 31 août 2026
 - [x] Archive + upload + **soumission review v1.1** — 31 août 2026 — **attente Apple**
-- [ ] Légal OVH : préciser paiement Apple (App Store) en plus de Google, si pas déjà
+- [x] Légal OVH : préciser paiement Apple (App Store) en plus de Google, si pas déjà
 - [ ] **Après acceptation :** mettre en prod + lier AdMob iOS
 
 ### Plus tard
@@ -235,7 +261,7 @@ Compte **enregistré** (pas invité) : hôte lobby, Paramètres, suppression com
 6. Popup **UMP** (consentement pub RGPD) si affichée  
 7. Popup **ATT** (« Autoriser le suivi ») — accepter **ou** refuser  
 8. Paramètres → Politique de confidentialité  
-9. Paramètres → **Supprimer mon compte** (montrer l’écran ; annuler si tu veux garder le compte démo)  
+9. Paramètres → Support → **Supprimer mon compte** : confirmer **dans l’app** (suppression réelle). Pour une vidéo, préférer un compte jetable, pas le compte démo si tu veux le garder.  
 10. (Optionnel) Mode Invité : pseudo + code lobby  
 11. (Optionnel) Profil → Sans pub : montrer le bouton 2,99 € **sans** forcer l’achat review  
 
@@ -281,8 +307,13 @@ Not applicable. Casual party game; no licensed third-party media.
 USER-GENERATED CONTENT:
 Nicknames, lobby chat, custom game text in private lobbies (code required). Private friend list with lobby-only discovery (registered accounts only; no player search). Private ephemeral party invites between registered friends (tied to a living lobby; no public invite link). Recently-crossed registered players from a shared lobby, shown for 24 hours after the lobby ends (not a search, not suggestions of strangers). Mitigations: client-side word filter, host can remove players, contact@revealthepartygame.fr for abuse reports. No public social feed.
 
-ACCOUNT DELETION:
-In-app: Settings → Legal → “Supprimer mon compte”, or https://revealthepartygame.fr/suppression-compte.html
+ACCOUNT DELETION (Guideline 5.1.1):
+Completed in-app, no website or email required.
+Path: open the app → log in → Menu (bottom or settings) → Support tab → “Supprimer mon compte” → confirm.
+This permanently deletes the REVEAL account and associated personal data immediately.
+Guest mode does not create an account.
+The public URL https://revealthepartygame.fr/suppression-compte.html is only for users who uninstalled the app (Play Store requirement).
+You may complete deletion with a test account; Guest mode remains available without an account.
 
 PRIVACY POLICY: https://revealthepartygame.fr/privacy.html
 

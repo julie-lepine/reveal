@@ -1,3 +1,7 @@
 # Webhooks RevenueCat n'envoient pas de JWT Supabase.
 [functions.revenuecat-webhook]
 verify_jwt = false
+
+# Suppression de compte : uniquement l'utilisateur authentifié (son JWT).
+[functions.delete-account]
+verify_jwt = true

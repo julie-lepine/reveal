@@ -8,7 +8,7 @@ import {
 
 export const PRIVACY_POLICY = {
   title: "Politique de confidentialité",
-  updated: "27 août 2026",
+  updated: "2 septembre 2026",
   sections: [
     {
       heading: "Qui sommes-nous ?",
@@ -36,11 +36,11 @@ export const PRIVACY_POLICY = {
     },
     {
       heading: "Conservation",
-      body: `Les données de session et de lobby sont conservées le temps de la soirée et liées à votre compte Supabase. Les invitations de soirée sont éphémères : elles disparaissent à la fermeture du lobby, au refus ou à l’acceptation. Les joueurs récemment croisés en salon sont oubliés 24 h après la fin du lobby commun. Vous pouvez demander la suppression de votre compte via la page dédiée (voir ci-dessous) ou par e-mail à ${CONTACT_EMAIL}.`,
+      body: `Les données de session et de lobby sont conservées le temps de la soirée et liées à votre compte Supabase. Les invitations de soirée sont éphémères : elles disparaissent à la fermeture du lobby, au refus ou à l’acceptation. Les joueurs récemment croisés en salon sont oubliés 24 h après la fin du lobby commun. Vous pouvez supprimer votre compte enregistré à tout moment depuis l'application (Paramètres → Support → Supprimer mon compte).`,
     },
     {
       heading: "Suppression de compte",
-      body: `Les comptes enregistrés (e-mail) peuvent être supprimés à tout moment. Envoyez une demande depuis l'application (Paramètres) ou depuis la page publique de suppression de compte. Nous effaçons le compte Supabase Auth, le profil (pseudo, emoji), les demandes d’amitié et amitiés associées (suppression en cascade), les invitations de soirée associées (suppression en cascade), les joueurs récemment croisés associés (suppression en cascade), et les données de jeu associées, sous 30 jours ouvrés. Le mode invité ne crée pas de compte permanent : les données de session expirent automatiquement.`,
+      body: `Les comptes enregistrés (e-mail) peuvent être supprimés à tout moment depuis l'application : Paramètres → Support → Supprimer mon compte. La suppression est immédiate et définitive. Nous effaçons le compte Supabase Auth, le profil (pseudo, emoji), les demandes d’amitié et amitiés associées (suppression en cascade), les invitations de soirée associées (suppression en cascade), les joueurs récemment croisés associés (suppression en cascade), et les données de jeu associées. Si vous n’avez plus l’application, vous pouvez aussi écrire à ${CONTACT_EMAIL} ou utiliser la page publique de suppression de compte. Le mode invité ne crée pas de compte permanent : les données de session expirent automatiquement.`,
     },
     {
       heading: "Vos droits (RGPD)",
