@@ -97,6 +97,21 @@ async function ensureConsent(AdMob, AdmobConsentStatus) {
   }
 }
 
+/** Popup système Apple (iPhone / iPad). Après UMP s'il s'affiche, avant les bannières. */
+async function ensureTrackingAuthorization(AdMob) {
+  if (getNativePlatform() !== "ios") return;
+  if (typeof AdMob.trackingAuthorizationStatus !== "function") return;
+  if (typeof AdMob.requestTrackingAuthorization !== "function") return;
+  try {
+    const info = await AdMob.trackingAuthorizationStatus();
+    if (info?.status === "notDetermined") {
+      await AdMob.requestTrackingAuthorization();
+    }
+  } catch (err) {
+    console.warn("REVEAL ATT:", err);
+  }
+}
+
 async function ensureAdMobReady() {
   if (!isNativeApp()) return false;
   if (initialized) return true;
@@ -114,6 +129,7 @@ async function ensureAdMobReady() {
       });
 
       await ensureConsent(AdMob, AdmobConsentStatus);
+      await ensureTrackingAuthorization(AdMob);
 
       AdMob.addListener(BannerAdPluginEvents.SizeChanged, (size) => {
         if (bannerVisible && size?.height && shouldShowAdForScreen(getCurrentScreen())) {

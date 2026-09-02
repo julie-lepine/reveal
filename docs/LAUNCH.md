@@ -37,11 +37,14 @@ Apple : le compte doit être **supprimé dans l’app** (confirm → effacement 
 - [x] **Déployer** `delete-account` (Dashboard, JWT **on**) — 2 sept 2026
 - [x] Textes in-app (`data/legalContent.js`) : suppression immédiate depuis Paramètres
 - [x] Site OVH `suppression-compte.html` + `privacy.html` : in-app en premier, e-mail de secours — 2 sept 2026
+- [x] **ATT iOS** : `requestTrackingAuthorization` après UMP, avant bannière (`js/core/ads.js`) — 2 sept 2026
+- [ ] iPhone : cold start / reset suivi → popup Apple ATT (Autoriser / Ne pas suivre)
+- [ ] Vidéo ATT (install neuf) jointe dans App Review Information
 
 ### QA (compte **jetable**, pas le compte démo Review si tu veux le garder)
-- [ ] iPhone : inscris un compte test → Menu → Support → Supprimer mon compte → confirmer → message OK → écran connexion
-- [ ] Reconnexion avec le même e-mail / MDP : **échec** (compte inexistant)
-- [ ] Invité : pas de suppression de compte (texte d’explication seulement)
+- [x] Compte test → Menu → Support → Supprimer mon compte → confirmer → plus reconnectable — 2 sept 2026 (web / GitHub)
+- [ ] iPhone (Xcode / TestFlight) : **même parcours** dans le binaire native avant Archive
+- [ ] Invité : pas de bouton supprimer (texte d’expiration seulement)
 - [ ] Annuler la confirm : compte toujours là
 
 ### Resoumission App Store
