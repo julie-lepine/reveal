@@ -8,11 +8,11 @@ export const APP_URL_SCHEME = APP_BUNDLE_ID;
 export const NATIVE_AUTH_REDIRECT = `${APP_URL_SCHEME}://auth/callback`;
 
 /**
- * Page Turnstile ouverte dans une WebView **in-app** (pas Safari).
- * Hostname déjà autorisé dans Cloudflare Turnstile.
+ * Page Turnstile iOS (WebView in-app). Domaine store, pas GitHub Pages.
+ * À autoriser dans Cloudflare Turnstile → Hostnames : `revealthepartygame.fr`.
  */
 export const NATIVE_CAPTCHA_PAGE_URL =
-  "https://julie-lepine.github.io/reveal/captcha.html";
+  "https://revealthepartygame.fr/captcha.html";
 
 /** Retour app après le défi natif (`sid` seulement — le token passe par Realtime). */
 export const NATIVE_CAPTCHA_REDIRECT = `${APP_URL_SCHEME}://captcha`;

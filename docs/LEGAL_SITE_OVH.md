@@ -60,6 +60,7 @@ Attendre 15 min à 2 h (parfois 24 h) pour la propagation.
 6. **Upload** depuis ton repo local :
    - `index.html`
    - `privacy.html`
+   - `captcha.html` (captcha iOS — fichier du repo app, pas GitHub Pages)
    - `mentions-legales.html`
    - `legal.css`
    - `reveal.png`
@@ -103,7 +104,7 @@ Dans ce repo :
 - [x] `data/appConfig.js` → `PRIVACY_POLICY_PUBLIC_URL` =  
   `https://revealthepartygame.fr/privacy.html`
 - [x] Fiches **Play Console** / **App Store Connect** : même URL confidentialité (`https://revealthepartygame.fr/privacy.html`) — ASC 24 août 2026
-- [ ] Optionnel : Cloudflare Turnstile → hostname `revealthepartygame.fr` / `www` si un jour l’app web y est hébergée
+- [ ] Cloudflare Turnstile → hostname `revealthepartygame.fr` (et `www`) — requis pour le captcha iOS (`/captcha.html`)
 
 ---
 

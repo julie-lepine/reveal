@@ -102,25 +102,23 @@ Le code utilise `getAuthRedirectUrl()` : redirect web en navigateur, deep link e
 
 ---
 
-## Turnstile (Cloudflare)
+## Captcha (hCaptcha)
 
-| Plateforme | Turnstile |
-|------------|-----------|
+| Plateforme | hCaptcha |
+|------------|----------|
 | **Web** | ✅ widget in-page |
-| **Android** | ✅ widget in-page (même WebView Chromium que le web) |
-| **iOS** | ✅ bouton « Je ne suis pas un robot » → feuille Safari **in-app** (`SFSafariViewController`, pas l’app Safari) |
+| **Android** | ✅ widget in-page |
+| **iOS** | ✅ widget in-page (dans l’app, pas Safari, pas de site) |
 
-Turnstile **refuse WKWebView** (widget cliquable puis « Échec du défi »). Sur iPhone le défi s’ouvre donc dans une **feuille Safari à l’intérieur de REVEAL** : e-mail et mot de passe restent dans l’app, l’utilisateur ne bascule pas vers Safari.app. Hostname Cloudflare : `julie-lepine.github.io`.
+Supabase n’accepte **qu’un** provider. Provider actuel : **hCaptcha** (plus Turnstile). Secret uniquement dans **Authentication → Attack Protection**. Sitekey publique : `js/config/turnstile.js`.
 
-Le token revient par deep link `com.reveal.partygames://captcha?token=…` (et Realtime en secours).
+Le widget charge `js.hcaptcha.com` dans l’app : Apple le voit comme un captcha in-app, pas comme un login sur un site tiers.
 
-**Avant de tester iOS** : pousser `captcha.html` sur GitHub Pages (`https://julie-lepine.github.io/reveal/captcha.html`), puis rebuild Xcode.
+**Supabase → Authentication → Attack Protection** : provider **hCaptcha**, protection **activée**, secret = celui du site **REVEAL Party Games**. Sans ça, le captcha côté app est cosmétique.
 
-**Notes App Review (prochaine version iOS)** : *CAPTCHA uses an in-app Safari View Controller (not switching to the Safari app). There is no native Cloudflare SDK. Email and password stay in the app UI.*
+Hostname hCaptcha à autoriser : celui de la page (`julie-lepine.github.io` tant que Capacitor / Pages l’utilisent).
 
-Supabase n’accepte **qu’un** provider captcha. On **garde Turnstile** (pas hCaptcha) : le token natif est un vrai token Turnstile, vérifié par Attack Protection.
-
-**Supabase → Authentication → Attack Protection** : provider **Cloudflare Turnstile**, protection **activée** (login, signup, invité, reset). Sans ça, le captcha côté app est cosmétique.
+**Notes App Review** : *CAPTCHA (hCaptcha) is shown inside the app. The user never leaves REVEAL to a website or Safari. Email and password stay in the app UI.*
 
 ---
 
@@ -235,14 +233,14 @@ npm run cap:open:ios
 
 Après chaque changement de code web : `npm run cap:sync` puis ▶ Run (ou *Product → Clean Build Folder*).
 
-### D. Auth (app native — Turnstile in-app)
+### D. Auth (app native — hCaptcha in-page)
 
-- [ ] 🧪 **Connexion email** : champs saisissables → « Je ne suis pas un robot » ouvre la vérif **dans l’app** → case Cloudflare → Se connecter
-- [ ] 🧪 **Inscription** email (même flux in-app)
-- [ ] 🧪 **Invité** + pseudo + code lobby (même flux in-app)
-- [ ] 🧪 **Mot de passe oublié** : saisie email → défi in-app → mail reçu
+- [ ] 🧪 **Connexion email** : champs saisissables → case hCaptcha dans le formulaire → Se connecter
+- [ ] 🧪 **Inscription** email (même flux)
+- [ ] 🧪 **Invité** + pseudo + code lobby (même flux)
+- [ ] 🧪 **Mot de passe oublié** : saisie email → hCaptcha → mail reçu
 
-> **Supabase** : Attack Protection = **Turnstile, activé**. Si le bouton n’ouvre rien : `npm run cap:sync` (plugin in-app browser) ou `captcha.html` pas encore live sur GitHub Pages.
+> **Supabase** : Attack Protection = **hCaptcha, activé**. Secret = site **REVEAL Party Games**. Pas de page tierce, pas Safari.
 
 ### E. Deep link — reset mot de passe (priorité store)
 

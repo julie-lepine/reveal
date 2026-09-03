@@ -1,2 +1,3 @@
-/** Copie en `turnstile.js` - Site Key Cloudflare Turnstile (publique, côté navigateur). */
-export const TURNSTILE_SITE_KEY = "YOUR_TURNSTILE_SITE_KEY";
+/** Copie en `turnstile.js` — sitekey hCaptcha (publique, côté navigateur). */
+export const HCAPTCHA_SITE_KEY = "YOUR_HCAPTCHA_SITE_KEY";
+export const TURNSTILE_SITE_KEY = HCAPTCHA_SITE_KEY;

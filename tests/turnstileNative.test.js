@@ -1,5 +1,5 @@
 /**
- * Turnstile : widget in-page sur le web ; WebView in-app sur iOS/Android.
+ * hCaptcha : widget in-page web + Android + iOS (Supabase Attack Protection).
  */
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
@@ -10,27 +10,27 @@ import { fileURLToPath } from "node:url";
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const read = (rel) => readFileSync(join(ROOT, rel), "utf8");
 
-describe("Turnstile web + captcha natif in-app", () => {
+describe("hCaptcha in-page (web + native)", () => {
   it("isTurnstileRequired ne court-circuite plus isNativeApp", () => {
     const src = read("js/core/turnstile.js");
-    assert.match(src, /import \{ getNativePlatform \} from "\.\/platform\.js"/);
+    assert.match(src, /HCAPTCHA_SITE_KEY/);
+    assert.match(src, /js\.hcaptcha\.com/);
     assert.doesNotMatch(src, /if \(isNativeApp\(\)\) return false;/);
+    assert.doesNotMatch(src, /challenges\.cloudflare\.com\/turnstile/);
     assert.match(src, /export function usesNativeCaptchaSheet/);
     assert.match(src, /export function usesInPageTurnstile/);
+    assert.match(src, /return isTurnstileRequired\(\);/);
   });
 
-  it("le défi iOS s’ouvre dans Safari in-app (pas WKWebView)", () => {
+  it("pas de Safari ni de page tierce pour le captcha", () => {
     const src = read("js/core/turnstile.js");
-    assert.match(src, /loadCapacitorBrowser/);
-    assert.match(src, /Browser\.open/);
-    assert.match(src, /NATIVE_CAPTCHA_PAGE_URL/);
-    assert.match(src, /getNativePlatform\(\) === "ios"/);
-    assert.match(src, /getNativePlatform\(\) !== "ios"/);
-    assert.match(src, /Je ne suis pas un robot/);
-    assert.doesNotMatch(src, /startOverlayTurnstile/);
+    assert.doesNotMatch(src, /loadCapacitorBrowser/);
+    assert.doesNotMatch(src, /Browser\.open/);
     assert.doesNotMatch(src, /openWebView/);
-    const pkg = JSON.parse(read("package.json"));
-    assert.ok(pkg.dependencies["@capacitor/browser"]);
+    assert.doesNotMatch(src, /github\.io/);
+    const cfg = read("js/config/turnstile.js");
+    assert.match(cfg, /HCAPTCHA_SITE_KEY/);
+    assert.doesNotMatch(cfg, /0x4AAAAAA/);
   });
 
   it("l’écran home monte un slot captcha si requis", () => {
@@ -39,15 +39,5 @@ describe("Turnstile web + captcha natif in-app", () => {
     assert.match(src, /isTurnstileRequired\(\) \? `<div id="signup-turnstile"/);
     assert.match(src, /isTurnstileRequired\(\) \? `<div id="guest-turnstile"/);
     assert.match(src, /isTurnstileRequired\(\) \? `<div id="guest-rejoin-turnstile"/);
-  });
-
-  it("captcha.html charge Turnstile sans modules ES (WebView Android)", () => {
-    const page = read("captcha.html");
-    assert.match(page, /challenges\.cloudflare\.com\/turnstile/);
-    assert.match(page, /mobileApp\.postMessage/);
-    assert.match(page, /com\.reveal\.partygames:\/\/captcha/);
-    assert.match(page, /realtime\/v1\/api\/broadcast/);
-    assert.doesNotMatch(page, /type="module"/);
-    assert.doesNotMatch(page, /supabase-js/);
   });
 });

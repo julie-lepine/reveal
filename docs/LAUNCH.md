@@ -202,7 +202,7 @@ Play : **demandée** 29 août 2026 — à faire **quand la fiche est live**. App
 | Symptôme | Piste |
 |----------|--------|
 | Modifs invisibles | Save → push → `?v=` dans `index.html` |
-| `no captcha_token` | Turnstile pas validé (web), ou WebView in-app native pas terminée / `captcha.html` pas live sur Pages |
+| `no captcha_token` | Turnstile pas validé (web), ou défi iOS pas terminé / `captcha.html` pas live sur `revealthepartygame.fr` |
 | Turnstile 600010 | Hostname Cloudflare, bloqueur, onglet caché. En natif : le défi doit s’ouvrir **dans l’app** (WebView dédiée), pas dans le formulaire Capacitor |
 | Invité impossible | Anonymous sign-ins Supabase |
 | Sync cassée | Realtime + RLS — [SUPABASE.md](./SUPABASE.md) |
