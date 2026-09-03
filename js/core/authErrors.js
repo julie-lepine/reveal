@@ -24,7 +24,7 @@ export function formatAuthErrorMessage(message) {
     return "Indique ton email pour te connecter.";
   }
   if (/captcha|turnstile|challenge.*failed|verification.*failed|no captcha_token/i.test(m)) {
-    return "Vérifie la case anti-robot et réessaie.";
+    return "Valide la vérification anti-robot et réessaie.";
   }
 
   return raw;

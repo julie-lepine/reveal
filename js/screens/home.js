@@ -1052,7 +1052,7 @@ export function mountHome(app) {
               })}
               ${isTurnstileRequired() ? `<div id="guest-turnstile" class="auth-turnstile-wrap"></div>` : ""}
               ${guestJoinErrorHtml("guest-error", guestJoinError)}
-              <button type="button" class="btn btn-primary btn--spaced" id="btn-guest-join"${joinDisabledAttr}>${escapeHtml(guestJoinLabel)}</button>
+              <button type="button" class="btn btn-primary btn--spaced" id="btn-guest-join"${joinDisabledAttr}${isTurnstileRequired() && !joinPendingActive ? " disabled" : ""}>${escapeHtml(guestJoinLabel)}</button>
               `
               }
             </div>

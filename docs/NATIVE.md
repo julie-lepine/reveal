@@ -22,7 +22,7 @@ Checklist launch : [LAUNCH.md](./LAUNCH.md) · Backend : [SUPABASE.md](./SUPABAS
 ## Workflow dev → native
 
 ```bash
-# Après modification du code web (js/, data/, style.css, index.html)
+# Après modification du code web (js/, data/, style.css, index.html, captcha.html)
 npm run cap:sync
 
 npm run cap:open:android   # Windows / Mac
@@ -106,14 +106,18 @@ Le code utilise `getAuthRedirectUrl()` : redirect web en navigateur, deep link e
 
 | Plateforme | Turnstile |
 |------------|-----------|
-| **Web** (GitHub Pages, navigateur) | ✅ widget + token envoyé à Supabase |
-| **App native** (Capacitor) | ❌ pas de widget (`isNativeApp()` → `isTurnstileRequired()` false) — **comme l’AAB Play en review** |
+| **Web** (GitHub Pages, navigateur) | ✅ widget in-page + token envoyé à Supabase |
+| **App native** (Capacitor) | ✅ bouton « Je ne suis pas un robot » → **WebView in-app** (`captcha.html`) → token à l’app → auth |
 
-Turnstile casse dans WKWebView iOS. On ne change **pas** de provider (hCaptcha) tant que Play n’est pas live.
+Turnstile **casse dans la WebView Capacitor du formulaire** (widget KO + champs email/mdp bloqués). On ne le monte donc **pas** dans cet écran. Le défi s’ouvre dans une **seconde WebView à l’intérieur de REVEAL** (pas Safari, pas Chrome). Hostname Cloudflare : `julie-lepine.github.io`.
 
-**Supabase → Authentication → Attack Protection** : ne **pas** changer de provider. Ne pas exiger un token sur les requêtes sans widget (sinon login natif échoue). Laisser comme quand le Z Flip se connectait.
+Supabase n’accepte **qu’un** provider captcha. On **garde Turnstile** (pas hCaptcha) : le token natif est un vrai token Turnstile, vérifié par Attack Protection.
 
-Hostnames Cloudflare (web) : `julie-lepine.github.io`, `localhost` (dev local).
+**Supabase → Authentication → Attack Protection** : provider **Cloudflare Turnstile**, protection **activée** (login, signup, invité, reset). Sans ça, le captcha côté app est cosmétique.
+
+**Avant de tester l’app native** : pousser `captcha.html` sur GitHub Pages (`https://julie-lepine.github.io/reveal/captcha.html`), puis `npm run cap:sync` (plugin `@capgo/capacitor-inappbrowser`).
+
+**Notes App Review (prochaine version iOS)** : *CAPTCHA stays in-app. A dedicated WebView shows only the Cloudflare Turnstile widget (no native SDK exists). Email and password fields remain in the app UI. The user never leaves REVEAL to Safari.*
 
 ---
 
@@ -228,14 +232,14 @@ npm run cap:open:ios
 
 Après chaque changement de code web : `npm run cap:sync` puis ▶ Run (ou *Product → Clean Build Folder*).
 
-### D. Auth (app native — sans widget Turnstile)
+### D. Auth (app native — Turnstile in-app)
 
-- [ ] 🧪 **Connexion email** + mot de passe (pas de case Cloudflare)
-- [ ] 🧪 **Inscription** email
-- [ ] 🧪 **Invité** + pseudo + code lobby
-- [ ] 🧪 **Mot de passe oublié** : saisie email → mail reçu (Resend — web OK le 25 août 2026 ; à retester sur iPhone)
+- [ ] 🧪 **Connexion email** : champs saisissables → « Je ne suis pas un robot » ouvre la vérif **dans l’app** → case Cloudflare → Se connecter
+- [ ] 🧪 **Inscription** email (même flux in-app)
+- [ ] 🧪 **Invité** + pseudo + code lobby (même flux in-app)
+- [ ] 🧪 **Mot de passe oublié** : saisie email → défi in-app → mail reçu
 
-> **Supabase** : ne pas basculer vers hCaptcha. Si login affiche « vérifie la case anti-robot », Attack Protection exige un token : remettre comme pour le test Play (Z Flip).
+> **Supabase** : Attack Protection = **Turnstile, activé**. Si le bouton n’ouvre rien : `npm run cap:sync` (plugin in-app browser) ou `captcha.html` pas encore live sur GitHub Pages.
 
 ### E. Deep link — reset mot de passe (priorité store)
 

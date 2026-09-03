@@ -61,6 +61,14 @@ export async function loadCapacitorBrowser() {
   return Browser ? { Browser } : null;
 }
 
+/** WebView in-app (pas Safari) — captcha natif. Plugin : CapgoInAppBrowser. */
+export async function loadCapacitorInAppBrowser() {
+  if (!isNativeApp()) return null;
+  const InAppBrowser =
+    nativePlugin("CapgoInAppBrowser") || nativePlugin("InAppBrowser");
+  return InAppBrowser ? { InAppBrowser } : null;
+}
+
 export async function loadCapacitorAdMob() {
   if (!isNativeApp()) return null;
   const AdMob = nativePlugin("AdMob");

@@ -2884,6 +2884,31 @@ select.field-input option{
   margin:12px 0 8px;
 }
 
+.auth-captcha-native{
+  display:flex;
+  flex-direction:column;
+  align-items:stretch;
+  gap:8px;
+  width:100%;
+}
+
+.auth-captcha-native__btn{
+  width:100%;
+}
+
+.auth-captcha-native__status{
+  margin:0;
+  text-align:center;
+}
+
+.auth-captcha-native.is-solved .auth-captcha-native__status{
+  color:#34d399;
+}
+
+.auth-turnstile-wrap--dialog{
+  margin:12px 0 8px;
+}
+
 .auth-error{
   color:#F87171;
   font-size:13px;

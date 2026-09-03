@@ -16,6 +16,8 @@ async function routeAfterAuthRedirect(result) {
 
 async function onDeepLink(url) {
   if (!url) return;
+  const { handleNativeCaptchaUrl } = await import("./turnstile.js");
+  if (handleNativeCaptchaUrl(url)) return;
   const result = await handleAuthRedirectUrl(url);
   await routeAfterAuthRedirect(result);
 }

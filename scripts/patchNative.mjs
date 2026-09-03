@@ -1,5 +1,5 @@
 /**
- * Patch projets natifs Android / iOS : AdMob, deep links auth, ATT iOS, ProGuard AGP 9+.
+ * Patch projets natifs Android / iOS : AdMob, deep links auth + captcha, ATT iOS, ProGuard AGP 9+.
  * À lancer après `npx cap add android|ios` ou `npx cap sync`.
  */
 import fs from "node:fs";
@@ -258,7 +258,22 @@ function patchAndroid() {
     console.log("Android: meta-data AdMob ajouté");
   }
 
-  if (!manifest.includes(`android:scheme="${URL_SCHEME}"`)) {
+  if (!manifest.includes(`android:host="captcha"`)) {
+    const captchaLink = `
+            <intent-filter android:autoVerify="false">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="${URL_SCHEME}" android:host="captcha" />
+            </intent-filter>`;
+    manifest = manifest.replace(
+      "</activity>",
+      `${captchaLink}\n\n        </activity>`
+    );
+    console.log("Android: deep link captcha ajouté");
+  }
+
+  if (!manifest.includes(`android:host="auth"`)) {
     const deepLink = `
             <intent-filter android:autoVerify="false">
                 <action android:name="android.intent.action.VIEW" />
