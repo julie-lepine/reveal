@@ -37,14 +37,39 @@
   <script>
     (function () {
       var FALLBACK_SITE_KEY = "0x4AAAAAADX_7XllBAkmx7Xg";
+      var SUPABASE_URL = "https://ojzxbvpdfnwagrvbhfll.supabase.co";
+      var SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9qenhidnBkZm53YWdydmJoZmxsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkyMDU2OTUsImV4cCI6MjA5NDc4MTY5NX0.kUkNxsYhnZPJ7ffelarYRL9AhJdv5mh8jEZRBl7xMyw";
+      var APP_RETURN = "com.reveal.partygames://captcha";
       var params = new URLSearchParams(window.location.search);
       var siteKey = String(params.get("sitekey") || FALLBACK_SITE_KEY).trim();
+      var sid = String(params.get("sid") || "").trim();
       var statusEl = document.getElementById("status");
       var widgetEl = document.getElementById("widget");
 
       function setStatus(text, kind) {
         statusEl.textContent = text;
         statusEl.className = "status" + (kind ? " is-" + kind : "");
+      }
+
+      function broadcastToken(token) {
+        if (!sid || !token) return;
+        try {
+          fetch(SUPABASE_URL + "/realtime/v1/api/broadcast", {
+            method: "POST",
+            headers: {
+              apikey: SUPABASE_ANON_KEY,
+              Authorization: "Bearer " + SUPABASE_ANON_KEY,
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+              messages: [{
+                topic: "captcha-handoff-" + sid,
+                event: "token",
+                payload: { token: token }
+              }]
+            })
+          }).catch(function () { /* ignore */ });
+        } catch (e) { /* ignore */ }
       }
 
       function notifyHost(token) {
@@ -59,15 +84,19 @@
             window.parent.postMessage(payload, window.location.origin);
           }
         } catch (e2) { /* ignore */ }
+        broadcastToken(token);
         window.setTimeout(function () {
           try {
             if (window.mobileApp && window.mobileApp.close) window.mobileApp.close();
           } catch (err) { /* ignore */ }
-        }, 200);
+          try {
+            window.location.href = APP_RETURN + "?token=" + encodeURIComponent(token);
+          } catch (err2) { /* ignore */ }
+        }, 250);
       }
 
       function onSolved(token) {
-        setStatus("C’est bon.", "ok");
+        setStatus("C’est bon. Retour à REVEAL…", "ok");
         notifyHost(token);
       }
 
@@ -81,6 +110,7 @@
           theme: "dark",
           size: "flexible",
           appearance: "always",
+          retry: "auto",
           language: "fr",
           callback: onSolved,
           "error-callback": function () { setStatus("Échec du défi. Réessaie.", "err"); },

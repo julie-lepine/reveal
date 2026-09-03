@@ -108,19 +108,19 @@ Le code utilise `getAuthRedirectUrl()` : redirect web en navigateur, deep link e
 |------------|-----------|
 | **Web** | ✅ widget in-page |
 | **Android** | ✅ widget in-page (même WebView Chromium que le web) |
-| **iOS** | ✅ bouton « Je ne suis pas un robot » → WebView in-app (`captcha.html`) |
+| **iOS** | ✅ bouton « Je ne suis pas un robot » → feuille Safari **in-app** (`SFSafariViewController`, pas l’app Safari) |
 
-Turnstile **casse dans le formulaire iOS** (WKWebView : widget KO + champs bloqués). Sur iPhone le défi s’ouvre dans une **seconde WebView à l’intérieur de REVEAL** (pas Safari). Si cette WebView native refuse de s’ouvrir, une feuille plein écran dans l’app prend le relais. Sur Android, le widget est **dans le formulaire**, comme sur le web.
+Turnstile **refuse WKWebView** (widget cliquable puis « Échec du défi »). Sur iPhone le défi s’ouvre donc dans une **feuille Safari à l’intérieur de REVEAL** : e-mail et mot de passe restent dans l’app, l’utilisateur ne bascule pas vers Safari.app. Hostname Cloudflare : `julie-lepine.github.io`.
 
-Le hostname Capacitor iOS est `julie-lepine.github.io` : la page captcha chargée par la WebView native est le fichier **bundlé** `www/captcha.html` (pas `…/reveal/captcha.html`, que le plugin prendrait pour un asset local inexistant).
+Le token revient par deep link `com.reveal.partygames://captcha?token=…` (et Realtime en secours).
+
+**Avant de tester iOS** : pousser `captcha.html` sur GitHub Pages (`https://julie-lepine.github.io/reveal/captcha.html`), puis rebuild Xcode.
+
+**Notes App Review (prochaine version iOS)** : *CAPTCHA uses an in-app Safari View Controller (not switching to the Safari app). There is no native Cloudflare SDK. Email and password stay in the app UI.*
 
 Supabase n’accepte **qu’un** provider captcha. On **garde Turnstile** (pas hCaptcha) : le token natif est un vrai token Turnstile, vérifié par Attack Protection.
 
 **Supabase → Authentication → Attack Protection** : provider **Cloudflare Turnstile**, protection **activée** (login, signup, invité, reset). Sans ça, le captcha côté app est cosmétique.
-
-**Avant de tester l’app native** : pousser `captcha.html` sur GitHub Pages (`https://julie-lepine.github.io/reveal/captcha.html`), puis `npm run cap:sync` (plugin `@capgo/capacitor-inappbrowser`).
-
-**Notes App Review (prochaine version iOS)** : *CAPTCHA stays in-app. A dedicated WebView shows only the Cloudflare Turnstile widget (no native SDK exists). Email and password fields remain in the app UI. The user never leaves REVEAL to Safari.*
 
 ---
 

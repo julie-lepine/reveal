@@ -19,22 +19,18 @@ describe("Turnstile web + captcha natif in-app", () => {
     assert.match(src, /export function usesInPageTurnstile/);
   });
 
-  it("le défi natif reste dans l’app (WebView iOS, pas Safari)", () => {
+  it("le défi iOS s’ouvre dans Safari in-app (pas WKWebView)", () => {
     const src = read("js/core/turnstile.js");
-    assert.match(src, /openWebView/);
-    assert.match(src, /loadCapacitorInAppBrowser/);
+    assert.match(src, /loadCapacitorBrowser/);
+    assert.match(src, /Browser\.open/);
+    assert.match(src, /NATIVE_CAPTCHA_PAGE_URL/);
     assert.match(src, /getNativePlatform\(\) === "ios"/);
     assert.match(src, /getNativePlatform\(\) !== "ios"/);
-    assert.doesNotMatch(src, /loadCapacitorBrowser/);
     assert.match(src, /Je ne suis pas un robot/);
-    assert.match(src, /captcha\.html/);
-    assert.match(src, /auth-captcha-overlay/);
-    assert.match(src, /startOverlayTurnstile/);
-    const imports = read("js/core/capacitorImports.js");
-    assert.match(imports, /CapgoInAppBrowser/);
-    assert.match(imports, /isPluginAvailable/);
+    assert.doesNotMatch(src, /startOverlayTurnstile/);
+    assert.doesNotMatch(src, /openWebView/);
     const pkg = JSON.parse(read("package.json"));
-    assert.ok(pkg.dependencies["@capgo/capacitor-inappbrowser"]);
+    assert.ok(pkg.dependencies["@capacitor/browser"]);
   });
 
   it("l’écran home monte un slot captcha si requis", () => {
@@ -49,7 +45,8 @@ describe("Turnstile web + captcha natif in-app", () => {
     const page = read("captcha.html");
     assert.match(page, /challenges\.cloudflare\.com\/turnstile/);
     assert.match(page, /mobileApp\.postMessage/);
-    assert.match(page, /parent\.postMessage/);
+    assert.match(page, /com\.reveal\.partygames:\/\/captcha/);
+    assert.match(page, /realtime\/v1\/api\/broadcast/);
     assert.doesNotMatch(page, /type="module"/);
     assert.doesNotMatch(page, /supabase-js/);
   });
