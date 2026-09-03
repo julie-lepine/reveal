@@ -132,12 +132,27 @@ async function closeNativeCaptchaView() {
 }
 
 function tokenFromWebviewMessage(event) {
-  const detail = event?.detail;
-  if (detail && typeof detail === "object") {
-    const token = String(detail.token || "").trim();
-    if (token) return token;
+  if (!event) return "";
+  if (typeof event === "string") {
+    try {
+      event = JSON.parse(event);
+    } catch {
+      return "";
+    }
   }
-  return String(event?.payload?.token || "").trim();
+  const nested =
+    event.detail && typeof event.detail === "object" ? event.detail : null;
+  const token = String(
+    event.token || nested?.token || event.rawMessage || ""
+  ).trim();
+  if (token.startsWith("{")) {
+    try {
+      return String(JSON.parse(token).token || "").trim();
+    } catch {
+      return "";
+    }
+  }
+  return token;
 }
 
 async function startNativeCaptcha(slot, container) {
@@ -224,13 +239,15 @@ async function startNativeCaptcha(slot, container) {
 
     const pageUrl = new URL(NATIVE_CAPTCHA_PAGE_URL);
     pageUrl.searchParams.set("sid", sid);
+    pageUrl.searchParams.set("sitekey", TURNSTILE_SITE_KEY);
 
     await InAppBrowser.openWebView({
       url: pageUrl.toString(),
       title: "Vérification",
-      toolbarType: "",
+      toolbarType: "compact",
       backgroundColor: "black",
       isAnimated: true,
+      persistWebViewData: true,
       activeNativeNavigationForWebview: false,
     });
 

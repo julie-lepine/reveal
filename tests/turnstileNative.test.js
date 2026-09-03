@@ -39,10 +39,11 @@ describe("Turnstile web + captcha natif in-app", () => {
     assert.match(src, /isTurnstileRequired\(\) \? `<div id="guest-rejoin-turnstile"/);
   });
 
-  it("captcha.html envoie le token à l’app in-app", () => {
+  it("captcha.html charge Turnstile sans modules ES (WebView Android)", () => {
     const page = read("captcha.html");
     assert.match(page, /challenges\.cloudflare\.com\/turnstile/);
-    assert.match(page, /mobileApp\?\.postMessage/);
-    assert.match(page, /captcha-handoff-/);
+    assert.match(page, /mobileApp\.postMessage/);
+    assert.doesNotMatch(page, /type="module"/);
+    assert.doesNotMatch(page, /supabase-js/);
   });
 });

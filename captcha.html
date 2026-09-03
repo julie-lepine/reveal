@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
-  <meta name="theme-color" content="#0D0F1E"/>
+  <meta name="theme-color" content="#0D0F1C"/>
   <title>REVEAL — Vérification</title>
   <style>
     html, body {
@@ -11,7 +11,7 @@
       min-height: 100%;
       background: #0A0F1C;
       color: #EEF1FF;
-      font-family: Inter, system-ui, sans-serif;
+      font-family: system-ui, sans-serif;
     }
     body {
       display: flex;
@@ -23,7 +23,7 @@
     }
     h1 { font-size: 1.25rem; margin: 0 0 8px; }
     p { margin: 0 0 20px; color: #A8B0C7; font-size: 0.95rem; text-align: center; line-height: 1.45; }
-    #widget { min-height: 70px; }
+    #widget { min-height: 70px; width: min(100%, 320px); }
     .status { margin-top: 16px; font-size: 0.9rem; color: #A8B0C7; text-align: center; }
     .status.is-ok { color: #34d399; }
     .status.is-err { color: #F87171; }
@@ -34,116 +34,87 @@
   <p>Coche la case pour continuer.</p>
   <div id="widget"></div>
   <p class="status" id="status">Chargement…</p>
-  <script type="module">
-    import { TURNSTILE_SITE_KEY } from "./js/config/turnstile.js";
-    import { SUPABASE_URL, SUPABASE_ANON_KEY } from "./js/config/supabase.js";
-    import { createClient } from "./js/vendor/supabase-js.js";
+  <script>
+    (function () {
+      var FALLBACK_SITE_KEY = "0x4AAAAAADX_7XllBAkmx7Xg";
+      var params = new URLSearchParams(window.location.search);
+      var siteKey = String(params.get("sitekey") || FALLBACK_SITE_KEY).trim();
+      var statusEl = document.getElementById("status");
+      var widgetEl = document.getElementById("widget");
 
-    const params = new URLSearchParams(window.location.search);
-    const sid = String(params.get("sid") || "").trim();
-    const statusEl = document.getElementById("status");
-    const widgetEl = document.getElementById("widget");
+      function setStatus(text, kind) {
+        statusEl.textContent = text;
+        statusEl.className = "status" + (kind ? " is-" + kind : "");
+      }
 
-    function setStatus(text, kind) {
-      statusEl.textContent = text;
-      statusEl.className = "status" + (kind ? " is-" + kind : "");
-    }
+      function notifyHost(token) {
+        var payload = JSON.stringify({ token: token });
+        try {
+          if (window.mobileApp && window.mobileApp.postMessage) {
+            window.mobileApp.postMessage(payload);
+          }
+        } catch (e) { /* ignore */ }
+        window.setTimeout(function () {
+          try {
+            if (window.mobileApp && window.mobileApp.close) window.mobileApp.close();
+          } catch (err) { /* ignore */ }
+        }, 200);
+      }
 
-    function loadTurnstile() {
-      return new Promise((resolve, reject) => {
-        if (window.turnstile) {
-          resolve();
+      function onSolved(token) {
+        setStatus("C’est bon.", "ok");
+        notifyHost(token);
+      }
+
+      function renderWidget() {
+        if (!window.turnstile || !window.turnstile.render) {
+          setStatus("Impossible de charger la vérification.", "err");
           return;
         }
-        const script = document.createElement("script");
-        script.src = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
-        script.async = true;
-        script.onload = () => resolve();
-        script.onerror = () => reject(new Error("script"));
-        document.head.appendChild(script);
-      });
-    }
-
-    async function sendToken(token) {
-      if (!sid) return;
-      const client = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-        auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
-      });
-      const channel = client.channel("captcha-handoff-" + sid, {
-        config: { broadcast: { ack: true } },
-      });
-      await new Promise((resolve, reject) => {
-        const t = window.setTimeout(() => reject(new Error("subscribe")), 8000);
-        channel.subscribe((status) => {
-          if (status === "SUBSCRIBED") {
-            window.clearTimeout(t);
-            resolve();
-          }
-          if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
-            window.clearTimeout(t);
-            reject(new Error(status));
-          }
-        });
-      });
-      const sent = await channel.send({
-        type: "broadcast",
-        event: "token",
-        payload: { token },
-      });
-      try {
-        await client.removeChannel(channel);
-      } catch {
-        /* ignore */
-      }
-      if (sent !== "ok") throw new Error("broadcast");
-    }
-
-    function notifyHost(token) {
-      try {
-        window.mobileApp?.postMessage?.({ detail: { token } });
-      } catch {
-        /* pas dans la WebView in-app */
-      }
-      window.setTimeout(() => {
-        try {
-          window.mobileApp?.close?.();
-        } catch {
-          /* ignore */
-        }
-      }, 150);
-    }
-
-    async function onSolved(token) {
-      setStatus("Vérification OK…");
-      try {
-        await sendToken(token);
-      } catch {
-        /* postMessage suffit dans l’app ; Realtime est un secours */
-      }
-      notifyHost(token);
-      setStatus("C’est bon.", "ok");
-    }
-
-    if (!sid) {
-      setStatus("Lien invalide. Ferme cette fenêtre et réessaie depuis l’app.", "err");
-    } else {
-      try {
-        await loadTurnstile();
         window.turnstile.render(widgetEl, {
-          sitekey: TURNSTILE_SITE_KEY,
+          sitekey: siteKey,
           theme: "dark",
           size: "flexible",
           appearance: "always",
           language: "fr",
           callback: onSolved,
-          "error-callback": () => setStatus("Échec du défi. Réessaie.", "err"),
-          "expired-callback": () => setStatus("Expiré. Recommence le défi.", "err"),
+          "error-callback": function () { setStatus("Échec du défi. Réessaie.", "err"); },
+          "expired-callback": function () { setStatus("Expiré. Recommence le défi.", "err"); }
         });
         setStatus("Coche la case ci-dessus.");
-      } catch {
-        setStatus("Impossible de charger la vérification.", "err");
       }
-    }
+
+      if (!siteKey || /YOUR_TURNSTILE/i.test(siteKey)) {
+        setStatus("Clé de vérification manquante.", "err");
+        return;
+      }
+
+      if (window.turnstile) {
+        renderWidget();
+        return;
+      }
+
+      var timedOut = false;
+      var timer = window.setTimeout(function () {
+        timedOut = true;
+        setStatus("Chargement trop long. Ferme et réessaie.", "err");
+      }, 12000);
+
+      var script = document.createElement("script");
+      script.src = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
+      script.async = true;
+      script.onload = function () {
+        if (timedOut) return;
+        window.clearTimeout(timer);
+        renderWidget();
+      };
+      script.onerror = function () {
+        if (timedOut) return;
+        window.clearTimeout(timer);
+        setStatus("Impossible de charger Cloudflare. Vérifie ta connexion.", "err");
+      };
+      document.head.appendChild(script);
+    })();
   </script>
 </body>
 </html>
