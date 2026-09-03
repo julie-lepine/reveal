@@ -106,10 +106,13 @@ Le code utilise `getAuthRedirectUrl()` : redirect web en navigateur, deep link e
 
 | Plateforme | Turnstile |
 |------------|-----------|
-| **Web** (GitHub Pages, navigateur) | ✅ widget in-page + token envoyé à Supabase |
-| **App native** (Capacitor) | ✅ bouton « Je ne suis pas un robot » → **WebView in-app** (`captcha.html`) → token à l’app → auth |
+| **Web** | ✅ widget in-page |
+| **Android** | ✅ widget in-page (même WebView Chromium que le web) |
+| **iOS** | ✅ bouton « Je ne suis pas un robot » → WebView in-app (`captcha.html`) |
 
-Turnstile **casse dans la WebView Capacitor du formulaire** (widget KO + champs email/mdp bloqués). On ne le monte donc **pas** dans cet écran. Le défi s’ouvre dans une **seconde WebView à l’intérieur de REVEAL** (pas Safari, pas Chrome). Hostname Cloudflare : `julie-lepine.github.io`.
+Turnstile **casse dans le formulaire iOS** (WKWebView : widget KO + champs bloqués). Sur iPhone le défi s’ouvre dans une **seconde WebView à l’intérieur de REVEAL** (pas Safari). Si cette WebView native refuse de s’ouvrir, une feuille plein écran dans l’app prend le relais. Sur Android, le widget est **dans le formulaire**, comme sur le web.
+
+Le hostname Capacitor iOS est `julie-lepine.github.io` : la page captcha chargée par la WebView native est le fichier **bundlé** `www/captcha.html` (pas `…/reveal/captcha.html`, que le plugin prendrait pour un asset local inexistant).
 
 Supabase n’accepte **qu’un** provider captcha. On **garde Turnstile** (pas hCaptcha) : le token natif est un vrai token Turnstile, vérifié par Attack Protection.
 

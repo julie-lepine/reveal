@@ -1,7 +1,7 @@
 import { TURNSTILE_SITE_KEY } from "../config/turnstile.js";
-import { NATIVE_CAPTCHA_PAGE_URL, APP_URL_SCHEME } from "../../data/appConfig.js";
+import { APP_URL_SCHEME } from "../../data/appConfig.js";
 import { supabase, isSupabaseConfigured } from "./supabaseClient.js";
-import { isNativeApp } from "./platform.js";
+import { getNativePlatform } from "./platform.js";
 import { loadCapacitorInAppBrowser } from "./capacitorImports.js";
 
 const SCRIPT_SRC = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
@@ -26,8 +26,9 @@ let loadPromise = null;
 let nativeChallenge = null;
 
 /**
- * Captcha requis dès qu’une site key est configurée (web + app native).
- * Web : widget in-page. Native : WebView in-app (Turnstile casse dans la WebView Capacitor du formulaire).
+ * Captcha requis dès qu’une site key est configurée.
+ * Web + Android : widget in-page (WebView Chromium).
+ * iOS : WebView in-app dédiée (Turnstile casse dans le formulaire WKWebView).
  */
 export function isTurnstileRequired() {
   if (!isSupabaseConfigured()) return false;
@@ -35,14 +36,14 @@ export function isTurnstileRequired() {
   return key.length > 0 && !/YOUR_TURNSTILE/i.test(key);
 }
 
-/** Widget Cloudflare dans la page (navigateur seulement). */
+/** Widget Cloudflare dans le formulaire (web + Android). */
 export function usesInPageTurnstile() {
-  return isTurnstileRequired() && !isNativeApp();
+  return isTurnstileRequired() && getNativePlatform() !== "ios";
 }
 
-/** Défi Turnstile dans une WebView in-app (reste dans REVEAL, pas Safari). */
+/** Défi Turnstile dans une WebView in-app — iOS seulement. */
 export function usesNativeCaptchaSheet() {
-  return isTurnstileRequired() && isNativeApp();
+  return isTurnstileRequired() && getNativePlatform() === "ios";
 }
 
 /** @deprecated Utiliser isTurnstileRequired */
@@ -53,8 +54,8 @@ function notifySlot(slot) {
   slotState[slot].onChange?.(solved);
 }
 
-function loadScript() {
-  if (!usesInPageTurnstile()) return Promise.resolve(false);
+function loadScript(force = false) {
+  if (!force && !usesInPageTurnstile()) return Promise.resolve(false);
   if (window.turnstile) return Promise.resolve(true);
   if (loadPromise) return loadPromise;
 
@@ -131,6 +132,80 @@ async function closeNativeCaptchaView() {
   }
 }
 
+/** Page captcha bundlée (www/captcha.html) — pas l’URL GitHub /reveal/… (conflit hostname Capacitor). */
+function captchaChallengeUrl(sid) {
+  const url = new URL("captcha.html", window.location.href);
+  url.searchParams.set("sid", sid);
+  url.searchParams.set("sitekey", TURNSTILE_SITE_KEY);
+  return url;
+}
+
+function captchaBundledPath(sid) {
+  const url = captchaChallengeUrl(sid);
+  return `${url.pathname}${url.search}`;
+}
+
+function removeCaptchaOverlay() {
+  document.getElementById("auth-captcha-overlay")?.remove();
+}
+
+function openCaptchaOverlay(onCancel) {
+  removeCaptchaOverlay();
+  const overlay = document.createElement("div");
+  overlay.id = "auth-captcha-overlay";
+  overlay.className = "auth-captcha-overlay";
+  overlay.setAttribute("role", "dialog");
+  overlay.setAttribute("aria-label", "Vérification anti-robot");
+  overlay.innerHTML = `
+    <div class="auth-captcha-overlay__bar">
+      <button type="button" class="btn btn-secondary auth-captcha-overlay__close">Fermer</button>
+    </div>
+    <div class="auth-captcha-overlay__body">
+      <h2 class="auth-captcha-overlay__title">Vérification anti-robot</h2>
+      <p class="hint">Coche la case pour continuer.</p>
+      <div class="auth-captcha-overlay__widget"></div>
+      <p class="hint auth-captcha-overlay__status">Chargement…</p>
+    </div>
+  `;
+  overlay.querySelector(".auth-captcha-overlay__close")?.addEventListener("click", () => {
+    onCancel?.();
+  });
+  document.body.appendChild(overlay);
+  return overlay;
+}
+
+async function startOverlayTurnstile(onSolved, onCancel) {
+  const overlay = openCaptchaOverlay(onCancel);
+  const widget = overlay.querySelector(".auth-captcha-overlay__widget");
+  const status = overlay.querySelector(".auth-captcha-overlay__status");
+  try {
+    await loadScript(true);
+    if (!widget || !window.turnstile?.render) {
+      throw new Error("TURNSTILE_UNAVAILABLE");
+    }
+    window.turnstile.render(widget, {
+      sitekey: TURNSTILE_SITE_KEY,
+      theme: "dark",
+      size: "flexible",
+      appearance: "always",
+      language: "fr",
+      callback: (token) => {
+        if (status) status.textContent = "C’est bon.";
+        onSolved?.(String(token || "").trim());
+      },
+      "error-callback": () => {
+        if (status) status.textContent = "Échec du défi. Réessaie.";
+      },
+      "expired-callback": () => {
+        if (status) status.textContent = "Expiré. Recommence le défi.";
+      },
+    });
+    if (status) status.textContent = "Coche la case ci-dessus.";
+  } catch {
+    if (status) status.textContent = "Impossible de charger la vérification.";
+  }
+}
+
 function tokenFromWebviewMessage(event) {
   if (!event) return "";
   if (typeof event === "string") {
@@ -173,8 +248,16 @@ async function startNativeCaptcha(slot, container) {
   let finishTimer = 0;
   const listenerHandles = [];
 
+  const onWindowMessage = (event) => {
+    if (event?.origin && event.origin !== window.location.origin) return;
+    const token = tokenFromWebviewMessage(event?.data);
+    if (token) nativeChallenge?.settle(token, "message");
+  };
+
   const cleanup = async () => {
     window.clearTimeout(finishTimer);
+    window.removeEventListener("message", onWindowMessage);
+    removeCaptchaOverlay();
     for (const handle of listenerHandles) {
       try {
         await handle?.remove?.();
@@ -209,47 +292,52 @@ async function startNativeCaptcha(slot, container) {
   channel.subscribe();
 
   setNativeStatus(container, { pending: true });
+  window.addEventListener("message", onWindowMessage);
 
   try {
-    const mod = await loadCapacitorInAppBrowser();
-    const InAppBrowser = mod?.InAppBrowser;
-    if (!InAppBrowser?.openWebView) {
-      await cleanup();
-      setNativeStatus(container, { error: "Impossible d’ouvrir la vérification." });
-      notifySlot(slot);
-      return { ok: false, error: "Impossible d’ouvrir la vérification anti-robot." };
+    let openedNative = false;
+    try {
+      const mod = await loadCapacitorInAppBrowser();
+      const InAppBrowser = mod?.InAppBrowser;
+      if (InAppBrowser?.openWebView) {
+        const addListener = async (eventName, fn) => {
+          if (typeof InAppBrowser.addListener !== "function") return;
+          const maybe = InAppBrowser.addListener(eventName, fn);
+          const handle = maybe && typeof maybe.then === "function" ? await maybe : maybe;
+          if (handle) listenerHandles.push(handle);
+        };
+
+        await addListener("messageFromWebview", (event) => {
+          const token = tokenFromWebviewMessage(event);
+          if (token) nativeChallenge?.settle(token, "message");
+        });
+        await addListener("closeEvent", () => {
+          window.setTimeout(() => {
+            nativeChallenge?.settle("", "closed");
+          }, 400);
+        });
+
+        await InAppBrowser.openWebView({
+          url: captchaBundledPath(sid),
+          title: "Vérification",
+          toolbarType: "compact",
+          backgroundColor: "black",
+          isAnimated: true,
+          preventDeeplink: true,
+          activeNativeNavigationForWebview: false,
+        });
+        openedNative = true;
+      }
+    } catch (openErr) {
+      console.warn("REVEAL native captcha WebView:", openErr?.message || openErr);
     }
 
-    const addListener = async (eventName, fn) => {
-      if (typeof InAppBrowser.addListener !== "function") return;
-      const maybe = InAppBrowser.addListener(eventName, fn);
-      const handle = maybe && typeof maybe.then === "function" ? await maybe : maybe;
-      if (handle) listenerHandles.push(handle);
-    };
-
-    await addListener("messageFromWebview", (event) => {
-      const token = tokenFromWebviewMessage(event);
-      if (token) nativeChallenge?.settle(token, "message");
-    });
-    await addListener("closeEvent", () => {
-      window.setTimeout(() => {
-        nativeChallenge?.settle("", "closed");
-      }, 400);
-    });
-
-    const pageUrl = new URL(NATIVE_CAPTCHA_PAGE_URL);
-    pageUrl.searchParams.set("sid", sid);
-    pageUrl.searchParams.set("sitekey", TURNSTILE_SITE_KEY);
-
-    await InAppBrowser.openWebView({
-      url: pageUrl.toString(),
-      title: "Vérification",
-      toolbarType: "compact",
-      backgroundColor: "black",
-      isAnimated: true,
-      persistWebViewData: true,
-      activeNativeNavigationForWebview: false,
-    });
+    if (!openedNative) {
+      await startOverlayTurnstile(
+        (token) => nativeChallenge?.settle(token, "overlay"),
+        () => nativeChallenge?.settle("", "closed")
+      );
+    }
 
     const timeout = new Promise((resolve) => {
       window.setTimeout(() => resolve({ token: "", reason: "timeout" }), NATIVE_CHALLENGE_TIMEOUT_MS);

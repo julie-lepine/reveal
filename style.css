@@ -2905,6 +2905,42 @@ select.field-input option{
   color:#34d399;
 }
 
+.auth-captcha-overlay{
+  position:fixed;
+  inset:0;
+  z-index:100000;
+  display:flex;
+  flex-direction:column;
+  background:#0A0F1C;
+}
+
+.auth-captcha-overlay__bar{
+  display:flex;
+  justify-content:flex-end;
+  padding:calc(10px + env(safe-area-inset-top, 0px)) 12px 8px;
+}
+
+.auth-captcha-overlay__body{
+  flex:1;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:12px;
+  padding:16px 20px calc(24px + env(safe-area-inset-bottom, 0px));
+  text-align:center;
+}
+
+.auth-captcha-overlay__title{
+  margin:0;
+  font-size:1.2rem;
+}
+
+.auth-captcha-overlay__widget{
+  min-height:70px;
+  width:min(100%, 320px);
+}
+
 .auth-turnstile-wrap--dialog{
   margin:12px 0 8px;
 }

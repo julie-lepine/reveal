@@ -61,11 +61,30 @@ export async function loadCapacitorBrowser() {
   return Browser ? { Browser } : null;
 }
 
+function nativePluginName(...names) {
+  const cap = getCapacitor();
+  const available = names.find((name) => {
+    try {
+      return cap?.isPluginAvailable?.(name) === true;
+    } catch {
+      return false;
+    }
+  });
+  if (available) return available;
+  // Ancien Capacitor sans isPluginAvailable : on tente l’enregistrement.
+  return names[0] || "";
+}
+
 /** WebView in-app (pas Safari) — captcha natif. Plugin : CapgoInAppBrowser. */
 export async function loadCapacitorInAppBrowser() {
   if (!isNativeApp()) return null;
-  const InAppBrowser =
-    nativePlugin("CapgoInAppBrowser") || nativePlugin("InAppBrowser");
+  const cap = getCapacitor();
+  const name = nativePluginName("CapgoInAppBrowser", "InAppBrowser");
+  if (!name) return null;
+  if (typeof cap?.isPluginAvailable === "function" && !cap.isPluginAvailable(name)) {
+    return null;
+  }
+  const InAppBrowser = nativePlugin(name);
   return InAppBrowser ? { InAppBrowser } : null;
 }
 

@@ -54,6 +54,11 @@
             window.mobileApp.postMessage(payload);
           }
         } catch (e) { /* ignore */ }
+        try {
+          if (window.parent && window.parent !== window) {
+            window.parent.postMessage(payload, window.location.origin);
+          }
+        } catch (e2) { /* ignore */ }
         window.setTimeout(function () {
           try {
             if (window.mobileApp && window.mobileApp.close) window.mobileApp.close();
