@@ -305,11 +305,9 @@ function personnalisationPanelHtml({ emailAccount, user, selectedEmoji }) {
             ? `<p class="hint settings-social-hint">Compte ${escapeHtml(user.provider || "social")} - le mot de passe se gère chez le fournisseur.</p>`
             : ""
       }
-      <div class="card settings-section">
-        <button type="button" class="btn btn-secondary friends-entry" data-nav="${HELP_LEGAL_SCREEN_ID}">
-          ${escapeHtml(HELP_LEGAL_LABEL)}
-        </button>
-      </div>
+      <button type="button" class="btn btn-secondary settings-party__btn" data-nav="${HELP_LEGAL_SCREEN_ID}">
+        ${escapeHtml(HELP_LEGAL_LABEL)}
+      </button>
       ${profileLogoutSectionHtml(user)}
     </div>`;
 }
