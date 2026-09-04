@@ -60,7 +60,7 @@ Ordre : **0** (contrat, ci-dessous) → **1** (code + SQL) → **2** (admin stor
 
 - [x] **Empilement** : **Signature** (6,99 €, SKU `reveal_profile`) **inclut** Sans pub. Un seul chemin pubs : `isAdFree()` vrai aussi si `profile_pack`.
 - [x] **Upgrade** : un acheteur 2,99 € paie **4,00 €** (`reveal_profile_upgrade`). Les autres paient **6,99 €** (`reveal_profile`). Les stores ne proratisent pas un achat ponctuel.
-- [x] **Compte** : inscrit + natif only ; droit lié au compte. Invité / web = pas d’achat. Ne pas re-payerwaller pseudo, 30 emojis actuels, amis, jeux, lobby 8.
+- [x] **Compte** : inscrit + natif only ; droit lié au compte. Invité / web = pas d’achat. Ne pas re-payerwaller pseudo, 24 emojis gratuits, amis, jeux, lobby 8.
 - [x] **Maître de soirée 12,99 €** : hors scope. Réserver : lobby > 8, outils de table. Mots perso qui suivent le **joueur** = Signature, pas Maître de soirée.
 - [x] **Noms affichés** : Sans pub · Signature · Maître de soirée (onglet Menu reste « Profil »). SKUs inchangés.
 - [x] **Ce que Signature débloque** (3 couches ; la fiche store ne promet que ce qui est dans le build) :

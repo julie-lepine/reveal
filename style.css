@@ -572,6 +572,10 @@ body.has-top-ad .back{
   background:rgba(245,215,110,.06);
 }
 
+.emoji-picker-signature-wrap + .hint{
+  margin-top:12px;
+}
+
 .emoji-picker-signature-wrap .emoji-picker__sig-label{
   margin:0 0 8px;
   font-weight:700;
@@ -3888,9 +3892,8 @@ button.emoji-picker-preview__avatar:active{
   position:relative;
 }
 
-.settings-section > .friends-entry{
-  margin-top:0;
-  border-color:var(--color-secondary);
+.settings-panel > .friends-entry{
+  margin:0 0 12px;
 }
 
 .friends-row{

@@ -30,15 +30,15 @@ as $$
 declare
   v_allowed_colors text[] := array['gold','rose','violet','cyan','lime','amber','coral','ice'];
   v_free_emoji text[] := array[
-    '😀','😎','🤩','🥳','😈','👻',
-    '🎭','🎮','🃏','👤','🍺','⚽',
-    '🔥','💜','⭐','🌟','🎯','🎲',
-    '🦊','🐱','🐶','🦁','🐸','🍕',
-    '🎸','🚀','💎','🌈','🎈','🕵️'
+    '😀','😎','🤩','🥳','🎭','🎮',
+    '🃏','👤','🍺','⚽','💜','⭐',
+    '🌟','🎯','🎲','🦊','🐱','🐶',
+    '🦁','🍕','🎸','🚀','🎈','🕵️'
   ];
   v_sig_emoji text[] := array[
     '👑','🦄','🐉','🦋','🌙','⚡',
-    '🥂','🏆','💫','🧿','🖤','🩷'
+    '🥂','🏆','💫','🧿','🖤','🩷',
+    '😈','👻','🔥','🐸','💎','🌈'
   ];
   v_emoji text;
   v_old_emoji text;
@@ -58,6 +58,8 @@ begin
     new.emoji := v_emoji;
   elsif coalesce(new.profile_pack, false) and v_emoji = any (v_sig_emoji) then
     new.emoji := v_emoji;
+  elsif v_old_emoji is not null and v_emoji = v_old_emoji and v_emoji = any (v_sig_emoji) then
+    new.emoji := v_old_emoji;
   else
     if v_old_emoji is not null and (
       v_old_emoji = any (v_free_emoji)

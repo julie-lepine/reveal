@@ -11,6 +11,7 @@ describe("normalizeGuestEmoji", () => {
     assert.equal(normalizeGuestEmoji(null), DEFAULT_GUEST_EMOJI);
     assert.equal(normalizeGuestEmoji(undefined), DEFAULT_GUEST_EMOJI);
     assert.equal(normalizeGuestEmoji("🦄"), DEFAULT_GUEST_EMOJI);
+    assert.equal(normalizeGuestEmoji("😈"), DEFAULT_GUEST_EMOJI);
   });
 
   it("accepts known profile emojis", () => {

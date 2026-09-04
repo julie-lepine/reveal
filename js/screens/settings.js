@@ -245,12 +245,10 @@ function personnalisationPanelHtml({ emailAccount, user, selectedEmoji }) {
   };
   return `
     <div class="settings-panel" id="settings-panel-personnalisation">
-      <div class="card settings-section">
-        <button type="button" class="btn btn-secondary friends-entry" data-nav="${FRIENDS_SCREEN_ID}" data-friends-entry="${FRIENDS_ENTRY.settingsProfile}">
-          ${escapeHtml(FRIEND_LABEL.entrySettings)}
-          <span class="friends-badge" data-friends-badge hidden aria-hidden="true"></span>
-        </button>
-      </div>
+      <button type="button" class="btn btn-secondary settings-party__btn friends-entry" data-nav="${FRIENDS_SCREEN_ID}" data-friends-entry="${FRIENDS_ENTRY.settingsProfile}">
+        ${escapeHtml(FRIEND_LABEL.entrySettings)}
+        <span class="friends-badge" data-friends-badge hidden aria-hidden="true"></span>
+      </button>
       <div class="card settings-section">
         <h2 class="settings-section__title">Pseudo</h2>
         <p class="hint settings-section__hint">Visible dans le lobby et les scores.</p>

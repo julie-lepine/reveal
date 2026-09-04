@@ -11,6 +11,7 @@ import {
   SIGNATURE_EMOJI_CHOICES,
   SIGNATURE_NAME_COLOR_IDS,
 } from "../data/signatureIdentity.js";
+import { PROFILE_EMOJI_CHOICES } from "../data/profileEmojis.js";
 import { playerNameHtml, signatureRingClass, signatureSelfPreviewHtml } from "../js/core/signatureUi.js";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -48,12 +49,20 @@ describe("FEATURE-PROFILE-03 — identité Signature", () => {
     assert.equal(resolvedNameColorHex({ signature: true, nameColor: "nope" }), null);
   });
 
-  it("emojis extra seulement avec Signature ; 30 gratuits restent libres", () => {
+  it("24 emojis gratuits ; 6 déplacés dans Signature", () => {
     assert.equal(canUseProfileEmoji("🦊", { profilePack: false }), true);
     assert.equal(canUseProfileEmoji("👑", { profilePack: false }), false);
     assert.equal(canUseProfileEmoji("👑", { profilePack: true }), true);
     assert.equal(canUseProfileEmoji("👑", { profilePack: true, isGuest: true }), false);
-    assert.equal(SIGNATURE_EMOJI_CHOICES.length, 12);
+    assert.equal(PROFILE_EMOJI_CHOICES.length, 24);
+    assert.equal(SIGNATURE_EMOJI_CHOICES.length, 18);
+    for (const emoji of ["😈", "👻", "🔥", "🐸", "💎", "🌈"]) {
+      assert.equal(PROFILE_EMOJI_CHOICES.includes(emoji), false, emoji);
+      assert.equal(SIGNATURE_EMOJI_CHOICES.includes(emoji), true, emoji);
+      assert.equal(canUseProfileEmoji(emoji, { profilePack: false }), false, emoji);
+      assert.equal(canUseProfileEmoji(emoji, { profilePack: true }), true, emoji);
+      assert.equal(canUseProfileEmoji(emoji, { profilePack: true, isGuest: true }), false, emoji);
+    }
   });
 
   it("setLocalEmoji / setLocalNameColor refusent sans pack", () => {
@@ -110,6 +119,9 @@ describe("FEATURE-PROFILE-03 — identité Signature", () => {
     assert.match(sql, /lobby_members_stamp_signature/);
     assert.match(sql, /friends_live_name_color/);
     assert.match(sql, /friends_live_signature/);
+    const split = src("supabase/feature-profile-03b-emoji-split.sql");
+    assert.match(split, /'😈','👻','🔥','🐸','💎','🌈'/);
+    assert.match(sql, /'😈','👻','🔥','🐸','💎','🌈'/);
     const profile = src("js/core/supabaseProfile.js");
     assert.match(profile, /name_color/);
     const upsert = profile.slice(profile.indexOf("export async function upsertProfile"));

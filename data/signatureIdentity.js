@@ -1,6 +1,6 @@
 /**
  * Identité Signature : palette fermée + emojis extra.
- * Les 30 emojis de profileEmojis.js restent gratuits.
+ * Les emojis de profileEmojis.js restent gratuits.
  */
 
 import { PROFILE_EMOJI_CHOICES } from "./profileEmojis.js";
@@ -34,6 +34,12 @@ export const SIGNATURE_EMOJI_CHOICES = Object.freeze([
   "🧿",
   "🖤",
   "🩷",
+  "😈",
+  "👻",
+  "🔥",
+  "🐸",
+  "💎",
+  "🌈",
 ]);
 
 export function normalizeEmojiGrapheme(emoji) {
