@@ -1,4 +1,4 @@
-# REVEAL — Lancement (web, stores, sans pub)
+# REVEAL — Lancement
 
 Prod web : **https://julie-lepine.github.io/reveal/**  
 Backend : [SUPABASE.md](./SUPABASE.md) · Native : [NATIVE.md](./NATIVE.md) · Site légal : [LEGAL_SITE_OVH.md](./LEGAL_SITE_OVH.md)
@@ -6,194 +6,47 @@ Backend : [SUPABASE.md](./SUPABASE.md) · Native : [NATIVE.md](./NATIVE.md) · S
 | | |
 |--|--|
 | Package | `com.reveal.partygames` |
-| Play | compte **individuel** `contact@revealthepartygame.fr` — test fermé OK, **prod demandée** (29 août 2026) — attente review Google |
-| App Store | **REVEAL - Party Games** — Apple ID [`6785256450`](https://apps.apple.com/app/id6785256450) — **v1.1 refusée** 2 sept 2026 (5.1.1 + 2.1 : suppression par e-mail) — **resoumettre après suppression in-app** |
+| Play | **live** ([fiche](https://play.google.com/store/apps/details?id=com.reveal.partygames)) — 3 sept 2026 — compte `contact@revealthepartygame.fr` |
+| App Store | **REVEAL - Party Games** — Apple ID [`6785256450`](https://apps.apple.com/app/id6785256450) — **live** (dernière maj acceptée) — **maj hCaptcha + URL marketing en review** (4 sept 2026) |
 | Privacy | `https://revealthepartygame.fr/privacy.html` |
 | Suppression | `https://revealthepartygame.fr/suppression-compte.html` |
 | Contact | `contact@revealthepartygame.fr` |
 
-Builds natifs : `npm run cap:sync` (Node ≥ 22) → AAB / Archive. 
+Builds : `npm run cap:sync` (Node ≥ 22) → AAB / Archive.
 
 ---
 
-**Draw It** : seul QA jeu Android restant (25 août 2026).
+## À faire
+
+1. **Apple** — maj **hCaptcha** (+ URL marketing) **en review**. L’app est déjà live (maj précédente acceptée).
+2. **Après acceptation de cette maj** — release, puis AdMob iOS → **Rechercher des mises à jour** (`app-ads.txt`). Store déjà associé ; l’URL marketing n’est que sur **cette** version.
+3. **Plus tard** — palier Profil 6,99 / Hôte 12,99. Draw It (QA Android, hors gate).
+
+- [ ] Release maj hCaptcha + AdMob iOS `app-ads.txt` (Site Web du développeur = `revealthepartygame.fr`)
+- [ ] Palier Profil / Hôte
 
 ---
 
-## Reste (ordre — 2 septembre 2026)
+## Fait
 
-1. **iOS** — **v1.1 refusée** 2 sept 2026 (Guideline **5.1.1** + **2.1** : « Supprimer mon compte » ouvrait le site / e-mail). Checklist ci-dessous. **Ne pas** répondre au fil 1.0.0 (build 4). **Ne pas** renvoyer d’AAB Android tant que Play est en review.
-2. **Play** — **prod demandée** (29 août 2026). Attente review / rollout Google. QA Sans pub déjà OK (achat 0 €, restore, pubs off, 2ᵉ téléphone). Garder l’URL `suppression-compte.html` + parcours e-mail de secours.
+**Play** live 3 sept 2026. AdMob Android lié 4 sept 2026 (recherche URL + `&gl=FR`). Test fermé, QA 11 jeux, Sans pub (0 € + 2ᵉ téléphone). Data safety + catégorie Jeu / Décontracté.
 
----
+**iOS** — v1.1 refusée 2 sept 2026 (5.1.1 + 2.1) ; suppression **in-app** puis **maj acceptée** (app live). **Nouvelle version en review** : hCaptcha + URL marketing `https://revealthepartygame.fr` (4 sept 2026). AdMob iOS associé (validation `app-ads.txt` après cette maj live). IAP `reveal_adfree`, Paid Apps Actif, RevenueCat, ATT. QA iPhone XR 31 août 2026.
 
-## iOS — suppression de compte in-app (refus 5.1.1 / 2.1)
+**Ads / légal** — `app-ads.txt` live (`pub-6332424645114129`). `ADMOB_USE_TEST_ADS = false`. Logo REVEAL déjà sur le message UMP. Privacy + suppression OVH. Amis / invitations / croisés 24 h (FEATURE-FRIENDS-04) sur web + fiches.
 
-Apple : le compte doit être **supprimé dans l’app** (confirm → effacement → retour connexion). Pas de Safari, pas d’e-mail.
-
-### Code & backend
-- [x] Bouton Paramètres → Support → **Supprimer mon compte** : confirm in-app, plus d’ouverture du site
-- [x] Edge Function `delete-account` (JWT + `auth.admin.deleteUser`) — **à déployer en prod**
-- [x] **Déployer** `delete-account` (Dashboard, JWT **on**) — 2 sept 2026
-- [x] Textes in-app (`data/legalContent.js`) : suppression immédiate depuis Paramètres
-- [x] Site OVH `suppression-compte.html` + `privacy.html` : in-app en premier, e-mail de secours — 2 sept 2026
-- [x] **ATT iOS** : `requestTrackingAuthorization` après UMP, avant bannière (`js/core/ads.js`) — 2 sept 2026
-- [ ] iPhone : cold start / reset suivi → popup Apple ATT (Autoriser / Ne pas suivre)
-- [ ] Vidéo ATT (install neuf) jointe dans App Review Information
-
-### QA (compte **jetable**, pas le compte démo Review si tu veux le garder)
-- [x] Compte test → Menu → Support → Supprimer mon compte → confirmer → plus reconnectable — 2 sept 2026 (web / GitHub)
-- [ ] iPhone (Xcode / TestFlight) : **même parcours** dans le binaire native avant Archive
-- [ ] Invité : pas de bouton supprimer (texte d’expiration seulement)
-- [ ] Annuler la confirm : compte toujours là
-
-### Resoumission App Store
-- [ ] Recréer un compte démo Review **après** QA (si le reviewer le supprime, c’est OK — le recréer)
-- [ ] Notes App Review : paragraphe ACCOUNT DELETION ci-dessous (in-app, pas d’e-mail)
-- [ ] `cap:sync` → Archive Xcode → upload → **nouvelle version** (ex. 1.1.1), IAP `reveal_adfree` joint
-- [ ] Répondre dans Resolution Center **après** le nouveau build : deletion completed in-app, Settings → Support → Supprimer mon compte
-- [ ] **Après acceptation :** release prod → lier AdMob ↔ App Store → bannières prod
-
-Ne pas uploader d’AAB Play pour ce correctif tant que la prod Google est en review.
+**Hors scope** — DUNS, diffusion INSEE, nom de société sur la fiche.
 
 ---
 
-## Stores — ouvert
+## Après acceptation de la maj hCaptcha
 
-### Play
-- [x] **12 testeurs** installés via **code d’accès** — 25 août 2026
-- [x] **14 jours** de test fermé — **accès production disponible** (lancement au choix)
-- [x] **QA Sans pub** : achat 0 € → pubs off ; Restaurer ; 2ᵉ téléphone même compte — 29 août 2026
-- [x] **Publication production demandée** (Play Console → accès production → rollout) — 29 août 2026 — **attente review Google** (pas encore live)
-- [x] 🧪 QA app Android : **11 jeux** + parcours app validés — 25 août 2026 · **Draw It** reste (hors gate lancement)
-- [x] Fiche Play : description courte / complète + nouveautés (amis, Sans pub 2,99 €) — 29 août 2026
-- [x] Contenu de l’application : pubs, UGC, financier (IAP), Data safety (amis + IAP + AdMob) — 29 août 2026
-- [x] Catégorie **Jeu → Décontracté** (Casual), pas Famille — 29 août 2026
-  *(Paramètres de la fiche Play Store, pas la fiche textes)*
+1. Release (manuel ou auto).
+2. Fiche App Store : lien **Site Web du développeur** = `revealthepartygame.fr`.
+3. AdMob → app iOS → **Rechercher des mises à jour**.
+4. URLs store sur `revealthepartygame.fr` si pas déjà.
 
-### App Store
-**v1.1 refusée** 2 sept 2026 (5.1.1 + 2.1). Le 1.0.0 (build 4) est **abandonné** — ne pas répondre à ce fil. Resoumettre **après** suppression in-app (checklist en tête).
-
-#### Fiche (déjà fait)
-- [x] Fiche **REVEAL - Party Games** + Apple ID `6785256450`
-- [x] Vérif **infos app + compte développeur** (modifs soumises) — en attente Apple — 25 août 2026
-- [x] DSA : **commerçant** + coordonnées fiche UE — 25 août 2026
-- [x] Catégorie **Casual**, retirer **Famille** (fiche 16+)
-- [x] Privacy URL = `https://revealthepartygame.fr/privacy.html`
-
-#### Ancien binaire
-- [x] Review **1.0.0** (build **4**, soumise 24 août 2026) — **refusée** 30 août 2026 (app obsolète ; 2.1 abandonné)
-- [x] Pas de *Remove from Review* : version déjà **Refusée** — on resoumet un **nouveau build** sur 1.0.0 (ou version suivante)
-
-#### Build prod (tout brancher **avant** Archive)
-- [x] Paid Apps : W-8BEN + RIB CA Atlantique Vendée → **Actif** — 29 août 2026
-- [x] Produit IAP App Store `reveal_adfree` (achat unique, 2,99 €) — créé 29 août 2026 — soumis **avec** v1.1 — 31 août 2026
-- [x] RevenueCat iOS : app Apple dans RC, credentials App Store Connect, produit dans l’offering Current (`reveal_adfree` Play **et** iOS) — 30 août 2026
-- [x] Clé publique iOS `appl_…` collée dans `data/revenueCatConfig.js` — 30 août 2026 — `npm run cap:sync` **avant** l’Archive Mac
-- [x] App Privacy Apple : User ID (amis, liste privée, pas de recherche) + Achats (Sans pub) + contenu de jeu — publié 30 août 2026
-- [ ] AdMob : app iOS déjà créée (IDs dans `data/admobConfig.js`) — test device OK — 31 août 2026 — **lier l’App Store après la fiche live** ; `ADMOB_USE_TEST_ADS = false` — 31 août 2026
-- [x] Fiche textes : description alignée Play (amis, Sans pub 2,99 €) — 30 août 2026
-- [x] 🧪 Parcours iPhone — [NATIVE.md](./NATIVE.md) § Test iPhone + Sans pub sandbox (compte Sandbox Apple) — **validé** 31 août 2026 (iPhone XR, iOS 15)
-- [x] Compte démo review + Notes App Review — App Store Connect — 31 août 2026
-- [x] `cap:sync` → Archive Xcode → upload → **soumis en review** (v1.1, build du soir) — 31 août 2026
-- [ ] **Après acceptation Apple :** release prod (manuel ou auto) + lier AdMob iOS
-
-Hors scope : DUNS, diffusion INSEE, nom de société sur la fiche. Palier Profil 6,99 / Hôte 12,99.
-
-### Native (amis) — ce build
-
-Le build prod iOS **embarque** amis / invitations / croisés 24 h (plus le 1.0.0 obsolète).
-
-- [x] Play Data safety : relations sociales / user IDs — *No public social feed*, *private friend list*, *lobby-only discovery* (pas de recherche, pas de fil) — 29 août 2026
-- [x] App Privacy Apple : **ce build prod** — User ID (amis privés, lobby only) + Achats + contenu de jeu — 30 août 2026
-
-### Site & AdMob (après pubs live)
-- [x] `suppression-compte.html` en HTTPS — 25 août 2026
-- [x] `https://revealthepartygame.fr/app-ads.txt` (`pub-6332424645114129`) — 25 août 2026
-- [x] Boutons Play / App Store sur le site légal — 25 août 2026
-- [ ] Lier AdMob ↔ Play et ↔ App Store ; logo message UMP
-
----
-
-## Sans pub (RevenueCat + stores)
-
-### Fait (Android)
-- [x] Flag serveur `profiles.ad_free` + trigger (client ne peut pas s’auto-attribuer)
-- [x] App lit le flag, coupe AdMob
-- [x] Plugin `@revenuecat/purchases-capacitor` + permission `BILLING`
-- [x] `applicationId` = `com.reveal.partygames`
-- [x] versionCode **17** / 1.0.17 · AAB 17 en **test fermé Alpha**
-- [x] Produit Play `reveal_adfree` (ponctuel)
-- [x] Cloud : API Play activée, compte `revenuecat`, JSON
-- [x] Play : user `revenuecat@…` invité + droits financiers / commandes
-- [x] RC : JSON uploadé, catalogue lu (2 checks verts)
-- [x] RC : entitlement `ad_free` + produit Play `reveal_adfree`
-- [x] Play : licence testers (Gmails, achats sandbox 0 €)
-- [x] RC : credentials Play valides — 25 août 2026
-- [x] Clé publique Android `goog_…` dans `data/revenueCatConfig.js`
-- [x] 02B code : `Purchases.configure` + `logIn` (compte, pas invité)
-- [x] 02B code : Acheter / Restaurer ; plus d’**Actualiser**
-- [x] 02B code : Edge Function `revenuecat-webhook` déployée + webhook RC — 25 août 2026
-- [x] RC Send test → 200 `ad_free: true` (Authorization **sans** `Bearer`)
-- [x] RC : Pub/Sub — **skip** (achat unique ; achats / remboursements Play OK sans ; webhook `REFUND` déjà câblé) — 29 août 2026
-- [x] Légal in-app : `data/legalContent.js` (IAP + RevenueCat + liste d’amis privée + invitations de soirée éphémères, 27 août 2026)
-- [x] Légal OVH : `privacy.html` + `mentions-legales.html` (2,99 € TTC, Google = paiement) — 25 août 2026
-- [x] Légal OVH : recopie **liste d’amis / demandes** sur `privacy.html` — 27 août 2026
-- [x] Légal OVH : recopie **invitations de soirée** sur `privacy.html` — 27 août 2026
-- [x] Légal OVH : recopie **joueurs récemment croisés 24 h** sur `privacy.html` — FEATURE-FRIENDS-04 — 27 août 2026
-- [x] QA testeur Play (après MAJ store) : achat **0 €** → pubs off ; **2ᵉ téléphone** même compte → Sans pub déjà là (AAB **24+**, pas le 17)
-
-### En cours — iOS (ce build)
-- [x] Prod Play — **demandée** 29 août 2026 (QA Sans pub OK ; critères test fermé déjà remplis) — **attente review Google**
-- [x] Paid Apps **Actif** — 29 août 2026
-- [x] Produit IAP Apple `reveal_adfree` **dans l’offering RC** (Play **et** iOS) — 30 août 2026
-- [x] Clé publique iOS `appl_…` dans `data/revenueCatConfig.js` — 30 août 2026
-- [x] 🧪 QA iPhone XR : parcours app + pubs (test puis prod) + Sans pub sandbox — 31 août 2026
-- [x] Archive + upload + **soumission review v1.1** — 31 août 2026 — **attente Apple**
-- [x] Légal OVH : préciser paiement Apple (App Store) en plus de Google, si pas déjà
-- [ ] **Après acceptation :** mettre en prod + lier AdMob iOS
-
-### Plus tard
-- [ ] Palier Profil 6,99 / Hôte 12,99
-
-### Webhook (obligatoire pour que l’achat coupe les pubs)
-
-1. Supabase → **Edge Functions** → secret `REVENUECAT_WEBHOOK_AUTH` = une longue chaîne aléatoire (pas `sk_` RevenueCat).
-2. Déployer : `npx supabase functions deploy revenuecat-webhook --no-verify-jwt`
-3. URL : `https://<projet>.supabase.co/functions/v1/revenuecat-webhook`
-4. RevenueCat → **Integrations → Webhooks** → cette URL. Authorization header = **la même** chaîne que le secret, **sans** le mot `Bearer`.
-5. Événements : purchases + refunds (lifetime = `NON_RENEWING_PURCHASE` / `INITIAL_PURCHASE`).
-6. RC **Offering** : le package doit exposer `reveal_adfree` **Play et iOS** (Current offering).
-
-Le webhook existant suffit pour iOS (même entitlement `ad_free`). Pas de nouvel AAB Android juste pour la clé iOS.
-
----
-
-## Déjà en place
-
-Auth e-mail + invité, Turnstile (widget web ; WebView in-app sur iOS/Android), Resend + SMTP, Realtime, schema lobby / game_sessions. Détail : [SUPABASE.md](./SUPABASE.md) · [NATIVE.md](./NATIVE.md) § Turnstile.
-
-Comptes Play + Apple, fiches, UMP publié, AdMob IDs, assets (`resources/`, `store-assets/`), AAB test fermé. Âge Apple **16+** (IARC Play **3** : grilles différentes, normal). App Privacy Apple (e-mail, IDs, AdMob, UGC, gameplay) publiée le 24 août 2026 — **à compléter amis** sur le build prod.
-
-Test fermé Play : codes générés, bêta device OK (Z Flip), critères prod remplis — 25 août 2026. Keystore `reveal-release.jks` hors repo.
-
-**Reset MDP** (Resend) validé et testé — 25 août 2026.  
-**Egress Supabase** : optimisations + migration faite — 25 août 2026.  
-**App Store** : v1.1 **soumise en review** 31 août 2026 (remplace 1.0.0 build 4 abandonné). QA iPhone validée 31 août 2026. **Attente Apple** — release + AdMob iOS après acceptation.  
-**Play** : test fermé OK ; QA 11 jeux + app validés — 25 août 2026. Fiche + Data safety + catégorie Jeu/Décontracté — 29 août 2026. QA Sans pub (0 € + 2ᵉ téléphone) OK. **Prod demandée** 29 août 2026 — attente review Google.  
-**Amis / invitations de soirée / Annuler / croisés 24 h** : code FEATURE-FRIENDS-04 prêt ; web [Pages](https://julie-lepine.github.io/reveal/) (`main`) après ton push. Play : fiche à jour (29 août 2026). App Store : **v1.1 en review** (31 août 2026).
-
----
-
-## Après acceptation / prod
-
-Play : **demandée** 29 août 2026 — à faire **quand la fiche est live**. App Store : **v1.1 en review** 31 août 2026 — idem **après acceptation Apple**.
-
-1. Vérifier fiche live + pubs AdMob (`ADMOB_USE_TEST_ADS = false` — voir [NATIVE.md](./NATIVE.md)).
-2. Lier les stores dans AdMob (Play **et** App Store).
-3. Coller les URLs store sur `revealthepartygame.fr`.
-
-**Update store :** code → `cap:sync` → test → bump `versionCode` / `versionName` (Play : +1 obligatoire) → AAB ou Archive → upload. Play Data safety **déjà à jour** (amis + IAP, 29 août 2026). App Privacy Apple : **avec ce build prod** (amis + IAP).
+**Update store :** code → `cap:sync` → test → bump `versionCode` / `versionName` (Play : +1) → AAB ou Archive → upload.
 
 ---
 
@@ -202,134 +55,21 @@ Play : **demandée** 29 août 2026 — à faire **quand la fiche est live**. App
 | Symptôme | Piste |
 |----------|--------|
 | Modifs invisibles | Save → push → `?v=` dans `index.html` |
-| `no captcha_token` | Turnstile pas validé (web), ou défi iOS pas terminé / `captcha.html` pas live sur `revealthepartygame.fr` |
-| Turnstile 600010 | Hostname Cloudflare, bloqueur, onglet caché. En natif : le défi doit s’ouvrir **dans l’app** (WebView dédiée), pas dans le formulaire Capacitor |
+| `no captcha_token` | hCaptcha (web + natif) / `captcha.html` pas live |
+| Captcha 600010 / widget | Site key, hostname, bloqueur. Natif : in-page hCaptcha, pas Safari |
 | Invité impossible | Anonymous sign-ins Supabase |
 | Sync cassée | Realtime + RLS — [SUPABASE.md](./SUPABASE.md) |
 | Pas de mail reset | [SUPABASE.md](./SUPABASE.md) § Emails Resend |
-| Achat iOS « indisponible » | Clé `appl_…` pas collée, ou Paid Apps pas **Actif**, ou produit absent de l’offering RC |
+| Achat iOS « indisponible » | Clé `appl_…`, Paid Apps **Actif**, produit dans l’offering RC |
+| AdMob ne trouve pas Play | Coller l’URL complète + `&gl=FR` |
+
+Webhook Sans pub déjà en place (secret `REVENUECAT_WEBHOOK_AUTH`, sans `Bearer`). Offering RC : `reveal_adfree` Play **et** iOS.
 
 ---
 
-## Soumission prod iOS — build final
+## App Review (référence)
 
-**Fait** — v1.1 soumise en review App Store — 31 août 2026 (build uploadé ce soir, IAP `reveal_adfree` joint). Référence ci-dessous si Apple redemande des infos (2.1, vidéo, etc.).
+Fil **2.1** du 1.0.0 (build 4) : **abandonné**. Compte démo : `review@revealthepartygame.fr` (enregistré, pas invité ; ne pas acheter Sans pub en review). Cette review = maj **hCaptcha**, pas une première soumission.
 
-Le fil **Guideline 2.1** du 1.0.0 (build 4) est **abandonné** (29 août 2026) : **ne pas** répondre dans Resolution Center sur ce fil.
+QA native : Xcode / TestFlight — pas GitHub Pages. 2ᵉ joueur : web + code lobby.
 
-### Compte démo (à créer dans l’app)
-
-| Champ | Valeur |
-|-------|--------|
-| E-mail | `review@revealthepartygame.fr` (ou Gmail dédié) |
-| Mot de passe | `[CHOISIR — ex. RevealReview2026!]` |
-
-Compte **enregistré** (pas invité) : hôte lobby, Paramètres, suppression compte, liste d’amis. Préciser à Apple que le mode **Invité** fonctionne sans compte. **Ne pas** acheter Sans pub avec ce compte en review (sandbox Apple à part).
-
-### Comment avoir l’app sur iPhone **sans** publication App Store
-
-**GitHub Pages ne suffit pas** pour QA native / une éventuelle vidéo Apple.
-
-| Méthode | C’est quoi | OK native ? |
-|---------|------------|-------------|
-| [julie-lepine.github.io/reveal](https://julie-lepine.github.io/reveal/) (Safari) | Version **web** | ❌ Pas ATT, pas AdMob natif, pas IAP |
-| **Xcode + câble USB** | `npm run cap:sync` → Run sur iPhone | ✅ Idéal ([NATIVE.md](./NATIVE.md)) |
-| **TestFlight** | Après upload du **nouveau** build | ✅ QA + review interne |
-
-#### Xcode (Mac + câble)
-
-1. Cloner le repo sur le Mac, `npm install`, coller `appl_…` si pas déjà, `npm run cap:sync`
-2. `npm run cap:open:ios` → signing → Run sur iPhone branché
-3. Réglages iPhone → Général → Gestion de l’appareil → faire confiance au dev
-4. Lancer depuis l’**icône** REVEAL (pas seulement Xcode)
-
-#### TestFlight (après upload du build prod)
-
-1. App Store Connect → **TestFlight** → build **nouveau** (pas le 1.0.0 (4))
-2. **Internal Testing** → ton Apple ID
-3. iPhone : app **TestFlight** → installer **REVEAL**
-
-#### Multijoueur (1 seul iPhone)
-
-- Hôte sur iPhone (app native)
-- 2ᵉ joueur : navigateur sur [julie-lepine.github.io/reveal](https://julie-lepine.github.io/reveal/) avec le **code lobby** (même Supabase prod)
-
-### Script vidéo (si Apple redemande 2.1 — 3–5 min, cold start)
-
-1. Lancement depuis l’icône REVEAL  
-2. Connexion compte démo (e-mail / mot de passe)  
-3. Créer un lobby → code visible  
-4. (Optionnel) 2ᵉ client web rejoint avec le code  
-5. Lancer une soirée → **1 jeu court** (ex. SpeedVote, Hot Take)  
-6. Popup **UMP** (consentement pub RGPD) si affichée  
-7. Popup **ATT** (« Autoriser le suivi ») — accepter **ou** refuser  
-8. Paramètres → Politique de confidentialité  
-9. Paramètres → Support → **Supprimer mon compte** : confirmer **dans l’app** (suppression réelle). Pour une vidéo, préférer un compte jetable, pas le compte démo si tu veux le garder.  
-10. (Optionnel) Mode Invité : pseudo + code lobby  
-11. (Optionnel) Profil → Sans pub : montrer le bouton 2,99 € **sans** forcer l’achat review  
-
-### Notes App Review (anglais — coller dans App Review Information)
-
-```
-Hello App Review Team,
-
-Please find below the information for REVEAL - Party Games (com.reveal.partygames), the production build (friends + Remove ads IAP). This replaces the obsolete 1.0.0 (build 4).
-
-1. DEVICES TESTED
-- iPhone [model], iOS [version] — primary App Store review device
-- Samsung Galaxy Z Flip, Android 14 — Android (same Capacitor codebase; Play production submitted)
-
-2. APP PURPOSE & AUDIENCE
-REVEAL is a multiplayer party games app for groups of friends (16+). Users create or join a private lobby via a short code, then play synchronized mini-games together in real time. Target audience: adults and older teens at casual social gatherings.
-
-3. SETUP & ACCESS INSTRUCTIONS
-- Open the app → Log in / Sign up.
-- Demo account (registered user, can host a lobby):
-  Email: [review@…]
-  Password: […]
-- Guest mode (no account): Guest → nickname → enter lobby code from host.
-- Multiplayer demo: host on iPhone; second player can join via https://julie-lepine.github.io/reveal/ with the same lobby code.
-
-4. IN-APP PURCHASE
-One-time “Remove ads” purchase, 2.99 EUR, product ID reveal_adfree (non-consumable), via RevenueCat / App Store. Restores on the same Apple ID. Please use a Sandbox Apple ID if you test the purchase; the demo account above is for gameplay, not a paid entitlement.
-
-5. EXTERNAL SERVICES
-- Supabase (auth, database, Realtime sync)
-- Google AdMob (banner ads; GDPR via Google UMP)
-- RevenueCat (IAP entitlement sync)
-- Resend (password-reset email via Supabase SMTP)
-- Google Fonts (Inter)
-Cloudflare Turnstile on website login/signup (in-page widget) and in the native iOS/Android apps via an in-app WebView (`captcha.html`) — not Safari, and not inside the login form WebView.
-
-6. REGIONAL DIFFERENCES
-No regional differences. French UI and content; consistent behavior worldwide.
-
-7. REGULATED INDUSTRY / THIRD-PARTY MATERIAL
-Not applicable. Casual party game; no licensed third-party media.
-
-USER-GENERATED CONTENT:
-Nicknames, lobby chat, custom game text in private lobbies (code required). Private friend list with lobby-only discovery (registered accounts only; no player search). Private ephemeral party invites between registered friends (tied to a living lobby; no public invite link). Recently-crossed registered players from a shared lobby, shown for 24 hours after the lobby ends (not a search, not suggestions of strangers). Mitigations: client-side word filter, host can remove players, contact@revealthepartygame.fr for abuse reports. No public social feed.
-
-ACCOUNT DELETION (Guideline 5.1.1):
-Completed in-app, no website or email required.
-Path: open the app → log in → Menu (bottom or settings) → Support tab → “Supprimer mon compte” → confirm.
-This permanently deletes the REVEAL account and associated personal data immediately.
-Guest mode does not create an account.
-The public URL https://revealthepartygame.fr/suppression-compte.html is only for users who uninstalled the app (Play Store requirement).
-You may complete deletion with a test account; Guest mode remains available without an account.
-
-PRIVACY POLICY: https://revealthepartygame.fr/privacy.html
-
-Best regards,
-Julie [Last name]
-contact@revealthepartygame.fr
-```
-
-### Points sensibles REVEAL
-
-| Sujet | Réponse |
-|-------|---------|
-| IAP iOS | **Oui** sur ce build — `reveal_adfree`, 2,99 €, unique, RevenueCat |
-| UGC | Lobbies **privées** ; liste d’amis **privée** (découverte roster lobby, pas de recherche) ; invitations de soirée **privées** (éphémères, amis inscrits) ; croisés récents **24 h** (inscrits déjà vus en salon, pas une recherche) ; filtre mots ; kick hôte ; **pas de fil public** ; pas de bouton « Signaler » in-app |
-| ATT / UMP | **Obligatoire** dans une éventuelle vidéo |
-| GitHub | Version web seulement — **ne remplace pas** la démo native |
