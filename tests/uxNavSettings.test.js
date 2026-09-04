@@ -14,7 +14,12 @@ import {
 import {
   lobbySettingsActionsForRole,
 } from "../js/core/partySettingsMenu.js";
-import { SETTINGS_TAB } from "../js/config/settingsTabs.js";
+import {
+  SETTINGS_TAB,
+  rememberSettingsReturnTab,
+  consumePendingSettingsTab,
+  resolveSettingsTab,
+} from "../js/config/settingsTabs.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, "..");
@@ -156,16 +161,26 @@ describe("UX-NAV-SETTINGS - contenu écran", () => {
 
   it("retour Amis / Aide & légal rouvre l’onglet Profil", () => {
     const nav = src("js/screens/nav.js");
+    assert.match(nav, /rememberSettingsReturnTab\(SETTINGS_TAB\.PERSONNALISATION\)/);
+    assert.match(nav, /markReturnToProfileIfFromSettings/);
     const back = nav.slice(
       nav.indexOf("function goBackFromMenuSubpage"),
       nav.indexOf("async function handleBackNavigation")
     );
-    assert.match(back, /prev === "settings"/);
-    assert.match(back, /SETTINGS_TAB\.PERSONNALISATION/);
+    assert.match(back, /params:\s*\{\s*tab:\s*SETTINGS_TAB\.PERSONNALISATION/);
+    assert.doesNotMatch(back, /prev === "settings"/);
     const handle = nav.slice(nav.indexOf("async function handleBackNavigation"));
     assert.match(handle, /getCurrentScreen\(\) === "friends"/);
     assert.match(handle, /HELP_LEGAL_SCREEN_ID/);
     assert.match(handle, /goBackFromMenuSubpage\(\)/);
+    const evening = nav.slice(
+      nav.indexOf("export function goToEveningSettings"),
+      nav.indexOf("export async function returnFromEveningProfile")
+    );
+    assert.match(evening, /settingsTabAfterProfileSubpage/);
+    const settings = src("js/screens/settings.js");
+    assert.match(settings, /consumePendingSettingsTab/);
+    assert.match(settings, /resolveSettingsTab/);
   });
 
   it("Aide & légal est une page, pas un onglet", () => {
@@ -242,5 +257,42 @@ describe("UX-NAV-SETTINGS - modules morts retirés", () => {
     const dialog = src("js/core/dialog.js");
     assert.equal(dialog.includes("showPartySettingsDialog"), false);
     assert.equal(dialog.includes("Paramètres de partie"), false);
+  });
+});
+
+describe("UX-NAV-SETTINGS - onglet de retour Profil", () => {
+  it("pending Profil gagne en lobby si aucun tab explicite", () => {
+    consumePendingSettingsTab();
+    rememberSettingsReturnTab(SETTINGS_TAB.PERSONNALISATION);
+    assert.equal(
+      resolveSettingsTab({
+        requested: undefined,
+        pending: consumePendingSettingsTab(),
+        inLobby: true,
+      }),
+      SETTINGS_TAB.PERSONNALISATION
+    );
+    assert.equal(consumePendingSettingsTab(), null);
+  });
+
+  it("params.tab Forfaits prime sur le pending Profil", () => {
+    consumePendingSettingsTab();
+    rememberSettingsReturnTab(SETTINGS_TAB.PERSONNALISATION);
+    assert.equal(
+      resolveSettingsTab({
+        requested: SETTINGS_TAB.FORFAITS,
+        pending: consumePendingSettingsTab(),
+        inLobby: true,
+      }),
+      SETTINGS_TAB.FORFAITS
+    );
+  });
+
+  it("sans pending ni params, lobby ouvre Soirée", () => {
+    consumePendingSettingsTab();
+    assert.equal(
+      resolveSettingsTab({ requested: undefined, pending: null, inLobby: true }),
+      SETTINGS_TAB.SOIREE
+    );
   });
 });

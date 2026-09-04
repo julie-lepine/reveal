@@ -1,5 +1,9 @@
-import { navigate, goBack, getCurrentScreen, getNavStack } from "../core/router.js";
-import { SETTINGS_TAB } from "../config/settingsTabs.js";
+import { navigate, goBack, getCurrentScreen } from "../core/router.js";
+import {
+  SETTINGS_TAB,
+  SETTINGS_PROFILE_SUBPAGES,
+  rememberSettingsReturnTab,
+} from "../config/settingsTabs.js";
 import {
   goToLobby,
   hasActiveLobby,
@@ -32,12 +36,26 @@ export async function goToEveningHome() {
   await returnToEveningGames({ hubOnly: true });
 }
 
+function markReturnToProfileIfFromSettings() {
+  if (getCurrentScreen() === "settings") {
+    rememberSettingsReturnTab(SETTINGS_TAB.PERSONNALISATION);
+  }
+}
+
+function settingsTabAfterProfileSubpage() {
+  if (SETTINGS_PROFILE_SUBPAGES.has(getCurrentScreen())) {
+    return SETTINGS_TAB.PERSONNALISATION;
+  }
+  return null;
+}
+
 /** Page Amis : même contrat que Menu (pas une manche). */
 export function goToFriends() {
   if (!canPlay()) {
     navigate("home", { reset: true });
     return;
   }
+  markReturnToProfileIfFromSettings();
   if (getCurrentScreen() === "friends") return;
   if (hasActiveLobby()) {
     suppressSessionRoute(120000, getCachedGameSession()?.screen ?? null);
@@ -53,6 +71,7 @@ export function goToHelpLegal() {
     navigate("home", { reset: true });
     return;
   }
+  markReturnToProfileIfFromSettings();
   if (getCurrentScreen() === HELP_LEGAL_SCREEN_ID) return;
   if (hasActiveLobby()) {
     suppressSessionRoute(120000, getCachedGameSession()?.screen ?? null);
@@ -67,6 +86,7 @@ export function goToEveningSettings({ tab } = {}) {
     navigate("home", { reset: true });
     return;
   }
+  if (!tab) tab = settingsTabAfterProfileSubpage() || undefined;
   const params = tab ? { tab } : null;
   if (getCurrentScreen() === "settings") {
     if (!params) return;
@@ -101,12 +121,7 @@ export async function returnFromEveningProfile() {
 }
 
 function goBackFromMenuSubpage() {
-  const prev = getNavStack()[getNavStack().length - 2];
-  if (prev === "settings") {
-    goBack("home", { params: { tab: SETTINGS_TAB.PERSONNALISATION } });
-    return;
-  }
-  goBack();
+  goBack("home", { params: { tab: SETTINGS_TAB.PERSONNALISATION } });
 }
 
 async function handleBackNavigation() {

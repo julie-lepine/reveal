@@ -10,7 +10,11 @@ import {
   logout,
 } from "../core/auth.js";
 import { PACK_SIGNATURE_LABEL } from "../config/premiumPacks.js";
-import { SETTINGS_TAB } from "../config/settingsTabs.js";
+import {
+  SETTINGS_TAB,
+  consumePendingSettingsTab,
+  resolveSettingsTab,
+} from "../config/settingsTabs.js";
 import { refreshAdsForEntitlement } from "../core/ads.js";
 import { adFreeSettingsCardHtml } from "../core/adFreeUi.js";
 import { profilePackSettingsCardHtml } from "../core/profilePackUi.js";
@@ -88,11 +92,11 @@ function settingsTabIndex(activeTab) {
 }
 
 function initialSettingsTab() {
-  const requested = getScreenParams()?.tab;
-  if (requested === TAB_FORFAITS) return TAB_FORFAITS;
-  if (requested === TAB_PERSONNALISATION) return TAB_PERSONNALISATION;
-  if (requested === TAB_SOIREE && hasActiveLobby()) return TAB_SOIREE;
-  return hasActiveLobby() ? TAB_SOIREE : TAB_PERSONNALISATION;
+  return resolveSettingsTab({
+    requested: getScreenParams()?.tab,
+    pending: consumePendingSettingsTab(),
+    inLobby: hasActiveLobby(),
+  });
 }
 
 function settingsTabsHtml(activeTab, inLobby) {

@@ -40,8 +40,8 @@ describe("FEATURE-ADFREE promo hub + Forfaits", () => {
     const settings = src("js/screens/settings.js");
     assert.match(settings, /function initialSettingsTab/);
     assert.match(settings, /getScreenParams\(\)\?\.tab/);
-    assert.match(settings, /requested === TAB_FORFAITS/);
-    assert.match(settings, /requested === TAB_PERSONNALISATION/);
+    assert.match(settings, /consumePendingSettingsTab/);
+    assert.match(settings, /resolveSettingsTab/);
     assert.match(settings, /let activeTab = initialSettingsTab\(\)/);
     assert.match(src("js/screens/nav.js"), /tab \? \{ tab \} : null/);
     assert.match(src("js/config/settingsTabs.js"), /FORFAITS:\s*"forfaits"/);
