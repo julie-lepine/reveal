@@ -79,6 +79,8 @@ describe("FEATURE-FRIENDS-01 Palier 6 — page Amis", () => {
     assert.match(fn, /navigate\("friends"\)/);
     assert.match(nav, /target === "friends"/);
     assert.match(nav, /goToFriends\(\)/);
+    assert.match(nav, /goBackFromMenuSubpage/);
+    assert.match(nav, /SETTINGS_TAB\.PERSONNALISATION/);
     assert.doesNotMatch(fn, /exitGameToGameSelect/);
   });
 });

@@ -8,6 +8,7 @@ import {
   resetNav,
   getCurrentScreen,
   getNavStack,
+  getScreenParams,
 } from "../js/core/router.js";
 import {
   createMountGuard,
@@ -258,5 +259,18 @@ describe("ARCH-06 Vague C0 - génération routeur", () => {
     assert.ok(getMountGenerationForTests() > genPlay);
     assert.equal(playGuard.isCurrentMount(), false);
     assert.equal(lastGuard.isCurrentMount(), true);
+  });
+
+  it("goBack({ params }) transmet le tab au Menu sous-jacent", () => {
+    registerScreen("home", () => {});
+    registerScreen("settings", () => {});
+    registerScreen("friends", () => {});
+    navigate("home", { reset: true });
+    navigate("settings");
+    navigate("friends");
+    goBack("home", { params: { tab: "personnalisation" } });
+    assert.equal(getCurrentScreen(), "settings");
+    assert.equal(getScreenParams().tab, "personnalisation");
+    assert.deepEqual(getNavStack(), ["home", "settings"]);
   });
 });

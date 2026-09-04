@@ -1,4 +1,5 @@
-import { navigate, goBack, getCurrentScreen } from "../core/router.js";
+import { navigate, goBack, getCurrentScreen, getNavStack } from "../core/router.js";
+import { SETTINGS_TAB } from "../config/settingsTabs.js";
 import {
   goToLobby,
   hasActiveLobby,
@@ -99,9 +100,25 @@ export async function returnFromEveningProfile() {
   await returnToEveningGames({ rejoinActiveGame: true });
 }
 
+function goBackFromMenuSubpage() {
+  const prev = getNavStack()[getNavStack().length - 2];
+  if (prev === "settings") {
+    goBack("home", { params: { tab: SETTINGS_TAB.PERSONNALISATION } });
+    return;
+  }
+  goBack();
+}
+
 async function handleBackNavigation() {
   if (getCurrentScreen() === "settings" && !hasActiveLobby()) {
     navigate("home", { reset: true });
+    return;
+  }
+  if (
+    getCurrentScreen() === "friends" ||
+    getCurrentScreen() === HELP_LEGAL_SCREEN_ID
+  ) {
+    goBackFromMenuSubpage();
     return;
   }
   if (getCurrentScreen() === "lobby") {

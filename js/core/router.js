@@ -144,7 +144,7 @@ export function navigate(screenId, { reset = false, params = null, navStack: for
   return true;
 }
 
-export function goBack(fallback = "home") {
+export function goBack(fallback = "home", { params } = {}) {
   if (!appEl) return;
 
   if (currentCleanup) {
@@ -156,6 +156,10 @@ export function goBack(fallback = "home") {
 
   const screenId = navStack[navStack.length - 1] || fallback;
   nestedNavigateCompleted = false;
+
+  if (params !== undefined) {
+    screenParams = params || {};
+  }
 
   if (!screens[screenId]) {
     navStack.length = 0;

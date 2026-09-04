@@ -154,6 +154,20 @@ describe("UX-NAV-SETTINGS - contenu écran", () => {
     assert.match(src("style.css"), /\.settings-link-row\{/);
   });
 
+  it("retour Amis / Aide & légal rouvre l’onglet Profil", () => {
+    const nav = src("js/screens/nav.js");
+    const back = nav.slice(
+      nav.indexOf("function goBackFromMenuSubpage"),
+      nav.indexOf("async function handleBackNavigation")
+    );
+    assert.match(back, /prev === "settings"/);
+    assert.match(back, /SETTINGS_TAB\.PERSONNALISATION/);
+    const handle = nav.slice(nav.indexOf("async function handleBackNavigation"));
+    assert.match(handle, /getCurrentScreen\(\) === "friends"/);
+    assert.match(handle, /HELP_LEGAL_SCREEN_ID/);
+    assert.match(handle, /goBackFromMenuSubpage\(\)/);
+  });
+
   it("Aide & légal est une page, pas un onglet", () => {
     const help = src("js/screens/helpLegal.js");
     const nav = src("js/screens/nav.js");
