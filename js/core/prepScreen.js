@@ -1,5 +1,6 @@
 import { PLAYER_TEXT_MAX_LEN, playerTextRemaining } from "../../data/playerTextLimits.js";
 import { escapeHtml } from "./ui.js";
+import { playerNameHtml } from "./signatureUi.js";
 import { getCurrentScreen } from "./router.js";
 import { isGameSyncActive, refreshGameSession } from "./gameSync.js";
 import { formatSyncErrorMessage } from "./authErrors.js";
@@ -32,7 +33,7 @@ export function playersReadySectionHtml(members, readyMap, { readyKey = (m) => m
         (m) => `
       <div class="lobby-player ${readyMap[readyKey(m)] ? "lobby-player--ready" : ""}">
         <span class="lobby-player__status">${readyMap[readyKey(m)] ? "✓" : "…"}</span>
-        <span class="lobby-player__name">${escapeHtml(m.name)}</span>
+        ${playerNameHtml(m, "lobby-player__name")}
       </div>`
       )
       .join("")}`;

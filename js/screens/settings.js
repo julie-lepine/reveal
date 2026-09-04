@@ -5,16 +5,24 @@ import {
   getUser,
   updateProfileName,
   updateProfileEmoji,
+  updateProfileNameColor,
   changeEmailPassword,
   logout,
   deleteRegisteredAccount,
 } from "../core/auth.js";
+import { PACK_SIGNATURE_LABEL } from "../config/premiumPacks.js";
 import { refreshAdsForEntitlement } from "../core/ads.js";
 import { adFreeSettingsCardHtml } from "../core/adFreeUi.js";
 import { profilePackSettingsCardHtml } from "../core/profilePackUi.js";
 import { purchaseAdFree, restoreAdFree, purchaseProfile, restoreProfile } from "../core/purchases.js";
 import { getLocalDisplayName, getLocalEmoji } from "../core/state.js";
-import { PROFILE_EMOJI_CHOICES } from "../../data/profileEmojis.js";
+import {
+  isLockedSignatureEmojiClick,
+  isProfilePack,
+  nameColorChipsHtml,
+  playerNameHtml,
+  profileEmojiPickerHtml,
+} from "../core/signatureUi.js";
 import {
   hasActiveLobby,
   getLobby,
@@ -220,6 +228,15 @@ function profileLogoutSectionHtml(user) {
 }
 
 function personnalisationPanelHtml({ emailAccount, user, selectedEmoji }) {
+  const unlocked = isProfilePack();
+  const selectedColor = user?.nameColor || null;
+  const previewPlayer = {
+    name: getLocalDisplayName(),
+    emoji: selectedEmoji,
+    color: "#60A5FA",
+    nameColor: selectedColor,
+    signature: unlocked,
+  };
   return `
     <div class="settings-panel" id="settings-panel-personnalisation">
       ${adFreeSettingsCardHtml()}
@@ -233,10 +250,13 @@ function personnalisationPanelHtml({ emailAccount, user, selectedEmoji }) {
       <div class="card settings-section">
         <h2 class="settings-section__title">Pseudo</h2>
         <p class="hint settings-section__hint">Visible dans le lobby et les scores.</p>
+        <p class="settings-name-preview">${playerNameHtml(previewPlayer, "settings-name-preview__text")}</p>
         <label class="field-label" for="settings-name">Ton pseudo</label>
         <input type="text" class="field-input" id="settings-name" maxlength="24" value="${escapeHtml(getLocalDisplayName())}" />
+        ${nameColorChipsHtml(selectedColor, { unlocked })}
         <p class="auth-error hidden" id="name-error"></p>
         <p class="settings-ok hidden" id="name-ok">Pseudo enregistré.</p>
+        <p class="settings-ok hidden" id="color-ok">Couleur enregistrée.</p>
         <button type="button" class="btn btn-primary btn--spaced" id="btn-save-name">Enregistrer le pseudo</button>
       </div>
 
@@ -247,12 +267,7 @@ function personnalisationPanelHtml({ emailAccount, user, selectedEmoji }) {
           <span class="emoji-picker-preview__avatar" id="emoji-preview">${selectedEmoji}</span>
           <span class="hint">Aperçu de ton avatar</span>
         </div>
-        <div class="emoji-picker" role="listbox" aria-label="Choisir un emoji">
-          ${PROFILE_EMOJI_CHOICES.map(
-            (e) => `
-            <button type="button" class="emoji-picker__btn ${e === selectedEmoji ? "emoji-picker__btn--active" : ""}" data-emoji="${e}" aria-label="${e}">${e}</button>`
-          ).join("")}
-        </div>
+        ${profileEmojiPickerHtml(selectedEmoji, { includeSignatureExtras: !user?.isGuest, unlocked })}
         <p class="auth-error hidden" id="emoji-error"></p>
         <p class="settings-ok hidden" id="emoji-ok">Emoji enregistré.</p>
       </div>
@@ -349,12 +364,49 @@ export function mountSettings(app) {
   const friendLock = createActionLock();
 
   function bindPersonnalisationEvents() {
+    function focusSignatureCard() {
+      const card = app.querySelector(".settings-premium");
+      card?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+
+    app.querySelectorAll(".name-color-chip").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        if (!mount.isMounted()) return;
+        if (btn.getAttribute("data-signature-lock")) {
+          focusSignatureCard();
+          return;
+        }
+        const colorId = btn.getAttribute("data-name-color");
+        const err = app.querySelector("#name-error");
+        const ok = app.querySelector("#color-ok");
+        const res = await updateProfileNameColor(colorId);
+        if (!mount.isMounted()) return;
+        if (!res.ok) {
+          if (err) {
+            err.textContent = res.error || "Impossible d'enregistrer la couleur.";
+            err.classList.remove("hidden");
+          }
+          ok?.classList.add("hidden");
+          return;
+        }
+        err?.classList.add("hidden");
+        ok?.classList.remove("hidden");
+        app.querySelectorAll(".name-color-chip").forEach((b) => {
+          b.classList.toggle("name-color-chip--active", b === btn);
+        });
+      });
+    });
+
     app.querySelectorAll(".emoji-picker__btn").forEach((btn) => {
       btn.addEventListener("click", async () => {
         if (!mount.isMounted()) return;
         const emoji = btn.getAttribute("data-emoji");
         const err = app.querySelector("#emoji-error");
         const ok = app.querySelector("#emoji-ok");
+        if (isLockedSignatureEmojiClick(emoji, getUser())) {
+          focusSignatureCard();
+          return;
+        }
         const res = await updateProfileEmoji(emoji);
         if (!mount.isMounted()) return;
         if (!res.ok) {
@@ -477,13 +529,13 @@ export function mountSettings(app) {
       swapActivePanel();
       if (res?.cancelled) return;
       await showAppAlert(res?.message || "Action terminée.", {
-        title: "Profil",
+        title: PACK_SIGNATURE_LABEL,
         icon: res?.ok && res?.profilePack ? "✨" : "📢",
       });
     } catch (e) {
       if (!mount.isMounted()) return;
       await showAppAlert(e?.message || "Impossible de finaliser l’achat.", {
-        title: "Profil",
+        title: PACK_SIGNATURE_LABEL,
         icon: "⚠️",
       });
     }

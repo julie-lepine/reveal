@@ -1,4 +1,5 @@
 import { escapeHtml } from "./ui.js";
+import { playerAvatarHtml, playerNameHtml } from "./signatureUi.js";
 import {
   formatNameList,
   medalForCompetitionRank,
@@ -13,6 +14,8 @@ export function serializeLastGameStandings(standings = []) {
     rank: Number(player.rank) || 0,
     emoji: player.emoji || "🙂",
     color: player.color || "#888",
+    nameColor: player.nameColor || null,
+    signature: Boolean(player.signature),
   }));
 }
 
@@ -44,8 +47,8 @@ export function lastGamePodiumHtml(lastGame) {
           (player) => `
         <div class="trivia-results__row ${player.rank <= 3 ? "trivia-results__row--winner" : ""} ${player.rank === 1 ? "trivia-results__row--champion" : ""}">
           <span class="trivia-results__medal">${medalForCompetitionRank(player.rank)}</span>
-          <div class="avatar avatar--sm" style="background:${player.color}">${player.emoji}</div>
-          <span class="player-name trivia-results__name">${escapeHtml(player.name)}</span>
+          ${playerAvatarHtml(player)}
+          ${playerNameHtml(player, "player-name trivia-results__name")}
           <span class="trivia-results__score">${player.score} pts</span>
         </div>`
         )

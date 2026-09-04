@@ -8,6 +8,7 @@ create table if not exists public.profiles (
   emoji text default '👤',
   ad_free boolean not null default false,
   profile_pack boolean not null default false,
+  name_color text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -34,6 +35,8 @@ create table if not exists public.lobby_members (
   display_name text not null,
   emoji text not null default '👤',
   color text not null default '#60A5FA',
+  name_color text,
+  signature boolean not null default false,
   is_host boolean not null default false,
   ready boolean not null default false,
   joined_at timestamptz not null default now(),

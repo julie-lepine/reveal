@@ -1,4 +1,4 @@
-import { getState, saveStatePatch, renameLocalPlayer, setLocalEmoji } from "./state.js";
+import { getState, saveStatePatch, renameLocalPlayer, setLocalEmoji, setLocalNameColor } from "./state.js";
 import { isSupabaseConfigured } from "./supabaseClient.js";
 import {
   signUpWithEmail as sbSignUp,
@@ -177,6 +177,23 @@ export async function updateProfileEmoji(emoji) {
       if (getState().lobby?.id) {
         await updateLobbyMemberProfileSupabase({ emoji: res.emoji });
       }
+    } catch (e) {
+      return { ok: false, error: e.message || "Erreur profil." };
+    }
+  }
+  return res;
+}
+
+export async function updateProfileNameColor(colorId) {
+  const res = setLocalNameColor(colorId);
+  if (!res.ok) return res;
+
+  if (!isSupabaseConfigured()) return res;
+
+  const userId = getSupabaseUserId();
+  if (userId) {
+    try {
+      await upsertProfile({ userId, nameColor: res.nameColor });
     } catch (e) {
       return { ok: false, error: e.message || "Erreur profil." };
     }

@@ -12,8 +12,8 @@ describe("lastGamePodium", () => {
       { name: "Bob", score: 10, rank: 2, emoji: "🐱", color: "#0f0" },
     ]);
     assert.deepEqual(out, [
-      { name: "Ada", score: 30, rank: 1, emoji: "🦊", color: "#f00" },
-      { name: "Bob", score: 10, rank: 2, emoji: "🐱", color: "#0f0" },
+      { name: "Ada", score: 30, rank: 1, emoji: "🦊", color: "#f00", nameColor: null, signature: false },
+      { name: "Bob", score: 10, rank: 2, emoji: "🐱", color: "#0f0", nameColor: null, signature: false },
     ]);
   });
 

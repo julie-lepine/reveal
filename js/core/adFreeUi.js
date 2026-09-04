@@ -1,3 +1,4 @@
+import { PACK_SIGNATURE_LABEL } from "../config/premiumPacks.js";
 import { isLoggedIn, isGuest } from "./auth.js";
 import { isAdFree, isProfilePack } from "./entitlements.js";
 import { isNativeApp } from "./platform.js";
@@ -26,7 +27,7 @@ export function adFreeSettingsCardHtml() {
     body = `
         <p class="settings-premium__ok" role="status">${
           included
-            ? "Sans pub est inclus dans Profil."
+            ? `Sans pub est inclus dans ${PACK_SIGNATURE_LABEL}.`
             : "Sans pub est actif sur ce compte."
         }</p>
         <p class="hint settings-section__hint">Plus de bannière dans l’app native, sur tous tes appareils liés à ce compte.</p>

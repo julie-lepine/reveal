@@ -1,4 +1,5 @@
 import { escapeHtml } from "../core/ui.js";
+import { playerAvatarHtml, playerNameHtml } from "../core/signatureUi.js";
 import {
   formatNameList,
   medalForCompetitionRank,
@@ -45,8 +46,8 @@ export function renderTriviaResults({
                 : ""
             }
             <span class="trivia-results__medal">${medalForCompetitionRank(player.rank)}</span>
-            <div class="avatar avatar--sm" style="background:${player.color}">${player.emoji}</div>
-            <span class="player-name trivia-results__name">${escapeHtml(player.name)}</span>
+            ${playerAvatarHtml(player)}
+            ${playerNameHtml(player, "player-name trivia-results__name")}
             <span class="trivia-results__score">${player.score} pts quiz</span>
             <span class="trivia-results__bonus">${
               player.lobbyBonus > 0

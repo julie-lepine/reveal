@@ -8,6 +8,12 @@ export function profilePackFromProfile(profile) {
   return profile?.profile_pack === true;
 }
 
+export function nameColorFromProfile(profile) {
+  if (!profilePackFromProfile(profile)) return null;
+  const id = profile?.name_color;
+  return typeof id === "string" && id.trim() ? id.trim() : null;
+}
+
 /** Sans pub lié au compte (pas à l’appareil). Invité = toujours false. Profil l’inclut. */
 export function isAdFree() {
   const user = getState().user;
@@ -26,14 +32,15 @@ export async function refreshAdFreeFromServer() {
   const userId = getState().supabaseUserId;
   const user = getState().user || {};
   if (!userId || user.isGuest) {
-    saveStatePatch({ user: { ...user, adFree: false, profilePack: false } });
+    saveStatePatch({ user: { ...user, adFree: false, profilePack: false, nameColor: null } });
     return false;
   }
   const { fetchProfile } = await import("./supabaseProfile.js");
   const profile = await fetchProfile(userId);
   const adFree = adFreeFromProfile(profile);
   const profilePack = profilePackFromProfile(profile);
-  saveStatePatch({ user: { ...getState().user, adFree, profilePack } });
+  const nameColor = nameColorFromProfile(profile);
+  saveStatePatch({ user: { ...getState().user, adFree, profilePack, nameColor } });
   return adFree || profilePack;
 }
 

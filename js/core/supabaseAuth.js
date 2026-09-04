@@ -6,7 +6,7 @@ import {
   resolveLiveDisplayName,
   resolveLiveEmoji,
 } from "./profileIdentity.js";
-import { adFreeFromProfile, profilePackFromProfile } from "./entitlements.js";
+import { adFreeFromProfile, nameColorFromProfile, profilePackFromProfile } from "./entitlements.js";
 import { formatAuthErrorMessage, isAuthRateLimitError, isAuthCaptchaError } from "./authErrors.js";
 import {
   getPasswordResetCooldownRemainingMs,
@@ -181,6 +181,7 @@ export async function syncSessionToState(session) {
         provider: null,
         adFree: false,
         profilePack: false,
+        nameColor: null,
       },
       supabaseUserId: null,
     });
@@ -245,6 +246,7 @@ export async function syncSessionToState(session) {
       provider: providerFromUser(user),
       adFree: isAnonymous ? false : adFreeFromProfile(profile),
       profilePack: isAnonymous ? false : profilePackFromProfile(profile),
+      nameColor: isAnonymous ? null : nameColorFromProfile(profile),
     },
   });
 
@@ -706,6 +708,7 @@ export async function signInAsGuest(displayName, captchaToken = null, emoji = nu
       provider: "guest",
       adFree: false,
       profilePack: false,
+      nameColor: null,
     },
   });
 

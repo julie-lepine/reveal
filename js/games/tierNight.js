@@ -38,6 +38,7 @@ import { getSupabaseUserId } from "../core/supabaseAuth.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
 import { navigate } from "../core/router.js";
 import { escapeHtml, pageShell, tierLogoHtml, bindTierLogos } from "../core/ui.js";
+import { playerAvatarHtml, playerNameHtml } from "../core/signatureUi.js";
 import { gameExitBarHtml, bindExitGame } from "../core/exitGame.js";
 import { bindNav } from "../screens/nav.js";
 
@@ -206,8 +207,8 @@ export function mountTierNight(app) {
             .map(
               (p) => `
             <div class="lobby-player ${p.done ? "lobby-player--ready" : ""}">
-              <span class="recap-card__avatar" style="background:${p.color}">${p.emoji}</span>
-              <span class="lobby-player__name">${escapeHtml(p.name)}</span>
+              ${playerAvatarHtml(p, "recap-card__avatar")}
+              ${playerNameHtml(p, "lobby-player__name")}
               <span class="tier-lobby-wait__status">${p.done ? "Terminé ✓" : "En cours…"}</span>
             </div>`
             )

@@ -38,6 +38,7 @@ import {
 import { navigate } from "../core/router.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
+import { playerNameHtml, signatureRingClass } from "../core/signatureUi.js";
 import { bindNav } from "./nav.js";
 import { showAppAlert, showAppConfirm, showEmojiPickerDialog } from "../core/dialog.js";
 import { getLobbyAutoCloseHint } from "../config/lobbyLifecycle.js";
@@ -70,11 +71,11 @@ function participantsHtml(participants, { canKick = false, hostId = null, localI
         ${p.emoji}
         ${p.ready ? '<span class="participant__check">✓</span>' : ""}`;
       const avatar = p.isLocal
-        ? `<button type="button" class="participant__avatar participant__avatar--editable" style="background:${p.color}" data-edit-emoji aria-label="Changer mon emoji" title="Changer mon emoji">
+        ? `<button type="button" class="${signatureRingClass(p, "participant__avatar participant__avatar--editable")}" style="background:${p.color}" data-edit-emoji aria-label="Changer mon emoji" title="Changer mon emoji">
         ${inner}
         <span class="participant__edit" aria-hidden="true">✎</span>
       </button>`
-        : `<div class="participant__avatar" style="background:${p.color}">
+        : `<div class="${signatureRingClass(p, "participant__avatar")}" style="background:${p.color}">
         ${inner}
       </div>`;
       const kickable = canKick && p.userId && !p.isLocal && !isHost;
@@ -85,7 +86,7 @@ function participantsHtml(participants, { canKick = false, hostId = null, localI
       return `
     <div class="participant ${p.ready ? "participant--ready" : ""}">
       ${avatar}
-      <span class="participant__name">${escapeHtml(p.name)}</span>
+      <span class="participant__name">${playerNameHtml(p, "participant__name-text")}</span>
       ${friendBit}
       ${kickBtn}
     </div>`;
@@ -348,10 +349,16 @@ export function mountLobby(app) {
   }
 
   async function openEmojiPicker() {
-    const res = await showEmojiPickerDialog(getLocalEmoji());
+    const res = await showEmojiPickerDialog(getLocalEmoji(), { includeSignatureExtras: true });
     if (!mount.isMounted()) return;
     if (!mount.isCurrentMount()) return;
-    if (!res?.ok) return;
+    if (res?.needSignature) {
+      await showAppAlert("Emojis extra : inclus dans Signature (Menu → Profil).", {
+        title: "Signature",
+        icon: "✦",
+      });
+      return;
+    }
     const saved = await updateProfileEmoji(res.emoji);
     if (!mount.isMounted()) return;
     if (!mount.isCurrentMount()) return;

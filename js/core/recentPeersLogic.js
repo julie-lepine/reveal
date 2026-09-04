@@ -14,6 +14,8 @@ export function normalizeRecentPeerRow(row) {
     name: row.display_name || row.name || "Joueur",
     emoji: row.emoji || "👤",
     lastSharedAt: row.last_shared_at || row.lastSharedAt || null,
+    nameColor: row.name_color || row.nameColor || null,
+    signature: row.signature === true,
   };
 }
 

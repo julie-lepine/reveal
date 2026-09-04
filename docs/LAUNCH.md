@@ -20,10 +20,10 @@ Builds : `npm run cap:sync` (Node ≥ 22) → AAB / Archive.
 
 1. **Apple** — maj **hCaptcha** (+ URL marketing) **en review**. L’app est déjà live (maj précédente acceptée).
 2. **Après acceptation de cette maj** — release, puis AdMob iOS → **Rechercher des mises à jour** (`app-ads.txt`). Store déjà associé ; l’URL marketing n’est que sur **cette** version.
-3. **Plus tard** — palier **Profil 6,99** (ci-dessous). Hôte 12,99 et Draw It (QA Android) hors gate.
+3. **Plus tard** — palier **Signature 6,99** (ci-dessous). Maître de soirée 12,99 et Draw It (QA Android) hors gate.
 
 - [ ] Release maj hCaptcha + AdMob iOS `app-ads.txt` (Site Web du développeur = `revealthepartygame.fr`)
-- [ ] Palier Profil 6,99 (Hôte 12,99 plus tard)
+- [ ] Palier Signature 6,99 (Maître de soirée 12,99 plus tard)
 
 ---
 
@@ -52,17 +52,18 @@ Builds : `npm run cap:sync` (Node ≥ 22) → AAB / Archive.
 
 ## Palier Profil 6,99
 
-Socle IAP déjà là (RevenueCat, webhook, flag `ad_free`, achat lié au compte). Hôte 12,99 € hors scope (pas de SKU, pas de colonne). Nouvel IAP Apple = **nouvelle version** après la maj hCaptcha en review — ne pas coller ça sur le build en file.
+Socle IAP déjà là (RevenueCat, webhook, flag `ad_free`, achat lié au compte). **Maître de soirée** 12,99 € hors scope (pas de SKU, pas de colonne). Noms affichés : Sans pub → Signature → Maître de soirée. Nouvel IAP Apple = **nouvelle version** après la maj hCaptcha en review — ne pas coller ça sur le build en file.
 
 Ordre : **0** (contrat, ci-dessous) → **1** (code + SQL) → **2** (admin stores, en parallèle du 1) → **3 → 4 → 5 → 6**.
 
 ### 0. Contrat produit — figé 4 sept 2026
 
-- [x] **Empilement** : Profil **inclut** Sans pub. Un seul chemin pubs : `isAdFree()` vrai aussi si `profile_pack`.
+- [x] **Empilement** : **Signature** (6,99 €, SKU `reveal_profile`) **inclut** Sans pub. Un seul chemin pubs : `isAdFree()` vrai aussi si `profile_pack`.
 - [x] **Upgrade** : un acheteur 2,99 € paie **4,00 €** (`reveal_profile_upgrade`). Les autres paient **6,99 €** (`reveal_profile`). Les stores ne proratisent pas un achat ponctuel.
 - [x] **Compte** : inscrit + natif only ; droit lié au compte. Invité / web = pas d’achat. Ne pas re-payerwaller pseudo, 30 emojis actuels, amis, jeux, lobby 8.
-- [x] **Hôte 12,99 €** : hors scope. Réserver mentalement : lobby > 8, outils de table. Mots perso qui suivent le **joueur** = Profil, pas Hôte.
-- [x] **Ce que Profil débloque** (3 couches ; la fiche store ne promet que ce qui est dans le build) :
+- [x] **Maître de soirée 12,99 €** : hors scope. Réserver : lobby > 8, outils de table. Mots perso qui suivent le **joueur** = Signature, pas Maître de soirée.
+- [x] **Noms affichés** : Sans pub · Signature · Maître de soirée (onglet Menu reste « Profil »). SKUs inchangés.
+- [x] **Ce que Signature débloque** (3 couches ; la fiche store ne promet que ce qui est dans le build) :
   1. **Identité visible** (1er ship métier) : couleur de pseudo (palette fermée), cadre / badge Profil en lobby, emojis extra. **Pas** d’avatar photo (UGC, plus tard).
   2. **Carnet perso** (après) : stats agrégées (parties, winrate, MVP, jeu préféré), **20** dernières soirées (date, jeux, *ton* rang/score, prénoms des amis encore amis). **Pas** un historique de salons : pas de code lobby, pas de rejoin, pas de fil. Carte Instagram ensuite.
   3. **Mots perso** (après) : paquet Draw It / thèmes Tier Night persisté sur le compte.
@@ -90,7 +91,9 @@ Admin, pas de code app. En parallèle du 1.
 | Catalogue | Identifiants alignés Play / iOS / RC |
 
 - [ ] Produit Play `reveal_profile` + `reveal_profile_upgrade`
-- [ ] Produit App Store `reveal_profile` + `reveal_profile_upgrade`
+- [ ] Produit App Store `reveal_profile` + `reveal_profile_upgrade` (minuscules, comme `reveal_adfree` — pas `Reveal_profile`)
+- [ ] Captures review App Store Connect pour **Profil** et **Profil upgrade** (une par IAP, écran d’achat) — sans ça l’IAP reste « Finaliser avant soumission », donc pas de lien iOS dans RevenueCat
+- [ ] RC : SKUs iOS sur l’offering + entitlement `profile` (Play déjà OK)
 - [ ] Entitlement RC `profile` + offering (upgrade **et** plein tarif grant `profile`)
 
 Code client 02B prêt ; l’achat échoue tant que ces produits ne sont pas dans l’offering. **iOS : nouvelle version** (ne pas coller sur la maj hCaptcha en review).
@@ -111,9 +114,9 @@ Réutiliser `purchases.js` / `revenuecat-webhook`, pas un 2ᵉ pipeline.
 
 Couche 1 d’abord (couleur, cadre, emojis extra), puis carnet, puis mots. Ne pas promettre 2/3 dans la fiche si absents du build.
 
-- [ ] Gate UI (Menu Profil + éventuellement hub)
-- [ ] Gate réelle (pas seulement un bouton grisé)
-- [ ] États : invité, inscrit sans palier, Sans pub seul, Profil, restore, refund
+- [x] Gate UI (Menu Profil + éventuellement hub)
+- [x] Gate réelle (pas seulement un bouton grisé)
+- [x] États : invité, inscrit sans palier, Sans pub seul, Profil, restore, refund
 
 ### 5. Légal + stores
 

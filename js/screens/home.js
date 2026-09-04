@@ -699,7 +699,7 @@ export function mountHome(app) {
   }
 
   async function openGuestEmojiPicker() {
-    const res = await showEmojiPickerDialog(selectedGuestEmoji);
+    const res = await showEmojiPickerDialog(selectedGuestEmoji, { includeSignatureExtras: false });
     if (!res?.ok) return;
     selectedGuestEmoji = normalizeGuestEmoji(res.emoji);
     syncGuestEmojiPreview();

@@ -1,5 +1,6 @@
 import { flushSave, scheduleSave } from "./persist.js";
 import { DEFAULT_PROFILE_EMOJI } from "../../data/profileEmojis.js";
+import { canUseProfileEmoji } from "../../data/signatureIdentity.js";
 import { trimPlayerText } from "../../data/playerTextLimits.js";
 import { getLastGameScopeKey, isLastGameInCurrentScope } from "./lobbyBoundary.js";
 import { migrateTruthMeterIdentityOnRename } from "./truthMeterIdentity.js";
@@ -42,6 +43,7 @@ const defaultUser = () => ({
   provider: null,
   adFree: false,
   profilePack: false,
+  nameColor: null,
 });
 
 const defaultLobby = () => ({
@@ -512,6 +514,15 @@ export function setLocalEmoji(emoji) {
     return { ok: false, error: "Choisis un emoji." };
   }
   const chosen = graphemes.slice(0, 2).join("");
+  const user = state.user || {};
+  if (
+    !canUseProfileEmoji(chosen, {
+      profilePack: user.profilePack === true,
+      isGuest: user.isGuest === true,
+    })
+  ) {
+    return { ok: false, error: "Cet emoji est inclus dans Signature." };
+  }
 
   state.user = { ...state.user, emoji: chosen };
 
@@ -526,6 +537,25 @@ export function setLocalEmoji(emoji) {
 
   save();
   return { ok: true, emoji: chosen };
+}
+
+export function setLocalNameColor(colorId) {
+  const user = state.user || {};
+  if (user.isGuest || user.profilePack !== true) {
+    return { ok: false, error: "La couleur de pseudo est incluse dans Signature." };
+  }
+  const id = colorId == null || colorId === "" ? null : String(colorId);
+  state.user = { ...state.user, nameColor: id };
+  if (state.lobby?.participants?.length) {
+    state.lobby = {
+      ...state.lobby,
+      participants: state.lobby.participants.map((p) =>
+        p.isLocal ? { ...p, nameColor: id, signature: true } : p
+      ),
+    };
+  }
+  save();
+  return { ok: true, nameColor: id };
 }
 
 /**

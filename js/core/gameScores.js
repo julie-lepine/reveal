@@ -1,6 +1,7 @@
 import { getSortedActivePlayers, getEveningStandingPlayers } from "./players.js";
 import { getCurrentSessionScoreMap, getState, resolveGameScoreSessionDisplay } from "./state.js";
 import { escapeHtml } from "./ui.js";
+import { playerAvatarHtml, playerNameHtml } from "./signatureUi.js";
 import {
   sortAndRankByScore,
 } from "./competitionRank.js";
@@ -39,8 +40,8 @@ function gameScoresBoxRowsHtml(players, scores) {
       return `
         <div class="game-scores-box__row">
           <span class="game-scores-box__rank">${p.rank}</span>
-          <div class="avatar avatar--sm" style="background:${p.color}">${p.emoji}</div>
-          <span class="player-name game-scores-box__name">${escapeHtml(p.name)}</span>
+          ${playerAvatarHtml(p)}
+          ${playerNameHtml(p, "player-name game-scores-box__name")}
           <span class="player-score ${p.rank === 1 && pts > 0 ? "player-score--gold" : ""}">${pts}</span>
         </div>`;
     })
@@ -71,8 +72,8 @@ function gameLeaderboardRowsHtml(players, scoreMap) {
       return `
         <div class="game-scores-box__row">
           <span class="game-scores-box__rank">${p.rank}</span>
-          <div class="avatar avatar--sm" style="background:${p.color}">${p.emoji}</div>
-          <span class="player-name game-scores-box__name">${escapeHtml(p.name)}</span>
+          ${playerAvatarHtml(p)}
+          ${playerNameHtml(p, "player-name game-scores-box__name")}
           <span class="player-score ${gold}">${pts}</span>
         </div>`;
     })

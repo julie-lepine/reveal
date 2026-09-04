@@ -143,7 +143,7 @@ describe("FEATURE-FRIENDS-01 Palier 2 — client", () => {
 
   it("listes amis / incoming normalisées, pas de snapshot figé côté SQL (profiles live)", () => {
     setMyFriends([{ user_id: "x", display_name: "Léa", emoji: "🦊" }]);
-    assert.deepEqual(getMyFriends(), [{ userId: "x", name: "Léa", emoji: "🦊" }]);
+    assert.deepEqual(getMyFriends(), [{ userId: "x", name: "Léa", emoji: "🦊", nameColor: null, signature: false }]);
     setIncomingFriendRequests([
       { id: "r1", from_user_id: "y", display_name: "Max", emoji: "🎲", created_at: "t" },
     ]);

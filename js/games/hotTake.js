@@ -34,6 +34,7 @@ import { withClickLock } from "../core/actionLock.js";
 import { createMountGuard } from "../core/mountLifecycle.js";
 import { navigate } from "../core/router.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
+import { playerAvatarHtml, playerNameHtml } from "../core/signatureUi.js";
 import { bindNav } from "../screens/nav.js";
 import { gameExitBarHtml, bindExitGame } from "../core/exitGame.js";
 import {
@@ -215,8 +216,8 @@ export function mountHotTake(app) {
           : `<span class="muted">Pas voté</span>`;
         return `
           <div class="player-row player-row--compact ${isOutsider ? "player-row--outsider" : ""}">
-            <div class="avatar avatar--sm" style="background:${p.color}">${p.emoji}</div>
-            <span class="player-name">${escapeHtml(p.name)}${isOutsider ? ` <span class="hot-take-outsider-tag">outsider</span>` : ""}</span>
+            ${playerAvatarHtml(p)}
+            ${playerNameHtml(p)}${isOutsider ? ` <span class="hot-take-outsider-tag">outsider</span>` : ""}
             ${voteHtml}
           </div>`;
       })

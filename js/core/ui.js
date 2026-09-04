@@ -1,4 +1,5 @@
 import { APP_LOGO } from "../../data/branding.js";
+import { playerAvatarHtml, playerNameHtml } from "./signatureUi.js";
 
 const EL = "di" + "v";
 
@@ -249,8 +250,8 @@ export function bindTierLogos(root) {
 export function playerRow(p, extra = "") {
   return `
     <${EL} class="player-row">
-      <${EL} class="avatar avatar--sm" style="background:${p.color}">${p.emoji}</${EL}>
-      <span class="player-name">${escapeHtml(p.name)}</span>
+      ${playerAvatarHtml(p)}
+      ${playerNameHtml(p)}
       ${extra}
     </${EL}>
   `;

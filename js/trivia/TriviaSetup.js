@@ -1,4 +1,5 @@
 import { escapeHtml } from "../core/ui.js";
+import { playerNameHtml } from "../core/signatureUi.js";
 import { rulesButtonHtml } from "../core/gameRulesUi.js";
 import { prepStartSlotHtml } from "../core/prepScreen.js";
 
@@ -77,7 +78,7 @@ export function renderTriviaSetup({
           (member) => `
         <div class="lobby-player ${readyMap[member.name] ? "lobby-player--ready" : ""}">
           <span class="lobby-player__status">${readyMap[member.name] ? "✓" : "…"}</span>
-          <span class="lobby-player__name">${escapeHtml(member.name)}</span>
+          ${playerNameHtml(member, "lobby-player__name")}
         </div>`
         )
         .join("")}

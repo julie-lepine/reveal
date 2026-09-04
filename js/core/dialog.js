@@ -9,6 +9,13 @@ import {
 } from "./turnstile.js";
 import { PROFILE_EMOJI_CHOICES } from "../../data/profileEmojis.js";
 import { getState } from "./state.js";
+import {
+  isLockedSignatureEmojiClick,
+  isProfilePack,
+  playerNameHtml,
+  profileEmojiPickerHtml,
+  signatureRingClass,
+} from "./signatureUi.js";
 
 let openDialog = null;
 
@@ -431,8 +438,8 @@ function lobbyPlayersListHtml(participants, { canKick, friendActionHtml }) {
       const friendBit = renderFriend(p);
       return `
         <div class="lobby-manage__row">
-          <span class="lobby-manage__avatar" style="background:${escapeHtml(p.color || "#60A5FA")}">${p.emoji || "👤"}</span>
-          <span class="lobby-manage__name">${escapeHtml(p.name || "Joueur")}${badge}</span>
+          <span class="${signatureRingClass(p, "lobby-manage__avatar")}" style="background:${escapeHtml(p.color || "#60A5FA")}">${p.emoji || "👤"}</span>
+          <span class="lobby-manage__name">${playerNameHtml({ ...p, name: p.name || "Joueur" }, "lobby-manage__name-text")}${badge}</span>
           <span class="lobby-manage__actions">${friendBit}${kickBtn}</span>
         </div>`;
     })
@@ -561,7 +568,7 @@ export async function showLobbyPlayersManageDialog({
  */
 export function showEmojiPickerDialog(
   current = "",
-  { title = "Choisis ton emoji", icon = "🎭" } = {}
+  { title = "Choisis ton emoji", icon = "🎭", includeSignatureExtras = true } = {}
 ) {
   return new Promise((resolve) => {
     if (openDialog) {
@@ -569,10 +576,15 @@ export function showEmojiPickerDialog(
       openDialog = null;
     }
 
-    const grid = PROFILE_EMOJI_CHOICES.map(
-      (e) =>
-        `<button type="button" class="emoji-picker__btn ${e === current ? "emoji-picker__btn--active" : ""}" data-emoji="${e}" aria-label="${e}">${e}</button>`
-    ).join("");
+    const user = getState().user || {};
+    const unlocked = isProfilePack();
+    const extras = includeSignatureExtras && !user.isGuest;
+    const grid = extras
+      ? profileEmojiPickerHtml(current, { includeSignatureExtras: true, unlocked })
+      : `<div class="emoji-picker" role="listbox" aria-label="Choisir un emoji">${PROFILE_EMOJI_CHOICES.map(
+          (e) =>
+            `<button type="button" class="emoji-picker__btn ${e === current ? "emoji-picker__btn--active" : ""}" data-emoji="${e}" aria-label="${e}">${e}</button>`
+        ).join("")}</div>`;
 
     const root = document.createElement("div");
     root.className = "app-dialog";
@@ -589,18 +601,21 @@ export function showEmojiPickerDialog(
         <p class="app-dialog__icon" aria-hidden="true">${icon}</p>
         <p class="app-dialog__title" id="app-dialog-title">${escapeHtml(title)}</p>
         <div class="app-dialog__rich">
-          <div class="emoji-picker" role="listbox" aria-label="Choisir un emoji">
-            ${grid}
-          </div>
+          ${grid}
         </div>
         <button type="button" class="btn btn-secondary app-dialog__btn" data-dialog-cancel>Annuler</button>
       </div>
     `;
 
     root.querySelectorAll("[data-emoji]").forEach((btn) => {
-      btn.addEventListener("click", () =>
-        close({ ok: true, emoji: btn.getAttribute("data-emoji") })
-      );
+      btn.addEventListener("click", () => {
+        const emoji = btn.getAttribute("data-emoji");
+        if (isLockedSignatureEmojiClick(emoji, user)) {
+          close({ ok: false, needSignature: true });
+          return;
+        }
+        close({ ok: true, emoji });
+      });
     });
     root.querySelector("[data-dialog-cancel]")?.addEventListener("click", () => close({ ok: false }));
     root.querySelector("[data-dialog-dismiss]")?.addEventListener("click", () => close({ ok: false }));

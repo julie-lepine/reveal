@@ -23,6 +23,7 @@ import { withClickLock } from "../core/actionLock.js";
 import { createMountGuard } from "../core/mountLifecycle.js";
 import { navigate } from "../core/router.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
+import { playerAvatarHtml, playerNameHtml } from "../core/signatureUi.js";
 import { bindNav } from "../screens/nav.js";
 import { gameExitBarHtml, bindExitGame } from "../core/exitGame.js";
 import {
@@ -180,8 +181,8 @@ export function mountSpeedVote(app) {
             return `
           <button type="button" class="speedvote-vote-btn ${active ? "speedvote-vote-btn--active" : ""}"
             data-vote-player="${escapeHtml(p.name)}" style="--vote-color:${p.color}">
-            <span class="speedvote-vote-btn__avatar" style="background:${p.color}">${p.emoji}</span>
-            <span class="speedvote-vote-btn__name">${escapeHtml(p.name)}${selfLabel}</span>
+            ${playerAvatarHtml(p, "speedvote-vote-btn__avatar")}
+            <span class="speedvote-vote-btn__name">${playerNameHtml(p, "speedvote-vote-btn__name-text")}${selfLabel}</span>
             ${active ? '<span class="speedvote-vote-btn__check">✓</span>' : ""}
           </button>`;
           })

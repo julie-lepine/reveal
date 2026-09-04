@@ -4,6 +4,7 @@
  * Le client n’écrit jamais `profiles.ad_free` ni `profiles.profile_pack`.
  * Après achat / restore, on relit le profil (webhook service_role).
  */
+import { PACK_SIGNATURE_LABEL } from "../config/premiumPacks.js";
 import { isNativeApp, getNativePlatform } from "./platform.js";
 import { getState } from "./state.js";
 import {
@@ -266,7 +267,7 @@ export async function purchaseProfile() {
   if (!isNativeApp()) {
     return {
       ok: false,
-      message: "L’achat Profil se fait dans l’app native, pas sur le web.",
+      message: `L’achat ${PACK_SIGNATURE_LABEL} se fait dans l’app native, pas sur le web.`,
     };
   }
   if (!isPurchasesNativeReady()) {
@@ -274,10 +275,10 @@ export async function purchaseProfile() {
   }
   const user = getState().user || {};
   if (!user.loggedIn || user.isGuest) {
-    return { ok: false, message: "Connecte-toi avec un compte pour acheter Profil." };
+    return { ok: false, message: `Connecte-toi avec un compte pour acheter ${PACK_SIGNATURE_LABEL}.` };
   }
   if (user.profilePack === true) {
-    return { ok: true, profilePack: true, message: "Profil est déjà actif sur ce compte." };
+    return { ok: true, profilePack: true, message: `${PACK_SIGNATURE_LABEL} est déjà actif sur ce compte.` };
   }
   try {
     const Purchases = await ensurePurchasesConfigured();
@@ -287,7 +288,7 @@ export async function purchaseProfile() {
     if (!pkg) {
       return {
         ok: false,
-        message: "Offre Profil introuvable. Vérifie le produit dans RevenueCat.",
+        message: `Offre ${PACK_SIGNATURE_LABEL} introuvable. Vérifie le produit dans RevenueCat.`,
       };
     }
     await Purchases.purchasePackage({ aPackage: pkg });
@@ -296,8 +297,8 @@ export async function purchaseProfile() {
       ok: true,
       profilePack,
       message: profilePack
-        ? "Profil est actif sur ce compte."
-        : "Achat enregistré. L’activation peut prendre une minute — rouvre Profil si ce n’est pas encore affiché.",
+        ? `${PACK_SIGNATURE_LABEL} est actif sur ce compte.`
+        : "Achat enregistré. L’activation peut prendre une minute — rouvre le menu si ce n’est pas encore affiché.",
     };
   } catch (e) {
     if (isUserCancelled(e)) return { ok: false, cancelled: true };
@@ -325,8 +326,8 @@ export async function restoreProfile() {
       ok: true,
       profilePack,
       message: profilePack
-        ? "Profil est de nouveau actif sur ce compte."
-        : "Aucun achat Profil trouvé pour ce compte.",
+        ? `${PACK_SIGNATURE_LABEL} est de nouveau actif sur ce compte.`
+        : `Aucun achat ${PACK_SIGNATURE_LABEL} trouvé pour ce compte.`,
     };
   } catch (e) {
     return { ok: false, message: e?.message || "Restauration impossible." };

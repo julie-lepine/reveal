@@ -1236,6 +1236,8 @@ function isMeaningfulMemberChange(payload) {
     row.display_name !== cur.name ||
     row.emoji !== cur.emoji ||
     row.color !== cur.color ||
+    (row.name_color || null) !== (cur.nameColor || null) ||
+    Boolean(row.signature) !== Boolean(cur.signature) ||
     Boolean(row.ready) !== Boolean(cur.ready) ||
     Boolean(row.is_host) !== Boolean(cur.isHost)
   );
@@ -1252,12 +1254,43 @@ function mapMember(row, currentUserId) {
     name: row.display_name,
     emoji: row.emoji,
     color: row.color,
+    nameColor: row.name_color || null,
+    signature: Boolean(row.signature),
     ready: Boolean(row.ready),
     isHost: Boolean(row.is_host),
     isLocal: row.user_id === currentUserId,
     lastSeenAt: row.last_seen_at || null,
     joinedAt: row.joined_at || null,
   };
+}
+
+function isMissingMemberColumn(error) {
+  const msg = String(error?.message || "").toLowerCase();
+  const code = String(error?.code || "");
+  return (
+    code === "42703" ||
+    ((msg.includes("name_color") || msg.includes("signature")) &&
+      (msg.includes("column") || msg.includes("schema cache")))
+  );
+}
+
+async function fetchLobbyMembers(lobbyId) {
+  const selects = [
+    "id, user_id, display_name, emoji, color, ready, is_host, joined_at, last_seen_at, name_color, signature",
+    "id, user_id, display_name, emoji, color, ready, is_host, joined_at, last_seen_at",
+  ];
+  let last = { data: null, error: new Error("lobby_members") };
+  for (const select of selects) {
+    const res = await supabase
+      .from("lobby_members")
+      .select(select)
+      .eq("lobby_id", lobbyId)
+      .order("joined_at");
+    last = res;
+    if (!res.error) return res;
+    if (!isMissingMemberColumn(res.error)) return res;
+  }
+  return last;
 }
 
 /**
@@ -1273,11 +1306,7 @@ async function fetchLobbyBundle(lobbyId, { withMessages = false, currentUserId =
       .select("id, code, status, game_id, host_id, last_activity_at")
       .eq("id", lobbyId)
       .single(),
-    supabase
-      .from("lobby_members")
-      .select("id, user_id, display_name, emoji, color, ready, is_host, joined_at, last_seen_at")
-      .eq("lobby_id", lobbyId)
-      .order("joined_at"),
+    fetchLobbyMembers(lobbyId),
   ];
   if (withMessages) {
     queries.push(

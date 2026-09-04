@@ -32,6 +32,7 @@ import { createMountGuard } from "../core/mountLifecycle.js";
 import { rulesButtonHtml } from "../core/gameRulesUi.js";
 import { navigate } from "../core/router.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
+import { playerAvatarHtml, playerNameHtml } from "../core/signatureUi.js";
 import { bindNav } from "../screens/nav.js";
 import { gameExitBarHtml, bindExitGame } from "../core/exitGame.js";
 import {
@@ -419,8 +420,8 @@ export function mountTraitre(app) {
             return `
             <button type="button" class="traitre-vote-btn ${active ? "traitre-vote-btn--active" : ""}"
               data-traitre-vote="${escapeHtml(p.name)}">
-              <span class="recap-card__avatar" style="background:${p.color}">${p.emoji}</span>
-              <span>${escapeHtml(p.name)}</span>
+              ${playerAvatarHtml(p, "recap-card__avatar")}
+              ${playerNameHtml(p)}
             </button>`;
           })
           .join("")}

@@ -75,13 +75,28 @@ import {
 } from "../core/supabaseLobbyInvites.js";
 import { fetchRecentLobbyPeers } from "../core/supabaseRecentPeers.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
+import { playerNameHtml, signatureRingClass } from "../core/signatureUi.js";
 import { bindNav } from "./nav.js";
+
+function friendRowIdentity(row) {
+  return {
+    name: row.name || "Joueur",
+    emoji: row.emoji || "👤",
+    nameColor: row.nameColor || null,
+    signature: row.signature === true,
+  };
+}
+
+function friendAvatarHtml(row) {
+  const ident = friendRowIdentity(row);
+  return `<span class="${signatureRingClass(ident, "friends-row__avatar")}" aria-hidden="true">${escapeHtml(ident.emoji)}</span>`;
+}
 
 function outgoingRowHtml(row) {
   return `
     <div class="friends-row" data-friend-to="${escapeHtml(row.toUserId)}">
-      <span class="friends-row__avatar" aria-hidden="true">${escapeHtml(row.emoji || "👤")}</span>
-      <span class="friends-row__name">${escapeHtml(row.name || "Joueur")}</span>
+      ${friendAvatarHtml(row)}
+      ${playerNameHtml(friendRowIdentity(row), "friends-row__name")}
       <div class="friends-row__actions">
         <button type="button" class="btn btn-secondary btn--compact" data-friend-cancel="${escapeHtml(row.toUserId)}">${escapeHtml(FRIEND_LABEL.cancelRequest)}</button>
       </div>
@@ -91,8 +106,8 @@ function outgoingRowHtml(row) {
 function incomingRowHtml(row) {
   return `
     <div class="friends-row" data-friend-from="${escapeHtml(row.fromUserId)}">
-      <span class="friends-row__avatar" aria-hidden="true">${escapeHtml(row.emoji || "👤")}</span>
-      <span class="friends-row__name">${escapeHtml(row.name || "Joueur")}</span>
+      ${friendAvatarHtml(row)}
+      ${playerNameHtml(friendRowIdentity(row), "friends-row__name")}
       <div class="friends-row__actions">
         <button type="button" class="btn btn-primary btn--compact" data-friend-accept="${escapeHtml(row.fromUserId)}">${escapeHtml(FRIEND_LABEL.accept)}</button>
         <button type="button" class="btn btn-secondary btn--compact" data-friend-refuse="${escapeHtml(row.fromUserId)}">${escapeHtml(FRIEND_LABEL.refuse)}</button>
@@ -103,8 +118,8 @@ function incomingRowHtml(row) {
 function incomingLobbyInviteRowHtml(row) {
   return `
     <div class="friends-row" data-lobby-invite="${escapeHtml(row.id)}">
-      <span class="friends-row__avatar" aria-hidden="true">${escapeHtml(row.emoji || "👤")}</span>
-      <span class="friends-row__name">${escapeHtml(row.name || "Joueur")}</span>
+      ${friendAvatarHtml(row)}
+      ${playerNameHtml(friendRowIdentity(row), "friends-row__name")}
       <div class="friends-row__actions">
         <button type="button" class="btn btn-primary btn--compact" data-lobby-invite-join="${escapeHtml(row.id)}">${escapeHtml(LOBBY_INVITE_LABEL.join)}</button>
         <button type="button" class="btn btn-secondary btn--compact" data-lobby-invite-refuse="${escapeHtml(row.id)}">${escapeHtml(LOBBY_INVITE_LABEL.refuse)}</button>
@@ -152,8 +167,8 @@ function recentPeerRowHtml(row, graph, { peerIds }) {
   if (action === RECENT_PEER_ACTION.omit) return "";
   return `
     <div class="friends-row" data-recent-peer="${escapeHtml(row.userId)}">
-      <span class="friends-row__avatar" aria-hidden="true">${escapeHtml(row.emoji || "👤")}</span>
-      <span class="friends-row__name">${escapeHtml(row.name || "Joueur")}</span>
+      ${friendAvatarHtml(row)}
+      ${playerNameHtml(friendRowIdentity(row), "friends-row__name")}
       <div class="friends-row__actions">
         ${recentPeerControlHtml(row.userId, action)}
       </div>
@@ -167,9 +182,9 @@ function friendRowHtml(row, inviteCtx) {
     : "";
   return `
     <div class="friends-row" data-friend-user="${escapeHtml(row.userId)}">
-      <span class="friends-row__avatar" aria-hidden="true">${escapeHtml(row.emoji || "👤")}</span>
+      ${friendAvatarHtml(row)}
       <div class="friends-row__meta">
-        <span class="friends-row__name">${escapeHtml(row.name || "Joueur")}</span>
+        ${playerNameHtml(friendRowIdentity(row), "friends-row__name")}
         ${status}
       </div>
       <div class="friends-row__actions">

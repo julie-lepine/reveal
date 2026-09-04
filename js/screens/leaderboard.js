@@ -3,6 +3,7 @@ import { getPlayerBadges } from "../core/badges.js";
 import { getSortedEveningStandingPlayers } from "../core/players.js";
 import { getCurrentScreen } from "../core/router.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
+import { playerAvatarHtml, playerNameHtml } from "../core/signatureUi.js";
 import { bindNav } from "./nav.js";
 import {
   isGameSyncActive,
@@ -53,8 +54,8 @@ export function mountLeaderboard(app) {
             const height = p.rank === 1 ? 120 : p.rank === 2 ? 90 : 70;
             return `
               <div class="podium__col ${isFirst ? "podium__col--first" : ""}">
-                <div class="avatar avatar--md" style="background:${p.color}">${p.emoji}</div>
-                <span class="podium__name">${escapeHtml(p.name)}</span>
+                ${playerAvatarHtml(p, "avatar avatar--md")}
+                ${playerNameHtml(p, "podium__name")}
                 ${p.badge ? `<span class="podium__badge hint">${escapeHtml(p.badge)}</span>` : ""}
                 <div class="podium__bar" style="height:${height}px">
                   <span class="podium__rank">${competitionRankLabel(p.rank)}</span>
@@ -71,9 +72,9 @@ export function mountLeaderboard(app) {
             (p) => `
           <div class="player-row player-row--list">
             <span class="rank ${p.rank === 1 ? "rank--gold" : ""}">${p.rank}</span>
-            <div class="avatar avatar--sm" style="background:${p.color}">${p.emoji}</div>
+            ${playerAvatarHtml(p)}
             <div class="player-row__info">
-              <span class="player-name">${escapeHtml(p.name)}</span>
+              ${playerNameHtml(p)}
               <span class="player-badge">${escapeHtml(p.badge || "")}</span>
             </div>
             <span class="player-score ${p.rank === 1 ? "player-score--gold" : ""}">${scores[p.name] || 0}</span>

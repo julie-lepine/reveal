@@ -16,6 +16,8 @@ export function getActivePlayers() {
     userId: p.userId || null,
     color: p.color,
     emoji: p.emoji,
+    nameColor: p.nameColor || null,
+    signature: Boolean(p.signature),
     isLocal: Boolean(p.isLocal),
     isHost: Boolean(p.isHost),
   }));
@@ -35,6 +37,8 @@ export function getLocalPlayer() {
     name: getLocalDisplayName(),
     color: "#60A5FA",
     emoji: getLocalEmoji(),
+    nameColor: getState().user?.nameColor || null,
+    signature: getState().user?.profilePack === true && getState().user?.isGuest !== true,
     isLocal: true,
   };
 }

@@ -88,6 +88,8 @@ export function normalizeFriendRow(row) {
     userId,
     name: row.display_name || row.name || "Joueur",
     emoji: row.emoji || "👤",
+    nameColor: row.name_color || row.nameColor || null,
+    signature: row.signature === true,
   };
 }
 
@@ -102,6 +104,8 @@ export function normalizeIncomingRequestRow(row) {
     name: row.display_name || row.name || "Joueur",
     emoji: row.emoji || "👤",
     createdAt: row.created_at || row.createdAt || null,
+    nameColor: row.name_color || row.nameColor || null,
+    signature: row.signature === true,
   };
 }
 
@@ -116,6 +120,8 @@ export function normalizeOutgoingRequestRow(row) {
     name: row.display_name || row.name || "Joueur",
     emoji: row.emoji || "👤",
     createdAt: row.created_at || row.createdAt || null,
+    nameColor: row.name_color || row.nameColor || null,
+    signature: row.signature === true,
   };
 }
 

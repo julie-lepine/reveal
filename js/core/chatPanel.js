@@ -1,8 +1,22 @@
 import { escapeHtml } from "./ui.js";
+import { getState } from "./state.js";
+import { playerNameHtml } from "./signatureUi.js";
 
 export const CHAT_MAX_LENGTH = 200;
 
-/** @param {{ from?: string, text?: string }[]} messages */
+function identityForChatMessage(m) {
+  const ps = getState().lobby?.participants || [];
+  const p = m?.userId
+    ? ps.find((x) => x.userId === m.userId)
+    : ps.find((x) => x.name === m.from);
+  return {
+    name: m?.from || "Joueur",
+    nameColor: p?.nameColor || null,
+    signature: Boolean(p?.signature),
+  };
+}
+
+/** @param {{ from?: string, text?: string, userId?: string }[]} messages */
 export function renderChatMessagesHtml(messages) {
   if (!messages?.length) {
     return `<p class="chat-empty">Aucun message pour l'instant.</p>`;
@@ -11,7 +25,7 @@ export function renderChatMessagesHtml(messages) {
     .map(
       (m) => `
       <div class="chat-msg">
-        <span class="chat-msg__from">${escapeHtml(m.from)}</span>
+        ${playerNameHtml(identityForChatMessage(m), "chat-msg__from")}
         <span class="chat-msg__text">${escapeHtml(m.text)}</span>
       </div>`
     )

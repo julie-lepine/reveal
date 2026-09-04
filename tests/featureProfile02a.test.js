@@ -62,6 +62,7 @@ describe("FEATURE-PROFILE-02A/02B — SKUs + carte Menu", () => {
   it("Sans pub : pas d’achat 2,99 si Profil (inclus)", () => {
     const ui = src("js/core/adFreeUi.js");
     assert.match(ui, /isProfilePack/);
-    assert.match(ui, /Sans pub est inclus dans Profil/);
+    assert.match(ui, /PACK_SIGNATURE_LABEL/);
+    assert.match(src("js/config/premiumPacks.js"), /Signature/);
   });
 });
