@@ -11,14 +11,15 @@ function src(rel) {
   return readFileSync(join(ROOT, rel), "utf8");
 }
 
-describe("FEATURE-ADFREE promo hub + Profil", () => {
-  it("hub : carte sous le récap, CTA vers Profil", () => {
+describe("FEATURE-ADFREE promo hub + Forfaits", () => {
+  it("hub : carte sous le récap, CTA vers Forfaits", () => {
     const gs = src("js/screens/gameSelect.js");
     const recapIdx = gs.indexOf("${eveningRecapHtml(recap)}");
     const hubIdx = gs.indexOf("${adFreeHubCardHtml()}");
     const gridIdx = gs.indexOf('gameGridSection("🎮 Jeux disponibles"');
     assert.ok(recapIdx > 0 && hubIdx > recapIdx && gridIdx > hubIdx);
-    assert.match(gs, /goToEveningSettings\(\{\s*tab:\s*"personnalisation"\s*\}\)/);
+    assert.match(gs, /SETTINGS_TAB\.FORFAITS/);
+    assert.match(gs, /goToEveningSettings\(\{\s*tab:\s*SETTINGS_TAB\.FORFAITS\s*\}\)/);
     assert.match(gs, /adFree:\s*isAdFree\(\)/);
     assert.match(src("style.css"), /\.adfree-hub-card\{/);
   });
@@ -35,12 +36,14 @@ describe("FEATURE-ADFREE promo hub + Profil", () => {
     assert.match(src("style.css"), /color-mix\(in srgb, var\(--color-primary\) 22%/);
   });
 
-  it("settings lit params.tab personnalisation au mount", () => {
+  it("settings lit params.tab forfaits au mount", () => {
     const settings = src("js/screens/settings.js");
     assert.match(settings, /function initialSettingsTab/);
     assert.match(settings, /getScreenParams\(\)\?\.tab/);
+    assert.match(settings, /requested === TAB_FORFAITS/);
     assert.match(settings, /requested === TAB_PERSONNALISATION/);
     assert.match(settings, /let activeTab = initialSettingsTab\(\)/);
     assert.match(src("js/screens/nav.js"), /tab \? \{ tab \} : null/);
+    assert.match(src("js/config/settingsTabs.js"), /FORFAITS:\s*"forfaits"/);
   });
 });

@@ -11,10 +11,11 @@ import {
   deleteRegisteredAccount,
 } from "../core/auth.js";
 import { PACK_SIGNATURE_LABEL } from "../config/premiumPacks.js";
+import { SETTINGS_TAB } from "../config/settingsTabs.js";
 import { refreshAdsForEntitlement } from "../core/ads.js";
 import { adFreeSettingsCardHtml } from "../core/adFreeUi.js";
 import { profilePackSettingsCardHtml } from "../core/profilePackUi.js";
-import { purchaseAdFree, restoreAdFree, purchaseProfile, restoreProfile } from "../core/purchases.js";
+import { purchaseAdFree, purchaseProfile, restorePremiumPurchases } from "../core/purchases.js";
 import { getLocalDisplayName, getLocalEmoji } from "../core/state.js";
 import { resolvedNameColorHex } from "../../data/signatureIdentity.js";
 import {
@@ -61,9 +62,10 @@ import { onFriendsCacheUpdated } from "../core/friendsState.js";
 import { fetchLobbyFriendOverlay } from "../core/supabaseFriends.js";
 import { createActionLock } from "../core/actionLock.js";
 
-const TAB_PERSONNALISATION = "personnalisation";
-const TAB_SOIREE = "soiree";
-const TAB_SUPPORT = "support";
+const TAB_PERSONNALISATION = SETTINGS_TAB.PERSONNALISATION;
+const TAB_SOIREE = SETTINGS_TAB.SOIREE;
+const TAB_FORFAITS = SETTINGS_TAB.FORFAITS;
+const TAB_SUPPORT = SETTINGS_TAB.SUPPORT;
 
 function localLobbyRole() {
   if (!hasActiveLobby()) return null;
@@ -86,11 +88,13 @@ function partySectionSnapshot() {
 function settingsTabIndex(activeTab) {
   if (activeTab === TAB_SOIREE) return 0;
   if (activeTab === TAB_PERSONNALISATION) return 1;
-  return 2;
+  if (activeTab === TAB_FORFAITS) return 2;
+  return 3;
 }
 
 function initialSettingsTab() {
   const requested = getScreenParams()?.tab;
+  if (requested === TAB_FORFAITS) return TAB_FORFAITS;
   if (requested === TAB_PERSONNALISATION) return TAB_PERSONNALISATION;
   if (requested === TAB_SUPPORT) return TAB_SUPPORT;
   if (requested === TAB_SOIREE && hasActiveLobby()) return TAB_SOIREE;
@@ -119,6 +123,14 @@ function settingsTabsHtml(activeTab, inLobby) {
         <span class="settings-tabs__icon" aria-hidden="true">✨</span>
         <span class="settings-tabs__label">Profil</span>
         <span class="friends-badge" data-friends-badge hidden aria-hidden="true"></span>
+      </button>
+      <button type="button" class="settings-tabs__btn${
+        activeTab === TAB_FORFAITS ? " settings-tabs__btn--active" : ""
+      }" role="tab" data-settings-tab="${TAB_FORFAITS}" aria-selected="${
+        activeTab === TAB_FORFAITS ? "true" : "false"
+      }">
+        <span class="settings-tabs__icon" aria-hidden="true">⭐</span>
+        <span class="settings-tabs__label">Forfaits</span>
       </button>
       <button type="button" class="settings-tabs__btn${
         activeTab === TAB_SUPPORT ? " settings-tabs__btn--active" : ""
@@ -229,6 +241,12 @@ function profileLogoutSectionHtml(user) {
       </button>`;
 }
 
+function premiumRestoreButtonHtml(user) {
+  if (!user?.loggedIn || user.isGuest) return "";
+  return `
+      <button type="button" class="btn btn-secondary btn--spaced" id="btn-premium-restore">Restaurer les achats</button>`;
+}
+
 function personnalisationPanelHtml({ emailAccount, user, selectedEmoji }) {
   const unlocked = isProfilePack();
   const selectedColor = user?.nameColor || null;
@@ -241,8 +259,6 @@ function personnalisationPanelHtml({ emailAccount, user, selectedEmoji }) {
   };
   return `
     <div class="settings-panel" id="settings-panel-personnalisation">
-      ${adFreeSettingsCardHtml()}
-      ${profilePackSettingsCardHtml()}
       <div class="card settings-section">
         <button type="button" class="btn btn-secondary friends-entry" data-nav="${FRIENDS_SCREEN_ID}" data-friends-entry="${FRIENDS_ENTRY.settingsProfile}">
           ${escapeHtml(FRIEND_LABEL.entrySettings)}
@@ -276,6 +292,11 @@ function personnalisationPanelHtml({ emailAccount, user, selectedEmoji }) {
         ${profileEmojiPickerHtml(selectedEmoji, { includeSignatureExtras: !user?.isGuest, unlocked })}
         <p class="auth-error hidden" id="emoji-error"></p>
         <p class="settings-ok hidden" id="emoji-ok">Emoji enregistré.</p>
+        ${
+          unlocked
+            ? ""
+            : `<button type="button" class="btn btn-secondary btn--spaced" data-settings-goto="${TAB_FORFAITS}">Voir les forfaits</button>`
+        }
       </div>
 
       ${
@@ -299,6 +320,21 @@ function personnalisationPanelHtml({ emailAccount, user, selectedEmoji }) {
             : ""
       }
       ${profileLogoutSectionHtml(user)}
+    </div>`;
+}
+
+function forfaitsPanelHtml(user) {
+  const unlocked = isProfilePack();
+  return `
+    <div class="settings-panel" id="settings-panel-forfaits">
+      ${adFreeSettingsCardHtml()}
+      ${profilePackSettingsCardHtml()}
+      ${premiumRestoreButtonHtml(user)}
+      ${
+        unlocked
+          ? `<button type="button" class="btn btn-secondary btn--spaced" data-settings-goto="${TAB_PERSONNALISATION}">Personnaliser le profil</button>`
+          : ""
+      }
     </div>`;
 }
 
@@ -369,10 +405,41 @@ export function mountSettings(app) {
   let partyActionInFlight = false;
   const friendLock = createActionLock();
 
+  function goToSettingsTab(tab) {
+    if (!tab || tab === activeTab) return;
+    if (tab === TAB_SOIREE && !hasActiveLobby()) return;
+    activeTab = tab;
+    paintTabChrome();
+    swapActivePanel();
+  }
+
+  function bindSettingsGoto() {
+    app.querySelectorAll("[data-settings-goto]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        goToSettingsTab(btn.getAttribute("data-settings-goto"));
+      });
+    });
+  }
+
+  function settingsPanelHtml(inLobby) {
+    if (activeTab === TAB_PERSONNALISATION) {
+      return personnalisationPanelHtml({ emailAccount, user, selectedEmoji });
+    }
+    if (activeTab === TAB_FORFAITS) return forfaitsPanelHtml(user);
+    if (activeTab === TAB_SOIREE) return soireePanelHtml(inLobby);
+    return supportPanelHtml(isLoggedIn());
+  }
+
+  function bindActivePanelEvents() {
+    if (activeTab === TAB_PERSONNALISATION) bindPersonnalisationEvents();
+    if (activeTab === TAB_FORFAITS) bindForfaitsEvents();
+    if (activeTab === TAB_SOIREE) bindSoireeEvents();
+    if (activeTab === TAB_SUPPORT) bindSupportEvents();
+  }
+
   function bindPersonnalisationEvents() {
-    function focusSignatureCard() {
-      const card = app.querySelector(".settings-premium");
-      card?.scrollIntoView({ behavior: "smooth", block: "center" });
+    function goToForfaitsTab() {
+      goToSettingsTab(TAB_FORFAITS);
     }
 
     function currentPreviewPlayer() {
@@ -416,7 +483,7 @@ export function mountSettings(app) {
       btn.addEventListener("click", async () => {
         if (!mount.isMounted()) return;
         if (btn.getAttribute("data-signature-lock")) {
-          focusSignatureCard();
+          goToForfaitsTab();
           return;
         }
         const colorId = btn.getAttribute("data-name-color");
@@ -448,7 +515,7 @@ export function mountSettings(app) {
         const err = app.querySelector("#emoji-error");
         const ok = app.querySelector("#emoji-ok");
         if (isLockedSignatureEmojiClick(emoji, getUser())) {
-          focusSignatureCard();
+          goToForfaitsTab();
           return;
         }
         const res = await updateProfileEmoji(emoji);
@@ -533,8 +600,14 @@ export function mountSettings(app) {
       navigate("home", { reset: true });
     });
 
+    bindSettingsGoto();
+  }
+
+  function bindForfaitsEvents() {
     bindAdFreeEvents();
     bindProfilePackEvents();
+    bindPremiumRestoreEvents();
+    bindSettingsGoto();
   }
 
   async function runAdFreeAction(action) {
@@ -561,8 +634,31 @@ export function mountSettings(app) {
     app.querySelector("#btn-adfree-buy")?.addEventListener("click", () => {
       void runAdFreeAction(purchaseAdFree);
     });
-    app.querySelector("#btn-adfree-restore")?.addEventListener("click", () => {
-      void runAdFreeAction(restoreAdFree);
+  }
+
+  async function runPremiumRestoreAction() {
+    try {
+      const res = await restorePremiumPurchases();
+      refreshAdsForEntitlement();
+      if (!mount.isMounted()) return;
+      swapActivePanel();
+      if (res?.cancelled) return;
+      await showAppAlert(res?.message || "Action terminée.", {
+        title: "Achats",
+        icon: res?.ok && (res?.profilePack || res?.adFree) ? "✨" : "📢",
+      });
+    } catch (e) {
+      if (!mount.isMounted()) return;
+      await showAppAlert(e?.message || "Impossible de restaurer les achats.", {
+        title: "Achats",
+        icon: "⚠️",
+      });
+    }
+  }
+
+  function bindPremiumRestoreEvents() {
+    app.querySelector("#btn-premium-restore")?.addEventListener("click", () => {
+      void runPremiumRestoreAction();
     });
   }
 
@@ -589,9 +685,6 @@ export function mountSettings(app) {
   function bindProfilePackEvents() {
     app.querySelector("#btn-profile-buy")?.addEventListener("click", () => {
       void runProfilePackAction(purchaseProfile);
-    });
-    app.querySelector("#btn-profile-restore")?.addEventListener("click", () => {
-      void runProfilePackAction(restoreProfile);
     });
   }
 
@@ -748,12 +841,7 @@ export function mountSettings(app) {
     app.querySelector(".settings-tabs")?.addEventListener("click", (e) => {
       const btn = e.target.closest("[data-settings-tab]");
       if (!btn || btn.disabled) return;
-      const tab = btn.getAttribute("data-settings-tab");
-      if (tab === TAB_SOIREE && !hasActiveLobby()) return;
-      if (tab === activeTab) return;
-      activeTab = tab;
-      paintTabChrome();
-      swapActivePanel();
+      goToSettingsTab(btn.getAttribute("data-settings-tab"));
     });
   }
 
@@ -776,19 +864,11 @@ export function mountSettings(app) {
       render();
       return;
     }
-    const html =
-      activeTab === TAB_PERSONNALISATION
-        ? personnalisationPanelHtml({ emailAccount, user, selectedEmoji })
-        : activeTab === TAB_SOIREE
-          ? soireePanelHtml(inLobby)
-          : supportPanelHtml(isLoggedIn());
-    panel.outerHTML = html;
+    panel.outerHTML = settingsPanelHtml(inLobby);
     bindNav(app, {
       "evening-return": () => returnFromEveningProfile(),
     });
-    if (activeTab === TAB_PERSONNALISATION) bindPersonnalisationEvents();
-    if (activeTab === TAB_SOIREE) bindSoireeEvents();
-    if (activeTab === TAB_SUPPORT) bindSupportEvents();
+    bindActivePanelEvents();
   }
 
   function syncTabChrome(inLobby) {
@@ -848,13 +928,7 @@ export function mountSettings(app) {
         <p class="label-upper label-upper--gold">Menu</p>
         <h1 class="page-title">Menu</h1>
         ${settingsTabsHtml(activeTab, inLobby)}
-        ${
-          activeTab === TAB_PERSONNALISATION
-            ? personnalisationPanelHtml({ emailAccount, user, selectedEmoji })
-            : activeTab === TAB_SOIREE
-              ? soireePanelHtml(inLobby)
-              : supportPanelHtml(isLoggedIn())
-        }
+        ${settingsPanelHtml(inLobby)}
       `,
     });
 
@@ -864,9 +938,7 @@ export function mountSettings(app) {
     });
     syncFriendsEntryBadges(app);
 
-    if (activeTab === TAB_PERSONNALISATION) bindPersonnalisationEvents();
-    if (activeTab === TAB_SOIREE) bindSoireeEvents();
-    if (activeTab === TAB_SUPPORT) bindSupportEvents();
+    bindActivePanelEvents();
   }
 
   render();

@@ -8,7 +8,7 @@ export function shouldShowAdFreePromo() {
   return !isAdFree();
 }
 
-/** Carte Menu → Profil. */
+/** Carte Menu → Forfaits. */
 export function adFreeSettingsCardHtml() {
   const loggedIn = isLoggedIn();
   const guest = isGuest();
@@ -30,8 +30,7 @@ export function adFreeSettingsCardHtml() {
             ? `Sans pub est inclus dans ${PACK_SIGNATURE_LABEL}.`
             : "Sans pub est actif sur ce compte."
         }</p>
-        <p class="hint settings-section__hint">Plus de bannière dans l’app native, sur tous tes appareils liés à ce compte.</p>
-        <button type="button" class="btn btn-secondary btn--spaced" id="btn-adfree-restore">Restaurer l’achat</button>`;
+        <p class="hint settings-section__hint">Plus de bannière dans l’app native, sur tous tes appareils liés à ce compte.</p>`;
   } else {
     const storeHint = isNativeApp()
       ? storeReady
@@ -43,8 +42,7 @@ export function adFreeSettingsCardHtml() {
           2,99&nbsp;€ à vie - supprime la pub sur tes appareils liés à ce compte.
         </p>
         <p class="hint settings-section__hint">${storeHint}</p>
-        <button type="button" class="btn btn-primary btn--spaced" id="btn-adfree-buy">Payer 2,99&nbsp;€</button>
-        <button type="button" class="btn btn-secondary btn--spaced" id="btn-adfree-restore">Restaurer l’achat</button>`;
+        <button type="button" class="btn btn-primary btn--spaced" id="btn-adfree-buy">Payer 2,99&nbsp;€</button>`;
   }
 
   return `

@@ -6,7 +6,7 @@ import { isNativeApp } from "./platform.js";
 import { isPurchasesNativeReady, profileSkuForUser } from "./purchases.js";
 import { PLAY_PRODUCT_ID_PROFILE_UPGRADE } from "../../data/revenueCatConfig.js";
 
-/** Carte Menu → forfait Signature (6,99 €). */
+/** Carte Menu → Forfaits (Signature 6,99 €). */
 export function profilePackSettingsCardHtml() {
   const loggedIn = isLoggedIn();
   const guest = isGuest();
@@ -26,8 +26,7 @@ export function profilePackSettingsCardHtml() {
   } else if (unlocked) {
     body = `
         <p class="settings-premium__ok" role="status">${PACK_SIGNATURE_LABEL} est actif sur ce compte.</p>
-        <p class="hint settings-section__hint">Sans pub inclus, sur tous tes appareils liés à ce compte.</p>
-        <button type="button" class="btn btn-secondary btn--spaced" id="btn-profile-restore">Restaurer l’achat</button>`;
+        <p class="hint settings-section__hint">Sans pub inclus, sur tous tes appareils liés à ce compte.</p>`;
   } else {
     const storeHint = isNativeApp()
       ? storeReady
@@ -40,8 +39,7 @@ export function profilePackSettingsCardHtml() {
     body = `
         <p class="hint settings-section__hint">${priceHint}</p>
         <p class="hint settings-section__hint">${storeHint}</p>
-        <button type="button" class="btn btn-primary btn--spaced" id="btn-profile-buy">Payer ${priceLabel}&nbsp;€</button>
-        <button type="button" class="btn btn-secondary btn--spaced" id="btn-profile-restore">Restaurer l’achat</button>`;
+        <button type="button" class="btn btn-primary btn--spaced" id="btn-profile-buy">Payer ${priceLabel}&nbsp;€</button>`;
   }
 
   return `

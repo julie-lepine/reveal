@@ -9,6 +9,7 @@ import {
   gameTileVisualHtml,
   bindGameTileLogos,
 } from "../core/ui.js";
+import { SETTINGS_TAB } from "../config/settingsTabs.js";
 import { handleNavTarget, goToEveningSettings } from "./nav.js";
 import {
   isGameSyncActive,
@@ -349,7 +350,7 @@ export function mountGameSelect(app) {
 
     if (e.target.closest("#btn-adfree-hub")) {
       e.preventDefault();
-      goToEveningSettings({ tab: "personnalisation" });
+      goToEveningSettings({ tab: SETTINGS_TAB.FORFAITS });
       return;
     }
 

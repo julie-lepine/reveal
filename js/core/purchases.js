@@ -235,7 +235,25 @@ export async function purchaseAdFree() {
   }
 }
 
-export async function restoreAdFree() {
+async function refreshPremiumAfterStore() {
+  const { refreshAdFreeFromServer, isAdFree, isProfilePack } = await import("./entitlements.js");
+  const tries = 8;
+  const delayMs = 1000;
+  let adFree = false;
+  let profilePack = false;
+  for (let i = 0; i < tries; i++) {
+    await refreshAdFreeFromServer();
+    adFree = isAdFree();
+    profilePack = isProfilePack();
+    if (profilePack) break;
+    if (adFree && i >= 2) break;
+    if (i < tries - 1) await new Promise((r) => setTimeout(r, delayMs));
+  }
+  await refreshAdsQuiet();
+  return { adFree, profilePack };
+}
+
+export async function restorePremiumPurchases() {
   if (!isNativeApp()) {
     return { ok: false, message: "La restauration se fait dans l’app native." };
   }
@@ -250,17 +268,21 @@ export async function restoreAdFree() {
     const Purchases = await ensurePurchasesConfigured();
     await Purchases.logIn({ appUserID: getState().supabaseUserId });
     await Purchases.restorePurchases();
-    const adFree = await refreshAdFreeAfterStore();
-    return {
-      ok: true,
-      adFree,
-      message: adFree
-        ? "Sans pub est de nouveau actif sur ce compte."
-        : "Aucun achat Sans pub trouvé pour ce compte.",
-    };
+    const { adFree, profilePack } = await refreshPremiumAfterStore();
+    let message = "Aucun achat trouvé pour ce compte.";
+    if (profilePack) {
+      message = `${PACK_SIGNATURE_LABEL} est de nouveau actif sur ce compte. Sans pub inclus.`;
+    } else if (adFree) {
+      message = "Sans pub est de nouveau actif sur ce compte.";
+    }
+    return { ok: true, adFree, profilePack, message };
   } catch (e) {
     return { ok: false, message: e?.message || "Restauration impossible." };
   }
+}
+
+export async function restoreAdFree() {
+  return restorePremiumPurchases();
 }
 
 export async function purchaseProfile() {
@@ -307,29 +329,5 @@ export async function purchaseProfile() {
 }
 
 export async function restoreProfile() {
-  if (!isNativeApp()) {
-    return { ok: false, message: "La restauration se fait dans l’app native." };
-  }
-  if (!isPurchasesNativeReady()) {
-    return { ok: false, message: "Achats indisponibles sur cette version." };
-  }
-  const user = getState().user || {};
-  if (!user.loggedIn || user.isGuest) {
-    return { ok: false, message: "Connecte-toi avec un compte pour restaurer l’achat." };
-  }
-  try {
-    const Purchases = await ensurePurchasesConfigured();
-    await Purchases.logIn({ appUserID: getState().supabaseUserId });
-    await Purchases.restorePurchases();
-    const profilePack = await refreshProfilePackAfterStore();
-    return {
-      ok: true,
-      profilePack,
-      message: profilePack
-        ? `${PACK_SIGNATURE_LABEL} est de nouveau actif sur ce compte.`
-        : `Aucun achat ${PACK_SIGNATURE_LABEL} trouvé pour ce compte.`,
-    };
-  } catch (e) {
-    return { ok: false, message: e?.message || "Restauration impossible." };
-  }
+  return restorePremiumPurchases();
 }

@@ -485,14 +485,19 @@ body.has-top-ad .back{
 
 .name-color-chips{
   display:flex;
-  flex-wrap:wrap;
-  gap:10px;
+  flex-wrap:nowrap;
+  justify-content:space-between;
+  align-items:center;
+  gap:6px;
   margin:8px 0 12px;
 }
 
 .name-color-chip{
-  width:36px;
-  height:36px;
+  flex:1 1 0;
+  width:0;
+  max-width:36px;
+  aspect-ratio:1;
+  height:auto;
   border-radius:50%;
   border:2px solid rgba(255,255,255,.25);
   background:var(--chip, #888);
@@ -3293,11 +3298,12 @@ select.field-input option{
 
 .settings-tabs{
   --settings-tab-index:0;
+  --settings-tabs-count:4;
   --settings-tabs-pad:3px;
   --settings-tabs-gap:2px;
   position:relative;
   display:grid;
-  grid-template-columns:repeat(3, minmax(0, 1fr));
+  grid-template-columns:repeat(var(--settings-tabs-count), minmax(0, 1fr));
   gap:var(--settings-tabs-gap);
   margin:0 0 16px;
   padding:var(--settings-tabs-pad);
@@ -3312,7 +3318,7 @@ select.field-input option{
   top:var(--settings-tabs-pad);
   bottom:var(--settings-tabs-pad);
   left:var(--settings-tabs-pad);
-  width:calc((100% - 2 * var(--settings-tabs-pad) - 2 * var(--settings-tabs-gap)) / 3);
+  width:calc((100% - 2 * var(--settings-tabs-pad) - (var(--settings-tabs-count) - 1) * var(--settings-tabs-gap)) / var(--settings-tabs-count));
   border-radius:11px;
   background:rgba(99,102,241,.28);
   border:1px solid rgba(129,140,248,.45);
@@ -3328,14 +3334,14 @@ select.field-input option{
   display:inline-flex;
   align-items:center;
   justify-content:center;
-  gap:5px;
+  gap:4px;
   min-height:44px;
-  padding:8px 4px;
+  padding:8px 2px;
   border:none;
   border-radius:11px;
   background:transparent;
   color:rgba(255,255,255,.55);
-  font-size:12px;
+  font-size:11px;
   font-weight:650;
   font-family:inherit;
   line-height:1.15;
@@ -3348,6 +3354,12 @@ select.field-input option{
   flex-shrink:0;
   font-size:14px;
   line-height:1;
+}
+
+@media (max-width: 360px){
+  .settings-tabs__icon{
+    display:none;
+  }
 }
 
 .settings-tabs__label{

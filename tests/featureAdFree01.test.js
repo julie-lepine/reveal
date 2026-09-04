@@ -77,18 +77,22 @@ describe("FEATURE-ADFREE-01 — entitlement Sans pub", () => {
     assert.match(ads, /refreshAdsForEntitlement/);
   });
 
-  it("Menu Profil expose Sans pub", () => {
+  it("Menu Forfaits expose Sans pub", () => {
     const settings = src("js/screens/settings.js");
     const ui = src("js/core/adFreeUi.js");
     assert.match(settings, /adFreeSettingsCardHtml/);
     assert.match(settings, /btn-adfree-buy/);
-    assert.match(settings, /btn-adfree-restore/);
+    assert.match(settings, /btn-premium-restore/);
+    assert.equal(/btn-adfree-restore/.test(settings), false);
     assert.equal(/btn-adfree-refresh/.test(settings), false);
     assert.match(ui, /Sans pub/);
     assert.match(ui, /2,99/);
     const persoStart = settings.indexOf("function personnalisationPanelHtml");
+    const forfaitsStart = settings.indexOf("function forfaitsPanelHtml");
     const supportStart = settings.indexOf("function supportPanelHtml");
-    assert.match(settings.slice(persoStart, supportStart), /adFreeSettingsCardHtml/);
+    assert.ok(forfaitsStart > persoStart && forfaitsStart < supportStart);
+    assert.equal(settings.slice(persoStart, forfaitsStart).includes("adFreeSettingsCardHtml"), false);
+    assert.match(settings.slice(forfaitsStart, supportStart), /adFreeSettingsCardHtml/);
     assert.equal(settings.slice(supportStart).includes("adFreeSettingsCardHtml"), false);
   });
 

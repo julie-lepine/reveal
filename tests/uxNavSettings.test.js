@@ -72,23 +72,29 @@ describe("UX-NAV-SETTINGS - game-select sans doublon", () => {
 });
 
 describe("UX-NAV-SETTINGS - contenu écran", () => {
-  it("profil / soirée / support en onglets ; soirée grisée hors lobby", () => {
+  it("profil / soirée / forfaits / support en onglets ; soirée grisée hors lobby", () => {
     const settings = src("js/screens/settings.js");
     assert.match(settings, /Profil/);
     assert.match(settings, /Soirée/);
+    assert.match(settings, /Forfaits/);
     assert.match(settings, /Support/);
     assert.match(settings, /settings-tabs__cursor/);
     assert.match(settings, /🎉/);
     assert.match(settings, /✨/);
+    assert.match(settings, /⭐/);
     assert.match(settings, /💬/);
     assert.match(settings, /data-settings-tab="\$\{TAB_PERSONNALISATION\}"|data-settings-tab="personnalisation"/);
     assert.match(settings, /data-settings-tab="\$\{TAB_SOIREE\}"|data-settings-tab="soiree"/);
+    assert.match(settings, /data-settings-tab="\$\{TAB_FORFAITS\}"|data-settings-tab="forfaits"/);
     assert.match(settings, /data-settings-tab="\$\{TAB_SUPPORT\}"|data-settings-tab="support"/);
-    assert.match(settings, /TAB_PERSONNALISATION\s*=\s*"personnalisation"/);
-    assert.match(settings, /TAB_SOIREE\s*=\s*"soiree"/);
-    assert.match(settings, /TAB_SUPPORT\s*=\s*"support"/);
+    assert.match(settings, /TAB_PERSONNALISATION\s*=\s*SETTINGS_TAB\.PERSONNALISATION/);
+    assert.match(settings, /TAB_SOIREE\s*=\s*SETTINGS_TAB\.SOIREE/);
+    assert.match(settings, /TAB_FORFAITS\s*=\s*SETTINGS_TAB\.FORFAITS/);
+    assert.match(settings, /TAB_SUPPORT\s*=\s*SETTINGS_TAB\.SUPPORT/);
     assert.match(settings, /settings-tabs__btn--disabled/);
-    assert.match(settings, /FRIEND_LABEL\.entrySettings/);
+    assert.match(settings, /function forfaitsPanelHtml/);
+    assert.match(settings, /data-settings-goto="\$\{TAB_FORFAITS\}"/);
+    assert.match(settings, /data-settings-goto="\$\{TAB_PERSONNALISATION\}"/);
     assert.match(settings, /FRIENDS_SCREEN_ID/);
     assert.match(settings, /Emoji/);
     assert.match(settings, /Pseudo/);
@@ -141,7 +147,7 @@ describe("UX-NAV-SETTINGS - contenu écran", () => {
     assert.match(css, /\.settings-tabs\{/);
     assert.match(css, /\.settings-tabs__cursor/);
     assert.match(css, /\.settings-tabs__btn--disabled/);
-    assert.match(css, /--settings-tab-index/);
+    assert.match(css, /--settings-tabs-count/);
   });
 
   it("rôle hôte / membre via lobbySettingsActionsForRole", () => {

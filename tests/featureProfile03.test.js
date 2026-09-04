@@ -86,9 +86,20 @@ describe("FEATURE-PROFILE-03 — identité Signature", () => {
       signature: true,
       nameColor: "gold",
     });
-    assert.match(self, /Comme ça, les autres te voient/);
+    assert.match(self, /Les autres te voient comme ça/);
     assert.match(self, /signature-badge/);
     assert.match(self, /signature-ring/);
+  });
+
+  it("liens Profil ↔ Forfaits", () => {
+    const settings = src("js/screens/settings.js");
+    assert.match(settings, /goToSettingsTab\(TAB_FORFAITS\)/);
+    assert.match(settings, /data-settings-goto="\$\{TAB_FORFAITS\}"/);
+    assert.match(settings, /data-settings-goto="\$\{TAB_PERSONNALISATION\}"/);
+    assert.match(src("js/screens/lobby.js"), /Voir les forfaits/);
+    assert.match(src("js/screens/lobby.js"), /SETTINGS_TAB\.FORFAITS/);
+    assert.match(src("js/screens/gameSelect.js"), /SETTINGS_TAB\.FORFAITS/);
+    assert.match(src("style.css"), /flex-wrap:\s*nowrap/);
   });
 
   it("SQL : colonnes + trigger gate + snapshot salon", () => {

@@ -49,7 +49,7 @@ export function playerAvatarHtml(p, baseClass = "avatar avatar--sm") {
 }
 
 /** Mini carte salon : avatar + pseudo, pour que le joueur se voie comme les autres. */
-export function signatureSelfPreviewHtml(p, { caption = "Comme ça, les autres te voient" } = {}) {
+export function signatureSelfPreviewHtml(p, { caption = "Les autres te voient comme ça" } = {}) {
   const ident = signatureIdentityFrom(p);
   return `
     <div class="signature-self-preview" id="settings-signature-preview">

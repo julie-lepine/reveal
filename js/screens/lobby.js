@@ -39,7 +39,8 @@ import { navigate } from "../core/router.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
 import { playerNameHtml, signatureRingClass } from "../core/signatureUi.js";
-import { bindNav } from "./nav.js";
+import { SETTINGS_TAB } from "../config/settingsTabs.js";
+import { bindNav, goToEveningSettings } from "./nav.js";
 import { showAppAlert, showAppConfirm, showEmojiPickerDialog } from "../core/dialog.js";
 import { getLobbyAutoCloseHint } from "../config/lobbyLifecycle.js";
 import {
@@ -353,10 +354,13 @@ export function mountLobby(app) {
     if (!mount.isMounted()) return;
     if (!mount.isCurrentMount()) return;
     if (res?.needSignature) {
-      await showAppAlert("Emojis extra : inclus dans Signature (Menu → Profil).", {
+      const go = await showAppConfirm("Emojis extra : inclus dans Signature.", {
         title: "Signature",
+        confirmLabel: "Voir les forfaits",
+        cancelLabel: "Plus tard",
         icon: "✦",
       });
+      if (go) goToEveningSettings({ tab: SETTINGS_TAB.FORFAITS });
       return;
     }
     const saved = await updateProfileEmoji(res.emoji);

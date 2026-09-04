@@ -42,18 +42,19 @@ describe("FEATURE-PROFILE-02A/02B — SKUs + carte Menu", () => {
     const purchases = src("js/core/purchases.js");
     assert.equal(/\.from\(["']profiles["']\)/.test(purchases), false);
     assert.match(purchases, /purchaseProfile/);
-    assert.match(purchases, /restoreProfile/);
+    assert.match(purchases, /restorePremiumPurchases/);
     assert.match(purchases, /refreshProfilePackFromServerUntil/);
   });
 
-  it("Menu Profil : carte Acheter / Restaurer", () => {
+  it("Menu Forfaits : carte Acheter / Restaurer", () => {
     const ui = src("js/core/profilePackUi.js");
     const settings = src("js/screens/settings.js");
     assert.match(settings, /profilePackSettingsCardHtml/);
     assert.match(settings, /purchaseProfile/);
-    assert.match(settings, /restoreProfile/);
+    assert.match(settings, /restorePremiumPurchases/);
+    assert.match(settings, /btn-premium-restore/);
     assert.match(ui, /id="btn-profile-buy"/);
-    assert.match(ui, /id="btn-profile-restore"/);
+    assert.equal(/id="btn-profile-restore"/.test(ui), false);
     assert.match(ui, /6,99/);
     assert.match(ui, /4,00/);
     assert.equal(/btn-profile-refresh/.test(ui), false);

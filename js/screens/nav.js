@@ -50,9 +50,12 @@ export function goToEveningSettings({ tab } = {}) {
     navigate("home", { reset: true });
     return;
   }
-  if (getCurrentScreen() === "settings") return;
-
   const params = tab ? { tab } : null;
+  if (getCurrentScreen() === "settings") {
+    if (!params) return;
+    navigate("settings", { params });
+    return;
+  }
   if (hasActiveLobby()) {
     suppressSessionRoute(120000, getCachedGameSession()?.screen ?? null);
     // Push sur la pile courante (game-select / results / leaderboard / …).
