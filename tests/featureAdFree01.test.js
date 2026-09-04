@@ -89,11 +89,10 @@ describe("FEATURE-ADFREE-01 — entitlement Sans pub", () => {
     assert.match(ui, /2,99/);
     const persoStart = settings.indexOf("function personnalisationPanelHtml");
     const forfaitsStart = settings.indexOf("function forfaitsPanelHtml");
-    const supportStart = settings.indexOf("function supportPanelHtml");
-    assert.ok(forfaitsStart > persoStart && forfaitsStart < supportStart);
+    assert.ok(forfaitsStart > persoStart);
     assert.equal(settings.slice(persoStart, forfaitsStart).includes("adFreeSettingsCardHtml"), false);
-    assert.match(settings.slice(forfaitsStart, supportStart), /adFreeSettingsCardHtml/);
-    assert.equal(settings.slice(supportStart).includes("adFreeSettingsCardHtml"), false);
+    assert.match(settings.slice(forfaitsStart), /adFreeSettingsCardHtml/);
+    assert.equal(settings.includes("supportPanelHtml"), false);
   });
 
   it("la bannière reste sur les écrans de play", () => {

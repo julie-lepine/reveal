@@ -7,6 +7,7 @@ import {
   tryRecoverLobbyFromServer,
 } from "../core/lobby.js";
 import { canPlay } from "../core/auth.js";
+import { HELP_LEGAL_SCREEN_ID } from "../config/helpLegal.js";
 import {
   isGameSyncActive,
   isLobbyHost,
@@ -43,6 +44,21 @@ export function goToFriends() {
     return;
   }
   navigate("friends");
+}
+
+/** Page Aide & légal : même contrat qu’Amis (pas un onglet Menu). */
+export function goToHelpLegal() {
+  if (!canPlay()) {
+    navigate("home", { reset: true });
+    return;
+  }
+  if (getCurrentScreen() === HELP_LEGAL_SCREEN_ID) return;
+  if (hasActiveLobby()) {
+    suppressSessionRoute(120000, getCachedGameSession()?.screen ?? null);
+    navigate(HELP_LEGAL_SCREEN_ID);
+    return;
+  }
+  navigate(HELP_LEGAL_SCREEN_ID);
 }
 
 export function goToEveningSettings({ tab } = {}) {
@@ -167,6 +183,10 @@ export async function handleNavTarget(target, handlers) {
   }
   if (target === "friends") {
     goToFriends();
+    return;
+  }
+  if (target === HELP_LEGAL_SCREEN_ID) {
+    goToHelpLegal();
     return;
   }
   navigate(target);

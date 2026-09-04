@@ -8,7 +8,6 @@ import {
   updateProfileNameColor,
   changeEmailPassword,
   logout,
-  deleteRegisteredAccount,
 } from "../core/auth.js";
 import { PACK_SIGNATURE_LABEL } from "../config/premiumPacks.js";
 import { SETTINGS_TAB } from "../config/settingsTabs.js";
@@ -36,7 +35,6 @@ import {
   canManageLobbyRoster,
   kickLobbyMember,
   isVoluntaryLeaveInFlight,
-  resetAppToCleanHome,
 } from "../core/lobby.js";
 import { isLobbyHost } from "../core/gameSync.js";
 import { isSupabaseConfigured } from "../core/supabaseClient.js";
@@ -46,11 +44,10 @@ import { MAX_PLAYERS } from "../config/lobbyLifecycle.js";
 import { lobbySettingsActionsForRole } from "../core/partySettingsMenu.js";
 import { navigate, getCurrentScreen, getScreenParams } from "../core/router.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
-import { INSTAGRAM_HANDLE, INSTAGRAM_PROFILE_URL } from "../../data/appConfig.js";
-import { openInstagramProfile } from "../core/feedbackUi.js";
 import { createMountGuard } from "../core/mountLifecycle.js";
 import { bindNav, returnFromEveningProfile } from "./nav.js";
 import { FRIEND_LABEL, FRIENDS_ENTRY, FRIENDS_SCREEN_ID } from "../config/friends.js";
+import { HELP_LEGAL_LABEL, HELP_LEGAL_SCREEN_ID } from "../config/helpLegal.js";
 import { syncFriendsEntryBadges, flushFriendRequestNotice } from "../core/friendRequestNotice.js";
 import { friendRosterActionHtml, lobbyFriendsHintHtml } from "../core/friendsRosterUi.js";
 import {
@@ -65,7 +62,6 @@ import { createActionLock } from "../core/actionLock.js";
 const TAB_PERSONNALISATION = SETTINGS_TAB.PERSONNALISATION;
 const TAB_SOIREE = SETTINGS_TAB.SOIREE;
 const TAB_FORFAITS = SETTINGS_TAB.FORFAITS;
-const TAB_SUPPORT = SETTINGS_TAB.SUPPORT;
 
 function localLobbyRole() {
   if (!hasActiveLobby()) return null;
@@ -88,15 +84,13 @@ function partySectionSnapshot() {
 function settingsTabIndex(activeTab) {
   if (activeTab === TAB_SOIREE) return 0;
   if (activeTab === TAB_PERSONNALISATION) return 1;
-  if (activeTab === TAB_FORFAITS) return 2;
-  return 3;
+  return 2;
 }
 
 function initialSettingsTab() {
   const requested = getScreenParams()?.tab;
   if (requested === TAB_FORFAITS) return TAB_FORFAITS;
   if (requested === TAB_PERSONNALISATION) return TAB_PERSONNALISATION;
-  if (requested === TAB_SUPPORT) return TAB_SUPPORT;
   if (requested === TAB_SOIREE && hasActiveLobby()) return TAB_SOIREE;
   return hasActiveLobby() ? TAB_SOIREE : TAB_PERSONNALISATION;
 }
@@ -131,14 +125,6 @@ function settingsTabsHtml(activeTab, inLobby) {
       }">
         <span class="settings-tabs__icon" aria-hidden="true">⭐</span>
         <span class="settings-tabs__label">Forfaits</span>
-      </button>
-      <button type="button" class="settings-tabs__btn${
-        activeTab === TAB_SUPPORT ? " settings-tabs__btn--active" : ""
-      }" role="tab" data-settings-tab="${TAB_SUPPORT}" aria-selected="${
-        activeTab === TAB_SUPPORT ? "true" : "false"
-      }">
-        <span class="settings-tabs__icon" aria-hidden="true">💬</span>
-        <span class="settings-tabs__label">Support</span>
       </button>
     </div>`;
 }
@@ -319,6 +305,11 @@ function personnalisationPanelHtml({ emailAccount, user, selectedEmoji }) {
             ? `<p class="hint settings-social-hint">Compte ${escapeHtml(user.provider || "social")} - le mot de passe se gère chez le fournisseur.</p>`
             : ""
       }
+      <div class="card settings-section">
+        <button type="button" class="btn btn-secondary friends-entry" data-nav="${HELP_LEGAL_SCREEN_ID}">
+          ${escapeHtml(HELP_LEGAL_LABEL)}
+        </button>
+      </div>
       ${profileLogoutSectionHtml(user)}
     </div>`;
 }
@@ -335,56 +326,6 @@ function forfaitsPanelHtml(user) {
           ? `<button type="button" class="btn btn-secondary btn--spaced" data-settings-goto="${TAB_PERSONNALISATION}">Personnaliser le profil</button>`
           : ""
       }
-    </div>`;
-}
-
-function supportPanelHtml(registeredAccount) {
-  const deletionBlock = registeredAccount
-    ? `
-        <button type="button" class="btn btn-secondary btn--spaced" id="btn-delete-account">Supprimer mon compte</button>
-        <p class="hint settings-section__hint">
-          Suppression définitive, immédiate, dans l'application. Irréversible.
-        </p>`
-    : `
-        <p class="hint settings-section__hint">
-          Le mode invité ne crée pas de compte. Tes données de session expirent toutes seules.
-        </p>`;
-
-  return `
-    <div class="settings-panel" id="settings-panel-support">
-      <div class="card settings-section feedback-prompt">
-        <h2 class="settings-section__title">Aide &amp; retours</h2>
-        <p class="hint feedback-prompt__hint">
-          Un bug, une idée de jeu ou un mot à ajouter ? Écris-nous sur Instagram
-          <strong>@${escapeHtml(INSTAGRAM_HANDLE)}</strong>.
-        </p>
-        <button type="button" class="btn btn-accent feedback-prompt__btn btn--spaced" id="btn-feedback-dm">Envoie un DM</button>
-      </div>
-
-      <div class="card settings-section">
-        <h2 class="settings-section__title">Dépannage</h2>
-        <p class="hint settings-section__hint">
-          Affichage bloqué ou session coincée ? Efface les données locales et recharge l'app.
-        </p>
-        <button type="button" class="btn btn-secondary btn--spaced" id="btn-settings-reset-app">Problème d'affichage ? Réinitialiser l'app</button>
-      </div>
-
-      <div class="card settings-section">
-        <h2 class="settings-section__title">Légal</h2>
-        <p class="hint settings-section__hint">Politique de confidentialité (RGPD, AdMob, Supabase).</p>
-        <p class="hint settings-section__hint">
-          Contact RGPD :
-        <a
-          class="settings-instagram-link"
-          href="${escapeHtml(INSTAGRAM_PROFILE_URL)}"
-          target="_blank"
-          rel="noopener noreferrer"
-          data-open-instagram
-        >@${escapeHtml(INSTAGRAM_HANDLE)}</a>
-        </p>
-        <button type="button" class="btn btn-secondary btn--spaced" data-nav="privacy">Politique de confidentialité</button>
-        ${deletionBlock}
-      </div>
     </div>`;
 }
 
@@ -427,14 +368,13 @@ export function mountSettings(app) {
     }
     if (activeTab === TAB_FORFAITS) return forfaitsPanelHtml(user);
     if (activeTab === TAB_SOIREE) return soireePanelHtml(inLobby);
-    return supportPanelHtml(isLoggedIn());
+    return personnalisationPanelHtml({ emailAccount, user, selectedEmoji });
   }
 
   function bindActivePanelEvents() {
     if (activeTab === TAB_PERSONNALISATION) bindPersonnalisationEvents();
     if (activeTab === TAB_FORFAITS) bindForfaitsEvents();
     if (activeTab === TAB_SOIREE) bindSoireeEvents();
-    if (activeTab === TAB_SUPPORT) bindSupportEvents();
   }
 
   function bindPersonnalisationEvents() {
@@ -685,70 +625,6 @@ export function mountSettings(app) {
   function bindProfilePackEvents() {
     app.querySelector("#btn-profile-buy")?.addEventListener("click", () => {
       void runProfilePackAction(purchaseProfile);
-    });
-  }
-
-  function bindSupportEvents() {
-    app.querySelector("#btn-feedback-dm")?.addEventListener("click", () => {
-      openInstagramProfile();
-    });
-
-    app.querySelector("#btn-settings-reset-app")?.addEventListener("click", async () => {
-      const ok = await showAppConfirm(
-        "Ta session et les données locales seront effacées. Tu pourras rejoindre une partie à nouveau.",
-        {
-          title: "Réinitialiser REVEAL",
-          confirmLabel: "Réinitialiser",
-          cancelLabel: "Annuler",
-          icon: "🔄",
-        }
-      );
-      if (!mount.isMounted()) return;
-      if (!ok) return;
-      await resetAppToCleanHome();
-    });
-
-    app.querySelector("#btn-delete-account")?.addEventListener("click", async () => {
-      if (!mount.isMounted()) return;
-      const btn = app.querySelector("#btn-delete-account");
-      if (btn?.disabled) return;
-
-      const ok = await showAppConfirm(
-        "Ton compte et tes données personnelles (profil, amis, invitations) seront définitivement supprimés. Cette action est irréversible. L'achat Sans pub reste lié à ton compte Apple ou Google : tu pourras le restaurer plus tard.",
-        {
-          title: "Supprimer mon compte",
-          confirmLabel: "Supprimer définitivement",
-          cancelLabel: "Annuler",
-          icon: "⚠️",
-        }
-      );
-      if (!mount.isMounted() || !ok) return;
-
-      if (btn) btn.disabled = true;
-      const res = await deleteRegisteredAccount();
-      if (!mount.isMounted()) return;
-      if (res?.cancelled) {
-        if (btn) btn.disabled = false;
-        return;
-      }
-      if (res?.ok === false) {
-        if (btn) btn.disabled = false;
-        await showAppAlert(res.error || "Impossible de supprimer le compte.", {
-          title: "Suppression",
-          icon: "⚠️",
-        });
-        return;
-      }
-      await showAppAlert("Ton compte a été supprimé.", {
-        title: "Compte supprimé",
-        icon: "✅",
-      });
-      navigate("home", { reset: true });
-    });
-
-    app.querySelector("[data-open-instagram]")?.addEventListener("click", (e) => {
-      e.preventDefault();
-      openInstagramProfile();
     });
   }
 

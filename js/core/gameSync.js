@@ -314,6 +314,7 @@ const MENU_SCREENS = new Set([
   "game-select",
   "settings",
   "friends",
+  "help-legal",
   "privacy",
 ]);
 
@@ -323,6 +324,7 @@ export function isPassiveChromeScreen(screen) {
     screen === "home" ||
     screen === "settings" ||
     screen === "friends" ||
+    screen === "help-legal" ||
     screen === "privacy"
   );
 }

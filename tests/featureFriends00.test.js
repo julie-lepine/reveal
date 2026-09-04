@@ -106,6 +106,7 @@ describe("FEATURE-FRIENDS-01 Palier 0 — contrats", () => {
       "leaderboard",
       "friends",
       "settings",
+      "help-legal",
       "home",
     ]) {
       assert.equal(isFriendNoticeCalmScreen(id), true, id);

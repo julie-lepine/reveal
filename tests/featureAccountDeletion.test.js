@@ -15,22 +15,23 @@ function src(rel) {
 }
 
 describe("FEATURE-ACCOUNT-DELETION — in-app", () => {
-  it("le bouton Paramètres n’ouvre plus le site ni un mailto", () => {
-    const settings = src("js/screens/settings.js");
-    assert.match(settings, /deleteRegisteredAccount/);
-    assert.match(settings, /Supprimer définitivement/);
-    assert.match(settings, /id="btn-delete-account"/);
-    assert.equal(settings.includes("openExternalUrl"), false);
-    assert.equal(settings.includes("ACCOUNT_DELETION_PUBLIC_URL"), false);
-    assert.equal(settings.includes("ACCOUNT_DELETION_MAILTO"), false);
-    assert.equal(settings.includes("openDeletionPage"), false);
+  it("le bouton n’ouvre plus le site ni un mailto", () => {
+    const help = src("js/screens/helpLegal.js");
+    assert.match(help, /deleteRegisteredAccount/);
+    assert.match(help, /Supprimer définitivement/);
+    assert.match(help, /id="btn-delete-account"/);
+    assert.equal(help.includes("openExternalUrl"), false);
+    assert.equal(help.includes("ACCOUNT_DELETION_PUBLIC_URL"), false);
+    assert.equal(help.includes("ACCOUNT_DELETION_MAILTO"), false);
+    assert.equal(help.includes("openDeletionPage"), false);
+    assert.equal(src("js/screens/settings.js").includes("btn-delete-account"), false);
   });
 
   it("invité : pas de bouton supprimer, texte d’expiration", () => {
-    const settings = src("js/screens/settings.js");
-    assert.match(settings, /supportPanelHtml\(registeredAccount\)/);
-    assert.match(settings, /Le mode invité ne crée pas de compte/);
-    assert.match(settings, /supportPanelHtml\(isLoggedIn\(\)\)/);
+    const help = src("js/screens/helpLegal.js");
+    assert.match(help, /helpLegalBodyHtml\(registeredAccount\)/);
+    assert.match(help, /Le mode invité ne crée pas de compte/);
+    assert.match(help, /const registeredAccount = isLoggedIn\(\)/);
   });
 
   it("auth : JWT courant, pas d’id client, signOut local après delete", () => {
@@ -70,7 +71,7 @@ describe("FEATURE-ACCOUNT-DELETION — in-app", () => {
   it("politique in-app : suppression immédiate depuis Paramètres", () => {
     const legal = src("data/legalContent.js");
     const deletion = legal.slice(legal.indexOf("Suppression de compte"));
-    assert.match(deletion, /Paramètres → Support → Supprimer mon compte/);
+    assert.match(deletion, /Menu → Aide & légal → Supprimer mon compte/);
     assert.match(deletion, /immédiate/);
     assert.equal(deletion.includes("sous 30 jours ouvrés"), false);
     assert.equal(deletion.includes("Envoyez une demande depuis l'application"), false);

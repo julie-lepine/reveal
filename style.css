@@ -3298,7 +3298,7 @@ select.field-input option{
 
 .settings-tabs{
   --settings-tab-index:0;
-  --settings-tabs-count:4;
+  --settings-tabs-count:3;
   --settings-tabs-pad:3px;
   --settings-tabs-gap:2px;
   position:relative;
@@ -3334,14 +3334,14 @@ select.field-input option{
   display:inline-flex;
   align-items:center;
   justify-content:center;
-  gap:4px;
+  gap:5px;
   min-height:44px;
-  padding:8px 2px;
+  padding:8px 4px;
   border:none;
   border-radius:11px;
   background:transparent;
   color:rgba(255,255,255,.55);
-  font-size:11px;
+  font-size:12px;
   font-weight:650;
   font-family:inherit;
   line-height:1.15;

@@ -3,5 +3,4 @@ export const SETTINGS_TAB = {
   SOIREE: "soiree",
   PERSONNALISATION: "personnalisation",
   FORFAITS: "forfaits",
-  SUPPORT: "support",
 };

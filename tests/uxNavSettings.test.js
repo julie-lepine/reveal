@@ -1,5 +1,5 @@
 /**
- * UX-NAV-SETTINGS - écran Menu unique (profil + soirée + support).
+ * UX-NAV-SETTINGS - écran Menu unique (profil + soirée + forfaits).
  */
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
@@ -72,38 +72,37 @@ describe("UX-NAV-SETTINGS - game-select sans doublon", () => {
 });
 
 describe("UX-NAV-SETTINGS - contenu écran", () => {
-  it("profil / soirée / forfaits / support en onglets ; soirée grisée hors lobby", () => {
+  it("profil / soirée / forfaits en onglets ; soirée grisée hors lobby", () => {
     const settings = src("js/screens/settings.js");
     assert.match(settings, /Profil/);
     assert.match(settings, /Soirée/);
     assert.match(settings, /Forfaits/);
-    assert.match(settings, /Support/);
+    assert.equal(settings.includes("data-settings-tab=\"${TAB_SUPPORT}\""), false);
+    assert.doesNotMatch(settings, /TAB_SUPPORT/);
     assert.match(settings, /settings-tabs__cursor/);
     assert.match(settings, /🎉/);
     assert.match(settings, /✨/);
     assert.match(settings, /⭐/);
-    assert.match(settings, /💬/);
+    assert.equal(settings.includes("💬"), false);
     assert.match(settings, /data-settings-tab="\$\{TAB_PERSONNALISATION\}"|data-settings-tab="personnalisation"/);
     assert.match(settings, /data-settings-tab="\$\{TAB_SOIREE\}"|data-settings-tab="soiree"/);
     assert.match(settings, /data-settings-tab="\$\{TAB_FORFAITS\}"|data-settings-tab="forfaits"/);
-    assert.match(settings, /data-settings-tab="\$\{TAB_SUPPORT\}"|data-settings-tab="support"/);
     assert.match(settings, /TAB_PERSONNALISATION\s*=\s*SETTINGS_TAB\.PERSONNALISATION/);
     assert.match(settings, /TAB_SOIREE\s*=\s*SETTINGS_TAB\.SOIREE/);
     assert.match(settings, /TAB_FORFAITS\s*=\s*SETTINGS_TAB\.FORFAITS/);
-    assert.match(settings, /TAB_SUPPORT\s*=\s*SETTINGS_TAB\.SUPPORT/);
     assert.match(settings, /settings-tabs__btn--disabled/);
     assert.match(settings, /function forfaitsPanelHtml/);
     assert.match(settings, /data-settings-goto="\$\{TAB_FORFAITS\}"/);
     assert.match(settings, /data-settings-goto="\$\{TAB_PERSONNALISATION\}"/);
     assert.match(settings, /FRIENDS_SCREEN_ID/);
+    assert.match(settings, /HELP_LEGAL_SCREEN_ID/);
+    assert.match(settings, /HELP_LEGAL_LABEL/);
     assert.match(settings, /Emoji/);
     assert.match(settings, /Pseudo/);
     assert.match(settings, /Mot de passe/);
-    assert.match(settings, /Aide/);
-    assert.match(settings, /Dépannage/);
-    assert.match(settings, /btn-settings-reset-app/);
-    assert.match(settings, /resetAppToCleanHome/);
-    assert.match(settings, /Légal/);
+    assert.equal(settings.includes("btn-settings-reset-app"), false);
+    assert.equal(settings.includes("resetAppToCleanHome"), false);
+    assert.equal(settings.includes("btn-delete-account"), false);
     assert.match(settings, /btn-save-name/);
     assert.match(settings, /updateProfileEmoji/);
     assert.match(settings, /changeEmailPassword/);
@@ -135,6 +134,31 @@ describe("UX-NAV-SETTINGS - contenu écran", () => {
     assert.match(settings, /onLobbyBundleUpdated/);
     assert.match(settings, /createMountGuard/);
     assert.match(settings, /mount\.dispose/);
+  });
+
+  it("Aide & légal est une page, pas un onglet", () => {
+    const help = src("js/screens/helpLegal.js");
+    const nav = src("js/screens/nav.js");
+    const main = src("js/main.js");
+    const settings = src("js/screens/settings.js");
+    const tabs = src("js/config/settingsTabs.js");
+    assert.match(src("js/config/helpLegal.js"), /HELP_LEGAL_SCREEN_ID = "help-legal"/);
+    assert.match(src("js/config/helpLegal.js"), /Aide & légal/);
+    assert.match(main, /registerScreen\(HELP_LEGAL_SCREEN_ID/);
+    assert.match(nav, /export function goToHelpLegal/);
+    assert.match(nav, /target === HELP_LEGAL_SCREEN_ID/);
+    assert.match(settings, /data-nav="\$\{HELP_LEGAL_SCREEN_ID\}"/);
+    const perso = settings.slice(settings.indexOf("function personnalisationPanelHtml"));
+    assert.ok(perso.indexOf("HELP_LEGAL_SCREEN_ID") < perso.indexOf("profileLogoutSectionHtml"));
+    assert.doesNotMatch(tabs, /SUPPORT/);
+    assert.match(help, /id="btn-delete-account"/);
+    assert.match(help, /btn-settings-reset-app/);
+    assert.match(help, /resetAppToCleanHome/);
+    assert.match(help, /data-nav="privacy"/);
+    assert.match(help, /Dépannage/);
+    assert.match(src("js/core/bottomNav.js"), /"help-legal":\s*TAB_SETTINGS/);
+    assert.match(src("js/core/gameSync.js"), /screen === "help-legal"/);
+    assert.match(src("js/screens/privacy.js"), /backTarget:\s*"back"/);
   });
 
   it("CSS hamburger menu bottom nav présent", () => {

@@ -68,6 +68,7 @@ describe("FEATURE-FRIENDS-01 Palier 6 — page Amis", () => {
     assert.match(menuBlock, /"friends"/);
     assert.match(menuBlock, /"settings"/);
     assert.match(sync, /screen === "friends"/);
+    assert.match(sync, /screen === "help-legal"/);
     const nav = read("js/screens/nav.js");
     const fn = nav.slice(
       nav.indexOf("export function goToFriends"),
