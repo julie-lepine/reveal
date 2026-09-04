@@ -6,7 +6,7 @@ import {
   resolveLiveDisplayName,
   resolveLiveEmoji,
 } from "./profileIdentity.js";
-import { adFreeFromProfile } from "./entitlements.js";
+import { adFreeFromProfile, profilePackFromProfile } from "./entitlements.js";
 import { formatAuthErrorMessage, isAuthRateLimitError, isAuthCaptchaError } from "./authErrors.js";
 import {
   getPasswordResetCooldownRemainingMs,
@@ -180,6 +180,7 @@ export async function syncSessionToState(session) {
         isGuest: false,
         provider: null,
         adFree: false,
+        profilePack: false,
       },
       supabaseUserId: null,
     });
@@ -243,6 +244,7 @@ export async function syncSessionToState(session) {
       isGuest: isAnonymous,
       provider: providerFromUser(user),
       adFree: isAnonymous ? false : adFreeFromProfile(profile),
+      profilePack: isAnonymous ? false : profilePackFromProfile(profile),
     },
   });
 
@@ -703,6 +705,7 @@ export async function signInAsGuest(displayName, captchaToken = null, emoji = nu
       isGuest: true,
       provider: "guest",
       adFree: false,
+      profilePack: false,
     },
   });
 

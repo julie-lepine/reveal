@@ -392,3 +392,19 @@ Table `lobby_encounters` + trigger `lobby_members` INSERT/DELETE + RPC `list_rec
 | Hors scope | Recherche · invités · historique > 24 h · stores 1.0.0 |
 
 **Statut** : SQL + hotfix + QA **✅** (même projet) · runbook **non** exécuté (prod) · palier 6 docs **27 août 2026** · Pages = push `main`.
+
+---
+
+## 18. FEATURE-PROFILE-01 — Flag Profil (`profiles.profile_pack`)
+
+Deuxième palier Premium (6,99 €) : entitlement serveur, **sans IAP** pour l’instant. Le client lit le flag. `isAdFree()` est aussi vrai si `profile_pack` (Profil inclut Sans pub). L’écriture `profile_pack = true` est bloquée pour `authenticated` / `anon` (trigger). Cette migration **n’écrit pas** `ad_free`.
+
+| Élément | Valeur |
+| ------- | ------ |
+| Migration | [`feature-profile-01-profile-flag.sql`](../supabase/feature-profile-01-profile-flag.sql) — **⏳ à appliquer** (SQL Editor staging puis prod) |
+| Colonne | `public.profiles.profile_pack boolean not null default false` |
+| Client | `js/core/entitlements.js` (`isProfilePack`, `isAdFree`) · `js/core/supabaseProfile.js` |
+| Test manuel | `update public.profiles set profile_pack = true where id = '<uuid>';` puis recharge |
+| Hors scope | Play Billing · App Store · RevenueCat · webhook · UI métier · Hôte 12,99 |
+
+**Statut** : code client dans le repo · SQL **non appliquée** tant que cette ligne n’est pas passée à ✅.

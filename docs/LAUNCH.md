@@ -52,60 +52,61 @@ Builds : `npm run cap:sync` (Node ≥ 22) → AAB / Archive.
 
 ## Palier Profil 6,99
 
-Pas de spec produit dans le repo : on a le prix et le fait que ça vient après **Sans pub 2,99 €**, pas ce que ça débloque. Socle IAP déjà là (RevenueCat, webhook, flag `ad_free`, achat lié au compte). Hôte 12,99 € hors scope.
+Socle IAP déjà là (RevenueCat, webhook, flag `ad_free`, achat lié au compte). Hôte 12,99 € hors scope (pas de SKU, pas de colonne). Nouvel IAP Apple = **nouvelle version** après la maj hCaptcha en review — ne pas coller ça sur le build en file.
 
-Ordre : **0 → 1** (code + SQL) → **2** (admin stores, en parallèle du 1) → **3 → 4 → 5 → 6**. Nouvel IAP Apple = **nouvelle version** après la maj hCaptcha en review — ne pas coller ça sur le build en file.
+Ordre : **0** (contrat, ci-dessous) → **1** (code + SQL) → **2** (admin stores, en parallèle du 1) → **3 → 4 → 5 → 6**.
 
-### 0. Contrat produit *(avant tout code)*
+### 0. Contrat produit — figé 4 sept 2026
 
-- [ ] **Ce que Profil débloque** (stats persistantes, emojis extra, cadre, historique de soirées…)
-- [ ] **Empilement** : Profil inclut-il Sans pub, ou deux achats séparés ?
-- [ ] **Upgrade** : un acheteur 2,99 € paie-t-il 4 € de plus, ou le plein tarif 6,99 € ?
-- [ ] **Hôte 12,99 €** : hors scope ; n’anticiper SQL/RC que si le schéma doit déjà le prévoir
-
-Sans ça : socle entitlement (flag + IAP) possible, pas l’UI métier.
+- [x] **Empilement** : Profil **inclut** Sans pub. Un seul chemin pubs : `isAdFree()` vrai aussi si `profile_pack`.
+- [x] **Upgrade** : un acheteur 2,99 € paie **4,00 €** (`reveal_profile_upgrade`). Les autres paient **6,99 €** (`reveal_profile`). Les stores ne proratisent pas un achat ponctuel.
+- [x] **Compte** : inscrit + natif only ; droit lié au compte. Invité / web = pas d’achat. Ne pas re-payerwaller pseudo, 30 emojis actuels, amis, jeux, lobby 8.
+- [x] **Hôte 12,99 €** : hors scope. Réserver mentalement : lobby > 8, outils de table. Mots perso qui suivent le **joueur** = Profil, pas Hôte.
+- [x] **Ce que Profil débloque** (3 couches ; la fiche store ne promet que ce qui est dans le build) :
+  1. **Identité visible** (1er ship métier) : couleur de pseudo (palette fermée), cadre / badge Profil en lobby, emojis extra. **Pas** d’avatar photo (UGC, plus tard).
+  2. **Carnet perso** (après) : stats agrégées (parties, winrate, MVP, jeu préféré), **20** dernières soirées (date, jeux, *ton* rang/score, prénoms des amis encore amis). **Pas** un historique de salons : pas de code lobby, pas de rejoin, pas de fil. Carte Instagram ensuite.
+  3. **Mots perso** (après) : paquet Draw It / thèmes Tier Night persisté sur le compte.
 
 ### 1. FEATURE-PROFILE-01 — Flag serveur
 
 Même modèle que `profiles.ad_free` : le client **ne peut pas** s’auto-attribuer.
 
-- [ ] Colonne `profiles.profile_pack` (ou `premium_tier`) + trigger
-- [ ] `fetchProfile` lit le flag ; `upsertProfile` ne l’écrit pas
-- [ ] `entitlements.js` : `isProfilePack()` (invité = toujours false)
-- [ ] Si Profil **inclut** Sans pub : `isAdFree()` vrai aussi pour ce palier (un seul chemin pubs)
-- [ ] Tests type `featureAdFree01` + migration SQL + ligne [DEPLOYMENTS_SQL.md](./DEPLOYMENTS_SQL.md)
+- [x] Colonne `profiles.profile_pack` boolean + trigger
+- [x] `fetchProfile` lit le flag ; `upsertProfile` ne l’écrit pas
+- [x] `entitlements.js` : `isProfilePack()` (invité = toujours false)
+- [x] `isAdFree()` vrai si `ad_free` **ou** `profile_pack`
+- [x] Tests type `featureAdFree01` + migration SQL + ligne [DEPLOYMENTS_SQL.md](./DEPLOYMENTS_SQL.md) — **SQL ⏳ à appliquer**
 
 ### 2. FEATURE-PROFILE-02A — Stores + RevenueCat
 
-Admin, pas de code app.
+Admin, pas de code app. En parallèle du 1.
 
 | Où | Quoi |
 |----|------|
-| Play Console | Produit ponctuel `reveal_profile` à **6,99 € TTC** |
-| App Store Connect | Même SKU, **non-conso / lifetime**, 6,99 € |
-| RevenueCat | Entitlement `profile` + produit Play **et** iOS |
-| Offering RC | Package Profil dans l’offering courant (à côté de `reveal_adfree`) |
+| Play Console | Ponctuel `reveal_profile` **6,99 €** + `reveal_profile_upgrade` **4,00 €** |
+| App Store Connect | Mêmes SKUs, **non-conso / lifetime** |
+| RevenueCat | Entitlement `profile` (les **deux** SKUs) ; `ad_free` inchangé |
+| Offering RC | Packages à côté de `reveal_adfree` |
 | Catalogue | Identifiants alignés Play / iOS / RC |
 
-- [ ] Produit Play `reveal_profile`
-- [ ] Produit App Store `reveal_profile`
-- [ ] Entitlement RC `profile` + offering
-- [ ] Si empilement : upgrade RC 2,99 → 6,99 (pas deux entitlements orphelins)
+- [ ] Produit Play `reveal_profile` + `reveal_profile_upgrade`
+- [ ] Produit App Store `reveal_profile` + `reveal_profile_upgrade`
+- [ ] Entitlement RC `profile` + offering (upgrade **et** plein tarif grant `profile`)
 
 ### 3. FEATURE-PROFILE-02B — Achat client + webhook
 
 Réutiliser `purchases.js` / `revenuecat-webhook`, pas un 2ᵉ pipeline.
 
-- [ ] SKU `reveal_profile` dans `data/revenueCatConfig.js`
-- [ ] `purchaseProfile` / restore (compte inscrit only, pas web, pas invité)
-- [ ] Menu → **Profil** : carte comme Sans pub (acheter / restaurer / « actif sur ce compte »)
-- [ ] Webhook : `GRANT`/`REVOKE` → `profiles.profile_pack` (et `ad_free` si inclus)
+- [ ] SKUs dans `data/revenueCatConfig.js`
+- [ ] `purchaseProfile` : 6,99 si pas Sans pub ; 4,00 si Sans pub sans Profil. Restore. Compte inscrit only, pas web, pas invité
+- [ ] Menu → **Profil** : carte comme Sans pub ; si Profil actif, masquer l’achat 2,99 (inclus)
+- [ ] Webhook : entitlement `profile` → `profile_pack` + `ad_free`. Refund upgrade → perd Profil, **garde** Sans pub si `reveal_adfree` encore valide
 - [ ] Poll `refresh…FromServerUntil` après achat, **zéro écriture client**
 - [ ] Tests type `featureAdFree02a` / `02b`
 
 ### 4. FEATURE-PROFILE-03 — Ce que ça débloque
 
-Uniquement après l’étape 0.
+Couche 1 d’abord (couleur, cadre, emojis extra), puis carnet, puis mots. Ne pas promettre 2/3 dans la fiche si absents du build.
 
 - [ ] Gate UI (Menu Profil + éventuellement hub)
 - [ ] Gate réelle (pas seulement un bouton grisé)

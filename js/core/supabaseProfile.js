@@ -1,35 +1,44 @@
 import { supabase, isSupabaseConfigured } from "./supabaseClient.js";
 
-function isMissingAdFreeColumn(error) {
+function isMissingProfileColumn(error) {
   const msg = String(error?.message || "").toLowerCase();
   const code = String(error?.code || "");
   return (
     code === "42703" ||
-    (msg.includes("ad_free") && (msg.includes("column") || msg.includes("schema cache")))
+    ((msg.includes("ad_free") || msg.includes("profile_pack")) &&
+      (msg.includes("column") || msg.includes("schema cache")))
   );
 }
 
-async function fetchProfileRow(userId) {
-  const withFlag = await supabase
-    .from("profiles")
-    .select("id, display_name, emoji, ad_free")
-    .eq("id", userId)
-    .maybeSingle();
-
-  if (!withFlag.error) return withFlag;
-
-  if (!isMissingAdFreeColumn(withFlag.error)) return withFlag;
-
-  const fallback = await supabase
-    .from("profiles")
-    .select("id, display_name, emoji")
-    .eq("id", userId)
-    .maybeSingle();
-  if (fallback.error) return fallback;
+function withEntitlementDefaults(row) {
+  if (!row) return row;
   return {
-    data: fallback.data ? { ...fallback.data, ad_free: false } : fallback.data,
-    error: null,
+    ad_free: false,
+    profile_pack: false,
+    ...row,
   };
+}
+
+async function fetchProfileRow(userId) {
+  const selects = [
+    "id, display_name, emoji, ad_free, profile_pack",
+    "id, display_name, emoji, ad_free",
+    "id, display_name, emoji",
+  ];
+  let last = null;
+  for (const select of selects) {
+    const res = await supabase
+      .from("profiles")
+      .select(select)
+      .eq("id", userId)
+      .maybeSingle();
+    last = res;
+    if (!res.error) {
+      return { data: withEntitlementDefaults(res.data), error: null };
+    }
+    if (!isMissingProfileColumn(res.error)) return res;
+  }
+  return last;
 }
 
 export async function fetchProfile(userId) {

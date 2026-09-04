@@ -41,6 +41,7 @@ const defaultUser = () => ({
   isGuest: false,
   provider: null,
   adFree: false,
+  profilePack: false,
 });
 
 const defaultLobby = () => ({

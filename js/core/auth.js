@@ -258,6 +258,7 @@ export async function logout() {
         isGuest: false,
         provider: null,
         adFree: false,
+        profilePack: false,
       },
       inLobby: false,
       lobby: null,

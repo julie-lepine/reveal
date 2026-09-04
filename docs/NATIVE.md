@@ -128,7 +128,7 @@ Capacitor + plugin `@capacitor-community/admob`, logique JS dans `js/core/ads.js
 
 La bannière s’affiche en **haut** à partir du **lobby** (prep, jeux, résultats…). Elle est **masquée** sur l’intro (`welcome`), la page connexion / accueil (`home`) et le reset mot de passe.
 
-Si `profiles.ad_free` est vrai pour le compte connecté, **aucune bannière** (voir [`feature-adfree-01-profile-flag.sql`](../supabase/feature-adfree-01-profile-flag.sql) et Menu → Profil).
+Si `profiles.ad_free` **ou** `profiles.profile_pack` est vrai pour le compte connecté, **aucune bannière** (voir [`feature-adfree-01-profile-flag.sql`](../supabase/feature-adfree-01-profile-flag.sql), [`feature-profile-01-profile-flag.sql`](../supabase/feature-profile-01-profile-flag.sql) et Menu → Profil).
 
 ### Configuration
 

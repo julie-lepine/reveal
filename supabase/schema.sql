@@ -7,6 +7,7 @@ create table if not exists public.profiles (
   display_name text not null check (char_length(display_name) >= 2),
   emoji text default '👤',
   ad_free boolean not null default false,
+  profile_pack boolean not null default false,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -183,6 +184,31 @@ drop trigger if exists profiles_protect_ad_free on public.profiles;
 create trigger profiles_protect_ad_free
 before insert or update on public.profiles
 for each row execute function public.profiles_protect_ad_free();
+
+-- Profil 6,99 € : le client ne peut pas s’auto-attribuer profile_pack (voir aussi feature-profile-01).
+create or replace function public.profiles_protect_profile_pack()
+returns trigger
+language plpgsql
+as $$
+begin
+  if tg_op = 'INSERT' then
+    if coalesce(auth.role(), '') in ('authenticated', 'anon') then
+      new.profile_pack := false;
+    end if;
+    return new;
+  end if;
+
+  if coalesce(auth.role(), '') in ('authenticated', 'anon') then
+    new.profile_pack := old.profile_pack;
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists profiles_protect_profile_pack on public.profiles;
+create trigger profiles_protect_profile_pack
+before insert or update on public.profiles
+for each row execute function public.profiles_protect_profile_pack();
 
 drop policy if exists "lobbies_insert_host" on public.lobbies;
 create policy "lobbies_insert_host" on public.lobbies for insert
