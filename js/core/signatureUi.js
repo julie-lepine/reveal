@@ -48,8 +48,22 @@ export function playerAvatarHtml(p, baseClass = "avatar avatar--sm") {
   return `<span class="${escapeHtml(cls)}" style="background:${escapeHtml(ident.color)}">${escapeHtml(ident.emoji)}</span>`;
 }
 
+/** Mini carte salon : avatar + pseudo, pour que le joueur se voie comme les autres. */
+export function signatureSelfPreviewHtml(p, { caption = "Comme ça, les autres te voient" } = {}) {
+  const ident = signatureIdentityFrom(p);
+  return `
+    <div class="signature-self-preview" id="settings-signature-preview">
+      <p class="hint signature-self-preview__caption">${escapeHtml(caption)}</p>
+      <div class="signature-self-preview__row">
+        ${playerAvatarHtml(ident, "signature-self-preview__avatar")}
+        ${playerNameHtml(ident, "signature-self-preview__name")}
+      </div>
+    </div>`;
+}
+
 export function nameColorChipsHtml(selectedId, { unlocked = false } = {}) {
   return `
+    <p class="field-label">Couleur du pseudo</p>
     <div class="name-color-chips" role="listbox" aria-label="Couleur du pseudo">
       ${SIGNATURE_NAME_COLORS.map((c) => {
         const active = selectedId === c.id;
@@ -82,8 +96,10 @@ export function profileEmojiPickerHtml(selectedEmoji, { includeSignatureExtras =
   ).join("");
   return `
     <div class="emoji-picker" role="listbox" aria-label="Choisir un emoji">${free}</div>
-    <p class="hint settings-section__hint emoji-picker__sig-label">${escapeHtml(PACK_SIGNATURE_LABEL)}</p>
-    <div class="emoji-picker emoji-picker--signature" role="listbox" aria-label="Emojis ${escapeHtml(PACK_SIGNATURE_LABEL)}">${extras}</div>
+    <div class="emoji-picker-signature-wrap">
+      <p class="emoji-picker__sig-label">${escapeHtml(PACK_SIGNATURE_LABEL)}</p>
+      <div class="emoji-picker emoji-picker--signature" role="listbox" aria-label="Emojis ${escapeHtml(PACK_SIGNATURE_LABEL)}">${extras}</div>
+    </div>
     ${
       unlocked
         ? ""

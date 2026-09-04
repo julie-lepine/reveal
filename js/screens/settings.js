@@ -16,12 +16,14 @@ import { adFreeSettingsCardHtml } from "../core/adFreeUi.js";
 import { profilePackSettingsCardHtml } from "../core/profilePackUi.js";
 import { purchaseAdFree, restoreAdFree, purchaseProfile, restoreProfile } from "../core/purchases.js";
 import { getLocalDisplayName, getLocalEmoji } from "../core/state.js";
+import { resolvedNameColorHex } from "../../data/signatureIdentity.js";
 import {
   isLockedSignatureEmojiClick,
   isProfilePack,
   nameColorChipsHtml,
-  playerNameHtml,
+  playerAvatarHtml,
   profileEmojiPickerHtml,
+  signatureSelfPreviewHtml,
 } from "../core/signatureUi.js";
 import {
   hasActiveLobby,
@@ -250,9 +252,13 @@ function personnalisationPanelHtml({ emailAccount, user, selectedEmoji }) {
       <div class="card settings-section">
         <h2 class="settings-section__title">Pseudo</h2>
         <p class="hint settings-section__hint">Visible dans le lobby et les scores.</p>
-        <p class="settings-name-preview">${playerNameHtml(previewPlayer, "settings-name-preview__text")}</p>
+        ${signatureSelfPreviewHtml(previewPlayer)}
         <label class="field-label" for="settings-name">Ton pseudo</label>
-        <input type="text" class="field-input" id="settings-name" maxlength="24" value="${escapeHtml(getLocalDisplayName())}" />
+        <input type="text" class="field-input" id="settings-name" maxlength="24" value="${escapeHtml(getLocalDisplayName())}" ${
+          resolvedNameColorHex(previewPlayer)
+            ? `style="color:${resolvedNameColorHex(previewPlayer)}"`
+            : ""
+        } />
         ${nameColorChipsHtml(selectedColor, { unlocked })}
         <p class="auth-error hidden" id="name-error"></p>
         <p class="settings-ok hidden" id="name-ok">Pseudo enregistré.</p>
@@ -264,7 +270,7 @@ function personnalisationPanelHtml({ emailAccount, user, selectedEmoji }) {
         <h2 class="settings-section__title">Emoji</h2>
         <p class="hint settings-section__hint">Affiché dans le lobby et les classements.</p>
         <div class="emoji-picker-preview">
-          <span class="emoji-picker-preview__avatar" id="emoji-preview">${selectedEmoji}</span>
+          ${playerAvatarHtml(previewPlayer, "emoji-picker-preview__avatar")}
           <span class="hint">Aperçu de ton avatar</span>
         </div>
         ${profileEmojiPickerHtml(selectedEmoji, { includeSignatureExtras: !user?.isGuest, unlocked })}
@@ -369,6 +375,43 @@ export function mountSettings(app) {
       card?.scrollIntoView({ behavior: "smooth", block: "center" });
     }
 
+    function currentPreviewPlayer() {
+      return {
+        name: app.querySelector("#settings-name")?.value?.trim() || getLocalDisplayName(),
+        emoji: selectedEmoji,
+        color: "#60A5FA",
+        nameColor: getUser()?.nameColor || null,
+        signature: isProfilePack(),
+      };
+    }
+
+    function refreshSignaturePreview() {
+      const p = currentPreviewPlayer();
+      const box = app.querySelector("#settings-signature-preview");
+      if (box) {
+        const fresh = document.createElement("div");
+        fresh.innerHTML = signatureSelfPreviewHtml(p).trim();
+        const next = fresh.firstElementChild;
+        if (next) box.replaceWith(next);
+      }
+      const emojiPreview = app.querySelector(".emoji-picker-preview__avatar");
+      if (emojiPreview) {
+        const wrap = document.createElement("div");
+        wrap.innerHTML = playerAvatarHtml(p, "emoji-picker-preview__avatar");
+        const nextAv = wrap.firstElementChild;
+        if (nextAv) emojiPreview.replaceWith(nextAv);
+      }
+      const input = app.querySelector("#settings-name");
+      if (input) {
+        const hex = resolvedNameColorHex(p);
+        input.style.color = hex || "";
+      }
+    }
+
+    app.querySelector("#settings-name")?.addEventListener("input", () => {
+      refreshSignaturePreview();
+    });
+
     app.querySelectorAll(".name-color-chip").forEach((btn) => {
       btn.addEventListener("click", async () => {
         if (!mount.isMounted()) return;
@@ -394,6 +437,7 @@ export function mountSettings(app) {
         app.querySelectorAll(".name-color-chip").forEach((b) => {
           b.classList.toggle("name-color-chip--active", b === btn);
         });
+        refreshSignaturePreview();
       });
     });
 
@@ -420,10 +464,10 @@ export function mountSettings(app) {
 
         err?.classList.add("hidden");
         selectedEmoji = res.emoji;
-        app.querySelector("#emoji-preview").textContent = res.emoji;
         app.querySelectorAll(".emoji-picker__btn").forEach((b) => {
           b.classList.toggle("emoji-picker__btn--active", b === btn);
         });
+        refreshSignaturePreview();
         ok?.classList.remove("hidden");
       });
     });
@@ -443,6 +487,7 @@ export function mountSettings(app) {
       err.classList.add("hidden");
       ok?.classList.remove("hidden");
       app.querySelector("#settings-name").value = res.name;
+      refreshSignaturePreview();
     });
 
     app.querySelector("#btn-save-password")?.addEventListener("click", async () => {

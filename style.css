@@ -486,15 +486,15 @@ body.has-top-ad .back{
 .name-color-chips{
   display:flex;
   flex-wrap:wrap;
-  gap:8px;
-  margin:10px 0 8px;
+  gap:10px;
+  margin:8px 0 12px;
 }
 
 .name-color-chip{
-  width:28px;
-  height:28px;
+  width:36px;
+  height:36px;
   border-radius:50%;
-  border:2px solid rgba(255,255,255,.2);
+  border:2px solid rgba(255,255,255,.25);
   background:var(--chip, #888);
   padding:0;
   cursor:pointer;
@@ -522,6 +522,58 @@ body.has-top-ad .back{
   margin:0 0 10px;
   font-size:16px;
   font-weight:700;
+}
+
+.signature-self-preview{
+  margin:0 0 14px;
+  padding:12px 14px;
+  border-radius:16px;
+  border:1px solid rgba(245,215,110,.35);
+  background:rgba(245,215,110,.08);
+}
+
+.signature-self-preview__caption{
+  margin:0 0 8px;
+  font-size:12px;
+}
+
+.signature-self-preview__row{
+  display:flex;
+  align-items:center;
+  gap:12px;
+}
+
+.signature-self-preview__avatar{
+  width:48px;
+  height:48px;
+  border-radius:50%;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:24px;
+  flex-shrink:0;
+}
+
+.signature-self-preview__name{
+  font-size:18px;
+  font-weight:700;
+}
+
+.emoji-picker-signature-wrap{
+  margin-top:14px;
+  padding:12px;
+  border-radius:16px;
+  border:1px solid rgba(245,215,110,.35);
+  background:rgba(245,215,110,.06);
+}
+
+.emoji-picker-signature-wrap .emoji-picker__sig-label{
+  margin:0 0 8px;
+  font-weight:700;
+  color:#F5D76E;
+  font-size:13px;
+  letter-spacing:.04em;
+  text-transform:uppercase;
 }
 
 .label-upper{

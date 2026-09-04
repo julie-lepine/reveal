@@ -11,7 +11,7 @@ import {
   SIGNATURE_EMOJI_CHOICES,
   SIGNATURE_NAME_COLOR_IDS,
 } from "../data/signatureIdentity.js";
-import { playerNameHtml, signatureRingClass } from "../js/core/signatureUi.js";
+import { playerNameHtml, signatureRingClass, signatureSelfPreviewHtml } from "../js/core/signatureUi.js";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -80,6 +80,15 @@ describe("FEATURE-PROFILE-03 — identité Signature", () => {
     assert.match(sig, /#F5D76E/);
     assert.equal(signatureRingClass({ signature: true }, "avatar"), "avatar signature-ring");
     assert.equal(signatureRingClass({ signature: false }, "avatar"), "avatar");
+    const self = signatureSelfPreviewHtml({
+      name: "Ada",
+      emoji: "🦊",
+      signature: true,
+      nameColor: "gold",
+    });
+    assert.match(self, /Comme ça, les autres te voient/);
+    assert.match(self, /signature-badge/);
+    assert.match(self, /signature-ring/);
   });
 
   it("SQL : colonnes + trigger gate + snapshot salon", () => {
