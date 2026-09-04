@@ -3892,8 +3892,66 @@ button.emoji-picker-preview__avatar:active{
   position:relative;
 }
 
-.settings-panel > .friends-entry{
-  margin:0 0 12px;
+.settings-link-row{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  width:100%;
+  min-height:48px;
+  margin:0 0 14px;
+  padding:4px 2px;
+  border:0;
+  background:transparent;
+  -webkit-appearance:none;
+  appearance:none;
+  color:#fff;
+  font:inherit;
+  font-weight:650;
+  letter-spacing:.01em;
+  text-align:left;
+  cursor:pointer;
+  -webkit-tap-highlight-color:transparent;
+}
+
+.settings-link-row:focus-visible{
+  outline:2px solid var(--color-secondary);
+  outline-offset:2px;
+  border-radius:10px;
+}
+
+.settings-link-row__icon-wrap{
+  position:relative;
+  flex-shrink:0;
+  width:36px;
+  height:36px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  border-radius:10px;
+  background:rgba(129,140,248,.16);
+}
+
+.settings-link-row__icon{
+  font-size:18px;
+  line-height:1;
+}
+
+.settings-link-row__label{
+  flex:1;
+  min-width:0;
+}
+
+.settings-link-row__chevron{
+  flex-shrink:0;
+  color:rgba(255,255,255,.4);
+  font-size:22px;
+  line-height:1;
+  font-weight:400;
+}
+
+.settings-link-row .friends-badge{
+  top:-2px;
+  right:-2px;
 }
 
 .friends-row{

@@ -1,8 +1,8 @@
--- FEATURE-PROFILE-03b — 6 emojis passent de gratuit à Signature
+-- FEATURE-PROFILE-03b — emojis déplacés de gratuit vers Signature
 --
 -- À coller dans SQL Editor (prod) si FEATURE-PROFILE-03 est déjà appliqué.
--- Idempotent (`create or replace`).
--- Un joueur sans pack qui a déjà 😈👻🔥🐸💎🌈 le garde tant qu’il ne le change pas.
+-- Idempotent (`create or replace`). Un seul collage suffit (lots 1 + 2).
+-- Déjà équipé sans pack : l’emoji est gardé tant qu’il n’est pas changé.
 
 create or replace function public.profiles_signature_cosmetics()
 returns trigger
@@ -11,15 +11,15 @@ as $$
 declare
   v_allowed_colors text[] := array['gold','rose','violet','cyan','lime','amber','coral','ice'];
   v_free_emoji text[] := array[
-    '😀','😎','🤩','🥳','🎭','🎮',
-    '🃏','👤','🍺','⚽','💜','⭐',
-    '🌟','🎯','🎲','🦊','🐱','🐶',
-    '🦁','🍕','🎸','🚀','🎈','🕵️'
+    '😀','🤩','🥳','🎭','🎮','🃏',
+    '👤','🍺','⚽','⭐','🎲','🦊',
+    '🐱','🐶','🦁','🍕','🎸','🕵️'
   ];
   v_sig_emoji text[] := array[
     '👑','🦄','🐉','🦋','🌙','⚡',
     '🥂','🏆','💫','🧿','🖤','🩷',
-    '😈','👻','🔥','🐸','💎','🌈'
+    '😈','👻','🔥','🐸','💎','🌈',
+    '😎','💜','🌟','🎯','🚀','🎈'
   ];
   v_emoji text;
   v_old_emoji text;

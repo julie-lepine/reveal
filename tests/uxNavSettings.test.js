@@ -14,6 +14,7 @@ import {
 import {
   lobbySettingsActionsForRole,
 } from "../js/core/partySettingsMenu.js";
+import { SETTINGS_TAB } from "../js/config/settingsTabs.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, "..");
@@ -134,6 +135,23 @@ describe("UX-NAV-SETTINGS - contenu écran", () => {
     assert.match(settings, /onLobbyBundleUpdated/);
     assert.match(settings, /createMountGuard/);
     assert.match(settings, /mount\.dispose/);
+  });
+
+  it("Mes amis est une ligne du Profil, pas un onglet", () => {
+    const tabs = src("js/config/settingsTabs.js");
+    const settings = src("js/screens/settings.js");
+    assert.doesNotMatch(tabs, /AMIS|FRIENDS|amis/);
+    assert.deepEqual(Object.values(SETTINGS_TAB), ["soiree", "personnalisation", "forfaits"]);
+    const tabsHtml = settings.slice(
+      settings.indexOf("function settingsTabsHtml"),
+      settings.indexOf("function partySectionHtml")
+    );
+    assert.doesNotMatch(tabsHtml, /FRIENDS_SCREEN_ID/);
+    assert.doesNotMatch(tabsHtml, /Mes amis/);
+    const perso = settings.slice(settings.indexOf("function personnalisationPanelHtml"));
+    assert.match(perso, /settings-link-row/);
+    assert.match(perso, /FRIEND_LABEL\.entrySettings/);
+    assert.match(src("style.css"), /\.settings-link-row\{/);
   });
 
   it("Aide & légal est une page, pas un onglet", () => {

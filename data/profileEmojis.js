@@ -1,9 +1,8 @@
 /** Emojis proposés pour le profil joueur (gratuit). */
 export const PROFILE_EMOJI_CHOICES = [
-  "😀", "😎", "🤩", "🥳", "🎭", "🎮",
-  "🃏", "👤", "🍺", "⚽", "💜", "⭐",
-  "🌟", "🎯", "🎲", "🦊", "🐱", "🐶",
-  "🦁", "🍕", "🎸", "🚀", "🎈", "🕵️",
+  "😀", "🤩", "🥳", "🎭", "🎮", "🃏",
+  "👤", "🍺", "⚽", "⭐", "🎲", "🦊",
+  "🐱", "🐶", "🦁", "🍕", "🎸", "🕵️",
 ];
 
 export const DEFAULT_PROFILE_EMOJI = "👤";

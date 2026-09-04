@@ -40,6 +40,12 @@ export const SIGNATURE_EMOJI_CHOICES = Object.freeze([
   "🐸",
   "💎",
   "🌈",
+  "😎",
+  "💜",
+  "🌟",
+  "🎯",
+  "🚀",
+  "🎈",
 ]);
 
 export function normalizeEmojiGrapheme(emoji) {

@@ -49,14 +49,14 @@ describe("FEATURE-PROFILE-03 — identité Signature", () => {
     assert.equal(resolvedNameColorHex({ signature: true, nameColor: "nope" }), null);
   });
 
-  it("24 emojis gratuits ; 6 déplacés dans Signature", () => {
+  it("18 emojis gratuits ; extra dans Signature", () => {
     assert.equal(canUseProfileEmoji("🦊", { profilePack: false }), true);
     assert.equal(canUseProfileEmoji("👑", { profilePack: false }), false);
     assert.equal(canUseProfileEmoji("👑", { profilePack: true }), true);
     assert.equal(canUseProfileEmoji("👑", { profilePack: true, isGuest: true }), false);
-    assert.equal(PROFILE_EMOJI_CHOICES.length, 24);
-    assert.equal(SIGNATURE_EMOJI_CHOICES.length, 18);
-    for (const emoji of ["😈", "👻", "🔥", "🐸", "💎", "🌈"]) {
+    assert.equal(PROFILE_EMOJI_CHOICES.length, 18);
+    assert.equal(SIGNATURE_EMOJI_CHOICES.length, 24);
+    for (const emoji of ["😈", "👻", "🔥", "🐸", "💎", "🌈", "😎", "💜", "🌟", "🎯", "🚀", "🎈"]) {
       assert.equal(PROFILE_EMOJI_CHOICES.includes(emoji), false, emoji);
       assert.equal(SIGNATURE_EMOJI_CHOICES.includes(emoji), true, emoji);
       assert.equal(canUseProfileEmoji(emoji, { profilePack: false }), false, emoji);
@@ -121,7 +121,9 @@ describe("FEATURE-PROFILE-03 — identité Signature", () => {
     assert.match(sql, /friends_live_signature/);
     const split = src("supabase/feature-profile-03b-emoji-split.sql");
     assert.match(split, /'😈','👻','🔥','🐸','💎','🌈'/);
+    assert.match(split, /'😎','💜','🌟','🎯','🚀','🎈'/);
     assert.match(sql, /'😈','👻','🔥','🐸','💎','🌈'/);
+    assert.match(sql, /'😎','💜','🌟','🎯','🚀','🎈'/);
     const profile = src("js/core/supabaseProfile.js");
     assert.match(profile, /name_color/);
     const upsert = profile.slice(profile.indexOf("export async function upsertProfile"));
