@@ -1,8 +1,8 @@
 /**
- * FEATURE-ADFREE-02B — RevenueCat natif (Play live ; iOS dès que `appl_…` est collée).
+ * FEATURE-ADFREE-02B / FEATURE-PROFILE-02B — RevenueCat natif.
  *
- * Le client n’écrit jamais `profiles.ad_free`. Après achat / restore, on relit le profil
- * (webhook service_role).
+ * Le client n’écrit jamais `profiles.ad_free` ni `profiles.profile_pack`.
+ * Après achat / restore, on relit le profil (webhook service_role).
  */
 import { isNativeApp, getNativePlatform } from "./platform.js";
 import { getState } from "./state.js";
@@ -10,6 +10,8 @@ import {
   REVENUECAT_ANDROID_PUBLIC_SDK_KEY,
   REVENUECAT_IOS_PUBLIC_SDK_KEY,
   PLAY_PRODUCT_ID_AD_FREE,
+  PLAY_PRODUCT_ID_PROFILE,
+  PLAY_PRODUCT_ID_PROFILE_UPGRADE,
 } from "../../data/revenueCatConfig.js";
 
 let configurePromise = null;
@@ -137,22 +139,57 @@ export function unwrapOfferings(result) {
   return result;
 }
 
-function packageForAdFree(offerings) {
+function productIdentifier(pkg) {
+  return String(pkg?.product?.identifier || pkg?.product?.productIdentifier || "");
+}
+
+function identifierMatchesSku(id, sku) {
+  if (!id || !sku) return false;
+  return id === sku || id.endsWith(`.${sku}`);
+}
+
+function packagesFromOfferings(offerings) {
   const current = offerings?.current;
-  const packages =
+  return (
     current?.availablePackages ||
     offerings?.all?.default?.availablePackages ||
-    [];
-  const match = packages.find((pkg) => {
-    const id = pkg?.product?.identifier || pkg?.product?.productIdentifier || "";
-    return id === PLAY_PRODUCT_ID_AD_FREE || id?.endsWith(PLAY_PRODUCT_ID_AD_FREE);
-  });
-  return match || packages[0] || current?.lifetime || offerings?.all?.default?.lifetime || null;
+    []
+  );
+}
+
+function packageForSku(offerings, sku) {
+  const packages = packagesFromOfferings(offerings);
+  return packages.find((pkg) => identifierMatchesSku(productIdentifier(pkg), sku)) || null;
+}
+
+function packageForAdFree(offerings) {
+  const match = packageForSku(offerings, PLAY_PRODUCT_ID_AD_FREE);
+  const current = offerings?.current;
+  return match || packagesFromOfferings(offerings)[0] || current?.lifetime || offerings?.all?.default?.lifetime || null;
+}
+
+/** SKU Profil : 4,00 € si Sans pub déjà là, sinon 6,99 €. Pas de fallback sur Sans pub. */
+export function profileSkuForUser(user) {
+  if (user?.adFree === true && user?.profilePack !== true) {
+    return PLAY_PRODUCT_ID_PROFILE_UPGRADE;
+  }
+  return PLAY_PRODUCT_ID_PROFILE;
+}
+
+function packageForProfile(offerings, user) {
+  return packageForSku(offerings, profileSkuForUser(user));
 }
 
 async function refreshAdFreeAfterStore() {
   const { refreshAdFreeFromServerUntil } = await import("./entitlements.js");
   const on = await refreshAdFreeFromServerUntil(true, { tries: 8, delayMs: 1000 });
+  await refreshAdsQuiet();
+  return on;
+}
+
+async function refreshProfilePackAfterStore() {
+  const { refreshProfilePackFromServerUntil } = await import("./entitlements.js");
+  const on = await refreshProfilePackFromServerUntil(true, { tries: 8, delayMs: 1000 });
   await refreshAdsQuiet();
   return on;
 }
@@ -219,6 +256,77 @@ export async function restoreAdFree() {
       message: adFree
         ? "Sans pub est de nouveau actif sur ce compte."
         : "Aucun achat Sans pub trouvé pour ce compte.",
+    };
+  } catch (e) {
+    return { ok: false, message: e?.message || "Restauration impossible." };
+  }
+}
+
+export async function purchaseProfile() {
+  if (!isNativeApp()) {
+    return {
+      ok: false,
+      message: "L’achat Profil se fait dans l’app native, pas sur le web.",
+    };
+  }
+  if (!isPurchasesNativeReady()) {
+    return { ok: false, message: "Achats indisponibles sur cette version." };
+  }
+  const user = getState().user || {};
+  if (!user.loggedIn || user.isGuest) {
+    return { ok: false, message: "Connecte-toi avec un compte pour acheter Profil." };
+  }
+  if (user.profilePack === true) {
+    return { ok: true, profilePack: true, message: "Profil est déjà actif sur ce compte." };
+  }
+  try {
+    const Purchases = await ensurePurchasesConfigured();
+    await Purchases.logIn({ appUserID: getState().supabaseUserId });
+    const offerings = unwrapOfferings(await Purchases.getOfferings());
+    const pkg = packageForProfile(offerings, user);
+    if (!pkg) {
+      return {
+        ok: false,
+        message: "Offre Profil introuvable. Vérifie le produit dans RevenueCat.",
+      };
+    }
+    await Purchases.purchasePackage({ aPackage: pkg });
+    const profilePack = await refreshProfilePackAfterStore();
+    return {
+      ok: true,
+      profilePack,
+      message: profilePack
+        ? "Profil est actif sur ce compte."
+        : "Achat enregistré. L’activation peut prendre une minute — rouvre Profil si ce n’est pas encore affiché.",
+    };
+  } catch (e) {
+    if (isUserCancelled(e)) return { ok: false, cancelled: true };
+    return { ok: false, message: e?.message || "Achat impossible." };
+  }
+}
+
+export async function restoreProfile() {
+  if (!isNativeApp()) {
+    return { ok: false, message: "La restauration se fait dans l’app native." };
+  }
+  if (!isPurchasesNativeReady()) {
+    return { ok: false, message: "Achats indisponibles sur cette version." };
+  }
+  const user = getState().user || {};
+  if (!user.loggedIn || user.isGuest) {
+    return { ok: false, message: "Connecte-toi avec un compte pour restaurer l’achat." };
+  }
+  try {
+    const Purchases = await ensurePurchasesConfigured();
+    await Purchases.logIn({ appUserID: getState().supabaseUserId });
+    await Purchases.restorePurchases();
+    const profilePack = await refreshProfilePackAfterStore();
+    return {
+      ok: true,
+      profilePack,
+      message: profilePack
+        ? "Profil est de nouveau actif sur ce compte."
+        : "Aucun achat Profil trouvé pour ce compte.",
     };
   } catch (e) {
     return { ok: false, message: e?.message || "Restauration impossible." };

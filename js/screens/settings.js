@@ -11,7 +11,8 @@ import {
 } from "../core/auth.js";
 import { refreshAdsForEntitlement } from "../core/ads.js";
 import { adFreeSettingsCardHtml } from "../core/adFreeUi.js";
-import { purchaseAdFree, restoreAdFree } from "../core/purchases.js";
+import { profilePackSettingsCardHtml } from "../core/profilePackUi.js";
+import { purchaseAdFree, restoreAdFree, purchaseProfile, restoreProfile } from "../core/purchases.js";
 import { getLocalDisplayName, getLocalEmoji } from "../core/state.js";
 import { PROFILE_EMOJI_CHOICES } from "../../data/profileEmojis.js";
 import {
@@ -222,6 +223,7 @@ function personnalisationPanelHtml({ emailAccount, user, selectedEmoji }) {
   return `
     <div class="settings-panel" id="settings-panel-personnalisation">
       ${adFreeSettingsCardHtml()}
+      ${profilePackSettingsCardHtml()}
       <div class="card settings-section">
         <button type="button" class="btn btn-secondary friends-entry" data-nav="${FRIENDS_SCREEN_ID}" data-friends-entry="${FRIENDS_ENTRY.settingsProfile}">
           ${escapeHtml(FRIEND_LABEL.entrySettings)}
@@ -435,6 +437,7 @@ export function mountSettings(app) {
     });
 
     bindAdFreeEvents();
+    bindProfilePackEvents();
   }
 
   async function runAdFreeAction(action) {
@@ -463,6 +466,35 @@ export function mountSettings(app) {
     });
     app.querySelector("#btn-adfree-restore")?.addEventListener("click", () => {
       void runAdFreeAction(restoreAdFree);
+    });
+  }
+
+  async function runProfilePackAction(action) {
+    try {
+      const res = await action();
+      refreshAdsForEntitlement();
+      if (!mount.isMounted()) return;
+      swapActivePanel();
+      if (res?.cancelled) return;
+      await showAppAlert(res?.message || "Action terminée.", {
+        title: "Profil",
+        icon: res?.ok && res?.profilePack ? "✨" : "📢",
+      });
+    } catch (e) {
+      if (!mount.isMounted()) return;
+      await showAppAlert(e?.message || "Impossible de finaliser l’achat.", {
+        title: "Profil",
+        icon: "⚠️",
+      });
+    }
+  }
+
+  function bindProfilePackEvents() {
+    app.querySelector("#btn-profile-buy")?.addEventListener("click", () => {
+      void runProfilePackAction(purchaseProfile);
+    });
+    app.querySelector("#btn-profile-restore")?.addEventListener("click", () => {
+      void runProfilePackAction(restoreProfile);
     });
   }
 

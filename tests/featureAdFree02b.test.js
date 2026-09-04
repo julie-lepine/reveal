@@ -23,7 +23,9 @@ describe("FEATURE-ADFREE-02B — achat + webhook", () => {
   });
 
   it("webhook service_role, jamais le secret dans le client", () => {
-    const fn = src("supabase/functions/revenuecat-webhook/index.ts");
+    const fn =
+      src("supabase/functions/revenuecat-webhook/index.ts") +
+      src("supabase/revenuecat-entitlement-patch.js");
     assert.match(fn, /REVENUECAT_WEBHOOK_AUTH/);
     assert.match(fn, /SUPABASE_SERVICE_ROLE_KEY/);
     assert.match(fn, /ad_free/);

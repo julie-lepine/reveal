@@ -92,6 +92,7 @@ Sources : audit SQL du dépôt (`AUDIT-SQL-01`) + docs ops ([`SUPABASE.md`](./SU
 | 2026-08-27 | [`feature-friends-03-live-identity.sql`](../supabase/feature-friends-03-live-identity.sql) | FEATURE-FRIENDS-03 identité | ✅ | ✅ | — | Tes amis « Joueur » / 👤 · voir §16 |
 | 2026-08-27 | [`feature-friends-04.sql`](../supabase/feature-friends-04.sql) | FEATURE-FRIENDS-04 | ✅ | ✅ | [`feature-friends-04-runbook.sql`](../supabase/tests/feature-friends-04-runbook.sql) | Croisés 24 h · runbook **staging only** · voir §17 |
 | 2026-08-27 | [`feature-friends-04-dissolve-trigger.sql`](../supabase/feature-friends-04-dissolve-trigger.sql) | FEATURE-FRIENDS-04 hotfix | ✅ | ✅ | — | BEFORE DELETE dissolve + `NOTIFY pgrst` · voir §17 |
+| 2026-09-04 | [`feature-profile-01-profile-flag.sql`](../supabase/feature-profile-01-profile-flag.sql) | FEATURE-PROFILE-01 | ✅ | ✅ | — | Colonne `profiles.profile_pack` + trigger · catalogue `boolean` confirmé · voir §18 |
 
 **Hors migrations (tracés ailleurs si besoin)** : préflight [`lobby-membership-e4-00-preflight-duplicates.sql`](../supabase/lobby-membership-e4-00-preflight-duplicates.sql) (lecture seule) ; runbooks / harness sous [`supabase/tests/`](../supabase/tests/) et [`lobby-membership-e4-RUNBOOK.sql`](../supabase/lobby-membership-e4-RUNBOOK.sql) / [`lobby-membership-e5-RUNBOOK.sql`](../supabase/lobby-membership-e5-RUNBOOK.sql) — ce ne sont pas des migrations. Voir aussi [`lobby-membership-e4-tests-manual.sql`](../supabase/lobby-membership-e4-tests-manual.sql).
 
@@ -401,10 +402,10 @@ Deuxième palier Premium (6,99 €) : entitlement serveur, **sans IAP** pour l�
 
 | Élément | Valeur |
 | ------- | ------ |
-| Migration | [`feature-profile-01-profile-flag.sql`](../supabase/feature-profile-01-profile-flag.sql) — **⏳ à appliquer** (SQL Editor staging puis prod) |
+| Migration | [`feature-profile-01-profile-flag.sql`](../supabase/feature-profile-01-profile-flag.sql) — **✅** 4 sept 2026 |
 | Colonne | `public.profiles.profile_pack boolean not null default false` |
 | Client | `js/core/entitlements.js` (`isProfilePack`, `isAdFree`) · `js/core/supabaseProfile.js` |
 | Test manuel | `update public.profiles set profile_pack = true where id = '<uuid>';` puis recharge |
 | Hors scope | Play Billing · App Store · RevenueCat · webhook · UI métier · Hôte 12,99 |
 
-**Statut** : code client dans le repo · SQL **non appliquée** tant que cette ligne n’est pas passée à ✅.
+**Statut** : SQL **✅ prod** (même projet) · catalogue `profile_pack` / `boolean` **4 sept 2026**.

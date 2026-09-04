@@ -75,7 +75,7 @@ Même modèle que `profiles.ad_free` : le client **ne peut pas** s’auto-attrib
 - [x] `fetchProfile` lit le flag ; `upsertProfile` ne l’écrit pas
 - [x] `entitlements.js` : `isProfilePack()` (invité = toujours false)
 - [x] `isAdFree()` vrai si `ad_free` **ou** `profile_pack`
-- [x] Tests type `featureAdFree01` + migration SQL + ligne [DEPLOYMENTS_SQL.md](./DEPLOYMENTS_SQL.md) — **SQL ⏳ à appliquer**
+- [x] Tests type `featureAdFree01` + migration SQL + ligne [DEPLOYMENTS_SQL.md](./DEPLOYMENTS_SQL.md) — **SQL ✅** 4 sept 2026
 
 ### 2. FEATURE-PROFILE-02A — Stores + RevenueCat
 
@@ -93,16 +93,19 @@ Admin, pas de code app. En parallèle du 1.
 - [ ] Produit App Store `reveal_profile` + `reveal_profile_upgrade`
 - [ ] Entitlement RC `profile` + offering (upgrade **et** plein tarif grant `profile`)
 
+Code client 02B prêt ; l’achat échoue tant que ces produits ne sont pas dans l’offering. **iOS : nouvelle version** (ne pas coller sur la maj hCaptcha en review).
+
 ### 3. FEATURE-PROFILE-02B — Achat client + webhook
 
 Réutiliser `purchases.js` / `revenuecat-webhook`, pas un 2ᵉ pipeline.
 
-- [ ] SKUs dans `data/revenueCatConfig.js`
-- [ ] `purchaseProfile` : 6,99 si pas Sans pub ; 4,00 si Sans pub sans Profil. Restore. Compte inscrit only, pas web, pas invité
-- [ ] Menu → **Profil** : carte comme Sans pub ; si Profil actif, masquer l’achat 2,99 (inclus)
-- [ ] Webhook : entitlement `profile` → `profile_pack` + `ad_free`. Refund upgrade → perd Profil, **garde** Sans pub si `reveal_adfree` encore valide
-- [ ] Poll `refresh…FromServerUntil` après achat, **zéro écriture client**
-- [ ] Tests type `featureAdFree02a` / `02b`
+- [x] SKUs dans `data/revenueCatConfig.js`
+- [x] `purchaseProfile` : 6,99 si pas Sans pub ; 4,00 si Sans pub sans Profil. Restore. Compte inscrit only, pas web, pas invité
+- [x] Menu → **Profil** : carte comme Sans pub ; si Profil actif, masquer l’achat 2,99 (inclus)
+- [x] Webhook : entitlement `profile` → `profile_pack` + `ad_free`. Refund upgrade → perd Profil, **garde** Sans pub si `reveal_adfree` encore valide
+- [x] Poll `refresh…FromServerUntil` après achat, **zéro écriture client**
+- [x] Tests type `featureAdFree02a` / `02b`
+- [ ] **Redéployer** `revenuecat-webhook` (`npx supabase functions deploy revenuecat-webhook --no-verify-jwt`)
 
 ### 4. FEATURE-PROFILE-03 — Ce que ça débloque
 

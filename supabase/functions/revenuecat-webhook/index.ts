@@ -1,4 +1,5 @@
-// FEATURE-ADFREE-02B — webhook RevenueCat → profiles.ad_free
+// FEATURE-ADFREE-02B / FEATURE-PROFILE-02B — webhook RevenueCat
+// → profiles.ad_free + profiles.profile_pack
 // Secrets (Dashboard → Edge Functions → Secrets, jamais dans le repo) :
 //   REVENUECAT_WEBHOOK_AUTH  = même chaîne que RevenueCat → Webhooks → Authorization
 //                            (mot de passe seul, sans le mot Bearer)
@@ -73,11 +74,49 @@ function mismatchHint(presented, secret) {
   };
 }
 
+function eventProductId(event) {
+  return String(event?.product_id || event?.new_product_id || "");
+}
+
+function skuMatch(product, sku) {
+  return product === sku || product.endsWith(`.${sku}`);
+}
+
 function eventTouchesAdFree(event) {
   const ids = event?.entitlement_ids;
   if (Array.isArray(ids) && ids.includes("ad_free")) return true;
-  const product = String(event?.product_id || event?.new_product_id || "");
-  return product === "reveal_adfree" || product.endsWith("reveal_adfree");
+  return skuMatch(eventProductId(event), "reveal_adfree");
+}
+
+function eventTouchesProfile(event) {
+  const ids = event?.entitlement_ids;
+  if (Array.isArray(ids) && ids.includes("profile")) return true;
+  const product = eventProductId(event);
+  return skuMatch(product, "reveal_profile_upgrade") || skuMatch(product, "reveal_profile");
+}
+
+function isProfileUpgradeProduct(event) {
+  return skuMatch(eventProductId(event), "reveal_profile_upgrade");
+}
+
+function entitlementPatch(type, event) {
+  const grant = GRANT.has(type);
+  const revoke = REVOKE.has(type);
+  if (!grant && !revoke) return null;
+
+  const touchesProfile = eventTouchesProfile(event);
+  const touchesAdFree = eventTouchesAdFree(event);
+  const patch = {};
+
+  if (touchesProfile) {
+    patch.profile_pack = grant;
+    if (grant) patch.ad_free = true;
+    else if (!isProfileUpgradeProduct(event)) patch.ad_free = false;
+  } else if (touchesAdFree || type === "TEST") {
+    patch.ad_free = grant;
+  }
+
+  return Object.keys(patch).length ? patch : null;
 }
 
 Deno.serve(async (req) => {
@@ -107,14 +146,12 @@ Deno.serve(async (req) => {
     return json(200, { ok: true, skipped: "app_user_id" });
   }
 
-  if (!eventTouchesAdFree(event) && type !== "TEST") {
+  if (!eventTouchesAdFree(event) && !eventTouchesProfile(event) && type !== "TEST") {
     return json(200, { ok: true, skipped: "product" });
   }
 
-  let adFree = null;
-  if (GRANT.has(type)) adFree = true;
-  if (REVOKE.has(type)) adFree = false;
-  if (adFree == null) return json(200, { ok: true, skipped: type });
+  const patch = entitlementPatch(type, event);
+  if (!patch) return json(200, { ok: true, skipped: type });
 
   const url = Deno.env.get("SUPABASE_URL") || "";
   const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
@@ -126,9 +163,9 @@ Deno.serve(async (req) => {
 
   const { error } = await supabase
     .from("profiles")
-    .update({ ad_free: adFree })
+    .update(patch)
     .eq("id", userId);
 
   if (error) return json(500, { ok: false, error: error.message });
-  return json(200, { ok: true, ad_free: adFree });
+  return json(200, { ok: true, ...patch });
 });

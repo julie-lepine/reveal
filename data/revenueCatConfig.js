@@ -11,8 +11,13 @@ export const REVENUECAT_ANDROID_PUBLIC_SDK_KEY = "goog_fAWUHQzLQozCmAoNwnJURxbeJ
 
 export const REVENUECAT_IOS_PUBLIC_SDK_KEY = "appl_bpgdhybGDtsIWmmFNqlRlnJxLgV";
 
-/** Identifiant d’entitlement prévu (pas encore utilisé). */
 export const REVENUECAT_ENTITLEMENT_AD_FREE = "ad_free";
+
+export const REVENUECAT_ENTITLEMENT_PROFILE = "profile";
 
 /** SKU Play Console et App Store. */
 export const PLAY_PRODUCT_ID_AD_FREE = "reveal_adfree";
+
+export const PLAY_PRODUCT_ID_PROFILE = "reveal_profile";
+
+export const PLAY_PRODUCT_ID_PROFILE_UPGRADE = "reveal_profile_upgrade";
