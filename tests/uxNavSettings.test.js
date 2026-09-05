@@ -171,6 +171,7 @@ describe("UX-NAV-SETTINGS - contenu écran", () => {
     assert.doesNotMatch(back, /prev === "settings"/);
     const handle = nav.slice(nav.indexOf("async function handleBackNavigation"));
     assert.match(handle, /getCurrentScreen\(\) === "friends"/);
+    assert.match(handle, /CARNET_SCREEN_ID/);
     assert.match(handle, /HELP_LEGAL_SCREEN_ID/);
     assert.match(handle, /goBackFromMenuSubpage\(\)/);
     const evening = nav.slice(

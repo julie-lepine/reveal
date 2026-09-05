@@ -65,7 +65,7 @@ Ordre : **0** (contrat, ci-dessous) → **1** (code + SQL) → **2** (admin stor
 - [x] **Noms affichés** : Sans pub · Signature · Maître de soirée (onglet Menu reste « Profil »). SKUs inchangés.
 - [x] **Ce que Signature débloque** (3 couches ; la fiche store ne promet que ce qui est dans le build) :
   1. **Identité visible** (1er ship métier) : couleur de pseudo (palette fermée), cadre / badge Profil en lobby, emojis extra. **Pas** d’avatar photo (UGC, plus tard).
-  2. **Carnet perso** (après) : stats agrégées (parties, winrate, MVP, jeu préféré), **20** dernières soirées (date, jeux, *ton* rang/score, prénoms des amis encore amis). **Pas** un historique de salons : pas de code lobby, pas de rejoin, pas de fil. Carte Instagram ensuite.
+  2. **Carnet perso** (FEATURE-PROFILE-04) : stats agrégées (parties, winrate, MVP, jeu préféré), **20** dernières soirées (date, jeux, *ton* rang/score, prénoms des amis encore amis). **Pas** un historique de salons : pas de code lobby, pas de rejoin, pas de fil. Carte Instagram ensuite.
   3. **Mots perso** (après) : paquet Draw It / thèmes Tier Night persisté sur le compte.
 
 ### 1. FEATURE-PROFILE-01 — Flag serveur
@@ -118,9 +118,21 @@ Couche 1 d’abord (couleur, cadre, emojis extra), puis carnet, puis mots. Ne pa
 - [x] Gate réelle (pas seulement un bouton grisé)
 - [x] États : invité, inscrit sans palier, Sans pub seul, Profil, restore, refund
 
+### 4b. FEATURE-PROFILE-04 — Carnet Signature
+
+Stats + 20 soirées. Archive au leave/dissolve **avant** perte de membership. `lobby_id` jamais renvoyé au client.
+
+- [x] SQL `signature_evenings` + RPC `archive_signature_evening` / `list_signature_carnet`
+- [x] Menu → Profil → Mon carnet (teaser si pas Signature)
+- [x] Amis encore amis uniquement (pseudos live)
+- [ ] Coller [`feature-profile-04-carnet.sql`](../supabase/feature-profile-04-carnet.sql) en prod
+- Hors scope ici : carte Instagram, mots perso, photo avatar
+
 ### 5. Légal + stores
 
-- [ ] `data/legalContent.js` : achat Profil (prix TTC, lifetime, compte pas appareil)
+Reporté après **Maître de soirée 12,99 €** (un seul passage privacy / OVH / fiches).
+
+- [ ] `data/legalContent.js` : achats Signature + Maître de soirée (prix TTC, lifetime, compte pas appareil)
 - [ ] Pages OVH (`privacy.html`, mentions) — même mention
 - [ ] Fiches Play / App Store si le texte IAP change
 

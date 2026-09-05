@@ -13,6 +13,7 @@ import {
 } from "../core/lobby.js";
 import { canPlay } from "../core/auth.js";
 import { HELP_LEGAL_SCREEN_ID } from "../config/helpLegal.js";
+import { CARNET_SCREEN_ID } from "../config/signatureCarnet.js";
 import {
   isGameSyncActive,
   isLobbyHost,
@@ -63,6 +64,22 @@ export function goToFriends() {
     return;
   }
   navigate("friends");
+}
+
+/** Page Carnet Signature : même contrat qu’Amis (pas un onglet Menu). */
+export function goToCarnet() {
+  if (!canPlay()) {
+    navigate("home", { reset: true });
+    return;
+  }
+  markReturnToProfileIfFromSettings();
+  if (getCurrentScreen() === CARNET_SCREEN_ID) return;
+  if (hasActiveLobby()) {
+    suppressSessionRoute(120000, getCachedGameSession()?.screen ?? null);
+    navigate(CARNET_SCREEN_ID);
+    return;
+  }
+  navigate(CARNET_SCREEN_ID);
 }
 
 /** Page Aide & légal : même contrat qu’Amis (pas un onglet Menu). */
@@ -131,6 +148,7 @@ async function handleBackNavigation() {
   }
   if (
     getCurrentScreen() === "friends" ||
+    getCurrentScreen() === CARNET_SCREEN_ID ||
     getCurrentScreen() === HELP_LEGAL_SCREEN_ID
   ) {
     goBackFromMenuSubpage();
@@ -215,6 +233,10 @@ export async function handleNavTarget(target, handlers) {
   }
   if (target === "friends") {
     goToFriends();
+    return;
+  }
+  if (target === CARNET_SCREEN_ID) {
+    goToCarnet();
     return;
   }
   if (target === HELP_LEGAL_SCREEN_ID) {

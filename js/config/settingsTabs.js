@@ -6,7 +6,12 @@ export const SETTINGS_TAB = {
 };
 
 /** Pages poussées depuis Profil (pas des onglets). */
-export const SETTINGS_PROFILE_SUBPAGES = new Set(["friends", "help-legal", "privacy"]);
+export const SETTINGS_PROFILE_SUBPAGES = new Set([
+  "friends",
+  "carnet",
+  "help-legal",
+  "privacy",
+]);
 
 let pendingReturnTab = null;
 

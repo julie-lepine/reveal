@@ -47,6 +47,7 @@ export async function notifyVoluntaryLeaveFailure(res, deps) {
  *   getLobby: () => object|null|undefined,
  *   isGuest: () => boolean,
  *   isSupabaseConfigured: () => boolean,
+ *   archiveSignatureEvening?: () => Promise<unknown>,
  *   leaveLobbySupabase: () => Promise<{ ok: boolean, error?: string }>,
  *   stopMultiplayerSync: () => void,
  *   stopLobbyPresenceSync: () => void,
@@ -81,6 +82,13 @@ export async function runVoluntaryMemberLeave(options = {}, deps) {
     const remote = Boolean(deps.isSupabaseConfigured() && lobby?.id);
 
     if (remote) {
+      if (typeof deps.archiveSignatureEvening === "function") {
+        try {
+          await deps.archiveSignatureEvening();
+        } catch (e) {
+          console.warn("REVEAL signature carnet archive:", e?.message || e);
+        }
+      }
       let res;
       try {
         res = await deps.leaveLobbySupabase();

@@ -3954,6 +3954,50 @@ button.emoji-picker-preview__avatar:active{
   right:-2px;
 }
 
+.carnet-stats{
+  display:grid;
+  grid-template-columns:repeat(2, minmax(0, 1fr));
+  gap:10px;
+  margin:0 0 18px;
+}
+
+.carnet-stat{
+  padding:12px 12px 10px;
+  border-radius:12px;
+  background:rgba(129,140,248,.12);
+}
+
+.carnet-stat__value{
+  margin:0;
+  font-size:1.15rem;
+  font-weight:750;
+  line-height:1.2;
+}
+
+.carnet-stat__label{
+  margin:4px 0 0;
+  font-size:.78rem;
+  opacity:.72;
+}
+
+.carnet-stats .carnet-stat:last-child{
+  grid-column:1 / -1;
+}
+
+.carnet-evening__meta{
+  margin:0 0 6px;
+  font-weight:650;
+}
+
+.carnet-evening__games{
+  margin:0;
+  font-size:.92rem;
+}
+
+.carnet-evening__friends{
+  margin:8px 0 0;
+}
+
 .friends-row{
   display:flex;
   align-items:center;
@@ -6815,6 +6859,15 @@ body{
   pointer-events:none;
   opacity:0;
   transition:opacity .3s ease, transform .3s ease;
+}
+
+body.has-top-ad .host-notice-toast{
+  top:calc(
+    8px
+    + var(--ad-banner-height, 72px)
+    + var(--ad-banner-buffer, 8px)
+    + env(safe-area-inset-top, 0px)
+  );
 }
 
 .host-notice-toast--in{

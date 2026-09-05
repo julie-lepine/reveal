@@ -1365,6 +1365,15 @@ async function reconcileHostDissolveNotAllowed(lobbyId) {
   };
 }
 
+async function archiveSignatureEveningBeforeLeave() {
+  try {
+    const { archiveSignatureEveningQuiet } = await import("./signatureCarnet.js");
+    await archiveSignatureEveningQuiet();
+  } catch (e) {
+    console.warn("REVEAL signature carnet:", e?.message || e);
+  }
+}
+
 /** Hôte : supprime le lobby pour tout le monde. */
 export async function dissolveLobbyAsHost({ navigateAway = true } = {}) {
   stopMultiplayerSync();
@@ -1376,6 +1385,7 @@ export async function dissolveLobbyAsHost({ navigateAway = true } = {}) {
   const wasGuest = isGuest();
 
   if (isSupabaseConfigured() && lobby?.id) {
+    await archiveSignatureEveningBeforeLeave();
     const res = await closeLobbySupabase();
     if (!res.ok) {
       if (res.status === LOBBY_DISSOLVE_STATUS.NOT_ALLOWED) {
@@ -1483,6 +1493,7 @@ export async function leaveLobby({ navigateAway = true, skipConfirm = false } = 
       getLobby,
       isGuest,
       isSupabaseConfigured,
+      archiveSignatureEvening: archiveSignatureEveningBeforeLeave,
       leaveLobbySupabase,
       stopMultiplayerSync,
       stopLobbyPresenceSync,

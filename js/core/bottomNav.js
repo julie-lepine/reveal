@@ -32,6 +32,7 @@ const SCREEN_TO_TAB = {
   results: TAB_RESULTS,
   settings: TAB_SETTINGS,
   friends: TAB_SETTINGS,
+  carnet: TAB_SETTINGS,
   "help-legal": TAB_SETTINGS,
   privacy: TAB_SETTINGS,
   "hottake-prep": TAB_GAMES,

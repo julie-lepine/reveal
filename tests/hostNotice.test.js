@@ -67,6 +67,18 @@ describe("hostNotice — toast hôte", () => {
     assert.equal(left.show, false);
   });
 
+  it("avec pubs : toast sous la bannière ; sans pubs : ancrage inchangé", () => {
+    const css = read("style.css");
+    const toastBlock = css.slice(css.indexOf(".host-notice-toast{"));
+    const defaultTop = toastBlock.slice(0, toastBlock.indexOf("}"));
+    assert.match(defaultTop, /top:calc\(8px \+ env\(safe-area-inset-top, 0px\)\)/);
+    assert.equal(defaultTop.includes("--ad-banner-height"), false);
+    assert.match(
+      toastBlock,
+      /body\.has-top-ad \.host-notice-toast\{[\s\S]*?--ad-banner-height[\s\S]*?--ad-banner-buffer/
+    );
+  });
+
   it("invite leave+join reset le toast ; hydrate ne recopie pas l’ancien roster", () => {
     const join = read("js/core/lobbyInviteJoin.js");
     assert.match(join, /resetHostNoticeOnLobbySwitch/);

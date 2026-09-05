@@ -382,6 +382,8 @@ Aligne-toi mot pour mot sur les inserts ci-dessus. Apostrophes : celles déjà e
 
 En ligne (27 août 2026) : [privacy.html](https://revealthepartygame.fr/privacy.html) — croisés 24 h, finalités, conservation, cascade compte. Stores inchangés.
 
+Légal Signature / Maître de soirée : **reporté** après le palier 12,99 € (un seul passage OVH).
+
 ---
 
 ## Suppression in-app (App Store 5.1.1) — 2 septembre 2026

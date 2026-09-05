@@ -51,6 +51,7 @@ import { escapeHtml, pageShell } from "../core/ui.js";
 import { createMountGuard } from "../core/mountLifecycle.js";
 import { bindNav, returnFromEveningProfile } from "./nav.js";
 import { FRIEND_LABEL, FRIENDS_ENTRY, FRIENDS_SCREEN_ID } from "../config/friends.js";
+import { CARNET_LABEL, CARNET_SCREEN_ID } from "../config/signatureCarnet.js";
 import { HELP_LEGAL_LABEL, HELP_LEGAL_SCREEN_ID } from "../config/helpLegal.js";
 import { syncFriendsEntryBadges, flushFriendRequestNotice } from "../core/friendRequestNotice.js";
 import { friendRosterActionHtml, lobbyFriendsHintHtml } from "../core/friendsRosterUi.js";
@@ -255,6 +256,13 @@ function personnalisationPanelHtml({ emailAccount, user, selectedEmoji }) {
           <span class="friends-badge" data-friends-badge hidden aria-hidden="true"></span>
         </span>
         <span class="settings-link-row__label">${escapeHtml(FRIEND_LABEL.entrySettings)}</span>
+        <span class="settings-link-row__chevron" aria-hidden="true">›</span>
+      </button>
+      <button type="button" class="settings-link-row" data-nav="${CARNET_SCREEN_ID}">
+        <span class="settings-link-row__icon-wrap">
+          <span class="settings-link-row__icon" aria-hidden="true">📓</span>
+        </span>
+        <span class="settings-link-row__label">${escapeHtml(CARNET_LABEL.entrySettings)}</span>
         <span class="settings-link-row__chevron" aria-hidden="true">›</span>
       </button>
       <div class="card settings-section">
