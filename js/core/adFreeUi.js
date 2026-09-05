@@ -1,58 +1,60 @@
-import { PACK_HOST_LABEL, PACK_SIGNATURE_LABEL } from "../config/premiumPacks.js";
-import { isLoggedIn, isGuest } from "./auth.js";
+import { PACK_SIGNATURE_LABEL } from "../config/premiumPacks.js";
 import { isAdFree, isHostPack, isProfilePack } from "./entitlements.js";
-import { isNativeApp } from "./platform.js";
-import { isPurchasesNativeReady } from "./purchases.js";
+import {
+  canBuyPremiumPacks,
+  includedInHostStatus,
+  premiumPackCardHtml,
+} from "./premiumOfferUi.js";
 
 export function shouldShowAdFreePromo() {
   return !isAdFree();
 }
 
+const AD_FREE_FEATURES = ["Plus de bannière dans l’app native, sur tous tes appareils liés à ce compte."];
+
 /** Carte Menu → Forfaits. */
 export function adFreeSettingsCardHtml() {
-  const loggedIn = isLoggedIn();
-  const guest = isGuest();
   const unlocked = isAdFree();
-  const storeReady = isPurchasesNativeReady();
+  const canBuy = canBuyPremiumPacks();
+  const includedHost = unlocked && isHostPack();
+  const includedSignature = unlocked && isProfilePack() && !includedHost;
 
-  let body;
-  if (guest || !loggedIn) {
-    body = `
-        <p class="hint settings-section__hint">
-          Connecte-toi avec un compte (e-mail ou Facebook) pour activer Sans pub à vie - 2,99&nbsp;€.
-        </p>
-        <p class="hint settings-section__hint">Les invités ne peuvent pas acheter : le droit suit le compte, pas le téléphone.</p>`;
-  } else if (unlocked) {
-    const includedHost = isHostPack();
-    const included = isProfilePack();
-    body = `
-        <p class="settings-premium__ok" role="status">${
-          includedHost
-            ? `Sans pub est inclus dans ${PACK_HOST_LABEL}.`
-            : included
-              ? `Sans pub est inclus dans ${PACK_SIGNATURE_LABEL}.`
-              : "Sans pub est actif sur ce compte."
-        }</p>
-        <p class="hint settings-section__hint">Plus de bannière dans l’app native, sur tous tes appareils liés à ce compte.</p>`;
-  } else {
-    const storeHint = isNativeApp()
-      ? storeReady
-        ? "Paiement unique."
-        : "Achats pas encore disponibles sur cette plateforme."
-      : "L’achat se fait dans l’app Android (Play Store), pas sur le navigateur.";
-    body = `
-        <p class="hint settings-section__hint">
-          2,99&nbsp;€ à vie - supprime la pub sur tes appareils liés à ce compte.
-        </p>
-        <p class="hint settings-section__hint">${storeHint}</p>
-        <button type="button" class="btn btn-primary btn--spaced" id="btn-adfree-buy">Payer 2,99&nbsp;€</button>`;
+  let badge = "";
+  let badgeTone = "gold";
+  let price = "2,99 €";
+  let priceSuffix = "à vie";
+  let status = "";
+  let buttonId = "";
+  let buttonLabel = "";
+
+  if (unlocked) {
+    badge = includedHost || includedSignature ? "Inclus" : "Actif";
+    badgeTone = includedHost || includedSignature ? "included" : "ok";
+    price = "";
+    priceSuffix = "";
+    status = includedHost
+      ? includedInHostStatus()
+      : includedSignature
+        ? `Sans pub est inclus dans ${PACK_SIGNATURE_LABEL}.`
+        : "";
+  } else if (canBuy) {
+    buttonId = "btn-adfree-buy";
+    buttonLabel = "Payer 2,99&nbsp;€";
   }
 
-  return `
-      <div class="card settings-section settings-premium">
-        <h2 class="settings-section__title">Sans pub</h2>
-        ${body}
-      </div>`;
+  return premiumPackCardHtml({
+    icon: "🔇",
+    title: "Sans pub",
+    badge,
+    badgeTone,
+    price,
+    priceSuffix,
+    status,
+    features: AD_FREE_FEATURES,
+    buttonId,
+    buttonLabel,
+    buttonPrimary: false,
+  });
 }
 
 /** Carte compacte hub jeux, sous le récap. Vide si déjà Sans pub. Le bloc entier est le CTA. */

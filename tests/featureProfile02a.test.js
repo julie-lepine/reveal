@@ -53,8 +53,8 @@ describe("FEATURE-PROFILE-02A/02B — SKUs + carte Menu", () => {
     assert.match(settings, /purchaseProfile/);
     assert.match(settings, /restorePremiumPurchases/);
     assert.match(settings, /btn-premium-restore/);
-    assert.match(ui, /id="btn-profile-buy"/);
-    assert.equal(/id="btn-profile-restore"/.test(ui), false);
+    assert.match(ui, /btn-profile-buy/);
+    assert.equal(/btn-profile-restore/.test(ui), false);
     assert.match(ui, /6,99/);
     assert.match(ui, /4,00/);
     assert.equal(/btn-profile-refresh/.test(ui), false);

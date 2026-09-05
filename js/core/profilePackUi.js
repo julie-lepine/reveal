@@ -1,55 +1,64 @@
-import { PACK_HOST_LABEL, PACK_SIGNATURE_LABEL } from "../config/premiumPacks.js";
-import { isLoggedIn, isGuest } from "./auth.js";
+import { PACK_SIGNATURE_LABEL } from "../config/premiumPacks.js";
 import { isHostPack, isProfilePack } from "./entitlements.js";
 import { getState } from "./state.js";
-import { isNativeApp } from "./platform.js";
-import { isPurchasesNativeReady, profileSkuForUser } from "./purchases.js";
+import { profileSkuForUser } from "./purchases.js";
 import { PLAY_PRODUCT_ID_PROFILE_UPGRADE } from "../../data/revenueCatConfig.js";
+import {
+  canBuyPremiumPacks,
+  includedInHostStatus,
+  premiumPackCardHtml,
+} from "./premiumOfferUi.js";
+
+const SIGNATURE_FEATURES = [
+  "Photo de profil et couleur du pseudo",
+  "Emojis extra et carnet des soirées",
+  "Sans pub inclus",
+];
 
 /** Carte Menu → Forfaits (Signature 6,99 €). */
 export function profilePackSettingsCardHtml() {
-  const loggedIn = isLoggedIn();
-  const guest = isGuest();
   const unlocked = isProfilePack();
-  const storeReady = isPurchasesNativeReady();
   const user = getState().user || {};
   const upgrade = profileSkuForUser(user) === PLAY_PRODUCT_ID_PROFILE_UPGRADE;
   const priceLabel = upgrade ? "4,00" : "6,99";
+  const canBuy = canBuyPremiumPacks();
+  const includedHost = unlocked && isHostPack();
 
-  let body;
-  if (guest || !loggedIn) {
-    body = `
-        <p class="hint settings-section__hint">
-          Connecte-toi avec un compte (e-mail ou Facebook) pour activer ${PACK_SIGNATURE_LABEL} à vie - 6,99&nbsp;€.
-        </p>
-        <p class="hint settings-section__hint">Les invités ne peuvent pas acheter : le droit suit le compte, pas le téléphone.</p>`;
-  } else if (unlocked) {
-    const includedHost = isHostPack();
-    body = `
-        <p class="settings-premium__ok" role="status">${
-          includedHost
-            ? `${PACK_SIGNATURE_LABEL} est inclus dans ${PACK_HOST_LABEL}.`
-            : `${PACK_SIGNATURE_LABEL} est actif sur ce compte.`
-        }</p>
-        <p class="hint settings-section__hint">Sans pub inclus, sur tous tes appareils liés à ce compte.</p>`;
-  } else {
-    const storeHint = isNativeApp()
-      ? storeReady
-        ? "Paiement unique."
-        : "Achats pas encore disponibles sur cette plateforme."
-      : "L’achat se fait dans l’app native, pas sur le navigateur.";
-    const priceHint = upgrade
-      ? `4,00&nbsp;€ de plus - tu as déjà Sans pub. ${PACK_SIGNATURE_LABEL} à vie, pubs incluses.`
-      : `6,99&nbsp;€ à vie - ${PACK_SIGNATURE_LABEL} + Sans pub, sur tes appareils liés à ce compte.`;
-    body = `
-        <p class="hint settings-section__hint">${priceHint}</p>
-        <p class="hint settings-section__hint">${storeHint}</p>
-        <button type="button" class="btn btn-primary btn--spaced" id="btn-profile-buy">Payer ${priceLabel}&nbsp;€</button>`;
+  let badge = "";
+  let badgeTone = "gold";
+  let price = upgrade ? "4,00 €" : "6,99 €";
+  let priceSuffix = upgrade ? "de plus" : "à vie";
+  let priceNote = upgrade
+    ? `Tu as déjà Sans pub. ${PACK_SIGNATURE_LABEL} à vie, pubs incluses.`
+    : "";
+  let status = "";
+  let buttonId = "";
+  let buttonLabel = "";
+
+  if (unlocked) {
+    badge = includedHost ? "Inclus" : "Actif";
+    badgeTone = includedHost ? "included" : "ok";
+    price = "";
+    priceSuffix = "";
+    priceNote = "";
+    status = includedHost ? includedInHostStatus() : "";
+  } else if (canBuy) {
+    buttonId = "btn-profile-buy";
+    buttonLabel = `Payer ${priceLabel}&nbsp;€`;
   }
 
-  return `
-      <div class="card settings-section settings-premium">
-        <h2 class="settings-section__title">${PACK_SIGNATURE_LABEL}</h2>
-        ${body}
-      </div>`;
+  return premiumPackCardHtml({
+    icon: "✨",
+    title: PACK_SIGNATURE_LABEL,
+    badge,
+    badgeTone,
+    price,
+    priceSuffix,
+    priceNote,
+    status,
+    features: SIGNATURE_FEATURES,
+    buttonId,
+    buttonLabel,
+    buttonPrimary: false,
+  });
 }

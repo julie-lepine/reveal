@@ -21,6 +21,7 @@ import { refreshAdsForEntitlement } from "../core/ads.js";
 import { adFreeSettingsCardHtml } from "../core/adFreeUi.js";
 import { profilePackSettingsCardHtml } from "../core/profilePackUi.js";
 import { hostPackSettingsCardHtml } from "../core/hostPackUi.js";
+import { premiumOfferChromeHtml, premiumOfferFooterHintHtml } from "../core/premiumOfferUi.js";
 import { purchaseAdFree, purchaseHost, purchaseProfile, restorePremiumPurchases } from "../core/purchases.js";
 import { getLocalDisplayName, getLocalEmoji } from "../core/state.js";
 import { resolvedNameColorHex } from "../../data/signatureIdentity.js";
@@ -362,9 +363,11 @@ function forfaitsPanelHtml(user) {
   const unlocked = isProfilePack();
   return `
     <div class="settings-panel" id="settings-panel-forfaits">
-      ${adFreeSettingsCardHtml()}
-      ${profilePackSettingsCardHtml()}
+      ${premiumOfferChromeHtml()}
       ${hostPackSettingsCardHtml()}
+      ${profilePackSettingsCardHtml()}
+      ${adFreeSettingsCardHtml()}
+      ${premiumOfferFooterHintHtml()}
       ${premiumRestoreButtonHtml(user)}
       ${
         unlocked

@@ -3328,6 +3328,147 @@ select.field-input option{
   color:#4ADE80;
 }
 
+#settings-panel-forfaits .card{
+  margin-top:12px;
+}
+
+.premium-offer__intro{
+  margin:4px 0 2px;
+}
+
+.premium-offer__hook{
+  margin:0;
+  font-size:18px;
+  font-weight:800;
+  letter-spacing:-.02em;
+  line-height:1.25;
+}
+
+.premium-offer__login{
+  margin:10px 0 0;
+}
+
+.premium-offer__store{
+  margin:16px 0 4px;
+  text-align:center;
+}
+
+.premium-offer__top{
+  display:flex;
+  align-items:flex-start;
+  gap:10px;
+  margin-bottom:10px;
+}
+
+.premium-offer__icon{
+  font-size:22px;
+  line-height:1.2;
+  flex-shrink:0;
+}
+
+.premium-offer__heading{
+  min-width:0;
+  flex:1;
+}
+
+.premium-offer__title{
+  margin:0;
+}
+
+.premium-offer__badge{
+  display:inline-flex;
+  align-items:center;
+  margin-top:6px;
+  padding:3px 8px;
+  border-radius:999px;
+  background:rgba(245,215,110,.18);
+  color:#F5D76E;
+  font-size:10px;
+  font-weight:800;
+  letter-spacing:.06em;
+  text-transform:uppercase;
+}
+
+.premium-offer__badge--ok{
+  background:rgba(74,222,128,.16);
+  color:#4ADE80;
+}
+
+.premium-offer__badge--included{
+  background:rgba(129,140,248,.16);
+  color:#A5B4FC;
+}
+
+.premium-offer__price{
+  display:flex;
+  align-items:baseline;
+  gap:8px;
+  margin:0 0 8px;
+}
+
+.premium-offer__amount{
+  font-size:22px;
+  font-weight:900;
+  letter-spacing:-.03em;
+}
+
+.premium-offer--hero .premium-offer__amount{
+  font-size:32px;
+}
+
+.premium-offer__life{
+  color:#F5D76E;
+  font-weight:700;
+  font-size:13px;
+}
+
+.premium-offer__note{
+  margin:0 0 8px;
+}
+
+.premium-offer__feats{
+  list-style:none;
+  margin:4px 0 0;
+  padding:0;
+}
+
+.premium-offer__feat{
+  position:relative;
+  padding:7px 0 7px 26px;
+  color:rgba(255,255,255,.82);
+  font-size:14px;
+  line-height:1.35;
+}
+
+.premium-offer__feat::before{
+  content:"✓";
+  position:absolute;
+  left:0;
+  top:7px;
+  color:#4ADE80;
+  font-weight:800;
+}
+
+.premium-offer .btn-secondary{
+  margin-top:14px;
+}
+
+.premium-offer--hero{
+  border-color:rgba(245,215,110,.42);
+  background:
+    radial-gradient(120% 90% at 100% 0%, rgba(245,215,110,.18), transparent 55%),
+    rgba(255,255,255,.06);
+  box-shadow:0 0 28px rgba(245,215,110,.12);
+}
+
+.premium-offer--hero .premium-offer__title{
+  font-size:20px;
+}
+
+.premium-offer--side{
+  padding:16px 18px;
+}
+
 #btn-delete-account{
   margin-bottom:14px;
 }

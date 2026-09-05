@@ -71,13 +71,13 @@ describe("FEATURE-ADFREE-02A — préparation Billing / RevenueCat", () => {
   it("Forfaits : Acheter / Restaurer, pas Actualiser", () => {
     const ui = src("js/core/adFreeUi.js");
     const settings = src("js/screens/settings.js");
-    assert.match(ui, /id="btn-adfree-buy"/);
-    assert.equal(/id="btn-adfree-buy" disabled/.test(ui), false);
-    assert.match(ui, />Payer 2,99&nbsp;€</);
+    assert.match(ui, /btn-adfree-buy/);
+    assert.equal(/btn-adfree-buy" disabled/.test(ui), false);
+    assert.match(ui, /Payer 2,99&nbsp;€/);
     assert.equal(/id="btn-adfree-restore"/.test(ui), false);
     assert.equal(/btn-adfree-refresh/.test(ui), false);
     assert.match(ui, /2,99/);
-    assert.match(ui, /Paiement unique\./);
+    assert.match(src("js/core/premiumOfferUi.js"), /Paiement unique/);
     assert.equal(/Licence testeur|0&nbsp;€/.test(ui), false);
     assert.match(settings, /purchaseAdFree/);
     assert.match(settings, /restorePremiumPurchases/);

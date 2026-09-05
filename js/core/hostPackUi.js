@@ -1,14 +1,12 @@
 import { PACK_HOST_LABEL, PACK_SIGNATURE_LABEL } from "../config/premiumPacks.js";
-import { hostLobbyCapacityHint } from "../config/lobbyLifecycle.js";
-import { isLoggedIn, isGuest } from "./auth.js";
 import { isHostPack } from "./entitlements.js";
 import { getState } from "./state.js";
-import { isNativeApp } from "./platform.js";
-import { hostSkuForUser, isPurchasesNativeReady } from "./purchases.js";
+import { hostSkuForUser } from "./purchases.js";
 import {
   PLAY_PRODUCT_ID_HOST_UPGRADE_ADFREE,
   PLAY_PRODUCT_ID_HOST_UPGRADE_PROFILE,
 } from "../../data/revenueCatConfig.js";
+import { canBuyPremiumPacks, premiumPackCardHtml } from "./premiumOfferUi.js";
 
 function hostPriceForUser(user) {
   const sku = hostSkuForUser(user);
@@ -17,48 +15,60 @@ function hostPriceForUser(user) {
   return { amount: "9,99", euros: 9.99 };
 }
 
+const HOST_FEATURES = [
+  "14 joueurs dans le lobby (toi + 13)",
+  "Photo, couleur, emojis extra, carnet",
+  "Plus de pub, sur tous tes appareils",
+];
+
 /** Carte Menu → Forfaits (Maître de soirée 9,99 €). */
 export function hostPackSettingsCardHtml() {
-  const loggedIn = isLoggedIn();
-  const guest = isGuest();
   const unlocked = isHostPack();
-  const storeReady = isPurchasesNativeReady();
   const user = getState().user || {};
   const { amount, euros } = hostPriceForUser(user);
+  const canBuy = canBuyPremiumPacks();
 
-  let body;
-  if (guest || !loggedIn) {
-    body = `
-        <p class="hint settings-section__hint">
-          Connecte-toi avec un compte (e-mail ou Facebook) pour activer ${PACK_HOST_LABEL} à vie - 9,99&nbsp;€.
-        </p>
-        <p class="hint settings-section__hint">Les invités ne peuvent pas acheter : le droit suit le compte, pas le téléphone.</p>`;
-  } else if (unlocked) {
-    body = `
-        <p class="settings-premium__ok" role="status">${PACK_HOST_LABEL} est actif sur ce compte.</p>
-        <p class="hint settings-section__hint">${hostLobbyCapacityHint()}</p>
-        <p class="hint settings-section__hint">${PACK_SIGNATURE_LABEL} et Sans pub inclus, sur tous tes appareils liés à ce compte.</p>`;
+  let badge = "Le plus complet";
+  let badgeTone = "gold";
+  let price = "9,99 €";
+  let priceSuffix = "à vie";
+  let priceNote = "";
+  let buttonId = "";
+  let buttonLabel = "";
+
+  if (unlocked) {
+    badge = "Actif";
+    badgeTone = "ok";
+    price = "";
+    priceSuffix = "";
   } else {
-    const storeHint = isNativeApp()
-      ? storeReady
-        ? "Paiement unique."
-        : "Achats pas encore disponibles sur cette plateforme."
-      : "L’achat se fait dans l’app native, pas sur le navigateur.";
-    let priceHint = `9,99&nbsp;€ à vie - ${PACK_HOST_LABEL} + ${PACK_SIGNATURE_LABEL} + Sans pub, sur tes appareils liés à ce compte.`;
     if (euros === 3) {
-      priceHint = `3,00&nbsp;€ de plus - tu as déjà ${PACK_SIGNATURE_LABEL}. ${PACK_HOST_LABEL} à vie, Signature et pubs inclus.`;
+      price = "3,00 €";
+      priceSuffix = "de plus";
+      priceNote = `Tu as déjà ${PACK_SIGNATURE_LABEL}. ${PACK_HOST_LABEL} à vie, Signature et pubs inclus.`;
     } else if (euros === 7) {
-      priceHint = `7,00&nbsp;€ de plus - tu as déjà Sans pub. ${PACK_HOST_LABEL} à vie, ${PACK_SIGNATURE_LABEL} et pubs inclus.`;
+      price = "7,00 €";
+      priceSuffix = "de plus";
+      priceNote = `Tu as déjà Sans pub. ${PACK_HOST_LABEL} à vie, ${PACK_SIGNATURE_LABEL} et pubs inclus.`;
     }
-    body = `
-        <p class="hint settings-section__hint">${priceHint}</p>
-        <p class="hint settings-section__hint">${storeHint}</p>
-        <button type="button" class="btn btn-primary btn--spaced" id="btn-host-buy">Payer ${amount}&nbsp;€</button>`;
+    if (canBuy) {
+      buttonId = "btn-host-buy";
+      buttonLabel = `Débloquer Maître — ${amount}&nbsp;€`;
+    }
   }
 
-  return `
-      <div class="card settings-section settings-premium">
-        <h2 class="settings-section__title">${PACK_HOST_LABEL}</h2>
-        ${body}
-      </div>`;
+  return premiumPackCardHtml({
+    hero: true,
+    icon: "👑",
+    title: PACK_HOST_LABEL,
+    badge,
+    badgeTone,
+    price,
+    priceSuffix,
+    priceNote,
+    features: HOST_FEATURES,
+    buttonId,
+    buttonLabel,
+    buttonPrimary: true,
+  });
 }

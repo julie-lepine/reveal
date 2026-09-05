@@ -83,7 +83,7 @@ describe("FEATURE-HOST-01 — entitlement Maître de soirée", () => {
     assert.equal(lobbyMaxPlayers(false), 8);
     assert.match(src("js/screens/lobby.js"), /hostLobbyCapacityHint/);
     assert.match(src("js/screens/home.js"), /hostLobbyCapacityHint/);
-    assert.match(src("js/core/hostPackUi.js"), /hostLobbyCapacityHint/);
+    assert.match(src("js/core/hostPackUi.js"), /14 joueurs dans le lobby/);
   });
 
   it("fetchProfile lit host_pack ; upsert ne l’écrit pas", () => {
