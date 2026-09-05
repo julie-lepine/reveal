@@ -3,8 +3,19 @@
  * Le join est refusé côté serveur (find_lobby_by_code) au-delà de JOIN_MAX_AGE.
  */
 
-/** Plafond de joueurs par lobby (UI + gate join client). */
+/** Plafond de joueurs par lobby (UI + gate join client). Hôte sans Maître. */
 export const MAX_PLAYERS = 8;
+
+/** Hôte Maître de soirée : 1 + 13 invités. */
+export const MAX_PLAYERS_HOST = 14;
+
+export function lobbyMaxPlayers(hostPack) {
+  return hostPack === true ? MAX_PLAYERS_HOST : MAX_PLAYERS;
+}
+
+export function hostLobbyCapacityHint() {
+  return "Avantage Maître de soirée : tu peux inviter 13 autres joueurs.";
+}
 
 /** Message renvoyé quand le lobby est plein. */
 export const LOBBY_FULL_MSG = "Nombre de joueurs max atteint pour ce lobby";

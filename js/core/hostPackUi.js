@@ -1,4 +1,5 @@
 import { PACK_HOST_LABEL, PACK_SIGNATURE_LABEL } from "../config/premiumPacks.js";
+import { hostLobbyCapacityHint } from "../config/lobbyLifecycle.js";
 import { isLoggedIn, isGuest } from "./auth.js";
 import { isHostPack } from "./entitlements.js";
 import { getState } from "./state.js";
@@ -35,6 +36,7 @@ export function hostPackSettingsCardHtml() {
   } else if (unlocked) {
     body = `
         <p class="settings-premium__ok" role="status">${PACK_HOST_LABEL} est actif sur ce compte.</p>
+        <p class="hint settings-section__hint">${hostLobbyCapacityHint()}</p>
         <p class="hint settings-section__hint">${PACK_SIGNATURE_LABEL} et Sans pub inclus, sur tous tes appareils liés à ce compte.</p>`;
   } else {
     const storeHint = isNativeApp()

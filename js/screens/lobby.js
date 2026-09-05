@@ -7,7 +7,6 @@ import {
   simulateLobbyJoins,
   addLobbyMessage,
   getLobbyStatus,
-  MAX_PLAYERS,
   createLobby,
   hasActiveLobby,
   reconcileLobbyReadyOnMount,
@@ -18,6 +17,12 @@ import {
   kickLobbyMember,
   canManageLobbyRoster,
 } from "../core/lobby.js";
+import {
+  getLobbyAutoCloseHint,
+  hostLobbyCapacityHint,
+  lobbyMaxPlayers,
+} from "../config/lobbyLifecycle.js";
+import { isHostPack } from "../core/entitlements.js";
 import { mountChatPanel, CHAT_MAX_LENGTH } from "../core/chatPanel.js";
 import { updateProfileEmoji, isLoggedIn } from "../core/auth.js";
 import { getLocalEmoji } from "../core/state.js";
@@ -42,7 +47,6 @@ import { playerNameHtml, avatarPhotoHtml, signatureRingClass } from "../core/sig
 import { SETTINGS_TAB } from "../config/settingsTabs.js";
 import { bindNav, goToEveningSettings } from "./nav.js";
 import { showAppAlert, showAppConfirm, showEmojiPickerDialog } from "../core/dialog.js";
-import { getLobbyAutoCloseHint } from "../config/lobbyLifecycle.js";
 import {
   getResumableSessionScreen,
   mountGameResumeInterstitial,
@@ -262,7 +266,10 @@ export function mountLobby(app) {
     }
 
     const countEl = app.querySelector(".lobby-count");
-    if (countEl) countEl.textContent = `${total} / ${MAX_PLAYERS} participants connectés`;
+    if (countEl) {
+      const cap = lobbyMaxPlayers(isLobbyHost() && isHostPack());
+      countEl.textContent = `${total} / ${cap} participants connectés`;
+    }
 
     const grid = app.querySelector(".participants-grid");
     if (grid) {
@@ -507,10 +514,17 @@ export function mountLobby(app) {
     const lobbyId = lobby?.id || null;
     const localIsRegistered = isLoggedIn();
 
+    const hostPack = isHostPack();
+    const seatCap = lobbyMaxPlayers(isHost && hostPack);
+    const hostCapHint =
+      isHost && hostPack
+        ? `<p class="hint lobby-host-cap-hint">${escapeHtml(hostLobbyCapacityHint())}</p>`
+        : "";
+
     app.innerHTML = pageShell({
       backTarget: "home",
       content: `
-        <p class="lobby-count">${total} / ${MAX_PLAYERS} participants connectés</p>
+        <p class="lobby-count">${total} / ${seatCap} participants connectés</p>
 
         <div class="participants-wrap">
           <div class="participants-grid">${participantsHtml(participants, { canKick, hostId, localIsRegistered, lobbyId })}</div>
@@ -533,6 +547,7 @@ export function mountLobby(app) {
             <button type="button" class="btn-icon" id="copy-code" aria-label="Copier le code">⧉</button>
           </div>
           <p class="hint">Partage le code - les invités rejoignent sans compte.</p>
+          ${hostCapHint}
           ${isHost && online ? `<p class="hint lobby-lifecycle-hint">${escapeHtml(getLobbyAutoCloseHint(getLobbyStatus()))}</p>` : ""}
         </div>
 

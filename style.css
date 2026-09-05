@@ -4539,6 +4539,20 @@ button.emoji-picker-preview__avatar:active{
   margin:8px 0 0;
 }
 
+.lobby-host-cap-hint{
+  color:#4ADE80;
+  font-weight:600;
+  margin:6px 0 12px;
+}
+
+.lobby-actions .lobby-host-cap-hint{
+  margin:8px 0 0;
+}
+
+.invite-card .lobby-host-cap-hint{
+  margin:8px 0 0;
+}
+
 .invite-card{
   background:rgba(255,255,255,.04);
   border:1px solid rgba(255,255,255,.08);

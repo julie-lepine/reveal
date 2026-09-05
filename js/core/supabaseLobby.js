@@ -65,7 +65,7 @@ import {
   LOBBY_HEARTBEAT_MIN_MS,
   HOST_PRESENCE_STALE_MS,
   HOST_TRANSFER_STALE_MS,
-  MAX_PLAYERS,
+  lobbyMaxPlayers,
   isLobbyJoinTooOld,
 } from "../config/lobbyLifecycle.js";
 import { startLobbyHeartbeat } from "./lobbyHeartbeat.js";
@@ -1860,7 +1860,17 @@ export async function joinLobbySupabase(codeInput, { joinEffects: externalEffect
     });
     if (countErr) return { ok: false, error: countErr.message, joinEffects };
 
-    if ((memberCount ?? 0) >= MAX_PLAYERS) {
+    let hostPack = false;
+    const hostId = lobbyRow.host_id || lobbyRow.hostId;
+    if (hostId) {
+      const { data: hostProfile } = await supabase
+        .from("profiles")
+        .select("host_pack")
+        .eq("id", hostId)
+        .maybeSingle();
+      hostPack = hostProfile?.host_pack === true;
+    }
+    if ((memberCount ?? 0) >= lobbyMaxPlayers(hostPack)) {
       return { ok: false, error: LOBBY_FULL_MSG, joinEffects };
     }
 

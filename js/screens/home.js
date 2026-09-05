@@ -10,6 +10,8 @@ import {
   getUser,
   logout,
 } from "../core/auth.js";
+import { isHostPack } from "../core/entitlements.js";
+import { hostLobbyCapacityHint } from "../config/lobbyLifecycle.js";
 import { isSupabaseConfigured } from "../core/supabaseClient.js";
 import {
   createLobby,
@@ -1061,7 +1063,7 @@ export function mountHome(app) {
         }
 
         ${
-          loggedIn && !membershipActionsHtml && !joinUi.active
+            loggedIn && !membershipActionsHtml && !joinUi.active
             ? `<p class="hint auth-form__guest-intro lobby-actions__intro">Prêt·e pour la soirée ? Crée un lobby pour inviter tes amis, ou entre un code pour rejoindre une partie.</p>`
             : ""
         }
@@ -1071,7 +1073,12 @@ export function mountHome(app) {
           ${
             showLoggedInLobbyControls
               ? canStartNewLobby
-                ? `<button type="button" class="btn btn-primary" id="btn-create-lobby">${escapeHtml(createLobbyLabel)}</button>`
+                ? `<button type="button" class="btn btn-primary" id="btn-create-lobby">${escapeHtml(createLobbyLabel)}</button>
+                ${
+                  isHostPack()
+                    ? `<p class="hint lobby-host-cap-hint">${escapeHtml(hostLobbyCapacityHint())}</p>`
+                    : ""
+                }`
                 : `<button type="button" class="btn btn-primary" id="btn-create-lobby" disabled aria-disabled="true" title="${escapeHtml(createLobbyDisabledReason)}">${escapeHtml(createLobbyLabel)}</button>`
               : ""
           }

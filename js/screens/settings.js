@@ -45,10 +45,11 @@ import {
   isVoluntaryLeaveInFlight,
 } from "../core/lobby.js";
 import { isLobbyHost } from "../core/gameSync.js";
+import { isHostPack } from "../core/entitlements.js";
 import { isSupabaseConfigured } from "../core/supabaseClient.js";
 import { onLobbyBundleUpdated } from "../core/supabaseLobby.js";
 import { showAppAlert, showAppConfirm, showLobbyPlayersManageDialog } from "../core/dialog.js";
-import { MAX_PLAYERS } from "../config/lobbyLifecycle.js";
+import { lobbyMaxPlayers } from "../config/lobbyLifecycle.js";
 import { lobbySettingsActionsForRole } from "../core/partySettingsMenu.js";
 import { navigate, getCurrentScreen, getScreenParams } from "../core/router.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
@@ -807,7 +808,7 @@ export function mountSettings(app) {
         }
         await showLobbyPlayersManageDialog({
           getParticipants: () => getLobbyParticipants(),
-          maxPlayers: MAX_PLAYERS,
+          maxPlayers: lobbyMaxPlayers(isLobbyHost() && isHostPack()),
           canKick: Boolean(isLobbyHost() && canManageLobbyRoster()),
           onKick: (userId, name) => kickLobbyMember(userId, { confirmName: name }),
           friendActionHtml: (p) =>
