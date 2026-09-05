@@ -108,7 +108,7 @@ describe("FEATURE-HOST-02A/02B — SKUs + carte Menu", () => {
       assert.match(profile, /id="btn-profile-buy"/);
       assert.equal(/btn-primary/.test(profile), false);
       assert.match(adfree, /id="btn-adfree-buy"/);
-      assert.match(adfree, />Payer 2,99&nbsp;€</);
+      assert.match(adfree, />Débloquer Sans pub - 2,99&nbsp;€</);
       assert.match(premiumOfferChromeHtml(), /Un paiement\. Tes soirées, à vie\./);
     });
 

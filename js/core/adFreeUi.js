@@ -39,7 +39,7 @@ export function adFreeSettingsCardHtml() {
         : "";
   } else if (canBuy) {
     buttonId = "btn-adfree-buy";
-    buttonLabel = "Payer 2,99&nbsp;€";
+    buttonLabel = "Débloquer Sans pub - 2,99&nbsp;€";
   }
 
   return premiumPackCardHtml({

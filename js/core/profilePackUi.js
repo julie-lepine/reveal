@@ -10,8 +10,9 @@ import {
 } from "./premiumOfferUi.js";
 
 const SIGNATURE_FEATURES = [
-  "Photo de profil et couleur du pseudo",
-  "Emojis extra et carnet des soirées",
+  "Ta photo dans le lobby - plus un emoji anonyme",
+  "Un pseudo en couleur, rien qu’à toi",
+  "Emojis Signature + carnet des 20 dernières soirées (rangs, carte à partager)",
   "Sans pub inclus",
 ];
 
@@ -44,7 +45,7 @@ export function profilePackSettingsCardHtml() {
     status = includedHost ? includedInHostStatus() : "";
   } else if (canBuy) {
     buttonId = "btn-profile-buy";
-    buttonLabel = `Payer ${priceLabel}&nbsp;€`;
+    buttonLabel = `Débloquer Signature - ${priceLabel}&nbsp;€`;
   }
 
   return premiumPackCardHtml({

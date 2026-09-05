@@ -73,7 +73,7 @@ describe("FEATURE-ADFREE-02A — préparation Billing / RevenueCat", () => {
     const settings = src("js/screens/settings.js");
     assert.match(ui, /btn-adfree-buy/);
     assert.equal(/btn-adfree-buy" disabled/.test(ui), false);
-    assert.match(ui, /Payer 2,99&nbsp;€/);
+    assert.match(ui, /Débloquer Sans pub - 2,99&nbsp;€/);
     assert.equal(/id="btn-adfree-restore"/.test(ui), false);
     assert.equal(/btn-adfree-refresh/.test(ui), false);
     assert.match(ui, /2,99/);

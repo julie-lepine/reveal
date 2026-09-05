@@ -17,7 +17,7 @@ function hostPriceForUser(user) {
 
 const HOST_FEATURES = [
   "14 joueurs dans le lobby (toi + 13)",
-  "Photo, couleur, emojis extra, carnet",
+  "Tout Signature : ton profil, pas un pseudo générique",
   "Plus de pub, sur tous tes appareils",
 ];
 
@@ -53,7 +53,7 @@ export function hostPackSettingsCardHtml() {
     }
     if (canBuy) {
       buttonId = "btn-host-buy";
-      buttonLabel = `Débloquer Maître — ${amount}&nbsp;€`;
+      buttonLabel = `Débloquer Maître - ${amount}&nbsp;€`;
     }
   }
 
