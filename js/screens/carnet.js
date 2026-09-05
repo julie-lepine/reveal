@@ -120,14 +120,15 @@ function scoresSparkHtml(evenings) {
   const scores = chrono.map((row) => row.score);
   const layout = carnetSparklineLayout(scores);
   const last = layout.dots[layout.dots.length - 1];
-  const range =
-    layout.min == null || layout.max == null
-      ? ""
-      : layout.min === layout.max
-        ? String(layout.min)
-        : `${layout.min} – ${layout.max}`;
+  const hasEnds = layout.min != null && layout.max != null;
+  const flat = hasEnds && layout.min === layout.max;
+  const rangeLabel = !hasEnds
+    ? ""
+    : flat
+      ? String(layout.max)
+      : `${layout.min} – ${layout.max}`;
   const aria = scores.length
-    ? `${CARNET_LABEL.chartScores}${range ? ` ${range}` : ""}`
+    ? `${CARNET_LABEL.chartScores}${rangeLabel ? ` ${rangeLabel}` : ""}`
     : CARNET_LABEL.chartScores;
   const line =
     layout.dots.length === 1 && last
@@ -135,19 +136,23 @@ function scoresSparkHtml(evenings) {
       : `<path class="carnet-spark__area" d="${layout.area}"></path>
         <polyline class="carnet-spark__line" fill="none" points="${layout.points}"></polyline>
         ${last ? `<circle class="carnet-spark__dot" cx="${last.x}" cy="${last.y}" r="3.5"></circle>` : ""}`;
+  const ends = !hasEnds
+    ? ""
+    : flat
+      ? `<p class="carnet-spark__ends carnet-spark__ends--flat">
+          <span class="carnet-spark__end">${escapeHtml(String(layout.max))}</span>
+        </p>`
+      : `<p class="carnet-spark__ends">
+          <span class="carnet-spark__end">${escapeHtml(String(layout.min))}</span>
+          <span class="carnet-spark__end">${escapeHtml(String(layout.max))}</span>
+        </p>`;
   return `
     <figure class="carnet-viz-card carnet-viz-card--spark">
-      <div class="carnet-viz__head">
-        <figcaption class="carnet-viz__label">${escapeHtml(CARNET_LABEL.chartScores)}</figcaption>
-        ${
-          range
-            ? `<p class="carnet-spark__range">${escapeHtml(range)}</p>`
-            : ""
-        }
-      </div>
+      <figcaption class="carnet-viz__label">${escapeHtml(CARNET_LABEL.chartScores)}</figcaption>
       <svg class="carnet-spark" viewBox="0 0 ${layout.width} ${layout.height}" role="img" aria-label="${escapeHtml(aria)}">
         ${line}
       </svg>
+      ${ends}
     </figure>`;
 }
 

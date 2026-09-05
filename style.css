@@ -4181,27 +4181,31 @@ button.emoji-picker-preview__avatar:active{
   min-width:0;
 }
 
-.carnet-viz__head{
-  display:flex;
-  align-items:baseline;
-  justify-content:space-between;
-  gap:8px;
-}
-
-.carnet-spark__range{
-  margin:0;
-  font-size:.78rem;
-  font-weight:750;
-  color:var(--color-secondary-soft);
-  letter-spacing:.02em;
-  white-space:nowrap;
-}
-
 .carnet-spark{
   display:block;
   width:100%;
   height:72px;
   margin-top:4px;
+}
+
+.carnet-spark__ends{
+  display:flex;
+  justify-content:space-between;
+  align-items:baseline;
+  margin:2px 0 0;
+  padding:0 4px;
+}
+
+.carnet-spark__ends--flat{
+  justify-content:flex-end;
+}
+
+.carnet-spark__end{
+  font-size:.82rem;
+  font-weight:800;
+  color:var(--color-secondary-soft);
+  letter-spacing:.02em;
+  line-height:1.1;
 }
 
 .carnet-spark__area{
