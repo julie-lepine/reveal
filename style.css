@@ -4069,6 +4069,57 @@ button.emoji-picker-preview__avatar:active{
   margin-top:14px;
 }
 
+.carnet-crop-dialog{
+  z-index:10050;
+}
+
+.carnet-crop-dialog__panel{
+  max-width:380px;
+  width:100%;
+  padding:20px 16px 16px;
+}
+
+.carnet-crop__stage{
+  position:relative;
+  width:100%;
+  height:min(52vw, 320px);
+  margin:8px 0 12px;
+  overflow:hidden;
+  border-radius:16px;
+  background:#05060f;
+  touch-action:none;
+  user-select:none;
+  -webkit-user-select:none;
+}
+
+.carnet-crop__img{
+  position:absolute;
+  left:50%;
+  top:50%;
+  max-width:none;
+  pointer-events:none;
+  transform-origin:center center;
+}
+
+.carnet-crop__hole{
+  position:absolute;
+  left:50%;
+  top:50%;
+  width:72%;
+  aspect-ratio:1 / 1;
+  max-height:85%;
+  transform:translate(-50%, -50%);
+  border-radius:50%;
+  border:2px solid rgba(245, 215, 110, 0.85);
+  box-shadow:0 0 0 999px rgba(5, 6, 15, 0.72);
+  pointer-events:none;
+}
+
+.carnet-crop__hint{
+  margin:0 0 14px;
+  font-size:.82rem;
+}
+
 .carnet-list__title{
   margin:0;
   font-size:16px;

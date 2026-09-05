@@ -397,4 +397,43 @@ describe("FEATURE-PROFILE-04 — carnet Signature", () => {
     );
     assert.doesNotMatch(hook([{ ...days(1), rank: 2 }], { favoriteGame: null }), /carnet/i);
   });
+
+  it("recadrage cercle : cover, clamp, pas de capture caméra", async () => {
+    const { cropMinScale, cropMaxScale, clampCropTransform, cropSourceRect } = await import(
+      "../js/core/signatureCarnetCropLogic.js"
+    );
+    assert.equal(cropMinScale(400, 200, 100), 0.5);
+    assert.equal(cropMaxScale(0.5), 2);
+    const clamped = clampCropTransform({
+      tx: 999,
+      ty: 999,
+      scale: 0.5,
+      imgW: 400,
+      imgH: 200,
+      circleD: 100,
+      minScale: 0.5,
+      maxScale: 2,
+    });
+    assert.equal(clamped.ty, 0);
+    assert.equal(clamped.tx, 50);
+    const rect = cropSourceRect({
+      imgW: 400,
+      imgH: 200,
+      scale: 0.5,
+      tx: 0,
+      ty: 0,
+      circleD: 100,
+    });
+    assert.equal(rect.sw, 200);
+    assert.equal(rect.sh, 200);
+    assert.equal(rect.sy, 0);
+
+    const cardJs = src("js/core/signatureCarnetCard.js");
+    assert.match(cardJs, /accept="image\/\*"/);
+    assert.doesNotMatch(cardJs, /capture=/);
+    assert.match(cardJs, /openCarnetPhotoCrop/);
+    const cropUi = src("js/core/signatureCarnetCrop.js");
+    assert.doesNotMatch(cropUi, /rotate|90°|Pivoter/);
+    assert.match(src("js/config/signatureCarnet.js"), /Choisir une photo/);
+  });
 });

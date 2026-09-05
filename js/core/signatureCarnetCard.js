@@ -16,6 +16,12 @@ import {
   carnetCardLayout,
 } from "./signatureCarnetCardLogic.js";
 import {
+  loadImageFromFile,
+  closeCarnetPhotoCrop,
+  openCarnetPhotoCrop,
+  revokeCropImage,
+} from "./signatureCarnetCrop.js";
+import {
   carnetSparklineLayout,
   carnetWinrateRing,
   formatCarnetWinrate,
@@ -160,14 +166,30 @@ function drawHero(ctx, box, hook) {
   ctx.restore();
 }
 
-function drawIdentity(ctx, box, identity) {
-  const cx = box.x + box.avatar / 2;
+function drawIdentity(ctx, box, identity, photo) {
+  const r = box.avatar / 2;
+  const cx = box.x + r;
   const cy = box.y + box.h / 2;
+  ctx.save();
   ctx.beginPath();
-  ctx.arc(cx, cy, box.avatar / 2, 0, Math.PI * 2);
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
   ctx.fillStyle = identity.color;
   ctx.fill();
+  if (photo) {
+    ctx.clip();
+    ctx.drawImage(photo, cx - r, cy - r, box.avatar, box.avatar);
+  }
+  ctx.restore();
+  if (!photo) {
+    ctx.font = `48px ${FONT}`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = COLOR.white;
+    ctx.fillText(identity.emoji, cx, cy + 2);
+  }
   if (identity.signature) {
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
     ctx.strokeStyle = COLOR.gold;
     ctx.lineWidth = 4;
     ctx.shadowColor = "rgba(245, 215, 110, 0.45)";
@@ -175,11 +197,6 @@ function drawIdentity(ctx, box, identity) {
     ctx.stroke();
     ctx.shadowBlur = 0;
   }
-  ctx.font = `48px ${FONT}`;
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.fillStyle = COLOR.white;
-  ctx.fillText(identity.emoji, cx, cy + 2);
 
   const nameX = box.x + box.avatar + 22;
   const nameMax = box.w - box.avatar - 22;
@@ -449,7 +466,7 @@ export async function renderCarnetSharePng(model) {
   ctx.fillRect(0, 0, layout.w, layout.h);
 
   drawHero(ctx, layout.hero, model.hook);
-  drawIdentity(ctx, layout.ident, model.identity);
+  drawIdentity(ctx, layout.ident, model.identity, model.photo);
   drawRing(ctx, layout.ring, model.stats.winrate);
   drawSpark(ctx, layout.spark, model.sparkScores);
   drawRanks(ctx, layout.ranks, model.rankSplit, model.rankPercents);
@@ -523,6 +540,10 @@ export function openCarnetSharePreview(model) {
       <p class="hint carnet-share-dialog__hint" data-carnet-share-hint hidden>${escapeHtml(
         CARNET_LABEL.shareHint
       )}</p>
+      <button type="button" class="btn btn-secondary app-dialog__btn" data-carnet-share-photo hidden>${escapeHtml(
+        CARNET_LABEL.sharePickPhoto
+      )}</button>
+      <input type="file" accept="image/*" hidden data-carnet-share-file />
       <button type="button" class="btn btn-primary app-dialog__btn" data-carnet-share-send disabled>${escapeHtml(
         CARNET_LABEL.shareConfirm
       )}</button>
@@ -536,11 +557,56 @@ export function openCarnetSharePreview(model) {
   const imgEl = root.querySelector("[data-carnet-share-img]");
   const hintEl = root.querySelector("[data-carnet-share-hint]");
   const sendBtn = root.querySelector("[data-carnet-share-send]");
+  const photoBtn = root.querySelector("[data-carnet-share-photo]");
+  const fileInput = root.querySelector("[data-carnet-share-file]");
+  let painting = false;
+
+  const paintPreview = () => {
+    if (closed || painting) return;
+    painting = true;
+    if (sendBtn) sendBtn.disabled = true;
+    if (statusEl) {
+      statusEl.hidden = false;
+      statusEl.textContent = CARNET_LABEL.shareGenerating;
+    }
+    if (imgEl) imgEl.hidden = true;
+    void renderCarnetSharePng(model)
+      .then((out) => {
+        if (closed) return;
+        if (objectUrl) URL.revokeObjectURL(objectUrl);
+        blob = out;
+        objectUrl = URL.createObjectURL(out);
+        if (imgEl) {
+          imgEl.src = objectUrl;
+          imgEl.hidden = false;
+        }
+        if (statusEl) statusEl.hidden = true;
+        if (hintEl) {
+          hintEl.hidden = false;
+          hintEl.textContent = CARNET_LABEL.shareHint;
+        }
+        if (sendBtn) sendBtn.disabled = false;
+        if (photoBtn) {
+          photoBtn.hidden = false;
+          photoBtn.textContent = model.photo
+            ? CARNET_LABEL.shareChangePhoto
+            : CARNET_LABEL.sharePickPhoto;
+        }
+      })
+      .catch(() => {
+        if (closed) return;
+        if (statusEl) statusEl.textContent = CARNET_LABEL.shareError;
+      })
+      .finally(() => {
+        painting = false;
+      });
+  };
 
   const close = () => {
     if (closed) return;
     closed = true;
     if (previewClose === close) previewClose = null;
+    closeCarnetPhotoCrop();
     if (objectUrl) URL.revokeObjectURL(objectUrl);
     objectUrl = null;
     blob = null;
@@ -555,7 +621,7 @@ export function openCarnetSharePreview(model) {
   root.querySelector("[data-carnet-share-close]")?.addEventListener("click", close);
   root.querySelector("[data-carnet-share-dismiss]")?.addEventListener("click", close);
   root.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") close();
+    if (e.key === "Escape" && !document.querySelector(".carnet-crop-dialog")) close();
   });
   sendBtn?.addEventListener(
     "click",
@@ -568,28 +634,36 @@ export function openCarnetSharePreview(model) {
       }
     })
   );
+  photoBtn?.addEventListener("click", () => fileInput?.click());
+  fileInput?.addEventListener(
+    "change",
+    withClickLock(async () => {
+      const file = fileInput.files && fileInput.files[0];
+      fileInput.value = "";
+      if (!file) return;
+      let loaded = null;
+      try {
+        loaded = await loadImageFromFile(file);
+        const cropped = await openCarnetPhotoCrop(loaded);
+        if (cropped) {
+          model.photo = cropped;
+          paintPreview();
+        }
+      } catch {
+        if (hintEl) {
+          hintEl.hidden = false;
+          hintEl.textContent = CARNET_LABEL.sharePhotoError;
+        }
+      } finally {
+        revokeCropImage(loaded);
+      }
+    })
+  );
 
   document.body.appendChild(root);
   requestAnimationFrame(() => root.classList.add("app-dialog--in"));
   sendBtn?.focus();
-
-  void renderCarnetSharePng(model)
-    .then((out) => {
-      if (closed) return;
-      blob = out;
-      objectUrl = URL.createObjectURL(out);
-      if (imgEl) {
-        imgEl.src = objectUrl;
-        imgEl.hidden = false;
-      }
-      if (statusEl) statusEl.hidden = true;
-      if (hintEl) hintEl.hidden = false;
-      if (sendBtn) sendBtn.disabled = false;
-    })
-    .catch(() => {
-      if (closed) return;
-      if (statusEl) statusEl.textContent = CARNET_LABEL.shareError;
-    });
+  paintPreview();
 
   return close;
 }
