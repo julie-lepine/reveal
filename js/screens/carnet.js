@@ -118,7 +118,7 @@ function winrateRingHtml(winrate) {
 function scoresSparkHtml(evenings) {
   const chrono = chronologicalCarnetEvenings(evenings);
   const scores = chrono.map((row) => row.score);
-  const layout = carnetSparklineLayout(scores, { pad: 8 });
+  const layout = carnetSparklineLayout(scores);
   const last = layout.dots[layout.dots.length - 1];
   const hasRange = layout.min != null && layout.max != null;
   const rangeLabel = !hasRange
@@ -135,17 +135,19 @@ function scoresSparkHtml(evenings) {
       : `<path class="carnet-spark__area" d="${layout.area}"></path>
         <polyline class="carnet-spark__line" fill="none" points="${layout.points}"></polyline>
         ${last ? `<circle class="carnet-spark__dot" cx="${last.x}" cy="${last.y}" r="3.5"></circle>` : ""}`;
+  const ends = !hasRange
+    ? ""
+    : `<p class="carnet-spark__ends">
+        <span class="carnet-spark__end">${escapeHtml(String(layout.min))}</span>
+        <span class="carnet-spark__end">${escapeHtml(String(layout.max))}</span>
+      </p>`;
   return `
     <figure class="carnet-viz-card carnet-viz-card--spark">
       <figcaption class="carnet-viz__label">${escapeHtml(CARNET_LABEL.chartScores)}</figcaption>
-      ${
-        rangeLabel
-          ? `<p class="carnet-spark__range">${escapeHtml(rangeLabel)}</p>`
-          : ""
-      }
       <svg class="carnet-spark" viewBox="0 0 ${layout.width} ${layout.height}" preserveAspectRatio="none" role="img" aria-label="${escapeHtml(aria)}">
         ${line}
       </svg>
+      ${ends}
     </figure>`;
 }
 
