@@ -17,6 +17,10 @@ export function hostLobbyCapacityHint() {
   return "Avantage Maître de soirée : tu peux inviter 13 autres joueurs.";
 }
 
+export function hostLobbyUpsellHint() {
+  return "Tu veux un + grand lobby ?";
+}
+
 /** Message renvoyé quand le lobby est plein. */
 export const LOBBY_FULL_MSG = "Nombre de joueurs max atteint pour ce lobby";
 

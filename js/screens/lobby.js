@@ -20,6 +20,7 @@ import {
 import {
   getLobbyAutoCloseHint,
   hostLobbyCapacityHint,
+  hostLobbyUpsellHint,
   lobbyMaxPlayers,
 } from "../config/lobbyLifecycle.js";
 import { isHostPack } from "../core/entitlements.js";
@@ -389,6 +390,10 @@ export function mountLobby(app) {
     if (!mount.isCurrentMount()) return;
     bindNav(app);
 
+    app.querySelector("[data-lobby-cap-upsell]")?.addEventListener("click", () => {
+      goToEveningSettings({ tab: SETTINGS_TAB.FORFAITS });
+    });
+
     app.querySelector(".participants-grid")?.addEventListener("click", (e) => {
       if (!mount.isMounted()) return;
       if (!mount.isCurrentMount()) return;
@@ -520,11 +525,20 @@ export function mountLobby(app) {
       isHost && hostPack
         ? `<p class="hint lobby-host-cap-hint">${escapeHtml(hostLobbyCapacityHint())}</p>`
         : "";
+    const capUpsell =
+      !hostPack
+        ? `<button type="button" class="lobby-count-upsell" data-lobby-cap-upsell>${escapeHtml(
+            hostLobbyUpsellHint()
+          )}</button>`
+        : "";
 
     app.innerHTML = pageShell({
       backTarget: "home",
       content: `
-        <p class="lobby-count">${total} / ${seatCap} participants connectés</p>
+        <div class="lobby-head">
+          <p class="lobby-count">${total} / ${seatCap} participants connectés</p>
+          ${capUpsell}
+        </div>
 
         <div class="participants-wrap">
           <div class="participants-grid">${participantsHtml(participants, { canKick, hostId, localIsRegistered, lobbyId })}</div>

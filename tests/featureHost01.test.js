@@ -71,17 +71,19 @@ describe("FEATURE-HOST-01 — entitlement Maître de soirée", () => {
   });
 
   it("phrase et plafond 14 places pour un hôte Maître", async () => {
-    const { hostLobbyCapacityHint, lobbyMaxPlayers, MAX_PLAYERS, MAX_PLAYERS_HOST } =
+    const { hostLobbyCapacityHint, hostLobbyUpsellHint, lobbyMaxPlayers, MAX_PLAYERS, MAX_PLAYERS_HOST } =
       await import("../js/config/lobbyLifecycle.js");
     assert.equal(
       hostLobbyCapacityHint(),
       "Avantage Maître de soirée : tu peux inviter 13 autres joueurs."
     );
+    assert.equal(hostLobbyUpsellHint(), "Tu veux un + grand lobby ?");
     assert.equal(MAX_PLAYERS, 8);
     assert.equal(MAX_PLAYERS_HOST, 14);
     assert.equal(lobbyMaxPlayers(true), 14);
     assert.equal(lobbyMaxPlayers(false), 8);
     assert.match(src("js/screens/lobby.js"), /hostLobbyCapacityHint/);
+    assert.match(src("js/screens/lobby.js"), /hostLobbyUpsellHint/);
     assert.match(src("js/screens/home.js"), /hostLobbyCapacityHint/);
     assert.match(src("js/core/hostPackUi.js"), /14 joueurs dans le lobby/);
   });

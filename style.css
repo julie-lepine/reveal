@@ -646,6 +646,7 @@ body.has-top-ad .back{
   margin-bottom:var(--heading-gap-h1);
 }
 
+.page:has(.back) .container > .lobby-head:first-child,
 .page:has(.back) .container > .lobby-count:first-child,
 .page:has(.back) .container > .game-header:first-child{
   padding-left:calc(var(--touch-min) + 12px);
@@ -3888,6 +3889,43 @@ button.emoji-picker-preview__avatar:active{
   font-size:14px;
   color:rgba(255,255,255,.45);
   margin:8px 0 20px;
+}
+
+.lobby-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  min-height:var(--touch-min);
+  margin:8px 0 20px;
+}
+
+.lobby-head .lobby-count{
+  margin:0;
+  flex:1 1 auto;
+  min-width:0;
+}
+
+.lobby-count-upsell{
+  flex:0 1 11.5rem;
+  margin:0;
+  padding:4px 0;
+  border:none;
+  background:transparent;
+  min-height:var(--touch-min);
+  font:inherit;
+  font-size:12px;
+  font-weight:600;
+  line-height:1.25;
+  letter-spacing:.01em;
+  color:rgba(245,215,110,.78);
+  text-align:right;
+  cursor:pointer;
+  -webkit-appearance:none;
+}
+
+.lobby-count-upsell:active{
+  color:rgba(245,215,110,.95);
 }
 
 .participants-wrap{
