@@ -387,6 +387,12 @@ export function mountSettings(app) {
   let lastLobbyActive = hasActiveLobby();
   let partyActionInFlight = false;
   const friendLock = createActionLock();
+  let localAvatarPreviewUrl = null;
+
+  function setLocalAvatarPreview(blob) {
+    if (localAvatarPreviewUrl) URL.revokeObjectURL(localAvatarPreviewUrl);
+    localAvatarPreviewUrl = blob ? URL.createObjectURL(blob) : null;
+  }
 
   function goToSettingsTab(tab) {
     if (!tab || tab === activeTab) return;
@@ -434,6 +440,7 @@ export function mountSettings(app) {
         signature: isProfilePack(),
         avatarPath: u.avatarPath || null,
         avatarRev: Number(u.avatarRev) || 0,
+        avatarUrl: localAvatarPreviewUrl || null,
       };
     }
 
@@ -575,6 +582,7 @@ export function mountSettings(app) {
             showAvatarStatus("", res.error || AVATAR_LABEL.error);
             return;
           }
+          setLocalAvatarPreview(blob);
           showAvatarStatus(AVATAR_LABEL.ok, "");
           syncAvatarButtons();
           refreshSignaturePreview();
@@ -595,6 +603,7 @@ export function mountSettings(app) {
           showAvatarStatus("", res.error || AVATAR_LABEL.error);
           return;
         }
+        setLocalAvatarPreview(null);
         showAvatarStatus(AVATAR_LABEL.removed, "");
         syncAvatarButtons();
         refreshSignaturePreview();
@@ -950,5 +959,6 @@ export function mountSettings(app) {
   return () => {
     mount.dispose();
     unsubLobby();
+    setLocalAvatarPreview(null);
   };
 }

@@ -22,6 +22,7 @@ function escapeHtml(str) {
 
 export function signatureIdentityFrom(p = {}) {
   const avatar = avatarFieldsFrom(p);
+  const localUrl = typeof p.avatarUrl === "string" ? p.avatarUrl.trim() : "";
   return {
     name: p.name || "Joueur",
     emoji: p.emoji || "👤",
@@ -30,13 +31,16 @@ export function signatureIdentityFrom(p = {}) {
     signature: p.signature === true,
     avatarPath: avatar.avatarPath,
     avatarRev: avatar.avatarRev,
+    avatarUrl: localUrl || null,
   };
 }
 
 /** Photo par-dessus l’emoji ; `onerror` retire l’img → l’emoji reste. */
 export function avatarPhotoHtml(p) {
   const ident = signatureIdentityFrom(p);
-  const url = ident.signature ? publicAvatarUrl(ident.avatarPath, ident.avatarRev) : null;
+  const url =
+    ident.avatarUrl ||
+    (ident.signature ? publicAvatarUrl(ident.avatarPath, ident.avatarRev) : null);
   if (!url) return "";
   return `<img class="avatar__photo" src="${escapeHtml(url)}" alt="" onerror="this.remove()">`;
 }

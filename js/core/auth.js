@@ -245,10 +245,14 @@ export async function uploadProfileAvatarBlob(blob) {
   const path = avatarPathForUser(userId);
   if (!path) return { ok: false, error: AVATAR_LABEL.error };
 
+  if (user.avatarPath) {
+    await supabase.storage.from(AVATAR_BUCKET).remove([path]);
+  }
+
   const { error } = await supabase.storage.from(AVATAR_BUCKET).upload(path, blob, {
     upsert: true,
     contentType: "image/jpeg",
-    cacheControl: "60",
+    cacheControl: "0",
   });
   if (error) return { ok: false, error: error.message || AVATAR_LABEL.error };
 

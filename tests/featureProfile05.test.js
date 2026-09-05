@@ -116,7 +116,8 @@ describe("FEATURE-PROFILE-05 — avatar photo Signature", () => {
     assert.equal(/profile_pack\s*:/.test(upsert), false);
     assert.match(upsert, /avatar_path/);
     assert.match(upsert, /avatar_rev/);
-    assert.match(src("js/core/players.js"), /avatarPath/);
+    assert.match(src("js/core/auth.js"), /cacheControl:\s*"0"/);
+    assert.match(src("js/core/auth.js"), /\.remove\(\[path\]\)/);
     assert.match(src("js/screens/lobby.js"), /avatarPhotoHtml/);
   });
 });
