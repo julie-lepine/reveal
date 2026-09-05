@@ -122,6 +122,7 @@ describe("FEATURE-PROFILE-04 — carnet Signature", () => {
     assert.match(sql, /is_lobby_member/);
     assert.match(sql, /friends_live_display_name/);
     assert.match(sql, /p_peer_user_ids/);
+    assert.match(sql, /notify pgrst/);
     assert.match(sql, /revoke all on table public\.signature_evenings from authenticated/);
     assert.doesNotMatch(sql, /grant select on table public\.signature_evenings/);
     const listFn = sql.slice(sql.indexOf("create or replace function public.list_signature_carnet"));
@@ -174,5 +175,12 @@ describe("FEATURE-PROFILE-04 — carnet Signature", () => {
     assert.doesNotMatch(screen, /lobby_id/);
     assert.match(screen, /data-carnet-forfaits/);
     assert.match(screen, /CARNET_LABEL\.seePacks/);
+    const sync = src("js/core/gameSync.js");
+    const menuBlock = sync.slice(
+      sync.indexOf("const MENU_SCREENS"),
+      sync.indexOf("export function isPassiveChromeScreen")
+    );
+    assert.match(menuBlock, /"carnet"/);
+    assert.match(sync, /screen === "carnet"/);
   });
 });

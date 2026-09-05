@@ -314,16 +314,18 @@ const MENU_SCREENS = new Set([
   "game-select",
   "settings",
   "friends",
+  "carnet",
   "help-legal",
   "privacy",
 ]);
 
-/** Accueil / Menu / Amis / légal : chrome soirée, pas une manche. */
+/** Accueil / Menu / Amis / carnet / légal : chrome soirée, pas une manche. */
 export function isPassiveChromeScreen(screen) {
   return (
     screen === "home" ||
     screen === "settings" ||
     screen === "friends" ||
+    screen === "carnet" ||
     screen === "help-legal" ||
     screen === "privacy"
   );

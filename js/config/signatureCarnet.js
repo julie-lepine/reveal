@@ -12,6 +12,8 @@ export const CARNET_LABEL = {
   empty:
     "Pas encore de soirée archivée. Joue, puis quitte le salon — ça s’enregistre tout seul.",
   loadError: "Impossible de charger le carnet. Réessaie dans un instant.",
+  missingRpc:
+    "Le carnet n’est pas encore activé sur le serveur. Recolle le SQL feature-profile-04 (il finit par notify pgrst).",
   statsEvenings: "Soirées",
   statsGames: "Parties",
   statsWinrate: "Winrate",

@@ -81,13 +81,17 @@ function eveningCardHtml(row) {
     </article>`;
 }
 
-function carnetBodyHtml({ registered, unlocked, loading, error, payload }) {
+function carnetBodyHtml({ registered, unlocked, loading, error, errorCode, payload }) {
   if (!registered || !unlocked) return lockedHtml(registered);
   if (loading) {
     return `<p class="hint settings-section__hint">Chargement…</p>`;
   }
   if (error) {
-    return `<p class="auth-error">${escapeHtml(CARNET_LABEL.loadError)}</p>`;
+    const msg =
+      errorCode === "PGRST202" || errorCode === "42883"
+        ? CARNET_LABEL.missingRpc
+        : CARNET_LABEL.loadError;
+    return `<p class="auth-error">${escapeHtml(msg)}</p>`;
   }
   const evenings = payload?.evenings || [];
   if (!evenings.length) {
@@ -112,7 +116,7 @@ export function mountCarnet(app) {
   const registered = isLoggedIn();
   const unlocked = registered && isProfilePack();
 
-  function paint({ loading = false, error = false, payload = null } = {}) {
+  function paint({ loading = false, error = false, errorCode = null, payload = null } = {}) {
     if (!mount.isMounted()) return;
     app.innerHTML = pageShell({
       back: true,
@@ -121,7 +125,7 @@ export function mountCarnet(app) {
       content: `
         <p class="label-upper label-upper--muted">Menu</p>
         <h1 class="page-title">${escapeHtml(CARNET_LABEL.pageTitle)}</h1>
-        ${carnetBodyHtml({ registered, unlocked, loading, error, payload })}
+        ${carnetBodyHtml({ registered, unlocked, loading, error, errorCode, payload })}
       `,
     });
     bindNav(app);
@@ -134,13 +138,21 @@ export function mountCarnet(app) {
   if (unlocked) {
     void fetchSignatureCarnet()
       .then((res) => {
+        if (res.skipped) {
+          paint({ loading: false, error: false, payload: { evenings: [], stats: null } });
+          return;
+        }
         paint({
           loading: false,
           error: !res.ok,
+          errorCode: res.code || null,
           payload: res.ok ? res : { evenings: [], stats: null },
         });
       })
-      .catch(() => paint({ loading: false, error: true }));
+      .catch((e) => {
+        console.warn("REVEAL signature carnet list:", e?.message || e);
+        paint({ loading: false, error: true });
+      });
   }
 
   return () => mount.dispose();

@@ -212,12 +212,12 @@ begin
       e.score,
       e.games,
       (
-        select coalesce(jsonb_agg(public.friends_live_display_name(peer) order by public.friends_live_display_name(peer)), '[]'::jsonb)
-        from unnest(e.peer_user_ids) as peer
+        select coalesce(jsonb_agg(public.friends_live_display_name(t.peer) order by public.friends_live_display_name(t.peer)), '[]'::jsonb)
+        from unnest(e.peer_user_ids) as t(peer)
         where exists (
           select 1 from public.friendships f
-          where (f.user_a = v_uid and f.user_b = peer)
-             or (f.user_b = v_uid and f.user_a = peer)
+          where (f.user_a = v_uid and f.user_b = t.peer)
+             or (f.user_b = v_uid and f.user_a = t.peer)
         )
       ) as friend_names
     from public.signature_evenings e
@@ -265,3 +265,5 @@ $$;
 revoke all on function public.list_signature_carnet() from public;
 revoke all on function public.list_signature_carnet() from anon;
 grant execute on function public.list_signature_carnet() to authenticated;
+
+notify pgrst, 'reload schema';

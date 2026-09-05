@@ -150,6 +150,7 @@ export const FRIEND_NOTICE_CALM_SCREENS = new Set([
   "leaderboard",
   FRIENDS_SCREEN_ID,
   "settings",
+  "carnet",
   "help-legal",
   "home",
 ]);

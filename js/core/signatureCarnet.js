@@ -48,6 +48,7 @@ function rpcCode(error) {
     "signature_empty",
     "signature_not_member",
     "friends_guest",
+    "PGRST202",
   ]) {
     if (raw.includes(code)) return code;
   }
@@ -149,9 +150,10 @@ export async function fetchSignatureCarnet() {
   if (!canCallCarnetRpc() || !isProfilePack()) {
     return { ok: false, skipped: true, evenings: [], stats: null };
   }
-  const { data, error } = await supabase.rpc("list_signature_carnet");
+  const { data, error } = await supabase.rpc("list_signature_carnet", {});
   if (error) {
     const code = rpcCode(error);
+    console.warn("REVEAL signature carnet list:", code || error.message || error);
     return { ok: false, skipped: false, code, evenings: [], stats: null };
   }
   let raw = data;
