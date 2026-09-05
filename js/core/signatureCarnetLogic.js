@@ -198,10 +198,9 @@ export function carnetSparklineLayout(
     return { x: round(x), y: round(y), score };
   });
   const points = dots.map((d) => `${d.x},${d.y}`).join(" ");
-  const baseY = h - p;
-  const area = `M ${dots[0].x} ${baseY} L ${dots
+  const area = `M ${dots[0].x} ${h} L ${dots
     .map((d) => `${d.x} ${d.y}`)
-    .join(" ")} L ${dots[dots.length - 1].x} ${baseY} Z`;
+    .join(" ")} L ${dots[dots.length - 1].x} ${h} Z`;
   return { width: w, height: h, points, area, dots, min, max };
 }
 

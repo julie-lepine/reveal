@@ -4179,33 +4179,24 @@ button.emoji-picker-preview__avatar:active{
   display:flex;
   flex-direction:column;
   min-width:0;
+  padding:12px 12px 0;
+  overflow:hidden;
+}
+
+.carnet-spark__range{
+  margin:2px 0 0;
+  font-size:1.35rem;
+  font-weight:800;
+  line-height:1.15;
+  letter-spacing:.01em;
+  color:#fff;
 }
 
 .carnet-spark{
   display:block;
-  width:100%;
+  width:calc(100% + 24px);
   height:72px;
-  margin-top:4px;
-}
-
-.carnet-spark__ends{
-  display:flex;
-  justify-content:space-between;
-  align-items:baseline;
-  margin:2px 0 0;
-  padding:0 4px;
-}
-
-.carnet-spark__ends--flat{
-  justify-content:flex-end;
-}
-
-.carnet-spark__end{
-  font-size:.82rem;
-  font-weight:800;
-  color:var(--color-secondary-soft);
-  letter-spacing:.02em;
-  line-height:1.1;
+  margin:8px -12px 0;
 }
 
 .carnet-spark__area{

@@ -228,8 +228,7 @@ describe("FEATURE-PROFILE-04 — carnet Signature", () => {
     assert.match(screen, /CARNET_LABEL\.seePacks/);
     assert.match(screen, /carnet-viz/);
     assert.match(screen, /carnet-ring/);
-    assert.match(screen, /carnet-spark__ends/);
-    assert.match(screen, /carnet-spark__end/);
+    assert.match(screen, /carnet-spark__range/);
     assert.match(screen, /carnet-rank-row/);
     assert.match(screen, /CARNET_LABEL\.listTitle/);
     assert.match(screen, /carnet-chip/);
