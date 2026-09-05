@@ -53,11 +53,11 @@ export function openCarnetPhotoCrop(img) {
           <div class="carnet-crop__hole" data-crop-hole aria-hidden="true"></div>
         </div>
         <p class="hint carnet-crop__hint">${escapeHtml(CARNET_LABEL.shareCropHint)}</p>
-        <div class="app-dialog__actions carnet-crop__actions">
-          <button type="button" class="btn btn-secondary app-dialog__btn" data-crop-cancel>${escapeHtml(
+        <div class="carnet-crop__actions">
+          <button type="button" class="btn btn-secondary" data-crop-cancel>${escapeHtml(
             CARNET_LABEL.shareCropCancel
           )}</button>
-          <button type="button" class="btn btn-primary app-dialog__btn" data-crop-ok>${escapeHtml(
+          <button type="button" class="btn btn-primary" data-crop-ok>${escapeHtml(
             CARNET_LABEL.shareCropOk
           )}</button>
         </div>

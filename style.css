@@ -3588,13 +3588,15 @@ button.emoji-picker-preview__avatar:active{
 
 .settings-avatar-actions{
   display:flex;
+  flex-wrap:nowrap;
   gap:10px;
   margin:0 0 14px;
 }
 
 .settings-avatar-actions .btn{
   flex:1 1 0;
-  width:auto;
+  width:0;
+  min-width:0;
   margin:0;
   min-height:44px;
   padding:10px 12px;
@@ -4163,13 +4165,15 @@ button.emoji-picker-preview__avatar:active{
 
 .carnet-crop__actions{
   display:flex;
+  flex-wrap:nowrap;
   gap:10px;
   margin-top:0;
 }
 
-.carnet-crop__actions .app-dialog__btn{
+.carnet-crop-dialog__panel .carnet-crop__actions .btn{
   flex:1 1 0;
-  width:auto;
+  width:0;
+  min-width:0;
   max-width:none;
   margin:0;
   min-height:44px;
