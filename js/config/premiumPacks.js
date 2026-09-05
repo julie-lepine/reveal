@@ -6,5 +6,5 @@ export const PACK_AD_FREE_LABEL = "Sans pub";
 
 export const PACK_SIGNATURE_LABEL = "Signature";
 
-/** Palier 12,99 € — nom figé, pas de SKU / UI pour l’instant. */
+/** Palier 9,99 € — inclut Signature + Sans pub. */
 export const PACK_HOST_LABEL = "Maître de soirée";

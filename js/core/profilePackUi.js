@@ -1,6 +1,6 @@
-import { PACK_SIGNATURE_LABEL } from "../config/premiumPacks.js";
+import { PACK_HOST_LABEL, PACK_SIGNATURE_LABEL } from "../config/premiumPacks.js";
 import { isLoggedIn, isGuest } from "./auth.js";
-import { isProfilePack } from "./entitlements.js";
+import { isHostPack, isProfilePack } from "./entitlements.js";
 import { getState } from "./state.js";
 import { isNativeApp } from "./platform.js";
 import { isPurchasesNativeReady, profileSkuForUser } from "./purchases.js";
@@ -24,8 +24,13 @@ export function profilePackSettingsCardHtml() {
         </p>
         <p class="hint settings-section__hint">Les invités ne peuvent pas acheter : le droit suit le compte, pas le téléphone.</p>`;
   } else if (unlocked) {
+    const includedHost = isHostPack();
     body = `
-        <p class="settings-premium__ok" role="status">${PACK_SIGNATURE_LABEL} est actif sur ce compte.</p>
+        <p class="settings-premium__ok" role="status">${
+          includedHost
+            ? `${PACK_SIGNATURE_LABEL} est inclus dans ${PACK_HOST_LABEL}.`
+            : `${PACK_SIGNATURE_LABEL} est actif sur ce compte.`
+        }</p>
         <p class="hint settings-section__hint">Sans pub inclus, sur tous tes appareils liés à ce compte.</p>`;
   } else {
     const storeHint = isNativeApp()

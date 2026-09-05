@@ -6,7 +6,7 @@ import {
   resolveLiveDisplayName,
   resolveLiveEmoji,
 } from "./profileIdentity.js";
-import { adFreeFromProfile, avatarFromProfile, nameColorFromProfile, profilePackFromProfile } from "./entitlements.js";
+import { adFreeFromProfile, avatarFromProfile, hostPackFromProfile, nameColorFromProfile, profilePackFromProfile } from "./entitlements.js";
 import { formatAuthErrorMessage, isAuthRateLimitError, isAuthCaptchaError } from "./authErrors.js";
 import {
   getPasswordResetCooldownRemainingMs,
@@ -181,6 +181,7 @@ export async function syncSessionToState(session) {
         provider: null,
         adFree: false,
         profilePack: false,
+        hostPack: false,
         nameColor: null,
         avatarPath: null,
         avatarRev: 0,
@@ -248,6 +249,7 @@ export async function syncSessionToState(session) {
       provider: providerFromUser(user),
       adFree: isAnonymous ? false : adFreeFromProfile(profile),
       profilePack: isAnonymous ? false : profilePackFromProfile(profile),
+      hostPack: isAnonymous ? false : hostPackFromProfile(profile),
       nameColor: isAnonymous ? null : nameColorFromProfile(profile),
       avatarPath: isAnonymous ? null : avatarFromProfile(profile).avatarPath,
       avatarRev: isAnonymous ? 0 : avatarFromProfile(profile).avatarRev,
@@ -712,6 +714,7 @@ export async function signInAsGuest(displayName, captchaToken = null, emoji = nu
       provider: "guest",
       adFree: false,
       profilePack: false,
+      hostPack: false,
       nameColor: null,
       avatarPath: null,
       avatarRev: 0,

@@ -1,5 +1,5 @@
-// FEATURE-ADFREE-02B / FEATURE-PROFILE-02B — webhook RevenueCat
-// → profiles.ad_free + profiles.profile_pack
+// FEATURE-ADFREE-02B / FEATURE-PROFILE-02B / FEATURE-HOST-02B — webhook RevenueCat
+// → profiles.ad_free + profiles.profile_pack + profiles.host_pack
 // Secrets (Dashboard → Edge Functions → Secrets, jamais dans le repo) :
 //   REVENUECAT_WEBHOOK_AUTH  = même chaîne que RevenueCat → Webhooks → Authorization
 //                            (mot de passe seul, sans le mot Bearer)
@@ -20,6 +20,7 @@ const GRANT = new Set([
   "SUBSCRIPTION_EXTENDED",
   "TEMPORARY_ENTITLEMENT_GRANT",
   "TRANSFER",
+  "RESTORE",
   "TEST",
 ]);
 
@@ -95,8 +96,27 @@ function eventTouchesProfile(event) {
   return skuMatch(product, "reveal_profile_upgrade") || skuMatch(product, "reveal_profile");
 }
 
+function eventTouchesHost(event) {
+  const ids = event?.entitlement_ids;
+  if (Array.isArray(ids) && ids.includes("host")) return true;
+  const product = eventProductId(event);
+  return (
+    skuMatch(product, "reveal_host_upgrade_profile") ||
+    skuMatch(product, "reveal_host_upgrade_adfree") ||
+    skuMatch(product, "reveal_host")
+  );
+}
+
 function isProfileUpgradeProduct(event) {
   return skuMatch(eventProductId(event), "reveal_profile_upgrade");
+}
+
+function isHostUpgradeFromProfile(event) {
+  return skuMatch(eventProductId(event), "reveal_host_upgrade_profile");
+}
+
+function isHostUpgradeFromAdFree(event) {
+  return skuMatch(eventProductId(event), "reveal_host_upgrade_adfree");
 }
 
 function entitlementPatch(type, event) {
@@ -104,11 +124,25 @@ function entitlementPatch(type, event) {
   const revoke = REVOKE.has(type);
   if (!grant && !revoke) return null;
 
+  const touchesHost = eventTouchesHost(event);
   const touchesProfile = eventTouchesProfile(event);
   const touchesAdFree = eventTouchesAdFree(event);
   const patch = {};
 
-  if (touchesProfile) {
+  if (touchesHost) {
+    patch.host_pack = grant;
+    if (grant) {
+      patch.profile_pack = true;
+      patch.ad_free = true;
+    } else if (isHostUpgradeFromProfile(event)) {
+      /* garde Signature + Sans pub */
+    } else if (isHostUpgradeFromAdFree(event)) {
+      patch.profile_pack = false;
+    } else {
+      patch.profile_pack = false;
+      patch.ad_free = false;
+    }
+  } else if (touchesProfile) {
     patch.profile_pack = grant;
     if (grant) patch.ad_free = true;
     else if (!isProfileUpgradeProduct(event)) patch.ad_free = false;
@@ -146,7 +180,12 @@ Deno.serve(async (req) => {
     return json(200, { ok: true, skipped: "app_user_id" });
   }
 
-  if (!eventTouchesAdFree(event) && !eventTouchesProfile(event) && type !== "TEST") {
+  if (
+    !eventTouchesAdFree(event) &&
+    !eventTouchesProfile(event) &&
+    !eventTouchesHost(event) &&
+    type !== "TEST"
+  ) {
     return json(200, { ok: true, skipped: "product" });
   }
 

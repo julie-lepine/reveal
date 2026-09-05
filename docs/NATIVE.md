@@ -11,7 +11,7 @@ Checklist launch : [LAUNCH.md](./LAUNCH.md) · Backend : [SUPABASE.md](./SUPABAS
 | Capacitor 8 + `android/` + `ios/` | ✅ |
 | AdMob bannière + consentement UMP | ✅ |
 | Deep links auth Supabase | ✅ |
-| Politique de confidentialité | ✅ (`privacy.html` + écran in-app) |
+| Politique de confidentialité | ✅ (écran in-app + [havefuncorp.fr/reveal/privacy](https://havefuncorp.fr/reveal/privacy)) |
 | Sources icône / splash (`resources/`) | ✅ custom (icon, splash 2732², portrait iOS/Android) |
 | Icônes / splash injectés dans `android/` / `ios/` | ✅ `npm run assets:native` puis rebuild Android Studio |
 | Test sur device réel | Android ✅ · iPhone → § Test iPhone ci-dessous |
@@ -22,7 +22,7 @@ Checklist launch : [LAUNCH.md](./LAUNCH.md) · Backend : [SUPABASE.md](./SUPABAS
 ## Workflow dev → native
 
 ```bash
-# Après modification du code web (js/, data/, style.css, index.html, captcha.html)
+# Après modification du code web (js/, data/, style.css, index.html)
 npm run cap:sync
 
 npm run cap:open:android   # Windows / Mac

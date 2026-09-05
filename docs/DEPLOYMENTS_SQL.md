@@ -97,7 +97,7 @@ Sources : audit SQL du dépôt (`AUDIT-SQL-01`) + docs ops ([`SUPABASE.md`](./SU
 | 2026-09-05 | [`feature-profile-03b-emoji-split.sql`](../supabase/feature-profile-03b-emoji-split.sql) | FEATURE-PROFILE-03b | ✅ | ✅ | — | 12 emojis → Signature (😈👻🔥🐸💎🌈 + 😎💜🌟🎯🚀🎈) · coller si 03 déjà en prod |
 | 2026-09-05 | [`feature-profile-03c-emoji-fe0f.sql`](../supabase/feature-profile-03c-emoji-fe0f.sql) | FEATURE-PROFILE-03c | ☐ | ☐ | — | Trigger : strip U+FE0F sinon 🦄 → 👤 · coller prod |
 | 2026-09-05 | [`feature-profile-04-carnet.sql`](../supabase/feature-profile-04-carnet.sql) | FEATURE-PROFILE-04 | ☐ | ☐ | — | Carnet 20 soirées · RPC archive/list · voir §20 |
-| 2026-09-05 | [`feature-profile-05-avatar.sql`](../supabase/feature-profile-05-avatar.sql) | FEATURE-PROFILE-05 | ✅ | ✅ | — | Photo avatar Signature · Storage `avatars` · voir §21 |
+| 2026-09-05 | [`feature-host-01-profile-flag.sql`](../supabase/feature-host-01-profile-flag.sql) | FEATURE-HOST-01 | ⏳ | ⏳ | — | Colonne `profiles.host_pack` + trigger · 9,99 / 7 € / 3 € · voir §22 |
 
 **Hors migrations (tracés ailleurs si besoin)** : préflight [`lobby-membership-e4-00-preflight-duplicates.sql`](../supabase/lobby-membership-e4-00-preflight-duplicates.sql) (lecture seule) ; runbooks / harness sous [`supabase/tests/`](../supabase/tests/) et [`lobby-membership-e4-RUNBOOK.sql`](../supabase/lobby-membership-e4-RUNBOOK.sql) / [`lobby-membership-e5-RUNBOOK.sql`](../supabase/lobby-membership-e5-RUNBOOK.sql) — ce ne sont pas des migrations. Voir aussi [`lobby-membership-e4-tests-manual.sql`](../supabase/lobby-membership-e4-tests-manual.sql).
 
@@ -466,3 +466,19 @@ Canvas share : `img.crossOrigin = "anonymous"`. Si le bucket n’envoie pas CORS
 | Hors scope | Photo hero carte · report UGC · Maître de soirée |
 
 **Statut** : SQL **à appliquer** · 5 sept 2026.
+
+---
+
+## 22. FEATURE-HOST-01 — Flag Maître de soirée (`profiles.host_pack`)
+
+Troisième palier Premium (9,99 €) : entitlement serveur. Inclut Signature + Sans pub. Upgrades store : **7,00 €** si Sans pub déjà là (`reveal_host_upgrade_adfree`), **3,00 €** si Signature déjà là (`reveal_host_upgrade_profile`). L’écriture `host_pack = true` est bloquée pour `authenticated` / `anon` (trigger). Cette migration **n’écrit pas** `profile_pack` / `ad_free`.
+
+| Élément | Valeur |
+| ------- | ------ |
+| Migration | [`feature-host-01-profile-flag.sql`](../supabase/feature-host-01-profile-flag.sql) — **⏳** à coller |
+| Colonne | `public.profiles.host_pack boolean not null default false` |
+| Client | `js/core/entitlements.js` (`isHostPack`, `isProfilePack`, `isAdFree`) · Forfaits |
+| Test manuel | `update public.profiles set host_pack = true, profile_pack = true, ad_free = true where id = '<uuid>';` puis recharge |
+| Hors scope | Lobby > 8 · outils de table · privacy |
+
+**Statut** : SQL **⏳** · contrat prix **5 sept 2026**.

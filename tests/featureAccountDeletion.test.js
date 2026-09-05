@@ -73,7 +73,8 @@ describe("FEATURE-ACCOUNT-DELETION — in-app", () => {
     const deletion = legal.slice(legal.indexOf("Suppression de compte"));
     assert.match(deletion, /Menu → Aide & légal → Supprimer mon compte/);
     assert.match(deletion, /immédiate/);
-    assert.equal(deletion.includes("sous 30 jours ouvrés"), false);
+    assert.match(deletion, /Si vous n.avez plus l.application/);
+    assert.match(deletion, /30 jours ouvrés/);
     assert.equal(deletion.includes("Envoyez une demande depuis l'application"), false);
   });
 });

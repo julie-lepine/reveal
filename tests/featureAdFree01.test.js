@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { getState, saveStatePatch } from "../js/core/state.js";
-import { isAdFree, adFreeFromProfile } from "../js/core/entitlements.js";
+import { isAdFree, adFreeFromProfile, applyPremiumFromStore } from "../js/core/entitlements.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, "..");
@@ -53,6 +53,32 @@ describe("FEATURE-ADFREE-01 — entitlement Sans pub", () => {
       },
     });
     assert.equal(isAdFree(), true);
+  });
+
+  it("applyPremiumFromStore active Sans pub pour un compte connecté, pas un invité", () => {
+    saveStatePatch({
+      user: {
+        ...(getState().user || {}),
+        loggedIn: true,
+        isGuest: false,
+        adFree: false,
+        profilePack: false,
+      },
+    });
+    applyPremiumFromStore({ adFree: true });
+    assert.equal(isAdFree(), true);
+
+    saveStatePatch({
+      user: {
+        ...(getState().user || {}),
+        loggedIn: false,
+        isGuest: true,
+        adFree: false,
+        profilePack: false,
+      },
+    });
+    applyPremiumFromStore({ adFree: true, profilePack: true });
+    assert.equal(isAdFree(), false);
   });
 
   it("SQL protège ad_free côté authenticated", () => {

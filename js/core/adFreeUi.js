@@ -1,6 +1,6 @@
-import { PACK_SIGNATURE_LABEL } from "../config/premiumPacks.js";
+import { PACK_HOST_LABEL, PACK_SIGNATURE_LABEL } from "../config/premiumPacks.js";
 import { isLoggedIn, isGuest } from "./auth.js";
-import { isAdFree, isProfilePack } from "./entitlements.js";
+import { isAdFree, isHostPack, isProfilePack } from "./entitlements.js";
 import { isNativeApp } from "./platform.js";
 import { isPurchasesNativeReady } from "./purchases.js";
 
@@ -23,12 +23,15 @@ export function adFreeSettingsCardHtml() {
         </p>
         <p class="hint settings-section__hint">Les invités ne peuvent pas acheter : le droit suit le compte, pas le téléphone.</p>`;
   } else if (unlocked) {
+    const includedHost = isHostPack();
     const included = isProfilePack();
     body = `
         <p class="settings-premium__ok" role="status">${
-          included
-            ? `Sans pub est inclus dans ${PACK_SIGNATURE_LABEL}.`
-            : "Sans pub est actif sur ce compte."
+          includedHost
+            ? `Sans pub est inclus dans ${PACK_HOST_LABEL}.`
+            : included
+              ? `Sans pub est inclus dans ${PACK_SIGNATURE_LABEL}.`
+              : "Sans pub est actif sur ce compte."
         }</p>
         <p class="hint settings-section__hint">Plus de bannière dans l’app native, sur tous tes appareils liés à ce compte.</p>`;
   } else {

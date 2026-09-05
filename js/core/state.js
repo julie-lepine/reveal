@@ -44,6 +44,7 @@ const defaultUser = () => ({
   provider: null,
   adFree: false,
   profilePack: false,
+  hostPack: false,
   nameColor: null,
   avatarPath: null,
   avatarRev: 0,

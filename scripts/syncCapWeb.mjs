@@ -8,7 +8,7 @@ import { spawnSync } from "node:child_process";
 
 const root = process.cwd();
 const www = path.join(root, "www");
-const entries = ["index.html", "privacy.html", "suppression-compte.html", "captcha.html", "style.css", "reveal.png", "js", "data", "assets", "css"];
+const entries = ["index.html", "style.css", "reveal.png", "js", "data", "assets", "css"];
 
 function resolveSupabaseEntry() {
   const candidates = [

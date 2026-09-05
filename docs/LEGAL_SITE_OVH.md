@@ -1,12 +1,38 @@
-# Site légal REVEAL sur revealthepartygame.fr (OVH)
+# Site légal REVEAL — havefuncorp.fr
 
-Repo **séparé** du projet Party Games (pages statiques : `index.html`, `privacy.html`, `suppression-compte.html`, `mentions-legales.html`, `legal.css`, `reveal.png`).
+Canonique depuis **5 septembre 2026** : **[havefuncorp.fr](https://havefuncorp.fr/)** (HAVEFUNCORP). Pages REVEAL sous `/reveal/`. Les `.html` redirigent en 301 vers le chemin sans extension.
 
-Checklist associée : [LAUNCH.md](./LAUNCH.md) (bloc site & AdMob).
+| Page | URL |
+|------|-----|
+| Société | [https://havefuncorp.fr/](https://havefuncorp.fr/) |
+| REVEAL | [https://havefuncorp.fr/reveal](https://havefuncorp.fr/reveal) |
+| Privacy | [https://havefuncorp.fr/reveal/privacy](https://havefuncorp.fr/reveal/privacy) |
+| Suppression | [https://havefuncorp.fr/reveal/suppression-compte](https://havefuncorp.fr/reveal/suppression-compte) |
+| Mentions | [https://havefuncorp.fr/reveal/mentions-legales](https://havefuncorp.fr/reveal/mentions-legales) |
+| `app-ads.txt` | [https://havefuncorp.fr/app-ads.txt](https://havefuncorp.fr/app-ads.txt) |
+
+Contact e-mail inchangé : `contact@revealthepartygame.fr`. Instagram : `@revealthepartygame`.
+
+Repo **séparé** du projet Party Games. L’ancien domaine `revealthepartygame.fr` peut encore servir des copies ; **ne plus coller ces URLs** dans l’app ni les stores.
+
+Checklist associée : [LAUNCH.md](./LAUNCH.md).
 
 ---
 
-## Équivalent Hostinger → OVH
+## Site actuel (havefuncorp.fr)
+
+Les étapes FTP / DNS ci-dessous décrivent le **premier** déploiement OVH sur `revealthepartygame.fr` (août 2026). Elles restent une référence d’hébergement. Pour une maj de contenu : éditer le site **havefuncorp.fr**, puis aligner `data/appConfig.js` + `data/legalContent.js` dans ce repo.
+
+- [x] Privacy live 5 sept 2026 (Signature, photo, carnet, 6,99 € / 4,00 €)
+- [x] `data/appConfig.js` → `PRIVACY_POLICY_PUBLIC_URL` = `https://havefuncorp.fr/reveal/privacy`
+- [x] `ACCOUNT_DELETION_PUBLIC_URL` = `https://havefuncorp.fr/reveal/suppression-compte`
+- [x] App Store Connect : mêmes URLs — 5 sept 2026
+- [x] Play Console : privacy + suppression + site web — 5 sept 2026
+- Captcha iOS : **plus de `captcha.html`** (hCaptcha in-page). `NATIVE_CAPTCHA_PAGE_URL` retiré. `captcha.html` et `privacy.html` ne sont plus dans le repo app (privacy in-app = `data/legalContent.js` ; publique = havefuncorp.fr).
+
+---
+
+## Équivalent Hostinger → OVH (historique revealthepartygame.fr)
 
 | Hostinger | OVH |
 |-----------|-----|
@@ -60,7 +86,6 @@ Attendre 15 min à 2 h (parfois 24 h) pour la propagation.
 6. **Upload** depuis ton repo local :
    - `index.html`
    - `privacy.html`
-   - `captcha.html` (captcha iOS — fichier du repo app, pas GitHub Pages)
    - `mentions-legales.html`
    - `legal.css`
    - `reveal.png`
@@ -93,7 +118,7 @@ Attendre 15 min à 2 h (parfois 24 h) pour la propagation.
 - [x] Logo `reveal.png` s’affiche
 - [x] Liens footer entre les pages
 - [x] **Liens téléchargement app** (Play Store / App Store) sur `index.html` — 25 août 2026
-- [ ] `privacy.html` + `mentions-legales.html` / accueil : Instagram **@revealthepartygame** (`https://www.instagram.com/revealthepartygame/`) — plus `reveal.the.party.game` — 29 août 2026 *(à recoller sur OVH)*
+- [x] Instagram **@revealthepartygame** (`https://www.instagram.com/revealthepartygame/`) — live havefuncorp 5 sept 2026
 
 ---
 
@@ -101,10 +126,13 @@ Attendre 15 min à 2 h (parfois 24 h) pour la propagation.
 
 Dans ce repo :
 
-- [x] `data/appConfig.js` → `PRIVACY_POLICY_PUBLIC_URL` =  
-  `https://revealthepartygame.fr/privacy.html`
-- [x] Fiches **Play Console** / **App Store Connect** : même URL confidentialité (`https://revealthepartygame.fr/privacy.html`) — ASC 24 août 2026
-- [ ] Cloudflare Turnstile → hostname `revealthepartygame.fr` (et `www`) — requis pour le captcha iOS (`/captcha.html`)
+- [x] `data/appConfig.js` → `PRIVACY_POLICY_PUBLIC_URL` =
+  `https://havefuncorp.fr/reveal/privacy` — 5 sept 2026
+- [x] `ACCOUNT_DELETION_PUBLIC_URL` =
+  `https://havefuncorp.fr/reveal/suppression-compte`
+- [x] Fiche **App Store Connect** : même URL confidentialité — 5 sept 2026
+- [x] Fiche **Play Console** : privacy + suppression + site web — 5 sept 2026
+- Captcha : hCaptcha **in-page** ; plus de hostname Turnstile requis pour `captcha.html`.
 
 ---
 
@@ -203,7 +231,7 @@ Nous effaçons le compte Supabase Auth, le profil (pseudo, emoji), les demandes 
 Aligne-toi mot pour mot sur les paragraphes ci-dessus (mêmes apostrophes typographiques si le fichier les utilise déjà).
 ```
 
-En ligne (27 août 2026) : [privacy.html](https://revealthepartygame.fr/privacy.html) — liste d’amis, finalités, cascade. Recocher LAUNCH fait.
+En ligne (27 août 2026, historique) : [privacy.html](https://revealthepartygame.fr/privacy.html) — liste d’amis, finalités, cascade. Canonique 5 sept 2026 : [havefuncorp.fr/reveal/privacy](https://havefuncorp.fr/reveal/privacy).
 
 ---
 
@@ -290,7 +318,7 @@ Nous effaçons le compte Supabase Auth, le profil (pseudo, emoji), les demandes 
 Aligne-toi mot pour mot sur les inserts ci-dessus (mêmes apostrophes typographiques que le fichier déjà en ligne : si la page utilise ' ASCII, garde-les ; si elle utilise ’, garde-les).
 ```
 
-En ligne (27 août 2026) : [privacy.html](https://revealthepartygame.fr/privacy.html) — invitations éphémères, finalités, conservation, cascade compte.
+En ligne (27 août 2026, historique) : [privacy.html](https://revealthepartygame.fr/privacy.html) — invitations éphémères, finalités, conservation, cascade compte. Canonique : [havefuncorp.fr/reveal/privacy](https://havefuncorp.fr/reveal/privacy).
 
 ---
 
@@ -380,9 +408,9 @@ Nous effaçons le compte Supabase Auth, le profil (pseudo, emoji), les demandes 
 Aligne-toi mot pour mot sur les inserts ci-dessus. Apostrophes : celles déjà en ligne sur privacy.html (si la page utilise ' ASCII, garde-les ; si elle utilise ’, garde-les).
 ```
 
-En ligne (27 août 2026) : [privacy.html](https://revealthepartygame.fr/privacy.html) — croisés 24 h, finalités, conservation, cascade compte. Stores inchangés.
+En ligne (27 août 2026, historique) : [privacy.html](https://revealthepartygame.fr/privacy.html) — croisés 24 h, finalités, conservation, cascade compte. Canonique : [havefuncorp.fr/reveal/privacy](https://havefuncorp.fr/reveal/privacy).
 
-Légal Signature / Maître de soirée : **reporté** après le palier 12,99 € (un seul passage OVH).
+Légal Signature : **fait** 5 sept 2026 (in-app + site). Maître de soirée 12,99 € : encore reporté.
 
 ---
 
@@ -421,7 +449,7 @@ Date **2 septembre 2026**. Dans Conservation / Suppression : le chemin principal
 
 ### Vérif
 
-- https://revealthepartygame.fr/suppression-compte.html — plus de « redirigé vers cette page »
+- https://havefuncorp.fr/reveal/suppression-compte — plus de « redirigé vers cette page »
 - Ctrl+F « immédiat » (in-app) et « 30 jours » (e-mail seulement)
 - Bouton mailto toujours là (Play / sans app)
 

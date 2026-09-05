@@ -42,6 +42,17 @@ describe("FEATURE-PROFILE-02B — webhook + poll", () => {
     );
   });
 
+  it("RESTORE pose les mêmes flags qu’un achat", () => {
+    assert.deepEqual(entitlementPatch("RESTORE", { product_id: "reveal_adfree" }), {
+      ad_free: true,
+    });
+    assert.deepEqual(entitlementPatch("RESTORE", { product_id: "reveal_profile" }), {
+      profile_pack: true,
+      ad_free: true,
+    });
+    assert.match(src("supabase/functions/revenuecat-webhook/index.ts"), /"RESTORE"/);
+  });
+
   it("GRANT/REVOKE Sans pub seul ne touche pas profile_pack", () => {
     assert.deepEqual(entitlementPatch("INITIAL_PURCHASE", { product_id: "reveal_adfree" }), {
       ad_free: true,

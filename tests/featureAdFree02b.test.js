@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { unwrapOfferings } from "../js/core/purchases.js";
+import { unwrapOfferings, isAlreadyOwnedError, storePurchaseErrorMessage, entitlementsFromCustomerInfo } from "../js/core/purchases.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, "..");
@@ -55,5 +55,39 @@ describe("FEATURE-ADFREE-02B — achat + webhook", () => {
     assert.equal(/const \{ offerings \} = await Purchases\.getOfferings/.test(purchases), false);
     assert.match(purchases, /packageForSku\(offerings, PLAY_PRODUCT_ID_AD_FREE\)/);
     assert.equal(/packagesFromOfferings\(offerings\)\[0\]/.test(purchases), false);
+  });
+
+  it("traduit déjà acheté et restaure au lieu d’afficher l’anglais Play", () => {
+    assert.equal(
+      isAlreadyOwnedError({ message: "This product is already active for this user." }),
+      true
+    );
+    assert.equal(isAlreadyOwnedError({ code: "6" }), true);
+    assert.equal(isAlreadyOwnedError({ code: "PRODUCT_ALREADY_PURCHASED_ERROR" }), true);
+    assert.equal(isAlreadyOwnedError({ message: "Purchase was cancelled." }), false);
+    const fr = storePurchaseErrorMessage({
+      message: "This product is already active for this user.",
+    });
+    assert.match(fr, /déjà actif/);
+    assert.equal(/already active/i.test(fr), false);
+    const purchases = src("js/core/purchases.js");
+    assert.match(purchases, /isAlreadyOwnedError\(e\)\) return recoverOwnedPurchase/);
+    assert.match(purchases, /restorePurchases/);
+    assert.match(purchases, /getCustomerInfo/);
+  });
+
+  it("lit les entitlements RevenueCat (ad_free + profile)", () => {
+    assert.deepEqual(
+      entitlementsFromCustomerInfo({
+        entitlements: { active: { ad_free: { identifier: "ad_free" } } },
+      }),
+      { adFree: true, profilePack: false, hostPack: false }
+    );
+    assert.deepEqual(
+      entitlementsFromCustomerInfo({
+        customerInfo: { entitlements: { active: { profile: { identifier: "profile" } } } },
+      }),
+      { adFree: true, profilePack: true, hostPack: false }
+    );
   });
 });

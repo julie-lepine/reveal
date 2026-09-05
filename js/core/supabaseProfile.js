@@ -7,6 +7,7 @@ function isMissingProfileColumn(error) {
     code === "42703" ||
     ((msg.includes("ad_free") ||
       msg.includes("profile_pack") ||
+      msg.includes("host_pack") ||
       msg.includes("name_color") ||
       msg.includes("avatar_path") ||
       msg.includes("avatar_rev")) &&
@@ -19,6 +20,7 @@ function withEntitlementDefaults(row) {
   return {
     ad_free: false,
     profile_pack: false,
+    host_pack: false,
     name_color: null,
     avatar_path: null,
     avatar_rev: 0,
@@ -28,6 +30,9 @@ function withEntitlementDefaults(row) {
 
 async function fetchProfileRow(userId) {
   const selects = [
+    "id, display_name, emoji, ad_free, profile_pack, host_pack, name_color, avatar_path, avatar_rev",
+    "id, display_name, emoji, ad_free, profile_pack, host_pack, name_color",
+    "id, display_name, emoji, ad_free, profile_pack, host_pack",
     "id, display_name, emoji, ad_free, profile_pack, name_color, avatar_path, avatar_rev",
     "id, display_name, emoji, ad_free, profile_pack, name_color",
     "id, display_name, emoji, ad_free, profile_pack",

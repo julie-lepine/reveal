@@ -11,7 +11,7 @@ import {
   changeEmailPassword,
   logout,
 } from "../core/auth.js";
-import { PACK_SIGNATURE_LABEL } from "../config/premiumPacks.js";
+import { PACK_HOST_LABEL, PACK_SIGNATURE_LABEL } from "../config/premiumPacks.js";
 import {
   SETTINGS_TAB,
   consumePendingSettingsTab,
@@ -20,7 +20,8 @@ import {
 import { refreshAdsForEntitlement } from "../core/ads.js";
 import { adFreeSettingsCardHtml } from "../core/adFreeUi.js";
 import { profilePackSettingsCardHtml } from "../core/profilePackUi.js";
-import { purchaseAdFree, purchaseProfile, restorePremiumPurchases } from "../core/purchases.js";
+import { hostPackSettingsCardHtml } from "../core/hostPackUi.js";
+import { purchaseAdFree, purchaseHost, purchaseProfile, restorePremiumPurchases } from "../core/purchases.js";
 import { getLocalDisplayName, getLocalEmoji } from "../core/state.js";
 import { resolvedNameColorHex } from "../../data/signatureIdentity.js";
 import {
@@ -362,6 +363,7 @@ function forfaitsPanelHtml(user) {
     <div class="settings-panel" id="settings-panel-forfaits">
       ${adFreeSettingsCardHtml()}
       ${profilePackSettingsCardHtml()}
+      ${hostPackSettingsCardHtml()}
       ${premiumRestoreButtonHtml(user)}
       ${
         unlocked
@@ -677,6 +679,7 @@ export function mountSettings(app) {
   function bindForfaitsEvents() {
     bindAdFreeEvents();
     bindProfilePackEvents();
+    bindHostPackEvents();
     bindPremiumRestoreEvents();
     bindSettingsGoto();
   }
@@ -756,6 +759,32 @@ export function mountSettings(app) {
   function bindProfilePackEvents() {
     app.querySelector("#btn-profile-buy")?.addEventListener("click", () => {
       void runProfilePackAction(purchaseProfile);
+    });
+  }
+
+  async function runHostPackAction(action) {
+    try {
+      const res = await action();
+      refreshAdsForEntitlement();
+      if (!mount.isMounted()) return;
+      swapActivePanel();
+      if (res?.cancelled) return;
+      await showAppAlert(res?.message || "Action terminée.", {
+        title: PACK_HOST_LABEL,
+        icon: res?.ok && res?.hostPack ? "✨" : "📢",
+      });
+    } catch (e) {
+      if (!mount.isMounted()) return;
+      await showAppAlert(e?.message || "Impossible de finaliser l’achat.", {
+        title: PACK_HOST_LABEL,
+        icon: "⚠️",
+      });
+    }
+  }
+
+  function bindHostPackEvents() {
+    app.querySelector("#btn-host-buy")?.addEventListener("click", () => {
+      void runHostPackAction(purchaseHost);
     });
   }
 

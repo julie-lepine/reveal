@@ -1,15 +1,16 @@
 # REVEAL — Lancement
 
 Prod web : **https://julie-lepine.github.io/reveal/**  
-Backend : [SUPABASE.md](./SUPABASE.md) · Native : [NATIVE.md](./NATIVE.md) · Site légal : [LEGAL_SITE_OVH.md](./LEGAL_SITE_OVH.md)
+Backend : [SUPABASE.md](./SUPABASE.md) · Native : [NATIVE.md](./NATIVE.md) · Site légal : [LEGAL_SITE_OVH.md](./LEGAL_SITE_OVH.md) — **[havefuncorp.fr](https://havefuncorp.fr/)**
 
 | | |
 |--|--|
 | Package | `com.reveal.partygames` |
-| Play | **live** ([fiche](https://play.google.com/store/apps/details?id=com.reveal.partygames)) — 3 sept 2026 — compte `contact@revealthepartygame.fr` |
-| App Store | **REVEAL - Party Games** — Apple ID [`6785256450`](https://apps.apple.com/app/id6785256450) — **live 1.1.2** (hCaptcha acceptée 5 sept 2026) — AdMob iOS : coller **URL marketing** à la prochaine version |
-| Privacy | `https://revealthepartygame.fr/privacy.html` |
-| Suppression | `https://revealthepartygame.fr/suppression-compte.html` |
+| Play | **live** ([fiche](https://play.google.com/store/apps/details?id=com.reveal.partygames)) — 3 sept 2026 — compte `contact@revealthepartygame.fr` — **URLs légales havefuncorp collées 5 sept 2026** |
+| App Store | **REVEAL - Party Games** — Apple ID [`6785256450`](https://apps.apple.com/app/id6785256450) — **live 1.1.2** (hCaptcha acceptée 5 sept 2026) — **URLs légales maj 5 sept 2026** |
+| Privacy | `https://havefuncorp.fr/reveal/privacy` |
+| Suppression | `https://havefuncorp.fr/reveal/suppression-compte` |
+| Site / marketing | `https://havefuncorp.fr/` (AdMob : racine, pas `/privacy`) |
 | Contact | `contact@revealthepartygame.fr` |
 
 Builds : `npm run cap:sync` (Node ≥ 22) → AAB / Archive.
@@ -18,12 +19,14 @@ Builds : `npm run cap:sync` (Node ≥ 22) → AAB / Archive.
 
 ## À faire
 
-1. **Apple** — **1.1.2** acceptée, **Prête pour la distribution** (hCaptcha). AdMob iOS encore bloqué : pas d’**URL marketing** sur la fiche (AdMob cherche « site Web version développeur », pas la politique de confidentialité).
-2. **AdMob iOS** — sur la **prochaine** version ASC : URL marketing = `https://revealthepartygame.fr` (racine, pas `/privacy.html`). Puis AdMob → Verify. `app-ads.txt` est déjà live.
-3. **Signature iOS** — IAP « Prêt pour la vérification » sur cette même prochaine version. RC catalogue déjà clos.
+1. **Apple** — **1.1.2** acceptée, **Prête pour la distribution** (hCaptcha). **Privacy + site développeur** collés 5 sept 2026 (`havefuncorp.fr`). AdMob iOS : Verify après crawl de l’URL marketing.
+2. **AdMob iOS** — URL marketing = `https://havefuncorp.fr/` (racine, pas `/reveal/privacy`). `app-ads.txt` live à [havefuncorp.fr/app-ads.txt](https://havefuncorp.fr/app-ads.txt). Puis AdMob → Verify.
+3. **Play Console** — privacy + suppression + site web `havefuncorp.fr` collés 5 sept 2026.
+4. **Signature iOS** — catalogue RC + IAP « Prêt pour la vérification ». **QA sandbox OK** 5 sept 2026 (voir §6). Coller les IAP sur la **prochaine** version ASC (pas la 1.1.2 déjà live).
 
-- [ ] Release maj hCaptcha + AdMob iOS `app-ads.txt` (Site Web du développeur = `revealthepartygame.fr`)
-- [ ] Palier Signature 6,99 (Maître de soirée 12,99 plus tard)
+- [ ] AdMob iOS Verify (Site Web du développeur = `havefuncorp.fr`)
+- [x] Play Console : URLs privacy + suppression + site web havefuncorp — 5 sept 2026
+- [ ] Palier Signature 6,99 (Maître de soirée 9,99 ensuite)
 
 ---
 
@@ -31,9 +34,11 @@ Builds : `npm run cap:sync` (Node ≥ 22) → AAB / Archive.
 
 **Play** live 3 sept 2026. AdMob Android lié 4 sept 2026 (recherche URL + `&gl=FR`) ; **appli approuvée 5 sept 2026** (`com.reveal.partygames`, limites d’examen levées, pubs autorisées). Test fermé, QA 11 jeux, Sans pub (0 € + 2ᵉ téléphone). Data safety + catégorie Jeu / Décontracté.
 
-**iOS** — v1.1 refusée 2 sept 2026 (5.1.1 + 2.1) ; suppression **in-app** puis **maj acceptée**. **1.1.2** (hCaptcha) **Prête pour la distribution** (5 sept 2026). AdMob iOS associé, **pas encore** « peut diffuser » : la fiche live n’a pas d’URL marketing (seulement confidentialité `…/privacy.html`). IAP `reveal_adfree`, Paid Apps Actif, RevenueCat, ATT. QA iPhone XR 31 août 2026.
+**iOS** — v1.1 refusée 2 sept 2026 (5.1.1 + 2.1) ; suppression **in-app** puis **maj acceptée**. **1.1.2** (hCaptcha) **Prête pour la distribution** (5 sept 2026). AdMob iOS associé, **pas encore** « peut diffuser » tant que Verify n’a pas vu l’URL marketing `https://havefuncorp.fr/`. IAP `reveal_adfree`, Paid Apps Actif, RevenueCat, ATT. QA iPhone XR 31 août 2026. **QA Signature sandbox** 5 sept 2026 : Sans pub → plus de pubs → upgrade **4,00 €** → perso compte (couleur, emojis, cadre, photo) → invité refusé (« connecte-toi avec un compte »). **Fiche ASC** : privacy + site développeur **havefuncorp.fr** collés 5 sept 2026.
 
-**Ads / légal** — `app-ads.txt` live (`pub-6332424645114129`). `ADMOB_USE_TEST_ADS = false`. Logo REVEAL déjà sur le message UMP. Privacy + suppression OVH. Amis / invitations / croisés 24 h (FEATURE-FRIENDS-04) sur web + fiches. AdMob **Onboarding / Revenus** (barre du mail) = paiements éditeur, pas un blocage des pubs Android.
+**Ads / légal** — `app-ads.txt` live sur `havefuncorp.fr` (`pub-6332424645114129`). `ADMOB_USE_TEST_ADS = false`. Logo REVEAL déjà sur le message UMP. Privacy + suppression : [havefuncorp.fr/reveal/privacy](https://havefuncorp.fr/reveal/privacy). **Play + App Store** : URLs havefuncorp collées 5 sept 2026. Amis / invitations / croisés 24 h (FEATURE-FRIENDS-04) sur web + fiches. AdMob **Onboarding / Revenus** (barre du mail) = paiements éditeur, pas un blocage des pubs Android.
+
+**App Privacy / Data safety (figé)** — *No public social feed*. *Private friend list*. *lobby-only discovery*. *Recently-crossed registered players* (24 h).
 
 **Hors scope** — DUNS, diffusion INSEE, nom de société sur la fiche.
 
@@ -42,9 +47,9 @@ Builds : `npm run cap:sync` (Node ≥ 22) → AAB / Archive.
 ## Après acceptation de la maj hCaptcha
 
 1. Release (manuel ou auto).
-2. Fiche App Store : lien **Site Web du développeur** = `revealthepartygame.fr`.
+2. Fiche App Store : lien **Site Web du développeur** = `https://havefuncorp.fr/` — **fait** 5 sept 2026.
 3. AdMob → app iOS → **Rechercher des mises à jour**.
-4. URLs store sur `revealthepartygame.fr` si pas déjà.
+4. Play Console : privacy + suppression + site web havefuncorp — **fait** 5 sept 2026.
 
 **Update store :** code → `cap:sync` → test → bump `versionCode` / `versionName` (Play : +1) → AAB ou Archive → upload.
 
@@ -52,7 +57,7 @@ Builds : `npm run cap:sync` (Node ≥ 22) → AAB / Archive.
 
 ## Palier Profil 6,99
 
-Socle IAP déjà là (RevenueCat, webhook, flag `ad_free`, achat lié au compte). **Maître de soirée** 12,99 € hors scope (pas de SKU, pas de colonne). Noms affichés : Sans pub → Signature → Maître de soirée. Nouvel IAP Apple = **nouvelle version** après la maj hCaptcha en review — ne pas coller ça sur le build en file.
+Socle IAP déjà là (RevenueCat, webhook, flag `ad_free`, achat lié au compte). **Maître de soirée** 9,99 € : flag `host_pack` + SKUs (plein tarif / 7 € / 3 €). Noms affichés : Sans pub → Signature → Maître de soirée. Nouvel IAP Apple = **nouvelle version** — ne pas coller ça sur un build déjà en file.
 
 Ordre : **0** (contrat, ci-dessous) → **1** (code + SQL) → **2** (admin stores, en parallèle du 1) → **3 → 4 → 5 → 6**.
 
@@ -61,7 +66,7 @@ Ordre : **0** (contrat, ci-dessous) → **1** (code + SQL) → **2** (admin stor
 - [x] **Empilement** : **Signature** (6,99 €, SKU `reveal_profile`) **inclut** Sans pub. Un seul chemin pubs : `isAdFree()` vrai aussi si `profile_pack`.
 - [x] **Upgrade** : un acheteur 2,99 € paie **4,00 €** (`reveal_profile_upgrade`). Les autres paient **6,99 €** (`reveal_profile`). Les stores ne proratisent pas un achat ponctuel.
 - [x] **Compte** : inscrit + natif only ; droit lié au compte. Invité / web = pas d’achat. Ne pas re-payerwaller pseudo, 18 emojis gratuits, amis, jeux, lobby 8.
-- [x] **Maître de soirée 12,99 €** : hors scope. Réserver : lobby > 8, outils de table. Mots perso qui suivent le **joueur** = Signature, pas Maître de soirée.
+- [x] **Maître de soirée 9,99 €** : inclut Signature + Sans pub. SKUs `reveal_host` (9,99) · `reveal_host_upgrade_adfree` (7,00 si Sans pub déjà là) · `reveal_host_upgrade_profile` (3,00 si Signature déjà là). Réserver métier : lobby > 8, outils de table. Mots perso qui suivent le **joueur** = Signature, pas Maître de soirée.
 - [x] **Noms affichés** : Sans pub · Signature · Maître de soirée (onglet Menu reste « Profil »). SKUs inchangés.
 - [x] **Ce que Signature débloque** (3 couches ; la fiche store ne promet que ce qui est dans le build) :
   1. **Identité visible** (1er ship métier) : couleur de pseudo (palette fermée), cadre / badge Profil en lobby, emojis extra, **photo de profil** (cercle, remplace l’emoji ; emoji si l’image ne charge pas). Recadrage dans Menu → Profil.
@@ -96,7 +101,7 @@ Admin, pas de code app. En parallèle du 1.
 - [x] Entitlement RC `profile` : 4 produits (Play + iOS, plein tarif **et** upgrade). Pas d’entitlement `profile_upgrade`. `ad_free` inchangé.
 - [x] Offering current : packages Custom `profile` / `profile_upgrade` (Play + App Store) + `$rc_lifetime` = `reveal_adfree`
 
-Code client 02B prêt. **iOS : nouvelle version** (ne pas coller sur la maj hCaptcha en review). QA achat = licence testers Play + sandbox iOS, pas GitHub Pages.
+Code client 02B prêt. QA achat iOS sandbox **OK** 5 sept 2026. Ship store = prochaine version ASC (URL marketing + IAP Signature). Play = licence testers, pas GitHub Pages.
 
 ### 3. FEATURE-PROFILE-02B — Achat client + webhook
 
@@ -140,19 +145,20 @@ Photo Signature = le même cercle que l’emoji, **partout** (lobby, scores, ami
 
 ### 5. Légal + stores
 
-Reporté après **Maître de soirée 12,99 €** (un seul passage privacy / OVH / fiches).
+Privacy publique + in-app alignées **5 sept 2026** (Signature 6,99 / upgrade 4,00, photo, carnet). **Maître de soirée 9,99 €** : pas encore dans `legalContent.js`.
 
-- [ ] `data/legalContent.js` : achats Signature + Maître de soirée (prix TTC, lifetime, compte pas appareil)
-- [ ] Pages OVH (`privacy.html`, mentions) — même mention
-- [ ] Fiches Play / App Store si le texte IAP change
+- [x] `data/legalContent.js` + [havefuncorp.fr/reveal/privacy](https://havefuncorp.fr/reveal/privacy) : Sans pub + Signature (prix TTC, lifetime, compte pas appareil) — 5 sept 2026
+- [x] App Store Connect : privacy + site développeur havefuncorp — 5 sept 2026
+- [x] Play Console : privacy + suppression + site web havefuncorp — 5 sept 2026
+- [ ] Maître de soirée 9,99 € : un passage privacy / fiches plus tard
 
 ### 6. QA puis ship
 
-- [ ] Licence testers Play (0 €) + sandbox iOS
-- [ ] Achat → flag on → pubs coupées (si inclus) → features Profil visibles → restore 2ᵉ téléphone → refund → flag off
-- [ ] Invité : achat refusé
+- [x] **iOS sandbox** (5 sept 2026, Xcode) : Sans pub → pubs coupées → Signature **4,00 €** → perso compte → invité refusé
+- [ ] iOS : 6,99 € en direct, restore 2ᵉ appareil, refund — optionnel / autre sandbox
+- [ ] Licence testers Play (0 €) : même parcours Android
 - [ ] Web : message « dans l’app native »
-- [ ] `cap:sync` → bump `versionCode` / `versionName` → AAB + Archive
+- [ ] `cap:sync` → bump `versionCode` / `versionName` → AAB + Archive (1.1.3 : URL marketing + IAP Signature)
 
 ---
 
@@ -161,7 +167,7 @@ Reporté après **Maître de soirée 12,99 €** (un seul passage privacy / OVH 
 | Symptôme | Piste |
 |----------|--------|
 | Modifs invisibles | Save → push → `?v=` dans `index.html` |
-| `no captcha_token` | hCaptcha (web + natif) / `captcha.html` pas live |
+| `no captcha_token` | hCaptcha in-page (web + natif) ; plus de page `captcha.html` tierce |
 | Captcha 600010 / widget | Site key, hostname, bloqueur. Natif : in-page hCaptcha, pas Safari |
 | Invité impossible | Anonymous sign-ins Supabase |
 | Sync cassée | Realtime + RLS — [SUPABASE.md](./SUPABASE.md) |

@@ -350,6 +350,7 @@ export async function logout() {
         provider: null,
         adFree: false,
         profilePack: false,
+        hostPack: false,
         nameColor: null,
         avatarPath: null,
         avatarRev: 0,

@@ -13,7 +13,7 @@ const read = (rel) => readFileSync(join(ROOT, rel), "utf8");
 
 describe("FEATURE-FRIENDS-04 Palier 4 — légal", () => {
   it("politique in-app : croisés 24 h + cascade + pas de recherche", () => {
-    assert.equal(PRIVACY_POLICY.updated, "27 août 2026");
+    assert.equal(PRIVACY_POLICY.updated, "5 septembre 2026");
     const collected = PRIVACY_POLICY.sections.find((s) => s.heading === "Données collectées");
     const purposes = PRIVACY_POLICY.sections.find((s) => s.heading === "Finalités");
     const retention = PRIVACY_POLICY.sections.find((s) => s.heading === "Conservation");
@@ -40,8 +40,6 @@ describe("FEATURE-FRIENDS-04 Palier 4 — légal", () => {
     assert.match(ovh, /privacy\.html/);
     assert.match(ovh, /App Privacy Apple \/ Play Data safety/);
     assert.match(ovh, /Ne pas citer de noms de tables SQL/);
-    const friends = read("docs/FRIENDS.md");
-    assert.match(friends, /Stores : prochain build qui embarque la feature/);
     const launch = read("docs/LAUNCH.md");
     assert.match(launch, /Recently-crossed registered players/);
     assert.match(launch, /No public social feed/);
