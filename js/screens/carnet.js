@@ -120,8 +120,14 @@ function scoresSparkHtml(evenings) {
   const scores = chrono.map((row) => row.score);
   const layout = carnetSparklineLayout(scores);
   const last = layout.dots[layout.dots.length - 1];
+  const range =
+    layout.min == null || layout.max == null
+      ? ""
+      : layout.min === layout.max
+        ? String(layout.min)
+        : `${layout.min} – ${layout.max}`;
   const aria = scores.length
-    ? `${CARNET_LABEL.chartScores} : ${scores.join(", ")}`
+    ? `${CARNET_LABEL.chartScores}${range ? ` ${range}` : ""}`
     : CARNET_LABEL.chartScores;
   const line =
     layout.dots.length === 1 && last
@@ -131,7 +137,14 @@ function scoresSparkHtml(evenings) {
         ${last ? `<circle class="carnet-spark__dot" cx="${last.x}" cy="${last.y}" r="3.5"></circle>` : ""}`;
   return `
     <figure class="carnet-viz-card carnet-viz-card--spark">
-      <figcaption class="carnet-viz__label">${escapeHtml(CARNET_LABEL.chartScores)}</figcaption>
+      <div class="carnet-viz__head">
+        <figcaption class="carnet-viz__label">${escapeHtml(CARNET_LABEL.chartScores)}</figcaption>
+        ${
+          range
+            ? `<p class="carnet-spark__range">${escapeHtml(range)}</p>`
+            : ""
+        }
+      </div>
       <svg class="carnet-spark" viewBox="0 0 ${layout.width} ${layout.height}" role="img" aria-label="${escapeHtml(aria)}">
         ${line}
       </svg>

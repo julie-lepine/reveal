@@ -25,6 +25,7 @@ import {
   isLockedSignatureEmojiClick,
   isProfilePack,
   nameColorChipsHtml,
+  pickerEmojiFromButton,
   playerAvatarHtml,
   profileEmojiPickerHtml,
   signatureSelfPreviewHtml,
@@ -463,7 +464,7 @@ export function mountSettings(app) {
     app.querySelectorAll(".emoji-picker__btn").forEach((btn) => {
       btn.addEventListener("click", async () => {
         if (!mount.isMounted()) return;
-        const emoji = btn.getAttribute("data-emoji");
+        const emoji = pickerEmojiFromButton(btn);
         const err = app.querySelector("#emoji-error");
         const ok = app.querySelector("#emoji-ok");
         if (isLockedSignatureEmojiClick(emoji, getUser())) {

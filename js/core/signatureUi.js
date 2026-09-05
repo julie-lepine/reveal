@@ -3,8 +3,10 @@ import {
   SIGNATURE_EMOJI_CHOICES,
   SIGNATURE_NAME_COLORS,
   canUseProfileEmoji,
+  emojiFromUtf8Hex,
   isSignatureProfileEmoji,
   resolvedNameColorHex,
+  utf8HexFromEmoji,
 } from "../../data/signatureIdentity.js";
 import { PROFILE_EMOJI_CHOICES } from "../../data/profileEmojis.js";
 import { isProfilePack } from "./entitlements.js";
@@ -83,7 +85,17 @@ function emojiBtnHtml(emoji, selectedEmoji, { locked = false } = {}) {
   const lockCls = locked ? " emoji-picker__btn--locked" : "";
   const activeCls = active ? " emoji-picker__btn--active" : "";
   const lockAttr = locked ? ' data-signature-lock="1"' : "";
-  return `<button type="button" class="emoji-picker__btn${activeCls}${lockCls}" data-emoji="${emoji}" aria-label="${emoji}"${lockAttr}>${emoji}</button>`;
+  const hex = utf8HexFromEmoji(emoji);
+  return `<button type="button" class="emoji-picker__btn${activeCls}${lockCls}" data-emoji="${emoji}" data-emoji-hex="${hex}" aria-label="${emoji}"${lockAttr}>${emoji}</button>`;
+}
+
+export function pickerEmojiFromButton(btn) {
+  if (!btn) return "";
+  return (
+    emojiFromUtf8Hex(btn.getAttribute("data-emoji-hex")) ||
+    btn.getAttribute("data-emoji") ||
+    ""
+  );
 }
 
 export function profileEmojiPickerHtml(selectedEmoji, { includeSignatureExtras = true, unlocked = false } = {}) {

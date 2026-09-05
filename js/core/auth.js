@@ -168,14 +168,22 @@ export async function updateProfileEmoji(emoji) {
   const userId = getSupabaseUserId();
   if (userId) {
     try {
-      const currentName = getState().user?.name;
-      await upsertProfile({
+      const data = await upsertProfile({
         userId,
-        displayName: isPlaceholderDisplayName(currentName) ? undefined : currentName,
         emoji: res.emoji,
       });
+      if (data?.emoji) {
+        const synced = setLocalEmoji(data.emoji);
+        if (!synced.ok) {
+          saveStatePatch({
+            user: { ...getState().user, emoji: data.emoji },
+          });
+        }
+      }
       if (getState().lobby?.id) {
-        await updateLobbyMemberProfileSupabase({ emoji: res.emoji });
+        await updateLobbyMemberProfileSupabase({
+          emoji: data?.emoji || res.emoji,
+        });
       }
     } catch (e) {
       return { ok: false, error: e.message || "Erreur profil." };

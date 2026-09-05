@@ -72,9 +72,9 @@ export async function upsertProfile({ userId, displayName, emoji, nameColor } = 
     const row = {
       id: userId,
       display_name: name,
-      emoji: emoji || "👤",
       ...colorPatch,
     };
+    if (emoji !== undefined) row.emoji = emoji || "👤";
     let { data, error } = await supabase.from("profiles").upsert(row).select().single();
     if (error && colorPatch.name_color !== undefined && isMissingProfileColumn(error)) {
       const { name_color: _drop, ...withoutColor } = row;

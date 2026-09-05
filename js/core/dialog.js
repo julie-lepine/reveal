@@ -12,6 +12,7 @@ import { getState } from "./state.js";
 import {
   isLockedSignatureEmojiClick,
   isProfilePack,
+  pickerEmojiFromButton,
   playerNameHtml,
   profileEmojiPickerHtml,
   signatureRingClass,
@@ -609,7 +610,7 @@ export function showEmojiPickerDialog(
 
     root.querySelectorAll("[data-emoji]").forEach((btn) => {
       btn.addEventListener("click", () => {
-        const emoji = btn.getAttribute("data-emoji");
+        const emoji = pickerEmojiFromButton(btn);
         if (isLockedSignatureEmojiClick(emoji, user)) {
           close({ ok: false, needSignature: true });
           return;

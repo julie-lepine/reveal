@@ -117,6 +117,8 @@ describe("FEATURE-PROFILE-04 — carnet Signature", () => {
 
     const spark = carnetSparklineLayout([5, 12, 20]);
     assert.equal(spark.dots.length, 3);
+    assert.equal(spark.min, 5);
+    assert.equal(spark.max, 20);
     assert.ok(spark.dots[2].y < spark.dots[0].y);
     assert.match(spark.points, /,/);
     const flat = carnetSparklineLayout([10, 10, 10]);
@@ -226,7 +228,7 @@ describe("FEATURE-PROFILE-04 — carnet Signature", () => {
     assert.match(screen, /CARNET_LABEL\.seePacks/);
     assert.match(screen, /carnet-viz/);
     assert.match(screen, /carnet-ring/);
-    assert.match(screen, /carnet-spark/);
+    assert.match(screen, /carnet-spark__range/);
     assert.match(screen, /carnet-rank-row/);
     assert.match(screen, /CARNET_LABEL\.listTitle/);
     assert.match(screen, /carnet-chip/);

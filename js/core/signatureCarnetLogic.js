@@ -183,7 +183,7 @@ export function carnetSparklineLayout(
     ? scores.map((n) => Number(n)).filter((n) => Number.isFinite(n))
     : [];
   if (!list.length) {
-    return { width: w, height: h, points: "", area: "", dots: [] };
+    return { width: w, height: h, points: "", area: "", dots: [], min: null, max: null };
   }
   const min = Math.min(...list);
   const max = Math.max(...list);
@@ -202,7 +202,7 @@ export function carnetSparklineLayout(
   const area = `M ${dots[0].x} ${baseY} L ${dots
     .map((d) => `${d.x} ${d.y}`)
     .join(" ")} L ${dots[dots.length - 1].x} ${baseY} Z`;
-  return { width: w, height: h, points, area, dots };
+  return { width: w, height: h, points, area, dots, min, max };
 }
 
 export function formatCarnetEveningDate(iso, now = new Date()) {

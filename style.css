@@ -4181,6 +4181,22 @@ button.emoji-picker-preview__avatar:active{
   min-width:0;
 }
 
+.carnet-viz__head{
+  display:flex;
+  align-items:baseline;
+  justify-content:space-between;
+  gap:8px;
+}
+
+.carnet-spark__range{
+  margin:0;
+  font-size:.78rem;
+  font-weight:750;
+  color:var(--color-secondary-soft);
+  letter-spacing:.02em;
+  white-space:nowrap;
+}
+
 .carnet-spark{
   display:block;
   width:100%;

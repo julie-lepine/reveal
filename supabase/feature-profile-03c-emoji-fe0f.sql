@@ -1,7 +1,15 @@
--- FEATURE-PROFILE-03b — emojis déplacés de gratuit vers Signature
+-- FEATURE-PROFILE-03c — persistance emojis Signature
 --
--- Lots extra : 😈👻🔥🐸💎🌈 + 😎💜🌟🎯🚀🎈
--- Trigger : coller 03c (03c-persist-v3).
+-- Coller TOUT ce fichier. Idempotent.
+--
+-- Bug : l’app fait un UPSERT (INSERT … ON CONFLICT). Au BEFORE INSERT,
+-- profile_pack n’est pas dans le payload → défaut false. Les emojis payants
+-- étaient rejetés ; les gratuits passaient (liste free). On lit le pack
+-- déjà en base (la ligne existe pendant l’UPSERT).
+--
+-- Preuve (true) :
+--   select pg_get_functiondef('public.profiles_signature_cosmetics()'::regprocedure)
+--     like '%03c-persist-v3%';
 
 create or replace function public.profiles_signature_cosmetics()
 returns trigger
@@ -61,3 +69,8 @@ begin
   return new;
 end;
 $$;
+
+drop trigger if exists profiles_signature_cosmetics on public.profiles;
+create trigger profiles_signature_cosmetics
+before insert or update on public.profiles
+for each row execute function public.profiles_signature_cosmetics();

@@ -49,19 +49,45 @@ export const SIGNATURE_EMOJI_CHOICES = Object.freeze([
 ]);
 
 export function normalizeEmojiGrapheme(emoji) {
-  const raw = String(emoji ?? "").trim();
+  const raw = String(emoji ?? "").trim().replace(/\uFE0F/g, "");
   if (!raw) return "";
   return [...raw].slice(0, 2).join("");
 }
 
+export function emojiFromUtf8Hex(hex) {
+  const h = String(hex || "").toLowerCase().replace(/[^0-9a-f]/g, "");
+  if (!h || h.length % 2) return "";
+  const bytes = new Uint8Array(h.length / 2);
+  for (let i = 0; i < bytes.length; i += 1) {
+    bytes[i] = parseInt(h.slice(i * 2, i * 2 + 2), 16);
+  }
+  try {
+    return new TextDecoder().decode(bytes);
+  } catch {
+    return "";
+  }
+}
+
+export function utf8HexFromEmoji(emoji) {
+  const chosen = normalizeEmojiGrapheme(emoji);
+  if (!chosen || typeof TextEncoder === "undefined") return "";
+  return Array.from(new TextEncoder().encode(chosen))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
 export function isFreeProfileEmoji(emoji) {
   const chosen = normalizeEmojiGrapheme(emoji);
-  return Boolean(chosen && PROFILE_EMOJI_CHOICES.includes(chosen));
+  return Boolean(
+    chosen && PROFILE_EMOJI_CHOICES.some((e) => normalizeEmojiGrapheme(e) === chosen)
+  );
 }
 
 export function isSignatureProfileEmoji(emoji) {
   const chosen = normalizeEmojiGrapheme(emoji);
-  return Boolean(chosen && SIGNATURE_EMOJI_CHOICES.includes(chosen));
+  return Boolean(
+    chosen && SIGNATURE_EMOJI_CHOICES.some((e) => normalizeEmojiGrapheme(e) === chosen)
+  );
 }
 
 export function canUseProfileEmoji(emoji, { profilePack = false, isGuest = false } = {}) {

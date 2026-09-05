@@ -95,6 +95,7 @@ Sources : audit SQL du dépôt (`AUDIT-SQL-01`) + docs ops ([`SUPABASE.md`](./SU
 | 2026-09-04 | [`feature-profile-01-profile-flag.sql`](../supabase/feature-profile-01-profile-flag.sql) | FEATURE-PROFILE-01 | ✅ | ✅ | — | Colonne `profiles.profile_pack` + trigger · catalogue `boolean` confirmé · voir §18 |
 | 2026-09-05 | [`feature-profile-03-identity.sql`](../supabase/feature-profile-03-identity.sql) | FEATURE-PROFILE-03 | ✅ | ✅ | — | `name_color` + snapshot salon + friends_live_* · voir §19 |
 | 2026-09-05 | [`feature-profile-03b-emoji-split.sql`](../supabase/feature-profile-03b-emoji-split.sql) | FEATURE-PROFILE-03b | ✅ | ✅ | — | 12 emojis → Signature (😈👻🔥🐸💎🌈 + 😎💜🌟🎯🚀🎈) · coller si 03 déjà en prod |
+| 2026-09-05 | [`feature-profile-03c-emoji-fe0f.sql`](../supabase/feature-profile-03c-emoji-fe0f.sql) | FEATURE-PROFILE-03c | ☐ | ☐ | — | Trigger : strip U+FE0F sinon 🦄 → 👤 · coller prod |
 | 2026-09-05 | [`feature-profile-04-carnet.sql`](../supabase/feature-profile-04-carnet.sql) | FEATURE-PROFILE-04 | ☐ | ☐ | — | Carnet 20 soirées · RPC archive/list · voir §20 |
 
 **Hors migrations (tracés ailleurs si besoin)** : préflight [`lobby-membership-e4-00-preflight-duplicates.sql`](../supabase/lobby-membership-e4-00-preflight-duplicates.sql) (lecture seule) ; runbooks / harness sous [`supabase/tests/`](../supabase/tests/) et [`lobby-membership-e4-RUNBOOK.sql`](../supabase/lobby-membership-e4-RUNBOOK.sql) / [`lobby-membership-e5-RUNBOOK.sql`](../supabase/lobby-membership-e5-RUNBOOK.sql) — ce ne sont pas des migrations. Voir aussi [`lobby-membership-e4-tests-manual.sql`](../supabase/lobby-membership-e4-tests-manual.sql).
@@ -421,13 +422,13 @@ Couleur de pseudo (palette fermée), anneau + badge salon, emojis extra. Gate se
 
 | Élément | Valeur |
 | ------- | ------ |
-| Migration | [`feature-profile-03-identity.sql`](../supabase/feature-profile-03-identity.sql) — à coller prod |
+| Migration | [`feature-profile-03-identity.sql`](../supabase/feature-profile-03-identity.sql) puis [`feature-profile-03c-emoji-fe0f.sql`](../supabase/feature-profile-03c-emoji-fe0f.sql) |
 | Colonnes | `profiles.name_color` · `lobby_members.name_color` · `lobby_members.signature` |
 | Client | `data/signatureIdentity.js` · `js/core/signatureUi.js` |
 | Test manuel | `update public.profiles set profile_pack = true, name_color = 'gold' where id = '<uuid>';` puis recharge |
 | Hors scope | Photo avatar · carte share · mots perso · Maître de soirée |
 
-**Statut** : SQL **✅ prod** (collé 5 sept 2026).
+**Statut** : SQL **✅ prod** (collé 5 sept 2026). **03c** (U+FE0F → plus de 🦄 écrasée en 👤) : à coller.
 
 ---
 
