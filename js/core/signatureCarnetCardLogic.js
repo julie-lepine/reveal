@@ -114,8 +114,8 @@ export function carnetCardLayout() {
     { x: padX, y: tilesY + tileH + tileGap, w: tileW, h: tileH, r },
     { x: padX + tileW + tileGap, y: tilesY + tileH + tileGap, w: tileW, h: tileH, r },
   ];
-  const dotsY = tiles[2].y + tileH + 36;
-  const dots = { x: padX, y: dotsY, w: innerW, h: 36 };
+  const dotsY = tiles[2].y + tileH + 28;
+  const dots = { x: padX, y: dotsY, w: innerW, h: 70 };
   const logoH = 120;
   const logo = { x: padX, y: h - padBottom - logoH, w: innerW, h: logoH };
 

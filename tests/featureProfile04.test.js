@@ -320,5 +320,7 @@ describe("FEATURE-PROFILE-04 — carnet Signature", () => {
     assert.match(cardJs, /navigator\.share/);
     const labels = src("js/config/signatureCarnet.js");
     assert.match(labels, /Partager ma carte/);
+    assert.match(labels, /Mes 20 dernières soirées/);
+    assert.doesNotMatch(labels, /derniers tops/);
   });
 });

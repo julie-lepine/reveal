@@ -37,4 +37,5 @@ export const CARNET_LABEL = {
   chartRankFirst: "1er",
   chartRankSecond: "2e",
   chartRankRest: "3e+",
+  shareDotsTitle: "Mes 20 dernières soirées",
 };

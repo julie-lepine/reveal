@@ -367,13 +367,20 @@ function drawTiles(ctx, tiles, model) {
 }
 
 function drawDots(ctx, box, tones) {
+  ctx.fillStyle = COLOR.muted;
+  ctx.font = `600 22px ${FONT}`;
+  ctx.textAlign = "left";
+  ctx.textBaseline = "alphabetic";
+  ctx.fillText(CARNET_LABEL.shareDotsTitle, box.x, box.y + 22);
+
   const n = tones.length || 20;
   const d = 22;
   const span = box.w - d;
+  const rowY = box.y + box.h - d / 2;
   ctx.lineWidth = 2;
   for (let i = 0; i < n; i += 1) {
     const x = n === 1 ? box.x + box.w / 2 : box.x + d / 2 + (i / (n - 1)) * span;
-    const y = box.y + box.h / 2;
+    const y = rowY;
     const tone = tones[i];
     ctx.beginPath();
     ctx.arc(x, y, d / 2, 0, Math.PI * 2);
