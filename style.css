@@ -4061,6 +4061,14 @@ button.emoji-picker-preview__avatar:active{
   font-size:.82rem;
 }
 
+.carnet-share-dialog__panel .app-dialog__btn{
+  max-width:none;
+}
+
+.carnet-share-dialog__panel .app-dialog__btn + .app-dialog__btn{
+  margin-top:14px;
+}
+
 .carnet-list__title{
   margin:0;
   font-size:16px;

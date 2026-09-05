@@ -23,6 +23,7 @@ import {
   CARNET_CARD_WIDTH,
   buildCarnetCardModel,
   canShareCarnetCard,
+  carnetCardHook,
   carnetCardLayout,
   carnetCardRankDots,
 } from "../js/core/signatureCarnetCardLogic.js";
@@ -302,7 +303,7 @@ describe("FEATURE-PROFILE-04 — carnet Signature", () => {
     assert.equal(model.identity.name, "Ada");
     assert.equal(model.identity.nameColorHex, "#F5D76E");
     assert.equal(model.dots.length, 20);
-    assert.equal(model.sparkScores.length, 1);
+    assert.equal(model.hook, "Première soirée, première place");
 
     const layout = carnetCardLayout();
     assert.equal(layout.w, CARNET_CARD_WIDTH);
@@ -322,5 +323,78 @@ describe("FEATURE-PROFILE-04 — carnet Signature", () => {
     assert.match(labels, /Partager ma carte/);
     assert.match(labels, /Mes 20 dernières soirées/);
     assert.doesNotMatch(labels, /derniers tops/);
+  });
+
+  it("accroche carte : barème, 🥇, pas Mon carnet", () => {
+    const days = (d) => ({
+      endedAt: `2026-09-0${d}T10:00:00.000Z`,
+      score: 10,
+      games: ["clutch"],
+    });
+    const hook = (rows, statsExtra = {}) =>
+      carnetCardHook(
+        buildCarnetCardModel({
+          evenings: rows,
+          stats: {
+            evenings: rows.length,
+            games: rows.length,
+            mvp: rows.filter((r) => r.rank === 1).length,
+            winrate: rows.length
+              ? rows.filter((r) => r.rank === 1).length / rows.length
+              : null,
+            favoriteGame: "clutch",
+            ...statsExtra,
+          },
+        })
+      );
+
+    assert.equal(
+      hook([
+        { ...days(1), rank: 1 },
+        { ...days(2), rank: 1 },
+        { ...days(3), rank: 1 },
+      ]),
+      "3 🥇 d'affilée"
+    );
+    assert.equal(
+      hook([
+        { ...days(1), rank: 1 },
+        { ...days(2), rank: 1 },
+        { ...days(3), rank: 2 },
+      ]),
+      "3 soirées, 3 podiums"
+    );
+    assert.equal(
+      hook([
+        { ...days(1), rank: 1 },
+        { ...days(2), rank: 3 },
+        { ...days(3), rank: 1 },
+      ]),
+      "2 MVP en 3 soirées"
+    );
+    assert.equal(
+      hook(
+        Array.from({ length: 6 }, (_, i) => ({
+          endedAt: `2026-09-${String(i + 1).padStart(2, "0")}T10:00:00.000Z`,
+          rank: i < 4 ? 1 : 3,
+          score: 10,
+          games: ["clutch"],
+        }))
+      ),
+      "67 % de 1re places"
+    );
+    assert.equal(hook([{ ...days(1), rank: 2 }]), "Jeu fétiche : Clutch");
+    assert.equal(hook([{ ...days(1), rank: 2 }], { favoriteGame: null }), "C'est lancé");
+    assert.equal(
+      hook(
+        [
+          { ...days(1), rank: 3 },
+          { ...days(2), rank: 4 },
+        ],
+        { favoriteGame: null }
+      ),
+      "2 soirées au compteur"
+    );
+    assert.doesNotMatch(hook([{ ...days(1), rank: 2 }], { favoriteGame: null }), /carnet/i);
   });
 });

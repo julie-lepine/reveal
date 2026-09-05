@@ -107,7 +107,7 @@ function loadLogo() {
   return logoCache;
 }
 
-function drawHero(ctx, box) {
+function drawHero(ctx, box, hook) {
   fillRoundRect(ctx, box.x, box.y, box.w, box.h, box.r, COLOR.hero);
   ctx.save();
   roundRectPath(ctx, box.x, box.y, box.w, box.h, box.r);
@@ -136,6 +136,21 @@ function drawHero(ctx, box) {
   g2.addColorStop(1, "rgba(99, 102, 241, 0)");
   ctx.fillStyle = g2;
   ctx.fillRect(box.x, box.y, box.w, box.h);
+  if (hook) {
+    const fade = ctx.createLinearGradient(box.x, box.y + box.h - 150, box.x, box.y + box.h);
+    fade.addColorStop(0, "rgba(5, 6, 15, 0)");
+    fade.addColorStop(1, "rgba(5, 6, 15, 0.58)");
+    ctx.fillStyle = fade;
+    ctx.fillRect(box.x, box.y + box.h - 150, box.w, 150);
+    ctx.fillStyle = COLOR.white;
+    ctx.font = `800 44px ${FONT}`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "alphabetic";
+    ctx.shadowColor = "rgba(0, 0, 0, 0.45)";
+    ctx.shadowBlur = 12;
+    ctx.fillText(ellipsize(ctx, hook, box.w - 56), box.x + box.w / 2, box.y + box.h - 32);
+    ctx.shadowBlur = 0;
+  }
   ctx.restore();
   ctx.save();
   roundRectPath(ctx, box.x, box.y, box.w, box.h, box.r);
@@ -433,7 +448,7 @@ export async function renderCarnetSharePng(model) {
   ctx.fillStyle = bgGlow;
   ctx.fillRect(0, 0, layout.w, layout.h);
 
-  drawHero(ctx, layout.hero);
+  drawHero(ctx, layout.hero, model.hook);
   drawIdentity(ctx, layout.ident, model.identity);
   drawRing(ctx, layout.ring, model.stats.winrate);
   drawSpark(ctx, layout.spark, model.sparkScores);

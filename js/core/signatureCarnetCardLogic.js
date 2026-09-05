@@ -3,6 +3,7 @@
  * Pas de DOM, pas de fetch, pas de noms d’amis.
  */
 import { resolvedNameColorHex } from "../../data/signatureIdentity.js";
+import { catalogTitleForSessionGameId } from "./gameCatalogTitle.js";
 import {
   SIGNATURE_CARNET_MAX_EVENINGS,
   aggregateCarnetRankSplit,
@@ -37,6 +38,47 @@ export function carnetCardRankDots(evenings = [], slots = SIGNATURE_CARNET_MAX_E
   return tones;
 }
 
+/** 1ers d’affilée les plus récents (pastilles remplies, droite = récent). */
+export function carnetCardRecentFirstStreak(dots = []) {
+  const filled = (Array.isArray(dots) ? dots : []).filter((t) => t !== "empty");
+  let n = 0;
+  for (let i = filled.length - 1; i >= 0; i -= 1) {
+    if (filled[i] !== "first") break;
+    n += 1;
+  }
+  return n;
+}
+
+/**
+ * Une accroche, la plus rare. Pas de honte, pas de titre générique.
+ */
+export function carnetCardHook(model = {}) {
+  const stats = model.stats || {};
+  const split = model.rankSplit || {};
+  const n = Math.max(0, Number(stats.evenings) || 0);
+  const mvp = Math.max(0, Number(stats.mvp) || 0);
+  const winrate = stats.winrate;
+  const first = Math.max(0, Number(split.first) || 0);
+  const second = Math.max(0, Number(split.second) || 0);
+  const rest = Math.max(0, Number(split.rest) || 0);
+  const streak = carnetCardRecentFirstStreak(model.dots);
+
+  if (streak >= 2) return `${streak} 🥇 d'affilée`;
+  if (n >= 2 && rest === 0 && first + second === n) {
+    return `${n} soirées, ${n} podiums`;
+  }
+  if (mvp >= 2 && n < 6) return `${mvp} MVP en ${n} soirée${n > 1 ? "s" : ""}`;
+  if (n >= 3 && winrate != null && Number.isFinite(winrate) && winrate >= 0.5) {
+    return `${Math.round(winrate * 100)} % de 1re places`;
+  }
+  if (n === 1 && first === 1) return "Première soirée, première place";
+  const fav = catalogTitleForSessionGameId(stats.favoriteGame);
+  if (fav) return `Jeu fétiche : ${fav}`;
+  if (n === 1) return "C'est lancé";
+  if (n >= 2) return `${n} soirées au compteur`;
+  return "C'est lancé";
+}
+
 function cardIdentity(raw = {}) {
   const signature = raw.signature === true;
   return {
@@ -63,7 +105,7 @@ export function buildCarnetCardModel({ identity, evenings, stats } = {}) {
     games: Array.isArray(row?.games) ? row.games : [],
   }));
   const split = aggregateCarnetRankSplit(slim);
-  return {
+  const model = {
     identity: cardIdentity(identity),
     stats: {
       evenings: Number(stats?.evenings) || slim.length,
@@ -77,6 +119,8 @@ export function buildCarnetCardModel({ identity, evenings, stats } = {}) {
     rankPercents: carnetRankBarPercents(split),
     dots: carnetCardRankDots(slim),
   };
+  model.hook = carnetCardHook(model);
+  return model;
 }
 
 /** Zones en px (1080×1920). Logo sous les pastilles, marge IG bas. */
