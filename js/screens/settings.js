@@ -307,12 +307,14 @@ function personnalisationPanelHtml({ emailAccount, user, selectedEmoji }) {
         ${
           unlocked
             ? `<input type="file" accept="image/*" hidden id="settings-avatar-file" />
-        <button type="button" class="btn btn-secondary btn--spaced" id="btn-pick-avatar">${escapeHtml(
-          hasPhoto ? AVATAR_LABEL.change : AVATAR_LABEL.pick
-        )}</button>
-        <button type="button" class="btn btn-secondary btn--spaced" id="btn-remove-avatar"${
-          hasPhoto ? "" : " hidden"
-        }>${escapeHtml(AVATAR_LABEL.remove)}</button>
+        <div class="settings-avatar-actions">
+          <button type="button" class="btn btn-secondary" id="btn-pick-avatar">${escapeHtml(
+            hasPhoto ? AVATAR_LABEL.change : AVATAR_LABEL.pick
+          )}</button>
+          <button type="button" class="btn btn-secondary" id="btn-remove-avatar"${
+            hasPhoto ? "" : " hidden"
+          }>${escapeHtml(AVATAR_LABEL.remove)}</button>
+        </div>
         <p class="auth-error hidden" id="avatar-error"></p>
         <p class="settings-ok hidden" id="avatar-ok"></p>`
             : `<p class="hint settings-section__hint">${escapeHtml(AVATAR_LABEL.lockedHint)}</p>`

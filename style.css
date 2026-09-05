@@ -3586,6 +3586,21 @@ button.emoji-picker-preview__avatar:active{
   transform:scale(.96);
 }
 
+.settings-avatar-actions{
+  display:flex;
+  gap:10px;
+  margin:0 0 14px;
+}
+
+.settings-avatar-actions .btn{
+  flex:1 1 0;
+  width:auto;
+  margin:0;
+  min-height:44px;
+  padding:10px 12px;
+  font-size:15px;
+}
+
 .emoji-picker{
   display:grid;
   width:100%;
@@ -4142,8 +4157,24 @@ button.emoji-picker-preview__avatar:active{
 }
 
 .carnet-crop__hint{
-  margin:0 0 14px;
+  margin:0 0 12px;
   font-size:.82rem;
+}
+
+.carnet-crop__actions{
+  display:flex;
+  gap:10px;
+  margin-top:0;
+}
+
+.carnet-crop__actions .app-dialog__btn{
+  flex:1 1 0;
+  width:auto;
+  max-width:none;
+  margin:0;
+  min-height:44px;
+  padding:10px 12px;
+  font-size:15px;
 }
 
 .carnet-list__title{
