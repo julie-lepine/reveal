@@ -128,7 +128,7 @@ function winrateRingHtml(winrate) {
 function scoresSparkHtml(evenings) {
   const chrono = chronologicalCarnetEvenings(evenings);
   const scores = chrono.map((row) => row.score);
-  const layout = carnetSparklineLayout(scores);
+  const layout = carnetSparklineLayout(scores, { width: 240, height: 120 });
   const last = layout.dots[layout.dots.length - 1];
   const hasRange = layout.yMin != null && layout.yMax != null;
   const rangeLabel = hasRange ? `${layout.yMin} – ${layout.yMax}` : "";

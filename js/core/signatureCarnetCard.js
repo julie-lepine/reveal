@@ -269,12 +269,14 @@ function drawSpark(ctx, box, scores) {
   ctx.textBaseline = "alphabetic";
   ctx.fillText(CARNET_LABEL.chartScores, box.x + 18, box.y + 32);
 
-  const pad = 16;
+  const padX = 16;
+  const padBottom = 14;
+  const titleY = 44;
   const chart = {
-    x: box.x + pad,
-    y: box.y + 44,
-    w: box.w - pad * 2,
-    h: 140,
+    x: box.x + padX,
+    y: box.y + titleY,
+    w: box.w - padX * 2,
+    h: Math.max(96, box.h - titleY - padBottom),
   };
   const finite = (Array.isArray(scores) ? scores : []).filter((n) => Number.isFinite(n));
   const layout = carnetSparklineLayout(finite, {

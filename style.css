@@ -4336,18 +4336,23 @@ button.emoji-picker-preview__avatar:active{
   display:flex;
   flex-direction:column;
   min-width:0;
+  min-height:0;
 }
 
 .carnet-spark-wrap{
   position:relative;
+  flex:1 1 auto;
   min-width:0;
+  min-height:72px;
+  margin-top:6px;
 }
 
 .carnet-spark{
+  position:absolute;
+  inset:0;
   display:block;
   width:100%;
-  height:64px;
-  margin-top:8px;
+  height:100%;
 }
 
 .carnet-spark__y{
@@ -4368,7 +4373,7 @@ button.emoji-picker-preview__avatar:active{
 
 .carnet-spark__y--max{
   right:0;
-  top:8px;
+  top:0;
 }
 
 .carnet-spark__area{
@@ -4380,6 +4385,7 @@ button.emoji-picker-preview__avatar:active{
   stroke-width:2.4;
   stroke-linejoin:round;
   stroke-linecap:round;
+  vector-effect:non-scaling-stroke;
 }
 
 .carnet-spark__dot{

@@ -249,8 +249,10 @@ describe("FEATURE-PROFILE-04 — carnet Signature", () => {
     assert.match(screen, /carnet-spark__y--min/);
     assert.match(screen, /carnet-spark__y--max/);
     const css = src("style.css");
+    assert.match(css, /\.carnet-spark-wrap\{[\s\S]*flex:\s*1/);
+    assert.match(css, /\.carnet-spark\{[\s\S]*inset:0/);
     assert.match(css, /\.carnet-spark__y--min\{[\s\S]*bottom:0/);
-    assert.match(css, /\.carnet-spark__y--max\{[\s\S]*top:8px/);
+    assert.match(css, /\.carnet-spark__y--max\{[\s\S]*top:0/);
     assert.match(screen, /carnet-rank-row/);
     assert.match(screen, /CARNET_LABEL\.listTitle/);
     assert.match(screen, /data-carnet-share/);
@@ -335,6 +337,8 @@ describe("FEATURE-PROFILE-04 — carnet Signature", () => {
     assert.match(cardJs, /layout\.yMax/);
     assert.match(cardJs, /chart\.x \+ chart\.w/);
     assert.match(cardJs, /chart\.y \+ chart\.h/);
+    assert.match(cardJs, /box\.h - titleY - padBottom/);
+    assert.doesNotMatch(cardJs, /h:\s*140/);
     assert.doesNotMatch(cardJs, /box\.y \+ box\.h - 18/);
     const labels = src("js/config/signatureCarnet.js");
     assert.match(labels, /Partager ma carte/);
