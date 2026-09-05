@@ -53,5 +53,7 @@ describe("FEATURE-ADFREE-02B — achat + webhook", () => {
     const purchases = src("js/core/purchases.js");
     assert.match(purchases, /unwrapOfferings\(await Purchases\.getOfferings\(\)\)/);
     assert.equal(/const \{ offerings \} = await Purchases\.getOfferings/.test(purchases), false);
+    assert.match(purchases, /packageForSku\(offerings, PLAY_PRODUCT_ID_AD_FREE\)/);
+    assert.equal(/packagesFromOfferings\(offerings\)\[0\]/.test(purchases), false);
   });
 });

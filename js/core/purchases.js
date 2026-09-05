@@ -165,8 +165,9 @@ function packageForSku(offerings, sku) {
 
 function packageForAdFree(offerings) {
   const match = packageForSku(offerings, PLAY_PRODUCT_ID_AD_FREE);
+  if (match) return match;
   const current = offerings?.current;
-  return match || packagesFromOfferings(offerings)[0] || current?.lifetime || offerings?.all?.default?.lifetime || null;
+  return current?.lifetime || offerings?.all?.default?.lifetime || null;
 }
 
 /** SKU Profil : 4,00 € si Sans pub déjà là, sinon 6,99 €. Pas de fallback sur Sans pub. */

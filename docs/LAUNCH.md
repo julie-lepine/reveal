@@ -7,7 +7,7 @@ Backend : [SUPABASE.md](./SUPABASE.md) · Native : [NATIVE.md](./NATIVE.md) · S
 |--|--|
 | Package | `com.reveal.partygames` |
 | Play | **live** ([fiche](https://play.google.com/store/apps/details?id=com.reveal.partygames)) — 3 sept 2026 — compte `contact@revealthepartygame.fr` |
-| App Store | **REVEAL - Party Games** — Apple ID [`6785256450`](https://apps.apple.com/app/id6785256450) — **live** (dernière maj acceptée) — **maj hCaptcha + URL marketing en review** (4 sept 2026) |
+| App Store | **REVEAL - Party Games** — Apple ID [`6785256450`](https://apps.apple.com/app/id6785256450) — **live 1.1.2** (hCaptcha acceptée 5 sept 2026) — AdMob iOS : coller **URL marketing** à la prochaine version |
 | Privacy | `https://revealthepartygame.fr/privacy.html` |
 | Suppression | `https://revealthepartygame.fr/suppression-compte.html` |
 | Contact | `contact@revealthepartygame.fr` |
@@ -18,9 +18,9 @@ Builds : `npm run cap:sync` (Node ≥ 22) → AAB / Archive.
 
 ## À faire
 
-1. **Apple** — maj **hCaptcha** (+ URL marketing) **en review**. L’app est déjà live (maj précédente acceptée).
-2. **Après acceptation de cette maj** — release, puis AdMob iOS → **Rechercher des mises à jour** (`app-ads.txt`). Store déjà associé ; l’URL marketing n’est que sur **cette** version.
-3. **Plus tard** — palier **Signature 6,99** (ci-dessous). Maître de soirée 12,99 et Draw It (QA Android) hors gate.
+1. **Apple** — **1.1.2** acceptée, **Prête pour la distribution** (hCaptcha). AdMob iOS encore bloqué : pas d’**URL marketing** sur la fiche (AdMob cherche « site Web version développeur », pas la politique de confidentialité).
+2. **AdMob iOS** — sur la **prochaine** version ASC : URL marketing = `https://revealthepartygame.fr` (racine, pas `/privacy.html`). Puis AdMob → Verify. `app-ads.txt` est déjà live.
+3. **Signature iOS** — IAP « Prêt pour la vérification » sur cette même prochaine version. RC catalogue déjà clos.
 
 - [ ] Release maj hCaptcha + AdMob iOS `app-ads.txt` (Site Web du développeur = `revealthepartygame.fr`)
 - [ ] Palier Signature 6,99 (Maître de soirée 12,99 plus tard)
@@ -29,11 +29,11 @@ Builds : `npm run cap:sync` (Node ≥ 22) → AAB / Archive.
 
 ## Fait
 
-**Play** live 3 sept 2026. AdMob Android lié 4 sept 2026 (recherche URL + `&gl=FR`). Test fermé, QA 11 jeux, Sans pub (0 € + 2ᵉ téléphone). Data safety + catégorie Jeu / Décontracté.
+**Play** live 3 sept 2026. AdMob Android lié 4 sept 2026 (recherche URL + `&gl=FR`) ; **appli approuvée 5 sept 2026** (`com.reveal.partygames`, limites d’examen levées, pubs autorisées). Test fermé, QA 11 jeux, Sans pub (0 € + 2ᵉ téléphone). Data safety + catégorie Jeu / Décontracté.
 
-**iOS** — v1.1 refusée 2 sept 2026 (5.1.1 + 2.1) ; suppression **in-app** puis **maj acceptée** (app live). **Nouvelle version en review** : hCaptcha + URL marketing `https://revealthepartygame.fr` (4 sept 2026). AdMob iOS associé (validation `app-ads.txt` après cette maj live). IAP `reveal_adfree`, Paid Apps Actif, RevenueCat, ATT. QA iPhone XR 31 août 2026.
+**iOS** — v1.1 refusée 2 sept 2026 (5.1.1 + 2.1) ; suppression **in-app** puis **maj acceptée**. **1.1.2** (hCaptcha) **Prête pour la distribution** (5 sept 2026). AdMob iOS associé, **pas encore** « peut diffuser » : la fiche live n’a pas d’URL marketing (seulement confidentialité `…/privacy.html`). IAP `reveal_adfree`, Paid Apps Actif, RevenueCat, ATT. QA iPhone XR 31 août 2026.
 
-**Ads / légal** — `app-ads.txt` live (`pub-6332424645114129`). `ADMOB_USE_TEST_ADS = false`. Logo REVEAL déjà sur le message UMP. Privacy + suppression OVH. Amis / invitations / croisés 24 h (FEATURE-FRIENDS-04) sur web + fiches.
+**Ads / légal** — `app-ads.txt` live (`pub-6332424645114129`). `ADMOB_USE_TEST_ADS = false`. Logo REVEAL déjà sur le message UMP. Privacy + suppression OVH. Amis / invitations / croisés 24 h (FEATURE-FRIENDS-04) sur web + fiches. AdMob **Onboarding / Revenus** (barre du mail) = paiements éditeur, pas un blocage des pubs Android.
 
 **Hors scope** — DUNS, diffusion INSEE, nom de société sur la fiche.
 
@@ -90,13 +90,13 @@ Admin, pas de code app. En parallèle du 1.
 | Offering RC | Packages à côté de `reveal_adfree` |
 | Catalogue | Identifiants alignés Play / iOS / RC |
 
-- [ ] Produit Play `reveal_profile` + `reveal_profile_upgrade`
-- [ ] Produit App Store `reveal_profile` + `reveal_profile_upgrade` (minuscules, comme `reveal_adfree` — pas `Reveal_profile`)
-- [ ] Captures review App Store Connect pour **Profil** et **Profil upgrade** (une par IAP, écran d’achat) — sans ça l’IAP reste « Finaliser avant soumission », donc pas de lien iOS dans RevenueCat
-- [ ] RC : SKUs iOS sur l’offering + entitlement `profile` (Play déjà OK)
-- [ ] Entitlement RC `profile` + offering (upgrade **et** plein tarif grant `profile`)
+- [x] Produit Play `reveal_profile` + `reveal_profile_upgrade` — 4 sept 2026
+- [x] Produit App Store `reveal_profile` + `reveal_profile_upgrade` (minuscules, comme `reveal_adfree`) — **Prêt pour la vérification**
+- [x] Captures review App Store Connect pour **Profil** et **Profil upgrade**
+- [x] Entitlement RC `profile` : 4 produits (Play + iOS, plein tarif **et** upgrade). Pas d’entitlement `profile_upgrade`. `ad_free` inchangé.
+- [x] Offering current : packages Custom `profile` / `profile_upgrade` (Play + App Store) + `$rc_lifetime` = `reveal_adfree`
 
-Code client 02B prêt ; l’achat échoue tant que ces produits ne sont pas dans l’offering. **iOS : nouvelle version** (ne pas coller sur la maj hCaptcha en review).
+Code client 02B prêt. **iOS : nouvelle version** (ne pas coller sur la maj hCaptcha en review). QA achat = licence testers Play + sandbox iOS, pas GitHub Pages.
 
 ### 3. FEATURE-PROFILE-02B — Achat client + webhook
 
@@ -133,7 +133,7 @@ Stats + 20 soirées. Archive au leave/dissolve **avant** perte de membership. `l
 
 Photo Signature = le même cercle que l’emoji, **partout** (lobby, scores, amis, aperçu Profil, carte share). Pas de picker sur la carte. Pas de photo dans le hero 9:16.
 
-- [x] SQL `profiles.avatar_path` / `avatar_rev` + snapshot salon + Storage `avatars` — **à coller prod**
+- [x] SQL `profiles.avatar_path` / `avatar_rev` + snapshot salon + Storage `avatars` — **prod** (5 sept 2026)
 - [x] Recadrage cercle dans Menu → Profil (pinch / drag, pas de 90°)
 - [x] Emoji conservé en secours (`onerror` / canvas CORS)
 - Hors scope : photo hero carte, report UGC store (légal toujours après Maître de soirée)

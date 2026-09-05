@@ -97,7 +97,7 @@ Sources : audit SQL du dépôt (`AUDIT-SQL-01`) + docs ops ([`SUPABASE.md`](./SU
 | 2026-09-05 | [`feature-profile-03b-emoji-split.sql`](../supabase/feature-profile-03b-emoji-split.sql) | FEATURE-PROFILE-03b | ✅ | ✅ | — | 12 emojis → Signature (😈👻🔥🐸💎🌈 + 😎💜🌟🎯🚀🎈) · coller si 03 déjà en prod |
 | 2026-09-05 | [`feature-profile-03c-emoji-fe0f.sql`](../supabase/feature-profile-03c-emoji-fe0f.sql) | FEATURE-PROFILE-03c | ☐ | ☐ | — | Trigger : strip U+FE0F sinon 🦄 → 👤 · coller prod |
 | 2026-09-05 | [`feature-profile-04-carnet.sql`](../supabase/feature-profile-04-carnet.sql) | FEATURE-PROFILE-04 | ☐ | ☐ | — | Carnet 20 soirées · RPC archive/list · voir §20 |
-| 2026-09-05 | [`feature-profile-05-avatar.sql`](../supabase/feature-profile-05-avatar.sql) | FEATURE-PROFILE-05 | ☐ | ☐ | — | Photo avatar Signature · Storage `avatars` · voir §21 |
+| 2026-09-05 | [`feature-profile-05-avatar.sql`](../supabase/feature-profile-05-avatar.sql) | FEATURE-PROFILE-05 | ✅ | ✅ | — | Photo avatar Signature · Storage `avatars` · voir §21 |
 
 **Hors migrations (tracés ailleurs si besoin)** : préflight [`lobby-membership-e4-00-preflight-duplicates.sql`](../supabase/lobby-membership-e4-00-preflight-duplicates.sql) (lecture seule) ; runbooks / harness sous [`supabase/tests/`](../supabase/tests/) et [`lobby-membership-e4-RUNBOOK.sql`](../supabase/lobby-membership-e4-RUNBOOK.sql) / [`lobby-membership-e5-RUNBOOK.sql`](../supabase/lobby-membership-e5-RUNBOOK.sql) — ce ne sont pas des migrations. Voir aussi [`lobby-membership-e4-tests-manual.sql`](../supabase/lobby-membership-e4-tests-manual.sql).
 
