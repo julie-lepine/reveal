@@ -7,8 +7,13 @@ import { getState, saveStatePatch } from "../js/core/state.js";
 import { SESSION_GAME_ID_TO_TILE } from "../js/core/gameCatalogTitle.js";
 import {
   SIGNATURE_CARNET_ALLOWED_GAMES,
+  aggregateCarnetRankSplit,
   aggregateCarnetStats,
   buildSignatureEveningPayload,
+  carnetRankBarPercents,
+  carnetSparklineLayout,
+  carnetWinrateRing,
+  chronologicalCarnetEvenings,
   formatCarnetWinrate,
   parseCarnetListPayload,
   sanitizeCarnetGames,
@@ -87,6 +92,41 @@ describe("FEATURE-PROFILE-04 — carnet Signature", () => {
     assert.equal(stats.favoriteGame, "hottake");
     assert.equal(formatCarnetWinrate(stats.winrate), "67%");
     assert.equal(formatCarnetWinrate(null), "—");
+  });
+
+  it("visuels : rangs 1/2/reste, courbe chrono, anneau", () => {
+    const split = aggregateCarnetRankSplit([
+      { rank: 1 },
+      { rank: 1 },
+      { rank: 2 },
+      { rank: 4 },
+      { rank: null },
+    ]);
+    assert.deepEqual(split, { first: 2, second: 1, rest: 1 });
+    const pct = carnetRankBarPercents(split);
+    assert.equal(pct.first, 100);
+    assert.ok(pct.second > 0 && pct.second < 100);
+    assert.equal(carnetRankBarPercents({ first: 0, second: 0, rest: 0 }).first, 0);
+
+    const chrono = chronologicalCarnetEvenings([
+      { endedAt: "2026-09-05T10:00:00.000Z", score: 20 },
+      { endedAt: "2026-09-01T10:00:00.000Z", score: 5 },
+      { endedAt: "2026-09-03T10:00:00.000Z", score: 12 },
+    ]);
+    assert.deepEqual(chrono.map((r) => r.score), [5, 12, 20]);
+
+    const spark = carnetSparklineLayout([5, 12, 20]);
+    assert.equal(spark.dots.length, 3);
+    assert.ok(spark.dots[2].y < spark.dots[0].y);
+    assert.match(spark.points, /,/);
+    const flat = carnetSparklineLayout([10, 10, 10]);
+    assert.equal(flat.dots[0].y, flat.dots[2].y);
+
+    const ring = carnetWinrateRing(2 / 3);
+    assert.equal(ring.percent, 67);
+    assert.ok(ring.dash > 0 && ring.dash < ring.circumference);
+    assert.equal(carnetWinrateRing(null).percent, 0);
+    assert.equal(carnetWinrateRing(1).dash, carnetWinrateRing(1).circumference);
   });
 
   it("parse liste : pas de lobby_id, amis encore amis seulement", () => {
@@ -184,6 +224,13 @@ describe("FEATURE-PROFILE-04 — carnet Signature", () => {
     assert.doesNotMatch(screen, /lobby_id/);
     assert.match(screen, /data-carnet-forfaits/);
     assert.match(screen, /CARNET_LABEL\.seePacks/);
+    assert.match(screen, /carnet-viz/);
+    assert.match(screen, /carnet-ring/);
+    assert.match(screen, /carnet-spark/);
+    assert.match(screen, /carnet-rank-row/);
+    assert.match(screen, /CARNET_LABEL\.listTitle/);
+    assert.match(screen, /carnet-chip/);
+    assert.match(screen, /medalForCompetitionRank/);
     const sync = src("js/core/gameSync.js");
     const menuBlock = sync.slice(
       sync.indexOf("const MENU_SCREENS"),

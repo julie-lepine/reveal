@@ -119,6 +119,92 @@ export function formatCarnetWinrate(winrate) {
   return `${Math.round(winrate * 100)}%`;
 }
 
+/** 1er / 2e / reste — pour la répartition des rangs. */
+export function aggregateCarnetRankSplit(evenings = []) {
+  let first = 0;
+  let second = 0;
+  let rest = 0;
+  for (const row of Array.isArray(evenings) ? evenings : []) {
+    const r = Number(row?.rank);
+    if (r === 1) first += 1;
+    else if (r === 2) second += 1;
+    else if (Number.isInteger(r) && r >= 3) rest += 1;
+  }
+  return { first, second, rest };
+}
+
+/** Largeur des barres (0–100), calée sur le max pour que le plus fréquent remplisse. */
+export function carnetRankBarPercents(split = {}) {
+  const first = Math.max(0, Number(split.first) || 0);
+  const second = Math.max(0, Number(split.second) || 0);
+  const rest = Math.max(0, Number(split.rest) || 0);
+  const max = Math.max(first, second, rest, 1);
+  const pct = (n) => (n > 0 ? Math.max(8, Math.round((n / max) * 100)) : 0);
+  return { first: pct(first), second: pct(second), rest: pct(rest) };
+}
+
+/** Soirées du plus ancien au plus récent (courbe gauche → droite). */
+export function chronologicalCarnetEvenings(evenings = []) {
+  const rows = Array.isArray(evenings) ? evenings : [];
+  return rows
+    .map((row, i) => {
+      const t = Date.parse(row?.endedAt);
+      return { row, i, t: Number.isFinite(t) ? t : 0 };
+    })
+    .sort((a, b) => (a.t !== b.t ? a.t - b.t : a.i - b.i))
+    .map((x) => x.row);
+}
+
+export function carnetWinrateRing(winrate, { radius = 38, stroke = 7 } = {}) {
+  const r = Number(radius) || 38;
+  const s = Number(stroke) || 7;
+  const c = 2 * Math.PI * r;
+  const pct =
+    winrate == null || !Number.isFinite(winrate) ? 0 : Math.max(0, Math.min(1, winrate));
+  return {
+    radius: r,
+    stroke: s,
+    size: Math.round((r + s) * 2),
+    circumference: Math.round(c * 100) / 100,
+    dash: Math.round(pct * c * 100) / 100,
+    percent: Math.round(pct * 100),
+  };
+}
+
+/** Points SVG pour la courbe des scores (Y haut = meilleur score). */
+export function carnetSparklineLayout(
+  scores = [],
+  { width = 200, height = 72, pad = 10 } = {}
+) {
+  const w = Number(width) || 200;
+  const h = Number(height) || 72;
+  const p = Number(pad) || 10;
+  const list = Array.isArray(scores)
+    ? scores.map((n) => Number(n)).filter((n) => Number.isFinite(n))
+    : [];
+  if (!list.length) {
+    return { width: w, height: h, points: "", area: "", dots: [] };
+  }
+  const min = Math.min(...list);
+  const max = Math.max(...list);
+  const span = max - min || 1;
+  const innerW = w - p * 2;
+  const innerH = h - p * 2;
+  const n = list.length;
+  const round = (v) => Math.round(v * 10) / 10;
+  const dots = list.map((score, i) => {
+    const x = n === 1 ? w / 2 : p + (i / (n - 1)) * innerW;
+    const y = p + (1 - (score - min) / span) * innerH;
+    return { x: round(x), y: round(y), score };
+  });
+  const points = dots.map((d) => `${d.x},${d.y}`).join(" ");
+  const baseY = h - p;
+  const area = `M ${dots[0].x} ${baseY} L ${dots
+    .map((d) => `${d.x} ${d.y}`)
+    .join(" ")} L ${dots[dots.length - 1].x} ${baseY} Z`;
+  return { width: w, height: h, points, area, dots };
+}
+
 export function formatCarnetEveningDate(iso, now = new Date()) {
   const d = iso instanceof Date ? iso : new Date(iso);
   if (Number.isNaN(d.getTime())) return "";

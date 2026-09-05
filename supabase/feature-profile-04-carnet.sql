@@ -175,9 +175,6 @@ begin
 end;
 $$;
 
-revoke all on function public.archive_signature_evening(uuid, integer, integer, text[]) from public;
-revoke all on function public.archive_signature_evening(uuid, integer, integer, text[]) from anon;
-revoke all on function public.archive_signature_evening(uuid, integer, integer, text[]) from authenticated;
 revoke all on function public.archive_signature_evening(uuid, integer, integer, text[], uuid[]) from public;
 revoke all on function public.archive_signature_evening(uuid, integer, integer, text[], uuid[]) from anon;
 grant execute on function public.archive_signature_evening(uuid, integer, integer, text[], uuid[]) to authenticated;

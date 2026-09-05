@@ -28,14 +28,22 @@ export const TILE_ID_TO_SESSION_GAME_ID = Object.fromEntries(
   ])
 );
 
+function catalogForSessionGameId(gameId) {
+  if (!gameId || typeof gameId !== "string") return null;
+  const tileId = SESSION_GAME_ID_TO_TILE[gameId];
+  if (!tileId) return null;
+  return GAMES.find((g) => g.id === tileId) || null;
+}
+
 /**
  * @param {string|null|undefined} gameId
  * @returns {string|null} titre officiel catalogue, ou null si inconnu
  */
 export function catalogTitleForSessionGameId(gameId) {
-  if (!gameId || typeof gameId !== "string") return null;
-  const tileId = SESSION_GAME_ID_TO_TILE[gameId];
-  if (!tileId) return null;
-  const catalog = GAMES.find((g) => g.id === tileId);
-  return catalog?.title || null;
+  return catalogForSessionGameId(gameId)?.title || null;
+}
+
+/** Emoji catalogue (tuile jeu), ou null si inconnu. */
+export function catalogEmojiForSessionGameId(gameId) {
+  return catalogForSessionGameId(gameId)?.emoji || null;
 }
