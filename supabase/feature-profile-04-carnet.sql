@@ -182,8 +182,16 @@ revoke all on function public.archive_signature_evening(uuid, integer, integer, 
 revoke all on function public.archive_signature_evening(uuid, integer, integer, text[], uuid[]) from anon;
 grant execute on function public.archive_signature_evening(uuid, integer, integer, text[], uuid[]) to authenticated;
 
-create or replace function public.list_signature_carnet()
-returns jsonb
+drop function if exists public.list_signature_carnet();
+
+create function public.list_signature_carnet()
+returns table (
+  ended_at timestamptz,
+  rank integer,
+  score integer,
+  games text[],
+  friend_names text[]
+)
 language plpgsql
 stable
 security definer
@@ -191,8 +199,6 @@ set search_path = pg_catalog, public
 as $$
 declare
   v_uid uuid;
-  v_evenings jsonb := '[]'::jsonb;
-  v_stats jsonb;
 begin
   v_uid := public.friends_require_caller();
 
@@ -203,62 +209,25 @@ begin
     raise exception 'signature_locked';
   end if;
 
-  select coalesce(jsonb_agg(row_to_json(r) order by r.ended_at desc), '[]'::jsonb)
-  into v_evenings
-  from (
-    select
-      e.ended_at,
-      e.rank,
-      e.score,
-      e.games,
-      (
-        select coalesce(jsonb_agg(public.friends_live_display_name(t.peer) order by public.friends_live_display_name(t.peer)), '[]'::jsonb)
-        from unnest(e.peer_user_ids) as t(peer)
-        where exists (
-          select 1 from public.friendships f
-          where (f.user_a = v_uid and f.user_b = t.peer)
-             or (f.user_b = v_uid and f.user_a = t.peer)
-        )
-      ) as friend_names
-    from public.signature_evenings e
-    where e.user_id = v_uid
-    order by e.ended_at desc, e.id desc
-    limit 20
-  ) r;
-
-  select jsonb_build_object(
-    'evenings', count(*)::int,
-    'games', coalesce(sum(cardinality(e.games)), 0)::int,
-    'wins', coalesce(sum(case when e.rank = 1 then 1 else 0 end), 0)::int,
-    'mvp', coalesce(sum(case when e.rank = 1 then 1 else 0 end), 0)::int,
-    'favorite_game', (
-      select g
-      from public.signature_evenings e2
-      cross join unnest(e2.games) as g
-      where e2.user_id = v_uid
-      group by g
-      order by count(*) desc, g
-      limit 1
-    )
-  )
-  into v_stats
+  return query
+  select
+    e.ended_at,
+    e.rank,
+    e.score,
+    e.games,
+    coalesce((
+      select array_agg(public.friends_live_display_name(t.peer) order by public.friends_live_display_name(t.peer))
+      from unnest(e.peer_user_ids) as t(peer)
+      where exists (
+        select 1 from public.friendships f
+        where (f.user_a = v_uid and f.user_b = t.peer)
+           or (f.user_b = v_uid and f.user_a = t.peer)
+      )
+    ), '{}'::text[]) as friend_names
   from public.signature_evenings e
-  where e.user_id = v_uid;
-
-  if v_stats is null then
-    v_stats := jsonb_build_object(
-      'evenings', 0,
-      'games', 0,
-      'wins', 0,
-      'mvp', 0,
-      'favorite_game', null
-    );
-  end if;
-
-  return jsonb_build_object(
-    'evenings', v_evenings,
-    'stats', v_stats
-  );
+  where e.user_id = v_uid
+  order by e.ended_at desc, e.id desc
+  limit 20;
 end;
 $$;
 

@@ -164,6 +164,8 @@ export async function fetchSignatureCarnet() {
       return { ok: false, skipped: false, evenings: [], stats: null };
     }
   }
-  const parsed = parseCarnetListPayload(raw);
+  const parsed = parseCarnetListPayload(
+    Array.isArray(raw) ? { evenings: raw } : raw
+  );
   return { ok: true, skipped: false, ...parsed };
 }

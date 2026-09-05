@@ -50,6 +50,11 @@ function settingsTabAfterProfileSubpage() {
   return null;
 }
 
+function suppressEveningChromeRoute() {
+  if (!hasActiveLobby()) return;
+  suppressSessionRoute(120000, getCachedGameSession()?.screen || "game-select");
+}
+
 /** Page Amis : même contrat que Menu (pas une manche). */
 export function goToFriends() {
   if (!canPlay()) {
@@ -58,11 +63,7 @@ export function goToFriends() {
   }
   markReturnToProfileIfFromSettings();
   if (getCurrentScreen() === "friends") return;
-  if (hasActiveLobby()) {
-    suppressSessionRoute(120000, getCachedGameSession()?.screen ?? null);
-    navigate("friends");
-    return;
-  }
+  suppressEveningChromeRoute();
   navigate("friends");
 }
 
@@ -74,11 +75,7 @@ export function goToCarnet() {
   }
   markReturnToProfileIfFromSettings();
   if (getCurrentScreen() === CARNET_SCREEN_ID) return;
-  if (hasActiveLobby()) {
-    suppressSessionRoute(120000, getCachedGameSession()?.screen ?? null);
-    navigate(CARNET_SCREEN_ID);
-    return;
-  }
+  suppressEveningChromeRoute();
   navigate(CARNET_SCREEN_ID);
 }
 
@@ -90,11 +87,7 @@ export function goToHelpLegal() {
   }
   markReturnToProfileIfFromSettings();
   if (getCurrentScreen() === HELP_LEGAL_SCREEN_ID) return;
-  if (hasActiveLobby()) {
-    suppressSessionRoute(120000, getCachedGameSession()?.screen ?? null);
-    navigate(HELP_LEGAL_SCREEN_ID);
-    return;
-  }
+  suppressEveningChromeRoute();
   navigate(HELP_LEGAL_SCREEN_ID);
 }
 
@@ -111,7 +104,7 @@ export function goToEveningSettings({ tab } = {}) {
     return;
   }
   if (hasActiveLobby()) {
-    suppressSessionRoute(120000, getCachedGameSession()?.screen ?? null);
+    suppressSessionRoute(120000, getCachedGameSession()?.screen || "game-select");
     // Push sur la pile courante (game-select / results / leaderboard / …).
     if (params) navigate("settings", { params });
     else navigate("settings");

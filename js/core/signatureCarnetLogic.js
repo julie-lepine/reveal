@@ -131,7 +131,11 @@ export function formatCarnetEveningDate(iso, now = new Date()) {
 }
 
 export function parseCarnetListPayload(raw) {
-  const src = raw && typeof raw === "object" ? raw : {};
+  const src = Array.isArray(raw)
+    ? { evenings: raw }
+    : raw && typeof raw === "object"
+      ? raw
+      : {};
   const eveningsIn = Array.isArray(src.evenings) ? src.evenings : [];
   const evenings = eveningsIn.slice(0, SIGNATURE_CARNET_MAX_EVENINGS).map((row) => ({
     endedAt: row?.ended_at || row?.endedAt || null,

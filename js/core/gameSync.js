@@ -550,11 +550,12 @@ function shouldApplySessionRoute(row, { fromScreen = null, debugSource = null } 
   }
 
   // Hub / post-partie : les invités restent libres (home, settings, classement…).
+  // Hub soirée : ne ramener que depuis le lobby d’attente, pas depuis Menu / Amis / Carnet.
   if (isSessionHubScreen(screen)) {
     if (
       screen === "game-select" &&
       isLobbyEveningStarted() &&
-      (current === "lobby" || isPassiveChromeScreen(current))
+      current === "lobby"
     ) {
       return routeLog(true, "hub_game_select_from_passive");
     }

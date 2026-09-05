@@ -5,8 +5,10 @@ import { CARNET_LABEL, CARNET_SCREEN_ID } from "../config/signatureCarnet.js";
 import { SETTINGS_TAB } from "../config/settingsTabs.js";
 import { canPlay, isLoggedIn } from "../core/auth.js";
 import { isProfilePack } from "../core/entitlements.js";
+import { getCachedGameSession, suppressSessionRoute } from "../core/gameSync.js";
 import { catalogTitleForSessionGameId } from "../core/gameCatalogTitle.js";
 import { competitionRankLabel, formatNameList } from "../core/competitionRank.js";
+import { hasActiveLobby } from "../core/lobby.js";
 import { createMountGuard } from "../core/mountLifecycle.js";
 import { navigate } from "../core/router.js";
 import { fetchSignatureCarnet } from "../core/signatureCarnet.js";
@@ -115,6 +117,10 @@ export function mountCarnet(app) {
   const mount = createMountGuard();
   const registered = isLoggedIn();
   const unlocked = registered && isProfilePack();
+
+  if (hasActiveLobby()) {
+    suppressSessionRoute(120000, getCachedGameSession()?.screen || "game-select");
+  }
 
   function paint({ loading = false, error = false, errorCode = null, payload = null } = {}) {
     if (!mount.isMounted()) return;

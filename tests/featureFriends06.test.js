@@ -75,7 +75,7 @@ describe("FEATURE-FRIENDS-01 Palier 6 — page Amis", () => {
       nav.indexOf("export function goToFriends"),
       nav.indexOf("export function goToEveningSettings")
     );
-    assert.match(fn, /suppressSessionRoute/);
+    assert.match(fn, /suppressEveningChromeRoute/);
     assert.match(fn, /navigate\("friends"\)/);
     assert.match(nav, /target === "friends"/);
     assert.match(nav, /goToFriends\(\)/);

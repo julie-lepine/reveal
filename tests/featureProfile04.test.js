@@ -109,6 +109,14 @@ describe("FEATURE-PROFILE-04 — carnet Signature", () => {
     assert.deepEqual(parsed.evenings[0].friendNames, ["Léa"]);
     assert.equal(parsed.stats.favoriteGame, "hottake");
     assert.equal(parsed.stats.winrate, 1);
+
+    const fromTable = parseCarnetListPayload([
+      { ended_at: "2026-09-05T10:00:00.000Z", rank: 2, score: 8, games: ["trivia"], friend_names: ["Tom"] },
+    ]);
+    assert.equal(fromTable.evenings.length, 1);
+    assert.equal(fromTable.evenings[0].rank, 2);
+    assert.deepEqual(fromTable.evenings[0].friendNames, ["Tom"]);
+    assert.equal(fromTable.stats.evenings, 1);
   });
 
   it("SQL : table interne, RPC, trim 20, pas de GRANT SELECT client", () => {
@@ -117,7 +125,7 @@ describe("FEATURE-PROFILE-04 — carnet Signature", () => {
     assert.match(sql, /unique \(user_id, lobby_id\)/);
     assert.match(sql, /limit 20/);
     assert.match(sql, /create or replace function public\.archive_signature_evening/);
-    assert.match(sql, /create or replace function public\.list_signature_carnet/);
+    assert.match(sql, /create function public\.list_signature_carnet/);
     assert.match(sql, /signature_locked/);
     assert.match(sql, /is_lobby_member/);
     assert.match(sql, /friends_live_display_name/);
@@ -125,7 +133,8 @@ describe("FEATURE-PROFILE-04 — carnet Signature", () => {
     assert.match(sql, /notify pgrst/);
     assert.match(sql, /revoke all on table public\.signature_evenings from authenticated/);
     assert.doesNotMatch(sql, /grant select on table public\.signature_evenings/);
-    const listFn = sql.slice(sql.indexOf("create or replace function public.list_signature_carnet"));
+    const listFn = sql.slice(sql.indexOf("create function public.list_signature_carnet"));
+    assert.match(sql, /returns table/);
     assert.doesNotMatch(listFn, /e\.lobby_id/);
     assert.match(listFn, /friend_names/);
   });
@@ -182,5 +191,12 @@ describe("FEATURE-PROFILE-04 — carnet Signature", () => {
     );
     assert.match(menuBlock, /"carnet"/);
     assert.match(sync, /screen === "carnet"/);
+    const hub = sync.slice(
+      sync.indexOf("if (isSessionHubScreen(screen))"),
+      sync.indexOf('return routeLog(false, "session_hub_screen_guest_free")')
+    );
+    assert.match(hub, /current === "lobby"/);
+    assert.doesNotMatch(hub, /isPassiveChromeScreen/);
+    assert.match(screen, /suppressSessionRoute/);
   });
 });
