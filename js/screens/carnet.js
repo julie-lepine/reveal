@@ -15,10 +15,20 @@ import {
   formatNameList,
   medalForCompetitionRank,
 } from "../core/competitionRank.js";
+import { withClickLock } from "../core/actionLock.js";
 import { hasActiveLobby } from "../core/lobby.js";
 import { createMountGuard } from "../core/mountLifecycle.js";
+import { getLocalPlayer } from "../core/players.js";
 import { navigate } from "../core/router.js";
 import { fetchSignatureCarnet } from "../core/signatureCarnet.js";
+import {
+  closeCarnetSharePreview,
+  openCarnetSharePreview,
+} from "../core/signatureCarnetCard.js";
+import {
+  buildCarnetCardModel,
+  canShareCarnetCard,
+} from "../core/signatureCarnetCardLogic.js";
 import {
   SIGNATURE_CARNET_MAX_EVENINGS,
   aggregateCarnetRankSplit,
@@ -237,8 +247,14 @@ function eveningCardHtml(row) {
 
 function eveningsListHtml(evenings) {
   const n = evenings.length;
+  const share = canShareCarnetCard(evenings)
+    ? `<button type="button" class="btn btn-primary carnet-share-btn" data-carnet-share>${escapeHtml(
+        CARNET_LABEL.shareCard
+      )}</button>`
+    : "";
   return `
     <section class="carnet-list">
+      ${share}
       <div class="carnet-list__head">
         <h2 class="carnet-list__title">${escapeHtml(CARNET_LABEL.listTitle)}</h2>
         <p class="carnet-list__count">${escapeHtml(`${n}/${SIGNATURE_CARNET_MAX_EVENINGS}`)}</p>
@@ -301,6 +317,17 @@ export function mountCarnet(app) {
     app.querySelector("[data-carnet-forfaits]")?.addEventListener("click", () => {
       goToEveningSettings({ tab: SETTINGS_TAB.FORFAITS });
     });
+    app.querySelector("[data-carnet-share]")?.addEventListener(
+      "click",
+      withClickLock(async () => {
+        const model = buildCarnetCardModel({
+          identity: getLocalPlayer(),
+          evenings: payload?.evenings || [],
+          stats: payload?.stats,
+        });
+        openCarnetSharePreview(model);
+      })
+    );
   }
 
   paint({ loading: unlocked });
@@ -324,7 +351,10 @@ export function mountCarnet(app) {
       });
   }
 
-  return () => mount.dispose();
+  return () => {
+    closeCarnetSharePreview();
+    mount.dispose();
+  };
 }
 
 export { CARNET_SCREEN_ID };

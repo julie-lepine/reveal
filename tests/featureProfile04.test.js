@@ -18,6 +18,14 @@ import {
   parseCarnetListPayload,
   sanitizeCarnetGames,
 } from "../js/core/signatureCarnetLogic.js";
+import {
+  CARNET_CARD_HEIGHT,
+  CARNET_CARD_WIDTH,
+  buildCarnetCardModel,
+  canShareCarnetCard,
+  carnetCardLayout,
+  carnetCardRankDots,
+} from "../js/core/signatureCarnetCardLogic.js";
 import { CARNET_SCREEN_ID } from "../js/config/signatureCarnet.js";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -232,6 +240,11 @@ describe("FEATURE-PROFILE-04 — carnet Signature", () => {
     assert.match(screen, /carnet-spark__end/);
     assert.match(screen, /carnet-rank-row/);
     assert.match(screen, /CARNET_LABEL\.listTitle/);
+    assert.match(screen, /data-carnet-share/);
+    assert.match(screen, /openCarnetSharePreview/);
+    const shareIdx = screen.indexOf("data-carnet-share");
+    const listIdx = screen.indexOf("CARNET_LABEL.listTitle");
+    assert.ok(shareIdx > 0 && listIdx > shareIdx);
     assert.match(screen, /carnet-chip/);
     assert.match(screen, /medalForCompetitionRank/);
     const sync = src("js/core/gameSync.js");
@@ -248,5 +261,64 @@ describe("FEATURE-PROFILE-04 — carnet Signature", () => {
     assert.match(hub, /current === "lobby"/);
     assert.doesNotMatch(hub, /isPassiveChromeScreen/);
     assert.match(screen, /suppressSessionRoute/);
+  });
+
+  it("carte share 9:16 : 20 pastilles, pas de prénoms d’amis", () => {
+    assert.equal(canShareCarnetCard([]), false);
+    assert.equal(canShareCarnetCard([{ rank: 1 }]), true);
+
+    const dots = carnetCardRankDots([
+      { endedAt: "2026-09-05T10:00:00.000Z", rank: 1 },
+      { endedAt: "2026-09-01T10:00:00.000Z", rank: 2 },
+      { endedAt: "2026-09-03T10:00:00.000Z", rank: 4 },
+    ]);
+    assert.equal(dots.length, 20);
+    assert.deepEqual(dots.slice(0, 3), ["second", "rest", "first"]);
+    assert.ok(dots.slice(3).every((t) => t === "empty"));
+
+    const model = buildCarnetCardModel({
+      identity: {
+        name: "Ada",
+        emoji: "🦄",
+        color: "#60A5FA",
+        nameColor: "gold",
+        signature: true,
+      },
+      evenings: [
+        {
+          endedAt: "2026-09-05T10:00:00.000Z",
+          rank: 1,
+          score: 20,
+          games: ["hottake"],
+          friendNames: ["Léa", "Tom"],
+        },
+      ],
+      stats: { evenings: 1, games: 1, mvp: 1, winrate: 1, favoriteGame: "hottake" },
+    });
+    const dumped = JSON.stringify(model);
+    assert.equal(dumped.includes("Léa"), false);
+    assert.equal(dumped.includes("Tom"), false);
+    assert.equal(dumped.includes("friend"), false);
+    assert.equal(model.identity.name, "Ada");
+    assert.equal(model.identity.nameColorHex, "#F5D76E");
+    assert.equal(model.dots.length, 20);
+    assert.equal(model.sparkScores.length, 1);
+
+    const layout = carnetCardLayout();
+    assert.equal(layout.w, CARNET_CARD_WIDTH);
+    assert.equal(layout.h, CARNET_CARD_HEIGHT);
+    assert.equal(layout.w / layout.h, 1080 / 1920);
+    assert.ok(layout.hero.y >= layout.padTop);
+    assert.ok(layout.ident.y >= layout.hero.y + layout.hero.h);
+    assert.ok(layout.dots.y >= layout.tiles[2].y + layout.tiles[2].h);
+    assert.ok(layout.logo.y > layout.dots.y + layout.dots.h);
+    assert.ok(layout.logo.y + layout.logo.h <= layout.h - 160);
+
+    const cardJs = src("js/core/signatureCarnetCard.js");
+    assert.doesNotMatch(cardJs, /friendNames|friend_names/);
+    assert.match(cardJs, /renderCarnetSharePng/);
+    assert.match(cardJs, /navigator\.share/);
+    const labels = src("js/config/signatureCarnet.js");
+    assert.match(labels, /Partager ma carte/);
   });
 });

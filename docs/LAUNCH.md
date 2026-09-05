@@ -65,7 +65,7 @@ Ordre : **0** (contrat, ci-dessous) → **1** (code + SQL) → **2** (admin stor
 - [x] **Noms affichés** : Sans pub · Signature · Maître de soirée (onglet Menu reste « Profil »). SKUs inchangés.
 - [x] **Ce que Signature débloque** (3 couches ; la fiche store ne promet que ce qui est dans le build) :
   1. **Identité visible** (1er ship métier) : couleur de pseudo (palette fermée), cadre / badge Profil en lobby, emojis extra. **Pas** d’avatar photo (UGC, plus tard).
-  2. **Carnet perso** (FEATURE-PROFILE-04) : stats agrégées (parties, winrate, MVP, jeu préféré), **20** dernières soirées (date, jeux, *ton* rang/score, prénoms des amis encore amis). Visuels : anneau winrate, courbe scores (min / max dynamiques sous la courbe), barres 1er / 2e / 3e+. **Pas** un historique de salons : pas de code lobby, pas de rejoin, pas de fil. Carte Instagram ensuite.
+  2. **Carnet perso** (FEATURE-PROFILE-04) : stats agrégées (parties, winrate, MVP, jeu préféré), **20** dernières soirées (date, jeux, *ton* rang/score, prénoms des amis encore amis). Visuels : anneau winrate, courbe scores (min / max dynamiques sous la courbe), barres 1er / 2e / 3e+. **Pas** un historique de salons : pas de code lobby, pas de rejoin, pas de fil. Carte share 9:16 (sans prénoms d’amis sur l’image).
   3. **Mots perso** (après) : paquet Draw It / thèmes Tier Night persisté sur le compte.
 
 ### 1. FEATURE-PROFILE-01 — Flag serveur
@@ -126,7 +126,8 @@ Stats + 20 soirées. Archive au leave/dissolve **avant** perte de membership. `l
 - [x] Menu → Profil → Mon carnet (teaser si pas Signature)
 - [x] Amis encore amis uniquement (pseudos live)
 - [x] Visuels : anneau winrate, courbe scores (min gauche / max droite, dynamiques), barres 1er / 2e / 3e+, tuile favori 2×2
-- Hors scope ici : carte Instagram, mots perso, photo avatar
+- [x] Carte share 9:16 (preview + share sheet), sans prénoms d’amis ; hero réservé photo
+- Hors scope ici : mots perso, photo avatar
 
 ### 5. Légal + stores
 

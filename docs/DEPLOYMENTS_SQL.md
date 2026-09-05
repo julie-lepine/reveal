@@ -441,8 +441,8 @@ Couleur de pseudo (palette fermée), anneau + badge salon, emojis extra. Gate se
 | Migration | [`feature-profile-04-carnet.sql`](../supabase/feature-profile-04-carnet.sql) — à coller prod |
 | Table | `public.signature_evenings` (RLS, pas de GRANT SELECT client) |
 | RPC | `archive_signature_evening` · `list_signature_carnet` |
-| Client | `js/core/signatureCarnet.js` · `js/screens/carnet.js` |
-| Test manuel | Signature on → joue une soirée → quitte le salon → Menu → Profil → Mon carnet |
-| Hors scope | Carte Instagram · mots perso · photo avatar · Maître de soirée |
+| Client | `js/core/signatureCarnet.js` · `js/screens/carnet.js` · `js/core/signatureCarnetCard.js` |
+| Test manuel | Signature on → joue une soirée → quitte le salon → Menu → Profil → Mon carnet → Partager ma carte |
+| Hors scope | Photo avatar · mots perso · Maître de soirée |
 
 **Statut** : SQL **à appliquer** · 5 sept 2026.

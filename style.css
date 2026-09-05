@@ -4016,12 +4016,49 @@ button.emoji-picker-preview__avatar:active{
   opacity:.72;
 }
 
+.carnet-share-btn{
+  margin:4px 0 16px;
+}
+
 .carnet-list__head{
   display:flex;
   align-items:baseline;
   justify-content:space-between;
   gap:10px;
   margin:4px 0 12px;
+}
+
+.carnet-share-dialog__panel{
+  max-width:380px;
+  width:100%;
+  max-height:min(92dvh, 920px);
+  overflow:auto;
+  padding:20px 16px 16px;
+}
+
+.carnet-share-dialog__stage{
+  margin:8px 0 10px;
+  min-height:120px;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+}
+
+.carnet-share-dialog__status{
+  margin:18px 0;
+}
+
+.carnet-share-dialog__img{
+  display:block;
+  width:min(100%, 320px);
+  height:auto;
+  border-radius:16px;
+  box-shadow:0 12px 40px rgba(0,0,0,.45);
+}
+
+.carnet-share-dialog__hint{
+  margin:0 0 14px;
+  font-size:.82rem;
 }
 
 .carnet-list__title{
