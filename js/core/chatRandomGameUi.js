@@ -15,6 +15,7 @@ import {
   isChatRouletteActionCurrent,
   isChatRouletteBlockingLaunch,
   normalizeChatRouletteEvent,
+  resolveChatRouletteEventAfterLocalSpin,
   resolveChatRouletteResultAct,
   shouldDeferChatRouletteResultForLocalSpin,
   CHAT_ROULETTE_REACTION_DEFS,
@@ -55,6 +56,7 @@ let lastReactionsSig = "";
  *   onDismiss: () => void,
  *   onReaction?: (reactionId: string) => void,
  *   onSpinAnimationComplete?: (scope: { rouletteId: string, attemptId: string }) => void,
+ *   getLiveEvent?: () => object|null,
  *   canControl: () => boolean,
  *   getLocalUid?: () => string|null,
  *   getActiveUids?: () => string[],
@@ -347,7 +349,10 @@ function finishSpinIfCurrent(ev) {
   ) {
     return;
   }
-  presentEvent(ev, { forceResult: true });
+  const live = handlers?.getLiveEvent?.() || null;
+  presentEvent(resolveChatRouletteEventAfterLocalSpin(ev, live) || ev, {
+    forceResult: true,
+  });
   if (ev?.rouletteId && ev?.attemptId) {
     handlers?.onSpinAnimationComplete?.({
       rouletteId: ev.rouletteId,

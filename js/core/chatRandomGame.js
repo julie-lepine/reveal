@@ -592,6 +592,7 @@ export function initChatRandomGameSync() {
   setChatRouletteUiHandlers({
     canControl: () => canControlChatRoulette(),
     getCatalogById: catalogById,
+    getLiveEvent: () => readActiveChatRoulette(),
     hasOpenLobbyPoll: () => Boolean(hasOpenLobbyPollFn?.()),
     onStart: () => {
       void hostStartSpin();

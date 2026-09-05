@@ -65,7 +65,7 @@ Ordre : **0** (contrat, ci-dessous) → **1** (code + SQL) → **2** (admin stor
 - [x] **Noms affichés** : Sans pub · Signature · Maître de soirée (onglet Menu reste « Profil »). SKUs inchangés.
 - [x] **Ce que Signature débloque** (3 couches ; la fiche store ne promet que ce qui est dans le build) :
   1. **Identité visible** (1er ship métier) : couleur de pseudo (palette fermée), cadre / badge Profil en lobby, emojis extra. **Pas** d’avatar photo (UGC, plus tard).
-  2. **Carnet perso** (FEATURE-PROFILE-04) : stats agrégées (parties, winrate, MVP, jeu préféré), **20** dernières soirées (date, jeux, *ton* rang/score, prénoms des amis encore amis). **Pas** un historique de salons : pas de code lobby, pas de rejoin, pas de fil. Carte Instagram ensuite.
+  2. **Carnet perso** (FEATURE-PROFILE-04) : stats agrégées (parties, winrate, MVP, jeu préféré), **20** dernières soirées (date, jeux, *ton* rang/score, prénoms des amis encore amis). Visuels : anneau winrate, courbe scores (min / max dynamiques sous la courbe), barres 1er / 2e / 3e+. **Pas** un historique de salons : pas de code lobby, pas de rejoin, pas de fil. Carte Instagram ensuite.
   3. **Mots perso** (après) : paquet Draw It / thèmes Tier Night persisté sur le compte.
 
 ### 1. FEATURE-PROFILE-01 — Flag serveur
@@ -108,11 +108,11 @@ Réutiliser `purchases.js` / `revenuecat-webhook`, pas un 2ᵉ pipeline.
 - [x] Webhook : entitlement `profile` → `profile_pack` + `ad_free`. Refund upgrade → perd Profil, **garde** Sans pub si `reveal_adfree` encore valide
 - [x] Poll `refresh…FromServerUntil` après achat, **zéro écriture client**
 - [x] Tests type `featureAdFree02a` / `02b`
-- [ ] **Redéployer** `revenuecat-webhook` (`npx supabase functions deploy revenuecat-webhook --no-verify-jwt`)
+- [x] **Webhook** déployé (Dashboard, 5 sept 2026) : `profile_pack` + JWT off — CLI `TransportError` ignoré
 
 ### 4. FEATURE-PROFILE-03 — Ce que ça débloque
 
-Couche 1 d’abord (couleur, cadre, emojis extra), puis carnet, puis mots. Ne pas promettre 2/3 dans la fiche si absents du build.
+Couche 1 (couleur, cadre, emojis extra) + carnet visuels sont dans le build. Mots perso ensuite. Ne pas promettre la couche 3 dans la fiche si absente du build.
 
 - [x] Gate UI (Menu Profil + éventuellement hub)
 - [x] Gate réelle (pas seulement un bouton grisé)
@@ -120,12 +120,12 @@ Couche 1 d’abord (couleur, cadre, emojis extra), puis carnet, puis mots. Ne pa
 
 ### 4b. FEATURE-PROFILE-04 — Carnet Signature
 
-Stats + 20 soirées. Archive au leave/dissolve **avant** perte de membership. `lobby_id` jamais renvoyé au client.
+Stats + 20 soirées. Archive au leave/dissolve **avant** perte de membership. `lobby_id` jamais renvoyé au client. Visuels : client only, pas de SQL.
 
-- [x] SQL `signature_evenings` + RPC `archive_signature_evening` / `list_signature_carnet`
+- [x] SQL `signature_evenings` + RPC `archive_signature_evening` / `list_signature_carnet` — **prod**
 - [x] Menu → Profil → Mon carnet (teaser si pas Signature)
 - [x] Amis encore amis uniquement (pseudos live)
-- [ ] Coller [`feature-profile-04-carnet.sql`](../supabase/feature-profile-04-carnet.sql) en prod
+- [x] Visuels : anneau winrate, courbe scores (min gauche / max droite, dynamiques), barres 1er / 2e / 3e+, tuile favori 2×2
 - Hors scope ici : carte Instagram, mots perso, photo avatar
 
 ### 5. Légal + stores

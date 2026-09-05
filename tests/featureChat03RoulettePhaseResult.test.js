@@ -13,6 +13,7 @@ import {
   mergeChatRoulettePhaseResultPatch,
   shouldPublishChatRoulettePhaseResult,
   shouldDeferChatRouletteResultForLocalSpin,
+  resolveChatRouletteEventAfterLocalSpin,
 } from "../js/core/chatRandomGameLogic.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -209,5 +210,32 @@ describe("FEATURE-CHAT-03 - phase result partagée", () => {
       ),
       false
     );
+  });
+
+  it("fin spin local : event live result du même attempt, pas le snapshot spinning", () => {
+    const started = spinEvent();
+    const live = spinEvent({ phase: "result" });
+    assert.equal(
+      resolveChatRouletteEventAfterLocalSpin(started, live).phase,
+      "result"
+    );
+    assert.equal(
+      resolveChatRouletteEventAfterLocalSpin(
+        started,
+        spinEvent({ attemptId: "a2", phase: "result" })
+      ).phase,
+      "spinning"
+    );
+    const uiSrc = readFileSync(
+      join(__dirname, "../js/core/chatRandomGameUi.js"),
+      "utf8"
+    );
+    const syncSrc = readFileSync(
+      join(__dirname, "../js/core/chatRandomGame.js"),
+      "utf8"
+    );
+    assert.match(uiSrc, /resolveChatRouletteEventAfterLocalSpin/);
+    assert.match(uiSrc, /getLiveEvent/);
+    assert.match(syncSrc, /getLiveEvent:\s*\(\)\s*=>\s*readActiveChatRoulette/);
   });
 });

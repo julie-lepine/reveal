@@ -903,6 +903,23 @@ export function pickChatRouletteReroll(prev, catalogGames, rng = Math.random) {
 }
 
 /**
+ * Fin de spin local : si le sync a déjà `result` pour le même attempt,
+ * on présente ça (mini-sondage) plutôt que le snapshot `spinning`.
+ */
+export function resolveChatRouletteEventAfterLocalSpin(startedEv, liveEv) {
+  const started = normalizeChatRouletteEvent(startedEv);
+  const live = normalizeChatRouletteEvent(liveEv);
+  if (
+    started &&
+    live &&
+    isChatRouletteActionCurrent(started, live, { matchAttempt: true })
+  ) {
+    return live;
+  }
+  return started || live;
+}
+
+/**
  * Une action ne s’applique que si elle cible encore l’événement courant.
  * @param {{ rouletteId?: string, attemptId?: string }|null} expected
  * @param {{ rouletteId?: string, attemptId?: string }|null} current
