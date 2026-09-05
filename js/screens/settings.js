@@ -6,6 +6,8 @@ import {
   updateProfileName,
   updateProfileEmoji,
   updateProfileNameColor,
+  uploadProfileAvatarBlob,
+  removeProfileAvatar,
   changeEmailPassword,
   logout,
 } from "../core/auth.js";
@@ -53,6 +55,7 @@ import { createMountGuard } from "../core/mountLifecycle.js";
 import { bindNav, returnFromEveningProfile } from "./nav.js";
 import { FRIEND_LABEL, FRIENDS_ENTRY, FRIENDS_SCREEN_ID } from "../config/friends.js";
 import { CARNET_LABEL, CARNET_SCREEN_ID } from "../config/signatureCarnet.js";
+import { AVATAR_JPEG_QUALITY, AVATAR_LABEL } from "../config/signatureAvatar.js";
 import { HELP_LEGAL_LABEL, HELP_LEGAL_SCREEN_ID } from "../config/helpLegal.js";
 import { syncFriendsEntryBadges, flushFriendRequestNotice } from "../core/friendRequestNotice.js";
 import { friendRosterActionHtml, lobbyFriendsHintHtml } from "../core/friendsRosterUi.js";
@@ -63,7 +66,13 @@ import {
 } from "../core/lobbyFriendActions.js";
 import { onFriendsCacheUpdated } from "../core/friendsState.js";
 import { fetchLobbyFriendOverlay } from "../core/supabaseFriends.js";
-import { createActionLock } from "../core/actionLock.js";
+import { createActionLock, withClickLock } from "../core/actionLock.js";
+import {
+  canvasToJpegBlob,
+  loadImageFromFile,
+  openCarnetPhotoCrop,
+  revokeCropImage,
+} from "../core/signatureCarnetCrop.js";
 
 const TAB_PERSONNALISATION = SETTINGS_TAB.PERSONNALISATION;
 const TAB_SOIREE = SETTINGS_TAB.SOIREE;
@@ -242,12 +251,15 @@ function premiumRestoreButtonHtml(user) {
 function personnalisationPanelHtml({ emailAccount, user, selectedEmoji }) {
   const unlocked = isProfilePack();
   const selectedColor = user?.nameColor || null;
+  const hasPhoto = unlocked && Boolean(user?.avatarPath);
   const previewPlayer = {
     name: getLocalDisplayName(),
     emoji: selectedEmoji,
     color: "#60A5FA",
     nameColor: selectedColor,
     signature: unlocked,
+    avatarPath: user?.avatarPath || null,
+    avatarRev: Number(user?.avatarRev) || 0,
   };
   return `
     <div class="settings-panel" id="settings-panel-personnalisation">
@@ -284,12 +296,27 @@ function personnalisationPanelHtml({ emailAccount, user, selectedEmoji }) {
       </div>
 
       <div class="card settings-section">
-        <h2 class="settings-section__title">Emoji</h2>
-        <p class="hint settings-section__hint">Affiché dans le lobby et les classements.</p>
+        <h2 class="settings-section__title">Avatar</h2>
+        <p class="hint settings-section__hint">${escapeHtml(
+          unlocked ? AVATAR_LABEL.hint : "Affiché dans le lobby et les classements."
+        )}</p>
         <div class="emoji-picker-preview">
           ${playerAvatarHtml(previewPlayer, "emoji-picker-preview__avatar")}
           <span class="hint">Aperçu de ton avatar</span>
         </div>
+        ${
+          unlocked
+            ? `<input type="file" accept="image/*" hidden id="settings-avatar-file" />
+        <button type="button" class="btn btn-secondary btn--spaced" id="btn-pick-avatar">${escapeHtml(
+          hasPhoto ? AVATAR_LABEL.change : AVATAR_LABEL.pick
+        )}</button>
+        <button type="button" class="btn btn-secondary btn--spaced" id="btn-remove-avatar"${
+          hasPhoto ? "" : " hidden"
+        }>${escapeHtml(AVATAR_LABEL.remove)}</button>
+        <p class="auth-error hidden" id="avatar-error"></p>
+        <p class="settings-ok hidden" id="avatar-ok"></p>`
+            : `<p class="hint settings-section__hint">${escapeHtml(AVATAR_LABEL.lockedHint)}</p>`
+        }
         ${profileEmojiPickerHtml(selectedEmoji, { includeSignatureExtras: !user?.isGuest, unlocked })}
         <p class="auth-error hidden" id="emoji-error"></p>
         <p class="settings-ok hidden" id="emoji-ok">Emoji enregistré.</p>
@@ -396,12 +423,15 @@ export function mountSettings(app) {
     }
 
     function currentPreviewPlayer() {
+      const u = getUser() || {};
       return {
         name: app.querySelector("#settings-name")?.value?.trim() || getLocalDisplayName(),
         emoji: selectedEmoji,
         color: "#60A5FA",
-        nameColor: getUser()?.nameColor || null,
+        nameColor: u.nameColor || null,
         signature: isProfilePack(),
+        avatarPath: u.avatarPath || null,
+        avatarRev: Number(u.avatarRev) || 0,
       };
     }
 
@@ -491,6 +521,83 @@ export function mountSettings(app) {
         ok?.classList.remove("hidden");
       });
     });
+
+    function showAvatarStatus(okText, errText) {
+      const err = app.querySelector("#avatar-error");
+      const ok = app.querySelector("#avatar-ok");
+      if (errText) {
+        if (err) {
+          err.textContent = errText;
+          err.classList.remove("hidden");
+        }
+        ok?.classList.add("hidden");
+        return;
+      }
+      err?.classList.add("hidden");
+      if (ok && okText) {
+        ok.textContent = okText;
+        ok.classList.remove("hidden");
+      } else {
+        ok?.classList.add("hidden");
+      }
+    }
+
+    function syncAvatarButtons() {
+      const hasPhoto = Boolean(getUser()?.avatarPath);
+      const pick = app.querySelector("#btn-pick-avatar");
+      const remove = app.querySelector("#btn-remove-avatar");
+      if (pick) pick.textContent = hasPhoto ? AVATAR_LABEL.change : AVATAR_LABEL.pick;
+      if (remove) remove.hidden = !hasPhoto;
+    }
+
+    app.querySelector("#btn-pick-avatar")?.addEventListener("click", () => {
+      app.querySelector("#settings-avatar-file")?.click();
+    });
+    app.querySelector("#settings-avatar-file")?.addEventListener(
+      "change",
+      withClickLock(async () => {
+        if (!mount.isMounted()) return;
+        const input = app.querySelector("#settings-avatar-file");
+        const file = input?.files && input.files[0];
+        if (input) input.value = "";
+        if (!file) return;
+        let loaded = null;
+        try {
+          loaded = await loadImageFromFile(file);
+          const cropped = await openCarnetPhotoCrop(loaded);
+          if (!cropped || !mount.isMounted()) return;
+          const blob = await canvasToJpegBlob(cropped, AVATAR_JPEG_QUALITY);
+          const res = await uploadProfileAvatarBlob(blob);
+          if (!mount.isMounted()) return;
+          if (!res.ok) {
+            showAvatarStatus("", res.error || AVATAR_LABEL.error);
+            return;
+          }
+          showAvatarStatus(AVATAR_LABEL.ok, "");
+          syncAvatarButtons();
+          refreshSignaturePreview();
+        } catch {
+          if (mount.isMounted()) showAvatarStatus("", AVATAR_LABEL.readError);
+        } finally {
+          revokeCropImage(loaded);
+        }
+      })
+    );
+    app.querySelector("#btn-remove-avatar")?.addEventListener(
+      "click",
+      withClickLock(async () => {
+        if (!mount.isMounted()) return;
+        const res = await removeProfileAvatar();
+        if (!mount.isMounted()) return;
+        if (!res.ok) {
+          showAvatarStatus("", res.error || AVATAR_LABEL.error);
+          return;
+        }
+        showAvatarStatus(AVATAR_LABEL.removed, "");
+        syncAvatarButtons();
+        refreshSignaturePreview();
+      })
+    );
 
     app.querySelector("#btn-save-name")?.addEventListener("click", async () => {
       if (!mount.isMounted()) return;

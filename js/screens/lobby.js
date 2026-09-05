@@ -38,7 +38,7 @@ import {
 import { navigate } from "../core/router.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
-import { playerNameHtml, signatureRingClass } from "../core/signatureUi.js";
+import { playerNameHtml, avatarPhotoHtml, signatureRingClass } from "../core/signatureUi.js";
 import { SETTINGS_TAB } from "../config/settingsTabs.js";
 import { bindNav, goToEveningSettings } from "./nav.js";
 import { showAppAlert, showAppConfirm, showEmojiPickerDialog } from "../core/dialog.js";
@@ -69,6 +69,7 @@ function participantsHtml(participants, { canKick = false, hostId = null, localI
         (hostId && p.userId && p.userId === hostId) || (!hostId && p.isHost)
       );
       const inner = `
+        ${avatarPhotoHtml(p)}
         ${p.emoji}
         ${p.ready ? '<span class="participant__check">✓</span>' : ""}`;
       const avatar = p.isLocal

@@ -474,6 +474,32 @@ body.has-top-ad .back{
   box-shadow:0 0 0 2px #F5D76E, 0 0 10px rgba(245,215,110,.35);
 }
 
+.avatar,
+.signature-self-preview__avatar,
+.emoji-picker-preview__avatar,
+.friends-row__avatar,
+.lobby-manage__avatar,
+.recap-card__avatar,
+.speedvote-vote-btn__avatar{
+  position:relative;
+}
+
+.avatar__photo{
+  position:absolute;
+  inset:0;
+  width:100%;
+  height:100%;
+  object-fit:cover;
+  border-radius:inherit;
+  pointer-events:none;
+  z-index:1;
+}
+
+.participant__check,
+.participant__edit{
+  z-index:2;
+}
+
 .signature-badge{
   display:inline-block;
   margin-left:4px;

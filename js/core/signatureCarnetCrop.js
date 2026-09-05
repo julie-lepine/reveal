@@ -195,6 +195,23 @@ export function openCarnetPhotoCrop(img) {
   });
 }
 
+export function canvasToJpegBlob(canvas, quality = 0.86) {
+  return new Promise((resolve, reject) => {
+    if (!canvas || typeof canvas.toBlob !== "function") {
+      reject(new Error("canvas"));
+      return;
+    }
+    canvas.toBlob(
+      (blob) => {
+        if (blob) resolve(blob);
+        else reject(new Error("jpeg"));
+      },
+      "image/jpeg",
+      quality
+    );
+  });
+}
+
 export function loadImageFromFile(file) {
   return new Promise((resolve, reject) => {
     if (!file) {

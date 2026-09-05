@@ -16,12 +16,6 @@ import {
   carnetCardLayout,
 } from "./signatureCarnetCardLogic.js";
 import {
-  loadImageFromFile,
-  closeCarnetPhotoCrop,
-  openCarnetPhotoCrop,
-  revokeCropImage,
-} from "./signatureCarnetCrop.js";
-import {
   carnetSparklineLayout,
   carnetWinrateRing,
   formatCarnetWinrate,
@@ -111,6 +105,24 @@ function loadLogo() {
     setTimeout(() => done(img.complete && img.naturalWidth ? img : null), 4000);
   });
   return logoCache;
+}
+
+function loadAvatarImage(url) {
+  if (!url || typeof Image === "undefined") return Promise.resolve(null);
+  return new Promise((resolve) => {
+    let settled = false;
+    const done = (value) => {
+      if (settled) return;
+      settled = true;
+      resolve(value);
+    };
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => done(img.naturalWidth ? img : null);
+    img.onerror = () => done(null);
+    img.src = url;
+    setTimeout(() => done(img.complete && img.naturalWidth ? img : null), 4000);
+  });
 }
 
 function drawHero(ctx, box, hook) {
@@ -466,7 +478,8 @@ export async function renderCarnetSharePng(model) {
   ctx.fillRect(0, 0, layout.w, layout.h);
 
   drawHero(ctx, layout.hero, model.hook);
-  drawIdentity(ctx, layout.ident, model.identity, model.photo);
+  const photo = await loadAvatarImage(model.identity?.avatarUrl);
+  drawIdentity(ctx, layout.ident, model.identity, photo);
   drawRing(ctx, layout.ring, model.stats.winrate);
   drawSpark(ctx, layout.spark, model.sparkScores);
   drawRanks(ctx, layout.ranks, model.rankSplit, model.rankPercents);
@@ -537,13 +550,9 @@ export function openCarnetSharePreview(model) {
           CARNET_LABEL.sharePreviewTitle
         )}" hidden />
       </div>
-      <p class="hint carnet-share-dialog__hint" data-carnet-share-hint hidden>${escapeHtml(
-        CARNET_LABEL.shareHint
-      )}</p>
-      <button type="button" class="btn btn-secondary app-dialog__btn" data-carnet-share-photo hidden>${escapeHtml(
-        CARNET_LABEL.sharePickPhoto
-      )}</button>
-      <input type="file" accept="image/*" hidden data-carnet-share-file />
+        <p class="hint carnet-share-dialog__hint" data-carnet-share-hint hidden>${escapeHtml(
+          CARNET_LABEL.shareHint
+        )}</p>
       <button type="button" class="btn btn-primary app-dialog__btn" data-carnet-share-send disabled>${escapeHtml(
         CARNET_LABEL.shareConfirm
       )}</button>
@@ -557,8 +566,6 @@ export function openCarnetSharePreview(model) {
   const imgEl = root.querySelector("[data-carnet-share-img]");
   const hintEl = root.querySelector("[data-carnet-share-hint]");
   const sendBtn = root.querySelector("[data-carnet-share-send]");
-  const photoBtn = root.querySelector("[data-carnet-share-photo]");
-  const fileInput = root.querySelector("[data-carnet-share-file]");
   let painting = false;
 
   const paintPreview = () => {
@@ -586,12 +593,6 @@ export function openCarnetSharePreview(model) {
           hintEl.textContent = CARNET_LABEL.shareHint;
         }
         if (sendBtn) sendBtn.disabled = false;
-        if (photoBtn) {
-          photoBtn.hidden = false;
-          photoBtn.textContent = model.photo
-            ? CARNET_LABEL.shareChangePhoto
-            : CARNET_LABEL.sharePickPhoto;
-        }
       })
       .catch(() => {
         if (closed) return;
@@ -606,7 +607,6 @@ export function openCarnetSharePreview(model) {
     if (closed) return;
     closed = true;
     if (previewClose === close) previewClose = null;
-    closeCarnetPhotoCrop();
     if (objectUrl) URL.revokeObjectURL(objectUrl);
     objectUrl = null;
     blob = null;
@@ -621,7 +621,7 @@ export function openCarnetSharePreview(model) {
   root.querySelector("[data-carnet-share-close]")?.addEventListener("click", close);
   root.querySelector("[data-carnet-share-dismiss]")?.addEventListener("click", close);
   root.addEventListener("keydown", (e) => {
-    if (e.key === "Escape" && !document.querySelector(".carnet-crop-dialog")) close();
+    if (e.key === "Escape") close();
   });
   sendBtn?.addEventListener(
     "click",
@@ -631,31 +631,6 @@ export function openCarnetSharePreview(model) {
         await shareOrDownloadPng(blob);
       } catch {
         if (statusEl) statusEl.textContent = CARNET_LABEL.shareError;
-      }
-    })
-  );
-  photoBtn?.addEventListener("click", () => fileInput?.click());
-  fileInput?.addEventListener(
-    "change",
-    withClickLock(async () => {
-      const file = fileInput.files && fileInput.files[0];
-      fileInput.value = "";
-      if (!file) return;
-      let loaded = null;
-      try {
-        loaded = await loadImageFromFile(file);
-        const cropped = await openCarnetPhotoCrop(loaded);
-        if (cropped) {
-          model.photo = cropped;
-          paintPreview();
-        }
-      } catch {
-        if (hintEl) {
-          hintEl.hidden = false;
-          hintEl.textContent = CARNET_LABEL.sharePhotoError;
-        }
-      } finally {
-        revokeCropImage(loaded);
       }
     })
   );

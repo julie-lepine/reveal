@@ -13,9 +13,9 @@ import {
   isLockedSignatureEmojiClick,
   isProfilePack,
   pickerEmojiFromButton,
+  playerAvatarHtml,
   playerNameHtml,
   profileEmojiPickerHtml,
-  signatureRingClass,
 } from "./signatureUi.js";
 
 let openDialog = null;
@@ -439,7 +439,7 @@ function lobbyPlayersListHtml(participants, { canKick, friendActionHtml }) {
       const friendBit = renderFriend(p);
       return `
         <div class="lobby-manage__row">
-          <span class="${signatureRingClass(p, "lobby-manage__avatar")}" style="background:${escapeHtml(p.color || "#60A5FA")}">${p.emoji || "👤"}</span>
+          ${playerAvatarHtml(p, "lobby-manage__avatar")}
           <span class="lobby-manage__name">${playerNameHtml({ ...p, name: p.name || "Joueur" }, "lobby-manage__name-text")}${badge}</span>
           <span class="lobby-manage__actions">${friendBit}${kickBtn}</span>
         </div>`;

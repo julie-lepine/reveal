@@ -428,12 +428,10 @@ describe("FEATURE-PROFILE-04 — carnet Signature", () => {
     assert.equal(rect.sh, 200);
     assert.equal(rect.sy, 0);
 
-    const cardJs = src("js/core/signatureCarnetCard.js");
-    assert.match(cardJs, /accept="image\/\*"/);
-    assert.doesNotMatch(cardJs, /capture=/);
-    assert.match(cardJs, /openCarnetPhotoCrop/);
     const cropUi = src("js/core/signatureCarnetCrop.js");
     assert.doesNotMatch(cropUi, /rotate|90°|Pivoter/);
-    assert.match(src("js/config/signatureCarnet.js"), /Choisir une photo/);
+    assert.match(cropUi, /carnet-crop-dialog/);
+    assert.doesNotMatch(src("js/core/signatureCarnetCard.js"), /openCarnetPhotoCrop/);
+    assert.match(src("js/screens/settings.js"), /openCarnetPhotoCrop/);
   });
 });

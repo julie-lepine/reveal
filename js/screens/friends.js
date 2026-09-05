@@ -75,7 +75,7 @@ import {
 } from "../core/supabaseLobbyInvites.js";
 import { fetchRecentLobbyPeers } from "../core/supabaseRecentPeers.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
-import { playerNameHtml, signatureRingClass } from "../core/signatureUi.js";
+import { playerAvatarHtml, playerNameHtml } from "../core/signatureUi.js";
 import { bindNav } from "./nav.js";
 
 function friendRowIdentity(row) {
@@ -84,12 +84,13 @@ function friendRowIdentity(row) {
     emoji: row.emoji || "👤",
     nameColor: row.nameColor || null,
     signature: row.signature === true,
+    avatarPath: row.avatarPath || null,
+    avatarRev: Number(row.avatarRev) || 0,
   };
 }
 
 function friendAvatarHtml(row) {
-  const ident = friendRowIdentity(row);
-  return `<span class="${signatureRingClass(ident, "friends-row__avatar")}" aria-hidden="true">${escapeHtml(ident.emoji)}</span>`;
+  return playerAvatarHtml(friendRowIdentity(row), "friends-row__avatar");
 }
 
 function outgoingRowHtml(row) {

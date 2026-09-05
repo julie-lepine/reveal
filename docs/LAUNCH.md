@@ -64,7 +64,7 @@ Ordre : **0** (contrat, ci-dessous) → **1** (code + SQL) → **2** (admin stor
 - [x] **Maître de soirée 12,99 €** : hors scope. Réserver : lobby > 8, outils de table. Mots perso qui suivent le **joueur** = Signature, pas Maître de soirée.
 - [x] **Noms affichés** : Sans pub · Signature · Maître de soirée (onglet Menu reste « Profil »). SKUs inchangés.
 - [x] **Ce que Signature débloque** (3 couches ; la fiche store ne promet que ce qui est dans le build) :
-  1. **Identité visible** (1er ship métier) : couleur de pseudo (palette fermée), cadre / badge Profil en lobby, emojis extra. **Pas** d’avatar photo (UGC, plus tard).
+  1. **Identité visible** (1er ship métier) : couleur de pseudo (palette fermée), cadre / badge Profil en lobby, emojis extra, **photo de profil** (cercle, remplace l’emoji ; emoji si l’image ne charge pas). Recadrage dans Menu → Profil.
   2. **Carnet perso** (FEATURE-PROFILE-04) : stats agrégées (parties, winrate, MVP, jeu préféré), **20** dernières soirées (date, jeux, *ton* rang/score, prénoms des amis encore amis). Visuels : anneau winrate, courbe scores (min / max dynamiques sous la courbe), barres 1er / 2e / 3e+. **Pas** un historique de salons : pas de code lobby, pas de rejoin, pas de fil. Carte share 9:16 (sans prénoms d’amis sur l’image).
   3. **Mots perso** (après) : paquet Draw It / thèmes Tier Night persisté sur le compte.
 
@@ -126,8 +126,17 @@ Stats + 20 soirées. Archive au leave/dissolve **avant** perte de membership. `l
 - [x] Menu → Profil → Mon carnet (teaser si pas Signature)
 - [x] Amis encore amis uniquement (pseudos live)
 - [x] Visuels : anneau winrate, courbe scores (min gauche / max droite, dynamiques), barres 1er / 2e / 3e+, tuile favori 2×2
-- [x] Carte share 9:16 (preview + share sheet), sans prénoms d’amis ; hero réservé photo
-- Hors scope ici : mots perso, photo avatar
+- [x] Carte share 9:16 (preview + share sheet), sans prénoms d’amis ; hero = accroche stats (photo rectangle plus tard)
+- Hors scope ici : mots perso
+
+### 4c. FEATURE-PROFILE-05 — Photo avatar (pastille unique)
+
+Photo Signature = le même cercle que l’emoji, **partout** (lobby, scores, amis, aperçu Profil, carte share). Pas de picker sur la carte. Pas de photo dans le hero 9:16.
+
+- [x] SQL `profiles.avatar_path` / `avatar_rev` + snapshot salon + Storage `avatars` — **à coller prod**
+- [x] Recadrage cercle dans Menu → Profil (pinch / drag, pas de 90°)
+- [x] Emoji conservé en secours (`onerror` / canvas CORS)
+- Hors scope : photo hero carte, report UGC store (légal toujours après Maître de soirée)
 
 ### 5. Légal + stores
 

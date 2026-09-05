@@ -1,6 +1,7 @@
 import { flushSave, scheduleSave } from "./persist.js";
 import { DEFAULT_PROFILE_EMOJI } from "../../data/profileEmojis.js";
 import { canUseProfileEmoji } from "../../data/signatureIdentity.js";
+import { sanitizeAvatarPath, sanitizeAvatarRev } from "./signatureAvatar.js";
 import { trimPlayerText } from "../../data/playerTextLimits.js";
 import { getLastGameScopeKey, isLastGameInCurrentScope } from "./lobbyBoundary.js";
 import { migrateTruthMeterIdentityOnRename } from "./truthMeterIdentity.js";
@@ -44,6 +45,8 @@ const defaultUser = () => ({
   adFree: false,
   profilePack: false,
   nameColor: null,
+  avatarPath: null,
+  avatarRev: 0,
 });
 
 const defaultLobby = () => ({
@@ -556,6 +559,33 @@ export function setLocalNameColor(colorId) {
   }
   save();
   return { ok: true, nameColor: id };
+}
+
+export function setLocalAvatar({ path = null, rev = 0 } = {}) {
+  const user = state.user || {};
+  if (user.isGuest || user.profilePack !== true) {
+    return { ok: false, error: "La photo de profil est incluse dans Signature." };
+  }
+  const avatarPath = sanitizeAvatarPath(path);
+  const avatarRev = avatarPath ? sanitizeAvatarRev(rev) : 0;
+  state.user = { ...state.user, avatarPath, avatarRev };
+  if (state.lobby?.participants?.length) {
+    state.lobby = {
+      ...state.lobby,
+      participants: state.lobby.participants.map((p) =>
+        p.isLocal
+          ? {
+              ...p,
+              avatarPath: state.user.avatarPath,
+              avatarRev: state.user.avatarRev,
+              signature: true,
+            }
+          : p
+      ),
+    };
+  }
+  save();
+  return { ok: true, avatarPath: state.user.avatarPath, avatarRev: state.user.avatarRev };
 }
 
 /**

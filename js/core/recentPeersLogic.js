@@ -16,6 +16,8 @@ export function normalizeRecentPeerRow(row) {
     lastSharedAt: row.last_shared_at || row.lastSharedAt || null,
     nameColor: row.name_color || row.nameColor || null,
     signature: row.signature === true,
+    avatarPath: row.avatar_path || row.avatarPath || null,
+    avatarRev: Number(row.avatar_rev ?? row.avatarRev) || 0,
   };
 }
 

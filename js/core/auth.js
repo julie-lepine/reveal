@@ -1,5 +1,5 @@
-import { getState, saveStatePatch, renameLocalPlayer, setLocalEmoji, setLocalNameColor } from "./state.js";
-import { isSupabaseConfigured } from "./supabaseClient.js";
+import { getState, saveStatePatch, renameLocalPlayer, setLocalEmoji, setLocalNameColor, setLocalAvatar } from "./state.js";
+import { isSupabaseConfigured, supabase } from "./supabaseClient.js";
 import {
   signUpWithEmail as sbSignUp,
   signInWithEmail as sbSignIn,
@@ -15,6 +15,8 @@ import {
   isAuthReadyResolved,
 } from "./supabaseAuth.js";
 import { upsertProfile } from "./supabaseProfile.js";
+import { AVATAR_BUCKET, AVATAR_LABEL } from "../config/signatureAvatar.js";
+import { avatarPathForUser } from "./signatureAvatar.js";
 import { isPlaceholderDisplayName } from "./profileIdentity.js";
 import {
   stopLobbyPresenceSync,
@@ -209,6 +211,66 @@ export async function updateProfileNameColor(colorId) {
   return res;
 }
 
+export async function updateProfileAvatar({ path = null, rev = 0 } = {}) {
+  const res = setLocalAvatar({ path, rev });
+  if (!res.ok) return res;
+
+  if (!isSupabaseConfigured()) return res;
+
+  const userId = getSupabaseUserId();
+  if (userId) {
+    try {
+      await upsertProfile({
+        userId,
+        avatarPath: res.avatarPath,
+        avatarRev: res.avatarRev,
+      });
+    } catch (e) {
+      return { ok: false, error: e.message || AVATAR_LABEL.error };
+    }
+  }
+  return res;
+}
+
+export async function uploadProfileAvatarBlob(blob) {
+  const user = getState().user || {};
+  if (user.isGuest || user.profilePack !== true) {
+    return { ok: false, error: "La photo de profil est incluse dans Signature." };
+  }
+  if (!blob) return { ok: false, error: AVATAR_LABEL.readError };
+  if (!isSupabaseConfigured() || !supabase) {
+    return { ok: false, error: BACKEND_REQUIRED };
+  }
+  const userId = getSupabaseUserId();
+  const path = avatarPathForUser(userId);
+  if (!path) return { ok: false, error: AVATAR_LABEL.error };
+
+  const { error } = await supabase.storage.from(AVATAR_BUCKET).upload(path, blob, {
+    upsert: true,
+    contentType: "image/jpeg",
+    cacheControl: "60",
+  });
+  if (error) return { ok: false, error: error.message || AVATAR_LABEL.error };
+
+  const rev = (Number(user.avatarRev) || 0) + 1;
+  return updateProfileAvatar({ path, rev });
+}
+
+export async function removeProfileAvatar() {
+  const res = await updateProfileAvatar({ path: null, rev: 0 });
+  if (!res.ok) return res;
+  if (!isSupabaseConfigured() || !supabase) return res;
+  const path = avatarPathForUser(getSupabaseUserId());
+  if (path) {
+    try {
+      await supabase.storage.from(AVATAR_BUCKET).remove([path]);
+    } catch {
+      /* path already null en profil */
+    }
+  }
+  return res;
+}
+
 export async function changeEmailPassword(_currentPassword, newPassword) {
   const user = getState().user;
   const recoveryFlow = isPasswordRecoveryPending();
@@ -284,6 +346,9 @@ export async function logout() {
         provider: null,
         adFree: false,
         profilePack: false,
+        nameColor: null,
+        avatarPath: null,
+        avatarRev: 0,
       },
       inLobby: false,
       lobby: null,

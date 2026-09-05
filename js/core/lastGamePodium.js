@@ -16,6 +16,8 @@ export function serializeLastGameStandings(standings = []) {
     color: player.color || "#888",
     nameColor: player.nameColor || null,
     signature: Boolean(player.signature),
+    avatarPath: player.avatarPath || null,
+    avatarRev: Number(player.avatarRev) || 0,
   }));
 }
 

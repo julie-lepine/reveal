@@ -97,6 +97,7 @@ Sources : audit SQL du dépôt (`AUDIT-SQL-01`) + docs ops ([`SUPABASE.md`](./SU
 | 2026-09-05 | [`feature-profile-03b-emoji-split.sql`](../supabase/feature-profile-03b-emoji-split.sql) | FEATURE-PROFILE-03b | ✅ | ✅ | — | 12 emojis → Signature (😈👻🔥🐸💎🌈 + 😎💜🌟🎯🚀🎈) · coller si 03 déjà en prod |
 | 2026-09-05 | [`feature-profile-03c-emoji-fe0f.sql`](../supabase/feature-profile-03c-emoji-fe0f.sql) | FEATURE-PROFILE-03c | ☐ | ☐ | — | Trigger : strip U+FE0F sinon 🦄 → 👤 · coller prod |
 | 2026-09-05 | [`feature-profile-04-carnet.sql`](../supabase/feature-profile-04-carnet.sql) | FEATURE-PROFILE-04 | ☐ | ☐ | — | Carnet 20 soirées · RPC archive/list · voir §20 |
+| 2026-09-05 | [`feature-profile-05-avatar.sql`](../supabase/feature-profile-05-avatar.sql) | FEATURE-PROFILE-05 | ☐ | ☐ | — | Photo avatar Signature · Storage `avatars` · voir §21 |
 
 **Hors migrations (tracés ailleurs si besoin)** : préflight [`lobby-membership-e4-00-preflight-duplicates.sql`](../supabase/lobby-membership-e4-00-preflight-duplicates.sql) (lecture seule) ; runbooks / harness sous [`supabase/tests/`](../supabase/tests/) et [`lobby-membership-e4-RUNBOOK.sql`](../supabase/lobby-membership-e4-RUNBOOK.sql) / [`lobby-membership-e5-RUNBOOK.sql`](../supabase/lobby-membership-e5-RUNBOOK.sql) — ce ne sont pas des migrations. Voir aussi [`lobby-membership-e4-tests-manual.sql`](../supabase/lobby-membership-e4-tests-manual.sql).
 
@@ -426,7 +427,7 @@ Couleur de pseudo (palette fermée), anneau + badge salon, emojis extra. Gate se
 | Colonnes | `profiles.name_color` · `lobby_members.name_color` · `lobby_members.signature` |
 | Client | `data/signatureIdentity.js` · `js/core/signatureUi.js` |
 | Test manuel | `update public.profiles set profile_pack = true, name_color = 'gold' where id = '<uuid>';` puis recharge |
-| Hors scope | Photo avatar · carte share · mots perso · Maître de soirée |
+| Hors scope | Carte share · mots perso · Maître de soirée |
 
 **Statut** : SQL **✅ prod** (collé 5 sept 2026). **03c** (U+FE0F → plus de 🦄 écrasée en 👤) : à coller.
 
@@ -443,6 +444,25 @@ Couleur de pseudo (palette fermée), anneau + badge salon, emojis extra. Gate se
 | RPC | `archive_signature_evening` · `list_signature_carnet` |
 | Client | `js/core/signatureCarnet.js` · `js/screens/carnet.js` · `js/core/signatureCarnetCard.js` |
 | Test manuel | Signature on → joue une soirée → quitte le salon → Menu → Profil → Mon carnet → Partager ma carte |
-| Hors scope | Photo avatar · mots perso · Maître de soirée |
+| Hors scope | Photo hero carte · mots perso · Maître de soirée |
+
+**Statut** : SQL **à appliquer** · 5 sept 2026.
+
+---
+
+## 21. FEATURE-PROFILE-05 — Photo avatar Signature
+
+Pastille unique : la photo remplace l’emoji partout (lobby, scores, amis, aperçu Profil, carte share). Emoji conservé si l’image ne charge pas. Recadrage dans Menu → Profil, **pas** sur la carte. Le client écrit `profiles.avatar_path` / `avatar_rev` ; le trigger n’accepte que `{user_id}/avatar.jpg` et uniquement avec `profile_pack`. `lobby_members.avatar_*` = snapshot (trigger), comme `name_color` / `signature`.
+
+Canvas share : `img.crossOrigin = "anonymous"`. Si le bucket n’envoie pas CORS, la carte retombe sur l’emoji (les pastilles in-app restent OK). Dashboard Storage → bucket `avatars` → CORS : autoriser GET depuis GitHub Pages et l’app native.
+
+| Élément | Valeur |
+| ------- | ------ |
+| Migration | [`feature-profile-05-avatar.sql`](../supabase/feature-profile-05-avatar.sql) — à coller **après** 03-identity |
+| Colonnes | `profiles.avatar_path` · `profiles.avatar_rev` · snapshot `lobby_members` |
+| Storage | bucket public `avatars` · `{uid}/avatar.jpg` · JPEG ≤ 512 Ko |
+| Client | `js/core/signatureAvatar.js` · `js/core/signatureUi.js` · Menu → Profil |
+| Test manuel | Signature on → Profil → Choisir une photo → recadrer → visible lobby / amis / carte share ; couper le réseau → emoji |
+| Hors scope | Photo hero carte · report UGC · Maître de soirée |
 
 **Statut** : SQL **à appliquer** · 5 sept 2026.

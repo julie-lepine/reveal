@@ -18,6 +18,8 @@ export function getActivePlayers() {
     emoji: p.emoji,
     nameColor: p.nameColor || null,
     signature: Boolean(p.signature),
+    avatarPath: p.avatarPath || null,
+    avatarRev: Number(p.avatarRev) || 0,
     isLocal: Boolean(p.isLocal),
     isHost: Boolean(p.isHost),
   }));
@@ -39,6 +41,8 @@ export function getLocalPlayer() {
     emoji: getLocalEmoji(),
     nameColor: getState().user?.nameColor || null,
     signature: getState().user?.profilePack === true && getState().user?.isGuest !== true,
+    avatarPath: getState().user?.avatarPath || null,
+    avatarRev: Number(getState().user?.avatarRev) || 0,
     isLocal: true,
   };
 }

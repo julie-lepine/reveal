@@ -10,6 +10,7 @@ import {
 } from "../../data/signatureIdentity.js";
 import { PROFILE_EMOJI_CHOICES } from "../../data/profileEmojis.js";
 import { isProfilePack } from "./entitlements.js";
+import { avatarFieldsFrom, publicAvatarUrl } from "./signatureAvatar.js";
 
 function escapeHtml(str) {
   return String(str)
@@ -20,13 +21,24 @@ function escapeHtml(str) {
 }
 
 export function signatureIdentityFrom(p = {}) {
+  const avatar = avatarFieldsFrom(p);
   return {
     name: p.name || "Joueur",
     emoji: p.emoji || "👤",
     color: p.color || "#60A5FA",
     nameColor: p.nameColor || p.name_color || null,
     signature: p.signature === true,
+    avatarPath: avatar.avatarPath,
+    avatarRev: avatar.avatarRev,
   };
+}
+
+/** Photo par-dessus l’emoji ; `onerror` retire l’img → l’emoji reste. */
+export function avatarPhotoHtml(p) {
+  const ident = signatureIdentityFrom(p);
+  const url = ident.signature ? publicAvatarUrl(ident.avatarPath, ident.avatarRev) : null;
+  if (!url) return "";
+  return `<img class="avatar__photo" src="${escapeHtml(url)}" alt="" onerror="this.remove()">`;
 }
 
 export function playerNameHtml(p, className = "player-name") {
@@ -47,7 +59,8 @@ export function signatureRingClass(p, baseClass) {
 export function playerAvatarHtml(p, baseClass = "avatar avatar--sm") {
   const ident = signatureIdentityFrom(p);
   const cls = signatureRingClass(ident, baseClass);
-  return `<span class="${escapeHtml(cls)}" style="background:${escapeHtml(ident.color)}">${escapeHtml(ident.emoji)}</span>`;
+  const bg = p.color ? ` style="background:${escapeHtml(p.color)}"` : "";
+  return `<span class="${escapeHtml(cls)}"${bg}>${avatarPhotoHtml(ident)}${escapeHtml(ident.emoji)}</span>`;
 }
 
 /** Mini carte salon : avatar + pseudo, pour que le joueur se voie comme les autres. */

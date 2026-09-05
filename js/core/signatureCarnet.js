@@ -81,6 +81,8 @@ export function collectSignatureEveningArchivePayload() {
     emoji: p.emoji,
     nameColor: p.nameColor || null,
     signature: Boolean(p.signature),
+    avatarPath: p.avatarPath || null,
+    avatarRev: Number(p.avatarRev) || 0,
     isLocal: Boolean(p.isLocal),
     isHost: Boolean(p.isHost),
   }));

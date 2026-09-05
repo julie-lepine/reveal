@@ -309,7 +309,8 @@ function lobbyBundleSignature(bundle, now = Date.now()) {
     s: bundle.status,
     g: bundle.gameId,
     p: (bundle.participants || []).map(
-      (x) => `${x.userId}:${x.name}:${x.emoji}:${x.ready ? 1 : 0}:${x.isHost ? 1 : 0}`
+      (x) =>
+        `${x.userId}:${x.name}:${x.emoji}:${x.ready ? 1 : 0}:${x.isHost ? 1 : 0}:${x.nameColor || ""}:${x.signature ? 1 : 0}:${x.avatarPath || ""}:${x.avatarRev || 0}`
     ),
     m: (bundle.messages || []).length,
     lm: bundle.messages?.[bundle.messages.length - 1]?.at || 0,
@@ -1238,6 +1239,8 @@ function isMeaningfulMemberChange(payload) {
     row.color !== cur.color ||
     (row.name_color || null) !== (cur.nameColor || null) ||
     Boolean(row.signature) !== Boolean(cur.signature) ||
+    (row.avatar_path || null) !== (cur.avatarPath || null) ||
+    Number(row.avatar_rev || 0) !== Number(cur.avatarRev || 0) ||
     Boolean(row.ready) !== Boolean(cur.ready) ||
     Boolean(row.is_host) !== Boolean(cur.isHost)
   );
@@ -1256,6 +1259,8 @@ function mapMember(row, currentUserId) {
     color: row.color,
     nameColor: row.name_color || null,
     signature: Boolean(row.signature),
+    avatarPath: row.avatar_path || null,
+    avatarRev: Number(row.avatar_rev) || 0,
     ready: Boolean(row.ready),
     isHost: Boolean(row.is_host),
     isLocal: row.user_id === currentUserId,
@@ -1269,13 +1274,17 @@ function isMissingMemberColumn(error) {
   const code = String(error?.code || "");
   return (
     code === "42703" ||
-    ((msg.includes("name_color") || msg.includes("signature")) &&
+    ((msg.includes("name_color") ||
+      msg.includes("signature") ||
+      msg.includes("avatar_path") ||
+      msg.includes("avatar_rev")) &&
       (msg.includes("column") || msg.includes("schema cache")))
   );
 }
 
 async function fetchLobbyMembers(lobbyId) {
   const selects = [
+    "id, user_id, display_name, emoji, color, ready, is_host, joined_at, last_seen_at, name_color, signature, avatar_path, avatar_rev",
     "id, user_id, display_name, emoji, color, ready, is_host, joined_at, last_seen_at, name_color, signature",
     "id, user_id, display_name, emoji, color, ready, is_host, joined_at, last_seen_at",
   ];

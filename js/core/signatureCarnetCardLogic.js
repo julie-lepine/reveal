@@ -3,6 +3,7 @@
  * Pas de DOM, pas de fetch, pas de noms d’amis.
  */
 import { resolvedNameColorHex } from "../../data/signatureIdentity.js";
+import { publicAvatarUrl } from "./signatureAvatar.js";
 import { catalogTitleForSessionGameId } from "./gameCatalogTitle.js";
 import {
   SIGNATURE_CARNET_MAX_EVENINGS,
@@ -81,6 +82,8 @@ export function carnetCardHook(model = {}) {
 
 function cardIdentity(raw = {}) {
   const signature = raw.signature === true;
+  const avatarPath = raw.avatarPath || raw.avatar_path || null;
+  const avatarRev = raw.avatarRev ?? raw.avatar_rev;
   return {
     name: String(raw.name || "Joueur").trim().slice(0, 24) || "Joueur",
     emoji: raw.emoji || "👤",
@@ -90,6 +93,7 @@ function cardIdentity(raw = {}) {
       nameColor: raw.nameColor || raw.name_color || null,
     }),
     signature,
+    avatarUrl: signature ? publicAvatarUrl(avatarPath, avatarRev) : null,
   };
 }
 
