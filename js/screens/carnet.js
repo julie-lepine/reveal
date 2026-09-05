@@ -130,12 +130,8 @@ function scoresSparkHtml(evenings) {
   const scores = chrono.map((row) => row.score);
   const layout = carnetSparklineLayout(scores);
   const last = layout.dots[layout.dots.length - 1];
-  const hasRange = layout.min != null && layout.max != null;
-  const rangeLabel = !hasRange
-    ? ""
-    : layout.min === layout.max
-      ? String(layout.max)
-      : `${layout.min} – ${layout.max}`;
+  const hasRange = layout.yMin != null && layout.yMax != null;
+  const rangeLabel = hasRange ? `${layout.yMin} – ${layout.yMax}` : "";
   const aria = scores.length
     ? `${CARNET_LABEL.chartScores}${rangeLabel ? ` ${rangeLabel}` : ""}`
     : CARNET_LABEL.chartScores;
@@ -147,17 +143,17 @@ function scoresSparkHtml(evenings) {
         ${last ? `<circle class="carnet-spark__dot" cx="${last.x}" cy="${last.y}" r="3.5"></circle>` : ""}`;
   const ends = !hasRange
     ? ""
-    : `<p class="carnet-spark__ends">
-        <span class="carnet-spark__end">${escapeHtml(String(layout.min))}</span>
-        <span class="carnet-spark__end">${escapeHtml(String(layout.max))}</span>
-      </p>`;
+    : `<span class="carnet-spark__y carnet-spark__y--min">${escapeHtml(String(layout.yMin))}</span>
+      <span class="carnet-spark__y carnet-spark__y--max">${escapeHtml(String(layout.yMax))}</span>`;
   return `
     <figure class="carnet-viz-card carnet-viz-card--spark">
       <figcaption class="carnet-viz__label">${escapeHtml(CARNET_LABEL.chartScores)}</figcaption>
-      <svg class="carnet-spark" viewBox="0 0 ${layout.width} ${layout.height}" preserveAspectRatio="none" role="img" aria-label="${escapeHtml(aria)}">
-        ${line}
-      </svg>
-      ${ends}
+      <div class="carnet-spark-wrap">
+        ${ends}
+        <svg class="carnet-spark" viewBox="0 0 ${layout.width} ${layout.height}" preserveAspectRatio="none" role="img" aria-label="${escapeHtml(aria)}">
+          ${line}
+        </svg>
+      </div>
     </figure>`;
 }
 

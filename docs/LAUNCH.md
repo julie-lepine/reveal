@@ -65,7 +65,7 @@ Ordre : **0** (contrat, ci-dessous) → **1** (code + SQL) → **2** (admin stor
 - [x] **Noms affichés** : Sans pub · Signature · Maître de soirée (onglet Menu reste « Profil »). SKUs inchangés.
 - [x] **Ce que Signature débloque** (3 couches ; la fiche store ne promet que ce qui est dans le build) :
   1. **Identité visible** (1er ship métier) : couleur de pseudo (palette fermée), cadre / badge Profil en lobby, emojis extra, **photo de profil** (cercle, remplace l’emoji ; emoji si l’image ne charge pas). Recadrage dans Menu → Profil.
-  2. **Carnet perso** (FEATURE-PROFILE-04) : stats agrégées (parties, winrate, MVP, jeu préféré), **20** dernières soirées (date, jeux, *ton* rang/score, prénoms des amis encore amis). Visuels : anneau winrate, courbe scores (min / max dynamiques sous la courbe), barres 1er / 2e / 3e+. **Pas** un historique de salons : pas de code lobby, pas de rejoin, pas de fil. Carte share 9:16 (sans prénoms d’amis sur l’image).
+  2. **Carnet perso** (FEATURE-PROFILE-04) : stats agrégées (parties, winrate, MVP, jeu préféré), **20** dernières soirées (date, jeux, *ton* rang/score, prénoms des amis encore amis). Visuels : anneau winrate, courbe scores (Y : 0 ou pire−10 → max+10), barres 1er / 2e / 3e+. **Pas** un historique de salons : pas de code lobby, pas de rejoin, pas de fil. Carte share 9:16 (sans prénoms d’amis sur l’image).
   3. **Mots perso** (après) : paquet Draw It / thèmes Tier Night persisté sur le compte.
 
 ### 1. FEATURE-PROFILE-01 — Flag serveur
@@ -125,7 +125,7 @@ Stats + 20 soirées. Archive au leave/dissolve **avant** perte de membership. `l
 - [x] SQL `signature_evenings` + RPC `archive_signature_evening` / `list_signature_carnet` — **prod**
 - [x] Menu → Profil → Mon carnet (teaser si pas Signature)
 - [x] Amis encore amis uniquement (pseudos live)
-- [x] Visuels : anneau winrate, courbe scores (min gauche / max droite, dynamiques), barres 1er / 2e / 3e+, tuile favori 2×2
+- [x] Visuels : anneau winrate, courbe scores (0 ou pire−10 → max+10), barres 1er / 2e / 3e+, tuile favori 2×2
 - [x] Carte share 9:16 (preview + share sheet), sans prénoms d’amis ; hero = accroche stats (photo rectangle plus tard)
 - Hors scope ici : mots perso
 

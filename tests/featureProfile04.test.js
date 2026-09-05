@@ -126,12 +126,20 @@ describe("FEATURE-PROFILE-04 — carnet Signature", () => {
 
     const spark = carnetSparklineLayout([5, 12, 20]);
     assert.equal(spark.dots.length, 3);
-    assert.equal(spark.min, 5);
-    assert.equal(spark.max, 20);
+    assert.equal(spark.yMin, 0);
+    assert.equal(spark.yMax, 30);
     assert.ok(spark.dots[2].y < spark.dots[0].y);
     assert.match(spark.points, /,/);
     const flat = carnetSparklineLayout([10, 10, 10]);
     assert.equal(flat.dots[0].y, flat.dots[2].y);
+    assert.equal(flat.yMin, 0);
+    assert.equal(flat.yMax, 20);
+    const neg = carnetSparklineLayout([-20, 8]);
+    assert.equal(neg.yMin, -30);
+    assert.equal(neg.yMax, 18);
+    const allNeg = carnetSparklineLayout([-20, -5]);
+    assert.equal(allNeg.yMin, -30);
+    assert.equal(allNeg.yMax, 5);
 
     const ring = carnetWinrateRing(2 / 3);
     assert.equal(ring.percent, 67);
@@ -237,8 +245,12 @@ describe("FEATURE-PROFILE-04 — carnet Signature", () => {
     assert.match(screen, /CARNET_LABEL\.seePacks/);
     assert.match(screen, /carnet-viz/);
     assert.match(screen, /carnet-ring/);
-    assert.match(screen, /carnet-spark__ends/);
-    assert.match(screen, /carnet-spark__end/);
+    assert.match(screen, /carnet-spark-wrap/);
+    assert.match(screen, /carnet-spark__y--min/);
+    assert.match(screen, /carnet-spark__y--max/);
+    const css = src("style.css");
+    assert.match(css, /\.carnet-spark__y--min\{[\s\S]*bottom:0/);
+    assert.match(css, /\.carnet-spark__y--max\{[\s\S]*top:8px/);
     assert.match(screen, /carnet-rank-row/);
     assert.match(screen, /CARNET_LABEL\.listTitle/);
     assert.match(screen, /data-carnet-share/);
@@ -319,6 +331,11 @@ describe("FEATURE-PROFILE-04 — carnet Signature", () => {
     assert.doesNotMatch(cardJs, /friendNames|friend_names/);
     assert.match(cardJs, /renderCarnetSharePng/);
     assert.match(cardJs, /navigator\.share/);
+    assert.match(cardJs, /layout\.yMin/);
+    assert.match(cardJs, /layout\.yMax/);
+    assert.match(cardJs, /chart\.x \+ chart\.w/);
+    assert.match(cardJs, /chart\.y \+ chart\.h/);
+    assert.doesNotMatch(cardJs, /box\.y \+ box\.h - 18/);
     const labels = src("js/config/signatureCarnet.js");
     assert.match(labels, /Partager ma carte/);
     assert.match(labels, /Mes 20 dernières soirées/);

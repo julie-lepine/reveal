@@ -36,7 +36,7 @@ export const CARNET_LABEL = {
   shareCropOk: "Valider",
   shareCropCancel: "Annuler",
   listTitle: "Tes 20 dernières soirées",
-  chartScores: "Scores",
+  chartScores: "Scores par soirée",
   chartRanks: "Rangs",
   chartRankFirst: "1er",
   chartRankSecond: "2e",

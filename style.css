@@ -4338,6 +4338,11 @@ button.emoji-picker-preview__avatar:active{
   min-width:0;
 }
 
+.carnet-spark-wrap{
+  position:relative;
+  min-width:0;
+}
+
 .carnet-spark{
   display:block;
   width:100%;
@@ -4345,20 +4350,25 @@ button.emoji-picker-preview__avatar:active{
   margin-top:8px;
 }
 
-.carnet-spark__ends{
-  display:flex;
-  justify-content:space-between;
-  align-items:baseline;
-  margin:4px 0 0;
-  padding:0 5%;
-}
-
-.carnet-spark__end{
-  font-size:1.05rem;
+.carnet-spark__y{
+  position:absolute;
+  z-index:1;
+  font-size:.92rem;
   font-weight:800;
-  line-height:1.1;
+  line-height:1;
   letter-spacing:.01em;
   color:var(--color-secondary-soft);
+  pointer-events:none;
+}
+
+.carnet-spark__y--min{
+  left:0;
+  bottom:0;
+}
+
+.carnet-spark__y--max{
+  right:0;
+  top:8px;
 }
 
 .carnet-spark__area{

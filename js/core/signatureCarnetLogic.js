@@ -172,6 +172,21 @@ export function carnetWinrateRing(winrate, { radius = 38, stroke = 7 } = {}) {
 }
 
 /** Points SVG pour la courbe des scores (Y haut = meilleur score). */
+export const CARNET_SPARK_Y_PAD = 10;
+
+export function carnetSparklineYDomain(scores = []) {
+  const list = Array.isArray(scores)
+    ? scores.map((n) => Number(n)).filter((n) => Number.isFinite(n))
+    : [];
+  if (!list.length) return { yMin: null, yMax: null };
+  const dataMin = Math.min(...list);
+  const dataMax = Math.max(...list);
+  return {
+    yMin: dataMin < 0 ? dataMin - CARNET_SPARK_Y_PAD : 0,
+    yMax: dataMax + CARNET_SPARK_Y_PAD,
+  };
+}
+
 export function carnetSparklineLayout(
   scores = [],
   { width = 200, height = 72, pad = 10 } = {}
@@ -183,18 +198,27 @@ export function carnetSparklineLayout(
     ? scores.map((n) => Number(n)).filter((n) => Number.isFinite(n))
     : [];
   if (!list.length) {
-    return { width: w, height: h, points: "", area: "", dots: [], min: null, max: null };
+    return {
+      width: w,
+      height: h,
+      points: "",
+      area: "",
+      dots: [],
+      yMin: null,
+      yMax: null,
+      min: null,
+      max: null,
+    };
   }
-  const min = Math.min(...list);
-  const max = Math.max(...list);
-  const span = max - min || 1;
+  const { yMin, yMax } = carnetSparklineYDomain(list);
+  const span = yMax - yMin || 1;
   const innerW = w - p * 2;
   const innerH = h - p * 2;
   const n = list.length;
   const round = (v) => Math.round(v * 10) / 10;
   const dots = list.map((score, i) => {
     const x = n === 1 ? w / 2 : p + (i / (n - 1)) * innerW;
-    const y = p + (1 - (score - min) / span) * innerH;
+    const y = p + (1 - (score - yMin) / span) * innerH;
     return { x: round(x), y: round(y), score };
   });
   const points = dots.map((d) => `${d.x},${d.y}`).join(" ");
@@ -202,7 +226,7 @@ export function carnetSparklineLayout(
   const area = `M ${dots[0].x} ${baseY} L ${dots
     .map((d) => `${d.x} ${d.y}`)
     .join(" ")} L ${dots[dots.length - 1].x} ${baseY} Z`;
-  return { width: w, height: h, points, area, dots, min, max };
+  return { width: w, height: h, points, area, dots, yMin, yMax, min: yMin, max: yMax };
 }
 
 export function formatCarnetEveningDate(iso, now = new Date()) {

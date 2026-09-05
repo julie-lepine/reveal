@@ -315,14 +315,15 @@ function drawSpark(ctx, box, scores) {
   }
   ctx.restore();
 
-  if (layout.min != null && layout.max != null) {
+  if (layout.yMin != null && layout.yMax != null) {
     ctx.fillStyle = COLOR.secondarySoft;
     ctx.font = `800 28px ${FONT}`;
-    ctx.textBaseline = "alphabetic";
     ctx.textAlign = "left";
-    ctx.fillText(String(layout.min), box.x + 22, box.y + box.h - 18);
+    ctx.textBaseline = "alphabetic";
+    ctx.fillText(String(layout.yMin), chart.x, chart.y + chart.h - 4);
     ctx.textAlign = "right";
-    ctx.fillText(String(layout.max), box.x + box.w - 22, box.y + box.h - 18);
+    ctx.textBaseline = "alphabetic";
+    ctx.fillText(String(layout.yMax), chart.x + chart.w, chart.y + 26);
   }
 }
 
