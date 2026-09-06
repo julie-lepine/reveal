@@ -40,7 +40,7 @@ describe("FEATURE-FRIENDS-02 Palier 0 — contrats invitations", () => {
     assert.match(configSrc, /Pas de colonnes d’invite sur lobby_members/);
     assert.match(configSrc, /Pas le code lobby/);
     assert.match(configSrc, /ses amis inscrits hors salle/);
-    assert.match(configSrc, /plafond 8 s’applique au \*\*Rejoindre\*\*/);
+    assert.match(configSrc, /plafond \(8, ou 14 si l’hôte a Maître de soirée\) s’applique au \*\*Rejoindre\*\*/);
     assert.doesNotMatch(configSrc, /from\(["']lobby_members["']/);
   });
 

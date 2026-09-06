@@ -19,12 +19,12 @@ Builds : `npm run cap:sync` (Node ≥ 22) → AAB / Archive.
 
 ## À faire
 
-1. **Apple** — **1.1.2** acceptée, **Prête pour la distribution** (hCaptcha). **Privacy + site développeur** collés 5 sept 2026 (`havefuncorp.fr`). AdMob iOS : Verify après crawl de l’URL marketing.
-2. **AdMob iOS** — URL marketing = `https://havefuncorp.fr/` (racine, pas `/reveal/privacy`). `app-ads.txt` live à [havefuncorp.fr/app-ads.txt](https://havefuncorp.fr/app-ads.txt). Puis AdMob → Verify.
+1. **Apple** — **1.1.2** acceptée, **Prête pour la distribution** (hCaptcha). **Privacy + site développeur** collés 5 sept 2026 (`havefuncorp.fr`).
+2. **AdMob iOS** — **approuvée 6 sept 2026** (`ca-app-pub-…1825936767`, Apple ID `6785256450`). Limites d’examen levées, pubs autorisées. URL marketing = `https://havefuncorp.fr/` · `app-ads.txt` live.
 3. **Play Console** — privacy + suppression + site web `havefuncorp.fr` collés 5 sept 2026.
 4. **Signature iOS** — catalogue RC + IAP « Prêt pour la vérification ». **QA sandbox OK** 5 sept 2026 (voir §6). Coller les IAP sur la **prochaine** version ASC (pas la 1.1.2 déjà live).
 
-- [ ] AdMob iOS Verify (Site Web du développeur = `havefuncorp.fr`)
+- [x] AdMob iOS Verify (Site Web du développeur = `havefuncorp.fr`) — 6 sept 2026
 - [x] Play Console : URLs privacy + suppression + site web havefuncorp — 5 sept 2026
 - [ ] Palier Signature 6,99 (Maître de soirée 9,99 ensuite)
 
@@ -34,9 +34,9 @@ Builds : `npm run cap:sync` (Node ≥ 22) → AAB / Archive.
 
 **Play** live 3 sept 2026. AdMob Android lié 4 sept 2026 (recherche URL + `&gl=FR`) ; **appli approuvée 5 sept 2026** (`com.reveal.partygames`, limites d’examen levées, pubs autorisées). Test fermé, QA 11 jeux, Sans pub (0 € + 2ᵉ téléphone). Data safety + catégorie Jeu / Décontracté.
 
-**iOS** — v1.1 refusée 2 sept 2026 (5.1.1 + 2.1) ; suppression **in-app** puis **maj acceptée**. **1.1.2** (hCaptcha) **Prête pour la distribution** (5 sept 2026). AdMob iOS associé, **pas encore** « peut diffuser » tant que Verify n’a pas vu l’URL marketing `https://havefuncorp.fr/`. IAP `reveal_adfree`, Paid Apps Actif, RevenueCat, ATT. QA iPhone XR 31 août 2026. **QA Signature sandbox** 5 sept 2026 : Sans pub → plus de pubs → upgrade **4,00 €** → perso compte (couleur, emojis, cadre, photo) → invité refusé (« connecte-toi avec un compte »). **Fiche ASC** : privacy + site développeur **havefuncorp.fr** collés 5 sept 2026.
+**iOS** — v1.1 refusée 2 sept 2026 (5.1.1 + 2.1) ; suppression **in-app** puis **maj acceptée**. **1.1.2** (hCaptcha) **Prête pour la distribution** (5 sept 2026). AdMob iOS **approuvée 6 sept 2026** (pubs autorisées, limites d’examen levées). IAP `reveal_adfree`, Paid Apps Actif, RevenueCat, ATT. QA iPhone XR 31 août 2026. **QA Signature sandbox** 5 sept 2026 : Sans pub → plus de pubs → upgrade **4,00 €** → perso compte (couleur, emojis, cadre, photo) → invité refusé (« connecte-toi avec un compte »). **Fiche ASC** : privacy + site développeur **havefuncorp.fr** collés 5 sept 2026.
 
-**Ads / légal** — `app-ads.txt` live sur `havefuncorp.fr` (`pub-6332424645114129`). `ADMOB_USE_TEST_ADS = false`. Logo REVEAL déjà sur le message UMP. Privacy + suppression : [havefuncorp.fr/reveal/privacy](https://havefuncorp.fr/reveal/privacy). **Play + App Store** : URLs havefuncorp collées 5 sept 2026. Amis / invitations / croisés 24 h (FEATURE-FRIENDS-04) sur web + fiches. AdMob **Onboarding / Revenus** (barre du mail) = paiements éditeur, pas un blocage des pubs Android.
+**Ads / légal** — `app-ads.txt` live sur `havefuncorp.fr` (`pub-6332424645114129`). `ADMOB_USE_TEST_ADS = false`. Logo REVEAL déjà sur le message UMP. Privacy + suppression : [havefuncorp.fr/reveal/privacy](https://havefuncorp.fr/reveal/privacy). **Play + App Store** : URLs havefuncorp collées 5 sept 2026. Amis / invitations / croisés 24 h (FEATURE-FRIENDS-04) sur web + fiches. AdMob **Onboarding / Revenus** (barre du mail) = paiements éditeur, pas un blocage des pubs.
 
 **App Privacy / Data safety (figé)** — *No public social feed*. *Private friend list*. *lobby-only discovery*. *Recently-crossed registered players* (24 h).
 

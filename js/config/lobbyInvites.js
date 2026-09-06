@@ -13,7 +13,7 @@ export const LOBBY_INVITE_TABLE = "lobby_invites";
  * Unique pending : (lobby_id, to_user_id) = pas deux lignes vers le *même* ami
  * pour le *même* lobby (re-tap = Envoyée).
  * L’émetteur peut inviter **tous** ses amis inscrits hors salle (1, 7, N).
- * Le plafond 8 s’applique au **Rejoindre**, pas à l’envoi.
+ * Le plafond (8, ou 14 si l’hôte a Maître de soirée) s’applique au **Rejoindre**, pas à l’envoi.
  */
 export const LOBBY_INVITE_UNIQUE = "lobby_id_to_user_id";
 
