@@ -99,6 +99,7 @@ Sources : audit SQL du dépôt (`AUDIT-SQL-01`) + docs ops ([`SUPABASE.md`](./SU
 | 2026-09-05 | [`feature-profile-04-carnet.sql`](../supabase/feature-profile-04-carnet.sql) | FEATURE-PROFILE-04 | ☐ | ☐ | — | Carnet 20 soirées · RPC archive/list · voir §20 |
 | 2026-09-05 | [`feature-host-01-profile-flag.sql`](../supabase/feature-host-01-profile-flag.sql) | FEATURE-HOST-01 | ⏳ | ⏳ | — | Colonne `profiles.host_pack` + trigger · 9,99 / 7 € / 3 € · voir §22 |
 | 2026-09-06 | [`feature-host-02-invite-cap.sql`](../supabase/feature-host-02-invite-cap.sql) | FEATURE-HOST-02 / H-INVITE | ✅ | ✅ | [`feature-host-02-invite-cap-runbook.sql`](../supabase/tests/feature-host-02-invite-cap-runbook.sql) | `accept_lobby_invite` cap 8/14 via `host_pack` de l’hôte · QA **✅** 7 sept 2026 (1+13 OK, 15ᵉ refusé) · **ne pas** réexécuter friends-02 · voir §23 |
+| 2026-09-07 | [`feature-host-03-send-invite-cap.sql`](../supabase/feature-host-03-send-invite-cap.sql) | FEATURE-HOST-03 / H-INVITE-FULL | ⏳ | ⏳ | [`feature-host-03-send-invite-cap-runbook.sql`](../supabase/tests/feature-host-03-send-invite-cap-runbook.sql) | `send_lobby_invite` refuse si count ≥ cap 8/14 · **ne pas** réexécuter friends-02 ni HOST-02 · voir §24 |
 
 **Hors migrations (tracés ailleurs si besoin)** : préflight [`lobby-membership-e4-00-preflight-duplicates.sql`](../supabase/lobby-membership-e4-00-preflight-duplicates.sql) (lecture seule) ; runbooks / harness sous [`supabase/tests/`](../supabase/tests/) et [`lobby-membership-e4-RUNBOOK.sql`](../supabase/lobby-membership-e4-RUNBOOK.sql) / [`lobby-membership-e5-RUNBOOK.sql`](../supabase/lobby-membership-e5-RUNBOOK.sql) — ce ne sont pas des migrations. Voir aussi [`lobby-membership-e4-tests-manual.sql`](../supabase/lobby-membership-e4-tests-manual.sql).
 
@@ -488,7 +489,7 @@ Troisième palier Premium (9,99 €) : entitlement serveur. Inclut Signature + S
 
 ## 23. FEATURE-HOST-02 — Cap invitation ami 8 / 14 (H-INVITE)
 
-`accept_lobby_invite` (FEATURE-FRIENDS-02, ✅ 27 août 2026) refusait à **8** membres. Le join par code lisait déjà `profiles.host_pack` de **l’hôte du salon**. Cette migration remplace l’RPC (helper `lobby_max_players` : 14 si `host_pack`, sinon 8). `send_lobby_invite` inchangé (plafond au Rejoindre). Ne **pas** réexécuter `feature-friends-02.sql`.
+`accept_lobby_invite` (FEATURE-FRIENDS-02, ✅ 27 août 2026) refusait à **8** membres. Le join par code lisait déjà `profiles.host_pack` de **l’hôte du salon**. Cette migration remplace l’RPC (helper `lobby_max_players` : 14 si `host_pack`, sinon 8). `send_lobby_invite` : refus à salon plein = **FEATURE-HOST-03**. Ne **pas** réexécuter `feature-friends-02.sql`.
 
 | Élément | Valeur |
 | ------- | ------ |
@@ -499,3 +500,18 @@ Troisième palier Premium (9,99 €) : entitlement serveur. Inclut Signature + S
 | Hors scope | Gate SQL du join par code (toujours client) · outils de table |
 
 **Statut** : SQL **✅** · QA **✅** 7 sept 2026.
+
+---
+
+## 24. FEATURE-HOST-03 — Envoi d’invite refusé à salon plein (H-INVITE-FULL)
+
+QA 7 sept 2026 : à 14/14 l’hôte pouvait encore **envoyer** une invitation ; l’ami ne pouvait pas entrer. Cette migration ajoute le même cap `lobby_max_players` sur `send_lobby_invite`. Overbooking des places restantes inchangé. Une invite **déjà pending** après transfert d’hôte n’est pas purgée (ticket **H-INVITE-TRANSFER**).
+
+| Élément | Valeur |
+| ------- | ------ |
+| Migration | [`feature-host-03-send-invite-cap.sql`](../supabase/feature-host-03-send-invite-cap.sql) — **⏳** à coller (après HOST-02) |
+| Runbook | [`tests/feature-host-03-send-invite-cap-runbook.sql`](../supabase/tests/feature-host-03-send-invite-cap-runbook.sql) — catalogue `HOST03_SEND_INVITE_CAP_OK` |
+| Client | bouton Amis « Soirée complète » (`isCurrentLobbyFull`) · `lobby_invite_full` → « Cette soirée est complète. » |
+| Hors scope | Purge des invites pending · limiter N invites aux sièges restants · gate SQL du join par code |
+
+**Statut** : SQL **⏳** · client **dans le repo**.

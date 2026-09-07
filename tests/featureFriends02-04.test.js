@@ -46,8 +46,17 @@ describe("FEATURE-FRIENDS-02 Palier 4 — page Amis invitations", () => {
       friendInviteAction({ localIsRegistered: true, localInLobby: false }),
       LOBBY_INVITE_ACTION.omit
     );
+    assert.equal(
+      friendInviteAction({
+        localIsRegistered: true,
+        localInLobby: true,
+        lobbyFull: true,
+      }),
+      LOBBY_INVITE_ACTION.full
+    );
     assert.equal(LOBBY_INVITE_LABEL.invite, "Inviter");
     assert.equal(LOBBY_INVITE_LABEL.sent, "Envoyée");
+    assert.equal(LOBBY_INVITE_LABEL.full, "Soirée complète");
     assert.equal(LOBBY_INVITE_LABEL.alreadyIn, "Dans la soirée");
     assert.equal(LOBBY_INVITE_LABEL.join, "Rejoindre");
     assert.equal(LOBBY_INVITE_LABEL.refuse, "Refuser");
@@ -61,6 +70,8 @@ describe("FEATURE-FRIENDS-02 Palier 4 — page Amis invitations", () => {
     const src = read("js/screens/friends.js");
     assert.match(src, /data-lobby-invites-incoming/);
     assert.match(src, /data-lobby-invite-send/);
+    assert.match(src, /data-lobby-invite-full/);
+    assert.match(src, /isCurrentLobbyFull/);
     assert.match(src, /data-lobby-invite-join/);
     assert.match(src, /data-lobby-invite-refuse/);
     assert.match(src, /data-lobby-invite-no-lobby/);

@@ -37,9 +37,7 @@ Ces écarts sont lus dans le code, pas des hypothèses. Cocher `repro OK` / `pas
 | Sev | ID | Symptôme attendu | Cause |
 | --- | -- | ---------------- | ----- |
 | P0 | **H-SQL** | Achat Maître : store OK, Forfaits reste « Débloquer », lobby reste `/ 8` | Colonne `host_pack` absente → `fetchProfile` fallback `host_pack: false` |
-| P0 | **H-INVITE** | Hôte Maître, 8+ dans le salon : invitation ami → « Cette soirée est complète » | **déjà patché** · QA **✅** 7 sept 2026 : 1 + 13 invités OK, 15ᵉ refusé. SQL [`feature-host-02-invite-cap.sql`](../supabase/feature-host-02-invite-cap.sql) |
-| P1 | **H-UI-CAP** | Invité / membre voit `n / 8` alors que l’hôte Maître a 9–14 joueurs | **patch repo** : compteur = `host_pack` de l’hôte du salon (`lobby.hostPack`). QA à rejouer. |
-| P1 | **H-UPSELL** | Membres d’un salon déjà à 14 voient encore « Tu veux un + grand lobby ? » | **patch repo** : upsell masqué si le salon est déjà à 14. QA à rejouer. |
+
 | P1 | **C-KICK** | Signature kické → soirée absente du carnet | `handleKickedFromLobby` n’appelle pas `archiveSignatureEveningBeforeLeave` |
 | P1 | **C-DISSOLVE** | Hôte ferme le salon → seul **son** carnet archive ; les autres Signature perdent la soirée | `dissolveLobbyAsHost` archive uniquement l’appelant, tant qu’il est encore membre. Pas de trigger SQL sur DELETE lobby |
 | P1 | **C-HOME** | Quitter depuis Accueil (membership serveur, cache non hydraté) → pas d’archive | `leaveLobbyMembershipFromServer` ne câble pas l’archive |
@@ -50,6 +48,8 @@ Ces écarts sont lus dans le code, pas des hypothèses. Cocher `repro OK` / `pas
 | P2 | **AV-STORAGE** | Utilisateur inscrit **sans** Signature peut uploader `{uid}/avatar.jpg` public | Policies Storage `avatars` : owner path only, **pas** de check `profile_pack` |
 | P2 | **AV-REPLACE** | Remplacement photo : `remove` puis `upload` ; échec upload → plus de fichier, profil pointe encore le path | `uploadProfileAvatarBlob` |
 | P2 | **H-RACE** | Deux joins simultanés passent le cap 8/14 | Gate capacité **client-only** (pas de contrainte SQL sur le count) |
+| P2 | **H-INVITE-FULL** | Hôte invite un ami alors que le salon est plein (8/8 ou 14/14) ; l’ami ne pourra pas entrer | **Patché** : `feature-host-03-send-invite-cap.sql` + bouton Amis « Soirée complète ». SQL **⏳** à coller. QA 7 sept 2026 : repro OK avant patch |
+| P2 | **H-INVITE-TRANSFER** | Transfert Maître → non-Maître, salon à 10, invite **déjà pending** : l’ami voit encore Rejoindre, tap → « Cette soirée est complète. » | `accept_lobby_invite` relit `lobby_max_players` du nouveau `host_id` (10 ≥ 8). Pas de purge des `lobby_invites`. Un *nouvel* envoi est refusé par HOST-03 |
 | P2 | **H-TRANSFER** | Transfert d’hôte vers un non-Maître : sièges 9–14 restent, nouveaux joins refusés à 8 | Join relit le `host_pack` du **nouveau** `host_id` |
 | P3 | **LEGAL** | Privacy in-app / site : Maître 9,99 absent ; `LEGAL_SITE_OVH.md` cite encore 12,99 € | `data/legalContent.js` + docs |
 
@@ -225,40 +225,43 @@ Le cap 14 s’applique au **salon dont l’hôte a `host_pack`**, pas au joiner.
 - [ ] Accueil, hôte Maître hors salon : hint sous « Créer un lobby ».
 - [ ] Accueil, pas Maître : pas de hint 13 joueurs.
 - [ ] Menu → Soirée → Joueurs : même cap que le lobby (`getCurrentLobbySeatCap()`).
-- [ ] **H-UI-CAP** : non-hôte ne doit plus voir `n / 8` ni `14 / 8`.
+- [x] **H-UI-CAP** : invité voit `14 / 14` (QA 7 sept 2026). Compteur `14 / 14` validé salon non démarré (même session).
 
 ### 5.2 Join par code
 
 - [ ] Hôte **sans** Maître : 9ᵉ joueur (code) → « Nombre de joueurs max atteint ».
-- [ ] Hôte **avec** Maître : 9ᵉ … 14ᵉ OK ; 15ᵉ refusé.
-- [ ] Le 9ᵉ n’a **pas** besoin d’être Maître.
+- [x] Hôte **avec** Maître : 9ᵉ … 14ᵉ OK ; 15ᵉ refusé (QA 7 sept 2026, salon 14/14).
+- [x] Le 9ᵉ n’a **pas** besoin d’être Maître.
 - [ ] **P0 H-SQL** : si `select host_pack` échoue, le join se comporte comme cap 8 (erreur avalée → `hostPack = false`).
 - [ ] **P2 H-RACE** : deux appareils joignent le 8ᵉ/14ᵉ siège en même temps (optionnel, difficile).
 
-### 5.3 Invitations amis — **H-INVITE** ✅
+### 5.3 Invitations amis — **H-INVITE** ✅ / **H-INVITE-FULL** (patché, SQL ⏳)
 
-QA 7 sept 2026 : hôte Maître, 13 autres joueurs invités OK, 15ᵉ refusé.
+**H-INVITE** (accept) OK : le 9ᵉ–14ᵉ entre ; un 15ᵉ qui **accepte** est refusé (« Cette soirée est complète. »).
+
+**H-INVITE-FULL** (envoi) : patch client + `feature-host-03-send-invite-cap.sql`. Attendu après coller SQL : à 14/14 (ou 8/8), bouton **Soirée complète**, l’invite ne part pas. Overbooking des places restantes inchangé (13/14 → N invites OK).
+
+QA 7 sept 2026 : hôte Maître, 13 autres joueurs invités OK. Salon 14/14 → bouton Inviter encore actif (repro **avant** patch).
 
 1. Hôte Maître, 8 membres déjà là (join par code).
-2. Envoyer une invitation à un 9ᵉ ami (`send_lobby_invite` **ne** check **pas** le count → l’invite part).
-3. L’ami accepte.
-4. [x] Il entre (siège 9/14). 15ᵉ → « Cette soirée est complète. »
+2. Envoyer une invitation à un 9ᵉ ami → entre (siège 9/14).
+3. [x] **H-INVITE-FULL** repro : à 14/14, l’hôte envoie encore une invite (avant HOST-03).
+4. [ ] Après HOST-03 : à 14/14, Inviter → « Soirée complète » / RPC `lobby_invite_full`. 15ᵉ **accepte** une vieille invite → « Cette soirée est complète. »
 
-Variante encore utile : salon à 8, hôte **sans** Maître → refus d’acceptation **correct**.
+Variante encore utile : salon à 8, hôte **sans** Maître → refus d’acceptation **correct** ; même gate d’envoi après HOST-03.
 
-Transfert d’hôte vers un non-Maître pendant qu’une invite est pending : l’acceptation doit alors caper à 8 (le helper relit `host_id` actuel).
-
-### 5.4 Transfert / refund en cours de salon — **H-TRANSFER**
+### 5.4 Transfert / refund en cours de salon — **H-TRANSFER** / **H-INVITE-TRANSFER**
 
 - [ ] Hôte Maître, 10 joueurs, transfert vers un membre **sans** pack : les 10 restent ; 11ᵉ join par code refusé (cap 8).
 - [ ] Refund Maître pendant un salon à 12 : membres inchangés ; nouveau join cap 8.
 - [ ] Claim hôte stale / acting host : **aucun** lien avec le pack. Les contrôles de manche ne doivent pas exiger `host_pack`.
+- [ ] **H-INVITE-TRANSFER** : hôte Maître, salon à 10, invite pending vers un 11ᵉ → transfert vers non-Maître. L’ami tape Rejoindre → « Cette soirée est complète. » (cap 8, 10 déjà là). L’invite n’est **pas** retirée. Un *nouvel* Inviter après transfert : refusé (HOST-03, 10 ≥ 8).
 
 ### 5.5 Jeux à 9–14 joueurs (régression layout)
 
 Pas de `maxPlayers` jeu à 8. Vérifier quand même overflow / perf :
 
-- [ ] Grille lobby 14 pastilles (wrap, pas de crop).
+- [x] Grille lobby 14 pastilles (wrap, pas de crop) — QA 7 sept 2026, salon 14/14 non démarré.
 - [ ] Scores de soirée + podiums lisibles.
 - [ ] Spot the fake (min 3, pas de max) : deal / vote / liste vivants.
 - [ ] Tier Night « classe le groupe » : 14 noms.
@@ -324,7 +327,7 @@ Pas de `maxPlayers` jeu à 8. Vérifier quand même overflow / perf :
 6. Restore Maître sur un compte déjà Signature (**RC-RESTORE**).
 7. Refund upgrade 3 € vs 9,99 (table §2.5).
 8. Photo replace + surfaces d’affichage.
-9. Transfert d’hôte 10 joueurs (**H-TRANSFER**).
+9. Transfert d’hôte 10 joueurs (**H-TRANSFER**, **H-INVITE-TRANSFER** si une invite est pending).
 
 Pour chaque fail : noter **appareil**, **rôle salon**, **flags SQL**, **SKU**, **horaire webhook**, capture Forfaits + compteur lobby.
 
@@ -337,7 +340,7 @@ Pour chaque fail : noter **appareil**, **rôle salon**, **flags SQL**, **SKU**, 
 | Flags client | `js/core/entitlements.js`, `js/core/supabaseProfile.js`, `js/core/state.js` |
 | IAP | `js/core/purchases.js`, `data/revenueCatConfig.js`, `supabase/functions/revenuecat-webhook/index.ts` |
 | Cap 8/14 | `js/config/lobbyLifecycle.js`, `js/screens/lobby.js`, `js/core/supabaseLobby.js` |
-| Invites | `supabase/feature-host-02-invite-cap.sql` (remplace `accept_lobby_invite`) · snapshot historique `feature-friends-02.sql` |
+| Invites | `supabase/feature-host-03-send-invite-cap.sql` (send à salon plein) · `feature-host-02-invite-cap.sql` (`accept_lobby_invite`) · snapshot historique `feature-friends-02.sql` |
 | Identité | `js/core/signatureUi.js`, `js/core/auth.js`, `supabase/feature-profile-03-identity.sql`, `feature-profile-05-avatar.sql` |
 | Carnet | `js/core/signatureCarnet.js`, `js/core/lobby.js`, `supabase/feature-profile-04-carnet.sql` |
 | UI Forfaits | `js/core/hostPackUi.js`, `js/core/profilePackUi.js`, `js/core/adFreeUi.js` |

@@ -42,7 +42,7 @@ describe("FEATURE-HOST-02 — cap invitation ami 8 / 14", () => {
     assert.match(accept, /for v_i in 0\.\.20 loop/);
   });
 
-  it("send_lobby_invite ne gagne pas de check count (plafond = Rejoindre)", () => {
+  it("send_lobby_invite : HOST-02 ne le touche pas ; HOST-03 ajoute le cap", () => {
     const friends = read("supabase/feature-friends-02.sql");
     const send = friends.slice(
       friends.indexOf("create or replace function public.send_lobby_invite"),
@@ -51,6 +51,7 @@ describe("FEATURE-HOST-02 — cap invitation ami 8 / 14", () => {
     assert.doesNotMatch(send, /get_lobby_member_count/);
     const delta = read("supabase/feature-host-02-invite-cap.sql");
     assert.doesNotMatch(delta, /create or replace function public\.send_lobby_invite/);
+    assert.match(delta, /FEATURE-HOST-03/);
   });
 
   it("snapshot FRIENDS-02 historique reste à 8 ; le delta le remplace", () => {

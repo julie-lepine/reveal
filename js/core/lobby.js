@@ -357,6 +357,11 @@ export function getCurrentLobbySeatCap() {
   });
 }
 
+/** True si le salon local a déjà autant de membres que son cap 8/14. */
+export function isCurrentLobbyFull() {
+  return getLobbyParticipants().length >= getCurrentLobbySeatCap();
+}
+
 export function getLobbyStatus() {
   return getLobby()?.status || "waiting";
 }

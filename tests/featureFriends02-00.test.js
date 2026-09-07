@@ -40,7 +40,9 @@ describe("FEATURE-FRIENDS-02 Palier 0 — contrats invitations", () => {
     assert.match(configSrc, /Pas de colonnes d’invite sur lobby_members/);
     assert.match(configSrc, /Pas le code lobby/);
     assert.match(configSrc, /ses amis inscrits hors salle/);
-    assert.match(configSrc, /plafond \(8, ou 14 si l’hôte a Maître de soirée\) s’applique au \*\*Rejoindre\*\*/);
+    assert.match(configSrc, /Salon déjà plein/);
+    assert.match(configSrc, /send_lobby_invite/);
+    assert.match(configSrc, /lobby_invite_full/);
     assert.doesNotMatch(configSrc, /from\(["']lobby_members["']/);
   });
 
@@ -87,6 +89,14 @@ describe("FEATURE-FRIENDS-02 Palier 0 — contrats invitations", () => {
     assert.equal(
       friendInviteAction({ localIsRegistered: false, localInLobby: true }),
       LOBBY_INVITE_ACTION.omit
+    );
+    assert.equal(
+      friendInviteAction({
+        localIsRegistered: true,
+        localInLobby: true,
+        lobbyFull: true,
+      }),
+      LOBBY_INVITE_ACTION.full
     );
     assert.equal(LOBBY_INVITE_LABEL.invite, "Inviter");
     assert.equal(LOBBY_INVITE_LABEL.join, "Rejoindre");

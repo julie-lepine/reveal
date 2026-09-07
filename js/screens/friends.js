@@ -12,6 +12,7 @@ import {
 import {
   LOBBY_INVITE_ACTION,
   LOBBY_INVITE_LABEL,
+  LOBBY_INVITE_RPC_ERROR,
   friendInviteAction,
   lobbyInviteBusyCopy,
   lobbyInviteBusyDecision,
@@ -28,6 +29,7 @@ import {
   getLobby,
   getLobbyParticipants,
   hasActiveLobby,
+  isCurrentLobbyFull,
 } from "../core/lobby.js";
 import {
   getIncomingFriendRequests,
@@ -128,12 +130,13 @@ function incomingLobbyInviteRowHtml(row) {
     </div>`;
 }
 
-function friendInviteKind(row, { localIsRegistered, localInLobby, lobbyId, peerIds }) {
+function friendInviteKind(row, { localIsRegistered, localInLobby, lobbyId, peerIds, lobbyFull }) {
   return friendInviteAction({
     localIsRegistered,
     localInLobby,
     peerInSameLobby: peerIds.has(row.userId),
     pendingOut: isLobbyInvitePendingOut(lobbyId, row.userId),
+    lobbyFull,
   });
 }
 
@@ -143,6 +146,9 @@ function friendInviteControlHtml(row, inviteCtx) {
   if (kind === LOBBY_INVITE_ACTION.alreadyIn) return "";
   if (kind === LOBBY_INVITE_ACTION.sent) {
     return `<button type="button" class="btn btn-secondary btn--compact" data-lobby-invite-sent="${escapeHtml(row.userId)}" disabled>${escapeHtml(LOBBY_INVITE_LABEL.sent)}</button>`;
+  }
+  if (kind === LOBBY_INVITE_ACTION.full) {
+    return `<button type="button" class="btn btn-secondary btn--compact" data-lobby-invite-full="${escapeHtml(row.userId)}" disabled>${escapeHtml(LOBBY_INVITE_LABEL.full)}</button>`;
   }
   return `<button type="button" class="btn btn-primary btn--compact" data-lobby-invite-send="${escapeHtml(row.userId)}">${escapeHtml(LOBBY_INVITE_LABEL.invite)}</button>`;
 }
@@ -226,6 +232,7 @@ function listsHtml() {
     localInLobby,
     lobbyId,
     peerIds,
+    lobbyFull: localInLobby && isCurrentLobbyFull(),
   };
   const lobbyInvitesBody = lobbyInvites.length
     ? lobbyInvites.map(incomingLobbyInviteRowHtml).join("")
@@ -506,6 +513,13 @@ export function mountFriends(app) {
 
   async function onInvite(toUserId) {
     if (!toUserId || !isLoggedIn() || !hasActiveLobby()) return;
+    if (isCurrentLobbyFull()) {
+      await showAppAlert(lobbyInviteFailMessage(LOBBY_INVITE_RPC_ERROR.full), {
+        title: LOBBY_INVITE_LABEL.noticeTitle,
+        icon: "⚠️",
+      });
+      return;
+    }
     const run = await actionLock.run(async () => {
       try {
         return await sendLobbyInvite(toUserId);

@@ -6,7 +6,7 @@
 --
 -- Prérequis : FEATURE-HOST-01 (`profiles.host_pack`) + FEATURE-FRIENDS-02.
 -- Ne PAS réexécuter feature-friends-02.sql.
--- `send_lobby_invite` reste sans check de count (plafond = Rejoindre).
+-- `send_lobby_invite` : refus à salon plein = FEATURE-HOST-03 (ne pas recoller ici).
 --
 -- À coller dans SQL Editor (staging puis prod). Idempotent.
 -- Consigner dans docs/DEPLOYMENTS_SQL.md.

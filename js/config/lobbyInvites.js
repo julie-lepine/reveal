@@ -12,8 +12,10 @@ export const LOBBY_INVITE_TABLE = "lobby_invites";
 /**
  * Unique pending : (lobby_id, to_user_id) = pas deux lignes vers le *même* ami
  * pour le *même* lobby (re-tap = Envoyée).
- * L’émetteur peut inviter **tous** ses amis inscrits hors salle (1, 7, N).
- * Le plafond (8, ou 14 si l’hôte a Maître de soirée) s’applique au **Rejoindre**, pas à l’envoi.
+ * L’émetteur peut inviter **tous** ses amis inscrits hors salle tant qu’il
+ * reste au moins une place (overbooking des sièges restants OK).
+ * Salon déjà plein (8/8 ou 14/14, pack de l’hôte) : `send_lobby_invite`
+ * refuse `lobby_invite_full` — même copy que Rejoindre.
  */
 export const LOBBY_INVITE_UNIQUE = "lobby_id_to_user_id";
 
@@ -51,11 +53,13 @@ export const LOBBY_INVITE_ACTION = {
   invite: "invite",
   sent: "sent",
   alreadyIn: "already_in",
+  full: "full",
 };
 
 export const LOBBY_INVITE_LABEL = {
   invite: "Inviter",
   sent: "Envoyée",
+  full: "Soirée complète",
   join: "Rejoindre",
   refuse: "Refuser",
   alreadyIn: "Dans la soirée",
@@ -75,6 +79,7 @@ export const LOBBY_INVITE_LABEL = {
  *   localInLobby?: boolean,
  *   peerInSameLobby?: boolean,
  *   pendingOut?: boolean,
+ *   lobbyFull?: boolean,
  * }} opts
  */
 export function friendInviteAction({
@@ -82,10 +87,12 @@ export function friendInviteAction({
   localInLobby = false,
   peerInSameLobby = false,
   pendingOut = false,
+  lobbyFull = false,
 } = {}) {
   if (!localIsRegistered || !localInLobby) return LOBBY_INVITE_ACTION.omit;
   if (peerInSameLobby) return LOBBY_INVITE_ACTION.alreadyIn;
   if (pendingOut) return LOBBY_INVITE_ACTION.sent;
+  if (lobbyFull) return LOBBY_INVITE_ACTION.full;
   return LOBBY_INVITE_ACTION.invite;
 }
 
