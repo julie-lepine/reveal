@@ -44,9 +44,7 @@ Ces écarts sont lus dans le code, pas des hypothèses. Cocher `repro OK` / `pas
 | --- | -- | ---------------- | ----- |
 | P0 | **H-SQL** | Achat Maître : store OK, Forfaits reste « Débloquer », lobby reste `/ 8` | Colonne `host_pack` absente → `fetchProfile` fallback `host_pack: false` |
 
-| P1 | **C-KICK** | Signature kické → soirée absente du carnet | SQL 04b (jeton) **+** client : ne plus prendre un kick pour un dissolve (RLS masque `lobbies` au kické). |
-| P1 | **C-DISSOLVE** | Hôte ferme le salon → seul **son** carnet archive ; les autres Signature perdent la soirée | **patch** : jetons `signature_carnet_kick_allow` dans `dissolve_lobby_atomically` + archive dans `resolveLobbyClosureAndExit`. SQL [`feature-profile-04c-carnet-dissolve.sql`](../supabase/feature-profile-04c-carnet-dissolve.sql) **⏳ à coller**. |
-| P1 | **C-HOME** | Quitter depuis Accueil (membership serveur, cache non hydraté) → pas d’archive | `leaveLobbyMembershipFromServer` ne câble pas l’archive |
+| P1 | **C-HOME** | Quitter depuis Accueil (membership serveur, cache non hydraté) → pas d’archive | **patch 04d** : draft local `(userId, lobbyId)` hors `reveal-app-state` · fallback Accueil · **⏳ QA terrain** |
 | P1 | **RC-RESTORE** | Compte déjà Signature, restore / already-owned Maître → Signature OK, Maître pas actif jusqu’au webhook | `refreshPremiumAfterStore` **break** dès que `profilePack` est true ; overlay store réappliqué seulement si les **3** flags sont false |
 | P1 | **RC-SKU-ADF** | `profileSkuForUser` lit `user.adFree` (colonne), pas `isAdFree()` | Un compte Signature sans `ad_free` en base paierait 6,99 au lieu de 4,00 (cas SQL manuel / grant incomplet) |
 | P2 | **ID-OLD** | Refund Signature puis rachat : couleur / photo / emoji extra **effacés** au grant | Triggers cosmetics / avatar lisent `old.profile_pack` sur UPDATE |
@@ -190,9 +188,9 @@ Archive **uniquement** si : inscrit + pack + encore **membre** du lobby + `hasEv
 | Action | Attendu produit | Code actuel |
 | ------ | --------------- | ----------- |
 | Quitter volontaire (membre) | Archive | OK (`leaveLobby` → `archiveSignatureEveningBeforeLeave`) |
-| Hôte dissolve | Tous les Signature du salon archivent | **patch 04c** (jetons + client) — SQL ⏳ |
+| Hôte dissolve | Tous les Signature du salon archivent | **OK** (04c) QA ✅ 7 sept 2026 |
 | Kick | Le kické archive | **04b + client** : jeton SQL + archive même si RLS cache le salon |
-| Accueil → quitter membership serveur | Archive | **Bug C-HOME** : non |
+| Accueil → quitter membership serveur | Archive si draft / live | **04d** draft local · QA ⏳ |
 | Quitter **sans** avoir joué | Rien | OK (`hasEveningStatsActivity` false) |
 | Rang introuvable (joueur local absent du standing) | Skip silencieux | Payload null |
 

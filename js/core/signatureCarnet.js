@@ -19,6 +19,13 @@ import {
 } from "./signatureCarnetLogic.js";
 import { isRegisteredUser } from "./friendsLogic.js";
 import { getSupabaseUserId } from "./supabaseAuth.js";
+import { setSignatureEveningArchiveDraftListener } from "./state.js";
+import {
+  clearSignatureEveningArchiveDraft,
+  inspectSignatureEveningArchiveDraft,
+  saveSignatureEveningArchiveDraft,
+} from "./signatureCarnetDraftStore.js";
+import { payloadFromSignatureCarnetDraft } from "./signatureCarnetDraftLogic.js";
 
 const SILENT_ARCHIVE_CODES = new Set([
   "signature_locked",
@@ -126,6 +133,49 @@ export function collectSignatureEveningArchivePayload() {
   });
 }
 
+/** Persiste un snapshot atomique si le payload live est archivable. Ne supprime jamais un draft si le live est vide. */
+export function refreshSignatureEveningArchiveDraft() {
+  const payload = collectSignatureEveningArchivePayload();
+  const userId = getSupabaseUserId();
+  if (!payload || !userId) return false;
+  return saveSignatureEveningArchiveDraft({ userId, lobbyId: payload.lobbyId, payload });
+}
+
+/**
+ * LIVE > draft. `lobbyId` du snapshot membership Accueil — jamais un autre salon.
+ * @returns {{ payload: object|null, source: "live"|"draft"|"none"|"stale"|"mismatch" }}
+ */
+export function resolveSignatureEveningArchivePayloadForLobby(lobbyId) {
+  const lid = lobbyId != null ? String(lobbyId).trim() : "";
+  if (!lid) return { payload: null, source: "none" };
+
+  const live = collectSignatureEveningArchivePayload();
+  if (live && String(live.lobbyId) === lid) {
+    return { payload: live, source: "live" };
+  }
+  if (live && String(live.lobbyId) !== lid) {
+    /* live d’un autre salon : ne pas fusionner */
+  }
+
+  const userId = getSupabaseUserId();
+  const inspected = inspectSignatureEveningArchiveDraft(userId, lid);
+  if (inspected.reason !== "ok" || !inspected.draft) {
+    return { payload: null, source: inspected.reason === "stale" ? "stale" : inspected.reason };
+  }
+  const fromDraft = payloadFromSignatureCarnetDraft(inspected.draft);
+  if (!fromDraft || String(fromDraft.lobbyId) !== lid) {
+    return { payload: null, source: "mismatch" };
+  }
+  return { payload: fromDraft, source: "draft" };
+}
+
+function clearDraftAfterConfirmedArchive(payload) {
+  const userId = getSupabaseUserId();
+  const lobbyId = payload?.lobbyId;
+  if (!userId || !lobbyId) return;
+  clearSignatureEveningArchiveDraft(userId, lobbyId);
+}
+
 /** Best-effort : n’échoue jamais le leave. Passer un snapshot si l’état lobby peut disparaître. */
 export async function archiveSignatureEveningQuiet(precollected = undefined) {
   const payload =
@@ -146,6 +196,7 @@ export async function archiveSignatureEveningQuiet(precollected = undefined) {
       }
       return { ok: false, code, skipped: false };
     }
+    clearDraftAfterConfirmedArchive(payload);
     return { ok: true, skipped: false };
   } catch (e) {
     console.warn("REVEAL signature carnet archive:", e?.message || e);
@@ -176,3 +227,41 @@ export async function fetchSignatureCarnet() {
   );
   return { ok: true, skipped: false, ...parsed };
 }
+
+/**
+ * C-HOME : archive live si encore là, sinon draft du même lobbyId.
+ * Ne invente rien. Diagnostic explicite si skip.
+ *
+ * Échec RPC réel → bloquer le DELETE. Codes silencieux (pack / déjà hors membership)
+ * ne piègent pas l’utilisateur : leave continue, sans prétendre que l’archive a réussi.
+ */
+export function shouldBlockServerLeaveUntilArchive(archiveRes) {
+  if (!archiveRes || archiveRes.ok !== false) return false;
+  if (archiveRes.skipped) return false;
+  const code = archiveRes.code;
+  if (code && SILENT_ARCHIVE_CODES.has(code)) return false;
+  return true;
+}
+
+export async function archiveSignatureEveningForServerLeave(lobbyId) {
+  const resolved = resolveSignatureEveningArchivePayloadForLobby(lobbyId);
+  if (!resolved.payload) {
+    console.warn("REVEAL C-HOME signature archive skipped:", {
+      reason: resolved.source,
+      lobbyId: lobbyId || null,
+    });
+    return { ok: true, skipped: true, source: resolved.source };
+  }
+  const res = await archiveSignatureEveningQuiet(resolved.payload);
+  if (!res.ok) {
+    console.warn("REVEAL C-HOME signature archive failed:", {
+      code: res.code || null,
+      lobbyId: lobbyId || null,
+      source: resolved.source,
+    });
+  }
+  return { ...res, source: resolved.source };
+}
+
+setSignatureEveningArchiveDraftListener(refreshSignatureEveningArchiveDraft);
+

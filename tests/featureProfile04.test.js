@@ -216,13 +216,13 @@ describe("FEATURE-PROFILE-04 — carnet Signature", () => {
       lobby.indexOf("export async function leaveLobbyMembershipFromServer")
     );
     assert.match(leaveCall, /archiveSignatureEvening:\s*archiveSignatureEveningBeforeLeave/);
-    assert.doesNotMatch(
-      lobby.slice(
-        lobby.indexOf("export async function leaveLobbyMembershipFromServer"),
-        lobby.indexOf("export async function leaveLobbyMembershipFromServer") + 800
-      ),
-      /archiveSignatureEvening/
+    const serverLeave = lobby.slice(
+      lobby.indexOf("export async function leaveLobbyMembershipFromServer"),
+      lobby.indexOf("export async function transferLobbyHost")
     );
+    const archIdx = serverLeave.indexOf("archiveSignatureEveningForServerLeave");
+    const remoteIdx = serverLeave.indexOf("runServerOnlyLeave");
+    assert.ok(archIdx >= 0 && remoteIdx > archIdx);
   });
 
   it("Profil : lien Mon carnet, écran dédié, retour onglet Profil", () => {

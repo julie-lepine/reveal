@@ -456,6 +456,40 @@ function save() {
   scheduleSave(saveNow);
 }
 
+const SIGNATURE_DRAFT_PATCH_KEYS = [
+  "scores",
+  "gameScores",
+  "gameScoreOrder",
+  "eveningGamesRecorded",
+];
+
+let signatureEveningArchiveDraftListener = null;
+
+/** FEATURE-PROFILE-04d — sync draft carnet après mutation soirée. Tests : passer null. */
+export function setSignatureEveningArchiveDraftListener(fn) {
+  signatureEveningArchiveDraftListener =
+    typeof fn === "function" ? fn : null;
+}
+
+export function resetSignatureEveningArchiveDraftListenerForTests() {
+  signatureEveningArchiveDraftListener = null;
+}
+
+function notifySignatureEveningArchiveDraft() {
+  try {
+    signatureEveningArchiveDraftListener?.();
+  } catch (e) {
+    console.warn("REVEAL signature carnet draft:", e?.message || e);
+  }
+}
+
+function patchTouchesSignatureEveningDraft(patch) {
+  if (!patch || typeof patch !== "object") return false;
+  return SIGNATURE_DRAFT_PATCH_KEYS.some((key) =>
+    Object.prototype.hasOwnProperty.call(patch, key)
+  );
+}
+
 export function saveStatePatch(patch) {
   state = { ...state, ...patch };
   if (patch.lobby) state.lobby = { ...state.lobby, ...patch.lobby };
@@ -465,6 +499,7 @@ export function saveStatePatch(patch) {
   if (patch.playerStats) state.playerStats = { ...state.playerStats, ...patch.playerStats };
   if (patch.settings) state.settings = { ...state.settings, ...patch.settings };
   save();
+  if (patchTouchesSignatureEveningDraft(patch)) notifySignatureEveningArchiveDraft();
 }
 
 /**
@@ -486,6 +521,7 @@ export function replaceEveningScoreMaps(maps) {
     state.gameScoreSessionBaseline = maps.gameScoreSessionBaseline;
   }
   save();
+  notifySignatureEveningArchiveDraft();
 }
 
 export function getState() {
@@ -1634,6 +1670,7 @@ export function addScore(playerName, points) {
   state.scores[playerName] += points;
   creditGameScore(playerName, points);
   save();
+  notifySignatureEveningArchiveDraft();
 }
 
 export function addLocalScore(points) {
@@ -1672,6 +1709,7 @@ export function recordEveningGameOnce(gameId, apply) {
   state.eveningGamesRecorded[gameId] = true;
   apply();
   save();
+  notifySignatureEveningArchiveDraft();
   return true;
 }
 

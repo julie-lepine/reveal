@@ -91,7 +91,9 @@ import {
 } from "./dialog.js";
 import {
   archiveSignatureEveningQuiet,
+  archiveSignatureEveningForServerLeave,
   collectSignatureEveningArchivePayload,
+  shouldBlockServerLeaveUntilArchive,
 } from "./signatureCarnet.js";
 
 export {
@@ -1565,6 +1567,25 @@ export async function leaveLobbyMembershipFromServer(membership) {
       LOBBY_SERVER_LEAVE_ERROR.FAILED,
       "Multijoueur en ligne requis."
     );
+  }
+
+  if (!hasActiveLobby()) {
+    const archiveRes = await archiveSignatureEveningForServerLeave(
+      membership?.lobbyId
+    );
+    if (shouldBlockServerLeaveUntilArchive(archiveRes)) {
+      const { makeLobbyServerLeaveError, LOBBY_SERVER_LEAVE_ERROR } = await import(
+        "./lobbyServerLeave.js"
+      );
+      throw makeLobbyServerLeaveError(
+        LOBBY_SERVER_LEAVE_ERROR.FAILED,
+        "Impossible d'enregistrer la soirée dans le carnet. Réessaie avant de quitter.",
+        {
+          archiveFailed: true,
+          archiveSource: archiveRes?.source || null,
+        }
+      );
+    }
   }
 
   return runServerOnlyLeave(
