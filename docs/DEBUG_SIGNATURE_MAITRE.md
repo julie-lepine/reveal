@@ -37,9 +37,9 @@ Ces écarts sont lus dans le code, pas des hypothèses. Cocher `repro OK` / `pas
 | Sev | ID | Symptôme attendu | Cause |
 | --- | -- | ---------------- | ----- |
 | P0 | **H-SQL** | Achat Maître : store OK, Forfaits reste « Débloquer », lobby reste `/ 8` | Colonne `host_pack` absente → `fetchProfile` fallback `host_pack: false` |
-| P0 | **H-INVITE** | Hôte Maître, 8+ dans le salon : invitation ami → « Cette soirée est complète » | **Patch repo** : [`feature-host-02-invite-cap.sql`](../supabase/feature-host-02-invite-cap.sql) — **⏳ à coller en prod**. Tant que friends-02 n’est pas remplacé, `accept_lobby_invite` reste `>= 8`. |
-| P1 | **H-UI-CAP** | Invité / membre voit `n / 8` alors que l’hôte Maître a 9–14 joueurs | Compteur lobby = `lobbyMaxPlayers(isLobbyHost() && isHostPack())` **local**, pas le pack de l’hôte |
-| P1 | **H-UPSELL** | Membres d’un salon déjà à 14 voient encore « Tu veux un + grand lobby ? » | Upsell si `!isHostPack()` local ; ils ne peuvent pas élargir ce salon |
+| P0 | **H-INVITE** | Hôte Maître, 8+ dans le salon : invitation ami → « Cette soirée est complète » | **déjà patché** · QA **✅** 7 sept 2026 : 1 + 13 invités OK, 15ᵉ refusé. SQL [`feature-host-02-invite-cap.sql`](../supabase/feature-host-02-invite-cap.sql) |
+| P1 | **H-UI-CAP** | Invité / membre voit `n / 8` alors que l’hôte Maître a 9–14 joueurs | **patch repo** : compteur = `host_pack` de l’hôte du salon (`lobby.hostPack`). QA à rejouer. |
+| P1 | **H-UPSELL** | Membres d’un salon déjà à 14 voient encore « Tu veux un + grand lobby ? » | **patch repo** : upsell masqué si le salon est déjà à 14. QA à rejouer. |
 | P1 | **C-KICK** | Signature kické → soirée absente du carnet | `handleKickedFromLobby` n’appelle pas `archiveSignatureEveningBeforeLeave` |
 | P1 | **C-DISSOLVE** | Hôte ferme le salon → seul **son** carnet archive ; les autres Signature perdent la soirée | `dissolveLobbyAsHost` archive uniquement l’appelant, tant qu’il est encore membre. Pas de trigger SQL sur DELETE lobby |
 | P1 | **C-HOME** | Quitter depuis Accueil (membership serveur, cache non hydraté) → pas d’archive | `leaveLobbyMembershipFromServer` ne câble pas l’archive |
@@ -215,16 +215,17 @@ Le cap 14 s’applique au **salon dont l’hôte a `host_pack`**, pas au joiner.
 
 ### 5.1 Compteur et copy
 
-| Qui | Salon hôte Maître, 9 joueurs | Attendu | Code |
-| --- | ---------------------------- | ------- | ---- |
-| Hôte Maître | `9 / 14` + hint 13 invités | OK | `isHost && hostPack` |
-| Membre inscrit sans Maître | devrait `9 / 14` | **voit `9 / 8` + upsell** | H-UI-CAP / H-UPSELL |
-| Invité | devrait `9 / 14` | **voit `9 / 8` + upsell** | idem |
-| Membre qui a Maître (pas hôte) | `9 / 14`, pas d’upsell | cap encore 8 (il n’est pas hôte) ; upsell **masqué** parce que `isHostPack()` local | copy trompeuse |
+| Qui | Salon hôte Maître, 9 joueurs | Attendu |
+| --- | ---------------------------- | ------- |
+| Hôte Maître | `9 / 14` + hint 13 invités | |
+| Membre inscrit sans Maître | `9 / 14`, pas d’upsell | |
+| Invité | `9 / 14`, pas d’upsell | |
+| Membre qui a Maître (pas hôte) | `9 / 14`, pas d’upsell | |
 
 - [ ] Accueil, hôte Maître hors salon : hint sous « Créer un lobby ».
 - [ ] Accueil, pas Maître : pas de hint 13 joueurs.
-- [ ] Menu → Soirée → Joueurs : même cap que le lobby (`lobbyMaxPlayers(isLobbyHost() && isHostPack())`) — **même biais local**.
+- [ ] Menu → Soirée → Joueurs : même cap que le lobby (`getCurrentLobbySeatCap()`).
+- [ ] **H-UI-CAP** : non-hôte ne doit plus voir `n / 8` ni `14 / 8`.
 
 ### 5.2 Join par code
 
@@ -234,17 +235,16 @@ Le cap 14 s’applique au **salon dont l’hôte a `host_pack`**, pas au joiner.
 - [ ] **P0 H-SQL** : si `select host_pack` échoue, le join se comporte comme cap 8 (erreur avalée → `hostPack = false`).
 - [ ] **P2 H-RACE** : deux appareils joignent le 8ᵉ/14ᵉ siège en même temps (optionnel, difficile).
 
-### 5.3 Invitations amis — **H-INVITE** (patch repo, SQL ⏳)
+### 5.3 Invitations amis — **H-INVITE** ✅
 
-Après apply `feature-host-02-invite-cap.sql` :
+QA 7 sept 2026 : hôte Maître, 13 autres joueurs invités OK, 15ᵉ refusé.
 
 1. Hôte Maître, 8 membres déjà là (join par code).
 2. Envoyer une invitation à un 9ᵉ ami (`send_lobby_invite` **ne** check **pas** le count → l’invite part).
 3. L’ami accepte.
-4. [ ] **Attendu** : il entre (siège 9/14). 15ᵉ → « Cette soirée est complète. »
-5. [ ] **Sans** le SQL : encore `lobby_invite_full` à 8.
+4. [x] Il entre (siège 9/14). 15ᵉ → « Cette soirée est complète. »
 
-Variante : salon à 8, hôte **sans** Maître → refus d’acceptation **correct**.
+Variante encore utile : salon à 8, hôte **sans** Maître → refus d’acceptation **correct**.
 
 Transfert d’hôte vers un non-Maître pendant qu’une invite est pending : l’acceptation doit alors caper à 8 (le helper relit `host_id` actuel).
 

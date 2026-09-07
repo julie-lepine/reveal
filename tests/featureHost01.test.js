@@ -71,8 +71,15 @@ describe("FEATURE-HOST-01 — entitlement Maître de soirée", () => {
   });
 
   it("phrase et plafond 14 places pour un hôte Maître", async () => {
-    const { hostLobbyCapacityHint, hostLobbyUpsellHint, lobbyMaxPlayers, MAX_PLAYERS, MAX_PLAYERS_HOST } =
-      await import("../js/config/lobbyLifecycle.js");
+    const {
+      hostLobbyCapacityHint,
+      hostLobbyUpsellHint,
+      lobbyMaxPlayers,
+      MAX_PLAYERS,
+      MAX_PLAYERS_HOST,
+      resolveLobbySeatCap,
+      shouldShowLobbyCapUpsell,
+    } = await import("../js/config/lobbyLifecycle.js");
     assert.equal(
       hostLobbyCapacityHint(),
       "Avantage Maître de soirée : tu peux inviter 13 autres joueurs."
@@ -82,10 +89,28 @@ describe("FEATURE-HOST-01 — entitlement Maître de soirée", () => {
     assert.equal(MAX_PLAYERS_HOST, 14);
     assert.equal(lobbyMaxPlayers(true), 14);
     assert.equal(lobbyMaxPlayers(false), 8);
-    assert.match(src("js/screens/lobby.js"), /hostLobbyCapacityHint/);
-    assert.match(src("js/screens/lobby.js"), /hostLobbyUpsellHint/);
+    assert.equal(
+      resolveLobbySeatCap({ salonHostPack: true, localIsHost: false, localHostPack: false }),
+      14
+    );
+    assert.equal(
+      resolveLobbySeatCap({ salonHostPack: false, localIsHost: false, localHostPack: true }),
+      8
+    );
+    assert.equal(
+      resolveLobbySeatCap({ salonHostPack: false, localIsHost: true, localHostPack: true }),
+      14
+    );
+    assert.equal(shouldShowLobbyCapUpsell({ salonHostPack: true, localHostPack: false }), false);
+    assert.equal(shouldShowLobbyCapUpsell({ salonHostPack: false, localHostPack: false }), true);
+    const lobbySrc = src("js/screens/lobby.js");
+    assert.match(lobbySrc, /getCurrentLobbySeatCap/);
+    assert.match(lobbySrc, /hostLobbyCapacityHint/);
+    assert.match(lobbySrc, /hostLobbyUpsellHint/);
     assert.match(src("js/screens/home.js"), /hostLobbyCapacityHint/);
     assert.match(src("js/core/hostPackUi.js"), /14 joueurs dans le lobby/);
+    assert.match(src("js/core/supabaseLobby.js"), /fetchProfileHostPack/);
+    assert.match(src("js/core/supabaseLobby.js"), /hostPack,/);
   });
 
   it("fetchProfile lit host_pack ; upsert ne l’écrit pas", () => {

@@ -13,6 +13,29 @@ export function lobbyMaxPlayers(hostPack) {
   return hostPack === true ? MAX_PLAYERS_HOST : MAX_PLAYERS;
 }
 
+/**
+ * Plafond de CE salon : pack de l’hôte du salon, pas du viewer.
+ * `localIsHost && localHostPack` : l’hôte qui vient d’acheter voit 14 avant le prochain fetch.
+ */
+export function resolveLobbySeatCap({
+  salonHostPack = false,
+  localIsHost = false,
+  localHostPack = false,
+} = {}) {
+  return lobbyMaxPlayers(
+    salonHostPack === true || (localIsHost === true && localHostPack === true)
+  );
+}
+
+/** Upsell Forfaits seulement si ce salon est encore à 8 et que le viewer n’a pas Maître. */
+export function shouldShowLobbyCapUpsell({
+  salonHostPack = false,
+  localHostPack = false,
+} = {}) {
+  if (salonHostPack === true) return false;
+  return localHostPack !== true;
+}
+
 export function hostLobbyCapacityHint() {
   return "Avantage Maître de soirée : tu peux inviter 13 autres joueurs.";
 }

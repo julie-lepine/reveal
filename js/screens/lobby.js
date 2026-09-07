@@ -1,5 +1,6 @@
 import {
   getLobby,
+  getCurrentLobbySeatCap,
   getLobbyParticipants,
   getLobbyMessages,
   getReadyCount,
@@ -21,7 +22,7 @@ import {
   getLobbyAutoCloseHint,
   hostLobbyCapacityHint,
   hostLobbyUpsellHint,
-  lobbyMaxPlayers,
+  shouldShowLobbyCapUpsell,
 } from "../config/lobbyLifecycle.js";
 import { isHostPack } from "../core/entitlements.js";
 import { mountChatPanel, CHAT_MAX_LENGTH } from "../core/chatPanel.js";
@@ -268,7 +269,7 @@ export function mountLobby(app) {
 
     const countEl = app.querySelector(".lobby-count");
     if (countEl) {
-      const cap = lobbyMaxPlayers(isLobbyHost() && isHostPack());
+      const cap = getCurrentLobbySeatCap();
       countEl.textContent = `${total} / ${cap} participants connectés`;
     }
 
@@ -519,14 +520,15 @@ export function mountLobby(app) {
     const lobbyId = lobby?.id || null;
     const localIsRegistered = isLoggedIn();
 
-    const hostPack = isHostPack();
-    const seatCap = lobbyMaxPlayers(isHost && hostPack);
+    const salonHostPack = lobby?.hostPack === true;
+    const localHostPack = isHostPack();
+    const seatCap = getCurrentLobbySeatCap();
     const hostCapHint =
-      isHost && hostPack
+      isHost && seatCap === 14
         ? `<p class="hint lobby-host-cap-hint">${escapeHtml(hostLobbyCapacityHint())}</p>`
         : "";
     const capUpsell =
-      !hostPack
+      shouldShowLobbyCapUpsell({ salonHostPack, localHostPack })
         ? `<button type="button" class="lobby-count-upsell" data-lobby-cap-upsell>${escapeHtml(
             hostLobbyUpsellHint()
           )}</button>`

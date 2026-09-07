@@ -1282,6 +1282,17 @@ function isMissingMemberColumn(error) {
   );
 }
 
+async function fetchProfileHostPack(userId) {
+  if (!userId || !supabase) return false;
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("host_pack")
+    .eq("id", userId)
+    .maybeSingle();
+  if (error) return false;
+  return data?.host_pack === true;
+}
+
 async function fetchLobbyMembers(lobbyId) {
   const selects = [
     "id, user_id, display_name, emoji, color, ready, is_host, joined_at, last_seen_at, name_color, signature, avatar_path, avatar_rev",
@@ -1336,6 +1347,7 @@ async function fetchLobbyBundle(lobbyId, { withMessages = false, currentUserId =
   if (msgRes?.error) throw msgRes.error;
 
   const participants = (members || []).map((m) => mapMember(m, userId));
+  const hostPack = await fetchProfileHostPack(lobby.host_id);
 
   console.log("[DEBUG FETCH BUNDLE MEMBERS]", {
     currentUserId: userId,
@@ -1353,6 +1365,7 @@ async function fetchLobbyBundle(lobbyId, { withMessages = false, currentUserId =
     status: lobby.status || "waiting",
     gameId: lobby.game_id,
     hostId: lobby.host_id,
+    hostPack,
     lastActivityAt: lobby.last_activity_at || null,
     participants,
   };
@@ -1392,6 +1405,15 @@ function applyLobbyToState(bundle, { persistGuestMembership = false } = {}) {
   rememberLobbyIdentity(bundle);
 
   const prevLobby = getState().lobby;
+  const salonHostPack =
+    bundle.hostPack === true
+      ? true
+      : bundle.hostPack === false
+        ? false
+        : prevLobby?.hostId &&
+            String(prevLobby.hostId) === String(bundle.hostId || "")
+          ? prevLobby.hostPack === true
+          : false;
   const now = Date.now();
   // Capture BEFORE toute mutation state / saveStatePatch.
   // BEFORE = dernier acting mémorisé - JAMAIS re-resolve(prev, now) qui avale
@@ -1491,6 +1513,7 @@ function applyLobbyToState(bundle, { persistGuestMembership = false } = {}) {
       status: bundle.status,
       gameId: bundle.gameId,
       hostId: bundle.hostId,
+      hostPack: salonHostPack,
       lastActivityAt: bundle.lastActivityAt || null,
       actingHostUserId: actingHostAfterResolved,
     },
@@ -1863,12 +1886,7 @@ export async function joinLobbySupabase(codeInput, { joinEffects: externalEffect
     let hostPack = false;
     const hostId = lobbyRow.host_id || lobbyRow.hostId;
     if (hostId) {
-      const { data: hostProfile } = await supabase
-        .from("profiles")
-        .select("host_pack")
-        .eq("id", hostId)
-        .maybeSingle();
-      hostPack = hostProfile?.host_pack === true;
+      hostPack = await fetchProfileHostPack(hostId);
     }
     if ((memberCount ?? 0) >= lobbyMaxPlayers(hostPack)) {
       return { ok: false, error: LOBBY_FULL_MSG, joinEffects };

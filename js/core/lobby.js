@@ -124,7 +124,8 @@ import {
   mapParticipantsReadyFalse,
   shouldReconcileLobbyReadyFromServer,
 } from "./lobbyReadyMount.js";
-import { MAX_PLAYERS } from "../config/lobbyLifecycle.js";
+import { MAX_PLAYERS, resolveLobbySeatCap } from "../config/lobbyLifecycle.js";
+import { isHostPack } from "./entitlements.js";
 import { bumpLobbyRuntimeGeneration } from "./lobbyRuntime.js";
 import {
   createLobbyJoinEffects,
@@ -345,6 +346,15 @@ async function runFinalizeFailedJoinAttempt(ctx) {
 
 export function getLobby() {
   return getState().lobby;
+}
+
+/** Cap affiché / dialog joueurs : pack de l’hôte du salon, pas du viewer. */
+export function getCurrentLobbySeatCap() {
+  return resolveLobbySeatCap({
+    salonHostPack: getLobby()?.hostPack === true,
+    localIsHost: isLocalLobbyHost(),
+    localHostPack: isHostPack(),
+  });
 }
 
 export function getLobbyStatus() {
