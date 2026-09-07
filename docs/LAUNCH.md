@@ -157,7 +157,7 @@ Privacy publique + in-app alignées **7 sept 2026** (Sans pub, Signature, Maîtr
 - [x] **iOS sandbox** (5 sept 2026, Xcode) : Sans pub → pubs coupées → Signature **4,00 €** → perso compte → invité refusé
 - [ ] iOS : 6,99 € en direct, restore 2ᵉ appareil, refund — optionnel / autre sandbox
 - [ ] Licence testers Play (0 €) : même parcours Android
-- [ ] Web : message « dans l’app native »
+- [x] Web : message « dans l’app native »
 - [ ] `cap:sync` → bump `versionCode` / `versionName` → AAB + Archive (1.1.3 : URL marketing + IAP Signature)
 
 ---
