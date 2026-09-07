@@ -44,8 +44,7 @@ Ces écarts sont lus dans le code, pas des hypothèses. Cocher `repro OK` / `pas
 | --- | -- | ---------------- | ----- |
 | P0 | **H-SQL** | Achat Maître : store OK, Forfaits reste « Débloquer », lobby reste `/ 8` | Colonne `host_pack` absente → `fetchProfile` fallback `host_pack: false` |
 
-| P2 | **AV-STORAGE** | Utilisateur inscrit **sans** Signature peut uploader `{uid}/avatar.jpg` public | **patch** Storage RLS owner + `profile_pack OR host_pack` · QA ⏳ |
-| P2 | **AV-REPLACE** | Remplacement photo : `remove` puis `upload` ; échec upload → plus de fichier, profil pointe encore le path | `uploadProfileAvatarBlob` |
+| P2 | **AV-REPLACE** | Code patché (upload upsert, plus de `remove` préalable) — **QA Pages à faire**, ticket non fermé | `uploadProfileAvatarBlob` |
 | P2 | **H-RACE** | Deux joins simultanés passent le cap 8/14 | Gate capacité **client-only** (pas de contrainte SQL sur le count) |
 
 | P3 | **LEGAL** | Privacy in-app / site : Maître 9,99 absent ; `LEGAL_SITE_OVH.md` cite encore 12,99 € | `data/legalContent.js` + docs |
@@ -159,10 +158,12 @@ QA **✅** 7 sept 2026 Pages/SQL Anrobensy (`__revealPremium`) : overlay Signatu
 
 ### 3.5 Photo — **repro P2 AV-REPLACE / AV-STORAGE**
 
-**AV-STORAGE** : patch SQL `feature-profile-av-storage.sql` (owner + `profile_pack OR host_pack`). QA ⏳. Hors UI : `storage.from("avatars").upload`. AV-REPLACE (ordre remove→upload) **non traité**.
+**AV-STORAGE** : patch SQL `feature-profile-av-storage.sql` (owner + `profile_pack OR host_pack`). QA **✅** 7 sept 2026 Pages/SQL Anrobensy (sans pack 403 · Signature OK · Maître seul OK · retrait packs 403).
 
-- [ ] Remplacer une photo existante (réseau coupé au moment de l’upload) : ancienne image disparue, pastille cassée. (**AV-REPLACE**)
-- [ ] Compte inscrit **sans** pack : upload Storage `{uid}/avatar.jpg` depuis un client (hors UI) → **refusé** après AV-STORAGE. Avant patch : fichier public, `avatar_path` null.
+**AV-REPLACE** : `uploadProfileAvatarBlob` n’appelle plus `remove` avant l’upload ; remplacement = `upload({ upsert: true })` sur `{uid}/avatar.jpg` puis `updateProfileAvatar`. Code prêt, **QA Pages ouverte**.
+
+- [ ] Remplacer une photo existante (réseau coupé au moment de l’upload) : **A reste visible**, `avatar_rev` inchangé, pas de 404. (**AV-REPLACE** — happy path inverse)
+- [x] Compte inscrit **sans** pack : upload Storage `{uid}/avatar.jpg` depuis un client (hors UI) → **refusé** après AV-STORAGE. QA **✅** 7 sept 2026 Anrobensy.
 - [ ] Suppression de compte : ligne `profiles` + `signature_evenings` cascade ; **objet Storage** peut rester (orphan, hors scope).
 
 ---

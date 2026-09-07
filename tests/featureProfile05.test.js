@@ -122,8 +122,12 @@ describe("FEATURE-PROFILE-05 — avatar photo Signature", () => {
     assert.equal(/profile_pack\s*:/.test(upsert), false);
     assert.match(upsert, /avatar_path/);
     assert.match(upsert, /avatar_rev/);
-    assert.match(src("js/core/auth.js"), /cacheControl:\s*"0"/);
-    assert.match(src("js/core/auth.js"), /\.remove\(\[path\]\)/);
+    const auth = src("js/core/auth.js");
+    assert.match(auth, /cacheControl:\s*"0"/);
+    const uploadStart = auth.indexOf("export async function uploadProfileAvatarBlob");
+    const uploadEnd = auth.indexOf("\nexport async function", uploadStart + 1);
+    assert.doesNotMatch(auth.slice(uploadStart, uploadEnd), /\.remove\s*\(/);
+    assert.match(auth.slice(auth.indexOf("export async function removeProfileAvatar")), /\.remove\(\[path\]\)/);
     assert.match(src("js/screens/lobby.js"), /avatarPhotoHtml/);
   });
 });

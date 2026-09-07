@@ -77,10 +77,15 @@ describe("AV-STORAGE — policies Storage avatars", () => {
       /v_pack := coalesce\(old\.profile_pack, false\) or coalesce\(new\.profile_pack, false\)/
     );
     assert.match(overlay, /replayPendingSignatureCosmetics/);
-    const upload = auth.slice(auth.indexOf("export async function uploadProfileAvatarBlob"));
-    assert.match(upload, /\.remove\(\[path\]\)/);
+    const uploadStart = auth.indexOf("export async function uploadProfileAvatarBlob");
+    const uploadEnd = auth.indexOf("\nexport async function", uploadStart + 1);
+    const upload = auth.slice(uploadStart, uploadEnd);
+    assert.doesNotMatch(upload, /\.remove\s*\(/);
     assert.match(upload, /\.upload\(path, blob/);
+    assert.match(upload, /upsert:\s*true/);
     assert.match(upload, /user\.profilePack !== true/);
+    const removeFn = auth.slice(auth.indexOf("export async function removeProfileAvatar"));
+    assert.match(removeFn, /\.remove\(\[path\]\)/);
     assert.doesNotMatch(sql, /create (or replace )?function public\.profiles_signature_avatar/);
     assert.doesNotMatch(sql, /create trigger profiles_signature_avatar/);
   });
