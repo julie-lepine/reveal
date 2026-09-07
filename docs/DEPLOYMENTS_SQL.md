@@ -101,6 +101,7 @@ Sources : audit SQL du dépôt (`AUDIT-SQL-01`) + docs ops ([`SUPABASE.md`](./SU
 | 2026-09-06 | [`feature-host-02-invite-cap.sql`](../supabase/feature-host-02-invite-cap.sql) | FEATURE-HOST-02 / H-INVITE | ✅ | ✅ | [`feature-host-02-invite-cap-runbook.sql`](../supabase/tests/feature-host-02-invite-cap-runbook.sql) | `accept_lobby_invite` cap 8/14 via `host_pack` de l’hôte · QA **✅** 7 sept 2026 (1+13 OK, 15ᵉ refusé) · **ne pas** réexécuter friends-02 · voir §23 |
 | 2026-09-07 | [`feature-host-03-send-invite-cap.sql`](../supabase/feature-host-03-send-invite-cap.sql) | FEATURE-HOST-03 / H-INVITE-FULL | ✅ | ✅ | [`feature-host-03-send-invite-cap-runbook.sql`](../supabase/tests/feature-host-03-send-invite-cap-runbook.sql) | `send_lobby_invite` refuse si count ≥ cap 8/14 · QA **✅** 7 sept 2026 · **ne pas** réexécuter friends-02 ni HOST-02 · voir §24 |
 | 2026-09-07 | [`feature-profile-04b-carnet-kick.sql`](../supabase/feature-profile-04b-carnet-kick.sql) | FEATURE-PROFILE-04b / C-KICK | ⏳ | ⏳ | [`feature-profile-04b-carnet-kick-runbook.sql`](../supabase/tests/feature-profile-04b-carnet-kick-runbook.sql) | Jeton kick + `archive_signature_evening` · **ne pas** réexécuter 04 / kick-lobby-member · voir §25 |
+| 2026-09-07 | [`feature-profile-04c-carnet-dissolve.sql`](../supabase/feature-profile-04c-carnet-dissolve.sql) | FEATURE-PROFILE-04c / C-DISSOLVE | ⏳ | ⏳ | [`feature-profile-04c-carnet-dissolve-runbook.sql`](../supabase/tests/feature-profile-04c-carnet-dissolve-runbook.sql) | Jetons carnet dans `dissolve_lobby_atomically` · **ne pas** réexécuter 04 / 04b / xx-e · voir §26 |
 
 **Hors migrations (tracés ailleurs si besoin)** : préflight [`lobby-membership-e4-00-preflight-duplicates.sql`](../supabase/lobby-membership-e4-00-preflight-duplicates.sql) (lecture seule) ; runbooks / harness sous [`supabase/tests/`](../supabase/tests/) et [`lobby-membership-e4-RUNBOOK.sql`](../supabase/lobby-membership-e4-RUNBOOK.sql) / [`lobby-membership-e5-RUNBOOK.sql`](../supabase/lobby-membership-e5-RUNBOOK.sql) — ce ne sont pas des migrations. Voir aussi [`lobby-membership-e4-tests-manual.sql`](../supabase/lobby-membership-e4-tests-manual.sql).
 
@@ -531,6 +532,21 @@ Le client ne doit **pas** SELECT `lobbies` pour distinguer kick / dissolve : RLS
 | Migration | [`feature-profile-04b-carnet-kick.sql`](../supabase/feature-profile-04b-carnet-kick.sql) — collé (jeton) |
 | Runbook | [`tests/feature-profile-04b-carnet-kick-runbook.sql`](../supabase/tests/feature-profile-04b-carnet-kick-runbook.sql) — `CARNET04B_KICK_OK` |
 | Client | `js/core/lobby.js` (`handleKickedFromLobby`) · `js/core/supabaseLobby.js` (kick vs gone) |
-| Hors scope | C-DISSOLVE · C-HOME |
+| Hors scope | C-HOME |
 
 **Statut** : SQL collé · client **fix RLS kick→dissolve** 7 sept 2026.
+
+---
+
+## 26. FEATURE-PROFILE-04c — Carnet après dissolve (C-DISSOLVE)
+
+L’hôte archive tant qu’il est membre, puis `dissolve_lobby_atomically` DELETE le lobby (CASCADE membership). Les autres Signature voient `resolveLobbyClosureAndExit` trop tard : plus membres, pas de jeton → `signature_not_member`. Cette migration réécrit **uniquement** `dissolve_lobby_atomically` : jetons `signature_carnet_kick_allow` pour chaque membre `profile_pack`, **avant** DELETE. L’archive 04b les accepte 30 min. Client : snapshot + archive dans `resolveLobbyClosureAndExit` avant wipe.
+
+| Élément | Valeur |
+| ------- | ------ |
+| Migration | [`feature-profile-04c-carnet-dissolve.sql`](../supabase/feature-profile-04c-carnet-dissolve.sql) — **⏳** après 04b |
+| Runbook | [`tests/feature-profile-04c-carnet-dissolve-runbook.sql`](../supabase/tests/feature-profile-04c-carnet-dissolve-runbook.sql) — `CARNET04C_DISSOLVE_OK` |
+| Client | `js/core/lobby.js` (`resolveLobbyClosureAndExit`) · snapshot Realtime / gone |
+| Hors scope | C-HOME · purge `inactive_expired` |
+
+**Statut** : SQL **⏳** · 7 sept 2026. **Ne pas** réexécuter `lobby-closures-xx-e.sql` après 04c.

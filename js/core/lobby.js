@@ -1126,6 +1126,7 @@ async function clearGuestSessionAfterFailedJoin() {
  *   lobbyId?: string|null,
  *   source?: string,
  *   showModal?: boolean,
+ *   archivePayload?: object|null,
  * }} [opts]
  */
 export async function resolveLobbyClosureAndExit(opts = {}) {
@@ -1158,9 +1159,16 @@ export async function resolveLobbyClosureAndExit(opts = {}) {
     return { ok: false, skipped: true, reason: "in-flight" };
   }
 
+  const archivePayload =
+    opts.archivePayload !== undefined
+      ? opts.archivePayload
+      : collectSignatureEveningArchivePayload();
+
   // Priorité dissolution : bloquer kick pendant le pipeline.
   lobbyDissolveHandling = true;
   markLobbyClosureHandled(lobbyId);
+
+  await archiveSignatureEveningBeforeLeave(archivePayload);
 
   stopMultiplayerSync();
   stopLobbyPresenceSync();

@@ -1016,6 +1016,7 @@ async function handlePossibleLobbyGone(lobbyId, e) {
     await resolveLobbyClosureAndExit({
       lobbyId: lobbyId || readRememberedLobbyId(),
       source: "possible-lobby-gone",
+      archivePayload,
     });
     return false;
   }
@@ -2480,10 +2481,12 @@ export function subscribeLobbyRealtime(onUpdate) {
         if (!isLiveLobbyChannelEvent()) return;
         const closedId =
           payload?.old?.id != null ? String(payload.old.id) : String(lobbyId);
+        const archivePayload = collectSignatureEveningArchivePayload();
         const { resolveLobbyClosureAndExit } = await import("./lobby.js");
         await resolveLobbyClosureAndExit({
           lobbyId: closedId,
           source: "realtime-lobbies-delete",
+          archivePayload,
         });
         onUpdate?.();
       }
