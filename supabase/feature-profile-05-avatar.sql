@@ -430,6 +430,10 @@ on storage.objects
 for select
 using (bucket_id = 'avatars');
 
+-- AV-STORAGE : coller feature-profile-av-storage.sql après HOST-01.
+-- Ces trois policies owner-only sont remplacées (owner + profile_pack OR host_pack).
+-- Ne pas s'arrêter ici en prod.
+
 drop policy if exists "avatars owner insert" on storage.objects;
 create policy "avatars owner insert"
 on storage.objects

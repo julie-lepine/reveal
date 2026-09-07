@@ -97,6 +97,7 @@ Sources : audit SQL du dépôt (`AUDIT-SQL-01`) + docs ops ([`SUPABASE.md`](./SU
 | 2026-09-05 | [`feature-profile-03b-emoji-split.sql`](../supabase/feature-profile-03b-emoji-split.sql) | FEATURE-PROFILE-03b | ✅ | ✅ | — | 12 emojis → Signature (😈👻🔥🐸💎🌈 + 😎💜🌟🎯🚀🎈) · coller si 03 déjà en prod |
 | 2026-09-05 | [`feature-profile-03c-emoji-fe0f.sql`](../supabase/feature-profile-03c-emoji-fe0f.sql) | FEATURE-PROFILE-03c | ☐ | ☐ | — | Trigger : strip U+FE0F sinon 🦄 → 👤 · coller prod |
 | 2026-09-07 | [`feature-profile-id-old.sql`](../supabase/feature-profile-id-old.sql) | ID-OLD | ✅ | ✅ | [`feature-profile-id-old-runbook.sql`](../supabase/tests/feature-profile-id-old-runbook.sql) | UPDATE pack = old OR new · coller après 03c+05 · QA **✅** 7 sept 2026 Anrobensy · voir §30 |
+| 2026-09-07 | [`feature-profile-av-storage.sql`](../supabase/feature-profile-av-storage.sql) | AV-STORAGE | ⏳ | ⏳ | [`feature-profile-av-storage-runbook.sql`](../supabase/tests/feature-profile-av-storage-runbook.sql) | Storage avatars write : owner + pack OR host · coller après 05 + HOST-01 · **ne pas** réexécuter 05 · voir §32 |
 | 2026-09-05 | [`feature-profile-04-carnet.sql`](../supabase/feature-profile-04-carnet.sql) | FEATURE-PROFILE-04 | ☐ | ☐ | — | Carnet 20 soirées · RPC archive/list · voir §20 |
 | 2026-09-05 | [`feature-host-01-profile-flag.sql`](../supabase/feature-host-01-profile-flag.sql) | FEATURE-HOST-01 | ⏳ | ⏳ | — | Colonne `profiles.host_pack` + trigger · 9,99 / 7 € / 3 € · voir §22 |
 | 2026-09-06 | [`feature-host-02-invite-cap.sql`](../supabase/feature-host-02-invite-cap.sql) | FEATURE-HOST-02 / H-INVITE | ✅ | ✅ | [`feature-host-02-invite-cap-runbook.sql`](../supabase/tests/feature-host-02-invite-cap-runbook.sql) | `accept_lobby_invite` cap 8/14 via `host_pack` de l’hôte · QA **✅** 7 sept 2026 (1+13 OK, 15ᵉ refusé) · **ne pas** réexécuter friends-02 · voir §23 |
@@ -620,8 +621,28 @@ Pas de SQL. Overlay RC débloque l’UI avant `profile_pack` serveur ; un choix 
 
 | Élément | Valeur |
 | ------- | ------ |
-| Client | `js/core/signatureCosmeticsPending.js` · `entitlements.js` · `auth.js` |
+| Client | `js/core/signatureCosmeticsPending.js` · `entitlements.js` · `auth.js` · `state.js` · `settings.js` |
 | Tests | `tests/featureIdOverlay.test.js` |
 | Hors scope | webhook · AV-STORAGE · AV-REPLACE · snapshot `lobby_members.signature` |
 
-**Statut** : client **implémenté** 7 sept 2026 · QA **⏳**.
+**QA Anrobensy** : overlay `__revealPremium` + `profile_pack=false` → lime → refresh conserve → grant SQL `name_color` encore null → refresh replay → `lime` en base → F5 OK.
+
+**Statut** : client **✅** · QA **✅** 7 sept 2026 (Pages/SQL couleur). Avatar pending **non rejoué** sur Pages. Achat Play natif **non exécuté**.
+
+---
+
+## 32. AV-STORAGE — écriture Storage avatars gated Signature / Maître
+
+Pas de colonnes nouvelles. Les policies `avatars owner insert/update/delete` n’exigeaient que `{auth.uid()}/avatar.jpg`. Un inscrit **sans** pack pouvait uploader un JPEG public. Correctif : helper `can_write_own_avatar()` (`profile_pack OR host_pack`, `auth.uid()` uniquement) + mêmes noms de policies (drop/create, pas de policy permissive oubliée). SELECT public **inchangé**. Bucket public **inchangé**. Triggers `profiles` / ID-OLD inchangés. Client inchangé. AV-REPLACE hors scope.
+
+| Élément | Valeur |
+| ------- | ------ |
+| Migration | [`feature-profile-av-storage.sql`](../supabase/feature-profile-av-storage.sql) — coller après 05 + HOST-01 |
+| Preuve | `av-storage-v1` dans `can_write_own_avatar` |
+| Runbook | [`tests/feature-profile-av-storage-runbook.sql`](../supabase/tests/feature-profile-av-storage-runbook.sql) — `AVSTORAGE_POLICIES_OK` |
+| Tests | `tests/featureAvStorage.test.js` |
+| Hors scope | AV-REPLACE · orphelins delete-account · ID-OVERLAY · webhook |
+
+**QA** (après collage) : compte `profile_pack=false` `host_pack=false` → console `storage.from("avatars").upload(...)` → **403**. Signature ou Maître seul → upload OK. GET public inchangé. **Ne pas** réexécuter `feature-profile-05-avatar.sql` ensuite (remettrait owner-only).
+
+**Statut** : SQL **implémenté** 7 sept 2026 · QA **⏳**.

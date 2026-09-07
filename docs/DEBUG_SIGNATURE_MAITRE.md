@@ -44,8 +44,7 @@ Ces écarts sont lus dans le code, pas des hypothèses. Cocher `repro OK` / `pas
 | --- | -- | ---------------- | ----- |
 | P0 | **H-SQL** | Achat Maître : store OK, Forfaits reste « Débloquer », lobby reste `/ 8` | Colonne `host_pack` absente → `fetchProfile` fallback `host_pack: false` |
 
-| P2 | **ID-OVERLAY** | Après achat, couleur « sauvée » puis disparue ; badge lobby en retard vs Menu → Profil | **patch** pending session + replay après `profile_pack` SQL · QA ⏳ |
-| P2 | **AV-STORAGE** | Utilisateur inscrit **sans** Signature peut uploader `{uid}/avatar.jpg` public | Policies Storage `avatars` : owner path only, **pas** de check `profile_pack` |
+| P2 | **AV-STORAGE** | Utilisateur inscrit **sans** Signature peut uploader `{uid}/avatar.jpg` public | **patch** Storage RLS owner + `profile_pack OR host_pack` · QA ⏳ |
 | P2 | **AV-REPLACE** | Remplacement photo : `remove` puis `upload` ; échec upload → plus de fichier, profil pointe encore le path | `uploadProfileAvatarBlob` |
 | P2 | **H-RACE** | Deux joins simultanés passent le cap 8/14 | Gate capacité **client-only** (pas de contrainte SQL sur le count) |
 
@@ -143,11 +142,13 @@ Sans pack : pas de couleur, pas de ✦, pas de photo (même si un client envoie 
 
 ### 3.3 Overlay vs serveur — **repro P2 ID-OVERLAY**
 
+QA **✅** 7 sept 2026 Pages/SQL Anrobensy (`__revealPremium`) : overlay Signature + `profile_pack=false` → lime visible → refresh ne wipe plus → grant SQL → replay `name_color=lime` → F5 OK. Achat Play natif **non exécuté**. Badge lobby partagé toujours le snapshot SQL (hors scope).
+
 1. Acheter Signature, **immédiatement** choisir une couleur avant la fin du poll.
-2. [ ] UI Profil montre la couleur.
-3. [ ] Relire `profiles.name_color` : souvent **null** tant que le webhook n’a pas posé `profile_pack`.
-4. [ ] Lobby : `lobby_members.signature` encore false → pas de badge chez les autres.
-5. [ ] Après webhook + Realtime : badge et couleur apparaissent. Si l’utilisateur a quitté l’écran, re-taper la couleur.
+2. [x] UI Profil montre la couleur.
+3. [x] Relire `profiles.name_color` : **null** tant que le webhook n’a pas posé `profile_pack`.
+4. [ ] Lobby : `lobby_members.signature` encore false → pas de badge chez les autres. (hors scope)
+5. [x] Après grant SQL + refresh : couleur persistée ; F5 OK.
 
 ### 3.4 Écriture locale vs inclusion Maître
 
@@ -158,9 +159,11 @@ Sans pack : pas de couleur, pas de ✦, pas de photo (même si un client envoie 
 
 ### 3.5 Photo — **repro P2 AV-REPLACE / AV-STORAGE**
 
-- [ ] Remplacer une photo existante (réseau coupé au moment de l’upload) : ancienne image disparue, pastille cassée.
-- [ ] Compte inscrit **sans** pack : upload Storage `{uid}/avatar.jpg` depuis un client (hors UI) → fichier public, profil `avatar_path` null. Confirmer si la policy est encore ouverte.
-- [ ] Suppression de compte : ligne `profiles` + `signature_evenings` cascade ; **objet Storage** peut rester (orphan).
+**AV-STORAGE** : patch SQL `feature-profile-av-storage.sql` (owner + `profile_pack OR host_pack`). QA ⏳. Hors UI : `storage.from("avatars").upload`. AV-REPLACE (ordre remove→upload) **non traité**.
+
+- [ ] Remplacer une photo existante (réseau coupé au moment de l’upload) : ancienne image disparue, pastille cassée. (**AV-REPLACE**)
+- [ ] Compte inscrit **sans** pack : upload Storage `{uid}/avatar.jpg` depuis un client (hors UI) → **refusé** après AV-STORAGE. Avant patch : fichier public, `avatar_path` null.
+- [ ] Suppression de compte : ligne `profiles` + `signature_evenings` cascade ; **objet Storage** peut rester (orphan, hors scope).
 
 ---
 
