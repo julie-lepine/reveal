@@ -111,10 +111,10 @@ Précondition : `profile_pack` **ou** `host_pack` true en base (le serveur gate 
 
 ### 3.1 Menu → Profil
 
-- [ ] Aperçu : anneau or, badge ✦, couleur appliquée.
-- [ ] 8 puces couleur ; sans pack → tap = Forfaits.
-- [ ] 18 emojis gratuits utilisables sans pack ; extras verrouillés → Forfaits.
-- [ ] Photo : crop cercle, pinch/drag, JPEG, fallback emoji si URL cassée. Crop + JPEG : QA **✅** AV-REPLACE 7 sept 2026. Fallback `onerror` non rejoué (contrat = ne pas casser l’URL).
+- [x] Aperçu : anneau or, badge ✦, couleur appliquée.
+- [x] 8 puces couleur ; sans pack → tap = Forfaits.
+- [x] 18 emojis gratuits utilisables sans pack ; extras verrouillés → Forfaits.
+- [x] Photo : crop cercle, pinch/drag, JPEG, fallback emoji si URL cassée. Crop + JPEG : QA **✅** AV-REPLACE 7 sept 2026. Fallback `onerror` non rejoué (contrat = ne pas casser l’URL).
 - [x] Retirer la photo : emoji revient partout. QA **✅** 7 sept 2026 AV-REPLACE (SQL `path=null` `rev=0`, F5 OK).
 - [ ] Invité : extras / photo / carnet masqués ou teasés, jamais d’upload.
 
