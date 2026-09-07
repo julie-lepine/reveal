@@ -44,8 +44,7 @@ Ces écarts sont lus dans le code, pas des hypothèses. Cocher `repro OK` / `pas
 | --- | -- | ---------------- | ----- |
 | P0 | **H-SQL** | Achat Maître : store OK, Forfaits reste « Débloquer », lobby reste `/ 8` | Colonne `host_pack` absente → `fetchProfile` fallback `host_pack: false` |
 
-| P1 | **C-HOME** | Quitter depuis Accueil (membership serveur, cache non hydraté) → pas d’archive | **patch 04d** : draft local `(userId, lobbyId)` hors `reveal-app-state` · fallback Accueil · **⏳ QA terrain** |
-| P1 | **RC-RESTORE** | Compte déjà Signature, restore / already-owned Maître → Signature OK, Maître pas actif jusqu’au webhook | `refreshPremiumAfterStore` **break** dès que `profilePack` est true ; overlay store réappliqué seulement si les **3** flags sont false |
+| P1 | **RC-RESTORE** | Compte déjà Signature, restore / already-owned Maître → Signature OK, Maître pas actif jusqu’au webhook | **patch** overlay + poll jusqu’à `host_pack` · **🟡 CODE / STORE QA BLOCKED** |
 | P1 | **RC-SKU-ADF** | `profileSkuForUser` lit `user.adFree` (colonne), pas `isAdFree()` | Un compte Signature sans `ad_free` en base paierait 6,99 au lieu de 4,00 (cas SQL manuel / grant incomplet) |
 | P2 | **ID-OLD** | Refund Signature puis rachat : couleur / photo / emoji extra **effacés** au grant | Triggers cosmetics / avatar lisent `old.profile_pack` sur UPDATE |
 | P2 | **ID-OVERLAY** | Après achat, couleur « sauvée » puis disparue ; badge lobby en retard vs Menu → Profil | Overlay store débloque l’UI avant le webhook ; `upsertProfile` est strippé tant que `profile_pack` est false |
@@ -100,8 +99,8 @@ Compte A = Signature déjà en base. Sur un 2ᵉ appareil / après réinstall :
 
 - [ ] Restaurer les achats alors que Maître est aussi sur le même compte Play/Apple.
 - [ ] **Attendu produit** : Forfaits = Maître Actif + cap 14 si hôte.
-- [ ] **Bug code** : Signature s’affiche, Maître reste off jusqu’à ce que le webhook `host_pack` arrive. Si le webhook est lent/absent, Maître ne revient pas.
-- [ ] Contrôle : `profiles.host_pack` vs `state.user.hostPack` (localStorage `reveal-app-state`).
+- [ ] **Code** : overlay session si RC `host` ; poll 8×1 s jusqu’à `host_pack` (ne s’arrête plus sur Signature). Timeout → Maître reste visible + message d’activation différée. QA store **⏳** (comptes Play bloqués).
+- [ ] Contrôle : `profiles.host_pack` vs `state.user.hostPack` (overlay session, pas d’écriture SQL).
 
 Même scénario via « déjà acheté » (error already-owned) pendant `purchaseHost`.
 
@@ -190,7 +189,7 @@ Archive **uniquement** si : inscrit + pack + encore **membre** du lobby + `hasEv
 | Quitter volontaire (membre) | Archive | OK (`leaveLobby` → `archiveSignatureEveningBeforeLeave`) |
 | Hôte dissolve | Tous les Signature du salon archivent | **OK** (04c) QA ✅ 7 sept 2026 |
 | Kick | Le kické archive | **04b + client** : jeton SQL + archive même si RLS cache le salon |
-| Accueil → quitter membership serveur | Archive si draft / live | **04d** draft local · QA ⏳ |
+| Accueil → quitter membership serveur | Archive si draft / live | **04d** QA **✅** 7 sept 2026 |
 | Quitter **sans** avoir joué | Rien | OK (`hasEveningStatsActivity` false) |
 | Rang introuvable (joueur local absent du standing) | Skip silencieux | Payload null |
 

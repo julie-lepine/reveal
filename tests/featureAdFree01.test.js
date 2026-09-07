@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { getState, saveStatePatch } from "../js/core/state.js";
-import { isAdFree, adFreeFromProfile, applyPremiumFromStore } from "../js/core/entitlements.js";
+import { isAdFree, adFreeFromProfile, applyPremiumFromStore, resetPremiumStoreOverlayForTests } from "../js/core/entitlements.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, "..");
@@ -21,6 +21,7 @@ describe("FEATURE-ADFREE-01 — entitlement Sans pub", () => {
   });
 
   afterEach(() => {
+    resetPremiumStoreOverlayForTests();
     saveStatePatch(snapshot);
   });
 

@@ -1,4 +1,14 @@
 import { getState, saveStatePatch } from "./state.js";
+import {
+  emptyPremiumFlags,
+  mergePremiumSessionFlags,
+  normalizePremiumFlags,
+} from "./premiumStoreOverlay.js";
+
+/** Overlay session RevenueCat (webhook pending). Jamais écrit en SQL. */
+let storePremiumOverlay = emptyPremiumFlags();
+let storePremiumOverlayActive = false;
+let lastServerPremium = emptyPremiumFlags();
 
 export function adFreeFromProfile(profile) {
   return profile?.ad_free === true;
@@ -48,10 +58,43 @@ export function isHostPack() {
   return user.hostPack === true;
 }
 
+export function getStorePremiumOverlay() {
+  return storePremiumOverlayActive ? { ...storePremiumOverlay } : null;
+}
+
+export function getLastServerPremium() {
+  return { ...lastServerPremium };
+}
+
+export function clearStorePremiumOverlay() {
+  storePremiumOverlay = emptyPremiumFlags();
+  storePremiumOverlayActive = false;
+}
+
+export function resetPremiumStoreOverlayForTests() {
+  clearStorePremiumOverlay();
+  lastServerPremium = emptyPremiumFlags();
+}
+
+function applyMergedPremiumToUser(serverFlags, extra = {}) {
+  const overlay = storePremiumOverlayActive ? storePremiumOverlay : emptyPremiumFlags();
+  const merged = mergePremiumSessionFlags(serverFlags, overlay);
+  saveStatePatch({
+    user: {
+      ...getState().user,
+      ...merged,
+      ...extra,
+    },
+  });
+  return merged;
+}
+
 export async function refreshAdFreeFromServer() {
   const userId = getState().supabaseUserId;
   const user = getState().user || {};
   if (!userId || user.isGuest) {
+    clearStorePremiumOverlay();
+    lastServerPremium = emptyPremiumFlags();
     saveStatePatch({
       user: {
         ...user,
@@ -70,28 +113,27 @@ export async function refreshAdFreeFromServer() {
   const hostPack = hostPackFromProfile(profile);
   const profilePack = profilePackFromProfile(profile) || hostPack;
   const adFree = adFreeFromProfile(profile) || profilePack;
+  lastServerPremium = { adFree, profilePack, hostPack };
   const nameColor = nameColorFromProfile(profile);
   const { avatarPath, avatarRev } = avatarFromProfile(profile);
-  saveStatePatch({
-    user: { ...getState().user, adFree, profilePack, hostPack, nameColor, avatarPath, avatarRev },
+  const merged = applyMergedPremiumToUser(lastServerPremium, {
+    nameColor,
+    avatarPath,
+    avatarRev,
   });
-  return adFree || profilePack || hostPack;
+  return merged.adFree || merged.profilePack || merged.hostPack;
 }
 
-/** Overlay session depuis RevenueCat (Play dit déjà acheté, webhook pas encore). N’écrit pas la base. */
+/**
+ * Overlay session depuis RevenueCat (Play dit déjà acheté, webhook pas encore).
+ * N’écrit pas la base. Ne retire pas un flag déjà confirmé serveur.
+ */
 export function applyPremiumFromStore({ adFree = false, profilePack = false, hostPack = false } = {}) {
   const user = getState().user || {};
   if (!user.loggedIn || user.isGuest) return;
-  const host = hostPack === true;
-  const pack = profilePack === true || host;
-  saveStatePatch({
-    user: {
-      ...getState().user,
-      adFree: adFree === true || pack,
-      profilePack: pack,
-      hostPack: host,
-    },
-  });
+  storePremiumOverlay = normalizePremiumFlags({ adFree, profilePack, hostPack });
+  storePremiumOverlayActive = true;
+  applyMergedPremiumToUser(lastServerPremium);
 }
 
 export async function refreshAdFreeFromServerUntil(expected, opts = {}) {

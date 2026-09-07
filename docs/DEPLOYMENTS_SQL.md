@@ -561,6 +561,20 @@ Pas de SQL. Snapshot d’archive Signature en localStorage (`reveal-signature-ca
 | ------- | ------ |
 | Client | `js/core/signatureCarnetDraftLogic.js` · `signatureCarnetDraftStore.js` · `signatureCarnet.js` · `leaveLobbyMembershipFromServer` |
 | Tests | `tests/featureProfile04dCarnetDraft.test.js` |
-| Hors scope | Realtime draft · table Supabase · QA terrain ⏳ |
+| Hors scope | Realtime draft · table Supabase |
 
-**Statut** : client **implémenté** 7 sept 2026 · QA terrain **⏳**.
+**Statut** : client **✅** · QA **✅** 7 sept 2026 (Pages A/D/E/F ; B/C non reproductibles tant que la reprise réhydrate le salon / Accueil inaccessible en lobby).
+
+---
+
+## 28. RC-RESTORE — Overlay Maître si Signature déjà en base
+
+Pas de SQL. Restore / already-owned : si RevenueCat a l’entitlement `host`, le poll n’est plus coupé par `profile_pack`. Overlay session (`applyPremiumFromStore`) fusionné après chaque `fetchProfile`. Timeout 8×1 s : overlay conservé, message d’activation différée. Le client n’écrit jamais `host_pack`.
+
+| Élément | Valeur |
+| ------- | ------ |
+| Client | `js/core/premiumStoreOverlay.js` · `entitlements.js` · `purchases.js` (`reconcilePremiumAfterStore`) |
+| Tests | `tests/featureRcRestore.test.js` |
+| Hors scope | RC-SKU-ADF · webhook SQL · GitHub Pages · écriture `host_pack` |
+
+**Statut** : client **implémenté** 7 sept 2026 · QA store **🟡 BLOCKED** (comptes Google Play).

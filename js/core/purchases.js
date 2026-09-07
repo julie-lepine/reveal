@@ -5,6 +5,13 @@
  * Après achat / restore, on relit le profil (webhook service_role).
  */
 import { PACK_HOST_LABEL, PACK_SIGNATURE_LABEL } from "../config/premiumPacks.js";
+import {
+  PREMIUM_STORE_POLL_DELAY_MS,
+  PREMIUM_STORE_POLL_TRIES,
+  hasAnyStoreEntitlement,
+  premiumRestoreUserMessage,
+  shouldContinuePremiumStorePoll,
+} from "./premiumStoreOverlay.js";
 import { isNativeApp, getNativePlatform } from "./platform.js";
 import { getState } from "./state.js";
 import {
@@ -330,59 +337,92 @@ async function recoverOwnedPurchase() {
   await syncStorePurchases(Purchases);
   await Purchases.restorePurchases();
   const fromStore = entitlementsFromCustomerInfo(await Purchases.getCustomerInfo());
-  const { applyPremiumFromStore, refreshAdFreeFromServer, isAdFree, isProfilePack, isHostPack } =
-    await import("./entitlements.js");
-  if (fromStore.adFree || fromStore.profilePack || fromStore.hostPack) {
-    applyPremiumFromStore(fromStore);
-    await refreshAdFreeFromServer();
-    if (!isAdFree() && !isProfilePack() && !isHostPack()) applyPremiumFromStore(fromStore);
-    await refreshAdsQuiet();
-    const adFree = isAdFree();
-    const profilePack = isProfilePack();
-    const hostPack = isHostPack();
-    let message = "Cet achat est déjà sur ce compte Play. Appuie sur Restaurer les achats si le forfait n’apparaît pas.";
-    if (hostPack) {
-      message = `${PACK_HOST_LABEL} est déjà actif sur ce compte Play — c’est maintenant affiché. Signature et Sans pub inclus.`;
-    } else if (profilePack) {
-      message = `${PACK_SIGNATURE_LABEL} est déjà actif sur ce compte Play — c’est maintenant affiché. Sans pub inclus.`;
-    } else if (adFree) {
-      message = "Sans pub est déjà actif sur ce compte Play — c’est maintenant affiché.";
-    }
-    return { ok: true, adFree, profilePack, hostPack, alreadyOwned: true, message };
-  }
-  const refreshed = await refreshPremiumAfterStore();
-  let message = "Cet achat est déjà sur ce compte Play. Appuie sur Restaurer les achats si le forfait n’apparaît pas.";
-  if (refreshed.hostPack) {
-    message = `${PACK_HOST_LABEL} est déjà actif sur ce compte Play — c’est maintenant affiché. Signature et Sans pub inclus.`;
-  } else if (refreshed.profilePack) {
-    message = `${PACK_SIGNATURE_LABEL} est déjà actif sur ce compte Play — c’est maintenant affiché. Sans pub inclus.`;
-  } else if (refreshed.adFree) {
-    message = "Sans pub est déjà actif sur ce compte Play — c’est maintenant affiché.";
-  }
-  return { ok: true, ...refreshed, alreadyOwned: true, message };
+  return reconcilePremiumAfterStore(fromStore, { alreadyOwned: true });
 }
 
-async function refreshPremiumAfterStore() {
-  const { refreshAdFreeFromServer, isAdFree, isProfilePack, isHostPack } = await import(
-    "./entitlements.js"
-  );
-  const tries = 8;
-  const delayMs = 1000;
-  let adFree = false;
-  let profilePack = false;
-  let hostPack = false;
+/**
+ * Relit `profiles` après overlay store.
+ * Si RevenueCat confirme `host`, ne s’arrête pas sur Signature déjà en base.
+ * Timeout : conserve l’overlay Maître (pas d’écriture SQL).
+ */
+export async function refreshPremiumAfterStore(fromStore = {}, opts = {}) {
+  const {
+    applyPremiumFromStore,
+    refreshAdFreeFromServer,
+    isAdFree,
+    isProfilePack,
+    isHostPack,
+    getLastServerPremium,
+  } = await import("./entitlements.js");
+  const tries =
+    Number(opts.tries) > 0 ? Number(opts.tries) : PREMIUM_STORE_POLL_TRIES;
+  const delayMs =
+    Number(opts.delayMs) >= 0 ? Number(opts.delayMs) : PREMIUM_STORE_POLL_DELAY_MS;
+  const store = {
+    adFree: fromStore.adFree === true,
+    profilePack: fromStore.profilePack === true,
+    hostPack: fromStore.hostPack === true,
+  };
+
+  if (hasAnyStoreEntitlement(store)) {
+    applyPremiumFromStore(store);
+  }
+  if (store.hostPack) {
+    console.info("REVEAL RC-RESTORE: RevenueCat host entitlement detected");
+  }
+
+  let server = { adFree: false, profilePack: false, hostPack: false };
   for (let i = 0; i < tries; i++) {
     await refreshAdFreeFromServer();
-    adFree = isAdFree();
-    profilePack = isProfilePack();
-    hostPack = isHostPack();
-    if (hostPack) break;
-    if (profilePack) break;
-    if (adFree && i >= 2) break;
+    server = getLastServerPremium();
+    if (store.hostPack) {
+      if (server.hostPack) {
+        console.info("REVEAL RC-RESTORE: server host_pack confirmed");
+      } else {
+        console.info("REVEAL RC-RESTORE: server host_pack pending");
+      }
+    }
+    if (
+      !shouldContinuePremiumStorePoll({
+        fromStore: store,
+        server,
+        attemptIndex: i,
+      })
+    ) {
+      break;
+    }
     if (i < tries - 1) await new Promise((r) => setTimeout(r, delayMs));
   }
+
+  const pendingServerHost = Boolean(store.hostPack && !server.hostPack);
+  if (pendingServerHost) {
+    applyPremiumFromStore(store);
+    console.info("REVEAL RC-RESTORE: poll timeout — retaining store overlay");
+  }
+
   await refreshAdsQuiet();
-  return { adFree, profilePack, hostPack };
+  return {
+    adFree: isAdFree(),
+    profilePack: isProfilePack(),
+    hostPack: isHostPack(),
+    serverHostPack: server.hostPack === true,
+    pendingServerHost,
+  };
+}
+
+export async function reconcilePremiumAfterStore(fromStore, { alreadyOwned = false, ...opts } = {}) {
+  const refreshed = await refreshPremiumAfterStore(fromStore, opts);
+  if (alreadyOwned) {
+    console.info("REVEAL RC-RESTORE: restore already-owned");
+  }
+  const message = premiumRestoreUserMessage({
+    alreadyOwned,
+    hostPack: refreshed.hostPack,
+    profilePack: refreshed.profilePack,
+    adFree: refreshed.adFree,
+    pendingServerHost: refreshed.pendingServerHost,
+  });
+  return { ok: true, ...refreshed, alreadyOwned, message };
 }
 
 export async function restorePremiumPurchases() {
@@ -402,34 +442,7 @@ export async function restorePremiumPurchases() {
     await syncStorePurchases(Purchases);
     await Purchases.restorePurchases();
     const fromStore = entitlementsFromCustomerInfo(await Purchases.getCustomerInfo());
-    const { applyPremiumFromStore } = await import("./entitlements.js");
-    if (fromStore.adFree || fromStore.profilePack || fromStore.hostPack) {
-      applyPremiumFromStore(fromStore);
-    }
-    const refreshed = await refreshPremiumAfterStore();
-    let adFree = refreshed.adFree;
-    let profilePack = refreshed.profilePack;
-    let hostPack = refreshed.hostPack;
-    if (
-      !adFree &&
-      !profilePack &&
-      !hostPack &&
-      (fromStore.adFree || fromStore.profilePack || fromStore.hostPack)
-    ) {
-      applyPremiumFromStore(fromStore);
-      adFree = fromStore.adFree;
-      profilePack = fromStore.profilePack;
-      hostPack = fromStore.hostPack;
-    }
-    let message = "Aucun achat trouvé pour ce compte.";
-    if (hostPack) {
-      message = `${PACK_HOST_LABEL} est de nouveau actif sur ce compte. Signature et Sans pub inclus.`;
-    } else if (profilePack) {
-      message = `${PACK_SIGNATURE_LABEL} est de nouveau actif sur ce compte. Sans pub inclus.`;
-    } else if (adFree) {
-      message = "Sans pub est de nouveau actif sur ce compte.";
-    }
-    return { ok: true, adFree, profilePack, hostPack, message };
+    return reconcilePremiumAfterStore(fromStore, { alreadyOwned: false });
   } catch (e) {
     return { ok: false, message: storePurchaseErrorMessage(e) };
   }

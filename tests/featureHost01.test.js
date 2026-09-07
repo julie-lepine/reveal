@@ -9,6 +9,7 @@ import {
   isHostPack,
   isProfilePack,
   hostPackFromProfile,
+  resetPremiumStoreOverlayForTests,
 } from "../js/core/entitlements.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -35,6 +36,7 @@ describe("FEATURE-HOST-01 — entitlement Maître de soirée", () => {
   });
 
   afterEach(() => {
+    resetPremiumStoreOverlayForTests();
     saveStatePatch(snapshot);
   });
 

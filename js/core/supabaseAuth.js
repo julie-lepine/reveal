@@ -6,7 +6,7 @@ import {
   resolveLiveDisplayName,
   resolveLiveEmoji,
 } from "./profileIdentity.js";
-import { adFreeFromProfile, avatarFromProfile, hostPackFromProfile, nameColorFromProfile, profilePackFromProfile } from "./entitlements.js";
+import { adFreeFromProfile, avatarFromProfile, clearStorePremiumOverlay, hostPackFromProfile, nameColorFromProfile, profilePackFromProfile } from "./entitlements.js";
 import { formatAuthErrorMessage, isAuthRateLimitError, isAuthCaptchaError } from "./authErrors.js";
 import {
   getPasswordResetCooldownRemainingMs,
@@ -171,6 +171,7 @@ export async function syncSessionToState(session) {
   const prevUserId = getState().supabaseUserId || null;
 
   if (!session?.user) {
+    clearStorePremiumOverlay();
     saveStatePatch({
       user: {
         email: null,

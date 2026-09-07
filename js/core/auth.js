@@ -26,6 +26,7 @@ import { stopMultiplayerSync } from "./gameSync.js";
 import { getMembershipSnapshot } from "./lobbyMembershipSnapshot.js";
 import { canCreateLobbyFromInputs } from "./lobbyCreateGuard.js";
 import { hasActiveLobby } from "./lobby.js";
+import { clearStorePremiumOverlay } from "./entitlements.js";
 
 const BACKEND_REQUIRED =
   "Configuration backend requise. Relance l’application après configuration Supabase.";
@@ -340,6 +341,7 @@ async function leaveActiveLobbyForAuthChange() {
 }
 
 export async function logout() {
+  clearStorePremiumOverlay();
   if (!isSupabaseConfigured()) {
     saveStatePatch({
       user: {
