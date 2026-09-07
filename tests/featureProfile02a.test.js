@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { getState, saveStatePatch } from "../js/core/state.js";
 import { profileSkuForUser } from "../js/core/purchases.js";
 import {
   PLAY_PRODUCT_ID_PROFILE,
@@ -25,17 +26,53 @@ describe("FEATURE-PROFILE-02A/02B — SKUs + carte Menu", () => {
     assert.equal(/\bsk_[A-Za-z0-9]/.test(config), false);
   });
 
-  it("upgrade 4 € seulement si Sans pub sans Profil", () => {
+  it("upgrade 4 € seulement si Sans pub sans Profil ni Maître", () => {
     assert.equal(profileSkuForUser({}), PLAY_PRODUCT_ID_PROFILE);
-    assert.equal(profileSkuForUser({ adFree: false, profilePack: false }), PLAY_PRODUCT_ID_PROFILE);
-    assert.equal(
-      profileSkuForUser({ adFree: true, profilePack: false }),
-      PLAY_PRODUCT_ID_PROFILE_UPGRADE
-    );
+    assert.equal(profileSkuForUser({ adFree: true }), PLAY_PRODUCT_ID_PROFILE_UPGRADE);
+    assert.equal(profileSkuForUser({ profilePack: true }), PLAY_PRODUCT_ID_PROFILE);
+    assert.equal(profileSkuForUser({ hostPack: true }), PLAY_PRODUCT_ID_PROFILE);
     assert.equal(
       profileSkuForUser({ adFree: true, profilePack: true }),
       PLAY_PRODUCT_ID_PROFILE
     );
+    assert.equal(profileSkuForUser({ adFree: true, hostPack: true }), PLAY_PRODUCT_ID_PROFILE);
+    assert.equal(
+      profileSkuForUser({ adFree: false, profilePack: true, hostPack: false }),
+      PLAY_PRODUCT_ID_PROFILE
+    );
+  });
+
+  it("profileSkuForUser ignore le user du state global", () => {
+    const snapshot = structuredClone(getState());
+    saveStatePatch({
+      user: {
+        ...(getState().user || {}),
+        loggedIn: true,
+        isGuest: false,
+        adFree: true,
+        profilePack: false,
+        hostPack: false,
+      },
+    });
+    try {
+      assert.equal(profileSkuForUser({}), PLAY_PRODUCT_ID_PROFILE);
+      assert.equal(
+        profileSkuForUser({ adFree: false, profilePack: false, hostPack: false }),
+        PLAY_PRODUCT_ID_PROFILE
+      );
+    } finally {
+      saveStatePatch(snapshot);
+    }
+  });
+
+  it("profileSkuForUser ne lit pas getState / isAdFree", () => {
+    const purchases = src("js/core/purchases.js");
+    const start = purchases.indexOf("export function profileSkuForUser");
+    const end = purchases.indexOf("export function hostSkuForUser");
+    const fn = purchases.slice(start, end);
+    assert.match(fn, /isAdFreeForUser\(user\)/);
+    assert.equal(/getState\(/.test(fn), false);
+    assert.equal(/isAdFree\(\)/.test(fn), false);
   });
 
   it("purchases n’écrit pas profile_pack en base", () => {

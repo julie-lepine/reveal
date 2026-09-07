@@ -577,4 +577,18 @@ Pas de SQL. Restore / already-owned : si RevenueCat a l’entitlement `host`, le
 | Tests | `tests/featureRcRestore.test.js` |
 | Hors scope | RC-SKU-ADF · webhook SQL · GitHub Pages · écriture `host_pack` |
 
-**Statut** : client **implémenté** 7 sept 2026 · QA store **🟡 BLOCKED** (comptes Google Play).
+**Statut** : client **✅** · QA **✅** 7 sept 2026 (Pages/SQL Anrobensy A–F : overlay, `fetchProfile` ne wipe pas, grant `host_pack`, cap 14). Restore Google Play **non exécuté**.
+
+---
+
+## 29. RC-SKU-ADF — SKU Premium + hydrate
+
+Pas de SQL. Helpers SKU restent purs (`user` snapshot). Sans pub effectif = `adFree OR profilePack OR hostPack` via `isAdFreeForUser(user)` (pas `isAdFree()` / `getState`). Login et `refreshAdFreeFromServer` partagent `premiumFlagsFromProfile` : `ad_free` **ou** pack inclus. Pas d’écriture `ad_free` / `host_pack`. Overlay RC-RESTORE inchangé.
+
+| Élément | Valeur |
+| ------- | ------ |
+| Client | `js/core/entitlements.js` · `purchases.js` · `supabaseAuth.js` |
+| Tests | `tests/featureRcSkuAdf.test.js` · `featureProfile02a` · `featureHost02a` · `featureRcRestore` |
+| Hors scope | webhook · product IDs · overlay store · cap 14 |
+
+**Statut** : client **implémenté** 7 sept 2026 · QA **⏳**.

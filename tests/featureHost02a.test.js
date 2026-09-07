@@ -34,22 +34,51 @@ describe("FEATURE-HOST-02A/02B — SKUs + carte Menu", () => {
 
   it("9,99 / 7 € / 3 € selon le palier déjà acheté", () => {
     assert.equal(hostSkuForUser({}), PLAY_PRODUCT_ID_HOST);
+    assert.equal(hostSkuForUser({ adFree: true }), PLAY_PRODUCT_ID_HOST_UPGRADE_ADFREE);
+    assert.equal(hostSkuForUser({ profilePack: true }), PLAY_PRODUCT_ID_HOST_UPGRADE_PROFILE);
+    assert.equal(hostSkuForUser({ hostPack: true }), PLAY_PRODUCT_ID_HOST);
     assert.equal(
-      hostSkuForUser({ adFree: false, profilePack: false, hostPack: false }),
-      PLAY_PRODUCT_ID_HOST
-    );
-    assert.equal(
-      hostSkuForUser({ adFree: true, profilePack: false, hostPack: false }),
-      PLAY_PRODUCT_ID_HOST_UPGRADE_ADFREE
-    );
-    assert.equal(
-      hostSkuForUser({ adFree: true, profilePack: true, hostPack: false }),
+      hostSkuForUser({ adFree: true, profilePack: true }),
       PLAY_PRODUCT_ID_HOST_UPGRADE_PROFILE
     );
+    assert.equal(hostSkuForUser({ adFree: true, hostPack: true }), PLAY_PRODUCT_ID_HOST);
     assert.equal(
       hostSkuForUser({ adFree: false, profilePack: true, hostPack: false }),
       PLAY_PRODUCT_ID_HOST_UPGRADE_PROFILE
     );
+  });
+
+  it("hostSkuForUser ignore le user du state global", () => {
+    const snapshot = structuredClone(getState());
+    saveStatePatch({
+      user: {
+        ...(getState().user || {}),
+        loggedIn: true,
+        isGuest: false,
+        adFree: true,
+        profilePack: false,
+        hostPack: false,
+      },
+    });
+    try {
+      assert.equal(hostSkuForUser({}), PLAY_PRODUCT_ID_HOST);
+      assert.equal(
+        hostSkuForUser({ adFree: false, profilePack: false, hostPack: false }),
+        PLAY_PRODUCT_ID_HOST
+      );
+    } finally {
+      saveStatePatch(snapshot);
+    }
+  });
+
+  it("hostSkuForUser ne lit pas getState / isAdFree", () => {
+    const purchases = src("js/core/purchases.js");
+    const start = purchases.indexOf("export function hostSkuForUser");
+    const end = purchases.indexOf("function packageForProfile");
+    const fn = purchases.slice(start, end);
+    assert.match(fn, /isAdFreeForUser\(user\)/);
+    assert.equal(/getState\(/.test(fn), false);
+    assert.equal(/isAdFree\(\)/.test(fn), false);
   });
 
   it("purchases n’écrit pas host_pack en base", () => {

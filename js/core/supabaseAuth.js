@@ -6,7 +6,12 @@ import {
   resolveLiveDisplayName,
   resolveLiveEmoji,
 } from "./profileIdentity.js";
-import { adFreeFromProfile, avatarFromProfile, clearStorePremiumOverlay, hostPackFromProfile, nameColorFromProfile, profilePackFromProfile } from "./entitlements.js";
+import {
+  avatarFromProfile,
+  clearStorePremiumOverlay,
+  nameColorFromProfile,
+  premiumFlagsFromProfile,
+} from "./entitlements.js";
 import { formatAuthErrorMessage, isAuthRateLimitError, isAuthCaptchaError } from "./authErrors.js";
 import {
   getPasswordResetCooldownRemainingMs,
@@ -239,6 +244,10 @@ export async function syncSessionToState(session) {
     localEmoji: lockedGuestName ? "🎭" : getState().user?.emoji,
   });
 
+  const premium = isAnonymous
+    ? { adFree: false, profilePack: false, hostPack: false }
+    : premiumFlagsFromProfile(profile);
+
   saveStatePatch({
     supabaseUserId: user.id,
     user: {
@@ -248,9 +257,9 @@ export async function syncSessionToState(session) {
       loggedIn: !isAnonymous,
       isGuest: isAnonymous,
       provider: providerFromUser(user),
-      adFree: isAnonymous ? false : adFreeFromProfile(profile),
-      profilePack: isAnonymous ? false : profilePackFromProfile(profile),
-      hostPack: isAnonymous ? false : hostPackFromProfile(profile),
+      adFree: premium.adFree,
+      profilePack: premium.profilePack,
+      hostPack: premium.hostPack,
       nameColor: isAnonymous ? null : nameColorFromProfile(profile),
       avatarPath: isAnonymous ? null : avatarFromProfile(profile).avatarPath,
       avatarRev: isAnonymous ? 0 : avatarFromProfile(profile).avatarRev,

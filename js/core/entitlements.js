@@ -22,6 +22,25 @@ export function hostPackFromProfile(profile) {
   return profile?.host_pack === true;
 }
 
+/**
+ * Flags premium lus depuis une ligne `profiles` (pas d’écriture SQL).
+ * `adFree` effectif = colonne `ad_free` ou pack qui l’inclut (Signature / Maître).
+ */
+export function premiumFlagsFromProfile(profile) {
+  const hostPack = hostPackFromProfile(profile);
+  const profilePack = profilePackFromProfile(profile);
+  const adFree = adFreeFromProfile(profile) || profilePack;
+  return { adFree, profilePack, hostPack };
+}
+
+/**
+ * Sans pub effectif sur un snapshot `user`. Pur : pas de getState.
+ * Le filtre invité reste dans `isAdFree()` (comportement pubs inchangé).
+ */
+export function isAdFreeForUser(user) {
+  return user?.adFree === true || user?.profilePack === true || user?.hostPack === true;
+}
+
 export function nameColorFromProfile(profile) {
   if (!profilePackFromProfile(profile)) return null;
   const id = profile?.name_color;
@@ -41,7 +60,7 @@ export function avatarFromProfile(profile) {
 export function isAdFree() {
   const user = getState().user;
   if (!user || user.isGuest) return false;
-  return user.adFree === true || user.profilePack === true || user.hostPack === true;
+  return isAdFreeForUser(user);
 }
 
 /** Pack Profil lié au compte. Invité = toujours false. Maître l’inclut. */
@@ -110,10 +129,7 @@ export async function refreshAdFreeFromServer() {
   }
   const { fetchProfile } = await import("./supabaseProfile.js");
   const profile = await fetchProfile(userId);
-  const hostPack = hostPackFromProfile(profile);
-  const profilePack = profilePackFromProfile(profile) || hostPack;
-  const adFree = adFreeFromProfile(profile) || profilePack;
-  lastServerPremium = { adFree, profilePack, hostPack };
+  lastServerPremium = premiumFlagsFromProfile(profile);
   const nameColor = nameColorFromProfile(profile);
   const { avatarPath, avatarRev } = avatarFromProfile(profile);
   const merged = applyMergedPremiumToUser(lastServerPremium, {

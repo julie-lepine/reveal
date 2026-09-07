@@ -12,6 +12,7 @@ import {
   premiumRestoreUserMessage,
   shouldContinuePremiumStorePoll,
 } from "./premiumStoreOverlay.js";
+import { isAdFreeForUser } from "./entitlements.js";
 import { isNativeApp, getNativePlatform } from "./platform.js";
 import { getState } from "./state.js";
 import {
@@ -241,7 +242,11 @@ function packageForHost(offerings, user) {
 
 /** SKU Profil : 4,00 € si Sans pub déjà là, sinon 6,99 €. Pas de fallback sur Sans pub. */
 export function profileSkuForUser(user) {
-  if (user?.adFree === true && user?.profilePack !== true && user?.hostPack !== true) {
+  if (
+    isAdFreeForUser(user) &&
+    user?.profilePack !== true &&
+    user?.hostPack !== true
+  ) {
     return PLAY_PRODUCT_ID_PROFILE_UPGRADE;
   }
   return PLAY_PRODUCT_ID_PROFILE;
@@ -251,7 +256,7 @@ export function profileSkuForUser(user) {
 export function hostSkuForUser(user) {
   if (user?.hostPack === true) return PLAY_PRODUCT_ID_HOST;
   if (user?.profilePack === true) return PLAY_PRODUCT_ID_HOST_UPGRADE_PROFILE;
-  if (user?.adFree === true) return PLAY_PRODUCT_ID_HOST_UPGRADE_ADFREE;
+  if (isAdFreeForUser(user)) return PLAY_PRODUCT_ID_HOST_UPGRADE_ADFREE;
   return PLAY_PRODUCT_ID_HOST;
 }
 

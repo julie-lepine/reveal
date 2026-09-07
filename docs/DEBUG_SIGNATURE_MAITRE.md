@@ -44,8 +44,7 @@ Ces écarts sont lus dans le code, pas des hypothèses. Cocher `repro OK` / `pas
 | --- | -- | ---------------- | ----- |
 | P0 | **H-SQL** | Achat Maître : store OK, Forfaits reste « Débloquer », lobby reste `/ 8` | Colonne `host_pack` absente → `fetchProfile` fallback `host_pack: false` |
 
-| P1 | **RC-RESTORE** | Compte déjà Signature, restore / already-owned Maître → Signature OK, Maître pas actif jusqu’au webhook | **patch** overlay + poll jusqu’à `host_pack` · **🟡 CODE / STORE QA BLOCKED** |
-| P1 | **RC-SKU-ADF** | `profileSkuForUser` lit `user.adFree` (colonne), pas `isAdFree()` | Un compte Signature sans `ad_free` en base paierait 6,99 au lieu de 4,00 (cas SQL manuel / grant incomplet) |
+| P1 | **RC-SKU-ADF** | Helpers SKU vs Sans pub effectif ; hydrate login ≠ refresh | **patch** helper pur `isAdFreeForUser` + `premiumFlagsFromProfile` · QA ⏳ |
 | P2 | **ID-OLD** | Refund Signature puis rachat : couleur / photo / emoji extra **effacés** au grant | Triggers cosmetics / avatar lisent `old.profile_pack` sur UPDATE |
 | P2 | **ID-OVERLAY** | Après achat, couleur « sauvée » puis disparue ; badge lobby en retard vs Menu → Profil | Overlay store débloque l’UI avant le webhook ; `upsertProfile` est strippé tant que `profile_pack` est false |
 | P2 | **AV-STORAGE** | Utilisateur inscrit **sans** Signature peut uploader `{uid}/avatar.jpg` public | Policies Storage `avatars` : owner path only, **pas** de check `profile_pack` |
@@ -97,10 +96,10 @@ SQL après achat (service_role / Editor) : les trois colonnes, pas seulement l�
 
 Compte A = Signature déjà en base. Sur un 2ᵉ appareil / après réinstall :
 
-- [ ] Restaurer les achats alors que Maître est aussi sur le même compte Play/Apple.
-- [ ] **Attendu produit** : Forfaits = Maître Actif + cap 14 si hôte.
-- [ ] **Code** : overlay session si RC `host` ; poll 8×1 s jusqu’à `host_pack` (ne s’arrête plus sur Signature). Timeout → Maître reste visible + message d’activation différée. QA store **⏳** (comptes Play bloqués).
-- [ ] Contrôle : `profiles.host_pack` vs `state.user.hostPack` (overlay session, pas d’écriture SQL).
+- [ ] Restaurer les achats (Play natif) — non joué, comptes store bloqués.
+- [x] **Attendu produit** (simulé SQL/overlay) : Forfaits = Maître Actif + cap 14 si hôte. QA **✅** 7 sept 2026 Anrobensy Pages.
+- [x] Overlay + `fetchProfile` : Maître reste visible si `host_pack` false ; F5 enlève l’overlay ; SQL `host_pack` true le rétablit.
+- [x] Contrôle : overlay n’écrit pas `host_pack` (SQL resté false pendant B/C).
 
 Même scénario via « déjà acheté » (error already-owned) pendant `purchaseHost`.
 

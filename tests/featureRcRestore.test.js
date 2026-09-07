@@ -317,11 +317,13 @@ describe("RC-RESTORE — contrats source", () => {
     assert.doesNotMatch(fn.slice(0, 1800), /host_pack\s*:/);
   });
 
-  it("profileSkuForUser inchangé (RC-SKU-ADF hors scope)", () => {
+  it("profileSkuForUser reste pur (RC-SKU-ADF)", () => {
     const src = read("js/core/purchases.js");
-    assert.match(
-      src,
-      /if \(user\?\.adFree === true && user\?\.profilePack !== true && user\?\.hostPack !== true\)/
-    );
+    const start = src.indexOf("export function profileSkuForUser");
+    const end = src.indexOf("export function hostSkuForUser");
+    const fn = src.slice(start, end);
+    assert.match(fn, /isAdFreeForUser\(user\)/);
+    assert.equal(/getState\(/.test(fn), false);
+    assert.equal(/isAdFree\(\)/.test(fn), false);
   });
 });
