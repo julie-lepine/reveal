@@ -9,6 +9,7 @@ import {
   capturePendingAvatar,
   capturePendingNameColor,
   clearPendingSignatureCosmetics,
+  coalesceLocalCosmeticsDuringHold,
   getPendingSignatureCosmetics,
   pendingHasCosmetics,
   replayPendingSignatureCosmetics,
@@ -175,13 +176,37 @@ export async function refreshAdFreeFromServer() {
   };
   const nameColor = nameColorFromProfile(profile);
   const { avatarPath, avatarRev } = avatarFromProfile(profile);
-  const cosmetics = applyServerCosmeticsWithPending({
+  const hold = shouldHoldPendingSignatureCosmetics({
+    overlay: getStorePremiumOverlay(),
+    serverProfilePackColumn: lastServerPremium.profilePackColumn === true,
+  });
+  let cosmetics = applyServerCosmeticsWithPending({
     serverNameColor: nameColor,
     serverAvatarPath: avatarPath,
     serverAvatarRev: avatarRev,
     pending: getPendingSignatureCosmetics(),
     userId,
   });
+  cosmetics = coalesceLocalCosmeticsDuringHold({
+    hold,
+    fromServer: cosmetics,
+    local: {
+      nameColor: user.nameColor,
+      avatarPath: user.avatarPath,
+      avatarRev: user.avatarRev,
+    },
+  });
+  if (hold) {
+    if (cosmetics.nameColor != null && !getPendingSignatureCosmetics().hasNameColor) {
+      capturePendingNameColor(userId, cosmetics.nameColor);
+    }
+    if (cosmetics.avatarPath && !getPendingSignatureCosmetics().hasAvatar) {
+      capturePendingAvatar(userId, {
+        avatarPath: cosmetics.avatarPath,
+        avatarRev: cosmetics.avatarRev,
+      });
+    }
+  }
   const merged = applyMergedPremiumToUser(lastServerPremium, cosmetics);
   if (
     lastServerPremium.profilePackColumn === true &&

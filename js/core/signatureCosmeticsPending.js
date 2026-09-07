@@ -96,6 +96,37 @@ export function applyServerCosmeticsWithPending({
   };
 }
 
+/**
+ * Fenêtre overlay : un null serveur (pack SQL encore false) n’écrase pas
+ * la couleur / photo déjà posée en local, même si le pending session a raté.
+ */
+export function coalesceLocalCosmeticsDuringHold({
+  hold = false,
+  fromServer = {},
+  local = {},
+} = {}) {
+  if (!hold) {
+    return {
+      nameColor: fromServer.nameColor ?? null,
+      avatarPath: fromServer.avatarPath ?? null,
+      avatarRev: Number(fromServer.avatarRev) || 0,
+    };
+  }
+  const nameColor =
+    fromServer.nameColor != null && fromServer.nameColor !== ""
+      ? fromServer.nameColor
+      : local.nameColor != null && local.nameColor !== ""
+        ? local.nameColor
+        : null;
+  const avatarPath = fromServer.avatarPath || local.avatarPath || null;
+  const avatarRev = fromServer.avatarPath
+    ? Number(fromServer.avatarRev) || 0
+    : avatarPath
+      ? Number(local.avatarRev) || 0
+      : 0;
+  return { nameColor, avatarPath, avatarRev };
+}
+
 export function nameColorReplayAccepted(data, expected) {
   const got = data?.name_color == null ? null : String(data.name_color);
   const want = expected == null || expected === "" ? null : String(expected);

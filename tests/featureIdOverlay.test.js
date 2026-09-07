@@ -9,6 +9,7 @@ import { fileURLToPath } from "node:url";
 import { getState, saveStatePatch, setLocalNameColor, setLocalAvatar } from "../js/core/state.js";
 import {
   applyServerCosmeticsWithPending,
+  coalesceLocalCosmeticsDuringHold,
   emptyPendingSignatureCosmetics,
   getPendingSignatureCosmetics,
   rememberPendingNameColor,
@@ -118,6 +119,21 @@ describe("ID-OVERLAY — helpers purs", () => {
     });
     assert.equal(other.nameColor, null);
   });
+
+  it("hold : null serveur n’efface pas la couleur locale", () => {
+    const kept = coalesceLocalCosmeticsDuringHold({
+      hold: true,
+      fromServer: { nameColor: null, avatarPath: null, avatarRev: 0 },
+      local: { nameColor: "lime", avatarPath: null, avatarRev: 0 },
+    });
+    assert.equal(kept.nameColor, "lime");
+    const released = coalesceLocalCosmeticsDuringHold({
+      hold: false,
+      fromServer: { nameColor: null, avatarPath: null, avatarRev: 0 },
+      local: { nameColor: "lime", avatarPath: null, avatarRev: 0 },
+    });
+    assert.equal(released.nameColor, null);
+  });
 });
 
 describe("ID-OVERLAY — overlay / refresh / replay", () => {
@@ -154,6 +170,18 @@ describe("ID-OVERLAY — overlay / refresh / replay", () => {
     assert.equal(getLastServerProfilePackColumn(), false);
     assert.equal(getState().user.nameColor, "rose");
     assert.equal(getPendingSignatureCosmetics().hasNameColor, true);
+    assert.equal(upsertCalls.length, 0);
+  });
+
+  it("A2 — overlay : couleur locale survit même sans capture préalable", async () => {
+    applyPremiumFromStore({ profilePack: true });
+    assert.equal(setLocalNameColor("lime").ok, true);
+    assert.equal(getPendingSignatureCosmetics().hasNameColor, false);
+    await refreshAdFreeFromServer();
+    assert.equal(getLastServerProfilePackColumn(), false);
+    assert.equal(getState().user.nameColor, "lime");
+    assert.equal(getPendingSignatureCosmetics().hasNameColor, true);
+    assert.equal(getPendingSignatureCosmetics().nameColor, "lime");
     assert.equal(upsertCalls.length, 0);
   });
 
