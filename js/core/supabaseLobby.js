@@ -90,6 +90,8 @@ import {
   wasLobbyClosureHandled,
   isLocalHostManualDissolve,
 } from "./lobbyClosureSession.js";
+import { LOBBY_CLOSURE_FETCH } from "./lobbyClosureContract.js";
+import { collectSignatureEveningArchivePayload } from "./signatureCarnet.js";
 
 export {
   JOIN_SESSION_RESTORE_DELAYS_MS,
@@ -961,29 +963,35 @@ export async function isLocalStillLobbyMember(lobbyId = getState().lobby?.id) {
   return Boolean(data);
 }
 
-async function kickLocalPlayerIfStillInOpenLobby(lobbyId) {
-  if (!lobbyId || !getState().inLobby) return;
+async function kickLocalPlayerIfStillInOpenLobby(lobbyId, archivePayload) {
+  if (!lobbyId) return;
   if (wasLobbyClosureHandled(lobbyId) || isLocalHostManualDissolve(lobbyId)) return;
+  const payload =
+    archivePayload !== undefined
+      ? archivePayload
+      : collectSignatureEveningArchivePayload();
+  if (!getState().inLobby && !payload) return;
   const { handleKickedFromLobby } = await import("./lobby.js");
-  await handleKickedFromLobby();
+  await handleKickedFromLobby({ archivePayload: payload });
 }
 
-/** DELETE membership : kick immédiat si le lobby existe encore (pas un dissolve CASCADE). */
+/** DELETE membership : kick immédiat si le lobby n'a pas de tombstone de fermeture.
+ * Ne pas SELECT `lobbies` : RLS masque la ligne au kické (plus membre) — ça
+ * ressemblait à un dissolve et l'archive carnet n'était jamais appelée.
+ */
 async function kickLocalIfMemberDeleteIsNotDissolve(lobbyId) {
   if (!lobbyId || !getState().inLobby) return;
   if (wasLobbyClosureHandled(lobbyId) || isLocalHostManualDissolve(lobbyId)) return;
-  const { data, error } = await supabase
-    .from("lobbies")
-    .select("id")
-    .eq("id", lobbyId)
-    .maybeSingle();
-  if (error || !data) return;
-  await kickLocalPlayerIfStillInOpenLobby(lobbyId);
+  const archivePayload = collectSignatureEveningArchivePayload();
+  const closure = await fetchLobbyClosure(lobbyId);
+  if (closure.status === LOBBY_CLOSURE_FETCH.FOUND) return;
+  await kickLocalPlayerIfStillInOpenLobby(lobbyId, archivePayload);
 }
 
 /** N'expulse que si le membre local n'existe plus (évite faux « lobby fermé » après sync profil). */
 async function handlePossibleLobbyGone(lobbyId, e) {
   if (!isLobbyGoneError(e)) throw e;
+  const archivePayload = collectSignatureEveningArchivePayload();
   const stillMember = await isLocalStillLobbyMember(lobbyId);
   if (stillMember === true) {
     console.warn("REVEAL lobby fetch failed but member still present:", e.message || e);
@@ -1002,11 +1010,17 @@ async function handlePossibleLobbyGone(lobbyId, e) {
     }
     return false;
   }
-  const { resolveLobbyClosureAndExit } = await import("./lobby.js");
-  await resolveLobbyClosureAndExit({
-    lobbyId: lobbyId || readRememberedLobbyId(),
-    source: "possible-lobby-gone",
-  });
+  const closure = await fetchLobbyClosure(lobbyId);
+  if (closure.status === LOBBY_CLOSURE_FETCH.FOUND) {
+    const { resolveLobbyClosureAndExit } = await import("./lobby.js");
+    await resolveLobbyClosureAndExit({
+      lobbyId: lobbyId || readRememberedLobbyId(),
+      source: "possible-lobby-gone",
+    });
+    return false;
+  }
+  const { handleKickedFromLobby } = await import("./lobby.js");
+  await handleKickedFromLobby({ archivePayload });
   return false;
 }
 
@@ -1398,7 +1412,8 @@ function applyLobbyToState(bundle, { persistGuestMembership = false } = {}) {
     // Kick prouvé : roster non vide sans le joueur local.
     // participants=[] ne suffit pas (bundle vide / partiel) - dissolve/gone gèrent autrement.
     const lid = getState().lobby?.id || bundle.id;
-    void kickLocalPlayerIfStillInOpenLobby(lid);
+    const archivePayload = collectSignatureEveningArchivePayload();
+    void kickLocalPlayerIfStillInOpenLobby(lid, archivePayload);
     return;
   }
 
@@ -2021,10 +2036,11 @@ export async function refreshLobbyFromSupabase({ withMessages = false } = {}) {
     const uid = getSupabaseUserId();
     const stillOnRoster = (bundle.participants || []).some((p) => p.userId === uid);
     if (uid && getState().inLobby && !stillOnRoster) {
+      const archivePayload = collectSignatureEveningArchivePayload();
       const stillMember = await isLocalStillLobbyMember(lobbyId);
       if (stillMember === false) {
         const { handleKickedFromLobby } = await import("./lobby.js");
-        await handleKickedFromLobby();
+        await handleKickedFromLobby({ archivePayload });
       }
     }
     return true;
@@ -2429,9 +2445,10 @@ export function subscribeLobbyRealtime(onUpdate) {
         }
         if (payload?.eventType === "DELETE" && !removedUid && localUid) {
           const capturedLobbyId = lobbyId;
+          const archivePayload = collectSignatureEveningArchivePayload();
           void isLocalStillLobbyMember(capturedLobbyId).then((still) => {
             if (still !== false) return;
-            void kickLocalPlayerIfStillInOpenLobby(capturedLobbyId);
+            void kickLocalPlayerIfStillInOpenLobby(capturedLobbyId, archivePayload);
           });
         }
         if (!isMeaningfulMemberChange(payload)) return;

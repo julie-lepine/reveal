@@ -42,6 +42,29 @@ describe("FEATURE-PROFILE-04b — carnet après kick", () => {
     const archiveIdx = fn.indexOf("archiveSignatureEveningBeforeLeave");
     const wipeIdx = fn.indexOf("applyLeaveLobbyLocal");
     assert.ok(archiveIdx >= 0 && wipeIdx > archiveIdx);
+    assert.match(fn, /archivePayload/);
+  });
+
+  it("kick client : tombstone dissolve vs RLS kick ; snapshot avant await", () => {
+    const src = read("js/core/supabaseLobby.js");
+    const kickFn = src.slice(
+      src.indexOf("async function kickLocalIfMemberDeleteIsNotDissolve"),
+      src.indexOf("async function handlePossibleLobbyGone")
+    );
+    assert.match(kickFn, /collectSignatureEveningArchivePayload/);
+    assert.match(kickFn, /fetchLobbyClosure/);
+    assert.match(kickFn, /LOBBY_CLOSURE_FETCH\.FOUND/);
+    assert.doesNotMatch(kickFn, /\.from\("lobbies"\)/);
+
+    const gone = src.slice(
+      src.indexOf("async function handlePossibleLobbyGone"),
+      src.indexOf("const DISPLAY_NAME_TAKEN_MSG")
+    );
+    const snapIdx = gone.indexOf("collectSignatureEveningArchivePayload");
+    const memberIdx = gone.indexOf("isLocalStillLobbyMember");
+    assert.ok(snapIdx >= 0 && memberIdx > snapIdx);
+    assert.match(gone, /handleKickedFromLobby\(\s*\{\s*archivePayload/);
+    assert.match(gone, /LOBBY_CLOSURE_FETCH\.FOUND/);
   });
 
   it("runbook catalogue ; ne pas réexécuter 04 / kick historique", () => {

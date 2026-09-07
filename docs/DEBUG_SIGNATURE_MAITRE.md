@@ -44,7 +44,7 @@ Ces écarts sont lus dans le code, pas des hypothèses. Cocher `repro OK` / `pas
 | --- | -- | ---------------- | ----- |
 | P0 | **H-SQL** | Achat Maître : store OK, Forfaits reste « Débloquer », lobby reste `/ 8` | Colonne `host_pack` absente → `fetchProfile` fallback `host_pack: false` |
 
-| P1 | **C-KICK** | Signature kické → soirée absente du carnet | **patch repo** : jeton `signature_carnet_kick_allow` au kick + archive client avant wipe. SQL [`feature-profile-04b-carnet-kick.sql`](../supabase/feature-profile-04b-carnet-kick.sql) **⏳ à coller**. |
+| P1 | **C-KICK** | Signature kické → soirée absente du carnet | SQL 04b (jeton) **+** client : ne plus prendre un kick pour un dissolve (RLS masque `lobbies` au kické). |
 | P1 | **C-DISSOLVE** | Hôte ferme le salon → seul **son** carnet archive ; les autres Signature perdent la soirée | `dissolveLobbyAsHost` archive uniquement l’appelant, tant qu’il est encore membre. Pas de trigger SQL sur DELETE lobby |
 | P1 | **C-HOME** | Quitter depuis Accueil (membership serveur, cache non hydraté) → pas d’archive | `leaveLobbyMembershipFromServer` ne câble pas l’archive |
 | P1 | **RC-RESTORE** | Compte déjà Signature, restore / already-owned Maître → Signature OK, Maître pas actif jusqu’au webhook | `refreshPremiumAfterStore` **break** dès que `profilePack` est true ; overlay store réappliqué seulement si les **3** flags sont false |
@@ -191,7 +191,7 @@ Archive **uniquement** si : inscrit + pack + encore **membre** du lobby + `hasEv
 | ------ | --------------- | ----------- |
 | Quitter volontaire (membre) | Archive | OK (`leaveLobby` → `archiveSignatureEveningBeforeLeave`) |
 | Hôte dissolve | Tous les Signature du salon archivent | **Bug C-DISSOLVE** : hôte seul |
-| Kick | Le kické archive | **patch 04b** (jeton + client) — SQL ⏳ |
+| Kick | Le kické archive | **04b + client** : jeton SQL + archive même si RLS cache le salon |
 | Accueil → quitter membership serveur | Archive | **Bug C-HOME** : non |
 | Quitter **sans** avoir joué | Rien | OK (`hasEveningStatsActivity` false) |
 | Rang introuvable (joueur local absent du standing) | Skip silencieux | Payload null |

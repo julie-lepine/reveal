@@ -761,6 +761,7 @@ describe("lobbyMembershipVagueE2 - contrats dissolution / kick", () => {
     assert.match(gone, /stillMember === true/);
     assert.match(gone, /stillMember === null/);
     assert.match(gone, /resolveLobbyClosureAndExit/);
+    assert.match(gone, /handleKickedFromLobby/);
     // stillMember null / true → pas de dissolve (ordre : return avant import dissolve)
     const nullIdx = gone.indexOf("stillMember === null");
     const trueIdx = gone.indexOf("stillMember === true");

@@ -18,6 +18,7 @@ import {
   parseCarnetListPayload,
 } from "./signatureCarnetLogic.js";
 import { isRegisteredUser } from "./friendsLogic.js";
+import { getSupabaseUserId } from "./supabaseAuth.js";
 
 const SILENT_ARCHIVE_CODES = new Set([
   "signature_locked",
@@ -97,14 +98,17 @@ export function collectSignatureEveningArchivePayload() {
     (p) => scores[p.name] || 0
   );
   const localName = getLocalDisplayName();
+  const localUserId =
+    participants.find((p) => p.isLocal)?.userId || getSupabaseUserId() || null;
   const me =
-    ranked.find((p) => p.isLocal) || ranked.find((p) => p.name === localName) || null;
+    ranked.find((p) => p.isLocal) ||
+    ranked.find((p) => p.name === localName) ||
+    null;
   const gameIds = resolveEveningGameScoreOrder({
     gameScoreOrder: state.gameScoreOrder,
     gameScores: state.gameScores,
     eveningGamesRecorded: state.eveningGamesRecorded,
   });
-  const localUserId = participants.find((p) => p.isLocal)?.userId || null;
   const peerUserIds = participants
     .filter((p) => p.userId && !p.isLocal && String(p.userId) !== String(localUserId || ""))
     .map((p) => p.userId);
@@ -122,9 +126,10 @@ export function collectSignatureEveningArchivePayload() {
   });
 }
 
-/** Best-effort : n’échoue jamais le leave. À appeler tant que la membership existe. */
-export async function archiveSignatureEveningQuiet() {
-  const payload = collectSignatureEveningArchivePayload();
+/** Best-effort : n’échoue jamais le leave. Passer un snapshot si l’état lobby peut disparaître. */
+export async function archiveSignatureEveningQuiet(precollected = undefined) {
+  const payload =
+    precollected !== undefined ? precollected : collectSignatureEveningArchivePayload();
   if (!payload || !canCallCarnetRpc()) return { ok: true, skipped: true };
   try {
     const { error } = await supabase.rpc("archive_signature_evening", {

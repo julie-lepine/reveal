@@ -89,6 +89,10 @@ import {
   showAppConfirm,
   showTransferHostDialog,
 } from "./dialog.js";
+import {
+  archiveSignatureEveningQuiet,
+  collectSignatureEveningArchivePayload,
+} from "./signatureCarnet.js";
 
 export {
   isVoluntaryLeaveInFlight,
@@ -1221,9 +1225,8 @@ export async function handleLobbyDissolvedForGuest(opts = {}) {
 }
 
 /** Invité : retiré du lobby par l'hôte (kick) - membership locale absente côté serveur. */
-export async function handleKickedFromLobby() {
+export async function handleKickedFromLobby(opts = {}) {
   if (lobbyKickHandling || lobbyDissolveHandling) return;
-  if (!getState().inLobby) return;
   if (isLocalLobbyHost()) return;
 
   const kickedLobbyId = getLobby()?.id || getRememberedLobbyId() || null;
@@ -1231,8 +1234,21 @@ export async function handleKickedFromLobby() {
   if (kickedLobbyId && wasLobbyClosureHandled(kickedLobbyId)) return;
   if (kickedLobbyId && isLocalHostManualDissolve(kickedLobbyId)) return;
 
+  const archivePayload =
+    opts.archivePayload !== undefined
+      ? opts.archivePayload
+      : collectSignatureEveningArchivePayload();
+
+  if (!getState().inLobby && !archivePayload) return;
+
   lobbyKickHandling = true;
-  await archiveSignatureEveningBeforeLeave();
+  await archiveSignatureEveningBeforeLeave(archivePayload);
+
+  if (!getState().inLobby) {
+    lobbyKickHandling = false;
+    return;
+  }
+
   stopMultiplayerSync();
   stopLobbyPresenceSync();
 
@@ -1381,10 +1397,9 @@ async function reconcileHostDissolveNotAllowed(lobbyId) {
   };
 }
 
-async function archiveSignatureEveningBeforeLeave() {
+async function archiveSignatureEveningBeforeLeave(payload) {
   try {
-    const { archiveSignatureEveningQuiet } = await import("./signatureCarnet.js");
-    await archiveSignatureEveningQuiet();
+    await archiveSignatureEveningQuiet(payload);
   } catch (e) {
     console.warn("REVEAL signature carnet:", e?.message || e);
   }

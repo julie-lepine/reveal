@@ -522,13 +522,15 @@ QA 7 sept 2026 : à 14/14 l’hôte pouvait encore **envoyer** une invitation ; 
 
 ## 25. FEATURE-PROFILE-04b — Carnet après kick (C-KICK)
 
-`archive_signature_evening` exigeait `is_lobby_member`. Le kick supprime la membership avant que le kické puisse archiver. Cette migration : table `signature_carnet_kick_allow` (écriture definer dans `kick_lobby_member`, **avant** DELETE) ; l’RPC archive accepte ce jeton 30 min pour **ce** uid + lobby. Client : `handleKickedFromLobby` archive tant que l’état soirée est encore là.
+`archive_signature_evening` exigeait `is_lobby_member`. Le kick supprime la membership avant que le kické puisse archiver. Cette migration : table `signature_carnet_kick_allow` (écriture definer dans `kick_lobby_member`, **avant** DELETE) ; l’RPC archive accepte ce jeton 30 min pour **ce** uid + lobby.
+
+Le client ne doit **pas** SELECT `lobbies` pour distinguer kick / dissolve : RLS masque la ligne au kické, le fetch tombe en « 0 rows » et l’ancien chemin prenait `resolveLobbyClosureAndExit` **sans** archive. Discriminant : tombstone `get_lobby_closure` ; snapshot carnet **avant** les awaits.
 
 | Élément | Valeur |
 | ------- | ------ |
-| Migration | [`feature-profile-04b-carnet-kick.sql`](../supabase/feature-profile-04b-carnet-kick.sql) — **⏳** après FEATURE-PROFILE-04 |
+| Migration | [`feature-profile-04b-carnet-kick.sql`](../supabase/feature-profile-04b-carnet-kick.sql) — collé (jeton) |
 | Runbook | [`tests/feature-profile-04b-carnet-kick-runbook.sql`](../supabase/tests/feature-profile-04b-carnet-kick-runbook.sql) — `CARNET04B_KICK_OK` |
-| Client | `js/core/lobby.js` (`handleKickedFromLobby`) |
+| Client | `js/core/lobby.js` (`handleKickedFromLobby`) · `js/core/supabaseLobby.js` (kick vs gone) |
 | Hors scope | C-DISSOLVE · C-HOME |
 
-**Statut** : SQL **⏳** · 7 sept 2026.
+**Statut** : SQL collé · client **fix RLS kick→dissolve** 7 sept 2026.
