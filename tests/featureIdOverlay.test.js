@@ -99,6 +99,14 @@ describe("ID-OVERLAY — helpers purs", () => {
       }),
       false
     );
+    assert.equal(
+      shouldHoldPendingSignatureCosmetics({
+        overlay: null,
+        serverProfilePackColumn: false,
+        holdNameColor: "lime",
+      }),
+      true
+    );
   });
 
   it("pending gagne sur un null serveur, pas sur un autre userId", () => {
@@ -180,6 +188,7 @@ describe("ID-OVERLAY — overlay / refresh / replay", () => {
     await refreshAdFreeFromServer();
     assert.equal(getLastServerProfilePackColumn(), false);
     assert.equal(getState().user.nameColor, "lime");
+    assert.equal(getState().user.signatureHoldNameColor, "lime");
     assert.equal(getPendingSignatureCosmetics().hasNameColor, true);
     assert.equal(getPendingSignatureCosmetics().nameColor, "lime");
     assert.equal(upsertCalls.length, 0);
@@ -257,6 +266,9 @@ describe("ID-OVERLAY — overlay / refresh / replay", () => {
     loggedInUser({
       profilePack: false,
       nameColor: null,
+      signatureHoldNameColor: null,
+      signatureHoldAvatarPath: null,
+      signatureHoldAvatarRev: 0,
     });
     saveStatePatch({ supabaseUserId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb" });
     assert.equal(getPendingSignatureCosmetics().hasNameColor, false);

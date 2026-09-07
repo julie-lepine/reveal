@@ -416,6 +416,7 @@ export function mountSettings(app) {
   }
 
   function settingsPanelHtml(inLobby) {
+    const user = getUser();
     if (activeTab === TAB_PERSONNALISATION) {
       return personnalisationPanelHtml({ emailAccount, user, selectedEmoji });
     }

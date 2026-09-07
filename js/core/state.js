@@ -48,6 +48,9 @@ const defaultUser = () => ({
   nameColor: null,
   avatarPath: null,
   avatarRev: 0,
+  signatureHoldNameColor: null,
+  signatureHoldAvatarPath: null,
+  signatureHoldAvatarRev: 0,
 });
 
 const defaultLobby = () => ({
@@ -585,7 +588,11 @@ export function setLocalNameColor(colorId) {
     return { ok: false, error: "La couleur de pseudo est incluse dans Signature." };
   }
   const id = colorId == null || colorId === "" ? null : String(colorId);
-  state.user = { ...state.user, nameColor: id };
+  state.user = {
+    ...state.user,
+    nameColor: id,
+    signatureHoldNameColor: id,
+  };
   if (state.lobby?.participants?.length) {
     state.lobby = {
       ...state.lobby,
@@ -605,7 +612,13 @@ export function setLocalAvatar({ path = null, rev = 0 } = {}) {
   }
   const avatarPath = sanitizeAvatarPath(path);
   const avatarRev = avatarPath ? sanitizeAvatarRev(rev) : 0;
-  state.user = { ...state.user, avatarPath, avatarRev };
+  state.user = {
+    ...state.user,
+    avatarPath,
+    avatarRev,
+    signatureHoldAvatarPath: avatarPath,
+    signatureHoldAvatarRev: avatarRev,
+  };
   if (state.lobby?.participants?.length) {
     state.lobby = {
       ...state.lobby,

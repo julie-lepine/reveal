@@ -179,6 +179,8 @@ export async function refreshAdFreeFromServer() {
   const hold = shouldHoldPendingSignatureCosmetics({
     overlay: getStorePremiumOverlay(),
     serverProfilePackColumn: lastServerPremium.profilePackColumn === true,
+    holdNameColor: user.signatureHoldNameColor,
+    holdAvatarPath: user.signatureHoldAvatarPath,
   });
   let cosmetics = applyServerCosmeticsWithPending({
     serverNameColor: nameColor,
@@ -191,9 +193,11 @@ export async function refreshAdFreeFromServer() {
     hold,
     fromServer: cosmetics,
     local: {
-      nameColor: user.nameColor,
-      avatarPath: user.avatarPath,
-      avatarRev: user.avatarRev,
+      nameColor: user.signatureHoldNameColor || user.nameColor,
+      avatarPath: user.signatureHoldAvatarPath || user.avatarPath,
+      avatarRev: user.signatureHoldAvatarPath
+        ? user.signatureHoldAvatarRev
+        : user.avatarRev,
     },
   });
   if (hold) {
@@ -270,4 +274,16 @@ export async function refreshHostPackFromServerUntil(expected, opts = {}) {
     await new Promise((r) => setTimeout(r, delayMs));
   }
   return last;
+}
+
+if (!globalThis.__revealPremium) {
+  globalThis.__revealPremium = {
+    applyPremiumFromStore,
+    refreshAdFreeFromServer,
+    getLastServerProfilePackColumn,
+    getLastServerPremium,
+    getStorePremiumOverlay,
+    isProfilePack,
+    isHostPack,
+  };
 }

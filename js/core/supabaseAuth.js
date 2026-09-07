@@ -263,6 +263,9 @@ export async function syncSessionToState(session) {
       nameColor: isAnonymous ? null : nameColorFromProfile(profile),
       avatarPath: isAnonymous ? null : avatarFromProfile(profile).avatarPath,
       avatarRev: isAnonymous ? 0 : avatarFromProfile(profile).avatarRev,
+      signatureHoldNameColor: null,
+      signatureHoldAvatarPath: null,
+      signatureHoldAvatarRev: 0,
     },
   });
 
@@ -728,6 +731,9 @@ export async function signInAsGuest(displayName, captchaToken = null, emoji = nu
       nameColor: null,
       avatarPath: null,
       avatarRev: 0,
+      signatureHoldNameColor: null,
+      signatureHoldAvatarPath: null,
+      signatureHoldAvatarRev: 0,
     },
   });
 

@@ -22,8 +22,15 @@ export function overlayUnlocksSignature(overlay) {
 export function shouldHoldPendingSignatureCosmetics({
   overlay,
   serverProfilePackColumn,
+  holdNameColor = null,
+  holdAvatarPath = null,
 } = {}) {
-  return overlayUnlocksSignature(overlay) && serverProfilePackColumn !== true;
+  if (serverProfilePackColumn === true) return false;
+  return (
+    overlayUnlocksSignature(overlay) ||
+    Boolean(holdNameColor) ||
+    Boolean(holdAvatarPath)
+  );
 }
 
 export function pendingHasCosmetics(pending) {
