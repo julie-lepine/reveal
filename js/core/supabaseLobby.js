@@ -62,6 +62,7 @@ import { scalePollIntervalMs } from "../config/syncConfig.js";
 import {
   LOBBY_EXPIRED_JOIN_MSG,
   LOBBY_FULL_MSG,
+  isLobbyFullServerError,
   LOBBY_HEARTBEAT_MIN_MS,
   HOST_PRESENCE_STALE_MS,
   HOST_TRANSFER_STALE_MS,
@@ -1297,14 +1298,15 @@ function isMissingMemberColumn(error) {
   );
 }
 
+/** `true` / `false` si lu ; `null` si la lecture a échoué (ne pas inventer un cap 8). */
 async function fetchProfileHostPack(userId) {
-  if (!userId || !supabase) return false;
+  if (!userId || !supabase) return null;
   const { data, error } = await supabase
     .from("profiles")
     .select("host_pack")
     .eq("id", userId)
     .maybeSingle();
-  if (error) return false;
+  if (error) return null;
   return data?.host_pack === true;
 }
 
@@ -1362,7 +1364,7 @@ async function fetchLobbyBundle(lobbyId, { withMessages = false, currentUserId =
   if (msgRes?.error) throw msgRes.error;
 
   const participants = (members || []).map((m) => mapMember(m, userId));
-  const hostPack = await fetchProfileHostPack(lobby.host_id);
+  const hostPack = (await fetchProfileHostPack(lobby.host_id)) === true;
 
   console.log("[DEBUG FETCH BUNDLE MEMBERS]", {
     currentUserId: userId,
@@ -1894,17 +1896,23 @@ export async function joinLobbySupabase(codeInput, { joinEffects: externalEffect
   }
 
   if (!existing) {
+    // UX : refus rapide. Autorité = trigger H-RACE (FOR UPDATE + count).
     const { data: memberCount, error: countErr } = await supabase.rpc("get_lobby_member_count", {
       p_lobby_id: lobbyRow.id,
     });
     if (countErr) return { ok: false, error: countErr.message, joinEffects };
 
     let hostPack = false;
+    let hostPackKnown = false;
     const hostId = lobbyRow.host_id || lobbyRow.hostId;
     if (hostId) {
-      hostPack = await fetchProfileHostPack(hostId);
+      const read = await fetchProfileHostPack(hostId);
+      if (read != null) {
+        hostPackKnown = true;
+        hostPack = read === true;
+      }
     }
-    if ((memberCount ?? 0) >= lobbyMaxPlayers(hostPack)) {
+    if (hostPackKnown && (memberCount ?? 0) >= lobbyMaxPlayers(hostPack)) {
       return { ok: false, error: LOBBY_FULL_MSG, joinEffects };
     }
 
@@ -1967,6 +1975,9 @@ export async function joinLobbySupabase(codeInput, { joinEffects: externalEffect
             code: "membership_already_elsewhere",
             joinEffects,
           };
+        }
+        if (isLobbyFullServerError(joinErr)) {
+          return { ok: false, error: LOBBY_FULL_MSG, joinEffects };
         }
         if (isDuplicateLobbyDisplayNameError(joinErr)) {
           const storedBeforeReclaim = loadGuestMembership();

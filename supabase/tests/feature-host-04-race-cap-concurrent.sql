@@ -1,0 +1,91 @@
+-- =============================================================================
+-- FEATURE-HOST-04 / H-RACE — preuve concurrente (2 sessions SQL, staging)
+-- Ce fichier N'EST PAS exécuté par `npm test`.
+-- Une seule session SQL Editor ne prouve PAS la course : il faut DEUX backends.
+--
+-- Prérequis : feature-host-04-race-cap.sql collé.
+-- Besoin : un lobby déjà à 7 membres (cap 8) ou 13 (cap 14), plus 2 comptes
+--          distincts qui NE sont pas encore membres (FK auth.users).
+--
+-- Ne PAS coller en production sur un salon réel sans ROLLBACK.
+-- =============================================================================
+--
+-- Remplacer :
+--   :lobby   uuid du salon
+--   :uid_a   8e / 14e siège (session A)
+--   :uid_b   concurrent (session B)
+--
+-- ---------------------------------------------------------------------------
+-- SESSION A (ne pas COMMIT tout de suite)
+-- ---------------------------------------------------------------------------
+--
+-- BEGIN;
+--
+-- INSERT INTO public.lobby_members (
+--   lobby_id, user_id, display_name, emoji, color, is_host, ready
+-- ) VALUES (
+--   ':lobby'::uuid,
+--   ':uid_a'::uuid,
+--   'RaceA',
+--   '🔵',
+--   '#60A5FA',
+--   false,
+--   false
+-- );
+--
+-- -- garder le lock FOR UPDATE (trigger) pendant que B tente l’INSERT
+-- SELECT pg_sleep(8);
+--
+-- COMMIT;
+--
+-- Attendu SESSION A : SUCCESS (8e / 14e siège).
+--
+-- ---------------------------------------------------------------------------
+-- SESSION B (lancer pendant le pg_sleep de A, autre onglet SQL / autre psql)
+-- ---------------------------------------------------------------------------
+--
+-- BEGIN;
+--
+-- INSERT INTO public.lobby_members (
+--   lobby_id, user_id, display_name, emoji, color, is_host, ready
+-- ) VALUES (
+--   ':lobby'::uuid,
+--   ':uid_b'::uuid,
+--   'RaceB',
+--   '🔴',
+--   '#60A5FA',
+--   false,
+--   false
+-- );
+--
+-- COMMIT;
+--
+-- Attendu SESSION B : ERROR lobby_full (attend le lock, recompte, refuse).
+-- Jamais : les deux INSERT OK.
+--
+-- ---------------------------------------------------------------------------
+-- SESSION C — compte final (après COMMIT A, et après l’échec B)
+-- ---------------------------------------------------------------------------
+--
+-- SELECT public.get_lobby_member_count(':lobby'::uuid) AS n,
+--        public.lobby_max_players(':lobby'::uuid) AS cap;
+--
+-- Attendu : n = cap (8 ou 14). Jamais cap+1.
+--
+-- ---------------------------------------------------------------------------
+-- H-TRANSFER (séquentiel, une session, après un salon Maître à 10)
+-- ---------------------------------------------------------------------------
+--
+-- 1. host_pack de l’hôte = true, 10 membres, cap = 14.
+-- 2. transfer_lobby_host vers un membre sans host_pack.
+-- 3. SELECT count(*) = 10 (aucun DELETE).
+-- 4. INSERT d’un 11e → lobby_full.
+--
+-- Cap dynamique inverse :
+-- 1. cap 8, 8 membres.
+-- 2. host_pack hôte → true (cap 14).
+-- 3. INSERT 9e → SUCCESS.
+--
+-- Ownership RLS (en session authenticated, pas postgres) :
+-- INSERT ... user_id = autre uid → refusé par members_insert_self.
+-- =============================================================================

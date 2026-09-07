@@ -410,7 +410,7 @@ Aligne-toi mot pour mot sur les inserts ci-dessus. Apostrophes : celles déjà e
 
 En ligne (27 août 2026, historique) : [privacy.html](https://revealthepartygame.fr/privacy.html) — croisés 24 h, finalités, conservation, cascade compte. Canonique : [havefuncorp.fr/reveal/privacy](https://havefuncorp.fr/reveal/privacy).
 
-Légal Signature : **fait** 5 sept 2026 (in-app + site). Maître de soirée 12,99 € : encore reporté.
+Légal Signature : **fait** 5 sept 2026 (in-app + site). Maître de soirée 9,99 / 7,00 / 3,00 : **fait** 7 sept 2026 ([privacy live](https://havefuncorp.fr/reveal/privacy) + `data/legalContent.js`). Prix mort 12,99 € retiré.
 
 ---
 

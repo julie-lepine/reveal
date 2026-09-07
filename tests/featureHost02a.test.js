@@ -9,6 +9,7 @@ import { hostPackSettingsCardHtml } from "../js/core/hostPackUi.js";
 import { adFreeSettingsCardHtml } from "../js/core/adFreeUi.js";
 import { profilePackSettingsCardHtml } from "../js/core/profilePackUi.js";
 import { premiumOfferChromeHtml } from "../js/core/premiumOfferUi.js";
+import { PRIVACY_POLICY } from "../data/legalContent.js";
 import {
   PLAY_PRODUCT_ID_HOST,
   PLAY_PRODUCT_ID_HOST_UPGRADE_ADFREE,
@@ -104,6 +105,19 @@ describe("FEATURE-HOST-02A/02B — SKUs + carte Menu", () => {
     assert.match(src("js/config/premiumPacks.js"), /Maître de soirée/);
   });
 
+  it("privacy in-app : Maître 9,99 / 7,00 / 3,00, pas 12,99", () => {
+    const host = PRIVACY_POLICY.sections.find((s) => s.heading === "Achat Maître de soirée");
+    const hosting = PRIVACY_POLICY.sections.find((s) => s.heading === "Hébergement et sous-traitants");
+    assert.equal(PRIVACY_POLICY.updated, "7 septembre 2026");
+    assert.ok(host);
+    assert.match(host.body, /9,99 € TTC/);
+    assert.match(host.body, /7,00 € TTC/);
+    assert.match(host.body, /3,00 € TTC/);
+    assert.match(host.body, /14 joueurs/);
+    assert.match(hosting.body, /Maître de soirée/);
+    assert.equal(PRIVACY_POLICY.sections.some((s) => /12,99/.test(s.body)), false);
+  });
+
   describe("rendu Forfaits", () => {
     let snapshot;
 
@@ -139,6 +153,20 @@ describe("FEATURE-HOST-02A/02B — SKUs + carte Menu", () => {
       assert.match(adfree, /id="btn-adfree-buy"/);
       assert.match(adfree, />Débloquer Sans pub - 2,99&nbsp;€</);
       assert.match(premiumOfferChromeHtml(), /Un paiement\. Tes soirées, à vie\./);
+      assert.equal(/Facebook/i.test(premiumOfferChromeHtml()), false);
+    });
+
+    it("invité : hint e-mail seul, pas Facebook", () => {
+      saveStatePatch({
+        user: {
+          ...(getState().user || {}),
+          loggedIn: true,
+          isGuest: true,
+        },
+      });
+      const html = premiumOfferChromeHtml();
+      assert.match(html, /compte e-mail/);
+      assert.equal(/Facebook/i.test(html), false);
     });
 
     it("Maître actif : pastille Actif, pas de bouton d’achat", () => {

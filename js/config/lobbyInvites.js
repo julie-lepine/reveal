@@ -42,6 +42,8 @@ export const LOBBY_INVITE_RPC_ERROR = {
   noLobby: "lobby_invite_no_lobby",
   alreadyIn: "lobby_invite_already_in",
   full: "lobby_invite_full",
+  /** Trigger H-RACE sur INSERT membre (accept invite inclus). */
+  lobbyFull: "lobby_full",
   closed: "lobby_invite_closed",
   busy: "lobby_invite_busy",
   gone: "lobby_invite_gone",

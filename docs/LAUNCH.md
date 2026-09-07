@@ -145,12 +145,12 @@ Photo Signature = le même cercle que l’emoji, **partout** (lobby, scores, ami
 
 ### 5. Légal + stores
 
-Privacy publique + in-app alignées **5 sept 2026** (Signature 6,99 / upgrade 4,00, photo, carnet). **Maître de soirée 9,99 €** : pas encore dans `legalContent.js`.
+Privacy publique + in-app alignées **7 sept 2026** (Sans pub, Signature, Maître 9,99 / 7,00 / 3,00, photo, carnet).
 
 - [x] `data/legalContent.js` + [havefuncorp.fr/reveal/privacy](https://havefuncorp.fr/reveal/privacy) : Sans pub + Signature (prix TTC, lifetime, compte pas appareil) — 5 sept 2026
+- [x] Maître de soirée 9,99 / 7,00 / 3,00 (privacy live + in-app) — 7 sept 2026
 - [x] App Store Connect : privacy + site développeur havefuncorp — 5 sept 2026
 - [x] Play Console : privacy + suppression + site web havefuncorp — 5 sept 2026
-- [ ] Maître de soirée 9,99 € : un passage privacy / fiches plus tard
 
 ### 6. QA puis ship
 

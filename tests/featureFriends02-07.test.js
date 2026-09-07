@@ -13,7 +13,7 @@ const read = (rel) => readFileSync(join(ROOT, rel), "utf8");
 
 describe("FEATURE-FRIENDS-02 Palier 7 — légal", () => {
   it("politique in-app : invitations éphémères + cascade + pas de fil public", () => {
-    assert.equal(PRIVACY_POLICY.updated, "5 septembre 2026");
+    assert.equal(PRIVACY_POLICY.updated, "7 septembre 2026");
     const collected = PRIVACY_POLICY.sections.find((s) => s.heading === "Données collectées");
     const purposes = PRIVACY_POLICY.sections.find((s) => s.heading === "Finalités");
     const retention = PRIVACY_POLICY.sections.find((s) => s.heading === "Conservation");

@@ -12,7 +12,7 @@ Objectif : rejouer les parcours, coller le symptôme à une cause connue, et con
 
 Sans ça, les symptômes « ça ne se débloque pas » sont des faux positifs.
 
-- [x] **P0** SQL `feature-host-01-profile-flag.sql` **appliqué en prod** (`docs/DEPLOYMENTS_SQL.md` §22 encore ⏳). Sinon : achat RC OK, `fetchProfile` retombe sans `host_pack`, join toujours cap 8, UI Maître jamais « Actif » après refresh serveur.
+- [x] **P0** SQL `feature-host-01-profile-flag.sql` **appliqué en prod** (`docs/DEPLOYMENTS_SQL.md` §22 : colonne `host_pack` utilisée en QA Anrobensy). Sinon : achat RC OK, `fetchProfile` retombe sans `host_pack`, join toujours cap 8, UI Maître jamais « Actif » après refresh serveur.
 - [x] SQL Signature déjà en prod : `feature-profile-01` … `05` (flag, identité, emojis, carnet, avatar).
 - [x] Webhook RevenueCat déployé avec le patch Host (`profile_pack` + `ad_free` + `host_pack`).
 - [x] Compte **inscrit** (pas invité) sur **app native** (pas GitHub Pages).
@@ -38,16 +38,7 @@ where id = '9c922f36-e153-4c3f-babc-cfda255ef946';
 
 ## 1. Bugs confirmés dans le code (à reproduire en priorité)
 
-Ces écarts sont lus dans le code, pas des hypothèses. Cocher `repro OK` / `pas vu` / `déjà patché`.
-
-| Sev | ID | Symptôme attendu | Cause |
-| --- | -- | ---------------- | ----- |
-| P0 | **H-SQL** | Achat Maître : store OK, Forfaits reste « Débloquer », lobby reste `/ 8` | Colonne `host_pack` absente → `fetchProfile` fallback `host_pack: false` |
-
-| P2 | **AV-REPLACE** | Code patché (upload upsert, plus de `remove` préalable) — **QA Pages à faire**, ticket non fermé | `uploadProfileAvatarBlob` |
-| P2 | **H-RACE** | Deux joins simultanés passent le cap 8/14 | Gate capacité **client-only** (pas de contrainte SQL sur le count) |
-
-| P3 | **LEGAL** | Privacy in-app / site : Maître 9,99 absent ; `LEGAL_SITE_OVH.md` cite encore 12,99 € | `data/legalContent.js` + docs |
+Tous les tickets code de ce tableau (H-SQL, H-RACE, AV-REPLACE, LEGAL, …) sont **fermés** au 7 sept 2026. Restent hors tableau : recette native IAP, H-KICK-14, Play/ASC.
 
 Hors scope produit (ne pas ouvrir de bug) : **outils de table** (réservés, pas dans le build) · **mots perso** Draw It / Tier Night (couche 3 Signature, pas shippée).
 
@@ -59,10 +50,10 @@ Tester **un compte par palier** (ne pas mélanger les SKU sur le même UUID sauf
 
 ### 2.1 Portes d’entrée
 
-- [ ] Invité → Forfaits : pas de bouton d’achat, hint connexion.
-- [ ] Web → achat Signature / Maître / Sans pub : message « dans l’app native ».
-- [ ] Inscrit natif sans palier : cartes 2,99 / 6,99 / 9,99 visibles.
-- [ ] `purchaseProfile` / `purchaseHost` refusent invité et web.
+- [x] Invité → Forfaits : pas de bouton d’achat, hint connexion.
+- [x] Web → achat Signature / Maître / Sans pub : message « dans l’app native ».
+- [x ] Inscrit natif sans palier : cartes 2,99 / 6,99 / 9,99 visibles.
+- [x] `purchaseProfile` / `purchaseHost` refusent invité et web.
 
 ### 2.2 SKU affiché (Forfaits)
 
@@ -123,15 +114,15 @@ Précondition : `profile_pack` **ou** `host_pack` true en base (le serveur gate 
 - [ ] Aperçu : anneau or, badge ✦, couleur appliquée.
 - [ ] 8 puces couleur ; sans pack → tap = Forfaits.
 - [ ] 18 emojis gratuits utilisables sans pack ; extras verrouillés → Forfaits.
-- [ ] Photo : crop cercle, pinch/drag, JPEG, fallback emoji si URL cassée.
-- [ ] Retirer la photo : emoji revient partout.
+- [ ] Photo : crop cercle, pinch/drag, JPEG, fallback emoji si URL cassée. Crop + JPEG : QA **✅** AV-REPLACE 7 sept 2026. Fallback `onerror` non rejoué (contrat = ne pas casser l’URL).
+- [x] Retirer la photo : emoji revient partout. QA **✅** 7 sept 2026 AV-REPLACE (SQL `path=null` `rev=0`, F5 OK).
 - [ ] Invité : extras / photo / carnet masqués ou teasés, jamais d’upload.
 
 ### 3.2 Surfaces d’affichage (même joueur Signature)
 
 Vérifier **nom coloré + ✦ + photo** (ou emoji) sur :
 
-- [ ] Lobby (pastille + nom)
+- [x] Lobby (pastille + nom) — photo B + cache-bust. QA **✅** 7 sept 2026 AV-REPLACE.
 - [ ] Chat
 - [ ] Scores / podium / scores de soirée
 - [ ] Amis / croisés 24 h
@@ -153,16 +144,16 @@ QA **✅** 7 sept 2026 Pages/SQL Anrobensy (`__revealPremium`) : overlay Signatu
 
 `setLocalNameColor` / `setLocalAvatar` / `uploadProfileAvatarBlob` testent `user.profilePack !== true`, **pas** `isProfilePack()`.
 
-- [ ] Compte Maître **normal** (webhook a posé `profile_pack`) : couleur / photo OK.
+- [x] Compte Maître **normal** (flags SQL `profile_pack` + `host_pack`) : couleur / photo OK. QA **✅** Anrobensy (lime · photo · ID-OVERLAY / AV-REPLACE). Webhook Play non joué.
 - [ ] SQL manuel `host_pack = true` **sans** `profile_pack` : Forfaits / carnet UI débloqués, **couleur et photo refusées** localement, RPC carnet `signature_locked`.
 
 ### 3.5 Photo — **repro P2 AV-REPLACE / AV-STORAGE**
 
 **AV-STORAGE** : patch SQL `feature-profile-av-storage.sql` (owner + `profile_pack OR host_pack`). QA **✅** 7 sept 2026 Pages/SQL Anrobensy (sans pack 403 · Signature OK · Maître seul OK · retrait packs 403).
 
-**AV-REPLACE** : `uploadProfileAvatarBlob` n’appelle plus `remove` avant l’upload ; remplacement = `upload({ upsert: true })` sur `{uid}/avatar.jpg` puis `updateProfileAvatar`. Code prêt, **QA Pages ouverte**.
+**AV-REPLACE** : `uploadProfileAvatarBlob` n’appelle plus `remove` avant l’upload ; remplacement = `upload({ upsert: true })` sur `{uid}/avatar.jpg` puis `updateProfileAvatar`. QA **✅** 7 sept 2026 Pages/SQL Anrobensy (échec Offline : A + `rev` inchangés · B `rev=2` Profil+lobby · première photo · Retirer `path=null`).
 
-- [ ] Remplacer une photo existante (réseau coupé au moment de l’upload) : **A reste visible**, `avatar_rev` inchangé, pas de 404. (**AV-REPLACE** — happy path inverse)
+- [x] Remplacer une photo existante (réseau coupé au moment de l’upload) : **A reste visible**, `avatar_rev` inchangé, pas de 404. (**AV-REPLACE**) QA **✅** 7 sept 2026 Anrobensy.
 - [x] Compte inscrit **sans** pack : upload Storage `{uid}/avatar.jpg` depuis un client (hors UI) → **refusé** après AV-STORAGE. QA **✅** 7 sept 2026 Anrobensy.
 - [ ] Suppression de compte : ligne `profiles` + `signature_evenings` cascade ; **objet Storage** peut rester (orphan, hors scope).
 
@@ -226,11 +217,11 @@ Le cap 14 s’applique au **salon dont l’hôte a `host_pack`**, pas au joiner.
 
 ### 5.2 Join par code
 
-- [ ] Hôte **sans** Maître : 9ᵉ joueur (code) → « Nombre de joueurs max atteint ».
+- [x] Hôte **sans** Maître : 9ᵉ joueur (code) → « Nombre de joueurs max atteint ». QA **✅** 7 sept 2026 H-RACE (`RMX7KX` 8/8).
 - [x] Hôte **avec** Maître : 9ᵉ … 14ᵉ OK ; 15ᵉ refusé (QA 7 sept 2026, salon 14/14).
 - [x] Le 9ᵉ n’a **pas** besoin d’être Maître.
-- [ ] **P0 H-SQL** : si `select host_pack` échoue, le join se comporte comme cap 8 (erreur avalée → `hostPack = false`).
-- [ ] **P2 H-RACE** : deux appareils joignent le 8ᵉ/14ᵉ siège en même temps (optionnel, difficile).
+- [x] **P0 H-SQL** : colonne `host_pack` en prod (HOST-01). Join : si `select host_pack` échoue, plus de faux cap 8 client — l’INSERT va au trigger H-RACE. QA colonne **✅** (Anrobensy).
+- [x] **P2 H-RACE** : SQL + runbook **✅** · QA Pages **✅** 7 sept 2026 Anrobensy : 8/8 → 9ᵉ refusé · Maître cap 14 → 9ᵉ OK · cap redescendu 9/8 conservés → 10ᵉ refusé. Concurrent 2 appareils **non joué**.
 
 ### 5.3 Invitations amis — **H-INVITE** ✅ / **H-INVITE-FULL** ✅
 
@@ -250,7 +241,7 @@ Variante encore utile : salon à 8, hôte **sans** Maître → refus d’accepta
 ### 5.4 Transfert / refund en cours de salon — **H-TRANSFER** ✅ / **H-INVITE-TRANSFER** ✅
 
 - [x] Hôte Maître, 10 joueurs, transfert vers un membre **sans** pack : les 10 restent ; 11ᵉ join par code refusé (cap 8). QA 7 sept 2026.
-- [ ] Refund Maître pendant un salon à 12 : membres inchangés ; nouveau join cap 8.
+- [x] Refund Maître pendant un salon (simulé SQL `host_pack=false`, 9 membres pas 12) : membres inchangés ; nouveau join cap 8. QA **✅** 7 sept 2026 H-RACE (`9/8`, 10ᵉ refusé). Refund Play non joué.
 - [ ] Claim hôte stale / acting host : **aucun** lien avec le pack. Les contrôles de manche ne doivent pas exiger `host_pack`.
 - [x] **H-INVITE-TRANSFER** : hôte Maître, salon à 10, invite pending vers un 11ᵉ → transfert vers non-Maître. L’ami tape Rejoindre → « Cette soirée est complète. » QA 7 sept 2026.
 
@@ -315,8 +306,8 @@ Rappel produit : kick autorisé **lobby d’attente** et **entre deux jeux** (`c
 
 ## 9. Légal / stores / docs (P3)
 
-- [ ] `legalContent.js` + page havefuncorp : Maître 9,99 / 7,00 / 3,00 encore **absents**.
-- [ ] `docs/LEGAL_SITE_OVH.md` : encore **12,99 €** (prix mort).
+- [x] `legalContent.js` + page havefuncorp : Maître 9,99 / 7,00 / 3,00. QA **✅** 7 sept 2026 ([privacy](https://havefuncorp.fr/reveal/privacy) + in-app).
+- [x] `docs/LEGAL_SITE_OVH.md` : 12,99 € retiré.
 - [ ] Fiches Play / ASC : ne pas promettre outils de table ni mots perso.
 - [ ] RevenueCat : entitlements `ad_free`, `profile`, `host` ; SKUs alignés Play + iOS.
 
@@ -324,7 +315,7 @@ Rappel produit : kick autorisé **lobby d’attente** et **entre deux jeux** (`c
 
 ## 10. Ordre de debug suggéré (une session)
 
-1. Vérifier SQL `host_pack` en prod (**H-SQL**) — 2 min.
+1. Vérifier SQL `host_pack` en prod (**H-SQL**) — **fait** (colonne + Anrobensy).
 2. Compte test Maître (SQL Editor si IAP pas collé) : créer salon, join code 9ᵉ, invitation ami 9ᵉ (**H-INVITE**).
 3. 2e téléphone **invité** : lire `n / 8` vs `n / 14` (**H-UI-CAP**).
 4. Deux comptes Signature, une manche, dissolve + kick (**C-DISSOLVE**, **C-KICK**).

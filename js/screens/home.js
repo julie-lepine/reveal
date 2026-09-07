@@ -4,7 +4,7 @@ import {
   canPlay,
   canCreateLobby,
   loginWithEmail,
-  // loginWithSocial, /* réactiver avec connexion Facebook / Instagram */
+  // loginWithSocial, /* social désactivé : compte e-mail uniquement */
   signupWithEmail,
   requestPasswordReset,
   getUser,
@@ -916,10 +916,7 @@ export function mountHome(app) {
     }
   }
 
-  /* Connexion Facebook / Instagram (home.js paint) - réactiver plus tard :
-   *  HTML : auth-divider « ou continuer avec », social-row data-social facebook|instagram, hint Meta.
-   *  JS : import loginWithSocial + handler data-social dans onHomeClick.
-   */
+  /* Connexion Facebook / Instagram : désactivée. Compte e-mail uniquement. */
 
   function paint(chrome = currentMembershipChrome()) {
     const user = getUser();
@@ -1126,7 +1123,7 @@ export function mountHome(app) {
       return;
     }
 
-    /* Connexion sociale - réactiver avec le bloc HTML ci-dessus.
+    /* Connexion sociale désactivée (compte e-mail uniquement).
     const socialBtn = e.target.closest("[data-social]");
     if (socialBtn) {
       const err = app.querySelector("#login-error") || app.querySelector("#signup-error");

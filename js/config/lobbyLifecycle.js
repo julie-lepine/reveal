@@ -47,6 +47,27 @@ export function hostLobbyUpsellHint() {
 /** Message renvoyé quand le lobby est plein. */
 export const LOBBY_FULL_MSG = "Nombre de joueurs max atteint pour ce lobby";
 
+/** Exception trigger H-RACE (`lobby_members_enforce_seat_cap`). */
+export const LOBBY_FULL_SQL = "lobby_full";
+
+/**
+ * Erreur serveur « salon complet » (trigger H-RACE ou copy join).
+ * `lobby_invite_full` est un autre code (invites) — ne pas le confondre ici.
+ * @param {unknown} error
+ */
+export function isLobbyFullServerError(error) {
+  if (error == null) return false;
+  const blob = [
+    typeof error === "string" ? error : "",
+    error && typeof error === "object" ? error.message : "",
+    error && typeof error === "object" ? error.details : "",
+    error && typeof error === "object" ? error.hint : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+  return blob.includes(LOBBY_FULL_SQL) || blob.includes(LOBBY_FULL_MSG);
+}
+
 /** Refus de rejoindre si last_activity > 24 h (RPC find_lobby_by_code). */
 export const LOBBY_JOIN_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 

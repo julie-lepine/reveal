@@ -112,7 +112,8 @@ describe("FEATURE-HOST-01 — entitlement Maître de soirée", () => {
     assert.match(src("js/screens/home.js"), /hostLobbyCapacityHint/);
     assert.match(src("js/core/hostPackUi.js"), /14 joueurs dans le lobby/);
     assert.match(src("js/core/supabaseLobby.js"), /fetchProfileHostPack/);
-    assert.match(src("js/core/supabaseLobby.js"), /hostPack,/);
+    assert.match(src("js/core/supabaseLobby.js"), /hostPackKnown/);
+    assert.match(src("js/core/supabaseLobby.js"), /if \(error\) return null/);
   });
 
   it("fetchProfile lit host_pack ; upsert ne l’écrit pas", () => {

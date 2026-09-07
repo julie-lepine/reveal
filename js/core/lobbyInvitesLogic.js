@@ -105,7 +105,12 @@ export function lobbyInviteFailMessage(code) {
   if (code === LOBBY_INVITE_RPC_ERROR.busy) {
     return "Tu es déjà dans une soirée. Tu ne peux en rejoindre qu’une à la fois.";
   }
-  if (code === LOBBY_INVITE_RPC_ERROR.full) return "Cette soirée est complète.";
+  if (
+    code === LOBBY_INVITE_RPC_ERROR.full ||
+    code === LOBBY_INVITE_RPC_ERROR.lobbyFull
+  ) {
+    return "Cette soirée est complète.";
+  }
   if (code === LOBBY_INVITE_RPC_ERROR.closed) {
     return "Cette soirée n’est plus disponible.";
   }

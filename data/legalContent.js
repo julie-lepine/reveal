@@ -9,7 +9,7 @@ import {
 
 export const PRIVACY_POLICY = {
   title: "Politique de confidentialité",
-  updated: "5 septembre 2026",
+  updated: "7 septembre 2026",
   sections: [
     {
       heading: "Qui sommes-nous ?",
@@ -25,7 +25,7 @@ export const PRIVACY_POLICY = {
     },
     {
       heading: "Hébergement et sous-traitants",
-      body: "Les données sont hébergées via Supabase (base de données, authentification, temps réel). Supabase Storage héberge la photo de profil Signature. Cloudflare Turnstile protège les formulaires sensibles. Google AdMob affiche des publicités sur l'app mobile native. RevenueCat relaie l'état des achats in-app (Sans pub et Signature) afin de les associer au compte (RevenueCat n'encaisse pas les paiements). Les polices Inter sont chargées depuis Google Fonts.",
+      body: "Les données sont hébergées via Supabase (base de données, authentification, temps réel). Supabase Storage héberge la photo de profil Signature. Cloudflare Turnstile protège les formulaires sensibles. Google AdMob affiche des publicités sur l'app mobile native. RevenueCat relaie l'état des achats in-app (Sans pub, Signature et Maître de soirée) afin de les associer au compte (RevenueCat n'encaisse pas les paiements). Les polices Inter sont chargées depuis Google Fonts.",
     },
     {
       heading: "Publicité (AdMob)",
@@ -38,6 +38,10 @@ export const PRIVACY_POLICY = {
     {
       heading: "Achat Signature",
       body: "L'option Signature à vie (6,99 € TTC) est un achat in-app. Elle inclut Sans pub. Si vous avez déjà Sans pub, l'upgrade coûte 4,00 € TTC. Le paiement est encaissé par Google Play ou l'App Store (Apple), pas par HAVEFUNCORP. RevenueCat transmet l'état de l'achat pour l'associer au compte REVEAL (pas à l'appareil). Les invités et le web ne peuvent pas acheter. L'achat se restaure après réinstallation ou changement de téléphone, en se connectant au même compte. Signature débloque la personnalisation d'identité (couleur, cadre, emojis extra, photo de profil) et un carnet personnel privé (pas un historique de salons : pas de code lobby, pas de rejoin).",
+    },
+    {
+      heading: "Achat Maître de soirée",
+      body: "L'option Maître de soirée à vie (9,99 € TTC) est un achat in-app. Elle inclut Signature et Sans pub. Si vous avez déjà Sans pub sans Signature, l'upgrade coûte 7,00 € TTC. Si vous avez déjà Signature, l'upgrade coûte 3,00 € TTC. Le paiement est encaissé par Google Play ou l'App Store (Apple), pas par HAVEFUNCORP. RevenueCat transmet l'état de l'achat pour l'associer au compte REVEAL (pas à l'appareil). Les invités et le web ne peuvent pas acheter. L'achat se restaure après réinstallation ou changement de téléphone, en se connectant au même compte. Maître de soirée débloque un lobby jusqu'à 14 joueurs (toi + 13) lorsque vous êtes l'hôte du salon. Un Maître invité dans le salon d'un autre joueur n'élargit pas ce lobby. L'identité Signature (couleur, cadre, emojis extra, photo) et le carnet personnel restent ceux de Signature.",
     },
     {
       heading: "Conservation",

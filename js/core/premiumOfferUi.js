@@ -28,7 +28,7 @@ export function premiumFeatureListHtml(items) {
 export function premiumOfferChromeHtml() {
   const loginHint = canBuyPremiumPacks()
     ? ""
-    : `<p class="hint premium-offer__login">Connecte-toi avec un compte (e-mail ou Facebook) pour acheter. Le droit suit le compte, pas le téléphone.</p>`;
+    : `<p class="hint premium-offer__login">Connecte-toi avec un compte e-mail pour acheter. Le droit suit le compte, pas le téléphone.</p>`;
   return `
       <div class="premium-offer__intro">
         <p class="premium-offer__hook">${escapeHtml(PREMIUM_OFFER_HOOK)}</p>

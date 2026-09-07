@@ -101,7 +101,7 @@ Sources : audit SQL du dépôt (`AUDIT-SQL-01`) + docs ops ([`SUPABASE.md`](./SU
 | 2026-09-05 | [`feature-profile-04-carnet.sql`](../supabase/feature-profile-04-carnet.sql) | FEATURE-PROFILE-04 | ☐ | ☐ | — | Carnet 20 soirées · RPC archive/list · voir §20 |
 | 2026-09-05 | [`feature-host-01-profile-flag.sql`](../supabase/feature-host-01-profile-flag.sql) | FEATURE-HOST-01 | ⏳ | ⏳ | — | Colonne `profiles.host_pack` + trigger · 9,99 / 7 € / 3 € · voir §22 |
 | 2026-09-06 | [`feature-host-02-invite-cap.sql`](../supabase/feature-host-02-invite-cap.sql) | FEATURE-HOST-02 / H-INVITE | ✅ | ✅ | [`feature-host-02-invite-cap-runbook.sql`](../supabase/tests/feature-host-02-invite-cap-runbook.sql) | `accept_lobby_invite` cap 8/14 via `host_pack` de l’hôte · QA **✅** 7 sept 2026 (1+13 OK, 15ᵉ refusé) · **ne pas** réexécuter friends-02 · voir §23 |
-| 2026-09-07 | [`feature-host-03-send-invite-cap.sql`](../supabase/feature-host-03-send-invite-cap.sql) | FEATURE-HOST-03 / H-INVITE-FULL | ✅ | ✅ | [`feature-host-03-send-invite-cap-runbook.sql`](../supabase/tests/feature-host-03-send-invite-cap-runbook.sql) | `send_lobby_invite` refuse si count ≥ cap 8/14 · QA **✅** 7 sept 2026 · **ne pas** réexécuter friends-02 ni HOST-02 · voir §24 |
+| 2026-09-07 | [`feature-host-04-race-cap.sql`](../supabase/feature-host-04-race-cap.sql) | FEATURE-HOST-04 / H-RACE | ✅ | ✅ | [`feature-host-04-race-cap-runbook.sql`](../supabase/tests/feature-host-04-race-cap-runbook.sql) | BEFORE INSERT `lobby_members` : `FOR UPDATE` lobby puis cap · QA **✅** 7 sept 2026 Pages/SQL Anrobensy (8/8→9ᵉ refusé · cap 14 9ᵉ OK · 9/8 conservés · 10ᵉ refusé) · concurrent 2 appareils **non joué** · voir §33 |
 | 2026-09-07 | [`feature-profile-04b-carnet-kick.sql`](../supabase/feature-profile-04b-carnet-kick.sql) | FEATURE-PROFILE-04b / C-KICK | ✅ | ✅ | [`feature-profile-04b-carnet-kick-runbook.sql`](../supabase/tests/feature-profile-04b-carnet-kick-runbook.sql) | Jeton kick + `archive_signature_evening` · QA **✅** 7 sept 2026 · **ne pas** réexécuter 04 / kick-lobby-member · voir §25 |
 | 2026-09-07 | [`feature-profile-04c-carnet-dissolve.sql`](../supabase/feature-profile-04c-carnet-dissolve.sql) | FEATURE-PROFILE-04c / C-DISSOLVE | ✅ | ✅ | [`feature-profile-04c-carnet-dissolve-runbook.sql`](../supabase/tests/feature-profile-04c-carnet-dissolve-runbook.sql) | Jetons carnet dans `dissolve_lobby_atomically` · QA **✅** 7 sept 2026 · **ne pas** réexécuter 04 / 04b / xx-e · voir §26 |
 
@@ -646,3 +646,26 @@ Pas de colonnes nouvelles. Les policies `avatars owner insert/update/delete` n�
 **QA** (après collage) : compte `profile_pack=false` `host_pack=false` → console `storage.from("avatars").upload(...)` → **403**. Signature ou Maître seul → upload OK. GET public inchangé. **Ne pas** réexécuter `feature-profile-05-avatar.sql` ensuite (remettrait owner-only).
 
 **Statut** : SQL **✅** collé · QA **✅** 7 sept 2026 (Pages/SQL Anrobensy A/B/C/F). D (autre uid) et GET public **non rejoués**. AV-REPLACE hors scope.
+
+---
+
+## 33. FEATURE-HOST-04 — Cap sièges concurrent-safe (H-RACE)
+
+Le join par code lisait `get_lobby_member_count` puis `INSERT lobby_members`. Deux clients au dernier siège pouvaient tous les deux passer. `accept_lobby_invite` avait déjà un count SQL + advisory lock, mais l’INSERT client restait ouvert.
+
+Correctif : trigger `BEFORE INSERT` `lobby_members_enforce_seat_cap` — `SELECT … FROM lobbies WHERE id = NEW.lobby_id FOR UPDATE`, puis `lobby_max_players` + `get_lobby_member_count`, puis `raise exception 'lobby_full'`. Pas de `DELETE` membres (H-TRANSFER : cap 14→8, les présents restent). RLS `members_insert_self` inchangée. `send_lobby_invite` / HOST-02 / HOST-03 non réécrits.
+
+| Élément | Valeur |
+| ------- | ------ |
+| Migration | [`feature-host-04-race-cap.sql`](../supabase/feature-host-04-race-cap.sql) — coller après HOST-02 |
+| Preuve | `h-race-v1` dans `lobby_members_enforce_seat_cap` |
+| Runbook | [`tests/feature-host-04-race-cap-runbook.sql`](../supabase/tests/feature-host-04-race-cap-runbook.sql) — `HRACE_SEAT_CAP_OK` |
+| Concurrence | [`tests/feature-host-04-race-cap-concurrent.sql`](../supabase/tests/feature-host-04-race-cap-concurrent.sql) — **2 sessions SQL**, pas `npm test` |
+| Tests | `tests/featureHost04RaceCap.test.js` |
+| Client | check count = UX ; `isLobbyFullServerError` → `LOBBY_FULL_MSG` |
+| Hors scope | RevenueCat · avatars · ID-OVERLAY · ID-OLD · `send_lobby_invite` |
+
+**QA** : coller le SQL · runbook catalogue · Pages 8/8 → 9ᵉ refusé · (optionnel) 7/8 deux appareils. Ne pas réexécuter HOST-02/03.
+
+**Statut** : SQL **✅** collé 7 sept 2026 · runbook `HRACE_SEAT_CAP_OK` · QA Pages **✅** 7 sept 2026 Anrobensy (séquentiel). Concurrent 2 backends **non joué** sur Pages.
+
