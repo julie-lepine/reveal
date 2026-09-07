@@ -124,10 +124,10 @@ describe("FEATURE-PROFILE-03 — identité Signature", () => {
     assert.match(split, /😈👻🔥🐸💎🌈/);
     assert.match(split, /😎💜🌟🎯🚀🎈/);
     const persist = src("supabase/feature-profile-03c-emoji-fe0f.sql");
-    assert.match(persist, /03c-persist-v3/);
+    assert.match(persist, /03c-persist-v4/);
     assert.match(persist, /from public\.profiles p/);
     assert.match(persist, /profiles_signature_cosmetics/);
-    assert.match(sql, /03c-persist-v3/);
+    assert.match(sql, /03c-persist-v4/);
     const auth = src("js/core/auth.js");
     const emojiFn = auth.slice(auth.indexOf("export async function updateProfileEmoji"));
     assert.match(emojiFn, /upsertProfile\(\{\s*userId,\s*emoji:/);

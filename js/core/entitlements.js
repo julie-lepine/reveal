@@ -4,6 +4,16 @@ import {
   mergePremiumSessionFlags,
   normalizePremiumFlags,
 } from "./premiumStoreOverlay.js";
+import {
+  applyServerCosmeticsWithPending,
+  capturePendingAvatar,
+  capturePendingNameColor,
+  clearPendingSignatureCosmetics,
+  getPendingSignatureCosmetics,
+  pendingHasCosmetics,
+  replayPendingSignatureCosmetics,
+  shouldHoldPendingSignatureCosmetics,
+} from "./signatureCosmeticsPending.js";
 
 /** Overlay session RevenueCat (webhook pending). Jamais écrit en SQL. */
 let storePremiumOverlay = emptyPremiumFlags();
@@ -85,14 +95,44 @@ export function getLastServerPremium() {
   return { ...lastServerPremium };
 }
 
+export function getLastServerProfilePackColumn() {
+  return lastServerPremium.profilePackColumn === true;
+}
+
 export function clearStorePremiumOverlay() {
   storePremiumOverlay = emptyPremiumFlags();
   storePremiumOverlayActive = false;
+  clearPendingSignatureCosmetics();
 }
 
 export function resetPremiumStoreOverlayForTests() {
   clearStorePremiumOverlay();
   lastServerPremium = emptyPremiumFlags();
+}
+
+/** Overlay Signature + pack SQL encore false → garder l’intention locale. */
+export function captureSignatureCosmeticsPendingIfActivationWindow(partial = {}) {
+  const userId = getState().supabaseUserId;
+  const user = getState().user || {};
+  if (!userId || user.isGuest) return;
+  const overlay = getStorePremiumOverlay();
+  if (
+    !shouldHoldPendingSignatureCosmetics({
+      overlay,
+      serverProfilePackColumn: lastServerPremium.profilePackColumn === true,
+    })
+  ) {
+    return;
+  }
+  if (Object.prototype.hasOwnProperty.call(partial, "nameColor")) {
+    capturePendingNameColor(userId, partial.nameColor);
+  }
+  if (Object.prototype.hasOwnProperty.call(partial, "avatarPath")) {
+    capturePendingAvatar(userId, {
+      avatarPath: partial.avatarPath,
+      avatarRev: partial.avatarRev,
+    });
+  }
 }
 
 function applyMergedPremiumToUser(serverFlags, extra = {}) {
@@ -129,14 +169,31 @@ export async function refreshAdFreeFromServer() {
   }
   const { fetchProfile } = await import("./supabaseProfile.js");
   const profile = await fetchProfile(userId);
-  lastServerPremium = premiumFlagsFromProfile(profile);
+  lastServerPremium = {
+    ...premiumFlagsFromProfile(profile),
+    profilePackColumn: profile?.profile_pack === true,
+  };
   const nameColor = nameColorFromProfile(profile);
   const { avatarPath, avatarRev } = avatarFromProfile(profile);
-  const merged = applyMergedPremiumToUser(lastServerPremium, {
-    nameColor,
-    avatarPath,
-    avatarRev,
+  const cosmetics = applyServerCosmeticsWithPending({
+    serverNameColor: nameColor,
+    serverAvatarPath: avatarPath,
+    serverAvatarRev: avatarRev,
+    pending: getPendingSignatureCosmetics(),
+    userId,
   });
+  const merged = applyMergedPremiumToUser(lastServerPremium, cosmetics);
+  if (
+    lastServerPremium.profilePackColumn === true &&
+    pendingHasCosmetics(getPendingSignatureCosmetics())
+  ) {
+    const { upsertProfile } = await import("./supabaseProfile.js");
+    await replayPendingSignatureCosmetics({
+      upsertProfile,
+      userId,
+      serverProfilePackColumn: true,
+    });
+  }
   return merged.adFree || merged.profilePack || merged.hostPack;
 }
 

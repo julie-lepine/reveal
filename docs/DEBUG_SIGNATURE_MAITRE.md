@@ -44,9 +44,7 @@ Ces écarts sont lus dans le code, pas des hypothèses. Cocher `repro OK` / `pas
 | --- | -- | ---------------- | ----- |
 | P0 | **H-SQL** | Achat Maître : store OK, Forfaits reste « Débloquer », lobby reste `/ 8` | Colonne `host_pack` absente → `fetchProfile` fallback `host_pack: false` |
 
-| P1 | **RC-SKU-ADF** | Helpers SKU vs Sans pub effectif ; hydrate login ≠ refresh | **patch** helper pur `isAdFreeForUser` + `premiumFlagsFromProfile` · QA ⏳ |
-| P2 | **ID-OLD** | Refund Signature puis rachat : couleur / photo / emoji extra **effacés** au grant | Triggers cosmetics / avatar lisent `old.profile_pack` sur UPDATE |
-| P2 | **ID-OVERLAY** | Après achat, couleur « sauvée » puis disparue ; badge lobby en retard vs Menu → Profil | Overlay store débloque l’UI avant le webhook ; `upsertProfile` est strippé tant que `profile_pack` est false |
+| P2 | **ID-OVERLAY** | Après achat, couleur « sauvée » puis disparue ; badge lobby en retard vs Menu → Profil | **patch** pending session + replay après `profile_pack` SQL · QA ⏳ |
 | P2 | **AV-STORAGE** | Utilisateur inscrit **sans** Signature peut uploader `{uid}/avatar.jpg` public | Policies Storage `avatars` : owner path only, **pas** de check `profile_pack` |
 | P2 | **AV-REPLACE** | Remplacement photo : `remove` puis `upload` ; échec upload → plus de fichier, profil pointe encore le path | `uploadProfileAvatarBlob` |
 | P2 | **H-RACE** | Deux joins simultanés passent le cap 8/14 | Gate capacité **client-only** (pas de contrainte SQL sur le count) |
@@ -77,9 +75,9 @@ Tester **un compte par palier** (ne pas mélanger les SKU sur le même UUID sauf
 | Signature (`profile_pack`) | Actif / Inclus | **3,00 €** |
 | Maître (`host_pack`) | Inclus dans Maître | Actif |
 
-- [ ] Prix et notes d’upgrade collent au tableau.
-- [ ] Avec Maître : cartes Signature et Sans pub en badge « Inclus », pas de 2ᵉ achat.
-- [ ] `purchaseProfile` court-circuite si `hostPack` déjà true.
+- [x] Prix et notes d’upgrade collent au tableau. QA **✅** 7 sept 2026 Pages/SQL Anrobensy (SKU-B…F).
+- [x] Avec Maître : cartes Signature et Sans pub en badge « Inclus », pas de 2ᵉ achat.
+- [ ] `purchaseProfile` court-circuite si `hostPack` déjà true. (natif non joué)
 
 ### 2.3 Grant webhook
 
@@ -114,7 +112,7 @@ Même scénario via « déjà acheté » (error already-owned) pendant `purchase
 | `reveal_host_upgrade_adfree` (7 €) | false | **false** | **gardé** |
 
 - [ ] Rejouer chaque ligne : Menu, pubs, couleur, carnet, cap lobby.
-- [ ] **P2 ID-OLD** : refund Signature → racheter tout de suite → couleur / photo encore là **ou** wipe au grant.
+- [x] **P2 ID-OLD** : refund simulé SQL `true → false → true` : couleur / photo / emoji extra **conservés**. QA **✅** 7 sept 2026 Anrobensy (lime · 🐉 · photo). Refund Play non joué.
 
 ---
 

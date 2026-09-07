@@ -96,6 +96,7 @@ Sources : audit SQL du dépôt (`AUDIT-SQL-01`) + docs ops ([`SUPABASE.md`](./SU
 | 2026-09-05 | [`feature-profile-03-identity.sql`](../supabase/feature-profile-03-identity.sql) | FEATURE-PROFILE-03 | ✅ | ✅ | — | `name_color` + snapshot salon + friends_live_* · voir §19 |
 | 2026-09-05 | [`feature-profile-03b-emoji-split.sql`](../supabase/feature-profile-03b-emoji-split.sql) | FEATURE-PROFILE-03b | ✅ | ✅ | — | 12 emojis → Signature (😈👻🔥🐸💎🌈 + 😎💜🌟🎯🚀🎈) · coller si 03 déjà en prod |
 | 2026-09-05 | [`feature-profile-03c-emoji-fe0f.sql`](../supabase/feature-profile-03c-emoji-fe0f.sql) | FEATURE-PROFILE-03c | ☐ | ☐ | — | Trigger : strip U+FE0F sinon 🦄 → 👤 · coller prod |
+| 2026-09-07 | [`feature-profile-id-old.sql`](../supabase/feature-profile-id-old.sql) | ID-OLD | ✅ | ✅ | [`feature-profile-id-old-runbook.sql`](../supabase/tests/feature-profile-id-old-runbook.sql) | UPDATE pack = old OR new · coller après 03c+05 · QA **✅** 7 sept 2026 Anrobensy · voir §30 |
 | 2026-09-05 | [`feature-profile-04-carnet.sql`](../supabase/feature-profile-04-carnet.sql) | FEATURE-PROFILE-04 | ☐ | ☐ | — | Carnet 20 soirées · RPC archive/list · voir §20 |
 | 2026-09-05 | [`feature-host-01-profile-flag.sql`](../supabase/feature-host-01-profile-flag.sql) | FEATURE-HOST-01 | ⏳ | ⏳ | — | Colonne `profiles.host_pack` + trigger · 9,99 / 7 € / 3 € · voir §22 |
 | 2026-09-06 | [`feature-host-02-invite-cap.sql`](../supabase/feature-host-02-invite-cap.sql) | FEATURE-HOST-02 / H-INVITE | ✅ | ✅ | [`feature-host-02-invite-cap-runbook.sql`](../supabase/tests/feature-host-02-invite-cap-runbook.sql) | `accept_lobby_invite` cap 8/14 via `host_pack` de l’hôte · QA **✅** 7 sept 2026 (1+13 OK, 15ᵉ refusé) · **ne pas** réexécuter friends-02 · voir §23 |
@@ -590,5 +591,37 @@ Pas de SQL. Helpers SKU restent purs (`user` snapshot). Sans pub effectif = `adF
 | Client | `js/core/entitlements.js` · `purchases.js` · `supabaseAuth.js` |
 | Tests | `tests/featureRcSkuAdf.test.js` · `featureProfile02a` · `featureHost02a` · `featureRcRestore` |
 | Hors scope | webhook · product IDs · overlay store · cap 14 |
+
+**Statut** : client **✅** · QA **✅** 7 sept 2026 (Pages/SQL Anrobensy B–F). Achat Play natif **non exécuté**.
+
+---
+
+## 30. ID-OLD — Cosmetics Signature au refund → re-grant
+
+Pas de colonnes nouvelles. Les triggers `profiles_signature_cosmetics` et `profiles_signature_avatar` lisaient `coalesce(old.profile_pack, new.profile_pack)` : au grant (`false` → `true`) PostgreSQL évalue `coalesce(false, true) = false` et **wipe** couleur / emoji extra / photo. Correctif : sur UPDATE, `old.profile_pack OR new.profile_pack`. Branche INSERT 03c inchangée. Webhook inchangé. Coller **uniquement** le patch (pas tout 05).
+
+| Élément | Valeur |
+| ------- | ------ |
+| Migration | [`feature-profile-id-old.sql`](../supabase/feature-profile-id-old.sql) — coller après 03c + 05 |
+| Preuve | `03c-persist-v4` · `id-old-v1` |
+| Runbook | [`tests/feature-profile-id-old-runbook.sql`](../supabase/tests/feature-profile-id-old-runbook.sql) — `IDOLD_FUNCTIONS_OK` |
+| Tests | `tests/featureProfileIdOld.test.js` |
+| Hors scope | ID-OVERLAY · AV-STORAGE · AV-REPLACE · webhook · gating lecture |
+
+**QA Anrobensy** (après collage) : compte Signature avec `name_color`, emoji extra, `avatar_path`. `update … set profile_pack = false` → cosmetics **encore là**. Puis `profile_pack = true` → **mêmes valeurs**. F5 → Profil : couleur + photo + emoji. Remettre `profile_pack = true` (et les autres flags) à la fin.
+
+**Statut** : SQL **✅** collé · QA **✅** 7 sept 2026 (Pages/SQL Anrobensy A–E : lime · 🐉 · photo conservés). Refund Play **non exécuté**.
+
+---
+
+## 31. ID-OVERLAY — Pending cosmetics pendant overlay Signature
+
+Pas de SQL. Overlay RC débloque l’UI avant `profile_pack` serveur ; un choix couleur/photo est gardé en **pending session** (même cycle de vie que l’overlay, namespacé `userId`, vidé au logout). `refreshAdFreeFromServer` n’écrase plus par un `null` serveur. Replay `upsertProfile` **seulement** si la colonne SQL `profile_pack` est true. Pending retiré après succès. Triggers inchangés. Pas d’écriture `profile_pack`. Badge lobby partagé reste le snapshot SQL.
+
+| Élément | Valeur |
+| ------- | ------ |
+| Client | `js/core/signatureCosmeticsPending.js` · `entitlements.js` · `auth.js` |
+| Tests | `tests/featureIdOverlay.test.js` |
+| Hors scope | webhook · AV-STORAGE · AV-REPLACE · snapshot `lobby_members.signature` |
 
 **Statut** : client **implémenté** 7 sept 2026 · QA **⏳**.

@@ -26,7 +26,7 @@ import { stopMultiplayerSync } from "./gameSync.js";
 import { getMembershipSnapshot } from "./lobbyMembershipSnapshot.js";
 import { canCreateLobbyFromInputs } from "./lobbyCreateGuard.js";
 import { hasActiveLobby } from "./lobby.js";
-import { clearStorePremiumOverlay } from "./entitlements.js";
+import { captureSignatureCosmeticsPendingIfActivationWindow, clearStorePremiumOverlay } from "./entitlements.js";
 
 const BACKEND_REQUIRED =
   "Configuration backend requise. Relance l’application après configuration Supabase.";
@@ -199,6 +199,8 @@ export async function updateProfileNameColor(colorId) {
   const res = setLocalNameColor(colorId);
   if (!res.ok) return res;
 
+  captureSignatureCosmeticsPendingIfActivationWindow({ nameColor: res.nameColor });
+
   if (!isSupabaseConfigured()) return res;
 
   const userId = getSupabaseUserId();
@@ -215,6 +217,11 @@ export async function updateProfileNameColor(colorId) {
 export async function updateProfileAvatar({ path = null, rev = 0 } = {}) {
   const res = setLocalAvatar({ path, rev });
   if (!res.ok) return res;
+
+  captureSignatureCosmeticsPendingIfActivationWindow({
+    avatarPath: res.avatarPath,
+    avatarRev: res.avatarRev,
+  });
 
   if (!isSupabaseConfigured()) return res;
 

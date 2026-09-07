@@ -32,13 +32,16 @@ returns trigger
 language plpgsql
 as $$
 declare
+  v_ver constant text := 'id-old-v1';
   v_pack boolean;
   v_existing boolean;
   v_expected text;
 begin
   v_pack := coalesce(new.profile_pack, false);
   if tg_op = 'UPDATE' then
-    v_pack := coalesce(old.profile_pack, new.profile_pack, false);
+    -- ID-OLD : conservé si old OU new a le pack (refund true→false et grant false→true).
+    -- coalesce(old, new) est faux : coalesce(false, true) = false en PostgreSQL.
+    v_pack := coalesce(old.profile_pack, false) or coalesce(new.profile_pack, false);
   elsif new.id is not null then
     select p.profile_pack into v_existing
     from public.profiles p

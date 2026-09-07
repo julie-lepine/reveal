@@ -82,6 +82,12 @@ describe("FEATURE-PROFILE-05 — avatar photo Signature", () => {
     assert.match(sql, /add column if not exists avatar_path/);
     assert.match(sql, /lobby_members[\s\S]*avatar_rev integer/);
     assert.match(sql, /profiles_signature_avatar/);
+    assert.match(sql, /id-old-v1/);
+    assert.match(
+      sql,
+      /v_pack := coalesce\(old\.profile_pack, false\) or coalesce\(new\.profile_pack, false\)/
+    );
+    assert.equal(sql.includes("coalesce(old.profile_pack, new.profile_pack, false)"), false);
     assert.match(sql, /id::text \|\| '\/avatar\.jpg'/);
     assert.match(sql, /lobby_members_stamp_signature/);
     assert.match(sql, /new\.avatar_path := case when new\.signature then v_path/);

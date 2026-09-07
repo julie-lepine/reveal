@@ -1,14 +1,14 @@
 -- FEATURE-PROFILE-03b — emojis déplacés de gratuit vers Signature
 --
 -- Lots extra : 😈👻🔥🐸💎🌈 + 😎💜🌟🎯🚀🎈
--- Trigger : coller 03c (03c-persist-v3).
+-- Trigger : coller 03c (03c-persist-v4).
 
 create or replace function public.profiles_signature_cosmetics()
 returns trigger
 language plpgsql
 as $$
 declare
-  v_ver constant text := '03c-persist-v3';
+  v_ver constant text := '03c-persist-v4';
   v_allowed_colors text[] := array['gold','rose','violet','cyan','lime','amber','coral','ice'];
   v_free_hex text[] := array[
     'f09f9880','f09fa4a9','f09fa5b3','f09f8ead','f09f8eae','f09f838f',
@@ -22,7 +22,9 @@ declare
 begin
   v_pack := coalesce(new.profile_pack, false);
   if tg_op = 'UPDATE' then
-    v_pack := coalesce(old.profile_pack, new.profile_pack, false);
+    -- ID-OLD : conservé si old OU new a le pack (refund true→false et grant false→true).
+    -- coalesce(old, new) est faux : coalesce(false, true) = false en PostgreSQL.
+    v_pack := coalesce(old.profile_pack, false) or coalesce(new.profile_pack, false);
   elsif new.id is not null then
     select p.profile_pack into v_existing
     from public.profiles p
