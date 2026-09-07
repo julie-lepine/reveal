@@ -1232,6 +1232,7 @@ export async function handleKickedFromLobby() {
   if (kickedLobbyId && isLocalHostManualDissolve(kickedLobbyId)) return;
 
   lobbyKickHandling = true;
+  await archiveSignatureEveningBeforeLeave();
   stopMultiplayerSync();
   stopLobbyPresenceSync();
 

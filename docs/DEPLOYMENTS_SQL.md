@@ -99,7 +99,8 @@ Sources : audit SQL du dépôt (`AUDIT-SQL-01`) + docs ops ([`SUPABASE.md`](./SU
 | 2026-09-05 | [`feature-profile-04-carnet.sql`](../supabase/feature-profile-04-carnet.sql) | FEATURE-PROFILE-04 | ☐ | ☐ | — | Carnet 20 soirées · RPC archive/list · voir §20 |
 | 2026-09-05 | [`feature-host-01-profile-flag.sql`](../supabase/feature-host-01-profile-flag.sql) | FEATURE-HOST-01 | ⏳ | ⏳ | — | Colonne `profiles.host_pack` + trigger · 9,99 / 7 € / 3 € · voir §22 |
 | 2026-09-06 | [`feature-host-02-invite-cap.sql`](../supabase/feature-host-02-invite-cap.sql) | FEATURE-HOST-02 / H-INVITE | ✅ | ✅ | [`feature-host-02-invite-cap-runbook.sql`](../supabase/tests/feature-host-02-invite-cap-runbook.sql) | `accept_lobby_invite` cap 8/14 via `host_pack` de l’hôte · QA **✅** 7 sept 2026 (1+13 OK, 15ᵉ refusé) · **ne pas** réexécuter friends-02 · voir §23 |
-| 2026-09-07 | [`feature-host-03-send-invite-cap.sql`](../supabase/feature-host-03-send-invite-cap.sql) | FEATURE-HOST-03 / H-INVITE-FULL | ⏳ | ⏳ | [`feature-host-03-send-invite-cap-runbook.sql`](../supabase/tests/feature-host-03-send-invite-cap-runbook.sql) | `send_lobby_invite` refuse si count ≥ cap 8/14 · **ne pas** réexécuter friends-02 ni HOST-02 · voir §24 |
+| 2026-09-07 | [`feature-host-03-send-invite-cap.sql`](../supabase/feature-host-03-send-invite-cap.sql) | FEATURE-HOST-03 / H-INVITE-FULL | ✅ | ✅ | [`feature-host-03-send-invite-cap-runbook.sql`](../supabase/tests/feature-host-03-send-invite-cap-runbook.sql) | `send_lobby_invite` refuse si count ≥ cap 8/14 · QA **✅** 7 sept 2026 · **ne pas** réexécuter friends-02 ni HOST-02 · voir §24 |
+| 2026-09-07 | [`feature-profile-04b-carnet-kick.sql`](../supabase/feature-profile-04b-carnet-kick.sql) | FEATURE-PROFILE-04b / C-KICK | ⏳ | ⏳ | [`feature-profile-04b-carnet-kick-runbook.sql`](../supabase/tests/feature-profile-04b-carnet-kick-runbook.sql) | Jeton kick + `archive_signature_evening` · **ne pas** réexécuter 04 / kick-lobby-member · voir §25 |
 
 **Hors migrations (tracés ailleurs si besoin)** : préflight [`lobby-membership-e4-00-preflight-duplicates.sql`](../supabase/lobby-membership-e4-00-preflight-duplicates.sql) (lecture seule) ; runbooks / harness sous [`supabase/tests/`](../supabase/tests/) et [`lobby-membership-e4-RUNBOOK.sql`](../supabase/lobby-membership-e4-RUNBOOK.sql) / [`lobby-membership-e5-RUNBOOK.sql`](../supabase/lobby-membership-e5-RUNBOOK.sql) — ce ne sont pas des migrations. Voir aussi [`lobby-membership-e4-tests-manual.sql`](../supabase/lobby-membership-e4-tests-manual.sql).
 
@@ -509,9 +510,25 @@ QA 7 sept 2026 : à 14/14 l’hôte pouvait encore **envoyer** une invitation ; 
 
 | Élément | Valeur |
 | ------- | ------ |
-| Migration | [`feature-host-03-send-invite-cap.sql`](../supabase/feature-host-03-send-invite-cap.sql) — **⏳** à coller (après HOST-02) |
+| Migration | [`feature-host-03-send-invite-cap.sql`](../supabase/feature-host-03-send-invite-cap.sql) — **✅** 7 sept 2026 (après HOST-02) |
 | Runbook | [`tests/feature-host-03-send-invite-cap-runbook.sql`](../supabase/tests/feature-host-03-send-invite-cap-runbook.sql) — catalogue `HOST03_SEND_INVITE_CAP_OK` |
 | Client | bouton Amis « Soirée complète » (`isCurrentLobbyFull`) · `lobby_invite_full` → « Cette soirée est complète. » |
+| QA | **✅** 7 sept 2026 : salon 14/14, envoi refusé |
 | Hors scope | Purge des invites pending · limiter N invites aux sièges restants · gate SQL du join par code |
 
-**Statut** : SQL **⏳** · client **dans le repo**.
+**Statut** : SQL **✅** · QA **✅** 7 sept 2026.
+
+---
+
+## 25. FEATURE-PROFILE-04b — Carnet après kick (C-KICK)
+
+`archive_signature_evening` exigeait `is_lobby_member`. Le kick supprime la membership avant que le kické puisse archiver. Cette migration : table `signature_carnet_kick_allow` (écriture definer dans `kick_lobby_member`, **avant** DELETE) ; l’RPC archive accepte ce jeton 30 min pour **ce** uid + lobby. Client : `handleKickedFromLobby` archive tant que l’état soirée est encore là.
+
+| Élément | Valeur |
+| ------- | ------ |
+| Migration | [`feature-profile-04b-carnet-kick.sql`](../supabase/feature-profile-04b-carnet-kick.sql) — **⏳** après FEATURE-PROFILE-04 |
+| Runbook | [`tests/feature-profile-04b-carnet-kick-runbook.sql`](../supabase/tests/feature-profile-04b-carnet-kick-runbook.sql) — `CARNET04B_KICK_OK` |
+| Client | `js/core/lobby.js` (`handleKickedFromLobby`) |
+| Hors scope | C-DISSOLVE · C-HOME |
+
+**Statut** : SQL **⏳** · 7 sept 2026.

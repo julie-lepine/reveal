@@ -28,6 +28,12 @@ from public.profiles
 where id = '<uuid>';
 ```
 
+update public.profiles
+set host_pack = true,
+    profile_pack = true,
+    ad_free = true
+where id = '9c922f36-e153-4c3f-babc-cfda255ef946';
+
 ---
 
 ## 1. Bugs confirmés dans le code (à reproduire en priorité)
@@ -38,7 +44,7 @@ Ces écarts sont lus dans le code, pas des hypothèses. Cocher `repro OK` / `pas
 | --- | -- | ---------------- | ----- |
 | P0 | **H-SQL** | Achat Maître : store OK, Forfaits reste « Débloquer », lobby reste `/ 8` | Colonne `host_pack` absente → `fetchProfile` fallback `host_pack: false` |
 
-| P1 | **C-KICK** | Signature kické → soirée absente du carnet | `handleKickedFromLobby` n’appelle pas `archiveSignatureEveningBeforeLeave` |
+| P1 | **C-KICK** | Signature kické → soirée absente du carnet | **patch repo** : jeton `signature_carnet_kick_allow` au kick + archive client avant wipe. SQL [`feature-profile-04b-carnet-kick.sql`](../supabase/feature-profile-04b-carnet-kick.sql) **⏳ à coller**. |
 | P1 | **C-DISSOLVE** | Hôte ferme le salon → seul **son** carnet archive ; les autres Signature perdent la soirée | `dissolveLobbyAsHost` archive uniquement l’appelant, tant qu’il est encore membre. Pas de trigger SQL sur DELETE lobby |
 | P1 | **C-HOME** | Quitter depuis Accueil (membership serveur, cache non hydraté) → pas d’archive | `leaveLobbyMembershipFromServer` ne câble pas l’archive |
 | P1 | **RC-RESTORE** | Compte déjà Signature, restore / already-owned Maître → Signature OK, Maître pas actif jusqu’au webhook | `refreshPremiumAfterStore` **break** dès que `profilePack` est true ; overlay store réappliqué seulement si les **3** flags sont false |
@@ -48,9 +54,7 @@ Ces écarts sont lus dans le code, pas des hypothèses. Cocher `repro OK` / `pas
 | P2 | **AV-STORAGE** | Utilisateur inscrit **sans** Signature peut uploader `{uid}/avatar.jpg` public | Policies Storage `avatars` : owner path only, **pas** de check `profile_pack` |
 | P2 | **AV-REPLACE** | Remplacement photo : `remove` puis `upload` ; échec upload → plus de fichier, profil pointe encore le path | `uploadProfileAvatarBlob` |
 | P2 | **H-RACE** | Deux joins simultanés passent le cap 8/14 | Gate capacité **client-only** (pas de contrainte SQL sur le count) |
-| P2 | **H-INVITE-FULL** | Hôte invite un ami alors que le salon est plein (8/8 ou 14/14) ; l’ami ne pourra pas entrer | **Patché** : `feature-host-03-send-invite-cap.sql` + bouton Amis « Soirée complète ». SQL **⏳** à coller. QA 7 sept 2026 : repro OK avant patch |
-| P2 | **H-INVITE-TRANSFER** | Transfert Maître → non-Maître, salon à 10, invite **déjà pending** : l’ami voit encore Rejoindre, tap → « Cette soirée est complète. » | `accept_lobby_invite` relit `lobby_max_players` du nouveau `host_id` (10 ≥ 8). Pas de purge des `lobby_invites`. Un *nouvel* envoi est refusé par HOST-03 |
-| P2 | **H-TRANSFER** | Transfert d’hôte vers un non-Maître : sièges 9–14 restent, nouveaux joins refusés à 8 | Join relit le `host_pack` du **nouveau** `host_id` |
+
 | P3 | **LEGAL** | Privacy in-app / site : Maître 9,99 absent ; `LEGAL_SITE_OVH.md` cite encore 12,99 € | `data/legalContent.js` + docs |
 
 Hors scope produit (ne pas ouvrir de bug) : **outils de table** (réservés, pas dans le build) · **mots perso** Draw It / Tier Night (couche 3 Signature, pas shippée).
@@ -187,10 +191,12 @@ Archive **uniquement** si : inscrit + pack + encore **membre** du lobby + `hasEv
 | ------ | --------------- | ----------- |
 | Quitter volontaire (membre) | Archive | OK (`leaveLobby` → `archiveSignatureEveningBeforeLeave`) |
 | Hôte dissolve | Tous les Signature du salon archivent | **Bug C-DISSOLVE** : hôte seul |
-| Kick | Le kické archive | **Bug C-KICK** : non |
+| Kick | Le kické archive | **patch 04b** (jeton + client) — SQL ⏳ |
 | Accueil → quitter membership serveur | Archive | **Bug C-HOME** : non |
 | Quitter **sans** avoir joué | Rien | OK (`hasEveningStatsActivity` false) |
 | Rang introuvable (joueur local absent du standing) | Skip silencieux | Payload null |
+
+Repro C-KICK (après SQL 04b) : 2 comptes Signature, une manche, kick du non-hôte → carnet du kické **contient** la soirée.
 
 Repro C-DISSOLVE :
 
@@ -198,8 +204,6 @@ Repro C-DISSOLVE :
 2. Hôte ferme le salon.
 3. [ ] Carnet hôte : soirée présente.
 4. [ ] Carnet de l’autre Signature : **absente** (bug) vs devrait être là.
-
-Repro C-KICK : même setup, kick du Signature → carnet vide.
 
 ### 4.3 Amis au **read** time
 
@@ -235,38 +239,46 @@ Le cap 14 s’applique au **salon dont l’hôte a `host_pack`**, pas au joiner.
 - [ ] **P0 H-SQL** : si `select host_pack` échoue, le join se comporte comme cap 8 (erreur avalée → `hostPack = false`).
 - [ ] **P2 H-RACE** : deux appareils joignent le 8ᵉ/14ᵉ siège en même temps (optionnel, difficile).
 
-### 5.3 Invitations amis — **H-INVITE** ✅ / **H-INVITE-FULL** (patché, SQL ⏳)
+### 5.3 Invitations amis — **H-INVITE** ✅ / **H-INVITE-FULL** ✅
 
 **H-INVITE** (accept) OK : le 9ᵉ–14ᵉ entre ; un 15ᵉ qui **accepte** est refusé (« Cette soirée est complète. »).
 
-**H-INVITE-FULL** (envoi) : patch client + `feature-host-03-send-invite-cap.sql`. Attendu après coller SQL : à 14/14 (ou 8/8), bouton **Soirée complète**, l’invite ne part pas. Overbooking des places restantes inchangé (13/14 → N invites OK).
+**H-INVITE-FULL** (envoi) : à 14/14 (ou 8/8), bouton **Soirée complète**, l’invite ne part pas. Overbooking des places restantes inchangé (13/14 → N invites OK).
 
-QA 7 sept 2026 : hôte Maître, 13 autres joueurs invités OK. Salon 14/14 → bouton Inviter encore actif (repro **avant** patch).
+QA 7 sept 2026 : hôte Maître, 13 autres joueurs invités OK. Repro avant patch : Inviter encore actif à 14/14. Après HOST-03 : envoi refusé.
 
 1. Hôte Maître, 8 membres déjà là (join par code).
 2. Envoyer une invitation à un 9ᵉ ami → entre (siège 9/14).
 3. [x] **H-INVITE-FULL** repro : à 14/14, l’hôte envoie encore une invite (avant HOST-03).
-4. [ ] Après HOST-03 : à 14/14, Inviter → « Soirée complète » / RPC `lobby_invite_full`. 15ᵉ **accepte** une vieille invite → « Cette soirée est complète. »
+4. [x] Après HOST-03 : à 14/14, Inviter → « Soirée complète » / RPC `lobby_invite_full` (QA 7 sept 2026).
 
 Variante encore utile : salon à 8, hôte **sans** Maître → refus d’acceptation **correct** ; même gate d’envoi après HOST-03.
 
-### 5.4 Transfert / refund en cours de salon — **H-TRANSFER** / **H-INVITE-TRANSFER**
+### 5.4 Transfert / refund en cours de salon — **H-TRANSFER** ✅ / **H-INVITE-TRANSFER** ✅
 
-- [ ] Hôte Maître, 10 joueurs, transfert vers un membre **sans** pack : les 10 restent ; 11ᵉ join par code refusé (cap 8).
+- [x] Hôte Maître, 10 joueurs, transfert vers un membre **sans** pack : les 10 restent ; 11ᵉ join par code refusé (cap 8). QA 7 sept 2026.
 - [ ] Refund Maître pendant un salon à 12 : membres inchangés ; nouveau join cap 8.
 - [ ] Claim hôte stale / acting host : **aucun** lien avec le pack. Les contrôles de manche ne doivent pas exiger `host_pack`.
-- [ ] **H-INVITE-TRANSFER** : hôte Maître, salon à 10, invite pending vers un 11ᵉ → transfert vers non-Maître. L’ami tape Rejoindre → « Cette soirée est complète. » (cap 8, 10 déjà là). L’invite n’est **pas** retirée. Un *nouvel* Inviter après transfert : refusé (HOST-03, 10 ≥ 8).
+- [x] **H-INVITE-TRANSFER** : hôte Maître, salon à 10, invite pending vers un 11ᵉ → transfert vers non-Maître. L’ami tape Rejoindre → « Cette soirée est complète. » QA 7 sept 2026.
 
-### 5.5 Jeux à 9–14 joueurs (régression layout)
+### 5.5 Jeux à 9–14 joueurs (régression layout) ✅
 
-Pas de `maxPlayers` jeu à 8. Vérifier quand même overflow / perf :
+Pas de `maxPlayers` jeu à 8. QA **✅** 7 sept 2026, salon 14/14 lancé :
 
-- [x] Grille lobby 14 pastilles (wrap, pas de crop) — QA 7 sept 2026, salon 14/14 non démarré.
-- [ ] Scores de soirée + podiums lisibles.
-- [ ] Spot the fake (min 3, pas de max) : deal / vote / liste vivants.
-- [ ] Tier Night « classe le groupe » : 14 noms.
-- [ ] Chat + random game.
-- [ ] Prep « tous prêts » avec 14.
+- [x] Grille lobby 14 pastilles (wrap, pas de crop).
+- [x] Scores de soirée + podiums lisibles.
+- [x] Spot the fake (min 3, pas de max) : deal / vote / liste vivants.
+- [x] Tier Night « classe le groupe » : 14 noms.
+- [x] Chat + random game.
+- [x] Prep « tous prêts » avec 14.
+
+### 5.6 Kick à 14 — **H-KICK-14**
+
+QA : **en partie à 14**, l’hôte ne peut plus kick de joueurs.
+
+Rappel produit : kick autorisé **lobby d’attente** et **entre deux jeux** (`canManageLobbyRoster` / RPC `kick_lobby_member`), **pas** mid-manche.
+
+- [ ] **H-KICK-14** : salon Maître 14/14, soirée lancée. Entre deux jeux (pastilles lobby **et** Menu → Soirée → Joueurs) : boutons Retirer absents, ou tap → refus. Distinguer du refus mid-manche (voulu). Contrôle à 8 joueurs : le kick entre deux jeux doit encore marcher.
 
 ---
 
@@ -328,6 +340,7 @@ Pas de `maxPlayers` jeu à 8. Vérifier quand même overflow / perf :
 7. Refund upgrade 3 € vs 9,99 (table §2.5).
 8. Photo replace + surfaces d’affichage.
 9. Transfert d’hôte 10 joueurs (**H-TRANSFER**, **H-INVITE-TRANSFER** si une invite est pending).
+10. Salon 14/14 lancé : kick **entre deux jeux** (**H-KICK-14**). Mid-manche = refus voulu.
 
 Pour chaque fail : noter **appareil**, **rôle salon**, **flags SQL**, **SKU**, **horaire webhook**, capture Forfaits + compteur lobby.
 
