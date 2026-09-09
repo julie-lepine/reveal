@@ -131,42 +131,39 @@ function drawHero(ctx, box, hook) {
   roundRectPath(ctx, box.x, box.y, box.w, box.h, box.r);
   ctx.clip();
   const g1 = ctx.createRadialGradient(
-    box.x + box.w * 0.22,
-    box.y + box.h * 0.28,
-    20,
-    box.x + box.w * 0.22,
-    box.y + box.h * 0.28,
-    box.w * 0.62
+    box.x + box.w * 0.18,
+    box.y + box.h * 0.5,
+    16,
+    box.x + box.w * 0.18,
+    box.y + box.h * 0.5,
+    box.w * 0.55
   );
-  g1.addColorStop(0, "rgba(255, 60, 172, 0.42)");
+  g1.addColorStop(0, "rgba(255, 60, 172, 0.5)");
   g1.addColorStop(1, "rgba(255, 60, 172, 0)");
   ctx.fillStyle = g1;
   ctx.fillRect(box.x, box.y, box.w, box.h);
   const g2 = ctx.createRadialGradient(
     box.x + box.w * 0.82,
-    box.y + box.h * 0.78,
+    box.y + box.h * 0.5,
     10,
     box.x + box.w * 0.82,
-    box.y + box.h * 0.78,
-    box.w * 0.7
+    box.y + box.h * 0.5,
+    box.w * 0.62
   );
-  g2.addColorStop(0, "rgba(99, 102, 241, 0.5)");
+  g2.addColorStop(0, "rgba(99, 102, 241, 0.55)");
   g2.addColorStop(1, "rgba(99, 102, 241, 0)");
   ctx.fillStyle = g2;
   ctx.fillRect(box.x, box.y, box.w, box.h);
+  ctx.fillStyle = "rgba(5, 6, 15, 0.22)";
+  ctx.fillRect(box.x, box.y, box.w, box.h);
   if (hook) {
-    const fade = ctx.createLinearGradient(box.x, box.y + box.h - 150, box.x, box.y + box.h);
-    fade.addColorStop(0, "rgba(5, 6, 15, 0)");
-    fade.addColorStop(1, "rgba(5, 6, 15, 0.58)");
-    ctx.fillStyle = fade;
-    ctx.fillRect(box.x, box.y + box.h - 150, box.w, 150);
     ctx.fillStyle = COLOR.white;
-    ctx.font = `800 44px ${FONT}`;
+    ctx.font = `800 72px ${FONT}`;
     ctx.textAlign = "center";
-    ctx.textBaseline = "alphabetic";
+    ctx.textBaseline = "middle";
     ctx.shadowColor = "rgba(0, 0, 0, 0.45)";
     ctx.shadowBlur = 12;
-    ctx.fillText(ellipsize(ctx, hook, box.w - 56), box.x + box.w / 2, box.y + box.h - 32);
+    ctx.fillText(ellipsize(ctx, hook, box.w - 56), box.x + box.w / 2, box.y + box.h / 2);
     ctx.shadowBlur = 0;
   }
   ctx.restore();
@@ -228,9 +225,12 @@ function drawIdentity(ctx, box, identity, photo) {
 
 function drawRing(ctx, box, winrate) {
   fillRoundRect(ctx, box.x, box.y, box.w, box.h, box.r, COLOR.card);
-  const ring = carnetWinrateRing(winrate, { radius: 72, stroke: 14 });
+  const labelH = 40;
+  const bodyH = Math.max(1, box.h - labelH);
+  const radius = Math.max(72, Math.min(96, Math.round(bodyH * 0.32)));
+  const ring = carnetWinrateRing(winrate, { radius, stroke: 16 });
   const cx = box.x + box.w / 2;
-  const cy = box.y + 118;
+  const cy = box.y + bodyH / 2;
   ctx.beginPath();
   ctx.arc(cx, cy, ring.radius, 0, Math.PI * 2);
   ctx.strokeStyle = COLOR.track;
@@ -251,7 +251,7 @@ function drawRing(ctx, box, winrate) {
     ctx.lineCap = "butt";
   }
   ctx.fillStyle = COLOR.primary;
-  ctx.font = `800 36px ${FONT}`;
+  ctx.font = `800 42px ${FONT}`;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.fillText(formatCarnetWinrate(winrate), cx, cy);
@@ -342,21 +342,33 @@ function drawRanks(ctx, box, split, percents) {
     { label: CARNET_LABEL.chartRankSecond, n: split.second, pct: percents.second, fill: COLOR.secondarySoft },
     { label: CARNET_LABEL.chartRankRest, n: split.rest, pct: percents.rest, fill: COLOR.restBar },
   ];
+  const headerH = 52;
+  const rowH = (box.h - headerH - 12) / rows.length;
   rows.forEach((row, i) => {
-    const y = box.y + 58 + i * 40;
+    const mid = box.y + headerH + i * rowH + rowH / 2;
     ctx.fillStyle = COLOR.white;
     ctx.font = `600 22px ${FONT}`;
     ctx.textAlign = "left";
-    ctx.fillText(row.label, box.x + 18, y + 16);
+    ctx.textBaseline = "middle";
+    ctx.fillText(row.label, box.x + 18, mid);
     const trackX = box.x + 86;
     const trackW = box.w - 86 - 64;
-    fillRoundRect(ctx, trackX, y + 6, trackW, 12, 99, "rgba(255,255,255,0.1)");
+    const barH = 14;
+    fillRoundRect(ctx, trackX, mid - barH / 2, trackW, barH, 99, "rgba(255,255,255,0.1)");
     if (row.pct > 0) {
-      fillRoundRect(ctx, trackX, y + 6, Math.max(12, (trackW * row.pct) / 100), 12, 99, row.fill);
+      fillRoundRect(
+        ctx,
+        trackX,
+        mid - barH / 2,
+        Math.max(12, (trackW * row.pct) / 100),
+        barH,
+        99,
+        row.fill
+      );
     }
     ctx.textAlign = "right";
     ctx.fillStyle = COLOR.muted;
-    ctx.fillText(String(row.n), box.x + box.w - 18, y + 16);
+    ctx.fillText(String(row.n), box.x + box.w - 18, mid);
   });
 }
 
@@ -403,13 +415,13 @@ function drawTiles(ctx, tiles, model) {
     fillRoundRect(ctx, box.x, box.y, box.w, box.h, box.r, cell.fill);
     ctx.textAlign = "left";
     ctx.textBaseline = "alphabetic";
-    ctx.font = `800 32px ${FONT}`;
+    ctx.font = `800 36px ${FONT}`;
     ctx.fillStyle = cell.valueColor;
     const value = ellipsize(ctx, `${cell.emoji}  ${cell.value}`, box.w - 28);
-    ctx.fillText(value, box.x + 16, box.y + 52);
+    ctx.fillText(value, box.x + 16, box.y + Math.round(box.h * 0.48));
     ctx.fillStyle = COLOR.muted;
-    ctx.font = `600 20px ${FONT}`;
-    ctx.fillText(cell.label, box.x + 16, box.y + box.h - 22);
+    ctx.font = `600 22px ${FONT}`;
+    ctx.fillText(cell.label, box.x + 16, box.y + box.h - 24);
   }
 }
 
@@ -421,7 +433,7 @@ function drawDots(ctx, box, tones) {
   ctx.fillText(CARNET_LABEL.shareDotsTitle, box.x, box.y + 22);
 
   const n = tones.length || 20;
-  const d = 22;
+  const d = 26;
   const span = box.w - d;
   const rowY = box.y + box.h - d / 2;
   ctx.lineWidth = 2;

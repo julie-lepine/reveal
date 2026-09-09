@@ -325,8 +325,11 @@ describe("FEATURE-PROFILE-04 — carnet Signature", () => {
     assert.equal(layout.w / layout.h, 1080 / 1920);
     assert.ok(layout.hero.y >= layout.padTop);
     assert.ok(layout.ident.y >= layout.hero.y + layout.hero.h);
+    assert.ok(layout.hero.h <= 200);
+    assert.ok(layout.hero.h < layout.ring.h);
     assert.ok(layout.dots.y >= layout.tiles[2].y + layout.tiles[2].h);
     assert.ok(layout.logo.y > layout.dots.y + layout.dots.h);
+    assert.ok(layout.logo.y - (layout.dots.y + layout.dots.h) < 120);
     assert.ok(layout.logo.y + layout.logo.h <= layout.h - 160);
 
     const cardJs = src("js/core/signatureCarnetCard.js");

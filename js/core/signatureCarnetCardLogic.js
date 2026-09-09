@@ -127,7 +127,7 @@ export function buildCarnetCardModel({ identity, evenings, stats } = {}) {
   return model;
 }
 
-/** Zones en px (1080×1920). Logo sous les pastilles, marge IG bas. */
+/** Zones en px (1080×1920). Accroche en bandeau ; stats prennent la hauteur. Logo + marge IG bas. */
 export function carnetCardLayout() {
   const w = CARNET_CARD_WIDTH;
   const h = CARNET_CARD_HEIGHT;
@@ -138,10 +138,10 @@ export function carnetCardLayout() {
   const gap = 16;
   const r = 24;
 
-  const hero = { x: padX, y: padTop, w: innerW, h: 400, r: 36 };
-  const ident = { x: padX, y: hero.y + hero.h + 36, w: innerW, h: 96, avatar: 88 };
-  const vizY = ident.y + ident.h + 28;
-  const topH = 250;
+  const hero = { x: padX, y: padTop, w: innerW, h: 176, r: 28 };
+  const ident = { x: padX, y: hero.y + hero.h + 36, w: innerW, h: 108, avatar: 88 };
+  const vizY = ident.y + ident.h + 32;
+  const topH = 330;
   const ringW = Math.round(innerW * 0.36);
   const ring = { x: padX, y: vizY, w: ringW, h: topH, r };
   const spark = {
@@ -151,10 +151,10 @@ export function carnetCardLayout() {
     h: topH,
     r,
   };
-  const ranks = { x: padX, y: vizY + topH + gap, w: innerW, h: 188, r };
+  const ranks = { x: padX, y: vizY + topH + gap, w: innerW, h: 228, r };
   const tileGap = 14;
   const tileW = (innerW - tileGap) / 2;
-  const tileH = 118;
+  const tileH = 148;
   const tilesY = ranks.y + ranks.h + gap;
   const tiles = [
     { x: padX, y: tilesY, w: tileW, h: tileH, r },
@@ -162,8 +162,8 @@ export function carnetCardLayout() {
     { x: padX, y: tilesY + tileH + tileGap, w: tileW, h: tileH, r },
     { x: padX + tileW + tileGap, y: tilesY + tileH + tileGap, w: tileW, h: tileH, r },
   ];
-  const dotsY = tiles[2].y + tileH + 28;
-  const dots = { x: padX, y: dotsY, w: innerW, h: 70 };
+  const dotsY = tiles[2].y + tileH + 36;
+  const dots = { x: padX, y: dotsY, w: innerW, h: 90 };
   const logoH = 120;
   const logo = { x: padX, y: h - padBottom - logoH, w: innerW, h: logoH };
 
