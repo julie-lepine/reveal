@@ -6,7 +6,7 @@ Maître **inclut** Signature et Sans pub (UI + webhook posent les trois flags). 
 
 Hors scope : outils de table · mots perso Draw It / Tier Night.
 
-**Recette Pages + SQL** (7–8 sept 2026, Anrobensy) : tickets code fermés (H-SQL, H-RACE, AV-REPLACE, LEGAL, identité, carnet, cap 8/14, kick 14, spoof, triggers). Il reste **l’app native** et les **stores**.
+**Recette Pages + SQL** (7–8 sept 2026, Anrobensy) : tickets code fermés (H-SQL, H-RACE, AV-REPLACE, LEGAL, identité, carnet, cap 8/14, kick 14, spoof, triggers). Native 1–7 cochés. **Stores / RC / webhook ✅ 14 sept 2026** (points 8–10). Play 13 sept 14:20 UTC : `reveal_host` 9,99 (autre commande, pas le total 9,99 du 11 sur `b5721277-…`).
 
 ---
 
@@ -18,13 +18,15 @@ from public.profiles
 where id = '<uuid>';
 ```
 
-Anrobensy `0e36808e-52e3-461d-a424-906129b24aed` — remettre les packs après un test :
+Anrobensy `0e36808e-52e3-461d-a424-906129b24aed` — recette Pages, **pas** l’acheteur Play du 11 sept. Remettre les packs après un test :
 
 ```sql
 update public.profiles
 set host_pack = true, profile_pack = true, ad_free = true
 where id = '0e36808e-52e3-461d-a424-906129b24aed';
 ```
+
+Achat sandbox Play **11 sept 2026** (Sans pub → Signature upgrade → Maître 3 €) : `b5721277-5ded-4672-a920-be35ff0d0ea5` (customer RC = ce UUID, SQL aligné 14 sept).
 
 Le SQL Editor (`postgres`) **peut** changer les flags. Un `UPDATE` **client** (JWT) est ignoré par les triggers protect.
 
@@ -98,11 +100,11 @@ Sans 3 comptes : faire A, rembourser Signature **et** Maître, SQL reset, puis B
 
 - [x] **7. Refunds sandbox** — Play Console → commandes / Order management (licence tester) : rembourser **un** produit, attendre 1–2 min, kill+relance, SQL. Flags = **table Refunds** ci-dessous. Puis Menu (cartes), pubs (reviennent si `ad_free` false), couleur / photo **conservées** (ID-OLD), carnet (bloqué si plus Signature), cap lobby (14 → 8 si tu es l’hôte et `host_pack` tombe). Cosmétiques restent si tu **re-grantes** le pack après.
 
-- [x] **8. Fiches store** — Play Console + App Store Connect : texte / captures. **Ne pas** promettre outils de table ni mots perso Draw It / Tier Night (hors scope). OK : 14 joueurs, Signature (profil, carnet), sans pub.
+- [x] **8. Fiches store** — Play Console + App Store Connect : texte / captures. **Ne pas** promettre outils de table ni mots perso Draw It / Tier Night (hors scope). OK : 14 joueurs, Signature (profil, carnet), sans pub. **14 sept** : captures fiche = jeu (accueil, lobby, Consensus, classement, Dilemma), 5/8 Play. **Pas** besoin de photographier le paywall / les SKUs. Captures IAP App Review ≠ fiche publique.
 
-- [x] **9. RevenueCat (dashboard)** — entitlements exactement `ad_free`, `profile`, `host`. Produits attachés, **mêmes** SKUs Play **et** iOS : `reveal_adfree`, `reveal_profile`, `reveal_profile_upgrade`, `reveal_host`, `reveal_host_upgrade_adfree`, `reveal_host_upgrade_profile`. Offering actuel : le bon package selon le palier déjà possédé.
+- [x] **9. RevenueCat (dashboard)** — **14 sept** : entitlements `ad_free`, `profile` (display *profil*), `host`. 6 SKUs Play **Published** + 6 iOS (badge *Could not check* = API ASC, pas un trou catalogue). Offering **current** `default` : `$rc_lifetime` / profile / profile_upgrade / host / host_upgrade_adfree / host_upgrade_profile (Play + iOS). Test Store `lifetime` sur `ad_free` OK. Signature/Maître **pas** recollés sur `ad_free` (le webhook pose les flags SQL).
 
-- [ ] **10. Webhook (si accès dashboards)** — customer RevenueCat = **UUID** du profil, pas `$RCAnonymousID…`. Cas connus (pas un crash) : `app_user_id` invalide ou `$RC…` → webhook **200**, SQL **inchangé**. Profil pas encore créé (UPDATE 0 rows) → **200** quand même, **grant perdu** jusqu’au **prochain** event (nouvel achat, restore, ou re-delivery RC). Après un achat OK : logs Edge Function `revenuecat-webhook` + SQL alignés.
+- [x] **10. Webhook** — **14 sept** : customer `b5721277-5ded-4672-a920-be35ff0d0ea5` = `profiles.id`, entitlements `ad_free` + `profile` + `host` actifs. Play 11 sept 17:39–17:41 UTC : `reveal_adfree` 2,99 → `reveal_profile_upgrade` 4,00 → `reveal_host_upgrade_profile` 3,00 (GPA.3348… / 3361… / 3318-6187-6876-01343). Alias `$RCAnonymousID:453c9a0f…` à 17:42 = `logIn` (normal). SQL aligné. **Pas** Anrobensy. `$RCAnonymousID:7168c45c…` = autre fiche, **pas** un UUID profil. Export CSV customers : colonnes produits souvent **vides** ; Play Commandes test **sans** e-mail acheteur. Cas connus inchangés : `$RC…` → webhook 200 SQL inchangé ; profil absent → 200, grant perdu jusqu’au prochain event.
 
 **Anrobensy** (`0e36808e-…`) : après les tests, recoller le `UPDATE … host_pack = true, profile_pack = true, ad_free = true` du § SQL.
 
