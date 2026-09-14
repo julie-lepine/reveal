@@ -112,3 +112,15 @@ export async function loadCapacitorSplashScreen() {
   const SplashScreen = nativePlugin("SplashScreen");
   return SplashScreen ? { SplashScreen } : null;
 }
+
+export async function loadCapacitorShare() {
+  if (!isNativeApp()) return null;
+  const Share = nativePlugin("Share");
+  return Share ? { Share } : null;
+}
+
+export async function loadCapacitorFilesystem() {
+  if (!isNativeApp()) return null;
+  const Filesystem = nativePlugin("Filesystem");
+  return Filesystem ? { Filesystem } : null;
+}

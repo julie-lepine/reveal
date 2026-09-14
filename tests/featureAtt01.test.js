@@ -31,5 +31,6 @@ describe("FEATURE-ATT-01 — demande de suivi iOS", () => {
   it("le plist iOS garde NSUserTrackingUsageDescription", () => {
     const patch = src("scripts/patchNative.mjs");
     assert.match(patch, /NSUserTrackingUsageDescription/);
+    assert.match(patch, /NSPhotoLibraryAddUsageDescription/);
   });
 });

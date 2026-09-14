@@ -8,12 +8,15 @@ import {
   catalogEmojiForSessionGameId,
   catalogTitleForSessionGameId,
 } from "./gameCatalogTitle.js";
+import { loadCapacitorFilesystem, loadCapacitorShare } from "./capacitorImports.js";
+import { isNativeApp } from "./platform.js";
 import {
   CARNET_CARD_FILE,
   CARNET_CARD_HEIGHT,
   CARNET_CARD_MIME,
   CARNET_CARD_WIDTH,
   carnetCardLayout,
+  isShareCancelError,
 } from "./signatureCarnetCardLogic.js";
 import {
   carnetSparklineLayout,
@@ -511,19 +514,68 @@ export async function renderCarnetSharePng(model) {
   return blob;
 }
 
+function blobToBase64(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const s = String(reader.result || "");
+      const comma = s.indexOf(",");
+      resolve(comma >= 0 ? s.slice(comma + 1) : s);
+    };
+    reader.onerror = () => reject(reader.error || new Error("base64"));
+    reader.readAsDataURL(blob);
+  });
+}
+
+async function sharePngNative(blob) {
+  const shareMod = await loadCapacitorShare();
+  const fsMod = await loadCapacitorFilesystem();
+  const Share = shareMod?.Share;
+  const Filesystem = fsMod?.Filesystem;
+  if (!Share?.share || !Filesystem?.writeFile || !Filesystem?.getUri) {
+    throw new Error("share");
+  }
+  const data = await blobToBase64(blob);
+  await Filesystem.writeFile({
+    path: CARNET_CARD_FILE,
+    data,
+    directory: "CACHE",
+  });
+  const got = await Filesystem.getUri({
+    path: CARNET_CARD_FILE,
+    directory: "CACHE",
+  });
+  const uri = got?.uri;
+  if (!uri) throw new Error("share");
+  try {
+    await Share.share({
+      title: "REVEAL",
+      files: [uri],
+      dialogTitle: CARNET_LABEL.shareConfirm,
+    });
+    return { ok: true, method: "share" };
+  } catch (e) {
+    if (isShareCancelError(e)) return { ok: true, method: "cancel" };
+    throw e;
+  }
+}
+
 async function shareOrDownloadPng(blob) {
+  if (isNativeApp()) {
+    return sharePngNative(blob);
+  }
   const file = new File([blob], CARNET_CARD_FILE, { type: CARNET_CARD_MIME });
-  if (typeof navigator !== "undefined" && navigator.share) {
-    const payload = { files: [file], title: "REVEAL", text: CARNET_LABEL.shareCard };
-    const canFiles =
-      typeof navigator.canShare !== "function" || navigator.canShare({ files: [file] });
+  const canFiles =
+    typeof navigator !== "undefined" &&
+    typeof navigator.share === "function" &&
+    typeof navigator.canShare === "function" &&
+    navigator.canShare({ files: [file] });
+  if (canFiles) {
     try {
-      if (canFiles) {
-        await navigator.share(payload);
-        return { ok: true, method: "share" };
-      }
+      await navigator.share({ files: [file], title: "REVEAL" });
+      return { ok: true, method: "share" };
     } catch (e) {
-      if (e?.name === "AbortError") return { ok: true, method: "cancel" };
+      if (isShareCancelError(e)) return { ok: true, method: "cancel" };
     }
   }
   const url = URL.createObjectURL(blob);

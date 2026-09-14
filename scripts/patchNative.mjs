@@ -441,6 +441,14 @@ async function patchIos() {
     console.log("iOS: NSUserTrackingUsageDescription ajouté");
   }
 
+  if (!plist.includes("NSPhotoLibraryAddUsageDescription")) {
+    const photos = `\t<key>NSPhotoLibraryAddUsageDescription</key>
+\t<string>REVEAL enregistre ta carte pour que tu puisses la partager ou la garder dans Photos.</string>
+`;
+    plist = plistInsertAfterDict(plist, photos);
+    console.log("iOS: NSPhotoLibraryAddUsageDescription ajouté");
+  }
+
   fs.writeFileSync(plistPath, plist);
   await patchIosSplash();
 }

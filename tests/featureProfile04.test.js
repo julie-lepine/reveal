@@ -26,6 +26,7 @@ import {
   carnetCardHook,
   carnetCardLayout,
   carnetCardRankDots,
+  isShareCancelError,
 } from "../js/core/signatureCarnetCardLogic.js";
 import { CARNET_SCREEN_ID } from "../js/config/signatureCarnet.js";
 
@@ -336,6 +337,16 @@ describe("FEATURE-PROFILE-04 — carnet Signature", () => {
     assert.doesNotMatch(cardJs, /friendNames|friend_names/);
     assert.match(cardJs, /renderCarnetSharePng/);
     assert.match(cardJs, /navigator\.share/);
+    assert.match(cardJs, /isNativeApp\(\)/);
+    assert.match(cardJs, /loadCapacitorShare/);
+    assert.match(cardJs, /loadCapacitorFilesystem/);
+    assert.match(cardJs, /directory:\s*["']CACHE["']/);
+    assert.doesNotMatch(cardJs, /from ["']@capacitor\//);
+    assert.match(src("js/core/capacitorImports.js"), /loadCapacitorShare/);
+    assert.match(src("js/core/capacitorImports.js"), /loadCapacitorFilesystem/);
+    assert.equal(isShareCancelError({ name: "AbortError" }), true);
+    assert.equal(isShareCancelError({ message: "Share canceled" }), true);
+    assert.equal(isShareCancelError({ message: "network" }), false);
     assert.match(cardJs, /layout\.yMin/);
     assert.match(cardJs, /layout\.yMax/);
     assert.match(cardJs, /chart\.x \+ chart\.w/);

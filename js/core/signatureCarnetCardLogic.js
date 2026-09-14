@@ -127,6 +127,18 @@ export function buildCarnetCardModel({ identity, evenings, stats } = {}) {
   return model;
 }
 
+/** Annulation share sheet (Web AbortError / Capacitor « Share canceled »). */
+export function isShareCancelError(error) {
+  const name = error?.name || "";
+  const msg = String(error?.message || error?.errorMessage || "");
+  return (
+    name === "AbortError" ||
+    name === "ShareCancelledError" ||
+    /share canceled/i.test(msg) ||
+    /share cancelled/i.test(msg)
+  );
+}
+
 /** Zones en px (1080×1920). Accroche en bandeau ; stats prennent la hauteur. Logo + marge IG bas. */
 export function carnetCardLayout() {
   const w = CARNET_CARD_WIDTH;

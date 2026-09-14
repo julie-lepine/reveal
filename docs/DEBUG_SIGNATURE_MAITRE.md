@@ -45,20 +45,68 @@ Invité : pas de bouton d’achat, hint **compte e-mail**. Web : « dans l’app
 
 ## Encore à jouer (native / stores)
 
-Compte **inscrit**, app native (pas Pages). Un palier par UUID sauf parcours upgrade. Après achat : poll ≤ 8 s, sinon kill + relance. Vérifier SQL, pas seulement l’UI.
+À faire **ce week-end** sur téléphone, **sans GitHub Pages**. Cocher au fur et à mesure. En cas de doute : SQL d’abord, UI ensuite.
 
-- [ ] Inscrit natif sans palier : cartes 2,99 / 6,99 / 9,99.
-- [ ] `purchaseProfile` refuse si Maître déjà là.
-- [ ] Achat Signature : `profile_pack` + `ad_free` ; `host_pack` false. Pubs coupées.
-- [ ] Achat Maître (9,99 / 7,00 / 3,00) : **trois** flags true. Pubs coupées.
-- [ ] Timeout poll : message « jusqu’à une minute », pas un 2ᵉ achat.
-- [ ] Restore Play (2ᵉ appareil / réinstall). Overlay ne doit **pas** écrire `host_pack`.
-- [ ] Refunds sandbox (table ci-dessous) : Menu, pubs, couleur, carnet, cap lobby.
-- [ ] Fiches Play / ASC : ne pas promettre outils de table ni mots perso.
-- [ ] RevenueCat : entitlements `ad_free`, `profile`, `host` ; SKUs Play + iOS alignés.
-- [ ] Webhook : `app_user_id` non-UUID / `$RC…` → 200, flags inchangés. UPDATE 0 rows (profil pas encore créé) → grant perdu jusqu’à un nouvel event.
+### Avant de commencer
 
-Optionnel : C-KICK (2 Signature, une manche, kick → carnet du kické) · autres jeux §identité (1 jeu + chat/scores déjà OK).
+1. **App installée** (APK / Play interne / TestFlight), pas le site.
+2. Compte **e-mail inscrit** (pas Invité). Noter l’UUID (`profiles.id`) — requête SQL plus haut.
+3. Licence tester Play (ou sandbox Apple) sur le **même** Google / Apple que le téléphone.
+4. Ouvrir le SQL Editor **avant** le 1er achat, onglet prêt avec `where id = '<uuid>'`.
+
+**Règles d’or**
+
+- Un achat Play/Apple est **à vie sur ce compte store**. Remettre `host_pack = false` en SQL **ne permet pas** de racheter le même SKU. Pour retester le même tarif : **rembourser** la commande sandbox, **puis** SQL, **puis** kill + relance. Sinon : autre compte e-mail + autre compte store.
+- Après un achat, l’app attend le webhook **8 secondes**. Si le SQL n’a pas bougé : **ne rachète pas**. Force-stop l’app, relance, reconnecte, relance la requête SQL. L’UI peut déjà afficher le pack (overlay session) alors que SQL est encore `false` — c’est le cas « activation jusqu’à une minute ».
+- Overlay = affichage temporaire côté téléphone. **Seul le webhook** écrit `ad_free` / `profile_pack` / `host_pack`. Un restore / overlay vert + SQL `host_pack = false` = webhook pas encore passé (ou jamais, voir test 10).
+
+**Où cliquer** : Menu → Forfaits. Pubs = bannières / interstitiels en lobby ou entre jeux.
+
+### Parcours (un par UUID, sauf upgrades)
+
+Idéal : **3 comptes** (ou 1 compte + refunds entre chaque).
+
+| Compte | Départ SQL (tout `false`) | Acheter | Prix attendu |
+| ------ | ------------------------- | ------- | ------------ |
+| A | rien | Signature, puis Maître | 6,99 puis **3,00** |
+| B | rien | Maître direct | **9,99** |
+| C | rien | Sans pub, puis Maître | 2,99 puis **7,00** |
+
+Sans 3 comptes : faire A, rembourser Signature **et** Maître, SQL reset, puis B, etc.
+
+---
+
+- [x] **1. Prix au repos** — inscrit, **aucun** palier (`ad_free` `profile_pack` `host_pack` tous false). Menu → Forfaits : **2,99 / 6,99 / 9,99**. Invité : pas de bouton d’achat, hint compte e-mail. Sur le **web** : « dans l’app native ».
+
+- [x] **2. Signature refuse si Maître déjà là** — SQL `host_pack = true` (vrai achat Maître, ou Anrobensy déjà Maître). Menu → Forfaits : Signature **Inclus** / déjà actif, **pas** de paiement 6,99. Un tap ne doit **pas** ouvrir la feuille Play/Apple.
+
+- [x] **3. Achat Signature 6,99** (compte A, rien en SQL). Payer `reveal_profile`. **≤ 8 s** puis SQL : `profile_pack = true`, `ad_free = true`, `host_pack = false`. UI : Signature actif, pubs coupées, couleur / photo / carnet dispo. Maître affiche **3,00 € de plus**. Si SQL encore false après 8 s → message « jusqu’à une minute » / « rouvre le menu » : kill + relance, **pas** un 2ᵉ achat.
+
+- [x] **4. Achat Maître** — trois flags **true**, pubs coupées. Vérifier les **trois** tarifs (comptes A/B/C ou refunds) :
+
+  | Départ | Bouton | SKU | SQL après succès |
+  | ------ | ------ | --- | ---------------- |
+  | rien | 9,99 | `reveal_host` | `host_pack` `profile_pack` `ad_free` = true |
+  | Sans pub seul | 7,00 | `reveal_host_upgrade_adfree` | idem |
+  | Signature | 3,00 | `reveal_host_upgrade_profile` | idem |
+
+  Cap lobby : **toi hôte** → 14. Un Maître **invité** dans un salon d’un non-Maître → toujours **8**.
+
+- [x] **5. Timeout poll** — si l’activation SQL dépasse ~8 s : toast du type *« Achat enregistré. L’activation peut prendre une minute »* (Maître restore : *« …jusqu’à une minute »*). **Ne pas** racheter. Attendre / kill+relance. SQL doit finir par passer ; si au bout d’**une minute** les flags sont encore false → noter UUID + heure, regarder RevenueCat (customer = UUID ?) et logs webhook.
+
+- [x] **6. Restore Play** — après un achat **réussi** (SQL déjà true). 2ᵉ téléphone **ou** désinstall / réinstall, **même** compte e-mail Reveal + même compte Google. Menu → restaurer (pas racheter). UI : packs visibles. SQL : flags **inchangés** (toujours true). L’overlay ne doit **jamais** passer `host_pack` à true **tout seul** : sur un UUID **sans** pack en base, un restore ne doit pas laisser `host_pack = true` en SQL si le webhook n’a rien écrit. Si l’UI montre Maître mais SQL `host_pack = false` : overlay OK, attendre le webhook ; si SQL reste false → bug / `app_user_id` (test 10).
+
+- [x] **7. Refunds sandbox** — Play Console → commandes / Order management (licence tester) : rembourser **un** produit, attendre 1–2 min, kill+relance, SQL. Flags = **table Refunds** ci-dessous. Puis Menu (cartes), pubs (reviennent si `ad_free` false), couleur / photo **conservées** (ID-OLD), carnet (bloqué si plus Signature), cap lobby (14 → 8 si tu es l’hôte et `host_pack` tombe). Cosmétiques restent si tu **re-grantes** le pack après.
+
+- [x] **8. Fiches store** — Play Console + App Store Connect : texte / captures. **Ne pas** promettre outils de table ni mots perso Draw It / Tier Night (hors scope). OK : 14 joueurs, Signature (profil, carnet), sans pub.
+
+- [x] **9. RevenueCat (dashboard)** — entitlements exactement `ad_free`, `profile`, `host`. Produits attachés, **mêmes** SKUs Play **et** iOS : `reveal_adfree`, `reveal_profile`, `reveal_profile_upgrade`, `reveal_host`, `reveal_host_upgrade_adfree`, `reveal_host_upgrade_profile`. Offering actuel : le bon package selon le palier déjà possédé.
+
+- [ ] **10. Webhook (si accès dashboards)** — customer RevenueCat = **UUID** du profil, pas `$RCAnonymousID…`. Cas connus (pas un crash) : `app_user_id` invalide ou `$RC…` → webhook **200**, SQL **inchangé**. Profil pas encore créé (UPDATE 0 rows) → **200** quand même, **grant perdu** jusqu’au **prochain** event (nouvel achat, restore, ou re-delivery RC). Après un achat OK : logs Edge Function `revenuecat-webhook` + SQL alignés.
+
+**Anrobensy** (`0e36808e-…`) : après les tests, recoller le `UPDATE … host_pack = true, profile_pack = true, ad_free = true` du § SQL.
+
+Optionnel métier (Pages déjà OK, native si le temps) : **C-KICK** — 2 joueurs Signature, une manche, kick **entre deux jeux** → le kické garde le carnet. Autres jeux identité : 1 partie + chat / scores.
 
 ### Refunds
 
