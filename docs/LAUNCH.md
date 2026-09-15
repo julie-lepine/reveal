@@ -1,7 +1,7 @@
 # REVEAL — Lancement
 
 Prod web : **https://julie-lepine.github.io/reveal/**  
-Backend : [SUPABASE.md](./SUPABASE.md) · Native : [NATIVE.md](./NATIVE.md) · Site légal : [LEGAL_SITE_OVH.md](./LEGAL_SITE_OVH.md) — **[havefuncorp.fr](https://havefuncorp.fr/)**
+Backend : [SUPABASE.md](./SUPABASE.md) · Stats hebdo : [WAREHOUSE_WEEKLY.md](./WAREHOUSE_WEEKLY.md) · Native : [NATIVE.md](./NATIVE.md) · Site légal : [LEGAL_SITE_OVH.md](./LEGAL_SITE_OVH.md) — **[havefuncorp.fr](https://havefuncorp.fr/)**
 
 | | |
 |--|--|

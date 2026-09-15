@@ -104,6 +104,7 @@ Sources : audit SQL du dépôt (`AUDIT-SQL-01`) + docs ops ([`SUPABASE.md`](./SU
 | 2026-09-07 | [`feature-host-04-race-cap.sql`](../supabase/feature-host-04-race-cap.sql) | FEATURE-HOST-04 / H-RACE | ✅ | ✅ | [`feature-host-04-race-cap-runbook.sql`](../supabase/tests/feature-host-04-race-cap-runbook.sql) | BEFORE INSERT `lobby_members` : `FOR UPDATE` lobby puis cap · QA **✅** 7 sept 2026 Pages/SQL Anrobensy (8/8→9ᵉ refusé · cap 14 9ᵉ OK · 9/8 conservés · 10ᵉ refusé) · concurrent 2 appareils **non joué** · voir §33 |
 | 2026-09-07 | [`feature-profile-04b-carnet-kick.sql`](../supabase/feature-profile-04b-carnet-kick.sql) | FEATURE-PROFILE-04b / C-KICK | ✅ | ✅ | [`feature-profile-04b-carnet-kick-runbook.sql`](../supabase/tests/feature-profile-04b-carnet-kick-runbook.sql) | Jeton kick + `archive_signature_evening` · QA **✅** 7 sept 2026 · **ne pas** réexécuter 04 / kick-lobby-member · voir §25 |
 | 2026-09-07 | [`feature-profile-04c-carnet-dissolve.sql`](../supabase/feature-profile-04c-carnet-dissolve.sql) | FEATURE-PROFILE-04c / C-DISSOLVE | ✅ | ✅ | [`feature-profile-04c-carnet-dissolve-runbook.sql`](../supabase/tests/feature-profile-04c-carnet-dissolve-runbook.sql) | Jetons carnet dans `dissolve_lobby_atomically` · QA **✅** 7 sept 2026 · **ne pas** réexécuter 04 / 04b / xx-e · voir §26 |
+| 2026-09-15 | SQL Editor (pas de fichier `supabase/`) | warehouse v1 | ⏳ | ✅ | — | Schéma `warehouse` + triggers + vues + cron `reveal-warehouse-purge` (job 4, 04:15 UTC). Pas de grant `anon`/`authenticated`. Lecture : §34 |
 
 **Hors migrations (tracés ailleurs si besoin)** : préflight [`lobby-membership-e4-00-preflight-duplicates.sql`](../supabase/lobby-membership-e4-00-preflight-duplicates.sql) (lecture seule) ; runbooks / harness sous [`supabase/tests/`](../supabase/tests/) et [`lobby-membership-e4-RUNBOOK.sql`](../supabase/lobby-membership-e4-RUNBOOK.sql) / [`lobby-membership-e5-RUNBOOK.sql`](../supabase/lobby-membership-e5-RUNBOOK.sql) — ce ne sont pas des migrations. Voir aussi [`lobby-membership-e4-tests-manual.sql`](../supabase/lobby-membership-e4-tests-manual.sql).
 
@@ -668,4 +669,44 @@ Correctif : trigger `BEFORE INSERT` `lobby_members_enforce_seat_cap` — `SELECT
 **QA** : coller le SQL · runbook catalogue · Pages 8/8 → 9ᵉ refusé · (optionnel) 7/8 deux appareils. Ne pas réexécuter HOST-02/03.
 
 **Statut** : SQL **✅** collé 7 sept 2026 · runbook `HRACE_SEAT_CAP_OK` · QA Pages **✅** 7 sept 2026 Anrobensy (séquentiel). Concurrent 2 backends **non joué** sur Pages.
+
+---
+
+## 34. warehouse v1 — Stats d’usage (SQL Editor, 15 sept 2026)
+
+Pas de fichier dans `supabase/`. Collé dans le SQL Editor du projet **production** (triggers + vues + cron). Staging **non** recollé (⏳). L’app joueur n’a **aucun** accès au schéma `warehouse` (`anon` / `authenticated` révoqués).
+
+**Lecture hebdo** : [WAREHOUSE_WEEKLY.md](./WAREHOUSE_WEEKLY.md) (rituel lundi, requêtes à coller). Ci-dessous : trace de déploiement.
+
+| Élément | Valeur |
+| ------- | ------ |
+| Objets | `warehouse.events` · `warehouse.lobby_live` · vues `v_daily` / `v_games` / `v_lobby_quality` / `v_live_now` |
+| Triggers | `public.lobbies` (create) · `lobby_members` (peak) · `lobby_closures` (close) · `game_sessions.game_id` · `profiles` (signup + IAP) |
+| Cron | `reveal-warehouse-purge` — job **4** — `15 4 * * *` UTC — events > 90 j sauf IAP |
+| Hors scope | plateforme web/iOS/Android · Metabase · rollup > 90 j · recettes € (RevenueCat / stores) |
+| Ne pas | `cron.schedule` une 2ᵉ fois · grant PostgREST · réutiliser le carnet Signature |
+
+**QA 15 sept 2026** : salon `170d3da3-7886-4aca-961b-3038a8b88636` vu dans `lobby_live` (`peak_members` 2, `host_guest` false) puis cycle fermeture / vues / cron `active`.
+
+**Comment lire (prod)** — [Dashboard Supabase](https://supabase.com/dashboard) → le projet **live** → **SQL Editor** → New query. **Un seul** `select` par Run (l’éditeur n’affiche que le dernier résultat). Rôle postgres. Les vues ne sont pas dans Table Editor sous `public`.
+
+| Question | Requête |
+| -------- | ------- |
+| Soirées / jeux / inscrits / IAP par jour (Paris) | `select * from warehouse.v_daily limit 14;` |
+| Quels jeux ont été lancés (7 j) | `select * from warehouse.v_games where day >= current_date - 7;` |
+| Qualité des salons fermés (raison, taille, durée) | `select * from warehouse.v_lobby_quality limit 20;` |
+| Combien de salons **en ce moment** | `select * from warehouse.v_live_now;` |
+| Salons encore ouverts (détail) | `select * from warehouse.lobby_live;` |
+| Derniers événements bruts | voir ci-dessous |
+
+```sql
+select event_type, game_id, props, occurred_at
+from warehouse.events
+order by id desc
+limit 20;
+```
+
+Colonnes utiles : `v_daily.lobbies` / `closed` / `games` / `signups` (comptes) / `guest_profiles` (invités) / `iap_grants`. `v_lobby_quality.close_reason` = `host_closed` ou `inactive_expired`. `avg_min` = durée moyenne en minutes. Les stats **commencent le 15 sept 2026** (rien avant les triggers). Recettes € : RevenueCat / stores, pas ici.
+
+Signet : dans le SQL Editor, enregistrer chaque requête (étoile / snippet) pour ne pas les retaper.
 

@@ -1,6 +1,6 @@
 # Supabase — REVEAL (setup, egress, emails)
 
-Lancement : [LAUNCH.md](./LAUNCH.md) · Native : [NATIVE.md](./NATIVE.md) · SQL prod : [DEPLOYMENTS_SQL.md](./DEPLOYMENTS_SQL.md)
+Lancement : [LAUNCH.md](./LAUNCH.md) · Native : [NATIVE.md](./NATIVE.md) · SQL prod : [DEPLOYMENTS_SQL.md](./DEPLOYMENTS_SQL.md) · Stats hebdo : [WAREHOUSE_WEEKLY.md](./WAREHOUSE_WEEKLY.md) (`warehouse`)
 
 ---
 
