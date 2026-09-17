@@ -81,6 +81,7 @@ import {
 } from "./core/clientCompatibilityGateUi.js";
 import { initClientCompatibilityForeground } from "./core/clientCompatibilityForeground.js";
 import { armNativeSplashSafetyHide, hideNativeSplash } from "./core/nativeSplash.js";
+import { initEventSkin } from "./core/eventSkin.js";
 
 const app = document.getElementById("app");
 
@@ -90,6 +91,8 @@ if (!app) {
 
 // Ancien canal #join= abandonné : neutraliser l’URL sans pending / auto-join.
 stripLegacyJoinHashFromLocation();
+
+initEventSkin();
 
 initRouter(app);
 

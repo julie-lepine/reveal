@@ -23,6 +23,7 @@ Builds : `npm run cap:sync` (Node ≥ 22) → AAB / Archive.
 2. **AdMob iOS** — **approuvée 6 sept 2026** (`ca-app-pub-…1825936767`, Apple ID `6785256450`). Limites d’examen levées, pubs autorisées. URL marketing = `https://havefuncorp.fr/` · `app-ads.txt` live.
 3. **Play Console** — privacy + suppression + site web `havefuncorp.fr` collés 5 sept 2026.
 4. **Signature iOS** — catalogue RC + IAP « Prêt pour la vérification ». **QA sandbox OK** 5 sept 2026 (voir §6). Coller les IAP sur la **prochaine** version ASC (pas la 1.1.2 déjà live).
+5. **Après ship Play** — warning Console Android 15 edge-to-edge (`setStatusBarColor` / `setNavigationBarColor` / `LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES`). Reco, **pas** un blocage. Insets / libs Capacitor–Material plus tard.
 
 - [x] AdMob iOS Verify (Site Web du développeur = `havefuncorp.fr`) — 6 sept 2026
 - [x] Play Console : URLs privacy + suppression + site web havefuncorp — 5 sept 2026
@@ -158,7 +159,8 @@ Privacy publique + in-app alignées **7 sept 2026** (Sans pub, Signature, Maîtr
 - [ ] iOS : 6,99 € en direct, restore 2ᵉ appareil, refund — optionnel / autre sandbox
 - [x] Licence testers Play (0 €) : même parcours Android
 - [x] Web : message « dans l’app native »
-- [ ] `cap:sync` → bump `versionCode` / `versionName` → AAB + Archive (1.1.3 : URL marketing + IAP Signature)
+- [x] `cap:sync` → bump `versionCode` / `versionName` → AAB + Archive (1.1.3 : URL marketing + IAP Signature)
+- [ ] **Post-release Play** — warning Android 15 edge-to-edge (APIs status/nav bar + cutout `SHORT_EDGES`). Ne pas retarder Signature/Maître. Après : insets + libs (souvent Material / AndroidX, pas le JS).
 
 ---
 

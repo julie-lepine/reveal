@@ -1,0 +1,271 @@
+/* Calques saisonniers — tokens + atmosphère. */
+
+html.event-halloween {
+  --color-bg: #14080c;
+  --color-bg-deep: #0a0406;
+  --color-primary: #ff6b1a;
+  --color-primary-hot: #ffb347;
+  --color-secondary: #7c3aed;
+  --color-secondary-soft: #c084fc;
+  --color-secondary-deep: #5b21b6;
+  --shadow-primary: 0 8px 32px rgba(255, 107, 26, 0.35);
+  --shadow-secondary: 0 8px 28px rgba(124, 58, 237, 0.4);
+}
+
+html.event-christmas {
+  --color-bg: #07140c;
+  --color-bg-deep: #030a06;
+  --color-primary: #e11d48;
+  --color-primary-hot: #f43f5e;
+  --color-secondary: #15803d;
+  --color-secondary-soft: #4ade80;
+  --color-secondary-deep: #14532d;
+  --shadow-primary: 0 8px 32px rgba(225, 29, 72, 0.32);
+  --shadow-secondary: 0 8px 28px rgba(21, 128, 61, 0.35);
+}
+
+html.event-nye {
+  --color-bg: #12100a;
+  --color-bg-deep: #080704;
+  --color-primary: #f5d76e;
+  --color-primary-hot: #fff1b8;
+  --color-secondary: #a78bfa;
+  --color-secondary-soft: #ddd6fe;
+  --color-secondary-deep: #6d28d9;
+  --shadow-primary: 0 8px 32px rgba(245, 215, 110, 0.28);
+  --shadow-secondary: 0 8px 28px rgba(167, 139, 250, 0.32);
+}
+
+html.event-stpatrick {
+  --color-bg: #07140c;
+  --color-bg-deep: #030a06;
+  --color-primary: #22c55e;
+  --color-primary-hot: #86efac;
+  --color-secondary: #ca8a04;
+  --color-secondary-soft: #fde047;
+  --color-secondary-deep: #166534;
+  --shadow-primary: 0 8px 32px rgba(34, 197, 94, 0.32);
+  --shadow-secondary: 0 8px 28px rgba(202, 138, 4, 0.28);
+}
+
+html.event-aprilfools {
+  --color-bg: #0f0d1e;
+  --color-bg-deep: #070612;
+  --color-primary: #6366f1;
+  --color-primary-hot: #818cf8;
+  --color-secondary: #ff3cac;
+  --color-secondary-soft: #ff6b6b;
+  --color-secondary-deep: #db2777;
+  --shadow-primary: 0 8px 32px rgba(99, 102, 241, 0.38);
+  --shadow-secondary: 0 8px 28px rgba(255, 60, 172, 0.32);
+}
+
+html.event-music {
+  --color-bg: #0c0618;
+  --color-bg-deep: #05030c;
+  --color-primary: #ff3cac;
+  --color-primary-hot: #22d3ee;
+  --color-secondary: #38bdf8;
+  --color-secondary-soft: #67e8f9;
+  --color-secondary-deep: #0e7490;
+  --shadow-primary: 0 8px 32px rgba(255, 60, 172, 0.38);
+  --shadow-secondary: 0 8px 28px rgba(34, 211, 238, 0.32);
+}
+
+html.event-bastille {
+  --color-bg: #0a0e1c;
+  --color-bg-deep: #050814;
+  --color-primary: #ef4444;
+  --color-primary-hot: #f87171;
+  --color-secondary: #3b82f6;
+  --color-secondary-soft: #93c5fd;
+  --color-secondary-deep: #1d4ed8;
+  --shadow-primary: 0 8px 32px rgba(239, 68, 68, 0.32);
+  --shadow-secondary: 0 8px 28px rgba(59, 130, 246, 0.32);
+}
+
+html.event-rentree {
+  --color-bg: #12100c;
+  --color-bg-deep: #0a0806;
+  --color-primary: #f59e0b;
+  --color-primary-hot: #fbbf24;
+  --color-secondary: #64748b;
+  --color-secondary-soft: #94a3b8;
+  --color-secondary-deep: #334155;
+  --shadow-primary: 0 8px 32px rgba(245, 158, 11, 0.32);
+  --shadow-secondary: 0 8px 28px rgba(100, 116, 139, 0.28);
+}
+
+html.event-halloween .bottom-nav {
+  background: linear-gradient(180deg, rgba(20, 8, 12, 0) 0%, rgba(20, 8, 12, 0.97) 24%, #14080c 100%);
+  border-top-color: rgba(255, 107, 26, 0.22);
+}
+
+html.event-halloween .welcome .cta-btn {
+  box-shadow: 0 0 32px rgba(255, 107, 26, 0.45);
+  animation-name: event-halloween-cta-pulse;
+}
+
+@keyframes event-halloween-cta-pulse {
+  0%, 100% { box-shadow: 0 0 28px rgba(255, 107, 26, 0.4); }
+  50% { box-shadow: 0 0 44px rgba(255, 107, 26, 0.7); }
+}
+
+html.event-halloween .page::after {
+  content: "";
+  position: absolute;
+  width: min(190px, 48vw);
+  height: min(190px, 48vw);
+  border-radius: 50%;
+  filter: blur(48px);
+  background: #ff6b1a;
+  opacity: 0.22;
+  top: 38%;
+  right: -88px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+html.event-christmas .page::after,
+html.event-nye .page::after,
+html.event-stpatrick .page::after,
+html.event-aprilfools .page::after,
+html.event-music .page::after,
+html.event-bastille .page::after,
+html.event-rentree .page::after {
+  content: "";
+  position: absolute;
+  width: min(190px, 48vw);
+  height: min(190px, 48vw);
+  border-radius: 50%;
+  filter: blur(48px);
+  opacity: 0.22;
+  top: 38%;
+  right: -88px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+html.event-christmas .page::after { background: #e11d48; }
+html.event-nye .page::after { background: #f5d76e; }
+html.event-stpatrick .page::after { background: #22c55e; }
+html.event-aprilfools .page::after { background: #6366f1; }
+html.event-music .page::after { background: #22d3ee; }
+html.event-bastille .page::after { background: #3b82f6; }
+html.event-rentree .page::after { background: #f59e0b; }
+
+html.event-halloween .logo--with-img .subtitle::after,
+html.event-christmas .logo--with-img .subtitle::after,
+html.event-nye .logo--with-img .subtitle::after,
+html.event-stpatrick .logo--with-img .subtitle::after,
+html.event-aprilfools .logo--with-img .subtitle::after,
+html.event-music .logo--with-img .subtitle::after,
+html.event-bastille .logo--with-img .subtitle::after,
+html.event-rentree .logo--with-img .subtitle::after {
+  color: var(--color-primary);
+  font-weight: 600;
+}
+
+html.event-halloween .logo--with-img .subtitle::after { content: " à Halloween"; }
+html.event-christmas .logo--with-img .subtitle::after { content: " pendant les Fêtes de Fin d'Année"; }
+html.event-nye .logo--with-img .subtitle::after { content: " au Nouvel An"; }
+html.event-stpatrick .logo--with-img .subtitle::after { content: " à la St Patrick"; }
+html.event-aprilfools .logo--with-img .subtitle::after { content: " le 1er avril"; }
+html.event-music .logo--with-img .subtitle::after { content: " à la Fête de la musique"; }
+html.event-bastille .logo--with-img .subtitle::after { content: " le 14 juillet"; }
+html.event-rentree .logo--with-img .subtitle::after { content: " à la rentrée"; }
+
+#event-layer {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 100%;
+  max-width: var(--app-max);
+  transform: translateX(-50%);
+  pointer-events: none;
+  z-index: 4;
+  overflow: hidden;
+}
+
+.event-layer__vignette {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 90% 55% at 50% -10%, rgba(255, 107, 26, 0.16), transparent 58%),
+    radial-gradient(ellipse 70% 50% at 110% 110%, rgba(124, 58, 237, 0.22), transparent 55%),
+    radial-gradient(ellipse 50% 40% at -10% 80%, rgba(255, 107, 26, 0.1), transparent 60%);
+}
+
+html.event-christmas .event-layer__vignette {
+  background:
+    radial-gradient(ellipse 90% 55% at 50% -10%, rgba(225, 29, 72, 0.14), transparent 58%),
+    radial-gradient(ellipse 70% 50% at 110% 110%, rgba(21, 128, 61, 0.22), transparent 55%);
+}
+
+html.event-nye .event-layer__vignette {
+  background:
+    radial-gradient(ellipse 90% 55% at 50% -10%, rgba(245, 215, 110, 0.16), transparent 58%),
+    radial-gradient(ellipse 70% 50% at 110% 110%, rgba(167, 139, 250, 0.2), transparent 55%);
+}
+
+html.event-stpatrick .event-layer__vignette {
+  background:
+    radial-gradient(ellipse 90% 55% at 50% -10%, rgba(34, 197, 94, 0.16), transparent 58%),
+    radial-gradient(ellipse 70% 50% at 110% 110%, rgba(202, 138, 4, 0.16), transparent 55%);
+}
+
+html.event-aprilfools .event-layer__vignette {
+  background:
+    radial-gradient(ellipse 90% 55% at 50% -10%, rgba(99, 102, 241, 0.18), transparent 58%),
+    radial-gradient(ellipse 70% 50% at 110% 110%, rgba(255, 60, 172, 0.2), transparent 55%);
+}
+
+html.event-music .event-layer__vignette {
+  background:
+    radial-gradient(ellipse 90% 55% at 50% -10%, rgba(255, 60, 172, 0.18), transparent 58%),
+    radial-gradient(ellipse 70% 50% at 110% 110%, rgba(34, 211, 238, 0.2), transparent 55%);
+}
+
+html.event-bastille .event-layer__vignette {
+  background:
+    radial-gradient(ellipse 90% 55% at 50% -10%, rgba(239, 68, 68, 0.16), transparent 58%),
+    radial-gradient(ellipse 70% 50% at 110% 110%, rgba(59, 130, 246, 0.2), transparent 55%);
+}
+
+html.event-rentree .event-layer__vignette {
+  background:
+    radial-gradient(ellipse 90% 55% at 50% -10%, rgba(245, 158, 11, 0.16), transparent 58%),
+    radial-gradient(ellipse 70% 50% at 110% 110%, rgba(100, 116, 139, 0.18), transparent 55%);
+}
+
+.event-float {
+  position: absolute;
+  font-size: 22px;
+  line-height: 1;
+  opacity: 0.55;
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.45));
+  animation: event-float-drift 9s ease-in-out infinite;
+}
+
+.event-float--1 { top: 7%; left: 6%; font-size: 20px; animation-duration: 8s; }
+.event-float--2 { top: 11%; right: 8%; font-size: 26px; animation-duration: 11s; animation-delay: -2s; }
+.event-float--3 { top: 28%; left: 4%; font-size: 14px; opacity: 0.4; animation-duration: 7s; animation-delay: -1s; }
+.event-float--4 { bottom: 22%; right: 7%; font-size: 18px; animation-duration: 10s; animation-delay: -4s; }
+.event-float--5 { bottom: 18%; left: 8%; font-size: 18px; animation-duration: 12s; animation-delay: -3s; }
+.event-float--6 { top: 42%; right: 5%; font-size: 13px; opacity: 0.38; animation-duration: 8.5s; animation-delay: -5s; }
+
+@keyframes event-float-drift {
+  0%, 100% { transform: translate(0, 0) rotate(-6deg); }
+  50% { transform: translate(6px, -10px) rotate(8deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .event-float {
+    animation: none;
+    opacity: 0.28;
+  }
+  html.event-halloween .welcome .cta-btn {
+    animation: none;
+  }
+}
