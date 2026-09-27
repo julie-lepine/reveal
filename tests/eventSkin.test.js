@@ -15,8 +15,7 @@ describe("event skin calendar", () => {
   });
 
   it("registers the extra seasonal skins", () => {
-    assert.equal(EVENT_SKINS.test21.start, "2026-09-21");
-    assert.equal(EVENT_SKINS.test21.end, "2026-09-22");
+    assert.equal(EVENT_SKINS.test21, undefined);
     assert.equal(EVENT_SKINS.aprilfools.start, "2027-03-31");
     assert.equal(EVENT_SKINS.music.end, "2027-06-23");
     assert.equal(EVENT_SKINS.bastille.start, "2027-07-12");
@@ -38,9 +37,8 @@ describe("event skin calendar", () => {
     assert.equal(skinForDate(new Date(2027, 5, 21))?.id, "music");
     assert.equal(skinForDate(new Date(2027, 6, 14))?.id, "bastille");
     assert.equal(skinForDate(new Date(2027, 8, 5))?.id, "rentree");
-    assert.equal(skinForDate(new Date(2026, 8, 21))?.id, "test21");
+    assert.equal(skinForDate(new Date(2026, 8, 21)), null);
     assert.equal(skinForDate(new Date(2026, 8, 20)), null);
-    assert.equal(skinForDate(new Date(2026, 8, 22)), null);
     assert.equal(skinForDate(new Date(2026, 8, 17)), null);
   });
 

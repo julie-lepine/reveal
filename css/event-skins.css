@@ -1,17 +1,5 @@
 /* Calques saisonniers — tokens + atmosphère. */
 
-html.event-test21 {
-  --color-bg: #1c0628;
-  --color-bg-deep: #0e0314;
-  --color-primary: #ff2bd6;
-  --color-primary-hot: #c8ff00;
-  --color-secondary: #00e8ff;
-  --color-secondary-soft: #7afcff;
-  --color-secondary-deep: #0e7490;
-  --shadow-primary: 0 8px 32px rgba(255, 43, 214, 0.38);
-  --shadow-secondary: 0 8px 28px rgba(0, 232, 255, 0.32);
-}
-
 html.event-halloween {
   --color-bg: #14080c;
   --color-bg-deep: #0a0406;
@@ -130,21 +118,6 @@ html.event-rentree {
   --shadow-secondary: 0 8px 28px rgba(100, 116, 139, 0.28);
 }
 
-html.event-test21 .bottom-nav {
-  background: linear-gradient(180deg, rgba(28, 6, 40, 0) 0%, rgba(28, 6, 40, 0.97) 24%, #1c0628 100%);
-  border-top-color: rgba(255, 43, 214, 0.28);
-}
-
-html.event-test21 .welcome .cta-btn {
-  box-shadow: 0 0 32px rgba(255, 43, 214, 0.5);
-  animation-name: event-test21-cta-pulse;
-}
-
-@keyframes event-test21-cta-pulse {
-  0%, 100% { box-shadow: 0 0 28px rgba(255, 43, 214, 0.4); }
-  50% { box-shadow: 0 0 44px rgba(200, 255, 0, 0.7); }
-}
-
 html.event-halloween .bottom-nav {
   background: linear-gradient(180deg, rgba(20, 8, 12, 0) 0%, rgba(20, 8, 12, 0.97) 24%, #14080c 100%);
   border-top-color: rgba(255, 107, 26, 0.22);
@@ -175,7 +148,6 @@ html.event-halloween .page::after {
   z-index: 0;
 }
 
-html.event-test21 .page::after,
 html.event-christmas .page::after,
 html.event-nye .page::after,
 html.event-stpatrick .page::after,
@@ -196,7 +168,6 @@ html.event-rentree .page::after {
   z-index: 0;
 }
 
-html.event-test21 .page::after { background: #ff2bd6; }
 html.event-christmas .page::after { background: #e11d48; }
 html.event-nye .page::after { background: #f5d76e; }
 html.event-stpatrick .page::after { background: #22c55e; }
@@ -206,7 +177,6 @@ html.event-bastille .page::after { background: #0055a4; }
 html.event-rentree .page::after { background: #f59e0b; }
 
 html.event-halloween .logo--with-img .subtitle::after,
-html.event-test21 .logo--with-img .subtitle::after,
 html.event-christmas .logo--with-img .subtitle::after,
 html.event-nye .logo--with-img .subtitle::after,
 html.event-stpatrick .logo--with-img .subtitle::after,
@@ -219,7 +189,6 @@ html.event-rentree .logo--with-img .subtitle::after {
 }
 
 html.event-halloween .logo--with-img .subtitle::after { content: " à Halloween"; }
-html.event-test21 .logo--with-img .subtitle::after { content: " — test 21 sept"; }
 html.event-christmas .logo--with-img .subtitle::after { content: " pendant les Fêtes de Fin d'Année"; }
 html.event-nye .logo--with-img .subtitle::after { content: " au Nouvel An"; }
 html.event-stpatrick .logo--with-img .subtitle::after { content: " à la St Patrick"; }
@@ -248,13 +217,6 @@ html.event-rentree .logo--with-img .subtitle::after { content: " à la rentrée"
     radial-gradient(ellipse 90% 55% at 50% -10%, rgba(255, 107, 26, 0.16), transparent 58%),
     radial-gradient(ellipse 70% 50% at 110% 110%, rgba(124, 58, 237, 0.22), transparent 55%),
     radial-gradient(ellipse 50% 40% at -10% 80%, rgba(255, 107, 26, 0.1), transparent 60%);
-}
-
-html.event-test21 .event-layer__vignette {
-  background:
-    radial-gradient(ellipse 90% 55% at 50% -10%, rgba(255, 43, 214, 0.22), transparent 58%),
-    radial-gradient(ellipse 70% 50% at 110% 110%, rgba(0, 232, 255, 0.22), transparent 55%),
-    radial-gradient(ellipse 50% 40% at -10% 80%, rgba(200, 255, 0, 0.12), transparent 60%);
 }
 
 html.event-christmas .event-layer__vignette {
@@ -300,63 +262,6 @@ html.event-rentree .event-layer__vignette {
     radial-gradient(ellipse 70% 50% at 110% 110%, rgba(100, 116, 139, 0.18), transparent 55%);
 }
 
-.event-skin-preview {
-  position: fixed;
-  top: auto;
-  bottom: calc(72px + env(safe-area-inset-bottom, 0px));
-  left: 50%;
-  width: calc(100% - 16px);
-  max-width: var(--app-max);
-  transform: translateX(-50%);
-  z-index: 120;
-  pointer-events: auto;
-  padding: 8px 10px;
-  border-radius: 14px;
-  background: rgba(8, 8, 14, 0.78);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-}
-
-body.has-bottom-nav .event-skin-preview {
-  bottom: calc(88px + env(safe-area-inset-bottom, 0px));
-}
-
-.event-skin-preview__label {
-  margin: 0 0 6px;
-  font-size: 10px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: rgba(248, 250, 252, 0.55);
-  font-weight: 700;
-}
-
-.event-skin-preview__row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.event-skin-preview__btn {
-  flex: 1 1 auto;
-  min-height: 32px;
-  padding: 4px 8px;
-  border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: transparent;
-  color: #f8fafc;
-  font: inherit;
-  font-size: 11px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.event-skin-preview__btn[aria-pressed="true"] {
-  background: var(--color-primary);
-  border-color: transparent;
-  color: #0d0f1e;
-}
-
 .event-float {
   position: absolute;
   font-size: 22px;
@@ -383,7 +288,6 @@ body.has-bottom-nav .event-skin-preview {
     animation: none;
     opacity: 0.28;
   }
-  html.event-test21 .welcome .cta-btn,
   html.event-halloween .welcome .cta-btn {
     animation: none;
   }

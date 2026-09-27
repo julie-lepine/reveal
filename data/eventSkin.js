@@ -1,10 +1,10 @@
 /**
  * Calques saisonniers. Une seule peau à la fois ; hors fenêtre = DA d’origine.
  * Priorité : ?event= (QA) → EVENT_SKIN_OVERRIDE → calendrier (date locale du téléphone).
- * Prod : OVERRIDE = null, EVENT_SKIN_PREVIEW = false.
+ * Prod : OVERRIDE = null.
  */
 
-/** @typedef {"test21" | "halloween" | "christmas" | "nye" | "stpatrick" | "aprilfools" | "music" | "bastille" | "rentree"} EventSkinId */
+/** @typedef {"halloween" | "christmas" | "nye" | "stpatrick" | "aprilfools" | "music" | "bastille" | "rentree"} EventSkinId */
 
 /**
  * @typedef {object} EventSkin
@@ -17,13 +17,6 @@
 
 /** @type {Record<EventSkinId, EventSkin>} */
 export const EVENT_SKINS = {
-  test21: {
-    id: "test21",
-    className: "event-test21",
-    themeColor: "#1c0628",
-    start: "2026-09-21",
-    end: "2026-09-22",
-  },
   halloween: {
     id: "halloween",
     className: "event-halloween",
@@ -84,9 +77,6 @@ export const EVENT_SKINS = {
 
 /** @type {EventSkinId | "off" | null} */
 export const EVENT_SKIN_OVERRIDE = null;
-
-/** Barre Proto DA. Passer à false avant un build store. */
-export const EVENT_SKIN_PREVIEW = true;
 
 export function toLocalDateKey(date = new Date()) {
   const y = date.getFullYear();
