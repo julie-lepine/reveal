@@ -78,7 +78,7 @@ export const GAMES = [
     logo: "assets/games/drawit.png",
     borderGradient:
       "linear-gradient(145deg, #38BDF8 0%, #A78BFA 48%, #2B2D66 100%)",
-    enabled: false,
+    enabled: true,
   },
   {
     id: "wronganswer-prep",
@@ -89,7 +89,7 @@ export const GAMES = [
     logo: "assets/games/wronganswer.png",
     borderGradient:
       "linear-gradient(145deg, #F472B6 0%, #A78BFA 48%, #2B2D66 100%)",
-    enabled: false,
+    enabled: true,
   },
   {
     id: "dilemma-prep",
