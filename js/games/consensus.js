@@ -58,10 +58,12 @@ function buildNpcConsensusAnswer(question, playerIndex = 0) {
   return Math.max(0, Math.min(100, Math.round(cluster + noise)));
 }
 
-function bindConsensusSlider(app, { onInput, disabled = false } = {}) {
+function bindConsensusSlider(app, { onInput, disabled = false, value, roundKey = "" } = {}) {
   const input = app.querySelector("#consensus-slider");
   const wrap = input?.closest(".truth-meter__slider-wrap");
   if (!input || !wrap) return;
+  input.dataset.roundKey = roundKey;
+  if (value != null) input.value = String(value);
   input.disabled = disabled;
   if (disabled) {
     wrap.classList.add("consensus-slider--locked");
@@ -232,11 +234,15 @@ export function mountConsensus(app) {
     }, CONSENSUS_REVEAL_PENDING_MS);
   }
 
-  function captureDraftFromDom() {
+  function sliderMatchesCurrentRound() {
     const slider = app.querySelector("#consensus-slider");
-    if (slider && phase === "question") {
-      draftValue = consensus.clampValue(slider.value);
-    }
+    return Boolean(slider && phase === "question" && slider.dataset.roundKey === roundKey);
+  }
+
+  function captureDraftFromDom() {
+    if (!sliderMatchesCurrentRound()) return;
+    const slider = app.querySelector("#consensus-slider");
+    draftValue = consensus.clampValue(slider.value);
   }
 
   function syncFromSession() {
@@ -359,10 +365,12 @@ export function mountConsensus(app) {
   }
 
   async function commitLocalDraft({ submitted = false } = {}) {
+    if (submitted && !sliderMatchesCurrentRound()) return false;
     if (submitted) captureDraftFromDom();
     const value = consensus.clampValue(draftValue);
     await consensus.commitAnswer(value, { submitted });
     answers = { ...(consensus.getSession().answers || {}) };
+    return true;
   }
 
   async function fillMissingLocalAnswers() {
@@ -841,13 +849,16 @@ export function mountConsensus(app) {
       const answerLocked = answerState() === "submitted";
       bindConsensusSlider(app, {
         disabled: answerLocked,
+        value: draftValue,
+        roundKey,
         onInput: (value) => {
           draftValue = value;
         },
       });
       app.querySelector("#btn-consensus-submit")?.addEventListener("click", async () => {
         if (answerState() === "submitted") return;
-        await commitLocalDraft({ submitted: true });
+        const committed = await commitLocalDraft({ submitted: true });
+        if (!committed) return;
         if (!mount.isMounted()) return;
         if (!mount.isCurrentMount()) return;
         if (consensus.allAnswersIn() && (!mp || canActAsHost())) {

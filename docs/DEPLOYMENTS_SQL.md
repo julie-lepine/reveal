@@ -710,3 +710,18 @@ Colonnes utiles : `v_daily.lobbies` / `closed` / `games` / `signups` (comptes) /
 
 Signet : dans le SQL Editor, enregistrer chaque requête (étoile / snippet) pour ne pas les retaper.
 
+---
+
+## 35. Sondages — allowlist 12 jeux
+
+`reveal_poll_allowed_game_ids` en prod vient de FEATURE-VIBECHECK-01 : Wrong Answer Only, sans Draw it !. Le catalogue client a maintenant les deux.
+
+| Élément | Valeur |
+| ------- | ------ |
+| Migration | [`feature-poll-allowlist-12-games.sql`](../supabase/feature-poll-allowlist-12-games.sql) — **à coller** |
+| Fonction | `reveal_poll_allowed_game_ids` |
+| Contrat | même liste que `GAMES_AVAILABLE` dans `data/games.js` · test `tests/lobbyPollsAllowlist.test.js` lit `lobby-polls.sql` |
+| Ne pas | réexécuter `feature-vibecheck-01-remove-allowlist.sql` ensuite (retire Draw it !) |
+
+**Statut** : SQL repo ✅ · **pas encore collé** en base.
+

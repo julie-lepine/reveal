@@ -73,29 +73,6 @@ Chaque campagne : `1_*.png` · `2_*.png` · `3_*.png` · `4_*.png` · `5_FINAL.p
 
 ## OCTOBRE 2026 — Lancement calendrier + Halloween
 
-### Semaine 1 (1–5 oct.)
-
-#### Mer 1 oct. — Vidéo promo #1 (Reel / TikTok)
-**Format :** Vidéo app (centrale)  
-**Objectif :** Relancer la com’ avec la vidéo principale
-
-**Assets :**
-- Feed Reel 9:16 → `VIDEOS/PORTRAIT/Pub REVEAL.mp4`
-- TikTok / YouTube → `VIDEOS/PAYSAGE/Pub REVEAL.mp4`
-- Cover story (option) → template `FOND INSTA AVEC LOGO` (+ texte si besoin)
-
-```
-Soirée entre potes ce week-end ? 🎉
-
-REVEAL, c’est l’app de jeux de soirée multijoueur :
-→ 1 code, tout le monde joue depuis son tel
-→ Des jeux sans préparation, pour lancer (ou sauver) une soirée
-
-Télécharge REVEAL — lien en bio 📲
-
-#REVEAL #PartyGames #SoiréeEntrePotes #JeuxDeSoirée #Apéro
-```
-
 ### Semaine 2 (6–12 oct.)
 #### Mar 7 oct. — Engagement : sondage
 **Format :** Story ou post question
@@ -119,29 +96,6 @@ Réponds en commentaire — on te dira lequel choisir selon ton groupe 😉
 ```
 
 ### Semaine 5 (27–31 oct.)
-
-#### Mar 28 oct. — Spotlight : Spot the fake
-**Format :** Post image
-
-**Assets :**
-- Feed → `z_archives/POSTS/OK/10.traitre.jpg`
-- Complément (option) → `assets/LOGO JEUX/traitre.png` · `assets/SCREENS/` (pas de screen dédié — logo suffit)
-
-```
-🎭 SPOT THE FAKE
-
-Un mot secret.
-Des indices oraux.
-Un intrus qui ment.
-
-Ton job : le démasquer avant qu’il te démasque.
-
-4 joueurs min. Parfait pour une soirée Halloween (ou n’importe quand).
-
-REVEAL — Party Games | Lien en bio 📲
-
-#SpotTheFake #SoiréeJeux #REVEAL #PartyGames
-```
 
 #### Ven 31 oct. — Halloween — post du jour
 **Format :** Story + post feed
