@@ -132,6 +132,7 @@ export async function mountTurnstile(slot, container, { onChange } = {}) {
 
   state.widgetId = api.render(container, {
     sitekey: HCAPTCHA_SITE_KEY,
+    hl: "fr",
     theme: "dark",
     callback: () => {
       state.solved = true;

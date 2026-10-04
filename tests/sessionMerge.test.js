@@ -29,6 +29,10 @@ import {
   mergeTruthMeterPhase,
   isNewTraitreVoteRound,
   isNewTraitreGame,
+  isTraitrePrivateRoleCurrent,
+  traitreKnownImpostorFlag,
+  shouldInvalidateTraitrePrivateRole,
+  traitrePrivateRoleFields,
   isStaleTraitreVotePatch,
   isTraitreVoteResetAfterTie,
   pickLatestTriviaAnswer,
@@ -629,6 +633,91 @@ describe("isNewTraitreGame", () => {
       ),
       true
     );
+  });
+});
+
+describe("rôle privé Spot the fake", () => {
+  const pair = "tech_9";
+
+  it("false sans paire de rôle n'est pas un joueur normal validé", () => {
+    const session = { pairId: pair, isLocalImpostor: false, privateRoleSynced: true };
+    assert.equal(isTraitrePrivateRoleCurrent(session), false);
+    assert.equal(traitreKnownImpostorFlag(session), null);
+  });
+
+  it("rôle validé pour la paire courante : normal ou fake", () => {
+    const normal = {
+      pairId: pair,
+      privateRolePairId: pair,
+      privateRoleSynced: true,
+      isLocalImpostor: false,
+    };
+    const fake = { ...normal, isLocalImpostor: true };
+    assert.equal(traitreKnownImpostorFlag(normal), false);
+    assert.equal(traitreKnownImpostorFlag(fake), true);
+  });
+
+  it("un rôle d'une autre paire est ignoré", () => {
+    const session = {
+      pairId: "food_10",
+      privateRolePairId: pair,
+      privateRoleSynced: true,
+      isLocalImpostor: false,
+    };
+    assert.equal(traitreKnownImpostorFlag(session), null);
+  });
+
+  it("prep → deal invalide le rôle précédent", () => {
+    const local = {
+      phase: null,
+      pairId: null,
+      lobbyStarted: false,
+      privateRoleNonce: 2,
+      privateRoleSynced: true,
+      isLocalImpostor: false,
+    };
+    const remote = { phase: "deal", pairId: pair, lobbyStarted: true };
+    assert.equal(shouldInvalidateTraitrePrivateRole(local, remote), true);
+    const fields = traitrePrivateRoleFields(local, pair, true);
+    assert.equal(fields.isLocalImpostor, null);
+    assert.equal(fields.privateRoleSynced, false);
+    assert.equal(fields.privateRoleNonce, 3);
+  });
+
+  it("deuxième partie, même paire, depuis les indices : rôle effacé", () => {
+    const local = {
+      phase: "speak",
+      pairId: pair,
+      privateRolePairId: pair,
+      privateRoleSynced: true,
+      isLocalImpostor: false,
+      privateRoleNonce: 4,
+    };
+    const remote = { phase: "deal", pairId: pair, lobbyStarted: true };
+    assert.equal(shouldInvalidateTraitrePrivateRole(local, remote), true);
+  });
+
+  it("résultat → nouvelle partie invalide le rôle", () => {
+    const local = { phase: "final", pairId: pair, lobbyStarted: true, privateRoleNonce: 1 };
+    const remote = { phase: "deal", pairId: "food_10", lobbyStarted: true };
+    assert.equal(shouldInvalidateTraitrePrivateRole(local, remote), true);
+  });
+
+  it("le même deal conserve le rôle déjà validé", () => {
+    const local = {
+      phase: "deal",
+      pairId: pair,
+      privateRolePairId: pair,
+      privateRoleSynced: true,
+      isLocalImpostor: true,
+      privateRoleNonce: 5,
+    };
+    const remote = { phase: "deal", pairId: pair, lobbyStarted: true };
+    assert.equal(shouldInvalidateTraitrePrivateRole(local, remote), false);
+    const fields = traitrePrivateRoleFields(local, pair, false);
+    assert.equal(fields.isLocalImpostor, true);
+    assert.equal(fields.privateRoleSynced, true);
+    assert.equal(fields.privateRoleNonce, 5);
   });
 });
 

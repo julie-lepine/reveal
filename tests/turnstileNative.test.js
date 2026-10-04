@@ -15,6 +15,8 @@ describe("hCaptcha in-page (web + native)", () => {
     const src = read("js/core/turnstile.js");
     assert.match(src, /HCAPTCHA_SITE_KEY/);
     assert.match(src, /js\.hcaptcha\.com/);
+    assert.match(src, /hl=fr/);
+    assert.match(src, /hl:\s*"fr"/);
     assert.doesNotMatch(src, /if \(isNativeApp\(\)\) return false;/);
     assert.doesNotMatch(src, /challenges\.cloudflare\.com\/turnstile/);
     assert.match(src, /export function usesNativeCaptchaSheet/);

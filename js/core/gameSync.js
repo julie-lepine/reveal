@@ -77,6 +77,8 @@ import {
   isNewSpeedVoteVoteRound,
   isNewTraitreVoteRound,
   isNewTraitreGame,
+  shouldInvalidateTraitrePrivateRole,
+  traitrePrivateRoleFields,
   mergePlayerVoteMapsForCatchUp,
   isStaleTraitreVotePatch,
   isTraitreVoteResetAfterTie,
@@ -1714,12 +1716,12 @@ function mergeTraitreGameLocal(local, remote) {
   if (!remote) return local;
   if (!local) return remote;
   if (isNewTraitreGame(local, remote)) {
+    const pairId = remote.pairId ?? null;
     return {
       ...remote,
-      pairId: remote.pairId ?? null,
+      pairId,
       impostorName: remote.impostorRevealed ? remote.impostorName ?? null : null,
-      isLocalImpostor: false,
-      privateRoleSynced: false,
+      ...traitrePrivateRoleFields(local, pairId, true),
     };
   }
   const newVoteRound = isNewTraitreVoteRound(local, remote);
@@ -1752,6 +1754,9 @@ function mergeTraitreGameLocal(local, remote) {
     !remote.lobbyStarted && !local.lobbyStarted
       ? mergeReadyMapsLocal(local.ready || {}, remote.ready || {}, getActivePlayerNames(), getLocalDisplayName())
       : remote.ready || {};
+  const pairId = remote.pairId || local.pairId || null;
+  const invalidateRole = shouldInvalidateTraitrePrivateRole(local, remote);
+  const privateRole = traitrePrivateRoleFields(local, pairId, invalidateRole);
   return {
     ...local,
     ...remote,
@@ -1759,15 +1764,17 @@ function mergeTraitreGameLocal(local, remote) {
       newVoteRound,
       staleVotePatch: isStaleTraitreVotePatch(local, remote),
     }),
-    pairId: remote.pairId || local.pairId || null,
+    pairId,
     impostorName: (() => {
+      if (invalidateRole) {
+        return remote.impostorRevealed && remote.impostorName ? remote.impostorName : null;
+      }
       if (isLobbyHost() && local.impostorName) return local.impostorName;
       if (remote.impostorRevealed && remote.impostorName) return remote.impostorName;
-      if (local.isLocalImpostor) return getLocalDisplayName();
+      if (local.isLocalImpostor === true) return getLocalDisplayName();
       return null;
     })(),
-    isLocalImpostor: local.isLocalImpostor ?? remote.isLocalImpostor ?? false,
-    privateRoleSynced: local.privateRoleSynced ?? remote.privateRoleSynced ?? false,
+    ...privateRole,
     votes,
     dealAcks,
     ready,
@@ -2943,7 +2950,10 @@ export function traitreFromRemote(remote) {
     lobbyStarted: Boolean(remote.lobbyStarted),
     phase: remote.phase || null,
     pairId: remote.pairId || null,
-    isLocalImpostor: false,
+    isLocalImpostor: null,
+    privateRoleSynced: false,
+    privateRolePairId: null,
+    privateRoleNonce: 0,
     impostorName,
     speakRound: remote.speakRound ?? 1,
     speakerIndex: remote.speakerIndex ?? 0,

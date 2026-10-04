@@ -191,6 +191,7 @@ describe("commitTraitreDealAck - mocks comportementaux", () => {
     mock.module("../js/core/sessionMerge.js", {
       namedExports: {
         normalizeKeyedVotes: mock.fn((v) => v || {}),
+        traitreKnownImpostorFlag: mock.fn(() => null),
       },
     });
 

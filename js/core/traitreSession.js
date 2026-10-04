@@ -31,7 +31,7 @@ import {
   hostDistributeTraitreRoles,
 } from "./traitrePrivate.js";
 import { launchGameWithSync, commitHostGamePlay, commitPrepReadyToggle } from "./mpLaunch.js";
-import { normalizeKeyedVotes } from "./sessionMerge.js";
+import { normalizeKeyedVotes, traitreKnownImpostorFlag } from "./sessionMerge.js";
 import {
   computeOptimisticMapEntryApply,
   rollbackOptimisticMapEntry,
@@ -48,7 +48,9 @@ function defaultSession() {
     phase: null,
     pairId: null,
     impostorName: null,
-    isLocalImpostor: false,
+    isLocalImpostor: null,
+    privateRolePairId: null,
+    privateRoleNonce: 0,
     speakRound: 1,
     speakerIndex: 0,
     alive: [],
@@ -71,9 +73,7 @@ function defaultSession() {
 }
 
 export function isTraitrePrivateRoleReady(session = getTraitreSession()) {
-  if (!isGameSyncActive()) return true;
-  if (isLobbyHost()) return true;
-  return Boolean(session.privateRoleSynced);
+  return traitreKnownImpostorFlag(session, { offline: !isGameSyncActive() }) !== null;
 }
 
 /** Phase « deal » : rôle privé + paire de mots résolue (évite l'affichage « … »). */
@@ -107,9 +107,8 @@ export function getTraitreResultPair(session = getTraitreSession()) {
 export function getMyTraitreWord(session = getTraitreSession()) {
   const pair = getTraitrePair(session);
   if (!pair) return null;
-  const me = getLocalDisplayName();
-  const amImpostor =
-    session.isLocalImpostor === true || (session.impostorName && session.impostorName === me);
+  const amImpostor = traitreKnownImpostorFlag(session, { offline: !isGameSyncActive() });
+  if (amImpostor === null) return null;
   return amImpostor ? pair.b : pair.a;
 }
 
@@ -187,6 +186,9 @@ export function createStartedTraitreSession(rosterNames) {
       pairId: pair.id,
       impostorName,
       isLocalImpostor: impostorName === localName,
+      privateRoleSynced: true,
+      privateRolePairId: pair.id,
+      privateRoleNonce: (getTraitreSession().privateRoleNonce || 0) + 1,
       alive: [...names],
       eliminated: [],
       speakRound: 1,

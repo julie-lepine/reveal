@@ -2,6 +2,7 @@
 import { supabase, isSupabaseConfigured } from "./supabaseClient.js";
 import { getSupabaseUserId } from "./supabaseAuth.js";
 import { getState, saveStatePatch, getLocalDisplayName } from "./state.js";
+import { isTraitrePrivateRoleCurrent } from "./sessionMerge.js";
 
 const LOCAL_KEY = "reveal-traitre-private";
 
@@ -151,23 +152,33 @@ export async function clearTraitrePrivateForLobby(lobbyId) {
   if (error) console.warn("[traitre_private] clear:", error.message);
 }
 
-function applyTraitrePrivateRole(session, priv) {
-  const isLocalImpostor = Boolean(priv.is_impostor);
-  const revealed = Boolean(session.impostorRevealed);
+function applyTraitrePrivateRole(session, priv, expectedNonce) {
+  const current = getState().traitreGame || session || {};
+  const currentPairId = current.pairId || null;
+  if (!priv || (priv.is_impostor !== true && priv.is_impostor !== false)) return false;
+  if (!priv.pair_id || priv.pair_id !== currentPairId) return false;
+  if ((current.privateRoleNonce ?? 0) !== expectedNonce) return false;
+  if (isTraitrePrivateRoleCurrent(current)) return true;
+
+  const isLocalImpostor = priv.is_impostor === true;
+  const revealed = Boolean(current.impostorRevealed);
   const impostorName = revealed
-    ? session.impostorName
+    ? current.impostorName
     : isLocalImpostor
       ? getLocalDisplayName()
       : null;
 
   saveStatePatch({
     traitreGame: {
-      ...session,
+      ...current,
       isLocalImpostor,
       impostorName,
       privateRoleSynced: true,
+      privateRolePairId: currentPairId,
+      privateRoleNonce: expectedNonce,
     },
   });
+  return true;
 }
 
 /** Invité : lit le rôle privé et met à jour traitreGame local (retry si distribution en cours). */
@@ -177,13 +188,23 @@ export async function syncTraitrePrivateRole(
 ) {
   if (!pairId || isLocalLobbyHost()) return true;
 
-  const session = getState().traitreGame || {};
-  if (session.privateRoleSynced) return true;
-
   for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    const live = getState().traitreGame || {};
+    if ((live.pairId || null) !== pairId) return false;
+    if (isTraitrePrivateRoleCurrent(live)) return true;
+
+    const nonce = live.privateRoleNonce ?? 0;
     const priv = await fetchMyTraitrePrivate(pairId);
-    if (priv) {
-      applyTraitrePrivateRole(getState().traitreGame || {}, priv);
+    const after = getState().traitreGame || {};
+    if ((after.pairId || null) !== pairId) return false;
+    if ((after.privateRoleNonce ?? 0) !== nonce) {
+      if (attempt < maxAttempts - 1) {
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+      }
+      continue;
+    }
+
+    if (priv?.pair_id === pairId && applyTraitrePrivateRole(after, priv, nonce)) {
       notify?.();
       return true;
     }

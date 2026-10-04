@@ -1007,6 +1007,77 @@ export function isNewTraitreVoteRound(cur, inc) {
   return false;
 }
 
+/**
+ * Rôle privé déjà validé pour la paire affichée.
+ * `isLocalImpostor: false` sans ce lien reste « inconnu », pas « joueur normal ».
+ */
+export function isTraitrePrivateRoleCurrent(session) {
+  if (!session?.pairId) return false;
+  if (session.privateRoleSynced !== true) return false;
+  if (session.privateRolePairId !== session.pairId) return false;
+  return session.isLocalImpostor === true || session.isLocalImpostor === false;
+}
+
+/**
+ * @returns {true|false|null} null tant que le rôle n'est pas validé pour ce pairId.
+ * `offline` ne couvre qu'une partie locale ancienne, sans paire de rôle enregistrée.
+ */
+export function traitreKnownImpostorFlag(session, { offline = false } = {}) {
+  if (isTraitrePrivateRoleCurrent(session)) return session.isLocalImpostor === true;
+  if (
+    offline &&
+    session?.pairId &&
+    session.privateRolePairId == null &&
+    (session.isLocalImpostor === true || session.isLocalImpostor === false)
+  ) {
+    return session.isLocalImpostor === true;
+  }
+  return null;
+}
+
+/** Nouveau deal : autre paire, entrée en phase deal, ou nouvelle partie. */
+export function shouldInvalidateTraitrePrivateRole(local, remote) {
+  if (!local || !remote) return false;
+  if (isNewTraitreGame(local, remote)) return true;
+  const nextPair = remote.pairId || null;
+  const prevPair = local.pairId || null;
+  if (nextPair && prevPair && nextPair !== prevPair) return true;
+  if (remote.phase === "deal" && local.phase !== "deal") return true;
+  if (local.privateRolePairId && nextPair && local.privateRolePairId !== nextPair) return true;
+  return false;
+}
+
+/** Champs de rôle à garder ou à effacer. L'effacement avance le nonce local. */
+export function traitrePrivateRoleFields(local, pairId, invalidate) {
+  if (invalidate || !pairId) {
+    return {
+      isLocalImpostor: null,
+      privateRoleSynced: false,
+      privateRolePairId: null,
+      privateRoleNonce: (local?.privateRoleNonce || 0) + 1,
+    };
+  }
+  const nonce = local?.privateRoleNonce ?? 0;
+  if (
+    local?.privateRoleSynced === true &&
+    local?.privateRolePairId === pairId &&
+    (local.isLocalImpostor === true || local.isLocalImpostor === false)
+  ) {
+    return {
+      isLocalImpostor: local.isLocalImpostor,
+      privateRoleSynced: true,
+      privateRolePairId: pairId,
+      privateRoleNonce: nonce,
+    };
+  }
+  return {
+    isLocalImpostor: null,
+    privateRoleSynced: false,
+    privateRolePairId: null,
+    privateRoleNonce: nonce,
+  };
+}
+
 /** Nouvelle partie Spot the fake (relance après fin ou retour prep). */
 export function isNewTraitreGame(cur, inc) {
   if (!inc) return false;
