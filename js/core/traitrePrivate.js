@@ -193,6 +193,8 @@ export async function syncTraitrePrivateRole(
     if ((live.pairId || null) !== pairId) return false;
     if (isTraitrePrivateRoleCurrent(live)) return true;
 
+    // Nonce = contexte de deal au lancement du fetch, pas « aucun merge depuis ».
+    // Un snapshot du même deal ne l'avance pas. Un autre deal / une autre partie oui.
     const nonce = live.privateRoleNonce ?? 0;
     const priv = await fetchMyTraitrePrivate(pairId);
     const after = getState().traitreGame || {};

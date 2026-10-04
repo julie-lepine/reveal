@@ -1035,14 +1035,29 @@ export function traitreKnownImpostorFlag(session, { offline = false } = {}) {
   return null;
 }
 
-/** Nouveau deal : autre paire, entrée en phase deal, ou nouvelle partie. */
+const TRAITRE_PHASES_PAST_DEAL = new Set(["speak", "decision", "vote", "final"]);
+
+function isTraitrePhasePastDeal(phase) {
+  return TRAITRE_PHASES_PAST_DEAL.has(phase);
+}
+
+/**
+ * Le nonce identifie le contexte de deal, pas le passage d'un snapshot.
+ * On l'avance pour une autre paire, une nouvelle partie, ou un retour au deal
+ * depuis une phase déjà jouée (même si la paire est réutilisée).
+ * Un écho du deal déjà identifié (même pairId, phase encore vide ou déjà « deal »)
+ * ne change pas le contexte : la lecture privée de ce deal reste applicable.
+ */
 export function shouldInvalidateTraitrePrivateRole(local, remote) {
   if (!local || !remote) return false;
   if (isNewTraitreGame(local, remote)) return true;
   const nextPair = remote.pairId || null;
   const prevPair = local.pairId || null;
   if (nextPair && prevPair && nextPair !== prevPair) return true;
-  if (remote.phase === "deal" && local.phase !== "deal") return true;
+  if (remote.phase === "deal" && isTraitrePhasePastDeal(local.phase)) return true;
+  if (remote.phase === "deal" && local.phase !== "deal") {
+    if (!(prevPair && nextPair && prevPair === nextPair)) return true;
+  }
   if (local.privateRolePairId && nextPair && local.privateRolePairId !== nextPair) return true;
   return false;
 }

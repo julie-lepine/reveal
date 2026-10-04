@@ -703,6 +703,33 @@ describe("rôle privé Spot the fake", () => {
     assert.equal(shouldInvalidateTraitrePrivateRole(local, remote), true);
   });
 
+  it("écho du deal déjà affiché : même pairId, phase pas encore deal, nonce inchangé", () => {
+    const local = {
+      phase: null,
+      pairId: pair,
+      lobbyStarted: true,
+      privateRoleNonce: 3,
+      privateRoleSynced: false,
+      privateRolePairId: null,
+      isLocalImpostor: null,
+    };
+    const remote = { phase: "deal", pairId: pair, lobbyStarted: true };
+    assert.equal(shouldInvalidateTraitrePrivateRole(local, remote), false);
+    const fields = traitrePrivateRoleFields(local, pair, false);
+    assert.equal(fields.privateRoleNonce, 3);
+    assert.equal(fields.privateRoleSynced, false);
+    assert.equal(fields.isLocalImpostor, null);
+  });
+
+  it("résultat → deal, même paire réutilisée : contexte invalide", () => {
+    const local = { phase: "final", pairId: pair, lobbyStarted: true, privateRoleNonce: 2 };
+    const remote = { phase: "deal", pairId: pair, lobbyStarted: true };
+    assert.equal(shouldInvalidateTraitrePrivateRole(local, remote), true);
+    const fields = traitrePrivateRoleFields(local, pair, true);
+    assert.equal(fields.privateRoleNonce, 3);
+    assert.equal(fields.isLocalImpostor, null);
+  });
+
   it("le même deal conserve le rôle déjà validé", () => {
     const local = {
       phase: "deal",
