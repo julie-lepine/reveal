@@ -181,6 +181,45 @@ function applyTraitrePrivateRole(session, priv, expectedNonce) {
   return true;
 }
 
+/** Une lecture en vol par contexte (pairId + nonce). Un autre contexte a sa propre lecture. */
+const inFlightByContext = new Map();
+
+function contextKey(pairId, nonce) {
+  return `${pairId}\u0000${nonce}`;
+}
+
+function flushNotifies(entry) {
+  const fns = entry.notifies.splice(0, entry.notifies.length);
+  for (const fn of fns) fn();
+}
+
+/**
+ * Boucle liée à un seul contexte. Un changement de paire ou de nonce rejette
+ * la réponse et laisse une nouvelle synchro partir pour le nouveau contexte.
+ */
+async function syncTraitrePrivateRoleForContext(pairId, expectedNonce, entry, maxAttempts, delayMs) {
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    const live = getState().traitreGame || {};
+    if ((live.pairId || null) !== pairId) return false;
+    if (isTraitrePrivateRoleCurrent(live)) return true;
+    if ((live.privateRoleNonce ?? 0) !== expectedNonce) return false;
+
+    const priv = await fetchMyTraitrePrivate(pairId);
+    const after = getState().traitreGame || {};
+    if ((after.pairId || null) !== pairId) return false;
+    if ((after.privateRoleNonce ?? 0) !== expectedNonce) return false;
+
+    if (priv?.pair_id === pairId && applyTraitrePrivateRole(after, priv, expectedNonce)) {
+      flushNotifies(entry);
+      return true;
+    }
+    if (attempt < maxAttempts - 1) {
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+  }
+  return false;
+}
+
 /** Invité : lit le rôle privé et met à jour traitreGame local (retry si distribution en cours). */
 export async function syncTraitrePrivateRole(
   pairId,
@@ -188,32 +227,36 @@ export async function syncTraitrePrivateRole(
 ) {
   if (!pairId || isLocalLobbyHost()) return true;
 
-  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
-    const live = getState().traitreGame || {};
-    if ((live.pairId || null) !== pairId) return false;
-    if (isTraitrePrivateRoleCurrent(live)) return true;
+  const live = getState().traitreGame || {};
+  if ((live.pairId || null) !== pairId) return false;
+  if (isTraitrePrivateRoleCurrent(live)) return true;
 
-    // Nonce = contexte de deal au lancement du fetch, pas « aucun merge depuis ».
-    // Un snapshot du même deal ne l'avance pas. Un autre deal / une autre partie oui.
-    const nonce = live.privateRoleNonce ?? 0;
-    const priv = await fetchMyTraitrePrivate(pairId);
-    const after = getState().traitreGame || {};
-    if ((after.pairId || null) !== pairId) return false;
-    if ((after.privateRoleNonce ?? 0) !== nonce) {
-      if (attempt < maxAttempts - 1) {
-        await new Promise((resolve) => setTimeout(resolve, delayMs));
-      }
-      continue;
-    }
-
-    if (priv?.pair_id === pairId && applyTraitrePrivateRole(after, priv, nonce)) {
-      notify?.();
-      return true;
-    }
-    if (attempt < maxAttempts - 1) {
-      await new Promise((resolve) => setTimeout(resolve, delayMs));
-    }
+  const nonce = live.privateRoleNonce ?? 0;
+  const key = contextKey(pairId, nonce);
+  const existing = inFlightByContext.get(key);
+  if (existing) {
+    if (typeof notify === "function") existing.notifies.push(notify);
+    return existing.promise;
   }
 
-  return false;
+  let resolveRun;
+  let rejectRun;
+  const result = new Promise((resolve, reject) => {
+    resolveRun = resolve;
+    rejectRun = reject;
+  });
+  const entry = {
+    notifies: typeof notify === "function" ? [notify] : [],
+    promise: null,
+  };
+  entry.promise = result.finally(() => {
+    if (inFlightByContext.get(key) === entry) inFlightByContext.delete(key);
+  });
+  inFlightByContext.set(key, entry);
+
+  void syncTraitrePrivateRoleForContext(pairId, nonce, entry, maxAttempts, delayMs).then(
+    resolveRun,
+    rejectRun
+  );
+  return entry.promise;
 }

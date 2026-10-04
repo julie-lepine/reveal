@@ -48,6 +48,7 @@ import {
   stopGameSessionListenerOnPostGame,
 } from "../core/gameSync.js";
 import { voteConfirmChrome, pickForVoteConfirm } from "../core/voteConfirm.js";
+import { syncTraitrePrivateRole } from "../core/traitrePrivate.js";
 
 export function mountTraitre(app) {
   if (!requireLobbyPlay()) return null;
@@ -71,7 +72,6 @@ export function mountTraitre(app) {
   let impostorRevealed = false;
   let winner = null;
   let voteSurvivals = 0;
-  let roleSyncInFlight = false;
   /** Empêche double-clic pendant le patch Deal ACK. */
   let dealAckInFlight = false;
   /** ARCH-06 : vivacité + instance courante (remplace le flag local de mount). */
@@ -89,16 +89,9 @@ export function mountTraitre(app) {
 
   async function ensurePrivateRole() {
     if (!mp || isLobbyHost() || isTraitrePrivateRoleReady()) return;
-    if (roleSyncInFlight) return;
     const pairId = getTraitreSession().pairId;
     if (!pairId) return;
-    roleSyncInFlight = true;
-    try {
-      const { syncTraitrePrivateRole } = await import("../core/traitrePrivate.js");
-      await syncTraitrePrivateRole(pairId, { maxAttempts: 8, delayMs: 500 });
-    } finally {
-      roleSyncInFlight = false;
-    }
+    await syncTraitrePrivateRole(pairId, { maxAttempts: 8, delayMs: 500 });
   }
 
   function syncFromSession() {
