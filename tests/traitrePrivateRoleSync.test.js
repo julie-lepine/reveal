@@ -9,6 +9,7 @@ import { getTraitrePairById } from "../data/traitre.js";
 import { getState, saveStatePatch } from "../js/core/state.js";
 import {
   isTraitrePrivateRoleCurrent,
+  mergeTraitrePhase,
   shouldInvalidateTraitrePrivateRole,
   traitreKnownImpostorFlag,
   traitrePrivateRoleFields,
@@ -486,5 +487,130 @@ describe("sync rôle privé — une lecture par contexte", () => {
     assert.equal(fetches, 0);
     assert.equal(getState().traitreGame.isLocalImpostor, null);
     assert.match(screen, /if \(!mp \|\| isLobbyHost\(\) \|\| isTraitrePrivateRoleReady\(\)\) return;/);
+  });
+});
+
+function roleFlag(session = getState().traitreGame) {
+  return traitreKnownImpostorFlag(session, { offline: false });
+}
+
+function hostDeal(isLocalImpostor) {
+  return {
+    phase: "deal",
+    pairId: PAIR,
+    lobbyStarted: true,
+    isLocalImpostor,
+    privateRoleSynced: true,
+    privateRolePairId: PAIR,
+    privateRoleNonce: 1,
+    impostorName: isLocalImpostor ? "Hote" : "Sam",
+    impostorRevealed: false,
+    alive: ["Hote", "Sam", "Léa", "Noa"],
+    speakRound: 1,
+    dealAcks: {},
+    votes: {},
+  };
+}
+
+/** Ordre de markTraitreLobbyStarted avec localFirst : next est sauvé, puis l'écho fusionne. */
+function launchThenEcho(isLocalImpostor) {
+  const flags = [];
+  const snap = () => flags.push(roleFlag());
+  seatGuest({
+    phase: null,
+    pairId: null,
+    lobbyStarted: false,
+    isLocalImpostor: null,
+    privateRoleSynced: false,
+    privateRolePairId: null,
+    privateRoleNonce: 0,
+  });
+  snap();
+  saveStatePatch({ traitreGame: hostDeal(isLocalImpostor) });
+  snap();
+  const invalidated = mergeSnapshot({ phase: "deal", pairId: PAIR, lobbyStarted: true });
+  snap();
+  return { flags, invalidated, session: getState().traitreGame };
+}
+
+describe("lancement hôte — l'écho du push voit le rôle déjà posé", () => {
+  it("hôte fake : le premier état après l'écho a le mot B", () => {
+    const { flags, invalidated, session } = launchThenEcho(true);
+    assert.deepEqual(flags, [null, true, true]);
+    assert.equal(invalidated, false);
+    assert.equal(roleFlag(session) !== null, true);
+    assert.equal(session.privateRoleSynced, true);
+    assert.equal(session.privateRolePairId, PAIR);
+    assert.equal(wordShown(session), WORD_B);
+    assert.notEqual(wordShown(session), WORD_A);
+  });
+
+  it("hôte détective : le premier état après l'écho a le mot A", () => {
+    const { flags, invalidated, session } = launchThenEcho(false);
+    assert.deepEqual(flags, [null, false, false]);
+    assert.equal(invalidated, false);
+    assert.equal(roleFlag(session) !== null, true);
+    assert.equal(wordShown(session), WORD_A);
+  });
+
+  it("l'écho ne fait pas passer le rôle par null", () => {
+    const fake = launchThenEcho(true);
+    const detective = launchThenEcho(false);
+    assert.equal(fake.flags.includes(null) && fake.flags.indexOf(null) === 0, true);
+    assert.equal(fake.flags.slice(1).every((flag) => flag === true), true);
+    assert.equal(detective.flags.slice(1).every((flag) => flag === false), true);
+  });
+
+  it("écho du propre push : le rôle privé reste valide", () => {
+    const src = readFileSync(new URL("../js/core/traitreSession.js", import.meta.url), "utf8");
+    const start = src.indexOf("export async function markTraitreLobbyStarted");
+    const block = src.slice(start, start + 1800);
+    assert.match(block, /localFirst:\s*true/);
+    const { invalidated, session } = launchThenEcho(true);
+    assert.equal(invalidated, false);
+    assert.equal(session.isLocalImpostor, true);
+    assert.equal(session.privateRoleSynced, true);
+    assert.equal(isTraitrePrivateRoleCurrent(session), true);
+  });
+
+  it("après le deal, un snapshot de phase suivant ne retire pas le rôle hôte", () => {
+    launchThenEcho(true);
+    for (const phase of ["speak", "decision", "vote", "final"]) {
+      const local = getState().traitreGame;
+      const remote = { phase, pairId: PAIR, lobbyStarted: true };
+      const invalidate = shouldInvalidateTraitrePrivateRole(local, remote);
+      const privateRole = traitrePrivateRoleFields(local, PAIR, invalidate);
+      saveStatePatch({
+        traitreGame: {
+          ...local,
+          phase: mergeTraitrePhase(local.phase, phase),
+          ...privateRole,
+        },
+      });
+      const session = getState().traitreGame;
+      assert.equal(invalidate, false, phase);
+      assert.equal(session.phase, phase);
+      assert.equal(session.isLocalImpostor, true);
+      assert.equal(session.privateRoleSynced, true);
+      assert.equal(wordShown(session), WORD_B);
+    }
+  });
+
+  it("invité : le deal sur une préparation laisse le rôle inconnu", () => {
+    seatGuest({
+      phase: null,
+      pairId: null,
+      lobbyStarted: false,
+      isLocalImpostor: null,
+      privateRoleSynced: false,
+      privateRolePairId: null,
+      privateRoleNonce: 0,
+    });
+    const invalidated = mergeSnapshot({ phase: "deal", pairId: PAIR, lobbyStarted: true });
+    const session = getState().traitreGame;
+    assert.equal(invalidated, true);
+    assert.equal(roleFlag(session), null);
+    assert.equal(session.privateRoleSynced, false);
+    assert.equal(wordShown(session), null);
   });
 });

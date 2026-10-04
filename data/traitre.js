@@ -1,32 +1,3 @@
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 /** Le Traître - paires de mots (majorité = a, intrus = b). */
 
 import { EVENING_POINTS } from "./eveningScoring.js";
@@ -96,24 +67,19 @@ export const TRAITRE_WORD_PAIRS = [
     { id: "lifestyle_5", a: "Festival", b: "Rave", theme: "événements" },
     { id: "lifestyle_6", a: "Vinted", b: "LeBonCoin", theme: "seconde main" },
     { id: "lifestyle_7", a: "Tinder", b: "Bumble", theme: "applications de rencontre" },
-    { id: "lifestyle_8", a: "Road Trip", b: "City Break", theme: "voyage" },
   
     { id: "culture_1", a: "Meme", b: "GIF", theme: "culture internet" },
     { id: "culture_2", a: "Podcast", b: "Vlog", theme: "création de contenu" },
-    { id: "culture_3", a: "Emoji", b: "Sticker", theme: "communication numérique" },
     { id: "culture_4", a: "Croissant", b: "Pain au chocolat", theme: "viennoiseries" },
-    { id: "culture_5", a: "Pokémon", b: "Palworld", theme: "créatures de collection" },
   { id: "culture_6", a: "Air Fryer", b: "Thermomix", theme: "électroménager tendance" },
   { id: "culture_7", a: "Lego", b: "Playmobil", theme: "jouets de construction" },
 
-  { id: "social_6", a: "Threads", b: "Bluesky", theme: "réseaux sociaux" },
   { id: "social_7", a: "YouTube", b: "Twitch", theme: "plateformes vidéo" },
 
-  { id: "gaming_101", a: "FIFA", b: "Pro Evolution Soccer", theme: "jeux de foot" },
+  { id: "gaming_101", a: "FIFA", b: "Rocket League", theme: "jeux de foot" },
   { id: "gaming_11", a: "GTA", b: "Cyberpunk", theme: "mondes ouverts" },
 
   { id: "stream_9", a: "Breaking Bad", b: "Narcos", theme: "séries" },
-  { id: "stream_10", a: "Game of Thrones", b: "House of the Dragon", theme: "fantasy" },
 
   { id: "music_9", a: "Drake", b: "Kendrick Lamar", theme: "rap US" },
   { id: "music_10", a: "Aya Nakamura", b: "Théodora", theme: "pop française" },
@@ -124,6 +90,8 @@ export const TRAITRE_WORD_PAIRS = [
   { id: "food_9", a: "Pizza", b: "Calzone", theme: "cuisine italienne" },
   { id: "food_10", a: "Coca", b: "Pepsi", theme: "sodas" },
   { id: "food_11", a: "Thé", b: "Café", theme: "boissons chaudes" },
+  { id: "food_12", a: "Salade", b: "Sandwich", theme: "cuisine" },
+  { id: "food_13", a: "Matcha", b: "Chocolat chaud", theme: "cuisine" },
 
   { id: "lifestyle_9", a: "Métro", b: "Tram", theme: "transports en commun" },
   { id: "lifestyle_10", a: "Vélo", b: "Trottinette", theme: "mobilité urbaine" },

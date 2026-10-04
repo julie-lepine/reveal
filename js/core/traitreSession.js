@@ -243,10 +243,13 @@ export async function markTraitreLobbyStarted({ rosterNames } = {}) {
     }
   }
 
+  // L'écho du push fusionne et peint l'écran avant le applyLocal de fin.
+  // Le rôle hôte doit déjà être dans le state, sinon ce premier rendu le voit invalidé.
   const result = await launchGameWithSync({
     screen: "traitre",
     gameId: "traitre",
     mode: "push",
+    localFirst: true,
     applyLocal: () => saveStatePatch({ traitreGame: next }),
     getRemoteState: () => ({ traitre: traitreToRemote(next) }),
   });
