@@ -34,6 +34,7 @@ function wordShown(session) {
 function guestSession(overrides = {}) {
   return {
     phase: null,
+    matchId: "match-role",
     pairId: PAIR,
     lobbyStarted: true,
     isLocalImpostor: null,
@@ -124,7 +125,7 @@ describe("sync rôle privé — contexte de deal", () => {
       const invalidated = mergeSnapshot({ phase: "deal", pairId: PAIR, lobbyStarted: true });
       assert.equal(invalidated, false);
       assert.equal(getState().traitreGame.privateRoleNonce, 3);
-      return { data: { is_impostor: true, pair_id: PAIR }, error: null };
+      return { data: { is_impostor: true, pair_id: PAIR, match_id: "match-role" }, error: null };
     };
 
     const ok = await syncTraitrePrivateRole(PAIR, { maxAttempts: 1, delayMs: 0 });
@@ -144,7 +145,7 @@ describe("sync rôle privé — contexte de deal", () => {
       const invalidated = mergeSnapshot({ phase: "deal", pairId: PAIR, lobbyStarted: true });
       assert.equal(invalidated, false);
       assert.equal(getState().traitreGame.privateRoleNonce, 3);
-      return { data: { is_impostor: false, pair_id: PAIR }, error: null };
+      return { data: { is_impostor: false, pair_id: PAIR, match_id: "match-role" }, error: null };
     };
 
     const ok = await syncTraitrePrivateRole(PAIR, { maxAttempts: 1, delayMs: 0 });
@@ -161,7 +162,7 @@ describe("sync rôle privé — contexte de deal", () => {
     fetchBehavior = async () => {
       fetches += 1;
       mergeSnapshot({ phase: "deal", pairId: PAIR, lobbyStarted: true });
-      return { data: { is_impostor: true, pair_id: PAIR }, error: null };
+      return { data: { is_impostor: true, pair_id: PAIR, match_id: "match-role" }, error: null };
     };
 
     const [first, second] = await Promise.all([
@@ -189,7 +190,7 @@ describe("sync rôle privé — contexte de deal", () => {
       });
       assert.equal(invalidated, true);
       assert.notEqual(getState().traitreGame.privateRoleNonce, 3);
-      return { data: { is_impostor: true, pair_id: PAIR }, error: null };
+      return { data: { is_impostor: true, pair_id: PAIR, match_id: "match-role" }, error: null };
     };
 
     const ok = await syncTraitrePrivateRole(PAIR, { maxAttempts: 1, delayMs: 0 });
@@ -213,7 +214,7 @@ describe("sync rôle privé — contexte de deal", () => {
       const invalidated = mergeSnapshot({ phase: "deal", pairId: PAIR, lobbyStarted: true });
       assert.equal(invalidated, true);
       assert.equal(getState().traitreGame.privateRoleNonce, 5);
-      return { data: { is_impostor: true, pair_id: PAIR }, error: null };
+      return { data: { is_impostor: true, pair_id: PAIR, match_id: "match-role" }, error: null };
     };
 
     const ok = await syncTraitrePrivateRole(PAIR, { maxAttempts: 1, delayMs: 0 });
@@ -256,7 +257,7 @@ describe("sync rôle privé — une lecture par contexte", () => {
     assert.equal(wordShown(opened), null);
 
     let fetches = 0;
-    const held = holdRow({ is_impostor: true, pair_id: PAIR });
+    const held = holdRow({ is_impostor: true, pair_id: PAIR, match_id: "match-role" });
     fetchBehavior = () => {
       fetches += 1;
       return held.promise;
@@ -291,7 +292,7 @@ describe("sync rôle privé — une lecture par contexte", () => {
   it("deux déclencheurs pendant le fetch : une requête, un notify, rôle fake", async () => {
     seatGuest({ phase: "deal", privateRoleNonce: 4 });
     let fetches = 0;
-    const held = holdRow({ is_impostor: true, pair_id: PAIR });
+    const held = holdRow({ is_impostor: true, pair_id: PAIR, match_id: "match-role" });
     fetchBehavior = () => {
       fetches += 1;
       return held.promise;
@@ -325,7 +326,7 @@ describe("sync rôle privé — une lecture par contexte", () => {
     let fetches = 0;
     fetchBehavior = async () => {
       fetches += 1;
-      return { data: { is_impostor: false, pair_id: PAIR }, error: null };
+      return { data: { is_impostor: false, pair_id: PAIR, match_id: "match-role" }, error: null };
     };
 
     const ok = await syncTraitrePrivateRole(PAIR, { maxAttempts: 1, delayMs: 0 });
@@ -347,10 +348,10 @@ describe("sync rôle privé — une lecture par contexte", () => {
       if (fetches === 1) {
         mergeSnapshot({ phase: "deal", pairId: OTHER_PAIR, lobbyStarted: true });
         return new Promise((resolve) => {
-          releaseOld = () => resolve({ data: { is_impostor: true, pair_id: PAIR }, error: null });
+          releaseOld = () => resolve({ data: { is_impostor: true, pair_id: PAIR, match_id: "match-role" }, error: null });
         });
       }
-      return Promise.resolve({ data: { is_impostor: false, pair_id: OTHER_PAIR }, error: null });
+      return Promise.resolve({ data: { is_impostor: false, pair_id: OTHER_PAIR, match_id: "match-role" }, error: null });
     };
 
     const oldSync = syncTraitrePrivateRole(PAIR, { maxAttempts: 1, delayMs: 0 });
@@ -388,10 +389,10 @@ describe("sync rôle privé — une lecture par contexte", () => {
       if (fetches === 1) {
         mergeSnapshot({ phase: "deal", pairId: PAIR, lobbyStarted: true });
         return new Promise((resolve) => {
-          releaseOld = () => resolve({ data: { is_impostor: false, pair_id: PAIR }, error: null });
+          releaseOld = () => resolve({ data: { is_impostor: false, pair_id: PAIR, match_id: "match-role" }, error: null });
         });
       }
-      return Promise.resolve({ data: { is_impostor: true, pair_id: PAIR }, error: null });
+      return Promise.resolve({ data: { is_impostor: true, pair_id: PAIR, match_id: "match-role" }, error: null });
     };
 
     const oldSync = syncTraitrePrivateRole(PAIR, { maxAttempts: 1, delayMs: 0 });
@@ -419,7 +420,7 @@ describe("sync rôle privé — une lecture par contexte", () => {
     let fetches = 0;
     fetchBehavior = async () => {
       fetches += 1;
-      return { data: { is_impostor: false, pair_id: PAIR }, error: null };
+      return { data: { is_impostor: false, pair_id: PAIR, match_id: "match-role" }, error: null };
     };
 
     const okFirst = await syncTraitrePrivateRole(PAIR, { maxAttempts: 1, delayMs: 0 });
@@ -436,7 +437,7 @@ describe("sync rôle privé — une lecture par contexte", () => {
   it("réseau lent : le rôle reste indisponible, un second appel ne refetch pas, puis le mot arrive", async () => {
     seatGuest({ phase: "deal", privateRoleNonce: 8 });
     let fetches = 0;
-    const held = holdRow({ is_impostor: true, pair_id: PAIR });
+    const held = holdRow({ is_impostor: true, pair_id: PAIR, match_id: "match-role" });
     fetchBehavior = () => {
       fetches += 1;
       return held.promise;
@@ -477,7 +478,7 @@ describe("sync rôle privé — une lecture par contexte", () => {
     let fetches = 0;
     fetchBehavior = async () => {
       fetches += 1;
-      return { data: { is_impostor: true, pair_id: PAIR }, error: null };
+      return { data: { is_impostor: true, pair_id: PAIR, match_id: "match-role" }, error: null };
     };
 
     const ok = await syncTraitrePrivateRole(PAIR, { maxAttempts: 1, delayMs: 0 });

@@ -1715,6 +1715,7 @@ function normalizeTraitreVotesMap(votes = {}, alive = []) {
 function mergeTraitreGameLocal(local, remote) {
   if (!remote) return local;
   if (!local) return remote;
+  if (local?.matchId && !remote?.matchId && remote.lobbyStarted !== false) return local;
   if (isNewTraitreGame(local, remote)) {
     const pairId = remote.pairId ?? null;
     return {
@@ -1756,7 +1757,12 @@ function mergeTraitreGameLocal(local, remote) {
       : remote.ready || {};
   const pairId = remote.pairId || local.pairId || null;
   const invalidateRole = shouldInvalidateTraitrePrivateRole(local, remote);
-  const privateRole = traitrePrivateRoleFields(local, pairId, invalidateRole);
+  const privateRole = traitrePrivateRoleFields(
+    local,
+    pairId,
+    invalidateRole,
+    remote.matchId || local.matchId || null
+  );
   return {
     ...local,
     ...remote,
@@ -1775,6 +1781,7 @@ function mergeTraitreGameLocal(local, remote) {
       return null;
     })(),
     ...privateRole,
+    matchId: remote.matchId || local.matchId || null,
     votes,
     dealAcks,
     ready,
@@ -2901,6 +2908,7 @@ export function traitreToRemote(session) {
     lobbyStarted: Boolean(session.lobbyStarted),
     phase: session.phase || null,
     pairId: session.pairId || null,
+    matchId: session.matchId || null,
     speakRound: session.speakRound ?? 1,
     speakerIndex: session.speakerIndex ?? 0,
     alive: [...(session.alive || [])],
@@ -2960,6 +2968,7 @@ export function traitreFromRemote(remote) {
     lobbyStarted: Boolean(remote.lobbyStarted),
     phase: remote.phase || null,
     pairId: remote.pairId || null,
+    matchId: remote.matchId || null,
     isLocalImpostor: null,
     privateRoleSynced: false,
     privateRolePairId: null,
@@ -3751,9 +3760,10 @@ export function applyRemoteSession(row, { epoch = null } = {}) {
     const remote = traitreFromRemote(st.traitre);
     const local = getState().traitreGame;
     patch.traitreGame = local ? mergeTraitreGameLocal(local, remote) : remote;
-    if (st.traitre.pairId && st.traitre.lobbyStarted) {
+    if (st.traitre.pairId && st.traitre.matchId && st.traitre.lobbyStarted) {
       void import("./traitrePrivate.js").then(({ syncTraitrePrivateRole }) =>
         syncTraitrePrivateRole(st.traitre.pairId, {
+          matchId: st.traitre.matchId,
           maxAttempts: 8,
           delayMs: 500,
           notify: () => notify(row),

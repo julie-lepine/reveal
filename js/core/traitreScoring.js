@@ -64,6 +64,19 @@ export function buildTraitreEliminationPatch(session, eliminatedName) {
   };
 }
 
+/** Égalité au vote : nouveau tour d'indices (mêmes mots, mêmes rôles). */
+export function buildTraitreTieSpeakPatch(session) {
+  return {
+    phase: "speak",
+    speakRound: (session.speakRound || 1) + 1,
+    speakerIndex: 0,
+    votes: {},
+    revotePending: false,
+    revoteCount: 0,
+    tieAfterVote: true,
+  };
+}
+
 /** Calcule les points de fin de partie (pur, testable). */
 export function computeTraitreScoreDeltas(session) {
   const impostor = session.impostorName;

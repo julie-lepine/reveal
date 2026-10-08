@@ -36,34 +36,49 @@ function writeLocalBundle(lobbyId, bundle) {
   }
 }
 
-/** @returns {{ is_impostor: boolean, pair_id: string } | null} */
-export async function fetchMyTraitrePrivate(pairId) {
+function localMatchBucket(bundle, matchId) {
+  const bucket = bundle?.[matchId];
+  if (!bucket || typeof bucket !== "object" || bucket.pair_id) return null;
+  return bucket;
+}
+
+function localPrivateRow(lobbyId, matchId, uid) {
+  const row = localMatchBucket(readLocalBundle(lobbyId), matchId)?.[uid];
+  if (!row || row.match_id !== matchId) return null;
+  return row;
+}
+
+function privateRolePayload(row, matchId) {
+  if (!row || row.match_id !== matchId) return null;
+  return {
+    is_impostor: Boolean(row.is_impostor),
+    pair_id: row.pair_id,
+    match_id: matchId,
+  };
+}
+
+/** @returns {{ is_impostor: boolean, pair_id: string, match_id: string } | null} */
+export async function fetchMyTraitrePrivate(matchId) {
   const lobbyId = getState().lobby?.id;
   const uid = getSupabaseUserId();
-  if (!lobbyId || !uid || !pairId) return null;
+  if (!lobbyId || !uid || !matchId) return null;
 
   if (!isSupabaseConfigured()) {
-    const row = readLocalBundle(lobbyId)[uid];
-    if (!row || row.pair_id !== pairId) return null;
-    return { is_impostor: Boolean(row.is_impostor), pair_id: row.pair_id };
+    return privateRolePayload(localPrivateRow(lobbyId, matchId, uid), matchId);
   }
 
   const { data, error } = await supabase
     .from("traitre_private")
-    .select("is_impostor, pair_id")
+    .select("is_impostor, pair_id, match_id")
     .eq("lobby_id", lobbyId)
+    .eq("match_id", matchId)
     .eq("user_id", uid)
     .maybeSingle();
   if (error) {
     console.warn("[traitre_private]", error.message);
-    const row = readLocalBundle(lobbyId)[uid];
-    if (row?.pair_id === pairId) {
-      return { is_impostor: Boolean(row.is_impostor), pair_id: row.pair_id };
-    }
-    return null;
+    return privateRolePayload(localPrivateRow(lobbyId, matchId, uid), matchId);
   }
-  if (!data || data.pair_id !== pairId) return null;
-  return { is_impostor: Boolean(data.is_impostor), pair_id: data.pair_id };
+  return privateRolePayload(data, matchId);
 }
 
 async function resolvePlayerUid(name) {
@@ -74,9 +89,9 @@ async function resolvePlayerUid(name) {
 }
 
 /** Hôte : distribue le rôle fake à chaque joueur (table privée / localStorage). */
-export async function hostDistributeTraitreRoles(pairId, impostorName, playerNames = []) {
+export async function hostDistributeTraitreRoles(matchId, pairId, impostorName, playerNames = []) {
   const lobbyId = getState().lobby?.id;
-  if (!lobbyId || !pairId || !impostorName) {
+  if (!lobbyId || !matchId || !pairId || !impostorName) {
     return { ok: false, written: 0, skippedNames: [], error: "Lobby ou partie invalide." };
   }
 
@@ -86,11 +101,13 @@ export async function hostDistributeTraitreRoles(pairId, impostorName, playerNam
   }
 
   if (!isSupabaseConfigured()) {
-    const bundle = {};
+    const bundle = readLocalBundle(lobbyId);
+    const bucket = { ...(localMatchBucket(bundle, matchId) || {}) };
     names.forEach((name) => {
       const uid = localPrivateKeyForName(name);
-      bundle[uid] = { pair_id: pairId, is_impostor: name === impostorName };
+      bucket[uid] = { pair_id: pairId, is_impostor: name === impostorName, match_id: matchId };
     });
+    bundle[matchId] = bucket;
     writeLocalBundle(lobbyId, bundle);
     return { ok: true, written: names.length, skippedNames: [] };
   }
@@ -107,10 +124,11 @@ export async function hostDistributeTraitreRoles(pairId, impostorName, playerNam
       {
         lobby_id: lobbyId,
         user_id: uid,
+        match_id: matchId,
         pair_id: pairId,
         is_impostor: name === impostorName,
       },
-      { onConflict: "lobby_id,user_id" }
+      { onConflict: "lobby_id,match_id,user_id" }
     );
     if (error) throw error;
     written += 1;
@@ -157,6 +175,7 @@ function applyTraitrePrivateRole(session, priv, expectedNonce) {
   const currentPairId = current.pairId || null;
   if (!priv || (priv.is_impostor !== true && priv.is_impostor !== false)) return false;
   if (!priv.pair_id || priv.pair_id !== currentPairId) return false;
+  if (!priv.match_id || priv.match_id !== current.matchId) return false;
   if ((current.privateRoleNonce ?? 0) !== expectedNonce) return false;
   if (isTraitrePrivateRoleCurrent(current)) return true;
 
@@ -175,6 +194,7 @@ function applyTraitrePrivateRole(session, priv, expectedNonce) {
       impostorName,
       privateRoleSynced: true,
       privateRolePairId: currentPairId,
+      privateRoleMatchId: priv.match_id,
       privateRoleNonce: expectedNonce,
     },
   });
@@ -184,8 +204,8 @@ function applyTraitrePrivateRole(session, priv, expectedNonce) {
 /** Une lecture en vol par contexte (pairId + nonce). Un autre contexte a sa propre lecture. */
 const inFlightByContext = new Map();
 
-function contextKey(pairId, nonce) {
-  return `${pairId}\u0000${nonce}`;
+function contextKey(matchId, pairId, nonce) {
+  return `${matchId}\u0000${pairId}\u0000${nonce}`;
 }
 
 function flushNotifies(entry) {
@@ -197,19 +217,32 @@ function flushNotifies(entry) {
  * Boucle liée à un seul contexte. Un changement de paire ou de nonce rejette
  * la réponse et laisse une nouvelle synchro partir pour le nouveau contexte.
  */
-async function syncTraitrePrivateRoleForContext(pairId, expectedNonce, entry, maxAttempts, delayMs) {
+async function syncTraitrePrivateRoleForContext(
+  matchId,
+  pairId,
+  expectedNonce,
+  entry,
+  maxAttempts,
+  delayMs
+) {
   for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
     const live = getState().traitreGame || {};
+    if ((live.matchId || null) !== matchId) return false;
     if ((live.pairId || null) !== pairId) return false;
     if (isTraitrePrivateRoleCurrent(live)) return true;
     if ((live.privateRoleNonce ?? 0) !== expectedNonce) return false;
 
-    const priv = await fetchMyTraitrePrivate(pairId);
+    const priv = await fetchMyTraitrePrivate(matchId);
     const after = getState().traitreGame || {};
+    if ((after.matchId || null) !== matchId) return false;
     if ((after.pairId || null) !== pairId) return false;
     if ((after.privateRoleNonce ?? 0) !== expectedNonce) return false;
 
-    if (priv?.pair_id === pairId && applyTraitrePrivateRole(after, priv, expectedNonce)) {
+    if (
+      priv?.match_id === matchId &&
+      priv?.pair_id === pairId &&
+      applyTraitrePrivateRole(after, priv, expectedNonce)
+    ) {
       flushNotifies(entry);
       return true;
     }
@@ -223,16 +256,19 @@ async function syncTraitrePrivateRoleForContext(pairId, expectedNonce, entry, ma
 /** Invité : lit le rôle privé et met à jour traitreGame local (retry si distribution en cours). */
 export async function syncTraitrePrivateRole(
   pairId,
-  { notify, maxAttempts = 6, delayMs = 400 } = {}
+  { matchId = null, notify, maxAttempts = 6, delayMs = 400 } = {}
 ) {
-  if (!pairId || isLocalLobbyHost()) return true;
-
   const live = getState().traitreGame || {};
+  const expectedMatchId = matchId || live.matchId || null;
+  if (!pairId || !expectedMatchId || isLocalLobbyHost()) {
+    return isLocalLobbyHost();
+  }
+  if ((live.matchId || null) !== expectedMatchId) return false;
   if ((live.pairId || null) !== pairId) return false;
   if (isTraitrePrivateRoleCurrent(live)) return true;
 
   const nonce = live.privateRoleNonce ?? 0;
-  const key = contextKey(pairId, nonce);
+  const key = contextKey(expectedMatchId, pairId, nonce);
   const existing = inFlightByContext.get(key);
   if (existing) {
     if (typeof notify === "function") existing.notifies.push(notify);
@@ -254,7 +290,14 @@ export async function syncTraitrePrivateRole(
   });
   inFlightByContext.set(key, entry);
 
-  void syncTraitrePrivateRoleForContext(pairId, nonce, entry, maxAttempts, delayMs).then(
+  void syncTraitrePrivateRoleForContext(
+    expectedMatchId,
+    pairId,
+    nonce,
+    entry,
+    maxAttempts,
+    delayMs
+  ).then(
     resolveRun,
     rejectRun
   );

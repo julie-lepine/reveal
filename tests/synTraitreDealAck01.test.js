@@ -177,6 +177,7 @@ describe("commitTraitreDealAck - mocks comportementaux", () => {
     mock.module("../js/core/traitreScoring.js", {
       namedExports: {
         buildTraitreEliminationPatch: mock.fn(),
+        buildTraitreTieSpeakPatch: mock.fn(),
         computeTraitreScoreDeltas: mock.fn(),
       },
     });

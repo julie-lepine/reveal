@@ -26,10 +26,7 @@ import {
   traitreToRemote,
 } from "./gameSync.js";
 import { patchGameStateWithFeedback } from "./patchGameStateFeedback.js";
-import {
-  clearTraitrePrivateForLobby,
-  hostDistributeTraitreRoles,
-} from "./traitrePrivate.js";
+import { hostDistributeTraitreRoles } from "./traitrePrivate.js";
 import { launchGameWithSync, commitHostGamePlay, commitPrepReadyToggle } from "./mpLaunch.js";
 import { normalizeKeyedVotes, traitreKnownImpostorFlag } from "./sessionMerge.js";
 import {
@@ -68,6 +65,8 @@ function defaultSession() {
     winner: null,
     scoresApplied: false,
     lastRound: null,
+    matchId: null,
+    privateRoleMatchId: null,
     privateRoleSynced: false,
   };
 }
@@ -177,10 +176,13 @@ export function createStartedTraitreSession(rosterNames) {
   const pair = pickRandomTraitrePair();
   const impostorName = names[Math.floor(Math.random() * names.length)];
   const localName = getLocalDisplayName();
+  const matchId = globalThis.crypto.randomUUID();
   return {
     ok: true,
     session: {
       ...defaultSession(),
+      matchId,
+      privateRoleMatchId: matchId,
       lobbyStarted: true,
       phase: "deal",
       pairId: pair.id,
@@ -205,8 +207,20 @@ async function distributeTraitreRolesForHost(session) {
   if (!lobbyId) {
     throw new Error("Lobby introuvable.");
   }
-  await clearTraitrePrivateForLobby(lobbyId);
-  return hostDistributeTraitreRoles(session.pairId, session.impostorName, session.alive);
+  if (!session?.matchId) {
+    return {
+      ok: false,
+      written: 0,
+      skippedNames: [],
+      error: "matchId manquant.",
+    };
+  }
+  return hostDistributeTraitreRoles(
+    session.matchId,
+    session.pairId,
+    session.impostorName,
+    session.alive
+  );
 }
 
 export async function markTraitreLobbyStarted({ rosterNames } = {}) {
@@ -436,24 +450,15 @@ export function countTraitreVotes(votes = {}, alive = []) {
   };
 }
 
-export { buildTraitreEliminationPatch, computeTraitreScoreDeltas } from "./traitreScoring.js";
+export {
+  buildTraitreEliminationPatch,
+  buildTraitreTieSpeakPatch,
+  computeTraitreScoreDeltas,
+} from "./traitreScoring.js";
 
 /** Manche d'indices après égalité au vote (bandeau visible pour tout le lobby). */
 export function isTraitreTieSpeakRound(session = getTraitreSession()) {
   return session.phase === "speak" && Boolean(session.tieAfterVote);
-}
-
-/** Égalité au vote : nouveau tour d'indices (mêmes mots, mêmes rôles). */
-export function buildTraitreTieSpeakPatch(session) {
-  return {
-    phase: "speak",
-    speakRound: (session.speakRound || 1) + 1,
-    speakerIndex: 0,
-    votes: {},
-    revotePending: false,
-    revoteCount: 0,
-    tieAfterVote: true,
-  };
 }
 
 export function awardTraitreGame(session = getTraitreSession()) {

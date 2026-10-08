@@ -49,6 +49,7 @@ import {
 } from "../core/gameSync.js";
 import { voteConfirmChrome, pickForVoteConfirm } from "../core/voteConfirm.js";
 import { syncTraitrePrivateRole } from "../core/traitrePrivate.js";
+import { commitTraitreAdvance } from "../core/traitreAdvance.js";
 
 export function mountTraitre(app) {
   if (!requireLobbyPlay()) return null;
@@ -219,6 +220,10 @@ export function mountTraitre(app) {
     await dealAdvanceLock.run(async () => {
       if (getTraitreSession().phase !== "deal" || !allTraitreDealAcksIn()) return;
       if (mp && !canActAsHost()) return;
+      if (mp) {
+        await commitTraitreAdvance("deal_to_speak", { quiet: true });
+        return;
+      }
       await commitTraitrePlay({
         ...getTraitreSession(),
         phase: "speak",
@@ -229,6 +234,10 @@ export function mountTraitre(app) {
 
   async function finishSpeakRound() {
     if (mp && !canActAsHost()) return;
+    if (mp) {
+      await commitTraitreAdvance("finish_speak");
+      return;
+    }
     const s = getTraitreSession();
     const basePatch = s.lastEliminated ? { lastEliminated: null, speakerIndex: 0 } : { speakerIndex: 0 };
     if (s.speakRound === 1) {
@@ -248,6 +257,10 @@ export function mountTraitre(app) {
 
   async function continueSpeakRound() {
     if (mp && !canActAsHost()) return;
+    if (mp) {
+      await commitTraitreAdvance("continue_speak");
+      return;
+    }
     const s = getTraitreSession();
     await commitTraitrePlay({
       ...s,
@@ -259,6 +272,10 @@ export function mountTraitre(app) {
 
   async function startVoteFromDecision() {
     if (mp && !canActAsHost()) return;
+    if (mp) {
+      await commitTraitreAdvance("start_vote");
+      return;
+    }
     const s = getTraitreSession();
     await commitTraitrePlay({
       ...s,
@@ -284,6 +301,11 @@ export function mountTraitre(app) {
         if (votedCount === 0) return false;
       } else if (!allTraitreVotesIn(s)) {
         return false;
+      }
+
+      if (mp) {
+        await commitTraitreAdvance("resolve_vote", { force, quiet: !force });
+        return true;
       }
 
       if (!mp && !force) {

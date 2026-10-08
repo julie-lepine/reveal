@@ -44,6 +44,8 @@ $$;
 
 grant execute on function public.touch_lobby_activity(uuid) to authenticated;
 
+-- Même corps que schema.sql. Ne pas laisser schema.sql rebrancher
+-- lobbies_updated_at sur set_updated_at.
 create or replace function public.set_lobbies_timestamps()
 returns trigger
 language plpgsql

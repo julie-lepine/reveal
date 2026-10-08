@@ -288,7 +288,7 @@ describe("lobbyMembershipVagueE5 - contrats source", () => {
     const restart = read("js/core/restartGame.js");
     assert.match(restart, /clearTraitrePrivateForLobby/);
     const traitre = read("js/core/traitreSession.js");
-    assert.match(traitre, /clearTraitrePrivateForLobby/);
+    assert.equal(traitre.includes("clearTraitrePrivateForLobby"), false);
     const priv = read("js/core/traitrePrivate.js");
     assert.match(priv, /export function clearTraitrePrivateLocalForLobby/);
     assert.match(priv, /export async function clearTraitrePrivateForLobby/);

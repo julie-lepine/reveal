@@ -1015,6 +1015,7 @@ export function isTraitrePrivateRoleCurrent(session) {
   if (!session?.pairId) return false;
   if (session.privateRoleSynced !== true) return false;
   if (session.privateRolePairId !== session.pairId) return false;
+  if (session.matchId && session.privateRoleMatchId !== session.matchId) return false;
   return session.isLocalImpostor === true || session.isLocalImpostor === false;
 }
 
@@ -1063,17 +1064,23 @@ export function shouldInvalidateTraitrePrivateRole(local, remote) {
 }
 
 /** Champs de rôle à garder ou à effacer. L'effacement avance le nonce local. */
-export function traitrePrivateRoleFields(local, pairId, invalidate) {
-  if (invalidate || !pairId) {
+export function traitrePrivateRoleFields(local, pairId, invalidate, matchId = null) {
+  const matchMismatch = Boolean(
+    matchId && local?.privateRoleMatchId && local.privateRoleMatchId !== matchId
+  );
+  if (invalidate || matchMismatch || !pairId) {
     return {
       isLocalImpostor: null,
       privateRoleSynced: false,
       privateRolePairId: null,
+      privateRoleMatchId: null,
       privateRoleNonce: (local?.privateRoleNonce || 0) + 1,
     };
   }
   const nonce = local?.privateRoleNonce ?? 0;
+  const sameMatch = !matchId || !local?.privateRoleMatchId || local.privateRoleMatchId === matchId;
   if (
+    sameMatch &&
     local?.privateRoleSynced === true &&
     local?.privateRolePairId === pairId &&
     (local.isLocalImpostor === true || local.isLocalImpostor === false)
@@ -1082,6 +1089,7 @@ export function traitrePrivateRoleFields(local, pairId, invalidate) {
       isLocalImpostor: local.isLocalImpostor,
       privateRoleSynced: true,
       privateRolePairId: pairId,
+      privateRoleMatchId: local.privateRoleMatchId || matchId,
       privateRoleNonce: nonce,
     };
   }
@@ -1089,6 +1097,7 @@ export function traitrePrivateRoleFields(local, pairId, invalidate) {
     isLocalImpostor: null,
     privateRoleSynced: false,
     privateRolePairId: null,
+    privateRoleMatchId: null,
     privateRoleNonce: nonce,
   };
 }
@@ -1096,8 +1105,9 @@ export function traitrePrivateRoleFields(local, pairId, invalidate) {
 /** Nouvelle partie Spot the fake (relance après fin ou retour prep). */
 export function isNewTraitreGame(cur, inc) {
   if (!inc) return false;
-  if (inc.pairId && cur?.pairId && inc.pairId !== cur.pairId) return true;
-  if (cur?.phase === "final" && inc.phase === "deal") return true;
+  const curId = cur?.matchId || null;
+  const incId = inc?.matchId || null;
+  if (curId && incId && curId !== incId) return true;
   // Un retour prep envoie l'état remote complet (lobbyStarted: false explicite).
   // Un patch étroit (dealAcks/ready/votes) omet la clé lobbyStarted : ne pas le
   // confondre avec une nouvelle partie, sinon la map `ready` serait remise à zéro.
@@ -1105,6 +1115,8 @@ export function isNewTraitreGame(cur, inc) {
     if (cur?.phase === "final") return true;
     if (cur?.lobbyStarted) return true;
   }
+  if (curId && incId) return false;
+  if (!curId && incId && inc.lobbyStarted !== false) return true;
   return false;
 }
 
@@ -1155,6 +1167,7 @@ export function mergeTraitrePatchState(
       dealAcks: { ...(cur.dealAcks || {}), ...inc.dealAcks },
     };
   }
+  if (cur?.matchId && !inc?.matchId && inc.lobbyStarted !== false) return cur;
   const voteResetAfterTie = isTraitreVoteResetAfterTie(cur, inc);
   const tieAfterVote = voteResetAfterTie
     ? true

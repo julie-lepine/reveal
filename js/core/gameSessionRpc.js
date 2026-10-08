@@ -304,6 +304,37 @@ export async function rpcAdvanceDrawItRound({ lobbyId }) {
   return asSessionRow(data);
 }
 
+/**
+ * Spot the Fake — transition d'hôte ou d'acting host.
+ * N'envoie pas le blob : action + gardes de phase. Le fake reste dans traitre_private.
+ * Un retry reçoit la ligne déjà avancée (idempotent), sans second scoring.
+ */
+export async function rpcAdvanceTraitrePlay({
+  lobbyId,
+  matchId = null,
+  action,
+  expectedPhase,
+  expectedSpeakRound,
+  expectedPairId,
+  expectedAliveCount,
+  force = false,
+}) {
+  requireClient();
+  const { data, error } = await supabase.rpc("advance_traitre_play", {
+    p_lobby_id: lobbyId,
+    p_match_id: matchId,
+    p_action: action,
+    p_expected_phase: expectedPhase,
+    p_expected_speak_round: expectedSpeakRound,
+    p_expected_pair_id: expectedPairId,
+    p_expected_alive_count: expectedAliveCount,
+    p_force: force === true,
+  });
+  if (error) throw error;
+  if (Array.isArray(data)) return data[0] ?? null;
+  return data ?? null;
+}
+
 export async function rpcFinalizeDrawItScores({ lobbyId }) {
   requireClient();
   const { data, error } = await supabase.rpc("finalize_drawit_scores", {

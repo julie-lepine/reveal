@@ -385,7 +385,8 @@ describe("ARCH-06 Traître host V2 - acting host + contrats source", () => {
     assert.match(src, /async function startVoteFromDecision\(\) \{\s*\n\s*if \(mp && !canActAsHost\(\)\) return;/s);
     assert.match(src, /async function resolveVoteRound\([\s\S]*?if \(mp && !canActAsHost\(\)\) return;/s);
     assert.match(src, /async function maybeAdvanceFromDeal\(\) \{[\s\S]*?if \(mp && !canActAsHost\(\)\) return;/s);
-    // Invité : host flag UI via canActAsHost, pas un 2e chemin RPC dédié dans l'écran
+    // Les boutons d'hôte passent par canActAsHost. Le patch large apply_acting_host_play
+    // n'est pas le chemin de transition : advance_traitre_play l'est.
     assert.match(src, /const host = !mp \|\| canActAsHost\(\);/);
     assert.equal(/apply_acting_host_play/.test(src), false);
   });
@@ -409,16 +410,18 @@ describe("ARCH-06 Traître host V2 - acting host + contrats source", () => {
 });
 
 describe("ARCH-06 Traître host V2 - régression métier (contrats)", () => {
-  it("transitions / scoring / commits inchangés dans l'écran", () => {
+  it("transitions solo conservées, transitions multijoueur via advance_traitre_play", () => {
     const src = readSrc("../js/games/traitre.js");
     assert.match(src, /phase: "speak"/);
     assert.match(src, /phase: "decision"/);
     assert.match(src, /phase: "vote"/);
     assert.match(src, /buildTraitreEliminationPatch/);
     assert.match(src, /awardTraitreGame/);
+    assert.match(src, /commitTraitreAdvance\(/);
     assert.match(src, /withEveningScores: patch\.phase === "final" && mp && isLobbyHost\(\)/);
     assert.match(src, /btn-force-vote/);
     assert.match(src, /phase === "final"/);
+    assert.equal(/apply_acting_host_play/.test(src), false);
   });
 
   it("session listener : double garde + auto advance deal/vote", () => {

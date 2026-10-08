@@ -5,14 +5,16 @@ create table if not exists public.traitre_private (
   id uuid primary key default gen_random_uuid(),
   lobby_id uuid not null references public.lobbies(id) on delete cascade,
   user_id uuid not null references auth.users(id) on delete cascade,
+  match_id uuid not null,
   pair_id text not null,
   is_impostor boolean not null default false,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
-  unique (lobby_id, user_id)
+  constraint traitre_private_lobby_match_user_key unique (lobby_id, match_id, user_id)
 );
 
 create index if not exists traitre_private_lobby_idx on public.traitre_private (lobby_id);
+create index if not exists traitre_private_lobby_match_idx on public.traitre_private (lobby_id, match_id);
 create index if not exists traitre_private_pair_idx on public.traitre_private (lobby_id, pair_id);
 
 drop trigger if exists traitre_private_updated_at on public.traitre_private;

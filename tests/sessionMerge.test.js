@@ -597,16 +597,22 @@ describe("mergeTraitrePhase", () => {
 });
 
 describe("isNewTraitreGame", () => {
-  it("détecte un changement de paire de mots", () => {
+  it("détecte un changement de paire quand le matchId change", () => {
     assert.equal(
-      isNewTraitreGame({ pairId: "a", phase: "final" }, { pairId: "b", phase: "deal" }),
+      isNewTraitreGame(
+        { matchId: "A", pairId: "a", phase: "final" },
+        { matchId: "B", pairId: "b", phase: "deal" }
+      ),
       true
     );
   });
 
-  it("détecte relance final → deal", () => {
+  it("détecte relance final → deal quand le matchId change", () => {
     assert.equal(
-      isNewTraitreGame({ phase: "final", pairId: "a" }, { phase: "deal", pairId: "a" }),
+      isNewTraitreGame(
+        { matchId: "A", phase: "final", pairId: "a" },
+        { matchId: "B", phase: "deal", pairId: "a" }
+      ),
       true
     );
   });
@@ -879,6 +885,7 @@ describe("mergeTraitrePatchState", () => {
 
   it("remplace l'état local sur nouvelle partie", () => {
     const cur = {
+      matchId: "match-a",
       phase: "final",
       pairId: "old_pair",
       lobbyStarted: true,
@@ -887,6 +894,7 @@ describe("mergeTraitrePatchState", () => {
       votes: { a: "b" },
     };
     const inc = {
+      matchId: "match-b",
       phase: "deal",
       pairId: "new_pair",
       lobbyStarted: true,

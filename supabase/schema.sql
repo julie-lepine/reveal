@@ -58,11 +58,25 @@ create table if not exists public.lobby_messages (
 
 create index if not exists lobby_messages_lobby_idx on public.lobby_messages (lobby_id, created_at);
 
--- updated_at
+-- Activité des salons. Même corps que lobby-lifecycle.sql.
+-- Une réexécution de ce fichier ne doit pas rebrancher le trigger
+-- sur set_updated_at : last_activity_at ne bougerait plus.
+create or replace function public.set_lobbies_timestamps()
+returns trigger
+language plpgsql
+as $$
+begin
+  new.updated_at = now();
+  new.last_activity_at = now();
+  return new;
+end;
+$$;
+
+-- Horodatage des autres tables. Les lobbies n'utilisent pas cette fonction.
 create or replace function public.set_updated_at()
 returns trigger language plpgsql as $$
 begin
-  new.updated_at = now();
+  new.updated_at = clock_timestamp();
   return new;
 end;
 $$;
@@ -70,25 +84,41 @@ $$;
 drop trigger if exists lobbies_updated_at on public.lobbies;
 create trigger lobbies_updated_at
 before update on public.lobbies
-for each row execute function public.set_updated_at();
+for each row execute function public.set_lobbies_timestamps();
 
 drop trigger if exists profiles_updated_at on public.profiles;
 create trigger profiles_updated_at
 before update on public.profiles
 for each row execute function public.set_updated_at();
 
--- Profil auto à l'inscription
+-- Profil auto à l'inscription.
+-- Même corps que feature-friends-03-live-identity.sql :
+-- un local-part d'e-mail d'un seul caractère est ignoré (CHECK display_name >= 2).
 create or replace function public.handle_new_user()
-returns trigger language plpgsql security definer set search_path = public as $$
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_email_local text;
+  v_name text;
 begin
+  v_email_local := nullif(split_part(coalesce(new.email, ''), '@', 1), '');
+  if v_email_local is not null and char_length(v_email_local) < 2 then
+    v_email_local := null;
+  end if;
+
+  v_name := coalesce(
+    nullif(trim(new.raw_user_meta_data->>'display_name'), ''),
+    v_email_local,
+    'Joueur'
+  );
+
   insert into public.profiles (id, display_name, emoji)
   values (
     new.id,
-    coalesce(
-      nullif(trim(new.raw_user_meta_data->>'display_name'), ''),
-      nullif(split_part(coalesce(new.email, ''), '@', 1), ''),
-      'Joueur'
-    ),
+    v_name,
     coalesce(nullif(trim(new.raw_user_meta_data->>'emoji'), ''), '👤')
   )
   on conflict (id) do nothing;
