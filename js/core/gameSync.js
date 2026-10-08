@@ -611,6 +611,34 @@ function sessionSignature(row) {
   return `${row.screen}|${JSON.stringify(row.state || {})}`;
 }
 
+/** Jeux absents de playChanged : un reset local ne doit pas masquer une partie distante active. */
+const PREP_RESTORE_GAME_KEYS = ["traitreGame", "consensusGame", "clutchGame"];
+
+/**
+ * Vrai si le patch fusionné relance une partie alors que le local, lu avant
+ * merge et avant saveStatePatch, est encore en préparation.
+ */
+export function remoteActiveOverLocalPrep(localStarted, patch) {
+  if (!patch) return false;
+  return PREP_RESTORE_GAME_KEYS.some((key) => {
+    if (!Object.prototype.hasOwnProperty.call(patch, key)) return false;
+    return patch[key]?.lobbyStarted === true && localStarted?.[key] !== true;
+  });
+}
+
+/** Décision d'écriture locale. Ne pousse rien vers game_sessions et ne route pas. */
+export function shouldPersistAppliedRemotePatch({
+  hasPatch,
+  sigUnchanged,
+  playChanged,
+  localStarted,
+  patch,
+}) {
+  if (!hasPatch) return false;
+  if (!sigUnchanged || playChanged) return true;
+  return remoteActiveOverLocalPrep(localStarted, patch);
+}
+
 function isOlderSessionRow(row) {
   if (!row?.updated_at || !lastSessionUpdatedAt) return false;
   const incoming = Date.parse(row.updated_at);
@@ -3703,6 +3731,13 @@ export function applyRemoteSession(row, { epoch = null } = {}) {
   }
 
   const patch = {};
+  // Avant tout merge : un reset invité a pu remettre ces jeux en préparation
+  // sans changer la signature de la ligne distante déjà vue.
+  const localLobbyStartedBeforeMerge = {
+    traitreGame: getState().traitreGame?.lobbyStarted === true,
+    consensusGame: getState().consensusGame?.lobbyStarted === true,
+    clutchGame: getState().clutchGame?.lobbyStarted === true,
+  };
   const prevDmPhase = getState().dilemmaGame?.phase ?? null;
   const prevDmRoundIdx = getState().dilemmaGame?.roundIdx ?? null;
   const prevWaPhase = getState().wrongAnswerGame?.phase ?? null;
@@ -4023,7 +4058,18 @@ export function applyRemoteSession(row, { epoch = null } = {}) {
   // `state`) et aucune transition locale en retard : l'état local reflète déjà le
   // distant. On évite alors la réécriture localStorage (JSON.stringify de tout le state)
   // qui, multipliée par chaque push/poll, était un coût CPU inutile.
-  if (Object.keys(patch).length && (!sigUnchanged || playChanged)) saveStatePatch(patch);
+  // Exception : local remis en préparation alors que la fusion est une partie active.
+  if (
+    shouldPersistAppliedRemotePatch({
+      hasPatch: Object.keys(patch).length > 0,
+      sigUnchanged,
+      playChanged,
+      localStarted: localLobbyStartedBeforeMerge,
+      patch,
+    })
+  ) {
+    saveStatePatch(patch);
+  }
 
   if (tierNightPlayChanged || tierNightLivePlayChanged) {
     flushPendingRemoteGameScoreSession();
