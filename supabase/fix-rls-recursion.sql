@@ -30,9 +30,14 @@ $$;
 grant execute on function public.is_lobby_member(uuid) to authenticated;
 grant execute on function public.get_lobby_member_count(uuid) to authenticated;
 
+-- auth.uid() = user_id : INSERT ... RETURNING du join.
+-- is_lobby_member (STABLE) ne voit pas la ligne dans la même commande.
 drop policy if exists "members_select_same_lobby" on public.lobby_members;
 create policy "members_select_same_lobby" on public.lobby_members
-for select using (public.is_lobby_member(lobby_id));
+for select using (
+  auth.uid() = user_id
+  or public.is_lobby_member(lobby_id)
+);
 
 -- L'hôte doit voir son lobby avant d'être dans lobby_members (insert + .select())
 drop policy if exists "lobbies_select_host" on public.lobbies;

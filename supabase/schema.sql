@@ -264,9 +264,13 @@ drop policy if exists "lobbies_delete_host" on public.lobbies;
 create policy "lobbies_delete_host" on public.lobbies
   for delete using (auth.uid() = host_id);
 
+-- auth.uid() = user_id : le join client fait INSERT ... RETURNING.
+-- is_lobby_member est STABLE et ne voit pas la ligne dans la même commande,
+-- donc RETURNING échouait pour le joueur qui n'était pas encore membre.
 drop policy if exists "members_select_same_lobby" on public.lobby_members;
 create policy "members_select_same_lobby" on public.lobby_members for select using (
-  public.is_lobby_member(lobby_id)
+  auth.uid() = user_id
+  or public.is_lobby_member(lobby_id)
 );
 
 drop policy if exists "members_insert_self" on public.lobby_members;
