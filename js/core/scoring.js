@@ -6,11 +6,7 @@ import { filterVoterVotes, computeRoundMetrics } from "./truthMeterSession.js";
 import { countDilemmaResults } from "./dilemmaSession.js";
 import { DILEMMA_POINTS_MAJORITY_WIN, DILEMMA_POINTS_TIE } from "../../data/dilemma.js";
 import { HOT_TAKE_POINTS_TIE } from "../../data/hotTakes.js";
-import {
-  TRUTH_METER_BLUFF_GAP,
-  TRUTH_METER_CONSENSUS_GAP,
-  TRUTH_METER_CLOSE_DISTANCE,
-} from "../../data/truthMeter.js";
+import { TRUTH_METER_BLUFF_GAP } from "../../data/truthMeter.js";
 import { addScore, bumpPlayerStat } from "./state.js";
 import { getMajorityOption } from "./hotTakeSession.js";
 
@@ -133,7 +129,7 @@ export function awardWrongAnswerRound(
   return award;
 }
 
-/** TruthMeter : au plus un bonus par joueur et par manche. */
+/** TruthMeter : auteur +15 si écart ≥ 20, sinon 0. Plus proches de la moyenne : +10 chacun. */
 export function awardTruthMeterRound(votes, author, authorEstimate) {
   const voterVotes = filterVoterVotes(votes, author);
   const { groupAvg, gap, variance } = computeRoundMetrics(
@@ -161,11 +157,6 @@ export function awardTruthMeterRound(votes, author, authorEstimate) {
     summary.bluffWin = true;
     summary.authorPoints = EVENING_POINTS.BONUS;
     summary.deltas[author] = EVENING_POINTS.BONUS;
-  } else if (gap <= TRUTH_METER_CONSENSUS_GAP) {
-    addScore(author, EVENING_POINTS.WIN);
-    summary.consensus = true;
-    summary.authorPoints = EVENING_POINTS.WIN;
-    summary.deltas[author] = EVENING_POINTS.WIN;
   }
 
   let closest = [];
@@ -181,20 +172,14 @@ export function awardTruthMeterRound(votes, author, authorEstimate) {
   });
 
   if (closest.length) {
-    const pts =
-      bestDist <= TRUTH_METER_CLOSE_DISTANCE ? EVENING_POINTS.BONUS : EVENING_POINTS.WIN;
     closest.forEach((name) => {
-      addScore(name, pts);
-      summary.deltas[name] = (summary.deltas[name] || 0) + pts;
-      if (bestDist <= TRUTH_METER_CLOSE_DISTANCE) {
-        summary.closeVoters.push(name);
-      }
-      if (pts === EVENING_POINTS.BONUS) {
-        bumpPlayerStat(name, "truthMeterMindReaderWins", 1);
-      }
+      addScore(name, EVENING_POINTS.WIN);
+      summary.deltas[name] = (summary.deltas[name] || 0) + EVENING_POINTS.WIN;
+      bumpPlayerStat(name, "truthMeterMindReaderWins", 1);
     });
+    summary.closeVoters = closest;
     summary.mindReader = closest[0];
-    summary.voterPoints = pts;
+    summary.voterPoints = EVENING_POINTS.WIN;
   }
 
   return summary;
@@ -258,8 +243,8 @@ export function awardGuessLieRound({ correct, liarName, liarBonus }) {
   };
 }
 
-/** Mensonge non trouvé par la majorité des détectives → bonus menteur. */
+/** Le menteur gagne s'il trompe au moins la moitié des votants. Personne n'a voté : pas de bonus. */
 export function guessLieLiarWins(correctCount, voterCount) {
-  if (voterCount <= 0) return true;
-  return correctCount * 2 < voterCount;
+  if (voterCount <= 0) return false;
+  return correctCount * 2 <= voterCount;
 }

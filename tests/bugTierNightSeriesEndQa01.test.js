@@ -507,6 +507,8 @@ describe("bugTierNightSeriesEndQa01 - explication scoring + quit", () => {
     assert.match(between, /tierNightBetweenScoringExplainText/);
     assert.match(between, /tier-between-scoring-explain/);
     assert.match(tierNightPointsHintText({ reverse: false }), /\+15/);
+    assert.match(tierNightPointsHintText({ reverse: false }), /moyenne arrondie/);
+    assert.match(tierNightBetweenScoringExplainText({ reverse: false }), /moyenne arrondie/);
   });
 
   it("explication absente de Rank Live", () => {

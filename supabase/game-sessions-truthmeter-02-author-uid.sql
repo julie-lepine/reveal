@@ -166,14 +166,13 @@ declare
   v_pts int;
   v_deltas jsonb := '{}'::jsonb;
   v_mind text;
+  v_close jsonb := '[]'::jsonb;
   v_author_pts int := 0;
   v_voter_pts int := 0;
   v_bluff boolean := false;
   v_consensus boolean := false;
   v_last jsonb;
-  v_const_bluff constant int := 40;
-  v_const_consensus constant int := 12;
-  v_const_close constant int := 12;
+  v_const_bluff constant int := 20;
   v_const_bonus constant int := 15;
   v_const_win constant int := 10;
 begin
@@ -218,28 +217,17 @@ begin
 
   v_gap := abs(round(v_est)::int - v_avg);
 
-  if v_author_uid is not null then
-    if v_gap >= v_const_bluff then
-      v_bluff := true;
-      v_author_pts := v_const_bonus;
-      v_deltas := jsonb_set(v_deltas, array[v_author_uid], to_jsonb(v_const_bonus), true);
-      v_match := jsonb_set(
-        v_match,
-        array[v_author_uid],
-        to_jsonb(coalesce((v_match ->> v_author_uid)::numeric, 0) + v_const_bonus),
-        true
-      );
-    elsif v_gap <= v_const_consensus then
-      v_consensus := true;
-      v_author_pts := v_const_win;
-      v_deltas := jsonb_set(v_deltas, array[v_author_uid], to_jsonb(v_const_win), true);
-      v_match := jsonb_set(
-        v_match,
-        array[v_author_uid],
-        to_jsonb(coalesce((v_match ->> v_author_uid)::numeric, 0) + v_const_win),
-        true
-      );
-    end if;
+  -- Auteur : +15 si écart >= 20, sinon 0
+  if v_author_uid is not null and v_gap >= v_const_bluff then
+    v_bluff := true;
+    v_author_pts := v_const_bonus;
+    v_deltas := jsonb_set(v_deltas, array[v_author_uid], to_jsonb(v_const_bonus), true);
+    v_match := jsonb_set(
+      v_match,
+      array[v_author_uid],
+      to_jsonb(coalesce((v_match ->> v_author_uid)::numeric, 0) + v_const_bonus),
+      true
+    );
   end if;
 
   select min(abs(x.val - v_avg)) into v_best_dist
@@ -251,11 +239,7 @@ begin
   ) x;
 
   if v_best_dist is not null then
-    if v_best_dist <= v_const_close then
-      v_pts := v_const_bonus;
-    else
-      v_pts := v_const_win;
-    end if;
+    v_pts := v_const_win;
     v_voter_pts := v_pts;
 
     for v_rec in
@@ -269,6 +253,7 @@ begin
       if v_mind is null then
         v_mind := v_rec.uid;
       end if;
+      v_close := v_close || jsonb_build_array(v_rec.uid);
       v_deltas := jsonb_set(
         v_deltas,
         array[v_rec.uid],
@@ -291,6 +276,7 @@ begin
       'bluffWin', v_bluff,
       'consensus', v_consensus,
       'mindReader', to_jsonb(v_mind),
+      'closeVoters', v_close,
       'gap', v_gap,
       'groupAvg', v_avg,
       'authorPoints', v_author_pts,

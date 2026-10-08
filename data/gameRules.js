@@ -159,11 +159,11 @@ export const GAME_RULES = {
       "On compare l'estimation de l'auteur et la moyenne du groupe.",
     ],
     points: [
-      "L'auteur : +15 si le groupe se trompe loin de son estimation (bluff réussi), +10 si le groupe tombe juste.",
-      "Le joueur le plus proche de la moyenne du groupe : +15 pts, sinon +10 pts.",
+      "L'auteur : +15 si l'écart avec la moyenne du groupe est d'au moins 20. En dessous, 0.",
+      "Le ou les joueurs les plus proches de la moyenne : +10 pts chacun.",
     ],
     exemple:
-      "Léa affirme un chiffre. Le groupe vise très loin de son estimation → Léa a bluffé : +15.",
+      "Léa estime 80. Le groupe tourne autour de 40 (écart 40) → Léa +15. Celui qui a visé le plus près de 40 prend +10.",
   },
 
   tiernight: {
@@ -177,8 +177,10 @@ export const GAME_RULES = {
       "On révèle le classement du groupe, l'item le plus clivant et le board.",
     ],
     points: [
-      "Chaque élément placé au même tier que le consensus du groupe : +15 pts. À un tier d'écart : +10. Au-delà : 0.",
-      "Bonus Outsider : l'avis le plus tranché sur l'item le plus clivant rapporte +15 pts.",
+      "Chaque élément : +15 s'il est sur le même tier que le groupe, +10 à un tier d'écart, 0 au-delà.",
+      "Le score de la manche est la moyenne arrondie de ces points, pas leur somme.",
+      "Bonus Outsider : +5 pour l'avis le plus tranché sur l'item le plus clivant.",
+      "Mode À contre-courant : +15 à 3 tiers d'écart ou plus, +10 à 2 tiers, 0 sinon. Même moyenne.",
       "Rank live : votes simultanés item par item, puis consensus médian du groupe.",
     ],
     exemple:
@@ -225,7 +227,7 @@ export const GAME_RULES = {
       "+10 pts si tu as été éliminé à tort alors que tu avais voté pour le fake (bonne intuition).",
     ],
     exemple:
-      "Mot majorité « Android », fake « iOS ». Tour 1 : indices oraux. Tour 2 : vote - le fake survit (+10). Tour 3 : vote - Léa et Tom éliminent le fake : Léa et Tom +25 chacun (+10 survivant +15 détective), les autres survivants +10, le fake garde +20 pour ses 2 votes survécus.",
+      "Mot majorité « Android », fake « iOS ». Tour 1 : indices oraux. Tour 2 : vote - le fake survit (+10). Tour 3 : vote - Léa et Tom éliminent le fake : Léa et Tom +25 chacun (+10 survivant +15 détective), les autres survivants +10, le fake garde +10 pour son vote survécu.",
   },
 };
 

@@ -1041,6 +1041,7 @@ export function renameLocalPlayer(newName) {
     if (tm.lastRound) {
       tm.lastRound = migrateLastRoundNameMaps(tm.lastRound, oldName, trimmed, {
         nameScalars: ["mindReader"],
+        nameArrays: ["closeVoters"],
       });
     }
   }

@@ -442,7 +442,7 @@ export function applyTruthMeterEveningFromLastRound(session = getTruthMeterSessi
   if (lastRound.bluffWin && author) {
     bumpPlayerStat(author, "truthMeterBluffWins", 1);
   }
-  if (lastRound.voterPoints === EVENING_POINTS.BONUS) {
+  if (lastRound.voterPoints === EVENING_POINTS.WIN) {
     Object.entries(lastRound.deltas).forEach(([name, pts]) => {
       if (author && name === author) return;
       if (Number(pts) > 0) bumpPlayerStat(name, "truthMeterMindReaderWins", 1);

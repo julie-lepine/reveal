@@ -77,9 +77,9 @@ export function buildTierNightScoreBreakdown(
 /** Libellé court pour l'écran de jeu selon le modificateur. */
 export function tierNightPointsHintText({ reverse = false } = {}) {
   if (reverse) {
-    return "Points : +15 si tu t'éloignes fort du groupe, +10 si modérément (à contre-courant).";
+    return "Points : +15 à 3 tiers ou plus, +10 à 2 tiers, puis moyenne arrondie.";
   }
-  return "Points : +15 même tier que le groupe, +10 à 1 tier d'écart · bonus +5 sur l'item le plus clivant.";
+  return "Points : +15 sur le même tier, +10 à 1 tier d'écart, puis moyenne arrondie. Bonus +5 sur l'item le plus clivant.";
 }
 
 /**
@@ -88,7 +88,7 @@ export function tierNightPointsHintText({ reverse = false } = {}) {
  */
 export function tierNightBetweenScoringExplainText({ reverse = false } = {}) {
   if (reverse) {
-    return "Plus ton classement s’éloigne du consensus du groupe, plus tu marques de points.";
+    return "Plus ton classement s’éloigne du consensus du groupe, plus tu marques. Le score est la moyenne arrondie.";
   }
-  return "Plus ton classement se rapproche du classement du groupe, plus tu marques de points.";
+  return "Plus ton classement se rapproche du classement du groupe, plus tu marques. Le score est la moyenne arrondie.";
 }

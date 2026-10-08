@@ -77,7 +77,7 @@ export const EVENT_SKINS = {
 };
 
 /** @type {EventSkinId | "off" | null} */
-export const EVENT_SKIN_OVERRIDE = "off";
+export const EVENT_SKIN_OVERRIDE = "null";
 
 export function toLocalDateKey(date = new Date()) {
   const y = date.getFullYear();

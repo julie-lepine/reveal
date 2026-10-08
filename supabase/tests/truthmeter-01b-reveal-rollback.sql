@@ -29,8 +29,8 @@ BEGIN
     (v_lobby, v_guest, 'Guest', false, now()),
     (v_lobby, v_guest2, 'Guest2', false, now());
 
-  -- Affirmation Host, estimate 50 ; votes Guest=40, Guest2=60 → avg=50, gap=0 → consensus auteur +10
-  -- Closest: both dist 10 <= 12 → +15 chacun
+  -- Affirmation Host, estimate 50 ; votes Guest=40, Guest2=60 → avg=50, gap=0 → auteur 0
+  -- Les deux votes sont à égale distance de la moyenne → +10 chacun
   INSERT INTO public.game_sessions (lobby_id, game_id, screen, host_id, state)
   VALUES (
     v_lobby, 'truthmeter', 'truthmeter', v_host,
@@ -64,11 +64,12 @@ BEGIN
   IF (v_tm #>> '{lastRound,groupAvg}')::int IS DISTINCT FROM 50 THEN
     RAISE EXCEPTION 'groupAvg attendu 50';
   END IF;
-  IF (v_tm #>> '{lastRound,authorPoints}')::int IS DISTINCT FROM 10 THEN
-    RAISE EXCEPTION 'author consensus +10 attendu';
+  -- gap = 0 → auteur 0 ; les deux votes sont à égale distance → +10 chacun
+  IF (v_tm #>> '{lastRound,authorPoints}')::int IS DISTINCT FROM 0 THEN
+    RAISE EXCEPTION 'auteur écart 0 : 0 pt attendu, got %', v_tm #>> '{lastRound,authorPoints}';
   END IF;
-  IF (v_tm #>> '{lastRound,voterPoints}')::int IS DISTINCT FROM 15 THEN
-    RAISE EXCEPTION 'voter close +15 attendu';
+  IF (v_tm #>> '{lastRound,voterPoints}')::int IS DISTINCT FROM 10 THEN
+    RAISE EXCEPTION 'plus proches +10 attendu, got %', v_tm #>> '{lastRound,voterPoints}';
   END IF;
   v_scores_before := v_tm -> 'matchScores';
 

@@ -2258,6 +2258,11 @@ export function truthMeterToRemote(session) {
             ? playerKeyToRemoteUid(session.lastRound.mindReader) ||
               session.lastRound.mindReader
             : null,
+          closeVoters: Array.isArray(session.lastRound.closeVoters)
+            ? session.lastRound.closeVoters
+                .map((name) => playerKeyToRemoteUid(name) || name)
+                .filter(Boolean)
+            : [],
           deltas: scoresToRemote(session.lastRound.deltas || {}),
         }
       : null,
@@ -2299,6 +2304,11 @@ export function truthMeterFromRemote(remote) {
           mindReader: remote.lastRound.mindReader
             ? nameForUserId(remote.lastRound.mindReader) || remote.lastRound.mindReader
             : null,
+          closeVoters: Array.isArray(remote.lastRound.closeVoters)
+            ? remote.lastRound.closeVoters
+                .map((key) => nameForUserId(key) || key)
+                .filter(Boolean)
+            : [],
           deltas: scoresFromRemote(remote.lastRound.deltas || {}),
         }
       : null,

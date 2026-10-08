@@ -5,7 +5,6 @@ import {
   TRUTH_METER_REVEAL_HOLD_SEC,
   TRUTH_METER_INTERMISSION_SEC,
   TRUTH_METER_BLUFF_GAP,
-  TRUTH_METER_CONSENSUS_GAP,
   TRUTH_METER_EXAMPLES,
 } from "../../data/truthMeter.js";
 import {
@@ -391,14 +390,21 @@ export function mountTruthMeter(app) {
       </div>`;
   }
 
+  function closestVoterNames(metrics) {
+    if (Array.isArray(metrics.closeVoters) && metrics.closeVoters.length) {
+      return metrics.closeVoters.filter(Boolean);
+    }
+    return metrics.mindReader ? [metrics.mindReader] : [];
+  }
+
   function revealAwardLinesHtml(metrics, aff) {
     const awardLine = metrics.bluffWin
       ? `<p class="hint">🎭 Bluff réussi ! Écart <strong>${metrics.gap}</strong> - <strong>${escapeHtml(aff.author)}</strong> +${EVENING_POINTS.BONUS} pts</p>`
-      : metrics.consensus
-        ? `<p class="hint">🤝 Consensus - <strong>${escapeHtml(aff.author)}</strong> +${EVENING_POINTS.WIN} pts (écart ${metrics.gap}).</p>`
-        : `<p class="hint">Écart auteur/groupe : <strong>${metrics.gap}</strong> pts</p>`;
-    const mindLine = metrics.mindReader
-      ? `<p class="hint">🧠 Le plus proche : <strong>${escapeHtml(metrics.mindReader)}</strong> +${metrics.voterPoints || EVENING_POINTS.WIN} pts</p>`
+      : `<p class="hint">Écart avec le groupe : <strong>${metrics.gap}</strong></p>`;
+    const names = closestVoterNames(metrics);
+    const label = names.length > 1 ? "Les plus proches" : "Le plus proche";
+    const mindLine = names.length
+      ? `<p class="hint">🧠 ${label} : <strong>${names.map((name) => escapeHtml(name)).join(", ")}</strong> +${EVENING_POINTS.WIN} pts</p>`
       : "";
     return awardLine + mindLine;
   }
@@ -507,6 +513,7 @@ export function mountTruthMeter(app) {
       bluffWin: Boolean(award.bluffWin),
       consensus: Boolean(award.consensus),
       mindReader: award.mindReader || null,
+      closeVoters: award.closeVoters || [],
       gap: award.gap,
       groupAvg: award.groupAvg,
       authorPoints: award.authorPoints || 0,
@@ -1073,20 +1080,24 @@ export function mountTruthMeter(app) {
   function buildRevealMetrics(votesToShow, authorName) {
     const m = computeRoundMetrics(votesToShow, authorEstimate, authorName);
     const voterVotes = filterVoterVotes(votesToShow, authorName);
-    let mindReader = null;
+    let closeVoters = [];
     let bestDist = Infinity;
     Object.entries(voterVotes).forEach(([name, v]) => {
       const d = Math.abs(v - m.groupAvg);
-      if (d < bestDist) {
+      if (d < bestDist - 1e-9) {
         bestDist = d;
-        mindReader = name;
+        closeVoters = [name];
+      } else if (Math.abs(d - bestDist) < 1e-9) {
+        closeVoters.push(name);
       }
     });
     return {
       ...m,
       bluffWin: m.gap >= TRUTH_METER_BLUFF_GAP,
-      consensus: m.gap <= TRUTH_METER_CONSENSUS_GAP,
-      mindReader,
+      consensus: false,
+      mindReader: closeVoters[0] || null,
+      closeVoters,
+      voterPoints: closeVoters.length ? EVENING_POINTS.WIN : 0,
     };
   }
 
