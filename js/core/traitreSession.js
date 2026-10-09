@@ -24,10 +24,13 @@ import {
   requirePlayerUid,
   syncTraitreSession,
   traitreToRemote,
+  userIdForName,
 } from "./gameSync.js";
 import { patchGameStateWithFeedback } from "./patchGameStateFeedback.js";
 import { hostDistributeTraitreRoles } from "./traitrePrivate.js";
 import { launchGameWithSync, commitHostGamePlay, commitPrepReadyToggle } from "./mpLaunch.js";
+import { withPatchTimeout } from "./withPatchTimeout.js";
+import { SYNC_PATCH_TIMEOUT_MS } from "../config/syncConfig.js";
 import { normalizeKeyedVotes, traitreKnownImpostorFlag } from "./sessionMerge.js";
 import {
   computeOptimisticMapEntryApply,
@@ -223,6 +226,142 @@ async function distributeTraitreRolesForHost(session) {
   );
 }
 
+/** Jeton interne : ne pas le confondre avec un message d'erreur Supabase. */
+const TRAITRE_ROLE_DISTRIBUTION_TIMEOUT = "TRAITRE_ROLE_DISTRIBUTION_TIMEOUT";
+
+const TRAITRE_ROLE_INCOMPLETE_MESSAGE =
+  "La distribution des rôles n'a pas abouti. La manche n'a pas démarré.";
+
+const TRAITRE_ROLE_TIMEOUT_MESSAGE =
+  "La distribution des rôles n'a pas été confirmée à temps. La manche n'a pas démarré.";
+
+function traitreLaunchRefusal(reason) {
+  return { ok: false, reason };
+}
+
+async function alertTraitreLaunchRefusal(message) {
+  const { showAppAlert } = await import("./dialog.js");
+  await showAppAlert(message, { title: "Spot the fake", icon: "🎭" });
+}
+
+function repeatedAliveNames(names) {
+  const counts = new Map();
+  for (const name of names) {
+    counts.set(name, (counts.get(name) || 0) + 1);
+  }
+  return [...counts.entries()].filter(([, count]) => count > 1).map(([name]) => name);
+}
+
+/**
+ * Même résolution que l'écriture : `userIdForName` reprend le userId du
+ * participant, puis l'uid local si le pseudo est celui du joueur de cet appareil.
+ * Les pseudos du lobby sont uniques (index insensible à la casse).
+ */
+function inspectTraitreAliveIdentities(names) {
+  if (!Array.isArray(names) || names.length === 0) {
+    return { ok: false, reason: "invalid_roster" };
+  }
+  if (names.some((name) => typeof name !== "string" || name.trim() === "")) {
+    return { ok: false, reason: "invalid_roster" };
+  }
+  const duplicateNames = repeatedAliveNames(names);
+  if (duplicateNames.length) {
+    return { ok: false, reason: "duplicate_names", names: duplicateNames };
+  }
+  const missing = [];
+  const namesByUid = new Map();
+  for (const name of names) {
+    const uid = userIdForName(name);
+    if (!uid) {
+      missing.push(name);
+      continue;
+    }
+    const group = namesByUid.get(uid) || [];
+    group.push(name);
+    namesByUid.set(uid, group);
+  }
+  if (missing.length) {
+    return { ok: false, reason: "missing_uid", names: missing };
+  }
+  const shared = [];
+  for (const group of namesByUid.values()) {
+    if (group.length > 1) shared.push(...group);
+  }
+  if (shared.length) {
+    return { ok: false, reason: "duplicate_uid", names: shared };
+  }
+  return { ok: true };
+}
+
+function traitreIdentityRefusalMessage(check) {
+  const listed = (check.names || []).join(", ");
+  if (check.reason === "missing_uid") {
+    return `Ces joueurs n'ont pas d'identité synchronisée : ${listed}. La manche n'a pas démarré.`;
+  }
+  return `Identité ambiguë pour : ${listed}. La manche n'a pas démarré.`;
+}
+
+function isConfirmedTraitreDistribution(dist, expected) {
+  if (!dist || typeof dist !== "object" || Array.isArray(dist)) return false;
+  if (dist.ok !== true) return false;
+  if (Object.prototype.hasOwnProperty.call(dist, "error") && dist.error != null) return false;
+  if (dist.skippedNames != null && (!Array.isArray(dist.skippedNames) || dist.skippedNames.length > 0)) {
+    return false;
+  }
+  return dist.written === expected;
+}
+
+async function refuseTraitreLaunchIfRolesUnconfirmed(next) {
+  const names = next?.alive;
+  const identity = inspectTraitreAliveIdentities(names);
+  if (!identity.ok) {
+    const message =
+      identity.reason === "missing_uid" ||
+      identity.reason === "duplicate_names" ||
+      identity.reason === "duplicate_uid"
+        ? traitreIdentityRefusalMessage(identity)
+        : TRAITRE_ROLE_INCOMPLETE_MESSAGE;
+    await alertTraitreLaunchRefusal(message);
+    return traitreLaunchRefusal(identity.reason);
+  }
+  if (!names.includes(next.impostorName)) {
+    await alertTraitreLaunchRefusal(TRAITRE_ROLE_INCOMPLETE_MESSAGE);
+    return traitreLaunchRefusal("impostor_not_in_roster");
+  }
+
+  let dist;
+  try {
+    dist = await withPatchTimeout(
+      distributeTraitreRolesForHost(next),
+      SYNC_PATCH_TIMEOUT_MS,
+      TRAITRE_ROLE_DISTRIBUTION_TIMEOUT
+    );
+  } catch (error) {
+    console.warn("REVEAL traitre roles:", error);
+    if (error?.message === TRAITRE_ROLE_DISTRIBUTION_TIMEOUT) {
+      await alertTraitreLaunchRefusal(TRAITRE_ROLE_TIMEOUT_MESSAGE);
+      return traitreLaunchRefusal("timeout");
+    }
+    await alertTraitreLaunchRefusal(TRAITRE_ROLE_INCOMPLETE_MESSAGE);
+    return traitreLaunchRefusal("distribution_failed");
+  }
+
+  if (isConfirmedTraitreDistribution(dist, names.length)) return null;
+
+  if (Array.isArray(dist?.skippedNames) && dist.skippedNames.length > 0) {
+    await alertTraitreLaunchRefusal(
+      traitreIdentityRefusalMessage({ reason: "missing_uid", names: dist.skippedNames })
+    );
+    return traitreLaunchRefusal("missing_uid");
+  }
+  await alertTraitreLaunchRefusal(TRAITRE_ROLE_INCOMPLETE_MESSAGE);
+  return traitreLaunchRefusal(
+    !dist || typeof dist !== "object" || Array.isArray(dist)
+      ? "unreadable_result"
+      : "distribution_incomplete"
+  );
+}
+
 export async function markTraitreLobbyStarted({ rosterNames } = {}) {
   const started = createStartedTraitreSession(rosterNames);
   if (!started.ok) return started;
@@ -233,28 +372,8 @@ export async function markTraitreLobbyStarted({ rosterNames } = {}) {
   };
 
   if (isGameSyncActive() && isLobbyHost()) {
-    try {
-      const dist = await distributeTraitreRolesForHost(next);
-      if (!dist.ok) {
-        const { showAppAlert } = await import("./dialog.js");
-        await showAppAlert(
-          dist.error ||
-            "Impossible d'enregistrer les rôles secrets. Vérifie Supabase (traitre_private).",
-          { title: "Spot the fake", icon: "🎭" }
-        );
-      } else if (dist.error) {
-        const { showAppAlert } = await import("./dialog.js");
-        await showAppAlert(dist.error, { title: "Spot the fake", icon: "⚠️" });
-      }
-    } catch (e) {
-      console.warn("REVEAL traitre roles:", e);
-      const { showAppAlert } = await import("./dialog.js");
-      await showAppAlert(
-        e.message ||
-          "Impossible d'enregistrer les rôles secrets. Vérifie que traitre-private.sql est appliqué sur Supabase.",
-        { title: "Spot the fake", icon: "🎭" }
-      );
-    }
+    const refusal = await refuseTraitreLaunchIfRolesUnconfirmed(next);
+    if (refusal) return refusal;
   }
 
   // L'écho du push fusionne et peint l'écran avant le applyLocal de fin.
