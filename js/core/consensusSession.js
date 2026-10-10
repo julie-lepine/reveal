@@ -149,11 +149,32 @@ export class ConsensusWriteBlockedError extends Error {
 
 let consensusAnswerAttemptId = 0;
 
+/** Écrans Consensus montés pendant le lancement. Pas un bus global. */
+const consensusLaunchEndedListeners = new Set();
+
+export function subscribeConsensusLaunchEnded(listener) {
+  consensusLaunchEndedListeners.add(listener);
+  return () => {
+    consensusLaunchEndedListeners.delete(listener);
+  };
+}
+
+function notifyConsensusLaunchEnded() {
+  [...consensusLaunchEndedListeners].forEach((listener) => {
+    try {
+      listener();
+    } catch (err) {
+      console.warn("Consensus launch ended:", err);
+    }
+  });
+}
+
 export function __resetConsensusWriteGuardForTests() {
   const store = consensusWriteStore();
   store.removeItem(CONSENSUS_WRITE_MARKER_KEY);
   store.removeItem(CONSENSUS_WRITE_ATTEMPT_KEY);
   consensusAnswerAttemptId = 0;
+  consensusLaunchEndedListeners.clear();
 }
 
 export function __getConsensusWriteMarkerForTests() {
@@ -544,12 +565,12 @@ export async function markConsensusLobbyStarted() {
   // peut encore aboutir. Les deux portent l'instantané de départ et peuvent écraser
   // une transition plus récente. Ce ticket ne modifie pas ce retry.
   let reserved = null;
-  if (isGameSyncActive()) {
-    reserved = reserveConsensusServerWrite("lobby-start");
-    if (!reserved.ok) return { ok: false, blocked: true };
-  }
-
   try {
+    if (isGameSyncActive()) {
+      reserved = reserveConsensusServerWrite("lobby-start");
+      if (!reserved.ok) return { ok: false, blocked: true };
+    }
+
     const result = await launchGameWithSync({
       screen: "consensus",
       gameId: "consensus",
@@ -562,6 +583,8 @@ export async function markConsensusLobbyStarted() {
     return { ...result, ok: result.ok !== false, session: next };
   } catch (err) {
     throw err;
+  } finally {
+    if (reserved?.ok) notifyConsensusLaunchEnded();
   }
 }
 

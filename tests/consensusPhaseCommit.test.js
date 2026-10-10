@@ -241,6 +241,158 @@ describe("consensus phase commit guard", () => {
     assert.deepEqual(payload.lastRound, scored.lastRound);
   });
 
+  it("refreshes once a confirmed launch has actually removed the marker", async () => {
+    let blockedDuringLaunch = null;
+    let refreshes = 0;
+    let blockedAtRefresh = null;
+    let patchAtRefresh = 0;
+    let launchAtRefresh = 0;
+    let saveAtRefresh = 0;
+    let answersAtRefresh = null;
+    launchMock.mock.mockImplementation(async () => {
+      blockedDuringLaunch = session.consensusLobbyWriteBlocked();
+      return { ok: true };
+    });
+    const unsubscribe = session.subscribeConsensusLaunchEnded(() => {
+      refreshes += 1;
+      blockedAtRefresh = session.consensusLobbyWriteBlocked();
+      patchAtRefresh = patchMock.mock.callCount();
+      launchAtRefresh = launchMock.mock.callCount();
+      saveAtRefresh = saveStatePatchMock.mock.callCount();
+      answersAtRefresh = state.consensusGame.answers;
+    });
+    try {
+      const result = await session.markConsensusLobbyStarted();
+      assert.equal(result.ok, true);
+      assert.equal(blockedDuringLaunch, true);
+      assert.equal(session.__getConsensusWriteMarkerForTests(), null);
+      assert.equal(refreshes, 1);
+      assert.equal(blockedAtRefresh, false);
+      assert.equal(patchMock.mock.callCount(), 0);
+      assert.equal(syncMock.mock.callCount(), 0);
+      assert.equal(launchMock.mock.callCount(), 1);
+      assert.equal(patchMock.mock.callCount(), patchAtRefresh);
+      assert.equal(launchMock.mock.callCount(), launchAtRefresh);
+      assert.equal(saveStatePatchMock.mock.callCount(), saveAtRefresh);
+      assert.equal(state.consensusGame.answers, answersAtRefresh);
+    } finally {
+      unsubscribe();
+    }
+  });
+
+  it("keeps the block visible when the launch reports a fallback", async () => {
+    launchMock.mock.mockImplementation(async () => ({ ok: false, usedFallback: true }));
+    let blockedAtRefresh = null;
+    const unsubscribe = session.subscribeConsensusLaunchEnded(() => {
+      blockedAtRefresh = session.consensusLobbyWriteBlocked();
+    });
+    try {
+      const result = await session.markConsensusLobbyStarted();
+      assert.equal(result.usedFallback, true);
+      assert.equal(blockedAtRefresh, true);
+      assert.equal(session.__getConsensusWriteMarkerForTests().step, "lobby-start");
+      assert.equal(patchMock.mock.callCount(), 0);
+      assert.equal(launchMock.mock.callCount(), 1);
+    } finally {
+      unsubscribe();
+    }
+  });
+
+  it("keeps the block visible when the launch times out", async () => {
+    launchMock.mock.mockImplementation(async () => {
+      throw new Error("Synchronisation trop longue.");
+    });
+    let refreshes = 0;
+    let blockedAtRefresh = null;
+    const unsubscribe = session.subscribeConsensusLaunchEnded(() => {
+      refreshes += 1;
+      blockedAtRefresh = session.consensusLobbyWriteBlocked();
+    });
+    try {
+      await assert.rejects(() => session.markConsensusLobbyStarted(), /Synchronisation trop longue/);
+      assert.equal(refreshes, 1);
+      assert.equal(blockedAtRefresh, true);
+      assert.equal(session.__getConsensusWriteMarkerForTests().step, "lobby-start");
+      assert.equal(patchMock.mock.callCount(), 0);
+      assert.equal(launchMock.mock.callCount(), 1);
+    } finally {
+      unsubscribe();
+    }
+  });
+
+  it("does not unlock the screen when a newer marker replaced the launch attempt", async () => {
+    launchMock.mock.mockImplementation(async () => {
+      session.__setConsensusWriteMarkerForTests({
+        lobbyId: LOBBY_ID,
+        questionIdx: 0,
+        step: "answer",
+        attemptId: 999,
+      });
+      return { ok: true };
+    });
+    let blockedAtRefresh = null;
+    const unsubscribe = session.subscribeConsensusLaunchEnded(() => {
+      blockedAtRefresh = session.consensusLobbyWriteBlocked();
+    });
+    try {
+      await session.markConsensusLobbyStarted();
+      assert.equal(blockedAtRefresh, true);
+      assert.equal(session.__getConsensusWriteMarkerForTests().attemptId, 999);
+      assert.equal(session.__getConsensusWriteMarkerForTests().step, "answer");
+      assert.equal(patchMock.mock.callCount(), 0);
+    } finally {
+      unsubscribe();
+    }
+  });
+
+  it("stops refreshing after the Consensus screen unsubscribes", async () => {
+    let refreshes = 0;
+    const unsubscribe = session.subscribeConsensusLaunchEnded(() => {
+      refreshes += 1;
+    });
+    unsubscribe();
+    launchMock.mock.mockImplementation(async () => ({ ok: true }));
+    await session.markConsensusLobbyStarted();
+    assert.equal(refreshes, 0);
+    assert.equal(session.__getConsensusWriteMarkerForTests(), null);
+  });
+
+  it("does not signal the screen on a solo launch or a later round", async () => {
+    let refreshes = 0;
+    const unsubscribe = session.subscribeConsensusLaunchEnded(() => {
+      refreshes += 1;
+    });
+    try {
+      isGameSyncActiveMock.mock.mockImplementation(() => false);
+      await session.markConsensusLobbyStarted();
+      assert.equal(refreshes, 0);
+      assert.equal(session.__getConsensusWriteMarkerForTests(), null);
+      isGameSyncActiveMock.mock.mockImplementation(() => true);
+      state.consensusGame = {
+        ...state.consensusGame,
+        phase: "reveal",
+        deck: [
+          { id: "q1", question: "Première" },
+          { id: "q2", question: "Deuxième" },
+        ],
+      };
+      patchMock.mock.mockImplementation(async (body) => {
+        const remote = body.consensus;
+        state.consensusGame = {
+          ...state.consensusGame,
+          questionIdx: remote.questionIdx,
+          phase: remote.phase,
+          currentQuestion: remote.currentQuestion,
+          answers: {},
+        };
+      });
+      await session.startConsensusQuestion(1);
+      assert.equal(refreshes, 0);
+    } finally {
+      unsubscribe();
+    }
+  });
+
   it("keeps the marker when the initial launch reports a fallback retry", async () => {
     launchMock.mock.mockImplementation(async () => ({ ok: false, usedFallback: true }));
     const result = await session.markConsensusLobbyStarted();
@@ -438,6 +590,18 @@ describe("consensus launch and reveal source contracts", () => {
       syncSrc.indexOf("export async function syncDilemmaSession")
     );
     assert.ok(syncFn.indexOf("saveStatePatch") < syncFn.indexOf("patchGameState"));
+    const refresh = gameSrc.slice(
+      gameSrc.indexOf("const unsubscribeLaunchEnded = subscribeConsensusLaunchEnded"),
+      gameSrc.indexOf("if (\n    mp &&\n    canActAsHost()")
+    );
+    assert.match(refresh, /if \(!mount\.isMounted\(\)\) return;/);
+    assert.match(refresh, /if \(!mount\.isCurrentMount\(\)\) return;\s*render\(\);/);
+    assert.equal(refresh.includes("navigate("), false);
+    assert.equal(refresh.includes("saveStatePatch"), false);
+    assert.equal(refresh.includes("patchGameState"), false);
+    assert.equal(refresh.includes("launchGameWithSync"), false);
+    const cleanup = gameSrc.slice(gameSrc.lastIndexOf("return () => {"));
+    assert.match(cleanup, /unsubscribeLaunchEnded\(\)/);
   });
 
   it("executes the three prep launch paths without writing while a marker is set", () => {

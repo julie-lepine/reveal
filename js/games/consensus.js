@@ -3,6 +3,7 @@ import { useConsensusGame } from "../core/useConsensusGame.js";
 import {
   consensusLobbyWriteBlocked,
   guardConsensusServerWrite,
+  subscribeConsensusLaunchEnded,
 } from "../core/consensusSession.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
 import { withClickLock } from "../core/actionLock.js";
@@ -1101,6 +1102,11 @@ export function mountConsensus(app) {
 
   render();
   lastAckedActingHostToken = getActingHostUiRefreshToken();
+  const unsubscribeLaunchEnded = subscribeConsensusLaunchEnded(() => {
+    if (!mount.isMounted()) return;
+    if (!mount.isCurrentMount()) return;
+    render();
+  });
 
   if (
     mp &&
@@ -1117,5 +1123,6 @@ export function mountConsensus(app) {
     clearRevealPending();
     if (renderTimer) clearTimeout(renderTimer);
     unsub();
+    unsubscribeLaunchEnded();
   };
 }
