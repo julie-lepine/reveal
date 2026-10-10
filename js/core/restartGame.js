@@ -31,7 +31,7 @@ import { defaultDrawItPrepSession, drawItToRemote } from "./drawItSession.js";
 import { defaultWrongAnswerPrepSession } from "./wrongAnswerSession.js";
 import { defaultTriviaPrepSession } from "./triviaSession.js";
 import { defaultTruthMeterPrepSession } from "./truthMeterSession.js";
-import { defaultConsensusPrepSession } from "./consensusSession.js";
+import { consensusLobbyWriteBlocked, defaultConsensusPrepSession } from "./consensusSession.js";
 import { defaultDilemmaPrepSession } from "./dilemmaSession.js";
 import { showAppAlert } from "./dialog.js";
 import { escapeHtml } from "./ui.js";
@@ -401,6 +401,7 @@ export async function launchTruthMeterPrep() {
 }
 
 export async function launchConsensusPrep() {
+  if (consensusLobbyWriteBlocked()) return;
   if (!(await assertNoActiveChatRoulette({ sessionGameId: "consensus" }))) return;
   const consensus = defaultConsensusPrepSession();
 

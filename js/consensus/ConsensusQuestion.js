@@ -18,6 +18,8 @@ export function renderConsensusQuestion({
   answerState = "draft",
   answerLocked = false,
   waitingMessage = "",
+  interactionBlocked = false,
+  blockedMessage = "",
 } = {}) {
   if (!question) {
     return `<p class="hint">Aucune question disponible.</p>`;
@@ -25,7 +27,10 @@ export function renderConsensusQuestion({
 
   const clamped = sliderDisplayValue(value);
   const locked = answerLocked || answerState === "submitted";
-  const submittedLabel = locked ? "" : "Déplace le slider puis valide.";
+  const blockedText = interactionBlocked
+    ? blockedMessage || "Une synchro Consensus n'est pas confirmée. La réponse ne peut plus être envoyée."
+    : "";
+  const submittedLabel = blockedText || (locked ? "" : "Déplace le slider puis valide.");
 
   return `
     <div class="card consensus-question-card">
@@ -58,7 +63,7 @@ export function renderConsensusQuestion({
         max="100"
         step="1"
         value="${clamped}"
-        ${locked ? "disabled" : ""}
+        ${locked || interactionBlocked ? "disabled" : ""}
       />
       <div class="consensus-slider__ticks" aria-hidden="true">
         <span>0</span>
@@ -67,12 +72,14 @@ export function renderConsensusQuestion({
         <span>75</span>
         <span>100</span>
       </div>
-      <p class="hint truth-meter__hint">${escapeHtml(waitingMessage)}</p>
+      <p class="hint truth-meter__hint">${escapeHtml(blockedText || waitingMessage)}</p>
     </div>
 
     ${
-      locked
-        ? `<p class="hint btn--spaced">Réponse enregistrée ✓</p>`
-        : `<button type="button" class="btn btn-primary btn--spaced" id="btn-consensus-submit">Valider ma réponse</button>`
+      interactionBlocked
+        ? `<button type="button" class="btn btn-primary btn--spaced" id="btn-consensus-submit" disabled>Valider ma réponse</button>`
+        : locked
+          ? `<p class="hint btn--spaced">Réponse enregistrée ✓</p>`
+          : `<button type="button" class="btn btn-primary btn--spaced" id="btn-consensus-submit">Valider ma réponse</button>`
     }`;
 }

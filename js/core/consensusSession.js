@@ -26,6 +26,11 @@ import {
 import { patchGameStateWithFeedback } from "./patchGameStateFeedback.js";
 import { launchGameWithSync, commitHostGamePlay, commitPrepReadyToggle } from "./mpLaunch.js";
 import {
+  canRollbackOptimisticSubmission,
+  computeOptimisticMapEntryApply,
+  rollbackOptimisticMapEntry,
+} from "./optimisticMapEntry.js";
+import {
   applyConsensusDefaultAnswers as applyConsensusDefaultAnswersCore,
   pickLatestConsensusAnswer,
   clampConsensusValue,
@@ -38,6 +43,151 @@ export { clampConsensusValue, isConsensusAnswerForRound } from "./consensusAnswe
 
 /** Estimation prep uniquement (plus de chrono en partie). */
 const CONSENSUS_ESTIMATE_SEC_PER_QUESTION = 45;
+
+/**
+ * Marqueur d'une écriture Consensus peut-être encore en vol.
+ * Clé distincte du compteur : le compteur survit au retrait du marqueur.
+ * Hors du blob `consensusGame` : jamais envoyé au serveur.
+ */
+const CONSENSUS_WRITE_MARKER_KEY = "reveal.consensus.writeMarker";
+const CONSENSUS_WRITE_ATTEMPT_KEY = "reveal.consensus.writeAttemptHighWater";
+const memoryWriteStore = new Map();
+
+function consensusWriteStore() {
+  try {
+    if (typeof localStorage !== "undefined" && localStorage) return localStorage;
+  } catch {
+    /* mode privé */
+  }
+  return {
+    getItem: (key) => (memoryWriteStore.has(key) ? memoryWriteStore.get(key) : null),
+    setItem: (key, value) => {
+      memoryWriteStore.set(key, String(value));
+    },
+    removeItem: (key) => {
+      memoryWriteStore.delete(key);
+    },
+  };
+}
+
+function readConsensusWriteMarker() {
+  try {
+    const raw = consensusWriteStore().getItem(CONSENSUS_WRITE_MARKER_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") return null;
+    if (!parsed.lobbyId || parsed.attemptId == null) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function writeConsensusWriteMarker(marker) {
+  consensusWriteStore().setItem(CONSENSUS_WRITE_MARKER_KEY, JSON.stringify(marker));
+}
+
+function clearConsensusWriteMarker() {
+  consensusWriteStore().removeItem(CONSENSUS_WRITE_MARKER_KEY);
+}
+
+function currentConsensusLobbyId() {
+  return getState().lobby?.id || null;
+}
+
+/** Vrai tant qu'une écriture Consensus de ce lobby n'a pas été confirmée par sa promesse. */
+export function consensusLobbyWriteBlocked() {
+  if (!isGameSyncActive()) return false;
+  const marker = readConsensusWriteMarker();
+  const lobbyId = currentConsensusLobbyId();
+  if (!marker || !lobbyId) return false;
+  return marker.lobbyId === lobbyId;
+}
+
+function allocateConsensusAttemptId() {
+  const store = consensusWriteStore();
+  const current = Number(store.getItem(CONSENSUS_WRITE_ATTEMPT_KEY));
+  const next = Number.isFinite(current) && current >= 0 ? Math.floor(current) + 1 : 1;
+  store.setItem(CONSENSUS_WRITE_ATTEMPT_KEY, String(next));
+  return next;
+}
+
+/**
+ * Pose le marqueur avant toute requête. Refus si un doute existe déjà pour ce lobby.
+ * Le compteur est incrémenté dans sa propre clé, même si le marqueur est ensuite retiré.
+ */
+function reserveConsensusServerWrite(step) {
+  if (consensusLobbyWriteBlocked()) return { ok: false, blocked: true };
+  const lobbyId = currentConsensusLobbyId();
+  const attemptId = allocateConsensusAttemptId();
+  writeConsensusWriteMarker({
+    lobbyId,
+    questionIdx: getConsensusSession().questionIdx ?? 0,
+    step,
+    attemptId,
+  });
+  return { ok: true, attemptId };
+}
+
+/** Retire le marqueur seulement si c'est encore celui de cette tentative. */
+function settleConsensusServerWrite(attemptId) {
+  const marker = readConsensusWriteMarker();
+  if (!marker) return false;
+  if (marker.attemptId !== attemptId) return false;
+  if (marker.lobbyId !== currentConsensusLobbyId()) return false;
+  clearConsensusWriteMarker();
+  return true;
+}
+
+export class ConsensusWriteBlockedError extends Error {
+  constructor() {
+    super("Écriture Consensus en attente de confirmation.");
+    this.name = "ConsensusWriteBlockedError";
+    this.code = "CONSENSUS_WRITE_BLOCKED";
+  }
+}
+
+let consensusAnswerAttemptId = 0;
+
+export function __resetConsensusWriteGuardForTests() {
+  const store = consensusWriteStore();
+  store.removeItem(CONSENSUS_WRITE_MARKER_KEY);
+  store.removeItem(CONSENSUS_WRITE_ATTEMPT_KEY);
+  consensusAnswerAttemptId = 0;
+}
+
+export function __getConsensusWriteMarkerForTests() {
+  return readConsensusWriteMarker();
+}
+
+export function __getConsensusAttemptHighWaterForTests() {
+  return Number(consensusWriteStore().getItem(CONSENSUS_WRITE_ATTEMPT_KEY)) || 0;
+}
+
+export function __setConsensusWriteMarkerForTests(marker) {
+  writeConsensusWriteMarker(marker);
+}
+
+export function __settleConsensusServerWriteForTests(attemptId) {
+  return settleConsensusServerWrite(attemptId);
+}
+
+export function __setConsensusAnswerAttemptForTests(attemptId) {
+  consensusAnswerAttemptId = attemptId;
+}
+
+/**
+ * Pose le marqueur puis n'appelle settle que si la promesse aboutit avec un résultat.
+ * Un rejet, avec ou sans `code`, conserve le marqueur.
+ */
+export async function guardConsensusServerWrite(step, run) {
+  if (!isGameSyncActive()) return run();
+  const reserved = reserveConsensusServerWrite(step);
+  if (!reserved.ok) throw new ConsensusWriteBlockedError();
+  const result = await run();
+  if (result != null) settleConsensusServerWrite(reserved.attemptId);
+  return result;
+}
 
 function defaultSession() {
   return {
@@ -255,32 +405,63 @@ export function isLocalConsensusHost() {
 
 export async function setConsensusMode(modeId) {
   const session = getConsensusSession();
-  await syncConsensusSession({
-    ...session,
-    selectedModeId: modeId,
-    deck: null,
-  });
+  const next = { ...session, selectedModeId: modeId, deck: null };
+  if (!isGameSyncActive()) {
+    saveStatePatch({ consensusGame: next });
+    return;
+  }
+  const reserved = reserveConsensusServerWrite("prep-mode");
+  if (!reserved.ok) return;
+  try {
+    await syncConsensusSession(next);
+    settleConsensusServerWrite(reserved.attemptId);
+  } catch (err) {
+    throw err;
+  }
 }
 
 export async function setConsensusQuestionCount(questionCount) {
   const session = getConsensusSession();
-  await syncConsensusSession({
-    ...session,
-    questionCount,
-    deck: null,
-  });
+  const next = { ...session, questionCount, deck: null };
+  if (!isGameSyncActive()) {
+    saveStatePatch({ consensusGame: next });
+    return;
+  }
+  const reserved = reserveConsensusServerWrite("prep-count");
+  if (!reserved.ok) return;
+  try {
+    await syncConsensusSession(next);
+    settleConsensusServerWrite(reserved.attemptId);
+  } catch (err) {
+    throw err;
+  }
 }
 
 export async function setConsensusReady(playerName, ready) {
-  await commitPrepReadyToggle({
-    readyKey: playerName,
-    ready,
-    getSession: getConsensusSession,
-    saveLocal: (session) => saveStatePatch({ consensusGame: session }),
-    stateKey: "consensus",
-    gameId: "consensus",
-    screen: "consensus-prep",
-  });
+  const run = () =>
+    commitPrepReadyToggle({
+      readyKey: playerName,
+      ready,
+      getSession: getConsensusSession,
+      saveLocal: (session) => saveStatePatch({ consensusGame: session }),
+      stateKey: "consensus",
+      gameId: "consensus",
+      screen: "consensus-prep",
+    });
+  if (!isGameSyncActive()) {
+    await run();
+    return;
+  }
+  const reserved = reserveConsensusServerWrite("prep-ready");
+  if (!reserved.ok) return;
+  try {
+    const result = await run();
+    if (result && result[playerName] === ready) {
+      settleConsensusServerWrite(reserved.attemptId);
+    }
+  } catch (err) {
+    throw err;
+  }
 }
 
 export async function toggleLocalConsensusReady() {
@@ -351,36 +532,92 @@ export function createStartedConsensusSession(session = getConsensusSession()) {
 }
 
 export async function markConsensusLobbyStarted() {
+  if (isGameSyncActive() && consensusLobbyWriteBlocked()) {
+    return { ok: false, blocked: true };
+  }
   const started = createStartedConsensusSession();
   if (!started.ok) return started;
   const next = started.session;
 
-  const result = await launchGameWithSync({
-    screen: "consensus",
-    gameId: "consensus",
-    mode: "push",
-    applyLocal: () => saveStatePatch({ consensusGame: next }),
-    getRemoteState: () => ({ consensus: consensusToRemote(next) }),
-  });
-  return { ...result, ok: result.ok !== false, session: next };
+  // Risque résiduel, hors de ce marqueur : si ce lancement expire, launchGameWithSync
+  // appelle retryLaunchCommitInBackground (mpLaunch.js) pendant que le premier upsert
+  // peut encore aboutir. Les deux portent l'instantané de départ et peuvent écraser
+  // une transition plus récente. Ce ticket ne modifie pas ce retry.
+  let reserved = null;
+  if (isGameSyncActive()) {
+    reserved = reserveConsensusServerWrite("lobby-start");
+    if (!reserved.ok) return { ok: false, blocked: true };
+  }
+
+  try {
+    const result = await launchGameWithSync({
+      screen: "consensus",
+      gameId: "consensus",
+      mode: "push",
+      applyLocal: () => saveStatePatch({ consensusGame: next }),
+      getRemoteState: () => ({ consensus: consensusToRemote(next) }),
+    });
+    const confirmed = result?.ok === true && !result?.usedFallback;
+    if (reserved && confirmed) settleConsensusServerWrite(reserved.attemptId);
+    return { ...result, ok: result.ok !== false, session: next };
+  } catch (err) {
+    throw err;
+  }
+}
+
+function confirmedConsensusQuestion(prepared, live) {
+  if (!live || !prepared) return false;
+  if ((live.questionIdx ?? 0) !== (prepared.questionIdx ?? 0)) return false;
+  return live.phase === "question";
 }
 
 export async function startConsensusQuestion(questionIdx) {
-  const next = buildQuestionStartPatch(getConsensusSession(), questionIdx);
-  await syncConsensusSession(next);
-  return next;
+  const confirmed = getConsensusSession();
+  const next = buildQuestionStartPatch(confirmed, questionIdx);
+  if (!isGameSyncActive()) {
+    await syncConsensusSession(next);
+    return next;
+  }
+  const baselineIdx = confirmed.questionIdx ?? 0;
+  const baselinePhase = confirmed.phase;
+  const reserved = reserveConsensusServerWrite("next-question");
+  if (!reserved.ok) throw new ConsensusWriteBlockedError();
+  const beforeSend = getConsensusSession();
+  if ((beforeSend.questionIdx ?? 0) !== baselineIdx || beforeSend.phase !== baselinePhase) {
+    return beforeSend;
+  }
+  try {
+    await patchGameState({ consensus: consensusToRemote(next) }, CONSENSUS_MP_PATCH_OPTS);
+    const live = getConsensusSession();
+    if (!confirmedConsensusQuestion(next, live)) return live;
+    settleConsensusServerWrite(reserved.attemptId);
+    return live;
+  } catch (err) {
+    throw err;
+  }
 }
 
 export async function commitConsensusPlay(patch, { screen } = {}) {
-  return commitHostGamePlay({
-    patch,
-    gameId: "consensus",
-    screen: screen || "consensus",
-    stateKey: "consensus",
-    getSession: getConsensusSession,
-    saveLocal: (session) => saveStatePatch({ consensusGame: session }),
-    toRemote: consensusToRemote,
-  });
+  const run = () =>
+    commitHostGamePlay({
+      patch,
+      gameId: "consensus",
+      screen: screen || "consensus",
+      stateKey: "consensus",
+      getSession: getConsensusSession,
+      saveLocal: (session) => saveStatePatch({ consensusGame: session }),
+      toRemote: consensusToRemote,
+    });
+  if (!isGameSyncActive() || !canActAsHost()) return run();
+  const reserved = reserveConsensusServerWrite("play");
+  if (!reserved.ok) throw new ConsensusWriteBlockedError();
+  try {
+    const result = await run();
+    settleConsensusServerWrite(reserved.attemptId);
+    return result;
+  } catch (err) {
+    throw err;
+  }
 }
 
 const CONSENSUS_MP_PATCH_OPTS = {
@@ -392,22 +629,43 @@ const CONSENSUS_MP_PATCH_OPTS = {
 /** MP : patch phase seule (reveal-pending) - évite le blob complet. */
 export async function commitConsensusPhase(phase) {
   const session = { ...getConsensusSession(), phase };
-  saveStatePatch({ consensusGame: session });
-  if (!isGameSyncActive() || !canActAsHost()) return session;
-  await patchGameState({ consensus: { phase } }, CONSENSUS_MP_PATCH_OPTS);
-  return session;
+  if (!isGameSyncActive()) {
+    saveStatePatch({ consensusGame: session });
+    return session;
+  }
+  if (!canActAsHost()) return getConsensusSession();
+  const reserved = reserveConsensusServerWrite(
+    phase === "reveal-pending" ? "reveal-pending" : `phase:${phase}`
+  );
+  if (!reserved.ok) throw new ConsensusWriteBlockedError();
+  try {
+    await patchGameState({ consensus: { phase } }, CONSENSUS_MP_PATCH_OPTS);
+    settleConsensusServerWrite(reserved.attemptId);
+    return getConsensusSession();
+  } catch (err) {
+    throw err;
+  }
 }
 
-/** MP : patch révélation (scores + réponses imputées, sans deck). */
+/** MP : patch révélation (scores + réponses imputées, sans deck ni currentQuestion). */
 export async function commitConsensusReveal(scoredSession) {
   const revealSession = { ...scoredSession, phase: "reveal" };
-  saveStatePatch({ consensusGame: revealSession });
-  if (!isGameSyncActive() || !canActAsHost()) return revealSession;
-  await patchGameState(
-    { consensus: consensusRevealToRemote(revealSession) },
-    CONSENSUS_MP_PATCH_OPTS
-  );
-  return revealSession;
+  if (!isGameSyncActive()) {
+    saveStatePatch({ consensusGame: revealSession });
+    return revealSession;
+  }
+  if (!canActAsHost()) return getConsensusSession();
+  const reserved = reserveConsensusServerWrite("reveal");
+  if (!reserved.ok) throw new ConsensusWriteBlockedError();
+  const remote = consensusRevealToRemote(revealSession);
+  delete remote.currentQuestion;
+  try {
+    await patchGameState({ consensus: remote }, CONSENSUS_MP_PATCH_OPTS);
+    settleConsensusServerWrite(reserved.attemptId);
+    return getConsensusSession();
+  } catch (err) {
+    throw err;
+  }
 }
 
 export async function commitConsensusAnswer(value, { submitted = false } = {}) {
@@ -425,25 +683,62 @@ export async function commitConsensusAnswer(value, { submitted = false } = {}) {
     questionIdx,
     imputed: false,
   };
-  const nextAnswers = stripAnswersForRound(session.answers || {}, questionIdx);
-  nextAnswers[localName] = nextAnswer;
-  saveStatePatch({ consensusGame: { ...session, answers: nextAnswers } });
-  if (!isGameSyncActive()) return nextAnswer;
-  const uid = requireLocalParticipantUid();
-  await patchGameStateWithFeedback({
-    consensus: {
-      answers: {
-        [uid]: {
-          value: nextAnswer.value,
-          timestamp: nextAnswer.timestamp,
-          submittedAt: nextAnswer.submittedAt,
-          questionIdx: nextAnswer.questionIdx,
-          imputed: nextAnswer.imputed,
+  const baseAnswers = stripAnswersForRound(session.answers || {}, questionIdx);
+  const apply = computeOptimisticMapEntryApply({
+    map: baseAnswers,
+    key: localName,
+    value: nextAnswer,
+  });
+  if (!isGameSyncActive()) {
+    saveStatePatch({ consensusGame: { ...session, answers: apply.nextMap } });
+    return nextAnswer;
+  }
+  if (consensusLobbyWriteBlocked()) throw new ConsensusWriteBlockedError();
+  const reserved = reserveConsensusServerWrite("answer");
+  if (!reserved.ok) throw new ConsensusWriteBlockedError();
+  const answerAttemptId = ++consensusAnswerAttemptId;
+  const captured = { phase: session.phase, questionIdx };
+  saveStatePatch({ consensusGame: { ...session, answers: apply.nextMap } });
+  try {
+    const uid = requireLocalParticipantUid();
+    await patchGameStateWithFeedback({
+      consensus: {
+        answers: {
+          [uid]: {
+            value: nextAnswer.value,
+            timestamp: nextAnswer.timestamp,
+            submittedAt: nextAnswer.submittedAt,
+            questionIdx: nextAnswer.questionIdx,
+            imputed: nextAnswer.imputed,
+          },
         },
       },
-    },
-  });
-  return nextAnswer;
+    });
+    settleConsensusServerWrite(reserved.attemptId);
+    return nextAnswer;
+  } catch (err) {
+    const live = getConsensusSession();
+    if (
+      canRollbackOptimisticSubmission(
+        { phase: captured.phase, roundIdx: captured.questionIdx },
+        { phase: live.phase, roundIdx: live.questionIdx ?? 0 }
+      )
+    ) {
+      const rolled = rollbackOptimisticMapEntry({
+        currentMap: live.answers,
+        key: localName,
+        hadPreviousValue: apply.hadPreviousValue,
+        previousValue: apply.previousValue,
+        optimisticValue: apply.optimisticValue,
+        attemptId: answerAttemptId,
+        currentAttemptId: consensusAnswerAttemptId,
+      });
+      if (rolled.applied) {
+        saveStatePatch({ consensusGame: { ...live, answers: rolled.map } });
+      }
+    }
+    throw err;
+  }
 }
 
 export function getConsensusWaitingPlayers() {
