@@ -28,7 +28,7 @@ export function renderConsensusQuestion({
   const clamped = sliderDisplayValue(value);
   const locked = answerLocked || answerState === "submitted";
   const blockedText = interactionBlocked
-    ? blockedMessage || "Une synchro Consensus n'est pas confirmée. La réponse ne peut plus être envoyée."
+    ? blockedMessage || "Ta réponse n'est pas partie. Tu ne peux plus l'envoyer depuis ce téléphone."
     : "";
   const submittedLabel = blockedText || (locked ? "" : "Déplace le slider puis valide.");
 

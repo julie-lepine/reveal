@@ -20,11 +20,13 @@ import {
   syncConsensusSession,
   consensusToRemote,
   patchGameState,
+  fetchRawGameSessionRow,
   requireLocalParticipantUid,
   consensusRevealToRemote,
 } from "./gameSync.js";
 import { patchGameStateWithFeedback } from "./patchGameStateFeedback.js";
 import { launchGameWithSync, commitHostGamePlay, commitPrepReadyToggle } from "./mpLaunch.js";
+import { withPatchTimeout } from "./withPatchTimeout.js";
 import {
   canRollbackOptimisticSubmission,
   computeOptimisticMapEntryApply,
@@ -116,7 +118,7 @@ function allocateConsensusAttemptId() {
  * Pose le marqueur avant toute requête. Refus si un doute existe déjà pour ce lobby.
  * Le compteur est incrémenté dans sa propre clé, même si le marqueur est ensuite retiré.
  */
-function reserveConsensusServerWrite(step) {
+function reserveConsensusServerWrite(step, extra = null) {
   if (consensusLobbyWriteBlocked()) return { ok: false, blocked: true };
   const lobbyId = currentConsensusLobbyId();
   const attemptId = allocateConsensusAttemptId();
@@ -125,6 +127,7 @@ function reserveConsensusServerWrite(step) {
     questionIdx: getConsensusSession().questionIdx ?? 0,
     step,
     attemptId,
+    ...(extra || {}),
   });
   return { ok: true, attemptId };
 }
@@ -169,12 +172,22 @@ function notifyConsensusLaunchEnded() {
   });
 }
 
+/** Tentative « question suivante » encore suivie dans cette page. Absente après rechargement. */
+let liveNextQuestionAttempt = null;
+let consensusRecoveryReadTimeoutMs = CONSENSUS_SYNC_PATCH_TIMEOUT_MS;
+
+export function __setConsensusRecoveryReadTimeoutForTests(ms) {
+  consensusRecoveryReadTimeoutMs = ms;
+}
+
 export function __resetConsensusWriteGuardForTests() {
   const store = consensusWriteStore();
   store.removeItem(CONSENSUS_WRITE_MARKER_KEY);
   store.removeItem(CONSENSUS_WRITE_ATTEMPT_KEY);
   consensusAnswerAttemptId = 0;
   consensusLaunchEndedListeners.clear();
+  liveNextQuestionAttempt = null;
+  consensusRecoveryReadTimeoutMs = CONSENSUS_SYNC_PATCH_TIMEOUT_MS;
 }
 
 export function __getConsensusWriteMarkerForTests() {
@@ -594,6 +607,28 @@ function confirmedConsensusQuestion(prepared, live) {
   return live.phase === "question";
 }
 
+function consensusRecoveryPhaseRank(phase) {
+  if (phase === "question") return 0;
+  if (phase === "reveal-pending") return 1;
+  if (phase === "reveal") return 2;
+  if (phase === "final") return 3;
+  return -1;
+}
+
+function remoteShowsTargetOrNewer(remote, targetIdx) {
+  const idx = remote?.questionIdx;
+  if (idx == null || targetIdx == null) return false;
+  if (idx > targetIdx) return true;
+  return idx === targetIdx && consensusRecoveryPhaseRank(remote.phase) >= 0;
+}
+
+function remoteIsExactBaseline(remote, attempt) {
+  return (
+    remote?.questionIdx === attempt.baselineIdx &&
+    remote?.phase === attempt.baselinePhase
+  );
+}
+
 export async function startConsensusQuestion(questionIdx) {
   const confirmed = getConsensusSession();
   const next = buildQuestionStartPatch(confirmed, questionIdx);
@@ -603,14 +638,45 @@ export async function startConsensusQuestion(questionIdx) {
   }
   const baselineIdx = confirmed.questionIdx ?? 0;
   const baselinePhase = confirmed.phase;
-  const reserved = reserveConsensusServerWrite("next-question");
+  const reserved = reserveConsensusServerWrite("next-question", {
+    baselineQuestionIdx: baselineIdx,
+    baselinePhase,
+    targetQuestionIdx: questionIdx,
+  });
   if (!reserved.ok) throw new ConsensusWriteBlockedError();
   const beforeSend = getConsensusSession();
   if ((beforeSend.questionIdx ?? 0) !== baselineIdx || beforeSend.phase !== baselinePhase) {
     return beforeSend;
   }
+  const attempt = {
+    attemptId: reserved.attemptId,
+    lobbyId: currentConsensusLobbyId(),
+    baselineIdx,
+    baselinePhase,
+    targetIdx: questionIdx,
+    innerSettled: false,
+    mutableStarted: false,
+  };
+  liveNextQuestionAttempt = attempt;
   try {
-    await patchGameState({ consensus: consensusToRemote(next) }, CONSENSUS_MP_PATCH_OPTS);
+    await patchGameState(
+      { consensus: consensusToRemote(next) },
+      {
+        ...CONSENSUS_MP_PATCH_OPTS,
+        observeConsensusAttempt(hooks) {
+          hooks.promise.then(
+            () => {
+              attempt.innerSettled = true;
+              attempt.mutableStarted = hooks.mutableStarted();
+            },
+            () => {
+              attempt.innerSettled = true;
+              attempt.mutableStarted = hooks.mutableStarted();
+            }
+          );
+        },
+      }
+    );
     const live = getConsensusSession();
     if (!confirmedConsensusQuestion(next, live)) return live;
     settleConsensusServerWrite(reserved.attemptId);
@@ -618,6 +684,71 @@ export async function startConsensusQuestion(questionIdx) {
   } catch (err) {
     throw err;
   }
+}
+
+/**
+ * Reprise du lancement de manche. Ne renvoie jamais le snapshot.
+ * Une révélation encore visible n'autorise un futur clic que si aucun appel
+ * mutable n'a commencé. Sinon le marqueur reste : une réponse HTTP ne prouve
+ * pas que cet appel ne peut plus remplacer `state`.
+ */
+export async function reconcileConsensusNextQuestion() {
+  const marker = readConsensusWriteMarker();
+  if (!marker || marker.step !== "next-question" || !consensusLobbyWriteBlocked()) {
+    return { released: false, reason: "not-blocked-next-question", write: false };
+  }
+  const attempt = liveNextQuestionAttempt;
+  if (
+    !attempt ||
+    attempt.attemptId !== marker.attemptId ||
+    attempt.lobbyId !== marker.lobbyId ||
+    marker.targetQuestionIdx == null
+  ) {
+    return { released: false, reason: "no-live-attempt", write: false };
+  }
+  if (!attempt.innerSettled) {
+    return { released: false, reason: "pending", write: false };
+  }
+
+  let row = null;
+  try {
+    row = await withPatchTimeout(
+      fetchRawGameSessionRow(attempt.lobbyId),
+      consensusRecoveryReadTimeoutMs
+    );
+  } catch {
+    return { released: false, reason: "read-failed", write: false };
+  }
+  const remote = row?.state?.consensus;
+  if (!row || !remote || (row.lobby_id && row.lobby_id !== attempt.lobbyId)) {
+    return { released: false, reason: "no-row", write: false };
+  }
+
+  const current = readConsensusWriteMarker();
+  if (
+    !current ||
+    current.attemptId !== attempt.attemptId ||
+    current.lobbyId !== attempt.lobbyId
+  ) {
+    return { released: false, reason: "attempt-changed", write: false };
+  }
+
+  if (remoteShowsTargetOrNewer(remote, attempt.targetIdx)) {
+    const released = settleConsensusServerWrite(attempt.attemptId);
+    return { released, reason: released ? "adopt" : "attempt-changed", write: false, row };
+  }
+
+  if (!attempt.mutableStarted && remoteIsExactBaseline(remote, attempt)) {
+    const released = settleConsensusServerWrite(attempt.attemptId);
+    return {
+      released,
+      reason: released ? "retry-allowed" : "attempt-changed",
+      write: false,
+      row,
+    };
+  }
+
+  return { released: false, reason: "ambiguous", write: false, row };
 }
 
 export async function commitConsensusPlay(patch, { screen } = {}) {

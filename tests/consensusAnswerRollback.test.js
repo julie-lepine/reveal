@@ -56,6 +56,7 @@ mock.module("../js/core/gameSync.js", {
     syncConsensusSession: mock.fn(),
     consensusToRemote: mock.fn((session) => session),
     patchGameState: mock.fn(),
+    fetchRawGameSessionRow: mock.fn(async () => null),
     requireLocalParticipantUid: mock.fn(() => HOST_UID),
     consensusRevealToRemote: mock.fn((session) => session),
   },
@@ -176,11 +177,11 @@ describe("consensus answer rollback", () => {
       totalQuestions: 5,
       interactionBlocked: true,
       blockedMessage:
-        "Une synchro Consensus n'est pas confirmée. La réponse ne peut plus être envoyée.",
+        "Ta réponse n'est pas partie. Tu ne peux plus l'envoyer depuis ce téléphone.",
       waitingMessage: "Choisis une valeur entre 0 et 100 puis valide.",
     });
     assert.match(html, /id="btn-consensus-submit" disabled/);
-    assert.match(html, /ne peut plus être envoyée/);
+    assert.match(html, /Tu ne peux plus l'envoyer depuis ce téléphone/);
     assert.equal(html.includes("Déplace le slider puis valide."), false);
     assert.equal(html.includes("Choisis une valeur entre 0 et 100 puis valide."), false);
     assert.match(html, /id="consensus-slider"[\s\S]*disabled/);
@@ -192,7 +193,7 @@ describe("consensus answer rollback", () => {
     assert.match(src, /interactionBlocked: writesBlocked\(\)/);
     assert.match(
       src,
-      /Une synchro Consensus n'est pas confirmée\. La réponse ne peut plus être envoyée\./
+      /Ta réponse n'est pas partie\. Tu ne peux plus l'envoyer depuis ce téléphone\./
     );
   });
 

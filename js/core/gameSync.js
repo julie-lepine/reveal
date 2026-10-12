@@ -5036,9 +5036,20 @@ export async function commitGuessLieLobbyStart() {
   });
 }
 
+export async function fetchRawGameSessionRow(lobbyId = getState().lobby?.id) {
+  if (!lobbyId) return null;
+  return fetchGameSessionByLobby(lobbyId);
+}
+
 export async function patchGameState(
   stateMerge,
-  { screen, gameId, withEveningScores = false, timeoutMs = DEFAULT_SYNC_PATCH_TIMEOUT_MS } = {}
+  {
+    screen,
+    gameId,
+    withEveningScores = false,
+    timeoutMs = DEFAULT_SYNC_PATCH_TIMEOUT_MS,
+    observeConsensusAttempt = null,
+  } = {}
 ) {
   if (
     __trackSessionWrite("patchGameState", {
@@ -5056,10 +5067,20 @@ export async function patchGameState(
   ) {
     return null;
   }
-  return withPatchTimeout(
-    patchGameStateInner(stateMerge, { screen, gameId, withEveningScores }),
-    timeoutMs
-  );
+  let mutableStarted = false;
+  const inner = patchGameStateInner(stateMerge, {
+    screen,
+    gameId,
+    withEveningScores,
+    markMutable() {
+      mutableStarted = true;
+    },
+  });
+  observeConsensusAttempt?.({
+    promise: inner,
+    mutableStarted: () => mutableStarted,
+  });
+  return withPatchTimeout(inner, timeoutMs);
 }
 
 /**
@@ -5209,7 +5230,7 @@ async function patchGameStateAsNonHost(
 
 async function patchGameStateInner(
   stateMerge,
-  { screen, gameId, withEveningScores = false } = {}
+  { screen, gameId, withEveningScores = false, markMutable = null } = {}
 ) {
   if (!isGameSyncActive()) return null;
   const lobbyId = getState().lobby.id;
@@ -5263,6 +5284,7 @@ async function patchGameStateInner(
           "REVEAL FEATURE-TIERNIGHT-04C: customLiveTierLists stripped from generic patch (upsert fallback)"
         );
       }
+      markMutable?.();
       freshRow = await upsertSessionPreservingRosterTopics({
         lobbyId,
         gameId: gameId || cachedSession?.game_id || "consensus",
@@ -5672,6 +5694,7 @@ async function patchGameStateInner(
     }
   }
 
+  markMutable?.();
   let row = await updateGameSession(lobbyId, patch);
   // L'update ne renvoie plus `state` : on le rattache localement (on vient de l'écrire).
   if (row) {

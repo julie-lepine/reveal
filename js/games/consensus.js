@@ -3,6 +3,7 @@ import { useConsensusGame } from "../core/useConsensusGame.js";
 import {
   consensusLobbyWriteBlocked,
   guardConsensusServerWrite,
+  reconcileConsensusNextQuestion,
   subscribeConsensusLaunchEnded,
 } from "../core/consensusSession.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
@@ -368,7 +369,7 @@ export function mountConsensus(app) {
 
   function waitingMessage() {
     if (writesBlocked()) {
-      return "Une synchro Consensus n'est pas confirmée. La réponse ne peut plus être envoyée.";
+      return "Ta réponse n'est pas partie. Tu ne peux plus l'envoyer depuis ce téléphone.";
     }
     if (phase !== "question") return "";
     const mine = myAnswer();
@@ -495,8 +496,8 @@ export function mountConsensus(app) {
       console.warn("Consensus reveal-pending:", err);
       if (mp && canActAsHost() && mount.isMounted() && mount.isCurrentMount()) {
         await showAppAlert(
-          "La synchro n'a pas abouti. La manche reste sur la question déjà confirmée.",
-          { title: "Connexion", icon: "📡" }
+          "La révélation n'a pas été lancée. Tout le monde reste sur la question en cours.",
+          { title: "Partie", icon: "📡" }
         );
       }
     } finally {
@@ -514,8 +515,8 @@ export function mountConsensus(app) {
     if (mp && !canActAsHost()) return;
     if (writesBlocked()) {
       await showAppAlert(
-        "Une synchro Consensus n'est pas confirmée. Vérifie l'état avant de révéler.",
-        { title: "Connexion", icon: "📡" }
+        "La révélation ne partira pas depuis ce téléphone.",
+        { title: "Partie", icon: "📡" }
       );
       return;
     }
@@ -591,8 +592,8 @@ export function mountConsensus(app) {
       if (!mount.isCurrentMount()) return;
       if (syncFailed && mp && canActAsHost()) {
         await showAppAlert(
-          "La synchro n'a pas abouti. Les résultats ne s'affichent pas tant que le serveur ne les a pas confirmés.",
-          { title: "Sync révélation", icon: "📡" }
+          "Les résultats n'ont pas été montrés aux autres. Ils restent sur la question en cours.",
+          { title: "Partie", icon: "📡" }
         );
       }
       if (!mount.isMounted()) return;
@@ -605,8 +606,8 @@ export function mountConsensus(app) {
   async function openConsensusSetup(configSession) {
     if (writesBlocked()) {
       await showAppAlert(
-        "Une synchro Consensus n'est pas confirmée. Les réglages ne sont pas renvoyés.",
-        { title: "Connexion", icon: "📡" }
+        "Les réglages n'ont pas été changés.",
+        { title: "Partie", icon: "📡" }
       );
       return;
     }
@@ -647,8 +648,8 @@ export function mountConsensus(app) {
   async function replayConsensus() {
     if (writesBlocked()) {
       await showAppAlert(
-        "Une synchro Consensus n'est pas confirmée. La relance n'est pas envoyée.",
-        { title: "Connexion", icon: "📡" }
+        "La partie n'a pas été relancée.",
+        { title: "Partie", icon: "📡" }
       );
       return;
     }
@@ -901,8 +902,8 @@ export function mountConsensus(app) {
         ${
           writesBlocked()
             ? `<div class="card card--highlight">
-                <p class="hint">Une synchro Consensus n'est pas confirmée. Aucune nouvelle écriture n'est envoyée depuis cet appareil.</p>
-                <button type="button" class="btn btn-secondary btn--spaced" id="btn-consensus-recheck">Vérifier l'état</button>
+                <p class="hint">Ce téléphone ne peut plus modifier la partie. L'écran peut encore afficher ce que font les autres.</p>
+                <button type="button" class="btn btn-secondary btn--spaced" id="btn-consensus-recheck">Voir la partie</button>
               </div>`
             : ""
         }
@@ -914,13 +915,22 @@ export function mountConsensus(app) {
     bindNav(app);
     bindExitGame(app);
     app.querySelector("#btn-consensus-recheck")?.addEventListener("click", () => {
-      void refreshGameSession()
-        .catch(() => null)
-        .finally(() => {
-          if (!mount.isMounted() || !mount.isCurrentMount()) return;
-          syncFromSession();
-          render();
-        });
+      void (async () => {
+        const result = await reconcileConsensusNextQuestion().catch(() => null);
+        if (result?.released && result.row?.state?.consensus) {
+          const remote = consensusFromRemote(result.row.state.consensus);
+          if (remote) {
+            saveStatePatch({
+              consensusGame: { ...consensus.getSession(), ...remote },
+            });
+          }
+        } else {
+          await refreshGameSession().catch(() => null);
+        }
+        if (!mount.isMounted() || !mount.isCurrentMount()) return;
+        syncFromSession();
+        render();
+      })();
     });
 
     const newScrollEl = app.querySelector(".page--scroll");
@@ -949,8 +959,8 @@ export function mountConsensus(app) {
         if (answerState() === "submitted") return;
         if (writesBlocked()) {
           await showAppAlert(
-            "Une synchro Consensus n'est pas confirmée. La réponse n'est pas renvoyée.",
-            { title: "Connexion", icon: "📡" }
+            "Ta réponse ne partira pas. Les autres peuvent continuer sans elle.",
+            { title: "Partie", icon: "📡" }
           );
           return;
         }
@@ -979,8 +989,8 @@ export function mountConsensus(app) {
     app.querySelector("#btn-consensus-next")?.addEventListener("click", withClickLock(async () => {
       if (writesBlocked()) {
         await showAppAlert(
-          "Une synchro Consensus n'est pas confirmée. La question suivante n'est pas envoyée.",
-          { title: "Connexion", icon: "📡" }
+          "La question suivante n'a pas été lancée. Ce téléphone ne peut plus le faire. Un autre joueur peut continuer la partie.",
+          { title: "Partie", icon: "📡" }
         );
         return;
       }

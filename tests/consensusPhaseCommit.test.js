@@ -19,6 +19,7 @@ globalThis.localStorage = {
 };
 
 const patchMock = mock.fn();
+const fetchRawMock = mock.fn(async () => null);
 const syncMock = mock.fn();
 const launchMock = mock.fn();
 const isGameSyncActiveMock = mock.fn(() => true);
@@ -66,6 +67,7 @@ mock.module("../js/core/gameSync.js", {
     syncConsensusSession: syncMock,
     consensusToRemote: mock.fn((session) => session),
     patchGameState: patchMock,
+    fetchRawGameSessionRow: (...args) => fetchRawMock(...args),
     requireLocalParticipantUid: mock.fn(() => HOST_UID),
     consensusRevealToRemote: mock.fn(revealRemote),
   },
@@ -125,6 +127,7 @@ describe("consensus phase commit guard", () => {
     isGameSyncActiveMock.mock.mockImplementation(() => true);
     canActAsHostMock.mock.mockImplementation(() => true);
     patchMock.mock.resetCalls();
+    fetchRawMock.mock.resetCalls();
     syncMock.mock.resetCalls();
     launchMock.mock.resetCalls();
     saveStatePatchMock.mock.resetCalls();
@@ -576,9 +579,10 @@ describe("consensus launch and reveal source contracts", () => {
     assert.match(sessionSrc, /delete remote\.currentQuestion/);
     const nextQuestion = sessionSrc.slice(
       sessionSrc.indexOf("export async function startConsensusQuestion"),
-      sessionSrc.indexOf("export async function commitConsensusPlay")
+      sessionSrc.indexOf("export async function reconcileConsensusNextQuestion")
     );
-    assert.match(nextQuestion, /patchGameState\(\{ consensus: consensusToRemote\(next\) \}/);
+    assert.match(nextQuestion, /consensus: consensusToRemote\(next\)/);
+    assert.match(nextQuestion, /observeConsensusAttempt/);
     assert.equal(nextQuestion.includes("syncConsensusSession(next)"), true);
     const multiplayerBranch = nextQuestion.slice(nextQuestion.indexOf("reserveConsensusServerWrite"));
     assert.equal(multiplayerBranch.includes("syncConsensusSession"), false);
@@ -651,5 +655,309 @@ describe("consensus launch and reveal source contracts", () => {
     });
     assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
     assert.match(result.stdout, /OK/);
+  });
+});
+
+function revealRow(consensus) {
+  return {
+    id: "sess-1",
+    lobby_id: LOBBY_ID,
+    state: { consensus },
+  };
+}
+
+function observeUnresolved(opts, { mutable = false } = {}) {
+  let settle;
+  const promise = new Promise((resolve) => {
+    settle = resolve;
+  });
+  opts?.observeConsensusAttempt?.({
+    promise,
+    mutableStarted: () => mutable,
+  });
+  return { promise, settle };
+}
+
+describe("consensus next-question recovery", () => {
+  beforeEach(() => {
+    storage.clear();
+    session.__resetConsensusWriteGuardForTests();
+    state.consensusGame = {
+      phase: "reveal",
+      questionIdx: 0,
+      questionCount: 2,
+      selectedModeId: "standard",
+      lobbyStarted: true,
+      deck: [
+        { id: "q1", question: "Première" },
+        { id: "q2", question: "Deuxième" },
+      ],
+      currentQuestion: { id: "q1", question: "Première" },
+      answers: { Host: { value: 20, questionIdx: 0 } },
+      matchScores: { Host: 1, Guest: 0 },
+      roundScored: true,
+      lastRound: { deltas: { Host: 1 } },
+    };
+    state.lobby = { id: LOBBY_ID };
+    isGameSyncActiveMock.mock.mockImplementation(() => true);
+    patchMock.mock.resetCalls();
+    fetchRawMock.mock.resetCalls();
+    patchMock.mock.mockImplementation(async () => {
+      throw new Error("offline");
+    });
+    fetchRawMock.mock.mockImplementation(async () => null);
+  });
+
+  it("1 retire le marqueur sans écriture si l'échec précède tout appel mutable", async () => {
+    patchMock.mock.mockImplementation(async (_body, opts) => {
+      const inner = Promise.reject(new Error("lecture préalable"));
+      opts?.observeConsensusAttempt?.({
+        promise: inner,
+        mutableStarted: () => false,
+      });
+      throw new Error("lecture préalable");
+    });
+    fetchRawMock.mock.mockImplementation(async () =>
+      revealRow({ phase: "reveal", questionIdx: 0, answers: { Host: { value: 20 } } })
+    );
+    await assert.rejects(() => session.startConsensusQuestion(1));
+    const result = await session.reconcileConsensusNextQuestion();
+    assert.equal(result.released, true);
+    assert.equal(result.reason, "retry-allowed");
+    assert.equal(result.write, false);
+    assert.equal(session.__getConsensusWriteMarkerForTests(), null);
+    assert.equal(patchMock.mock.callCount(), 1);
+    assert.equal(fetchRawMock.mock.callCount(), 1);
+  });
+
+  it("2 conserve le marqueur tant que la promesse interne est ouverte après le timeout", async () => {
+    patchMock.mock.mockImplementation(async (_body, opts) => {
+      observeUnresolved(opts);
+      throw new Error("Synchronisation trop longue.");
+    });
+    await assert.rejects(() => session.startConsensusQuestion(1), /Synchronisation trop longue/);
+    const result = await session.reconcileConsensusNextQuestion();
+    assert.equal(result.released, false);
+    assert.equal(result.reason, "pending");
+    assert.equal(session.__getConsensusWriteMarkerForTests().step, "next-question");
+    assert.equal(fetchRawMock.mock.callCount(), 0);
+    assert.equal(patchMock.mock.callCount(), 1);
+  });
+
+  it("3 ne retire pas le marqueur si la cible est déjà visible pendant que l'appel reste ouvert", async () => {
+    patchMock.mock.mockImplementation(async (_body, opts) => {
+      observeUnresolved(opts, { mutable: true });
+      throw new Error("Synchronisation trop longue.");
+    });
+    fetchRawMock.mock.mockImplementation(async () =>
+      revealRow({
+        phase: "question",
+        questionIdx: 1,
+        answers: { Guest: { value: 80, questionIdx: 1 } },
+      })
+    );
+    await assert.rejects(() => session.startConsensusQuestion(1));
+    const result = await session.reconcileConsensusNextQuestion();
+    assert.equal(result.released, false);
+    assert.equal(result.reason, "pending");
+    assert.equal(session.__getConsensusWriteMarkerForTests().targetQuestionIdx, 1);
+    assert.equal(fetchRawMock.mock.callCount(), 0);
+    assert.equal(patchMock.mock.callCount(), 1);
+  });
+
+  it("4 adopte la cible déjà répondue sans renvoyer le snapshot", async () => {
+    patchMock.mock.mockImplementation(async (_body, opts) => {
+      const inner = Promise.resolve({ id: "sess-1", updated_at: "t1" });
+      opts?.observeConsensusAttempt?.({
+        promise: inner,
+        mutableStarted: () => true,
+      });
+      return inner;
+    });
+    fetchRawMock.mock.mockImplementation(async () =>
+      revealRow({
+        phase: "question",
+        questionIdx: 1,
+        answers: { Guest: { value: 80, questionIdx: 1 } },
+      })
+    );
+    await session.startConsensusQuestion(1);
+    const result = await session.reconcileConsensusNextQuestion();
+    assert.equal(result.released, true);
+    assert.equal(result.reason, "adopt");
+    assert.equal(result.write, false);
+    assert.equal(result.row.state.consensus.answers.Guest.value, 80);
+    assert.equal(patchMock.mock.callCount(), 1);
+  });
+
+  it("5 adopte un index supérieur sans revenir à la cible", async () => {
+    patchMock.mock.mockImplementation(async (_body, opts) => {
+      const inner = Promise.resolve({ id: "sess-1" });
+      opts?.observeConsensusAttempt?.({
+        promise: inner,
+        mutableStarted: () => true,
+      });
+      return inner;
+    });
+    fetchRawMock.mock.mockImplementation(async () =>
+      revealRow({ phase: "question", questionIdx: 2, answers: {} })
+    );
+    await session.startConsensusQuestion(1);
+    const result = await session.reconcileConsensusNextQuestion();
+    assert.equal(result.released, true);
+    assert.equal(result.reason, "adopt");
+    assert.equal(result.row.state.consensus.questionIdx, 2);
+    assert.equal(patchMock.mock.callCount(), 1);
+  });
+
+  it("6 conserve le marqueur après un rejet réseau si la révélation est encore visible", async () => {
+    patchMock.mock.mockImplementation(async (_body, opts) => {
+      const inner = Promise.reject(new TypeError("Failed to fetch"));
+      opts?.observeConsensusAttempt?.({
+        promise: inner,
+        mutableStarted: () => true,
+      });
+      throw new TypeError("Failed to fetch");
+    });
+    fetchRawMock.mock.mockImplementation(async () =>
+      revealRow({ phase: "reveal", questionIdx: 0, answers: { Host: { value: 20 } } })
+    );
+    await assert.rejects(() => session.startConsensusQuestion(1));
+    const result = await session.reconcileConsensusNextQuestion();
+    assert.equal(result.released, false);
+    assert.equal(result.reason, "ambiguous");
+    assert.equal(result.write, false);
+    assert.equal(session.__getConsensusWriteMarkerForTests().step, "next-question");
+    assert.equal(patchMock.mock.callCount(), 1);
+  });
+
+  it("une réponse observée et la révélation de départ ne libèrent pas le marqueur", async () => {
+    patchMock.mock.mockImplementation(async (_body, opts) => {
+      const inner = Promise.resolve({ id: "sess-1", updated_at: "t1" });
+      opts?.observeConsensusAttempt?.({
+        promise: inner,
+        mutableStarted: () => true,
+      });
+      return inner;
+    });
+    fetchRawMock.mock.mockImplementation(async () =>
+      revealRow({ phase: "reveal", questionIdx: 0, answers: { Host: { value: 20 } } })
+    );
+    await session.startConsensusQuestion(1);
+    const result = await session.reconcileConsensusNextQuestion();
+    assert.equal(result.released, false);
+    assert.equal(result.reason, "ambiguous");
+    assert.equal(patchMock.mock.callCount(), 1);
+    assert.ok(session.__getConsensusWriteMarkerForTests());
+  });
+
+  it("7 reprend sans renvoi si le rejet réseau laisse la cible visible", async () => {
+    patchMock.mock.mockImplementation(async (_body, opts) => {
+      const inner = Promise.reject(new TypeError("Failed to fetch"));
+      opts?.observeConsensusAttempt?.({
+        promise: inner,
+        mutableStarted: () => true,
+      });
+      throw new TypeError("Failed to fetch");
+    });
+    fetchRawMock.mock.mockImplementation(async () =>
+      revealRow({ phase: "question", questionIdx: 1, answers: {} })
+    );
+    await assert.rejects(() => session.startConsensusQuestion(1));
+    const result = await session.reconcileConsensusNextQuestion();
+    assert.equal(result.released, true);
+    assert.equal(result.reason, "adopt");
+    assert.equal(result.write, false);
+    assert.equal(patchMock.mock.callCount(), 1);
+  });
+
+  it("8 conserve le marqueur si la lecture brute échoue, expire ou est vide", async () => {
+    async function launchSettled() {
+      patchMock.mock.mockImplementation(async (_body, opts) => {
+        const inner = Promise.reject(new Error("offline"));
+        opts?.observeConsensusAttempt?.({
+          promise: inner,
+          mutableStarted: () => false,
+        });
+        throw new Error("offline");
+      });
+      await assert.rejects(() => session.startConsensusQuestion(1));
+    }
+
+    await launchSettled();
+    fetchRawMock.mock.mockImplementation(async () => {
+      throw new Error("network");
+    });
+    assert.equal((await session.reconcileConsensusNextQuestion()).reason, "read-failed");
+    assert.ok(session.__getConsensusWriteMarkerForTests());
+
+    session.__setConsensusRecoveryReadTimeoutForTests(30);
+    fetchRawMock.mock.mockImplementation(() => new Promise(() => {}));
+    assert.equal((await session.reconcileConsensusNextQuestion()).reason, "read-failed");
+    assert.ok(session.__getConsensusWriteMarkerForTests());
+
+    session.__resetConsensusWriteGuardForTests();
+    await launchSettled();
+    fetchRawMock.mock.mockImplementation(async () => null);
+    assert.equal((await session.reconcileConsensusNextQuestion()).reason, "no-row");
+    assert.ok(session.__getConsensusWriteMarkerForTests());
+  });
+
+  it("9 maintient le blocage au rechargement si le marqueur n'a pas de cible", async () => {
+    session.__setConsensusWriteMarkerForTests({
+      lobbyId: LOBBY_ID,
+      questionIdx: 0,
+      step: "next-question",
+      attemptId: 4,
+    });
+    const result = await session.reconcileConsensusNextQuestion();
+    assert.equal(result.released, false);
+    assert.equal(result.reason, "no-live-attempt");
+    assert.equal(session.__getConsensusWriteMarkerForTests().attemptId, 4);
+    assert.equal(fetchRawMock.mock.callCount(), 0);
+  });
+
+  it("10 ne retire pas le marqueur courant avec le résultat d'une ancienne tentative", async () => {
+    patchMock.mock.mockImplementation(async (_body, opts) => {
+      const inner = Promise.resolve({ id: "sess-1" });
+      opts?.observeConsensusAttempt?.({
+        promise: inner,
+        mutableStarted: () => false,
+      });
+      return inner;
+    });
+    fetchRawMock.mock.mockImplementation(async () => {
+      session.__setConsensusWriteMarkerForTests({
+        lobbyId: LOBBY_ID,
+        questionIdx: 0,
+        step: "next-question",
+        attemptId: 999,
+        targetQuestionIdx: 3,
+      });
+      return revealRow({ phase: "reveal", questionIdx: 0, answers: {} });
+    });
+    await session.startConsensusQuestion(1);
+    const result = await session.reconcileConsensusNextQuestion();
+    assert.equal(result.released, false);
+    assert.equal(result.reason, "attempt-changed");
+    assert.equal(session.__getConsensusWriteMarkerForTests().attemptId, 999);
+  });
+
+  it("11 repère l'upsert mutable et son repli sans prétendre observer un commit tardif", () => {
+    const src = fs.readFileSync(new URL("../js/core/gameSync.js", import.meta.url), "utf8");
+    const innerStart = src.indexOf("async function patchGameStateInner");
+    const innerEnd = src.indexOf("export async function endGameSession");
+    const inner = src.slice(innerStart, innerEnd);
+    const freshGuard = inner.indexOf("if (!freshRow)");
+    const upsertAt = inner.indexOf("await upsertSessionPreservingRosterTopics");
+    const updateAt = inner.indexOf("await updateGameSession");
+    assert.ok(freshGuard > 0 && upsertAt > freshGuard && updateAt > upsertAt);
+    assert.ok(inner.slice(freshGuard, upsertAt).includes("markMutable?.()"));
+    assert.ok(inner.slice(upsertAt, updateAt).includes("markMutable?.()"));
+    const upsertStart = src.indexOf("async function upsertSessionPreservingRosterTopics");
+    const upsertEnd = src.indexOf("export async function syncLobbyScores");
+    const upsertFn = src.slice(upsertStart, upsertEnd);
+    assert.match(upsertFn, /upsertGameSessionPreservingRosterTopics/);
+    assert.match(upsertFn, /return upsertGameSession\(/);
   });
 });
