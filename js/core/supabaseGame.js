@@ -71,15 +71,20 @@ export async function upsertGameSessionPreservingRosterTopics({
   return data;
 }
 
-export async function updateGameSession(lobbyId, patch) {
-  // On ne re-télécharge PAS `state` ici : l'appelant connaît déjà l'état qu'il
-  // vient d'écrire, et le Realtime diffuse la ligne complète aux autres clients.
-  const { data, error } = await supabase
-    .from("game_sessions")
-    .update(patch)
-    .eq("lobby_id", lobbyId)
-    .select("id, lobby_id, game_id, screen, host_id, updated_at")
-    .limit(1);
+export async function updateGameSession(lobbyId, patch, options = null) {
+  // Sans option, le contrat historique reste : filtre lobby seul, `state` non relu.
+  // L'appelant recolle alors l'état qu'il vient d'envoyer.
+  // Avec expectedUpdatedAt, la chaîne PostgREST est comparée telle quelle.
+  const expectedUpdatedAt = options?.expectedUpdatedAt;
+  const returnState = options?.returnState === true;
+  let query = supabase.from("game_sessions").update(patch).eq("lobby_id", lobbyId);
+  if (typeof expectedUpdatedAt === "string" && expectedUpdatedAt.length > 0) {
+    query = query.eq("updated_at", expectedUpdatedAt);
+  }
+  const selected = returnState
+    ? query.select("id, lobby_id, game_id, screen, host_id, state, updated_at")
+    : query.select("id, lobby_id, game_id, screen, host_id, updated_at");
+  const { data, error } = await selected.limit(1);
   if (error) throw error;
   return data?.[0] ?? null;
 }

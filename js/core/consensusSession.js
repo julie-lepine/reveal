@@ -19,6 +19,7 @@ import {
   playerKeyToDisplayName,
   syncConsensusSession,
   consensusToRemote,
+  consensusFromRemote,
   patchGameState,
   fetchRawGameSessionRow,
   requireLocalParticipantUid,
@@ -669,10 +670,13 @@ export async function startConsensusQuestion(questionIdx) {
   };
   liveNextQuestionAttempt = attempt;
   try {
-    await patchGameState(
+    const result = await patchGameState(
       { consensus: consensusToRemote(next) },
       {
         ...CONSENSUS_MP_PATCH_OPTS,
+        conditionalUpdatedAt: true,
+        baselineQuestionIdx: baselineIdx,
+        baselinePhase,
         observeConsensusAttempt(hooks) {
           hooks.promise.then(
             () => {
@@ -687,6 +691,18 @@ export async function startConsensusQuestion(questionIdx) {
         },
       }
     );
+    if (result?.applied === true || result?.applied === false || result?.adopted === true) {
+      attempt.innerSettled = true;
+    }
+    if (result?.adopted === true) {
+      return resumeConsensusNextQuestion();
+    }
+    if (result?.applied === false) {
+      return resumeConsensusNextQuestion({ writesAlready: 1 });
+    }
+    if (result?.applied === true && result.row) {
+      applyReturnedConsensusRow(result.row);
+    }
     const live = getConsensusSession();
     if (!confirmedConsensusQuestion(next, live)) return live;
     settleConsensusServerWrite(reserved.attemptId);
@@ -694,6 +710,185 @@ export async function startConsensusQuestion(questionIdx) {
   } catch (err) {
     throw err;
   }
+}
+
+function markerBaselineIndex(marker) {
+  return Number.isInteger(marker?.baselineQuestionIdx)
+    ? marker.baselineQuestionIdx
+    : marker?.questionIdx;
+}
+
+export function classifyConsensusResumeRow(row, lobbyId, marker) {
+  const remote = row?.state?.consensus;
+  if (!row || row.lobby_id !== lobbyId || !remote || typeof remote !== "object") {
+    return "incomplete";
+  }
+  const baselineIdx = markerBaselineIndex(marker);
+  if (!Number.isInteger(baselineIdx)) return "incomplete";
+  const baseline = {
+    lobbyStarted: true,
+    questionIdx: baselineIdx,
+    phase: marker?.baselinePhase || "reveal",
+  };
+  if (isConsensusRoundAhead(baseline, remote)) return "ahead";
+  if (
+    remote.lobbyStarted === true &&
+    remote.questionIdx === baselineIdx &&
+    remote.phase === baseline.phase &&
+    typeof row.updated_at === "string" &&
+    row.updated_at.length > 0
+  ) {
+    return "baseline";
+  }
+  return "incoherent";
+}
+
+function applyReturnedConsensusRow(row) {
+  const remote = row?.state?.consensus;
+  if (!remote || typeof remote !== "object") return false;
+  const local = consensusFromRemote(remote);
+  if (!local) return false;
+  saveStatePatch({ consensusGame: { ...getConsensusSession(), ...local } });
+  return true;
+}
+
+function watchNextQuestionAttempt(attempt) {
+  return {
+    ...CONSENSUS_MP_PATCH_OPTS,
+    observeConsensusAttempt(hooks) {
+      hooks.promise.then(
+        () => {
+          attempt.innerSettled = true;
+          attempt.mutableStarted = hooks.mutableStarted();
+        },
+        () => {
+          attempt.innerSettled = true;
+          attempt.mutableStarted = hooks.mutableStarted();
+        }
+      );
+    },
+  };
+}
+
+async function readResumeRow(lobbyId) {
+  try {
+    const row = await fetchRawGameSessionRow(lobbyId);
+    return { row };
+  } catch {
+    return { reason: "read-failed" };
+  }
+}
+
+/**
+ * Reprise de « Question suivante ». Au plus deux UPDATE conditionnels.
+ * Une promesse encore ouverte, une lecture inutilisable ou un second refus
+ * n'envoient rien de plus.
+ */
+export async function resumeConsensusNextQuestion({ writesAlready = 0 } = {}) {
+  if (consensusNextQuestionFlightOpen()) {
+    return { released: false, reason: "pending", write: false, writes: writesAlready };
+  }
+  const marker = readConsensusWriteMarker();
+  const lobbyId = currentConsensusLobbyId();
+  if (!marker || marker.step !== "next-question" || !lobbyId || marker.lobbyId !== lobbyId) {
+    return { released: false, reason: "not-next-question", write: false, writes: 0 };
+  }
+  const baselineIdx = markerBaselineIndex(marker);
+  const target = marker.targetQuestionIdx;
+  if (!Number.isInteger(baselineIdx) || !Number.isInteger(target)) {
+    return { released: false, reason: "incomplete-marker", write: false, writes: 0 };
+  }
+
+  let writes = writesAlready;
+  let previousToken = null;
+  for (let round = writesAlready; round < 2; round += 1) {
+    const read = await readResumeRow(lobbyId);
+    if (read.reason) {
+      return { released: false, reason: read.reason, write: writes > 0, writes };
+    }
+    const kind = classifyConsensusResumeRow(read.row, lobbyId, marker);
+    if (kind === "ahead") {
+      applyReturnedConsensusRow(read.row);
+      const released = settleConsensusServerWrite(marker.attemptId);
+      return { released, reason: released ? "adopt" : "attempt-changed", write: false, writes };
+    }
+    if (kind !== "baseline") {
+      return {
+        released: false,
+        reason: kind === "incomplete" ? "incomplete-read" : "incoherent",
+        write: writes > 0,
+        writes,
+      };
+    }
+    const token = read.row.updated_at;
+    if (round === 1 && token === previousToken) {
+      return { released: false, reason: "stopped", write: writes > 0, writes };
+    }
+    if (consensusNextQuestionFlightOpen()) {
+      return { released: false, reason: "pending", write: writes > 0, writes };
+    }
+    const local = consensusFromRemote(read.row.state.consensus);
+    if (!local) {
+      return { released: false, reason: "incomplete-read", write: writes > 0, writes };
+    }
+    const next = buildQuestionStartPatch(local, target);
+    const attempt = {
+      attemptId: marker.attemptId,
+      lobbyId,
+      baselineIdx,
+      baselinePhase: marker.baselinePhase || "reveal",
+      targetIdx: target,
+      innerSettled: false,
+      mutableStarted: false,
+    };
+    liveNextQuestionAttempt = attempt;
+    previousToken = token;
+    writes += 1;
+    let result;
+    try {
+      result = await patchGameState(
+        { consensus: consensusToRemote(next) },
+        {
+          ...watchNextQuestionAttempt(attempt),
+          conditionalUpdatedAt: true,
+          baselineQuestionIdx: baselineIdx,
+          baselinePhase: marker.baselinePhase || "reveal",
+        }
+      );
+    } catch {
+      return { released: false, reason: "unknown", write: true, writes };
+    }
+    if (result?.applied === true || result?.applied === false || result?.adopted === true) {
+      attempt.innerSettled = true;
+    }
+    if (result?.adopted === true) {
+      if (result.row) applyReturnedConsensusRow(result.row);
+      const released = settleConsensusServerWrite(marker.attemptId);
+      return { released, reason: released ? "adopt" : "attempt-changed", write: false, writes };
+    }
+    if (result?.applied === true) {
+      if (result.row) applyReturnedConsensusRow(result.row);
+      const live = getConsensusSession();
+      if (!confirmedConsensusQuestion(next, live)) {
+        return { released: false, reason: "unconfirmed", write: true, writes };
+      }
+      const released = settleConsensusServerWrite(marker.attemptId);
+      return { released, reason: released ? "applied" : "attempt-changed", write: true, writes };
+    }
+    if (result?.applied !== false) {
+      return { released: false, reason: "unconfirmed", write: true, writes };
+    }
+    if (round === 1) {
+      const finalRead = await readResumeRow(lobbyId);
+      if (!finalRead.reason && classifyConsensusResumeRow(finalRead.row, lobbyId, marker) === "ahead") {
+        applyReturnedConsensusRow(finalRead.row);
+        const released = settleConsensusServerWrite(marker.attemptId);
+        return { released, reason: released ? "adopt" : "attempt-changed", write: true, writes };
+      }
+      return { released: false, reason: "stopped", write: true, writes };
+    }
+  }
+  return { released: false, reason: "stopped", write: writes > 0, writes };
 }
 
 /**

@@ -4,6 +4,7 @@ import {
   consensusLobbyWriteBlocked,
   guardConsensusServerWrite,
   releaseInheritedNextQuestionMarker,
+  resumeConsensusNextQuestion,
   subscribeConsensusLaunchEnded,
 } from "../core/consensusSession.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
@@ -237,7 +238,21 @@ export function mountConsensus(app) {
       return;
     }
     if (!mount.isMounted() || !mount.isCurrentMount()) return;
-    releaseInheritedNextQuestionMarker(row);
+    const released = releaseInheritedNextQuestionMarker(row);
+    if (!released?.released) {
+      const resumed = await resumeConsensusNextQuestion();
+      if (
+        resumed?.reason === "read-failed" ||
+        resumed?.reason === "unknown" ||
+        resumed?.reason === "incomplete-read"
+      ) {
+        await showAppAlert("Vérifie ta connexion réseau et réessaie", {
+          title: "Partie",
+          icon: "📡",
+        });
+      }
+    }
+    if (!mount.isMounted() || !mount.isCurrentMount()) return;
     syncFromSession();
     render();
   }

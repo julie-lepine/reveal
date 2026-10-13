@@ -66,6 +66,7 @@ mock.module("../js/core/gameSync.js", {
     playerKeyToDisplayName: mock.fn((key) => key),
     syncConsensusSession: syncMock,
     consensusToRemote: mock.fn((session) => session),
+    consensusFromRemote: (remote) => (remote ? { ...remote } : null),
     patchGameState: patchMock,
     fetchRawGameSessionRow: (...args) => fetchRawMock(...args),
     requireLocalParticipantUid: mock.fn(() => HOST_UID),
@@ -1178,6 +1179,292 @@ describe("consensus next-question recovery", () => {
     const blocked = click.slice(click.indexOf("if (writesBlocked())"), click.indexOf("try {"));
     assert.equal(blocked.includes("startQuestion"), false);
     assert.ok(click.indexOf("startQuestion") > click.indexOf("try {"));
+  });
+
+  function revealLine(consensus, updatedAt, lobbyId = LOBBY_ID) {
+    return {
+      ...revealRow({
+        lobbyStarted: true,
+        phase: "reveal",
+        questionIdx: 0,
+        answers: { Host: { value: 20, questionIdx: 0 } },
+        deck: [
+          { id: "q1", question: "Première" },
+          { id: "q2", question: "Deuxième" },
+        ],
+        ...consensus,
+      }),
+      lobby_id: lobbyId,
+      updated_at: updatedAt,
+    };
+  }
+
+  it("jeton valide : la transition utilise l'état renvoyé, pas le corps local", async () => {
+    inheritedNextQuestionMarker();
+    fetchRawMock.mock.mockImplementation(async () =>
+      revealLine({}, "2026-10-13T18:00:00.123456+00:00")
+    );
+    const sent = [];
+    patchMock.mock.mockImplementation(async (body) => {
+      sent.push(body.consensus.answers);
+      return {
+        applied: true,
+        row: {
+          lobby_id: LOBBY_ID,
+          state: {
+            consensus: {
+              lobbyStarted: true,
+              phase: "question",
+              questionIdx: 1,
+              answers: { Guest: { value: 80, questionIdx: 1 } },
+              deck: [
+                { id: "q1", question: "Première" },
+                { id: "q2", question: "Deuxième" },
+              ],
+            },
+          },
+        },
+      };
+    });
+    const result = await session.resumeConsensusNextQuestion();
+    assert.equal(result.reason, "applied");
+    assert.equal(result.writes, 1);
+    assert.deepEqual(sent, [{}]);
+    assert.equal(state.consensusGame.answers.Guest.value, 80);
+    assert.equal(session.__getConsensusWriteMarkerForTests(), null);
+  });
+
+  it("filtre périmé : aucun faux succès et le corps n'est pas renvoyé tel quel", async () => {
+    inheritedNextQuestionMarker();
+    const bodies = [];
+    let reads = 0;
+    fetchRawMock.mock.mockImplementation(async () => {
+      reads += 1;
+      return revealLine(
+        reads === 1 ? { matchScores: { Host: 1 } } : { matchScores: { Host: 9 } },
+        reads === 1 ? "2026-10-13T18:00:00.111111+00:00" : "2026-10-13T18:00:01.222222+00:00"
+      );
+    });
+    patchMock.mock.mockImplementation(async (body) => {
+      bodies.push(body.consensus.matchScores.Host);
+      return { applied: false, reason: "not-applied", row: null };
+    });
+    const result = await session.resumeConsensusNextQuestion();
+    assert.equal(result.reason, "stopped");
+    assert.equal(result.released, false);
+    assert.deepEqual(bodies, [1, 9]);
+    assert.equal(session.__getConsensusWriteMarkerForTests().attemptId, 4);
+  });
+
+  it("après un refus, N+1 déjà répondue est adoptée sans second envoi", async () => {
+    inheritedNextQuestionMarker();
+    let reads = 0;
+    fetchRawMock.mock.mockImplementation(async () => {
+      reads += 1;
+      if (reads === 1) return revealLine({}, "2026-10-13T18:00:00.111111+00:00");
+      return revealLine(
+        {
+          phase: "question",
+          questionIdx: 1,
+          answers: { Guest: { value: 80, questionIdx: 1 } },
+        },
+        "2026-10-13T18:00:02.000000+00:00"
+      );
+    });
+    patchMock.mock.mockImplementation(async () => ({ applied: false, row: null }));
+    const result = await session.resumeConsensusNextQuestion();
+    assert.equal(result.reason, "adopt");
+    assert.equal(result.released, true);
+    assert.equal(patchMock.mock.callCount(), 1);
+    assert.equal(state.consensusGame.answers.Guest.value, 80);
+    assert.equal(state.consensusGame.phase, "question");
+    assert.equal(session.__getConsensusWriteMarkerForTests(), null);
+  });
+
+  it("après un refus, N avec un nouveau jeton n'autorise qu'une seconde tentative", async () => {
+    inheritedNextQuestionMarker();
+    const tokens = ["2026-10-13T18:00:00.111111+00:00", "2026-10-13T18:00:03.333333+00:00"];
+    let reads = 0;
+    fetchRawMock.mock.mockImplementation(async () => {
+      const token = tokens[Math.min(reads, tokens.length - 1)];
+      reads += 1;
+      return revealLine({ matchScores: { Host: reads } }, token);
+    });
+    const hosts = [];
+    patchMock.mock.mockImplementation(async (body) => {
+      hosts.push(body.consensus.matchScores.Host);
+      if (hosts.length === 1) return { applied: false, row: null };
+      return {
+        applied: true,
+        row: {
+          lobby_id: LOBBY_ID,
+          state: {
+            consensus: {
+              lobbyStarted: true,
+              phase: "question",
+              questionIdx: 1,
+              answers: { Guest: { value: 5, questionIdx: 1 } },
+            },
+          },
+        },
+      };
+    });
+    const result = await session.resumeConsensusNextQuestion();
+    assert.equal(result.reason, "applied");
+    assert.deepEqual(hosts, [1, 2]);
+    assert.equal(patchMock.mock.callCount(), 2);
+  });
+
+  it("un second refus arrête sans troisième écriture", async () => {
+    inheritedNextQuestionMarker();
+    let reads = 0;
+    fetchRawMock.mock.mockImplementation(async () => {
+      reads += 1;
+      return revealLine({}, `2026-10-13T18:00:0${reads}.000000+00:00`);
+    });
+    patchMock.mock.mockImplementation(async () => ({ applied: false, row: null }));
+    const result = await session.resumeConsensusNextQuestion();
+    assert.equal(result.reason, "stopped");
+    assert.equal(patchMock.mock.callCount(), 2);
+    assert.equal(session.__getConsensusWriteMarkerForTests().attemptId, 4);
+  });
+
+  it("un timeout laisse le résultat inconnu et une lecture ratée n'écrit plus", async () => {
+    inheritedNextQuestionMarker();
+    fetchRawMock.mock.mockImplementation(async () =>
+      revealLine({}, "2026-10-13T18:00:00.123456+00:00")
+    );
+    let settleInner = null;
+    patchMock.mock.mockImplementation(async (_body, opts) => {
+      settleInner = observeUnresolved(opts).settle;
+      throw new Error("Synchronisation trop longue.");
+    });
+    const first = await session.resumeConsensusNextQuestion();
+    assert.equal(first.reason, "unknown");
+    assert.equal(patchMock.mock.callCount(), 1);
+    assert.equal(session.consensusNextQuestionFlightOpen(), true);
+    const blocked = await session.resumeConsensusNextQuestion();
+    assert.equal(blocked.reason, "pending");
+    assert.equal(patchMock.mock.callCount(), 1);
+    settleInner();
+    await Promise.resolve();
+    fetchRawMock.mock.mockImplementation(async () => {
+      throw new Error("offline");
+    });
+    const second = await session.resumeConsensusNextQuestion();
+    assert.equal(second.reason, "read-failed");
+    assert.equal(patchMock.mock.callCount(), 1);
+    assert.equal(session.__getConsensusWriteMarkerForTests().step, "next-question");
+  });
+
+  it("une promesse interne ouverte interdit le second envoi", async () => {
+    patchMock.mock.mockImplementation(async (_body, opts) => {
+      observeUnresolved(opts, { mutable: true });
+      throw new Error("Synchronisation trop longue.");
+    });
+    await assert.rejects(() => session.startConsensusQuestion(1));
+    const before = patchMock.mock.callCount();
+    const result = await session.resumeConsensusNextQuestion();
+    assert.equal(result.reason, "pending");
+    assert.equal(patchMock.mock.callCount(), before);
+  });
+
+  it("une ancienne tentative ne retire pas le marqueur posé pendant la reprise", async () => {
+    inheritedNextQuestionMarker({ attemptId: 4 });
+    fetchRawMock.mock.mockImplementation(async () =>
+      revealLine({}, "2026-10-13T18:00:00.123456+00:00")
+    );
+    patchMock.mock.mockImplementation(async () => {
+      session.__setConsensusWriteMarkerForTests({
+        lobbyId: LOBBY_ID,
+        questionIdx: 1,
+        step: "next-question",
+        attemptId: 9,
+        targetQuestionIdx: 2,
+        baselineQuestionIdx: 1,
+        baselinePhase: "reveal",
+      });
+      return {
+        applied: true,
+        row: {
+          lobby_id: LOBBY_ID,
+          state: {
+            consensus: { lobbyStarted: true, phase: "question", questionIdx: 1, answers: {} },
+          },
+        },
+      };
+    });
+    const result = await session.resumeConsensusNextQuestion();
+    assert.equal(result.reason, "attempt-changed");
+    assert.equal(result.released, false);
+    assert.equal(session.__getConsensusWriteMarkerForTests().attemptId, 9);
+  });
+
+  it("une lecture absente, invalide ou d'un autre lobby conserve le marqueur", async () => {
+    inheritedNextQuestionMarker();
+    for (const row of [
+      null,
+      { lobby_id: LOBBY_ID, state: {} },
+      { lobby_id: "other-lobby", state: { consensus: { lobbyStarted: true, phase: "question", questionIdx: 1 } } },
+    ]) {
+      fetchRawMock.mock.mockImplementation(async () => row);
+      const result = await session.resumeConsensusNextQuestion();
+      assert.equal(result.released, false);
+      assert.equal(session.__getConsensusWriteMarkerForTests().attemptId, 4);
+    }
+    fetchRawMock.mock.mockImplementation(async () => {
+      throw new Error("offline");
+    });
+    assert.equal((await session.resumeConsensusNextQuestion()).reason, "read-failed");
+    assert.equal(patchMock.mock.callCount(), 0);
+  });
+
+  it("les marqueurs answer et reveal ne sont pas repris", async () => {
+    for (const step of ["answer", "reveal"]) {
+      session.__setConsensusWriteMarkerForTests({
+        lobbyId: LOBBY_ID,
+        questionIdx: 0,
+        step,
+        attemptId: 3,
+      });
+      const result = await session.resumeConsensusNextQuestion();
+      assert.equal(result.reason, "not-next-question");
+      assert.equal(session.__getConsensusWriteMarkerForTests().step, step);
+    }
+    assert.equal(patchMock.mock.callCount(), 0);
+    assert.equal(fetchRawMock.mock.callCount(), 0);
+  });
+
+  it("la reprise conditionnelle ne change pas la passation et garde le filtre optionnel", () => {
+    const hostSrc = fs.readFileSync(new URL("../js/core/hostPresence.js", import.meta.url), "utf8");
+    const sessionSrc = fs.readFileSync(
+      new URL("../js/core/consensusSession.js", import.meta.url),
+      "utf8"
+    );
+    const gameSrc = fs.readFileSync(new URL("../js/core/gameSync.js", import.meta.url), "utf8");
+    const apiSrc = fs.readFileSync(new URL("../js/core/supabaseGame.js", import.meta.url), "utf8");
+    assert.match(hostSrc, /export function resolveActingHostUserId/);
+    assert.match(hostSrc, /\.sort\(\(a, b\) => String\(a\)\.localeCompare\(String\(b\)\)\)/);
+    const resume = sessionSrc.slice(
+      sessionSrc.indexOf("export async function resumeConsensusNextQuestion"),
+      sessionSrc.indexOf("export function releaseInheritedNextQuestionMarker")
+    );
+    assert.equal(resume.includes("resolveActingHostUserId"), false);
+    assert.match(apiSrc, /\.select\("id, lobby_id, game_id, screen, host_id, updated_at"\)/);
+    assert.match(apiSrc, /query\.eq\("updated_at", expectedUpdatedAt\)/);
+    assert.match(apiSrc, /"id, lobby_id, game_id, screen, host_id, state, updated_at"/);
+    const conditionalStart = gameSrc.indexOf("const token = freshRow?.updated_at;");
+    const conditionalEnd = gameSrc.indexOf("let row = await updateGameSession(lobbyId, patch);");
+    const conditional = gameSrc.slice(conditionalStart, conditionalEnd);
+    assert.ok(conditionalStart > 0 && conditionalEnd > conditionalStart);
+    assert.match(conditional, /expectedUpdatedAt: token/);
+    assert.match(conditional, /returnState: true/);
+    assert.equal(conditional.includes("state: nextState"), false);
+    assert.match(gameSrc, /if \(!freshRow && conditionalUpdatedAt\)/);
+    assert.match(
+      gameSrc,
+      /let row = await updateGameSession\(lobbyId, patch\);/
+    );
   });
 
   it("le clic bloqué relit et le premier échec annonce la connexion, sans relancer la question", () => {

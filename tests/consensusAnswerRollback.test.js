@@ -55,6 +55,7 @@ mock.module("../js/core/gameSync.js", {
     playerKeyToDisplayName: mock.fn((key) => key),
     syncConsensusSession: mock.fn(),
     consensusToRemote: mock.fn((session) => session),
+    consensusFromRemote: (remote) => (remote ? { ...remote } : null),
     patchGameState: mock.fn(),
     fetchRawGameSessionRow: mock.fn(async () => null),
     requireLocalParticipantUid: mock.fn(() => HOST_UID),

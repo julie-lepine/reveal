@@ -5055,6 +5055,9 @@ export async function patchGameState(
     withEveningScores = false,
     timeoutMs = DEFAULT_SYNC_PATCH_TIMEOUT_MS,
     observeConsensusAttempt = null,
+    conditionalUpdatedAt = false,
+    baselineQuestionIdx = null,
+    baselinePhase = null,
   } = {}
 ) {
   if (
@@ -5078,6 +5081,9 @@ export async function patchGameState(
     screen,
     gameId,
     withEveningScores,
+    conditionalUpdatedAt,
+    baselineQuestionIdx,
+    baselinePhase,
     markMutable() {
       mutableStarted = true;
     },
@@ -5236,10 +5242,22 @@ async function patchGameStateAsNonHost(
 
 async function patchGameStateInner(
   stateMerge,
-  { screen, gameId, withEveningScores = false, markMutable = null } = {}
+  {
+    screen,
+    gameId,
+    withEveningScores = false,
+    markMutable = null,
+    conditionalUpdatedAt = false,
+    baselineQuestionIdx = null,
+    baselinePhase = null,
+  } = {}
 ) {
   if (!isGameSyncActive()) return null;
   const lobbyId = getState().lobby.id;
+
+  if (conditionalUpdatedAt && !isLobbyHost()) {
+    return { applied: false, reason: "not-real-host", row: null };
+  }
 
   // I-08 : seul l'hôte réel conserve updateGameSession
   if (!isLobbyHost()) {
@@ -5270,6 +5288,10 @@ async function patchGameStateInner(
   const scoresOnly = isEveningScoresOnlyMerge(mergePayload);
   const forceFresh = patchNeedsFreshSessionRow(mergePayload);
   let freshRow = await loadSessionRowForPatch(lobbyId, { scoresOnly, forceFresh });
+
+  if (!freshRow && conditionalUpdatedAt) {
+    return { applied: false, reason: "missing-row", row: null };
+  }
 
   if (!freshRow) {
     const hostId = getSupabaseUserId();
@@ -5698,6 +5720,45 @@ async function patchGameStateInner(
       if (screen) handleSessionRoute(freshRow);
       return freshRow;
     }
+  }
+
+  if (conditionalUpdatedAt) {
+    const remote = freshRow?.state?.consensus;
+    const baseline = {
+      lobbyStarted: true,
+      questionIdx: baselineQuestionIdx,
+      phase: baselinePhase || "reveal",
+    };
+    const token = freshRow?.updated_at;
+    if (typeof token !== "string" || token.length === 0) {
+      return { applied: false, reason: "missing-token", row: null };
+    }
+    if (remote && isConsensusRoundAhead(baseline, remote)) {
+      applyRemoteSession(freshRow);
+      if (screen) handleSessionRoute(freshRow);
+      return { adopted: true, applied: false, row: freshRow };
+    }
+    if (
+      !remote ||
+      remote.lobbyStarted !== true ||
+      remote.questionIdx !== baselineQuestionIdx ||
+      remote.phase !== baseline.phase
+    ) {
+      applyRemoteSession(freshRow);
+      if (screen) handleSessionRoute(freshRow);
+      return { applied: false, reason: "not-baseline", row: freshRow };
+    }
+    markMutable?.();
+    const returned = await updateGameSession(lobbyId, patch, {
+      expectedUpdatedAt: token,
+      returnState: true,
+    });
+    if (!returned?.state || typeof returned.state !== "object") {
+      return { applied: false, reason: "not-applied", row: null };
+    }
+    applyRemoteSession(returned);
+    if (screen) handleSessionRoute(returned);
+    return { applied: true, row: returned };
   }
 
   markMutable?.();
