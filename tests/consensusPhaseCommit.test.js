@@ -943,6 +943,90 @@ describe("consensus next-question recovery", () => {
     assert.equal(session.__getConsensusWriteMarkerForTests().attemptId, 999);
   });
 
+  it("marqueur next-question sans promesse : aucun envoi", async () => {
+    session.__setConsensusWriteMarkerForTests({
+      lobbyId: LOBBY_ID,
+      questionIdx: 0,
+      step: "next-question",
+      attemptId: 4,
+      targetQuestionIdx: 1,
+    });
+    await assert.rejects(
+      () => session.startConsensusQuestion(1),
+      (err) => err?.code === "CONSENSUS_WRITE_BLOCKED"
+    );
+    assert.equal(patchMock.mock.callCount(), 0);
+    assert.equal(session.__getConsensusWriteMarkerForTests().step, "next-question");
+    assert.equal(session.consensusNextQuestionFlightOpen(), false);
+  });
+
+  it("marqueur answer : la protection d'écriture reste", async () => {
+    session.__setConsensusWriteMarkerForTests({
+      lobbyId: LOBBY_ID,
+      questionIdx: 0,
+      step: "answer",
+      attemptId: 2,
+    });
+    await assert.rejects(
+      () => session.startConsensusQuestion(1),
+      (err) => err?.code === "CONSENSUS_WRITE_BLOCKED"
+    );
+    assert.equal(patchMock.mock.callCount(), 0);
+    assert.equal(session.__getConsensusWriteMarkerForTests().step, "answer");
+  });
+
+  it("promesse active et timeout d'écran : pas de second envoi", async () => {
+    patchMock.mock.mockImplementation(async (_body, opts) => {
+      observeUnresolved(opts, { mutable: true });
+      throw new Error("Synchronisation trop longue.");
+    });
+    await assert.rejects(() => session.startConsensusQuestion(1));
+    assert.equal(session.consensusNextQuestionFlightOpen(), true);
+    await assert.rejects(
+      () => session.startConsensusQuestion(1),
+      (err) => err?.code === "CONSENSUS_WRITE_BLOCKED"
+    );
+    assert.equal(patchMock.mock.callCount(), 1);
+    assert.equal(session.__getConsensusWriteMarkerForTests().step, "next-question");
+  });
+
+  it("une ancienne tentative ne retire pas le marqueur courant", () => {
+    session.__setConsensusWriteMarkerForTests({
+      lobbyId: LOBBY_ID,
+      questionIdx: 0,
+      step: "next-question",
+      attemptId: 8,
+    });
+    assert.equal(session.__settleConsensusServerWriteForTests(3), false);
+    assert.equal(session.__getConsensusWriteMarkerForTests().attemptId, 8);
+  });
+
+  it("le clic bloqué relit et le premier échec annonce la connexion, sans relancer la question", () => {
+    const gameSrc = fs.readFileSync(new URL("../js/games/consensus.js", import.meta.url), "utf8");
+    const reread = gameSrc.slice(
+      gameSrc.indexOf("async function rereadSharedConsensus"),
+      gameSrc.indexOf("async function beginReveal")
+    );
+    assert.match(reread, /refreshGameSession/);
+    assert.equal(reread.includes("startQuestion"), false);
+    assert.equal(reread.includes("reconcileConsensusNextQuestion"), false);
+    assert.match(reread, /Vérifie ta connexion réseau et réessaie/);
+    const click = gameSrc.slice(
+      gameSrc.indexOf('"#btn-consensus-next"'),
+      gameSrc.indexOf('"[data-consensus-action]"')
+    );
+    const blocked = click.slice(click.indexOf("if (writesBlocked())"), click.indexOf("try {"));
+    assert.match(blocked, /rereadSharedConsensus/);
+    assert.equal(blocked.includes("startQuestion"), false);
+    assert.match(click, /Vérifie ta connexion réseau et réessaie/);
+    const syncSrc = fs.readFileSync(new URL("../js/core/gameSync.js", import.meta.url), "utf8");
+    const displayMerge = syncSrc.slice(
+      syncSrc.indexOf("function mergeConsensusGameLocal"),
+      syncSrc.indexOf("function normalizeConsensusPlayerList")
+    );
+    assert.match(displayMerge, /consensusAheadAnswers/);
+  });
+
   it("11 repère l'upsert mutable et son repli sans prétendre observer un commit tardif", () => {
     const src = fs.readFileSync(new URL("../js/core/gameSync.js", import.meta.url), "utf8");
     const innerStart = src.indexOf("async function patchGameStateInner");

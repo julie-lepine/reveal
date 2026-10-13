@@ -95,6 +95,8 @@ import {
   mergeTriviaAnswersUid,
   normalizeTriviaAnswersMap,
   isNewConsensusQuestionRound,
+  isConsensusRoundAhead,
+  consensusAheadAnswers,
   isNewConsensusGame,
   mergeCustomGameDeck,
   normalizePlayerKeyedMap,
@@ -1930,11 +1932,15 @@ function mergeConsensusGameLocal(local, remote) {
     );
     return { ...remote, ready };
   }
-  const newQuestionRound = isNewConsensusQuestionRound(local, remote);
+  const aheadAnswers = consensusAheadAnswers(local, remote);
+  const newQuestionRound =
+    aheadAnswers != null || isNewConsensusQuestionRound(local, remote);
   const remoteAnswers = remote.answers || {};
   const localAnswers = local.answers || {};
   let answers = remoteAnswers;
-  if (newQuestionRound) {
+  if (aheadAnswers) {
+    answers = aheadAnswers;
+  } else if (newQuestionRound) {
     answers = remoteAnswers;
   } else if (
     remote.phase === "question" ||

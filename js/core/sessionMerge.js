@@ -581,6 +581,33 @@ export function isNewConsensusGame(cur, inc) {
   return false;
 }
 
+/**
+ * Manche distante plus avancée, à afficher sans écriture.
+ * Un index plus grand ne suffit pas : la phase doit être une phase de partie,
+ * et les deux côtés doivent être une partie déjà lancée. Un index plus petit
+ * (revanche, retour à la question 0) n'est pas une avance.
+ */
+export function isConsensusRoundAhead(cur, inc) {
+  if (!cur || !inc) return false;
+  if (inc.lobbyStarted !== true || cur.lobbyStarted === false) return false;
+  const curIdx = cur.questionIdx;
+  const incIdx = inc.questionIdx;
+  if (!Number.isInteger(curIdx) || !Number.isInteger(incIdx)) return false;
+  if (incIdx <= curIdx) return false;
+  return (
+    inc.phase === "question" ||
+    inc.phase === "reveal-pending" ||
+    inc.phase === "reveal" ||
+    inc.phase === "final"
+  );
+}
+
+/** Réponses à afficher quand la manche distante est devant. Null sinon. */
+export function consensusAheadAnswers(cur, inc) {
+  if (!isConsensusRoundAhead(cur, inc)) return null;
+  return { ...(inc.answers || {}) };
+}
+
 /** Nouvelle manche Consensus : index avancé ou réponses distantes vidées après une manche précédente. */
 export function isNewConsensusQuestionRound(cur, inc) {
   if (!inc) return false;

@@ -3,7 +3,6 @@ import { useConsensusGame } from "../core/useConsensusGame.js";
 import {
   consensusLobbyWriteBlocked,
   guardConsensusServerWrite,
-  reconcileConsensusNextQuestion,
   subscribeConsensusLaunchEnded,
 } from "../core/consensusSession.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
@@ -221,6 +220,23 @@ export function mountConsensus(app) {
 
   function writesBlocked() {
     return mp && consensusLobbyWriteBlocked();
+  }
+
+  async function rereadSharedConsensus() {
+    try {
+      await refreshGameSession();
+    } catch (err) {
+      console.warn("Consensus reread:", err);
+      if (!mount.isMounted() || !mount.isCurrentMount()) return;
+      await showAppAlert("Vérifie ta connexion réseau et réessaie", {
+        title: "Partie",
+        icon: "📡",
+      });
+      return;
+    }
+    if (!mount.isMounted() || !mount.isCurrentMount()) return;
+    syncFromSession();
+    render();
   }
 
   async function beginReveal() {
@@ -915,22 +931,7 @@ export function mountConsensus(app) {
     bindNav(app);
     bindExitGame(app);
     app.querySelector("#btn-consensus-recheck")?.addEventListener("click", () => {
-      void (async () => {
-        const result = await reconcileConsensusNextQuestion().catch(() => null);
-        if (result?.released && result.row?.state?.consensus) {
-          const remote = consensusFromRemote(result.row.state.consensus);
-          if (remote) {
-            saveStatePatch({
-              consensusGame: { ...consensus.getSession(), ...remote },
-            });
-          }
-        } else {
-          await refreshGameSession().catch(() => null);
-        }
-        if (!mount.isMounted() || !mount.isCurrentMount()) return;
-        syncFromSession();
-        render();
-      })();
+      void rereadSharedConsensus();
     });
 
     const newScrollEl = app.querySelector(".page--scroll");
@@ -988,10 +989,7 @@ export function mountConsensus(app) {
 
     app.querySelector("#btn-consensus-next")?.addEventListener("click", withClickLock(async () => {
       if (writesBlocked()) {
-        await showAppAlert(
-          "La question suivante n'a pas été lancée. Ce téléphone ne peut plus le faire. Un autre joueur peut continuer la partie.",
-          { title: "Partie", icon: "📡" }
-        );
+        await rereadSharedConsensus();
         return;
       }
       try {
@@ -1005,7 +1003,12 @@ export function mountConsensus(app) {
         await finishConsensusGame();
       } catch (err) {
         console.warn("Consensus next:", err);
-        if (mount.isMounted() && mount.isCurrentMount()) render();
+        if (!mount.isMounted() || !mount.isCurrentMount()) return;
+        await showAppAlert("Vérifie ta connexion réseau et réessaie", {
+          title: "Partie",
+          icon: "📡",
+        });
+        render();
       }
     }));
 

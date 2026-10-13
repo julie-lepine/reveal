@@ -21,6 +21,8 @@ import {
   mergeConsensusPatchState,
   mergeConsensusPhase,
   isNewConsensusQuestionRound,
+  isConsensusRoundAhead,
+  consensusAheadAnswers,
   mergeTriviaPatchState,
   mergeTruthMeterPatchState,
   mergeSpeedVotePatchState,
@@ -386,6 +388,79 @@ describe("isNewConsensusQuestionRound", () => {
     };
     const inc = { phase: "question", questionIdx: 1, answers: { u2: { value: 60, submittedAt: 2 } } };
     assert.equal(isNewConsensusQuestionRound(cur, inc), false);
+  });
+});
+
+describe("consensus display catch-up", () => {
+  const local = {
+    lobbyStarted: true,
+    phase: "reveal",
+    questionIdx: 0,
+    answers: { Host: { value: 20, questionIdx: 0 } },
+  };
+
+  it("affiche une manche distante plus avancée et conserve ses réponses", () => {
+    const remote = {
+      lobbyStarted: true,
+      phase: "question",
+      questionIdx: 1,
+      answers: { Guest: { value: 80, questionIdx: 1 } },
+    };
+    assert.equal(isConsensusRoundAhead(local, remote), true);
+    assert.deepEqual(consensusAheadAnswers(local, remote), remote.answers);
+    assert.equal(consensusAheadAnswers(local, remote).Guest.value, 80);
+    assert.equal(mergeConsensusPhase("reveal", "question", { newQuestionRound: true }), "question");
+  });
+
+  it("n'adopte pas un index distant inférieur", () => {
+    const remote = {
+      lobbyStarted: true,
+      phase: "question",
+      questionIdx: 0,
+      answers: { Guest: { value: 10, questionIdx: 0 } },
+    };
+    const aheadLocal = { ...local, questionIdx: 2 };
+    assert.equal(isConsensusRoundAhead(aheadLocal, remote), false);
+    assert.equal(consensusAheadAnswers(aheadLocal, remote), null);
+  });
+
+  it("n'adopte pas une partie non lancée ni un index illisible", () => {
+    assert.equal(
+      isConsensusRoundAhead(local, {
+        lobbyStarted: false,
+        phase: "question",
+        questionIdx: 3,
+        answers: { Guest: { value: 1 } },
+      }),
+      false
+    );
+    assert.equal(
+      isConsensusRoundAhead(local, {
+        lobbyStarted: true,
+        phase: "prep",
+        questionIdx: 3,
+        answers: {},
+      }),
+      false
+    );
+    assert.equal(
+      isConsensusRoundAhead(local, {
+        lobbyStarted: true,
+        phase: "question",
+        questionIdx: 1.5,
+        answers: { Guest: { value: 1 } },
+      }),
+      false
+    );
+    assert.equal(
+      isConsensusRoundAhead({ ...local, lobbyStarted: false }, {
+        lobbyStarted: true,
+        phase: "question",
+        questionIdx: 1,
+        answers: {},
+      }),
+      false
+    );
   });
 });
 

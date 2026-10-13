@@ -629,6 +629,14 @@ function remoteIsExactBaseline(remote, attempt) {
   );
 }
 
+export function consensusNextQuestionFlightOpen() {
+  return Boolean(
+    liveNextQuestionAttempt &&
+      liveNextQuestionAttempt.innerSettled === false &&
+      liveNextQuestionAttempt.lobbyId === currentConsensusLobbyId()
+  );
+}
+
 export async function startConsensusQuestion(questionIdx) {
   const confirmed = getConsensusSession();
   const next = buildQuestionStartPatch(confirmed, questionIdx);
@@ -636,6 +644,7 @@ export async function startConsensusQuestion(questionIdx) {
     await syncConsensusSession(next);
     return next;
   }
+  if (consensusNextQuestionFlightOpen()) throw new ConsensusWriteBlockedError();
   const baselineIdx = confirmed.questionIdx ?? 0;
   const baselinePhase = confirmed.phase;
   const reserved = reserveConsensusServerWrite("next-question", {
