@@ -4,6 +4,7 @@ import {
   consensusLobbyWriteBlocked,
   guardConsensusServerWrite,
   releaseInheritedNextQuestionMarker,
+  resumeConsensusAnswer,
   resumeConsensusNextQuestion,
   subscribeConsensusLaunchEnded,
 } from "../core/consensusSession.js";
@@ -241,10 +242,19 @@ export function mountConsensus(app) {
     const released = releaseInheritedNextQuestionMarker(row);
     if (!released?.released) {
       const resumed = await resumeConsensusNextQuestion();
+      const answerResumed =
+        resumed?.reason === "not-next-question"
+          ? await resumeConsensusAnswer({ fallbackValue: draftValue })
+          : null;
+      const reason = answerResumed?.reason || resumed?.reason;
       if (
-        resumed?.reason === "read-failed" ||
-        resumed?.reason === "unknown" ||
-        resumed?.reason === "incomplete-read"
+        reason === "read-failed" ||
+        reason === "unknown" ||
+        reason === "incomplete-read" ||
+        reason === "pending" ||
+        reason === "stopped" ||
+        reason === "incoherent" ||
+        reason === "incomplete-marker"
       ) {
         await showAppAlert("Vérifie ta connexion réseau et réessaie", {
           title: "Partie",
@@ -974,22 +984,25 @@ export function mountConsensus(app) {
           draftValue = value;
         },
       });
-      app.querySelector("#btn-consensus-submit")?.addEventListener("click", async () => {
-        if (answerState() === "submitted") return;
+      const submitBtn = app.querySelector("#btn-consensus-submit");
+      if (submitBtn && writesBlocked()) submitBtn.disabled = false;
+      submitBtn?.addEventListener("click", async () => {
         if (writesBlocked()) {
-          await showAppAlert(
-            "Ta réponse ne partira pas. Les autres peuvent continuer sans elle.",
-            { title: "Partie", icon: "📡" }
-          );
+          await rereadSharedConsensus();
           return;
         }
+        if (answerState() === "submitted") return;
         try {
           const committed = await commitLocalDraft({ submitted: true });
           if (!committed) return;
           if (!mount.isMounted()) return;
           if (!mount.isCurrentMount()) return;
           if (writesBlocked()) return;
-          if (consensus.allAnswersIn() && (!mp || canActAsHost())) {
+          if (
+            consensus.getSession().phase === "question" &&
+            consensus.allAnswersIn() &&
+            (!mp || canActAsHost())
+          ) {
             await beginReveal();
           } else {
             render();

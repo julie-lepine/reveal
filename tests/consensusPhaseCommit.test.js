@@ -19,6 +19,7 @@ globalThis.localStorage = {
 };
 
 const patchMock = mock.fn();
+const feedbackMock = mock.fn();
 const fetchRawMock = mock.fn(async () => null);
 const syncMock = mock.fn();
 const launchMock = mock.fn();
@@ -85,7 +86,7 @@ mock.module("../js/core/state.js", {
 });
 
 mock.module("../js/core/patchGameStateFeedback.js", {
-  namedExports: { patchGameStateWithFeedback: mock.fn() },
+  namedExports: { patchGameStateWithFeedback: feedbackMock },
 });
 
 mock.module("../js/core/mpLaunch.js", {
@@ -1509,5 +1510,340 @@ describe("consensus next-question recovery", () => {
     const upsertFn = src.slice(upsertStart, upsertEnd);
     assert.match(upsertFn, /upsertGameSessionPreservingRosterTopics/);
     assert.match(upsertFn, /return upsertGameSession\(/);
+  });
+});
+
+function hostAnswer(questionIdx = 0, value = 40) {
+  return {
+    value,
+    timestamp: 10,
+    submittedAt: 10,
+    questionIdx,
+    imputed: false,
+  };
+}
+
+function answerMarker(extra = {}) {
+  session.__setConsensusWriteMarkerForTests({
+    lobbyId: LOBBY_ID,
+    questionIdx: 0,
+    step: "answer",
+    attemptId: 4,
+    baselineQuestionIdx: 0,
+    baselinePhase: "question",
+    answer: hostAnswer(),
+    ...extra,
+  });
+}
+
+function questionLine(consensus = {}, updatedAt = "2026-10-13T18:00:00.111111+00:00") {
+  return {
+    lobby_id: LOBBY_ID,
+    updated_at: updatedAt,
+    state: {
+      consensus: {
+        lobbyStarted: true,
+        phase: "question",
+        questionIdx: 0,
+        answers: {},
+        ...consensus,
+      },
+    },
+  };
+}
+
+function assertConditionalAnswerCall(call, value = 40) {
+  const body = call.arguments[0];
+  const opts = call.arguments[1];
+  assert.equal(opts.conditionalUpdatedAt, true);
+  assert.equal(opts.baselineQuestionIdx, 0);
+  assert.equal(opts.baselinePhase, "question");
+  assert.deepEqual(Object.keys(body.consensus), ["answers"]);
+  assert.equal(body.consensus.answers[HOST_UID].value, value);
+  assert.equal(body.consensus.phase, undefined);
+}
+
+describe("consensus answer recovery", () => {
+  beforeEach(() => {
+    storage.clear();
+    session.__resetConsensusWriteGuardForTests();
+    state.consensusGame = {
+      phase: "question",
+      questionIdx: 0,
+      lobbyStarted: true,
+      answers: {},
+    };
+    state.lobby = { id: LOBBY_ID };
+    patchMock.mock.resetCalls();
+    feedbackMock.mock.resetCalls();
+    fetchRawMock.mock.resetCalls();
+    saveStatePatchMock.mock.resetCalls();
+    patchMock.mock.mockImplementation(async () => ({ applied: false, row: null }));
+    feedbackMock.mock.mockImplementation(async () => {
+      throw new Error("feedback inattendu");
+    });
+    fetchRawMock.mock.mockImplementation(async () => null);
+    saveStatePatchMock.mock.mockImplementation((patch) => {
+      if (patch?.consensusGame) state.consensusGame = patch.consensusGame;
+    });
+  });
+
+  it("1 envoie une réponse absente sur N avec un filtre conditionnel, puis la confirme", async () => {
+    answerMarker();
+    fetchRawMock.mock.mockImplementation(async () => questionLine());
+    patchMock.mock.mockImplementation(async () => ({
+      applied: true,
+      row: questionLine({ answers: { [HOST_UID]: hostAnswer() } }),
+    }));
+    const result = await session.resumeConsensusAnswer();
+    assert.equal(result.reason, "applied");
+    assert.equal(result.released, true);
+    assert.equal(patchMock.mock.callCount(), 1);
+    assertConditionalAnswerCall(patchMock.mock.calls[0]);
+    assert.equal(session.__getConsensusWriteMarkerForTests(), null);
+    assert.equal(state.consensusGame.answers[HOST_UID].value, 40);
+  });
+
+  it("la première validation hôte est elle aussi conditionnelle", async () => {
+    feedbackMock.mock.mockImplementation(async (body) => ({
+      applied: true,
+      row: questionLine({ answers: body.consensus.answers }),
+    }));
+    await session.commitConsensusAnswer(40, { submitted: true });
+    assert.equal(feedbackMock.mock.callCount(), 1);
+    assert.equal(patchMock.mock.callCount(), 0);
+    assertConditionalAnswerCall(feedbackMock.mock.calls[0]);
+    assert.equal(session.__getConsensusWriteMarkerForTests(), null);
+  });
+
+  it("2 n'envoie rien si la réponse du joueur est déjà sur N", async () => {
+    answerMarker();
+    state.consensusGame.answers = { Host: hostAnswer(0, 7) };
+    fetchRawMock.mock.mockImplementation(async () =>
+      questionLine({ answers: { [HOST_UID]: hostAnswer(0, 42) } })
+    );
+    const result = await session.resumeConsensusAnswer();
+    assert.equal(result.reason, "confirmed");
+    assert.equal(result.write, false);
+    assert.equal(patchMock.mock.callCount(), 0);
+    assert.equal(session.__getConsensusWriteMarkerForTests(), null);
+    assert.equal(state.consensusGame.answers[HOST_UID].value, 42);
+  });
+
+  it("3 adopte N+1 et ses réponses sans réécrire la réponse de N", async () => {
+    answerMarker();
+    fetchRawMock.mock.mockImplementation(async () =>
+      questionLine({
+        phase: "question",
+        questionIdx: 1,
+        answers: {
+          Guest: {
+            value: 80,
+            timestamp: 3,
+            submittedAt: 3,
+            questionIdx: 1,
+            imputed: false,
+          },
+        },
+      })
+    );
+    const result = await session.resumeConsensusAnswer();
+    assert.equal(result.reason, "adopt");
+    assert.equal(result.write, false);
+    assert.equal(patchMock.mock.callCount(), 0);
+    assert.equal(session.__getConsensusWriteMarkerForTests(), null);
+    assert.equal(state.consensusGame.questionIdx, 1);
+    assert.equal(state.consensusGame.answers.Guest.value, 80);
+    assert.equal(state.consensusGame.answers[HOST_UID], undefined);
+  });
+
+  it("4 ne traite pas une réponse locale absente du serveur comme confirmée", async () => {
+    answerMarker();
+    state.consensusGame.answers = { Host: hostAnswer(0, 40) };
+    fetchRawMock.mock.mockImplementation(async () => questionLine({ answers: {} }));
+    patchMock.mock.mockImplementation(async () => ({
+      applied: true,
+      row: questionLine({ answers: { [HOST_UID]: hostAnswer() } }),
+    }));
+    const result = await session.resumeConsensusAnswer();
+    assert.equal(result.reason, "applied");
+    assert.equal(patchMock.mock.callCount(), 1);
+    assert.equal(result.write, true);
+  });
+
+  it("5 après un résultat vide, adopte la réponse apparue sans second envoi", async () => {
+    answerMarker();
+    let reads = 0;
+    fetchRawMock.mock.mockImplementation(async () => {
+      reads += 1;
+      if (reads === 1) return questionLine({}, "2026-10-13T18:00:00.111111+00:00");
+      return questionLine(
+        { answers: { [HOST_UID]: hostAnswer() } },
+        "2026-10-13T18:00:02.000000+00:00"
+      );
+    });
+    patchMock.mock.mockImplementation(async () => ({ applied: false, reason: "not-applied", row: null }));
+    const result = await session.resumeConsensusAnswer();
+    assert.equal(result.reason, "confirmed");
+    assert.equal(result.write, false);
+    assert.equal(patchMock.mock.callCount(), 1);
+    assert.equal(session.__getConsensusWriteMarkerForTests(), null);
+    assert.equal(state.consensusGame.answers[HOST_UID].value, 40);
+  });
+
+  it("6 après un résultat vide et un nouveau jeton, n'autorise qu'une seconde tentative", async () => {
+    answerMarker();
+    const tokens = ["2026-10-13T18:00:00.111111+00:00", "2026-10-13T18:00:03.333333+00:00"];
+    let reads = 0;
+    fetchRawMock.mock.mockImplementation(async () => {
+      const token = tokens[Math.min(reads, tokens.length - 1)];
+      reads += 1;
+      return questionLine({}, token);
+    });
+    let patches = 0;
+    patchMock.mock.mockImplementation(async () => {
+      patches += 1;
+      if (patches === 1) return { applied: false, reason: "not-applied", row: null };
+      return {
+        applied: true,
+        row: questionLine({ answers: { [HOST_UID]: hostAnswer() } }, tokens[1]),
+      };
+    });
+    const result = await session.resumeConsensusAnswer();
+    assert.equal(result.reason, "applied");
+    assert.equal(patchMock.mock.callCount(), 2);
+    assertConditionalAnswerCall(patchMock.mock.calls[0]);
+    assertConditionalAnswerCall(patchMock.mock.calls[1]);
+    assert.equal(session.__getConsensusWriteMarkerForTests(), null);
+  });
+
+  it("7 un second refus arrête sans troisième envoi", async () => {
+    answerMarker();
+    let reads = 0;
+    fetchRawMock.mock.mockImplementation(async () => {
+      reads += 1;
+      return questionLine({}, `2026-10-13T18:00:0${reads}.000000+00:00`);
+    });
+    patchMock.mock.mockImplementation(async () => ({ applied: false, reason: "not-applied", row: null }));
+    const result = await session.resumeConsensusAnswer();
+    assert.equal(result.reason, "stopped");
+    assert.equal(patchMock.mock.callCount(), 2);
+    assert.equal(session.__getConsensusWriteMarkerForTests().step, "answer");
+    assert.equal(session.__getConsensusWriteMarkerForTests().attemptId, 4);
+  });
+
+  it("8 une promesse de réponse encore ouverte n'envoie pas une autre écriture", async () => {
+    feedbackMock.mock.mockImplementation(async (_body, opts) => {
+      observeUnresolved(opts, { mutable: true });
+      throw new Error("Synchronisation trop longue.");
+    });
+    await assert.rejects(() => session.commitConsensusAnswer(40, { submitted: true }));
+    const before = patchMock.mock.callCount();
+    const result = await session.resumeConsensusAnswer();
+    assert.equal(result.reason, "pending");
+    assert.equal(patchMock.mock.callCount(), before);
+    assert.equal(feedbackMock.mock.callCount(), 1);
+    assert.equal(session.consensusAnswerFlightOpen(), true);
+    assert.equal(session.__getConsensusWriteMarkerForTests().step, "answer");
+  });
+
+  it("9 un timeout puis une lecture impossible garde le marqueur sans renvoi", async () => {
+    let settleInner = null;
+    feedbackMock.mock.mockImplementation(async (_body, opts) => {
+      settleInner = observeUnresolved(opts).settle;
+      throw new Error("Synchronisation trop longue.");
+    });
+    await assert.rejects(() => session.commitConsensusAnswer(33, { submitted: true }));
+    assert.equal((await session.resumeConsensusAnswer()).reason, "pending");
+    settleInner();
+    await Promise.resolve();
+    fetchRawMock.mock.mockImplementation(async () => {
+      throw new Error("offline");
+    });
+    const second = await session.resumeConsensusAnswer();
+    assert.equal(second.reason, "read-failed");
+    assert.equal(patchMock.mock.callCount(), 0);
+    assert.equal(session.__getConsensusWriteMarkerForTests().step, "answer");
+  });
+
+  it("10 une ancienne tentative ne retire pas le marqueur remplacé pendant l'envoi", async () => {
+    answerMarker({ attemptId: 4 });
+    fetchRawMock.mock.mockImplementation(async () => questionLine());
+    patchMock.mock.mockImplementation(async () => {
+      session.__setConsensusWriteMarkerForTests({
+        lobbyId: LOBBY_ID,
+        questionIdx: 0,
+        step: "answer",
+        attemptId: 9,
+        baselineQuestionIdx: 0,
+        baselinePhase: "question",
+        answer: hostAnswer(),
+      });
+      return {
+        applied: true,
+        row: questionLine({ answers: { [HOST_UID]: hostAnswer() } }),
+      };
+    });
+    const result = await session.resumeConsensusAnswer();
+    assert.equal(result.reason, "attempt-changed");
+    assert.equal(result.released, false);
+    assert.equal(session.__getConsensusWriteMarkerForTests().attemptId, 9);
+  });
+
+  it("12 ne reprend ni un marqueur reveal, ni un marqueur play, ni la question suivante", async () => {
+    for (const step of ["reveal", "play", "next-question"]) {
+      session.__resetConsensusWriteGuardForTests();
+      session.__setConsensusWriteMarkerForTests({
+        lobbyId: LOBBY_ID,
+        questionIdx: 0,
+        step,
+        attemptId: 3,
+        targetQuestionIdx: step === "next-question" ? 1 : undefined,
+        baselineQuestionIdx: 0,
+        baselinePhase: "reveal",
+      });
+      const result = await session.resumeConsensusAnswer();
+      assert.equal(result.reason, "not-answer");
+      assert.equal(session.__getConsensusWriteMarkerForTests().step, step);
+    }
+    assert.equal(patchMock.mock.callCount(), 0);
+    const src = fs.readFileSync(new URL("../js/core/consensusSession.js", import.meta.url), "utf8");
+    const resume = src.slice(
+      src.indexOf("export async function resumeConsensusAnswer"),
+      src.indexOf("export async function commitConsensusAnswer")
+    );
+    assert.equal(resume.includes('step !== "answer"'), true);
+    assert.equal(resume.includes('step === "reveal"'), false);
+    assert.equal(resume.includes('step === "play"'), false);
+  });
+
+  it("une phase de révélation sur la même manche est adoptée sans renvoi", async () => {
+    answerMarker();
+    fetchRawMock.mock.mockImplementation(async () =>
+      questionLine({
+        phase: "reveal",
+        answers: { Guest: hostAnswer() },
+      })
+    );
+    const result = await session.resumeConsensusAnswer();
+    assert.equal(result.reason, "adopt");
+    assert.equal(patchMock.mock.callCount(), 0);
+    assert.equal(session.__getConsensusWriteMarkerForTests(), null);
+    assert.equal(state.consensusGame.phase, "reveal");
+  });
+
+  it("le bouton bloqué et Voir la partie passent par la même relecture", () => {
+    const gameSrc = fs.readFileSync(new URL("../js/games/consensus.js", import.meta.url), "utf8");
+    const reread = gameSrc.slice(
+      gameSrc.indexOf("async function rereadSharedConsensus"),
+      gameSrc.indexOf("async function beginReveal")
+    );
+    assert.match(reread, /resumeConsensusAnswer/);
+    assert.equal(reread.includes("startQuestion"), false);
+    assert.equal(reread.includes("reconcileConsensusNextQuestion"), false);
+    const submitAt = gameSrc.indexOf('const submitBtn = app.querySelector("#btn-consensus-submit")');
+    const submit = gameSrc.slice(submitAt, gameSrc.indexOf('"#btn-consensus-force"', submitAt));
+    assert.match(submit, /rereadSharedConsensus/);
+    assert.equal(submit.includes("Ta réponse ne partira pas"), false);
   });
 });

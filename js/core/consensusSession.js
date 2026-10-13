@@ -176,6 +176,8 @@ function notifyConsensusLaunchEnded() {
 
 /** Tentative « question suivante » encore suivie dans cette page. Absente après rechargement. */
 let liveNextQuestionAttempt = null;
+/** Tentative de réponse encore suivie dans cette page. Absente après rechargement. */
+let liveAnswerAttempt = null;
 let consensusRecoveryReadTimeoutMs = CONSENSUS_SYNC_PATCH_TIMEOUT_MS;
 
 export function __setConsensusRecoveryReadTimeoutForTests(ms) {
@@ -189,6 +191,7 @@ export function __resetConsensusWriteGuardForTests() {
   consensusAnswerAttemptId = 0;
   consensusLaunchEndedListeners.clear();
   liveNextQuestionAttempt = null;
+  liveAnswerAttempt = null;
   consensusRecoveryReadTimeoutMs = CONSENSUS_SYNC_PATCH_TIMEOUT_MS;
 }
 
@@ -1072,6 +1075,256 @@ export async function commitConsensusReveal(scoredSession) {
   }
 }
 
+export function consensusAnswerFlightOpen() {
+  return Boolean(
+    liveAnswerAttempt &&
+      liveAnswerAttempt.innerSettled === false &&
+      liveAnswerAttempt.lobbyId === currentConsensusLobbyId()
+  );
+}
+
+function watchAnswerAttempt(attempt) {
+  return {
+    observeConsensusAttempt(hooks) {
+      hooks.promise.then(
+        () => {
+          attempt.innerSettled = true;
+        },
+        () => {
+          attempt.innerSettled = true;
+        }
+      );
+    },
+  };
+}
+
+/** Réponse distante de ce joueur, lue par uid. Une copie locale ne compte pas. */
+function consensusRemoteConfirmsAnswer(remote, uid, questionIdx) {
+  if (!remote || !uid) return false;
+  const answer = remote.answers?.[uid];
+  return isConsensusAnswerForRound(answer, questionIdx) && answer.imputed !== true;
+}
+
+function consensusAnswerWindowClosed(remote, questionIdx) {
+  if (!remote || remote.lobbyStarted !== true) return false;
+  if (remote.questionIdx !== questionIdx) return false;
+  return (
+    remote.phase === "reveal-pending" ||
+    remote.phase === "reveal" ||
+    remote.phase === "final"
+  );
+}
+
+function consensusAnswerPayload(marker, questionIdx, fallbackValue) {
+  const stored = marker?.answer;
+  if (isConsensusAnswerForRound(stored, questionIdx) && stored.imputed !== true) {
+    return stored;
+  }
+  if (fallbackValue == null || fallbackValue === "") return null;
+  const now = Date.now();
+  return {
+    value: clampConsensusValue(fallbackValue),
+    timestamp: now,
+    submittedAt: now,
+    questionIdx,
+    imputed: false,
+  };
+}
+
+function consensusAnswerPatch(uid, answer) {
+  return {
+    consensus: {
+      answers: {
+        [uid]: {
+          value: answer.value,
+          timestamp: answer.timestamp,
+          submittedAt: answer.submittedAt,
+          questionIdx: answer.questionIdx,
+          imputed: false,
+        },
+      },
+    },
+  };
+}
+
+/**
+ * Reprise d'une réponse. Au plus deux UPDATE conditionnels pour l'hôte.
+ * Une promesse encore ouverte, une lecture inutilisable ou un second refus
+ * n'envoient rien de plus. Une réponse locale ne confirme pas le serveur.
+ */
+export async function resumeConsensusAnswer({ writesAlready = 0, fallbackValue = null } = {}) {
+  if (consensusAnswerFlightOpen()) {
+    return { released: false, reason: "pending", write: false, writes: writesAlready };
+  }
+  const marker = readConsensusWriteMarker();
+  const lobbyId = currentConsensusLobbyId();
+  if (!marker || marker.step !== "answer" || !lobbyId || marker.lobbyId !== lobbyId) {
+    return { released: false, reason: "not-answer", write: false, writes: 0 };
+  }
+  const questionIdx = Number.isInteger(marker.baselineQuestionIdx)
+    ? marker.baselineQuestionIdx
+    : marker.questionIdx;
+  if (!Number.isInteger(questionIdx)) {
+    return { released: false, reason: "incomplete-marker", write: false, writes: 0 };
+  }
+  let uid = null;
+  try {
+    uid = requireLocalParticipantUid();
+  } catch {
+    uid = null;
+  }
+  if (!uid) {
+    return { released: false, reason: "incomplete-marker", write: false, writes: 0 };
+  }
+  const attemptId = marker.attemptId;
+  const baseline = { lobbyStarted: true, questionIdx, phase: "question" };
+
+  const adoptRead = (row, write, writes) => {
+    if (row) applyReturnedConsensusRow(row);
+    const released = settleConsensusServerWrite(attemptId);
+    return {
+      released,
+      reason: released ? "adopt" : "attempt-changed",
+      write,
+      writes,
+    };
+  };
+
+  let writes = writesAlready;
+  let previousToken = null;
+  for (let round = writesAlready; round < 2; round += 1) {
+    const read = await readResumeRow(lobbyId);
+    if (read.reason) {
+      return { released: false, reason: read.reason, write: writes > 0, writes };
+    }
+    const row = read.row;
+    const remote = row?.state?.consensus;
+    if (!row || row.lobby_id !== lobbyId || !remote || typeof remote !== "object") {
+      return { released: false, reason: "incomplete-read", write: writes > 0, writes };
+    }
+    if (isConsensusRoundAhead(baseline, remote) || consensusAnswerWindowClosed(remote, questionIdx)) {
+      return adoptRead(row, false, writes);
+    }
+    const stillOnQuestion =
+      remote.lobbyStarted === true &&
+      remote.questionIdx === questionIdx &&
+      remote.phase === "question" &&
+      typeof row.updated_at === "string" &&
+      row.updated_at.length > 0;
+    if (!stillOnQuestion) {
+      return {
+        released: false,
+        reason: "incoherent",
+        write: writes > 0,
+        writes,
+      };
+    }
+    if (consensusRemoteConfirmsAnswer(remote, uid, questionIdx)) {
+      applyReturnedConsensusRow(row);
+      const released = settleConsensusServerWrite(attemptId);
+      return {
+        released,
+        reason: released ? "confirmed" : "attempt-changed",
+        write: false,
+        writes,
+      };
+    }
+    const payload = consensusAnswerPayload(marker, questionIdx, fallbackValue);
+    if (!payload) {
+      return { released: false, reason: "incomplete-marker", write: writes > 0, writes };
+    }
+    const token = row.updated_at;
+    if (round === 1 && token === previousToken) {
+      return { released: false, reason: "stopped", write: writes > 0, writes };
+    }
+    if (consensusAnswerFlightOpen()) {
+      return { released: false, reason: "pending", write: writes > 0, writes };
+    }
+    const attempt = {
+      attemptId,
+      lobbyId,
+      innerSettled: false,
+    };
+    liveAnswerAttempt = attempt;
+    previousToken = token;
+    writes += 1;
+    let result;
+    try {
+      const options = {
+        ...watchAnswerAttempt(attempt),
+      };
+      if (isLobbyHost()) {
+        options.conditionalUpdatedAt = true;
+        options.baselineQuestionIdx = questionIdx;
+        options.baselinePhase = "question";
+      }
+      result = await patchGameState(consensusAnswerPatch(uid, payload), options);
+    } catch {
+      return { released: false, reason: "unknown", write: true, writes };
+    }
+    if (result?.applied === true || result?.applied === false || result?.adopted === true) {
+      attempt.innerSettled = true;
+    } else if (result?.state) {
+      attempt.innerSettled = true;
+    }
+    const returnedRemote = result?.row?.state?.consensus || result?.state?.consensus || null;
+    const returnedRow = result?.row?.state ? result.row : result?.state ? result : null;
+    if (
+      result?.adopted === true ||
+      (returnedRemote &&
+        (isConsensusRoundAhead(baseline, returnedRemote) ||
+          consensusAnswerWindowClosed(returnedRemote, questionIdx)))
+    ) {
+      const settled = adoptRead(returnedRow, false, writes);
+      return settled;
+    }
+    if (returnedRemote && consensusRemoteConfirmsAnswer(returnedRemote, uid, questionIdx)) {
+      if (returnedRow) applyReturnedConsensusRow(returnedRow);
+      const released = settleConsensusServerWrite(attemptId);
+      return {
+        released,
+        reason: released ? (result?.applied === true ? "applied" : "confirmed") : "attempt-changed",
+        write: result?.applied === true,
+        writes,
+      };
+    }
+    if (result?.applied === true) {
+      return { released: false, reason: "unconfirmed", write: true, writes };
+    }
+    if (result?.applied !== false && !result?.state) {
+      return { released: false, reason: "unconfirmed", write: true, writes };
+    }
+    if (round === 1) {
+      const finalRead = await readResumeRow(lobbyId);
+      const finalRemote = finalRead.row?.state?.consensus;
+      if (
+        !finalRead.reason &&
+        finalRemote &&
+        (isConsensusRoundAhead(baseline, finalRemote) ||
+          consensusAnswerWindowClosed(finalRemote, questionIdx))
+      ) {
+        return adoptRead(finalRead.row, true, writes);
+      }
+      if (
+        !finalRead.reason &&
+        finalRemote &&
+        consensusRemoteConfirmsAnswer(finalRemote, uid, questionIdx)
+      ) {
+        applyReturnedConsensusRow(finalRead.row);
+        const released = settleConsensusServerWrite(attemptId);
+        return {
+          released,
+          reason: released ? "confirmed" : "attempt-changed",
+          write: true,
+          writes,
+        };
+      }
+      return { released: false, reason: "stopped", write: true, writes };
+    }
+  }
+  return { released: false, reason: "stopped", write: writes > 0, writes };
+}
+
 export async function commitConsensusAnswer(value, { submitted = false } = {}) {
   const session = getConsensusSession();
   const localName = getLocalDisplayName();
@@ -1097,29 +1350,71 @@ export async function commitConsensusAnswer(value, { submitted = false } = {}) {
     saveStatePatch({ consensusGame: { ...session, answers: apply.nextMap } });
     return nextAnswer;
   }
+  if (consensusAnswerFlightOpen()) throw new ConsensusWriteBlockedError();
   if (consensusLobbyWriteBlocked()) throw new ConsensusWriteBlockedError();
-  const reserved = reserveConsensusServerWrite("answer");
+  const reserved = reserveConsensusServerWrite("answer", {
+    baselineQuestionIdx: questionIdx,
+    baselinePhase: session.phase,
+    answer: nextAnswer,
+  });
   if (!reserved.ok) throw new ConsensusWriteBlockedError();
   const answerAttemptId = ++consensusAnswerAttemptId;
   const captured = { phase: session.phase, questionIdx };
   saveStatePatch({ consensusGame: { ...session, answers: apply.nextMap } });
+  const attempt = {
+    attemptId: reserved.attemptId,
+    lobbyId: currentConsensusLobbyId(),
+    innerSettled: false,
+  };
+  liveAnswerAttempt = attempt;
   try {
     const uid = requireLocalParticipantUid();
-    await patchGameStateWithFeedback({
-      consensus: {
-        answers: {
-          [uid]: {
-            value: nextAnswer.value,
-            timestamp: nextAnswer.timestamp,
-            submittedAt: nextAnswer.submittedAt,
-            questionIdx: nextAnswer.questionIdx,
-            imputed: nextAnswer.imputed,
-          },
-        },
-      },
-    });
-    settleConsensusServerWrite(reserved.attemptId);
-    return nextAnswer;
+    const options = {
+      ...watchAnswerAttempt(attempt),
+    };
+    if (isLobbyHost()) {
+      options.conditionalUpdatedAt = true;
+      options.baselineQuestionIdx = questionIdx;
+      options.baselinePhase = session.phase || "question";
+    }
+    const result = await patchGameStateWithFeedback(consensusAnswerPatch(uid, nextAnswer), options);
+    if (result?.applied === true || result?.applied === false || result?.adopted === true) {
+      attempt.innerSettled = true;
+    } else if (result?.state) {
+      attempt.innerSettled = true;
+    }
+    const returnedRemote = result?.row?.state?.consensus || result?.state?.consensus || null;
+    const returnedRow = result?.row?.state ? result.row : result?.state ? result : null;
+    const baseline = { lobbyStarted: true, questionIdx, phase: session.phase || "question" };
+    const confirmed =
+      returnedRemote && consensusRemoteConfirmsAnswer(returnedRemote, uid, questionIdx);
+    const moved =
+      returnedRemote &&
+      (isConsensusRoundAhead(baseline, returnedRemote) ||
+        consensusAnswerWindowClosed(returnedRemote, questionIdx));
+    if ((result?.applied === true && confirmed) || result?.adopted === true || moved) {
+      if (returnedRow) applyReturnedConsensusRow(returnedRow);
+      settleConsensusServerWrite(reserved.attemptId);
+      return nextAnswer;
+    }
+    if (result?.applied == null && result?.state && confirmed) {
+      if (returnedRow) applyReturnedConsensusRow(returnedRow);
+      settleConsensusServerWrite(reserved.attemptId);
+      return nextAnswer;
+    }
+    if (result?.applied === false || result?.applied === true) {
+      const resumed = await resumeConsensusAnswer({
+        writesAlready: result.reason === "not-applied" || result.applied === true ? 1 : 0,
+      });
+      if (resumed?.released) return nextAnswer;
+      throw new Error("Réponse non confirmée.");
+    }
+    if (result?.state) {
+      const resumed = await resumeConsensusAnswer();
+      if (resumed?.released) return nextAnswer;
+      throw new Error("Réponse non confirmée.");
+    }
+    throw new Error("Réponse non confirmée.");
   } catch (err) {
     const live = getConsensusSession();
     if (

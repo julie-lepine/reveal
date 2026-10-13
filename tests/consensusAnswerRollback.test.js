@@ -199,10 +199,24 @@ describe("consensus answer rollback", () => {
   });
 
   it("clears the marker only after the awaited answer promise fulfills", async () => {
-    feedbackMock.mock.mockImplementation(async () => ({}));
+    feedbackMock.mock.mockImplementation(async (body) => ({
+      applied: true,
+      row: {
+        lobby_id: LOBBY_ID,
+        updated_at: "2026-10-13T18:00:00.111111+00:00",
+        state: {
+          consensus: {
+            lobbyStarted: true,
+            phase: "question",
+            questionIdx: 0,
+            answers: body.consensus.answers,
+          },
+        },
+      },
+    }));
     await session.commitConsensusAnswer(33, { submitted: true });
     assert.equal(session.__getConsensusWriteMarkerForTests(), null);
-    assert.equal(state.consensusGame.answers.Host.value, 33);
+    assert.equal(state.consensusGame.answers[HOST_UID].value, 33);
     assert.equal(session.__getConsensusAttemptHighWaterForTests(), 1);
   });
 });
