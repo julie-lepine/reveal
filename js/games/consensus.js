@@ -3,6 +3,7 @@ import { useConsensusGame } from "../core/useConsensusGame.js";
 import {
   consensusLobbyWriteBlocked,
   guardConsensusServerWrite,
+  releaseInheritedNextQuestionMarker,
   subscribeConsensusLaunchEnded,
 } from "../core/consensusSession.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
@@ -223,8 +224,9 @@ export function mountConsensus(app) {
   }
 
   async function rereadSharedConsensus() {
+    let row = null;
     try {
-      await refreshGameSession();
+      row = await refreshGameSession();
     } catch (err) {
       console.warn("Consensus reread:", err);
       if (!mount.isMounted() || !mount.isCurrentMount()) return;
@@ -235,6 +237,7 @@ export function mountConsensus(app) {
       return;
     }
     if (!mount.isMounted() || !mount.isCurrentMount()) return;
+    releaseInheritedNextQuestionMarker(row);
     syncFromSession();
     render();
   }

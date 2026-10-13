@@ -27,6 +27,7 @@ import {
 import { patchGameStateWithFeedback } from "./patchGameStateFeedback.js";
 import { launchGameWithSync, commitHostGamePlay, commitPrepReadyToggle } from "./mpLaunch.js";
 import { withPatchTimeout } from "./withPatchTimeout.js";
+import { isConsensusRoundAhead } from "./sessionMerge.js";
 import {
   canRollbackOptimisticSubmission,
   computeOptimisticMapEntryApply,
@@ -693,6 +694,51 @@ export async function startConsensusQuestion(questionIdx) {
   } catch (err) {
     throw err;
   }
+}
+
+/**
+ * Retire un marqueur next-question hérité quand la ligne lue est déjà plus loin.
+ * Ne lit pas le réseau et n'écrit aucun état de jeu.
+ * La manche comparée est celle du marqueur, pas l'écran local déjà rattrapé.
+ */
+export function releaseInheritedNextQuestionMarker(row, { beforeSettle } = {}) {
+  if (consensusNextQuestionFlightOpen()) {
+    return { released: false, reason: "pending", write: false };
+  }
+  const marker = readConsensusWriteMarker();
+  const lobbyId = currentConsensusLobbyId();
+  if (!marker || marker.step !== "next-question" || !lobbyId || marker.lobbyId !== lobbyId) {
+    return { released: false, reason: "not-next-question", write: false };
+  }
+  const remote = row?.state?.consensus;
+  if (!row || row.lobby_id !== lobbyId || !remote || typeof remote !== "object") {
+    return { released: false, reason: "incomplete-read", write: false };
+  }
+  const baselineIdx = Number.isInteger(marker.baselineQuestionIdx)
+    ? marker.baselineQuestionIdx
+    : marker.questionIdx;
+  if (!Number.isInteger(baselineIdx)) {
+    return { released: false, reason: "incomplete-marker", write: false };
+  }
+  const ahead = isConsensusRoundAhead(
+    {
+      lobbyStarted: true,
+      questionIdx: baselineIdx,
+      phase: marker.baselinePhase || "reveal",
+    },
+    remote
+  );
+  if (!ahead) {
+    return { released: false, reason: "not-ahead", write: false };
+  }
+  const attemptId = marker.attemptId;
+  beforeSettle?.();
+  const released = settleConsensusServerWrite(attemptId);
+  return {
+    released,
+    reason: released ? "adopt" : "attempt-changed",
+    write: false,
+  };
 }
 
 /**

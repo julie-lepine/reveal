@@ -1001,6 +1001,185 @@ describe("consensus next-question recovery", () => {
     assert.equal(session.__getConsensusWriteMarkerForTests().attemptId, 8);
   });
 
+  function inheritedNextQuestionMarker(extra = {}) {
+    session.__setConsensusWriteMarkerForTests({
+      lobbyId: LOBBY_ID,
+      questionIdx: 0,
+      baselineQuestionIdx: 0,
+      baselinePhase: "reveal",
+      targetQuestionIdx: 1,
+      step: "next-question",
+      attemptId: 4,
+      ...extra,
+    });
+  }
+
+  function aheadRow(consensus) {
+    return revealRow({
+      lobbyStarted: true,
+      phase: "question",
+      questionIdx: 1,
+      answers: { Guest: { value: 80, questionIdx: 1 } },
+      ...consensus,
+    });
+  }
+
+  it("retire le marqueur hérité si la manche distante est devant, sans envoi", () => {
+    inheritedNextQuestionMarker();
+    const before = patchMock.mock.callCount();
+    const result = session.releaseInheritedNextQuestionMarker(aheadRow());
+    assert.equal(result.released, true);
+    assert.equal(result.reason, "adopt");
+    assert.equal(result.write, false);
+    assert.equal(session.__getConsensusWriteMarkerForTests(), null);
+    assert.equal(session.consensusLobbyWriteBlocked(), false);
+    assert.equal(patchMock.mock.callCount(), before);
+    assert.equal(fetchRawMock.mock.callCount(), 0);
+    assert.equal(syncMock.mock.callCount(), 0);
+    assert.equal(saveStatePatchMock.mock.callCount(), 0);
+  });
+
+  it("conserve le marqueur si le serveur est encore sur la révélation N", () => {
+    inheritedNextQuestionMarker();
+    const result = session.releaseInheritedNextQuestionMarker(
+      revealRow({
+        lobbyStarted: true,
+        phase: "reveal",
+        questionIdx: 0,
+        answers: { Host: { value: 20, questionIdx: 0 } },
+      })
+    );
+    assert.equal(result.released, false);
+    assert.equal(result.reason, "not-ahead");
+    assert.equal(result.write, false);
+    assert.equal(session.__getConsensusWriteMarkerForTests().attemptId, 4);
+    assert.equal(patchMock.mock.callCount(), 0);
+  });
+
+  it("conserve le marqueur tant qu'une promesse interne est ouverte", async () => {
+    patchMock.mock.mockImplementation(async (_body, opts) => {
+      observeUnresolved(opts, { mutable: true });
+      throw new Error("Synchronisation trop longue.");
+    });
+    await assert.rejects(() => session.startConsensusQuestion(1));
+    const result = session.releaseInheritedNextQuestionMarker(aheadRow());
+    assert.equal(result.released, false);
+    assert.equal(result.reason, "pending");
+    assert.equal(session.consensusNextQuestionFlightOpen(), true);
+    assert.equal(session.__getConsensusWriteMarkerForTests().step, "next-question");
+    assert.equal(patchMock.mock.callCount(), 1);
+  });
+
+  it("conserve le marqueur si la lecture est vide, incomplète ou d'un autre lobby", () => {
+    inheritedNextQuestionMarker();
+    assert.equal(session.releaseInheritedNextQuestionMarker(null).reason, "incomplete-read");
+    assert.equal(
+      session.releaseInheritedNextQuestionMarker({ lobby_id: LOBBY_ID, state: {} }).reason,
+      "incomplete-read"
+    );
+    assert.equal(
+      session.releaseInheritedNextQuestionMarker({
+        lobby_id: "other-lobby",
+        state: { consensus: aheadRow().state.consensus },
+      }).reason,
+      "incomplete-read"
+    );
+    assert.equal(session.__getConsensusWriteMarkerForTests().attemptId, 4);
+    assert.equal(patchMock.mock.callCount(), 0);
+  });
+
+  it("conserve le marqueur si la partie distante n'est pas une avance cohérente", () => {
+    const cases = [
+      { lobbyStarted: false, phase: "question", questionIdx: 2, answers: { Guest: { value: 1 } } },
+      { lobbyStarted: true, phase: "prep", questionIdx: 2, answers: {} },
+      { lobbyStarted: true, phase: "question", questionIdx: 1.5, answers: { Guest: { value: 1 } } },
+      { lobbyStarted: true, phase: "question", questionIdx: 0, answers: {} },
+    ];
+    for (const consensus of cases) {
+      inheritedNextQuestionMarker();
+      const result = session.releaseInheritedNextQuestionMarker(revealRow(consensus));
+      assert.equal(result.released, false, JSON.stringify(consensus));
+      assert.equal(result.write, false);
+      assert.equal(session.__getConsensusWriteMarkerForTests().attemptId, 4);
+    }
+    assert.equal(patchMock.mock.callCount(), 0);
+  });
+
+  it("ne retire pas un marqueur answer, reveal ou play", () => {
+    for (const step of ["answer", "reveal", "play"]) {
+      session.__setConsensusWriteMarkerForTests({
+        lobbyId: LOBBY_ID,
+        questionIdx: 0,
+        step,
+        attemptId: 6,
+      });
+      const result = session.releaseInheritedNextQuestionMarker(aheadRow());
+      assert.equal(result.released, false);
+      assert.equal(result.reason, "not-next-question");
+      assert.equal(session.__getConsensusWriteMarkerForTests().step, step);
+    }
+    assert.equal(patchMock.mock.callCount(), 0);
+  });
+
+  it("ne retire pas un marqueur plus récent posé avant la suppression", () => {
+    inheritedNextQuestionMarker({ attemptId: 4 });
+    const result = session.releaseInheritedNextQuestionMarker(aheadRow(), {
+      beforeSettle() {
+        session.__setConsensusWriteMarkerForTests({
+          lobbyId: LOBBY_ID,
+          questionIdx: 1,
+          step: "next-question",
+          attemptId: 9,
+        });
+      },
+    });
+    assert.equal(result.released, false);
+    assert.equal(result.reason, "attempt-changed");
+    assert.equal(result.write, false);
+    assert.equal(session.__getConsensusWriteMarkerForTests().attemptId, 9);
+    assert.equal(patchMock.mock.callCount(), 0);
+  });
+
+  it("la relecture libère sans écrire, et les actions restent derrière leurs gardes", () => {
+    const gameSrc = fs.readFileSync(new URL("../js/games/consensus.js", import.meta.url), "utf8");
+    const sessionSrc = fs.readFileSync(
+      new URL("../js/core/consensusSession.js", import.meta.url),
+      "utf8"
+    );
+    const reread = gameSrc.slice(
+      gameSrc.indexOf("async function rereadSharedConsensus"),
+      gameSrc.indexOf("async function beginReveal")
+    );
+    const catchBody = reread.slice(reread.indexOf("} catch"), reread.indexOf("if (!mount.isMounted()"));
+    assert.equal(catchBody.includes("releaseInheritedNextQuestionMarker"), false);
+    assert.match(reread, /releaseInheritedNextQuestionMarker\(row\)/);
+    assert.equal(reread.includes("startQuestion"), false);
+    assert.equal(reread.includes("reconcileConsensusNextQuestion"), false);
+    assert.equal(reread.includes("patchGameState"), false);
+    assert.equal(reread.includes("saveStatePatch"), false);
+    const releaseFn = sessionSrc.slice(
+      sessionSrc.indexOf("export function releaseInheritedNextQuestionMarker"),
+      sessionSrc.indexOf("export async function reconcileConsensusNextQuestion")
+    );
+    assert.match(releaseFn, /settleConsensusServerWrite\(attemptId\)/);
+    assert.equal(releaseFn.includes("patchGameState"), false);
+    assert.equal(releaseFn.includes("startConsensusQuestion"), false);
+    assert.equal(releaseFn.includes("updateGameSession"), false);
+    assert.equal(releaseFn.includes("upsert"), false);
+    const reveal = gameSrc.slice(
+      gameSrc.indexOf("async function beginReveal"),
+      gameSrc.indexOf("function scheduleRevealFromPending")
+    );
+    assert.match(reveal, /if \(writesBlocked\(\)\) return;/);
+    const click = gameSrc.slice(
+      gameSrc.indexOf('"#btn-consensus-next"'),
+      gameSrc.indexOf('"[data-consensus-action]"')
+    );
+    const blocked = click.slice(click.indexOf("if (writesBlocked())"), click.indexOf("try {"));
+    assert.equal(blocked.includes("startQuestion"), false);
+    assert.ok(click.indexOf("startQuestion") > click.indexOf("try {"));
+  });
+
   it("le clic bloqué relit et le premier échec annonce la connexion, sans relancer la question", () => {
     const gameSrc = fs.readFileSync(new URL("../js/games/consensus.js", import.meta.url), "utf8");
     const reread = gameSrc.slice(
