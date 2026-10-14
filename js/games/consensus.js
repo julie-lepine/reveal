@@ -1,6 +1,7 @@
 import { CONSENSUS_DEFAULT_SLIDER_VALUE, CONSENSUS_REVEAL_PENDING_MS } from "../../data/consensus.js";
 import { useConsensusGame } from "../core/useConsensusGame.js";
 import {
+  __getConsensusWriteMarkerForTests as readActiveConsensusWriteMarker,
   consensusLobbyWriteBlocked,
   guardConsensusServerWrite,
   releaseInheritedNextQuestionMarker,
@@ -48,6 +49,26 @@ import { arch03AhLogSkipDecision } from "../core/arch03ActingHostDebug.js";
 
 function questionKeyOf(session) {
   return `${session.questionIdx ?? 0}:${session.currentQuestion?.id || "none"}`;
+}
+
+/** Libellés du bloc persistant. Seuls answer et next-question sont repris par le clic. */
+export function consensusRecoveryBannerCopy(step) {
+  if (step === "answer" || step === "next-question") {
+    return {
+      hint: "Cette action n'est pas encore confirmée.",
+      button: "Reprendre la partie",
+    };
+  }
+  if (step === "reveal" || step === "play") {
+    return {
+      hint: "Cette action n'est pas encore confirmée. L'écran continue d'afficher la partie.",
+      button: "Voir la partie",
+    };
+  }
+  return {
+    hint: "Ce téléphone ne peut plus modifier la partie. L'écran peut encore afficher ce que font les autres.",
+    button: "Voir la partie",
+  };
 }
 
 function hashQuestion(question) {
@@ -223,6 +244,15 @@ export function mountConsensus(app) {
 
   function writesBlocked() {
     return mp && consensusLobbyWriteBlocked();
+  }
+
+  function recoveryBannerHtml() {
+    if (!writesBlocked()) return "";
+    const copy = consensusRecoveryBannerCopy(readActiveConsensusWriteMarker()?.step);
+    return `<div class="card card--highlight">
+                <p class="hint">${copy.hint}</p>
+                <button type="button" class="btn btn-secondary btn--spaced" id="btn-consensus-recheck">${copy.button}</button>
+              </div>`;
   }
 
   async function rereadSharedConsensus() {
@@ -943,14 +973,7 @@ export function mountConsensus(app) {
           <span class="muted">${Math.min(questionIdx + 1, Math.max(totalQuestions, 1))}/${Math.max(totalQuestions, 1)}</span>
         </div>
         <div class="logo logo--sm"><h1>CONSENSUS</h1></div>
-        ${
-          writesBlocked()
-            ? `<div class="card card--highlight">
-                <p class="hint">Ce téléphone ne peut plus modifier la partie. L'écran peut encore afficher ce que font les autres.</p>
-                <button type="button" class="btn btn-secondary btn--spaced" id="btn-consensus-recheck">Voir la partie</button>
-              </div>`
-            : ""
-        }
+        ${recoveryBannerHtml()}
         ${phaseHtml}
         ${gameExitBarHtml()}
       `,
