@@ -51,17 +51,27 @@ function questionKeyOf(session) {
   return `${session.questionIdx ?? 0}:${session.currentQuestion?.id || "none"}`;
 }
 
-/** Libellés du bloc persistant. Seuls answer et next-question sont repris par le clic. */
+/**
+ * Libellés du bloc persistant.
+ * answer et next-question nomment l'action que la relecture peut reprendre.
+ * reveal et play ne sont pas relancés : le bouton ne promet qu'une relecture.
+ */
 export function consensusRecoveryBannerCopy(step) {
-  if (step === "answer" || step === "next-question") {
+  if (step === "answer") {
     return {
-      hint: "Cette action n'est pas encore confirmée.",
-      button: "Reprendre la partie",
+      hint: "L'envoi de ta réponse n'est pas confirmé.",
+      button: "Réessayer d'envoyer ma réponse",
+    };
+  }
+  if (step === "next-question") {
+    return {
+      hint: "Le passage à la question suivante n'est pas confirmé.",
+      button: "Réessayer de passer à la question suivante",
     };
   }
   if (step === "reveal" || step === "play") {
     return {
-      hint: "Cette action n'est pas encore confirmée. L'écran continue d'afficher la partie.",
+      hint: "Cette action n'est pas relancée depuis ce téléphone. L'écran peut afficher la partie.",
       button: "Voir la partie",
     };
   }
@@ -69,6 +79,27 @@ export function consensusRecoveryBannerCopy(step) {
     hint: "Ce téléphone ne peut plus modifier la partie. L'écran peut encore afficher ce que font les autres.",
     button: "Voir la partie",
   };
+}
+
+/**
+ * Après une reprise déjà terminée : même porte que le clic normal,
+ * sans second envoi de réponse et sans nouvelle écoute du poll.
+ */
+export function shouldContinueConsensusRevealAfterRecovery({
+  writesBlocked = false,
+  phase = "",
+  allAnswersIn = false,
+  canLeadReveal = false,
+  revealInFlight = false,
+  revealPendingInFlight = false,
+  revealPendingScheduled = false,
+} = {}) {
+  if (writesBlocked) return false;
+  if (phase !== "question") return false;
+  if (!allAnswersIn) return false;
+  if (!canLeadReveal) return false;
+  if (revealInFlight || revealPendingInFlight || revealPendingScheduled) return false;
+  return true;
 }
 
 function hashQuestion(question) {
@@ -295,6 +326,19 @@ export function mountConsensus(app) {
     if (!mount.isMounted() || !mount.isCurrentMount()) return;
     syncFromSession();
     render();
+    if (
+      shouldContinueConsensusRevealAfterRecovery({
+        writesBlocked: writesBlocked(),
+        phase,
+        allAnswersIn: consensus.allAnswersIn(),
+        canLeadReveal: !mp || canActAsHost(),
+        revealInFlight,
+        revealPendingInFlight,
+        revealPendingScheduled: Boolean(revealPendingTimeoutId),
+      })
+    ) {
+      await beginReveal();
+    }
   }
 
   async function beginReveal() {
@@ -443,7 +487,7 @@ export function mountConsensus(app) {
 
   function waitingMessage() {
     if (writesBlocked()) {
-      return "Ta réponse n'est pas partie. Tu ne peux plus l'envoyer depuis ce téléphone.";
+      return consensusRecoveryBannerCopy(readActiveConsensusWriteMarker()?.step).hint;
     }
     if (phase !== "question") return "";
     const mine = myAnswer();

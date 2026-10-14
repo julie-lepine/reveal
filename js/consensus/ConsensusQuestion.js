@@ -28,7 +28,7 @@ export function renderConsensusQuestion({
   const clamped = sliderDisplayValue(value);
   const locked = answerLocked || answerState === "submitted";
   const blockedText = interactionBlocked
-    ? blockedMessage || "Ta réponse n'est pas partie. Tu ne peux plus l'envoyer depuis ce téléphone."
+    ? blockedMessage || "Cette action n'est pas confirmée."
     : "";
   const submittedLabel = blockedText || (locked ? "" : "Déplace le slider puis valide.");
 

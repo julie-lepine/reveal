@@ -177,12 +177,12 @@ describe("consensus answer rollback", () => {
       questionIdx: 0,
       totalQuestions: 5,
       interactionBlocked: true,
-      blockedMessage:
-        "Ta réponse n'est pas partie. Tu ne peux plus l'envoyer depuis ce téléphone.",
+      blockedMessage: "L'envoi de ta réponse n'est pas confirmé.",
       waitingMessage: "Choisis une valeur entre 0 et 100 puis valide.",
     });
     assert.match(html, /id="btn-consensus-submit" disabled/);
-    assert.match(html, /Tu ne peux plus l'envoyer depuis ce téléphone/);
+    assert.match(html, /L'envoi de ta réponse n'est pas confirmé\./);
+    assert.equal(html.includes("Tu ne peux plus l'envoyer depuis ce téléphone"), false);
     assert.equal(html.includes("Déplace le slider puis valide."), false);
     assert.equal(html.includes("Choisis une valeur entre 0 et 100 puis valide."), false);
     assert.match(html, /id="consensus-slider"[\s\S]*disabled/);
@@ -192,10 +192,8 @@ describe("consensus answer rollback", () => {
     const src = fs.readFileSync(new URL("../js/games/consensus.js", import.meta.url), "utf8");
     assert.match(src, /writesBlocked\(\) \? "blocked" : "open"/);
     assert.match(src, /interactionBlocked: writesBlocked\(\)/);
-    assert.match(
-      src,
-      /Ta réponse n'est pas partie\. Tu ne peux plus l'envoyer depuis ce téléphone\./
-    );
+    assert.match(src, /consensusRecoveryBannerCopy\(readActiveConsensusWriteMarker\(\)\?\.step\)\.hint/);
+    assert.equal(src.includes("Tu ne peux plus l'envoyer depuis ce téléphone"), false);
   });
 
   it("clears the marker only after the awaited answer promise fulfills", async () => {
