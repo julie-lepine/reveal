@@ -72,6 +72,7 @@ mock.module("../js/core/router.js", {
 mock.module("../js/core/state.js", {
   namedExports: {
     getState: getStateMock,
+    saveStatePatch: mock.fn(),
   },
 });
 

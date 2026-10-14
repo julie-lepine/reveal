@@ -207,6 +207,22 @@ mock.module("../js/config/lobbyLifecycle.js", {
     HOST_TRANSFER_STALE_MS: 300000,
     MAX_PLAYERS: 12,
     isLobbyJoinTooOld: () => false,
+    lobbyMaxPlayers: (hostPack) => (hostPack === true ? 14 : 12),
+    isLobbyFullServerError: (error) => {
+      if (error == null) return false;
+      const blob = [
+        typeof error === "string" ? error : "",
+        error && typeof error === "object" ? error.message : "",
+        error && typeof error === "object" ? error.details : "",
+        error && typeof error === "object" ? error.hint : "",
+      ]
+        .filter(Boolean)
+        .join(" ");
+      return (
+        blob.includes("lobby_full") ||
+        blob.includes("Nombre de joueurs max atteint pour ce lobby")
+      );
+    },
   },
 });
 
@@ -221,6 +237,14 @@ mock.module("../js/core/presenceUiLive.js", {
     hostAgeMs: () => 0,
     isHostPresentAt: () => true,
     shouldNudgeClaimHubUi: () => false,
+  },
+});
+
+// Coupe auth.js → lobby.js. Ces tests n’ont ni compte Signature ni soirée à archiver :
+// le collecteur réel retourne null dans ce cas.
+mock.module("../js/core/signatureCarnet.js", {
+  namedExports: {
+    collectSignatureEveningArchivePayload: () => null,
   },
 });
 
@@ -508,12 +532,21 @@ describe("ARCH-07 contrats source gameSync foreground", () => {
     gameSyncSrc.match(/function logForegroundLobbyRefreshFailure[\s\S]*?^}/m)?.[0] || "";
   const visibilityBlock =
     gameSyncSrc.match(/export function initMultiplayerSyncVisibility[\s\S]*?^}/m)?.[0] || "";
+  const visibilityHandlerBlock =
+    gameSyncSrc.match(/function onMultiplayerSyncVisibilityChange[\s\S]*?^}/m)?.[0] || "";
+  const resumeBlock =
+    gameSyncSrc.match(/function resumeMultiplayerSyncAfterForeground[\s\S]*?^}/m)?.[0] || "";
+  const cycleBlock =
+    gameSyncSrc.match(/async function runForegroundCatchUp[\s\S]*?^}/m)?.[0] || "";
+  const nativeBlock =
+    gameSyncSrc.match(/async function installNativeForegroundCatchUp[\s\S]*?^}/m)?.[0] || "";
 
   it("13. passage visible - refresh lobby toujours appelé", () => {
-    assert.match(visibilityBlock, /m\.refreshLobbyFromSupabase\?\.\(\)\.catch\(/);
-    assert.match(visibilityBlock, /logForegroundLobbyRefreshFailure/);
-    assert.match(visibilityBlock, /resubscribeLobbyRealtime/);
-    assert.match(visibilityBlock, /void syncTick\(\)/);
+    assert.match(visibilityHandlerBlock, /resumeMultiplayerSyncAfterForeground\(\)/);
+    assert.match(cycleBlock, /refreshLobbyFromSupabase/);
+    assert.match(cycleBlock, /logForegroundLobbyRefreshFailure/);
+    assert.match(cycleBlock, /resubscribeLobbyRealtime/);
+    assert.match(resumeBlock, /void syncTick\(\)/);
   });
 
   it("14. refresh lobby rejeté - log foreground (contrat source)", () => {
@@ -527,15 +560,25 @@ describe("ARCH-07 contrats source gameSync foreground", () => {
     assert.ok(foregroundLogBlock);
     assert.doesNotMatch(foregroundLogBlock, /attempt:\s*2/);
     assert.doesNotMatch(foregroundLogBlock, /setTimeout/);
+    assert.doesNotMatch(cycleBlock, /setTimeout/);
+    assert.doesNotMatch(cycleBlock, /attempt:\s*2/);
   });
 
-  it("16. resubscribe et syncTick restent dans le handler visibility", () => {
-    assert.match(visibilityBlock, /m\.resubscribeLobbyRealtime/);
-    assert.match(visibilityBlock, /void syncTick\(\)/);
+  it("16. resubscribe et syncTick restent sur le retour visible", () => {
+    assert.match(visibilityBlock, /onMultiplayerSyncVisibilityChange/);
+    assert.match(visibilityHandlerBlock, /resumeMultiplayerSyncAfterForeground\(\)/);
+    assert.match(cycleBlock, /resubscribeLobbyRealtime/);
+    assert.match(resumeBlock, /void syncTick\(\)/);
   });
 
   it("17. aucune UI ajoutée foreground (contrat source)", () => {
     assert.doesNotMatch(foregroundLogBlock, /showAppAlert/);
     assert.doesNotMatch(visibilityBlock, /showAppAlert/);
+    assert.doesNotMatch(cycleBlock, /showAppAlert/);
+    assert.doesNotMatch(resumeBlock, /document\.hidden/);
+    assert.match(nativeBlock, /isActive !== true/);
+    assert.doesNotMatch(nativeBlock, /syncPausedByHidden/);
+    assert.doesNotMatch(cycleBlock, /subscribeLobbyRealtime\(/);
+    assert.doesNotMatch(cycleBlock, /removeChannel\(/);
   });
 });

@@ -1,4 +1,6 @@
 import { isSupabaseConfigured } from "./supabaseClient.js";
+import { isNativeApp } from "./platform.js";
+import { loadCapacitorApp } from "./capacitorImports.js";
 import { getSupabaseUserId } from "./supabaseAuth.js";
 import { resolveActingHostUserId } from "./hostPresence.js";
 import { arch03AhLog } from "./arch03ActingHostDebug.js";
@@ -4577,7 +4579,7 @@ function normalizeForegroundCatchUpErrorForLog(error) {
 
 function logForegroundLobbyRefreshFailure(error, lobbyModule) {
   const { errorName, errorMessage } = normalizeForegroundCatchUpErrorForLog(error);
-  const meta = lobbyModule.getLobbyRealtimeMeta?.() ?? {};
+  const meta = lobbyModule?.getLobbyRealtimeMeta?.() ?? {};
   console.warn("[MP-RT] catch-up failed", {
     event: "mp_rt_catchup_failed",
     phase: "foreground_refresh",
@@ -4593,39 +4595,177 @@ function logForegroundLobbyRefreshFailure(error, lobbyModule) {
   });
 }
 
+/** idle | running — un seul cycle de rattrapage foreground possède le verrou. */
+let foregroundPhase = "idle";
+/** @type {{ lobbyId: string, epoch: import("./lobbyRuntime.js").LobbyRuntimeEpoch } | null} */
+let foregroundAgain = null;
+let foregroundCycleToken = 0;
+let foregroundSyncTickCalls = 0;
+/** @type {((event: Event) => void) | null} */
+let visibilityListener = null;
+/** @type {{ remove?: () => void } | null} */
+let nativeForegroundHandle = null;
+let nativeForegroundInstallGen = 0;
+/** @type {null | (() => Promise<object>)} */
+let foregroundLobbyImporter = null;
+
+function snapshotForegroundLobby() {
+  const lobbyId = getState().lobby?.id;
+  if (!lobbyId) return null;
+  return {
+    lobbyId,
+    epoch: captureLobbyRuntimeEpoch(lobbyId),
+  };
+}
+
+function isForegroundSnapshotValid(snapshot) {
+  if (!snapshot?.lobbyId || !snapshot.epoch) return false;
+  if (!isGameSyncActive() || !getState().inLobby) return false;
+  const currentId = getState().lobby?.id;
+  if (!currentId || currentId !== snapshot.lobbyId) return false;
+  return isLobbyRuntimeEpochCurrent(snapshot.epoch);
+}
+
+async function importLobbyModuleForForegroundCatchUp() {
+  if (foregroundLobbyImporter) return foregroundLobbyImporter();
+  return import("./supabaseLobby.js");
+}
+
+/**
+ * Retour au premier plan (visibility visible ou App.appStateChange isActive).
+ * Ne lit pas document.hidden : la WebView peut encore le laisser vrai.
+ * isActive === false n'entre pas ici.
+ */
+function resumeMultiplayerSyncAfterForeground() {
+  const wasPaused = syncPausedByHidden;
+  syncPausedByHidden = false;
+  if (!isGameSyncActive() || !getState().inLobby || !getState().lobby?.id) return;
+  if (foregroundPhase === "running") {
+    if (wasPaused) {
+      foregroundAgain = snapshotForegroundLobby();
+      scheduleSyncPoll();
+      foregroundSyncTickCalls += 1;
+      void syncTick();
+    }
+    return;
+  }
+  if (!wasPaused && pollTimer) return;
+  armForegroundCatchUp(snapshotForegroundLobby());
+}
+
+/** Démarre un cycle sans repasser par resume() ni exiger une transition de paused. */
+function armForegroundCatchUp(snapshot) {
+  if (!isForegroundSnapshotValid(snapshot)) return;
+  const myToken = ++foregroundCycleToken;
+  foregroundPhase = "running";
+  foregroundAgain = null;
+  scheduleSyncPoll();
+  foregroundSyncTickCalls += 1;
+  void syncTick();
+  void runForegroundCatchUp(myToken, snapshot);
+}
+
+async function runForegroundCatchUp(myToken, snapshot) {
+  let lobbyModule = null;
+  try {
+    lobbyModule = await importLobbyModuleForForegroundCatchUp();
+    if (myToken !== foregroundCycleToken) return;
+    if (!isForegroundSnapshotValid(snapshot)) return;
+    lobbyModule.resubscribeLobbyRealtime?.();
+    await lobbyModule.refreshLobbyFromSupabase?.();
+  } catch (error) {
+    logForegroundLobbyRefreshFailure(error, lobbyModule ?? {});
+  } finally {
+    if (myToken !== foregroundCycleToken) return;
+    let follow = foregroundAgain;
+    foregroundAgain = null;
+    if (syncPausedByHidden) follow = null;
+    if (follow && isForegroundSnapshotValid(follow)) {
+      armForegroundCatchUp(follow);
+      return;
+    }
+    foregroundPhase = "idle";
+  }
+}
+
+function onMultiplayerSyncVisibilityChange() {
+  if (document.hidden) {
+    syncPausedByHidden = true;
+    if (pollTimer) {
+      clearInterval(pollTimer);
+      pollTimer = null;
+    }
+    return;
+  }
+  resumeMultiplayerSyncAfterForeground();
+}
+
+async function installNativeForegroundCatchUp() {
+  const gen = ++nativeForegroundInstallGen;
+  try {
+    if (!isNativeApp()) return;
+    if (gen !== nativeForegroundInstallGen || !syncVisibilityInit) return;
+    const mod = await loadCapacitorApp();
+    if (gen !== nativeForegroundInstallGen || !syncVisibilityInit) return;
+    const App = mod?.App;
+    if (!App?.addListener) return;
+    const handle = await App.addListener("appStateChange", (event) => {
+      if (event?.isActive !== true) return;
+      resumeMultiplayerSyncAfterForeground();
+    });
+    if (gen !== nativeForegroundInstallGen || !syncVisibilityInit) {
+      handle?.remove?.();
+      return;
+    }
+    nativeForegroundHandle = handle;
+  } catch (error) {
+    console.warn("[MP-RT] native foreground listener:", error?.message || error);
+  }
+}
+
 /** Pause le polling quand l’onglet est en arrière-plan (egress + batterie). */
 export function initMultiplayerSyncVisibility() {
   if (syncVisibilityInit || typeof document === "undefined") return;
   syncVisibilityInit = true;
-  document.addEventListener("visibilitychange", () => {
-    if (document.hidden) {
-      syncPausedByHidden = true;
-      if (pollTimer) {
-        clearInterval(pollTimer);
-        pollTimer = null;
-      }
-      return;
-    }
-    syncPausedByHidden = false;
-    if (isGameSyncActive() && getState().inLobby) {
-      scheduleSyncPoll();
-      void syncTick();
-      import("./supabaseLobby.js").then((m) => {
-        // Le socket Realtime a pu être étranglé/fermé en arrière-plan : on force un
-        // canal frais (le navigateur ne le recrée pas toujours seul) en plus du refresh.
-        m.resubscribeLobbyRealtime?.();
-        m.refreshLobbyFromSupabase?.().catch((error) => {
-          logForegroundLobbyRefreshFailure(error, m);
-        });
-      });
-    }
-  });
+  visibilityListener = onMultiplayerSyncVisibilityChange;
+  document.addEventListener("visibilitychange", visibilityListener);
+  void installNativeForegroundCatchUp();
 }
 
 /** Tests ARCH-07 - réinitialise le listener visibility (singleton). */
 export function __testResetSyncVisibilityForTests() {
   syncVisibilityInit = false;
   syncPausedByHidden = false;
+  foregroundPhase = "idle";
+  foregroundAgain = null;
+  foregroundCycleToken += 1;
+  foregroundSyncTickCalls = 0;
+  nativeForegroundInstallGen += 1;
+  if (visibilityListener && typeof document !== "undefined") {
+    document.removeEventListener("visibilitychange", visibilityListener);
+  }
+  visibilityListener = null;
+  const handle = nativeForegroundHandle;
+  nativeForegroundHandle = null;
+  handle?.remove?.();
+  stopMultiplayerSync();
+}
+
+/** Tests P1 foreground - état du cycle (pas une preuve à lui seul). */
+export function __testReadForegroundCatchUpForTests() {
+  return {
+    phase: foregroundPhase,
+    paused: syncPausedByHidden,
+    again: foregroundAgain ? { lobbyId: foregroundAgain.lobbyId, generation: foregroundAgain.epoch?.generation } : null,
+    cycleToken: foregroundCycleToken,
+    pollTimerActive: Boolean(pollTimer),
+    syncTickCalls: foregroundSyncTickCalls,
+  };
+}
+
+/** Tests P1 foreground - remplace l'import dynamique du module lobby. */
+export function __testSetForegroundLobbyImporterForTests(importer) {
+  foregroundLobbyImporter = importer;
 }
 
 /** Tests ARCH-07 - logger foreground (robustesse erreurs). */

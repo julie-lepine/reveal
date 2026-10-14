@@ -276,6 +276,14 @@ mock.module("../js/core/lobbyClosureSession.js", {
   },
 });
 
+// Coupe auth.js → lobby.js. Ces tests n’ont ni compte Signature ni soirée à archiver :
+// le collecteur réel retourne null dans ce cas.
+mock.module("../js/core/signatureCarnet.js", {
+  namedExports: {
+    collectSignatureEveningArchivePayload: () => null,
+  },
+});
+
 const {
   subscribeLobbyRealtime,
   unsubscribeLobbyRealtime,
