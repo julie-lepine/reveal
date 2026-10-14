@@ -35,7 +35,7 @@
   /* Espacement titre → contenu (h1 > h2 > h3) */
   --heading-gap-h1: 18px;
   --heading-gap-h2: 14px;
-  --heading-gap-h3: 12px;
+  --heading-gap-h3: 12px; 
 }
 
 *{
