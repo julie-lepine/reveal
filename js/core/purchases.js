@@ -12,7 +12,7 @@ import {
   premiumRestoreUserMessage,
   shouldContinuePremiumStorePoll,
 } from "./premiumStoreOverlay.js";
-import { isAdFreeForUser } from "./entitlements.js";
+import { applyPremiumFromStore, isAdFreeForUser } from "./entitlements.js";
 import { isNativeApp, getNativePlatform } from "./platform.js";
 import { getState } from "./state.js";
 import {
@@ -28,6 +28,8 @@ import {
 
 let configurePromise = null;
 let listenerAttached = false;
+/** Une identification plus récente invalide la lecture CustomerInfo encore en vol. */
+let purchasesIdentityGen = 0;
 
 export function isPublicSdkKeyReady(key) {
   return (
@@ -168,15 +170,36 @@ export async function ensurePurchasesConfigured() {
   return configurePromise;
 }
 
+/**
+ * Plugin 13.4.1 : `logIn` rejette si l’identification échoue.
+ * Une promesse résolue ne compte que si elle porte le `customerInfo` du `LogInResult`.
+ */
+function isRevenueCatLogInEstablished(result) {
+  return Boolean(
+    result &&
+      typeof result === "object" &&
+      result.customerInfo &&
+      typeof result.customerInfo === "object"
+  );
+}
+
+function isSameConnectedPurchasesAccount(userId) {
+  if (!userId || getState().supabaseUserId !== userId) return false;
+  const user = getState().user || {};
+  return user.loggedIn === true && user.isGuest !== true;
+}
+
 /** Lie (ou détache) RevenueCat à l’utilisateur Supabase. Invité = logOut. */
 export async function syncPurchasesIdentity() {
   if (!isPurchasesNativeReady()) return;
+  const gen = ++purchasesIdentityGen;
   try {
     const Purchases = await ensurePurchasesConfigured();
-    if (!Purchases) return;
-    const user = getState().user || {};
+    if (!Purchases || gen !== purchasesIdentityGen) return;
     const userId = getState().supabaseUserId;
+    const user = getState().user || {};
     if (!userId || user.isGuest || !user.loggedIn) {
+      if (gen !== purchasesIdentityGen) return;
       try {
         await Purchases.logOut();
       } catch {
@@ -184,9 +207,17 @@ export async function syncPurchasesIdentity() {
       }
       return;
     }
-    if (typeof Purchases.logIn === "function") {
-      await Purchases.logIn({ appUserID: userId });
-    }
+    if (typeof Purchases.logIn !== "function") return;
+    const loginResult = await Purchases.logIn({ appUserID: userId });
+    if (gen !== purchasesIdentityGen || !isRevenueCatLogInEstablished(loginResult)) return;
+    if (!isSameConnectedPurchasesAccount(userId)) return;
+    if (typeof Purchases.getCustomerInfo !== "function") return;
+    const customerInfo = await Purchases.getCustomerInfo();
+    if (gen !== purchasesIdentityGen || !isSameConnectedPurchasesAccount(userId)) return;
+    const fromStore = entitlementsFromCustomerInfo(customerInfo);
+    if (!hasAnyStoreEntitlement(fromStore)) return;
+    applyPremiumFromStore(fromStore);
+    await refreshAdsQuiet();
   } catch (e) {
     console.warn("REVEAL Purchases identity:", e?.message || e);
   }

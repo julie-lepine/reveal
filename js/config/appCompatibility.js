@@ -22,16 +22,18 @@ export const APP_VERSION = "1.0.3";
 /**
  * Niveau de contrat client/serveur - commun iOS, Android et web pour un même code.
  * Augmenter uniquement quand une évolution serveur rend les anciens binaires incompatibles.
- * Vague 1 : rester à 1 (égal au floor SQL initial) - ne pas bloquer la prod.
+ * Build 2 : permet de relever le floor SQL à 2 une fois ce build disponible sur les
+ * stores, pour forcer les builds 1 à se mettre à jour. Tant que le floor SQL reste
+ * à 1, rien ne change pour personne - ne pas relever le floor avant la dispo store.
  */
-export const APP_COMPATIBILITY_BUILD = 1;
+export const APP_COMPATIBILITY_BUILD = 2;
 
 /**
- * URLs stores - laisser vide tant que non publiées / non confirmées.
+ * URLs stores (sans paramètres de tracking).
  * Le bouton « Mettre à jour » n’apparaît que si l’URL de la plateforme est non vide.
  */
-export const IOS_APP_STORE_URL = "";
-export const ANDROID_PLAY_STORE_URL = "";
+export const IOS_APP_STORE_URL = "https://apps.apple.com/fr/app/reveal-party-games/id6785256450";
+export const ANDROID_PLAY_STORE_URL = "https://play.google.com/store/apps/details?id=com.reveal.partygames";
 
 /** Timeout contrôle serveur (ms). Heuristique Vague 1. */
 export const CLIENT_COMPAT_TIMEOUT_MS = 8_000;
