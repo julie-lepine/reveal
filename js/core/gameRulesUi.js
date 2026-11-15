@@ -1,5 +1,6 @@
 import { escapeHtml } from "./ui.js";
 import { showAppRichDialog } from "./dialog.js";
+import { GAMES } from "../../data/games.js";
 import { getGameRules, RULES_KEY_BY_NAV } from "../../data/gameRules.js";
 
 /** Bouton « Règles » à poser dans l'en-tête d'un écran de paramétrage. */
@@ -39,15 +40,41 @@ function rulesBodyHtml(rules) {
     }`;
 }
 
+function gameForRulesKey(key) {
+  const rulesKey = getGameRules(key) ? key : RULES_KEY_BY_NAV[key];
+  if (!rulesKey) return null;
+  return GAMES.find((game) => RULES_KEY_BY_NAV[game.id] === rulesKey) || null;
+}
+
+function rulesDialogIcon(rules, game) {
+  const emoji = escapeHtml(rules.emoji || "📜");
+  const logo = game?.logo ? escapeHtml(game.logo) : "";
+  if (!logo) return emoji;
+  return `<img src="${logo}" alt="" class="app-dialog__game-logo" width="72" height="72" data-rules-logo><span class="app-dialog__game-logo-fallback" hidden>${emoji}</span>`;
+}
+
+function bindRulesLogoFallback() {
+  const img = document.querySelector(".app-dialog__panel--rich [data-rules-logo]");
+  if (!img) return;
+  const fallback = img.parentElement?.querySelector(".app-dialog__game-logo-fallback");
+  const showEmoji = () => {
+    img.hidden = true;
+    if (fallback) fallback.hidden = false;
+  };
+  img.addEventListener("error", showEmoji);
+  if (img.complete && !img.naturalWidth) showEmoji();
+}
+
 /** Ouvre la modale de règles pour une clé de jeu (ex. "consensus" ou un id de nav). */
 export function openGameRules(key) {
   const rules = getGameRules(key) || getGameRules(RULES_KEY_BY_NAV[key]);
   if (!rules) return;
   void showAppRichDialog({
     title: rules.title,
-    icon: rules.emoji || "📜",
+    icon: rulesDialogIcon(rules, gameForRulesKey(key)),
     bodyHtml: rulesBodyHtml(rules),
   });
+  bindRulesLogoFallback();
 }
 
 // Délégation globale : un seul écouteur ouvre les règles au clic sur tout [data-rules].

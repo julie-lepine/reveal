@@ -3998,7 +3998,6 @@ button.emoji-picker-preview__avatar:active{
   gap:6px;
   flex-shrink:0;
 }
-
 .friends-row__actions .btn--compact{
   margin:0;
 }
@@ -5973,6 +5972,29 @@ body{
 .app-dialog__panel--rich .app-dialog__icon,
 .app-dialog__panel--rich .app-dialog__title{
   text-align:center;
+}
+
+.app-dialog__panel--rich .app-dialog__icon:has(.app-dialog__game-logo){
+  display:flex;
+  justify-content:center;
+  filter:none;
+}
+
+.app-dialog__game-logo{
+  width:72px;
+  height:72px;
+  object-fit:contain;
+  display:block;
+}
+
+/* Logo introuvable : le repli emoji prend sa place (display:block masquerait [hidden]). */
+.app-dialog__game-logo[hidden]{
+  display:none;
+}
+
+.app-dialog__game-logo-fallback{
+  font-size:32px;
+  line-height:1;
 }
 
 .app-dialog__panel--rich .app-dialog__title{
