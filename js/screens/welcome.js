@@ -1,6 +1,6 @@
 import { markWelcomeSeen } from "../core/welcomeGate.js";
 import { navigate } from "../core/router.js";
-import { escapeHtml, logoHtml, pageShell } from "../core/ui.js";
+import { escapeHtml, logoHtml, logoRuleHtml, pageShell } from "../core/ui.js";
 
 const STEPS = [
   { variant: "pink", icon: "✨", label: "Étape 1", title: "Connecte-toi" },
@@ -12,21 +12,6 @@ const STEPS = [
     title: "Invite tes amis et affrontez-vous dans une soirée de mini-jeux",
   },
 ];
-
-const LOGO_RULE_SVG = `
-  <svg class="welcome__logo-rule" viewBox="0 0 200 14" aria-hidden="true" focusable="false">
-    <defs>
-      <linearGradient id="welcome-logo-rule-grad" x1="0%" y1="0%" x2="100%" y2="0%">
-        <stop offset="0%" stop-color="#ff3cac"/>
-        <stop offset="45%" stop-color="#ff6b6b"/>
-        <stop offset="70%" stop-color="#818cf8"/>
-        <stop offset="100%" stop-color="#38bdf8"/>
-      </linearGradient>
-    </defs>
-    <path d="M 10 10 Q 100 3 190 10" stroke="url(#welcome-logo-rule-grad)" stroke-width="2.5" fill="none" stroke-linecap="round"/>
-    <circle cx="10" cy="10" r="3.5" fill="#ff3cac"/>
-    <circle cx="190" cy="10" r="3.5" fill="#38bdf8"/>
-  </svg>`;
 
 function renderStepsHtml() {
   return STEPS.map((step, index) => {
@@ -54,7 +39,7 @@ export function mountWelcome(app) {
         <div class="welcome__hero-area">
           <div class="welcome__hero logo logo--with-img logo--landing">
             ${logoHtml({ className: "app-logo app-logo--landing welcome__logo" })}
-            ${LOGO_RULE_SVG}
+            ${logoRuleHtml()}
             <p class="subtitle welcome__baseline">L'app de soirée entre amis</p>
           </div>
         </div>
