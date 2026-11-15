@@ -369,8 +369,7 @@ body[data-screen="home"] .lobby-actions__intro{ margin:28px 0 14px; }
 }
 
 .trivia-answer-btn--wrong,
-.statement--lie,
-.statement--wrong{
+.statement--lie{
   border-color:var(--color-danger);
   background:rgba(255,107,107,.14);
 }

@@ -283,15 +283,7 @@
 }
 
 .section-title--sm{ font-size:20px; }
-
 /* Ligne titre + Règles. */
-.screen-title-row{
-  align-items:flex-end;
-  margin-bottom:var(--sp-3);
-}
-
-.screen-title-row .screen-title{ margin:0; }
-
 /* Libellé au-dessus d'un titre (« Menu », « 🤝 Question 2 »…). */
 .label-upper{
   font-size:12px;
@@ -299,7 +291,8 @@
   letter-spacing:.12em;
 }
 
-.label-upper:has(+ .screen-title, + .screen-title-row, + .page-title){
+.label-upper:has(+ .screen-title,
++ .page-title){
   margin-bottom:6px;
 }
 
