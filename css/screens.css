@@ -313,21 +313,30 @@ body[data-screen="home"] .lobby-actions__intro{ margin:28px 0 14px; }
   font-weight:700;
 }
 
-.vote-btn--active,
 .statement--picked,
 .trivia-answer-btn--active,
 .wrong-vote-card--picked{
   border-color:var(--g2);
   background:rgba(255,60,172,.14);
+  background:color-mix(in srgb, var(--g2) 16%, transparent);
 }
 
 .statement__letter,
 .trivia-answer-btn__letter,
 .wrong-vote-card__num{
+  flex:none;
+  width:32px;
+  min-width:32px;
+  height:32px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
   border-radius:10px;
   background:rgba(255,255,255,.1);
   font-family:var(--font-display);
   font-weight:400;
+  font-size:17px;
+  line-height:1;
 }
 
 .statement--picked .statement__letter,
@@ -356,6 +365,39 @@ body[data-screen="home"] .lobby-actions__intro{ margin:28px 0 14px; }
 
 .wrong-vote-card--mine{ opacity:.5; }
 
+/* Hot Take : chaque option garde sa couleur (VALIDE / ACCEPTABLE / CRIMINEL). */
+.vote-btn--active{
+  border-color:var(--vote-color, var(--g2));
+  background:rgba(255,255,255,.08);
+  background:color-mix(in srgb, var(--vote-color, var(--g2)) 18%, transparent);
+}
+
+/* Spot the fake : le mot secret en Anton dégradé. */
+.traitre-word{
+  font-family:var(--font-display);
+  font-weight:400;
+  font-size:44px;
+  line-height:1.05;
+  text-transform:uppercase;
+  transform:skewX(var(--display-skew));
+  background:linear-gradient(135deg, var(--g1), var(--g2));
+  -webkit-background-clip:text;
+  background-clip:text;
+  -webkit-text-fill-color:transparent;
+}
+
+/* Tier Night : nom de la liste en Anton. */
+.tier-game-header__title{
+  font-family:var(--font-display);
+  font-weight:400;
+  font-size:34px;
+  line-height:1.05;
+  letter-spacing:.01em;
+  text-transform:uppercase;
+  transform:skewX(var(--display-skew));
+  transform-origin:left bottom;
+}
+
 /* Joueurs à voter (SpeedVote, Spot the fake) : grille de cartes. */
 .speedvote-vote-btn,
 .traitre-vote-btn{
@@ -369,6 +411,7 @@ body[data-screen="home"] .lobby-actions__intro{ margin:28px 0 14px; }
 .traitre-vote-btn--active{
   border-color:var(--g2);
   background:rgba(255,60,172,.14);
+  background:color-mix(in srgb, var(--g2) 16%, transparent);
 }
 
 .speedvote-vote-btn__check{ background:var(--g2); }
@@ -474,10 +517,33 @@ body[data-screen="home"] .lobby-actions__intro{ margin:28px 0 14px; }
   border-color:transparent;
 }
 
-/* Draw it : outils carrés. */
+/* Draw it : outils côte à côte (planche DR2), pas en pleine largeur. */
 .draw-it-tools__btn{
+  width:auto;
+  flex:0 0 auto;
+  min-height:var(--touch-min);
   border-radius:var(--r-sm);
   background:rgba(255,255,255,.08);
+}
+
+/* TruthMeter / Consensus : pourcentage en Anton dégradé (v2-pct). */
+.truth-meter__pct{
+  font-family:var(--font-display);
+  font-weight:400;
+  font-size:72px;
+  line-height:1;
+  text-align:center;
+  transform:skewX(var(--display-skew));
+  background:linear-gradient(135deg, var(--g1), var(--g2));
+  -webkit-background-clip:text;
+  background-clip:text;
+  -webkit-text-fill-color:transparent;
+}
+
+/* Draw it : outil actif à l’accent du jeu. */
+.draw-it-tools__btn.is-active{
+  background:linear-gradient(135deg, var(--g1), var(--g2));
+  color:#fff;
 }
 
 /* Rank Live : boutons de tier en Anton. */
@@ -594,6 +660,20 @@ body[data-screen="home"] .lobby-actions__intro{ margin:28px 0 14px; }
   font-weight:400;
   font-size:18px;
   color:rgba(255,255,255,.5);
+}
+
+/* ─── Lobby (planche « Lobby : actuel + titre LOBBY + amis ») ───
+   Titre Anton sous le bouton retour, compteur dessous. */
+body[data-screen="lobby"] .page:has(.back) .container > .lobby-head:first-child{
+  flex-wrap:wrap;
+  row-gap:8px;
+  padding-left:0;
+  margin:calc(var(--touch-min) + 8px) 0 18px;
+}
+
+.lobby-title{
+  flex:1 0 100%;
+  font-size:44px;
 }
 
 /* ─── Choix des jeux (planche « Game-select : validé ») ─── */
@@ -925,4 +1005,12 @@ body[data-screen="home"] .lobby-actions__intro{ margin:28px 0 14px; }
   display:block;
   margin:0 0 2px;
   font-size:12px;
+}
+
+/* Roulette : logo du jeu sur les cartes du rouleau (planche AS5). */
+.chat-roulette__card-logo{
+  flex:none;
+  width:44px;
+  height:44px;
+  object-fit:contain;
 }
