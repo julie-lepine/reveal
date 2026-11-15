@@ -16,8 +16,15 @@ import { detectAppPlatform } from "./appBuildIdentity.js";
 import {
   checkClientCompatibility,
 } from "./clientCompatibility.js";
-import { openExternalUrl } from "./openExternal.js";
+import { openStorePage } from "./openExternal.js";
 import { COMPAT_STATUS } from "./clientCompatibilityContract.js";
+
+const MSG_NATIVE =
+  "Une nouvelle version de REVEAL est disponible. Mets à jour pour continuer à jouer avec tes amis.";
+const MSG_WEB =
+  "Cette version n'est plus à jour. Recharge la page pour continuer à jouer en ligne.";
+const LABEL_ALREADY_UPDATED = "J'ai déjà mis à jour";
+const LABEL_RETRY = "Réessayer";
 
 const RECHECK_UNKNOWN_MSG =
   "Impossible de vérifier la mise à jour. Vérifie ta connexion, puis réessaie.";
@@ -63,6 +70,10 @@ function setGateFeedback(text) {
   }
   el.textContent = text || "";
   el.hidden = !text;
+  if (text) {
+    const retry = gateRoot.querySelector("[data-compat-retry]");
+    if (retry) retry.textContent = LABEL_RETRY;
+  }
 }
 
 /**
@@ -107,9 +118,7 @@ export function showClientCompatibilityGate(opts = {}) {
 
   const body =
     opts.message ||
-    (isWeb
-      ? "Cette version de test n'est plus compatible avec les soirées en ligne. Recharge une version à jour ou mets à jour le floor de test."
-      : "Cette version de REVEAL n'est plus compatible avec les soirées en ligne. Mets l'application à jour pour continuer.");
+    (isWeb ? MSG_WEB : MSG_NATIVE);
 
   root.innerHTML = `
     <div class="app-dialog__backdrop" aria-hidden="true"></div>
@@ -124,14 +133,18 @@ export function showClientCompatibilityGate(opts = {}) {
       <div class="client-compat-gate__actions" style="display:flex;flex-direction:column;gap:0.5rem;width:100%">
         ${storeBtn}
         ${webReload}
-        <button type="button" class="btn btn-secondary app-dialog__btn" data-compat-retry>Réessayer</button>
+        <button type="button" class="${
+          storeBtn ? "btn-link" : "btn btn-secondary app-dialog__btn"
+        }" data-compat-retry>${
+          storeBtn && !opts.feedback ? LABEL_ALREADY_UPDATED : LABEL_RETRY
+        }</button>
       </div>
     </div>
   `;
 
   root.querySelector("[data-compat-update]")?.addEventListener("click", async () => {
     try {
-      await openExternalUrl(storeUrl);
+      await openStorePage(storeUrl, platform);
     } catch (e) {
       console.warn("[ARCH-23] store open failed", e?.message || e, {
         platform,
@@ -191,9 +204,7 @@ export async function applyForcedRecheckResult(result) {
     } else {
       setGateFeedback("");
       setGateMessage(
-        result.client?.platform === "web"
-          ? "Cette version de test n'est plus compatible avec les soirées en ligne. Recharge une version à jour ou mets à jour le floor de test."
-          : "Cette version de REVEAL n'est plus compatible avec les soirées en ligne. Mets l'application à jour pour continuer."
+        result.client?.platform === "web" ? MSG_WEB : MSG_NATIVE
       );
     }
     return;

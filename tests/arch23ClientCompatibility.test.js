@@ -596,6 +596,12 @@ describe("ARCH-23 - wiring / SQL (statique)", () => {
     assert.match(ui, /Impossible de vérifier la mise à jour/);
     assert.match(ui, /applyForcedRecheckResult/);
     assert.doesNotMatch(ui, /play\.google\.com\/store\/apps\/details/);
+    assert.match(ui, /Une nouvelle version de REVEAL est disponible/);
+    assert.match(ui, /J'ai déjà mis à jour/);
+    assert.doesNotMatch(ui, /floor de test/);
+    const ext = read("js/core/openExternal.js");
+    assert.match(ext, /itms-apps:\/\//);
+    assert.match(ext, /market:\/\/details\?id=/);
   });
 
   it("compatibility build commun - pas versionCode comme floor", () => {

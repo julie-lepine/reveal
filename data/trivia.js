@@ -12,7 +12,7 @@ export const TRIVIA_THEMES = [
   { id: "geography", label: "Géographie" },
   { id: "sport", label: "Sport" },
   { id: "videogames", label: "Jeux vidéo" },
-  { id: "series", label: "Séries" },
+  { id: "series", label: "Séries / animés" },
   { id: "food", label: "Food" },
   { id: "general", label: "Culture Générale" },
   { id: "memes", label: "Internet / Mèmes" },
@@ -113,16 +113,8 @@ export const TRIVIA_QUESTIONS = [
     id: "cinema-012",
     theme: "cinema",
     question: "Quel film de la saga 'Harry Potter' est le plus long ?",
-    answers: ["Harry Potter et la Chambre des secrets","Harry Potter et le Prisoner d'Azkaban","Harry Potter et le Prince de sang-mêlé","Harry Potter et les Reliques de la Mort"],
-    correct: 3,
-    difficulty: "hard",
-  },
-  {
-    id: "cinema-013",
-    theme: "cinema",
-    question: "Dans Dragon Ball Z, comment s'appelle la transformation la plus connue de Goku ?",
-    answers: ["Bankai","Titan","Super Saiyan","Gear 5"],
-    correct: 2,
+    answers: ["Harry Potter et la Chambre des secrets","Harry Potter et le Prisonnier d'Azkaban","Harry Potter et le Prince de sang-mêlé","Harry Potter et les Reliques de la Mort"],
+    correct: 0,
     difficulty: "hard",
   },
   {
@@ -138,14 +130,14 @@ export const TRIVIA_QUESTIONS = [
     theme: "cinema",
     question: "Quel film de la saga 'Star Wars' est le plus récent ?",
     answers: ["Star Wars: Episode VII - The Force Awakens","Star Wars: Episode VIII - The Last Jedi","Star Wars: Episode IX - The Rise of Skywalker","Star Wars: Episode I - The Phantom Menace"],
-    correct: 3,
+    correct: 2,
     difficulty: "medium",
   },
   {
     id: "cinema-016",
     theme: "cinema",
     question: "Quel film de la saga 'Harry Potter' est le plus récent ?",
-    answers: ["Harry Potter et la Chambre des secrets","Harry Potter et le Prisoner d'Azkaban","Harry Potter et le Prince de sang-mêlé","Harry Potter et les Reliques de la Mort"],
+    answers: ["Harry Potter et la Chambre des secrets","Harry Potter et le Prisonnier d'Azkaban","Harry Potter et le Prince de sang-mêlé","Harry Potter et les Reliques de la Mort"],
     correct: 3,
     difficulty: "medium",
   },
@@ -158,36 +150,12 @@ export const TRIVIA_QUESTIONS = [
     difficulty: "easy",
   },
   {
-    id: "cinema-018",
-    theme: "cinema",
-    question: "Dans Naruto, quel est le rêve de Naruto ?",
-    answers: ["Devenir Hokage","Devenir pirate","Devenir samouraï","Devenir ninja légendaire"],
-    correct: 0,
-    difficulty: "medium",
-  },
-  {
     id: "cinema-019",
     theme: "cinema",
     question: "Quel film Disney raconte l’histoire de Simba ?",
     answers: ["Aladdin","Le Roi Lion","Mulan","Tarzan"],
     correct: 1,
     difficulty: "easy",
-  },
-  {
-    id: "cinema-020",
-    theme: "cinema",
-    question: "Dans One Piece, comment s’appelle le capitaine de l’équipage ?",
-    answers: ["Luffy","Zoro","Sanji","Nami"],
-    correct: 0,
-    difficulty: "easy",
-  },
-  {
-    id: "cinema-021",
-    theme: "cinema",
-    question: "Dans Attack on Titan, que sont les Titans ?",
-    answers: ["Des robots","Des humains géants","Des démons marins","Des aliens"],
-    correct: 1,
-    difficulty: "medium",
   },
   {
     id: "cinema-022",
@@ -206,14 +174,6 @@ export const TRIVIA_QUESTIONS = [
     difficulty: "medium",
   },
   {
-    id: "cinema-024",
-    theme: "cinema",
-    question: "Dans Death Note, quel objet permet de tuer quelqu’un en écrivant son nom ?",
-    answers: ["Un sabre","Un carnet","Une bague","Un livre magique"],
-    correct: 1,
-    difficulty: "easy",
-  },
-  {
     id: "cinema-025",
     theme: "cinema",
     question: "Quel film Pixar met en scène des voitures vivantes ?",
@@ -222,20 +182,102 @@ export const TRIVIA_QUESTIONS = [
     difficulty: "easy",
   },
   {
-    id: "cinema-026",
-    theme: "cinema",
-    question: "Dans Demon Slayer, quel est le nom du sabre utilisé ?",
-    answers: ["Katana classique","Nichirin","Chidori","Bankai"],
-    correct: 1,
-    difficulty: "hard",
-  },
-  {
     id: "cinema-027",
     theme: "cinema",
     question: "Quel film d’animation met en scène un poisson clown nommé Marin ?",
     answers: ["Le Monde de Nemo","Shark Tale","Moana","Rio"],
     correct: 0,
     difficulty: "easy",
+  },
+
+  {
+    id: "cinema-028",
+    theme: "cinema",
+    question: "Qui a réalisé « Pulp Fiction » ?",
+    answers: ["Martin Scorsese", "Stanley Kubrick", "Quentin Tarantino", "Ridley Scott"],
+    correct: 2,
+    difficulty: "medium",
+  },
+
+  {
+    id: "cinema-029",
+    theme: "cinema",
+    question: "Quel acteur incarne Jack Dawson dans « Titanic » ?",
+    answers: ["Brad Pitt", "Matt Damon", "Leonardo DiCaprio", "Johnny Depp"],
+    correct: 2,
+    difficulty: "medium",
+  },
+
+  {
+    id: "cinema-030",
+    theme: "cinema",
+    question: "Dans « Le Seigneur des anneaux », comment s'appelle le porteur de l'Anneau ?",
+    answers: ["Samsagace Gamegie", "Bilbon Sacquet", "Frodon Sacquet", "Aragorn"],
+    correct: 2,
+    difficulty: "medium",
+  },
+
+  {
+    id: "cinema-031",
+    theme: "cinema",
+    question: "Qui a réalisé « Le Parrain » (1972) ?",
+    answers: ["Martin Scorsese", "Brian De Palma", "Sidney Lumet", "Francis Ford Coppola"],
+    correct: 3,
+    difficulty: "hard",
+  },
+
+  {
+    id: "cinema-032",
+    theme: "cinema",
+    question: "Quel film a remporté la Palme d'or à Cannes en 2019 ?",
+    answers: ["Once Upon a Time… in Hollywood", "Parasite", "Joker", "Roma"],
+    correct: 1,
+    difficulty: "hard",
+  },
+
+  {
+    id: "cinema-033",
+    theme: "cinema",
+    question: "Quel film d'animation met en scène un rat qui rêve de devenir cuisinier à Paris ?",
+    answers: ["Les Aristochats", "Cars", "Ratatouille", "Rio"],
+    correct: 2,
+    difficulty: "easy",
+  },
+
+  {
+    id: "cinema-034",
+    theme: "cinema",
+    question: "Quel acteur joue le Joker dans « The Dark Knight » ?",
+    answers: ["Joaquin Phoenix", "Jared Leto", "Heath Ledger", "Jack Nicholson"],
+    correct: 2,
+    difficulty: "medium",
+  },
+
+  {
+    id: "cinema-035",
+    theme: "cinema",
+    question: "Dans quel film Tom Hanks est-il naufragé sur une île avec un ballon nommé Wilson ?",
+    answers: ["Forrest Gump", "Seul au monde", "La Ligne verte", "Il faut sauver le soldat Ryan"],
+    correct: 1,
+    difficulty: "hard",
+  },
+
+  {
+    id: "cinema-036",
+    theme: "cinema",
+    question: "Quel studio a produit « Toy Story », premier long-métrage entièrement en images de synthèse ?",
+    answers: ["DreamWorks", "Pixar", "Illumination", "Blue Sky"],
+    correct: 1,
+    difficulty: "medium",
+  },
+
+  {
+    id: "cinema-037",
+    theme: "cinema",
+    question: "Quel film d'Alfred Hitchcock contient la célèbre scène de la douche ?",
+    answers: ["Les Oiseaux", "Fenêtre sur cour", "Psychose", "Sueurs froides"],
+    correct: 2,
+    difficulty: "hard",
   },
 
   /* MUSIC */
@@ -315,8 +357,8 @@ export const TRIVIA_QUESTIONS = [
     id: "music-010",
     theme: "music",
     question: "Quel groupe chante 'Yellow' ?",
-    answers: ["Maroon 5","Imagine Dragons","U2"," Coldplay"],
-    correct: 2,
+    answers: ["Maroon 5","Imagine Dragons","U2","Coldplay"],
+    correct: 3,
     difficulty: "hard",
   },
   
@@ -414,7 +456,7 @@ export const TRIVIA_QUESTIONS = [
     id: "music-021",
     theme: "music",
     question: "Quel rappeur français est connu pour le morceau 'La danse des bandits' ?",
-    answers: ["Ninho","PLK","Gazo","SCH"],
+    answers: ["Ninho","PLK","Naps","Jul"],
     correct: 2,
     difficulty: "easy",
   },
@@ -449,9 +491,9 @@ export const TRIVIA_QUESTIONS = [
   {
     id: "music-025",
     theme: "music",
-    question: "Quel DJ français a produit 'Never Be Alone' et 'Alone' ?",
+    question: "Quel DJ français est derrière « Never Be Alone » avec Aloe Blacc ?",
     answers: ["David Guetta","DJ Snake","Martin Solveig","Madeon"],
-    correct: 1,
+    correct: 0,
     difficulty: "medium",
   },
   
@@ -476,18 +518,108 @@ export const TRIVIA_QUESTIONS = [
   {
     id: "music-028",
     theme: "music",
-    question: "Quel artiste français est connu pour 'Fade Up' et 'Avant toi' ?",
-    answers: ["Ninho","PNL","Soolking","Damso"],
-    correct: 2,
+    question: "Qui a sorti « Fade Up » avec Hamza et SCH en 2022 ?",
+    answers: ["Zeg P","Soolking","Gazo","Ninho"],
+    correct: 0,
     difficulty: "easy",
   },
   
   {
     id: "music-029",
     theme: "music",
-    question: "Quel festival est connu pour accueillir de nombreux artistes électro en Europe ?",
-    answers: ["Tomorrowland","Sunburn","Electric Daisy Carnival","Creamfields"],
+    question: "Quel festival belge, créé en 2005 à Boom, accueille chaque été des centaines de milliers de fans d'électro ?",
+    answers: ["Tomorrowland", "Sunburn", "Electric Daisy Carnival", "Creamfields"],
     correct: 0,
+    difficulty: "medium",
+  },
+
+  {
+    id: "music-030",
+    theme: "music",
+    question: "Quel chanteur américain est surnommé « The Boss » ?",
+    answers: ["Bob Dylan", "Billy Joel", "Bruce Springsteen", "Neil Young"],
+    correct: 2,
+    difficulty: "medium",
+  },
+
+  {
+    id: "music-031",
+    theme: "music",
+    question: "Quel groupe britannique a chanté « Wonderwall » ?",
+    answers: ["Blur", "Oasis", "Radiohead", "Pulp"],
+    correct: 1,
+    difficulty: "medium",
+  },
+
+  {
+    id: "music-032",
+    theme: "music",
+    question: "Quelle chanteuse est surnommée « Queen B » ?",
+    answers: ["Rihanna", "Lady Gaga", "Beyoncé", "Nicki Minaj"],
+    correct: 2,
+    difficulty: "medium",
+  },
+
+  {
+    id: "music-033",
+    theme: "music",
+    question: "Quel compositeur a écrit la 9e Symphonie et son « Ode à la joie » ?",
+    answers: ["Mozart", "Bach", "Beethoven", "Vivaldi"],
+    correct: 2,
+    difficulty: "medium",
+  },
+
+  {
+    id: "music-034",
+    theme: "music",
+    question: "Quel chanteur est connu pour le titre « Papaoutai » ?",
+    answers: ["Maître Gims", "Soprano", "Black M", "Stromae"],
+    correct: 3,
+    difficulty: "easy",
+  },
+
+  {
+    id: "music-035",
+    theme: "music",
+    question: "Quel groupe a sorti l'album « Nevermind » en 1991 ?",
+    answers: ["Pearl Jam", "Soundgarden", "Nirvana", "Alice in Chains"],
+    correct: 2,
+    difficulty: "hard",
+  },
+
+  {
+    id: "music-036",
+    theme: "music",
+    question: "Quel chanteur interprète « Uptown Funk » avec Mark Ronson ?",
+    answers: ["Justin Timberlake", "Pharrell Williams", "Bruno Mars", "The Weeknd"],
+    correct: 2,
+    difficulty: "medium",
+  },
+
+  {
+    id: "music-037",
+    theme: "music",
+    question: "Quelle artiste a sorti l'album « Folklore » en 2020 ?",
+    answers: ["Billie Eilish", "Taylor Swift", "Lorde", "Lana Del Rey"],
+    correct: 1,
+    difficulty: "medium",
+  },
+
+  {
+    id: "music-038",
+    theme: "music",
+    question: "Quel rappeur américain est surnommé « Hova » ?",
+    answers: ["Nas", "Jay-Z", "Eminem", "50 Cent"],
+    correct: 1,
+    difficulty: "hard",
+  },
+
+  {
+    id: "music-039",
+    theme: "music",
+    question: "Quelle chanteuse québécoise est célèbre pour « My Heart Will Go On » ?",
+    answers: ["Avril Lavigne", "Shania Twain", "Céline Dion", "Alanis Morissette"],
+    correct: 2,
     difficulty: "easy",
   },
 
@@ -496,7 +628,7 @@ export const TRIVIA_QUESTIONS = [
     id: "geography-001",
     theme: "geography",
     question: "Quelle est la capitale du Mexique ?",
-    answers: ["Mexico City", "Guadalajara", "Monterrey", "Tijuana"],
+    answers: ["Mexico", "Guadalajara", "Monterrey", "Tijuana"],
     correct: 0,
     difficulty: "easy",
   },
@@ -547,11 +679,11 @@ export const TRIVIA_QUESTIONS = [
   },
 
   {
-      id: "geography-007",
+    id: "geography-007",
     theme: "geography",
-    question: "Quel est le plus grand pays d'Afrique ?",
-    answers: ["Éthiopie","Kenya","Nigeria","Afrique du Sud"],
-    correct: 2,
+    question: "Quel est le plus grand pays d'Afrique par sa superficie ?",
+    answers: ["Éthiopie","Algérie","Nigeria","Afrique du Sud"],
+    correct: 1,
     difficulty: "hard",
   },
 
@@ -569,16 +701,16 @@ export const TRIVIA_QUESTIONS = [
     theme: "geography",
     question: "Quel est le plus grand pays d'Europe ?",
     answers: ["Russie","France","Allemagne","Italie"],
-    correct: 2,
+    correct: 0,
     difficulty: "medium",
   },
 
   {
     id: "geography-010",
     theme: "geography",
-    question: "Quel est le plus grand pays d'Asie ?",
-    answers: ["Russie","Chine","Inde","Japon"],
-    correct: 0,
+    question: "Quel est le plus grand pays entièrement situé en Asie ?",
+    answers: ["Russie", "Chine", "Inde", "Japon"],
+    correct: 1,
     difficulty: "medium",
   },
 
@@ -604,7 +736,7 @@ export const TRIVIA_QUESTIONS = [
     id: "geography-013",
     theme: "geography",
     question: "Quelle est la capitale de l’Allemagne ?",
-    answers: ["Berlin","Munich","Hamburg","Frankfurt"],
+    answers: ["Berlin","Munich","Hambourg","Francfort"],
     correct: 0,
     difficulty: "medium",
   },
@@ -622,7 +754,7 @@ export const TRIVIA_QUESTIONS = [
     id: "geography-015",
     theme: "geography",
     question: "Quel est le plus grand pays d'Amérique du Sud ?",
-    answers: ["Brésil","Argentine","Chile","Colombie"],
+    answers: ["Brésil","Argentine","Chili","Colombie"],
     correct: 0,
     difficulty: "medium",
   },
@@ -700,6 +832,96 @@ export const TRIVIA_QUESTIONS = [
   },
 
 
+  {
+    id: "geography-024",
+    theme: "geography",
+    question: "Quelle est la capitale du Canada ?",
+    answers: ["Toronto", "Montréal", "Ottawa", "Vancouver"],
+    correct: 2,
+    difficulty: "medium",
+  },
+
+  {
+    id: "geography-025",
+    theme: "geography",
+    question: "Quel est le plus long fleuve de France ?",
+    answers: ["La Seine", "Le Rhône", "La Loire", "La Garonne"],
+    correct: 2,
+    difficulty: "medium",
+  },
+
+  {
+    id: "geography-026",
+    theme: "geography",
+    question: "Quelle est la capitale de la Turquie ?",
+    answers: ["Istanbul", "Ankara", "Izmir", "Antalya"],
+    correct: 1,
+    difficulty: "medium",
+  },
+
+  {
+    id: "geography-027",
+    theme: "geography",
+    question: "De quel pays Buenos Aires est-elle la capitale ?",
+    answers: ["Chili", "Uruguay", "Argentine", "Paraguay"],
+    correct: 2,
+    difficulty: "easy",
+  },
+
+  {
+    id: "geography-028",
+    theme: "geography",
+    question: "Quel est le plus haut sommet des Alpes ?",
+    answers: ["Le Cervin", "Le Mont Blanc", "Le Mont Rose", "L'Eiger"],
+    correct: 1,
+    difficulty: "medium",
+  },
+
+  {
+    id: "geography-029",
+    theme: "geography",
+    question: "Quel pays est entièrement enclavé à l'intérieur de l'Afrique du Sud ?",
+    answers: ["Eswatini", "Lesotho", "Botswana", "Namibie"],
+    correct: 1,
+    difficulty: "hard",
+  },
+
+  {
+    id: "geography-030",
+    theme: "geography",
+    question: "Quel fleuve traverse Le Caire ?",
+    answers: ["Le Congo", "Le Niger", "Le Nil", "Le Zambèze"],
+    correct: 2,
+    difficulty: "easy",
+  },
+
+  {
+    id: "geography-031",
+    theme: "geography",
+    question: "Quelle est la capitale de la Suisse ?",
+    answers: ["Zurich", "Genève", "Berne", "Bâle"],
+    correct: 2,
+    difficulty: "medium",
+  },
+
+  {
+    id: "geography-032",
+    theme: "geography",
+    question: "Quel détroit sépare l'Espagne du Maroc ?",
+    answers: ["Le Bosphore", "Le détroit de Gibraltar", "Le canal de Suez", "Le détroit de Magellan"],
+    correct: 1,
+    difficulty: "medium",
+  },
+
+  {
+    id: "geography-033",
+    theme: "geography",
+    question: "Dans quel pays se trouve le site du Machu Picchu ?",
+    answers: ["Bolivie", "Colombie", "Pérou", "Équateur"],
+    correct: 2,
+    difficulty: "medium",
+  },
+
   /* SPORT */
   {
     id: "sport-001",
@@ -708,15 +930,6 @@ export const TRIVIA_QUESTIONS = [
     answers: ["Basketball", "Baseball", "Rugby", "Hockey sur glace"],
     correct: 3,
     difficulty: "medium",
-  },
-
-  {
-    id: "sport-002",
-    theme: "sport",
-    question: "Quel sport est considéré comme le plus dangereux ?",
-    answers: ["Football", "Basketball", "Hockey sur glace", "Tennis"],
-    correct: 2,
-    difficulty: "hard",
   },
 
   {
@@ -774,7 +987,7 @@ export const TRIVIA_QUESTIONS = [
   },
 
   {
-    id: "sport-008",
+    id: "sport-027",
     theme: "sport",
     question: "Quel sport se joue à Roland-Garros ?",
     answers: ["Football","Golf","Tennis","Rugby"],
@@ -803,7 +1016,7 @@ export const TRIVIA_QUESTIONS = [
   {
     id: "sport-011",
     theme: "sport",
-    question: "Quel sport utilise un ballon ovalué ?",
+    question: "Quel sport utilise un ballon ovale ?",
     answers: ["Football","Basketball","Rugby","Hockey"],
     correct: 2,
     difficulty: "easy",
@@ -821,8 +1034,8 @@ export const TRIVIA_QUESTIONS = [
   {
     id: "sport-013",
     theme: "sport",
-    question: "Quel sport utilise des bâtons pour courir ?",
-    answers: ["Sprint","Marche nordique","Saut en hauteur","Saut en longueur"],
+    question: "Quelle discipline se pratique en marchant avec des bâtons ?",
+    answers: ["Sprint", "Marche nordique", "Saut en hauteur", "Saut en longueur"],
     correct: 1,
     difficulty: "medium",
   },
@@ -891,15 +1104,6 @@ export const TRIVIA_QUESTIONS = [
   },
 
   {
-    id: "sport-021",
-    theme: "sport",
-    question: "Quel sport utilise des bâtes et des balles ?",
-    answers: ["Tennis","Golf","Basketball","Rugby"],
-    correct: 1,
-    difficulty: "easy",
-  },
-
-  {
     id: "sport-022",
     theme: "sport",
     question: "Dans quel sport peut-on marquer un essai ?",
@@ -920,8 +1124,8 @@ export const TRIVIA_QUESTIONS = [
   {
     id: "sport-024",
     theme: "sport",
-    question: "Dans quel sport utilise-t-on un terrain appelé 'court' ?",
-    answers: ["Basket","Tennis","Football","Rugby"],
+    question: "Dans quel sport joue-t-on sur un court en terre battue, en gazon ou en dur ?",
+    answers: ["Basket", "Tennis", "Football", "Rugby"],
     correct: 1,
     difficulty: "easy",
   },
@@ -938,18 +1142,117 @@ export const TRIVIA_QUESTIONS = [
   {
     id: "sport-026",
     theme: "sport",
-    question: "Dans quel sport peut-on faire un 'strike' ?",
-    answers: ["Golf","Bowling","Baseball","Cricket"],
+    question: "Dans quel sport marque-t-on un « strike » en renversant les 10 quilles d'un seul lancer ?",
+    answers: ["Golf", "Bowling", "Tennis", "Rugby"],
     correct: 1,
     difficulty: "easy",
   },
 
 
+  {
+    id: "sport-028",
+    theme: "sport",
+    question: "Quel pays a accueilli les Jeux olympiques d'été de 2016 ?",
+    answers: ["Chine", "Royaume-Uni", "Brésil", "Japon"],
+    correct: 2,
+    difficulty: "medium",
+  },
+
+  {
+    id: "sport-029",
+    theme: "sport",
+    question: "Quel tennisman est surnommé « le Roi de la terre battue » ?",
+    answers: ["Roger Federer", "Rafael Nadal", "Novak Djokovic", "Andy Murray"],
+    correct: 1,
+    difficulty: "medium",
+  },
+
+  {
+    id: "sport-030",
+    theme: "sport",
+    question: "Combien de joueurs une équipe de volley-ball aligne-t-elle sur le terrain ?",
+    answers: ["5", "6", "7", "8"],
+    correct: 1,
+    difficulty: "medium",
+  },
+
+  {
+    id: "sport-031",
+    theme: "sport",
+    question: "Quelle est la distance officielle d'un marathon ?",
+    answers: ["38,195 km", "40 km", "42,195 km", "45 km"],
+    correct: 2,
+    difficulty: "hard",
+  },
+
+  {
+    id: "sport-032",
+    theme: "sport",
+    question: "Quel pays a remporté la Coupe du monde de football en 2014 ?",
+    answers: ["Argentine", "Pays-Bas", "Allemagne", "Brésil"],
+    correct: 2,
+    difficulty: "medium",
+  },
+
+  {
+    id: "sport-033",
+    theme: "sport",
+    question: "Quel club de football est surnommé « les Merengues » ?",
+    answers: ["FC Barcelone", "Atlético de Madrid", "Real Madrid", "FC Valence"],
+    correct: 2,
+    difficulty: "medium",
+  },
+
+  {
+    id: "sport-034",
+    theme: "sport",
+    question: "Combien de titres de champion du monde de Formule 1 Michael Schumacher a-t-il remportés ?",
+    answers: ["5", "6", "7", "8"],
+    correct: 2,
+    difficulty: "hard",
+  },
+
+  {
+    id: "sport-035",
+    theme: "sport",
+    question: "Quelle ville a accueilli les Jeux olympiques d'été de 2024 ?",
+    answers: ["Los Angeles", "Tokyo", "Paris", "Londres"],
+    correct: 2,
+    difficulty: "easy",
+  },
+
+  {
+    id: "sport-036",
+    theme: "sport",
+    question: "Combien de points rapporte un essai transformé au rugby à XV ?",
+    answers: ["5", "6", "7", "8"],
+    correct: 2,
+    difficulty: "hard",
+  },
+
+  {
+    id: "sport-037",
+    theme: "sport",
+    question: "Combien de joueurs par équipe (gardien compris) sont sur la glace au hockey ?",
+    answers: ["5", "6", "7", "8"],
+    correct: 1,
+    difficulty: "hard",
+  },
+
+  {
+    id: "sport-038",
+    theme: "sport",
+    question: "Quel tournoi du Grand Chelem se joue sur gazon à Londres ?",
+    answers: ["Roland-Garros", "US Open", "Wimbledon", "Open d'Australie"],
+    correct: 2,
+    difficulty: "medium",
+  },
+
   /* VIDEOGAMES */
   {
     id: "videogames-001",
     theme: "videogames",
-    question: "Quel studio a cree la saga 'The Legend of Zelda' ?",
+    question: "Quel studio a créé la saga 'The Legend of Zelda' ?",
     answers: ["Capcom", "Sega", "Nintendo", "Square Enix"],
     correct: 2,
     difficulty: "easy",
@@ -971,15 +1274,6 @@ export const TRIVIA_QUESTIONS = [
     answers: ["Diamant","Bois","Pierre","Fer"],
     correct: 2,
     difficulty: "easy",
-  },
-
-  {
-    id: "videogames-004",
-    theme: "videogames",
-    question: "Quel jeu de la série 'The Elder Scrolls' est connu pour ses mondes ouverts et ses quêtes longues ?",
-    answers: ["The Elder Scrolls III: Morrowind","The Elder Scrolls IV: Oblivion","The Elder Scrolls V: Skyrim","The Elder Scrolls VI: Skyrim"],
-    correct: 3,
-    difficulty: "hard",
   },
 
   {
@@ -1094,7 +1388,7 @@ export const TRIVIA_QUESTIONS = [
     id: "videogames-017",
     theme: "videogames",
     question: "Dans Pokémon, quel type est super efficace contre le type Eau ?",
-    answers: ["Feu","Plante","Normal","Électrique"],
+    answers: ["Feu","Combat","Normal","Électrique"],
     correct: 3,
     difficulty: "medium",
   },
@@ -1102,7 +1396,7 @@ export const TRIVIA_QUESTIONS = [
   {
     id: "videogames-018",
     theme: "videogames",
-    question: "A quel sport joue-t-on dans FIFA ?",
+    question: "À quel sport joue-t-on dans FIFA ?",
     answers: ["Football","Basketball","Tennis","Golf"],
     correct: 0,
     difficulty: "easy",
@@ -1153,7 +1447,97 @@ export const TRIVIA_QUESTIONS = [
     difficulty: "medium",
   },
 
-  /* TV SHOWS */
+  {
+    id: "videogames-024",
+    theme: "videogames",
+    question: "Quel studio a développé la série « Dark Souls » ?",
+    answers: ["Capcom", "FromSoftware", "Konami", "Square Enix"],
+    correct: 1,
+    difficulty: "hard",
+  },
+
+  {
+    id: "videogames-025",
+    theme: "videogames",
+    question: "Dans « The Legend of Zelda », comment s'appelle le héros que l'on incarne ?",
+    answers: ["Zelda", "Ganon", "Link", "Epona"],
+    correct: 2,
+    difficulty: "easy",
+  },
+
+  {
+    id: "videogames-026",
+    theme: "videogames",
+    question: "Dans Minecraft, quel monstre explose lorsqu'il s'approche du joueur ?",
+    answers: ["Le zombie", "Le squelette", "Le creeper", "L'enderman"],
+    correct: 2,
+    difficulty: "easy",
+  },
+
+  {
+    id: "videogames-027",
+    theme: "videogames",
+    question: "Quel jeu de 2013 permet d'incarner Michael, Franklin et Trevor ?",
+    answers: ["Red Dead Redemption", "GTA IV", "GTA V", "Watch Dogs"],
+    correct: 2,
+    difficulty: "medium",
+  },
+
+  {
+    id: "videogames-028",
+    theme: "videogames",
+    question: "Quelle console Nintendo est sortie en mars 2017 ?",
+    answers: ["Wii U", "Switch", "3DS", "GameCube"],
+    correct: 1,
+    difficulty: "medium",
+  },
+
+  {
+    id: "videogames-029",
+    theme: "videogames",
+    question: "Dans Pac-Man, que doit manger Pac-Man pour pouvoir croquer les fantômes ?",
+    answers: ["Des cerises", "Des super pastilles", "Des champignons", "Des étoiles"],
+    correct: 1,
+    difficulty: "medium",
+  },
+
+  {
+    id: "videogames-030",
+    theme: "videogames",
+    question: "Quelle entreprise a créé « Fortnite » ?",
+    answers: ["Valve", "Riot Games", "Epic Games", "Activision"],
+    correct: 2,
+    difficulty: "medium",
+  },
+
+  {
+    id: "videogames-031",
+    theme: "videogames",
+    question: "Dans l'univers de Mario, comment s'appelle le frère de Mario ?",
+    answers: ["Wario", "Toad", "Luigi", "Yoshi"],
+    correct: 2,
+    difficulty: "easy",
+  },
+
+  {
+    id: "videogames-032",
+    theme: "videogames",
+    question: "Dans quel jeu rencontre-t-on l'intelligence artificielle GLaDOS ?",
+    answers: ["Half-Life", "Portal", "BioShock", "Doom"],
+    correct: 1,
+    difficulty: "hard",
+  },
+
+  {
+    id: "videogames-033",
+    theme: "videogames",
+    question: "Quel jeu se déroule sur la carte « Faille de l'invocateur » ?",
+    answers: ["Dota 2", "Heroes of the Storm", "League of Legends", "Smite"],
+    correct: 2,
+    difficulty: "medium",
+  },
+
+  /* SÉRIES / ANIMÉS */
   {
     id: "series-001",
     theme: "series",
@@ -1220,9 +1604,9 @@ export const TRIVIA_QUESTIONS = [
   {
     id: "series-008",
     theme: "series",
-    question: "Dans 'Game of Thrones', quel est le nom du personnage principal ?",
-    answers: ["Daenerys Targaryen","Jon Snow","Tyrion Lannister","Arya Stark"],
-    correct: 1,
+    question: "Dans « Game of Thrones », quelle maison a pour emblème un dragon à trois têtes ?",
+    answers: ["Stark", "Lannister", "Targaryen", "Baratheon"],
+    correct: 2,
     difficulty: "easy",
   },
 
@@ -1281,19 +1665,10 @@ export const TRIVIA_QUESTIONS = [
   },
 
   {
-    id: "series-015",
-    theme: "series",
-    question: "",
-    answers: [""],
-    correct: 0,
-    difficulty: "easy",
-  },
-
-  {
     id: "series-016",
     theme: "series",
-    question: "Quelle série met en scène les frères et sœurs Kardashian ?",
-    answers: ["The Kardashians","Keeping Up with the Kardashians","Kourtney and Kim Take New York","Kourtney and Khloe Take Miami"],
+    question: "Quelle émission de télé-réalité a lancé la famille Kardashian en 2007 ?",
+    answers: ["The Kardashians", "Keeping Up with the Kardashians", "Kourtney and Kim Take New York", "Kourtney and Khloe Take Miami"],
     correct: 1,
     difficulty: "medium",
   },
@@ -1353,20 +1728,155 @@ export const TRIVIA_QUESTIONS = [
   },
 
   {
-    id: "series-023",
+    id: "series-024",
     theme: "series",
-    question: "Dans Breaking Bad, quel est le surnom de Walter White ?",
-    answers: ["Heisenberg","Saul Good","El Camino","Blue Sky"],
+    question: "Dans « Friends », quel est le métier de Monica Geller ?",
+    answers: ["Actrice", "Chef cuisinière", "Journaliste", "Styliste"],
+    correct: 1,
+    difficulty: "medium",
+  },
+
+  {
+    id: "series-025",
+    theme: "series",
+    question: "Dans « Game of Thrones », quelle est la devise de la maison Stark ?",
+    answers: ["La nuit est sombre", "L'hiver vient", "Nous ne semons pas", "Feu et sang"],
+    correct: 1,
+    difficulty: "medium",
+  },
+
+  {
+    id: "series-026",
+    theme: "series",
+    question: "Dans « Breaking Bad », quel est le métier de Walter White au début de la série ?",
+    answers: ["Pharmacien", "Médecin", "Professeur de chimie", "Mécanicien"],
+    correct: 2,
+    difficulty: "medium",
+  },
+
+  {
+    id: "series-027",
+    theme: "series",
+    question: "Quelle série met en scène les policiers du 99e commissariat de Brooklyn, dirigés par le capitaine Holt ?",
+    answers: ["The Office", "Brooklyn Nine-Nine", "Parks and Recreation", "Superstore"],
+    correct: 1,
+    difficulty: "medium",
+  },
+
+  {
+    id: "series-028",
+    theme: "series",
+    question: "Dans « The Mandalorian », comment s'appelle « l'Enfant » ?",
+    answers: ["Yoda", "Grogu", "Ahsoka", "Kanan"],
+    correct: 1,
+    difficulty: "hard",
+  },
+
+  {
+    id: "series-029",
+    theme: "series",
+    question: "Dans « Squid Game », quel jeu d'enfant ouvre la compétition ?",
+    answers: ["Les billes", "1, 2, 3, soleil", "Le tir à la corde", "Le pont de verre"],
+    correct: 1,
+    difficulty: "medium",
+  },
+
+  {
+    id: "series-030",
+    theme: "series",
+    question: "Dans la première partie de « La Casa de Papel », quel lieu les braqueurs attaquent-ils ?",
+    answers: ["La Banque d'Espagne", "La Fabrique nationale de la monnaie et du timbre", "Le musée du Prado", "Le Parlement espagnol"],
+    correct: 1,
+    difficulty: "hard",
+  },
+
+  {
+    id: "series-031",
+    theme: "series",
+    question: "Dans « Les Simpson », comment s'appelle le bar où Homer retrouve ses amis ?",
+    answers: ["Le Kwik-E-Mart", "Le Krusty Burger", "Le Duff", "Chez Moe"],
+    correct: 3,
+    difficulty: "medium",
+  },
+
+  {
+    id: "series-032",
+    theme: "series",
+    question: "Quel acteur joue Assane Diop dans la série « Lupin » ?",
+    answers: ["Jamel Debbouze", "Omar Sy", "Franck Dubosc", "Dany Boon"],
+    correct: 1,
+    difficulty: "easy",
+  },
+
+  {
+    id: "series-033",
+    theme: "series",
+    question: "Dans « Dexter », quel est le métier de Dexter Morgan à la police de Miami ?",
+    answers: ["Médecin légiste", "Expert en traces de sang", "Avocat", "Journaliste"],
+    correct: 1,
+    difficulty: "hard",
+  },
+
+  {
+    id: "series-034",
+    theme: "series",
+    question: "Dans Dragon Ball Z, comment s'appelle la transformation la plus connue de Goku ?",
+    answers: ["Bankai","Titan","Super Saiyan","Gear 5"],
+    correct: 2,
+    difficulty: "hard",
+  },
+
+  {
+    id: "series-035",
+    theme: "series",
+    question: "Dans Naruto, quel est le rêve de Naruto ?",
+    answers: ["Devenir Hokage","Devenir pirate","Devenir samouraï","Devenir ninja légendaire"],
     correct: 0,
     difficulty: "medium",
+  },
+
+  {
+    id: "series-036",
+    theme: "series",
+    question: "Dans One Piece, comment s’appelle le capitaine de l’équipage ?",
+    answers: ["Luffy","Zoro","Sanji","Nami"],
+    correct: 0,
+    difficulty: "easy",
+  },
+
+  {
+    id: "series-037",
+    theme: "series",
+    question: "Dans Attack on Titan, que sont les Titans ?",
+    answers: ["Des robots","Des humains géants","Des démons marins","Des aliens"],
+    correct: 1,
+    difficulty: "medium",
+  },
+
+  {
+    id: "series-038",
+    theme: "series",
+    question: "Dans Death Note, quel objet permet de tuer quelqu’un en écrivant son nom ?",
+    answers: ["Un sabre","Un carnet","Une bague","Un livre magique"],
+    correct: 1,
+    difficulty: "easy",
+  },
+
+  {
+    id: "series-039",
+    theme: "series",
+    question: "Dans Demon Slayer, quel est le nom du sabre utilisé ?",
+    answers: ["Katana classique","Nichirin","Chidori","Bankai"],
+    correct: 1,
+    difficulty: "hard",
   },
 
   /* FOOD */
   {
     id: "food-001",
     theme: "food",
-    question: "Quel fromage est traditionnellement utilise dans une salade grecque ?",
-    answers: ["Feta", "Mozzarella", "Cheddar", "Comte"],
+    question: "Quel fromage est traditionnellement utilisé dans une salade grecque ?",
+    answers: ["Feta", "Mozzarella", "Cheddar", "Comté"],
     correct: 0,
     difficulty: "medium",
   },
@@ -1421,7 +1931,7 @@ export const TRIVIA_QUESTIONS = [
     theme: "food",
     question: "Quel aliment est connu pour être riche en vitamine C ?",
     answers: ["Pommes","Bananes","Poires","Fraises"],
-    correct: 0,
+    correct: 3,
     difficulty: "hard",
   },
 
@@ -1587,6 +2097,96 @@ export const TRIVIA_QUESTIONS = [
     difficulty: "easy",
   },
 
+  {
+    id: "food-026",
+    theme: "food",
+    question: "De quel pays vient le parmesan (Parmigiano Reggiano) ?",
+    answers: ["France", "Suisse", "Italie", "Espagne"],
+    correct: 2,
+    difficulty: "easy",
+  },
+
+  {
+    id: "food-027",
+    theme: "food",
+    question: "Quelle épice est généralement considérée comme la plus chère au monde ?",
+    answers: ["La vanille", "Le safran", "La cannelle", "La cardamome"],
+    correct: 1,
+    difficulty: "medium",
+  },
+
+  {
+    id: "food-028",
+    theme: "food",
+    question: "De quel pays vient la paella ?",
+    answers: ["Portugal", "Italie", "Espagne", "Mexique"],
+    correct: 2,
+    difficulty: "easy",
+  },
+
+  {
+    id: "food-029",
+    theme: "food",
+    question: "De quel pays vient le kimchi ?",
+    answers: ["Japon", "Chine", "Corée", "Vietnam"],
+    correct: 2,
+    difficulty: "medium",
+  },
+
+  {
+    id: "food-030",
+    theme: "food",
+    question: "Quel produit laitier est la base du tzatziki ?",
+    answers: ["La feta", "Le yaourt", "La crème fraîche", "Le lait de coco"],
+    correct: 1,
+    difficulty: "medium",
+  },
+
+  {
+    id: "food-031",
+    theme: "food",
+    question: "La vanille est issue d'une plante de quelle famille ?",
+    answers: ["Les palmiers", "Les orchidées", "Les cactus", "Les fougères"],
+    correct: 1,
+    difficulty: "hard",
+  },
+
+  {
+    id: "food-032",
+    theme: "food",
+    question: "Quel pain plat est traditionnellement cuit dans un four tandoor ?",
+    answers: ["Le pita", "La tortilla", "Le naan", "La focaccia"],
+    correct: 2,
+    difficulty: "medium",
+  },
+
+  {
+    id: "food-033",
+    theme: "food",
+    question: "Quel fromage bleu français est fabriqué avec du lait de brebis ?",
+    answers: ["Le comté", "Le roquefort", "Le reblochon", "Le munster"],
+    correct: 1,
+    difficulty: "medium",
+  },
+
+  {
+    id: "food-034",
+    theme: "food",
+    question: "Quel pays est à l'origine du cocktail mojito ?",
+    answers: ["Mexique", "Cuba", "Brésil", "Porto Rico"],
+    correct: 1,
+    difficulty: "hard",
+  },
+
+  {
+    id: "food-035",
+    theme: "food",
+    question: "Que signifie « al dente » pour des pâtes ?",
+    answers: ["Très cuites", "Cuites mais encore fermes sous la dent", "Cuites au four", "Cuites sans sel"],
+    correct: 1,
+    difficulty: "medium",
+  },
+
   /* GENERAL */
   {
     id: "general-001",
@@ -1664,8 +2264,8 @@ export const TRIVIA_QUESTIONS = [
     id: "general-009",
     theme: "general",
     question: "Quel est le plus petit continent du monde ?",
-    answers: ["Europe","Asie","Afrique","Amérique"],
-    correct: 0,
+    answers: ["Europe","Asie","Afrique","Océanie"],
+    correct: 3,
     difficulty: "easy",
   },
 
@@ -1711,15 +2311,6 @@ export const TRIVIA_QUESTIONS = [
     question: "Quel est le plus grand mammifère du monde ?",
     answers: ["Éléphant","Baleine bleue","Girafe","Orque"],
     correct: 1,
-    difficulty: "easy",
-  },
-
-  {
-    id: "general-015",
-    theme: "general",
-    question: "Quel est le plus grand pays du monde ?",
-    answers: ["Russie","Canada","Chine","États-Unis"],
-    correct: 0,
     difficulty: "easy",
   },
 
@@ -1772,7 +2363,7 @@ export const TRIVIA_QUESTIONS = [
     id: "general-021",
     theme: "general",
     question: "Quelle figure de style correspond à l'expression : monter en haut ?",
-    answers: ["Personnification","Metaphore","Pléonasme","Allitération"],
+    answers: ["Personnification","Métaphore","Pléonasme","Allitération"],
     correct: 2,
     difficulty: "medium",
   },
@@ -1780,17 +2371,116 @@ export const TRIVIA_QUESTIONS = [
   {
     id: "general-022",
     theme: "general",
-    question: "Quel est le plus grand lac du monde ?",
-    answers: ["Lac Supérieur","Lac Michigan","Lac Victoria","Lac Baïkal"],
-    correct: 3,
+    question: "Quel est le plus grand lac d'eau douce du monde par sa superficie ?",
+    answers: ["Lac Supérieur","Lac Tanganyika","Lac Victoria","Lac Baïkal"],
+    correct: 0,
     difficulty: "hard",
+  },
+
+  {
+    id: "general-023",
+    theme: "general",
+    question: "Quel est le symbole chimique de l'or ?",
+    answers: ["Ag", "Au", "Or", "Fe"],
+    correct: 1,
+    difficulty: "medium",
+  },
+
+  {
+    id: "general-024",
+    theme: "general",
+    question: "Qui a peint « La Joconde » ?",
+    answers: ["Michel-Ange", "Raphaël", "Léonard de Vinci", "Botticelli"],
+    correct: 2,
+    difficulty: "easy",
+  },
+
+  {
+    id: "general-025",
+    theme: "general",
+    question: "En quelle année l'être humain a-t-il posé le pied sur la Lune pour la première fois ?",
+    answers: ["1965", "1969", "1972", "1975"],
+    correct: 1,
+    difficulty: "medium",
+  },
+
+  {
+    id: "general-026",
+    theme: "general",
+    question: "Quel élément chimique a pour symbole O ?",
+    answers: ["L'or", "L'osmium", "L'oxygène", "L'oganesson"],
+    correct: 2,
+    difficulty: "medium",
+  },
+
+  {
+    id: "general-027",
+    theme: "general",
+    question: "Quel physicien est connu pour la théorie de la relativité ?",
+    answers: ["Isaac Newton", "Albert Einstein", "Niels Bohr", "Stephen Hawking"],
+    correct: 1,
+    difficulty: "easy",
+  },
+
+  {
+    id: "general-028",
+    theme: "general",
+    question: "Combien d'os compte le squelette d'un adulte ?",
+    answers: ["186", "206", "226", "256"],
+    correct: 1,
+    difficulty: "medium",
+  },
+
+  {
+    id: "general-029",
+    theme: "general",
+    question: "Quel est le plus long os du corps humain ?",
+    answers: ["Le tibia", "L'humérus", "Le fémur", "Le péroné"],
+    correct: 2,
+    difficulty: "hard",
+  },
+
+  {
+    id: "general-030",
+    theme: "general",
+    question: "En quelle année a débuté la Révolution française ?",
+    answers: ["1776", "1789", "1799", "1815"],
+    correct: 1,
+    difficulty: "medium",
+  },
+
+  {
+    id: "general-031",
+    theme: "general",
+    question: "Quel est le plus petit pays du monde par sa superficie ?",
+    answers: ["Monaco", "Saint-Marin", "La Cité du Vatican", "Le Liechtenstein"],
+    correct: 2,
+    difficulty: "hard",
+  },
+
+  {
+    id: "general-032",
+    theme: "general",
+    question: "Quel gaz les plantes absorbent-elles pour réaliser la photosynthèse ?",
+    answers: ["L'oxygène", "L'azote", "Le dioxyde de carbone", "L'hydrogène"],
+    correct: 2,
+    difficulty: "medium",
+  },
+
+  {
+    id: "general-033",
+    theme: "general",
+    question: "Quelle est la monnaie du Royaume-Uni ?",
+    answers: ["L'euro", "Le dollar", "La livre sterling", "Le franc"],
+    correct: 2,
+    difficulty: "easy",
   },
 
   /* MEMES */
   {
     id: "memes-001",
     theme: "memes",
-    question: "Quel mot est souvent associe au meme du chien Shiba Inu ?",
+    question: "Quel mot est souvent associé au mème du chien Shiba Inu ?",
     answers: ["Bruh", "Doge", "Sus", "Ratio"],
     correct: 1,
     difficulty: "hard",
@@ -1916,8 +2606,8 @@ export const TRIVIA_QUESTIONS = [
   {
     id: "memes-015",
     theme: "memes",
-    question: "Quel meme est souvent associé à un squelette dansant ?",
-    answers: ["Spooky Skeleton","Dancing Bones","Grave Meme","Halloween Dance"],
+    question: "Quel mème est souvent associé à un squelette dansant ?",
+    answers: ["Spooky Scary Skeleton","Dancing Bones","Grave Meme","Halloween Dance"],
     correct: 0,
     difficulty: "hard",
   },
@@ -1934,7 +2624,7 @@ export const TRIVIA_QUESTIONS = [
   {
     id: "memes-017",
     theme: "memes",
-    question: "Quel meme est associé à la phrase 'This is fine' ?",
+    question: "Quel mème est associé à la phrase 'This is fine' ?",
     answers: ["Un chien dans une maison en feu","Un chien policier","Un squelette","Un robot"],
     correct: 0,
     difficulty: "medium",
@@ -1944,7 +2634,7 @@ export const TRIVIA_QUESTIONS = [
     id: "memes-018",
     theme: "memes",
     question: "Que signifie 'ratio' sur les réseaux sociaux ?",
-    answers: ["Plus de likes que de commentaires","Plus de commentaires négatifs que de likes","Une vidéo virale","Un abonnement"],
+    answers: ["Une réponse qui a plus de likes que le post d'origine","Une vidéo devenue virale","Un abonnement payant","Un post supprimé par son auteur"],
     correct: 0,
     difficulty: "easy",
   },
@@ -1952,7 +2642,7 @@ export const TRIVIA_QUESTIONS = [
   {
     id: "memes-019",
     theme: "memes",
-    question: "Quel personnage est souvent utilisé dans les memes 'Pepe' ?",
+    question: "Quel personnage est souvent utilisé dans les mèmes 'Pepe' ?",
     answers: ["Grenouille","Chien","Chat","Lapin"],
     correct: 0,
     difficulty: "medium",
@@ -1982,6 +2672,105 @@ export const TRIVIA_QUESTIONS = [
     question: "Que signifie 'cringe' ?",
     answers: ["Quelque chose de gênant","Quelque chose de drôle","Quelque chose de stylé","Quelque chose de rapide"],
     correct: 0,
+    difficulty: "easy",
+  },
+
+  {
+    id: "memes-023",
+    theme: "memes",
+    question: "Que signifie « FOMO » ?",
+    answers: ["Fun Online Mood Overload", "Fear Of Missing Out", "Free Of Money Obligations", "Friends Of My Others"],
+    correct: 1,
+    difficulty: "medium",
+  },
+
+  {
+    id: "memes-024",
+    theme: "memes",
+    question: "Que signifie « TBH » dans un message ?",
+    answers: ["Take Back Home", "To Be Honest", "Too Bad Honey", "Think Before Hitting"],
+    correct: 1,
+    difficulty: "medium",
+  },
+
+  {
+    id: "memes-025",
+    theme: "memes",
+    question: "Que signifie « YOLO » ?",
+    answers: ["Your Own Life Online", "Young Online Lovers Only", "You Only Live Once", "You Owe Lots Online"],
+    correct: 2,
+    difficulty: "medium",
+  },
+
+  {
+    id: "memes-026",
+    theme: "memes",
+    question: "Quel mème montre Kermit la grenouille en train de boire une tasse de thé ?",
+    answers: ["Trollface", "But That's None of My Business", "Grumpy Cat", "Success Kid"],
+    correct: 1,
+    difficulty: "hard",
+  },
+
+  {
+    id: "memes-027",
+    theme: "memes",
+    question: "Comment appelle-t-on le fait de piéger quelqu'un avec un lien qui diffuse une vieille chanson de Rick Astley ?",
+    answers: ["Trollface", "Rickroll", "Nyan Cat", "Harlem Shake"],
+    correct: 1,
+    difficulty: "medium",
+  },
+
+  {
+    id: "memes-028",
+    theme: "memes",
+    question: "Quel mème montre un homme qui se retourne vers une autre femme alors que sa compagne le regarde, indignée ?",
+    answers: ["Woman Yelling at Cat", "Drake Hotline Bling", "Two Buttons", "Distracted Boyfriend"],
+    correct: 3,
+    difficulty: "hard",
+  },
+
+  {
+    id: "memes-029",
+    theme: "memes",
+    question: "Que signifie « bg » dans le langage des réseaux sociaux francophones ?",
+    answers: ["Bon Goût", "Beau Gosse", "Big Game", "Bonne Gestion"],
+    correct: 1,
+    difficulty: "medium",
+  },
+
+  {
+    id: "memes-030",
+    theme: "memes",
+    question: "Que veut dire « ghoster » quelqu'un ?",
+    answers: ["L'effrayer", "Cesser soudainement de lui répondre, sans explication", "Le filmer", "L'inviter à une soirée"],
+    correct: 1,
+    difficulty: "medium",
+  },
+
+  {
+    id: "memes-031",
+    theme: "memes",
+    question: "Que signifie « slay » dans le langage internet actuel ?",
+    answers: ["Rater complètement", "Réussir quelque chose avec brio", "Dormir", "Se moquer de quelqu'un"],
+    correct: 1,
+    difficulty: "hard",
+  },
+
+  {
+    id: "memes-032",
+    theme: "memes",
+    question: "Quel réseau social avait un oiseau bleu pour logo avant de devenir X ?",
+    answers: ["Snapchat", "Pinterest", "Twitter", "Tumblr"],
+    correct: 2,
+    difficulty: "easy",
+  },
+
+  {
+    id: "memes-033",
+    theme: "memes",
+    question: "Que signifie « BRB » dans une conversation en ligne ?",
+    answers: ["Big Red Button", "Bring Rice Back", "Back In Ten", "Be Right Back"],
+    correct: 3,
     difficulty: "easy",
   },
 

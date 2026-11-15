@@ -28,3 +28,45 @@ export async function openExternalUrl(url) {
   anchor.click();
   anchor.remove();
 }
+
+/** Deep link natif vers la fiche store (ouvre directement l'app Store / Play). */
+function nativeStoreDeepLink(httpsUrl, platform) {
+  try {
+    const u = new URL(httpsUrl);
+    if (platform === "ios" && u.hostname === "apps.apple.com") {
+      return `itms-apps://${u.host}${u.pathname}`;
+    }
+    if (platform === "android") {
+      const id = u.searchParams.get("id");
+      if (id) return `market://details?id=${encodeURIComponent(id)}`;
+    }
+  } catch {
+    /* URL invalide : pas de deep link */
+  }
+  return "";
+}
+
+/**
+ * Ouvre la fiche store : deep link natif d'abord, repli sur l'URL https
+ * (navigateur) si l'app est toujours au premier plan après ~1,5 s.
+ */
+export async function openStorePage(httpsUrl, platform) {
+  if (!httpsUrl || typeof window === "undefined") return;
+  const deep = isNativeApp() ? nativeStoreDeepLink(httpsUrl, platform) : "";
+  if (!deep) {
+    await openExternalUrl(httpsUrl);
+    return;
+  }
+  try {
+    window.location.href = deep;
+  } catch (e) {
+    console.warn("REVEAL openStorePage (deep link):", e?.message || e);
+    await openExternalUrl(httpsUrl);
+    return;
+  }
+  setTimeout(() => {
+    if (typeof document !== "undefined" && document.visibilityState === "visible") {
+      void openExternalUrl(httpsUrl);
+    }
+  }, 1500);
+}
