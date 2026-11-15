@@ -24,6 +24,7 @@ import { withClickLock } from "../core/actionLock.js";
 import { createMountGuard } from "../core/mountLifecycle.js";
 import { navigate } from "../core/router.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
+import { gamePlayTitleHtml } from "../core/gameTitle.js";
 import { bindNav } from "../screens/nav.js";
 import { gameExitBarHtml, bindExitGame } from "../core/exitGame.js";
 import { checkHotTakeModeration, getModerationNotice } from "../core/hotTakeSession.js";
@@ -520,7 +521,7 @@ export function mountWrongAnswer(app) {
           ).join("")}</div>
           <span class="muted">${roundIdx + 1}/${totalRounds}</span>
         </div>
-        <div class="logo logo--sm"><h1>WRONG ANSWER ONLY</h1></div>
+        ${gamePlayTitleHtml("wronganswer-prep", { title: "WRONG ANSWER ONLY" })}
         ${phaseHtml}
         ${gameExitBarHtml()}
       `,

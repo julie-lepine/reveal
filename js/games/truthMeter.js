@@ -46,9 +46,9 @@ import { requireLobbyPlay } from "../core/gameGuard.js";
 import { createMountGuard } from "../core/mountLifecycle.js";
 import { navigate } from "../core/router.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
+import { gameTitleHtml } from "../core/gameTitle.js";
 import { bindNav } from "../screens/nav.js";
 import { gameExitBarHtml, bindExitGame } from "../core/exitGame.js";
-import { rulesButtonHtml } from "../core/gameRulesUi.js";
 import {
   isGameSyncActive,
   canActAsHost,
@@ -854,10 +854,7 @@ export function mountTruthMeter(app) {
           ).join("")}</div>
           <span class="muted">${roundIdx + 1}/${total}</span>
         </div>
-        <div class="screen-title-row">
-          <div class="logo logo--sm"><h1>TRUTHMETER</h1></div>
-          ${rulesButtonHtml("truthmeter")}
-        </div>
+        ${gameTitleHtml("truthmeter-prep", { title: "TRUTHMETER", rulesKey: "truthmeter" })}
         ${author ? `<p class="hint">Auteur : <strong>${escapeHtml(author)}</strong></p>` : ""}
         ${phaseHtml}
         ${gameExitBarHtml()}

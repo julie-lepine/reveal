@@ -34,6 +34,7 @@ import { withClickLock } from "../core/actionLock.js";
 import { createMountGuard } from "../core/mountLifecycle.js";
 import { navigate } from "../core/router.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
+import { gamePlayTitleHtml } from "../core/gameTitle.js";
 import { playerAvatarHtml, playerNameHtml } from "../core/signatureUi.js";
 import { bindNav } from "../screens/nav.js";
 import { gameExitBarHtml, bindExitGame } from "../core/exitGame.js";
@@ -756,7 +757,7 @@ export function mountHotTake(app) {
           ).join("")}</div>
           <span class="muted">${Math.min(takeIdx + 1, total)}/${total}</span>
         </div>
-        <div class="logo logo--sm"><h1>HOT TAKE</h1></div>
+        ${gamePlayTitleHtml("hottake-prep", { title: "HOT TAKE" })}
         ${phaseHtml}
         ${gameExitBarHtml()}`
         : `
@@ -766,7 +767,7 @@ export function mountHotTake(app) {
           ).join("")}</div>
           <span class="muted">${takeIdx + 1}/${total}</span>
         </div>
-        <div class="logo logo--sm"><h1>HOT TAKE</h1></div>
+        ${gamePlayTitleHtml("hottake-prep", { title: "HOT TAKE" })}
         <div class="card card--hot">
           <p class="label-upper label-upper--hot">🔥 Hot Take #${takeIdx + 1}</p>
           ${takeAuthorLine(take)}

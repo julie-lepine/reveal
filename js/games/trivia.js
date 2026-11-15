@@ -13,6 +13,7 @@ import { getLocalDisplayName, recordTriviaPlayed, saveStatePatch, setLastGame } 
 import { showAppAlert } from "../core/dialog.js";
 import { navigate } from "../core/router.js";
 import { escapeHtml, pageShell, resetPageScroll } from "../core/ui.js";
+import { gamePlayTitleHtml } from "../core/gameTitle.js";
 import { bindNav } from "../screens/nav.js";
 import { gameExitBarHtml, bindExitGame } from "../core/exitGame.js";
 import {
@@ -604,7 +605,7 @@ export function mountTrivia(app) {
           </div>
           <span class="muted">${Math.min(questionIdx + 1, Math.max(totalQuestions, 1))}/${Math.max(totalQuestions, 1)}</span>
         </div>
-        <div class="logo logo--sm"><h1>TRIVIA</h1></div>
+        ${gamePlayTitleHtml("trivia-prep", { title: "TRIVIA" })}
         ${phaseHtml}
         ${gameExitBarHtml()}
       `,

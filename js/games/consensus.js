@@ -25,6 +25,7 @@ import {
 import { showAppAlert, showAppConfirm } from "../core/dialog.js";
 import { navigate } from "../core/router.js";
 import { pageShell } from "../core/ui.js";
+import { gamePlayTitleHtml } from "../core/gameTitle.js";
 import { bindNav } from "../screens/nav.js";
 import { gameExitBarHtml, bindExitGame } from "../core/exitGame.js";
 import {
@@ -1016,7 +1017,7 @@ export function mountConsensus(app) {
           </div>
           <span class="muted">${Math.min(questionIdx + 1, Math.max(totalQuestions, 1))}/${Math.max(totalQuestions, 1)}</span>
         </div>
-        <div class="logo logo--sm"><h1>CONSENSUS</h1></div>
+        ${gamePlayTitleHtml("consensus-prep", { title: "CONSENSUS" })}
         ${recoveryBannerHtml()}
         ${phaseHtml}
         ${gameExitBarHtml()}

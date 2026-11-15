@@ -23,6 +23,7 @@ import { withClickLock } from "../core/actionLock.js";
 import { createMountGuard } from "../core/mountLifecycle.js";
 import { navigate } from "../core/router.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
+import { gamePlayTitleHtml } from "../core/gameTitle.js";
 import { playerAvatarHtml, playerNameHtml } from "../core/signatureUi.js";
 import { bindNav } from "../screens/nav.js";
 import { gameExitBarHtml, bindExitGame } from "../core/exitGame.js";
@@ -308,7 +309,7 @@ export function mountSpeedVote(app) {
           ).join("")}</div>
           <span class="muted">${roundIdx + 1}/${total}</span>
         </div>
-        <div class="logo logo--sm"><h1>SPEED VOTE</h1></div>
+        ${gamePlayTitleHtml("speedvote-prep", { title: "SPEED VOTE" })}
         <div class="card card--speed">
           <p class="label-upper label-upper--gold">⚡ Question #${roundIdx + 1}</p>
           <p class="hot-take-text">${escapeHtml(currentQuestion)}</p>

@@ -24,3 +24,22 @@ export function gameTitleHtml(gameNavId, { kicker = "", rulesKey = "", title = "
       ${logo}
     </div>`;
 }
+
+/**
+ * Titre de jeu en cours de partie (sous la barre de progression) :
+ * nom du jeu en Anton + logo, sans ligne Règles.
+ * @param {string} gameNavId id du catalogue data/games.js
+ * @param {{ title?: string }} [opts] texte affiché (sinon titre du catalogue)
+ */
+export function gamePlayTitleHtml(gameNavId, { title = "" } = {}) {
+  const game = GAMES.find((g) => g.id === gameNavId) || {};
+  const name = title || game.title || "";
+  const logo = game.logo
+    ? `<img src="${escapeHtml(game.logo)}" alt="" class="game-title__logo" />`
+    : "";
+  return `
+    <div class="game-title game-title--play">
+      <h1 class="title-display">${escapeHtml(name)}</h1>
+      ${logo}
+    </div>`;
+}

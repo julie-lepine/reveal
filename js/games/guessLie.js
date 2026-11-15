@@ -29,6 +29,7 @@ import { createMountGuard } from "../core/mountLifecycle.js";
 import { createSyncPending } from "../core/syncPending.js";
 import { navigate } from "../core/router.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
+import { gamePlayTitleHtml } from "../core/gameTitle.js";
 import { bindNav } from "../screens/nav.js";
 import { gameExitBarHtml, bindExitGame } from "../core/exitGame.js";
 import { voteConfirmChrome, pickForVoteConfirm } from "../core/voteConfirm.js";
@@ -498,7 +499,7 @@ export function mountGuessLie(app) {
           ).join("")}</div>
           <span class="muted">${roundIdx + 1}/${total}</span>
         </div>
-        <div class="logo logo--sm"><h1>GUESS THE LIE</h1></div>
+        ${gamePlayTitleHtml("guesslie", { title: "GUESS THE LIE" })}
         ${body}
         ${gameExitBarHtml()}
       `,
