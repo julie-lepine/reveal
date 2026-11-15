@@ -249,8 +249,9 @@ function gameSelectHeaderHtml() {
     : "";
 
   return `
-    <div class="game-select-header">
-      <p class="label-upper label-upper--gold">🎮 La soirée</p>
+    <p class="kicker kicker--gold">🎮 La soirée</p>
+    <div class="screen-head game-select-header">
+      <h2 class="title-display">Choisir un jeu</h2>
       ${codeChip}
     </div>`;
 }
@@ -416,7 +417,6 @@ export function mountGameSelect(app) {
       content: `
       ${resumeBanner}
       ${gameSelectHeaderHtml()}
-      <h2 class="screen-title">Choisir un jeu</h2>
       <p class="game-intro">Sélectionne une activité pour le lobby.</p>
       ${gameSelectActionsHtml()}
 
