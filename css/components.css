@@ -245,50 +245,6 @@
 
 .page-cta .hint{ margin:0; }
 
-/* ─── Barre de bouton principal collée en bas (écrans de jeu, si besoin) ───
-   Dans le flux, en sticky : en fin de page, le contenu ne passe jamais
-   dessous, et aucune hauteur n'est réservée à l'avance (1 à 3 éléments).
-   overflow:clip sur .page (au lieu de hidden) : coupe les orbes sans créer
-   de conteneur de défilement, sinon le sticky ne colle pas. */
-.page:has(.sticky-cta){
-  overflow:clip;
-}
-
-.sticky-cta{
-  position:sticky;
-  bottom:env(safe-area-inset-bottom, 0px);
-  z-index:5;
-  display:flex;
-  flex-direction:column;
-  gap:10px;
-  margin:var(--sp-2) calc(-1 * var(--page-pad)) 0;
-  padding:28px var(--page-pad) var(--sp-3);
-  background:linear-gradient(180deg, rgba(13,15,30,0) 0%, var(--color-bg) 40%);
-}
-
-body.has-bottom-nav .sticky-cta{
-  bottom:calc(var(--nav-h) + env(safe-area-inset-bottom, 0px));
-}
-
-.container > .sticky-cta{ margin-bottom:0; }
-
-.sticky-cta > *,
-.sticky-cta .btn,
-.sticky-cta .btn-ready{
-  margin:0;
-}
-
-.sticky-cta > div:empty{ display:none; }
-
-/* Le slot de lancement garde ses enfants empilés avec le même écart. */
-.sticky-cta > div{
-  display:flex;
-  flex-direction:column;
-  gap:10px;
-}
-
-.sticky-cta .hint{ margin:0; }
-
 /* ═══════════════════════════════════════════════════════════════
    Pont : classes historiques → nouvelle DA
    Ces classes sont partagées par de nombreux écrans ; les restyler ici
