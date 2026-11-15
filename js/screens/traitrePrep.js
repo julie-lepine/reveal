@@ -11,7 +11,6 @@ import {
 import { getLobbyParticipants } from "../core/lobby.js";
 import { getLocalDisplayName } from "../core/state.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
-import { rulesButtonHtml } from "../core/gameRulesUi.js";
 import { isLobbyHost, onGameSessionChange, isGameSyncActive } from "../core/gameSync.js";
 import { prepGuestFollowOnSession } from "../core/mpLaunch.js";
 import { executePrepLaunch } from "../core/prepLaunch.js";
@@ -28,6 +27,7 @@ import {
 } from "../core/prepScreen.js";
 import { navigate } from "../core/router.js";
 import { pageShell, escapeHtml } from "../core/ui.js";
+import { gameTitleHtml } from "../core/gameTitle.js";
 import { bindNav } from "./nav.js";
 import { estimateTraitreDuration } from "../core/traitreDuration.js";
 
@@ -123,11 +123,7 @@ export function mountTraitrePrep(app) {
     app.innerHTML = pageShell({
       backTarget: "back",
       content: `
-        <p class="label-upper label-upper--gold">🎭 Spot the fake</p>
-        <div class="screen-title-row">
-          <h2 class="screen-title">Préparation</h2>
-          ${rulesButtonHtml("traitre")}
-        </div>
+        ${gameTitleHtml("traitre-prep", { kicker: "Préparation", rulesKey: "traitre" })}
         <p class="game-intro">
           Mot secret pour tous… sauf un. Indices oraux, votes d'élimination, démasque le fake avant le duo final.
           <span class="muted">${TRAITRE_MIN_PLAYERS} joueurs minimum.</span>

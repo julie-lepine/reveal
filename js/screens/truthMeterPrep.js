@@ -10,7 +10,6 @@ import { getActivePlayerNames } from "../core/players.js";
 import { getLobbyParticipants } from "../core/lobby.js";
 import { getLocalDisplayName } from "../core/state.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
-import { rulesButtonHtml } from "../core/gameRulesUi.js";
 import { isLobbyHost, onGameSessionChange } from "../core/gameSync.js";
 import { prepGuestFollowOnSession } from "../core/mpLaunch.js";
 import { executePrepLaunch, prepLaunchSlotParams } from "../core/prepLaunch.js";
@@ -24,6 +23,7 @@ import {
 } from "../core/prepScreen.js";
 import { navigate } from "../core/router.js";
 import { pageShell, escapeHtml } from "../core/ui.js";
+import { gameTitleHtml } from "../core/gameTitle.js";
 import { bindNav } from "./nav.js";
 import { showAppAlert } from "../core/dialog.js";
 import { estimateTruthMeterDuration } from "../core/truthMeterDuration.js";
@@ -121,11 +121,7 @@ export function mountTruthMeterPrep(app) {
     app.innerHTML = pageShell({
       backTarget: "back",
       content: `
-        <p class="label-upper label-upper--gold">📏 TruthMeter</p>
-        <div class="screen-title-row">
-          <h2 class="screen-title">Préparation</h2>
-          ${rulesButtonHtml("truthmeter")}
-        </div>
+        ${gameTitleHtml("truthmeter-prep", { kicker: "Préparation", rulesKey: "truthmeter" })}
         <p class="game-intro">Chacun écrit une affirmation, les autres jugent avec un curseur Faux → Vrai.</p>
 
         <div class="card">

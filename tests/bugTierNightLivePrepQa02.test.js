@@ -325,12 +325,11 @@ describe("BUG-TIERNIGHT-LIVE-PREP-QA-02 — J roster INCHANGÉ", () => {
 });
 
 describe("BUG-TIERNIGHT-LIVE-PREP-QA-02 — UI header game-prep", () => {
-  it("eyebrow Rank Live + titre Préparation + Règles dans screen-title-row", () => {
+  it("en-tête de jeu (gameTitleHtml) : titre Rank Live + Préparation + Règles", () => {
     const screen = read("js/screens/tierNightLivePrep.js");
-    assert.match(screen, /⚡ Rank Live/);
-    assert.match(screen, /screen-title-row/);
-    assert.match(screen, /<h2 class="screen-title">Préparation<\/h2>/);
-    assert.match(screen, /rulesButtonHtml\("tiernight"\)/);
+    assert.match(screen, /gameTitleHtml\("tiernight-select", \{[^}]*kicker: "Préparation"/);
+    assert.match(screen, /rulesKey: "tiernight"/);
+    assert.match(screen, /title: "Rank Live"/);
     assert.doesNotMatch(screen, /Préparation série/);
   });
 
@@ -339,11 +338,10 @@ describe("BUG-TIERNIGHT-LIVE-PREP-QA-02 — UI header game-prep", () => {
     assert.match(screen, /Listes custom partagées/);
   });
 
-  it("Hot Take référence conserve screen-title-row + Préparation", () => {
+  it("Hot Take référence : même en-tête de jeu (Préparation + Règles)", () => {
     const hot = read("js/screens/hotTakePrep.js");
-    assert.match(hot, /screen-title-row/);
-    assert.match(hot, /<h2 class="screen-title">Préparation<\/h2>/);
-    assert.match(hot, /rulesButtonHtml\("hottake"\)/);
+    assert.match(hot, /gameTitleHtml\("hottake-prep", \{[^}]*kicker: "Préparation"/);
+    assert.match(hot, /rulesKey: "hottake"/);
   });
 
   it("QA-01 mount contract préservé (pas d'écrasement)", () => {

@@ -20,6 +20,7 @@ import {
 import { markTierNightLiveLobbyStarted } from "../core/tierNightLiveSession.js";
 import { navigateAfterGameLaunch, prepGuestFollowOnSession } from "../core/mpLaunch.js";
 import { escapeHtml, pageShell, tierLogoHtml, bindTierLogos } from "../core/ui.js";
+import { gameTitleHtml } from "../core/gameTitle.js";
 import { rulesButtonHtml } from "../core/gameRulesUi.js";
 import { bindNav } from "./nav.js";
 import { showAppAlert, showAppConfirm } from "../core/dialog.js";
@@ -197,11 +198,7 @@ export function mountTierNightSelect(app) {
 
   function modeStepHtml() {
     return `
-      <p class="label-upper label-upper--gold">🏆 Tier Night</p>
-      <div class="screen-title-row">
-        <h2 class="screen-title">Choisis un mode</h2>
-        ${rulesButtonHtml("tiernight")}
-      </div>
+      ${gameTitleHtml("tiernight-select", { kicker: "Choisis un mode", rulesKey: "tiernight" })}
       <p class="game-intro">Classe le groupe en série de thèmes, ou vote en Rank live item par item.</p>
       <div class="tier-mode-list">
         ${TIER_NIGHT_MODES.map(renderModeCard).join("")}

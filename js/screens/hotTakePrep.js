@@ -23,13 +23,13 @@ import { getLobbyParticipants } from "../core/lobby.js";
 import { onLobbyBundleUpdated } from "../core/supabaseLobby.js";
 import { getLocalDisplayName } from "../core/state.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
-import { rulesButtonHtml } from "../core/gameRulesUi.js";
 import { isLobbyHost, onGameSessionChange, refreshGameSession, isGameSyncActive } from "../core/gameSync.js";
 import { prepGuestFollowOnSession } from "../core/mpLaunch.js";
 import { executePrepLaunch, prepLaunchSlotParams, DEFAULT_PREP_MIN_PLAYERS } from "../core/prepLaunch.js";
 import { createPrepLobbyController } from "../core/usePrepLobby.js";
 import { navigate } from "../core/router.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
+import { gameTitleHtml } from "../core/gameTitle.js";
 import {
   bindPrepRemoveDelegation,
   customEntryListHtml,
@@ -291,11 +291,7 @@ export function mountHotTakePrep(app) {
     app.innerHTML = pageShell({
       backTarget: "back",
       content: `
-        <p class="label-upper label-upper--hot">🔥 Hot Take</p>
-        <div class="screen-title-row">
-          <h2 class="screen-title">Préparation</h2>
-          ${rulesButtonHtml("hottake")}
-        </div>
+        ${gameTitleHtml("hottake-prep", { kicker: "Préparation", rulesKey: "hottake" })}
         <p class="game-intro">Opinions clivantes : suis le troupeau (+10) ou assume ton côté <strong>outsider</strong> (+15). L'admin choisit d'abord un thème, puis le nombre de manches. Ajoute tes takes si tu veux. <span class="muted">(${PLAYER_TEXT_MAX_LEN} caractères max. par take)</span></p>
 
         <div class="card">

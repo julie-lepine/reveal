@@ -2,7 +2,7 @@ import { setLocalGuessLieSubmission } from "../core/state.js";
 import { hasLocalSubmission } from "../core/guessLieSession.js";
 import { navigate } from "../core/router.js";
 import { pageShell } from "../core/ui.js";
-import { rulesButtonHtml } from "../core/gameRulesUi.js";
+import { gameTitleHtml } from "../core/gameTitle.js";
 import { checkHotTakeModeration, getModerationNotice } from "../core/hotTakeSession.js";
 import {
   charCountHtml,
@@ -27,11 +27,7 @@ export function mountGuessLieSetup(app) {
   app.innerHTML = pageShell({
     backTarget: "back",
     content: `
-      <p class="label-upper label-upper--green">🕵️ Guess The Lie</p>
-      <div class="screen-title-row">
-        <h2 class="screen-title">Prépare tes 3 affirmations</h2>
-        ${rulesButtonHtml("guesslie")}
-      </div>
+      ${gameTitleHtml("guesslie", { kicker: "Prépare tes 3 affirmations", rulesKey: "guesslie" })}
       <p class="game-intro">
         Écris <strong>2 vérités</strong> et <strong>1 mensonge</strong> sur toi, puis choisis la lettre du mensonge.
         <span class="muted"> (${PLAYER_TEXT_MAX_LEN} caractères max. par affirmation)</span>

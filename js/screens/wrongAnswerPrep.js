@@ -11,7 +11,6 @@ import { WRONG_ANSWER_ROUND_PRESETS } from "../../data/wrongAnswer.js";
 import { getLobbyParticipants } from "../core/lobby.js";
 import { getLocalDisplayName } from "../core/state.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
-import { rulesButtonHtml } from "../core/gameRulesUi.js";
 import { isLobbyHost, onGameSessionChange } from "../core/gameSync.js";
 import { prepGuestFollowOnSession } from "../core/mpLaunch.js";
 import { prepLaunchSlotParams, DEFAULT_PREP_MIN_PLAYERS, executePrepLaunch } from "../core/prepLaunch.js";
@@ -24,6 +23,7 @@ import {
   bindPrepLaunchButtons,
 } from "../core/prepScreen.js";
 import { pageShell, escapeHtml } from "../core/ui.js";
+import { gameTitleHtml } from "../core/gameTitle.js";
 import { navigate } from "../core/router.js";
 import { bindNav } from "./nav.js";
 
@@ -147,11 +147,7 @@ export function mountWrongAnswerPrep(app) {
     app.innerHTML = pageShell({
       backTarget: "back",
       content: `
-        <p class="label-upper label-upper--pink">↩️ Wrong Answer Only</p>
-        <div class="screen-title-row">
-          <h2 class="screen-title">Préparation</h2>
-          ${rulesButtonHtml("wronganswer")}
-        </div>
+        ${gameTitleHtml("wronganswer-prep", { kicker: "Préparation", rulesKey: "wronganswer" })}
         <p class="game-intro">À chaque manche, une question s'affiche. Donne la <strong>pire réponse possible</strong> en secret. Les réponses sont anonymisées, puis tout le monde vote pour la pire. Podium de manche : +15 / +10 / +5, plus +5 pts par vote reçu.</p>
 
         <div class="card">

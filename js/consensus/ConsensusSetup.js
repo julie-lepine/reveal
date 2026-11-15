@@ -1,6 +1,6 @@
 import { escapeHtml } from "../core/ui.js";
+import { gameTitleHtml } from "../core/gameTitle.js";
 import { playerNameHtml } from "../core/signatureUi.js";
-import { rulesButtonHtml } from "../core/gameRulesUi.js";
 import { prepStartSlotHtml } from "../core/prepScreen.js";
 
 export function renderConsensusSetup({
@@ -15,11 +15,7 @@ export function renderConsensusSetup({
   launchSlot = {},
 } = {}) {
   return `
-    <p class="label-upper label-upper--gold">🤝 Consensus</p>
-    <div class="screen-title-row">
-      <h2 class="screen-title">Configuration</h2>
-      ${rulesButtonHtml("consensus")}
-    </div>
+    ${gameTitleHtml("consensus-prep", { kicker: "Configuration", rulesKey: "consensus" })}
     <p class="game-intro">Tout le monde répond avec un slider de 0 à 100. Le but n'est pas d'avoir raison, mais de ressentir où le groupe va se placer.</p>
 
     <!-- Bloc Mode masqué temporairement. On garde la logique derrière pour le réactiver plus tard. -->

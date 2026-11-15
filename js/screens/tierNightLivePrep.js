@@ -29,7 +29,6 @@ import { getLobbyParticipants } from "../core/lobby.js";
 import { onLobbyBundleUpdated } from "../core/supabaseLobby.js";
 import { getLocalDisplayName } from "../core/state.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
-import { rulesButtonHtml } from "../core/gameRulesUi.js";
 import {
   isLobbyHost,
   onGameSessionChange,
@@ -47,6 +46,7 @@ import {
 import { createPrepLobbyController } from "../core/usePrepLobby.js";
 import { navigate } from "../core/router.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
+import { gameTitleHtml } from "../core/gameTitle.js";
 import {
   playersReadySectionHtml,
   prepStartSlotHtml,
@@ -375,11 +375,7 @@ export function mountTierNightLivePrep(app) {
     app.innerHTML = pageShell({
       backTarget: TIER_NIGHT_PREP_MODES_EXIT_NAV,
       content: `
-        <p class="label-upper label-upper--gold">⚡ Rank Live</p>
-        <div class="screen-title-row">
-          <h2 class="screen-title">Préparation</h2>
-          ${rulesButtonHtml("tiernight")}
-        </div>
+        ${gameTitleHtml("tiernight-select", { kicker: "Préparation", rulesKey: "tiernight", title: "Rank Live" })}
         <p class="game-intro">Choisis les catégories et la longueur, ajoute des listes custom, puis lance quand tout le monde est prêt.</p>
 
         <div class="card">

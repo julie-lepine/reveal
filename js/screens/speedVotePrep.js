@@ -16,7 +16,6 @@ import {
 import { getLobbyParticipants } from "../core/lobby.js";
 import { getLocalDisplayName } from "../core/state.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
-import { rulesButtonHtml } from "../core/gameRulesUi.js";
 import { isLobbyHost, onGameSessionChange } from "../core/gameSync.js";
 import { prepGuestFollowOnSession } from "../core/mpLaunch.js";
 import { executePrepLaunch, prepLaunchSlotParams, DEFAULT_PREP_MIN_PLAYERS } from "../core/prepLaunch.js";
@@ -30,6 +29,7 @@ import {
 } from "../core/prepScreen.js";
 import { navigate } from "../core/router.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
+import { gameTitleHtml } from "../core/gameTitle.js";
 import { bindNav } from "./nav.js";
 
 export function mountSpeedVotePrep(app) {
@@ -192,11 +192,7 @@ export function mountSpeedVotePrep(app) {
     app.innerHTML = pageShell({
       backTarget: "back",
       content: `
-        <p class="label-upper label-upper--gold">⚡ SpeedVote</p>
-        <div class="screen-title-row">
-          <h2 class="screen-title">Préparation</h2>
-          ${rulesButtonHtml("speedvote")}
-        </div>
+        ${gameTitleHtml("speedvote-prep", { kicker: "Préparation", rulesKey: "speedvote" })}
         <p class="game-intro">Vote éclair sur les joueurs de la soirée. La manche se clôture dès que tout le monde a voté.</p>
 
         <div class="card">

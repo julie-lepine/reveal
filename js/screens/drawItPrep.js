@@ -22,7 +22,6 @@ import {
 import { getLobbyParticipants } from "../core/lobby.js";
 import { getLocalDisplayName } from "../core/state.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
-import { rulesButtonHtml } from "../core/gameRulesUi.js";
 import { getLocalParticipantUid, isLobbyHost, onGameSessionChange } from "../core/gameSync.js";
 import { prepGuestFollowOnSession } from "../core/mpLaunch.js";
 import { executePrepLaunch, prepLaunchSlotParams, DEFAULT_PREP_MIN_PLAYERS } from "../core/prepLaunch.js";
@@ -42,6 +41,7 @@ import {
 } from "../core/prepScreen.js";
 import { navigate } from "../core/router.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
+import { gameTitleHtml } from "../core/gameTitle.js";
 import { bindNav } from "./nav.js";
 import { PLAYER_TEXT_MAX_LEN } from "../../data/playerTextLimits.js";
 
@@ -330,11 +330,7 @@ export function mountDrawItPrep(app) {
     app.innerHTML = pageShell({
       backTarget: "back",
       content: `
-        <p class="label-upper label-upper--gold">✏️ Draw it !</p>
-        <div class="screen-title-row">
-          <h2 class="screen-title">Préparation</h2>
-          ${rulesButtonHtml("drawit")}
-        </div>
+        ${gameTitleHtml("drawit-prep", { kicker: "Préparation", rulesKey: "drawit" })}
         <p class="game-intro">Un joueur dessine, les autres devinent. Chaque manche dure 60 secondes.</p>
 
         <div class="card">
