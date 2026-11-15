@@ -217,7 +217,35 @@
   white-space:nowrap;
 }
 
-/* ─── Barre de bouton principal collée en bas ───
+/* ─── Bloc de boutons en fin de page (prépa des jeux) ───
+   Dans le flux, non collé : il suit le dernier contenu. */
+.page-cta{
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+  margin-top:var(--sp-6);
+}
+
+.container > .page-cta{ margin-bottom:0; }
+
+.page-cta > *,
+.page-cta .btn,
+.page-cta .btn-ready{
+  margin:0;
+}
+
+.page-cta > div:empty{ display:none; }
+
+/* Le slot de lancement garde ses enfants empilés avec le même écart. */
+.page-cta > div{
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+}
+
+.page-cta .hint{ margin:0; }
+
+/* ─── Barre de bouton principal collée en bas (écrans de jeu, si besoin) ───
    Dans le flux, en sticky : en fin de page, le contenu ne passe jamais
    dessous, et aucune hauteur n'est réservée à l'avance (1 à 3 éléments).
    overflow:clip sur .page (au lieu de hidden) : coupe les orbes sans créer

@@ -389,7 +389,7 @@ export function mountDilemmaPrep(app) {
 
         <div class="players-ready" id="dilemma-players">${playersReadySectionHtml(members, session.ready, { variant: "pills" })}</div>
 
-        <div class="sticky-cta">
+        <div class="page-cta">
           <button type="button" class="btn btn-ready ${localReady ? "btn-ready--active" : ""}" id="btn-ready">
             ${localReady ? "Prêt ✓" : "Je suis prêt !"}
           </button>
