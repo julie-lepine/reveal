@@ -277,6 +277,11 @@ body[data-screen="home"] .lobby-actions__intro{ margin:28px 0 14px; }
 
 .game-title--play{ margin:24px 0 var(--sp-3); }
 
+/* Titre en tout premier (Tier Night, Rank Live) : il démarre sous le bouton retour. */
+.page:has(.back) .container > .game-title--play:first-child{
+  margin-top:calc(var(--touch-min) + 20px);
+}
+
 .game-title--play .title-display{ font-size:40px; }
 
 .card--hot,
@@ -397,7 +402,7 @@ body[data-screen="home"] .lobby-actions__intro{ margin:28px 0 14px; }
 .tier-game-header__title{
   font-family:var(--font-display);
   font-weight:400;
-  font-size:34px;
+  font-size:24px;
   line-height:1.05;
   letter-spacing:.01em;
   text-transform:uppercase;
@@ -681,6 +686,161 @@ body[data-screen="lobby"] .page:has(.back) .container > .lobby-head:first-child{
 .lobby-title{
   flex:1 0 100%;
   font-size:44px;
+}
+
+/* ─── Tier Night / Rank Live (planches TN1 à TN7, RL1 à RL4) ─── */
+/* Plateau S à D : étiquette pleine en Anton, zone d’items en pointillés. */
+.tier-row{
+  gap:8px;
+  min-height:44px;
+  padding:0;
+  border:0;
+  background:none;
+  align-items:stretch;
+}
+
+.tier-label{
+  width:44px;
+  height:auto;
+  min-height:44px;
+  border:0;
+  border-radius:12px;
+  background:var(--tier-color);
+  color:var(--color-bg);
+  font-family:var(--font-display);
+  font-weight:400;
+  font-size:22px;
+}
+
+.tier-items{
+  min-height:44px;
+  padding:5px;
+  gap:5px;
+  border-radius:12px;
+  border:1px dashed rgba(255,255,255,.12);
+  background:rgba(255,255,255,.04);
+}
+
+.tier-chip{
+  padding:6px 10px;
+  border-radius:10px;
+  border:1px solid var(--tier-color);
+  background:rgba(255,255,255,.08);
+  background:color-mix(in srgb, var(--tier-color) 22%, transparent);
+  color:var(--text);
+  font-size:12px;
+  font-weight:800;
+}
+
+/* Choix du mode : grande carte, emoji, titre en gras. */
+.tier-mode-card{
+  padding:18px;
+  border:2px solid rgba(255,255,255,.1);
+}
+
+/* Tier lists : cartes de la grille. */
+.tier-list-card{
+  border-radius:20px;
+  border:2px solid rgba(255,255,255,.1);
+}
+
+.card--create-tier{
+  border:2.5px solid transparent;
+  background:
+    linear-gradient(var(--color-bg), var(--color-bg)) padding-box,
+    linear-gradient(145deg, var(--g1) 0%, var(--g2) 48%, var(--color-ink) 100%) border-box;
+  backdrop-filter:none;
+}
+
+/* Vote Rank Live : lettres de tier en Anton, choix en couleur pleine. */
+.tier-live-vote__btn{
+  padding:12px 0;
+  border-radius:var(--r-sm);
+}
+
+/* Nom de la liste en cours : sous le titre du jeu, comme une pastille. */
+.tier-game-header{ margin:0 0 var(--sp-3); }
+
+/* ─── Révélations et fins de manche (planches *3 / *4) ─── */
+/* Hot Take : bandeau outsider (h-ban), titre en Anton. */
+.hot-take-outsider-banner{
+  border-radius:var(--r-md);
+  border-color:rgba(255,107,107,.35);
+  background:linear-gradient(135deg, rgba(255,107,107,.22), rgba(255,60,172,.14));
+}
+
+.hot-take-outsider-banner__kicker{
+  font-weight:900;
+  letter-spacing:.1em;
+  color:var(--color-danger);
+}
+
+.hot-take-outsider-banner__title{
+  font-family:var(--font-display);
+  font-weight:400;
+  font-size:22px;
+  text-transform:uppercase;
+}
+
+/* Wrong Answer : réponses révélées (w-rev), la pire mise en avant. */
+.wrong-reveal-row{
+  border-radius:var(--r-md);
+  padding:14px;
+}
+
+.wrong-reveal-row--worst{
+  border-color:rgba(255,60,172,.5);
+  background:linear-gradient(135deg, rgba(255,60,172,.22), rgba(99,102,241,.14));
+}
+
+.wrong-reveal-row__pts{
+  opacity:1;
+  font-weight:900;
+  color:var(--color-success);
+}
+
+/* Dilemma : barres A (indigo) et B (rose), pourcentages en Anton. */
+.dilemma__bar-a{ background:linear-gradient(90deg, var(--color-secondary-soft), var(--color-secondary)); }
+.dilemma__bar-b{ background:linear-gradient(90deg, var(--color-primary-hot), var(--color-primary)); }
+
+.dilemma__pct{
+  font-family:var(--font-display);
+  font-weight:400;
+  font-size:22px;
+}
+
+/* Lignes de joueurs dans les révélations et classements (v2-row / g-rk). */
+.player-row--compact{
+  border-bottom:0;
+  border-top:1px solid var(--divider);
+}
+
+.player-row--compact:first-child{ border-top:0; }
+
+.clutch-rank__pos{
+  font-family:var(--font-display);
+  font-weight:400;
+  font-size:20px;
+}
+
+.clutch-rank__pts{
+  font-weight:900;
+  color:var(--color-success);
+}
+
+/* Draw it : lignes du récap. */
+.draw-it-recap__row{
+  border-radius:var(--r-sm);
+}
+
+/* Cartes de fin encadrées : Spot the fake, Draw it. */
+.traitre-final,
+.draw-it-recap{
+  border:2.5px solid transparent;
+  background:
+    linear-gradient(var(--color-bg), var(--color-bg)) padding-box,
+    linear-gradient(145deg, var(--g1) 0%, var(--g2) 48%, var(--color-ink) 100%) border-box;
+  backdrop-filter:none;
 }
 
 /* ─── Choix des jeux (planche « Game-select : validé ») ─── */
