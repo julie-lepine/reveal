@@ -1,42 +1,11 @@
+@import url("css/tokens.css");
 @import url("css/a11y.css");
 @import url("css/prep-shared.css");
 @import url("css/event-skins.css");
 
 /* === Jeux : dilemme, hot take, speed vote, truth meter, tier night, guess lie === */
 
-:root{
-  /* Layout */
-  --app-max:430px;
-  --page-pad:16px;
-  --touch-min:44px;
-
-  /* Couleurs - primaire rose (#ff3cac), secondaire indigo (#6366f1) */
-  --color-bg: #0d0f1e;
-  --color-bg-deep: #05060f;
-  --color-primary: #ff3cac;
-  --color-primary-hot: #ff6b6b;
-  --color-secondary: #6366f1;
-  --color-secondary-soft: #818cf8;
-  --color-secondary-deep: #4f46e5;
-
-  --gradient-primary: linear-gradient(135deg, var(--color-primary-hot), var(--color-primary));
-  --gradient-secondary: linear-gradient(135deg, var(--color-secondary-soft), var(--color-secondary));
-  --gradient-secondary-deep: linear-gradient(135deg, var(--color-secondary), var(--color-secondary-deep));
-
-  --shadow-primary: 0 8px 32px rgba(255, 60, 172, 0.3);
-  --shadow-secondary: 0 8px 28px rgba(99, 102, 241, 0.35);
-
-  --focus-ring: var(--color-secondary-soft);
-
-  /* Bannière AdMob native (surchargé par js/core/ads.js) */
-  --ad-banner-height: 0px;
-  --ad-banner-buffer: 0px;
-
-  /* Espacement titre → contenu (h1 > h2 > h3) */
-  --heading-gap-h1: 18px;
-  --heading-gap-h2: 14px;
-  --heading-gap-h3: 12px; 
-}
+/* Variables : voir css/tokens.css */
 
 *{
   margin:0;
@@ -69,7 +38,7 @@ body{
 }
 
 body.has-bottom-nav .page{
-  padding-bottom:calc(88px + env(safe-area-inset-bottom, 0px));
+  padding-bottom:calc(var(--nav-h) + env(safe-area-inset-bottom, 0px));
 }
 
 body.has-top-ad .page{
