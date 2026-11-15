@@ -33,6 +33,10 @@ export function onScreenChange(fn) {
 
 function notifyScreenChange(screenId) {
   currentScreenId = screenId;
+  // Hook purement visuel : le CSS en déduit l'accent du jeu (--g1 / --g2).
+  if (typeof document !== "undefined" && document.body) {
+    document.body.dataset.screen = screenId;
+  }
   screenListeners.forEach((fn) => fn(screenId));
 }
 
