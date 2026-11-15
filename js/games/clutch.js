@@ -420,7 +420,7 @@ export function mountClutch(app) {
         ${btnDisabled ? "disabled" : ""}
         style="width:220px;height:220px;margin:24px auto;display:flex;align-items:center;justify-content:center;
           border-radius:50%;border:none;cursor:${btnDisabled ? "default" : "pointer"};
-          font-size:1.4rem;font-weight:900;color:#fff;
+          color:#fff;
           background:${tapped ? "linear-gradient(145deg,#34D399,#60A5FA)" : "radial-gradient(circle at 50% 35%, #FF6B6B 0%, #FF3CAC 55%, #2B2D66 100%)"};
           box-shadow:0 12px 40px rgba(255,60,172,.35);opacity:${(localWindowClosed && !tapped) || counting ? ".5" : "1"}">
         ${tapped ? "✓ Tapé" : "TAP !"}
