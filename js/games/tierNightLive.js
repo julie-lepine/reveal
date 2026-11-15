@@ -45,6 +45,7 @@ import { showAppAlert } from "../core/dialog.js";
 import { setLobbyPlaying } from "../core/lobby.js";
 import { navigate } from "../core/router.js";
 import { escapeHtml, pageShell, tierLogoHtml, bindTierLogos } from "../core/ui.js";
+import { gamePlayTitleHtml } from "../core/gameTitle.js";
 import { gameExitBarHtml, bindExitGame } from "../core/exitGame.js";
 import { bindNav } from "../screens/nav.js";
 import { withClickLock, createActionLock } from "../core/actionLock.js";
@@ -81,7 +82,7 @@ function makeItemLabel(list, players) {
 
 function headerHtml(list, idx, total) {
   return `
-    <p class="label-upper label-upper--gold">⚡ Tier Night · Rank live</p>
+    ${gamePlayTitleHtml("tiernight-select", { title: "Rank Live" })}
     <div class="tier-game-header">
       <div class="tier-game-header__logo tier-logo-wrap--card">${tierLogoHtml(list, "tier-list-logo tier-list-logo--fill")}</div>
       <h1 class="tier-game-header__title">${escapeHtml(list.name)}</h1>

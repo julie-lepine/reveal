@@ -59,7 +59,7 @@ describe("UX-TIERNIGHT-NAV-01 - source navigation", () => {
     assert.match(select, /getScreenParams/);
     assert.match(select, /LEGACY_SERIES_DEAD_STEPS|params\.step === "list"/);
     assert.match(select, /backTarget:\s*onModeLevel \? "back" : backTargetForStep\(\)/);
-    assert.match(select, /Rank live · modes de jeu/);
+    assert.match(select, /title: "Rank Live", kicker: "Choisis une tier list"/);
     assert.doesNotMatch(select, /btn-back-inline/);
     assert.doesNotMatch(select, /data-tier-back/);
     assert.doesNotMatch(select, /topicStepHtml/);

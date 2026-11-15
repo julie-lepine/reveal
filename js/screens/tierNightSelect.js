@@ -21,7 +21,6 @@ import { markTierNightLiveLobbyStarted } from "../core/tierNightLiveSession.js";
 import { navigateAfterGameLaunch, prepGuestFollowOnSession } from "../core/mpLaunch.js";
 import { escapeHtml, pageShell, tierLogoHtml, bindTierLogos } from "../core/ui.js";
 import { gameTitleHtml } from "../core/gameTitle.js";
-import { rulesButtonHtml } from "../core/gameRulesUi.js";
 import { bindNav } from "./nav.js";
 import { showAppAlert, showAppConfirm } from "../core/dialog.js";
 import { isTierNightSeriesUiEnabled } from "../core/tierNightSeriesGate.js";
@@ -207,11 +206,7 @@ export function mountTierNightSelect(app) {
 
   function listStepHtml() {
     return `
-      <p class="label-upper label-upper--gold">Rank live · modes de jeu</p>
-      <div class="screen-title-row">
-        <h2 class="screen-title">Choisis une tier list</h2>
-        ${rulesButtonHtml("tiernight")}
-      </div>
+      ${gameTitleHtml("tiernight-select", { title: "Rank Live", kicker: "Choisis une tier list", rulesKey: "tiernight" })}
 
       <button type="button" class="card card--clickable card--highlight card--create-tier" data-nav="tiernight-create">
         <div class="card-row">

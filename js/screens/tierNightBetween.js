@@ -46,6 +46,7 @@ import { createActionLock, withClickLock } from "../core/actionLock.js";
 import { gameCumulativeScoresHtml, refreshGameScoresBox } from "../core/gameScores.js";
 import { navigate } from "../core/router.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
+import { gameTitleHtml } from "../core/gameTitle.js";
 import { bindNav } from "./nav.js";
 import { showAppAlert } from "../core/dialog.js";
 import { createMountGuard } from "../core/mountLifecycle.js";
@@ -307,8 +308,7 @@ export function mountTierNightBetween(app) {
       backTarget: "back",
       scroll: true,
       content: `
-        <p class="label-upper label-upper--gold">⚡ Rank Live</p>
-        <h2 class="screen-title">Résultat de liste</h2>
+        ${gameTitleHtml("tiernight-select", { title: "Rank Live", kicker: "Résultat de liste" })}
         <p class="game-intro">${escapeHtml(topicEmoji)} ${escapeHtml(topicName)}${
         roundLabel ? ` · ${escapeHtml(roundLabel)}` : ""
       }</p>
@@ -418,8 +418,7 @@ export function mountTierNightBetween(app) {
       backTarget: "back",
       scroll: true,
       content: `
-        <p class="label-upper label-upper--gold">🏆 Tier Night · Série</p>
-        <h2 class="screen-title">Résultat de manche</h2>
+        ${gameTitleHtml("tiernight-select", { kicker: "Série · Résultat de manche" })}
         <p class="game-intro">${escapeHtml(topicEmoji)} ${escapeHtml(topicName)}${
         roundLabel ? ` · ${escapeHtml(roundLabel)}` : ""
       }</p>

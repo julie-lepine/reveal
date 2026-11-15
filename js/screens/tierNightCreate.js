@@ -19,6 +19,7 @@ import {
 import { markTierNightLiveLobbyStarted } from "../core/tierNightLiveSession.js";
 import { navigateAfterGameLaunch } from "../core/mpLaunch.js";
 import { pageShell, escapeHtml } from "../core/ui.js";
+import { gameTitleHtml } from "../core/gameTitle.js";
 import { checkHotTakeModeration, getModerationNotice } from "../core/hotTakeSession.js";
 import { showAppAlert } from "../core/dialog.js";
 import { returnToTierNightSelectStep } from "../core/tierNightNav.js";
@@ -54,10 +55,10 @@ export function mountTierNightCreate(app) {
   app.innerHTML = pageShell({
     backTarget: contribute ? "tiernight-live-prep" : "tiernight-live-lists",
     content: `
-      <p class="label-upper label-upper--gold">⚡ Rank Live</p>
-      <h2 class="screen-title">${
-        contribute ? "Ajouter une liste custom" : "Créer ma tier list"
-      }</h2>
+      ${gameTitleHtml("tiernight-select", {
+        title: "Rank Live",
+        kicker: contribute ? "Ajouter une liste custom" : "Créer ma tier list",
+      })}
       <p class="game-intro">${
         contribute
           ? `Nom + items (${LIVE_TIER_LIST_ITEMS_MIN}–${LIVE_TIER_LIST_ITEMS_MAX}), un par ligne. La liste rejoint le prep partagé - pas de lancement.`
