@@ -288,3 +288,146 @@ body.has-bottom-nav .sticky-cta{
 }
 
 .sticky-cta .hint{ margin:0; }
+
+/* ═══════════════════════════════════════════════════════════════
+   Pont : classes historiques → nouvelle DA
+   Ces classes sont partagées par de nombreux écrans ; les restyler ici
+   applique la DA partout sans réécrire chaque template.
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Titres d'écran : Anton, majuscules, inclinés, alignés à gauche. */
+.screen-title,
+.page-title{
+  margin:0 0 var(--sp-3);
+  font-family:var(--font-display);
+  font-weight:400;
+  font-size:36px;
+  line-height:1.02;
+  letter-spacing:.02em;
+  text-transform:uppercase;
+  text-align:left;
+  transform:skewX(var(--display-skew));
+  transform-origin:left bottom;
+  overflow-wrap:anywhere;
+}
+
+.page-title--carnet{ text-shadow:0 0 24px rgba(245,215,110,.28); }
+
+/* Titres de section (résultats, podium…) : Anton plus petit. */
+.section-title{
+  margin:var(--sp-5) 0 var(--sp-3);
+  font-family:var(--font-display);
+  font-weight:400;
+  font-size:26px;
+  line-height:1.05;
+  letter-spacing:.01em;
+  text-transform:uppercase;
+  transform:skewX(var(--display-skew));
+  transform-origin:left bottom;
+}
+
+.section-title--sm{ font-size:20px; }
+
+/* Ligne titre + Règles. */
+.screen-title-row{
+  align-items:flex-end;
+  margin-bottom:var(--sp-3);
+}
+
+.screen-title-row .screen-title{ margin:0; }
+
+/* Libellé au-dessus d'un titre (« Menu », « 🤝 Question 2 »…). */
+.label-upper{
+  font-size:12px;
+  font-weight:800;
+  letter-spacing:.12em;
+}
+
+.label-upper:has(+ .screen-title, + .screen-title-row, + .page-title){
+  margin-bottom:6px;
+}
+
+/* Pastilles de sélection historiques (thèmes, decks, manches). */
+.theme-chips{
+  justify-content:center;
+  gap:var(--sp-2);
+}
+
+.theme-chip{
+  min-height:var(--touch-min);
+  padding:12px 14px;
+  border-radius:16px;
+  border:1.5px solid rgba(255,255,255,.1);
+  background:var(--surface-2);
+  color:var(--text);
+  font-family:var(--font-body);
+  font-size:14px;
+  font-weight:800;
+  line-height:1;
+}
+
+.theme-chip--active{
+  background:linear-gradient(135deg, var(--g1), var(--g2));
+  border-color:transparent;
+  color:#fff;
+}
+
+.theme-chip:focus-visible{
+  outline:2px solid var(--focus-ring);
+  outline-offset:2px;
+}
+
+/* Nombre de manches : chiffres en Anton. */
+.theme-chips--rounds .theme-chip{
+  min-width:50px;
+  padding:9px 8px;
+  font-family:var(--font-display);
+  font-weight:400;
+  font-size:26px;
+  transform:skewX(var(--display-skew));
+}
+
+.theme-chips--rounds .theme-chip:active{ transform:skewX(var(--display-skew)) scale(.97); }
+
+/* Carte « Nombre de manches » : cadre à bordure dégradée, sans wrapper. */
+.card--frame,
+.card:not(.frame > .card):has(> .theme-chips--rounds){
+  border:2.5px solid transparent;
+  background:
+    linear-gradient(var(--color-bg), var(--color-bg)) padding-box,
+    linear-gradient(145deg, var(--g1) 0%, var(--g2) 48%, var(--color-ink) 100%) border-box;
+  backdrop-filter:none;
+}
+
+/* Joueurs prêts en pastilles : pas de carte autour. */
+.card:has(> .player-pills){
+  padding:0;
+  border:0;
+  background:none;
+  backdrop-filter:none;
+}
+
+.card:has(> .player-pills) .card-heading{ text-align:center; }
+
+/* Onglets du Menu (Soirée / Profil / Forfaits) : planche ME. */
+.settings-tabs{
+  --settings-tabs-pad:5px;
+  --settings-tabs-gap:4px;
+  margin-bottom:18px;
+  border:0;
+  border-radius:20px;
+  background:var(--surface-2);
+}
+
+.settings-tabs__cursor{
+  border:0;
+  border-radius:15px;
+  background:linear-gradient(135deg, var(--color-secondary), var(--color-primary));
+  box-shadow:0 6px 18px rgba(255,60,172,.3);
+}
+
+.settings-tabs__btn{
+  font-size:14px;
+  font-weight:800;
+  border-radius:15px;
+}

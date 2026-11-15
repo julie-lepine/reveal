@@ -73,6 +73,225 @@ body[data-screen="home"] .auth-welcome__btn--secondary{
 
 body[data-screen="home"] .lobby-actions__intro{ margin:28px 0 14px; }
 
+/* ─── Menu : Soirée / Profil / Forfaits (planches ME1 à ME4) ─── */
+.settings-section{
+  border-radius:var(--r-lg);
+  padding:18px 16px;
+}
+
+/* Titres de section : Anton italique (mn-h). */
+.settings-section__title{
+  margin:0 0 6px;
+  font-family:var(--font-display);
+  font-weight:400;
+  font-style:italic;
+  font-size:22px;
+  line-height:1.05;
+  letter-spacing:.01em;
+  text-transform:uppercase;
+  transform:skewX(var(--display-skew));
+  transform-origin:left;
+}
+
+.settings-section__hint{
+  font-size:13px;
+  line-height:1.4;
+  color:rgba(255,255,255,.62);
+}
+
+/* Bandeau « Soirée en cours » : cadre dégradé, code en Anton dégradé. */
+.settings-lobby-banner{
+  border:2.5px solid transparent;
+  background:
+    linear-gradient(var(--color-bg), var(--color-bg)) padding-box,
+    linear-gradient(145deg, var(--g1) 0%, var(--g2) 48%, var(--color-ink) 100%) border-box;
+  backdrop-filter:none;
+}
+
+.settings-lobby-banner__text strong{
+  font-family:var(--font-display);
+  font-weight:400;
+  font-size:22px;
+  letter-spacing:.04em;
+  background:linear-gradient(135deg, var(--g1), var(--g2));
+  -webkit-background-clip:text;
+  background-clip:text;
+  -webkit-text-fill-color:transparent;
+}
+
+/* Lignes de lien (Amis, Carnet, Aide) : mn-row. */
+.settings-link-row{
+  gap:14px;
+  min-height:var(--touch-min);
+  margin:0 0 12px;
+  padding:14px 16px;
+  border-radius:20px;
+  border:1px solid var(--border-1);
+  background:var(--surface-1);
+  font-weight:800;
+}
+
+.settings-link-row__icon-wrap{
+  width:42px;
+  height:42px;
+  border-radius:var(--r-sm);
+  background:linear-gradient(135deg, var(--color-secondary), var(--color-primary));
+}
+
+.settings-link-row__icon{ font-size:20px; }
+
+.settings-link-row__chevron{ color:rgba(255,255,255,.5); }
+
+/* Actions de partie : danger en rouge. */
+.settings-party__btn--danger{
+  border-color:rgba(255,107,107,.5);
+  color:var(--color-danger);
+}
+
+/* Forfaits : offre principale encadrée, prix en Anton dégradé. */
+.premium-offer__hook{
+  font-size:12px;
+  font-weight:800;
+  letter-spacing:.12em;
+  text-transform:uppercase;
+  color:var(--text-3);
+}
+
+.premium-offer--hero{
+  border:2.5px solid transparent;
+  background:
+    linear-gradient(var(--color-bg), var(--color-bg)) padding-box,
+    linear-gradient(145deg, var(--g1) 0%, var(--g2) 48%, var(--color-ink) 100%) border-box;
+  backdrop-filter:none;
+}
+
+.premium-offer__amount{
+  display:inline-block;
+  font-family:var(--font-display);
+  font-weight:400;
+  font-size:46px;
+  line-height:1;
+  background:linear-gradient(135deg, var(--color-gold), var(--color-primary));
+  -webkit-background-clip:text;
+  background-clip:text;
+  -webkit-text-fill-color:transparent;
+  transform:skewX(var(--display-skew));
+}
+
+.premium-offer--side .premium-offer__amount{ font-size:36px; }
+
+.premium-offer__feat{
+  font-size:14px;
+  font-weight:700;
+}
+
+/* ─── Menu : Amis, Carnet, Aide, Confidentialité (ME5 à ME8) ─── */
+/* Amis : lignes séparées par un filet, actions en pilules (mn-fr / mn-b). */
+.friends-row{
+  border-top:1px solid var(--divider);
+  padding:10px 0;
+}
+
+.friends-row:first-of-type{ border-top:0; }
+
+.friends-row__actions .btn--compact{
+  width:auto;
+  min-height:36px;
+  margin:0;
+  padding:9px 14px;
+  border:0;
+  border-radius:var(--r-pill);
+  background:rgba(255,255,255,.1);
+  box-shadow:none;
+  color:#fff;
+  font-size:13px;
+  font-weight:900;
+  white-space:nowrap;
+}
+
+.friends-row__actions .btn-primary.btn--compact{
+  background:linear-gradient(135deg, var(--color-secondary), var(--color-primary));
+}
+
+/* Carnet : tuiles à chiffre Anton dégradé, cartes de graphiques encadrées. */
+.carnet-stat__value{
+  font-family:var(--font-display);
+  font-weight:400;
+  font-size:36px;
+  line-height:1.1;
+  background:linear-gradient(135deg, var(--g1), var(--g2));
+  -webkit-background-clip:text;
+  background-clip:text;
+  -webkit-text-fill-color:transparent;
+}
+
+.carnet-viz-card{
+  border:2.5px solid transparent;
+  border-radius:var(--r-card);
+  background:
+    linear-gradient(var(--color-bg), var(--color-bg)) padding-box,
+    linear-gradient(145deg, var(--g1) 0%, var(--g2) 48%, var(--color-ink) 100%) border-box;
+}
+
+.carnet-viz__label{
+  font-size:12px;
+  font-weight:800;
+  letter-spacing:.12em;
+  text-transform:uppercase;
+  color:var(--text-3);
+}
+
+.carnet-ring__pct{
+  font-family:var(--font-display);
+  font-weight:400;
+}
+
+/* Confidentialité : texte dans un cadre dégradé, intertitres Anton. */
+.privacy-card{
+  border:2.5px solid transparent;
+  background:
+    linear-gradient(var(--color-bg), var(--color-bg)) padding-box,
+    linear-gradient(145deg, var(--g1) 0%, var(--g2) 48%, var(--color-ink) 100%) border-box;
+  backdrop-filter:none;
+}
+
+.privacy-section__title{
+  font-family:var(--font-display);
+  font-weight:400;
+  font-style:italic;
+  font-size:20px;
+  letter-spacing:.01em;
+  text-transform:uppercase;
+  transform:skewX(var(--display-skew));
+  transform-origin:left;
+}
+
+/* ─── En jeu : titre Anton + logo, carte principale encadrée ───
+   (planches Jeu2, DI2, HT2, TQ2, SV2, WA2…) */
+.game-title--play{ margin:var(--sp-5) 0 var(--sp-3); }
+
+.game-title--play .title-display{ font-size:40px; }
+
+.card--hot,
+.card--speed,
+.dilemma__card,
+.wrong-prompt,
+.traitre-word-card,
+.consensus-question-card,
+.consensus-stage,
+.consensus-reveal-card,
+.trivia-reveal-card,
+.draw-it-board,
+.hottake-final,
+.consensus-final,
+.trivia-results{
+  border:2.5px solid transparent;
+  background:
+    linear-gradient(var(--color-bg), var(--color-bg)) padding-box,
+    linear-gradient(145deg, var(--g1) 0%, var(--g2) 48%, var(--color-ink) 100%) border-box;
+  backdrop-filter:none;
+}
+
 /* ─── Choix des jeux (planche « Game-select : validé ») ─── */
 .game-select-header{
   align-items:center;
@@ -302,3 +521,6 @@ body[data-screen="home"] .lobby-actions__intro{ margin:28px 0 14px; }
   padding:10px;
   background:var(--color-bg);
 }
+
+/* Jeu favori : texte, pas un chiffre. */
+.carnet-stat--favorite .carnet-stat__value{ font-size:20px; line-height:1.3; }

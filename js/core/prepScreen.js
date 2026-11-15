@@ -43,11 +43,11 @@ function playersReadyPillsHtml(members, readyMap, readyKey) {
     </div>`;
 }
 
-/** Carte « Joueurs prêts » (HTML initial). `variant: "pills"` = nouvelle DA. */
+/** Section « Joueurs prêts ». Par défaut : pastilles (nouvelle DA) ; `variant: "list"` = ancienne liste. */
 export function playersReadySectionHtml(
   members,
   readyMap,
-  { readyKey = (m) => m.name, variant = "list" } = {}
+  { readyKey = (m) => m.name, variant = "pills" } = {}
 ) {
   if (variant === "pills") return playersReadyPillsHtml(members, readyMap, readyKey);
   return `
