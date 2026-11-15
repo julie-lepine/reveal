@@ -19,7 +19,6 @@
   --page-pad:16px;
   --touch-min:44px;
   --nav-h:88px;            /* hauteur réservée par la barre de menu basse */
-  --cta-h:84px;            /* hauteur réservée par un bouton principal collé en bas */
 
   /* ── Couleurs de marque ── */
   --color-bg:#0d0f1e;
@@ -106,20 +105,33 @@
   --ad-banner-buffer:0px;
 }
 
-/* ═══ Accent par jeu (--g1 / --g2), d'après body[data-screen] ═══ */
+/* ═══ Accent par jeu (--g1 / --g2) : écran courant (body[data-screen])
+   et vignettes du choix des jeux (.game-tile__logo-wrap--<cssClass>) ═══ */
 
-body[data-screen^="consensus"]{ --g1:#22d3ee; --g2:#a78bfa; }
-body[data-screen^="hottake"]{ --g1:#ff6b6b; --g2:#ff3cac; }
-body[data-screen^="traitre"]{ --g1:#f97316; --g2:#ef4444; }       /* Spot the fake */
-body[data-screen^="guesslie"]{ --g1:#ff6b6b; --g2:#ff3cac; }
-body[data-screen^="speedvote"]{ --g1:#fbbf24; --g2:#ff3cac; }
-body[data-screen^="clutch"]{ --g1:#ff6b6b; --g2:#ff3cac; }
-body[data-screen^="dilemma"]{ --g1:#6366f1; --g2:#ff3cac; }
-body[data-screen^="trivia"]{ --g1:#34d399; --g2:#22d3ee; }
-body[data-screen^="truthmeter"]{ --g1:#ff6b6b; --g2:#ff3cac; }
-body[data-screen^="drawit"]{ --g1:#fbbf24; --g2:#f97316; }
-body[data-screen^="wronganswer"]{ --g1:#ff3cac; --g2:#6366f1; }
-body[data-screen^="tiernight"]{ --g1:#fbbf24; --g2:#ff6b6b; }
+body[data-screen^="consensus"],
+.game-tile__logo-wrap--consensus{ --g1:#22d3ee; --g2:#a78bfa; }
+body[data-screen^="hottake"],
+.game-tile__logo-wrap--hot{ --g1:#ff6b6b; --g2:#ff3cac; }
+body[data-screen^="traitre"],
+.game-tile__logo-wrap--traitre{ --g1:#f97316; --g2:#ef4444; }       /* Spot the fake */
+body[data-screen^="guesslie"],
+.game-tile__logo-wrap--guess{ --g1:#ff6b6b; --g2:#ff3cac; }
+body[data-screen^="speedvote"],
+.game-tile__logo-wrap--speed{ --g1:#fbbf24; --g2:#ff3cac; }
+body[data-screen^="clutch"],
+.game-tile__logo-wrap--clutch{ --g1:#ff6b6b; --g2:#ff3cac; }
+body[data-screen^="dilemma"],
+.game-tile__logo-wrap--dilemma{ --g1:#6366f1; --g2:#ff3cac; }
+body[data-screen^="trivia"],
+.game-tile__logo-wrap--trivia{ --g1:#34d399; --g2:#22d3ee; }
+body[data-screen^="truthmeter"],
+.game-tile__logo-wrap--truth{ --g1:#ff6b6b; --g2:#ff3cac; }
+body[data-screen^="drawit"],
+.game-tile__logo-wrap--drawit{ --g1:#fbbf24; --g2:#f97316; }
+body[data-screen^="wronganswer"],
+.game-tile__logo-wrap--wrong{ --g1:#ff3cac; --g2:#6366f1; }
+body[data-screen^="tiernight"],
+.game-tile__logo-wrap--tier{ --g1:#fbbf24; --g2:#ff6b6b; }
 /* Rank Live : mode de Tier Night, accent propre (après tiernight pour l'emporter). */
 body[data-screen^="tiernight-live"]{ --g1:#22d3ee; --g2:#6366f1; }
 

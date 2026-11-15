@@ -1,0 +1,303 @@
+/* ═══════════════════════════════════════════════════════════════
+   REVEAL — Composants partagés (nouvelle DA)
+   Chargé APRÈS style.css (index.html) : à spécificité égale, ces
+   règles l'emportent sur l'ancien CSS, qu'on supprime au fil des écrans.
+   Les dégradés d'accent sont écrits avec var(--g1)/var(--g2) en direct
+   pour suivre un accent redéfini localement (ex. vignettes de jeux).
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ─── Titre d'affichage (Anton, majuscules, incliné) ─── */
+.title-display{
+  margin:0;
+  min-width:0;
+  font-family:var(--font-display);
+  font-weight:400;
+  font-size:40px;
+  line-height:1;
+  letter-spacing:.02em;
+  text-transform:uppercase;
+  text-align:left;
+  transform:skewX(var(--display-skew));
+  transform-origin:left bottom;
+  overflow-wrap:anywhere;
+}
+
+/* Petit libellé au-dessus d'un titre d'affichage. */
+.kicker{
+  margin:0 0 6px;
+  font-size:12px;
+  font-weight:800;
+  letter-spacing:.12em;
+  text-transform:uppercase;
+  color:var(--text-3);
+}
+
+.kicker--gold{ color:rgba(251,191,36,.85); }
+
+/* Ligne titre + élément à droite (code, logo…). */
+.screen-head{
+  display:flex;
+  align-items:flex-end;
+  justify-content:space-between;
+  gap:var(--sp-3);
+  margin:0 0 var(--sp-3);
+}
+
+/* ─── En-tête d'écran de jeu : ligne Règles + titre avec logo ─── */
+/* Ligne réservée à côté du bouton retour (Règles à droite). */
+.game-head{
+  display:flex;
+  align-items:center;
+  justify-content:flex-end;
+  min-height:var(--touch-min);
+  margin:-4px 0 0;
+}
+
+.game-title{
+  display:flex;
+  align-items:flex-end;
+  justify-content:space-between;
+  gap:var(--sp-3);
+  margin:var(--sp-3) 0 var(--sp-3);
+}
+
+.game-title__text{
+  min-width:0;
+}
+
+.game-title__logo{
+  flex:none;
+  height:64px;
+  width:auto;
+  max-width:40%;
+  margin:-14px 0 -4px;
+  object-fit:contain;
+  filter:var(--shadow-logo);
+}
+
+.container > .game-head{ margin-bottom:0; }
+.container > .game-title + .game-intro{ margin-bottom:var(--sp-4); }
+
+/* ─── Cadre à bordure dégradée (contient une .card) ─── */
+.frame{
+  padding:2.5px;
+  border-radius:var(--r-card);
+  background:linear-gradient(145deg, var(--g1) 0%, var(--g2) 48%, var(--color-ink) 100%);
+  margin-top:var(--sp-5);
+}
+
+.frame > .card{
+  margin:0;
+  border:0;
+  border-radius:calc(var(--r-card) - 2.5px);
+  background:var(--color-bg);
+  backdrop-filter:none;
+}
+
+/* ─── Pastilles de sélection ─── */
+.chips{
+  display:flex;
+  flex-wrap:wrap;
+  justify-content:center;
+  gap:var(--sp-2);
+}
+
+.chip{
+  min-height:var(--touch-min);
+  padding:12px 14px;
+  border-radius:16px;
+  border:1.5px solid rgba(255,255,255,.1);
+  background:var(--surface-2);
+  color:var(--text);
+  font-family:var(--font-body);
+  font-size:14px;
+  font-weight:800;
+  line-height:1;
+  cursor:pointer;
+  touch-action:manipulation;
+  -webkit-tap-highlight-color:transparent;
+}
+
+.chip:active{ transform:scale(.97); }
+
+/* Variante chiffre (Anton) : nombre de manches, durées… */
+.chip--num{
+  min-width:50px;
+  padding:9px 8px;
+  font-family:var(--font-display);
+  font-weight:400;
+  font-size:26px;
+  transform:skewX(var(--display-skew));
+}
+
+.chip--num:active{ transform:skewX(var(--display-skew)) scale(.97); }
+
+/* Actif : .chip--active, ou l'ancienne classe encore pilotée par le JS. */
+.chip.chip--active,
+.chip.theme-chip--active{
+  background:linear-gradient(135deg, var(--g1), var(--g2));
+  border-color:transparent;
+  color:#fff;
+}
+
+.chip:disabled{
+  opacity:.35;
+  cursor:not-allowed;
+}
+
+.chip:focus-visible{
+  outline:2px solid var(--focus-ring);
+  outline-offset:2px;
+}
+
+/* ─── Pastilles de joueurs (avatar + pseudo, coche si prêt) ─── */
+.players-ready{
+  margin-top:var(--sp-5);
+}
+
+.players-ready .card-heading{
+  text-align:center;
+  margin-bottom:var(--sp-3);
+}
+
+.player-pills{
+  display:flex;
+  flex-wrap:wrap;
+  justify-content:center;
+  gap:var(--sp-3) var(--sp-3);
+}
+
+.player-pill{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:6px;
+  width:60px;
+}
+
+.player-pill__avatar{
+  position:relative;
+  display:flex;
+  opacity:.45;
+  transition:opacity .3s;
+}
+
+.player-pill__avatar .avatar{ margin:0; }
+
+.player-pill.is-ready .player-pill__avatar{ opacity:1; }
+
+.player-pill.is-ready .player-pill__avatar .avatar{
+  box-shadow:0 0 0 2px var(--color-success);
+}
+
+.player-pill.is-ready .player-pill__avatar::after{
+  content:"✓";
+  position:absolute;
+  right:-4px;
+  bottom:-4px;
+  width:16px;
+  height:16px;
+  border-radius:50%;
+  background:var(--color-success);
+  color:var(--color-bg);
+  font-size:10px;
+  font-weight:900;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+
+.player-pill__name{
+  max-width:100%;
+  font-size:11px;
+  font-weight:600;
+  color:var(--text-3);
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+
+/* ─── Barre de bouton principal collée en bas ───
+   Dans le flux, en sticky : en fin de page, le contenu ne passe jamais
+   dessous, et aucune hauteur n'est réservée à l'avance (1 à 3 éléments).
+   overflow:clip sur .page (au lieu de hidden) : coupe les orbes sans créer
+   de conteneur de défilement, sinon le sticky ne colle pas. */
+.page:has(.sticky-cta){
+  overflow:clip;
+}
+
+.sticky-cta{
+  position:sticky;
+  bottom:env(safe-area-inset-bottom, 0px);
+  z-index:5;
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+  margin:var(--sp-2) calc(-1 * var(--page-pad)) 0;
+  padding:28px var(--page-pad) var(--sp-3);
+  background:linear-gradient(180deg, rgba(13,15,30,0) 0%, var(--color-bg) 40%);
+}
+
+body.has-bottom-nav .sticky-cta{
+  bottom:calc(var(--nav-h) + env(safe-area-inset-bottom, 0px));
+}
+
+.container > .sticky-cta{ margin-bottom:0; }
+
+.sticky-cta > *,
+.sticky-cta .btn,
+.sticky-cta .btn-ready{
+  margin:0;
+}
+
+.sticky-cta > div:empty{ display:none; }
+
+/* Le slot de lancement garde ses enfants empilés avec le même écart. */
+.sticky-cta > div{
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+}
+
+.sticky-cta .hint{ margin:0; }
+
+/* ─── Choix des jeux (planche « Game-select : validé ») ─── */
+.game-select-header{
+  align-items:center;
+  margin-bottom:var(--sp-3);
+}
+
+.game-select-code-chip{
+  min-height:36px;
+  padding:8px 14px;
+  border-radius:var(--r-pill);
+  border:1.5px solid rgba(255,60,172,.7);
+  background:rgba(255,60,172,.08);
+}
+
+.game-select-code-chip__code{
+  font-size:13px;
+  letter-spacing:.1em;
+  background:none;
+  -webkit-text-fill-color:currentColor;
+  color:#fff;
+}
+
+/* Vignettes */
+.game-grid{
+  row-gap:6px;
+}
+
+.game-tile{
+  padding:4px 12px 0;
+}
+
+.game-tile__logo-wrap{
+  aspect-ratio:1 / 1;
+  background:linear-gradient(145deg, var(--g1) 0%, var(--g2) 48%, var(--color-ink) 100%);
+}
+
+.game-tile__logo-inner{
+  padding:10px;
+  background:var(--color-bg);
+}

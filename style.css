@@ -5097,7 +5097,6 @@ button.emoji-picker-preview__avatar:active{
 }
 
 .game-tile__logo-wrap{
-  --logo-border:linear-gradient(135deg, #FF6B6B 0%, #2B2D66 100%);
   position:relative;
   width:100%;
   flex-shrink:0;
@@ -5105,7 +5104,7 @@ button.emoji-picker-preview__avatar:active{
   height:auto;
   padding:3.5px;
   border-radius:20px;
-  background:var(--logo-border);
+  /* fond : dégradé de l’accent du jeu (css/components.css) */
   border:none;
   z-index:1;
   box-sizing:border-box;
@@ -5124,45 +5123,15 @@ button.emoji-picker-preview__avatar:active{
   overflow:hidden;
 }
 
-.game-tile__logo-wrap--hot{
-  --logo-border:linear-gradient(145deg, #FF6B6B 0%, #FF3CAC 48%, #2B2D66 100%);
-}
 
-.game-tile__logo-wrap--guess{
-  --logo-border:linear-gradient(200deg, #4ADE80 0%, #22D3EE 42%, #2B2D66 100%);
-}
 
-.game-tile__logo-wrap--tier{
-  --logo-border:linear-gradient(320deg, #FBBF24 0%, #F97316 38%, #2B2D66 100%);
-}
 
-.game-tile__logo-wrap--speed{
-  --logo-border:linear-gradient(145deg, #FBBF24 0%, #FF3CAC 48%, #2B2D66 100%);
-}
 
-.game-tile__logo-wrap--trivia{
-  --logo-border:linear-gradient(145deg, #A78BFA 0%, #22D3EE 44%, #2B2D66 100%);
-}
 
-.game-tile__logo-wrap--truth{
-  --logo-border:linear-gradient(145deg, #34D399 0%, #60A5FA 48%, #2B2D66 100%);
-}
 
-.game-tile__logo-wrap--consensus{
-  --logo-border:linear-gradient(145deg, #22D3EE 0%, #A78BFA 48%, #2B2D66 100%);
-}
 
-.game-tile__logo-wrap--dilemma{
-  --logo-border:linear-gradient(145deg, #60A5FA 0%, #FF3CAC 48%, #2B2D66 100%);
-}
 
-.game-tile__logo-wrap--blindtest{
-  --logo-border:linear-gradient(145deg, #6366F1 0%, #818CF8 48%, #2B2D66 100%);
-}
 
-.game-tile__logo-wrap--traitre{
-  --logo-border:linear-gradient(145deg, #F97316 0%, #EF4444 48%, #2B2D66 100%);
-}
 
 .game-tile__logo-inner--emoji{
   align-items:center;

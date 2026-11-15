@@ -1,6 +1,6 @@
 import { PLAYER_TEXT_MAX_LEN, playerTextRemaining } from "../../data/playerTextLimits.js";
 import { escapeHtml } from "./ui.js";
-import { playerNameHtml } from "./signatureUi.js";
+import { playerAvatarHtml, playerNameHtml } from "./signatureUi.js";
 import { getCurrentScreen } from "./router.js";
 import { isGameSyncActive, refreshGameSession } from "./gameSync.js";
 import { formatSyncErrorMessage } from "./authErrors.js";
@@ -24,8 +24,32 @@ export function bindCharCounter(input, countEl, max = PLAYER_TEXT_MAX_LEN) {
   return () => input.removeEventListener("input", update);
 }
 
-/** Carte « Joueurs prêts » (HTML initial). */
-export function playersReadySectionHtml(members, readyMap, { readyKey = (m) => m.name } = {}) {
+/** Variante nouvelle DA : pastilles avatar + pseudo, coche verte si prêt. */
+function playersReadyPillsHtml(members, readyMap, readyKey) {
+  return `
+    <p class="card-heading">Joueurs prêts</p>
+    <div class="player-pills">
+      ${members
+        .map((m) => {
+          const ready = Boolean(readyMap[readyKey(m)]);
+          return `
+        <div class="player-pill ${ready ? "is-ready" : ""}">
+          <span class="player-pill__avatar">${playerAvatarHtml(m)}</span>
+          ${playerNameHtml(m, "player-pill__name")}
+          <span class="sr-only">${ready ? "✓" : "…"}</span>
+        </div>`;
+        })
+        .join("")}
+    </div>`;
+}
+
+/** Carte « Joueurs prêts » (HTML initial). `variant: "pills"` = nouvelle DA. */
+export function playersReadySectionHtml(
+  members,
+  readyMap,
+  { readyKey = (m) => m.name, variant = "list" } = {}
+) {
+  if (variant === "pills") return playersReadyPillsHtml(members, readyMap, readyKey);
   return `
     <p class="card-heading">Joueurs prêts</p>
     ${members
