@@ -58,7 +58,7 @@
   align-items:flex-end;
   justify-content:space-between;
   gap:var(--sp-3);
-  margin:var(--sp-3) 0 var(--sp-3);
+  margin:24px 0 var(--sp-3);
 }
 
 .game-title__text{

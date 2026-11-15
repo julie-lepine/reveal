@@ -268,7 +268,14 @@ body[data-screen="home"] .lobby-actions__intro{ margin:28px 0 14px; }
 
 /* ─── En jeu : titre Anton + logo, carte principale encadrée ───
    (planches Jeu2, DI2, HT2, TQ2, SV2, WA2…) */
-.game-title--play{ margin:var(--sp-5) 0 var(--sp-3); }
+/* Le bandeau de progression prend la hauteur du bouton retour : le titre
+   démarre sous le bouton, avec de l’air (planches *2 : marge 26 px). */
+.page:has(.back) .container > .game-header:first-child{
+  min-height:var(--touch-min);
+  margin-top:-4px;
+}
+
+.game-title--play{ margin:24px 0 var(--sp-3); }
 
 .game-title--play .title-display{ font-size:40px; }
 
