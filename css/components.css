@@ -388,7 +388,7 @@
    3. Neutre (.btn-secondary) : gris, texte plus lisible.
    Les habillages d'événement (event-skins.css) restent prioritaires. */
 .btn-primary{
-  background:linear-gradient(135deg, var(--g1), var(--g2));
+  background:var(--btn-sheen), linear-gradient(135deg, var(--g1), var(--g2));
 }
 
 .welcome .cta-btn{
@@ -413,7 +413,7 @@
    en bordure dégradée ; l'attente est une ligne d'état ; « Lancer … » plein,
    en Anton avec pulsation (comme « Commencer » de la roulette). */
 .btn-ready{
-  background:linear-gradient(135deg, var(--g1), var(--g2));
+  background:var(--btn-sheen), linear-gradient(135deg, var(--g1), var(--g2));
   box-shadow:var(--shadow-primary);
 }
 
@@ -466,5 +466,5 @@ body:has(.btn-ready:not(.btn-ready--active)) .prep-force-launch{
 /* Draw it : dégradé à 3 couleurs (ambre → orange → rouge) sur les boutons
    pleins ; bordures et cadres gardent --g1 → --g2. */
 body[data-screen^="drawit"] :is(.btn-primary, .btn-ready:not(.btn-ready--active), .evening-recap__other-game){
-  background:linear-gradient(135deg, var(--g1), var(--g3), var(--g2));
+  background:var(--btn-sheen), linear-gradient(135deg, var(--g1), var(--g3), var(--g2));
 }

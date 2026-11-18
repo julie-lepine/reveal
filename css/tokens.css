@@ -66,7 +66,10 @@
   --g2:var(--color-primary);
 
   /* ── Ombres ── */
-  --shadow-primary:0 8px 32px rgba(255, 60, 172, 0.3);
+  /* Boutons pleins : ombre courte et sombre (plus de halo rose) + liseré clair
+     en haut ; --btn-sheen ajoute un léger reflet pour donner du volume. */
+  --shadow-primary:0 6px 16px -6px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.22);
+  --btn-sheen:linear-gradient(180deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0) 55%);
   --shadow-secondary:0 8px 28px rgba(99, 102, 241, 0.35);
   --shadow-success:0 8px 28px rgba(74, 222, 128, 0.3);
   --shadow-logo:drop-shadow(0 4px 6px rgba(0,0,0,.5));
@@ -111,21 +114,21 @@
 body[data-screen^="consensus"],
 .game-tile__logo-wrap--consensus{ --g1:#22d3ee; --g2:#a78bfa; }
 body[data-screen^="hottake"],
-.game-tile__logo-wrap--hot{ --g1:#ff6b6b; --g2:#ff3cac; }
+.game-tile__logo-wrap--hot{ --g1:#f43f5e; --g2:#db2777; }
 body[data-screen^="traitre"],
 .game-tile__logo-wrap--traitre{ --g1:#f97316; --g2:#c026d3; }       /* Spot the fake */
 body[data-screen^="guesslie"],
-.game-tile__logo-wrap--guess{ --g1:#ff6b6b; --g2:#ff3cac; }
+.game-tile__logo-wrap--guess{ --g1:#f43f5e; --g2:#db2777; }
 body[data-screen^="speedvote"],
 .game-tile__logo-wrap--speed{ --g1:#fbbf24; --g2:#ff3cac; }
 body[data-screen^="clutch"],
-.game-tile__logo-wrap--clutch{ --g1:#ff6b6b; --g2:#ff3cac; }
+.game-tile__logo-wrap--clutch{ --g1:#f43f5e; --g2:#db2777; }
 body[data-screen^="dilemma"],
 .game-tile__logo-wrap--dilemma{ --g1:#6366f1; --g2:#ff3cac; }
 body[data-screen^="trivia"],
 .game-tile__logo-wrap--trivia{ --g1:#34d399; --g2:#22d3ee; }
 body[data-screen^="truthmeter"],
-.game-tile__logo-wrap--truth{ --g1:#ff6b6b; --g2:#ff3cac; }
+.game-tile__logo-wrap--truth{ --g1:#f43f5e; --g2:#db2777; }
 body[data-screen^="drawit"],
 .game-tile__logo-wrap--drawit{ --g1:#fbbf24; --g2:#dc2626; --g3:#f97316; }
 body[data-screen^="wronganswer"],

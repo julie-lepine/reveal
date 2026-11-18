@@ -1081,7 +1081,7 @@ body[data-screen="lobby"] .page:has(.back) .container > .lobby-head:first-child{
 .evening-recap__other-game{
   margin:10px 0 0;
   border:0;
-  background:linear-gradient(135deg, var(--g1), var(--g2));
+  background:var(--btn-sheen), linear-gradient(135deg, var(--g1), var(--g2));
   box-shadow:var(--shadow-primary);
 }
 
@@ -1246,7 +1246,7 @@ body[data-screen="lobby"] .page:has(.back) .container > .lobby-head:first-child{
   min-height:48px;
   border:0;
   border-radius:var(--r-md);
-  background:linear-gradient(135deg, var(--color-secondary), var(--color-primary));
+  background:var(--btn-sheen), linear-gradient(135deg, var(--color-secondary), var(--color-primary));
   box-shadow:var(--shadow-primary);
   color:#fff;
   font-size:15px;
@@ -1304,7 +1304,7 @@ body[data-screen="lobby"] .page:has(.back) .container > .lobby-head:first-child{
   padding:12px 16px;
   border:0;
   border-radius:var(--r-md);
-  background:linear-gradient(135deg, var(--color-secondary), var(--color-primary));
+  background:var(--btn-sheen), linear-gradient(135deg, var(--color-secondary), var(--color-primary));
   box-shadow:var(--shadow-primary);
   color:#fff;
   animation:welcome-cta-pulse 2.4s ease-in-out infinite;

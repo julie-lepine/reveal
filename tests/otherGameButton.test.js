@@ -46,9 +46,14 @@ describe("bouton « Jouer à un autre jeu »", () => {
     assert.match(traitre, /#btn-traitre-exit/);
   });
 
-  it("styles communs : Recommencer principal, autre jeu secondaire", () => {
-    const css = read("css/screens.css");
-    assert.match(css, /\.evening-recap__restart\{[\s\S]*?background:linear-gradient\(135deg, var\(--g1\), var\(--g2\)\)/);
-    assert.match(css, /\.evening-recap__other-game\{/);
+  it("styles communs : autre jeu principal (plein), Recommencer en bordure dégradée", () => {
+    const css = read("css/screens.css").replace(/\r\n/g, "\n");
+    const rule = (cls) => {
+      const bodies = [...css.matchAll(new RegExp(`\\n\\.${cls}\\{([^}]*)\\}`, "g"))].map((m) => m[1]);
+      assert.ok(bodies.length, `règle .${cls}`);
+      return bodies.join("\n");
+    };
+    assert.match(rule("evening-recap__other-game"), /background:var\(--btn-sheen\), linear-gradient\(135deg, var\(--g1\), var\(--g2\)\)/);
+    assert.match(rule("evening-recap__restart"), /border:2px solid transparent;[\s\S]*padding-box[\s\S]*border-box/);
   });
 });
