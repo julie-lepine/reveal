@@ -1054,8 +1054,12 @@ body[data-screen="lobby"] .page:has(.back) .container > .lobby-head:first-child{
 }
 
 /* « Recommencer une partie de … » : bouton principal à l'accent de la soirée. */
-.evening-recap--hub .evening-recap__restart{
-  margin:0;
+/* Fin de partie : « Recommencer » (principal, accent du jeu) puis
+   « Jouer à un autre jeu » (secondaire), partout où ils apparaissent :
+   choix des jeux, Résultats, Classement, Spot the fake, Tier Night. */
+.evening-recap__restart{
+  width:100%;
+  margin:12px 0 0;
   min-height:50px;
   padding:14px 16px;
   border:0;
@@ -1065,6 +1069,28 @@ body[data-screen="lobby"] .page:has(.back) .container > .lobby-head:first-child{
   color:#fff;
   font-size:15px;
 }
+
+.evening-recap__other-game{
+  width:100%;
+  margin:10px 0 0;
+  min-height:50px;
+  padding:14px 16px;
+  font-size:15px;
+}
+
+.evening-recap--hub .evening-recap__restart{ margin:0; }
+
+.btn-row--stack .evening-recap__restart,
+.btn-row--stack .evening-recap__other-game{ margin:0; }
+
+/* Rangée de boutons : un seul bouton → pleine largeur ; avec « Jouer à un
+   autre jeu » (libellé long) → boutons empilés. */
+.btn-row:has(> :only-child),
+.btn-row:has(> .evening-recap__other-game){
+  grid-template-columns:1fr;
+}
+
+.btn-row .evening-recap__other-game{ margin:0; }
 
 .evening-recap--hub .evening-recap__link{
   margin:0;

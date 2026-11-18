@@ -37,6 +37,7 @@ import { bindNav } from "../screens/nav.js";
 import { gameExitBarHtml, bindExitGame } from "../core/exitGame.js";
 import {
   eveningRecapRestartButtonHtml,
+  eveningRecapOtherGameButtonHtml,
   bindRestartGameButtons,
 } from "../core/restartGame.js";
 import {
@@ -183,7 +184,7 @@ export function mountTraitre(app) {
     const actionsHtml = showHostActions
       ? `<div class="btn-row btn-row--stack">
         ${eveningRecapRestartButtonHtml({ gameId: "traitre", title: "Spot the fake" })}
-        <button type="button" class="btn btn-primary" id="btn-traitre-exit">Retour au menu jeux</button>
+        ${eveningRecapOtherGameButtonHtml({ id: "btn-traitre-exit" })}
       </div>`
       : `<p class="hint">En attente de l'hôte pour recommencer ou quitter…</p>`;
 

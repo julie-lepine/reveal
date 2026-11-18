@@ -310,11 +310,12 @@ describe("BUG-TIERNIGHT-SERIES-QA-01 - fin série clôture", () => {
     assert.match(play, /phase === "series_end"/);
     const end = read("js/screens/tierNightEnd.js");
     assert.match(end, /btn-tiernight-end-continue/);
-    assert.match(end, /Autre jeu/);
+    // Fin de série : bouton partagé « Jouer à un autre jeu » (restartGame.js).
     assert.match(
       end,
-      /primaryCta = isSeriesEnd\s*\?[\s\S]*?Autre jeu[\s\S]*?Voir les résultats/
+      /primaryCta = isSeriesEnd\s*\?[\s\S]*?eveningRecapOtherGameButtonHtml\(\{ id: "btn-tiernight-end-continue" \}\)[\s\S]*?Voir les résultats/
     );
+    assert.match(read("js/core/restartGame.js"), /OTHER_GAME_LABEL = "Jouer à un autre jeu"/);
     const sql = read("supabase/bug-tiernight-series-qa-01-complete-screen.sql");
     assert.match(sql, /tiernight-end/);
     assert.match(sql, /complete_game_session_as_actor/);

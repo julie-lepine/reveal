@@ -422,14 +422,15 @@ describe("Draw it ! T10 — confidentialité / CTA", () => {
   it("O. CTA finaux : contrat REVEAL sans emoji", () => {
     const results = read("js/screens/results.js");
     assert.match(results, /eveningRecapRestartButtonHtml/);
-    assert.match(results, />Autre jeu</);
+    assert.match(results, /eveningRecapOtherGameButtonHtml\(\)/);
     const restart = read("js/core/restartGame.js");
+    assert.match(restart, /OTHER_GAME_LABEL = "Jouer à un autre jeu"/);
     assert.match(
       restart,
       /Recommencer une partie de \$\{escapeHtml\(title\)\}/
     );
     assert.doesNotMatch(restart, /Recommencer une partie de .*[🎮🎲✏️]/);
-    assert.match(read("js/screens/leaderboard.js"), />Autre jeu</);
+    assert.match(read("js/screens/leaderboard.js"), /eveningRecapOtherGameButtonHtml\(\)/);
     const game = read("js/games/drawIt.js");
     assert.match(game, /Manche suivante →/);
     assert.match(game, /Voir les résultats →/);

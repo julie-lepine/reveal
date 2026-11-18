@@ -6,6 +6,7 @@ import { escapeHtml, pageShell } from "../core/ui.js";
 import { bindNav } from "./nav.js";
 import {
   eveningRecapRestartButtonHtml,
+  eveningRecapOtherGameButtonHtml,
   bindRestartGameButtons,
   resolveLastGameForRestart,
 } from "../core/restartGame.js";
@@ -39,8 +40,10 @@ export function mountResults(app) {
       <p class="evening-recap__title">${escapeHtml(last.title || last.gameId)}</p>
       ${podiumHtml || `<p class="hint">${escapeHtml(last.summary || "")}</p>`}
       ${eveningRecapRestartButtonHtml(last)}
+      ${eveningRecapOtherGameButtonHtml()}
     </div>`
-      : `<p class="hint">Aucune partie récente.</p>`;
+      : `<p class="hint">Aucune partie récente.</p>
+    ${eveningRecapOtherGameButtonHtml()}`;
 
     const chips = [
       recap.hotTakes > 0 ? `<span class="evening-recap__chip">🔥 ${recap.hotTakes}</span>` : "",
@@ -84,7 +87,6 @@ export function mountResults(app) {
       ${eveningGameLeaderboardsHtml()}
 
       <div class="btn-row">
-        <button type="button" class="btn btn-primary" data-nav="game-select">Autre jeu</button>
         <button type="button" class="btn btn-accent" data-nav="leaderboard">Classement</button>
       </div>
     `,

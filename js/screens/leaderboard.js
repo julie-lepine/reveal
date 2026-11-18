@@ -5,6 +5,7 @@ import { getCurrentScreen } from "../core/router.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
 import { playerAvatarHtml, playerNameHtml } from "../core/signatureUi.js";
 import { bindNav } from "./nav.js";
+import { eveningRecapOtherGameButtonHtml } from "../core/restartGame.js";
 import {
   isGameSyncActive,
   refreshEveningScoresFromSession,
@@ -85,7 +86,7 @@ export function mountLeaderboard(app) {
 
       <div class="btn-row">
         <button type="button" class="btn btn-accent" data-nav="results">Résultats</button>
-        <button type="button" class="btn btn-primary" data-nav="game-select">Autre jeu</button>
+        ${eveningRecapOtherGameButtonHtml()}
       </div>
     `,
     });
