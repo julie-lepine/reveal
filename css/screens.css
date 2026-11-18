@@ -1238,3 +1238,63 @@ body[data-screen="lobby"] .page:has(.back) .container > .lobby-head:first-child{
   height:44px;
   object-fit:contain;
 }
+
+/* ─── Chat et roulette : boutons « Jeu aléatoire » / « Faire voter le groupe » ───
+   Même paire qu'en fin de partie : action principale pleine (dégradé de la
+   soirée indigo → rose, texte blanc), action secondaire en bordure dégradée.
+   Couleurs de la soirée, pas du jeu : le chat s'ouvre depuis n'importe quel écran. */
+.chat-sheet__actions .chat-random-cta__btn.btn-primary,
+.chat-roulette__actions .btn-primary,
+.chat-roulette__actions--bridge .btn-primary{
+  min-height:48px;
+  border:0;
+  border-radius:var(--r-md);
+  background:linear-gradient(135deg, var(--color-secondary), var(--color-primary));
+  box-shadow:var(--shadow-primary);
+  color:#fff;
+  font-size:15px;
+  font-weight:800;
+  text-shadow:none;
+}
+
+/* Bordure dégradée dessinée par un pseudo-élément masqué : l'intérieur reste
+   transparent (le panneau du chat a lui-même un fond en dégradé). */
+.chat-sheet__actions .lobby-poll__cta.btn-accent,
+.chat-roulette__actions .btn-accent,
+.chat-roulette__actions--bridge .btn-accent,
+.chat-roulette__actions .btn-secondary{
+  position:relative;
+  min-height:48px;
+  border:0;
+  border-radius:var(--r-md);
+  background:transparent;
+  box-shadow:none;
+  color:#fff;
+  font-size:15px;
+  font-weight:800;
+  text-shadow:none;
+}
+
+.chat-sheet__actions .lobby-poll__cta.btn-accent::before,
+.chat-roulette__actions .btn-accent::before,
+.chat-roulette__actions--bridge .btn-accent::before,
+.chat-roulette__actions .btn-secondary::before{
+  content:"";
+  position:absolute;
+  inset:0;
+  padding:2px;
+  border-radius:inherit;
+  background:linear-gradient(145deg, var(--color-secondary) 0%, var(--color-primary) 55%, var(--color-ink) 100%);
+  -webkit-mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor;
+  mask:linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+  pointer-events:none;
+}
+
+/* Invité : « Jeu aléatoire » visible mais clairement indisponible. */
+.chat-sheet__actions .chat-random-cta__btn.btn-primary:disabled{
+  background:rgba(255,255,255,.06);
+  box-shadow:none;
+  color:rgba(255,255,255,.45);
+  opacity:1;
+}
