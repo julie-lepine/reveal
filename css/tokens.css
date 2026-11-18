@@ -113,7 +113,7 @@ body[data-screen^="consensus"],
 body[data-screen^="hottake"],
 .game-tile__logo-wrap--hot{ --g1:#ff6b6b; --g2:#ff3cac; }
 body[data-screen^="traitre"],
-.game-tile__logo-wrap--traitre{ --g1:#f97316; --g2:#ef4444; }       /* Spot the fake */
+.game-tile__logo-wrap--traitre{ --g1:#f97316; --g2:#c026d3; }       /* Spot the fake */
 body[data-screen^="guesslie"],
 .game-tile__logo-wrap--guess{ --g1:#ff6b6b; --g2:#ff3cac; }
 body[data-screen^="speedvote"],
@@ -127,7 +127,7 @@ body[data-screen^="trivia"],
 body[data-screen^="truthmeter"],
 .game-tile__logo-wrap--truth{ --g1:#ff6b6b; --g2:#ff3cac; }
 body[data-screen^="drawit"],
-.game-tile__logo-wrap--drawit{ --g1:#fbbf24; --g2:#f97316; }
+.game-tile__logo-wrap--drawit{ --g1:#fbbf24; --g2:#dc2626; --g3:#f97316; }
 body[data-screen^="wronganswer"],
 .game-tile__logo-wrap--wrong{ --g1:#ff3cac; --g2:#6366f1; }
 body[data-screen^="tiernight"],

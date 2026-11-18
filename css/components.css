@@ -462,3 +462,9 @@ body:has(.btn-ready:not(.btn-ready--active)) .prep-force-launch{
 @media (prefers-reduced-motion: reduce){
   .prep-launch{ animation:none; }
 }
+
+/* Draw it : dégradé à 3 couleurs (ambre → orange → rouge) sur les boutons
+   pleins ; bordures et cadres gardent --g1 → --g2. */
+body[data-screen^="drawit"] :is(.btn-primary, .btn-ready:not(.btn-ready--active), .evening-recap__other-game){
+  background:linear-gradient(135deg, var(--g1), var(--g3), var(--g2));
+}
