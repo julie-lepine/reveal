@@ -38,6 +38,9 @@ import {
 import { launchGameWithSync, commitHostGamePlay, commitPrepReadyToggle } from "./mpLaunch.js";
 import { mergeHotTakeCustomTakes } from "./sessionMerge.js";
 import { countOtherAuthorsCustomEntries } from "./combinedGameDeck.js";
+// Import local : `export { … } from` ne crée pas de liaison utilisable ici
+// (addCustomTake levait « checkHotTakeModeration is not defined »).
+import { checkHotTakeModeration } from "./hotTakeModeration.js";
 export {
   checkHotTakeModeration,
   getHotTakeModerationNotice as getModerationNotice,
