@@ -172,7 +172,7 @@ function renderPrompt(canControl) {
     <p class="chat-roulette__headline">Quel sera<br/>le prochain jeu&nbsp;?</p>
     ${
       canControl
-        ? `<button type="button" class="btn btn-primary chat-roulette__btn" data-roulette-start>Commencer</button>`
+        ? `<button type="button" class="btn btn-primary chat-roulette__btn chat-roulette__start" data-roulette-start><span class="chat-roulette__start-label">Commencer</span></button>`
         : `<p class="hint chat-roulette__wait">L'hôte lance la roulette…</p>`
     }`;
 }
