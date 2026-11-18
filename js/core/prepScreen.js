@@ -136,19 +136,19 @@ export function prepStartSlotHtml({
   if (poolEmpty) {
     return `<button type="button" class="btn btn-secondary btn--spaced" disabled>${escapeHtml(poolEmptyLabel)}</button>`;
   }
+  // Un seul bouton plein à la fois : l'attente est une ligne d'état, pas un bouton.
   if (allReady && isHost) {
-    return `<button type="button" class="btn btn-primary btn--spaced" id="${escapeHtml(startButtonId)}">${escapeHtml(launchLabel)}</button>`;
+    return `<button type="button" class="btn btn-primary btn--spaced prep-launch" id="${escapeHtml(startButtonId)}"><span class="prep-launch__label">${escapeHtml(launchLabel)}</span></button>`;
   }
   if (allReady) {
-    return `<p class="hint btn--spaced">${escapeHtml(waitingHostLabel)}</p>`;
+    return `<p class="prep-status btn--spaced" role="status">${escapeHtml(waitingHostLabel)}</p>`;
   }
   if (canForceLaunch && isHost) {
     return `
-      <p class="hint btn--spaced">${readyCount}/${totalCount} prêts</p>
-      <button type="button" class="btn btn-secondary btn--spaced" disabled>${escapeHtml(waitingPlayersLabel)}</button>
-      <button type="button" class="btn btn-primary btn--spaced" id="${escapeHtml(forceButtonId)}">Lancer quand même (${readyCount} joueur${readyCount > 1 ? "s" : ""}) →</button>`;
+      <p class="prep-status btn--spaced" role="status"><b>${readyCount}/${totalCount} prêts</b> · ${escapeHtml(waitingPlayersLabel)}</p>
+      <button type="button" class="btn btn-primary btn--spaced prep-force-launch" id="${escapeHtml(forceButtonId)}">Lancer quand même (${readyCount} joueur${readyCount > 1 ? "s" : ""}) →</button>`;
   }
-  return `<button type="button" class="btn btn-secondary btn--spaced" disabled>${escapeHtml(waitingPlayersLabel)}</button>`;
+  return `<p class="prep-status btn--spaced" role="status">${escapeHtml(waitingPlayersLabel)}</p>`;
 }
 
 /** Met à jour le slot lancement et re-bind les boutons hôte. */
