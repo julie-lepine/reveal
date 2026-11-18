@@ -915,13 +915,34 @@ body[data-screen="lobby"] .page:has(.back) .container > .lobby-head:first-child{
   color:rgba(255,255,255,.75);
 }
 
+/* Bande défilante : une seule ligne, hauteur fixe quel que soit le nombre de
+   jeux joués. Elle va jusqu'aux bords de la carte ; un fondu à droite signale
+   la suite. Détail complet : écran Résultats (« Stats globales »). */
 .recap-stats{
-  display:grid;
-  grid-template-columns:1fr 1fr;
+  display:flex;
   gap:var(--sp-2);
+  margin:0 -16px;
+  padding:0 40px 0 16px;
+  overflow-x:auto;
+  overscroll-behavior-x:contain;
+  scroll-snap-type:x proximity;
+  scroll-padding-left:16px;
+  -webkit-overflow-scrolling:touch;
+  scrollbar-width:none;
+  -webkit-mask-image:linear-gradient(90deg, #000 calc(100% - 36px), transparent);
+  mask-image:linear-gradient(90deg, #000 calc(100% - 36px), transparent);
+}
+
+.recap-stats::-webkit-scrollbar{ display:none; }
+
+.recap-stats:focus-visible{
+  outline:2px solid var(--focus-ring);
+  outline-offset:2px;
 }
 
 .recap-stat{
+  flex:0 0 auto;
+  scroll-snap-align:start;
   display:flex;
   align-items:center;
   gap:10px;
@@ -958,6 +979,7 @@ body[data-screen="lobby"] .page:has(.back) .container > .lobby-head:first-child{
   font-weight:700;
   line-height:1.2;
   color:rgba(255,255,255,.7);
+  white-space:nowrap;
 }
 
 .recap-stat__label::first-letter{ text-transform:uppercase; }

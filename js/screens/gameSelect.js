@@ -69,7 +69,7 @@ function recapGameLogo(cssClass) {
 function recapStatHtml(cssClass, value, label) {
   const logo = recapGameLogo(cssClass);
   return `
-        <div class="recap-stat">
+        <div class="recap-stat" role="listitem">
           ${logo ? `<img src="${escapeHtml(logo)}" alt="" class="recap-stat__logo" />` : ""}
           <span class="recap-stat__text">
             <span class="recap-stat__value">${escapeHtml(String(value))}</span>
@@ -148,7 +148,7 @@ function eveningRecapHtml(recap) {
     <div class="frame evening-recap-frame">
       <div class="evening-recap evening-recap--hub card">
         ${eveningRecapHeadHtml(playersMeta)}
-        ${stats ? `<div class="recap-stats">${stats}</div>` : ""}
+        ${stats ? `<div class="recap-stats" role="list" aria-label="Parties de la soirée" tabindex="0">${stats}</div>` : ""}
         ${leader}
         ${lastTier}
         ${restartBtn}
