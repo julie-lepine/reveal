@@ -37,6 +37,7 @@ import {
   completeGameSession,
   stopGameSessionListenerOnPostGame,
   refreshGameSession,
+  ensurePostGameScreen,
 } from "../core/gameSync.js";
 import { arch03AhLogSkipDecision } from "../core/arch03ActingHostDebug.js";
 
@@ -397,6 +398,7 @@ export function mountSpeedVote(app) {
         if (mp) {
           try {
             await completeGameSession({ gameId: "speedvote", screen: "results", state: {} });
+            ensurePostGameScreen("results", { from: "speedvote", gameId: "speedvote" });
           } catch (e) {
             console.warn("REVEAL completeGameSession:", e);
             if (!mount.isMounted()) return;

@@ -24,6 +24,7 @@ import {
   catalogTitleForSessionGameId,
 } from "./gameCatalogTitle.js";
 import { navigate, getCurrentScreen, isScreenRegistered } from "./router.js";
+import { postGameFallbackTarget } from "./postGameRouteFallback.js";
 import { getLobbyParticipants, getLobbyStatus, getLobbyGameId, isLobbyEveningStarted } from "./lobby.js";
 import { getActivePlayerNames, getActivePlayers } from "./players.js";
 import {
@@ -6113,6 +6114,37 @@ export function stopGameSessionListenerOnPostGame(
   if (!isOnPostGameScreen(screen)) return false;
   if (typeof cleanup === "function") cleanup();
   routeToSessionScreen(screen, { force: true });
+  return true;
+}
+
+/**
+ * Filet après `completeGameSession` côté hôte : si l'on est encore sur l'écran du
+ * jeu, on rejoint l'écran post-partie localement.
+ *
+ * Couvre deux cas silencieux : `completeGameSession` qui renvoie `null` (sync ou
+ * identité pas prête) et un `routeToSessionScreen` ignoré parce qu'un autre
+ * routage était en cours (verrou `routing`) - l'écho de session, déjà en cache,
+ * ne reroute alors pas. Sans effet si une navigation a déjà eu lieu (`from` ≠
+ * écran courant), pour ne jamais écraser un choix de l'utilisateur.
+ *
+ * @param {string} screen écran post-partie visé (ex. "results")
+ * @param {{ from: string, gameId?: string|null }} opts `from` = écran du jeu
+ * @returns {boolean} true si la navigation de secours a eu lieu
+ */
+export function ensurePostGameScreen(screen = "results", { from, gameId = null } = {}) {
+  const target = postGameFallbackTarget(screen, {
+    from,
+    current: getCurrentScreen(),
+    postGameScreens: POST_GAME_SCREENS,
+  });
+  if (!target) return false;
+  console.warn("[MP-RT] post-game route fallback", {
+    event: "post_game_route_fallback",
+    gameId,
+    from,
+    target,
+  });
+  navigate(target, { navStack: navStackFor(target) });
   return true;
 }
 

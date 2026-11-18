@@ -50,6 +50,7 @@ import {
   hotTakeToRemote,
   stopGameSessionListenerOnPostGame,
   refreshGameSession,
+  ensurePostGameScreen,
 } from "../core/gameSync.js";
 import { getSupabaseUserId } from "../core/supabaseAuth.js";
 import { voteConfirmChrome, pickForVoteConfirm } from "../core/voteConfirm.js";
@@ -353,6 +354,7 @@ export function mountHotTake(app) {
           screen: "results",
           state: { hotTake: hotTakeToRemote(resetHt) },
         });
+        ensurePostGameScreen("results", { from: "hottake", gameId: "hottake" });
       } catch (e) {
         console.warn("REVEAL completeGameSession:", e);
         if (!mount.isMounted()) return;

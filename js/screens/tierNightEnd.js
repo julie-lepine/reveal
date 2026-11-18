@@ -19,6 +19,7 @@ import {
   ensureTierNightRecapsFromRemote,
   getCachedGameSession,
   returnToGameSelect,
+  ensurePostGameScreen,
 } from "../core/gameSync.js";
 import {
   gameCumulativeScoresHtml,
@@ -319,6 +320,7 @@ export function mountTierNightEnd(app) {
       if (isLobbyHost()) {
         try {
           await completeGameSession({ gameId: "tiernight", screen: "results", state: {} });
+          ensurePostGameScreen("results", { from: "tiernight-end", gameId: "tiernight" });
         } catch (e) {
           console.warn("REVEAL completeGameSession:", e);
           if (!mount.isMounted()) return;

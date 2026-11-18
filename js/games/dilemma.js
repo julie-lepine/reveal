@@ -40,6 +40,7 @@ import {
   dilemmaToRemote,
   stopGameSessionListenerOnPostGame,
   refreshGameSession,
+  ensurePostGameScreen,
 } from "../core/gameSync.js";
 import { voteConfirmChrome, pickForVoteConfirm } from "../core/voteConfirm.js";
 import { createSyncPending } from "../core/syncPending.js";
@@ -301,6 +302,7 @@ export function mountDilemma(app) {
             screen: "results",
             state: { dilemma: dilemmaToRemote(resetDm) },
           });
+          ensurePostGameScreen("results", { from: "dilemma", gameId: "dilemma" });
         } catch (e) {
           console.warn("REVEAL completeGameSession:", e);
           if (unmounted) return;

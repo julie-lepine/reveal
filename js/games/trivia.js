@@ -28,6 +28,7 @@ import {
   startGameSession,
   stopGameSessionListenerOnPostGame,
   triviaToRemote,
+  ensurePostGameScreen,
 } from "../core/gameSync.js";
 import { renderTriviaQuestion } from "../trivia/TriviaQuestion.js";
 import { renderTriviaScoreboard } from "../trivia/TriviaScoreboard.js";
@@ -481,6 +482,7 @@ export function mountTrivia(app) {
           screen: "results",
           state: { trivia: triviaToRemote(finalSession) },
         });
+        ensurePostGameScreen("results", { from: "trivia", gameId: "trivia" });
       } catch (e) {
         console.warn("REVEAL completeGameSession:", e);
         if (!mount.isMounted()) return;

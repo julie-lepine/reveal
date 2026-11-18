@@ -39,6 +39,7 @@ import {
   stopGameSessionListenerOnPostGame,
   getActingHostUiRefreshToken,
   needsActingHostUiRefresh,
+  ensurePostGameScreen,
 } from "../core/gameSync.js";
 import { arch03LiveLog } from "../core/presenceUiLive.js";
 
@@ -575,6 +576,7 @@ export function mountClutch(app) {
         if (mp) {
           try {
             await completeGameSession({ gameId: "clutch", screen: "results", state: {} });
+            ensurePostGameScreen("results", { from: "clutch", gameId: "clutch" });
           } catch (e) {
             console.warn("REVEAL completeGameSession:", e);
             if (!mount.isMounted()) return;

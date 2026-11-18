@@ -37,6 +37,7 @@ import {
   stopGameSessionListenerOnPostGame,
   getActingHostUiRefreshToken,
   needsActingHostUiRefresh,
+  ensurePostGameScreen,
 } from "../core/gameSync.js";
 import {
   decideWrongAnswerRemoteUi,
@@ -696,6 +697,7 @@ export function mountWrongAnswer(app) {
         if (mp) {
           try {
             await completeGameSession({ gameId: "wronganswer", screen: "results", state: {} });
+            ensurePostGameScreen("results", { from: "wronganswer", gameId: "wronganswer" });
           } catch (e) {
             console.warn("REVEAL completeGameSession:", e);
             if (!mount.isMounted()) return;

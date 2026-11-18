@@ -42,6 +42,7 @@ import {
   returnToGameSelect,
   startGameSession,
   stopGameSessionListenerOnPostGame,
+  ensurePostGameScreen,
 } from "../core/gameSync.js";
 import { renderConsensusQuestion } from "../consensus/ConsensusQuestion.js";
 import { renderConsensusResults } from "../consensus/ConsensusResults.js";
@@ -878,6 +879,7 @@ export function mountConsensus(app) {
             state: { consensus: consensusToRemote(finalSession) },
           })
         );
+        ensurePostGameScreen("results", { from: "consensus", gameId: "consensus" });
       } catch (e) {
         if (e?.code === "CONSENSUS_WRITE_BLOCKED") return;
         console.warn("REVEAL completeGameSession:", e);

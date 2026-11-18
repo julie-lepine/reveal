@@ -17,6 +17,7 @@ import {
   nameForUserId,
   completeGameSession,
   stopGameSessionListenerOnPostGame,
+  ensurePostGameScreen,
 } from "../core/gameSync.js";
 import { arch03AhLogSkipDecision } from "../core/arch03ActingHostDebug.js";
 import { getLocalDisplayName, recordGuessLieRoundStats, recordGuessLiePlayed, setLastGame } from "../core/state.js";
@@ -266,6 +267,7 @@ export function mountGuessLie(app) {
       if (mp) {
         try {
           await completeGameSession({ gameId: "guesslie", screen: "results", state: {} });
+          ensurePostGameScreen("results", { from: "guesslie", gameId: "guesslie" });
         } catch (e) {
           console.warn("REVEAL completeGameSession:", e);
           if (!mount.isMounted()) return;
