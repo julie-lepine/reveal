@@ -1,3 +1,6 @@
+/** Message quand l'envoi du tap échoue : le bouton est rouvert, il faut retaper. */
+export const CLUTCH_TAP_FAILED_LABEL = "Ton tap n’est pas parti, retape !";
+
 /** Fige le tap capturé au clic (aucun recalcul de ms/at). */
 import {
   computeOptimisticMapEntryApply,

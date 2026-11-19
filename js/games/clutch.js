@@ -16,7 +16,11 @@ import {
   startClutchRound,
   getClutchParticipantNames,
 } from "../core/clutchSession.js";
-import { resolveClutchTapCommitFailureUi, preferInFlightClutchTap } from "../core/clutchTapCommit.js";
+import {
+  CLUTCH_TAP_FAILED_LABEL,
+  resolveClutchTapCommitFailureUi,
+  preferInFlightClutchTap,
+} from "../core/clutchTapCommit.js";
 import { awardClutchRound } from "../core/scoring.js";
 import { applyMatchScoreDeltas, gameCumulativeScoresHtml, refreshGameScoresBox } from "../core/gameScores.js";
 import { getLocalDisplayName, recordClutchPlayed, setLastGame } from "../core/state.js";
@@ -68,6 +72,8 @@ export function mountClutch(app) {
   let activeKey = null;
   let localWindowClosed = false;
   let tapCommitInFlight = false;
+  /** Dernier envoi de tap échoué (réseau) : message tant que le joueur n'a pas retapé. */
+  let tapFailed = false;
   let graceTimer = null;
   let clockRaf = null;
   let hideBeforeMs = null;
@@ -290,6 +296,7 @@ export function mountClutch(app) {
         localStart = null;
         countdownEndsAt = performance.now() + CLUTCH_PRECOUNT_MS;
         localWindowClosed = false;
+        tapFailed = false;
         blindVibrated = false;
         clearCopyTimer();
         clearGrace();
@@ -389,7 +396,9 @@ export function mountClutch(app) {
           : BLIND_LINES[0]
         : "Le chrono monte vers la cible";
 
-    const status = localWindowClosed
+    const status = tapFailed && !tapped && !localWindowClosed
+      ? CLUTCH_TAP_FAILED_LABEL
+      : localWindowClosed
       ? "Temps écoulé - en attente du verdict…"
       : counting
         ? "Prépare-toi… le chrono démarre !"
@@ -415,7 +424,6 @@ export function mountClutch(app) {
         <p class="label-upper label-upper--gold">🎯 Objectif : ${escapeHtml(targetLabel)}</p>
         <p id="clutch-clock" class="clutch-clock" style="font-variant-numeric:tabular-nums">${escapeHtml(clockText)}</p>
         <p class="hint" id="clutch-clock-sub">${escapeHtml(clockSub)}</p>
-        <div class="clutch-tapped" id="clutch-tapped">${tappedChipsHtml(hidden)}</div>
       </div>
       <button type="button" id="clutch-target" class="${btnClasses}"
         ${btnDisabled ? "disabled" : ""}
@@ -426,6 +434,7 @@ export function mountClutch(app) {
           box-shadow:0 12px 40px rgba(255,60,172,.35);opacity:${(localWindowClosed && !tapped) || counting ? ".5" : "1"}">
         ${tapped ? "✓ Tapé" : "TAP !"}
       </button>
+      <div class="clutch-tapped" id="clutch-tapped">${tappedChipsHtml(hidden)}</div>
       <p class="hint" style="text-align:center">${escapeHtml(status)}</p>`;
   }
 
@@ -513,7 +522,7 @@ export function mountClutch(app) {
       else startClock();
     }
 
-    app.querySelector("#clutch-target")?.addEventListener("click", () => {
+    const onTap = () => {
       if (
         phase !== "active" ||
         localStart == null ||
@@ -528,6 +537,7 @@ export function mountClutch(app) {
         at: Date.now(),
       };
       tapCommitInFlight = true;
+      tapFailed = false;
       taps = { ...taps, [localName]: tap };
       vibrate(35);
       render();
@@ -548,6 +558,8 @@ export function mountClutch(app) {
           const ui = resolveClutchTapCommitFailureUi();
           tapCommitInFlight = ui.tapCommitInFlight;
           localWindowClosed = ui.localWindowClosed;
+          // Prévenir le joueur : sans message, le bouton revenait à « TAP ! » sans explication.
+          tapFailed = true;
         })
         .finally(() => {
           tapCommitInFlight = false;
@@ -556,6 +568,18 @@ export function mountClutch(app) {
           syncFromSession();
           render();
         });
+    };
+    const tapBtn = app.querySelector("#clutch-target");
+    // Tap compté dès que le doigt touche le bouton (pas au relâchement) : si le
+    // bouton bouge pendant l'appui, le tap n'est plus perdu, et le temps est plus juste.
+    tapBtn?.addEventListener("pointerdown", (e) => {
+      if (e.button !== 0) return;
+      e.preventDefault();
+      onTap();
+    });
+    // Clavier (Entrée / Espace) : click sans pointeur.
+    tapBtn?.addEventListener("click", (e) => {
+      if (e.detail === 0) onTap();
     });
 
     app.querySelector("#next-round")?.addEventListener("click", withClickLock(async () => {

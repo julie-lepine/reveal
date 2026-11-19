@@ -514,6 +514,11 @@ body[data-screen="home"] .lobby-actions__intro{ margin:28px 0 14px; }
   font-family:var(--font-display);
   font-size:44px;
   letter-spacing:.04em;
+  /* Tap compté à l'appui : pas de zoom ni de sélection au toucher. */
+  touch-action:manipulation;
+  -webkit-user-select:none;
+  user-select:none;
+  -webkit-tap-highlight-color:transparent;
 }
 
 /* Guess The Lie : choix de la lettre du mensonge. */
