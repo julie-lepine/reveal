@@ -14,7 +14,6 @@ import {
   requireLocalParticipantUid,
   patchGameState,
 } from "./gameSync.js";
-import { formatSyncErrorMessage } from "./authErrors.js";
 import { launchGameWithSync, commitHostGamePlay, commitPrepReadyToggle } from "./mpLaunch.js";
 import { freezeClutchTap, sameClutchTap } from "./clutchTapCommit.js";
 import {
@@ -254,16 +253,9 @@ export async function commitClutchTap(tapInput) {
         saveStatePatch({ clutchGame: { ...live, taps: rolled.map } });
       }
     }
+    // Pas de fenêtre d'alerte : elle cachait le jeu et gelait le bouton tant qu'elle
+    // restait ouverte. L'écran affiche le message sous le bouton.
     console.warn("REVEAL clutch tap:", err);
-    try {
-      const { showAppAlert } = await import("./dialog.js");
-      await showAppAlert(formatSyncErrorMessage(err?.message), {
-        title: "Connexion",
-        icon: "📡",
-      });
-    } catch {
-      /* ignore UI */
-    }
     throw err;
   }
 }

@@ -1,6 +1,9 @@
 /** Message quand l'envoi du tap échoue : le bouton est rouvert, il faut retaper. */
 export const CLUTCH_TAP_FAILED_LABEL = "Ton tap n’est pas parti, retape !";
 
+/** Message quand l'envoi du tap échoue alors que le temps de tap est écoulé. */
+export const CLUTCH_TAP_FAILED_LATE_LABEL = "Ton tap n’est pas parti à temps.";
+
 /**
  * Même tap si même contenu (ms, at). La synchro recopie la map des taps
  * (mergeClutchTapsFrozen) : comparer par identité ratait l'annulation après
@@ -76,13 +79,15 @@ export function computeClutchTapApply(session, localName, tap) {
 }
 
 /**
- * UI locale après échec de sync du tap : libère le verrou commit et rouvre
- * la fenêtre de tap (le grace timer a pu fermer pendant l’attente réseau).
+ * UI locale après échec de sync du tap : libère le verrou commit. La fenêtre de
+ * tap n'est rouverte que si le temps n'est pas écoulé (sinon le joueur pouvait
+ * retaper hors délai, avec un temps énorme).
+ * @param {boolean} [windowElapsed] - le temps de tap s'est terminé pendant l'envoi.
  */
-export function resolveClutchTapCommitFailureUi() {
+export function resolveClutchTapCommitFailureUi(windowElapsed = false) {
   return {
     tapCommitInFlight: false,
-    localWindowClosed: false,
+    localWindowClosed: Boolean(windowElapsed),
   };
 }
 

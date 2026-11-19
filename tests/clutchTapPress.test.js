@@ -34,11 +34,12 @@ describe("Clutch : tap à l'appui", () => {
     assert.match(css, /\.clutch-tapped:empty\{[\s\S]*?height:28px;/);
   });
 
-  it("échec d'envoi : bouton rouvert et message clair", () => {
-    assert.deepEqual(resolveClutchTapCommitFailureUi(), {
+  it("échec d'envoi : bouton rouvert (si le temps n'est pas écoulé) et message clair", () => {
+    assert.deepEqual(resolveClutchTapCommitFailureUi(false), {
       tapCommitInFlight: false,
       localWindowClosed: false,
     });
+    assert.match(src, /resolveClutchTapCommitFailureUi\(localWindowClosed\)/);
     assert.match(CLUTCH_TAP_FAILED_LABEL, /retape/);
     assert.match(src, /tapFailed = true;/);
     assert.match(src, /tapFailed && !tapped && !localWindowClosed\s*\?\s*CLUTCH_TAP_FAILED_LABEL/);

@@ -20,6 +20,7 @@ import {
 } from "../core/clutchSession.js";
 import {
   CLUTCH_TAP_FAILED_LABEL,
+  CLUTCH_TAP_FAILED_LATE_LABEL,
   resolveClutchTapCommitFailureUi,
   preferInFlightClutchTap,
   shouldHostRevealClutchRound,
@@ -450,6 +451,8 @@ export function mountClutch(app) {
       ? CLUTCH_REVEAL_RETRY_LABEL
       : tapFailed && !tapped && !localWindowClosed
       ? CLUTCH_TAP_FAILED_LABEL
+      : tapFailed && !tapped && localWindowClosed
+      ? CLUTCH_TAP_FAILED_LATE_LABEL
       : localWindowClosed
       ? "Temps écoulé - en attente du verdict…"
       : counting
@@ -614,8 +617,9 @@ export function mountClutch(app) {
         .catch(() => {
           if (!mount.isMounted()) return;
           if (!mount.isCurrentMount()) return;
-          // Session déjà rollback dans commitClutchTap ; rouvre la fenêtre de tap.
-          const ui = resolveClutchTapCommitFailureUi();
+          // Session déjà rollback dans commitClutchTap ; rouvre la fenêtre de tap
+          // seulement si le temps n'est pas écoulé.
+          const ui = resolveClutchTapCommitFailureUi(localWindowClosed);
           tapCommitInFlight = ui.tapCommitInFlight;
           localWindowClosed = ui.localWindowClosed;
           // Prévenir le joueur : sans message, le bouton revenait à « TAP ! » sans explication.

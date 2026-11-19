@@ -102,10 +102,21 @@ describe("SYN-26 clutch tap freeze / merge", () => {
     assert.equal(sessionTaps.Bob.at, 101);
   });
 
-  it("resolveClutchTapCommitFailureUi libère verrou et rouvre la fenêtre", () => {
+  it("resolveClutchTapCommitFailureUi libère verrou et rouvre la fenêtre (temps pas écoulé)", () => {
     assert.deepEqual(resolveClutchTapCommitFailureUi(), {
       tapCommitInFlight: false,
       localWindowClosed: false,
+    });
+    assert.deepEqual(resolveClutchTapCommitFailureUi(false), {
+      tapCommitInFlight: false,
+      localWindowClosed: false,
+    });
+  });
+
+  it("resolveClutchTapCommitFailureUi ne rouvre pas la fenêtre si le temps est écoulé", () => {
+    assert.deepEqual(resolveClutchTapCommitFailureUi(true), {
+      tapCommitInFlight: false,
+      localWindowClosed: true,
     });
   });
 });
