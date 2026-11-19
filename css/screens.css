@@ -1735,3 +1735,195 @@ body[data-screen="lobby"] .page:has(.back) .container > .lobby-head:first-child{
 
 /* « Retirer la photo » masqué tant qu’il n’y a pas de photo (.btn écrasait hidden). */
 .settings-avatar-actions .btn[hidden]{ display:none; }
+
+/* ═══ Menu > Amis : à traiter en haut, liste soignée, vignettes ═══ */
+/* Invitations de soirée / demandes reçues : cartes encadrées de dégradé. */
+.friends-todo{ margin:0 0 10px; }
+
+.friends-row.friends-action{
+  gap:12px;
+  margin:0 0 10px;
+  padding:14px;
+  border:1.5px solid transparent;
+  border-radius:18px;
+  background:
+    linear-gradient(160deg, #1d1b40, #13122b) padding-box,
+    linear-gradient(145deg, var(--color-secondary), var(--color-primary) 60%, var(--color-ink)) border-box;
+}
+
+.friends-action__kicker{
+  font-size:10.5px;
+  font-weight:800;
+  line-height:1.2;
+  letter-spacing:.1em;
+  text-transform:uppercase;
+  color:#f5d76e;
+}
+
+.friends-action .friends-row__name{ font-size:16px; font-weight:800; }
+
+.friends-section{ margin:24px 0 0; }
+
+.friends-todo + .friends-section,
+.page-title + .friends-section{ margin-top:16px; }
+
+.friends-section__title{
+  margin:0 0 8px;
+  font-family:var(--font-display);
+  font-size:22px;
+  font-weight:400;
+  text-transform:uppercase;
+  transform:skewX(var(--display-skew));
+  color:#fff;
+}
+
+.friends-section__title small{
+  display:inline-block;
+  font-family:inherit;
+  font-size:15px;
+  color:rgba(255,255,255,.45);
+}
+
+/* Tes amis : lignes aérées, pseudo en Anton. */
+.friends-row--friend{ gap:12px; padding:10px 0; }
+
+.friends-row--friend .friends-row__avatar{
+  width:48px;
+  height:48px;
+  font-size:26px;
+}
+
+.friends-row--friend .friends-row__name{
+  font-family:var(--font-display);
+  font-size:21px;
+  font-weight:400;
+  text-transform:uppercase;
+  transform:skewX(var(--display-skew));
+  transform-origin:left;
+}
+
+.friends-row--friend .friends-row__name .signature-badge{ display:none; }
+
+.friends-more{ position:relative; }
+
+.friends-more__btn{
+  width:36px;
+  height:36px;
+  border:0;
+  border-radius:10px;
+  background:rgba(255,255,255,.06);
+  color:rgba(255,255,255,.75);
+  font:inherit;
+  font-size:16px;
+  font-weight:800;
+  line-height:1;
+  cursor:pointer;
+}
+
+.friends-more__btn[aria-expanded="true"]{ background:rgba(255,255,255,.14); color:#fff; }
+
+.friends-more__menu{
+  position:absolute;
+  top:calc(100% + 6px);
+  right:0;
+  z-index:5;
+  min-width:150px;
+  padding:6px;
+  border:1px solid rgba(255,255,255,.1);
+  border-radius:14px;
+  background:#22244a;
+  box-shadow:0 12px 30px rgba(0,0,0,.5);
+}
+
+.friends-more__menu[hidden]{ display:none; }
+
+.friends-more__item{
+  display:block;
+  width:100%;
+  padding:10px 12px;
+  border:0;
+  border-radius:10px;
+  background:none;
+  color:#fb7185;
+  font:inherit;
+  font-size:14px;
+  font-weight:700;
+  text-align:left;
+  cursor:pointer;
+}
+
+/* Demandes envoyées : ligne discrète repliable. */
+.friends-pending{ margin:6px 0 0; }
+
+.friends-pending__summary{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:12px 14px;
+  border:1px dashed rgba(255,255,255,.15);
+  border-radius:14px;
+  color:rgba(255,255,255,.65);
+  font-size:13px;
+  font-weight:700;
+  list-style:none;
+  cursor:pointer;
+}
+
+.friends-pending__summary::-webkit-details-marker{ display:none; }
+
+.friends-pending__summary span{ transition:transform .2s; }
+
+.friends-pending__details[open] .friends-pending__summary span{ transform:rotate(90deg); }
+
+.friends-pending__list{ padding:4px 4px 0; }
+
+/* Vous venez de jouer avec : vignettes 4 par ligne. */
+.friends-recent{
+  display:grid;
+  grid-template-columns:repeat(4, minmax(0, 1fr));
+  gap:8px;
+}
+
+.friends-recent__item{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:6px;
+  min-width:0;
+  padding:10px 4px;
+  border-radius:16px;
+  background:rgba(255,255,255,.04);
+}
+
+.friends-recent__item .friends-row__avatar{
+  width:44px;
+  height:44px;
+  font-size:24px;
+}
+
+.friends-recent__item .friends-row__name{
+  max-width:100%;
+  font-size:12px;
+  font-weight:800;
+}
+
+.friends-recent__item .friends-row__name .signature-badge{ display:none; }
+
+.friends-recent__item .btn--compact{
+  width:auto;
+  min-height:0;
+  margin:0;
+  padding:5px 10px;
+  border:0;
+  border-radius:9px;
+  background:rgba(255,255,255,.1);
+  box-shadow:none;
+  color:#fff;
+  font-size:11.5px;
+  font-weight:800;
+  white-space:nowrap;
+}
+
+.friends-recent__item .btn-primary.btn--compact{
+  background:var(--btn-sheen), linear-gradient(135deg, var(--color-secondary), var(--color-primary));
+}

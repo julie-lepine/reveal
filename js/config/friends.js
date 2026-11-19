@@ -110,6 +110,11 @@ export const FRIEND_LABEL = {
   cancelRequest: "Annuler",
   outgoingSection: "Demandes envoyées",
   outgoingEmpty: "Aucune demande envoyée.",
+  /** Page Amis : demandes envoyées repliées (« 2 demandes en attente »). */
+  outgoingPendingOne: "demande en attente",
+  outgoingPendingMany: "demandes en attente",
+  /** Page Amis : menu « ⋯ » d'un ami (Retirer). */
+  moreActions: "Plus d’actions",
 };
 
 /** Action roster ( Palier 4 ). `hint_guest` = pas de bouton + Ami. */

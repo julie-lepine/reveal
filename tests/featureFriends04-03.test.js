@@ -42,7 +42,7 @@ describe("FEATURE-FRIENDS-04 Palier 3 — UI croisés", () => {
     assert.notEqual(FRIEND_LABEL.cancelRequest, LOBBY_INVITE_LABEL.invite);
   });
 
-  it("page Amis : section après demandes, avant Tes amis ; pas de chat", () => {
+  it("page Amis : section en bas, après Tes amis et les demandes envoyées ; pas de chat", () => {
     const src = read("js/screens/friends.js");
     assert.match(src, /data-recent-peers/);
     assert.match(src, /RECENT_PEERS_LABEL\.section/);
@@ -65,10 +65,12 @@ describe("FEATURE-FRIENDS-04 Palier 3 — UI croisés", () => {
     assert.doesNotMatch(controlFn, /LOBBY_INVITE/);
     assert.doesNotMatch(controlFn, /FRIEND_LABEL\.sent/);
     assert.doesNotMatch(src, /lobby_messages/);
-    const outgoingAt = src.indexOf("data-friends-outgoing>");
-    const recentAt = src.indexOf("data-recent-peers>");
-    const listAt = src.indexOf("data-friends-list>");
-    assert.ok(outgoingAt > 0 && recentAt > outgoingAt && listAt > recentAt);
+    const page = src.slice(src.indexOf("function listsHtml"));
+    const tpl = page.slice(page.lastIndexOf("return `"));
+    const listAt = tpl.indexOf("data-friends-list>");
+    const outgoingAt = tpl.indexOf("${outgoingSection}");
+    const recentAt = tpl.indexOf("data-recent-peers>");
+    assert.ok(listAt > 0 && outgoingAt > listAt && recentAt > outgoingAt);
     const guestAt = src.indexOf("function guestPanelHtml");
     const listsAt = src.indexOf("function listsHtml");
     const guestFn = src.slice(guestAt, listsAt);
