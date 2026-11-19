@@ -24,7 +24,15 @@ import { hostPackSettingsCardHtml } from "../core/hostPackUi.js";
 import { premiumOfferChromeHtml, premiumOfferFooterHintHtml } from "../core/premiumOfferUi.js";
 import { purchaseAdFree, purchaseHost, purchaseProfile, restorePremiumPurchases } from "../core/purchases.js";
 import { getLocalDisplayName, getLocalEmoji } from "../core/state.js";
-import { resolvedNameColorHex } from "../../data/signatureIdentity.js";
+import {
+  SIGNATURE_EMOJI_CHOICES,
+  SIGNATURE_NAME_COLORS,
+  emojiFromUtf8Hex,
+  resolvedNameColorHex,
+  utf8HexFromEmoji,
+} from "../../data/signatureIdentity.js";
+import { isAdFree } from "../core/entitlements.js";
+import { PROFILE_CARD_LABEL } from "../config/profileCard.js";
 import {
   isLockedSignatureEmojiClick,
   isProfilePack,
@@ -32,7 +40,6 @@ import {
   pickerEmojiFromButton,
   playerAvatarHtml,
   profileEmojiPickerHtml,
-  signatureSelfPreviewHtml,
 } from "../core/signatureUi.js";
 import {
   hasActiveLobby,
@@ -250,7 +257,119 @@ function premiumRestoreButtonHtml(user) {
       <button type="button" class="btn btn-secondary btn--spaced" id="btn-premium-restore">Restaurer les achats</button>`;
 }
 
-function personnalisationPanelHtml({ emailAccount, user, selectedEmoji }) {
+/** Joueur affiché sur la carte de profil ; `tryOn` = essai Signature non enregistré. */
+function profileCardPlayer(base, tryOn) {
+  if (!tryOn) return base;
+  return {
+    ...base,
+    emoji: tryOn.emoji || base.emoji,
+    nameColor: tryOn.nameColor || base.nameColor,
+    signature: true,
+  };
+}
+
+/** Carte de joueur (haut de Menu > Profil). */
+function profileCardHtml(player, { unlocked, tryOn = null }) {
+  const p = profileCardPlayer(player, tryOn);
+  const trying = !unlocked && Boolean(tryOn);
+  const nameHex = resolvedNameColorHex(p);
+  const badge = unlocked
+    ? `<span class="profile-card__badge profile-card__badge--sig">✨ ${escapeHtml(PACK_SIGNATURE_LABEL)}</span>`
+    : trying
+      ? `<span class="profile-card__badge profile-card__badge--try">${escapeHtml(PROFILE_CARD_LABEL.tryBadge)}</span>`
+      : `<span class="profile-card__badge">${escapeHtml(PROFILE_CARD_LABEL.freeBadge)}</span>`;
+  const stats = unlocked
+    ? ""
+    : `
+      <div class="profile-card__stats">
+        ${[
+          [CARNET_LABEL.statsEveningsEmoji, CARNET_LABEL.statsEvenings],
+          [CARNET_LABEL.statsMvpEmoji, CARNET_LABEL.statsMvp],
+          [CARNET_LABEL.statsFavoriteEmoji, CARNET_LABEL.statsFavorite],
+        ]
+          .map(
+            ([emoji, label]) => `
+          <div class="profile-card__stat"><b aria-hidden="true">${emoji} 00</b><span>${escapeHtml(label)}</span></div>`
+          )
+          .join("")}
+        <button type="button" class="profile-card__stats-lock" data-nav="${CARNET_SCREEN_ID}">🔒 ${escapeHtml(PROFILE_CARD_LABEL.unlockCarnet)}</button>
+      </div>`;
+  return `
+    <div class="profile-card${unlocked ? " profile-card--sig" : ""}${trying ? " profile-card--trying" : ""}" id="profile-card">
+      <div class="profile-card__avatar-wrap">
+        <div class="profile-card__ring">${playerAvatarHtml({ ...p, color: "" }, "profile-card__avatar")}</div>
+        ${unlocked ? "" : `<span class="profile-card__photo-slot" title="${escapeHtml(PROFILE_CARD_LABEL.photoSlot)}" aria-hidden="true">📷</span>`}
+      </div>
+      <p class="profile-card__name"${nameHex ? ` style="color:${escapeHtml(nameHex)}"` : ""}>${escapeHtml(p.name)}</p>
+      ${badge}
+      ${stats}
+      ${
+        trying
+          ? `
+      <div class="profile-card__try">
+        <p>${escapeHtml(PROFILE_CARD_LABEL.tryHint)}</p>
+        <button type="button" class="btn btn-primary" data-settings-goto="${TAB_FORFAITS}">${escapeHtml(PROFILE_CARD_LABEL.tryKeep)}</button>
+        <button type="button" class="profile-card__try-cancel" data-profile-try-cancel>${escapeHtml(PROFILE_CARD_LABEL.tryCancel)}</button>
+      </div>`
+          : ""
+      }
+    </div>`;
+}
+
+/** Vitrine Signature (joueur sans Signature) : 4 avantages, 2 à essayer sur la carte. */
+function profilePerksHtml(player) {
+  const gold = SIGNATURE_NAME_COLORS[0];
+  const perks = [
+    {
+      demo: `<span class="profile-perk__demo profile-perk__demo--name" style="color:${escapeHtml(gold.hex)}">${escapeHtml(player.name)}</span>`,
+      title: PROFILE_CARD_LABEL.perkColorTitle,
+      text: PROFILE_CARD_LABEL.perkColorText,
+      attr: `data-profile-try-color="${escapeHtml(gold.id)}"`,
+    },
+    {
+      demo: `<span class="profile-perk__demo">${SIGNATURE_EMOJI_CHOICES.slice(0, 3).join(" ")}</span>`,
+      title: PROFILE_CARD_LABEL.perkEmojiTitle,
+      text: `${SIGNATURE_EMOJI_CHOICES.length} ${PROFILE_CARD_LABEL.perkEmojiText}`,
+      attr: `data-profile-try-emoji="${escapeHtml(utf8HexFromEmoji(SIGNATURE_EMOJI_CHOICES[0]))}"`,
+    },
+    {
+      demo: `<span class="profile-perk__demo">📷</span>`,
+      title: PROFILE_CARD_LABEL.perkPhotoTitle,
+      text: PROFILE_CARD_LABEL.perkPhotoText,
+      attr: `data-settings-goto="${TAB_FORFAITS}"`,
+    },
+    isAdFree()
+      ? {
+          demo: `<span class="profile-perk__demo">📓 🏆</span>`,
+          title: PROFILE_CARD_LABEL.perkCarnetTitle,
+          text: PROFILE_CARD_LABEL.perkCarnetText,
+          attr: `data-settings-goto="${TAB_FORFAITS}"`,
+        }
+      : {
+          demo: `<span class="profile-perk__demo">🚫📢</span>`,
+          title: PROFILE_CARD_LABEL.perkAdFreeTitle,
+          text: PROFILE_CARD_LABEL.perkAdFreeText,
+          attr: `data-settings-goto="${TAB_FORFAITS}"`,
+        },
+  ];
+  return `
+      <h2 class="profile-section-title">${escapeHtml(PROFILE_CARD_LABEL.perksTitle)}</h2>
+      <div class="profile-perks">
+        ${perks
+          .map(
+            (perk) => `
+        <button type="button" class="profile-perk" ${perk.attr}>
+          ${perk.demo}
+          <b>${escapeHtml(perk.title)}</b>
+          <small>${escapeHtml(perk.text)}</small>
+          ${perk.attr.startsWith("data-profile-try") ? `<span class="profile-perk__try">${escapeHtml(PROFILE_CARD_LABEL.perkTry)}</span>` : ""}
+        </button>`
+          )
+          .join("")}
+      </div>`;
+}
+
+function personnalisationPanelHtml({ emailAccount, user, selectedEmoji, tryOn = null }) {
   const unlocked = isProfilePack();
   const selectedColor = user?.nameColor || null;
   const hasPhoto = unlocked && Boolean(user?.avatarPath);
@@ -263,98 +382,100 @@ function personnalisationPanelHtml({ emailAccount, user, selectedEmoji }) {
     avatarPath: user?.avatarPath || null,
     avatarRev: Number(user?.avatarRev) || 0,
   };
+  const signatureEmojis = !user?.isGuest;
   return `
-    <div class="settings-panel" id="settings-panel-personnalisation">
-      <button type="button" class="settings-link-row friends-entry" data-nav="${FRIENDS_SCREEN_ID}" data-friends-entry="${FRIENDS_ENTRY.settingsProfile}">
-        <span class="settings-link-row__icon-wrap">
-          <span class="settings-link-row__icon" aria-hidden="true">👥</span>
-          <span class="friends-badge" data-friends-badge hidden aria-hidden="true"></span>
-        </span>
-        <span class="settings-link-row__label">${escapeHtml(FRIEND_LABEL.entrySettings)}</span>
-        <span class="settings-link-row__chevron" aria-hidden="true">›</span>
-      </button>
-      <button type="button" class="settings-link-row" data-nav="${CARNET_SCREEN_ID}">
-        <span class="settings-link-row__icon-wrap">
-          <span class="settings-link-row__icon" aria-hidden="true">📓</span>
-        </span>
-        <span class="settings-link-row__label">${escapeHtml(CARNET_LABEL.entrySettings)}</span>
-        <span class="settings-link-row__chevron" aria-hidden="true">›</span>
-      </button>
-      <div class="card settings-section">
-        <h2 class="settings-section__title">Pseudo</h2>
-        <p class="hint settings-section__hint">Visible dans le lobby et les scores.</p>
-        ${signatureSelfPreviewHtml(previewPlayer)}
-        <label class="field-label" for="settings-name">Ton pseudo</label>
-        <input type="text" class="field-input" id="settings-name" maxlength="24" value="${escapeHtml(getLocalDisplayName())}" ${
-          resolvedNameColorHex(previewPlayer)
-            ? `style="color:${resolvedNameColorHex(previewPlayer)}"`
-            : ""
-        } />
-        ${nameColorChipsHtml(selectedColor, { unlocked })}
-        <p class="auth-error hidden" id="name-error"></p>
-        <p class="settings-ok hidden" id="name-ok">Pseudo enregistré.</p>
-        <p class="settings-ok hidden" id="color-ok">Couleur enregistrée.</p>
-        <button type="button" class="btn btn-primary btn--spaced" id="btn-save-name">Enregistrer le pseudo</button>
+    <div class="settings-panel profile-panel" id="settings-panel-personnalisation">
+      ${profileCardHtml(previewPlayer, { unlocked, tryOn })}
+      ${unlocked ? "" : profilePerksHtml(previewPlayer)}
+
+      <details class="profile-edit"${unlocked ? " open" : ""}>
+        <summary class="profile-edit__summary">${escapeHtml(PROFILE_CARD_LABEL.edit)}<span aria-hidden="true">⌄</span></summary>
+        <div class="profile-edit__body">
+          <label class="field-label" for="settings-name">Ton pseudo</label>
+          <div class="profile-edit__name-row">
+            <input type="text" class="field-input" id="settings-name" maxlength="24" value="${escapeHtml(getLocalDisplayName())}" ${
+              resolvedNameColorHex(previewPlayer)
+                ? `style="color:${resolvedNameColorHex(previewPlayer)}"`
+                : ""
+            } />
+            <button type="button" class="btn btn-primary" id="btn-save-name">OK</button>
+          </div>
+          <p class="hint settings-section__hint">Visible dans le lobby et les scores.</p>
+          <p class="auth-error hidden" id="name-error"></p>
+          <p class="settings-ok hidden" id="name-ok">Pseudo enregistré.</p>
+          ${nameColorChipsHtml(selectedColor, { unlocked })}
+          <p class="settings-ok hidden" id="color-ok">Couleur enregistrée.</p>
+
+          <p class="field-label">Avatar</p>
+          ${
+            unlocked
+              ? `<input type="file" accept="image/*" hidden id="settings-avatar-file" />
+          <div class="settings-avatar-actions">
+            <button type="button" class="btn btn-secondary" id="btn-pick-avatar">${escapeHtml(
+              hasPhoto ? AVATAR_LABEL.change : AVATAR_LABEL.pick
+            )}</button>
+            <button type="button" class="btn btn-secondary" id="btn-remove-avatar"${
+              hasPhoto ? "" : " hidden"
+            }>${escapeHtml(AVATAR_LABEL.remove)}</button>
+          </div>
+          <p class="hint settings-section__hint">${escapeHtml(AVATAR_LABEL.hint)}</p>
+          <p class="auth-error hidden" id="avatar-error"></p>
+          <p class="settings-ok hidden" id="avatar-ok"></p>`
+              : ""
+          }
+          ${profileEmojiPickerHtml(selectedEmoji, { includeSignatureExtras: signatureEmojis && unlocked, unlocked })}
+          ${
+            signatureEmojis && !unlocked
+              ? `<button type="button" class="profile-edit__more" data-profile-try-emoji="${escapeHtml(
+                  utf8HexFromEmoji(SIGNATURE_EMOJI_CHOICES[0])
+                )}"><span aria-hidden="true">${SIGNATURE_EMOJI_CHOICES.slice(0, 5).join("")}</span>+${
+                  SIGNATURE_EMOJI_CHOICES.length - 5
+                } ${escapeHtml(PROFILE_CARD_LABEL.moreEmojis)}</button>`
+              : ""
+          }
+          <p class="auth-error hidden" id="emoji-error"></p>
+          <p class="settings-ok hidden" id="emoji-ok">Emoji enregistré.</p>
+        </div>
+      </details>
+
+      <div class="profile-tiles">
+        <button type="button" class="profile-tile settings-link-row friends-entry" data-nav="${FRIENDS_SCREEN_ID}" data-friends-entry="${FRIENDS_ENTRY.settingsProfile}">
+          <span class="profile-tile__icon" aria-hidden="true">👥<span class="friends-badge" data-friends-badge hidden aria-hidden="true"></span></span>
+          <span class="profile-tile__label">${escapeHtml(FRIEND_LABEL.entrySettings)}</span>
+        </button>
+        <button type="button" class="profile-tile settings-link-row" data-nav="${CARNET_SCREEN_ID}">
+          <span class="profile-tile__icon" aria-hidden="true">📓</span>
+          <span class="profile-tile__label">${escapeHtml(CARNET_LABEL.entrySettings)}</span>
+          ${unlocked ? "" : `<small class="profile-tile__lock">🔒 ${escapeHtml(PACK_SIGNATURE_LABEL)}</small>`}
+        </button>
       </div>
 
-      <div class="card settings-section">
-        <h2 class="settings-section__title">Avatar</h2>
-        <p class="hint settings-section__hint">${escapeHtml(
-          unlocked ? AVATAR_LABEL.hint : "Affiché dans le lobby et les classements."
-        )}</p>
-        <div class="emoji-picker-preview">
-          ${playerAvatarHtml(previewPlayer, "emoji-picker-preview__avatar")}
-          <span class="hint">Aperçu de ton avatar</span>
-        </div>
+      <div class="profile-account">
         ${
-          unlocked
-            ? `<input type="file" accept="image/*" hidden id="settings-avatar-file" />
-        <div class="settings-avatar-actions">
-          <button type="button" class="btn btn-secondary" id="btn-pick-avatar">${escapeHtml(
-            hasPhoto ? AVATAR_LABEL.change : AVATAR_LABEL.pick
-          )}</button>
-          <button type="button" class="btn btn-secondary" id="btn-remove-avatar"${
-            hasPhoto ? "" : " hidden"
-          }>${escapeHtml(AVATAR_LABEL.remove)}</button>
-        </div>
-        <p class="auth-error hidden" id="avatar-error"></p>
-        <p class="settings-ok hidden" id="avatar-ok"></p>`
-            : `<p class="hint settings-section__hint">${escapeHtml(AVATAR_LABEL.lockedHint)}</p>`
+          emailAccount
+            ? `
+        <details class="profile-account__item">
+          <summary class="profile-account__row">Mot de passe<span aria-hidden="true">›</span></summary>
+          <div class="profile-account__body">
+            <p class="hint settings-section__hint">Compte ${escapeHtml(user.email)}</p>
+            <label class="field-label" for="pwd-current">Mot de passe actuel</label>
+            <input type="password" class="field-input" id="pwd-current" autocomplete="current-password" />
+            <label class="field-label" for="pwd-new">Nouveau mot de passe</label>
+            <input type="password" class="field-input" id="pwd-new" autocomplete="new-password" placeholder="4 caractères min." />
+            <label class="field-label" for="pwd-confirm">Confirmer</label>
+            <input type="password" class="field-input" id="pwd-confirm" autocomplete="new-password" />
+            <p class="auth-error hidden" id="pwd-error"></p>
+            <p class="settings-ok hidden" id="pwd-ok">Mot de passe mis à jour.</p>
+            <button type="button" class="btn btn-primary btn--spaced" id="btn-save-password">Changer le mot de passe</button>
+          </div>
+        </details>`
+            : user.loggedIn
+              ? `<p class="hint settings-social-hint">Compte ${escapeHtml(user.provider || "social")} - le mot de passe se gère chez le fournisseur.</p>`
+              : ""
         }
-        ${profileEmojiPickerHtml(selectedEmoji, { includeSignatureExtras: !user?.isGuest, unlocked })}
-        <p class="auth-error hidden" id="emoji-error"></p>
-        <p class="settings-ok hidden" id="emoji-ok">Emoji enregistré.</p>
-        ${
-          unlocked
-            ? ""
-            : `<button type="button" class="btn btn-secondary btn--spaced" data-settings-goto="${TAB_FORFAITS}">Voir les forfaits</button>`
-        }
+        <button type="button" class="profile-account__row" data-nav="${HELP_LEGAL_SCREEN_ID}">${escapeHtml(HELP_LEGAL_LABEL)}<span aria-hidden="true">›</span></button>
+        ${profileLogoutSectionHtml(user)}
       </div>
-
-      ${
-        emailAccount
-          ? `
-      <div class="card settings-section">
-        <h2 class="settings-section__title">Mot de passe</h2>
-        <p class="hint settings-section__hint">Compte ${escapeHtml(user.email)}</p>
-        <label class="field-label" for="pwd-current">Mot de passe actuel</label>
-        <input type="password" class="field-input" id="pwd-current" autocomplete="current-password" />
-        <label class="field-label" for="pwd-new">Nouveau mot de passe</label>
-        <input type="password" class="field-input" id="pwd-new" autocomplete="new-password" placeholder="4 caractères min." />
-        <label class="field-label" for="pwd-confirm">Confirmer</label>
-        <input type="password" class="field-input" id="pwd-confirm" autocomplete="new-password" />
-        <p class="auth-error hidden" id="pwd-error"></p>
-        <p class="settings-ok hidden" id="pwd-ok">Mot de passe mis à jour.</p>
-        <button type="button" class="btn btn-primary btn--spaced" id="btn-save-password">Changer le mot de passe</button>
-      </div>`
-          : user.loggedIn
-            ? `<p class="hint settings-social-hint">Compte ${escapeHtml(user.provider || "social")} - le mot de passe se gère chez le fournisseur.</p>`
-            : ""
-      }
-      <button type="button" class="btn btn-secondary settings-party__btn" data-nav="${HELP_LEGAL_SCREEN_ID}">
-        ${escapeHtml(HELP_LEGAL_LABEL)}
-      </button>
-      ${profileLogoutSectionHtml(user)}
     </div>`;
 }
 
@@ -387,6 +508,8 @@ export function mountSettings(app) {
   const emailAccount = isEmailAccount();
 
   let selectedEmoji = getLocalEmoji();
+  /** Essai Signature sur la carte de profil (jamais enregistré). */
+  let profileTryOn = null;
   let activeTab = initialSettingsTab();
   let lastPartySnap = "";
   let lastLobbyActive = hasActiveLobby();
@@ -402,6 +525,7 @@ export function mountSettings(app) {
   function goToSettingsTab(tab) {
     if (!tab || tab === activeTab) return;
     if (tab === TAB_SOIREE && !hasActiveLobby()) return;
+    profileTryOn = null;
     activeTab = tab;
     paintTabChrome();
     swapActivePanel();
@@ -418,7 +542,7 @@ export function mountSettings(app) {
   function settingsPanelHtml(inLobby) {
     const user = getUser();
     if (activeTab === TAB_PERSONNALISATION) {
-      return personnalisationPanelHtml({ emailAccount, user, selectedEmoji });
+      return personnalisationPanelHtml({ emailAccount, user, selectedEmoji, tryOn: profileTryOn });
     }
     if (activeTab === TAB_FORFAITS) return forfaitsPanelHtml(user);
     if (activeTab === TAB_SOIREE) return soireePanelHtml(inLobby);
@@ -450,22 +574,45 @@ export function mountSettings(app) {
       };
     }
 
+    function bindProfileCardActions(root) {
+      root.querySelectorAll("[data-settings-goto]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          goToSettingsTab(btn.getAttribute("data-settings-goto"));
+        });
+      });
+      root.querySelector("[data-profile-try-cancel]")?.addEventListener("click", () => {
+        profileTryOn = null;
+        paintProfileCard();
+      });
+    }
+
+    /** Redessine la carte de joueur (pseudo, avatar, essai Signature). */
+    function paintProfileCard() {
+      const card = app.querySelector("#profile-card");
+      if (!card) return;
+      const wrap = document.createElement("div");
+      wrap.innerHTML = profileCardHtml(currentPreviewPlayer(), {
+        unlocked: isProfilePack(),
+        tryOn: profileTryOn,
+      }).trim();
+      const next = wrap.firstElementChild;
+      if (!next) return;
+      card.replaceWith(next);
+      bindNav(next);
+      bindProfileCardActions(next);
+    }
+
+    /** Essai d'une option Signature sur la carte, sans rien enregistrer. */
+    function tryOnProfile(patch) {
+      if (isProfilePack()) return;
+      profileTryOn = { ...(profileTryOn || {}), ...patch };
+      paintProfileCard();
+      app.querySelector("#profile-card")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+
     function refreshSignaturePreview() {
       const p = currentPreviewPlayer();
-      const box = app.querySelector("#settings-signature-preview");
-      if (box) {
-        const fresh = document.createElement("div");
-        fresh.innerHTML = signatureSelfPreviewHtml(p).trim();
-        const next = fresh.firstElementChild;
-        if (next) box.replaceWith(next);
-      }
-      const emojiPreview = app.querySelector(".emoji-picker-preview__avatar");
-      if (emojiPreview) {
-        const wrap = document.createElement("div");
-        wrap.innerHTML = playerAvatarHtml(p, "emoji-picker-preview__avatar");
-        const nextAv = wrap.firstElementChild;
-        if (nextAv) emojiPreview.replaceWith(nextAv);
-      }
+      paintProfileCard();
       const input = app.querySelector("#settings-name");
       if (input) {
         const hex = resolvedNameColorHex(p);
@@ -480,11 +627,11 @@ export function mountSettings(app) {
     app.querySelectorAll(".name-color-chip").forEach((btn) => {
       btn.addEventListener("click", async () => {
         if (!mount.isMounted()) return;
+        const colorId = btn.getAttribute("data-name-color");
         if (btn.getAttribute("data-signature-lock")) {
-          goToForfaitsTab();
+          tryOnProfile({ nameColor: colorId });
           return;
         }
-        const colorId = btn.getAttribute("data-name-color");
         const err = app.querySelector("#name-error");
         const ok = app.querySelector("#color-ok");
         const res = await updateProfileNameColor(colorId);
@@ -513,7 +660,7 @@ export function mountSettings(app) {
         const err = app.querySelector("#emoji-error");
         const ok = app.querySelector("#emoji-ok");
         if (isLockedSignatureEmojiClick(emoji, getUser())) {
-          goToForfaitsTab();
+          tryOnProfile({ emoji });
           return;
         }
         const res = await updateProfileEmoji(emoji);
@@ -529,6 +676,10 @@ export function mountSettings(app) {
 
         err?.classList.add("hidden");
         selectedEmoji = res.emoji;
+        if (profileTryOn?.emoji) {
+          const { emoji: _tried, ...rest } = profileTryOn;
+          profileTryOn = Object.keys(rest).length ? rest : null;
+        }
         app.querySelectorAll(".emoji-picker__btn").forEach((b) => {
           b.classList.toggle("emoji-picker__btn--active", b === btn);
         });
@@ -536,6 +687,19 @@ export function mountSettings(app) {
         ok?.classList.remove("hidden");
       });
     });
+
+    app.querySelectorAll("[data-profile-try-color]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        tryOnProfile({ nameColor: btn.getAttribute("data-profile-try-color") });
+      });
+    });
+    app.querySelectorAll("[data-profile-try-emoji]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const emoji = emojiFromUtf8Hex(btn.getAttribute("data-profile-try-emoji"));
+        if (emoji) tryOnProfile({ emoji });
+      });
+    });
+    bindProfileCardActions(app.querySelector("#profile-card") || app);
 
     function showAvatarStatus(okText, errText) {
       const err = app.querySelector("#avatar-error");

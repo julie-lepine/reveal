@@ -1324,3 +1324,414 @@ body[data-screen="lobby"] .page:has(.back) .container > .lobby-head:first-child{
 @media (prefers-reduced-motion: reduce){
   .chat-roulette__start{ animation:none; }
 }
+
+/* ═══ Menu > Profil : carte de joueur ═══
+   Carte en haut (avatar dans un anneau, pseudo en Anton, badge) ; pour un
+   joueur sans Signature : emplacement photo, stats floutées, essai des
+   options Signature sur la carte et vitrine 2 × 2. Modification repliée,
+   tuiles Amis / Carnet, bloc Compte discret. */
+.profile-card{
+  position:relative;
+  padding:22px 18px 18px;
+  border:2px solid transparent;
+  border-radius:24px;
+  text-align:center;
+  background:
+    linear-gradient(160deg, #1a1b3d, #0f1027) padding-box,
+    linear-gradient(145deg, var(--color-secondary), var(--color-primary) 55%, var(--color-ink)) border-box;
+}
+
+.profile-card--sig{
+  background:
+    linear-gradient(160deg, #1d1a3a, #120f27) padding-box,
+    linear-gradient(145deg, #f5d76e, var(--color-primary) 50%, var(--color-secondary)) border-box;
+  box-shadow:0 18px 40px -18px rgba(245,215,110,.45);
+}
+
+.profile-card__avatar-wrap{
+  position:relative;
+  width:104px;
+  margin:0 auto 12px;
+}
+
+.profile-card__ring{
+  width:104px;
+  height:104px;
+  box-sizing:border-box;
+  padding:4px;
+  border-radius:50%;
+  background:conic-gradient(from 0deg, var(--color-secondary), var(--color-primary), var(--color-secondary));
+}
+
+.profile-card--sig .profile-card__ring,
+.profile-card--trying .profile-card__ring{
+  background:conic-gradient(from 0deg, #f5d76e, var(--color-primary), var(--color-secondary), #f5d76e);
+  animation:profile-ring-spin 6s linear infinite;
+}
+
+.profile-card__avatar{
+  position:relative;
+  display:grid;
+  place-items:center;
+  width:100%;
+  height:100%;
+  overflow:hidden;
+  border-radius:50%;
+  background:#16173a;
+  font-size:52px;
+  line-height:1;
+}
+
+/* L'anneau tourne, pas l'avatar ; la bague dorée historique est remplacée. */
+.profile-card--sig .profile-card__avatar,
+.profile-card--trying .profile-card__avatar{
+  animation:profile-ring-spin 6s linear infinite reverse;
+}
+
+.profile-card__avatar.signature-ring{ box-shadow:none; }
+
+@keyframes profile-ring-spin{ to{ transform:rotate(360deg); } }
+
+@media (prefers-reduced-motion: reduce){
+  .profile-card__ring,
+  .profile-card__avatar{ animation:none !important; }
+}
+
+.profile-card__photo-slot{
+  position:absolute;
+  right:-4px;
+  bottom:2px;
+  display:grid;
+  place-items:center;
+  width:34px;
+  height:34px;
+  border:2px solid var(--color-bg);
+  border-radius:50%;
+  background:#23264a;
+  font-size:15px;
+}
+
+.profile-card__name{
+  margin:0;
+  font-family:var(--font-display);
+  font-size:38px;
+  line-height:1.05;
+  text-transform:uppercase;
+  transform:skewX(var(--display-skew));
+  color:#fff;
+  overflow-wrap:anywhere;
+  transition:color .25s;
+}
+
+.profile-card__badge{
+  display:inline-flex;
+  align-items:center;
+  gap:5px;
+  margin:10px 0 0;
+  padding:4px 10px;
+  border-radius:var(--r-pill);
+  background:rgba(255,255,255,.07);
+  color:#c9cbe0;
+  font-size:11px;
+  font-weight:800;
+  line-height:1;
+  letter-spacing:.08em;
+  text-transform:uppercase;
+}
+
+.profile-card__badge--sig{
+  background:linear-gradient(135deg, #f5d76e, #fbbf24);
+  color:#1b1404;
+}
+
+.profile-card__badge--try{
+  background:linear-gradient(135deg, var(--color-secondary), var(--color-primary));
+  color:#fff;
+}
+
+.profile-card__stats{
+  position:relative;
+  display:grid;
+  grid-template-columns:repeat(3, 1fr);
+  gap:6px;
+  margin:16px 0 0;
+}
+
+.profile-card__stat{
+  padding:10px 4px;
+  border-radius:14px;
+  background:rgba(255,255,255,.05);
+}
+
+.profile-card__stat b{
+  display:block;
+  font-size:18px;
+  font-weight:800;
+  line-height:1;
+  color:#fff;
+  filter:blur(5px);
+  opacity:.7;
+}
+
+.profile-card__stat span{
+  display:block;
+  margin-top:5px;
+  font-size:11px;
+  color:rgba(255,255,255,.6);
+}
+
+.profile-card__stats-lock{
+  position:absolute;
+  inset:0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:6px;
+  border:0;
+  border-radius:14px;
+  background:rgba(9,10,26,.35);
+  color:#fff;
+  font:inherit;
+  font-size:13px;
+  font-weight:800;
+  cursor:pointer;
+}
+
+.profile-card__try{
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+  margin:14px 0 0;
+}
+
+.profile-card__try p{
+  margin:0;
+  font-size:12.5px;
+  color:rgba(255,255,255,.7);
+}
+
+.profile-card__try .btn{ margin:0; }
+
+.profile-card__try-cancel{
+  border:0;
+  background:none;
+  color:#c4b5fd;
+  font:inherit;
+  font-size:13px;
+  font-weight:700;
+  cursor:pointer;
+}
+
+.profile-section-title{
+  margin:24px 0 10px;
+  font-family:var(--font-display);
+  font-size:24px;
+  font-weight:400;
+  text-transform:uppercase;
+  transform:skewX(var(--display-skew));
+  color:#fff;
+}
+
+/* Vitrine Signature 2 × 2 */
+.profile-perks{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+}
+
+.profile-perk{
+  display:flex;
+  flex-direction:column;
+  align-items:flex-start;
+  gap:8px;
+  padding:14px 12px;
+  border:1.5px solid transparent;
+  border-radius:18px;
+  background:
+    linear-gradient(160deg, #1d1a3a, #120f27) padding-box,
+    linear-gradient(145deg, #f5d76e, var(--color-primary) 55%, var(--color-secondary)) border-box;
+  color:#fff;
+  font:inherit;
+  text-align:left;
+  cursor:pointer;
+}
+
+.profile-perk__demo{
+  display:grid;
+  place-items:center;
+  width:100%;
+  height:54px;
+  border-radius:12px;
+  background:rgba(255,255,255,.05);
+  font-size:24px;
+}
+
+.profile-perk__demo--name{
+  overflow:hidden;
+  font-family:var(--font-display);
+  font-size:22px;
+  text-transform:uppercase;
+  transform:skewX(var(--display-skew));
+  white-space:nowrap;
+  text-overflow:ellipsis;
+}
+
+.profile-perk b{ font-size:13px; line-height:1.2; }
+
+.profile-perk small{
+  font-size:11.5px;
+  line-height:1.3;
+  color:rgba(255,255,255,.6);
+}
+
+.profile-perk__try{
+  font-size:12px;
+  font-weight:800;
+  color:#f5d76e;
+}
+
+/* Modifier mon profil (replié) */
+.profile-edit{ margin:14px 0 0; }
+
+.profile-edit__summary{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:14px 16px;
+  border-radius:16px;
+  background:var(--surface-2);
+  color:#fff;
+  font-size:14px;
+  font-weight:800;
+  list-style:none;
+  cursor:pointer;
+}
+
+.profile-edit__summary::-webkit-details-marker{ display:none; }
+
+.profile-edit__summary span{ transition:transform .2s; }
+
+.profile-edit[open] .profile-edit__summary{ border-radius:16px 16px 0 0; }
+
+.profile-edit[open] .profile-edit__summary span{ transform:rotate(180deg); }
+
+.profile-edit__body{
+  padding:14px;
+  border-radius:0 0 16px 16px;
+  background:rgba(255,255,255,.03);
+}
+
+.profile-edit__name-row{
+  display:flex;
+  gap:8px;
+}
+
+.profile-edit__name-row .field-input{ margin:0; min-width:0; }
+
+.profile-edit__name-row .btn{
+  width:auto;
+  margin:0;
+  padding:0 18px;
+}
+
+.profile-edit__body .field-label{ margin-top:16px; }
+
+.profile-edit__body .field-label:first-child{ margin-top:0; }
+
+.profile-edit__more{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  width:100%;
+  margin:10px 0 0;
+  padding:10px 12px;
+  border:1px dashed rgba(245,215,110,.4);
+  border-radius:14px;
+  background:none;
+  color:#f5d76e;
+  font:inherit;
+  font-size:12.5px;
+  font-weight:700;
+  text-align:left;
+  cursor:pointer;
+}
+
+.profile-edit__more span{ font-size:18px; letter-spacing:2px; }
+
+/* Tuiles Amis / Carnet */
+.profile-tiles{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+  margin:22px 0 0;
+}
+
+.profile-tiles .profile-tile{
+  display:flex;
+  flex-direction:column;
+  align-items:flex-start;
+  gap:6px;
+  min-height:0;
+  margin:0;
+  padding:14px;
+  border-radius:18px;
+  text-align:left;
+}
+
+.profile-tile__icon{
+  position:relative;
+  font-size:22px;
+  line-height:1;
+}
+
+.profile-tile__label{ font-size:14px; }
+
+.profile-tile__lock{
+  font-size:11.5px;
+  font-weight:700;
+  color:#f5d76e;
+}
+
+/* Compte : lignes discrètes */
+.profile-account{
+  margin:22px 0 0;
+  overflow:hidden;
+  border:1px solid rgba(255,255,255,.06);
+  border-radius:18px;
+  background:rgba(255,255,255,.03);
+}
+
+.profile-account > * + *{ border-top:1px solid rgba(255,255,255,.06); }
+
+.profile-account__row,
+.profile-account .settings-party__btn{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  width:100%;
+  min-height:0;
+  margin:0;
+  padding:14px 16px;
+  border:0;
+  border-radius:0;
+  background:none;
+  box-shadow:none;
+  color:rgba(255,255,255,.8);
+  font:inherit;
+  font-size:14px;
+  font-weight:700;
+  text-align:left;
+  list-style:none;
+  cursor:pointer;
+}
+
+.profile-account__row::-webkit-details-marker{ display:none; }
+
+.profile-account .settings-party__btn--danger{ color:#fb7185; }
+
+.profile-account__body{ padding:0 16px 16px; }
+
+.profile-account .settings-social-hint{ margin:0; padding:14px 16px; }
+
+/* « Retirer la photo » masqué tant qu’il n’y a pas de photo (.btn écrasait hidden). */
+.settings-avatar-actions .btn[hidden]{ display:none; }
