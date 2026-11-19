@@ -157,6 +157,9 @@ export async function markClutchLobbyStarted({ rosterNames } = {}) {
 /** Message de l'hôte quand « Manche suivante » n'a pas pu être envoyée. */
 export const CLUTCH_NEXT_ROUND_FAILED_LABEL = "La manche suivante n’est pas partie, réessaie !";
 
+/** Message de l'hôte quand « Voir les résultats » (fin de partie) n'a pas pu être envoyé. */
+export const CLUTCH_FINISH_FAILED_LABEL = "Les résultats ne sont pas partis, réessaie !";
+
 /**
  * Lance la manche suivante. Si l'envoi échoue, le téléphone de l'hôte revient à la
  * manche affichée chez tout le monde (sinon il la lançait seul au prochain événement).

@@ -16,6 +16,7 @@ import {
   startClutchRound,
   getClutchParticipantNames,
   CLUTCH_NEXT_ROUND_FAILED_LABEL,
+  CLUTCH_FINISH_FAILED_LABEL,
 } from "../core/clutchSession.js";
 import {
   CLUTCH_TAP_FAILED_LABEL,
@@ -79,6 +80,8 @@ export function mountClutch(app) {
   let revealRetrying = false;
   /** Hôte : le dernier « Manche suivante » n'est pas parti (message sous le bouton). */
   let nextRoundFailed = false;
+  /** Hôte : la fin de partie (« Voir les résultats ») n'est pas partie. */
+  let finishFailed = false;
 
   let localStart = null;
   let countdownEndsAt = null;
@@ -529,6 +532,10 @@ export function mountClutch(app) {
               nextRoundFailed
                 ? `<p class="hint">${escapeHtml(CLUTCH_NEXT_ROUND_FAILED_LABEL)}</p>`
                 : ""
+            }${
+              finishFailed
+                ? `<p class="hint">${escapeHtml(CLUTCH_FINISH_FAILED_LABEL)}</p>`
+                : ""
             }`
           : `<p class="hint">En attente de l'hôte pour la suite…</p>`
       }
@@ -666,10 +673,13 @@ export function mountClutch(app) {
             await completeGameSession({ gameId: "clutch", screen: "results", state: {} });
             ensurePostGameScreen("results", { from: "clutch", gameId: "clutch" });
           } catch (e) {
+            // Fin de partie pas enregistrée : l'hôte reste sur le verdict (comme les
+            // invités) et peut réessayer. Avant, il partait seul aux résultats.
             console.warn("REVEAL completeGameSession:", e);
             if (!mount.isMounted()) return;
             if (!mount.isCurrentMount()) return;
-            navigate("results", { navStack: ["home", "lobby", "game-select", "results"] });
+            finishFailed = true;
+            render();
           }
         } else {
           if (!mount.isMounted()) return;
