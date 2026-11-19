@@ -47,6 +47,9 @@ import {
 } from "../core/gameSync.js";
 import { arch03LiveLog } from "../core/presenceUiLive.js";
 
+/** Pastille « X a tapé ! » (une ligne au-dessus du bouton) : emojis affichés au plus. */
+const CLUTCH_MAX_TAPPED_FACES = 5;
+
 export function mountClutch(app) {
   if (!requireLobbyPlay()) return null;
 
@@ -140,15 +143,25 @@ export function mountClutch(app) {
    */
   function tappedChipsHtml(showBlind) {
     if (!showBlind) return "";
-    const names = tappedNames();
+    // Dernier tap en premier : c'est lui qui met la pression.
+    const names = tappedNames().sort((a, b) => (taps[b]?.at || 0) - (taps[a]?.at || 0));
     if (!names.length) return "";
-    return names
-      .map((n) => {
-        const meta = playerMeta(n);
-        const label = n === localName ? "Toi" : n;
-        return `<span class="clutch-chip" style="--clutch-chip:${meta.color}">${meta.emoji} ${escapeHtml(label)} a tapé&nbsp;!</span>`;
-      })
+    if (names.length === 1) {
+      const n = names[0];
+      const meta = playerMeta(n);
+      const label = n === localName ? "Toi" : n;
+      return `<span class="clutch-chip" style="--clutch-chip:${meta.color}">${meta.emoji} <span class="clutch-chip__name">${escapeHtml(label)}</span>${n === localName ? "as" : "a"} tapé&nbsp;!</span>`;
+    }
+    // Plusieurs taps : une seule pastille sur une ligne (place réservée, le bouton
+    // ne bouge pas) : emojis + dernier pseudo + « et N autres ».
+    const latest = names.find((n) => n !== localName) || names[0];
+    const meta = playerMeta(latest);
+    const faces = names
+      .slice(0, CLUTCH_MAX_TAPPED_FACES)
+      .map((n) => playerMeta(n).emoji)
       .join("");
+    const others = names.length - 1;
+    return `<span class="clutch-chip clutch-chip--group" style="--clutch-chip:${meta.color}"><span class="clutch-chip__faces" aria-hidden="true">${faces}</span> <span class="clutch-chip__name">${escapeHtml(latest)}</span>et ${others} autre${others > 1 ? "s" : ""} ont tapé&nbsp;!</span>`;
   }
 
   function refreshTappedChips() {
@@ -424,6 +437,7 @@ export function mountClutch(app) {
         <p class="label-upper label-upper--gold">🎯 Objectif : ${escapeHtml(targetLabel)}</p>
         <p id="clutch-clock" class="clutch-clock" style="font-variant-numeric:tabular-nums">${escapeHtml(clockText)}</p>
         <p class="hint" id="clutch-clock-sub">${escapeHtml(clockSub)}</p>
+        <div class="clutch-tapped" id="clutch-tapped">${tappedChipsHtml(hidden)}</div>
       </div>
       <button type="button" id="clutch-target" class="${btnClasses}"
         ${btnDisabled ? "disabled" : ""}
@@ -434,7 +448,6 @@ export function mountClutch(app) {
           box-shadow:0 12px 40px rgba(255,60,172,.35);opacity:${(localWindowClosed && !tapped) || counting ? ".5" : "1"}">
         ${tapped ? "✓ Tapé" : "TAP !"}
       </button>
-      <div class="clutch-tapped" id="clutch-tapped">${tappedChipsHtml(hidden)}</div>
       <p class="hint" style="text-align:center">${escapeHtml(status)}</p>`;
   }
 

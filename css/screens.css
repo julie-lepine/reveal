@@ -521,6 +521,34 @@ body[data-screen="home"] .lobby-actions__intro{ margin:28px 0 14px; }
   -webkit-tap-highlight-color:transparent;
 }
 
+/* Pastilles « X a tapé ! » au-dessus du bouton : place réservée sur une ligne
+   dès le début de la manche, pour que le bouton TAP ne bouge jamais. */
+.clutch-tapped,
+.clutch-tapped:empty{
+  flex-wrap:nowrap;
+  height:28px;
+  min-height:28px;
+  margin-top:.6rem;
+  overflow:hidden;
+}
+
+.clutch-tapped .clutch-chip{
+  flex:0 1 auto;
+  min-width:0;
+  max-width:100%;
+  white-space:nowrap;
+}
+
+.clutch-chip__faces{ letter-spacing:-.15em; }
+
+/* Seul le pseudo est raccourci : « a tapé ! » reste lisible. */
+.clutch-chip__name{
+  min-width:0;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+
+
 /* Guess The Lie : choix de la lettre du mensonge. */
 .lie-pick{
   font-family:var(--font-display);

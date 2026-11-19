@@ -22,11 +22,16 @@ describe("Clutch : tap à l'appui", () => {
     assert.doesNotMatch(src, /#clutch-target"\)\?\.addEventListener\("click", \(\) =>/);
   });
 
-  it("les pastilles « a tapé » sont sous le bouton (le bouton ne bouge plus)", () => {
+  it("pastilles « a tapé » au-dessus du bouton, sur une ligne réservée (le bouton ne bouge pas)", () => {
     const active = src.slice(src.indexOf("function activeHtml"), src.indexOf("function revealHtml"));
     const btnAt = active.indexOf('id="clutch-target"');
     const chipsAt = active.indexOf('id="clutch-tapped"');
-    assert.ok(btnAt > 0 && chipsAt > btnAt);
+    assert.ok(chipsAt > 0 && btnAt > chipsAt);
+    assert.match(src, /const CLUTCH_MAX_TAPPED_FACES = 5;/);
+    assert.match(src, /clutch-chip--group/);
+    assert.match(src, /ont tapé&nbsp;!/);
+    const css = readFileSync(join(__dirname, "../css/screens.css"), "utf8");
+    assert.match(css, /\.clutch-tapped:empty\{[\s\S]*?height:28px;/);
   });
 
   it("échec d'envoi : bouton rouvert et message clair", () => {
