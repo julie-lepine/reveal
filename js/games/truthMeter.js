@@ -41,6 +41,7 @@ import {
 } from "../core/gameScores.js";
 import { getActivePlayers } from "../core/players.js";
 import { getLocalDisplayName, recordTruthMeterPlayed, setLastGame } from "../core/state.js";
+import { POST_GAME_FINISH_FAILED_LABEL } from "../core/postGameFinish.js";
 import { setLobbyPlaying, setLobbyWaiting } from "../core/lobby.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
 import { createMountGuard } from "../core/mountLifecycle.js";
@@ -208,6 +209,8 @@ export function mountTruthMeter(app) {
   let displayTimeoutId = null;
   let revealPendingTimeoutId = null;
   let nextRoundInFlight = false;
+  /** Hôte : la fin de partie n'est pas partie (message sous le bouton). */
+  let finishFailed = false;
   let revealInFlight = false;
   let authorFocusRound = -1;
   let suppressAuthorAutoFocus = false;
@@ -735,7 +738,7 @@ export function mountTruthMeter(app) {
           phaseHtml += `
           <button type="button" class="btn btn-secondary btn--spaced" id="truth-skip-author">
             Passer cet auteur (absent)
-          </button>`;
+          </button>${finishFailedHtml()}`;
         }
       }
     }
@@ -834,7 +837,7 @@ export function mountTruthMeter(app) {
           host
             ? `<button type="button" class="btn btn-primary btn--spaced" id="next-round">
           ${roundIdx < total - 1 ? "Joueur suivant →" : "Voir les résultats →"}
-        </button>`
+        </button>${finishFailedHtml()}`
             : `<p class="hint">En attente de l'hôte…</p>`
         }
         </div>
@@ -1016,6 +1019,8 @@ export function mountTruthMeter(app) {
           if (!mount.isMounted()) return;
           if (!mount.isCurrentMount()) return;
           if (!res?.ok) {
+            // Dernier auteur passé mais fin de partie pas enregistrée : message.
+            if (res?.reason === "complete-failed") finishFailed = true;
             tm02QaLog("skip-rejected", {
               runId: getTruthMeterSession().runId,
               phase,
@@ -1151,6 +1156,11 @@ export function mountTruthMeter(app) {
     }, TRUTH_METER_DISPLAY_SEC * 1000);
   }
 
+  /** Message sous le bouton de fin quand la fin de partie n'est pas partie. */
+  function finishFailedHtml() {
+    return finishFailed ? `<p class="hint">${escapeHtml(POST_GAME_FINISH_FAILED_LABEL)}</p>` : "";
+  }
+
   async function onNextRound() {
     if (nextRoundInFlight) return;
     if (mp && !canActAsHost()) return;
@@ -1197,7 +1207,15 @@ export function mountTruthMeter(app) {
         render();
       } else {
         if (mp) {
-          await finishTruthMeterGameSession();
+          const finished = await finishTruthMeterGameSession();
+          if (!finished.ok) {
+            // Fin de partie pas enregistrée : l'hôte reste sur le verdict (comme les
+            // invités) et peut réessayer.
+            if (!mount.isMounted()) return;
+            if (!mount.isCurrentMount()) return;
+            finishFailed = true;
+            render();
+          }
         } else {
           if (!mount.isMounted()) return;
           if (!mount.isCurrentMount()) return;
