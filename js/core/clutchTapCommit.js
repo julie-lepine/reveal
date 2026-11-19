@@ -193,3 +193,21 @@ export function simulateClutchTapCommitCycle({
     sent,
   };
 }
+
+/**
+ * Faut-il annoncer le verdict de la manche maintenant (appelé à chaque maj de session) ?
+ * Oui si ce téléphone peut agir en hôte, la manche est en cours, et soit tout le monde
+ * a tapé, soit le délai de tap est déjà écoulé ici. Le 2e cas couvre l'hôte parti en
+ * pleine manche : le remplaçant est désigné après la fin du délai, l'hôte parti n'a
+ * pas tapé, et sans ça personne n'annonçait le verdict (invités bloqués).
+ */
+export function shouldHostRevealClutchRound({
+  phase,
+  canActAsHost,
+  allTapsIn,
+  localWindowClosed,
+}) {
+  if (phase !== "active") return false;
+  if (!canActAsHost) return false;
+  return Boolean(allTapsIn) || Boolean(localWindowClosed);
+}

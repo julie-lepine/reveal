@@ -20,6 +20,7 @@ import {
   CLUTCH_TAP_FAILED_LABEL,
   resolveClutchTapCommitFailureUi,
   preferInFlightClutchTap,
+  shouldHostRevealClutchRound,
 } from "../core/clutchTapCommit.js";
 import { awardClutchRound } from "../core/scoring.js";
 import { applyMatchScoreDeltas, gameCumulativeScoresHtml, refreshGameScoresBox } from "../core/gameScores.js";
@@ -649,7 +650,16 @@ export function mountClutch(app) {
     );
     syncFromSession();
     ensureRoundTiming();
-    if (phase === "active" && canActAsHost() && allClutchTapsIn()) {
+    // Hôte (ou remplaçant désigné après la fin du délai) : verdict si tout le monde
+    // a tapé ou si le délai est écoulé ici. Sinon l'hôte parti bloquait la manche.
+    if (
+      shouldHostRevealClutchRound({
+        phase,
+        canActAsHost: canActAsHost(),
+        allTapsIn: allClutchTapsIn(),
+        localWindowClosed,
+      })
+    ) {
       lastAckedActingHostToken = ahTokenNow;
       void goToReveal();
       return;
