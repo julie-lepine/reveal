@@ -41,6 +41,7 @@ import {
   replayTierNightLiveAfterSeriesEnd,
 } from "../core/tierNightSeriesExitNav.js";
 import { EXIT_GAME_LABEL } from "../core/exitGame.js";
+import { POST_GAME_FINISH_FAILED_LABEL } from "../core/postGameFinish.js";
 import { resolveControversialItemForDisplay } from "../core/tierNightControversialDisplay.js";
 import { enterTierNightLivePrep } from "../core/tierNightLivePrepSession.js";
 import { TIER_NIGHT_LIVE_SERIES_PHASE_END } from "../core/tierNightLiveSeriesRuntime.js";
@@ -213,6 +214,8 @@ export function mountTierNightEnd(app) {
   let recaps = getTierNightRecaps();
   const localName = getLocalDisplayName();
   let bootstrapping = false;
+  /** Hôte : la fin de partie (« Voir les résultats ») n'est pas partie. */
+  let finishFailed = false;
 
   function reloadSession() {
     session = getTierNightSession();
@@ -321,12 +324,16 @@ export function mountTierNightEnd(app) {
       if (isLobbyHost()) {
         try {
           await completeGameSession({ gameId: "tiernight", screen: "results", state: {} });
+          finishFailed = false;
           ensurePostGameScreen("results", { from: "tiernight-end", gameId: "tiernight" });
         } catch (e) {
+          // Fin de partie pas enregistrée : l'hôte reste sur le récap et peut
+          // réessayer. Avant, il partait seul aux résultats.
           console.warn("REVEAL completeGameSession:", e);
           if (!mount.isMounted()) return;
           if (!mount.isCurrentMount()) return;
-          navigate("results", resultsNav);
+          finishFailed = true;
+          render();
         }
       } else {
         suppressSessionRoute(120000);
@@ -418,7 +425,11 @@ export function mountTierNightEnd(app) {
     // FEATURE-TIERNIGHT-04F — CTAs fin live sans emojis.
     const primaryCta = isSeriesEnd
       ? eveningRecapOtherGameButtonHtml({ id: "btn-tiernight-end-continue" })
-      : `<button type="button" class="btn btn-primary" data-nav="results">Voir les résultats →</button>`;
+      : `<button type="button" class="btn btn-primary" data-nav="results">Voir les résultats →</button>${
+          finishFailed && realHost
+            ? `<p class="hint">${escapeHtml(POST_GAME_FINISH_FAILED_LABEL)}</p>`
+            : ""
+        }`;
     const liveRestartHtml =
       liveEnd && realHost
         ? `<button type="button" class="btn btn-secondary btn--spaced evening-recap__restart" id="btn-tiernight-live-restart">Recommencer une partie</button>`
