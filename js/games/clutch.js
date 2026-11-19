@@ -15,6 +15,7 @@ import {
   rankClutchResults,
   startClutchRound,
   getClutchParticipantNames,
+  CLUTCH_NEXT_ROUND_FAILED_LABEL,
 } from "../core/clutchSession.js";
 import {
   CLUTCH_TAP_FAILED_LABEL,
@@ -76,6 +77,8 @@ export function mountClutch(app) {
   let revealInFlight = false;
   /** Hôte : l'envoi des résultats a échoué, relance automatique en cours. */
   let revealRetrying = false;
+  /** Hôte : le dernier « Manche suivante » n'est pas parti (message sous le bouton). */
+  let nextRoundFailed = false;
 
   let localStart = null;
   let countdownEndsAt = null;
@@ -320,6 +323,7 @@ export function mountClutch(app) {
         blindVibrated = false;
         revealRetry.stop();
         revealRetrying = false;
+        nextRoundFailed = false;
         clearCopyTimer();
         clearGrace();
       }
@@ -521,7 +525,11 @@ export function mountClutch(app) {
         host
           ? `<button type="button" class="btn btn-primary btn--spaced" id="next-round">
               ${roundIdx < totalRounds - 1 ? "Manche suivante →" : "Voir les résultats →"}
-            </button>`
+            </button>${
+              nextRoundFailed
+                ? `<p class="hint">${escapeHtml(CLUTCH_NEXT_ROUND_FAILED_LABEL)}</p>`
+                : ""
+            }`
           : `<p class="hint">En attente de l'hôte pour la suite…</p>`
       }
       </div>
@@ -629,7 +637,18 @@ export function mountClutch(app) {
 
     app.querySelector("#next-round")?.addEventListener("click", withClickLock(async () => {
       if (roundIdx < totalRounds - 1) {
-        await startClutchRound(roundIdx + 1);
+        try {
+          await startClutchRound(roundIdx + 1);
+        } catch (e) {
+          // Rien n'est parti : l'hôte reste sur le verdict, comme les invités.
+          console.warn("REVEAL clutch manche suivante:", e);
+          if (!mount.isMounted()) return;
+          if (!mount.isCurrentMount()) return;
+          nextRoundFailed = true;
+          render();
+          return;
+        }
+        nextRoundFailed = false;
         if (!mount.isMounted()) return;
         if (!mount.isCurrentMount()) return;
         syncFromSession();
