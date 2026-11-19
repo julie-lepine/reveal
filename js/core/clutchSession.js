@@ -16,7 +16,7 @@ import {
 } from "./gameSync.js";
 import { formatSyncErrorMessage } from "./authErrors.js";
 import { launchGameWithSync, commitHostGamePlay, commitPrepReadyToggle } from "./mpLaunch.js";
-import { freezeClutchTap } from "./clutchTapCommit.js";
+import { freezeClutchTap, sameClutchTap } from "./clutchTapCommit.js";
 import {
   computeOptimisticMapEntryApply,
   rollbackOptimisticMapEntry,
@@ -213,8 +213,9 @@ export async function commitClutchTap(tapInput) {
   });
   saveStatePatch({ clutchGame: { ...session, taps: apply.nextMap } });
   if (!isGameSyncActive()) return resolved;
-  const uid = requireLocalParticipantUid();
   try {
+    // Dans le try : si l'identifiant manque, le tap local est annulé comme un échec réseau.
+    const uid = requireLocalParticipantUid();
     await patchGameState({ clutch: { taps: { [uid]: resolved } } });
     return resolved;
   } catch (err) {
@@ -231,6 +232,7 @@ export async function commitClutchTap(tapInput) {
         optimisticValue: apply.optimisticValue,
         attemptId,
         currentAttemptId: clutchTapAttemptId,
+        valuesEqual: sameClutchTap,
       });
       if (rolled.applied) {
         saveStatePatch({ clutchGame: { ...live, taps: rolled.map } });

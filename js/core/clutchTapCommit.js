@@ -1,6 +1,17 @@
 /** Message quand l'envoi du tap échoue : le bouton est rouvert, il faut retaper. */
 export const CLUTCH_TAP_FAILED_LABEL = "Ton tap n’est pas parti, retape !";
 
+/**
+ * Même tap si même contenu (ms, at). La synchro recopie la map des taps
+ * (mergeClutchTapsFrozen) : comparer par identité ratait l'annulation après
+ * un échec réseau, et le joueur restait bloqué sur « ✓ Tapé ».
+ */
+export function sameClutchTap(a, b) {
+  if (a === b) return true;
+  if (!a || !b || typeof a !== "object" || typeof b !== "object") return false;
+  return a.ms === b.ms && (a.at ?? null) === (b.at ?? null);
+}
+
 /** Fige le tap capturé au clic (aucun recalcul de ms/at). */
 import {
   computeOptimisticMapEntryApply,
@@ -139,6 +150,7 @@ export function simulateClutchTapCommitCycle({
       hadPreviousValue: first.hadPreviousValue,
       previousValue: first.previousValue,
       optimisticValue: first.optimisticValue,
+      valuesEqual: sameClutchTap,
     });
     if (rolled.applied) taps = rolled.map;
     const ui = resolveClutchTapCommitFailureUi();
