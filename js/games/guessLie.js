@@ -21,6 +21,7 @@ import {
 } from "../core/gameSync.js";
 import { arch03AhLogSkipDecision } from "../core/arch03ActingHostDebug.js";
 import { getLocalDisplayName, recordGuessLieRoundStats, recordGuessLiePlayed, setLastGame } from "../core/state.js";
+import { POST_GAME_FINISH_FAILED_LABEL } from "../core/postGameFinish.js";
 import { awardGuessLieRound, guessLieLiarWins } from "../core/scoring.js";
 import { gameCumulativeScoresHtml, refreshGameScoresBox } from "../core/gameScores.js";
 import { setLobbyPlaying, setLobbyWaiting } from "../core/lobby.js";
@@ -85,6 +86,8 @@ export function mountGuessLie(app) {
   let roundScored = false;
   let revealResult = null;
   let revealAdvancing = false;
+  /** Hôte : la fin de partie (« Voir les résultats ») n'est pas partie. */
+  let finishFailed = false;
   const localName = getLocalDisplayName();
   resetGuessLieIdentityDebugDedupe();
 
@@ -267,12 +270,16 @@ export function mountGuessLie(app) {
       if (mp) {
         try {
           await completeGameSession({ gameId: "guesslie", screen: "results", state: {} });
+          finishFailed = false;
           ensurePostGameScreen("results", { from: "guesslie", gameId: "guesslie" });
         } catch (e) {
+          // Fin de partie pas enregistrée : l'hôte reste sur le verdict (comme les
+          // invités) et peut réessayer. Avant, il partait seul aux résultats.
           console.warn("REVEAL completeGameSession:", e);
           if (!mount.isMounted()) return;
           if (!mount.isCurrentMount()) return;
-          navigate("results", { navStack: ["home", "lobby", "game-select", "results"] });
+          finishFailed = true;
+          render();
         }
       } else {
         setLobbyWaiting();
@@ -485,7 +492,11 @@ export function mountGuessLie(app) {
           !mp || canActAsHost()
             ? `<button type="button" class="btn btn-primary btn--spaced" id="next-round">
           ${roundIdx >= total - 1 ? "Voir les résultats →" : "Manche suivante →"}
-        </button>`
+        </button>${
+              finishFailed
+                ? `<p class="hint">${escapeHtml(POST_GAME_FINISH_FAILED_LABEL)}</p>`
+                : ""
+            }`
             : `<p class="hint">En attente de l'hôte pour la suite…</p>`
         }
         </div>
