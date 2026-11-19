@@ -1927,3 +1927,383 @@ body[data-screen="lobby"] .page:has(.back) .container > .lobby-head:first-child{
 .friends-recent__item .btn-primary.btn--compact{
   background:var(--btn-sheen), linear-gradient(135deg, var(--color-secondary), var(--color-primary));
 }
+
+/* ═══ Carnet : carte en haut, Tes chiffres, frise des soirées ═══ */
+/* Carte de collection (version écran de la carte partagée). */
+.carnet-card{
+  position:relative;
+  width:min(100%, 268px);
+  margin:4px auto 0;
+  padding:16px 14px 14px;
+  box-sizing:border-box;
+  border:3px solid transparent;
+  border-radius:26px;
+  text-align:center;
+  background:
+    linear-gradient(160deg, #1d1a3a, #120f27) padding-box,
+    linear-gradient(145deg, #f5d76e, var(--color-primary) 50%, var(--color-secondary)) border-box;
+  box-shadow:0 18px 40px -16px rgba(245,215,110,.4);
+}
+
+.carnet-card__top{
+  display:flex;
+  justify-content:space-between;
+  font-size:10px;
+  font-weight:800;
+  letter-spacing:.14em;
+  text-transform:uppercase;
+  color:#f5d76e;
+}
+
+.carnet-card__ring{
+  width:80px;
+  height:80px;
+  margin:8px auto 0;
+  padding:4px;
+  box-sizing:border-box;
+  border-radius:50%;
+  background:conic-gradient(from 0deg, #f5d76e, var(--color-primary), var(--color-secondary), #f5d76e);
+}
+
+.carnet-card__avatar{
+  position:relative;
+  display:grid;
+  place-items:center;
+  width:100%;
+  height:100%;
+  overflow:hidden;
+  border-radius:50%;
+  background:#16173a;
+  font-size:40px;
+  line-height:1;
+}
+
+.carnet-card__photo{
+  position:absolute;
+  inset:0;
+  width:100%;
+  height:100%;
+  object-fit:cover;
+}
+
+.carnet-card__name{
+  margin:8px 0 0;
+  overflow:hidden;
+  font-family:var(--font-display);
+  font-size:32px;
+  line-height:1.05;
+  text-transform:uppercase;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  transform:skewX(var(--display-skew));
+  color:#fff;
+}
+
+.carnet-card__badge{
+  display:inline-block;
+  margin:6px 0 0;
+  padding:3px 10px;
+  border-radius:var(--r-pill);
+  background:linear-gradient(135deg, #f5d76e, #fbbf24);
+  color:#1b1404;
+  font-size:10px;
+  font-weight:800;
+  letter-spacing:.08em;
+  text-transform:uppercase;
+}
+
+.carnet-card__hook{
+  margin:7px 0 0;
+  font-size:13px;
+  font-weight:800;
+  color:#f5d76e;
+}
+
+.carnet-card__stats{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:6px;
+  margin:10px 0 0;
+  text-align:left;
+}
+
+.carnet-card__stats > div{
+  min-width:0;
+  padding:8px 10px;
+  border-radius:10px;
+  background:rgba(255,255,255,.06);
+}
+
+.carnet-card__stats b{
+  display:block;
+  overflow:hidden;
+  font-family:var(--font-display);
+  font-weight:400;
+  font-size:24px;
+  line-height:1.05;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  transform:skewX(var(--display-skew));
+  background:linear-gradient(135deg, var(--color-secondary-soft, #818cf8), var(--color-primary));
+  -webkit-background-clip:text;
+  background-clip:text;
+  -webkit-text-fill-color:transparent;
+}
+
+.carnet-card__stats b.carnet-card__fav{ font-size:16px; line-height:1.5; }
+
+.carnet-card__stats span{
+  display:block;
+  margin-top:3px;
+  font-size:10px;
+  font-weight:700;
+  color:rgba(255,255,255,.65);
+}
+
+.carnet-card__dots{
+  display:flex;
+  justify-content:space-between;
+  margin:10px 0 0;
+}
+
+.carnet-card__dot{
+  width:8px;
+  height:8px;
+  border-radius:50%;
+  background:rgba(255,255,255,.12);
+}
+
+.carnet-card__dot--first{ background:#f5d76e; box-shadow:0 0 6px rgba(245,215,110,.6); }
+.carnet-card__dot--second{ background:#c4b5fd; }
+.carnet-card__dot--rest{ background:#fb923c; }
+
+.carnet-card__logo{
+  display:block;
+  width:88px;
+  height:auto;
+  margin:8px auto 0;
+}
+
+.carnet-share-btn{ margin:14px 0 0; }
+
+/* Écran verrouillé : carte floutée + explication. */
+.carnet-locked{ position:relative; }
+
+.carnet-card--locked{
+  filter:blur(3px);
+  opacity:.55;
+  pointer-events:none;
+}
+
+.carnet-locked__over{
+  position:absolute;
+  inset:0;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:10px;
+  padding:0 22px;
+  text-align:center;
+}
+
+.carnet-locked__title{
+  margin:0;
+  font-family:var(--font-display);
+  font-size:28px;
+  font-weight:400;
+  text-transform:uppercase;
+  transform:skewX(var(--display-skew));
+  color:#fff;
+}
+
+.carnet-locked__body{
+  margin:0;
+  font-size:13px;
+  line-height:1.4;
+  color:rgba(255,255,255,.8);
+}
+
+.carnet-locked__over .btn{ margin:4px 0 0; }
+
+/* Tes chiffres */
+.carnet-section-title{
+  margin:26px 0 10px;
+  font-family:var(--font-display);
+  font-size:22px;
+  font-weight:400;
+  text-transform:uppercase;
+  transform:skewX(var(--display-skew));
+  color:#fff;
+}
+
+.carnet-viz__top{ grid-template-columns:minmax(0, 1fr) minmax(0, 1.3fr); }
+
+.carnet-viz-card--podium{
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+}
+
+.carnet-podium{
+  display:flex;
+  align-items:flex-end;
+  justify-content:center;
+  gap:8px;
+  flex:1;
+  min-height:96px;
+}
+
+.carnet-podium__step{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:2px;
+  width:46px;
+  padding-top:6px;
+  border-radius:10px 10px 0 0;
+  font-size:16px;
+  font-weight:800;
+}
+
+.carnet-podium__step b{
+  font-family:var(--font-display);
+  font-weight:400;
+  font-size:18px;
+  line-height:1.1;
+}
+
+.carnet-podium__step--first{ background:linear-gradient(180deg, rgba(245,215,110,.45), rgba(245,215,110,.08)); }
+.carnet-podium__step--second{ background:rgba(196,181,253,.22); }
+.carnet-podium__step--rest{ background:rgba(251,146,60,.22); font-size:12px; }
+
+.carnet-viz__best{
+  margin:-2px 0 0;
+  font-size:12px;
+  font-weight:800;
+  color:#f5d76e;
+}
+
+.carnet-spark__area{ fill:color-mix(in srgb, var(--color-primary) 24%, transparent); }
+.carnet-spark__line{ stroke:var(--color-primary); }
+.carnet-spark__dot{ fill:#f5d76e; }
+
+/* Frise des soirées, groupée par mois */
+.carnet-month{
+  margin:18px 0 6px;
+  font-size:11px;
+  font-weight:800;
+  letter-spacing:.14em;
+  text-transform:uppercase;
+  color:rgba(255,255,255,.5);
+}
+
+.carnet-list__title + .carnet-month{ margin-top:4px; }
+
+.carnet-ev{
+  margin:0 0 6px;
+  border:1px solid rgba(255,255,255,.05);
+  border-radius:16px;
+  background:rgba(255,255,255,.035);
+}
+
+.carnet-ev--1{
+  border-color:rgba(245,215,110,.3);
+  background:linear-gradient(90deg, rgba(245,215,110,.14), rgba(245,215,110,.03));
+}
+
+.carnet-ev__row{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  padding:10px 12px;
+  list-style:none;
+  cursor:pointer;
+}
+
+.carnet-ev__row::-webkit-details-marker{ display:none; }
+
+.carnet-ev__date{
+  flex:none;
+  width:38px;
+  text-align:center;
+  line-height:1;
+}
+
+.carnet-ev__date b{
+  display:block;
+  font-family:var(--font-display);
+  font-size:24px;
+  font-weight:400;
+}
+
+.carnet-ev__date small{
+  font-size:10px;
+  font-weight:800;
+  text-transform:uppercase;
+  color:rgba(255,255,255,.5);
+}
+
+.carnet-ev__mid{
+  display:flex;
+  flex:1;
+  flex-direction:column;
+  gap:4px;
+  min-width:0;
+}
+
+.carnet-ev__logos{ display:flex; align-items:center; gap:4px; }
+
+.carnet-ev__logo{
+  width:32px;
+  height:32px;
+  box-sizing:border-box;
+  padding:2px;
+  border:1px solid rgba(255,255,255,.1);
+  border-radius:9px;
+  background:rgba(255,255,255,.06);
+  object-fit:contain;
+}
+
+.carnet-ev__logo--emoji{ display:grid; place-items:center; font-size:16px; }
+
+.carnet-ev__more{
+  margin-left:2px;
+  font-size:11px;
+  font-weight:800;
+  color:rgba(255,255,255,.6);
+}
+
+.carnet-ev__with{
+  overflow:hidden;
+  font-size:11.5px;
+  color:rgba(255,255,255,.6);
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+
+.carnet-ev__rank{
+  flex:none;
+  text-align:right;
+  line-height:1.1;
+}
+
+.carnet-ev__rank b{
+  display:block;
+  font-size:15px;
+  font-weight:800;
+}
+
+.carnet-ev__pts{
+  display:inline-block;
+  font-family:var(--font-display);
+  font-size:20px;
+  transform:skewX(var(--display-skew));
+  color:#c4b5fd;
+}
+
+.carnet-ev--1 .carnet-ev__pts{ color:#f5d76e; }
+
+.carnet-ev__detail{ padding:0 12px 12px 62px; }
+
+.carnet-ev__detail .carnet-evening__games{ margin:0; }

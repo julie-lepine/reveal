@@ -254,13 +254,19 @@ describe("FEATURE-PROFILE-04 — carnet Signature", () => {
     assert.match(css, /\.carnet-spark\{[\s\S]*inset:0/);
     assert.match(css, /\.carnet-spark__y--min\{[\s\S]*bottom:0/);
     assert.match(css, /\.carnet-spark__y--max\{[\s\S]*top:0/);
-    assert.match(screen, /carnet-rank-row/);
+    // Rangs affichés en podium (1er, 2e, 3e+) dans « Tes chiffres ».
+    assert.match(screen, /carnet-podium/);
+    assert.match(screen, /aggregateCarnetRankSplit/);
     assert.match(screen, /CARNET_LABEL\.listTitle/);
     assert.match(screen, /data-carnet-share/);
     assert.match(screen, /openCarnetSharePreview/);
-    const shareIdx = screen.indexOf("data-carnet-share");
-    const listIdx = screen.indexOf("CARNET_LABEL.listTitle");
-    assert.ok(shareIdx > 0 && listIdx > shareIdx);
+    // Ordre affiché : carte, Partager ma carte, Tes chiffres, liste des soirées.
+    const body = screen.slice(screen.indexOf("function carnetBodyHtml"));
+    const tpl = body.slice(body.lastIndexOf("return `"));
+    const cardIdx = tpl.indexOf("${carnetCardHtml(model)}");
+    const shareIdx = tpl.indexOf("${share}");
+    const listIdx = tpl.indexOf("${eveningsListHtml(evenings)}");
+    assert.ok(cardIdx > 0 && shareIdx > cardIdx && listIdx > shareIdx);
     assert.match(screen, /carnet-chip/);
     assert.match(screen, /medalForCompetitionRank/);
     const sync = src("js/core/gameSync.js");

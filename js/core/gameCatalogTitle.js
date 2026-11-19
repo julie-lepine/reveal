@@ -44,6 +44,11 @@ export function catalogTitleForSessionGameId(gameId) {
 }
 
 /** Emoji catalogue (tuile jeu), ou null si inconnu. */
+/** Logo catalogue (chemin d'image) pour un game_id session, ou null. */
+export function catalogLogoForSessionGameId(gameId) {
+  return catalogForSessionGameId(gameId)?.logo || null;
+}
+
 export function catalogEmojiForSessionGameId(gameId) {
   return catalogForSessionGameId(gameId)?.emoji || null;
 }

@@ -1,6 +1,8 @@
 /**
  * FEATURE-PROFILE-04 — page Carnet (Menu → Profil).
  */
+import { APP_LOGO } from "../../data/branding.js";
+import { PACK_SIGNATURE_LABEL } from "../config/premiumPacks.js";
 import { CARNET_LABEL, CARNET_SCREEN_ID } from "../config/signatureCarnet.js";
 import { SETTINGS_TAB } from "../config/settingsTabs.js";
 import { canPlay, isLoggedIn } from "../core/auth.js";
@@ -8,6 +10,7 @@ import { isProfilePack } from "../core/entitlements.js";
 import { getCachedGameSession, suppressSessionRoute } from "../core/gameSync.js";
 import {
   catalogEmojiForSessionGameId,
+  catalogLogoForSessionGameId,
   catalogTitleForSessionGameId,
 } from "../core/gameCatalogTitle.js";
 import {
@@ -30,9 +33,7 @@ import {
   canShareCarnetCard,
 } from "../core/signatureCarnetCardLogic.js";
 import {
-  SIGNATURE_CARNET_MAX_EVENINGS,
   aggregateCarnetRankSplit,
-  carnetRankBarPercents,
   carnetSparklineLayout,
   carnetWinrateRing,
   chronologicalCarnetEvenings,
@@ -41,69 +42,6 @@ import {
 } from "../core/signatureCarnetLogic.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
 import { bindNav, goToEveningSettings } from "./nav.js";
-
-function lockedHtml(registered) {
-  return `
-    <div class="card settings-section carnet-locked">
-      <h2 class="settings-section__title">${escapeHtml(CARNET_LABEL.lockedTitle)}</h2>
-      <p class="hint settings-section__hint">${escapeHtml(
-        registered ? CARNET_LABEL.lockedBody : CARNET_LABEL.guestBody
-      )}</p>
-      ${
-        registered
-          ? `<button type="button" class="btn btn-primary btn--spaced" data-carnet-forfaits>${escapeHtml(
-              CARNET_LABEL.seePacks
-            )}</button>`
-          : ""
-      }
-    </div>`;
-}
-
-function statCell({ label, value, emoji, tone }) {
-  return `
-    <div class="carnet-stat carnet-stat--${tone}">
-      <p class="carnet-stat__value">
-        <span class="carnet-stat__emoji" aria-hidden="true">${emoji}</span>
-        ${escapeHtml(String(value))}
-      </p>
-      <p class="carnet-stat__label">${escapeHtml(label)}</p>
-    </div>`;
-}
-
-function statsHtml(stats) {
-  const favoriteId = stats?.favoriteGame;
-  const favoriteTitle =
-    catalogTitleForSessionGameId(favoriteId) || CARNET_LABEL.favoriteNone;
-  const favoriteEmoji =
-    catalogEmojiForSessionGameId(favoriteId) || CARNET_LABEL.statsFavoriteEmoji;
-  return `
-    <div class="carnet-stats">
-      ${statCell({
-        label: CARNET_LABEL.statsEvenings,
-        value: stats?.evenings ?? 0,
-        emoji: CARNET_LABEL.statsEveningsEmoji,
-        tone: "evenings",
-      })}
-      ${statCell({
-        label: CARNET_LABEL.statsGames,
-        value: stats?.games ?? 0,
-        emoji: CARNET_LABEL.statsGamesEmoji,
-        tone: "games",
-      })}
-      ${statCell({
-        label: CARNET_LABEL.statsMvp,
-        value: stats?.mvp ?? 0,
-        emoji: CARNET_LABEL.statsMvpEmoji,
-        tone: "mvp",
-      })}
-      ${statCell({
-        label: CARNET_LABEL.statsFavorite,
-        value: favoriteTitle,
-        emoji: favoriteEmoji,
-        tone: "favorite",
-      })}
-    </div>`;
-}
 
 function winrateRingHtml(winrate) {
   const ring = carnetWinrateRing(winrate);
@@ -157,45 +95,127 @@ function scoresSparkHtml(evenings) {
     </figure>`;
 }
 
-function rankBarRow(tone, label, count, pct) {
+/** Carte de collection (version écran de la carte partagée). */
+function carnetCardHtml(model, { locked = false } = {}) {
+  const ident = model.identity || {};
+  const stats = model.stats || {};
+  const favId = stats.favoriteGame;
+  const favTitle = catalogTitleForSessionGameId(favId) || CARNET_LABEL.favoriteNone;
+  const favEmoji = catalogEmojiForSessionGameId(favId) || CARNET_LABEL.statsFavoriteEmoji;
+  const value = (v) => (locked ? "00" : escapeHtml(String(v)));
+  const avatar = ident.avatarUrl
+    ? `<img class="carnet-card__photo" src="${escapeHtml(ident.avatarUrl)}" alt="" onerror="this.remove()">`
+    : "";
+  const dots = (model.dots || [])
+    .map((tone) => `<i class="carnet-card__dot carnet-card__dot--${escapeHtml(tone)}"></i>`)
+    .join("");
   return `
-    <div class="carnet-rank-row">
-      <span class="carnet-rank-row__label">${escapeHtml(label)}</span>
-      <span class="carnet-rank-row__track">
-        <span class="carnet-rank-row__fill carnet-rank-row__fill--${tone}" style="width:${pct}%"></span>
-      </span>
-      <span class="carnet-rank-row__n">${escapeHtml(String(count))}</span>
+    <div class="carnet-card${locked ? " carnet-card--locked" : ""}"${locked ? ' aria-hidden="true"' : ""}>
+      <div class="carnet-card__top"><span>${escapeHtml(CARNET_LABEL.pageTitle)}</span><span aria-hidden="true">✦</span></div>
+      <div class="carnet-card__ring"><span class="carnet-card__avatar">${avatar}${escapeHtml(ident.emoji || "👤")}</span></div>
+      <p class="carnet-card__name"${ident.nameColorHex ? ` style="color:${escapeHtml(ident.nameColorHex)}"` : ""}>${escapeHtml(ident.name || "Joueur")}</p>
+      <span class="carnet-card__badge">✨ ${escapeHtml(PACK_SIGNATURE_LABEL)}</span>
+      ${model.hook && !locked ? `<p class="carnet-card__hook">${escapeHtml(model.hook)}</p>` : ""}
+      <div class="carnet-card__stats">
+        <div><b>${value(stats.evenings ?? 0)}</b><span>${CARNET_LABEL.statsEveningsEmoji} ${escapeHtml(CARNET_LABEL.statsEvenings)}</span></div>
+        <div><b>${value(stats.mvp ?? 0)}</b><span>${CARNET_LABEL.statsMvpEmoji} ${escapeHtml(CARNET_LABEL.statsMvp)}</span></div>
+        <div><b>${locked ? "00" : escapeHtml(formatCarnetWinrate(stats.winrate))}</b><span>${escapeHtml(CARNET_LABEL.statsWinrate)}</span></div>
+        <div><b class="carnet-card__fav">${locked ? "00" : `${favEmoji} ${escapeHtml(favTitle)}`}</b><span>${CARNET_LABEL.statsFavoriteEmoji} ${escapeHtml(CARNET_LABEL.statsFavorite)}</span></div>
+      </div>
+      <div class="carnet-card__dots">${dots}</div>
+      <img class="carnet-card__logo" src="${escapeHtml(APP_LOGO)}" alt="REVEAL">
     </div>`;
 }
 
-function rankSplitHtml(evenings) {
-  const split = aggregateCarnetRankSplit(evenings);
-  const pct = carnetRankBarPercents(split);
-  const aria = `${CARNET_LABEL.chartRanks} : ${split.first} ${CARNET_LABEL.chartRankFirst}, ${split.second} ${CARNET_LABEL.chartRankSecond}, ${split.rest} ${CARNET_LABEL.chartRankRest}`;
+function lockedHtml(registered) {
+  const sample = buildCarnetCardModel({ identity: getLocalPlayer(), evenings: [], stats: null });
   return `
-    <figure class="carnet-viz-card carnet-viz-card--ranks" aria-label="${escapeHtml(aria)}">
-      <figcaption class="carnet-viz__label">${escapeHtml(CARNET_LABEL.chartRanks)}</figcaption>
-      ${rankBarRow("gold", CARNET_LABEL.chartRankFirst, split.first, pct.first)}
-      ${rankBarRow("silver", CARNET_LABEL.chartRankSecond, split.second, pct.second)}
-      ${rankBarRow("rest", CARNET_LABEL.chartRankRest, split.rest, pct.rest)}
+    <div class="carnet-locked">
+      ${carnetCardHtml(sample, { locked: true })}
+      <div class="carnet-locked__over">
+        <h2 class="carnet-locked__title">🔒 ${escapeHtml(CARNET_LABEL.lockedTitle)}</h2>
+        <p class="carnet-locked__body">${escapeHtml(
+          registered ? CARNET_LABEL.lockedBody : CARNET_LABEL.guestBody
+        )}</p>
+        ${
+          registered
+            ? `<button type="button" class="btn btn-primary" data-carnet-forfaits>${escapeHtml(
+                CARNET_LABEL.seePacks
+              )}</button>`
+            : ""
+        }
+      </div>
+    </div>`;
+}
+
+/** Podium : 2e, 1er, 3e+ (hauteurs proportionnelles). */
+function podiumHtml(evenings) {
+  const split = aggregateCarnetRankSplit(evenings);
+  const max = Math.max(1, split.first, split.second, split.rest);
+  const h = (n) => Math.round(28 + (n / max) * 64);
+  const aria = `${CARNET_LABEL.chartRanks} : ${split.first} ${CARNET_LABEL.chartRankFirst}, ${split.second} ${CARNET_LABEL.chartRankSecond}, ${split.rest} ${CARNET_LABEL.chartRankRest}`;
+  const step = (tone, label, n) => `
+        <div class="carnet-podium__step carnet-podium__step--${tone}" style="height:${h(n)}px">
+          <span>${label}</span><b>${escapeHtml(String(n))}</b>
+        </div>`;
+  return `
+    <figure class="carnet-viz-card carnet-viz-card--podium" aria-label="${escapeHtml(aria)}">
+      <figcaption class="carnet-viz__label">${escapeHtml(CARNET_LABEL.chartPodiums)}</figcaption>
+      <div class="carnet-podium">
+        ${step("second", "🥈", split.second)}
+        ${step("first", "🥇", split.first)}
+        ${step("rest", escapeHtml(CARNET_LABEL.chartRankRest), split.rest)}
+      </div>
     </figure>`;
+}
+
+function bestScoreHtml(evenings) {
+  const scores = evenings.map((row) => Number(row.score)).filter(Number.isFinite);
+  if (!scores.length) return "";
+  return `<span class="carnet-viz__best">${escapeHtml(
+    CARNET_LABEL.bestEvening.replace("{n}", String(Math.max(...scores)))
+  )}</span>`;
 }
 
 function vizHtml(evenings, stats) {
   if (!evenings.length) return "";
   return `
+    <h2 class="carnet-section-title">${escapeHtml(CARNET_LABEL.statsTitle)}</h2>
     <div class="carnet-viz">
       <div class="carnet-viz__top">
         ${winrateRingHtml(stats?.winrate)}
-        ${scoresSparkHtml(evenings)}
+        ${podiumHtml(evenings)}
       </div>
-      ${rankSplitHtml(evenings)}
+      ${scoresSparkHtml(evenings)}
+      ${bestScoreHtml(evenings)}
     </div>`;
 }
 
 function eveningRankTone(rank) {
   if (rank === 1 || rank === 2 || rank === 3) return String(rank);
   return "rest";
+}
+
+const CARNET_EVENING_MAX_LOGOS = 4;
+
+function eveningGameLogosHtml(gameIds) {
+  const ids = (Array.isArray(gameIds) ? gameIds : []).filter((id) =>
+    catalogTitleForSessionGameId(id)
+  );
+  const shown = ids.slice(0, CARNET_EVENING_MAX_LOGOS).map((id) => {
+    const title = catalogTitleForSessionGameId(id);
+    const logo = catalogLogoForSessionGameId(id);
+    return logo
+      ? `<img class="carnet-ev__logo" src="${escapeHtml(logo)}" alt="${escapeHtml(title)}">`
+      : `<span class="carnet-ev__logo carnet-ev__logo--emoji" title="${escapeHtml(title)}">${
+          catalogEmojiForSessionGameId(id) || "🎲"
+        }</span>`;
+  });
+  const more = ids.length - shown.length;
+  if (!shown.length) return "";
+  return `<div class="carnet-ev__logos">${shown.join("")}${
+    more > 0 ? `<span class="carnet-ev__more">+${more}</span>` : ""
+  }</div>`;
 }
 
 function eveningGameChipsHtml(gameIds) {
@@ -211,51 +231,66 @@ function eveningGameChipsHtml(gameIds) {
   return `<div class="carnet-evening__games">${chips.join("")}</div>`;
 }
 
-function eveningCardHtml(row) {
+function eveningDateParts(iso) {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  const month = new Intl.DateTimeFormat("fr-FR", { month: "long", year: "numeric" }).format(d);
+  return {
+    day: String(d.getDate()),
+    shortMonth: new Intl.DateTimeFormat("fr-FR", { month: "short" }).format(d),
+    month: month.charAt(0).toUpperCase() + month.slice(1),
+  };
+}
+
+function eveningRowHtml(row) {
+  const parts = eveningDateParts(row.endedAt);
   const date = formatCarnetEveningDate(row.endedAt);
   const rank = competitionRankLabel(row.rank);
   const medal = medalForCompetitionRank(row.rank);
   const friends = formatNameList(row.friendNames);
   const tone = eveningRankTone(row.rank);
   return `
-    <article class="card settings-section carnet-evening carnet-evening--${tone}">
-      <div class="carnet-evening__top">
-        <p class="carnet-evening__date">${date ? escapeHtml(date) : ""}</p>
+    <details class="carnet-ev carnet-ev--${tone}">
+      <summary class="carnet-ev__row" aria-label="${escapeHtml(date)}">
+        <span class="carnet-ev__date"><b>${escapeHtml(parts?.day || "")}</b><small>${escapeHtml(parts?.shortMonth || "")}</small></span>
+        <span class="carnet-ev__mid">
+          ${eveningGameLogosHtml(row.games)}
+          ${
+            friends
+              ? `<span class="carnet-ev__with"><span aria-hidden="true">🥳</span> Avec ${escapeHtml(friends)}</span>`
+              : ""
+          }
+        </span>
         ${
           row.rank
-            ? `<p class="carnet-evening__rank"><span aria-hidden="true">${medal}</span> ${escapeHtml(rank)}</p>`
+            ? `<span class="carnet-ev__rank"><b><span aria-hidden="true">${medal}</span> ${escapeHtml(rank)}</b><span class="carnet-ev__pts">${escapeHtml(String(row.score))} pts</span></span>`
             : ""
         }
+      </summary>
+      <div class="carnet-ev__detail">
+        ${eveningGameChipsHtml(row.games)}
       </div>
-      ${
-        row.rank
-          ? `<p class="carnet-evening__score">${escapeHtml(String(row.score))} pts</p>`
-          : ""
-      }
-      ${eveningGameChipsHtml(row.games)}
-      ${
-        friends
-          ? `<p class="carnet-evening__friends"><span aria-hidden="true">🥳</span> Avec ${escapeHtml(friends)}</p>`
-          : ""
-      }
-    </article>`;
+    </details>`;
+}
+
+function eveningsListTitle(n) {
+  return n === 1 ? CARNET_LABEL.listTitleOne : CARNET_LABEL.listTitle.replace("{n}", String(n));
 }
 
 function eveningsListHtml(evenings) {
-  const n = evenings.length;
-  const share = canShareCarnetCard(evenings)
-    ? `<button type="button" class="btn btn-primary carnet-share-btn" data-carnet-share>${escapeHtml(
-        CARNET_LABEL.shareCard
-      )}</button>`
-    : "";
+  let month = "";
+  const rows = evenings
+    .map((row) => {
+      const m = eveningDateParts(row.endedAt)?.month || "";
+      const head = m && m !== month ? `<p class="carnet-month">${escapeHtml(m)}</p>` : "";
+      if (m) month = m;
+      return `${head}${eveningRowHtml(row)}`;
+    })
+    .join("");
   return `
     <section class="carnet-list">
-      ${share}
-      <div class="carnet-list__head">
-        <h2 class="carnet-list__title">${escapeHtml(CARNET_LABEL.listTitle)}</h2>
-        <p class="carnet-list__count">${escapeHtml(`${n}/${SIGNATURE_CARNET_MAX_EVENINGS}`)}</p>
-      </div>
-      ${evenings.map(eveningCardHtml).join("")}
+      <h2 class="carnet-section-title carnet-list__title">${escapeHtml(eveningsListTitle(evenings.length))}</h2>
+      ${rows}
     </section>`;
 }
 
@@ -272,14 +307,25 @@ function carnetBodyHtml({ registered, unlocked, loading, error, errorCode, paylo
     return `<p class="auth-error">${escapeHtml(msg)}</p>`;
   }
   const evenings = payload?.evenings || [];
+  const model = buildCarnetCardModel({
+    identity: getLocalPlayer(),
+    evenings,
+    stats: payload?.stats,
+  });
+  const share = canShareCarnetCard(evenings)
+    ? `<button type="button" class="btn btn-primary carnet-share-btn" data-carnet-share>${escapeHtml(
+        CARNET_LABEL.shareCard
+      )}</button>`
+    : "";
   if (!evenings.length) {
     return `
-      ${statsHtml(payload?.stats)}
+      ${carnetCardHtml(model)}
       <p class="hint settings-section__hint">${escapeHtml(CARNET_LABEL.empty)}</p>`;
   }
   return `
+    ${carnetCardHtml(model)}
+    ${share}
     ${vizHtml(evenings, payload.stats)}
-    ${statsHtml(payload.stats)}
     ${eveningsListHtml(evenings)}`;
 }
 

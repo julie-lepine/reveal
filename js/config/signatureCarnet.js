@@ -35,7 +35,13 @@ export const CARNET_LABEL = {
   shareCropHint: "Pince pour zoomer, glisse pour cadrer.",
   shareCropOk: "Valider",
   shareCropCancel: "Annuler",
-  listTitle: "Tes 20 dernières soirées",
+  /** {n} = nombre de soirées enregistrées (20 au plus). */
+  listTitle: "Tes {n} dernières soirées",
+  listTitleOne: "Ta dernière soirée",
+  statsTitle: "Tes chiffres",
+  chartPodiums: "Podiums",
+  /** {n} = meilleur score d’une soirée. */
+  bestEvening: "Meilleure soirée : {n} pts",
   chartScores: "Scores par soirée",
   chartRanks: "Rangs",
   chartRankFirst: "1er",
