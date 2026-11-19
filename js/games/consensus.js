@@ -4,7 +4,10 @@ import {
   __getConsensusWriteMarkerForTests as readActiveConsensusWriteMarker,
   consensusLobbyWriteBlocked,
   guardConsensusServerWrite,
+  hasConsensusCompleteMarker,
+  releaseConsensusCompleteMarkerIfPostGame,
   releaseInheritedNextQuestionMarker,
+  resumeConsensusComplete,
   resumeConsensusAnswer,
   resumeConsensusNextQuestion,
   subscribeConsensusLaunchEnded,
@@ -69,6 +72,12 @@ export function consensusRecoveryBannerCopy(step) {
     return {
       hint: "Le passage à la question suivante n'est pas confirmé.",
       button: "Réessayer de passer à la question suivante",
+    };
+  }
+  if (step === "complete") {
+    return {
+      hint: "L'affichage des résultats n'est pas confirmé.",
+      button: "Réessayer d'afficher les résultats",
     };
   }
   if (step === "reveal" || step === "play") {
@@ -289,6 +298,10 @@ export function mountConsensus(app) {
   }
 
   async function rereadSharedConsensus() {
+    if (hasConsensusCompleteMarker()) {
+      await recheckConsensusComplete();
+      return;
+    }
     let row = null;
     try {
       row = await refreshGameSession();
@@ -838,7 +851,12 @@ export function mountConsensus(app) {
           await consensus.commitPlay(claimed);
         } catch (err) {
           console.warn("Consensus final:", err);
-          if (mount.isMounted() && mount.isCurrentMount()) render();
+          if (!mount.isMounted() || !mount.isCurrentMount()) return;
+          await showAppAlert("Vérifie ta connexion réseau et réessaie", {
+            title: "Partie",
+            icon: "📡",
+          });
+          render();
           return;
         }
       } else {
@@ -858,34 +876,75 @@ export function mountConsensus(app) {
     await showEveningResults();
   }
 
-  async function showEveningResults() {
-    const finalSession = {
+  function finalConsensusSession() {
+    return {
       ...consensus.getSession(),
       phase: "final",
       podiumApplied: true,
     };
+  }
+
+  /** Envoi de la fin de partie (même contenu au premier essai et aux reprises). */
+  function completeConsensusOnServer() {
+    return completeGameSession({
+      gameId: "consensus",
+      screen: "results",
+      state: { consensus: consensusToRemote(finalConsensusSession()) },
+    });
+  }
+
+  /**
+   * Reprise après un échec d'envoi de la fin de partie : relit la session, puis
+   * rejoint les résultats (déjà enregistrés) ou renvoie la fin de partie.
+   */
+  async function recheckConsensusComplete() {
+    const outcome = await resumeConsensusComplete({
+      readSession: () => refreshGameSession(),
+      complete: completeConsensusOnServer,
+    });
+    if (!mount.isMounted() || !mount.isCurrentMount()) return;
+    if (outcome.done) {
+      ensurePostGameScreen("results", { from: "consensus", gameId: "consensus" });
+      return;
+    }
+    await showAppAlert("Vérifie ta connexion réseau et réessaie", {
+      title: "Partie",
+      icon: "📡",
+    });
+    if (!mount.isMounted() || !mount.isCurrentMount()) return;
+    render();
+  }
+
+  async function showEveningResults() {
+    const finalSession = finalConsensusSession();
 
     clearNpcTimers();
     clearRevealPending();
 
     if (mp) {
       if (!canActAsHost()) return;
+      if (hasConsensusCompleteMarker()) {
+        await recheckConsensusComplete();
+        return;
+      }
       if (writesBlocked()) return;
       try {
-        await guardConsensusServerWrite("complete", () =>
-          completeGameSession({
-            gameId: "consensus",
-            screen: "results",
-            state: { consensus: consensusToRemote(finalSession) },
-          })
-        );
+        await guardConsensusServerWrite("complete", completeConsensusOnServer);
         ensurePostGameScreen("results", { from: "consensus", gameId: "consensus" });
       } catch (e) {
         if (e?.code === "CONSENSUS_WRITE_BLOCKED") return;
+        // Fin de partie pas confirmée : l'hôte reste sur « Partie terminée » (comme
+        // les invités) avec le bandeau de reprise. Avant, il partait seul aux résultats.
         console.warn("REVEAL completeGameSession:", e);
         if (!mount.isMounted()) return;
         if (!mount.isCurrentMount()) return;
-        navigate("results", { navStack: ["home", "lobby", "game-select", "results"] });
+        await showAppAlert("Vérifie ta connexion réseau et réessaie", {
+          title: "Partie",
+          icon: "📡",
+        });
+        if (!mount.isMounted()) return;
+        if (!mount.isCurrentMount()) return;
+        render();
       }
       return;
     }
@@ -1164,6 +1223,8 @@ export function mountConsensus(app) {
     if (!mount.isMounted()) return;
     if (!mount.isCurrentMount()) return;
     if (stopGameSessionListenerOnPostGame(row, { cleanup: () => {
+      // Fin de partie bien arrivée au serveur : plus de raison de bloquer ce téléphone.
+      releaseConsensusCompleteMarkerIfPostGame(row);
       clearNpcTimers();
       clearRevealPending();
       if (renderTimer) clearTimeout(renderTimer);
