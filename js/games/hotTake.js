@@ -26,7 +26,8 @@ import {
 import { getActivePlayers, getActivePlayerNames } from "../core/players.js";
 import { createSyncPending } from "../core/syncPending.js";
 import { formatWinnersLabel, withCompetitionRanks } from "../core/competitionRank.js";
-import { getLocalDisplayName, recordHotTakePlayed, setLastGame } from "../core/state.js";
+import { getLocalDisplayName, recordHotTakePlayed, saveStatePatch, setLastGame } from "../core/state.js";
+import { POST_GAME_FINISH_FAILED_LABEL } from "../core/postGameFinish.js";
 import { serializeLastGameStandings } from "../core/lastGamePodium.js";
 import { setLobbyPlaying, setLobbyWaiting } from "../core/lobby.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
@@ -95,6 +96,8 @@ export function mountHotTake(app) {
   let votes = {};
   let lastAward = null;
   let takeScored = false;
+  /** Hôte : la fin de partie (« Voir les résultats ») n'est pas partie. */
+  let finishFailed = false;
   /** Évite deux révélations / double scoring concurrentes. */
   let revealInFlight = false;
   /** Vote en cours d’envoi - évite que la synchro efface l’UI avant la réponse serveur. */
@@ -321,6 +324,11 @@ export function mountHotTake(app) {
     return hotTakeRevealSummaryHtml(voteResult, votesMap, options);
   }
 
+  /** Message sous « Voir les résultats » quand la fin de partie n'est pas partie. */
+  function finishFailedHtml() {
+    return finishFailed ? `<p class="hint">${escapeHtml(POST_GAME_FINISH_FAILED_LABEL)}</p>` : "";
+  }
+
   async function finishHotTakeGame() {
     if (mp && !canActAsHost()) return;
 
@@ -343,6 +351,7 @@ export function mountHotTake(app) {
   async function showEveningResults() {
     if (mp && !canActAsHost()) return;
 
+    const sessionBeforeReset = getHotTakeSession();
     const resetHt = await resetHotTakeAfterGame({ syncRemote: false });
     if (!mount.isMounted()) return;
     if (!mount.isCurrentMount()) return;
@@ -354,12 +363,19 @@ export function mountHotTake(app) {
           screen: "results",
           state: { hotTake: hotTakeToRemote(resetHt) },
         });
+        finishFailed = false;
         ensurePostGameScreen("results", { from: "hottake", gameId: "hottake" });
       } catch (e) {
+        // Fin de partie pas enregistrée : l'hôte retrouve sa partie (comme les
+        // invités) et peut réessayer. Avant, il partait seul aux résultats, avec
+        // une partie déjà remise à zéro sur son téléphone.
         console.warn("REVEAL completeGameSession:", e);
+        saveStatePatch({ hotTakeGame: sessionBeforeReset });
         if (!mount.isMounted()) return;
         if (!mount.isCurrentMount()) return;
-        navigate("results", { navStack: ["home", "lobby", "game-select", "results"] });
+        finishFailed = true;
+        syncFromSession();
+        render();
       }
       return;
     }
@@ -724,7 +740,7 @@ export function mountHotTake(app) {
           host
             ? `<button type="button" class="btn btn-primary btn--spaced" id="next-take">
           ${takeIdx < total - 1 ? "Prochain Hot Take →" : "Voir les résultats →"}
-        </button>`
+        </button>${finishFailedHtml()}`
             : `<p class="hint">En attente de l'hôte pour la suite…</p>`
         }
         </div>
@@ -744,7 +760,7 @@ export function mountHotTake(app) {
           <p class="hint">Le podium s'affiche dans les résultats de la soirée.</p>
           ${
             !mp || canActAsHost()
-              ? `<button type="button" class="btn btn-primary btn--spaced" data-hottake-action="show-results">Voir les résultats</button>`
+              ? `<button type="button" class="btn btn-primary btn--spaced" data-hottake-action="show-results">Voir les résultats</button>${finishFailedHtml()}`
               : `<p class="hint">En attente de l'hôte pour afficher les résultats…</p>`
           }
         </div>`;
