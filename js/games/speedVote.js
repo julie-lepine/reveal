@@ -15,6 +15,7 @@ import {
 import { awardSpeedVoteRound } from "../core/scoring.js";
 import { applyMatchScoreDeltas, gameCumulativeScoresHtml, refreshGameScoresBox } from "../core/gameScores.js";
 import { getLocalDisplayName, recordSpeedVotePlayed, setLastGame } from "../core/state.js";
+import { POST_GAME_FINISH_FAILED_LABEL } from "../core/postGameFinish.js";
 import { getLobbyParticipants } from "../core/lobby.js";
 import { getActivePlayers } from "../core/players.js";
 import { setLobbyPlaying, setLobbyWaiting } from "../core/lobby.js";
@@ -66,6 +67,8 @@ export function mountSpeedVote(app) {
   let lastAward = null;
   let takeScored = false;
   let revealInFlight = false;
+  /** Hôte : la fin de partie (« Voir les résultats ») n'est pas partie. */
+  let finishFailed = false;
   let currentQuestion = QUESTIONS[0];
   let modifier = "normal";
   const localName = getLocalDisplayName();
@@ -247,7 +250,11 @@ export function mountSpeedVote(app) {
         host
           ? `<button type="button" class="btn btn-primary btn--spaced" id="next-round">
           ${roundIdx < QUESTIONS.length - 1 ? "Prochaine question →" : "Voir les résultats →"}
-        </button>`
+        </button>${
+              finishFailed
+                ? `<p class="hint">${escapeHtml(POST_GAME_FINISH_FAILED_LABEL)}</p>`
+                : ""
+            }`
           : `<p class="hint">En attente de l'hôte pour la suite…</p>`
       }
       </div>
@@ -398,12 +405,16 @@ export function mountSpeedVote(app) {
         if (mp) {
           try {
             await completeGameSession({ gameId: "speedvote", screen: "results", state: {} });
+            finishFailed = false;
             ensurePostGameScreen("results", { from: "speedvote", gameId: "speedvote" });
           } catch (e) {
+            // Fin de partie pas enregistrée : l'hôte reste sur le verdict (comme les
+            // invités) et peut réessayer. Avant, il partait seul aux résultats.
             console.warn("REVEAL completeGameSession:", e);
             if (!mount.isMounted()) return;
             if (!mount.isCurrentMount()) return;
-            navigate("results", { navStack: ["home", "lobby", "game-select", "results"] });
+            finishFailed = true;
+            render();
           }
         } else {
           setLobbyWaiting();
