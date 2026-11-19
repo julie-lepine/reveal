@@ -33,6 +33,7 @@ import {
 } from "../../data/signatureIdentity.js";
 import { isAdFree } from "../core/entitlements.js";
 import { PROFILE_CARD_LABEL } from "../config/profileCard.js";
+import { profileEditInitiallyOpen, writeProfileEditOpen } from "../core/profileEditPref.js";
 import {
   isLockedSignatureEmojiClick,
   isProfilePack,
@@ -388,7 +389,7 @@ function personnalisationPanelHtml({ emailAccount, user, selectedEmoji, tryOn = 
       ${profileCardHtml(previewPlayer, { unlocked, tryOn })}
       ${unlocked ? "" : profilePerksHtml(previewPlayer)}
 
-      <details class="profile-edit"${unlocked ? " open" : ""}>
+      <details class="profile-edit"${profileEditInitiallyOpen(unlocked) ? " open" : ""}>
         <summary class="profile-edit__summary">${escapeHtml(PROFILE_CARD_LABEL.edit)}<span aria-hidden="true">⌄</span></summary>
         <div class="profile-edit__body">
           <label class="field-label" for="settings-name">Ton pseudo</label>
@@ -700,6 +701,9 @@ export function mountSettings(app) {
       });
     });
     bindProfileCardActions(app.querySelector("#profile-card") || app);
+    app.querySelector(".profile-edit")?.addEventListener("toggle", (e) => {
+      writeProfileEditOpen(e.currentTarget.open);
+    });
 
     function showAvatarStatus(okText, errText) {
       const err = app.querySelector("#avatar-error");
