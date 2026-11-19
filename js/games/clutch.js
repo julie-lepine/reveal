@@ -22,6 +22,10 @@ import {
   preferInFlightClutchTap,
   shouldHostRevealClutchRound,
 } from "../core/clutchTapCommit.js";
+import {
+  CLUTCH_REVEAL_RETRY_LABEL,
+  createClutchRevealRetry,
+} from "../core/clutchRevealRetry.js";
 import { awardClutchRound } from "../core/scoring.js";
 import { applyMatchScoreDeltas, gameCumulativeScoresHtml, refreshGameScoresBox } from "../core/gameScores.js";
 import { getLocalDisplayName, recordClutchPlayed, setLastGame } from "../core/state.js";
@@ -70,6 +74,8 @@ export function mountClutch(app) {
   let lastAward = null;
   let takeScored = false;
   let revealInFlight = false;
+  /** Hôte : l'envoi des résultats a échoué, relance automatique en cours. */
+  let revealRetrying = false;
 
   let localStart = null;
   let countdownEndsAt = null;
@@ -312,6 +318,8 @@ export function mountClutch(app) {
         localWindowClosed = false;
         tapFailed = false;
         blindVibrated = false;
+        revealRetry.stop();
+        revealRetrying = false;
         clearCopyTimer();
         clearGrace();
       }
@@ -371,13 +379,34 @@ export function mountClutch(app) {
         lastRound = lastRoundData;
         render();
       }
+    } catch (err) {
+      // Envoi raté : on autorise un nouvel essai (sinon bloqué sur « Temps écoulé »).
+      takeScored = false;
+      throw err;
     } finally {
       revealInFlight = false;
     }
   }
 
+  const revealRetry = createClutchRevealRetry({
+    attempt: () => transitionToReveal(),
+    shouldRetry: () =>
+      mount.isMounted() &&
+      mount.isCurrentMount() &&
+      phase === "active" &&
+      (!mp || canActAsHost()) &&
+      !getClutchSession().roundScored,
+    onStateChange: (failing) => {
+      revealRetrying = failing;
+      if (!mount.isMounted()) return;
+      if (!mount.isCurrentMount()) return;
+      if (phase === "active") render();
+    },
+  });
+
+  /** Ne rejette jamais : en cas d'échec, relance automatique toutes les 3 s. */
   async function goToReveal() {
-    await transitionToReveal();
+    await revealRetry.run();
   }
 
   function playerMeta(name) {
@@ -410,7 +439,9 @@ export function mountClutch(app) {
           : BLIND_LINES[0]
         : "Le chrono monte vers la cible";
 
-    const status = tapFailed && !tapped && !localWindowClosed
+    const status = revealRetrying && (!mp || canActAsHost())
+      ? CLUTCH_REVEAL_RETRY_LABEL
+      : tapFailed && !tapped && !localWindowClosed
       ? CLUTCH_TAP_FAILED_LABEL
       : localWindowClosed
       ? "Temps écoulé - en attente du verdict…"
@@ -637,6 +668,7 @@ export function mountClutch(app) {
     if (!mount.isMounted()) return;
     if (!mount.isCurrentMount()) return;
     if (stopGameSessionListenerOnPostGame(row, { cleanup: () => {
+      revealRetry.stop();
       clearGrace();
       stopClock();
     } })) return;
@@ -700,6 +732,7 @@ export function mountClutch(app) {
 
   return () => {
     mount.dispose();
+    revealRetry.stop();
     clearGrace();
     stopClock();
     clearCopyTimer();
