@@ -16,6 +16,7 @@ import {
 import { awardWrongAnswerRound } from "../core/scoring.js";
 import { applyMatchScoreDeltas, gameCumulativeScoresHtml, refreshGameScoresBox } from "../core/gameScores.js";
 import { getLocalDisplayName, recordWrongAnswerPlayed, setLastGame } from "../core/state.js";
+import { POST_GAME_FINISH_FAILED_LABEL } from "../core/postGameFinish.js";
 import { getLobbyParticipants } from "../core/lobby.js";
 import { getActivePlayerNames, getActivePlayers, getNpcPlayers } from "../core/players.js";
 import { setLobbyPlaying, setLobbyWaiting } from "../core/lobby.js";
@@ -75,6 +76,8 @@ export function mountWrongAnswer(app) {
   let lastRound = null;
   let roundScored = false;
   let transitionInFlight = false;
+  /** Hôte : la fin de partie (« Voir les résultats ») n'est pas partie. */
+  let finishFailed = false;
 
   let selectedTarget = null;
   let draftText = "";
@@ -392,7 +395,11 @@ export function mountWrongAnswer(app) {
         !mp || canActAsHost()
           ? `<button type="button" class="btn btn-primary btn--spaced" id="next-round">
               ${roundIdx < totalRounds - 1 ? "Manche suivante →" : "Voir les résultats →"}
-            </button>`
+            </button>${
+              finishFailed
+                ? `<p class="hint">${escapeHtml(POST_GAME_FINISH_FAILED_LABEL)}</p>`
+                : ""
+            }`
           : `<p class="hint">En attente de l'hôte pour la suite…</p>`
       }
       </div>
@@ -697,12 +704,16 @@ export function mountWrongAnswer(app) {
         if (mp) {
           try {
             await completeGameSession({ gameId: "wronganswer", screen: "results", state: {} });
+            finishFailed = false;
             ensurePostGameScreen("results", { from: "wronganswer", gameId: "wronganswer" });
           } catch (e) {
+            // Fin de partie pas enregistrée : l'hôte reste sur le verdict (comme les
+            // invités) et peut réessayer. Avant, il partait seul aux résultats.
             console.warn("REVEAL completeGameSession:", e);
             if (!mount.isMounted()) return;
             if (!mount.isCurrentMount()) return;
-            navigate("results", { navStack: ["home", "lobby", "game-select", "results"] });
+            finishFailed = true;
+            render();
           }
         } else {
           setLobbyWaiting();
