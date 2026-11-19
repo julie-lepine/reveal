@@ -324,14 +324,20 @@ describe("FEATURE-PROFILE-04 — carnet Signature", () => {
     assert.equal(layout.w, CARNET_CARD_WIDTH);
     assert.equal(layout.h, CARNET_CARD_HEIGHT);
     assert.equal(layout.w / layout.h, 1080 / 1920);
-    assert.ok(layout.hero.y >= layout.padTop);
-    assert.ok(layout.ident.y >= layout.hero.y + layout.hero.h);
-    assert.ok(layout.hero.h <= 200);
-    assert.ok(layout.hero.h < layout.ring.h);
+    // Carte de collection : tout tient dans le cadre, hors des 250 px qu'Instagram
+    // recouvre en haut et en bas d'une story.
+    const { card } = layout;
+    assert.ok(card.y >= 250 && card.y + card.h <= layout.h - 250);
+    assert.ok(layout.top.y >= card.y);
+    assert.ok(layout.avatar.cy - layout.avatar.r > layout.top.y + layout.top.h);
+    assert.ok(layout.name.y >= layout.avatar.cy + layout.avatar.r);
+    assert.ok(layout.badge.y >= layout.name.y + layout.name.h);
+    assert.ok(layout.hook.y >= layout.badge.y + layout.badge.h);
+    assert.ok(layout.tiles[0].y >= layout.hook.y + layout.hook.h);
+    assert.equal(layout.tiles.length, 4);
     assert.ok(layout.dots.y >= layout.tiles[2].y + layout.tiles[2].h);
     assert.ok(layout.logo.y > layout.dots.y + layout.dots.h);
-    assert.ok(layout.logo.y - (layout.dots.y + layout.dots.h) < 120);
-    assert.ok(layout.logo.y + layout.logo.h <= layout.h - 160);
+    assert.ok(layout.logo.y + layout.logo.h <= card.y + card.h);
 
     const cardJs = src("js/core/signatureCarnetCard.js");
     assert.doesNotMatch(cardJs, /friendNames|friend_names/);
@@ -347,13 +353,11 @@ describe("FEATURE-PROFILE-04 — carnet Signature", () => {
     assert.equal(isShareCancelError({ name: "AbortError" }), true);
     assert.equal(isShareCancelError({ message: "Share canceled" }), true);
     assert.equal(isShareCancelError({ message: "network" }), false);
-    assert.match(cardJs, /layout\.yMin/);
-    assert.match(cardJs, /layout\.yMax/);
-    assert.match(cardJs, /chart\.x \+ chart\.w/);
-    assert.match(cardJs, /chart\.y \+ chart\.h/);
-    assert.match(cardJs, /box\.h - titleY - padBottom/);
-    assert.doesNotMatch(cardJs, /h:\s*140/);
-    assert.doesNotMatch(cardJs, /box\.y \+ box\.h - 18/);
+    // Carte de collection : logo de l'app, pseudo en Anton, accroche conservée.
+    assert.match(cardJs, /loadLogo\(\)/);
+    assert.match(cardJs, /DISPLAY_FONT/);
+    assert.match(cardJs, /drawHook\(ctx, layout\.hook, model\.hook\)/);
+    assert.match(cardJs, /drawRankDots\(ctx, layout\.dots, model\.dots\)/);
     const labels = src("js/config/signatureCarnet.js");
     assert.match(labels, /Partager ma carte/);
     assert.match(labels, /Mes 20 dernières soirées/);

@@ -2,6 +2,7 @@
  * FEATURE-PROFILE-04 — carte share 9:16 (canvas + preview + share sheet).
  */
 import { APP_LOGO } from "../../data/branding.js";
+import { PACK_SIGNATURE_LABEL } from "../config/premiumPacks.js";
 import { CARNET_LABEL } from "../config/signatureCarnet.js";
 import { withClickLock } from "./actionLock.js";
 import {
@@ -18,11 +19,7 @@ import {
   carnetCardLayout,
   isShareCancelError,
 } from "./signatureCarnetCardLogic.js";
-import {
-  carnetSparklineLayout,
-  carnetWinrateRing,
-  formatCarnetWinrate,
-} from "./signatureCarnetLogic.js";
+import { formatCarnetWinrate } from "./signatureCarnetLogic.js";
 import { escapeHtml } from "./ui.js";
 
 const COLOR = {
@@ -39,9 +36,14 @@ const COLOR = {
   muted: "rgba(255,255,255,0.72)",
   track: "rgba(255,255,255,0.14)",
   restBar: "#b4b8f5",
+  lavender: "#c4b5fd",
+  orange: "#fb923c",
 };
 
 const FONT = 'Inter, system-ui, -apple-system, sans-serif';
+const DISPLAY_FONT = "Anton, Impact, Inter, sans-serif";
+/** skewX(-6deg) des titres de l'app (--display-skew). */
+const DISPLAY_SKEW = Math.tan((-6 * Math.PI) / 180);
 
 let previewClose = null;
 let logoCache = null;
@@ -128,381 +130,275 @@ function loadAvatarImage(url) {
   });
 }
 
-function drawHero(ctx, box, hook) {
-  fillRoundRect(ctx, box.x, box.y, box.w, box.h, box.r, COLOR.hero);
-  ctx.save();
-  roundRectPath(ctx, box.x, box.y, box.w, box.h, box.r);
-  ctx.clip();
-  const g1 = ctx.createRadialGradient(
-    box.x + box.w * 0.18,
-    box.y + box.h * 0.5,
-    16,
-    box.x + box.w * 0.18,
-    box.y + box.h * 0.5,
-    box.w * 0.55
-  );
-  g1.addColorStop(0, "rgba(255, 60, 172, 0.5)");
-  g1.addColorStop(1, "rgba(255, 60, 172, 0)");
-  ctx.fillStyle = g1;
-  ctx.fillRect(box.x, box.y, box.w, box.h);
-  const g2 = ctx.createRadialGradient(
-    box.x + box.w * 0.82,
-    box.y + box.h * 0.5,
-    10,
-    box.x + box.w * 0.82,
-    box.y + box.h * 0.5,
-    box.w * 0.62
-  );
-  g2.addColorStop(0, "rgba(99, 102, 241, 0.55)");
-  g2.addColorStop(1, "rgba(99, 102, 241, 0)");
-  ctx.fillStyle = g2;
-  ctx.fillRect(box.x, box.y, box.w, box.h);
-  ctx.fillStyle = "rgba(5, 6, 15, 0.22)";
-  ctx.fillRect(box.x, box.y, box.w, box.h);
-  if (hook) {
-    ctx.fillStyle = COLOR.white;
-    ctx.font = `800 72px ${FONT}`;
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.shadowColor = "rgba(0, 0, 0, 0.45)";
-    ctx.shadowBlur = 12;
-    ctx.fillText(ellipsize(ctx, hook, box.w - 56), box.x + box.w / 2, box.y + box.h / 2);
-    ctx.shadowBlur = 0;
-  }
-  ctx.restore();
-  ctx.save();
-  roundRectPath(ctx, box.x, box.y, box.w, box.h, box.r);
-  ctx.strokeStyle = "rgba(255,255,255,0.08)";
-  ctx.lineWidth = 2;
-  ctx.stroke();
-  ctx.restore();
+/** Dégradé du cadre : or → rose → indigo (carte de collection). */
+function frameGradient(ctx, box) {
+  const g = ctx.createLinearGradient(box.x, box.y, box.x + box.w, box.y + box.h);
+  g.addColorStop(0, COLOR.gold);
+  g.addColorStop(0.5, COLOR.primary);
+  g.addColorStop(1, COLOR.secondary);
+  return g;
 }
 
-function drawIdentity(ctx, box, identity, photo) {
-  const r = box.avatar / 2;
-  const cx = box.x + r;
-  const cy = box.y + box.h / 2;
+/** Dégradé des chiffres : indigo → rose (accent de la soirée). */
+function valueGradient(ctx, x, y, w, h) {
+  const g = ctx.createLinearGradient(x, y, x + w, y + h);
+  g.addColorStop(0, COLOR.secondarySoft);
+  g.addColorStop(1, COLOR.primary);
+  return g;
+}
+
+function drawBackground(ctx, layout) {
+  ctx.fillStyle = COLOR.bg;
+  ctx.fillRect(0, 0, layout.w, layout.h);
+  const glow = (x, y, r, color) => {
+    const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+    g.addColorStop(0, color);
+    g.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, layout.w, layout.h);
+  };
+  glow(layout.w * 0.15, layout.h * 0.08, 900, "rgba(255, 60, 172, 0.32)");
+  glow(layout.w * 0.95, layout.h * 0.95, 950, "rgba(99, 102, 241, 0.38)");
+}
+
+function drawCardFrame(ctx, box) {
+  const border = box.border;
+  ctx.save();
+  ctx.shadowColor = "rgba(245, 215, 110, 0.35)";
+  ctx.shadowBlur = 70;
+  ctx.shadowOffsetY = 30;
+  fillRoundRect(ctx, box.x, box.y, box.w, box.h, box.r, frameGradient(ctx, box));
+  ctx.restore();
+  const inner = ctx.createLinearGradient(box.x, box.y, box.x + box.w * 0.4, box.y + box.h);
+  inner.addColorStop(0, "#1d1a3a");
+  inner.addColorStop(1, "#120f27");
+  fillRoundRect(
+    ctx,
+    box.x + border,
+    box.y + border,
+    box.w - border * 2,
+    box.h - border * 2,
+    box.r - border,
+    inner
+  );
+}
+
+function drawCardTop(ctx, box, label) {
+  ctx.fillStyle = COLOR.gold;
+  ctx.font = `800 30px ${FONT}`;
+  ctx.textBaseline = "middle";
+  ctx.textAlign = "left";
+  if ("letterSpacing" in ctx) ctx.letterSpacing = "4px";
+  ctx.fillText(label.toUpperCase(), box.x, box.y + box.h / 2);
+  ctx.textAlign = "right";
+  ctx.fillText("✦", box.x + box.w, box.y + box.h / 2);
+  if ("letterSpacing" in ctx) ctx.letterSpacing = "0px";
+}
+
+function drawAvatar(ctx, box, identity, photo) {
+  const { cx, cy, r, ring } = box;
   ctx.save();
   ctx.beginPath();
   ctx.arc(cx, cy, r, 0, Math.PI * 2);
-  ctx.fillStyle = identity.color;
+  if (typeof ctx.createConicGradient === "function") {
+    const g = ctx.createConicGradient(0, cx, cy);
+    g.addColorStop(0, COLOR.gold);
+    g.addColorStop(0.33, COLOR.primary);
+    g.addColorStop(0.66, COLOR.secondary);
+    g.addColorStop(1, COLOR.gold);
+    ctx.fillStyle = g;
+  } else {
+    ctx.fillStyle = frameGradient(ctx, { x: cx - r, y: cy - r, w: r * 2, h: r * 2 });
+  }
+  ctx.fill();
+  ctx.restore();
+
+  const inner = r - ring;
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(cx, cy, inner, 0, Math.PI * 2);
+  ctx.fillStyle = "#16173a";
   ctx.fill();
   if (photo) {
     ctx.clip();
-    ctx.drawImage(photo, cx - r, cy - r, box.avatar, box.avatar);
+    ctx.drawImage(photo, cx - inner, cy - inner, inner * 2, inner * 2);
   }
   ctx.restore();
   if (!photo) {
-    ctx.font = `48px ${FONT}`;
+    ctx.font = `${Math.round(inner * 1.05)}px ${FONT}`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillStyle = COLOR.white;
-    ctx.fillText(identity.emoji, cx, cy + 2);
-  }
-  if (identity.signature) {
-    ctx.beginPath();
-    ctx.arc(cx, cy, r, 0, Math.PI * 2);
-    ctx.strokeStyle = COLOR.gold;
-    ctx.lineWidth = 4;
-    ctx.shadowColor = "rgba(245, 215, 110, 0.45)";
-    ctx.shadowBlur = 10;
-    ctx.stroke();
-    ctx.shadowBlur = 0;
-  }
-
-  const nameX = box.x + box.avatar + 22;
-  const nameMax = box.w - box.avatar - 22;
-  ctx.textAlign = "left";
-  ctx.textBaseline = "middle";
-  ctx.fillStyle = identity.nameColorHex || COLOR.white;
-  ctx.font = `700 42px ${FONT}`;
-  const name = ellipsize(ctx, identity.name, nameMax - (identity.signature ? 40 : 0));
-  ctx.fillText(name, nameX, cy);
-  if (identity.signature) {
-    const nw = ctx.measureText(name).width;
-    ctx.fillStyle = COLOR.gold;
-    ctx.font = `700 32px ${FONT}`;
-    ctx.fillText("✦", nameX + nw + 10, cy);
+    ctx.fillText(identity.emoji, cx, cy + inner * 0.06);
   }
 }
 
-function drawRing(ctx, box, winrate) {
-  fillRoundRect(ctx, box.x, box.y, box.w, box.h, box.r, COLOR.card);
-  const labelH = 40;
-  const bodyH = Math.max(1, box.h - labelH);
-  const radius = Math.max(72, Math.min(96, Math.round(bodyH * 0.32)));
-  const ring = carnetWinrateRing(winrate, { radius, stroke: 16 });
-  const cx = box.x + box.w / 2;
-  const cy = box.y + bodyH / 2;
-  ctx.beginPath();
-  ctx.arc(cx, cy, ring.radius, 0, Math.PI * 2);
-  ctx.strokeStyle = COLOR.track;
-  ctx.lineWidth = ring.stroke;
-  ctx.stroke();
-  const pct =
-    winrate == null || !Number.isFinite(winrate) ? 0 : Math.max(0, Math.min(1, winrate));
-  if (pct > 0) {
-    ctx.beginPath();
-    ctx.arc(cx, cy, ring.radius, -Math.PI / 2, -Math.PI / 2 + pct * Math.PI * 2);
-    ctx.strokeStyle = COLOR.primary;
-    ctx.lineCap = "round";
-    ctx.lineWidth = ring.stroke;
-    ctx.shadowColor = "rgba(255, 60, 172, 0.55)";
-    ctx.shadowBlur = 12;
-    ctx.stroke();
-    ctx.shadowBlur = 0;
-    ctx.lineCap = "butt";
-  }
-  ctx.fillStyle = COLOR.primary;
-  ctx.font = `800 42px ${FONT}`;
+/** Texte Anton incliné (comme les titres de l'app). */
+function fillDisplayText(ctx, text, x, y, { size, maxW, fill, align = "center" }) {
+  ctx.save();
+  ctx.font = `400 ${size}px ${DISPLAY_FONT}`;
+  ctx.textAlign = align;
+  ctx.textBaseline = "alphabetic";
+  const s = ellipsize(ctx, String(text || "").toUpperCase(), maxW);
+  ctx.translate(x, y);
+  ctx.transform(1, 0, DISPLAY_SKEW, 1, 0, 0);
+  ctx.fillStyle = fill;
+  ctx.fillText(s, 0, 0);
+  ctx.restore();
+}
+
+function drawName(ctx, box, identity) {
+  fillDisplayText(ctx, identity.name, box.x + box.w / 2, box.y + box.h, {
+    size: box.size,
+    maxW: box.w,
+    fill: identity.nameColorHex || COLOR.white,
+  });
+}
+
+function drawBadge(ctx, box) {
+  const label = `✨ ${PACK_SIGNATURE_LABEL.toUpperCase()}`;
+  ctx.font = `800 30px ${FONT}`;
+  if ("letterSpacing" in ctx) ctx.letterSpacing = "3px";
+  const w = ctx.measureText(label).width + 56;
+  const x = box.x + (box.w - w) / 2;
+  const g = ctx.createLinearGradient(x, box.y, x + w, box.y + box.h);
+  g.addColorStop(0, COLOR.gold);
+  g.addColorStop(1, "#fbbf24");
+  fillRoundRect(ctx, x, box.y, w, box.h, box.h / 2, g);
+  ctx.fillStyle = "#1b1404";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.fillText(formatCarnetWinrate(winrate), cx, cy);
-  ctx.fillStyle = COLOR.muted;
-  ctx.font = `600 22px ${FONT}`;
-  ctx.textBaseline = "alphabetic";
-  ctx.fillText(CARNET_LABEL.statsWinrate, cx, box.y + box.h - 22);
+  ctx.fillText(label, box.x + box.w / 2, box.y + box.h / 2 + 1);
+  if ("letterSpacing" in ctx) ctx.letterSpacing = "0px";
 }
 
-function drawSpark(ctx, box, scores) {
-  fillRoundRect(ctx, box.x, box.y, box.w, box.h, box.r, COLOR.card);
-  ctx.fillStyle = COLOR.muted;
-  ctx.font = `600 22px ${FONT}`;
-  ctx.textAlign = "left";
-  ctx.textBaseline = "alphabetic";
-  ctx.fillText(CARNET_LABEL.chartScores, box.x + 18, box.y + 32);
-
-  const padX = 16;
-  const padBottom = 14;
-  const titleY = 44;
-  const chart = {
-    x: box.x + padX,
-    y: box.y + titleY,
-    w: box.w - padX * 2,
-    h: Math.max(96, box.h - titleY - padBottom),
-  };
-  const finite = (Array.isArray(scores) ? scores : []).filter((n) => Number.isFinite(n));
-  const layout = carnetSparklineLayout(finite, {
-    width: chart.w,
-    height: chart.h,
-    pad: 8,
-  });
-  ctx.save();
-  ctx.translate(chart.x, chart.y);
-  if (layout.dots.length === 1) {
-    ctx.beginPath();
-    ctx.arc(layout.dots[0].x, layout.dots[0].y, 5, 0, Math.PI * 2);
-    ctx.fillStyle = COLOR.secondarySoft;
-    ctx.fill();
-  } else if (layout.dots.length > 1) {
-    ctx.beginPath();
-    ctx.moveTo(layout.dots[0].x, layout.height - 8);
-    for (const d of layout.dots) ctx.lineTo(d.x, d.y);
-    ctx.lineTo(layout.dots[layout.dots.length - 1].x, layout.height - 8);
-    ctx.closePath();
-    ctx.fillStyle = "rgba(99, 102, 241, 0.22)";
-    ctx.fill();
-    ctx.beginPath();
-    ctx.moveTo(layout.dots[0].x, layout.dots[0].y);
-    for (let i = 1; i < layout.dots.length; i += 1) {
-      ctx.lineTo(layout.dots[i].x, layout.dots[i].y);
-    }
-    ctx.strokeStyle = COLOR.secondarySoft;
-    ctx.lineWidth = 3;
-    ctx.lineJoin = "round";
-    ctx.lineCap = "round";
-    ctx.stroke();
-    const last = layout.dots[layout.dots.length - 1];
-    ctx.beginPath();
-    ctx.arc(last.x, last.y, 4.5, 0, Math.PI * 2);
-    ctx.fillStyle = COLOR.secondarySoft;
-    ctx.fill();
-  }
-  ctx.restore();
-
-  if (layout.yMin != null && layout.yMax != null) {
-    ctx.fillStyle = COLOR.secondarySoft;
-    ctx.font = `800 28px ${FONT}`;
-    ctx.textAlign = "left";
-    ctx.textBaseline = "alphabetic";
-    ctx.fillText(String(layout.yMin), chart.x, chart.y + chart.h - 4);
-    ctx.textAlign = "right";
-    ctx.textBaseline = "alphabetic";
-    ctx.fillText(String(layout.yMax), chart.x + chart.w, chart.y + 26);
-  }
+function drawHook(ctx, box, hook) {
+  if (!hook) return;
+  ctx.fillStyle = COLOR.gold;
+  ctx.font = `800 40px ${FONT}`;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(ellipsize(ctx, hook, box.w), box.x + box.w / 2, box.y + box.h / 2);
 }
 
-function drawRanks(ctx, box, split, percents) {
-  fillRoundRect(ctx, box.x, box.y, box.w, box.h, box.r, COLOR.card);
-  ctx.fillStyle = COLOR.muted;
-  ctx.font = `600 22px ${FONT}`;
-  ctx.textAlign = "left";
-  ctx.textBaseline = "alphabetic";
-  ctx.fillText(CARNET_LABEL.chartRanks, box.x + 18, box.y + 32);
-
-  const rows = [
-    { label: CARNET_LABEL.chartRankFirst, n: split.first, pct: percents.first, fill: COLOR.primary },
-    { label: CARNET_LABEL.chartRankSecond, n: split.second, pct: percents.second, fill: COLOR.secondarySoft },
-    { label: CARNET_LABEL.chartRankRest, n: split.rest, pct: percents.rest, fill: COLOR.restBar },
-  ];
-  const headerH = 52;
-  const rowH = (box.h - headerH - 12) / rows.length;
-  rows.forEach((row, i) => {
-    const mid = box.y + headerH + i * rowH + rowH / 2;
-    ctx.fillStyle = COLOR.white;
-    ctx.font = `600 22px ${FONT}`;
-    ctx.textAlign = "left";
-    ctx.textBaseline = "middle";
-    ctx.fillText(row.label, box.x + 18, mid);
-    const trackX = box.x + 86;
-    const trackW = box.w - 86 - 64;
-    const barH = 14;
-    fillRoundRect(ctx, trackX, mid - barH / 2, trackW, barH, 99, "rgba(255,255,255,0.1)");
-    if (row.pct > 0) {
-      fillRoundRect(
-        ctx,
-        trackX,
-        mid - barH / 2,
-        Math.max(12, (trackW * row.pct) / 100),
-        barH,
-        99,
-        row.fill
-      );
-    }
-    ctx.textAlign = "right";
-    ctx.fillStyle = COLOR.muted;
-    ctx.fillText(String(row.n), box.x + box.w - 18, mid);
-  });
-}
-
-function drawTiles(ctx, tiles, model) {
+function drawStatTiles(ctx, tiles, model) {
   const favId = model.stats.favoriteGame;
   const favTitle = catalogTitleForSessionGameId(favId) || CARNET_LABEL.favoriteNone;
   const favEmoji = catalogEmojiForSessionGameId(favId) || CARNET_LABEL.statsFavoriteEmoji;
   const cells = [
     {
-      box: tiles[0],
-      emoji: CARNET_LABEL.statsEveningsEmoji,
       value: String(model.stats.evenings),
-      label: CARNET_LABEL.statsEvenings,
-      fill: "rgba(255, 60, 172, 0.18)",
-      valueColor: COLOR.primary,
+      label: `${CARNET_LABEL.statsEveningsEmoji} ${CARNET_LABEL.statsEvenings}`,
     },
     {
-      box: tiles[1],
-      emoji: CARNET_LABEL.statsGamesEmoji,
-      value: String(model.stats.games),
-      label: CARNET_LABEL.statsGames,
-      fill: "rgba(99, 102, 241, 0.22)",
-      valueColor: COLOR.secondarySoft,
-    },
-    {
-      box: tiles[2],
-      emoji: CARNET_LABEL.statsMvpEmoji,
       value: String(model.stats.mvp),
-      label: CARNET_LABEL.statsMvp,
-      fill: "rgba(255, 107, 107, 0.18)",
-      valueColor: COLOR.primaryHot,
+      label: `${CARNET_LABEL.statsMvpEmoji} ${CARNET_LABEL.statsMvp}`,
     },
     {
-      box: tiles[3],
-      emoji: favEmoji,
-      value: favTitle,
-      label: CARNET_LABEL.statsFavorite,
-      fill: "rgba(129, 140, 248, 0.2)",
-      valueColor: COLOR.secondarySoft,
+      value: formatCarnetWinrate(model.stats.winrate),
+      label: CARNET_LABEL.statsWinrate,
+    },
+    {
+      value: `${favEmoji} ${favTitle}`,
+      label: `${CARNET_LABEL.statsFavoriteEmoji} ${CARNET_LABEL.statsFavorite}`,
+      small: true,
     },
   ];
-  for (const cell of cells) {
-    const { box } = cell;
-    fillRoundRect(ctx, box.x, box.y, box.w, box.h, box.r, cell.fill);
+  cells.forEach((cell, i) => {
+    const box = tiles[i];
+    fillRoundRect(ctx, box.x, box.y, box.w, box.h, box.r, "rgba(255,255,255,0.06)");
+    const padX = 30;
+    const size = cell.small ? 52 : 88;
+    fillDisplayText(ctx, cell.value, box.x + padX, box.y + 34 + size * 0.82, {
+      size,
+      maxW: box.w - padX * 2,
+      fill: valueGradient(ctx, box.x, box.y, box.w, box.h),
+      align: "left",
+    });
+    ctx.fillStyle = COLOR.muted;
+    ctx.font = `700 28px ${FONT}`;
     ctx.textAlign = "left";
     ctx.textBaseline = "alphabetic";
-    ctx.font = `800 36px ${FONT}`;
-    ctx.fillStyle = cell.valueColor;
-    const value = ellipsize(ctx, `${cell.emoji}  ${cell.value}`, box.w - 28);
-    ctx.fillText(value, box.x + 16, box.y + Math.round(box.h * 0.48));
-    ctx.fillStyle = COLOR.muted;
-    ctx.font = `600 22px ${FONT}`;
-    ctx.fillText(cell.label, box.x + 16, box.y + box.h - 24);
-  }
+    ctx.fillText(ellipsize(ctx, cell.label, box.w - padX * 2), box.x + padX, box.y + box.h - 30);
+  });
 }
 
-function drawDots(ctx, box, tones) {
-  ctx.fillStyle = COLOR.muted;
-  ctx.font = `600 22px ${FONT}`;
-  ctx.textAlign = "left";
-  ctx.textBaseline = "alphabetic";
-  ctx.fillText(CARNET_LABEL.shareDotsTitle, box.x, box.y + 22);
-
+function drawRankDots(ctx, box, tones) {
   const n = tones.length || 20;
-  const d = 26;
-  const span = box.w - d;
-  const rowY = box.y + box.h - d / 2;
-  ctx.lineWidth = 2;
+  const d = box.dot;
+  const gap = (box.w - n * d) / Math.max(1, n - 1);
+  const y = box.y + box.h / 2;
   for (let i = 0; i < n; i += 1) {
-    const x = n === 1 ? box.x + box.w / 2 : box.x + d / 2 + (i / (n - 1)) * span;
-    const y = rowY;
+    const x = box.x + d / 2 + i * (d + gap);
     const tone = tones[i];
+    ctx.save();
     ctx.beginPath();
     ctx.arc(x, y, d / 2, 0, Math.PI * 2);
     if (tone === "first") {
-      ctx.fillStyle = COLOR.primary;
+      ctx.shadowColor = "rgba(245, 215, 110, 0.6)";
+      ctx.shadowBlur = 14;
+      ctx.fillStyle = COLOR.gold;
       ctx.fill();
     } else if (tone === "second") {
-      ctx.fillStyle = COLOR.secondarySoft;
+      ctx.fillStyle = COLOR.lavender;
       ctx.fill();
     } else if (tone === "rest") {
-      ctx.fillStyle = "rgba(255,255,255,0.28)";
+      ctx.fillStyle = COLOR.orange;
       ctx.fill();
     } else {
-      ctx.strokeStyle = "rgba(255,255,255,0.16)";
-      ctx.stroke();
+      ctx.fillStyle = "rgba(255,255,255,0.12)";
+      ctx.fill();
     }
+    ctx.restore();
   }
 }
 
 function drawLogo(ctx, box, img) {
   if (img && img.naturalWidth) {
-    const maxW = Math.min(box.w * 0.72, 640);
-    const maxH = box.h;
-    const scale = Math.min(maxW / img.naturalWidth, maxH / img.naturalHeight);
+    const scale = Math.min(box.w / img.naturalWidth, box.h / img.naturalHeight);
     const dw = img.naturalWidth * scale;
     const dh = img.naturalHeight * scale;
     ctx.drawImage(img, box.x + (box.w - dw) / 2, box.y + (box.h - dh) / 2, dw, dh);
     return;
   }
-  ctx.fillStyle = COLOR.gold;
-  ctx.font = `800 42px ${FONT}`;
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.fillText("REVEAL", box.x + box.w / 2, box.y + box.h / 2);
+  fillDisplayText(ctx, "REVEAL", box.x + box.w / 2, box.y + box.h * 0.6, {
+    size: 72,
+    maxW: box.w,
+    fill: valueGradient(ctx, box.x, box.y, box.w, box.h),
+  });
 }
 
+async function waitDisplayFont() {
+  try {
+    if (typeof document !== "undefined" && document.fonts?.load) {
+      await document.fonts.load(`400 120px ${DISPLAY_FONT}`);
+    }
+  } catch {
+    /* police de secours */
+  }
+}
+
+/** Carte de collection 9:16 : cadre doré, avatar, pseudo, accroche, 4 stats, 20 soirées, logo. */
 export async function renderCarnetSharePng(model) {
   await waitFonts();
+  await waitDisplayFont();
   const layout = carnetCardLayout();
   const canvas = document.createElement("canvas");
   canvas.width = CARNET_CARD_WIDTH;
   canvas.height = CARNET_CARD_HEIGHT;
   const ctx = canvas.getContext("2d");
   if (!ctx) throw new Error("canvas");
-  ctx.fillStyle = COLOR.bg;
-  ctx.fillRect(0, 0, layout.w, layout.h);
-  const bgGlow = ctx.createRadialGradient(layout.w * 0.5, 80, 40, layout.w * 0.5, 400, 900);
-  bgGlow.addColorStop(0, COLOR.bgDeep);
-  bgGlow.addColorStop(1, COLOR.bg);
-  ctx.fillStyle = bgGlow;
-  ctx.fillRect(0, 0, layout.w, layout.h);
 
-  drawHero(ctx, layout.hero, model.hook);
+  drawBackground(ctx, layout);
+  drawCardFrame(ctx, layout.card);
+  drawCardTop(ctx, layout.top, CARNET_LABEL.pageTitle);
   const photo = await loadAvatarImage(model.identity?.avatarUrl);
-  drawIdentity(ctx, layout.ident, model.identity, photo);
-  drawRing(ctx, layout.ring, model.stats.winrate);
-  drawSpark(ctx, layout.spark, model.sparkScores);
-  drawRanks(ctx, layout.ranks, model.rankSplit, model.rankPercents);
-  drawTiles(ctx, layout.tiles, model);
-  drawDots(ctx, layout.dots, model.dots);
+  drawAvatar(ctx, layout.avatar, model.identity, photo);
+  drawName(ctx, layout.name, model.identity);
+  drawBadge(ctx, layout.badge);
+  drawHook(ctx, layout.hook, model.hook);
+  drawStatTiles(ctx, layout.tiles, model);
+  drawRankDots(ctx, layout.dots, model.dots);
   drawLogo(ctx, layout.logo, await loadLogo());
 
   const blob = await new Promise((resolve, reject) => {
