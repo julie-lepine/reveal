@@ -25,6 +25,7 @@ import {
   refreshGameSession,
   getEffectiveSessionScreen,
   isLobbyHost,
+  canActAsHost,
   canForceTierNightResults,
   canRouteToTierNightEnd,
 } from "../core/gameSync.js";
@@ -126,6 +127,16 @@ export function mountTierNight(app) {
     render();
   }
 
+  /**
+   * Peut terminer la manche : le vrai hôte, ou l'hôte remplaçant en mode série
+   * (les RPC finalize / advance acceptent is_acting_host). Le mode classique
+   * (solo / ancien) reste réservé au vrai hôte : son écriture finale n'est pas
+   * acceptée côté serveur pour le remplaçant.
+   */
+  function canLeadRoundEnd() {
+    return isLobbyHost() || (hasActiveTierNightSeries() && canActAsHost());
+  }
+
   async function finishGame() {
     if (finished) return;
     finished = true;
@@ -173,7 +184,7 @@ export function mountTierNight(app) {
       render();
       // FEATURE-TIERNIGHT-03-D - série : finalize RPC ; legacy : classic end.
       if (hasActiveTierNightSeries()) {
-        if (isLobbyHost()) {
+        if (canLeadRoundEnd()) {
           await hostFinalizeTierNightSeriesRound({
             shouldContinue: () => alive,
           });
@@ -195,7 +206,7 @@ export function mountTierNight(app) {
     const progress = getTierNightLobbyProgress();
     const doneCount = progress.filter((p) => p.done).length;
     const total = progress.length;
-    const host = isLobbyHost();
+    const host = canLeadRoundEnd();
     const canForce = host && canForceTierNightResults();
     const waitingNames = progress.filter((p) => !p.done).map((p) => p.name);
     return `
@@ -231,7 +242,7 @@ export function mountTierNight(app) {
   }
 
   async function forceResults() {
-    if (!isLobbyHost()) return;
+    if (!canLeadRoundEnd()) return;
     if (hasActiveTierNightSeries()) {
       await hostFinalizeTierNightSeriesRound({
         force: true,
@@ -447,7 +458,8 @@ export function mountTierNight(app) {
       if (!alive) return;
       render();
       if (hasActiveTierNightSeries()) {
-        if (isLobbyHost()) {
+        // Hôte parti : le remplaçant désigné termine la manche quand tout le monde a fini.
+        if (canLeadRoundEnd()) {
           await hostFinalizeTierNightSeriesRound({ shouldContinue: () => alive });
         }
         return;
