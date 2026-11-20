@@ -57,7 +57,7 @@ describe("Les 6 jeux : copie avant les points, remise si l'envoi échoue", () =>
     "js/games/hotTake.js": /if \(getHotTakeSession\(\)\.phase !== "reveal"\) restoreEveningScores\(eveningBefore\);/,
     "js/games/speedVote.js": /if \(getSpeedVoteSession\(\)\.phase !== "reveal"\) \{\s*restoreEveningScores\(eveningBefore\);/,
     "js/games/wrongAnswer.js": /if \(getWrongAnswerSession\(\)\.phase !== "reveal"\) restoreEveningScores\(eveningBefore\);/,
-    "js/games/guessLie.js": /restoreEveningScores\(eveningBefore\);\s*roundScored = false;\s*throw err;/,
+    "js/games/guessLie.js": /restoreEveningScores\(eveningBefore\);\s*roundScored = false;[\s\S]{0,400}?throw err;/,
   };
   const AWARD = {
     "js/games/clutch.js": "awardClutchRound(",

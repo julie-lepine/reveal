@@ -29,7 +29,11 @@ import {
   setLastGame,
   snapshotEveningScores,
 } from "../core/state.js";
-import { NEXT_ROUND_FAILED_LABEL, POST_GAME_FINISH_FAILED_LABEL } from "../core/postGameFinish.js";
+import {
+  NEXT_ROUND_FAILED_LABEL,
+  POST_GAME_FINISH_FAILED_LABEL,
+  REVEAL_FAILED_LABEL,
+} from "../core/postGameFinish.js";
 import { startRoundWithRollback } from "../core/roundStartRollback.js";
 import { awardGuessLieRound, guessLieLiarWins } from "../core/scoring.js";
 import { gameCumulativeScoresHtml, refreshGameScoresBox } from "../core/gameScores.js";
@@ -99,6 +103,8 @@ export function mountGuessLie(app) {
   let finishFailed = false;
   /** Hôte : le dernier « Manche suivante » n'est pas parti. */
   let nextRoundFailed = false;
+  /** Hôte : la dernière annonce du verdict n'est pas partie (message sous le bouton). */
+  let revealFailed = false;
   const localName = getLocalDisplayName();
   resetGuessLieIdentityDebugDedupe();
 
@@ -142,6 +148,7 @@ export function mountGuessLie(app) {
     const recordStats = gl.statsRecordedRoundIdx !== roundIdx;
 
     roundScored = true;
+    revealFailed = false;
 
     // Points de soirée avant cette manche : remis si l'envoi échoue (sinon un nouvel
     // essai « Révéler maintenant » les ajoutait une deuxième fois).
@@ -164,6 +171,11 @@ export function mountGuessLie(app) {
     } catch (err) {
       restoreEveningScores(eveningBefore);
       roundScored = false;
+      // Vrai hôte : commitGuessLiePlay enregistre « reveal » chez lui AVANT l'envoi.
+      // On remet la manche d'avant (celle des invités), sinon il voyait le verdict
+      // seul et « Révéler maintenant » ne faisait plus rien.
+      saveStatePatch({ guessLie: gl });
+      revealFailed = true;
       throw err;
     }
 
@@ -190,9 +202,20 @@ export function mountGuessLie(app) {
       if (!mount.isMounted()) return;
       if (!mount.isCurrentMount()) return;
       render();
+    } catch (err) {
+      onRevealFailed(err);
     } finally {
       revealAdvancing = false;
     }
+  }
+
+  /** Échec de l'annonce : l'hôte reste sur le vote, voit le message, peut réessayer. */
+  function onRevealFailed(err) {
+    console.warn("REVEAL guesslie verdict:", err);
+    if (!mount.isMounted()) return;
+    if (!mount.isCurrentMount()) return;
+    syncFromGl();
+    render();
   }
 
   function ensureRevealDisplay() {
@@ -208,6 +231,7 @@ export function mountGuessLie(app) {
     if (gl.phase) phase = gl.phase;
     const serverPick = (gl.votes || {})[localName] ?? null;
 
+    if (roundIdx !== prevIdx) revealFailed = false;
     if (roundIdx !== prevIdx || (phase === "voting" && prevPhase === "reveal")) {
       selected = null;
       myVote = serverPick;
@@ -254,6 +278,8 @@ export function mountGuessLie(app) {
         if (!mount.isMounted()) return;
         if (!mount.isCurrentMount()) return;
         render();
+      } catch (err) {
+        onRevealFailed(err);
       } finally {
         revealAdvancing = false;
       }
@@ -485,7 +511,9 @@ export function mountGuessLie(app) {
         body += `
           <button type="button" class="btn btn-secondary btn--spaced" id="guesslie-force">
             Révéler maintenant (${votedCount}/${totalDetectives})
-          </button>`;
+          </button>${
+            revealFailed ? `<p class="hint">${escapeHtml(REVEAL_FAILED_LABEL)}</p>` : ""
+          }`;
       }
     }
 

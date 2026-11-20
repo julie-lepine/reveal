@@ -9,3 +9,9 @@ export const POST_GAME_FINISH_FAILED_LABEL = "Les résultats ne sont pas partis,
  * il reste sur le verdict, comme les invités, et peut réessayer.
  */
 export const NEXT_ROUND_FAILED_LABEL = "La manche suivante n’est pas partie, réessaie !";
+
+/**
+ * Message de l'hôte quand l'annonce du verdict de la manche n'a pas pu être envoyée :
+ * il reste sur le vote, comme les invités, et peut réessayer (« Révéler maintenant »).
+ */
+export const REVEAL_FAILED_LABEL = "Le verdict n’est pas parti, réessaie !";
