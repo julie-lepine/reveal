@@ -19,7 +19,7 @@ import {
   refreshGameScoresBox,
 } from "../core/gameScores.js";
 import { getLocalDisplayName, recordDilemmaPlayed, saveStatePatch, setLastGame } from "../core/state.js";
-import { POST_GAME_FINISH_FAILED_LABEL } from "../core/postGameFinish.js";
+import { NEXT_ROUND_FAILED_LABEL, POST_GAME_FINISH_FAILED_LABEL } from "../core/postGameFinish.js";
 import { getLobbyParticipants } from "../core/lobby.js";
 import { getActivePlayers, getActivePlayerNames } from "../core/players.js";
 import { setLobbyPlaying, setLobbyWaiting } from "../core/lobby.js";
@@ -274,13 +274,26 @@ export function mountDilemma(app) {
 
   /** Hôte : la fin de partie (« Voir les résultats ») n'est pas partie. */
   let finishFailed = false;
+  /** Hôte : le dernier « Manche suivante » n'est pas parti. */
+  let nextRoundFailed = false;
 
   async function advanceRound() {
     if (mp && !canActAsHost()) return;
     const total = ROUNDS.length;
     if (roundIdx < total - 1) {
       const nextIdx = roundIdx + 1;
-      await startDilemmaRound(nextIdx);
+      try {
+        await startDilemmaRound(nextIdx);
+      } catch (e) {
+        // Rien n'est parti : l'hôte reste sur le verdict, comme les invités.
+        console.warn("REVEAL dilemma manche suivante:", e);
+        if (unmounted) return;
+        nextRoundFailed = true;
+        syncFromSession();
+        render();
+        return;
+      }
+      nextRoundFailed = false;
       if (unmounted) return;
       syncFromSession();
       selected = null;
@@ -441,6 +454,10 @@ export function mountDilemma(app) {
           ? `<button type="button" class="btn btn-primary btn--spaced" id="next-round">
           ${roundIdx < totalRounds - 1 ? "Manche suivante →" : "Voir les résultats →"}
         </button>${
+              nextRoundFailed
+                ? `<p class="hint">${escapeHtml(NEXT_ROUND_FAILED_LABEL)}</p>`
+                : ""
+            }${
               finishFailed
                 ? `<p class="hint">${escapeHtml(POST_GAME_FINISH_FAILED_LABEL)}</p>`
                 : ""
