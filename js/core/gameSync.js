@@ -181,6 +181,7 @@ export { pickRemotePlayFields, PLAY_PATCH_EXCLUDE } from "./playPatch.js";
 import {
   detectPlayerContribution,
   detectChatRouletteReactionContribution,
+  isHostClutchTapContribution,
   stateKeyToGameId,
 } from "./playerContribution.js";
 import {
@@ -5294,23 +5295,7 @@ async function patchGameStateAsNonHost(
   const contribution = detectPlayerContribution(stateMerge, uid);
   if (contribution) {
     arch03RevealLog("route contribute_game_session_player", contribution);
-    const {
-      rpcContributeGameSessionPlayer,
-    } = await import("./gameSessionRpc.js");
-    const row = await rpcContributeGameSessionPlayer({
-      lobbyId,
-      game: contribution.game,
-      kind: contribution.kind,
-      value: contribution.value,
-    });
-    if (!row) throw new Error("Contribution refusée.");
-    // RPC peut ne pas renvoyer state selon PostgREST ; recharger si besoin
-    let full = row;
-    if (!row.state) {
-      full = (await fetchGameSessionByLobby(lobbyId)) || row;
-    }
-    applyRemoteSession(full);
-    return full;
+    return contributeGameSessionPlayerAndApply(lobbyId, contribution);
   }
 
   // Acting host : play patch contrôlé (pas d'UPDATE libre)
@@ -5381,6 +5366,28 @@ async function patchGameStateAsNonHost(
   );
 }
 
+/**
+ * Contribution d'un joueur (vote, tap, réponse…) via la RPC serveur : le serveur
+ * ajoute la seule entrée du joueur, sans réécrire le reste de la partie.
+ */
+async function contributeGameSessionPlayerAndApply(lobbyId, contribution) {
+  const { rpcContributeGameSessionPlayer } = await import("./gameSessionRpc.js");
+  const row = await rpcContributeGameSessionPlayer({
+    lobbyId,
+    game: contribution.game,
+    kind: contribution.kind,
+    value: contribution.value,
+  });
+  if (!row) throw new Error("Contribution refusée.");
+  // RPC peut ne pas renvoyer state selon PostgREST ; recharger si besoin
+  let full = row;
+  if (!row.state) {
+    full = (await fetchGameSessionByLobby(lobbyId)) || row;
+  }
+  applyRemoteSession(full);
+  return full;
+}
+
 async function patchGameStateInner(
   stateMerge,
   {
@@ -5420,6 +5427,12 @@ async function patchGameStateInner(
     return persistChatRouletteReactionRemote({
       reaction: hostRouletteReaction.reaction,
     });
+  }
+
+  const hostContribution = hostUid ? detectPlayerContribution(stateMerge, hostUid) : null;
+  if (isHostClutchTapContribution(hostContribution)) {
+    arch03RevealLog("route host contribute_game_session_player (clutch tap)", hostContribution);
+    return contributeGameSessionPlayerAndApply(lobbyId, hostContribution);
   }
 
   let mergePayload = stateMerge;
