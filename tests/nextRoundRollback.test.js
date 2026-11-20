@@ -135,3 +135,31 @@ describe("Wrong Answer Only : manche suivante qui échoue", () => {
     assertMessageShown(screen);
   });
 });
+
+describe("Guess The Lie : manche suivante qui échoue", () => {
+  const screen = read("js/games/guessLie.js");
+  const nextRound = screen.slice(
+    screen.indexOf("async function nextRound"),
+    screen.indexOf("async function submitVote")
+  );
+
+  it("envoi avec remise de la manche d'avant si ça échoue", () => {
+    assert.match(
+      nextRound,
+      /startRoundWithRollback\(\{\s*previous: getGuessLieSession\(\),\s*send: \(\) =>\s*commitGuessLiePlay\(/
+    );
+    assert.match(nextRound, /restore: \(gl\) => saveStatePatch\(\{ guessLie: gl \}\)/);
+  });
+
+  it("l'écran ne change de manche qu'après un envoi réussi", () => {
+    const mpPart = nextRound.slice(nextRound.indexOf("if (mp) {", nextRound.indexOf("const next =")));
+    const sendAt = mpPart.indexOf("startRoundWithRollback");
+    const switchAt = mpPart.indexOf("roundIdx = next;");
+    assert.ok(sendAt > 0 && switchAt > sendAt);
+  });
+
+  it("échec : message affiché", () => {
+    assert.match(nextRound, /catch \(e\) \{[\s\S]*?nextRoundFailed = true;\s*render\(\);\s*return;/);
+    assertMessageShown(screen);
+  });
+});

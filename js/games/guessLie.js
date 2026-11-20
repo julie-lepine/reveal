@@ -20,8 +20,15 @@ import {
   ensurePostGameScreen,
 } from "../core/gameSync.js";
 import { arch03AhLogSkipDecision } from "../core/arch03ActingHostDebug.js";
-import { getLocalDisplayName, recordGuessLieRoundStats, recordGuessLiePlayed, setLastGame } from "../core/state.js";
-import { POST_GAME_FINISH_FAILED_LABEL } from "../core/postGameFinish.js";
+import {
+  getLocalDisplayName,
+  recordGuessLieRoundStats,
+  recordGuessLiePlayed,
+  saveStatePatch,
+  setLastGame,
+} from "../core/state.js";
+import { NEXT_ROUND_FAILED_LABEL, POST_GAME_FINISH_FAILED_LABEL } from "../core/postGameFinish.js";
+import { startRoundWithRollback } from "../core/roundStartRollback.js";
 import { awardGuessLieRound, guessLieLiarWins } from "../core/scoring.js";
 import { gameCumulativeScoresHtml, refreshGameScoresBox } from "../core/gameScores.js";
 import { setLobbyPlaying, setLobbyWaiting } from "../core/lobby.js";
@@ -88,6 +95,8 @@ export function mountGuessLie(app) {
   let revealAdvancing = false;
   /** Hôte : la fin de partie (« Voir les résultats ») n'est pas partie. */
   let finishFailed = false;
+  /** Hôte : le dernier « Manche suivante » n'est pas parti. */
+  let nextRoundFailed = false;
   const localName = getLocalDisplayName();
   resetGuessLieIdentityDebugDedupe();
 
@@ -291,16 +300,34 @@ export function mountGuessLie(app) {
     }
     const next = roundIdx + 1;
     if (mp) {
+      // L'écran ne change de manche qu'une fois l'envoi réussi. En cas d'échec,
+      // le téléphone de l'hôte (vrai hôte : enregistre puis envoie) revient à la
+      // manche en cours, comme les invités.
+      try {
+        await startRoundWithRollback({
+          previous: getGuessLieSession(),
+          send: () =>
+            commitGuessLiePlay(
+              { roundIdx: next, phase: "voting", votes: {}, roundScored: false },
+              { screen: "guesslie" }
+            ),
+          restore: (gl) => saveStatePatch({ guessLie: gl }),
+        });
+      } catch (e) {
+        console.warn("REVEAL guesslie manche suivante:", e);
+        if (!mount.isMounted()) return;
+        if (!mount.isCurrentMount()) return;
+        nextRoundFailed = true;
+        render();
+        return;
+      }
+      nextRoundFailed = false;
       roundIdx = next;
       phase = "voting";
       selected = null;
       myVote = null;
       roundScored = false;
       revealResult = null;
-      await commitGuessLiePlay(
-        { roundIdx: next, phase: "voting", votes: {}, roundScored: false },
-        { screen: "guesslie" }
-      );
       if (!mount.isMounted()) return;
       if (!mount.isCurrentMount()) return;
       render();
@@ -493,6 +520,10 @@ export function mountGuessLie(app) {
             ? `<button type="button" class="btn btn-primary btn--spaced" id="next-round">
           ${roundIdx >= total - 1 ? "Voir les résultats →" : "Manche suivante →"}
         </button>${
+              nextRoundFailed
+                ? `<p class="hint">${escapeHtml(NEXT_ROUND_FAILED_LABEL)}</p>`
+                : ""
+            }${
               finishFailed
                 ? `<p class="hint">${escapeHtml(POST_GAME_FINISH_FAILED_LABEL)}</p>`
                 : ""
