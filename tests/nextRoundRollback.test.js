@@ -93,3 +93,24 @@ describe("Dilemma : manche suivante qui échoue", () => {
     assertMessageShown(screen);
   });
 });
+
+describe("Speed Vote : question suivante qui échoue", () => {
+  const session = read("js/core/speedVoteSession.js");
+  const screen = read("js/games/speedVote.js");
+
+  it("startSpeedVoteRound remet la question d'avant si l'envoi échoue", () => {
+    const fn = session.slice(session.indexOf("export async function startSpeedVoteRound"));
+    assert.match(
+      fn,
+      /startRoundWithRollback\(\{\s*previous,\s*send: \(\) => syncSpeedVoteSession\(next\),\s*restore: \(session\) => saveStatePatch\(\{ speedVoteGame: session \}\),/
+    );
+  });
+
+  it("l'écran attrape l'échec et affiche le message", () => {
+    assert.match(
+      screen,
+      /try \{\s*await startSpeedVoteRound\(nextIdx\);\s*\} catch \(e\) \{[\s\S]*?nextRoundFailed = true;\s*syncFromSession\(\);\s*render\(\);\s*return;/
+    );
+    assertMessageShown(screen);
+  });
+});
