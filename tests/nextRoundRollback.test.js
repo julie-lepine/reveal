@@ -114,3 +114,24 @@ describe("Speed Vote : question suivante qui échoue", () => {
     assertMessageShown(screen);
   });
 });
+
+describe("Wrong Answer Only : manche suivante qui échoue", () => {
+  const session = read("js/core/wrongAnswerSession.js");
+  const screen = read("js/games/wrongAnswer.js");
+
+  it("startWrongAnswerRound remet la manche d'avant si l'envoi échoue", () => {
+    const fn = session.slice(session.indexOf("export async function startWrongAnswerRound"));
+    assert.match(
+      fn,
+      /startRoundWithRollback\(\{\s*previous: session,\s*send: \(\) => syncWrongAnswerSession\(next\),\s*restore: \(prev\) => saveStatePatch\(\{ wrongAnswerGame: prev \}\),/
+    );
+  });
+
+  it("l'écran attrape l'échec et affiche le message", () => {
+    assert.match(
+      screen,
+      /try \{\s*await startWrongAnswerRound\(roundIdx \+ 1\);\s*\} catch \(e\) \{[\s\S]*?nextRoundFailed = true;\s*syncFromSession\(\);\s*render\(\);\s*return;/
+    );
+    assertMessageShown(screen);
+  });
+});

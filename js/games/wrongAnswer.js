@@ -16,7 +16,7 @@ import {
 import { awardWrongAnswerRound } from "../core/scoring.js";
 import { applyMatchScoreDeltas, gameCumulativeScoresHtml, refreshGameScoresBox } from "../core/gameScores.js";
 import { getLocalDisplayName, recordWrongAnswerPlayed, setLastGame } from "../core/state.js";
-import { POST_GAME_FINISH_FAILED_LABEL } from "../core/postGameFinish.js";
+import { NEXT_ROUND_FAILED_LABEL, POST_GAME_FINISH_FAILED_LABEL } from "../core/postGameFinish.js";
 import { getLobbyParticipants } from "../core/lobby.js";
 import { getActivePlayerNames, getActivePlayers, getNpcPlayers } from "../core/players.js";
 import { setLobbyPlaying, setLobbyWaiting } from "../core/lobby.js";
@@ -78,6 +78,8 @@ export function mountWrongAnswer(app) {
   let transitionInFlight = false;
   /** Hôte : la fin de partie (« Voir les résultats ») n'est pas partie. */
   let finishFailed = false;
+  /** Hôte : le dernier « Manche suivante » n'est pas parti. */
+  let nextRoundFailed = false;
 
   let selectedTarget = null;
   let draftText = "";
@@ -396,6 +398,10 @@ export function mountWrongAnswer(app) {
           ? `<button type="button" class="btn btn-primary btn--spaced" id="next-round">
               ${roundIdx < totalRounds - 1 ? "Manche suivante →" : "Voir les résultats →"}
             </button>${
+              nextRoundFailed
+                ? `<p class="hint">${escapeHtml(NEXT_ROUND_FAILED_LABEL)}</p>`
+                : ""
+            }${
               finishFailed
                 ? `<p class="hint">${escapeHtml(POST_GAME_FINISH_FAILED_LABEL)}</p>`
                 : ""
@@ -686,7 +692,19 @@ export function mountWrongAnswer(app) {
 
     app.querySelector("#next-round")?.addEventListener("click", withClickLock(async () => {
       if (roundIdx < totalRounds - 1) {
-        await startWrongAnswerRound(roundIdx + 1);
+        try {
+          await startWrongAnswerRound(roundIdx + 1);
+        } catch (e) {
+          // Rien n'est parti : l'hôte reste sur le verdict, comme les invités.
+          console.warn("REVEAL wronganswer manche suivante:", e);
+          if (!mount.isMounted()) return;
+          if (!mount.isCurrentMount()) return;
+          nextRoundFailed = true;
+          syncFromSession();
+          render();
+          return;
+        }
+        nextRoundFailed = false;
         if (!mount.isMounted()) return;
         if (!mount.isCurrentMount()) return;
         syncFromSession();
