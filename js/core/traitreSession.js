@@ -463,6 +463,7 @@ export async function commitTraitreVote(targetName) {
   if (session.phase !== "vote") return null;
   const alive = session.alive || [];
   if (!alive.includes(localName) || !alive.includes(targetName)) return null;
+  if (targetName === localName) return null;
 
   const attemptId = ++traitreVoteAttemptId;
   const captured = { phase: session.phase };
@@ -529,8 +530,20 @@ export function normalizeTraitreVotes(votes = {}, alive = []) {
   });
 }
 
-export function getTraitrePendingVoters(session = getTraitreSession()) {
+/**
+ * Survivants encore dans le salon : un joueur parti ne vote plus, on ne l'attend
+ * pas (le serveur le retire des survivants à la clôture du vote).
+ */
+export function getTraitreVotingAlive(session = getTraitreSession()) {
   const alive = session.alive || [];
+  if (!isGameSyncActive()) return alive;
+  const present = new Set(getActivePlayerNames());
+  if (!present.size) return alive;
+  return alive.filter((name) => present.has(name));
+}
+
+export function getTraitrePendingVoters(session = getTraitreSession()) {
+  const alive = getTraitreVotingAlive(session);
   const normalized = normalizeTraitreVotes(session.votes || {}, alive);
   return alive.filter((name) => !normalized[name]);
 }
@@ -541,7 +554,7 @@ export function countTraitreVotesCast(votes = {}, alive = []) {
 }
 
 export function allTraitreVotesIn(session = getTraitreSession()) {
-  const alive = session.alive || [];
+  const alive = getTraitreVotingAlive(session);
   const votes = normalizeTraitreVotes(session.votes || {}, alive);
   return alive.length > 0 && alive.every((name) => votes[name] != null && votes[name] !== "");
 }
@@ -619,8 +632,12 @@ export function getTraitreEntryScreen() {
   return session.lobbyStarted ? "traitre" : "traitre-prep";
 }
 
+/** Cibles de vote : survivants présents, sauf soi-même (on ne vote pas pour soi). */
 export function getTraitreVoteTargets(session = getTraitreSession()) {
-  return getActivePlayers().filter((p) => (session.alive || []).includes(p.name));
+  const localName = getLocalDisplayName();
+  return getActivePlayers().filter(
+    (p) => (session.alive || []).includes(p.name) && p.name !== localName
+  );
 }
 
 export function simulateTraitreVotes(localTarget, session = getTraitreSession()) {

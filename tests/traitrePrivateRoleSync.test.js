@@ -465,7 +465,8 @@ describe("sync rôle privé — une lecture par contexte", () => {
     assert.equal(wordShown(session), WORD_B);
   });
 
-  it("hôte : aucun fetch traitre_private", async () => {
+  // Audit Le Traître n°3 : un hôte qui a perdu son rôle restait sur « Chargement… ».
+  it("hôte qui a perdu son rôle : il relit sa ligne traitre_private", async () => {
     saveStatePatch({
       lobby: {
         id: "lobby-role",
@@ -485,9 +486,38 @@ describe("sync rôle privé — une lecture par contexte", () => {
     const screen = readFileSync(new URL("../js/games/traitre.js", import.meta.url), "utf8");
 
     assert.equal(ok, true);
+    assert.equal(fetches, 1);
+    assert.equal(getState().traitreGame.isLocalImpostor, true);
+    assert.equal(wordShown(getState().traitreGame), WORD_B);
+    assert.match(screen, /if \(!mp \|\| isTraitrePrivateRoleReady\(\)\) return;/);
+  });
+
+  it("hôte qui a encore son rôle : aucune lecture", async () => {
+    saveStatePatch({
+      lobby: {
+        id: "lobby-role",
+        hostId: "uid-host",
+        participants: [{ name: "Hote", isLocal: true, isHost: true, userId: "uid-host" }],
+      },
+      user: { name: "Hote" },
+      traitreGame: guestSession({
+        phase: "deal",
+        privateRoleNonce: 1,
+        isLocalImpostor: false,
+        privateRoleSynced: true,
+        privateRolePairId: PAIR,
+        privateRoleMatchId: "match-role",
+      }),
+    });
+    let fetches = 0;
+    fetchBehavior = async () => {
+      fetches += 1;
+      return { data: { is_impostor: true, pair_id: PAIR, match_id: "match-role" }, error: null };
+    };
+    const ok = await syncTraitrePrivateRole(PAIR, { maxAttempts: 1, delayMs: 0 });
+    assert.equal(ok, true);
     assert.equal(fetches, 0);
-    assert.equal(getState().traitreGame.isLocalImpostor, null);
-    assert.match(screen, /if \(!mp \|\| isLobbyHost\(\) \|\| isTraitrePrivateRoleReady\(\)\) return;/);
+    assert.equal(getState().traitreGame.isLocalImpostor, false);
   });
 });
 

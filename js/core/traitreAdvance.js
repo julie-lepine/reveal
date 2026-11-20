@@ -49,6 +49,13 @@ export const TRAITRE_ADVANCE_ACTIONS = Object.freeze([
   "resolve_vote",
 ]);
 
+const TRAITRE_VOTE_RESET = Object.freeze({
+  votes: {},
+  revotePending: false,
+  revoteCount: 0,
+  tieAfterVote: false,
+});
+
 function aliveCountOf(session) {
   return (session?.alive || []).length;
 }
@@ -203,23 +210,70 @@ export function resolveTraitreAdvance(session, request, context = {}) {
   }
 
   if (phase === "vote" && speakRound === expectedSpeakRound && aliveCount === expectedAliveCount && expectedPhase === "vote") {
-    const alive = session.alive || [];
+    // Joueurs partis du salon : ils ne comptent plus parmi les survivants.
+    // `memberNames` absent = tout le monde est encore là.
+    const members = Array.isArray(context?.memberNames) ? new Set(context.memberNames) : null;
+    const allAlive = session.alive || [];
+    const alive = members ? allAlive.filter((name) => members.has(name)) : allAlive;
+    const departed = members ? allAlive.filter((name) => !members.has(name)) : [];
     const votes = session.votes || {};
+    const base = { ...session, alive };
+
     const { leaders, isTie, votedCount } = countNamedVotes(votes, alive);
     if (!force && votedCount !== alive.length) return rejected("TRAITRE_VOTES_INCOMPLETE");
     if (votedCount === 0) return rejected("TRAITRE_NO_VOTES");
     if (!impostorName) return rejected("TRAITRE_ROLE_MISSING");
-    if (isTie) {
-      return applied(withoutImpostorName({ ...session, ...buildTraitreTieSpeakPatch(session) }));
+
+    // Le fake a quitté le salon : partie arrêtée, aucun point.
+    if (members && !members.has(impostorName)) {
+      const leftName = departed.length === 1 ? departed[0] : null;
+      const lastRound = {
+        deltas: {},
+        breakdown: {},
+        winner: "abandon",
+        impostorName: leftName,
+        voteSurvivals: session.voteSurvivals || 0,
+        pairId: session.pairId,
+      };
+      return applied({
+        ...base,
+        ...TRAITRE_VOTE_RESET,
+        lastEliminated: null,
+        phase: "final",
+        winner: "abandon",
+        impostorRevealed: true,
+        impostorName: leftName,
+        scoresApplied: true,
+        lastRound,
+      }, {});
     }
-    if (!leaders.length) return rejected("TRAITRE_NO_MAJORITY");
-    const patch = buildTraitreEliminationPatch(
-      { ...session, impostorName, votes },
-      leaders[0]
-    );
-    const merged = { ...session, ...patch, impostorName };
-    if (merged.phase !== "final") {
-      return applied(withoutImpostorName(merged));
+    if (!alive.includes(impostorName)) return rejected("TRAITRE_ROLE_MISSING");
+
+    let merged;
+    if (departed.length > 0 && alive.length <= 2) {
+      // Départs : le fake est déjà dans le duo final, il gagne sans vote.
+      merged = {
+        ...base,
+        ...TRAITRE_VOTE_RESET,
+        lastEliminated: null,
+        phase: "final",
+        impostorRevealed: true,
+        winner: "traitre",
+        impostorName,
+      };
+    } else {
+      if (isTie) {
+        return applied(withoutImpostorName({ ...base, ...buildTraitreTieSpeakPatch(base) }));
+      }
+      if (!leaders.length) return rejected("TRAITRE_NO_MAJORITY");
+      const patch = buildTraitreEliminationPatch(
+        { ...base, impostorName, votes },
+        leaders[0]
+      );
+      merged = { ...base, ...patch, impostorName };
+      if (merged.phase !== "final") {
+        return applied(withoutImpostorName(merged));
+      }
     }
     const scored = computeTraitreScoreDeltas(merged);
     const finalSession = {
@@ -232,12 +286,14 @@ export function resolveTraitreAdvance(session, request, context = {}) {
     return applied(finalSession, scored.deltas || {});
   }
 
+  // Retry après résolution. Le nombre de survivants peut avoir baissé de plus
+  // d'un (joueurs partis retirés) ou pas du tout (égalité, fake parti, duo).
   if (
     expectedPhase === "vote" &&
     phase === "speak" &&
     speakRound === expectedSpeakRound + 1 &&
     session.tieAfterVote &&
-    aliveCount === expectedAliveCount
+    aliveCount <= expectedAliveCount
   ) {
     return idempotent();
   }
@@ -246,7 +302,7 @@ export function resolveTraitreAdvance(session, request, context = {}) {
     phase === "speak" &&
     speakRound === expectedSpeakRound + 1 &&
     !session.tieAfterVote &&
-    aliveCount === expectedAliveCount - 1 &&
+    aliveCount < expectedAliveCount &&
     session.lastEliminated
   ) {
     return idempotent();
@@ -258,7 +314,7 @@ export function resolveTraitreAdvance(session, request, context = {}) {
     session.scoresApplied &&
     session.pairId === expectedPairId &&
     speakRound === expectedSpeakRound &&
-    aliveCount === expectedAliveCount - 1
+    aliveCount <= expectedAliveCount
   ) {
     return idempotent();
   }

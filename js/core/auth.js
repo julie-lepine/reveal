@@ -1,4 +1,4 @@
-import { getState, saveStatePatch, renameLocalPlayer, setLocalEmoji, setLocalNameColor, setLocalAvatar } from "./state.js";
+import { getState, saveStatePatch, renameLocalPlayer, setLocalEmoji, setLocalNameColor, setLocalAvatar, getLocalDisplayName } from "./state.js";
 import { isSupabaseConfigured, supabase } from "./supabaseClient.js";
 import {
   signUpWithEmail as sbSignUp,
@@ -142,7 +142,24 @@ export async function loginAsGuest(displayName, captchaToken = null, emoji = nul
   return sbGuest(displayName, captchaToken, emoji);
 }
 
+export const RENAME_BLOCKED_IN_GAME_MESSAGE = "Change de pseudo entre deux parties.";
+
+/**
+ * Partie en cours dans le salon (pas le menu entre deux jeux). Certains jeux
+ * retrouvent les joueurs par pseudo côté serveur (Le Traître : survivants, fake) :
+ * un pseudo changé en pleine partie faisait passer le joueur pour parti, et
+ * bloquait la partie si c'était le fake.
+ */
+export function isRenameBlockedByGame(lobby = getState().lobby) {
+  return Boolean(
+    lobby?.id && lobby.status === "playing" && lobby.gameId && lobby.gameId !== "menu"
+  );
+}
+
 export async function updateProfileName(name) {
+  if (isRenameBlockedByGame() && String(name ?? "").trim() !== getLocalDisplayName()) {
+    return { ok: false, error: RENAME_BLOCKED_IN_GAME_MESSAGE };
+  }
   const res = renameLocalPlayer(name);
   if (!res.ok) return res;
 

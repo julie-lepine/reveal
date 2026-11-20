@@ -217,7 +217,9 @@ export const GAME_RULES = {
       "À partir du tour 2, un vote d'élimination est obligatoire après les indices.",
       "Les indices d'un nouveau tour doivent être différents des précédents.",
       "Égalité au vote : nouveau tour d'indices (mêmes mots) jusqu'à obtenir une majorité.",
+      "On ne peut pas voter pour soi-même.",
       "La partie continue jusqu'à l'élimination du fake ou s'il reste dans les 2 derniers survivants.",
+      "Un joueur qui quitte le salon est retiré des survivants au vote suivant. Si c'est le fake, la partie s'arrête sans points.",
     ],
     points: [
       "Fake encore présent dans les 2 derniers : +15 pts (+10 pts par vote survécu, cumulés).",

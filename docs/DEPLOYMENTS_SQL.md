@@ -725,3 +725,18 @@ Signet : dans le SQL Editor, enregistrer chaque requête (étoile / snippet) pou
 
 **Statut** : SQL repo ✅ · **pas encore collé** en base.
 
+---
+
+## 36. Le Traître — joueur qui quitte le salon en pleine partie
+
+Un joueur parti du salon restait dans les survivants : fake parti → partie impossible à finir (`TRAITRE_ROLE_MISSING`), autre joueur parti → jamais votant, impossible à éliminer.
+
+| Élément | Valeur |
+| ------- | ------ |
+| Migration | [`fix-traitre-departed-players.sql`](../supabase/fix-traitre-departed-players.sql) (remplace toute la fonction, inclut `feature-traitre-force-deal.sql`) |
+| Fonction | `advance_traitre_play` (action `resolve_vote`) |
+| Contrat | miroir `js/core/traitreAdvance.js` · test `tests/traitreDepartedPlayers.test.js` |
+| Prod | appliquée le 2026-11-20 (migration `fix_traitre_departed_players`) · contrôle : md5 du corps = fichier, `authenticated` seul en exécution |
+
+**Statut** : SQL repo ✅ · prod ✅.
+

@@ -253,16 +253,19 @@ async function syncTraitrePrivateRoleForContext(
   return false;
 }
 
-/** Invité : lit le rôle privé et met à jour traitreGame local (retry si distribution en cours). */
+/**
+ * Lit le rôle privé et met à jour traitreGame local (retry si distribution en cours).
+ * L'hôte a déjà son rôle en mémoire depuis le lancement : il ne relit que s'il l'a
+ * perdu (données effacées, autre appareil), sinon il restait sur « Chargement… ».
+ */
 export async function syncTraitrePrivateRole(
   pairId,
   { matchId = null, notify, maxAttempts = 6, delayMs = 400 } = {}
 ) {
   const live = getState().traitreGame || {};
   const expectedMatchId = matchId || live.matchId || null;
-  if (!pairId || !expectedMatchId || isLocalLobbyHost()) {
-    return isLocalLobbyHost();
-  }
+  if (isLocalLobbyHost() && isTraitrePrivateRoleCurrent(live)) return true;
+  if (!pairId || !expectedMatchId) return false;
   if ((live.matchId || null) !== expectedMatchId) return false;
   if ((live.pairId || null) !== pairId) return false;
   if (isTraitrePrivateRoleCurrent(live)) return true;
