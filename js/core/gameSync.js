@@ -181,7 +181,7 @@ export { pickRemotePlayFields, PLAY_PATCH_EXCLUDE } from "./playPatch.js";
 import {
   detectPlayerContribution,
   detectChatRouletteReactionContribution,
-  isHostClutchTapContribution,
+  isHostPlayerContribution,
   stateKeyToGameId,
 } from "./playerContribution.js";
 import {
@@ -5430,8 +5430,8 @@ async function patchGameStateInner(
   }
 
   const hostContribution = hostUid ? detectPlayerContribution(stateMerge, hostUid) : null;
-  if (isHostClutchTapContribution(hostContribution)) {
-    arch03RevealLog("route host contribute_game_session_player (clutch tap)", hostContribution);
+  if (isHostPlayerContribution(hostContribution)) {
+    arch03RevealLog("route host contribute_game_session_player", hostContribution);
     return contributeGameSessionPlayerAndApply(lobbyId, hostContribution);
   }
 
