@@ -11,6 +11,7 @@ import {
   commitDrawItEraseSegments,
   loadLocalDrawItPrivateWord,
   submitDrawItGuess,
+  getDrawItPresentUids,
 } from "../core/drawItSession.js";
 import {
   DRAW_IT_PHASE_DRAWING,
@@ -18,7 +19,9 @@ import {
   formatDrawItCountdown,
   remainingMsUntil,
   canCommitDrawItReveal,
+  canPlayerCommitDrawItReveal,
   drawItSyncedNowMs,
+  isDrawItDrawerGone,
 } from "../core/drawItRound.js";
 import {
   canKeepDrawItGuessComposer,
@@ -27,6 +30,10 @@ import {
   isUidInDrawItFoundOrder,
 } from "../core/drawItGuesses.js";
 import { mountChatPanel, CHAT_MAX_LENGTH } from "../core/chatPanel.js";
+import {
+  NEXT_ROUND_FAILED_LABEL,
+  POST_GAME_FINISH_FAILED_LABEL,
+} from "../core/postGameFinish.js";
 import { getLocalDisplayName, getState, saveStatePatch, setLastGame } from "../core/state.js";
 import { getSupabaseUserId } from "../core/supabaseAuth.js";
 import { setLobbyPlaying, setLobbyWaiting } from "../core/lobby.js";
@@ -103,6 +110,12 @@ export function mountDrawIt(app) {
   const mp = isGameSyncActive();
   let privateWord = null;
   let tickId = 0;
+  /** Nouvel essai de lecture du mot du dessinateur (voir schedulePrivateWordRetry). */
+  let privateWordRetryId = 0;
+  /** Hôte : « Manche suivante » / « Voir les résultats » n'est pas parti (message). */
+  let advanceFailed = false;
+  /** Dernier essai de fin de manche (horloge locale), pour espacer les essais. */
+  let lastRevealAttemptAt = 0;
   let chatPanel = null;
   let canvasCtl = null;
   let board = createDrawItBoardFromSession(getDrawItSession());
@@ -521,7 +534,7 @@ export function mountDrawIt(app) {
     applyGuessInputLock(session);
   }
 
-  async function refreshPrivateWord(session) {
+  async function refreshPrivateWord(session, { retry = true } = {}) {
     if (session.phase !== DRAW_IT_PHASE_DRAWING || !isLocalDrawer(session)) {
       privateWord = null;
       return;
@@ -529,6 +542,41 @@ export function mountDrawIt(app) {
     const row = await loadLocalDrawItPrivateWord();
     if (!mount.isMounted() || !mount.isCurrentMount()) return;
     privateWord = row?.wordLabel || null;
+    if (!privateWord && retry) schedulePrivateWordRetry(session);
+  }
+
+  /**
+   * Lecture du mot ratée (coupure brève) : le dessinateur restait sur « … », car
+   * en début de manche rien ne relance la lecture (personne ne propose sur une
+   * toile vide). Nouveaux essais en arrière-plan, sans retarder l'affichage.
+   */
+  const PRIVATE_WORD_RETRY_MAX = 8;
+  const PRIVATE_WORD_RETRY_DELAY_MS = 500;
+  function schedulePrivateWordRetry(session, attempt = 1) {
+    clearTimeout(privateWordRetryId);
+    privateWordRetryId = 0;
+    if (attempt > PRIVATE_WORD_RETRY_MAX) return;
+    const roundKey = `${session.runId}:${session.roundIdx}`;
+    privateWordRetryId = setTimeout(async () => {
+      privateWordRetryId = 0;
+      if (!mount.isMounted() || !mount.isCurrentMount()) return;
+      const live = getDrawItSession();
+      if (
+        privateWord ||
+        live.phase !== DRAW_IT_PHASE_DRAWING ||
+        !isLocalDrawer(live) ||
+        `${live.runId}:${live.roundIdx}` !== roundKey
+      ) {
+        return;
+      }
+      await refreshPrivateWord(live, { retry: false });
+      if (!mount.isMounted() || !mount.isCurrentMount()) return;
+      if (privateWord) {
+        patchDrawerWord(getDrawItSession());
+        return;
+      }
+      schedulePrivateWordRetry(live, attempt + 1);
+    }, PRIVATE_WORD_RETRY_DELAY_MS);
   }
 
   function drawerLabel(session) {
@@ -799,6 +847,8 @@ export function mountDrawIt(app) {
     const total = Number(session.roundCount) || 0;
     const roundIdx = session.roundIdx ?? 0;
     const phase = session.phase;
+    // Message d'échec propre à un récapitulatif : effacé dès que la partie avance.
+    if (phase !== DRAW_IT_PHASE_REVEAL) advanceFailed = false;
     const resetScroll = shouldResetPageScroll(session);
     if (
       lastPlayIdentity &&
@@ -841,7 +891,11 @@ export function mountDrawIt(app) {
           <p class="label-upper label-upper--gold">Récapitulatif de la manche</p>
           <p class="hot-take-text">${escapeHtml(word || "-")}</p>
           <p class="hint">${
-            recap.allGuessersFound ? "Tout le monde a trouvé !" : "Temps écoulé."
+            isDrawItDrawerGone(session, getDrawItPresentUids())
+              ? "Le dessinateur a quitté la partie."
+              : recap.allGuessersFound
+                ? "Tout le monde a trouvé !"
+                : "Temps écoulé."
           } Le mot est maintenant public.</p>
           <p class="label-upper">Dessin de la manche</p>
           ${roundRecapDrawingHtml()}
@@ -854,7 +908,14 @@ export function mountDrawIt(app) {
           host
             ? `<button type="button" class="btn btn-primary btn--spaced" id="draw-it-advance">
                 ${last ? "Voir les résultats →" : "Manche suivante →"}
-              </button>`
+              </button>
+              ${
+                advanceFailed
+                  ? `<p class="hint">${escapeHtml(
+                      last ? POST_GAME_FINISH_FAILED_LABEL : NEXT_ROUND_FAILED_LABEL
+                    )}</p>`
+                  : ""
+              }`
             : `<p class="hint">En attente de l'hôte…</p>`
         }`;
     }
@@ -903,7 +964,15 @@ export function mountDrawIt(app) {
             ),
           });
           const done = await commitDrawItComplete();
-          if (done?.ok === false) return;
+          if (done?.ok === false) {
+            // Avant : rien ne se passait, sans message. L'hôte peut réessayer.
+            if (done.reason === "in_flight") return;
+            advanceFailed = true;
+            if (!mount.isMounted() || !mount.isCurrentMount()) return;
+            render();
+            return;
+          }
+          advanceFailed = false;
           if (!mp) {
             setLobbyWaiting();
             if (!mount.isMounted()) return;
@@ -911,7 +980,8 @@ export function mountDrawIt(app) {
           }
           return;
         }
-        await commitDrawItNextRound();
+        const next = await commitDrawItNextRound();
+        advanceFailed = next?.ok === false && next.reason !== "in_flight";
         if (!mount.isMounted() || !mount.isCurrentMount()) return;
         await refreshPrivateWord(getDrawItSession());
         render();
@@ -937,7 +1007,20 @@ export function mountDrawIt(app) {
       }
       applyGuessInputLock(session);
       canvasCtl?.syncInteractive();
-      if ((!mp || canActAsHost()) && canCommitDrawItReveal(session, nowMs).ok) {
+      // Hôte : fin de manche dès 00:00 ou quand tout le monde a trouvé.
+      // Autres joueurs : seulement si l'hôte ne l'a pas fait (écran éteint…),
+      // 1,5 s après 00:00 ; le serveur vérifie l'heure.
+      // Dessinateur parti du salon : fin de manche tout de suite, pour tous.
+      const presentUids = getDrawItPresentUids();
+      const hostSide = !mp || canActAsHost();
+      const due = hostSide
+        ? canCommitDrawItReveal(session, nowMs, { presentUids }).ok
+        : canPlayerCommitDrawItReveal(session, nowMs, undefined, { presentUids }).ok;
+      // Pas plus d'un essai par seconde (2 s pour les joueurs) si le réseau échoue.
+      const minGapMs = hostSide ? 1000 : 2000;
+      const clientNow = Date.now();
+      if (due && clientNow - lastRevealAttemptAt >= minGapMs) {
+        lastRevealAttemptAt = clientNow;
         void commitDrawItReveal({ nowMs })
           .then((result) => {
             if (!mount.isMounted() || !mount.isCurrentMount()) return;
@@ -1056,6 +1139,7 @@ export function mountDrawIt(app) {
 
   return () => {
     stopTick();
+    clearTimeout(privateWordRetryId);
     teardownChat();
     teardownCanvas();
     unsub();

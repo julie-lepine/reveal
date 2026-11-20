@@ -740,3 +740,32 @@ Un joueur parti du salon restait dans les survivants : fake parti → partie imp
 
 **Statut** : SQL repo ✅ · prod ✅.
 
+---
+
+## 37. Draw It — fin de manche au chrono sans l'hôte
+
+À 00:00, seul l'hôte (ou son remplaçant) pouvait terminer la manche : écran de l'hôte éteint → tout le monde bloqué jusqu'à 2 min.
+
+| Élément | Valeur |
+| ------- | ------ |
+| Migration | [`fix-drawit-reveal-any-player.sql`](../supabase/fix-drawit-reveal-any-player.sql) (remplace toute la fonction) |
+| Fonction | `reveal_drawit_round` : tout joueur de la partie (membre + `drawerOrder`) après l'heure de fin ; fin anticipée « tout le monde a trouvé » réservée à l'hôte |
+| Contrat | `canPlayerCommitDrawItReveal` (`js/core/drawItRound.js`) · test `tests/drawItPlayerReveal.test.js` |
+| Prod | appliquée le 2026-11-20 (migration `fix_drawit_reveal_any_player`) · contrôle : md5 du corps = fichier, `authenticated` seul en exécution |
+
+**Statut** : SQL repo ✅ · prod ✅ (à appliquer avant de publier l'appli : fait).
+
+---
+
+## 38. Draw It — joueur qui quitte le salon en pleine partie
+
+Liste des joueurs figée au lancement : devineur parti → « tout le monde a trouvé » jamais atteint (60 s par manche) ; dessinateur parti → 60 s de toile vide.
+
+| Élément | Valeur |
+| ------- | ------ |
+| Migration | [`fix-drawit-departed-players.sql`](../supabase/fix-drawit-departed-players.sql) |
+| Fonctions | nouvelle `drawit_all_present_guessers_found(uuid, jsonb)` (aucun rôle client n'a le droit d'exécution) · `reveal_drawit_round` réécrite (inclut le n°37) · `submit_drawit_guess` : une ligne remplacée en place |
+| Contrat | `expectedDrawItGuessers` / `isDrawItDrawerGone` (`js/core/drawItRound.js`) · test `tests/drawItDepartedPlayers.test.js` |
+| Prod | appliquée le 2026-11-20 (migration `fix_drawit_departed_players`), après essai annulé · contrôle : md5 des corps = fichier, `submit_drawit_guess` +20 caractères (la seule ligne visée), droits inchangés |
+
+**Statut** : SQL repo ✅ · prod ✅.

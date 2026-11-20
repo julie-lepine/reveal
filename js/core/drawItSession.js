@@ -63,6 +63,7 @@ import {
   buildDrawItPrivateRounds,
   canCommitDrawItNextRound,
   canCommitDrawItReveal,
+  canPlayerCommitDrawItReveal,
   canCompleteDrawItGame,
   drawerUidForRound,
   resolveDrawItRoundDrawerUid,
@@ -420,13 +421,34 @@ function resolveRevealWordLabel(session) {
   return peeked?.wordLabel || "";
 }
 
+/**
+ * Joueurs encore dans le salon (multijoueur), pour ne pas attendre ceux qui
+ * sont partis. null hors multijoueur ou liste vide : aucun filtre.
+ */
+export function getDrawItPresentUids() {
+  if (!isGameSyncActive()) return null;
+  const uids = getLobbyParticipants()
+    .map((p) => String(p?.userId || "").trim())
+    .filter(Boolean);
+  return uids.length ? uids : null;
+}
+
 export async function commitDrawItReveal({ nowMs = Date.now() } = {}) {
   const outcome = await revealLock.run(async () => {
     const session = getDrawItSession();
-    const check = canCommitDrawItReveal(session, nowMs);
+    const mpServer = isGameSyncActive() && isSupabaseConfigured();
+    const actingHost = canActAsHost();
+    // Un joueur (pas hôte) peut terminer la manche une fois le temps écoulé :
+    // sinon tout le monde restait sur 00:00 quand l'écran de l'hôte était éteint.
+    const check =
+      mpServer && !actingHost
+        ? canPlayerCommitDrawItReveal(session, nowMs, undefined, {
+            presentUids: getDrawItPresentUids(),
+          })
+        : canCommitDrawItReveal(session, nowMs, { presentUids: getDrawItPresentUids() });
     if (!check.ok) return { ok: false, reason: check.reason };
 
-    if (isGameSyncActive() && isSupabaseConfigured() && canActAsHost()) {
+    if (mpServer) {
       try {
         const { rpcRevealDrawItRound } = await import("./gameSessionRpc.js");
         const row = await rpcRevealDrawItRound({ lobbyId: getState().lobby.id });
@@ -476,20 +498,36 @@ export async function commitDrawItNextRound({ nowMs = Date.now() } = {}) {
     if (!check.ok) return { ok: false, reason: check.reason };
 
     if (isGameSyncActive() && isSupabaseConfigured() && canActAsHost()) {
-      const { rpcAdvanceDrawItRound } = await import("./gameSessionRpc.js");
-      const row = await rpcAdvanceDrawItRound({ lobbyId: getState().lobby.id });
-      let full = row;
-      if (row && !row.state) full = await refreshGameSession();
-      if (!full?.state) return { ok: false, reason: "not_applied" };
-      applyRemoteSession(full);
-      const synced = getDrawItSession();
-      if (
-        synced.phase !== "drawing" ||
-        Number(synced.roundIdx) !== Number(check.nextIdx)
-      ) {
-        return { ok: false, reason: "not_applied" };
+      const reachedNext = () => {
+        const synced = getDrawItSession();
+        return (
+          synced.phase === "drawing" &&
+          Number(synced.roundIdx) === Number(check.nextIdx)
+        );
+      };
+      try {
+        const { rpcAdvanceDrawItRound } = await import("./gameSessionRpc.js");
+        const row = await rpcAdvanceDrawItRound({ lobbyId: getState().lobby.id });
+        let full = row;
+        if (row && !row.state) full = await refreshGameSession();
+        if (!full?.state) return { ok: false, reason: "not_applied" };
+        applyRemoteSession(full);
+        return reachedNext()
+          ? { ok: true, reason: null }
+          : { ok: false, reason: "not_applied" };
+      } catch {
+        // Réponse perdue ou second appel (le serveur refuse « uniquement depuis
+        // reveal ») : si la manche suivante a bien démarré, ce n'est pas un échec.
+        try {
+          const full = await refreshGameSession();
+          if (full) applyRemoteSession(full);
+        } catch {
+          /* relecture optionnelle */
+        }
+        return reachedNext()
+          ? { ok: true, reason: null }
+          : { ok: false, reason: "rpc_failed" };
       }
-      return { ok: true, reason: null };
     }
 
     const applied = applyDrawItNextRound(session, {
@@ -527,17 +565,23 @@ export async function commitDrawItComplete() {
     if (!check.ok) return { ok: false, reason: check.reason };
 
     if (isGameSyncActive() && isSupabaseConfigured()) {
-      const { rpcFinalizeDrawItScores } = await import("./gameSessionRpc.js");
-      const scoredRow = await rpcFinalizeDrawItScores({
-        lobbyId: getState().lobby.id,
-      });
-      if (!scoredRow?.state) return { ok: false, reason: "scores_not_committed" };
-      applyRemoteSession(scoredRow);
-      session = getDrawItSession();
-      if (session.scoresCommittedRunId !== session.runId) {
-        return { ok: false, reason: "scores_not_committed" };
+      // Réessayer est sans risque : les points ne sont comptés qu'une fois
+      // (scoresCommittedRunId côté serveur).
+      try {
+        const { rpcFinalizeDrawItScores } = await import("./gameSessionRpc.js");
+        const scoredRow = await rpcFinalizeDrawItScores({
+          lobbyId: getState().lobby.id,
+        });
+        if (!scoredRow?.state) return { ok: false, reason: "scores_not_committed" };
+        applyRemoteSession(scoredRow);
+        session = getDrawItSession();
+        if (session.scoresCommittedRunId !== session.runId) {
+          return { ok: false, reason: "scores_not_committed" };
+        }
+        await completeGameSession({ gameId: "drawit", screen: "results", state: {} });
+      } catch {
+        return { ok: false, reason: "rpc_failed" };
       }
-      await completeGameSession({ gameId: "drawit", screen: "results", state: {} });
       saveStatePatch({
         drawItGame: clearDrawItCustomWords(getDrawItSession()),
       });
