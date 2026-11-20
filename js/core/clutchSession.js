@@ -270,7 +270,14 @@ export function hasLocalClutchTap(session = getClutchSession()) {
 }
 
 export function allClutchTapsIn(session = getClutchSession()) {
+  // Membres actuels du salon : un joueur parti ne fait plus attendre la manche.
+  const memberUserIds = new Set(
+    getLobbyParticipants()
+      .map((p) => (p?.userId ? String(p.userId) : ""))
+      .filter(Boolean)
+  );
   return clutchAllTapsIn(session, session.taps || {}, {
+    memberUserIds,
     activeNames: getActivePlayerNames(),
     resolveNameByUserId: resolveLiveNameByUserId,
   });
