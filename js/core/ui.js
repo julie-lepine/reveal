@@ -162,18 +162,30 @@ export function logoHtml({ className = "app-logo", alt = "REVEAL" } = {}) {
   return `<img src="${APP_LOGO}" alt="${escapeHtml(alt)}" class="${className}" />`;
 }
 
+/** Trait dégradé sous le logo (Welcome, accueil). Décoratif. */
+export function logoRuleHtml() {
+  return `
+  <svg class="welcome__logo-rule" viewBox="0 0 200 14" aria-hidden="true" focusable="false">
+    <defs>
+      <linearGradient id="welcome-logo-rule-grad" x1="0%" y1="0%" x2="100%" y2="0%">
+        <stop offset="0%" stop-color="#ff3cac"/>
+        <stop offset="45%" stop-color="#ff6b6b"/>
+        <stop offset="70%" stop-color="#818cf8"/>
+        <stop offset="100%" stop-color="#38bdf8"/>
+      </linearGradient>
+    </defs>
+    <path d="M 10 10 Q 100 3 190 10" stroke="url(#welcome-logo-rule-grad)" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+    <circle cx="10" cy="10" r="3.5" fill="#ff3cac"/>
+    <circle cx="190" cy="10" r="3.5" fill="#38bdf8"/>
+  </svg>`;
+}
+
 export function tierLogoHtml(list, className = "tier-list-logo") {
   const emoji = list.emoji || "🏆";
   const logo = list.logo ? escapeHtml(list.logo) : "";
   return `
     <img src="${logo}" alt="" class="${className}" data-tier-img />
     <span class="tier-list-logo--emoji" hidden>${emoji}</span>`;
-}
-
-function gameTileBorderGradient(game) {
-  return game.borderGradient
-    ? escapeHtml(game.borderGradient)
-    : "linear-gradient(135deg, #FF6B6B 0%, #2B2D66 100%)";
 }
 
 function gameTileWrapClass(game) {
@@ -186,7 +198,7 @@ export function gameTileLogoHtml(game) {
   const emoji = game.emoji || "🎮";
   const mod = gameTileWrapClass(game);
   return `
-    <span class="game-tile__logo-wrap${mod}" style="--logo-border:${gameTileBorderGradient(game)}">
+    <span class="game-tile__logo-wrap${mod}">
       <span class="game-tile__logo-inner">
         <img src="${logo}" alt="" class="game-tile__logo" data-game-logo width="108" height="108" />
         <span class="game-tile__emoji game-tile__emoji--fallback" hidden>${emoji}</span>
@@ -199,7 +211,7 @@ export function gameTileEmojiFrameHtml(game) {
   const emoji = game.emoji || "🎮";
   const mod = gameTileWrapClass(game);
   return `
-    <span class="game-tile__logo-wrap${mod}" style="--logo-border:${gameTileBorderGradient(game)}">
+    <span class="game-tile__logo-wrap${mod}">
       <span class="game-tile__logo-inner game-tile__logo-inner--emoji">
         <span class="game-tile__emoji game-tile__emoji--framed" aria-hidden="true">${emoji}</span>
       </span>

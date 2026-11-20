@@ -32,7 +32,6 @@ import { getLobbyParticipants } from "../core/lobby.js";
 import { onLobbyBundleUpdated } from "../core/supabaseLobby.js";
 import { getLocalDisplayName } from "../core/state.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
-import { rulesButtonHtml } from "../core/gameRulesUi.js";
 import {
   isLobbyHost,
   onGameSessionChange,
@@ -50,6 +49,7 @@ import {
 import { createPrepLobbyController } from "../core/usePrepLobby.js";
 import { navigate } from "../core/router.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
+import { gameTitleHtml } from "../core/gameTitle.js";
 import {
   bindPrepRemoveDelegation,
   customEntryListHtml,
@@ -389,11 +389,7 @@ export function mountTierNightPrep(app) {
     app.innerHTML = pageShell({
       backTarget: TIER_NIGHT_PREP_MODES_EXIT_NAV,
       content: `
-        <p class="label-upper label-upper--gold">🏅 Classe le groupe</p>
-        <div class="screen-title-row">
-          <h2 class="screen-title">Préparation série</h2>
-          ${rulesButtonHtml("tiernight")}
-        </div>
+        ${gameTitleHtml("tiernight-select", { kicker: "Classe le groupe · Préparation série", rulesKey: "tiernight" })}
         <p class="game-intro">Enchaîne plusieurs thèmes d'affilée. L'hôte choisit les catégories et la longueur (3, 5 ou 8). Ajoute tes thèmes personnalisés si tu veux. <span class="muted">(${PLAYER_TEXT_MAX_LEN} caractères max.)</span></p>
 
         <div class="card">

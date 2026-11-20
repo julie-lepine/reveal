@@ -29,14 +29,15 @@ import { setLobbyPlaying, setLobbyWaiting } from "../core/lobby.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
 import { withClickLock, createActionLock } from "../core/actionLock.js";
 import { createMountGuard } from "../core/mountLifecycle.js";
-import { rulesButtonHtml } from "../core/gameRulesUi.js";
 import { navigate } from "../core/router.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
+import { gameTitleHtml } from "../core/gameTitle.js";
 import { playerAvatarHtml, playerNameHtml } from "../core/signatureUi.js";
 import { bindNav } from "../screens/nav.js";
 import { gameExitBarHtml, bindExitGame } from "../core/exitGame.js";
 import {
   eveningRecapRestartButtonHtml,
+  eveningRecapOtherGameButtonHtml,
   bindRestartGameButtons,
 } from "../core/restartGame.js";
 import {
@@ -183,7 +184,7 @@ export function mountTraitre(app) {
     const actionsHtml = showHostActions
       ? `<div class="btn-row btn-row--stack">
         ${eveningRecapRestartButtonHtml({ gameId: "traitre", title: "Spot the fake" })}
-        <button type="button" class="btn btn-primary" id="btn-traitre-exit">Retour au menu jeux</button>
+        ${eveningRecapOtherGameButtonHtml({ id: "btn-traitre-exit" })}
       </div>`
       : `<p class="hint">En attente de l'hôte pour recommencer ou quitter…</p>`;
 
@@ -583,11 +584,7 @@ export function mountTraitre(app) {
       backTarget: "back",
       scroll: true,
       content: `
-        <p class="label-upper label-upper--gold">🎭 Spot the fake</p>
-        <div class="screen-title-row">
-          <h2 class="screen-title">${escapeHtml(traitrePhaseTitle(phase))}</h2>
-          ${rulesButtonHtml("traitre")}
-        </div>
+        ${gameTitleHtml("traitre-prep", { kicker: traitrePhaseTitle(phase), rulesKey: "traitre" })}
         ${
           phase === "final"
             ? ""

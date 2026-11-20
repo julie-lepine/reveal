@@ -24,6 +24,7 @@ import {
   normalizePlayerVotesMap,
 } from "./gameSync.js";
 import { patchGameStateWithFeedback } from "./patchGameStateFeedback.js";
+import { startRoundWithRollback } from "./roundStartRollback.js";
 import { launchGameWithSync, commitHostGamePlay, commitPrepReadyToggle } from "./mpLaunch.js";
 import { checkHotTakeModeration, getModerationNotice } from "./hotTakeSession.js";
 import {
@@ -320,11 +321,17 @@ export async function markDilemmaLobbyStarted() {
 
 export async function startDilemmaRound(roundIdx) {
   const deck = getDilemmaRounds();
+  const previous = getDilemmaSession();
   const next = {
-    ...getDilemmaSession(),
+    ...previous,
     ...votingPayloadForRound(roundIdx, deck),
   };
-  await syncDilemmaSession(next);
+  // Envoi raté : l'hôte revient à la manche en cours (comme les invités).
+  await startRoundWithRollback({
+    previous,
+    send: () => syncDilemmaSession(next),
+    restore: (session) => saveStatePatch({ dilemmaGame: session }),
+  });
   return next;
 }
 

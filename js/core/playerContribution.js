@@ -156,6 +156,16 @@ export function detectPlayerContribution(stateMerge, localUid) {
   return { game, kind, value: map[localUid] };
 }
 
+/**
+ * Tap Clutch de l'hôte réel : même chemin que les invités (RPC contribute).
+ * Sinon l'hôte relisait puis réécrivait toute la partie, et un tap d'invité
+ * arrivé entre sa lecture et son écriture était effacé du serveur (l'invité
+ * voyait « ✓ Tapé » mais était classé « pas tapé »).
+ */
+export function isHostClutchTapContribution(contribution) {
+  return contribution?.game === "clutch" && contribution.kind === "tap";
+}
+
 export function stateKeyToGameId(stateKey) {
   return STATE_KEY_TO_GAME[stateKey] || null;
 }

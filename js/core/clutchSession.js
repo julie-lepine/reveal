@@ -14,9 +14,8 @@ import {
   requireLocalParticipantUid,
   patchGameState,
 } from "./gameSync.js";
-import { formatSyncErrorMessage } from "./authErrors.js";
 import { launchGameWithSync, commitHostGamePlay, commitPrepReadyToggle } from "./mpLaunch.js";
-import { freezeClutchTap } from "./clutchTapCommit.js";
+import { freezeClutchTap, sameClutchTap } from "./clutchTapCommit.js";
 import {
   computeOptimisticMapEntryApply,
   rollbackOptimisticMapEntry,
@@ -154,12 +153,28 @@ export async function markClutchLobbyStarted({ rosterNames } = {}) {
   });
 }
 
+/** Message de l'hôte quand « Manche suivante » n'a pas pu être envoyée. */
+export const CLUTCH_NEXT_ROUND_FAILED_LABEL = "La manche suivante n’est pas partie, réessaie !";
+
+/** Message de l'hôte quand « Voir les résultats » (fin de partie) n'a pas pu être envoyé. */
+export const CLUTCH_FINISH_FAILED_LABEL = "Les résultats ne sont pas partis, réessaie !";
+
+/**
+ * Lance la manche suivante. Si l'envoi échoue, le téléphone de l'hôte revient à la
+ * manche affichée chez tout le monde (sinon il la lançait seul au prochain événement).
+ */
 export async function startClutchRound(roundIdx) {
+  const prev = getClutchSession();
   const next = {
-    ...getClutchSession(),
+    ...prev,
     ...roundPayload(roundIdx),
   };
-  await syncClutchSession(next);
+  try {
+    await syncClutchSession(next);
+  } catch (err) {
+    saveStatePatch({ clutchGame: prev });
+    throw err;
+  }
   return next;
 }
 
@@ -213,8 +228,9 @@ export async function commitClutchTap(tapInput) {
   });
   saveStatePatch({ clutchGame: { ...session, taps: apply.nextMap } });
   if (!isGameSyncActive()) return resolved;
-  const uid = requireLocalParticipantUid();
   try {
+    // Dans le try : si l'identifiant manque, le tap local est annulé comme un échec réseau.
+    const uid = requireLocalParticipantUid();
     await patchGameState({ clutch: { taps: { [uid]: resolved } } });
     return resolved;
   } catch (err) {
@@ -231,21 +247,15 @@ export async function commitClutchTap(tapInput) {
         optimisticValue: apply.optimisticValue,
         attemptId,
         currentAttemptId: clutchTapAttemptId,
+        valuesEqual: sameClutchTap,
       });
       if (rolled.applied) {
         saveStatePatch({ clutchGame: { ...live, taps: rolled.map } });
       }
     }
+    // Pas de fenêtre d'alerte : elle cachait le jeu et gelait le bouton tant qu'elle
+    // restait ouverte. L'écran affiche le message sous le bouton.
     console.warn("REVEAL clutch tap:", err);
-    try {
-      const { showAppAlert } = await import("./dialog.js");
-      await showAppAlert(formatSyncErrorMessage(err?.message), {
-        title: "Connexion",
-        icon: "📡",
-      });
-    } catch {
-      /* ignore UI */
-    }
     throw err;
   }
 }
@@ -260,7 +270,14 @@ export function hasLocalClutchTap(session = getClutchSession()) {
 }
 
 export function allClutchTapsIn(session = getClutchSession()) {
+  // Membres actuels du salon : un joueur parti ne fait plus attendre la manche.
+  const memberUserIds = new Set(
+    getLobbyParticipants()
+      .map((p) => (p?.userId ? String(p.userId) : ""))
+      .filter(Boolean)
+  );
   return clutchAllTapsIn(session, session.taps || {}, {
+    memberUserIds,
     activeNames: getActivePlayerNames(),
     resolveNameByUserId: resolveLiveNameByUserId,
   });

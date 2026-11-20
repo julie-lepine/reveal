@@ -139,59 +139,45 @@ export function isShareCancelError(error) {
   );
 }
 
-/** Zones en px (1080×1920). Accroche en bandeau ; stats prennent la hauteur. Logo + marge IG bas. */
+/**
+ * Zones en px (1080×1920) de la carte de collection. Les 250 px du haut et du bas
+ * restent hors carte : Instagram y pose ses boutons en story.
+ */
 export function carnetCardLayout() {
   const w = CARNET_CARD_WIDTH;
   const h = CARNET_CARD_HEIGHT;
-  const padX = 56;
-  const padTop = 148;
-  const padBottom = 210;
-  const innerW = w - padX * 2;
-  const gap = 16;
-  const r = 24;
+  const safeTop = 250;
+  const safeBottom = 250;
+  const cardX = 90;
+  const card = { x: cardX, y: safeTop, w: w - cardX * 2, h: h - safeTop - safeBottom, r: 60, border: 8 };
+  const padX = 66;
+  const innerX = card.x + padX;
+  const innerW = card.w - padX * 2;
 
-  const hero = { x: padX, y: padTop, w: innerW, h: 176, r: 28 };
-  const ident = { x: padX, y: hero.y + hero.h + 36, w: innerW, h: 108, avatar: 88 };
-  const vizY = ident.y + ident.h + 32;
-  const topH = 330;
-  const ringW = Math.round(innerW * 0.36);
-  const ring = { x: padX, y: vizY, w: ringW, h: topH, r };
-  const spark = {
-    x: padX + ringW + gap,
-    y: vizY,
-    w: innerW - ringW - gap,
-    h: topH,
-    r,
-  };
-  const ranks = { x: padX, y: vizY + topH + gap, w: innerW, h: 228, r };
-  const tileGap = 14;
+  const top = { x: innerX, y: card.y + 50, w: innerW, h: 44 };
+  const avatar = { cx: w / 2, cy: top.y + top.h + 40 + 150, r: 150, ring: 12 };
+  const name = { x: innerX, y: avatar.cy + avatar.r + 34, w: innerW, h: 104, size: 116 };
+  const badge = { x: innerX, y: name.y + name.h + 26, w: innerW, h: 58 };
+  const hook = { x: innerX, y: badge.y + badge.h + 18, w: innerW, h: 60 };
+
+  const tileGap = 20;
   const tileW = (innerW - tileGap) / 2;
-  const tileH = 148;
-  const tilesY = ranks.y + ranks.h + gap;
+  const tileH = 176;
+  const tilesY = hook.y + hook.h + 26;
   const tiles = [
-    { x: padX, y: tilesY, w: tileW, h: tileH, r },
-    { x: padX + tileW + tileGap, y: tilesY, w: tileW, h: tileH, r },
-    { x: padX, y: tilesY + tileH + tileGap, w: tileW, h: tileH, r },
-    { x: padX + tileW + tileGap, y: tilesY + tileH + tileGap, w: tileW, h: tileH, r },
+    { x: innerX, y: tilesY, w: tileW, h: tileH, r: 28 },
+    { x: innerX + tileW + tileGap, y: tilesY, w: tileW, h: tileH, r: 28 },
+    { x: innerX, y: tilesY + tileH + tileGap, w: tileW, h: tileH, r: 28 },
+    { x: innerX + tileW + tileGap, y: tilesY + tileH + tileGap, w: tileW, h: tileH, r: 28 },
   ];
-  const dotsY = tiles[2].y + tileH + 36;
-  const dots = { x: padX, y: dotsY, w: innerW, h: 90 };
-  const logoH = 120;
-  const logo = { x: padX, y: h - padBottom - logoH, w: innerW, h: logoH };
-
-  return {
-    w,
-    h,
-    padX,
-    padTop,
-    padBottom,
-    hero,
-    ident,
-    ring,
-    spark,
-    ranks,
-    tiles,
-    dots,
-    logo,
+  const dots = { x: innerX, y: tiles[2].y + tileH + 36, w: innerW, h: 30, dot: 26 };
+  const logoW = 330;
+  const logo = {
+    x: (w - logoW) / 2,
+    y: dots.y + dots.h + 26,
+    w: logoW,
+    h: card.y + card.h - 40 - (dots.y + dots.h + 26),
   };
+
+  return { w, h, safeTop, safeBottom, card, top, avatar, name, badge, hook, tiles, dots, logo };
 }

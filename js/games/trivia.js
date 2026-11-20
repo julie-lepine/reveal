@@ -10,9 +10,11 @@ import { serializeLastGameStandings } from "../core/lastGamePodium.js";
 import { triviaEveningPoints } from "../core/triviaScoring.js";
 import { goToGameSelect, setLobbyPlaying, setLobbyWaiting } from "../core/lobby.js";
 import { getLocalDisplayName, recordTriviaPlayed, saveStatePatch, setLastGame } from "../core/state.js";
+import { POST_GAME_FINISH_FAILED_LABEL } from "../core/postGameFinish.js";
 import { showAppAlert } from "../core/dialog.js";
 import { navigate } from "../core/router.js";
 import { escapeHtml, pageShell, resetPageScroll } from "../core/ui.js";
+import { gamePlayTitleHtml } from "../core/gameTitle.js";
 import { bindNav } from "../screens/nav.js";
 import { gameExitBarHtml, bindExitGame } from "../core/exitGame.js";
 import {
@@ -27,6 +29,7 @@ import {
   startGameSession,
   stopGameSessionListenerOnPostGame,
   triviaToRemote,
+  ensurePostGameScreen,
 } from "../core/gameSync.js";
 import { renderTriviaQuestion } from "../trivia/TriviaQuestion.js";
 import { renderTriviaScoreboard } from "../trivia/TriviaScoreboard.js";
@@ -64,6 +67,8 @@ export function mountTrivia(app) {
   let npcRoundKey = "";
   let revealInFlight = false;
   let finishInFlight = false;
+  /** Hôte : la fin de partie (« Voir les résultats ») n'est pas partie. */
+  let finishFailed = false;
   let eveningPodiumApplied = false;
   let answerCommitInFlight = false;
   let pendingAnswerIndex = null;
@@ -463,6 +468,11 @@ export function mountTrivia(app) {
     }
   }
 
+  /** Message sous « Voir les résultats » quand la fin de partie n'est pas partie. */
+  function finishFailedHtml() {
+    return finishFailed ? `<p class="hint">${escapeHtml(POST_GAME_FINISH_FAILED_LABEL)}</p>` : "";
+  }
+
   async function showEveningResults() {
     const finalSession = {
       ...trivia.getSession(),
@@ -480,11 +490,16 @@ export function mountTrivia(app) {
           screen: "results",
           state: { trivia: triviaToRemote(finalSession) },
         });
+        finishFailed = false;
+        ensurePostGameScreen("results", { from: "trivia", gameId: "trivia" });
       } catch (e) {
+        // Fin de partie pas enregistrée : l'hôte reste sur l'écran (comme les
+        // invités) et peut réessayer. Avant, il partait seul aux résultats.
         console.warn("REVEAL completeGameSession:", e);
         if (!mount.isMounted()) return;
         if (!mount.isCurrentMount()) return;
-        navigate("results", { navStack: ["home", "lobby", "game-select", "results"] });
+        finishFailed = true;
+        render();
       }
       return;
     }
@@ -557,7 +572,7 @@ export function mountTrivia(app) {
           !mp || canActAsHost()
             ? `<button type="button" class="btn btn-primary btn--spaced" id="btn-trivia-next">
                 ${questionIdx < totalQuestions - 1 ? "Question suivante →" : "Voir les résultats →"}
-              </button>`
+              </button>${finishFailedHtml()}`
             : `<p class="hint">En attente de l'hote pour la suite…</p>`
         }
         </div>
@@ -575,7 +590,7 @@ export function mountTrivia(app) {
           <p class="hint">Le podium s'affiche dans les résultats de la soirée.</p>
           ${
             !mp || canActAsHost()
-              ? `<button type="button" class="btn btn-primary btn--spaced" data-trivia-action="show-results">Voir les résultats</button>`
+              ? `<button type="button" class="btn btn-primary btn--spaced" data-trivia-action="show-results">Voir les résultats</button>${finishFailedHtml()}`
               : `<p class="hint">En attente de l'hote pour afficher les resultats...</p>`
           }
           ${
@@ -604,7 +619,7 @@ export function mountTrivia(app) {
           </div>
           <span class="muted">${Math.min(questionIdx + 1, Math.max(totalQuestions, 1))}/${Math.max(totalQuestions, 1)}</span>
         </div>
-        <div class="logo logo--sm"><h1>TRIVIA</h1></div>
+        ${gamePlayTitleHtml("trivia-prep", { title: "TRIVIA" })}
         ${phaseHtml}
         ${gameExitBarHtml()}
       `,

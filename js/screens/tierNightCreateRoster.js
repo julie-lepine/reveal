@@ -1,4 +1,5 @@
 import { pageShell } from "../core/ui.js";
+import { gameTitleHtml } from "../core/gameTitle.js";
 import { checkHotTakeModeration, getModerationNotice } from "../core/hotTakeSession.js";
 import {
   ROSTER_TOPIC_NAME_MAX,
@@ -17,8 +18,7 @@ export function mountTierNightCreateRoster(app) {
   app.innerHTML = pageShell({
     backTarget: "tiernight-roster-topics",
     content: `
-      <p class="label-upper label-upper--gold">👥 Classe le groupe</p>
-      <h2 class="screen-title">Créer mon thème</h2>
+      ${gameTitleHtml("tiernight-select", { kicker: "Classe le groupe · Créer mon thème" })}
       <p class="game-intro">Formule une question pour classer les joueurs du lobby sur le plateau S/A/B/C/D. Les joueurs seront les items à classer.</p>
 
       <div class="card">

@@ -108,9 +108,34 @@ export function resolveClutchParticipantNames(session, opts = {}) {
   return names;
 }
 
-/** True si chaque participant du snapshot (ou legacy actifs) a un tap ms. */
-export function clutchAllTapsIn(session, taps = {}, opts = {}) {
+/**
+ * Noms à attendre pour « tout le monde a tapé » : le snapshot, sans les joueurs
+ * qui ont quitté le salon (UID absent de `memberUserIds`). Ils restent dans le
+ * classement (« pas tapé ») mais ne font plus attendre chaque manche jusqu'au bout.
+ * Sans liste de membres (vide / non fournie) : tout le snapshot, comme avant.
+ * Un joueur sans UID connu est toujours attendu (prudence).
+ */
+export function resolveClutchAwaitedNames(session, opts = {}) {
   const names = resolveClutchParticipantNames(session, opts);
+  const members = opts.memberUserIds;
+  if (!members || typeof members.has !== "function" || members.size === 0) return names;
+  if (!sessionHasClutchParticipantSnapshot(session)) return names;
+  const left = new Set();
+  for (const p of normalizeClutchParticipantEntries(session.participants)) {
+    if (!p.userId || members.has(p.userId)) continue;
+    let name = p.name;
+    if (typeof opts.resolveNameByUserId === "function") {
+      const live = opts.resolveNameByUserId(p.userId);
+      if (live && String(live).trim()) name = String(live).trim();
+    }
+    left.add(name);
+  }
+  return names.filter((n) => !left.has(n));
+}
+
+/** True si chaque participant attendu (snapshot moins les partis, ou legacy actifs) a un tap ms. */
+export function clutchAllTapsIn(session, taps = {}, opts = {}) {
+  const names = resolveClutchAwaitedNames(session, opts);
   return names.length > 0 && names.every((n) => taps[n]?.ms != null);
 }
 

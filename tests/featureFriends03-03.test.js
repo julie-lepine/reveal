@@ -49,7 +49,7 @@ describe("FEATURE-FRIENDS-03 Palier 3 — UI Annuler", () => {
     assert.match(css, /\.participant__friend-btn--cancel\{/);
   });
 
-  it("page Amis : Demandes envoyées sous reçues, au-dessus de Tes amis", () => {
+  it("page Amis : demandes reçues en haut, Demandes envoyées repliées sous Tes amis", () => {
     const src = read("js/screens/friends.js");
     assert.match(src, /data-friends-outgoing/);
     assert.match(src, /FRIEND_LABEL\.outgoingSection/);
@@ -57,10 +57,12 @@ describe("FEATURE-FRIENDS-03 Palier 3 — UI Annuler", () => {
     assert.match(src, /onCancelOutgoing/);
     assert.match(src, /fetchOutgoingFriendRequests/);
     assert.equal(FRIEND_LABEL.outgoingSection, "Demandes envoyées");
-    const incomingAt = src.indexOf("data-friends-incoming");
-    const outgoingAt = src.indexOf("data-friends-outgoing");
-    const listAt = src.indexOf("data-friends-list");
-    assert.ok(incomingAt > 0 && outgoingAt > incomingAt && listAt > outgoingAt);
+    const page = src.slice(src.indexOf("function listsHtml"));
+    const tpl = page.slice(page.lastIndexOf("return `"));
+    const incomingAt = tpl.indexOf("${incomingSection}");
+    const listAt = tpl.indexOf("data-friends-list>");
+    const outgoingAt = tpl.indexOf("${outgoingSection}");
+    assert.ok(incomingAt > 0 && listAt > incomingAt && outgoingAt > listAt);
     assert.doesNotMatch(src, /lobby_messages/);
   });
 });

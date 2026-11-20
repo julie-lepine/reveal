@@ -538,6 +538,7 @@ export function mountLobby(app) {
       backTarget: "home",
       content: `
         <div class="lobby-head">
+          <h1 class="title-display lobby-title">Lobby</h1>
           <p class="lobby-count">${total} / ${seatCap} participants connectés</p>
           ${capUpsell}
         </div>

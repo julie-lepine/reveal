@@ -16,6 +16,7 @@ import {
 import { awardWrongAnswerRound } from "../core/scoring.js";
 import { applyMatchScoreDeltas, gameCumulativeScoresHtml, refreshGameScoresBox } from "../core/gameScores.js";
 import { getLocalDisplayName, recordWrongAnswerPlayed, setLastGame } from "../core/state.js";
+import { NEXT_ROUND_FAILED_LABEL, POST_GAME_FINISH_FAILED_LABEL } from "../core/postGameFinish.js";
 import { getLobbyParticipants } from "../core/lobby.js";
 import { getActivePlayerNames, getActivePlayers, getNpcPlayers } from "../core/players.js";
 import { setLobbyPlaying, setLobbyWaiting } from "../core/lobby.js";
@@ -24,6 +25,7 @@ import { withClickLock } from "../core/actionLock.js";
 import { createMountGuard } from "../core/mountLifecycle.js";
 import { navigate } from "../core/router.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
+import { gamePlayTitleHtml } from "../core/gameTitle.js";
 import { bindNav } from "../screens/nav.js";
 import { gameExitBarHtml, bindExitGame } from "../core/exitGame.js";
 import { checkHotTakeModeration, getModerationNotice } from "../core/hotTakeSession.js";
@@ -36,6 +38,7 @@ import {
   stopGameSessionListenerOnPostGame,
   getActingHostUiRefreshToken,
   needsActingHostUiRefresh,
+  ensurePostGameScreen,
 } from "../core/gameSync.js";
 import {
   decideWrongAnswerRemoteUi,
@@ -73,6 +76,10 @@ export function mountWrongAnswer(app) {
   let lastRound = null;
   let roundScored = false;
   let transitionInFlight = false;
+  /** Hôte : la fin de partie (« Voir les résultats ») n'est pas partie. */
+  let finishFailed = false;
+  /** Hôte : le dernier « Manche suivante » n'est pas parti. */
+  let nextRoundFailed = false;
 
   let selectedTarget = null;
   let draftText = "";
@@ -390,7 +397,15 @@ export function mountWrongAnswer(app) {
         !mp || canActAsHost()
           ? `<button type="button" class="btn btn-primary btn--spaced" id="next-round">
               ${roundIdx < totalRounds - 1 ? "Manche suivante →" : "Voir les résultats →"}
-            </button>`
+            </button>${
+              nextRoundFailed
+                ? `<p class="hint">${escapeHtml(NEXT_ROUND_FAILED_LABEL)}</p>`
+                : ""
+            }${
+              finishFailed
+                ? `<p class="hint">${escapeHtml(POST_GAME_FINISH_FAILED_LABEL)}</p>`
+                : ""
+            }`
           : `<p class="hint">En attente de l'hôte pour la suite…</p>`
       }
       </div>
@@ -520,7 +535,7 @@ export function mountWrongAnswer(app) {
           ).join("")}</div>
           <span class="muted">${roundIdx + 1}/${totalRounds}</span>
         </div>
-        <div class="logo logo--sm"><h1>WRONG ANSWER ONLY</h1></div>
+        ${gamePlayTitleHtml("wronganswer-prep", { title: "WRONG ANSWER ONLY" })}
         ${phaseHtml}
         ${gameExitBarHtml()}
       `,
@@ -677,7 +692,19 @@ export function mountWrongAnswer(app) {
 
     app.querySelector("#next-round")?.addEventListener("click", withClickLock(async () => {
       if (roundIdx < totalRounds - 1) {
-        await startWrongAnswerRound(roundIdx + 1);
+        try {
+          await startWrongAnswerRound(roundIdx + 1);
+        } catch (e) {
+          // Rien n'est parti : l'hôte reste sur le verdict, comme les invités.
+          console.warn("REVEAL wronganswer manche suivante:", e);
+          if (!mount.isMounted()) return;
+          if (!mount.isCurrentMount()) return;
+          nextRoundFailed = true;
+          syncFromSession();
+          render();
+          return;
+        }
+        nextRoundFailed = false;
         if (!mount.isMounted()) return;
         if (!mount.isCurrentMount()) return;
         syncFromSession();
@@ -695,11 +722,16 @@ export function mountWrongAnswer(app) {
         if (mp) {
           try {
             await completeGameSession({ gameId: "wronganswer", screen: "results", state: {} });
+            finishFailed = false;
+            ensurePostGameScreen("results", { from: "wronganswer", gameId: "wronganswer" });
           } catch (e) {
+            // Fin de partie pas enregistrée : l'hôte reste sur le verdict (comme les
+            // invités) et peut réessayer. Avant, il partait seul aux résultats.
             console.warn("REVEAL completeGameSession:", e);
             if (!mount.isMounted()) return;
             if (!mount.isCurrentMount()) return;
-            navigate("results", { navStack: ["home", "lobby", "game-select", "results"] });
+            finishFailed = true;
+            render();
           }
         } else {
           setLobbyWaiting();

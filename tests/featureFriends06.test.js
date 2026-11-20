@@ -36,7 +36,8 @@ describe("FEATURE-FRIENDS-01 Palier 6 — page Amis", () => {
     assert.match(src, /acceptFriendRequest/);
     assert.match(src, /declineFriendRequest/);
     assert.match(src, /fetchMyFriends/);
-    assert.match(src, /data-friends-incoming-empty/);
+    // Demandes reçues affichées seulement s'il y en a (page Amis restylée).
+    assert.match(src, /incoming.lengths*?/);
     assert.match(src, /data-friends-list-empty/);
     assert.match(src, /data-friend-unfriend/);
     assert.doesNotMatch(src, /lobby_messages/);

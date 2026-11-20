@@ -11,7 +11,6 @@ import { CLUTCH_ROUND_PRESETS } from "../../data/clutch.js";
 import { getLobbyParticipants } from "../core/lobby.js";
 import { getLocalDisplayName } from "../core/state.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
-import { rulesButtonHtml } from "../core/gameRulesUi.js";
 import { isLobbyHost, onGameSessionChange } from "../core/gameSync.js";
 import { prepGuestFollowOnSession } from "../core/mpLaunch.js";
 import { prepLaunchSlotParams, DEFAULT_PREP_MIN_PLAYERS, executePrepLaunch } from "../core/prepLaunch.js";
@@ -24,6 +23,7 @@ import {
   bindPrepLaunchButtons,
 } from "../core/prepScreen.js";
 import { pageShell, escapeHtml } from "../core/ui.js";
+import { gameTitleHtml } from "../core/gameTitle.js";
 import { navigate } from "../core/router.js";
 import { bindNav } from "./nav.js";
 
@@ -147,11 +147,7 @@ export function mountClutchPrep(app) {
     app.innerHTML = pageShell({
       backTarget: "back",
       content: `
-        <p class="label-upper label-upper--gold">💥 Clutch</p>
-        <div class="screen-title-row">
-          <h2 class="screen-title">Préparation</h2>
-          ${rulesButtonHtml("clutch")}
-        </div>
+        ${gameTitleHtml("clutch-prep", { kicker: "Préparation", rulesKey: "clutch" })}
         <p class="game-intro">Un chrono part de 0 et monte vers une cible (7 à 15 s). Il disparaît un peu avant la cible - un délai différent à chaque manche : tape à l'instinct, au plus proche. Le plus précis gagne.</p>
 
         <div class="card">

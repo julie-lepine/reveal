@@ -686,7 +686,12 @@ export function getTruthMeterEntryScreen() {
   return "truthmeter";
 }
 
-/** Votes NPC pour le mode local */
+/**
+ * Fin de partie. En multijoueur, si l'envoi échoue : { ok: false, reason: "complete-failed" }
+ * et AUCUNE navigation (l'hôte reste sur le jeu, comme les invités, et peut réessayer).
+ * Avant, l'hôte partait seul aux résultats.
+ * @returns {Promise<{ ok: boolean, reason?: string }>}
+ */
 export async function finishTruthMeterGameSession() {
   const session = getTruthMeterSession();
   const total = (session.authorOrder || []).length;
@@ -706,12 +711,13 @@ export async function finishTruthMeterGameSession() {
       await completeGameSession({ gameId: "truthmeter", screen: "results", state: {} });
     } catch (e) {
       console.warn("REVEAL completeGameSession:", e);
-      navigate("results", { navStack: ["home", "lobby", "game-select", "results"] });
+      return { ok: false, reason: "complete-failed" };
     }
   } else {
     setLobbyWaiting();
   }
   navigate("results");
+  return { ok: true };
 }
 
 /** Hôte / acting host : passe la manche si l'auteur UID est réellement absent (phase writing). */
@@ -770,7 +776,8 @@ export async function skipTruthMeterAuthorRound() {
   const nextIdx = (live.roundIdx ?? 0) + 1;
 
   if (nextIdx >= total) {
-    await finishTruthMeterGameSession();
+    const finished = await finishTruthMeterGameSession();
+    if (!finished.ok) return { ok: false, reason: finished.reason };
     return { ok: true, completed: true };
   }
 

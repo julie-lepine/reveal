@@ -108,9 +108,12 @@ function outgoingRowHtml(row) {
 
 function incomingRowHtml(row) {
   return `
-    <div class="friends-row" data-friend-from="${escapeHtml(row.fromUserId)}">
+    <div class="friends-row friends-action" data-friend-from="${escapeHtml(row.fromUserId)}">
       ${friendAvatarHtml(row)}
-      ${playerNameHtml(friendRowIdentity(row), "friends-row__name")}
+      <div class="friends-row__meta">
+        <span class="friends-action__kicker">${escapeHtml(FRIEND_LABEL.incomingSection)}</span>
+        ${playerNameHtml(friendRowIdentity(row), "friends-row__name")}
+      </div>
       <div class="friends-row__actions">
         <button type="button" class="btn btn-primary btn--compact" data-friend-accept="${escapeHtml(row.fromUserId)}">${escapeHtml(FRIEND_LABEL.accept)}</button>
         <button type="button" class="btn btn-secondary btn--compact" data-friend-refuse="${escapeHtml(row.fromUserId)}">${escapeHtml(FRIEND_LABEL.refuse)}</button>
@@ -120,9 +123,12 @@ function incomingRowHtml(row) {
 
 function incomingLobbyInviteRowHtml(row) {
   return `
-    <div class="friends-row" data-lobby-invite="${escapeHtml(row.id)}">
+    <div class="friends-row friends-action" data-lobby-invite="${escapeHtml(row.id)}">
       ${friendAvatarHtml(row)}
-      ${playerNameHtml(friendRowIdentity(row), "friends-row__name")}
+      <div class="friends-row__meta">
+        <span class="friends-action__kicker">${escapeHtml(LOBBY_INVITE_LABEL.incomingSection)}</span>
+        ${playerNameHtml(friendRowIdentity(row), "friends-row__name")}
+      </div>
       <div class="friends-row__actions">
         <button type="button" class="btn btn-primary btn--compact" data-lobby-invite-join="${escapeHtml(row.id)}">${escapeHtml(LOBBY_INVITE_LABEL.join)}</button>
         <button type="button" class="btn btn-secondary btn--compact" data-lobby-invite-refuse="${escapeHtml(row.id)}">${escapeHtml(LOBBY_INVITE_LABEL.refuse)}</button>
@@ -173,12 +179,10 @@ function recentPeerRowHtml(row, graph, { peerIds }) {
   });
   if (action === RECENT_PEER_ACTION.omit) return "";
   return `
-    <div class="friends-row" data-recent-peer="${escapeHtml(row.userId)}">
+    <div class="friends-recent__item" data-recent-peer="${escapeHtml(row.userId)}">
       ${friendAvatarHtml(row)}
       ${playerNameHtml(friendRowIdentity(row), "friends-row__name")}
-      <div class="friends-row__actions">
-        ${recentPeerControlHtml(row.userId, action)}
-      </div>
+      ${recentPeerControlHtml(row.userId, action)}
     </div>`;
 }
 
@@ -187,8 +191,9 @@ function friendRowHtml(row, inviteCtx) {
   const status = inEvening
     ? `<span class="friends-row__status">${escapeHtml(LOBBY_INVITE_LABEL.alreadyIn)}</span>`
     : "";
+  const userId = escapeHtml(row.userId);
   return `
-    <div class="friends-row" data-friend-user="${escapeHtml(row.userId)}">
+    <div class="friends-row friends-row--friend" data-friend-user="${userId}">
       ${friendAvatarHtml(row)}
       <div class="friends-row__meta">
         ${playerNameHtml(friendRowIdentity(row), "friends-row__name")}
@@ -196,7 +201,12 @@ function friendRowHtml(row, inviteCtx) {
       </div>
       <div class="friends-row__actions">
         ${friendInviteControlHtml(row, inviteCtx)}
-        <button type="button" class="btn btn-secondary btn--compact" data-friend-unfriend="${escapeHtml(row.userId)}">${escapeHtml(FRIEND_LABEL.unfriend)}</button>
+        <div class="friends-more">
+          <button type="button" class="friends-more__btn" data-friend-more="${userId}" aria-expanded="false" aria-label="${escapeHtml(FRIEND_LABEL.moreActions)}">⋯</button>
+          <div class="friends-more__menu" data-friend-more-menu="${userId}" hidden>
+            <button type="button" class="friends-more__item" data-friend-unfriend="${userId}">${escapeHtml(FRIEND_LABEL.unfriend)}</button>
+          </div>
+        </div>
       </div>
     </div>`;
 }
@@ -212,6 +222,15 @@ function guestPanelHtml() {
     </div>`;
 }
 
+function outgoingPendingLabel(count) {
+  return `${count} ${count > 1 ? FRIEND_LABEL.outgoingPendingMany : FRIEND_LABEL.outgoingPendingOne}`;
+}
+
+/**
+ * Page Amis : ce qui demande une action (invitations de soirée, demandes reçues)
+ * en haut et seulement s'il y en a ; puis Tes amis ; demandes envoyées repliées ;
+ * Vous venez de jouer avec en vignettes.
+ */
 function listsHtml() {
   const lobbyInvites = getIncomingLobbyInvites();
   const incoming = getIncomingFriendRequests();
@@ -234,49 +253,56 @@ function listsHtml() {
     peerIds,
     lobbyFull: localInLobby && isCurrentLobbyFull(),
   };
-  const lobbyInvitesBody = lobbyInvites.length
-    ? lobbyInvites.map(incomingLobbyInviteRowHtml).join("")
-    : `<p class="hint friends-empty__hint" data-lobby-invites-empty>${escapeHtml(LOBBY_INVITE_LABEL.incomingEmpty)}</p>`;
-  const incomingBody = incoming.length
-    ? incoming.map(incomingRowHtml).join("")
-    : `<p class="hint friends-empty__hint" data-friends-incoming-empty>${escapeHtml(FRIEND_LABEL.incomingEmpty)}</p>`;
-  const outgoingBody = outgoing.length
-    ? outgoing.map(outgoingRowHtml).join("")
-    : `<p class="hint friends-empty__hint" data-friends-outgoing-empty>${escapeHtml(FRIEND_LABEL.outgoingEmpty)}</p>`;
   const recentGraph = { friends, incoming, outgoing };
   const recentRows = recentPeers
     .map((row) => recentPeerRowHtml(row, recentGraph, { peerIds }))
     .filter(Boolean);
   const recentBody = recentRows.length
-    ? recentRows.join("")
+    ? `<div class="friends-recent">${recentRows.join("")}</div>`
     : `<p class="hint friends-empty__hint" data-recent-peers-empty>${escapeHtml(RECENT_PEERS_LABEL.empty)}</p>`;
   const friendsBody = friends.length
-    ? friends.map((row) => friendRowHtml(row, inviteCtx)).join("")
+    ? `<div class="friends-list">${friends.map((row) => friendRowHtml(row, inviteCtx)).join("")}</div>`
     : `<p class="hint friends-empty__hint" data-friends-list-empty>${escapeHtml(FRIEND_LABEL.friendsEmpty)}</p>`;
-  const noLobbyHint = localInLobby
+  const noLobbyHint = localInLobby || !friends.length
     ? ""
     : `<p class="hint friends-empty__hint" data-lobby-invite-no-lobby>${escapeHtml(LOBBY_INVITE_LABEL.noLobbyHint)}</p>`;
+  const lobbyInvitesSection = lobbyInvites.length
+    ? `
+    <section class="friends-todo" data-lobby-invites-incoming aria-label="${escapeHtml(LOBBY_INVITE_LABEL.incomingSection)}">
+      ${lobbyInvites.map(incomingLobbyInviteRowHtml).join("")}
+    </section>`
+    : "";
+  const incomingSection = incoming.length
+    ? `
+    <section class="friends-todo" data-friends-incoming aria-label="${escapeHtml(FRIEND_LABEL.incomingSection)}">
+      ${incoming.map(incomingRowHtml).join("")}
+    </section>`
+    : "";
+  const outgoingSection = outgoing.length
+    ? `
+    <section class="friends-pending" data-friends-outgoing>
+      <details class="friends-pending__details">
+        <summary class="friends-pending__summary" title="${escapeHtml(FRIEND_LABEL.outgoingSection)}">${escapeHtml(
+          outgoingPendingLabel(outgoing.length)
+        )}<span aria-hidden="true">›</span></summary>
+        <div class="friends-pending__list">${outgoing.map(outgoingRowHtml).join("")}</div>
+      </details>
+    </section>`
+    : "";
   return `
-    <section class="card settings-section" data-lobby-invites-incoming>
-      <h2 class="settings-section__title">${escapeHtml(LOBBY_INVITE_LABEL.incomingSection)}</h2>
-      ${lobbyInvitesBody}
-    </section>
-    <section class="card settings-section" data-friends-incoming>
-      <h2 class="settings-section__title">${escapeHtml(FRIEND_LABEL.incomingSection)}</h2>
-      ${incomingBody}
-    </section>
-    <section class="card settings-section" data-friends-outgoing>
-      <h2 class="settings-section__title">${escapeHtml(FRIEND_LABEL.outgoingSection)}</h2>
-      ${outgoingBody}
-    </section>
-    <section class="card settings-section" data-recent-peers>
-      <h2 class="settings-section__title">${escapeHtml(RECENT_PEERS_LABEL.section)}</h2>
-      ${recentBody}
-    </section>
-    <section class="card settings-section" data-friends-list>
-      <h2 class="settings-section__title">${escapeHtml(FRIEND_LABEL.friendsSection)}</h2>
+    ${lobbyInvitesSection}
+    ${incomingSection}
+    <section class="friends-section" data-friends-list>
+      <h2 class="friends-section__title">${escapeHtml(FRIEND_LABEL.friendsSection)}${
+        friends.length ? `<small> · ${friends.length}</small>` : ""
+      }</h2>
       ${noLobbyHint}
       ${friendsBody}
+    </section>
+    ${outgoingSection}
+    <section class="friends-section" data-recent-peers>
+      <h2 class="friends-section__title">${escapeHtml(RECENT_PEERS_LABEL.section)}</h2>
+      ${recentBody}
     </section>`;
 }
 
@@ -349,6 +375,23 @@ export function mountFriends(app) {
       }
     });
     app.querySelector("[data-friends-list]")?.addEventListener("click", (e) => {
+      const list = e.currentTarget;
+      const moreBtn = e.target.closest("[data-friend-more]");
+      const closeMenus = (except = null) => {
+        list.querySelectorAll("[data-friend-more]").forEach((btn) => {
+          if (btn === except) return;
+          btn.setAttribute("aria-expanded", "false");
+          btn.nextElementSibling?.setAttribute("hidden", "");
+        });
+      };
+      if (moreBtn) {
+        const open = moreBtn.getAttribute("aria-expanded") === "true";
+        closeMenus(moreBtn);
+        moreBtn.setAttribute("aria-expanded", open ? "false" : "true");
+        moreBtn.nextElementSibling?.toggleAttribute("hidden", open);
+        return;
+      }
+      if (!e.target.closest(".friends-more__menu")) closeMenus();
       const inviteBtn = e.target.closest("[data-lobby-invite-send]");
       if (inviteBtn) {
         void onInvite(inviteBtn.getAttribute("data-lobby-invite-send"));

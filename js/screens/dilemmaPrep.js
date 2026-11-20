@@ -22,7 +22,6 @@ import { getLobbyParticipants } from "../core/lobby.js";
 import { onLobbyBundleUpdated } from "../core/supabaseLobby.js";
 import { getLocalDisplayName } from "../core/state.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
-import { rulesButtonHtml } from "../core/gameRulesUi.js";
 import {
   isGameSyncActive,
   isLobbyHost,
@@ -33,6 +32,7 @@ import { prepGuestFollowOnSession } from "../core/mpLaunch.js";
 import { executePrepLaunch, prepLaunchSlotParams, DEFAULT_PREP_MIN_PLAYERS } from "../core/prepLaunch.js";
 import { createPrepLobbyController } from "../core/usePrepLobby.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
+import { gameTitleHtml } from "../core/gameTitle.js";
 import {
   bindPrepRemoveDelegation,
   customEntryListHtml,
@@ -148,7 +148,9 @@ export function mountDilemmaPrep(app) {
     const localReady = localReadyState();
     const prep = getDilemmaPrepSummary();
 
-    updatePlayersReadyCard(app.querySelector("#dilemma-players"), members, session.ready);
+    updatePlayersReadyCard(app.querySelector("#dilemma-players"), members, session.ready, {
+      variant: "pills",
+    });
     updateReadyButton(app.querySelector("#btn-ready"), localReady);
 
     updatePrepStartSlot(
@@ -342,19 +344,15 @@ export function mountDilemmaPrep(app) {
     app.innerHTML = pageShell({
       backTarget: "back",
       content: `
-        <p class="label-upper label-upper--gold">⚖️ Dilemma</p>
-        <div class="screen-title-row">
-          <h2 class="screen-title">Préparation</h2>
-          ${rulesButtonHtml("dilemma")}
-        </div>
+        ${gameTitleHtml("dilemma-prep", { kicker: "Préparation", rulesKey: "dilemma" })}
         <p class="game-intro">Choix impossible A vs B, reveal dès que tout le monde a choisi. Ajoute tes dilemmes si tu veux. <span class="muted">(${PLAYER_TEXT_MAX_LEN} caractères max. par option)</span></p>
 
         <div class="card">
           <p class="card-heading">Deck de dilemmes</p>
-          <div class="theme-chips">
+          <div class="theme-chips chips">
             ${DILEMMA_DECKS.map(
               (d) => `
-              <button type="button" class="theme-chip ${deckId === d.id ? "theme-chip--active" : ""}" data-deck="${d.id}"
+              <button type="button" class="theme-chip chip ${deckId === d.id ? "theme-chip--active" : ""}" data-deck="${d.id}"
                 ${isHost ? "" : "disabled"}>
                 ${escapeHtml(d.label)}
               </button>`
@@ -363,13 +361,14 @@ export function mountDilemmaPrep(app) {
           <p class="hint" id="dilemma-pool-hint"></p>
         </div>
 
+        <div class="frame">
         <div class="card">
           <p class="card-heading">Nombre de manches</p>
-          <div class="theme-chips theme-chips--rounds">
+          <div class="theme-chips theme-chips--rounds chips">
             ${roundChips
               .map(
                 ({ value, label, disabled }) => `
-              <button type="button" class="theme-chip ${roundCount === value ? "theme-chip--active" : ""}"
+              <button type="button" class="theme-chip chip chip--num ${roundCount === value ? "theme-chip--active" : ""}"
                 data-round="${value}" ${disabled || !isHost ? "disabled" : ""}>
                 ${label}
               </button>`
@@ -384,16 +383,19 @@ export function mountDilemmaPrep(app) {
           }
           ${!isHost ? `<p class="hint">Seul l'hôte peut modifier les réglages.</p>` : ""}
         </div>
+        </div>
 
         ${customDilemmasCardHtml()}
 
-        <div class="card" id="dilemma-players">${playersReadySectionHtml(members, session.ready)}</div>
+        <div class="players-ready" id="dilemma-players">${playersReadySectionHtml(members, session.ready, { variant: "pills" })}</div>
 
-        <button type="button" class="btn btn-ready ${localReady ? "btn-ready--active" : ""}" id="btn-ready">
-          ${localReady ? "Prêt ✓" : "Je suis prêt !"}
-        </button>
+        <div class="page-cta">
+          <button type="button" class="btn btn-ready ${localReady ? "btn-ready--active" : ""}" id="btn-ready">
+            ${localReady ? "Prêt ✓" : "Je suis prêt !"}
+          </button>
 
-        <div id="dilemma-start-slot">${dilemmaStartSlotHtml(allReady, prep)}</div>
+          <div id="dilemma-start-slot">${dilemmaStartSlotHtml(allReady, prep)}</div>
+        </div>
       `,
     });
 

@@ -90,7 +90,7 @@ const opportunisticClearedIds = new Set();
 function catalogById(tileId) {
   const g = GAMES_AVAILABLE.find((x) => x.id === tileId);
   if (!g) return null;
-  return { id: g.id, title: g.title, emoji: g.emoji || "🎲" };
+  return { id: g.id, title: g.title, emoji: g.emoji || "🎲", logo: g.logo || "" };
 }
 
 function readRawRoulette() {

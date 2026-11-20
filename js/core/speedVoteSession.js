@@ -25,6 +25,7 @@ import {
   normalizePlayerVotesMap,
 } from "./gameSync.js";
 import { patchGameStateWithFeedback } from "./patchGameStateFeedback.js";
+import { startRoundWithRollback } from "./roundStartRollback.js";
 import { launchGameWithSync, commitHostGamePlay, commitPrepReadyToggle } from "./mpLaunch.js";
 import {
   computeOptimisticMapEntryApply,
@@ -173,11 +174,17 @@ export async function markSpeedVoteLobbyStarted() {
 
 export async function startSpeedVoteRound(roundIdx) {
   const deck = getSpeedVoteQuestions();
+  const previous = getSpeedVoteSession();
   const next = {
-    ...getSpeedVoteSession(),
+    ...previous,
     ...votingPayloadForRound(roundIdx, deck),
   };
-  await syncSpeedVoteSession(next);
+  // Envoi raté : l'hôte revient à la question en cours (comme les invités).
+  await startRoundWithRollback({
+    previous,
+    send: () => syncSpeedVoteSession(next),
+    restore: (session) => saveStatePatch({ speedVoteGame: session }),
+  });
   return next;
 }
 

@@ -1,3 +1,20 @@
+/** Message quand l'envoi du tap échoue : le bouton est rouvert, il faut retaper. */
+export const CLUTCH_TAP_FAILED_LABEL = "Ton tap n’est pas parti, retape !";
+
+/** Message quand l'envoi du tap échoue alors que le temps de tap est écoulé. */
+export const CLUTCH_TAP_FAILED_LATE_LABEL = "Ton tap n’est pas parti à temps.";
+
+/**
+ * Même tap si même contenu (ms, at). La synchro recopie la map des taps
+ * (mergeClutchTapsFrozen) : comparer par identité ratait l'annulation après
+ * un échec réseau, et le joueur restait bloqué sur « ✓ Tapé ».
+ */
+export function sameClutchTap(a, b) {
+  if (a === b) return true;
+  if (!a || !b || typeof a !== "object" || typeof b !== "object") return false;
+  return a.ms === b.ms && (a.at ?? null) === (b.at ?? null);
+}
+
 /** Fige le tap capturé au clic (aucun recalcul de ms/at). */
 import {
   computeOptimisticMapEntryApply,
@@ -62,13 +79,15 @@ export function computeClutchTapApply(session, localName, tap) {
 }
 
 /**
- * UI locale après échec de sync du tap : libère le verrou commit et rouvre
- * la fenêtre de tap (le grace timer a pu fermer pendant l’attente réseau).
+ * UI locale après échec de sync du tap : libère le verrou commit. La fenêtre de
+ * tap n'est rouverte que si le temps n'est pas écoulé (sinon le joueur pouvait
+ * retaper hors délai, avec un temps énorme).
+ * @param {boolean} [windowElapsed] - le temps de tap s'est terminé pendant l'envoi.
  */
-export function resolveClutchTapCommitFailureUi() {
+export function resolveClutchTapCommitFailureUi(windowElapsed = false) {
   return {
     tapCommitInFlight: false,
-    localWindowClosed: false,
+    localWindowClosed: Boolean(windowElapsed),
   };
 }
 
@@ -136,6 +155,7 @@ export function simulateClutchTapCommitCycle({
       hadPreviousValue: first.hadPreviousValue,
       previousValue: first.previousValue,
       optimisticValue: first.optimisticValue,
+      valuesEqual: sameClutchTap,
     });
     if (rolled.applied) taps = rolled.map;
     const ui = resolveClutchTapCommitFailureUi();
@@ -177,4 +197,23 @@ export function simulateClutchTapCommitCycle({
     taps,
     sent,
   };
+}
+
+/**
+ * Faut-il annoncer le verdict de la manche maintenant (appelé à chaque maj de session) ?
+ * Oui si ce téléphone peut agir en hôte, la manche est en cours, et soit tout le monde
+ * a tapé, soit l'attente de l'hôte est déjà écoulée ici (cible + grâce + attente
+ * supplémentaire en multijoueur). Le 2e cas couvre l'hôte parti en pleine manche :
+ * le remplaçant est désigné après la fin de l'attente, l'hôte parti n'a pas tapé, et
+ * sans ça personne n'annonçait le verdict (invités bloqués).
+ */
+export function shouldHostRevealClutchRound({
+  phase,
+  canActAsHost,
+  allTapsIn,
+  hostWaitElapsed,
+}) {
+  if (phase !== "active") return false;
+  if (!canActAsHost) return false;
+  return Boolean(allTapsIn) || Boolean(hostWaitElapsed);
 }

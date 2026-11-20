@@ -81,7 +81,7 @@ import {
   tryFollowHostGameSession,
 } from "../core/gameSync.js";
 import { navigate, getCurrentScreen, getScreenParams } from "../core/router.js";
-import { escapeHtml, logoHtml, pageShell } from "../core/ui.js";
+import { escapeHtml, logoHtml, logoRuleHtml, pageShell } from "../core/ui.js";
 import { handleNavTarget, goToEveningSettings } from "./nav.js";
 import { FRIEND_LABEL, FRIENDS_ENTRY, FRIENDS_SCREEN_ID } from "../config/friends.js";
 import { syncFriendsEntryBadges } from "../core/friendRequestNotice.js";
@@ -961,6 +961,7 @@ export function mountHome(app) {
       content: `
         <div class="logo logo--with-img logo--landing">
           ${logoHtml({ className: "app-logo app-logo--landing" })}
+          ${logoRuleHtml()}
           <p class="subtitle">L'app de soirée entre amis</p>
         </div>
 

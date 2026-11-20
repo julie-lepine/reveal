@@ -757,7 +757,7 @@ describe("FEATURE-TIERNIGHT-04F — screens", () => {
     assert.match(end, /replayTierNightLiveAfterSeriesEnd/);
     assert.match(end, /Recommencer/);
     assert.match(end, /Changer de mode/);
-    assert.match(end, /Autre jeu/);
+    assert.match(end, /eveningRecapOtherGameButtonHtml\(\{ id: "btn-tiernight-end-continue" \}\)/);
   });
 });
 

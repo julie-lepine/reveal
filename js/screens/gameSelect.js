@@ -1,4 +1,4 @@
-import { GAMES_AVAILABLE, GAMES_COMING_SOON } from "../../data/games.js";
+import { GAMES, GAMES_AVAILABLE, GAMES_COMING_SOON } from "../../data/games.js";
 import { RULES_KEY_BY_NAV } from "../../data/gameRules.js";
 import { rulesIconButtonHtml } from "../core/gameRulesUi.js";
 import { getEveningRecap } from "../core/eveningRecap.js";
@@ -25,6 +25,7 @@ import { isSupabaseConfigured } from "../core/supabaseClient.js";
 import { startLobbyPresenceSync, onLobbyBundleUpdated, getClaimHubUiToken } from "../core/supabaseLobby.js";
 import { getLobby, hasActiveLobby } from "../core/lobby.js";
 import { clientMayOfferHostClaim } from "../core/hostClaimOffer.js";
+import { reclaimHostCtaHtml } from "../core/reclaimHostCta.js";
 import { getLastGame, getState } from "../core/state.js";
 import { isAdFree } from "../core/entitlements.js";
 import { adFreeHubCardHtml } from "../core/adFreeUi.js";
@@ -61,55 +62,64 @@ function lobbyPlayersMetaHtml(count) {
   return `<p class="evening-recap__meta">${n} ${label} dans le lobby</p>`;
 }
 
+/** Logo de jeu (data/games.js) pour une statistique du récap. */
+function recapGameLogo(cssClass) {
+  return GAMES.find((g) => g.cssClass === cssClass)?.logo || "";
+}
+
+function recapStatHtml(cssClass, value, label) {
+  const logo = recapGameLogo(cssClass);
+  return `
+        <div class="recap-stat" role="listitem">
+          ${logo ? `<img src="${escapeHtml(logo)}" alt="" class="recap-stat__logo" />` : ""}
+          <span class="recap-stat__text">
+            <span class="recap-stat__value">${escapeHtml(String(value))}</span>
+            <span class="recap-stat__label">${escapeHtml(label)}</span>
+          </span>
+        </div>`;
+}
+
+function eveningRecapHeadHtml(playersMeta) {
+  return `
+        <div class="evening-recap__head">
+          <p class="evening-recap__title">Récap de la soirée</p>
+          ${playersMeta}
+        </div>`;
+}
+
 function eveningRecapHtml(recap) {
   const playersMeta = lobbyPlayersMetaHtml(recap.participantCount);
 
   if (!recap.hasActivity) {
     return `
-      <div class="evening-recap evening-recap--empty card">
-        <p class="evening-recap__title">📋 Récap de la soirée</p>
+    <div class="frame evening-recap-frame">
+      <div class="evening-recap evening-recap--hub evening-recap--empty card">
+        ${eveningRecapHeadHtml(playersMeta)}
         <p class="evening-recap__empty">La soirée commence… lance un premier jeu !</p>
-        ${playersMeta}
-      </div>`;
+      </div>
+    </div>`;
   }
 
-  const chips = [
-    recap.hotTakes > 0
-      ? `<span class="evening-recap__chip">🔥 ${recap.hotTakes} hot take${recap.hotTakes > 1 ? "s" : ""}</span>`
-      : "",
+  const plural = (n, word) => `${word}${n > 1 ? "s" : ""}`;
+  const stats = [
+    recap.hotTakes > 0 ? recapStatHtml("hot", recap.hotTakes, plural(recap.hotTakes, "hot take")) : "",
     recap.guessLieGamesPlayed > 0
-      ? `<span class="evening-recap__chip">🕵️ ${recap.guessLieGamesPlayed} Guess the Lie${recap.guessLieGamesPlayed > 1 ? "s" : ""}</span>`
+      ? recapStatHtml("guess", recap.guessLieGamesPlayed, plural(recap.guessLieGamesPlayed, "Guess the Lie"))
       : "",
     recap.liesTotal > 0
-      ? `<span class="evening-recap__chip">🕵️ ${recap.liesFound}/${recap.liesTotal} mensonges · ${recap.lieRate}</span>`
+      ? recapStatHtml("guess", `${recap.liesFound}/${recap.liesTotal}`, `mensonges · ${recap.lieRate}`)
       : "",
-    recap.speedVotes > 0
-      ? `<span class="evening-recap__chip">⚡ ${recap.speedVotes} SpeedVote${recap.speedVotes > 1 ? "s" : ""}</span>`
-      : "",
-    recap.clutches > 0
-      ? `<span class="evening-recap__chip">💥 ${recap.clutches} Clutch</span>`
-      : "",
-    recap.wrongAnswers > 0
-      ? `<span class="evening-recap__chip">↩️ ${recap.wrongAnswers} Wrong Answer Only</span>`
-      : "",
-    recap.traitreGames > 0
-      ? `<span class="evening-recap__chip">🎭 ${recap.traitreGames} Spot the fake</span>`
-      : "",
-    recap.triviaGames > 0
-      ? `<span class="evening-recap__chip">🧠 ${recap.triviaGames} Trivia${recap.triviaGames > 1 ? "s" : ""}</span>`
-      : "",
-    recap.truthMeters > 0
-      ? `<span class="evening-recap__chip">📏 ${recap.truthMeters} TruthMeter${recap.truthMeters > 1 ? "s" : ""}</span>`
-      : "",
+    recap.speedVotes > 0 ? recapStatHtml("speed", recap.speedVotes, plural(recap.speedVotes, "SpeedVote")) : "",
+    recap.clutches > 0 ? recapStatHtml("clutch", recap.clutches, "Clutch") : "",
+    recap.wrongAnswers > 0 ? recapStatHtml("wrong", recap.wrongAnswers, "Wrong Answer Only") : "",
+    recap.traitreGames > 0 ? recapStatHtml("traitre", recap.traitreGames, "Spot the fake") : "",
+    recap.triviaGames > 0 ? recapStatHtml("trivia", recap.triviaGames, plural(recap.triviaGames, "Trivia")) : "",
+    recap.truthMeters > 0 ? recapStatHtml("truth", recap.truthMeters, plural(recap.truthMeters, "TruthMeter")) : "",
     recap.consensusGames > 0
-      ? `<span class="evening-recap__chip">🤝 ${recap.consensusGames} Consensus${recap.consensusGames > 1 ? "s" : ""}</span>`
+      ? recapStatHtml("consensus", recap.consensusGames, plural(recap.consensusGames, "Consensus"))
       : "",
-    recap.dilemmas > 0
-      ? `<span class="evening-recap__chip">⚖️ ${recap.dilemmas} Dilemma${recap.dilemmas > 1 ? "s" : ""}</span>`
-      : "",
-    recap.tierNights > 0
-      ? `<span class="evening-recap__chip">🏆 ${recap.tierNights} tier list${recap.tierNights > 1 ? "s" : ""}</span>`
-      : "",
+    recap.dilemmas > 0 ? recapStatHtml("dilemma", recap.dilemmas, plural(recap.dilemmas, "Dilemma")) : "",
+    recap.tierNights > 0 ? recapStatHtml("tier", recap.tierNights, plural(recap.tierNights, "tier list")) : "",
   ]
     .filter(Boolean)
     .join("");
@@ -117,7 +127,11 @@ function eveningRecapHtml(recap) {
   const leader = recap.leadersLabel
     ? `<div class="evening-recap__leader">
         <span class="evening-recap__leader-avatar" style="background:${recap.leaders[0].color}">${recap.leaders[0].emoji}</span>
-        <span>En tête : <strong>${escapeHtml(recap.leadersLabel)}</strong> - ${recap.leaders[0].score} pts</span>
+        <span class="evening-recap__leader-who">
+          <span class="evening-recap__leader-kicker">En tête</span>
+          <strong class="evening-recap__leader-name">${escapeHtml(recap.leadersLabel)}</strong>
+        </span>
+        <span class="evening-recap__leader-pts"><b>${recap.leaders[0].score}</b> pts</span>
       </div>`
     : "";
 
@@ -132,14 +146,15 @@ function eveningRecapHtml(recap) {
   const restartBtn = eveningRecapRestartButtonHtml(resolveLastGameForRestart());
 
   return `
-    <div class="evening-recap card">
-      <p class="evening-recap__title">📋 Récap de la soirée</p>
-      ${playersMeta}
-      <div class="evening-recap__chips">${chips}</div>
-      ${leader}
-      ${lastTier}
-      ${restartBtn}
-      ${moreLink}
+    <div class="frame evening-recap-frame">
+      <div class="evening-recap evening-recap--hub card">
+        ${eveningRecapHeadHtml(playersMeta)}
+        ${stats ? `<div class="recap-stats" role="list" aria-label="Parties de la soirée" tabindex="0">${stats}</div>` : ""}
+        ${leader}
+        ${lastTier}
+        ${restartBtn}
+        ${moreLink}
+      </div>
     </div>`;
 }
 
@@ -249,20 +264,11 @@ function gameSelectHeaderHtml() {
     : "";
 
   return `
-    <div class="game-select-header">
-      <p class="label-upper label-upper--gold">🎮 La soirée</p>
+    <p class="kicker kicker--gold">🎮 La soirée</p>
+    <div class="screen-head game-select-header">
+      <h2 class="title-display">Choisir un jeu</h2>
       ${codeChip}
     </div>`;
-}
-
-/** CTA distinct ARCH-03b : offre claim sans réutiliser le libellé admin. */
-function reclaimHostCtaHtml() {
-  if (!isGameSyncActive() || isLobbyHost()) return "";
-  if (!clientMayOfferHostClaim()) return "";
-  return `
-      <button type="button" class="game-select-reclaim-host" data-claim-host>
-        👑 Reprendre l'animation
-      </button>`;
 }
 
 function gameSelectActionsHtml() {
@@ -285,6 +291,8 @@ export function mountGameSelect(app) {
   let unsubSession = () => {};
   let unsubResumeBanner = () => {};
   let renderTimer = null;
+  /** Écran quitté : plus aucun rafraîchissement programmé (ex. fin d'un chargement en cours). */
+  let disposed = false;
   let renderInFlight = false;
   let lastSnapshot = "";
   const catchupTimers = new Set();
@@ -367,6 +375,7 @@ export function mountGameSelect(app) {
   }
 
   function scheduleRender(force = false) {
+    if (disposed) return;
     if (renderTimer) clearTimeout(renderTimer);
     const delay = force ? 0 : 300;
     renderTimer = setTimeout(() => {
@@ -416,7 +425,6 @@ export function mountGameSelect(app) {
       content: `
       ${resumeBanner}
       ${gameSelectHeaderHtml()}
-      <h2 class="screen-title">Choisir un jeu</h2>
       <p class="game-intro">Sélectionne une activité pour le lobby.</p>
       ${gameSelectActionsHtml()}
 
@@ -477,6 +485,7 @@ export function mountGameSelect(app) {
   }
 
   return () => {
+    disposed = true;
     app.removeEventListener("click", onGameSelectClick);
     unsubResumeBanner();
     unsubSession();

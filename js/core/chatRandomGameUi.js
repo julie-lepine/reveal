@@ -61,7 +61,7 @@ let lastReactionsSig = "";
  *   getLocalUid?: () => string|null,
  *   getActiveUids?: () => string[],
  *   hasOpenLobbyPoll?: () => boolean,
- *   getCatalogById: (id: string) => { id: string, title: string, emoji: string }|null,
+ *   getCatalogById: (id: string) => { id: string, title: string, emoji: string, logo?: string }|null,
  * }} */
 let handlers = null;
 
@@ -147,7 +147,11 @@ function measureCardH() {
 function gameCardHtml(g, { winner = false } = {}) {
   return `
     <div class="chat-roulette__card${winner ? " chat-roulette__card--winner" : ""}" data-tile="${escapeHtml(g.id)}">
-      <span class="chat-roulette__card-emoji" aria-hidden="true">${escapeHtml(g.emoji || "🎲")}</span>
+      ${
+        g.logo
+          ? `<img src="${escapeHtml(g.logo)}" alt="" class="chat-roulette__card-logo" />`
+          : `<span class="chat-roulette__card-emoji" aria-hidden="true">${escapeHtml(g.emoji || "🎲")}</span>`
+      }
       <span class="chat-roulette__card-title">${escapeHtml(g.title)}</span>
     </div>`;
 }
@@ -168,7 +172,7 @@ function renderPrompt(canControl) {
     <p class="chat-roulette__headline">Quel sera<br/>le prochain jeu&nbsp;?</p>
     ${
       canControl
-        ? `<button type="button" class="btn btn-primary chat-roulette__btn" data-roulette-start>Commencer</button>`
+        ? `<button type="button" class="btn btn-primary chat-roulette__btn chat-roulette__start" data-roulette-start><span class="chat-roulette__start-label">Commencer</span></button>`
         : `<p class="hint chat-roulette__wait">L'hôte lance la roulette…</p>`
     }`;
 }

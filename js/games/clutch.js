@@ -1,5 +1,6 @@
 import {
   CLUTCH_GRACE_MS,
+  CLUTCH_HOST_EXTRA_WAIT_MS,
   CLUTCH_HIDE_BEFORE_MS,
   CLUTCH_PRECOUNT_MS,
   formatClutchSeconds,
@@ -15,8 +16,20 @@ import {
   rankClutchResults,
   startClutchRound,
   getClutchParticipantNames,
+  CLUTCH_NEXT_ROUND_FAILED_LABEL,
+  CLUTCH_FINISH_FAILED_LABEL,
 } from "../core/clutchSession.js";
-import { resolveClutchTapCommitFailureUi, preferInFlightClutchTap } from "../core/clutchTapCommit.js";
+import {
+  CLUTCH_TAP_FAILED_LABEL,
+  CLUTCH_TAP_FAILED_LATE_LABEL,
+  resolveClutchTapCommitFailureUi,
+  preferInFlightClutchTap,
+  shouldHostRevealClutchRound,
+} from "../core/clutchTapCommit.js";
+import {
+  CLUTCH_REVEAL_RETRY_LABEL,
+  createClutchRevealRetry,
+} from "../core/clutchRevealRetry.js";
 import { awardClutchRound } from "../core/scoring.js";
 import { applyMatchScoreDeltas, gameCumulativeScoresHtml, refreshGameScoresBox } from "../core/gameScores.js";
 import { getLocalDisplayName, recordClutchPlayed, setLastGame } from "../core/state.js";
@@ -27,6 +40,7 @@ import { withClickLock } from "../core/actionLock.js";
 import { createMountGuard } from "../core/mountLifecycle.js";
 import { navigate } from "../core/router.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
+import { gamePlayTitleHtml } from "../core/gameTitle.js";
 import { bindNav } from "../screens/nav.js";
 import { gameExitBarHtml, bindExitGame } from "../core/exitGame.js";
 import {
@@ -38,8 +52,12 @@ import {
   stopGameSessionListenerOnPostGame,
   getActingHostUiRefreshToken,
   needsActingHostUiRefresh,
+  ensurePostGameScreen,
 } from "../core/gameSync.js";
 import { arch03LiveLog } from "../core/presenceUiLive.js";
+
+/** Pastille « X a tapé ! » (une ligne au-dessus du bouton) : emojis affichés au plus. */
+const CLUTCH_MAX_TAPPED_FACES = 5;
 
 export function mountClutch(app) {
   if (!requireLobbyPlay()) return null;
@@ -60,13 +78,25 @@ export function mountClutch(app) {
   let lastAward = null;
   let takeScored = false;
   let revealInFlight = false;
+  /** Hôte : l'envoi des résultats a échoué, relance automatique en cours. */
+  let revealRetrying = false;
+  /** Hôte : le dernier « Manche suivante » n'est pas parti (message sous le bouton). */
+  let nextRoundFailed = false;
+  /** Hôte : la fin de partie (« Voir les résultats ») n'est pas partie. */
+  let finishFailed = false;
 
   let localStart = null;
   let countdownEndsAt = null;
   let activeKey = null;
   let localWindowClosed = false;
   let tapCommitInFlight = false;
+  /** Dernier envoi de tap échoué (réseau) : message tant que le joueur n'a pas retapé. */
+  let tapFailed = false;
   let graceTimer = null;
+  /** Multijoueur : attente supplémentaire avant le verdict (taps d'invités en retard). */
+  let hostWaitTimer = null;
+  /** L'attente de l'hôte est écoulée sur ce téléphone (cible + grâce + attente). */
+  let hostWaitElapsed = false;
   let clockRaf = null;
   let hideBeforeMs = null;
   let copyTimer = null;
@@ -101,6 +131,8 @@ export function mountClutch(app) {
   function clearGrace() {
     if (graceTimer) clearTimeout(graceTimer);
     graceTimer = null;
+    if (hostWaitTimer) clearTimeout(hostWaitTimer);
+    hostWaitTimer = null;
   }
 
   function stopClock() {
@@ -132,15 +164,25 @@ export function mountClutch(app) {
    */
   function tappedChipsHtml(showBlind) {
     if (!showBlind) return "";
-    const names = tappedNames();
+    // Dernier tap en premier : c'est lui qui met la pression.
+    const names = tappedNames().sort((a, b) => (taps[b]?.at || 0) - (taps[a]?.at || 0));
     if (!names.length) return "";
-    return names
-      .map((n) => {
-        const meta = playerMeta(n);
-        const label = n === localName ? "Toi" : n;
-        return `<span class="clutch-chip" style="--clutch-chip:${meta.color}">${meta.emoji} ${escapeHtml(label)} a tapé&nbsp;!</span>`;
-      })
+    if (names.length === 1) {
+      const n = names[0];
+      const meta = playerMeta(n);
+      const label = n === localName ? "Toi" : n;
+      return `<span class="clutch-chip" style="--clutch-chip:${meta.color}">${meta.emoji} <span class="clutch-chip__name">${escapeHtml(label)}</span>${n === localName ? "as" : "a"} tapé&nbsp;!</span>`;
+    }
+    // Plusieurs taps : une seule pastille sur une ligne (place réservée, le bouton
+    // ne bouge pas) : emojis + dernier pseudo + « et N autres ».
+    const latest = names.find((n) => n !== localName) || names[0];
+    const meta = playerMeta(latest);
+    const faces = names
+      .slice(0, CLUTCH_MAX_TAPPED_FACES)
+      .map((n) => playerMeta(n).emoji)
       .join("");
+    const others = names.length - 1;
+    return `<span class="clutch-chip clutch-chip--group" style="--clutch-chip:${meta.color}"><span class="clutch-chip__faces" aria-hidden="true">${faces}</span> <span class="clutch-chip__name">${escapeHtml(latest)}</span>et ${others} autre${others > 1 ? "s" : ""} ont tapé&nbsp;!</span>`;
   }
 
   function refreshTappedChips() {
@@ -259,6 +301,10 @@ export function mountClutch(app) {
     if (!mount.isMounted()) return;
     if (!mount.isCurrentMount()) return;
     refreshTappedChips();
+    // La phrase sous le bouton aussi (ex. « Tout le monde a tapé ! »), sans
+    // re-rendu complet qui casserait le chrono et les animations.
+    const statusEl = app.querySelector("#clutch-status");
+    if (statusEl) statusEl.textContent = activeStatusText();
   }
 
   function alreadyScoredThisRound() {
@@ -288,7 +334,12 @@ export function mountClutch(app) {
         localStart = null;
         countdownEndsAt = performance.now() + CLUTCH_PRECOUNT_MS;
         localWindowClosed = false;
+        hostWaitElapsed = false;
+        tapFailed = false;
         blindVibrated = false;
+        revealRetry.stop();
+        revealRetrying = false;
+        nextRoundFailed = false;
         clearCopyTimer();
         clearGrace();
       }
@@ -303,12 +354,25 @@ export function mountClutch(app) {
     if (!mount.isCurrentMount()) return;
     if (phase !== "active") return;
     localWindowClosed = true;
-    if (!mp || canActAsHost()) {
+    if (!mp) {
       void goToReveal();
       return;
     }
-    // Invité : fenêtre fermée localement, on attend la révélation de l'hôte.
+    // Multijoueur : le bouton est fermé pour tout le monde, mais le verdict attend
+    // encore un peu les taps d'invités en retard. Le minuteur tourne aussi chez les
+    // invités : l'un d'eux peut devenir hôte remplaçant entre-temps.
+    if (hostWaitTimer) clearTimeout(hostWaitTimer);
+    hostWaitTimer = setTimeout(onHostWaitElapsed, CLUTCH_HOST_EXTRA_WAIT_MS);
     render();
+  }
+
+  function onHostWaitElapsed() {
+    hostWaitTimer = null;
+    if (!mount.isMounted()) return;
+    if (!mount.isCurrentMount()) return;
+    if (phase !== "active") return;
+    hostWaitElapsed = true;
+    if (canActAsHost()) void goToReveal();
   }
 
   async function transitionToReveal() {
@@ -348,13 +412,34 @@ export function mountClutch(app) {
         lastRound = lastRoundData;
         render();
       }
+    } catch (err) {
+      // Envoi raté : on autorise un nouvel essai (sinon bloqué sur « Temps écoulé »).
+      takeScored = false;
+      throw err;
     } finally {
       revealInFlight = false;
     }
   }
 
+  const revealRetry = createClutchRevealRetry({
+    attempt: () => transitionToReveal(),
+    shouldRetry: () =>
+      mount.isMounted() &&
+      mount.isCurrentMount() &&
+      phase === "active" &&
+      (!mp || canActAsHost()) &&
+      !getClutchSession().roundScored,
+    onStateChange: (failing) => {
+      revealRetrying = failing;
+      if (!mount.isMounted()) return;
+      if (!mount.isCurrentMount()) return;
+      if (phase === "active") render();
+    },
+  });
+
+  /** Ne rejette jamais : en cas d'échec, relance automatique toutes les 3 s. */
   async function goToReveal() {
-    await transitionToReveal();
+    await revealRetry.run();
   }
 
   function playerMeta(name) {
@@ -364,6 +449,27 @@ export function mountClutch(app) {
 
   function sessionScores() {
     return getClutchSession().matchScores || {};
+  }
+
+  /** Phrase sous le bouton (rendu complet et maj légère pendant le chrono caché). */
+  function activeStatusText(tapped = myTapMs() != null, counting = localStart == null) {
+    return revealRetrying && (!mp || canActAsHost())
+      ? CLUTCH_REVEAL_RETRY_LABEL
+      : tapFailed && !tapped && !localWindowClosed
+      ? CLUTCH_TAP_FAILED_LABEL
+      : tapFailed && !tapped && localWindowClosed
+      ? CLUTCH_TAP_FAILED_LATE_LABEL
+      : localWindowClosed
+      ? "Temps écoulé - en attente du verdict…"
+      : counting
+        ? "Prépare-toi… le chrono démarre !"
+        : tapped
+          ? mp
+            ? allClutchTapsIn()
+              ? "Tout le monde a tapé !"
+              : "C'est noté ! En attente des autres…"
+            : "C'est noté !"
+          : "Tape pile au moment où le chrono atteint la cible 💥";
   }
 
   function activeHtml() {
@@ -387,17 +493,7 @@ export function mountClutch(app) {
           : BLIND_LINES[0]
         : "Le chrono monte vers la cible";
 
-    const status = localWindowClosed
-      ? "Temps écoulé - en attente du verdict…"
-      : counting
-        ? "Prépare-toi… le chrono démarre !"
-        : tapped
-          ? mp
-            ? allClutchTapsIn()
-              ? "Tout le monde a tapé !"
-              : "C'est noté ! En attente des autres…"
-            : "C'est noté !"
-          : "Tape pile au moment où le chrono atteint la cible 💥";
+    const status = activeStatusText(tapped, counting);
 
     const btnDisabled = tapped || localWindowClosed || counting || tapCommitInFlight;
     const btnClasses = [
@@ -419,12 +515,12 @@ export function mountClutch(app) {
         ${btnDisabled ? "disabled" : ""}
         style="width:220px;height:220px;margin:24px auto;display:flex;align-items:center;justify-content:center;
           border-radius:50%;border:none;cursor:${btnDisabled ? "default" : "pointer"};
-          font-size:1.4rem;font-weight:900;color:#fff;
+          color:#fff;
           background:${tapped ? "linear-gradient(145deg,#34D399,#60A5FA)" : "radial-gradient(circle at 50% 35%, #FF6B6B 0%, #FF3CAC 55%, #2B2D66 100%)"};
           box-shadow:0 12px 40px rgba(255,60,172,.35);opacity:${(localWindowClosed && !tapped) || counting ? ".5" : "1"}">
         ${tapped ? "✓ Tapé" : "TAP !"}
       </button>
-      <p class="hint" style="text-align:center">${escapeHtml(status)}</p>`;
+      <p class="hint" id="clutch-status" style="text-align:center">${escapeHtml(status)}</p>`;
   }
 
   function revealHtml() {
@@ -465,7 +561,15 @@ export function mountClutch(app) {
         host
           ? `<button type="button" class="btn btn-primary btn--spaced" id="next-round">
               ${roundIdx < totalRounds - 1 ? "Manche suivante →" : "Voir les résultats →"}
-            </button>`
+            </button>${
+              nextRoundFailed
+                ? `<p class="hint">${escapeHtml(CLUTCH_NEXT_ROUND_FAILED_LABEL)}</p>`
+                : ""
+            }${
+              finishFailed
+                ? `<p class="hint">${escapeHtml(CLUTCH_FINISH_FAILED_LABEL)}</p>`
+                : ""
+            }`
           : `<p class="hint">En attente de l'hôte pour la suite…</p>`
       }
       </div>
@@ -497,7 +601,7 @@ export function mountClutch(app) {
           ).join("")}</div>
           <span class="muted">${roundIdx + 1}/${totalRounds}</span>
         </div>
-        <div class="logo logo--sm"><h1>CLUTCH</h1></div>
+        ${gamePlayTitleHtml("clutch-prep", { title: "CLUTCH" })}
         ${phaseHtml}
         ${gameExitBarHtml()}
       `,
@@ -511,7 +615,7 @@ export function mountClutch(app) {
       else startClock();
     }
 
-    app.querySelector("#clutch-target")?.addEventListener("click", () => {
+    const onTap = () => {
       if (
         phase !== "active" ||
         localStart == null ||
@@ -526,6 +630,7 @@ export function mountClutch(app) {
         at: Date.now(),
       };
       tapCommitInFlight = true;
+      tapFailed = false;
       taps = { ...taps, [localName]: tap };
       vibrate(35);
       render();
@@ -542,10 +647,13 @@ export function mountClutch(app) {
         .catch(() => {
           if (!mount.isMounted()) return;
           if (!mount.isCurrentMount()) return;
-          // Session déjà rollback dans commitClutchTap ; rouvre la fenêtre de tap.
-          const ui = resolveClutchTapCommitFailureUi();
+          // Session déjà rollback dans commitClutchTap ; rouvre la fenêtre de tap
+          // seulement si le temps n'est pas écoulé.
+          const ui = resolveClutchTapCommitFailureUi(localWindowClosed);
           tapCommitInFlight = ui.tapCommitInFlight;
           localWindowClosed = ui.localWindowClosed;
+          // Prévenir le joueur : sans message, le bouton revenait à « TAP ! » sans explication.
+          tapFailed = true;
         })
         .finally(() => {
           tapCommitInFlight = false;
@@ -554,11 +662,34 @@ export function mountClutch(app) {
           syncFromSession();
           render();
         });
+    };
+    const tapBtn = app.querySelector("#clutch-target");
+    // Tap compté dès que le doigt touche le bouton (pas au relâchement) : si le
+    // bouton bouge pendant l'appui, le tap n'est plus perdu, et le temps est plus juste.
+    tapBtn?.addEventListener("pointerdown", (e) => {
+      if (e.button !== 0) return;
+      e.preventDefault();
+      onTap();
+    });
+    // Clavier (Entrée / Espace) : click sans pointeur.
+    tapBtn?.addEventListener("click", (e) => {
+      if (e.detail === 0) onTap();
     });
 
     app.querySelector("#next-round")?.addEventListener("click", withClickLock(async () => {
       if (roundIdx < totalRounds - 1) {
-        await startClutchRound(roundIdx + 1);
+        try {
+          await startClutchRound(roundIdx + 1);
+        } catch (e) {
+          // Rien n'est parti : l'hôte reste sur le verdict, comme les invités.
+          console.warn("REVEAL clutch manche suivante:", e);
+          if (!mount.isMounted()) return;
+          if (!mount.isCurrentMount()) return;
+          nextRoundFailed = true;
+          render();
+          return;
+        }
+        nextRoundFailed = false;
         if (!mount.isMounted()) return;
         if (!mount.isCurrentMount()) return;
         syncFromSession();
@@ -574,11 +705,15 @@ export function mountClutch(app) {
         if (mp) {
           try {
             await completeGameSession({ gameId: "clutch", screen: "results", state: {} });
+            ensurePostGameScreen("results", { from: "clutch", gameId: "clutch" });
           } catch (e) {
+            // Fin de partie pas enregistrée : l'hôte reste sur le verdict (comme les
+            // invités) et peut réessayer. Avant, il partait seul aux résultats.
             console.warn("REVEAL completeGameSession:", e);
             if (!mount.isMounted()) return;
             if (!mount.isCurrentMount()) return;
-            navigate("results", { navStack: ["home", "lobby", "game-select", "results"] });
+            finishFailed = true;
+            render();
           }
         } else {
           if (!mount.isMounted()) return;
@@ -596,6 +731,7 @@ export function mountClutch(app) {
     if (!mount.isMounted()) return;
     if (!mount.isCurrentMount()) return;
     if (stopGameSessionListenerOnPostGame(row, { cleanup: () => {
+      revealRetry.stop();
       clearGrace();
       stopClock();
     } })) return;
@@ -609,7 +745,16 @@ export function mountClutch(app) {
     );
     syncFromSession();
     ensureRoundTiming();
-    if (phase === "active" && canActAsHost() && allClutchTapsIn()) {
+    // Hôte (ou remplaçant désigné après la fin du délai) : verdict si tout le monde
+    // a tapé ou si le délai est écoulé ici. Sinon l'hôte parti bloquait la manche.
+    if (
+      shouldHostRevealClutchRound({
+        phase,
+        canActAsHost: canActAsHost(),
+        allTapsIn: allClutchTapsIn(),
+        hostWaitElapsed,
+      })
+    ) {
       lastAckedActingHostToken = ahTokenNow;
       void goToReveal();
       return;
@@ -650,6 +795,7 @@ export function mountClutch(app) {
 
   return () => {
     mount.dispose();
+    revealRetry.stop();
     clearGrace();
     stopClock();
     clearCopyTimer();

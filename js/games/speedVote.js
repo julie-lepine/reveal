@@ -15,6 +15,7 @@ import {
 import { awardSpeedVoteRound } from "../core/scoring.js";
 import { applyMatchScoreDeltas, gameCumulativeScoresHtml, refreshGameScoresBox } from "../core/gameScores.js";
 import { getLocalDisplayName, recordSpeedVotePlayed, setLastGame } from "../core/state.js";
+import { NEXT_ROUND_FAILED_LABEL, POST_GAME_FINISH_FAILED_LABEL } from "../core/postGameFinish.js";
 import { getLobbyParticipants } from "../core/lobby.js";
 import { getActivePlayers } from "../core/players.js";
 import { setLobbyPlaying, setLobbyWaiting } from "../core/lobby.js";
@@ -23,6 +24,7 @@ import { withClickLock } from "../core/actionLock.js";
 import { createMountGuard } from "../core/mountLifecycle.js";
 import { navigate } from "../core/router.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
+import { gamePlayTitleHtml } from "../core/gameTitle.js";
 import { playerAvatarHtml, playerNameHtml } from "../core/signatureUi.js";
 import { bindNav } from "../screens/nav.js";
 import { gameExitBarHtml, bindExitGame } from "../core/exitGame.js";
@@ -36,6 +38,7 @@ import {
   completeGameSession,
   stopGameSessionListenerOnPostGame,
   refreshGameSession,
+  ensurePostGameScreen,
 } from "../core/gameSync.js";
 import { arch03AhLogSkipDecision } from "../core/arch03ActingHostDebug.js";
 
@@ -64,6 +67,10 @@ export function mountSpeedVote(app) {
   let lastAward = null;
   let takeScored = false;
   let revealInFlight = false;
+  /** Hôte : la fin de partie (« Voir les résultats ») n'est pas partie. */
+  let finishFailed = false;
+  /** Hôte : le dernier « Prochaine question » n'est pas parti. */
+  let nextRoundFailed = false;
   let currentQuestion = QUESTIONS[0];
   let modifier = "normal";
   const localName = getLocalDisplayName();
@@ -245,7 +252,15 @@ export function mountSpeedVote(app) {
         host
           ? `<button type="button" class="btn btn-primary btn--spaced" id="next-round">
           ${roundIdx < QUESTIONS.length - 1 ? "Prochaine question →" : "Voir les résultats →"}
-        </button>`
+        </button>${
+              nextRoundFailed
+                ? `<p class="hint">${escapeHtml(NEXT_ROUND_FAILED_LABEL)}</p>`
+                : ""
+            }${
+              finishFailed
+                ? `<p class="hint">${escapeHtml(POST_GAME_FINISH_FAILED_LABEL)}</p>`
+                : ""
+            }`
           : `<p class="hint">En attente de l'hôte pour la suite…</p>`
       }
       </div>
@@ -308,7 +323,7 @@ export function mountSpeedVote(app) {
           ).join("")}</div>
           <span class="muted">${roundIdx + 1}/${total}</span>
         </div>
-        <div class="logo logo--sm"><h1>SPEED VOTE</h1></div>
+        ${gamePlayTitleHtml("speedvote-prep", { title: "SPEED VOTE" })}
         <div class="card card--speed">
           <p class="label-upper label-upper--gold">⚡ Question #${roundIdx + 1}</p>
           <p class="hot-take-text">${escapeHtml(currentQuestion)}</p>
@@ -374,10 +389,20 @@ export function mountSpeedVote(app) {
     app.querySelector("#next-round")?.addEventListener("click", withClickLock(async () => {
       if (roundIdx < total - 1) {
         const nextIdx = roundIdx + 1;
-        if (mp && isLobbyHost()) {
+        try {
           await startSpeedVoteRound(nextIdx);
-        } else {
-          await startSpeedVoteRound(nextIdx);
+        } catch (e) {
+          // Rien n'est parti : l'hôte reste sur le verdict, comme les invités.
+          console.warn("REVEAL speedvote question suivante:", e);
+          if (!mount.isMounted()) return;
+          if (!mount.isCurrentMount()) return;
+          nextRoundFailed = true;
+          syncFromSession();
+          render();
+          return;
+        }
+        nextRoundFailed = false;
+        if (!(mp && isLobbyHost())) {
           if (!mount.isMounted()) return;
           if (!mount.isCurrentMount()) return;
           syncFromSession();
@@ -396,11 +421,16 @@ export function mountSpeedVote(app) {
         if (mp) {
           try {
             await completeGameSession({ gameId: "speedvote", screen: "results", state: {} });
+            finishFailed = false;
+            ensurePostGameScreen("results", { from: "speedvote", gameId: "speedvote" });
           } catch (e) {
+            // Fin de partie pas enregistrée : l'hôte reste sur le verdict (comme les
+            // invités) et peut réessayer. Avant, il partait seul aux résultats.
             console.warn("REVEAL completeGameSession:", e);
             if (!mount.isMounted()) return;
             if (!mount.isCurrentMount()) return;
-            navigate("results", { navStack: ["home", "lobby", "game-select", "results"] });
+            finishFailed = true;
+            render();
           }
         } else {
           setLobbyWaiting();

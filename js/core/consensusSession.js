@@ -228,6 +228,70 @@ export async function guardConsensusServerWrite(step, run) {
   return result;
 }
 
+/** Écrans de fin de partie : la session serveur a quitté le jeu. */
+const CONSENSUS_POST_GAME_SCREENS = new Set(["results", "leaderboard", "tiernight-end"]);
+
+/** Marqueur « fin de partie » de ce lobby resté après un échec d'envoi (sinon null). */
+function readConsensusCompleteMarker() {
+  const marker = readConsensusWriteMarker();
+  if (!marker || marker.step !== "complete") return null;
+  if (marker.lobbyId !== currentConsensusLobbyId()) return null;
+  return marker;
+}
+
+export function hasConsensusCompleteMarker() {
+  return readConsensusCompleteMarker() != null;
+}
+
+/**
+ * La session serveur est déjà sur un écran de fin de partie : la fin a bien été
+ * enregistrée, on retire le marqueur « fin de partie » (sinon ce téléphone ne
+ * pouvait plus jamais modifier Consensus dans ce lobby).
+ */
+export function releaseConsensusCompleteMarkerIfPostGame(row) {
+  if (!readConsensusCompleteMarker()) return false;
+  if (!row || row.lobby_id !== currentConsensusLobbyId()) return false;
+  if (!CONSENSUS_POST_GAME_SCREENS.has(row.screen)) return false;
+  clearConsensusWriteMarker();
+  return true;
+}
+
+/**
+ * Reprise après un échec d'envoi de la fin de partie (bouton du bandeau).
+ * 1. Relit la session. Lecture impossible : on garde le marqueur.
+ * 2. Déjà sur les résultats (l'envoi avait abouti) : marqueur retiré, terminé.
+ * 3. Sinon : marqueur retiré puis fin de partie renvoyée (renvoi sans risque :
+ *    elle remet la partie dans le même état final). Nouvel échec : marqueur reposé.
+ *
+ * @param {{ readSession: () => Promise<object|null>, complete: () => Promise<unknown> }} opts
+ * @returns {Promise<{ done: boolean, reason: string }>}
+ */
+export async function resumeConsensusComplete({ readSession, complete }) {
+  if (!readConsensusCompleteMarker()) return { done: false, reason: "not-complete" };
+  let row = null;
+  try {
+    row = await readSession();
+  } catch (err) {
+    console.warn("Consensus complete reread:", err);
+    return { done: false, reason: "read-failed" };
+  }
+  if (!row || row.lobby_id !== currentConsensusLobbyId()) {
+    return { done: false, reason: "read-failed" };
+  }
+  if (releaseConsensusCompleteMarkerIfPostGame(row)) {
+    return { done: true, reason: "already-done" };
+  }
+  clearConsensusWriteMarker();
+  try {
+    await guardConsensusServerWrite("complete", complete);
+  } catch (err) {
+    console.warn("Consensus complete retry:", err);
+    return { done: false, reason: "retry-failed" };
+  }
+  if (readConsensusCompleteMarker()) return { done: false, reason: "retry-failed" };
+  return { done: true, reason: "retried" };
+}
+
 function defaultSession() {
   return {
     ready: {},

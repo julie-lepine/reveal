@@ -1,6 +1,6 @@
 import { escapeHtml } from "../core/ui.js";
+import { gameTitleHtml } from "../core/gameTitle.js";
 import { playerNameHtml } from "../core/signatureUi.js";
-import { rulesButtonHtml } from "../core/gameRulesUi.js";
 import { prepStartSlotHtml } from "../core/prepScreen.js";
 
 export function renderTriviaSetup({
@@ -17,11 +17,7 @@ export function renderTriviaSetup({
   launchSlot = {},
 } = {}) {
   return `
-    <p class="label-upper label-upper--gold">🧠 Trivia Quiz</p>
-    <div class="screen-title-row">
-      <h2 class="screen-title">Configuration</h2>
-      ${rulesButtonHtml("trivia")}
-    </div>
+    ${gameTitleHtml("trivia-prep", { kicker: "Configuration", rulesKey: "trivia" })}
     <p class="game-intro">Répondez juste, mais surtout vite : une bonne réponse vaut +10 pts, le plus rapide a répondre juste prend +10 pts bonus. La manche se cloture des que tout le monde a répondu.</p>
 
     <div class="card">

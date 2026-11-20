@@ -41,14 +41,15 @@ import {
 } from "../core/gameScores.js";
 import { getActivePlayers } from "../core/players.js";
 import { getLocalDisplayName, recordTruthMeterPlayed, setLastGame } from "../core/state.js";
+import { NEXT_ROUND_FAILED_LABEL, POST_GAME_FINISH_FAILED_LABEL } from "../core/postGameFinish.js";
 import { setLobbyPlaying, setLobbyWaiting } from "../core/lobby.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
 import { createMountGuard } from "../core/mountLifecycle.js";
 import { navigate } from "../core/router.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
+import { gameTitleHtml } from "../core/gameTitle.js";
 import { bindNav } from "../screens/nav.js";
 import { gameExitBarHtml, bindExitGame } from "../core/exitGame.js";
-import { rulesButtonHtml } from "../core/gameRulesUi.js";
 import {
   isGameSyncActive,
   canActAsHost,
@@ -208,6 +209,10 @@ export function mountTruthMeter(app) {
   let displayTimeoutId = null;
   let revealPendingTimeoutId = null;
   let nextRoundInFlight = false;
+  /** Hôte : la fin de partie n'est pas partie (message sous le bouton). */
+  let finishFailed = false;
+  /** Hôte : le dernier « Joueur suivant » n'est pas parti. */
+  let nextRoundFailed = false;
   let revealInFlight = false;
   let authorFocusRound = -1;
   let suppressAuthorAutoFocus = false;
@@ -735,7 +740,7 @@ export function mountTruthMeter(app) {
           phaseHtml += `
           <button type="button" class="btn btn-secondary btn--spaced" id="truth-skip-author">
             Passer cet auteur (absent)
-          </button>`;
+          </button>${finishFailedHtml()}`;
         }
       }
     }
@@ -834,7 +839,11 @@ export function mountTruthMeter(app) {
           host
             ? `<button type="button" class="btn btn-primary btn--spaced" id="next-round">
           ${roundIdx < total - 1 ? "Joueur suivant →" : "Voir les résultats →"}
-        </button>`
+        </button>${
+              nextRoundFailed
+                ? `<p class="hint">${escapeHtml(NEXT_ROUND_FAILED_LABEL)}</p>`
+                : ""
+            }${finishFailedHtml()}`
             : `<p class="hint">En attente de l'hôte…</p>`
         }
         </div>
@@ -854,10 +863,7 @@ export function mountTruthMeter(app) {
           ).join("")}</div>
           <span class="muted">${roundIdx + 1}/${total}</span>
         </div>
-        <div class="screen-title-row">
-          <div class="logo logo--sm"><h1>TRUTHMETER</h1></div>
-          ${rulesButtonHtml("truthmeter")}
-        </div>
+        ${gameTitleHtml("truthmeter-prep", { title: "TRUTHMETER", rulesKey: "truthmeter" })}
         ${author ? `<p class="hint">Auteur : <strong>${escapeHtml(author)}</strong></p>` : ""}
         ${phaseHtml}
         ${gameExitBarHtml()}
@@ -1019,6 +1025,8 @@ export function mountTruthMeter(app) {
           if (!mount.isMounted()) return;
           if (!mount.isCurrentMount()) return;
           if (!res?.ok) {
+            // Dernier auteur passé mais fin de partie pas enregistrée : message.
+            if (res?.reason === "complete-failed") finishFailed = true;
             tm02QaLog("skip-rejected", {
               runId: getTruthMeterSession().runId,
               phase,
@@ -1154,6 +1162,11 @@ export function mountTruthMeter(app) {
     }, TRUTH_METER_DISPLAY_SEC * 1000);
   }
 
+  /** Message sous le bouton de fin quand la fin de partie n'est pas partie. */
+  function finishFailedHtml() {
+    return finishFailed ? `<p class="hint">${escapeHtml(POST_GAME_FINISH_FAILED_LABEL)}</p>` : "";
+  }
+
   async function onNextRound() {
     if (nextRoundInFlight) return;
     if (mp && !canActAsHost()) return;
@@ -1166,6 +1179,30 @@ export function mountTruthMeter(app) {
       const total = totalRounds();
       if (roundIdx < total - 1) {
         const nextIdx = roundIdx + 1;
+        if (mp) {
+          // L'écran ne change de manche qu'une fois l'envoi réussi. Avant, il
+          // passait au joueur suivant avant l'envoi, sans message en cas d'échec.
+          try {
+            await commitTruthMeterPlay({
+              roundIdx: nextIdx,
+              phase: "writing",
+              affirmation: null,
+              authorEstimate: null,
+              votes: {},
+              voteEndsAt: null,
+              roundScored: false,
+            });
+          } catch (e) {
+            console.warn("REVEAL truthmeter joueur suivant:", e);
+            if (!mount.isMounted()) return;
+            if (!mount.isCurrentMount()) return;
+            nextRoundFailed = true;
+            syncFromSession();
+            render();
+            return;
+          }
+          nextRoundFailed = false;
+        }
         draftText = "";
         draftEstimate = 50;
         suppressAuthorAutoFocus = false;
@@ -1182,15 +1219,6 @@ export function mountTruthMeter(app) {
         authorEstimate = null;
 
         if (mp) {
-          await commitTruthMeterPlay({
-            roundIdx: nextIdx,
-            phase: "writing",
-            affirmation: null,
-            authorEstimate: null,
-            votes: {},
-            voteEndsAt: null,
-            roundScored: false,
-          });
           if (!mount.isMounted()) return;
           if (!mount.isCurrentMount()) return;
           syncFromSession();
@@ -1200,7 +1228,15 @@ export function mountTruthMeter(app) {
         render();
       } else {
         if (mp) {
-          await finishTruthMeterGameSession();
+          const finished = await finishTruthMeterGameSession();
+          if (!finished.ok) {
+            // Fin de partie pas enregistrée : l'hôte reste sur le verdict (comme les
+            // invités) et peut réessayer.
+            if (!mount.isMounted()) return;
+            if (!mount.isCurrentMount()) return;
+            finishFailed = true;
+            render();
+          }
         } else {
           if (!mount.isMounted()) return;
           if (!mount.isCurrentMount()) return;

@@ -26,7 +26,8 @@ import {
 import { getActivePlayers, getActivePlayerNames } from "../core/players.js";
 import { createSyncPending } from "../core/syncPending.js";
 import { formatWinnersLabel, withCompetitionRanks } from "../core/competitionRank.js";
-import { getLocalDisplayName, recordHotTakePlayed, setLastGame } from "../core/state.js";
+import { getLocalDisplayName, recordHotTakePlayed, saveStatePatch, setLastGame } from "../core/state.js";
+import { NEXT_ROUND_FAILED_LABEL, POST_GAME_FINISH_FAILED_LABEL } from "../core/postGameFinish.js";
 import { serializeLastGameStandings } from "../core/lastGamePodium.js";
 import { setLobbyPlaying, setLobbyWaiting } from "../core/lobby.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
@@ -34,6 +35,7 @@ import { withClickLock } from "../core/actionLock.js";
 import { createMountGuard } from "../core/mountLifecycle.js";
 import { navigate } from "../core/router.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
+import { gamePlayTitleHtml } from "../core/gameTitle.js";
 import { playerAvatarHtml, playerNameHtml } from "../core/signatureUi.js";
 import { bindNav } from "../screens/nav.js";
 import { gameExitBarHtml, bindExitGame } from "../core/exitGame.js";
@@ -49,6 +51,7 @@ import {
   hotTakeToRemote,
   stopGameSessionListenerOnPostGame,
   refreshGameSession,
+  ensurePostGameScreen,
 } from "../core/gameSync.js";
 import { getSupabaseUserId } from "../core/supabaseAuth.js";
 import { voteConfirmChrome, pickForVoteConfirm } from "../core/voteConfirm.js";
@@ -93,6 +96,10 @@ export function mountHotTake(app) {
   let votes = {};
   let lastAward = null;
   let takeScored = false;
+  /** Hôte : la fin de partie (« Voir les résultats ») n'est pas partie. */
+  let finishFailed = false;
+  /** Hôte : le dernier « Prochain Hot Take » n'est pas parti. */
+  let nextRoundFailed = false;
   /** Évite deux révélations / double scoring concurrentes. */
   let revealInFlight = false;
   /** Vote en cours d’envoi - évite que la synchro efface l’UI avant la réponse serveur. */
@@ -319,6 +326,11 @@ export function mountHotTake(app) {
     return hotTakeRevealSummaryHtml(voteResult, votesMap, options);
   }
 
+  /** Message sous « Voir les résultats » quand la fin de partie n'est pas partie. */
+  function finishFailedHtml() {
+    return finishFailed ? `<p class="hint">${escapeHtml(POST_GAME_FINISH_FAILED_LABEL)}</p>` : "";
+  }
+
   async function finishHotTakeGame() {
     if (mp && !canActAsHost()) return;
 
@@ -341,6 +353,7 @@ export function mountHotTake(app) {
   async function showEveningResults() {
     if (mp && !canActAsHost()) return;
 
+    const sessionBeforeReset = getHotTakeSession();
     const resetHt = await resetHotTakeAfterGame({ syncRemote: false });
     if (!mount.isMounted()) return;
     if (!mount.isCurrentMount()) return;
@@ -352,11 +365,19 @@ export function mountHotTake(app) {
           screen: "results",
           state: { hotTake: hotTakeToRemote(resetHt) },
         });
+        finishFailed = false;
+        ensurePostGameScreen("results", { from: "hottake", gameId: "hottake" });
       } catch (e) {
+        // Fin de partie pas enregistrée : l'hôte retrouve sa partie (comme les
+        // invités) et peut réessayer. Avant, il partait seul aux résultats, avec
+        // une partie déjà remise à zéro sur son téléphone.
         console.warn("REVEAL completeGameSession:", e);
+        saveStatePatch({ hotTakeGame: sessionBeforeReset });
         if (!mount.isMounted()) return;
         if (!mount.isCurrentMount()) return;
-        navigate("results", { navStack: ["home", "lobby", "game-select", "results"] });
+        finishFailed = true;
+        syncFromSession();
+        render();
       }
       return;
     }
@@ -544,10 +565,14 @@ export function mountHotTake(app) {
       });
       if (!mount.isMounted()) return;
       if (!mount.isCurrentMount()) return;
+      // Rien n'est parti : l'hôte reste sur le verdict et est prévenu (avant, le
+      // bouton revenait sans explication).
+      nextRoundFailed = true;
       syncFromSession();
       render();
       return;
     }
+    nextRoundFailed = false;
     if (!mount.isMounted()) return;
     if (!mount.isCurrentMount()) return;
     selected = null;
@@ -721,7 +746,11 @@ export function mountHotTake(app) {
           host
             ? `<button type="button" class="btn btn-primary btn--spaced" id="next-take">
           ${takeIdx < total - 1 ? "Prochain Hot Take →" : "Voir les résultats →"}
-        </button>`
+        </button>${
+              nextRoundFailed
+                ? `<p class="hint">${escapeHtml(NEXT_ROUND_FAILED_LABEL)}</p>`
+                : ""
+            }${finishFailedHtml()}`
             : `<p class="hint">En attente de l'hôte pour la suite…</p>`
         }
         </div>
@@ -741,7 +770,7 @@ export function mountHotTake(app) {
           <p class="hint">Le podium s'affiche dans les résultats de la soirée.</p>
           ${
             !mp || canActAsHost()
-              ? `<button type="button" class="btn btn-primary btn--spaced" data-hottake-action="show-results">Voir les résultats</button>`
+              ? `<button type="button" class="btn btn-primary btn--spaced" data-hottake-action="show-results">Voir les résultats</button>${finishFailedHtml()}`
               : `<p class="hint">En attente de l'hôte pour afficher les résultats…</p>`
           }
         </div>`;
@@ -756,7 +785,7 @@ export function mountHotTake(app) {
           ).join("")}</div>
           <span class="muted">${Math.min(takeIdx + 1, total)}/${total}</span>
         </div>
-        <div class="logo logo--sm"><h1>HOT TAKE</h1></div>
+        ${gamePlayTitleHtml("hottake-prep", { title: "HOT TAKE" })}
         ${phaseHtml}
         ${gameExitBarHtml()}`
         : `
@@ -766,7 +795,7 @@ export function mountHotTake(app) {
           ).join("")}</div>
           <span class="muted">${takeIdx + 1}/${total}</span>
         </div>
-        <div class="logo logo--sm"><h1>HOT TAKE</h1></div>
+        ${gamePlayTitleHtml("hottake-prep", { title: "HOT TAKE" })}
         <div class="card card--hot">
           <p class="label-upper label-upper--hot">🔥 Hot Take #${takeIdx + 1}</p>
           ${takeAuthorLine(take)}

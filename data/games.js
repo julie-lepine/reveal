@@ -77,7 +77,7 @@ export const GAMES = [
     cssClass: "drawit",
     logo: "assets/games/drawit.png",
     borderGradient:
-      "linear-gradient(145deg, #38BDF8 0%, #A78BFA 48%, #2B2D66 100%)",
+      "linear-gradient(145deg, #FBBF24 0%, #F97316 48%, #2B2D66 100%)",
     enabled: true,
   },
   {
@@ -88,7 +88,7 @@ export const GAMES = [
     cssClass: "wrong",
     logo: "assets/games/wronganswer.png",
     borderGradient:
-      "linear-gradient(145deg, #F472B6 0%, #A78BFA 48%, #2B2D66 100%)",
+      "linear-gradient(145deg, #FF3CAC 0%, #6366F1 48%, #2B2D66 100%)",
     enabled: true,
   },
   {
@@ -99,7 +99,7 @@ export const GAMES = [
     cssClass: "dilemma",
     logo: "assets/games/dilemma.png",
     borderGradient:
-      "linear-gradient(145deg, #60A5FA 0%, #FF3CAC 48%, #2B2D66 100%)",
+      "linear-gradient(145deg, #6366F1 0%, #FF3CAC 48%, #2B2D66 100%)",
     enabled: true,
   },
   {
@@ -110,7 +110,7 @@ export const GAMES = [
     cssClass: "truth",
     logo: "assets/games/truthmeter.png",
     borderGradient:
-      "linear-gradient(145deg, #34D399 0%, #60A5FA 48%, #2B2D66 100%)",
+      "linear-gradient(145deg, #FF6B6B 0%, #FF3CAC 48%, #2B2D66 100%)",
     enabled: true,
   },
   {
@@ -121,7 +121,7 @@ export const GAMES = [
     cssClass: "tier",
     logo: "assets/games/tiernight.png",
     borderGradient:
-      "linear-gradient(320deg, #FF6B6B 0%, #FF3CAC 48%, #2B2D66 100%)",
+      "linear-gradient(320deg, #FBBF24 0%, #FF6B6B 48%, #2B2D66 100%)",
     enabled: true,
   },
   {
@@ -132,7 +132,7 @@ export const GAMES = [
     cssClass: "trivia",
     logo: "assets/games/trivia.png",
     borderGradient:
-      "linear-gradient(145deg, #A78BFA 0%, #22D3EE 44%, #2B2D66 100%)",
+      "linear-gradient(145deg, #34D399 0%, #22D3EE 48%, #2B2D66 100%)",
     enabled: true,
   },
 ];

@@ -6,6 +6,7 @@ import { escapeHtml, pageShell } from "../core/ui.js";
 import { bindNav } from "./nav.js";
 import {
   eveningRecapRestartButtonHtml,
+  eveningRecapOtherGameButtonHtml,
   bindRestartGameButtons,
   resolveLastGameForRestart,
 } from "../core/restartGame.js";
@@ -21,6 +22,7 @@ import {
   getCachedGameSession,
 } from "../core/gameSync.js";
 import { refreshLobbyFromSupabase, onLobbyBundleUpdated } from "../core/supabaseLobby.js";
+import { bindReclaimHostButtons, reclaimHostCtaHtml } from "../core/reclaimHostCta.js";
 
 export function mountResults(app) {
   if (!requireLobbyPlay()) return null;
@@ -34,13 +36,17 @@ export function mountResults(app) {
 
     const lastBlock = last
       ? `
-    <div class="card card--highlight">
+    <div class="card card--frame results-last">
       <p class="card-heading">Dernière partie</p>
       <p class="evening-recap__title">${escapeHtml(last.title || last.gameId)}</p>
       ${podiumHtml || `<p class="hint">${escapeHtml(last.summary || "")}</p>`}
       ${eveningRecapRestartButtonHtml(last)}
+      ${eveningRecapOtherGameButtonHtml()}
+      ${reclaimHostCtaHtml()}
     </div>`
-      : `<p class="hint">Aucune partie récente.</p>`;
+      : `<p class="hint">Aucune partie récente.</p>
+    ${eveningRecapOtherGameButtonHtml()}
+    ${reclaimHostCtaHtml()}`;
 
     const chips = [
       recap.hotTakes > 0 ? `<span class="evening-recap__chip">🔥 ${recap.hotTakes}</span>` : "",
@@ -67,7 +73,7 @@ export function mountResults(app) {
 
       ${lastBlock}
 
-      <div class="evening-recap card">
+      <div class="evening-recap evening-recap--global card">
         <p class="evening-recap__title">Stats globales</p>
         <div class="evening-recap__chips">${chips || '<span class="hint">Lance un jeu !</span>'}</div>
         ${
@@ -84,7 +90,6 @@ export function mountResults(app) {
       ${eveningGameLeaderboardsHtml()}
 
       <div class="btn-row">
-        <button type="button" class="btn btn-primary" data-nav="game-select">Autre jeu</button>
         <button type="button" class="btn btn-accent" data-nav="leaderboard">Classement</button>
       </div>
     `,
@@ -92,6 +97,13 @@ export function mountResults(app) {
 
     bindNav(app);
     bindRestartGameButtons(app);
+    // Hôte absent : le remplaçant désigné peut reprendre l'animation d'ici
+    // (puis « Recommencer » apparaît), sans repasser par le menu des jeux.
+    bindReclaimHostButtons(app, {
+      onClaimed: () => {
+        if (getCurrentScreen() === "results") render();
+      },
+    });
   }
 
   let unsubSession = () => {};

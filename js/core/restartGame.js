@@ -713,6 +713,21 @@ export function eveningRecapRestartButtonHtml(lastGame = resolveLastGameForResta
   return `<button type="button" class="btn btn-secondary evening-recap__restart" data-restart-game="${escapeHtml(lastGame.gameId)}">Recommencer une partie de ${escapeHtml(title)}</button>`;
 }
 
+export const OTHER_GAME_LABEL = "Jouer à un autre jeu";
+
+/**
+ * « Jouer à un autre jeu », sous « Recommencer » en fin de partie.
+ * Même règle que Recommencer : hôte (ou hors multijoueur) seulement - les invités
+ * ne lancent pas de jeu et naviguent via la barre de menu.
+ * Par défaut `data-nav="game-select"` (retour menu jeux géré par nav.js) ; `id`
+ * pour un écran qui a déjà son propre gestionnaire de sortie.
+ */
+export function eveningRecapOtherGameButtonHtml({ id = "" } = {}) {
+  if (isGameSyncActive() && !isLobbyHost()) return "";
+  const hook = id ? `id="${escapeHtml(id)}"` : `data-nav="game-select"`;
+  return `<button type="button" class="btn btn-secondary evening-recap__other-game" ${hook}>${OTHER_GAME_LABEL}</button>`;
+}
+
 /**
  * Bind « Recommencer une partie de X ».
  * L'exclusivité est dans `restartGame` (verrou logique), pas sur le nœud -

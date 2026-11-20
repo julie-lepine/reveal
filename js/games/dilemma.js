@@ -18,7 +18,8 @@ import {
   gameCumulativeScoresHtml,
   refreshGameScoresBox,
 } from "../core/gameScores.js";
-import { getLocalDisplayName, recordDilemmaPlayed, setLastGame } from "../core/state.js";
+import { getLocalDisplayName, recordDilemmaPlayed, saveStatePatch, setLastGame } from "../core/state.js";
+import { NEXT_ROUND_FAILED_LABEL, POST_GAME_FINISH_FAILED_LABEL } from "../core/postGameFinish.js";
 import { getLobbyParticipants } from "../core/lobby.js";
 import { getActivePlayers, getActivePlayerNames } from "../core/players.js";
 import { setLobbyPlaying, setLobbyWaiting } from "../core/lobby.js";
@@ -26,6 +27,7 @@ import { requireLobbyPlay } from "../core/gameGuard.js";
 import { withClickLock } from "../core/actionLock.js";
 import { navigate } from "../core/router.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
+import { gamePlayTitleHtml } from "../core/gameTitle.js";
 import { bindNav } from "../screens/nav.js";
 import { gameExitBarHtml, bindExitGame } from "../core/exitGame.js";
 import {
@@ -39,6 +41,7 @@ import {
   dilemmaToRemote,
   stopGameSessionListenerOnPostGame,
   refreshGameSession,
+  ensurePostGameScreen,
 } from "../core/gameSync.js";
 import { voteConfirmChrome, pickForVoteConfirm } from "../core/voteConfirm.js";
 import { createSyncPending } from "../core/syncPending.js";
@@ -269,12 +272,28 @@ export function mountDilemma(app) {
     await goToReveal();
   }
 
+  /** Hôte : la fin de partie (« Voir les résultats ») n'est pas partie. */
+  let finishFailed = false;
+  /** Hôte : le dernier « Manche suivante » n'est pas parti. */
+  let nextRoundFailed = false;
+
   async function advanceRound() {
     if (mp && !canActAsHost()) return;
     const total = ROUNDS.length;
     if (roundIdx < total - 1) {
       const nextIdx = roundIdx + 1;
-      await startDilemmaRound(nextIdx);
+      try {
+        await startDilemmaRound(nextIdx);
+      } catch (e) {
+        // Rien n'est parti : l'hôte reste sur le verdict, comme les invités.
+        console.warn("REVEAL dilemma manche suivante:", e);
+        if (unmounted) return;
+        nextRoundFailed = true;
+        syncFromSession();
+        render();
+        return;
+      }
+      nextRoundFailed = false;
       if (unmounted) return;
       syncFromSession();
       selected = null;
@@ -291,6 +310,7 @@ export function mountDilemma(app) {
         title: "Dilemma",
         summary: `${total} dilemmes · dernière manche ${pctA}% option A`,
       });
+      const sessionBeforeReset = getDilemmaSession();
       const resetDm = await resetDilemmaAfterGame({ syncRemote: false });
       if (unmounted) return;
       if (mp) {
@@ -300,10 +320,19 @@ export function mountDilemma(app) {
             screen: "results",
             state: { dilemma: dilemmaToRemote(resetDm) },
           });
+          finishFailed = false;
+          ensurePostGameScreen("results", { from: "dilemma", gameId: "dilemma" });
         } catch (e) {
+          // Fin de partie pas enregistrée : l'hôte retrouve le verdict de la dernière
+          // manche (comme les invités) et peut réessayer. Avant, il partait seul aux
+          // résultats, avec une partie déjà remise à zéro sur son téléphone.
           console.warn("REVEAL completeGameSession:", e);
+          saveStatePatch({ dilemmaGame: sessionBeforeReset });
           if (unmounted) return;
-          navigate("results", { navStack: ["home", "lobby", "game-select", "results"] });
+          finishFailed = true;
+          syncFromSession();
+          render();
+          return;
         }
       } else {
         setLobbyWaiting();
@@ -424,7 +453,15 @@ export function mountDilemma(app) {
         host
           ? `<button type="button" class="btn btn-primary btn--spaced" id="next-round">
           ${roundIdx < totalRounds - 1 ? "Manche suivante →" : "Voir les résultats →"}
-        </button>`
+        </button>${
+              nextRoundFailed
+                ? `<p class="hint">${escapeHtml(NEXT_ROUND_FAILED_LABEL)}</p>`
+                : ""
+            }${
+              finishFailed
+                ? `<p class="hint">${escapeHtml(POST_GAME_FINISH_FAILED_LABEL)}</p>`
+                : ""
+            }`
           : `<p class="hint">En attente de l'hôte pour la suite…</p>`
       }
       </div>
@@ -540,7 +577,7 @@ export function mountDilemma(app) {
           ).join("")}</div>
           <span class="muted">${roundIdx + 1}/${total}</span>
         </div>
-        <div class="logo logo--sm"><h1>DILEMMA</h1></div>
+        ${gamePlayTitleHtml("dilemma-prep", { title: "DILEMMA" })}
         ${dilemmaCardHtml()}
         ${phaseHtml}
         ${gameExitBarHtml()}

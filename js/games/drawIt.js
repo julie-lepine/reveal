@@ -35,6 +35,7 @@ import { withClickLock } from "../core/actionLock.js";
 import { createMountGuard } from "../core/mountLifecycle.js";
 import { navigate } from "../core/router.js";
 import { escapeHtml, pageShell, schedulePageScrollToElement } from "../core/ui.js";
+import { gamePlayTitleHtml } from "../core/gameTitle.js";
 import { bindNav } from "../screens/nav.js";
 import { gameExitBarHtml, bindExitGame } from "../core/exitGame.js";
 import {
@@ -869,7 +870,7 @@ export function mountDrawIt(app) {
           ).join("")}</div>
           <span class="muted">${roundIdx + 1}/${total}</span>
         </div>
-        <div class="logo logo--sm"><h1>DRAW IT !</h1></div>
+        ${gamePlayTitleHtml("drawit-prep", { title: "DRAW IT !" })}
         ${phaseHtml}
         ${guessChatHtml(session)}
         ${gameExitBarHtml()}

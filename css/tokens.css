@@ -1,0 +1,146 @@
+/* ═══════════════════════════════════════════════════════════════
+   REVEAL — Design tokens (nouvelle DA)
+   Source unique des variables. Importé en premier par style.css.
+   Les anciens noms (--color-*, --gradient-*, --shadow-*) sont conservés.
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Police d'affichage embarquée (titres, gros chiffres). */
+@font-face{
+  font-family:"Anton";
+  font-style:normal;
+  font-weight:400;
+  font-display:swap;
+  src:url("../assets/fonts/anton-latin-400.woff2") format("woff2");
+}
+
+:root{
+  /* ── Layout ── */
+  --app-max:430px;
+  --page-pad:16px;
+  --touch-min:44px;
+  --nav-h:88px;            /* hauteur réservée par la barre de menu basse */
+
+  /* ── Couleurs de marque ── */
+  --color-bg:#0d0f1e;
+  --color-bg-deep:#05060f;
+  --color-ink:#2b2d66;      /* indigo profond : fin des dégradés de cadre */
+  --color-primary:#ff3cac;
+  --color-primary-hot:#ff6b6b;
+  --color-secondary:#6366f1;
+  --color-secondary-soft:#818cf8;
+  --color-secondary-deep:#4f46e5;
+  --color-cyan:#22d3ee;
+  --color-violet:#a78bfa;
+
+  /* ── Couleurs d'état ── */
+  --color-success:#4ade80;
+  --color-success-deep:#22c55e;
+  --color-gold:#fbbf24;
+  --color-danger:#ff6b6b;
+
+  /* ── Surfaces et bordures (blanc translucide sur fond sombre) ── */
+  --surface-1:rgba(255,255,255,.05);   /* cartes */
+  --surface-2:rgba(255,255,255,.06);   /* champs, pastilles */
+  --surface-3:rgba(255,255,255,.08);   /* éléments pressés, pistes */
+  --border-1:rgba(255,255,255,.08);
+  --border-2:rgba(255,255,255,.12);
+  --divider:rgba(255,255,255,.06);
+
+  /* ── Texte ── */
+  --text:#fff;
+  --text-2:rgba(255,255,255,.72);      /* hints (contraste AA) */
+  --text-3:rgba(255,255,255,.6);       /* sous-titres, labels */
+  --text-4:rgba(255,255,255,.45);      /* liens discrets */
+  --color-muted:#94a3b8;               /* était utilisé sans être défini */
+  --color-accent:var(--color-violet);  /* idem */
+
+  /* ── Dégradés ── */
+  --gradient-primary:linear-gradient(135deg, var(--color-primary-hot), var(--color-primary));
+  --gradient-secondary:linear-gradient(135deg, var(--color-secondary-soft), var(--color-secondary));
+  --gradient-secondary-deep:linear-gradient(135deg, var(--color-secondary), var(--color-secondary-deep));
+  --gradient-success:linear-gradient(135deg, var(--color-success), var(--color-success-deep));
+  --gradient-gold:linear-gradient(135deg, var(--color-gold), var(--color-primary-hot));
+
+  /* ── Accent du jeu courant (surchargé par body[data-screen]) ── */
+  --g1:var(--color-secondary);
+  --g2:var(--color-primary);
+
+  /* ── Ombres ── */
+  /* Boutons pleins : ombre courte et sombre (plus de halo rose) + liseré clair
+     en haut ; --btn-sheen ajoute un léger reflet pour donner du volume. */
+  --shadow-primary:0 6px 16px -6px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.22);
+  --btn-sheen:linear-gradient(180deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0) 55%);
+  --shadow-secondary:0 8px 28px rgba(99, 102, 241, 0.35);
+  --shadow-success:0 8px 28px rgba(74, 222, 128, 0.3);
+  --shadow-logo:drop-shadow(0 4px 6px rgba(0,0,0,.5));
+  --focus-ring:var(--color-secondary-soft);
+
+  /* ── Rayons ── */
+  --r-xs:10px;
+  --r-sm:14px;    /* champs, bouton retour, icônes */
+  --r-md:18px;    /* boutons, options */
+  --r-lg:22px;    /* cartes secondaires, modes */
+  --r-card:24px;  /* cartes, cadres */
+  --r-pill:999px;
+  --radius-sm:var(--r-xs);  /* alias : utilisés sans être définis */
+  --radius-md:var(--r-sm);
+
+  /* ── Espacements ── */
+  --sp-1:4px;
+  --sp-2:8px;
+  --sp-3:12px;
+  --sp-4:16px;
+  --sp-5:20px;
+  --sp-6:24px;
+
+  /* ── Typographie ── */
+  --font-body:'Inter', sans-serif;
+  --font-display:'Anton', 'Impact', 'Inter', sans-serif;
+  --display-skew:-6deg;
+
+  /* Espacement titre → contenu (h1 > h2 > h3) */
+  --heading-gap-h1:18px;
+  --heading-gap-h2:14px;
+  --heading-gap-h3:12px;
+
+  /* Bannière AdMob native (surchargé par js/core/ads.js) */
+  --ad-banner-height:0px;
+  --ad-banner-buffer:0px;
+}
+
+/* ═══ Accent par jeu (--g1 / --g2) : écran courant (body[data-screen])
+   et vignettes du choix des jeux (.game-tile__logo-wrap--<cssClass>) ═══ */
+
+body[data-screen^="consensus"],
+.game-tile__logo-wrap--consensus{ --g1:#22d3ee; --g2:#a78bfa; }
+body[data-screen^="hottake"],
+.game-tile__logo-wrap--hot{ --g1:#f43f5e; --g2:#db2777; }
+body[data-screen^="traitre"],
+.game-tile__logo-wrap--traitre{ --g1:#f97316; --g2:#c026d3; }       /* Spot the fake */
+body[data-screen^="guesslie"],
+.game-tile__logo-wrap--guess{ --g1:#f43f5e; --g2:#db2777; }
+body[data-screen^="speedvote"],
+.game-tile__logo-wrap--speed{ --g1:#fbbf24; --g2:#ff3cac; }
+body[data-screen^="clutch"],
+.game-tile__logo-wrap--clutch{ --g1:#f43f5e; --g2:#db2777; }
+body[data-screen^="dilemma"],
+.game-tile__logo-wrap--dilemma{ --g1:#6366f1; --g2:#ff3cac; }
+body[data-screen^="trivia"],
+.game-tile__logo-wrap--trivia{ --g1:#34d399; --g2:#22d3ee; }
+body[data-screen^="truthmeter"],
+.game-tile__logo-wrap--truth{ --g1:#f43f5e; --g2:#db2777; }
+body[data-screen^="drawit"],
+.game-tile__logo-wrap--drawit{ --g1:#fbbf24; --g2:#dc2626; --g3:#f97316; }
+body[data-screen^="wronganswer"],
+.game-tile__logo-wrap--wrong{ --g1:#ff3cac; --g2:#6366f1; }
+body[data-screen^="tiernight"],
+.game-tile__logo-wrap--tier{ --g1:#fbbf24; --g2:#ff6b6b; }
+/* Rank Live : mode de Tier Night, accent propre (après tiernight pour l'emporter). */
+body[data-screen^="tiernight-live"]{ --g1:#22d3ee; --g2:#6366f1; }
+
+/* Dégradés dérivés de l'accent : déclarés sur body (et non :root) pour
+   être recalculés avec le --g1/--g2 de l'écran courant. */
+body{
+  --grad-game:linear-gradient(135deg, var(--g1), var(--g2));
+  --grad-frame:linear-gradient(145deg, var(--g1) 0%, var(--g2) 48%, var(--color-ink) 100%);
+}

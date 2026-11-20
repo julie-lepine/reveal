@@ -38,6 +38,7 @@ import { getSupabaseUserId } from "../core/supabaseAuth.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
 import { navigate } from "../core/router.js";
 import { escapeHtml, pageShell, tierLogoHtml, bindTierLogos } from "../core/ui.js";
+import { gamePlayTitleHtml } from "../core/gameTitle.js";
 import { playerAvatarHtml, playerNameHtml } from "../core/signatureUi.js";
 import { gameExitBarHtml, bindExitGame } from "../core/exitGame.js";
 import { bindNav } from "../screens/nav.js";
@@ -255,7 +256,7 @@ export function mountTierNight(app) {
       backTarget: "back",
       scroll: true,
       content: `
-        <p class="label-upper label-upper--gold">🏆 Tier Night</p>
+        ${gamePlayTitleHtml("tiernight-select")}
         <div class="tier-game-header">
           <div class="tier-game-header__logo tier-logo-wrap--card">${tierLogoHtml(list, "tier-list-logo tier-list-logo--fill")}</div>
           <h1 class="tier-game-header__title">${escapeHtml(list.name)}</h1>

@@ -13,6 +13,7 @@ import {
   requirePlayerUid,
 } from "./gameSync.js";
 import { patchGameStateWithFeedback } from "./patchGameStateFeedback.js";
+import { startRoundWithRollback } from "./roundStartRollback.js";
 import { launchGameWithSync, commitHostGamePlay, commitPrepReadyToggle } from "./mpLaunch.js";
 import { checkHotTakeModeration } from "./hotTakeSession.js";
 import {
@@ -115,7 +116,12 @@ export async function startWrongAnswerRound(roundIdx) {
     ...session,
     ...roundPayload(session.deck, roundIdx),
   };
-  await syncWrongAnswerSession(next);
+  // Envoi raté : l'hôte revient à la manche en cours (comme les invités).
+  await startRoundWithRollback({
+    previous: session,
+    send: () => syncWrongAnswerSession(next),
+    restore: (prev) => saveStatePatch({ wrongAnswerGame: prev }),
+  });
   return next;
 }
 

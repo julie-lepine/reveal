@@ -254,13 +254,19 @@ describe("FEATURE-PROFILE-04 — carnet Signature", () => {
     assert.match(css, /\.carnet-spark\{[\s\S]*inset:0/);
     assert.match(css, /\.carnet-spark__y--min\{[\s\S]*bottom:0/);
     assert.match(css, /\.carnet-spark__y--max\{[\s\S]*top:0/);
-    assert.match(screen, /carnet-rank-row/);
+    // Rangs affichés en podium (1er, 2e, 3e+) dans « Tes chiffres ».
+    assert.match(screen, /carnet-podium/);
+    assert.match(screen, /aggregateCarnetRankSplit/);
     assert.match(screen, /CARNET_LABEL\.listTitle/);
     assert.match(screen, /data-carnet-share/);
     assert.match(screen, /openCarnetSharePreview/);
-    const shareIdx = screen.indexOf("data-carnet-share");
-    const listIdx = screen.indexOf("CARNET_LABEL.listTitle");
-    assert.ok(shareIdx > 0 && listIdx > shareIdx);
+    // Ordre affiché : carte, Partager ma carte, Tes chiffres, liste des soirées.
+    const body = screen.slice(screen.indexOf("function carnetBodyHtml"));
+    const tpl = body.slice(body.lastIndexOf("return `"));
+    const cardIdx = tpl.indexOf("${carnetCardHtml(model)}");
+    const shareIdx = tpl.indexOf("${share}");
+    const listIdx = tpl.indexOf("${eveningsListHtml(evenings)}");
+    assert.ok(cardIdx > 0 && shareIdx > cardIdx && listIdx > shareIdx);
     assert.match(screen, /carnet-chip/);
     assert.match(screen, /medalForCompetitionRank/);
     const sync = src("js/core/gameSync.js");
@@ -324,14 +330,20 @@ describe("FEATURE-PROFILE-04 — carnet Signature", () => {
     assert.equal(layout.w, CARNET_CARD_WIDTH);
     assert.equal(layout.h, CARNET_CARD_HEIGHT);
     assert.equal(layout.w / layout.h, 1080 / 1920);
-    assert.ok(layout.hero.y >= layout.padTop);
-    assert.ok(layout.ident.y >= layout.hero.y + layout.hero.h);
-    assert.ok(layout.hero.h <= 200);
-    assert.ok(layout.hero.h < layout.ring.h);
+    // Carte de collection : tout tient dans le cadre, hors des 250 px qu'Instagram
+    // recouvre en haut et en bas d'une story.
+    const { card } = layout;
+    assert.ok(card.y >= 250 && card.y + card.h <= layout.h - 250);
+    assert.ok(layout.top.y >= card.y);
+    assert.ok(layout.avatar.cy - layout.avatar.r > layout.top.y + layout.top.h);
+    assert.ok(layout.name.y >= layout.avatar.cy + layout.avatar.r);
+    assert.ok(layout.badge.y >= layout.name.y + layout.name.h);
+    assert.ok(layout.hook.y >= layout.badge.y + layout.badge.h);
+    assert.ok(layout.tiles[0].y >= layout.hook.y + layout.hook.h);
+    assert.equal(layout.tiles.length, 4);
     assert.ok(layout.dots.y >= layout.tiles[2].y + layout.tiles[2].h);
     assert.ok(layout.logo.y > layout.dots.y + layout.dots.h);
-    assert.ok(layout.logo.y - (layout.dots.y + layout.dots.h) < 120);
-    assert.ok(layout.logo.y + layout.logo.h <= layout.h - 160);
+    assert.ok(layout.logo.y + layout.logo.h <= card.y + card.h);
 
     const cardJs = src("js/core/signatureCarnetCard.js");
     assert.doesNotMatch(cardJs, /friendNames|friend_names/);
@@ -347,13 +359,11 @@ describe("FEATURE-PROFILE-04 — carnet Signature", () => {
     assert.equal(isShareCancelError({ name: "AbortError" }), true);
     assert.equal(isShareCancelError({ message: "Share canceled" }), true);
     assert.equal(isShareCancelError({ message: "network" }), false);
-    assert.match(cardJs, /layout\.yMin/);
-    assert.match(cardJs, /layout\.yMax/);
-    assert.match(cardJs, /chart\.x \+ chart\.w/);
-    assert.match(cardJs, /chart\.y \+ chart\.h/);
-    assert.match(cardJs, /box\.h - titleY - padBottom/);
-    assert.doesNotMatch(cardJs, /h:\s*140/);
-    assert.doesNotMatch(cardJs, /box\.y \+ box\.h - 18/);
+    // Carte de collection : logo de l'app, pseudo en Anton, accroche conservée.
+    assert.match(cardJs, /loadLogo\(\)/);
+    assert.match(cardJs, /DISPLAY_FONT/);
+    assert.match(cardJs, /drawHook\(ctx, layout\.hook, model\.hook\)/);
+    assert.match(cardJs, /drawRankDots\(ctx, layout\.dots, model\.dots\)/);
     const labels = src("js/config/signatureCarnet.js");
     assert.match(labels, /Partager ma carte/);
     assert.match(labels, /Mes 20 dernières soirées/);
