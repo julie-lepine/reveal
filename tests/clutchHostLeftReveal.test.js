@@ -31,7 +31,7 @@ describe("Clutch : hôte parti pendant une manche", () => {
         phase: "active",
         canActAsHost: true,
         allTapsIn: clutchAllTapsIn(session, taps, {}),
-        localWindowClosed: true,
+        hostWaitElapsed: true,
       }),
       true
     );
@@ -43,7 +43,7 @@ describe("Clutch : hôte parti pendant une manche", () => {
         phase: "active",
         canActAsHost: false,
         allTapsIn: false,
-        localWindowClosed: true,
+        hostWaitElapsed: true,
       }),
       false
     );
@@ -55,7 +55,7 @@ describe("Clutch : hôte parti pendant une manche", () => {
         phase: "active",
         canActAsHost: true,
         allTapsIn: false,
-        localWindowClosed: false,
+        hostWaitElapsed: false,
       }),
       false
     );
@@ -67,7 +67,7 @@ describe("Clutch : hôte parti pendant une manche", () => {
         phase: "active",
         canActAsHost: true,
         allTapsIn: true,
-        localWindowClosed: false,
+        hostWaitElapsed: false,
       }),
       true
     );
@@ -79,7 +79,7 @@ describe("Clutch : hôte parti pendant une manche", () => {
         phase: "reveal",
         canActAsHost: true,
         allTapsIn: true,
-        localWindowClosed: true,
+        hostWaitElapsed: true,
       }),
       false
     );
@@ -88,7 +88,7 @@ describe("Clutch : hôte parti pendant une manche", () => {
   it("l'écran Clutch utilise cette règle à chaque mise à jour de session", () => {
     const src = readFileSync(join(__dirname, "../js/games/clutch.js"), "utf8");
     const listener = src.slice(src.indexOf("onGameSessionChange((row)"));
-    assert.match(listener, /shouldHostRevealClutchRound\(\{[\s\S]*?localWindowClosed,[\s\S]*?\}\)/);
+    assert.match(listener, /shouldHostRevealClutchRound\(\{[\s\S]*?hostWaitElapsed,[\s\S]*?\}\)/);
     assert.doesNotMatch(listener, /canActAsHost\(\) && allClutchTapsIn\(\)\) \{/);
   });
 });

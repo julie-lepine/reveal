@@ -11,6 +11,14 @@ export const CLUTCH_MAX_TARGET_MS = 15000;
 /** Fenêtre de grâce (invisible) après la cible : on accepte encore les taps puis clôture. */
 export const CLUTCH_GRACE_MS = 3000;
 
+/**
+ * Multijoueur : attente supplémentaire de l'hôte après la fermeture du bouton,
+ * avant d'annoncer le verdict. Un invité reçoit la manche avec du retard (jusqu'à
+ * 2-4 s si la connexion en direct ne marche pas) : son tap parfait peut arriver
+ * chez l'hôte après la cible + grâce. Ignorée si tout le monde a déjà tapé.
+ */
+export const CLUTCH_HOST_EXTRA_WAIT_MS = 3000;
+
 /** Pré-décompte « 3 · 2 · 1 » avant le départ du chrono, pour mémoriser la cible. */
 export const CLUTCH_PRECOUNT_MS = 3000;
 

@@ -1,5 +1,6 @@
 import {
   CLUTCH_GRACE_MS,
+  CLUTCH_HOST_EXTRA_WAIT_MS,
   CLUTCH_HIDE_BEFORE_MS,
   CLUTCH_PRECOUNT_MS,
   formatClutchSeconds,
@@ -92,6 +93,10 @@ export function mountClutch(app) {
   /** Dernier envoi de tap échoué (réseau) : message tant que le joueur n'a pas retapé. */
   let tapFailed = false;
   let graceTimer = null;
+  /** Multijoueur : attente supplémentaire avant le verdict (taps d'invités en retard). */
+  let hostWaitTimer = null;
+  /** L'attente de l'hôte est écoulée sur ce téléphone (cible + grâce + attente). */
+  let hostWaitElapsed = false;
   let clockRaf = null;
   let hideBeforeMs = null;
   let copyTimer = null;
@@ -126,6 +131,8 @@ export function mountClutch(app) {
   function clearGrace() {
     if (graceTimer) clearTimeout(graceTimer);
     graceTimer = null;
+    if (hostWaitTimer) clearTimeout(hostWaitTimer);
+    hostWaitTimer = null;
   }
 
   function stopClock() {
@@ -323,6 +330,7 @@ export function mountClutch(app) {
         localStart = null;
         countdownEndsAt = performance.now() + CLUTCH_PRECOUNT_MS;
         localWindowClosed = false;
+        hostWaitElapsed = false;
         tapFailed = false;
         blindVibrated = false;
         revealRetry.stop();
@@ -342,12 +350,25 @@ export function mountClutch(app) {
     if (!mount.isCurrentMount()) return;
     if (phase !== "active") return;
     localWindowClosed = true;
-    if (!mp || canActAsHost()) {
+    if (!mp) {
       void goToReveal();
       return;
     }
-    // Invité : fenêtre fermée localement, on attend la révélation de l'hôte.
+    // Multijoueur : le bouton est fermé pour tout le monde, mais le verdict attend
+    // encore un peu les taps d'invités en retard. Le minuteur tourne aussi chez les
+    // invités : l'un d'eux peut devenir hôte remplaçant entre-temps.
+    if (hostWaitTimer) clearTimeout(hostWaitTimer);
+    hostWaitTimer = setTimeout(onHostWaitElapsed, CLUTCH_HOST_EXTRA_WAIT_MS);
     render();
+  }
+
+  function onHostWaitElapsed() {
+    hostWaitTimer = null;
+    if (!mount.isMounted()) return;
+    if (!mount.isCurrentMount()) return;
+    if (phase !== "active") return;
+    hostWaitElapsed = true;
+    if (canActAsHost()) void goToReveal();
   }
 
   async function transitionToReveal() {
@@ -722,7 +743,7 @@ export function mountClutch(app) {
         phase,
         canActAsHost: canActAsHost(),
         allTapsIn: allClutchTapsIn(),
-        localWindowClosed,
+        hostWaitElapsed,
       })
     ) {
       lastAckedActingHostToken = ahTokenNow;
