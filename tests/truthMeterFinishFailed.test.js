@@ -148,7 +148,7 @@ describe("Truth Meter : écran quand la fin de partie échoue", () => {
       screen,
       /finishFailed \? `<p class="hint">\$\{escapeHtml\(POST_GAME_FINISH_FAILED_LABEL\)\}<\/p>` : ""/
     );
-    assert.match(screen, /"Voir les résultats →"\}\s*<\/button>\$\{finishFailedHtml\(\)\}/);
+    assert.match(screen, /"Voir les résultats →"\}\s*<\/button>[\s\S]{0,300}?\$\{finishFailedHtml\(\)\}/);
     assert.match(screen, /Passer cet auteur \(absent\)\s*<\/button>\$\{finishFailedHtml\(\)\}/);
   });
 });

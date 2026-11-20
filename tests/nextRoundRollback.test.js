@@ -177,3 +177,22 @@ describe("Hot Take : prise suivante qui échoue", () => {
     assertMessageShown(screen);
   });
 });
+
+describe("Truth Meter : joueur suivant qui échoue", () => {
+  const screen = read("js/games/truthMeter.js");
+  const onNext = screen.slice(
+    screen.indexOf("async function onNextRound"),
+    screen.indexOf("finishTruthMeterGameSession()", screen.indexOf("async function onNextRound"))
+  );
+
+  it("l'écran ne change de manche qu'après un envoi réussi", () => {
+    const sendAt = onNext.indexOf("await commitTruthMeterPlay(");
+    const switchAt = onNext.indexOf("roundIdx = nextIdx;");
+    assert.ok(sendAt > 0 && switchAt > sendAt);
+  });
+
+  it("échec : l'hôte reste sur le verdict et voit le message", () => {
+    assert.match(onNext, /catch \(e\) \{[\s\S]*?nextRoundFailed = true;\s*syncFromSession\(\);\s*render\(\);\s*return;/);
+    assertMessageShown(screen);
+  });
+});

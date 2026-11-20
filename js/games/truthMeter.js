@@ -41,7 +41,7 @@ import {
 } from "../core/gameScores.js";
 import { getActivePlayers } from "../core/players.js";
 import { getLocalDisplayName, recordTruthMeterPlayed, setLastGame } from "../core/state.js";
-import { POST_GAME_FINISH_FAILED_LABEL } from "../core/postGameFinish.js";
+import { NEXT_ROUND_FAILED_LABEL, POST_GAME_FINISH_FAILED_LABEL } from "../core/postGameFinish.js";
 import { setLobbyPlaying, setLobbyWaiting } from "../core/lobby.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
 import { createMountGuard } from "../core/mountLifecycle.js";
@@ -211,6 +211,8 @@ export function mountTruthMeter(app) {
   let nextRoundInFlight = false;
   /** Hôte : la fin de partie n'est pas partie (message sous le bouton). */
   let finishFailed = false;
+  /** Hôte : le dernier « Joueur suivant » n'est pas parti. */
+  let nextRoundFailed = false;
   let revealInFlight = false;
   let authorFocusRound = -1;
   let suppressAuthorAutoFocus = false;
@@ -837,7 +839,11 @@ export function mountTruthMeter(app) {
           host
             ? `<button type="button" class="btn btn-primary btn--spaced" id="next-round">
           ${roundIdx < total - 1 ? "Joueur suivant →" : "Voir les résultats →"}
-        </button>${finishFailedHtml()}`
+        </button>${
+              nextRoundFailed
+                ? `<p class="hint">${escapeHtml(NEXT_ROUND_FAILED_LABEL)}</p>`
+                : ""
+            }${finishFailedHtml()}`
             : `<p class="hint">En attente de l'hôte…</p>`
         }
         </div>
@@ -1173,6 +1179,30 @@ export function mountTruthMeter(app) {
       const total = totalRounds();
       if (roundIdx < total - 1) {
         const nextIdx = roundIdx + 1;
+        if (mp) {
+          // L'écran ne change de manche qu'une fois l'envoi réussi. Avant, il
+          // passait au joueur suivant avant l'envoi, sans message en cas d'échec.
+          try {
+            await commitTruthMeterPlay({
+              roundIdx: nextIdx,
+              phase: "writing",
+              affirmation: null,
+              authorEstimate: null,
+              votes: {},
+              voteEndsAt: null,
+              roundScored: false,
+            });
+          } catch (e) {
+            console.warn("REVEAL truthmeter joueur suivant:", e);
+            if (!mount.isMounted()) return;
+            if (!mount.isCurrentMount()) return;
+            nextRoundFailed = true;
+            syncFromSession();
+            render();
+            return;
+          }
+          nextRoundFailed = false;
+        }
         draftText = "";
         draftEstimate = 50;
         suppressAuthorAutoFocus = false;
@@ -1189,15 +1219,6 @@ export function mountTruthMeter(app) {
         authorEstimate = null;
 
         if (mp) {
-          await commitTruthMeterPlay({
-            roundIdx: nextIdx,
-            phase: "writing",
-            affirmation: null,
-            authorEstimate: null,
-            votes: {},
-            voteEndsAt: null,
-            roundScored: false,
-          });
           if (!mount.isMounted()) return;
           if (!mount.isCurrentMount()) return;
           syncFromSession();
