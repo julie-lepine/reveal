@@ -41,9 +41,10 @@ describe("Tier Night (série) : l'hôte remplaçant peut terminer la manche", ()
     assert.match(fnBody(screen, "forceResults"), /if \(!canLeadRoundEnd\(\)\) return;/);
   });
 
-  it("le classement de chacun garde son chemin : vrai hôte en direct, les autres par la RPC", () => {
+  it("le classement passe par la RPC en série (hôte compris) ; écriture directe seulement en classique", () => {
     const finish = fnBody(screen, "finishGame");
-    assert.match(finish, /if \(isLobbyHost\(\)\) \{[\s\S]*?syncTierNightSession\(/);
-    assert.match(finish, /rpcContributeGameSessionPlayer\(\{[\s\S]*?kind: "placement"/);
+    assert.match(finish, /if \(isLobbyHost\(\) && !hasActiveTierNightSeries\(\)\) \{[\s\S]*?syncTierNightSession\(/);
+    assert.match(finish, /await contributeOwnPlacement\(\);/);
+    assert.match(fnBody(screen, "contributeOwnPlacement"), /rpcContributeGameSessionPlayer\(\{[\s\S]*?kind: "placement"/);
   });
 });
