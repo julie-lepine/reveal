@@ -301,6 +301,10 @@ export function mountClutch(app) {
     if (!mount.isMounted()) return;
     if (!mount.isCurrentMount()) return;
     refreshTappedChips();
+    // La phrase sous le bouton aussi (ex. « Tout le monde a tapé ! »), sans
+    // re-rendu complet qui casserait le chrono et les animations.
+    const statusEl = app.querySelector("#clutch-status");
+    if (statusEl) statusEl.textContent = activeStatusText();
   }
 
   function alreadyScoredThisRound() {
@@ -447,6 +451,27 @@ export function mountClutch(app) {
     return getClutchSession().matchScores || {};
   }
 
+  /** Phrase sous le bouton (rendu complet et maj légère pendant le chrono caché). */
+  function activeStatusText(tapped = myTapMs() != null, counting = localStart == null) {
+    return revealRetrying && (!mp || canActAsHost())
+      ? CLUTCH_REVEAL_RETRY_LABEL
+      : tapFailed && !tapped && !localWindowClosed
+      ? CLUTCH_TAP_FAILED_LABEL
+      : tapFailed && !tapped && localWindowClosed
+      ? CLUTCH_TAP_FAILED_LATE_LABEL
+      : localWindowClosed
+      ? "Temps écoulé - en attente du verdict…"
+      : counting
+        ? "Prépare-toi… le chrono démarre !"
+        : tapped
+          ? mp
+            ? allClutchTapsIn()
+              ? "Tout le monde a tapé !"
+              : "C'est noté ! En attente des autres…"
+            : "C'est noté !"
+          : "Tape pile au moment où le chrono atteint la cible 💥";
+  }
+
   function activeHtml() {
     const tapped = myTapMs() != null;
     const counting = localStart == null;
@@ -468,23 +493,7 @@ export function mountClutch(app) {
           : BLIND_LINES[0]
         : "Le chrono monte vers la cible";
 
-    const status = revealRetrying && (!mp || canActAsHost())
-      ? CLUTCH_REVEAL_RETRY_LABEL
-      : tapFailed && !tapped && !localWindowClosed
-      ? CLUTCH_TAP_FAILED_LABEL
-      : tapFailed && !tapped && localWindowClosed
-      ? CLUTCH_TAP_FAILED_LATE_LABEL
-      : localWindowClosed
-      ? "Temps écoulé - en attente du verdict…"
-      : counting
-        ? "Prépare-toi… le chrono démarre !"
-        : tapped
-          ? mp
-            ? allClutchTapsIn()
-              ? "Tout le monde a tapé !"
-              : "C'est noté ! En attente des autres…"
-            : "C'est noté !"
-          : "Tape pile au moment où le chrono atteint la cible 💥";
+    const status = activeStatusText(tapped, counting);
 
     const btnDisabled = tapped || localWindowClosed || counting || tapCommitInFlight;
     const btnClasses = [
@@ -511,7 +520,7 @@ export function mountClutch(app) {
           box-shadow:0 12px 40px rgba(255,60,172,.35);opacity:${(localWindowClosed && !tapped) || counting ? ".5" : "1"}">
         ${tapped ? "✓ Tapé" : "TAP !"}
       </button>
-      <p class="hint" style="text-align:center">${escapeHtml(status)}</p>`;
+      <p class="hint" id="clutch-status" style="text-align:center">${escapeHtml(status)}</p>`;
   }
 
   function revealHtml() {
