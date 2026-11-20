@@ -300,6 +300,8 @@ export function mountGameSelect(app) {
   let unsubSession = () => {};
   let unsubResumeBanner = () => {};
   let renderTimer = null;
+  /** Écran quitté : plus aucun rafraîchissement programmé (ex. fin d'un chargement en cours). */
+  let disposed = false;
   let renderInFlight = false;
   let lastSnapshot = "";
   const catchupTimers = new Set();
@@ -382,6 +384,7 @@ export function mountGameSelect(app) {
   }
 
   function scheduleRender(force = false) {
+    if (disposed) return;
     if (renderTimer) clearTimeout(renderTimer);
     const delay = force ? 0 : 300;
     renderTimer = setTimeout(() => {
@@ -491,6 +494,7 @@ export function mountGameSelect(app) {
   }
 
   return () => {
+    disposed = true;
     app.removeEventListener("click", onGameSelectClick);
     unsubResumeBanner();
     unsubSession();
