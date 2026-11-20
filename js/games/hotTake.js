@@ -26,7 +26,14 @@ import {
 import { getActivePlayers, getActivePlayerNames } from "../core/players.js";
 import { createSyncPending } from "../core/syncPending.js";
 import { formatWinnersLabel, withCompetitionRanks } from "../core/competitionRank.js";
-import { getLocalDisplayName, recordHotTakePlayed, saveStatePatch, setLastGame } from "../core/state.js";
+import {
+  getLocalDisplayName,
+  recordHotTakePlayed,
+  restoreEveningScores,
+  saveStatePatch,
+  setLastGame,
+  snapshotEveningScores,
+} from "../core/state.js";
 import { NEXT_ROUND_FAILED_LABEL, POST_GAME_FINISH_FAILED_LABEL } from "../core/postGameFinish.js";
 import { serializeLastGameStandings } from "../core/lastGamePodium.js";
 import { setLobbyPlaying, setLobbyWaiting } from "../core/lobby.js";
@@ -456,6 +463,9 @@ export function mountHotTake(app) {
     }
 
     revealInFlight = true;
+    // Points de soirée avant cette manche : remis si l'envoi échoue (sinon un nouvel
+    // essai les ajoutait une deuxième fois).
+    const eveningBefore = snapshotEveningScores();
     try {
       let matchScores = getHotTakeSession().matchScores || {};
       let lastRound = getHotTakeSession().lastRound || null;
@@ -510,6 +520,7 @@ export function mountHotTake(app) {
         takeScoredAfter: getHotTakeSession().takeScored,
       });
     } catch (err) {
+      if (getHotTakeSession().phase !== "reveal") restoreEveningScores(eveningBefore);
       arch03RevealLog("goToReveal aborted - stay on voting", {
         message: err?.message || String(err),
         phaseNow: getHotTakeSession().phase,

@@ -18,7 +18,14 @@ import {
   gameCumulativeScoresHtml,
   refreshGameScoresBox,
 } from "../core/gameScores.js";
-import { getLocalDisplayName, recordDilemmaPlayed, saveStatePatch, setLastGame } from "../core/state.js";
+import {
+  getLocalDisplayName,
+  recordDilemmaPlayed,
+  restoreEveningScores,
+  saveStatePatch,
+  setLastGame,
+  snapshotEveningScores,
+} from "../core/state.js";
 import { NEXT_ROUND_FAILED_LABEL, POST_GAME_FINISH_FAILED_LABEL } from "../core/postGameFinish.js";
 import { getLobbyParticipants } from "../core/lobby.js";
 import { getActivePlayers, getActivePlayerNames } from "../core/players.js";
@@ -223,6 +230,9 @@ export function mountDilemma(app) {
 
     revealInFlight = true;
     let awardedThisAttempt = false;
+    // Points de soirée avant cette manche : remis si l'envoi échoue (sinon un nouvel
+    // essai les ajoutait une deuxième fois).
+    const eveningBefore = snapshotEveningScores();
     try {
       roundScored = true;
       let matchScores = getDilemmaSession().matchScores || {};
@@ -255,6 +265,7 @@ export function mountDilemma(app) {
         enterRevealUi();
       } else if (awardedThisAttempt) {
         roundScored = Boolean(getDilemmaSession().roundScored);
+        restoreEveningScores(eveningBefore);
       }
       console.warn("dilemma reveal:", err);
     } finally {

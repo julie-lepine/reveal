@@ -34,7 +34,13 @@ import {
 } from "../core/clutchRevealRetry.js";
 import { awardClutchRound } from "../core/scoring.js";
 import { applyMatchScoreDeltas, gameCumulativeScoresHtml, refreshGameScoresBox } from "../core/gameScores.js";
-import { getLocalDisplayName, recordClutchPlayed, setLastGame } from "../core/state.js";
+import {
+  getLocalDisplayName,
+  recordClutchPlayed,
+  restoreEveningScores,
+  setLastGame,
+  snapshotEveningScores,
+} from "../core/state.js";
 import { getLobbyParticipants } from "../core/lobby.js";
 import { setLobbyPlaying, setLobbyWaiting } from "../core/lobby.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
@@ -402,6 +408,9 @@ export function mountClutch(app) {
     if (revealInFlight) return;
 
     revealInFlight = true;
+    // Points de soirée avant cette manche : remis si l'envoi échoue (sinon chaque
+    // nouvel essai de la relance automatique les ajoutait encore).
+    const eveningBefore = snapshotEveningScores();
     try {
       takeScored = true;
       const session = getClutchSession();
@@ -434,8 +443,10 @@ export function mountClutch(app) {
         render();
       }
     } catch (err) {
-      // Envoi raté : on autorise un nouvel essai (sinon bloqué sur « Temps écoulé »).
+      // Envoi raté : on autorise un nouvel essai (sinon bloqué sur « Temps écoulé »),
+      // sans garder les points ajoutés pour cet essai.
       takeScored = false;
+      restoreEveningScores(eveningBefore);
       throw err;
     } finally {
       revealInFlight = false;

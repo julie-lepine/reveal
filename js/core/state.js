@@ -1687,6 +1687,33 @@ export function addScore(playerName, points) {
   notifySignatureEveningArchiveDraft();
 }
 
+/**
+ * Copie des points de soirée du téléphone (avant d'ajouter les points d'une manche).
+ * Si l'envoi de la révélation échoue, restoreEveningScores(copie) remet tout comme
+ * avant : sinon un nouvel essai ajoutait les points une deuxième fois, et ils
+ * partaient ensuite au serveur avec l'envoi suivant de l'hôte.
+ */
+export function snapshotEveningScores() {
+  return JSON.parse(
+    JSON.stringify({
+      scores: state.scores || {},
+      gameScores: state.gameScores || {},
+      gameScoreOrder: state.gameScoreOrder || [],
+      playerStats: state.playerStats || {},
+    })
+  );
+}
+
+export function restoreEveningScores(snapshot) {
+  if (!snapshot || typeof snapshot !== "object") return;
+  state.scores = snapshot.scores || {};
+  state.gameScores = snapshot.gameScores || {};
+  state.gameScoreOrder = snapshot.gameScoreOrder || [];
+  state.playerStats = snapshot.playerStats || {};
+  save();
+  notifySignatureEveningArchiveDraft();
+}
+
 export function addLocalScore(points) {
   addScore(getLocalDisplayName(), points);
 }

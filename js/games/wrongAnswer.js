@@ -15,7 +15,13 @@ import {
 } from "../core/wrongAnswerSession.js";
 import { awardWrongAnswerRound } from "../core/scoring.js";
 import { applyMatchScoreDeltas, gameCumulativeScoresHtml, refreshGameScoresBox } from "../core/gameScores.js";
-import { getLocalDisplayName, recordWrongAnswerPlayed, setLastGame } from "../core/state.js";
+import {
+  getLocalDisplayName,
+  recordWrongAnswerPlayed,
+  restoreEveningScores,
+  setLastGame,
+  snapshotEveningScores,
+} from "../core/state.js";
 import { NEXT_ROUND_FAILED_LABEL, POST_GAME_FINISH_FAILED_LABEL } from "../core/postGameFinish.js";
 import { getLobbyParticipants } from "../core/lobby.js";
 import { getActivePlayerNames, getActivePlayers, getNpcPlayers } from "../core/players.js";
@@ -195,6 +201,9 @@ export function mountWrongAnswer(app) {
     if (mp && !canActAsHost()) return;
     if (roundScored || getWrongAnswerSession().roundScored) return;
     transitionInFlight = true;
+    // Points de soirée avant cette manche : remis si l'envoi échoue (sinon un nouvel
+    // essai les ajoutait une deuxième fois).
+    const eveningBefore = snapshotEveningScores();
     try {
       const session = getWrongAnswerSession();
       const sessionAnswers = session.answers || {};
@@ -230,6 +239,9 @@ export function mountWrongAnswer(app) {
       if (!mount.isMounted()) return;
       if (!mount.isCurrentMount()) return;
       render();
+    } catch (err) {
+      if (getWrongAnswerSession().phase !== "reveal") restoreEveningScores(eveningBefore);
+      throw err;
     } finally {
       transitionInFlight = false;
     }

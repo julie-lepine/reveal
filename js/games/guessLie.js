@@ -24,8 +24,10 @@ import {
   getLocalDisplayName,
   recordGuessLieRoundStats,
   recordGuessLiePlayed,
+  restoreEveningScores,
   saveStatePatch,
   setLastGame,
+  snapshotEveningScores,
 } from "../core/state.js";
 import { NEXT_ROUND_FAILED_LABEL, POST_GAME_FINISH_FAILED_LABEL } from "../core/postGameFinish.js";
 import { startRoundWithRollback } from "../core/roundStartRollback.js";
@@ -141,20 +143,29 @@ export function mountGuessLie(app) {
 
     roundScored = true;
 
+    // Points de soirée avant cette manche : remis si l'envoi échoue (sinon un nouvel
+    // essai « Révéler maintenant » les ajoutait une deuxième fois).
+    const eveningBefore = snapshotEveningScores();
     awardGuessLieRound({
       correct,
       liarName: round.player,
       liarBonus,
     });
 
-    await commitGuessLiePlay(
-      {
-        phase: "reveal",
-        roundScored: true,
-        ...(recordStats ? { statsRecordedRoundIdx: roundIdx } : {}),
-      },
-      { withEveningScores: mp && isLobbyHost() }
-    );
+    try {
+      await commitGuessLiePlay(
+        {
+          phase: "reveal",
+          roundScored: true,
+          ...(recordStats ? { statsRecordedRoundIdx: roundIdx } : {}),
+        },
+        { withEveningScores: mp && isLobbyHost() }
+      );
+    } catch (err) {
+      restoreEveningScores(eveningBefore);
+      roundScored = false;
+      throw err;
+    }
 
     if (!mount.isMounted()) return;
     if (!mount.isCurrentMount()) return;

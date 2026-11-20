@@ -14,7 +14,13 @@ import {
 } from "../core/speedVoteSession.js";
 import { awardSpeedVoteRound } from "../core/scoring.js";
 import { applyMatchScoreDeltas, gameCumulativeScoresHtml, refreshGameScoresBox } from "../core/gameScores.js";
-import { getLocalDisplayName, recordSpeedVotePlayed, setLastGame } from "../core/state.js";
+import {
+  getLocalDisplayName,
+  recordSpeedVotePlayed,
+  restoreEveningScores,
+  setLastGame,
+  snapshotEveningScores,
+} from "../core/state.js";
 import { NEXT_ROUND_FAILED_LABEL, POST_GAME_FINISH_FAILED_LABEL } from "../core/postGameFinish.js";
 import { getLobbyParticipants } from "../core/lobby.js";
 import { getActivePlayers } from "../core/players.js";
@@ -132,6 +138,9 @@ export function mountSpeedVote(app) {
     if (revealInFlight) return;
 
     revealInFlight = true;
+    // Points de soirée avant cette manche : remis si l'envoi échoue (sinon un nouvel
+    // essai les ajoutait une deuxième fois).
+    const eveningBefore = snapshotEveningScores();
     try {
       takeScored = true;
       let matchScores = getSpeedVoteSession().matchScores || {};
@@ -159,6 +168,12 @@ export function mountSpeedVote(app) {
         phase = "reveal";
         render();
       }
+    } catch (err) {
+      if (getSpeedVoteSession().phase !== "reveal") {
+        restoreEveningScores(eveningBefore);
+        takeScored = Boolean(getSpeedVoteSession().roundScored);
+      }
+      throw err;
     } finally {
       revealInFlight = false;
     }
