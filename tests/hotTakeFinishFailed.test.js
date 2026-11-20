@@ -48,7 +48,7 @@ describe("Hot Take : fin de partie qui échoue", () => {
       src,
       /finishFailed \? `<p class="hint">\$\{escapeHtml\(POST_GAME_FINISH_FAILED_LABEL\)\}<\/p>` : ""/
     );
-    assert.match(src, /"Voir les résultats →"\}\s*<\/button>\$\{finishFailedHtml\(\)\}/);
+    assert.match(src, /"Voir les résultats →"\}\s*<\/button>[\s\S]{0,300}?\$\{finishFailedHtml\(\)\}/);
     assert.match(src, /data-hottake-action="show-results">Voir les résultats<\/button>\$\{finishFailedHtml\(\)\}/);
   });
 });

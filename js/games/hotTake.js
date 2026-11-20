@@ -27,7 +27,7 @@ import { getActivePlayers, getActivePlayerNames } from "../core/players.js";
 import { createSyncPending } from "../core/syncPending.js";
 import { formatWinnersLabel, withCompetitionRanks } from "../core/competitionRank.js";
 import { getLocalDisplayName, recordHotTakePlayed, saveStatePatch, setLastGame } from "../core/state.js";
-import { POST_GAME_FINISH_FAILED_LABEL } from "../core/postGameFinish.js";
+import { NEXT_ROUND_FAILED_LABEL, POST_GAME_FINISH_FAILED_LABEL } from "../core/postGameFinish.js";
 import { serializeLastGameStandings } from "../core/lastGamePodium.js";
 import { setLobbyPlaying, setLobbyWaiting } from "../core/lobby.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
@@ -98,6 +98,8 @@ export function mountHotTake(app) {
   let takeScored = false;
   /** Hôte : la fin de partie (« Voir les résultats ») n'est pas partie. */
   let finishFailed = false;
+  /** Hôte : le dernier « Prochain Hot Take » n'est pas parti. */
+  let nextRoundFailed = false;
   /** Évite deux révélations / double scoring concurrentes. */
   let revealInFlight = false;
   /** Vote en cours d’envoi - évite que la synchro efface l’UI avant la réponse serveur. */
@@ -563,10 +565,14 @@ export function mountHotTake(app) {
       });
       if (!mount.isMounted()) return;
       if (!mount.isCurrentMount()) return;
+      // Rien n'est parti : l'hôte reste sur le verdict et est prévenu (avant, le
+      // bouton revenait sans explication).
+      nextRoundFailed = true;
       syncFromSession();
       render();
       return;
     }
+    nextRoundFailed = false;
     if (!mount.isMounted()) return;
     if (!mount.isCurrentMount()) return;
     selected = null;
@@ -740,7 +746,11 @@ export function mountHotTake(app) {
           host
             ? `<button type="button" class="btn btn-primary btn--spaced" id="next-take">
           ${takeIdx < total - 1 ? "Prochain Hot Take →" : "Voir les résultats →"}
-        </button>${finishFailedHtml()}`
+        </button>${
+              nextRoundFailed
+                ? `<p class="hint">${escapeHtml(NEXT_ROUND_FAILED_LABEL)}</p>`
+                : ""
+            }${finishFailedHtml()}`
             : `<p class="hint">En attente de l'hôte pour la suite…</p>`
         }
         </div>

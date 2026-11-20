@@ -163,3 +163,17 @@ describe("Guess The Lie : manche suivante qui échoue", () => {
     assertMessageShown(screen);
   });
 });
+
+describe("Hot Take : prise suivante qui échoue", () => {
+  const screen = read("js/games/hotTake.js");
+  const startNext = screen.slice(
+    screen.indexOf("async function startNextTakeVote"),
+    screen.indexOf("nextRoundFailed = false;", screen.indexOf("async function startNextTakeVote"))
+  );
+
+  it("échec : l'hôte reste sur le verdict et voit le message", () => {
+    assert.match(startNext, /await commitHotTakePlay\(/);
+    assert.match(startNext, /catch \(err\) \{[\s\S]*?nextRoundFailed = true;\s*syncFromSession\(\);\s*render\(\);\s*return;/);
+    assertMessageShown(screen);
+  });
+});
