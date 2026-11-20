@@ -488,6 +488,11 @@ export function mountTraitre(app) {
           <p class="card-heading">Tour dédié - lis ton mot en privé</p>
           <p class="hint">Chacun découvre son mot sur son téléphone, puis valide quand c'est mémorisé. Ne montre pas ton écran.</p>
           <p class="hint traitre-deal-progress">${dealAckCount}/${dealTotal} joueur(s) prêt(s)</p>
+          ${
+            mp && host && dealAckCount > 0 && dealAckCount < dealTotal
+              ? `<button type="button" class="btn btn-secondary btn--spaced" id="btn-force-deal">Commencer sans attendre (${dealAckCount}/${dealTotal})</button>`
+              : ""
+          }
         </div>
         <div class="card traitre-word-card">
           <p class="label-upper label-upper--gold">Ton mot secret</p>
@@ -606,6 +611,20 @@ export function mountTraitre(app) {
     app.querySelector("#btn-deal-ack")?.addEventListener("click", () => {
       void handleDealAckClick();
     });
+
+    // Un joueur parti avant de confirmer son mot (souvent l'hôte) bloquait la partie.
+    app.querySelector("#btn-force-deal")?.addEventListener(
+      "click",
+      withClickLock(async () => {
+        if (mp && !canActAsHost()) return;
+        if (getTraitreSession().phase !== "deal") return;
+        await commitTraitreAdvance("deal_to_speak", { force: true });
+        if (!mount.isMounted()) return;
+        if (!mount.isCurrentMount()) return;
+        syncFromSession();
+        render();
+      })
+    );
 
     async function handleDealAckClick() {
       if (dealAckInFlight) return;

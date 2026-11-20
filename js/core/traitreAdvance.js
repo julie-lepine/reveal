@@ -58,6 +58,11 @@ function dealAcksComplete(session) {
   return alive.length > 0 && alive.every((name) => session.dealAcks?.[name]);
 }
 
+/** Au moins un joueur a confirmé son mot (condition du départ forcé). */
+function dealAcksAny(session) {
+  return Object.values(session?.dealAcks || {}).some((v) => v === true);
+}
+
 function withoutImpostorName(session) {
   if (!session || !Object.prototype.hasOwnProperty.call(session, "impostorName")) {
     return session;
@@ -121,7 +126,10 @@ export function resolveTraitreAdvance(session, request, context = {}) {
     if (phase !== "deal" || expectedPhase !== "deal" || speakRound !== expectedSpeakRound) {
       return stale();
     }
-    if (!dealAcksComplete(session)) return rejected("TRAITRE_WAITING_ACKS");
+    // Départ forcé (hôte ou remplaçant) : un joueur parti ne bloque plus la partie.
+    if (!dealAcksComplete(session) && !(force && dealAcksAny(session))) {
+      return rejected("TRAITRE_WAITING_ACKS");
+    }
     return applied(withoutImpostorName({ ...session, phase: "speak", speakerIndex: 0 }));
   }
 
@@ -266,7 +274,7 @@ export function traitreAdvanceRpcArgs(session, action, { force = false } = {}) {
     expectedSpeakRound: session?.speakRound ?? 1,
     expectedPairId: session?.pairId ?? null,
     expectedAliveCount: aliveCountOf(session),
-    force: action === "resolve_vote" && force === true,
+    force: (action === "resolve_vote" || action === "deal_to_speak") && force === true,
   };
 }
 
