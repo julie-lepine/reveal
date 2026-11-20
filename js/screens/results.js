@@ -22,6 +22,7 @@ import {
   getCachedGameSession,
 } from "../core/gameSync.js";
 import { refreshLobbyFromSupabase, onLobbyBundleUpdated } from "../core/supabaseLobby.js";
+import { bindReclaimHostButtons, reclaimHostCtaHtml } from "../core/reclaimHostCta.js";
 
 export function mountResults(app) {
   if (!requireLobbyPlay()) return null;
@@ -41,9 +42,11 @@ export function mountResults(app) {
       ${podiumHtml || `<p class="hint">${escapeHtml(last.summary || "")}</p>`}
       ${eveningRecapRestartButtonHtml(last)}
       ${eveningRecapOtherGameButtonHtml()}
+      ${reclaimHostCtaHtml()}
     </div>`
       : `<p class="hint">Aucune partie récente.</p>
-    ${eveningRecapOtherGameButtonHtml()}`;
+    ${eveningRecapOtherGameButtonHtml()}
+    ${reclaimHostCtaHtml()}`;
 
     const chips = [
       recap.hotTakes > 0 ? `<span class="evening-recap__chip">🔥 ${recap.hotTakes}</span>` : "",
@@ -94,6 +97,13 @@ export function mountResults(app) {
 
     bindNav(app);
     bindRestartGameButtons(app);
+    // Hôte absent : le remplaçant désigné peut reprendre l'animation d'ici
+    // (puis « Recommencer » apparaît), sans repasser par le menu des jeux.
+    bindReclaimHostButtons(app, {
+      onClaimed: () => {
+        if (getCurrentScreen() === "results") render();
+      },
+    });
   }
 
   let unsubSession = () => {};

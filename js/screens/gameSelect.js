@@ -25,6 +25,7 @@ import { isSupabaseConfigured } from "../core/supabaseClient.js";
 import { startLobbyPresenceSync, onLobbyBundleUpdated, getClaimHubUiToken } from "../core/supabaseLobby.js";
 import { getLobby, hasActiveLobby } from "../core/lobby.js";
 import { clientMayOfferHostClaim } from "../core/hostClaimOffer.js";
+import { reclaimHostCtaHtml } from "../core/reclaimHostCta.js";
 import { getLastGame, getState } from "../core/state.js";
 import { isAdFree } from "../core/entitlements.js";
 import { adFreeHubCardHtml } from "../core/adFreeUi.js";
@@ -268,16 +269,6 @@ function gameSelectHeaderHtml() {
       <h2 class="title-display">Choisir un jeu</h2>
       ${codeChip}
     </div>`;
-}
-
-/** CTA distinct ARCH-03b : offre claim sans réutiliser le libellé admin. */
-function reclaimHostCtaHtml() {
-  if (!isGameSyncActive() || isLobbyHost()) return "";
-  if (!clientMayOfferHostClaim()) return "";
-  return `
-      <button type="button" class="game-select-reclaim-host" data-claim-host>
-        👑 Reprendre l'animation
-      </button>`;
 }
 
 function gameSelectActionsHtml() {
