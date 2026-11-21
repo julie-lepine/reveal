@@ -12,6 +12,8 @@ import {
   loadLocalDrawItPrivateWord,
   submitDrawItGuess,
   getDrawItPresentUids,
+  countPendingDrawItStrokes,
+  flushPendingDrawItStrokes,
 } from "../core/drawItSession.js";
 import {
   DRAW_IT_PHASE_DRAWING,
@@ -110,6 +112,11 @@ export function mountDrawIt(app) {
   const mp = isGameSyncActive();
   let privateWord = null;
   let tickId = 0;
+  /** Dernier renvoi des traits en attente (horloge locale). */
+  let lastStrokeFlushAt = 0;
+  /** Un trait en attente n'est renvoyé que s'il est toujours affiché (pas annulé ni gommé). */
+  const isStrokeStillDrawn = (strokeId) =>
+    (board?.strokes || []).some((stroke) => stroke?.strokeId === strokeId);
   /** Nouvel essai de lecture du mot du dessinateur (voir schedulePrivateWordRetry). */
   let privateWordRetryId = 0;
   /** Hôte : « Manche suivante » / « Voir les résultats » n'est pas parti (message). */
@@ -237,7 +244,7 @@ export function mountDrawIt(app) {
               render();
             }
           });
-          void commitDrawItCompletedStroke(stroke);
+          void commitDrawItCompletedStroke(stroke, { isStillDrawn: isStrokeStillDrawn });
         } finally {
           syncToolButtons();
         }
@@ -1007,6 +1014,16 @@ export function mountDrawIt(app) {
       }
       applyGuessInputLock(session);
       canvasCtl?.syncInteractive();
+      // Traits pas encore confirmés (coupure) : renvoi toutes les 2 s.
+      if (mp && countPendingDrawItStrokes() > 0 && isLocalDrawer(session)) {
+        const flushNow = Date.now();
+        if (flushNow - lastStrokeFlushAt >= 2000) {
+          lastStrokeFlushAt = flushNow;
+          void flushPendingDrawItStrokes({ isStillDrawn: isStrokeStillDrawn }).catch(() => {
+            /* nouvel essai au passage suivant */
+          });
+        }
+      }
       // Hôte : fin de manche dès 00:00 ou quand tout le monde a trouvé.
       // Autres joueurs : seulement si l'hôte ne l'a pas fait (écran éteint…),
       // 1,5 s après 00:00 ; le serveur vérifie l'heure.

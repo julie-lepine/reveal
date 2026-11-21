@@ -1,5 +1,6 @@
 import { getTriviaThemeLabel } from "../../data/trivia.js";
 import { useTriviaGame } from "../core/useTriviaGame.js";
+import { finalizeEveningScoresOnServer } from "../core/eveningFinalize.js";
 import { deriveTriviaCurrentQuestion } from "../core/triviaPlayPatch.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
 import { createActionLock, withClickLock } from "../core/actionLock.js";
@@ -412,9 +413,17 @@ export function mountTrivia(app) {
         if (!mount.isMounted()) return;
         if (!mount.isCurrentMount()) return;
         syncFromSession();
+        // Points de soirée (quiz + bonus podium) : ajoutés par le serveur, une
+        // fois par partie, même si c'est le remplaçant qui termine. Avant, ils
+        // l'étaient sur ce téléphone : perdus pour les autres si le remplaçant
+        // terminait, et comptés deux fois si l'écran était rouvert entre deux essais.
+        await finalizeEveningScoresOnServer("trivia");
+        if (!mount.isMounted()) return;
+        if (!mount.isCurrentMount()) return;
         if (!eveningPodiumApplied) {
-          const standings = trivia.applyLobbyPodium(trivia.getSession());
-          recordTriviaPlayed();
+          const standings = trivia.getPodiumAwards(
+            trivia.buildStandings(trivia.getSession().matchScores || {})
+          );
           setLastGame({
             gameId: "trivia",
             title: "Trivia Quiz",

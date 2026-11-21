@@ -24,6 +24,7 @@ const emptyGuessLie = () => ({
   votes: {},
   roundScored: false,
   statsRecordedRoundIdx: -1,
+  matchScores: {},
 });
 
 const defaultGlobalStats = () => ({

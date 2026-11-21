@@ -153,17 +153,28 @@ export function mountGuessLie(app) {
     // Points de soirée avant cette manche : remis si l'envoi échoue (sinon un nouvel
     // essai « Révéler maintenant » les ajoutait une deuxième fois).
     const eveningBefore = snapshotEveningScores();
-    awardGuessLieRound({
+    const award = awardGuessLieRound({
       correct,
       liarName: round.player,
       liarBonus,
     });
+    // Score de la partie (mêmes points que la soirée) : quand c'est un remplaçant
+    // qui annonce, le serveur en tire les points de soirée (règle « hôte absent ») ;
+    // avant, ces manches ne comptaient pour personne d'autre que lui.
+    const matchScores = { ...(gl.matchScores || {}) };
+    correct.forEach((name) => {
+      matchScores[name] = (Number(matchScores[name]) || 0) + award.detectivePoints;
+    });
+    if (award.liarPoints && round.player) {
+      matchScores[round.player] = (Number(matchScores[round.player]) || 0) + award.liarPoints;
+    }
 
     try {
       await commitGuessLiePlay(
         {
           phase: "reveal",
           roundScored: true,
+          matchScores,
           ...(recordStats ? { statsRecordedRoundIdx: roundIdx } : {}),
         },
         { withEveningScores: mp && isLobbyHost() }

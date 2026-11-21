@@ -471,6 +471,8 @@ export async function launchGuessLieMenu() {
     phase: null,
     votes: {},
     roundScored: false,
+    // Score de la partie : sert à la règle serveur « hôte absent » (points de soirée).
+    matchScores: {},
   };
 
   if (!isGameSyncActive()) {

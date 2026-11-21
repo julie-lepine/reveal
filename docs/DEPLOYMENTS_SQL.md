@@ -769,3 +769,33 @@ Liste des joueurs figée au lancement : devineur parti → « tout le monde a tr
 | Prod | appliquée le 2026-11-20 (migration `fix_drawit_departed_players`), après essai annulé · contrôle : md5 des corps = fichier, `submit_drawit_guess` +20 caractères (la seule ligne visée), droits inchangés |
 
 **Statut** : SQL repo ✅ · prod ✅.
+
+---
+
+## 39. Points de soirée de fin de partie — Trivia et Consensus
+
+Points ajoutés sur le téléphone de celui qui termine : perdus pour les autres si c'est l'hôte remplaçant (`complete_game_session_as_actor` n'écrit aucun point), et Trivia pouvait compter deux fois.
+
+| Élément | Valeur |
+| ------- | ------ |
+| Migration | [`fix-evening-scores-trivia-consensus.sql`](../supabase/fix-evening-scores-trivia-consensus.sql) |
+| Fonctions | `finalize_trivia_scores(uuid)` (quiz + podium 15/10/5) · `finalize_consensus_scores(uuid)` · `evening_finalize_credit` (interne, aucun rôle client) ; une fois par partie (`state.eveningFinalized`) |
+| Contrat | `js/core/eveningFinalize.js` · test `tests/eveningFinalizeTriviaConsensus.test.js` |
+| Prod | appliquée le 2026-11-20 (migration `fix_evening_scores_trivia_consensus`), après essai annulé (exemple de calcul vérifié) · contrôle : md5 des corps = fichier, droits OK |
+
+**Statut** : SQL repo ✅ · prod ✅ — à appliquer **avant** de publier l'appli : fait.
+
+---
+
+## 40. Guess the Lie — manches annoncées par l'hôte remplaçant (points de soirée)
+
+Guess the Lie n'avait pas de score de partie : la règle « hôte absent » ne le couvrait pas, ses manches annoncées par un remplaçant ne comptaient pour personne d'autre que lui.
+
+| Élément | Valeur |
+| ------- | ------ |
+| Migration | [`fix-guesslie-evening-scores.sql`](../supabase/fix-guesslie-evening-scores.sql) (modification ciblée en place, rejouable) |
+| Fonction | `game_sessions_credit_absent_host_evening_scores` : `'guesslie'` ajouté à la liste des jeux (rien d'autre) |
+| Contrat | appli : `state.guessLie.matchScores` mis à jour à chaque révélation · test `tests/eveningScoresOverwriteAndGuessLie.test.js` |
+| Prod | appliquée le 2026-11-20 (migration `fix_guesslie_evening_scores`), après essai annulé · contrôle : +12 caractères (la seule liste visée), trigger toujours actif |
+
+**Statut** : SQL repo ✅ · prod ✅ — ordre de mise en ligne indifférent.

@@ -3044,6 +3044,9 @@ export function guessLieToRemote(gl) {
     votes: mapVotesByUid(gl.votes || {}),
     roundScored: Boolean(gl.roundScored),
     statsRecordedRoundIdx: gl.statsRecordedRoundIdx ?? -1,
+    // Score de la partie (cumul des manches) : la règle serveur « hôte absent »
+    // en tire les points de soirée des manches annoncées par un remplaçant.
+    matchScores: scoresToRemote(gl.matchScores || {}),
   };
 }
 
@@ -3059,6 +3062,7 @@ export function guessLieFromRemote(remote) {
     votes: mapVotesByName(remote.votes || {}),
     roundScored: Boolean(remote.roundScored),
     statsRecordedRoundIdx: remote.statsRecordedRoundIdx ?? -1,
+    matchScores: scoresFromRemote(remote.matchScores || {}),
   };
 }
 
@@ -3359,6 +3363,36 @@ function applyRemoteGameScores(remote, order) {
     ),
   };
   saveStatePatch(patch);
+}
+
+/**
+ * Audit n°4, point 3 — vrai hôte, juste avant d'écrire ses points de soirée :
+ * reprend (au maximum) ceux que le serveur a ajoutés sans que ce téléphone les
+ * ait encore reçus (règle « hôte absent », fins de partie Draw It / Trivia /
+ * Consensus, rôles du Traître). Sinon l'écriture de l'hôte les effaçait.
+ * Fusion au maximum : pas de remise à zéro dans un même salon (seulement au
+ * changement de salon), donc rien de légitime n'est perdu.
+ */
+export function absorbServerEveningScores(serverState) {
+  if (!serverState || typeof serverState !== "object") return;
+  if (serverState.scores) applyRemoteLobbyScores(serverState.scores);
+  if (serverState.gameScores) {
+    applyRemoteGameScores(serverState.gameScores, serverState.gameScoreOrder);
+  }
+  if (serverState.playerStats) {
+    applyRemotePlayerStats(serverState.playerStats, (uid) => playerKeyToDisplayName(uid));
+  }
+  const patch = {};
+  if (serverState.stats && typeof serverState.stats === "object") {
+    patch.stats = mergeEveningStats(getState().stats, serverState.stats);
+  }
+  if (serverState.eveningGamesRecorded && typeof serverState.eveningGamesRecorded === "object") {
+    patch.eveningGamesRecorded = mergeEveningGamesRecorded(
+      getState().eveningGamesRecorded,
+      serverState.eveningGamesRecorded
+    );
+  }
+  if (Object.keys(patch).length) saveStatePatch(patch);
 }
 
 export function applyRemoteLobbyScores(remote) {
@@ -5034,6 +5068,20 @@ export function stopMultiplayerSync() {
   pollUnchangedStreak = 0;
 }
 
+/**
+ * Relit la partie du serveur et reprend ses points de soirée (au maximum) avant
+ * une réécriture complète par l'hôte. Échec de lecture : comportement d'avant.
+ */
+async function fetchServerRowForEveningWrite(lobbyId) {
+  try {
+    const row = await fetchGameSessionByLobby(lobbyId);
+    if (row?.state) absorbServerEveningScores(row.state);
+    return row || null;
+  } catch {
+    return null;
+  }
+}
+
 export async function startGameSession(gameId, screen, state) {
   if (!isGameSyncActive()) return null;
   const lobbyId = getState().lobby.id;
@@ -5042,6 +5090,9 @@ export async function startGameSession(gameId, screen, state) {
 
   const { setLobbyPlaying } = await import("./lobby.js");
   await setLobbyPlaying(gameId);
+  // Toute la partie est remplacée par les points de ce téléphone : reprendre
+  // d'abord ceux que le serveur a ajoutés entre-temps.
+  await fetchServerRowForEveningWrite(lobbyId);
   const row = await upsertSessionPreservingRosterTopics({
     lobbyId,
     gameId,
@@ -5488,6 +5539,13 @@ async function patchGameStateInner(
   if (freshRow) {
     cachedRow = freshRow;
     lastSessionSig = sessionSignature(freshRow);
+  }
+
+  // Points de soirée de l'hôte : reprendre d'abord ceux ajoutés par le serveur
+  // (au maximum), puis recalculer ce qu'on envoie, pour ne pas les effacer.
+  if ((withEveningScores || scoresOnly) && freshRow?.state) {
+    absorbServerEveningScores(freshRow.state);
+    mergePayload = { ...stateMerge, ...eveningStateToRemote() };
   }
 
   if (isLateGamePatchAfterPostGame(freshRow, mergePayload, screen)) {
@@ -6045,7 +6103,10 @@ export async function completeGameSession({ gameId = "menu", screen = "results",
   // vers la prépa au lieu des résultats). Robuste face à l'ordre d'arrivée des sync
   // lobby/session, contrairement à une inférence basée sur le gameId du lobby.
   const sessionGameId = POST_GAME_SCREENS.has(screen) ? "menu" : gameId;
-  const priorState = cachedRow?.state || {};
+  // Toute la partie est réécrite avec les points de ce téléphone : relire d'abord
+  // la partie du serveur et reprendre les points qu'il a ajoutés entre-temps.
+  const serverRow = await fetchServerRowForEveningWrite(lobbyId);
+  const priorState = serverRow?.state || cachedRow?.state || {};
   try {
     const { clearRemoteDrawItCustomWords } = await import("./drawItCustomWords.js");
     await clearRemoteDrawItCustomWords();

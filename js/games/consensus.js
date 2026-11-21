@@ -18,6 +18,7 @@ import { createMountGuard } from "../core/mountLifecycle.js";
 import { getActivePlayers } from "../core/players.js";
 import { formatWinnersLabel } from "../core/competitionRank.js";
 import { serializeLastGameStandings } from "../core/lastGamePodium.js";
+import { finalizeEveningScoresOnServer } from "../core/eveningFinalize.js";
 import { goToGameSelect, setLobbyPlaying, setLobbyWaiting } from "../core/lobby.js";
 import {
   getLocalDisplayName,
@@ -863,8 +864,38 @@ export function mountConsensus(app) {
         saveStatePatch({ consensusGame: claimed });
       }
 
-      const standings = consensus.applyLobbyPodium(consensus.getSession());
-      recordConsensusPlayed();
+      if (!mp) {
+        const standings = consensus.applyLobbyPodium(consensus.getSession());
+        recordConsensusPlayed();
+        setLastGame({
+          gameId: "consensus",
+          title: "Consensus",
+          summary: `${standings.length} joueur(s) · ${formatWinnersLabel(standings)}`,
+          standings: serializeLastGameStandings(standings),
+        });
+      }
+    }
+
+    if (mp) {
+      // Points de soirée : ajoutés par le serveur, une fois par partie, même si
+      // c'est le remplaçant qui termine (avant : perdus pour les autres joueurs).
+      // Appelé à chaque essai : sans effet si c'est déjà fait.
+      try {
+        await finalizeEveningScoresOnServer("consensus");
+      } catch (err) {
+        console.warn("Consensus points de soirée:", err);
+        if (!mount.isMounted() || !mount.isCurrentMount()) return;
+        await showAppAlert("Vérifie ta connexion réseau et réessaie", {
+          title: "Partie",
+          icon: "📡",
+        });
+        render();
+        return;
+      }
+      if (!mount.isMounted() || !mount.isCurrentMount()) return;
+      const standings = consensus.getPodiumAwards(
+        consensus.buildStandings(consensus.getSession().matchScores || {})
+      );
       setLastGame({
         gameId: "consensus",
         title: "Consensus",
