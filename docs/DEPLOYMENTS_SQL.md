@@ -855,9 +855,9 @@ Liste des joueurs attendus figée au début de la question (`questionPlayerUids`
 | Migration | [`fix-trivia-departed-players.sql`](../supabase/fix-trivia-departed-players.sql) : `trivia_all_expected_players_answered(uuid, jsonb)` réécrite (seuls les joueurs attendus encore dans `lobby_members` comptent) ; seul appelant : `submit_trivia_answer` |
 | Appli | `js/core/triviaPresentPlayers.js` (miroir JS) · `js/games/trivia.js` : l'hôte ou le remplaçant lance `reveal_trivia_round` quand un joueur part après les réponses des autres |
 | Contrat | `tests/auditFollowups.test.js` |
-| Prod | à appliquer |
+| Prod | appliquée le 2026-11-23 (migration `fix_trivia_departed_players`), après essai annulé · contrôle : la fonction ne compte que les membres du salon |
 
-**Statut** : SQL repo ✅ · prod ⏳.
+**Statut** : SQL repo ✅ · prod ✅.
 
 ---
 
@@ -870,9 +870,9 @@ Le bonus vitesse (+5) se jouait sur l'heure envoyée par chaque téléphone : un
 | Migration | [`fix-trivia-server-answer-time.sql`](../supabase/fix-trivia-server-answer-time.sql) : `submit_trivia_answer`, une ligne remplacée en place (`'answeredAt', p_answered_at` → heure serveur `clock_timestamp()` en ms) ; paramètre gardé pour les anciennes versions de l'appli |
 | Appli | rien à changer |
 | Contrat | `tests/auditFollowups.test.js` (bloc n°2) |
-| Prod | à appliquer (base : md5 du corps `5e074dc43cc6afd471333e8c1a015a59`, 2026-11-23) |
+| Prod | appliquée le 2026-11-23 (migration `fix_trivia_server_answer_time`), après essai annulé (base : md5 du corps `5e074dc43cc6afd471333e8c1a015a59`) · contrôle : heure serveur, +46 caractères (la seule ligne visée), droits inchangés |
 
-**Statut** : SQL repo ✅ · prod ⏳.
+**Statut** : SQL repo ✅ · prod ✅.
 
 ---
 
@@ -885,9 +885,9 @@ Refuser une demande d'ami ne bloquait la même personne que 60 s : elle pouvait 
 | Migration | [`fix-friends-decline-escalation.sql`](../supabase/fix-friends-decline-escalation.sql) : colonne `friend_request_cooldowns.decline_count` ; `decline_friend_request` (1er refus 1 jour, 2e 7 jours, 3e définitif) ; `send_friend_request` ne purge plus les délais expirés |
 | Appli | rien à changer (délai déjà silencieux pour celui qui demande) |
 | Contrat | `tests/auditFollowups.test.js` (bloc « Amis n°1 ») |
-| Prod | à appliquer (base : md5 `decline_friend_request` `6ff57c3a2d9eb7d28cfde64a3477e3b6`, `send_friend_request` `1b03d1b486c1b4b0b21fdc45c3c9dc7e`, 2026-11-23) |
+| Prod | appliquée le 2026-11-23 (migration `fix_friends_decline_escalation`), après essai annulé (base : md5 `decline_friend_request` `6ff57c3a2d9eb7d28cfde64a3477e3b6`, `send_friend_request` `1b03d1b486c1b4b0b21fdc45c3c9dc7e`) · contrôle : colonne `decline_count`, délai 1 j / 7 j / définitif, plus d'effacement des délais à la demande |
 
-**Statut** : SQL repo ✅ · prod ⏳.
+**Statut** : SQL repo ✅ · prod ✅.
 
 ---
 
@@ -900,9 +900,9 @@ Refuser une demande d'ami ne bloquait la même personne que 60 s : elle pouvait 
 | Migration | [`fix-lobby-invite-check-before-leave.sql`](../supabase/fix-lobby-invite-check-before-leave.sql) : nouvelle `check_lobby_invite(uuid)` (lecture seule ; `authenticated` seulement) |
 | Appli | `js/core/lobbyInviteJoin.js` l'appelle avant `leaveLobby` ; si elle manque en prod (avant la migration), l'appli fait comme avant |
 | Contrat | `tests/auditFollowups.test.js` (bloc « Invitations n°2 ») |
-| Prod | à appliquer |
+| Prod | appliquée le 2026-11-23 (migration `fix_lobby_invite_check_before_leave`), après la 48, après essai annulé · contrôle : `authenticated` seulement (pas `anon`) |
 
-**Statut** : SQL repo ✅ · prod ⏳.
+**Statut** : SQL repo ✅ · prod ✅.
 
 ---
 
@@ -916,6 +916,6 @@ Invitations encore utilisables après la fin de l'amitié, le départ de l'invit
 | Ordre | **avant** ou avec la fiche 47 (`check_lobby_invite` reprend la règle « invitant encore membre ») |
 | Appli | rien à changer |
 | Contrat | `tests/auditFollowups.test.js` (bloc « Amis et invitations n°3 à 6 ») |
-| Prod | à appliquer (base : md5 accept `84c69e03dce9928362b9dd31c4b3692d`, kick `0e259dd21dfc9e605af6c385be0b4b3f`, unfriend `6da3782d3563879007ce23181ef47051`, list_incoming `da5a33ae0cac3f91f23ca63042efa7b3`, 2026-11-23) |
+| Prod | appliquée le 2026-11-23 (migration `fix_friends_invites_cleanup`), après essai annulé (base : md5 accept `84c69e03dce9928362b9dd31c4b3692d`, kick `0e259dd21dfc9e605af6c385be0b4b3f`, unfriend `6da3782d3563879007ce23181ef47051`, list_incoming `da5a33ae0cac3f91f23ca63042efa7b3`) · contrôle : acceptation +292 caractères (le bloc visé), unfriend et retrait suppriment les invitations, liste filtrée, `authenticated` n'a plus que SELECT sur les 3 tables, droits d'exécution inchangés |
 
-**Statut** : SQL repo ✅ · prod ⏳.
+**Statut** : SQL repo ✅ · prod ✅.
