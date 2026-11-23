@@ -1,6 +1,7 @@
 import {
   CLUTCH_GRACE_MS,
   CLUTCH_HOST_EXTRA_WAIT_MS,
+  CLUTCH_HOST_SILENT_AFTER_MS,
   CLUTCH_HIDE_BEFORE_MS,
   CLUTCH_PRECOUNT_MS,
   formatClutchSeconds,
@@ -22,6 +23,7 @@ import {
 import {
   CLUTCH_TAP_FAILED_LABEL,
   CLUTCH_TAP_FAILED_LATE_LABEL,
+  CLUTCH_HOST_SILENT_LABEL,
   resolveClutchTapCommitFailureUi,
   preferInFlightClutchTap,
   shouldHostRevealClutchRound,
@@ -32,7 +34,13 @@ import {
 } from "../core/clutchRevealRetry.js";
 import { awardClutchRound } from "../core/scoring.js";
 import { applyMatchScoreDeltas, gameCumulativeScoresHtml, refreshGameScoresBox } from "../core/gameScores.js";
-import { getLocalDisplayName, recordClutchPlayed, setLastGame } from "../core/state.js";
+import {
+  getLocalDisplayName,
+  recordClutchPlayed,
+  restoreEveningScores,
+  setLastGame,
+  snapshotEveningScores,
+} from "../core/state.js";
 import { getLobbyParticipants } from "../core/lobby.js";
 import { setLobbyPlaying, setLobbyWaiting } from "../core/lobby.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
@@ -97,6 +105,9 @@ export function mountClutch(app) {
   let hostWaitTimer = null;
   /** L'attente de l'hôte est écoulée sur ce téléphone (cible + grâce + attente). */
   let hostWaitElapsed = false;
+  /** Invité : verdict toujours absent longtemps après la fin du temps de tap. */
+  let hostSilentTimer = null;
+  let hostSilent = false;
   let clockRaf = null;
   let hideBeforeMs = null;
   let copyTimer = null;
@@ -133,6 +144,8 @@ export function mountClutch(app) {
     graceTimer = null;
     if (hostWaitTimer) clearTimeout(hostWaitTimer);
     hostWaitTimer = null;
+    if (hostSilentTimer) clearTimeout(hostSilentTimer);
+    hostSilentTimer = null;
   }
 
   function stopClock() {
@@ -335,6 +348,7 @@ export function mountClutch(app) {
         countdownEndsAt = performance.now() + CLUTCH_PRECOUNT_MS;
         localWindowClosed = false;
         hostWaitElapsed = false;
+        hostSilent = false;
         tapFailed = false;
         blindVibrated = false;
         revealRetry.stop();
@@ -363,7 +377,20 @@ export function mountClutch(app) {
     // invités : l'un d'eux peut devenir hôte remplaçant entre-temps.
     if (hostWaitTimer) clearTimeout(hostWaitTimer);
     hostWaitTimer = setTimeout(onHostWaitElapsed, CLUTCH_HOST_EXTRA_WAIT_MS);
+    // Si le verdict n'arrive toujours pas, on prévient l'invité que l'hôte ne
+    // répond plus (le remplaçant n'est désigné qu'au bout de ~2 min).
+    if (hostSilentTimer) clearTimeout(hostSilentTimer);
+    hostSilentTimer = setTimeout(onHostSilent, CLUTCH_HOST_SILENT_AFTER_MS);
     render();
+  }
+
+  function onHostSilent() {
+    hostSilentTimer = null;
+    if (!mount.isMounted()) return;
+    if (!mount.isCurrentMount()) return;
+    if (phase !== "active") return;
+    hostSilent = true;
+    refreshActiveLive();
   }
 
   function onHostWaitElapsed() {
@@ -381,6 +408,9 @@ export function mountClutch(app) {
     if (revealInFlight) return;
 
     revealInFlight = true;
+    // Points de soirée avant cette manche : remis si l'envoi échoue (sinon chaque
+    // nouvel essai de la relance automatique les ajoutait encore).
+    const eveningBefore = snapshotEveningScores();
     try {
       takeScored = true;
       const session = getClutchSession();
@@ -413,8 +443,10 @@ export function mountClutch(app) {
         render();
       }
     } catch (err) {
-      // Envoi raté : on autorise un nouvel essai (sinon bloqué sur « Temps écoulé »).
+      // Envoi raté : on autorise un nouvel essai (sinon bloqué sur « Temps écoulé »),
+      // sans garder les points ajoutés pour cet essai.
       takeScored = false;
+      restoreEveningScores(eveningBefore);
       throw err;
     } finally {
       revealInFlight = false;
@@ -455,6 +487,8 @@ export function mountClutch(app) {
   function activeStatusText(tapped = myTapMs() != null, counting = localStart == null) {
     return revealRetrying && (!mp || canActAsHost())
       ? CLUTCH_REVEAL_RETRY_LABEL
+      : hostSilent && mp && !canActAsHost()
+      ? CLUTCH_HOST_SILENT_LABEL
       : tapFailed && !tapped && !localWindowClosed
       ? CLUTCH_TAP_FAILED_LABEL
       : tapFailed && !tapped && localWindowClosed

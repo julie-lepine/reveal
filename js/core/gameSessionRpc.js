@@ -344,6 +344,17 @@ export async function rpcFinalizeDrawItScores({ lobbyId }) {
   return asSessionRow(data);
 }
 
+/** Trivia / Consensus : points de soirée ajoutés par le serveur, une fois par partie. */
+export async function rpcFinalizeEveningScores({ rpc, lobbyId }) {
+  requireClient();
+  if (rpc !== "finalize_trivia_scores" && rpc !== "finalize_consensus_scores") {
+    throw new Error(`RPC de fin de partie inconnue : ${rpc}`);
+  }
+  const { data, error } = await supabase.rpc(rpc, { p_lobby_id: lobbyId });
+  if (error) throw error;
+  return asSessionRow(data);
+}
+
 export async function rpcSubmitDrawItGuess({ lobbyId, runId, roundIdx, value }) {
   requireClient();
   const { data, error } = await supabase.rpc("submit_drawit_guess", {

@@ -1,4 +1,33 @@
-import { CONSENSUS_DEFAULT_SLIDER_VALUE } from "../../data/consensus.js";
+import {
+  CONSENSUS_DEFAULT_SLIDER_VALUE,
+  decorateConsensusQuestionForMode,
+} from "../../data/consensus.js";
+
+/**
+ * AUDIT Consensus n°2 : question affichée, reconstruite à partir du paquet et du
+ * numéro de question (même calcul que l'hôte, sans hasard). L'hôte remplaçant ne
+ * peut pas envoyer `currentQuestion` (champ refusé par apply_acting_host_play) :
+ * après son « Question suivante », la question enregistrée est encore l'ancienne.
+ * Si elle ne correspond pas à la question du paquet, on prend celle du paquet.
+ *
+ * @param {{ currentQuestion?: object|null, deck?: object[]|null, questionIdx?: number,
+ *   selectedModeId?: string, phase?: string|null }} session paquet déjà réhydraté
+ * @returns {object|null}
+ */
+export function resolveConsensusCurrentQuestion(session = {}) {
+  const stored = session.currentQuestion || null;
+  const deck = Array.isArray(session.deck) ? session.deck : null;
+  const idx = session.questionIdx;
+  if (!deck || !Number.isInteger(idx)) return stored;
+  const phase = session.phase;
+  if (phase !== "question" && phase !== "reveal-pending" && phase !== "reveal" && phase !== "final") {
+    return stored;
+  }
+  const base = deck[idx];
+  if (!base || base.id == null) return stored;
+  if (stored && stored.id != null && String(stored.id) === String(base.id)) return stored;
+  return decorateConsensusQuestionForMode(base, session.selectedModeId || "standard", idx);
+}
 
 export function clampConsensusValue(value) {
   if (value === null || value === undefined || value === "") {

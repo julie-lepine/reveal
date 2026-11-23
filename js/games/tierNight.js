@@ -25,6 +25,7 @@ import {
   refreshGameSession,
   getEffectiveSessionScreen,
   isLobbyHost,
+  canActAsHost,
   canForceTierNightResults,
   canRouteToTierNightEnd,
 } from "../core/gameSync.js";
@@ -42,6 +43,9 @@ import { gamePlayTitleHtml } from "../core/gameTitle.js";
 import { playerAvatarHtml, playerNameHtml } from "../core/signatureUi.js";
 import { gameExitBarHtml, bindExitGame } from "../core/exitGame.js";
 import { bindNav } from "../screens/nav.js";
+
+/** Envoi du classement échoué : le joueur revient au classement pour renvoyer. */
+export const TIER_FINISH_FAILED_LABEL = "Ton classement n’est pas parti, réessaie !";
 
 export function mountTierNight(app) {
   if (!requireLobbyPlay()) return null;
@@ -100,6 +104,8 @@ export function mountTierNight(app) {
   });
   let dragItem = null;
   let finished = false;
+  /** Le dernier envoi du classement a échoué : message sous « Valider ». */
+  let finishFailed = false;
   let alive = true;
 
   function unplaced() {
@@ -126,54 +132,86 @@ export function mountTierNight(app) {
     render();
   }
 
+  /**
+   * Peut terminer la manche : le vrai hôte, ou l'hôte remplaçant en mode série
+   * (les RPC finalize / advance acceptent is_acting_host). Le mode classique
+   * (solo / ancien) reste réservé au vrai hôte : son écriture finale n'est pas
+   * acceptée côté serveur pour le remplaçant.
+   */
+  function canLeadRoundEnd() {
+    return isLobbyHost() || (hasActiveTierNightSeries() && canActAsHost());
+  }
+
+  /** Envoi du classement + « terminé » par la RPC (n'ajoute que l'entrée du joueur). */
+  async function contributeOwnPlacement() {
+    // I-08 : deux contributions atomiques uid-only
+    const { getState } = await import("../core/state.js");
+    const lobbyId = getState()?.lobby?.id;
+    if (!lobbyId) throw new Error("Salon introuvable.");
+    const { rpcContributeGameSessionPlayer } = await import("../core/gameSessionRpc.js");
+    const { applyRemoteSession } = await import("../core/gameSync.js");
+    const { fetchGameSessionByLobby } = await import("../core/supabaseGame.js");
+    await rpcContributeGameSessionPlayer({
+      lobbyId,
+      game: "tiernight",
+      kind: "placement",
+      value: placed,
+    });
+    const row = await rpcContributeGameSessionPlayer({
+      lobbyId,
+      game: "tiernight",
+      kind: "finished",
+      value: true,
+    });
+    const full = row?.state ? row : await fetchGameSessionByLobby(lobbyId);
+    if (full) applyRemoteSession(full);
+  }
+
   async function finishGame() {
     if (finished) return;
     finished = true;
+    finishFailed = false;
     void setLobbyPlaying("tiernight").catch(() => {});
 
     if (isGameSyncActive()) {
       const uid = getSupabaseUserId();
-      if (!uid) return;
+      if (!uid) {
+        finished = false;
+        return;
+      }
 
-      if (isLobbyHost()) {
-        const row = getCachedGameSession();
-        const tn = row?.state?.tierNight || {};
-        const placements = { ...(tn.placements || {}), [uid]: placed };
-        const done = { ...(tn.finished || {}), [uid]: true };
-        await syncTierNightSession({
-          topicId: list.id,
-          placements,
-          finished: done,
-        });
-      } else {
-        // I-08 : deux contributions atomiques uid-only
-        const { getState } = await import("../core/state.js");
-        const lobbyId = getState()?.lobby?.id;
-        if (!lobbyId) return;
-        const { rpcContributeGameSessionPlayer } = await import("../core/gameSessionRpc.js");
-        const { applyRemoteSession } = await import("../core/gameSync.js");
-        const { fetchGameSessionByLobby } = await import("../core/supabaseGame.js");
-        await rpcContributeGameSessionPlayer({
-          lobbyId,
-          game: "tiernight",
-          kind: "placement",
-          value: placed,
-        });
-        const row = await rpcContributeGameSessionPlayer({
-          lobbyId,
-          game: "tiernight",
-          kind: "finished",
-          value: true,
-        });
-        const full = row?.state ? row : await fetchGameSessionByLobby(lobbyId);
-        if (full) applyRemoteSession(full);
+      try {
+        if (isLobbyHost() && !hasActiveTierNightSeries()) {
+          // Mode classique (ancien) : écriture complète par le vrai hôte.
+          const row = getCachedGameSession();
+          const tn = row?.state?.tierNight || {};
+          const placements = { ...(tn.placements || {}), [uid]: placed };
+          const done = { ...(tn.finished || {}), [uid]: true };
+          await syncTierNightSession({
+            topicId: list.id,
+            placements,
+            finished: done,
+          });
+        } else {
+          // Série (tout le multijoueur) : l'hôte passe par la même RPC que les invités.
+          // Avant, il envoyait la liste des classements connue de son téléphone, qui
+          // remplaçait celle du serveur et pouvait effacer un invité tout juste validé.
+          await contributeOwnPlacement();
+        }
+      } catch (err) {
+        // Rien n'est (sûrement) parti : retour au classement, à renvoyer.
+        console.warn("REVEAL tiernight validation:", err);
+        finished = false;
+        finishFailed = true;
+        if (alive) render();
+        return;
       }
       if (!alive) return;
 
       render();
       // FEATURE-TIERNIGHT-03-D - série : finalize RPC ; legacy : classic end.
       if (hasActiveTierNightSeries()) {
-        if (isLobbyHost()) {
+        if (canLeadRoundEnd()) {
           await hostFinalizeTierNightSeriesRound({
             shouldContinue: () => alive,
           });
@@ -195,7 +233,7 @@ export function mountTierNight(app) {
     const progress = getTierNightLobbyProgress();
     const doneCount = progress.filter((p) => p.done).length;
     const total = progress.length;
-    const host = isLobbyHost();
+    const host = canLeadRoundEnd();
     const canForce = host && canForceTierNightResults();
     const waitingNames = progress.filter((p) => !p.done).map((p) => p.name);
     return `
@@ -231,7 +269,7 @@ export function mountTierNight(app) {
   }
 
   async function forceResults() {
-    if (!isLobbyHost()) return;
+    if (!canLeadRoundEnd()) return;
     if (hasActiveTierNightSeries()) {
       await hostFinalizeTierNightSeriesRound({
         force: true,
@@ -332,7 +370,9 @@ export function mountTierNight(app) {
             </div>
           </div>`
               : `<p class="hint tier-done-hint">Tous les items sont classés 🎉 Réajuste si besoin, puis valide.</p>
-          <button type="button" class="btn btn-primary btn--spaced" id="btn-validate">Valider ma tierlist</button>`
+          <button type="button" class="btn btn-primary btn--spaced" id="btn-validate">Valider ma tierlist</button>${
+            finishFailed ? `<p class="hint">${escapeHtml(TIER_FINISH_FAILED_LABEL)}</p>` : ""
+          }`
         }
         ${gameExitBarHtml()}
       `,
@@ -447,7 +487,8 @@ export function mountTierNight(app) {
       if (!alive) return;
       render();
       if (hasActiveTierNightSeries()) {
-        if (isLobbyHost()) {
+        // Hôte parti : le remplaçant désigné termine la manche quand tout le monde a fini.
+        if (canLeadRoundEnd()) {
           await hostFinalizeTierNightSeriesRound({ shouldContinue: () => alive });
         }
         return;

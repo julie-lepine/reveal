@@ -725,3 +725,197 @@ Signet : dans le SQL Editor, enregistrer chaque requête (étoile / snippet) pou
 
 **Statut** : SQL repo ✅ · **pas encore collé** en base.
 
+---
+
+## 36. Le Traître — joueur qui quitte le salon en pleine partie
+
+Un joueur parti du salon restait dans les survivants : fake parti → partie impossible à finir (`TRAITRE_ROLE_MISSING`), autre joueur parti → jamais votant, impossible à éliminer.
+
+| Élément | Valeur |
+| ------- | ------ |
+| Migration | [`fix-traitre-departed-players.sql`](../supabase/fix-traitre-departed-players.sql) (remplace toute la fonction, inclut `feature-traitre-force-deal.sql`) |
+| Fonction | `advance_traitre_play` (action `resolve_vote`) |
+| Contrat | miroir `js/core/traitreAdvance.js` · test `tests/traitreDepartedPlayers.test.js` |
+| Prod | appliquée le 2026-11-20 (migration `fix_traitre_departed_players`) · contrôle : md5 du corps = fichier, `authenticated` seul en exécution |
+
+**Statut** : SQL repo ✅ · prod ✅.
+
+---
+
+## 37. Draw It — fin de manche au chrono sans l'hôte
+
+À 00:00, seul l'hôte (ou son remplaçant) pouvait terminer la manche : écran de l'hôte éteint → tout le monde bloqué jusqu'à 2 min.
+
+| Élément | Valeur |
+| ------- | ------ |
+| Migration | [`fix-drawit-reveal-any-player.sql`](../supabase/fix-drawit-reveal-any-player.sql) (remplace toute la fonction) |
+| Fonction | `reveal_drawit_round` : tout joueur de la partie (membre + `drawerOrder`) après l'heure de fin ; fin anticipée « tout le monde a trouvé » réservée à l'hôte |
+| Contrat | `canPlayerCommitDrawItReveal` (`js/core/drawItRound.js`) · test `tests/drawItPlayerReveal.test.js` |
+| Prod | appliquée le 2026-11-20 (migration `fix_drawit_reveal_any_player`) · contrôle : md5 du corps = fichier, `authenticated` seul en exécution |
+
+**Statut** : SQL repo ✅ · prod ✅ (à appliquer avant de publier l'appli : fait).
+
+---
+
+## 38. Draw It — joueur qui quitte le salon en pleine partie
+
+Liste des joueurs figée au lancement : devineur parti → « tout le monde a trouvé » jamais atteint (60 s par manche) ; dessinateur parti → 60 s de toile vide.
+
+| Élément | Valeur |
+| ------- | ------ |
+| Migration | [`fix-drawit-departed-players.sql`](../supabase/fix-drawit-departed-players.sql) |
+| Fonctions | nouvelle `drawit_all_present_guessers_found(uuid, jsonb)` (aucun rôle client n'a le droit d'exécution) · `reveal_drawit_round` réécrite (inclut le n°37) · `submit_drawit_guess` : une ligne remplacée en place |
+| Contrat | `expectedDrawItGuessers` / `isDrawItDrawerGone` (`js/core/drawItRound.js`) · test `tests/drawItDepartedPlayers.test.js` |
+| Prod | appliquée le 2026-11-20 (migration `fix_drawit_departed_players`), après essai annulé · contrôle : md5 des corps = fichier, `submit_drawit_guess` +20 caractères (la seule ligne visée), droits inchangés |
+
+**Statut** : SQL repo ✅ · prod ✅.
+
+---
+
+## 39. Points de soirée de fin de partie — Trivia et Consensus
+
+Points ajoutés sur le téléphone de celui qui termine : perdus pour les autres si c'est l'hôte remplaçant (`complete_game_session_as_actor` n'écrit aucun point), et Trivia pouvait compter deux fois.
+
+| Élément | Valeur |
+| ------- | ------ |
+| Migration | [`fix-evening-scores-trivia-consensus.sql`](../supabase/fix-evening-scores-trivia-consensus.sql) |
+| Fonctions | `finalize_trivia_scores(uuid)` (quiz + podium 15/10/5) · `finalize_consensus_scores(uuid)` · `evening_finalize_credit` (interne, aucun rôle client) ; une fois par partie (`state.eveningFinalized`) |
+| Contrat | `js/core/eveningFinalize.js` · test `tests/eveningFinalizeTriviaConsensus.test.js` |
+| Prod | appliquée le 2026-11-20 (migration `fix_evening_scores_trivia_consensus`), après essai annulé (exemple de calcul vérifié) · contrôle : md5 des corps = fichier, droits OK |
+
+**Statut** : SQL repo ✅ · prod ✅ — à appliquer **avant** de publier l'appli : fait.
+
+---
+
+## 40. Guess the Lie — manches annoncées par l'hôte remplaçant (points de soirée)
+
+Guess the Lie n'avait pas de score de partie : la règle « hôte absent » ne le couvrait pas, ses manches annoncées par un remplaçant ne comptaient pour personne d'autre que lui.
+
+| Élément | Valeur |
+| ------- | ------ |
+| Migration | [`fix-guesslie-evening-scores.sql`](../supabase/fix-guesslie-evening-scores.sql) (modification ciblée en place, rejouable) |
+| Fonction | `game_sessions_credit_absent_host_evening_scores` : `'guesslie'` ajouté à la liste des jeux (rien d'autre) |
+| Contrat | appli : `state.guessLie.matchScores` mis à jour à chaque révélation · test `tests/eveningScoresOverwriteAndGuessLie.test.js` |
+| Prod | appliquée le 2026-11-20 (migration `fix_guesslie_evening_scores`), après essai annulé · contrôle : +12 caractères (la seule liste visée), trigger toujours actif |
+
+**Statut** : SQL repo ✅ · prod ✅ — ordre de mise en ligne indifférent.
+
+---
+
+## 41. Webhook RevenueCat — achats de test ignorés (Edge Function, pas de SQL)
+
+Le webhook RevenueCat envoie tous les environnements ; la fonction traitait un achat de test (gratuit : TestFlight, testeurs Play, Test Store) comme un vrai achat → droits gratuits et définitifs en prod.
+
+| Élément | Valeur |
+| ------- | ------ |
+| Fonction | Edge Function `revenuecat-webhook` ([`index.ts`](../supabase/functions/revenuecat-webhook/index.ts)) : ignore `environment: SANDBOX` |
+| Secret optionnel | `REVENUECAT_SANDBOX_ALLOWED_USER_IDS` (uids séparés par des virgules) : comptes qui gardent les droits sur achat de test |
+| Contrat | `isIgnoredSandboxEvent` ([`revenuecat-entitlement-patch.js`](../supabase/revenuecat-entitlement-patch.js)) · test `tests/revenuecatSandboxIgnored.test.js` |
+| Prod | déployée le 2026-11-22 (version 21, `verify_jwt` false comme avant) · contrôle : contenu en ligne = fichier, réponse 405 sur GET |
+
+**Statut** : repo ✅ · prod ✅. Droits déjà obtenus par achat de test : non nettoyés.
+
+---
+
+## 42. Webhook RevenueCat — droits relus chez RevenueCat, et suppression de compte (Edge Functions, pas de SQL)
+
+Audit achats (tmp/audit-achats-premium.md) n°1 à n°5 : transfert d'achat entre comptes ignoré (transfert confirmé actif dans RevenueCat), événements dans le désordre, profil absent, réponses d'erreur trop bavardes, mise à niveau gardée après remboursement de sa base, client RevenueCat gardé après suppression du compte.
+
+| Élément | Valeur |
+| ------- | ------ |
+| Fonctions | `revenuecat-webhook` v22 (`index.ts` + [`premium.js`](../supabase/functions/revenuecat-webhook/premium.js), `verify_jwt` false) · `delete-account` v10 (`verify_jwt` true, inchangé) |
+| Secrets à créer | `REVENUECAT_SECRET_API_KEY` (clé API v2, lecture des achats ; + suppression de client si option) · `REVENUECAT_PROJECT_ID` = `proj5ef4ccd9` · optionnels : `REVENUECAT_SANDBOX_ALLOWED_USER_IDS`, `REVENUECAT_DELETE_ON_ACCOUNT_DELETE=true` |
+| Sans les secrets | webhook en repli : ancien calcul + achats de test ignorés + 500 si profil absent + 401 muet ; suppression de compte inchangée |
+| Contrat | `tests/revenuecatPremiumFromPurchases.test.js`, `tests/revenuecatSandboxIgnored.test.js` |
+| Prod | déployées le 2026-11-22 · contrôle : webhook 405 (GET), 401 `{"ok":false}` sans secret et avec secret dans l'adresse ; delete-account 200 (OPTIONS), 401 sans jeton |
+
+**Statut** : repo ✅ · prod ✅ · secrets RevenueCat : **à créer** (relecture inactive tant qu'ils manquent).
+
+---
+
+## 43. Droits offerts (Maître / Signature / Sans pub par e-mail)
+
+| Élément | Valeur |
+| ------- | ------ |
+| Migration | [`feature-premium-manual-grants.sql`](../supabase/feature-premium-manual-grants.sql) : table `premium_manual_grants` (RLS, aucun accès appli), `grant_premium_by_email(email, 'host'\|'profile'\|'ad_free', raison)`, `revoke_premium_by_email(email)` (éditeur SQL seulement) |
+| Webhook | `revenuecat-webhook` v25 : droits offerts ajoutés aux droits des achats, jamais retirés |
+| Contrat | `tests/premiumManualGrants.test.js` |
+| Prod | appliquée le 2026-11-22 (migration `feature_premium_manual_grants`) après essai annulé ; webhook redéployé ensuite · contrôle : table + RLS, appli sans accès, service_role en lecture ; webhook 405 (GET), 401 sans secret |
+
+**Statut** : repo ✅ · prod ✅. Aucun droit offert pour l'instant.
+
+---
+
+## 44. Trivia — joueur qui quitte le salon en pleine question
+
+Liste des joueurs attendus figée au début de la question (`questionPlayerUids`) : un joueur parti bloquait la révélation automatique, les invités restaient sur « Révélation en cours… ».
+
+| Élément | Valeur |
+| ------- | ------ |
+| Migration | [`fix-trivia-departed-players.sql`](../supabase/fix-trivia-departed-players.sql) : `trivia_all_expected_players_answered(uuid, jsonb)` réécrite (seuls les joueurs attendus encore dans `lobby_members` comptent) ; seul appelant : `submit_trivia_answer` |
+| Appli | `js/core/triviaPresentPlayers.js` (miroir JS) · `js/games/trivia.js` : l'hôte ou le remplaçant lance `reveal_trivia_round` quand un joueur part après les réponses des autres |
+| Contrat | `tests/auditFollowups.test.js` |
+| Prod | appliquée le 2026-11-23 (migration `fix_trivia_departed_players`), après essai annulé · contrôle : la fonction ne compte que les membres du salon |
+
+**Statut** : SQL repo ✅ · prod ✅.
+
+---
+
+## 45. Trivia — heure de réponse notée par le serveur (bonus vitesse)
+
+Le bonus vitesse (+5) se jouait sur l'heure envoyée par chaque téléphone : une horloge en retard gagnait en répondant après les autres.
+
+| Élément | Valeur |
+| ------- | ------ |
+| Migration | [`fix-trivia-server-answer-time.sql`](../supabase/fix-trivia-server-answer-time.sql) : `submit_trivia_answer`, une ligne remplacée en place (`'answeredAt', p_answered_at` → heure serveur `clock_timestamp()` en ms) ; paramètre gardé pour les anciennes versions de l'appli |
+| Appli | rien à changer |
+| Contrat | `tests/auditFollowups.test.js` (bloc n°2) |
+| Prod | appliquée le 2026-11-23 (migration `fix_trivia_server_answer_time`), après essai annulé (base : md5 du corps `5e074dc43cc6afd471333e8c1a015a59`) · contrôle : heure serveur, +46 caractères (la seule ligne visée), droits inchangés |
+
+**Statut** : SQL repo ✅ · prod ✅.
+
+---
+
+## 46. Amis — délai qui s'allonge après chaque refus
+
+Refuser une demande d'ami ne bloquait la même personne que 60 s : elle pouvait redemander chaque minute.
+
+| Élément | Valeur |
+| ------- | ------ |
+| Migration | [`fix-friends-decline-escalation.sql`](../supabase/fix-friends-decline-escalation.sql) : colonne `friend_request_cooldowns.decline_count` ; `decline_friend_request` (1er refus 1 jour, 2e 7 jours, 3e définitif) ; `send_friend_request` ne purge plus les délais expirés |
+| Appli | rien à changer (délai déjà silencieux pour celui qui demande) |
+| Contrat | `tests/auditFollowups.test.js` (bloc « Amis n°1 ») |
+| Prod | appliquée le 2026-11-23 (migration `fix_friends_decline_escalation`), après essai annulé (base : md5 `decline_friend_request` `6ff57c3a2d9eb7d28cfde64a3477e3b6`, `send_friend_request` `1b03d1b486c1b4b0b21fdc45c3c9dc7e`) · contrôle : colonne `decline_count`, délai 1 j / 7 j / définitif, plus d'effacement des délais à la demande |
+
+**Statut** : SQL repo ✅ · prod ✅.
+
+---
+
+## 47. Invitations — vérifier avant « Quitter et rejoindre »
+
+« Quitter et rejoindre » quittait le salon actuel avant d'essayer l'invitation : invitation périmée = plus de salon, et l'hôte cédait le sien pour rien.
+
+| Élément | Valeur |
+| ------- | ------ |
+| Migration | [`fix-lobby-invite-check-before-leave.sql`](../supabase/fix-lobby-invite-check-before-leave.sql) : nouvelle `check_lobby_invite(uuid)` (lecture seule ; `authenticated` seulement) |
+| Appli | `js/core/lobbyInviteJoin.js` l'appelle avant `leaveLobby` ; si elle manque en prod (avant la migration), l'appli fait comme avant |
+| Contrat | `tests/auditFollowups.test.js` (bloc « Invitations n°2 ») |
+| Prod | appliquée le 2026-11-23 (migration `fix_lobby_invite_check_before_leave`), après la 48, après essai annulé · contrôle : `authenticated` seulement (pas `anon`) |
+
+**Statut** : SQL repo ✅ · prod ✅.
+
+---
+
+## 48. Amis et invitations — invitations périmées et droits en trop
+
+Invitations encore utilisables après la fin de l'amitié, le départ de l'invitant ou un retrait par l'hôte ; invitations vers des soirées fermées affichées ; droits d'écriture (dont `TRUNCATE`) donnés par défaut sur 3 tables.
+
+| Élément | Valeur |
+| ------- | ------ |
+| Migration | [`fix-friends-invites-cleanup.sql`](../supabase/fix-friends-invites-cleanup.sql) : `unfriend` et `kick_lobby_member` réécrites (suppriment les invitations concernées) ; `accept_lobby_invite` : un bloc ajouté en place (invitant encore membre) ; `list_incoming_lobby_invites` réécrite (soirée active + invitant présent) ; `revoke insert, update, delete, truncate, references, trigger` sur `friend_requests`, `friendships`, `lobby_invites` pour `authenticated` (lecture gardée) |
+| Ordre | **avant** ou avec la fiche 47 (`check_lobby_invite` reprend la règle « invitant encore membre ») |
+| Appli | rien à changer |
+| Contrat | `tests/auditFollowups.test.js` (bloc « Amis et invitations n°3 à 6 ») |
+| Prod | appliquée le 2026-11-23 (migration `fix_friends_invites_cleanup`), après essai annulé (base : md5 accept `84c69e03dce9928362b9dd31c4b3692d`, kick `0e259dd21dfc9e605af6c385be0b4b3f`, unfriend `6da3782d3563879007ce23181ef47051`, list_incoming `da5a33ae0cac3f91f23ca63042efa7b3`) · contrôle : acceptation +292 caractères (le bloc visé), unfriend et retrait suppriment les invitations, liste filtrée, `authenticated` n'a plus que SELECT sur les 3 tables, droits d'exécution inchangés |
+
+**Statut** : SQL repo ✅ · prod ✅.

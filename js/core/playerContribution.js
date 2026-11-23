@@ -157,13 +157,29 @@ export function detectPlayerContribution(stateMerge, localUid) {
 }
 
 /**
- * Tap Clutch de l'hôte réel : même chemin que les invités (RPC contribute).
- * Sinon l'hôte relisait puis réécrivait toute la partie, et un tap d'invité
- * arrivé entre sa lecture et son écriture était effacé du serveur (l'invité
- * voyait « ✓ Tapé » mais était classé « pas tapé »).
+ * Contributions simples de l'hôte réel envoyées par la même RPC que les invités
+ * (contribute_game_session_player), par jeu et par type. Sinon l'hôte relisait
+ * puis réécrivait toute la partie, et un vote / tap / réponse d'invité arrivé
+ * entre sa lecture et son écriture était effacé du serveur (l'invité se voyait
+ * « voté » mais était compté « pas voté »).
+ *
+ * Exclus volontairement :
+ *  - trivia (réponse) et truthmeter (vote) : RPC dédiées pour tout le monde ;
+ *  - consensus (réponse) : l'hôte écrit déjà de façon conditionnelle (updated_at) ;
+ *  - ready / submission / placement / finished : règles serveur propres (écran de
+ *    préparation, partie pas toujours créée) — à vérifier séparément.
  */
-export function isHostClutchTapContribution(contribution) {
-  return contribution?.game === "clutch" && contribution.kind === "tap";
+const HOST_RPC_CONTRIBUTIONS = {
+  tap: new Set(["clutch"]),
+  vote: new Set(["hottake", "dilemma", "speedvote", "wronganswer", "traitre", "guesslie", "tiernightlive"]),
+  answer: new Set(["wronganswer"]),
+  deal_ack: new Set(["traitre"]),
+};
+
+export function isHostPlayerContribution(contribution) {
+  if (!contribution) return false;
+  const games = HOST_RPC_CONTRIBUTIONS[contribution.kind];
+  return Boolean(games && games.has(contribution.game));
 }
 
 export function stateKeyToGameId(stateKey) {

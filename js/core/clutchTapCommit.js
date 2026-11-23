@@ -4,6 +4,10 @@ export const CLUTCH_TAP_FAILED_LABEL = "Ton tap n’est pas parti, retape !";
 /** Message quand l'envoi du tap échoue alors que le temps de tap est écoulé. */
 export const CLUTCH_TAP_FAILED_LATE_LABEL = "Ton tap n’est pas parti à temps.";
 
+/** Invité : le verdict tarde, l'hôte ne répond plus (remplaçant désigné au bout de ~2 min). */
+export const CLUTCH_HOST_SILENT_LABEL =
+  "L’hôte ne répond plus… la partie reprendra toute seule s’il ne revient pas.";
+
 /**
  * Même tap si même contenu (ms, at). La synchro recopie la map des taps
  * (mergeClutchTapsFrozen) : comparer par identité ratait l'annulation après

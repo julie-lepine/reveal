@@ -5,7 +5,11 @@
  */
 import { supabase, isSupabaseConfigured } from "./supabaseClient.js";
 import { getState } from "./state.js";
-import { LOBBY_INVITE_RPC, LOBBY_INVITE_TABLE } from "../config/lobbyInvites.js";
+import {
+  LOBBY_INVITE_CHECK_RPC,
+  LOBBY_INVITE_RPC,
+  LOBBY_INVITE_TABLE,
+} from "../config/lobbyInvites.js";
 import { isRegisteredUser } from "./friendsLogic.js";
 import { parseLobbyInviteRpcError } from "./lobbyInvitesLogic.js";
 import {
@@ -60,6 +64,32 @@ export async function acceptLobbyInvite(inviteId) {
   return {
     ok: true,
     result: data?.result || "joined",
+    lobbyId: data?.lobby_id || data?.lobbyId || null,
+  };
+}
+
+/** Fonction serveur absente (migration pas encore appliquée). */
+function isMissingRpcError(error) {
+  const text = `${error?.code || ""} ${error?.message || ""}`;
+  return /PGRST202|42883|Could not find the function/i.test(text);
+}
+
+/**
+ * Audit amis et invitations n°2 : l'invitation est-elle encore bonne ? (lecture
+ * seule, sans rien changer). Appelée avant de quitter son salon pour la rejoindre.
+ * Erreur métier (gone / closed / full) → exception avec `code`, comme accept.
+ * Fonction serveur absente → { ok: true, unchecked: true } (comportement d'avant).
+ */
+export async function checkLobbyInvite(inviteId) {
+  if (!canCallLobbyInviteRpc() || !inviteId) return { ok: false, skipped: true };
+  const { data, error } = await supabase.rpc(LOBBY_INVITE_CHECK_RPC, { p_id: inviteId });
+  if (error) {
+    if (isMissingRpcError(error)) return { ok: true, unchecked: true };
+    throw inviteError(error);
+  }
+  return {
+    ok: true,
+    result: data?.result || "ok",
     lobbyId: data?.lobby_id || data?.lobbyId || null,
   };
 }

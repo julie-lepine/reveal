@@ -239,11 +239,23 @@ function drawItUid(value) {
   return String(value).trim();
 }
 
-/** Devineurs du snapshot figé ; drawerOrder sert uniquement de repli legacy. */
+/** Identifiants des joueurs encore dans le salon, ou null si inconnu (pas de filtre). */
+function presentUidSet(presentUids) {
+  if (!Array.isArray(presentUids) || !presentUids.length) return null;
+  return new Set(presentUids.map(drawItUid).filter(Boolean));
+}
+
+/**
+ * Devineurs du snapshot figé ; drawerOrder sert uniquement de repli legacy.
+ * `presentUids` (joueurs encore dans le salon) retire ceux qui sont partis :
+ * sinon « tout le monde a trouvé » n'arrivait plus jamais (miroir de
+ * `drawit_all_present_guessers_found`).
+ */
 export function expectedDrawItGuessers({
   participants = [],
   drawerOrder = [],
   drawerUid = null,
+  presentUids = null,
 } = {}) {
   const frozenParticipants = Array.isArray(participants)
     ? participants.map(drawItUid).filter(Boolean)
@@ -254,7 +266,17 @@ export function expectedDrawItGuessers({
       ? drawerOrder.map(drawItUid).filter(Boolean)
       : [];
   const drawer = drawItUid(drawerUid);
-  return [...new Set(source)].filter((uid) => uid !== drawer);
+  const present = presentUidSet(presentUids);
+  return [...new Set(source)].filter(
+    (uid) => uid !== drawer && (!present || present.has(uid))
+  );
+}
+
+/** Le dessinateur de la manche a quitté le salon (personne ne peut plus dessiner). */
+export function isDrawItDrawerGone(session, presentUids = null) {
+  const present = presentUidSet(presentUids);
+  const drawer = drawItUid(session?.drawerUid);
+  return Boolean(present && drawer && !present.has(drawer));
 }
 
 export function areAllDrawItGuessersFound(expectedGuessers = [], foundOrder = []) {
@@ -335,7 +357,7 @@ export function buildDrawItLaunchState({
   };
 }
 
-export function canCommitDrawItReveal(session, nowMs = Date.now()) {
+export function canCommitDrawItReveal(session, nowMs = Date.now(), { presentUids = null } = {}) {
   if (!session?.lobbyStarted) return { ok: false, reason: "not_started" };
   if (session.phase === DRAW_IT_PHASE_REVEAL) {
     return { ok: false, reason: "already_reveal" };
@@ -343,13 +365,45 @@ export function canCommitDrawItReveal(session, nowMs = Date.now()) {
   if (session.phase !== DRAW_IT_PHASE_DRAWING) {
     return { ok: false, reason: "not_drawing" };
   }
-  const expectedGuessers = expectedDrawItGuessers(session);
+  if (isDrawItDrawerGone(session, presentUids)) return { ok: true };
+  const expectedGuessers = expectedDrawItGuessers({ ...session, presentUids });
   if (!shouldEndDrawItRound({
     nowMs,
     roundEndsAt: session.roundEndsAt,
     expectedGuessers,
     foundOrder: session.foundOrder,
   })) {
+    return { ok: false, reason: "too_early" };
+  }
+  return { ok: true };
+}
+
+/**
+ * Délai laissé à l'hôte avant qu'un autre joueur ne demande la fin de manche :
+ * l'hôte la déclenche à 00:00, les autres seulement s'il ne l'a pas fait.
+ */
+export const DRAW_IT_PLAYER_REVEAL_GRACE_MS = 1500;
+
+/**
+ * Joueur (pas hôte) : fin de manche permise seulement une fois le temps écoulé
+ * (le serveur `reveal_drawit_round` vérifie l'heure et l'appartenance à la partie).
+ */
+export function canPlayerCommitDrawItReveal(
+  session,
+  nowMs = Date.now(),
+  graceMs = DRAW_IT_PLAYER_REVEAL_GRACE_MS,
+  { presentUids = null } = {}
+) {
+  if (!session?.lobbyStarted) return { ok: false, reason: "not_started" };
+  if (session.phase === DRAW_IT_PHASE_REVEAL) {
+    return { ok: false, reason: "already_reveal" };
+  }
+  if (session.phase !== DRAW_IT_PHASE_DRAWING) {
+    return { ok: false, reason: "not_drawing" };
+  }
+  if (isDrawItDrawerGone(session, presentUids)) return { ok: true };
+  const end = Date.parse(session.roundEndsAt);
+  if (!Number.isFinite(end) || Number(nowMs) < end + Number(graceMs || 0)) {
     return { ok: false, reason: "too_early" };
   }
   return { ok: true };

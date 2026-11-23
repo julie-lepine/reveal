@@ -19,6 +19,13 @@ export const CLUTCH_GRACE_MS = 3000;
  */
 export const CLUTCH_HOST_EXTRA_WAIT_MS = 3000;
 
+/**
+ * Invité : délai après la fin du temps de tap sans verdict au bout duquel on le
+ * prévient que l'hôte ne répond plus. Le remplaçant automatique n'est désigné
+ * qu'après ~2 min d'absence de l'hôte (HOST_PRESENCE_STALE_MS).
+ */
+export const CLUTCH_HOST_SILENT_AFTER_MS = 15000;
+
 /** Pré-décompte « 3 · 2 · 1 » avant le départ du chrono, pour mémoriser la cible. */
 export const CLUTCH_PRECOUNT_MS = 3000;
 

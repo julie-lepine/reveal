@@ -10,7 +10,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   detectPlayerContribution,
-  isHostClutchTapContribution,
+  isHostPlayerContribution,
 } from "../js/core/playerContribution.js";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -21,11 +21,11 @@ describe("Tap Clutch de l'hôte : contribution serveur", () => {
     const tap = { ms: 4100, at: 1 };
     const c = detectPlayerContribution({ clutch: { taps: { [HOST]: tap } } }, HOST);
     assert.deepEqual(c, { game: "clutch", kind: "tap", value: tap });
-    assert.equal(isHostClutchTapContribution(c), true);
+    assert.equal(isHostPlayerContribution(c), true);
   });
 
   it("les autres écritures de l'hôte gardent leur chemin habituel", () => {
-    assert.equal(isHostClutchTapContribution(null), false);
+    assert.equal(isHostPlayerContribution(null), false);
     // Révélation Clutch : plusieurs champs, pas une contribution.
     assert.equal(
       detectPlayerContribution(
@@ -34,9 +34,9 @@ describe("Tap Clutch de l'hôte : contribution serveur", () => {
       ),
       null
     );
-    // Vote de l'hôte dans un autre jeu : inchangé (pas un tap Clutch).
-    const vote = detectPlayerContribution({ hotTake: { votes: { [HOST]: "A" } } }, HOST);
-    assert.equal(isHostClutchTapContribution(vote), false);
+    // Réponse Trivia de l'hôte : RPC dédiée, pas ce chemin.
+    const trivia = detectPlayerContribution({ trivia: { answers: { [HOST]: { index: 1 } } } }, HOST);
+    assert.equal(isHostPlayerContribution(trivia), false);
     // Tap d'un autre joueur : jamais envoyé au nom de l'hôte.
     assert.equal(
       detectPlayerContribution({ clutch: { taps: { "autre-uid": { ms: 1 } } } }, HOST),
@@ -47,12 +47,12 @@ describe("Tap Clutch de l'hôte : contribution serveur", () => {
   it("l'écriture de l'hôte réel envoie son tap par la RPC avant toute réécriture", () => {
     const src = readFileSync(join(ROOT, "js/core/gameSync.js"), "utf8");
     const inner = src.slice(src.indexOf("async function patchGameStateInner"));
-    const routeAt = inner.indexOf("if (isHostClutchTapContribution(hostContribution))");
+    const routeAt = inner.indexOf("if (isHostPlayerContribution(hostContribution))");
     const rewriteAt = inner.indexOf("let mergePayload = stateMerge;");
     assert.ok(routeAt > 0 && rewriteAt > routeAt, "routage avant la fusion / réécriture");
     assert.match(
       inner,
-      /if \(isHostClutchTapContribution\(hostContribution\)\) \{[\s\S]{0,200}return contributeGameSessionPlayerAndApply\(lobbyId, hostContribution\);/
+      /if \(isHostPlayerContribution\(hostContribution\)\) \{[\s\S]{0,200}return contributeGameSessionPlayerAndApply\(lobbyId, hostContribution\);/
     );
   });
 

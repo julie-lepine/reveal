@@ -60,21 +60,32 @@ export function awardHotTakeVotes(votes, options) {
 }
 
 /** Joueur(s) le plus voté(s) : +10 (×2 si modificateur). Les autres : 0. */
-export function awardSpeedVoteRound(votes, { multiplier = 1 } = {}) {
+/**
+ * @param {Record<string, string>} votes votant → joueur désigné
+ * @param {{ multiplier?: number, eligibleWinners?: string[]|null }} [opts]
+ *   eligibleWinners : joueurs qui peuvent gagner (présents dans le salon). Un joueur
+ *   parti garde les votes reçus dans `counts` (affichage) mais ne gagne pas ; le
+ *   gagnant est le joueur présent le plus voté. Ses propres votes comptent toujours.
+ *   null = tout le monde (comme avant).
+ */
+export function awardSpeedVoteRound(votes, { multiplier = 1, eligibleWinners = null } = {}) {
   const counts = {};
   Object.values(votes).forEach((target) => {
     if (!target) return;
     counts[target] = (counts[target] || 0) + 1;
   });
 
+  const eligible = Array.isArray(eligibleWinners) ? new Set(eligibleWinners) : null;
+  const candidates = Object.entries(counts).filter(([name]) => !eligible || eligible.has(name));
+
   let max = 0;
-  Object.values(counts).forEach((n) => {
+  candidates.forEach(([, n]) => {
     if (n > max) max = n;
   });
 
   const winners =
     max > 0
-      ? Object.entries(counts)
+      ? candidates
           .filter(([, n]) => n === max)
           .map(([name]) => name)
       : [];

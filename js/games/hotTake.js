@@ -26,7 +26,14 @@ import {
 import { getActivePlayers, getActivePlayerNames } from "../core/players.js";
 import { createSyncPending } from "../core/syncPending.js";
 import { formatWinnersLabel, withCompetitionRanks } from "../core/competitionRank.js";
-import { getLocalDisplayName, recordHotTakePlayed, saveStatePatch, setLastGame } from "../core/state.js";
+import {
+  getLocalDisplayName,
+  recordHotTakePlayed,
+  restoreEveningScores,
+  saveStatePatch,
+  setLastGame,
+  snapshotEveningScores,
+} from "../core/state.js";
 import { NEXT_ROUND_FAILED_LABEL, POST_GAME_FINISH_FAILED_LABEL } from "../core/postGameFinish.js";
 import { serializeLastGameStandings } from "../core/lastGamePodium.js";
 import { setLobbyPlaying, setLobbyWaiting } from "../core/lobby.js";
@@ -57,6 +64,7 @@ import { getSupabaseUserId } from "../core/supabaseAuth.js";
 import { voteConfirmChrome, pickForVoteConfirm } from "../core/voteConfirm.js";
 import { arch03AhLogSkipDecision } from "../core/arch03ActingHostDebug.js";
 import { arch03RevealLog } from "../core/arch03RevealDebug.js";
+import { watchLobbyDepartures } from "../core/lobbyDepartureWatch.js";
 
 function buildHotTakeStandings(matchScores = {}) {
   const sorted = [...getActivePlayers()]
@@ -456,6 +464,9 @@ export function mountHotTake(app) {
     }
 
     revealInFlight = true;
+    // Points de soirée avant cette manche : remis si l'envoi échoue (sinon un nouvel
+    // essai les ajoutait une deuxième fois).
+    const eveningBefore = snapshotEveningScores();
     try {
       let matchScores = getHotTakeSession().matchScores || {};
       let lastRound = getHotTakeSession().lastRound || null;
@@ -510,6 +521,7 @@ export function mountHotTake(app) {
         takeScoredAfter: getHotTakeSession().takeScored,
       });
     } catch (err) {
+      if (getHotTakeSession().phase !== "reveal") restoreEveningScores(eveningBefore);
       arch03RevealLog("goToReveal aborted - stay on voting", {
         message: err?.message || String(err),
         phaseNow: getHotTakeSession().phase,
@@ -957,6 +969,21 @@ export function mountHotTake(app) {
     lastAckedActingHostToken = ahTokenNow;
   });
 
+  // Un joueur quitte le salon : s'il était le dernier à ne pas avoir voté, la
+  // manche peut se conclure (rien d'autre ne la relancerait).
+  const unsubDeparture = mp
+    ? watchLobbyDepartures(() => {
+        if (!mount.isMounted() || !mount.isCurrentMount()) return;
+        syncFromSession();
+        if (phase !== "voting") return;
+        if (canActAsHost() && allHotTakeVotesIn()) {
+          void goToReveal();
+          return;
+        }
+        patchVotingChrome();
+      })
+    : () => {};
+
   syncFromSession();
   render();
   lastAckedActingHostToken = getActingHostUiRefreshToken();
@@ -965,6 +992,7 @@ export function mountHotTake(app) {
     syncPending.dispose();
     mount.dispose();
     unsubGame();
+    unsubDeparture();
     if (!mp) setLobbyWaiting();
   };
 }

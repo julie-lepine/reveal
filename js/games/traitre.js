@@ -18,6 +18,7 @@ import {
   getTraitreSession,
   getTraitrePendingVoters,
   getTraitreVoteTargets,
+  getTraitreVotingAlive,
   isTraitrePrivateRoleReady,
   isTraitreTieSpeakRound,
   isTraitreWordDealReady,
@@ -90,7 +91,8 @@ export function mountTraitre(app) {
   const mp = isGameSyncActive();
 
   async function ensurePrivateRole() {
-    if (!mp || isLobbyHost() || isTraitrePrivateRoleReady()) return;
+    // L'hôte aussi : s'il a perdu son rôle (données effacées), il le relit.
+    if (!mp || isTraitrePrivateRoleReady()) return;
     const pairId = getTraitreSession().pairId;
     if (!pairId) return;
     await syncTraitrePrivateRole(pairId, { maxAttempts: 8, delayMs: 500 });
@@ -126,9 +128,21 @@ export function mountTraitre(app) {
     const deltas = lastRound.deltas || {};
     const breakdown = lastRound.breakdown || {};
     const fakeWon = resultWinner === "traitre";
+    // Le fake a quitté le salon en pleine partie : partie arrêtée, aucun point.
+    const fakeLeft = resultWinner === "abandon";
     const impostorMeta = playerMeta(resultImpostor || "?");
     const localLost = fakeWon && Boolean(localName) && localName !== resultImpostor;
-    const resultEmoji = localLost ? "😔" : fakeWon ? "🥳" : "🎯";
+    const resultEmoji = fakeLeft ? "🚪" : localLost ? "😔" : fakeWon ? "🥳" : "🎯";
+    const resultTitle = fakeLeft
+      ? "Le fake a quitté la partie"
+      : fakeWon
+        ? "Le fake gagne !"
+        : "Le fake est démasqué !";
+    const finalModifier = fakeLeft
+      ? "traitre-final--fake-left"
+      : fakeWon
+        ? "traitre-final--fake-wins"
+        : "traitre-final--fake-caught";
     const showHostActions = !mp || isLobbyHost();
 
     const scoreNames = [
@@ -177,8 +191,10 @@ export function mountTraitre(app) {
         </div>`
       : "";
 
-    const pointsHint = fakeWon
-      ? `+${TRAITRE_POINTS.FAKE_WIN} victoire fake${resultVoteSurvivals ? ` · +${TRAITRE_POINTS.FAKE_SURVIVE_VOTE}/vote survécu` : ""}`
+    const pointsHint = fakeLeft
+      ? "Partie arrêtée : aucun point."
+      : fakeWon
+      ?`+${TRAITRE_POINTS.FAKE_WIN} victoire fake${resultVoteSurvivals ? ` · +${TRAITRE_POINTS.FAKE_SURVIVE_VOTE}/vote survécu` : ""}`
       : `+${TRAITRE_POINTS.SURVIVOR} survivant · +${TRAITRE_POINTS.DETECTIVE_BONUS} détective · +${TRAITRE_POINTS.GOOD_INTUITION} bonne intuition · fake garde +${TRAITRE_POINTS.FAKE_SURVIVE_VOTE}/vote survécu`;
 
     const actionsHtml = showHostActions
@@ -189,16 +205,16 @@ export function mountTraitre(app) {
       : `<p class="hint">En attente de l'hôte pour recommencer ou quitter…</p>`;
 
     return `
-      <div class="card traitre-final ${fakeWon ? "traitre-final--fake-wins" : "traitre-final--fake-caught"}">
+      <div class="card traitre-final ${finalModifier}">
         <div class="traitre-final__hero">
           <span class="traitre-final__emoji" aria-hidden="true">${resultEmoji}</span>
-          <p class="traitre-final__title">${fakeWon ? "Le fake gagne !" : "Le fake est démasqué !"}</p>
+          <p class="traitre-final__title">${resultTitle}</p>
         </div>
 
         <div class="traitre-final__impostor">
           <span class="recap-card__avatar traitre-final__impostor-avatar" style="background:${impostorMeta.color}">${impostorMeta.emoji}</span>
           <div class="traitre-final__impostor-text">
-            <span class="traitre-final__impostor-label">${fakeWon ? "Le fake" : "C'était"}</span>
+            <span class="traitre-final__impostor-label">${fakeWon || fakeLeft ? "Le fake" : "C'était"}</span>
             <strong class="traitre-final__impostor-name">${escapeHtml(resultImpostor || "?")}</strong>
           </div>
         </div>
@@ -488,6 +504,11 @@ export function mountTraitre(app) {
           <p class="card-heading">Tour dédié - lis ton mot en privé</p>
           <p class="hint">Chacun découvre son mot sur son téléphone, puis valide quand c'est mémorisé. Ne montre pas ton écran.</p>
           <p class="hint traitre-deal-progress">${dealAckCount}/${dealTotal} joueur(s) prêt(s)</p>
+          ${
+            mp && host && dealAckCount > 0 && dealAckCount < dealTotal
+              ? `<button type="button" class="btn btn-secondary btn--spaced" id="btn-force-deal">Commencer sans attendre (${dealAckCount}/${dealTotal})</button>`
+              : ""
+          }
         </div>
         <div class="card traitre-word-card">
           <p class="label-upper label-upper--gold">Ton mot secret</p>
@@ -530,7 +551,9 @@ export function mountTraitre(app) {
     } else if (phase === "vote") {
       const normalizedVotes = normalizeTraitreVotes(votes, alive);
       const committedVote = normalizedVotes[localName];
-      const votedCount = countTraitreVotesCast(normalizedVotes, alive);
+      // Les joueurs partis du salon ne votent plus : on ne les attend pas.
+      const voters = getTraitreVotingAlive(session);
+      const votedCount = countTraitreVotesCast(normalizedVotes, voters);
       const isAlive = alive.includes(localName);
       const pendingVoters = getTraitrePendingVoters({ ...session, votes: normalizedVotes });
       const allIn = allTraitreVotesIn({ ...session, votes: normalizedVotes });
@@ -543,7 +566,7 @@ export function mountTraitre(app) {
       phaseHtml = `
         <div class="card">
           <p class="card-heading">Vote d'élimination</p>
-          <p class="hint">Qui est le fake ? ${votedCount}/${alive.length} vote(s).</p>
+          <p class="hint">Qui est le fake ? ${votedCount}/${voters.length} vote(s).</p>
           ${
             eliminated.length
               ? `<p class="hint">Éliminé(s) : ${eliminated.map((n) => escapeHtml(n)).join(", ")}</p>`
@@ -565,7 +588,7 @@ export function mountTraitre(app) {
         }
         ${
           host
-            ? `<button type="button" class="btn btn-secondary btn--spaced" id="btn-force-vote" ${votedCount === 0 ? "disabled" : ""}>Clôturer le vote (${votedCount}/${alive.length})</button>`
+            ? `<button type="button" class="btn btn-secondary btn--spaced" id="btn-force-vote" ${votedCount === 0 ? "disabled" : ""}>Clôturer le vote (${votedCount}/${voters.length})</button>`
             : isAlive
               ? `<p class="hint">En attente des votes…</p>`
               : `<p class="hint">En attente de la clôture du vote…</p>`
@@ -606,6 +629,20 @@ export function mountTraitre(app) {
     app.querySelector("#btn-deal-ack")?.addEventListener("click", () => {
       void handleDealAckClick();
     });
+
+    // Un joueur parti avant de confirmer son mot (souvent l'hôte) bloquait la partie.
+    app.querySelector("#btn-force-deal")?.addEventListener(
+      "click",
+      withClickLock(async () => {
+        if (mp && !canActAsHost()) return;
+        if (getTraitreSession().phase !== "deal") return;
+        await commitTraitreAdvance("deal_to_speak", { force: true });
+        if (!mount.isMounted()) return;
+        if (!mount.isCurrentMount()) return;
+        syncFromSession();
+        render();
+      })
+    );
 
     async function handleDealAckClick() {
       if (dealAckInFlight) return;

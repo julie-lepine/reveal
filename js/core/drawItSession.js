@@ -63,6 +63,7 @@ import {
   buildDrawItPrivateRounds,
   canCommitDrawItNextRound,
   canCommitDrawItReveal,
+  canPlayerCommitDrawItReveal,
   canCompleteDrawItGame,
   drawerUidForRound,
   resolveDrawItRoundDrawerUid,
@@ -420,13 +421,34 @@ function resolveRevealWordLabel(session) {
   return peeked?.wordLabel || "";
 }
 
+/**
+ * Joueurs encore dans le salon (multijoueur), pour ne pas attendre ceux qui
+ * sont partis. null hors multijoueur ou liste vide : aucun filtre.
+ */
+export function getDrawItPresentUids() {
+  if (!isGameSyncActive()) return null;
+  const uids = getLobbyParticipants()
+    .map((p) => String(p?.userId || "").trim())
+    .filter(Boolean);
+  return uids.length ? uids : null;
+}
+
 export async function commitDrawItReveal({ nowMs = Date.now() } = {}) {
   const outcome = await revealLock.run(async () => {
     const session = getDrawItSession();
-    const check = canCommitDrawItReveal(session, nowMs);
+    const mpServer = isGameSyncActive() && isSupabaseConfigured();
+    const actingHost = canActAsHost();
+    // Un joueur (pas hôte) peut terminer la manche une fois le temps écoulé :
+    // sinon tout le monde restait sur 00:00 quand l'écran de l'hôte était éteint.
+    const check =
+      mpServer && !actingHost
+        ? canPlayerCommitDrawItReveal(session, nowMs, undefined, {
+            presentUids: getDrawItPresentUids(),
+          })
+        : canCommitDrawItReveal(session, nowMs, { presentUids: getDrawItPresentUids() });
     if (!check.ok) return { ok: false, reason: check.reason };
 
-    if (isGameSyncActive() && isSupabaseConfigured() && canActAsHost()) {
+    if (mpServer) {
       try {
         const { rpcRevealDrawItRound } = await import("./gameSessionRpc.js");
         const row = await rpcRevealDrawItRound({ lobbyId: getState().lobby.id });
@@ -476,20 +498,36 @@ export async function commitDrawItNextRound({ nowMs = Date.now() } = {}) {
     if (!check.ok) return { ok: false, reason: check.reason };
 
     if (isGameSyncActive() && isSupabaseConfigured() && canActAsHost()) {
-      const { rpcAdvanceDrawItRound } = await import("./gameSessionRpc.js");
-      const row = await rpcAdvanceDrawItRound({ lobbyId: getState().lobby.id });
-      let full = row;
-      if (row && !row.state) full = await refreshGameSession();
-      if (!full?.state) return { ok: false, reason: "not_applied" };
-      applyRemoteSession(full);
-      const synced = getDrawItSession();
-      if (
-        synced.phase !== "drawing" ||
-        Number(synced.roundIdx) !== Number(check.nextIdx)
-      ) {
-        return { ok: false, reason: "not_applied" };
+      const reachedNext = () => {
+        const synced = getDrawItSession();
+        return (
+          synced.phase === "drawing" &&
+          Number(synced.roundIdx) === Number(check.nextIdx)
+        );
+      };
+      try {
+        const { rpcAdvanceDrawItRound } = await import("./gameSessionRpc.js");
+        const row = await rpcAdvanceDrawItRound({ lobbyId: getState().lobby.id });
+        let full = row;
+        if (row && !row.state) full = await refreshGameSession();
+        if (!full?.state) return { ok: false, reason: "not_applied" };
+        applyRemoteSession(full);
+        return reachedNext()
+          ? { ok: true, reason: null }
+          : { ok: false, reason: "not_applied" };
+      } catch {
+        // Réponse perdue ou second appel (le serveur refuse « uniquement depuis
+        // reveal ») : si la manche suivante a bien démarré, ce n'est pas un échec.
+        try {
+          const full = await refreshGameSession();
+          if (full) applyRemoteSession(full);
+        } catch {
+          /* relecture optionnelle */
+        }
+        return reachedNext()
+          ? { ok: true, reason: null }
+          : { ok: false, reason: "rpc_failed" };
       }
-      return { ok: true, reason: null };
     }
 
     const applied = applyDrawItNextRound(session, {
@@ -527,17 +565,23 @@ export async function commitDrawItComplete() {
     if (!check.ok) return { ok: false, reason: check.reason };
 
     if (isGameSyncActive() && isSupabaseConfigured()) {
-      const { rpcFinalizeDrawItScores } = await import("./gameSessionRpc.js");
-      const scoredRow = await rpcFinalizeDrawItScores({
-        lobbyId: getState().lobby.id,
-      });
-      if (!scoredRow?.state) return { ok: false, reason: "scores_not_committed" };
-      applyRemoteSession(scoredRow);
-      session = getDrawItSession();
-      if (session.scoresCommittedRunId !== session.runId) {
-        return { ok: false, reason: "scores_not_committed" };
+      // Réessayer est sans risque : les points ne sont comptés qu'une fois
+      // (scoresCommittedRunId côté serveur).
+      try {
+        const { rpcFinalizeDrawItScores } = await import("./gameSessionRpc.js");
+        const scoredRow = await rpcFinalizeDrawItScores({
+          lobbyId: getState().lobby.id,
+        });
+        if (!scoredRow?.state) return { ok: false, reason: "scores_not_committed" };
+        applyRemoteSession(scoredRow);
+        session = getDrawItSession();
+        if (session.scoresCommittedRunId !== session.runId) {
+          return { ok: false, reason: "scores_not_committed" };
+        }
+        await completeGameSession({ gameId: "drawit", screen: "results", state: {} });
+      } catch {
+        return { ok: false, reason: "rpc_failed" };
       }
-      await completeGameSession({ gameId: "drawit", screen: "results", state: {} });
       saveStatePatch({
         drawItGame: clearDrawItCustomWords(getDrawItSession()),
       });
@@ -683,7 +727,128 @@ async function applyDrawItStrokeRow(row) {
   return getDrawItSession();
 }
 
-export async function commitDrawItCompletedStroke(stroke) {
+/**
+ * Audit salon/reconnexion n°1 — traits terminés pas encore confirmés par le serveur.
+ * Avant : un trait envoyé pendant une coupure n'était jamais renvoyé ; le
+ * dessinateur le voyait, les autres non. Ils sont gardés ici et renvoyés (au
+ * prochain trait, ou par l'écran toutes les 2 s). Sans risque : le serveur ignore
+ * un trait déjà reçu (même strokeId).
+ * @type {Map<string, { durable: object, runId: string|null, roundIdx: number, canvasEpoch: number }>}
+ */
+const pendingDrawItStrokes = new Map();
+
+/** Refus définitifs : renvoyer ne servirait à rien (manche finie, toile effacée…). */
+const TERMINAL_DRAWIT_STROKE_CODES = new Set([
+  "DRAWIT_STALE_RUN",
+  "DRAWIT_STALE_ROUND",
+  "DRAWIT_STALE_EPOCH",
+  "DRAWIT_NOT_DRAWING",
+  "DRAWIT_NOT_DRAWER",
+  "DRAWIT_INVALID_STROKE",
+  "DRAWIT_STROKE_TOO_LONG",
+  "DRAWIT_STROKE_CAP",
+  "DRAWIT_WRONG_GAME",
+  "DRAWIT_NO_SESSION",
+]);
+
+function pendingStrokeMatchesSession(entry, session) {
+  return (
+    (entry.runId || null) === (session.runId || null) &&
+    Number(entry.roundIdx) === Number(session.roundIdx) &&
+    Number(entry.canvasEpoch) === (Number(session.canvasEpoch) || 0) &&
+    session.phase === "drawing"
+  );
+}
+
+/** Nombre de traits en attente de confirmation (écran : relancer les renvois). */
+export function countPendingDrawItStrokes() {
+  return pendingDrawItStrokes.size;
+}
+
+export function __resetPendingDrawItStrokesForTests() {
+  pendingDrawItStrokes.clear();
+}
+
+/**
+ * Envoie un trait au serveur. Échec réseau : le trait reste en attente.
+ * Refus définitif ou succès : il quitte la file.
+ */
+async function sendDurableDrawItStroke(session, durable) {
+  const entry = {
+    durable,
+    runId: session.runId || null,
+    roundIdx: Number(session.roundIdx),
+    canvasEpoch: Number(session.canvasEpoch) || 0,
+  };
+  try {
+    const { rpcAppendDrawItStroke } = await import("./gameSessionRpc.js");
+    const row = await rpcAppendDrawItStroke({
+      lobbyId: getState().lobby.id,
+      runId: session.runId,
+      roundIdx: session.roundIdx,
+      canvasEpoch: Number(session.canvasEpoch) || 0,
+      stroke: durable,
+    });
+    if (!row) {
+      pendingDrawItStrokes.set(durable.strokeId, entry);
+      return { ok: false, reason: "not_applied", retryable: true };
+    }
+    pendingDrawItStrokes.delete(durable.strokeId);
+    await applyDrawItStrokeRow(row);
+    return { ok: true, skipped: false };
+  } catch (error) {
+    const code = String(error?.message || error).match(/DRAWIT_[A-Z_]+/)?.[0];
+    const retryable = !code || !TERMINAL_DRAWIT_STROKE_CODES.has(code);
+    if (retryable) pendingDrawItStrokes.set(durable.strokeId, entry);
+    else pendingDrawItStrokes.delete(durable.strokeId);
+    return { ok: false, reason: (code || "rpc_failed").toLowerCase(), retryable };
+  }
+}
+
+/**
+ * Renvoie les traits en attente, dans l'ordre. Abandonne ceux d'une autre manche
+ * ou toile, et ceux que le dessinateur n'a plus à l'écran (annulés, gommés).
+ * S'arrête au premier échec réseau (la connexion n'est pas revenue).
+ */
+async function flushPendingDrawItStrokesInLock(session, isStillDrawn) {
+  let sent = 0;
+  for (const [strokeId, entry] of [...pendingDrawItStrokes.entries()]) {
+    if (!pendingStrokeMatchesSession(entry, session)) {
+      pendingDrawItStrokes.delete(strokeId);
+      continue;
+    }
+    if (typeof isStillDrawn === "function" && !isStillDrawn(strokeId)) {
+      pendingDrawItStrokes.delete(strokeId);
+      continue;
+    }
+    const result = await sendDurableDrawItStroke(session, entry.durable);
+    if (result.ok) {
+      sent += 1;
+      continue;
+    }
+    if (result.retryable) break;
+  }
+  return { sent, remaining: pendingDrawItStrokes.size };
+}
+
+/** Écran Draw It : renvoi des traits en attente (dessinateur, multijoueur). */
+export async function flushPendingDrawItStrokes({ isStillDrawn } = {}) {
+  if (!pendingDrawItStrokes.size) return { sent: 0, remaining: 0 };
+  if (!isGameSyncActive() || !isSupabaseConfigured()) return { sent: 0, remaining: 0 };
+  const outcome = await completedStrokeLock.run(async () => {
+    const session = getDrawItSession();
+    const gate = canPersistDrawItStroke(session, getSupabaseUserId());
+    if (!gate.ok) {
+      pendingDrawItStrokes.clear();
+      return { sent: 0, remaining: 0 };
+    }
+    return flushPendingDrawItStrokesInLock(session, isStillDrawn);
+  });
+  if (!outcome.ok) return { sent: 0, remaining: pendingDrawItStrokes.size };
+  return outcome.value;
+}
+
+export async function commitDrawItCompletedStroke(stroke, { isStillDrawn } = {}) {
   if (!stroke?.strokeId || !Array.isArray(stroke.points) || !stroke.points.length) {
     return { ok: false, reason: "invalid_stroke" };
   }
@@ -696,22 +861,13 @@ export async function commitDrawItCompletedStroke(stroke) {
     if (!durable) return { ok: false, reason: "invalid_stroke" };
 
     if (isGameSyncActive() && isSupabaseConfigured()) {
-      try {
-        const { rpcAppendDrawItStroke } = await import("./gameSessionRpc.js");
-        const row = await rpcAppendDrawItStroke({
-          lobbyId: getState().lobby.id,
-          runId: session.runId,
-          roundIdx: session.roundIdx,
-          canvasEpoch: Number(session.canvasEpoch) || 0,
-          stroke: durable,
-        });
-        if (!row) return { ok: false, reason: "not_applied" };
-        await applyDrawItStrokeRow(row);
-        return { ok: true, skipped: false };
-      } catch (error) {
-        const code = String(error?.message || error).match(/DRAWIT_[A-Z_]+/)?.[0];
-        return { ok: false, reason: (code || "rpc_failed").toLowerCase() };
+      // Traits ratés plus tôt d'abord, pour garder l'ordre du dessin.
+      if (pendingDrawItStrokes.size) {
+        await flushPendingDrawItStrokesInLock(session, isStillDrawn);
       }
+      const result = await sendDurableDrawItStroke(session, durable);
+      if (!result.ok) return { ok: false, reason: result.reason };
+      return result;
     }
 
     const applied = applyDrawItDurableAppend(session, durable, { uid });

@@ -1022,6 +1022,19 @@ export function normalizeKeyedVotes(votes = {}, alive = [], resolveKey = (k) => 
 export function isNewTraitreVoteRound(cur, inc) {
   if (!inc) return false;
   if (inc.phase === "vote" && cur?.phase !== "vote") return true;
+  // Téléphone en veille pendant les indices : il passe directement du vote du
+  // tour N à celui du tour N+1 sans voir la phase « indices ». Sans ce test,
+  // l'ancien vote local revenait, affiché comme envoyé alors que le serveur ne
+  // l'a pas. Seulement vers un tour plus récent (une ligne en retard ne vide rien).
+  if (
+    inc.phase === "vote" &&
+    cur?.phase === "vote" &&
+    Number.isFinite(inc.speakRound) &&
+    Number.isFinite(cur?.speakRound) &&
+    inc.speakRound > cur.speakRound
+  ) {
+    return true;
+  }
   if (
     inc.phase === "vote" &&
     cur?.phase === "vote" &&

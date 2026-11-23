@@ -101,6 +101,15 @@ export function lobbyInviteAcceptPlan({
   return "join";
 }
 
+/**
+ * Message d'échec, avec « Tu restes dans ta soirée. » quand l'invitation a été
+ * vérifiée avant de quitter son salon (audit amis et invitations n°2).
+ */
+export function lobbyInviteFailMessageAfterCheck(code, { stayed = false } = {}) {
+  const base = lobbyInviteFailMessage(code);
+  return stayed ? `${base} Tu restes dans ta soirée.` : base;
+}
+
 export function lobbyInviteFailMessage(code) {
   if (code === LOBBY_INVITE_RPC_ERROR.busy) {
     return "Tu es déjà dans une soirée. Tu ne peux en rejoindre qu’une à la fois.";

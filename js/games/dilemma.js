@@ -18,7 +18,14 @@ import {
   gameCumulativeScoresHtml,
   refreshGameScoresBox,
 } from "../core/gameScores.js";
-import { getLocalDisplayName, recordDilemmaPlayed, saveStatePatch, setLastGame } from "../core/state.js";
+import {
+  getLocalDisplayName,
+  recordDilemmaPlayed,
+  restoreEveningScores,
+  saveStatePatch,
+  setLastGame,
+  snapshotEveningScores,
+} from "../core/state.js";
 import { NEXT_ROUND_FAILED_LABEL, POST_GAME_FINISH_FAILED_LABEL } from "../core/postGameFinish.js";
 import { getLobbyParticipants } from "../core/lobby.js";
 import { getActivePlayers, getActivePlayerNames } from "../core/players.js";
@@ -46,6 +53,7 @@ import {
 import { voteConfirmChrome, pickForVoteConfirm } from "../core/voteConfirm.js";
 import { createSyncPending } from "../core/syncPending.js";
 import { arch03AhLogSkipDecision } from "../core/arch03ActingHostDebug.js";
+import { watchLobbyDepartures } from "../core/lobbyDepartureWatch.js";
 
 const DILEMMA_VS_SRC = "js/games/dilemma-vs.svg";
 
@@ -223,6 +231,9 @@ export function mountDilemma(app) {
 
     revealInFlight = true;
     let awardedThisAttempt = false;
+    // Points de soirée avant cette manche : remis si l'envoi échoue (sinon un nouvel
+    // essai les ajoutait une deuxième fois).
+    const eveningBefore = snapshotEveningScores();
     try {
       roundScored = true;
       let matchScores = getDilemmaSession().matchScores || {};
@@ -255,6 +266,7 @@ export function mountDilemma(app) {
         enterRevealUi();
       } else if (awardedThisAttempt) {
         roundScored = Boolean(getDilemmaSession().roundScored);
+        restoreEveningScores(eveningBefore);
       }
       console.warn("dilemma reveal:", err);
     } finally {
@@ -703,6 +715,21 @@ export function mountDilemma(app) {
     lastAckedActingHostToken = ahTokenNow;
   });
 
+  // Un joueur quitte le salon : s'il était le dernier à ne pas avoir voté, la
+  // manche peut se conclure (rien d'autre ne la relancerait).
+  const unsubDeparture = mp
+    ? watchLobbyDepartures(() => {
+        if (unmounted) return;
+        syncFromSession();
+        if (phase !== "voting") return;
+        if (canActAsHost() && allDilemmaVotesIn()) {
+          void goToReveal();
+          return;
+        }
+        patchVotingChrome();
+      })
+    : () => {};
+
   render();
   lastAckedActingHostToken = getActingHostUiRefreshToken();
 
@@ -711,5 +738,6 @@ export function mountDilemma(app) {
     syncPending.dispose();
     cancelRevealAnim();
     unsub();
+    unsubDeparture();
   };
 }

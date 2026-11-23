@@ -275,11 +275,26 @@ export function allWrongAnswersIn(session = getWrongAnswerSession()) {
   return names.length > 0 && names.every((n) => Boolean(answers[n]?.text));
 }
 
-/** Tous les votants (= tous les joueurs) ont voté. */
+/**
+ * Votants attendus : joueurs présents qui ont au moins une réponse d'un AUTRE
+ * joueur à choisir (on ne vote pas pour soi). Audit petits jeux à votes n°4 :
+ * avec une seule réponse, son auteur n'avait personne pour qui voter mais était
+ * attendu quand même → la manche ne se terminait qu'avec « Révéler maintenant ».
+ */
+export function wrongAnswerExpectedVoterNames(
+  session = getWrongAnswerSession(),
+  names = getActivePlayerNames()
+) {
+  const answers = session.answers || {};
+  const authors = Object.keys(answers).filter((a) => answers[a]?.text);
+  return names.filter((n) => authors.some((a) => a !== n));
+}
+
+/** Tous les votants attendus ont voté. */
 export function allWrongAnswerVotesIn(session = getWrongAnswerSession()) {
-  const names = getActivePlayerNames();
+  const expected = wrongAnswerExpectedVoterNames(session);
   const votes = session.votes || {};
-  return names.length > 0 && names.every((n) => votes[n] != null);
+  return expected.length > 0 && expected.every((n) => votes[n] != null);
 }
 
 export function getWrongAnswerEntryScreen() {
