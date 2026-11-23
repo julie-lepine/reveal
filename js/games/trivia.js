@@ -9,7 +9,13 @@ import { getActivePlayers } from "../core/players.js";
 import { formatWinnersLabel } from "../core/competitionRank.js";
 import { serializeLastGameStandings } from "../core/lastGamePodium.js";
 import { triviaEveningPoints } from "../core/triviaScoring.js";
-import { goToGameSelect, setLobbyPlaying, setLobbyWaiting } from "../core/lobby.js";
+import { getLobbyParticipants, goToGameSelect, setLobbyPlaying, setLobbyWaiting } from "../core/lobby.js";
+import { onLobbyBundleUpdated } from "../core/supabaseLobby.js";
+import {
+  triviaAllPresentPlayersAnswered,
+  triviaFastestPlayerLabel,
+  triviaHasDepartedExpectedPlayer,
+} from "../core/triviaPresentPlayers.js";
 import { getLocalDisplayName, recordTriviaPlayed, saveStatePatch, setLastGame } from "../core/state.js";
 import { POST_GAME_FINISH_FAILED_LABEL } from "../core/postGameFinish.js";
 import { showAppAlert } from "../core/dialog.js";
@@ -31,6 +37,7 @@ import {
   stopGameSessionListenerOnPostGame,
   triviaToRemote,
   ensurePostGameScreen,
+  getCachedGameSession,
 } from "../core/gameSync.js";
 import { renderTriviaQuestion } from "../trivia/TriviaQuestion.js";
 import { renderTriviaScoreboard } from "../trivia/TriviaScoreboard.js";
@@ -192,7 +199,7 @@ export function mountTrivia(app) {
       });
   }
 
-  async function goToReveal() {
+  async function goToReveal({ silent = false } = {}) {
     if (revealInFlight) return;
     const initial = trivia.getSession();
     if (initial.phase !== "question") return;
@@ -214,6 +221,13 @@ export function mountTrivia(app) {
     } catch (err) {
       console.warn("REVEAL trivia goToReveal:", err);
       syncFromSession();
+      if (silent) {
+        // Révélation lancée seule (joueur parti) : pas de fenêtre d'alerte.
+        // L'hôte garde « Révéler maintenant », et un nouvel essai se fera au
+        // prochain changement du salon ou de la partie.
+        if (mount.isMounted() && mount.isCurrentMount()) render();
+        return;
+      }
       await showAppAlert(err?.message || "Révélation impossible. Réessaie.", {
         title: "Trivia",
         icon: "🧠",
@@ -222,6 +236,25 @@ export function mountTrivia(app) {
     } finally {
       revealInFlight = false;
     }
+  }
+
+  /**
+   * Audit Trivia n°1 : un joueur a quitté le salon et tous les joueurs encore
+   * présents ont répondu → plus aucune réponse n'arrivera pour déclencher la
+   * révélation côté serveur. L'hôte (ou le remplaçant) la lance lui-même.
+   */
+  function maybeRevealAfterDeparture() {
+    if (!mp || !canActAsHost()) return;
+    if (revealInFlight) return;
+    if (!mount.isMounted() || !mount.isCurrentMount()) return;
+    if (trivia.getSession().phase !== "question") return;
+    const remoteTrivia = getCachedGameSession()?.state?.trivia;
+    const memberUserIds = getLobbyParticipants()
+      .map((p) => (p?.userId ? String(p.userId) : ""))
+      .filter(Boolean);
+    if (!triviaHasDepartedExpectedPlayer({ remoteTrivia, memberUserIds })) return;
+    if (!triviaAllPresentPlayersAnswered({ remoteTrivia, memberUserIds })) return;
+    void goToReveal({ silent: true });
   }
 
   /** Filet de sécurité hôte : clôt la manche même si un joueur (AFK/déconnecté) n'a pas répondu. */
@@ -270,6 +303,10 @@ export function mountTrivia(app) {
       : "-";
     const deltas = lastRound?.deltas || {};
     const deltaRows = Object.entries(deltas).sort(([, a], [, b]) => b - a);
+    const fastestLabel = triviaFastestPlayerLabel(
+      lastRound?.fastestPlayer,
+      getActivePlayers().map((p) => p.name)
+    );
 
     return `
       ${localRevealFeedbackHtml()}
@@ -278,8 +315,8 @@ export function mountTrivia(app) {
         <p class="trivia-reveal-card__answer">${escapeHtml(correctLabel)}</p>
         <p class="hint">
           ${
-            lastRound?.fastestPlayer
-              ? `Bonus vitesse : ${escapeHtml(lastRound.fastestPlayer)}`
+            fastestLabel
+              ? `Bonus vitesse : ${escapeHtml(fastestLabel)}`
               : "Personne n'a trouvé la bonne réponse à temps."
           }
         </p>
@@ -831,6 +868,7 @@ export function mountTrivia(app) {
       canActAsHost: canActAsHost(),
       phase,
     });
+    maybeRevealAfterDeparture();
     if (skipFull && !actingHostUiRefresh) {
       patchQuestionChrome();
       return;
@@ -839,13 +877,24 @@ export function mountTrivia(app) {
     lastAckedActingHostToken = ahTokenNow;
   });
 
+  // Départ d'un joueur : la liste des membres change sans que la partie change.
+  const unsubLobby = mp
+    ? onLobbyBundleUpdated(() => {
+        if (!mount.isMounted() || !mount.isCurrentMount()) return;
+        maybeRevealAfterDeparture();
+        if (phase === "question") patchQuestionChrome();
+      })
+    : () => {};
+
   render();
   lastAckedActingHostToken = getActingHostUiRefreshToken();
+  maybeRevealAfterDeparture();
 
   return () => {
     mount.dispose();
     clearNpcTimers();
     clearAnswerCommitUi();
     unsub();
+    unsubLobby();
   };
 }

@@ -843,3 +843,33 @@ Audit achats (tmp/audit-achats-premium.md) n°1 à n°5 : transfert d'achat entr
 | Prod | appliquée le 2026-11-22 (migration `feature_premium_manual_grants`) après essai annulé ; webhook redéployé ensuite · contrôle : table + RLS, appli sans accès, service_role en lecture ; webhook 405 (GET), 401 sans secret |
 
 **Statut** : repo ✅ · prod ✅. Aucun droit offert pour l'instant.
+
+---
+
+## 44. Trivia — joueur qui quitte le salon en pleine question
+
+Liste des joueurs attendus figée au début de la question (`questionPlayerUids`) : un joueur parti bloquait la révélation automatique, les invités restaient sur « Révélation en cours… ».
+
+| Élément | Valeur |
+| ------- | ------ |
+| Migration | [`fix-trivia-departed-players.sql`](../supabase/fix-trivia-departed-players.sql) : `trivia_all_expected_players_answered(uuid, jsonb)` réécrite (seuls les joueurs attendus encore dans `lobby_members` comptent) ; seul appelant : `submit_trivia_answer` |
+| Appli | `js/core/triviaPresentPlayers.js` (miroir JS) · `js/games/trivia.js` : l'hôte ou le remplaçant lance `reveal_trivia_round` quand un joueur part après les réponses des autres |
+| Contrat | `tests/auditFollowups.test.js` |
+| Prod | à appliquer |
+
+**Statut** : SQL repo ✅ · prod ⏳.
+
+---
+
+## 45. Trivia — heure de réponse notée par le serveur (bonus vitesse)
+
+Le bonus vitesse (+5) se jouait sur l'heure envoyée par chaque téléphone : une horloge en retard gagnait en répondant après les autres.
+
+| Élément | Valeur |
+| ------- | ------ |
+| Migration | [`fix-trivia-server-answer-time.sql`](../supabase/fix-trivia-server-answer-time.sql) : `submit_trivia_answer`, une ligne remplacée en place (`'answeredAt', p_answered_at` → heure serveur `clock_timestamp()` en ms) ; paramètre gardé pour les anciennes versions de l'appli |
+| Appli | rien à changer |
+| Contrat | `tests/auditFollowups.test.js` (bloc n°2) |
+| Prod | à appliquer (base : md5 du corps `5e074dc43cc6afd471333e8c1a015a59`, 2026-11-23) |
+
+**Statut** : SQL repo ✅ · prod ⏳.
