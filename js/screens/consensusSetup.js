@@ -4,6 +4,10 @@ import { getLocalDisplayName } from "../core/state.js";
 import { showAppAlert } from "../core/dialog.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
 import { onGameSessionChange } from "../core/gameSync.js";
+import {
+  consensusLobbyWriteBlocked,
+  releaseStaleConsensusWriteMarker,
+} from "../core/consensusSession.js";
 import { prepGuestFollowOnSession } from "../core/mpLaunch.js";
 import { executePrepLaunch, prepLaunchSlotParams, DEFAULT_PREP_MIN_PLAYERS } from "../core/prepLaunch.js";
 import { createPrepLobbyController } from "../core/usePrepLobby.js";
@@ -28,7 +32,41 @@ export function mountConsensusSetup(app) {
     getReadyMap: () => consensus.getSession().ready || {},
   });
 
+  /**
+   * Audit Consensus n°1 : un envoi raté laissait un verrou qui rendait muets les
+   * boutons de la préparation. On lève un verrou périmé, sinon on dit quoi faire.
+   */
+  async function ensureConsensusWritable() {
+    if (!consensusLobbyWriteBlocked()) return true;
+    const stale = releaseStaleConsensusWriteMarker({
+      allowLegacy: true,
+      includeSelfResuming: true,
+      includeManual: true,
+    });
+    if (stale.released) return true;
+    const seconds = Math.max(1, Math.ceil(stale.waitMs / 1000));
+    await showAppAlert(
+      `Le dernier envoi n'est pas encore confirmé. Réessaie dans ${seconds} s.`,
+      { title: "Consensus", icon: "⏳" }
+    );
+    return false;
+  }
+
+  async function runPrepWrite(write) {
+    if (!(await ensureConsensusWritable())) return;
+    try {
+      await write();
+    } catch (err) {
+      console.warn("Consensus prep:", err);
+      await showAppAlert("Vérifie ta connexion réseau et réessaie", {
+        title: "Consensus",
+        icon: "📡",
+      });
+    }
+  }
+
   async function onLaunch({ force = false } = {}) {
+    if (!(await ensureConsensusWritable())) return;
     const validation = consensus.validateLaunchConfig();
     if (!validation.ok) {
       await showAppAlert(
@@ -59,7 +97,7 @@ export function mountConsensusSetup(app) {
     app.querySelectorAll("[data-consensus-mode]").forEach((btn) => {
       btn.addEventListener("click", async () => {
         if (!consensus.isHost()) return;
-        await consensus.setMode(btn.getAttribute("data-consensus-mode"));
+        await runPrepWrite(() => consensus.setMode(btn.getAttribute("data-consensus-mode")));
         render();
       });
     });
@@ -67,12 +105,15 @@ export function mountConsensusSetup(app) {
     app.querySelectorAll("[data-consensus-count]").forEach((btn) => {
       btn.addEventListener("click", async () => {
         if (!consensus.isHost()) return;
-        await consensus.setQuestionCount(Number(btn.getAttribute("data-consensus-count")));
+        await runPrepWrite(() =>
+          consensus.setQuestionCount(Number(btn.getAttribute("data-consensus-count")))
+        );
         render();
       });
     });
 
-    app.querySelector("#btn-consensus-ready")?.addEventListener("click", () => {
+    app.querySelector("#btn-consensus-ready")?.addEventListener("click", async () => {
+      if (!(await ensureConsensusWritable())) return;
       void prepLobby.toggleReady({
         setReady: (name, ready) => consensus.setReady(name, ready),
         simulateReady: (cb) => consensus.simulateReady(cb),

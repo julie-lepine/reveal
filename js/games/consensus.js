@@ -3,7 +3,9 @@ import { useConsensusGame } from "../core/useConsensusGame.js";
 import {
   __getConsensusWriteMarkerForTests as readActiveConsensusWriteMarker,
   consensusLobbyWriteBlocked,
+  consensusWriteMarkerWaitMs,
   guardConsensusServerWrite,
+  releaseStaleConsensusWriteMarker,
   hasConsensusCompleteMarker,
   releaseConsensusCompleteMarkerIfPostGame,
   releaseInheritedNextQuestionMarker,
@@ -20,6 +22,7 @@ import { formatWinnersLabel } from "../core/competitionRank.js";
 import { serializeLastGameStandings } from "../core/lastGamePodium.js";
 import { finalizeEveningScoresOnServer } from "../core/eveningFinalize.js";
 import { goToGameSelect, setLobbyPlaying, setLobbyWaiting } from "../core/lobby.js";
+import { onLobbyBundleUpdated } from "../core/supabaseLobby.js";
 import {
   getLocalDisplayName,
   recordConsensusPlayed,
@@ -28,7 +31,7 @@ import {
 } from "../core/state.js";
 import { showAppAlert, showAppConfirm } from "../core/dialog.js";
 import { navigate } from "../core/router.js";
-import { pageShell } from "../core/ui.js";
+import { escapeHtml, pageShell } from "../core/ui.js";
 import { gamePlayTitleHtml } from "../core/gameTitle.js";
 import { bindNav } from "../screens/nav.js";
 import { gameExitBarHtml, bindExitGame } from "../core/exitGame.js";
@@ -81,16 +84,42 @@ export function consensusRecoveryBannerCopy(step) {
       button: "Réessayer d'afficher les résultats",
     };
   }
-  if (step === "reveal" || step === "play") {
-    return {
-      hint: "Cette action n'est pas relancée depuis ce téléphone. L'écran peut afficher la partie.",
-      button: "Voir la partie",
-    };
-  }
+  // Révélation, lancement, fin de partie, réglages… : pas relancés depuis ce téléphone,
+  // mais le verrou se lève une minute au plus après l'envoi raté (audit Consensus n°1).
   return {
-    hint: "Ce téléphone ne peut plus modifier la partie. L'écran peut encore afficher ce que font les autres.",
-    button: "Voir la partie",
+    hint: "Le dernier envoi n'est pas confirmé. Patiente une minute au plus, puis reprends la partie.",
+    button: "Reprendre la partie",
   };
+}
+
+/**
+ * Audit Consensus n°4 : textes de « Révéler maintenant ». L'hôte qui n'a pas validé
+ * était annoncé « pas compté », puis sa valeur de curseur était envoyée comme une
+ * vraie réponse. On le dit maintenant : sa valeur actuelle est prise, il peut
+ * annuler pour la régler et la valider.
+ * @param {{ waitingNames?: string[], localName?: string, localValue?: number }} opts
+ * @returns {{ confirm: string, hint: string }}
+ */
+export function consensusForceRevealCopy({ waitingNames = [], localName = "", localValue = 50 } = {}) {
+  const localWaiting = Boolean(localName) && waitingNames.includes(localName);
+  const others = waitingNames.filter((name) => name !== localName);
+  const othersLine = others.length
+    ? `${others.length} ${others.length > 1 ? "autres joueurs" : "autre joueur"} sans réponse validée (${others.join(", ")}) ne ${others.length > 1 ? "seront pas comptés" : "sera pas compté"} dans la moyenne (0 pt cette manche).`
+    : "";
+  const localLine = localWaiting
+    ? `Tu n'as pas validé ta réponse : ta valeur actuelle (${localValue} %) sera prise. Annule pour la régler et la valider.`
+    : "";
+  const confirm = [localLine, othersLine, "Continuer la révélation ?"].filter(Boolean).join("\n\n");
+  const hintParts = [];
+  if (others.length) {
+    hintParts.push(
+      `${others.length} joueur(s) sans réponse validée ne seront pas comptés dans la moyenne (0 pt cette manche) si tu révèles maintenant.`
+    );
+  }
+  if (localWaiting) {
+    hintParts.push("Si tu révèles sans valider, ta valeur actuelle sera prise.");
+  }
+  return { confirm, hint: hintParts.join(" ") };
 }
 
 /**
@@ -259,12 +288,21 @@ export function mountConsensus(app) {
     return { qIdx, totalPlayers, answeredCount, missingCount: totalPlayers - answeredCount };
   }
 
+  /** Audit Consensus n°4 : phrase sous « Révéler maintenant ». */
+  function forceRevealHintText() {
+    return consensusForceRevealCopy({
+      waitingNames: consensus.getWaitingPlayers().map((player) => player.name),
+      localName,
+      localValue: consensus.clampValue(draftValue),
+    }).hint;
+  }
+
   function consensusForceRevealChromeHtml(session) {
-    const { totalPlayers, answeredCount, missingCount } = consensusAnswerCounts(session);
-    const forceHint =
-      missingCount > 0
-        ? `<p class="hint consensus-force-hint" id="consensus-force-hint">${missingCount} joueur(s) sans réponse validée ne seront pas comptés dans la moyenne (0 pt cette manche) si tu révèles maintenant.</p>`
-        : "";
+    const { totalPlayers, answeredCount } = consensusAnswerCounts(session);
+    const hintText = forceRevealHintText();
+    const forceHint = hintText
+      ? `<p class="hint consensus-force-hint" id="consensus-force-hint">${escapeHtml(hintText)}</p>`
+      : `<p class="hint consensus-force-hint" id="consensus-force-hint" hidden></p>`;
     return `
       <button type="button" class="btn btn-secondary btn--spaced" id="btn-consensus-force">
         Révéler maintenant (${answeredCount}/${totalPlayers})
@@ -316,6 +354,22 @@ export function mountConsensus(app) {
       return;
     }
     if (!mount.isMounted() || !mount.isCurrentMount()) return;
+    // Audit Consensus n°1 : verrou sans reprise propre (révélation, lancement…).
+    const blockedStep = readActiveConsensusWriteMarker()?.step || null;
+    const stale = releaseStaleConsensusWriteMarker({ allowLegacy: true, includeManual: true });
+    if (stale.reason === "recent") {
+      await showAppAlert(
+        `Le dernier envoi peut encore arriver. Réessaie dans ${Math.ceil(stale.waitMs / 1000)} s.`,
+        { title: "Partie", icon: "⏳" }
+      );
+      if (!mount.isMounted() || !mount.isCurrentMount()) return;
+      syncFromSession();
+      render();
+      return;
+    }
+    if (stale.released && blockedStep === "lobby-start" && returnToPrepIfLaunchMissing(row)) {
+      return;
+    }
     const released = releaseInheritedNextQuestionMarker(row);
     if (!released?.released) {
       const resumed = await resumeConsensusNextQuestion();
@@ -342,6 +396,7 @@ export function mountConsensus(app) {
     if (!mount.isMounted() || !mount.isCurrentMount()) return;
     syncFromSession();
     render();
+    continueRevealPendingAfterRecovery();
     if (
       shouldContinueConsensusRevealAfterRecovery({
         writesBlocked: writesBlocked(),
@@ -379,6 +434,80 @@ export function mountConsensus(app) {
       if (!mount.isCurrentMount()) return;
       void goToReveal();
     }, CONSENSUS_REVEAL_PENDING_MS);
+  }
+
+  /**
+   * Audit Consensus n°3 : un joueur quitte le salon alors que tous les autres ont
+   * répondu. Aucune réponse n'arrivera plus pour déclencher la révélation : l'hôte
+   * (ou le remplaçant) la lance dès que tous les joueurs encore présents ont répondu.
+   * Un joueur qui a seulement perdu le réseau reste membre, donc toujours attendu.
+   */
+  function maybeRevealWhenAllPresentAnswered() {
+    if (!mp || !canActAsHost()) return;
+    if (!mount.isMounted() || !mount.isCurrentMount()) return;
+    if (writesBlocked()) return;
+    if (revealInFlight || revealPendingInFlight || revealPendingTimeoutId) return;
+    if (consensus.getSession().phase !== "question") return;
+    if (!consensus.allAnswersIn()) return;
+    void beginReveal();
+  }
+
+  /** Révélation restée en attente quand le verrou bloquait : on la termine. */
+  function continueRevealPendingAfterRecovery() {
+    if (writesBlocked()) return;
+    if (consensus.getSession().phase !== "reveal-pending") return;
+    if (mp && !canActAsHost()) return;
+    scheduleRevealFromPending();
+  }
+
+  /**
+   * Lancement raté (le premier envoi et l'essai en arrière-plan) : le serveur est
+   * resté sur la préparation. On y revient au lieu de jouer seul une partie que
+   * personne d'autre ne voit.
+   */
+  function returnToPrepIfLaunchMissing(row) {
+    const remote = row?.state?.consensus;
+    if (!row || row.game_id !== "consensus" || !remote) return false;
+    if (remote.lobbyStarted === true) return false;
+    const prep = consensusFromRemote(remote);
+    saveStatePatch({
+      consensusGame: {
+        ...consensus.buildReplaySession(prep || consensus.getSession()),
+        ready: prep?.ready || {},
+        lobbyStarted: false,
+      },
+    });
+    navigate("consensus-prep", {
+      navStack: ["home", "lobby", "game-select", "consensus-prep"],
+    });
+    return true;
+  }
+
+  /** Verrou récent : on reprend tout seul dès qu'il est périmé (sans attendre un clic). */
+  let staleMarkerTimerId = null;
+  function scheduleStaleMarkerResume() {
+    if (staleMarkerTimerId || !mp) return;
+    const waitMs = consensusWriteMarkerWaitMs();
+    if (waitMs <= 0) return;
+    staleMarkerTimerId = setTimeout(() => {
+      staleMarkerTimerId = null;
+      if (!mount.isMounted() || !mount.isCurrentMount()) return;
+      render();
+      continueRevealPendingAfterRecovery();
+      if (
+        shouldContinueConsensusRevealAfterRecovery({
+          writesBlocked: writesBlocked(),
+          phase,
+          allAnswersIn: consensus.allAnswersIn(),
+          canLeadReveal: canActAsHost(),
+          revealInFlight,
+          revealPendingInFlight,
+          revealPendingScheduled: Boolean(revealPendingTimeoutId),
+        })
+      ) {
+        void beginReveal();
+      }
+    }, waitMs + 250);
   }
 
   function sliderMatchesCurrentRound() {
@@ -446,15 +575,16 @@ export function mountConsensus(app) {
   }
 
   function patchQuestionPhaseChrome(session) {
-    const { answeredCount, totalPlayers, missingCount } = consensusAnswerCounts(session);
+    const { answeredCount, totalPlayers } = consensusAnswerCounts(session);
     const forceBtn = app.querySelector("#btn-consensus-force");
     if (forceBtn) {
       forceBtn.textContent = `Révéler maintenant (${answeredCount}/${totalPlayers})`;
     }
     const forceHint = app.querySelector("#consensus-force-hint");
     if (forceHint) {
-      if (missingCount > 0) {
-        forceHint.textContent = `${missingCount} joueur(s) sans réponse validée ne seront pas comptés dans la moyenne (0 pt cette manche) si tu révèles maintenant.`;
+      const hintText = forceRevealHintText();
+      if (hintText) {
+        forceHint.textContent = hintText;
         forceHint.hidden = false;
       } else {
         forceHint.hidden = true;
@@ -656,9 +786,14 @@ export function mountConsensus(app) {
     }
     const waiting = consensus.getWaitingPlayers();
     if (waiting.length > 0) {
-      const names = waiting.map((player) => player.name).join(", ");
+      captureDraftFromDom();
+      const copy = consensusForceRevealCopy({
+        waitingNames: waiting.map((player) => player.name),
+        localName,
+        localValue: consensus.clampValue(draftValue),
+      });
       const confirmed = await showAppConfirm(
-        `${waiting.length} joueur(s) sans réponse validée (${names}) ne seront pas comptés dans la moyenne (0 pt cette manche). Continuer la révélation ?`,
+        copy.confirm,
         {
           title: "Révéler maintenant",
           confirmLabel: "Révéler",
@@ -849,7 +984,9 @@ export function mountConsensus(app) {
       };
       if (mp) {
         try {
-          await consensus.commitPlay(claimed);
+          // Audit Consensus n°2 : seulement ce qui change. Le serveur refuse
+          // `currentQuestion` chez l'hôte remplaçant ; le reste y est déjà.
+          await consensus.commitPlay({ phase: "final", podiumApplied: true });
         } catch (err) {
           console.warn("Consensus final:", err);
           if (!mount.isMounted() || !mount.isCurrentMount()) return;
@@ -1121,6 +1258,7 @@ export function mountConsensus(app) {
     app.querySelector("#btn-consensus-recheck")?.addEventListener("click", () => {
       void rereadSharedConsensus();
     });
+    if (writesBlocked()) scheduleStaleMarkerResume();
 
     const newScrollEl = app.querySelector(".page--scroll");
     if (newScrollEl) newScrollEl.scrollTop = scrollTop;
@@ -1306,8 +1444,18 @@ export function mountConsensus(app) {
     lastAckedActingHostToken = ahTokenNow;
   });
 
+  // Départ d'un joueur : la liste des membres change sans que la partie change.
+  const unsubLobby = mp
+    ? onLobbyBundleUpdated(() => {
+        if (!mount.isMounted() || !mount.isCurrentMount()) return;
+        maybeRevealWhenAllPresentAnswered();
+        if (phase === "question") scheduleRender();
+      })
+    : () => {};
+
   render();
   lastAckedActingHostToken = getActingHostUiRefreshToken();
+  maybeRevealWhenAllPresentAnswered();
   const unsubscribeLaunchEnded = subscribeConsensusLaunchEnded(() => {
     if (!mount.isMounted()) return;
     if (!mount.isCurrentMount()) return;
@@ -1328,7 +1476,9 @@ export function mountConsensus(app) {
     clearNpcTimers();
     clearRevealPending();
     if (renderTimer) clearTimeout(renderTimer);
+    if (staleMarkerTimerId) clearTimeout(staleMarkerTimerId);
     unsub();
+    unsubLobby();
     unsubscribeLaunchEnded();
   };
 }

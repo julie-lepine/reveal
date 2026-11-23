@@ -553,7 +553,10 @@ describe("consensus launch and reveal source contracts", () => {
   it("guards every Consensus prep launch before a local or remote write", () => {
     const body = functionBody(restartSrc, "launchConsensusPrep", "launchHotTakePrep");
     const open = body.indexOf("{");
-    assert.match(body.slice(open), /^\{\s*if \(consensusLobbyWriteBlocked\(\)\) return;/);
+    // Audit Consensus n°1 : verrou vérifié d'abord ; périmé il est levé, sinon on s'arrête.
+    assert.match(body.slice(open), /^\{\s*if \(consensusLobbyWriteBlocked\(\)\) \{/);
+    assert.match(body, /releaseStaleConsensusWriteMarker\(/);
+    assert.match(body, /if \(!stale\.released\) \{[\s\S]*?return;\s*\}/);
     assert.ok(body.indexOf("consensusLobbyWriteBlocked") < body.indexOf("saveStatePatch"));
     assert.ok(body.indexOf("consensusLobbyWriteBlocked") < body.indexOf("commitPrepSessionLaunch"));
     assert.match(selectSrc, /"consensus-prep":\s*launchConsensusPrep/);
@@ -636,6 +639,8 @@ describe("consensus launch and reveal source contracts", () => {
         questionIdx: 2,
         step: "reveal",
         attemptId: 7,
+        // Verrou récent (moins d'une minute) : rien ne doit partir.
+        createdAt: Date.now(),
       });
       const before = JSON.stringify(getState().consensusGame);
       await launchConsensusPrep();
@@ -1845,5 +1850,97 @@ describe("consensus answer recovery", () => {
     const submit = gameSrc.slice(submitAt, gameSrc.indexOf('"#btn-consensus-force"', submitAt));
     assert.match(submit, /rereadSharedConsensus/);
     assert.equal(submit.includes("Ta réponse ne partira pas"), false);
+  });
+});
+
+/**
+ * Audit Consensus n°5 : en passant en « reveal-pending », le vrai hôte réécrivait toute
+ * la partie ; une réponse d'invité arrivée entre sa lecture et son écriture était
+ * effacée. L'écriture est maintenant conditionnelle, avec de nouveaux essais.
+ */
+describe("consensus reveal-pending sans écraser une réponse", () => {
+  beforeEach(() => {
+    storage.clear();
+    session.__resetConsensusWriteGuardForTests();
+    state.consensusGame = baseSession();
+    state.lobby = { id: LOBBY_ID };
+    isGameSyncActiveMock.mock.mockImplementation(() => true);
+    canActAsHostMock.mock.mockImplementation(() => true);
+    patchMock.mock.resetCalls();
+  });
+
+  it("écrit en conditionnel sur la question en cours", async () => {
+    patchMock.mock.mockImplementation(async () => ({ applied: true, row: null }));
+    await session.commitConsensusPhase("reveal-pending");
+    assert.equal(patchMock.mock.callCount(), 1);
+    const [merge, opts] = patchMock.mock.calls[0].arguments;
+    assert.deepEqual(merge, { consensus: { phase: "reveal-pending" } });
+    assert.equal(opts.conditionalUpdatedAt, true);
+    assert.equal(opts.baselineQuestionIdx, 0);
+    assert.equal(opts.baselinePhase, "question");
+    assert.equal(session.__getConsensusWriteMarkerForTests(), null);
+  });
+
+  it("une réponse arrivée entre-temps (conflit) : relit et réessaie", async () => {
+    let calls = 0;
+    patchMock.mock.mockImplementation(async () => {
+      calls += 1;
+      return calls === 1
+        ? { applied: false, reason: "not-applied", row: null }
+        : { applied: true, row: null };
+    });
+    await session.commitConsensusPhase("reveal-pending");
+    assert.equal(patchMock.mock.callCount(), 2);
+    assert.equal(session.__getConsensusWriteMarkerForTests(), null);
+  });
+
+  it("trois conflits : erreur, rien d'écrit, le verrou est levé", async () => {
+    patchMock.mock.mockImplementation(async () => ({ applied: false, reason: "not-applied", row: null }));
+    await assert.rejects(() => session.commitConsensusPhase("reveal-pending"));
+    assert.equal(patchMock.mock.callCount(), 3);
+    assert.equal(session.__getConsensusWriteMarkerForTests(), null);
+  });
+
+  it("partie déjà en révélation sur cette question : rien à faire", async () => {
+    patchMock.mock.mockImplementation(async () => ({
+      applied: false,
+      reason: "not-baseline",
+      row: { state: { consensus: { questionIdx: 0, phase: "reveal-pending" } } },
+    }));
+    await session.commitConsensusPhase("reveal-pending");
+    assert.equal(patchMock.mock.callCount(), 1);
+    assert.equal(session.__getConsensusWriteMarkerForTests(), null);
+  });
+
+  it("partie passée ailleurs : erreur sans nouvel essai, verrou levé", async () => {
+    patchMock.mock.mockImplementation(async () => ({
+      applied: false,
+      reason: "not-baseline",
+      row: { state: { consensus: { questionIdx: 2, phase: "question" } } },
+    }));
+    await assert.rejects(() => session.commitConsensusPhase("reveal-pending"));
+    assert.equal(patchMock.mock.callCount(), 1);
+    assert.equal(session.__getConsensusWriteMarkerForTests(), null);
+  });
+
+  it("erreur réseau : le verrou reste (l'écriture a peut-être eu lieu)", async () => {
+    patchMock.mock.mockImplementation(async () => {
+      throw new Error("timeout");
+    });
+    await assert.rejects(() => session.commitConsensusPhase("reveal-pending"));
+    assert.equal(patchMock.mock.callCount(), 1);
+    assert.equal(session.__getConsensusWriteMarkerForTests().step, "reveal-pending");
+  });
+
+  it("classifyRevealPendingWrite", () => {
+    const c = session.classifyRevealPendingWrite;
+    assert.equal(c({ applied: true }, 0), "done");
+    assert.equal(c({ adopted: true, applied: false }, 0), "done");
+    assert.equal(c({ applied: false, reason: "not-applied" }, 0), "conflict");
+    assert.equal(c({ applied: false, reason: "missing-row", row: null }, 0), "refused");
+    assert.equal(c({ applied: false, reason: "missing-token", row: null }, 0), "refused");
+    assert.equal(c({ applied: false, reason: "not-baseline", row: { state: { consensus: { questionIdx: 0, phase: "reveal" } } } }, 0), "done");
+    assert.equal(c({ state: { consensus: { phase: "reveal-pending" } } }, 0), "done");
+    assert.equal(c(null, 0), "done");
   });
 });

@@ -31,7 +31,11 @@ import { defaultDrawItPrepSession, drawItToRemote } from "./drawItSession.js";
 import { defaultWrongAnswerPrepSession } from "./wrongAnswerSession.js";
 import { defaultTriviaPrepSession } from "./triviaSession.js";
 import { defaultTruthMeterPrepSession } from "./truthMeterSession.js";
-import { consensusLobbyWriteBlocked, defaultConsensusPrepSession } from "./consensusSession.js";
+import {
+  consensusLobbyWriteBlocked,
+  defaultConsensusPrepSession,
+  releaseStaleConsensusWriteMarker,
+} from "./consensusSession.js";
 import { defaultDilemmaPrepSession } from "./dilemmaSession.js";
 import { showAppAlert } from "./dialog.js";
 import { escapeHtml } from "./ui.js";
@@ -401,7 +405,27 @@ export async function launchTruthMeterPrep() {
 }
 
 export async function launchConsensusPrep() {
-  if (consensusLobbyWriteBlocked()) return;
+  if (consensusLobbyWriteBlocked()) {
+    // Audit Consensus n°1 : action volontaire hors partie, on lève un verrou périmé
+    // (même d'une ancienne version) ; sinon on le dit au lieu de ne rien faire.
+    const stale = releaseStaleConsensusWriteMarker({
+      allowLegacy: true,
+      includeSelfResuming: true,
+      includeManual: true,
+    });
+    if (!stale.released) {
+      const seconds = Math.max(1, Math.ceil(stale.waitMs / 1000));
+      try {
+        await showAppAlert(
+          `Le dernier envoi de Consensus n'est pas encore confirmé. Réessaie dans ${seconds} s.`,
+          { title: "Consensus", icon: "⏳" }
+        );
+      } catch {
+        /* pas de fenêtre disponible : on ne lance rien, c'est l'essentiel */
+      }
+      return;
+    }
+  }
   if (!(await assertNoActiveChatRoulette({ sessionGameId: "consensus" }))) return;
   const consensus = defaultConsensusPrepSession();
 

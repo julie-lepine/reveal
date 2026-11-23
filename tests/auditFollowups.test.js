@@ -7,6 +7,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
@@ -537,5 +538,319 @@ describe("Amis et invitations n°3 à 6", () => {
   it("la vérification d'avant départ suit la même règle que l'acceptation", () => {
     const check = readFileSync(join(ROOT, "supabase/fix-lobby-invite-check-before-leave.sql"), "utf8");
     assert.match(check, /and m\.user_id = i\.from_user_id/);
+  });
+});
+
+/**
+ * Audit Consensus n°1 : un envoi raté laissait un verrou qui bloquait Consensus sur
+ * ce téléphone pour tout le salon. Le verrou se lève maintenant une minute après
+ * l'envoi raté (3 × le délai d'envoi), automatiquement ou par le bandeau.
+ */
+function runConsensusMarkerScript(body) {
+  const script = `
+    const storage = new Map();
+    globalThis.localStorage = {
+      getItem: (key) => (storage.has(key) ? storage.get(key) : null),
+      setItem: (key, value) => storage.set(key, String(value)),
+      removeItem: (key) => storage.delete(key),
+    };
+    const { saveStatePatch } = await import("./js/core/state.js");
+    const { isGameSyncActive } = await import("./js/core/gameSync.js");
+    const session = await import("./js/core/consensusSession.js");
+    const lobbyId = "consensus-stale-lobby";
+    saveStatePatch({
+      lobby: { id: lobbyId, hostId: "host", participants: [] },
+      consensusGame: { phase: "reveal-pending", questionIdx: 1, lobbyStarted: true },
+    });
+    if (!isGameSyncActive()) { console.error("SYNC_INACTIVE"); process.exit(2); }
+    const out = {};
+    ${body}
+    console.log(JSON.stringify(out));
+    process.exit(0);
+  `;
+  const result = spawnSync(process.execPath, ["--input-type=module", "-e", script], {
+    cwd: ROOT,
+    encoding: "utf8",
+  });
+  assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+  return JSON.parse(result.stdout.trim().split("\n").pop());
+}
+
+describe("Consensus : verrou d'envoi qui ne se levait jamais", () => {
+  it("un verrou de révélation récent bloque, puis se lève tout seul après une minute", () => {
+    const out = runConsensusMarkerScript(`
+      let now = 1000000;
+      session.__setConsensusNowForTests(() => now);
+      session.__setConsensusWriteMarkerForTests({ lobbyId, questionIdx: 1, step: "reveal", attemptId: 3, createdAt: now });
+      out.blockedAtStart = session.consensusLobbyWriteBlocked();
+      out.waitAtStart = session.consensusWriteMarkerWaitMs();
+      now += session.CONSENSUS_STALE_MARKER_MS - 1;
+      out.blockedJustBefore = session.consensusLobbyWriteBlocked();
+      now += 1;
+      out.blockedAfter = session.consensusLobbyWriteBlocked();
+      out.markerAfter = session.__getConsensusWriteMarkerForTests();
+      out.staleMs = session.CONSENSUS_STALE_MARKER_MS;
+    `);
+    assert.equal(out.blockedAtStart, true);
+    assert.equal(out.waitAtStart, out.staleMs);
+    assert.equal(out.blockedJustBefore, true);
+    assert.equal(out.blockedAfter, false);
+    assert.equal(out.markerAfter, null);
+    assert.equal(out.staleMs, 60000);
+  });
+
+  it("les étapes qui ont leur propre reprise ne sont pas levées à l'ancienneté pendant la partie", () => {
+    const out = runConsensusMarkerScript(`
+      session.__setConsensusNowForTests(() => 10000000);
+      for (const step of ["answer", "next-question", "complete"]) {
+        session.__setConsensusWriteMarkerForTests({ lobbyId, questionIdx: 1, step, attemptId: 4, createdAt: 1 });
+        out[step] = session.consensusLobbyWriteBlocked();
+        out[step + "-outside"] = session.releaseStaleConsensusWriteMarker({ includeSelfResuming: true }).released;
+      }
+    `);
+    for (const step of ["answer", "next-question", "complete"]) {
+      assert.equal(out[step], true, step);
+      assert.equal(out[`${step}-outside`], true, `${step} hors partie`);
+    }
+  });
+
+  it("un lancement raté n'est levé que sur action (le serveur doit être relu)", () => {
+    const out = runConsensusMarkerScript(`
+      session.__setConsensusNowForTests(() => 10000000);
+      session.__setConsensusWriteMarkerForTests({ lobbyId, questionIdx: 0, step: "lobby-start", attemptId: 5, createdAt: 1 });
+      out.auto = session.consensusLobbyWriteBlocked();
+      out.wait = session.consensusWriteMarkerWaitMs();
+      out.manual = session.releaseStaleConsensusWriteMarker({ includeManual: true }).released;
+    `);
+    assert.equal(out.auto, true);
+    assert.equal(out.wait, 0);
+    assert.equal(out.manual, true);
+  });
+
+  it("un verrou d'une ancienne version (sans date) n'est levé que sur action de l'utilisateur", () => {
+    const out = runConsensusMarkerScript(`
+      session.__setConsensusWriteMarkerForTests({ lobbyId, questionIdx: 1, step: "prep-ready", attemptId: 6 });
+      out.auto = session.consensusLobbyWriteBlocked();
+      out.manual = session.releaseStaleConsensusWriteMarker({ allowLegacy: true });
+    `);
+    assert.equal(out.auto, true);
+    assert.equal(out.manual.released, true);
+  });
+
+  it("un verrou récent indique le temps restant et n'est pas levé, même sur action", () => {
+    const out = runConsensusMarkerScript(`
+      session.__setConsensusNowForTests(() => 50000);
+      session.__setConsensusWriteMarkerForTests({ lobbyId, questionIdx: 1, step: "play", attemptId: 7, createdAt: 30000 });
+      out.res = session.releaseStaleConsensusWriteMarker({ allowLegacy: true, includeSelfResuming: true, includeManual: true });
+      out.marker = session.__getConsensusWriteMarkerForTests();
+    `);
+    assert.equal(out.res.released, false);
+    assert.equal(out.res.reason, "recent");
+    assert.equal(out.res.waitMs, 40000);
+    assert.equal(out.marker.attemptId, 7);
+  });
+
+  it("chaque nouvel envoi date son verrou", () => {
+    const out = runConsensusMarkerScript(`
+      session.__setConsensusNowForTests(() => 123456);
+      void session.guardConsensusServerWrite("restart", () => new Promise(() => {}));
+      out.marker = session.__getConsensusWriteMarkerForTests();
+    `);
+    assert.equal(out.marker.step, "restart");
+    assert.equal(out.marker.createdAt, 123456);
+  });
+
+  it("le verrou d'un autre salon ne bloque pas et n'est pas touché", () => {
+    const out = runConsensusMarkerScript(`
+      session.__setConsensusWriteMarkerForTests({ lobbyId: "autre", questionIdx: 1, step: "reveal", attemptId: 8, createdAt: 1 });
+      out.blocked = session.consensusLobbyWriteBlocked();
+      out.res = session.releaseStaleConsensusWriteMarker({ allowLegacy: true, includeManual: true, includeSelfResuming: true });
+      out.marker = session.__getConsensusWriteMarkerForTests();
+    `);
+    assert.equal(out.blocked, false);
+    assert.equal(out.res.released, false);
+    assert.equal(out.marker.lobbyId, "autre");
+  });
+
+  it("écran de jeu : le bandeau lève le verrou, termine une révélation en attente, revient à la préparation si le lancement manque", () => {
+    const src = readFileSync(join(ROOT, "js/games/consensus.js"), "utf8");
+    const reread = src.slice(
+      src.indexOf("async function rereadSharedConsensus"),
+      src.indexOf("async function beginReveal")
+    );
+    assert.match(reread, /releaseStaleConsensusWriteMarker\(\{ allowLegacy: true, includeManual: true \}\)/);
+    assert.match(reread, /stale\.reason === "recent"/);
+    assert.match(reread, /blockedStep === "lobby-start" && returnToPrepIfLaunchMissing\(row\)/);
+    assert.match(reread, /continueRevealPendingAfterRecovery\(\)/);
+    assert.match(src, /if \(writesBlocked\(\)\) scheduleStaleMarkerResume\(\);/);
+    assert.match(src, /if \(staleMarkerTimerId\) clearTimeout\(staleMarkerTimerId\);/);
+  });
+
+  it("préparation : les réglages et « Prêt » ne restent plus muets", () => {
+    const src = readFileSync(join(ROOT, "js/screens/consensusSetup.js"), "utf8");
+    assert.match(src, /runPrepWrite\(\(\) => consensus\.setMode/);
+    assert.match(src, /runPrepWrite\(\(\) =>\s*consensus\.setQuestionCount/);
+    assert.match(src, /#btn-consensus-ready"\)\?\.addEventListener\("click", async \(\) => \{\s*if \(!\(await ensureConsensusWritable\(\)\)\) return;/);
+    assert.match(src, /async function onLaunch\(\{ force = false \} = \{\}\) \{\s*if \(!\(await ensureConsensusWritable\(\)\)\) return;/);
+  });
+});
+
+/**
+ * Audit Consensus n°2 : après « Question suivante » de l'hôte remplaçant, la question
+ * enregistrée reste l'ancienne (le serveur refuse `currentQuestion` chez lui).
+ * Chaque téléphone reconstruit la question à partir du paquet et du numéro.
+ */
+describe("Consensus : question reconstruite à partir du paquet (hôte remplaçant)", () => {
+  const deck = [
+    { id: 4, question: "Première" },
+    { id: 9, question: "Deuxième" },
+  ];
+
+  it("question enregistrée périmée → celle du paquet, avec le mode", async () => {
+    const { resolveConsensusCurrentQuestion } = await import("../js/core/consensusAnswerUtils.js");
+    const q = resolveConsensusCurrentQuestion({
+      currentQuestion: { id: 4, question: "Première", modeId: "standard" },
+      deck,
+      questionIdx: 1,
+      selectedModeId: "standard",
+      phase: "question",
+    });
+    assert.equal(q.id, 9);
+    assert.equal(q.question, "Deuxième");
+    // Même calcul que l'hôte (decorateConsensusQuestionForMode).
+    const { decorateConsensusQuestionForMode } = await import("../data/consensus.js");
+    assert.deepEqual(q, decorateConsensusQuestionForMode(deck[1], "standard", 1));
+    assert.equal(q.modeTarget, "mean");
+  });
+
+  it("question enregistrée à jour → gardée telle quelle", async () => {
+    const { resolveConsensusCurrentQuestion } = await import("../js/core/consensusAnswerUtils.js");
+    const stored = { id: "9", question: "Deuxième", modeTarget: "mean", extra: "gardé" };
+    const q = resolveConsensusCurrentQuestion({
+      currentQuestion: stored,
+      deck,
+      questionIdx: 1,
+      selectedModeId: "standard",
+      phase: "reveal",
+    });
+    assert.equal(q, stored);
+  });
+
+  it("préparation, paquet absent ou numéro hors paquet → rien de reconstruit", async () => {
+    const { resolveConsensusCurrentQuestion } = await import("../js/core/consensusAnswerUtils.js");
+    const stored = { id: 4 };
+    assert.equal(resolveConsensusCurrentQuestion({ currentQuestion: stored, deck, questionIdx: 1, phase: null }), stored);
+    assert.equal(resolveConsensusCurrentQuestion({ currentQuestion: stored, deck: null, questionIdx: 1, phase: "question" }), stored);
+    assert.equal(resolveConsensusCurrentQuestion({ currentQuestion: stored, deck, questionIdx: 5, phase: "question" }), stored);
+    assert.equal(resolveConsensusCurrentQuestion({ currentQuestion: null, deck: null, questionIdx: 0, phase: "question" }), null);
+  });
+
+  it("consensusFromRemote utilise la question reconstruite", () => {
+    const src = readFileSync(join(ROOT, "js/core/gameSync.js"), "utf8");
+    const fn = src.slice(
+      src.indexOf("export function consensusFromRemote"),
+      src.indexOf("export function triviaToRemote")
+    );
+    assert.match(fn, /currentQuestion: resolveConsensusCurrentQuestion\(\{/);
+  });
+
+  it("fin de partie : n'envoie que phase et podiumApplied (currentQuestion refusé chez le remplaçant)", () => {
+    const src = readFileSync(join(ROOT, "js/games/consensus.js"), "utf8");
+    const fn = src.slice(
+      src.indexOf("async function finishConsensusGame"),
+      src.indexOf("function finalConsensusSession")
+    );
+    assert.match(fn, /consensus\.commitPlay\(\{ phase: "final", podiumApplied: true \}\)/);
+    assert.equal(fn.includes("consensus.commitPlay(claimed)"), false);
+  });
+});
+
+/**
+ * Audit Consensus n°3 : un joueur qui quitte le salon en pleine question bloquait la
+ * révélation automatique (comme Trivia n°1). L'hôte écoute maintenant les départs.
+ */
+describe("Consensus : joueur parti du salon en pleine question", () => {
+  const src = readFileSync(join(ROOT, "js/games/consensus.js"), "utf8");
+  const fn = src.slice(
+    src.indexOf("function maybeRevealWhenAllPresentAnswered"),
+    src.indexOf("/** Révélation restée en attente quand le verrou bloquait")
+  );
+
+  it("révèle seulement chez l'hôte ou le remplaçant, sur une question, quand les présents ont tous répondu", () => {
+    assert.match(fn, /if \(!mp \|\| !canActAsHost\(\)\) return;/);
+    assert.match(fn, /if \(writesBlocked\(\)\) return;/);
+    assert.match(fn, /if \(revealInFlight \|\| revealPendingInFlight \|\| revealPendingTimeoutId\) return;/);
+    assert.match(fn, /phase !== "question"\) return;/);
+    assert.match(fn, /if \(!consensus\.allAnswersIn\(\)\) return;/);
+    assert.match(fn, /void beginReveal\(\);/);
+  });
+
+  it("écoute les changements du salon, au montage et se désabonne", () => {
+    assert.match(src, /import \{ onLobbyBundleUpdated \} from "\.\.\/core\/supabaseLobby\.js";/);
+    assert.match(src, /onLobbyBundleUpdated\(\(\) => \{[\s\S]*?maybeRevealWhenAllPresentAnswered\(\);/);
+    assert.match(src, /lastAckedActingHostToken = getActingHostUiRefreshToken\(\);\s*maybeRevealWhenAllPresentAnswered\(\);/);
+    const cleanup = src.slice(src.lastIndexOf("return () => {"));
+    assert.match(cleanup, /unsubLobby\(\);/);
+  });
+
+  it("« tout le monde a répondu » ne compte que les joueurs encore dans le salon", () => {
+    const sessionSrc = readFileSync(join(ROOT, "js/core/consensusSession.js"), "utf8");
+    const all = sessionSrc.slice(
+      sessionSrc.indexOf("export function allConsensusAnswersIn"),
+      sessionSrc.indexOf("function getExtremesReference")
+    );
+    assert.match(all, /getActivePlayerNames\(\)/);
+    const players = readFileSync(join(ROOT, "js/core/players.js"), "utf8");
+    assert.match(players, /export function getActivePlayers\(\) \{[\s\S]*?getLobbyParticipants\(\)/);
+  });
+});
+
+/**
+ * Audit Consensus n°4 : « Révéler maintenant » annonçait l'hôte « pas compté » alors
+ * que sa valeur de curseur était envoyée. On le dit maintenant, et il peut annuler.
+ */
+describe("Consensus : « Révéler maintenant » quand l'hôte n'a pas validé", () => {
+  it("l'hôte n'a pas validé : sa valeur actuelle est annoncée, il n'est pas dans les absents", async () => {
+    const { consensusForceRevealCopy } = await import("../js/games/consensus.js");
+    const copy = consensusForceRevealCopy({
+      waitingNames: ["Julie", "Léa", "Max"],
+      localName: "Julie",
+      localValue: 50,
+    });
+    assert.match(copy.confirm, /^Tu n'as pas validé ta réponse : ta valeur actuelle \(50 %\) sera prise\. Annule pour la régler et la valider\./);
+    assert.match(copy.confirm, /2 autres joueurs sans réponse validée \(Léa, Max\) ne seront pas comptés/);
+    assert.equal(copy.confirm.includes("Julie"), false);
+    assert.match(copy.confirm, /Continuer la révélation \?$/);
+    assert.match(copy.hint, /^2 joueur\(s\) sans réponse validée/);
+    assert.match(copy.hint, /ta valeur actuelle sera prise\.$/);
+  });
+
+  it("seul l'hôte manque : pas de ligne « autres joueurs »", async () => {
+    const { consensusForceRevealCopy } = await import("../js/games/consensus.js");
+    const copy = consensusForceRevealCopy({ waitingNames: ["Julie"], localName: "Julie", localValue: 72 });
+    assert.equal(
+      copy.confirm,
+      "Tu n'as pas validé ta réponse : ta valeur actuelle (72 %) sera prise. Annule pour la régler et la valider.\n\nContinuer la révélation ?"
+    );
+    assert.equal(copy.hint, "Si tu révèles sans valider, ta valeur actuelle sera prise.");
+  });
+
+  it("l'hôte a validé : seulement les absents, au singulier si un seul", async () => {
+    const { consensusForceRevealCopy } = await import("../js/games/consensus.js");
+    const copy = consensusForceRevealCopy({ waitingNames: ["Léa"], localName: "Julie", localValue: 50 });
+    assert.equal(
+      copy.confirm,
+      "1 autre joueur sans réponse validée (Léa) ne sera pas compté dans la moyenne (0 pt cette manche).\n\nContinuer la révélation ?"
+    );
+    assert.equal(copy.confirm.includes("Tu n'as pas validé"), false);
+  });
+
+  it("la fenêtre utilise ce texte, avec la valeur du curseur lue juste avant, et Annuler n'envoie rien", () => {
+    const src = readFileSync(join(ROOT, "js/games/consensus.js"), "utf8");
+    const fn = src.slice(src.indexOf("async function forceReveal"), src.indexOf("function scoreFlagsCoherent"));
+    assert.match(fn, /captureDraftFromDom\(\);\s*const copy = consensusForceRevealCopy\(/);
+    assert.match(fn, /showAppConfirm\(\s*copy\.confirm,/);
+    assert.match(fn, /cancelLabel: "Annuler"/);
+    assert.ok(fn.indexOf("if (!confirmed || !mount.isMounted()) return;") < fn.indexOf("commitLocalDraft"));
   });
 });

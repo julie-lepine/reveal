@@ -99,13 +99,94 @@ function currentConsensusLobbyId() {
   return getState().lobby?.id || null;
 }
 
+/**
+ * Étapes qui ont leur propre reprise dans la partie (bouton du bandeau) :
+ * leur verrou n'est pas levé à l'ancienneté pendant la partie.
+ */
+const CONSENSUS_SELF_RESUMING_STEPS = new Set(["answer", "next-question", "complete"]);
+
+/**
+ * Étapes levées seulement sur action de l'utilisateur : le lancement raté doit être
+ * relu sur le serveur (la partie a-t-elle vraiment démarré ?) avant de reprendre.
+ */
+const CONSENSUS_MANUAL_RELEASE_STEPS = new Set(["lobby-start"]);
+
+/**
+ * AUDIT Consensus n°1. Au-delà de ce délai (3 × le délai d'envoi), un envoi raté ne
+ * peut plus arriver au serveur : le verrou peut être levé sans risque d'écrasement.
+ * Avant, un seul envoi raté (révélation, lancement, réglage, « Prêt »…) bloquait
+ * Consensus sur ce téléphone pour tout le salon, sans issue.
+ */
+export const CONSENSUS_STALE_MARKER_MS = CONSENSUS_SYNC_PATCH_TIMEOUT_MS * 3;
+
+let consensusNow = () => Date.now();
+
+export function __setConsensusNowForTests(fn) {
+  consensusNow = typeof fn === "function" ? fn : () => Date.now();
+}
+
+/**
+ * Lève le verrou de ce lobby s'il est périmé.
+ * @param {{ allowLegacy?: boolean, includeSelfResuming?: boolean }} [opts]
+ *   allowLegacy : lève aussi un verrou sans date (ancienne version), sur action de l'utilisateur ;
+ *   includeSelfResuming : lève aussi réponse / question suivante / fin de partie (hors partie) ;
+ *   includeManual : lève aussi le lancement (l'appelant relit le serveur).
+ * @returns {{ released: boolean, reason: string, waitMs: number }}
+ *   reason : none | self-resuming | manual | legacy | recent | stale
+ */
+export function releaseStaleConsensusWriteMarker({
+  allowLegacy = false,
+  includeSelfResuming = false,
+  includeManual = false,
+} = {}) {
+  const marker = readConsensusWriteMarker();
+  const lobbyId = currentConsensusLobbyId();
+  if (!marker || !lobbyId || marker.lobbyId !== lobbyId) {
+    return { released: false, reason: "none", waitMs: 0 };
+  }
+  if (!includeSelfResuming && CONSENSUS_SELF_RESUMING_STEPS.has(marker.step)) {
+    return { released: false, reason: "self-resuming", waitMs: 0 };
+  }
+  if (!includeManual && CONSENSUS_MANUAL_RELEASE_STEPS.has(marker.step)) {
+    return { released: false, reason: "manual", waitMs: 0 };
+  }
+  const createdAt = Number(marker.createdAt);
+  if (!Number.isFinite(createdAt)) {
+    if (!allowLegacy) return { released: false, reason: "legacy", waitMs: 0 };
+  } else {
+    const age = consensusNow() - createdAt;
+    // Horloge reculée (age < 0) : on ne peut rien conclure de l'âge, on lève.
+    if (age >= 0 && age < CONSENSUS_STALE_MARKER_MS) {
+      return { released: false, reason: "recent", waitMs: CONSENSUS_STALE_MARKER_MS - age };
+    }
+  }
+  clearConsensusWriteMarker();
+  return { released: true, reason: "stale", waitMs: 0 };
+}
+
+/** Temps restant avant qu'un verrou récent de ce lobby (hors reprise propre) soit périmé, sinon 0. */
+export function consensusWriteMarkerWaitMs() {
+  const marker = readConsensusWriteMarker();
+  const lobbyId = currentConsensusLobbyId();
+  if (!marker || !lobbyId || marker.lobbyId !== lobbyId) return 0;
+  if (CONSENSUS_SELF_RESUMING_STEPS.has(marker.step)) return 0;
+  if (CONSENSUS_MANUAL_RELEASE_STEPS.has(marker.step)) return 0;
+  const createdAt = Number(marker.createdAt);
+  if (!Number.isFinite(createdAt)) return 0;
+  const age = consensusNow() - createdAt;
+  if (age < 0 || age >= CONSENSUS_STALE_MARKER_MS) return 0;
+  return CONSENSUS_STALE_MARKER_MS - age;
+}
+
 /** Vrai tant qu'une écriture Consensus de ce lobby n'a pas été confirmée par sa promesse. */
 export function consensusLobbyWriteBlocked() {
   if (!isGameSyncActive()) return false;
   const marker = readConsensusWriteMarker();
   const lobbyId = currentConsensusLobbyId();
   if (!marker || !lobbyId) return false;
-  return marker.lobbyId === lobbyId;
+  if (marker.lobbyId !== lobbyId) return false;
+  if (releaseStaleConsensusWriteMarker().released) return false;
+  return true;
 }
 
 function allocateConsensusAttemptId() {
@@ -129,6 +210,7 @@ function reserveConsensusServerWrite(step, extra = null) {
     questionIdx: getConsensusSession().questionIdx ?? 0,
     step,
     attemptId,
+    createdAt: consensusNow(),
     ...(extra || {}),
   });
   return { ok: true, attemptId };
@@ -193,6 +275,7 @@ export function __resetConsensusWriteGuardForTests() {
   liveNextQuestionAttempt = null;
   liveAnswerAttempt = null;
   consensusRecoveryReadTimeoutMs = CONSENSUS_SYNC_PATCH_TIMEOUT_MS;
+  consensusNow = () => Date.now();
 }
 
 export function __getConsensusWriteMarkerForTests() {
@@ -714,6 +797,9 @@ export async function startConsensusQuestion(questionIdx) {
     return next;
   }
   if (consensusNextQuestionFlightOpen()) throw new ConsensusWriteBlockedError();
+  if (!isLobbyHost() && canActAsHost()) {
+    return startConsensusQuestionAsActingHost(confirmed, questionIdx);
+  }
   const baselineIdx = confirmed.questionIdx ?? 0;
   const baselinePhase = confirmed.phase;
   const reserved = reserveConsensusServerWrite("next-question", {
@@ -777,6 +863,51 @@ export async function startConsensusQuestion(questionIdx) {
   } catch (err) {
     throw err;
   }
+}
+
+/**
+ * AUDIT Consensus n°2 : champs envoyés par l'hôte remplaçant pour passer à la
+ * question suivante. Le serveur (apply_acting_host_play) refuse `currentQuestion`,
+ * `deck`… : chaque téléphone reconstruit la question à partir du paquet
+ * (`resolveConsensusCurrentQuestion`).
+ */
+export function actingHostQuestionStartPatch(questionIdx) {
+  return {
+    questionIdx,
+    phase: "question",
+    answers: {},
+    roundScored: false,
+    lastRound: null,
+  };
+}
+
+/**
+ * « Question suivante » de l'hôte remplaçant. L'écriture conditionnelle est réservée
+ * au vrai hôte : on relit donc la partie et on n'envoie que si elle est encore sur la
+ * révélation de départ (sinon on affiche ce que le serveur montre, sans écrire).
+ */
+async function startConsensusQuestionAsActingHost(confirmed, questionIdx) {
+  const baselineIdx = confirmed.questionIdx ?? 0;
+  const baselinePhase = confirmed.phase || "reveal";
+  const row = await withPatchTimeout(
+    fetchRawGameSessionRow(currentConsensusLobbyId()),
+    CONSENSUS_SYNC_PATCH_TIMEOUT_MS
+  );
+  const remote = row?.state?.consensus;
+  if (!row || !remote || typeof remote !== "object") {
+    throw new Error("Partie introuvable.");
+  }
+  const stillOnBaseline =
+    remote.lobbyStarted === true &&
+    remote.questionIdx === baselineIdx &&
+    remote.phase === "reveal" &&
+    baselinePhase === "reveal";
+  if (!stillOnBaseline) {
+    applyReturnedConsensusRow(row);
+    return getConsensusSession();
+  }
+  await commitConsensusPlay(actingHostQuestionStartPatch(questionIdx));
+  return getConsensusSession();
 }
 
 function markerBaselineIndex(marker) {
@@ -1109,13 +1240,72 @@ export async function commitConsensusPhase(phase) {
     phase === "reveal-pending" ? "reveal-pending" : `phase:${phase}`
   );
   if (!reserved.ok) throw new ConsensusWriteBlockedError();
-  try {
+  const before = getConsensusSession();
+  const questionIdx = before.questionIdx ?? 0;
+  // Audit Consensus n°5 : le vrai hôte relit puis réécrit toute la partie. Une réponse
+  // d'invité arrivée entre les deux était effacée. Depuis la question, l'écriture est
+  // donc conditionnelle (rien n'a changé depuis la lecture), avec de nouveaux essais.
+  // Le remplaçant passe par une RPC qui ne touche que `phase` : pas concerné.
+  if (!isLobbyHost() || before.phase !== "question" || phase !== "reveal-pending") {
     await patchGameState({ consensus: { phase } }, CONSENSUS_MP_PATCH_OPTS);
     settleConsensusServerWrite(reserved.attemptId);
     return getConsensusSession();
-  } catch (err) {
-    throw err;
   }
+  for (let attempt = 0; attempt < CONSENSUS_REVEAL_PENDING_ATTEMPTS; attempt += 1) {
+    const result = await patchGameState(
+      { consensus: { phase } },
+      {
+        ...CONSENSUS_MP_PATCH_OPTS,
+        conditionalUpdatedAt: true,
+        baselineQuestionIdx: questionIdx,
+        baselinePhase: "question",
+      }
+    );
+    const outcome = classifyRevealPendingWrite(result, questionIdx);
+    if (outcome === "done") {
+      settleConsensusServerWrite(reserved.attemptId);
+      return getConsensusSession();
+    }
+    if (outcome === "refused") {
+      // Rien n'a été écrit (refus avant tout envoi) : pas de doute, on lève le verrou.
+      settleConsensusServerWrite(reserved.attemptId);
+      throw new Error("La partie a changé : révélation non lancée.");
+    }
+    // "conflict" : quelqu'un a écrit entre la lecture et l'écriture (souvent une réponse).
+    // Rien n'a été écrit ; on relit et on réessaie.
+  }
+  settleConsensusServerWrite(reserved.attemptId);
+  throw new Error("La partie change trop vite : révélation non lancée.");
+}
+
+/** Nombre d'essais de « reveal-pending » quand une réponse arrive au même moment. */
+const CONSENSUS_REVEAL_PENDING_ATTEMPTS = 3;
+
+/**
+ * Résultat d'une écriture conditionnelle de « reveal-pending » (patchGameState).
+ * @returns {"done"|"conflict"|"refused"}
+ *   done : appliquée, ou le serveur est déjà en révélation / plus loin ;
+ *   conflict : la ligne a changé entre la lecture et l'écriture (rien d'écrit) ;
+ *   refused : la partie n'est plus sur cette question (rien d'écrit).
+ */
+export function classifyRevealPendingWrite(result, questionIdx) {
+  if (!result || typeof result !== "object") return "done";
+  if (result.adopted === true) return "done";
+  if (result.applied === true) return "done";
+  const remote = result.row?.state?.consensus || result.state?.consensus || null;
+  if (result.applied === false) {
+    if (result.reason === "not-applied") return "conflict";
+    if (
+      remote &&
+      remote.questionIdx === questionIdx &&
+      (remote.phase === "reveal-pending" || remote.phase === "reveal" || remote.phase === "final")
+    ) {
+      return "done";
+    }
+    return "refused";
+  }
+  // Ligne renvoyée sans écriture (déjà identique) ou ancienne forme : comme avant.
+  return "done";
 }
 
 /** MP : patch révélation (scores + réponses imputées, sans deck ni currentQuestion). */

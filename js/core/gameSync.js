@@ -150,7 +150,10 @@ import {
   resolveCustomLiveTierListsFromRemote,
 } from "./customLiveTierListsSyncGuard.js";
 import { resolveCustomRosterTopicsFromRemote } from "./tierNightCustomRosterClear.js";
-import { pickLatestConsensusAnswer } from "./consensusAnswerUtils.js";
+import {
+  pickLatestConsensusAnswer,
+  resolveConsensusCurrentQuestion,
+} from "./consensusAnswerUtils.js";
 import {
   finishedTierNightLiveRemote,
   shouldPreferTierNightEndRoute,
@@ -2404,15 +2407,23 @@ export function consensusRevealToRemote(session) {
 
 export function consensusFromRemote(remote) {
   if (!remote) return null;
+  const deck = remote.deck ? rehydrateConsensusDeck(remote.deck) : null;
   return {
     ready: mapReadyByName(remote.ready || {}),
     lobbyStarted: Boolean(remote.lobbyStarted),
     selectedModeId: remote.selectedModeId || "standard",
     questionCount: remote.questionCount ?? 5,
-    deck: remote.deck ? rehydrateConsensusDeck(remote.deck) : null,
+    deck,
     questionIdx: remote.questionIdx ?? 0,
     phase: remote.phase || null,
-    currentQuestion: remote.currentQuestion || null,
+    // Audit Consensus n°2 : l'hôte remplaçant ne peut pas envoyer la question.
+    currentQuestion: resolveConsensusCurrentQuestion({
+      currentQuestion: remote.currentQuestion || null,
+      deck,
+      questionIdx: remote.questionIdx ?? 0,
+      selectedModeId: remote.selectedModeId || "standard",
+      phase: remote.phase || null,
+    }),
     answers: mapConsensusAnswersByName(remote.answers || {}),
     roundScored: Boolean(remote.roundScored),
     matchScores: scoresFromRemote(remote.matchScores || {}),

@@ -34,16 +34,16 @@ describe("consensus recovery banner copy", () => {
     const copy = consensusRecoveryBannerCopy("reveal");
     assert.equal(
       copy.hint,
-      "Cette action n'est pas relancée depuis ce téléphone. L'écran peut afficher la partie."
+      "Le dernier envoi n'est pas confirmé. Patiente une minute au plus, puis reprends la partie."
     );
-    assert.equal(copy.button, "Voir la partie");
+    assert.equal(copy.button, "Reprendre la partie");
     assert.equal(copy.button.includes("Réessayer"), false);
   });
 
   it("play ne promet pas de relancer l'action", () => {
     const copy = consensusRecoveryBannerCopy("play");
     assert.equal(copy.hint, consensusRecoveryBannerCopy("reveal").hint);
-    assert.equal(copy.button, "Voir la partie");
+    assert.equal(copy.button, "Reprendre la partie");
   });
 
   it("le clic reste sur rereadSharedConsensus et le poll ne gagne pas ce rattrapage", () => {
