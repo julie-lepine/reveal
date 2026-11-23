@@ -21,6 +21,7 @@ import {
 import { getIncomingLobbyInvites } from "./lobbyInvitesState.js";
 import {
   acceptLobbyInvite,
+  checkLobbyInvite,
   declineLobbyInvite,
   fetchIncomingLobbyInvites,
 } from "./supabaseLobbyInvites.js";
@@ -100,6 +101,22 @@ export async function refuseLobbyInvite(inviteId) {
 
 export async function leaveAndJoinFromLobbyInvite(inviteId) {
   if (!inviteId) return { ok: false, skipped: true };
+  // Audit amis et invitations n°2 : vérifier l'invitation AVANT de quitter son
+  // salon. Avant, on quittait d'abord : invitation périmée (plein, fermé,
+  // retirée) = plus de salon du tout, et l'hôte cédait le sien pour rien.
+  try {
+    const check = await checkLobbyInvite(inviteId);
+    if (check?.skipped) return { ok: false, skipped: true };
+  } catch (err) {
+    void fetchIncomingLobbyInvites();
+    // Réseau ou invitation plus bonne : on reste dans son salon.
+    return {
+      ok: false,
+      code: err.code || parseLobbyInviteRpcError(err),
+      error: err,
+      stayed: true,
+    };
+  }
   resetHostNoticeOnLobbySwitch();
   const left = await leaveLobby({ navigateAway: false, skipConfirm: true });
   if (left?.cancelled) return { ok: false, cancelled: true };

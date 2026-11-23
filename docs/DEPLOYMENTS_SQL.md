@@ -873,3 +873,49 @@ Le bonus vitesse (+5) se jouait sur l'heure envoyée par chaque téléphone : un
 | Prod | à appliquer (base : md5 du corps `5e074dc43cc6afd471333e8c1a015a59`, 2026-11-23) |
 
 **Statut** : SQL repo ✅ · prod ⏳.
+
+---
+
+## 46. Amis — délai qui s'allonge après chaque refus
+
+Refuser une demande d'ami ne bloquait la même personne que 60 s : elle pouvait redemander chaque minute.
+
+| Élément | Valeur |
+| ------- | ------ |
+| Migration | [`fix-friends-decline-escalation.sql`](../supabase/fix-friends-decline-escalation.sql) : colonne `friend_request_cooldowns.decline_count` ; `decline_friend_request` (1er refus 1 jour, 2e 7 jours, 3e définitif) ; `send_friend_request` ne purge plus les délais expirés |
+| Appli | rien à changer (délai déjà silencieux pour celui qui demande) |
+| Contrat | `tests/auditFollowups.test.js` (bloc « Amis n°1 ») |
+| Prod | à appliquer (base : md5 `decline_friend_request` `6ff57c3a2d9eb7d28cfde64a3477e3b6`, `send_friend_request` `1b03d1b486c1b4b0b21fdc45c3c9dc7e`, 2026-11-23) |
+
+**Statut** : SQL repo ✅ · prod ⏳.
+
+---
+
+## 47. Invitations — vérifier avant « Quitter et rejoindre »
+
+« Quitter et rejoindre » quittait le salon actuel avant d'essayer l'invitation : invitation périmée = plus de salon, et l'hôte cédait le sien pour rien.
+
+| Élément | Valeur |
+| ------- | ------ |
+| Migration | [`fix-lobby-invite-check-before-leave.sql`](../supabase/fix-lobby-invite-check-before-leave.sql) : nouvelle `check_lobby_invite(uuid)` (lecture seule ; `authenticated` seulement) |
+| Appli | `js/core/lobbyInviteJoin.js` l'appelle avant `leaveLobby` ; si elle manque en prod (avant la migration), l'appli fait comme avant |
+| Contrat | `tests/auditFollowups.test.js` (bloc « Invitations n°2 ») |
+| Prod | à appliquer |
+
+**Statut** : SQL repo ✅ · prod ⏳.
+
+---
+
+## 48. Amis et invitations — invitations périmées et droits en trop
+
+Invitations encore utilisables après la fin de l'amitié, le départ de l'invitant ou un retrait par l'hôte ; invitations vers des soirées fermées affichées ; droits d'écriture (dont `TRUNCATE`) donnés par défaut sur 3 tables.
+
+| Élément | Valeur |
+| ------- | ------ |
+| Migration | [`fix-friends-invites-cleanup.sql`](../supabase/fix-friends-invites-cleanup.sql) : `unfriend` et `kick_lobby_member` réécrites (suppriment les invitations concernées) ; `accept_lobby_invite` : un bloc ajouté en place (invitant encore membre) ; `list_incoming_lobby_invites` réécrite (soirée active + invitant présent) ; `revoke insert, update, delete, truncate, references, trigger` sur `friend_requests`, `friendships`, `lobby_invites` pour `authenticated` (lecture gardée) |
+| Ordre | **avant** ou avec la fiche 47 (`check_lobby_invite` reprend la règle « invitant encore membre ») |
+| Appli | rien à changer |
+| Contrat | `tests/auditFollowups.test.js` (bloc « Amis et invitations n°3 à 6 ») |
+| Prod | à appliquer (base : md5 accept `84c69e03dce9928362b9dd31c4b3692d`, kick `0e259dd21dfc9e605af6c385be0b4b3f`, unfriend `6da3782d3563879007ce23181ef47051`, list_incoming `da5a33ae0cac3f91f23ca63042efa7b3`, 2026-11-23) |
+
+**Statut** : SQL repo ✅ · prod ⏳.

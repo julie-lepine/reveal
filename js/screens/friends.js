@@ -46,6 +46,7 @@ import {
 import {
   lobbyInviteAcceptPlan,
   lobbyInviteFailMessage,
+  lobbyInviteFailMessageAfterCheck,
 } from "../core/lobbyInvitesLogic.js";
 import {
   joinFromLobbyInvite,
@@ -637,7 +638,7 @@ export function mountFriends(app) {
       joiningLobby = false;
       if (!mount.isMounted()) return;
       if (left?.cancelled) return;
-      await showAppAlert(lobbyInviteFailMessage(left?.code), {
+      await showAppAlert(lobbyInviteFailMessageAfterCheck(left?.code, { stayed: Boolean(left?.stayed) }), {
         title: LOBBY_INVITE_LABEL.busyTitle,
         icon: "⚠️",
       });

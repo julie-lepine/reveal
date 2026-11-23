@@ -20,6 +20,7 @@ import {
 import {
   lobbyInviteAcceptPlan,
   lobbyInviteFailMessage,
+  lobbyInviteFailMessageAfterCheck,
   nextUnseenLobbyInvite,
 } from "./lobbyInvitesLogic.js";
 import {
@@ -90,7 +91,7 @@ async function presentIncoming(row) {
     }
     if (res?.cancelled || res?.skipped) return;
     if (res && res.ok === false && !res.joinedUnhydrated) {
-      await showAppAlert(lobbyInviteFailMessage(res.code), {
+      await showAppAlert(lobbyInviteFailMessageAfterCheck(res.code, { stayed: Boolean(res.stayed) }), {
         title: copy.title,
         icon: "⚠️",
       });

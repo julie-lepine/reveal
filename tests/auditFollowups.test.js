@@ -396,3 +396,146 @@ describe("Speed Vote n°6 : joueur parti jamais gagnant", () => {
     assert.match(src, /const leaders = lastAward\?\.winners \|\| liveLeaders;/);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Audit amis et invitations n°1 (décision 2026-11-23) : délai qui s'allonge
+// après chaque refus d'une demande d'ami (1 jour, 7 jours, puis jamais).
+// ---------------------------------------------------------------------------
+describe("Amis n°1 : délai qui s'allonge après un refus", () => {
+  const sql = readFileSync(join(ROOT, "supabase/fix-friends-decline-escalation.sql"), "utf8");
+  const decline = sql.slice(sql.indexOf("create or replace function public.decline_friend_request"), sql.indexOf("create or replace function public.send_friend_request"));
+  const send = sql.slice(sql.indexOf("create or replace function public.send_friend_request"));
+
+  it("compteur de refus ajouté à la table des délais", () => {
+    assert.match(sql, /add column if not exists decline_count integer not null default 1;/);
+  });
+
+  it("1 jour, puis 7 jours, puis plus jamais", () => {
+    assert.match(decline, /when v_count <= 1 then now\(\) \+ interval '1 day'/);
+    assert.match(decline, /when v_count = 2 then now\(\) \+ interval '7 days'/);
+    assert.match(decline, /else 'infinity'::timestamptz/);
+    assert.match(decline, /decline_count = excluded\.decline_count/);
+    assert.doesNotMatch(decline, /60 seconds/);
+  });
+
+  it("une demande ne purge plus les délais expirés (le compteur reste)", () => {
+    assert.doesNotMatch(send, /delete from public\.friend_request_cooldowns where until < now\(\)/);
+    assert.match(send, /raise exception 'friends_cooldown';/);
+  });
+
+  it("devenir amis remet le compteur à zéro (lignes supprimées dans les deux sens)", () => {
+    assert.match(send, /delete from public\.friend_request_cooldowns\s+where \(from_user_id = v_from and to_user_id = p_to\)\s+or \(from_user_id = p_to and to_user_id = v_from\);/);
+  });
+
+  it("le délai reste silencieux côté appli (bouton « + Ami », pas de message de refus)", () => {
+    const logic = readFileSync(join(ROOT, "js/core/friendsLogic.js"), "utf8");
+    assert.match(logic, /return code === FRIEND_RPC_ERROR\.cooldown;/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Audit amis et invitations n°2 : « Quitter et rejoindre » vérifie l'invitation
+// AVANT de quitter son salon.
+// ---------------------------------------------------------------------------
+import { lobbyInviteFailMessageAfterCheck } from "../js/core/lobbyInvitesLogic.js";
+
+describe("Invitations n°2 : vérifier avant de quitter son salon", () => {
+  it("SQL : lecture seule, mêmes contrôles que l'acceptation, réservée aux comptes connectés", () => {
+    const sql = readFileSync(join(ROOT, "supabase/fix-lobby-invite-check-before-leave.sql"), "utf8");
+    const body = sql.slice(sql.indexOf("create or replace function public.check_lobby_invite"));
+    assert.match(body, /^create or replace function public\.check_lobby_invite\(p_id uuid\)\s+returns jsonb\s+language plpgsql\s+stable/m);
+    assert.match(body, /v_uid := public\.friends_require_caller\(\);/);
+    assert.match(body, /raise exception 'lobby_invite_gone';/);
+    assert.match(body, /raise exception 'lobby_invite_closed';/);
+    assert.match(body, /raise exception 'lobby_invite_full';/);
+    assert.match(body, /'result', 'already_in'/);
+    const fn = body.slice(0, body.indexOf("revoke all"));
+    assert.doesNotMatch(fn, /\b(insert|delete|update)\b/i, "ne modifie rien");
+    assert.match(sql, /revoke all on function public\.check_lobby_invite\(uuid\) from anon;/);
+    assert.match(sql, /grant execute on function public\.check_lobby_invite\(uuid\) to authenticated;/);
+  });
+
+  it("appli : la vérification passe avant leaveLobby, et on reste si elle échoue", () => {
+    const src = readFileSync(join(ROOT, "js/core/lobbyInviteJoin.js"), "utf8");
+    const fn = src.slice(src.indexOf("export async function leaveAndJoinFromLobbyInvite"));
+    const check = fn.indexOf("await checkLobbyInvite(inviteId)");
+    const leave = fn.indexOf("await leaveLobby(");
+    assert.ok(check > 0 && leave > check, "checkLobbyInvite avant leaveLobby");
+    assert.match(fn, /stayed: true,/);
+  });
+
+  it("fonction serveur absente (avant la migration) → comportement d'avant", () => {
+    const src = readFileSync(join(ROOT, "js/core/supabaseLobbyInvites.js"), "utf8");
+    assert.match(src, /PGRST202\|42883\|Could not find the function/);
+    assert.match(src, /if \(isMissingRpcError\(error\)\) return \{ ok: true, unchecked: true \};/);
+  });
+
+  it("message : « Tu restes dans ta soirée. » quand on n'a pas quitté", () => {
+    assert.equal(
+      lobbyInviteFailMessageAfterCheck("lobby_invite_full", { stayed: true }),
+      "Cette soirée est complète. Tu restes dans ta soirée."
+    );
+    assert.equal(lobbyInviteFailMessageAfterCheck("lobby_invite_full"), "Cette soirée est complète.");
+    for (const file of ["js/core/lobbyInviteNotice.js", "js/screens/friends.js"]) {
+      const src = readFileSync(join(ROOT, file), "utf8");
+      assert.match(src, /lobbyInviteFailMessageAfterCheck\([^)]*stayed: Boolean\(/);
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Audit amis et invitations n°3 à 6 : invitations périmées et droits en trop.
+// ---------------------------------------------------------------------------
+describe("Amis et invitations n°3 à 6", () => {
+  const sql = readFileSync(join(ROOT, "supabase/fix-friends-invites-cleanup.sql"), "utf8");
+  const section = (start, end) => sql.slice(sql.indexOf(start), end ? sql.indexOf(end) : undefined);
+
+  it("n°3a : unfriend supprime les invitations entre les deux, dans les deux sens", () => {
+    const fn = section("create or replace function public.unfriend", "-- n°3b.");
+    assert.match(fn, /delete from public\.friendships/);
+    assert.match(fn, /delete from public\.lobby_invites\s+where \(from_user_id = v_uid and to_user_id = p_other\)\s+or \(from_user_id = p_other and to_user_id = v_uid\);/);
+  });
+
+  it("n°3b : accept refuse si l'invitant n'est plus dans le salon (modif en place, rejouable)", () => {
+    const block = section("-- n°3b.", "-- n°4.");
+    assert.match(block, /accept_lobby_invite\(uuid\)'::regprocedure/);
+    assert.match(block, /if v_count <> 1 then/);
+    assert.match(block, /déjà à jour, rien à faire/);
+    assert.match(block, /and m\.user_id = i\.from_user_id/);
+    assert.match(block, /raise exception ''lobby_invite_gone'';/);
+    assert.match(block, /execute replace\(v_def, v_anchor, v_block \|\| v_anchor\);/);
+  });
+
+  it("n°4 : retirer un joueur supprime ses invitations vers ce salon", () => {
+    const fn = section("create or replace function public.kick_lobby_member", "-- n°5.");
+    const kick = fn.indexOf("delete from public.lobby_members");
+    const inv = fn.indexOf("delete from public.lobby_invites");
+    assert.ok(kick > 0 && inv > kick);
+    assert.match(fn, /where lobby_id = p_lobby_id\s+and to_user_id = p_target_user_id;/);
+    assert.match(fn, /Seul l''hôte peut retirer un joueur\./, "garde de l'hôte conservée");
+  });
+
+  it("n°5 : la liste ne montre que les invitations encore utilisables (lecture seule)", () => {
+    const fn = section("create or replace function public.list_incoming_lobby_invites", "-- n°6.");
+    assert.match(fn, /\bstable\b/);
+    assert.match(fn, /join public\.lobbies l\s+on l\.id = i\.lobby_id/);
+    assert.match(fn, /> now\(\) - interval '24 hours'/);
+    assert.match(fn, /and m\.user_id = i\.from_user_id/);
+    assert.doesNotMatch(fn, /\bdelete\b/);
+  });
+
+  it("n°6 : l'appli garde seulement la lecture sur les 3 tables", () => {
+    for (const table of ["friend_requests", "friendships", "lobby_invites"]) {
+      assert.match(
+        sql,
+        new RegExp(String.raw`revoke insert, update, delete, truncate, references, trigger\s+on table public\.${table} from authenticated;`)
+      );
+    }
+    assert.doesNotMatch(sql, /revoke[^;]*select[^;]*from authenticated/i, "la lecture reste (temps réel)");
+  });
+
+  it("la vérification d'avant départ suit la même règle que l'acceptation", () => {
+    const check = readFileSync(join(ROOT, "supabase/fix-lobby-invite-check-before-leave.sql"), "utf8");
+    assert.match(check, /and m\.user_id = i\.from_user_id/);
+  });
+});

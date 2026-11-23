@@ -30,6 +30,13 @@ export const LOBBY_INVITE_RPC = {
 };
 
 /**
+ * Audit amis et invitations n°2 : vérification en lecture seule avant « Quitter et
+ * rejoindre » (supabase/fix-lobby-invite-check-before-leave.sql). À part de
+ * LOBBY_INVITE_RPC, qui décrit les fonctions de feature-friends-02.sql.
+ */
+export const LOBBY_INVITE_CHECK_RPC = "check_lobby_invite";
+
+/**
  * `error.message` métier.
  * `friends_guest` / `friends_self` : mêmes codes que FEATURE-FRIENDS-01
  * (helpers `friends_auth_kind` / `friends_require_caller`).
