@@ -799,3 +799,47 @@ Guess the Lie n'avait pas de score de partie : la règle « hôte absent » ne l
 | Prod | appliquée le 2026-11-20 (migration `fix_guesslie_evening_scores`), après essai annulé · contrôle : +12 caractères (la seule liste visée), trigger toujours actif |
 
 **Statut** : SQL repo ✅ · prod ✅ — ordre de mise en ligne indifférent.
+
+---
+
+## 41. Webhook RevenueCat — achats de test ignorés (Edge Function, pas de SQL)
+
+Le webhook RevenueCat envoie tous les environnements ; la fonction traitait un achat de test (gratuit : TestFlight, testeurs Play, Test Store) comme un vrai achat → droits gratuits et définitifs en prod.
+
+| Élément | Valeur |
+| ------- | ------ |
+| Fonction | Edge Function `revenuecat-webhook` ([`index.ts`](../supabase/functions/revenuecat-webhook/index.ts)) : ignore `environment: SANDBOX` |
+| Secret optionnel | `REVENUECAT_SANDBOX_ALLOWED_USER_IDS` (uids séparés par des virgules) : comptes qui gardent les droits sur achat de test |
+| Contrat | `isIgnoredSandboxEvent` ([`revenuecat-entitlement-patch.js`](../supabase/revenuecat-entitlement-patch.js)) · test `tests/revenuecatSandboxIgnored.test.js` |
+| Prod | déployée le 2026-11-22 (version 21, `verify_jwt` false comme avant) · contrôle : contenu en ligne = fichier, réponse 405 sur GET |
+
+**Statut** : repo ✅ · prod ✅. Droits déjà obtenus par achat de test : non nettoyés.
+
+---
+
+## 42. Webhook RevenueCat — droits relus chez RevenueCat, et suppression de compte (Edge Functions, pas de SQL)
+
+Audit achats (tmp/audit-achats-premium.md) n°1 à n°5 : transfert d'achat entre comptes ignoré (transfert confirmé actif dans RevenueCat), événements dans le désordre, profil absent, réponses d'erreur trop bavardes, mise à niveau gardée après remboursement de sa base, client RevenueCat gardé après suppression du compte.
+
+| Élément | Valeur |
+| ------- | ------ |
+| Fonctions | `revenuecat-webhook` v22 (`index.ts` + [`premium.js`](../supabase/functions/revenuecat-webhook/premium.js), `verify_jwt` false) · `delete-account` v10 (`verify_jwt` true, inchangé) |
+| Secrets à créer | `REVENUECAT_SECRET_API_KEY` (clé API v2, lecture des achats ; + suppression de client si option) · `REVENUECAT_PROJECT_ID` = `proj5ef4ccd9` · optionnels : `REVENUECAT_SANDBOX_ALLOWED_USER_IDS`, `REVENUECAT_DELETE_ON_ACCOUNT_DELETE=true` |
+| Sans les secrets | webhook en repli : ancien calcul + achats de test ignorés + 500 si profil absent + 401 muet ; suppression de compte inchangée |
+| Contrat | `tests/revenuecatPremiumFromPurchases.test.js`, `tests/revenuecatSandboxIgnored.test.js` |
+| Prod | déployées le 2026-11-22 · contrôle : webhook 405 (GET), 401 `{"ok":false}` sans secret et avec secret dans l'adresse ; delete-account 200 (OPTIONS), 401 sans jeton |
+
+**Statut** : repo ✅ · prod ✅ · secrets RevenueCat : **à créer** (relecture inactive tant qu'ils manquent).
+
+---
+
+## 43. Droits offerts (Maître / Signature / Sans pub par e-mail)
+
+| Élément | Valeur |
+| ------- | ------ |
+| Migration | [`feature-premium-manual-grants.sql`](../supabase/feature-premium-manual-grants.sql) : table `premium_manual_grants` (RLS, aucun accès appli), `grant_premium_by_email(email, 'host'\|'profile'\|'ad_free', raison)`, `revoke_premium_by_email(email)` (éditeur SQL seulement) |
+| Webhook | `revenuecat-webhook` v25 : droits offerts ajoutés aux droits des achats, jamais retirés |
+| Contrat | `tests/premiumManualGrants.test.js` |
+| Prod | appliquée le 2026-11-22 (migration `feature_premium_manual_grants`) après essai annulé ; webhook redéployé ensuite · contrôle : table + RLS, appli sans accès, service_role en lecture ; webhook 405 (GET), 401 sans secret |
+
+**Statut** : repo ✅ · prod ✅. Aucun droit offert pour l'instant.

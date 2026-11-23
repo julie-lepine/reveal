@@ -15,6 +15,21 @@ export const GRANT = new Set([
 
 export const REVOKE = new Set(["EXPIRATION", "REFUND"]);
 
+/**
+ * Achats de test (sandbox : TestFlight, testeurs Play, Test Store RevenueCat) :
+ * gratuits → aucun droit en prod, sauf pour les comptes listés dans
+ * REVENUECAT_SANDBOX_ALLOWED_USER_IDS (uids séparés par des virgules).
+ */
+export function isIgnoredSandboxEvent(event, userId, allowedCsv = "") {
+  const env = String(event?.environment || "").trim().toUpperCase();
+  if (env !== "SANDBOX") return false;
+  const allowed = String(allowedCsv || "")
+    .split(",")
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean);
+  return !allowed.includes(String(userId || "").trim().toLowerCase());
+}
+
 function eventProductId(event) {
   return String(event?.product_id || event?.new_product_id || "");
 }

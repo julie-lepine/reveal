@@ -66,5 +66,37 @@ Deno.serve(async (req) => {
     return json(500, { ok: false, error: "delete_failed" });
   }
 
-  return json(200, { ok: true });
+  // Audit achats n°5 : le client RevenueCat restait rattaché au compte supprimé
+  // (achats bloqués sur un compte qui n'existe plus, données gardées). Suppression
+  // côté RevenueCat, en option (REVENUECAT_DELETE_ON_ACCOUNT_DELETE=true), sans
+  // bloquer la suppression du compte si RevenueCat ne répond pas.
+  const revenuecat = await deleteRevenueCatCustomer(user.id);
+
+  return json(200, { ok: true, revenuecat });
 });
+
+/**
+ * Supprime le client RevenueCat (API v2). Clé secrète avec le droit
+ * « customer_information:customers:read_write ». Renvoie un état, sans lever.
+ * Attention : RevenueCat efface alors l'historique de ce client (y compris dans
+ * ses graphiques de revenus).
+ */
+async function deleteRevenueCatCustomer(userId: string): Promise<string> {
+  if ((Deno.env.get("REVENUECAT_DELETE_ON_ACCOUNT_DELETE") || "") !== "true") return "skipped";
+  const apiKey = Deno.env.get("REVENUECAT_SECRET_API_KEY") || "";
+  const projectId = Deno.env.get("REVENUECAT_PROJECT_ID") || "";
+  if (!apiKey || !projectId) return "not_configured";
+  try {
+    const res = await fetch(
+      `https://api.revenuecat.com/v2/projects/${encodeURIComponent(projectId)}` +
+        `/customers/${encodeURIComponent(userId)}`,
+      { method: "DELETE", headers: { Authorization: `Bearer ${apiKey}` } }
+    );
+    if (res.ok || res.status === 404) return "deleted";
+    console.error("delete-account: RevenueCat", res.status);
+    return "failed";
+  } catch (e) {
+    console.error("delete-account: RevenueCat", e instanceof Error ? e.message : e);
+    return "failed";
+  }
+}

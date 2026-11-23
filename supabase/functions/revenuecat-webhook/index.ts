@@ -2,14 +2,37 @@
 // → profiles.ad_free + profiles.profile_pack + profiles.host_pack
 // Secrets (Dashboard → Edge Functions → Secrets, jamais dans le repo) :
 //   REVENUECAT_WEBHOOK_AUTH  = même chaîne que RevenueCat → Webhooks → Authorization
-//                            (mot de passe seul, sans le mot Bearer)
+//                            (mot de passe seul, sans le mot Bearer). En-tête seulement.
 //   SUPABASE_URL             = fourni par la plateforme
 //   SUPABASE_SERVICE_ROLE_KEY
+//   REVENUECAT_SECRET_API_KEY = clé secrète API v2 RevenueCat (sk_…), droit
+//                            « customer_information:purchases:read ». Avec elle, les
+//                            droits sont relus chez RevenueCat à chaque événement.
+//                            Sans elle : ancien calcul d'après l'événement (repli).
+//   REVENUECAT_PROJECT_ID    = identifiant du projet RevenueCat (proj…).
+//   REVENUECAT_SANDBOX_ALLOWED_USER_IDS (optionnel) = uids Supabase autorisés à
+//                            recevoir un droit depuis un achat de test (sandbox),
+//                            séparés par des virgules. Vide = aucun.
+//
+// Audit achats (tmp/audit-achats-premium.md) : n°1 transfert / désordre (relecture
+// RevenueCat), n°2 profil absent (500 pour que RevenueCat réessaie), n°3 réponses
+// d'erreur muettes et secret en en-tête seulement, n°3b achats de test, n°4 mise à
+// niveau sans base. Droits offerts (table premium_manual_grants, migration
+// feature-premium-manual-grants.sql) : ajoutés, jamais retirés.
 //
 // Deploy : npx supabase functions deploy revenuecat-webhook --no-verify-jwt
 // URL    : https://<project>.supabase.co/functions/v1/revenuecat-webhook
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import {
+  applyManualGrant,
+  fetchCustomerPurchases,
+  isIgnoredSandboxEvent,
+  isSupabaseUserId,
+  premiumFlagsFromPurchases,
+  protectManualGrantInPatch,
+  targetUserIdsFromEvent,
+} from "./premium.js";
 
 const GRANT = new Set([
   "INITIAL_PURCHASE",
@@ -25,9 +48,6 @@ const GRANT = new Set([
 ]);
 
 const REVOKE = new Set(["EXPIRATION", "REFUND"]);
-
-const UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function json(status, body) {
   return new Response(JSON.stringify(body), {
@@ -48,33 +68,15 @@ function stripBearer(value) {
   return s;
 }
 
-function presentedAuth(req) {
-  const header = req.headers.get("Authorization") || req.headers.get("authorization") || "";
-  const url = new URL(req.url);
-  const query = url.searchParams.get("auth") || url.searchParams.get("token") || "";
-  return { header, query };
-}
-
 function authorizationMatches(presented, secret) {
   const token = stripBearer(presented);
   const expected = stripBearer(secret);
   return Boolean(token && expected && token === expected);
 }
 
-function mismatchHint(presented, secret) {
-  const got = stripBearer(presented);
-  const want = stripBearer(secret);
-  if (!want) return { reason: "missing_secret" };
-  if (!got) return { reason: "missing_header" };
-  return {
-    reason: "mismatch",
-    got_len: got.length,
-    want_len: want.length,
-    got_jwt: got.split(".").length === 3,
-    got_sk: got.startsWith("sk_"),
-  };
-}
-
+// ---------------------------------------------------------------------------
+// Repli (sans clé secrète RevenueCat) : droits déduits de l'événement seul.
+// ---------------------------------------------------------------------------
 function eventProductId(event) {
   return String(event?.product_id || event?.new_product_id || "");
 }
@@ -153,16 +155,47 @@ function entitlementPatch(type, event) {
   return Object.keys(patch).length ? patch : null;
 }
 
+/**
+ * Droit offert du compte (table `premium_manual_grants`), ou null. Erreur de
+ * lecture : on refuse l'événement (500) plutôt que de risquer de retirer un
+ * droit offert ; RevenueCat le renverra.
+ */
+async function readManualGrant(supabase, userId) {
+  const { data, error } = await supabase
+    .from("premium_manual_grants")
+    .select("host_pack, profile_pack, ad_free")
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (error) return { ok: false };
+  return { ok: true, grant: data || null };
+}
+
+/**
+ * Écrit les droits d'un compte. Ligne `profiles` absente alors qu'il y a un droit
+ * à donner : erreur, pour que RevenueCat renvoie l'événement plus tard.
+ */
+async function writeFlags(supabase, userId, flags) {
+  const { data, error } = await supabase
+    .from("profiles")
+    .update(flags)
+    .eq("id", userId)
+    .select("id");
+  if (error) return { ok: false, reason: "db_error" };
+  const touched = Array.isArray(data) && data.length > 0;
+  const grantsSomething = Object.values(flags).some((v) => v === true);
+  if (!touched && grantsSomething) return { ok: false, reason: "profile_missing" };
+  return { ok: true, touched };
+}
+
 Deno.serve(async (req) => {
   if (req.method !== "POST") return json(405, { ok: false });
 
+  // Secret en en-tête seulement (une adresse finit dans les journaux), et aucun
+  // indice sur le secret dans la réponse.
   const expected = Deno.env.get("REVENUECAT_WEBHOOK_AUTH") || "";
-  const { header, query } = presentedAuth(req);
-  if (
-    !authorizationMatches(header, expected) &&
-    !authorizationMatches(query, expected)
-  ) {
-    return json(401, { ok: false, ...mismatchHint(header || query, expected) });
+  const header = req.headers.get("Authorization") || req.headers.get("authorization") || "";
+  if (!authorizationMatches(header, expected)) {
+    return json(401, { ok: false });
   }
 
   let payload;
@@ -174,12 +207,60 @@ Deno.serve(async (req) => {
 
   const event = payload?.event || payload;
   const type = String(event?.type || "");
-  const userId = String(event?.app_user_id || "");
+  const sandboxAllowed = Deno.env.get("REVENUECAT_SANDBOX_ALLOWED_USER_IDS") || "";
 
-  if (!UUID_RE.test(userId) || userId.startsWith("$RC")) {
-    return json(200, { ok: true, skipped: "app_user_id" });
+  const url = Deno.env.get("SUPABASE_URL") || "";
+  const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+  if (!url || !key) return json(500, { ok: false });
+  const supabase = createClient(url, key, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+
+  const rcKey = Deno.env.get("REVENUECAT_SECRET_API_KEY") || "";
+  const rcProject = Deno.env.get("REVENUECAT_PROJECT_ID") || "";
+
+  // --- Voie principale : droits relus chez RevenueCat pour chaque compte touché.
+  if (rcKey && rcProject) {
+    const userIds = targetUserIdsFromEvent(event);
+    if (!userIds.length) return json(200, { ok: true, skipped: "app_user_id" });
+    const results = {};
+    for (const userId of userIds) {
+      const fetched = await fetchCustomerPurchases({
+        projectId: rcProject,
+        apiKey: rcKey,
+        customerId: userId,
+      });
+      if (!fetched.ok) {
+        // Erreur RevenueCat (ou compte inconnu : réglage faux) : rien n'est changé,
+        // RevenueCat renverra l'événement.
+        console.error("revenuecat-webhook: lecture des achats impossible", fetched.status);
+        return json(500, { ok: false, reason: "revenuecat_read" });
+      }
+      const manual = await readManualGrant(supabase, userId);
+      if (!manual.ok) return json(500, { ok: false, reason: "manual_grant_read" });
+      // Droits des achats + droits offerts (jamais retirés).
+      const flags = applyManualGrant(
+        premiumFlagsFromPurchases(fetched.purchases, {
+          userId,
+          sandboxAllowedCsv: sandboxAllowed,
+        }),
+        manual.grant
+      );
+      const written = await writeFlags(supabase, userId, flags);
+      if (!written.ok) return json(500, { ok: false, reason: written.reason });
+      results[userId] = flags;
+    }
+    return json(200, { ok: true, mode: "revenuecat", accounts: Object.keys(results).length });
   }
 
+  // --- Repli (clé RevenueCat pas encore configurée) : ancien calcul.
+  const userId = String(event?.app_user_id || "");
+  if (!isSupabaseUserId(userId)) {
+    return json(200, { ok: true, skipped: "app_user_id" });
+  }
+  if (isIgnoredSandboxEvent(event, userId, sandboxAllowed)) {
+    return json(200, { ok: true, skipped: "sandbox" });
+  }
   if (
     !eventTouchesAdFree(event) &&
     !eventTouchesProfile(event) &&
@@ -188,23 +269,13 @@ Deno.serve(async (req) => {
   ) {
     return json(200, { ok: true, skipped: "product" });
   }
-
-  const patch = entitlementPatch(type, event);
-  if (!patch) return json(200, { ok: true, skipped: type });
-
-  const url = Deno.env.get("SUPABASE_URL") || "";
-  const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
-  if (!url || !key) return json(500, { ok: false });
-
-  const supabase = createClient(url, key, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
-
-  const { error } = await supabase
-    .from("profiles")
-    .update(patch)
-    .eq("id", userId);
-
-  if (error) return json(500, { ok: false, error: error.message });
-  return json(200, { ok: true, ...patch });
+  const rawPatch = entitlementPatch(type, event);
+  if (!rawPatch) return json(200, { ok: true, skipped: type });
+  const manual = await readManualGrant(supabase, userId);
+  if (!manual.ok) return json(500, { ok: false, reason: "manual_grant_read" });
+  // Un droit offert n'est jamais retiré par un remboursement.
+  const patch = protectManualGrantInPatch(rawPatch, manual.grant);
+  const written = await writeFlags(supabase, userId, patch);
+  if (!written.ok) return json(500, { ok: false, reason: written.reason });
+  return json(200, { ok: true, mode: "event", ...patch });
 });
