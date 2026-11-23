@@ -12,6 +12,7 @@ import {
   allWrongAnswersIn,
   allWrongAnswerVotesIn,
   sanitizeWrongAnswer,
+  wrongAnswerExpectedVoterNames,
 } from "../core/wrongAnswerSession.js";
 import { awardWrongAnswerRound } from "../core/scoring.js";
 import { applyMatchScoreDeltas, gameCumulativeScoresHtml, refreshGameScoresBox } from "../core/gameScores.js";
@@ -22,7 +23,12 @@ import {
   setLastGame,
   snapshotEveningScores,
 } from "../core/state.js";
-import { NEXT_ROUND_FAILED_LABEL, POST_GAME_FINISH_FAILED_LABEL } from "../core/postGameFinish.js";
+import {
+  NEXT_ROUND_FAILED_LABEL,
+  POST_GAME_FINISH_FAILED_LABEL,
+  REVEAL_FAILED_LABEL,
+  VOTE_START_FAILED_LABEL,
+} from "../core/postGameFinish.js";
 import { getLobbyParticipants } from "../core/lobby.js";
 import { getActivePlayerNames, getActivePlayers, getNpcPlayers } from "../core/players.js";
 import { setLobbyPlaying, setLobbyWaiting } from "../core/lobby.js";
@@ -35,6 +41,7 @@ import { gamePlayTitleHtml } from "../core/gameTitle.js";
 import { bindNav } from "../screens/nav.js";
 import { gameExitBarHtml, bindExitGame } from "../core/exitGame.js";
 import { checkHotTakeModeration, getModerationNotice } from "../core/hotTakeSession.js";
+import { watchLobbyDepartures } from "../core/lobbyDepartureWatch.js";
 import {
   isGameSyncActive,
   canActAsHost,
@@ -86,6 +93,10 @@ export function mountWrongAnswer(app) {
   let finishFailed = false;
   /** Hôte : le dernier « Manche suivante » n'est pas parti. */
   let nextRoundFailed = false;
+  /** Hôte : le passage au vote n'est pas parti (il reste sur les réponses). */
+  let voteStartFailed = false;
+  /** Hôte : le verdict n'est pas parti (il reste sur le vote). */
+  let revealFailed = false;
 
   let selectedTarget = null;
   let draftText = "";
@@ -138,8 +149,14 @@ export function mountWrongAnswer(app) {
 
   function syncFromSession() {
     const s = getWrongAnswerSession();
+    const prevRoundIdx = roundIdx;
+    const prevPhase = phase;
     if (s.roundIdx != null) roundIdx = s.roundIdx;
     if (s.phase) phase = s.phase;
+    if (roundIdx !== prevRoundIdx || phase !== prevPhase) {
+      voteStartFailed = false;
+      revealFailed = false;
+    }
     currentPrompt = s.currentPrompt || currentPrompt;
     answers = { ...(s.answers || {}) };
     votes = { ...(s.votes || {}) };
@@ -187,10 +204,19 @@ export function mountWrongAnswer(app) {
         { phase: "voting" },
         { screen: "wronganswer" }
       );
+      voteStartFailed = false;
       // commitWrongAnswerPlay a déjà sauvegardé localement la phase : render() la relit.
       if (!mount.isMounted()) return;
       if (!mount.isCurrentMount()) return;
       render();
+    } catch (err) {
+      // Passage au vote pas parti : l'hôte reste sur les réponses (comme les invités)
+      // et un message lui dit de réessayer. Avant : aucune erreur attrapée, aucun message.
+      console.warn("REVEAL wronganswer passage au vote:", err);
+      if (getWrongAnswerSession().phase === "answer") {
+        voteStartFailed = true;
+        showHostFailedHint();
+      }
     } finally {
       transitionInFlight = false;
     }
@@ -235,13 +261,20 @@ export function mountWrongAnswer(app) {
         },
         { withEveningScores: mp && isLobbyHost() }
       );
+      revealFailed = false;
       // commitWrongAnswerPlay a déjà sauvegardé localement : render() relit la session.
       if (!mount.isMounted()) return;
       if (!mount.isCurrentMount()) return;
       render();
     } catch (err) {
-      if (getWrongAnswerSession().phase !== "reveal") restoreEveningScores(eveningBefore);
-      throw err;
+      // Verdict pas parti : points remis, l'hôte reste sur le vote et un message lui
+      // dit de réessayer. Avant : erreur relancée, attrapée nulle part, aucun message.
+      console.warn("REVEAL wronganswer verdict:", err);
+      if (getWrongAnswerSession().phase !== "reveal") {
+        restoreEveningScores(eveningBefore);
+        revealFailed = true;
+        showHostFailedHint();
+      }
     } finally {
       transitionInFlight = false;
     }
@@ -305,14 +338,17 @@ export function mountWrongAnswer(app) {
           : formHtml
       }
       <p class="hint" id="wrong-answer-status" style="text-align:center">${escapeHtml(status)}</p>
-      <div id="wrong-answer-host-slot">${hostSlotInner}</div>`;
+      <div id="wrong-answer-host-slot">${hostSlotInner}</div>
+      <p class="hint" id="wrong-answer-host-failed"${voteStartFailed ? "" : " hidden"}>${escapeHtml(VOTE_START_FAILED_LABEL)}</p>`;
   }
 
   function votingHtml() {
     ensureDisplayOrder();
     const voted = myVote() != null;
-    const votedCount = getActivePlayerNames().filter((n) => votes[n] != null).length;
-    const total = getActivePlayerNames().length;
+    const expectedVoters = wrongAnswerExpectedVoterNames(getWrongAnswerSession());
+    const votedCount = expectedVoters.filter((n) => votes[n] != null).length;
+    const total = expectedVoters.length;
+    const noChoice = !expectedVoters.includes(localName);
     const displayPick = selectedTarget ?? myVote();
     const { confirmDisabled, label: confirmLabel } = wrongAnswerConfirmVoteState({
       displayPick,
@@ -345,6 +381,7 @@ export function mountWrongAnswer(app) {
       allIn: allWrongAnswerVotesIn(),
       votedCount,
       total,
+      noChoice,
     });
 
     return `
@@ -365,7 +402,20 @@ export function mountWrongAnswer(app) {
             </button>`
           : ""
       }
-      </div>`;
+      </div>
+      <p class="hint" id="wrong-vote-host-failed"${revealFailed ? "" : " hidden"}>${escapeHtml(REVEAL_FAILED_LABEL)}</p>`;
+  }
+
+  /**
+   * Affiche le message d'échec sous les boutons de l'hôte sans redessiner l'écran
+   * (BUG-WAO-02 : un redessin fermait le clavier pendant la saisie).
+   */
+  function showHostFailedHint() {
+    if (!mount.isMounted() || !mount.isCurrentMount()) return;
+    const answerHint = app.querySelector("#wrong-answer-host-failed");
+    if (answerHint) answerHint.hidden = !voteStartFailed;
+    const voteHint = app.querySelector("#wrong-vote-host-failed");
+    if (voteHint) voteHint.hidden = !revealFailed;
   }
 
   function revealHtml() {
@@ -469,8 +519,9 @@ export function mountWrongAnswer(app) {
     if (!mount.isMounted() || !mount.isCurrentMount()) return;
     if (phase !== "voting") return;
     const voted = myVote() != null;
-    const votedCount = getActivePlayerNames().filter((n) => votes[n] != null).length;
-    const total = getActivePlayerNames().length;
+    const expectedVoters = wrongAnswerExpectedVoterNames(getWrongAnswerSession());
+    const votedCount = expectedVoters.filter((n) => votes[n] != null).length;
+    const total = expectedVoters.length;
     const displayPick = selectedTarget ?? myVote();
 
     const statusEl = app.querySelector("#wrong-vote-status");
@@ -480,6 +531,7 @@ export function mountWrongAnswer(app) {
         allIn: allWrongAnswerVotesIn(),
         votedCount,
         total,
+        noChoice: !expectedVoters.includes(localName),
       });
     }
 
@@ -900,10 +952,36 @@ export function mountWrongAnswer(app) {
     lastAckedActingHostToken = ahTokenNow;
   });
 
+  // Un joueur quitte le salon : s'il était le dernier à ne pas avoir répondu (ou
+  // voté), la manche peut avancer (rien d'autre ne la relancerait).
+  const unsubDeparture = mp
+    ? watchLobbyDepartures(() => {
+        if (!mount.isMounted() || !mount.isCurrentMount()) return;
+        syncFromSession();
+        if (canActAsHost()) {
+          if (phase === "answer" && allWrongAnswersIn()) {
+            void transitionToVoting().catch((err) => {
+              console.warn("REVEAL wronganswer vote après départ :", err);
+            });
+            return;
+          }
+          if (phase === "voting" && allWrongAnswerVotesIn() && !roundScored) {
+            void transitionToReveal().catch((err) => {
+              console.warn("REVEAL wronganswer révélation après départ :", err);
+            });
+            return;
+          }
+        }
+        if (phase === "answer") refreshWrongAnswerResponseProgress();
+        if (phase === "voting") refreshWrongAnswerVoteProgress();
+      })
+    : () => {};
+
   render();
 
   return () => {
     mount.dispose();
     unsub();
+    unsubDeparture();
   };
 }

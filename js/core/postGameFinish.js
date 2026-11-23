@@ -15,3 +15,9 @@ export const NEXT_ROUND_FAILED_LABEL = "La manche suivante n’est pas partie, r
  * il reste sur le vote, comme les invités, et peut réessayer (« Révéler maintenant »).
  */
 export const REVEAL_FAILED_LABEL = "Le verdict n’est pas parti, réessaie !";
+
+/**
+ * Message de l'hôte quand le passage au vote (Wrong Answer) n'a pas pu être envoyé :
+ * il reste sur les réponses, comme les invités, et peut réessayer (« Passer au vote »).
+ */
+export const VOTE_START_FAILED_LABEL = "Le vote n’est pas parti, réessaie !";

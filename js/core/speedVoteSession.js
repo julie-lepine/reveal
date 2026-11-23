@@ -305,6 +305,17 @@ export function __resetSpeedVoteVoteAttemptIdForTests() {
   speedVoteVoteAttemptId = 0;
 }
 
+/**
+ * Nombre de joueurs présents qui ont voté (même règle que allSpeedVoteVotesIn).
+ * Audit petits jeux à votes n°5 : le compteur comptait aussi le vote d'un joueur
+ * parti (« Révéler maintenant (4/3) »).
+ */
+export function countSpeedVoteVotersIn(session = getSpeedVoteSession()) {
+  const names = getActivePlayerNames();
+  const votes = normalizePlayerVotesMap(session.votes || {}, names);
+  return names.filter((name) => votes[name] != null && votes[name] !== "").length;
+}
+
 export function allSpeedVoteVotesIn(session = getSpeedVoteSession()) {
   const names = getActivePlayerNames();
   const votes = normalizePlayerVotesMap(session.votes || {}, names);
@@ -334,17 +345,24 @@ export function simulateSpeedVoteLobbyVotes(localTarget) {
   return result;
 }
 
-export function countSpeedVoteResults(votes) {
+/**
+ * @param {Record<string, string>} votes
+ * @param {{ eligibleWinners?: string[]|null }} [opts] même règle que awardSpeedVoteRound :
+ *   un joueur parti garde ses votes reçus dans `counts` mais n'est pas en tête.
+ */
+export function countSpeedVoteResults(votes, { eligibleWinners = null } = {}) {
   const counts = {};
   Object.values(votes).forEach((target) => {
     if (!target) return;
     counts[target] = (counts[target] || 0) + 1;
   });
+  const eligible = Array.isArray(eligibleWinners) ? new Set(eligibleWinners) : null;
+  const candidates = Object.entries(counts).filter(([name]) => !eligible || eligible.has(name));
   let max = 0;
-  Object.values(counts).forEach((n) => {
+  candidates.forEach(([, n]) => {
     if (n > max) max = n;
   });
-  const leaders = Object.entries(counts)
+  const leaders = candidates
     .filter(([, n]) => n === max && max > 0)
     .map(([name]) => name);
   return { counts, leaders, maxVotes: max, totalVotes: Object.keys(votes).length };

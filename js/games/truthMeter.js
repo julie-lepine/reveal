@@ -41,7 +41,11 @@ import {
 } from "../core/gameScores.js";
 import { getActivePlayers } from "../core/players.js";
 import { getLocalDisplayName, recordTruthMeterPlayed, setLastGame } from "../core/state.js";
-import { NEXT_ROUND_FAILED_LABEL, POST_GAME_FINISH_FAILED_LABEL } from "../core/postGameFinish.js";
+import {
+  NEXT_ROUND_FAILED_LABEL,
+  POST_GAME_FINISH_FAILED_LABEL,
+  REVEAL_FAILED_LABEL,
+} from "../core/postGameFinish.js";
 import { setLobbyPlaying, setLobbyWaiting } from "../core/lobby.js";
 import { requireLobbyPlay } from "../core/gameGuard.js";
 import { createMountGuard } from "../core/mountLifecycle.js";
@@ -50,6 +54,7 @@ import { escapeHtml, pageShell } from "../core/ui.js";
 import { gameTitleHtml } from "../core/gameTitle.js";
 import { bindNav } from "../screens/nav.js";
 import { gameExitBarHtml, bindExitGame } from "../core/exitGame.js";
+import { watchLobbyDepartures } from "../core/lobbyDepartureWatch.js";
 import {
   isGameSyncActive,
   canActAsHost,
@@ -213,6 +218,13 @@ export function mountTruthMeter(app) {
   let finishFailed = false;
   /** Hôte : le dernier « Joueur suivant » n'est pas parti. */
   let nextRoundFailed = false;
+  /**
+   * Hôte : la révélation (« Calcul du TruthMeter… ») a échoué. Message + bouton
+   * « Réessayer » ; plus de nouvel essai automatique tant qu'il n'a pas appuyé
+   * (avant : une fenêtre d'alerte revenait toutes les secondes).
+   * @type {string|null}
+   */
+  let revealFailedMessage = null;
   let revealInFlight = false;
   let authorFocusRound = -1;
   let suppressAuthorAutoFocus = false;
@@ -346,6 +358,8 @@ export function mountTruthMeter(app) {
   function scheduleRevealFromPending() {
     if (revealPendingTimeoutId || revealInFlight || phase !== "reveal-pending") return;
     if (mp && !canActAsHost()) return;
+    // Échec précédent : on attend « Réessayer » (pas de boucle d'essais / d'alertes).
+    if (revealFailedMessage) return;
     revealPendingTimeoutId = setTimeout(() => {
       revealPendingTimeoutId = null;
       if (!mount.isMounted()) return;
@@ -565,14 +579,13 @@ export function mountTruthMeter(app) {
         }
         try {
           await commitTruthMeterReveal();
+          revealFailedMessage = null;
         } catch (err) {
           const mapped = mapTruthMeterRevealRpcError(err);
           console.warn("REVEAL truthMeter reveal:", mapped);
-          const { showAppAlert } = await import("../core/dialog.js");
-          await showAppAlert(
-            mapped?.message || "Impossible de révéler cette manche.",
-            { title: "TruthMeter", icon: "📏" }
-          );
+          // Message sous « Calcul du TruthMeter… » + bouton « Réessayer », au lieu
+          // d'une fenêtre d'alerte relancée en boucle toutes les 0,8 s.
+          revealFailedMessage = mapped?.message || REVEAL_FAILED_LABEL;
           if (mount.isMounted() && mount.isCurrentMount()) {
             syncFromSession();
             render();
@@ -801,11 +814,17 @@ export function mountTruthMeter(app) {
     }
 
     if (phase === "reveal-pending") {
+      const showRetry = mp && canActAsHost() && revealFailedMessage;
       phaseHtml = `
         <div class="truth-meter__suspense">
           <p class="truth-meter__suspense-title">Calcul du TruthMeter…</p>
           <div class="truth-meter__suspense-pulse" aria-hidden="true"></div>
-        </div>`;
+        </div>${
+          showRetry
+            ? `<p class="hint">${escapeHtml(revealFailedMessage)}</p>
+        <button type="button" class="btn btn-primary btn--spaced" id="truth-reveal-retry">Réessayer</button>`
+            : ""
+        }`;
     }
 
     if (phase === "reveal" && affirmation) {
@@ -1060,6 +1079,12 @@ export function mountTruthMeter(app) {
     }
 
     if (phase === "reveal-pending" && host && mp) {
+      app.querySelector("#truth-reveal-retry")?.addEventListener("click", () => {
+        if (revealInFlight) return;
+        revealFailedMessage = null;
+        render();
+        void transitionToReveal();
+      });
       scheduleRevealFromPending();
     }
   }
@@ -1296,6 +1321,8 @@ export function mountTruthMeter(app) {
       voteCommitInFlight = null;
       voteCommitPromise = null;
     }
+    // Révélation passée (ou nouvelle manche) : plus de message d'échec.
+    if (phase !== prevPhase || roundIdx !== prevRound) revealFailedMessage = null;
     // Reveal distant : nettoyer pending / spinner 01A (vote tardif rejeté ou auto-reveal).
     if (phase === "reveal" && prevPhase !== "reveal") {
       voteCommitInFlight = null;
@@ -1376,6 +1403,32 @@ export function mountTruthMeter(app) {
   };
   app.addEventListener("click", onAppClick);
 
+  // Un joueur quitte le salon : s'il était le dernier à ne pas avoir voté, la
+  // manche peut se conclure (rien d'autre ne la relancerait). Le serveur ne compte
+  // déjà que les membres actuels (truth_meter_expected_voter_uids).
+  const unsubDeparture = mp
+    ? watchLobbyDepartures(() => {
+        if (!mount.isMounted() || !mount.isCurrentMount()) return;
+        if (phase !== "voting") return;
+        if (canActAsHost() && allVotesReadyForReveal()) {
+          void (async () => {
+            await ensureLocalVoteCommitted();
+            if (!mount.isMounted() || !mount.isCurrentMount()) return;
+            if (getTruthMeterSession().phase === "reveal") {
+              syncFromSession();
+              render();
+              return;
+            }
+            await goToRevealPending();
+          })().catch((err) => {
+            console.warn("REVEAL truthmeter révélation après départ :", err);
+          });
+          return;
+        }
+        refreshForceRevealCounter();
+      })
+    : () => {};
+
   syncFromSession();
   render();
   markRenderedSessionSnapshot();
@@ -1386,6 +1439,7 @@ export function mountTruthMeter(app) {
 
   return () => {
     mount.dispose();
+    unsubDeparture();
     app.removeEventListener("click", onAppClick);
     if (displayTimeoutId) clearTimeout(displayTimeoutId);
     if (revealPendingTimeoutId) clearTimeout(revealPendingTimeoutId);

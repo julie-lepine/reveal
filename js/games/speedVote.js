@@ -8,6 +8,7 @@ import {
   commitSpeedVotePlay,
   commitSpeedVoteVote,
   allSpeedVoteVotesIn,
+  countSpeedVoteVotersIn,
   simulateSpeedVoteLobbyVotes,
   countSpeedVoteResults,
   startSpeedVoteRound,
@@ -21,7 +22,11 @@ import {
   setLastGame,
   snapshotEveningScores,
 } from "../core/state.js";
-import { NEXT_ROUND_FAILED_LABEL, POST_GAME_FINISH_FAILED_LABEL } from "../core/postGameFinish.js";
+import {
+  NEXT_ROUND_FAILED_LABEL,
+  POST_GAME_FINISH_FAILED_LABEL,
+  REVEAL_FAILED_LABEL,
+} from "../core/postGameFinish.js";
 import { getLobbyParticipants } from "../core/lobby.js";
 import { getActivePlayers } from "../core/players.js";
 import { setLobbyPlaying, setLobbyWaiting } from "../core/lobby.js";
@@ -47,6 +52,7 @@ import {
   ensurePostGameScreen,
 } from "../core/gameSync.js";
 import { arch03AhLogSkipDecision } from "../core/arch03ActingHostDebug.js";
+import { watchLobbyDepartures } from "../core/lobbyDepartureWatch.js";
 
 export function mountSpeedVote(app) {
   if (!requireLobbyPlay()) return null;
@@ -77,6 +83,8 @@ export function mountSpeedVote(app) {
   let finishFailed = false;
   /** Hôte : le dernier « Prochaine question » n'est pas parti. */
   let nextRoundFailed = false;
+  /** Hôte : le dernier envoi du verdict n'est pas parti (il reste sur le vote). */
+  let revealFailed = false;
   let currentQuestion = QUESTIONS[0];
   let modifier = "normal";
   const localName = getLocalDisplayName();
@@ -99,6 +107,7 @@ export function mountSpeedVote(app) {
     if (roundIdx !== prevRound || phase !== "reveal") {
       lastAward = null;
     }
+    if (roundIdx !== prevRound || phase !== "voting") revealFailed = false;
     takeScored = Boolean(s.roundScored);
   }
 
@@ -113,9 +122,19 @@ export function mountSpeedVote(app) {
     return `<p class="speedvote-modifier speedvote-modifier--${mod.id}">${mod.emoji} ${escapeHtml(mod.label)}</p>`;
   }
 
+  /**
+   * Joueurs qui peuvent gagner la manche : ceux encore dans le salon. Un joueur parti
+   * garde les votes qu'il a donnés (ils comptent pour les autres) et ceux qu'il a
+   * reçus restent affichés, mais il n'est pas déclaré gagnant (ses points seraient
+   * perdus) : c'est le joueur présent le plus voté qui gagne.
+   */
+  function eligibleWinnerNames() {
+    return getActivePlayers().map((p) => p.name);
+  }
+
   function previewRoundAward() {
     const mod = getSpeedVoteModifier({ modifier });
-    const { leaders } = countSpeedVoteResults(votes);
+    const { leaders } = countSpeedVoteResults(votes, { eligibleWinners: eligibleWinnerNames() });
     const pointsAwarded = SPEED_VOTE_POINTS_WINNER * mod.multiplier;
     const deltas = {};
     leaders.forEach((name) => {
@@ -146,7 +165,10 @@ export function mountSpeedVote(app) {
       let matchScores = getSpeedVoteSession().matchScores || {};
       if (!mp || canActAsHost()) {
         const mod = getSpeedVoteModifier({ modifier });
-        lastAward = awardSpeedVoteRound(votes, { multiplier: mod.multiplier });
+        lastAward = awardSpeedVoteRound(votes, {
+          multiplier: mod.multiplier,
+          eligibleWinners: eligibleWinnerNames(),
+        });
         matchScores = applyMatchScoreDeltas(matchScores, lastAward.deltas || {});
       } else {
         lastAward = previewRoundAward();
@@ -161,6 +183,7 @@ export function mountSpeedVote(app) {
         },
         { withEveningScores: mp && isLobbyHost() }
       );
+      revealFailed = false;
 
       if (!mp) {
         if (!mount.isMounted()) return;
@@ -169,11 +192,16 @@ export function mountSpeedVote(app) {
         render();
       }
     } catch (err) {
+      // Verdict pas parti : l'hôte reste sur le vote (comme les invités), les points
+      // sont remis, et un message lui dit de réessayer (« Révéler maintenant »).
+      // Avant, l'erreur n'était attrapée nulle part : aucun message.
+      console.warn("REVEAL speedvote verdict:", err);
       if (getSpeedVoteSession().phase !== "reveal") {
         restoreEveningScores(eveningBefore);
         takeScored = Boolean(getSpeedVoteSession().roundScored);
+        revealFailed = true;
       }
-      throw err;
+      if (mount.isMounted() && mount.isCurrentMount()) render();
     } finally {
       revealInFlight = false;
     }
@@ -213,7 +241,12 @@ export function mountSpeedVote(app) {
   }
 
   function revealHtml() {
-    const { counts, leaders, totalVotes } = countSpeedVoteResults(votes);
+    const { counts, leaders: liveLeaders, totalVotes } = countSpeedVoteResults(votes, {
+      eligibleWinners: eligibleWinnerNames(),
+    });
+    // Hôte : les gagnants réellement payés (un départ après le verdict ne déplace
+    // pas la couronne chez lui).
+    const leaders = lastAward?.winners || liveLeaders;
     const mod = getSpeedVoteModifier({ modifier });
     const names = Object.keys(counts).sort(
       (a, b) => (counts[b] || 0) - (counts[a] || 0)
@@ -307,7 +340,7 @@ export function mountSpeedVote(app) {
     let phaseHtml = "";
 
     if (phase === "voting") {
-      const votedCount = Object.keys(votes).length;
+      const votedCount = countSpeedVoteVotersIn();
       // Dénominateur = votants attendus (joueurs actifs), cohérent avec
       // allSpeedVoteVotesIn() et patchVotingChrome(), pas le nombre de cibles votables.
       const totalPlayers = getActivePlayers().length;
@@ -320,7 +353,9 @@ export function mountSpeedVote(app) {
           host
             ? `<button type="button" class="btn btn-secondary btn--spaced" id="speedvote-force">
                 Révéler maintenant (${votedCount}/${totalPlayers})
-              </button>`
+              </button>${
+                revealFailed ? `<p class="hint">${escapeHtml(REVEAL_FAILED_LABEL)}</p>` : ""
+              }`
             : ""
         }`;
     }
@@ -467,7 +502,7 @@ export function mountSpeedVote(app) {
   }
 
   function patchVotingChrome() {
-    const votedCount = Object.keys(votes).length;
+    const votedCount = countSpeedVoteVotersIn();
     const totalPlayers = getActivePlayers().length;
     const forceBtn = app.querySelector("#speedvote-force");
     if (forceBtn) {
@@ -523,11 +558,29 @@ export function mountSpeedVote(app) {
     lastAckedActingHostToken = ahTokenNow;
   });
 
+  // Un joueur quitte le salon : s'il était le dernier à ne pas avoir voté, la
+  // manche peut se conclure (rien d'autre ne la relancerait).
+  const unsubDeparture = mp
+    ? watchLobbyDepartures(() => {
+        if (!mount.isMounted() || !mount.isCurrentMount()) return;
+        syncFromSession();
+        if (phase !== "voting") return;
+        if (canActAsHost() && allSpeedVoteVotesIn()) {
+          void goToReveal().catch((err) => {
+            console.warn("REVEAL speedvote révélation après départ :", err);
+          });
+          return;
+        }
+        patchVotingChrome();
+      })
+    : () => {};
+
   render();
   lastAckedActingHostToken = getActingHostUiRefreshToken();
 
   return () => {
     mount.dispose();
     unsub();
+    unsubDeparture();
   };
 }

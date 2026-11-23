@@ -140,7 +140,11 @@ export function wrongAnswerVoteStatusText({
   allIn,
   votedCount,
   total,
+  noChoice = false,
 }) {
+  if (!voted && noChoice) {
+    return "Aucune autre réponse à choisir : attends le verdict.";
+  }
   if (!voted) {
     return "Vote pour la PIRE réponse (tu ne peux pas voter pour la tienne).";
   }

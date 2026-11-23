@@ -53,6 +53,7 @@ import {
 import { voteConfirmChrome, pickForVoteConfirm } from "../core/voteConfirm.js";
 import { createSyncPending } from "../core/syncPending.js";
 import { arch03AhLogSkipDecision } from "../core/arch03ActingHostDebug.js";
+import { watchLobbyDepartures } from "../core/lobbyDepartureWatch.js";
 
 const DILEMMA_VS_SRC = "js/games/dilemma-vs.svg";
 
@@ -714,6 +715,21 @@ export function mountDilemma(app) {
     lastAckedActingHostToken = ahTokenNow;
   });
 
+  // Un joueur quitte le salon : s'il était le dernier à ne pas avoir voté, la
+  // manche peut se conclure (rien d'autre ne la relancerait).
+  const unsubDeparture = mp
+    ? watchLobbyDepartures(() => {
+        if (unmounted) return;
+        syncFromSession();
+        if (phase !== "voting") return;
+        if (canActAsHost() && allDilemmaVotesIn()) {
+          void goToReveal();
+          return;
+        }
+        patchVotingChrome();
+      })
+    : () => {};
+
   render();
   lastAckedActingHostToken = getActingHostUiRefreshToken();
 
@@ -722,5 +738,6 @@ export function mountDilemma(app) {
     syncPending.dispose();
     cancelRevealAnim();
     unsub();
+    unsubDeparture();
   };
 }

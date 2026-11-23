@@ -64,6 +64,7 @@ import { getSupabaseUserId } from "../core/supabaseAuth.js";
 import { voteConfirmChrome, pickForVoteConfirm } from "../core/voteConfirm.js";
 import { arch03AhLogSkipDecision } from "../core/arch03ActingHostDebug.js";
 import { arch03RevealLog } from "../core/arch03RevealDebug.js";
+import { watchLobbyDepartures } from "../core/lobbyDepartureWatch.js";
 
 function buildHotTakeStandings(matchScores = {}) {
   const sorted = [...getActivePlayers()]
@@ -968,6 +969,21 @@ export function mountHotTake(app) {
     lastAckedActingHostToken = ahTokenNow;
   });
 
+  // Un joueur quitte le salon : s'il était le dernier à ne pas avoir voté, la
+  // manche peut se conclure (rien d'autre ne la relancerait).
+  const unsubDeparture = mp
+    ? watchLobbyDepartures(() => {
+        if (!mount.isMounted() || !mount.isCurrentMount()) return;
+        syncFromSession();
+        if (phase !== "voting") return;
+        if (canActAsHost() && allHotTakeVotesIn()) {
+          void goToReveal();
+          return;
+        }
+        patchVotingChrome();
+      })
+    : () => {};
+
   syncFromSession();
   render();
   lastAckedActingHostToken = getActingHostUiRefreshToken();
@@ -976,6 +992,7 @@ export function mountHotTake(app) {
     syncPending.dispose();
     mount.dispose();
     unsubGame();
+    unsubDeparture();
     if (!mp) setLobbyWaiting();
   };
 }
