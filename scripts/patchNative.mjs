@@ -4,6 +4,7 @@
  */
 import fs from "node:fs";
 import path from "node:path";
+import { addSkAdNetworkItems } from "./lib/skadnetworks.mjs";
 
 const root = process.cwd();
 const ANDROID_APP_ID = "ca-app-pub-6332424645114129~4800114696";
@@ -447,6 +448,12 @@ async function patchIos() {
 `;
     plist = plistInsertAfterDict(plist, photos);
     console.log("iOS: NSPhotoLibraryAddUsageDescription ajouté");
+  }
+
+  const skad = addSkAdNetworkItems(plist);
+  if (skad.added) {
+    plist = skad.plist;
+    console.log(`iOS: SKAdNetworkItems AdMob (+${skad.added})`);
   }
 
   fs.writeFileSync(plistPath, plist);

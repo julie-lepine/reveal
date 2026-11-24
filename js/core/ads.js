@@ -83,17 +83,80 @@ async function loadAdMobModule() {
   return admobModule;
 }
 
+/** Délai minimum entre deux essais de consentement ratés (hors ligne au lancement…). */
+const CONSENT_RETRY_MS = 30_000;
+
+/** Dernier état connu du consentement Google (UMP), pour ce lancement. */
+let consentState = { known: false, canRequestAds: false, privacyOptionsRequired: false };
+let lastConsentFailureAt = 0;
+const consentListeners = new Set();
+
+function applyConsentInfo(info) {
+  if (!info || typeof info !== "object") return;
+  const next = {
+    known: true,
+    canRequestAds:
+      typeof info.canRequestAds === "boolean" ? info.canRequestAds : consentState.canRequestAds,
+    privacyOptionsRequired:
+      typeof info.privacyOptionsRequirementStatus === "string"
+        ? info.privacyOptionsRequirementStatus === "REQUIRED"
+        : consentState.privacyOptionsRequired,
+  };
+  const changed =
+    next.known !== consentState.known ||
+    next.canRequestAds !== consentState.canRequestAds ||
+    next.privacyOptionsRequired !== consentState.privacyOptionsRequired;
+  consentState = next;
+  if (!changed) return;
+  for (const cb of consentListeners) {
+    try {
+      cb({ ...consentState });
+    } catch (err) {
+      console.warn("AdMob consent listener:", err);
+    }
+  }
+}
+
+/**
+ * Google a donné son feu vert pour demander des pubs (après la demande de ce lancement).
+ * Ce n'est PAS « le joueur accepte les pubs » : `canRequestAds` est vrai dès que le
+ * formulaire a reçu une réponse (OBTAINED), même un refus de personnalisation, ou hors
+ * Europe (NOT_REQUIRED). Faux seulement si le formulaire n'a jamais été rempli.
+ */
+export function adConsentAllowsAds() {
+  return consentState.known && consentState.canRequestAds;
+}
+
+/** Le bouton « Choix publicitaires » doit être visible (Europe, appli native). */
+export function adPrivacyOptionsRequired() {
+  return isNativeApp() && consentState.privacyOptionsRequired;
+}
+
+/** Abonnement aux changements de consentement. Retourne la fonction de désabonnement. */
+export function onAdConsentChange(cb) {
+  consentListeners.add(cb);
+  return () => consentListeners.delete(cb);
+}
+
+/**
+ * Demande le consentement Google (formulaire si requis).
+ * true = on peut demander des pubs ; false = pas de pub pour l'instant (réessai plus tard).
+ */
 async function ensureConsent(AdMob, AdmobConsentStatus) {
   try {
     const info = await AdMob.requestConsentInfo();
+    applyConsentInfo(info);
     if (
       info?.isConsentFormAvailable &&
       info?.status === AdmobConsentStatus.REQUIRED
     ) {
-      await AdMob.showConsentForm();
+      const after = await AdMob.showConsentForm();
+      applyConsentInfo(after);
     }
+    return adConsentAllowsAds();
   } catch (err) {
     console.warn("AdMob consent:", err);
+    return false;
   }
 }
 
@@ -112,10 +175,22 @@ async function ensureTrackingAuthorization(AdMob) {
   }
 }
 
+let sdkStarted = false;
+let trackingAsked = false;
+
+/**
+ * Démarre le plugin (une fois), puis consentement Google, puis demande Apple.
+ * Sur iOS le plugin exige `initialize` avant le formulaire (il y relie la vue).
+ * Aucune pub n'est demandée tant que Google n'a pas dit oui (`canRequestAds`).
+ * true = pubs autorisées. false = pas maintenant ; réessai au prochain écran (30 s mini).
+ */
 async function ensureAdMobReady() {
   if (!isNativeApp()) return false;
   if (initialized) return true;
   if (initPromise) return initPromise;
+  if (lastConsentFailureAt && Date.now() - lastConsentFailureAt < CONSENT_RETRY_MS) {
+    return false;
+  }
 
   initPromise = (async () => {
     try {
@@ -124,34 +199,81 @@ async function ensureAdMobReady() {
 
       const { AdMob, BannerAdPluginEvents, AdmobConsentStatus } = mod;
 
-      await AdMob.initialize({
-        initializeForTesting: ADMOB_USE_TEST_ADS,
-      });
+      if (!sdkStarted) {
+        await AdMob.initialize({
+          initializeForTesting: ADMOB_USE_TEST_ADS,
+        });
 
-      await ensureConsent(AdMob, AdmobConsentStatus);
-      await ensureTrackingAuthorization(AdMob);
+        AdMob.addListener(BannerAdPluginEvents.SizeChanged, (size) => {
+          if (bannerVisible && size?.height && shouldShowAdForScreen(getCurrentScreen())) {
+            setTopAdLayout(true, size.height);
+          }
+        });
 
-      AdMob.addListener(BannerAdPluginEvents.SizeChanged, (size) => {
-        if (bannerVisible && size?.height && shouldShowAdForScreen(getCurrentScreen())) {
-          setTopAdLayout(true, size.height);
-        }
-      });
+        AdMob.addListener(BannerAdPluginEvents.FailedToLoad, (err) => {
+          console.warn("AdMob bannière:", err);
+          bannerVisible = false;
+          setTopAdLayout(false);
+        });
+        sdkStarted = true;
+      }
 
-      AdMob.addListener(BannerAdPluginEvents.FailedToLoad, (err) => {
-        console.warn("AdMob bannière:", err);
-        bannerVisible = false;
-        setTopAdLayout(false);
-      });
+      const allowed = await ensureConsent(AdMob, AdmobConsentStatus);
 
+      if (!trackingAsked && consentState.known) {
+        trackingAsked = true;
+        await ensureTrackingAuthorization(AdMob);
+      }
+
+      if (!allowed) {
+        lastConsentFailureAt = Date.now();
+        return false;
+      }
+
+      lastConsentFailureAt = 0;
       initialized = true;
       return true;
     } catch (err) {
       console.warn("AdMob init:", err);
+      lastConsentFailureAt = Date.now();
       return false;
+    } finally {
+      initPromise = null;
     }
   })();
 
   return initPromise;
+}
+
+/**
+ * Rouvre le formulaire Google « Choix publicitaires » (bouton Aide & légal).
+ * Relit ensuite l'état et resynchronise la bannière.
+ */
+export async function openAdPrivacyOptions() {
+  if (!isNativeApp()) return { ok: false };
+  try {
+    const mod = await loadAdMobModule();
+    if (!mod) return { ok: false };
+    const { AdMob } = mod;
+    if (!sdkStarted) {
+      await ensureAdMobReady();
+    }
+    if (!sdkStarted) return { ok: false };
+    await AdMob.showPrivacyOptionsForm();
+    try {
+      applyConsentInfo(await AdMob.requestConsentInfo());
+    } catch (err) {
+      console.warn("AdMob consent refresh:", err);
+    }
+    if (!adConsentAllowsAds()) {
+      initialized = false;
+    }
+    enqueueAdSync(getCurrentScreen());
+    return { ok: true };
+  } catch (err) {
+    console.warn("AdMob privacy options:", err);
+    return { ok: false };
+  }
 }
 
 async function removeBannerIfPresent(AdMob) {
@@ -176,12 +298,17 @@ async function showTopBanner() {
   if (!adId) return;
 
   const ready = await ensureAdMobReady();
-  if (!ready) return;
-  if (!shouldShowAdForScreen(getCurrentScreen())) return;
-
   const mod = await loadAdMobModule();
   if (!mod) return;
   const { AdMob, BannerAdSize, BannerAdPosition } = mod;
+
+  if (!ready) {
+    // Pas de feu vert Google : aucune bannière (et retirer celle d'avant s'il y en a une).
+    setTopAdLayout(false);
+    if (bannerVisible) await removeBannerIfPresent(AdMob);
+    return;
+  }
+  if (!shouldShowAdForScreen(getCurrentScreen())) return;
 
   const cameFromNoAd =
     lastSyncedAdScreen != null && !shouldShowAdForScreen(lastSyncedAdScreen);
@@ -234,11 +361,18 @@ async function hideTopBanner() {
     return;
   }
 
+  // Cacher ne démarre jamais le système pub : formulaire Google et demande Apple
+  // n'arrivent qu'au premier écran qui affiche vraiment une bannière (jamais pour
+  // un compte Sans pub, ni sur l'accueil / la connexion).
+  if (!sdkStarted) {
+    bannerVisible = false;
+    return;
+  }
+
   try {
     const mod = await loadAdMobModule();
     if (mod) {
       const { AdMob } = mod;
-      await ensureAdMobReady();
       await removeBannerIfPresent(AdMob);
     }
   } catch (err) {
