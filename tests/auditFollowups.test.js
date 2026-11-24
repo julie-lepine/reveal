@@ -960,3 +960,20 @@ describe("Compte n°8 — comptes invités supprimés après 30 jours sans activ
     assert.match(help, /supprimée toute seule après 30 jours sans utilisation/);
   });
 });
+
+/** Audit compte et profil n°9 et 10 : textes de la page Aide & légal. */
+describe("Compte n°9 et 10 — fenêtre de suppression et contact RGPD", () => {
+  const help = readFileSync(join(ROOT, "js/screens/helpLegal.js"), "utf8");
+
+  it("la suppression cite la photo, le carnet et les 3 achats restaurables", () => {
+    assert.match(help, /\(profil, photo, carnet, amis, invitations\)/);
+    assert.match(help, /Tes achats \(Sans pub, Signature, Maître de soirée\) restent liés à ton compte Apple ou Google/);
+    assert.equal(help.includes("L'achat Sans pub reste lié"), false);
+  });
+
+  it("le contact RGPD donne l'e-mail (et toujours Instagram)", () => {
+    assert.match(help, /import \{ CONTACT_EMAIL, INSTAGRAM_HANDLE, INSTAGRAM_PROFILE_URL \} from "..\/..\/data\/appConfig.js";/);
+    assert.match(help, /href="mailto:\$\{escapeHtml\(CONTACT_EMAIL\)\}"/);
+    assert.match(help, /data-open-instagram/);
+  });
+});
