@@ -1,4 +1,5 @@
 import { changeEmailPassword } from "../core/auth.js";
+import { PASSWORD_MIN_LENGTH, PASSWORD_MIN_PLACEHOLDER, PASSWORD_TOO_SHORT_MESSAGE } from "../config/password.js";
 import { isSupabaseConfigured } from "../core/supabaseClient.js";
 import { supabase } from "../core/supabaseClient.js";
 import {
@@ -55,7 +56,7 @@ export function mountResetPassword(app) {
           <p class="hint auth-form__guest-intro">Choisis un nouveau mot de passe pour ton compte REVEAL.</p>
           <label class="field-label" for="reset-pwd-new">Nouveau mot de passe</label>
           <div class="password-field">
-            <input type="password" class="field-input password-field__input" id="reset-pwd-new" autocomplete="new-password" placeholder="4 caractères min." />
+            <input type="password" class="field-input password-field__input" id="reset-pwd-new" autocomplete="new-password" placeholder="${PASSWORD_MIN_PLACEHOLDER}" />
             <button type="button" class="password-field__toggle" data-toggle-password="reset-pwd-new" aria-label="Afficher le mot de passe" aria-pressed="false">👁️</button>
           </div>
           <label class="field-label" for="reset-pwd-confirm">Confirmer</label>
@@ -92,8 +93,8 @@ export function mountResetPassword(app) {
 
       err?.classList.add("hidden");
 
-      if (next.length < 4) {
-        err.textContent = "Le mot de passe doit faire au moins 4 caractères.";
+      if (next.length < PASSWORD_MIN_LENGTH) {
+        err.textContent = PASSWORD_TOO_SHORT_MESSAGE;
         err.classList.remove("hidden");
         return;
       }

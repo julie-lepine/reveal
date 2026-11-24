@@ -874,6 +874,7 @@ export async function verifyCurrentPassword(email, password) {
 
 export async function updatePassword(newPassword) {
   const { error } = await supabase.auth.updateUser({ password: newPassword });
-  if (error) return { ok: false, error: error.message };
+  // En français (mot de passe trop court ou trop connu), comme à l'inscription.
+  if (error) return { ok: false, error: formatAuthErrorMessage(error.message) };
   return { ok: true };
 }

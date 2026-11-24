@@ -17,6 +17,7 @@ import {
 } from "./supabaseAuth.js";
 import { upsertProfile } from "./supabaseProfile.js";
 import { AVATAR_BUCKET, AVATAR_LABEL } from "../config/signatureAvatar.js";
+import { PASSWORD_MIN_LENGTH, PASSWORD_TOO_SHORT_MESSAGE } from "../config/password.js";
 import { avatarPathForUser } from "./signatureAvatar.js";
 import { isPlaceholderDisplayName } from "./profileIdentity.js";
 import {
@@ -96,6 +97,9 @@ export async function loginWithEmail(email, password, captchaToken = null) {
 export async function signupWithEmail(email, password, name, captchaToken = null) {
   if (!isSupabaseConfigured()) {
     return { ok: false, error: BACKEND_REQUIRED };
+  }
+  if (!password || password.length < PASSWORD_MIN_LENGTH) {
+    return { ok: false, error: PASSWORD_TOO_SHORT_MESSAGE };
   }
 
   if (!captchaToken) {
@@ -314,8 +318,8 @@ export async function changeEmailPassword(currentPassword, newPassword) {
     return { ok: false, error: BACKEND_REQUIRED };
   }
 
-  if (!newPassword || newPassword.length < 4) {
-    return { ok: false, error: "Le nouveau mot de passe doit faire au moins 4 caractères." };
+  if (!newPassword || newPassword.length < PASSWORD_MIN_LENGTH) {
+    return { ok: false, error: PASSWORD_TOO_SHORT_MESSAGE };
   }
 
   // Lien « mot de passe oublié » : l'e-mail tient lieu de preuve. Sinon, l'ancien

@@ -1,3 +1,5 @@
+import { PASSWORD_MIN_LENGTH } from "../config/password.js";
+
 /** Messages auth Supabase en français pour l’UI. */
 export function formatAuthErrorMessage(message) {
   const raw = String(message || "").trim();
@@ -17,8 +19,15 @@ export function formatAuthErrorMessage(message) {
   if (/email not confirmed/i.test(m)) {
     return "Confirme ton email avant de te connecter (vérifie ta boîte mail).";
   }
-  if (/password.*at least|weak password/i.test(m)) {
-    return "Le mot de passe est trop faible (4 caractères minimum).";
+  // Mot de passe connu des fuites (« known to be weak and easy to guess », pwned).
+  if (/pwned|easy to guess|known to be weak|leaked/i.test(m)) {
+    return "Ce mot de passe est trop connu (il apparaît dans des fuites de données). Choisis-en un autre.";
+  }
+  if (/different from the old password/i.test(m)) {
+    return "Choisis un mot de passe différent de l'ancien.";
+  }
+  if (/password.*at least|weak password|password.*should contain/i.test(m)) {
+    return `Le mot de passe est trop faible (${PASSWORD_MIN_LENGTH} caractères minimum).`;
   }
   if (/missing email or phone/i.test(m)) {
     return "Indique ton email pour te connecter.";
