@@ -935,6 +935,6 @@ Audit compte et profil (tmp/audit-compte-profil.md) n°1 et 2 : la photo restait
 | Contrat | `tests/featureAvReplace.test.js`, `tests/auditFollowups.test.js` (bloc « Compte n°1 et 2 ») |
 | Changement voulu | après un remboursement puis un nouvel achat, la photo ne revient plus : il faut la remettre (couleur et cadre reviennent toujours, ID-OLD) |
 | Prod | migration appliquée le 2026-11-24 (`fix_avatar_delete_without_pack`), après essai annulé · contrôle : runbook `AVSTORAGE_POLICIES_OK` · fonctions déployées le 2026-11-24 : `delete-account` v14 (`verify_jwt` true), `revenuecat-webhook` v27 (`verify_jwt` false) · contrôle : webhook 405 (GET), 401 `{"ok":false}` sans secret ; delete-account 200 (OPTIONS), 401 sans jeton |
-| Reste | 1 fichier sans photo au profil (compte qui a encore Signature et Maître, id des tests du dépôt : sans doute un compte de test) : effacement en attente d'accord |
+| Nettoyage | 1 fichier sans photo au profil (compte qui a encore Signature et Maître, id des tests du dépôt) effacé le 2026-11-24 avec accord (`supabase storage rm`) · contrôle : son adresse publique ne répond plus (400), il reste 1 fichier dans `avatars`, affiché au profil de son compte |
 
-**Statut** : repo ✅ · prod ✅ (fichier en trop : en attente).
+**Statut** : repo ✅ · prod ✅.
