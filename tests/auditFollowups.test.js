@@ -977,3 +977,23 @@ describe("Compte n°9 et 10 — fenêtre de suppression et contact RGPD", () => 
     assert.match(help, /data-open-instagram/);
   });
 });
+
+/**
+ * Audit compte et profil n°11 : l'id d'un compte supprimé restait dans
+ * `signature_evenings.peer_user_ids` des autres (tableau, pas de clé étrangère).
+ */
+describe("Compte n°11 — id d'un compte supprimé retiré des carnets", () => {
+  const sql = readFileSync(join(ROOT, "supabase/fix-carnet-peer-ids-on-account-delete.sql"), "utf8");
+  const body = sql.replace(/--.*$/gm, "");
+
+  it("déclencheur après suppression d'un compte, quelle que soit la voie", () => {
+    assert.match(body, /after delete on auth\.users\s+for each row execute function public\.signature_evenings_forget_deleted_user\(\)/);
+    assert.match(body, /set peer_user_ids = array_remove\(peer_user_ids, old\.id\)\s+where old\.id = any \(peer_user_ids\)/);
+    assert.match(body, /security definer/);
+    assert.match(body, /revoke all on function public\.signature_evenings_forget_deleted_user\(\) from public, anon, authenticated;/);
+  });
+
+  it("rattrapage des ids de comptes déjà supprimés", () => {
+    assert.match(body, /where not exists \(select 1 from auth\.users u where u\.id = p\)/);
+  });
+});

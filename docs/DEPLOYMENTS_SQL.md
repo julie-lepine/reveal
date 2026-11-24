@@ -975,3 +975,20 @@ Audit compte et profil (tmp/audit-compte-profil.md) n°8 : la politique disait q
 | Prod | appliquée le 2026-11-24 (migration `purge_stale_anonymous_users`), après essai annulé · contrôle : 1 tâche `reveal-purge-stale-anonymous-users` active (`45 4 * * *`), fonction exécutable par `postgres` et `service_role` seulement · 1er passage : nuit du 2026-11-25, environ 427 comptes invités (472 avant) · à vérifier : `select * from cron.job_run_details where jobid = (select jobid from cron.job where jobname = 'reveal-purge-stale-anonymous-users') order by start_time desc limit 3;` |
 
 **Statut** : repo ✅ · prod ✅ (1er passage à vérifier le 2026-11-25).
+
+---
+
+## 52. Carnet — id d'un compte supprimé retiré du carnet des autres
+
+Audit compte et profil (tmp/audit-compte-profil.md) n°11 : `signature_evenings.peer_user_ids` (tableau, sans clé étrangère) gardait l'id d'un compte supprimé dans le carnet des autres joueurs. Il n'était jamais affiché, mais il était conservé.
+
+| Élément | Valeur |
+| ------- | ------ |
+| Migration | [`fix-carnet-peer-ids-on-account-delete.sql`](../supabase/fix-carnet-peer-ids-on-account-delete.sql) : `signature_evenings_forget_deleted_user()` (SECURITY DEFINER) + déclencheur `on_auth_user_deleted_forget_carnet_peer` (AFTER DELETE sur `auth.users`) ; rattrapage unique des ids de comptes déjà supprimés (aucun au 2026-11-24) |
+| Couvre | suppression depuis l'appli (`delete-account`), nettoyage des invités (fiche 51), suppression dans le tableau de bord |
+| Appli | rien à changer |
+| Contrat | `tests/auditFollowups.test.js` (bloc « Compte n°11 ») |
+| Essai annulé (2026-11-24) | compte cité dans 12 soirées d'autres joueurs : 12 → 0 ; ids 22 → 2 (ses 9 propres soirées parties en cascade) ; annulation vérifiée |
+| Prod | à faire |
+
+**Statut** : repo ✅ · prod ☐.
