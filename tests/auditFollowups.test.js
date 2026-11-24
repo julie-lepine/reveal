@@ -997,3 +997,97 @@ describe("Compte n°11 — id d'un compte supprimé retiré des carnets", () => 
     assert.match(body, /where not exists \(select 1 from auth\.users u where u\.id = p\)/);
   });
 });
+
+describe("Chat n°1 à 3 — 50 derniers messages, nom imposé, limite d'envoi", () => {
+  const sql = readFileSync(join(ROOT, "supabase/fix-chat-cap-name-rate-limit.sql"), "utf8");
+  const body = sql.replace(/--.*$/gm, "");
+
+  it("la base ne garde que les 50 derniers messages par salon", () => {
+    assert.match(body, /after insert on public\.lobby_messages\s+for each row execute function public\.lobby_messages_keep_latest\(\)/);
+    assert.match(body, /order by k\.created_at desc, k\.id desc\s+limit 50/);
+    assert.match(body, /where r\.rn > 50/);
+  });
+
+  it("le nom vient du salon, pas de l'appli, et 5 messages max en 10 s", () => {
+    assert.match(body, /before insert on public\.lobby_messages\s+for each row execute function public\.lobby_messages_before_insert\(\)/);
+    assert.match(body, /new\.display_name := v_name;/);
+    assert.match(body, /interval '10 seconds'/);
+    assert.match(body, /if v_recent >= 5 then\s+raise exception 'chat_rate_limited'/);
+    assert.match(body, /revoke all on function public\.lobby_messages_before_insert\(\) from public, anon, authenticated;/);
+    assert.match(body, /revoke all on function public\.lobby_messages_keep_latest\(\) from public, anon, authenticated;/);
+  });
+
+  it("l'appli reconnaît le refus « trop de messages »", async () => {
+    const { isChatRateLimitedError } = await import("../js/core/chatPanel.js");
+    assert.equal(isChatRateLimitedError({ message: "chat_rate_limited" }), true);
+    assert.equal(isChatRateLimitedError(new Error("guess_failed")), false);
+    assert.equal(isChatRateLimitedError(null), false);
+  });
+});
+
+describe("Chat n°5 — repères « dernier message lu » oubliés après la soirée", () => {
+  it("garde les 20 repères les plus récents, de moins de 24 h", async () => {
+    const { pruneReadCursorStore } = await import("../js/core/chatUnread.js");
+    const now = 10 * 24 * 3600 * 1000;
+    const store = {};
+    for (let i = 0; i < 25; i++) store[`id:L${i}`] = { at: 1, id: "m", savedAt: now - i * 1000 };
+    store["id:vieux"] = { at: now, id: "m", savedAt: now - 25 * 3600 * 1000 };
+    const kept = pruneReadCursorStore(store, now);
+    assert.equal(Object.keys(kept).length, 20);
+    assert.ok("id:L0" in kept && "id:L19" in kept);
+    assert.ok(!("id:L20" in kept) && !("id:vieux" in kept));
+  });
+
+  it("un repère d'une ancienne version est daté de maintenant, puis oublié 24 h plus tard", async () => {
+    const { pruneReadCursorStore } = await import("../js/core/chatUnread.js");
+    const now = 10 * 24 * 3600 * 1000;
+    const first = pruneReadCursorStore({ "id:L1": { at: 5, id: "m" } }, now);
+    assert.equal(first["id:L1"].savedAt, now);
+    assert.deepEqual(pruneReadCursorStore(first, now + 25 * 3600 * 1000), {});
+  });
+
+  it("le ménage est fait à l'écriture et au démarrage du suivi", () => {
+    const src = readFileSync(join(ROOT, "js/core/chatUnread.js"), "utf8");
+    assert.match(src, /function writeStore\(store\) \{\s+store = pruneReadCursorStore\(store\);/);
+    assert.match(src, /writeStore\(readStore\(\)\);/);
+    assert.match(src, /savedAt: Date\.now\(\)/);
+  });
+});
+
+describe("Chat — 50 derniers messages et pas de rechargement complet à chaque message", () => {
+  it("fusion : sans doublon, triée, 50 derniers, même liste si rien de neuf", async () => {
+    const { mergeLobbyMessages, lobbyMessageFromRow, LOBBY_CHAT_MAX_MESSAGES } = await import(
+      "../js/core/lobbyMessagesMerge.js"
+    );
+    assert.equal(LOBBY_CHAT_MAX_MESSAGES, 50);
+    const cur = Array.from({ length: 50 }, (_, i) => ({ id: `m${i}`, at: i }));
+    const same = mergeLobbyMessages(cur, [{ id: "m3", at: 3 }]);
+    assert.equal(same, cur);
+    const next = mergeLobbyMessages(cur, [{ id: "new", at: 100 }]);
+    assert.equal(next.length, 50);
+    assert.equal(next[0].id, "m1");
+    assert.equal(next[49].id, "new");
+    const desc = mergeLobbyMessages([], [{ id: "b", at: 2 }, { id: "a", at: 1 }]);
+    assert.deepEqual(desc.map((m) => m.id), ["a", "b"]);
+    const row = lobbyMessageFromRow({
+      id: "x", display_name: "Alice", body: "salut", created_at: "2026-11-24T20:00:00Z", user_id: "u1",
+    });
+    assert.deepEqual(row, { id: "x", from: "Alice", text: "salut", at: Date.parse("2026-11-24T20:00:00Z"), userId: "u1" });
+    assert.equal(lobbyMessageFromRow(null), null);
+  });
+
+  it("supabaseLobby : charge les 50 derniers, ajoute le message reçu sans tout recharger", () => {
+    const src = readFileSync(join(ROOT, "js/core/supabaseLobby.js"), "utf8");
+    assert.match(src, /\.order\("created_at", \{ ascending: false \}\)\s+\.limit\(LOBBY_CHAT_MAX_MESSAGES\)/);
+    assert.doesNotMatch(src, /\.limit\(100\)/);
+    assert.match(src, /handleLobbyMessageRealtime\(lobbyId, payload\);/);
+    assert.match(src, /if \(payload\?\.eventType === "INSERT"\)/);
+    assert.match(src, /if \(payload\?\.eventType === "DELETE"\) return;/);
+    const send = src.slice(src.indexOf("export async function addLobbyMessageSupabase"));
+    const sendBody = send.slice(0, send.search(/\r?\n\}\r?\n/));
+    assert.match(sendBody, /\.select\("id, display_name, body, created_at, user_id"\)\s+\.single\(\)/);
+    assert.doesNotMatch(sendBody, /refreshLobbyFromSupabase/);
+    assert.match(src, /emitLobbyRealtimeStatus\("subscribed", \{ gen: myGen \}\);\s+\/\/[^\n]*\n\s+scheduleLobbyRefresh\(\{ withMessages: true \}\);/);
+    assert.match(src, /mergeLobbyMessages\(bundle\.messages, prevForMessages\.messages\)/);
+  });
+});

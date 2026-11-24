@@ -32,6 +32,14 @@ export function renderChatMessagesHtml(messages) {
     .join("");
 }
 
+export const CHAT_RATE_LIMITED_MESSAGE =
+  "Doucement ! Attends quelques secondes avant d'envoyer un autre message.";
+
+/** Refus de la base : plus de 5 messages en 10 secondes (audit chat n°3). */
+export function isChatRateLimitedError(err) {
+  return /chat_rate_limited/.test(String(err?.message ?? err ?? ""));
+}
+
 export function validateChatText(raw) {
   const trimmed = String(raw || "").trim();
   if (!trimmed) return { ok: false, text: "" };
@@ -92,6 +100,10 @@ export function mountChatPanel(_root, opts) {
       refresh();
       opts.onAfterSend?.();
       inputEl.focus();
+    } catch (err) {
+      if (!isChatRateLimitedError(err)) throw err;
+      const { showAppAlert } = await import("./dialog.js");
+      await showAppAlert(CHAT_RATE_LIMITED_MESSAGE, { title: "Trop de messages", icon: "⏳" });
     } finally {
       setSending(false);
     }

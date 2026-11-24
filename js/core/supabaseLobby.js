@@ -93,6 +93,11 @@ import {
 } from "./lobbyClosureSession.js";
 import { LOBBY_CLOSURE_FETCH } from "./lobbyClosureContract.js";
 import { collectSignatureEveningArchivePayload } from "./signatureCarnet.js";
+import {
+  LOBBY_CHAT_MAX_MESSAGES,
+  lobbyMessageFromRow,
+  mergeLobbyMessages,
+} from "./lobbyMessagesMerge.js";
 
 export {
   JOIN_SESSION_RESTORE_DELAYS_MS,
@@ -1351,8 +1356,9 @@ async function fetchLobbyBundle(lobbyId, { withMessages = false, currentUserId =
         .from("lobby_messages")
         .select("id, display_name, body, created_at, user_id")
         .eq("lobby_id", lobbyId)
-        .order("created_at", { ascending: true })
-        .limit(100)
+        // Les 50 DERNIERS (la base n'en garde pas plus) ; remis dans l'ordre plus bas.
+        .order("created_at", { ascending: false })
+        .limit(LOBBY_CHAT_MAX_MESSAGES)
     );
   }
 
@@ -1388,13 +1394,10 @@ async function fetchLobbyBundle(lobbyId, { withMessages = false, currentUserId =
   };
 
   if (withMessages) {
-    bundle.messages = (msgRes?.data || []).map((m) => ({
-      id: m.id,
-      from: m.display_name,
-      text: m.body,
-      at: new Date(m.created_at).getTime(),
-      userId: m.user_id || null,
-    }));
+    bundle.messages = mergeLobbyMessages(
+      [],
+      (msgRes?.data || []).map(lobbyMessageFromRow)
+    );
   }
 
   return bundle;
@@ -1402,8 +1405,15 @@ async function fetchLobbyBundle(lobbyId, { withMessages = false, currentUserId =
 
 function applyLobbyToState(bundle, { persistGuestMembership = false } = {}) {
   // Si le bundle n'a pas chargé les messages, on conserve ceux déjà en mémoire.
+  // S'il les a chargés (même salon), on garde aussi ceux arrivés par Realtime
+  // pendant le chargement : sinon un message reçu à ce moment disparaîtrait.
+  const prevForMessages = getState().lobby;
   const messages =
-    bundle.messages !== undefined ? bundle.messages : getState().lobby?.messages || [];
+    bundle.messages === undefined
+      ? prevForMessages?.messages || []
+      : prevForMessages?.id && String(prevForMessages.id) === String(bundle.id)
+        ? mergeLobbyMessages(bundle.messages, prevForMessages.messages)
+        : bundle.messages;
 
   const localUid = getSupabaseUserId();
   if (
@@ -2358,15 +2368,52 @@ export async function addLobbyMessageSupabase(text) {
   const body = text.trim();
   if (!body) return;
 
-  const { error } = await supabase.from("lobby_messages").insert({
-    lobby_id: lobbyId,
-    user_id: userId,
-    display_name: getLocalDisplayName(),
-    body,
-  });
+  const { data, error } = await supabase
+    .from("lobby_messages")
+    .insert({
+      lobby_id: lobbyId,
+      user_id: userId,
+      display_name: getLocalDisplayName(),
+      body,
+    })
+    .select("id, display_name, body, created_at, user_id")
+    .single();
 
   if (error) throw error;
-  await refreshLobbyFromSupabase({ withMessages: true });
+  // Le message enregistré (nom imposé par la base) est ajouté tel quel ; l'écho
+  // Realtime du même id est ignoré. Plus de rechargement complet du salon.
+  applyLobbyMessagesToState(lobbyId, [lobbyMessageFromRow(data)]);
+}
+
+/** Ajoute des messages à l'état du salon courant et prévient les écrans. */
+function applyLobbyMessagesToState(lobbyId, incoming) {
+  const lobby = getState().lobby;
+  if (!lobby?.id || String(lobby.id) !== String(lobbyId)) return false;
+  const current = lobby.messages || [];
+  const messages = mergeLobbyMessages(current, incoming);
+  if (messages === current) return false;
+  saveStatePatch({ lobby: { ...lobby, messages } });
+  notifyLobbyBundleUpdated();
+  return true;
+}
+
+/**
+ * Événement Realtime sur `lobby_messages` : un nouveau message est ajouté
+ * directement (avant : chaque message faisait recharger tout le salon à chaque
+ * joueur). Les effacements des plus anciens par la base n'arrivent pas ici
+ * (pas de `lobby_id` dans l'ancienne ligne) et ne sont pas nécessaires :
+ * l'appli garde elle aussi les 50 derniers. Autre cas : rechargement.
+ */
+function handleLobbyMessageRealtime(lobbyId, payload) {
+  if (payload?.eventType === "INSERT") {
+    const msg = lobbyMessageFromRow(payload.new);
+    if (msg) {
+      applyLobbyMessagesToState(lobbyId, [msg]);
+      return;
+    }
+  }
+  if (payload?.eventType === "DELETE") return;
+  scheduleLobbyRefresh({ withMessages: true });
 }
 
 export function subscribeLobbyRealtime(onUpdate) {
@@ -2470,9 +2517,9 @@ export function subscribeLobbyRealtime(onUpdate) {
     .on(
       "postgres_changes",
       { event: "*", schema: "public", table: "lobby_messages", filter: `lobby_id=eq.${lobbyId}` },
-      () => {
+      (payload) => {
         if (!isLiveLobbyChannelEvent()) return;
-        scheduleLobbyRefresh({ withMessages: true });
+        handleLobbyMessageRealtime(lobbyId, payload);
       }
     )
     .on(
@@ -2579,6 +2626,8 @@ export function subscribeLobbyRealtime(onUpdate) {
       realtimeReconnectAttempts = 0;
       clearRealtimeReconnect();
       emitLobbyRealtimeStatus("subscribed", { gen: myGen });
+      // Messages envoyés pendant une coupure : un seul rechargement à la (re)connexion.
+      scheduleLobbyRefresh({ withMessages: true });
       void runSubscribedSessionCatchUp({
         lobbyId,
         channelGeneration: myGen,

@@ -992,3 +992,22 @@ Audit compte et profil (tmp/audit-compte-profil.md) n°11 : `signature_evenings.
 | Prod | appliquée le 2026-11-24 (migration `fix_carnet_peer_ids_on_account_delete`), avant le 1er nettoyage des invités · contrôle : déclencheur actif, fonction exécutable par `postgres` et `service_role` seulement, carnets intacts (25 soirées, 22 ids, aucun à rattraper) |
 
 **Statut** : repo ✅ · prod ✅.
+
+## 53. Chat du salon — 50 derniers messages, nom imposé, limite d'envoi
+
+Audit chat et sondages (tmp/audit-chat-sondages.md) n°1 à 3 :
+- n°1 : l'appli charge les 100 **premiers** messages du salon ; au 101e message le chat se figeait pour tout le monde ;
+- n°2 : le nom affiché était envoyé par l'appli de l'envoyeur, donc on pouvait écrire sous le nom d'un autre ;
+- n°3 : aucune limite d'envoi, alors que chaque message fait tout recharger chez chaque joueur.
+
+| Élément | Valeur |
+| ------- | ------ |
+| Migration | [`fix-chat-cap-name-rate-limit.sql`](../supabase/fix-chat-cap-name-rate-limit.sql) : `lobby_messages_before_insert()` + déclencheur `lobby_messages_guard` (BEFORE INSERT : nom pris dans `lobby_members`, refus `chat_rate_limited` au-delà de 5 messages en 10 s par joueur et par salon) ; `lobby_messages_keep_latest()` + déclencheur `lobby_messages_keep_latest` (AFTER INSERT : garde les 50 derniers messages du salon) ; les deux SECURITY DEFINER, exécution retirée à `anon` / `authenticated` ; rattrapage unique des salons à plus de 50 messages (aucun au 2026-11-24) |
+| Versions publiées | corrigées sans mise à jour : avec 50 messages au plus, leur chargement des « 100 premiers » renvoie toujours les derniers |
+| Appli | `js/core/chatPanel.js` : refus « trop de messages » traduit (« Doucement ! … »), le texte reste dans le champ. Les versions publiées ne l'ont pas : le message ne part pas, sans explication (seulement en cas d'abus) |
+| Appli (suite, même jour) | `js/core/supabaseLobby.js` + `js/core/lobbyMessagesMerge.js` : charge les 50 derniers messages (comme la base) ; un message reçu par Realtime est ajouté directement au lieu de recharger tout le salon chez chaque joueur ; l’envoyeur ajoute le message enregistré (sans rechargement) ; un seul rechargement des messages à chaque (re)connexion du canal, pour ceux manqués pendant une coupure |
+| Contrat | `tests/auditFollowups.test.js` (bloc « Chat n°1 à 3 ») | + bloc « Chat — 50 derniers messages et pas de rechargement complet »
+| Essai annulé (2026-11-24) | salon d'essai à 2 joueurs : message envoyé sous « Faux nom » enregistré sous le pseudo du salon ; 6e message en 10 s refusé (`chat_rate_limited`), l'autre joueur écrit toujours ; 66 messages envoyés → 50 gardés (les 6 récents + les 44 plus récents des anciens) ; fonctions non exécutables par `anon` / `authenticated` ; annulation vérifiée (aucun déclencheur, aucune fonction, aucun salon d'essai) |
+| Prod | appliquée le 2026-11-24 (migration `fix_chat_cap_name_rate_limit`) · contrôle : déclencheurs `lobby_messages_guard` (avant) et `lobby_messages_keep_latest` (après) actifs, fonctions SECURITY DEFINER non exécutables par `anon` / `authenticated`, 0 message à rattraper |
+
+**Statut** : repo ✅ · prod ✅.
