@@ -854,3 +854,146 @@ describe("Consensus : « Révéler maintenant » quand l'hôte n'a pas validé",
     assert.ok(fn.indexOf("if (!confirmed || !mount.isMounted()) return;") < fn.indexOf("commitLocalDraft"));
   });
 });
+
+/**
+ * Audit compte et profil n°1 et 2 : la photo de profil restait publique après la
+ * suppression du compte, après un remboursement de Signature, ou quand le retrait
+ * échouait sans le dire.
+ */
+describe("Compte n°1 et 2 — la photo ne reste pas en ligne", () => {
+  const read = (rel) => readFileSync(join(ROOT, rel), "utf8");
+
+  it("delete-account efface le fichier après la suppression du compte, sans la bloquer", () => {
+    const fn = read("supabase/functions/delete-account/index.ts");
+    const del = fn.indexOf("admin.auth.admin.deleteUser");
+    const avatar = fn.indexOf("deleteAvatarFile(admin, user.id)");
+    assert.ok(del >= 0 && avatar > del);
+    assert.match(fn, /storage\.from\("avatars"\)\.remove\(\[`\$\{userId\}\/avatar\.jpg`\]\)/);
+    assert.match(fn, /json\(200, \{ ok: true, avatar, revenuecat \}\)/);
+  });
+
+  it("webhook : sans Signature ni Maître, photo retirée du profil et fichier effacé", () => {
+    const fn = read("supabase/functions/revenuecat-webhook/index.ts");
+    const write = fn.slice(fn.indexOf("async function writeFlags"), fn.indexOf("async function deleteAvatarFile"));
+    assert.match(write, /flags\.profile_pack === false && flags\.host_pack !== true/);
+    assert.match(write, /avatar_path: null, avatar_rev: 0/);
+    assert.ok(write.indexOf("profile_missing") < write.indexOf("deleteAvatarFile(supabase, userId)"));
+    assert.match(fn, /storage\.from\("avatars"\)\.remove\(\[`\$\{userId\}\/avatar\.jpg`\]\)/);
+  });
+
+  it("migration : effacer son propre fichier ne demande plus Signature", () => {
+    const sql = read("supabase/fix-avatar-delete-without-pack.sql");
+    const pol = sql.slice(sql.indexOf('create policy "avatars owner delete"'));
+    assert.match(pol, /for delete\s+to authenticated/);
+    assert.match(pol, /name = auth\.uid\(\)::text \|\| '\/avatar\.jpg'/);
+    assert.doesNotMatch(pol.replace(/--.*$/gm, ""), /can_write_own_avatar/);
+    const runbook = read("supabase/tests/feature-profile-av-storage-runbook.sql");
+    assert.match(runbook, /AVSTORAGE_DELETE_STILL_PACK/);
+    assert.match(runbook, /cmd in \('INSERT', 'UPDATE'\)/);
+  });
+});
+
+/**
+ * Audit compte et profil n°7 : tous les profils (pseudo, achats, photo) et toutes
+ * les photos pouvaient être aspirés avec la clé publique, même sans session.
+ */
+describe("Compte n°7 — profils et photos lisibles seulement par qui en a besoin", () => {
+  const sql = readFileSync(join(ROOT, "supabase/fix-profiles-avatars-read-scope.sql"), "utf8");
+  const body = sql.replace(/--.*$/gm, "");
+
+  it("profils : comptes connectés seulement, soi + même salon + hôte d'un salon existant", () => {
+    assert.match(body, /create policy "profiles_select"\s+on public\.profiles\s+for select\s+to authenticated\s+using \(public\.can_see_profile\(id\)\)/);
+    assert.match(body, /p_target = auth\.uid\(\)/);
+    assert.match(body, /join public\.lobby_members them on them\.lobby_id = me\.lobby_id/);
+    assert.match(body, /from public\.lobbies l where l\.host_id = p_target/);
+    assert.match(body, /security definer/);
+    assert.match(body, /revoke all on function public\.can_see_profile\(uuid\) from public, anon;/);
+    assert.match(body, /revoke all on table public\.profiles from anon;/);
+  });
+
+  it("l'appli lit encore host_pack de l'hôte avant de rejoindre (versions déjà publiées)", () => {
+    const lobby = readFileSync(join(ROOT, "js/core/supabaseLobby.js"), "utf8");
+    assert.match(lobby, /\.from\("profiles"\)\s*\.select\("host_pack"\)/);
+  });
+
+  it("photos : plus de lecture publique par l'API, seulement son propre fichier", () => {
+    assert.match(body, /drop policy if exists "avatars public read" on storage\.objects;/);
+    const pol = body.slice(body.indexOf('create policy "avatars owner read"'));
+    assert.match(pol, /for select\s+to authenticated/);
+    assert.match(pol, /name = auth\.uid\(\)::text \|\| '\/avatar\.jpg'/);
+    assert.doesNotMatch(body, /public\s*=\s*false/);
+    const runbook = readFileSync(join(ROOT, "supabase/tests/feature-profile-av-storage-runbook.sql"), "utf8");
+    assert.match(runbook, /AVSTORAGE_SELECT_STILL_PUBLIC/);
+  });
+});
+
+/**
+ * Audit compte et profil n°8 : la politique disait que les données du mode invité
+ * expirent toutes seules, mais aucun compte invité n'était jamais supprimé.
+ */
+describe("Compte n°8 — comptes invités supprimés après 30 jours sans activité", () => {
+  const sql = readFileSync(join(ROOT, "supabase/purge-stale-anonymous-users.sql"), "utf8");
+  const body = sql.replace(/--.*$/gm, "");
+
+  it("seulement des invités, inactifs 30 jours sur toute l'activité, hors salon, par lots", () => {
+    assert.match(body, /u\.is_anonymous is true/);
+    assert.equal((body.match(/is_anonymous is true/g) || []).length, 2);
+    assert.match(body, /u\.last_sign_in_at/);
+    assert.match(body, /auth\.sessions s where s\.user_id = u\.id/);
+    assert.match(body, /auth\.refresh_tokens r where r\.user_id = u\.id::text/);
+    assert.match(body, /< now\(\) - interval '30 days'/);
+    assert.match(body, /not exists \(select 1 from public\.lobby_members m where m\.user_id = u\.id\)/);
+    assert.match(body, /limit greatest\(coalesce\(p_limit, 500\), 1\)/);
+    assert.match(body, /revoke all on function public\.purge_stale_anonymous_users\(int\) from public, anon, authenticated;/);
+  });
+
+  it("tâche planifiée chaque nuit", () => {
+    assert.match(body, /cron\.schedule\(\s*'reveal-purge-stale-anonymous-users',\s*'45 4 \* \* \*'/);
+  });
+
+  it("la politique et Aide & légal disent 30 jours", async () => {
+    const { PRIVACY_POLICY } = await import("../data/legalContent.js");
+    const all = PRIVACY_POLICY.sections.map((s) => s.body).join("\n");
+    assert.doesNotMatch(all, /expirent automatiquement/);
+    assert.match(all, /Les comptes invités sont supprimés automatiquement après 30 jours sans utilisation\./);
+    const help = readFileSync(join(ROOT, "js/screens/helpLegal.js"), "utf8");
+    assert.match(help, /supprimée toute seule après 30 jours sans utilisation/);
+  });
+});
+
+/** Audit compte et profil n°9 et 10 : textes de la page Aide & légal. */
+describe("Compte n°9 et 10 — fenêtre de suppression et contact RGPD", () => {
+  const help = readFileSync(join(ROOT, "js/screens/helpLegal.js"), "utf8");
+
+  it("la suppression cite la photo, le carnet et les 3 achats restaurables", () => {
+    assert.match(help, /\(profil, photo, carnet, amis, invitations\)/);
+    assert.match(help, /Tes achats \(Sans pub, Signature, Maître de soirée\) restent liés à ton compte Apple ou Google/);
+    assert.equal(help.includes("L'achat Sans pub reste lié"), false);
+  });
+
+  it("le contact RGPD donne l'e-mail (et toujours Instagram)", () => {
+    assert.match(help, /import \{ CONTACT_EMAIL, INSTAGRAM_HANDLE, INSTAGRAM_PROFILE_URL \} from "..\/..\/data\/appConfig.js";/);
+    assert.match(help, /href="mailto:\$\{escapeHtml\(CONTACT_EMAIL\)\}"/);
+    assert.match(help, /data-open-instagram/);
+  });
+});
+
+/**
+ * Audit compte et profil n°11 : l'id d'un compte supprimé restait dans
+ * `signature_evenings.peer_user_ids` des autres (tableau, pas de clé étrangère).
+ */
+describe("Compte n°11 — id d'un compte supprimé retiré des carnets", () => {
+  const sql = readFileSync(join(ROOT, "supabase/fix-carnet-peer-ids-on-account-delete.sql"), "utf8");
+  const body = sql.replace(/--.*$/gm, "");
+
+  it("déclencheur après suppression d'un compte, quelle que soit la voie", () => {
+    assert.match(body, /after delete on auth\.users\s+for each row execute function public\.signature_evenings_forget_deleted_user\(\)/);
+    assert.match(body, /set peer_user_ids = array_remove\(peer_user_ids, old\.id\)\s+where old\.id = any \(peer_user_ids\)/);
+    assert.match(body, /security definer/);
+    assert.match(body, /revoke all on function public\.signature_evenings_forget_deleted_user\(\) from public, anon, authenticated;/);
+  });
+
+  it("rattrapage des ids de comptes déjà supprimés", () => {
+    assert.match(body, /where not exists \(select 1 from auth\.users u where u\.id = p\)/);
+  });
+});

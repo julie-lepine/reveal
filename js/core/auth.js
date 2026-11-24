@@ -10,12 +10,14 @@ import {
   deleteRegisteredAccountOnServer,
   sendPasswordResetEmail as sbSendPasswordResetEmail,
   updatePassword,
+  verifyCurrentPassword,
   getSupabaseUserId,
   isPasswordRecoveryPending,
   isAuthReadyResolved,
 } from "./supabaseAuth.js";
 import { upsertProfile } from "./supabaseProfile.js";
 import { AVATAR_BUCKET, AVATAR_LABEL } from "../config/signatureAvatar.js";
+import { PASSWORD_MIN_LENGTH, PASSWORD_TOO_SHORT_MESSAGE } from "../config/password.js";
 import { avatarPathForUser } from "./signatureAvatar.js";
 import { isPlaceholderDisplayName } from "./profileIdentity.js";
 import {
@@ -95,6 +97,9 @@ export async function loginWithEmail(email, password, captchaToken = null) {
 export async function signupWithEmail(email, password, name, captchaToken = null) {
   if (!isSupabaseConfigured()) {
     return { ok: false, error: BACKEND_REQUIRED };
+  }
+  if (!password || password.length < PASSWORD_MIN_LENGTH) {
+    return { ok: false, error: PASSWORD_TOO_SHORT_MESSAGE };
   }
 
   if (!captchaToken) {
@@ -281,22 +286,28 @@ export async function uploadProfileAvatarBlob(blob) {
   return updateProfileAvatar({ path, rev });
 }
 
+/**
+ * Audit compte n°2 : le fichier d'abord, et son erreur regardée. Avant, le profil
+ * était vidé puis l'erreur d'effacement ignorée : la photo restait publique et le
+ * bouton « Retirer » disparaissait, sans moyen de réessayer.
+ */
 export async function removeProfileAvatar() {
-  const res = await updateProfileAvatar({ path: null, rev: 0 });
-  if (!res.ok) return res;
-  if (!isSupabaseConfigured() || !supabase) return res;
-  const path = avatarPathForUser(getSupabaseUserId());
-  if (path) {
-    try {
-      await supabase.storage.from(AVATAR_BUCKET).remove([path]);
-    } catch {
-      /* path already null en profil */
+  if (isSupabaseConfigured() && supabase) {
+    const path = avatarPathForUser(getSupabaseUserId());
+    if (path) {
+      let error = null;
+      try {
+        ({ error } = await supabase.storage.from(AVATAR_BUCKET).remove([path]));
+      } catch (e) {
+        error = e;
+      }
+      if (error) return { ok: false, error: AVATAR_LABEL.removeError };
     }
   }
-  return res;
+  return updateProfileAvatar({ path: null, rev: 0 });
 }
 
-export async function changeEmailPassword(_currentPassword, newPassword) {
+export async function changeEmailPassword(currentPassword, newPassword) {
   const user = getState().user;
   const recoveryFlow = isPasswordRecoveryPending();
   if (!recoveryFlow && (!isEmailAccount() || !user.email)) {
@@ -307,8 +318,18 @@ export async function changeEmailPassword(_currentPassword, newPassword) {
     return { ok: false, error: BACKEND_REQUIRED };
   }
 
-  if (!newPassword || newPassword.length < 4) {
-    return { ok: false, error: "Le nouveau mot de passe doit faire au moins 4 caractères." };
+  if (!newPassword || newPassword.length < PASSWORD_MIN_LENGTH) {
+    return { ok: false, error: PASSWORD_TOO_SHORT_MESSAGE };
+  }
+
+  // Lien « mot de passe oublié » : l'e-mail tient lieu de preuve. Sinon, l'ancien
+  // mot de passe est vérifié (téléphone déverrouillé prêté, session restée ouverte).
+  if (!recoveryFlow) {
+    if (!currentPassword) {
+      return { ok: false, error: "Indique ton mot de passe actuel." };
+    }
+    const check = await verifyCurrentPassword(user.email, currentPassword);
+    if (!check.ok) return check;
   }
   return updatePassword(newPassword);
 }

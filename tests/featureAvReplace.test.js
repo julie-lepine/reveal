@@ -18,6 +18,7 @@ const upsertCalls = [];
 const callLog = [];
 let uploadError = null;
 let upsertError = null;
+let removeError = null;
 
 function resetCalls() {
   storageCalls.from.length = 0;
@@ -27,6 +28,7 @@ function resetCalls() {
   callLog.length = 0;
   uploadError = null;
   upsertError = null;
+  removeError = null;
 }
 
 mock.module("../js/core/supabaseClient.js", {
@@ -40,6 +42,7 @@ mock.module("../js/core/supabaseClient.js", {
             async remove(paths) {
               callLog.push("remove");
               storageCalls.remove.push({ bucket, paths: [...paths] });
+              if (removeError) return { data: null, error: removeError };
               return { data: [], error: null };
             },
             async upload(path, blob, opts) {
@@ -114,10 +117,13 @@ describe("AV-REPLACE — contrat source", () => {
     assert.ok(upload.indexOf("if (error)") < upload.indexOf("updateProfileAvatar"));
   });
 
-  it("removeProfileAvatar reste SQL puis Storage remove", () => {
+  // Audit compte n°2 : le fichier d'abord, et son erreur regardée (avant : profil
+  // vidé puis erreur ignorée, photo restée publique sans moyen de réessayer).
+  it("removeProfileAvatar : Storage remove (erreur regardée) puis SQL", () => {
     assert.match(remove, /updateProfileAvatar\(\{\s*path:\s*null,\s*rev:\s*0\s*\}\)/);
     assert.match(remove, /\.remove\(\[path\]\)/);
-    assert.ok(remove.indexOf("updateProfileAvatar") < remove.indexOf(".remove([path])"));
+    assert.ok(remove.indexOf(".remove([path])") < remove.indexOf("updateProfileAvatar"));
+    assert.match(remove, /if \(error\) return \{ ok: false/);
   });
 
   it("UI : preview seulement après upload OK ; pas d’optimistic avant", () => {
@@ -195,7 +201,7 @@ describe("AV-REPLACE — appels Storage / SQL", () => {
     assert.deepEqual(callLog, ["upload"]);
   });
 
-  it("TEST 4 — retrait volontaire : SQL null puis storage.remove", async () => {
+  it("TEST 4 — retrait volontaire : storage.remove puis SQL null", async () => {
     signatureUser({ avatarPath: PATH, avatarRev: 8 });
     const res = await removeProfileAvatar();
     assert.equal(res.ok, true);
@@ -208,7 +214,19 @@ describe("AV-REPLACE — appels Storage / SQL", () => {
     assert.equal(storageCalls.remove.length, 1);
     assert.deepEqual(storageCalls.remove[0].paths, [PATH]);
     assert.equal(storageCalls.remove[0].bucket, "avatars");
-    assert.deepEqual(callLog, ["upsert", "remove"]);
+    assert.deepEqual(callLog, ["remove", "upsert"]);
+  });
+
+  it("retrait : effacement du fichier en échec → profil inchangé, erreur, on peut réessayer", async () => {
+    signatureUser({ avatarPath: PATH, avatarRev: 8 });
+    removeError = new Error("network");
+    const res = await removeProfileAvatar();
+    assert.equal(res.ok, false);
+    assert.match(res.error, /retirer la photo/);
+    assert.equal(getState().user.avatarPath, PATH);
+    assert.equal(getState().user.avatarRev, 8);
+    assert.equal(upsertCalls.length, 0);
+    assert.deepEqual(callLog, ["remove"]);
   });
 
   it("upload OK puis upsert SQL FAIL : Storage déjà B, SQL non mis à jour — pas de rollback", async () => {

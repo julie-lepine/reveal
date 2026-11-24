@@ -11,6 +11,7 @@ import {
   changeEmailPassword,
   logout,
 } from "../core/auth.js";
+import { PASSWORD_MIN_PLACEHOLDER } from "../config/password.js";
 import { PACK_HOST_LABEL, PACK_SIGNATURE_LABEL } from "../config/premiumPacks.js";
 import {
   SETTINGS_TAB,
@@ -462,7 +463,7 @@ function personnalisationPanelHtml({ emailAccount, user, selectedEmoji, tryOn = 
             <label class="field-label" for="pwd-current">Mot de passe actuel</label>
             <input type="password" class="field-input" id="pwd-current" autocomplete="current-password" />
             <label class="field-label" for="pwd-new">Nouveau mot de passe</label>
-            <input type="password" class="field-input" id="pwd-new" autocomplete="new-password" placeholder="4 caractères min." />
+            <input type="password" class="field-input" id="pwd-new" autocomplete="new-password" placeholder="${PASSWORD_MIN_PLACEHOLDER}" />
             <label class="field-label" for="pwd-confirm">Confirmer</label>
             <input type="password" class="field-input" id="pwd-confirm" autocomplete="new-password" />
             <p class="auth-error hidden" id="pwd-error"></p>

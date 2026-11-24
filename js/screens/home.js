@@ -11,6 +11,7 @@ import {
   logout,
 } from "../core/auth.js";
 import { isHostPack } from "../core/entitlements.js";
+import { PASSWORD_MIN_PLACEHOLDER } from "../config/password.js";
 import { hostLobbyCapacityHint } from "../config/lobbyLifecycle.js";
 import { isSupabaseConfigured } from "../core/supabaseClient.js";
 import {
@@ -1029,7 +1030,7 @@ export function mountHome(app) {
               <input type="email" class="field-input" id="signup-email" placeholder="toi@email.com" />
               <label class="field-label" for="signup-password">Mot de passe</label>
               <div class="password-field">
-                <input type="password" class="field-input password-field__input" id="signup-password" placeholder="4 caractères min." />
+                <input type="password" class="field-input password-field__input" id="signup-password" placeholder="${PASSWORD_MIN_PLACEHOLDER}" />
                 <button type="button" class="password-field__toggle" data-toggle-password="signup-password" aria-label="Afficher le mot de passe" aria-pressed="false">👁️</button>
               </div>
               ${isTurnstileRequired() ? `<div id="signup-turnstile" class="auth-turnstile-wrap"></div>` : ""}

@@ -63,22 +63,37 @@ begin
   from pg_policies
   where schemaname = 'storage' and tablename = 'objects'
     and policyname = 'avatars owner delete';
-  if v_del is null or position('can_write_own_avatar' in v_del) = 0 then
-    raise exception 'AVSTORAGE_DELETE_NO_PACK';
+  -- Audit compte n°2 (fix-avatar-delete-without-pack.sql) : effacer sa propre
+  -- photo ne demande plus Signature (sinon elle restait en ligne après un remboursement).
+  if v_del is null or position('/avatar.jpg' in v_del) = 0 then
+    raise exception 'AVSTORAGE_DELETE_NOT_OWNER';
+  end if;
+  if position('can_write_own_avatar' in v_del) > 0 then
+    raise exception 'AVSTORAGE_DELETE_STILL_PACK';
   end if;
 
+  -- Audit compte n°7 (fix-profiles-avatars-read-scope.sql) : plus de lecture
+  -- publique par l'API (on listait tout le bucket) ; seulement son propre fichier
+  -- (nécessaire pour remplacer et retirer). Les adresses publiques marchent toujours.
+  if exists (
+    select 1 from pg_policies
+    where schemaname = 'storage' and tablename = 'objects'
+      and policyname = 'avatars public read'
+  ) then
+    raise exception 'AVSTORAGE_SELECT_STILL_PUBLIC';
+  end if;
   select coalesce(qual, '') into v_sel
   from pg_policies
   where schemaname = 'storage' and tablename = 'objects'
-    and policyname = 'avatars public read';
+    and policyname = 'avatars owner read';
   if v_sel is null then
     raise exception 'AVSTORAGE_SELECT_MISSING';
   end if;
   if position('can_write_own_avatar' in v_sel) > 0 then
     raise exception 'AVSTORAGE_SELECT_GATED';
   end if;
-  if position('avatars' in v_sel) = 0 then
-    raise exception 'AVSTORAGE_SELECT_NOT_AVATARS';
+  if position('avatars' in v_sel) = 0 or position('/avatar.jpg' in v_sel) = 0 then
+    raise exception 'AVSTORAGE_SELECT_NOT_OWNER';
   end if;
 
   select count(*)::int into v_write_bad
@@ -86,7 +101,7 @@ begin
   where schemaname = 'storage'
     and tablename = 'objects'
     and policyname like 'avatars%'
-    and cmd in ('INSERT', 'UPDATE', 'DELETE')
+    and cmd in ('INSERT', 'UPDATE')
     and position('can_write_own_avatar' in coalesce(qual, '') || coalesce(with_check, '')) = 0;
   if v_write_bad > 0 then
     raise exception 'AVSTORAGE_PERMISSIVE_WRITE';

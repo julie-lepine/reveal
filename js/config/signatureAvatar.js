@@ -10,6 +10,7 @@ export const AVATAR_LABEL = {
   hint: "Visible dans le lobby, les scores et ta carte. Si la photo ne charge pas, ton emoji s’affiche.",
   lockedHint: "Photo de profil : inclus dans Signature.",
   error: "Impossible d'enregistrer la photo.",
+  removeError: "Impossible de retirer la photo. Vérifie ta connexion puis réessaie.",
   readError: "Impossible de lire cette image.",
   ok: "Photo enregistrée.",
   removed: "Photo retirée.",

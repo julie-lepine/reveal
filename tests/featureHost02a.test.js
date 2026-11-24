@@ -108,7 +108,7 @@ describe("FEATURE-HOST-02A/02B — SKUs + carte Menu", () => {
   it("privacy in-app : Maître 9,99 / 7,00 / 3,00, pas 12,99", () => {
     const host = PRIVACY_POLICY.sections.find((s) => s.heading === "Achat Maître de soirée");
     const hosting = PRIVACY_POLICY.sections.find((s) => s.heading === "Hébergement et sous-traitants");
-    assert.equal(PRIVACY_POLICY.updated, "7 septembre 2026");
+    assert.equal(PRIVACY_POLICY.updated, "24 novembre 2026");
     assert.ok(host);
     assert.match(host.body, /9,99 € TTC/);
     assert.match(host.body, /7,00 € TTC/);

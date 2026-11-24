@@ -919,3 +919,76 @@ Invitations encore utilisables après la fin de l'amitié, le départ de l'invit
 | Prod | appliquée le 2026-11-23 (migration `fix_friends_invites_cleanup`), après essai annulé (base : md5 accept `84c69e03dce9928362b9dd31c4b3692d`, kick `0e259dd21dfc9e605af6c385be0b4b3f`, unfriend `6da3782d3563879007ce23181ef47051`, list_incoming `da5a33ae0cac3f91f23ca63042efa7b3`) · contrôle : acceptation +292 caractères (le bloc visé), unfriend et retrait suppriment les invitations, liste filtrée, `authenticated` n'a plus que SELECT sur les 3 tables, droits d'exécution inchangés |
 
 **Statut** : SQL repo ✅ · prod ✅.
+
+---
+
+## 49. Photo de profil — effacée avec le compte, au remboursement, et quand on la retire
+
+Audit compte et profil (tmp/audit-compte-profil.md) n°1 et 2 : la photo restait publique après la suppression du compte (Supabase n'efface pas les fichiers d'un compte supprimé), après un remboursement de Signature (le joueur ne pouvait plus l'effacer : la règle exigeait Signature) et quand « Retirer la photo » échouait sans le dire.
+
+| Élément | Valeur |
+| ------- | ------ |
+| Migration | [`fix-avatar-delete-without-pack.sql`](../supabase/fix-avatar-delete-without-pack.sql) : règle `avatars owner delete` sans `can_write_own_avatar()` (son propre fichier seulement) ; envoyer et remplacer exigent toujours Signature ou Maître · **ne pas** réexécuter `feature-profile-av-storage.sql` ensuite |
+| Fonctions | `delete-account` : efface `avatars/<id>/avatar.jpg` après la suppression du compte (échec noté dans le journal, la suppression reste faite ; réponse `avatar: deleted / failed`) · `revenuecat-webhook` : sans Signature ni Maître, retire la photo du profil et efface le fichier (sans bloquer l'événement) |
+| Appli | `js/core/auth.js` `removeProfileAvatar` : fichier d'abord, erreur regardée (message « Impossible de retirer la photo… »), profil vidé ensuite |
+| Contrôle | [`tests/feature-profile-av-storage-runbook.sql`](../supabase/tests/feature-profile-av-storage-runbook.sql) mis à jour (`AVSTORAGE_POLICIES_OK` : effacement sans Signature exigé) |
+| Contrat | `tests/featureAvReplace.test.js`, `tests/auditFollowups.test.js` (bloc « Compte n°1 et 2 ») |
+| Changement voulu | après un remboursement puis un nouvel achat, la photo ne revient plus : il faut la remettre (couleur et cadre reviennent toujours, ID-OLD) |
+| Prod | migration appliquée le 2026-11-24 (`fix_avatar_delete_without_pack`), après essai annulé · contrôle : runbook `AVSTORAGE_POLICIES_OK` · fonctions déployées le 2026-11-24 : `delete-account` v14 (`verify_jwt` true), `revenuecat-webhook` v27 (`verify_jwt` false) · contrôle : webhook 405 (GET), 401 `{"ok":false}` sans secret ; delete-account 200 (OPTIONS), 401 sans jeton |
+| Nettoyage | 1 fichier sans photo au profil (compte qui a encore Signature et Maître, id des tests du dépôt) effacé le 2026-11-24 avec accord (`supabase storage rm`) · contrôle : son adresse publique ne répond plus (400), il reste 1 fichier dans `avatars`, affiché au profil de son compte |
+
+**Statut** : repo ✅ · prod ✅.
+
+---
+
+## 50. Profils et photos lisibles seulement par qui en a besoin
+
+Audit compte et profil (tmp/audit-compte-profil.md) n°7 : avec la clé publique de l'appli, même sans session, on lisait tous les profils (pseudo, emoji, achats, chemin de la photo) et on listait toutes les photos du bucket.
+
+| Élément | Valeur |
+| ------- | ------ |
+| Migration | [`fix-profiles-avatars-read-scope.sql`](../supabase/fix-profiles-avatars-read-scope.sql) : `can_see_profile(uuid)` (SECURITY DEFINER, `authenticated` seulement) ; `profiles_select` réservée aux comptes connectés (invités compris) : son profil, ceux des joueurs du même salon, ceux des hôtes d'un salon existant ; plus aucun droit `anon` sur `profiles`, plus d'effacement ni de `TRUNCATE` pour `authenticated` ; `avatars public read` remplacée par `avatars owner read` (son propre fichier) |
+| Pourquoi l'hôte | l'appli lit `host_pack` de l'hôte **avant** de rejoindre (« salon plein » à 8 ou 14) : sans ça, les versions déjà publiées refuseraient le 9ᵉ joueur d'un salon Maître |
+| Ce qui ne change pas | bucket public : les adresses des photos s'affichent toujours ; fonctions serveur (amis, carnet, salons) |
+| Appli | rien à changer |
+| Contrôle | [`tests/feature-profile-av-storage-runbook.sql`](../supabase/tests/feature-profile-av-storage-runbook.sql) mis à jour (`AVSTORAGE_SELECT_STILL_PUBLIC`) |
+| Contrat | `tests/auditFollowups.test.js` (bloc « Compte n°7 ») |
+| Essai annulé (2026-11-24) | joueur connecté : 1 profil visible sur 165 (le sien), peut modifier le sien, 1 photo listable (la sienne) ; visiteur : 0 photo listable ; faux salon : un membre voit lui + l'hôte, pas un joueur hors salon ; hors salon : voit l'hôte (et son `host_pack`), pas les autres membres |
+| Prod | appliquée le 2026-11-24 (migration `fix_profiles_avatars_read_scope`), après essai annulé · contrôle : runbook `AVSTORAGE_POLICIES_OK` ; droits `profiles` : `authenticated` INSERT/SELECT/UPDATE, rien pour `anon` ; `can_see_profile` exécutable par `authenticated` seulement ; avec la clé publique sans session : profils refusés (42501), liste des photos vide, photo par son adresse publique 200 |
+
+**Statut** : repo ✅ · prod ✅.
+
+---
+
+## 51. Comptes invités supprimés après 30 jours sans activité
+
+Audit compte et profil (tmp/audit-compte-profil.md) n°8 : la politique disait que les données du mode invité expirent toutes seules, mais aucun compte invité n'était supprimé (472 au 2026-11-24, dont 427 sans activité depuis plus de 30 jours, le plus ancien du 19 mai).
+
+| Élément | Valeur |
+| ------- | ------ |
+| Migration | [`purge-stale-anonymous-users.sql`](../supabase/purge-stale-anonymous-users.sql) : `purge_stale_anonymous_users(p_limit int default 500)` (SECURITY DEFINER, appelable par personne d'autre que le serveur) ; supprime les comptes `is_anonymous` sans activité depuis 30 jours (connexion, mise à jour, session ou jeton renouvelés), jamais un invité encore membre d'un salon ; le reste part en cascade · tâche planifiée `reveal-purge-stale-anonymous-users` chaque nuit à 04:45 UTC |
+| Pourquoi pas la date de connexion seule | un invité qui garde l'appli renouvelle sa session sans se reconnecter : 3 invités actifs auraient été supprimés |
+| Appli | texte de la politique (Conservation + Suppression de compte, date 24 novembre 2026) et d'Aide & légal : « supprimé après 30 jours sans utilisation » |
+| Site public | à mettre à jour aussi : https://havefuncorp.fr/reveal/privacy (pas dans ce dépôt) |
+| Contrat | `tests/auditFollowups.test.js` (bloc « Compte n°8 ») |
+| Essai annulé (2026-11-24) | 1er lot (limite 200) : 200 ; 2e lot : 227 ; 3e lot : 0 · invités 472 → 45, inscrits 88 → 88, profils 165 → 131, aucun profil sans compte |
+| Prod | appliquée le 2026-11-24 (migration `purge_stale_anonymous_users`), après essai annulé · contrôle : 1 tâche `reveal-purge-stale-anonymous-users` active (`45 4 * * *`), fonction exécutable par `postgres` et `service_role` seulement · 1er passage : nuit du 2026-11-25, environ 427 comptes invités (472 avant) · à vérifier : `select * from cron.job_run_details where jobid = (select jobid from cron.job where jobname = 'reveal-purge-stale-anonymous-users') order by start_time desc limit 3;` |
+
+**Statut** : repo ✅ · prod ✅ (1er passage à vérifier le 2026-11-25).
+
+---
+
+## 52. Carnet — id d'un compte supprimé retiré du carnet des autres
+
+Audit compte et profil (tmp/audit-compte-profil.md) n°11 : `signature_evenings.peer_user_ids` (tableau, sans clé étrangère) gardait l'id d'un compte supprimé dans le carnet des autres joueurs. Il n'était jamais affiché, mais il était conservé.
+
+| Élément | Valeur |
+| ------- | ------ |
+| Migration | [`fix-carnet-peer-ids-on-account-delete.sql`](../supabase/fix-carnet-peer-ids-on-account-delete.sql) : `signature_evenings_forget_deleted_user()` (SECURITY DEFINER) + déclencheur `on_auth_user_deleted_forget_carnet_peer` (AFTER DELETE sur `auth.users`) ; rattrapage unique des ids de comptes déjà supprimés (aucun au 2026-11-24) |
+| Couvre | suppression depuis l'appli (`delete-account`), nettoyage des invités (fiche 51), suppression dans le tableau de bord |
+| Appli | rien à changer |
+| Contrat | `tests/auditFollowups.test.js` (bloc « Compte n°11 ») |
+| Essai annulé (2026-11-24) | compte cité dans 12 soirées d'autres joueurs : 12 → 0 ; ids 22 → 2 (ses 9 propres soirées parties en cascade) ; annulation vérifiée |
+| Prod | appliquée le 2026-11-24 (migration `fix_carnet_peer_ids_on_account_delete`), avant le 1er nettoyage des invités · contrôle : déclencheur actif, fonction exécutable par `postgres` et `service_role` seulement, carnets intacts (25 soirées, 22 ids, aucun à rattraper) |
+
+**Statut** : repo ✅ · prod ✅.

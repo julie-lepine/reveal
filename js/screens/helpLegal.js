@@ -3,7 +3,7 @@
  * Entrée : Menu → Profil, au-dessus de Déconnexion.
  */
 import { HELP_LEGAL_LABEL } from "../config/helpLegal.js";
-import { INSTAGRAM_HANDLE, INSTAGRAM_PROFILE_URL } from "../../data/appConfig.js";
+import { CONTACT_EMAIL, INSTAGRAM_HANDLE, INSTAGRAM_PROFILE_URL } from "../../data/appConfig.js";
 import { canPlay, deleteRegisteredAccount, isLoggedIn } from "../core/auth.js";
 import { showAppAlert, showAppConfirm } from "../core/dialog.js";
 import { openInstagramProfile } from "../core/feedbackUi.js";
@@ -22,7 +22,7 @@ function helpLegalBodyHtml(registeredAccount) {
         </p>`
     : `
         <p class="hint settings-section__hint">
-          Le mode invité ne crée pas de compte. Tes données de session expirent toutes seules.
+          Le mode invité ne crée pas de compte. Ta session invité est supprimée toute seule après 30 jours sans utilisation.
         </p>`;
 
   return `
@@ -48,6 +48,12 @@ function helpLegalBodyHtml(registeredAccount) {
         <p class="hint settings-section__hint">Politique de confidentialité (RGPD, AdMob, Supabase).</p>
         <p class="hint settings-section__hint">
           Contact RGPD :
+        <a
+          class="settings-instagram-link"
+          href="mailto:${escapeHtml(CONTACT_EMAIL)}"
+          data-contact-email
+        >${escapeHtml(CONTACT_EMAIL)}</a>
+          ou sur Instagram
         <a
           class="settings-instagram-link"
           href="${escapeHtml(INSTAGRAM_PROFILE_URL)}"
@@ -108,7 +114,7 @@ export function mountHelpLegal(app) {
     if (btn?.disabled) return;
 
     const ok = await showAppConfirm(
-      "Ton compte et tes données personnelles (profil, amis, invitations) seront définitivement supprimés. Cette action est irréversible. L'achat Sans pub reste lié à ton compte Apple ou Google : tu pourras le restaurer plus tard.",
+      "Ton compte et tes données personnelles (profil, photo, carnet, amis, invitations) seront définitivement supprimés. Cette action est irréversible. Tes achats (Sans pub, Signature, Maître de soirée) restent liés à ton compte Apple ou Google : tu pourras les restaurer sur un nouveau compte.",
       {
         title: "Supprimer mon compte",
         confirmLabel: "Supprimer définitivement",
