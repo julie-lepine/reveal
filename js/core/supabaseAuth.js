@@ -845,6 +845,33 @@ export async function sendPasswordResetEmail(email, captchaToken = null) {
   return { ok: true };
 }
 
+/**
+ * Audit compte n°4 : le mot de passe actuel était demandé dans Paramètres mais
+ * jamais vérifié. Vérifié par une connexion au même compte (supabase-js 2.11 ne
+ * sait pas envoyer le mot de passe actuel avec updateUser).
+ */
+export async function verifyCurrentPassword(email, password) {
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email: String(email || "").trim().toLowerCase(),
+    password,
+  });
+  if (error) {
+    if (/invalid login credentials|invalid credentials/i.test(error.message || "")) {
+      return { ok: false, error: "Mot de passe actuel incorrect." };
+    }
+    if (isAuthCaptchaError(error.message)) {
+      return {
+        ok: false,
+        error:
+          "Vérification impossible ici. Utilise « Mot de passe oublié » sur l'écran de connexion pour changer ton mot de passe.",
+      };
+    }
+    return { ok: false, error: formatAuthErrorMessage(error.message) };
+  }
+  if (data?.session) await syncSessionToState(data.session);
+  return { ok: true };
+}
+
 export async function updatePassword(newPassword) {
   const { error } = await supabase.auth.updateUser({ password: newPassword });
   if (error) return { ok: false, error: error.message };

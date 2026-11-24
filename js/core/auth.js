@@ -10,6 +10,7 @@ import {
   deleteRegisteredAccountOnServer,
   sendPasswordResetEmail as sbSendPasswordResetEmail,
   updatePassword,
+  verifyCurrentPassword,
   getSupabaseUserId,
   isPasswordRecoveryPending,
   isAuthReadyResolved,
@@ -302,7 +303,7 @@ export async function removeProfileAvatar() {
   return updateProfileAvatar({ path: null, rev: 0 });
 }
 
-export async function changeEmailPassword(_currentPassword, newPassword) {
+export async function changeEmailPassword(currentPassword, newPassword) {
   const user = getState().user;
   const recoveryFlow = isPasswordRecoveryPending();
   if (!recoveryFlow && (!isEmailAccount() || !user.email)) {
@@ -315,6 +316,16 @@ export async function changeEmailPassword(_currentPassword, newPassword) {
 
   if (!newPassword || newPassword.length < 4) {
     return { ok: false, error: "Le nouveau mot de passe doit faire au moins 4 caractères." };
+  }
+
+  // Lien « mot de passe oublié » : l'e-mail tient lieu de preuve. Sinon, l'ancien
+  // mot de passe est vérifié (téléphone déverrouillé prêté, session restée ouverte).
+  if (!recoveryFlow) {
+    if (!currentPassword) {
+      return { ok: false, error: "Indique ton mot de passe actuel." };
+    }
+    const check = await verifyCurrentPassword(user.email, currentPassword);
+    if (!check.ok) return check;
   }
   return updatePassword(newPassword);
 }
