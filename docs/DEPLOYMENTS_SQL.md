@@ -954,6 +954,6 @@ Audit compte et profil (tmp/audit-compte-profil.md) n°7 : avec la clé publique
 | Contrôle | [`tests/feature-profile-av-storage-runbook.sql`](../supabase/tests/feature-profile-av-storage-runbook.sql) mis à jour (`AVSTORAGE_SELECT_STILL_PUBLIC`) |
 | Contrat | `tests/auditFollowups.test.js` (bloc « Compte n°7 ») |
 | Essai annulé (2026-11-24) | joueur connecté : 1 profil visible sur 165 (le sien), peut modifier le sien, 1 photo listable (la sienne) ; visiteur : 0 photo listable ; faux salon : un membre voit lui + l'hôte, pas un joueur hors salon ; hors salon : voit l'hôte (et son `host_pack`), pas les autres membres |
-| Prod | à faire |
+| Prod | appliquée le 2026-11-24 (migration `fix_profiles_avatars_read_scope`), après essai annulé · contrôle : runbook `AVSTORAGE_POLICIES_OK` ; droits `profiles` : `authenticated` INSERT/SELECT/UPDATE, rien pour `anon` ; `can_see_profile` exécutable par `authenticated` seulement ; avec la clé publique sans session : profils refusés (42501), liste des photos vide, photo par son adresse publique 200 |
 
-**Statut** : repo ✅ · prod ☐.
+**Statut** : repo ✅ · prod ✅.
