@@ -32,6 +32,17 @@ export const CHAT_HUB_SCREENS = new Set([
   "leaderboard",
 ]);
 
+/** Écrans qui affichent le chat du salon dans la page (hors bouton 💬). */
+export const CHAT_INLINE_SCREENS = new Set(["lobby"]);
+
+/**
+ * Le joueur voit-il le chat ? (chat du bouton 💬 ouvert, ou chat intégré à l'écran).
+ * Sert au badge « non lus » : un message affiché n'est pas « non lu ».
+ */
+export function isChatVisibleForUnread({ sheetOpen = false, screenId = null } = {}) {
+  return Boolean(sheetOpen) || CHAT_INLINE_SCREENS.has(screenId);
+}
+
 export function isChatFabAllowedScreen(screenId) {
   return CHAT_FAB_ALLOWED_SCREENS.has(screenId);
 }

@@ -1,6 +1,7 @@
 import { INSTAGRAM_HANDLE, INSTAGRAM_PROFILE_URL } from "../../data/appConfig.js";
 import {
   isChatFabAllowedScreen,
+  isChatVisibleForUnread,
   shouldDismissChatSheetOnScreenTransition,
 } from "./chatFabScreens.js";
 import { mountChatPanel } from "./chatPanel.js";
@@ -322,9 +323,15 @@ export function initFeedbackFab() {
   updateFeedbackFabVisibility();
 
   onScreenChange(() => updateFeedbackFabVisibility());
+  // Arrivée sur l'écran du salon : son chat intégré rend tout « lu ».
+  onScreenChange(() => void syncChatUnread());
   onLobbyBundleUpdated(() => updateFeedbackFabVisibility());
 
-  initChatUnreadTracking({ isChatSheetOpen: () => sheetOpen });
+  // Lu = chat du bouton 💬 ouvert OU chat intégré à l'écran du salon affiché.
+  initChatUnreadTracking({
+    isChatSheetOpen: () =>
+      isChatVisibleForUnread({ sheetOpen, screenId: getCurrentScreen() }),
+  });
   onChatUnreadChange((count) => {
     chatUnreadCount = Number(count) || 0;
     updateFabBadge();

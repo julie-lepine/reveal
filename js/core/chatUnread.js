@@ -23,7 +23,31 @@ function readStore() {
   }
 }
 
+/** Audit chat n°5 : un salon ne vit jamais 24 h, ses repères n'ont plus d'usage. */
+export const CHAT_READ_CURSOR_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+export const CHAT_READ_CURSOR_MAX_ENTRIES = 20;
+
+/**
+ * Garde les 20 repères enregistrés le plus récemment, et seulement ceux de moins de 24 h.
+ * Repère sans date d'enregistrement (anciennes versions) : daté de maintenant, donc
+ * oublié 24 h plus tard.
+ */
+export function pruneReadCursorStore(store, nowMs = Date.now()) {
+  const minSavedAt = nowMs - CHAT_READ_CURSOR_MAX_AGE_MS;
+  const kept = Object.entries(store || {})
+    .filter(([, entry]) => entry && typeof entry === "object")
+    .map(([key, entry]) => {
+      const savedAt = Number(entry.savedAt);
+      return [key, { ...entry, savedAt: Number.isFinite(savedAt) ? savedAt : nowMs }];
+    })
+    .filter(([, entry]) => entry.savedAt >= minSavedAt)
+    .sort(([, a], [, b]) => b.savedAt - a.savedAt)
+    .slice(0, CHAT_READ_CURSOR_MAX_ENTRIES);
+  return Object.fromEntries(kept);
+}
+
 function writeStore(store) {
+  store = pruneReadCursorStore(store);
   if (typeof localStorage === "undefined") {
     memoryStore = { ...store };
     return;
@@ -124,7 +148,11 @@ export function getReadCursor(lobbyKey) {
 export function setReadCursor(lobbyKey, cursor) {
   if (!lobbyKey || !cursor) return;
   const store = readStore();
-  store[lobbyKey] = { at: Number(cursor.at) || 0, id: cursor.id != null ? String(cursor.id) : "" };
+  store[lobbyKey] = {
+    at: Number(cursor.at) || 0,
+    id: cursor.id != null ? String(cursor.id) : "",
+    savedAt: Date.now(),
+  };
   writeStore(store);
 }
 
@@ -212,6 +240,8 @@ export function initChatUnreadTracking(opts = {}) {
   if (typeof opts.isChatSheetOpen === "function") {
     sheetOpenGetter = opts.isChatSheetOpen;
   }
+  // Ménage au démarrage : repères des anciennes soirées (audit chat n°5).
+  writeStore(readStore());
   if (!unsubBundle) {
     void import("./supabaseLobby.js").then(({ onLobbyBundleUpdated }) => {
       if (unsubBundle) return;
