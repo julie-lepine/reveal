@@ -10,12 +10,8 @@ import {
 } from "../data/eventSkin.js";
 
 describe("event skin calendar", () => {
-  it("hides calendar skins in production so the original skin shows", () => {
-    assert.equal(EVENT_SKIN_OVERRIDE, "off");
-    assert.equal(
-      resolveEventSkin({ now: new Date(2026, 9, 6), search: "" }),
-      null
-    );
+  it("ships with the calendar on (override null)", () => {
+    assert.equal(EVENT_SKIN_OVERRIDE, null);
   });
 
   it("registers the extra seasonal skins", () => {
@@ -62,18 +58,25 @@ describe("event skin calendar", () => {
     assert.equal(off, null);
   });
 
-  it("uses the shipped override (off) when no query is present", () => {
+  it("uses the shipped override (calendar) when no query is present", () => {
     const outOfSeason = resolveEventSkin({
       now: new Date(2026, 8, 17),
       search: "",
     });
     assert.equal(outOfSeason, null);
 
-    const halloweenWindow = resolveEventSkin({
-      now: new Date(2026, 9, 15),
+    const christmasWindow = resolveEventSkin({
+      now: new Date(2026, 11, 10),
       search: "",
     });
-    assert.equal(halloweenWindow, null);
+    assert.equal(christmasWindow?.id, "christmas");
+  });
+
+  it("override off hides calendar skins", () => {
+    assert.equal(
+      resolveEventSkin({ now: new Date(2026, 9, 15), search: "", override: "off" }),
+      null
+    );
   });
 
   it("falls back to the calendar when override is null", () => {

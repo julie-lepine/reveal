@@ -1,8 +1,8 @@
 /**
  * Calques saisonniers. Une seule peau à la fois ; hors fenêtre = DA d’origine.
  * Priorité : ?event= (QA) → EVENT_SKIN_OVERRIDE → calendrier (date locale du téléphone).
- * Prod : OVERRIDE = "off" masque le calendrier et laisse la DA d’origine.
- * Remettre null pour réactiver les fenêtres saisonnières.
+ * OVERRIDE = null (sans guillemets) : calendrier actif.
+ * OVERRIDE = "off" : masque le calendrier et laisse la DA d’origine.
  */
 
 /** @typedef {"halloween" | "christmas" | "nye" | "stpatrick" | "aprilfools" | "music" | "bastille" | "rentree"} EventSkinId */
@@ -77,7 +77,7 @@ export const EVENT_SKINS = {
 };
 
 /** @type {EventSkinId | "off" | null} */
-export const EVENT_SKIN_OVERRIDE = "null";
+export const EVENT_SKIN_OVERRIDE = null;
 
 export function toLocalDateKey(date = new Date()) {
   const y = date.getFullYear();
