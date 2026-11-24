@@ -989,6 +989,6 @@ Audit compte et profil (tmp/audit-compte-profil.md) n°11 : `signature_evenings.
 | Appli | rien à changer |
 | Contrat | `tests/auditFollowups.test.js` (bloc « Compte n°11 ») |
 | Essai annulé (2026-11-24) | compte cité dans 12 soirées d'autres joueurs : 12 → 0 ; ids 22 → 2 (ses 9 propres soirées parties en cascade) ; annulation vérifiée |
-| Prod | à faire |
+| Prod | appliquée le 2026-11-24 (migration `fix_carnet_peer_ids_on_account_delete`), avant le 1er nettoyage des invités · contrôle : déclencheur actif, fonction exécutable par `postgres` et `service_role` seulement, carnets intacts (25 soirées, 22 ids, aucun à rattraper) |
 
-**Statut** : repo ✅ · prod ☐.
+**Statut** : repo ✅ · prod ✅.
