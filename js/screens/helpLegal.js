@@ -4,6 +4,11 @@
  */
 import { HELP_LEGAL_LABEL } from "../config/helpLegal.js";
 import { CONTACT_EMAIL, INSTAGRAM_HANDLE, INSTAGRAM_PROFILE_URL } from "../../data/appConfig.js";
+import {
+  adPrivacyOptionsRequired,
+  onAdConsentChange,
+  openAdPrivacyOptions,
+} from "../core/ads.js";
 import { canPlay, deleteRegisteredAccount, isLoggedIn } from "../core/auth.js";
 import { showAppAlert, showAppConfirm } from "../core/dialog.js";
 import { openInstagramProfile } from "../core/feedbackUi.js";
@@ -12,6 +17,16 @@ import { createMountGuard } from "../core/mountLifecycle.js";
 import { navigate } from "../core/router.js";
 import { escapeHtml, pageShell } from "../core/ui.js";
 import { bindNav } from "./nav.js";
+
+/** Bouton « Choix publicitaires » : seulement quand Google l'exige (Europe, appli native). */
+export function adPrivacyOptionsHtml(required) {
+  if (!required) return "";
+  return `
+        <button type="button" class="btn btn-secondary btn--spaced" id="btn-ad-privacy-options">Choix publicitaires</button>
+        <p class="hint settings-section__hint">
+          Revois ou retire ton accord pour les pubs personnalisées (Google AdMob).
+        </p>`;
+}
 
 function helpLegalBodyHtml(registeredAccount) {
   const deletionBlock = registeredAccount
@@ -63,6 +78,7 @@ function helpLegalBodyHtml(registeredAccount) {
         >@${escapeHtml(INSTAGRAM_HANDLE)}</a>
         </p>
         <button type="button" class="btn btn-secondary btn--spaced" data-nav="privacy">Politique de confidentialité</button>
+        <div id="ad-privacy-slot">${adPrivacyOptionsHtml(adPrivacyOptionsRequired())}</div>
         ${deletionBlock}
       </div>`;
 }
@@ -151,7 +167,28 @@ export function mountHelpLegal(app) {
     openInstagramProfile();
   });
 
+  const adPrivacySlot = app.querySelector("#ad-privacy-slot");
+  adPrivacySlot?.addEventListener("click", async (e) => {
+    const btn = e.target.closest("#btn-ad-privacy-options");
+    if (!btn || btn.disabled) return;
+    btn.disabled = true;
+    const res = await openAdPrivacyOptions();
+    if (!mount.isMounted()) return;
+    btn.disabled = false;
+    if (!res?.ok) {
+      await showAppAlert(
+        "Le formulaire de Google n'a pas pu s'ouvrir. Vérifie ta connexion et réessaie.",
+        { title: "Choix publicitaires", icon: "⚠️" }
+      );
+    }
+  });
+  const stopAdConsentWatch = onAdConsentChange(() => {
+    if (!mount.isMounted() || !adPrivacySlot) return;
+    adPrivacySlot.innerHTML = adPrivacyOptionsHtml(adPrivacyOptionsRequired());
+  });
+
   return () => {
+    stopAdConsentWatch();
     mount.dispose();
   };
 }
