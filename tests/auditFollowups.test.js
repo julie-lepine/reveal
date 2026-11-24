@@ -1091,3 +1091,35 @@ describe("Chat — 50 derniers messages et pas de rechargement complet à chaque
     assert.match(src, /mergeLobbyMessages\(bundle\.messages, prevForMessages\.messages\)/);
   });
 });
+
+describe("Chat — badge « non lus » : le chat de l'écran du salon compte comme lu", () => {
+  it("chat visible = bouton 💬 ouvert ou écran du salon", async () => {
+    const { isChatVisibleForUnread } = await import("../js/core/chatFabScreens.js");
+    assert.equal(isChatVisibleForUnread({ sheetOpen: false, screenId: "lobby" }), true);
+    assert.equal(isChatVisibleForUnread({ sheetOpen: true, screenId: "game-select" }), true);
+    assert.equal(isChatVisibleForUnread({ sheetOpen: false, screenId: "game-select" }), false);
+    assert.equal(isChatVisibleForUnread({ sheetOpen: false, screenId: "drawit-play" }), false);
+    assert.equal(isChatVisibleForUnread(), false);
+  });
+
+  it("messages lus dans le salon → badge à 0 au choix du jeu", async () => {
+    const { markMessagesRead, getReadCursor, countUnreadMessages, resetChatUnreadStoreForTests } =
+      await import("../js/core/chatUnread.js");
+    resetChatUnreadStoreForTests();
+    const msgs = [
+      { id: "1", from: "B", text: "salut", at: 10, userId: "uB" },
+      { id: "2", from: "B", text: "ça va", at: 20, userId: "uB" },
+    ];
+    // Avant : rien ne marquait lu sur l'écran du salon → 2 non lus.
+    assert.equal(countUnreadMessages(msgs, getReadCursor("id:L"), { localUserId: "uA" }), 2);
+    // Écran du salon affiché = chat visible → syncChatUnread marque lu.
+    markMessagesRead(msgs, "id:L");
+    assert.equal(countUnreadMessages(msgs, getReadCursor("id:L"), { localUserId: "uA" }), 0);
+  });
+
+  it("feedbackUi branche le badge sur la visibilité réelle du chat", () => {
+    const src = readFileSync(join(ROOT, "js/core/feedbackUi.js"), "utf8");
+    assert.match(src, /isChatVisibleForUnread\(\{ sheetOpen, screenId: getCurrentScreen\(\) \}\)/);
+    assert.match(src, /onScreenChange\(\(\) => void syncChatUnread\(\)\);/);
+  });
+});
