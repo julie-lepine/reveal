@@ -22,7 +22,7 @@ function helpLegalBodyHtml(registeredAccount) {
         </p>`
     : `
         <p class="hint settings-section__hint">
-          Le mode invité ne crée pas de compte. Tes données de session expirent toutes seules.
+          Le mode invité ne crée pas de compte. Ta session invité est supprimée toute seule après 30 jours sans utilisation.
         </p>`;
 
   return `

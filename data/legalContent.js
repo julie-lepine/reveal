@@ -9,7 +9,7 @@ import {
 
 export const PRIVACY_POLICY = {
   title: "Politique de confidentialité",
-  updated: "7 septembre 2026",
+  updated: "24 novembre 2026",
   sections: [
     {
       heading: "Qui sommes-nous ?",
@@ -45,11 +45,11 @@ export const PRIVACY_POLICY = {
     },
     {
       heading: "Conservation",
-      body: `Les données de session et de lobby sont conservées le temps de la soirée et liées à votre compte Supabase. Les invitations de soirée sont éphémères : elles disparaissent à la fermeture du lobby, au refus ou à l'acceptation. Les joueurs récemment croisés en salon sont oubliés 24 h après la fin du lobby commun. Le carnet Signature (soirées et stats) est lié au compte tant qu'il n'est pas supprimé. La photo de profil Signature est conservée tant que vous la gardez ou jusqu'à la suppression du compte. Vous pouvez supprimer votre compte enregistré à tout moment depuis l'application (Menu → Aide & légal → Supprimer mon compte) : la suppression est immédiate. Si vous n'avez plus l'application, utilisez la page de suppression de compte (${ACCOUNT_DELETION_PUBLIC_URL}) ou écrivez à ${CONTACT_EMAIL} (traité sous 30 jours ouvrés).`,
+      body: `Les données de session et de lobby sont conservées le temps de la soirée et liées à votre compte Supabase. Les invitations de soirée sont éphémères : elles disparaissent à la fermeture du lobby, au refus ou à l'acceptation. Les joueurs récemment croisés en salon sont oubliés 24 h après la fin du lobby commun. Les comptes invités sont supprimés automatiquement après 30 jours sans utilisation. Le carnet Signature (soirées et stats) est lié au compte tant qu'il n'est pas supprimé. La photo de profil Signature est conservée tant que vous la gardez ou jusqu'à la suppression du compte. Vous pouvez supprimer votre compte enregistré à tout moment depuis l'application (Menu → Aide & légal → Supprimer mon compte) : la suppression est immédiate. Si vous n'avez plus l'application, utilisez la page de suppression de compte (${ACCOUNT_DELETION_PUBLIC_URL}) ou écrivez à ${CONTACT_EMAIL} (traité sous 30 jours ouvrés).`,
     },
     {
       heading: "Suppression de compte",
-      body: `Les comptes enregistrés (e-mail) peuvent être supprimés à tout moment depuis l'application : Menu → Aide & légal → Supprimer mon compte. La suppression est immédiate et définitive. Nous effaçons le compte Supabase Auth, le profil (pseudo, emoji), photo de profil et fichier Storage associé, préférences d'identité Signature (couleur, cadre), et le carnet (soirées archivées), les demandes d'amitié et amitiés associées (suppression en cascade), les invitations de soirée associées (suppression en cascade), les joueurs récemment croisés associés (suppression en cascade), et les données de jeu associées. Si vous n'avez plus l'application, utilisez la page publique de suppression de compte (${ACCOUNT_DELETION_PUBLIC_URL}) ou écrivez à ${CONTACT_EMAIL} (demande traitée sous 30 jours ouvrés). Le mode invité ne crée pas de compte permanent : les données de session expirent automatiquement.`,
+      body: `Les comptes enregistrés (e-mail) peuvent être supprimés à tout moment depuis l'application : Menu → Aide & légal → Supprimer mon compte. La suppression est immédiate et définitive. Nous effaçons le compte Supabase Auth, le profil (pseudo, emoji), photo de profil et fichier Storage associé, préférences d'identité Signature (couleur, cadre), et le carnet (soirées archivées), les demandes d'amitié et amitiés associées (suppression en cascade), les invitations de soirée associées (suppression en cascade), les joueurs récemment croisés associés (suppression en cascade), et les données de jeu associées. Si vous n'avez plus l'application, utilisez la page publique de suppression de compte (${ACCOUNT_DELETION_PUBLIC_URL}) ou écrivez à ${CONTACT_EMAIL} (demande traitée sous 30 jours ouvrés). Le mode invité ne crée pas de compte permanent : la session invité et ses données (pseudo, emoji, données de jeu) sont supprimées automatiquement après 30 jours sans utilisation.`,
     },
     {
       heading: "Vos droits (RGPD)",

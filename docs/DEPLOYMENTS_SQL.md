@@ -957,3 +957,21 @@ Audit compte et profil (tmp/audit-compte-profil.md) n°7 : avec la clé publique
 | Prod | appliquée le 2026-11-24 (migration `fix_profiles_avatars_read_scope`), après essai annulé · contrôle : runbook `AVSTORAGE_POLICIES_OK` ; droits `profiles` : `authenticated` INSERT/SELECT/UPDATE, rien pour `anon` ; `can_see_profile` exécutable par `authenticated` seulement ; avec la clé publique sans session : profils refusés (42501), liste des photos vide, photo par son adresse publique 200 |
 
 **Statut** : repo ✅ · prod ✅.
+
+---
+
+## 51. Comptes invités supprimés après 30 jours sans activité
+
+Audit compte et profil (tmp/audit-compte-profil.md) n°8 : la politique disait que les données du mode invité expirent toutes seules, mais aucun compte invité n'était supprimé (472 au 2026-11-24, dont 427 sans activité depuis plus de 30 jours, le plus ancien du 19 mai).
+
+| Élément | Valeur |
+| ------- | ------ |
+| Migration | [`purge-stale-anonymous-users.sql`](../supabase/purge-stale-anonymous-users.sql) : `purge_stale_anonymous_users(p_limit int default 500)` (SECURITY DEFINER, appelable par personne d'autre que le serveur) ; supprime les comptes `is_anonymous` sans activité depuis 30 jours (connexion, mise à jour, session ou jeton renouvelés), jamais un invité encore membre d'un salon ; le reste part en cascade · tâche planifiée `reveal-purge-stale-anonymous-users` chaque nuit à 04:45 UTC |
+| Pourquoi pas la date de connexion seule | un invité qui garde l'appli renouvelle sa session sans se reconnecter : 3 invités actifs auraient été supprimés |
+| Appli | texte de la politique (Conservation + Suppression de compte, date 24 novembre 2026) et d'Aide & légal : « supprimé après 30 jours sans utilisation » |
+| Site public | à mettre à jour aussi : https://havefuncorp.fr/reveal/privacy (pas dans ce dépôt) |
+| Contrat | `tests/auditFollowups.test.js` (bloc « Compte n°8 ») |
+| Essai annulé (2026-11-24) | 1er lot (limite 200) : 200 ; 2e lot : 227 ; 3e lot : 0 · invités 472 → 45, inscrits 88 → 88, profils 165 → 131, aucun profil sans compte |
+| Prod | à faire. Le 1er passage de la nuit supprime environ 427 comptes invités (en 1 lot de 500) |
+
+**Statut** : repo ✅ · prod ☐.

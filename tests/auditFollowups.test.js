@@ -926,3 +926,37 @@ describe("Compte n°7 — profils et photos lisibles seulement par qui en a beso
     assert.match(runbook, /AVSTORAGE_SELECT_STILL_PUBLIC/);
   });
 });
+
+/**
+ * Audit compte et profil n°8 : la politique disait que les données du mode invité
+ * expirent toutes seules, mais aucun compte invité n'était jamais supprimé.
+ */
+describe("Compte n°8 — comptes invités supprimés après 30 jours sans activité", () => {
+  const sql = readFileSync(join(ROOT, "supabase/purge-stale-anonymous-users.sql"), "utf8");
+  const body = sql.replace(/--.*$/gm, "");
+
+  it("seulement des invités, inactifs 30 jours sur toute l'activité, hors salon, par lots", () => {
+    assert.match(body, /u\.is_anonymous is true/);
+    assert.equal((body.match(/is_anonymous is true/g) || []).length, 2);
+    assert.match(body, /u\.last_sign_in_at/);
+    assert.match(body, /auth\.sessions s where s\.user_id = u\.id/);
+    assert.match(body, /auth\.refresh_tokens r where r\.user_id = u\.id::text/);
+    assert.match(body, /< now\(\) - interval '30 days'/);
+    assert.match(body, /not exists \(select 1 from public\.lobby_members m where m\.user_id = u\.id\)/);
+    assert.match(body, /limit greatest\(coalesce\(p_limit, 500\), 1\)/);
+    assert.match(body, /revoke all on function public\.purge_stale_anonymous_users\(int\) from public, anon, authenticated;/);
+  });
+
+  it("tâche planifiée chaque nuit", () => {
+    assert.match(body, /cron\.schedule\(\s*'reveal-purge-stale-anonymous-users',\s*'45 4 \* \* \*'/);
+  });
+
+  it("la politique et Aide & légal disent 30 jours", async () => {
+    const { PRIVACY_POLICY } = await import("../data/legalContent.js");
+    const all = PRIVACY_POLICY.sections.map((s) => s.body).join("\n");
+    assert.doesNotMatch(all, /expirent automatiquement/);
+    assert.match(all, /Les comptes invités sont supprimés automatiquement après 30 jours sans utilisation\./);
+    const help = readFileSync(join(ROOT, "js/screens/helpLegal.js"), "utf8");
+    assert.match(help, /supprimée toute seule après 30 jours sans utilisation/);
+  });
+});
