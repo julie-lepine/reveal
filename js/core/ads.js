@@ -361,11 +361,18 @@ async function hideTopBanner() {
     return;
   }
 
+  // Cacher ne démarre jamais le système pub : formulaire Google et demande Apple
+  // n'arrivent qu'au premier écran qui affiche vraiment une bannière (jamais pour
+  // un compte Sans pub, ni sur l'accueil / la connexion).
+  if (!sdkStarted) {
+    bannerVisible = false;
+    return;
+  }
+
   try {
     const mod = await loadAdMobModule();
     if (mod) {
       const { AdMob } = mod;
-      await ensureAdMobReady();
       await removeBannerIfPresent(AdMob);
     }
   } catch (err) {

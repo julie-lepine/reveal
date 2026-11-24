@@ -26,6 +26,7 @@ globalThis.document = {
 };
 
 let currentScreen = "game-select";
+let adFree = false;
 
 mock.module("../js/core/platform.js", {
   namedExports: {
@@ -40,7 +41,7 @@ mock.module("../js/core/router.js", {
   },
 });
 mock.module("../js/core/entitlements.js", {
-  namedExports: { isAdFree: () => false },
+  namedExports: { isAdFree: () => adFree },
 });
 
 let fakeAdMob;
@@ -90,6 +91,7 @@ async function settle() {
 
 beforeEach(() => {
   currentScreen = "game-select";
+  adFree = false;
   bodyClasses.clear();
 });
 
@@ -151,6 +153,38 @@ describe("Audit pubs n°3 — pas de pub sans feu vert Google", () => {
     await settle();
     assert.equal(fakeAdMob.initialize.mock.callCount(), 1);
     assert.equal(fakeAdMob.addListener.mock.callCount(), 2);
+    assert.equal(ads.adPrivacyOptionsRequired(), false);
+  });
+});
+
+describe("Audit pubs n°5 — pas de fenêtres pub sans bannière", () => {
+  const consent = { status: "OBTAINED", canRequestAds: true, privacyOptionsRequirementStatus: "REQUIRED" };
+
+  it("accueil : ni formulaire Google ni demande Apple tant qu'aucune bannière n'est due", async () => {
+    currentScreen = "home";
+    fakeAdMob = makeAdMob({ consent });
+    const ads = await freshAds();
+    ads.initAds();
+    await settle();
+    assert.equal(fakeAdMob.initialize.mock.callCount(), 0);
+    assert.equal(fakeAdMob.requestConsentInfo.mock.callCount(), 0);
+
+    currentScreen = "game-select";
+    ads.refreshAdsForEntitlement();
+    await settle();
+    assert.equal(fakeAdMob.requestConsentInfo.mock.callCount(), 1);
+    assert.equal(fakeAdMob.showBanner.mock.callCount(), 1);
+  });
+
+  it("compte Sans pub : le système pub ne démarre jamais, pas de bouton Choix publicitaires", async () => {
+    adFree = true;
+    fakeAdMob = makeAdMob({ consent });
+    const ads = await freshAds();
+    ads.initAds();
+    await settle();
+    assert.equal(fakeAdMob.initialize.mock.callCount(), 0);
+    assert.equal(fakeAdMob.requestConsentInfo.mock.callCount(), 0);
+    assert.equal(fakeAdMob.showBanner.mock.callCount(), 0);
     assert.equal(ads.adPrivacyOptionsRequired(), false);
   });
 });

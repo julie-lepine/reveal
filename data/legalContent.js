@@ -29,7 +29,7 @@ export const PRIVACY_POLICY = {
     },
     {
       heading: "Publicité (AdMob)",
-      body: "Sur l'application mobile (pas sur le web), une bannière publicitaire Google AdMob s'affiche en haut de la plupart des écrans, y compris pendant les parties et dans le salon (pas sur l'écran d'accueil ni à la connexion). Dans l'Union européenne, un formulaire Google vous demande au premier lancement si vous acceptez les publicités personnalisées ; si vous refusez, des publicités non personnalisées s'affichent. Vous pouvez changer ce choix à tout moment dans Menu → Profil → Aide & légal → Choix publicitaires. Sur iPhone, Apple vous demande aussi si REVEAL peut utiliser l'identifiant publicitaire de l'appareil ; refuser ne bloque aucune fonction du jeu. L'option Sans pub retire la bannière.",
+      body: "Sur l'application mobile (pas sur le web), une bannière publicitaire Google AdMob s'affiche en haut de la plupart des écrans, y compris pendant les parties et dans le salon (pas sur l'écran d'accueil ni à la connexion). Dans l'Union européenne, un formulaire Google vous demande, la première fois qu'une publicité doit s'afficher, si vous acceptez les publicités personnalisées ; si vous refusez, des publicités non personnalisées s'affichent. Vous pouvez changer ce choix à tout moment dans Menu → Profil → Aide & légal → Choix publicitaires. Sur iPhone, Apple vous demande aussi si REVEAL peut utiliser l'identifiant publicitaire de l'appareil ; refuser ne bloque aucune fonction du jeu. L'option Sans pub retire la bannière.",
     },
     {
       heading: "Achat Sans pub",
