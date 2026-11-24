@@ -972,6 +972,6 @@ Audit compte et profil (tmp/audit-compte-profil.md) n°8 : la politique disait q
 | Site public | à mettre à jour aussi : https://havefuncorp.fr/reveal/privacy (pas dans ce dépôt) |
 | Contrat | `tests/auditFollowups.test.js` (bloc « Compte n°8 ») |
 | Essai annulé (2026-11-24) | 1er lot (limite 200) : 200 ; 2e lot : 227 ; 3e lot : 0 · invités 472 → 45, inscrits 88 → 88, profils 165 → 131, aucun profil sans compte |
-| Prod | à faire. Le 1er passage de la nuit supprime environ 427 comptes invités (en 1 lot de 500) |
+| Prod | appliquée le 2026-11-24 (migration `purge_stale_anonymous_users`), après essai annulé · contrôle : 1 tâche `reveal-purge-stale-anonymous-users` active (`45 4 * * *`), fonction exécutable par `postgres` et `service_role` seulement · 1er passage : nuit du 2026-11-25, environ 427 comptes invités (472 avant) · à vérifier : `select * from cron.job_run_details where jobid = (select jobid from cron.job where jobname = 'reveal-purge-stale-anonymous-users') order by start_time desc limit 3;` |
 
-**Statut** : repo ✅ · prod ☐.
+**Statut** : repo ✅ · prod ✅ (1er passage à vérifier le 2026-11-25).
