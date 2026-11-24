@@ -938,3 +938,22 @@ Audit compte et profil (tmp/audit-compte-profil.md) n°1 et 2 : la photo restait
 | Nettoyage | 1 fichier sans photo au profil (compte qui a encore Signature et Maître, id des tests du dépôt) effacé le 2026-11-24 avec accord (`supabase storage rm`) · contrôle : son adresse publique ne répond plus (400), il reste 1 fichier dans `avatars`, affiché au profil de son compte |
 
 **Statut** : repo ✅ · prod ✅.
+
+---
+
+## 50. Profils et photos lisibles seulement par qui en a besoin
+
+Audit compte et profil (tmp/audit-compte-profil.md) n°7 : avec la clé publique de l'appli, même sans session, on lisait tous les profils (pseudo, emoji, achats, chemin de la photo) et on listait toutes les photos du bucket.
+
+| Élément | Valeur |
+| ------- | ------ |
+| Migration | [`fix-profiles-avatars-read-scope.sql`](../supabase/fix-profiles-avatars-read-scope.sql) : `can_see_profile(uuid)` (SECURITY DEFINER, `authenticated` seulement) ; `profiles_select` réservée aux comptes connectés (invités compris) : son profil, ceux des joueurs du même salon, ceux des hôtes d'un salon existant ; plus aucun droit `anon` sur `profiles`, plus d'effacement ni de `TRUNCATE` pour `authenticated` ; `avatars public read` remplacée par `avatars owner read` (son propre fichier) |
+| Pourquoi l'hôte | l'appli lit `host_pack` de l'hôte **avant** de rejoindre (« salon plein » à 8 ou 14) : sans ça, les versions déjà publiées refuseraient le 9ᵉ joueur d'un salon Maître |
+| Ce qui ne change pas | bucket public : les adresses des photos s'affichent toujours ; fonctions serveur (amis, carnet, salons) |
+| Appli | rien à changer |
+| Contrôle | [`tests/feature-profile-av-storage-runbook.sql`](../supabase/tests/feature-profile-av-storage-runbook.sql) mis à jour (`AVSTORAGE_SELECT_STILL_PUBLIC`) |
+| Contrat | `tests/auditFollowups.test.js` (bloc « Compte n°7 ») |
+| Essai annulé (2026-11-24) | joueur connecté : 1 profil visible sur 165 (le sien), peut modifier le sien, 1 photo listable (la sienne) ; visiteur : 0 photo listable ; faux salon : un membre voit lui + l'hôte, pas un joueur hors salon ; hors salon : voit l'hôte (et son `host_pack`), pas les autres membres |
+| Prod | à faire |
+
+**Statut** : repo ✅ · prod ☐.

@@ -892,3 +892,37 @@ describe("Compte n°1 et 2 — la photo ne reste pas en ligne", () => {
     assert.match(runbook, /cmd in \('INSERT', 'UPDATE'\)/);
   });
 });
+
+/**
+ * Audit compte et profil n°7 : tous les profils (pseudo, achats, photo) et toutes
+ * les photos pouvaient être aspirés avec la clé publique, même sans session.
+ */
+describe("Compte n°7 — profils et photos lisibles seulement par qui en a besoin", () => {
+  const sql = readFileSync(join(ROOT, "supabase/fix-profiles-avatars-read-scope.sql"), "utf8");
+  const body = sql.replace(/--.*$/gm, "");
+
+  it("profils : comptes connectés seulement, soi + même salon + hôte d'un salon existant", () => {
+    assert.match(body, /create policy "profiles_select"\s+on public\.profiles\s+for select\s+to authenticated\s+using \(public\.can_see_profile\(id\)\)/);
+    assert.match(body, /p_target = auth\.uid\(\)/);
+    assert.match(body, /join public\.lobby_members them on them\.lobby_id = me\.lobby_id/);
+    assert.match(body, /from public\.lobbies l where l\.host_id = p_target/);
+    assert.match(body, /security definer/);
+    assert.match(body, /revoke all on function public\.can_see_profile\(uuid\) from public, anon;/);
+    assert.match(body, /revoke all on table public\.profiles from anon;/);
+  });
+
+  it("l'appli lit encore host_pack de l'hôte avant de rejoindre (versions déjà publiées)", () => {
+    const lobby = readFileSync(join(ROOT, "js/core/supabaseLobby.js"), "utf8");
+    assert.match(lobby, /\.from\("profiles"\)\s*\.select\("host_pack"\)/);
+  });
+
+  it("photos : plus de lecture publique par l'API, seulement son propre fichier", () => {
+    assert.match(body, /drop policy if exists "avatars public read" on storage\.objects;/);
+    const pol = body.slice(body.indexOf('create policy "avatars owner read"'));
+    assert.match(pol, /for select\s+to authenticated/);
+    assert.match(pol, /name = auth\.uid\(\)::text \|\| '\/avatar\.jpg'/);
+    assert.doesNotMatch(body, /public\s*=\s*false/);
+    const runbook = readFileSync(join(ROOT, "supabase/tests/feature-profile-av-storage-runbook.sql"), "utf8");
+    assert.match(runbook, /AVSTORAGE_SELECT_STILL_PUBLIC/);
+  });
+});
