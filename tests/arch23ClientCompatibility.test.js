@@ -73,9 +73,12 @@ describe("ARCH-23 - identité client", () => {
     assert.equal(detectAppPlatform(), "web");
   });
 
-  it("store URLs vides en Vague 1 (pas d’invention)", () => {
-    assert.equal(IOS_APP_STORE_URL, "");
-    assert.equal(ANDROID_PLAY_STORE_URL, "");
+  it("store URLs : fiches publiées, sans paramètres de tracking", () => {
+    assert.match(IOS_APP_STORE_URL, /^https:\/\/apps\.apple\.com\/[a-z]{2}\/app\/[^?]+\/id\d+$/);
+    assert.match(
+      ANDROID_PLAY_STORE_URL,
+      /^https:\/\/play\.google\.com\/store\/apps\/details\?id=com\.reveal\.partygames$/
+    );
   });
 
   it("heuristiques Vague 1 centralisées et non dupliquées", () => {
@@ -609,8 +612,11 @@ describe("ARCH-23 - wiring / SQL (statique)", () => {
     assert.match(id, /APP_COMPATIBILITY_BUILD/);
     assert.doesNotMatch(id, /versionCode/);
     const cfg = read("js/config/appCompatibility.js");
-    assert.equal(APP_COMPATIBILITY_BUILD, 1);
-    assert.match(cfg, /Vague 1 : rester à 1/);
+    // Entier positif ; chaque bump doit être documenté dans la config (« Build N : … »).
+    assert.ok(Number.isInteger(APP_COMPATIBILITY_BUILD) && APP_COMPATIBILITY_BUILD >= 1);
+    if (APP_COMPATIBILITY_BUILD > 1) {
+      assert.match(cfg, new RegExp(`Build ${APP_COMPATIBILITY_BUILD} :`));
+    }
   });
 
   it("docs périmètre writes in-game", () => {

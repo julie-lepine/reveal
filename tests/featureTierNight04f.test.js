@@ -192,7 +192,7 @@ beforeEach(() => {
 
 describe("FEATURE-TIERNIGHT-04F — wiring", () => {
   it("package + nextRound series path", () => {
-    assert.ok(read("package.json").includes("featureTierNight04f.test.js"));
+    assert.ok(JSON.parse(read("package.json")).scripts.test.includes("tests/*.test.js"));
     const game = read("js/games/tierNightLive.js");
     assert.match(game, /hostFinalizeTierNightLiveSeriesList/);
     assert.match(game, /series\?\.kind === ["']live["']/);

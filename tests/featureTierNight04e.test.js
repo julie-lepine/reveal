@@ -153,7 +153,7 @@ describe("FEATURE-TIERNIGHT-04E — wiring", () => {
     assert.match(sql, /v_prep -> 'categoryIds'\) is distinct from \(v_series -> 'categoryIds'\)/);
     assert.doesNotMatch(sql, /TIER_NIGHT_LIVE_CATEGORIES/);
     assert.doesNotMatch(sql, /categoryIds'\) <> 1\s*\n\s*or coalesce\(p_series -> 'categoryIds' ->> 0, ''\) <> '\*'/);
-    assert.ok(read("package.json").includes("featureTierNight04e.test.js"));
+    assert.ok(JSON.parse(read("package.json")).scripts.test.includes("tests/*.test.js"));
     assert.match(read("js/core/gameSessionRpc.js"), /p_series:\s*series/);
   });
 

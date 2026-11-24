@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "reveal-static",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["C:/Users/Lepin/AppData/Local/Temp/claude/c1c1dcb66f055639/76685cc4-2ff9-4c4a-ad55-901c6771c609/scratchpad/tools/serve.mjs", ".", "5173"],
+      "port": 5173
+    },
+    {
+      "name": "reveal-static-2",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["C:/Users/Lepin/AppData/Local/Temp/claude/e7cbb23f8e7a8588/d9b2ecad-7430-4ce5-8526-a799b30915e1/scratchpad/tools/serve.mjs", ".", "5174"],
+      "port": 5174
+    }
+  ]
+}

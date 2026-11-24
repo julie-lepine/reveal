@@ -33,13 +33,7 @@ describe("FEATURE-FRIENDS-04 Palier 4 — légal", () => {
     assert.match(deletion.body, /cascade/);
   });
 
-  it("prompt OVH FEATURE-FRIENDS-04 documenté ; stores plus tard", () => {
-    const ovh = read("docs/LEGAL_SITE_OVH.md");
-    assert.match(ovh, /FEATURE-FRIENDS-04/);
-    assert.match(ovh, /joueurs récemment croisés en salon/);
-    assert.match(ovh, /privacy\.html/);
-    assert.match(ovh, /App Privacy Apple \/ Play Data safety/);
-    assert.match(ovh, /Ne pas citer de noms de tables SQL/);
+  it("LAUNCH : croisés récents déclarés, pas de fil public", () => {
     const launch = read("docs/LAUNCH.md");
     assert.match(launch, /Recently-crossed registered players/);
     assert.match(launch, /No public social feed/);

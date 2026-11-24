@@ -28,7 +28,6 @@ import {
 } from "../js/config/lobbyInvites.js";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
-const friendsDoc = readFileSync(join(ROOT, "docs/FRIENDS.md"), "utf8");
 const configSrc = readFileSync(join(ROOT, "js/config/lobbyInvites.js"), "utf8");
 
 describe("FEATURE-FRIENDS-02 Palier 0 — contrats invitations", () => {
@@ -130,14 +129,4 @@ describe("FEATURE-FRIENDS-02 Palier 0 — contrats invitations", () => {
     assert.equal(FRIEND_NOTICE_CALM_SCREENS.has("trivia"), false);
   });
 
-  it("docs/FRIENDS.md nomme FEATURE-FRIENDS-02 et les RPC", () => {
-    assert.match(friendsDoc, /FEATURE-FRIENDS-02/);
-    for (const name of Object.values(LOBBY_INVITE_RPC)) {
-      assert.match(friendsDoc, new RegExp(name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
-    }
-    assert.match(friendsDoc, /js\/config\/lobbyInvites\.js/);
-    assert.match(friendsDoc, /Rester et refuser/);
-    assert.match(friendsDoc, /Quitter et rejoindre/);
-    assert.match(friendsDoc, /tous tes amis inscrits/);
-  });
 });

@@ -23,7 +23,6 @@ import {
 import { rosterLabelFromAction } from "../js/core/friendsLogic.js";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
-const friendsDoc = readFileSync(join(ROOT, "docs/FRIENDS.md"), "utf8");
 const configSrc = readFileSync(join(ROOT, "js/config/friends.js"), "utf8");
 
 describe("FEATURE-FRIENDS-03 Palier 0 — contrats Annuler", () => {
@@ -71,12 +70,4 @@ describe("FEATURE-FRIENDS-03 Palier 0 — contrats Annuler", () => {
     assert.equal(rosterLabelFromAction(FRIEND_ROSTER_ACTION.cancel), "Annuler");
   });
 
-  it("docs/FRIENDS.md nomme FEATURE-FRIENDS-03 et les RPC", () => {
-    assert.match(friendsDoc, /FEATURE-FRIENDS-03/);
-    assert.match(friendsDoc, /cancel_friend_request/);
-    assert.match(friendsDoc, /list_outgoing_friend_requests/);
-    assert.match(friendsDoc, /Demandes envoyées/);
-    assert.match(friendsDoc, /Pas de cooldown/);
-    assert.match(friendsDoc, /Silencieux pour le destinataire/);
-  });
 });

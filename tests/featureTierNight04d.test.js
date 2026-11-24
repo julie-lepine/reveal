@@ -194,7 +194,7 @@ describe("FEATURE-TIERNIGHT-04D — fichiers & wiring", () => {
   it("session + screen + package test existent", () => {
     assert.ok(read("js/core/tierNightLivePrepSession.js").length > 100);
     assert.ok(read("js/screens/tierNightLivePrep.js").length > 100);
-    assert.ok(read("package.json").includes("featureTierNight04d.test.js"));
+    assert.ok(JSON.parse(read("package.json")).scripts.test.includes("tests/*.test.js"));
   });
 
   it("main enregistre tiernight-live-prep", () => {
@@ -639,7 +639,7 @@ describe("FEATURE-TIERNIGHT-04D — contrats mappés (≥40 assertions groupées
     ok("delete own attr", read("js/screens/tierNightLivePrep.js").includes("data-remove-live-custom"));
     ok("select live prep", read("js/screens/tierNightSelect.js").includes("enterTierNightLivePrep"));
     ok("no list bind mono", !read("js/screens/tierNightSelect.js").includes("bindTierGrid(app, (id) => startLiveGame"));
-    ok("package wired", read("package.json").includes("featureTierNight04d.test.js"));
+    ok("package wired", JSON.parse(read("package.json")).scripts.test.includes("tests/*.test.js"));
 
     saveStatePatch({
       tierNightLiveSeriesPrep: {

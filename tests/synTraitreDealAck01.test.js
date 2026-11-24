@@ -128,6 +128,7 @@ describe("commitTraitreDealAck - mocks comportementaux", () => {
         isGameSyncActive: mock.fn(() => true),
         requireLocalParticipantUid: mock.fn(() => UID),
         requirePlayerUid: mock.fn((n) => `uid-${n}`),
+        userIdForName: mock.fn((n) => (n === "Alice" ? UID : `uid-${n}`)),
         nameForUserId: mock.fn(),
         isLobbyHost: mock.fn(() => false),
         allMembersReady: mock.fn(),
