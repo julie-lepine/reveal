@@ -117,7 +117,12 @@ function applyConsentInfo(info) {
   }
 }
 
-/** Google a donné son feu vert pour demander des pubs (après la demande de ce lancement). */
+/**
+ * Google a donné son feu vert pour demander des pubs (après la demande de ce lancement).
+ * Ce n'est PAS « le joueur accepte les pubs » : `canRequestAds` est vrai dès que le
+ * formulaire a reçu une réponse (OBTAINED), même un refus de personnalisation, ou hors
+ * Europe (NOT_REQUIRED). Faux seulement si le formulaire n'a jamais été rempli.
+ */
 export function adConsentAllowsAds() {
   return consentState.known && consentState.canRequestAds;
 }

@@ -109,7 +109,9 @@ describe("Audit pubs n°3 — pas de pub sans feu vert Google", () => {
     assert.equal(fakeAdMob.showBanner.mock.callCount(), 0);
   });
 
-  it("Google refuse (canRequestAds faux) : aucune bannière", async () => {
+  // canRequestAds n'est faux que si le formulaire n'a pas encore reçu de réponse :
+  // un joueur qui refuse la personnalisation a le statut OBTAINED, donc des pubs non personnalisées.
+  it("formulaire pas encore rempli (canRequestAds faux) : aucune bannière", async () => {
     fakeAdMob = makeAdMob({
       consent: { status: "OBTAINED", canRequestAds: false, privacyOptionsRequirementStatus: "REQUIRED" },
     });
