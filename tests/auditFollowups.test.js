@@ -854,3 +854,41 @@ describe("Consensus : « Révéler maintenant » quand l'hôte n'a pas validé",
     assert.ok(fn.indexOf("if (!confirmed || !mount.isMounted()) return;") < fn.indexOf("commitLocalDraft"));
   });
 });
+
+/**
+ * Audit compte et profil n°1 et 2 : la photo de profil restait publique après la
+ * suppression du compte, après un remboursement de Signature, ou quand le retrait
+ * échouait sans le dire.
+ */
+describe("Compte n°1 et 2 — la photo ne reste pas en ligne", () => {
+  const read = (rel) => readFileSync(join(ROOT, rel), "utf8");
+
+  it("delete-account efface le fichier après la suppression du compte, sans la bloquer", () => {
+    const fn = read("supabase/functions/delete-account/index.ts");
+    const del = fn.indexOf("admin.auth.admin.deleteUser");
+    const avatar = fn.indexOf("deleteAvatarFile(admin, user.id)");
+    assert.ok(del >= 0 && avatar > del);
+    assert.match(fn, /storage\.from\("avatars"\)\.remove\(\[`\$\{userId\}\/avatar\.jpg`\]\)/);
+    assert.match(fn, /json\(200, \{ ok: true, avatar, revenuecat \}\)/);
+  });
+
+  it("webhook : sans Signature ni Maître, photo retirée du profil et fichier effacé", () => {
+    const fn = read("supabase/functions/revenuecat-webhook/index.ts");
+    const write = fn.slice(fn.indexOf("async function writeFlags"), fn.indexOf("async function deleteAvatarFile"));
+    assert.match(write, /flags\.profile_pack === false && flags\.host_pack !== true/);
+    assert.match(write, /avatar_path: null, avatar_rev: 0/);
+    assert.ok(write.indexOf("profile_missing") < write.indexOf("deleteAvatarFile(supabase, userId)"));
+    assert.match(fn, /storage\.from\("avatars"\)\.remove\(\[`\$\{userId\}\/avatar\.jpg`\]\)/);
+  });
+
+  it("migration : effacer son propre fichier ne demande plus Signature", () => {
+    const sql = read("supabase/fix-avatar-delete-without-pack.sql");
+    const pol = sql.slice(sql.indexOf('create policy "avatars owner delete"'));
+    assert.match(pol, /for delete\s+to authenticated/);
+    assert.match(pol, /name = auth\.uid\(\)::text \|\| '\/avatar\.jpg'/);
+    assert.doesNotMatch(pol.replace(/--.*$/gm, ""), /can_write_own_avatar/);
+    const runbook = read("supabase/tests/feature-profile-av-storage-runbook.sql");
+    assert.match(runbook, /AVSTORAGE_DELETE_STILL_PACK/);
+    assert.match(runbook, /cmd in \('INSERT', 'UPDATE'\)/);
+  });
+});

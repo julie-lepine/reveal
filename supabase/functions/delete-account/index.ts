@@ -66,14 +66,35 @@ Deno.serve(async (req) => {
     return json(500, { ok: false, error: "delete_failed" });
   }
 
+  // Audit compte n°1 : Supabase n'efface pas les fichiers d'un compte supprimé
+  // (et le SQL ne peut pas les effacer). Sans ça, la photo restait publique.
+  // Après deleteUser : si l'effacement échoue, le compte est quand même supprimé.
+  const avatar = await deleteAvatarFile(admin, user.id);
+
   // Audit achats n°5 : le client RevenueCat restait rattaché au compte supprimé
   // (achats bloqués sur un compte qui n'existe plus, données gardées). Suppression
   // côté RevenueCat, en option (REVENUECAT_DELETE_ON_ACCOUNT_DELETE=true), sans
   // bloquer la suppression du compte si RevenueCat ne répond pas.
   const revenuecat = await deleteRevenueCatCustomer(user.id);
 
-  return json(200, { ok: true, revenuecat });
+  return json(200, { ok: true, avatar, revenuecat });
 });
+
+/** Efface `avatars/<id>/avatar.jpg` (absent : rien à faire). Renvoie un état, sans lever. */
+async function deleteAvatarFile(
+  admin: ReturnType<typeof createClient>,
+  userId: string
+): Promise<string> {
+  try {
+    const { error } = await admin.storage.from("avatars").remove([`${userId}/avatar.jpg`]);
+    if (!error) return "deleted";
+    console.error("delete-account: photo", error.message);
+    return "failed";
+  } catch (e) {
+    console.error("delete-account: photo", e instanceof Error ? e.message : e);
+    return "failed";
+  }
+}
 
 /**
  * Supprime le client RevenueCat (API v2). Clé secrète avec le droit

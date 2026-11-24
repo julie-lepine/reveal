@@ -171,7 +171,8 @@ describe("Webhook (fichier déployé)", () => {
 
   it("n°2 : profil absent alors qu'il y a un droit à donner → 500", () => {
     const fn = src.slice(src.indexOf("async function writeFlags("));
-    assert.match(fn, /\.update\(flags\)\s*\.eq\("id", userId\)\s*\.select\("id"\);/);
+    // `row` = les droits (+ photo retirée sans Signature ni Maître, audit compte n°2).
+    assert.match(fn, /\.update\(row\)\s*\.eq\("id", userId\)\s*\.select\("id"\);/);
     assert.match(fn, /if \(!touched && grantsSomething\) return \{ ok: false, reason: "profile_missing" \};/);
   });
 
@@ -194,6 +195,6 @@ describe("n°5 : suppression de compte", () => {
   it("une panne RevenueCat ne bloque pas la suppression du compte", () => {
     const fn = src.slice(src.indexOf("async function deleteRevenueCatCustomer("));
     assert.match(fn, /\} catch \(e\) \{[\s\S]*return "failed";/);
-    assert.match(src, /return json\(200, \{ ok: true, revenuecat \}\);/);
+    assert.match(src, /return json\(200, \{ ok: true, avatar, revenuecat \}\);/);
   });
 });

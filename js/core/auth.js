@@ -281,19 +281,25 @@ export async function uploadProfileAvatarBlob(blob) {
   return updateProfileAvatar({ path, rev });
 }
 
+/**
+ * Audit compte n°2 : le fichier d'abord, et son erreur regardée. Avant, le profil
+ * était vidé puis l'erreur d'effacement ignorée : la photo restait publique et le
+ * bouton « Retirer » disparaissait, sans moyen de réessayer.
+ */
 export async function removeProfileAvatar() {
-  const res = await updateProfileAvatar({ path: null, rev: 0 });
-  if (!res.ok) return res;
-  if (!isSupabaseConfigured() || !supabase) return res;
-  const path = avatarPathForUser(getSupabaseUserId());
-  if (path) {
-    try {
-      await supabase.storage.from(AVATAR_BUCKET).remove([path]);
-    } catch {
-      /* path already null en profil */
+  if (isSupabaseConfigured() && supabase) {
+    const path = avatarPathForUser(getSupabaseUserId());
+    if (path) {
+      let error = null;
+      try {
+        ({ error } = await supabase.storage.from(AVATAR_BUCKET).remove([path]));
+      } catch (e) {
+        error = e;
+      }
+      if (error) return { ok: false, error: AVATAR_LABEL.removeError };
     }
   }
-  return res;
+  return updateProfileAvatar({ path: null, rev: 0 });
 }
 
 export async function changeEmailPassword(_currentPassword, newPassword) {

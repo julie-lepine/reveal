@@ -175,16 +175,32 @@ async function readManualGrant(supabase, userId) {
  * à donner : erreur, pour que RevenueCat renvoie l'événement plus tard.
  */
 async function writeFlags(supabase, userId, flags) {
+  // Audit compte n°2 : sans Signature ni Maître (remboursement), la photo est
+  // retirée du profil et son fichier effacé ; sinon il restait public, et le
+  // joueur ne pouvait plus l'effacer lui-même. Rien à effacer : sans effet.
+  const losesPhoto = flags.profile_pack === false && flags.host_pack !== true;
+  const row = losesPhoto ? { ...flags, avatar_path: null, avatar_rev: 0 } : flags;
   const { data, error } = await supabase
     .from("profiles")
-    .update(flags)
+    .update(row)
     .eq("id", userId)
     .select("id");
   if (error) return { ok: false, reason: "db_error" };
   const touched = Array.isArray(data) && data.length > 0;
   const grantsSomething = Object.values(flags).some((v) => v === true);
   if (!touched && grantsSomething) return { ok: false, reason: "profile_missing" };
+  if (losesPhoto) await deleteAvatarFile(supabase, userId);
   return { ok: true, touched };
+}
+
+/** Efface `avatars/<id>/avatar.jpg`, sans bloquer l'événement si ça échoue. */
+async function deleteAvatarFile(supabase, userId) {
+  try {
+    const { error } = await supabase.storage.from("avatars").remove([`${userId}/avatar.jpg`]);
+    if (error) console.error("revenuecat-webhook: photo", error.message);
+  } catch (e) {
+    console.error("revenuecat-webhook: photo", e instanceof Error ? e.message : e);
+  }
 }
 
 Deno.serve(async (req) => {

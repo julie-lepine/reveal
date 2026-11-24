@@ -919,3 +919,21 @@ Invitations encore utilisables après la fin de l'amitié, le départ de l'invit
 | Prod | appliquée le 2026-11-23 (migration `fix_friends_invites_cleanup`), après essai annulé (base : md5 accept `84c69e03dce9928362b9dd31c4b3692d`, kick `0e259dd21dfc9e605af6c385be0b4b3f`, unfriend `6da3782d3563879007ce23181ef47051`, list_incoming `da5a33ae0cac3f91f23ca63042efa7b3`) · contrôle : acceptation +292 caractères (le bloc visé), unfriend et retrait suppriment les invitations, liste filtrée, `authenticated` n'a plus que SELECT sur les 3 tables, droits d'exécution inchangés |
 
 **Statut** : SQL repo ✅ · prod ✅.
+
+---
+
+## 49. Photo de profil — effacée avec le compte, au remboursement, et quand on la retire
+
+Audit compte et profil (tmp/audit-compte-profil.md) n°1 et 2 : la photo restait publique après la suppression du compte (Supabase n'efface pas les fichiers d'un compte supprimé), après un remboursement de Signature (le joueur ne pouvait plus l'effacer : la règle exigeait Signature) et quand « Retirer la photo » échouait sans le dire.
+
+| Élément | Valeur |
+| ------- | ------ |
+| Migration | [`fix-avatar-delete-without-pack.sql`](../supabase/fix-avatar-delete-without-pack.sql) : règle `avatars owner delete` sans `can_write_own_avatar()` (son propre fichier seulement) ; envoyer et remplacer exigent toujours Signature ou Maître · **ne pas** réexécuter `feature-profile-av-storage.sql` ensuite |
+| Fonctions | `delete-account` : efface `avatars/<id>/avatar.jpg` après la suppression du compte (échec noté dans le journal, la suppression reste faite ; réponse `avatar: deleted / failed`) · `revenuecat-webhook` : sans Signature ni Maître, retire la photo du profil et efface le fichier (sans bloquer l'événement) |
+| Appli | `js/core/auth.js` `removeProfileAvatar` : fichier d'abord, erreur regardée (message « Impossible de retirer la photo… »), profil vidé ensuite |
+| Contrôle | [`tests/feature-profile-av-storage-runbook.sql`](../supabase/tests/feature-profile-av-storage-runbook.sql) mis à jour (`AVSTORAGE_POLICIES_OK` : effacement sans Signature exigé) |
+| Contrat | `tests/featureAvReplace.test.js`, `tests/auditFollowups.test.js` (bloc « Compte n°1 et 2 ») |
+| Changement voulu | après un remboursement puis un nouvel achat, la photo ne revient plus : il faut la remettre (couleur et cadre reviennent toujours, ID-OLD) |
+| Prod | à faire : migration, puis déploiement des 2 fonctions, puis nettoyage du fichier déjà orphelin (1 fichier sans photo au profil au 2026-11-24) |
+
+**Statut** : repo ✅ · prod ☐.
