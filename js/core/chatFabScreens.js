@@ -32,6 +32,16 @@ export const CHAT_HUB_SCREENS = new Set([
   "leaderboard",
 ]);
 
+/**
+ * Écrans où la roulette a son propre bouton 🎲 flottant (au-dessus du 💬).
+ * Sur ces écrans, le bouton 🎲 du sheet chat est masqué (pas de doublon).
+ */
+export const ROULETTE_FAB_SCREENS = new Set(["game-select"]);
+
+export function isRouletteFabScreen(screenId) {
+  return ROULETTE_FAB_SCREENS.has(screenId);
+}
+
 /** Écrans qui affichent le chat du salon dans la page (hors bouton 💬). */
 export const CHAT_INLINE_SCREENS = new Set(["lobby"]);
 
