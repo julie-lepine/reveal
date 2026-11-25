@@ -16,6 +16,7 @@ import {
   isDrawItRoundCount,
 } from "../../data/drawIt.js";
 import { checkHotTakeModeration } from "./hotTakeModeration.js";
+import { checkCustomEntryLimit } from "./customEntryLimits.js";
 import { buildCombinedShuffledDeck, shuffleArray, dedupeEntriesById } from "./combinedGameDeck.js";
 import { normalizeDrawItGuess } from "./drawItNormalize.js";
 import {
@@ -445,6 +446,12 @@ export async function addDrawItCustomWord(text, session) {
 
   const { isGameSyncActive, getLocalParticipantUid } = await import("./gameSync.js");
   const authorUid = getLocalParticipantUid() || null;
+  const limit = checkCustomEntryLimit({
+    list: getDrawItCustomWords(session),
+    isMine: (item) => isDrawItCustomWordOwnedBy(item, getLocalDisplayName(), authorUid),
+    noun: { one: "mot", many: "mots" },
+  });
+  if (!limit.ok) return { ok: false, error: limit.error };
   const entry = {
     id: createCustomWordId(),
     text: trimmed,

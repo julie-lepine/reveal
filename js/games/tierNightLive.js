@@ -125,7 +125,7 @@ function consensusRevealHtml(item, votesByName, players, itemLabel) {
         .map(
           (r) => `
         <span class="tier-live-vote-chip" style="--tier-color:${TIER_COLORS[r.tier]}" title="${escapeHtml(r.p.name)}">
-          <span class="recap-card__avatar" style="background:${r.p.color}">${r.p.emoji}</span>
+          <span class="recap-card__avatar" style="background:${escapeHtml(r.p.color)}">${escapeHtml(r.p.emoji)}</span>
           <span class="tier-live-vote-chip__tier">${r.tier}</span>
         </span>`
         )

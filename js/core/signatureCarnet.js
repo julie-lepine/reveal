@@ -23,6 +23,7 @@ import { setSignatureEveningArchiveDraftListener } from "./state.js";
 import {
   clearSignatureEveningArchiveDraft,
   inspectSignatureEveningArchiveDraft,
+  pruneSignatureEveningArchiveDrafts,
   saveSignatureEveningArchiveDraft,
 } from "./signatureCarnetDraftStore.js";
 import { payloadFromSignatureCarnetDraft } from "./signatureCarnetDraftLogic.js";
@@ -264,4 +265,7 @@ export async function archiveSignatureEveningForServerLeave(lobbyId) {
 }
 
 setSignatureEveningArchiveDraftListener(refreshSignatureEveningArchiveDraft);
+
+/* Audit carnet n°4 : brouillons de plus de 14 jours retirés au démarrage. */
+pruneSignatureEveningArchiveDrafts();
 

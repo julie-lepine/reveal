@@ -39,7 +39,22 @@ import {
   playerTextMaxError,
   trimPlayerText,
 } from "../../data/playerTextLimits.js";
-import { mergeDilemmaCustomDilemmas, mergeAuthorOwnedCustomList, normalizeDilemmaEntry } from "./sessionMerge.js";
+import {
+  mergeDilemmaCustomDilemmas,
+  mergeAuthorOwnedCustomList,
+  normalizeDilemmaEntry,
+} from "./sessionMerge.js";
+import * as gameSyncNs from "./gameSync.js";
+
+/** Compte du joueur local (absent des faux gameSync de certains tests). */
+function localParticipantUid() {
+  return gameSyncNs.getLocalParticipantUid?.() || null;
+}
+import {
+  checkCustomEntryLimit,
+  isCustomLimitServerError,
+  isAuthorOwnedEntryMine,
+} from "./customEntryLimits.js";
 
 function defaultSession() {
   return {
@@ -84,6 +99,7 @@ export function normalizeCustomDilemma(entry) {
     optionA,
     optionB,
     author: entry.author || null,
+    ...(entry.authorUid ? { authorUid: String(entry.authorUid) } : {}),
     tier: entry.tier || "custom",
   };
 }
@@ -149,7 +165,7 @@ export function getMyCustomDilemmas() {
   return (getDilemmaSession().customDilemmas || [])
     .map(normalizeCustomDilemma)
     .filter(Boolean)
-    .filter((d) => (d.author || me) === me);
+    .filter((d) => isAuthorOwnedEntryMine(d, me, localParticipantUid()));
 }
 
 /** Nombre de dilemmes custom des autres (masqués jusqu'à la manche). */
@@ -208,11 +224,20 @@ export async function addCustomDilemma(optionA, optionB) {
   if (modB.blocked) return { ok: false, error: modB.message };
 
   const session = getDilemmaSession();
+  const me = getLocalDisplayName();
+  const myUid = localParticipantUid();
+  const limit = checkCustomEntryLimit({
+    list: session.customDilemmas || [],
+    isMine: (d) => isAuthorOwnedEntryMine(d, me, myUid),
+    noun: { one: "dilemme", many: "dilemmes" },
+  });
+  if (!limit.ok) return { ok: false, error: limit.error };
   const entry = {
     id: `custom-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     optionA: a,
     optionB: b,
-    author: getLocalDisplayName(),
+    author: me,
+    ...(myUid ? { authorUid: myUid } : {}),
     tier: "custom",
   };
   const merged = mergeDilemmaCustomDilemmas(
@@ -234,26 +259,51 @@ export async function addCustomDilemma(optionA, optionB) {
 
   const lobbyId = getState().lobby?.id;
   if (!lobbyId) return { ok: true };
-  const { rpcUpsertPlayerCustomEntry } = await import("./gameSessionRpc.js");
-  const { applyRemoteSession } = await import("./gameSync.js");
-  const { fetchGameSessionByLobby } = await import("./supabaseGame.js");
-  const row = await rpcUpsertPlayerCustomEntry({
-    lobbyId,
-    game: "dilemma",
-    entry,
-  });
-  const full = row?.state ? row : await fetchGameSessionByLobby(lobbyId);
-  if (full) applyRemoteSession(full);
-  return { ok: true };
+  try {
+    const { rpcUpsertPlayerCustomEntry } = await import("./gameSessionRpc.js");
+    const { applyRemoteSession } = await import("./gameSync.js");
+    const { fetchGameSessionByLobby } = await import("./supabaseGame.js");
+    const row = await rpcUpsertPlayerCustomEntry({
+      lobbyId,
+      game: "dilemma",
+      entry,
+    });
+    const full = row?.state ? row : await fetchGameSessionByLobby(lobbyId);
+    if (full) applyRemoteSession(full);
+    return { ok: true };
+  } catch (e) {
+    // Annule l'ajout optimiste : sinon le dilemme reste visible chez l'invité seul.
+    const cur = getDilemmaSession();
+    saveStatePatch({
+      dilemmaGame: {
+        ...cur,
+        customDilemmas: (cur.customDilemmas || []).filter((d) => d?.id !== entry.id),
+      },
+    });
+    return {
+      ok: false,
+      error: isCustomLimitServerError(e) ? e.message : CUSTOM_DILEMMA_SAVE_ERROR,
+    };
+  }
 }
 
+const CUSTOM_DILEMMA_SAVE_ERROR =
+  "Ton dilemme n'a pas pu être enregistré. Vérifie ta connexion et réessaie.";
+const CUSTOM_DILEMMA_DELETE_ERROR =
+  "Ton dilemme n'a pas pu être supprimé. Vérifie ta connexion et réessaie.";
+
 export async function removeCustomDilemma(dilemmaId) {
+  const myUid = localParticipantUid();
   const me = getLocalDisplayName();
   const session = getDilemmaSession();
+  const removed = (session.customDilemmas || [])
+    .map(normalizeCustomDilemma)
+    .filter(Boolean)
+    .find((d) => d.id === dilemmaId && isAuthorOwnedEntryMine(d, me, myUid));
   const next = (session.customDilemmas || [])
     .map(normalizeCustomDilemma)
     .filter(Boolean)
-    .filter((d) => !(d.id === dilemmaId && (d.author || me) === me));
+    .filter((d) => !(d.id === dilemmaId && isAuthorOwnedEntryMine(d, me, myUid)));
   saveStatePatch({ dilemmaGame: { ...session, customDilemmas: next, deck: null } });
   if (!isGameSyncActive()) return { ok: true };
 
@@ -264,17 +314,27 @@ export async function removeCustomDilemma(dilemmaId) {
 
   const lobbyId = getState().lobby?.id;
   if (!lobbyId) return { ok: true };
-  const { rpcDeletePlayerCustomEntry } = await import("./gameSessionRpc.js");
-  const { applyRemoteSession } = await import("./gameSync.js");
-  const { fetchGameSessionByLobby } = await import("./supabaseGame.js");
-  const row = await rpcDeletePlayerCustomEntry({
-    lobbyId,
-    game: "dilemma",
-    entryId: dilemmaId,
-  });
-  const full = row?.state ? row : await fetchGameSessionByLobby(lobbyId);
-  if (full) applyRemoteSession(full);
-  return { ok: true };
+  try {
+    const { rpcDeletePlayerCustomEntry } = await import("./gameSessionRpc.js");
+    const { applyRemoteSession } = await import("./gameSync.js");
+    const { fetchGameSessionByLobby } = await import("./supabaseGame.js");
+    const row = await rpcDeletePlayerCustomEntry({
+      lobbyId,
+      game: "dilemma",
+      entryId: dilemmaId,
+    });
+    const full = row?.state ? row : await fetchGameSessionByLobby(lobbyId);
+    if (full) applyRemoteSession(full);
+    return { ok: true };
+  } catch {
+    // Remet le dilemme : il est toujours dans la partie, donc toujours joué.
+    const cur = getDilemmaSession();
+    const list = cur.customDilemmas || [];
+    if (removed && !list.some((d) => d?.id === removed.id)) {
+      saveStatePatch({ dilemmaGame: { ...cur, customDilemmas: [...list, removed] } });
+    }
+    return { ok: false, error: CUSTOM_DILEMMA_DELETE_ERROR };
+  }
 }
 
 export function getDilemmaRounds() {

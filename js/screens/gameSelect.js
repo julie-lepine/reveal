@@ -126,7 +126,7 @@ function eveningRecapHtml(recap) {
 
   const leader = recap.leadersLabel
     ? `<div class="evening-recap__leader">
-        <span class="evening-recap__leader-avatar" style="background:${recap.leaders[0].color}">${recap.leaders[0].emoji}</span>
+        <span class="evening-recap__leader-avatar" style="background:${escapeHtml(recap.leaders[0].color)}">${escapeHtml(recap.leaders[0].emoji)}</span>
         <span class="evening-recap__leader-who">
           <span class="evening-recap__leader-kicker">En tête</span>
           <strong class="evening-recap__leader-name">${escapeHtml(recap.leadersLabel)}</strong>

@@ -27,6 +27,7 @@ export function normalizeDilemmaEntry(entry) {
     optionA,
     optionB,
     author: entry.author || null,
+    ...(entry.authorUid ? { authorUid: String(entry.authorUid) } : {}),
     tier: entry.tier || "custom",
   };
 }
@@ -44,6 +45,7 @@ export function normalizeHotTakeEntry(entry) {
     id: entry.id || `custom-${text.slice(0, 24)}-${entry.author || "anon"}`,
     text,
     author: entry.author || null,
+    ...(entry.authorUid ? { authorUid: String(entry.authorUid) } : {}),
     themeId: entry.themeId || null,
   };
 }

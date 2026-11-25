@@ -452,7 +452,7 @@ export function mountDilemma(app) {
             const label = choice === "A" ? currentDilemma?.optionA : currentDilemma?.optionB;
             return `
             <div class="player-row player-row--compact">
-              <span class="player-avatar" style="background:${meta.color}">${meta.emoji}</span>
+              <span class="player-avatar" style="background:${escapeHtml(meta.color)}">${escapeHtml(meta.emoji)}</span>
               <span class="player-name">${escapeHtml(voter)}</span>
               <span class="dilemma__choice-tag dilemma__choice-tag--${choice}">${choice}</span>
               <span class="muted dilemma__choice-short">${escapeHtml((label || "").slice(0, 28))}${(label || "").length > 28 ? "…" : ""}</span>

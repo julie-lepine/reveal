@@ -177,7 +177,7 @@ describe("FEATURE-PROFILE-04d — leave / C-HOME contrats source", () => {
     const blockIdx = fn.indexOf("shouldBlockServerLeaveUntilArchive");
     const remoteIdx = fn.indexOf("runServerOnlyLeave");
     assert.ok(archIdx >= 0 && blockIdx > archIdx && remoteIdx > blockIdx);
-    assert.match(fn, /if \(!hasActiveLobby\(\)\)/);
+    assert.match(fn, /if \(!hasActiveLobby\(\) && !skipArchive\)/);
     assert.match(fn, /archiveFailed:\s*true/);
 
     const carnet = read("js/core/signatureCarnet.js");

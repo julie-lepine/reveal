@@ -12,6 +12,7 @@ import {
 import { mergeCustomRosterTopics, isCustomRosterTopicOwnedBy } from "./sessionMerge.js";
 import { getLocalDisplayName, getState, saveStatePatch } from "./state.js";
 import { checkHotTakeModeration } from "./hotTakeModeration.js";
+import { checkCustomEntryLimit } from "./customEntryLimits.js";
 
 function mergedTopicsWithLocal(extraLocal = [], localAuthorUid = null) {
   const me = getLocalDisplayName();
@@ -42,6 +43,14 @@ export async function addCustomRosterTopicAndSync({ name }) {
   const { isGameSyncActive } = await import("./gameSync.js");
   const { getSupabaseUserId } = await import("./supabaseAuth.js");
   const authorUid = getSupabaseUserId() || null;
+
+  const me = getLocalDisplayName();
+  const limit = checkCustomEntryLimit({
+    list: getState().customRosterTopics || [],
+    isMine: (t) => isCustomRosterTopicOwnedBy(t, me, authorUid),
+    noun: { one: "thème", many: "thèmes" },
+  });
+  if (!limit.ok) return { ok: false, error: limit.error };
 
   const id = createCustomRosterTopicId();
   const topic = {

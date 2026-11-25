@@ -26,6 +26,7 @@ import {
 } from "./lobbyMembershipAlign.js";
 import { isLobbyMembersOneLivingPerUserConflict } from "./lobbyMembershipUniqueConflict.js";
 import { queryActiveLobbyMembership } from "./lobbyMembershipFetch.js";
+import { sanitizeMemberColor, sanitizeMemberEmoji } from "./memberCosmetics.js";
 import {
   invalidateMembershipSnapshot,
   getMembershipSnapshot,
@@ -1256,8 +1257,8 @@ function isMeaningfulMemberChange(payload) {
   if (!cur) return true;
   return (
     row.display_name !== cur.name ||
-    row.emoji !== cur.emoji ||
-    row.color !== cur.color ||
+    sanitizeMemberEmoji(row.emoji) !== cur.emoji ||
+    sanitizeMemberColor(row.color, GUEST_COLOR) !== cur.color ||
     (row.name_color || null) !== (cur.nameColor || null) ||
     Boolean(row.signature) !== Boolean(cur.signature) ||
     (row.avatar_path || null) !== (cur.avatarPath || null) ||
@@ -1276,8 +1277,8 @@ function mapMember(row, currentUserId) {
     membershipId: row.id,
     userId: row.user_id,
     name: row.display_name,
-    emoji: row.emoji,
-    color: row.color,
+    emoji: sanitizeMemberEmoji(row.emoji),
+    color: sanitizeMemberColor(row.color, GUEST_COLOR),
     nameColor: row.name_color || null,
     signature: Boolean(row.signature),
     avatarPath: row.avatar_path || null,

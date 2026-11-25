@@ -76,14 +76,14 @@ function participantsHtml(participants, { canKick = false, hostId = null, localI
       );
       const inner = `
         ${avatarPhotoHtml(p)}
-        ${p.emoji}
+        ${escapeHtml(p.emoji)}
         ${p.ready ? '<span class="participant__check">✓</span>' : ""}`;
       const avatar = p.isLocal
-        ? `<button type="button" class="${signatureRingClass(p, "participant__avatar participant__avatar--editable")}" style="background:${p.color}" data-edit-emoji aria-label="Changer mon emoji" title="Changer mon emoji">
+        ? `<button type="button" class="${signatureRingClass(p, "participant__avatar participant__avatar--editable")}" style="background:${escapeHtml(p.color)}" data-edit-emoji aria-label="Changer mon emoji" title="Changer mon emoji">
         ${inner}
         <span class="participant__edit" aria-hidden="true">✎</span>
       </button>`
-        : `<div class="${signatureRingClass(p, "participant__avatar")}" style="background:${p.color}">
+        : `<div class="${signatureRingClass(p, "participant__avatar")}" style="background:${escapeHtml(p.color)}">
         ${inner}
       </div>`;
       const kickable = canKick && p.userId && !p.isLocal && !isHost;

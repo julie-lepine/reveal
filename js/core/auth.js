@@ -28,6 +28,10 @@ import { stopMultiplayerSync } from "./gameSync.js";
 import { getMembershipSnapshot } from "./lobbyMembershipSnapshot.js";
 import { canCreateLobbyFromInputs } from "./lobbyCreateGuard.js";
 import { hasActiveLobby } from "./lobby.js";
+import {
+  clearAllSignatureEveningArchiveDrafts,
+  clearSignatureEveningArchiveDraftsForUser,
+} from "./signatureCarnetDraftStore.js";
 import { captureSignatureCosmeticsPendingIfActivationWindow, clearStorePremiumOverlay } from "./entitlements.js";
 
 const BACKEND_REQUIRED =
@@ -410,6 +414,11 @@ export async function logout() {
 
   const leave = await leaveActiveLobbyForAuthChange();
   if (!leave.ok) return leave;
+  // Audit carnet n°4 : brouillons du compte retirés, sauf le salon encore rejoint.
+  const snap = getMembershipSnapshot();
+  clearSignatureEveningArchiveDraftsForUser(getSupabaseUserId(), {
+    keepLobbyId: snap?.status === "found" ? snap.membership?.lobbyId || null : null,
+  });
   await signOutSupabase();
   saveStatePatch({ inLobby: false, lobby: null, lobbyCode: null });
   return { ok: true };
@@ -430,6 +439,7 @@ export async function deleteRegisteredAccount() {
   const server = await deleteRegisteredAccountOnServer();
   if (!server.ok) return server;
 
+  clearAllSignatureEveningArchiveDrafts();
   await signOutSupabaseAfterAccountDeleted();
   saveStatePatch({ inLobby: false, lobby: null, lobbyCode: null });
   return { ok: true };

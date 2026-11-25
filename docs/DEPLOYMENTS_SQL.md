@@ -1011,3 +1011,99 @@ Audit chat et sondages (tmp/audit-chat-sondages.md) n°1 à 3 :
 | Prod | appliquée le 2026-11-24 (migration `fix_chat_cap_name_rate_limit`) · contrôle : déclencheurs `lobby_messages_guard` (avant) et `lobby_messages_keep_latest` (après) actifs, fonctions SECURITY DEFINER non exécutables par `anon` / `authenticated`, 0 message à rattraper |
 
 **Statut** : repo ✅ · prod ✅.
+
+## 54. Contenus perso — plafonds de nombre, identifiants et propriétaire
+
+Audit contenus perso (tmp/audit-contenus-perso.md) n°2 : le serveur bornait la taille d'une prise, d'un dilemme, d'un mot, d'un thème ou d'une tier list, pas leur nombre. Un joueur pouvait en ajouter des centaines ; la partie grossissait et était renvoyée en entier à chaque joueur à chaque changement.
+
+| Élément | Valeur |
+| ------- | ------ |
+| Migration | [`fix-custom-entries-caps.sql`](../supabase/fix-custom-entries-caps.sql) : `upsert_player_custom_entry` (Hot Take, Dilemma, Draw It, thèmes Tier Night) et `upsert_player_custom_live_tier_list` (Rank Live) reprises telles qu'en prod le 2026-11-25, avec en plus : 10 entrées par joueur et par jeu (3 tier lists Rank Live), 50 par salon et par jeu ; seul un nouvel ajout est compté ; refus avec message lisible et `hint` `CUSTOM_LIMIT_PLAYER` / `CUSTOM_LIMIT_LOBBY` ; plafond vérifié avant l'écriture du mot Draw It |
+| Choix | de l'utilisatrice le 2026-11-25 : 10 / 3 / 50, pas de limite de rythme |
+| Versions publiées | protégées côté invités sans mise à jour. Elles affichent le message du serveur pour Draw It, les thèmes et Rank Live ; pour Hot Take et Dilemma elles n'affichent rien (défaut corrigé par le n°1 dans la nouvelle version) |
+| Appli | `js/core/customEntryLimits.js` (mêmes chiffres) : vérification avant envoi dans les 5 fonctions d'ajout ; seule barrière pour l'hôte de Hot Take / Dilemma, qui écrit la partie directement (nouvelle version seulement) |
+| Contrat | `tests/customEntryLimits.test.js` (chiffres appli = migration), `tests/customEntryRpcRollback.test.js` |
+| Essai annulé (2026-11-25) | un seul bloc annulé par une erreur finale ; salon à 2 joueurs, parties de départ avec leur objet de jeu (`{"hotTake":{}}`…) : Hot Take 10 OK, 11e refusée (`CUSTOM_LIMIT_PLAYER`, message lisible), renvoi d'une prise existante accepté (total 10, texte mis à jour), l'autre joueur ajoute encore ; salon à 50 → 51e refusée (`CUSTOM_LIMIT_LOBBY`), à 49 → 50e acceptée ; Dilemma, Draw It et thèmes : 11e refusée ; Draw It : 10 mots dans la table privée et dans la partie (le 11e n'est pas écrit) ; Rank Live : 3 OK, renvoi identique accepté, 4e refusée, l'autre joueur ajoute encore ; annulation vérifiée (fonctions d'origine en place, aucun compte, salon ni mot d'essai) · à savoir : sur une partie sans objet de jeu (`{}`), la fonction n'écrit rien (déjà le cas avant : `jsonb_set` ne crée pas le parent), ce qui n'arrive pas en vrai |
+| n°3 et n°4 (même migration, ajoutés le 2026-11-25) | `upsert_player_custom_entry` refuse un identifiant déjà pris par un autre joueur (`hint` `CUSTOM_ID_TAKEN`) au lieu d'ajouter un doublon ; `delete_player_custom_entry` (reprise aussi) retire les entrées du joueur sans être bloquée par celle d'un autre au même identifiant ; Hot Take et Dilemma enregistrent `authorUid` ; propriétaire = même compte, ou (pas de compte et même pseudo) pour les entrées d'anciennes versions, pour les 4 types. Les votes restent reconnus par le pseudo. Appli : `normalizeHotTakeEntry` / `normalizeDilemmaEntry` (et leurs copies dans les sessions) gardent `authorUid` ; `isAuthorOwnedEntryMine` (`js/core/customEntryLimits.js`) pour « mes prises », la suppression et le plafond. Une ancienne version d'hôte qui réenregistre la partie retire `authorUid` : on retombe alors sur le pseudo, comme avant |
+| Essai annulé n°3-4 (2026-11-25) | 3 comptes : `authorUid` enregistré ; l'hôte reprend l'identifiant de l'invité → refus `CUSTOM_ID_TAKEN`, prise d'origine intacte ; l'hôte ne peut pas supprimer la prise de l'invité ; ancien doublon : l'invité supprime la sienne, celle de l'hôte reste ; invité parti, un autre compte arrive avec le même pseudo → ne peut pas supprimer la prise de l'ancien, et elle ne compte pas dans son plafond (10 ajoutées, 11e refusée) ; ancienne entrée sans compte supprimée par repli sur le pseudo ; Draw It : identifiant pris refusé, mot d'origine intact, suppression OK ; annulation vérifiée |
+| Prod | appliquée le 2026-11-25 (migration `fix_custom_entries_caps`, version 20261125192307) · contrôle : 3 fonctions SECURITY DEFINER exécutables par `authenticated` et `service_role` seulement (pas `anon`) ; `upsert_player_custom_entry` avec plafonds et `CUSTOM_ID_TAKEN`, `delete_player_custom_entry` non bloquée par un doublon, `upsert_player_custom_live_tier_list` à 3 par joueur ; 0 partie en cours au moment de l'application |
+
+**Statut** : repo ✅ · essai ✅ · prod ✅.
+
+---
+
+## 55. Fonctions internes fermées — reprise de place, ancienne création de membre, outils internes
+
+Audit sécurité Supabase d'ensemble (tmp/audit-securite-supabase.md) n°1 et n°2 : `remap_lobby_user_id` (remplace un joueur par un autre dans un salon : rôle secret, messages, état de partie) ne vérifiait rien et était exécutable par `anon` et `authenticated` ; `create_lobby_member` (remplacée par `create_lobby_atomically`, ajoute l'appelant comme hôte) n'avait jamais été fermée (fiche E4-03b restée « à vérifier »).
+
+| Élément | Valeur |
+| ------- | ------ |
+| Migration | [`fix-security-internal-functions.sql`](../supabase/fix-security-internal-functions.sql) : retrait des droits `public`, `anon`, `authenticated` sur les deux fonctions ; `service_role` garde l'accès. Reprend aussi [`lobby-membership-e4-03b-revoke-create-lobby-member.sql`](../supabase/lobby-membership-e4-03b-revoke-create-lobby-member.sql) |
+| Appli | aucun changement : `remap_lobby_user_id` n'est appelée que par `reclaim_guest_membership` (droits du propriétaire `postgres`) ; `create_lobby_member` n'est plus appelée depuis le 2026-07-28 (commit 6a00cc9) |
+| Versions publiées | une version installée avant le 2026-07-28 et jamais mise à jour ne pourrait plus créer de salon (le minimum de version est à 1). Journaux du 2026-11-22 au 25 : aucun appel à `create_lobby_member` ni à `remap_lobby_user_id` |
+| n°6 et n°7 (même migration, ajoutés le 2026-11-25) | outils internes fermés à `public`, `anon`, `authenticated` (`service_role` garde l'accès) : `is_auth_user_anonymous`, `touch_lobby_activity`, `trivia_all_expected_players_answered`, `trivia_question_player_uids`, `truth_meter_all_expected_voters_voted`, `truth_meter_apply_reveal_scoring`, `truth_meter_expected_voter_uids`, `truth_meter_resolve_author_uid`, `cleanup_stale_guest_members`. Appelants vérifiés : tous SECURITY DEFINER appartenant à `postgres` (ou la tâche planifiée), aucune règle d'accès ne les utilise, l'appli ne les appelle pas. `search_path` fixé sur `cleanup_stale_guest_members` et `update_member_presence` (qui reste ouverte aux joueurs) |
+| Contrat | `tests/fixSecurityInternalFunctions.test.js` |
+| Essai annulé (2026-11-25) | un seul bloc annulé par une erreur finale ; 3 comptes (hôte, ancien invité, nouvel invité), salon, partie et rôle Spot the fake de l'ancien invité ; après les retraits : droits `anon` / `authenticated` à faux, `service_role` à vrai ; appel direct de `remap_lobby_user_id` refusé en invité connecté et sans session ; `create_lobby_member` refusée (aucun intrus ajouté) ; reprise de place normale (`reclaim_guest_membership`) OK : place, état de partie et rôle secret passés au nouvel invité, plus aucune trace de l'ancien ; annulation vérifiée (droits d'origine en place, aucun compte ni salon d'essai) |
+| Essai annulé n°6-7 (2026-11-25) | migration complète (n°1, 2, 6, 7) dans un bloc annulé : les 11 fonctions refusées à `anon` / `authenticated`, permises à `service_role` ; appels directs refusés en invité connecté ; parcours normal OK : création de salon, arrivée d'un invité et présence (salon rafraîchi par les déclencheurs), message du chat, `peek_lobby_by_membership` (`reclaimable` vrai), ménage des invités lancé comme la tâche planifiée ; annulation vérifiée |
+| Prod | appliquée le 2026-11-25 (migration `fix_security_internal_functions`, version 20261125195417) · contrôle : les 11 fonctions refusées à `anon` et `authenticated`, permises à `service_role`, `search_path` fixé partout ; `update_member_presence` toujours ouverte aux joueurs ; 0 salon ouvert au moment de l'application |
+
+**Statut** : repo ✅ · essai ✅ · prod ✅.
+
+---
+
+## 56. Membres du salon — un joueur ne change plus son salon, son rôle d'hôte ni son arrivée
+
+Audit sécurité Supabase d'ensemble (tmp/audit-securite-supabase.md) n°4 : les règles `members_insert_self` / `members_update_self` laissaient un joueur écrire toutes les colonnes de sa ligne (en appelant la base directement) : se marquer hôte (les téléphones des autres le croyaient), passer dans un autre salon sans code ni plafond de places, pseudo / emoji / couleur sans limite de longueur.
+
+| Élément | Valeur |
+| ------- | ------ |
+| Migration | [`fix-lobby-members-player-guard.sql`](../supabase/fix-lobby-members-player-guard.sql) : déclencheur `lobby_members_guard_player_write` (avant ajout et modification, SECURITY INVOKER). Écriture directe d'un joueur (`current_user` = `authenticated` / `anon`) : à l'arrivée `is_host` forcé à faux ; en modification `id`, `lobby_id`, `user_id`, `is_host`, `joined_at` gardent leur valeur. Toujours : pseudo coupé à 24, emoji et couleur à 16 |
+| Appli | aucun changement : elle envoie déjà `is_host: false` à l'arrivée et ne modifie que `last_seen_at`, `ready`, `display_name`, `emoji`. Les fonctions serveur (création, transfert d'hôte, reprise de place) tournent avec les droits de `postgres` et gardent la main |
+| Contrat | `tests/fixLobbyMembersPlayerGuard.test.js` |
+| Essai annulé (2026-11-25) | 4 comptes, 2 salons créés par `create_lobby_atomically` (hôtes à `is_host` vrai) ; invité qui arrive en se déclarant hôte → enregistré non-hôte ; invité qui tente de changer salon, `is_host`, `joined_at`, pseudo de 100, emoji de 40, couleur de 50 → reste dans son salon, non-hôte, arrivée inchangée, `ready` accepté, longueurs 24 / 16 / 16, l'autre salon toujours à 1 membre ; usage normal (pseudo, emoji, `ready`, `last_seen_at`, `update_member_presence`) OK ; transfert d'hôte OK (`is_host` et `lobbies.host_id`) ; reprise de place par un autre invité OK ; annulation vérifiée |
+| Prod | appliquée le 2026-11-25 (migration `fix_lobby_members_player_guard`, version 20261125195427) · contrôle : déclencheur `lobby_members_guard_player_write` en place sur `lobby_members` ; 0 salon ouvert au moment de l'application |
+
+**Statut** : repo ✅ · essai ✅ · prod ✅.
+
+## 57. Membres du salon — emoji et couleur limités aux valeurs connues
+
+Audit carnet et cosmétiques (tmp/audit-carnet-cosmetiques.md) n°1 : l'emoji et la couleur d'un membre (`lobby_members`) étaient écrits par le joueur, coupés à 16 caractères mais sans contrôle du contenu, puis insérés tels quels dans la page : une appli modifiée pouvait afficher du HTML court à tout le salon, et un joueur sans Signature pouvait prendre un emoji Signature. L'emoji d'un profil Signature acceptait n'importe quel texte (32 octets).
+
+| Élément | Valeur |
+| ------- | ------ |
+| Migration | [`fix-member-cosmetics.sql`](../supabase/fix-member-cosmetics.sql) : `lobby_members_stamp_signature` (déjà SECURITY DEFINER, lit le pack) n'accepte qu'un emoji gratuit, ou Signature si le compte a le pack, sinon 👤 ; couleur `#rgb` / `#rrggbb` / `#rrggbbaa`, sinon la couleur d'avant (modification) ou `#60A5FA` (arrivée). `profiles_signature_cosmetics` : avec le pack, emoji gratuit ou Signature seulement, sinon 👤. Marqueur `member-cosmetics-v1` |
+| Appli | `js/core/memberCosmetics.js` : `mapMember` (`supabaseLobby.js`) ne garde qu'un emoji connu et une couleur #hex ; emoji et couleur passés par `escapeHtml` à l'affichage (salon, écran des jeux, Clutch, Consensus, Dilemma, Speed Vote, Tier Night Live, Le Traître, Truth Meter, Wrong Answer) |
+| Contrat | `tests/fixMemberCosmetics.test.js` (listes SQL alignées sur `data/profileEmojis.js` et `data/signatureIdentity.js`) |
+| Essai annulé (2026-11-25) | 1 compte Signature, 1 compte gratuit, 1 salon créé pour l'essai. Membre Signature 👑 / `#A78BFA` → gardé ; membre gratuit 👑 / `red;"><b>` → 👤 / `#60A5FA` ; 🦊 / `#123456` → gardé ; `<a href=//x.yz>` / `url(//x)` → 👤 / `#123456` (couleur d'avant) ; 🕵️ → gardé ; battement de présence du membre Signature → 👑 et `signature` inchangés. Profil gratuit 👑 → 👤, 🦊 → gardé ; profil Signature `<b>x</b>` → 👤, 🐉 → gardé. Annulation vérifiée (empreintes des 2 fonctions inchangées, aucun salon d'essai restant) |
+| Effet à connaître | un compte qui perd le pack (remboursement) repasse à 👤 dans le salon s'il avait un emoji Signature ; pendant l'attente du webhook après un achat, un emoji Signature choisi apparaît en 👤 dans le salon jusqu'au prochain changement d'emoji (le profil se comportait déjà ainsi) |
+| Prod | appliquée le 2026-11-25 (migration `fix_member_cosmetics`, version 20261125212148) · contrôle : marqueur `member-cosmetics-v1` présent dans les 2 fonctions ; 0 membre de salon au moment de l'application |
+
+**Statut** : repo ✅ · essai ✅ · prod ✅.
+
+## 58. Carnet — jetons d'archive nettoyés, plus de jeton pour l'hôte qui ferme
+
+Audit carnet et cosmétiques (tmp/audit-carnet-cosmetiques.md) n°2 : les jetons d'archive carnet (`signature_carnet_kick_allow`, valables 30 min) n'étaient effacés que si la personne archivait ensuite (46 jetons expirés le 2026-11-25, le plus ancien du 2026-09-07), et l'hôte Signature en recevait un inutile à chaque fermeture.
+
+| Élément | Valeur |
+| ------- | ------ |
+| Migration | [`fix-carnet-kick-allow-cleanup.sql`](../supabase/fix-carnet-kick-allow-cleanup.sql) : `dissolve_lobby_atomically` (reprise de 04c) efface les jetons de plus de 30 min avant d'en créer, et n'en crée plus pour l'hôte ; nettoyage unique des jetons déjà expirés. `archive_signature_evening` et `kick_lobby_member` inchangés |
+| Appli | aucun changement |
+| Contrat | `tests/fixCarnetKickAllowCleanup.test.js` |
+| Essai annulé (2026-11-25) | 2 comptes Signature (hôte, membre) et 1 compte gratuit dans un salon créé pour l'essai ; fermeture par le membre → `NOT_ALLOWED` ; par l'hôte → `DISSOLVED`, jeton pour le membre Signature seulement (hôte 0, gratuit 0), jetons expirés 46 → 0, salon et membres supprimés, fermeture notée ; 2e appel → `ALREADY_GONE`. Annulation vérifiée (empreinte inchangée, 46 jetons, aucun salon d'essai) |
+| Prod | appliquée le 2026-11-25 (migration `fix_carnet_kick_allow_cleanup`, version 20261125212206) · contrôle : fonction sans jeton pour l'hôte, droits inchangés (authenticated, service_role), 0 jeton expiré restant (46 effacés) |
+
+**Statut** : repo ✅ · essai ✅ · prod ✅.
+
+## 59. Sessions de jeu — écritures directes réservées à l'hôte du salon
+
+Audit badges, classement et stats (tmp/audit-badges-classement-stats.md) n°1 : la règle d'ajout de `game_sessions` vérifiait seulement que la personne était membre du salon et s'inscrivait comme hôte de la ligne. Entre deux parties la ligne est supprimée (retour au choix des jeux) : un invité pouvait la créer, y écrire points et stats (`scores`, `playerStats`) puis la modifier ; les valeurs gonflées restaient sur tous les téléphones (fusion au maximum) jusqu'à la fin du salon.
+
+| Élément | Valeur |
+| ------- | ------ |
+| Migration | [`fix-game-sessions-host-only.sql`](../supabase/fix-game-sessions-host-only.sql) : `game_sessions_insert`, `game_sessions_update` et `game_sessions_delete` exigent `is_lobby_host(lobby_id) and auth.uid() = host_id`. Lecture inchangée. Fonctions serveur (SECURITY DEFINER) non concernées. Rollback dans l'en-tête du fichier |
+| Appli | aucun changement (l'appli n'écrit déjà directement que depuis l'hôte) |
+| Contrat | `tests/fixGameSessionsHostOnly.test.js` |
+| Essai annulé (2026-11-25) | 1 salon créé pour l'essai (hôte, invité). Invité : ajout refusé (42501), modification 0 ligne, suppression 0 ligne. Hôte : ajout direct OK, modification 1 ligne, `upsert_game_session_preserving_roster_topics` OK. Après `transfer_lobby_host` vers l'invité : ancien hôte modification 0 ligne et ajout refusé, nouvel hôte modification et suppression 1 ligne. Annulation vérifiée (règles d'avant en place, aucun salon d'essai) |
+| Prod | appliquée le 2026-11-25 (migration `fix_game_sessions_host_only`, version 20261125213522) · contrôle : les 3 règles d'écriture exigent `is_lobby_host(lobby_id) AND auth.uid() = host_id`, lecture inchangée ; aucun salon ouvert au moment de l'application |
+
+**Statut** : repo ✅ · essai ✅ · prod ✅.

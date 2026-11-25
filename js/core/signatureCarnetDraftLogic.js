@@ -181,3 +181,22 @@ export function pruneStaleSignatureCarnetDrafts(store, now = Date.now(), ttlMs =
   }
   return out;
 }
+
+/**
+ * Audit carnet et cosmétiques n°4 — brouillons d'un compte à la déconnexion.
+ * Garde seulement celui du salon dont le compte est encore membre (archive C-HOME
+ * possible après reconnexion), retire les autres.
+ */
+export function removeSignatureCarnetDraftsForUser(store, userId, { keepLobbyId = null } = {}) {
+  const uid = typeof userId === "string" ? userId.trim() : "";
+  const src = store && typeof store === "object" ? store : {};
+  if (!isSignatureDraftUuid(uid)) return src;
+  const keepKey = keepLobbyId ? signatureCarnetDraftKey(uid, String(keepLobbyId)) : null;
+  const prefix = `${uid}:`;
+  const out = {};
+  for (const [key, row] of Object.entries(src)) {
+    if (key.startsWith(prefix) && key !== keepKey) continue;
+    out[key] = row;
+  }
+  return out;
+}
