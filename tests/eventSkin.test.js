@@ -7,6 +7,7 @@ import {
   resolveEventSkin,
   skinForDate,
   toLocalDateKey,
+  toLocalMonthDayKey,
 } from "../data/eventSkin.js";
 
 describe("event skin calendar", () => {
@@ -16,10 +17,10 @@ describe("event skin calendar", () => {
 
   it("registers the extra seasonal skins", () => {
     assert.equal(EVENT_SKINS.test21, undefined);
-    assert.equal(EVENT_SKINS.aprilfools.start, "2027-03-31");
-    assert.equal(EVENT_SKINS.music.end, "2027-06-23");
-    assert.equal(EVENT_SKINS.bastille.start, "2027-07-12");
-    assert.equal(EVENT_SKINS.rentree.end, "2027-09-16");
+    assert.equal(EVENT_SKINS.aprilfools.start, "03-31");
+    assert.equal(EVENT_SKINS.music.end, "06-23");
+    assert.equal(EVENT_SKINS.bastille.start, "07-12");
+    assert.equal(EVENT_SKINS.rentree.end, "09-16");
   });
 
   it("maps local dates into inclusive/exclusive windows", () => {
@@ -97,5 +98,38 @@ describe("event skin calendar", () => {
 
   it("formats local date keys without UTC shift surprises", () => {
     assert.equal(toLocalDateKey(new Date(2026, 9, 1)), "2026-10-01");
+    assert.equal(toLocalMonthDayKey(new Date(2026, 9, 1)), "10-01");
+  });
+
+  it("dates sans année : chaque skin revient tous les ans", () => {
+    for (const skin of Object.values(EVENT_SKINS)) {
+      assert.match(skin.start, /^\d{2}-\d{2}$/, skin.id);
+      assert.match(skin.end, /^\d{2}-\d{2}$/, skin.id);
+    }
+    for (const year of [2026, 2027, 2028, 2031]) {
+      assert.equal(skinForDate(new Date(year, 9, 31))?.id, "halloween", String(year));
+      assert.equal(skinForDate(new Date(year, 11, 24))?.id, "christmas", String(year));
+      assert.equal(skinForDate(new Date(year, 6, 14))?.id, "bastille", String(year));
+      assert.equal(skinForDate(new Date(year, 8, 15))?.id, "rentree", String(year));
+      assert.equal(skinForDate(new Date(year, 8, 16)), null, String(year));
+    }
+  });
+
+  it("Nouvel An à cheval sur le 1er janvier", () => {
+    assert.equal(skinForDate(new Date(2026, 11, 25))?.id, "christmas");
+    assert.equal(skinForDate(new Date(2026, 11, 26))?.id, "nye");
+    assert.equal(skinForDate(new Date(2026, 11, 31, 23, 59))?.id, "nye");
+    assert.equal(skinForDate(new Date(2027, 0, 1))?.id, "nye");
+    assert.equal(skinForDate(new Date(2028, 0, 2))?.id, "nye");
+    assert.equal(skinForDate(new Date(2028, 0, 3)), null);
+    assert.equal(skinForDate(new Date(2027, 5, 15)), null);
+  });
+
+  it("une seule peau à la fois sur toute l'année", () => {
+    const skins = Object.values(EVENT_SKINS);
+    for (let d = new Date(2028, 0, 1); d.getFullYear() === 2028; d.setDate(d.getDate() + 1)) {
+      const hits = skins.filter((s) => isDateInSkinWindow(d, s)).map((s) => s.id);
+      assert.ok(hits.length <= 1, `${toLocalDateKey(d)} : ${hits.join(", ")}`);
+    }
   });
 });

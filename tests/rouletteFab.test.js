@@ -60,3 +60,10 @@ describe("bouton 🎲 roulette sur game-select", () => {
     assert.ok(main.indexOf("initRouletteFab();") > main.indexOf("initFeedbackFab();"));
   });
 });
+
+describe("bouton 🎲 roulette caché hors game-select", () => {
+  it("l'attribut hidden l'emporte sur display:flex", () => {
+    const css = read("style.css");
+    assert.match(css, /\.roulette-fab\[hidden\]\{\s*display:none;?\s*\}/);
+  });
+});

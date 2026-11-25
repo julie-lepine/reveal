@@ -1,4 +1,5 @@
 import { EVENT_SKINS, resolveEventSkin } from "../../data/eventSkin.js";
+import { isNativeApp } from "./platform.js";
 
 const LAYER_ID = "event-layer";
 const DEFAULT_THEME_COLOR = "#0D0F1E";
@@ -84,8 +85,73 @@ export function applyEventSkin(skin) {
   return resolved;
 }
 
+let appliedSkinId = null;
+let refreshInit = false;
+let midnightTimer = null;
+
+/**
+ * Recalcule le skin (date du jour) et ne touche au DOM que s'il a changé :
+ * pas de calque recréé ni d'animation relancée à chaque retour dans l'appli.
+ */
+export function refreshEventSkin() {
+  const next = resolveEventSkin({ search: currentSearch() });
+  const nextId = next?.id ?? null;
+  if (nextId === appliedSkinId) return next;
+  appliedSkinId = nextId;
+  return applyEventSkin(next);
+}
+
+/** Millisecondes jusqu'au prochain minuit local (+1 s de marge). */
+export function msUntilNextLocalMidnight(now = new Date()) {
+  const next = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 1);
+  return Math.max(1000, next.getTime() - now.getTime());
+}
+
+function scheduleMidnightRefresh() {
+  if (midnightTimer) clearTimeout(midnightTimer);
+  midnightTimer = setTimeout(() => {
+    midnightTimer = null;
+    refreshEventSkin();
+    scheduleMidnightRefresh();
+  }, msUntilNextLocalMidnight());
+}
+
+/**
+ * L'appli revient souvent du second plan sans redémarrer : on recalcule
+ * le skin au retour au premier plan et à minuit si elle reste ouverte.
+ */
+function initEventSkinRefresh() {
+  if (refreshInit || typeof document === "undefined") return;
+  refreshInit = true;
+
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) return;
+    refreshEventSkin();
+    scheduleMidnightRefresh();
+  });
+  scheduleMidnightRefresh();
+
+  if (!isNativeApp()) return;
+  void (async () => {
+    try {
+      const { loadCapacitorApp } = await import("./capacitorImports.js");
+      const App = (await loadCapacitorApp())?.App;
+      App?.addListener?.("appStateChange", ({ isActive }) => {
+        if (!isActive) return;
+        refreshEventSkin();
+        scheduleMidnightRefresh();
+      });
+    } catch (e) {
+      console.warn("[eventSkin] foreground listener:", e?.message || e);
+    }
+  })();
+}
+
 export function initEventSkin() {
-  return applyEventSkin();
+  const skin = applyEventSkin();
+  appliedSkinId = skin?.id ?? null;
+  initEventSkinRefresh();
+  return skin;
 }
 
 export { EVENT_SKINS };

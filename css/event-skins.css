@@ -27,13 +27,14 @@ html.event-christmas {
 html.event-nye {
   --color-bg: #12100a;
   --color-bg-deep: #080704;
-  --color-primary: #f5d76e;
-  --color-primary-hot: #fff1b8;
-  --color-secondary: #a78bfa;
+  /* Doré soutenu : le texte des boutons reste blanc (≥ contraste du rose d'origine). */
+  --color-primary: #b8860b;
+  --color-primary-hot: #c4921a;
+  --color-secondary: #8b5cf6;
   --color-secondary-soft: #ddd6fe;
   --color-secondary-deep: #6d28d9;
   --shadow-primary: 0 8px 32px rgba(245, 215, 110, 0.28);
-  --shadow-secondary: 0 8px 28px rgba(167, 139, 250, 0.32);
+  --shadow-secondary: 0 8px 28px rgba(139, 92, 246, 0.32);
 }
 
 html.event-stpatrick {
