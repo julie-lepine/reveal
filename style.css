@@ -4783,6 +4783,11 @@ body.has-bottom-nav .roulette-fab{
   pointer-events:none;
   transform:scale(.85);
 }
+/* display:flex annule l'attribut hidden : sans ça, le bouton reste lu par le
+   lecteur d'écran et atteignable au clavier sur tous les écrans. */
+.roulette-fab[hidden]{
+  display:none;
+}
 .roulette-fab:active{
   transform:scale(.92);
 }

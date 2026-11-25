@@ -12,8 +12,8 @@
  * @property {EventSkinId} id
  * @property {string} className
  * @property {string} themeColor
- * @property {string} start inclusive YYYY-MM-DD (local)
- * @property {string} end exclusive YYYY-MM-DD (local)
+ * @property {string} start inclusive MM-DD (local), revient chaque année
+ * @property {string} end exclusive MM-DD (local) ; end <= start = fenêtre à cheval sur le 1er janvier
  */
 
 /** @type {Record<EventSkinId, EventSkin>} */
@@ -22,57 +22,57 @@ export const EVENT_SKINS = {
     id: "halloween",
     className: "event-halloween",
     themeColor: "#14080c",
-    start: "2026-10-01",
-    end: "2026-11-01",
+    start: "10-01",
+    end: "11-01",
   },
   christmas: {
     id: "christmas",
     className: "event-christmas",
     themeColor: "#07140c",
-    start: "2026-12-01",
-    end: "2026-12-26",
+    start: "12-01",
+    end: "12-26",
   },
   nye: {
     id: "nye",
     className: "event-nye",
     themeColor: "#12100a",
-    start: "2026-12-26",
-    end: "2027-01-03",
+    start: "12-26",
+    end: "01-03",
   },
   stpatrick: {
     id: "stpatrick",
     className: "event-stpatrick",
     themeColor: "#07140c",
-    start: "2027-03-10",
-    end: "2027-03-18",
+    start: "03-10",
+    end: "03-18",
   },
   aprilfools: {
     id: "aprilfools",
     className: "event-aprilfools",
     themeColor: "#0f0d1e",
-    start: "2027-03-31",
-    end: "2027-04-03",
+    start: "03-31",
+    end: "04-03",
   },
   music: {
     id: "music",
     className: "event-music",
     themeColor: "#0c0618",
-    start: "2027-06-18",
-    end: "2027-06-23",
+    start: "06-18",
+    end: "06-23",
   },
   bastille: {
     id: "bastille",
     className: "event-bastille",
     themeColor: "#070b16",
-    start: "2027-07-12",
-    end: "2027-07-16",
+    start: "07-12",
+    end: "07-16",
   },
   rentree: {
     id: "rentree",
     className: "event-rentree",
     themeColor: "#12100c",
-    start: "2027-09-01",
-    end: "2027-09-16",
+    start: "09-01",
+    end: "09-16",
   },
 };
 
@@ -86,10 +86,17 @@ export function toLocalDateKey(date = new Date()) {
   return `${y}-${m}-${day}`;
 }
 
+/** "MM-DD" local, sans l'année : le calendrier revient chaque année. */
+export function toLocalMonthDayKey(date = new Date()) {
+  return toLocalDateKey(date).slice(5);
+}
+
 export function isDateInSkinWindow(date, skin) {
   if (!skin?.start || !skin?.end) return false;
-  const key = toLocalDateKey(date);
-  return key >= skin.start && key < skin.end;
+  const key = toLocalMonthDayKey(date);
+  if (skin.start < skin.end) return key >= skin.start && key < skin.end;
+  // À cheval sur le 1er janvier (Nouvel An : 12-26 → 01-03).
+  return key >= skin.start || key < skin.end;
 }
 
 export function skinForDate(date = new Date()) {
