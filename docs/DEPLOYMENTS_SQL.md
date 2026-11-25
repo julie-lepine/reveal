@@ -1093,3 +1093,17 @@ Audit carnet et cosmétiques (tmp/audit-carnet-cosmetiques.md) n°2 : les jetons
 | Prod | appliquée le 2026-11-25 (migration `fix_carnet_kick_allow_cleanup`, version 20261125212206) · contrôle : fonction sans jeton pour l'hôte, droits inchangés (authenticated, service_role), 0 jeton expiré restant (46 effacés) |
 
 **Statut** : repo ✅ · essai ✅ · prod ✅.
+
+## 59. Sessions de jeu — écritures directes réservées à l'hôte du salon
+
+Audit badges, classement et stats (tmp/audit-badges-classement-stats.md) n°1 : la règle d'ajout de `game_sessions` vérifiait seulement que la personne était membre du salon et s'inscrivait comme hôte de la ligne. Entre deux parties la ligne est supprimée (retour au choix des jeux) : un invité pouvait la créer, y écrire points et stats (`scores`, `playerStats`) puis la modifier ; les valeurs gonflées restaient sur tous les téléphones (fusion au maximum) jusqu'à la fin du salon.
+
+| Élément | Valeur |
+| ------- | ------ |
+| Migration | [`fix-game-sessions-host-only.sql`](../supabase/fix-game-sessions-host-only.sql) : `game_sessions_insert`, `game_sessions_update` et `game_sessions_delete` exigent `is_lobby_host(lobby_id) and auth.uid() = host_id`. Lecture inchangée. Fonctions serveur (SECURITY DEFINER) non concernées. Rollback dans l'en-tête du fichier |
+| Appli | aucun changement (l'appli n'écrit déjà directement que depuis l'hôte) |
+| Contrat | `tests/fixGameSessionsHostOnly.test.js` |
+| Essai annulé (2026-11-25) | 1 salon créé pour l'essai (hôte, invité). Invité : ajout refusé (42501), modification 0 ligne, suppression 0 ligne. Hôte : ajout direct OK, modification 1 ligne, `upsert_game_session_preserving_roster_topics` OK. Après `transfer_lobby_host` vers l'invité : ancien hôte modification 0 ligne et ajout refusé, nouvel hôte modification et suppression 1 ligne. Annulation vérifiée (règles d'avant en place, aucun salon d'essai) |
+| Prod | appliquée le 2026-11-25 (migration `fix_game_sessions_host_only`, version 20261125213522) · contrôle : les 3 règles d'écriture exigent `is_lobby_host(lobby_id) AND auth.uid() = host_id`, lecture inchangée ; aucun salon ouvert au moment de l'application |
+
+**Statut** : repo ✅ · essai ✅ · prod ✅.
