@@ -67,6 +67,7 @@ import { mountTierNight } from "./games/tierNight.js";
 import { mountTierNightLive } from "./games/tierNightLive.js";
 import { initMultiplayerSyncVisibility } from "./core/gameSync.js";
 import { initFeedbackFab } from "./core/feedbackUi.js";
+import { initRouletteFab } from "./core/rouletteFab.js";
 import { initLobbyPollSync } from "./core/lobbyPollStore.js";
 import { initChatRandomGameSync } from "./core/chatRandomGame.js";
 import { initHostNoticeListener } from "./core/hostNotice.js";
@@ -148,6 +149,7 @@ registerScreen("tiernight-live", mountTierNightLive);
 try {
   initBottomNav();
   initFeedbackFab();
+  initRouletteFab();
   // initLobbyPollSync après authReady (voir boot) - évite subscribe Realtime sans JWT
   initExitGameDelegation(app);
   initAds();

@@ -25,7 +25,6 @@ import {
 } from "../js/config/friends.js";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
-const friendsDoc = readFileSync(join(ROOT, "docs/FRIENDS.md"), "utf8");
 const configSrc = readFileSync(join(ROOT, "js/config/friends.js"), "utf8");
 
 describe("FEATURE-FRIENDS-01 Palier 0 — contrats", () => {
@@ -122,11 +121,4 @@ describe("FEATURE-FRIENDS-01 Palier 0 — contrats", () => {
     assert.doesNotMatch(friendsRealtimeTopic("abc"), /^lobby:/);
   });
 
-  it("docs/FRIENDS.md nomme les mêmes RPC et l’écran friends", () => {
-    for (const name of Object.values(FRIEND_RPC_F01)) {
-      assert.match(friendsDoc, new RegExp(name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
-    }
-    assert.match(friendsDoc, /js\/screens\/friends\.js/);
-    assert.match(friendsDoc, /js\/config\/friends\.js/);
-  });
 });

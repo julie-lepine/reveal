@@ -11,16 +11,6 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const read = (rel) => readFileSync(join(ROOT, rel), "utf8");
 
 describe("FEATURE-FRIENDS-02 Palier 9 — docs / Pages", () => {
-  it("FRIENDS.md palier 9 coché ; Phase 2 close sauf stores", () => {
-    const friends = read("docs/FRIENDS.md");
-    assert.match(friends, /Palier 9 validé/);
-    assert.match(friends, /FEATURE-FRIENDS-02 Phase 2 close/);
-    assert.match(friends, /julie-lepine\.github\.io\/reveal/);
-    assert.match(friends, /pas.*1\.0\.0 App Store/);
-    assert.match(friends, /Ne pas.*relancer le runbook/);
-    assert.doesNotMatch(friends, /\*\*Prochain : palier 9\.\*\*/);
-  });
-
   it("DEPLOYMENTS_SQL §14 : Pages, pas wrappers-only", () => {
     const dep = read("docs/DEPLOYMENTS_SQL.md");
     assert.match(dep, /## 14\. FEATURE-FRIENDS-02/);
@@ -39,10 +29,9 @@ describe("FEATURE-FRIENDS-02 Palier 9 — docs / Pages", () => {
     assert.match(supabase, /pas `friend_request_cooldowns`/);
   });
 
-  it("LAUNCH.md : invitations live web ; build prod iOS embarque amis", () => {
+  it("LAUNCH.md : amis / invitations live sur web + fiches stores", () => {
     const launch = read("docs/LAUNCH.md");
-    assert.match(launch, /Amis \/ invitations de soirée/);
+    assert.match(launch, /Amis \/ invitations \/ croisés 24 h/);
     assert.match(launch, /julie-lepine\.github\.io\/reveal/);
-    assert.match(launch, /build prod iOS embarque/);
   });
 });

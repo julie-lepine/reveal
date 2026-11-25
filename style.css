@@ -4743,6 +4743,56 @@ body.has-bottom-nav .feedback-fab{
     box-shadow:0 10px 28px rgba(0,0,0,.45);
   }
 }
+
+/* Bouton 🎲 roulette : même gabarit que le 💬, posé juste au-dessus (48px + 12px). */
+.roulette-fab{
+  position:fixed;
+  right:max(var(--page-pad), env(safe-area-inset-right, 0px));
+  bottom:calc(76px + env(safe-area-inset-bottom, 0px));
+  z-index:110;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  width:48px;
+  height:48px;
+  padding:0;
+  border-radius:999px;
+  border:1px solid rgba(255,255,255,.22);
+  background:linear-gradient(145deg, rgba(236,72,153,.92), rgba(88,28,135,.94));
+  box-shadow:0 8px 24px rgba(0,0,0,.35);
+  color:#fff;
+  font-size:22px;
+  line-height:1;
+  cursor:pointer;
+  transition:transform .15s ease, opacity .2s ease, box-shadow .15s ease;
+  -webkit-tap-highlight-color:transparent;
+}
+body.has-bottom-nav .roulette-fab{
+  bottom:calc(160px + env(safe-area-inset-bottom, 0px));
+}
+.roulette-fab__icon{
+  display:block;
+  line-height:1;
+}
+.roulette-fab--guest{
+  opacity:.55;
+  box-shadow:none;
+}
+.roulette-fab--hidden{
+  opacity:0;
+  pointer-events:none;
+  transform:scale(.85);
+}
+.roulette-fab:active{
+  transform:scale(.92);
+}
+body.has-roulette-fab .page{
+  padding-bottom:calc(var(--page-pad) + 136px + env(safe-area-inset-bottom, 0px));
+}
+/* Avec la barre du bas : 🎲 finit à 160 + 48 = 208px du bas, + 12px d'air. */
+body.has-roulette-fab.has-bottom-nav .page{
+  padding-bottom:calc(220px + env(safe-area-inset-bottom, 0px));
+}
 /* ─── Chat sheet (Vague A) ─── */
 .chat-sheet{
   position:fixed;

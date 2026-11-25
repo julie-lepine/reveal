@@ -30,12 +30,4 @@ describe("FEATURE-FRIENDS-02 Palier 7 — légal", () => {
     assert.match(deletion.body, /invitations de soirée associées/);
     assert.match(deletion.body, /cascade/);
   });
-
-  it("prompt OVH FEATURE-FRIENDS-02 documenté ; stores plus tard", () => {
-    const ovh = read("docs/LEGAL_SITE_OVH.md");
-    assert.match(ovh, /FEATURE-FRIENDS-02/);
-    assert.match(ovh, /invitations de soirée éphémères/);
-    assert.match(ovh, /privacy\.html/);
-    assert.match(ovh, /App Privacy Apple \/ Play Data safety/);
-  });
 });

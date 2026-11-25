@@ -37,8 +37,13 @@ describe("FEATURE-FRIENDS-02 Palier 1 — SQL source", () => {
   });
 
   it("erreurs métier + busy sans auto-leave + plafond 8 au join", () => {
-    for (const code of Object.values(LOBBY_INVITE_RPC_ERROR)) {
-      assert.match(sql, new RegExp(`raise exception '${code}'`));
+    for (const [key, code] of Object.entries(LOBBY_INVITE_RPC_ERROR)) {
+      // lobby_full vient du trigger H-RACE (feature-host-04), pas des RPC invitations.
+      const file =
+        key === "lobbyFull"
+          ? readFileSync(join(ROOT, "supabase/feature-host-04-race-cap.sql"), "utf8")
+          : sql;
+      assert.match(file, new RegExp(`raise exception '${code}'`), code);
     }
     assert.match(sql, /get_lobby_member_count\(v_lobby_id\) >= 8/);
     assert.match(sql, /interval '24 hours'/);

@@ -67,7 +67,7 @@ import {
   ensureLobbyHostOrOfferClaim,
   clientMayOfferHostClaim,
 } from "./hostClaimOffer.js";
-import { isChatFabAllowedScreen } from "./chatFabScreens.js";
+import { isChatFabAllowedScreen, isRouletteFabScreen } from "./chatFabScreens.js";
 
 const hostActionLock = createActionLock();
 const resultPhasePublishLock = createActionLock();
@@ -683,7 +683,8 @@ export function resetChatRandomGameCtaForTests() {
 
 export function renderChatRandomGameCta(rootEl) {
   if (!rootEl) return;
-  if (!canOfferChatRouletteCta()) {
+  // Sur game-select, le bouton 🎲 flottant (rouletteFab.js) remplace celui du chat.
+  if (!canOfferChatRouletteCta() || isRouletteFabScreen(getCurrentScreen())) {
     rootEl.innerHTML = "";
     rootEl.hidden = true;
     return;

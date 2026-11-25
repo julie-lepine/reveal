@@ -314,7 +314,9 @@ describe("lobbyMembershipVagueE3 - soft-hold post-leave", () => {
 
   it("13 - atomicité unknown→pending : aucun checking entre end et pending", () => {
     // Contrat Home : pending = true AVANT end(gen).
-    // Frame interdite : snapshot null + !transition + !pending → checking.
+    // Frame interdite : snapshot null + !transition + !pending → check_failed
+    // (depuis que « aucun snapshot sans résolution en cours » = erreur + Réessayer,
+    // au lieu d'un « Vérification… » sans fin).
     beginPostLeaveHomeTransition();
     const gen = getPostLeaveHomeTransitionGeneration();
 
@@ -328,7 +330,7 @@ describe("lobbyMembershipVagueE3 - soft-hold post-leave", () => {
       }).state;
     // Prouve le trou si on endait sans pending :
     endPostLeaveHomeTransition(gen);
-    assert.equal(forbiddenIfEndFirst(), "checking");
+    assert.equal(forbiddenIfEndFirst(), "check_failed");
 
     // Contrat réel : pending avant end - derive ne voit jamais checking.
     __resetPostLeaveHomeTransitionForTests();

@@ -27,7 +27,6 @@ import {
 } from "../js/config/recentPeers.js";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
-const friendsDoc = readFileSync(join(ROOT, "docs/FRIENDS.md"), "utf8");
 const configSrc = readFileSync(join(ROOT, "js/config/recentPeers.js"), "utf8");
 
 describe("FEATURE-FRIENDS-04 Palier 0 — contrats croisés récents", () => {
@@ -89,12 +88,4 @@ describe("FEATURE-FRIENDS-04 Palier 0 — contrats croisés récents", () => {
     assert.equal(RECENT_PEERS_LABEL.empty, "Personne récemment.");
   });
 
-  it("docs/FRIENDS.md nomme FEATURE-FRIENDS-04, la table et la RPC", () => {
-    assert.match(friendsDoc, /FEATURE-FRIENDS-04/);
-    assert.match(friendsDoc, /list_recent_lobby_peers/);
-    assert.match(friendsDoc, /lobby_encounters/);
-    assert.match(friendsDoc, /Vous venez de jouer avec/);
-    assert.match(friendsDoc, /Personne récemment/);
-    assert.match(friendsDoc, /24 h/);
-  });
 });

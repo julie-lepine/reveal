@@ -115,7 +115,8 @@ describe("RC-SKU-ADF — flags profil + isAdFreeForUser", () => {
     const auth = src("js/core/supabaseAuth.js");
     const ent = src("js/core/entitlements.js");
     assert.match(auth, /premiumFlagsFromProfile\(profile\)/);
-    assert.match(ent, /lastServerPremium = premiumFlagsFromProfile\(profile\)/);
+    // Refresh : lastServerPremium part de premiumFlagsFromProfile (+ colonnes annexes).
+    assert.match(ent, /lastServerPremium = \{\s*\.\.\.premiumFlagsFromProfile\(profile\)/);
     assert.equal(/adFreeFromProfile\(profile\)/.test(auth), false);
     const upsert = src("js/core/supabaseProfile.js");
     const upsertFn = upsert.slice(upsert.indexOf("export async function upsertProfile"));

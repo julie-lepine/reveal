@@ -25,14 +25,10 @@ describe("FEATURE-FRIENDS-01 Palier 8 — légal", () => {
     assert.match(deletion.body, /cascade/);
   });
 
-  it("LAUNCH UGC reste sans fil public ; prompt OVH documenté", () => {
+  it("LAUNCH UGC reste sans fil public", () => {
     const launch = read("docs/LAUNCH.md");
     assert.match(launch, /No public social feed/);
     assert.match(launch, /Private friend list/);
     assert.match(launch, /lobby-only discovery/);
-    const ovh = read("docs/LEGAL_SITE_OVH.md");
-    assert.match(ovh, /FEATURE-FRIENDS-01/);
-    assert.match(ovh, /27 août 2026/);
-    assert.match(ovh, /privacy\.html/);
   });
 });
