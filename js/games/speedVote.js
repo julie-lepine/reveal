@@ -230,7 +230,7 @@ export function mountSpeedVote(app) {
             const selfLabel = p.isLocal || p.name === localName ? ' <span class="muted">(toi)</span>' : "";
             return `
           <button type="button" class="speedvote-vote-btn ${active ? "speedvote-vote-btn--active" : ""}"
-            data-vote-player="${escapeHtml(p.name)}" style="--vote-color:${p.color}">
+            data-vote-player="${escapeHtml(p.name)}" style="--vote-color:${escapeHtml(p.color)}">
             ${playerAvatarHtml(p, "speedvote-vote-btn__avatar")}
             <span class="speedvote-vote-btn__name">${playerNameHtml(p, "speedvote-vote-btn__name-text")}${selfLabel}</span>
             ${active ? '<span class="speedvote-vote-btn__check">✓</span>' : ""}
@@ -268,11 +268,11 @@ export function mountSpeedVote(app) {
             return `
             <div class="result-row">
               <div class="result-row__head">
-                <span style="color:${meta.color}">${escapeHtml(name)}${crown}</span>
+                <span style="color:${escapeHtml(meta.color)}">${escapeHtml(name)}${crown}</span>
                 <span class="muted">${n} vote${n > 1 ? "s" : ""} · ${pct}%</span>
               </div>
               <div class="progress">
-                <div class="progress-fill" style="width:${pct}%;background:${meta.color}"></div>
+                <div class="progress-fill" style="width:${pct}%;background:${escapeHtml(meta.color)}"></div>
               </div>
             </div>`;
           })
@@ -290,7 +290,7 @@ export function mountSpeedVote(app) {
             return `
             <div class="player-row player-row--compact">
               <span class="player-name">${escapeHtml(voter)}</span>
-              <span style="color:${t.color};font-weight:800">→ ${escapeHtml(target)}</span>
+              <span style="color:${escapeHtml(t.color)};font-weight:800">→ ${escapeHtml(target)}</span>
             </div>`;
           })
           .join("")}

@@ -151,10 +151,10 @@ export function renderConsensusResults({
               (row, index) => `
             <span
               class="consensus-stage__marker"
-              style="left:${row.value}%;--marker-color:${row.color};--lane:${index % 3};--delay:${120 + index * 45}ms"
+              style="left:${row.value}%;--marker-color:${escapeHtml(row.color)};--lane:${index % 3};--delay:${120 + index * 45}ms"
               title="${escapeHtml(row.name)} · ${formatScore(row.value)}"
             >
-              <span class="consensus-stage__marker-core">${row.emoji}</span>
+              <span class="consensus-stage__marker-core">${escapeHtml(row.emoji)}</span>
             </span>`
             )
             .join("")}

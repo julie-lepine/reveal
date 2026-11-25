@@ -184,7 +184,7 @@ export function mountClutch(app) {
       const n = names[0];
       const meta = playerMeta(n);
       const label = n === localName ? "Toi" : n;
-      return `<span class="clutch-chip" style="--clutch-chip:${meta.color}">${meta.emoji} <span class="clutch-chip__name">${escapeHtml(label)}</span>${n === localName ? "as" : "a"} tapé&nbsp;!</span>`;
+      return `<span class="clutch-chip" style="--clutch-chip:${escapeHtml(meta.color)}">${escapeHtml(meta.emoji)} <span class="clutch-chip__name">${escapeHtml(label)}</span>${n === localName ? "as" : "a"} tapé&nbsp;!</span>`;
     }
     // Plusieurs taps : une seule pastille sur une ligne (place réservée, le bouton
     // ne bouge pas) : emojis + dernier pseudo + « et N autres ».
@@ -192,10 +192,10 @@ export function mountClutch(app) {
     const meta = playerMeta(latest);
     const faces = names
       .slice(0, CLUTCH_MAX_TAPPED_FACES)
-      .map((n) => playerMeta(n).emoji)
+      .map((n) => escapeHtml(playerMeta(n).emoji))
       .join("");
     const others = names.length - 1;
-    return `<span class="clutch-chip clutch-chip--group" style="--clutch-chip:${meta.color}"><span class="clutch-chip__faces" aria-hidden="true">${faces}</span> <span class="clutch-chip__name">${escapeHtml(latest)}</span>et ${others} autre${others > 1 ? "s" : ""} ont tapé&nbsp;!</span>`;
+    return `<span class="clutch-chip clutch-chip--group" style="--clutch-chip:${escapeHtml(meta.color)}"><span class="clutch-chip__faces" aria-hidden="true">${faces}</span> <span class="clutch-chip__name">${escapeHtml(latest)}</span>et ${others} autre${others > 1 ? "s" : ""} ont tapé&nbsp;!</span>`;
   }
 
   function refreshTappedChips() {
@@ -576,9 +576,9 @@ export function mountClutch(app) {
         return `
           <div class="clutch-rank__row ${entry.tapped ? "" : "clutch-rank__row--out"}">
             <span class="clutch-rank__pos">${posHtml}</span>
-            <span class="clutch-rank__avatar" style="--clutch-chip:${meta.color}">${meta.emoji}</span>
+            <span class="clutch-rank__avatar" style="--clutch-chip:${escapeHtml(meta.color)}">${escapeHtml(meta.emoji)}</span>
             <span class="clutch-rank__body">
-              <span class="clutch-rank__name" style="color:${meta.color}">${escapeHtml(entry.name)}</span>
+              <span class="clutch-rank__name" style="color:${escapeHtml(meta.color)}">${escapeHtml(entry.name)}</span>
               <span class="clutch-rank__detail">${detail}</span>
             </span>
             <span class="clutch-rank__pts ${pts ? "clutch-rank__pts--gain" : ""}">${pts ? `+${pts}` : "-"}</span>

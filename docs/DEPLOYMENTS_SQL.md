@@ -1064,3 +1064,18 @@ Audit sécurité Supabase d'ensemble (tmp/audit-securite-supabase.md) n°4 : les
 | Prod | appliquée le 2026-11-25 (migration `fix_lobby_members_player_guard`, version 20261125195427) · contrôle : déclencheur `lobby_members_guard_player_write` en place sur `lobby_members` ; 0 salon ouvert au moment de l'application |
 
 **Statut** : repo ✅ · essai ✅ · prod ✅.
+
+## 57. Membres du salon — emoji et couleur limités aux valeurs connues
+
+Audit carnet et cosmétiques (tmp/audit-carnet-cosmetiques.md) n°1 : l'emoji et la couleur d'un membre (`lobby_members`) étaient écrits par le joueur, coupés à 16 caractères mais sans contrôle du contenu, puis insérés tels quels dans la page : une appli modifiée pouvait afficher du HTML court à tout le salon, et un joueur sans Signature pouvait prendre un emoji Signature. L'emoji d'un profil Signature acceptait n'importe quel texte (32 octets).
+
+| Élément | Valeur |
+| ------- | ------ |
+| Migration | [`fix-member-cosmetics.sql`](../supabase/fix-member-cosmetics.sql) : `lobby_members_stamp_signature` (déjà SECURITY DEFINER, lit le pack) n'accepte qu'un emoji gratuit, ou Signature si le compte a le pack, sinon 👤 ; couleur `#rgb` / `#rrggbb` / `#rrggbbaa`, sinon la couleur d'avant (modification) ou `#60A5FA` (arrivée). `profiles_signature_cosmetics` : avec le pack, emoji gratuit ou Signature seulement, sinon 👤. Marqueur `member-cosmetics-v1` |
+| Appli | `js/core/memberCosmetics.js` : `mapMember` (`supabaseLobby.js`) ne garde qu'un emoji connu et une couleur #hex ; emoji et couleur passés par `escapeHtml` à l'affichage (salon, écran des jeux, Clutch, Consensus, Dilemma, Speed Vote, Tier Night Live, Le Traître, Truth Meter, Wrong Answer) |
+| Contrat | `tests/fixMemberCosmetics.test.js` (listes SQL alignées sur `data/profileEmojis.js` et `data/signatureIdentity.js`) |
+| Essai annulé (2026-11-25) | 1 compte Signature, 1 compte gratuit, 1 salon créé pour l'essai. Membre Signature 👑 / `#A78BFA` → gardé ; membre gratuit 👑 / `red;"><b>` → 👤 / `#60A5FA` ; 🦊 / `#123456` → gardé ; `<a href=//x.yz>` / `url(//x)` → 👤 / `#123456` (couleur d'avant) ; 🕵️ → gardé ; battement de présence du membre Signature → 👑 et `signature` inchangés. Profil gratuit 👑 → 👤, 🦊 → gardé ; profil Signature `<b>x</b>` → 👤, 🐉 → gardé. Annulation vérifiée (empreintes des 2 fonctions inchangées, aucun salon d'essai restant) |
+| Effet à connaître | un compte qui perd le pack (remboursement) repasse à 👤 dans le salon s'il avait un emoji Signature ; pendant l'attente du webhook après un achat, un emoji Signature choisi apparaît en 👤 dans le salon jusqu'au prochain changement d'emoji (le profil se comportait déjà ainsi) |
+| Prod | pas appliquée |
+
+**Statut** : repo ✅ · essai ✅ · prod ⏳.

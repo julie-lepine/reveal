@@ -437,10 +437,10 @@ export function mountWrongAnswer(app) {
         const pts = deltas[row.name];
         return `
           <div class="wrong-reveal-row ${isWorst ? "wrong-reveal-row--worst" : ""}">
-            <span class="wrong-reveal-row__avatar" style="--wrong-chip:${meta.color}">${meta.emoji}</span>
+            <span class="wrong-reveal-row__avatar" style="--wrong-chip:${escapeHtml(meta.color)}">${escapeHtml(meta.emoji)}</span>
             <span class="wrong-reveal-row__body">
               <span class="wrong-reveal-row__text">« ${escapeHtml(row.text)} »</span>
-              <span class="wrong-reveal-row__author" style="color:${meta.color}">${escapeHtml(row.name)}${isWorst ? " 👑" : ""}</span>
+              <span class="wrong-reveal-row__author" style="color:${escapeHtml(meta.color)}">${escapeHtml(row.name)}${isWorst ? " 👑" : ""}</span>
             </span>
             <span class="wrong-reveal-row__votes">${row.n} vote${row.n > 1 ? "s" : ""}</span>
             <span class="wrong-reveal-row__pts ${pts ? "wrong-reveal-row__pts--gain" : ""}">${pts ? `+${pts}` : "-"}</span>

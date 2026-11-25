@@ -383,7 +383,7 @@ export function mountTruthMeter(app) {
           <div class="truth-meter__spread-row">
             <span class="truth-meter__spread-name">${escapeHtml(name)}</span>
             <div class="truth-meter__spread-track">
-              <span class="truth-meter__spread-dot" style="left:${v}%;background:${meta.color}"></span>
+              <span class="truth-meter__spread-dot" style="left:${v}%;background:${escapeHtml(meta.color)}"></span>
             </div>
             <span class="truth-meter__spread-val">${v}%</span>
           </div>`;

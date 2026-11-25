@@ -162,7 +162,7 @@ export function mountTraitre(app) {
         return `
           <div class="traitre-delta-list__row ${pts > 0 ? "traitre-delta-list__row--scored" : ""} ${isFake ? "traitre-delta-list__row--fake" : ""}">
             <span class="traitre-delta-list__player">
-              <span class="recap-card__avatar" style="background:${meta.color}">${meta.emoji}</span>
+              <span class="recap-card__avatar" style="background:${escapeHtml(meta.color)}">${escapeHtml(meta.emoji)}</span>
               <span class="traitre-delta-list__name">${escapeHtml(name)}${isFake ? '<span class="traitre-final__fake-tag">fake</span>' : ""}</span>
             </span>
             <span class="traitre-delta-list__score-col">
@@ -212,7 +212,7 @@ export function mountTraitre(app) {
         </div>
 
         <div class="traitre-final__impostor">
-          <span class="recap-card__avatar traitre-final__impostor-avatar" style="background:${impostorMeta.color}">${impostorMeta.emoji}</span>
+          <span class="recap-card__avatar traitre-final__impostor-avatar" style="background:${escapeHtml(impostorMeta.color)}">${escapeHtml(impostorMeta.emoji)}</span>
           <div class="traitre-final__impostor-text">
             <span class="traitre-final__impostor-label">${fakeWon || fakeLeft ? "Le fake" : "C'était"}</span>
             <strong class="traitre-final__impostor-name">${escapeHtml(resultImpostor || "?")}</strong>
@@ -428,7 +428,7 @@ export function mountTraitre(app) {
             .map(
               (name) => `
             <div class="traitre-speak-collective__player">
-              <span class="recap-card__avatar" style="background:${playerMeta(name).color}">${playerMeta(name).emoji}</span>
+              <span class="recap-card__avatar" style="background:${escapeHtml(playerMeta(name).color)}">${escapeHtml(playerMeta(name).emoji)}</span>
               <span>${escapeHtml(name)}</span>
             </div>`
             )
