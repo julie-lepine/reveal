@@ -139,7 +139,10 @@ import {
   markLobbyJoinFinalized,
 } from "./lobbyJoinEffects.js";
 import { finalizeFailedJoinAttempt } from "./lobbyJoinFinalize.js";
-import { assertClientCompatibility } from "./clientCompatibility.js";
+import {
+  assertClientCompatibility,
+  bootCompatibilityAllowsResume,
+} from "./clientCompatibility.js";
 import { COMPAT_STATUS } from "./clientCompatibilityContract.js";
 import { presentCompatibilityGateIfNeeded } from "./clientCompatibilityGateUi.js";
 
@@ -859,9 +862,12 @@ export async function routeToEveningHub({
  * Après F5 ou reconnexion : resynchronise et rejoint la partie en cours si besoin.
  * @param {{ force?: boolean }} [options] - force=true au boot ; false si l’utilisateur est allé à l’accueil volontairement.
  */
-export async function resumeEveningSession({ force = false } = {}) {
-  const compat = await guardClientCompatibility("resume");
-  if (!compat.ok) return false;
+export async function resumeEveningSession({ force = false, bootCompat = null } = {}) {
+  // Audit mise à jour n°4 : au démarrage, réutiliser le contrôle qui vient d'être fait.
+  if (!bootCompatibilityAllowsResume(bootCompat)) {
+    const compat = await guardClientCompatibility("resume");
+    if (!compat.ok) return false;
+  }
 
   if (!hasActiveLobby()) {
     const recovered = await tryRecoverLobbyFromServer();

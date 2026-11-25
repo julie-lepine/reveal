@@ -5,13 +5,35 @@ import { navigate } from "./router.js";
 
 let bound = false;
 
-async function routeAfterAuthRedirect(result) {
-  if (!result?.handled) return;
-  if (result.recovery) {
-    navigate("reset-password", { reset: true });
-    return;
+export const EXPIRED_AUTH_LINK_MESSAGE =
+  "Ce lien n'est plus valable. Redemande un e-mail depuis l'appli si besoin.";
+
+/**
+ * Audit liens n°2 : on ne quitte l'écran courant (partie comprise) que si le
+ * lien a vraiment ouvert une session. Lien périmé ou refusé : on reste sur place.
+ * @param {{ handled?: boolean, recovery?: boolean, sessionApplied?: boolean, linkError?: boolean }} result
+ * @param {{ navigateTo?: typeof navigate, alert?: (msg: string) => unknown }} [deps]
+ */
+export function routeAfterAuthRedirect(result, deps = {}) {
+  const go = deps.navigateTo || navigate;
+  if (!result?.handled) return "ignored";
+  if (result.sessionApplied) {
+    if (result.recovery) {
+      go("reset-password", { reset: true });
+      return "reset-password";
+    }
+    go("home", { reset: true });
+    return "home";
   }
-  navigate("home", { reset: true });
+  // Pas d'attente : au démarrage, le lien est traité avant l'affichage de l'appli.
+  const alert =
+    deps.alert ||
+    ((msg) =>
+      import("./dialog.js")
+        .then(({ showAppAlert }) => showAppAlert(msg, { title: "Lien expiré", icon: "🔗" }))
+        .catch(() => {}));
+  void alert(EXPIRED_AUTH_LINK_MESSAGE);
+  return "stay";
 }
 
 async function onDeepLink(url) {
@@ -19,7 +41,7 @@ async function onDeepLink(url) {
   const { handleNativeCaptchaUrl } = await import("./turnstile.js");
   if (handleNativeCaptchaUrl(url)) return;
   const result = await handleAuthRedirectUrl(url);
-  await routeAfterAuthRedirect(result);
+  routeAfterAuthRedirect(result);
 }
 
 export async function initDeepLinks() {

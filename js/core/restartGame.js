@@ -692,6 +692,19 @@ export async function restartGame(gameId) {
 }
 
 /**
+ * Audit mise à jour n°5 : les tuiles du menu des jeux passent par le même
+ * verrou que « Recommencer » et la roulette. Un second appui pendant un
+ * lancement est ignoré (plus de double partie ni de double annonce chat).
+ * @template T
+ * @param {() => Promise<T>} fn
+ * @returns {Promise<T|undefined>}
+ */
+export async function runExclusiveGameLaunch(fn) {
+  const outcome = await restartLock.run(() => fn());
+  return outcome.ok ? outcome.value : undefined;
+}
+
+/**
  * FEATURE-CHAT-03 - lance un jeu depuis un id catalogue (tile),
  * sans passer par game-select. Réutilise `restartGame` / launchers existants.
  * @param {string} tileId

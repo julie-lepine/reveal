@@ -328,6 +328,19 @@ export async function assertClientCompatibility(opts) {
   };
 }
 
+/**
+ * Audit mise à jour n°4 : au démarrage, un contrôle « inconnu » (réseau lent)
+ * laisse déjà continuer. La reprise de partie qui suit ne doit pas refaire
+ * un contrôle de 8 s puis renvoyer à l'accueil : elle reprend ce résultat.
+ * Seule une incompatibilité confirmée bloque.
+ * @param {null | { status?: string }} bootResult
+ */
+export function bootCompatibilityAllowsResume(bootResult) {
+  if (!bootResult?.status) return false;
+  if (lastConfirmedIncompatible) return false;
+  return bootResult.status !== COMPAT_STATUS.INCOMPATIBLE;
+}
+
 export function getLastConfirmedIncompatible() {
   return lastConfirmedIncompatible;
 }

@@ -13,11 +13,27 @@ import {
 } from "./clientCompatibility.js";
 import { COMPAT_STATUS } from "./clientCompatibilityContract.js";
 import {
-  hideClientCompatibilityGate,
+  applyForcedRecheckResult,
   presentCompatibilityGateIfNeeded,
 } from "./clientCompatibilityGateUi.js";
 
 let foregroundInit = false;
+
+/**
+ * Applique le contrôle fait au retour au premier plan.
+ * Audit mise à jour n°3 : « compatible » passe par applyForcedRecheckResult,
+ * comme le bouton « J'ai déjà mis à jour ». Si l'écran bloquait le démarrage,
+ * celui-ci reprend (une seule fois : onCompatible est consommé, et le boot a
+ * son propre verrou). Sinon l'écran disparaissait sur une appli vide.
+ * @param {object} result
+ */
+export async function applyForegroundCompatibilityResult(result) {
+  if (result?.status === COMPAT_STATUS.COMPATIBLE) {
+    await applyForcedRecheckResult(result);
+    return;
+  }
+  presentCompatibilityGateIfNeeded(result);
+}
 
 async function onBecameActive() {
   const hiddenAt = getClientCompatHiddenAt();
@@ -29,12 +45,8 @@ async function onBecameActive() {
     source: "foreground",
     force: true,
   });
-  if (result.status === COMPAT_STATUS.COMPATIBLE) {
-    // Lève le gate sans relancer boot / reconcile / Realtime.
-    hideClientCompatibilityGate();
-    return;
-  }
-  presentCompatibilityGateIfNeeded(result);
+  await applyForegroundCompatibilityResult(result);
+  if (result.status === COMPAT_STATUS.COMPATIBLE) return;
   // Compromis Vague 1 : si incompatible pendant une partie, overlay bloquant ;
   // on ne force pas leaveLobby / teardown - mais create/join/resume et UI gate
   // empêchent nouveaux writes d’entrée. Writes in-game existants : risque résiduel documenté.
