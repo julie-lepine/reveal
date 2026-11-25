@@ -8,6 +8,7 @@ import {
   parseSignatureCarnetDraftStore,
   pruneStaleSignatureCarnetDrafts,
   removeSignatureCarnetDraft,
+  removeSignatureCarnetDraftsForUser,
   serializeSignatureCarnetDraftStore,
   upsertSignatureCarnetDraft,
 } from "./signatureCarnetDraftLogic.js";
@@ -74,10 +75,29 @@ export function clearSignatureEveningArchiveDraft(userId, lobbyId, storage = def
   return writeSignatureCarnetDraftStore(next, storage);
 }
 
+/** Retire les brouillons de plus de 14 jours. N'écrit rien s'il n'y a rien à retirer. */
 export function pruneSignatureEveningArchiveDrafts(now = Date.now(), storage = defaultStorage()) {
-  const next = pruneStaleSignatureCarnetDrafts(
-    readSignatureCarnetDraftStore(storage),
-    now
-  );
+  const prev = readSignatureCarnetDraftStore(storage);
+  const next = pruneStaleSignatureCarnetDrafts(prev, now);
+  if (Object.keys(next).length === Object.keys(prev).length) return true;
   return writeSignatureCarnetDraftStore(next, storage);
+}
+
+/** Déconnexion : brouillons du compte retirés, sauf celui du salon encore rejoint. */
+export function clearSignatureEveningArchiveDraftsForUser(userId, { keepLobbyId = null } = {}, storage = defaultStorage()) {
+  const prev = readSignatureCarnetDraftStore(storage);
+  const next = removeSignatureCarnetDraftsForUser(prev, userId, { keepLobbyId });
+  if (Object.keys(next).length === Object.keys(prev).length) return true;
+  return writeSignatureCarnetDraftStore(next, storage);
+}
+
+/** Suppression du compte ou réinitialisation : plus aucun brouillon sur l'appareil. */
+export function clearAllSignatureEveningArchiveDrafts(storage = defaultStorage()) {
+  if (!storage?.removeItem) return false;
+  try {
+    storage.removeItem(SIGNATURE_CARNET_DRAFT_STORAGE_KEY);
+    return true;
+  } catch {
+    return false;
+  }
 }

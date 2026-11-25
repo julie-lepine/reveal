@@ -95,6 +95,7 @@ import {
   collectSignatureEveningArchivePayload,
   shouldBlockServerLeaveUntilArchive,
 } from "./signatureCarnet.js";
+import { clearAllSignatureEveningArchiveDrafts } from "./signatureCarnetDraftStore.js";
 
 export {
   isVoluntaryLeaveInFlight,
@@ -695,6 +696,7 @@ export async function resetAppToCleanHome() {
   resetWelcomeSeen();
   try {
     localStorage.removeItem("reveal-app-state");
+    clearAllSignatureEveningArchiveDrafts();
     clearGuestMembership();
   } catch {
     /* ignore */

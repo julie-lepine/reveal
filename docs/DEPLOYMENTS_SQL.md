@@ -1079,3 +1079,17 @@ Audit carnet et cosmétiques (tmp/audit-carnet-cosmetiques.md) n°1 : l'emoji et
 | Prod | pas appliquée |
 
 **Statut** : repo ✅ · essai ✅ · prod ⏳.
+
+## 58. Carnet — jetons d'archive nettoyés, plus de jeton pour l'hôte qui ferme
+
+Audit carnet et cosmétiques (tmp/audit-carnet-cosmetiques.md) n°2 : les jetons d'archive carnet (`signature_carnet_kick_allow`, valables 30 min) n'étaient effacés que si la personne archivait ensuite (46 jetons expirés le 2026-11-25, le plus ancien du 2026-09-07), et l'hôte Signature en recevait un inutile à chaque fermeture.
+
+| Élément | Valeur |
+| ------- | ------ |
+| Migration | [`fix-carnet-kick-allow-cleanup.sql`](../supabase/fix-carnet-kick-allow-cleanup.sql) : `dissolve_lobby_atomically` (reprise de 04c) efface les jetons de plus de 30 min avant d'en créer, et n'en crée plus pour l'hôte ; nettoyage unique des jetons déjà expirés. `archive_signature_evening` et `kick_lobby_member` inchangés |
+| Appli | aucun changement |
+| Contrat | `tests/fixCarnetKickAllowCleanup.test.js` |
+| Essai annulé (2026-11-25) | 2 comptes Signature (hôte, membre) et 1 compte gratuit dans un salon créé pour l'essai ; fermeture par le membre → `NOT_ALLOWED` ; par l'hôte → `DISSOLVED`, jeton pour le membre Signature seulement (hôte 0, gratuit 0), jetons expirés 46 → 0, salon et membres supprimés, fermeture notée ; 2e appel → `ALREADY_GONE`. Annulation vérifiée (empreinte inchangée, 46 jetons, aucun salon d'essai) |
+| Prod | pas appliquée |
+
+**Statut** : repo ✅ · essai ✅ · prod ⏳.
