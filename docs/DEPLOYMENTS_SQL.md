@@ -1029,3 +1029,38 @@ Audit contenus perso (tmp/audit-contenus-perso.md) n°2 : le serveur bornait la 
 | Prod | appliquée le 2026-11-25 (migration `fix_custom_entries_caps`, version 20261125192307) · contrôle : 3 fonctions SECURITY DEFINER exécutables par `authenticated` et `service_role` seulement (pas `anon`) ; `upsert_player_custom_entry` avec plafonds et `CUSTOM_ID_TAKEN`, `delete_player_custom_entry` non bloquée par un doublon, `upsert_player_custom_live_tier_list` à 3 par joueur ; 0 partie en cours au moment de l'application |
 
 **Statut** : repo ✅ · essai ✅ · prod ✅.
+
+---
+
+## 55. Fonctions internes fermées — reprise de place, ancienne création de membre, outils internes
+
+Audit sécurité Supabase d'ensemble (tmp/audit-securite-supabase.md) n°1 et n°2 : `remap_lobby_user_id` (remplace un joueur par un autre dans un salon : rôle secret, messages, état de partie) ne vérifiait rien et était exécutable par `anon` et `authenticated` ; `create_lobby_member` (remplacée par `create_lobby_atomically`, ajoute l'appelant comme hôte) n'avait jamais été fermée (fiche E4-03b restée « à vérifier »).
+
+| Élément | Valeur |
+| ------- | ------ |
+| Migration | [`fix-security-internal-functions.sql`](../supabase/fix-security-internal-functions.sql) : retrait des droits `public`, `anon`, `authenticated` sur les deux fonctions ; `service_role` garde l'accès. Reprend aussi [`lobby-membership-e4-03b-revoke-create-lobby-member.sql`](../supabase/lobby-membership-e4-03b-revoke-create-lobby-member.sql) |
+| Appli | aucun changement : `remap_lobby_user_id` n'est appelée que par `reclaim_guest_membership` (droits du propriétaire `postgres`) ; `create_lobby_member` n'est plus appelée depuis le 2026-07-28 (commit 6a00cc9) |
+| Versions publiées | une version installée avant le 2026-07-28 et jamais mise à jour ne pourrait plus créer de salon (le minimum de version est à 1). Journaux du 2026-11-22 au 25 : aucun appel à `create_lobby_member` ni à `remap_lobby_user_id` |
+| n°6 et n°7 (même migration, ajoutés le 2026-11-25) | outils internes fermés à `public`, `anon`, `authenticated` (`service_role` garde l'accès) : `is_auth_user_anonymous`, `touch_lobby_activity`, `trivia_all_expected_players_answered`, `trivia_question_player_uids`, `truth_meter_all_expected_voters_voted`, `truth_meter_apply_reveal_scoring`, `truth_meter_expected_voter_uids`, `truth_meter_resolve_author_uid`, `cleanup_stale_guest_members`. Appelants vérifiés : tous SECURITY DEFINER appartenant à `postgres` (ou la tâche planifiée), aucune règle d'accès ne les utilise, l'appli ne les appelle pas. `search_path` fixé sur `cleanup_stale_guest_members` et `update_member_presence` (qui reste ouverte aux joueurs) |
+| Contrat | `tests/fixSecurityInternalFunctions.test.js` |
+| Essai annulé (2026-11-25) | un seul bloc annulé par une erreur finale ; 3 comptes (hôte, ancien invité, nouvel invité), salon, partie et rôle Spot the fake de l'ancien invité ; après les retraits : droits `anon` / `authenticated` à faux, `service_role` à vrai ; appel direct de `remap_lobby_user_id` refusé en invité connecté et sans session ; `create_lobby_member` refusée (aucun intrus ajouté) ; reprise de place normale (`reclaim_guest_membership`) OK : place, état de partie et rôle secret passés au nouvel invité, plus aucune trace de l'ancien ; annulation vérifiée (droits d'origine en place, aucun compte ni salon d'essai) |
+| Essai annulé n°6-7 (2026-11-25) | migration complète (n°1, 2, 6, 7) dans un bloc annulé : les 11 fonctions refusées à `anon` / `authenticated`, permises à `service_role` ; appels directs refusés en invité connecté ; parcours normal OK : création de salon, arrivée d'un invité et présence (salon rafraîchi par les déclencheurs), message du chat, `peek_lobby_by_membership` (`reclaimable` vrai), ménage des invités lancé comme la tâche planifiée ; annulation vérifiée |
+| Prod | appliquée le 2026-11-25 (migration `fix_security_internal_functions`, version 20261125195417) · contrôle : les 11 fonctions refusées à `anon` et `authenticated`, permises à `service_role`, `search_path` fixé partout ; `update_member_presence` toujours ouverte aux joueurs ; 0 salon ouvert au moment de l'application |
+
+**Statut** : repo ✅ · essai ✅ · prod ✅.
+
+---
+
+## 56. Membres du salon — un joueur ne change plus son salon, son rôle d'hôte ni son arrivée
+
+Audit sécurité Supabase d'ensemble (tmp/audit-securite-supabase.md) n°4 : les règles `members_insert_self` / `members_update_self` laissaient un joueur écrire toutes les colonnes de sa ligne (en appelant la base directement) : se marquer hôte (les téléphones des autres le croyaient), passer dans un autre salon sans code ni plafond de places, pseudo / emoji / couleur sans limite de longueur.
+
+| Élément | Valeur |
+| ------- | ------ |
+| Migration | [`fix-lobby-members-player-guard.sql`](../supabase/fix-lobby-members-player-guard.sql) : déclencheur `lobby_members_guard_player_write` (avant ajout et modification, SECURITY INVOKER). Écriture directe d'un joueur (`current_user` = `authenticated` / `anon`) : à l'arrivée `is_host` forcé à faux ; en modification `id`, `lobby_id`, `user_id`, `is_host`, `joined_at` gardent leur valeur. Toujours : pseudo coupé à 24, emoji et couleur à 16 |
+| Appli | aucun changement : elle envoie déjà `is_host: false` à l'arrivée et ne modifie que `last_seen_at`, `ready`, `display_name`, `emoji`. Les fonctions serveur (création, transfert d'hôte, reprise de place) tournent avec les droits de `postgres` et gardent la main |
+| Contrat | `tests/fixLobbyMembersPlayerGuard.test.js` |
+| Essai annulé (2026-11-25) | 4 comptes, 2 salons créés par `create_lobby_atomically` (hôtes à `is_host` vrai) ; invité qui arrive en se déclarant hôte → enregistré non-hôte ; invité qui tente de changer salon, `is_host`, `joined_at`, pseudo de 100, emoji de 40, couleur de 50 → reste dans son salon, non-hôte, arrivée inchangée, `ready` accepté, longueurs 24 / 16 / 16, l'autre salon toujours à 1 membre ; usage normal (pseudo, emoji, `ready`, `last_seen_at`, `update_member_presence`) OK ; transfert d'hôte OK (`is_host` et `lobbies.host_id`) ; reprise de place par un autre invité OK ; annulation vérifiée |
+| Prod | appliquée le 2026-11-25 (migration `fix_lobby_members_player_guard`, version 20261125195427) · contrôle : déclencheur `lobby_members_guard_player_write` en place sur `lobby_members` ; 0 salon ouvert au moment de l'application |
+
+**Statut** : repo ✅ · essai ✅ · prod ✅.
