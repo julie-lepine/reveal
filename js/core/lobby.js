@@ -1555,10 +1555,14 @@ export async function leaveLobby({ navigateAway = true, skipConfirm = false } = 
  * Identité : { lobbyId, code, role } du snapshot - pas state.lobby.
  * Ne remplace pas leaveLobby / dissolveLobbyAsHost (pipeline cache-actif).
  *
+ * `skipArchive` : le joueur a choisi de quitter sans enregistrer la soirée après un
+ * échec de l'archive carnet (audit carnet et cosmétiques n°3).
+ *
  * @param {{ lobbyId: string, code?: string|null, role: "host"|"member" }} membership
+ * @param {{ skipArchive?: boolean }} [opts]
  * @returns {Promise<{ ok: true, action: "left"|"dissolved", lobbyId: string, code?: string|null }>}
  */
-export async function leaveLobbyMembershipFromServer(membership) {
+export async function leaveLobbyMembershipFromServer(membership, { skipArchive = false } = {}) {
   if (!isSupabaseConfigured()) {
     const { makeLobbyServerLeaveError, LOBBY_SERVER_LEAVE_ERROR } = await import(
       "./lobbyServerLeave.js"
@@ -1569,7 +1573,7 @@ export async function leaveLobbyMembershipFromServer(membership) {
     );
   }
 
-  if (!hasActiveLobby()) {
+  if (!hasActiveLobby() && !skipArchive) {
     const archiveRes = await archiveSignatureEveningForServerLeave(
       membership?.lobbyId
     );
@@ -1579,7 +1583,7 @@ export async function leaveLobbyMembershipFromServer(membership) {
       );
       throw makeLobbyServerLeaveError(
         LOBBY_SERVER_LEAVE_ERROR.FAILED,
-        "Impossible d'enregistrer la soirée dans le carnet. Réessaie avant de quitter.",
+        "Impossible d'enregistrer la soirée dans le carnet.",
         {
           archiveFailed: true,
           archiveSource: archiveRes?.source || null,

@@ -40,6 +40,23 @@ export function leaveServerActionLabel(role) {
   return role === "host" ? "Fermer le lobby" : "Quitter le lobby";
 }
 
+/**
+ * Audit carnet et cosmétiques n°3 : l'archive carnet a échoué avant de quitter.
+ * Le joueur peut réessayer plus tard ou partir sans enregistrer la soirée.
+ */
+export function serverLeaveArchiveFailedConfirm(role) {
+  const host = role === "host";
+  return {
+    title: "Soirée non enregistrée",
+    message:
+      "Ta soirée n'a pas pu être enregistrée dans ton carnet (connexion ou serveur). " +
+      `Tu peux réessayer plus tard, ou ${host ? "fermer" : "quitter"} maintenant sans l'enregistrer.`,
+    confirmLabel: host ? "Fermer sans enregistrer" : "Quitter sans enregistrer",
+    cancelLabel: "Réessayer plus tard",
+    icon: "📒",
+  };
+}
+
 export const SERVER_LEAVE_CONFIRM = Object.freeze({
   member: Object.freeze({
     title: "Quitter ce lobby ?",

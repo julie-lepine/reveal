@@ -65,6 +65,7 @@ import {
 import {
   SERVER_LEAVE_CONFIRM,
   LOBBY_SERVER_LEAVE_ERROR,
+  serverLeaveArchiveFailedConfirm,
 } from "../core/lobbyServerLeave.js";
 import {
   getSupabaseUserId,
@@ -1470,11 +1471,31 @@ export function mountHome(app) {
       scheduleRender(true);
 
       try {
-        await leaveLobbyMembershipFromServer({
+        const leaveInput = {
           lobbyId: membership.lobbyId,
           code: membership.code,
           role: membership.role,
-        });
+        };
+        try {
+          await leaveLobbyMembershipFromServer(leaveInput);
+        } catch (archiveErr) {
+          if (!archiveErr?.archiveFailed) throw archiveErr;
+          // Audit carnet n°3 : archive ratée → réessayer plus tard ou partir sans l'enregistrer.
+          if (!shouldContinue()) return;
+          const archiveCfg = serverLeaveArchiveFailedConfirm(membership.role);
+          const skip = await showAppConfirm(archiveCfg.message, {
+            title: archiveCfg.title,
+            confirmLabel: archiveCfg.confirmLabel,
+            cancelLabel: archiveCfg.cancelLabel,
+            icon: archiveCfg.icon,
+          });
+          if (!shouldContinue()) return;
+          if (!skip) {
+            scheduleRender(true);
+            return;
+          }
+          await leaveLobbyMembershipFromServer(leaveInput, { skipArchive: true });
+        }
         if (!shouldContinue()) return;
 
         // Retirer le found B avant confirmation - évite retain_found trompeur (Vague D).
