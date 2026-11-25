@@ -1076,9 +1076,9 @@ Audit carnet et cosmétiques (tmp/audit-carnet-cosmetiques.md) n°1 : l'emoji et
 | Contrat | `tests/fixMemberCosmetics.test.js` (listes SQL alignées sur `data/profileEmojis.js` et `data/signatureIdentity.js`) |
 | Essai annulé (2026-11-25) | 1 compte Signature, 1 compte gratuit, 1 salon créé pour l'essai. Membre Signature 👑 / `#A78BFA` → gardé ; membre gratuit 👑 / `red;"><b>` → 👤 / `#60A5FA` ; 🦊 / `#123456` → gardé ; `<a href=//x.yz>` / `url(//x)` → 👤 / `#123456` (couleur d'avant) ; 🕵️ → gardé ; battement de présence du membre Signature → 👑 et `signature` inchangés. Profil gratuit 👑 → 👤, 🦊 → gardé ; profil Signature `<b>x</b>` → 👤, 🐉 → gardé. Annulation vérifiée (empreintes des 2 fonctions inchangées, aucun salon d'essai restant) |
 | Effet à connaître | un compte qui perd le pack (remboursement) repasse à 👤 dans le salon s'il avait un emoji Signature ; pendant l'attente du webhook après un achat, un emoji Signature choisi apparaît en 👤 dans le salon jusqu'au prochain changement d'emoji (le profil se comportait déjà ainsi) |
-| Prod | pas appliquée |
+| Prod | appliquée le 2026-11-25 (migration `fix_member_cosmetics`, version 20261125212148) · contrôle : marqueur `member-cosmetics-v1` présent dans les 2 fonctions ; 0 membre de salon au moment de l'application |
 
-**Statut** : repo ✅ · essai ✅ · prod ⏳.
+**Statut** : repo ✅ · essai ✅ · prod ✅.
 
 ## 58. Carnet — jetons d'archive nettoyés, plus de jeton pour l'hôte qui ferme
 
@@ -1090,6 +1090,6 @@ Audit carnet et cosmétiques (tmp/audit-carnet-cosmetiques.md) n°2 : les jetons
 | Appli | aucun changement |
 | Contrat | `tests/fixCarnetKickAllowCleanup.test.js` |
 | Essai annulé (2026-11-25) | 2 comptes Signature (hôte, membre) et 1 compte gratuit dans un salon créé pour l'essai ; fermeture par le membre → `NOT_ALLOWED` ; par l'hôte → `DISSOLVED`, jeton pour le membre Signature seulement (hôte 0, gratuit 0), jetons expirés 46 → 0, salon et membres supprimés, fermeture notée ; 2e appel → `ALREADY_GONE`. Annulation vérifiée (empreinte inchangée, 46 jetons, aucun salon d'essai) |
-| Prod | pas appliquée |
+| Prod | appliquée le 2026-11-25 (migration `fix_carnet_kick_allow_cleanup`, version 20261125212206) · contrôle : fonction sans jeton pour l'hôte, droits inchangés (authenticated, service_role), 0 jeton expiré restant (46 effacés) |
 
-**Statut** : repo ✅ · essai ✅ · prod ⏳.
+**Statut** : repo ✅ · essai ✅ · prod ✅.
