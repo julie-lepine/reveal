@@ -20,12 +20,11 @@ import { commitTierNightSeriesRoundResult } from "./tierNightSeriesFinalize.js";
 import { commitTierNightSeriesNextRound } from "./tierNightSeriesAdvance.js";
 import {
   allTierNightMembersFinished,
-  applyRemoteLobbyScores,
+  absorbServerEveningScores,
   canActAsHost,
   completeGameSession,
   isGameSyncActive,
   isLobbyHost,
-  mergeRemoteGameScoresIntoLocal,
   refreshGameSession,
   getCachedGameSession,
 } from "./gameSync.js";
@@ -477,24 +476,10 @@ export function applyAuthoritativeSeriesRpcState(rpcState, guards = {}) {
   }
 
   applySeriesRowToLocal({ state: rpcState });
-  if (rpcState.scores && typeof rpcState.scores === "object") {
-    applyRemoteLobbyScores(rpcState.scores);
-  }
-  const patch = {};
-  if (rpcState.playerStats && typeof rpcState.playerStats === "object") {
-    patch.playerStats = rpcState.playerStats;
-  }
-  if (rpcState.gameScores && typeof rpcState.gameScores === "object") {
-    // BUG-TIERNIGHT-SERIES-QA-02 : UID serveur → pseudos (même contrat qu’hydratation).
-    patch.gameScores = mergeRemoteGameScoresIntoLocal(
-      getState().gameScores || {},
-      rpcState.gameScores
-    );
-  }
-  if (rpcState.stats && typeof rpcState.stats === "object") {
-    patch.stats = rpcState.stats;
-  }
-  if (Object.keys(patch).length) saveStatePatch(patch);
+  // Audit badges et stats : points, scores des jeux (UID → pseudos, cf.
+  // BUG-TIERNIGHT-SERIES-QA-02), stats joueurs et compteurs repris au maximum.
+  // Avant, `playerStats` (clés uid) remplaçait toutes les stats du téléphone.
+  absorbServerEveningScores(rpcState);
   return { ok: true, phase: series.phase, series, appliedLocal: true };
 }
 
@@ -758,7 +743,7 @@ export async function hostFinalizeTierNightSeriesRound({
       });
       if (rec.ok) {
         applySeriesRowToLocal(rec.row);
-        if (rec.row?.state?.scores) applyRemoteLobbyScores(rec.row.state.scores);
+        if (rec.row?.state) absorbServerEveningScores(rec.row.state);
         if (rec.phase === "series_end") {
           await ensureTierNightSeriesSessionCompleted({ shouldContinue });
         } else if (canContinue()) {

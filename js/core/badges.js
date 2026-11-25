@@ -1,27 +1,59 @@
 import { getState } from "./state.js";
-import { getSortedActivePlayers } from "./players.js";
+import { getSortedEveningStandingPlayers } from "./players.js";
 import { buildBadgeMap } from "./badgeRules.js";
 
-function resolveFallbackBadge(index, total, hasStatBadge) {
-  if (hasStatBadge) return "";
-  if (index === 0) return "MVP de la soirée";
-  if (total > 1 && index === total - 1) return "En progression";
-  return "";
+export const MVP_BADGE = "MVP de la soirée";
+export const PROGRESS_BADGE = "En progression";
+
+/**
+ * Badges de repli (joueur sans badge de stat), audit badges et stats n°3 :
+ * - « MVP de la soirée » pour chaque joueur à égalité en tête, avec au moins 1 point ;
+ * - « En progression » pour un dernier seul, avec au moins 1 point, derrière tous
+ *   les autres.
+ * @param {Array<{ name: string, score: number }>} players classement de la soirée
+ * @returns {Record<string, string>}
+ */
+export function buildFallbackBadgeMap(players = []) {
+  const out = {};
+  if (!players.length) return out;
+  const scores = players.map((p) => Number(p.score) || 0);
+  const top = Math.max(...scores);
+  const bottom = Math.min(...scores);
+  if (top > 0) {
+    players.forEach((p, i) => {
+      if (scores[i] === top) out[p.name] = MVP_BADGE;
+    });
+  }
+  const lasts = players.filter((_, i) => scores[i] === bottom);
+  if (players.length > 1 && lasts.length === 1 && bottom > 0 && bottom < top) {
+    out[lasts[0].name] = PROGRESS_BADGE;
+  }
+  return out;
 }
 
 export { buildBadgeMap } from "./badgeRules.js";
 
+/**
+ * Badges sur le même classement que le podium : joueurs présents et joueurs
+ * partis qui ont marqué des points (avant, seuls les présents comptaient : le 2e
+ * pouvait être « MVP » derrière un joueur parti).
+ */
 export function getPlayerBadges() {
   const { playerStats, scores } = getState();
-  const sorted = getSortedActivePlayers();
-  const names = sorted.map((p) => p.name);
-  const badgeByName = buildBadgeMap(playerStats, names);
+  const standings = getSortedEveningStandingPlayers().map((p) => ({
+    ...p,
+    score: scores[p.name] || 0,
+  }));
+  const statBadges = buildBadgeMap(
+    playerStats,
+    standings.map((p) => p.name)
+  );
+  const fallback = buildFallbackBadgeMap(standings);
 
-  return sorted.map((p, index) => {
-    const statBadge = badgeByName[p.name] || "";
-    const badge = statBadge || resolveFallbackBadge(index, sorted.length, Boolean(statBadge));
-    return { ...p, badge, score: scores[p.name] || 0 };
-  });
+  return standings.map((p) => ({
+    ...p,
+    badge: statBadges[p.name] || fallback[p.name] || "",
+  }));
 }
 
 /** Badge d'un joueur (même logique que le classement). */

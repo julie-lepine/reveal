@@ -158,8 +158,16 @@ describe("BUG-TIERNIGHT-SERIES-QA-02 - fantômes UID", () => {
     const play = read("js/core/tierNightSeriesPlaySession.js");
     assert.match(sync, /export function mergeRemoteGameScoresIntoLocal/);
     assert.match(sync, /export function pruneUidAliasKeysFromScoreMap/);
-    assert.match(play, /mergeRemoteGameScoresIntoLocal/);
+    // Audit badges et stats : la reprise passe par absorbServerEveningScores →
+    // applyRemoteGameScores → mergeRemoteGameScoresIntoLocal (UID → pseudos).
+    assert.match(play, /absorbServerEveningScores\(rpcState\)/);
+    assert.match(
+      sync,
+      /function applyRemoteGameScores\(remote, order\) \{\s*if \(!remote \|\| typeof remote !== "object"\) return;\s*const merged = mergeRemoteGameScoresIntoLocal\(/
+    );
+    assert.match(sync, /applyRemoteGameScores\(serverState\.gameScores, serverState\.gameScoreOrder\)/);
     assert.doesNotMatch(play, /patch\.gameScores = rpcState\.gameScores/);
+    assert.doesNotMatch(play, /patch\.playerStats = rpcState\.playerStats/);
   });
 
   it("joueur historique légitime conservé", () => {

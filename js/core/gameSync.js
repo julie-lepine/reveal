@@ -49,6 +49,15 @@ import {
   playerStatsToRemote,
 } from "./playerStatsSync.js";
 import {
+  EVENING_PLAYER_NAMES_KEY,
+  carryOverMissingUidEntries,
+  departedDisplayName,
+  departedUidForName,
+  getEveningPlayerNames,
+  rememberEveningParticipants,
+  rememberEveningPlayerNames,
+} from "./eveningPlayerNames.js";
+import {
   mergeReadyMapsLocal,
   mergeDilemmaCustomDilemmas,
   mergeHotTakeCustomTakes,
@@ -1139,6 +1148,44 @@ function playerKeyToRemoteUid(key) {
   if (getState().lobby?.participants?.some((p) => p.userId === raw)) return raw;
   if (getSupabaseUserId() === raw) return raw;
   return userIdForName(raw);
+}
+
+/**
+ * Audit badges et stats n°2 — points et stats de la soirée : un joueur parti
+ * garde son pseudo (liste `eveningPlayerNames` de la session) au lieu d'être
+ * ignoré, puis effacé du serveur à l'envoi suivant de l'hôte.
+ */
+function eveningNamesContext() {
+  const lobbyId = currentLobbyIdForSession();
+  const participants = getState().lobby?.participants || [];
+  rememberEveningParticipants(lobbyId, participants);
+  return { lobbyId, participants, names: getEveningPlayerNames(lobbyId) };
+}
+
+function eveningKeyToDisplayName(key) {
+  const name = playerKeyToDisplayName(key);
+  if (name) return name;
+  if (key == null || key === "") return null;
+  const { names, participants } = eveningNamesContext();
+  return departedDisplayName(String(key), names, participants);
+}
+
+function eveningNameToRemoteUid(name) {
+  const uid = playerKeyToRemoteUid(name);
+  if (uid) return uid;
+  if (name == null || name === "") return null;
+  const { names, participants } = eveningNamesContext();
+  return departedUidForName(String(name), names, participants);
+}
+
+/** Liste uid → pseudo reçue d'une session (à appeler avant de lire ses points). */
+export function rememberSessionEveningPlayerNames(sessionState) {
+  if (!sessionState || typeof sessionState !== "object") return;
+  rememberEveningPlayerNames(
+    currentLobbyIdForSession(),
+    sessionState[EVENING_PLAYER_NAMES_KEY],
+    getState().lobby?.participants || []
+  );
 }
 
 function playerNamesToUids(names = []) {
@@ -3267,20 +3314,20 @@ function mergeTierNightLiveGameLocal(local, remote) {
   };
 }
 
-export function scoresToRemote(scoresByName = {}) {
+export function scoresToRemote(scoresByName = {}, toUid = playerKeyToRemoteUid) {
   const out = {};
   Object.entries(scoresByName).forEach(([name, val]) => {
-    const uid = playerKeyToRemoteUid(name);
+    const uid = toUid(name);
     if (!uid) return;
     if (typeof val === "number" && Number.isFinite(val)) out[uid] = val;
   });
   return out;
 }
 
-function scoresFromRemote(remote = {}) {
+function scoresFromRemote(remote = {}, toName = playerKeyToDisplayName) {
   const out = {};
   Object.entries(remote).forEach(([uid, val]) => {
-    const name = playerKeyToDisplayName(uid);
+    const name = toName(uid);
     if (!name || typeof val !== "number" || !Number.isFinite(val)) return;
     const prev = out[name];
     out[name] = prev == null ? val : Math.max(prev, val);
@@ -3321,7 +3368,7 @@ function mergeRemoteMatchScoresUid(cur = {}, inc = {}) {
 function gameScoresToRemote(byGame = {}) {
   const out = {};
   Object.entries(byGame).forEach(([gid, scoresByName]) => {
-    out[gid] = scoresToRemote(scoresByName || {});
+    out[gid] = scoresToRemote(scoresByName || {}, eveningNameToRemoteUid);
   });
   return out;
 }
@@ -3329,7 +3376,7 @@ function gameScoresToRemote(byGame = {}) {
 export function gameScoresFromRemote(remote = {}) {
   const out = {};
   Object.entries(remote || {}).forEach(([gid, scoresByUid]) => {
-    out[gid] = scoresFromRemote(scoresByUid || {});
+    out[gid] = scoresFromRemote(scoresByUid || {}, eveningKeyToDisplayName);
   });
   return out;
 }
@@ -3386,12 +3433,13 @@ function applyRemoteGameScores(remote, order) {
  */
 export function absorbServerEveningScores(serverState) {
   if (!serverState || typeof serverState !== "object") return;
+  rememberSessionEveningPlayerNames(serverState);
   if (serverState.scores) applyRemoteLobbyScores(serverState.scores);
   if (serverState.gameScores) {
     applyRemoteGameScores(serverState.gameScores, serverState.gameScoreOrder);
   }
   if (serverState.playerStats) {
-    applyRemotePlayerStats(serverState.playerStats, (uid) => playerKeyToDisplayName(uid));
+    applyRemotePlayerStats(serverState.playerStats, eveningKeyToDisplayName);
   }
   const patch = {};
   if (serverState.stats && typeof serverState.stats === "object") {
@@ -3408,7 +3456,7 @@ export function absorbServerEveningScores(serverState) {
 
 export function applyRemoteLobbyScores(remote) {
   if (!remote || typeof remote !== "object") return;
-  const byName = scoresFromRemote(remote);
+  const byName = scoresFromRemote(remote, eveningKeyToDisplayName);
   if (!Object.keys(byName).length) return;
 
   const merged = { ...getState().scores };
@@ -3438,8 +3486,8 @@ function eveningStateToRemote() {
   // Toute republication de tableau complet depuis un snapshot client provoque des lost updates.
   // Écritures = RPC atomique ; survie aux startGameSession = préservation explicite (voir helpers).
   const remote = {
-    scores: scoresToRemote(getState().scores),
-    playerStats: playerStatsToRemote(getState().playerStats || {}, (name) => playerKeyToRemoteUid(name)),
+    scores: scoresToRemote(getState().scores, eveningNameToRemoteUid),
+    playerStats: playerStatsToRemote(getState().playerStats || {}, eveningNameToRemoteUid),
     gameScores: gameScoresToRemote(getState().gameScores || {}),
     gameScoreOrder: [...(getState().gameScoreOrder || [])],
     gameScoreSessionBaseline: scoresToRemote(gameScoreSessionBaseline || {}),
@@ -3464,11 +3512,38 @@ function eveningStateToRemote() {
     lastGame: lastGame ? { ...lastGame } : null,
     lastTierName: tierNightGame?.listName || null,
   };
+  keepServerEveningEntries(remote);
   return remote;
+}
+
+/**
+ * Audit badges et stats n°2 — l'envoi remplace les listes entières : on y remet
+ * les joueurs que le serveur connaît et ce téléphone non (joueur parti avant
+ * son arrivée, appli relancée), et la liste uid → pseudo des joueurs vus.
+ */
+function keepServerEveningEntries(remote) {
+  const { lobbyId, names } = eveningNamesContext();
+  const prev = cachedRow && cachedRow.lobby_id === lobbyId ? cachedRow.state || {} : {};
+  remote.scores = carryOverMissingUidEntries(remote.scores, prev.scores);
+  remote.playerStats = carryOverMissingUidEntries(
+    remote.playerStats,
+    prev.playerStats,
+    (v) => Boolean(v) && typeof v === "object" && !Array.isArray(v)
+  );
+  const prevGames = prev.gameScores && typeof prev.gameScores === "object" ? prev.gameScores : {};
+  for (const [gid, byUid] of Object.entries(prevGames)) {
+    remote.gameScores[gid] = carryOverMissingUidEntries(remote.gameScores[gid], byUid);
+  }
+  const prevNames = prev[EVENING_PLAYER_NAMES_KEY];
+  remote[EVENING_PLAYER_NAMES_KEY] = {
+    ...(prevNames && typeof prevNames === "object" && !Array.isArray(prevNames) ? prevNames : {}),
+    ...names,
+  };
 }
 
 export function applyRemoteEveningState(st) {
   if (!st || typeof st !== "object") return;
+  rememberSessionEveningPlayerNames(st);
   const patch = {};
 
   if (st.stats && typeof st.stats === "object") {
@@ -3591,7 +3666,7 @@ export function applyRemoteEveningState(st) {
 
   if (Object.keys(patch).length) saveStatePatch(patch);
   if (st.scores) applyRemoteLobbyScores(st.scores);
-  if (st.playerStats) applyRemotePlayerStats(st.playerStats, (uid) => playerKeyToDisplayName(uid));
+  if (st.playerStats) applyRemotePlayerStats(st.playerStats, eveningKeyToDisplayName);
   if (st.gameScores) applyRemoteGameScores(st.gameScores, st.gameScoreOrder);
   if (
     st.gameScoreSessionGameId !== undefined ||
@@ -3683,9 +3758,10 @@ export async function refreshEveningScoresFromSession() {
   const lobbyId = currentLobbyIdForSession();
   const row = await refreshGameSession();
   if (row && !isSessionRowForLobby(row, lobbyId)) return null;
+  rememberSessionEveningPlayerNames(row?.state);
   if (row?.state?.scores) applyRemoteLobbyScores(row.state.scores);
   if (row?.state?.playerStats) {
-    applyRemotePlayerStats(row.state.playerStats, (uid) => playerKeyToDisplayName(uid));
+    applyRemotePlayerStats(row.state.playerStats, eveningKeyToDisplayName);
   }
   return row;
 }
@@ -4825,6 +4901,7 @@ function isRecentGameSessionRealtime() {
 
 const EVENING_STATE_KEYS = new Set([
   "scores",
+  EVENING_PLAYER_NAMES_KEY,
   "playerStats",
   "gameScores",
   "gameScoreOrder",
@@ -6179,6 +6256,11 @@ export function clearCachedGameSessionUnlessForLobby(lobbyId) {
 /** Tests uniquement - injecte une ligne cache sans passer par applyRemoteSession. */
 export function __setCachedGameSessionRowForTests(row) {
   cachedRow = row;
+}
+
+/** Tests uniquement - ce que l'hôte enverrait comme points et stats de soirée. */
+export function __testEveningStateToRemote() {
+  return eveningStateToRemote();
 }
 
 /** Tests uniquement - remet le cache session à zéro. */

@@ -25,7 +25,7 @@ export function mountLeaderboard(app) {
   function renderBoard() {
     const { scores } = getState();
     // UX-HIST-01 : standings soirée (actifs + contributeurs partis).
-    // Badges : uniquement ceux déjà calculés pour les actifs - pas de filtre de ligne.
+    // Badges : calculés sur ce même classement (joueurs partis compris).
     const badgeByName = Object.fromEntries(
       getPlayerBadges().map((p) => [p.name, p.badge || ""])
     );
