@@ -375,8 +375,15 @@ export function mountHotTakePrep(app) {
     screenId: "hottake-prep",
     attr: "data-remove-take",
     onRemove: async (id) => {
-      await removeCustomTake(id);
+      const res = await removeCustomTake(id);
       refreshFromSync();
+      if (res && !res.ok) {
+        const err = app.querySelector("#take-error");
+        if (err) {
+          err.textContent = res.error;
+          err.classList.remove("hidden");
+        }
+      }
     },
   });
 

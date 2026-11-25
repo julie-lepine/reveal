@@ -37,10 +37,21 @@ import {
 } from "./optimisticMapEntry.js";
 import { launchGameWithSync, commitHostGamePlay, commitPrepReadyToggle } from "./mpLaunch.js";
 import { mergeHotTakeCustomTakes } from "./sessionMerge.js";
+import * as gameSyncNs from "./gameSync.js";
+
+/** Compte du joueur local (absent des faux gameSync de certains tests). */
+function localParticipantUid() {
+  return gameSyncNs.getLocalParticipantUid?.() || null;
+}
 import { countOtherAuthorsCustomEntries } from "./combinedGameDeck.js";
 // Import local : `export { … } from` ne crée pas de liaison utilisable ici
 // (addCustomTake levait « checkHotTakeModeration is not defined »).
 import { checkHotTakeModeration } from "./hotTakeModeration.js";
+import {
+  checkCustomEntryLimit,
+  isCustomLimitServerError,
+  isAuthorOwnedEntryMine,
+} from "./customEntryLimits.js";
 export {
   checkHotTakeModeration,
   getHotTakeModerationNotice as getModerationNotice,
@@ -96,6 +107,7 @@ function normalizeTake(entry) {
     id: entry.id || `custom-${text.slice(0, 24)}-${entry.author || "anon"}`,
     text,
     author: entry.author || null,
+    ...(entry.authorUid ? { authorUid: String(entry.authorUid) } : {}),
     themeId: entry.themeId || null,
   };
 }
@@ -185,7 +197,7 @@ export function getMyCustomTakes() {
   const me = getLocalDisplayName();
   return (getHotTakeSession().customTakes || [])
     .map(normalizeTake)
-    .filter((t) => (t.author || me) === me);
+    .filter((t) => isAuthorOwnedEntryMine(t, me, localParticipantUid()));
 }
 
 /** Nombre de takes custom des autres (texte masqué jusqu’à la manche). */
@@ -206,10 +218,19 @@ export async function addCustomTake(text) {
   if (mod.blocked) return { ok: false, error: mod.message };
 
   const session = getHotTakeSession();
+  const me = getLocalDisplayName();
+  const myUid = localParticipantUid();
+  const limit = checkCustomEntryLimit({
+    list: session.customTakes || [],
+    isMine: (t) => isAuthorOwnedEntryMine(t, me, myUid),
+    noun: { one: "prise", many: "prises", feminine: true },
+  });
+  if (!limit.ok) return { ok: false, error: limit.error };
   const entry = {
     id: `custom-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     text: trimmed,
-    author: getLocalDisplayName(),
+    author: me,
+    ...(myUid ? { authorUid: myUid } : {}),
   };
   const merged = mergeHotTakeCustomTakes(
     [...(session.customTakes || []), entry],
@@ -230,26 +251,51 @@ export async function addCustomTake(text) {
 
   const lobbyId = getState().lobby?.id;
   if (!lobbyId) return { ok: true };
-  const { rpcUpsertPlayerCustomEntry } = await import("./gameSessionRpc.js");
-  const { applyRemoteSession } = await import("./gameSync.js");
-  const { fetchGameSessionByLobby } = await import("./supabaseGame.js");
-  const row = await rpcUpsertPlayerCustomEntry({
-    lobbyId,
-    game: "hottake",
-    entry,
-  });
-  const full = row?.state ? row : await fetchGameSessionByLobby(lobbyId);
-  if (full) applyRemoteSession(full);
-  return { ok: true };
+  try {
+    const { rpcUpsertPlayerCustomEntry } = await import("./gameSessionRpc.js");
+    const { applyRemoteSession } = await import("./gameSync.js");
+    const { fetchGameSessionByLobby } = await import("./supabaseGame.js");
+    const row = await rpcUpsertPlayerCustomEntry({
+      lobbyId,
+      game: "hottake",
+      entry,
+    });
+    const full = row?.state ? row : await fetchGameSessionByLobby(lobbyId);
+    if (full) applyRemoteSession(full);
+    return { ok: true };
+  } catch (e) {
+    // Annule l'ajout optimiste : sinon la prise reste visible chez l'invité seul.
+    const cur = getHotTakeSession();
+    saveStatePatch({
+      hotTakeGame: {
+        ...cur,
+        customTakes: (cur.customTakes || []).filter((t) => t?.id !== entry.id),
+      },
+    });
+    return {
+      ok: false,
+      error: isCustomLimitServerError(e) ? e.message : CUSTOM_TAKE_SAVE_ERROR,
+    };
+  }
 }
+
+const CUSTOM_TAKE_SAVE_ERROR =
+  "Ta prise n'a pas pu être enregistrée. Vérifie ta connexion et réessaie.";
+const CUSTOM_TAKE_DELETE_ERROR =
+  "Ta prise n'a pas pu être supprimée. Vérifie ta connexion et réessaie.";
 
 export async function removeCustomTake(takeId) {
   const me = getLocalDisplayName();
+  const myUid = localParticipantUid();
   const session = getHotTakeSession();
+  const removed = (session.customTakes || [])
+    .map(normalizeTake)
+    .filter(Boolean)
+    .find((t) => t.id === takeId && isAuthorOwnedEntryMine(t, me, myUid));
   const next = (session.customTakes || [])
     .map(normalizeTake)
     .filter(Boolean)
-    .filter((t) => !(t.id === takeId && (t.author || me) === me));
+    .filter((t) => !(t.id === takeId && isAuthorOwnedEntryMine(t, me, myUid)));
   saveStatePatch({ hotTakeGame: { ...session, customTakes: next, deck: null } });
   if (!isGameSyncActive()) return { ok: true };
 
@@ -260,17 +306,27 @@ export async function removeCustomTake(takeId) {
 
   const lobbyId = getState().lobby?.id;
   if (!lobbyId) return { ok: true };
-  const { rpcDeletePlayerCustomEntry } = await import("./gameSessionRpc.js");
-  const { applyRemoteSession } = await import("./gameSync.js");
-  const { fetchGameSessionByLobby } = await import("./supabaseGame.js");
-  const row = await rpcDeletePlayerCustomEntry({
-    lobbyId,
-    game: "hottake",
-    entryId: takeId,
-  });
-  const full = row?.state ? row : await fetchGameSessionByLobby(lobbyId);
-  if (full) applyRemoteSession(full);
-  return { ok: true };
+  try {
+    const { rpcDeletePlayerCustomEntry } = await import("./gameSessionRpc.js");
+    const { applyRemoteSession } = await import("./gameSync.js");
+    const { fetchGameSessionByLobby } = await import("./supabaseGame.js");
+    const row = await rpcDeletePlayerCustomEntry({
+      lobbyId,
+      game: "hottake",
+      entryId: takeId,
+    });
+    const full = row?.state ? row : await fetchGameSessionByLobby(lobbyId);
+    if (full) applyRemoteSession(full);
+    return { ok: true };
+  } catch {
+    // Remet la prise : elle est toujours dans la partie, donc toujours jouée.
+    const cur = getHotTakeSession();
+    const list = cur.customTakes || [];
+    if (removed && !list.some((t) => t?.id === removed.id)) {
+      saveStatePatch({ hotTakeGame: { ...cur, customTakes: [...list, removed] } });
+    }
+    return { ok: false, error: CUSTOM_TAKE_DELETE_ERROR };
+  }
 }
 
 export async function setHotTakeReady(playerName, ready) {

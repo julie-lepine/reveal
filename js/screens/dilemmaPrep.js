@@ -418,8 +418,15 @@ export function mountDilemmaPrep(app) {
     screenId: "dilemma-prep",
     attr: "data-remove-dilemma",
     onRemove: async (id) => {
-      await removeCustomDilemma(id);
+      const res = await removeCustomDilemma(id);
       refreshFromSync();
+      if (res && !res.ok) {
+        const err = app.querySelector("#dilemma-error");
+        if (err) {
+          err.textContent = res.error;
+          err.classList.remove("hidden");
+        }
+      }
     },
   });
 

@@ -21,6 +21,10 @@ import {
   isTierNightLiveCustomPoolWritable,
 } from "./tierNightLiveCustomPoolLock.js";
 import { shouldAcceptRemoteCustomLiveTierListsEmpty } from "./customLiveTierListsSyncGuard.js";
+import {
+  checkCustomEntryLimit,
+  CUSTOM_LIVE_TIER_LISTS_MAX_PER_PLAYER,
+} from "./customEntryLimits.js";
 
 export {
   isTierNightLiveCustomPoolWritable,
@@ -136,6 +140,14 @@ export async function addCustomLiveTierListAndSync(input) {
       code: "TNS_LIVE_CUSTOM_LOCKED",
     };
   }
+
+  const limit = checkCustomEntryLimit({
+    list: st.customLiveTierLists || [],
+    isMine: (t) => isCustomLiveTierListOwnedBy(t, null, authorUid),
+    maxPerPlayer: CUSTOM_LIVE_TIER_LISTS_MAX_PER_PLAYER,
+    noun: { one: "tier list", many: "tier lists", feminine: true },
+  });
+  if (!limit.ok) return { ok: false, error: limit.error, code: limit.code };
 
   const list = validated.list;
   saveStatePatch({
