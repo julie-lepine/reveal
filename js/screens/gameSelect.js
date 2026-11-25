@@ -54,6 +54,7 @@ import {
   eveningRecapRestartButtonHtml,
   resolveLastGameForRestart,
   restartGame,
+  runExclusiveGameLaunch,
 } from "../core/restartGame.js";
 
 function lobbyPlayersMetaHtml(count) {
@@ -158,8 +159,8 @@ function eveningRecapHtml(recap) {
     </div>`;
 }
 
-function buildGameSelectHandlers() {
-  return {
+export function buildGameSelectHandlers() {
+  const launchers = {
     "traitre-prep": launchTraitrePrep,
     "speedvote-prep": launchSpeedVotePrep,
     "clutch-prep": launchClutchPrep,
@@ -173,6 +174,10 @@ function buildGameSelectHandlers() {
     guesslie: launchGuessLieMenu,
     "tiernight-select": launchTierNightSelect,
   };
+  // Audit mise à jour n°5 : un seul lancement à la fois (double appui ignoré).
+  return Object.fromEntries(
+    Object.entries(launchers).map(([nav, fn]) => [nav, () => runExclusiveGameLaunch(fn)])
+  );
 }
 
 function gameTileMarkup(g) {

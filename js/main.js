@@ -209,7 +209,8 @@ async function boot() {
   await initSupabaseAuth();
   await authReady;
 
-  async function continueBootAfterCompatibilityOk() {
+  /** @param {null | object} [bootCompat] résultat du contrôle de démarrage, réutilisé par la reprise */
+  async function continueBootAfterCompatibilityOk(bootCompat = null) {
     if (postCompatBootStarted) return;
     postCompatBootStarted = true;
 
@@ -222,7 +223,7 @@ async function boot() {
     if (isPasswordRecoveryPending()) {
       navigate("reset-password", { reset: true });
     } else if (hasActiveLobby()) {
-      const resumed = await resumeEveningSession({ force: true });
+      const resumed = await resumeEveningSession({ force: true, bootCompat });
       if (!resumed) navigate("home", { reset: true });
     } else if (shouldShowWelcome()) {
       navigate("welcome", { reset: true });
@@ -243,7 +244,8 @@ async function boot() {
     return;
   }
   // unknown au boot : ne pas afficher « mise à jour » ; continuer (create/join re-check).
-  await continueBootAfterCompatibilityOk();
+  // La reprise de partie réutilise ce résultat (pas de second contrôle de 8 s).
+  await continueBootAfterCompatibilityOk(compat);
 }
 
 boot().catch((e) => {

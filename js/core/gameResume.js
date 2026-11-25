@@ -9,7 +9,6 @@ import {
   isOnGameSetupScreen,
   isResumableSessionDestination,
   refreshGameSession,
-  isSessionInProgressPlay,
   routeToActiveGameIfNeeded,
   routeToSessionScreen,
   suppressRoutingForScoreView,
@@ -20,7 +19,7 @@ import {
   shouldShowResumeBannerAfterDismiss,
 } from "./resumeBannerDismiss.js";
 import { bindNav } from "../screens/nav.js";
-import { getCurrentScreen } from "./router.js";
+import { getCurrentScreen, navigate } from "./router.js";
 import { getState } from "./state.js";
 
 const SCREEN_LABELS = {
@@ -202,13 +201,14 @@ export function stayOnGameResumeTarget(resumeScreen = null) {
 /**
  * Ecran plein page (lobby par erreur) : reprise auto vers prep / partie.
  * @returns {() => void} cleanup
- * NOTE (résidu) : « Rester ici » de l’interstitial (#game-resume-stay) ne masque
- * pas l’UI plein écran - hors scope du fix bandeau game-select.
+ * Audit mise à jour n°6 : « Rester ici » mène au menu des jeux de la soirée
+ * (même effet que « Rester ici » du bandeau) ; si la reprise automatique ne
+ * peut pas se faire, le compte à rebours disparaît au lieu de rester figé.
  */
 export function mountGameResumeInterstitial(
   app,
   targetScreen,
-  { allowStay = false, shouldContinue = null } = {}
+  { allowStay = false, shouldContinue = null, navigateTo = navigate } = {}
 ) {
   const canContinue = () => typeof shouldContinue !== "function" || shouldContinue();
   const gameLabel = gameLabelForScreen(targetScreen);
@@ -225,12 +225,21 @@ export function mountGameResumeInterstitial(
     if (redirectTimer) clearTimeout(redirectTimer);
   };
 
+  const hideCountdown = () => {
+    app.querySelector(".game-resume__countdown")?.remove();
+  };
+
+  /** @returns {Promise<boolean>} true si on part vers la partie */
   const rejoin = async () => {
-    if (disposed) return;
+    if (disposed) return false;
     cleanup();
-    if (!isGameSyncActive()) return;
-    if (!canContinue()) return;
-    await rejoinGameResumeTarget(targetScreen, { shouldContinue });
+    if (!isGameSyncActive() || !canContinue()) {
+      hideCountdown();
+      return false;
+    }
+    const moved = await rejoinGameResumeTarget(targetScreen, { shouldContinue });
+    if (!moved) hideCountdown();
+    return moved;
   };
 
   const paint = () => {
@@ -250,7 +259,8 @@ export function mountGameResumeInterstitial(
     });
     app.querySelector("#game-resume-stay")?.addEventListener("click", () => {
       cleanup();
-      if (isSessionInProgressPlay(targetScreen)) stayOnGameResumeTarget();
+      stayOnGameResumeTarget(targetScreen);
+      navigateTo("game-select", { navStack: ["home", "lobby", "game-select"] });
     });
   };
 

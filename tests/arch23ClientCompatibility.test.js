@@ -35,7 +35,6 @@ import {
 } from "../js/core/clientCompatibility.js";
 import {
   applyForcedRecheckResult,
-  hideClientCompatibilityGate,
   isClientCompatibilityGateVisible,
   presentCompatibilityGateIfNeeded,
   __resetClientCompatibilityGateForTests,
@@ -508,7 +507,10 @@ describe("ARCH-23 - gate UI retry", () => {
     assert.ok(getLastConfirmedIncompatible());
   });
 
-  it("foreground compatible : hide sans double init (callback boot non rejoué)", async () => {
+  it("foreground compatible après gate de boot : écran levé ET démarrage repris une fois (audit n°3)", async () => {
+    const { applyForegroundCompatibilityResult } = await import(
+      "../js/core/clientCompatibilityForeground.js"
+    );
     let bootContinues = 0;
     await checkClientCompatibility({
       source: "boot",
@@ -527,11 +529,47 @@ describe("ARCH-23 - gate UI retry", () => {
       client,
       fetchFloor: async () => ({ min_compatibility_build: 1 }),
     });
-    // Foreground path : hide seulement (pas applyForcedRecheckResult / onCompatible boot).
-    hideClientCompatibilityGate();
     assert.equal(ok.status, COMPAT_STATUS.COMPATIBLE);
+    await applyForegroundCompatibilityResult(ok);
+    // Deuxième retour au premier plan, puis « J'ai déjà mis à jour » : pas de double démarrage.
+    await applyForegroundCompatibilityResult(ok);
+    await applyForcedRecheckResult(ok);
     assert.equal(isClientCompatibilityGateVisible(), false);
-    assert.equal(bootContinues, 0);
+    assert.equal(bootContinues, 1);
+  });
+
+  it("foreground compatible sans démarrage en attente (gate create/join) : écran levé seulement", async () => {
+    const { applyForegroundCompatibilityResult } = await import(
+      "../js/core/clientCompatibilityForeground.js"
+    );
+    const bad = await checkClientCompatibility({
+      source: "join",
+      client,
+      fetchFloor: async () => ({ min_compatibility_build: 99 }),
+    });
+    presentCompatibilityGateIfNeeded(bad);
+    const ok = await checkClientCompatibility({
+      source: "foreground",
+      force: true,
+      client,
+      fetchFloor: async () => ({ min_compatibility_build: 1 }),
+    });
+    await applyForegroundCompatibilityResult(ok);
+    assert.equal(isClientCompatibilityGateVisible(), false);
+  });
+
+  it("foreground incompatible : l'écran reste affiché", async () => {
+    const { applyForegroundCompatibilityResult } = await import(
+      "../js/core/clientCompatibilityForeground.js"
+    );
+    const bad = await checkClientCompatibility({
+      source: "foreground",
+      force: true,
+      client,
+      fetchFloor: async () => ({ min_compatibility_build: 99 }),
+    });
+    await applyForegroundCompatibilityResult(bad);
+    assert.equal(isClientCompatibilityGateVisible(), true);
   });
 });
 
@@ -623,5 +661,41 @@ describe("ARCH-23 - wiring / SQL (statique)", () => {
     const dep = read("docs/DEPLOYMENTS_SQL.md");
     assert.match(dep, /writes in-game|partie déjà active/i);
     assert.match(dep, /rétrocompatibilité|rétrocompat/i);
+  });
+});
+
+describe("ARCH-23 - reprise au démarrage (audit mise à jour n°4)", () => {
+  beforeEach(() => {
+    __resetClientCompatibilityForTests();
+  });
+
+  it("démarrage « inconnu » ou « compatible » : la reprise ne refait pas le contrôle", async () => {
+    const { bootCompatibilityAllowsResume } = await import("../js/core/clientCompatibility.js");
+    assert.equal(bootCompatibilityAllowsResume({ status: COMPAT_STATUS.UNKNOWN }), true);
+    assert.equal(bootCompatibilityAllowsResume({ status: COMPAT_STATUS.COMPATIBLE }), true);
+  });
+
+  it("incompatible confirmé ou pas de résultat : la reprise contrôle", async () => {
+    const { bootCompatibilityAllowsResume } = await import("../js/core/clientCompatibility.js");
+    assert.equal(bootCompatibilityAllowsResume(null), false);
+    assert.equal(bootCompatibilityAllowsResume({ status: COMPAT_STATUS.INCOMPATIBLE }), false);
+    await checkClientCompatibility({
+      source: "boot",
+      client: buildInstalledClientIdentity({ platform: "android", compatibilityBuild: 2 }),
+      fetchFloor: async () => ({ min_compatibility_build: 99 }),
+    });
+    // Un « inconnu » ultérieur ne doit pas passer outre un blocage confirmé.
+    assert.equal(bootCompatibilityAllowsResume({ status: COMPAT_STATUS.UNKNOWN }), false);
+  });
+
+  it("main.js transmet le résultat du démarrage à la reprise, lobby.js s'en sert", () => {
+    const main = read("js/main.js");
+    assert.match(main, /continueBootAfterCompatibilityOk\(compat\)/);
+    assert.match(main, /resumeEveningSession\(\{ force: true, bootCompat \}\)/);
+    const lobby = read("js/core/lobby.js");
+    assert.match(
+      lobby,
+      /if \(!bootCompatibilityAllowsResume\(bootCompat\)\) \{\s*const compat = await guardClientCompatibility\("resume"\);/
+    );
   });
 });

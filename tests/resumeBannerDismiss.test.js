@@ -181,13 +181,14 @@ describe("UX-RESUME-BANNER - dismiss game-select", () => {
     assert.notEqual(resumeBannerSessionKey("hottake", null), "hottake"); // préfixe family:
   });
 
-  it("10. clear explicite + interstitial hors scope documenté", () => {
+  it("10. clear explicite + « Rester ici » de l'interstitiel = même effet que le bandeau", () => {
     dismissResumeBannerForSession("hottake", "hottake");
     clearResumeBannerDismiss();
     assert.equal(getResumeBannerDismissedKey(), null);
 
+    // Audit mise à jour n°6 : plus de résidu, comportement testé dans gameResumeInterstitial.test.js.
     const src = readFileSync(join(root, "js/core/gameResume.js"), "utf8");
-    assert.match(src, /résidu.*game-resume-stay|interstitial.*hors scope/i);
+    assert.match(src, /stayOnGameResumeTarget\(targetScreen\);\s*navigateTo\("game-select"/);
   });
 
   it("preuve restart Recommencer passe par post-game (trou d’éligibilité)", () => {

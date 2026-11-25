@@ -21,6 +21,12 @@ import {
 } from "./passwordResetCooldown.js";
 import { isNativeApp } from "./platform.js";
 import { NATIVE_AUTH_REDIRECT } from "../../data/appConfig.js";
+import {
+  clearNativeAuthPending,
+  evaluateNativeAuthLink,
+  markNativeRecoveryPending,
+  readNativeAuthPending,
+} from "./nativeAuthLinkGuard.js";
 import { loadGuestMembership } from "./guestMembership.js";
 import { normalizeGuestEmoji } from "../../data/profileEmojis.js";
 
@@ -323,14 +329,43 @@ export async function handleAuthRedirectUrl(rawUrl) {
     return { handled: false, recovery: false };
   }
 
-  if (isRecoveryAuthParams(hashParams, searchParams)) {
+  const isRecoveryLink = isRecoveryAuthParams(hashParams, searchParams);
+  const opensSession = Boolean(
+    authCode ||
+      tokenHash ||
+      (hashParams.get("access_token") && hashParams.get("refresh_token"))
+  );
+
+  // Audit liens n°1 : sur l'appli, un lien n'ouvre une session que si ce
+  // téléphone a lancé la connexion peu avant (sinon : session imposée par lien).
+  if (isNativeApp() && opensSession) {
+    const verdict = evaluateNativeAuthLink({
+      rawUrl,
+      isRecovery: isRecoveryLink,
+      accessToken: hashParams.get("access_token"),
+      pending: readNativeAuthPending(),
+    });
+    if (!verdict.ok) {
+      console.warn("[AUTH] lien de connexion refusé", { reason: verdict.reason });
+      return { handled: false, recovery: false, rejected: true };
+    }
+  }
+
+  // Audit liens n°2 : sur l'appli, « réinitialisation en cours » seulement une
+  // fois la session ouverte (un lien périmé n'ouvre plus l'écran mot de passe).
+  if (isRecoveryLink && !isNativeApp()) {
     setPasswordRecoveryPending();
   }
+
+  const linkError = Boolean(hashParams.get("error") || hashParams.get("error_description"));
+  let sessionApplied = false;
 
   if (authCode) {
     const { data, error } = await supabase.auth.exchangeCodeForSession(authCode);
     if (error) console.warn("Supabase auth code:", error.message);
     if (data?.session) {
+      sessionApplied = true;
+      if (isNativeApp()) clearNativeAuthPending();
       await syncSessionToState(data.session);
       if (authType === "recovery") setPasswordRecoveryPending();
     }
@@ -341,6 +376,8 @@ export async function handleAuthRedirectUrl(rawUrl) {
     });
     if (error) console.warn("Supabase verifyOtp:", error.message);
     if (data?.session) {
+      sessionApplied = true;
+      if (isNativeApp()) clearNativeAuthPending();
       await syncSessionToState(data.session);
       if (authType === "recovery") setPasswordRecoveryPending();
     }
@@ -354,7 +391,12 @@ export async function handleAuthRedirectUrl(rawUrl) {
         refresh_token,
       });
       if (error) console.warn("Supabase setSession:", error.message);
-      if (data?.session) await syncSessionToState(data.session);
+      if (data?.session) {
+        sessionApplied = true;
+        if (isNativeApp()) clearNativeAuthPending();
+        await syncSessionToState(data.session);
+        if (isRecoveryLink) setPasswordRecoveryPending();
+      }
     } else if (!isNativeApp()) {
       const next =
         window.location.pathname +
@@ -363,7 +405,10 @@ export async function handleAuthRedirectUrl(rawUrl) {
       window.history.replaceState(null, "", next);
       const { data, error } = await supabase.auth.getSession();
       if (error) console.warn("Supabase auth redirect:", error.message);
-      if (data?.session) await syncSessionToState(data.session);
+      if (data?.session) {
+        sessionApplied = true;
+        await syncSessionToState(data.session);
+      }
       window.history.replaceState(null, "", window.location.pathname + window.location.search);
     }
   }
@@ -371,6 +416,8 @@ export async function handleAuthRedirectUrl(rawUrl) {
   return {
     handled: true,
     recovery: isPasswordRecoveryPending(),
+    sessionApplied,
+    linkError,
   };
 }
 
@@ -842,6 +889,7 @@ export async function sendPasswordResetEmail(email, captchaToken = null) {
   }
 
   markPasswordResetSent();
+  if (isNativeApp()) markNativeRecoveryPending({ email: trimmed });
   return { ok: true };
 }
 
