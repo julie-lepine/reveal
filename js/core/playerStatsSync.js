@@ -56,5 +56,13 @@ export function applyRemotePlayerStats(remote, uidToName = (uid) => uid) {
   Object.entries(byName).forEach(([name, stats]) => {
     merged[name] = mergePlayerStatsRecord(merged[name], stats);
   });
+  // Clés uid restées dans le téléphone (ancienne copie brute Tier Night série) :
+  // rangées sous le pseudo, sinon elles pouvaient écraser les stats à l'envoi.
+  Object.keys(merged).forEach((key) => {
+    const name = uidToName(key);
+    if (!name || name === key) return;
+    merged[name] = mergePlayerStatsRecord(merged[name], merged[key]);
+    delete merged[key];
+  });
   saveStatePatch({ playerStats: merged });
 }
