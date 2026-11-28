@@ -885,8 +885,8 @@ body[data-screen="lobby"] .page:has(.back) .container > .lobby-head:first-child{
   min-height:36px;
   padding:8px 14px;
   border-radius:var(--r-pill);
-  border:1.5px solid rgba(255,60,172,.7);
-  background:rgba(255,60,172,.08);
+  border:1.5px solid rgba(var(--primary-rgb),.7);
+  background:rgba(var(--primary-rgb),.08);
 }
 
 .game-select-code-chip__code{
@@ -1168,8 +1168,8 @@ body[data-screen="lobby"] .page:has(.back) .container > .lobby-head:first-child{
 .app-dialog__backdrop,
 .chat-roulette__backdrop{
   background:
-    radial-gradient(circle at 30% 20%, rgba(99,102,241,.35), transparent 50%),
-    radial-gradient(circle at 80% 80%, rgba(255,60,172,.3), transparent 50%),
+    radial-gradient(circle at 30% 20%, rgba(var(--secondary-rgb),.35), transparent 50%),
+    radial-gradient(circle at 80% 80%, rgba(var(--primary-rgb),.3), transparent 50%),
     rgba(5,6,16,.8);
 }
 
@@ -1184,7 +1184,7 @@ body[data-screen="lobby"] .page:has(.back) .container > .lobby-head:first-child{
 
 .app-dialog__icon,
 .chat-roulette__icon{
-  filter:drop-shadow(0 6px 14px rgba(255,60,172,.5));
+  filter:drop-shadow(0 6px 14px rgba(var(--primary-rgb),.5));
 }
 
 /* Titre : Anton dégradé. */
@@ -1221,8 +1221,8 @@ body[data-screen="lobby"] .page:has(.back) .container > .lobby-head:first-child{
 .chat-roulette__center-line{
   border:3px solid var(--color-primary);
   border-radius:var(--r-lg);
-  background:rgba(255,60,172,.08);
-  box-shadow:0 0 30px rgba(255,60,172,.45);
+  background:rgba(var(--primary-rgb),.08);
+  box-shadow:0 0 30px rgba(var(--primary-rgb),.45);
 }
 
 .chat-roulette__reaction{
@@ -1234,7 +1234,7 @@ body[data-screen="lobby"] .page:has(.back) .container > .lobby-head:first-child{
 
 .chat-roulette__reaction--active{
   border-color:var(--color-primary);
-  background:rgba(255,60,172,.2);
+  background:rgba(var(--primary-rgb),.2);
 }
 
 /* Chat : titre Anton, messages en bulles. */

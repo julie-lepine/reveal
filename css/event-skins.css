@@ -10,6 +10,7 @@ html.event-halloween {
   --ev-a: #ff6b1a; --ev-hot: #ffb347; --ev-b: #7c3aed; --ev-soft: #c084fc; --ev-deep: #5b21b6;
   --ev-bg: #14080c; --ev-bg-deep: #0a0406;
   --ev-short: "🎃  Halloween";
+  --ev-a-rgb: 255, 107, 26; --ev-b-rgb: 124, 58, 237; --ev-soft-rgb: 192, 132, 252;
 }
 html.event-halloween .logo--with-img .subtitle::after { content: "à Halloween"; }
 
@@ -18,6 +19,7 @@ html.event-christmas {
   --ev-a: #e11d48; --ev-hot: #f43f5e; --ev-b: #15803d; --ev-soft: #4ade80; --ev-deep: #14532d;
   --ev-bg: #07140c; --ev-bg-deep: #030a06;
   --ev-short: "🎄  Noël";
+  --ev-a-rgb: 225, 29, 72; --ev-b-rgb: 21, 128, 61; --ev-soft-rgb: 74, 222, 128;
 }
 html.event-christmas .logo--with-img .subtitle::after { content: "pendant les Fêtes de Fin d'Année"; }
 
@@ -26,6 +28,7 @@ html.event-nye {
   --ev-a: #b8860b; --ev-hot: #d4a017; --ev-b: #8b5cf6; --ev-soft: #ddd6fe; --ev-deep: #6d28d9;
   --ev-bg: #12100a; --ev-bg-deep: #080704;
   --ev-short: "🥂  Nouvel An";
+  --ev-a-rgb: 184, 134, 11; --ev-b-rgb: 139, 92, 246; --ev-soft-rgb: 221, 214, 254;
 }
 html.event-nye .logo--with-img .subtitle::after { content: "au Nouvel An"; }
 
@@ -34,6 +37,7 @@ html.event-stpatrick {
   --ev-a: #16a34a; --ev-hot: #22c55e; --ev-b: #ca8a04; --ev-soft: #fde047; --ev-deep: #166534;
   --ev-bg: #07140c; --ev-bg-deep: #030a06;
   --ev-short: "☘️  St Patrick";
+  --ev-a-rgb: 22, 163, 74; --ev-b-rgb: 202, 138, 4; --ev-soft-rgb: 253, 224, 71;
 }
 html.event-stpatrick .logo--with-img .subtitle::after { content: "à la St Patrick"; }
 
@@ -42,6 +46,7 @@ html.event-aprilfools {
   --ev-a: #6366f1; --ev-hot: #818cf8; --ev-b: #ff3cac; --ev-soft: #ff6b6b; --ev-deep: #db2777;
   --ev-bg: #0f0d1e; --ev-bg-deep: #070612;
   --ev-short: "🃏  1er avril";
+  --ev-a-rgb: 99, 102, 241; --ev-b-rgb: 255, 60, 172; --ev-soft-rgb: 255, 107, 107;
 }
 html.event-aprilfools .logo--with-img .subtitle::after { content: "le 1er avril"; }
 
@@ -50,6 +55,7 @@ html.event-music {
   --ev-a: #ff3cac; --ev-hot: #22d3ee; --ev-b: #38bdf8; --ev-soft: #67e8f9; --ev-deep: #0e7490;
   --ev-bg: #0c0618; --ev-bg-deep: #05030c;
   --ev-short: "🎶  Musique";
+  --ev-a-rgb: 255, 60, 172; --ev-b-rgb: 56, 189, 248; --ev-soft-rgb: 103, 232, 249;
 }
 html.event-music .logo--with-img .subtitle::after { content: "à la Fête de la musique"; }
 
@@ -58,6 +64,7 @@ html.event-bastille {
   --ev-a: #e10600; --ev-hot: #ff2b2b; --ev-b: #0055a4; --ev-soft: #f8fafc; --ev-deep: #002654;
   --ev-bg: #070b16; --ev-bg-deep: #04060e;
   --ev-short: "🇫🇷  14 juillet";
+  --ev-a-rgb: 225, 6, 0; --ev-b-rgb: 0, 85, 164; --ev-soft-rgb: 248, 250, 252;
 }
 html.event-bastille .logo--with-img .subtitle::after { content: "le 14 juillet"; }
 
@@ -66,6 +73,7 @@ html.event-rentree {
   --ev-a: #d97706; --ev-hot: #f59e0b; --ev-b: #64748b; --ev-soft: #94a3b8; --ev-deep: #334155;
   --ev-bg: #12100c; --ev-bg-deep: #0a0806;
   --ev-short: "🍁  Rentrée";
+  --ev-a-rgb: 217, 119, 6; --ev-b-rgb: 100, 116, 139; --ev-soft-rgb: 148, 163, 184;
 }
 html.event-rentree .logo--with-img .subtitle::after { content: "à la rentrée"; }
 
@@ -80,6 +88,9 @@ html[class*="event-"]:has(body:is([data-screen="welcome"],[data-screen="home"],[
   --color-secondary-deep: var(--ev-deep);
   --color-ink: var(--ev-deep);
   --focus-ring: var(--ev-soft);
+  --primary-rgb: var(--ev-a-rgb);
+  --secondary-rgb: var(--ev-b-rgb);
+  --secondary-soft-rgb: var(--ev-soft-rgb);
   /* --shadow-primary reste celui de la DA (ombre courte + liseré). */
   --shadow-secondary: 0 6px 16px -6px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.22);
 }
@@ -90,7 +101,7 @@ html[class*="event-"]:has(body:is([data-screen="welcome"],[data-screen="home"],[
 html[class*="event-"]:has(body:is([data-screen="welcome"],[data-screen="home"],[data-screen="game-select"],[data-screen="results"],[data-screen="leaderboard"],[data-screen="settings"],[data-screen="lobby"],[data-screen="friends"],[data-screen="carnet"],[data-screen="tiernight-select"],[data-screen="guesslie-menu"],[data-screen="guesslie-setup"],[data-screen="guesslie-wait"],[data-screen$="-prep"])) .game-tile__logo-wrap { --g1: var(--ev-a); --g2: var(--ev-b); }
 html[class*="event-"]:has(body:is([data-screen="welcome"],[data-screen="home"],[data-screen="game-select"],[data-screen="results"],[data-screen="leaderboard"],[data-screen="settings"],[data-screen="lobby"],[data-screen="friends"],[data-screen="carnet"],[data-screen="tiernight-select"],[data-screen="guesslie-menu"],[data-screen="guesslie-setup"],[data-screen="guesslie-wait"],[data-screen$="-prep"])) .game-tile-cell:nth-child(even) .game-tile__logo-wrap { --g1: var(--ev-b); --g2: var(--ev-a); }
 
-/* Pastille d'événement en tête d'écran (hors accueil : le sous-titre le dit déjà). */
+/* Pastille d'événement en tête de chaque écran du périmètre. */
 html[class*="event-"]:has(body:is([data-screen="welcome"],[data-screen="home"],[data-screen="game-select"],[data-screen="results"],[data-screen="leaderboard"],[data-screen="settings"],[data-screen="lobby"],[data-screen="friends"],[data-screen="carnet"],[data-screen="tiernight-select"],[data-screen="guesslie-menu"],[data-screen="guesslie-setup"],[data-screen="guesslie-wait"],[data-screen$="-prep"])) .container::before {
   content: var(--ev-label);
   display: block;
@@ -109,7 +120,6 @@ html[class*="event-"]:has(body:is([data-screen="welcome"],[data-screen="home"],[
   border: 1.5px solid transparent;
   box-shadow: 0 6px 16px -8px rgba(0, 0, 0, .6);
 }
-body[data-screen="welcome"] .container::before { display: none; }
 
 
 /* Écrans de préparation : le cadre (dégradé --g1/--g2) passe à l'événement ;

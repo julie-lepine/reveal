@@ -31,6 +31,11 @@
   --color-secondary-deep:#4f46e5;
   --color-cyan:#22d3ee;
   --color-violet:#a78bfa;
+  /* Canaux RGB des couleurs de marque : permettent rgba(var(--primary-rgb), .14)
+     et suivent donc les skins saisonniers (css/event-skins.css). */
+  --primary-rgb:255, 60, 172;
+  --secondary-rgb:99, 102, 241;
+  --secondary-soft-rgb:129, 140, 248;
 
   /* ── Couleurs d'état ── */
   --color-success:#4ade80;
