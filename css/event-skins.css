@@ -1,204 +1,187 @@
-/* Calques saisonniers — tokens + atmosphère. */
+/* Calques saisonniers — nouvelle DA.
+   Périmètre : accueil (welcome, home), choix des jeux, résultats, classement.
+   Aucun skin dans les écrans de jeu ni les autres écrans.
+   Principe : chaque skin ne déclare que ses couleurs (--ev-*). Les règles
+   communes plus bas les appliquent, uniquement sur les écrans du périmètre.
+   Boutons : ombre courte et sombre de la DA (pas de halo coloré, pas de pulsation). */
 
 html.event-halloween {
-  --color-bg: #14080c;
-  --color-bg-deep: #0a0406;
-  --color-primary: #ff6b1a;
-  --color-primary-hot: #ffb347;
-  --color-secondary: #7c3aed;
-  --color-secondary-soft: #c084fc;
-  --color-secondary-deep: #5b21b6;
-  --shadow-primary: 0 8px 32px rgba(255, 107, 26, 0.35);
-  --shadow-secondary: 0 8px 28px rgba(124, 58, 237, 0.4);
+  --ev-label: "🎃  Halloween";
+  --ev-a: #ff6b1a; --ev-hot: #ffb347; --ev-b: #7c3aed; --ev-soft: #c084fc; --ev-deep: #5b21b6;
+  --ev-bg: #14080c; --ev-bg-deep: #0a0406;
+  --ev-short: "🎃  Halloween";
 }
+html.event-halloween .logo--with-img .subtitle::after { content: "à Halloween"; }
 
 html.event-christmas {
-  --color-bg: #07140c;
-  --color-bg-deep: #030a06;
-  --color-primary: #e11d48;
-  --color-primary-hot: #f43f5e;
-  --color-secondary: #15803d;
-  --color-secondary-soft: #4ade80;
-  --color-secondary-deep: #14532d;
-  --shadow-primary: 0 8px 32px rgba(225, 29, 72, 0.32);
-  --shadow-secondary: 0 8px 28px rgba(21, 128, 61, 0.35);
+  --ev-label: "🎄  Fêtes de fin d'année";
+  --ev-a: #e11d48; --ev-hot: #f43f5e; --ev-b: #15803d; --ev-soft: #4ade80; --ev-deep: #14532d;
+  --ev-bg: #07140c; --ev-bg-deep: #030a06;
+  --ev-short: "🎄  Noël";
 }
+html.event-christmas .logo--with-img .subtitle::after { content: "pendant les Fêtes de Fin d'Année"; }
 
 html.event-nye {
-  --color-bg: #12100a;
-  --color-bg-deep: #080704;
-  /* Doré soutenu : le texte des boutons reste blanc (≥ contraste du rose d'origine). */
-  --color-primary: #b8860b;
-  --color-primary-hot: #c4921a;
-  --color-secondary: #8b5cf6;
-  --color-secondary-soft: #ddd6fe;
-  --color-secondary-deep: #6d28d9;
-  --shadow-primary: 0 8px 32px rgba(245, 215, 110, 0.28);
-  --shadow-secondary: 0 8px 28px rgba(139, 92, 246, 0.32);
+  --ev-label: "🥂  Nouvel An";
+  --ev-a: #b8860b; --ev-hot: #d4a017; --ev-b: #8b5cf6; --ev-soft: #ddd6fe; --ev-deep: #6d28d9;
+  --ev-bg: #12100a; --ev-bg-deep: #080704;
+  --ev-short: "🥂  Nouvel An";
 }
+html.event-nye .logo--with-img .subtitle::after { content: "au Nouvel An"; }
 
 html.event-stpatrick {
-  --color-bg: #07140c;
-  --color-bg-deep: #030a06;
-  --color-primary: #22c55e;
-  --color-primary-hot: #86efac;
-  --color-secondary: #ca8a04;
-  --color-secondary-soft: #fde047;
-  --color-secondary-deep: #166534;
-  --shadow-primary: 0 8px 32px rgba(34, 197, 94, 0.32);
-  --shadow-secondary: 0 8px 28px rgba(202, 138, 4, 0.28);
+  --ev-label: "☘️  St Patrick";
+  --ev-a: #16a34a; --ev-hot: #22c55e; --ev-b: #ca8a04; --ev-soft: #fde047; --ev-deep: #166534;
+  --ev-bg: #07140c; --ev-bg-deep: #030a06;
+  --ev-short: "☘️  St Patrick";
 }
+html.event-stpatrick .logo--with-img .subtitle::after { content: "à la St Patrick"; }
 
 html.event-aprilfools {
-  --color-bg: #0f0d1e;
-  --color-bg-deep: #070612;
-  --color-primary: #6366f1;
-  --color-primary-hot: #818cf8;
-  --color-secondary: #ff3cac;
-  --color-secondary-soft: #ff6b6b;
-  --color-secondary-deep: #db2777;
-  --shadow-primary: 0 8px 32px rgba(99, 102, 241, 0.38);
-  --shadow-secondary: 0 8px 28px rgba(255, 60, 172, 0.32);
+  --ev-label: "🃏  1er avril";
+  --ev-a: #6366f1; --ev-hot: #818cf8; --ev-b: #ff3cac; --ev-soft: #ff6b6b; --ev-deep: #db2777;
+  --ev-bg: #0f0d1e; --ev-bg-deep: #070612;
+  --ev-short: "🃏  1er avril";
 }
+html.event-aprilfools .logo--with-img .subtitle::after { content: "le 1er avril"; }
 
 html.event-music {
-  --color-bg: #0c0618;
-  --color-bg-deep: #05030c;
-  --color-primary: #ff3cac;
-  --color-primary-hot: #22d3ee;
-  --color-secondary: #38bdf8;
-  --color-secondary-soft: #67e8f9;
-  --color-secondary-deep: #0e7490;
-  --shadow-primary: 0 8px 32px rgba(255, 60, 172, 0.38);
-  --shadow-secondary: 0 8px 28px rgba(34, 211, 238, 0.32);
+  --ev-label: "🎶  Fête de la musique";
+  --ev-a: #ff3cac; --ev-hot: #22d3ee; --ev-b: #38bdf8; --ev-soft: #67e8f9; --ev-deep: #0e7490;
+  --ev-bg: #0c0618; --ev-bg-deep: #05030c;
+  --ev-short: "🎶  Musique";
 }
+html.event-music .logo--with-img .subtitle::after { content: "à la Fête de la musique"; }
 
 html.event-bastille {
-  --color-bg: #070b16;
-  --color-bg-deep: #04060e;
-  --color-primary: #e10600;
-  --color-primary-hot: #ff2b2b;
-  --color-secondary: #0055a4;
-  --color-secondary-soft: #f8fafc;
-  --color-secondary-deep: #002654;
-  --shadow-primary: 0 8px 32px rgba(225, 6, 0, 0.38);
-  --shadow-secondary: 0 8px 28px rgba(248, 250, 252, 0.18);
+  --ev-label: "🇫🇷  14 juillet";
+  --ev-a: #e10600; --ev-hot: #ff2b2b; --ev-b: #0055a4; --ev-soft: #f8fafc; --ev-deep: #002654;
+  --ev-bg: #070b16; --ev-bg-deep: #04060e;
+  --ev-short: "🇫🇷  14 juillet";
 }
-
-html.event-bastille .welcome .cta-btn {
-  background: linear-gradient(135deg, #0055a4 0%, #f8fafc 46%, #e10600 100%);
-  color: #0a1020;
-  box-shadow: 0 0 32px rgba(225, 6, 0, 0.35);
-}
-
-html.event-bastille .page::before {
-  content: "";
-  position: absolute;
-  width: min(160px, 42vw);
-  height: min(160px, 42vw);
-  border-radius: 50%;
-  filter: blur(42px);
-  background: #f8fafc;
-  opacity: 0.16;
-  top: 8%;
-  left: 50%;
-  transform: translateX(-50%);
-  pointer-events: none;
-  z-index: 0;
-}
+html.event-bastille .logo--with-img .subtitle::after { content: "le 14 juillet"; }
 
 html.event-rentree {
-  --color-bg: #12100c;
-  --color-bg-deep: #0a0806;
-  --color-primary: #f59e0b;
-  --color-primary-hot: #fbbf24;
-  --color-secondary: #64748b;
-  --color-secondary-soft: #94a3b8;
-  --color-secondary-deep: #334155;
-  --shadow-primary: 0 8px 32px rgba(245, 158, 11, 0.32);
-  --shadow-secondary: 0 8px 28px rgba(100, 116, 139, 0.28);
+  --ev-label: "🍁  Rentrée";
+  --ev-a: #d97706; --ev-hot: #f59e0b; --ev-b: #64748b; --ev-soft: #94a3b8; --ev-deep: #334155;
+  --ev-bg: #12100c; --ev-bg-deep: #0a0806;
+  --ev-short: "🍁  Rentrée";
+}
+html.event-rentree .logo--with-img .subtitle::after { content: "à la rentrée"; }
+
+/* Tokens : remplacent ceux de la DA d'origine, sur le périmètre seulement. */
+html[class*="event-"]:has(body:is([data-screen="welcome"],[data-screen="home"],[data-screen="game-select"],[data-screen="results"],[data-screen="leaderboard"],[data-screen="settings"],[data-screen="lobby"],[data-screen="friends"],[data-screen="carnet"],[data-screen="tiernight-select"],[data-screen="guesslie-menu"],[data-screen="guesslie-setup"],[data-screen="guesslie-wait"],[data-screen$="-prep"])) {
+  --color-bg: var(--ev-bg);
+  --color-bg-deep: var(--ev-bg-deep);
+  --color-primary: var(--ev-a);
+  --color-primary-hot: var(--ev-hot);
+  --color-secondary: var(--ev-b);
+  --color-secondary-soft: var(--ev-soft);
+  --color-secondary-deep: var(--ev-deep);
+  --color-ink: var(--ev-deep);
+  --focus-ring: var(--ev-soft);
+  /* --shadow-primary reste celui de la DA (ombre courte + liseré). */
+  --shadow-secondary: 0 6px 16px -6px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.22);
 }
 
-html.event-halloween .bottom-nav {
-  background: linear-gradient(180deg, rgba(20, 8, 12, 0) 0%, rgba(20, 8, 12, 0.97) 24%, #14080c 100%);
-  border-top-color: rgba(255, 107, 26, 0.22);
-}
+/* Cadres (récap, cartes cadrées) et vignettes des jeux : dégradé de l'événement.
+   Une vignette sur deux inverse le sens pour garder du rythme. */
+html[class*="event-"]:has(body:is([data-screen="welcome"],[data-screen="home"],[data-screen="game-select"],[data-screen="results"],[data-screen="leaderboard"],[data-screen="settings"],[data-screen="lobby"],[data-screen="friends"],[data-screen="carnet"],[data-screen="tiernight-select"],[data-screen="guesslie-menu"],[data-screen="guesslie-setup"],[data-screen="guesslie-wait"],[data-screen$="-prep"])) .frame,
+html[class*="event-"]:has(body:is([data-screen="welcome"],[data-screen="home"],[data-screen="game-select"],[data-screen="results"],[data-screen="leaderboard"],[data-screen="settings"],[data-screen="lobby"],[data-screen="friends"],[data-screen="carnet"],[data-screen="tiernight-select"],[data-screen="guesslie-menu"],[data-screen="guesslie-setup"],[data-screen="guesslie-wait"],[data-screen$="-prep"])) .game-tile__logo-wrap { --g1: var(--ev-a); --g2: var(--ev-b); }
+html[class*="event-"]:has(body:is([data-screen="welcome"],[data-screen="home"],[data-screen="game-select"],[data-screen="results"],[data-screen="leaderboard"],[data-screen="settings"],[data-screen="lobby"],[data-screen="friends"],[data-screen="carnet"],[data-screen="tiernight-select"],[data-screen="guesslie-menu"],[data-screen="guesslie-setup"],[data-screen="guesslie-wait"],[data-screen$="-prep"])) .game-tile-cell:nth-child(even) .game-tile__logo-wrap { --g1: var(--ev-b); --g2: var(--ev-a); }
 
-html.event-halloween .welcome .cta-btn {
-  box-shadow: 0 0 32px rgba(255, 107, 26, 0.45);
-  animation-name: event-halloween-cta-pulse;
+/* Pastille d'événement en tête d'écran (hors accueil : le sous-titre le dit déjà). */
+html[class*="event-"]:has(body:is([data-screen="welcome"],[data-screen="home"],[data-screen="game-select"],[data-screen="results"],[data-screen="leaderboard"],[data-screen="settings"],[data-screen="lobby"],[data-screen="friends"],[data-screen="carnet"],[data-screen="tiernight-select"],[data-screen="guesslie-menu"],[data-screen="guesslie-setup"],[data-screen="guesslie-wait"],[data-screen$="-prep"])) .container::before {
+  content: var(--ev-label);
+  display: block;
+  width: fit-content;
+  margin: 0 auto 14px;
+  padding: 7px 16px 6px;
+  border-radius: var(--r-pill);
+  font-family: var(--font-display);
+  font-size: 15px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: #fff;
+  background:
+    linear-gradient(var(--ev-bg), var(--ev-bg)) padding-box,
+    linear-gradient(135deg, var(--ev-a), var(--ev-b)) border-box;
+  border: 1.5px solid transparent;
+  box-shadow: 0 6px 16px -8px rgba(0, 0, 0, .6);
 }
+body[data-screen="welcome"] .container::before { display: none; }
 
-@keyframes event-halloween-cta-pulse {
-  0%, 100% { box-shadow: 0 0 28px rgba(255, 107, 26, 0.4); }
-  50% { box-shadow: 0 0 44px rgba(255, 107, 26, 0.7); }
-}
 
-html.event-halloween .page::after {
-  content: "";
+/* Écrans de préparation : le cadre (dégradé --g1/--g2) passe à l'événement ;
+   seul le logo du jeu garde ses couleurs. */
+html[class*="event-"]:has(body:is([data-screen="welcome"],[data-screen="home"],[data-screen="game-select"],[data-screen="results"],[data-screen="leaderboard"],[data-screen="settings"],[data-screen="lobby"],[data-screen="friends"],[data-screen="carnet"],[data-screen="tiernight-select"],[data-screen="guesslie-menu"],[data-screen="guesslie-setup"],[data-screen="guesslie-wait"],[data-screen$="-prep"])) body { --g1: var(--ev-a); --g2: var(--ev-b); }
+html[class*="event-"]:has(body:is([data-screen$="-prep"],[data-screen="tiernight-select"],[data-screen="guesslie-menu"],[data-screen="guesslie-setup"],[data-screen="guesslie-wait"])) .container::before {
+  content: var(--ev-short);
   position: absolute;
-  width: min(190px, 48vw);
-  height: min(190px, 48vw);
-  border-radius: 50%;
-  filter: blur(48px);
-  background: #ff6b1a;
-  opacity: 0.22;
-  top: 38%;
-  right: -88px;
-  pointer-events: none;
-  z-index: 0;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  margin: 0;
+  padding: 6px 14px 5px;
+  font-size: 14px;
+  z-index: 3;
 }
 
-html.event-christmas .page::after,
-html.event-nye .page::after,
-html.event-stpatrick .page::after,
-html.event-aprilfools .page::after,
-html.event-music .page::after,
-html.event-bastille .page::after,
-html.event-rentree .page::after {
-  content: "";
-  position: absolute;
-  width: min(190px, 48vw);
-  height: min(190px, 48vw);
-  border-radius: 50%;
-  filter: blur(48px);
-  opacity: 0.22;
-  top: 38%;
-  right: -88px;
-  pointer-events: none;
-  z-index: 0;
+/* Écrans de préparation : pas de décor en haut, il masquerait le logo du jeu. */
+html[class*="event-"]:has(body:is([data-screen$="-prep"],[data-screen="tiernight-select"],[data-screen="guesslie-menu"],[data-screen="guesslie-setup"],[data-screen="guesslie-wait"])) #event-layer .event-float--1,
+html[class*="event-"]:has(body:is([data-screen$="-prep"],[data-screen="tiernight-select"],[data-screen="guesslie-menu"],[data-screen="guesslie-setup"],[data-screen="guesslie-wait"])) #event-layer .event-float--2 { display: none; }
+
+/* Accueil : baseline plus lisible, bouton plein (ombre DA, sans pulsation). */
+html[class*="event-"]:has(body:is([data-screen="welcome"],[data-screen="home"],[data-screen="game-select"],[data-screen="results"],[data-screen="leaderboard"],[data-screen="settings"],[data-screen="lobby"],[data-screen="friends"],[data-screen="carnet"],[data-screen="tiernight-select"],[data-screen="guesslie-menu"],[data-screen="guesslie-setup"],[data-screen="guesslie-wait"],[data-screen$="-prep"])) .welcome .cta-btn {
+  background: linear-gradient(135deg, var(--ev-hot), var(--ev-a) 45%, var(--ev-b));
+  box-shadow: var(--shadow-primary);
+  animation: none;
+}
+html[class*="event-"]:has(body:is([data-screen="welcome"],[data-screen="home"],[data-screen="game-select"],[data-screen="results"],[data-screen="leaderboard"],[data-screen="settings"],[data-screen="lobby"],[data-screen="friends"],[data-screen="carnet"],[data-screen="tiernight-select"],[data-screen="guesslie-menu"],[data-screen="guesslie-setup"],[data-screen="guesslie-wait"],[data-screen$="-prep"])) .logo--with-img .subtitle::after {
+  display: block;
+  margin-top: 6px;
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 400;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--ev-hot);
 }
 
-html.event-christmas .page::after { background: #e11d48; }
-html.event-nye .page::after { background: #f5d76e; }
-html.event-stpatrick .page::after { background: #22c55e; }
-html.event-aprilfools .page::after { background: #6366f1; }
-html.event-music .page::after { background: #22d3ee; }
-html.event-bastille .page::after { background: #0055a4; }
-html.event-rentree .page::after { background: #f59e0b; }
+/* Pastilles « étapes » : bordure et ombre de l'événement. */
+html[class*="event-"]:has(body:is([data-screen="welcome"],[data-screen="home"],[data-screen="game-select"],[data-screen="results"],[data-screen="leaderboard"],[data-screen="settings"],[data-screen="lobby"],[data-screen="friends"],[data-screen="carnet"],[data-screen="tiernight-select"],[data-screen="guesslie-menu"],[data-screen="guesslie-setup"],[data-screen="guesslie-wait"],[data-screen$="-prep"])) .welcome .step-pill { border: 1px solid color-mix(in srgb, var(--ev-a) 45%, transparent); }
 
-html.event-halloween .logo--with-img .subtitle::after,
-html.event-christmas .logo--with-img .subtitle::after,
-html.event-nye .logo--with-img .subtitle::after,
-html.event-stpatrick .logo--with-img .subtitle::after,
-html.event-aprilfools .logo--with-img .subtitle::after,
-html.event-music .logo--with-img .subtitle::after,
-html.event-bastille .logo--with-img .subtitle::after,
-html.event-rentree .logo--with-img .subtitle::after {
-  color: var(--color-primary);
-  font-weight: 600;
+/* Titres, libellés et chiffres clés aux couleurs de l'événement. */
+html[class*="event-"]:has(body:is([data-screen="welcome"],[data-screen="home"],[data-screen="game-select"],[data-screen="results"],[data-screen="leaderboard"],[data-screen="settings"],[data-screen="lobby"],[data-screen="friends"],[data-screen="carnet"],[data-screen="tiernight-select"],[data-screen="guesslie-menu"],[data-screen="guesslie-setup"],[data-screen="guesslie-wait"],[data-screen$="-prep"])) .label-upper--gold { color: var(--ev-hot); }
+html[class*="event-"]:has(body:is([data-screen="welcome"],[data-screen="home"],[data-screen="game-select"],[data-screen="results"],[data-screen="leaderboard"],[data-screen="settings"],[data-screen="lobby"],[data-screen="friends"],[data-screen="carnet"],[data-screen="tiernight-select"],[data-screen="guesslie-menu"],[data-screen="guesslie-setup"],[data-screen="guesslie-wait"],[data-screen$="-prep"])) .game-grid__label { color: var(--ev-hot); }
+html[class*="event-"]:has(body:is([data-screen="welcome"],[data-screen="home"],[data-screen="game-select"],[data-screen="results"],[data-screen="leaderboard"],[data-screen="settings"],[data-screen="lobby"],[data-screen="friends"],[data-screen="carnet"],[data-screen="tiernight-select"],[data-screen="guesslie-menu"],[data-screen="guesslie-setup"],[data-screen="guesslie-wait"],[data-screen$="-prep"])) .screen-title { color: #fff; text-shadow: 0 2px 0 color-mix(in srgb, var(--ev-a) 55%, transparent); }
+html[class*="event-"]:has(body:is([data-screen="welcome"],[data-screen="home"],[data-screen="game-select"],[data-screen="results"],[data-screen="leaderboard"],[data-screen="settings"],[data-screen="lobby"],[data-screen="friends"],[data-screen="carnet"],[data-screen="tiernight-select"],[data-screen="guesslie-menu"],[data-screen="guesslie-setup"],[data-screen="guesslie-wait"],[data-screen$="-prep"])) .podium__col--first .podium__bar { border-color: var(--ev-hot); background: linear-gradient(180deg, var(--ev-hot), var(--ev-a)); }
+html[class*="event-"]:has(body:is([data-screen="welcome"],[data-screen="home"],[data-screen="game-select"],[data-screen="results"],[data-screen="leaderboard"],[data-screen="settings"],[data-screen="lobby"],[data-screen="friends"],[data-screen="carnet"],[data-screen="tiernight-select"],[data-screen="guesslie-menu"],[data-screen="guesslie-setup"],[data-screen="guesslie-wait"],[data-screen$="-prep"])) .podium__col--first .podium__rank,
+html[class*="event-"]:has(body:is([data-screen="welcome"],[data-screen="home"],[data-screen="game-select"],[data-screen="results"],[data-screen="leaderboard"],[data-screen="settings"],[data-screen="lobby"],[data-screen="friends"],[data-screen="carnet"],[data-screen="tiernight-select"],[data-screen="guesslie-menu"],[data-screen="guesslie-setup"],[data-screen="guesslie-wait"],[data-screen$="-prep"])) .podium__col--first .podium__score { color: var(--ev-bg-deep); }
+html[class*="event-"]:has(body:is([data-screen="welcome"],[data-screen="home"],[data-screen="game-select"],[data-screen="results"],[data-screen="leaderboard"],[data-screen="settings"],[data-screen="lobby"],[data-screen="friends"],[data-screen="carnet"],[data-screen="tiernight-select"],[data-screen="guesslie-menu"],[data-screen="guesslie-setup"],[data-screen="guesslie-wait"],[data-screen$="-prep"])) .rank--gold,
+html[class*="event-"]:has(body:is([data-screen="welcome"],[data-screen="home"],[data-screen="game-select"],[data-screen="results"],[data-screen="leaderboard"],[data-screen="settings"],[data-screen="lobby"],[data-screen="friends"],[data-screen="carnet"],[data-screen="tiernight-select"],[data-screen="guesslie-menu"],[data-screen="guesslie-setup"],[data-screen="guesslie-wait"],[data-screen$="-prep"])) .player-score--gold { color: var(--ev-hot); }
+html[class*="event-"]:has(body:is([data-screen="welcome"],[data-screen="home"],[data-screen="game-select"],[data-screen="results"],[data-screen="leaderboard"],[data-screen="settings"],[data-screen="lobby"],[data-screen="friends"],[data-screen="carnet"],[data-screen="tiernight-select"],[data-screen="guesslie-menu"],[data-screen="guesslie-setup"],[data-screen="guesslie-wait"],[data-screen$="-prep"])) .evening-recap__chip { background: color-mix(in srgb, var(--ev-a) 22%, transparent); }
+html[class*="event-"]:has(body:is([data-screen="welcome"],[data-screen="home"],[data-screen="game-select"],[data-screen="results"],[data-screen="leaderboard"],[data-screen="settings"],[data-screen="lobby"],[data-screen="friends"],[data-screen="carnet"],[data-screen="tiernight-select"],[data-screen="guesslie-menu"],[data-screen="guesslie-setup"],[data-screen="guesslie-wait"],[data-screen$="-prep"])) .card { border-color: color-mix(in srgb, var(--ev-a) 32%, transparent); }
+html[class*="event-"]:has(body:is([data-screen="welcome"],[data-screen="home"],[data-screen="game-select"],[data-screen="results"],[data-screen="leaderboard"],[data-screen="settings"],[data-screen="lobby"],[data-screen="friends"],[data-screen="carnet"],[data-screen="tiernight-select"],[data-screen="guesslie-menu"],[data-screen="guesslie-setup"],[data-screen="guesslie-wait"],[data-screen$="-prep"])) .frame > .card { border: 0; }
+
+/* Menu bas : fond et liseré de l'événement, onglet actif teinté. */
+html[class*="event-"]:has(body:is([data-screen="welcome"],[data-screen="home"],[data-screen="game-select"],[data-screen="results"],[data-screen="leaderboard"],[data-screen="settings"],[data-screen="lobby"],[data-screen="friends"],[data-screen="carnet"],[data-screen="tiernight-select"],[data-screen="guesslie-menu"],[data-screen="guesslie-setup"],[data-screen="guesslie-wait"],[data-screen$="-prep"])) .bottom-nav {
+  background: linear-gradient(180deg, transparent 0%, color-mix(in srgb, var(--ev-bg) 97%, transparent) 24%, var(--ev-bg) 100%);
+  border-top: 2px solid var(--ev-a);
 }
+html[class*="event-"]:has(body:is([data-screen="welcome"],[data-screen="home"],[data-screen="game-select"],[data-screen="results"],[data-screen="leaderboard"],[data-screen="settings"],[data-screen="lobby"],[data-screen="friends"],[data-screen="carnet"],[data-screen="tiernight-select"],[data-screen="guesslie-menu"],[data-screen="guesslie-setup"],[data-screen="guesslie-wait"],[data-screen$="-prep"])) .bottom-nav__item--active .bottom-nav__icon-wrap {
+  background: color-mix(in srgb, var(--ev-a) 30%, transparent);
+  border-color: var(--ev-a);
+}
+html[class*="event-"]:has(body:is([data-screen="welcome"],[data-screen="home"],[data-screen="game-select"],[data-screen="results"],[data-screen="leaderboard"],[data-screen="settings"],[data-screen="lobby"],[data-screen="friends"],[data-screen="carnet"],[data-screen="tiernight-select"],[data-screen="guesslie-menu"],[data-screen="guesslie-setup"],[data-screen="guesslie-wait"],[data-screen$="-prep"])) .bottom-nav__item--active .bottom-nav__label { color: var(--ev-hot); }
 
-html.event-halloween .logo--with-img .subtitle::after { content: " à Halloween"; }
-html.event-christmas .logo--with-img .subtitle::after { content: " pendant les Fêtes de Fin d'Année"; }
-html.event-nye .logo--with-img .subtitle::after { content: " au Nouvel An"; }
-html.event-stpatrick .logo--with-img .subtitle::after { content: " à la St Patrick"; }
-html.event-aprilfools .logo--with-img .subtitle::after { content: " le 1er avril"; }
-html.event-music .logo--with-img .subtitle::after { content: " à la Fête de la musique"; }
-html.event-bastille .logo--with-img .subtitle::after { content: " le 14 juillet"; }
-html.event-rentree .logo--with-img .subtitle::after { content: " à la rentrée"; }
+/* Ambiance : grandes lueurs de l'événement (orbes plus présentes) + vignette. */
+html[class*="event-"]:has(body:is([data-screen="welcome"],[data-screen="home"],[data-screen="game-select"],[data-screen="results"],[data-screen="leaderboard"],[data-screen="settings"],[data-screen="lobby"],[data-screen="friends"],[data-screen="carnet"],[data-screen="tiernight-select"],[data-screen="guesslie-menu"],[data-screen="guesslie-setup"],[data-screen="guesslie-wait"],[data-screen$="-prep"])) .orb { opacity: .62; }
+html[class*="event-"]:has(body:is([data-screen="welcome"],[data-screen="home"],[data-screen="game-select"],[data-screen="results"],[data-screen="leaderboard"],[data-screen="settings"],[data-screen="lobby"],[data-screen="friends"],[data-screen="carnet"],[data-screen="tiernight-select"],[data-screen="guesslie-menu"],[data-screen="guesslie-setup"],[data-screen="guesslie-wait"],[data-screen$="-prep"])) .orb1 { background: var(--ev-a); }
+html[class*="event-"]:has(body:is([data-screen="welcome"],[data-screen="home"],[data-screen="game-select"],[data-screen="results"],[data-screen="leaderboard"],[data-screen="settings"],[data-screen="lobby"],[data-screen="friends"],[data-screen="carnet"],[data-screen="tiernight-select"],[data-screen="guesslie-menu"],[data-screen="guesslie-setup"],[data-screen="guesslie-wait"],[data-screen$="-prep"])) .orb2 { background: var(--ev-b); }
 
 #event-layer {
+  display: none;
   position: fixed;
   top: 0;
   bottom: 0;
@@ -210,74 +193,38 @@ html.event-rentree .logo--with-img .subtitle::after { content: " à la rentrée"
   z-index: 4;
   overflow: hidden;
 }
+body:is([data-screen="welcome"],[data-screen="home"],[data-screen="game-select"],[data-screen="results"],[data-screen="leaderboard"],[data-screen="settings"],[data-screen="lobby"],[data-screen="friends"],[data-screen="carnet"],[data-screen="tiernight-select"],[data-screen="guesslie-menu"],[data-screen="guesslie-setup"],[data-screen="guesslie-wait"],[data-screen$="-prep"]) #event-layer { display: block; }
 
 .event-layer__vignette {
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(ellipse 90% 55% at 50% -10%, rgba(255, 107, 26, 0.16), transparent 58%),
-    radial-gradient(ellipse 70% 50% at 110% 110%, rgba(124, 58, 237, 0.22), transparent 55%),
-    radial-gradient(ellipse 50% 40% at -10% 80%, rgba(255, 107, 26, 0.1), transparent 60%);
+    radial-gradient(ellipse 100% 48% at 50% -8%, color-mix(in srgb, var(--ev-a) 42%, transparent), transparent 62%),
+    radial-gradient(ellipse 80% 50% at 108% 108%, color-mix(in srgb, var(--ev-b) 46%, transparent), transparent 58%),
+    radial-gradient(ellipse 60% 42% at -12% 78%, color-mix(in srgb, var(--ev-a) 26%, transparent), transparent 62%);
 }
-
-html.event-christmas .event-layer__vignette {
-  background:
-    radial-gradient(ellipse 90% 55% at 50% -10%, rgba(225, 29, 72, 0.14), transparent 58%),
-    radial-gradient(ellipse 70% 50% at 110% 110%, rgba(21, 128, 61, 0.22), transparent 55%);
-}
-
-html.event-nye .event-layer__vignette {
-  background:
-    radial-gradient(ellipse 90% 55% at 50% -10%, rgba(245, 215, 110, 0.16), transparent 58%),
-    radial-gradient(ellipse 70% 50% at 110% 110%, rgba(167, 139, 250, 0.2), transparent 55%);
-}
-
-html.event-stpatrick .event-layer__vignette {
-  background:
-    radial-gradient(ellipse 90% 55% at 50% -10%, rgba(34, 197, 94, 0.16), transparent 58%),
-    radial-gradient(ellipse 70% 50% at 110% 110%, rgba(202, 138, 4, 0.16), transparent 55%);
-}
-
-html.event-aprilfools .event-layer__vignette {
-  background:
-    radial-gradient(ellipse 90% 55% at 50% -10%, rgba(99, 102, 241, 0.18), transparent 58%),
-    radial-gradient(ellipse 70% 50% at 110% 110%, rgba(255, 60, 172, 0.2), transparent 55%);
-}
-
-html.event-music .event-layer__vignette {
-  background:
-    radial-gradient(ellipse 90% 55% at 50% -10%, rgba(255, 60, 172, 0.18), transparent 58%),
-    radial-gradient(ellipse 70% 50% at 110% 110%, rgba(34, 211, 238, 0.2), transparent 55%);
-}
-
 html.event-bastille .event-layer__vignette {
   background:
-    radial-gradient(ellipse 80% 50% at 50% -8%, rgba(248, 250, 252, 0.22), transparent 55%),
-    radial-gradient(ellipse 60% 45% at 0% 100%, rgba(225, 6, 0, 0.22), transparent 55%),
-    radial-gradient(ellipse 60% 45% at 100% 100%, rgba(0, 85, 164, 0.28), transparent 55%);
+    radial-gradient(ellipse 85% 46% at 50% -8%, rgba(248,250,252,.30), transparent 58%),
+    radial-gradient(ellipse 65% 48% at 0% 100%, rgba(225,6,0,.38), transparent 58%),
+    radial-gradient(ellipse 65% 48% at 100% 100%, rgba(0,85,164,.46), transparent 58%);
 }
 
-html.event-rentree .event-layer__vignette {
-  background:
-    radial-gradient(ellipse 90% 55% at 50% -10%, rgba(245, 158, 11, 0.16), transparent 58%),
-    radial-gradient(ellipse 70% 50% at 110% 110%, rgba(100, 116, 139, 0.18), transparent 55%);
-}
-
+/* Décor : plus gros, plus présent, calé sur les bords (moitié hors écran)
+   pour ne pas couvrir le contenu. */
 .event-float {
   position: absolute;
-  font-size: 22px;
   line-height: 1;
-  opacity: 0.55;
-  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.45));
+  opacity: .78;
+  filter: drop-shadow(0 3px 6px rgba(0, 0, 0, .5));
   animation: event-float-drift 9s ease-in-out infinite;
 }
-
-.event-float--1 { top: 7%; left: 6%; font-size: 20px; animation-duration: 8s; }
-.event-float--2 { top: 11%; right: 8%; font-size: 26px; animation-duration: 11s; animation-delay: -2s; }
-.event-float--3 { top: 28%; left: 4%; font-size: 14px; opacity: 0.4; animation-duration: 7s; animation-delay: -1s; }
-.event-float--4 { bottom: 22%; right: 7%; font-size: 18px; animation-duration: 10s; animation-delay: -4s; }
-.event-float--5 { bottom: 18%; left: 8%; font-size: 18px; animation-duration: 12s; animation-delay: -3s; }
-.event-float--6 { top: 42%; right: 5%; font-size: 13px; opacity: 0.38; animation-duration: 8.5s; animation-delay: -5s; }
+.event-float--1 { top: 6%;  left: -10px;  font-size: 44px; animation-duration: 8s; }
+.event-float--2 { top: 12%; right: -12px; font-size: 52px; animation-duration: 11s; animation-delay: -2s; }
+.event-float--3 { top: 38%; left: -14px;  font-size: 34px; opacity: .6; animation-duration: 7s; animation-delay: -1s; }
+.event-float--4 { bottom: 24%; right: -10px; font-size: 40px; animation-duration: 10s; animation-delay: -4s; }
+.event-float--5 { bottom: 15%; left: -12px; font-size: 46px; animation-duration: 12s; animation-delay: -3s; }
+.event-float--6 { top: 58%; right: -8px; font-size: 30px; opacity: .55; animation-duration: 8.5s; animation-delay: -5s; }
 
 @keyframes event-float-drift {
   0%, 100% { transform: translate(0, 0) rotate(-6deg); }
@@ -285,11 +232,11 @@ html.event-rentree .event-layer__vignette {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .event-float {
-    animation: none;
-    opacity: 0.28;
-  }
-  html.event-halloween .welcome .cta-btn {
-    animation: none;
-  }
+  .event-float { animation: none; opacity: .5; }
+}
+
+/* 14 juillet : bouton tricolore (texte sombre pour le contraste). */
+html.event-bastille:has(body[data-screen="welcome"]) .welcome .cta-btn {
+  background: linear-gradient(135deg, #0055a4 0%, #f8fafc 46%, #e10600 100%);
+  color: #0a1020;
 }
